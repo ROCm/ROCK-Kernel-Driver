@@ -672,7 +672,7 @@ prom_instantiate_rtas(void)
 	prom_rtas = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/rtas"));
 	if (prom_rtas != (ihandle) -1) {
 		unsigned long x;
-		x = call_prom(RELOC("getprop"), 
+		x = call_prom(RELOC("getprop"),
 				  4, 1, prom_rtas,
 				  RELOC("ibm,hypertas-functions"), 
 				  hypertas_funcs, 
@@ -1548,6 +1548,7 @@ static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end
 
 	*mem_start = ALIGN(*mem_start, align);
 	if (*mem_start + needed > *mem_end) {
+#ifdef CONFIG_BLK_DEV_INITRD
 		/* FIXME: Apple OF doesn't map unclaimed mem.  If this
 		 * ever happened on G5, we'd need to fix. */
 		unsigned long initrd_len;
@@ -1563,6 +1564,9 @@ static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end
 			initrd_len);
 		RELOC(initrd_start) = *mem_end;
 		RELOC(initrd_end) = RELOC(initrd_start) + initrd_len;
+#else
+		prom_panic(RELOC("No memory for copy_device_tree"));
+#endif
 	}
 
 	ret = (void *)*mem_start;
@@ -1589,7 +1593,7 @@ inspect_node(phandle node, struct device_node *dad,
 
 	np = make_room(mem_start, mem_end, struct device_node);
 	memset(np, 0, sizeof(*np));
-	
+
 	np->node = node;
 	**allnextpp = PTRUNRELOC(np);
 	*allnextpp = &np->allnext;
@@ -1699,11 +1703,14 @@ copy_device_tree(unsigned long mem_start)
 	phandle root;
 	struct device_node **allnextp;
 	unsigned long offset = reloc_offset();
-	unsigned long mem_end = RELOC(initrd_start);
+	unsigned long mem_end;
 
 	/* We pass mem_end-mem_start to OF: keep it well under 32-bit */
-	if (!mem_end)
-		mem_end = mem_start + 1024*1024*1024;
+	mem_end = mem_start + 1024*1024*1024;
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (RELOC(initrd_start) && RELOC(initrd_start) > mem_start)
+		mem_end = RELOC(initrd_start);
+#endif /* CONFIG_BLK_DEV_INITRD */
 
 	root = call_prom(RELOC("peer"), 1, 1, (phandle)0);
 	if (root == (phandle)0) {
@@ -1878,7 +1885,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		copy_and_flush(0, KERNELBASE - offset, 0x100, 0);
 
 	/* Start storing things at klimit */
-      	mem = RELOC(klimit) - offset; 
+      	mem = RELOC(klimit) - offset;
 
 	/* Get the full OF pathname of the stdout device */
 	p = (char *) mem;
@@ -1932,7 +1939,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	RELOC(cmd_line[0]) = 0;
 	if ((long)_prom->chosen > 0) {
-		call_prom(RELOC("getprop"), 4, 1, _prom->chosen, 
+		call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
 			  RELOC("bootargs"), p, sizeof(cmd_line));
 		if (p != NULL && p[0] != 0)
 			strlcpy(RELOC(cmd_line), p, sizeof(cmd_line));
@@ -1948,12 +1955,12 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	if (_systemcfg->platform != PLATFORM_POWERMAC)
 		prom_instantiate_rtas();
-        
+
         /* Initialize some system info into the Naca early... */
         prom_initialize_naca();
 
 	smt_setup();
-	
+
         /* If we are on an SMP machine, then we *MUST* do the
          * following, regardless of whether we have an SMP
          * kernel or not.
@@ -1964,12 +1971,14 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
   	prom_print(RELOC("after basic inits, mem=0x"));
   	prom_print_hex(mem);
   	prom_print_nl();
+#ifdef CONFIG_BLK_DEV_INITRD
 	prom_print(RELOC("initrd_start=0x"));
 	prom_print_hex(RELOC(initrd_start));
 	prom_print_nl();
 	prom_print(RELOC("initrd_end=0x"));
 	prom_print_hex(RELOC(initrd_end));
 	prom_print_nl();
+#endif /* CONFIG_BLK_DEV_INITRD */
 	prom_print(RELOC("copying OF device tree...\n"));
 #endif /* DEBUG_PROM */
 	mem = copy_device_tree(mem);
