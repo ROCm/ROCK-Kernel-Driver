@@ -148,24 +148,19 @@ static snd_timer_t *snd_timer_find(snd_timer_id_t *tid)
 
 static void snd_timer_request(snd_timer_id_t *tid)
 {
-	char str[32];
-	
 	switch (tid->dev_class) {
 	case SNDRV_TIMER_CLASS_GLOBAL:
-		if (tid->device >= timer_limit)
-			return;
-		sprintf(str, "snd-timer-%i", tid->device);
+		if (tid->device < timer_limit)
+			request_module("snd-timer-%i", tid->device);
 		break;
 	case SNDRV_TIMER_CLASS_CARD:
 	case SNDRV_TIMER_CLASS_PCM:
-		if (tid->card >= snd_ecards_limit)
-			return;
-		sprintf(str, "snd-card-%i", tid->card);
+		if (tid->card < snd_ecards_limit)
+			request_module("snd-card-%i", tid->card);
 		break;
 	default:
-		return;
+		break;
 	}
-	request_module(str);
 }
 
 #endif
