@@ -452,7 +452,11 @@ static int snd_emu10k1_capture_prepare(snd_pcm_substream_t * substream)
 		snd_emu10k1_ptr_write(emu, ADCCR, 0, 0);
 		break;
 	case CAPTURE_EFX:
-		snd_emu10k1_ptr_write(emu, FXWC, 0, 0);
+		if (emu->audigy) {
+			snd_emu10k1_ptr_write(emu, A_FXWC1, 0, 0);
+			snd_emu10k1_ptr_write(emu, A_FXWC2, 0, 0);
+		} else
+			snd_emu10k1_ptr_write(emu, FXWC, 0, 0);
 		break;
 	default:
 		break;
@@ -618,7 +622,11 @@ static int snd_emu10k1_capture_trigger(snd_pcm_substream_t * substream,
 			snd_emu10k1_ptr_write(emu, ADCCR, 0, epcm->capture_cr_val);
 			break;
 		case CAPTURE_EFX:
-			snd_emu10k1_ptr_write(emu, FXWC, 0, epcm->capture_cr_val);
+			if (emu->audigy) {
+				snd_emu10k1_ptr_write(emu, A_FXWC1, 0, epcm->capture_cr_val);
+				snd_emu10k1_ptr_write(emu, A_FXWC2, 0, epcm->capture_cr_val2);
+			} else
+				snd_emu10k1_ptr_write(emu, FXWC, 0, epcm->capture_cr_val);
 			break;
 		default:	
 			break;
@@ -637,7 +645,11 @@ static int snd_emu10k1_capture_trigger(snd_pcm_substream_t * substream,
 			snd_emu10k1_ptr_write(emu, ADCCR, 0, 0);
 			break;
 		case CAPTURE_EFX:
-			snd_emu10k1_ptr_write(emu, FXWC, 0, 0);
+			if (emu->audigy) {
+				snd_emu10k1_ptr_write(emu, A_FXWC1, 0, 0);
+				snd_emu10k1_ptr_write(emu, A_FXWC2, 0, 0);
+			} else
+				snd_emu10k1_ptr_write(emu, FXWC, 0, 0);
 			break;
 		default:
 			break;
