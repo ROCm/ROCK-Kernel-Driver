@@ -916,7 +916,8 @@ static void resched_task(task_t *p)
 {
 	int need_resched, nrpolling;
 
-	preempt_disable();
+	BUG_ON(!spin_is_locked(&task_rq(p)->lock));
+
 	/* minimise the chance of sending an interrupt to poll_idle() */
 	nrpolling = test_tsk_thread_flag(p,TIF_POLLING_NRFLAG);
 	need_resched = test_and_set_tsk_thread_flag(p,TIF_NEED_RESCHED);
@@ -924,7 +925,6 @@ static void resched_task(task_t *p)
 
 	if (!need_resched && !nrpolling && (task_cpu(p) != smp_processor_id()))
 		smp_send_reschedule(task_cpu(p));
-	preempt_enable();
 }
 #else
 static inline void resched_task(task_t *p)
@@ -2336,17 +2336,20 @@ static inline void idle_balance(int cpu, runqueue_t *rq)
 
 static inline int wake_priority_sleeper(runqueue_t *rq)
 {
+	int ret = 0;
 #ifdef CONFIG_SCHED_SMT
+	spin_lock(&rq->lock);
 	/*
 	 * If an SMT sibling task has been put to sleep for priority
 	 * reasons reschedule the idle task to see if it can now run.
 	 */
 	if (rq->nr_running) {
 		resched_task(rq->idle);
-		return 1;
+		ret = 1;
 	}
+	spin_unlock(&rq->lock);
 #endif
-	return 0;
+	return ret;
 }
 
 DEFINE_PER_CPU(struct kernel_stat, kstat);
@@ -2492,23 +2495,34 @@ out:
 }
 
 #ifdef CONFIG_SCHED_SMT
-static inline void wake_sleeping_dependent(int cpu, runqueue_t *rq)
+static inline void wake_sleeping_dependent(int this_cpu, runqueue_t *this_rq)
 {
-	int i;
-	struct sched_domain *sd = rq->sd;
+	struct sched_domain *sd = this_rq->sd;
 	cpumask_t sibling_map;
+	int i;
 
 	if (!(sd->flags & SD_SHARE_CPUPOWER))
 		return;
 
+	/*
+	 * Unlock the current runqueue because we have to lock in
+	 * CPU order to avoid deadlocks. Caller knows that we might
+	 * unlock. We keep IRQs disabled.
+	 */
+	spin_unlock(&this_rq->lock);
+
 	cpus_and(sibling_map, sd->span, cpu_online_map);
+
+	for_each_cpu_mask(i, sibling_map)
+		spin_lock(&cpu_rq(i)->lock);
+	/*
+	 * We clear this CPU from the mask. This both simplifies the
+	 * inner loop and keps this_rq locked when we exit:
+	 */
+	cpu_clear(this_cpu, sibling_map);
+
 	for_each_cpu_mask(i, sibling_map) {
-		runqueue_t *smt_rq;
-
-		if (i == cpu)
-			continue;
-
-		smt_rq = cpu_rq(i);
+		runqueue_t *smt_rq = cpu_rq(i);
 
 		/*
 		 * If an SMT sibling task is sleeping due to priority
@@ -2517,27 +2531,53 @@ static inline void wake_sleeping_dependent(int cpu, runqueue_t *rq)
 		if (smt_rq->curr == smt_rq->idle && smt_rq->nr_running)
 			resched_task(smt_rq->idle);
 	}
+
+	for_each_cpu_mask(i, sibling_map)
+		spin_unlock(&cpu_rq(i)->lock);
+	/*
+	 * We exit with this_cpu's rq still held and IRQs
+	 * still disabled:
+	 */
 }
 
-static inline int dependent_sleeper(int cpu, runqueue_t *rq, task_t *p)
+static inline int dependent_sleeper(int this_cpu, runqueue_t *this_rq)
 {
-	struct sched_domain *sd = rq->sd;
+	struct sched_domain *sd = this_rq->sd;
 	cpumask_t sibling_map;
+	prio_array_t *array;
 	int ret = 0, i;
+	task_t *p;
 
 	if (!(sd->flags & SD_SHARE_CPUPOWER))
 		return 0;
 
+	/*
+	 * The same locking rules and details apply as for
+	 * wake_sleeping_dependent():
+	 */
+	spin_unlock(&this_rq->lock);
 	cpus_and(sibling_map, sd->span, cpu_online_map);
+	for_each_cpu_mask(i, sibling_map)
+		spin_lock(&cpu_rq(i)->lock);
+	cpu_clear(this_cpu, sibling_map);
+
+	/*
+	 * Establish next task to be run - it might have gone away because
+	 * we released the runqueue lock above:
+	 */
+	if (!this_rq->nr_running)
+		goto out_unlock;
+	array = this_rq->active;
+	if (!array->nr_active)
+		array = this_rq->expired;
+	BUG_ON(!array->nr_active);
+
+	p = list_entry(array->queue[sched_find_first_bit(array->bitmap)].next,
+		task_t, run_list);
+
 	for_each_cpu_mask(i, sibling_map) {
-		runqueue_t *smt_rq;
-		task_t *smt_curr;
-
-		if (i == cpu)
-			continue;
-
-		smt_rq = cpu_rq(i);
-		smt_curr = smt_rq->curr;
+		runqueue_t *smt_rq = cpu_rq(i);
+		task_t *smt_curr = smt_rq->curr;
 
 		/*
 		 * If a user task with lower static priority than the
@@ -2563,14 +2603,17 @@ static inline int dependent_sleeper(int cpu, runqueue_t *rq, task_t *p)
 			(smt_curr == smt_rq->idle && smt_rq->nr_running))
 				resched_task(smt_curr);
 	}
+out_unlock:
+	for_each_cpu_mask(i, sibling_map)
+		spin_unlock(&cpu_rq(i)->lock);
 	return ret;
 }
 #else
-static inline void wake_sleeping_dependent(int cpu, runqueue_t *rq)
+static inline void wake_sleeping_dependent(int this_cpu, runqueue_t *this_rq)
 {
 }
 
-static inline int dependent_sleeper(int cpu, runqueue_t *rq, task_t *p)
+static inline int dependent_sleeper(int this_cpu, runqueue_t *this_rq)
 {
 	return 0;
 }
@@ -2650,13 +2693,33 @@ need_resched:
 
 	cpu = smp_processor_id();
 	if (unlikely(!rq->nr_running)) {
+go_idle:
 		idle_balance(cpu, rq);
 		if (!rq->nr_running) {
 			next = rq->idle;
 			rq->expired_timestamp = 0;
 			wake_sleeping_dependent(cpu, rq);
+			/*
+			 * wake_sleeping_dependent() might have released
+			 * the runqueue, so break out if we got new
+			 * tasks meanwhile:
+			 */
+			if (!rq->nr_running)
+				goto switch_tasks;
+		}
+	} else {
+		if (dependent_sleeper(cpu, rq)) {
+			schedstat_inc(rq, sched_goidle);
+			next = rq->idle;
 			goto switch_tasks;
 		}
+		/*
+		 * dependent_sleeper() releases and reacquires the runqueue
+		 * lock, hence go into the idle loop if the rq went
+		 * empty meanwhile:
+		 */
+		if (unlikely(!rq->nr_running))
+			goto go_idle;
 	}
 
 	array = rq->active;
@@ -2676,12 +2739,6 @@ need_resched:
 	idx = sched_find_first_bit(array->bitmap);
 	queue = array->queue + idx;
 	next = list_entry(queue->next, task_t, run_list);
-
-	if (dependent_sleeper(cpu, rq, next)) {
-		schedstat_inc(rq, sched_goidle);
-		next = rq->idle;
-		goto switch_tasks;
-	}
 
 	if (!rt_task(next) && next->activated > 0) {
 		unsigned long long delta = now - next->timestamp;
