@@ -61,6 +61,7 @@ rpcauth_unregister(struct rpc_authops *ops)
 struct rpc_auth *
 rpcauth_create(rpc_authflavor_t pseudoflavor, struct rpc_clnt *clnt)
 {
+	struct rpc_auth		*auth;
 	struct rpc_authops	*ops;
 	u32			flavor = pseudoflavor_to_flavor(pseudoflavor);
 
@@ -68,13 +69,21 @@ rpcauth_create(rpc_authflavor_t pseudoflavor, struct rpc_clnt *clnt)
 		return NULL;
 	if (!try_module_get(ops->owner))
 		return NULL;
-	clnt->cl_auth = ops->create(clnt, pseudoflavor);
-	return clnt->cl_auth;
+	auth = ops->create(clnt, pseudoflavor);
+	if (!auth)
+		return NULL;
+	atomic_set(&auth->au_count, 1);
+	if (clnt->cl_auth)
+		rpcauth_destroy(clnt->cl_auth);
+	clnt->cl_auth = auth;
+	return auth;
 }
 
 void
 rpcauth_destroy(struct rpc_auth *auth)
 {
+	if (!atomic_dec_and_test(&auth->au_count))
+		return;
 	auth->au_ops->destroy(auth);
 	module_put(auth->au_ops->owner);
 	kfree(auth);

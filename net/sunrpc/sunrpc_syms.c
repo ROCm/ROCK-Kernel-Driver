@@ -41,6 +41,7 @@ EXPORT_SYMBOL(rpc_release_task);
 
 /* RPC client functions */
 EXPORT_SYMBOL(rpc_create_client);
+EXPORT_SYMBOL(rpc_clone_client);
 EXPORT_SYMBOL(rpc_destroy_client);
 EXPORT_SYMBOL(rpc_shutdown_client);
 EXPORT_SYMBOL(rpc_release_client);
@@ -66,6 +67,7 @@ EXPORT_SYMBOL(xprt_set_timeout);
 /* Client credential cache */
 EXPORT_SYMBOL(rpcauth_register);
 EXPORT_SYMBOL(rpcauth_unregister);
+EXPORT_SYMBOL(rpcauth_create);
 EXPORT_SYMBOL(rpcauth_lookupcred);
 EXPORT_SYMBOL(rpcauth_lookup_credcache);
 EXPORT_SYMBOL(rpcauth_free_credcache);

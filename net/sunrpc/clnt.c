@@ -102,6 +102,7 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 {
 	struct rpc_version	*version;
 	struct rpc_clnt		*clnt = NULL;
+	int len;
 
 	dprintk("RPC: creating %s client for %s (xprt %p)\n",
 		program->name, servname, xprt);
@@ -116,23 +117,37 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 		goto out_no_clnt;
 	memset(clnt, 0, sizeof(*clnt));
 	atomic_set(&clnt->cl_users, 0);
+	atomic_set(&clnt->cl_count, 1);
+	clnt->cl_parent = clnt;
+
+	clnt->cl_server = clnt->cl_inline_name;
+	len = strlen(servname) + 1;
+	if (len > sizeof(clnt->cl_inline_name)) {
+		char *buf = kmalloc(len, GFP_KERNEL);
+		if (buf != 0)
+			clnt->cl_server = buf;
+		else
+			len = sizeof(clnt->cl_inline_name);
+	}
+	strlcpy(clnt->cl_server, servname, len);
 
 	clnt->cl_xprt     = xprt;
 	clnt->cl_procinfo = version->procs;
 	clnt->cl_maxproc  = version->nrprocs;
-	clnt->cl_server   = servname;
 	clnt->cl_protname = program->name;
+	clnt->cl_pmap	  = &clnt->cl_pmap_default;
 	clnt->cl_port     = xprt->addr.sin_port;
 	clnt->cl_prog     = program->number;
 	clnt->cl_vers     = version->number;
 	clnt->cl_prot     = xprt->prot;
 	clnt->cl_stats    = program->stats;
-	INIT_RPC_WAITQ(&clnt->cl_bindwait, "bindwait");
+	INIT_RPC_WAITQ(&clnt->cl_pmap_default.pm_bindwait, "bindwait");
 
 	if (!clnt->cl_port)
 		clnt->cl_autobind = 1;
 
-	rpc_init_rtt(&clnt->cl_rtt, xprt->timeout.to_initval);
+	clnt->cl_rtt = &clnt->cl_rtt_default;
+	rpc_init_rtt(&clnt->cl_rtt_default, xprt->timeout.to_initval);
 
 	if (rpc_setup_pipedir(clnt, program->pipe_dir_name) < 0)
 		goto out_no_path;
@@ -157,8 +172,36 @@ out_no_clnt:
 out_no_auth:
 	rpc_rmdir(clnt->cl_pathname);
 out_no_path:
+	if (clnt->cl_server != clnt->cl_inline_name)
+		kfree(clnt->cl_server);
 	kfree(clnt);
 	clnt = NULL;
+	goto out;
+}
+
+/*
+ * This function clones the RPC client structure. It allows us to share the
+ * same transport while varying parameters such as the authentication
+ * flavour.
+ */
+struct rpc_clnt *
+rpc_clone_client(struct rpc_clnt *clnt)
+{
+	struct rpc_clnt *new;
+
+	new = (struct rpc_clnt *)kmalloc(sizeof(*new), GFP_KERNEL);
+	if (!new)
+		goto out_no_clnt;
+	memcpy(new, clnt, sizeof(*new));
+	atomic_set(&new->cl_count, 1);
+	atomic_set(&new->cl_users, 0);
+	atomic_inc(&new->cl_parent->cl_count);
+	if (new->cl_auth)
+		atomic_inc(&new->cl_auth->au_count);
+out:
+	return new;
+out_no_clnt:
+	printk(KERN_INFO "RPC: out of memory in %s\n", __FUNCTION__);
 	goto out;
 }
 
@@ -201,12 +244,19 @@ rpc_shutdown_client(struct rpc_clnt *clnt)
 int
 rpc_destroy_client(struct rpc_clnt *clnt)
 {
+	if (!atomic_dec_and_test(&clnt->cl_count))
+		return 1;
+	BUG_ON(atomic_read(&clnt->cl_users) != 0);
+
 	dprintk("RPC: destroying %s client for %s\n",
 			clnt->cl_protname, clnt->cl_server);
-
 	if (clnt->cl_auth) {
 		rpcauth_destroy(clnt->cl_auth);
 		clnt->cl_auth = NULL;
+	}
+	if (clnt->cl_parent != clnt) {
+		rpc_destroy_client(clnt->cl_parent);
+		goto out_free;
 	}
 	if (clnt->cl_pathname[0])
 		rpc_rmdir(clnt->cl_pathname);
@@ -214,6 +264,9 @@ rpc_destroy_client(struct rpc_clnt *clnt)
 		xprt_destroy(clnt->cl_xprt);
 		clnt->cl_xprt = NULL;
 	}
+	if (clnt->cl_server != clnt->cl_inline_name)
+		kfree(clnt->cl_server);
+out_free:
 	kfree(clnt);
 	return 0;
 }

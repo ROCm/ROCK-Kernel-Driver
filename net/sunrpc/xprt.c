@@ -584,9 +584,9 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 		__xprt_put_cong(xprt, req);
 		if (timer) {
 			if (req->rq_ntrans == 1)
-				rpc_update_rtt(&clnt->cl_rtt, timer,
+				rpc_update_rtt(clnt->cl_rtt, timer,
 						(long)jiffies - req->rq_xtime);
-			rpc_set_timeo(&clnt->cl_rtt, timer, req->rq_ntrans - 1);
+			rpc_set_timeo(clnt->cl_rtt, timer, req->rq_ntrans - 1);
 		}
 	}
 
@@ -1224,8 +1224,8 @@ xprt_transmit(struct rpc_task *task)
 	spin_lock_bh(&xprt->sock_lock);
 	if (!xprt->nocong) {
 		int timer = task->tk_msg.rpc_proc->p_timer;
-		task->tk_timeout = rpc_calc_rto(&clnt->cl_rtt, timer);
-		task->tk_timeout <<= rpc_ntimeo(&clnt->cl_rtt, timer);
+		task->tk_timeout = rpc_calc_rto(clnt->cl_rtt, timer);
+		task->tk_timeout <<= rpc_ntimeo(clnt->cl_rtt, timer);
 		task->tk_timeout <<= clnt->cl_timeout.to_retries
 			- req->rq_timeout.to_retries;
 		if (task->tk_timeout > req->rq_timeout.to_maxval)

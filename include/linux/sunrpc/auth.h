@@ -73,6 +73,7 @@ struct rpc_auth {
 						 * differ from the flavor in
 						 * au_ops->au_flavor in gss
 						 * case) */
+	atomic_t		au_count;	/* Reference counter */
 
 	/* per-flavor data */
 };
