@@ -613,15 +613,14 @@ static void udsl_process_receive (unsigned long data)
 static void udsl_fire_receivers (struct udsl_instance_data *instance)
 {
 	struct list_head receivers, *pos, *n;
-	unsigned long flags;
 
 	INIT_LIST_HEAD (&receivers);
 
 	down (&instance->serialize);
 
-	spin_lock_irqsave (&instance->spare_receivers_lock, flags);
+	spin_lock_irq (&instance->spare_receivers_lock);
 	list_splice_init (&instance->spare_receivers, &receivers);
-	spin_unlock_irqrestore (&instance->spare_receivers_lock, flags);
+	spin_unlock_irq (&instance->spare_receivers_lock);
 
 	list_for_each_safe (pos, n, &receivers) {
 		struct udsl_receiver *rcv = list_entry (pos, struct udsl_receiver, list);
@@ -638,9 +637,9 @@ static void udsl_fire_receivers (struct udsl_instance_data *instance)
 
 		if (usb_submit_urb (rcv->urb, GFP_KERNEL) < 0) {
 			dbg ("udsl_fire_receivers: submit failed!");
-			spin_lock_irqsave (&instance->spare_receivers_lock, flags);
+			spin_lock_irq (&instance->spare_receivers_lock);
 			list_move (pos, &instance->spare_receivers);
-			spin_unlock_irqrestore (&instance->spare_receivers_lock, flags);
+			spin_unlock_irq (&instance->spare_receivers_lock);
 		}
 	}
 
@@ -782,11 +781,10 @@ made_progress:
 
 static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vcc *vcc)
 {
-	unsigned long flags;
 	struct sk_buff *skb, *n;
 
 	dbg ("udsl_cancel_send entered");
-	spin_lock_irqsave (&instance->sndqueue.lock, flags);
+	spin_lock_irq (&instance->sndqueue.lock);
 	for (skb = instance->sndqueue.next, n = skb->next; skb != (struct sk_buff *)&instance->sndqueue; skb = n, n = skb->next)
 		if (UDSL_SKB (skb)->atm_data.vcc == vcc) {
 			dbg ("popping skb 0x%p", skb);
@@ -796,7 +794,7 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 			else
 				kfree_skb (skb);
 		}
-	spin_unlock_irqrestore (&instance->sndqueue.lock, flags);
+	spin_unlock_irq (&instance->sndqueue.lock);
 
 	tasklet_disable (&instance->send_tasklet);
 	if ((skb = instance->current_skb) && (UDSL_SKB (skb)->atm_data.vcc == vcc)) {
@@ -1252,7 +1250,6 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 {
 	struct udsl_instance_data *instance = usb_get_intfdata (intf);
 	struct list_head *pos;
-	unsigned long flags;
 	unsigned int count = 0;
 	int result, i;
 
@@ -1288,11 +1285,11 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	do {
 		unsigned int completed = 0;
 
-		spin_lock_irqsave (&instance->completed_receivers_lock, flags);
+		spin_lock_irq (&instance->completed_receivers_lock);
 		list_for_each (pos, &instance->completed_receivers)
 			if (++completed > count)
 				panic (__FILE__ ": memory corruption detected at line %d!\n", __LINE__);
-		spin_unlock_irqrestore (&instance->completed_receivers_lock, flags);
+		spin_unlock_irq (&instance->completed_receivers_lock);
 
 		dbg ("udsl_usb_disconnect: found %u completed receivers", completed);
 
@@ -1328,11 +1325,11 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	/* wait for completion handlers to finish */
 	do {
 		count = 0;
-		spin_lock_irqsave (&instance->send_lock, flags);
+		spin_lock_irq (&instance->send_lock);
 		list_for_each (pos, &instance->spare_senders)
 			if (++count > UDSL_NUM_SND_URBS)
 				panic (__FILE__ ": memory corruption detected at line %d!\n", __LINE__);
-		spin_unlock_irqrestore (&instance->send_lock, flags);
+		spin_unlock_irq (&instance->send_lock);
 
 		dbg ("udsl_usb_disconnect: found %u spare senders", count);
 
