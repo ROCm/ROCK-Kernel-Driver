@@ -1320,13 +1320,13 @@ char *tab_vflags[] = {
 	"INVALID0x40000",	/*    0x40000 */
 	"INVALID0x80000",	/*    0x80000 */
 	"VROOT",		/*   0x100000 */
-	"VNOSWAP",		/*   0x200000 */
-	"VISSWAP",		/*   0x400000 */
-	"VREPLICABLE",		/*   0x800000 */
-	"VNOTREPLICABLE",	/*  0x1000000 */
-	"VDOCMP",		/*  0x2000000 */
+	"INVALID0x200000",	/*   0x200000 */
+	"INVALID00x400000",	/*   0x400000 */
+	"INVALID0x800000",	/*   0x800000 */
+	"INVALID0x1000000",	/*  0x1000000 */
+	"INVALID0x2000000",	/*  0x2000000 */
 	"VSHARE",		/*  0x4000000 */
-	"VFRLOCKS",		/*  0x8000000 */
+	"INVALID0x8000000",     /*  0x8000000 */
 	"VENF_LOCKING",		/* 0x10000000 */
 	"VOPLOCK",		/* 0x20000000 */
 	"VPURGE",		/* 0x40000000 */
@@ -1373,9 +1373,10 @@ static void	printvnode(vnode_t *vp)
 
 	kdb_printf("vnode: 0x%p type ", vp);
 	if ((size_t)vp->v_type >= sizeof(vnode_type)/sizeof(vnode_type[0]))
-		kdb_printf("out of range 0x%x\n", vp->v_type);
+		kdb_printf("out of range 0x%x", vp->v_type);
 	else
-		kdb_printf("%s\n", vnode_type[vp->v_type]);
+		kdb_printf("%s", vnode_type[vp->v_type]);
+	kdb_printf(" v_bh %p\n", &vp->v_bh);
 
 	if ((bh = vp->v_bh.bh_first)) {
 		kdb_printf("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p\n",
@@ -1397,6 +1398,9 @@ static void	printvnode(vnode_t *vp)
 #ifdef	CONFIG_XFS_VNODE_TRACING
 	kdb_printf("   v_trace 0x%p\n", vp->v_trace);
 #endif	/* CONFIG_XFS_VNODE_TRACING */
+        
+	kdb_printf("   v_vfsp 0x%p v_number %Lx\n",
+	        vp->v_vfsp, vp->v_number);
 }
 
 
@@ -4808,13 +4812,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 static void
 xfsidbg_xcore(xfs_iocore_t *io)
 {
-	if (IO_IS_XFS(io)) {
-		kdb_printf("io_obj 0x%p (xinode) io_mount 0x%p\n",
-			io->io_obj, io->io_mount);
-	} else {
-		kdb_printf("io_obj 0x%p (dcxvn) io_mount 0x%p\n",
-			io->io_obj, io->io_mount);
-	}
+        kdb_printf("io_obj 0x%p io_flags 0x%x io_mount 0x%p\n",
+			io->io_obj, io->io_flags, io->io_mount);
 	kdb_printf("new_size %Lx\n", io->io_new_size);
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -43,20 +43,20 @@
  * This is used for two variables in XFS, one of which is a debug trace
  * buffer index. They are not accessed via any other atomic operations
  * so this is safe. All other atomic increments and decrements in XFS
- * now use the linux built in functions.
+ * now use the Linux built-in functions.
  */
 
-extern spinlock_t Atomic_spin;
+extern spinlock_t xfs_atomic_spin;
 
 static __inline__ int atomicIncWithWrap(int *ip, int val)
 {
 	unsigned long flags;
 	int ret;
-	spin_lock_irqsave(&Atomic_spin, flags);
+	spin_lock_irqsave(&xfs_atomic_spin, flags);
 	ret = *ip;
 	(*ip)++;
 	if (*ip == val) *ip = 0;
-	spin_unlock_irqrestore(&Atomic_spin, flags);
+	spin_unlock_irqrestore(&xfs_atomic_spin, flags);
 	return ret;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -64,16 +64,6 @@ struct xfs_mount_args {
 	int	sunit;		/* stripe unit (BBs) */
 	int	swidth;		/* stripe width (BBs), multiple of sunit */
 	uchar_t iosizelog;	/* log2 of the preferred I/O size */
-
-	/*  The remainder is for CXFS support.	*/
-	char	**servlist;	/* Table of hosts which may be servers */
-	int	*servlistlen;	/* Table of hostname lengths. */
-	int	slcount;	/* Count of hosts which may be servers. */
-	int	stimeout;	/* Server timeout in milliseconds */
-	int	ctimeout;	/* Client timeout in milliseconds */
-	char	*server;	/* Designated server hostname (for remount). */
-	int	servlen;	/* Length of server hostname (for remount). */
-	int	servcell;	/* Server cell (internal testing only) */
 };
 
 /*
@@ -101,17 +91,6 @@ struct xfs_mount_args {
 #define XFSMNT_IOSIZE		0x00002000	/* optimize for I/O size */
 #define XFSMNT_OSYNCISOSYNC	0x00004000	/* o_sync is REALLY o_sync */
 						/* (osyncisdsync is now default) */
-#define XFSMNT_CLNTONLY		0x00008000	/* cxfs mount as client only */
-#define XFSMNT_UNSHARED		0x00010000	/* cxfs filesystem mounted
-						 * unshared */
-#define XFSMNT_CHGCLNTONLY	0x00020000	/* changing client only flag */
-						/* (for remount only) */
-#define XFSMNT_SERVCELL		0x00040000	/* setting server cell */
-						/* (allowed on remount) */
-#define XFSMNT_MAKESERVER	0x00080000	/* become the server (remount */
-						/* only) */
-#define XFSMNT_NOTSERVER	0x00100000	/* give up being the server */
-						/* (remount only) */
 #define XFSMNT_32BITINODES	0x00200000	/* restrict inodes to 32
 						 * bits of address space */
 #define XFSMNT_GQUOTA		0x00400000	/* group quota accounting */
@@ -120,11 +99,5 @@ struct xfs_mount_args {
 #define XFSMNT_NOUUID		0x01000000	/* Ignore fs uuid */
 #define XFSMNT_DMAPI		0x02000000	/* enable dmapi/xdsm */
 #define XFSMNT_NOLOGFLUSH	0x04000000	/* Don't flush for log blocks */
-
-/* Did we get any args for CXFS to consume? */
-#define XFSARGS_FOR_CXFSARR(ap)		\
-	((ap)->servlist || (ap)->slcount >= 0 || \
-	 (ap)->stimeout >= 0 || (ap)->ctimeout >= 0 || \
-	 (ap)->flags & (XFSMNT_CLNTONLY | XFSMNT_UNSHARED))
 
 #endif	/* __XFS_CLNT_H__ */

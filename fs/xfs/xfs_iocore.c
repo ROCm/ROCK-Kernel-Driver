@@ -77,11 +77,9 @@ xfs_iocore_inode_reinit(
 {
 	xfs_iocore_t	*io = &ip->i_iocore;
 
-	io->io_flags = XFS_IOCORE_ISXFS;
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+	io->io_flags = 0;
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
 		io->io_flags |= XFS_IOCORE_RT;
-	}
-
 	io->io_dmevmask = ip->i_d.di_dmevmask;
 	io->io_dmstate = ip->i_d.di_dmstate;
 }

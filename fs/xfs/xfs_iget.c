@@ -609,11 +609,8 @@ xfs_ireclaim(xfs_inode_t *ip)
 
 /*
  * This routine removes an about-to-be-destroyed inode from
- * all of the lists in which it is lcoated with the exception
- * of the behavior chain.  It is used by xfs_ireclaim and
- * by cxfs relocation cocde, in which case, we are removing
- * the xfs_inode but leaving the vnode alone since it has
- * been transformed into a client vnode.
+ * all of the lists in which it is located with the exception
+ * of the behavior chain. 
  */
 void
 xfs_iextract(

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -40,7 +40,7 @@
 /*
  * System memory size - used to scale certain data structures in XFS.
  */
-unsigned long	xfs_physmem;
+unsigned long xfs_physmem;
 
 /*
  * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
@@ -51,7 +51,7 @@ xfs_param_t xfs_params = { 0, 1, 0, 0, 0, 3 };
 /*
  * Used to serialize atomicIncWithWrap.
  */
-spinlock_t Atomic_spin = SPIN_LOCK_UNLOCKED;
+spinlock_t xfs_atomic_spin = SPIN_LOCK_UNLOCKED;
 
 /*
  * Global system credential structure.
