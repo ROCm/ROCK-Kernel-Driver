@@ -422,6 +422,8 @@ struct thread_struct {
 	unsigned int		saved_fs, saved_gs;
 /* IO permissions */
 	unsigned long	*io_bitmap_ptr;
+/* max allowed port in the bitmap, in bytes: */
+	unsigned int	io_bitmap_max;
 };
 
 #define INIT_THREAD  {							\
@@ -442,7 +444,7 @@ struct thread_struct {
 	.esp1		= sizeof(init_tss[0]) + (long)&init_tss[0],	\
 	.ss1		= __KERNEL_CS,					\
 	.ldt		= GDT_ENTRY_LDT,				\
-	.io_bitmap_base	= INVALID_IO_BITMAP_OFFSET,			\
+	.io_bitmap_base	= offsetof(struct tss_struct,io_bitmap),	\
 	.io_bitmap	= { [ 0 ... IO_BITMAP_LONGS] = ~0 },		\
 }
 

@@ -56,6 +56,7 @@ static void set_bitmap(unsigned long *bitmap, unsigned int base, unsigned int ex
  */
 asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
+	unsigned int i, max_long, bytes, bytes_updated;
 	struct thread_struct * t = &current->thread;
 	struct tss_struct * tss;
 	unsigned long *bitmap;
@@ -81,16 +82,34 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 
 	/*
 	 * do it in the per-thread copy and in the TSS ...
+	 *
+	 * Disable preemption via get_cpu() - we must not switch away
+	 * because the ->io_bitmap_max value must match the bitmap
+	 * contents:
 	 */
-	set_bitmap(t->io_bitmap_ptr, from, num, !turn_on);
 	tss = init_tss + get_cpu();
-	if (tss->io_bitmap_base == IO_BITMAP_OFFSET) { /* already active? */
-		set_bitmap(tss->io_bitmap, from, num, !turn_on);
-	} else {
-		memcpy(tss->io_bitmap, t->io_bitmap_ptr, IO_BITMAP_BYTES);
-		tss->io_bitmap_base = IO_BITMAP_OFFSET; /* Activate it in the TSS */
-	}
+
+	set_bitmap(t->io_bitmap_ptr, from, num, !turn_on);
+
+	/*
+	 * Search for a (possibly new) maximum. This is simple and stupid,
+	 * to keep it obviously correct:
+	 */
+	max_long = 0;
+	for (i = 0; i < IO_BITMAP_LONGS; i++)
+		if (t->io_bitmap_ptr[i] != ~0UL)
+			max_long = i;
+
+	bytes = (max_long + 1) * sizeof(long);
+	bytes_updated = max(bytes, t->io_bitmap_max);
+
+	t->io_bitmap_max = bytes;
+
+	/* Update the TSS: */
+	memcpy(tss->io_bitmap, t->io_bitmap_ptr, bytes_updated);
+
 	put_cpu();
+
 	return 0;
 }
 

@@ -294,14 +294,20 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 void exit_thread(void)
 {
 	struct task_struct *tsk = current;
+	struct thread_struct *t = &tsk->thread;
 
 	/* The process may have allocated an io port bitmap... nuke it. */
-	if (unlikely(NULL != tsk->thread.io_bitmap_ptr)) {
+	if (unlikely(NULL != t->io_bitmap_ptr)) {
 		int cpu = get_cpu();
 		struct tss_struct *tss = init_tss + cpu;
-		kfree(tsk->thread.io_bitmap_ptr);
-		tsk->thread.io_bitmap_ptr = NULL;
-		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+
+		kfree(t->io_bitmap_ptr);
+		t->io_bitmap_ptr = NULL;
+		/*
+		 * Careful, clear this in the TSS too:
+		 */
+		memset(tss->io_bitmap, 0xff, t->io_bitmap_max);
+		t->io_bitmap_max = 0;
 		put_cpu();
 	}
 }
@@ -369,8 +375,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	tsk = current;
 	if (unlikely(NULL != tsk->thread.io_bitmap_ptr)) {
 		p->thread.io_bitmap_ptr = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
-		if (!p->thread.io_bitmap_ptr)
+		if (!p->thread.io_bitmap_ptr) {
+			p->thread.io_bitmap_max = 0;
 			return -ENOMEM;
+		}
 		memcpy(p->thread.io_bitmap_ptr, tsk->thread.io_bitmap_ptr,
 			IO_BITMAP_BYTES);
 	}
@@ -401,8 +409,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 
 	err = 0;
  out:
-	if (err && p->thread.io_bitmap_ptr)
+	if (err && p->thread.io_bitmap_ptr) {
 		kfree(p->thread.io_bitmap_ptr);
+		p->thread.io_bitmap_max = 0;
+	}
 	return err;
 }
 
@@ -552,26 +562,18 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	}
 
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
-		if (next->io_bitmap_ptr) {
+		if (next->io_bitmap_ptr)
 			/*
-			 * 4 cachelines copy ... not good, but not that
-			 * bad either. Anyone got something better?
-			 * This only affects processes which use ioperm().
-			 * [Putting the TSSs into 4k-tlb mapped regions
-			 * and playing VM tricks to switch the IO bitmap
-			 * is not really acceptable.]
+			 * Copy the relevant range of the IO bitmap.
+			 * Normally this is 128 bytes or less:
 			 */
 			memcpy(tss->io_bitmap, next->io_bitmap_ptr,
-				IO_BITMAP_BYTES);
-			tss->io_bitmap_base = IO_BITMAP_OFFSET;
-		} else
+				max(prev->io_bitmap_max, next->io_bitmap_max));
+		else
 			/*
-			 * a bitmap offset pointing outside of the TSS limit
-			 * causes a nicely controllable SIGSEGV if a process
-			 * tries to use a port IO instruction. The first
-			 * sys_ioperm() call sets up the bitmap properly.
+			 * Clear any possible leftover bits:
 			 */
-			tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+			memset(tss->io_bitmap, 0xff, prev->io_bitmap_max);
 	}
 	return prev_p;
 }
