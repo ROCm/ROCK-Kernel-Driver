@@ -242,9 +242,10 @@ extern int pfm_unregister_buffer_fmt(pfm_uuid_t uuid);
 /*
  * perfmon interface exported to modules
  */
-extern long pfm_mod_fast_read_pmds(struct task_struct *, unsigned long mask[4], unsigned long *addr, struct pt_regs *regs);
-extern long pfm_mod_read_pmds(struct task_struct *, pfarg_reg_t *req, unsigned int nreq, struct pt_regs *regs);
-extern long pfm_mod_write_pmcs(struct task_struct *, pfarg_reg_t *req, unsigned int nreq, struct pt_regs *regs);
+extern int pfm_mod_read_pmds(struct task_struct *, void *req, unsigned int nreq, struct pt_regs *regs);
+extern int pfm_mod_write_pmcs(struct task_struct *, void *req, unsigned int nreq, struct pt_regs *regs);
+extern int pfm_mod_write_ibrs(struct task_struct *task, void *req, unsigned int nreq, struct pt_regs *regs);
+extern int pfm_mod_write_dbrs(struct task_struct *task, void *req, unsigned int nreq, struct pt_regs *regs);
 
 /*
  * describe the content of the local_cpu_date->pfm_syst_info field
