@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.43.2.6 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.43.2.7 $"
 
 #include "zfcp_ext.h"
 
@@ -4788,6 +4788,7 @@ zfcp_fsf_req_create(struct zfcp_adapter *adapter, u32 fsf_cmd, int req_flags,
 
 	if (!atomic_test_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status)) {
 		write_unlock_irqrestore(&req_queue->queue_lock, *lock_flags);
+		ret = -EIO;
 		goto failed_sbals;
 	}
 
