@@ -567,7 +567,7 @@ int module_param_sysfs_setup(struct module *mod,
 {
 	struct param_kobject *pk;
 
-	pk = param_sysfs_setup(mod->mkobj, kparam, num_params, 0);
+	pk = param_sysfs_setup(&mod->mkobj, kparam, num_params, 0);
 	if (IS_ERR(pk))
 		return PTR_ERR(pk);
 
@@ -610,8 +610,10 @@ static void __init kernel_param_sysfs_setup(const char *name,
 	kobject_register(&mk->kobj);
 
 	/* no need to keep the kobject if no parameter is exported */
-	if (!param_sysfs_setup(mk, kparam, num_params, name_skip))
+	if (!param_sysfs_setup(mk, kparam, num_params, name_skip)) {
 		kobject_unregister(&mk->kobj);
+		kfree(mk);
+	}
 }
 
 /*
@@ -710,14 +712,8 @@ static struct sysfs_ops module_sysfs_ops = {
 };
 #endif
 
-static void module_kobj_release(struct kobject *kobj)
-{
-	kfree(container_of(kobj, struct module_kobject, kobj));
-}
-
 static struct kobj_type module_ktype = {
 	.sysfs_ops =	&module_sysfs_ops,
-	.release =	&module_kobj_release,
 };
 
 decl_subsys(module, &module_ktype, NULL);

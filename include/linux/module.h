@@ -250,7 +250,7 @@ struct module
 	char name[MODULE_NAME_LEN];
 
 	/* Sysfs stuff. */
-	struct module_kobject *mkobj;
+	struct module_kobject mkobj;
 	struct param_kobject *params_kobject;
 
 	/* Exported symbols */
