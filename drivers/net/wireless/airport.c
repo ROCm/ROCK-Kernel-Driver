@@ -1,4 +1,4 @@
-/* airport.c 0.13
+/* airport.c 0.13a
  *
  * A driver for "Hermes" chipset based Apple Airport wireless
  * card.
@@ -264,7 +264,7 @@ airport_detach(struct net_device *dev)
 	kfree(dev);
 }				/* airport_detach */
 
-static char version[] __initdata = "airport.c 0.13 (Benjamin Herrenschmidt <benh@kernel.crashing.org>)";
+static char version[] __initdata = "airport.c 0.13a (Benjamin Herrenschmidt <benh@kernel.crashing.org>)";
 MODULE_AUTHOR("Benjamin Herrenschmidt <benh@kernel.crashing.org>");
 MODULE_DESCRIPTION("Driver for the Apple Airport wireless card.");
 MODULE_LICENSE("Dual MPL/GPL");

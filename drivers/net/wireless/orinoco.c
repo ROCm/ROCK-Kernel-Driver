@@ -1,4 +1,4 @@
-/* orinoco.c 0.13	- (formerly known as dldwd_cs.c and orinoco_cs.c)
+/* orinoco.c 0.13a	- (formerly known as dldwd_cs.c and orinoco_cs.c)
  *
  * A driver for Hermes or Prism 2 chipset based PCMCIA wireless
  * adaptors, with Lucent/Agere, Intersil or Symbol firmware.
@@ -316,15 +316,21 @@
  *	o No longer ignore the hard_reset argument to
  *	  alloc_orinocodev().  Oops.
  *
- * v0.12c -> v0.13 - 13 Sep 2002 - David Gibson
+ * v0.12c -> v0.13beta1 - 13 Sep 2002 - David Gibson
  *	o Revert the broken 0.12* locking scheme and go to a new yet
  *	  simpler scheme.
  *	o Do firmware resets only in orinoco_init() and when waking
  *	  the card from hard sleep.
  *
- * v0.13 -> v0.13 - 27 Sep 2002 - David Gibson
+ * v0.13beta1 -> v0.13 - 27 Sep 2002 - David Gibson
  *	o Re-introduced full resets (via schedule_task()) on Tx
  *	  timeout.
+ *
+ * v0.13 -> v0.13a - 30 Sep 2002 - David Gibson
+ *	o Minor cleanups to info frame handling.  Add basic support
+ *	  for linkstatus info frames.
+ *	o Include required kernel headers in orinoco.h, to avoid
+ *	  compile problems.
  *
  * TODO
  *	o New wireless extensions API (patch forthcoming from Moustafa
@@ -1425,6 +1431,7 @@ static void __orinoco_ev_info(struct orinoco_private *priv, hermes_t *hw)
 		u16 len;
 		u16 type;
 	} __attribute__ ((packed)) info;
+	int len, type;
 	int err;
 
 	/* This is an answer to an INQUIRE command that we did earlier,
@@ -1442,25 +1449,29 @@ static void __orinoco_ev_info(struct orinoco_private *priv, hermes_t *hw)
 		return;
 	}
 	
-	switch (le16_to_cpu(info.type)) {
+	len = HERMES_RECLEN_TO_BYTES(le16_to_cpu(info.len));
+	type = le16_to_cpu(info.type);
+
+	switch (type) {
 	case HERMES_INQ_TALLIES: {
 		struct hermes_tallies_frame tallies;
 		struct iw_statistics *wstats = &priv->wstats;
-		int len = le16_to_cpu(info.len) - 1;
 		
-		if (len > (sizeof(tallies) / 2)) {
-			DEBUG(1, "%s: tallies frame too long.\n", dev->name);
-			len = sizeof(tallies) / 2;
+		if (len > sizeof(tallies)) {
+			printk(KERN_WARNING "%s: Tallies frame too long (%d bytes)\n",
+			       dev->name, len);
+			len = sizeof(tallies);
 		}
 		
 		/* Read directly the data (no seek) */
-		hermes_read_words(hw, HERMES_DATA1, (void *) &tallies, len);
+		hermes_read_words(hw, HERMES_DATA1, (void *) &tallies,
+				  len / 2); /* FIXME: blech! */
 		
 		/* Increment our various counters */
 		/* wstats->discard.nwid - no wrong BSSID stuff */
 		wstats->discard.code +=
 			le16_to_cpu(tallies.RxWEPUndecryptable);
-		if (len == (sizeof(tallies) / 2))  
+		if (len == sizeof(tallies))  
 			wstats->discard.code +=
 				le16_to_cpu(tallies.RxDiscards_WEPICVError) +
 				le16_to_cpu(tallies.RxDiscards_WEPExcluded);
@@ -1475,9 +1486,54 @@ static void __orinoco_ev_info(struct orinoco_private *priv, hermes_t *hw)
 #endif /* WIRELESS_EXT > 11 */
 	}
 	break;
+	case HERMES_INQ_LINKSTATUS: {
+		struct hermes_linkstatus linkstatus;
+		u16 newstatus;
+		const char *s;
+		
+		if (len != sizeof(linkstatus)) {
+			printk(KERN_WARNING "%s: Unexpected size for linkstatus frame (%d bytes)\n",
+			       dev->name, len);
+			break;
+		}
+
+		hermes_read_words(hw, HERMES_DATA1, (void *) &linkstatus,
+				  len / 2);
+		newstatus = le16_to_cpu(linkstatus.linkstatus);
+
+		switch (newstatus) {
+		case HERMES_LINKSTATUS_NOT_CONNECTED:
+			s = "Not Connected";
+                       break;
+               case HERMES_LINKSTATUS_CONNECTED:
+		       s = "Connected";
+                       break;
+               case HERMES_LINKSTATUS_DISCONNECTED:
+		       s = "Disconnected";
+                       break;
+               case HERMES_LINKSTATUS_AP_CHANGE:
+		       s = "AP Changed";
+                       break;
+               case HERMES_LINKSTATUS_AP_OUT_OF_RANGE:
+		       s = "AP Out of Range";
+                       break;
+               case HERMES_LINKSTATUS_AP_IN_RANGE:
+		       s = "AP In Range";
+                       break;
+               case HERMES_LINKSTATUS_ASSOC_FAILED:
+		       s = "Association Failed";
+		       break;
+		default:
+			s = "UNKNOWN";
+		}
+
+		printk(KERN_INFO "%s: New link status: %s (%04x)\n",
+		       dev->name, s, newstatus);
+	}
+	break;
 	default:
-		DEBUG(1, "%s: Unknown information frame received (type %04x).\n",
-		      priv->ndev->name, le16_to_cpu(info.type));
+		printk(KERN_DEBUG "%s: Unknown information frame received (type %04x).\n",
+		      dev->name, type);
 		/* We don't actually do anything about it */
 		break;
 	}
@@ -4207,7 +4263,7 @@ EXPORT_SYMBOL(orinoco_interrupt);
 
 /* Can't be declared "const" or the whole __initdata section will
  * become const */
-static char version[] __initdata = "orinoco.c 0.13 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = "orinoco.c 0.13a (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 static int __init init_orinoco(void)
 {

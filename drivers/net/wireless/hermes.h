@@ -251,6 +251,18 @@ struct hermes_scan_frame {
 	struct hermes_scan_apinfo aps[35];        /* Scan result */
 } __attribute__ ((packed));
 
+#define HERMES_LINKSTATUS_NOT_CONNECTED   (0x0000)  
+#define HERMES_LINKSTATUS_CONNECTED       (0x0001)
+#define HERMES_LINKSTATUS_DISCONNECTED    (0x0002)
+#define HERMES_LINKSTATUS_AP_CHANGE       (0x0003)
+#define HERMES_LINKSTATUS_AP_OUT_OF_RANGE (0x0004)
+#define HERMES_LINKSTATUS_AP_IN_RANGE     (0x0005)
+#define HERMES_LINKSTATUS_ASSOC_FAILED    (0x0006)
+  
+struct hermes_linkstatus {
+	u16 linkstatus;         /* Link status */
+} __attribute__ ((packed));
+
 // #define HERMES_DEBUG_BUFFER 1
 #define HERMES_DEBUG_BUFSIZE 4096
 struct hermes_debug_entry {
