@@ -477,15 +477,12 @@ struct net_device
  */
 #define SET_NETDEV_DEV(net, pdev)	((net)->class_dev.dev = (pdev))
 
-#define PKT_CAN_SHARE_SKB	((void*)1)
-
-struct packet_type 
-{
+struct packet_type {
 	unsigned short		type;	/* This is really htons(ether_type).	*/
 	struct net_device		*dev;	/* NULL is wildcarded here		*/
 	int			(*func) (struct sk_buff *, struct net_device *,
 					 struct packet_type *);
-	void			*data;	/* Private to the packet type		*/
+	void			*af_packet_priv;
 	struct list_head	list;
 };
 

@@ -1345,7 +1345,6 @@ SOCKOPS_WRAP(x25_proto, AF_X25);
 static struct packet_type x25_packet_type = {
 	.type =	__constant_htons(ETH_P_X25),
 	.func =	x25_lapb_receive_frame,
-	.data = PKT_CAN_SHARE_SKB,
 };
 
 struct notifier_block x25_dev_notifier = {

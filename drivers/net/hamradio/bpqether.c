@@ -105,7 +105,6 @@ static const char *bpq_print_ethaddr(const unsigned char *);
 static struct packet_type bpq_packet_type = {
 	.type	= __constant_htons(ETH_P_BPQ),
 	.func	= bpq_rcv,
-	.data	= PKT_CAN_SHARE_SKB,
 };
 
 static struct notifier_block bpq_dev_notifier = {

@@ -1052,7 +1052,6 @@ drop:
 static struct packet_type econet_packet_type = {
 	.type =		__constant_htons(ETH_P_ECONET),
 	.func =		econet_rcv,
-	.data =		PKT_CAN_SHARE_SKB,
 };
 
 static void econet_hw_initialise(void)

@@ -438,7 +438,6 @@ static int lapbeth_device_event(struct notifier_block *this,
 static struct packet_type lapbeth_packet_type = {
 	.type = __constant_htons(ETH_P_DEC),
 	.func = lapbeth_rcv,
-	.data = PKT_CAN_SHARE_SKB,
 };
 
 static struct notifier_block lapbeth_dev_notifier = {
