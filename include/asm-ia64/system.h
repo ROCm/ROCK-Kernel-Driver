@@ -26,7 +26,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <linux/percpu.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 
