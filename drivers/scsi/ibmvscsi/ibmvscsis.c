@@ -2098,15 +2098,8 @@ static int initialize_crq_queue(struct crq_queue *queue,
 
 	rc = plpar_hcall_norets(H_REG_CRQ, adapter->dma_dev->unit_address,
 				queue->msg_token, PAGE_SIZE);
-
-	/* If we opened successfully, send an init message */
-	if (rc == 0) {
-		plpar_hcall_norets(H_SEND_CRQ, adapter->dma_dev->unit_address,
-				   0xC001000000000000, 0);
-	} else if (rc == 2) {
-		/* Other end is still closed.  This is normal */
-		info("connection registered, other end closed\n");
-	} else {
+	
+	if ((rc != 0) && (rc != 2)) {
 		err("couldn't register crq--rc 0x%x\n", rc);
 		goto reg_crq_failed;
 	}
@@ -2115,6 +2108,15 @@ static int initialize_crq_queue(struct crq_queue *queue,
 	    (adapter->dma_dev->irq, &handle_interrupt, SA_INTERRUPT,
 	     "ibmvscsis", adapter) != 0)
 		goto req_irq_failed;
+
+	rc = h_vio_signal(adapter->dma_dev->unit_address, 1);
+	if (rc != 0) {
+		err("Error %d enabling interrupts!!!\n", rc);
+		goto req_irq_failed;
+	}
+
+	plpar_hcall_norets(H_SEND_CRQ, adapter->dma_dev->unit_address,
+				   0xC001000000000000, 0);
 
 	queue->cur = 0;
 	queue->lock = SPIN_LOCK_UNLOCKED;
@@ -2545,11 +2547,6 @@ static int ibmvscsis_probe(struct vio_dev *dev, const struct vio_device_id *id)
 	if (rc != 0) {
 		kfree(adapter);
 		return rc;
-	}
-
-	rc = h_vio_signal(adapter->dma_dev->unit_address, 1);
-	if (rc != 0) {
-		err("Error %d enabling interrupts!!!\n", rc);
 	}
 
 	ibmvscsis_proc_register_adapter(adapter);

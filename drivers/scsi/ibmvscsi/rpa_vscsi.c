@@ -229,6 +229,40 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 }
 
 /**
+ * reset_crq_queue: - resets a crq after a failure
+ * @queue:	crq_queue to initialize and register
+ * @hostdata:	ibmvscsi_host_data of host
+ *
+ */
+void ibmvscsi_reset_crq_queue(struct crq_queue *queue,
+			      struct ibmvscsi_host_data *hostdata) 
+{
+	int rc;
+	struct vio_dev *vdev = to_vio_dev(hostdata->dev);
+
+	/* Close the CRQ */
+	do {
+		rc = plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
+	} while ((rc == H_Busy) || (H_isLongBusy(rc)));
+	
+	/* Clean out the queue */
+	memset(queue->msgs, 0x00, PAGE_SIZE);
+	queue->cur = 0;
+	
+	/* And re-open it again */
+	rc = plpar_hcall_norets(H_REG_CRQ,
+				vdev->unit_address,
+				queue->msg_token, PAGE_SIZE);
+	if (rc == 2) {
+		/* Adapter is good, but other end is not ready */
+		printk(KERN_WARNING "ibmvscsi: Partner adapter not ready\n");
+	} else if (rc != 0) {
+		printk(KERN_WARNING
+		       "ibmvscsi: couldn't register crq--rc 0x%x\n", rc);
+	}
+}
+
+/**
  * rpa_device_table: Used by vio.c to match devices in the device tree we 
  * support.
  */

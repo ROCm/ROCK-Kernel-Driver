@@ -119,6 +119,18 @@ void ibmvscsi_release_crq_queue(struct crq_queue *queue,
 }
 
 /**
+ * reset_crq_queue: - resets a crq after a failure
+ * @queue:	crq_queue to initialize and register
+ * @hostdata:	ibmvscsi_host_data of host
+ *
+ * no-op for iSeries
+ */
+void ibmvscsi_reset_crq_queue(struct crq_queue *queue,
+			      struct ibmvscsi_host_data *hostdata) 
+{
+}
+
+/**
  * ibmvscsi_send_crq: - Send a CRQ
  * @hostdata:	the adapter
  * @word1:	the first 64 bits of the data

@@ -88,7 +88,7 @@ static int max_requests = 50;
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0");
+MODULE_VERSION("1.1");
 
 module_param_named(max_id, max_id, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_id, "Largest ID value for each channel");
@@ -1013,6 +1013,7 @@ void ibmvscsi_handle_crq(struct VIOSRP_CRQ *crq,
 
 		atomic_set(&hostdata->request_limit, -1);
 		purge_requests(hostdata);
+		ibmvscsi_reset_crq_queue(&hostdata->queue, hostdata);
 		return;
 	case 0x80:		/* real payload */
 		break;
