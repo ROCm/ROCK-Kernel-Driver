@@ -348,7 +348,7 @@
 #define	PVR	SPRN_PVR	/* Processor Version */
 #define	PIR	SPRN_PIR	/* Processor ID */
 #define	PURR	SPRN_PURR	/* Processor Utilization of Resource Register */
-#define	RPA	SPRN_RPA	/* Required Physical Address Register */
+//#define	RPA	SPRN_RPA	/* Required Physical Address Register */
 #define	SDR1	SPRN_SDR1      	/* MMU hash base register */
 #define	SPR0	SPRN_SPRG0	/* Supervisor Private Registers */
 #define	SPR1	SPRN_SPRG1

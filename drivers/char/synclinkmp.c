@@ -361,6 +361,10 @@ typedef struct _synclinkmp_info {
 #define TMCS	0x64
 #define TEPR	0x65
 
+/*
+ *  FIXME: DAR here clashed with asm-ppc/reg.h and asm-sh/.../dma.h
+ */
+#undef DAR
 /* DMA Controller Register macros */
 #define DAR	0x80
 #define DARL	0x80

@@ -683,7 +683,7 @@ Decrementer_Iseries_masked:
 	li	r11,1
 	stb	r11,PACALPPACA+LPPACADECRINT(r13)
 	lwz	r12,PACADEFAULTDECR(r13)
-	mtspr	DEC,r12
+	mtspr	SPRN_DEC,r12
 	/* fall through */
 
 	.globl HardwareInterrupt_Iseries_masked
