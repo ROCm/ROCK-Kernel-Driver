@@ -55,8 +55,8 @@ int i2c_device_remove(struct device *dev)
 	return 0;
 }
 
-static struct device_driver i2c_generic_driver = {
-	.name =	"i2c",
+static struct device_driver i2c_adapter_driver = {
+	.name =	"i2c_adapter",
 	.bus = &i2c_bus_type,
 	.probe = i2c_device_probe,
 	.remove = i2c_device_remove,
@@ -98,7 +98,7 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 	if (adap->dev.parent == NULL)
 		adap->dev.parent = &legacy_bus;
 	sprintf(adap->dev.bus_id, "i2c-%d", adap->nr);
-	adap->dev.driver = &i2c_generic_driver;
+	adap->dev.driver = &i2c_adapter_driver;
 	device_register(&adap->dev);
 
 	/* Add this adapter to the i2c_adapter class */
@@ -462,12 +462,16 @@ static int __init i2c_init(void)
 	retval = bus_register(&i2c_bus_type);
 	if (retval)
 		return retval;
+	retval = driver_register(&i2c_adapter_driver);
+	if (retval)
+		return retval;
 	return class_register(&i2c_adapter_class);
 }
 
 static void __exit i2c_exit(void)
 {
 	class_unregister(&i2c_adapter_class);
+	driver_unregister(&i2c_adapter_driver);
 	bus_unregister(&i2c_bus_type);
 }
 
