@@ -115,12 +115,6 @@ acpi_ex_convert_to_integer (
 	 */
 	result = 0;
 
-	/* Transfer no more than an integer's worth of data */
-
-	if (count > acpi_gbl_integer_byte_width) {
-		count = acpi_gbl_integer_byte_width;
-	}
-
 	/*
 	 * String conversion is different than Buffer conversion
 	 */
@@ -141,6 +135,12 @@ acpi_ex_convert_to_integer (
 
 
 	case ACPI_TYPE_BUFFER:
+
+		/* Transfer no more than an integer's worth of data */
+
+		if (count > acpi_gbl_integer_byte_width) {
+			count = acpi_gbl_integer_byte_width;
+		}
 
 		/*
 		 * Convert buffer to an integer - we simply grab enough raw data
@@ -173,6 +173,7 @@ acpi_ex_convert_to_integer (
 	/* Save the Result */
 
 	return_desc->integer.value = result;
+	acpi_ex_truncate_for32bit_table (return_desc);
 	*result_desc = return_desc;
 	return_ACPI_STATUS (AE_OK);
 }
@@ -520,7 +521,8 @@ acpi_ex_convert_to_string (
 
 			/* Recalculate length */
 
-			return_desc->string.length = ACPI_STRLEN (return_desc->string.pointer);
+			return_desc->string.length = (u32)
+				ACPI_STRLEN (return_desc->string.pointer);
 			break;
 
 		default:

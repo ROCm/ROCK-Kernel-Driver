@@ -110,10 +110,12 @@ acpi_ex_dump_operand (
 	/* obj_desc is a valid object */
 
 	if (depth > 0) {
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC, "%*s[%u] ", depth, " ", depth));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%*s[%u] %p ",
+			depth, " ", depth, obj_desc));
 	}
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_EXEC, "%p ", obj_desc));
-
+	else {
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p ", obj_desc));
+	}
 
 	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_LOCAL_REFERENCE:
@@ -712,9 +714,6 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_integer ("bit_length",  obj_desc->common_field.bit_length);
 		acpi_ex_out_integer ("fld_bit_offset", obj_desc->common_field.start_field_bit_offset);
 		acpi_ex_out_integer ("base_byte_offset", obj_desc->common_field.base_byte_offset);
-		acpi_ex_out_integer ("datum_valid_bits", obj_desc->common_field.datum_valid_bits);
-		acpi_ex_out_integer ("end_fld_valid_bits",obj_desc->common_field.end_field_valid_bits);
-		acpi_ex_out_integer ("end_buf_valid_bits",obj_desc->common_field.end_buffer_valid_bits);
 		acpi_ex_out_pointer ("parent_node", obj_desc->common_field.node);
 
 		switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {

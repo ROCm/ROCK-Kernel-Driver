@@ -762,9 +762,8 @@ acpi_ds_eval_region_operands (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Get the operands and complete the following data objec types:
- *              Buffer
- *              Package
+ * DESCRIPTION: Get the operands and complete the following data object types:
+ *              Buffer, Package.
  *
  ****************************************************************************/
 

@@ -612,210 +612,6 @@ acpi_ex_write_with_update_rule (
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_ex_get_buffer_datum
- *
- * PARAMETERS:  Datum               - Where the Datum is returned
- *              Buffer              - Raw field buffer
- *              buffer_length       - Entire length (used for big-endian only)
- *              byte_granularity    - 1/2/4/8 Granularity of the field
- *                                    (aka Datum Size)
- *              buffer_offset       - Datum offset into the buffer
- *
- * RETURN:      none
- *
- * DESCRIPTION: Get a datum from the buffer according to the buffer field
- *              byte granularity
- *
- ******************************************************************************/
-
-void
-acpi_ex_get_buffer_datum (
-	acpi_integer                    *datum,
-	void                            *buffer,
-	u32                             buffer_length,
-	u32                             byte_granularity,
-	u32                             buffer_offset)
-{
-	u32                             index;
-
-
-	ACPI_FUNCTION_TRACE_U32 ("ex_get_buffer_datum", byte_granularity);
-
-
-	/* Get proper index into buffer (handles big/little endian) */
-
-	index = ACPI_BUFFER_INDEX (buffer_length, buffer_offset, byte_granularity);
-
-	/* Move the requested number of bytes */
-
-	switch (byte_granularity) {
-	case ACPI_FIELD_BYTE_GRANULARITY:
-
-		*datum = ((u8 *) buffer) [index];
-		break;
-
-	case ACPI_FIELD_WORD_GRANULARITY:
-
-		ACPI_MOVE_16_TO_64 (datum, &(((u16 *) buffer) [index]));
-		break;
-
-	case ACPI_FIELD_DWORD_GRANULARITY:
-
-		ACPI_MOVE_32_TO_64 (datum, &(((u32 *) buffer) [index]));
-		break;
-
-	case ACPI_FIELD_QWORD_GRANULARITY:
-
-		ACPI_MOVE_64_TO_64 (datum, &(((u64 *) buffer) [index]));
-		break;
-
-	default:
-		/* Should not get here */
-		break;
-	}
-
-	return_VOID;
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    acpi_ex_set_buffer_datum
- *
- * PARAMETERS:  merged_datum        - Value to store
- *              Buffer              - Receiving buffer
- *              buffer_length       - Entire length (used for big-endian only)
- *              byte_granularity    - 1/2/4/8 Granularity of the field
- *                                    (aka Datum Size)
- *              buffer_offset       - Datum offset into the buffer
- *
- * RETURN:      none
- *
- * DESCRIPTION: Store the merged datum to the buffer according to the
- *              byte granularity
- *
- ******************************************************************************/
-
-void
-acpi_ex_set_buffer_datum (
-	acpi_integer                    merged_datum,
-	void                            *buffer,
-	u32                             buffer_length,
-	u32                             byte_granularity,
-	u32                             buffer_offset)
-{
-	u32                             index;
-
-
-	ACPI_FUNCTION_TRACE_U32 ("ex_set_buffer_datum", byte_granularity);
-
-
-	/* Get proper index into buffer (handles big/little endian) */
-
-	index = ACPI_BUFFER_INDEX (buffer_length, buffer_offset, byte_granularity);
-
-	/* Move the requested number of bytes */
-
-	switch (byte_granularity) {
-	case ACPI_FIELD_BYTE_GRANULARITY:
-
-		((u8 *) buffer) [index] = (u8) merged_datum;
-		break;
-
-	case ACPI_FIELD_WORD_GRANULARITY:
-
-		ACPI_MOVE_64_TO_16 (&(((u16 *) buffer)[index]), &merged_datum);
-		break;
-
-	case ACPI_FIELD_DWORD_GRANULARITY:
-
-		ACPI_MOVE_64_TO_32 (&(((u32 *) buffer)[index]), &merged_datum);
-		break;
-
-	case ACPI_FIELD_QWORD_GRANULARITY:
-
-		ACPI_MOVE_64_TO_64 (&(((u64 *) buffer)[index]), &merged_datum);
-		break;
-
-	default:
-		/* Should not get here */
-		break;
-	}
-
-	return_VOID;
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    acpi_ex_common_buffer_setup
- *
- * PARAMETERS:  obj_desc            - Field object
- *              buffer_length       - Length of caller's buffer
- *              datum_count         - Where the datum_count is returned
- *
- * RETURN:      Status, datum_count
- *
- * DESCRIPTION: Common code to validate the incoming buffer size and compute
- *              the number of field "datums" that must be read or written.
- *              A "datum" is the smallest unit that can be read or written
- *              to the field, it is either 1,2,4, or 8 bytes.
- *
- ******************************************************************************/
-
-acpi_status
-acpi_ex_common_buffer_setup (
-	union acpi_operand_object       *obj_desc,
-	u32                             buffer_length,
-	u32                             *datum_count)
-{
-	u32                             byte_field_length;
-	u32                             actual_byte_field_length;
-
-
-	ACPI_FUNCTION_TRACE ("ex_common_buffer_setup");
-
-
-	/*
-	 * Incoming buffer must be at least as long as the field, we do not
-	 * allow "partial" field reads/writes.  We do not care if the buffer is
-	 * larger than the field, this typically happens when an integer is
-	 * read/written to a field that is actually smaller than an integer.
-	 */
-	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (
-			 obj_desc->common_field.bit_length);
-	if (byte_field_length > buffer_length) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-			"Field size %X (bytes) is too large for buffer (%X)\n",
-			byte_field_length, buffer_length));
-
-		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
-	}
-
-	/*
-	 * Create "actual" field byte count (minimum number of bytes that
-	 * must be read), then convert to datum count (minimum number
-	 * of datum-sized units that must be read)
-	 */
-	actual_byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (
-			  obj_desc->common_field.start_field_bit_offset +
-			  obj_desc->common_field.bit_length);
-
-
-	*datum_count = ACPI_ROUND_UP_TO (actual_byte_field_length,
-			   obj_desc->common_field.access_byte_width);
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"buffer_bytes %X, actual_bytes %X, Datums %X, byte_gran %X\n",
-		byte_field_length, actual_byte_field_length,
-		*datum_count, obj_desc->common_field.access_byte_width));
-
-	return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
  * FUNCTION:    acpi_ex_extract_from_field
  *
  * PARAMETERS:  obj_desc            - Field to be read
@@ -835,128 +631,92 @@ acpi_ex_extract_from_field (
 	u32                             buffer_length)
 {
 	acpi_status                     status;
-	u32                             field_datum_byte_offset;
-	u32                             buffer_datum_offset;
-	acpi_integer                    previous_raw_datum = 0;
-	acpi_integer                    this_raw_datum = 0;
-	acpi_integer                    merged_datum = 0;
+	acpi_integer                    raw_datum;
+	acpi_integer                    merged_datum;
+	u32                             field_offset = 0;
+	u32                             buffer_offset = 0;
+	u32                             buffer_tail_bits;
 	u32                             datum_count;
+	u32                             field_datum_count;
 	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("ex_extract_from_field");
 
 
-	/* Validate buffer, compute number of datums */
+	/* Validate target buffer and clear it */
 
-	status = acpi_ex_common_buffer_setup (obj_desc, buffer_length, &datum_count);
+	if (buffer_length < ACPI_ROUND_BITS_UP_TO_BYTES (
+			 obj_desc->common_field.bit_length)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Field size %X (bits) is too large for buffer (%X)\n",
+			obj_desc->common_field.bit_length, buffer_length));
+
+		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
+	}
+	ACPI_MEMSET (buffer, 0, buffer_length);
+
+	/* Compute the number of datums (access width data items) */
+
+	datum_count = ACPI_ROUND_UP_TO (
+			   obj_desc->common_field.bit_length,
+			   obj_desc->common_field.access_bit_width);
+	field_datum_count = ACPI_ROUND_UP_TO (
+			   obj_desc->common_field.bit_length +
+			   obj_desc->common_field.start_field_bit_offset,
+			   obj_desc->common_field.access_bit_width);
+
+	/* Priming read from the field */
+
+	status = acpi_ex_field_datum_io (obj_desc, field_offset, &raw_datum, ACPI_READ);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
+	merged_datum = raw_datum >> obj_desc->common_field.start_field_bit_offset;
 
-	/*
-	 * Clear the caller's buffer (the whole buffer length as given)
-	 * This is very important, especially in the cases where the buffer
-	 * is longer than the size of the field.
-	 */
-	ACPI_MEMSET (buffer, 0, buffer_length);
+	/* Read the rest of the field */
 
-	field_datum_byte_offset = 0;
-	buffer_datum_offset= 0;
+	for (i = 1; i < field_datum_count; i++) {
+		/* Get next input datum from the field */
 
-	/* Read the entire field */
-
-	for (i = 0; i < datum_count; i++) {
-		status = acpi_ex_field_datum_io (obj_desc, field_datum_byte_offset,
-				  &this_raw_datum, ACPI_READ);
+		field_offset += obj_desc->common_field.access_byte_width;
+		status = acpi_ex_field_datum_io (obj_desc, field_offset,
+				  &raw_datum, ACPI_READ);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
 
-		/* We might actually be done if the request fits in one datum */
+		/* Merge with previous datum if necessary */
 
-		if ((datum_count == 1) &&
-			(obj_desc->common_field.flags & AOPOBJ_SINGLE_DATUM)) {
-			/* 1) Shift the valid data bits down to start at bit 0 */
+		merged_datum |= raw_datum <<
+			(obj_desc->common_field.access_bit_width - obj_desc->common_field.start_field_bit_offset);
 
-			merged_datum = (this_raw_datum >> obj_desc->common_field.start_field_bit_offset);
-
-			/* 2) Mask off any upper unused bits (bits not part of the field) */
-
-			if (obj_desc->common_field.end_buffer_valid_bits) {
-				merged_datum &= ACPI_MASK_BITS_ABOVE (obj_desc->common_field.end_buffer_valid_bits);
-			}
-
-			/* Store the datum to the caller buffer */
-
-			acpi_ex_set_buffer_datum (merged_datum, buffer, buffer_length,
-					obj_desc->common_field.access_byte_width, buffer_datum_offset);
-
-			return_ACPI_STATUS (AE_OK);
+		if (i == datum_count) {
+			break;
 		}
 
-		/* Special handling for the last datum to ignore extra bits */
+		/* Write merged datum to target buffer */
 
-		if ((i >= (datum_count -1))          &&
-			(obj_desc->common_field.end_field_valid_bits)) {
-			/*
-			 * This is the last iteration of the loop.  We need to clear
-			 * any unused bits (bits that are not part of this field) before
-			 * we store the final merged datum into the caller buffer.
-			 */
-			this_raw_datum &=
-				ACPI_MASK_BITS_ABOVE (obj_desc->common_field.end_field_valid_bits);
-		}
+		ACPI_MEMCPY (((char *) buffer) + buffer_offset, &merged_datum,
+			ACPI_MIN(obj_desc->common_field.access_byte_width,
+					 buffer_length - buffer_offset));
 
-		/*
-		 * Create the (possibly) merged datum to be stored to the caller buffer
-		 */
-		if (obj_desc->common_field.start_field_bit_offset == 0) {
-			/* Field is not skewed and we can just copy the datum */
-
-			acpi_ex_set_buffer_datum (this_raw_datum, buffer, buffer_length,
-					obj_desc->common_field.access_byte_width, buffer_datum_offset);
-			buffer_datum_offset++;
-		}
-		else {
-			/* Not aligned -- on the first iteration, just save the datum */
-
-			if (i != 0) {
-				/*
-				 * Put together the appropriate bits of the two raw data to make a
-				 * single complete field datum
-				 *
-				 * 1) Normalize the first datum down to bit 0
-				 */
-				merged_datum = (previous_raw_datum >> obj_desc->common_field.start_field_bit_offset);
-
-				/* 2) Insert the second datum "above" the first datum */
-
-				merged_datum |= (this_raw_datum << obj_desc->common_field.datum_valid_bits);
-
-				acpi_ex_set_buffer_datum (merged_datum, buffer, buffer_length,
-						obj_desc->common_field.access_byte_width, buffer_datum_offset);
-				buffer_datum_offset++;
-			}
-
-			/*
-			 * Save the raw datum that was just acquired since it may contain bits
-			 * of the *next* field datum
-			 */
-			previous_raw_datum = this_raw_datum;
-		}
-
-		field_datum_byte_offset += obj_desc->common_field.access_byte_width;
+		buffer_offset += obj_desc->common_field.access_byte_width;
+		merged_datum = raw_datum >> obj_desc->common_field.start_field_bit_offset;
 	}
 
-	/* For non-aligned case, there is one last datum to insert */
+	/* Mask off any extra bits in the last datum */
 
-	if (obj_desc->common_field.start_field_bit_offset != 0) {
-		merged_datum = (this_raw_datum >> obj_desc->common_field.start_field_bit_offset);
-
-		acpi_ex_set_buffer_datum (merged_datum, buffer, buffer_length,
-				obj_desc->common_field.access_byte_width, buffer_datum_offset);
+	buffer_tail_bits = obj_desc->common_field.bit_length % obj_desc->common_field.access_bit_width;
+	if (buffer_tail_bits) {
+		merged_datum &= ACPI_MASK_BITS_ABOVE (buffer_tail_bits);
 	}
+
+	/* Write the last datum to the buffer */
+
+	ACPI_MEMCPY (((char *) buffer) + buffer_offset, &merged_datum,
+		ACPI_MIN(obj_desc->common_field.access_byte_width,
+				 buffer_length - buffer_offset));
 
 	return_ACPI_STATUS (AE_OK);
 }
@@ -983,169 +743,91 @@ acpi_ex_insert_into_field (
 	u32                             buffer_length)
 {
 	acpi_status                     status;
-	u32                             field_datum_byte_offset;
-	u32                             datum_offset;
 	acpi_integer                    mask;
 	acpi_integer                    merged_datum;
-	acpi_integer                    previous_raw_datum;
-	acpi_integer                    this_raw_datum;
+	acpi_integer                    raw_datum = 0;
+	u32                             field_offset = 0;
+	u32                             buffer_offset = 0;
+	u32                             buffer_tail_bits;
 	u32                             datum_count;
+	u32                             field_datum_count;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("ex_insert_into_field");
 
 
-	/* Validate buffer, compute number of datums */
+	/* Validate input buffer */
 
-	status = acpi_ex_common_buffer_setup (obj_desc, buffer_length, &datum_count);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+	if (buffer_length < ACPI_ROUND_BITS_UP_TO_BYTES (
+			 obj_desc->common_field.bit_length)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Field size %X (bits) is too large for buffer (%X)\n",
+			obj_desc->common_field.bit_length, buffer_length));
+
+		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
 	}
 
-	/*
-	 * Break the request into up to three parts (similar to an I/O request):
-	 * 1) non-aligned part at start
-	 * 2) aligned part in middle
-	 * 3) non-aligned part at the end
-	 */
-	field_datum_byte_offset = 0;
-	datum_offset= 0;
+	/* Compute the number of datums (access width data items) */
 
-	/* Get a single datum from the caller's buffer */
-
-	acpi_ex_get_buffer_datum (&previous_raw_datum, buffer, buffer_length,
-			obj_desc->common_field.access_byte_width, datum_offset);
-
-	/*
-	 * Part1:
-	 * Write a partial field datum if field does not begin on a datum boundary
-	 * Note: The code in this section also handles the aligned case
-	 *
-	 * Construct Mask with 1 bits where the field is, 0 bits elsewhere
-	 * (Only the bottom 5 bits of bit_length are valid for a shift operation)
-	 *
-	 * Mask off bits that are "below" the field (if any)
-	 */
 	mask = ACPI_MASK_BITS_BELOW (obj_desc->common_field.start_field_bit_offset);
+	datum_count = ACPI_ROUND_UP_TO (obj_desc->common_field.bit_length,
+			  obj_desc->common_field.access_bit_width);
+	field_datum_count = ACPI_ROUND_UP_TO (obj_desc->common_field.bit_length +
+			   obj_desc->common_field.start_field_bit_offset,
+			   obj_desc->common_field.access_bit_width);
 
-	/* If the field fits in one datum, may need to mask upper bits */
+	/* Get initial Datum from the input buffer */
 
-	if ((obj_desc->common_field.flags & AOPOBJ_SINGLE_DATUM) &&
-		 obj_desc->common_field.end_field_valid_bits) {
-		/* There are bits above the field, mask them off also */
+	ACPI_MEMCPY (&raw_datum, buffer,
+		ACPI_MIN(obj_desc->common_field.access_byte_width,
+				 buffer_length - buffer_offset));
 
-		mask &= ACPI_MASK_BITS_ABOVE (obj_desc->common_field.end_field_valid_bits);
+	merged_datum = raw_datum << obj_desc->common_field.start_field_bit_offset;
+
+	/* Write the entire field */
+
+	for (i = 1; i < field_datum_count; i++) {
+		/* Write merged datum to the target field */
+
+		merged_datum &= mask;
+		status = acpi_ex_write_with_update_rule (obj_desc, mask, merged_datum, field_offset);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+
+		/* Start new output datum by merging with previous input datum */
+
+		field_offset += obj_desc->common_field.access_byte_width;
+		merged_datum = raw_datum >>
+			(obj_desc->common_field.access_bit_width - obj_desc->common_field.start_field_bit_offset);
+		mask = ACPI_INTEGER_MAX;
+
+		if (i == datum_count) {
+			break;
+		}
+
+		/* Get the next input datum from the buffer */
+
+		buffer_offset += obj_desc->common_field.access_byte_width;
+		ACPI_MEMCPY (&raw_datum, ((char *) buffer) + buffer_offset,
+			ACPI_MIN(obj_desc->common_field.access_byte_width,
+					 buffer_length - buffer_offset));
+		merged_datum |= raw_datum << obj_desc->common_field.start_field_bit_offset;
 	}
 
-	/* Shift and mask the value into the field position */
+	/* Mask off any extra bits in the last datum */
 
-	merged_datum = (previous_raw_datum << obj_desc->common_field.start_field_bit_offset);
+	buffer_tail_bits = (obj_desc->common_field.bit_length +
+			obj_desc->common_field.start_field_bit_offset) % obj_desc->common_field.access_bit_width;
+	if (buffer_tail_bits) {
+		mask &= ACPI_MASK_BITS_ABOVE (buffer_tail_bits);
+	}
+
+	/* Write the last datum to the field */
+
 	merged_datum &= mask;
-
-	/* Apply the update rule (if necessary) and write the datum to the field */
-
-	status = acpi_ex_write_with_update_rule (obj_desc, mask, merged_datum,
-			   field_datum_byte_offset);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
-	/* We just wrote the first datum */
-
-	datum_offset++;
-
-	/* If the entire field fits within one datum, we are done. */
-
-	if ((datum_count == 1) &&
-	   (obj_desc->common_field.flags & AOPOBJ_SINGLE_DATUM)) {
-		return_ACPI_STATUS (AE_OK);
-	}
-
-	/*
-	 * Part2:
-	 * Write the aligned data.
-	 *
-	 * We don't need to worry about the update rule for these data, because
-	 * all of the bits in each datum are part of the field.
-	 *
-	 * The last datum must be special cased because it might contain bits
-	 * that are not part of the field -- therefore the "update rule" must be
-	 * applied in Part3 below.
-	 */
-	while (datum_offset < datum_count) {
-		field_datum_byte_offset += obj_desc->common_field.access_byte_width;
-
-		/*
-		 * Get the next raw buffer datum.  It may contain bits of the previous
-		 * field datum
-		 */
-		acpi_ex_get_buffer_datum (&this_raw_datum, buffer, buffer_length,
-				obj_desc->common_field.access_byte_width, datum_offset);
-
-		/* Create the field datum based on the field alignment */
-
-		if (obj_desc->common_field.start_field_bit_offset != 0) {
-			/*
-			 * Put together appropriate bits of the two raw buffer data to make
-			 * a single complete field datum
-			 */
-			merged_datum =
-				(previous_raw_datum >> obj_desc->common_field.datum_valid_bits) |
-				(this_raw_datum << obj_desc->common_field.start_field_bit_offset);
-		}
-		else {
-			/* Field began aligned on datum boundary */
-
-			merged_datum = this_raw_datum;
-		}
-
-		/*
-		 * Special handling for the last datum if the field does NOT end on
-		 * a datum boundary.  Update Rule must be applied to the bits outside
-		 * the field.
-		 */
-		datum_offset++;
-		if ((datum_offset == datum_count) &&
-			(obj_desc->common_field.end_field_valid_bits)) {
-			/*
-			 * If there are dangling non-aligned bits, perform one more merged write
-			 * Else - field is aligned at the end, no need for any more writes
-			 */
-
-			/*
-			 * Part3:
-			 * This is the last datum and the field does not end on a datum boundary.
-			 * Build the partial datum and write with the update rule.
-			 *
-			 * Mask off the unused bits above (after) the end-of-field
-			 */
-			mask = ACPI_MASK_BITS_ABOVE (obj_desc->common_field.end_field_valid_bits);
-			merged_datum &= mask;
-
-			/* Write the last datum with the update rule */
-
-			status = acpi_ex_write_with_update_rule (obj_desc, mask, merged_datum,
-					   field_datum_byte_offset);
-			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
-			}
-		}
-		else {
-			/* Normal (aligned) case -- write the completed datum */
-
-			status = acpi_ex_field_datum_io (obj_desc, field_datum_byte_offset,
-					  &merged_datum, ACPI_WRITE);
-			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
-			}
-		}
-
-		/*
-		 * Save the most recent datum since it may contain bits of the *next*
-		 * field datum.  Update current byte offset.
-		 */
-		previous_raw_datum = this_raw_datum;
-	}
+	status = acpi_ex_write_with_update_rule (obj_desc, mask, merged_datum, field_offset);
 
 	return_ACPI_STATUS (status);
 }

@@ -94,9 +94,7 @@
 	u32                                     bit_length;         /* Length of field in bits */\
 	u32                                     base_byte_offset;   /* Byte offset within containing object */\
 	u8                                      start_field_bit_offset;/* Bit offset within first field datum (0-63) */\
-	u8                                      datum_valid_bits;   /* Valid bit in first "Field datum" */\
-	u8                                      end_field_valid_bits; /* Valid bits in the last "field datum" */\
-	u8                                      end_buffer_valid_bits; /* Valid bits in the last "buffer datum" */\
+	u8                                      access_bit_width;   /* Read/Write size in bits (8-64) */\
 	u32                                     value;              /* Value to store into the Bank or Index register */\
 	struct acpi_namespace_node              *node;              /* Link back to parent node */
 
