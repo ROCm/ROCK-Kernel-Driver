@@ -560,8 +560,8 @@ int wpc_init (sdla_t* card, wandev_conf_t* conf)
 	
 
 		if (chdlc_set_intr_mode(card, APP_INT_ON_TIMER)){
-			printk (KERN_INFO "%s: 
-				Failed to set interrupt triggers!\n",
+			printk (KERN_INFO "%s: "
+				"Failed to set interrupt triggers!\n",
 				card->devname);
 			return -EIO;	
         	}
