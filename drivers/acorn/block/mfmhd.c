@@ -1192,21 +1192,10 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 			return -EFAULT;
 		return 0;
 
-	case BLKSECTGET:
-		return put_user(max_sectors[major][minor], (long *) arg);
-
 	case BLKRRPART:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
 		return mfm_reread_partitions(dev);
-
-	case BLKGETSIZE:
-	case BLKGETSIZE64:
-	case BLKFLSBUF:
-	case BLKROSET:
-	case BLKROGET:
-	case BLKPG:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
 
 	default:
 		return -EINVAL;

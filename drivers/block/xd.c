@@ -315,7 +315,7 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 			g.heads = xd_info[dev].heads;
 			g.sectors = xd_info[dev].sectors;
 			g.cylinders = xd_info[dev].cylinders;
-			g.start = get_start_sect(inode->i_rdev);
+			g.start = get_start_sect(inode->i_bdev);
 			return copy_to_user(geometry, &g, sizeof g) ? -EFAULT : 0;
 		}
 		case HDIO_SET_DMA:
@@ -336,14 +336,6 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 			if (!capable(CAP_SYS_ADMIN)) 
 				return -EACCES;
 			return xd_reread_partitions(inode->i_rdev);
-
-		case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKFLSBUF:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKPG:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
 
 		default:
 			return -EINVAL;

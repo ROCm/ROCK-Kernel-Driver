@@ -641,7 +641,7 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 			g.heads = hd_info[dev].head;
 			g.sectors = hd_info[dev].sect;
 			g.cylinders = hd_info[dev].cyl;
-			g.start = get_start_sect(inode->i_rdev);
+			g.start = get_start_sect(inode->i_bdev);
 			return copy_to_user(loc, &g, sizeof g) ? -EFAULT : 0; 
 		}
 
@@ -649,14 +649,6 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
 			return revalidate_hddisk(inode->i_rdev, 1);
-
-         	case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKFLSBUF:
-		case BLKPG:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
 
 		default:
 			return -EINVAL;

@@ -1096,7 +1096,7 @@ static int ps2esdi_ioctl(struct inode *inode,
 				put_user(ps2esdi_info[dev].head, (char *) &geometry->heads);
 				put_user(ps2esdi_info[dev].sect, (char *) &geometry->sectors);
 				put_user(ps2esdi_info[dev].cyl, (short *) &geometry->cylinders);
-				put_user(get_start_sect(inode->i_rdev),
+				put_user(get_start_sect(inode->b_rdev),
 					    (long *) &geometry->start);
 
 				return 0;
@@ -1107,16 +1107,6 @@ static int ps2esdi_ioctl(struct inode *inode,
                         if (!capable(CAP_SYS_ADMIN)) 
 				return -EACCES;
 			return (ps2esdi_reread_partitions(inode->i_rdev));
-
-		case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKFLSBUF:
-		case BLKBSZGET:
-		case BLKBSZSET:
-		case BLKPG:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
 		}
 	return (-EINVAL);
 }

@@ -1123,21 +1123,10 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 	put_user(1, (char *)&geo->heads);
 	put_user(8, (char *)&geo->sectors);
 	put_user((sect>>3), (short *)&geo->cylinders);
-	put_user(get_start_sect(inode->i_rdev), (u_long *)&geo->start);
-	break;
-    case BLKGETSIZE:
-	ret = put_user(ftl_hd[minor].nr_sects, (unsigned long *)arg);
-	break;
-    case BLKGETSIZE64:
-	ret = put_user((u64)ftl_hd[minor].nr_sects << 9, (u64 *)arg);
+	put_user(get_start_sect(inode->i_bdev), (u_long *)&geo->start);
 	break;
     case BLKRRPART:
 	ret = ftl_reread_partitions(inode->i_rdev);
-	break;
-    case BLKROSET:
-    case BLKROGET:
-    case BLKFLSBUF:
-	ret = blk_ioctl(inode->i_bdev, cmd, arg);
 	break;
     default:
 	ret = -EINVAL;

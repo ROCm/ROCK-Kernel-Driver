@@ -848,16 +848,6 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 
 
 	switch(cmd) {
-
-	case BLKGETSIZE:
-		/* Return the device size, expressed in sectors */
-		err = ! access_ok (VERIFY_WRITE, arg, sizeof(long));
-		if (err) return -EFAULT;
-		size = mm_gendisk.part[minor].nr_sects;
-		if (copy_to_user((long *) arg, &size, sizeof (long)))
-			return -EFAULT;
-		return 0;
-
 	case BLKRRPART:
 		return (mm_revalidate(i->i_rdev));
 
@@ -872,16 +862,15 @@ static int mm_ioctl(struct inode *i, struct file *f, unsigned int cmd, unsigned 
 		size = cards[card_number].mm_size * (1024 / MM_HARDSECT);
 		geo.heads     = 64;
 		geo.sectors   = 32;
-		geo.start     = mm_gendisk.part[minor].start_sect;
+		geo.start     = get_start_sect(inode->i_bdev);
 		geo.cylinders = size / (geo.heads * geo.sectors);
 
 		if (copy_to_user((void *) arg, &geo, sizeof(geo)))
 			return -EFAULT;
 		return 0;
 
-
 	default:
-		return blk_ioctl(i->i_bdev, cmd, arg);
+		return -EINVAL;
 	}
 
 	return -ENOTTY; /* unknown command */

@@ -440,15 +440,6 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 	case BLKRRPART:
 		return revalidate_logvol(inode->i_rdev, 1);
-	case BLKGETSIZE:
-	case BLKGETSIZE64:
-	case BLKFLSBUF:
-	case BLKBSZSET:
-	case BLKBSZGET:
-	case BLKROSET:
-	case BLKROGET:
-	case BLKPG:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
 	case CCISS_GETPCIINFO:
 	{
 		cciss_pci_info_struct pciinfo;

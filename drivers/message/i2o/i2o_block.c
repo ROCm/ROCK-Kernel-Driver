@@ -1083,7 +1083,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 			int u = minor(inode->i_rdev) & 0xF0;
 			i2o_block_biosparam(i2ob_sizes[u]<<1, 
 				&g.cylinders, &g.heads, &g.sectors);
-			g.start = get_start_sect(inode->i_rdev);
+			g.start = get_start_sect(inode->i_bdev);
 			return copy_to_user((void *)arg, &g, sizeof(g))
 				? -EFAULT : 0;
 		}
@@ -1092,14 +1092,6 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 			if(!capable(CAP_SYS_ADMIN))
 				return -EACCES;
 			return do_i2ob_revalidate(inode->i_rdev,1);
-			
-		case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKFLSBUF:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKPG:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
 			
 		default:
 			return -EINVAL;

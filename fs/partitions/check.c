@@ -236,6 +236,7 @@ void driverfs_create_partitions(struct gendisk *hd, int minor)
 	int max_p;
 	int part;
 	devfs_handle_t dir = 0;
+	struct hd_struct *p = hd->part + minor;
 	
 	/* get parent driverfs device structure */
 	if (hd->driverfs_dev_arr)
@@ -260,9 +261,9 @@ void driverfs_create_partitions(struct gendisk *hd, int minor)
 	
 	/* for all partitions setup parents and device node names */
 	for(part=0; part < max_p; part++) {
-		if ((part == 0) || (hd->part[minor + part].nr_sects >= 1)) {
+		if ((part == 0) || (p[part].nr_sects >= 1)) {
 			struct device * current_driverfs_dev = 
-				&hd->part[minor+part].hd_driverfs_dev;
+				&p[part].hd_driverfs_dev;
 			current_driverfs_dev->parent = parent;
 			/* handle disc case */
 			current_driverfs_dev->driver_data =
@@ -300,7 +301,6 @@ void driverfs_create_partitions(struct gendisk *hd, int minor)
 					&partition_device_kdev_file);
 		}
 	}
-	return;
 }
 
 void driverfs_remove_partitions(struct gendisk *hd, int minor)
@@ -308,14 +308,14 @@ void driverfs_remove_partitions(struct gendisk *hd, int minor)
 	int max_p;
 	int part;
 	struct device * current_driverfs_dev;
+	struct hd_struct *p = hd->part + minor;
 	
 	max_p=(1 << hd->minor_shift);
 	
 	/* for all parts setup parent relationships and device node names */
 	for(part=1; part < max_p; part++) {
-		if ((hd->part[minor + part].nr_sects >= 1)) {
-			current_driverfs_dev = 
-				&hd->part[minor + part].hd_driverfs_dev;
+		if ((p[part].nr_sects >= 1)) {
+			current_driverfs_dev = &p[part].hd_driverfs_dev;
 			device_remove_file(current_driverfs_dev,
 					partition_device_type_file.name);
 			device_remove_file(current_driverfs_dev,
@@ -323,7 +323,7 @@ void driverfs_remove_partitions(struct gendisk *hd, int minor)
 			put_device(current_driverfs_dev);	
 		}
 	}
-	current_driverfs_dev = &hd->part[minor].hd_driverfs_dev;
+	current_driverfs_dev = &p->hd_driverfs_dev;
 	device_remove_file(current_driverfs_dev, 
 				partition_device_type_file.name);
 	device_remove_file(current_driverfs_dev, 

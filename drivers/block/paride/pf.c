@@ -423,10 +423,6 @@ static int pf_ioctl(struct inode *inode,struct file *file,
                 return put_user(PF.capacity,(long *) arg);
             case BLKGETSIZE64:
                 return put_user((u64)PF.capacity << 9,(u64 *)arg);
-	    case BLKROSET:
-	    case BLKROGET:
-	    case BLKFLSBUF:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
             default:
                 return -EINVAL;
         }

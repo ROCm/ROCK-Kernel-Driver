@@ -1116,7 +1116,7 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 		put_user(diskinfo[0], &geo->heads);
 		put_user(diskinfo[1], &geo->sectors);
 		put_user(diskinfo[2], &geo->cylinders);
-		put_user(get_start_sect(inode->i_rdev), &geo->start);
+		put_user(get_start_sect(inode->i_bdev), &geo->start);
 		return 0;
 	case IDAGETDRVINFO:
 		if (copy_to_user(&io->c.drv, &hba[ctlr]->drv[dsk],
@@ -1156,16 +1156,6 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 				return -EFAULT;
 		return(0);
 	}	
-
-	case BLKGETSIZE:
-	case BLKGETSIZE64:
-	case BLKFLSBUF:
-	case BLKBSZSET:
-	case BLKBSZGET:
-	case BLKROSET:
-	case BLKROGET:
-	case BLKPG:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
 
 	default:
 		return -EINVAL;

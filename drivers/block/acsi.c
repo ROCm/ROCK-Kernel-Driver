@@ -1105,7 +1105,7 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 	    put_user( 64, &geo->heads );
 	    put_user( 32, &geo->sectors );
 	    put_user( acsi_info[dev].size >> 11, &geo->cylinders );
-		put_user(get_start_sect(inode->i_rdev), &geo->start);
+		put_user(get_start_sect(inode->i_bdev), &geo->start);
 		return 0;
 	  }
 		
@@ -1116,14 +1116,6 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 		put_user( 0, &((Scsi_Idlun *) arg)->host_unique_id );
 		return 0;
 		
-	  case BLKGETSIZE:
-	  case BLKGETSIZE64:
-	  case BLKROSET:
-	  case BLKROGET:
-	  case BLKFLSBUF:
-	  case BLKPG:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
-
 	  case BLKRRPART: /* Re-read partition tables */
 	        if (!capable(CAP_SYS_ADMIN)) 
 			return -EACCES;

@@ -514,19 +514,6 @@ int check_disk_change(kdev_t dev)
 	return 1;
 }
 
-int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
-{
-	int res;
-	mm_segment_t old_fs = get_fs();
-
-	if (!bdev->bd_op->ioctl)
-		return -EINVAL;
-	set_fs(KERNEL_DS);
-	res = bdev->bd_op->ioctl(bdev->bd_inode, NULL, cmd, arg);
-	set_fs(old_fs);
-	return res;
-}
-
 static int do_open(struct block_device *bdev, struct inode *inode, struct file *file)
 {
 	int ret = -ENXIO;
@@ -731,15 +718,37 @@ static int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 {
 	int ret = -EINVAL;
 	switch (cmd) {
+	/*
+	 * deprecated, use the /proc/iosched interface instead
+	 */
+	case BLKELVGET:
+	case BLKELVSET:
+		ret = -ENOTTY;
+		break;
 	case BLKRAGET:
+	case BLKROGET:
+	case BLKBSZGET:
+	case BLKSSZGET:
 	case BLKFRAGET:
+	case BLKSECTGET:
 	case BLKRASET:
 	case BLKFRASET:
+	case BLKBSZSET:
+	case BLKPG:
 		ret = blk_ioctl(inode->i_bdev, cmd, arg);
 		break;
 	default:
 		if (inode->i_bdev->bd_op->ioctl)
 			ret =inode->i_bdev->bd_op->ioctl(inode, file, cmd, arg);
+		if (ret == -EINVAL) {
+			switch (cmd) {
+				case BLKGETSIZE:
+				case BLKGETSIZE64:
+				case BLKFLSBUF:
+				case BLKROSET:
+					ret = blk_ioctl(inode->i_bdev,cmd,arg);
+			}
+		}
 		break;
 	}
 	return ret;
@@ -766,6 +775,16 @@ struct file_operations def_blk_fops = {
 	fsync:		block_fsync,
 	ioctl:		blkdev_ioctl,
 };
+
+int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
+{
+	int res;
+	mm_segment_t old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	res = blkdev_ioctl(bdev->bd_inode, NULL, cmd, arg);
+	set_fs(old_fs);
+	return res;
+}
 
 const char *__bdevname(kdev_t dev)
 {

@@ -241,24 +241,11 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 				put_user(diskinfo[1], &loc->sectors) ||
 				put_user(diskinfo[2], &loc->cylinders) ||
 				put_user((unsigned) 
-					     get_start_sect(inode->i_rdev),
+					     get_start_sect(inode->i_bdev),
 					 (unsigned long *) &loc->start))
 				return -EFAULT;
 			return 0;
 		}
-
-		case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKFLSBUF:
-		case BLKSSZGET:
-		case BLKPG:
-                case BLKELVGET:
-                case BLKELVSET:
-		case BLKBSZGET:
-		case BLKBSZSET:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
 
 		case BLKRRPART: /* Re-read partition tables */
 		        if (!capable(CAP_SYS_ADMIN))

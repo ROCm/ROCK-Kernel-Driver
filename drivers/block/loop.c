@@ -912,10 +912,6 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 		}
 		err = put_user((u64)loop_sizes[lo->lo_number] << 10, (u64*)arg);
 		break;
-	case BLKBSZGET:
-	case BLKBSZSET:
-		err = blk_ioctl(inode->i_bdev, cmd, arg);
-		break;
 	default:
 		err = lo->ioctl ? lo->ioctl(lo, cmd, arg) : -EINVAL;
 	}

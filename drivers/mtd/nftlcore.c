@@ -787,7 +787,7 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 		g.heads = nftl->heads;
 		g.sectors = nftl->sectors;
 		g.cylinders = nftl->cylinders;
-		g.start = get_start_sect(inode->i_rdev);
+		g.start = get_start_sect(inode->i_bdev);
 		return copy_to_user((void *)arg, &g, sizeof g) ? -EFAULT : 0;
 	}
 	case BLKFLSBUF:
@@ -812,18 +812,6 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 		dev_unlock_part(device);
 		}
 		return res;
-
-#if (LINUX_VERSION_CODE < 0x20303)		
-	RO_IOCTLS(inode->i_rdev, arg);  /* ref. linux/blk.h */
-#else
-	case BLKGETSIZE:
-	case BLKGETSIZE64:
-	case BLKROSET:
-	case BLKROGET:
-	case BLKSSZGET:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
-#endif
-
 	default:
 		return -EINVAL;
 	}

@@ -117,31 +117,6 @@ get_gendisk(kdev_t dev)
 
 EXPORT_SYMBOL(get_gendisk);
 
-
-unsigned long
-get_start_sect(kdev_t dev)
-{
-	struct gendisk *gp;
-
-	gp = get_gendisk(dev);
-	if (gp)
-		return gp->part[minor(dev)].start_sect;
-	return 0;
-}
-
-EXPORT_SYMBOL(get_start_sect);
-
-unsigned long
-get_nr_sects(kdev_t dev)
-{
-	struct gendisk *gp;
-
-	gp = get_gendisk(dev);
-	if (gp)
-		return gp->part[minor(dev)].nr_sects;
-	return 0;
-}
-
 #ifdef CONFIG_PROC_FS
 /* iterator */
 static void *part_start(struct seq_file *part, loff_t *pos)

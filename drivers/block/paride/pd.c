@@ -460,19 +460,12 @@ static int pd_ioctl(struct inode *inode,struct file *file,
 		    put_user(PD.heads, (char *) &geo->heads);
 		    put_user(PD.sectors, (char *) &geo->sectors);
 		}
-		put_user(get_start_sect(inode->i_rdev), (long *)&geo->start);
+		put_user(get_start_sect(inode->i_bdev), (long *)&geo->start);
 		return 0;
 	    case BLKRRPART:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
 		return pd_revalidate(inode->i_rdev);
-	    case BLKGETSIZE:
-	    case BLKGETSIZE64:
-	    case BLKROSET:
-	    case BLKROGET:
-	    case BLKFLSBUF:
-	    case BLKPG:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
 	    default:
 		return -EINVAL;
 	}
@@ -515,7 +508,7 @@ static int pd_revalidate(kdev_t dev)
 	if ((unit >= PD_UNITS) || !PD.present)
 		return -ENODEV;
 
-	res = dev_part_lock(device);
+	res = dev_lock_part(device);
 	if (res < 0)
 		return res;
 	res = wipe_partitions(device);

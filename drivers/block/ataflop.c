@@ -1559,12 +1559,6 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 	struct floppy_struct setprm;
 
 	device = inode->i_rdev;
-	switch (cmd) {
-		case BLKROSET:
-		case BLKROGET:
-		case BLKFLSBUF:
-			return blk_ioctl(inode->i_bdev, cmd, param);
-	}
 	drive = minor (device);
 	type  = drive >> 2;
 	drive &= 3;
