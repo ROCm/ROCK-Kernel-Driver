@@ -102,7 +102,6 @@ extern void scsi_exit_procfs(void);
 #endif /* CONFIG_PROC_FS */
 
 /* scsi_scan.c */
-extern void scsi_scan_host(struct Scsi_Host *);
 extern void scsi_forget_host(struct Scsi_Host *);
 extern void scsi_free_sdev(struct scsi_device *);
 extern void scsi_free_shost(struct Scsi_Host *);
@@ -116,11 +115,6 @@ extern int scsi_sysfs_add_host(struct Scsi_Host *, struct device *);
 extern void scsi_sysfs_remove_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
-
-/* definitions for the linker default sections covering the host
- * class and device attributes */
-extern struct class_device_attribute *scsi_sysfs_shost_attrs[];
-extern struct device_attribute *scsi_sysfs_sdev_attrs[];
 
 extern struct class shost_class;
 extern struct bus_type scsi_bus_type;

@@ -329,12 +329,12 @@ struct scsi_host_template {
 #define SCSI_DEFAULT_HOST_BLOCKED	7
 
 	/*
-	 * Pointer to the sysfs class properties for this host
+	 * Pointer to the sysfs class properties for this host, NULL terminated.
 	 */
 	struct class_device_attribute **shost_attrs;
 
 	/*
-	 * Pointer to the SCSI device properties for this host
+	 * Pointer to the SCSI device properties for this host, NULL terminated.
 	 */
 	struct device_attribute **sdev_attrs;
 
@@ -442,12 +442,6 @@ struct Scsi_Host {
 	 */
 	unsigned int max_host_blocked;
 
-	/* 
-	 * Support for sysfs
-	 */
-	struct device host_gendev;
-	struct class_device class_dev;
-
 	/* legacy crap */
 	unsigned long base;
 	unsigned long io_port;
@@ -455,6 +449,9 @@ struct Scsi_Host {
 	unsigned char dma_channel;
 	unsigned int  irq;
 
+	/* ldm bits */
+	struct device		shost_gendev;
+	struct class_device	shost_classdev;
 
 	/*
 	 * List of hosts per template.
@@ -474,12 +471,13 @@ struct Scsi_Host {
 		__attribute__ ((aligned (sizeof(unsigned long))));
 };
 #define		dev_to_shost(d)		\
-	container_of(d, struct Scsi_Host, host_gendev)
+	container_of(d, struct Scsi_Host, shost_gendev)
 #define		class_to_shost(d)	\
-	container_of(d, struct Scsi_Host, class_dev)
+	container_of(d, struct Scsi_Host, shost_classdev)
 
 extern struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *, int);
 extern int scsi_add_host(struct Scsi_Host *, struct device *);
+extern void scsi_scan_host(struct Scsi_Host *);
 extern int scsi_remove_host(struct Scsi_Host *);
 extern void scsi_host_get(struct Scsi_Host *);
 extern void scsi_host_put(struct Scsi_Host *t);
@@ -495,15 +493,13 @@ static inline void scsi_assign_lock(struct Scsi_Host *shost, spinlock_t *lock)
 static inline void scsi_set_device(struct Scsi_Host *shost,
                                    struct device *dev)
 {
-        shost->host_gendev.parent = dev;
+        shost->shost_gendev.parent = dev;
 }
 
 static inline struct device *scsi_get_device(struct Scsi_Host *shost)
 {
-        return shost->host_gendev.parent;
+        return shost->shost_gendev.parent;
 }
-
-extern void scsi_sysfs_release_attributes(struct scsi_host_template *);
 
 extern void scsi_unblock_requests(struct Scsi_Host *);
 extern void scsi_block_requests(struct Scsi_Host *);
