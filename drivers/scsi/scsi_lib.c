@@ -1249,27 +1249,14 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
 	return BLK_BOUNCE_HIGH;
 }
 
-request_queue_t *scsi_alloc_queue(struct scsi_device *sdev)
+struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 {
-	request_queue_t *q;
-	struct Scsi_Host *shost;
+	struct Scsi_Host *shost = sdev->host;
+	struct request_queue *q = kmalloc(sizeof(*q), GFP_ATOMIC);
 
-	q = kmalloc(sizeof(*q), GFP_ATOMIC);
 	if (!q)
 		return NULL;
 	memset(q, 0, sizeof(*q));
-
-	/*
-	 * XXX move host code to scsi_register
-	 */
-	shost = sdev->host;
-	if (!shost->max_sectors) {
-		/*
-		 * Driver imposes no hard sector transfer limit.
-		 * start at machine infinity initially.
-		 */
-		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
-	}
 
 	blk_init_queue(q, scsi_request_fn, &sdev->sdev_lock);
 	blk_queue_prep_rq(q, scsi_prep_fn);
@@ -1281,11 +1268,10 @@ request_queue_t *scsi_alloc_queue(struct scsi_device *sdev)
 
 	if (!shost->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
-
 	return q;
 }
 
-void scsi_free_queue(request_queue_t *q)
+void scsi_free_queue(struct request_queue *q)
 {
 	blk_cleanup_queue(q);
 	kfree(q);

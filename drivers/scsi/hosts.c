@@ -424,8 +424,14 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	shost->use_clustering = shost_tp->use_clustering;
 	if (!blk_nohighio)
 		shost->highmem_io = shost_tp->highmem_io;
-
-	shost->max_sectors = shost_tp->max_sectors;
+	if (!shost_tp->max_sectors) {
+		/*
+		 * Driver imposes no hard sector transfer limit.
+		 * start at machine infinity initially.
+		 */
+		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
+	} else
+		shost->max_sectors = shost_tp->max_sectors;
 	shost->use_blk_tcq = shost_tp->use_blk_tcq;
 
 	spin_lock(&scsi_host_list_lock);
