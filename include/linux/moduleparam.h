@@ -23,6 +23,8 @@ static const char __module_cat(name,__LINE__)[]				  \
 #else  /* !MODULE */
 #define __MODULE_INFO(tag, name, info)
 #endif
+#define __MODULE_PARM_TYPE(parm, _type)					  \
+  __MODULE_INFO(parmtype, name##type, #name ":" _type)
 
 struct kernel_param;
 
@@ -76,7 +78,7 @@ struct kparam_array
 #define module_param_named(name, value, type, perm)			   \
 	param_check_##type(name, &(value));				   \
 	module_param_call(name, param_set_##type, param_get_##type, &value, perm); \
-	__MODULE_INFO(parmtype, name##type, #name ":" #type)
+	__MODULE_PARM_TYPE(name, #type)
 
 #define module_param(name, type, perm)				\
 	module_param_named(name, name, type, perm)
@@ -87,7 +89,7 @@ struct kparam_array
 		= { len, string };					\
 	module_param_call(name, param_set_copystring, param_get_string,	\
 		   &__param_string_##name, perm);			\
-	__MODULE_INFO(parmtype, name##type, #name ":string")
+	__MODULE_PARM_TYPE(name, "string")
 
 /* Called on module insert or kernel boot */
 extern int parse_args(const char *name,
@@ -149,7 +151,7 @@ extern int param_get_invbool(char *buffer, struct kernel_param *kp);
 	    sizeof(array[0]), array };					\
 	module_param_call(name, param_array_set, param_array_get, 	\
 			  &__param_arr_##name, perm);			\
-	__MODULE_INFO(parmtype, name##type, #name ":array of " #type)
+	__MODULE_PARM_TYPE(name, "array of " #type)
 
 #define module_param_array(name, type, nump, perm)		\
 	module_param_array_named(name, name, type, nump, perm)

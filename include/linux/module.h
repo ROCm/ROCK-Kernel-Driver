@@ -551,7 +551,7 @@ static inline void MODULE_PARM_(void) { }
 #define MODULE_PARM(var,type)						    \
 struct obsolete_modparm __parm_##var __attribute__((section("__obsparm"))) = \
 { __stringify(var), type, &MODULE_PARM_ }; \
-__MODULE_INFO(parmtype, var##type, #var ":" type)
+__MODULE_PARM_TYPE(var, type);
 #else
 #define MODULE_PARM(var,type) static void __attribute__((__unused__)) *__parm_##var = &MODULE_PARM_;
 #endif
