@@ -71,6 +71,13 @@ void cmd640_dump_regs (void);
 #endif
 
 /*
+ * Used to indicate "no IRQ", should be a value that cannot be an IRQ
+ * number.
+ */
+ 
+#define IDE_NO_IRQ		(-1)
+
+/*
  * IDE_DRIVE_CMD is used to implement many features of the hdparm utility
  */
 #define IDE_DRIVE_CMD			99	/* (magic) undef to reduce kernel size*/
@@ -106,6 +113,7 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * state flags
  */
+
 #define DMA_PIO_RETRY	1	/* retrying in PIO */
 
 /*
