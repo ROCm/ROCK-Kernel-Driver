@@ -7,6 +7,7 @@
 #include "linux/signal.h"
 #include "linux/kernel.h"
 #include "linux/interrupt.h"
+#include "linux/ptrace.h"
 #include "asm/system.h"
 #include "asm/pgalloc.h"
 #include "asm/ptrace.h"

@@ -12,6 +12,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/time.h>
+#include <linux/ptrace.h>
 
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
