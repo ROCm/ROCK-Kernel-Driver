@@ -519,9 +519,9 @@ unsigned long __init find_and_init_phbs(void)
 	return 0;
 }
 
+#if 0
 void pcibios_name_device(struct pci_dev *dev)
 {
-#if 0
 	struct device_node *dn;
 
 	/*
@@ -541,8 +541,9 @@ void pcibios_name_device(struct pci_dev *dev)
 			}
 		}
 	}
-#endif
 }   
+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, pcibios_name_device);
+#endif
 
 void __devinit pcibios_fixup_device_resources(struct pci_dev *dev,
 					   struct pci_bus *bus)
