@@ -43,7 +43,8 @@ endif
 
 ifeq ($(GCC_VERSION),3)
  ifeq ($(GCC_MINOR_VERSION),4)
-	cflags-$(CONFIG_ITANIUM)	+= -mtune=merced
+# Workaround Itanium 1 bugs in gcc 3.4.
+#	cflags-$(CONFIG_ITANIUM)	+= -mtune=merced
 	cflags-$(CONFIG_MCKINLEY)	+= -mtune=mckinley
  endif
 endif
