@@ -99,7 +99,7 @@ typedef struct xfs_dquot {
 	sema_t		 q_flock;	/* flush lock */
 	uint		 q_pincount;	/* pin count for this dquot */
 	sv_t		 q_pinwait;	/* sync var for pinning */
-#ifdef DQUOT_TRACING
+#ifdef XFS_DQUOT_TRACE
 	struct ktrace	*q_trace;	/* trace header structure */
 #endif
 } xfs_dquot_t;
@@ -175,23 +175,25 @@ XFS_DQ_IS_LOCKED(xfs_dquot_t *dqp)
 #define XFS_IS_THIS_QUOTA_OFF(d) (! (XFS_QM_ISUDQ(d) ? \
 				     (XFS_IS_UQUOTA_ON((d)->q_mount)) : \
 				     (XFS_IS_GQUOTA_ON((d)->q_mount))))
-#ifdef DQUOT_TRACING
+
+#ifdef XFS_DQUOT_TRACE
 /*
  * Dquot Tracing stuff.
  */
 #define DQUOT_TRACE_SIZE	64
 #define DQUOT_KTRACE_ENTRY	1
 
-#define xfs_dqtrace_entry_ino(a,b,ip) \
-xfs_dqtrace_entry__((a), (b), (void*)__return_address, (ip))
-#define xfs_dqtrace_entry(a,b) \
-xfs_dqtrace_entry__((a), (b), (void*)__return_address, NULL)
-extern void		xfs_dqtrace_entry__(xfs_dquot_t *dqp, char *func,
+extern void		__xfs_dqtrace_entry(xfs_dquot_t *dqp, char *func,
 					    void *, xfs_inode_t *);
+#define xfs_dqtrace_entry_ino(a,b,ip) \
+		__xfs_dqtrace_entry((a), (b), (void*)__return_address, (ip))
+#define xfs_dqtrace_entry(a,b) \
+		__xfs_dqtrace_entry((a), (b), (void*)__return_address, NULL)
 #else
 #define xfs_dqtrace_entry(a,b)
 #define xfs_dqtrace_entry_ino(a,b,ip)
 #endif
+
 #ifdef QUOTADEBUG
 extern void		xfs_qm_dqprint(xfs_dquot_t *);
 #else

@@ -37,6 +37,7 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 endif
 ifeq ($(CONFIG_XFS_TRACE),y)
 	EXTRA_CFLAGS += -DPAGEBUF_TRACE
+	EXTRA_CFLAGS += -DXFS_DQUOT_TRACE
 endif
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
