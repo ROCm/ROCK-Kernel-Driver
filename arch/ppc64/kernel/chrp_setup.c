@@ -56,7 +56,6 @@
 #include <asm/dma.h>
 #include <asm/machdep.h>
 #include <asm/irq.h>
-#include <asm/keyboard.h>
 #include <asm/naca.h>
 #include <asm/time.h>
 
@@ -72,14 +71,6 @@ void chrp_setup_pci_ptrs(void);
 void chrp_progress(char *, unsigned short);
 void chrp_request_regions(void);
 
-extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
-extern int pckbd_getkeycode(unsigned int scancode);
-extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
-			   char raw_mode);
-extern char pckbd_unexpected_up(unsigned char keycode);
-extern void pckbd_leds(unsigned char leds);
-extern void pckbd_init_hw(void);
-extern unsigned char pckbd_sysrq_xlate[128];
 extern void openpic_init_IRQ(void);
 extern void init_ras_IRQ(void);
 
@@ -283,19 +274,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.progress = chrp_progress;
 
-#ifdef CONFIG_VT
-	ppc_md.kbd_setkeycode    = pckbd_setkeycode;
-	ppc_md.kbd_getkeycode    = pckbd_getkeycode;
-	ppc_md.kbd_translate     = pckbd_translate;
-	ppc_md.kbd_unexpected_up = pckbd_unexpected_up;
-	ppc_md.kbd_leds          = pckbd_leds;
-	ppc_md.kbd_init_hw       = pckbd_init_hw;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.ppc_kbd_sysrq_xlate = pckbd_sysrq_xlate;
-	SYSRQ_KEY = 0x63;	/* Print Screen */
-#endif
-#endif
-	
 	ppc_md.progress("Linux ppc64\n", 0x0);
 }
 
