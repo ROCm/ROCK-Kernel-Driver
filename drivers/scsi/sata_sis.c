@@ -44,10 +44,6 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static u32 sis_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void sis_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
 
-#ifndef PCI_DEVICE_ID_SI_180
-#define PCI_DEVICE_ID_SI_180 0x0180
-#endif
-
 static struct pci_device_id sis_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_180, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sis_180 },
 	{ }	/* terminate list */
@@ -96,17 +92,6 @@ static struct ata_port_operations sis_ops = {
 	.port_stop		= ata_port_stop,
 };
 
-static struct ata_port_info sis_port_info[] = {
-	/* sis_180 */
-	{
-		.sht		= &sis_sht,
-		.host_flags	= ATA_FLAG_SATA| ATA_FLAG_NO_LEGACY |
-				  ATA_FLAG_SATA_RESET,
-		.pio_mask	= 0x03,			/* pio3-4 */
-		.udma_mask	= 0x7f,			/* udma0-6; FIXME */
-		.port_ops	= &sis_ops,
-	}
-};
 
 MODULE_AUTHOR("Uwe Koziolek");
 MODULE_DESCRIPTION("low-level driver for Silicon Integratad Systems SATA controller");
@@ -129,12 +114,22 @@ static void sis_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val)
 	outl(val, ap->ioaddr.scr_addr + (sc_reg * 4));
 }
 
+/* move to PCI layer, integrate w/ MSI stuff */
+static void pci_enable_intx(struct pci_dev *pdev)
+{
+	u16 pci_command;
+
+	pci_read_config_word(pdev, PCI_COMMAND, &pci_command);
+	if (pci_command & PCI_COMMAND_INTX_DISABLE) {
+		pci_command &= ~PCI_COMMAND_INTX_DISABLE;
+		pci_write_config_word(pdev, PCI_COMMAND, pci_command);
+	}
+}
+
 static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct ata_probe_ent *probe_ent = NULL;
-	struct ata_port_info *port0 = &sis_port_info[sis_180];
 	int rc;
-	u16 pci_cmd;
 
 	rc = pci_enable_device(pdev);
 	if (rc)
@@ -145,6 +140,9 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_out;
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
+	if (rc)
+		goto err_out_regions;
+	rc = pci_set_consistent_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
 		goto err_out_regions;
 
@@ -158,11 +156,12 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->pdev = pdev;
 	INIT_LIST_HEAD(&probe_ent->node);
 
-	probe_ent->sht = port0->sht;
-	probe_ent->host_flags = port0->host_flags;
-	probe_ent->pio_mask = port0->pio_mask;
-	probe_ent->udma_mask = port0->udma_mask;
-	probe_ent->port_ops = port0->port_ops;
+	probe_ent->sht = &sis_sht;
+	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_SATA_RESET |
+				ATA_FLAG_NO_LEGACY;
+	probe_ent->pio_mask = 0x03;
+	probe_ent->udma_mask = 0x7f;
+	probe_ent->port_ops = &sis_ops;
 
 	probe_ent->port[0].cmd_addr = pci_resource_start(pdev, 0);
 	ata_std_ports(&probe_ent->port[0]);
@@ -183,11 +182,9 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->irq_flags = SA_SHIRQ;
 
 	pci_set_master(pdev);
+	pci_enable_intx(pdev);
 
-	pci_read_config_word(pdev, PCI_COMMAND, &pci_cmd);
-	pci_write_config_word(pdev, PCI_COMMAND,
-		pci_cmd & ~PCI_COMMAND_INTX_DISABLE); /* enable interrupts */
-
+	/* FIXME: check ata_device_add return value */
 	ata_device_add(probe_ent);
 	kfree(probe_ent);
 
@@ -204,13 +201,7 @@ err_out:
 
 static int __init sis_init(void)
 {
-	int rc;
-
-	rc = pci_module_init(&sis_pci_driver);
-	if (rc)
-		return rc;
-
-	return 0;
+	return pci_module_init(&sis_pci_driver);
 }
 
 static void __exit sis_exit(void)
