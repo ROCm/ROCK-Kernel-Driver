@@ -138,8 +138,9 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int 
 		p->eaction = parm->eaction;
 		if (parm->ifindex) {
 			p->ifindex = parm->ifindex;
+			if (ovr)
+				dev_put(p->dev);
 			p->dev = dev;
-			dev_hold(p->dev); 
 		}
 		spin_unlock(&p->lock);
 	}
