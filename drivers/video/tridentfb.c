@@ -351,14 +351,14 @@ static void trident_8bpp_clear (struct vc_data *conp, struct display *p,
 }
 
 static struct display_switch trident_8bpp = {
-	setup:		fbcon_cfb8_setup,
-	bmove:		trident_bmove,
-	clear:		trident_8bpp_clear,
-	putc:		fbcon_cfb8_putc,
-	putcs:		fbcon_cfb8_putcs,
-	revc:		fbcon_cfb8_revc,
-	clear_margins:	fbcon_cfb8_clear_margins,
-	fontwidthmask:	FONTWIDTH (4) | FONTWIDTH (8) | FONTWIDTH (12) | FONTWIDTH (16)
+	.setup =	fbcon_cfb8_setup,
+	.bmove =	trident_bmove,
+	.clear =	trident_8bpp_clear,
+	.putc =		fbcon_cfb8_putc,
+	.putcs =	fbcon_cfb8_putcs,
+	.revc =		fbcon_cfb8_revc,
+	.clear_margins =fbcon_cfb8_clear_margins,
+	.fontwidthmask =FONTWIDTH (4) | FONTWIDTH (8) | FONTWIDTH (12) | FONTWIDTH (16)
 };
 #endif
 #ifdef FBCON_HAS_CFB16
@@ -372,14 +372,14 @@ static void trident_16bpp_clear (struct vc_data *conp, struct display *p,
 }
 
 static struct display_switch trident_16bpp = {
-	setup:		fbcon_cfb16_setup,
-	bmove:		trident_bmove,
-	clear:		trident_16bpp_clear,
-	putc:		fbcon_cfb16_putc,
-	putcs:		fbcon_cfb16_putcs,
-	revc:		fbcon_cfb16_revc,
-	clear_margins:	fbcon_cfb16_clear_margins,
-	fontwidthmask:	FONTWIDTH (4) | FONTWIDTH (8) | FONTWIDTH (12) | FONTWIDTH (16)
+	.setup =	fbcon_cfb16_setup,
+	.bmove =	trident_bmove,
+	.clear =	trident_16bpp_clear,
+	.putc =		fbcon_cfb16_putc,
+	.putcs =	fbcon_cfb16_putcs,
+	.revc =		fbcon_cfb16_revc,
+	.clear_margins =fbcon_cfb16_clear_margins,
+	.fontwidthmask =FONTWIDTH (4) | FONTWIDTH (8) | FONTWIDTH (12) | FONTWIDTH (16)
 };
 #endif
 #ifdef FBCON_HAS_CFB32
@@ -392,14 +392,14 @@ static void trident_32bpp_clear (struct vc_data *conp, struct display *p,
 }
 
 static struct display_switch trident_32bpp = {
-	setup:		fbcon_cfb32_setup,
-	bmove:		trident_bmove,
-	clear:		trident_32bpp_clear,
-	putc:		fbcon_cfb32_putc,
-	putcs:		fbcon_cfb32_putcs,
-	revc:		fbcon_cfb32_revc,
-	clear_margins:	fbcon_cfb32_clear_margins,
-	fontwidthmask:	FONTWIDTH (4) | FONTWIDTH (8) | FONTWIDTH (12) | FONTWIDTH (16)
+	.setup =	fbcon_cfb32_setup,
+	.bmove =	trident_bmove,
+	.clear =	trident_32bpp_clear,
+	.putc =		fbcon_cfb32_putc,
+	.putcs =	fbcon_cfb32_putcs,
+	.revc =		fbcon_cfb32_revc,
+	.clear_margins =fbcon_cfb32_clear_margins,
+	.fontwidthmask =FONTWIDTH (4) | FONTWIDTH (8) | FONTWIDTH (12) | FONTWIDTH (16)
 };
 #endif
 
@@ -1286,13 +1286,13 @@ int tridentfb_setup(char *options)
 }
 
 static struct fb_ops tridentfb_ops = {
-	fb_get_fix:	fbgen_get_fix,
-	fb_get_var:	fbgen_get_var,
-	fb_set_var:	fbgen_set_var,
-	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	fbgen_set_cmap,
-	fb_setcolreg:	tridentfb_setcolreg,
-	fb_pan_display:	fbgen_pan_display,
+	.fb_get_fix =	fbgen_get_fix,
+	.fb_get_var =	fbgen_get_var,
+	.fb_set_var =	fbgen_set_var,
+	.fb_get_cmap =	fbgen_get_cmap,
+	.fb_set_cmap =	fbgen_set_cmap,
+	.fb_setcolreg =	tridentfb_setcolreg,
+	.fb_pan_display =fbgen_pan_display,
 };
 
 #ifdef MODULE

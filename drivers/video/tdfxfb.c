@@ -91,36 +91,36 @@
 #define VOODOO5_MAX_PIXCLOCK 350000.0
 
 static struct fb_fix_screeninfo tdfx_fix __initdata = {
-	id:		"3Dfx",
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_PSEUDOCOLOR, 
-	ypanstep:	1,
-	ywrapstep:	1, 
-	accel:		FB_ACCEL_3DFX_BANSHEE
+	.id =		"3Dfx",
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_PSEUDOCOLOR, 
+	.ypanstep =	1,
+	.ywrapstep =	1, 
+	.accel =	FB_ACCEL_3DFX_BANSHEE
 };
 
 static struct fb_var_screeninfo tdfx_var __initdata = {
 	/* "640x480, 8 bpp @ 60 Hz */
-	xres:		640,
-	yres:		480,
-	xres_virtual:	640,
-	yres_virtual:	1024,
-	bits_per_pixel:	8,
-	red:		{0, 8, 0},
-	blue:		{0, 8, 0},
-	green:		{0, 8, 0},
-	activate:	FB_ACTIVATE_NOW,
-	height:		-1,
-	width:		-1,
-	accel_flags:	FB_ACCELF_TEXT,
-	pixclock:	39722,
-	left_margin:	40,
-	right_margin:	24,
-	upper_margin:	32,
-	lower_margin:	11,
-	hsync_len:	96,
-	vsync_len:	2,
-	vmode:		FB_VMODE_NONINTERLACED
+	.xres =		640,
+	.yres =		480,
+	.xres_virtual =	640,
+	.yres_virtual =	1024,
+	.bits_per_pixel =8,
+	.red =		{0, 8, 0},
+	.blue =		{0, 8, 0},
+	.green =	{0, 8, 0},
+	.activate =	FB_ACTIVATE_NOW,
+	.height =	-1,
+	.width =	-1,
+	.accel_flags =	FB_ACCELF_TEXT,
+	.pixclock =	39722,
+	.left_margin =	40,
+	.right_margin =	24,
+	.upper_margin =	32,
+	.lower_margin =	11,
+	.hsync_len =	96,
+	.vsync_len =	2,
+	.vmode =	FB_VMODE_NONINTERLACED
 };
 
 /*
@@ -143,10 +143,10 @@ static struct pci_device_id tdfxfb_id_table[] __devinitdata = {
 };
 
 static struct pci_driver tdfxfb_driver = {
-	name:		"tdfxfb",
-	id_table:	tdfxfb_id_table,
-	probe:		tdfxfb_probe,
-	remove:		tdfxfb_remove,
+	.name =		"tdfxfb",
+	.id_table =	tdfxfb_id_table,
+	.probe =	tdfxfb_probe,
+	.remove =	tdfxfb_remove,
 };
 
 MODULE_DEVICE_TABLE(pci, tdfxfb_id_table);
@@ -168,20 +168,18 @@ static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area);
 static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *image); 
 
 static struct fb_ops tdfxfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_check_var:	tdfxfb_check_var,
-	fb_set_par:	tdfxfb_set_par,
-	fb_setcolreg:	tdfxfb_setcolreg,
-	fb_blank:	tdfxfb_blank,
-	fb_pan_display:	tdfxfb_pan_display,
-	fb_fillrect:	tdfxfb_fillrect,
-	fb_copyarea:	tdfxfb_copyarea,
-	fb_imageblit:	tdfxfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_check_var	= tdfxfb_check_var,
+	.fb_set_par	= tdfxfb_set_par,
+	.fb_setcolreg	= tdfxfb_setcolreg,
+	.fb_blank	= tdfxfb_blank,
+	.fb_pan_display	= tdfxfb_pan_display,
+	.fb_fillrect	= tdfxfb_fillrect,
+	.fb_copyarea	= tdfxfb_copyarea,
+	.fb_imageblit	= tdfxfb_imageblit,
 };
 
 /*

@@ -117,18 +117,18 @@ static struct fb_var_screeninfo default_var = {
 /* default modedb mode */
 /* 640x480, 60 Hz, Non-Interlaced (25.172 MHz dotclock) */
 static struct fb_videomode defaultmode __initdata = {
-	refresh:	60,
-	xres:		640,
-	yres:		480,
-	pixclock:	39722,
-	left_margin:	48,
-	right_margin:	16,
-	upper_margin:	33,
-	lower_margin:	10,
-	hsync_len:	96,
-	vsync_len:	2,
-	sync:		0,
-	vmode:		FB_VMODE_NONINTERLACED
+	.refresh =	60,
+	.xres =		640,
+	.yres =		480,
+	.pixclock =	39722,
+	.left_margin =	48,
+	.right_margin =	16,
+	.upper_margin =	33,
+	.lower_margin =	10,
+	.hsync_len =	96,
+	.vsync_len =	2,
+	.sync =		0,
+	.vmode =	FB_VMODE_NONINTERLACED
 };
 
 /* struct to hold chip description information */
@@ -415,16 +415,16 @@ static void fbcon_aty32_putcs(struct vc_data *conp, struct display *p,
 #endif
 
 static struct fb_ops aty128fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	aty128fb_get_fix,
-	fb_get_var:	aty128fb_get_var,
-	fb_set_var:	aty128fb_set_var,
-	fb_get_cmap:	aty128fb_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	aty128fb_setcolreg,
-	fb_pan_display:	aty128fb_pan_display,
-	fb_blank:	aty128fb_blank,
-	fb_rasterimg:	aty128fb_rasterimg,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	aty128fb_get_fix,
+	.fb_get_var =	aty128fb_get_var,
+	.fb_set_var =	aty128fb_set_var,
+	.fb_get_cmap =	aty128fb_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	aty128fb_setcolreg,
+	.fb_pan_display =aty128fb_pan_display,
+	.fb_blank =	aty128fb_blank,
+	.fb_rasterimg =	aty128fb_rasterimg,
 };
 
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -1749,7 +1749,7 @@ aty128_init(struct fb_info_aty128 *info, const char *name)
     board_list = aty128_board_list_add(board_list, info);
 
     size = (var.bits_per_pixel <= 8) ? 256 : 32;
-    fb_alloc_cmap(info->fb_info.cmap, size, 0);	
+    fb_alloc_cmap(&info->fb_info.cmap, size, 0);	
 
     if (register_framebuffer(&info->fb_info) < 0)
 	return 0;

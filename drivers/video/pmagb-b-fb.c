@@ -58,24 +58,24 @@ static struct fb_info pmagbb_fb_info[3];
 static struct display pmagbb_disp[3];
 
 static struct fb_var_screeninfo pmagbbfb_defined = {
-	xres:		1280,
-	yres:		1024,
-	xres_virtual:	1280,
-	yres_virtual:	1024,
-	bits_per_pixel:	8,
-	activate:	FB_ACTIVATE_NOW,
-	height:		274,
-	width:		195,
-	accel_flags:	FB_ACCEL_NONE,
-	vmode:		FB_VMODE_NONINTERLACED,
+	.xres =		1280,
+	.yres =		1024,
+	.xres_virtual =	1280,
+	.yres_virtual =	1024,
+	.bits_per_pixel =8,
+	.activate =	FB_ACTIVATE_NOW,
+	.height =	274,
+	.width =	195,
+	.accel_flags =	FB_ACCEL_NONE,
+	.vmode =	FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo pmagbafb_fix = {
-	id:		"PMAGB-BA",
-	smem_len:	(1280 * 1024),
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_PSEUDOCOLOR,
-	line_length:	1280,
+	.id =		"PMAGB-BA",
+	.smem_len =	(1280 * 1024),
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_PSEUDOCOLOR,
+	.line_length =	1280,
 }
 
 /*
@@ -113,16 +113,14 @@ static int pmagbbfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 }
 
 static struct fb_ops pmagbbfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	pmagbbfb_setcolreg,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= pmagbbfb_setcolreg,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 int __init pmagbbfb_init_one(int slot)
