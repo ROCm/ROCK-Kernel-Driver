@@ -132,8 +132,8 @@ config TUN
 	  If you don't know what to use this for, you don't need it.
 
 config ETHERTAP
-	tristate "Ethertap network tap (OBSOLETE)"
-	depends on NETDEVICES && EXPERIMENTAL
+	tristate "Ethertap network tap"
+	depends on NETDEVICES && EXPERIMENTAL && NETLINK_DEV
 	---help---
 	  If you say Y here (and have said Y to "Kernel/User network link
 	  driver", above) and create a character special file /dev/tap0 with
