@@ -156,7 +156,10 @@ client_t *snd_seq_client_use_ptr(int clientid)
 					card_requested[card] = 1;
 					snd_request_card(card);
 				}
-				snd_seq_device_load_drivers();
+				/* FIXME: may cause blocking when called from
+				 * module_init(), so disable this feature
+				 */
+				/* snd_seq_device_load_drivers(); */
 			}
 		}
 		spin_lock_irqsave(&clients_lock, flags);
