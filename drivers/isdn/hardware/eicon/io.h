@@ -252,11 +252,6 @@ struct s_load {
 #define PR_RAM  ((struct pr_ram *)0)
 #define RAM ((struct dual *)0)
 /* ---------------------------------------------------------------------
-  Functions for port io
-   --------------------------------------------------------------------- */
-void outp_words_from_buffer (word __iomem * adr, byte* P, dword len);
-void inp_words_to_buffer    (word __iomem * adr, byte* P, dword len);
-/* ---------------------------------------------------------------------
   platform specific conversions
    --------------------------------------------------------------------- */
 extern void * PTR_P(ADAPTER * a, ENTITY * e, void * P);
