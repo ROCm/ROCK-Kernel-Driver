@@ -454,9 +454,6 @@ int pcmcia_modify_window(window_handle_t win, modwin_t *req);
 int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask);
 #endif
 
-/* rsrc_mgr.c */
-int pcmcia_adjust_resource_info(client_handle_t handle, adjust_t *adj);
-
 #endif /* __KERNEL__ */
 
 #endif /* _LINUX_CS_H */

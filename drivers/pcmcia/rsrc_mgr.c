@@ -973,11 +973,8 @@ static int adjust_irq(adjust_t *adj)
 
 /*====================================================================*/
 
-int pcmcia_adjust_resource_info(client_handle_t handle, adjust_t *adj)
+int pcmcia_adjust_resource_info(adjust_t *adj)
 {
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    
     switch (adj->Resource) {
     case RES_MEMORY_RANGE:
 	return adjust_memory(adj);
@@ -991,6 +988,7 @@ int pcmcia_adjust_resource_info(client_handle_t handle, adjust_t *adj)
     }
     return CS_UNSUPPORTED_FUNCTION;
 }
+EXPORT_SYMBOL(pcmcia_adjust_resource_info);
 
 /*====================================================================*/
 

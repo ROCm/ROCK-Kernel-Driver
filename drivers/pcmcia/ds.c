@@ -884,6 +884,8 @@ static u_int ds_poll(struct file *file, poll_table *wait)
 
 /*====================================================================*/
 
+extern int pcmcia_adjust_resource_info(adjust_t *adj);
+
 static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
 {
@@ -932,7 +934,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     
     switch (cmd) {
     case DS_ADJUST_RESOURCE_INFO:
-	ret = pcmcia_adjust_resource_info(s->handle, &buf.adjust);
+	ret = pcmcia_adjust_resource_info(&buf.adjust);
 	break;
     case DS_GET_CARD_SERVICES_INFO:
 	ret = pcmcia_get_card_services_info(&buf.servinfo);

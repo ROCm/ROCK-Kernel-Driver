@@ -2098,7 +2098,6 @@ EXPORT_SYMBOL(pcmcia_set_event_mask);
 ======================================================================*/
 /* in alpha order */
 EXPORT_SYMBOL(pcmcia_access_configuration_register);
-EXPORT_SYMBOL(pcmcia_adjust_resource_info);
 EXPORT_SYMBOL(pcmcia_deregister_client);
 EXPORT_SYMBOL(pcmcia_eject_card);
 EXPORT_SYMBOL(pcmcia_get_card_services_info);
