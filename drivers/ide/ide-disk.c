@@ -1628,6 +1628,24 @@ static ide_startstop_t idedisk_start_power_step (ide_drive_t *drive, struct requ
 	return ide_stopped;
 }
 
+typedef enum
+{
+	barrier_default,
+	barrier_on,
+	barrier_off
+} barrier_mode_t;
+static barrier_mode_t chosen_barrier_mode = barrier_default;
+
+static int __init barrier_setup (char *str)
+{
+	if (!strncmp (str, "on", 2))
+		chosen_barrier_mode = barrier_on;
+	else if (!strncmp (str, "off", 3))
+		chosen_barrier_mode = barrier_off;
+	return 1;
+}
+__setup ("barrier=", barrier_setup);
+
 static void idedisk_setup (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
@@ -1768,10 +1786,21 @@ static void idedisk_setup (ide_drive_t *drive)
 	 * if write back caching is enabled. LBA48 drives are newer, so
 	 * expect it to flag support properly. We can safely support
 	 * FLUSH_CACHE on lba48, if capacity doesn't exceed lba28
+	 * Let the user modify this decision using a boot parameter
+	 * barrier={on|off|default}
 	 */
-	barrier = 1;
+
+	if (chosen_barrier_mode == barrier_on) {
+		barrier = 1;
+		if (drive->addressing == 1)
+			barrier = ide_id_has_flush_cache (id);
+	}
+	else if (chosen_barrier_mode == barrier_off)
+		barrier = 0;
+	else
+		barrier = ide_id_has_flush_cache (id);
+
 	if (drive->addressing == 1) {
-		barrier = ide_id_has_flush_cache(id);
 		if (capacity > (1ULL << 28) && !ide_id_has_flush_cache_ext(id))
 			barrier = 0;
 	}
