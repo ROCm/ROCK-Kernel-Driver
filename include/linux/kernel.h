@@ -90,6 +90,7 @@ asmlinkage int printk(const char * fmt, ...)
 unsigned long int_sqrt(unsigned long);
 
 extern int printk_ratelimit(void);
+extern int __printk_ratelimit(int ratelimit_jiffies, int ratelimit_burst);
 
 static inline void console_silent(void)
 {

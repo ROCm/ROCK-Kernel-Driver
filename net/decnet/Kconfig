@@ -22,8 +22,9 @@ config DECNET_ROUTER
 	  network link driver", "Routing messages" and "Network packet
 	  filtering".  The first two are required to allow configuration via
 	  rtnetlink (you will need Alexey Kuznetsov's iproute2 package
-	  from <ftp://ftp.inr.ac.ru/>). The "Network packet filtering" option
-	  will be required for the forthcoming routing daemon to work.
+	  from <ftp://ftp.tux.org/pub/net/ip-routing/>). The "Network packet
+	  filtering" option will be required for the forthcoming routing daemon
+	  to work.
 
 	  See <file:Documentation/networking/decnet.txt> for more information.
 

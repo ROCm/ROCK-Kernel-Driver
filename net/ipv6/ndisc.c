@@ -707,8 +707,10 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	struct ndisc_options ndopts;
 	struct net_device *dev = skb->dev;
 	struct inet6_ifaddr *ifp;
+	struct inet6_dev *idev = NULL;
 	struct neighbour *neigh;
-	int addr_type = ipv6_addr_type(saddr);
+	int dad = ipv6_addr_any(saddr);
+	int inc;
 
 	if (ipv6_addr_is_multicast(&msg->target)) {
 		if (net_ratelimit())
@@ -720,7 +722,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	 * RFC2461 7.1.1:
 	 * DAD has to be destined for solicited node multicast address.
 	 */
-	if (addr_type == IPV6_ADDR_ANY &&
+	if (dad &&
 	    !(daddr->s6_addr32[0] == htonl(0xff020000) &&
 	      daddr->s6_addr32[1] == htonl(0x00000000) &&
 	      daddr->s6_addr32[2] == htonl(0x00000001) &&
@@ -750,12 +752,14 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		 *	there MUST NOT be source link-layer address option 
 		 *	in the message.
 		 */
-		if (addr_type == IPV6_ADDR_ANY) {
+		if (dad) {
 			if (net_ratelimit())
 				printk(KERN_WARNING "ICMP6 NS: bad DAD packet (link-layer address option)\n");
 			return;
 		}
 	}
+
+	inc = ipv6_addr_is_multicast(daddr);
 
 	if ((ifp = ipv6_get_ifaddr(&msg->target, dev, 1)) != NULL) {
 		if (ifp->flags & IFA_F_TENTATIVE) {
@@ -764,146 +768,89 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 			   does DAD, otherwise we ignore solicitations
 			   until DAD timer expires.
 			 */
-			if (addr_type == IPV6_ADDR_ANY) {
-				if (dev->type == ARPHRD_IEEE802_TR) { 
-					unsigned char *sadr = skb->mac.raw ;
-					if (((sadr[8] &0x7f) != (dev->dev_addr[0] & 0x7f)) ||
-					(sadr[9] != dev->dev_addr[1]) ||
-					(sadr[10] != dev->dev_addr[2]) ||
-					(sadr[11] != dev->dev_addr[3]) ||
-					(sadr[12] != dev->dev_addr[4]) ||
-					(sadr[13] != dev->dev_addr[5])) 
-					{
-						addrconf_dad_failure(ifp) ; 
-					}
-				} else {
-					addrconf_dad_failure(ifp);
+			if (!dad)
+				goto out;
+			if (dev->type == ARPHRD_IEEE802_TR) {
+				unsigned char *sadr = skb->mac.raw;
+				if (((sadr[8] ^ dev->dev_addr[0]) & 0x7f) == 0 &&
+				    sadr[9] == dev->dev_addr[1] &&
+				    sadr[10] == dev->dev_addr[2] &&
+				    sadr[11] == dev->dev_addr[3] &&
+				    sadr[12] == dev->dev_addr[4] &&
+				    sadr[13] == dev->dev_addr[5]) {
+					/* looped-back to us */
+					goto out;
 				}
-			} else
-				in6_ifa_put(ifp);
-			return;
-		}
-	
-		if (addr_type == IPV6_ADDR_ANY) {
-			struct in6_addr maddr;
-
-			ipv6_addr_all_nodes(&maddr);
-			ndisc_send_na(dev, NULL, &maddr, &ifp->addr, 
-				      ifp->idev->cnf.forwarding, 0, 
-				      1, 1);
-			in6_ifa_put(ifp);
-			return;
-		}
-
-		if (addr_type & IPV6_ADDR_UNICAST) {
-			if (ipv6_addr_is_multicast(daddr))
-				nd_tbl.stats.rcv_probes_mcast++;
-			else
-				nd_tbl.stats.rcv_probes_ucast++;
-
-			/* 
-			 *	update / create cache entry
-			 *	for the source address
-			 */
-
-			neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, dev);
-
-			if (neigh || !dev->hard_header) {
-				ndisc_send_na(dev, neigh, saddr, &ifp->addr, 
-					      ifp->idev->cnf.forwarding, 1, 
-					      1, 1);
-				if (neigh)
-					neigh_release(neigh);
 			}
+			addrconf_dad_failure(ifp); 
+			return;
 		}
-		in6_ifa_put(ifp);
-	} else if (ipv6_chk_acast_addr(dev, &msg->target)) {
-		struct inet6_dev *idev = in6_dev_get(dev);
-	
-		/* anycast */
-	
+
+		idev = ifp->idev;
+	} else {
+		idev = in6_dev_get(dev);
 		if (!idev) {
 			/* XXX: count this drop? */
 			return;
 		}
-	
-		if (addr_type == IPV6_ADDR_ANY) {
-			struct in6_addr maddr;
-	
-			ipv6_addr_all_nodes(&maddr);
-			ndisc_send_na(dev, NULL, &maddr, &msg->target,
-				      idev->cnf.forwarding, 0, 0, 1);
-			in6_dev_put(idev);
-			return;
-		}
 
-		if (addr_type & IPV6_ADDR_UNICAST) {
-			int inc = ipv6_addr_is_multicast(daddr);
-			if (inc)  
-				nd_tbl.stats.rcv_probes_mcast++;
-			else
-				nd_tbl.stats.rcv_probes_ucast++;
-	
-			/*
-			 *   update / create cache entry
-			 *   for the source address
-			 */
-
-			neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, skb->dev);
-
-			if (neigh || !dev->hard_header) {
-				ndisc_send_na(dev, neigh, saddr,
-					      &msg->target, 
-					      idev->cnf.forwarding, 1, 0, inc);
-				if (neigh)
-					neigh_release(neigh);
-			}
-		}
-		in6_dev_put(idev);
-	} else {
-		struct inet6_dev *in6_dev = in6_dev_get(dev);
-
-		if (in6_dev && in6_dev->cnf.forwarding &&
-		    (addr_type & IPV6_ADDR_UNICAST ||
-		     addr_type == IPV6_ADDR_ANY) &&
-		    pneigh_lookup(&nd_tbl, &msg->target, dev, 0)) {
-			int inc = ipv6_addr_is_multicast(daddr);
-
-			if (skb->stamp.tv_sec == 0 ||
-			    skb->pkt_type == PACKET_HOST ||
-			    inc == 0 ||
-			    in6_dev->nd_parms->proxy_delay == 0) {
-				if (inc)
-					nd_tbl.stats.rcv_probes_mcast++;
-				else
-					nd_tbl.stats.rcv_probes_ucast++;
-					
-				if (addr_type & IPV6_ADDR_UNICAST) {
-					neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, dev);
-
-					if (neigh) {
-						ndisc_send_na(dev, neigh, saddr, &msg->target,
-							      0, 1, 0, 1);
-						neigh_release(neigh);
-					}
-				} else {
-					/* proxy should also protect against DAD */
-					struct in6_addr maddr;
-					ipv6_addr_all_nodes(&maddr);
-					ndisc_send_na(dev, NULL, &maddr, &msg->target, 
-						      0, 0, 0, 1);
-				}
-			} else {
+		if (ipv6_chk_acast_addr(dev, &msg->target) ||
+		    (idev->cnf.forwarding && 
+		     pneigh_lookup(&nd_tbl, &msg->target, dev, 0))) {
+			if (skb->stamp.tv_sec != 0 &&
+			    skb->pkt_type != PACKET_HOST &&
+			    inc != 0 &&
+			    idev->nd_parms->proxy_delay != 0) {
+				/*
+				 * for anycast or proxy,
+				 * sender should delay its response 
+				 * by a random time between 0 and 
+				 * MAX_ANYCAST_DELAY_TIME seconds.
+				 * (RFC2461) -- yoshfuji
+				 */
 				struct sk_buff *n = skb_clone(skb, GFP_ATOMIC);
 				if (n)
-					pneigh_enqueue(&nd_tbl, in6_dev->nd_parms, n);
-				in6_dev_put(in6_dev);
-				return;
+					pneigh_enqueue(&nd_tbl, idev->nd_parms, n);
+				goto out;
 			}
-		}
-		if (in6_dev)
-			in6_dev_put(in6_dev);
+		} else
+			goto out;
 	}
+
+	if (dad) {
+		struct in6_addr maddr;
+
+		ipv6_addr_all_nodes(&maddr);
+		ndisc_send_na(dev, NULL, &maddr, &msg->target,
+			      idev->cnf.forwarding, 0, (ifp != NULL), 1);
+		goto out;
+	}
+
+	if (inc)
+		nd_tbl.stats.rcv_probes_mcast++;
+	else
+		nd_tbl.stats.rcv_probes_ucast++;
+
+	/* 
+	 *	update / create cache entry
+	 *	for the source address
+	 */
+	neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, dev);
+
+	if (neigh || !dev->hard_header) {
+		ndisc_send_na(dev, neigh, saddr, &msg->target,
+			      idev->cnf.forwarding, 
+			      1, (ifp != NULL && inc), inc);
+		if (neigh)
+			neigh_release(neigh);
+	}
+
+out:
+	if (ifp)
+		in6_ifa_put(ifp);
+	else
+		in6_dev_put(idev);
+
 	return;
 }
 
