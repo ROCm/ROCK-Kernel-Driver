@@ -497,18 +497,21 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	 */
 	ret |= !valid_user_regs(regs);
 
+	/*
+	 * Block the signal if we were unsuccessful.
+	 */
+	if (ret != 0 || !(ka->sa.sa_flags & SA_NODEFER)) {
+		spin_lock_irq(&tsk->sighand->siglock);
+		sigorsets(&tsk->blocked, &tsk->blocked,
+			  &ka->sa.sa_mask);
+		sigaddset(&tsk->blocked, sig);
+		recalc_sigpending();
+		spin_unlock_irq(&tsk->sighand->siglock);
+	}
+
 	if (ret == 0) {
 		if (ka->sa.sa_flags & SA_ONESHOT)
 			ka->sa.sa_handler = SIG_DFL;
-
-		if (!(ka->sa.sa_flags & SA_NODEFER)) {
-			spin_lock_irq(&tsk->sighand->siglock);
-			sigorsets(&tsk->blocked, &tsk->blocked,
-				  &ka->sa.sa_mask);
-			sigaddset(&tsk->blocked, sig);
-			recalc_sigpending();
-			spin_unlock_irq(&tsk->sighand->siglock);
-		}
 		return;
 	}
 
