@@ -1791,13 +1791,13 @@ static void ipr_worker_thread(void *data)
 
 	if (ioa_cfg->sdt_state == GET_DUMP) {
 		dump = ioa_cfg->dump;
-		if (!dump || !kobject_get(&dump->kobj)) {
+		if (!dump || !kref_get(&dump->kref)) {
 			spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 			return;
 		}
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		ipr_get_ioa_dump(ioa_cfg, dump);
-		kobject_put(&dump->kobj);
+		kref_put(&dump->kref);
 
 		spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 		if (ioa_cfg->sdt_state == DUMP_OBTAINED)
@@ -2392,7 +2392,7 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 	dump = ioa_cfg->dump;
 
-	if (ioa_cfg->sdt_state != DUMP_OBTAINED || !dump || !kobject_get(&dump->kobj)) {
+	if (ioa_cfg->sdt_state != DUMP_OBTAINED || !dump || !kref_get(&dump->kref)) {
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return 0;
 	}
@@ -2400,7 +2400,7 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 
 	if (off > dump->driver_dump.hdr.len) {
-		kobject_put(&dump->kobj);
+		kref_put(&dump->kref);
 		return 0;
 	}
 
@@ -2450,20 +2450,20 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 		count -= len;
 	}
 
-	kobject_put(&dump->kobj);
+	kref_put(&dump->kref);
 	return rc;
 }
 
 /**
  * ipr_release_dump - Free adapter dump memory
- * @kobj:	kobject struct
+ * @kref:	kref struct
  *
  * Return value:
  *	nothing
  **/
-static void ipr_release_dump(struct kobject *kobj)
+static void ipr_release_dump(struct kref *kref)
 {
-	struct ipr_dump *dump = container_of(kobj,struct ipr_dump,kobj);
+	struct ipr_dump *dump = container_of(kref,struct ipr_dump,kref);
 	struct ipr_ioa_cfg *ioa_cfg = dump->ioa_cfg;
 	unsigned long lock_flags = 0;
 	int i;
@@ -2480,10 +2480,6 @@ static void ipr_release_dump(struct kobject *kobj)
 	kfree(dump);
 	LEAVE;
 }
-
-static struct kobj_type ipr_dump_kobj_type = {
-	.release = ipr_release_dump,
-};
 
 /**
  * ipr_alloc_dump - Prepare for adapter dump
@@ -2506,8 +2502,7 @@ static int ipr_alloc_dump(struct ipr_ioa_cfg *ioa_cfg)
 	}
 
 	memset(dump, 0, sizeof(struct ipr_dump));
-	kobject_init(&dump->kobj);
-	dump->kobj.ktype = &ipr_dump_kobj_type;
+	kref_init(&dump->kref, ipr_release_dump);
 	dump->ioa_cfg = ioa_cfg;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
@@ -2554,7 +2549,7 @@ static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg)
 	ioa_cfg->dump = NULL;
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 
-	kobject_put(&dump->kobj);
+	kref_put(&dump->kref);
 
 	LEAVE;
 	return 0;

@@ -27,6 +27,7 @@
 #include <linux/types.h>
 #include <linux/completion.h>
 #include <linux/list.h>
+#include <linux/kref.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #ifdef CONFIG_KDB
@@ -1030,7 +1031,7 @@ struct ipr_ioa_dump {
 }__attribute__((packed, aligned (4)));
 
 struct ipr_dump {
-	struct kobject kobj;
+	struct kref kref;
 	struct ipr_ioa_cfg *ioa_cfg;
 	struct ipr_driver_dump driver_dump;
 	struct ipr_ioa_dump ioa_dump;
