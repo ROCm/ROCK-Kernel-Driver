@@ -1042,7 +1042,8 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 	ratep = &chip->rates[viadev->direction];
 	spin_lock_irqsave(&ratep->lock, flags);
 	ratep->used++;
-	if (chip->dxs_fixed) {
+	if (chip->dxs_fixed && viadev->direction == 0) {
+		/* fixed playback rate */
 		runtime->hw.rates = SNDRV_PCM_RATE_48000;
 		runtime->hw.rate_min = runtime->hw.rate_max = 48000;
 	} else if (! ratep->rate) {
@@ -2073,7 +2074,7 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		} else {
 			if ((err = snd_via8233_pcm_new(chip)) < 0)
 				goto __error;
-			if (dxs_support[dev] == 3)
+			if (dxs_support[dev] == VIA_DXS_48K)
 				chip->dxs_fixed = 1;
 		}
 		if ((err = snd_via8233_init_misc(chip, dev)) < 0)
