@@ -50,45 +50,29 @@ asmlinkage long compat_sys_mq_open(const char __user *u_name,
 			int oflag, compat_mode_t mode,
 			struct compat_mq_attr __user *u_attr)
 {
-	struct mq_attr attr;
-	mm_segment_t oldfs;
-	char *name;
-	long ret;
-
-	if ((oflag & O_CREAT) == 0 || !u_attr)
-		return sys_mq_open(u_name, oflag, mode, 0);
-
-	if (get_compat_mq_attr(&attr, u_attr))
-		return -EFAULT;
-
-	name = getname(u_name);
-	if (IS_ERR(name))
-		return PTR_ERR(name);
-
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_mq_open(name, oflag, mode, &attr);
-	set_fs(oldfs);
-
-	putname(name);
-	return ret;
+	void __user *p = NULL;
+	if (u_attr && oflag & O_CREAT) {
+		struct mq_attr attr;
+		p = compat_alloc_user_space(sizeof(attr));
+		if (get_compat_mq_attr(&attr, u_attr) ||
+		    copy_to_user(p, &attr, sizeof(attr)))
+			return -EFAULT;
+	}
+	return sys_mq_open(u_name, oflag, mode, p);
 }
 
-static struct timespec __user *compat_prepare_timeout(
-			const struct compat_timespec __user *u_abs_timeout)
+static int compat_prepare_timeout(struct timespec __user * *p,
+				  const struct compat_timespec __user *u)
 {
 	struct timespec ts;
-	struct timespec __user *u_ts;
-
-	if (!u_abs_timeout)
+	if (!u) {
+		*p = NULL;
 		return 0;
-
-	u_ts = compat_alloc_user_space(sizeof(*u_ts));
-	if (get_compat_timespec(&ts, u_abs_timeout)
-		|| copy_to_user(u_ts, &ts, sizeof(*u_ts)))
-		return ERR_PTR(-EFAULT);
-
-	return u_ts;
+	}
+	*p = compat_alloc_user_space(sizeof(ts));
+	if (get_compat_timespec(&ts, u) || copy_to_user(*p, &ts, sizeof(ts)))
+		return -EFAULT;
+	return 0;
 }
 
 asmlinkage long compat_sys_mq_timedsend(mqd_t mqdes,
@@ -98,8 +82,7 @@ asmlinkage long compat_sys_mq_timedsend(mqd_t mqdes,
 {
 	struct timespec __user *u_ts;
 
-	u_ts = compat_prepare_timeout(u_abs_timeout);
-	if (IS_ERR(u_ts))
+	if (compat_prepare_timeout(&u_ts, u_abs_timeout))
 		return -EFAULT;
 
 	return sys_mq_timedsend(mqdes, u_msg_ptr, msg_len,
@@ -112,9 +95,7 @@ asmlinkage ssize_t compat_sys_mq_timedreceive(mqd_t mqdes,
 			const struct compat_timespec __user *u_abs_timeout)
 {
 	struct timespec __user *u_ts;
-
-	u_ts = compat_prepare_timeout(u_abs_timeout);
-	if (IS_ERR(u_ts))
+	if (compat_prepare_timeout(&u_ts, u_abs_timeout))
 		return -EFAULT;
 
 	return sys_mq_timedreceive(mqdes, u_msg_ptr, msg_len,
@@ -138,60 +119,42 @@ static int get_compat_sigevent(struct sigevent *event,
 asmlinkage long compat_sys_mq_notify(mqd_t mqdes,
 			const struct compat_sigevent __user *u_notification)
 {
-	mm_segment_t oldfs;
-	struct sigevent notification;
-	char cookie[NOTIFY_COOKIE_LEN];
-	compat_uptr_t u_cookie;
-	long ret;
-
-	if (!u_notification)
-		return sys_mq_notify(mqdes, 0);
-
-	if (get_compat_sigevent(&notification, u_notification))
-		return -EFAULT;
-
-	if (notification.sigev_notify == SIGEV_THREAD) {
-		u_cookie = (compat_uptr_t)notification.sigev_value.sival_int;
-		if (copy_from_user(cookie, compat_ptr(u_cookie),
-						NOTIFY_COOKIE_LEN)) {
+	struct sigevent __user *p = NULL;
+	if (u_notification) {
+		struct sigevent n;
+		p = compat_alloc_user_space(sizeof(*p));
+		if (get_compat_sigevent(&n, u_notification))
 			return -EFAULT;
-		}
-		notification.sigev_value.sival_ptr = cookie;
+		if (n.sigev_notify == SIGEV_THREAD)
+			n.sigev_value.sival_ptr = compat_ptr(n.sigev_value.sival_int);
+		if (copy_to_user(p, &n, sizeof(*p)))
+			return -EFAULT;
 	}
-
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_mq_notify(mqdes, &notification);
-	set_fs(oldfs);
-
-	return ret;
+	return sys_mq_notify(mqdes, p);
 }
 
 asmlinkage long compat_sys_mq_getsetattr(mqd_t mqdes,
 			const struct compat_mq_attr __user *u_mqstat,
 			struct compat_mq_attr __user *u_omqstat)
 {
-	struct mq_attr mqstat, omqstat;
-	struct mq_attr *p_mqstat = 0, *p_omqstat = 0;
-	mm_segment_t oldfs;
+	struct mq_attr mqstat;
+	struct mq_attr __user *p = compat_alloc_user_space(2 * sizeof(*p));
 	long ret;
 
 	if (u_mqstat) {
-		p_mqstat = &mqstat;
-		if (get_compat_mq_attr(p_mqstat, u_mqstat))
+		if (get_compat_mq_attr(&mqstat, u_mqstat) ||
+		    copy_to_user(p, &mqstat, sizeof(mqstat)))
 			return -EFAULT;
 	}
-
-	if (u_omqstat)
-		p_omqstat = &omqstat;
-
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_mq_getsetattr(mqdes, p_mqstat, p_omqstat);
-	set_fs(oldfs);
-
+	ret = sys_mq_getsetattr(mqdes,
+				u_mqstat ? p : NULL,
+				u_omqstat ? p + 1 : NULL);
 	if (ret)
 		return ret;
-
-	return (u_omqstat) ? put_compat_mq_attr(&omqstat, u_omqstat) : 0;
+	if (u_omqstat) {
+		if (copy_from_user(&mqstat, p + 1, sizeof(mqstat)) ||
+		    put_compat_mq_attr(&mqstat, u_omqstat))
+			return -EFAULT;
+	}
+	return 0;
 }
