@@ -22,6 +22,7 @@
 #include <asm/delay.h>
 #include <asm/desc.h>
 #include <asm/apic.h>
+#include <asm/arch_hooks.h>
 
 #include <linux/irq.h>
 
@@ -333,15 +334,6 @@ static void math_error_irq(int cpl, void *dev_id, struct pt_regs *regs)
  */
 static struct irqaction irq13 = { math_error_irq, 0, 0, "fpu", NULL, NULL };
 
-/*
- * IRQ2 is cascade interrupt to second interrupt controller
- */
-
-#ifndef CONFIG_VISWS
-static struct irqaction irq2 = { no_action, 0, 0, "cascade", NULL, NULL};
-#endif
-
-
 void __init init_ISA_irqs (void)
 {
 	int i;
@@ -374,11 +366,9 @@ void __init init_IRQ(void)
 {
 	int i;
 
-#ifndef CONFIG_X86_VISWS_APIC
-	init_ISA_irqs();
-#else
-	init_VISWS_APIC_irqs();
-#endif
+	/* all the set up before the call gates are initialised */
+	pre_intr_init_hook();
+
 	/*
 	 * Cover the whole vector space, no vector can escape
 	 * us. (some of these will be overridden and become
@@ -390,39 +380,9 @@ void __init init_IRQ(void)
 			set_intr_gate(vector, interrupt[i]);
 	}
 
-#ifdef CONFIG_SMP
-	/*
-	 * IRQ0 must be given a fixed assignment and initialized,
-	 * because it's used before the IO-APIC is set up.
-	 */
-	set_intr_gate(FIRST_DEVICE_VECTOR, interrupt[0]);
-
-	/*
-	 * The reschedule interrupt is a CPU-to-CPU reschedule-helper
-	 * IPI, driven by wakeup.
-	 */
-	set_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
-
-	/* IPI for invalidation */
-	set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
-
-	/* IPI for generic function call */
-	set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
-#endif	
-
-#ifdef CONFIG_X86_LOCAL_APIC
-	/* self generated IPI for local APIC timer */
-	set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
-
-	/* IPI vectors for APIC spurious and error interrupts */
-	set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
-	set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
-
-	/* thermal monitor LVT interrupt */
-#ifdef CONFIG_X86_MCE_P4THERMAL
-	set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
-#endif
-#endif
+	/* setup after call gates are initialised (usually add in
+	 * the architecture specific gates */
+	intr_init_hook();
 
 	/*
 	 * Set the clock to HZ Hz, we already have a valid
@@ -431,10 +391,6 @@ void __init init_IRQ(void)
 	outb_p(0x34,0x43);		/* binary, mode 2, LSB/MSB, ch 0 */
 	outb_p(LATCH & 0xff , 0x40);	/* LSB */
 	outb(LATCH >> 8 , 0x40);	/* MSB */
-
-#ifndef CONFIG_VISWS
-	setup_irq(2, &irq2);
-#endif
 
 	/*
 	 * External FPU? Set up irq13 if so, for
