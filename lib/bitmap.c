@@ -71,6 +71,17 @@ void bitmap_complement(unsigned long *bitmap, int bits)
 }
 EXPORT_SYMBOL(bitmap_complement);
 
+/*
+ * bitmap_shift_write - logical right shift of the bits in a bitmap
+ *   @dst - destination bitmap
+ *   @src - source bitmap
+ *   @nbits - shift by this many bits
+ *   @bits - bitmap size, in bits
+ *
+ * Shifting right (dividing) means moving bits in the MS -> LS bit
+ * direction.  Zeros are fed into the vacated MS positions and the
+ * LS bits shifted off the bottom are lost.
+ */
 void bitmap_shift_right(unsigned long *dst,
 			const unsigned long *src, int shift, int bits)
 {
@@ -86,6 +97,17 @@ void bitmap_shift_right(unsigned long *dst,
 }
 EXPORT_SYMBOL(bitmap_shift_right);
 
+/*
+ * bitmap_shift_left - logical left shift of the bits in a bitmap
+ *   @dst - destination bitmap
+ *   @src - source bitmap
+ *   @nbits - shift by this many bits
+ *   @bits - bitmap size, in bits
+ *
+ * Shifting left (multiplying) means moving bits in the LS -> MS
+ * direction.  Zeros are fed into the vacated LS bit positions
+ * and those MS bits shifted off the top are lost.
+ */
 void bitmap_shift_left(unsigned long *dst,
 			const unsigned long *src, int shift, int bits)
 {
@@ -269,7 +291,7 @@ int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
 		if (nchunks == 0 && chunk == 0)
 			continue;
 
-		bitmap_shift_right(maskp, maskp, CHUNKSZ, nmaskbits);
+		bitmap_shift_left(maskp, maskp, CHUNKSZ, nmaskbits);
 		*maskp |= chunk;
 		nchunks++;
 		nbits += (nchunks == 1) ? nbits_to_hold_value(chunk) : CHUNKSZ;

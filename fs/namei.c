@@ -1031,9 +1031,8 @@ static inline int may_delete(struct inode *dir,struct dentry *victim,int isdir)
 		return error;
 	if (IS_APPEND(dir))
 		return -EPERM;
-	if (check_sticky(dir, victim->d_inode))
-		return -EACCES;
-	if (IS_APPEND(victim->d_inode) || IS_IMMUTABLE(victim->d_inode))
+	if (check_sticky(dir, victim->d_inode)||IS_APPEND(victim->d_inode)||
+	    IS_IMMUTABLE(victim->d_inode))
 		return -EPERM;
 	if (isdir) {
 		if (!S_ISDIR(victim->d_inode->i_mode))
