@@ -8,18 +8,10 @@
  *  for more details.
  */
 
-#ifndef _VIDEO_FONT_H
-#define _VIDEO_FONT_H
+#ifndef _VIDEO_CONSOLE_FONT_H
+#define _VIDEO_CONSOLE_FONT_H
 
-#include <linux/types.h>
-
-struct font_desc {
-    int idx;
-    char *name;
-    int width, height;
-    void *data;
-    int pref;
-};
+#include <video/font.h>		/* struct font_desc */
 
 #define VGA8x8_IDX	0
 #define VGA8x16_IDX	1
@@ -50,4 +42,4 @@ extern struct font_desc *get_default_font(int xres, int yres);
 /* Max. length for the name of a predefined font */
 #define MAX_FONT_NAME	32
 
-#endif /* _VIDEO_FONT_H */
+#endif /* _VIDEO_CONSOLE_FONT_H */
