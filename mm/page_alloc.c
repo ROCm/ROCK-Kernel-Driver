@@ -694,6 +694,15 @@ unsigned int nr_free_highpages (void)
 }
 #endif
 
+#ifdef CONFIG_NUMA
+static void show_node(struct zone *zone)
+{
+	printk("Node %d ", zone->zone_pgdat->node_id);
+}
+#else
+#define show_node(zone)	do { } while (0)
+#endif
+
 /*
  * Accumulate the page_state information across all CPUs.
  * The result is unavoidably approximate - it can change
@@ -793,67 +802,90 @@ void si_meminfo_node(struct sysinfo *val, int nid)
  */
 void show_free_areas(void)
 {
-	pg_data_t *pgdat;
 	struct page_state ps;
-	int type;
+	int cpu, temperature;
 	unsigned long active;
 	unsigned long inactive;
+	struct zone *zone;
+
+	for_each_zone(zone) {
+		show_node(zone);
+		printk("%s per-cpu:", zone->name);
+
+		if (!zone->present_pages) {
+			printk(" empty\n");
+			continue;
+		} else
+			printk("\n");
+
+		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
+			struct per_cpu_pageset *pageset = zone->pageset + cpu;
+			for (temperature = 0; temperature < 2; temperature++)
+				printk("cpu %d %s: low %d, high %d, batch %d\n",
+					cpu,
+					temperature ? "cold" : "hot",
+					pageset->pcp[temperature].low,
+					pageset->pcp[temperature].high,
+					pageset->pcp[temperature].batch);
+		}
+	}
 
 	get_page_state(&ps);
 	get_zone_counts(&active, &inactive);
 
-	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
+	printk("\nFree pages: %11ukB (%ukB HighMem)\n",
 		K(nr_free_pages()),
 		K(nr_free_highpages()));
 
-	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
-		for (type = 0; type < MAX_NR_ZONES; ++type) {
-			struct zone *zone = &pgdat->node_zones[type];
-			printk("Zone:%s"
-				" freepages:%6lukB"
-				" min:%6lukB"
-				" low:%6lukB"
-				" high:%6lukB"
-				" active:%6lukB"
-				" inactive:%6lukB"
-				"\n",
-				zone->name,
-				K(zone->free_pages),
-				K(zone->pages_min),
-				K(zone->pages_low),
-				K(zone->pages_high),
-				K(zone->nr_active),
-				K(zone->nr_inactive)
-				);
-		}
-
-	printk("( Active:%lu inactive:%lu dirty:%lu writeback:%lu free:%u )\n",
+	printk("Active:%lu inactive:%lu dirty:%lu writeback:%lu free:%u\n",
 		active,
 		inactive,
 		ps.nr_dirty,
 		ps.nr_writeback,
 		nr_free_pages());
 
-	for (pgdat = pgdat_list; pgdat; pgdat = pgdat->pgdat_next)
-		for (type = 0; type < MAX_NR_ZONES; type++) {
-			struct list_head *elem;
-			struct zone *zone = &pgdat->node_zones[type];
- 			unsigned long nr, flags, order, total = 0;
+	for_each_zone(zone) {
+		show_node(zone);
+		printk("%s"
+			" free:%lukB"
+			" min:%lukB"
+			" low:%lukB"
+			" high:%lukB"
+			" active:%lukB"
+			" inactive:%lukB"
+			"\n",
+			zone->name,
+			K(zone->free_pages),
+			K(zone->pages_min),
+			K(zone->pages_low),
+			K(zone->pages_high),
+			K(zone->nr_active),
+			K(zone->nr_inactive)
+			);
+	}
 
-			if (!zone->present_pages)
-				continue;
+	for_each_zone(zone) {
+		struct list_head *elem;
+ 		unsigned long nr, flags, order, total = 0;
 
-			spin_lock_irqsave(&zone->lock, flags);
-			for (order = 0; order < MAX_ORDER; order++) {
-				nr = 0;
-				list_for_each(elem, &zone->free_area[order].free_list)
-					++nr;
-				total += nr << order;
-				printk("%lu*%lukB ", nr, K(1UL) << order);
-			}
-			spin_unlock_irqrestore(&zone->lock, flags);
-			printk("= %lukB)\n", K(total));
+		show_node(zone);
+		printk("%s: ", zone->name);
+		if (!zone->present_pages) {
+			printk("empty\n");
+			continue;
 		}
+
+		spin_lock_irqsave(&zone->lock, flags);
+		for (order = 0; order < MAX_ORDER; order++) {
+			nr = 0;
+			list_for_each(elem, &zone->free_area[order].free_list)
+				++nr;
+			total += nr << order;
+			printk("%lu*%lukB ", nr, K(1UL) << order);
+		}
+		spin_unlock_irqrestore(&zone->lock, flags);
+		printk("= %lukB\n", K(total));
+	}
 
 	show_swap_cache_info();
 }
