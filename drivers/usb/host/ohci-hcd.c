@@ -240,7 +240,7 @@ static int ohci_urb_enqueue (
 	spin_lock_irqsave (&ohci->lock, flags);
 
 	/* don't submit to a dead HC */
-	if (!HCD_IS_RUNNING(ohci->hcd.state)) {
+	if (!HCD_IS_RUNNING(hcd->state)) {
 		retval = -ENODEV;
 		goto fail;
 	}
@@ -308,7 +308,7 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 #endif		  
 
 	spin_lock_irqsave (&ohci->lock, flags);
- 	if (HCD_IS_RUNNING(ohci->hcd.state)) {
+ 	if (HCD_IS_RUNNING(hcd->state)) {
 		urb_priv_t  *urb_priv;
 
 		/* Unless an IRQ completed the unlink while it was being
@@ -355,7 +355,7 @@ ohci_endpoint_disable (struct usb_hcd *hcd, struct usb_host_endpoint *ep)
 rescan:
 	spin_lock_irqsave (&ohci->lock, flags);
 
-	if (!HCD_IS_RUNNING (ohci->hcd.state)) {
+	if (!HCD_IS_RUNNING (hcd->state)) {
 sanitize:
 		ed->state = ED_IDLE;
 		finish_unlinks (ohci, 0, NULL);
@@ -420,7 +420,7 @@ static int ohci_init (struct ohci_hcd *ohci)
 	int ret;
 
 	disable (ohci);
-	ohci->regs = ohci->hcd.regs;
+	ohci->regs = ohci_to_hcd(ohci)->regs;
 	ohci->next_statechange = jiffies;
 
 #ifndef IR_DISABLE
@@ -456,13 +456,13 @@ static int ohci_init (struct ohci_hcd *ohci)
 	if (ohci->hcca)
 		return 0;
 
-	ohci->hcca = dma_alloc_coherent (ohci->hcd.self.controller,
+	ohci->hcca = dma_alloc_coherent (ohci_to_hcd(ohci)->self.controller,
 			sizeof *ohci->hcca, &ohci->hcca_dma, 0);
 	if (!ohci->hcca)
 		return -ENOMEM;
 
 	if ((ret = ohci_mem_init (ohci)) < 0)
-		ohci_stop (&ohci->hcd);
+		ohci_stop (ohci_to_hcd(ohci));
 
 	return ret;
 
@@ -507,7 +507,7 @@ static int ohci_run (struct ohci_hcd *ohci)
 
 	if (ohci->hc_control & OHCI_CTRL_RWC
 			&& !(ohci->flags & OHCI_QUIRK_AMD756))
-		ohci->hcd.can_wakeup = 1;
+		ohci_to_hcd(ohci)->can_wakeup = 1;
 
 	switch (ohci->hc_control & OHCI_CTRL_HCFS) {
 	case OHCI_USB_OPER:
@@ -605,7 +605,7 @@ retry:
 	ohci->hc_control &= OHCI_CTRL_RWC;
  	ohci->hc_control |= OHCI_CONTROL_INIT | OHCI_USB_OPER;
  	ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
-	ohci->hcd.state = USB_STATE_RUNNING;
+	ohci_to_hcd(ohci)->state = USB_STATE_RUNNING;
 
 	/* wake on ConnectStatusChange, matching external hubs */
 	ohci_writel (ohci, RH_HS_DRWE, &ohci->regs->roothub.status);
@@ -645,12 +645,12 @@ retry:
 
 	// POTPGT delay is bits 24-31, in 2 ms units.
 	mdelay ((roothub_a (ohci) >> 23) & 0x1fe);
-	bus = hcd_to_bus (&ohci->hcd);
-	ohci->hcd.state = USB_STATE_RUNNING;
+	bus = &ohci_to_hcd(ohci)->self;
+	ohci_to_hcd(ohci)->state = USB_STATE_RUNNING;
 
 	ohci_dump (ohci, 1);
 
-	udev = hcd_to_bus (&ohci->hcd)->root_hub;
+	udev = bus->root_hub;
 	if (udev) {
 		return 0;
 	}
@@ -665,7 +665,7 @@ retry:
 	}
 
 	udev->speed = USB_SPEED_FULL;
-	if (hcd_register_root (udev, &ohci->hcd) != 0) {
+	if (hcd_register_root (udev, ohci_to_hcd(ohci)) != 0) {
 		usb_put_dev (udev);
 		disable (ohci);
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;
@@ -740,11 +740,11 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	if (ohci->ed_rm_list)
 		finish_unlinks (ohci, ohci_frame_no(ohci), ptregs);
 	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list
-			&& HCD_IS_RUNNING(ohci->hcd.state))
+			&& HCD_IS_RUNNING(hcd->state))
 		ohci_writel (ohci, OHCI_INTR_SF, &regs->intrdisable);	
 	spin_unlock (&ohci->lock);
 
-	if (HCD_IS_RUNNING(ohci->hcd.state)) {
+	if (HCD_IS_RUNNING(hcd->state)) {
 		ohci_writel (ohci, ints, &regs->intrstatus);
 		ohci_writel (ohci, OHCI_INTR_MIE, &regs->intrenable);	
 		// flush those writes
@@ -762,7 +762,7 @@ static void ohci_stop (struct usb_hcd *hcd)
 
 	ohci_dbg (ohci, "stop %s controller (state 0x%02x)\n",
 		hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS),
-		ohci->hcd.state);
+		hcd->state);
 	ohci_dump (ohci, 1);
 
 	flush_scheduled_work();
@@ -773,7 +773,7 @@ static void ohci_stop (struct usb_hcd *hcd)
 	remove_debug_files (ohci);
 	ohci_mem_cleanup (ohci);
 	if (ohci->hcca) {
-		dma_free_coherent (ohci->hcd.self.controller, 
+		dma_free_coherent (hcd->self.controller, 
 				sizeof *ohci->hcca, 
 				ohci->hcca, ohci->hcca_dma);
 		ohci->hcca = NULL;
@@ -792,7 +792,7 @@ static int ohci_restart (struct ohci_hcd *ohci)
 	int temp;
 	int i;
 	struct urb_priv *priv;
-	struct usb_device *root = ohci->hcd.self.root_hub;
+	struct usb_device *root = ohci_to_hcd(ohci)->self.root_hub;
 
 	/* mark any devices gone, so they do nothing till khubd disconnects.
 	 * recycle any "live" eds/tds (and urbs) right away.

@@ -73,7 +73,7 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 	ohci_dbg (ohci, "suspend root hub\n");
 
 	/* First stop any processing */
-	ohci->hcd.state = USB_STATE_QUIESCING;
+	hcd->state = USB_STATE_QUIESCING;
 	if (ohci->hc_control & OHCI_SCHED_ENABLES) {
 		int		limit;
 
@@ -103,7 +103,7 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 			&ohci->regs->intrstatus);
 
 	/* maybe resume can wake root hub */
-	if (ohci->hcd.remote_wakeup)
+	if (hcd->remote_wakeup)
 		ohci->hc_control |= OHCI_CTRL_RWE;
 	else
 		ohci->hc_control &= ~OHCI_CTRL_RWE;
@@ -119,7 +119,7 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 
 done:
 	if (status == 0)
-		ohci->hcd.state = HCD_STATE_SUSPENDED;
+		hcd->state = HCD_STATE_SUSPENDED;
 	spin_unlock_irqrestore (&ohci->lock, flags);
 	return status;
 }
@@ -198,7 +198,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	}
 
 	/* Some controllers (lucent) need extra-long delays */
-	ohci->hcd.state = USB_STATE_RESUMING;
+	hcd->state = USB_STATE_RESUMING;
 	mdelay (20 /* usb 11.5.1.10 */ + 15);
 
 	temp = ohci_readl (ohci, &ohci->regs->control);
@@ -231,7 +231,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 	msleep (3);
 
 	temp = OHCI_CONTROL_INIT | OHCI_USB_OPER;
-	if (ohci->hcd.can_wakeup)
+	if (hcd->can_wakeup)
 		temp |= OHCI_CTRL_RWC;
 	ohci->hc_control = temp;
 	ohci_writel (ohci, temp, &ohci->regs->control);
@@ -261,8 +261,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 			temp |= OHCI_BLF;
 		}
 	}
-	if (hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs
-			|| hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs)
+	if (hcd->self.bandwidth_isoc_reqs || hcd->self.bandwidth_int_reqs)
 		enables |= OHCI_CTRL_PLE|OHCI_CTRL_IE;
 	if (enables) {
 		ohci_dbg (ohci, "restarting schedules ... %08x\n", enables);
@@ -273,7 +272,7 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 		(void) ohci_readl (ohci, &ohci->regs->control);
 	}
 
-	ohci->hcd.state = USB_STATE_RUNNING;
+	hcd->state = USB_STATE_RUNNING;
 	return 0;
 }
 
@@ -314,7 +313,7 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	 * letting khubd or root hub timer see state changes.
 	 */
 	if ((ohci->hc_control & OHCI_CTRL_HCFS) != OHCI_USB_OPER
-			|| !HCD_IS_RUNNING(ohci->hcd.state)) {
+			|| !HCD_IS_RUNNING(hcd->state)) {
 		can_suspend = 0;
 		goto done;
 	}
@@ -356,7 +355,7 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 		 */
 		if (!(status & RH_PS_CCS))
 			continue;
-		if ((status & RH_PS_PSS) && ohci->hcd.remote_wakeup)
+		if ((status & RH_PS_PSS) && hcd->remote_wakeup)
 			continue;
 		can_suspend = 0;
 	}
@@ -378,8 +377,8 @@ done:
 			&& usb_trylock_device (hcd->self.root_hub)
 			) {
 		ohci_vdbg (ohci, "autosuspend\n");
-		(void) ohci_hub_suspend (&ohci->hcd);
-		ohci->hcd.state = USB_STATE_RUNNING;
+		(void) ohci_hub_suspend (hcd);
+		hcd->state = USB_STATE_RUNNING;
 		usb_unlock_device (hcd->self.root_hub);
 	}
 #endif
@@ -613,8 +612,8 @@ static int ohci_hub_control (
 		switch (wValue) {
 		case USB_PORT_FEAT_SUSPEND:
 #ifdef	CONFIG_USB_OTG
-			if (ohci->hcd.self.otg_port == (wIndex + 1)
-					&& ohci->hcd.self.b_hnp_enable)
+			if (hcd->self.otg_port == (wIndex + 1)
+					&& hcd->self.b_hnp_enable)
 				start_hnp(ohci);
 			else
 #endif

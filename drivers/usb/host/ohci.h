@@ -345,11 +345,6 @@ typedef struct urb_priv {
  */
 
 struct ohci_hcd {
-	/*
-	 * framework state
-	 */
-	struct usb_hcd		hcd;		/* must come first! */
-
 	spinlock_t		lock;
 
 	/*
@@ -405,7 +400,15 @@ struct ohci_hcd {
 
 };
 
-#define hcd_to_ohci(hcd_ptr) container_of(hcd_ptr, struct ohci_hcd, hcd)
+/* convert between an hcd pointer and the corresponding ohci_hcd */
+static inline struct ohci_hcd *hcd_to_ohci (struct usb_hcd *hcd)
+{
+	return (struct ohci_hcd *) (hcd->hcd_priv);
+}
+static inline struct usb_hcd *ohci_to_hcd (const struct ohci_hcd *ohci)
+{
+	return container_of ((void *) ohci, struct usb_hcd, hcd_priv);
+}
 
 /*-------------------------------------------------------------------------*/
 
@@ -414,13 +417,13 @@ struct ohci_hcd {
 #endif	/* DEBUG */
 
 #define ohci_dbg(ohci, fmt, args...) \
-	dev_dbg ((ohci)->hcd.self.controller , fmt , ## args )
+	dev_dbg (ohci_to_hcd(ohci)->self.controller , fmt , ## args )
 #define ohci_err(ohci, fmt, args...) \
-	dev_err ((ohci)->hcd.self.controller , fmt , ## args )
+	dev_err (ohci_to_hcd(ohci)->self.controller , fmt , ## args )
 #define ohci_info(ohci, fmt, args...) \
-	dev_info ((ohci)->hcd.self.controller , fmt , ## args )
+	dev_info (ohci_to_hcd(ohci)->self.controller , fmt , ## args )
 #define ohci_warn(ohci, fmt, args...) \
-	dev_warn ((ohci)->hcd.self.controller , fmt , ## args )
+	dev_warn (ohci_to_hcd(ohci)->self.controller , fmt , ## args )
 
 #ifdef OHCI_VERBOSE_DEBUG
 #	define ohci_vdbg ohci_dbg
@@ -553,7 +556,7 @@ static inline u32 hc32_to_cpup (const struct ohci_hcd *ohci, const __hc32 *x)
 
 static inline void disable (struct ohci_hcd *ohci)
 {
-	ohci->hcd.state = USB_STATE_HALT;
+	ohci_to_hcd(ohci)->state = USB_STATE_HALT;
 }
 
 #define	FI			0x2edf		/* 12000 bits per frame (-1) */

@@ -676,19 +676,23 @@ done:
 static CLASS_DEVICE_ATTR (registers, S_IRUGO, show_registers, NULL);
 
 
-static inline void create_debug_files (struct ohci_hcd *bus)
+static inline void create_debug_files (struct ohci_hcd *ohci)
 {
-	class_device_create_file(&bus->hcd.self.class_dev, &class_device_attr_async);
-	class_device_create_file(&bus->hcd.self.class_dev, &class_device_attr_periodic);
-	class_device_create_file(&bus->hcd.self.class_dev, &class_device_attr_registers);
-	ohci_dbg (bus, "created debug files\n");
+	struct class_device *cldev = &ohci_to_hcd(ohci)->self.class_dev;
+
+	class_device_create_file(cldev, &class_device_attr_async);
+	class_device_create_file(cldev, &class_device_attr_periodic);
+	class_device_create_file(cldev, &class_device_attr_registers);
+	ohci_dbg (ohci, "created debug files\n");
 }
 
-static inline void remove_debug_files (struct ohci_hcd *bus)
+static inline void remove_debug_files (struct ohci_hcd *ohci)
 {
-	class_device_remove_file(&bus->hcd.self.class_dev, &class_device_attr_async);
-	class_device_remove_file(&bus->hcd.self.class_dev, &class_device_attr_periodic);
-	class_device_remove_file(&bus->hcd.self.class_dev, &class_device_attr_registers);
+	struct class_device *cldev = &ohci_to_hcd(ohci)->self.class_dev;
+
+	class_device_remove_file(cldev, &class_device_attr_async);
+	class_device_remove_file(cldev, &class_device_attr_periodic);
+	class_device_remove_file(cldev, &class_device_attr_registers);
 }
 
 #endif

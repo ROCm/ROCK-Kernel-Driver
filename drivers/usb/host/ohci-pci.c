@@ -35,6 +35,7 @@ ohci_pci_reset (struct usb_hcd *hcd)
 {
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 
+	ohci_hcd_init (ohci);
 	return ohci_init (ohci);
 }
 
@@ -172,6 +173,8 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 
 static const struct hc_driver ohci_pci_hc_driver = {
 	.description =		hcd_name,
+	.product_desc =		"OHCI Host Controller",
+	.hcd_priv_size =	sizeof(struct ohci_hcd),
 
 	/*
 	 * generic hardware linkage
@@ -189,11 +192,6 @@ static const struct hc_driver ohci_pci_hc_driver = {
 	.resume =		ohci_pci_resume,
 #endif
 	.stop =			ohci_stop,
-
-	/*
-	 * memory lifecycle (except per-request)
-	 */
-	.hcd_alloc =		ohci_hcd_alloc,
 
 	/*
 	 * managing i/o requests and associated device resources

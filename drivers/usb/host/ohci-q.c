@@ -60,10 +60,10 @@ __acquires(ohci->lock)
 
 	switch (usb_pipetype (urb->pipe)) {
 	case PIPE_ISOCHRONOUS:
-		hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs--;
+		ohci_to_hcd(ohci)->self.bandwidth_isoc_reqs--;
 		break;
 	case PIPE_INTERRUPT:
-		hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs--;
+		ohci_to_hcd(ohci)->self.bandwidth_int_reqs--;
 		break;
 	}
 
@@ -73,12 +73,12 @@ __acquires(ohci->lock)
 
 	/* urb->complete() can reenter this HCD */
 	spin_unlock (&ohci->lock);
-	usb_hcd_giveback_urb (&ohci->hcd, urb, regs);
+	usb_hcd_giveback_urb (ohci_to_hcd(ohci), urb, regs);
 	spin_lock (&ohci->lock);
 
 	/* stop periodic dma if it's not needed */
-	if (hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs == 0
-			&& hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs == 0) {
+	if (ohci_to_hcd(ohci)->self.bandwidth_isoc_reqs == 0
+			&& ohci_to_hcd(ohci)->self.bandwidth_int_reqs == 0) {
 		ohci->hc_control &= ~(OHCI_CTRL_PLE|OHCI_CTRL_IE);
 		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
 	}
@@ -163,7 +163,7 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 		}
 		ohci->load [i] += ed->load;
 	}
-	hcd_to_bus (&ohci->hcd)->bandwidth_allocated += ed->load / ed->interval;
+	ohci_to_hcd(ohci)->self.bandwidth_allocated += ed->load / ed->interval;
 }
 
 /* link an ed into one of the HC chains */
@@ -172,7 +172,7 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 {	 
 	int	branch;
 
-	if (ohci->hcd.state == USB_STATE_QUIESCING)
+	if (ohci_to_hcd(ohci)->state == USB_STATE_QUIESCING)
 		return -EAGAIN;
 
 	ed->state = ED_OPER;
@@ -276,7 +276,7 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
 		}
 		ohci->load [i] -= ed->load;
 	}	
-	hcd_to_bus (&ohci->hcd)->bandwidth_allocated -= ed->load / ed->interval;
+	ohci_to_hcd(ohci)->self.bandwidth_allocated -= ed->load / ed->interval;
 
 	ohci_vdbg (ohci, "unlink %sed %p branch %d [%dus.], interval %d\n",
 		(ed->hwINFO & cpu_to_hc32 (ohci, ED_ISO)) ? "iso " : "",
@@ -619,8 +619,8 @@ static void td_submit_urb (
 	 */
 	case PIPE_INTERRUPT:
 		/* ... and periodic urbs have extra accounting */
-		periodic = hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs++ == 0
-			&& hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs == 0;
+		periodic = ohci_to_hcd(ohci)->self.bandwidth_int_reqs++ == 0
+			&& ohci_to_hcd(ohci)->self.bandwidth_isoc_reqs == 0;
 		/* FALLTHROUGH */
 	case PIPE_BULK:
 		info = is_out
@@ -688,8 +688,8 @@ static void td_submit_urb (
 				data + urb->iso_frame_desc [cnt].offset,
 				urb->iso_frame_desc [cnt].length, urb, cnt);
 		}
-		periodic = hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs++ == 0
-			&& hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs == 0;
+		periodic = ohci_to_hcd(ohci)->self.bandwidth_isoc_reqs++ == 0
+			&& ohci_to_hcd(ohci)->self.bandwidth_int_reqs == 0;
 		break;
 	}
 
@@ -920,7 +920,7 @@ rescan_all:
 		/* only take off EDs that the HC isn't using, accounting for
 		 * frame counter wraps and EDs with partially retired TDs
 		 */
-		if (likely (regs && HCD_IS_RUNNING(ohci->hcd.state))) {
+		if (likely (regs && HCD_IS_RUNNING(ohci_to_hcd(ohci)->state))) {
 			if (tick_before (tick, ed->tick)) {
 skip_ed:
 				last = &ed->ed_next;
@@ -1002,7 +1002,7 @@ rescan_this:
 
 		/* but if there's work queued, reschedule */
 		if (!list_empty (&ed->td_list)) {
-			if (HCD_IS_RUNNING(ohci->hcd.state))
+			if (HCD_IS_RUNNING(ohci_to_hcd(ohci)->state))
 				ed_schedule (ohci, ed);
 		}
 
@@ -1011,8 +1011,8 @@ rescan_this:
    	}
 
 	/* maybe reenable control and bulk lists */ 
-	if (HCD_IS_RUNNING(ohci->hcd.state)
-			&& ohci->hcd.state != USB_STATE_QUIESCING
+	if (HCD_IS_RUNNING(ohci_to_hcd(ohci)->state)
+			&& ohci_to_hcd(ohci)->state != USB_STATE_QUIESCING
 			&& !ohci->ed_rm_list) {
 		u32	command = 0, control = 0;
 
