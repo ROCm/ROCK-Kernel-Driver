@@ -23,7 +23,6 @@ extern int maxnode;
 
 extern struct pglist_data *node_data[];
 
-/* kern_addr_valid below hardcodes the same algorithm*/
 static inline __attribute__((pure)) int phys_to_nid(unsigned long addr) 
 { 
 	int nid; 
@@ -46,19 +45,6 @@ static inline __attribute__((pure)) int phys_to_nid(unsigned long addr)
 
 #define local_mapnr(kvaddr) \
 	( (__pa(kvaddr) >> PAGE_SHIFT) - node_start_pfn(kvaddr_to_nid(kvaddr)) )
-#define kern_addr_valid(kvaddr) ({					\
-	int ok = 0;							\
-        unsigned long index = __pa(kvaddr) >> memnode_shift;		\
-	if (index <= NODEMAPSIZE) {					\
-		unsigned nodeid = memnodemap[index];			\
-		unsigned long pfn = __pa(kvaddr) >> PAGE_SHIFT;		\
-		unsigned long start_pfn = node_start_pfn(nodeid);	\
-		ok = (nodeid != 0xff) &&				\
-		     (pfn >= start_pfn) &&				\
-		     (pfn <  start_pfn + node_size(nodeid));		\
-	}								\
-        ok;								\
-})
 
 /* AK: this currently doesn't deal with invalid addresses. We'll see 
    if the 2.5 kernel doesn't pass them

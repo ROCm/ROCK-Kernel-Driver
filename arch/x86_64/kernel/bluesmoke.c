@@ -303,7 +303,7 @@ static void k8_machine_check(struct pt_regs * regs, long error_code)
 	wrmsrl(MSR_IA32_MCG_STATUS, 0);
        
 	if (regs && (status & (1<<1)))
-		printk(KERN_EMERG "MCE at EIP %lx ESP %lx\n", regs->rip, regs->rsp); 
+		printk(KERN_EMERG "MCE at RIP %lx RSP %lx\n", regs->rip, regs->rsp); 
 
  others:
 	generic_machine_check(regs, error_code); 
@@ -352,7 +352,6 @@ static void __init k8_mcheck_init(struct cpuinfo_x86 *c)
 {
 	u64 cap;
 	int i;
-	struct pci_dev *nb; 
 
 	if (!test_bit(X86_FEATURE_MCE, &c->x86_capability) || 
 	    !test_bit(X86_FEATURE_MCA, &c->x86_capability))

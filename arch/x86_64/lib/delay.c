@@ -21,7 +21,6 @@ int x86_udelay_tsc = 0;		/* Delay via TSC */
 
 void __delay(unsigned long loops)
 {
-#ifndef CONFIG_SIMNOW
 	unsigned long bclock, now;
 	
 	rdtscl(bclock);
@@ -31,7 +30,6 @@ void __delay(unsigned long loops)
 		rdtscl(now);
 	}
 	while((now-bclock) < loops);
-#endif
 }
 
 inline void __const_udelay(unsigned long xloops)

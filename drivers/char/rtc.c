@@ -279,7 +279,7 @@ static ssize_t rtc_read(struct file *file, char *buf,
 	if (rtc_has_irq == 0)
 		return -EIO;
 
-	if (count < sizeof(unsigned long))
+	if (count < sizeof(unsigned))
 		return -EINVAL;
 
 	add_wait_queue(&rtc_wait, &wait);
@@ -310,9 +310,10 @@ static ssize_t rtc_read(struct file *file, char *buf,
 		schedule();
 	} while (1);
 
-	retval = put_user(data, (unsigned long *)buf); 
-	if (!retval)
-		retval = sizeof(unsigned long); 
+	if (count < sizeof(unsigned long))
+		retval = put_user(data, (unsigned int *)buf) ?: sizeof(int); 
+	else
+		retval = put_user(data, (unsigned long *)buf) ?: sizeof(long);
  out:
 	current->state = TASK_RUNNING;
 	remove_wait_queue(&rtc_wait, &wait);

@@ -27,6 +27,7 @@
 #include <asm/pgtable.h>
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
+#include <asm/proto.h>
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/apic.h>
 #endif
@@ -37,9 +38,6 @@ extern int using_apic_timer;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
-
-extern int using_apic_timer;
-extern void smp_local_timer_interrupt(struct pt_regs * regs);
 
 #undef HPET_HACK_ENABLE_DANGEROUS
 
