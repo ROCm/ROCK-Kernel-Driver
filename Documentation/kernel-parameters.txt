@@ -17,6 +17,7 @@ restrictions referred to are that the relevant option is valid if:
 	CD	Appropriate CD support is enabled.
 	DEVFS   devfs support is enabled. 
 	DRM	Direct Rendering Management support is enabled. 
+	EFI	EFI Partitioning (GPT) is enabled
 	EIDE	EIDE/ATAPI support is enabled.
 	FB	The frame buffer device is enabled.
 	HW	Appropriate hardware is enabled.
@@ -218,6 +219,9 @@ running once the system is up.
 	gc_3=		[HW,JOY]
  
 	gdth=		[HW,SCSI]
+
+	gpt             [EFI] Forces disk with valid GPT signature but
+			invalid Protective MBR to be treated as GPT.
 
 	gscd=		[HW,CD]
 
