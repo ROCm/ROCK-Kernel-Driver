@@ -697,12 +697,13 @@ __setup("shapers=", set_num_shapers);
 
 static struct net_device *devs;
 
+static unsigned int shapers_registered = 0;
+
 static int __init shaper_init(void)
 {
 	int i, err;
 	size_t alloc_size;
 	struct shaper *sp;
-	unsigned int shapers_registered = 0;
 
 	if (shapers < 1)
 		return -ENODEV;
