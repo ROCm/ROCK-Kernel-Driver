@@ -870,7 +870,6 @@ static void nsc_ircc_init_dongle_interface (int iobase, int dongle_id)
  */
 static void nsc_ircc_change_dongle_speed(int iobase, int speed, int dongle_id)
 {
-	unsigned long flags;
 	__u8 bank;
 
 	/* Save current bank */
@@ -916,11 +915,10 @@ static void nsc_ircc_change_dongle_speed(int iobase, int speed, int dongle_id)
 		outb(0x01, iobase+4);
 
 		if (speed == 4000000) {
-			save_flags(flags);
-			cli();
+			/* There was a cli() there, but we now are already
+			 * under spin_lock_irqsave() - JeanII */
 			outb(0x81, iobase+4);
 			outb(0x80, iobase+4);
-			restore_flags(flags);
 		} else
 			outb(0x00, iobase+4);
 		break;
@@ -1960,33 +1958,30 @@ static int nsc_ircc_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	IRDA_DEBUG(2, __FUNCTION__ "(), %s, (cmd=0x%X)\n", dev->name, cmd);
 	
-	/* Disable interrupts & save flags */
-	save_flags(flags);
-	cli();
-
 	switch (cmd) {
 	case SIOCSBANDWIDTH: /* Set bandwidth */
 		if (!capable(CAP_NET_ADMIN)) {
 			ret = -EPERM;
-			goto out;
+			break;
 		}
+		spin_lock_irqsave(&self->lock, flags);
 		nsc_ircc_change_speed(self, irq->ifr_baudrate);
+		spin_unlock_irqrestore(&self->lock, flags);
 		break;
 	case SIOCSMEDIABUSY: /* Set media busy */
 		if (!capable(CAP_NET_ADMIN)) {
 			ret = -EPERM;
-			goto out;
+			break;
 		}
 		irda_device_set_media_busy(self->netdev, TRUE);
 		break;
 	case SIOCGRECEIVING: /* Check if we are receiving right now */
+		/* This is already protected */
 		irq->ifr_receiving = nsc_ircc_is_receiving(self);
 		break;
 	default:
 		ret = -EOPNOTSUPP;
 	}
-out:
-	restore_flags(flags);
 	return ret;
 }
 

@@ -74,8 +74,10 @@ char *driver_name = "irtty";
 int __init irtty_init(void)
 {
 	int status;
-	
-	irtty = hashbin_new( HB_LOCAL);
+
+	/* Probably no need to lock here because all operations done in
+	 * open()/close() which are already safe - Jean II */
+	irtty = hashbin_new( HB_NOLOCK);
 	if ( irtty == NULL) {
 		printk( KERN_WARNING "IrDA: Can't allocate irtty hashbin!\n");
 		return -ENOMEM;
@@ -163,6 +165,7 @@ static int irtty_open(struct tty_struct *tty)
 		return -ENOMEM;
 	}
 	memset(self, 0, sizeof(struct irtty_cb));
+	spin_lock_init(&self->lock);
 	
 	self->tty = tty;
 	tty->disc_data = self;
@@ -266,11 +269,12 @@ static int irtty_open(struct tty_struct *tty)
 static void irtty_close(struct tty_struct *tty) 
 {
 	struct irtty_cb *self = (struct irtty_cb *) tty->disc_data;
+	unsigned long flags;
 	
 	/* First make sure we're connected. */
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRTTY_MAGIC, return;);
-	
+
 	/* Stop tty */
 	tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
 	tty->disc_data = 0;
@@ -287,6 +291,11 @@ static void irtty_close(struct tty_struct *tty)
 		rtnl_unlock();
 	}
 	
+	self = hashbin_remove(irtty, (int) self, NULL);
+
+	/* Protect access to self->task and self->?x_buff - Jean II */
+	spin_lock_irqsave(&self->lock, flags);
+
 	/* Remove speed changing task if any */
 	if (self->task)
 		irda_task_delete(self->task);
@@ -294,13 +303,12 @@ static void irtty_close(struct tty_struct *tty)
 	self->tty = NULL;
 	self->magic = 0;
 	
-	self = hashbin_remove(irtty, (int) self, NULL);
-
 	if (self->tx_buff.head)
 		kfree(self->tx_buff.head);
 	
 	if (self->rx_buff.head)
 		kfree(self->rx_buff.head);
+	spin_unlock_irqrestore(&self->lock, flags);
 	
 	kfree(self);
 	
@@ -326,6 +334,7 @@ static void irtty_stop_receiver(struct irtty_cb *self, int stop)
 	else
 		cflag |= CREAD;
 
+	/* This is unsafe, but currently under discussion - Jean II */
 	self->tty->termios->c_cflag = cflag;
 	self->tty->driver.set_termios(self->tty, &old_termios);
 }
@@ -378,6 +387,7 @@ static void __irtty_change_speed(struct irtty_cb *self, __u32 speed)
 		break;
 	}	
 
+	/* This is unsafe, but currently under discussion - Jean II */
 	self->tty->termios->c_cflag = cflag;
 	self->tty->driver.set_termios(self->tty, &old_termios);
 
@@ -393,6 +403,7 @@ static void __irtty_change_speed(struct irtty_cb *self, __u32 speed)
 static int irtty_change_speed(struct irda_task *task)
 {
 	struct irtty_cb *self;
+	unsigned long flags;
 	__u32 speed = (__u32) task->param;
 	int ret = 0;
 
@@ -401,12 +412,17 @@ static int irtty_change_speed(struct irda_task *task)
 	self = (struct irtty_cb *) task->instance;
 	ASSERT(self != NULL, return -1;);
 
+	/* Protect access to self->task - Jean II */
+	spin_lock_irqsave(&self->lock, flags);
+
 	/* Check if busy */
 	if (self->task && self->task != task) {
 		IRDA_DEBUG(0, __FUNCTION__ "(), busy!\n");
+		spin_unlock_irqrestore(&self->lock, flags);
 		return MSECS_TO_JIFFIES(10);
 	} else
 		self->task = task;
+	spin_unlock_irqrestore(&self->lock, flags);
 
 	switch (task->state) {
 	case IRDA_TASK_INIT:
@@ -501,6 +517,7 @@ static int irtty_ioctl(struct tty_struct *tty, void *file, int cmd, void *arg)
 	switch (cmd) {
 	case TCGETS:
 	case TCGETA:
+		/* Unsure about locking here, to check - Jean II */
 		return n_tty_ioctl(tty, (struct file *) file, cmd, 
 				   (unsigned long) arg);
 		break;
@@ -516,15 +533,16 @@ static int irtty_ioctl(struct tty_struct *tty, void *file, int cmd, void *arg)
 		dongle->write       = irtty_raw_write;
 		dongle->set_dtr_rts = irtty_set_dtr_rts;
 		
-		/* Bind dongle */
-		self->dongle = dongle;
-		
 		/* Now initialize the dongle!  */
 		dongle->issue->open(dongle, &self->qos);
 		
 		/* Reset dongle */
 		irda_task_execute(dongle, dongle->issue->reset, NULL, NULL, 
 				  NULL);		
+
+		/* Make dongle available to driver only now to avoid
+		 * race conditions - Jean II */
+		self->dongle = dongle;
 		break;
 	case IRTTY_IOCGET:
 		ASSERT(self->netdev != NULL, return -1;);
@@ -559,6 +577,9 @@ static void irtty_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 		return;
 	}
 
+	// Are we in interrupt context ? What locking is done ? - Jean II
+	//spin_lock_irqsave(&self->lock, flags);
+
 	/* Read the characters out of the buffer */
  	while (count--) {
 		/* 
@@ -589,6 +610,7 @@ static void irtty_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 			break;
 		}
 	}
+	//spin_unlock_irqrestore(&self->lock, flags);
 }
 
 /*
@@ -626,11 +648,13 @@ static int irtty_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct irtty_cb *self;
 	int actual = 0;
 	__s32 speed;
+	unsigned long flags;
 
 	self = (struct irtty_cb *) dev->priv;
 	ASSERT(self != NULL, return 0;);
 
-	/* Lock transmit buffer */
+	/* Lock transmit buffer
+	 * this serialise operations, no need to spinlock - Jean II */
 	netif_stop_queue(dev);
 	
 	/* Check if we need to change the speed */
@@ -646,6 +670,9 @@ static int irtty_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		} else
 			self->new_speed = speed;
 	}
+
+	/* Protect access to self->tx_buff - Jean II */
+	spin_lock_irqsave(&self->lock, flags);
 
 	/* Init tx buffer*/
 	self->tx_buff.data = self->tx_buff.head;
@@ -666,6 +693,8 @@ static int irtty_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Hide the part we just transmitted */
 	self->tx_buff.data += actual;
 	self->tx_buff.len -= actual;
+
+	spin_unlock_irqrestore(&self->lock, flags);
 
 	dev_kfree_skb(skb);
 
@@ -695,12 +724,18 @@ static void irtty_write_wakeup(struct tty_struct *tty)
 {
 	struct irtty_cb *self = (struct irtty_cb *) tty->disc_data;
 	int actual = 0;
+	unsigned long flags;
 	
 	/* 
 	 *  First make sure we're connected. 
 	 */
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRTTY_MAGIC, return;);
+
+	/* Protected via netif_stop_queue(dev); - Jean II */
+
+	/* Protect access to self->tx_buff - Jean II */
+	spin_lock_irqsave(&self->lock, flags);
 
 	/* Finished with frame?  */
 	if (self->tx_buff.len > 0)  {
@@ -710,6 +745,7 @@ static void irtty_write_wakeup(struct tty_struct *tty)
 
 		self->tx_buff.data += actual;
 		self->tx_buff.len  -= actual;
+		spin_unlock_irqrestore(&self->lock, flags);
 	} else {		
 		/* 
 		 *  Now serial buffer is almost free & we can start 
@@ -720,6 +756,9 @@ static void irtty_write_wakeup(struct tty_struct *tty)
 		self->stats.tx_packets++;		      
 
 		tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
+
+		/* Don't change speed with irq off */
+		spin_unlock_irqrestore(&self->lock, flags);
 
 		if (self->new_speed) {
 			IRDA_DEBUG(5, __FUNCTION__ "(), Changing speed!\n");
@@ -755,11 +794,16 @@ static int irtty_set_dtr_rts(struct net_device *dev, int dtr, int rts)
 {
 	struct irtty_cb *self;
 	struct tty_struct *tty;
+	//unsigned long flags;
 	mm_segment_t fs;
 	int arg = 0;
 
 	self = (struct irtty_cb *) dev->priv;
 	tty = self->tty;
+
+	/* Was protected in ioctl handler, but the serial driver doesn't
+	 * like it. This may need to change. - Jean II */
+	//spin_lock_irqsave(&self->lock, flags);
 
 #ifdef TIOCM_OUT2 /* Not defined for ARM */
 	arg = TIOCM_OUT2;
@@ -780,10 +824,13 @@ static int irtty_set_dtr_rts(struct net_device *dev, int dtr, int rts)
 	fs = get_fs();
 	set_fs(get_ds());
 	
+	/* This is probably unsafe, but currently under discussion - Jean II */
 	if (tty->driver.ioctl(tty, NULL, TIOCMSET, (unsigned long) &arg)) { 
 		IRDA_DEBUG(2, __FUNCTION__ "(), error doing ioctl!\n");
 	}
 	set_fs(fs);
+
+	//spin_unlock_irqrestore(&self->lock, flags);
 
 	return 0;
 }
@@ -799,13 +846,17 @@ static int irtty_set_dtr_rts(struct net_device *dev, int dtr, int rts)
 int irtty_set_mode(struct net_device *dev, int mode)
 {
 	struct irtty_cb *self;
+	unsigned long flags;
 
 	self = (struct irtty_cb *) dev->priv;
 
 	ASSERT(self != NULL, return -1;);
 
 	IRDA_DEBUG(2, __FUNCTION__ "(), mode=%s\n", infrared_mode[mode]);
-	
+
+	/* Protect access to self->rx_buff - Jean II */
+	spin_lock_irqsave(&self->lock, flags);
+
 	/* save status for driver */
 	self->mode = mode;
 	
@@ -813,6 +864,8 @@ int irtty_set_mode(struct net_device *dev, int mode)
 	self->rx_buff.data = self->rx_buff.head;
 	self->rx_buff.len = 0;
 	self->rx_buff.state = OUTSIDE_FRAME;
+
+	spin_unlock_irqrestore(&self->lock, flags);
 
 	return 0;
 }
@@ -955,7 +1008,6 @@ static int irtty_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	struct if_irda_req *irq = (struct if_irda_req *) rq;
 	struct irtty_cb *self;
 	dongle_t *dongle;
-	unsigned long flags;
 	int ret = 0;
 
 	ASSERT(dev != NULL, return -1;);
@@ -971,8 +1023,7 @@ static int irtty_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	 * irda_device_dongle_init() can't be locked.
 	 * irda_task_execute() doesn't need to be locked (but
 	 * irtty_change_speed() should protect itself).
-	 * As this driver doesn't have spinlock protection, keep
-	 * old fashion locking :-(
+	 * Other calls protect themselves.
 	 * Jean II
 	 */
 	
@@ -1025,20 +1076,14 @@ static int irtty_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		if (!capable(CAP_NET_ADMIN))
 			ret = -EPERM;
 		else {
-			save_flags(flags);
-			cli();
 			irtty_set_dtr_rts(dev, irq->ifr_dtr, irq->ifr_rts);
-			restore_flags(flags);
 		}
 		break;
 	case SIOCSMODE:
 		if (!capable(CAP_NET_ADMIN))
 			ret = -EPERM;
 		else {
-			save_flags(flags);
-			cli();
 			irtty_set_mode(dev, irq->ifr_mode);
-			restore_flags(flags);
 		}
 		break;
 	default:

@@ -431,6 +431,7 @@ static int __init ircc_open(unsigned int fir_base, unsigned int sir_base)
 	struct ircc_cb *self;
         struct irport_cb *irport;
 	unsigned char low, high, chip, config, dma, irq, version;
+	unsigned long flags;
 
 
 	IRDA_DEBUG(0, __FUNCTION__ "\n");
@@ -484,7 +485,6 @@ static int __init ircc_open(unsigned int fir_base, unsigned int sir_base)
 		return -ENOMEM;
 	}
 	memset(self, 0, sizeof(struct ircc_cb));
-	spin_lock_init(&self->lock);
 
 	/* Max DMA buffer size needed = (data_size + 6) * (window_size) + 6; */
 	self->rx_buff.truesize = 4000; 
@@ -555,6 +555,9 @@ static int __init ircc_open(unsigned int fir_base, unsigned int sir_base)
 
 	request_region(self->io->fir_base, CHIP_IO_EXTENT, driver_name);
 
+	/* Don't allow irport to change under us - Jean II */
+	spin_lock_irqsave(&self->irport->lock, flags);
+
 	/* Initialize QoS for this device */
 	irda_init_max_qos_capabilies(&irport->qos);
 	
@@ -581,6 +584,7 @@ static int __init ircc_open(unsigned int fir_base, unsigned int sir_base)
 	self->netdev->stop   = &ircc_net_close;
 
 	irport_start(self->irport);
+	spin_unlock_irqrestore(&self->irport->lock, flags);
 
         self->pmdev = pm_register(PM_SYS_DEV, PM_SYS_IRDA, ircc_pmproc);
         if (self->pmdev)
@@ -598,6 +602,7 @@ static int __init ircc_open(unsigned int fir_base, unsigned int sir_base)
  *
  *    Change the speed of the device
  *
+ * This function should be called with irq off and spin-lock.
  */
 static void ircc_change_speed(void *priv, u32 speed)
 {
@@ -658,6 +663,7 @@ static void ircc_change_speed(void *priv, u32 speed)
 
 	/* Make special FIR init if necessary */
 	if (speed > 115200) {
+		/* No need to lock, already locked - Jean II */
 		irport_stop(self->irport);
 
 		/* Install FIR transmit handler */
@@ -674,6 +680,7 @@ static void ircc_change_speed(void *priv, u32 speed)
 	} else {
 		/* Install SIR transmit handler */
 		dev->hard_start_xmit = &irport_hard_xmit;
+		/* No need to lock, already locked - Jean II */
 		irport_start(self->irport);
 		
 	        IRDA_DEBUG(0, __FUNCTION__ 
@@ -727,20 +734,26 @@ static int ircc_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	netif_stop_queue(dev);
 
+	/* Make sure tests *& speed change are atomic */
+	spin_lock_irqsave(&self->irport->lock, flags);
+
+	/* Note : you should make sure that speed changes are not going
+	 * to corrupt any outgoing frame. Look at nsc-ircc for the gory
+	 * details - Jean II */
+
 	/* Check if we need to change the speed after this frame */
 	speed = irda_get_next_speed(skb);
 	if ((speed != self->io->speed) && (speed != -1)) {
 		/* Check for empty frame */
 		if (!skb->len) {
 			ircc_change_speed(self, speed); 
+			spin_unlock_irqrestore(&self->irport->lock, flags);
 			dev_kfree_skb(skb);
 			return 0;
 		} else
 			self->new_speed = speed;
 	}
 	
-	spin_lock_irqsave(&self->lock, flags);
-
 	memcpy(self->tx_buff.head, skb->data, skb->len);
 
 	self->tx_buff.len = skb->len;
@@ -763,7 +776,7 @@ static int ircc_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* Transmit frame */
 		ircc_dma_xmit(self, iobase, 0);
 	}
-	spin_unlock_irqrestore(&self->lock, flags);
+	spin_unlock_irqrestore(&self->irport->lock, flags);
 	dev_kfree_skb(skb);
 
 	return 0;
@@ -985,12 +998,13 @@ static void ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* Check if we should use the SIR interrupt handler */
 	if (self->io->speed < 576000) {
+		/* Will spinlock itself - Jean II */
 		irport_interrupt(irq, dev_id, regs);
 		return;
 	}
 	iobase = self->io->fir_base;
 
-	spin_lock(&self->lock);	
+	spin_lock(&self->irport->lock);	
 
 	register_bank(iobase, 0);
 	iir = inb(iobase+IRCC_IIR);
@@ -1013,7 +1027,7 @@ static void ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	register_bank(iobase, 0);
 	outb(IRCC_IER_ACTIVE_FRAME|IRCC_IER_EOM, iobase+IRCC_IER);
 
-	spin_unlock(&self->lock);
+	spin_unlock(&self->irport->lock);
 }
 
 #if 0 /* unused */
@@ -1128,17 +1142,15 @@ static void ircc_suspend(struct ircc_cb *self)
 
 static void ircc_wakeup(struct ircc_cb *self)
 {
-	unsigned long flags;
-
 	if (!self->io->suspended)
 		return;
 
-	save_flags(flags);
-	cli();
+	/* The code was doing a "cli()" here, but this can't be right.
+	 * If you need protection, do it in net_open with a spinlock
+	 * or give a good reason. - Jean II */
 
 	ircc_net_open(self->netdev);
 	
-	restore_flags(flags);
 	MESSAGE("%s, Waking up\n", driver_name);
 }
 
@@ -1174,6 +1186,7 @@ static int __exit ircc_close(struct ircc_cb *self)
 
         iobase = self->irport->io.fir_base;
 
+	/* This will destroy irport */
 	irport_close(self->irport);
 
 	/* Stop interrupts */
@@ -1187,6 +1200,7 @@ static int __exit ircc_close(struct ircc_cb *self)
         outb(IRCC_CFGA_IRDA_SIR_A|IRCC_CFGA_TX_POLARITY, iobase+IRCC_SCE_CFGA);
         outb(IRCC_CFGB_IR, iobase+IRCC_SCE_CFGB);
 #endif
+
 	/* Release the PORT that this driver is using */
 	IRDA_DEBUG(0, __FUNCTION__ "(), releasing 0x%03x\n", iobase);
 

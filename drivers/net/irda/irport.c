@@ -140,7 +140,7 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 	void *ret;
 	int err;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, __FUNCTION__ "()\n");
 
 	/*
 	 *  Allocate new instance of the driver
@@ -284,14 +284,13 @@ int irport_close(struct irport_cb *self)
 
 void irport_start(struct irport_cb *self)
 {
-	unsigned long flags;
 	int iobase;
 
 	iobase = self->io.sir_base;
 
 	irport_stop(self);
 	
-	spin_lock_irqsave(&self->lock, flags);
+	/* We can't lock, we may be called from a FIR driver - Jean II */
 
 	/* Initialize UART */
 	outb(UART_LCR_WLEN8, iobase+UART_LCR);  /* Reset DLAB */
@@ -299,26 +298,21 @@ void irport_start(struct irport_cb *self)
 	
 	/* Turn on interrups */
 	outb(UART_IER_RLSI | UART_IER_RDI |UART_IER_THRI, iobase+UART_IER);
-
-	spin_unlock_irqrestore(&self->lock, flags);
 }
 
 void irport_stop(struct irport_cb *self)
 {
-	unsigned long flags;
 	int iobase;
 
 	iobase = self->io.sir_base;
 
-	spin_lock_irqsave(&self->lock, flags);
+	/* We can't lock, we may be called from a FIR driver - Jean II */
 
 	/* Reset UART */
 	outb(0, iobase+UART_MCR);
 	
 	/* Turn off interrupts */
 	outb(0, iobase+UART_IER);
-
-	spin_unlock_irqrestore(&self->lock, flags);
 }
 
 /*
@@ -339,26 +333,27 @@ int irport_probe(int iobase)
  *
  *    Set speed of IrDA port to specified baudrate
  *
+ * This function should be called with irq off and spin-lock.
  */
 void irport_change_speed(void *priv, __u32 speed)
 {
 	struct irport_cb *self = (struct irport_cb *) priv;
-	unsigned long flags;
 	int iobase; 
 	int fcr;    /* FIFO control reg */
 	int lcr;    /* Line control reg */
 	int divisor;
 
-	IRDA_DEBUG(0, __FUNCTION__ "(), Setting speed to: %d\n", speed);
-
 	ASSERT(self != NULL, return;);
+
+	IRDA_DEBUG(1, "%s(), Setting speed to: %d - iobase=%#x\n",
+		    __FUNCTION__, speed, self->io.sir_base);
+
+	/* We can't lock, we may be called from a FIR driver - Jean II */
 
 	iobase = self->io.sir_base;
 	
 	/* Update accounting for new speed */
 	self->io.speed = speed;
-
-	spin_lock_irqsave(&self->lock, flags);
 
 	/* Turn off interrupts */
 	outb(0, iobase+UART_IER); 
@@ -387,9 +382,9 @@ void irport_change_speed(void *priv, __u32 speed)
 	outb(fcr,		  iobase+UART_FCR); /* Enable FIFO's */
 
 	/* Turn on interrups */
-	outb(/*UART_IER_RLSI|*/UART_IER_RDI/*|UART_IER_THRI*/, iobase+UART_IER);
-
-	spin_unlock_irqrestore(&self->lock, flags);
+	/* This will generate a fata interrupt storm.
+	 * People calling us will do that properly - Jean II */
+	//outb(/*UART_IER_RLSI|*/UART_IER_RDI/*|UART_IER_THRI*/, iobase+UART_IER);
 }
 
 /*
@@ -397,11 +392,14 @@ void irport_change_speed(void *priv, __u32 speed)
  *
  *    State machine for changing speed of the device. We do it this way since
  *    we cannot use schedule_timeout() when we are in interrupt context
+ *
  */
 int __irport_change_speed(struct irda_task *task)
 {
 	struct irport_cb *self;
 	__u32 speed = (__u32) task->param;
+	unsigned long flags = 0;
+	int wasunlocked = 0;
 	int ret = 0;
 
 	IRDA_DEBUG(2, __FUNCTION__ "(), <%ld>\n", jiffies); 
@@ -409,6 +407,17 @@ int __irport_change_speed(struct irda_task *task)
 	self = (struct irport_cb *) task->instance;
 
 	ASSERT(self != NULL, return -1;);
+
+	/* Locking notes : this function may be called from irq context with
+	 * spinlock, via irport_write_wakeup(), or from non-interrupt without
+	 * spinlock (from the task timer). Yuck !
+	 * This is ugly, and unsafe is the spinlock is not already aquired.
+	 * This will be fixed when irda-task get rewritten.
+	 * Jean II */
+	if (!spin_is_locked(&self->lock)) {
+		spin_lock_irqsave(&self->lock, flags);
+		wasunlocked = 1;
+	}
 
 	switch (task->state) {
 	case IRDA_TASK_INIT:
@@ -462,6 +471,11 @@ int __irport_change_speed(struct irda_task *task)
 		ret = -1;
 		break;
 	}	
+	/* Put stuff in the sate we found them - Jean II */
+	if(wasunlocked) {
+		spin_unlock_irqrestore(&self->lock, flags);
+	}
+
 	return ret;
 }
 
@@ -491,6 +505,9 @@ static void irport_write_wakeup(struct irport_cb *self)
 				      self->tx_buff.data, self->tx_buff.len);
 		self->tx_buff.data += actual;
 		self->tx_buff.len  -= actual;
+
+		/* Turn on transmit finished interrupt. */
+		outb(UART_IER_THRI, iobase+UART_IER); 
 	} else {
 		/* 
 		 *  Now serial buffer is almost free & we can start 
@@ -498,11 +515,12 @@ static void irport_write_wakeup(struct irport_cb *self)
 		 *  if we need to change the speed of the hardware
 		 */
 		if (self->new_speed) {
-			IRDA_DEBUG(5, __FUNCTION__ "(), Changing speed!\n");
+			IRDA_DEBUG(5, "%s(), Changing speed!\n", __FUNCTION__);
 			irda_task_execute(self, __irport_change_speed, 
 					  irport_change_speed_complete, 
 					  NULL, (void *) self->new_speed);
 			self->new_speed = 0;
+			IRDA_DEBUG(5, "%s(), Speed changed!\n", __FUNCTION__ );
 		} else {
 			/* Tell network layer that we want more frames */
 			netif_wake_queue(self->netdev);
@@ -563,7 +581,7 @@ static int irport_change_speed_complete(struct irda_task *task)
 {
 	struct irport_cb *self;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, __FUNCTION__ "()\n");
 
 	self = (struct irport_cb *) task->instance;
 
@@ -589,13 +607,19 @@ static void irport_timeout(struct net_device *dev)
 {
 	struct irport_cb *self;
 	int iobase;
+	unsigned long flags;
 
 	self = (struct irport_cb *) dev->priv;
 	iobase = self->io.sir_base;
 	
 	WARNING("%s: transmit timed out\n", dev->name);
+	spin_lock_irqsave(&self->lock, flags);
 	irport_start(self);
 	self->change_speed(self->priv, self->io.speed);
+	/* This will re-enable irqs */
+	outb(/*UART_IER_RLSI|*/UART_IER_RDI/*|UART_IER_THRI*/, iobase+UART_IER);
+	spin_unlock_irqrestore(&self->lock, flags);
+
 	dev->trans_start = jiffies;
 	netif_wake_queue(dev);
 }
@@ -614,7 +638,7 @@ int irport_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 	int iobase;
 	s32 speed;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, __FUNCTION__ "()\n");
 
 	ASSERT(dev != NULL, return 0;);
 	
@@ -625,21 +649,24 @@ int irport_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	netif_stop_queue(dev);
 	
+	/* Make sure tests *& speed change are atomic */
+	spin_lock_irqsave(&self->lock, flags);
+
 	/* Check if we need to change the speed */
 	speed = irda_get_next_speed(skb);
 	if ((speed != self->io.speed) && (speed != -1)) {
 		/* Check for empty frame */
 		if (!skb->len) {
+			/* Better go there already locked - Jean II */
 			irda_task_execute(self, __irport_change_speed, 
 					  irport_change_speed_complete, 
 					  NULL, (void *) speed);
+			spin_unlock_irqrestore(&self->lock, flags);
 			dev_kfree_skb(skb);
 			return 0;
 		} else
 			self->new_speed = speed;
 	}
-
-	spin_lock_irqsave(&self->lock, flags);
 
 	/* Init tx buffer */
 	self->tx_buff.data = self->tx_buff.head;
@@ -771,8 +798,9 @@ int irport_net_open(struct net_device *dev)
 	struct irport_cb *self;
 	int iobase;
 	char hwname[16];
+	unsigned long flags;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, __FUNCTION__ "()\n");
 	
 	ASSERT(dev != NULL, return -1;);
 	self = (struct irport_cb *) dev->priv;
@@ -786,7 +814,9 @@ int irport_net_open(struct net_device *dev)
 		return -EAGAIN;
 	}
 
+	spin_lock_irqsave(&self->lock, flags);
 	irport_start(self);
+	spin_unlock_irqrestore(&self->lock, flags);
 
 
 	/* Give self a hardware name */
@@ -818,6 +848,7 @@ int irport_net_close(struct net_device *dev)
 {
 	struct irport_cb *self;
 	int iobase;
+	unsigned long flags;
 
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 
@@ -836,7 +867,9 @@ int irport_net_close(struct net_device *dev)
 		irlap_close(self->irlap);
 	self->irlap = NULL;
 
+	spin_lock_irqsave(&self->lock, flags);
 	irport_stop(self);
+	spin_unlock_irqrestore(&self->lock, flags);
 
 	free_irq(self->io.irq, dev);
 
@@ -951,10 +984,6 @@ static int irport_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	IRDA_DEBUG(2, __FUNCTION__ "(), %s, (cmd=0x%X)\n", dev->name, cmd);
 	
-	/* Disable interrupts & save flags */
-	save_flags(flags);
-	cli();
-	
 	switch (cmd) {
 	case SIOCSBANDWIDTH: /* Set bandwidth */
 		if (!capable(CAP_NET_ADMIN))
@@ -979,14 +1008,16 @@ static int irport_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		dongle->write       = irport_raw_write;
 		dongle->set_dtr_rts = irport_set_dtr_rts;
 		
-		self->dongle = dongle;
-
 		/* Now initialize the dongle!  */
 		dongle->issue->open(dongle, &self->qos);
 		
 		/* Reset dongle */
 		irda_task_execute(dongle, dongle->issue->reset, NULL, NULL, 
 				  NULL);	
+
+		/* Make dongle available to driver only now to avoid
+		 * race conditions - Jean II */
+		self->dongle = dongle;
 		break;
 	case SIOCSMEDIABUSY: /* Set media busy */
 		if (!capable(CAP_NET_ADMIN)) {
@@ -1005,13 +1036,14 @@ static int irport_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			break;
 		}
 
+		/* No real need to lock... */
+		spin_lock_irqsave(&self->lock, flags);
 		irport_set_dtr_rts(dev, irq->ifr_dtr, irq->ifr_rts);
+		spin_unlock_irqrestore(&self->lock, flags);
 		break;
 	default:
 		ret = -EOPNOTSUPP;
 	}
-	
-	restore_flags(flags);
 	
 	return ret;
 }
