@@ -81,76 +81,6 @@ nfs4_setup_compound(struct nfs4_compound *cp, struct nfs4_op *ops,
 	cp->server = server;
 }
 
-static void
-nfs4_setup_create_dir(struct nfs4_compound *cp, struct qstr *name,
-		      struct iattr *sattr, struct nfs4_change_info *info)
-{
-	struct nfs4_create *create = GET_OP(cp, create);
-	
-	create->cr_ftype = NF4DIR;
-	create->cr_namelen = name->len;
-	create->cr_name = name->name;
-	create->cr_attrs = sattr;
-	create->cr_cinfo = info;
-	
-	OPNUM(cp) = OP_CREATE;
-	cp->req_nops++;
-}
-
-static void
-nfs4_setup_create_symlink(struct nfs4_compound *cp, struct qstr *name,
-			  struct qstr *linktext, struct iattr *sattr,
-			  struct nfs4_change_info *info)
-{
-	struct nfs4_create *create = GET_OP(cp, create);
-
-	create->cr_ftype = NF4LNK;
-	create->cr_textlen = linktext->len;
-	create->cr_text = linktext->name;
-	create->cr_namelen = name->len;
-	create->cr_name = name->name;
-	create->cr_attrs = sattr;
-	create->cr_cinfo = info;
-
-	OPNUM(cp) = OP_CREATE;
-	cp->req_nops++;
-}
-
-static void
-nfs4_setup_create_special(struct nfs4_compound *cp, struct qstr *name,
-			    dev_t dev, struct iattr *sattr,
-			    struct nfs4_change_info *info)
-{
-	int mode = sattr->ia_mode;
-	struct nfs4_create *create = GET_OP(cp, create);
-
-	BUG_ON(!(sattr->ia_valid & ATTR_MODE));
-	BUG_ON(!S_ISFIFO(mode) && !S_ISBLK(mode) && !S_ISCHR(mode) && !S_ISSOCK(mode));
-	
-	if (S_ISFIFO(mode))
-		create->cr_ftype = NF4FIFO;
-	else if (S_ISBLK(mode)) {
-		create->cr_ftype = NF4BLK;
-		create->cr_specdata1 = MAJOR(dev);
-		create->cr_specdata2 = MINOR(dev);
-	}
-	else if (S_ISCHR(mode)) {
-		create->cr_ftype = NF4CHR;
-		create->cr_specdata1 = MAJOR(dev);
-		create->cr_specdata2 = MINOR(dev);
-	}
-	else
-		create->cr_ftype = NF4SOCK;
-	
-	create->cr_namelen = name->len;
-	create->cr_name = name->name;
-	create->cr_attrs = sattr;
-	create->cr_cinfo = info;
-
-	OPNUM(cp) = OP_CREATE;
-	cp->req_nops++;
-}
-
 /*
  * This is our standard bitmap for GETATTR requests.
  */
@@ -225,17 +155,6 @@ nfs4_setup_pathconf(struct nfs4_compound *cp,
 {
 	__nfs4_setup_getattr(cp, nfs4_pathconf_bitmap,
 			NULL, NULL, pathconf);
-}
-
-static void
-nfs4_setup_getfh(struct nfs4_compound *cp, struct nfs_fh *fhandle)
-{
-	struct nfs4_getfh *getfh = GET_OP(cp, getfh);
-
-	getfh->gf_fhandle = fhandle;
-
-	OPNUM(cp) = OP_GETFH;
-	cp->req_nops++;
 }
 
 static void
@@ -331,20 +250,6 @@ nfs4_setup_remove(struct nfs4_compound *cp, struct qstr *name, struct nfs4_chang
 
 	OPNUM(cp) = OP_REMOVE;
 	cp->req_nops++;
-}
-
-static void
-nfs4_setup_restorefh(struct nfs4_compound *cp)
-{
-        OPNUM(cp) = OP_RESTOREFH;
-        cp->req_nops++;
-}
-
-static void
-nfs4_setup_savefh(struct nfs4_compound *cp)
-{
-        OPNUM(cp) = OP_SAVEFH;
-        cp->req_nops++;
 }
 
 static void
@@ -1308,64 +1213,68 @@ static int nfs4_proc_link(struct inode *inode, struct inode *dir, struct qstr *n
 	return nfs4_map_errors(status);
 }
 
-static int
-nfs4_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
-		  struct iattr *sattr, struct nfs_fh *fhandle,
-		  struct nfs_fattr *fattr)
+static int nfs4_proc_symlink(struct inode *dir, struct qstr *name,
+		struct qstr *path, struct iattr *sattr, struct nfs_fh *fhandle,
+		struct nfs_fattr *fattr)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[7];
-	struct nfs_fattr	dir_attr;
-	struct nfs4_change_info	dir_cinfo;
+	struct nfs4_create_arg arg = {
+		.dir_fh = NFS_FH(dir),
+		.server = NFS_SERVER(dir),
+		.name = name,
+		.attrs = sattr,
+		.ftype = NF4LNK,
+		.bitmask = nfs4_fattr_bitmap,
+	};
+	struct nfs4_create_res res = {
+		.server = NFS_SERVER(dir),
+		.fh = fhandle,
+		.fattr = fattr,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CREATE],
+		.rpc_argp = &arg,
+		.rpc_resp = &res,
+	};
 	int			status;
 
-	dir_attr.valid = 0;
+	arg.u.symlink = path;
 	fattr->valid = 0;
 	
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(dir), "symlink");
-	nfs4_setup_putfh(&compound, NFS_FH(dir));
-	nfs4_setup_savefh(&compound);
-	nfs4_setup_create_symlink(&compound, name, path, sattr, &dir_cinfo);
-	nfs4_setup_getattr(&compound, fattr);
-	nfs4_setup_getfh(&compound, fhandle);
-	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &dir_attr);
-	status = nfs4_call_compound(&compound, NULL, 0);
-
-	if (!status) {
-		process_cinfo(&dir_cinfo, &dir_attr);
-		nfs_refresh_inode(dir, &dir_attr);
-	}
+	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
+	if (!status)
+		update_changeattr(dir, &res.dir_cinfo);
 	return nfs4_map_errors(status);
 }
 
-static int
-nfs4_proc_mkdir(struct inode *dir, struct qstr *name, struct iattr *sattr,
-		struct nfs_fh *fhandle, struct nfs_fattr *fattr)
+static int nfs4_proc_mkdir(struct inode *dir, struct qstr *name,
+		struct iattr *sattr, struct nfs_fh *fhandle,
+		struct nfs_fattr *fattr)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[7];
-	struct nfs_fattr	dir_attr;
-	struct nfs4_change_info	dir_cinfo;
+	struct nfs4_create_arg arg = {
+		.dir_fh = NFS_FH(dir),
+		.server = NFS_SERVER(dir),
+		.name = name,
+		.attrs = sattr,
+		.ftype = NF4DIR,
+		.bitmask = nfs4_fattr_bitmap,
+	};
+	struct nfs4_create_res res = {
+		.server = NFS_SERVER(dir),
+		.fh = fhandle,
+		.fattr = fattr,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CREATE],
+		.rpc_argp = &arg,
+		.rpc_resp = &res,
+	};
 	int			status;
 
-	dir_attr.valid = 0;
 	fattr->valid = 0;
 	
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(dir), "mkdir");
-	nfs4_setup_putfh(&compound, NFS_FH(dir));
-	nfs4_setup_savefh(&compound);
-	nfs4_setup_create_dir(&compound, name, sattr, &dir_cinfo);
-	nfs4_setup_getattr(&compound, fattr);
-	nfs4_setup_getfh(&compound, fhandle);
-	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &dir_attr);
-	status = nfs4_call_compound(&compound, NULL, 0);
-
-	if (!status) {
-		process_cinfo(&dir_cinfo, &dir_attr);
-		nfs_refresh_inode(dir, &dir_attr);
-	}
+	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
+	if (!status)
+		update_changeattr(dir, &res.dir_cinfo);
 	return nfs4_map_errors(status);
 }
 
@@ -1391,33 +1300,52 @@ nfs4_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 	return nfs4_map_errors(status);
 }
 
-static int
-nfs4_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
-		dev_t rdev, struct nfs_fh *fh, struct nfs_fattr *fattr)
+static int nfs4_proc_mknod(struct inode *dir, struct qstr *name,
+		struct iattr *sattr, dev_t rdev, struct nfs_fh *fh,
+		struct nfs_fattr *fattr)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[7];
-	struct nfs_fattr	dir_attr;
-	struct nfs4_change_info	dir_cinfo;
+	struct nfs4_create_arg arg = {
+		.dir_fh = NFS_FH(dir),
+		.server = NFS_SERVER(dir),
+		.name = name,
+		.attrs = sattr,
+		.bitmask = nfs4_fattr_bitmap,
+	};
+	struct nfs4_create_res res = {
+		.server = NFS_SERVER(dir),
+		.fh = fh,
+		.fattr = fattr,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CREATE],
+		.rpc_argp = &arg,
+		.rpc_resp = &res,
+	};
 	int			status;
+	int                     mode = sattr->ia_mode;
 
-	dir_attr.valid = 0;
 	fattr->valid = 0;
-	
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(dir), "mknod");
-	nfs4_setup_putfh(&compound, NFS_FH(dir));
-	nfs4_setup_savefh(&compound);
-	nfs4_setup_create_special(&compound, name, rdev,sattr, &dir_cinfo);
-	nfs4_setup_getattr(&compound, fattr);
-	nfs4_setup_getfh(&compound, fh);
-	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &dir_attr);
-	status = nfs4_call_compound(&compound, NULL, 0);
 
-	if (!status) {
-		process_cinfo(&dir_cinfo, &dir_attr);
-		nfs_refresh_inode(dir, &dir_attr);
+	BUG_ON(!(sattr->ia_valid & ATTR_MODE));
+	BUG_ON(!S_ISFIFO(mode) && !S_ISBLK(mode) && !S_ISCHR(mode) && !S_ISSOCK(mode));
+	if (S_ISFIFO(mode))
+		arg.ftype = NF4FIFO;
+	else if (S_ISBLK(mode)) {
+		arg.ftype = NF4BLK;
+		arg.u.device.specdata1 = MAJOR(rdev);
+		arg.u.device.specdata2 = MINOR(rdev);
 	}
+	else if (S_ISCHR(mode)) {
+		arg.ftype = NF4CHR;
+		arg.u.device.specdata1 = MAJOR(rdev);
+		arg.u.device.specdata2 = MINOR(rdev);
+	}
+	else
+		arg.ftype = NF4SOCK;
+	
+	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
+	if (!status)
+		update_changeattr(dir, &res.dir_cinfo);
 	return nfs4_map_errors(status);
 }
 

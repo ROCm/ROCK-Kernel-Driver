@@ -501,23 +501,30 @@ struct nfs4_close {
 	u32				cl_seqid;          /* request */
 };
 
-struct nfs4_create {
-	u32				cr_ftype;          /* request */
-	union {                                            /* request */
-		struct {
-			u32		textlen;
-			const char *	text;
-		} symlink;   /* NF4LNK */
+struct nfs4_create_arg {
+	u32				ftype;
+	union {
+		struct qstr *		symlink;    /* NF4LNK */
 		struct {
 			u32		specdata1;
 			u32		specdata2;
 		} device;    /* NF4BLK, NF4CHR */
 	} u;
-	u32				cr_namelen;        /* request */
-	const char *			cr_name;           /* request */
-	struct iattr *			cr_attrs;          /* request */
-	struct nfs4_change_info	*	cr_cinfo;          /* response */
+	const struct qstr *		name;
+	const struct nfs_server *	server;
+	const struct iattr *		attrs;
+	const struct nfs_fh *		dir_fh;
+	const u32 *			bitmask;
 };
+
+struct nfs4_create_res {
+	const struct nfs_server *	server;
+	struct nfs_fh *			fh;
+	struct nfs_fattr *		fattr;
+	struct nfs4_change_info		dir_cinfo;
+};
+
+
 #define cr_textlen			u.symlink.textlen
 #define cr_text				u.symlink.text
 #define cr_specdata1			u.device.specdata1
@@ -538,10 +545,6 @@ struct nfs4_getattr_arg {
 struct nfs4_getattr_res {
 	const struct nfs_server *	server;
 	struct nfs_fattr *		fattr;
-};
-
-struct nfs4_getfh {
-	struct nfs_fh *			gf_fhandle;       /* response */
 };
 
 struct nfs4_link_arg {
@@ -647,9 +650,7 @@ struct nfs4_op {
 	u32				opnum;
 	union {
 		struct nfs4_close	close;
-		struct nfs4_create	create;
 		struct nfs4_getattr	getattr;
-		struct nfs4_getfh	getfh;
 		struct nfs4_open	open;
 		struct nfs4_open_confirm open_confirm;
 		struct nfs4_putfh	putfh;
