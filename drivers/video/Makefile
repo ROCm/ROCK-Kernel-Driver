@@ -2,8 +2,6 @@
 # 5 Aug 1999, James Simmons, <mailto:jsimmons@users.sf.net>
 # Rewritten to use lists instead of if-statements.
 
-mod-subdirs	:= matrox
-
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 

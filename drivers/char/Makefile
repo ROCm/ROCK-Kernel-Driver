@@ -17,8 +17,6 @@ export-objs     :=	busmouse.o console.o keyboard.o sysrq.o \
 			sonypi.o tty_io.o tty_ioctl.o generic_serial.o rtc.o \
 			ip2main.o
 
-mod-subdirs	:=	ftape drm pcmcia
-
 KEYMAP   =defkeymap.o
 KEYBD    =pc_keyb.o
 CONSOLE  =console.o

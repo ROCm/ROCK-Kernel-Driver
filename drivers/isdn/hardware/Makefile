@@ -2,7 +2,6 @@
 
 # Object files in subdirectories
 
-mod-subdirs			:= avm
 obj-$(CONFIG_CAPI_AVM)		+= avm/
 
 # The global Rules.make.

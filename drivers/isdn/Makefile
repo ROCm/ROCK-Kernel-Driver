@@ -2,8 +2,6 @@
 
 # Object files in subdirectories
 
-mod-subdirs				:= i4l hisax capi eicon
-
 obj-$(CONFIG_ISDN)			+= i4l/
 obj-$(CONFIG_ISDN_CAPI)			+= capi/
 obj-$(CONFIG_ISDN_CAPI)			+= hardware/

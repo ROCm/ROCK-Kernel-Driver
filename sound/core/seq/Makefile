@@ -3,8 +3,6 @@
 # Copyright (c) 1999 by Jaroslav Kysela <perex@suse.cz>
 #
 
-mod-subdirs  := instr
-
 obj-$(CONFIG_SND) += instr/
 obj-$(CONFIG_SND_SEQUENCER_OSS) += oss/
 
