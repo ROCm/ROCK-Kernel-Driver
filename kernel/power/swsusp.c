@@ -43,8 +43,8 @@
 #include <linux/version.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
-#include <linux/vt_kern.h>
 #include <linux/bitops.h>
+#include <linux/vt_kern.h>
 #include <linux/kbd_kern.h>
 #include <linux/keyboard.h>
 #include <linux/spinlock.h>
@@ -63,18 +63,11 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 
+#include "power.h"
+
 extern long sys_sync(void);
 
 unsigned char software_suspend_enabled = 0;
-
-#define SUSPEND_CONSOLE	(MAX_NR_CONSOLES-1)
-/* With SUSPEND_CONSOLE defined, it suspend looks *really* cool, but
-   we probably do not take enough locks for switching consoles, etc,
-   so bad things might happen.
-*/
-#if !defined(CONFIG_VT) || !defined(CONFIG_VT_CONSOLE)
-#undef SUSPEND_CONSOLE
-#endif
 
 #define __ADDRESS(x)  ((unsigned long) phys_to_virt(x))
 #define ADDRESS(x) __ADDRESS((x) << PAGE_SHIFT)
@@ -89,9 +82,6 @@ extern int is_head_of_free_region(struct page *);
 spinlock_t suspend_pagedir_lock __nosavedata = SPIN_LOCK_UNLOCKED;
 
 /* Variables to be preserved over suspend */
-static int new_loglevel = 7;
-static int orig_loglevel;
-static int orig_fgconsole, orig_kmsg;
 static int pagedir_order_check;
 static int nr_copy_pages_check;
 
@@ -455,40 +445,6 @@ static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
 	return pagedir;
 }
 
-static int prepare_suspend_console(void)
-{
-	orig_loglevel = console_loglevel;
-	console_loglevel = new_loglevel;
-
-#ifdef CONFIG_VT
-	orig_fgconsole = fg_console;
-#ifdef SUSPEND_CONSOLE
-	if(vc_allocate(SUSPEND_CONSOLE))
-	  /* we can't have a free VC for now. Too bad,
-	   * we don't want to mess the screen for now. */
-		return 1;
-
-	set_console (SUSPEND_CONSOLE);
-	if(vt_waitactive(SUSPEND_CONSOLE)) {
-		PRINTK("Bummer. Can't switch VCs.");
-		return 1;
-	}
-	orig_kmsg = kmsg_redirect;
-	kmsg_redirect = SUSPEND_CONSOLE;
-#endif
-#endif
-	return 0;
-}
-
-static void restore_console(void)
-{
-	console_loglevel = orig_loglevel;
-#ifdef SUSPEND_CONSOLE
-	set_console (orig_fgconsole);
-#endif
-	return;
-}
-
 static int prepare_suspend_processes(void)
 {
 	sys_sync();	/* Syncing needs pdflushd, so do it before stopping processes */
@@ -743,7 +699,7 @@ void do_magic_suspend_2(void)
 static void do_software_suspend(void)
 {
 	arch_prepare_suspend();
-	if (prepare_suspend_console())
+	if (pm_prepare_console())
 		printk( "%sCan't allocate a console... proceeding\n", name_suspend);
 	if (!prepare_suspend_processes()) {
 
@@ -774,7 +730,7 @@ static void do_software_suspend(void)
 	}
 	software_suspend_enabled = 1;
 	MDELAY(1000);
-	restore_console();
+	pm_restore_console();
 }
 
 /*
@@ -997,8 +953,6 @@ static int __read_suspend_image(struct block_device *bdev, union diskpage *cur, 
 		bdev_write_page(bdev, 0, cur);
 	}
 
-	if (prepare_suspend_console())
-		printk("%sCan't allocate a console... proceeding\n", name_resume);
 	printk( "%sSignature found, resuming\n", name_resume );
 	MDELAY(1000);
 
@@ -1119,8 +1073,8 @@ void software_resume(void)
 	}
 	MDELAY(1000);
 
-	orig_loglevel = console_loglevel;
-	console_loglevel = new_loglevel;
+	if (pm_prepare_console())
+		printk("swsusp: Can't allocate a console... proceeding\n");
 
 	if (!resume_file[0] && resume_status == RESUME_SPECIFIED) {
 		printk( "suspension device unspecified\n" );
@@ -1134,7 +1088,7 @@ void software_resume(void)
 	panic("This never returns");
 
 read_failure:
-	console_loglevel = orig_loglevel;
+	pm_restore_console();
 	return;
 }
 
