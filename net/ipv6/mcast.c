@@ -385,16 +385,16 @@ int ip6_mc_source(int add, int omode, struct sock *sk,
 
 	psl = pmc->sflist;
 	if (!add) {
-		if (!psl)
+		if (!psl || !psl->sl_count)
 			goto done;
-		rv = !0;
+		rv = 1;
 		for (i=0; i<psl->sl_count; i++) {
-			rv = memcmp(&psl->sl_addr, group,
+			rv = memcmp(&psl->sl_addr[i], source,
 				sizeof(struct in6_addr));
-			if (rv >= 0)
+			if (rv >= 0)	/* array is sorted */
 				break;
 		}
-		if (!rv)	/* source not found */
+		if (rv)		/* source not found */
 			goto done;
 
 		/* update the interface filter */
@@ -435,7 +435,7 @@ int ip6_mc_source(int add, int omode, struct sock *sk,
 	}
 	rv = 1;	/* > 0 for insert logic below if sl_count is 0 */
 	for (i=0; i<psl->sl_count; i++) {
-		rv = memcmp(&psl->sl_addr, group, sizeof(struct in6_addr));
+		rv = memcmp(&psl->sl_addr[i], source, sizeof(struct in6_addr));
 		if (rv >= 0)
 			break;
 	}
