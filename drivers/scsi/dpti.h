@@ -37,19 +37,19 @@
  * SCSI interface function Prototypes
  */
 
-static int adpt_detect(Scsi_Host_Template * sht);
-static int adpt_queue(Scsi_Cmnd * cmd, void (*cmdcomplete) (Scsi_Cmnd *));
-static int adpt_abort(Scsi_Cmnd * cmd);
-static int adpt_reset(Scsi_Cmnd* cmd);
+static int adpt_detect(struct scsi_host_template * sht);
+static int adpt_queue(struct scsi_cmnd * cmd, void (*cmdcomplete) (struct scsi_cmnd *));
+static int adpt_abort(struct scsi_cmnd * cmd);
+static int adpt_reset(struct scsi_cmnd* cmd);
 static int adpt_release(struct Scsi_Host *host);
-static int adpt_slave_configure(Scsi_Device *);
+static int adpt_slave_configure(struct scsi_device *);
 
 static const char *adpt_info(struct Scsi_Host *pSHost);
 static int adpt_bios_param(struct scsi_device * sdev, struct block_device *dev,
 		sector_t, int geom[]);
 
-static int adpt_bus_reset(Scsi_Cmnd* cmd);
-static int adpt_device_reset(Scsi_Cmnd* cmd);
+static int adpt_bus_reset(struct scsi_cmnd* cmd);
+static int adpt_device_reset(struct scsi_cmnd* cmd);
 
 
 /*
@@ -198,7 +198,7 @@ struct adpt_device {
 	u8	state;
 	u16	tid;
 	struct i2o_device* pI2o_dev;
-	Scsi_Device *pScsi_dev;
+	struct scsi_device *pScsi_dev;
 };
 
 struct adpt_channel {
@@ -296,9 +296,9 @@ static s32 adpt_i2o_quiesce_hba(adpt_hba* pHba);
 static s32 adpt_i2o_status_get(adpt_hba* pHba);
 static s32 adpt_i2o_init_outbound_q(adpt_hba* pHba);
 static s32 adpt_i2o_hrt_get(adpt_hba* pHba);
-static s32 adpt_scsi_to_i2o(adpt_hba* pHba, Scsi_Cmnd* cmd, struct adpt_device* dptdevice);
-static s32 adpt_i2o_to_scsi(ulong reply, Scsi_Cmnd* cmd);
-static s32 adpt_scsi_register(adpt_hba* pHba,Scsi_Host_Template * sht);
+static s32 adpt_scsi_to_i2o(adpt_hba* pHba, struct scsi_cmnd* cmd, struct adpt_device* dptdevice);
+static s32 adpt_i2o_to_scsi(ulong reply, struct scsi_cmnd* cmd);
+static s32 adpt_scsi_register(adpt_hba* pHba,struct scsi_host_template * sht);
 static s32 adpt_hba_reset(adpt_hba* pHba);
 static s32 adpt_i2o_reset_hba(adpt_hba* pHba);
 static s32 adpt_rescan(adpt_hba* pHba);
@@ -308,7 +308,7 @@ static void adpt_i2o_delete_hba(adpt_hba* pHba);
 static void adpt_inquiry(adpt_hba* pHba);
 static void adpt_fail_posted_scbs(adpt_hba* pHba);
 static struct adpt_device* adpt_find_device(adpt_hba* pHba, u32 chan, u32 id, u32 lun);
-static int adpt_install_hba(Scsi_Host_Template* sht, struct pci_dev* pDev) ;
+static int adpt_install_hba(struct scsi_host_template* sht, struct pci_dev* pDev) ;
 static int adpt_i2o_online_hba(adpt_hba* pHba);
 static void adpt_i2o_post_wait_complete(u32, int);
 static int adpt_i2o_systab_send(adpt_hba* pHba);
