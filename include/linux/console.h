@@ -97,7 +97,7 @@ struct console
 	char	name[8];
 	void	(*write)(struct console *, const char *, unsigned);
 	int	(*read)(struct console *, const char *, unsigned);
-	kdev_t	(*device)(struct console *);
+	struct tty_driver *(*device)(struct console *, int *);
 	void	(*unblank)(void);
 	int	(*setup)(struct console *, char *);
 	short	flags;

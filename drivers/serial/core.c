@@ -2187,17 +2187,19 @@ int uart_register_driver(struct uart_driver *drv)
  */
 void uart_unregister_driver(struct uart_driver *drv)
 {
-	tty_unregister_driver(drv->tty_driver);
-
+	struct tty_driver *p = drv->tty_driver;
+	drv->tty_driver = NULL;
+	tty_unregister_driver(p);
 	kfree(drv->state);
 	kfree(drv->tty_driver->termios);
 	kfree(drv->tty_driver);
 }
 
-kdev_t uart_console_device(struct console *co)
+struct tty_driver *uart_console_device(struct console *co, int *index)
 {
 	struct uart_driver *p = co->data;
-	return mk_kdev(p->major, p->minor + co->index);
+	*index = co->index;
+	return p->tty_driver;
 }
 
 /**

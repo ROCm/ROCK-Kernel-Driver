@@ -2835,9 +2835,11 @@ static void serial_console_write(struct console *co, const char *s,
 	/* Don't disable the transmitter. */
 }
 
-static kdev_t serial_console_device(struct console *c)
+extern struct tty_driver serial_driver;
+static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return &serial_driver;
 }
 
 /*

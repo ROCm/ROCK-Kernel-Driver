@@ -1990,11 +1990,11 @@ static int siccuart_console_wait_key(struct console *co)
     return c;
 }
 
-static kdev_t siccuart_console_device(struct console *c)
+static struct tty_driver *siccuart_console_device(struct console *c, int *index)
 {
-    return MKDEV(SERIAL_SICC_MAJOR, SERIAL_SICC_MINOR + c->index);
+	*index = c->index;
+	return &siccnormal_driver;
 }
-
 
 static int __init siccuart_console_setup(struct console *co, char *options)
 {

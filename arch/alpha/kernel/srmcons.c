@@ -318,11 +318,11 @@ srm_console_write(struct console *co, const char *s, unsigned count)
 	spin_unlock_irqrestore(&srmcons_callback_lock, flags);
 }
 
-static kdev_t
-srm_console_device(struct console *co)
+static struct tty_driver *
+srm_console_device(struct console *co, int *index)
 {
-	return mk_kdev(srmcons_driver.major,
-		       srmcons_driver.minor_start + co->index);
+	*index = co->index;
+	return &srmcons_driver;
 }
 
 static int __init
