@@ -781,4 +781,7 @@ extern struct xfrm_algo_desc *xfrm_calg_get_byname(char *name);
 struct crypto_tfm;
 typedef void (icv_update_fn_t)(struct crypto_tfm *, struct scatterlist *, unsigned int);
 
+extern void skb_icv_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
+			 int offset, int len, icv_update_fn_t icv_update);
+
 #endif	/* _NET_XFRM_H */

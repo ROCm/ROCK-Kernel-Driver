@@ -356,13 +356,10 @@ EXPORT_SYMBOL_GPL(xfrm_calg_get_byid);
 EXPORT_SYMBOL_GPL(xfrm_aalg_get_byname);
 EXPORT_SYMBOL_GPL(xfrm_ealg_get_byname);
 EXPORT_SYMBOL_GPL(xfrm_calg_get_byname);
-#if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
-EXPORT_SYMBOL_GPL(skb_ah_walk);
-#endif
+EXPORT_SYMBOL_GPL(skb_icv_walk);
 #if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
 EXPORT_SYMBOL_GPL(skb_cow_data);
 EXPORT_SYMBOL_GPL(pskb_put);
-EXPORT_SYMBOL_GPL(skb_icv_walk);
 EXPORT_SYMBOL_GPL(skb_to_sgvec);
 #endif
 
