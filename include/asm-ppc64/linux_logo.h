@@ -22,25 +22,5 @@
 
 #define LINUX_LOGO_HEIGHT	80
 #define LINUX_LOGO_WIDTH	80
-#define LINUX_LOGO_COLORS	214
 
-#ifdef INCLUDE_LINUX_LOGO_DATA
-
-#define INCLUDE_LINUX_LOGOBW
-#define INCLUDE_LINUX_LOGO16
 #include <linux/linux_logo.h>
-
-#else
-
-/* prototypes only */
-extern unsigned char linux_logo_red[];
-extern unsigned char linux_logo_green[];
-extern unsigned char linux_logo_blue[];
-extern unsigned char linux_logo[];
-extern unsigned char linux_logo_bw[];
-extern unsigned char linux_logo16_red[];
-extern unsigned char linux_logo16_green[];
-extern unsigned char linux_logo16_blue[];
-extern unsigned char linux_logo16[];
-
-#endif
