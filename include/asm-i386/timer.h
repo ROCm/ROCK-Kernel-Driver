@@ -19,4 +19,8 @@ struct timer_opts{
 #define TICK_SIZE (tick_nsec / 1000)
 
 extern struct timer_opts* select_timer(void);
+
+/* Modifiers for buggy PIT handling */
+
+extern int pit_latch_buggy;
 #endif
