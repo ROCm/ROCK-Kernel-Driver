@@ -7,7 +7,9 @@ src := $(obj)
 .PHONY: __build
 __build:
 
+ifdef include-config
 include .config
+endif
 
 include $(obj)/Makefile
 
