@@ -33,6 +33,12 @@
 #include <linux/timer.h>
 #include <linux/rcupdate.h>
 
+#ifdef CONFIG_NUMA
+#define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
+#else
+#define cpu_to_node_mask(cpu) (cpu_online_map)
+#endif
+
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
  * to static priority [ MAX_RT_PRIO..MAX_PRIO-1 ],
@@ -154,10 +160,9 @@ struct runqueue {
 	task_t *curr, *idle;
 	struct mm_struct *prev_mm;
 	prio_array_t *active, *expired, arrays[2];
-	int prev_nr_running[NR_CPUS];
+	int prev_cpu_load[NR_CPUS];
 #ifdef CONFIG_NUMA
 	atomic_t *node_nr_running;
-	unsigned int nr_balanced;
 	int prev_node_load[MAX_NUMNODES];
 #endif
 	task_t *migration_thread;
@@ -867,29 +872,6 @@ static int find_busiest_node(int this_node)
 	return node;
 }
 
-static inline unsigned long cpus_to_balance(int this_cpu, runqueue_t *this_rq)
-{
-	int this_node = cpu_to_node(this_cpu);
-	/*
-	 * Avoid rebalancing between nodes too often.
-	 * We rebalance globally once every NODE_BALANCE_RATE load balances.
-	 */
-	if (++(this_rq->nr_balanced) == NODE_BALANCE_RATE) {
-		int node = find_busiest_node(this_node);
-		this_rq->nr_balanced = 0;
-		if (node >= 0)
-			return (node_to_cpumask(node) | (1UL << this_cpu));
-	}
-	return node_to_cpumask(this_node);
-}
-
-#else /* !CONFIG_NUMA */
-
-static inline unsigned long cpus_to_balance(int this_cpu, runqueue_t *this_rq)
-{
-	return cpu_online_map;
-}
-
 #endif /* CONFIG_NUMA */
 
 #if CONFIG_SMP
@@ -909,10 +891,10 @@ static inline unsigned int double_lock_balance(runqueue_t *this_rq,
 			spin_lock(&busiest->lock);
 			spin_lock(&this_rq->lock);
 			/* Need to recalculate nr_running */
-			if (idle || (this_rq->nr_running > this_rq->prev_nr_running[this_cpu]))
+			if (idle || (this_rq->nr_running > this_rq->prev_cpu_load[this_cpu]))
 				nr_running = this_rq->nr_running;
 			else
-				nr_running = this_rq->prev_nr_running[this_cpu];
+				nr_running = this_rq->prev_cpu_load[this_cpu];
 		} else
 			spin_lock(&busiest->lock);
 	}
@@ -949,10 +931,10 @@ static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, 
 	 * that case we are less picky about moving a task across CPUs and
 	 * take what can be taken.
 	 */
-	if (idle || (this_rq->nr_running > this_rq->prev_nr_running[this_cpu]))
+	if (idle || (this_rq->nr_running > this_rq->prev_cpu_load[this_cpu]))
 		nr_running = this_rq->nr_running;
 	else
-		nr_running = this_rq->prev_nr_running[this_cpu];
+		nr_running = this_rq->prev_cpu_load[this_cpu];
 
 	busiest = NULL;
 	max_load = 1;
@@ -961,11 +943,11 @@ static inline runqueue_t *find_busiest_queue(runqueue_t *this_rq, int this_cpu, 
 			continue;
 
 		rq_src = cpu_rq(i);
-		if (idle || (rq_src->nr_running < this_rq->prev_nr_running[i]))
+		if (idle || (rq_src->nr_running < this_rq->prev_cpu_load[i]))
 			load = rq_src->nr_running;
 		else
-			load = this_rq->prev_nr_running[i];
-		this_rq->prev_nr_running[i] = rq_src->nr_running;
+			load = this_rq->prev_cpu_load[i];
+		this_rq->prev_cpu_load[i] = rq_src->nr_running;
 
 		if ((load > max_load) && (rq_src != this_rq)) {
 			busiest = rq_src;
@@ -1029,7 +1011,7 @@ static inline void pull_task(runqueue_t *src_rq, prio_array_t *src_array, task_t
  * We call this with the current runqueue locked,
  * irqs disabled.
  */
-static void load_balance(runqueue_t *this_rq, int idle)
+static void load_balance(runqueue_t *this_rq, int idle, unsigned long cpumask)
 {
 	int imbalance, idx, this_cpu = smp_processor_id();
 	runqueue_t *busiest;
@@ -1037,8 +1019,7 @@ static void load_balance(runqueue_t *this_rq, int idle)
 	struct list_head *head, *curr;
 	task_t *tmp;
 
-	busiest = find_busiest_queue(this_rq, this_cpu, idle, &imbalance,
-					cpus_to_balance(this_cpu, this_rq));
+	busiest = find_busiest_queue(this_rq, this_cpu, idle, &imbalance, cpumask);
 	if (!busiest)
 		goto out;
 
@@ -1113,21 +1094,75 @@ out:
  * frequency and balancing agressivity depends on whether the CPU is
  * idle or not.
  *
- * busy-rebalance every 250 msecs. idle-rebalance every 1 msec. (or on
+ * busy-rebalance every 200 msecs. idle-rebalance every 1 msec. (or on
  * systems with HZ=100, every 10 msecs.)
+ *
+ * On NUMA, do a node-rebalance every 400 msecs.
  */
-#define BUSY_REBALANCE_TICK (HZ/4 ?: 1)
 #define IDLE_REBALANCE_TICK (HZ/1000 ?: 1)
+#define BUSY_REBALANCE_TICK (HZ/5 ?: 1)
+#define IDLE_NODE_REBALANCE_TICK (IDLE_REBALANCE_TICK * 5)
+#define BUSY_NODE_REBALANCE_TICK (BUSY_REBALANCE_TICK * 100)
 
-static inline void idle_tick(runqueue_t *rq)
+#if CONFIG_NUMA
+static void balance_node(runqueue_t *this_rq, int idle, int this_cpu)
 {
-	if (jiffies % IDLE_REBALANCE_TICK)
-		return;
-	spin_lock(&rq->lock);
-	load_balance(rq, 1);
-	spin_unlock(&rq->lock);
-}
+	int node = find_busiest_node(cpu_to_node(this_cpu));
+	unsigned long cpumask, this_cpumask = 1UL << this_cpu;
 
+	if (node >= 0) {
+		cpumask = node_to_cpumask(node) | this_cpumask;
+		spin_lock(&this_rq->lock);
+		load_balance(this_rq, idle, cpumask);
+		spin_unlock(&this_rq->lock);
+	}
+}
+#endif
+
+static void rebalance_tick(runqueue_t *this_rq, int idle)
+{
+#if CONFIG_NUMA
+	int this_cpu = smp_processor_id();
+#endif
+	unsigned long j = jiffies;
+
+	/*
+	 * First do inter-node rebalancing, then intra-node rebalancing,
+	 * if both events happen in the same tick. The inter-node
+	 * rebalancing does not necessarily have to create a perfect
+	 * balance within the node, since we load-balance the most loaded
+	 * node with the current CPU. (ie. other CPUs in the local node
+	 * are not balanced.)
+	 */
+	if (idle) {
+#if CONFIG_NUMA
+		if (!(j % IDLE_NODE_REBALANCE_TICK))
+			balance_node(this_rq, idle, this_cpu);
+#endif
+		if (!(j % IDLE_REBALANCE_TICK)) {
+			spin_lock(&this_rq->lock);
+			load_balance(this_rq, 0, cpu_to_node_mask(this_cpu));
+			spin_unlock(&this_rq->lock);
+		}
+		return;
+	}
+#if CONFIG_NUMA
+	if (!(j % BUSY_NODE_REBALANCE_TICK))
+		balance_node(this_rq, idle, this_cpu);
+#endif
+	if (!(j % BUSY_REBALANCE_TICK)) {
+		spin_lock(&this_rq->lock);
+		load_balance(this_rq, idle, cpu_to_node_mask(this_cpu));
+		spin_unlock(&this_rq->lock);
+	}
+}
+#else
+/*
+ * on UP we do not need to balance between CPUs:
+ */
+static inline void rebalance_tick(runqueue_t *this_rq, int idle)
+{
+}
 #endif
 
 DEFINE_PER_CPU(struct kernel_stat, kstat) = { { 0 } };
@@ -1170,9 +1205,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			kstat_cpu(cpu).cpustat.iowait += sys_ticks;
 		else
 			kstat_cpu(cpu).cpustat.idle += sys_ticks;
-#if CONFIG_SMP
-		idle_tick(rq);
-#endif
+		rebalance_tick(rq, 1);
 		return;
 	}
 	if (TASK_NICE(p) > 0)
@@ -1228,11 +1261,8 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			enqueue_task(p, rq->active);
 	}
 out:
-#if CONFIG_SMP
-	if (!(jiffies % BUSY_REBALANCE_TICK))
-		load_balance(rq, 0);
-#endif
 	spin_unlock(&rq->lock);
+	rebalance_tick(rq, 0);
 }
 
 void scheduling_functions_start_here(void) { }
@@ -1291,7 +1321,7 @@ need_resched:
 pick_next_task:
 	if (unlikely(!rq->nr_running)) {
 #if CONFIG_SMP
-		load_balance(rq, 1);
+		load_balance(rq, 1, cpu_to_node_mask(smp_processor_id()));
 		if (rq->nr_running)
 			goto pick_next_task;
 #endif
