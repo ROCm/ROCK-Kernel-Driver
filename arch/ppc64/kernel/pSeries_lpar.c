@@ -269,7 +269,7 @@ static int find_udbg_vterm(void)
 	}
 
 	/* now we have the stdout node; figure out what type of device it is. */
-	name = (char *)get_property(stdout_node, "name", 0);
+	name = (char *)get_property(stdout_node, "name", NULL);
 	if (!name) {
 		printk(KERN_WARNING "stdout node missing 'name' property!\n");
 		goto out;
@@ -277,7 +277,7 @@ static int find_udbg_vterm(void)
 
 	if (strncmp(name, "vty", 3) == 0) {
 		if (device_is_compatible(stdout_node, "hvterm1")) {
-			termno = (u32 *)get_property(stdout_node, "reg", 0);
+			termno = (u32 *)get_property(stdout_node, "reg", NULL);
 			if (termno) {
 				vtermno = termno[0];
 				ppc_md.udbg_putc = udbg_putcLP;
