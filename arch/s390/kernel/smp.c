@@ -562,24 +562,15 @@ int __devinit start_secondary(void *cpuvoid)
 
 static void __init smp_create_idle(unsigned int cpu)
 {
-	struct pt_regs regs;
 	struct task_struct *p;
 
 	/*
 	 *  don't care about the psw and regs settings since we'll never
 	 *  reschedule the forked task.
 	 */
-	memset(&regs, 0, sizeof(struct pt_regs));
-	p = copy_process(CLONE_VM | CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	p = fork_idle(cpu);
 	if (IS_ERR(p))
 		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
-
-	/* Make this the idle thread */
-	init_idle(p, cpu);
-
-	/* Remove it from the pidhash */
-	unhash_process(p);
-
 	current_set[cpu] = p;
 }
 

@@ -392,16 +392,6 @@ void __init start_secondary(void)
 extern volatile unsigned long init_rsp; 
 extern void (*initial_code)(void);
 
-static struct task_struct * __init fork_by_hand(void)
-{
-	struct pt_regs regs;
-	/*
-	 * don't care about the eip and regs settings since
-	 * we'll never reschedule the forked task.
-	 */
-	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
-}
-
 #if APIC_DEBUG
 static inline void inquire_remote_apic(int apicid)
 {
@@ -575,16 +565,10 @@ static void __init do_boot_cpu (int apicid)
 	 * We can't use kernel_thread since we must avoid to
 	 * reschedule the child.
 	 */
-	idle = fork_by_hand();
+	idle = fork_idle(cpu);
 	if (IS_ERR(idle))
 		panic("failed fork for CPU %d", cpu);
 	x86_cpu_to_apicid[cpu] = apicid;
-
-	/* Make this the idle thread */
-	init_idle(idle,cpu);
-
-	/* Remove it from the pidhash */
-	unhash_process(idle);
 
 	cpu_pda[cpu].pcurrent = idle;
 

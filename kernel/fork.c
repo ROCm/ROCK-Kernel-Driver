@@ -865,7 +865,7 @@ asmlinkage long sys_set_tid_address(int __user *tidptr)
  * parts of the process environment (as per the clone
  * flags). The actual kick-off is left to the caller.
  */
-struct task_struct *copy_process(unsigned long clone_flags,
+static task_t *copy_process(unsigned long clone_flags,
 				 unsigned long stack_start,
 				 struct pt_regs *regs,
 				 unsigned long stack_size,
@@ -1151,6 +1151,20 @@ bad_fork_cleanup_count:
 bad_fork_free:
 	free_task(p);
 	goto fork_out;
+}
+
+task_t * __init fork_idle(int cpu)
+{
+	task_t *task;
+	struct pt_regs regs;
+
+	memset(&regs, 0, sizeof(struct pt_regs));
+	task = copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	if (!task)
+		return ERR_PTR(-ENOMEM);
+	init_idle(task, cpu);
+	unhash_process(task);
+	return task;
 }
 
 static inline int fork_traceflag (unsigned clone_flags)

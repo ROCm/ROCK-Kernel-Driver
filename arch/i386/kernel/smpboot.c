@@ -496,16 +496,6 @@ extern struct {
 	unsigned short ss;
 } stack_start;
 
-static struct task_struct * __init fork_by_hand(void)
-{
-	struct pt_regs regs;
-	/*
-	 * don't care about the eip and regs settings since
-	 * we'll never reschedule the forked task.
-	 */
-	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
-}
-
 #ifdef CONFIG_NUMA
 
 /* which logical CPUs are on which nodes */
@@ -801,18 +791,10 @@ static int __init do_boot_cpu(int apicid)
 	 * We can't use kernel_thread since we must avoid to
 	 * reschedule the child.
 	 */
-	idle = fork_by_hand();
+	idle = fork_idle(cpu);
 	if (IS_ERR(idle))
 		panic("failed fork for CPU %d", cpu);
-
-	/* Make this the idle thread */
-	init_idle(idle, cpu);
-
 	idle->thread.eip = (unsigned long) start_secondary;
-
-	/* Remove it from the pidhash */
-	unhash_process(idle);
-
 	/* start_eip had better be page-aligned! */
 	start_eip = setup_trampoline();
 

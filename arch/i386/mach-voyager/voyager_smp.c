@@ -523,15 +523,6 @@ start_secondary(void *unused)
 	return cpu_idle();
 }
 
-static struct task_struct * __init
-fork_by_hand(void)
-{
-	struct pt_regs regs;
-	/* don't care about the eip and regs settings since we'll
-	 * never reschedule the forked task. */
-	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
-}
-
 
 /* Routine to kick start the given CPU and wait for it to report ready
  * (or timeout in startup).  When this routine returns, the requested
@@ -587,17 +578,10 @@ do_boot_cpu(__u8 cpu)
 	hijack_source.idt.Segment = (start_phys_address >> 4) & 0xFFFF;
 
 	cpucount++;
-	idle = fork_by_hand();
+	idle = fork_idle(cpu);
 	if(IS_ERR(idle))
 		panic("failed fork for CPU%d", cpu);
-
-	/* Make this the idle thread */
-	init_idle(idle, cpu);
-
 	idle->thread.eip = (unsigned long) start_secondary;
-
-	/* Remove it from the pidhash */
-	unhash_process(idle);
 	/* init_tasks (in sched.c) is indexed logically */
 	stack_start.esp = (void *) idle->thread.esp;
 
