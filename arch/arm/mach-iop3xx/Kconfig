@@ -1,3 +1,4 @@
+if ARCH_IOP3XX
 
 menu "IOP3xx Implementation Options"
 
@@ -46,4 +47,4 @@ comment "IOP3xx Chipset Features"
 
 endmenu
 
-
+endif
