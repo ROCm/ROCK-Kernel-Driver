@@ -4602,8 +4602,10 @@ static int tg3_reset_hw(struct tg3 *tp)
 	     (GRC_MODE_IRQ_ON_MAC_ATTN | GRC_MODE_HOST_STACKUP));
 
 	/* Setup the timer prescalar register.  Clock is always 66Mhz. */
-	tw32(GRC_MISC_CFG,
-	     (65 << GRC_MISC_CFG_PRESCALAR_SHIFT));
+	val = tr32(GRC_MISC_CFG);
+	val &= ~0xff;
+	val |= (65 << GRC_MISC_CFG_PRESCALAR_SHIFT);
+	tw32(GRC_MISC_CFG, val);
 
 	/* Initialize MBUF/DESC pool. */
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
