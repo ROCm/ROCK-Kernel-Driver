@@ -2,8 +2,8 @@
  * attrib.h - Defines for attribute handling in NTFS Linux kernel driver.
  *	      Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (C) 2002 Richard Russon.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -93,8 +93,8 @@ extern int load_attribute_list(ntfs_volume *vol, run_list *rl, u8 *al,
 static inline s64 attribute_value_length(const ATTR_RECORD *a)
 {
 	if (!a->non_resident)
-		return (s64)le32_to_cpu(a->_ARA(value_length));
-	return sle64_to_cpu(a->_ANR(data_size));
+		return (s64)le32_to_cpu(a->data.resident.value_length);
+	return sle64_to_cpu(a->data.non_resident.data_size);
 }
 
 extern void reinit_attr_search_ctx(attr_search_context *ctx);
