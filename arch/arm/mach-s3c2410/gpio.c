@@ -24,6 +24,9 @@
  *	14-Sep-2004  BJD  Added getpin call
  *	14-Sep-2004  BJD  Fixed bug in setpin() call
  *	30-Sep-2004  BJD  Fixed cfgpin() mask bug
+ *	01-Oct-2004  BJD  Added getcfg() to get pin configuration
+ *	01-Oct-2004  BJD  Fixed mask bug in pullup() call
+ *	01-Oct-2004  BJD  Added getoirq() to turn pin into irqno
  */
 
 
@@ -62,6 +65,20 @@ void s3c2410_gpio_cfgpin(unsigned int pin, unsigned int function)
 	local_irq_restore(flags);
 }
 
+unsigned int s3c2410_gpio_getcfg(unsigned int pin)
+{
+	unsigned long base = S3C2410_GPIO_BASE(pin);
+	unsigned long mask;
+
+	if (pin < S3C2410_GPIO_BANKB) {
+		mask = 1 << S3C2410_GPIO_OFFSET(pin);
+	} else {
+		mask = 3 << S3C2410_GPIO_OFFSET(pin)*2;
+	}
+
+	return __raw_readl(base) & mask;
+}
+
 void s3c2410_gpio_pullup(unsigned int pin, unsigned int to)
 {
 	unsigned long base = S3C2410_GPIO_BASE(pin);
@@ -75,7 +92,7 @@ void s3c2410_gpio_pullup(unsigned int pin, unsigned int to)
 	local_irq_save(flags);
 
 	up = __raw_readl(base + 0x08);
-	up &= 1 << offs;
+	up &= ~(1L << offs);
 	up |= to << offs;
 	__raw_writel(up, base + 0x08);
 
@@ -120,4 +137,21 @@ unsigned int s3c2410_modify_misccr(unsigned int clear, unsigned int change)
 	local_irq_restore(flags);
 
 	return misccr;
+}
+
+int s3c2410_gpio_getirq(unsigned int pin)
+{
+	if (pin < S3C2410_GPF0 || pin > S3C2410_GPG15_EINT23)
+		return -1;	/* not valid interrupts */
+
+	if (pin < S3C2410_GPG0 && pin > S3C2410_GPF7)
+		return -1;	/* not valid pin */
+
+	if (pin < S3C2410_GPF4)
+		return (pin - S3C2410_GPF0) + IRQ_EINT0;
+
+	if (pin < S3C2410_GPG0)
+		return (pin - S3C2410_GPF4) + IRQ_EINT4;
+
+	return (pin - S3C2410_GPG0) + IRQ_EINT8;
 }
