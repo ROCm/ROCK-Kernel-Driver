@@ -737,7 +737,7 @@ static int __init a2065_probe(void)
 			continue;
 		}
 
-		dev = init_etherdev(NULL, sizeof(struct lance_private));
+		dev = alloc_etherdev(0, sizeof(struct lance_private));
 
 		if (dev == NULL) {
 			release_resource(r1);
@@ -791,17 +791,22 @@ static int __init a2065_probe(void)
 		dev->set_multicast_list = &lance_set_multicast;
 		dev->dma = 0;
 
-#ifdef MODULE
-		priv->next_module = root_a2065_dev;
-		root_a2065_dev = priv;
-#endif
-		ether_setup(dev);
 		init_timer(&priv->multicast_timer);
 		priv->multicast_timer.data = (unsigned long) dev;
 		priv->multicast_timer.function =
 			(void (*)(unsigned long)) &lance_set_multicast;
 
-		res = 0;
+		res = register_netdev(dev);
+		if (res) {
+			release_resource(r1);
+			release_resource(r2);
+			free_netdev(dev);
+			break;
+		}
+#ifdef MODULE
+		priv->next_module = root_a2065_dev;
+		root_a2065_dev = priv;
+#endif
 	}
 	return res;
 }
