@@ -46,7 +46,6 @@ obj-$(CONFIG_USB_DC2XX)		+= image/
 obj-$(CONFIG_USB_HPUSBSCSI)	+= image/
 obj-$(CONFIG_USB_MDC800)	+= image/
 obj-$(CONFIG_USB_MICROTEK)	+= image/
-obj-$(CONFIG_USB_SCANNER)	+= image/
 
 obj-$(CONFIG_USB_SERIAL)	+= serial/
 
