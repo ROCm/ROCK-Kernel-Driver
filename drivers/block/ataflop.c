@@ -394,7 +394,7 @@ static int floppy_release( struct inode * inode, struct file * filp );
 
 static struct timer_list motor_off_timer =
 	TIMER_INITIALIZER(fd_motor_off_timer, 0, 0);
-static struct timer_list readtrack_timer
+static struct timer_list readtrack_timer =
 	TIMER_INITIALIZER(fd_readtrack_check, 0, 0);
 
 static struct timer_list timeout_timer =
