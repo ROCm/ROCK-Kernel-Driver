@@ -14,11 +14,6 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#ifndef __KERNEL_STRICT_NAMES
-#include <linux/types.h>
-typedef __kernel_fsid_t __kernel_fsid_t32;
-#endif
-
 /* Use this to get at 32-bit user passed pointers. */
 /* Things to consider: the low-level assembly stub does
    srl x, 0, x for first four arguments, so if you have
@@ -44,11 +39,6 @@ typedef __kernel_fsid_t __kernel_fsid_t32;
 })
 
 /* These are here to support 32-bit syscalls on a 64-bit kernel. */
-typedef unsigned short	__kernel_ipc_pid_t32;
-typedef unsigned int	__kernel_umode_t32;
-typedef int		__kernel_daddr_t32;
-typedef unsigned int	__kernel_caddr_t32;
-typedef int		__kernel_loff_t32;
 
 struct statfs32 {
 	int f_type;
@@ -58,7 +48,7 @@ struct statfs32 {
 	int f_bavail;
 	int f_files;
 	int f_ffree;
-	__kernel_fsid_t32 f_fsid;
+	compat_fsid_t f_fsid;
 	int f_namelen;  /* SunOS ignores this field. */
 	int f_spare[6];
 };
