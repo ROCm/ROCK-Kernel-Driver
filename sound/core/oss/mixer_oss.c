@@ -1177,6 +1177,7 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 		{ SOUND_MIXER_TREBLE,	"Tone Control - Treble", 0 },
 		{ SOUND_MIXER_SYNTH,	"Synth",		0 },
 		{ SOUND_MIXER_SYNTH,	"FM",			0 }, /* fallback */
+		{ SOUND_MIXER_SYNTH,	"Music",		0 }, /* fallback */
 		{ SOUND_MIXER_PCM,	"PCM",			0 },
 		{ SOUND_MIXER_SPEAKER,	"PC Speaker", 		0 },
 		{ SOUND_MIXER_LINE,	"Line", 		0 },
@@ -1184,6 +1185,7 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 		{ SOUND_MIXER_CD,	"CD", 			0 },
 		{ SOUND_MIXER_IMIX,	"Monitor Mix", 		0 },
 		{ SOUND_MIXER_ALTPCM,	"PCM",			1 },
+		{ SOUND_MIXER_ALTPCM,	"Headphone",		0 }, /* fallback */
 		{ SOUND_MIXER_ALTPCM,	"Wave",			0 }, /* fallback */
 		{ SOUND_MIXER_RECLEV,	"-- nothing --",	0 },
 		{ SOUND_MIXER_IGAIN,	"Capture",		0 },
@@ -1192,10 +1194,14 @@ static void snd_mixer_oss_build(snd_mixer_oss_t *mixer)
 		{ SOUND_MIXER_LINE2,	"Aux",			1 },
 		{ SOUND_MIXER_LINE3,	"Aux",			2 },
 		{ SOUND_MIXER_DIGITAL1,	"Digital",		0 },
+		{ SOUND_MIXER_DIGITAL1,	"IEC958",		0 }, /* fallback */
+		{ SOUND_MIXER_DIGITAL1,	"IEC958 Optical",	0 }, /* fallback */
+		{ SOUND_MIXER_DIGITAL1,	"IEC958 Coaxial",	0 }, /* fallback */
 		{ SOUND_MIXER_DIGITAL2,	"Digital",		1 },
 		{ SOUND_MIXER_DIGITAL3,	"Digital",		2 },
 		{ SOUND_MIXER_PHONEIN,	"Phone",		0 },
-		{ SOUND_MIXER_PHONEOUT,	"Phone",		1 },
+		{ SOUND_MIXER_PHONEOUT,	"Master Mono",		0 },
+		{ SOUND_MIXER_PHONEOUT,	"Phone",		0 }, /* fallback */
 		{ SOUND_MIXER_VIDEO,	"Video",		0 },
 		{ SOUND_MIXER_RADIO,	"Radio",		0 },
 		{ SOUND_MIXER_MONITOR,	"Monitor",		0 }
