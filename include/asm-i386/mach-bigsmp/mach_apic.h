@@ -39,7 +39,6 @@ static inline cpumask_t target_cpus(void)
 #define INT_DELIVERY_MODE dest_Fixed
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
 
-#define APIC_BROADCAST_ID     (0xff)
 static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
 {
 	return 0;

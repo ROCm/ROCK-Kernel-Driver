@@ -23,6 +23,7 @@
 #include <linux/smp_lock.h>
 #include <linux/kernel_stat.h>
 #include <linux/mc146818rtc.h>
+#include <linux/bitops.h>
 
 #include <asm/smp.h>
 #include <asm/acpi.h>
@@ -103,6 +104,31 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 static int mpc_record; 
 static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdata;
 
+#ifdef CONFIG_X86_NUMAQ
+static int MP_valid_apicid(int apicid, int version)
+{
+	return hweight_long(i & 0xf) == 1 && (i >> 4) != 0xf;
+}
+#else
+static int MP_valid_apicid(int apicid, int version)
+{
+	if (version >= 0x14)
+		return apicid < 0xff;
+	else
+		return apicid < 0xf;
+}
+#endif
+
+static void MP_mark_version_physids(int version)
+{
+	int i;
+
+	for (i = 0; i < MAX_APICS; ++i) {
+		if (!MP_valid_apicid(i, version))
+			physid_set(i, phys_cpu_present_map);
+	}
+}
+
 void __init MP_processor_info (struct mpc_config_processor *m)
 {
  	int ver, apicid;
@@ -179,14 +205,16 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 		return;
 	}
 	num_processors++;
+	ver = m->mpc_apicver;
 
-	if (MAX_APICS - m->mpc_apicid <= 0) {
+	if (MP_valid_apicid(m->mpc_apicid, ver))
+		MP_mark_version_physids(ver);
+	else {
 		printk(KERN_WARNING "Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
 		--num_processors;
 		return;
 	}
-	ver = m->mpc_apicver;
 
 	tmp = apicid_to_cpu_present(apicid);
 	physids_or(phys_cpu_present_map, phys_cpu_present_map, tmp);

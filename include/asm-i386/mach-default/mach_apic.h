@@ -23,12 +23,6 @@ static inline cpumask_const_t target_cpus(void)
 #define INT_DELIVERY_MODE dest_LowestPrio
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
 
-/*
- * this isn't really broadcast, just a (potentially inaccurate) upper
- * bound for valid physical APIC id's
- */
-#define APIC_BROADCAST_ID      0x0F
-
 static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
 {
 	return physid_isset(apicid, bitmap);

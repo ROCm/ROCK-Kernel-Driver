@@ -19,7 +19,6 @@
  #define TARGET_CPUS cpumask_of_cpu(0)
 #endif
 
-#define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid)	physid_isset(apicid, bitmap)
 #define check_apicid_present(bit)		physid_isset(bit, phys_cpu_present_map)
 
