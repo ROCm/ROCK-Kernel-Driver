@@ -72,7 +72,6 @@ inline void vm_unacct_memory(long pages)
 int vm_enough_memory(long pages)
 {
 	unsigned long free, allowed;
-	struct sysinfo i;
 
 	atomic_add(pages, &vm_committed_space);
 
@@ -113,12 +112,7 @@ int vm_enough_memory(long pages)
 		return 0;
 	}
 
-	/*
-	 * FIXME: need to add arch hooks to get the bits we need
-	 * without this higher overhead crap
-	 */
-	si_meminfo(&i);
-	allowed = i.totalram * sysctl_overcommit_ratio / 100;
+	allowed = totalram_pages * sysctl_overcommit_ratio / 100;
 	allowed += total_swap_pages;
 
 	if (atomic_read(&vm_committed_space) < allowed)
