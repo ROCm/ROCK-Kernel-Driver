@@ -117,6 +117,7 @@ struct eth_dev {
 	unsigned		zlp:1;
 	unsigned		cdc:1;
 	unsigned		rndis:1;
+	u16			cdc_filter;
 	unsigned long		todo;
 #define	WORK_RX_MEMORY		0
 	int			rndis_config;
@@ -1139,6 +1140,9 @@ eth_set_config (struct eth_dev *dev, unsigned number, int gfp_flags)
 	}
 	eth_reset_config (dev);
 
+	/* default:  pass all packets, no multicast filtering */
+	dev->cdc_filter = 0x000f;
+
 	switch (number) {
 	case DEV_CONFIG_VALUE:
 		dev->rndis = 0;
@@ -1311,9 +1315,20 @@ static void eth_setup_complete (struct usb_ep *ep, struct usb_request *req)
  * section 3.6.2.1 table 4 has ACM requests; RNDIS requires the
  * encapsulated command mechanism.
  */
-#define CDC_SEND_ENCAPSULATED_COMMAND	0x00	/* optional */
-#define CDC_GET_ENCAPSULATED_RESPONSE	0x01	/* optional */
-#define CDC_SET_ETHERNET_PACKET_FILTER	0x43	/* required */
+#define CDC_SEND_ENCAPSULATED_COMMAND		0x00	/* optional */
+#define CDC_GET_ENCAPSULATED_RESPONSE		0x01	/* optional */
+#define CDC_SET_ETHERNET_MULTICAST_FILTERS	0x40	/* optional */
+#define CDC_SET_ETHERNET_PM_PATTERN_FILTER	0x41	/* optional */
+#define CDC_GET_ETHERNET_PM_PATTERN_FILTER	0x42	/* optional */
+#define CDC_SET_ETHERNET_PACKET_FILTER		0x43	/* required */
+#define CDC_GET_ETHERNET_STATISTIC		0x44	/* optional */
+
+/* table 62; bits in cdc_filter */
+#define	CDC_PACKET_TYPE_PROMISCUOUS		(1 << 0)
+#define	CDC_PACKET_TYPE_ALL_MULTICAST		(1 << 1) /* no filter */
+#define	CDC_PACKET_TYPE_DIRECTED		(1 << 2)
+#define	CDC_PACKET_TYPE_BROADCAST		(1 << 3)
+#define	CDC_PACKET_TYPE_MULTICAST		(1 << 4) /* filtered */
 
 #ifdef CONFIG_USB_ETH_RNDIS
 
@@ -1513,8 +1528,9 @@ done_set_intf:
 		DEBUG (dev, "NOP packet filter %04x\n", ctrl->wValue);
 		/* NOTE: table 62 has 5 filter bits to reduce traffic,
 		 * and we "must" support multicast and promiscuous.
-		 * this NOP implements a bad filter...
+		 * this NOP implements a bad filter (always promisc)
 		 */
+		dev->cdc_filter = ctrl->wValue;
 		value = 0;
 		break;
 #endif /* DEV_CONFIG_CDC */
@@ -1941,6 +1957,11 @@ static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 	int			retval;
 	struct usb_request	*req = 0;
 	unsigned long		flags;
+
+	/* FIXME check dev->cdc_filter to decide whether to send this,
+	 * instead of acting as if CDC_PACKET_TYPE_PROMISCUOUS were
+	 * always set.  RNDIS has the same kind of outgoing filter.
+	 */
 
 	spin_lock_irqsave (&dev->lock, flags);
 	req = container_of (dev->tx_reqs.next, struct usb_request, list);
