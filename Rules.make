@@ -457,7 +457,7 @@ cmd_shipped = cat $< > $@
 # ---------------------------------------------------------------------------
 
 quiet_cmd_ld = LD      $(echo_target)
-cmd_ld = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_$@) \
+cmd_ld = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) $(LDFLAGS_$(@F)) \
 	       $(filter-out FORCE,$^) -o $@ 
 
 # Objcopy

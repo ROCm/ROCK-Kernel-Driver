@@ -38,30 +38,32 @@ include $(TOPDIR)/Rules.make
 
 # ---------------------------------------------------------------------------
 
-zImage:  IMAGE_OFFSET := 0x1000
-zImage:  EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK)
-bzImage: IMAGE_OFFSET := 0x100000
-bzImage: EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK) -D__BIG_KERNEL__
-bzImage: BUILDFLAGS   := -b
+$(obj)/zImage:  IMAGE_OFFSET := 0x1000
+$(obj)/zImage:  EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK)
+$(obj)/bzImage: IMAGE_OFFSET := 0x100000
+$(obj)/bzImage: EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK) -D__BIG_KERNEL__
+$(obj)/bzImage: BUILDFLAGS   := -b
 
 quiet_cmd_image = BUILD   $(echo_target)
-cmd_image = tools/build $(BUILDFLAGS) bootsect setup vmlinux.bin \
-			$(ROOT_DEV) > $@
+cmd_image = $(obj)/tools/build $(BUILDFLAGS) $(obj)/bootsect $(obj)/setup \
+	    $(obj)/vmlinux.bin $(ROOT_DEV) > $@
 
-zImage bzImage: bootsect setup vmlinux.bin tools/build FORCE
+$(obj)/zImage $(obj)/bzImage: $(obj)/bootsect $(obj)/setup \
+			      $(obj)/vmlinux.bin $(obj)/tools/build FORCE
 	$(call if_changed,image)
 
-vmlinux.bin: compressed/vmlinux FORCE
+$(obj)/vmlinux.bin: $(obj)/compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
 
 LDFLAGS_bootsect := -Ttext 0x0 -s --oformat binary
 LDFLAGS_setup	 := -Ttext 0x0 -s --oformat binary -e begtext
 
-setup bootsect: %: %.o FORCE
+$(obj)/setup $(obj)/bootsect: %: %.o FORCE
 	$(call if_changed,ld)
 
-compressed/vmlinux: FORCE
-	@$(MAKE) IMAGE_OFFSET=$(IMAGE_OFFSET) -C compressed vmlinux
+$(obj)/compressed/vmlinux: FORCE
+	@$(call descend,$(obj)/compressed,IMAGE_OFFSET=$(IMAGE_OFFSET) \
+		$(obj)/compressed/vmlinux)
 
 
 zdisk: $(BOOTIMAGE)
@@ -71,18 +73,17 @@ zlilo: $(BOOTIMAGE)
 	if [ -f $(INSTALL_PATH)/vmlinuz ]; then mv $(INSTALL_PATH)/vmlinuz $(INSTALL_PATH)/vmlinuz.old; fi
 	if [ -f $(INSTALL_PATH)/System.map ]; then mv $(INSTALL_PATH)/System.map $(INSTALL_PATH)/System.old; fi
 	cat $(BOOTIMAGE) > $(INSTALL_PATH)/vmlinuz
-	cp $(TOPDIR)/System.map $(INSTALL_PATH)/
+	cp System.map $(INSTALL_PATH)/
 	if [ -x /sbin/lilo ]; then /sbin/lilo; else /etc/lilo/install; fi
 
 install: $(BOOTIMAGE)
-	sh -x ./install.sh $(KERNELRELEASE) $(BOOTIMAGE) $(TOPDIR)/System.map "$(INSTALL_PATH)"
+	sh $(src)/install.sh $(KERNELRELEASE) $(BOOTIMAGE) System.map "$(INSTALL_PATH)"
 
 clean:
 	@echo 'Cleaning up (boot)'
-	@rm -f tools/build vmlinux.bin bvmlinux.bin
-	@rm -f setup bootsect zImage compressed/vmlinux.out
-	@rm -f bsetup bbootsect bzImage compressed/bvmlinux.out
-	@$(MAKE) -C compressed clean
+	@rm -f $(addprefix $(obj)/,tools/build vmlinux.bin bvmlinux.bin \
+		bootsect zImage bsetup bbootsect bzImage)
+	@$(call descend,$(obj)/compressed) clean
 
 archhelp:
 	@echo  '* bzImage	- Compressed kernel image (arch/$(ARCH)/boot/bzImage)'
