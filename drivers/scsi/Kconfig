@@ -1441,7 +1441,7 @@ config A4000T_SCSI
 
 config A2091_SCSI
 	tristate "A2091/A590 WD33C93A support"
-	depends on ZORRO && SCSI && BROKEN
+	depends on ZORRO && SCSI
 	help
 	  If you have a Commodore A2091 SCSI controller, say Y. Otherwise,
 	  say N.
