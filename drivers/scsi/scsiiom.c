@@ -1632,18 +1632,6 @@ dc390_DoingSRB_Done(struct dc390_acb* pACB, struct scsi_cmnd *cmd)
 	    psrb2 = psrb->pNextSRB;
 	    pcmd = psrb->pcmd;
 	    dc390_Free_insert (pACB, psrb);
-#ifndef USE_NEW_EH
-	    /* New EH will crash on being given timed out cmnds */
-	    if (pcmd == cmd)
-		pcmd->result = MK_RES(0,DID_ABORT,0,0);
-	    else
-		pcmd->result = MK_RES(0,DID_RESET,0,0);
-
-/*	    ReleaseSRB( pDCB, pSRB ); */
-
-	    DEBUG0(printk (KERN_DEBUG "DC390: DoingSRB_Done: done pid %li\n", pcmd->pid));
-	    pcmd->scsi_done( pcmd );
-#endif	
 	    psrb  = psrb2;
 	}
 	pdcb->GoingSRBCnt = 0;
