@@ -52,7 +52,7 @@ extern void subsystem_unregister(struct subsystem *);
 
 static inline struct subsystem * subsys_get(struct subsystem * s)
 {
-	return container_of(kobject_get(&s->kobj),struct subsystem,kobj);
+	return s ? container_of(kobject_get(&s->kobj),struct subsystem,kobj) : NULL;
 }
 
 static inline void subsys_put(struct subsystem * s)
