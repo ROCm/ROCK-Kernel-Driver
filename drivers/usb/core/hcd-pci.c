@@ -174,6 +174,7 @@ clean_3:
 	}
 	hcd->state = USB_STATE_HALT;
 
+	pci_set_master (dev);
 #ifndef __sparc__
 	sprintf (buf, "%d", dev->irq);
 #else
@@ -422,7 +423,6 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 		return retval;
 	}
 	hcd->saw_irq = 0;
-	pci_set_master (dev);
 	pci_restore_state (dev);
 #ifdef	CONFIG_USB_SUSPEND
 	pci_enable_wake (dev, dev->current_state, 0);
