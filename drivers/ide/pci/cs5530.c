@@ -42,7 +42,7 @@ static struct pci_dev *bmide_dev;
 static int cs5530_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
-	u32 bibma = pci_resource_start(bmide_dev, 4);
+	unsigned long bibma = pci_resource_start(bmide_dev, 4);
 	u8  c0 = 0, c1 = 0;
 
 	/*
@@ -124,7 +124,8 @@ static unsigned int cs5530_pio_timings[2][5] = {
 static void cs5530_tuneproc (ide_drive_t *drive, u8 pio)	/* pio=255 means "autotune" */
 {
 	ide_hwif_t	*hwif = HWIF(drive);
-	unsigned int	format, basereg = CS5530_BASEREG(hwif);
+	unsigned int	format;
+	unsigned long basereg = CS5530_BASEREG(hwif);
 	static u8	modes[5] = { XFER_PIO_0, XFER_PIO_1, XFER_PIO_2, XFER_PIO_3, XFER_PIO_4};
 
 	pio = ide_get_best_pio_mode(drive, pio, 4, NULL);
@@ -151,7 +152,8 @@ static int cs5530_config_dma (ide_drive_t *drive)
 	int			unit = drive->select.b.unit;
 	ide_drive_t		*mate = &hwif->drives[unit^1];
 	struct hd_driveid	*id = drive->id;
-	unsigned int		basereg, reg, timings;
+	unsigned int		reg, timings;
+	unsigned long		basereg;
 
 	/*
 	 * Default to DMA-off in case we run into trouble here.
@@ -365,7 +367,8 @@ static unsigned int __init init_chipset_cs5530 (struct pci_dev *dev, const char 
 
 static void __init init_hwif_cs5530 (ide_hwif_t *hwif)
 {
-	unsigned int basereg, d0_timings;
+	unsigned long basereg;
+	u32 d0_timings;
 	hwif->autodma = 0;
 
 	if (hwif->mate)
