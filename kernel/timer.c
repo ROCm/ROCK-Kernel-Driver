@@ -1445,7 +1445,7 @@ void __init init_timers(void)
 
 struct time_interpolator *time_interpolator;
 static struct time_interpolator *time_interpolator_list;
-static spinlock_t time_interpolator_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(time_interpolator_lock);
 
 static inline u64 time_interpolator_get_cycles(unsigned int src)
 {

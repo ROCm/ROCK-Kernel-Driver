@@ -89,7 +89,7 @@ int cad_pid = 1;
  */
 
 static struct notifier_block *reboot_notifier_list;
-rwlock_t notifier_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(notifier_lock);
 
 /**
  *	notifier_chain_register	- Add notifier to a notifier chain

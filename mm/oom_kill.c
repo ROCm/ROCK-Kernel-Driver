@@ -233,7 +233,7 @@ void out_of_memory(int gfp_mask)
 	 * oom_lock protects out_of_memory()'s static variables.
 	 * It's a global lock; this is not performance-critical.
 	 */
-	static spinlock_t oom_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(oom_lock);
 	static unsigned long first, last, count, lastkill;
 	unsigned long now, since;
 

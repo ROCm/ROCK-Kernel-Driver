@@ -58,7 +58,7 @@ int max_threads;		/* tunable limit on nr_threads */
 
 DEFINE_PER_CPU(unsigned long, process_counts) = 0;
 
-rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
+ __cacheline_aligned DEFINE_RWLOCK(tasklist_lock);  /* outer */
 
 EXPORT_SYMBOL(tasklist_lock);
 
@@ -281,7 +281,7 @@ static inline void mm_free_pgd(struct mm_struct * mm)
 #define mm_free_pgd(mm)
 #endif /* CONFIG_MMU */
 
-spinlock_t mmlist_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+ __cacheline_aligned_in_smp DEFINE_SPINLOCK(mmlist_lock);
 
 #define allocate_mm()	(kmem_cache_alloc(mm_cachep, SLAB_KERNEL))
 #define free_mm(mm)	(kmem_cache_free(mm_cachep, (mm)))

@@ -64,7 +64,7 @@ struct workqueue_struct {
 
 /* All the per-cpu workqueues on the system, for hotplug cpu to add/remove
    threads to each one as cpus come/go. */
-static spinlock_t workqueue_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(workqueue_lock);
 static LIST_HEAD(workqueues);
 
 /* If it's single threaded, it isn't in the list of workqueues. */

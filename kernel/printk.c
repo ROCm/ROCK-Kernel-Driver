@@ -78,7 +78,7 @@ static int console_locked;
  * It is also used in interesting ways to provide interlocking in
  * release_console_sem().
  */
-static spinlock_t logbuf_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(logbuf_lock);
 
 static char __log_buf[__LOG_BUF_LEN];
 static char *log_buf = __log_buf;
@@ -875,7 +875,7 @@ void tty_write_message(struct tty_struct *tty, char *msg)
  */
 int __printk_ratelimit(int ratelimit_jiffies, int ratelimit_burst)
 {
-	static spinlock_t ratelimit_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(ratelimit_lock);
 	static unsigned long toks = 10*5*HZ;
 	static unsigned long last_msg;
 	static int missed;

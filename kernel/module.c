@@ -53,7 +53,7 @@
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
 
 /* Protects module list */
-static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(modlist_lock);
 
 /* List of modules, protected by module_mutex AND modlist_lock */
 static DECLARE_MUTEX(module_mutex);

@@ -204,7 +204,7 @@ asmlinkage long sys_munlockall(void)
  * Objects with different lifetime than processes (SHM_LOCK and SHM_HUGETLB
  * shm segments) get accounted against the user_struct instead.
  */
-static spinlock_t shmlock_user_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(shmlock_user_lock);
 
 int user_shm_lock(size_t size, struct user_struct *user)
 {
