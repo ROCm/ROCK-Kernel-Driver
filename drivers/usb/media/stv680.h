@@ -45,7 +45,7 @@
 /* fmt 4 */
 #define STV_VIDEO_PALETTE       VIDEO_PALETTE_RGB24
 
-static __devinitdata struct usb_device_id device_table[] = {
+static struct usb_device_id device_table[] = {
 	{USB_DEVICE (USB_PENCAM_VENDOR_ID, USB_PENCAM_PRODUCT_ID)},
 	{}
 };

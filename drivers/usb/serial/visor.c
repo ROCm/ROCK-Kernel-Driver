@@ -168,7 +168,8 @@ static int  visor_write_room		(struct usb_serial_port *port);
 static int  visor_chars_in_buffer	(struct usb_serial_port *port);
 static void visor_throttle	(struct usb_serial_port *port);
 static void visor_unthrottle	(struct usb_serial_port *port);
-static int  visor_startup	(struct usb_serial *serial);
+static int  visor_probe		(struct usb_serial *serial);
+static int  visor_calc_num_ports(struct usb_serial *serial);
 static void visor_shutdown	(struct usb_serial *serial);
 static int  visor_ioctl		(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
 static void visor_set_termios	(struct usb_serial_port *port, struct termios *old_termios);
@@ -177,7 +178,7 @@ static void visor_read_bulk_callback	(struct urb *urb);
 static int  clie_3_5_startup	(struct usb_serial *serial);
 
 
-static __devinitdata struct usb_device_id combined_id_table [] = {
+static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID) },
@@ -191,12 +192,12 @@ static __devinitdata struct usb_device_id combined_id_table [] = {
 	{ }					/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id clie_id_3_5_table [] = {
+static struct usb_device_id clie_id_3_5_table [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_3_5_ID) },
 	{ }					/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id id_table [] = {
+static __devinitdata struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
@@ -211,7 +212,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 	{ }					/* Terminating entry */
 };
 
-MODULE_DEVICE_TABLE (usb, id_table);
+MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 
 
@@ -219,7 +220,7 @@ MODULE_DEVICE_TABLE (usb, id_table);
 static struct usb_serial_device_type handspring_device = {
 	owner:			THIS_MODULE,
 	name:			"Handspring Visor / Palm 4.0 / Clié 4.x",
-	id_table:		combined_id_table,
+	id_table:		id_table,
 	num_interrupt_in:	0,
 	num_bulk_in:		2,
 	num_bulk_out:		2,
@@ -228,7 +229,8 @@ static struct usb_serial_device_type handspring_device = {
 	close:			visor_close,
 	throttle:		visor_throttle,
 	unthrottle:		visor_unthrottle,
-	startup:		visor_startup,
+	probe:			visor_probe,
+	calc_num_ports:		visor_calc_num_ports,
 	shutdown:		visor_shutdown,
 	ioctl:			visor_ioctl,
 	set_termios:		visor_set_termios,
@@ -252,7 +254,7 @@ static struct usb_serial_device_type clie_3_5_device = {
 	close:			visor_close,
 	throttle:		visor_throttle,
 	unthrottle:		visor_unthrottle,
-	startup:		clie_3_5_startup,
+	attach:			clie_3_5_startup,
 	ioctl:			visor_ioctl,
 	set_termios:		visor_set_termios,
 	write:			visor_write,
@@ -531,11 +533,11 @@ static void visor_unthrottle (struct usb_serial_port *port)
 		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 }
 
-
-static int  visor_startup (struct usb_serial *serial)
+static int visor_probe (struct usb_serial *serial)
 {
 	int response;
 	int i;
+	int num_ports;
 	unsigned char *transfer_buffer =  kmalloc (256, GFP_KERNEL);
 
 	if (!transfer_buffer) {
@@ -558,8 +560,9 @@ static int  visor_startup (struct usb_serial *serial)
 		char *string;
 
 		le16_to_cpus(&connection_info->num_ports);
+		num_ports = connection_info->num_ports;
 		info("%s: Number of ports: %d", serial->type->name, connection_info->num_ports);
-		for (i = 0; i < connection_info->num_ports; ++i) {
+		for (i = 0; i < num_ports; ++i) {
 			switch (connection_info->connections[i].port_function_id) {
 				case VISOR_FUNCTION_GENERIC:
 					string = "Generic";
@@ -580,7 +583,10 @@ static int  visor_startup (struct usb_serial *serial)
 					string = "unknown";
 					break;	
 			}
-			info("%s: port %d, is for %s use and is bound to ttyUSB%d", serial->type->name, connection_info->connections[i].port, string, serial->minor + i);
+			info("%s: port %d, is for %s use", serial->type->name,
+			     connection_info->connections[i].port, string);
+		/* save off our num_ports info so that we can use it in the calc_num_ports call */
+		serial->private = (void *)num_ports;
 		}
 	}
 
@@ -619,6 +625,17 @@ static int  visor_startup (struct usb_serial *serial)
 
 	/* continue on with initialization */
 	return 0;
+}
+
+static int visor_calc_num_ports (struct usb_serial *serial)
+{
+	int num_ports = 0;
+
+	if (serial->private) {
+		num_ports = (int)serial->private;
+		serial->private = NULL;
+	}
+	return num_ports;
 }
 
 static int clie_3_5_startup (struct usb_serial *serial)

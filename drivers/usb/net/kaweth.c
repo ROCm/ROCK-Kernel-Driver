@@ -75,6 +75,7 @@
 #define KAWETH_MTU			1514
 #define KAWETH_BUF_SIZE			1664
 #define KAWETH_TX_TIMEOUT		(5 * HZ)
+#define KAWETH_SCRATCH_SIZE		32
 #define KAWETH_FIRMWARE_BUF_SIZE	4096
 #define KAWETH_CONTROL_TIMEOUT		(30 * HZ)
 
@@ -220,7 +221,8 @@ struct kaweth_device
 	struct urb *tx_urb;
 	struct urb *irq_urb;
 
-	__u8 firmware_buf[KAWETH_FIRMWARE_BUF_SIZE];
+	__u8 *firmware_buf;
+	__u8 scratch[KAWETH_SCRATCH_SIZE];
 	__u8 tx_buf[KAWETH_BUF_SIZE];
 	__u8 rx_buf[KAWETH_BUF_SIZE];
 	__u8 intbuffer[INTBUFFERSIZE];
@@ -312,7 +314,7 @@ static int kaweth_set_urb_size(struct kaweth_device *kaweth, __u16 urb_size)
 				USB_TYPE_VENDOR | USB_DIR_OUT | USB_RECIP_DEVICE,
 				urb_size,
 				0,
-				(void *)&kaweth->firmware_buf,
+				(void *)&kaweth->scratch,
 				0,
 				KAWETH_CONTROL_TIMEOUT);
 
@@ -334,7 +336,7 @@ static int kaweth_set_sofs_wait(struct kaweth_device *kaweth, __u16 sofs_wait)
 				USB_TYPE_VENDOR | USB_DIR_OUT | USB_RECIP_DEVICE,
 				sofs_wait,
 				0,
-				(void *)&kaweth->firmware_buf,
+				(void *)&kaweth->scratch,
 				0,
 				KAWETH_CONTROL_TIMEOUT);
 
@@ -357,7 +359,7 @@ static int kaweth_set_receive_filter(struct kaweth_device *kaweth,
 				USB_TYPE_VENDOR | USB_DIR_OUT | USB_RECIP_DEVICE,
 				receive_filter,
 				0,
-				(void *)&kaweth->firmware_buf,
+				(void *)&kaweth->scratch,
 				0,
 				KAWETH_CONTROL_TIMEOUT);
 
@@ -399,7 +401,7 @@ static int kaweth_download_firmware(struct kaweth_device *kaweth,
 			      USB_TYPE_VENDOR | USB_DIR_OUT | USB_RECIP_DEVICE,
 			      0,
 			      0,
-			      (void *)&kaweth->firmware_buf,
+			      (void *)kaweth->firmware_buf,
 			      data_len,
 			      KAWETH_CONTROL_TIMEOUT);
 }
@@ -427,7 +429,7 @@ static int kaweth_trigger_firmware(struct kaweth_device *kaweth,
 			      USB_TYPE_VENDOR | USB_DIR_OUT | USB_RECIP_DEVICE,
 			      0,
 			      0,
-			      (void *)&kaweth->firmware_buf,
+			      (void *)kaweth->firmware_buf,
 			      8,
 			      KAWETH_CONTROL_TIMEOUT);
 }
@@ -755,7 +757,7 @@ static void kaweth_async_set_rx_mode(struct kaweth_device *kaweth)
 				USB_TYPE_VENDOR | USB_DIR_OUT | USB_RECIP_DEVICE,
 				packet_filter_bitmap,
 				0,
-				(void *)&kaweth->firmware_buf,
+				(void *)&kaweth->scratch,
 				0,
 				KAWETH_CONTROL_TIMEOUT);
 
@@ -840,12 +842,14 @@ static void *kaweth_probe(
 	} else {
 		/* Download the firmware */
 		kaweth_info("Downloading firmware...");
+		kaweth->firmware_buf = (__u8 *)__get_free_page(GFP_KERNEL);
 		if ((result = kaweth_download_firmware(kaweth,
 						      kaweth_new_code,
 						      len_kaweth_new_code,
 						      100,
 						      2)) < 0) {
 			kaweth_err("Error downloading firmware (%d)", result);
+			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
 			return NULL;
 		}
@@ -856,6 +860,7 @@ static void *kaweth_probe(
 						      100,
 						      3)) < 0) {
 			kaweth_err("Error downloading firmware fix (%d)", result);
+			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
 			return NULL;
 		}
@@ -866,6 +871,7 @@ static void *kaweth_probe(
 						      126,
 						      2)) < 0) {
 			kaweth_err("Error downloading trigger code (%d)", result);
+			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
 			return NULL;
 		}
@@ -876,6 +882,7 @@ static void *kaweth_probe(
 						      126,
 						      3)) < 0) {
 			kaweth_err("Error downloading trigger code fix (%d)", result);
+			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
 			return NULL;
 		}
@@ -883,12 +890,14 @@ static void *kaweth_probe(
 
 		if ((result = kaweth_trigger_firmware(kaweth, 126)) < 0) {
 			kaweth_err("Error triggering firmware (%d)", result);
+			free_page((unsigned long)kaweth->firmware_buf);
 			kfree(kaweth);
 			return NULL;
 		}
 
 		/* Device will now disappear for a moment...  */
 		kaweth_info("Firmware loaded.  I'll be back...");
+		free_page((unsigned long)kaweth->firmware_buf);
 		kfree(kaweth);
 		return NULL;
 	}

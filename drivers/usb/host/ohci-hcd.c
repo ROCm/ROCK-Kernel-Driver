@@ -106,7 +106,6 @@
 
 /*-------------------------------------------------------------------------*/
 
-#define OHCI_USE_NPS		// force NoPowerSwitching mode
 // #define OHCI_VERBOSE_DEBUG	/* not always helpful */
 
 /* For initializing controller (mask in an HCFS mode too) */
@@ -349,22 +348,23 @@ static int ohci_get_frame (struct usb_hcd *hcd)
 
 static int hc_reset (struct ohci_hcd *ohci)
 {
-	int timeout = 30;
-	int smm_timeout = 50; /* 0,5 sec */
-	 	
-	if (readl (&ohci->regs->control) & OHCI_CTRL_IR) { /* SMM owns the HC */
+	u32 temp;
+
+	/* SMM owns the HC?  not for long! */
+	if (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
+		temp = 50;	/* arbitrary: half second */
 		writel (OHCI_INTR_OC, &ohci->regs->intrenable);
 		writel (OHCI_OCR, &ohci->regs->cmdstatus);
 		dbg ("USB HC TakeOver from SMM");
 		while (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
 			wait_ms (10);
-			if (--smm_timeout == 0) {
+			if (--temp == 0) {
 				err ("USB HC TakeOver failed!");
 				return -1;
 			}
 		}
-	}	
-		
+	}
+
 	/* Disable HC interrupts */
 	writel (OHCI_INTR_MIE, &ohci->regs->intrdisable);
 
@@ -372,22 +372,41 @@ static int hc_reset (struct ohci_hcd *ohci)
 		ohci->hcd.self.bus_name,
 		readl (&ohci->regs->control));
 
-  	/* Reset USB (needed by some controllers) */
-	writel (0, &ohci->regs->control);
-      	
-	/* HC Reset requires max 10 ms delay */
+  	/* Reset USB (needed by some controllers); RemoteWakeupConnected
+	 * saved if boot firmware (BIOS/SMM/...) told us it's connected
+	 */
+	ohci->hc_control = readl (&ohci->regs->control);
+	ohci->hc_control &= OHCI_CTRL_RWC;	/* hcfs 0 = RESET */
+	writel (ohci->hc_control, &ohci->regs->control);
+	wait_ms (50);
+
+	/* HC Reset requires max 10 us delay */
 	writel (OHCI_HCR,  &ohci->regs->cmdstatus);
+	temp = 30;	/* ... allow extra time */
 	while ((readl (&ohci->regs->cmdstatus) & OHCI_HCR) != 0) {
-		if (--timeout == 0) {
+		if (--temp == 0) {
 			err ("USB HC reset timed out!");
 			return -1;
-		}	
+		}
 		udelay (1);
-	}	 
+	}
+
+	/* now we're in the SUSPEND state ... must go OPERATIONAL
+	 * within 2msec else HC enters RESUME
+	 *
+	 * ... but some hardware won't init fmInterval "by the book"
+	 * (SiS, OPTi ...), so reset again instead.  SiS doesn't need
+	 * this if we write fmInterval after we're OPERATIONAL.
+	 */
+	writel (ohci->hc_control, &ohci->regs->control);
+
 	return 0;
 }
 
 /*-------------------------------------------------------------------------*/
+
+#define	FI		0x2edf		/* 12000 bits per frame (-1) */
+#define LSTHRESH	0x628		/* lowspeed bit threshold */
 
 /* Start an OHCI controller, set the BUS operational
  * enable interrupts 
@@ -395,8 +414,7 @@ static int hc_reset (struct ohci_hcd *ohci)
  */
 static int hc_start (struct ohci_hcd *ohci)
 {
-  	__u32			mask;
-  	unsigned int		fminterval;
+  	u32			mask;
   	struct usb_device	*udev;
 
 	spin_lock_init (&ohci->lock);
@@ -405,35 +423,44 @@ static int hc_start (struct ohci_hcd *ohci)
 
 	/* Tell the controller where the control and bulk lists are
 	 * The lists are empty now. */
-	 
 	writel (0, &ohci->regs->ed_controlhead);
 	writel (0, &ohci->regs->ed_bulkhead);
-	
+
 	/* a reset clears this */
 	writel ((u32) ohci->hcca_dma, &ohci->regs->hcca);
-   
-  	fminterval = 0x2edf;
-	writel ((fminterval * 9) / 10, &ohci->regs->periodicstart);
-	fminterval |= ((((fminterval - 210) * 6) / 7) << 16); 
-	writel (fminterval, &ohci->regs->fminterval);	
-	writel (0x628, &ohci->regs->lsthresh);
+
+	/* force default fmInterval (we won't adjust it); init thresholds
+	 * for last FS and LS packets, reserve 90% for periodic.
+	 */
+	writel ((((6 * (FI - 210)) / 7) << 16) | FI, &ohci->regs->fminterval);
+	writel (((9 * FI) / 10) & 0x3fff, &ohci->regs->periodicstart);
+	writel (LSTHRESH, &ohci->regs->lsthresh);
+
+	/* some OHCI implementations are finicky about how they init.
+	 * bogus values here mean not even enumeration could work.
+	 */
+	if ((readl (&ohci->regs->fminterval) & 0x3fff0000) == 0
+			|| !readl (&ohci->regs->periodicstart)) {
+		err ("%s init err", ohci->hcd.self.bus_name);
+		return -EOVERFLOW;
+	}
 
  	/* start controller operations */
- 	ohci->hc_control = OHCI_CONTROL_INIT | OHCI_USB_OPER;
+	ohci->hc_control &= OHCI_CTRL_RWC;
+ 	ohci->hc_control |= OHCI_CONTROL_INIT | OHCI_USB_OPER;
 	ohci->disabled = 0;
  	writel (ohci->hc_control, &ohci->regs->control);
- 
+
 	/* Choose the interrupts we care about now, others later on demand */
 	mask = OHCI_INTR_MIE | OHCI_INTR_UE | OHCI_INTR_WDH;
 	writel (mask, &ohci->regs->intrstatus);
 	writel (mask, &ohci->regs->intrenable);
 
-#ifdef	OHCI_USE_NPS
-	/* required for AMD-756 and some Mac platforms */
-	writel ((roothub_a (ohci) | RH_A_NPS) & ~RH_A_PSM,
+	/* hub power always on: required for AMD-756 and some Mac platforms */
+	writel ((roothub_a (ohci) | RH_A_NPS) & ~(RH_A_PSM | RH_A_OCPM),
 		&ohci->regs->roothub.a);
 	writel (RH_HS_LPSC, &ohci->regs->roothub.status);
-#endif	/* OHCI_USE_NPS */
+	writel (0, &ohci->regs->roothub.b);
 
 	// POTPGT delay is bits 24-31, in 2 ms units.
 	mdelay ((roothub_a (ohci) >> 23) & 0x1fe);
@@ -442,9 +469,10 @@ static int hc_start (struct ohci_hcd *ohci)
 	ohci->hcd.self.root_hub = udev = usb_alloc_dev (NULL, &ohci->hcd.self);
 	ohci->hcd.state = USB_STATE_READY;
 	if (!udev) {
-	    ohci->disabled = 1;
-// FIXME cleanup
-	    return -ENOMEM;
+		ohci->disabled = 1;
+		ohci->hc_control &= ~OHCI_CTRL_HCFS;
+		writel (ohci->hc_control, &ohci->regs->control);
+		return -ENOMEM;
 	}
 
 	usb_connect (udev);
@@ -452,10 +480,11 @@ static int hc_start (struct ohci_hcd *ohci)
 	if (usb_register_root_hub (udev, ohci->parent_dev) != 0) {
 		usb_free_dev (udev); 
 		ohci->disabled = 1;
-// FIXME cleanup
+		ohci->hc_control &= ~OHCI_CTRL_HCFS;
+		writel (ohci->hc_control, &ohci->regs->control);
 		return -ENODEV;
 	}
-	
+
 	return 0;
 }
 

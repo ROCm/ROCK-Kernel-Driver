@@ -130,9 +130,20 @@ struct usb_serial {
  * @num_bulk_in: the number of bulk in endpoints this device will have.
  * @num_bulk_out: the number of bulk out endpoints this device will have.
  * @num_ports: the number of different ports this device will have.
- * @startup: pointer to the driver's startup function.  This will be called
- *	when the driver is inserted into the system.  Return 0 to continue
- *	on with the initialization sequence.  Anything else will abort it.
+ * @calc_num_ports: pointer to a function to determine how many ports this
+ *	device has dynamically.  It will be called after the probe()
+ *	callback is called, but before attach()
+ * @probe: pointer to the driver's probe function.
+ *	This will be called when the device is inserted into the system,
+ *	but before the device has been fully initialized by the usb_serial
+ *	subsystem.  Use this function to download any firmware to the device,
+ *	or any other early initialization that might be needed.
+ *	Return 0 to continue on with the initialization sequence.  Anything 
+ *	else will abort it.
+ * @attach: pointer to the driver's attach function.
+ *	This will be called when the struct usb_serial structure is fully set
+ *	set up.  Do any local initialization of the device, or any private
+ *	memory structure allocation at this point in time.
  * @shutdown: pointer to the driver's shutdown function.  This will be
  *	called when the device is removed from the system.
  *
@@ -153,7 +164,10 @@ struct usb_serial_device_type {
 
 	struct list_head	driver_list;
 	
-	int (*startup) (struct usb_serial *serial);
+	int (*probe) (struct usb_serial *serial);
+	int (*attach) (struct usb_serial *serial);
+	int (*calc_num_ports) (struct usb_serial *serial);
+
 	void (*shutdown) (struct usb_serial *serial);
 
 	/* serial function calls */
