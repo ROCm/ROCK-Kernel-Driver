@@ -363,7 +363,7 @@ smb_file_open(struct inode *inode, struct file * file)
 	SMB_I(inode)->openers++;
 out:
 	unlock_kernel();
-	return 0;
+	return result;
 }
 
 static int
