@@ -649,9 +649,7 @@ static u16 irqrx_handler(struct SKMCA_NETDEV *dev, u16 oldcsr0)
 				skb->protocol = eth_type_trans(skb, dev);
 				skb->ip_summed = CHECKSUM_NONE;
 				priv->stat.rx_packets++;
-#if LINUX_VERSION_CODE >= 0x020119	/* byte counters for >= 2.1.25 */
 				priv->stat.rx_bytes += descr.Len;
-#endif
 				netif_rx(skb);
 				dev->last_rx = jiffies;
 			}
@@ -709,9 +707,7 @@ static u16 irqtx_handler(struct SKMCA_NETDEV *dev, u16 oldcsr0)
 		/* update statistics */
 		if ((descr.Flags & TXDSCR_FLAGS_ERR) == 0) {
 			priv->stat.tx_packets++;
-#if LINUX_VERSION_CODE >= 0x020119	/* byte counters for >= 2.1.25 */
 			priv->stat.tx_bytes++;
-#endif
 		} else {
 			priv->stat.tx_errors++;
 			if ((descr.Status & TXDSCR_STATUS_UFLO) != 0) {
@@ -1001,13 +997,8 @@ static int skmca_tx(struct sk_buff *skb, struct SKMCA_NETDEV *dev)
 
       tx_done:
 
-	/* When did that change exactly ? */
-
-#if LINUX_VERSION_CODE >= 0x020200
 	dev_kfree_skb(skb);
-#else
-	dev_kfree_skb(skb, FREE_WRITE);
-#endif
+
 	return retval;
 }
 
@@ -1146,9 +1137,7 @@ int __init skmca_probe(struct SKMCA_NETDEV *dev)
 		mca_set_adapter_name(slot, "SKNET MC2+ Ethernet Adapter");
 	mca_set_adapter_procfn(slot, (MCA_ProcFn) skmca_getinfo, dev);
 
-#if LINUX_VERSION_CODE >= 0x020200
 	mca_mark_as_used(slot);
-#endif
 
 	/* announce success */
 	printk("%s: SKNet %s adapter found in slot %d\n", dev->name,
@@ -1283,9 +1272,7 @@ void cleanup_module(void)
 				free_irq(dev->irq, dev);
 			dev->irq = 0;
 			unregister_netdev(dev);
-#if LINUX_VERSION_CODE >= 0x020200
 			mca_mark_as_unused(priv->slot);
-#endif
 			mca_set_adapter_procfn(priv->slot, NULL, NULL);
 			kfree(dev->priv);
 			dev->priv = NULL;
