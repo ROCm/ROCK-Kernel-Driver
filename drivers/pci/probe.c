@@ -225,7 +225,7 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 	pci_read_config_word(dev, PCI_MEMORY_LIMIT, &mem_limit_lo);
 	base = (mem_base_lo & PCI_MEMORY_RANGE_MASK) << 16;
 	limit = (mem_limit_lo & PCI_MEMORY_RANGE_MASK) << 16;
-	if (base && base <= limit) {
+	if (base <= limit) {
 		res->flags = (mem_base_lo & PCI_MEMORY_RANGE_TYPE_MASK) | IORESOURCE_MEM;
 		res->start = base;
 		res->end = limit + 0xfffff;
@@ -251,7 +251,7 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		}
 #endif
 	}
-	if (base && base <= limit) {
+	if (base <= limit) {
 		res->flags = (mem_base_lo & PCI_MEMORY_RANGE_TYPE_MASK) | IORESOURCE_MEM | IORESOURCE_PREFETCH;
 		res->start = base;
 		res->end = limit + 0xfffff;
@@ -643,7 +643,7 @@ int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 				}
 			}
 		} else {
-			if (!scan_all_fns && func == 0)
+			if (func == 0 && !scan_all_fns)
 				break;
 		}
 	}

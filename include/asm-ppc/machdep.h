@@ -54,6 +54,7 @@ struct machdep_calls {
 
 	void		(*early_serial_map)(void);
   	void		(*progress)(char *, unsigned short);
+	void		(*kgdb_map_scc)(void);
 
 	unsigned char 	(*nvram_read_val)(int addr);
 	void		(*nvram_write_val)(int addr, unsigned char val);

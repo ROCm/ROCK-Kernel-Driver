@@ -9,8 +9,6 @@
 #ifndef _ASM_IA64_SN_ADDRS_H
 #define _ASM_IA64_SN_ADDRS_H
 
-#include <linux/config.h>
-
 #include <asm/sn/sn2/addrs.h>
 
 #ifndef __ASSEMBLY__
@@ -154,7 +152,7 @@
  * the base of the register space.
  */
 #define HUB_REG_PTR(_base, _off)	\
-	(HUBREG_CAST ((__psunsigned_t)(_base) + (__psunsigned_t)(_off)))
+	(HUBREG_CAST ((unsigned long)(_base) + (__psunsigned_t)(_off)))
 
 #define HUB_REG_PTR_L(_base, _off)	\
 	HUB_L(HUB_REG_PTR((_base), (_off)))

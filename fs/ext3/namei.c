@@ -1311,7 +1311,7 @@ static int make_indexed_dir(handle_t *handle, struct dentry *dentry,
 	memcpy (data1, de, len);
 	de = (struct ext3_dir_entry_2 *) data1;
 	top = data1 + len;
-	while (((char *) de2=(char*)de+le16_to_cpu(de->rec_len)) < top)
+	while ((char *)(de2=(void*)de+le16_to_cpu(de->rec_len)) < top)
 		de = de2;
 	de->rec_len = cpu_to_le16(data1 + blocksize - (char *) de);
 	/* Initialize the root; the dot dirents already exist */

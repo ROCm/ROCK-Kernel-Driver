@@ -685,13 +685,13 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 	{
 		struct vt_mode tmp;
 		int rc;
-		
+
 		acquire_console_sem();
 		memcpy(&tmp, &vt_cons[console]->vt_mode, sizeof(struct vt_mode));
 		release_console_sem();
 
 		rc = copy_to_user((void*)arg, &tmp, sizeof(struct vt_mode));
-		return rc ? -EFAULT : 0;		
+		return rc ? -EFAULT : 0;
 	}
 
 	/*

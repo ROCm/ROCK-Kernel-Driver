@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_immed.c,v 1.10 2001/04/25 18:11:23 hch Exp hch $"
-
 /*
  * Veritas filesystem driver - support for 'immed' inodes.
  */

@@ -65,10 +65,13 @@ static uint16_t qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport);
 static os_lun_t * qla2x00_fclun_bind(scsi_qla_host_t *, fc_port_t *,
     fc_lun_t *);
 static void qla2x00_lun_free(scsi_qla_host_t *, uint16_t, uint16_t);
+
 static int qla2x00_bstr_to_hex(char *, uint8_t *, int);
 static int qla2x00_find_propname(scsi_qla_host_t *,
     char *, char *, char *, int);
 #if 0
+static void qla2x00_get_lun_mask_from_config(scsi_qla_host_t *, fc_port_t *,
+    uint16_t, uint16_t);
 static int qla2x00_get_prop_16chars(scsi_qla_host_t *,
     char *, char *, char *);
 static void qla2x00_get_properties(scsi_qla_host_t *, char *);
@@ -148,6 +151,7 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 	 */
 	if (ql2xdevconf) {
 		ha->cmdline = ql2xdevconf;
+		qla2x00_get_properties(ha, ql2xdevconf);
 	}
 #endif
 
@@ -165,13 +169,6 @@ qla2x00_initialize_adapter(scsi_qla_host_t *ha)
 				rval = qla2x00_setup_chip(ha);
 			}
 		}
-
-		/* Retrieve firmware information */
-		qla2x00_get_fw_version(ha, &ha->fw_major_version,
-		    &ha->fw_minor_version, &ha->fw_subminor_version,
-		    &ha->fw_attributes);
-		qla2x00_get_resource_cnts(ha, NULL, &ha->xchg_buf_cnt,
-		    &ha->iocb_buf_cnt, NULL);
 
 		if (rval == QLA_SUCCESS &&
 		    (rval = qla2x00_init_rings(ha)) == QLA_SUCCESS) {
@@ -226,6 +223,11 @@ check_fw_ready_again:
 	} while (restart_risc && retry--);
 
 	if (isp_init) {
+		/* Retrieve firmware information */
+		qla2x00_get_fw_version(ha, &ha->fw_major_version,
+		    &ha->fw_minor_version, &ha->fw_subminor_version,
+		    &ha->fw_attributes);
+
 		clear_bit(RESET_MARKER_NEEDED, &ha->dpc_flags);
 		ha->marker_needed = 1;
 		qla2x00_marker(ha, 0, 0, MK_SYNC_ALL);
@@ -282,11 +284,11 @@ qla2x00_pci_config(scsi_qla_host_t *ha)
 	ha->pci_attr = RD_REG_WORD(&ha->iobase->ctrl_status);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
-	if (IS_QLA23XX(ha)) {
+	if (!IS_QLA2100(ha) && !IS_QLA2200(ha)) {
 		pci_write_config_byte(ha->pdev, PCI_LATENCY_TIMER, 0x80);
 
 		/* PCI Specification Revision 2.3 changes */
-		if (IS_QLA2322(ha))
+		if (IS_QLA2322(ha) || IS_QLA6322(ha))
 			/* Command Register - Reset Interrupt Disable. */
 			w &= ~BIT_10;
 
@@ -406,7 +408,7 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 	if (!IS_QLA2100(ha)) {
 		/* Pause RISC. */
 		WRT_REG_WORD(&reg->hccr, HCCR_PAUSE_RISC);
-		if (!IS_QLA2312(ha) && !IS_QLA2322(ha)) {
+		if (IS_QLA2200(ha) || IS_QLA2300(ha)) {
 			for (cnt = 0; cnt < 30000; cnt++) {
 				if ((RD_REG_WORD(&reg->hccr) &
 				    HCCR_RISC_PAUSE) != 0)
@@ -424,7 +426,7 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 		WRT_REG_WORD(&reg->fpm_diag_config, 0x100);
 
 		/* Toggle Fpm Reset. */
-		if (IS_QLA23XX(ha))
+		if (!IS_QLA2200(ha))
 			WRT_REG_WORD(&reg->fpm_diag_config, 0x0);
 
 		/* Select frame buffer registers. */
@@ -461,9 +463,7 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 	WRT_REG_WORD(&reg->ctrl_status, CSR_ISP_SOFT_RESET);
 
 	/* Wait for RISC to recover from reset. */
-	if (IS_QLA2312(ha) || IS_QLA2322(ha)) {
-		udelay(10);
-	} else {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha) || IS_QLA2300(ha)) {
 		/*
 		 * It is necessary to for a delay here since the card doesn't
 		 * respond to PCI reads during a reset. On some architectures
@@ -476,7 +476,8 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 				break;
 			udelay(100);
 		}
-	}
+	} else
+		udelay(10);
 
 	/* Reset RISC processor. */
 	WRT_REG_WORD(&reg->hccr, HCCR_RESET_RISC);
@@ -487,9 +488,7 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 	WRT_REG_WORD(&reg->hccr, HCCR_RELEASE_RISC);
 	RD_REG_WORD(&reg->hccr);		/* PCI Posting. */
 
-	if (IS_QLA2312(ha) || IS_QLA2322(ha))
-		udelay(100);
-	else {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha) || IS_QLA2300(ha)) {
 		for (cnt = 0; cnt < 30000; cnt++) {
 			if (!(test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags)))
 				spin_lock_irqsave(&ha->mbx_reg_lock, mbx_flags);
@@ -508,7 +507,8 @@ qla2x00_reset_chip(scsi_qla_host_t *ha)
 
 			udelay(100);
 		}
-	}
+	} else
+		udelay(100);
 
 	/* Turn on master enable */
 	cmd |= PCI_COMMAND_MASTER;
@@ -570,16 +570,15 @@ qla2x00_chip_diag(scsi_qla_host_t *ha)
 	WRT_REG_WORD(&reg->hccr, HCCR_RELEASE_RISC);
 
 	/* Workaround for QLA2312 PCI parity error */
-	if (IS_QLA2312(ha) || IS_QLA2322(ha))
-		udelay(10);
-	else {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha) || IS_QLA2300(ha)) {
 		data = qla2x00_debounce_register(MAILBOX_REG(ha, reg, 0));
 		for (cnt = 6000000; cnt && (data == MBS_BUSY); cnt--) {
 			udelay(5);
 			data = RD_MAILBOX_REG(ha, reg, 0);
 			barrier(); 
 		}
-	}
+	} else
+		udelay(10);
 
 	if (!cnt)
 		goto chip_diag_failed;
@@ -590,7 +589,7 @@ qla2x00_chip_diag(scsi_qla_host_t *ha)
 	mb[1] = RD_MAILBOX_REG(ha, reg, 1);
 	mb[2] = RD_MAILBOX_REG(ha, reg, 2);
 	mb[3] = RD_MAILBOX_REG(ha, reg, 3);
-
+	mb[4] = qla2x00_debounce_register(MAILBOX_REG(ha, reg, 4));
 	if (mb[1] != PROD_ID_1 || (mb[2] != PROD_ID_2 && mb[2] != PROD_ID_2a) ||
 	    mb[3] != PROD_ID_3) {
 		qla_printk(KERN_WARNING, ha,
@@ -598,6 +597,10 @@ qla2x00_chip_diag(scsi_qla_host_t *ha)
 
 		goto chip_diag_failed;
 	}
+	ha->product_id[0] = mb[1];
+	ha->product_id[1] = mb[2];
+	ha->product_id[2] = mb[3];
+	ha->product_id[3] = mb[4];
 
 	/* Adjust fw RISC transfer size */
 	ha->fw_transfer_size = REQUEST_ENTRY_SIZE * REQUEST_ENTRY_CNT;
@@ -1106,7 +1109,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 
 	/* Determine NVRAM starting address. */
 	ha->nvram_base = 0;
-	if (IS_QLA2312(ha) || IS_QLA2322(ha))
+	if (!IS_QLA2100(ha) && !IS_QLA2200(ha) && !IS_QLA2300(ha))
 		if ((RD_REG_WORD(&reg->ctrl_status) >> 14) == 1)
 			ha->nvram_base = 0x80;
 
@@ -1218,7 +1221,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 			} else {
 				strcpy(ha->model_number, "QLA2300");
 			}
-		} else if (IS_QLA2312(ha) || IS_QLA2322(ha)) {
+		} else {
 			if (rval == 0 &&
 			    memcmp(nv->model_number, BINZERO,
 				    sizeof(nv->model_number)) != 0) {
@@ -1229,7 +1232,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 				st = en = ha->model_number;
 				en += sizeof(nv->model_number) - 1;
 				while (en > st) {
-					if (*en != 0x20)
+					if (*en != 0x20 && *en != 0x00)
 						break;
 					*en-- = '\0';
 				}
@@ -1246,8 +1249,6 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 					strcpy(ha->model_number, "QLA23xx");
 				}
 			}
-		} else {
-			strcpy(ha->model_number, "QLA23xx");
 		}
 	} else if (IS_QLA2200(ha)) {
 		nv->firmware_options[0] |= BIT_2;
@@ -1287,6 +1288,9 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 	ha->nvram_version = nv->nvram_version;
 
 	ha->flags.disable_risc_code_load = ((nv->host_p[0] & BIT_4) ? 1 : 0);
+	/* Always load RISC code on non ISP2[12]00 chips. */
+	if (!IS_QLA2100(ha) && !IS_QLA2200(ha))
+		ha->flags.disable_risc_code_load = 0;
 	ha->flags.enable_lip_reset = ((nv->host_p[1] & BIT_1) ? 1 : 0);
 	ha->flags.enable_lip_full_login = ((nv->host_p[1] & BIT_2) ? 1 : 0);
 	ha->flags.enable_target_reset = ((nv->host_p[1] & BIT_3) ? 1 : 0);
@@ -1318,14 +1322,8 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 	/* Set minimum RATOV to 200 tenths of a second. */
 	ha->r_a_tov = 200;
 
-/* FIXME
- *
- * port_down_retry_count updated twice
- *
- */
-	ha->port_down_retry_count = nv->port_down_retry_count;
 	ha->minimum_timeout =
-	    (ha->login_timeout * ha->retry_count) + ha->port_down_retry_count;
+	    (ha->login_timeout * ha->retry_count) + nv->port_down_retry_count;
 	ha->loop_reset_delay = nv->reset_delay;
 
 	/* Will get the value from NVRAM. */
@@ -1350,28 +1348,15 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		    (LOOP_DOWN_TIME - ha->link_down_timeout);
 	} 
 
+	ha->max_luns = MAX_LUNS;
 	ha->max_probe_luns = le16_to_cpu(nv->max_luns_per_target);
 	if (ha->max_probe_luns == 0)
 		ha->max_probe_luns = MIN_LUNS;
 
-#if USE_BIOS_MAX_LUNS
-	ha->max_luns = le16_to_cpu(nv->max_luns_per_target);
-	if (ha->max_luns == 0)
-		ha->max_luns = MAX_LUNS;
-	else if (ha->max_luns > MAX_LUNS)
-		ha->max_luns = MAX_LUNS;
-#else
-	ha->max_luns = MAX_LUNS;
-#endif
-
-/* FIXME
- *
- * port_down_retry_count updated twice
- *
- */
 	/*
 	 * Need enough time to try and get the port back.
 	 */
+	ha->port_down_retry_count = nv->port_down_retry_count;
 	if (qlport_down_retry)
 		ha->port_down_retry_count = qlport_down_retry;
 	/* Set login_retry_count */
@@ -1414,7 +1399,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		icb->firmware_options[0] &= ~BIT_3;
 		icb->add_firmware_options[0] &=
 		    ~(BIT_3 | BIT_2 | BIT_1 | BIT_0);
-		icb->add_firmware_options[0] |= (BIT_1 | BIT_0);
+		icb->add_firmware_options[0] |= BIT_2;
 		icb->response_accumulation_timer = 3;
 		icb->interrupt_delay_timer = 5;
 
@@ -1426,7 +1411,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		 *    ~(BIT_3 | BIT_2 | BIT_1 | BIT_0);
 		 * icb->add_firmware_options[0] |= (BIT_2 | BIT_0);
 		 */
-		timer_mode  = icb->add_firmware_options[0] &
+		timer_mode = icb->add_firmware_options[0] &
 		    (BIT_3 | BIT_2 | BIT_1 | BIT_0);
 		if (timer_mode == 5) {
 			DEBUG2(printk("scsi(%ld): ZIO enabled; timer delay "
@@ -1445,9 +1430,6 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		DEBUG2_3(printk(KERN_WARNING
 		    "scsi(%ld): NVRAM configuration failed!\n", ha->host_no));
 	}
-
-	LEAVE(__func__);
-
 	return (rval);
 }
 
@@ -1466,12 +1448,8 @@ qla2x00_init_tgt_map(scsi_qla_host_t *ha)
 {
 	uint32_t t;
 
-	ENTER(__func__);
-
 	for (t = 0; t < MAX_TARGETS; t++)
 		TGT_Q(ha, t) = (os_tgt_t *)NULL;
-
-	LEAVE(__func__);
 }
 
 /**
@@ -1856,7 +1834,7 @@ qla2x00_update_fcport(scsi_qla_host_t *ha, fc_port_t *fcport)
 	    PORT_RETRY_TIME;
 	atomic_set(&fcport->port_down_timer, ha->port_down_retry_count *
 	    PORT_RETRY_TIME);
-	fcport->flags &= ~(FCF_LOGIN_NEEDED);
+	fcport->flags &= ~FCF_LOGIN_NEEDED;
 
 	/*
 	 * Check for outstanding cmd on tape Bypass LUN discovery if active
@@ -2323,6 +2301,7 @@ qla2x00_configure_fabric(scsi_qla_host_t *ha)
 	int	rval, rval2;
 	fc_port_t	*fcport, *fcptemp;
 	uint16_t	next_loopid;
+	uint16_t	mb[MAILBOX_REGISTER_COUNT];
 	LIST_HEAD(new_fcports);
 
 	/* If FL port exists, then SNS is present */
@@ -2342,6 +2321,17 @@ qla2x00_configure_fabric(scsi_qla_host_t *ha)
 		return (QLA_SUCCESS);
 	}
 	do {
+		/* Ensure we are logged into the SNS. */
+		qla2x00_login_fabric(ha, SIMPLE_NAME_SERVER, 0xff, 0xff, 0xfc,
+		    mb, BIT_0);
+		if (mb[0] != MBS_COMMAND_COMPLETE) {
+			qla_printk(KERN_INFO, ha,
+			    "Failed SNS login: loop_id=%x mb[0]=%x mb[1]=%x "
+			    "mb[2]=%x mb[6]=%x mb[7]=%x\n", SIMPLE_NAME_SERVER,
+			    mb[0], mb[1], mb[2], mb[6], mb[7]);
+			return (QLA_FUNCTION_FAILED);
+		}
+
 		if (test_and_clear_bit(REGISTER_FC4_NEEDED, &ha->dpc_flags)) {
 			if (qla2x00_rft_id(ha)) {
 				/* EMPTY */
@@ -2811,7 +2801,9 @@ qla2x00_device_resync(scsi_qla_host_t *ha)
 
 		switch (format) {
 		case 0:
-			if (IS_QLA23XX(ha) && ha->flags.init_done) {
+			if (!IS_QLA2100(ha) && !IS_QLA2200(ha) &&
+			    !IS_QLA6312(ha) && !IS_QLA6322(ha) &&
+			    ha->flags.init_done) {
 				/* Handle port RSCN via asyncronous IOCBs */
 				rval2 = qla2x00_handle_port_rscn(ha, rscn_entry,
 				    NULL, 0);
@@ -2836,7 +2828,7 @@ qla2x00_device_resync(scsi_qla_host_t *ha)
 		rval = QLA_SUCCESS;
 
 		/* Abort any outstanding IO descriptors. */
-		if (IS_QLA23XX(ha))
+		if (!IS_QLA2100(ha) && !IS_QLA2200(ha))
 			qla2x00_cancel_io_descriptors(ha);
 
 		list_for_each_entry(fcport, &ha->fcports, list) {
@@ -3128,13 +3120,9 @@ qla2x00_restart_queues(scsi_qla_host_t *ha, uint8_t flush)
 	struct list_head *list, *temp;
 	unsigned long flags = 0;
 
-	ENTER(__func__);
-
 	clear_bit(RESTART_QUEUES_NEEDED, &ha->dpc_flags);
 
-	/*
-	 * start pending queue
-	 */
+	/* start pending queue */
 	pending_q_cnt = ha->qthreads;
 	if (flush) {
 		spin_lock_irqsave(&ha->list_lock,flags);
@@ -3188,8 +3176,6 @@ qla2x00_restart_queues(scsi_qla_host_t *ha, uint8_t flush)
 
 	if (!list_empty(&ha->done_queue))
 		qla2x00_done(ha);
-
-	LEAVE(__func__);
 }
 
 //FIXME - Document
@@ -3344,6 +3330,9 @@ qla2x00_fcport_bind(scsi_qla_host_t *ha, fc_port_t *fcport)
 		tq->flags |= TQF_ONLINE;
 		tq->port_down_retry_count = ha->port_down_retry_count;
 
+#if 0
+		qla2x00_get_lun_mask_from_config(ha, fcport, tgt, 0);
+#endif
 	}
 
 	if (tgt == MAX_TARGETS) {
@@ -3587,6 +3576,52 @@ qla2x00_lun_free(scsi_qla_host_t *ha, uint16_t tgt, uint16_t lun)
 }
 
 
+#if 0
+/*
+ * qla2x00_get_lun_mask_from_config
+ *      Get lun mask from the configuration parameters.
+ *      Bit order is little endian.
+ *
+ * Input:
+ * ha  -- Host adapter
+ * tgt  -- target/device number
+ * port -- pointer to port
+ */
+static void
+qla2x00_get_lun_mask_from_config(scsi_qla_host_t *ha,
+    fc_port_t *fcport, uint16_t tgt, uint16_t dev_no) 
+{
+	char		propbuf[60]; /* size of search string */
+	int		rval, lun, bit;
+	lun_bit_mask_t	lun_mask, *mask_ptr = &lun_mask;
+
+	/* Get "target-N-device-N-lun-mask" as a 256 bit lun_mask*/
+	sprintf(propbuf, "scsi-qla%ld-tgt-%d-di-%d-lun-disabled",
+	    ha->instance, tgt, dev_no);
+
+	rval = qla2x00_get_prop_xstr(ha, propbuf,
+	    (uint8_t *)&lun_mask, sizeof(lun_bit_mask_t));
+	if (rval == sizeof(lun_bit_mask_t)) {
+		memset(&fcport->lun_mask, 0, sizeof(lun_bit_mask_t));
+		for (lun = 8 * sizeof(lun_bit_mask_t) - 1, bit = 0;
+		    lun >= 0; lun--, bit++) {
+			if (EXT_IS_LUN_BIT_SET(mask_ptr, lun))
+				EXT_SET_LUN_BIT((&fcport->lun_mask), bit);
+		}
+
+		DEBUG3(printk("scsi(%ld): returning lun mask for fcport "
+		    "%02x%02x%02x%02x%02x%02x%02x%02x:\n",
+		    ha->host_no,
+		    fcport->port_name[0], fcport->port_name[1],
+		    fcport->port_name[2], fcport->port_name[3],
+		    fcport->port_name[4], fcport->port_name[5],
+		    fcport->port_name[6], fcport->port_name[7]));
+		DEBUG3(qla2x00_dump_buffer((uint8_t *)&fcport->lun_mask,
+		    sizeof(lun_bit_mask_t));)
+	}
+}
+#endif
+
 /*
  * qla2x00_bstr_to_hex
  *	Convert hex byte string to number.
@@ -3670,7 +3705,6 @@ qla2x00_get_prop_xstr(scsi_qla_host_t *ha,
 		propstr++;   /* ignore equal sign */
 
 	if (rval == 0) {  /* not found */
-		LEAVE(__func__);
 		return (-1);
 	}
 
@@ -4035,8 +4069,6 @@ qla2x00_abort_isp(scsi_qla_host_t *ha)
 	srb_t          *sp;
 	uint8_t        status = 0;
 
-	ENTER("qla2x00_abort_isp");
-
 	if (ha->flags.online) {
 		ha->flags.online = FALSE;
 		clear_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
@@ -4176,7 +4208,7 @@ qla2x00_restart_isp(scsi_qla_host_t *ha)
 	if (qla2x00_isp_firmware(ha)) {
 		ha->flags.online = FALSE;
 		if (!(status = qla2x00_chip_diag(ha))) {
-			if (!IS_QLA23XX(ha)) {
+			if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 				status = qla2x00_setup_chip(ha);
 				goto done;
 			}
@@ -4192,14 +4224,14 @@ qla2x00_restart_isp(scsi_qla_host_t *ha)
 			spin_lock_irqsave(&ha->hardware_lock, flags);
  
  			/* Enable proper parity */
- 			if (IS_QLA2312(ha) || IS_QLA2322(ha))
- 				/* SRAM, Instruction RAM and GP RAM parity */
- 				WRT_REG_WORD(&reg->hccr,
- 				    (HCCR_ENABLE_PARITY + 0x7));
- 			else
+ 			if (IS_QLA2300(ha))
  				/* SRAM parity */
  				WRT_REG_WORD(&reg->hccr,
  				    (HCCR_ENABLE_PARITY + 0x1));
+ 			else
+ 				/* SRAM, Instruction RAM and GP RAM parity */
+ 				WRT_REG_WORD(&reg->hccr,
+ 				    (HCCR_ENABLE_PARITY + 0x7));
 
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 		}
@@ -4246,8 +4278,6 @@ qla2x00_reset_adapter(scsi_qla_host_t *ha)
 	unsigned long flags = 0;
 	device_reg_t *reg = ha->iobase;
 
-	ENTER(__func__);
-
 	ha->flags.online = FALSE;
 	qla2x00_disable_intrs(ha);
 	/* Reset RISC processor. */
@@ -4255,6 +4285,4 @@ qla2x00_reset_adapter(scsi_qla_host_t *ha)
 	WRT_REG_WORD(&reg->hccr, HCCR_RESET_RISC);
 	WRT_REG_WORD(&reg->hccr, HCCR_RELEASE_RISC);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-	LEAVE(__func__);
 }

@@ -232,9 +232,13 @@ static void mark_offset_tsc(void)
 		/* sanity check to ensure we're not always losing ticks */
 		if (lost_count++ > 100) {
 			printk(KERN_WARNING "Losing too many ticks!\n");
-			printk(KERN_WARNING "TSC cannot be used as a timesource."
-					" (Are you running with SpeedStep?)\n");
-			printk(KERN_WARNING "Falling back to a sane timesource.\n");
+			printk(KERN_WARNING "TSC cannot be used as a timesource.  ");
+			printk(KERN_WARNING "Possible reasons for this are:\n");
+			printk(KERN_WARNING "  You're running with Speedstep,\n");
+			printk(KERN_WARNING "  You don't have DMA enabled for your hard disk (see hdparm),\n");
+			printk(KERN_WARNING "  Incorrect TSC synchronization on an SMP system (see dmesg).\n");
+			printk(KERN_WARNING "Falling back to a sane timesource now.\n");
+
 			clock_fallback();
 		}
 	} else

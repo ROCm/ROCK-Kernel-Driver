@@ -57,7 +57,7 @@ op_axp_setup(void)
 
 	/* Compute the mask of enabled counters.  */
 	for (i = e = 0; i < model->num_counters; ++i)
-		if (ctr[0].enabled)
+		if (ctr[i].enabled)
 			e |= 1 << i;
 	reg.enable = e;
 

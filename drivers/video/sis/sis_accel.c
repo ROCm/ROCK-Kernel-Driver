@@ -1,14 +1,27 @@
 /*
- * SiS 300/630/730/540/315/550/650/740 frame buffer driver
- * for Linux kernels 2.4.x and 2.5.x
+ * SiS 300/630/730/540/315/550/65x/74x/330/760 frame buffer driver
+ * for Linux kernels 2.4.x and 2.6.x
  *
  * 2D acceleration part
  *
- * Based on the X driver's sis300_accel.c which is
- *     Copyright Xavier Ducoin <x.ducoin@lectra.com>
- *     Copyright 2002 by Thomas Winischhofer, Vienna, Austria
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the named License,
+ * or any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA
+ *
+ * Based on the XFree86 driver's sis300_accel.c which is
+ *     Copyright (C) 2001-2004 by Thomas Winischhofer, Vienna, Austria
  * and sis310_accel.c which is
- *     Copyright 2002 by Thomas Winischhofer, Vienna, Austria
+ *     Copyright (C) 2001-2004 by Thomas Winischhofer, Vienna, Austria
  *
  * Author: Thomas Winischhofer <thomas@winischhofer.net>
  *			(see http://www.winischhofer.net/
@@ -114,18 +127,12 @@ static const unsigned char myrops[] = {
    };
 #endif
 
-/* 300 series */
-
+/* 300 series ----------------------------------------------------- */
+#ifdef CONFIG_FB_SIS_300
 static void
 SiS300Sync(void)
 {
 	SiS300Idle
-}
-
-static void
-SiS310Sync(void)
-{
-	SiS310Idle
 }
 
 static void
@@ -210,8 +217,16 @@ SiS300SubsequentSolidFillRect(int x, int y, int w, int h)
 	SiS300SetupCMDFlag(X_INC | Y_INC | BITBLT)
 	SiS300DoCMD
 }
+#endif
 
-/* 310/325 series ------------------------------------------------ */
+/* 315/330 series ------------------------------------------------- */
+
+#ifdef CONFIG_FB_SIS_315
+static void
+SiS310Sync(void)
+{
+	SiS310Idle
+}
 
 static void
 SiS310SetupForScreenToScreenCopy(int xdir, int ydir, int rop,
@@ -230,7 +245,7 @@ SiS310SetupForScreenToScreenCopy(int xdir, int ydir, int rop,
 		/* SiSSetupCMDFlag(BITBLT | SRCVIDEO) */
 	}
 	SiS310SetupCMDFlag(ivideo.SiS310_AccelDepth)
-	/* TW: The 310/325 series is smart enough to know the direction */
+	/* The 315 series is smart enough to know the direction */
 }
 
 static void
@@ -306,6 +321,7 @@ SiS310SubsequentSolidFillRect(int x, int y, int w, int h)
 	SiS310SetupCMDFlag(BITBLT)
 	SiS310DoCMD
 }
+#endif
 
 /* --------------------------------------------------------------------- */
 
@@ -322,22 +338,33 @@ int sisfb_initaccel(void)
 void sisfb_syncaccel(void)
 {
     if(sisvga_engine == SIS_300_VGA) {
+#ifdef CONFIG_FB_SIS_300
     	SiS300Sync();
+#endif
     } else {
+#ifdef CONFIG_FB_SIS_315
     	SiS310Sync();
+#endif
     }
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,34)  /* --- KERNEL 2.5.34 and later --- */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)  /* --------------- 2.5 --------------- */
 
 int fbcon_sis_sync(struct fb_info *info)
 {
-   if(!sisfb_accel) return 0;
    CRITFLAGS
+
+   if(!ivideo.accel)
+   	return 0;
+
    if(sisvga_engine == SIS_300_VGA) {
+#ifdef CONFIG_FB_SIS_300
       SiS300Sync();
+#endif
    } else {
+#ifdef CONFIG_FB_SIS_315
       SiS310Sync();
+#endif
    }
    CRITEND
    return 0;
@@ -352,32 +379,36 @@ void fbcon_sis_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
    if(!rect->width || !rect->height)
    	return;
 
-   if(!sisfb_accel) {
+   if(!ivideo.accel) {
 	cfb_fillrect(info, rect);
 	return;
    }
    
    switch(info->var.bits_per_pixel) {
-		case 8: col = rect->color;
-			break;
-		case 16: col = ((u32 *)(info->pseudo_palette))[rect->color];
-			 break;
-		case 32: col = ((u32 *)(info->pseudo_palette))[rect->color];
-			 break;
-	}	
+	case 8:  col = rect->color;
+		 break;
+	case 16: col = ((u32 *)(info->pseudo_palette))[rect->color];
+		 break;
+	case 32: col = ((u32 *)(info->pseudo_palette))[rect->color];
+		 break;
+   }
 
    if(sisvga_engine == SIS_300_VGA) {
-	   CRITBEGIN
-	   SiS300SetupForSolidFill(col, myrops[rect->rop], 0);
-	   SiS300SubsequentSolidFillRect(rect->dx, rect->dy, rect->width, rect->height);
-	   CRITEND
-	   SiS300Sync();
+#ifdef CONFIG_FB_SIS_300
+      CRITBEGIN
+      SiS300SetupForSolidFill(col, myrops[rect->rop], 0);
+      SiS300SubsequentSolidFillRect(rect->dx, rect->dy, rect->width, rect->height);
+      CRITEND
+      SiS300Sync();
+#endif
    } else {
-	   CRITBEGIN
-	   SiS310SetupForSolidFill(col, myrops[rect->rop], 0);
-	   SiS310SubsequentSolidFillRect(rect->dx, rect->dy, rect->width, rect->height);
-	   CRITEND
-	   SiS310Sync();
+#ifdef CONFIG_FB_SIS_315
+      CRITBEGIN
+      SiS310SetupForSolidFill(col, myrops[rect->rop], 0);
+      SiS310SubsequentSolidFillRect(rect->dx, rect->dy, rect->width, rect->height);
+      CRITEND
+      SiS310Sync();
+#endif
    }
 
 }
@@ -388,7 +419,7 @@ void fbcon_sis_copyarea(struct fb_info *info, const struct fb_copyarea *area)
    CRITFLAGS
 
    TWDEBUG("Inside sis_copyarea");
-   if(!sisfb_accel) {
+   if(!ivideo.accel) {
    	cfb_copyarea(info, area);
 	return;
    }
@@ -402,23 +433,27 @@ void fbcon_sis_copyarea(struct fb_info *info, const struct fb_copyarea *area)
    else                    ydir = 1;
 
    if(sisvga_engine == SIS_300_VGA) {
+#ifdef CONFIG_FB_SIS_300
       CRITBEGIN
       SiS300SetupForScreenToScreenCopy(xdir, ydir, 3, 0, -1);
       SiS300SubsequentScreenToScreenCopy(area->sx, area->sy, area->dx, area->dy, area->width, area->height);
       CRITEND
       SiS300Sync();
+#endif
    } else {
+#ifdef CONFIG_FB_SIS_315
       CRITBEGIN
       SiS310SetupForScreenToScreenCopy(xdir, ydir, 3, 0, -1);
       SiS310SubsequentScreenToScreenCopy(area->sx, area->sy, area->dx, area->dy, area->width, area->height);
       CRITEND
       SiS310Sync();
+#endif
    }
 }
 
 #endif
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,33)  /* ------ KERNEL <2.5.34 ------ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)  /* -------------- 2.4 --------------- */
 
 void fbcon_sis_bmove(struct display *p, int srcy, int srcx,
 			    int dsty, int dstx, int height, int width)
@@ -460,24 +495,27 @@ void fbcon_sis_bmove(struct display *p, int srcy, int srcx,
 	else            ydir = 1;
 
 	if(sisvga_engine == SIS_300_VGA) {
+#ifdef CONFIG_FB_SIS_300
 	   CRITBEGIN
 	   SiS300SetupForScreenToScreenCopy(xdir, ydir, 3, 0, -1);
 	   SiS300SubsequentScreenToScreenCopy(srcx, srcy, dstx, dsty, width, height);
 	   CRITEND
 	   SiS300Sync();
+#endif
 	} else {
+#ifdef CONFIG_FB_SIS_315
 	   CRITBEGIN
 	   SiS310SetupForScreenToScreenCopy(xdir, ydir, 3, 0, -1);
 	   SiS310SubsequentScreenToScreenCopy(srcx, srcy, dstx, dsty, width, height);
 	   CRITEND
 	   SiS310Sync();
-#if 0	   
+#if 0
 	   printk(KERN_INFO "sis_bmove sx %d sy %d dx %d dy %d w %d h %d\n",
 		srcx, srcy, dstx, dsty, width, height);
-#endif		
+#endif
+#endif
 	}
 }
-
 
 static void fbcon_sis_clear(struct vc_data *conp, struct display *p,
 			int srcy, int srcx, int height, int width, int color)
@@ -490,17 +528,21 @@ static void fbcon_sis_clear(struct vc_data *conp, struct display *p,
 	height *= fontheight(p);
 
 	if(sisvga_engine == SIS_300_VGA) {
+#ifdef CONFIG_FB_SIS_300
 	   CRITBEGIN
 	   SiS300SetupForSolidFill(color, 3, 0);
 	   SiS300SubsequentSolidFillRect(srcx, srcy, width, height);
 	   CRITEND
 	   SiS300Sync();
+#endif
 	} else {
+#ifdef CONFIG_FB_SIS_315
 	   CRITBEGIN
 	   SiS310SetupForSolidFill(color, 3, 0);
 	   SiS310SubsequentSolidFillRect(srcx, srcy, width, height);
 	   CRITEND
 	   SiS310Sync();
+#endif
 	}
 }
 
@@ -575,54 +617,58 @@ void fbcon_sis_revc(struct display *p, int srcx, int srcy)
 	srcy *= fontheight(p);
 
 	if(sisvga_engine == SIS_300_VGA) {
+#ifdef CONFIG_FB_SIS_300
 	   CRITBEGIN
 	   SiS300SetupForSolidFill(0, 0x0a, 0);
 	   SiS300SubsequentSolidFillRect(srcx, srcy, fontwidth(p), fontheight(p));
 	   CRITEND
 	   SiS300Sync();
+#endif
 	} else {
+#ifdef CONFIG_FB_SIS_315
 	   CRITBEGIN
 	   SiS310SetupForSolidFill(0, 0x0a, 0);
 	   SiS310SubsequentSolidFillRect(srcx, srcy, fontwidth(p), fontheight(p));
 	   CRITEND
 	   SiS310Sync();
+#endif
 	}
 }
 
 #ifdef FBCON_HAS_CFB8
 struct display_switch fbcon_sis8 = {
-	setup:			fbcon_cfb8_setup,
-	bmove:			fbcon_sis_bmove,
-	clear:			fbcon_sis_clear8,
-	putc:			fbcon_cfb8_putc,
-	putcs:			fbcon_cfb8_putcs,
-	revc:			fbcon_cfb8_revc,
-	clear_margins:		fbcon_cfb8_clear_margins,
-	fontwidthmask:		FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup			= fbcon_cfb8_setup,
+	.bmove			= fbcon_sis_bmove,
+	.clear			= fbcon_sis_clear8,
+	.putc			= fbcon_cfb8_putc,
+	.putcs			= fbcon_cfb8_putcs,
+	.revc			= fbcon_cfb8_revc,
+	.clear_margins		= fbcon_cfb8_clear_margins,
+	.fontwidthmask		= FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 #ifdef FBCON_HAS_CFB16
 struct display_switch fbcon_sis16 = {
-	setup:			fbcon_cfb16_setup,
-	bmove:			fbcon_sis_bmove,
-	clear:			fbcon_sis_clear16,
-	putc:			fbcon_cfb16_putc,
-	putcs:			fbcon_cfb16_putcs,
-	revc:			fbcon_sis_revc,
-	clear_margins:		fbcon_cfb16_clear_margins,
-	fontwidthmask:		FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup			= fbcon_cfb16_setup,
+	.bmove			= fbcon_sis_bmove,
+	.clear			= fbcon_sis_clear16,
+	.putc			= fbcon_cfb16_putc,
+	.putcs			= fbcon_cfb16_putcs,
+	.revc			= fbcon_sis_revc,
+	.clear_margins		= fbcon_cfb16_clear_margins,
+	.fontwidthmask		= FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 #ifdef FBCON_HAS_CFB32
 struct display_switch fbcon_sis32 = {
-	setup:			fbcon_cfb32_setup,
-	bmove:			fbcon_sis_bmove,
-	clear:			fbcon_sis_clear32,
-	putc:			fbcon_cfb32_putc,
-	putcs:			fbcon_cfb32_putcs,
-	revc:			fbcon_sis_revc,
-	clear_margins:		fbcon_cfb32_clear_margins,
-	fontwidthmask:		FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup			= fbcon_cfb32_setup,
+	.bmove			= fbcon_sis_bmove,
+	.clear			= fbcon_sis_clear32,
+	.putc			= fbcon_cfb32_putc,
+	.putcs			= fbcon_cfb32_putcs,
+	.revc			= fbcon_sis_revc,
+	.clear_margins		= fbcon_cfb32_clear_margins,
+	.fontwidthmask		= FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 

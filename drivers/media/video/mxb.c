@@ -261,7 +261,7 @@ static int mxb_probe(struct saa7146_dev* dev)
 	/* all devices are present, probe was successful */	
 
 	/* we store the pointer in our private data field */
-	(struct mxb*)dev->ext_priv = mxb;
+	dev->ext_priv = mxb;
 
 	return 0;
 }

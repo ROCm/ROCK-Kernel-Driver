@@ -435,7 +435,7 @@ int __init pnpbios_probe_system(void)
 	 */
 	for (check = (union pnp_bios_install_struct *) __va(0xf0000);
 	     check < (union pnp_bios_install_struct *) __va(0xffff0);
-	     ((void *) (check)) += 16) {
+	     check = (void *)check + 16) {
 		if (check->fields.signature != PNP_SIGNATURE)
 			continue;
 		printk(KERN_INFO "PnPBIOS: Found PnP BIOS installation structure at 0x%p\n", check);

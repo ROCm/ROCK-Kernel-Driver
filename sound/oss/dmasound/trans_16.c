@@ -61,6 +61,7 @@ static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
 
 /*** Translations ************************************************************/
 
+extern int expand_bal;	/* Balance factor for expanding (not volume!) */
 static int expand_data;	/* Data for expanding */
 
 static ssize_t pmac_ct_law(const u_char *userPtr, size_t userCount,
@@ -782,34 +783,34 @@ static ssize_t pmac_ctx_u16_read(const u_char *userPtr, size_t userCount,
 
 
 TRANS transAwacsNormal = {
-	ct_ulaw:	pmac_ct_law,
-	ct_alaw:	pmac_ct_law,
-	ct_s8:		pmac_ct_s8,
-	ct_u8:		pmac_ct_u8,
-	ct_s16be:	pmac_ct_s16,
-	ct_u16be:	pmac_ct_u16,
-	ct_s16le:	pmac_ct_s16,
-	ct_u16le:	pmac_ct_u16,
+	.ct_ulaw=	pmac_ct_law,
+	.ct_alaw=	pmac_ct_law,
+	.ct_s8=		pmac_ct_s8,
+	.ct_u8=		pmac_ct_u8,
+	.ct_s16be=	pmac_ct_s16,
+	.ct_u16be=	pmac_ct_u16,
+	.ct_s16le=	pmac_ct_s16,
+	.ct_u16le=	pmac_ct_u16,
 };
 
 TRANS transAwacsExpand = {
-	ct_ulaw:	pmac_ctx_law,
-	ct_alaw:	pmac_ctx_law,
-	ct_s8:		pmac_ctx_s8,
-	ct_u8:		pmac_ctx_u8,
-	ct_s16be:	pmac_ctx_s16,
-	ct_u16be:	pmac_ctx_u16,
-	ct_s16le:	pmac_ctx_s16,
-	ct_u16le:	pmac_ctx_u16,
+	.ct_ulaw=	pmac_ctx_law,
+	.ct_alaw=	pmac_ctx_law,
+	.ct_s8=		pmac_ctx_s8,
+	.ct_u8=		pmac_ctx_u8,
+	.ct_s16be=	pmac_ctx_s16,
+	.ct_u16be=	pmac_ctx_u16,
+	.ct_s16le=	pmac_ctx_s16,
+	.ct_u16le=	pmac_ctx_u16,
 };
 
 TRANS transAwacsNormalRead = {
-	ct_s8:		pmac_ct_s8_read,
-	ct_u8:		pmac_ct_u8_read,
-	ct_s16be:	pmac_ct_s16_read,
-	ct_u16be:	pmac_ct_u16_read,
-	ct_s16le:	pmac_ct_s16_read,
-	ct_u16le:	pmac_ct_u16_read,
+	.ct_s8=		pmac_ct_s8_read,
+	.ct_u8=		pmac_ct_u8_read,
+	.ct_s16be=	pmac_ct_s16_read,
+	.ct_u16be=	pmac_ct_u16_read,
+	.ct_s16le=	pmac_ct_s16_read,
+	.ct_u16le=	pmac_ct_u16_read,
 };
 
 TRANS transAwacsExpandRead = {

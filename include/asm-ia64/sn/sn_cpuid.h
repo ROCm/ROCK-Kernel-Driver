@@ -13,12 +13,8 @@
 
 #include <linux/config.h>
 #include <linux/smp.h>
-#include <linux/sched.h>
-#include <linux/mmzone.h>
-#include <asm/sn/types.h>
-#include <asm/current.h>
-#include <asm/nodedata.h>
 #include <asm/sn/pda.h>
+#include <asm/intrinsics.h>
 
 
 /*

@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -291,7 +291,7 @@ int32_t e1000_read_mac_addr(struct e1000_hw * hw);
 
 /* Filters (multicast, vlan, receive) */
 void e1000_init_rx_addrs(struct e1000_hw *hw);
-void e1000_mc_addr_list_update(struct e1000_hw *hw, uint8_t * mc_addr_list, uint32_t mc_addr_count, uint32_t pad);
+void e1000_mc_addr_list_update(struct e1000_hw *hw, uint8_t * mc_addr_list, uint32_t mc_addr_count, uint32_t pad, uint32_t rar_used_count);
 uint32_t e1000_hash_mc_addr(struct e1000_hw *hw, uint8_t * mc_addr);
 void e1000_mta_set(struct e1000_hw *hw, uint32_t hash_value);
 void e1000_rar_set(struct e1000_hw *hw, uint8_t * mc_addr, uint32_t rar_index);
@@ -317,9 +317,9 @@ void e1000_pci_clear_mwi(struct e1000_hw *hw);
 void e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 void e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 /* Port I/O is only supported on 82544 and newer */
-uint32_t e1000_io_read(struct e1000_hw *hw, uint32_t port);
+uint32_t e1000_io_read(struct e1000_hw *hw, unsigned long port);
 uint32_t e1000_read_reg_io(struct e1000_hw *hw, uint32_t offset);
-void e1000_io_write(struct e1000_hw *hw, uint32_t port, uint32_t value);
+void e1000_io_write(struct e1000_hw *hw, unsigned long port, uint32_t value);
 void e1000_write_reg_io(struct e1000_hw *hw, uint32_t offset, uint32_t value);
 int32_t e1000_config_dsp_after_link_change(struct e1000_hw *hw, boolean_t link_up);
 int32_t e1000_set_d3_lplu_state(struct e1000_hw *hw, boolean_t active);
@@ -978,7 +978,7 @@ struct e1000_hw {
     e1000_ms_type master_slave;
     e1000_ms_type original_master_slave;
     e1000_ffe_config ffe_config_state;
-    uint32_t io_base;
+    unsigned long io_base;
     uint32_t phy_id;
     uint32_t phy_revision;
     uint32_t phy_addr;
@@ -1021,6 +1021,7 @@ struct e1000_hw {
     boolean_t speed_downgraded;
     e1000_dsp_config dsp_config_state;
     boolean_t get_link_status;
+    boolean_t serdes_link_down;
     boolean_t tbi_compatibility_en;
     boolean_t tbi_compatibility_on;
     boolean_t phy_reset_disable;
@@ -1310,6 +1311,7 @@ struct e1000_hw {
 #define E1000_RCTL_DPF            0x00400000    /* discard pause frames */
 #define E1000_RCTL_PMCF           0x00800000    /* pass MAC control frames */
 #define E1000_RCTL_BSEX           0x02000000    /* Buffer size extension */
+#define E1000_RCTL_SECRC          0x04000000    /* Strip Ethernet CRC */
 
 /* Receive Descriptor */
 #define E1000_RDT_DELAY 0x0000ffff      /* Delay timer (1=1024us) */

@@ -104,7 +104,7 @@ static unsigned long output_ptr = 0;
 static void *malloc(int size);
 static void free(void *where);
 
-static void puts(const char *);
+static void putstr(const char *);
 
 extern int end;
 static long free_mem_ptr = (long)&end;
@@ -169,7 +169,7 @@ static void scroll(void)
 		vidmem[i] = ' ';
 }
 
-static void puts(const char *s)
+static void putstr(const char *s)
 {
 	int x,y,pos;
 	char c;
@@ -287,9 +287,9 @@ static void flush_window(void)
 
 static void error(char *x)
 {
-	puts("\n\n");
-	puts(x);
-	puts("\n\n -- System halted");
+	putstr("\n\n");
+	putstr(x);
+	putstr("\n\n -- System halted");
 
 	while(1);	/* Halt */
 }
@@ -373,9 +373,9 @@ asmlinkage int decompress_kernel(struct moveparams *mv, void *rmode)
 	else setup_output_buffer_if_we_run_high(mv);
 
 	makecrc();
-	puts("Uncompressing Linux... ");
+	putstr("Uncompressing Linux... ");
 	gunzip();
-	puts("Ok, booting the kernel.\n");
+	putstr("Ok, booting the kernel.\n");
 	if (high_loaded) close_output_buffer_if_we_run_high(mv);
 	return high_loaded;
 }

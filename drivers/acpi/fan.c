@@ -214,8 +214,8 @@ acpi_fan_add (
 	memset(fan, 0, sizeof(struct acpi_fan));
 
 	fan->handle = device->handle;
-	sprintf(acpi_device_name(device), "%s", ACPI_FAN_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_FAN_CLASS);
+	strcpy(acpi_device_name(device), ACPI_FAN_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_FAN_CLASS);
 	acpi_driver_data(device) = fan;
 
 	result = acpi_bus_get_power(fan->handle, &state);

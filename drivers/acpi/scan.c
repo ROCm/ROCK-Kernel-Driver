@@ -486,13 +486,13 @@ static void acpi_device_get_busid(struct acpi_device * device, acpi_handle handl
 	 */
 	switch (type) {
 	case ACPI_BUS_TYPE_SYSTEM:
-		sprintf(device->pnp.bus_id, "%s", "ACPI");
+		strcpy(device->pnp.bus_id, "ACPI");
 		break;
 	case ACPI_BUS_TYPE_POWER_BUTTON:
-		sprintf(device->pnp.bus_id, "%s", "PWRF");
+		strcpy(device->pnp.bus_id, "PWRF");
 		break;
 	case ACPI_BUS_TYPE_SLEEP_BUTTON:
-		sprintf(device->pnp.bus_id, "%s", "SLPF");
+		strcpy(device->pnp.bus_id, "SLPF");
 		break;
 	default:
 		acpi_get_name(handle, ACPI_SINGLE_NAME, &buffer);
@@ -503,7 +503,7 @@ static void acpi_device_get_busid(struct acpi_device * device, acpi_handle handl
 			else
 				break;
 		}
-		sprintf(device->pnp.bus_id, "%s", bus_id);
+		strcpy(device->pnp.bus_id, bus_id);
 		break;
 	}
 }
@@ -565,16 +565,16 @@ static void acpi_device_set_id(struct acpi_device * device, struct acpi_device *
 	 */
 	if ((parent == ACPI_ROOT_OBJECT) && (type == ACPI_BUS_TYPE_DEVICE)) {
 		hid = ACPI_BUS_HID;
-		sprintf(device->pnp.device_name, "%s", ACPI_BUS_DEVICE_NAME);
-		sprintf(device->pnp.device_class, "%s", ACPI_BUS_CLASS);
+		strcpy(device->pnp.device_name, ACPI_BUS_DEVICE_NAME);
+		strcpy(device->pnp.device_class, ACPI_BUS_CLASS);
 	}
 
 	if (hid) {
-		sprintf(device->pnp.hardware_id, "%s", hid);
+		strcpy(device->pnp.hardware_id, hid);
 		device->flags.hardware_id = 1;
 	}
 	if (uid) {
-		sprintf(device->pnp.unique_id, "%s", uid);
+		strcpy(device->pnp.unique_id, uid);
 		device->flags.unique_id = 1;
 	}
 	if (cid_list) {

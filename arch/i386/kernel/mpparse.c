@@ -1126,7 +1126,8 @@ void __init mp_parse_prt (void)
 
 		/* Don't set up the ACPI SCI because it's already set up */
                 if (acpi_fadt.sci_int == irq) {
-                        entry->irq = irq; /*we still need to set entry's irq*/
+			irq = acpi_irq_to_vector(irq);
+			entry->irq = irq; /* we still need to set entry's irq */
 			continue;
                 }
 	
@@ -1156,18 +1157,14 @@ void __init mp_parse_prt (void)
 		if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
 			printk(KERN_DEBUG "Pin %d-%d already programmed\n",
 				mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
- 			if (use_pci_vector() && !platform_legacy_irq(irq))
- 				irq = IO_APIC_VECTOR(irq);
- 			entry->irq = irq;
+ 			entry->irq = acpi_irq_to_vector(irq);
 			continue;
 		}
 
 		mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
 
 		if (!io_apic_set_pci_routing(ioapic, ioapic_pin, irq, edge_level, active_high_low)) {
- 			if (use_pci_vector() && !platform_legacy_irq(irq))
- 				irq = IO_APIC_VECTOR(irq);
- 			entry->irq = irq;
+ 			entry->irq = acpi_irq_to_vector(irq);
  		}
 		printk(KERN_DEBUG "%02x:%02x:%02x[%c] -> %d-%d -> IRQ %d\n",
 			entry->id.segment, entry->id.bus, 

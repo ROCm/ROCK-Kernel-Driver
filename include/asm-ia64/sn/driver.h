@@ -31,7 +31,7 @@ struct eframe_s;
 struct piomap;
 struct dmamap;
 
-typedef __psunsigned_t iobush_t;
+typedef unsigned long iobush_t;
 
 /* interrupt function */
 typedef void	       *intr_arg_t;

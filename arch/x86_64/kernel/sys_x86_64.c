@@ -105,13 +105,13 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		return -ENOMEM;
 
 	if (addr) {
-	addr = PAGE_ALIGN(addr);
+		addr = PAGE_ALIGN(addr);
 		vma = find_vma(mm, addr);
 		if (end - len >= addr &&
 		    (!vma || addr + len <= vma->vm_start))
 			return addr;
-	}
-	addr = mm->free_area_cache;
+	} else
+		addr = mm->free_area_cache;
 	if (addr < begin) 
 		addr = begin; 
 	start_addr = addr;

@@ -296,8 +296,8 @@ acpi_bus_generate_event (
 	if (!event)
 		return_VALUE(-ENOMEM);
 
-	sprintf(event->device_class, "%s", device->pnp.device_class);
-	sprintf(event->bus_id, "%s", device->pnp.bus_id);
+	strcpy(event->device_class, device->pnp.device_class);
+	strcpy(event->bus_id, device->pnp.bus_id);
 	event->type = type;
 	event->data = data;
 

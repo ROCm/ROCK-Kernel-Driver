@@ -668,9 +668,6 @@ prom_dump_lmb(void)
         prom_print(RELOC("    memory.size                 = 0x"));
         prom_print_hex(_lmb->memory.size);
 	prom_print_nl();
-        prom_print(RELOC("    memory.lcd_size             = 0x"));
-        prom_print_hex(_lmb->memory.lcd_size);
-	prom_print_nl();
         for (i=0; i < _lmb->memory.cnt ;i++) {
                 prom_print(RELOC("    memory.region[0x"));
 		prom_print_hex(i);
@@ -683,9 +680,6 @@ prom_dump_lmb(void)
                 prom_print(RELOC("                      .size     = 0x"));
                 prom_print_hex(_lmb->memory.region[i].size);
 		prom_print_nl();
-                prom_print(RELOC("                      .type     = 0x"));
-                prom_print_hex(_lmb->memory.region[i].type);
-		prom_print_nl();
         }
 
 	prom_print_nl();
@@ -694,9 +688,6 @@ prom_dump_lmb(void)
 	prom_print_nl();
         prom_print(RELOC("    reserved.size                 = 0x"));
         prom_print_hex(_lmb->reserved.size);
-	prom_print_nl();
-        prom_print(RELOC("    reserved.lcd_size             = 0x"));
-        prom_print_hex(_lmb->reserved.lcd_size);
 	prom_print_nl();
         for (i=0; i < _lmb->reserved.cnt ;i++) {
                 prom_print(RELOC("    reserved.region[0x"));
@@ -709,9 +700,6 @@ prom_dump_lmb(void)
 		prom_print_nl();
                 prom_print(RELOC("                      .size     = 0x"));
                 prom_print_hex(_lmb->reserved.region[i].size);
-		prom_print_nl();
-                prom_print(RELOC("                      .type     = 0x"));
-                prom_print_hex(_lmb->reserved.region[i].type);
 		prom_print_nl();
         }
 }

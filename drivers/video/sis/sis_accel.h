@@ -4,11 +4,24 @@
  *
  * 2D acceleration part
  *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the named License,
+ * or any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA
+ *
  * Based on the X driver's sis300_accel.h which is
- *     Copyright Xavier Ducoin <x.ducoin@lectra.com>
- *     Copyright 2002 by Thomas Winischhofer, Vienna, Austria
+ *     Copyright (C) 2001-2004 by Thomas Winischhofer, Vienna, Austria
  * and sis310_accel.h which is
- *     Copyright 2002 by Thomas Winischhofer, Vienna, Austria
+ *     Copyright (C) 2001-2004 by Thomas Winischhofer, Vienna, Austria
  *
  * Author:   Thomas Winischhofer <thomas@winischhofer.net>:
  *			(see http://www.winischhofer.net/
@@ -47,7 +60,7 @@
 #define TRAPAZOID_FILL          0x00000005  /* Fill trapezoid */
 #define TRANSPARENT_BITBLT      0x00000006  /* Transparent Blit */
 
-/* Additional engine commands for 310/325 */
+/* Additional engine commands for 315 */
 #define ALPHA_BLEND		0x00000007  /* Alpha blend ? */
 #define A3D_FUNCTION		0x00000008  /* 3D command ? */
 #define	CLEAR_Z_BUFFER		0x00000009  /* ? */
@@ -90,11 +103,11 @@
 #define NO_RESET_COUNTER        0x00400000
 #define NO_LAST_PIXEL           0x00200000
 
-/* Subfunctions for Color/Enhanced Color Expansion (310/325 only) */
+/* Subfunctions for Color/Enhanced Color Expansion (315 only) */
 #define COLOR_TO_MONO		0x00100000
 #define AA_TEXT			0x00200000
 
-/* Some general registers for 310/325 series */
+/* Some general registers for 315 series */
 #define SRC_ADDR		0x8200
 #define SRC_PITCH		0x8204
 #define AGP_BASE		0x8206 /* color-depth dependent value */
@@ -326,7 +339,7 @@ int     CmdQueLen;
 
 
 
-/* ----------- SiS 310/325 series --------------- */
+/* -------------- SiS 315 series --------------- */
 
 /* Q_STATUS:
    bit 31 = 1: All engines idle and all queues empty
@@ -342,16 +355,27 @@ int     CmdQueLen;
    bits 7:0:   2D counter 1
 
    Where is the command queue length (current amount of commands the queue
-   can accept) on the 310/325 series? (The current implementation is taken
-   from 300 series and certainly wrong...)
+   can accept) on the 315 series?
 */
 
 /* TW: FIXME: CmdQueLen is... where....? */
+/* We assume a length of 4 bytes per command; since 512K of
+ * of RAM are allocated, the number of commands is easily
+ * calculated (assuming that there is no 3D support yet)
+ * We calculate it very cautiously (128K only) and let the
+ * rest to the (never?)-to-come (?) 3D engine. (The 3D engine
+ * can use a similar technique, using the remaining 384K,
+ * hence a queue overflow is avoided)
+ * UPDATE: This technique causes a terrible system latency
+ * on integrated chipsets. Disable the queue handling for
+ * now.
+ */
 #define SiS310Idle \
   { \
   while( (MMIO_IN16(ivideo.mmio_vbase, Q_STATUS+2) & 0x8000) != 0x8000){}; \
   while( (MMIO_IN16(ivideo.mmio_vbase, Q_STATUS+2) & 0x8000) != 0x8000){}; \
-  CmdQueLen=MMIO_IN16(ivideo.mmio_vbase, Q_STATUS); \
+  CmdQueLen = 0; \
+  /*CmdQueLen = ((128 * 1024) / 4) - 64; */ \
   }
 
 #define SiS310SetupSRCBase(base) \

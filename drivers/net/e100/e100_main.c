@@ -46,20 +46,18 @@
 
 /* Change Log
  * 
- * 2.3.30       09/21/03
+ * 2.3.36       11/13/03
+ * o Moved to 2.6 APIs: pci_name() and free_netdev().
+ * o Removed some __devinit from some functions that shouldn't be marked
+ *   as such (Anton Blanchard [anton@samba.org]).
+ * 
+ * 2.3.33       10/21/03
  * o Bug fix (Bugzilla 97908): Loading e100 was causing crash on Itanium2
  *   with HP chipset
  * o Bug fix (Bugzilla 101583): e100 can't pass traffic with ipv6
  * o Bug fix (Bugzilla 101360): PRO/10+ can't pass traffic
  * 
  * 2.3.27       08/08/03
- * o Bug fix: read skb->len after freeing skb
- *   [Andrew Morton] akpm@zip.com.au
- * o Bug fix: 82557 (with National PHY) timeout during init
- *   [Adam Kropelin] akropel1@rochester.rr.com
- * o Feature add: allow to change Wake On LAN when EEPROM disabled
- * 
- * 2.3.13       05/08/03
  */
  
 #include <linux/config.h>
@@ -125,7 +123,7 @@ static void e100_non_tx_background(unsigned long);
 static inline void e100_tx_skb_free(struct e100_private *bdp, tcb_t *tcb);
 /* Global Data structures and variables */
 char e100_copyright[] = "Copyright (c) 2003 Intel Corporation";
-char e100_driver_version[]="2.3.30-k1";
+char e100_driver_version[]="2.3.36-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -696,7 +694,7 @@ err_pci:
 	pci_disable_device(pcid);
 err_dev:
 	pci_set_drvdata(pcid, NULL);
-	kfree(dev);
+	free_netdev(dev);
 out:
 	return rc;
 }

@@ -264,7 +264,6 @@
  * Initial revision
  *
  ************************************************************************/
-#ident "$Id: gdth.c,v 1.64 2003/09/17 08:30:26 achim Exp $" 
 
 /* All GDT Disk Array Controllers are fully supported by this driver.
  * This includes the PCI/EISA/ISA SCSI Disk Array Controllers and the

@@ -38,7 +38,7 @@ void net_srandom(unsigned long entropy)
 }
 
 int net_msg_cost = 5*HZ;
-int net_msg_burst = 10*5*HZ;
+int net_msg_burst = 10;
 
 /* 
  * This enforces a rate limit: not more than one kernel message

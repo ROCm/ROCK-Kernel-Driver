@@ -124,8 +124,9 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 	/*REFERENCED*/
 	graph_error_t err;
 
-	if ((brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_IOBRICK_XBOW)) == NULL)
-			return;
+	if (!(brd = find_lboard_nasid((lboard_t *)KL_CONFIG_INFO(nasid), 
+			nasid, KLTYPE_IOBRICK_XBOW)))
+		return;
 
 	if (KL_CONFIG_DUPLICATE_BOARD(brd))
 	    return;
@@ -200,7 +201,7 @@ klhwg_add_node(vertex_hdl_t hwgraph_root, cnodeid_t cnode)
 	vertex_hdl_t cpu_dir;
 
 	nasid = COMPACT_TO_NASID_NODEID(cnode);
-	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
+	brd = find_lboard_any((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 	ASSERT(brd);
 
 	/* Generate a hardware graph path for this board. */
@@ -280,7 +281,7 @@ klhwg_add_all_routers(vertex_hdl_t hwgraph_root)
 
 	for (cnode = 0; cnode < numnodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
-		brd = find_lboard_class((lboard_t *)KL_CONFIG_INFO(nasid),
+		brd = find_lboard_class_any((lboard_t *)KL_CONFIG_INFO(nasid),
 				KLTYPE_ROUTER);
 
 		if (!brd)
@@ -307,7 +308,7 @@ klhwg_add_all_routers(vertex_hdl_t hwgraph_root)
 			HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, node_vertex, NULL, "Created router path.\n"));
 
 		/* Find the rest of the routers stored on this node. */
-		} while ( (brd = find_lboard_class(KLCF_NEXT(brd),
+		} while ( (brd = find_lboard_class_any(KLCF_NEXT_ANY(brd),
 			 KLTYPE_ROUTER)) );
 	}
 
@@ -414,7 +415,7 @@ klhwg_connect_routers(vertex_hdl_t hwgraph_root)
 
 	for (cnode = 0; cnode < numnodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
-		brd = find_lboard_class((lboard_t *)KL_CONFIG_INFO(nasid),
+		brd = find_lboard_class_any((lboard_t *)KL_CONFIG_INFO(nasid),
 				KLTYPE_ROUTER);
 
 		if (!brd)
@@ -428,7 +429,7 @@ klhwg_connect_routers(vertex_hdl_t hwgraph_root)
 						 cnode, nasid);
 
 		/* Find the rest of the routers stored on this node. */
-		} while ( (brd = find_lboard_class(KLCF_NEXT(brd), KLTYPE_ROUTER)) );
+		} while ( (brd = find_lboard_class_any(KLCF_NEXT_ANY(brd), KLTYPE_ROUTER)) );
 	}
 }
 
@@ -452,8 +453,7 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 	for (cnode = 0; cnode < numionodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
 
-		brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
-		ASSERT(brd);
+		brd = find_lboard_any((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 
 		hub = (klhub_t *)find_first_component(brd, KLSTRUCT_HUB);
 		ASSERT(hub);
@@ -507,69 +507,6 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 					return;
 				}
 			}
-		}
-	}
-}
-
-/* Store the pci/vme disabled board information as extended administrative
- * hints which can later be used by the drivers using the device/driver
- * admin interface. 
- */
-static void __init
-klhwg_device_disable_hints_add(void)
-{
-	cnodeid_t	cnode; 		/* node we are looking at */
-	nasid_t		nasid;		/* nasid of the node */
-	lboard_t	*board;		/* board we are looking at */
-	int		comp_index;	/* component index */
-	klinfo_t	*component;	/* component in the board we are
-					 * looking at 
-					 */
-	char		device_name[MAXDEVNAME];
-	
-	for(cnode = 0; cnode < numnodes; cnode++) {
-		nasid = COMPACT_TO_NASID_NODEID(cnode);
-		board = (lboard_t *)KL_CONFIG_INFO(nasid);
-		/* Check out all the board info stored  on a node */
-		while(board) {
-			/* No need to look at duplicate boards or non-io 
-			 * boards
-			 */
-			if (KL_CONFIG_DUPLICATE_BOARD(board) ||
-			    KLCLASS(board->brd_type) != KLCLASS_IO) {
-				board = KLCF_NEXT(board);
-				continue;
-			}
-			/* Check out all the components of a board */
-			for (comp_index = 0; 
-			     comp_index < KLCF_NUM_COMPS(board);
-			     comp_index++) {
-				component = KLCF_COMP(board,comp_index);
-				/* If the component is enabled move on to
-				 * the next component
-				 */
-				if (KLCONFIG_INFO_ENABLED(component))
-					continue;
-				/* NOTE : Since the prom only supports
-				 * the disabling of pci devices the following
-				 * piece of code makes sense. 
-				 * Make sure that this assumption is valid
-				 */
-				/* This component is disabled. Store this
-				 * hint in the extended device admin table
-				 */
-				/* Get the canonical name of the pci device */
-				device_component_canonical_name_get(board,
-							    component,
-							    device_name);
-#ifdef DEBUG
-				printf("%s DISABLED\n",device_name);
-#endif				
-			}
-			/* go to the next board info stored on this 
-			 * node 
-			 */
-			board = KLCF_NEXT(board);
 		}
 	}
 }
@@ -637,10 +574,4 @@ klhwg_add_all_nodes(vertex_hdl_t hwgraph_root)
 	klhwg_add_all_routers(hwgraph_root);
 	klhwg_connect_routers(hwgraph_root);
 	klhwg_connect_hubs(hwgraph_root);
-
-	/* Go through the entire system's klconfig
-	 * to figure out which pci components have been disabled
-	 */
-	klhwg_device_disable_hints_add();
-
 }

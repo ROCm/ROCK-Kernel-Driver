@@ -62,12 +62,8 @@ extern struct pglist_data *node_data[];
 	(__pfn - node_start_pfn(pfn_to_nid(__pfn)));			\
 })
 
-#define kern_addr_valid(kaddr)						\
-({									\
-	unsigned long __kaddr = (unsigned long)(kaddr);			\
-	pg_data_t *__pgdat = NODE_DATA(kvaddr_to_nid(__kaddr));		\
-	test_bit(local_mapnr(__kaddr), __pgdat->valid_addr_bitmap);	\
-})
+/* XXX: FIXME -- wli */
+#define kern_addr_valid(kaddr)	(0)
 
 #define pfn_to_page(pfn)						\
 ({									\

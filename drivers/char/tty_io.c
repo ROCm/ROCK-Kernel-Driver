@@ -1486,7 +1486,7 @@ static int tiocswinsz(struct tty_struct *tty, struct tty_struct *real_tty,
 		unsigned int currcons = tty->index;
 		int rc;
 
-		acquire_console_sem();	       
+		acquire_console_sem();
 		rc = vc_resize(currcons, tmp_ws.ws_col, tmp_ws.ws_row);
 		release_console_sem();
 		if (rc)

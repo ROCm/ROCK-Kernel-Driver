@@ -344,7 +344,7 @@ static void do_update_region(int currcons, unsigned long start, int count)
 void update_region(int currcons, unsigned long start, int count)
 {
 	WARN_CONSOLE_UNLOCKED();
-       
+
 	if (DO_UPDATE) {
 		hide_cursor(currcons);
 		do_update_region(currcons, start, count);
@@ -808,7 +808,6 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 	screenbuf = newscreen;
 	kmalloced = 1;
 	screenbuf_size = new_screen_size;
-
 	if (IS_VISIBLE)
 		err = resize_screen(currcons, new_cols, new_rows);
 	set_origin(currcons);
@@ -816,7 +815,7 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 	/* do part of a reset_terminal() */
 	top = 0;
 	bottom = video_num_lines;
-	gotoxy(currcons, x, y);	
+	gotoxy(currcons, x, y);
 	save_cur(currcons);
 
 	if (vc_cons[currcons].d->vc_tty) {
@@ -834,7 +833,6 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 
 	if (IS_VISIBLE)
 		update_screen(currcons);
-
 	return err;
 }
 
@@ -2119,6 +2117,8 @@ void set_console(int nr)
 	schedule_console_callback();
 }
 
+struct tty_driver *console_driver;
+
 #ifdef CONFIG_VT_CONSOLE
 
 /*
@@ -2217,8 +2217,6 @@ void vt_console_print(struct console *co, const char * b, unsigned count)
 quit:
 	clear_bit(0, &printing);
 }
-
-struct tty_driver *console_driver;
 
 static struct tty_driver *vt_console_device(struct console *c, int *index)
 {
@@ -2742,7 +2740,7 @@ void do_blank_screen(int entering_gfx)
 		if (blank_state == blank_vesa_wait) {
 			blank_state = blank_off;
 			vesa_powerdown();
-			
+
 		}
 		return;
 	}
@@ -2834,7 +2832,7 @@ void unblank_screen(void)
 static void blank_screen_t(unsigned long dummy)
 {
 	blank_timer_expired = 1;
-	schedule_work(&console_work);	
+	schedule_work(&console_work);
 }
 
 void poke_blanked_console(void)
@@ -2961,7 +2959,6 @@ int con_font_op(int currcons, struct console_font_op *op)
 
 	if (vt_cons[currcons]->vc_mode != KD_TEXT)
 		goto quit;
-
 	memcpy(&old_op, op, sizeof(old_op));
 	if (op->op == KD_FONT_OP_SET) {
 		if (!op->data)
@@ -3065,13 +3062,13 @@ unsigned short *screen_pos(int currcons, int w_offset, int viewed)
 	return screenpos(currcons, 2 * w_offset, viewed);
 }
 
-void getconsxy(int currcons, char *p)
+void getconsxy(int currcons, unsigned char *p)
 {
 	p[0] = x;
 	p[1] = y;
 }
 
-void putconsxy(int currcons, char *p)
+void putconsxy(int currcons, unsigned char *p)
 {
 	gotoxy(currcons, p[0], p[1]);
 	set_cursor(currcons);

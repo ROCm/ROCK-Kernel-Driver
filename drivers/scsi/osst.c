@@ -5106,6 +5106,8 @@ static int enlarge_buffer(OSST_buffer *STbuffer, int need_dma)
 	if (need_dma)
 		priority |= GFP_DMA;
 
+	priority |= __GFP_NOWARN;
+
 	/* Try to allocate the first segment up to OS_DATA_SIZE and the others
 	   big enough to reach the goal (code assumes no segments in place) */
 	for (b_size = OS_DATA_SIZE, order = OSST_FIRST_ORDER; b_size >= PAGE_SIZE; order--, b_size /= 2) {

@@ -55,7 +55,7 @@ qla2x00_lock_nvram_access(scsi_qla_host_t *ha)
 
 	reg = ha->iobase;
 
-	if (IS_QLA2312(ha) || IS_QLA2322(ha)) {
+	if (!IS_QLA2100(ha) && !IS_QLA2200(ha) && !IS_QLA2300(ha)) {
 		data = RD_REG_WORD(&reg->nvram);
 		while (data & NVR_BUSY) {
 			udelay(100);
@@ -87,7 +87,7 @@ qla2x00_unlock_nvram_access(scsi_qla_host_t *ha)
 
 	reg = ha->iobase;
 
-	if (IS_QLA2312(ha) || IS_QLA2322(ha)) 
+	if (!IS_QLA2100(ha) && !IS_QLA2200(ha) && !IS_QLA2300(ha))
 		WRT_REG_WORD(&reg->u.isp2300.host_semaphore, 0);
 }
 
@@ -296,6 +296,7 @@ qla2x00_flash_enable(scsi_qla_host_t *ha)
 	data = RD_REG_WORD(&reg->ctrl_status);
 	data |= CSR_FLASH_ENABLE;
 	WRT_REG_WORD(&reg->ctrl_status, data);
+	RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
 }
 
 /**
@@ -311,6 +312,7 @@ qla2x00_flash_disable(scsi_qla_host_t *ha)
 	data = RD_REG_WORD(&reg->ctrl_status);
 	data &= ~(CSR_FLASH_ENABLE);
 	WRT_REG_WORD(&reg->ctrl_status, data);
+	RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
 }
 
 /**
@@ -334,13 +336,30 @@ qla2x00_read_flash_byte(scsi_qla_host_t *ha, uint32_t addr)
 	if ((addr & BIT_16) && ((bank_select & CSR_FLASH_64K_BANK) == 0)) {
 		bank_select |= CSR_FLASH_64K_BANK;
 		WRT_REG_WORD(&reg->ctrl_status, bank_select);
+		RD_REG_WORD(&reg->ctrl_status);	/* PCI Posting. */
 	} else if (((addr & BIT_16) == 0) &&
 	    (bank_select & CSR_FLASH_64K_BANK)) {
 		bank_select &= ~(CSR_FLASH_64K_BANK);
 		WRT_REG_WORD(&reg->ctrl_status, bank_select);
+		RD_REG_WORD(&reg->ctrl_status);	/* PCI Posting. */
 	}
-	WRT_REG_WORD(&reg->flash_address, (uint16_t)addr);
-	data = qla2x00_debounce_register(&reg->flash_data);
+
+	/* The ISP2312 v2 chip cannot access the FLASH registers via MMIO. */
+	if (IS_QLA2312(ha) && ha->product_id[3] == 0x2 && ha->pio_address) {
+		uint16_t data2;
+
+		reg = (device_reg_t *)ha->pio_address;
+		outw((uint16_t)addr, (unsigned long)(&reg->flash_address));
+		do {
+			data = inw((unsigned long)(&reg->flash_data));
+			barrier();
+			cpu_relax();
+			data2 = inw((unsigned long)(&reg->flash_data));
+		} while (data != data2);
+	} else {
+		WRT_REG_WORD(&reg->flash_address, (uint16_t)addr);
+		data = qla2x00_debounce_register(&reg->flash_data);
+	}
 
 	return ((uint8_t)data);
 }
@@ -362,13 +381,25 @@ qla2x00_write_flash_byte(scsi_qla_host_t *ha, uint32_t addr, uint8_t data)
 	if ((addr & BIT_16) && ((bank_select & CSR_FLASH_64K_BANK) == 0)) {
 		bank_select |= CSR_FLASH_64K_BANK;
 		WRT_REG_WORD(&reg->ctrl_status, bank_select);
+		RD_REG_WORD(&reg->ctrl_status);	/* PCI Posting. */
 	} else if (((addr & BIT_16) == 0) &&
 	    (bank_select & CSR_FLASH_64K_BANK)) {
 		bank_select &= ~(CSR_FLASH_64K_BANK);
 		WRT_REG_WORD(&reg->ctrl_status, bank_select);
+		RD_REG_WORD(&reg->ctrl_status);	/* PCI Posting. */
 	}
-	WRT_REG_WORD(&reg->flash_address, (uint16_t)addr);
-	WRT_REG_WORD(&reg->flash_data, (uint16_t)data);
+
+	/* The ISP2312 v2 chip cannot access the FLASH registers via MMIO. */
+	if (IS_QLA2312(ha) && ha->product_id[3] == 0x2 && ha->pio_address) {
+		reg = (device_reg_t *)ha->pio_address;
+		outw((uint16_t)addr, (unsigned long)(&reg->flash_address));
+		outw((uint16_t)data, (unsigned long)(&reg->flash_data));
+	} else {
+		WRT_REG_WORD(&reg->flash_address, (uint16_t)addr);
+		RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
+		WRT_REG_WORD(&reg->flash_data, (uint16_t)data);
+		RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
+	}
 }
 
 /**
@@ -504,7 +535,9 @@ qla2x00_get_flash_version(scsi_qla_host_t *ha)
 	uint32_t	loop_cnt = 1;  /* this is for error exit only */
 	uint32_t	pcir_adr;
 
-	ENTER(__func__);
+	/* The ISP2312 v2 chip cannot access the FLASH registers via MMIO. */
+	if (IS_QLA2312(ha) && ha->product_id[3] == 0x2 && !ha->pio_address)
+		ret = QLA_FUNCTION_FAILED;
 
 	qla2x00_flash_enable(ha);
 	do {	/* Loop once to provide quick error exit */
@@ -545,8 +578,6 @@ qla2x00_get_flash_version(scsi_qla_host_t *ha)
 	} while (--loop_cnt);
 	qla2x00_flash_disable(ha);
 
-	LEAVE(__func__);
-
 	return (ret);
 }
 
@@ -569,6 +600,7 @@ qla2x00_get_flash_image(scsi_qla_host_t *ha, uint8_t *image)
 
 	qla2x00_flash_enable(ha);
 	WRT_REG_WORD(&reg->nvram, 0);
+	RD_REG_WORD(&reg->nvram);		/* PCI Posting. */
 	for (addr = 0, data = image; addr < FLASH_IMAGE_SIZE; addr++, data++) {
 		if (addr == midpoint)
 			WRT_REG_WORD(&reg->nvram, NVR_SELECT);
@@ -605,6 +637,7 @@ qla2x00_set_flash_image(scsi_qla_host_t *ha, uint8_t *image)
 
 	/* Reset ISP chip. */
 	WRT_REG_WORD(&reg->ctrl_status, CSR_ISP_SOFT_RESET);
+	RD_REG_WORD(&reg->ctrl_status);		/* PCI Posting. */
 
 	qla2x00_flash_enable(ha);
 	do {	/* Loop once to provide quick error exit */

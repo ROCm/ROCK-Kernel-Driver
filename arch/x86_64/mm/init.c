@@ -39,7 +39,7 @@
 
 #define Dprintk(x...)
 
-extern char _stext;
+extern char _stext[];
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
@@ -80,7 +80,7 @@ void show_mem(void)
 
 /* References to section boundaries */
 
-extern char _text, _etext, _edata, __bss_start, _end;
+extern char _text, _etext, _edata, __bss_start, _end[];
 extern char __init_begin, __init_end;
 
 int after_bootmem;
@@ -442,7 +442,7 @@ void __init mem_init(void)
 	kclist_add(&kcore_mem, __va(0), max_low_pfn << PAGE_SHIFT); 
 	kclist_add(&kcore_vmalloc, (void *)VMALLOC_START, 
 		   VMALLOC_END-VMALLOC_START);
-	kclist_add(&kcore_kernel, &_stext, &_end - &_stext); 
+	kclist_add(&kcore_kernel, &_stext, _end - _stext);
 	kclist_add(&kcore_modules, (void *)MODULES_VADDR, MODULES_LEN);
 	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_START, 
 				 VSYSCALL_END - VSYSCALL_START);

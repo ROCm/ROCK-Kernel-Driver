@@ -245,7 +245,7 @@ static int hexium_attach(struct saa7146_dev *dev, struct saa7146_pci_extension_d
 		return -ENOMEM;
 	}
 	memset(hexium, 0x0, sizeof(struct hexium));
-	(struct hexium *) dev->ext_priv = hexium;
+	dev->ext_priv = hexium;
 
 	/* enable i2c-port pins */
 	saa7146_write(dev, MC1, (MASK_08 | MASK_24 | MASK_10 | MASK_26));

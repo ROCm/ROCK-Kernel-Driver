@@ -607,6 +607,7 @@ static void conf_choice(struct menu *menu)
 	struct symbol *active;
 	int stat;
 
+	active = sym_get_choice_value(menu->sym);
 	while (1) {
 		cprint_init();
 		cprint("--title");
@@ -618,24 +619,32 @@ static void conf_choice(struct menu *menu)
 		cprint("6");
 
 		current_menu = menu;
-		active = sym_get_choice_value(menu->sym);
 		for (child = menu->list; child; child = child->next) {
 			if (!menu_is_visible(child))
 				continue;
 			cprint("%p", child);
 			cprint("%s", menu_get_prompt(child));
-			cprint(child->sym == active ? "ON" : "OFF");
+			if (child->sym == sym_get_choice_value(menu->sym))
+				cprint("ON");
+			else if (child->sym == active)
+				cprint("SELECTED");
+			else
+				cprint("OFF");
 		}
 
 		stat = exec_conf();
 		switch (stat) {
 		case 0:
-			if (sscanf(input_buf, "%p", &menu) != 1)
+			if (sscanf(input_buf, "%p", &child) != 1)
 				break;
-			sym_set_tristate_value(menu->sym, yes);
+			sym_set_tristate_value(child->sym, yes);
 			return;
 		case 1:
-			show_help(menu);
+			if (sscanf(input_buf, "%p", &child) == 1) {
+				show_help(child);
+				active = child->sym;
+			} else
+				show_help(menu);
 			break;
 		case 255:
 			return;

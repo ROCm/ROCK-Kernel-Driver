@@ -16,6 +16,7 @@
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/in.h>
+#include <linux/sched.h>
 #include <asm/semaphore.h>
 #include "flask.h"
 #include "avc.h"

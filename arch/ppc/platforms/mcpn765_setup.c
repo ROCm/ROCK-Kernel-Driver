@@ -50,6 +50,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/bootinfo.h>
 #include <asm/pplus.h>
+#include <asm/kgdb.h>
 
 #include "mcpn765.h"
 #include "mcpn765_serial.h"
@@ -77,9 +78,6 @@ static u_char mcpn765_openpic_initsenses[] __initdata = {
 
 extern u_int openpic_irq(void);
 extern char cmd_line[];
-
-extern void gen550_progress(char *, unsigned short);
-extern void gen550_init(int, struct uart_port *);
 
 int use_of_interrupt_tree = 0;
 
@@ -472,6 +470,9 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_SERIAL_8250) && \
 	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
 	mcpn765_early_serial_map();
+#ifdef CONFIG_KGDB
+	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
+#endif
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
 	ppc_md.progress = gen550_progress;
 #endif

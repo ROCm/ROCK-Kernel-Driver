@@ -246,8 +246,8 @@ acpi_ac_add (
 	memset(ac, 0, sizeof(struct acpi_ac));
 
 	ac->handle = device->handle;
-	sprintf(acpi_device_name(device), "%s", ACPI_AC_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_AC_CLASS);
+	strcpy(acpi_device_name(device), ACPI_AC_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_AC_CLASS);
 	acpi_driver_data(device) = ac;
 
 	result = acpi_ac_get_state(ac);

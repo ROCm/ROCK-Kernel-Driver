@@ -365,7 +365,7 @@ int save_vga(struct vgastate *state)
 	if (saved == NULL)
 		return 1;
 	memset (saved, 0, sizeof(struct regstate));
-	(struct regstate *) state->vidstate = saved;
+	state->vidstate = (void *)saved;
 		
 	if (state->flags & VGA_SAVE_CMAP) {
 		saved->vga_cmap = vmalloc(768);
@@ -420,9 +420,8 @@ int save_vga(struct vgastate *state)
 
 		if (!fbbase) {
 			vga_cleanup(state);
-			iounmap(fbbase);
 			return 1;
-	}
+		}
 
 		/* 
 		 * save only first 32K used by vgacon
@@ -430,10 +429,11 @@ int save_vga(struct vgastate *state)
 		if (state->flags & VGA_SAVE_FONT0) {
 			saved->vga_font0 = vmalloc(4 * 8192);
 			if (!saved->vga_font0) {
-			vga_cleanup(state);
-			return 1;
+				iounmap(fbbase);
+				vga_cleanup(state);
+				return 1;
+			}
 		}
-	}
 		/* 
 		 * largely unused, but if required by the caller
 		 * we'll just save everything.
@@ -441,19 +441,21 @@ int save_vga(struct vgastate *state)
 		if (state->flags & VGA_SAVE_FONT1) {
 			saved->vga_font1 = vmalloc(state->memsize);
 			if (!saved->vga_font1) {
-			vga_cleanup(state);
-			return 1;
+				iounmap(fbbase);
+				vga_cleanup(state);
+				return 1;
+			}
 		}
-	}
 		/*
 		 * Save 8K at plane0[0], and 8K at plane1[16K]
 		 */
 		if (state->flags & VGA_SAVE_TEXT) {
 			saved->vga_text = vmalloc(8192 * 2);
 			if (!saved->vga_text) {
-			vga_cleanup(state);
-			return 1;
-		}
+				iounmap(fbbase);
+				vga_cleanup(state);
+				return 1;
+			}
 		}
 		
 		save_vga_text(state, fbbase);
@@ -475,7 +477,6 @@ int restore_vga (struct vgastate *state)
 
 		if (!fbbase) {
 			vga_cleanup(state);
-			iounmap(fbbase);
 			return 1;
 		}
 		restore_vga_text(state, fbbase);

@@ -65,6 +65,10 @@ typedef unsigned char ia64_mv_readb_t (void *);
 typedef unsigned short ia64_mv_readw_t (void *);
 typedef unsigned int ia64_mv_readl_t (void *);
 typedef unsigned long ia64_mv_readq_t (void *);
+typedef unsigned char ia64_mv_readb_relaxed_t (void *);
+typedef unsigned short ia64_mv_readw_relaxed_t (void *);
+typedef unsigned int ia64_mv_readl_relaxed_t (void *);
+typedef unsigned long ia64_mv_readq_relaxed_t (void *);
 
 extern void machvec_noop (void);
 extern void machvec_memory_fence (void);
@@ -116,6 +120,10 @@ extern void machvec_memory_fence (void);
 #  define platform_readw        ia64_mv.readw
 #  define platform_readl        ia64_mv.readl
 #  define platform_readq        ia64_mv.readq
+#  define platform_readb_relaxed        ia64_mv.readb_relaxed
+#  define platform_readw_relaxed        ia64_mv.readw_relaxed
+#  define platform_readl_relaxed        ia64_mv.readl_relaxed
+#  define platform_readq_relaxed        ia64_mv.readq_relaxed
 # endif
 
 /* __attribute__((__aligned__(16))) is required to make size of the
@@ -158,6 +166,10 @@ struct ia64_machine_vector {
 	ia64_mv_readw_t *readw;
 	ia64_mv_readl_t *readl;
 	ia64_mv_readq_t *readq;
+	ia64_mv_readb_relaxed_t *readb_relaxed;
+	ia64_mv_readw_relaxed_t *readw_relaxed;
+	ia64_mv_readl_relaxed_t *readl_relaxed;
+	ia64_mv_readq_relaxed_t *readq_relaxed;
 } __attribute__((__aligned__(16))); /* align attrib? see above comment */
 
 #define MACHVEC_INIT(name)			\
@@ -196,6 +208,10 @@ struct ia64_machine_vector {
 	platform_readw,				\
 	platform_readl,				\
 	platform_readq,				\
+	platform_readb_relaxed,			\
+	platform_readw_relaxed,			\
+	platform_readl_relaxed,			\
+	platform_readq_relaxed,			\
 }
 
 extern struct ia64_machine_vector ia64_mv;
@@ -321,6 +337,18 @@ extern ia64_mv_dma_supported		swiotlb_dma_supported;
 #endif
 #ifndef platform_readq
 # define platform_readq		__ia64_readq
+#endif
+#ifndef platform_readb_relaxed
+# define platform_readb_relaxed	__ia64_readb_relaxed
+#endif
+#ifndef platform_readw_relaxed
+# define platform_readw_relaxed	__ia64_readw_relaxed
+#endif
+#ifndef platform_readl_relaxed
+# define platform_readl_relaxed	__ia64_readl_relaxed
+#endif
+#ifndef platform_readq_relaxed
+# define platform_readq_relaxed	__ia64_readq_relaxed
 #endif
 
 #endif /* _ASM_IA64_MACHVEC_H */

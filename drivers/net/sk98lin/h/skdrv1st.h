@@ -2,8 +2,6 @@
  *
  * Name:	skdrv1st.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.4 $
- * Date:	$Date: 2003/11/12 14:28:14 $
  * Purpose:	First header file for driver and all other modules
  *
  ******************************************************************************/
@@ -19,87 +17,6 @@
  *	(at your option) any later version.
  *
  *	The information in this file is provided "AS IS" without warranty.
- *
- ******************************************************************************/
-
-/******************************************************************************
- *
- * History:
- *
- *	$Log: skdrv1st.h,v $
- *	Revision 1.4  2003/11/12 14:28:14  rroesler
- *	Fix: use dedicated ip_fast_csum() on X86_64 systems
- *	
- *	Revision 1.3  2003/10/07 08:16:52  mlindner
- *	Fix: Copyright changes
- *	
- *	Revision 1.2  2003/09/29 12:05:59  mlindner
- *	Fix: Added define SK_CS_CALCULSTE_CHECKSUM
- *	
- *	Revision 1.1  2003/07/21 07:22:43  rroesler
- *	Fix: Re-Enter after CVS crash
- *	
- *	Revision 1.15  2003/07/17 14:54:09  rroesler
- *	Fix: Corrected SK_PNMI_READ macros to copy right amount of bytes
- *	
- *	Revision 1.14  2003/06/03 14:36:32  mlindner
- *	Add: Additions for SK_SLIM
- *	
- *	Revision 1.13  2003/05/26 14:03:06  mlindner
- *	Add: Support for SLIM skaddr
- *	
- *	Revision 1.12  2003/05/26 12:56:39  mlindner
- *	Add: Support for Kernel 2.5/2.6
- *	Add: New SkOsGetTimeCurrent function
- *	Add: SK_PNMI_HUNDREDS_SEC definition
- *	Fix: SK_TICKS_PER_SEC on Intel Itanium2
- *	
- *	Revision 1.11  2003/02/25 14:16:40  mlindner
- *	Fix: Copyright statement
- *	
- *	Revision 1.10  2002/10/02 12:46:02  mlindner
- *	Add: Support for Yukon
- *	
- *	Revision 1.9.2.2  2001/12/07 12:06:42  mlindner
- *	Fix: malloc -> slab changes
- *	
- *	Revision 1.9.2.1  2001/03/12 16:50:59  mlindner
- *	chg: kernel 2.4 adaption
- *	
- *	Revision 1.9  2001/01/22 14:16:04  mlindner
- *	added ProcFs functionality
- *	Dual Net functionality integrated
- *	Rlmt networks added
- *	
- *	Revision 1.8  2000/02/21 12:19:18  cgoos
- *	Added default for SK_DEBUG_CHKMOD/_CHKCAT
- *	
- *	Revision 1.7  1999/11/22 13:50:00  cgoos
- *	Changed license header to GPL.
- *	Added overwrite for several functions.
- *	Removed linux 2.0.x definitions.
- *	Removed PCI vendor ID definition (now in kernel).
- *	
- *	Revision 1.6  1999/07/27 08:03:33  cgoos
- *	Changed SK_IN/OUT macros to readX/writeX instead of memory
- *	accesses (necessary for ALPHA).
- *	
- *	Revision 1.5  1999/07/23 12:10:21  cgoos
- *	Removed SK_RLMT_SLOW_LOOKAHEAD define.
- *	
- *	Revision 1.4  1999/07/14 12:31:13  cgoos
- *	Added SK_RLMT_SLOW_LOOKAHEAD define.
- *	
- *	Revision 1.3  1999/04/07 10:12:54  cgoos
- *	Added check for KERNEL and OPTIMIZATION defines.
- *	
- *	Revision 1.2  1999/03/01 08:51:47  cgoos
- *	Fixed pcibios_read/write definitions.
- *	
- *	Revision 1.1  1999/02/16 07:40:49  cgoos
- *	First version.
- *	
- *	
  *
  ******************************************************************************/
 

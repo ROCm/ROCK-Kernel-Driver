@@ -86,9 +86,9 @@ static unsigned long nr_available_slots(struct oprofile_cpu_buffer const * b)
 	unsigned long tail = b->tail_pos;
 
 	if (tail > head)
-		return tail - head;
+		return (tail - head) - 1;
 
-	return tail + (b->buffer_size - head);
+	return tail + (b->buffer_size - head) - 1;
 }
 
 

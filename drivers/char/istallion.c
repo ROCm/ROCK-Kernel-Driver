@@ -417,13 +417,14 @@ int		stli_eisaprobe = STLI_EISAPROBE;
 #ifndef PCI_DEVICE_ID_ECRA
 #define	PCI_DEVICE_ID_ECRA		0x0004
 #endif
-#endif
 
 static struct pci_device_id istallion_pci_tbl[] = {
 	{ PCI_VENDOR_ID_STALLION, PCI_DEVICE_ID_ECRA, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, istallion_pci_tbl);
+
+#endif /* CONFIG_PCI */
 
 /*****************************************************************************/
 
