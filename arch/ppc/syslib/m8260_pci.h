@@ -65,4 +65,11 @@
 #define _IO_BASE isa_io_base
 #endif
 
+#ifdef CONFIG_8260_PCI9
+extern void setup_m8260_indirect_pci(struct pci_controller* hose,
+				     u32 cfg_addr, u32 cfg_data);
+#else
+#define setup_m8260_indirect_pci setup_indirect_pci
+#endif
+
 #endif /* _PPC_KERNEL_M8260_PCI_H */

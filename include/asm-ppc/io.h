@@ -138,18 +138,27 @@ extern __inline__ void name(unsigned int val, unsigned int port) \
 		: : "r" (val), "r" (port + _IO_BASE));	\
 }
 
-__do_in_asm(inb, "lbzx")
 __do_out_asm(outb, "stbx")
 #ifdef CONFIG_APUS
+__do_in_asm(inb, "lbzx")
 __do_in_asm(inw, "lhz%U1%X1")
 __do_in_asm(inl, "lwz%U1%X1")
 __do_out_asm(outl,"stw%U0%X0")
 __do_out_asm(outw, "sth%U0%X0")
+#elif defined (CONFIG_8260_PCI9)
+/* in asm cannot be defined if PCI9 workaround is used */
+#define inb(port)		in_8((u8 *)((port)+_IO_BASE))
+#define inw(port)		in_le16((u16 *)((port)+_IO_BASE))
+#define inl(port)		in_le32((u32 *)((port)+_IO_BASE))
+__do_out_asm(outw, "sthbrx")
+__do_out_asm(outl, "stwbrx")
 #else
+__do_in_asm(inb, "lbzx")
 __do_in_asm(inw, "lhbrx")
 __do_in_asm(inl, "lwbrx")
 __do_out_asm(outw, "sthbrx")
 __do_out_asm(outl, "stwbrx")
+
 #endif
 
 #define inb_p(port)		inb((port))
@@ -389,4 +398,9 @@ static inline int isa_check_signature(unsigned long io_addr,
 }
 
 #endif /* _PPC_IO_H */
+
+#ifdef CONFIG_8260_PCI9
+#include <asm/mpc8260_pci9.h>
+#endif
+
 #endif /* __KERNEL__ */

@@ -1026,6 +1026,29 @@ config PCI_8260
 	depends on PCI && 8260 && !8272
 	default y
 	
+config 8260_PCI9
+	bool "  Enable workaround for MPC826x erratum PCI 9"
+	depends on PCI_8260
+	default y
+
+choice 
+	prompt "  IDMA channel for PCI 9 workaround"
+	depends on 8260_PCI9
+
+config 8260_PCI9_IDMA1
+	bool "IDMA1"
+
+config 8260_PCI9_IDMA2
+	bool "IDMA2"
+
+config 8260_PCI9_IDMA3
+	bool "IDMA3"
+
+config 8260_PCI9_IDMA4
+	bool "IDMA4"
+
+endchoice
+
 config PCI_PERMEDIA
 	bool "PCI for Permedia2"
 	depends on !4xx && !8xx && APUS
