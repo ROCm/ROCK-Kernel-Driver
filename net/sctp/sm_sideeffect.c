@@ -798,7 +798,7 @@ void sctp_generate_t3_rtx_event(unsigned long peer)
 	/* Check whether a task is in the sock.  */
 
 	sctp_bh_lock_sock(asoc->base.sk);
-	if (__sctp_sock_busy(asoc->base.sk)) {
+	if (sock_owned_by_user(asoc->base.sk)) {
 		SCTP_DEBUG_PRINTK("%s:Sock is busy.\n", __FUNCTION__);
 
 		/* Try again later.  */
@@ -837,7 +837,7 @@ static void sctp_generate_timeout_event(sctp_association_t *asoc,
 	int error = 0;
 
 	sctp_bh_lock_sock(asoc->base.sk);
-	if (__sctp_sock_busy(asoc->base.sk)) {
+	if (sock_owned_by_user(asoc->base.sk)) {
 		SCTP_DEBUG_PRINTK("%s:Sock is busy: timer %d\n",
 				  __FUNCTION__,
 				  timeout_type);
@@ -911,7 +911,7 @@ void sctp_generate_heartbeat_event(unsigned long data)
 	sctp_association_t *asoc = transport->asoc;
 
 	sctp_bh_lock_sock(asoc->base.sk);
-	if (__sctp_sock_busy(asoc->base.sk)) {
+	if (sock_owned_by_user(asoc->base.sk)) {
 		SCTP_DEBUG_PRINTK("%s:Sock is busy.\n", __FUNCTION__);
 
 		/* Try again later.  */

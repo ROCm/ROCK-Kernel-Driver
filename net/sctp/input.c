@@ -229,7 +229,7 @@ int sctp_rcv(struct sk_buff *skb)
 	 */
 	sctp_bh_lock_sock(sk);
 
-	if (__sctp_sock_busy(sk)) {
+	if (sock_owned_by_user(sk)) {
 		sk_add_backlog(sk, (struct sk_buff *) chunk);
 	} else {
 		sctp_backlog_rcv(sk, (struct sk_buff *) chunk);

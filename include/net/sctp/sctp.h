@@ -198,7 +198,6 @@ extern void sctp_hash_digest(const char *secret, const int secret_len,
 #define sctp_release_sock(sk) release_sock(sk)
 #define sctp_bh_lock_sock(sk) bh_lock_sock(sk)
 #define sctp_bh_unlock_sock(sk) bh_unlock_sock(sk)
-#define __sctp_sock_busy(sk) ((sk)->lock.users)
 #define SCTP_SOCK_SLEEP_PRE(sk) SOCK_SLEEP_PRE(sk)
 #define SCTP_SOCK_SLEEP_POST(sk) SOCK_SLEEP_POST(sk)
 
