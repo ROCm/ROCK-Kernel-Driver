@@ -20,6 +20,10 @@
  *      "AS-IS" and at no charge.
  *
  *      (c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>*
+ *
+ *      14-Dec-2001 Matt Domsch <Matt_Domsch@dell.com>
+ *          Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
+ *          Added timeout module option to override default
  */
 
 #include <linux/config.h>
@@ -45,7 +49,6 @@
 #include <linux/smp_lock.h>
 
 static int eurwdt_is_open;
-static int eurwdt_timeout; 
 static spinlock_t eurwdt_lock;
  
 /*
@@ -58,6 +61,18 @@ static int irq = 10;
 static char *ev = "int";
  
 #define WDT_TIMEOUT		60                /* 1 minute */
+static int timeout = WDT_TIMEOUT;
+
+MODULE_PARM(timeout,"i");
+MODULE_PARM_DESC(timeout, "Eurotech WDT timeout in seconds (default=60)"); 
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 
 /*
@@ -115,6 +130,15 @@ MODULE_PARM_DESC(ev, "Eurotech WDT event type (default is `reboot')");
 /*
  *      Programming support
  */
+
+static void __init eurwdt_validate_timeout(void)
+{
+	if (timeout < 0 || timeout > 255) {
+		timeout = WDT_TIMEOUT;
+		printk(KERN_INFO "eurwdt: timeout must be 0 < x < 255, using %d\n",
+		       timeout);
+	}
+}
 
 static inline void eurwdt_write_reg(u8 index, u8 data)
 {
@@ -189,7 +213,7 @@ void eurwdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void eurwdt_ping(void)
 {
    /* Write the watchdog default value */
-   eurwdt_set_timeout(eurwdt_timeout);
+   eurwdt_set_timeout(timeout);
 }
  
 /**
@@ -263,7 +287,7 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
          if (time < 0 || time > 255)
             return -EINVAL;
 
-         eurwdt_timeout = time; 
+         timeout = time; 
          eurwdt_set_timeout(time); 
          return 0;
    }
@@ -287,9 +311,11 @@ static int eurwdt_open(struct inode *inode, struct file *file)
             spin_unlock(&eurwdt_lock);
             return -EBUSY;
          }
+	 if (nowayout) {
+		 MOD_INC_USE_COUNT;
+	 }
 
          eurwdt_is_open = 1;
-         eurwdt_timeout = WDT_TIMEOUT;   /* initial timeout */
 
          /* Activate the WDT */
          eurwdt_activate_timer(); 
@@ -323,12 +349,12 @@ static int eurwdt_open(struct inode *inode, struct file *file)
 static int eurwdt_release(struct inode *inode, struct file *file)
 {
    if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-      eurwdt_disable_timer();
-#endif
-      eurwdt_is_open = 0;
+	   if (!nowayout) {
+		   eurwdt_disable_timer();
+	   }
+	   eurwdt_is_open = 0;
 
-      MOD_DEC_USE_COUNT;
+	   MOD_DEC_USE_COUNT;
    }
 
    return 0;
@@ -422,7 +448,8 @@ static void __exit eurwdt_exit(void)
 static int __init eurwdt_init(void)
 {
    int ret;
- 
+
+   eurwdt_validate_timeout();
    ret = misc_register(&eurwdt_miscdev);
    if (ret) {
       printk(KERN_ERR "eurwdt: can't misc_register on minor=%d\n",
