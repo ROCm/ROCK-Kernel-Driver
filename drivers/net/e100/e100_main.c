@@ -182,7 +182,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.25-pre1"
+#define E100_VERSION  "2.0.27-pre1"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -455,7 +455,7 @@ e100_wait_scb(struct e100_private *bdp)
 	}
 
 	/* it didn't work. do it the slow way using udelay()s */
-	for (i = 0; i < E100_MAX_BUSY_WAIT; i++) {
+	for (i = 0; i < E100_MAX_SCB_WAIT; i++) {
 		if (!readb(&bdp->scb->scb_cmd_low))
 			return true;
 		cpu_relax();
@@ -521,7 +521,7 @@ e100_wait_cus_idle(struct e100_private *bdp)
 		cpu_relax();
 	}
 
-	for (i = 0; i < E100_MAX_BUSY_WAIT; i++) {
+	for (i = 0; i < E100_MAX_CU_IDLE_WAIT; i++) {
 		if (((readw(&(bdp->scb->scb_status)) & SCB_CUS_MASK) !=
 		     SCB_CUS_ACTIVE)) {
 			return true;
