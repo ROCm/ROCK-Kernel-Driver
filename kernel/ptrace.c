@@ -189,6 +189,7 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 		if (write) {
 			memcpy(maddr + offset, buf, bytes);
 			flush_icache_user_range(vma, page, addr, bytes);
+			set_page_dirty_lock(page);
 		} else {
 			memcpy(buf, maddr + offset, bytes);
 		}
