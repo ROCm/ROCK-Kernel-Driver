@@ -362,7 +362,7 @@ static struct super_operations pcihpfs_ops = {
 	put_inode:	force_delete,
 };
 
-static struct super_block *pcihpfs_read_super (struct super_block *sb, void *data, int silent)
+static int pcihpfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct inode *inode;
 	struct dentry *root;
@@ -375,20 +375,31 @@ static struct super_block *pcihpfs_read_super (struct super_block *sb, void *dat
 
 	if (!inode) {
 		dbg("%s: could not get inode!\n",__FUNCTION__);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	root = d_alloc_root(inode);
 	if (!root) {
 		dbg("%s: could not get root dentry!\n",__FUNCTION__);
 		iput(inode);
-		return NULL;
+		return -ENOMEM;
 	}
 	sb->s_root = root;
-	return sb;
+	return 0;
 }
 
-static DECLARE_FSTYPE(pcihpfs_fs_type, "pcihpfs", pcihpfs_read_super, FS_SINGLE | FS_LITTER);
+static struct super_block *pcihpfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_single(fs_type, flags, data, pcihpfs_fill_super);
+}
+
+static struct file_system_type pcihpfs_type = {
+	owner:		THIS_MODULE,
+	name:		"pchihpfs",
+	get_sb:		pcihpfs_get_sb,
+	fs_flags:	FS_LITTER,
+};
 
 static int get_mount (void)
 {
