@@ -57,7 +57,7 @@ struct cpufreq_governor;
 struct cpufreq_cpuinfo {
 	unsigned int		max_freq;
 	unsigned int		min_freq;
-	unsigned int		transition_latency; /* in 10^(-9) s */
+	unsigned int		transition_latency; /* in 10^(-9) s = nanoseconds */
 };
 
 struct cpufreq_real_policy {

@@ -387,7 +387,11 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 				minimum_speed, maximum_speed);
 
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
-	policy->cpuinfo.transition_latency = latency;
+
+	/* latency is in 10 ns (look for SGTC above) for each VID
+	 * and FID transition, so multiply that value with 20 */
+	policy->cpuinfo.transition_latency = latency * 20;
+
 	policy->cur = maximum_speed;
 
 	return cpufreq_frequency_table_cpuinfo(policy, powernow_table);

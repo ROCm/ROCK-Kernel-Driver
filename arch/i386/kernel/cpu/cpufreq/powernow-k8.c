@@ -954,9 +954,10 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 
 	pol->governor = CPUFREQ_DEFAULT_GOVERNOR;
 
-	/* Take a crude guess here. */
-	pol->cpuinfo.transition_latency = ((rvo + 8) * vstable * VST_UNITS_20US)
-	    + (3 * (1 << irt) * 10);
+	/* Take a crude guess here. 
+	 * That guess was in microseconds, so multply with 1000 */
+	pol->cpuinfo.transition_latency = (((rvo + 8) * vstable * VST_UNITS_20US)
+	    + (3 * (1 << irt) * 10)) * 1000;
 
 	if (query_current_values_with_pending_wait())
 		return -EIO;
