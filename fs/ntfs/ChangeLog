@@ -47,6 +47,10 @@ ToDo/Notes:
 	- Implement fs/ntfs/runlist.c::ntfs_rl_truncate_nolock().
 	- Add MFT_RECORD_OLD as a copy of MFT_RECORD in fs/ntfs/layout.h and
 	  change MFT_RECORD to contain the NTFS 3.1+ specific fields.
+	- Add a helper function fs/ntfs/aops.c::mark_ntfs_record_dirty() which
+	  marks all buffers belonging to an ntfs record dirty, followed by
+	  marking the page the ntfs record is in dirty and also marking the vfs
+	  inode containing the ntfs record dirty (I_DIRTY_PAGES).
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 
