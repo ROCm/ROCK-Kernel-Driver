@@ -1077,7 +1077,7 @@ iput_mirr_err_out:
  * releases all inodes and memory belonging to the NTFS specific part of the
  * super block.
  */
-void ntfs_put_super(struct super_block *vfs_sb)
+static void ntfs_put_super(struct super_block *vfs_sb)
 {
 	ntfs_volume *vol = NTFS_SB(vfs_sb);
 
@@ -1155,7 +1155,7 @@ void ntfs_put_super(struct super_block *vfs_sb)
  * Errors are ignored and we just return the number of free clusters we have
  * found. This means we return an underestimate on error.
  */
-s64 get_nr_free_clusters(ntfs_volume *vol)
+static s64 get_nr_free_clusters(ntfs_volume *vol)
 {
 	struct address_space *mapping = vol->lcnbmp_ino->i_mapping;
 	filler_t *readpage = (filler_t*)mapping->a_ops->readpage;
@@ -1227,7 +1227,7 @@ handle_partial_page:
 }
 
 /**
- * get_nr_free_mft_records - return the number of free inodes on a volume
+ * __get_nr_free_mft_records - return the number of free inodes on a volume
  * @vol:	ntfs volume for which to obtain free inode count
  *
  * Calculate the number of free mft records (inodes) on the mounted NTFS
@@ -1235,8 +1235,10 @@ handle_partial_page:
  *
  * Errors are ignored and we just return the number of free inodes we have
  * found. This means we return an underestimate on error.
+ *
+ * NOTE: Caller must hold mftbmp_lock rw_semaphore for reading or writing.
  */
-unsigned long get_nr_free_mft_records(ntfs_volume *vol)
+static unsigned long __get_nr_free_mft_records(ntfs_volume *vol)
 {
 	struct address_space *mapping;
 	filler_t *readpage;
@@ -1247,7 +1249,6 @@ unsigned long get_nr_free_mft_records(ntfs_volume *vol)
 
 	ntfs_debug("Entering.");
 	/* Serialize accesses to the inode bitmap. */
-	down_read(&vol->mftbmp_lock);
 	mapping = &vol->mftbmp_mapping;
 	readpage = (filler_t*)mapping->a_ops->readpage;
 	/*
@@ -1307,7 +1308,6 @@ handle_partial_page:
 	}
 	ntfs_debug("Finished reading $MFT/$BITMAP, last index = 0x%lx",
 			index - 1);
-	up_read(&vol->mftbmp_lock);
 	ntfs_debug("Exiting.");
 	return nr_free;
 }
@@ -1330,7 +1330,7 @@ handle_partial_page:
  *
  * Return 0 on success or -errno on error.
  */
-int ntfs_statfs(struct super_block *sb, struct statfs *sfs)
+static int ntfs_statfs(struct super_block *sb, struct statfs *sfs)
 {
 	ntfs_volume *vol = NTFS_SB(sb);
 	s64 size;
@@ -1354,10 +1354,12 @@ int ntfs_statfs(struct super_block *sb, struct statfs *sfs)
 		size = 0LL;
 	/* Free blocks avail to non-superuser, same as above on NTFS. */
 	sfs->f_bavail = sfs->f_bfree = size;
+	down_read(&vol->mftbmp_lock);
 	/* Total file nodes in file system (at this moment in time). */
 	sfs->f_files  = vol->mft_ino->i_size >> vol->mft_record_size_bits;
 	/* Free file nodes in fs (based on current total count). */
-	sfs->f_ffree = get_nr_free_mft_records(vol);
+	sfs->f_ffree = __get_nr_free_mft_records(vol);
+	up_read(&vol->mftbmp_lock);
 	/*
 	 * File system id. This is extremely *nix flavour dependent and even
 	 * within Linux itself all fs do their own thing. I interpret this to
