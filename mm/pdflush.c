@@ -172,6 +172,12 @@ static int __pdflush(struct pdflush_work *my_work)
 static int pdflush(void *dummy)
 {
 	struct pdflush_work my_work;
+
+	/*
+	 * pdflush can spend a lot of time doing encryption via dm-crypt.  We
+	 * don't want to do that at keventd's priority.
+	 */
+	set_user_nice(current, 0);
 	return __pdflush(&my_work);
 }
 
