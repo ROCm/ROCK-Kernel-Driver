@@ -949,6 +949,12 @@ L:	sensors@stimpy.netroedge.com
 W:	http://www.lm-sensors.nu/
 S:	Maintained
 
+I2O
+P:	Markus Lidel
+M:	markus.lidel@shadowconnect.com
+W:	http://i2o.shadowconnect.com/
+S:	Maintained
+
 i386 BOOT CODE
 P:	Riley H. Williams
 M:	Riley@Williams.Name
