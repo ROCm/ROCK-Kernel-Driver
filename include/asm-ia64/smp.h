@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 2001-2002 Hewlett-Packard Co
+ * Copyright (C) 2001-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #ifndef _ASM_IA64_SMP_H
@@ -74,7 +74,7 @@ cpu_logical_id (int cpuid)
 	int i;
 
 	for (i = 0; i < NR_CPUS; ++i)
-		if (cpu_physical_id(i) == (__u32) cpuid)
+		if (cpu_physical_id(i) == cpuid)
 			break;
 	return i;
 }
