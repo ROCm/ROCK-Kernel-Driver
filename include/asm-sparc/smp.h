@@ -15,17 +15,7 @@
 
 #include <linux/cpumask.h>
 
-/* PROM provided per-processor information we need
- * to start them all up.
- */
-
-struct prom_cpuinfo {
-	int prom_node;
-	int mid;
-};
-extern int linux_num_cpus;	/* number of CPUs probed  */
-
-#endif /* !(__ASSEMBLY__) */
+#endif /* __ASSEMBLY__ */
 
 #ifdef CONFIG_SMP
 
@@ -33,27 +23,18 @@ extern int linux_num_cpus;	/* number of CPUs probed  */
 
 #include <asm/ptrace.h>
 #include <asm/asi.h>
-
-extern struct prom_cpuinfo linux_cpus[NR_CPUS];
-
-/* Per processor Sparc parameters we need. */
-
-struct cpuinfo_sparc {
-	unsigned long udelay_val; /* that's it */
-	unsigned short next;
-	unsigned short mid;
-};
-
-extern struct cpuinfo_sparc cpu_data[NR_CPUS];
-extern unsigned long cpu_offset[NR_CPUS];
+#include <asm/atomic.h>
 
 /*
  *	Private routines/data
  */
  
 extern unsigned char boot_cpu_id;
-extern unsigned long cpu_present_map;
-#define cpu_online_map cpu_present_map
+extern cpumask_t phys_cpu_present_map;
+#define cpu_possible_map phys_cpu_present_map
+
+extern atomic_t sparc_num_cpus_possible;
+#define num_possible_cpus()	(atomic_read(&sparc_num_cpus_possible))
 
 typedef void (*smpfunc_t)(unsigned long, unsigned long, unsigned long,
 		       unsigned long, unsigned long);
@@ -70,7 +51,7 @@ void smp_boot_cpus(void);
 void smp_store_cpu_info(int);
 
 struct seq_file;
-void smp_bogo_info(struct seq_file *);
+void smp_bogo(struct seq_file *);
 void smp_info(struct seq_file *);
 
 BTFIXUPDEF_CALL(void, smp_cross_call, smpfunc_t, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)
@@ -105,7 +86,6 @@ extern __inline__ int smp_call_function(void (*func)(void *info), void *info, in
 
 extern __volatile__ int __cpu_number_map[NR_CPUS];
 extern __volatile__ int __cpu_logical_map[NR_CPUS];
-extern unsigned long smp_proc_in_lock[NR_CPUS];
 
 extern __inline__ int cpu_logical_map(int cpu)
 {
@@ -189,7 +169,11 @@ extern __inline__ int hard_smp_processor_id(void)
 #define MBOX_IDLECPU2         0xFD
 #define MBOX_STOPCPU2         0xFE
 
-#endif /* !(CONFIG_SMP) */
+#else /* SMP */
+
+#define num_possible_cpus()	(1)
+
+#endif /* SMP */
 
 #define NO_PROC_ID            0xFF
 
