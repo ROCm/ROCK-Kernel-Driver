@@ -145,7 +145,7 @@ static inline unsigned long ___pa(unsigned long x)
 {
      if(x == 0)
 	  return 0;
-     if(x > PAGE_OFFSET)
+     if(x >= PAGE_OFFSET)
         return (x-PAGE_OFFSET);
      else
         return (x+0x2000000);
