@@ -426,7 +426,7 @@ shares_write(struct file *file, const char __user *buf,
 	int rc = 0;
 	struct ckrm_core_class *core;
 	int done;
-	char *resname;
+	char *resname = NULL;
 
 	struct ckrm_shares newshares = {
 		CKRM_SHARE_UNCHANGED,
@@ -454,6 +454,11 @@ shares_write(struct file *file, const char __user *buf,
 	
 	core = ri->core; 
 	optbuf = kmalloc(SHARES_MAX_INPUT_SIZE, GFP_KERNEL);
+	if (!optbuf) {
+		up(&inode->i_sem);
+		return -ENOMEM ;
+	}
+
 	__copy_from_user(optbuf, buf, count);
 	if (optbuf[count-1] == '\n')
 		optbuf[count-1]='\0';
