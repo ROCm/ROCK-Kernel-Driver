@@ -80,8 +80,8 @@
 
 /* hardware minimum and maximum for a single frame's data payload */
 #define TG3_MIN_MTU			60
-#define TG3_MAX_MTU			9000
-#define TG3_MAX_MTU_5705		1500
+#define TG3_MAX_MTU(tp)	\
+	(GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705 ? 9000 : 1500)
 
 /* These numbers seem to be hard coded in the NIC firmware somehow.
  * You can't change the ring sizes, but you can change where you place
@@ -2785,11 +2785,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct tg3 *tp = dev->priv;
 
-	if (new_mtu < TG3_MIN_MTU || new_mtu > TG3_MAX_MTU)
-		return -EINVAL;
-
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 &&
-	    new_mtu > TG3_MAX_MTU_5705)
+	if (new_mtu < TG3_MIN_MTU || new_mtu > TG3_MAX_MTU(tp))
 		return -EINVAL;
 
 	if (!netif_running(dev)) {
@@ -4131,11 +4127,13 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tg3_init_rings(tp);
 
 	/* Clear statistics/status block in chip, and status block in ram. */
-	for (i = NIC_SRAM_STATS_BLK;
-	     i < NIC_SRAM_STATUS_BLK + TG3_HW_STATUS_SIZE;
-	     i += sizeof(u32)) {
-		tg3_write_mem(tp, i, 0);
-		udelay(40);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		for (i = NIC_SRAM_STATS_BLK;
+	     	     i < NIC_SRAM_STATUS_BLK + TG3_HW_STATUS_SIZE;
+	     	     i += sizeof(u32)) {
+			tg3_write_mem(tp, i, 0);
+			udelay(40);
+		}
 	}
 	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
 
