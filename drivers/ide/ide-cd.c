@@ -965,7 +965,7 @@ static void cdrom_buffer_sectors (ide_drive_t *drive, unsigned long sector,
 	struct cdrom_info *info = drive->driver_data;
 
 	/* Number of sectors to read into the buffer. */
-	int sectors_to_buffer = MIN (sectors_to_transfer,
+	int sectors_to_buffer = min_t(int, sectors_to_transfer,
 				     (SECTOR_BUFFER_SIZE >> SECTOR_BITS) -
 				       info->nsectors_buffered);
 
@@ -1114,7 +1114,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 
 	/* First, figure out if we need to bit-bucket
 	   any of the leading sectors. */
-	nskip = MIN((int)(rq->current_nr_sectors - bio_cur_sectors(rq->bio)), sectors_to_transfer);
+	nskip = min_t(int, rq->current_nr_sectors - bio_cur_sectors(rq->bio), sectors_to_transfer);
 
 	while (nskip > 0) {
 		/* We need to throw away a sector. */
@@ -1144,7 +1144,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 			/* Transfer data to the buffers.
 			   Figure out how many sectors we can transfer
 			   to the current buffer. */
-			this_transfer = MIN (sectors_to_transfer,
+			this_transfer = min_t(int, sectors_to_transfer,
 					     rq->current_nr_sectors);
 
 			/* Read this_transfer sectors
@@ -1860,7 +1860,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 		/*
 		 * Figure out how many sectors we can transfer
 		 */
-		this_transfer = MIN(sectors_to_transfer,rq->current_nr_sectors);
+		this_transfer = min_t(int, sectors_to_transfer, rq->current_nr_sectors);
 
 		while (this_transfer > 0) {
 			HWIF(drive)->atapi_output_bytes(drive, rq->buffer, SECTOR_SIZE);
