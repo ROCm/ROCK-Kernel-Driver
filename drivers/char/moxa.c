@@ -644,8 +644,8 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 		ch->count = 1;
 	}
 	if (--ch->count < 0) {
-		printk("moxa_close: bad serial port count, minor=%d\n",
-		       minor(tty->device));
+		printk("moxa_close: bad serial port count, device=%s\n",
+		       tty->name);
 		ch->count = 0;
 	}
 	if (ch->count) {

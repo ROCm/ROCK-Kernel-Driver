@@ -1045,17 +1045,17 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 }
 
 static inline int
-isdn_tty_paranoia_check(modem_info * info, kdev_t device, const char *routine)
+isdn_tty_paranoia_check(modem_info * info, char *name, const char *routine)
 {
 #ifdef MODEM_PARANOIA_CHECK
 	if (!info) {
-		printk(KERN_WARNING "isdn_tty: null info_struct for (%d, %d) in %s\n",
-		       major(device), minor(device), routine);
+		printk(KERN_WARNING "isdn_tty: null info_struct for %s in %s\n",
+		       name, routine);
 		return 1;
 	}
 	if (info->magic != ISDN_ASYNC_MAGIC) {
-		printk(KERN_WARNING "isdn_tty: bad magic for modem struct (%d, %d) in %s\n",
-		       major(device), minor(device), routine);
+		printk(KERN_WARNING "isdn_tty: bad magic for modem struct %s in %s\n",
+		       name, routine);
 		return 1;
 	}
 #endif
@@ -1205,7 +1205,7 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 	modem_info *info = (modem_info *) tty->driver_data;
 	atemu *m = &info->emu;
 
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_write"))
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_write"))
 		return 0;
 	if (from_user)
 		down(&info->write_sem);
@@ -1318,7 +1318,7 @@ isdn_tty_write_room(struct tty_struct *tty)
 	modem_info *info = (modem_info *) tty->driver_data;
 	int ret;
 
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_write_room"))
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_write_room"))
 		return 0;
 	if (!info->online)
 		return info->xmit_size;
@@ -1331,7 +1331,7 @@ isdn_tty_chars_in_buffer(struct tty_struct *tty)
 {
 	modem_info *info = (modem_info *) tty->driver_data;
 
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_chars_in_buffer"))
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_chars_in_buffer"))
 		return 0;
 	if (!info->online)
 		return 0;
@@ -1351,7 +1351,7 @@ isdn_tty_flush_buffer(struct tty_struct *tty)
 		return;
 	}
 	info = (modem_info *) tty->driver_data;
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_flush_buffer")) {
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_flush_buffer")) {
 		restore_flags(flags);
 		return;
 	}
@@ -1369,7 +1369,7 @@ isdn_tty_flush_chars(struct tty_struct *tty)
 {
 	modem_info *info = (modem_info *) tty->driver_data;
 
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_flush_chars"))
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_flush_chars"))
 		return;
 	if ((info->xmit_count) || (skb_queue_len(&info->xmit_queue)))
 		isdn_tty_modem_xmit(info);
@@ -1388,7 +1388,7 @@ isdn_tty_throttle(struct tty_struct *tty)
 {
 	modem_info *info = (modem_info *) tty->driver_data;
 
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_throttle"))
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_throttle"))
 		return;
 	if (I_IXOFF(tty))
 		info->x_char = STOP_CHAR(tty);
@@ -1400,7 +1400,7 @@ isdn_tty_unthrottle(struct tty_struct *tty)
 {
 	modem_info *info = (modem_info *) tty->driver_data;
 
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_unthrottle"))
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_unthrottle"))
 		return;
 	if (I_IXOFF(tty)) {
 		if (info->x_char)
@@ -1542,7 +1542,7 @@ isdn_tty_ioctl(struct tty_struct *tty, struct file *file,
 	modem_info *info = (modem_info *) tty->driver_data;
 	int retval;
 
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_ioctl"))
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_ioctl"))
 		return -ENODEV;
 	if (tty->flags & (1 << TTY_IO_ERROR))
 		return -EIO;
@@ -1770,11 +1770,11 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 	if (line < 0 || line > ISDN_MAX_CHANNELS)
 		return -ENODEV;
 	info = &isdn_mdm.info[line];
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_open"))
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_open"))
 		return -ENODEV;
 #ifdef ISDN_DEBUG_MODEM_OPEN
-	printk(KERN_DEBUG "isdn_tty_open %s%d, count = %d\n", tty->driver->name,
-	       info->line, info->count);
+	printk(KERN_DEBUG "isdn_tty_open %s, count = %d\n", tty->name,
+	       info->count);
 #endif
 	info->count++;
 	tty->driver_data = info;
@@ -1822,7 +1822,7 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 	ulong flags;
 	ulong timeout;
 
-	if (!info || isdn_tty_paranoia_check(info, tty->device, "isdn_tty_close"))
+	if (!info || isdn_tty_paranoia_check(info, tty->name, "isdn_tty_close"))
 		goto out;
 
 	save_flags(flags);
@@ -1923,7 +1923,7 @@ isdn_tty_hangup(struct tty_struct *tty)
 {
 	modem_info *info = (modem_info *) tty->driver_data;
 
-	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_hangup"))
+	if (isdn_tty_paranoia_check(info, tty->name, "isdn_tty_hangup"))
 		return;
 	isdn_tty_shutdown(info);
 	info->count = 0;

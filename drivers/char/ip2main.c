@@ -366,7 +366,7 @@ static int tracewrap;
 
 #if defined(MODULE) && defined(IP2DEBUG_OPEN)
 #define DBG_CNT(s) printk(KERN_DEBUG "(%s): [%x] refc=%d, ttyc=%d, modc=%x -> %s\n", \
-		    cdevname(tty->device),(pCh->flags),ref_count, \
+		    tty->name,(pCh->flags),ref_count, \
 		    tty->count,/*GET_USE_COUNT(module)*/0,s)
 #else
 #define DBG_CNT(s)
@@ -1578,9 +1578,8 @@ ip2_open( PTTY tty, struct file *pFile )
 
 #ifdef IP2DEBUG_OPEN
 	printk(KERN_DEBUG \
-			"IP2:open(tty=%p,pFile=%p):dev=%x,maj=%d,min=%d,ch=%d,idx=%d\n",
-	       tty, pFile, tty->device, major(tty->device), minor(tty->device),
-			 pCh->infl.hd.i2sChannel, pCh->port_index);
+			"IP2:open(tty=%p,pFile=%p):dev=%s,ch=%d,idx=%d\n",
+	       tty, pFile, tty->name, pCh->infl.hd.i2sChannel, pCh->port_index);
 	open_sanity_check ( pCh, pCh->pMyBord );
 #endif
 
@@ -1771,7 +1770,7 @@ ip2_close( PTTY tty, struct file *pFile )
 	ip2trace (CHANN, ITRC_CLOSE, ITRC_ENTER, 0 );
 
 #ifdef IP2DEBUG_OPEN
-	printk(KERN_DEBUG "IP2:close ttyF%02X:\n",minor(tty->device));
+	printk(KERN_DEBUG "IP2:close %s:\n",tty->name);
 #endif
 
 	if ( tty_hung_up_p ( pFile ) ) {

@@ -1482,7 +1482,7 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
         state->count = 1;
     }
     if (--state->count < 0) {
-        printk("rs_close: bad serial port count for %s%d: %d\n", tty->driver->name, info->state->line, state->count);
+        printk("rs_close: bad serial port count for %s: %d\n", tty->name, state->count);
         state->count = 0;
     }
     if (state->count) {

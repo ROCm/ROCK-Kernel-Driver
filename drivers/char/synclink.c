@@ -978,7 +978,7 @@ static unsigned char *tmp_buf;
 static DECLARE_MUTEX(tmp_buf_sem);
 
 static inline int mgsl_paranoia_check(struct mgsl_struct *info,
-					kdev_t device, const char *routine)
+					char *name, const char *routine)
 {
 #ifdef MGSL_PARANOIA_CHECK
 	static const char *badmagic =
@@ -987,11 +987,11 @@ static inline int mgsl_paranoia_check(struct mgsl_struct *info,
 		"Warning: null mgsl_struct for (%s) in %s\n";
 
 	if (!info) {
-		printk(badinfo, cdevname(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (info->magic != MGSL_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -1008,7 +1008,7 @@ static void mgsl_stop(struct tty_struct *tty)
 	struct mgsl_struct *info = (struct mgsl_struct *)tty->driver_data;
 	unsigned long flags;
 	
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_stop"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_stop"))
 		return;
 	
 	if ( debug_level >= DEBUG_LEVEL_INFO )
@@ -1031,7 +1031,7 @@ static void mgsl_start(struct tty_struct *tty)
 	struct mgsl_struct *info = (struct mgsl_struct *)tty->driver_data;
 	unsigned long flags;
 	
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_start"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_start"))
 		return;
 	
 	if ( debug_level >= DEBUG_LEVEL_INFO )
@@ -2048,7 +2048,7 @@ static void mgsl_put_char(struct tty_struct *tty, unsigned char ch)
 			__FILE__,__LINE__,ch,info->device_name);
 	}		
 	
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_put_char"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_put_char"))
 		return;
 
 	if (!tty || !info->xmit_buf)
@@ -2086,7 +2086,7 @@ static void mgsl_flush_chars(struct tty_struct *tty)
 		printk( "%s(%d):mgsl_flush_chars() entry on %s xmit_cnt=%d\n",
 			__FILE__,__LINE__,info->device_name,info->xmit_cnt);
 	
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_flush_chars"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_flush_chars"))
 		return;
 
 	if (info->xmit_cnt <= 0 || tty->stopped || tty->hw_stopped ||
@@ -2139,7 +2139,7 @@ static int mgsl_write(struct tty_struct * tty, int from_user,
 		printk( "%s(%d):mgsl_write(%s) count=%d\n",
 			__FILE__,__LINE__,info->device_name,count);
 	
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_write"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_write"))
 		goto cleanup;
 
 	if (!tty || !info->xmit_buf || !tmp_buf)
@@ -2315,7 +2315,7 @@ static int mgsl_write_room(struct tty_struct *tty)
 	struct mgsl_struct *info = (struct mgsl_struct *)tty->driver_data;
 	int	ret;
 				
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_write_room"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_write_room"))
 		return 0;
 	ret = SERIAL_XMIT_SIZE - info->xmit_cnt - 1;
 	if (ret < 0)
@@ -2353,7 +2353,7 @@ static int mgsl_chars_in_buffer(struct tty_struct *tty)
 		printk("%s(%d):mgsl_chars_in_buffer(%s)\n",
 			 __FILE__,__LINE__, info->device_name );
 			 
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_chars_in_buffer"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_chars_in_buffer"))
 		return 0;
 		
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -2388,7 +2388,7 @@ static void mgsl_flush_buffer(struct tty_struct *tty)
 		printk("%s(%d):mgsl_flush_buffer(%s) entry\n",
 			 __FILE__,__LINE__, info->device_name );
 	
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_flush_buffer"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_flush_buffer"))
 		return;
 		
 	spin_lock_irqsave(&info->irq_spinlock,flags); 
@@ -2420,7 +2420,7 @@ static void mgsl_send_xchar(struct tty_struct *tty, char ch)
 		printk("%s(%d):mgsl_send_xchar(%s,%d)\n",
 			 __FILE__,__LINE__, info->device_name, ch );
 			 
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_send_xchar"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_send_xchar"))
 		return;
 
 	info->x_char = ch;
@@ -2449,7 +2449,7 @@ static void mgsl_throttle(struct tty_struct * tty)
 		printk("%s(%d):mgsl_throttle(%s) entry\n",
 			 __FILE__,__LINE__, info->device_name );
 
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_throttle"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_throttle"))
 		return;
 	
 	if (I_IXOFF(tty))
@@ -2479,7 +2479,7 @@ static void mgsl_unthrottle(struct tty_struct * tty)
 		printk("%s(%d):mgsl_unthrottle(%s) entry\n",
 			 __FILE__,__LINE__, info->device_name );
 
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_unthrottle"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_unthrottle"))
 		return;
 	
 	if (I_IXOFF(tty)) {
@@ -2989,7 +2989,7 @@ static void mgsl_break(struct tty_struct *tty, int break_state)
 		printk("%s(%d):mgsl_break(%s,%d)\n",
 			 __FILE__,__LINE__, info->device_name, break_state);
 			 
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_break"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_break"))
 		return;
 
 	spin_lock_irqsave(&info->irq_spinlock,flags);
@@ -3021,7 +3021,7 @@ static int mgsl_ioctl(struct tty_struct *tty, struct file * file,
 		printk("%s(%d):mgsl_ioctl %s cmd=%08X\n", __FILE__,__LINE__,
 			info->device_name, cmd );
 	
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_ioctl"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_ioctl"))
 		return -ENODEV;
 
 	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
@@ -3182,7 +3182,7 @@ static void mgsl_close(struct tty_struct *tty, struct file * filp)
 {
 	struct mgsl_struct * info = (struct mgsl_struct *)tty->driver_data;
 
-	if (!info || mgsl_paranoia_check(info, tty->device, "mgsl_close"))
+	if (!info || mgsl_paranoia_check(info, tty->name, "mgsl_close"))
 		return;
 	
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -3291,7 +3291,7 @@ static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout)
 		printk("%s(%d):mgsl_wait_until_sent(%s) entry\n",
 			 __FILE__,__LINE__, info->device_name );
       
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_wait_until_sent"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_wait_until_sent"))
 		return;
 
 	if (!(info->flags & ASYNC_INITIALIZED))
@@ -3360,7 +3360,7 @@ static void mgsl_hangup(struct tty_struct *tty)
 		printk("%s(%d):mgsl_hangup(%s)\n",
 			 __FILE__,__LINE__, info->device_name );
 			 
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_hangup"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_hangup"))
 		return;
 
 	mgsl_flush_buffer(tty);
@@ -3549,7 +3549,7 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 	
 	tty->driver_data = info;
 	info->tty = tty;
-	if (mgsl_paranoia_check(info, tty->device, "mgsl_open"))
+	if (mgsl_paranoia_check(info, tty->name, "mgsl_open"))
 		return -ENODEV;
 		
 	if (debug_level >= DEBUG_LEVEL_INFO)

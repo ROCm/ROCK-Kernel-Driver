@@ -2070,7 +2070,7 @@ static void receive_data(struct channel *ch)
 
 	if(bc->orun) {
 		bc->orun = 0;
-		printk("overrun! DigiBoard device minor=%d\n",minor(tty->device));
+		printk("overrun! DigiBoard device %s\n", tty->name);
 	}
 
 	rxwinon(ch);

@@ -1017,8 +1017,8 @@ static int stl_open(struct tty_struct *tty, struct file *filp)
 	int		brdnr, panelnr, portnr, rc;
 
 #if DEBUG
-	printk("stl_open(tty=%x,filp=%x): device=%x\n", (int) tty,
-		(int) filp, tty->device);
+	printk("stl_open(tty=%x,filp=%x): device=%s\n", (int) tty,
+		(int) filp, tty->name);
 #endif
 
 	minordev = minor(tty->device);

@@ -893,8 +893,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	info->tty = tty;
 
 #ifdef SIMSERIAL_DEBUG
-	printk("rs_open %s%d, count = %d\n", tty->driver->name, info->line,
-	       info->state->count);
+	printk("rs_open %s, count = %d\n", tty->name, info->state->count);
 #endif
 	info->tty->low_latency = (info->flags & ASYNC_LOW_LATENCY) ? 1 : 0;
 

@@ -2888,7 +2888,7 @@ static void receive_data(struct channel *ch)
 	if (bc->orun) 
 	{
 		bc->orun = 0;
-		printk(KERN_WARNING "overrun! DigiBoard device minor = %d\n",minor(tty->device));
+		printk(KERN_WARNING "overrun! DigiBoard device %s\n",tty->name);
 	}
 
 	rxwinon(ch);

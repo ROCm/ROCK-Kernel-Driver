@@ -338,7 +338,7 @@ static int ISILoad_ioctl(struct inode *inode, struct file *filp,
  *
  */
  
-static inline int isicom_paranoia_check(struct isi_port const * port, kdev_t dev, 
+static inline int isicom_paranoia_check(struct isi_port const * port, char *name, 
 					const char * routine)
 {
 #ifdef ISICOM_DEBUG 
@@ -347,11 +347,11 @@ static inline int isicom_paranoia_check(struct isi_port const * port, kdev_t dev
 	static const char * badport = 
 			KERN_WARNING "ISICOM: Warning: NULL isicom port for dev %s in %s.\n";		
 	if (!port) {
-		printk(badport, cdevname(dev), routine);
+		printk(badport, name, routine);
 		return 1;
 	}
 	if (port->magic != ISICOM_MAGIC) {
-		printk(badmagic, cdevname(dev), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}	
 #endif	
@@ -1049,7 +1049,7 @@ static int isicom_open(struct tty_struct * tty, struct file * filp)
 		return -ENODEV;
 	}	
 	port = &isi_ports[line];	
-	if (isicom_paranoia_check(port, tty->device, "isicom_open"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_open"))
 		return -ENODEV;
 		
 #ifdef ISICOM_DEBUG		
@@ -1146,7 +1146,7 @@ static void isicom_close(struct tty_struct * tty, struct file * filp)
 	
 	if (!port)
 		return;
-	if (isicom_paranoia_check(port, tty->device, "isicom_close"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_close"))
 		return;
 	
 #ifdef ISICOM_DEBUG		
@@ -1232,7 +1232,7 @@ static int isicom_write(struct tty_struct * tty, int from_user,
 	printk(KERN_DEBUG "ISICOM: isicom_write for port%d: %d bytes.\n",
 			port->channel+1, count);
 #endif	  	
-	if (isicom_paranoia_check(port, tty->device, "isicom_write"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_write"))
 		return 0;
 	
 	if (!tty || !port->xmit_buf || !tmp_buf)
@@ -1290,7 +1290,7 @@ static void isicom_put_char(struct tty_struct * tty, unsigned char ch)
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	unsigned long flags;
 	
-	if (isicom_paranoia_check(port, tty->device, "isicom_put_char"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_put_char"))
 		return;
 	
 	if (!tty || !port->xmit_buf)
@@ -1317,7 +1317,7 @@ static void isicom_flush_chars(struct tty_struct * tty)
 {
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	
-	if (isicom_paranoia_check(port, tty->device, "isicom_flush_chars"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_flush_chars"))
 		return;
 	
 	if (port->xmit_cnt <= 0 || tty->stopped || tty->hw_stopped ||
@@ -1334,7 +1334,7 @@ static int isicom_write_room(struct tty_struct * tty)
 {
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	int free;
-	if (isicom_paranoia_check(port, tty->device, "isicom_write_room"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_write_room"))
 		return 0;
 	
 	free = SERIAL_XMIT_SIZE - port->xmit_cnt - 1;
@@ -1347,7 +1347,7 @@ static int isicom_write_room(struct tty_struct * tty)
 static int isicom_chars_in_buffer(struct tty_struct * tty)
 {
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
-	if (isicom_paranoia_check(port, tty->device, "isicom_chars_in_buffer"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_chars_in_buffer"))
 		return 0;
 	return port->xmit_cnt;
 }
@@ -1495,7 +1495,7 @@ static int isicom_ioctl(struct tty_struct * tty, struct file * filp,
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	int retval;
 
-	if (isicom_paranoia_check(port, tty->device, "isicom_ioctl"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_ioctl"))
 		return -ENODEV;
 
 	switch(cmd) {
@@ -1556,7 +1556,7 @@ static void isicom_set_termios(struct tty_struct * tty, struct termios * old_ter
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	unsigned long flags;
 	
-	if (isicom_paranoia_check(port, tty->device, "isicom_set_termios"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_set_termios"))
 		return;
 	
 	if (tty->termios->c_cflag == old_termios->c_cflag &&
@@ -1581,7 +1581,7 @@ static void isicom_throttle(struct tty_struct * tty)
 	struct isi_board * card = port->card;
 	unsigned long flags;
 	
-	if (isicom_paranoia_check(port, tty->device, "isicom_throttle"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_throttle"))
 		return;
 	
 	/* tell the card that this port cannot handle any more data for now */
@@ -1598,7 +1598,7 @@ static void isicom_unthrottle(struct tty_struct * tty)
 	struct isi_board * card = port->card;
 	unsigned long flags;
 	
-	if (isicom_paranoia_check(port, tty->device, "isicom_unthrottle"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_unthrottle"))
 		return;
 	
 	/* tell the card that this port is ready to accept more data */
@@ -1613,7 +1613,7 @@ static void isicom_stop(struct tty_struct * tty)
 {
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
 
-	if (isicom_paranoia_check(port, tty->device, "isicom_stop"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_stop"))
 		return;
 	
 	/* this tells the transmitter not to consider this port for
@@ -1626,7 +1626,7 @@ static void isicom_start(struct tty_struct * tty)
 {
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	
-	if (isicom_paranoia_check(port, tty->device, "isicom_start"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_start"))
 		return;
 	
 	/* this tells the transmitter to consider this port for
@@ -1650,7 +1650,7 @@ static void isicom_hangup(struct tty_struct * tty)
 {
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	
-	if (isicom_paranoia_check(port, tty->device, "isicom_hangup"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_hangup"))
 		return;
 	
 	isicom_shutdown_port(port);
@@ -1666,7 +1666,7 @@ static void isicom_flush_buffer(struct tty_struct * tty)
 	struct isi_port * port = (struct isi_port *) tty->driver_data;
 	unsigned long flags;
 	
-	if (isicom_paranoia_check(port, tty->device, "isicom_flush_buffer"))
+	if (isicom_paranoia_check(port, tty->name, "isicom_flush_buffer"))
 		return;
 	
 	save_flags(flags); cli();

@@ -170,9 +170,7 @@ static int irtty_open(struct tty_struct *tty)
 	tty->disc_data = self;
 
 	/* Give self a name */
-	sprintf(name, "%s%d", tty->driver->name,
-		minor(tty->device) - tty->driver->minor_start +
-		tty->driver->name_base);
+	strcpy(name, tty->name);
 
 	hashbin_insert(irtty, (irda_queue_t *) self, (int) self, NULL);
 
@@ -957,9 +955,7 @@ static int irtty_net_open(struct net_device *dev)
 	irtty_stop_receiver(self, FALSE);
 
 	/* Give self a hardware name */
-	sprintf(hwname, "%s%d", tty->driver->name,
-		minor(tty->device) - tty->driver->minor_start +
-		tty->driver->name_base);
+	sprintf(hwname, "%s", tty->name);
 
 	/* 
 	 * Open new IrLAP layer instance, now that everything should be

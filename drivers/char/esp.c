@@ -135,7 +135,7 @@ static int serial_refcount;
   
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
 #define DBG_CNT(s) printk("(%s): [%x] refc=%d, serc=%d, ttyc=%d -> %s\n", \
- cdevname(tty->device), (info->flags), serial_refcount,info->count,tty->count,s)
+ tty->name, (info->flags), serial_refcount,info->count,tty->count,s)
 #else
 #define DBG_CNT(s)
 #endif
@@ -175,7 +175,7 @@ static unsigned char *tmp_buf;
 static DECLARE_MUTEX(tmp_buf_sem);
 
 static inline int serial_paranoia_check(struct esp_struct *info,
-					kdev_t device, const char *routine)
+					char *name, const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
 	static const char badmagic[] = KERN_WARNING
@@ -184,11 +184,11 @@ static inline int serial_paranoia_check(struct esp_struct *info,
 		"Warning: null esp_struct for (%s) in %s\n";
 
 	if (!info) {
-		printk(badinfo, cdevname(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (info->magic != ESP_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -219,7 +219,7 @@ static void rs_stop(struct tty_struct *tty)
 	struct esp_struct *info = (struct esp_struct *)tty->driver_data;
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_stop"))
+	if (serial_paranoia_check(info, tty->name, "rs_stop"))
 		return;
 	
 	save_flags(flags); cli();
@@ -237,7 +237,7 @@ static void rs_start(struct tty_struct *tty)
 	struct esp_struct *info = (struct esp_struct *)tty->driver_data;
 	unsigned long flags;
 	
-	if (serial_paranoia_check(info, tty->device, "rs_start"))
+	if (serial_paranoia_check(info, tty->name, "rs_start"))
 		return;
 	
 	save_flags(flags); cli();
@@ -1256,7 +1256,7 @@ static void rs_put_char(struct tty_struct *tty, unsigned char ch)
 	struct esp_struct *info = (struct esp_struct *)tty->driver_data;
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_put_char"))
+	if (serial_paranoia_check(info, tty->name, "rs_put_char"))
 		return;
 
 	if (!tty || !info->xmit_buf)
@@ -1279,7 +1279,7 @@ static void rs_flush_chars(struct tty_struct *tty)
 	struct esp_struct *info = (struct esp_struct *)tty->driver_data;
 	unsigned long flags;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_flush_chars"))
+	if (serial_paranoia_check(info, tty->name, "rs_flush_chars"))
 		return;
 
 	if (info->xmit_cnt <= 0 || tty->stopped || !info->xmit_buf)
@@ -1301,7 +1301,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	struct esp_struct *info = (struct esp_struct *)tty->driver_data;
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_write"))
+	if (serial_paranoia_check(info, tty->name, "rs_write"))
 		return 0;
 
 	if (!tty || !info->xmit_buf || !tmp_buf)
@@ -1368,7 +1368,7 @@ static int rs_write_room(struct tty_struct *tty)
 	struct esp_struct *info = (struct esp_struct *)tty->driver_data;
 	int	ret;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_write_room"))
+	if (serial_paranoia_check(info, tty->name, "rs_write_room"))
 		return 0;
 	ret = ESP_XMIT_SIZE - info->xmit_cnt - 1;
 	if (ret < 0)
@@ -1380,7 +1380,7 @@ static int rs_chars_in_buffer(struct tty_struct *tty)
 {
 	struct esp_struct *info = (struct esp_struct *)tty->driver_data;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_chars_in_buffer"))
+	if (serial_paranoia_check(info, tty->name, "rs_chars_in_buffer"))
 		return 0;
 	return info->xmit_cnt;
 }
@@ -1389,7 +1389,7 @@ static void rs_flush_buffer(struct tty_struct *tty)
 {
 	struct esp_struct *info = (struct esp_struct *)tty->driver_data;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_flush_buffer"))
+	if (serial_paranoia_check(info, tty->name, "rs_flush_buffer"))
 		return;
 	cli();
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
@@ -1418,7 +1418,7 @@ static void rs_throttle(struct tty_struct * tty)
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (serial_paranoia_check(info, tty->device, "rs_throttle"))
+	if (serial_paranoia_check(info, tty->name, "rs_throttle"))
 		return;
 	
 	cli();
@@ -1440,7 +1440,7 @@ static void rs_unthrottle(struct tty_struct * tty)
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (serial_paranoia_check(info, tty->device, "rs_unthrottle"))
+	if (serial_paranoia_check(info, tty->name, "rs_unthrottle"))
 		return;
 	
 	cli();
@@ -1841,7 +1841,7 @@ static void esp_break(struct tty_struct *tty, int break_state)
 	struct esp_struct * info = (struct esp_struct *)tty->driver_data;
 	unsigned long flags;
 	
-	if (serial_paranoia_check(info, tty->device, "esp_break"))
+	if (serial_paranoia_check(info, tty->name, "esp_break"))
 		return;
 
 	save_flags(flags); cli();
@@ -1864,7 +1864,7 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 	struct async_icount cprev, cnow;	/* kernel counter temps */
 	struct serial_icounter_struct *p_cuser;	/* user space */
 
-	if (serial_paranoia_check(info, tty->device, "rs_ioctl"))
+	if (serial_paranoia_check(info, tty->name, "rs_ioctl"))
 		return -ENODEV;
 
 	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
@@ -2037,7 +2037,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	struct esp_struct * info = (struct esp_struct *)tty->driver_data;
 	unsigned long flags;
 
-	if (!info || serial_paranoia_check(info, tty->device, "rs_close"))
+	if (!info || serial_paranoia_check(info, tty->name, "rs_close"))
 		return;
 	
 	save_flags(flags); cli();
@@ -2140,7 +2140,7 @@ static void rs_wait_until_sent(struct tty_struct *tty, int timeout)
 	unsigned long orig_jiffies, char_time;
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_wait_until_sent"))
+	if (serial_paranoia_check(info, tty->name, "rs_wait_until_sent"))
 		return;
 
 	orig_jiffies = jiffies;
@@ -2179,7 +2179,7 @@ static void esp_hangup(struct tty_struct *tty)
 {
 	struct esp_struct * info = (struct esp_struct *)tty->driver_data;
 	
-	if (serial_paranoia_check(info, tty->device, "esp_hangup"))
+	if (serial_paranoia_check(info, tty->name, "esp_hangup"))
 		return;
 	
 	rs_flush_buffer(tty);
@@ -2366,13 +2366,12 @@ static int esp_open(struct tty_struct *tty, struct file * filp)
 		info = info->next_port;
 
 	if (!info) {
-		serial_paranoia_check(info, tty->device, "esp_open");
+		serial_paranoia_check(info, tty->name, "esp_open");
 		return -ENODEV;
 	}
 
 #ifdef SERIAL_DEBUG_OPEN
-	printk("esp_open %s%d, count = %d\n", tty->driver->name, info->line,
-	       info->count);
+	printk("esp_open %s, count = %d\n", tty->name, info->count);
 #endif
 	MOD_INC_USE_COUNT;
 	info->count++;
@@ -2413,7 +2412,7 @@ static int esp_open(struct tty_struct *tty, struct file * filp)
 	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
-	printk("esp_open ttys%d successful...", info->line);
+	printk("esp_open %s successful...", tty->name);
 #endif
 	return 0;
 }

@@ -210,7 +210,7 @@ static void sx_interrupt(int irq, void * dev_id, struct pt_regs * regs);
 
 
 static inline int sx_paranoia_check(struct specialix_port const * port,
-				    kdev_t device, const char *routine)
+				    char *name, const char *routine)
 {
 #ifdef SPECIALIX_PARANOIA_CHECK
 	static const char *badmagic =
@@ -219,11 +219,11 @@ static inline int sx_paranoia_check(struct specialix_port const * port,
 		KERN_ERR "sx: Warning: null specialix port for device %s in %s\n";
  
 	if (!port) {
-		printk(badinfo, cdevname(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (port->magic != SPECIALIX_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -1467,7 +1467,7 @@ static int sx_open(struct tty_struct * tty, struct file * filp)
 	        board, bp, port, SX_PORT(minor(tty->device)));
 #endif
 
-	if (sx_paranoia_check(port, tty->device, "sx_open"))
+	if (sx_paranoia_check(port, tty->name, "sx_open"))
 		return -ENODEV;
 
 	if ((error = sx_setup_board(bp)))
@@ -1506,7 +1506,7 @@ static void sx_close(struct tty_struct * tty, struct file * filp)
 	unsigned long flags;
 	unsigned long timeout;
 	
-	if (!port || sx_paranoia_check(port, tty->device, "close"))
+	if (!port || sx_paranoia_check(port, tty->name, "close"))
 		return;
 	
 	save_flags(flags); cli();
@@ -1605,7 +1605,7 @@ static int sx_write(struct tty_struct * tty, int from_user,
 	int c, total = 0;
 	unsigned long flags;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_write"))
+	if (sx_paranoia_check(port, tty->name, "sx_write"))
 		return 0;
 	
 	bp = port_Board(port);
@@ -1679,7 +1679,7 @@ static void sx_put_char(struct tty_struct * tty, unsigned char ch)
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
 	unsigned long flags;
 
-	if (sx_paranoia_check(port, tty->device, "sx_put_char"))
+	if (sx_paranoia_check(port, tty->name, "sx_put_char"))
 		return;
 
 	if (!tty || !port->xmit_buf)
@@ -1704,7 +1704,7 @@ static void sx_flush_chars(struct tty_struct * tty)
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
 	unsigned long flags;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_flush_chars"))
+	if (sx_paranoia_check(port, tty->name, "sx_flush_chars"))
 		return;
 	
 	if (port->xmit_cnt <= 0 || tty->stopped || tty->hw_stopped ||
@@ -1724,7 +1724,7 @@ static int sx_write_room(struct tty_struct * tty)
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
 	int	ret;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_write_room"))
+	if (sx_paranoia_check(port, tty->name, "sx_write_room"))
 		return 0;
 
 	ret = SERIAL_XMIT_SIZE - port->xmit_cnt - 1;
@@ -1738,7 +1738,7 @@ static int sx_chars_in_buffer(struct tty_struct *tty)
 {
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_chars_in_buffer"))
+	if (sx_paranoia_check(port, tty->name, "sx_chars_in_buffer"))
 		return 0;
 	
 	return port->xmit_cnt;
@@ -1750,7 +1750,7 @@ static void sx_flush_buffer(struct tty_struct *tty)
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
 	unsigned long flags;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_flush_buffer"))
+	if (sx_paranoia_check(port, tty->name, "sx_flush_buffer"))
 		return;
 
 	save_flags(flags); cli();
@@ -1976,7 +1976,7 @@ static int sx_ioctl(struct tty_struct * tty, struct file * filp,
 	int error;
 	int retval;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_ioctl"))
+	if (sx_paranoia_check(port, tty->name, "sx_ioctl"))
 		return -ENODEV;
 	
 	switch (cmd) {
@@ -2035,7 +2035,7 @@ static void sx_throttle(struct tty_struct * tty)
 	struct specialix_board *bp;
 	unsigned long flags;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_throttle"))
+	if (sx_paranoia_check(port, tty->name, "sx_throttle"))
 		return;
 	
 	bp = port_Board(port);
@@ -2070,7 +2070,7 @@ static void sx_unthrottle(struct tty_struct * tty)
 	struct specialix_board *bp;
 	unsigned long flags;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_unthrottle"))
+	if (sx_paranoia_check(port, tty->name, "sx_unthrottle"))
 		return;
 	
 	bp = port_Board(port);
@@ -2098,7 +2098,7 @@ static void sx_stop(struct tty_struct * tty)
 	struct specialix_board *bp;
 	unsigned long flags;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_stop"))
+	if (sx_paranoia_check(port, tty->name, "sx_stop"))
 		return;
 	
 	bp = port_Board(port);
@@ -2117,7 +2117,7 @@ static void sx_start(struct tty_struct * tty)
 	struct specialix_board *bp;
 	unsigned long flags;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_start"))
+	if (sx_paranoia_check(port, tty->name, "sx_start"))
 		return;
 	
 	bp = port_Board(port);
@@ -2158,7 +2158,7 @@ static void sx_hangup(struct tty_struct * tty)
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
 	struct specialix_board *bp;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_hangup"))
+	if (sx_paranoia_check(port, tty->name, "sx_hangup"))
 		return;
 	
 	bp = port_Board(port);
@@ -2177,7 +2177,7 @@ static void sx_set_termios(struct tty_struct * tty, struct termios * old_termios
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
 	unsigned long flags;
 				
-	if (sx_paranoia_check(port, tty->device, "sx_set_termios"))
+	if (sx_paranoia_check(port, tty->name, "sx_set_termios"))
 		return;
 	
 	if (tty->termios->c_cflag == old_termios->c_cflag &&

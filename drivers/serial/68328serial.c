@@ -151,20 +151,20 @@ static unsigned char tmp_buf[SERIAL_XMIT_SIZE]; /* This is cheating */
 DECLARE_MUTEX(tmp_buf_sem);
 
 static inline int serial_paranoia_check(struct m68k_serial *info,
-					kdev_t device, const char *routine)
+					char *name, const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
 	static const char *badmagic =
-		"Warning: bad magic number for serial struct (%d, %d) in %s\n";
+		"Warning: bad magic number for serial struct %s in %s\n";
 	static const char *badinfo =
-		"Warning: null m68k_serial for (%d, %d) in %s\n";
+		"Warning: null m68k_serial for %s in %s\n";
 
 	if (!info) {
-		printk(badinfo, major(device), minor(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (info->magic != SERIAL_MAGIC) {
-		printk(badmagic, major(device), minor(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -216,7 +216,7 @@ static void rs_stop(struct tty_struct *tty)
 	m68328_uart *uart = &uart_addr[info->line];
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_stop"))
+	if (serial_paranoia_check(info, tty->name, "rs_stop"))
 		return;
 	
 	save_flags(flags); cli();
@@ -246,7 +246,7 @@ static void rs_start(struct tty_struct *tty)
 	m68328_uart *uart = &uart_addr[info->line];
 	unsigned long flags;
 	
-	if (serial_paranoia_check(info, tty->device, "rs_start"))
+	if (serial_paranoia_check(info, tty->name, "rs_start"))
 		return;
 	
 	save_flags(flags); cli();
@@ -711,7 +711,7 @@ static void rs_set_ldisc(struct tty_struct *tty)
 {
 	struct m68k_serial *info = (struct m68k_serial *)tty->driver_data;
 
-	if (serial_paranoia_check(info, tty->device, "rs_set_ldisc"))
+	if (serial_paranoia_check(info, tty->name, "rs_set_ldisc"))
 		return;
 
 	info->is_cons = (tty->termios->c_line == N_TTY);
@@ -725,7 +725,7 @@ static void rs_flush_chars(struct tty_struct *tty)
 	m68328_uart *uart = &uart_addr[info->line];
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_flush_chars"))
+	if (serial_paranoia_check(info, tty->name, "rs_flush_chars"))
 		return;
 #ifndef USE_INTS
 	for(;;) {
@@ -774,7 +774,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 	m68328_uart *uart = &uart_addr[info->line];
 	unsigned long flags;
 
-	if (serial_paranoia_check(info, tty->device, "rs_write"))
+	if (serial_paranoia_check(info, tty->name, "rs_write"))
 		return 0;
 
 	if (!tty || !info->xmit_buf)
@@ -838,7 +838,7 @@ static int rs_write_room(struct tty_struct *tty)
 	struct m68k_serial *info = (struct m68k_serial *)tty->driver_data;
 	int	ret;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_write_room"))
+	if (serial_paranoia_check(info, tty->name, "rs_write_room"))
 		return 0;
 	ret = SERIAL_XMIT_SIZE - info->xmit_cnt - 1;
 	if (ret < 0)
@@ -850,7 +850,7 @@ static int rs_chars_in_buffer(struct tty_struct *tty)
 {
 	struct m68k_serial *info = (struct m68k_serial *)tty->driver_data;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_chars_in_buffer"))
+	if (serial_paranoia_check(info, tty->name, "rs_chars_in_buffer"))
 		return 0;
 	return info->xmit_cnt;
 }
@@ -859,7 +859,7 @@ static void rs_flush_buffer(struct tty_struct *tty)
 {
 	struct m68k_serial *info = (struct m68k_serial *)tty->driver_data;
 				
-	if (serial_paranoia_check(info, tty->device, "rs_flush_buffer"))
+	if (serial_paranoia_check(info, tty->name, "rs_flush_buffer"))
 		return;
 	cli();
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
@@ -882,7 +882,7 @@ static void rs_throttle(struct tty_struct * tty)
 {
 	struct m68k_serial *info = (struct m68k_serial *)tty->driver_data;
 
-	if (serial_paranoia_check(info, tty->device, "rs_throttle"))
+	if (serial_paranoia_check(info, tty->name, "rs_throttle"))
 		return;
 	
 	if (I_IXOFF(tty))
@@ -895,7 +895,7 @@ static void rs_unthrottle(struct tty_struct * tty)
 {
 	struct m68k_serial *info = (struct m68k_serial *)tty->driver_data;
 
-	if (serial_paranoia_check(info, tty->device, "rs_unthrottle"))
+	if (serial_paranoia_check(info, tty->name, "rs_unthrottle"))
 		return;
 	
 	if (I_IXOFF(tty)) {
@@ -1035,7 +1035,7 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 	struct m68k_serial * info = (struct m68k_serial *)tty->driver_data;
 	int retval;
 
-	if (serial_paranoia_check(info, tty->device, "rs_ioctl"))
+	if (serial_paranoia_check(info, tty->name, "rs_ioctl"))
 		return -ENODEV;
 
 	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
@@ -1140,7 +1140,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	m68328_uart *uart = &uart_addr[info->line];
 	unsigned long flags;
 
-	if (!info || serial_paranoia_check(info, tty->device, "rs_close"))
+	if (!info || serial_paranoia_check(info, tty->name, "rs_close"))
 		return;
 	
 	save_flags(flags); cli();
@@ -1233,7 +1233,7 @@ void rs_hangup(struct tty_struct *tty)
 {
 	struct m68k_serial * info = (struct m68k_serial *)tty->driver_data;
 	
-	if (serial_paranoia_check(info, tty->device, "rs_hangup"))
+	if (serial_paranoia_check(info, tty->name, "rs_hangup"))
 		return;
 	
 	rs_flush_buffer(tty);
@@ -1381,7 +1381,7 @@ int rs_open(struct tty_struct *tty, struct file * filp)
 
 	info = &m68k_soft[line];
 
-	if (serial_paranoia_check(info, tty->device, "rs_open"))
+	if (serial_paranoia_check(info, tty->name, "rs_open"))
 		return -ENODEV;
 
 	info->count++;

@@ -262,6 +262,7 @@ struct tty_struct {
 	struct tty_driver *driver;
 	struct tty_ldisc ldisc;
 	struct termios *termios, *termios_locked;
+	char name[64];
 	int pgrp;
 	int session;
 	kdev_t	device;

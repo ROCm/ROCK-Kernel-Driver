@@ -441,7 +441,7 @@ static struct miscdevice sx_fw_device = {
 /* This doesn't work. Who's paranoid around here? Not me! */
 
 static inline int sx_paranoia_check(struct sx_port const * port,
-				    kdev_t device, const char *routine)
+				    char *name, const char *routine)
 {
 
 	static const char *badmagic =
@@ -450,11 +450,11 @@ static inline int sx_paranoia_check(struct sx_port const * port,
 	  KERN_ERR "sx: Warning: null sx port for device %s in %s\n";
  
 	if (!port) {
-		printk(badinfo, cdevname(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (port->magic != SX_MAGIC) {
-		printk(badmagic, cdevname(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 

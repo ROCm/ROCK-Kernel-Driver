@@ -172,29 +172,16 @@ static inline void free_tty_struct(struct tty_struct *tty)
 	kfree(tty);
 }
 
-/*
- * This routine returns the name of tty.
- */
-static char *
-_tty_make_name(struct tty_struct *tty, const char *name, char *buf)
-{
-	int idx = (tty)? minor(tty->device) - tty->driver->minor_start:0;
-
-	if (!tty) /* Hmm.  NULL pointer.  That's fun. */
-		strcpy(buf, "NULL tty");
-	else
-		sprintf(buf, name,
-			idx + tty->driver->name_base);
-		
-	return buf;
-}
-
 #define TTY_NUMBER(tty) (minor((tty)->device) - (tty)->driver->minor_start + \
 			 (tty)->driver->name_base)
 
 char *tty_name(struct tty_struct *tty, char *buf)
 {
-	return _tty_make_name(tty, (tty)?tty->driver->name:NULL, buf);
+	if (!tty) /* Hmm.  NULL pointer.  That's fun. */
+		strcpy(buf, "NULL tty");
+	else
+		strcpy(buf, tty->name);
+	return buf;
 }
 
 EXPORT_SYMBOL(tty_name);
@@ -238,7 +225,7 @@ static int check_tty_count(struct tty_struct *tty, const char *routine)
 	if (tty->count != count) {
 		printk(KERN_WARNING "Warning: dev (%s) tty->count(%d) "
 				    "!= #fd's(%d) in %s\n",
-		       cdevname(tty->device), tty->count, count, routine);
+		       tty->name, tty->count, count, routine);
 		return count;
        }	
 #endif
@@ -856,6 +843,8 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 	initialize_tty_struct(tty);
 	tty->device = device;
 	tty->driver = driver;
+	sprintf(tty->name, "%s%d",
+		driver->name, idx + driver->name_base);
 
 	tp_loc = &driver->termios[idx];
 	if (!*tp_loc) {
@@ -883,6 +872,8 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 		o_tty->device = mk_kdev(driver->other->major,
 					driver->other->minor_start + idx);
 		o_tty->driver = driver->other;
+		sprintf(o_tty->name, "%s%d",
+			driver->other->name, idx + driver->other->name_base);
 
 		o_tp_loc  = &driver->other->termios[idx];
 		if (!*o_tp_loc) {
@@ -1086,24 +1077,24 @@ static void release_dev(struct file * filp)
 #ifdef TTY_PARANOIA_CHECK
 	if (idx < 0 || idx >= tty->driver->num) {
 		printk(KERN_DEBUG "release_dev: bad idx when trying to "
-				  "free (%s)\n", cdevname(tty->device));
+				  "free (%s)\n", tty->name);
 		return;
 	}
 	if (tty != tty->driver->table[idx]) {
 		printk(KERN_DEBUG "release_dev: driver.table[%d] not tty "
-				  "for (%s)\n", idx, cdevname(tty->device));
+				  "for (%s)\n", idx, tty->name);
 		return;
 	}
 	if (tty->termios != tty->driver->termios[idx]) {
 		printk(KERN_DEBUG "release_dev: driver.termios[%d] not termios "
 		       "for (%s)\n",
-		       idx, cdevname(tty->device));
+		       idx, tty->name);
 		return;
 	}
 	if (tty->termios_locked != tty->driver->termios_locked[idx]) {
 		printk(KERN_DEBUG "release_dev: driver.termios_locked[%d] not "
 		       "termios_locked for (%s)\n",
-		       idx, cdevname(tty->device));
+		       idx, tty->name);
 		return;
 	}
 #endif
@@ -1118,20 +1109,20 @@ static void release_dev(struct file * filp)
 		if (o_tty != tty->driver->other->table[idx]) {
 			printk(KERN_DEBUG "release_dev: other->table[%d] "
 					  "not o_tty for (%s)\n",
-			       idx, cdevname(tty->device));
+			       idx, tty->name);
 			return;
 		}
 		if (o_tty->termios != tty->driver->other->termios[idx]) {
 			printk(KERN_DEBUG "release_dev: other->termios[%d] "
 					  "not o_termios for (%s)\n",
-			       idx, cdevname(tty->device));
+			       idx, tty->name);
 			return;
 		}
 		if (o_tty->termios_locked != 
 		      tty->driver->other->termios_locked[idx]) {
 			printk(KERN_DEBUG "release_dev: other->termios_locked["
 					  "%d] not o_termios_locked for (%s)\n",
-			       idx, cdevname(tty->device));
+			       idx, tty->name);
 			return;
 		}
 		if (o_tty->link != tty) {

@@ -148,20 +148,20 @@ static void	mcfrs_change_speed(struct mcf_serial *info);
 
 
 static inline int serial_paranoia_check(struct mcf_serial *info,
-					kdev_t device, const char *routine)
+					char *name, const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
 	static const char *badmagic =
-		"MCFRS(warning): bad magic number for serial struct (%d, %d) in %s\n";
+		"MCFRS(warning): bad magic number for serial struct %s in %s\n";
 	static const char *badinfo =
-		"MCFRS(warning): null mcf_serial for (%d, %d) in %s\n";
+		"MCFRS(warning): null mcf_serial for %s in %s\n";
 
 	if (!info) {
-		printk(badinfo, MAJOR(device), MINOR(device), routine);
+		printk(badinfo, name, routine);
 		return 1;
 	}
 	if (info->magic != SERIAL_MAGIC) {
-		printk(badmagic, MAJOR(device), MINOR(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -257,7 +257,7 @@ static void mcfrs_stop(struct tty_struct *tty)
 	struct mcf_serial	*info = (struct mcf_serial *)tty->driver_data;
 	unsigned long		flags;
 
-	if (serial_paranoia_check(info, tty->device, "mcfrs_stop"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_stop"))
 		return;
 	
 	local_irq_save(flags);
@@ -273,7 +273,7 @@ static void mcfrs_start(struct tty_struct *tty)
 	struct mcf_serial	*info = (struct mcf_serial *)tty->driver_data;
 	unsigned long		flags;
 	
-	if (serial_paranoia_check(info, tty->device, "mcfrs_start"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_start"))
 		return;
 
 	local_irq_save(flags);
@@ -712,7 +712,7 @@ static void mcfrs_flush_chars(struct tty_struct *tty)
 	struct mcf_serial	*info = (struct mcf_serial *)tty->driver_data;
 	unsigned long		flags;
 
-	if (serial_paranoia_check(info, tty->device, "mcfrs_flush_chars"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_flush_chars"))
 		return;
 
 	if (info->xmit_cnt <= 0 || tty->stopped || tty->hw_stopped ||
@@ -740,7 +740,7 @@ static int mcfrs_write(struct tty_struct * tty, int from_user,
 		__FILE__, __LINE__, tty, from_user, buf, count);
 #endif
 
-	if (serial_paranoia_check(info, tty->device, "mcfrs_write"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_write"))
 		return 0;
 
 	if (!tty || !info->xmit_buf)
@@ -792,7 +792,7 @@ static int mcfrs_write_room(struct tty_struct *tty)
 	struct mcf_serial *info = (struct mcf_serial *)tty->driver_data;
 	int	ret;
 				
-	if (serial_paranoia_check(info, tty->device, "mcfrs_write_room"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_write_room"))
 		return 0;
 	ret = SERIAL_XMIT_SIZE - info->xmit_cnt - 1;
 	if (ret < 0)
@@ -804,7 +804,7 @@ static int mcfrs_chars_in_buffer(struct tty_struct *tty)
 {
 	struct mcf_serial *info = (struct mcf_serial *)tty->driver_data;
 				
-	if (serial_paranoia_check(info, tty->device, "mcfrs_chars_in_buffer"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_chars_in_buffer"))
 		return 0;
 	return info->xmit_cnt;
 }
@@ -814,7 +814,7 @@ static void mcfrs_flush_buffer(struct tty_struct *tty)
 	struct mcf_serial	*info = (struct mcf_serial *)tty->driver_data;
 	unsigned long		flags;
 				
-	if (serial_paranoia_check(info, tty->device, "mcfrs_flush_buffer"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_flush_buffer"))
 		return;
 
 	local_irq_save(flags);
@@ -845,7 +845,7 @@ static void mcfrs_throttle(struct tty_struct * tty)
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (serial_paranoia_check(info, tty->device, "mcfrs_throttle"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_throttle"))
 		return;
 	
 	if (I_IXOFF(tty))
@@ -864,7 +864,7 @@ static void mcfrs_unthrottle(struct tty_struct * tty)
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (serial_paranoia_check(info, tty->device, "mcfrs_unthrottle"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_unthrottle"))
 		return;
 	
 	if (I_IXOFF(tty)) {
@@ -1002,7 +1002,7 @@ static int mcfrs_ioctl(struct tty_struct *tty, struct file * file,
 	int retval, error;
 	int dtr, rts;
 
-	if (serial_paranoia_check(info, tty->device, "mcfrs_ioctl"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_ioctl"))
 		return -ENODEV;
 
 	if ((cmd != TIOCGSERIAL) && (cmd != TIOCSSERIAL) &&
@@ -1159,7 +1159,7 @@ static void mcfrs_close(struct tty_struct *tty, struct file * filp)
 	struct mcf_serial	*info = (struct mcf_serial *)tty->driver_data;
 	unsigned long		flags;
 
-	if (!info || serial_paranoia_check(info, tty->device, "mcfrs_close"))
+	if (!info || serial_paranoia_check(info, tty->name, "mcfrs_close"))
 		return;
 	
 	local_irq_save(flags);
@@ -1264,7 +1264,7 @@ void mcfrs_hangup(struct tty_struct *tty)
 {
 	struct mcf_serial * info = (struct mcf_serial *)tty->driver_data;
 	
-	if (serial_paranoia_check(info, tty->device, "mcfrs_hangup"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_hangup"))
 		return;
 	
 	mcfrs_flush_buffer(tty);
@@ -1420,11 +1420,10 @@ int mcfrs_open(struct tty_struct *tty, struct file * filp)
 	if ((line < 0) || (line >= NR_PORTS))
 		return -ENODEV;
 	info = mcfrs_table + line;
-	if (serial_paranoia_check(info, tty->device, "mcfrs_open"))
+	if (serial_paranoia_check(info, tty->name, "mcfrs_open"))
 		return -ENODEV;
 #ifdef SERIAL_DEBUG_OPEN
-	printk("mcfrs_open %s%d, count = %d\n", tty->driver->name, info->line,
-	       info->count);
+	printk("mcfrs_open %s, count = %d\n", tty->name, info->count);
 #endif
 	info->count++;
 	tty->driver_data = info;
@@ -1458,7 +1457,7 @@ int mcfrs_open(struct tty_struct *tty, struct file * filp)
 	info->pgrp = current->pgrp;
 
 #ifdef SERIAL_DEBUG_OPEN
-	printk("mcfrs_open ttyS%d successful...\n", info->line);
+	printk("mcfrs_open %s successful...\n", tty->name);
 #endif
 	return 0;
 }

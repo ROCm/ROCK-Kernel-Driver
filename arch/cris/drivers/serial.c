@@ -3302,8 +3302,7 @@ rs_open(struct tty_struct *tty, struct file * filp)
 		return -ENODEV; 
   
 #ifdef SERIAL_DEBUG_OPEN
-	printk("[%d] rs_open %s%d, count = %d\n", current->pid,
-	       tty->driver->name, info->line,
+	printk("[%d] rs_open %s, count = %d\n", current->pid, tty->name,
 	       info->count);
 #endif
 
