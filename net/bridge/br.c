@@ -31,6 +31,8 @@ int (*br_should_route_hook) (struct sk_buff **pskb) = NULL;
 
 static int __init br_init(void)
 {
+	br_fdb_init();
+
 #ifdef CONFIG_BRIDGE_NETFILTER
 	if (br_netfilter_init())
 		return 1;
@@ -65,6 +67,7 @@ static void __exit br_deinit(void)
 #endif
 
 	br_handle_frame_hook = NULL;
+	br_fdb_fini();
 }
 
 EXPORT_SYMBOL(br_should_route_hook);

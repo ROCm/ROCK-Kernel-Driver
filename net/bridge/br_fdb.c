@@ -22,6 +22,22 @@
 #include <asm/uaccess.h>
 #include "br_private.h"
 
+static kmem_cache_t *br_fdb_cache;
+
+void __init br_fdb_init(void)
+{
+	br_fdb_cache = kmem_cache_create("bridge_fdb_cache",
+					 sizeof(struct net_bridge_fdb_entry),
+					 0,
+					 SLAB_HWCACHE_ALIGN, NULL, NULL);
+}
+
+void __exit br_fdb_fini(void)
+{
+	kmem_cache_destroy(br_fdb_cache);
+}
+
+
 /* if topology_changing then use forward_delay (default 15 sec)
  * otherwise keep longer (default 5 minutes)
  */
@@ -37,7 +53,7 @@ static __inline__ int has_expired(const struct net_bridge *br,
 		&& time_before_eq(fdb->ageing_timer + hold_time(br), jiffies);
 }
 
-static __inline__ void copy_fdb(struct __fdb_entry *ent, 
+static inline void copy_fdb(struct __fdb_entry *ent, 
 				const struct net_bridge_fdb_entry *f)
 {
 	memset(ent, 0, sizeof(struct __fdb_entry));
@@ -175,7 +191,7 @@ struct net_bridge_fdb_entry *br_fdb_get(struct net_bridge *br, unsigned char *ad
 void br_fdb_put(struct net_bridge_fdb_entry *ent)
 {
 	if (atomic_dec_and_test(&ent->use_count))
-		kfree(ent);
+		kmem_cache_free(br_fdb_cache, ent);
 }
 
 int br_fdb_get_entries(struct net_bridge *br,
@@ -222,7 +238,7 @@ int br_fdb_get_entries(struct net_bridge *br,
 			
 			/* entry was deleted during copy_to_user */
 			if (atomic_dec_and_test(&f->use_count)) {
-				kfree(f);
+				kmem_cache_free(br_fdb_cache, f);
 				num = -EAGAIN;
 				goto out;
 			}
@@ -282,7 +298,7 @@ int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 		}
 	}
 
-	fdb = kmalloc(sizeof(*fdb), GFP_ATOMIC);
+	fdb = kmem_cache_alloc(br_fdb_cache, GFP_ATOMIC);
 	if (unlikely(fdb == NULL)) {
 		ret = -ENOMEM;
 		goto out;

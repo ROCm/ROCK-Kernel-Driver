@@ -127,6 +127,8 @@ extern void br_dev_setup(struct net_device *dev);
 extern int br_dev_xmit(struct sk_buff *skb, struct net_device *dev);
 
 /* br_fdb.c */
+extern void br_fdb_init(void);
+extern void br_fdb_fini(void);
 extern void br_fdb_changeaddr(struct net_bridge_port *p,
 			      const unsigned char *newaddr);
 extern void br_fdb_cleanup(unsigned long arg);
