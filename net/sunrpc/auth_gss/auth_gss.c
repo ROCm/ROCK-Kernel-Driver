@@ -690,12 +690,12 @@ gss_marshal(struct rpc_task *task, u32 *p, int ruid)
 		goto out_put_ctx;
 	}
 	spin_lock(&ctx->gc_seq_lock);
-	task->tk_gss_seqno = ctx->gc_seq++;
+	req->rq_seqno = ctx->gc_seq++;
 	spin_unlock(&ctx->gc_seq_lock);
 
 	*p++ = htonl((u32) RPC_GSS_VERSION);
 	*p++ = htonl((u32) ctx->gc_proc);
-	*p++ = htonl((u32) task->tk_gss_seqno);
+	*p++ = htonl((u32) req->rq_seqno);
 	*p++ = htonl((u32) service);
 	p = xdr_encode_netobj(p, &ctx->gc_wire_ctx);
 	*cred_len = htonl((p - (cred_len + 1)) << 2);
@@ -766,7 +766,7 @@ gss_validate(struct rpc_task *task, u32 *p)
                 goto out_bad;
 	if (flav != RPC_AUTH_GSS)
 		goto out_bad;
-	seq = htonl(task->tk_gss_seqno);
+	seq = htonl(task->tk_rqstp->rq_seqno);
 	iov.iov_base = &seq;
 	iov.iov_len = sizeof(seq);
 	xdr_buf_from_iov(&iov, &verf_buf);
@@ -832,7 +832,7 @@ gss_wrap_req(struct rpc_task *task,
 
 			integ_len = p++;
 			offset = (u8 *)p - (u8 *)snd_buf->head[0].iov_base;
-			*p++ = htonl(task->tk_gss_seqno);
+			*p++ = htonl(req->rq_seqno);
 
 			status = encode(rqstp, p, obj);
 			if (status)
@@ -909,7 +909,7 @@ gss_unwrap_resp(struct rpc_task *task,
 			mic_offset = integ_len + data_offset;
 			if (mic_offset > rcv_buf->len)
 				goto out;
-			if (ntohl(*p++) != task->tk_gss_seqno)
+			if (ntohl(*p++) != req->rq_seqno)
 				goto out;
 
 			if (xdr_buf_subsegment(rcv_buf, &integ_buf, data_offset,

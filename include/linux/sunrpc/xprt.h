@@ -95,6 +95,7 @@ struct rpc_rqst {
 	struct rpc_rqst *	rq_next;	/* free list */
 	int			rq_cong;	/* has incremented xprt->cong */
 	int			rq_received;	/* receive completed */
+	u32			rq_seqno;	/* gss seq no. used on req. */
 
 	struct list_head	rq_list;
 
