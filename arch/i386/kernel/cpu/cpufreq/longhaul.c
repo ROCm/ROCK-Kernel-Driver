@@ -194,7 +194,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 
 #define ROUNDING	0xf
 
-static int _guess (int guess, int maxmult)
+static int _guess (int guess)
 {
 	int target;
 
@@ -207,7 +207,7 @@ static int _guess (int guess, int maxmult)
 }
 
 
-static int guess_fsb(int maxmult)
+static int guess_fsb(void)
 {
 	int speed = (cpu_khz/1000);
 	int i;
@@ -217,14 +217,14 @@ static int guess_fsb(int maxmult)
 	speed &= ~ROUNDING;
 
 	for (i=0; i<3; i++) {
-		if (_guess(speeds[i],maxmult) == speed)
+		if (_guess(speeds[i]) == speed)
 			return speeds[i];
 	}
 	return 0;
 }
 
 
-static int __init longhaul_get_ranges (void)
+static int __init longhaul_get_ranges(void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 	unsigned long invalue;
@@ -248,7 +248,7 @@ static int __init longhaul_get_ranges (void)
 		if (c->x86_model==6)
 			fsb = eblcr_fsb_table_v1[invalue];
 		else
-			fsb = guess_fsb(maxmult);
+			fsb = guess_fsb();
 		break;
 
 	case 2:
