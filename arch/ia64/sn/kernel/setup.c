@@ -90,7 +90,7 @@ int numionodes;
  * early_printk won't try to access the UART before
  * master_node_bedrock_address is properly calculated.
  */
-u64 master_node_bedrock_address;
+u64 __iomem *master_node_bedrock_address;
 
 static void sn_init_pdas(char **);
 static void scan_for_ionodes(void);
@@ -196,10 +196,10 @@ void __init early_sn_setup(void)
 	}
 
 	if (IS_RUNNING_ON_SIMULATOR()) {
-		master_node_bedrock_address =
-		    (u64) REMOTE_HUB(get_nasid(), SH_JUNK_BUS_UART0);
-		printk(KERN_DEBUG
-		       "early_sn_setup: setting master_node_bedrock_address to 0x%lx\n",
+		master_node_bedrock_address = (u64 __iomem *)
+			REMOTE_HUB(get_nasid(), SH_JUNK_BUS_UART0);
+		printk(KERN_DEBUG "early_sn_setup: setting "
+		       "master_node_bedrock_address to 0x%p\n",
 		       master_node_bedrock_address);
 	}
 }
@@ -313,10 +313,10 @@ void __init sn_setup(char **cmdline_p)
 	platform_intr_list[ACPI_INTERRUPT_CPEI] = IA64_CPE_VECTOR;
 
 	if (IS_RUNNING_ON_SIMULATOR()) {
-		master_node_bedrock_address =
-		    (u64) REMOTE_HUB(get_nasid(), SH_JUNK_BUS_UART0);
-		printk(KERN_DEBUG
-		       "sn_setup: setting master_node_bedrock_address to 0x%lx\n",
+		master_node_bedrock_address = (u64 __iomem *)
+			REMOTE_HUB(get_nasid(), SH_JUNK_BUS_UART0);
+		printk(KERN_DEBUG "sn_setup: setting "
+		       "master_node_bedrock_address to 0x%p\n",
 		       master_node_bedrock_address);
 	}
 

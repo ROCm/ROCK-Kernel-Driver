@@ -108,7 +108,7 @@ static struct sn_cons_port sal_console_port;
 /* Only used if USE_DYNAMIC_MINOR is set to 1 */
 static struct miscdevice misc;	/* used with misc_register for dynamic */
 
-extern u64 master_node_bedrock_address;
+extern u64 __iomem *master_node_bedrock_address;
 extern void early_sn_setup(void);
 
 #undef DEBUG
