@@ -9,6 +9,7 @@ define_bool CONFIG_SUPERH y
 define_bool CONFIG_UID16 y
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+define_bool CONFIG_GENERIC_ISA_DMA y
 
 source init/Config.in
 

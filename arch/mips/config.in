@@ -4,6 +4,7 @@
 #
 define_bool CONFIG_MIPS y
 define_bool CONFIG_SMP n
+define_bool CONFIG_GENERIC_ISA_DMA y
 
 mainmenu_name "Linux Kernel Configuration"
 

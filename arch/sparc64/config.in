@@ -26,6 +26,7 @@ bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
 define_bool CONFIG_HAVE_DEC_LOCK y
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
+define_bool CONFIG_GENERIC_ISA_DMA y
 define_bool CONFIG_ISA n
 define_bool CONFIG_ISAPNP n
 define_bool CONFIG_EISA n

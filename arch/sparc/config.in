@@ -6,6 +6,7 @@ mainmenu_name "Linux/SPARC Kernel Configuration"
 
 define_bool CONFIG_UID16 y
 define_bool CONFIG_HIGHMEM y
+define_bool CONFIG_GENERIC_ISA_DMA y
 
 source init/Config.in
 

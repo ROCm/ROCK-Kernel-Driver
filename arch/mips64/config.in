@@ -26,6 +26,7 @@ endmenu
 
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+define_bool CONFIG_GENERIC_ISA_DMA y
 
 #
 # Select some configuration options automatically based on user selections
