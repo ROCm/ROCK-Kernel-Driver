@@ -22,12 +22,6 @@
 #endif
 #endif
 
-#ifdef CONFIG_X86_NUMAQ
- #define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
-#else
- #define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */
-#endif
-
 #define BAD_APICID 0xFFu
 #ifdef CONFIG_SMP
 #ifndef __ASSEMBLY__

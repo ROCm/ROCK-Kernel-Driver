@@ -25,6 +25,9 @@ static inline unsigned long calculate_ldr(unsigned long old)
 #define APIC_DFR_VALUE	(x86_summit ? APIC_DFR_CLUSTER : APIC_DFR_FLAT)
 #define TARGET_CPUS	(x86_summit ? XAPIC_DEST_CPUS_MASK : cpu_online_map)
 
+#define INT_DELIVERY_MODE dest_Fixed
+#define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
+
 #define APIC_BROADCAST_ID     (x86_summit ? 0xFF : 0x0F)
 #define check_apicid_used(bitmap, apicid) (0)
 

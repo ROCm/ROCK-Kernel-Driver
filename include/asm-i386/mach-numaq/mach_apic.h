@@ -8,6 +8,9 @@
 #define no_balance_irq (1)
 #define esr_disable (1)
 
+#define INT_DELIVERY_MODE dest_LowestPrio
+#define INT_DEST_MODE 0     /* physical delivery on LOCAL quad */
+ 
 #define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) ((bitmap) & (1 << (apicid)))
 

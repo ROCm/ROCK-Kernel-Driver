@@ -21,6 +21,9 @@ static inline int apic_id_registered(void)
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
 #define TARGET_CPUS	((cpu_online_map < 0xf)?cpu_online_map:0xf)
 
+#define INT_DELIVERY_MODE dest_LowestPrio
+#define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
+
 #define APIC_BROADCAST_ID     (0x0f)
 #define check_apicid_used(bitmap, apicid) (0)
 
