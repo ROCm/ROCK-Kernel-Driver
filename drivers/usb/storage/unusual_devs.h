@@ -207,7 +207,7 @@ UNUSUAL_DEV(  0x04e6, 0x0005, 0x0100, 0x0208,
 UNUSUAL_DEV(  0x04e6, 0x0006, 0x0100, 0x0205, 
 		"Shuttle",
 		"eUSB MMC Adapter",
-		US_SC_SCSI, US_PR_CB, NULL, 
+		US_SC_SCSI, US_PR_DEVICE, NULL, 
 		US_FL_SINGLE_LUN), 
 
 UNUSUAL_DEV(  0x04e6, 0x0007, 0x0100, 0x0200, 
@@ -359,12 +359,18 @@ UNUSUAL_DEV(  0x057b, 0x0000, 0x0300, 0x9999,
 UNUSUAL_DEV(  0x0595, 0x4343, 0x0000, 0x2210,
 		"Fujifilm",
 		"Digital Camera EX-20 DSC",
-		US_SC_8070, US_PR_CBI, NULL, 0 ),
+		US_SC_8070, US_PR_DEVICE, NULL, 0 ),
 
 UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200, 
 		"LaCie",
 		"USB Hard Disk",
 		US_SC_RBC, US_PR_CB, NULL, 0 ), 
+
+/* Submitted by Jol Bourquard <numlock@freesurf.ch> */
+UNUSUAL_DEV(  0x05ab, 0x0060, 0x1104, 0x1110,
+		"In-System",
+		"PyroGate External CD-ROM Enclosure (FCD-523)",
+		US_SC_SCSI, US_PR_BULK, NULL, 0 ),
 
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,
@@ -396,8 +402,8 @@ UNUSUAL_DEV(  0x05ab, 0x5701, 0x0100, 0x0110,
 UNUSUAL_DEV(  0x05dc, 0x0001, 0x0000, 0x0001,
 		"Lexar",
 		"Jumpshot USB CF Reader",
-		US_SC_DEVICE, US_PR_JUMPSHOT, NULL,
-		US_FL_MODE_XLATE ),
+		US_SC_SCSI, US_PR_JUMPSHOT, NULL,
+		US_FL_NEED_OVERRIDE | US_FL_MODE_XLATE ),
 #endif
 
 /* Reported by Blake Matheny <bmatheny@purdue.edu> */
@@ -628,19 +634,13 @@ UNUSUAL_DEV(  0x07c4, 0xa400, 0x0000, 0xffff,
  * - Some cameras with idProduct=0x1001 and bcdDevice=0x1000 have
  *   bInterfaceProtocol=0x00 (US_PR_CBI) while others have 0x01 (US_PR_CB).
  *   So don't remove the US_PR_CB override!
+ * - Cameras with bcdDevice=0x9009 require the US_SC_8070 override.
  */
-UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
+UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9999,
 		"Casio",
 		"QV DigitalCamera",
-		US_SC_DEVICE, US_PR_CB, NULL,
+		US_SC_8070, US_PR_CB, NULL,
 		US_FL_NEED_OVERRIDE | US_FL_FIX_INQUIRY ),
-
-/* Later Casio cameras apparently tell the truth */
-UNUSUAL_DEV( 0x07cf, 0x1001, 0x9010, 0x9999,
-		"Casio",
-		"QV DigitalCamera",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
 
 /* Submitted by Hartmut Wahl <hwahl@hwahl.de>*/
 UNUSUAL_DEV( 0x0839, 0x000a, 0x0001, 0x0001,

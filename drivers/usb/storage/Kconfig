@@ -23,6 +23,28 @@ config USB_STORAGE_DEBUG
 	  Say Y here in order to have the USB Mass Storage code generate
 	  verbose debugging messages.
 
+config USB_STORAGE_RW_DETECT
+	bool "USB Mass Storage Write-Protected Media Detection (EXPERIMENTAL)"
+	depends on USB_STORAGE && EXPERIMENTAL
+	help
+	  Say Y here in order to have the USB Mass Storage code indicate to
+	  the SCSI layer that using MODE SENSE(6) and MODE SENSE(10) to
+	  determine if the media is write-protected is a good thing to do.
+
+	  Many devices have historically had trouble with these commands,
+	  hence the default 2.6.x behavior has been to suppress their use.
+	  2.4.x used these commands with (at best) mixed results, often
+	  crashing the firmware of the device.  However, the SCSI layer now
+	  issues these commands in a manner more consistent with other
+	  "popular" OSes, in an attempt to improve compatibility.
+
+	  Saying Y here allows these commands to be sent to a USB device.
+	  If you find a device this doesn't work for, switch to N and let
+	  us know at usb-storage@lists.one-eyed-alien.net
+
+	  If you say N here, the kernel will assume that all disk-like USB
+	  devices are write-enabled.
+
 config USB_STORAGE_DATAFAB
 	bool "Datafab Compact Flash Reader support (EXPERIMENTAL)"
 	depends on USB_STORAGE && EXPERIMENTAL

@@ -46,7 +46,7 @@ static int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
 			      unsigned int cmd, unsigned long arg);
 static int usbvideo_v4l_mmap(struct file *file, struct vm_area_struct *vma);
 static int usbvideo_v4l_open(struct inode *inode, struct file *file);
-static ssize_t usbvideo_v4l_read(struct file *file, char *buf,
+static ssize_t usbvideo_v4l_read(struct file *file, char __user *buf,
 			     size_t count, loff_t *ppos);
 static int usbvideo_v4l_close(struct inode *inode, struct file *file);
 
@@ -1587,7 +1587,7 @@ static int usbvideo_v4l_ioctl(struct inode *inode, struct file *file,
  * 20-Oct-2000 Created.
  * 01-Nov-2000 Added mutex (uvd->lock).
  */
-static ssize_t usbvideo_v4l_read(struct file *file, char *buf,
+static ssize_t usbvideo_v4l_read(struct file *file, char __user *buf,
 		      size_t count, loff_t *ppos)
 {
 	struct uvd *uvd = file->private_data;

@@ -290,16 +290,17 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 {
 	if (cap & (1 << 16)) {
 		int msec = 500;
+		struct pci_dev *pdev = to_pci_dev(ehci->hcd.self.controller);
 
 		/* request handoff to OS */
-		cap &= 1 << 24;
-		pci_write_config_dword (to_pci_dev(ehci->hcd.self.controller), where, cap);
+		cap |= 1 << 24;
+		pci_write_config_dword(pdev, where, cap);
 
 		/* and wait a while for it to happen */
 		do {
 			msleep(10);
 			msec -= 10;
-			pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller), where, &cap);
+			pci_read_config_dword(pdev, where, &cap);
 		} while ((cap & (1 << 16)) && msec);
 		if (cap & (1 << 16)) {
 			ehci_err (ehci, "BIOS handoff failed (%d, %04x)\n",
@@ -520,7 +521,7 @@ static int ehci_start (struct usb_hcd *hcd)
 
 	/* wire up the root hub */
 	bus = hcd_to_bus (hcd);
-	bus->root_hub = udev = usb_alloc_dev (NULL, bus, 0);
+	udev = usb_alloc_dev (NULL, bus, 0);
 	if (!udev) {
 done2:
 		ehci_mem_cleanup (ehci);
@@ -553,11 +554,10 @@ done2:
 	 * and device drivers may start it running.
 	 */
 	udev->speed = USB_SPEED_HIGH;
-	if (hcd_register_root (hcd) != 0) {
+	if (hcd_register_root (udev, hcd) != 0) {
 		if (hcd->state == USB_STATE_RUNNING)
 			ehci_ready (ehci);
 		ehci_reset (ehci);
-		bus->root_hub = 0;
 		usb_put_dev (udev); 
 		retval = -ENODEV;
 		goto done2;

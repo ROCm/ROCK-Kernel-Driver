@@ -2,8 +2,8 @@
  * drivers/usb/core/sysfs.c
  *
  * (C) Copyright 2002 David Brownell
- * (C) Copyright 2002 Greg Kroah-Hartman
- * (C) Copyright 2002 IBM Corp.
+ * (C) Copyright 2002,2004 Greg Kroah-Hartman
+ * (C) Copyright 2002,2004 IBM Corp.
  *
  * All of the sysfs file attributes for usb devices and interfaces.
  *
@@ -162,29 +162,35 @@ usb_descriptor_attr (bDeviceSubClass, "%02x\n")
 usb_descriptor_attr (bDeviceProtocol, "%02x\n")
 usb_descriptor_attr (bNumConfigurations, "%d\n")
 
+static struct attribute *dev_attrs[] = {
+	/* current configuration's attributes */
+	&dev_attr_bNumInterfaces.attr,
+	&dev_attr_bConfigurationValue.attr,
+	&dev_attr_bmAttributes.attr,
+	&dev_attr_bMaxPower.attr,
+	/* device attributes */
+	&dev_attr_idVendor.attr,
+	&dev_attr_idProduct.attr,
+	&dev_attr_bcdDevice.attr,
+	&dev_attr_bDeviceClass.attr,
+	&dev_attr_bDeviceSubClass.attr,
+	&dev_attr_bDeviceProtocol.attr,
+	&dev_attr_bNumConfigurations.attr,
+	&dev_attr_speed.attr,
+	&dev_attr_devnum.attr,
+	&dev_attr_version.attr,
+	&dev_attr_maxchild.attr,
+	NULL,
+};
+static struct attribute_group dev_attr_grp = {
+	.attrs = dev_attrs,
+};
 
 void usb_create_sysfs_dev_files (struct usb_device *udev)
 {
 	struct device *dev = &udev->dev;
 
-	/* current configuration's attributes */
-	device_create_file (dev, &dev_attr_bNumInterfaces);
-	device_create_file (dev, &dev_attr_bConfigurationValue);
-	device_create_file (dev, &dev_attr_bmAttributes);
-	device_create_file (dev, &dev_attr_bMaxPower);
-
-	/* device attributes */
-	device_create_file (dev, &dev_attr_idVendor);
-	device_create_file (dev, &dev_attr_idProduct);
-	device_create_file (dev, &dev_attr_bcdDevice);
-	device_create_file (dev, &dev_attr_bDeviceClass);
-	device_create_file (dev, &dev_attr_bDeviceSubClass);
-	device_create_file (dev, &dev_attr_bDeviceProtocol);
-	device_create_file (dev, &dev_attr_bNumConfigurations);
-
-	/* speed varies depending on how you connect the device */
-	device_create_file (dev, &dev_attr_speed);
-	// FIXME iff there are other speed configs, show how many
+	sysfs_create_group(&dev->kobj, &dev_attr_grp);
 
 	if (udev->descriptor.iManufacturer)
 		device_create_file (dev, &dev_attr_manufacturer);
@@ -192,10 +198,20 @@ void usb_create_sysfs_dev_files (struct usb_device *udev)
 		device_create_file (dev, &dev_attr_product);
 	if (udev->descriptor.iSerialNumber)
 		device_create_file (dev, &dev_attr_serial);
+}
 
-	device_create_file (dev, &dev_attr_devnum);
-	device_create_file (dev, &dev_attr_version);
-	device_create_file (dev, &dev_attr_maxchild);
+void usb_remove_sysfs_dev_files (struct usb_device *udev)
+{
+	struct device *dev = &udev->dev;
+
+	sysfs_remove_group(&dev->kobj, &dev_attr_grp);
+
+	if (udev->descriptor.iManufacturer)
+		device_remove_file(dev, &dev_attr_manufacturer);
+	if (udev->descriptor.iProduct)
+		device_remove_file(dev, &dev_attr_product);
+	if (udev->descriptor.iSerialNumber)
+		device_remove_file(dev, &dev_attr_serial);
 }
 
 /* Interface fields */
@@ -217,13 +233,26 @@ usb_intf_attr (bInterfaceSubClass, "%02x\n")
 usb_intf_attr (bInterfaceProtocol, "%02x\n")
 usb_intf_attr (iInterface, "%02x\n")
 
+static struct attribute *intf_attrs[] = {
+	&dev_attr_bInterfaceNumber.attr,
+	&dev_attr_bAlternateSetting.attr,
+	&dev_attr_bNumEndpoints.attr,
+	&dev_attr_bInterfaceClass.attr,
+	&dev_attr_bInterfaceSubClass.attr,
+	&dev_attr_bInterfaceProtocol.attr,
+	&dev_attr_iInterface.attr,
+	NULL,
+};
+static struct attribute_group intf_attr_grp = {
+	.attrs = intf_attrs,
+};
+
 void usb_create_sysfs_intf_files (struct usb_interface *intf)
 {
-	device_create_file (&intf->dev, &dev_attr_bInterfaceNumber);
-	device_create_file (&intf->dev, &dev_attr_bAlternateSetting);
-	device_create_file (&intf->dev, &dev_attr_bNumEndpoints);
-	device_create_file (&intf->dev, &dev_attr_bInterfaceClass);
-	device_create_file (&intf->dev, &dev_attr_bInterfaceSubClass);
-	device_create_file (&intf->dev, &dev_attr_bInterfaceProtocol);
-	device_create_file (&intf->dev, &dev_attr_iInterface);
+	sysfs_create_group(&intf->dev.kobj, &intf_attr_grp);
+}
+
+void usb_remove_sysfs_intf_files (struct usb_interface *intf)
+{
+	sysfs_remove_group(&intf->dev.kobj, &intf_attr_grp);
 }

@@ -667,10 +667,10 @@ static int mdc800_device_release (struct inode* inode, struct file *file)
 /*
  * The Device read callback Function
  */
-static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, loff_t *pos)
+static ssize_t mdc800_device_read (struct file *file, char __user *buf, size_t len, loff_t *pos)
 {
 	size_t left=len, sts=len; /* single transfer size */
-	char* ptr=buf;
+	char __user *ptr = buf;
 	long timeout;
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -767,7 +767,7 @@ static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, lof
  * After this the driver initiates the request for the answer or
  * just waits until the camera becomes ready.
  */
-static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t len, loff_t *pos)
+static ssize_t mdc800_device_write (struct file *file, const char __user *buf, size_t len, loff_t *pos)
 {
 	size_t i=0;
 	DECLARE_WAITQUEUE(wait, current);

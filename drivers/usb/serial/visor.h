@@ -55,6 +55,9 @@
 #define ACEECA_VENDOR_ID		0x4766
 #define ACEECA_MEZ1000_ID		0x0001
 
+#define KYOCERA_VENDOR_ID		0x0C88
+#define KYOCERA_7135_ID			0x0021 
+
 /****************************************************************************
  * Handspring Visor Vendor specific request codes (bRequest values)
  * A big thank you to Handspring for providing the following information.

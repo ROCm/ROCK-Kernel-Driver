@@ -295,7 +295,7 @@ static int hiddev_open(struct inode * inode, struct file * file) {
 /*
  * "write" file op
  */
-static ssize_t hiddev_write(struct file * file, const char * buffer, size_t count, loff_t *ppos)
+static ssize_t hiddev_write(struct file * file, const char __user * buffer, size_t count, loff_t *ppos)
 {
 	return -EINVAL;
 }
@@ -303,7 +303,7 @@ static ssize_t hiddev_write(struct file * file, const char * buffer, size_t coun
 /*
  * "read" file op
  */
-static ssize_t hiddev_read(struct file * file, char * buffer, size_t count, loff_t *ppos)
+static ssize_t hiddev_read(struct file * file, char __user * buffer, size_t count, loff_t *ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct hiddev_list *list = file->private_data;
@@ -406,6 +406,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	struct hiddev_devinfo dinfo;
 	struct hid_report *report;
 	struct hid_field *field;
+	void __user *user_arg = (void __user *)arg;
 	int i;
 
 	if (!hiddev->exist)
@@ -414,7 +415,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	switch (cmd) {
 
 	case HIDIOCGVERSION:
-		return put_user(HID_VERSION, (int *) arg);
+		return put_user(HID_VERSION, (int __user *)arg);
 
 	case HIDIOCAPPLICATION:
 		if (arg < 0 || arg >= hid->maxapplication)
@@ -439,13 +440,13 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		dinfo.product = dev->descriptor.idProduct;
 		dinfo.version = dev->descriptor.bcdDevice;
 		dinfo.num_applications = hid->maxapplication;
-		if (copy_to_user((void *) arg, &dinfo, sizeof(dinfo)))
+		if (copy_to_user(user_arg, &dinfo, sizeof(dinfo)))
 			return -EFAULT;
 
 		return 0;
 
 	case HIDIOCGFLAG:
-		if (put_user(list->flags, (int *) arg))
+		if (put_user(list->flags, (int __user *)arg))
 			return -EFAULT;
 
 		return 0;
@@ -453,7 +454,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	case HIDIOCSFLAG:
 		{
 			int newflags;
-			if (get_user(newflags, (int *) arg))
+			if (get_user(newflags, (int __user *)arg))
 				return -EFAULT;
 
 			if ((newflags & ~HIDDEV_FLAGS) != 0 ||
@@ -471,7 +472,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			int idx, len;
 			char *buf;
 
-			if (get_user(idx, (int *) arg))
+			if (get_user(idx, (int __user *)arg))
 				return -EFAULT;
 
 			if ((buf = kmalloc(HID_STRING_SIZE, GFP_KERNEL)) == NULL)
@@ -482,7 +483,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 				return -EINVAL;
 			}
 
-			if (copy_to_user((void *) (arg+sizeof(int)), buf, len+1)) {
+			if (copy_to_user(user_arg+sizeof(int), buf, len+1)) {
 				kfree(buf);
 				return -EFAULT;
 			}
@@ -498,7 +499,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
 	case HIDIOCGREPORT:
-		if (copy_from_user(&rinfo, (void *) arg, sizeof(rinfo)))
+		if (copy_from_user(&rinfo, user_arg, sizeof(rinfo)))
 			return -EFAULT;
 
 		if (rinfo.report_type == HID_REPORT_TYPE_OUTPUT)
@@ -513,7 +514,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
 	case HIDIOCSREPORT:
-		if (copy_from_user(&rinfo, (void *) arg, sizeof(rinfo)))
+		if (copy_from_user(&rinfo, user_arg, sizeof(rinfo)))
 			return -EFAULT;
 
 		if (rinfo.report_type == HID_REPORT_TYPE_INPUT)
@@ -527,7 +528,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
 	case HIDIOCGREPORTINFO:
-		if (copy_from_user(&rinfo, (void *) arg, sizeof(rinfo)))
+		if (copy_from_user(&rinfo, user_arg, sizeof(rinfo)))
 			return -EFAULT;
 
 		if ((report = hiddev_lookup_report(hid, &rinfo)) == NULL)
@@ -535,13 +536,13 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 		rinfo.num_fields = report->maxfield;
 
-		if (copy_to_user((void *) arg, &rinfo, sizeof(rinfo)))
+		if (copy_to_user(user_arg, &rinfo, sizeof(rinfo)))
 			return -EFAULT;
 
 		return 0;
 
 	case HIDIOCGFIELDINFO:
-		if (copy_from_user(&finfo, (void *) arg, sizeof(finfo)))
+		if (copy_from_user(&finfo, user_arg, sizeof(finfo)))
 			return -EFAULT;
 		rinfo.report_type = finfo.report_type;
 		rinfo.report_id = finfo.report_id;
@@ -568,7 +569,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		finfo.unit_exponent = field->unit_exponent;
 		finfo.unit = field->unit;
 
-		if (copy_to_user((void *) arg, &finfo, sizeof(finfo)))
+		if (copy_to_user(user_arg, &finfo, sizeof(finfo)))
 			return -EFAULT;
 
 		return 0;
@@ -578,7 +579,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if (!uref_multi)
 			return -ENOMEM;
 		uref = &uref_multi->uref;
-		if (copy_from_user(uref, (void *) arg, sizeof(*uref))) 
+		if (copy_from_user(uref, user_arg, sizeof(*uref))) 
 			goto fault;
 
 		rinfo.report_type = uref->report_type;
@@ -595,7 +596,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 		uref->usage_code = field->usage[uref->usage_index].hid;
 
-		if (copy_to_user((void *) arg, uref, sizeof(*uref)))
+		if (copy_to_user(user_arg, uref, sizeof(*uref)))
 			goto fault;
 
 		kfree(uref_multi);
@@ -611,11 +612,11 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			return -ENOMEM;
 		uref = &uref_multi->uref;
 		if (cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) {
-			if (copy_from_user(uref_multi, (void *) arg, 
+			if (copy_from_user(uref_multi, user_arg, 
 					   sizeof(*uref_multi)))
 				goto fault;
 		} else {
-			if (copy_from_user(uref, (void *) arg, sizeof(*uref)))
+			if (copy_from_user(uref, user_arg, sizeof(*uref)))
 				goto fault;
 		}
 
@@ -652,7 +653,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		switch (cmd) {
 			case HIDIOCGUSAGE:
 				uref->value = field->value[uref->usage_index];
-				if (copy_to_user((void *) arg, uref, sizeof(*uref)))
+				if (copy_to_user(user_arg, uref, sizeof(*uref)))
 					goto fault;
 				goto goodreturn;
 
@@ -667,7 +668,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 				for (i = 0; i < uref_multi->num_values; i++)
 					uref_multi->values[i] = 
 					    field->value[uref->usage_index + i];
-				if (copy_to_user((void *) arg, uref_multi, 
+				if (copy_to_user(user_arg, uref_multi, 
 						 sizeof(*uref_multi)))
 					goto fault;
 				goto goodreturn;
@@ -689,7 +690,7 @@ inval:
 		return -EINVAL;
 
 	case HIDIOCGCOLLECTIONINFO:
-		if (copy_from_user(&cinfo, (void *) arg, sizeof(cinfo)))
+		if (copy_from_user(&cinfo, user_arg, sizeof(cinfo)))
 			return -EFAULT;
 
 		if (cinfo.index >= hid->maxcollection)
@@ -699,7 +700,7 @@ inval:
 		cinfo.usage = hid->collection[cinfo.index].usage;
 		cinfo.level = hid->collection[cinfo.index].level;
 
-		if (copy_to_user((void *) arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user(user_arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 
@@ -715,7 +716,7 @@ inval:
 			len = strlen(hid->name) + 1;
 			if (len > _IOC_SIZE(cmd))
 				 len = _IOC_SIZE(cmd);
-			return copy_to_user((char *) arg, hid->name, len) ?
+			return copy_to_user(user_arg, hid->name, len) ?
 				-EFAULT : len;
 		}
 
@@ -726,7 +727,7 @@ inval:
 			len = strlen(hid->phys) + 1;
 			if (len > _IOC_SIZE(cmd))
 				len = _IOC_SIZE(cmd);
-			return copy_to_user((char *) arg, hid->phys, len) ?
+			return copy_to_user(user_arg, hid->phys, len) ?
 				-EFAULT : len;
 		}
 	}

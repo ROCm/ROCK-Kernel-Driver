@@ -237,7 +237,6 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
  */
 void usb_hcd_sa1111_remove (struct usb_hcd *hcd, struct sa1111_dev *dev)
 {
-	struct usb_device	*hub;
 	void *base;
 
 	info ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
@@ -245,11 +244,10 @@ void usb_hcd_sa1111_remove (struct usb_hcd *hcd, struct sa1111_dev *dev)
 	if (in_interrupt ())
 		BUG ();
 
-	hub = hcd->self.root_hub;
 	hcd->state = USB_STATE_QUIESCING;
 
 	dbg ("%s: roothub graceful disconnect", hcd->self.bus_name);
-	usb_disconnect (&hub);
+	usb_disconnect (&hcd->self.root_hub);
 
 	hcd->driver->stop (hcd);
 	hcd->state = USB_STATE_HALT;

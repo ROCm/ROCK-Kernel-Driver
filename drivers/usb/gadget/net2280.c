@@ -1902,6 +1902,8 @@ static void ep0_start (struct net2280 *dev)
 		, &dev->usb->stdrsp);
 	writel (  (1 << USB_ROOT_PORT_WAKEUP_ENABLE)
 		| (1 << SELF_POWERED_USB_DEVICE)
+		/* erratum 0102 workaround */
+		| ((dev->chiprev == 0100) ? 0 : 1) << SUSPEND_IMMEDIATELY
 		| (1 << REMOTE_WAKEUP_SUPPORT)
 		| (1 << USB_DETECT_ENABLE)
 		| (1 << SELF_POWERED_STATUS)
@@ -1917,6 +1919,7 @@ static void ep0_start (struct net2280 *dev)
 		| (1 << PCI_RETRY_ABORT_INTERRUPT_ENABLE)
 		| (1 << VBUS_INTERRUPT_ENABLE)
 		| (1 << ROOT_PORT_RESET_INTERRUPT_ENABLE)
+		| (1 << SUSPEND_REQUEST_CHANGE_INTERRUPT_ENABLE)
 		, &dev->regs->pciirqenb1);
 
 	/* don't leave any writes posted */
@@ -2513,19 +2516,24 @@ static void handle_stat1_irqs (struct net2280 *dev, u32 stat)
 			return;
 	}
 
-	/* NOTE: we don't actually suspend the hardware; that starts to
-	 * interact with PCI power management, and needs something like a
-	 * controller->suspend() call to clear SUSPEND_REQUEST_INTERRUPT.
-	 * we shouldn't see resume interrupts.
-	 * for rev 0100, this also avoids erratum 0102.
+	/* NOTE: chip stays in PCI D0 state for now, but it could
+	 * enter D1 to save more power
 	 */
 	tmp = (1 << SUSPEND_REQUEST_CHANGE_INTERRUPT);
 	if (stat & tmp) {
-		if (dev->driver->suspend)
-			dev->driver->suspend (&dev->gadget);
+		writel (tmp, &dev->regs->irqstat1);
+		if (stat & (1 << SUSPEND_REQUEST_INTERRUPT)) {
+			if (dev->driver->suspend)
+				dev->driver->suspend (&dev->gadget);
+			/* we use SUSPEND_IMMEDIATELY */
+			stat &= ~(1 << SUSPEND_REQUEST_INTERRUPT);
+		} else {
+			if (dev->driver->resume)
+				dev->driver->resume (&dev->gadget);
+			/* at high speed, note erratum 0133 */
+		}
 		stat &= ~tmp;
 	}
-	stat &= ~(1 << SUSPEND_REQUEST_INTERRUPT);
 
 	/* clear any other status/irqs */
 	if (stat)
@@ -2533,6 +2541,7 @@ static void handle_stat1_irqs (struct net2280 *dev, u32 stat)
 
 	/* some status we can just ignore */
 	stat &= ~((1 << CONTROL_STATUS_INTERRUPT)
+			| (1 << SUSPEND_REQUEST_INTERRUPT)
 			| (1 << RESUME_INTERRUPT)
 			| (1 << SOF_INTERRUPT));
 	if (!stat)

@@ -17,6 +17,10 @@
  *
  * CAUTION: Generally you should use 0 < degrees < 180 as anything else
  * is probably beyond the range of your servo and may damage it.
+ *
+ * Jun 16, 2004: Sean Young <sean@mess.org>
+ *  - cleanups
+ *  - was using memory after kfree()
  */
 
 #include <linux/config.h>
@@ -33,19 +37,36 @@
 #define DRIVER_AUTHOR "Sean Young <sean@mess.org>"
 #define DRIVER_DESC "USB PhidgetServo Driver"
 
-#define VENDOR_ID_GLAB			0x06c2
-#define DEVICE_ID_4MOTOR_SERVO_30	0x0038
-#define DEVICE_ID_1MOTOR_SERVO_30	0x0039
+#define VENDOR_ID_GLAB				0x06c2
+#define DEVICE_ID_GLAB_PHIDGETSERVO_QUAD	0x0038
+#define DEVICE_ID_GLAB_PHIDGETSERVO_UNI		0x0039
 
-#define VENDOR_ID_WISEGROUP		0x0925
-#define DEVICE_ID_1MOTOR_SERVO_20	0x8101
-#define DEVICE_ID_4MOTOR_SERVO_20	0x8104
+#define VENDOR_ID_WISEGROUP			0x0925
+#define VENDOR_ID_WISEGROUP_PHIDGETSERVO_QUAD	0x8101
+#define VENDOR_ID_WISEGROUP_PHIDGETSERVO_UNI	0x8104
+
+#define SERVO_VERSION_30			0x01
+#define SERVO_COUNT_QUAD			0x02
 
 static struct usb_device_id id_table[] = {
-	{USB_DEVICE(VENDOR_ID_GLAB, DEVICE_ID_4MOTOR_SERVO_30)},
-	{USB_DEVICE(VENDOR_ID_GLAB, DEVICE_ID_1MOTOR_SERVO_30)},
-	{USB_DEVICE(VENDOR_ID_WISEGROUP, DEVICE_ID_4MOTOR_SERVO_20)},
-	{USB_DEVICE(VENDOR_ID_WISEGROUP, DEVICE_ID_1MOTOR_SERVO_20)},
+	{
+		USB_DEVICE(VENDOR_ID_GLAB, DEVICE_ID_GLAB_PHIDGETSERVO_QUAD), 
+		.driver_info = SERVO_VERSION_30 | SERVO_COUNT_QUAD 
+	},
+	{
+		USB_DEVICE(VENDOR_ID_GLAB, DEVICE_ID_GLAB_PHIDGETSERVO_UNI),
+		.driver_info = SERVO_VERSION_30 
+	},
+	{
+		USB_DEVICE(VENDOR_ID_WISEGROUP, 
+				VENDOR_ID_WISEGROUP_PHIDGETSERVO_QUAD),
+		.driver_info = SERVO_COUNT_QUAD 
+	},
+	{
+		USB_DEVICE(VENDOR_ID_WISEGROUP, 
+				VENDOR_ID_WISEGROUP_PHIDGETSERVO_UNI),
+		.driver_info = 0
+	},
 	{}
 };
 
@@ -53,14 +74,13 @@ MODULE_DEVICE_TABLE(usb, id_table);
 
 struct phidget_servo {
 	struct usb_device *udev;
-	int version;
-	int quad_servo;
+	ulong type;
 	int pulse[4];
 	int degrees[4];
 	int minutes[4];
 };
 
-static void
+static int
 change_position_v30(struct phidget_servo *servo, int servo_no, int degrees, 
 								int minutes)
 {
@@ -71,7 +91,7 @@ change_position_v30(struct phidget_servo *servo, int servo_no, int degrees,
 	if (!buffer) {
 		dev_err(&servo->udev->dev, "%s - out of memory\n",
 			__FUNCTION__);
-		return;
+		return -ENOMEM;
 	}
 
 	/*
@@ -124,12 +144,13 @@ change_position_v30(struct phidget_servo *servo, int servo_no, int degrees,
 	retval = usb_control_msg(servo->udev,
 				 usb_sndctrlpipe(servo->udev, 0),
 				 0x09, 0x21, 0x0200, 0x0000, buffer, 6, 2 * HZ);
-	if (retval != 6)
-		dev_err(&servo->udev->dev, "retval = %d\n", retval);
+
 	kfree(buffer);
+
+	return retval;
 }
 
-static void
+static int
 change_position_v20(struct phidget_servo *servo, int servo_no, int degrees,
 								int minutes)
 {
@@ -140,7 +161,7 @@ change_position_v20(struct phidget_servo *servo, int servo_no, int degrees,
 	if (!buffer) {
 		dev_err(&servo->udev->dev, "%s - out of memory\n",
 			__FUNCTION__);
-		return;
+		return -ENOMEM;
 	}
 
 	/*
@@ -171,16 +192,17 @@ change_position_v20(struct phidget_servo *servo, int servo_no, int degrees,
 	retval = usb_control_msg(servo->udev,
 				 usb_sndctrlpipe(servo->udev, 0),
 				 0x09, 0x21, 0x0200, 0x0000, buffer, 2, 2 * HZ);
-	if (retval != 2)
-		dev_err(&servo->udev->dev, "retval = %d\n", retval);
+
 	kfree(buffer);
+
+	return retval;
 }
 
 #define show_set(value)	\
 static ssize_t set_servo##value (struct device *dev,			\
 					const char *buf, size_t count)	\
 {									\
-	int degrees, minutes;						\
+	int degrees, minutes, retval;					\
 	struct usb_interface *intf = to_usb_interface (dev);		\
 	struct phidget_servo *servo = usb_get_intfdata (intf);		\
 									\
@@ -195,12 +217,14 @@ static ssize_t set_servo##value (struct device *dev,			\
 		return -EINVAL;						\
 	}								\
 									\
-	if (servo->version >= 3) 					\
-		change_position_v30 (servo, value, degrees, minutes);	\
+	if (servo->type & SERVO_VERSION_30)				\
+		retval = change_position_v30 (servo, value, degrees, 	\
+							minutes);	\
 	else 								\
-		change_position_v20 (servo, value, degrees, minutes);	\
+		retval = change_position_v20 (servo, value, degrees, 	\
+							minutes);	\
 									\
-	return count;							\
+	return retval < 0 ? retval : count;				\
 }									\
 									\
 static ssize_t show_servo##value (struct device *dev, char *buf) 	\
@@ -223,7 +247,7 @@ static int
 servo_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(interface);
-	struct phidget_servo *dev = NULL;
+	struct phidget_servo *dev;
 
 	dev = kmalloc(sizeof (struct phidget_servo), GFP_KERNEL);
 	if (dev == NULL) {
@@ -233,37 +257,21 @@ servo_probe(struct usb_interface *interface, const struct usb_device_id *id)
 	memset(dev, 0x00, sizeof (*dev));
 
 	dev->udev = usb_get_dev(udev);
-	switch (udev->descriptor.idVendor) {
-	case VENDOR_ID_WISEGROUP:
-		dev->version = 2;
-		break;
-	case VENDOR_ID_GLAB:
-		dev->version = 3;
-		break;
-	}
-	switch (udev->descriptor.idProduct) {
-	case DEVICE_ID_4MOTOR_SERVO_20:
-	case DEVICE_ID_4MOTOR_SERVO_30:
-		dev->quad_servo = 1;
-		break;
-	case DEVICE_ID_1MOTOR_SERVO_20:
-	case DEVICE_ID_1MOTOR_SERVO_30:
-		dev->quad_servo = 0;
-		break;
-	}
-
+	dev->type = id->driver_info;
 	usb_set_intfdata(interface, dev);
 
 	device_create_file(&interface->dev, &dev_attr_servo0);
-	if (dev->quad_servo) {
+	if (dev->type & SERVO_COUNT_QUAD) {
 		device_create_file(&interface->dev, &dev_attr_servo1);
 		device_create_file(&interface->dev, &dev_attr_servo2);
 		device_create_file(&interface->dev, &dev_attr_servo3);
 	}
 
 	dev_info(&interface->dev, "USB %d-Motor PhidgetServo v%d.0 attached\n",
-		 dev->quad_servo ? 4 : 1, dev->version);
-	if (dev->version == 2) 
+		dev->type & SERVO_COUNT_QUAD ? 4 : 1,
+		dev->type & SERVO_VERSION_30 ? 3 : 2);
+
+	if(!(dev->type & SERVO_VERSION_30))
 		dev_info(&interface->dev,
 			 "WARNING: v2.0 not tested! Please report if it works.\n");
 
@@ -279,7 +287,7 @@ servo_disconnect(struct usb_interface *interface)
 	usb_set_intfdata(interface, NULL);
 
 	device_remove_file(&interface->dev, &dev_attr_servo0);
-	if (dev->quad_servo) {
+	if (dev->type & SERVO_COUNT_QUAD) {
 		device_remove_file(&interface->dev, &dev_attr_servo1);
 		device_remove_file(&interface->dev, &dev_attr_servo2);
 		device_remove_file(&interface->dev, &dev_attr_servo3);
@@ -287,10 +295,11 @@ servo_disconnect(struct usb_interface *interface)
 
 	usb_put_dev(dev->udev);
 
-	kfree(dev);
-
 	dev_info(&interface->dev, "USB %d-Motor PhidgetServo v%d.0 detached\n",
-		 dev->quad_servo ? 4 : 1, dev->version);
+		dev->type & SERVO_COUNT_QUAD ? 4 : 1,
+		dev->type & SERVO_VERSION_30 ? 3 : 2);
+
+	kfree(dev);
 }
 
 static struct usb_driver servo_driver = {
@@ -304,7 +313,7 @@ static struct usb_driver servo_driver = {
 static int __init
 phidget_servo_init(void)
 {
-	int retval = 0;
+	int retval;
 
 	retval = usb_register(&servo_driver);
 	if (retval)

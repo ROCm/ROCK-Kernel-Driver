@@ -236,8 +236,8 @@ struct lego_usb_tower {
 
 
 /* local function prototypes */
-static ssize_t tower_read	(struct file *file, char *buffer, size_t count, loff_t *ppos);
-static ssize_t tower_write	(struct file *file, const char *buffer, size_t count, loff_t *ppos);
+static ssize_t tower_read	(struct file *file, char __user *buffer, size_t count, loff_t *ppos);
+static ssize_t tower_write	(struct file *file, const char __user *buffer, size_t count, loff_t *ppos);
 static inline void tower_delete (struct lego_usb_tower *dev);
 static int tower_open		(struct inode *inode, struct file *file);
 static int tower_release	(struct inode *inode, struct file *file);
@@ -560,7 +560,7 @@ static loff_t tower_llseek (struct file *file, loff_t off, int whence)
 /**
  *	tower_read
  */
-static ssize_t tower_read (struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t tower_read (struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct lego_usb_tower *dev;
 	size_t bytes_to_read;
@@ -651,7 +651,7 @@ exit:
 /**
  *	tower_write
  */
-static ssize_t tower_write (struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t tower_write (struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct lego_usb_tower *dev;
 	size_t bytes_to_write;

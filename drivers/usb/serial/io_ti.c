@@ -2428,7 +2428,7 @@ static int edge_tiocmget(struct usb_serial_port *port, struct file *file)
 	return result;
 }
 
-static int get_serial_info (struct edgeport_port *edge_port, struct serial_struct * retinfo)
+static int get_serial_info (struct edgeport_port *edge_port, struct serial_struct __user *retinfo)
 {
 	struct serial_struct tmp;
 
@@ -2477,7 +2477,7 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 
 		case TIOCGSERIAL:
 			dbg("%s - (%d) TIOCGSERIAL", __FUNCTION__, port->number);
-			return get_serial_info(edge_port, (struct serial_struct *) arg);
+			return get_serial_info(edge_port, (struct serial_struct __user *) arg);
 			break;
 
 		case TIOCSSERIAL:
@@ -2510,7 +2510,7 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 		case TIOCGICOUNT:
 			dbg ("%s - (%d) TIOCGICOUNT RX=%d, TX=%d", __FUNCTION__,
 			     port->number, edge_port->icount.rx, edge_port->icount.tx);
-			if (copy_to_user((void *)arg, &edge_port->icount, sizeof(edge_port->icount)))
+			if (copy_to_user((void __user *)arg, &edge_port->icount, sizeof(edge_port->icount)))
 				return -EFAULT;
 			return 0;
 	}

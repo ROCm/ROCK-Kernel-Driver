@@ -48,12 +48,12 @@
 #include "usb.h"
 #include "debug.h"
 #include "transport.h"
+#include "protocol.h"
 
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <scsi/scsi_devinfo.h>
 #include <scsi/scsi_host.h>
-
 
 /***********************************************************************
  * Host functions 
@@ -68,10 +68,13 @@ static int slave_alloc (struct scsi_device *sdev)
 {
 	/*
 	 * Set default bflags. These can be overridden for individual
-	 * models and vendors via the scsi devinfo mechanism.
+	 * models and vendors via the scsi devinfo mechanism.  The only
+	 * flag we need is to force 36-byte INQUIRYs; we don't use any
+	 * of the extra data and many devices choke if asked for more or
+	 * less than 36 bytes.
 	 */
-	sdev->sdev_bflags = (BLIST_MS_SKIP_PAGE_08 | BLIST_MS_SKIP_PAGE_3F |
-			     BLIST_USE_10_BYTE_MS);
+	sdev->sdev_bflags = BLIST_INQUIRY_36;
+
 	return 0;
 }
 
@@ -95,11 +98,48 @@ static int slave_configure(struct scsi_device *sdev)
 	 * reduce the maximum transfer size to 64 KB = 128 sectors. */
 
 #define USB_VENDOR_ID_GENESYS	0x05e3		// Needs a standard location
+
 	if (us->pusb_dev->descriptor.idVendor == USB_VENDOR_ID_GENESYS &&
-			us->pusb_dev->speed == USB_SPEED_HIGH)
+			us->pusb_dev->speed == USB_SPEED_HIGH &&
+			sdev->request_queue->max_sectors > 128)
 		blk_queue_max_sectors(sdev->request_queue, 128);
 
-	/* this is to satisify the compiler, tho I don't think the 
+	/* We can't put these settings in slave_alloc() because that gets
+	 * called before the device type is known.  Consequently these
+	 * settings can't be overridden via the scsi devinfo mechanism. */
+	if (sdev->type == TYPE_DISK) {
+
+		/* Disk-type devices use MODE SENSE(6) if the protocol
+		 * (SubClass) is Transparent SCSI, otherwise they use
+		 * MODE SENSE(10). */
+		if (us->subclass != US_SC_SCSI)
+			sdev->use_10_for_ms = 1;
+
+		/* Many disks only accept MODE SENSE transfer lengths of
+		 * 192 bytes (that's what Windows uses). */
+		sdev->use_192_bytes_for_3f = 1;
+
+		/* A number of devices have problems with MODE SENSE for
+		 * page x08, so we will skip it. */
+		sdev->skip_ms_page_8 = 1;
+
+#ifndef CONFIG_USB_STORAGE_RW_DETECT
+		/* Some devices may not like MODE SENSE with page=0x3f.
+		 * Now that we're using 192-byte transfers this may no
+		 * longer be a problem.  So this will be a configuration
+		 * option. */
+		sdev->skip_ms_page_3f = 1;
+#endif
+
+	} else {
+
+		/* Non-disk-type devices don't need to blacklist any pages
+		 * or to force 192-byte transfer lengths for MODE SENSE.
+		 * But they do need to use MODE SENSE(10). */
+		sdev->use_10_for_ms = 1;
+	}
+
+	/* this is to satisfy the compiler, tho I don't think the 
 	 * return code is ever checked anywhere. */
 	return 0;
 }

@@ -1022,7 +1022,7 @@ static __u32 get_ftdi_divisor(struct usb_serial_port * port)
 }
 
 
-static int get_serial_info(struct usb_serial_port * port, struct serial_struct * retinfo)
+static int get_serial_info(struct usb_serial_port * port, struct serial_struct __user * retinfo)
 {
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	struct serial_struct tmp;
@@ -1039,7 +1039,7 @@ static int get_serial_info(struct usb_serial_port * port, struct serial_struct *
 } /* get_serial_info */
 
 
-static int set_serial_info(struct usb_serial_port * port, struct serial_struct * newinfo)
+static int set_serial_info(struct usb_serial_port * port, struct serial_struct __user * newinfo)
 { /* set_serial_info */
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	struct serial_struct new_serial;
@@ -1504,6 +1504,7 @@ static int ftdi_write (struct usb_serial_port *port, int from_user,
 	if (status) {
 		err("%s - failed submitting write urb, error %d", __FUNCTION__, status);
 		count = status;
+		kfree (buffer);
 	}
 
 	/* we are done with this urb, so let the host driver
@@ -2042,7 +2043,7 @@ static int ftdi_ioctl (struct usb_serial_port *port, struct file * file, unsigne
 
 	case TIOCMBIS: /* turns on (Sets) the lines as specified by the mask */
 		dbg("%s TIOCMBIS", __FUNCTION__);
- 	        if (get_user(mask, (unsigned long *) arg))
+ 	        if (get_user(mask, (unsigned long __user *) arg))
 			return -EFAULT;
   	        if (mask & TIOCM_DTR){
 			if ((ret = set_dtr(port, HIGH)) < 0) {
@@ -2061,7 +2062,7 @@ static int ftdi_ioctl (struct usb_serial_port *port, struct file * file, unsigne
 
 	case TIOCMBIC: /* turns off (Clears) the lines as specified by the mask */
 		dbg("%s TIOCMBIC", __FUNCTION__);
- 	        if (get_user(mask, (unsigned long *) arg))
+ 	        if (get_user(mask, (unsigned long __user *) arg))
 			return -EFAULT;
   	        if (mask & TIOCM_DTR){
 			if ((ret = set_dtr(port, LOW)) < 0){
@@ -2088,10 +2089,10 @@ static int ftdi_ioctl (struct usb_serial_port *port, struct file * file, unsigne
 		 */
 
 	case TIOCGSERIAL: /* gets serial port data */
-		return get_serial_info(port, (struct serial_struct *) arg);
+		return get_serial_info(port, (struct serial_struct __user *) arg);
 
 	case TIOCSSERIAL: /* sets serial port data */
-		return set_serial_info(port, (struct serial_struct *) arg);
+		return set_serial_info(port, (struct serial_struct __user *) arg);
 
 	/*
 	 * Wait for any of the 4 modem inputs (DCD,RI,DSR,CTS) to change

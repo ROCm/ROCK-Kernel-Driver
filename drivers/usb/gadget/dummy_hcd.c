@@ -825,8 +825,7 @@ static int dummy_urb_enqueue (
 	dum = container_of (hcd, struct dummy, hcd);
 	spin_lock_irqsave (&dum->lock, flags);
 
-	if (!dum->hdev)
-		dum->hdev = urb->dev->hcpriv;
+	dum->hdev = urb->dev->hcpriv;
 	urb->hcpriv = dum;
 	if (usb_pipetype (urb->pipe) == PIPE_CONTROL)
 		urb->error_count = 1;		/* mark as a new urb */
@@ -994,10 +993,17 @@ static int periodic_bytes (struct dummy *dum, struct dummy_ep *ep)
 	return limit;
 }
 
+#define is_active(dum)	((dum->port_status & \
+		(USB_PORT_STAT_CONNECTION | USB_PORT_STAT_ENABLE | \
+			USB_PORT_STAT_SUSPEND)) \
+		== (USB_PORT_STAT_CONNECTION | USB_PORT_STAT_ENABLE))
+
 static struct dummy_ep *find_endpoint (struct dummy *dum, u8 address)
 {
 	int		i;
 
+	if (!is_active (dum))
+		return NULL;
 	if ((address & ~USB_DIR_IN) == 0)
 		return &dum->ep [0];
 	for (i = 1; i < DUMMY_ENDPOINTS; i++) {
@@ -1010,6 +1016,8 @@ static struct dummy_ep *find_endpoint (struct dummy *dum, u8 address)
 	}
 	return NULL;
 }
+
+#undef is_active
 
 #define Dev_Request	(USB_TYPE_STANDARD | USB_RECIP_DEVICE)
 #define Dev_InRequest	(Dev_Request | USB_DIR_IN)
@@ -1152,11 +1160,6 @@ restart:
 			case USB_REQ_SET_ADDRESS:
 				if (setup.bRequestType != Dev_Request)
 					break;
-				if (dum->address != 0) {
-					maybe_set_status (urb, -ETIMEDOUT);
-					urb->actual_length = 0;
-					goto return_urb;
-				}
 				dum->address = setup.wValue;
 				maybe_set_status (urb, 0);
 				dev_dbg (hardware, "set_address = %d\n",
@@ -1404,9 +1407,8 @@ static int dummy_hub_control (
 			break;
 		case USB_PORT_FEAT_POWER:
 			dum->port_status = 0;
-			dum->address = 0;
-			dum->hdev = 0;
 			dum->resuming = 0;
+			stop_activity(dum, dum->driver);
 			break;
 		default:
 			dum->port_status &= ~(1 << wValue);
@@ -1657,7 +1659,7 @@ clean0:
 	INIT_LIST_HEAD (&hcd->dev_list);
 	usb_register_bus (bus);
 
-	bus->root_hub = root = usb_alloc_dev (0, bus, 0);
+	root = usb_alloc_dev (0, bus, 0);
 	if (!root) {
 		retval = -ENOMEM;
 clean1:
@@ -1671,13 +1673,15 @@ clean1:
 	root->speed = USB_SPEED_HIGH;
 
 	/* ...then configured, so khubd sees us. */
-	if ((retval = hcd_register_root (&dum->hcd)) != 0) {
-		bus->root_hub = 0;
+	if ((retval = hcd_register_root (root, &dum->hcd)) != 0) {
 		usb_put_dev (root);
 clean2:
 		dum->hcd.state = USB_STATE_QUIESCING;
 		goto clean1;
 	}
+
+	/* only show a low-power port: just 8mA */
+	hub_set_power_budget (root, 8);
 
 	dum->started = 1;
 

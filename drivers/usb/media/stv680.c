@@ -1309,7 +1309,7 @@ static int stv680_mmap (struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
-static ssize_t stv680_read (struct file *file, char *buf,
+static ssize_t stv680_read (struct file *file, char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	struct video_device *dev = file->private_data;

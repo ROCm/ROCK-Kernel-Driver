@@ -266,6 +266,7 @@ void fill_inquiry_response(struct us_data *us, unsigned char *data,
 static int usb_stor_control_thread(void * __us)
 {
 	struct us_data *us = (struct us_data *)__us;
+	struct Scsi_Host *host = us->host;
 
 	lock_kernel();
 
@@ -283,19 +284,21 @@ static int usb_stor_control_thread(void * __us)
 	complete(&(us->notify));
 
 	for(;;) {
-		struct Scsi_Host *host;
 		US_DEBUGP("*** thread sleeping.\n");
 		if(down_interruptible(&us->sema))
 			break;
 			
 		US_DEBUGP("*** thread awakened.\n");
 
+		/* lock the device pointers */
+		down(&(us->dev_semaphore));
+
 		/* if us->srb is NULL, we are being asked to exit */
 		if (us->srb == NULL) {
 			US_DEBUGP("-- exit command received\n");
+			up(&(us->dev_semaphore));
 			break;
 		}
-		host = us->srb->device->host;
 
 		/* lock access to the state */
 		scsi_lock(host);
@@ -306,23 +309,20 @@ static int usb_stor_control_thread(void * __us)
 			goto SkipForAbort;
 		}
 
+		/* don't do anything if we are disconnecting */
+		if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+			US_DEBUGP("No command during disconnect\n");
+			goto SkipForDisconnect;
+		}
+
 		/* set the state and release the lock */
 		us->sm_state = US_STATE_RUNNING;
 		scsi_unlock(host);
 
-		/* lock the device pointers */
-		down(&(us->dev_semaphore));
-
-		/* don't do anything if we are disconnecting */
-		if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
-			US_DEBUGP("No command during disconnect\n");
-			us->srb->result = DID_BAD_TARGET << 16;
-		}
-
 		/* reject the command if the direction indicator 
 		 * is UNKNOWN
 		 */
-		else if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
+		if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
 			US_DEBUGP("UNKNOWN data direction\n");
 			us->srb->result = DID_ERROR << 16;
 		}
@@ -362,9 +362,6 @@ static int usb_stor_control_thread(void * __us)
 			us->proto_handler(us->srb, us);
 		}
 
-		/* unlock the device pointers */
-		up(&(us->dev_semaphore));
-
 		/* lock access to the state */
 		scsi_lock(host);
 
@@ -374,7 +371,7 @@ static int usb_stor_control_thread(void * __us)
 				   us->srb->result);
 			us->srb->scsi_done(us->srb);
 		} else {
-			SkipForAbort:
+SkipForAbort:
 			US_DEBUGP("scsi command aborted\n");
 		}
 
@@ -387,9 +384,13 @@ static int usb_stor_control_thread(void * __us)
 			complete(&(us->notify));
 
 		/* empty the queue, reset the state, and release the lock */
+SkipForDisconnect:
 		us->srb = NULL;
 		us->sm_state = US_STATE_IDLE;
 		scsi_unlock(host);
+
+		/* unlock the device pointers */
+		up(&(us->dev_semaphore));
 	} /* for (;;) */
 
 	/* notify the exit routine that we're actually exiting now 
@@ -423,10 +424,8 @@ static int associate_dev(struct us_data *us, struct usb_interface *intf)
 	us->pusb_intf = intf;
 	us->ifnum = intf->cur_altsetting->desc.bInterfaceNumber;
 
-	/* Store our private data in the interface and increment the
-	 * device's reference count */
+	/* Store our private data in the interface */
 	usb_set_intfdata(intf, us);
-	usb_get_dev(us->pusb_dev);
 
 	/* Allocate the device-related DMA-mapped buffers */
 	us->cr = usb_buffer_alloc(us->pusb_dev, sizeof(*us->cr),
@@ -754,8 +753,14 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	down(&us->dev_semaphore);
 
 	/* For bulk-only devices, determine the max LUN value */
-	if (us->protocol == US_PR_BULK)
-		us->max_lun = usb_stor_Bulk_max_lun(us);
+	if (us->protocol == US_PR_BULK) {
+		p = usb_stor_Bulk_max_lun(us);
+		if (p < 0) {
+			up(&us->dev_semaphore);
+			return p;
+		}
+		us->max_lun = p;
+	}
 
 	/* Just before we start our control thread, initialize
 	 * the device if it needs initialization */
@@ -763,6 +768,20 @@ static int usb_stor_acquire_resources(struct us_data *us)
 		us->unusual_dev->initFunction(us);
 
 	up(&us->dev_semaphore);
+
+	/*
+	 * Since this is a new device, we need to register a SCSI
+	 * host definition with the higher SCSI layers.
+	 */
+	us->host = scsi_host_alloc(&usb_stor_host_template, sizeof(us));
+	if (!us->host) {
+		printk(KERN_WARNING USB_STORAGE
+			"Unable to allocate the scsi host\n");
+		return -EBUSY;
+	}
+
+	/* Set the hostdata to prepare for scanning */
+	us->host->hostdata[0] = (unsigned long) us;
 
 	/* Start up our control thread */
 	us->sm_state = US_STATE_IDLE;
@@ -777,76 +796,41 @@ static int usb_stor_acquire_resources(struct us_data *us)
 	/* Wait for the thread to start */
 	wait_for_completion(&(us->notify));
 
-	/*
-	 * Since this is a new device, we need to register a SCSI
-	 * host definition with the higher SCSI layers.
-	 */
-	us->host = scsi_host_alloc(&usb_stor_host_template, sizeof(us));
-	if (!us->host) {
-		printk(KERN_WARNING USB_STORAGE
-			"Unable to register the scsi host\n");
-		return -EBUSY;
-	}
-
-	/* Set the hostdata to prepare for scanning */
-	us->host->hostdata[0] = (unsigned long) us;
-
 	return 0;
 }
 
-/* Dissociate from the USB device */
-static void dissociate_dev(struct us_data *us)
-{
-	US_DEBUGP("-- %s\n", __FUNCTION__);
-	down(&us->dev_semaphore);
-
-	/* Free the device-related DMA-mapped buffers */
-	if (us->cr) {
-		usb_buffer_free(us->pusb_dev, sizeof(*us->cr), us->cr,
-				us->cr_dma);
-		us->cr = NULL;
-	}
-	if (us->iobuf) {
-		usb_buffer_free(us->pusb_dev, US_IOBUF_SIZE, us->iobuf,
-				us->iobuf_dma);
-		us->iobuf = NULL;
-	}
-
-	/* Remove our private data from the interface and decrement the
-	 * device's reference count */
-	usb_set_intfdata(us->pusb_intf, NULL);
-	usb_put_dev(us->pusb_dev);
-
-	us->pusb_dev = NULL;
-	us->pusb_intf = NULL;
-	up(&us->dev_semaphore);
-}
-
-/* Release all our static and dynamic resources */
+/* Release all our dynamic resources */
 void usb_stor_release_resources(struct us_data *us)
 {
-	/*
-	 * The host must already have been removed
-	 * and dissociate_dev() must have been called.
-	 */
+	US_DEBUGP("-- %s\n", __FUNCTION__);
 
-	/* Finish the SCSI host removal sequence */
-	if (us->host) {
-		us->host->hostdata[0] = 0;
-		scsi_host_put(us->host);
-	}
-
-	/* Kill the control thread
-	 *
-	 * Enqueue the command, wake up the thread, and wait for 
-	 * notification that it has exited.
+	/* Kill the control thread.  The SCSI host must already have been
+	 * removed so it won't try to queue any more commands.
 	 */
 	if (us->pid) {
+
+		/* Wait for the thread to be idle */
+		down(&us->dev_semaphore);
 		US_DEBUGP("-- sending exit command to thread\n");
 		BUG_ON(us->sm_state != US_STATE_IDLE);
+
+		/* If the SCSI midlayer queued a final command just before
+		 * scsi_remove_host() was called, us->srb might not be
+		 * NULL.  We can overwrite it safely, because the midlayer
+		 * will not wait for the command to finish.  Also the
+		 * control thread will already have been awakened.
+		 * That's okay, an extra up() on us->sema won't hurt.
+		 *
+		 * Enqueue the command, wake up the thread, and wait for 
+		 * notification that it has exited.
+		 */
+		scsi_lock(us->host);
 		us->srb = NULL;
-		up(&(us->sema));
-		wait_for_completion(&(us->notify));
+		scsi_unlock(us->host);
+		up(&us->dev_semaphore);
+
+		up(&us->sema);
+		wait_for_completion(&us->notify);
 	}
 
 	/* Call the destructor routine, if it exists */
@@ -855,15 +839,36 @@ void usb_stor_release_resources(struct us_data *us)
 		us->extra_destructor(us->extra);
 	}
 
+	/* Finish the host removal sequence */
+	if (us->host)
+		scsi_host_put(us->host);
+
 	/* Free the extra data and the URB */
 	if (us->extra)
 		kfree(us->extra);
 	if (us->current_urb)
 		usb_free_urb(us->current_urb);
 
+}
+
+/* Dissociate from the USB device */
+static void dissociate_dev(struct us_data *us)
+{
+	US_DEBUGP("-- %s\n", __FUNCTION__);
+
+	/* Free the device-related DMA-mapped buffers */
+	if (us->cr)
+		usb_buffer_free(us->pusb_dev, sizeof(*us->cr), us->cr,
+				us->cr_dma);
+	if (us->iobuf)
+		usb_buffer_free(us->pusb_dev, US_IOBUF_SIZE, us->iobuf,
+				us->iobuf_dma);
+
+	/* Remove our private data from the interface */
+	usb_set_intfdata(us->pusb_intf, NULL);
+
 	/* Free the structure itself */
 	kfree(us);
-	US_DEBUGP("-- %s finished\n", __FUNCTION__);
 }
 
 /* Probe to see if we can drive a newly-connected USB device */
@@ -889,6 +894,7 @@ static int storage_probe(struct usb_interface *intf,
 	init_MUTEX(&(us->dev_semaphore));
 	init_MUTEX_LOCKED(&(us->sema));
 	init_completion(&(us->notify));
+	init_waitqueue_head(&us->dev_reset_wait);
 
 	/* Associate the us_data structure with the USB device */
 	result = associate_dev(us, intf);
@@ -959,8 +965,8 @@ static int storage_probe(struct usb_interface *intf,
 	/* We come here if there are any problems */
 BadDevice:
 	US_DEBUGP("storage_probe() failed\n");
-	dissociate_dev(us);
 	usb_stor_release_resources(us);
+	dissociate_dev(us);
 	return result;
 }
 
@@ -971,20 +977,20 @@ static void storage_disconnect(struct usb_interface *intf)
 
 	US_DEBUGP("storage_disconnect() called\n");
 
-	/* Prevent new USB transfers and stop the current command */
+	/* Prevent new USB transfers, stop the current command, and
+	 * interrupt a device-reset delay */
 	set_bit(US_FLIDX_DISCONNECTING, &us->flags);
 	usb_stor_stop_transport(us);
+	wake_up(&us->dev_reset_wait);
 
-	/* Dissociate from the USB device */
-	dissociate_dev(us);
-
+	/* Wait for the current command to finish, then remove the host */
+	down(&us->dev_semaphore);
+	up(&us->dev_semaphore);
 	scsi_remove_host(us->host);
 
-	/* TODO: somehow, wait for the device to
-	 * be 'idle' (tasklet completion) */
-
-	/* Release all our other resources */
+	/* Wait for everything to become idle and release all our resources */
 	usb_stor_release_resources(us);
+	dissociate_dev(us);
 }
 
 /***********************************************************************
@@ -1017,47 +1023,6 @@ static void __exit usb_stor_exit(void)
 	 */
 	US_DEBUGP("-- calling usb_deregister()\n");
 	usb_deregister(&usb_storage_driver) ;
-
-#if 0
-	/* While there are still virtual hosts, unregister them
-	 * Note that it's important to do this completely before removing
-	 * the structures because of possible races with the /proc
-	 * interface
-	 */
-	for (next = us_list; next; next = next->next) {
-		US_DEBUGP("-- calling scsi_unregister_host()\n");
-		scsi_unregister_host(&usb_stor_host_template);
-	}
-
-	/* While there are still structures, free them.  Note that we are
-	 * now race-free, since these structures can no longer be accessed
-	 * from either the SCSI command layer or the /proc interface
-	 */
-	while (us_list) {
-		/* keep track of where the next one is */
-		next = us_list->next;
-
-		/* If there's extra data in the us_data structure then
-		 * free that first */
-		if (us_list->extra) {
-			/* call the destructor routine, if it exists */
-			if (us_list->extra_destructor) {
-				US_DEBUGP("-- calling extra_destructor()\n");
-				us_list->extra_destructor(us_list->extra);
-			}
-
-			/* destroy the extra data */
-			US_DEBUGP("-- freeing the data structure\n");
-			kfree(us_list->extra);
-		}
-
-		/* free the structure itself */
-		kfree (us_list);
-
-		/* advance the list pointer */
-		us_list = next;
-	}
-#endif
 }
 
 module_init(usb_stor_init);
