@@ -35,6 +35,7 @@
  * Written or modified by:
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    La Monte H.P. Yarroll <piggy@acm.org>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
@@ -285,6 +286,11 @@ struct sctp_ulpevent *sctp_ulpevent_make_peer_addr_change(
 	 * encountering the change of state.
 	 */
 	memcpy(&spc->spc_aaddr, aaddr, sizeof(struct sockaddr_storage));
+
+	/* Map ipv4 address into v4-mapped-on-v6 address.  */
+	sctp_get_pf_specific(asoc->base.sk->sk_family)->addr_v4map(
+					sctp_sk(asoc->base.sk),
+					(union sctp_addr *)&spc->spc_aaddr);
 
 	return event;
 

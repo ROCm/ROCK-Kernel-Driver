@@ -611,4 +611,23 @@ int static inline __sctp_sstate(const struct sock *sk, sctp_sock_state_t state)
 	return sk->sk_state == state;
 }
 
+/* Map v4-mapped v6 address back to v4 address */
+static inline void sctp_v6_map_v4(union sctp_addr *addr)
+{
+	addr->v4.sin_family = AF_INET;
+	addr->v4.sin_port = addr->v6.sin6_port;
+	addr->v4.sin_addr.s_addr = addr->v6.sin6_addr.s6_addr32[3];
+}
+
+/* Map v4 address to v4-mapped v6 address */
+static inline void sctp_v4_map_v6(union sctp_addr *addr)
+{
+	addr->v6.sin6_family = AF_INET6;
+	addr->v6.sin6_port = addr->v4.sin_port;
+	addr->v6.sin6_addr.s6_addr32[3] = addr->v4.sin_addr.s_addr;
+	addr->v6.sin6_addr.s6_addr32[0] = 0;
+	addr->v6.sin6_addr.s6_addr32[1] = 0;
+	addr->v6.sin6_addr.s6_addr32[2] = htonl(0x0000ffff);
+}
+
 #endif /* __net_sctp_h__ */
