@@ -486,12 +486,11 @@ static int usb_stor_control_thread(void * __us)
 static int usb_stor_allocate_urbs(struct us_data *ss)
 {
 	/* calculate and store the pipe values */
-	ss->send_bulk_pipe = usb_sndbulkpipe(ss->pusb_dev, ss->ep_out);
-	ss->recv_bulk_pipe = usb_rcvbulkpipe(ss->pusb_dev, ss->ep_in);
 	ss->send_ctrl_pipe = usb_sndctrlpipe(ss->pusb_dev, 0);
 	ss->recv_ctrl_pipe = usb_rcvctrlpipe(ss->pusb_dev, 0);
-	ss->recv_intr_pipe = usb_rcvintpipe(ss->pusb_dev,
-		    ss->ep_int->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
+	ss->send_bulk_pipe = usb_sndbulkpipe(ss->pusb_dev, ss->ep_out);
+	ss->recv_bulk_pipe = usb_rcvbulkpipe(ss->pusb_dev, ss->ep_in);
+	ss->recv_intr_pipe = usb_rcvintpipe(ss->pusb_dev, ss->ep_int);
 
 	/* allocate the usb_ctrlrequest for control packets */
 	US_DEBUGP("Allocating usb_ctrlrequest\n");
@@ -729,7 +728,9 @@ static int storage_probe(struct usb_interface *intf,
 			USB_ENDPOINT_NUMBER_MASK;
 		ss->ep_out = ep_out->bEndpointAddress & 
 			USB_ENDPOINT_NUMBER_MASK;
-		ss->ep_int = ep_int;
+		ss->ep_int = ep_int->bEndpointAddress & 
+			USB_ENDPOINT_NUMBER_MASK;
+		ss->ep_bInterval = ep_int->bInterval;
 
 		/* allocate the URB, the usb_ctrlrequest, and the IRQ URB */
 		if (usb_stor_allocate_urbs(ss))
@@ -770,7 +771,9 @@ static int storage_probe(struct usb_interface *intf,
 			USB_ENDPOINT_NUMBER_MASK;
 		ss->ep_out = ep_out->bEndpointAddress & 
 			USB_ENDPOINT_NUMBER_MASK;
-		ss->ep_int = ep_int;
+		ss->ep_int = ep_int->bEndpointAddress & 
+			USB_ENDPOINT_NUMBER_MASK;
+		ss->ep_bInterval = ep_int->bInterval;
 
 		/* establish the connection to the new device */
 		ss->ifnum = ifnum;

@@ -154,7 +154,8 @@ struct us_data {
 	u8			ifnum;		 /* interface number   */
 	u8			ep_in;		 /* bulk in endpoint   */
 	u8			ep_out;		 /* bulk out endpoint  */
-	struct usb_endpoint_descriptor *ep_int;	 /* interrupt endpoint */ 
+	u8			ep_int;		 /* interrupt endpoint */ 
+	u8			ep_bInterval;	 /* interrupt interval */ 
 
 	/* function pointers for this device */
 	trans_cmnd		transport;	 /* transport function	   */

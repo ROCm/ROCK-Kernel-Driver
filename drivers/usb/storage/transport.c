@@ -507,7 +507,7 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, unsigned int pipe,
  * to make aborts/resets/timeouts work
  *
  * This routine always uses us->recv_intr_pipe as the pipe and
- * us->ep_int->bInterval as the interrupt interval.
+ * us->ep_bInterval as the interrupt interval.
  */
 int usb_stor_interrupt_msg(struct us_data *us, void *data,
 			unsigned int len, unsigned int *act_len)
@@ -524,7 +524,7 @@ int usb_stor_interrupt_msg(struct us_data *us, void *data,
 	/* fill and submit the URB */
 	usb_fill_int_urb(us->current_urb, us->pusb_dev, pipe, data,
 			maxp, usb_stor_blocking_completion, NULL,
-			us->ep_int->bInterval);
+			us->ep_bInterval);
 	status = usb_stor_msg_common(us);
 
 	/* store the actual length of the data transferred */
