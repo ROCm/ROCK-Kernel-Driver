@@ -1,7 +1,7 @@
 /*
  * linux/drivers/video/neofb.c -- NeoMagic Framebuffer Driver
  *
- * Copyright (c) 2001  Denis Oliver Kropp <dok@convergence.de>
+ * Copyright (c) 2001-2002  Denis Oliver Kropp <dok@directfb.org>
  *
  *
  * Card specific code is based on XFree86's neomagic driver.
@@ -10,6 +10,16 @@
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
  * archive for more details.
+ *
+ *
+ * 0.4.1
+ *  - Cosmetic changes (dok)
+ *
+ * 0.4
+ *  - Toshiba Libretto support, allow modes larger than LCD size if
+ *    LCD is disabled, keep BIOS settings if internal/external display
+ *    haven't been enabled explicitly
+ *                          (Thomas J. Moore <dark@mama.indstate.edu>)
  *
  * 0.3.3
  *  - Porting over to new fbdev api. (jsimmons)
@@ -56,6 +66,10 @@
 #include <linux/fb.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#ifdef CONFIG_TOSHIBA
+#include <linux/toshiba.h>
+extern int tosh_smm(SMMRegisters *regs);
+#endif
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -67,20 +81,18 @@
 #include <asm/mtrr.h>
 #endif
 
-#include <video/fbcon.h>
 #include <video/neomagic.h>
 
-#define NEOFB_VERSION "0.3.3"
-
-struct neofb_par default_par;
+#define NEOFB_VERSION "0.4.1"
 
 /* --------------------------------------------------------------------- */
 
-static int disabled = 0;
-static int internal = 0;
-static int external = 0;
-static int nostretch = 0;
-static int nopciburst = 0;
+static int disabled;
+static int internal;
+static int external;
+static int libretto;
+static int nostretch;
+static int nopciburst;
 
 
 #ifdef MODULE
@@ -94,6 +106,8 @@ MODULE_PARM(internal, "i");
 MODULE_PARM_DESC(internal, "Enable output on internal LCD Display.");
 MODULE_PARM(external, "i");
 MODULE_PARM_DESC(external, "Enable output on external CRT.");
+MODULE_PARM(libretto, "i");
+MODULE_PARM_DESC(libretto, "Force Libretto 100/110 800x480 LCD.");
 MODULE_PARM(nostretch, "i");
 MODULE_PARM_DESC(nostretch,
 		 "Disable stretching of modes smaller than LCD.");
@@ -450,15 +464,17 @@ static void vgaHWRestore(const struct fb_info *info,
 /*
  * Hardware Acceleration for Neo2200+
  */
-static inline void neo2200_wait_idle(struct neofb_par *par)
+static inline int neo2200_sync(struct fb_info *info)
 {
+	struct neofb_par *par = (struct neofb_par *) info->par;
 	int waitcycles;
 
 	while (par->neo2200->bltStat & 1)
 		waitcycles++;
+	return 0;
 }
 
-static inline void neo2200_wait_fifo(struct neofb_par *par,
+static inline void neo2200_wait_fifo(struct fb_info *info,
 				     int requested_fifo_space)
 {
 	//  ndev->neo.waitfifo_calls++;
@@ -484,17 +500,17 @@ static inline void neo2200_wait_fifo(struct neofb_par *par,
 	   neo_fifo_space -= requested_fifo_space;
 	 */
 
-	neo2200_wait_idle(par);
+	neo2200_sync(info);
 }
 
-static inline void neo2200_accel_init(struct fb_info *fb,
+static inline void neo2200_accel_init(struct fb_info *info,
 				      struct fb_var_screeninfo *var)
 {
-	struct neofb_par *par = (struct neofb_par *) fb->par;
+	struct neofb_par *par = (struct neofb_par *) info->par;
 	Neo2200 *neo2200 = par->neo2200;
 	u32 bltMod, pitch;
 
-	neo2200_wait_idle(par);
+	neo2200_sync(info);
 
 	switch (var->bits_per_pixel) {
 	case 8:
@@ -551,8 +567,9 @@ neofb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	timings.sync = var->sync;
 
 	/* Is the mode larger than the LCD panel? */
-	if ((var->xres > par->NeoPanelWidth) ||
-	    (var->yres > par->NeoPanelHeight)) {
+	if (par->internal_display &&
+            ((var->xres > par->NeoPanelWidth) ||
+	     (var->yres > par->NeoPanelHeight))) {
 		printk(KERN_INFO
 		       "Mode (%dx%d) larger than the LCD panel (%dx%d)\n",
 		       var->xres, var->yres, par->NeoPanelWidth,
@@ -561,23 +578,27 @@ neofb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	}
 
 	/* Is the mode one of the acceptable sizes? */
-	switch (var->xres) {
-	case 1280:
-		if (var->yres == 1024)
-			mode_ok = 1;
-		break;
-	case 1024:
-		if (var->yres == 768)
-			mode_ok = 1;
-		break;
-	case 800:
-		if (var->yres == 600)
-			mode_ok = 1;
-		break;
-	case 640:
-		if (var->yres == 480)
-			mode_ok = 1;
-		break;
+	if (!par->internal_display)
+		mode_ok = 1;
+	else {
+		switch (var->xres) {
+		case 1280:
+			if (var->yres == 1024)
+				mode_ok = 1;
+			break;
+		case 1024:
+			if (var->yres == 768)
+				mode_ok = 1;
+			break;
+		case 800:
+			if (var->yres == (par->libretto ? 480 : 600))
+				mode_ok = 1;
+			break;
+		case 640:
+			if (var->yres == 480)
+				mode_ok = 1;
+			break;
+		}
 	}
 
 	if (!mode_ok) {
@@ -673,6 +694,10 @@ neofb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		var->xoffset = var->xres_virtual - var->xres;
 	if (var->yoffset + var->yres > var->yres_virtual)
 		var->yoffset = var->yres_virtual - var->yres;
+
+	var->nonstd = 0;
+	var->height = -1;
+	var->width = -1;
 
 	if (var->bits_per_pixel >= 24 || !par->neo2200)
 		var->accel_flags &= ~FB_ACCELF_TEXT;
@@ -1165,10 +1190,9 @@ static void neofb_update_start(struct fb_info *info,
 /*
  *    Pan or Wrap the Display
  */
-static int neofb_pan_display(struct fb_var_screeninfo *var, int con,
-			     struct fb_info *fb)
+static int neofb_pan_display(struct fb_var_screeninfo *var,
+			     struct fb_info *info)
 {
-	struct fb_info *info = (struct fb_info *) fb;
 	u_int y_bottom;
 
 	y_bottom = var->yoffset;
@@ -1178,19 +1202,18 @@ static int neofb_pan_display(struct fb_var_screeninfo *var, int con,
 
 	if (var->xoffset > (var->xres_virtual - var->xres))
 		return -EINVAL;
-	if (y_bottom > fb->var.yres_virtual)
+	if (y_bottom > info->var.yres_virtual)
 		return -EINVAL;
 
 	neofb_update_start(info, var);
 
-	fb->var.xoffset = var->xoffset;
-	fb->var.yoffset = var->yoffset;
+	info->var.xoffset = var->xoffset;
+	info->var.yoffset = var->yoffset;
 
 	if (var->vmode & FB_VMODE_YWRAP)
-		fb->var.vmode |= FB_VMODE_YWRAP;
+		info->var.vmode |= FB_VMODE_YWRAP;
 	else
-		fb->var.vmode &= ~FB_VMODE_YWRAP;
-
+		info->var.vmode &= ~FB_VMODE_YWRAP;
 	return 0;
 }
 
@@ -1239,10 +1262,8 @@ static int neofb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 /*
  *    (Un)Blank the display.
  */
-static int neofb_blank(int blank, struct fb_info *fb)
+static int neofb_blank(int blank, struct fb_info *info)
 {
-	//  struct fb_info *info = (struct fb_info *)fb;
-
 	/*
 	 *  Blank the screen if blank_mode != 0, else unblank. If
 	 *  blank == NULL then the caller blanks by setting the CLUT
@@ -1261,6 +1282,17 @@ static int neofb_blank(int blank, struct fb_info *fb)
 
 	switch (blank) {
 	case 4:		/* powerdown - both sync lines down */
+#ifdef CONFIG_TOSHIBA
+		/* attempt to turn off backlight on toshiba; also turns off external */
+		{
+			SMMRegisters regs;
+
+			regs.eax = 0xff00; /* HCI_SET */
+			regs.ebx = 0x0002; /* HCI_BACKLIGHT */
+			regs.ecx = 0x0000; /* HCI_DISABLE */
+			tosh_smm(&regs);
+		}
+#endif
 		break;
 	case 3:		/* hsync off */
 		break;
@@ -1269,13 +1301,24 @@ static int neofb_blank(int blank, struct fb_info *fb)
 	case 1:		/* just software blanking of screen */
 		break;
 	default:		/* case 0, or anything else: unblank */
+#ifdef CONFIG_TOSHIBA
+		/* attempt to re-enable backlight/external on toshiba */
+		{
+			SMMRegisters regs;
+
+			regs.eax = 0xff00; /* HCI_SET */
+			regs.ebx = 0x0002; /* HCI_BACKLIGHT */
+			regs.ecx = 0x0001; /* HCI_ENABLE */
+			tosh_smm(&regs);
+		}
+#endif
 		break;
 	}
 	return 0;
 }
 
 static void
-neo2200fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+neo2200_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
 	u_long dst, rop;
@@ -1283,7 +1326,7 @@ neo2200fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 	dst = rect->dx + rect->dy * info->var.xres_virtual;
 	rop = rect->rop ? 0x060000 : 0x0c0000;
 
-	neo2200_wait_fifo(par, 4);
+	neo2200_wait_fifo(info, 4);
 
 	/* set blt control */
 	par->neo2200->bltCntl = NEO_BC3_FIFO_EN |
@@ -1309,7 +1352,7 @@ neo2200fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 }
 
 static void
-neo2200fb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+neo2200_copyarea(struct fb_info *info, struct fb_copyarea *area)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
 	u_long src, dst, bltCntl;
@@ -1337,7 +1380,7 @@ neo2200fb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 	    area->dx * (info->var.bits_per_pixel >> 3) +
 	    area->dy * info->fix.line_length;
 
-	neo2200_wait_fifo(par, 4);
+	neo2200_wait_fifo(info, 4);
 
 	/* set blt control */
 	par->neo2200->bltCntl = bltCntl;
@@ -1349,11 +1392,11 @@ neo2200fb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 }
 
 static void
-neo2200fb_imageblit(struct fb_info *info, struct fb_image *image)
+neo2200_imageblit(struct fb_info *info, struct fb_image *image)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
 
-	neo2200_wait_idle(par);
+	neo2200_sync(info);
 
 	switch (info->var.bits_per_pixel) {
 	case 8:
@@ -1385,97 +1428,139 @@ neo2200fb_imageblit(struct fb_info *info, struct fb_image *image)
 	       (image->width * image->height) >> 3);
 }
 
+static void
+neofb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+{
+	if (info->var.accel_flags == FB_ACCELF_TEXT)
+		neo2200_fillrect(info, rect);	
+	else
+		cfb_fillrect(info, rect);
+}
+
+static void
+neofb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+{
+	if (info->var.accel_flags == FB_ACCELF_TEXT)
+		neo2200_copyarea(info, area);	
+	else
+		cfb_copyarea(info, area);	
+}
+
+static void
+neofb_imageblit(struct fb_info *info, struct fb_image *image)
+{
+	if (info->var.accel_flags == FB_ACCELF_TEXT)
+		neo2200_imageblit(info, image);	
+	else
+		cfb_imageblit(info, image);	
+}	
+	
 static struct fb_ops neofb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= neofb_check_var,
 	.fb_set_par	= neofb_set_par,
-	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= neofb_setcolreg,
 	.fb_pan_display	= neofb_pan_display,
 	.fb_blank	= neofb_blank,
-	.fb_fillrect	= cfb_fillrect,
-	.fb_copyarea	= cfb_copyarea,
-	.fb_imageblit	= cfb_imageblit,
+	.fb_sync	= neo2200_sync,
+	.fb_fillrect	= neofb_fillrect,
+	.fb_copyarea	= neofb_copyarea,
+	.fb_imageblit	= neofb_imageblit,
+	.fb_cursor	= soft_cursor,
 };
 
 /* --------------------------------------------------------------------- */
 
 static struct fb_var_screeninfo __devinitdata neofb_var640x480x8 = {
-	accel_flags:	FB_ACCELF_TEXT,
-	xres:		640,
-	yres:		480,
-	xres_virtual:	640,
-	yres_virtual:	30000,
-	bits_per_pixel:	8,
-	pixclock:	39722,
-	left_margin:	48,
-	right_margin:	16,
-	upper_margin:	33,
-	lower_margin:	10,
-	hsync_len:	96,
-	vsync_len:	2,
-	vmode:		FB_VMODE_NONINTERLACED
+	.accel_flags    = FB_ACCELF_TEXT,
+	.xres           = 640,
+	.yres           = 480,
+	.xres_virtual   = 640,
+	.yres_virtual   = 30000,
+	.bits_per_pixel = 8,
+	.pixclock       = 39722,
+	.left_margin    = 48,
+	.right_margin   = 16,
+	.upper_margin   = 33,
+	.lower_margin   = 10,
+	.hsync_len      = 96,
+	.vsync_len      = 2,
+	.vmode          = FB_VMODE_NONINTERLACED
 };
 
 static struct fb_var_screeninfo __devinitdata neofb_var800x600x8 = {
-	accel_flags:	FB_ACCELF_TEXT,
-	xres:		800,
-	yres:		600,
-	xres_virtual:	800,
-	yres_virtual:	30000,
-	bits_per_pixel:	8,
-	pixclock:	25000,
-	left_margin:	88,
-	right_margin:	40,
-	upper_margin:	23,
-	lower_margin:	1,
-	hsync_len:	128,
-	vsync_len:	4,
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-	vmode:		FB_VMODE_NONINTERLACED
+	.accel_flags    = FB_ACCELF_TEXT,
+	.xres           = 800,
+	.yres           = 600,
+	.xres_virtual   = 800,
+	.yres_virtual   = 30000,
+	.bits_per_pixel = 8,
+	.pixclock       = 25000,
+	.left_margin    = 88,
+	.right_margin   = 40,
+	.upper_margin   = 23,
+	.lower_margin   = 1,
+	.hsync_len      = 128,
+	.vsync_len      = 4,
+	.sync           = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.vmode          = FB_VMODE_NONINTERLACED
+};
+
+static struct fb_var_screeninfo __devinitdata neofb_var800x480x8 = {
+	.accel_flags    = FB_ACCELF_TEXT,
+	.xres           = 800,
+	.yres           = 480,
+	.xres_virtual   = 800,
+	.yres_virtual   = 30000,
+	.bits_per_pixel = 8,
+	.pixclock       = 25000,
+	.left_margin    = 88,
+	.right_margin   = 40,
+	.upper_margin   = 23,
+	.lower_margin   = 1,
+	.hsync_len      = 128,
+	.vsync_len      = 4,
+	.sync           = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.vmode          = FB_VMODE_NONINTERLACED
 };
 
 static struct fb_var_screeninfo __devinitdata neofb_var1024x768x8 = {
-	accel_flags:	FB_ACCELF_TEXT,
-	xres:		1024,
-	yres:		768,
-	xres_virtual:	1024,
-	yres_virtual:	30000,
-	bits_per_pixel:	8,
-	pixclock:	15385,
-	left_margin:	160,
-	right_margin:	24,
-	upper_margin:	29,
-	lower_margin:	3,
-	hsync_len:	136,
-	vsync_len:	6,
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-	vmode:		FB_VMODE_NONINTERLACED
+	.accel_flags    = FB_ACCELF_TEXT,
+	.xres           = 1024,
+	.yres           = 768,
+	.xres_virtual   = 1024,
+	.yres_virtual   = 30000,
+	.bits_per_pixel = 8,
+	.pixclock       = 15385,
+	.left_margin    = 160,
+	.right_margin   = 24,
+	.upper_margin   = 29,
+	.lower_margin   = 3,
+	.hsync_len      = 136,
+	.vsync_len      = 6,
+	.sync           = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.vmode          = FB_VMODE_NONINTERLACED
 };
 
 #ifdef NOT_DONE
 static struct fb_var_screeninfo __devinitdata neofb_var1280x1024x8 = {
-	accel_flags:	FB_ACCELF_TEXT,
-	xres:		1280,
-	yres:		1024,
-	xres_virtual:	1280,
-	yres_virtual:	30000,
-	bits_per_pixel:	8,
-	pixclock:	9260,
-	left_margin:	248,
-	right_margin:	48,
-	upper_margin:	38,
-	lower_margin:	1,
-	hsync_len:	112,
-	vsync_len:	3,
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-	vmode:		FB_VMODE_NONINTERLACED
+	.accel_flags    = FB_ACCELF_TEXT,
+	.xres           = 1280,
+	.yres           = 1024,
+	.xres_virtual   = 1280,
+	.yres_virtual   = 30000,
+	.bits_per_pixel = 8,
+	.pixclock       = 9260,
+	.left_margin    = 248,
+	.right_margin   = 48,
+	.upper_margin   = 38,
+	.lower_margin   = 1,
+	.hsync_len      = 112,
+	.vsync_len      = 3,
+	.sync           = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	.vmode          = FB_VMODE_NONINTERLACED
 };
 #endif
-
-static struct fb_var_screeninfo *neofb_var = NULL;
 
 static int __devinit neo_map_mmio(struct fb_info *info,
 				  struct pci_dev *dev)
@@ -1581,6 +1666,7 @@ static void __devinit neo_unmap_video(struct fb_info *info)
 static int __devinit neo_init_hw(struct fb_info *info)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
+	unsigned char type, display;
 	int videoRam = 896;
 	int maxClock = 65000;
 	int CursorMem = 1024;
@@ -1588,7 +1674,6 @@ static int __devinit neo_init_hw(struct fb_info *info)
 	int linearSize = 1024;
 	int maxWidth = 1024;
 	int maxHeight = 1024;
-	unsigned char type, display;
 	int w;
 
 	DBG("neo_init_hw");
@@ -1609,6 +1694,13 @@ static int __devinit neo_init_hw(struct fb_info *info)
 	VGAwGR(0x09, 0x26);
 	type = VGArGR(0x21);
 	display = VGArGR(0x20);
+	if (!par->internal_display && !par->external_display) {
+		par->internal_display = display & 2 || !(display & 3) ? 1 : 0;
+		par->external_display = display & 1;
+		printk (KERN_INFO "Autodetected %s display\n",
+			par->internal_display && par->external_display ? "simultaneous" :
+			par->internal_display ? "internal" : "external");
+	}
 
 	/* Determine panel width -- used in NeoValidMode. */
 	w = VGArGR(0x20);
@@ -1617,34 +1709,34 @@ static int __devinit neo_init_hw(struct fb_info *info)
 	case 0x00:
 		par->NeoPanelWidth = 640;
 		par->NeoPanelHeight = 480;
-		neofb_var = &neofb_var640x480x8;
+		info->var = neofb_var640x480x8;
 		break;
 	case 0x01:
 		par->NeoPanelWidth = 800;
-		par->NeoPanelHeight = 600;
-		neofb_var = &neofb_var800x600x8;
+		par->NeoPanelHeight = par->libretto ? 480 : 600;
+		info->var = par->libretto ? neofb_var800x480x8 : neofb_var800x600x8;
 		break;
 	case 0x02:
 		par->NeoPanelWidth = 1024;
 		par->NeoPanelHeight = 768;
-		neofb_var = &neofb_var1024x768x8;
+		info->var = neofb_var1024x768x8;
 		break;
 	case 0x03:
 		/* 1280x1024 panel support needs to be added */
 #ifdef NOT_DONE
 		par->NeoPanelWidth = 1280;
 		par->NeoPanelHeight = 1024;
-		neofb_var = &neofb_var1280x1024x8;
+		info->var = neofb_var1280x1024x8;
 		break;
 #else
 		printk(KERN_ERR
-		       "neofb: Only 640x480, 800x600 and 1024x768 panels are currently supported\n");
+		       "neofb: Only 640x480, 800x600/480 and 1024x768 panels are currently supported\n");
 		return -1;
 #endif
 	default:
 		par->NeoPanelWidth = 640;
 		par->NeoPanelHeight = 480;
-		neofb_var = &neofb_var640x480x8;
+		info->var = neofb_var640x480x8;
 		break;
 	}
 
@@ -1750,30 +1842,24 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 	struct fb_info *info;
 	struct neofb_par *par;
 
-	info = kmalloc(sizeof(struct fb_info) + sizeof(struct display) +
-		       sizeof(u32) * 16, GFP_KERNEL);
+	info = kmalloc(sizeof(struct fb_info) + sizeof(struct neofb_par) + 
+		       sizeof(u32) * 17, GFP_KERNEL);
 
 	if (!info)
 		return NULL;
 
-	memset(info, 0, sizeof(struct fb_info) + sizeof(struct display));
+	memset(info, 0, sizeof(struct fb_info) + sizeof(struct neofb_par) + sizeof(u32) * 17);
 
-	par = &default_par;
-	memset(par, 0, sizeof(struct neofb_par));
+	par = (struct neofb_par *) (info + 1);
 
-	info->currcon = -1;
 	info->fix.accel = id->driver_data;
 
 	par->pci_burst = !nopciburst;
 	par->lcd_stretch = !nostretch;
+	par->libretto = libretto;
 
-	if (!internal && !external) {
-		par->internal_display = 1;
-		par->external_display = 0;
-	} else {
-		par->internal_display = internal;
-		par->external_display = external;
-	}
+	par->internal_display = internal;
+	par->external_display = external;
 
 	switch (info->fix.accel) {
 	case FB_ACCEL_NEOMAGIC_NM2070:
@@ -1812,22 +1898,10 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 	info->fix.ywrapstep = 0;
 	info->fix.accel = id->driver_data;
 
-	info->var.nonstd = 0;
-	info->var.activate = FB_ACTIVATE_NOW;
-	info->var.height = -1;
-	info->var.width = -1;
-	info->var.accel_flags = 0;
-
-	strcpy(info->modename, info->fix.id);
-
 	info->fbops = &neofb_ops;
-	info->changevar = NULL;
-	info->switch_con = gen_switch;
-	info->updatevar = gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->par = par;
-	info->disp = (struct display *) (info + 1);
-	info->pseudo_palette = (void *) (info->disp + 1);
+	info->pseudo_palette = (void *) (par + 1);
 
 	fb_alloc_cmap(&info->cmap, NR_PALETTE, 0);
 
@@ -1881,8 +1955,6 @@ static int __devinit neofb_probe(struct pci_dev *dev,
 	if (err)
 		goto failed;
 
-	gen_set_var(neofb_var, -1, info);
-
 	/*
 	 * Calculate the hsync and vsync frequencies.  Note that
 	 * we split the 1e12 constant up so that we can preserve
@@ -1908,7 +1980,7 @@ static int __devinit neofb_probe(struct pci_dev *dev,
 		goto failed;
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       GET_FB_IDX(info->node), info->modename);
+	       minor(info->node), info->fix.id);
 
 	/*
 	 * Our driver data
@@ -2008,7 +2080,6 @@ static void __exit neo_done(void)
 	pci_unregister_driver(&neofb_driver);
 }
 
-
 #ifndef MODULE
 
 /* ************************* init in-kernel code ************************** */
@@ -2036,6 +2107,8 @@ int __init neofb_setup(char *options)
 			nostretch = 1;
 		if (!strncmp(this_opt, "nopciburst", 10))
 			nopciburst = 1;
+		if (!strncmp(this_opt, "libretto", 8))
+			libretto = 1;
 	}
 
 	return 0;

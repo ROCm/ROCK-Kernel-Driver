@@ -3391,7 +3391,7 @@ int __init sisfb_init(void)
 			return -EINVAL;
 
 		printk(KERN_INFO "fb%d: %s frame buffer device, Version %d.%d.%02d\n",
-	       		GET_FB_IDX(fb_info.node), fb_info.modename, VER_MAJOR, VER_MINOR,
+	       		minor(fb_info.node), fb_info.modename, VER_MAJOR, VER_MINOR,
 	       		VER_LEVEL);
 
 		printk(KERN_INFO "sisfb: Added SISFB_GET_INFO ioctl = %x\n", SISFB_GET_INFO);
