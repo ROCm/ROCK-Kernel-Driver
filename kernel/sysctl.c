@@ -167,7 +167,7 @@ static void register_proc_table(ctl_table *, struct proc_dir_entry *);
 static void unregister_proc_table(ctl_table *, struct proc_dir_entry *);
 #endif
 
-static unsigned long __HZ = HZ;
+static unsigned int __HZ = HZ;
 /* The default sysctl tables: */
 
 static ctl_table root_table[] = {
@@ -663,7 +663,7 @@ static ctl_table kern_table[] = {
 		.ctl_name	= KERN_HZ, 
 		.procname	= "HZ",
 		.data		= &__HZ,
-		.maxlen		= sizeof(long),
+		.maxlen		= sizeof(int),
 		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
