@@ -66,7 +66,6 @@ MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
 	 CDC_CD_R|CDC_CD_RW|CDC_DVD|CDC_DVD_R|CDC_GENERIC_PACKET)
 
 static int sr_attach(struct scsi_device *);
-static int sr_detect(struct scsi_device *);
 static void sr_detach(struct scsi_device *);
 static int sr_init_command(struct scsi_cmnd *);
 
@@ -75,7 +74,6 @@ static struct Scsi_Device_Template sr_template = {
 	.name		= "cdrom",
 	.tag		= "sr",
 	.scsi_type	= TYPE_ROM,
-	.detect		= sr_detect,
 	.attach		= sr_attach,
 	.detach		= sr_detach,
 	.init_command	= sr_init_command
@@ -487,14 +485,6 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 		get_sectorsize(cd);
 
 	return 0;
-}
-
-static int sr_detect(struct scsi_device * SDp)
-{
-
-	if (SDp->type != TYPE_ROM && SDp->type != TYPE_WORM)
-		return 0;
-	return 1;
 }
 
 static int sr_attach(struct scsi_device *sdev)

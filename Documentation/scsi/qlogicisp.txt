@@ -28,7 +28,3 @@ ehm@cris.com
 Revised:
 Michael A. Griffith
 grif@cs.ucr.edu
-
-
-
-

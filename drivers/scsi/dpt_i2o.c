@@ -5,10 +5,11 @@
     copyright            : (C) 2000 by Adaptec
     email                : deanna_bonds@adaptec.com
 
-    			   July 30, 2001 First version being submitted
+			   July 30, 2001 First version being submitted
 			   for inclusion in the kernel.  V2.4
 
-    See README.dpti for history, notes, license info, and credits
+    See Documentation/scsi/dpti.txt for history, notes, license info
+    and credits
  ***************************************************************************/
 
 /***************************************************************************

@@ -1,14 +1,15 @@
 /* 
  *  linux/kernel/scsi_debug.c
- *
+ * vvvvvvvvvvvvvvvvvvvvvvv Original vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
  *  Copyright (C) 1992  Eric Youngdale
  *  Simulate a host adapter with 2 disks attached.  Do a lot of checking
  *  to make sure that we are not getting blocks mixed up, and PANIC if
  *  anything out of the ordinary is seen.
+ * ^^^^^^^^^^^^^^^^^^^^^^^ Original ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
  *
  *  This version is more generic, simulating a variable number of disk 
- *  (or disk like devices) sharing a common amount of RAM (default 8 MB
- *  but can be set at driver/module load time).
+ *  (or disk like devices) sharing a common amount of RAM 
+ *  
  *
  *  For documentation see http://www.torque.net/sg/sdebug.html
  *
@@ -36,8 +37,6 @@
 #include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
 
-#include <asm/io.h>
-
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
@@ -50,10 +49,7 @@
 
 #include "scsi_debug.h"
 
-static const char * scsi_debug_version_str = "Version: 1.63 (20021103)";
-
-#define DRIVERFS_SUPPORT 1	/* comment out whole line to disable */
-
+static const char * scsi_debug_version_str = "Version: 1.64 (20021111 2)";
 
 #ifndef SCSI_CMD_READ_16
 #define SCSI_CMD_READ_16 0x88
@@ -72,6 +68,8 @@ static const char * scsi_debug_version_str = "Version: 1.63 (20021103)";
 #define DEF_DELAY   1
 #define DEF_MAX_LUNS   2
 #define DEF_SCSI_LEVEL   3
+#define DEF_NUM_HOST   1
+#define MAX_NUM_HOSTS   128
 
 #define DEF_OPTS   0
 #define SCSI_DEBUG_OPT_NOISE   1
@@ -87,8 +85,8 @@ static int scsi_debug_cmnd_count = 0;
 static int scsi_debug_delay = DEF_DELAY;
 static int scsi_debug_max_luns = DEF_MAX_LUNS;
 static int scsi_debug_scsi_level = DEF_SCSI_LEVEL;
+static int scsi_debug_add_host = DEF_NUM_HOST;
 
-#define NR_HOSTS_PRESENT (((scsi_debug_num_devs - 1) / 7) + 1)
 	/* This assumes one lun used per allocated target id */
 #define N_HEAD          8
 #define N_SECTOR        32
@@ -109,6 +107,7 @@ static int scsi_debug_dev_size_mb = DEF_DEV_SIZE_MB;
 #define CAPACITY (N_HEAD * N_SECTOR * N_CYLINDER)
 #define SECT_SIZE_PER(TGT) SECT_SIZE
 
+struct Scsi_Host *scsi_debug_hosts[MAX_NUM_HOSTS];
 
 #define SDEBUG_SENSE_LEN 32
 
@@ -146,9 +145,7 @@ static int num_host_resets = 0;
 static spinlock_t queued_arr_lock = SPIN_LOCK_UNLOCKED;
 static rwlock_t atomic_rw = RW_LOCK_UNLOCKED;
 
-#ifdef DRIVERFS_SUPPORT
 static struct device_driver sdebug_driverfs_driver;
-#endif
 
 /* function declarations */
 static int resp_inquiry(unsigned char * cmd, int target, unsigned char * buff,
@@ -176,10 +173,9 @@ static void stop_all_queued(void);
 static int stop_queued_cmnd(struct scsi_cmnd * cmnd);
 static int inquiry_evpd_83(unsigned char * arr, int dev_id_num,
                            const char * dev_id_str, int dev_id_str_len);
-#ifdef DRIVERFS_SUPPORT
 static void do_create_driverfs_files(void);
 static void do_remove_driverfs_files(void);
-#endif
+static struct Scsi_Host * sdebug_add_shost(void);
 
 
 static unsigned char * scatg2virt(const struct scatterlist * sclp)
@@ -225,7 +221,7 @@ int scsi_debug_queuecommand(struct scsi_cmnd * SCpnt, done_funct_t done)
 		bufflen = SDEBUG_SENSE_LEN;
 	}
 
-        if(target == driver_template.this_id) {
+        if(target == sdebug_driver_template.this_id) {
                 printk(KERN_WARNING 
 		       "scsi_debug: initiator's id used as target!\n");
 		return schedule_resp(SCpnt, NULL, done, 0, 0);
@@ -809,91 +805,7 @@ static void timer_intr_handler(unsigned long indx)
 	spin_unlock_irqrestore(&queued_arr_lock, iflags);
 }
 
-static int initialized = 0;
-static int num_hosts_present = 0;
 static const char * sdebug_proc_name = "scsi_debug";
-
-static int scsi_debug_detect(struct SHT * tpnt)
-{
-	int k, sz;
-	struct Scsi_Host * hpnt;
-
-	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
-		printk(KERN_INFO "scsi_debug: detect\n");
-	if (0 == initialized) {
-		++initialized;
-		sz = sizeof(struct sdebug_dev_info) * scsi_debug_num_devs;
-		devInfop = vmalloc(sz);
-		if (NULL == devInfop) {
-			printk(KERN_ERR "scsi_debug_detect: out of "
-			       "memory\n");
-			return 0;
-		}
-		memset(devInfop, 0, sz);
-		sz = STORE_SIZE;
-		fake_storep = vmalloc(sz);
-		if (NULL == fake_storep) {
-			printk(KERN_ERR "scsi_debug_detect: out of memory"
-			       ", 1\n");
-			return 0;
-		}
-		memset(fake_storep, 0, sz);
-		init_all_queued();
-#ifdef DRIVERFS_SUPPORT
-		sdebug_driverfs_driver.name = (char *)sdebug_proc_name;
-		sdebug_driverfs_driver.bus = &scsi_driverfs_bus_type;
-		driver_register(&sdebug_driverfs_driver);
-		do_create_driverfs_files();
-#endif
-		tpnt->proc_name = (char *)sdebug_proc_name;
-		for (num_hosts_present = 0, k = 0; k < NR_HOSTS_PRESENT; k++) {
-			if ((hpnt = scsi_register(tpnt, 0)) == NULL)
-				printk(KERN_ERR "scsi_debug_detect: "
-					"scsi_register failed k=%d\n", k);
-			else {
-				hpnt->max_lun = scsi_debug_max_luns;
-				++num_hosts_present;
-			}
-		}
-		if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
-			printk(KERN_INFO "scsi_debug: ... built %d host(s)\n",
-			       num_hosts_present);
-		return num_hosts_present;
-	} else {
-		printk(KERN_WARNING "scsi_debug_detect: called again\n");
-		return 0;
-	}
-}
-
-
-static int num_releases = 0;
-
-static int scsi_debug_release(struct Scsi_Host * hpnt)
-{
-	int host_no = hpnt->host_no;
-
-	if (++num_releases == num_hosts_present) {
-		if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
-			printk(KERN_INFO "scsi_debug: [last] release, "
-			       "host_no=%u\n", host_no);
-		num_releases = 0;
-		initialized = 0;
-		stop_all_queued();
-#ifdef DRIVERFS_SUPPORT
-		do_remove_driverfs_files();
-		driver_unregister(&sdebug_driverfs_driver);
-#endif
-		vfree(fake_storep);
-		vfree(devInfop);
-	}
-	else {
-		if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
-			printk(KERN_INFO "scsi_debug: release, host_no=%u\n",
-			       host_no);
-	}
-	scsi_unregister(hpnt);
-	return 0;
-}
 
 static int scsi_debug_slave_attach(struct scsi_device * sdp)
 {
@@ -1290,6 +1202,22 @@ static int __init delay_setup(char *str)
 }
 __setup("scsi_debug_delay=", delay_setup);
 
+static int __init add_host_setup(char *str)
+{
+    int tmp;
+
+    if (get_option(&str, &tmp) == 1) {
+	scsi_debug_add_host = tmp;
+        return 1;
+    } else {
+        printk(KERN_INFO "scsi_debug_add_host: usage "
+               "scsi_debug_add_host=<n>\n"
+               "    <n> 0..127 (default 1)\n");
+        return 0;
+    }
+}
+__setup("scsi_debug_add_host=", add_host_setup);
+
 #endif
 
 MODULE_AUTHOR("Eric Youngdale + Douglas Gilbert");
@@ -1308,6 +1236,8 @@ MODULE_PARM(scsi_debug_every_nth, "i");
 MODULE_PARM_DESC(scsi_debug_every_nth, "timeout every nth command(def=100)");
 MODULE_PARM(scsi_debug_delay, "i");
 MODULE_PARM_DESC(scsi_debug_delay, "# of jiffies to delay response(def=1)");
+MODULE_PARM(scsi_debug_add_host, "i");
+MODULE_PARM_DESC(scsi_debug_add_host, "0..127 hosts allowed(def=1)");
 MODULE_LICENSE("GPL");
 
 static char sdebug_info[256];
@@ -1372,7 +1302,6 @@ static int scsi_debug_proc_info(char *buffer, char **start, off_t offset,
 	return len;
 }
 
-#ifdef DRIVERFS_SUPPORT
 static ssize_t sdebug_delay_read(struct device_driver * ddp, char * buf, 
 				 size_t count, loff_t off)
 {
@@ -1464,6 +1393,58 @@ static ssize_t sdebug_scsi_level_read(struct device_driver * ddp, char * buf,
 }
 DRIVER_ATTR(scsi_level, S_IRUGO, sdebug_scsi_level_read, NULL) 
 
+static ssize_t sdebug_add_host_read(struct device_driver * ddp, char * buf, 
+				    size_t count, loff_t off)
+{
+        return off ? 0 : snprintf(buf, count, "%d\n", scsi_debug_add_host);
+}
+
+static ssize_t sdebug_add_host_write(struct device_driver * ddp, 
+				  const char * buf, size_t count, loff_t off)
+{
+	struct Scsi_Host * hpnt;
+        int delta_hosts, k;
+	char work[20];
+
+        if (off)
+                return 0;
+        if (1 != sscanf(buf, "%10s", work))
+		return -EINVAL;
+	if (1 != sscanf(work, "%d", &delta_hosts))
+		return -EINVAL;
+	if (delta_hosts > 0) {
+		do {
+			for (k = 0; k < MAX_NUM_HOSTS; ++k) {
+				if (NULL == scsi_debug_hosts[k]) {
+					hpnt = sdebug_add_shost();
+					scsi_debug_hosts[k] = hpnt;
+					break;
+				}
+			}
+			if (k == MAX_NUM_HOSTS)
+				break;
+			++scsi_debug_add_host;
+		} while (--delta_hosts);
+	} else if (delta_hosts < 0) {
+		do {
+			for (k = MAX_NUM_HOSTS - 1; k >= 0; --k) {
+				if (scsi_debug_hosts[k]) {
+					scsi_remove_host(scsi_debug_hosts[k]);
+					scsi_unregister(scsi_debug_hosts[k]);
+					scsi_debug_hosts[k] = NULL;
+					break;
+				}
+			}
+			if (k < 0)
+				break;
+			--scsi_debug_add_host;
+		} while (++delta_hosts);
+	}
+	return count;
+}
+DRIVER_ATTR(add_host, S_IRUGO | S_IWUSR, sdebug_add_host_read, 
+	    sdebug_add_host_write)
+
 static void do_create_driverfs_files()
 {
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_delay);
@@ -1473,10 +1454,12 @@ static void do_create_driverfs_files()
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_every_nth);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_max_luns);
 	driver_create_file(&sdebug_driverfs_driver, &driver_attr_scsi_level);
+	driver_create_file(&sdebug_driverfs_driver, &driver_attr_add_host);
 }
 
 static void do_remove_driverfs_files()
 {
+	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_add_host);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_scsi_level);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_max_luns);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_every_nth);
@@ -1485,6 +1468,98 @@ static void do_remove_driverfs_files()
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_opts);
 	driver_remove_file(&sdebug_driverfs_driver, &driver_attr_delay);
 }
-#endif
 
-#include "scsi_module.c"
+static struct Scsi_Host * sdebug_add_shost(void)
+{
+	struct Scsi_Host * hpnt;
+	int err;
+
+	hpnt = scsi_register(&sdebug_driver_template, 0);
+	if (NULL == hpnt) {
+		printk(KERN_ERR "sdebug_add_shost: scsi_register failed\n");
+		return NULL;
+	}
+	err = scsi_add_host(hpnt);
+	if (err) {
+		printk(KERN_ERR "sdebug_add_shost: scsi_add_host failed\n");
+		scsi_unregister(hpnt);
+		return NULL;
+	}
+	hpnt->max_lun = scsi_debug_max_luns;
+	return hpnt;
+}
+
+
+static int __init scsi_debug_init(void)
+{
+	int sz, k;
+
+	if (scsi_debug_num_devs > 0) {
+		sz = sizeof(struct sdebug_dev_info) * scsi_debug_num_devs;
+		devInfop = vmalloc(sz);
+		if (NULL == devInfop) {
+			printk(KERN_ERR "scsi_debug_init: out of memory\n");
+			return -ENOMEM;
+		}
+		memset(devInfop, 0, sz);
+	}
+
+	sz = STORE_SIZE;
+	fake_storep = vmalloc(sz);
+	if (NULL == fake_storep) {
+		printk(KERN_ERR "scsi_debug_init: out of memory, 1\n");
+		if (devInfop)
+			vfree(devInfop);
+		return -ENOMEM;
+	}
+	memset(fake_storep, 0, sz);
+
+	init_all_queued();
+
+	sdebug_driverfs_driver.name = (char *)sdebug_proc_name;
+	sdebug_driverfs_driver.bus = &scsi_driverfs_bus_type;
+	driver_register(&sdebug_driverfs_driver);
+	do_create_driverfs_files();
+
+	sdebug_driver_template.proc_name = (char *)sdebug_proc_name;
+
+	memset(scsi_debug_hosts, 0, sizeof(struct Scsi_Host *) * MAX_NUM_HOSTS);
+	for (k = 0; (k < scsi_debug_add_host) && (k < MAX_NUM_HOSTS); k++) {
+		scsi_debug_hosts[k] = sdebug_add_shost();
+		if (NULL == scsi_debug_hosts[k]) {
+			printk(KERN_ERR "scsi_debug_init: "
+			       "sdebug_add_shost failed k=%d\n", k);
+			break;
+		}
+	}
+	scsi_debug_add_host = k;	// number of hosts actually present
+
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts) {
+		printk(KERN_INFO "scsi_debug: ... built %d host(s)\n",
+		       scsi_debug_add_host);
+	}
+	return 0;
+}
+
+static void __exit scsi_debug_exit(void)
+{
+	int k;
+
+	for (k = MAX_NUM_HOSTS - 1; k >= 0; --k) {
+		if (scsi_debug_hosts[k]) {
+			scsi_remove_host(scsi_debug_hosts[k]);
+			scsi_unregister(scsi_debug_hosts[k]);
+			scsi_debug_hosts[k] = NULL;
+		}
+	}
+	stop_all_queued();
+	do_remove_driverfs_files();
+	driver_unregister(&sdebug_driverfs_driver);
+
+	vfree(fake_storep);
+	if (devInfop)
+		vfree(devInfop);
+}
+
+module_init(scsi_debug_init);
+module_exit(scsi_debug_exit);

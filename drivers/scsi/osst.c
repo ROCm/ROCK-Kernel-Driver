@@ -1,6 +1,6 @@
 /*
   SCSI Tape Driver for Linux version 1.1 and newer. See the accompanying
-  file README.st for more information.
+  file Documentation/scsi/st.txt for more information.
 
   History:
 
@@ -153,10 +153,8 @@ static int osst_copy_from_buffer(OSST_buffer *, unsigned char *);
 
 static int osst_init(void);
 static int osst_attach(Scsi_Device *);
-static int osst_detect(Scsi_Device *);
 static void osst_detach(Scsi_Device *);
 
-static int osst_dev_noticed;
 static int osst_nr_dev;
 static int osst_dev_max;
 
@@ -166,7 +164,6 @@ struct Scsi_Device_Template osst_template =
        name:		"OnStream tape",
        tag:		"osst",
        scsi_type:	TYPE_TAPE,
-       detect:		osst_detect,
        attach:		osst_attach,
        detach:		osst_detach
 };
@@ -5564,24 +5561,12 @@ static int osst_attach(Scsi_Device * SDp)
 	return 0;
 };
 
-static int osst_detect(Scsi_Device * SDp)
-{
-	if (SDp->type != TYPE_TAPE) return 0;
-	if ( ! osst_supports(SDp) ) return 0;
-	
-	osst_dev_noticed++;
-	return 1;
-}
-
 static int osst_registered = 0;
 
 /* Driver initialization (not __initfunc because may be called later) */
 static int osst_init()
 {
 	int i;
-
-	if (osst_dev_noticed == 0)
-		return 0;
 
 	if (!osst_registered) {
 		if (register_chrdev(MAJOR_NR,"osst",&osst_fops)) {
@@ -5653,7 +5638,6 @@ static void osst_detach(Scsi_Device * SDp)
 		os_scsi_tapes[i] = NULL;
 		scsi_slave_detach(SDp);
 		osst_nr_dev--;
-		osst_dev_noticed--;
 		return;
 	}
   }

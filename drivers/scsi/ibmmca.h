@@ -1,6 +1,7 @@
-/* 
+/*
  * Low Level Driver for the IBM Microchannel SCSI Subsystem
- * (Headerfile, see README.ibmmca for description of the IBM MCA SCSI-driver
+ * (Headerfile, see Documentation/scsi/ibmmca.txt for description of the
+ * IBM MCA SCSI-driver.
  * For use under the GNU General Public License within the Linux-kernel project.
  * This include file works only correctly with kernel 2.4.0 or higher!!! */
 

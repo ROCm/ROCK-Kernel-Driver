@@ -45,12 +45,101 @@
 #include "scsi.h"
 #include "hosts.h"
 
-static LIST_HEAD(scsi_host_hn_list);
 static LIST_HEAD(scsi_host_list);
 static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
 
 static int scsi_host_next_hn;		/* host_no for next new host */
 static int scsi_hosts_registered;	/* cnt of registered scsi hosts */
+static char *scsihosts;
+
+MODULE_PARM(scsihosts, "s");
+MODULE_PARM_DESC(scsihosts, "scsihosts=driver1,driver2,driver3");
+#ifndef MODULE
+int __init scsi_setup(char *str)
+{
+	scsihosts = str;
+	return 1;
+}
+
+__setup("scsihosts=", scsi_setup);
+#endif
+
+/**
+  * scsi_find_host_by_num - get a Scsi_Host by host no
+  *
+  * @host_no:	host number to locate
+  *
+  * Return value:
+  *	A pointer to located Scsi_Host or NULL.
+  **/
+static struct Scsi_Host *scsi_find_host_by_num(unsigned short host_no)
+{
+	struct Scsi_Host *shost, *shost_found = NULL;
+
+	spin_lock(&scsi_host_list_lock);
+	list_for_each_entry(shost, &scsi_host_list, sh_list) {
+		if (shost->host_no > host_no) {
+			/*
+			 * The list is sorted.
+			 */
+			break;
+		} else if (shost->host_no == host_no) {
+			shost_found = shost;
+			break;
+		}
+	}
+	spin_unlock(&scsi_host_list_lock);
+	return shost_found;
+}
+
+/**
+ * scsi_alloc_hostnum - choose new SCSI host number based on host name.
+ * @name:	String to store in name field
+ *
+ * Return value:
+ *	Pointer to a new Scsi_Host_Name
+ **/
+static int scsi_alloc_host_num(const char *name)
+{
+	int hostnum;
+	int namelen;
+	const char *start, *end;
+
+	if (name) {
+		hostnum = 0;
+		namelen = strlen(name);
+		start = scsihosts; 
+		while (1) {
+			int hostlen;
+
+			if (start && start[0] != '\0') {
+				end = strpbrk(start, ",:");
+				if (end) {
+					hostlen = (end - start);
+					end++;
+				} else
+					hostlen = strlen(start);
+				/*
+				 * Look for a match on the scsihosts list.
+				 */
+				if ((hostlen == namelen) && 
+				    (strncmp(name, start, hostlen) == 0) && 
+				    (!scsi_find_host_by_num(hostnum)))
+					return hostnum;
+				start = end;
+			} else  {
+				/*
+				 * Look for any unused numbers.
+				 */
+				if (!scsi_find_host_by_num(hostnum))
+					return hostnum;
+			}
+			hostnum++;
+		}
+	} else
+		return scsi_host_next_hn++;
+}
+
 
 /**
  * scsi_tp_for_each_host - call function for each scsi host off a template
@@ -243,20 +332,10 @@ int scsi_add_host(struct Scsi_Host *shost)
  **/
 void scsi_unregister(struct Scsi_Host *shost)
 {
-	struct list_head *lh;
-	Scsi_Host_Name *shost_name;
-
 	/* Remove shost from scsi_host_list */
 	spin_lock(&scsi_host_list_lock);
 	list_del(&shost->sh_list);
 	spin_unlock(&scsi_host_list_lock);
-
-	/* Unregister from scsi_host_hn_list */
-	list_for_each(lh, &scsi_host_hn_list) {
-		shost_name = list_entry(lh, Scsi_Host_Name, shn_list);
-		if (shost->host_no == shost_name->host_no)
-			shost_name->host_registered = 0;
-	}
 
 	/*
 	 * Next, kill the kernel error recovery thread for this host.
@@ -284,43 +363,6 @@ void scsi_unregister(struct Scsi_Host *shost)
 }
 
 /**
- * scsi_host_hn_add - allocate and add new Scsi_Host_Name
- * @name:	String to store in name field
- *
- * Return value:
- * 	Pointer to a new Scsi_Host_Name
- **/
-Scsi_Host_Name *scsi_host_hn_add(char *name)
-{
-	Scsi_Host_Name *shost_name;
-	int len;
-
-	len = strlen(name);
-	shost_name =  kmalloc(sizeof(*shost_name), GFP_KERNEL);
-	if (!shost_name) {
-		printk(KERN_ERR "%s: out of memory at line %d.\n",
-		       __FUNCTION__, __LINE__);
-		return NULL;
-	}
-	shost_name->name = kmalloc(len + 1, GFP_KERNEL);
-	if (!shost_name->name) {
-		kfree(shost_name);
-		printk(KERN_ERR "%s: out of memory at line %d.\n",
-		       __FUNCTION__, __LINE__);
-		return NULL;
-	}
-
-	if (len)
-		strncpy(shost_name->name, name, len);
-	shost_name->name[len] = 0;
-	shost_name->host_no = scsi_host_next_hn++;
-	shost_name->host_registered = 0;
-	list_add_tail(&shost_name->shn_list, &scsi_host_hn_list);
-
-	return shost_name;
-}
-
-/**
  * scsi_register - register a scsi host adapter instance.
  * @shost_tp:	pointer to scsi host template
  * @xtr_bytes:	extra bytes to allocate for driver
@@ -337,14 +379,19 @@ extern int blk_nohighio;
 struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 {
 	struct Scsi_Host *shost, *shost_scr;
-	Scsi_Host_Name *shost_name = NULL;
-	Scsi_Host_Name *shn = NULL;
-	char *hname;
-	size_t hname_len;
 	struct list_head *lh;
 	int gfp_mask;
 	DECLARE_MUTEX_LOCKED(sem);
 
+        /* Check to see if this host has any error handling facilities */
+        if(shost_tp->eh_strategy_handler == NULL &&
+           shost_tp->eh_abort_handler == NULL &&
+           shost_tp->eh_device_reset_handler == NULL &&
+           shost_tp->eh_bus_reset_handler == NULL &&
+           shost_tp->eh_host_reset_handler == NULL) {
+		printk(KERN_ERR "ERROR: SCSI host `%s' has no error handling\nERROR: This is not a safe way to run your SCSI host\nERROR: The error handling must be added to this driver\n", shost_tp->proc_name);
+		dump_stack();
+        } 
 	gfp_mask = GFP_KERNEL;
 	if (shost_tp->unchecked_isa_dma && xtr_bytes)
 		gfp_mask |= __GFP_DMA;
@@ -357,33 +404,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 
 	memset(shost, 0, sizeof(struct Scsi_Host) + xtr_bytes);
 
-	/*
-	 * Determine host number. Check reserved first before allocating
-	 * new one
-	 */
-	hname = (shost_tp->proc_name) ?  shost_tp->proc_name : "";
-	hname_len = strlen(hname);
-
-	if (hname_len)
-		list_for_each(lh, &scsi_host_hn_list) {
-			shn = list_entry(lh, Scsi_Host_Name, shn_list);
-			if (!(shn->host_registered) &&
-			    !strncmp(hname, shn->name, hname_len)) {
-				shost_name = shn;
-				break;
-			}
-		}
-
-	if (!shost_name) {
-		shost_name = scsi_host_hn_add(hname);
-		if (!shost_name) {
-			kfree(shost);
-			return NULL;
-		}
-	}
-
-	shost->host_no = shost_name->host_no;
-	shost_name->host_registered = 1;
+	shost->host_no = scsi_alloc_host_num(shost_tp->proc_name);
 	scsi_hosts_registered++;
 
 	spin_lock_init(&shost->default_lock);
@@ -632,22 +653,8 @@ done:
  **/
 struct Scsi_Host *scsi_host_hn_get(unsigned short host_no)
 {
-	struct list_head *lh;
-	struct Scsi_Host *shost;
-
-	spin_lock(&scsi_host_list_lock);
-	list_for_each(lh, &scsi_host_list) {
-		shost = list_entry(lh, struct Scsi_Host, sh_list);
-		if (shost->host_no == host_no) {
-			/* XXX Inc ref count */
-			goto done;
-		}
-	}
-
-	shost = (struct Scsi_Host *)NULL;
-done:
-	spin_unlock(&scsi_host_list_lock);
-	return shost;
+	/* XXX Inc ref count */
+	return scsi_find_host_by_num(host_no);
 }
 
 /**
@@ -664,38 +671,19 @@ void scsi_host_put(struct Scsi_Host *shost)
 }
 
 /**
- * scsi_host_hn_init - init scsi host number list from string
- * @shost_hn:	string of scsi host driver names.
+ * scsi_host_init - set up the scsi host number list based on any entries
+ * scsihosts.
  **/
-void __init scsi_host_hn_init(char *shost_hn)
+void __init scsi_host_init(void)
 {
-	char *temp = shost_hn;
+	char *shost_hn;
 
-	while (temp) {
-		while (*temp && (*temp != ':') && (*temp != ','))
-			temp++;
-		if (!*temp)
-			temp = NULL;
-		else
-			*temp++ = 0;
-		(void)scsi_host_hn_add(shost_hn);
-		shost_hn = temp;
-	}
-}
-
-/**
- * scsi_host_no_release - free all entries in scsi host number list
- **/
-void __exit scsi_host_hn_release()
-{
-	struct list_head *lh, *next;
-	Scsi_Host_Name *shn;
-
-	list_for_each_safe(lh, next, &scsi_host_hn_list) {
-		shn = list_entry(lh, Scsi_Host_Name, shn_list);
-		if (shn->name)
-			kfree(shn->name);
-		kfree(shn);
+	shost_hn = scsihosts;
+	while (shost_hn) {
+		scsi_host_next_hn++;
+		shost_hn = strpbrk(shost_hn, ":,");
+		if (shost_hn)
+			shost_hn++;
 	}
 }
 

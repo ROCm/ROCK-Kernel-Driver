@@ -41,5 +41,3 @@ After beating my head against this for a couple of weeks, getting
 nowhere, I give up.  So.....This driver does NOT use interrupts, even
 if you have the card jumpered to an IRQ.  Probably nobody will ever
 care.
-
-
