@@ -168,6 +168,7 @@ struct device_class {
 	struct subsystem	devsubsys;
 	struct subsystem	drvsubsys;
 	struct list_head	drivers;
+	struct list_head	devices;
 
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);
@@ -216,9 +217,7 @@ struct device_interface {
 	char			* name;
 	struct device_class	* devclass;
 
-	struct kobject		kobj;
-	struct list_head	devices;
-
+	struct subsystem	subsys;
 	u32			devnum;
 
 	int (*add_device)	(struct device *);
@@ -239,10 +238,11 @@ extern void interface_unregister(struct device_interface *);
  * and create a driverfs symlink for it.
  */
 struct intf_data {
-	struct list_head	node;
 	struct device_interface	* intf;
 	struct device		* dev;
 	u32			intf_num;
+	struct list_head	dev_entry;
+	struct kobject		kobj;
 };
 
 extern int interface_add_data(struct intf_data *);
@@ -252,6 +252,7 @@ extern int interface_add_data(struct intf_data *);
 struct device {
 	struct list_head node;		/* node in sibling list */
 	struct list_head bus_list;	/* node in bus's list */
+	struct list_head class_list;
 	struct list_head driver_list;
 	struct list_head children;
 	struct list_head intf_list;

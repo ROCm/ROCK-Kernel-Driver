@@ -144,6 +144,7 @@ void device_initialize(struct device *dev)
 	INIT_LIST_HEAD(&dev->children);
 	INIT_LIST_HEAD(&dev->driver_list);
 	INIT_LIST_HEAD(&dev->bus_list);
+	INIT_LIST_HEAD(&dev->class_list);
 	INIT_LIST_HEAD(&dev->intf_list);
 }
 
