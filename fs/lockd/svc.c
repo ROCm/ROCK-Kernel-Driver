@@ -221,7 +221,7 @@ lockd_rqst_needs_auth(struct svc_rqst *rqstp)
 	 || proc == NLMPROC_LOCK_RES
 	 || proc == NLMPROC_CANCEL_RES
 	 || proc == NLMPROC_UNLOCK_RES
-	 || proc == NLMPROC_GRANTED_RES
+	 || proc == NLMPROC_GRANTED_MSG
 	 || proc == NLMPROC_NSM_NOTIFY)
 		return 0;
 	return 1;
