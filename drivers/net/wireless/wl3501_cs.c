@@ -26,6 +26,8 @@
  * Tested with Planet AP in 2.5.73-bk, 216 Kbytes/s in Infrastructure mode
  * with a SMP machine (dual pentium 100), using pktgen, 432 pps (pkt_size = 60)
  */
+#undef REALLY_SLOW_IO	/* most systems can safely undef this */
+
 #include <linux/config.h>
 #include <linux/delay.h>
 #include <linux/types.h>
@@ -97,9 +99,9 @@ static int wl3501_chan2freq[] = {
 	[10] = 2462,
 };
 
-#define wl3501_outb(a, b) { outb(a, b); WL3501_SLOW_DOWN_IO; }
-#define wl3501_outb_p(a, b) { outb_p(a, b); WL3501_SLOW_DOWN_IO; }
-#define wl3501_outsb(a, b, c) { outsb(a, b, c); WL3501_SLOW_DOWN_IO; }
+#define wl3501_outb(a, b) { outb(a, b); slow_down_io(); }
+#define wl3501_outb_p(a, b) { outb_p(a, b); slow_down_io(); }
+#define wl3501_outsb(a, b, c) { outsb(a, b, c); slow_down_io(); }
 
 #define WL3501_RELEASE_TIMEOUT (25 * HZ)
 #define WL3501_MAX_ADHOC_TRIES 16
@@ -585,7 +587,7 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 
 static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 {
-	u16 i, j;
+	u16 i = 0;
 	int matchflag = 0;
 	struct wl3501_scan_confirm signal;
 
@@ -645,10 +647,10 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 		   this->driver_state != WL3501_SIG_SCAN_REQ) {
 		dprintk(3, "timeout");
 		this->join_sta_bss = 0;
-		for (j = this->join_sta_bss; j < this->bss_cnt; j++)
-			if (!wl3501_mgmt_join(this, j))
+		for (i = this->join_sta_bss; i < this->bss_cnt; i++)
+			if (!wl3501_mgmt_join(this, i))
 				break;
-		this->join_sta_bss = j;
+		this->join_sta_bss = i;
 		if (this->join_sta_bss == this->bss_cnt) {
 			if (this->net_type == IW_MODE_INFRA)
 				wl3501_mgmt_scan(this, 100);
@@ -888,7 +890,6 @@ static int wl3501_mgmt_association(struct wl3501_card *this)
 
 static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 {
-	u16 i, j;
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 	struct wl3501_join_confirm sig;
 
@@ -897,7 +898,7 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 	if (sig.status == WL3501_STATUS_SUCCESS) {
 		if (this->net_type == IW_MODE_INFRA) {
 			if (this->join_sta_bss < this->bss_cnt) {
-				i = this->join_sta_bss;
+				const int i = this->join_sta_bss;
 				memcpy((char *)&(this->bssid),
 				       (char *)&(this->bss_set[i].bssid),
 				       ETH_ALEN);
@@ -908,7 +909,7 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 				wl3501_mgmt_auth(this);
 			}
 		} else {
-			i = this->join_sta_bss;
+			const int i = this->join_sta_bss;
 			memcpy((char *)&(this->bssid),
 			       (char *)&(this->bss_set[i].bssid), ETH_ALEN);
 			this->chan = this->bss_set[i].phy_pset[2];
@@ -918,11 +919,12 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 			wl3501_online(dev);
 		}
 	} else {
+		int i;
 		this->join_sta_bss++;
-		for (j = this->join_sta_bss; j < this->bss_cnt; j++)
-			if (!wl3501_mgmt_join(this, j))
+		for (i = this->join_sta_bss; i < this->bss_cnt; i++)
+			if (!wl3501_mgmt_join(this, i))
 				break;
-		this->join_sta_bss = j;
+		this->join_sta_bss = i;
 		if (this->join_sta_bss == this->bss_cnt) {
 			if (this->net_type == IW_MODE_INFRA)
 				wl3501_mgmt_scan(this, 100);

@@ -3,10 +3,7 @@
 
 #include <linux/spinlock.h>
 
-#define WL3501_SLOW_DOWN_IO __asm__ __volatile__("outb %al,$0x80")
-
 /* define for WLA 2.0 */
-
 #define WL3501_BLKSZ 256
 /*
  * ID for input Signals of DRIVER block
@@ -420,7 +417,7 @@ struct wl3501_resync_req {
 };
 
 /* For rough constant delay */
-#define WL3501_NOPLOOP(n) { int x = 0; while (x++ < n) WL3501_SLOW_DOWN_IO; }
+#define WL3501_NOPLOOP(n) { int x = 0; while (x++ < n) slow_down_io(); }
 
 /* Ethernet MAC addr, BSS_ID, or ESS_ID */
 /* With this, we may simply write "x=y;" instead of "memcpy(x, y, 6);" */
