@@ -645,7 +645,7 @@ int __init kcopyd_init(void)
 	if (r)
 		return r;
 
-	_kcopyd_wq = create_workqueue("kcopyd");
+	_kcopyd_wq = create_singlethread_workqueue("kcopyd");
 	if (!_kcopyd_wq) {
 		jobs_exit();
 		return -ENOMEM;

@@ -81,9 +81,7 @@ struct dm_table *dm_get_table(struct mapped_device *md);
  * Event functions.
  */
 uint32_t dm_get_event_nr(struct mapped_device *md);
-int dm_add_wait_queue(struct mapped_device *md, wait_queue_t *wq,
-		      uint32_t event_nr);
-void dm_remove_wait_queue(struct mapped_device *md, wait_queue_t *wq);
+int dm_wait_event(struct mapped_device *md, int event_nr);
 
 /*
  * Info functions.

@@ -80,7 +80,7 @@ struct mapped_device {
 	/*
 	 * Event handling.
 	 */
-	uint32_t event_nr;
+	atomic_t event_nr;
 	wait_queue_head_t eventq;
 
 	/*
@@ -377,6 +377,7 @@ static void __map_bio(struct dm_target *ti, struct bio *clone,
 		struct dm_io *io = tio->io;
 		free_tio(tio->io->md, tio);
 		dec_pending(io, -EIO);
+		bio_put(clone);
 	}
 }
 
@@ -708,6 +709,7 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	init_rwsem(&md->lock);
 	rwlock_init(&md->map_lock);
 	atomic_set(&md->holders, 1);
+	atomic_set(&md->event_nr, 0);
 
 	md->queue = blk_alloc_queue(GFP_KERNEL);
 	if (!md->queue)
@@ -778,12 +780,8 @@ static void event_callback(void *context)
 {
 	struct mapped_device *md = (struct mapped_device *) context;
 
-	down_write(&md->lock);
-	md->event_nr++;
-	smp_mb();
-	if (waitqueue_active(&md->eventq))
-		wake_up(&md->eventq);
-	up_write(&md->lock);
+	atomic_inc(&md->event_nr);
+	wake_up(&md->eventq);
 }
 
 static void __set_size(struct gendisk *disk, sector_t size)
@@ -1082,35 +1080,13 @@ int dm_resume(struct mapped_device *md)
  *---------------------------------------------------------------*/
 uint32_t dm_get_event_nr(struct mapped_device *md)
 {
-	uint32_t r;
-
-	down_read(&md->lock);
-	r = md->event_nr;
-	up_read(&md->lock);
-
-	return r;
+	return atomic_read(&md->event_nr);
 }
 
-int dm_add_wait_queue(struct mapped_device *md, wait_queue_t *wq,
-		      uint32_t event_nr)
+int dm_wait_event(struct mapped_device *md, int event_nr)
 {
-	down_write(&md->lock);
-	if (event_nr != md->event_nr) {
-		up_write(&md->lock);
-		return 1;
-	}
-
-	add_wait_queue(&md->eventq, wq);
-	up_write(&md->lock);
-
-	return 0;
-}
-
-void dm_remove_wait_queue(struct mapped_device *md, wait_queue_t *wq)
-{
-	down_write(&md->lock);
-	remove_wait_queue(&md->eventq, wq);
-	up_write(&md->lock);
+	return wait_event_interruptible(md->eventq,
+			(event_nr != atomic_read(&md->event_nr)));
 }
 
 /*
