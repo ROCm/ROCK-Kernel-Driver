@@ -301,7 +301,8 @@ struct frame {
 	unsigned long data; 
 
 	/* Max # of packets per frame */
-        #define MAX_PACKETS 320
+	/* 320 is enough for NTSC, need to check what PAL is */
+        #define MAX_PACKETS 500
 
 
 	/* a PAGE_SIZE memory pool for allocating CIP headers

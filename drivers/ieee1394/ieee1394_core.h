@@ -69,13 +69,16 @@ struct hpsb_packet {
         /* Very core internal, don't care. */
         struct semaphore state_change;
 
-        task_queue complete_tq;
+	struct list_head complete_tq;
 
         /* Store jiffies for implementing bus timeouts. */
         unsigned long sendtime;
 
         quadlet_t embedded_header[5];
 };
+
+/* add a new task for when a packet completes */
+void hpsb_add_packet_complete_task(struct hpsb_packet *packet, struct tq_struct *tq);
 
 static inline struct hpsb_packet *driver_packet(struct list_head *l)
 {
