@@ -39,22 +39,22 @@ static int debug = 0;
 static
 struct dvb_frontend_info bsru6_info = {
 #ifdef CONFIG_ALPS_BSRU6_IS_LG_TDQBS00X
-	name: "LG TDQB-S00x",
+	.name			= "LG TDQB-S00x",
 #else
-	name: "Alps BSRU6",
+	.name			= "Alps BSRU6",
 #endif
-	type: FE_QPSK,
-	frequency_min: 950000,
-	frequency_max: 2150000,
-	frequency_stepsize: 125,   /* kHz for QPSK frontends */
-	frequency_tolerance: M_CLK/2000,
-	symbol_rate_min: 1000000,
-	symbol_rate_max: 45000000,
-	symbol_rate_tolerance: 500,  /* ppm */
-	notifier_delay: 0,
-	caps: FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
-	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
-	      FE_CAN_QPSK
+	.type			= FE_QPSK,
+	.frequency_min		= 950000,
+	.frequency_max		= 2150000,
+	.frequency_stepsize	= 125,   /* kHz for QPSK frontends */
+	.frequency_tolerance	= M_CLK/2000,
+	.symbol_rate_min	= 1000000,
+	.symbol_rate_max	= 45000000,
+	.symbol_rate_tolerance	= 500,  /* ppm */
+	.caps 			= FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
+				  FE_CAN_FEC_3_4 | FE_CAN_FEC_5_6 |
+				  FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
+				  FE_CAN_QPSK
 };
 
 
@@ -158,7 +158,7 @@ int stv0299_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
-	struct i2c_msg msg = { addr: 0x68, flags: 0, buf: buf, len: 2 };
+	struct i2c_msg msg = { .addr = 0x68, .flags = 0, .buf = buf, .len = 2 };
 
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -178,8 +178,8 @@ u8 stv0299_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	int ret;
 	u8 b0 [] = { reg };
 	u8 b1 [] = { 0 };
-	struct i2c_msg msg [] = { { addr: 0x68, flags: 0, buf: b0, len: 1 },
-			   { addr: 0x68, flags: I2C_M_RD, buf: b1, len: 1 } };
+	struct i2c_msg msg [] = { { .addr = 0x68, .flags = 0, .buf = b0, .len = 1 },
+			   { .addr = 0x68, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
         
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -196,8 +196,8 @@ static
 int stv0299_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
 {
         int ret;
-        struct i2c_msg msg [] = { { addr: 0x68, flags: 0, buf: &reg1, len: 1 },
-                           { addr: 0x68, flags: I2C_M_RD, buf: b, len: len } };
+        struct i2c_msg msg [] = { { .addr = 0x68, .flags = 0, .buf = &reg1, .len = 1 },
+                           { .addr = 0x68, .flags = I2C_M_RD, .buf = b, .len = len } };
 
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -216,8 +216,8 @@ int tsa5059_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
 	int ret;
 	u8 rpt1 [] = { 0x05, 0xb5 };  /*  enable i2c repeater on stv0299  */
-	struct i2c_msg msg [] = {{ addr: 0x68, flags: 0, buf: rpt1, len: 2 },
-				 { addr: 0x61, flags: 0, buf: data, len: 4 }};
+	struct i2c_msg msg [] = {{ .addr = 0x68, .flags = 0, .buf = rpt1, .len = 2 },
+				 { .addr = 0x61, .flags = 0, .buf = data, .len = 4 }};
 
 	dprintk ("%s\n", __FUNCTION__);
 
