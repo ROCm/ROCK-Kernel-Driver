@@ -606,7 +606,7 @@ static void ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, i
 	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, &buf);
 }
 
-void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
+static void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
 	u8 opt;
@@ -626,7 +626,7 @@ void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 	}
 }
 
-int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
+static int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
 	u8 opt = 0;
@@ -646,8 +646,8 @@ int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 	return 0;
 }
 
-int ax8817x_get_eeprom(struct net_device *net, 
-		       struct ethtool_eeprom *eeprom, u8 *data)
+static int ax8817x_get_eeprom(struct net_device *net,
+			      struct ethtool_eeprom *eeprom, u8 *data)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
 	u16 *ebuf = (u16 *)data;
@@ -3014,7 +3014,7 @@ static struct ethtool_ops usbnet_ethtool_ops;
 
 // precondition: never called in_interrupt
 
-int
+static int
 usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
 	struct usbnet			*dev;

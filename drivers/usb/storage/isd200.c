@@ -349,7 +349,7 @@ struct sense_data {
  * RETURNS:
  *    void
  */
-void isd200_build_sense(struct us_data *us, Scsi_Cmnd *srb)
+static void isd200_build_sense(struct us_data *us, Scsi_Cmnd *srb)
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	struct sense_data *buf = (struct sense_data *) &srb->sense_buffer[0];
@@ -505,7 +505,7 @@ static int isd200_action( struct us_data *us, int action,
  * RETURNS:
  *    ISD status code
  */
-int isd200_read_regs( struct us_data *us )
+static int isd200_read_regs( struct us_data *us )
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	int retStatus = ISD200_GOOD;
@@ -534,7 +534,7 @@ int isd200_read_regs( struct us_data *us )
  * This is used by the protocol layers to actually send the message to
  * the device and receive the response.
  */
-void isd200_invoke_transport( struct us_data *us, 
+static void isd200_invoke_transport( struct us_data *us, 
 			      Scsi_Cmnd *srb, 
 			      union ata_cdb *ataCdb )
 {
@@ -677,7 +677,7 @@ static void isd200_log_config( struct isd200_info* info )
  * RETURNS:
  *    ISD status code
  */
-int isd200_write_config( struct us_data *us ) 
+static int isd200_write_config( struct us_data *us ) 
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	int retStatus = ISD200_GOOD;
@@ -720,7 +720,7 @@ int isd200_write_config( struct us_data *us )
  * RETURNS:
  *    ISD status code
  */
-int isd200_read_config( struct us_data *us ) 
+static int isd200_read_config( struct us_data *us ) 
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	int retStatus = ISD200_GOOD;
@@ -765,7 +765,7 @@ int isd200_read_config( struct us_data *us )
  * RETURNS:
  *    NT status code
  */
-int isd200_atapi_soft_reset( struct us_data *us ) 
+static int isd200_atapi_soft_reset( struct us_data *us ) 
 {
 	int retStatus = ISD200_GOOD;
 	int transferStatus;
@@ -791,7 +791,7 @@ int isd200_atapi_soft_reset( struct us_data *us )
  * RETURNS:
  *    ISD status code
  */
-int isd200_srst( struct us_data *us ) 
+static int isd200_srst( struct us_data *us ) 
 {
 	int retStatus = ISD200_GOOD;
 	int transferStatus;
@@ -937,7 +937,7 @@ static int isd200_try_enum(struct us_data *us, unsigned char master_slave,
  * RETURNS:
  *    ISD status code
  */
-int isd200_manual_enum(struct us_data *us)
+static int isd200_manual_enum(struct us_data *us)
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	int retStatus = ISD200_GOOD;
@@ -981,7 +981,7 @@ int isd200_manual_enum(struct us_data *us)
  * RETURNS:
  *    ISD status code
  */
-int isd200_get_inquiry_data( struct us_data *us )
+static int isd200_get_inquiry_data( struct us_data *us )
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	int retStatus = ISD200_GOOD;
@@ -1124,8 +1124,8 @@ int isd200_get_inquiry_data( struct us_data *us )
  *    TRUE if the command needs to be sent to the transport layer
  *    FALSE otherwise
  */
-int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us, 
-		       union ata_cdb * ataCdb)
+static int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
+			      union ata_cdb * ataCdb)
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	struct hd_driveid *id = info->id;
@@ -1339,7 +1339,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
  *
  * Frees the driver structure.
  */
-void isd200_free_info_ptrs(void *info_)
+static void isd200_free_info_ptrs(void *info_)
 {
 	struct isd200_info *info = (struct isd200_info *) info_;
 
@@ -1357,7 +1357,7 @@ void isd200_free_info_ptrs(void *info_)
  * RETURNS:
  *    ISD status code
  */
-int isd200_init_info(struct us_data *us)
+static int isd200_init_info(struct us_data *us)
 {
 	int retStatus = ISD200_GOOD;
 	struct isd200_info *info;

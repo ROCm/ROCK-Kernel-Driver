@@ -188,13 +188,13 @@ exit:
 		     __FUNCTION__, retval);
 }
 
-struct aiptek_features aiptek_features[] = {
+static struct aiptek_features aiptek_features[] = {
 	{"Aiptek 6000U/8000U",
 	 8, 3000, 2250, 26, 511, aiptek_irq, 0, 0, 0, 0},
 	{NULL, 0}
 };
 
-struct usb_device_id aiptek_ids[] = {
+static struct usb_device_id aiptek_ids[] = {
 	{USB_DEVICE(USB_VENDOR_ID_AIPTEK, 0x20), .driver_info = 0},
 	{}
 };

@@ -958,7 +958,7 @@ static void hid_output_field(struct hid_field *field, __u8 *data)
  * Create a report.
  */
 
-void hid_output_report(struct hid_report *report, __u8 *data)
+static void hid_output_report(struct hid_report *report, __u8 *data)
 {
 	unsigned n;
 
@@ -1038,7 +1038,8 @@ int hid_find_report_by_usage(struct hid_device *hid, __u32 wanted_usage, struct 
 	return -1;
 }
 
-int hid_find_field_in_report(struct hid_report *report, __u32 wanted_usage, struct hid_field **field)
+#if 0
+static int hid_find_field_in_report(struct hid_report *report, __u32 wanted_usage, struct hid_field **field)
 {
 	int i, j;
 
@@ -1051,6 +1052,7 @@ int hid_find_field_in_report(struct hid_report *report, __u32 wanted_usage, stru
 
 	return -1;
 }
+#endif
 
 static int hid_submit_out(struct hid_device *hid)
 {
@@ -1420,7 +1422,7 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_1_PHIDGETSERVO_20	0x8101
 #define USB_DEVICE_ID_4_PHIDGETSERVO_20	0x8104
 
-struct hid_blacklist {
+static struct hid_blacklist {
 	__u16 idVendor;
 	__u16 idProduct;
 	unsigned quirks;
