@@ -1496,6 +1496,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 					rdev_dec_pending(conf->mirrors[d].rdev, mddev);
 			}
 			put_buf(r10_bio);
+			biolist = NULL;
 			goto giveup;
 		}
 	}
@@ -1557,7 +1558,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 		}
 	}
 
-	return nr_sectors;
+	return sectors_skipped + nr_sectors;
  giveup:
 	/* There is nowhere to write, so all non-sync
 	 * drives must be failed, so try the next chunk...
