@@ -80,6 +80,7 @@
  * 1.8 - Remove need to call cleanup ioctls on last client exit (keith)
  *       Add 'GET' queries for starting additional clients on different VT's.
  *       Add DRM_IOCTL_RADEON_CP_RESUME ioctl.
+ * 1.9 - Add texture rectangle support for r100.
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \
