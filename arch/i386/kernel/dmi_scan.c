@@ -314,23 +314,6 @@ static __init int disable_smbus(struct dmi_blacklist *d)
 }
 
 /*
- * Work around broken HP Pavilion Notebooks which assign USB to
- * IRQ 9 even though it is actually wired to IRQ 11
- */
-static __init int fix_broken_hp_bios_irq9(struct dmi_blacklist *d)
-{
-#ifdef CONFIG_PCI
-	extern int broken_hp_bios_irq9;
-	if (broken_hp_bios_irq9 == 0)
-	{
-		broken_hp_bios_irq9 = 1;
-		printk(KERN_INFO "%s detected - fixing broken IRQ routing\n", d->ident);
-	}
-#endif
-	return 0;
-}
-
-/*
  *  Check for clue free BIOS implementations who use
  *  the following QA technique
  *
@@ -816,14 +799,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH
 			} },
 	 
-	{ fix_broken_hp_bios_irq9, "HP Pavilion N5400 Series Laptop", {
-			MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
-			MATCH(DMI_BIOS_VERSION, "GE.M1.03"),
-			MATCH(DMI_PRODUCT_VERSION, "HP Pavilion Notebook Model GE"),
-			MATCH(DMI_BOARD_VERSION, "OmniBook N32N-736")
-			} },
- 
-
 	/*
 	 *	Generic per vendor APM settings
 	 */
