@@ -187,6 +187,8 @@ static int llc_ui_release(struct socket *sock)
 		llc_release_sockets(llc->sap);
 		llc_sap_close(llc->sap);
 	}
+	if (llc->dev)
+		dev_put(llc->dev);
 	sock_put(sk);
 	llc_sk_free(sk);
 out:
@@ -257,6 +259,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 		rc = -ENETUNREACH;
 		if (!dev)
 			goto out;
+		dev_hold(dev);
 		llc->dev = dev;
 	}
 	/* bind to a specific sap, optional. */
