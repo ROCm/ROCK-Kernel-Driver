@@ -25,18 +25,31 @@ $(obj)/%_gray256.o: $(src)/%_gray256.c
 
 # How to generate them
 
-$(obj)/%_mono.c:	$(src)/%_mono.pbm
-		$(objtree)/scripts/pnmtologo -t mono -n $*_mono -o $@ $<
+quiet_cmd_logo_mono    = MONO    $@
+      cmd_logo_mono    = $(objtree)/scripts/pnmtologo -t mono -n $*_mono -o $@ $<
 
-$(obj)/%_vga16.c:	$(src)/%_vga16.ppm
-		$(objtree)/scripts/pnmtologo -t vga16 -n $*_vga16 -o $@ $<
+quiet_cmd_logo_vga16   = VGA16   $@
+      cmd_logo_vga16   = $(objtree)/scripts/pnmtologo -t vga16 -n $*_vga16 -o $@ $<
 
-$(obj)/%_clut224.c:	$(src)/%_clut224.ppm
-		$(objtree)/scripts/pnmtologo -t clut224 -n $*_clut224 -o $@ $<
+quiet_cmd_logo_clut224 = CLUT224 $@
+      cmd_logo_clut224 = $(objtree)/scripts/pnmtologo -t clut224 -n $*_clut224 -o $@ $<
 
-$(obj)/%_gray256.c:	$(src)/%_gray256.pgm
-		$(objtree)/scripts/pnmtologo -t gray256 -n $*_gray256 -o $@ $<
+quiet_cmd_logo_gray256 = GRAY256 $@
+      cmd_logo_gray256 = $(objtree)/scripts/pnmtologo -t gray256 -n $*_gray256 -o $@ $<
+
+
+$(obj)/%_mono.c: $(src)/%_mono.pbm FORCE
+	$(call if_changed,logo_mono)
+
+$(obj)/%_vga16.c: $(src)/%_vga16.ppm FORCE
+	$(call if_changed,logo_vga16)
+
+$(obj)/%_clut224.c: $(src)/%_clut224.ppm FORCE
+	$(call if_changed,logo_clut224)
+
+$(obj)/%_gray256.c: $(src)/%_gray256.pgm FORCE
+	$(call if_changed,logo_gray256)
 
 
 # Files generated that shall be removed upon make clean
-clean-files := *_mono.c *_vga16.c *_clut224.c *_gray256.c
+targets := *_mono.c *_vga16.c *_clut224.c *_gray256.c
