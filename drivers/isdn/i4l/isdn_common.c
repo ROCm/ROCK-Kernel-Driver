@@ -71,7 +71,7 @@ extern char *isdn_v110_revision;
 #if defined(CONFIG_ISDN_DIVERSION) || defined(CONFIG_ISDN_DIVERSION_MODULE)
 static isdn_divert_if *divert_if; /* = NULL */
 #else
-#define divert_if (0)
+#define divert_if ((isdn_divert_if *) NULL)
 #endif
 
 
@@ -357,12 +357,13 @@ isdn_receive_skb_callback(int di, int channel, struct sk_buff *skb)
 static int
 isdn_command(isdn_ctrl *cmd)
 {
+	int idx = isdn_dc2minor(cmd->driver, cmd->arg & 255);
+
 	if (cmd->driver == -1) {
 		printk(KERN_WARNING "isdn_command command(%x) driver -1\n", cmd->command);
 		return(1);
 	}
 	if (cmd->command == ISDN_CMD_SETL2) {
-		int idx = isdn_dc2minor(cmd->driver, cmd->arg & 255);
 		unsigned long l2prot = (cmd->arg >> 8) & 255;
 		unsigned long features = (dev->drv[cmd->driver]->interface->features
 						>> ISDN_FEATURE_L2_SHIFT) &
@@ -385,6 +386,28 @@ isdn_command(isdn_ctrl *cmd)
 					slot[idx].iv110.v110emu = 0;
 		}
 	}
+#ifdef ISDN_DEBUG_COMMAND
+	switch (cmd->command) {
+	case ISDN_CMD_SETL2: 
+		printk(KERN_DEBUG "ISDN_CMD_SETL2 %d\n", idx); break;
+	case ISDN_CMD_SETL3: 
+		printk(KERN_DEBUG "ISDN_CMD_SETL3 %d\n", idx); break;
+	case ISDN_CMD_DIAL: 
+		printk(KERN_DEBUG "ISDN_CMD_DIAL %d\n", idx); break;
+	case ISDN_CMD_ACCEPTD: 
+		printk(KERN_DEBUG "ISDN_CMD_ACCEPTD %d\n", idx); break;
+	case ISDN_CMD_ACCEPTB: 
+		printk(KERN_DEBUG "ISDN_CMD_ACCEPTB %d\n", idx); break;
+	case ISDN_CMD_HANGUP: 
+		printk(KERN_DEBUG "ISDN_CMD_HANGUP %d\n", idx); break;
+	case ISDN_CMD_CLREAZ: 
+		printk(KERN_DEBUG "ISDN_CMD_CLREAZ %d\n", idx); break;
+	case ISDN_CMD_SETEAZ: 
+		printk(KERN_DEBUG "ISDN_CMD_SETEAZ %d\n", idx); break;
+	default:
+		printk(KERN_DEBUG "%s: cmd = %d\n", __FUNCTION__, cmd->command);
+	}
+#endif
 	return dev->drv[cmd->driver]->interface->command(cmd);
 }
 
@@ -458,7 +481,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_ICALL:
 			if (i < 0)
 				return -1;
-			dbg_statcallb("ICALL: %d %ld %s\n", di, c->arg, c->parm.num);
+			dbg_statcallb("ICALL: %d (%d,%ld) %s\n", i, di, c->arg, c->parm.num);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED) {
 				cmd.driver = di;
 				cmd.arg = c->arg;
@@ -490,13 +513,11 @@ isdn_status_callback(isdn_ctrl * c)
 					}
 					break;
 				case 1:
-					/* Schedule connection-setup */
-					isdn_net_dial();
 					list_for_each(l, &isdn_net_devs) {
 						isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
-						if (p->local.isdn_slot == isdn_dc2minor(di, cmd.arg)) {
-							strcpy( cmd.parm.setup.eazmsn, p->local.msn );
-							isdn_slot_command(p->local.isdn_slot, ISDN_CMD_ACCEPTD, &cmd);
+						if (p->local.isdn_slot == i) {
+							strcpy(cmd.parm.setup.eazmsn, p->local.msn);
+							isdn_slot_command(i, ISDN_CMD_ACCEPTD, &cmd);
 							retval = 1;
 							break;
 						}
@@ -516,7 +537,6 @@ isdn_status_callback(isdn_ctrl * c)
 					/* Fall through */
 				case 4:
 					/* ... then start callback. */
-					isdn_net_dial();
 					break;
 				case 5:
 					/* Number would eventually match, if longer */
@@ -529,7 +549,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_CINF:
 			if (i < 0)
 				return -1;
-			dbg_statcallb("CINF: %ld %s\n", c->arg, c->parm.num);
+			dbg_statcallb("CINF: %d %s\n", i, c->parm.num);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
 			if (strcmp(c->parm.num, "0"))
@@ -537,7 +557,7 @@ isdn_status_callback(isdn_ctrl * c)
 			isdn_tty_stat_callback(i, c);
 			break;
 		case ISDN_STAT_CAUSE:
-			dbg_statcallb("CAUSE: %ld %s\n", c->arg, c->parm.num);
+			dbg_statcallb("CAUSE: %d %s\n", i, c->parm.num);
 			printk(KERN_INFO "isdn: %s,ch%ld cause: %s\n",
 			       dev->drvid[di], c->arg, c->parm.num);
 			isdn_tty_stat_callback(i, c);
@@ -545,7 +565,7 @@ isdn_status_callback(isdn_ctrl * c)
 				divert_if->stat_callback(c); 
 			break;
 		case ISDN_STAT_DISPLAY:
-			dbg_statcallb("DISPLAY: %ld %s\n", c->arg, c->parm.display);
+			dbg_statcallb("DISPLAY: %d %s\n", i, c->parm.display);
 			isdn_tty_stat_callback(i, c);
                         if (divert_if)
 				divert_if->stat_callback(c); 
@@ -553,7 +573,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_DCONN:
 			if (i < 0)
 				return -1;
-			dbg_statcallb("DCONN: %ld\n", c->arg);
+			dbg_statcallb("DCONN: %d\n", i);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
 			/* Find any net-device, waiting for D-channel setup */
@@ -572,7 +592,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_DHUP:
 			if (i < 0)
 				return -1;
-			dbg_statcallb("DHUP: %ld\n", c->arg);
+			dbg_statcallb("DHUP: %d\n", i);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
 			dev->drv[di]->online &= ~(1 << (c->arg));
@@ -604,7 +624,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_BHUP:
 			if (i < 0)
 				return -1;
-			dbg_statcallb("BHUP: %ld\n", c->arg);
+			dbg_statcallb("BHUP: %d\n", i);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
 			dev->drv[di]->online &= ~(1 << (c->arg));
@@ -2101,8 +2121,17 @@ isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 {
 	ctrl->command = cmd;
 	ctrl->driver = isdn_slot_driver(sl);
-	ctrl->arg &= 0xff; ctrl->arg |= isdn_slot_channel(sl);
-	
+	switch (cmd) {
+	case ISDN_CMD_SETL2:
+	case ISDN_CMD_SETL3:
+	case ISDN_CMD_PROT_IO:
+		ctrl->arg &= ~0xff; ctrl->arg |= isdn_slot_channel(sl);
+		break;
+	default:
+		ctrl->arg = isdn_slot_channel(sl);
+		break;
+	}
+
 	return isdn_command(ctrl);
 }
 
@@ -2179,6 +2208,30 @@ isdn_slot_set_usage(int sl, int usage)
 	isdn_info_update();
 }
 
+int
+isdn_slot_m_idx(int sl)
+{
+	BUG_ON(sl < 0);
+
+	return slot[sl].m_idx;
+}
+
+void
+isdn_slot_set_m_idx(int sl, int midx)
+{
+	BUG_ON(sl < 0);
+
+	slot[sl].m_idx = midx;
+}
+
+char *
+isdn_slot_num(int sl)
+{
+	BUG_ON(sl < 0);
+
+	return slot[sl].num;
+}
+
 void
 isdn_slot_set_rx_netdev(int sl, isdn_net_dev *nd)
 {
@@ -2200,7 +2253,7 @@ isdn_slot_set_st_netdev(int sl, isdn_net_dev *nd)
 {
 	BUG_ON(sl < 0);
 
-	slot[sl].rx_netdev = nd;
+	slot[sl].st_netdev = nd;
 }
 
 isdn_net_dev *

@@ -24,6 +24,7 @@
 #undef  ISDN_DEBUG_NET_DIAL
 #undef  ISDN_DEBUG_NET_ICALL
 #undef  ISDN_DEBUG_STATCALLB
+#undef  ISDN_DEBUG_COMMAND
 
 #ifdef ISDN_DEBUG_NET_DIAL
 #define dbg_net_dial(arg...) printk(KERN_DEBUG arg)
@@ -44,8 +45,10 @@
 #endif
 
 #define isdn_BUG() \
-do { printk(KERN_WARNING "ISDN Bug at %s:%d", __FILE__, __LINE__); \
+do { printk(KERN_WARNING "ISDN Bug at %s:%d\n", __FILE__, __LINE__); \
 } while(0)
+
+#define HERE printk("%s:%d (%s)\n", __FILE__, __LINE__, __FUNCTION__)
 
 /* Prototypes */
 extern void isdn_MOD_INC_USE_COUNT(void);
@@ -94,7 +97,7 @@ extern int   isdn_slot_usage(int slot);
 extern void  isdn_slot_set_usage(int slot, int usage);
 extern char *isdn_slot_num(int slot);
 extern int   isdn_slot_m_idx(int slot);
-extern int   isdn_slot_set_m_idx(int slot, int midx);
+extern void  isdn_slot_set_m_idx(int slot, int midx);
 extern void  isdn_slot_set_rx_netdev(int sl, isdn_net_dev *nd);
 extern void  isdn_slot_set_st_netdev(int sl, isdn_net_dev *nd);
 extern isdn_net_dev *isdn_slot_rx_netdev(int sl);
