@@ -61,6 +61,10 @@
  *
  */
 
+#ifdef CONFIG_PMAC_DART
+extern unsigned long dart_tablebase;
+#endif /* CONFIG_PMAC_DART */
+
 HTAB htab_data = {NULL, 0, 0, 0, 0};
 
 extern unsigned long _SDR1;
@@ -180,6 +184,25 @@ void __init htab_initialize(void)
 		base = lmb.memory.region[i].physbase + KERNELBASE;
 		size = lmb.memory.region[i].size;
 
+#ifdef CONFIG_PMAC_DART
+		/* Do not map the DART space. Fortunately, it will be aligned
+		 * in such a way that it will not cross two lmb regions and will
+		 * fit within a single 16Mb page.
+		 * The DART space is assumed to be a full 16Mb region even if we
+		 * only use 2Mb of that space. We will use more of it later for
+		 * AGP GART. We have to use a full 16Mb large page.
+		 */
+		if (dart_tablebase != 0 && dart_tablebase >= base
+		    && dart_tablebase < (base + size)) {
+			if (base != dart_tablebase)
+				create_pte_mapping(base, dart_tablebase, mode_rw,
+						   use_largepages);
+			if ((base + size) > (dart_tablebase + 16*MB))
+				create_pte_mapping(dart_tablebase + 16*MB, base + size,
+						   mode_rw, use_largepages);
+			continue;
+		}
+#endif /* CONFIG_PMAC_DART */
 		create_pte_mapping(base, base + size, mode_rw, use_largepages);
 	}
 }

@@ -89,6 +89,17 @@ config PPC_PMAC
 	bool "Apple PowerMac G5 support"
 	select ADB_PMU
 
+config PMAC_DART
+	bool "Enable DART/IOMMU on PowerMac (allow >2G of RAM)"
+	depends on PPC_PMAC
+	depends on EXPERIMENTAL
+	default n
+	help
+	  Enabling DART makes it possible to boot a PowerMac G5 with more
+	  than 2GB of memory. Note that the code is very new and untested
+	  at this time, so it has to be considered experimental. Enabling
+	  this might result in data loss.
+
 config PPC_PMAC64
 	bool
 	depends on PPC_PMAC
