@@ -77,7 +77,7 @@ wrap_mmu_context (struct mm_struct *mm)
 	{
 		int cpu = get_cpu(); /* prevent preemption/migration */
 		for (i = 0; i < NR_CPUS; ++i)
-			if (i != cpu)
+			if (cpu_online(i) && (i != cpu))
 				per_cpu(ia64_need_tlb_flush, i) = 1;
 		put_cpu();
 	}
