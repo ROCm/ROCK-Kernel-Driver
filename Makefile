@@ -253,11 +253,14 @@ RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn --exclude CV
 
 # Helpers built in scripts/
 
-scripts/docproc scripts/fixdep scripts/split-include : scripts ;
+scripts/docproc scripts/split-include : scripts ;
 
-.PHONY: scripts
+.PHONY: scripts scripts/fixdep
 scripts:
 	$(Q)$(MAKE) $(build)=scripts
+
+scripts/fixdep:
+	$(Q)$(MAKE) $(build)=scripts $@
 
 
 # To make sure we do not include .config for any of the *config targets
@@ -336,8 +339,8 @@ include .config
 
 # If .config is newer than include/linux/autoconf.h, someone tinkered
 # with it and forgot to run make oldconfig
-include/linux/autoconf.h: scripts/fixdep .config
-	$(Q)$(MAKE) $(build)=scripts/kconfig silentoldconfig
+include/linux/autoconf.h: .config
+	$(Q)$(MAKE) -f $(srctree)/Makefile silentoldconfig
 
 endif
 
