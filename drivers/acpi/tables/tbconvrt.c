@@ -460,7 +460,7 @@ acpi_tb_convert_table_fadt (void)
 
 	/* Free the original table */
 
-	table_desc = &acpi_gbl_acpi_tables[ACPI_TABLE_FADT];
+	table_desc = acpi_gbl_table_lists[ACPI_TABLE_FADT].next;
 	acpi_tb_delete_single_table (table_desc);
 
 	/* Install the new table */

@@ -244,22 +244,22 @@ acpi_install_notify_handler (
 		/* Make sure the handler is not already installed */
 
 		if (((handler_type == ACPI_SYSTEM_NOTIFY) &&
-			  acpi_gbl_sys_notify.handler) ||
+				acpi_gbl_system_notify.handler)        ||
 			((handler_type == ACPI_DEVICE_NOTIFY) &&
-			  acpi_gbl_drv_notify.handler)) {
+				acpi_gbl_device_notify.handler)) {
 			status = AE_ALREADY_EXISTS;
 			goto unlock_and_exit;
 		}
 
 		if (handler_type == ACPI_SYSTEM_NOTIFY) {
-			acpi_gbl_sys_notify.node = node;
-			acpi_gbl_sys_notify.handler = handler;
-			acpi_gbl_sys_notify.context = context;
+			acpi_gbl_system_notify.node  = node;
+			acpi_gbl_system_notify.handler = handler;
+			acpi_gbl_system_notify.context = context;
 		}
 		else /* ACPI_DEVICE_NOTIFY */ {
-			acpi_gbl_drv_notify.node = node;
-			acpi_gbl_drv_notify.handler = handler;
-			acpi_gbl_drv_notify.context = context;
+			acpi_gbl_device_notify.node  = node;
+			acpi_gbl_device_notify.handler = handler;
+			acpi_gbl_device_notify.context = context;
 		}
 
 		/* Global notify handler installed */
@@ -282,13 +282,12 @@ acpi_install_notify_handler (
 
 		obj_desc = acpi_ns_get_attached_object (node);
 		if (obj_desc) {
-
 			/* Object exists - make sure there's no handler */
 
 			if (((handler_type == ACPI_SYSTEM_NOTIFY) &&
-				  obj_desc->common_notify.sys_handler) ||
+					obj_desc->common_notify.system_notify) ||
 				((handler_type == ACPI_DEVICE_NOTIFY) &&
-				  obj_desc->common_notify.drv_handler)) {
+					obj_desc->common_notify.device_notify)) {
 				status = AE_ALREADY_EXISTS;
 				goto unlock_and_exit;
 			}
@@ -305,6 +304,11 @@ acpi_install_notify_handler (
 			/* Attach new object to the Node */
 
 			status = acpi_ns_attach_object (device, obj_desc, node->type);
+
+			/* Remove local reference to the object */
+
+			acpi_ut_remove_reference (obj_desc);
+
 			if (ACPI_FAILURE (status)) {
 				goto unlock_and_exit;
 			}
@@ -318,15 +322,15 @@ acpi_install_notify_handler (
 			goto unlock_and_exit;
 		}
 
-		notify_obj->notify_handler.node = node;
-		notify_obj->notify_handler.handler = handler;
-		notify_obj->notify_handler.context = context;
+		notify_obj->notify.node   = node;
+		notify_obj->notify.handler = handler;
+		notify_obj->notify.context = context;
 
 		if (handler_type == ACPI_SYSTEM_NOTIFY) {
-			obj_desc->common_notify.sys_handler = notify_obj;
+			obj_desc->common_notify.system_notify = notify_obj;
 		}
 		else /* ACPI_DEVICE_NOTIFY */ {
-			obj_desc->common_notify.drv_handler = notify_obj;
+			obj_desc->common_notify.device_notify = notify_obj;
 		}
 	}
 
@@ -395,22 +399,22 @@ acpi_remove_notify_handler (
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing notify handler for ROOT object.\n"));
 
 		if (((handler_type == ACPI_SYSTEM_NOTIFY) &&
-			  !acpi_gbl_sys_notify.handler) ||
+			  !acpi_gbl_system_notify.handler) ||
 			((handler_type == ACPI_DEVICE_NOTIFY) &&
-			  !acpi_gbl_drv_notify.handler)) {
+			  !acpi_gbl_device_notify.handler)) {
 			status = AE_NOT_EXIST;
 			goto unlock_and_exit;
 		}
 
 		if (handler_type == ACPI_SYSTEM_NOTIFY) {
-			acpi_gbl_sys_notify.node  = NULL;
-			acpi_gbl_sys_notify.handler = NULL;
-			acpi_gbl_sys_notify.context = NULL;
+			acpi_gbl_system_notify.node  = NULL;
+			acpi_gbl_system_notify.handler = NULL;
+			acpi_gbl_system_notify.context = NULL;
 		}
 		else {
-			acpi_gbl_drv_notify.node  = NULL;
-			acpi_gbl_drv_notify.handler = NULL;
-			acpi_gbl_drv_notify.context = NULL;
+			acpi_gbl_device_notify.node  = NULL;
+			acpi_gbl_device_notify.handler = NULL;
+			acpi_gbl_device_notify.context = NULL;
 		}
 	}
 
@@ -436,14 +440,14 @@ acpi_remove_notify_handler (
 		/* Object exists - make sure there's an existing handler */
 
 		if (handler_type == ACPI_SYSTEM_NOTIFY) {
-			notify_obj = obj_desc->common_notify.sys_handler;
+			notify_obj = obj_desc->common_notify.system_notify;
 		}
 		else {
-			notify_obj = obj_desc->common_notify.drv_handler;
+			notify_obj = obj_desc->common_notify.device_notify;
 		}
 
 		if ((!notify_obj) ||
-			(notify_obj->notify_handler.handler != handler)) {
+			(notify_obj->notify.handler != handler)) {
 			status = AE_BAD_PARAMETER;
 			goto unlock_and_exit;
 		}
@@ -451,10 +455,10 @@ acpi_remove_notify_handler (
 		/* Remove the handler */
 
 		if (handler_type == ACPI_SYSTEM_NOTIFY) {
-			obj_desc->common_notify.sys_handler = NULL;
+			obj_desc->common_notify.system_notify = NULL;
 		}
 		else {
-			obj_desc->common_notify.drv_handler = NULL;
+			obj_desc->common_notify.device_notify = NULL;
 		}
 
 		acpi_ut_remove_reference (notify_obj);

@@ -799,38 +799,31 @@ void
 acpi_ns_terminate (void)
 {
 	union acpi_operand_object       *obj_desc;
-	struct acpi_namespace_node      *this_node;
 
 
 	ACPI_FUNCTION_TRACE ("ns_terminate");
 
 
-	this_node = acpi_gbl_root_node;
-
 	/*
-	 * 1) Free the entire namespace -- all objects, tables, and stacks
+	 * 1) Free the entire namespace -- all nodes and objects
 	 *
-	 * Delete all objects linked to the root
-	 * (additional table descriptors)
+	 * Delete all object descriptors attached to namepsace nodes
 	 */
-	acpi_ns_delete_namespace_subtree (this_node);
+	acpi_ns_delete_namespace_subtree (acpi_gbl_root_node);
 
-	/* Detach any object(s) attached to the root */
+	/* Detach any objects attached to the root */
 
-	obj_desc = acpi_ns_get_attached_object (this_node);
+	obj_desc = acpi_ns_get_attached_object (acpi_gbl_root_node);
 	if (obj_desc) {
-		acpi_ns_detach_object (this_node);
-		acpi_ut_remove_reference (obj_desc);
+		acpi_ns_detach_object (acpi_gbl_root_node);
 	}
 
-	acpi_ns_delete_children (this_node);
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Namespace freed\n"));
-
 
 	/*
 	 * 2) Now we can delete the ACPI tables
 	 */
-	acpi_tb_delete_acpi_tables ();
+	acpi_tb_delete_all_tables ();
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "ACPI Tables freed\n"));
 
 	return_VOID;
