@@ -282,6 +282,9 @@ config SHARED_KERNEL
 
 endmenu
 
+config PCMCIA
+	bool
+	default n
 
 menu "SCSI support"
 

@@ -2445,3 +2445,5 @@ source "drivers/net/wan/Kconfig"
 source "drivers/net/pcmcia/Kconfig"
 
 source "drivers/atm/Kconfig"
+
+source "drivers/s390/net/Kconfig"
