@@ -238,23 +238,6 @@ xfs_initialize_vnode(
 	}
 }
 
-void
-xfs_flush_inode(
-	xfs_inode_t	*ip)
-{
-	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
-
-	filemap_flush(inode->i_mapping);
-}
-
-void
-xfs_flush_device(
-	xfs_inode_t	*ip)
-{
-	sync_blockdev(XFS_ITOV(ip)->v_vfsp->vfs_super->s_bdev);
-	xfs_log_force(ip->i_mount, (xfs_lsn_t)0, XFS_LOG_FORCE|XFS_LOG_SYNC);
-}
-
 int
 xfs_blkdev_get(
 	xfs_mount_t		*mp,
@@ -308,7 +291,6 @@ xfs_inode_shake(
 {
 	int		pages;
 
-	
 	pages = kmem_zone_shrink(linvfs_inode_zone);
 	pages += kmem_zone_shrink(xfs_inode_zone);
 	return pages;
@@ -333,7 +315,6 @@ init_inodecache( void )
 	linvfs_inode_zone = kmem_cache_create("linvfs_icache",
 				sizeof(vnode_t), 0, SLAB_RECLAIM_ACCOUNT,
 				init_once, NULL);
-
 	if (linvfs_inode_zone == NULL)
 		return -ENOMEM;
 	return 0;
@@ -387,36 +368,146 @@ linvfs_clear_inode(
 }
 
 
+/*
+ * Enqueue a work item to be picked up by the vfs xfssyncd thread.
+ * Doing this has two advantages:
+ * - It saves on stack space, which is tight in certain situations
+ * - It can be used (with care) as a mechanism to avoid deadlocks.
+ * Flushing while allocating in a full filesystem requires both.
+ */
+STATIC void
+xfs_syncd_queue_work(
+	struct vfs	*vfs,
+	void		*data,
+	void		(*syncer)(vfs_t *, void *))
+{
+	vfs_sync_work_t	*work;
+
+	work = kmem_alloc(sizeof(struct vfs_sync_work), KM_SLEEP);
+	INIT_LIST_HEAD(&work->w_list);
+	work->w_syncer = syncer;
+	work->w_data = data;
+	work->w_vfs = vfs;
+	spin_lock(&vfs->vfs_sync_lock);
+	list_add_tail(&work->w_list, &vfs->vfs_sync_list);
+	spin_unlock(&vfs->vfs_sync_lock);
+	wake_up_process(vfs->vfs_sync_task);
+}
+
+/*
+ * Flush delayed allocate data, attempting to free up reserved space
+ * from existing allocations.  At this point a new allocation attempt
+ * has failed with ENOSPC and we are in the process of scratching our
+ * heads, looking about for more room...
+ */
+STATIC void
+xfs_flush_inode_work(
+	vfs_t		*vfs,
+	void		*inode)
+{
+	filemap_flush(((struct inode *)inode)->i_mapping);
+	iput((struct inode *)inode);
+}
+
+void
+xfs_flush_inode(
+	xfs_inode_t	*ip)
+{
+	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
+	struct vfs	*vfs = XFS_MTOVFS(ip->i_mount);
+
+	igrab(inode);
+	xfs_syncd_queue_work(vfs, inode, xfs_flush_inode_work);
+	delay(HZ/2);
+}
+
+/*
+ * This is the "bigger hammer" version of xfs_flush_inode_work...
+ * (IOW, "If at first you don't succeed, use a Bigger Hammer").
+ */
+STATIC void
+xfs_flush_device_work(
+	vfs_t		*vfs,
+	void		*inode)
+{
+	sync_blockdev(vfs->vfs_super->s_bdev);
+	iput((struct inode *)inode);
+}
+
+void
+xfs_flush_device(
+	xfs_inode_t	*ip)
+{
+	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
+	struct vfs	*vfs = XFS_MTOVFS(ip->i_mount);
+
+	igrab(inode);
+	xfs_syncd_queue_work(vfs, inode, xfs_flush_device_work);
+	delay(HZ/2);
+	xfs_log_force(ip->i_mount, (xfs_lsn_t)0, XFS_LOG_FORCE|XFS_LOG_SYNC);
+}
+
 #define SYNCD_FLAGS	(SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR)
+STATIC void
+vfs_sync_worker(
+	vfs_t		*vfsp,
+	void		*unused)
+{
+	int		error;
+
+	if (!(vfsp->vfs_flag & VFS_RDONLY))
+		VFS_SYNC(vfsp, SYNCD_FLAGS, NULL, error);
+	vfsp->vfs_sync_seq++;
+	wmb();
+	wake_up(&vfsp->vfs_wait_single_sync_task);
+}
 
 STATIC int
 xfssyncd(
 	void			*arg)
 {
+	long			timeleft;
 	vfs_t			*vfsp = (vfs_t *) arg;
-	int			error;
+	struct list_head	tmp;
+	struct vfs_sync_work	*work, *n;
 
 	daemonize("xfssyncd");
 
+	vfsp->vfs_sync_work.w_vfs = vfsp;
+	vfsp->vfs_sync_work.w_syncer = vfs_sync_worker;
 	vfsp->vfs_sync_task = current;
 	wmb();
 	wake_up(&vfsp->vfs_wait_sync_task);
 
+	INIT_LIST_HEAD(&tmp);
+	timeleft = (xfs_syncd_centisecs * HZ) / 100;
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout((xfs_syncd_centisecs * HZ) / 100);
+		timeleft = schedule_timeout(timeleft);
 		/* swsusp */
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_FREEZE);
 		if (vfsp->vfs_flag & VFS_UMOUNT)
 			break;
-		if (vfsp->vfs_flag & VFS_RDONLY)
-			continue;
-		VFS_SYNC(vfsp, SYNCD_FLAGS, NULL, error);
 
-		vfsp->vfs_sync_seq++;
-		wmb();
-		wake_up(&vfsp->vfs_wait_single_sync_task);
+		spin_lock(&vfsp->vfs_sync_lock);
+		if (!timeleft) {
+			timeleft = (xfs_syncd_centisecs * HZ) / 100;
+			INIT_LIST_HEAD(&vfsp->vfs_sync_work.w_list);
+			list_add_tail(&vfsp->vfs_sync_work.w_list,
+					&vfsp->vfs_sync_list);
+		}
+		list_for_each_entry_safe(work, n, &vfsp->vfs_sync_list, w_list)
+			list_move(&work->w_list, &tmp);
+		spin_unlock(&vfsp->vfs_sync_lock);
+
+		list_for_each_entry_safe(work, n, &tmp, w_list) {
+			(*work->w_syncer)(vfsp, work->w_data);
+			list_del(&work->w_list);
+			if (work == &vfsp->vfs_sync_work)
+				continue;
+			kmem_free(work, sizeof(struct vfs_sync_work));
+		}
 	}
 
 	vfsp->vfs_sync_task = NULL;
