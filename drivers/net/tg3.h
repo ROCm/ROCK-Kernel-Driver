@@ -1528,7 +1528,7 @@ struct tg3_internal_buffer_desc {
 	u32				__cookie3;
 };
 
-#define TG3_HW_STATUS_SIZE		0x80
+#define TG3_HW_STATUS_SIZE		0x50
 struct tg3_hw_status {
 	u32				status;
 #define SD_STATUS_UPDATED		0x00000001
