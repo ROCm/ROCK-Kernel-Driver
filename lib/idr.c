@@ -150,7 +150,7 @@ EXPORT_SYMBOL(idr_pre_get);
 
 static inline int sub_alloc(struct idr *idp, int shift, void *ptr)
 {
-	long n, v = 0;
+	int n, v = 0;
 	struct idr_layer *p;
 	struct idr_layer **pa[MAX_LEVEL];
 	struct idr_layer ***paa = &pa[0];
@@ -211,7 +211,7 @@ static inline int sub_alloc(struct idr *idp, int shift, void *ptr)
 
 int idr_get_new(struct idr *idp, void *ptr)
 {
-	long v;
+	int v;
 	
 	if (idp->id_free_cnt < idp->layers + 1) 
 		return (-1);
