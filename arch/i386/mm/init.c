@@ -291,7 +291,7 @@ void __init paging_init(void)
 
 #if CONFIG_X86_PAE
 	/*
-	 * We will bail out later - printk doesnt work right now so
+	 * We will bail out later - printk doesn't work right now so
 	 * the user would just see a hanging kernel.
 	 */
 	if (cpu_has_pae)
