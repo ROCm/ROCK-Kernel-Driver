@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_olt.c,v 1.8 2001/04/25 18:11:23 hch Exp hch $"
+#ident "$Id: vxfs_olt.c,v 1.9 2001/08/07 16:14:45 hch Exp hch $"
 
 /* 
  * Veritas filesystem driver - object location table support.
@@ -56,11 +56,11 @@ vxfs_get_ilist(struct vxfs_oltilist *ilistp, struct vxfs_sb_info *infp)
 }
 
 static __inline__ u_long
-vxfs_oblock(daddr_t oblock, u_long bsize)
+vxfs_oblock(struct super_block *sbp, daddr_t block, u_long bsize)
 {
-	if ((oblock * BLOCK_SIZE) % bsize)
+	if (sbp->s_blocksize % bsize)
 		BUG();
-	return ((oblock * BLOCK_SIZE) / bsize);
+	return (block * (sbp->s_blocksize / bsize));
 }
 
 
@@ -85,7 +85,8 @@ vxfs_read_olt(struct super_block *sbp, u_long bsize)
 	char			*oaddr, *eaddr;
 
 
-	bp = bread(sbp->s_dev, vxfs_oblock(infp->vsi_oltext, bsize), bsize);
+	bp = bread(sbp->s_dev,
+			vxfs_oblock(sbp, infp->vsi_oltext, bsize), bsize);
 	if (!bp || !bp->b_data)
 		goto fail;
 

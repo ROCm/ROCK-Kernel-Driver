@@ -107,6 +107,7 @@ static union {
 #define last_schedule(cpu) aligned_data[(cpu)].schedule_data.last_schedule
 
 struct kernel_stat kstat;
+extern struct task_struct *child_reaper;
 
 #ifdef CONFIG_SMP
 
@@ -1213,6 +1214,59 @@ void show_state(void)
 	for_each_task(p)
 		show_task(p);
 	read_unlock(&tasklist_lock);
+}
+
+/**
+ * reparent_to_init() - Reparent the calling kernel thread to the init task.
+ *
+ * If a kernel thread is launched as a result of a system call, or if
+ * it ever exits, it should generally reparent itself to init so that
+ * it is correctly cleaned up on exit.
+ *
+ * The various task state such as scheduling policy and priority may have
+ * been inherited fro a user process, so we reset them to sane values here.
+ *
+ * NOTE that reparent_to_init() gives the caller full capabilities.
+ */
+void reparent_to_init(void)
+{
+	struct task_struct *this_task = current;
+
+	write_lock_irq(&tasklist_lock);
+
+	/* Reparent to init */
+	REMOVE_LINKS(this_task);
+	this_task->p_pptr = child_reaper;
+	this_task->p_opptr = child_reaper;
+	SET_LINKS(this_task);
+
+	/* Set the exit signal to SIGCHLD so we signal init on exit */
+	if (this_task->exit_signal != 0) {
+		printk(KERN_ERR "task `%s' exit_signal %d in "
+				__FUNCTION__ "\n",
+			this_task->comm, this_task->exit_signal);
+	}
+	this_task->exit_signal = SIGCHLD;
+
+	/* We also take the runqueue_lock while altering task fields
+	 * which affect scheduling decisions */
+	spin_lock(&runqueue_lock);
+
+	this_task->ptrace = 0;
+	this_task->nice = DEF_NICE;
+	this_task->policy = SCHED_OTHER;
+	/* cpus_allowed? */
+	/* rt_priority? */
+	/* signals? */
+	this_task->cap_effective = CAP_INIT_EFF_SET;
+	this_task->cap_inheritable = CAP_INIT_INH_SET;
+	this_task->cap_permitted = CAP_FULL_SET;
+	this_task->keep_capabilities = 0;
+	memcpy(this_task->rlim, init_task.rlim, sizeof(*(this_task->rlim)));
+	this_task->user = INIT_USER;
+
+	spin_unlock(&runqueue_lock);
+	write_unlock_irq(&tasklist_lock);
 }
 
 /*

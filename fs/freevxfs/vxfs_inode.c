@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_inode.c,v 1.36 2001/05/26 22:28:02 hch Exp hch $"
+#ident "$Id: vxfs_inode.c,v 1.37 2001/08/07 16:13:30 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - inode routines.
@@ -47,6 +47,7 @@ extern struct address_space_operations vxfs_immed_aops;
 extern struct inode_operations vxfs_immed_symlink_iops;
 
 static struct file_operations vxfs_file_operations = {
+	.llseek =		generic_file_llseek,
 	.read =			generic_file_read,
 	.mmap =			generic_file_mmap,
 };
@@ -93,7 +94,7 @@ vxfs_dumpi(struct vxfs_inode_info *vip, ino_t ino)
  * NOTE:
  *  While __vxfs_iget uses the pagecache vxfs_blkiget uses the
  *  buffercache.  This function should not be used outside the
- *  read_super() method, othwerwise the data may be incoherent.
+ *  read_super() method, otherwise the data may be incoherent.
  */
 struct vxfs_inode_info *
 vxfs_blkiget(struct super_block *sbp, u_long extent, ino_t ino)
@@ -251,7 +252,7 @@ vxfs_iinit(struct inode *ip, struct vxfs_inode_info *vip)
 }
 
 /**
- * vxfs_fake_inode - get fake inode structure
+ * vxfs_get_fake_inode - get fake inode structure
  * @sbp:		filesystem superblock
  * @vip:		fspriv inode
  *
@@ -261,7 +262,7 @@ vxfs_iinit(struct inode *ip, struct vxfs_inode_info *vip)
  *  Returns the filled VFS inode.
  */
 struct inode *
-vxfs_fake_inode(struct super_block *sbp, struct vxfs_inode_info *vip)
+vxfs_get_fake_inode(struct super_block *sbp, struct vxfs_inode_info *vip)
 {
 	struct inode			*ip = NULL;
 
@@ -270,6 +271,19 @@ vxfs_fake_inode(struct super_block *sbp, struct vxfs_inode_info *vip)
 		ip->i_mapping->a_ops = &vxfs_aops;
 	}
 	return (ip);
+}
+
+/**
+ * vxfs_put_fake_inode - free faked inode
+ * *ip:			VFS inode
+ *
+ * Description:
+ *  vxfs_put_fake_inode frees all data asssociated with @ip.
+ */
+void
+vxfs_put_fake_inode(struct inode *ip)
+{
+	iput(ip);
 }
 
 /**

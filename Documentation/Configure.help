@@ -11601,6 +11601,20 @@ CONFIG_USB_STORAGE_DEBUG
   Say Y here in order to have the USB Mass Storage code generate
   verbose debugging messages.
 
+ISD-200 USB/ATA driver
+CONFIG_USB_STORAGE_ISD200
+  Say Y here if you want to use USB Mass Store devices based
+  on the In-Systems Design ISD-200 USB/ATA bridge.
+
+  Some of the products that use this chip are:
+
+    - Archos Jukebox 6000
+    - ISD SmartCable for Storage
+    - Taiwan Skymaster CD530U/DEL-0241 IDE bridge
+    - Sony CRX10U CD-R/RW drive
+    - CyQ've CQ8060A CDRW drive
+    - Planex eXtreme Drive RX-25HU USB-IDE cable (not model RX-25U)
+
 USS720 parport driver
 CONFIG_USB_USS720
   This driver is for USB parallel port adapters that use the Lucent

@@ -32,7 +32,12 @@ comment 'USB Controllers'
    if [ "$CONFIG_USB_STORAGE" != "n" ]; then
       bool '    USB Mass Storage verbose debug' CONFIG_USB_STORAGE_DEBUG
       bool '    Freecom USB/ATAPI Bridge support' CONFIG_USB_STORAGE_FREECOM
-      bool '    Microtech CompactFlash/SmartMedia reader' CONFIG_USB_STORAGE_DPCM
+      bool '    ISD-200 USB/ATA Bridge support' CONFIG_USB_STORAGE_ISD200
+      bool '    Microtech CompactFlash/SmartMedia support' CONFIG_USB_STORAGE_DPCM
+      if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+         bool '    HP CD-Writer 82xx support' CONFIG_USB_STORAGE_HP8200e
+         bool '    SanDisk SDDR-09 (and other SmartMedia) support' CONFIG_USB_STORAGE_SDDR09
+      fi
    fi
    dep_tristate '  USB Modem (CDC ACM) support' CONFIG_USB_ACM $CONFIG_USB
    dep_tristate '  USB Printer support' CONFIG_USB_PRINTER $CONFIG_USB

@@ -1610,6 +1610,7 @@ static int rtl8139_thread (void *data)
 	unsigned long timeout;
 
 	daemonize ();
+	reparent_to_init();
 	spin_lock_irq(&current->sigmask_lock);
 	sigemptyset(&current->blocked);
 	recalc_sigpending(current);

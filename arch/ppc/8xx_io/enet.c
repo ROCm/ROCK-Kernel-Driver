@@ -651,11 +651,10 @@ int __init scc_enet_init(void)
 	volatile	scc_t		*sccp;
 	volatile	scc_enet_t	*ep;
 	volatile	immap_t		*immap;
-	extern unsigned long _get_IMMR(void);
 
 	cp = cpmp;	/* Get pointer to Communication Processor */
 
-	immap = (immap_t *)(_get_IMMR() & 0xFFFF0000);	/* and to internal registers */
+	immap = (immap_t *)(mfspr(IMMR) & 0xFFFF0000);	/* and to internal registers */
 
 	bd = (bd_t *)__res;
 

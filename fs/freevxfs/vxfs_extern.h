@@ -30,7 +30,7 @@
 #ifndef _VXFS_EXTERN_H_
 #define _VXFS_EXTERN_H_
 
-#ident "$Id: vxfs_extern.h,v 1.20 2001/04/26 22:48:44 hch Exp hch $"
+#ident "$Id: vxfs_extern.h,v 1.21 2001/08/07 16:13:30 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - external prototypes.
@@ -55,8 +55,9 @@ extern int			vxfs_read_fshead(struct super_block *);
 /* vxfs_inode.c */
 extern struct kmem_cache_s	*vxfs_inode_cachep;
 extern void			vxfs_dumpi(struct vxfs_inode_info *, ino_t);
-extern struct inode *		vxfs_fake_inode(struct super_block *,
+extern struct inode *		vxfs_get_fake_inode(struct super_block *,
 					struct vxfs_inode_info *);
+extern void			vxfs_put_fake_inode(struct inode *);
 extern struct vxfs_inode_info *	vxfs_blkiget(struct super_block *, u_long, ino_t);
 extern struct vxfs_inode_info *	vxfs_stiget(struct super_block *, ino_t);
 extern void			vxfs_read_inode(struct inode *);

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_fshead.c,v 1.18 2001/04/25 18:11:23 hch Exp $"
+#ident "$Id: vxfs_fshead.c,v 1.19 2001/08/07 16:14:10 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - fileset header routines.
@@ -124,7 +124,7 @@ vxfs_read_fshead(struct super_block *sbp)
 	vxfs_dumpi(vip, infp->vsi_fshino);
 #endif
 
-	if (!(infp->vsi_fship = vxfs_fake_inode(sbp, vip))) {
+	if (!(infp->vsi_fship = vxfs_get_fake_inode(sbp, vip))) {
 		printk(KERN_ERR "vxfs: unabled to get fsh inode\n");
 		return -EINVAL;
 	}
@@ -148,7 +148,7 @@ vxfs_read_fshead(struct super_block *sbp)
 #endif
 
 	tip = vxfs_blkiget(sbp, infp->vsi_iext, sfp->fsh_ilistino[0]);
-	if (!tip || ((infp->vsi_stilist = vxfs_fake_inode(sbp, tip)) == NULL)) {
+	if (!tip || ((infp->vsi_stilist = vxfs_get_fake_inode(sbp, tip)) == NULL)) {
 		printk(KERN_ERR "vxfs: unabled to get structual list inode\n");
 		return -EINVAL;
 	} else if (!VXFS_ISILT(VXFS_INO(infp->vsi_stilist))) {
@@ -158,7 +158,7 @@ vxfs_read_fshead(struct super_block *sbp)
 	}
 
 	tip = vxfs_stiget(sbp, pfp->fsh_ilistino[0]);
-	if (!tip || ((infp->vsi_ilist = vxfs_fake_inode(sbp, tip)) == NULL)) {
+	if (!tip || ((infp->vsi_ilist = vxfs_get_fake_inode(sbp, tip)) == NULL)) {
 		printk(KERN_ERR "vxfs: unabled to get inode list inode\n");
 		return -EINVAL;
 	} else if (!VXFS_ISILT(VXFS_INO(infp->vsi_ilist))) {

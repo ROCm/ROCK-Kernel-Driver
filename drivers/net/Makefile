@@ -137,12 +137,8 @@ obj-$(CONFIG_PPP_BSDCOMP) += bsd_comp.o
 obj-$(CONFIG_PPPOE) += pppox.o pppoe.o
 
 obj-$(CONFIG_SLIP) += slip.o
-ifeq ($(CONFIG_SLIP),y)
-  obj-$(CONFIG_SLIP_COMPRESSED) += slhc.o
-else
-  ifeq ($(CONFIG_SLIP),m)
-    obj-$(CONFIG_SLIP_COMPRESSED) += slhc.o
-  endif
+ifeq ($(CONFIG_SLIP_COMPRESSED),y)
+  obj-$(CONFIG_SLIP) += slhc.o
 endif
 
 obj-$(CONFIG_STRIP) += strip.o

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_super.c,v 1.25 2001/05/25 18:25:55 hch Exp hch $"
+#ident "$Id: vxfs_super.c,v 1.26 2001/08/07 16:13:30 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - superblock related routines.
@@ -53,7 +53,6 @@ MODULE_DESCRIPTION("Veritas Filesystem (VxFS) driver");
 
 static void		vxfs_put_super(struct super_block *);
 static int		vxfs_statfs(struct super_block *, struct statfs *);
-
 
 static struct super_operations vxfs_super_ops = {
 	.read_inode =		vxfs_read_inode,
@@ -83,14 +82,15 @@ vxfs_validate_bsize(kdev_t dev)
  *   vxfs_put_super frees all resources allocated for @sbp
  *   after the last instance of the filesystem is unmounted.
  */
+
 static void
 vxfs_put_super(struct super_block *sbp)
 {
 	struct vxfs_sb_info	*infp = VXFS_SBI(sbp);
 
-	vxfs_put_inode(infp->vsi_fship);
-	vxfs_put_inode(infp->vsi_ilist);
-	vxfs_put_inode(infp->vsi_stilist);
+	vxfs_put_fake_inode(infp->vsi_fship);
+	vxfs_put_fake_inode(infp->vsi_ilist);
+	vxfs_put_fake_inode(infp->vsi_stilist);
 
 	brelse(infp->vsi_bp);
 	kfree(infp);
@@ -135,7 +135,7 @@ vxfs_statfs(struct super_block *sbp, struct statfs *bufp)
  * vxfs_read_super - read superblock into memory and initalize filesystem
  * @sbp:		VFS superblock (to fill)
  * @dp:			fs private mount data
- * @silent:		???
+ * @silent:		do not complain loudly when sth is wrong
  *
  * Description:
  *   We are called on the first mount of a filesystem to read the
@@ -167,18 +167,23 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 
 	bp = bread(dev, 1, bsize);
 	if (!bp) {
-		printk(KERN_WARNING "vxfs: unable to read disk superblock\n");
+		if (!silent) {
+			printk(KERN_WARNING
+				"vxfs: unable to read disk superblock\n");
+		}
 		goto out;
 	}
 
 	rsbp = (struct vxfs_sb *)bp->b_data;
 	if (rsbp->vs_magic != VXFS_SUPER_MAGIC) {
-		printk(KERN_NOTICE "vxfs: WRONG superblock magic\n");
+		if (!silent)
+			printk(KERN_NOTICE "vxfs: WRONG superblock magic\n");
 		goto out;
 	}
 
-	if (rsbp->vs_version < 2 || rsbp->vs_version > 4) {
-		printk(KERN_NOTICE "vxfs: unsupported VxFS version (%d)\n", rsbp->vs_version);
+	if ((rsbp->vs_version < 2 || rsbp->vs_version > 4) && !silent) {
+		printk(KERN_NOTICE "vxfs: unsupported VxFS version (%d)\n",
+		       rsbp->vs_version);
 		goto out;
 	}
 
@@ -188,6 +193,7 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 #endif
 
 	sbp->s_magic = rsbp->vs_magic;
+	sbp->s_blocksize = rsbp->vs_bsize;
 	sbp->u.generic_sbp = (void *)infp;
 
 	infp->vsi_raw = rsbp;
@@ -195,7 +201,6 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 	infp->vsi_oltext = rsbp->vs_oltext[0];
 	infp->vsi_oltsize = rsbp->vs_oltsize;
 	
-	sbp->s_blocksize = rsbp->vs_bsize;
 
 	switch (rsbp->vs_bsize) {
 	case 1024:
@@ -208,8 +213,11 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 		sbp->s_blocksize_bits = 12;
 		break;
 	default:
-		printk(KERN_WARNING "vxfs: unsupported blocksise: %d\n",
+		if (!silent) {
+			printk(KERN_WARNING
+				"vxfs: unsupported blocksise: %d\n",
 				rsbp->vs_bsize);
+		}
 		goto out;
 	}
 
@@ -220,19 +228,27 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 
 	if (vxfs_read_fshead(sbp)) {
 		printk(KERN_WARNING "vxfs: unable to read fshead\n");
-		return NULL;
+		goto out;
 	}
 
 	sbp->s_op = &vxfs_super_ops;
-	if ((sbp->s_root = d_alloc_root(iget(sbp, VXFS_ROOT_INO))))
-		return (sbp);
+	sbp->s_root = d_alloc_root(iget(sbp, VXFS_ROOT_INO));
+	if (!sbp->s_root) {
+		printk(KERN_WARNING "vxfs: unable to get root dentry.\n");
+		goto out_free_ilist;
+	}
+
+	return (sbp);
 	
-	printk(KERN_WARNING "vxfs: unable to get root dentry.\n");
+out_free_ilist:
+	vxfs_put_fake_inode(infp->vsi_fship);
+	vxfs_put_fake_inode(infp->vsi_ilist);
+	vxfs_put_fake_inode(infp->vsi_stilist);
 out:
+	brelse(bp);
 	kfree(infp);
 	return NULL;
 }
-
 
 /*
  * The usual module blurb.
@@ -246,7 +262,7 @@ vxfs_init(void)
 			sizeof(struct vxfs_inode_info), 0, 0, NULL, NULL);
 	if (vxfs_inode_cachep)
 		return (register_filesystem(&vxfs_fs_type));
-	return 0;
+	return -ENOMEM;
 }
 
 static void __exit

@@ -46,6 +46,14 @@ void sysv_free_block(struct super_block * sb, u32 nr)
 	unsigned count;
 	unsigned block = fs32_to_cpu(sb, nr);
 
+	/*
+	 * This code does not work at all for AFS (it has a bitmap
+	 * free list).  As AFS is supposed to be read-only no one
+	 * should call this for an AFS filesystem anyway...
+	 */
+	if (sb->sv_type == FSTYPE_AFS)
+		return;
+
 	if (block < sb->sv_firstdatazone || block >= sb->sv_nzones) {
 		printk("sysv_free_block: trying to free block not in datazone\n");
 		return;
@@ -153,6 +161,14 @@ unsigned long sysv_count_free_blocks(struct super_block * sb)
 	u32 *blocks;
 	unsigned block;
 	int n;
+
+	/*
+	 * This code does not work at all for AFS (it has a bitmap
+	 * free list).  As AFS is supposed to be read-only we just
+	 * lie and say it has no free block at all.
+	 */
+	if (sb->sv_type == FSTYPE_AFS)
+		return 0;
 
 	lock_super(sb);
 	sb_count = fs32_to_cpu(sb, *sb->sv_free_blocks);

@@ -1857,6 +1857,7 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 	return;
     }
     if (retval == POSITION_FOUND || retval == FILE_NOT_FOUND) {
+	pathrelse (&s_search_path);
 	reiserfs_warning ("PAP-5660: reiserfs_do_truncate: "
 			  "wrong result %d of search for %K\n", retval, &s_item_key);
 	return;

@@ -1509,7 +1509,6 @@ int __init fec_enet_init(void)
 	volatile	immap_t	*immap;
 	volatile	fec_t	*fecp;
 	bd_t		*bd;
-	extern		uint	_get_IMMR(void);
 #ifdef CONFIG_SCC_ENET
 	unsigned char	tmpaddr[6];
 #endif
@@ -1680,7 +1679,7 @@ int __init fec_enet_init(void)
 
 	/* Bits moved from Rev. D onward.
 	*/
-	if ((_get_IMMR() & 0xffff) < 0x0501)
+	if ((mfspr(IMMR) & 0xffff) < 0x0501)
 		immap->im_ioport.iop_pddir = 0x1c58;	/* Pre rev. D */
 	else
 		immap->im_ioport.iop_pddir = 0x1fff;	/* Rev. D and later */

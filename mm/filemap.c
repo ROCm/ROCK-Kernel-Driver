@@ -682,34 +682,6 @@ struct page * __find_get_page(struct address_space *mapping,
 }
 
 /*
- * Find a swapcache page (and get a reference) or return NULL.
- * The SwapCache check is protected by the pagecache lock.
- */
-struct page * __find_get_swapcache_page(struct address_space *mapping,
-			      unsigned long offset, struct page **hash)
-{
-	struct page *page;
-
-	/*
-	 * We need the LRU lock to protect against page_launder().
-	 */
-
-	spin_lock(&pagecache_lock);
-	page = __find_page_nolock(mapping, offset, *hash);
-	if (page) {
-		spin_lock(&pagemap_lru_lock);
-		if (PageSwapCache(page)) 
-			page_cache_get(page);
-		else
-			page = NULL;
-		spin_unlock(&pagemap_lru_lock);
-	}
-	spin_unlock(&pagecache_lock);
-
-	return page;
-}
-
-/*
  * Same as the above, but lock the page too, verifying that
  * it's still valid once we own it.
  */

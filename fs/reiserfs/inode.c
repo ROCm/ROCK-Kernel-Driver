@@ -55,6 +55,7 @@ void reiserfs_delete_inode (struct inode * inode)
 	;
     }
     clear_inode (inode); /* note this must go after the journal_end to prevent deadlock */
+    inode->i_blocks = 0;
     unlock_kernel() ;
 }
 
@@ -525,15 +526,25 @@ int reiserfs_get_block (struct inode * inode, long block,
     int fs_gen;
     int windex ;
     struct reiserfs_transaction_handle th ;
-    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 ;
+    /* space reserved in transaction batch: 
+        . 3 balancings in direct->indirect conversion
+        . 1 block involved into reiserfs_update_sd()
+       XXX in practically impossible worst case direct2indirect()
+       can incur (much) more that 3 balancings. */
+    int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3 + 1;
     int version;
     int transaction_started = 0 ;
-    loff_t new_offset = (block << inode->i_sb->s_blocksize_bits) + 1 ;
+    loff_t new_offset = (((loff_t)block) << inode->i_sb->s_blocksize_bits) + 1 ;
 
 				/* bad.... */
     lock_kernel() ;
     th.t_trans_id = 0 ;
     version = inode_items_version (inode);
+
+    if (block < 0) {
+	unlock_kernel();
+	return -EIO;
+    }
 
     if (!file_capable (inode, block)) {
 	unlock_kernel() ;
@@ -552,20 +563,14 @@ int reiserfs_get_block (struct inode * inode, long block,
 	return ret;
     }
 
-    if (block < 0) {
-	unlock_kernel();
-	return -EIO;
-    }
-
     inode->u.reiserfs_i.i_pack_on_close = 1 ;
 
     windex = push_journal_writer("reiserfs_get_block") ;
   
     /* set the key of the first byte in the 'block'-th block of file */
-    make_cpu_key (&key, inode,
-		  (loff_t)block * inode->i_sb->s_blocksize + 1, // k_offset
+    make_cpu_key (&key, inode, new_offset,
 		  TYPE_ANY, 3/*key length*/);
-    if ((new_offset + inode->i_sb->s_blocksize) >= inode->i_size) {
+    if ((new_offset + inode->i_sb->s_blocksize - 1) > inode->i_size) {
 	journal_begin(&th, inode->i_sb, jbegin_count) ;
 	transaction_started = 1 ;
     }
@@ -618,10 +623,13 @@ int reiserfs_get_block (struct inode * inode, long block,
     }
 
     if (indirect_item_found (retval, ih)) {
+	b_blocknr_t unfm_ptr;
+
 	/* 'block'-th block is in the file already (there is
 	   corresponding cell in some indirect item). But it may be
 	   zero unformatted node pointer (hole) */
-	if (!item[pos_in_item]) {
+	unfm_ptr = le32_to_cpu (item[pos_in_item]);
+	if (unfm_ptr == 0) {
 	    /* use allocated block to plug the hole */
 	    reiserfs_prepare_for_journal(inode->i_sb, bh, 1) ;
 	    if (fs_changed (fs_gen, inode->i_sb) && item_moved (&tmp_ih, &path)) {
@@ -630,15 +638,14 @@ int reiserfs_get_block (struct inode * inode, long block,
 	    }
 	    bh_result->b_state |= (1UL << BH_New);
 	    item[pos_in_item] = cpu_to_le32 (allocated_block_nr);
+	    unfm_ptr = allocated_block_nr;
 	    journal_mark_dirty (&th, inode->i_sb, bh);
 	    inode->i_blocks += (inode->i_sb->s_blocksize / 512) ;
 	    reiserfs_update_sd(&th, inode) ;
 	}
-	set_block_dev_mapped(bh_result, le32_to_cpu (item[pos_in_item]), inode);
+	set_block_dev_mapped(bh_result, unfm_ptr, inode);
 	pathrelse (&path);
-#ifdef REISERFS_CHECK
 	pop_journal_writer(windex) ;
-#endif /* REISERFS_CHECK */
 	if (transaction_started)
 	    journal_end(&th, inode->i_sb, jbegin_count) ;
 
@@ -815,8 +822,8 @@ int reiserfs_get_block (struct inode * inode, long block,
 	    goto failure;
 	}
 	if (retval == POSITION_FOUND) {
-	    reiserfs_warning ("vs-: reiserfs_get_block: "
-			      "%k should not be found", &key);
+	    reiserfs_warning ("vs-825: reiserfs_get_block: "
+			      "%k should not be found\n", &key);
 	    retval = -EEXIST;
 	    if (allocated_block_nr)
 	        reiserfs_free_block (&th, allocated_block_nr);

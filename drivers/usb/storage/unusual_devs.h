@@ -1,7 +1,7 @@
 /* Driver for USB Mass Storage compliant devices
  * Ununsual Devices File
  *
- * $Id: unusual_devs.h,v 1.16 2001/07/30 00:27:59 mdharm Exp $
+ * $Id: unusual_devs.h,v 1.20 2001/09/02 05:12:57 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -67,6 +67,19 @@ UNUSUAL_DEV(  0x0436, 0x0005, 0x0100, 0x0100,
  		US_SC_SCSI, US_PR_DPCM_USB, NULL,
 		US_FL_START_STOP ),
 #endif
+
+/* Made with the help of Edd Dumbill <edd@usefulinc.com> */
+UNUSUAL_DEV(  0x0451, 0x5409, 0x0001, 0x0001,
+		"Frontier Labs",
+		"Nex II Digital",
+		US_SC_SCSI, US_PR_BULK, NULL, US_FL_START_STOP),
+
+/* Reported by Paul Stewart <stewart@wetlogic.net>
+ * This entry is needed because the device reports Sub=ff */
+UNUSUAL_DEV(  0x04a4, 0x0004, 0x0001, 0x0001,
+		"Hitachi",
+		"DVD-CAM DZ-MV100A Camcorder",
+		US_SC_SCSI, US_PR_CB, NULL, US_FL_SINGLE_LUN),
 
 UNUSUAL_DEV(  0x04cb, 0x0100, 0x0000, 0x2210,
 		"Fujifilm",
@@ -155,13 +168,20 @@ UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0322,
 		US_SC_SCSI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN | US_FL_START_STOP | US_FL_MODE_XLATE ),
 
+/* Reported by win@geeks.nl */
+UNUSUAL_DEV(  0x054c, 0x0025, 0x0100, 0x0100, 
+		"Sony",
+		"Memorystick NW-MS7",
+		US_SC_UFI, US_PR_CB, NULL,
+		US_FL_SINGLE_LUN | US_FL_START_STOP ),
+
 UNUSUAL_DEV(  0x054c, 0x002d, 0x0100, 0x0100, 
 		"Sony",
 		"Memorystick MSAC-US1",
 		US_SC_UFI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN | US_FL_START_STOP ),
 
-/* Submitted by Klaus Mueller <k.mueller@intership.de> */
+/* Submitted by Klaus Mueller <k.mueller@intershop.de> */
 UNUSUAL_DEV(  0x054c, 0x002e, 0x0106, 0x0310, 
 		"Sony",
 		"Handycam",
@@ -195,12 +215,6 @@ UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200,
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,
                 "In-System",
                 "USB/IDE Bridge (ATA/ATAPI)",
-                US_SC_ISD200, US_PR_BULK, isd200_Initialization,
-                0 ),
-
-UNUSUAL_DEV(  0x05ab, 0x0060, 0x0100, 0x0110,
-                "In-System",
-                "USB 2.0/IDE Bridge (ATA/ATAPI)",
                 US_SC_ISD200, US_PR_BULK, isd200_Initialization,
                 0 ),
 

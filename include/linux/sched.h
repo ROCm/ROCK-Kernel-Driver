@@ -749,6 +749,7 @@ extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
 
+extern void reparent_to_init(void);
 extern void daemonize(void);
 
 extern int do_execve(char *, char **, char **, struct pt_regs *);

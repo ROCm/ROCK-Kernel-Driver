@@ -1,6 +1,6 @@
 /* Driver for USB Mass Storage compliant devices
  *
- * $Id: transport.c,v 1.39 2001/03/10 16:46:28 zagor Exp $
+ * $Id: transport.c,v 1.40 2001/08/18 08:37:46 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -371,10 +371,9 @@ int usb_stor_clear_halt(struct usb_device *dev, int pipe)
  */
 static void usb_stor_blocking_completion(urb_t *urb)
 {
-	wait_queue_head_t *wqh_ptr = (wait_queue_head_t *)urb->context;
+	struct completion *urb_done_ptr = (struct completion *)urb->context;
 
-	if (waitqueue_active(wqh_ptr))
-		wake_up(wqh_ptr);
+	complete(urb_done_ptr);
 }
 
 /* This is our function to emulate usb_control_msg() but give us enough
@@ -384,8 +383,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 			 u8 request, u8 requesttype, u16 value, u16 index, 
 			 void *data, u16 size)
 {
-	wait_queue_head_t wqh;
-	wait_queue_t wait;
+	struct completion urb_done;
 	int status;
 	devrequest *dr;
 
@@ -402,9 +400,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	dr->length = cpu_to_le16(size);
 
 	/* set up data structures for the wakeup system */
-	init_waitqueue_head(&wqh); 	
-	init_waitqueue_entry(&wait, current); 	
-	add_wait_queue(&wqh, &wait);
+	init_completion(&urb_done);
 
 	/* lock the URB */
 	down(&(us->current_urb_sem));
@@ -412,32 +408,24 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	/* fill the URB */
 	FILL_CONTROL_URB(us->current_urb, us->pusb_dev, pipe, 
 			 (unsigned char*) dr, data, size, 
-			 usb_stor_blocking_completion, &wqh);
+			 usb_stor_blocking_completion, &urb_done);
 	us->current_urb->actual_length = 0;
 	us->current_urb->error_count = 0;
 	us->current_urb->transfer_flags = USB_ASYNC_UNLINK;
 
 	/* submit the URB */
-	set_current_state(TASK_UNINTERRUPTIBLE);
 	status = usb_submit_urb(us->current_urb);
 	if (status) {
 		/* something went wrong */
 		up(&(us->current_urb_sem));
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&wqh, &wait);
 		kfree(dr);
 		return status;
 	}
 
 	/* wait for the completion of the URB */
 	up(&(us->current_urb_sem));
-	while (us->current_urb->status == -EINPROGRESS)
-		schedule();
+	wait_for_completion(&urb_done);
 	down(&(us->current_urb_sem));
-
-	/* we either timed out or got woken up -- clean up either way */
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&wqh, &wait);
 
 	/* return the actual length of the data transferred if no error*/
 	status = us->current_urb->status;
@@ -456,45 +444,34 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
 		      unsigned int len, unsigned int *act_len)
 {
-	wait_queue_head_t wqh;
-	wait_queue_t wait;
+	struct completion urb_done;
 	int status;
 
 	/* set up data structures for the wakeup system */
-	init_waitqueue_head(&wqh); 	
-	init_waitqueue_entry(&wait, current); 	
-	add_wait_queue(&wqh, &wait);
+	init_completion(&urb_done);
 
 	/* lock the URB */
 	down(&(us->current_urb_sem));
 
 	/* fill the URB */
 	FILL_BULK_URB(us->current_urb, us->pusb_dev, pipe, data, len,
-		      usb_stor_blocking_completion, &wqh);
+		      usb_stor_blocking_completion, &urb_done);
 	us->current_urb->actual_length = 0;
 	us->current_urb->error_count = 0;
 	us->current_urb->transfer_flags = USB_ASYNC_UNLINK;
 
 	/* submit the URB */
-	set_current_state(TASK_UNINTERRUPTIBLE);
 	status = usb_submit_urb(us->current_urb);
 	if (status) {
 		/* something went wrong */
 		up(&(us->current_urb_sem));
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&wqh, &wait);
 		return status;
 	}
 
 	/* wait for the completion of the URB */
 	up(&(us->current_urb_sem));
-	while (us->current_urb->status == -EINPROGRESS)
-		schedule();
+	wait_for_completion(&urb_done);
 	down(&(us->current_urb_sem));
-
-	/* we either timed out or got woken up -- clean up either way */
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&wqh, &wait);
 
 	/* return the actual length of the data transferred */
 	*act_len = us->current_urb->actual_length;

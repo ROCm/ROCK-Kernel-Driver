@@ -32,8 +32,6 @@
  */
 #define DEF_PRIORITY (6)
 
-#define MAX(a,b) ((a) > (b) ? (a) : (b))
-
 static inline void age_page_up(struct page *page)
 {
 	unsigned age = page->age + PAGE_AGE_ADV;
@@ -111,6 +109,7 @@ static void try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, u
 	 * is needed on CPUs which update the accessed and dirty
 	 * bits in hardware.
 	 */
+	flush_cache_page(vma, address);
 	pte = ptep_get_and_clear(page_table);
 	flush_tlb_page(vma, address);
 
@@ -138,7 +137,8 @@ drop_pte:
 	/*
 	 * Is it a clean page? Then it must be recoverable
 	 * by just paging it in again, and we can just drop
-	 * it..
+	 * it..  or if it's dirty but has backing store,
+	 * just mark the page dirty and drop it.
 	 *
 	 * However, this won't actually free any real
 	 * memory, as the page will just be in the page cache
@@ -148,20 +148,17 @@ drop_pte:
 	 * Basically, this just makes it possible for us to do
 	 * some real work in the future in "refill_inactive()".
 	 */
-	flush_cache_page(vma, address);
-	if (!pte_dirty(pte))
-		goto drop_pte;
-
-	/*
-	 * Ok, it's really dirty. That means that
-	 * we should either create a new swap cache
-	 * entry for it, or we should write it back
-	 * to its own backing store.
-	 */
 	if (page->mapping) {
-		set_page_dirty(page);
+		if (pte_dirty(pte))
+			set_page_dirty(page);
 		goto drop_pte;
 	}
+	/*
+	 * Check PageDirty as well as pte_dirty: page may
+	 * have been brought back from swap by swapoff.
+	 */
+	if (!pte_dirty(pte) && !PageDirty(page))
+		goto drop_pte;
 
 	/*
 	 * This is a dirty, swappable page.  First of all,
@@ -334,6 +331,9 @@ static inline int swap_amount(struct mm_struct *mm)
 	return nr;
 }
 
+/* Placeholder for swap_out(): may be updated by fork.c:mmput() */
+struct mm_struct *swap_mm = &init_mm;
+
 static void swap_out(unsigned int priority, int gfp_mask)
 {
 	int counter;
@@ -347,17 +347,15 @@ static void swap_out(unsigned int priority, int gfp_mask)
 	/* Then, look at the other mm's */
 	counter = (mmlist_nr << SWAP_MM_SHIFT) >> priority;
 	do {
-		struct list_head *p;
-
 		spin_lock(&mmlist_lock);
-		p = init_mm.mmlist.next;
-		if (p == &init_mm.mmlist)
-			goto empty;
-
-		/* Move it to the back of the queue.. */
-		list_del(p);
-		list_add_tail(p, &init_mm.mmlist);
-		mm = list_entry(p, struct mm_struct, mmlist);
+		mm = swap_mm;
+		if (mm == &init_mm) {
+			mm = list_entry(mm->mmlist.next, struct mm_struct, mmlist);
+			if (mm == &init_mm)
+				goto empty;
+		}
+		/* Set pointer for next call to next in the list */
+		swap_mm = list_entry(mm->mmlist.next, struct mm_struct, mmlist);
 
 		/* Make sure the mm doesn't disappear when we drop the lock.. */
 		atomic_inc(&mm->mm_users);
@@ -539,8 +537,12 @@ int page_launder(int gfp_mask, int sync)
 		 * last copy..
 		 */
 		if (PageDirty(page)) {
-			int (*writepage)(struct page *) = page->mapping->a_ops->writepage;
+			int (*writepage)(struct page *);
 
+			/* Can a page get here without page->mapping? */
+			if (!page->mapping)
+				goto page_active;
+			writepage = page->mapping->a_ops->writepage;
 			if (!writepage)
 				goto page_active;
 
@@ -779,7 +781,7 @@ int inactive_shortage(void)
 {
 	pg_data_t *pgdat;
 	unsigned int global_target = freepages.high + inactive_target;
-	unsigned int global_incative = 0;
+	unsigned int global_inactive = 0;
 
 	pgdat = pgdat_list;
 	do {
@@ -799,13 +801,13 @@ int inactive_shortage(void)
 			if (inactive < zone->pages_high)
 				return 1;
 
-			global_incative += inactive;
+			global_inactive += inactive;
 		}
 		pgdat = pgdat->node_next;
 	} while (pgdat);
 
 	/* Global shortage? */
-	return global_incative < global_target;
+	return global_inactive < global_target;
 }
 
 /*

@@ -325,6 +325,7 @@ enum {
 	FSTYPE_SYSV2,
 	FSTYPE_COH,
 	FSTYPE_V7,
+	FSTYPE_AFS,
 	FSTYPE_END,
 };
 
@@ -373,6 +374,7 @@ extern ino_t sysv_inode_by_name(struct dentry*);
 
 extern struct inode_operations sysv_file_inode_operations;
 extern struct inode_operations sysv_dir_inode_operations;
+extern struct inode_operations sysv_fast_symlink_inode_operations;
 extern struct file_operations sysv_file_operations;
 extern struct file_operations sysv_dir_operations;
 extern struct address_space_operations sysv_aops;

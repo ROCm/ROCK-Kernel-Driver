@@ -131,8 +131,11 @@ void sysv_set_inode(struct inode *inode, dev_t rdev)
 		inode->i_fop = &sysv_dir_operations;
 		inode->i_mapping->a_ops = &sysv_aops;
 	} else if (S_ISLNK(inode->i_mode)) {
-		inode->i_op = &sysv_symlink_inode_operations;
-		inode->i_mapping->a_ops = &sysv_aops;
+		if (inode->i_blocks) {
+			inode->i_op = &sysv_symlink_inode_operations;
+			inode->i_mapping->a_ops = &sysv_aops;
+		} else
+			inode->i_op = &sysv_fast_symlink_inode_operations;
 	} else
 		init_special_inode(inode, inode->i_mode, rdev);
 }
@@ -196,7 +199,6 @@ int sysv_notify_change(struct dentry *dentry, struct iattr *attr)
 				attr->ia_mode = COH_KLUDGE_NOT_SYMLINK;
 
 	inode_setattr(inode, attr);
-
 	return 0;
 }
 

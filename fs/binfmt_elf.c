@@ -633,7 +633,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			if (elf_ex.e_type == ET_DYN) {
 				load_bias += error -
 				             ELF_PAGESTART(load_bias + vaddr);
-				load_addr += error;
+				load_addr += load_bias;
 			}
 		}
 		k = elf_ppnt->p_vaddr;

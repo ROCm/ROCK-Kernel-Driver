@@ -48,20 +48,6 @@ ifeq ($(ARCH),s390x)
   SERIAL   =
 endif
 
-ifeq ($(ARCH),s390)
-  KEYMAP   =
-  KEYBD    =
-  CONSOLE  =
-  SERIAL   =
-endif
-
-ifeq ($(ARCH),s390x)
-  KEYMAP   =
-  KEYBD    =
-  CONSOLE  =
-  SERIAL   =
-endif
-
 ifeq ($(ARCH),m68k)
    ifdef CONFIG_AMIGA
       KEYBD = amikeyb.o
@@ -241,5 +227,7 @@ consolemap_deftbl.c: $(FONTMAPFILE) conmakehash
 
 consolemap_deftbl.o: consolemap_deftbl.c $(TOPDIR)/include/linux/types.h
 
+.DELETE_ON_ERROR:
+
 defkeymap.c: defkeymap.map
-	loadkeys --mktable defkeymap.map > defkeymap.c
+	set -e ; loadkeys --mktable $< | sed -e 's/^static *//' > $@

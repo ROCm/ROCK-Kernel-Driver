@@ -148,6 +148,9 @@ void clear_page_tables(struct mm_struct *mm, unsigned long first, int nr)
  *
  * 08Jan98 Merged into one routine from several inline routines to reduce
  *         variable count and make things faster. -jj
+ *
+ * dst->page_table_lock is held on entry and exit,
+ * but may be dropped within pmd_alloc() and pte_alloc().
  */
 int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 			struct vm_area_struct *vma)
@@ -159,8 +162,7 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 
 	src_pgd = pgd_offset(src, address)-1;
 	dst_pgd = pgd_offset(dst, address)-1;
-	
-	spin_lock(&dst->page_table_lock);		
+
 	for (;;) {
 		pmd_t * src_pmd, * dst_pmd;
 
@@ -234,6 +236,7 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 					pte = pte_mkclean(pte);
 				pte = pte_mkold(pte);
 				get_page(ptepage);
+				dst->rss++;
 
 cont_copy_pte_range:		set_pte(dst_pte, pte);
 cont_copy_pte_range_noset:	address += PAGE_SIZE;
@@ -251,11 +254,8 @@ cont_copy_pmd_range:	src_pmd++;
 out_unlock:
 	spin_unlock(&src->page_table_lock);
 out:
-	spin_unlock(&dst->page_table_lock);
 	return 0;
-
 nomem:
-	spin_unlock(&dst->page_table_lock);
 	return -ENOMEM;
 }
 
@@ -999,7 +999,6 @@ static void vmtruncate_list(struct vm_area_struct *mpnt, unsigned long pgoff)
 		flush_tlb_range(mm, start, end);
 	} while ((mpnt = mpnt->vm_next_share) != NULL);
 }
-			      
 
 /*
  * Handle all mappings that got truncated by a "truncate()"
@@ -1057,8 +1056,6 @@ out:
 	return;
 }
 
-
-
 /* 
  * Primitive swap readahead code. We simply read an aligned block of
  * (1 << page_cluster) entries in the swap area. This method is chosen
@@ -1072,23 +1069,19 @@ void swapin_readahead(swp_entry_t entry)
 	unsigned long offset;
 
 	/*
-	 * Get the number of handles we should do readahead io to. Also,
-	 * grab temporary references on them, releasing them as io completes.
+	 * Get the number of handles we should do readahead io to.
 	 */
 	num = valid_swaphandles(entry, &offset);
 	for (i = 0; i < num; offset++, i++) {
 		/* Don't block on I/O for read-ahead */
-		if (atomic_read(&nr_async_pages) >= pager_daemon.swap_cluster
-				* (1 << page_cluster)) {
-			while (i++ < num)
-				swap_free(SWP_ENTRY(SWP_TYPE(entry), offset++));
+		if (atomic_read(&nr_async_pages) >=
+		    pager_daemon.swap_cluster << page_cluster)
 			break;
-		}
 		/* Ok, do the async read-ahead now */
 		new_page = read_swap_cache_async(SWP_ENTRY(SWP_TYPE(entry), offset));
-		if (new_page != NULL)
-			page_cache_release(new_page);
-		swap_free(SWP_ENTRY(SWP_TYPE(entry), offset));
+		if (!new_page)
+			break;
+		page_cache_release(new_page);
 	}
 	return;
 }

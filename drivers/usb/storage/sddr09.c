@@ -1,6 +1,6 @@
 /* Driver for SanDisk SDDR-09 SmartMedia reader
  *
- * $Id: sddr09.c,v 1.18 2001/06/11 02:54:25 mdharm Exp $
+ * $Id: sddr09.c,v 1.19 2001/09/02 06:07:20 mdharm Exp $
  *
  * SDDR09 driver v0.1:
  *
@@ -693,7 +693,7 @@ int sddr09_read_map(struct us_data *us) {
 	// scatterlist block i*64/128k = i*(2^6)*(2^-17) = i*(2^-11)
 
 	for (i=0; i<numblocks; i++) {
-		ptr = sg[i>>11].address+(i<<6);
+		ptr = sg[i>>11].address+((i&0x7ff)<<6);
 		if (ptr[0]!=0xFF || ptr[1]!=0xFF || ptr[2]!=0xFF ||
 		    ptr[3]!=0xFF || ptr[4]!=0xFF || ptr[5]!=0xFF) {
 			US_DEBUGP("PBA %04X has no logical mapping: reserved area = "

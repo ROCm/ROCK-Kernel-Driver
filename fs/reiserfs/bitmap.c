@@ -499,6 +499,7 @@ int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th,
   unsigned long border = 0;
   unsigned long bstart = 0;
   unsigned long hash_in, hash_out;
+  unsigned long saved_search_start=search_start;
   int allocated[PREALLOCATION_SIZE];
   int blks;
 
@@ -604,7 +605,15 @@ int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th,
   ** and should probably be removed
   */
   if ( search_start < border ) search_start=border; 
-  
+
+  /* If the disk free space is already below 10% we should 
+  ** start looking for the free blocks from the beginning 
+  ** of the partition, before the border line.
+  */
+  if ( SB_FREE_BLOCKS(th->t_super) <= (SB_BLOCK_COUNT(th->t_super) / 10) ) {
+    search_start=saved_search_start;
+  }
+
   *free_blocknrs = 0;
   blks = PREALLOCATION_SIZE-1;
   for (blks_gotten=0; blks_gotten<PREALLOCATION_SIZE; blks_gotten++) {
