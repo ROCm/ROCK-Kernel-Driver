@@ -881,6 +881,8 @@ static int unlink1 (struct usbtest_dev *dev, int pipe, int size, int async)
 
 	init_completion (&completion);
 	urb = simple_alloc_urb (testdev_to_usbdev (dev), pipe, size);
+	if (!urb)
+		return -ENOMEM;
 	if (async)
 		urb->transfer_flags |= URB_ASYNC_UNLINK;
 	urb->context = &completion;
