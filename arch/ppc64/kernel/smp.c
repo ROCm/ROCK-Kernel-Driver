@@ -85,9 +85,9 @@ struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
 
 static inline void set_tb(unsigned int upper, unsigned int lower)
 {
-	mtspr(SPRN_TBWL, 0);
-	mtspr(SPRN_TBWU, upper);
-	mtspr(SPRN_TBWL, lower);
+	mttbl(0);
+	mttbu(upper);
+	mttbl(lower);
 }
 
 void iSeries_smp_message_recv( struct pt_regs * regs )
@@ -181,12 +181,12 @@ static void smp_iSeries_kick_cpu(int nr)
 	paca[nr].xProcStart = 1;
 }
 
-static void smp_iSeries_setup_cpu(int nr)
+static void __devinit smp_iSeries_setup_cpu(int nr)
 {
 }
 
 /* This is called very early. */
-void smp_init_iSeries(void)
+void __init smp_init_iSeries(void)
 {
 	smp_ops = &ppc_md.smp_ops;
 	smp_ops->message_pass = smp_iSeries_message_pass;
@@ -224,7 +224,7 @@ smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 	}
 }
 
-static int smp_chrp_probe(void)
+static int __init smp_chrp_probe(void)
 {
 	int i;
 	int nr_cpus = 0;
@@ -262,7 +262,7 @@ smp_kick_cpu(int nr)
 	paca[nr].xProcStart = 1;
 }
 
-static void smp_space_timers(unsigned int max_cpus)
+static void __init smp_space_timers(unsigned int max_cpus)
 {
 	int i;
 	unsigned long offset = tb_ticks_per_jiffy / max_cpus;
@@ -306,7 +306,7 @@ smp_xics_message_pass(int target, int msg, unsigned long data, int wait)
 	}
 }
 
-static int smp_xics_probe(void)
+static int __init smp_xics_probe(void)
 {
 	int i;
 	int nr_cpus = 0;
@@ -339,7 +339,7 @@ static void __devinit pSeries_take_timebase(void)
 	while (!timebase)
 		barrier();
 	spin_lock(&timebase_lock);
-	set_tb(timebase, timebase >> 32);
+	set_tb(timebase >> 32, timebase & 0xffffffff);
 	timebase = 0;
 	spin_unlock(&timebase_lock);
 }
@@ -608,7 +608,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	smp_space_timers(max_cpus);
 }
 
-int __cpu_up(unsigned int cpu)
+int __devinit __cpu_up(unsigned int cpu)
 {
 	struct pt_regs regs;
 	struct task_struct *p;
@@ -667,7 +667,6 @@ int __devinit start_secondary(void *unused)
 	if (smp_ops->take_timebase)
 		smp_ops->take_timebase();
 
-	/* XXX required? */
 	local_irq_enable();
 
 	return cpu_idle(NULL);
@@ -678,7 +677,7 @@ int setup_profiling_timer(unsigned int multiplier)
 	return 0;
 }
 
-void smp_cpus_done(unsigned int max_cpus)
+void __init smp_cpus_done(unsigned int max_cpus)
 {
 	smp_ops->setup_cpu(boot_cpuid);
 

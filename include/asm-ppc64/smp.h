@@ -56,9 +56,7 @@ extern volatile unsigned long cpu_callin_map[NR_CPUS];
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
 
-/* remove when the boot sequence gets rewritten to use hotplug interface */
 extern int boot_cpuid;
-extern int ppc64_is_smp;
 
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  *
