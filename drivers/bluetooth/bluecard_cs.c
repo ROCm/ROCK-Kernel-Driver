@@ -1075,36 +1075,29 @@ int bluecard_event(event_t event, int priority, event_callback_args_t *args)
 	return 0;
 }
 
+static struct pcmcia_driver bluecard_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "bluecard_cs",
+	},
+	.attach		= bluecard_attach,
+	.detach		= bluecard_detach,
+};
 
-
-/* ======================== Module initialization ======================== */
-
-
-int __init init_bluecard_cs(void)
+static int __init init_bluecard_cs(void)
 {
-	servinfo_t serv;
-	int err;
-
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "bluecard_cs: Card Services release does not match!\n");
-		return -1;
-	}
-
-	err = register_pccard_driver(&dev_info, &bluecard_attach, &bluecard_detach);
-
-	return err;
+	return pcmcia_register_driver(&bluecard_driver);
 }
 
 
-void __exit exit_bluecard_cs(void)
+static void __exit exit_bluecard_cs(void)
 {
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&bluecard_driver);
 
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL)
 		bluecard_detach(dev_list);
 }
-
 
 module_init(init_bluecard_cs);
 module_exit(exit_bluecard_cs);
