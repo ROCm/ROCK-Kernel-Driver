@@ -3,6 +3,7 @@
  * Licensed under the GPL
  */
 
+#include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h>
 #include "chan_user.h"
@@ -15,8 +16,9 @@ void *null_init(char *str, int device, struct chan_opts *opts)
 	return(&null_chan);
 }
 
-int null_open(int input, int output, int primary, void *d)
+int null_open(int input, int output, int primary, void *d, char **dev_out)
 {
+	*dev_out = NULL;
 	return(os_open_file(DEV_NULL, of_rdwr(OPENFLAGS()), 0));
 }
 
@@ -30,6 +32,7 @@ void null_free(void *data)
 }
 
 struct chan_ops null_ops = {
+	type:		"null",
 	init:		null_init,
 	open:		null_open,
 	close:		generic_close,

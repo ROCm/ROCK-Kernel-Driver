@@ -20,6 +20,7 @@
 #include "kern.h"
 #include "init.h"
 #include "irq_user.h"
+#include "mconsole_kern.h"
 #include "2_5compat.h"
 
 static int ssl_version = 1;
@@ -47,6 +48,10 @@ static struct chan_opts opts = {
 	in_kernel :	1,
 };
 
+static int ssl_config(char *str);
+static int ssl_get_config(char *dev, char *str, int size, char **error_out);
+static int ssl_remove(char *str);
+
 static struct line_driver driver = {
 	name :			"UML serial line",
 	devfs_name :		"tts/%d",
@@ -60,6 +65,12 @@ static struct line_driver driver = {
 	write_irq_name :	"ssl-write",
 	symlink_from :		"serial",
 	symlink_to :		"tts",
+	mc : {
+		name : 		"ssl",
+		config :	ssl_config,
+		get_config :	ssl_get_config,
+		remove :	ssl_remove,
+	},
 };
 
 /* The array is initialized by line_init, which is an initcall.  The 
@@ -69,6 +80,25 @@ static struct line serial_lines[NR_PORTS] =
 	{ [0 ... NR_PORTS - 1] = LINE_INIT(CONFIG_SSL_CHAN, &driver) };
 
 static struct lines lines = LINES_INIT(NR_PORTS);
+
+static int ssl_config(char *str)
+{
+	return(line_config(serial_lines, 
+			   sizeof(serial_lines)/sizeof(serial_lines[0]), str));
+}
+
+static int ssl_get_config(char *dev, char *str, int size, char **error_out)
+{
+	return(line_get_config(dev, serial_lines, 
+			       sizeof(serial_lines)/sizeof(serial_lines[0]), 
+			       str, size, error_out));
+}
+
+static int ssl_remove(char *str)
+{
+	return(line_remove(serial_lines, 
+			   sizeof(serial_lines)/sizeof(serial_lines[0]), str));
+}
 
 int ssl_open(struct tty_struct *tty, struct file *filp)
 {
@@ -207,7 +237,7 @@ __initcall(ssl_init);
 static int ssl_chan_setup(char *str)
 {
 	line_setup(serial_lines, sizeof(serial_lines)/sizeof(serial_lines[0]),
-		   str);
+		   str, 1);
 	return(1);
 }
 
