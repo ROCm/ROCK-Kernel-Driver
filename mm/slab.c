@@ -2064,7 +2064,7 @@ static void enable_cpucache (kmem_cache_t *cachep)
 	else
 		limit = 248;
 
-#ifndef DEBUG
+#if DEBUG
 	/* With debugging enabled, large batchcount lead to excessively
 	 * long periods with disabled local interrupts. Limit the 
 	 * batchcount
