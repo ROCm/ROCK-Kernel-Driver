@@ -81,6 +81,8 @@ static inline unsigned long prio_tree_maxindex(unsigned int bits)
 	return index_bits_to_maxindex[bits - 1];
 }
 
+static void prio_tree_remove(struct prio_tree_root *, struct prio_tree_node *);
+
 /*
  * Extend a priority search tree so that it can store a node with heap_index
  * max_heap_index. In the worst case, this algorithm takes O((log n)^2).
@@ -90,8 +92,6 @@ static inline unsigned long prio_tree_maxindex(unsigned int bits)
 static struct prio_tree_node *prio_tree_expand(struct prio_tree_root *root,
 		struct prio_tree_node *node, unsigned long max_heap_index)
 {
-	static void prio_tree_remove(struct prio_tree_root *,
-					struct prio_tree_node *);
 	struct prio_tree_node *first = NULL, *prev, *last = NULL;
 
 	if (max_heap_index > prio_tree_maxindex(root->index_bits))
