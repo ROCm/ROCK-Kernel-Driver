@@ -2223,7 +2223,7 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
     } while(bh != head) ;
 
     BUG_ON(PageWriteback(page));
-    SetPageWriteback(page);
+    set_page_writeback(page);
     unlock_page(page);
 
     /*
@@ -2287,7 +2287,7 @@ fail:
     } while(bh != head);
     SetPageError(page);
     BUG_ON(PageWriteback(page));
-    SetPageWriteback(page);
+    set_page_writeback(page);
     unlock_page(page);
     do {
         struct buffer_head *next = bh->b_this_page;

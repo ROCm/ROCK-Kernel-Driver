@@ -768,7 +768,7 @@ nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data, int how)
 		req = nfs_list_entry(head->next);
 		nfs_list_remove_request(req);
 		nfs_list_add_request(req, &data->pages);
-		SetPageWriteback(req->wb_page);
+		set_page_writeback(req->wb_page);
 		*pages++ = req->wb_page;
 		count += req->wb_bytes;
 	}
