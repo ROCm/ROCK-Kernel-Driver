@@ -233,7 +233,7 @@ struct module
 #ifdef CONFIG_KALLSYMS
 	/* We keep the symbol and string tables for kallsyms. */
 	Elf_Sym *symtab;
-	unsigned long num_kallsyms;
+	unsigned long num_symtab;
 	char *strtab;
 #endif
 

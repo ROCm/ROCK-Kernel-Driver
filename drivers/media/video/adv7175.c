@@ -231,7 +231,7 @@ int adv717x_probe(struct i2c_adapter *adap)
 static int adv717x_detach(struct i2c_client *client)
 {
 	i2c_detach_client(client);
-	i2c_get_clientdata(client);
+	kfree(i2c_get_clientdata(client));
 	kfree(client);
 	return 0;
 }
