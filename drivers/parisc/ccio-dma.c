@@ -483,7 +483,7 @@ typedef unsigned long space_t;
 */
 #define IOPDIR_VALID    0x01UL
 #define HINT_SAFE_DMA   0x02UL	/* used for pci_alloc_consistent() pages */
-#ifdef CONFIG_ISA	/* EISA support really */
+#ifdef CONFIG_EISA
 #define HINT_STOP_MOST  0x04UL	/* LSL support */
 #else
 #define HINT_STOP_MOST  0x00UL	/* only needed for "some EISA devices" */
@@ -617,7 +617,7 @@ ccio_clear_io_tlb(struct ioc *ioc, dma_addr_t iovp, size_t byte_cnt)
 		WRITE_U32(CMD_TLB_PURGE | iovp, &ioc->ioc_hpa->io_command);
 		iovp += chain_size;
 		byte_cnt -= chain_size;
-      }
+	}
 }
 
 /**
@@ -1312,8 +1312,8 @@ static struct ioc * ccio_find_ioc(int hw_path)
  * ccio_get_iommu - Find the iommu which controls this device
  * @dev: The parisc device.
  *
- * This function searches through the registerd IOMMU's and returns the
- * appropriate IOMMU for the device based upon the devices hardware path.
+ * This function searches through the registered IOMMU's and returns
+ * the appropriate IOMMU for the device based on its hardware path.
  */
 void * ccio_get_iommu(const struct parisc_device *dev)
 {
@@ -1509,12 +1509,13 @@ ccio_init_resource(struct resource *res, char *name, unsigned long ioaddr)
 {
 	int result;
 
+	res->parent = NULL;
 	res->flags = IORESOURCE_MEM;
 	res->start = (unsigned long)(signed) __raw_readl(ioaddr) << 16;
 	res->end = (unsigned long)(signed) (__raw_readl(ioaddr + 4) << 16) - 1;
+	res->name = name;
 	if (res->end + 1 == res->start)
 		return;
-	res->name = name;
 	result = request_resource(&iomem_resource, res);
 	if (result < 0) {
 		printk(KERN_ERR "%s: failed to claim CCIO bus address space (%08lx,%08lx)\n", 
@@ -1534,120 +1535,111 @@ static void __init ccio_init_resources(struct ioc *ioc)
 			(unsigned long)&ioc->ioc_hpa->io_io_low_hv);
 }
 
-static int expand_resource(struct resource *res, unsigned long size,
-			   unsigned long align)
+static int new_ioc_area(struct resource *res, unsigned long size,
+		unsigned long min, unsigned long max, unsigned long align)
 {
-	struct resource *temp_res;
-	unsigned long start = res->start;
-	unsigned long end ;
+	if (max <= min)
+		return -EBUSY;
 
-	/* see if we can expand above */
-	end = (res->end + size + align - 1) & ~(align - 1);;
-	
-	temp_res = __request_region(res->parent, res->end, end - res->end,
-				    "expansion");
-	if(!temp_res) {
-		/* now try below */
-		start = ((res->start - size + align) & ~(align - 1)) - align;
-		end = res->end;
-		temp_res = __request_region(res->parent, start, size,
-					    "expansion");	
-		if(!temp_res) {
-			return -ENOMEM;
-		}
-	} 
-	release_resource(temp_res);
-	temp_res = res->parent;
-	release_resource(res);
-	res->start = start;
-	res->end = end;
+	res->start = (max - size + 1) &~ (align - 1);
+	res->end = res->start + size;
+	if (!request_resource(&iomem_resource, res))
+		return 0;
 
-	/* This could be caused by some sort of race.  Basically, if
-	 * this tripped something stole the region we just reserved
-	 * and then released to check for expansion */
-	BUG_ON(request_resource(temp_res, res) != 0);
-
-	return 0;
+	return new_ioc_area(res, size, min, max - size, align);
 }
 
-static void expand_ioc_area(struct resource *parent, struct ioc *ioc,
-			    unsigned long size,	unsigned long min,
-			    unsigned long max, unsigned long align)
+static int expand_ioc_area(struct resource *res, unsigned long size,
+		unsigned long min, unsigned long max, unsigned long align)
 {
-	if(ioc == NULL)
-		/* no IOC, so nothing to expand */
-		return;
+	unsigned long start, len;
 
-	if (expand_resource(parent, size, align) != 0) {
-		printk(KERN_ERR "Unable to expand %s window by 0x%lx\n",
-		       parent->name, size);
-		return;
+	if (!res->parent)
+		return new_ioc_area(res, size, min, max, align);
+
+	start = (res->start - size) &~ (align - 1);
+	len = res->end - start + 1;
+	if (start >= min) {
+		if (!adjust_resource(res, start, len))
+			return 0;
 	}
 
-	/* OK, we have the memory, now expand the window */
-	if (parent == &ioc->mmio_region[0]) {
+	start = res->start;
+	len = ((size + res->end + align) &~ (align - 1)) - start;
+	if (start + len <= max) {
+		if (!adjust_resource(res, start, len))
+			return 0;
+	}
+
+	return -EBUSY;
+}
+
+/*
+ * Dino calls this function.  Beware that we may get called on systems
+ * which have no IOC (725, B180, C160L, etc) but do have a Dino.
+ * So it's legal to find no parent IOC.
+ *
+ * Some other issues: one of the resources in the ioc may be unassigned.
+ */
+int ccio_allocate_resource(const struct parisc_device *dev,
+		struct resource *res, unsigned long size,
+		unsigned long min, unsigned long max, unsigned long align)
+{
+	struct resource *parent = &iomem_resource;
+	struct ioc *ioc = ccio_get_iommu(dev);
+	if (!ioc)
+		goto out;
+
+	parent = ioc->mmio_region;
+	if (parent->parent &&
+	    !allocate_resource(parent, res, size, min, max, align, NULL, NULL))
+		return 0;
+
+	if ((parent + 1)->parent &&
+	    !allocate_resource(parent + 1, res, size, min, max, align,
+				NULL, NULL))
+		return 0;
+
+	if (!expand_ioc_area(parent, size, min, max, align)) {
 		__raw_writel(((parent->start)>>16) | 0xffff0000,
 			     (unsigned long)&(ioc->ioc_hpa->io_io_low));
 		__raw_writel(((parent->end)>>16) | 0xffff0000,
 			     (unsigned long)&(ioc->ioc_hpa->io_io_high));
-	} else if (parent == &ioc->mmio_region[1]) {
+	} else if (!expand_ioc_area(parent + 1, size, min, max, align)) {
+		parent++;
 		__raw_writel(((parent->start)>>16) | 0xffff0000,
 			     (unsigned long)&(ioc->ioc_hpa->io_io_low_hv));
 		__raw_writel(((parent->end)>>16) | 0xffff0000,
 			     (unsigned long)&(ioc->ioc_hpa->io_io_high_hv));
 	} else {
-		/* This should be impossible.  It means
-		 * expand_ioc_area got called with a resource that
-		 * didn't belong to the ioc
-		 */
-		BUG();
-	}
-}
-
-static struct resource *ccio_get_resource(struct ioc* ioc,
-		const struct parisc_device *dev)
-{
-	if (!ioc) {
-		return &iomem_resource;
-	} else if ((ioc->mmio_region->start <= dev->hpa) &&
-			(dev->hpa < ioc->mmio_region->end)) {
-		return ioc->mmio_region;
-	} else if (((ioc->mmio_region + 1)->start <= dev->hpa) &&
-			(dev->hpa < (ioc->mmio_region + 1)->end)) {
-		return ioc->mmio_region + 1;
-	} else {
-		return NULL;
-	}
-}
-
-int ccio_allocate_resource(const struct parisc_device *dev,
-		struct resource *res, unsigned long size,
-		unsigned long min, unsigned long max, unsigned long align,
-		void (*alignf)(void *, struct resource *, unsigned long, unsigned long),
-		void *alignf_data)
-{
-	struct ioc *ioc = ccio_get_iommu(dev);
-	struct resource *parent = ccio_get_resource(ioc, dev);
-	if (!parent)
 		return -EBUSY;
+	}
 
-	if (!allocate_resource(parent, res, size, min, max, align, alignf,
-			alignf_data))
-		return 0;
-
-	expand_ioc_area(parent, ioc, size, min, max, align);
-	return allocate_resource(parent, res, size, min, max, align, alignf,
-			alignf_data);
+ out:
+	return allocate_resource(parent, res, size, min, max, align, NULL,NULL);
 }
 
 int ccio_request_resource(const struct parisc_device *dev,
 		struct resource *res)
 {
+	struct resource *parent;
 	struct ioc *ioc = ccio_get_iommu(dev);
-	struct resource *parent = ccio_get_resource(ioc, dev);
+
+	if (!ioc) {
+		parent = &iomem_resource;
+	} else if ((ioc->mmio_region->start <= dev->hpa) &&
+			(dev->hpa < ioc->mmio_region->end)) {
+		parent = ioc->mmio_region;
+	} else if (((ioc->mmio_region + 1)->start <= dev->hpa) &&
+			(dev->hpa < (ioc->mmio_region + 1)->end)) {
+		parent = ioc->mmio_region + 1;
+	} else {
+		return -EBUSY;
+	}
 
 	return request_resource(parent, res);
 }
+
 /**
  * ccio_probe - Determine if ccio should claim this device.
  * @dev: The device which has been found

@@ -441,7 +441,6 @@ static __inline__ int led_get_diskio_activity(void)
 #if HZ==100
  #define NORMALIZED_COUNT(count) (count)
 #else
- #warning "Untested situation HZ != 100 !!"
  #define NORMALIZED_COUNT(count) (count/(HZ/100))
 #endif
 

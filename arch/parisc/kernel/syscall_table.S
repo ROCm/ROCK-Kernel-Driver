@@ -28,7 +28,7 @@
 #define ENTRY_COMP(_name_) .word sys_##_name_
 #endif
 
-	ENTRY_SAME(ni_syscall)	/* 0  -  old "setup()" system call*/
+	ENTRY_SAME(restart_syscall)	/* 0 */
 	ENTRY_SAME(exit)
 	ENTRY_SAME(fork_wrapper)
 	ENTRY_SAME(read)
@@ -260,15 +260,15 @@
 	ENTRY_COMP(recvmsg)
 	ENTRY_SAME(semop)		/* 185 */
 	ENTRY_SAME(semget)
-	ENTRY_DIFF(semctl_broken)
+	ENTRY_DIFF(semctl)
 	ENTRY_DIFF(msgsnd)
 	ENTRY_DIFF(msgrcv)
 	ENTRY_SAME(msgget)		/* 190 */
-	ENTRY_SAME(msgctl_broken)
+	ENTRY_SAME(msgctl)
 	ENTRY_SAME(shmat_wrapper)
 	ENTRY_SAME(shmdt)
 	ENTRY_SAME(shmget)
-	ENTRY_SAME(shmctl_broken)	/* 195 */
+	ENTRY_SAME(shmctl)		/* 195 */
 	ENTRY_SAME(ni_syscall)		/* streams1 */
 	ENTRY_SAME(ni_syscall)		/* streams2 */
 	ENTRY_SAME(lstat64)

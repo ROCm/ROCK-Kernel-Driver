@@ -109,7 +109,7 @@ config IOMMU_SBA
 
 config SUPERIO
 	bool "SuperIO (SuckyIO) support"
-	depends on PCI
+	depends on PCI_LBA
 	default y
 	help
 	  Say Y here to support the SuperIO chip found in Bxxxx, C3xxx and
@@ -124,10 +124,23 @@ config CHASSIS_LCD_LED
 	  Disk/Network activities LEDs on some PA-RISC machines,
 	  or support for the LCD that can be found on recent material.
 	
-	  This has nothing to do with LED State support for A, J and E class.
+	  This has nothing to do with LED State support for A and E class.
 	
 	  If unsure, say Y.
 
+config PDC_CHASSIS
+	bool "PDC chassis State Panel support"
+	default y
+	help
+	  Say Y here if you want to enable support for the LED State front
+	  panel as found on E class, and support for the GSP Virtual Front
+	  Panel (LED State and message logging)  as found on high end
+	  servers such as A, L and N-class.
+	  
+	  This has nothing to do with Chassis LCD and LED support.
+	  
+	  If unsure, say Y.
+ 
 config HOTPLUG
 	bool "Support for hot-pluggable devices"
 	---help---

@@ -27,14 +27,12 @@
  *
  */
 #include <linux/config.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
-#include <linux/seq_file.h>
-#include <linux/init.h>
 #include <linux/delay.h>
-#define PCI_DEBUG
-#include <linux/pci.h>
-#undef PCI_DEBUG
+#include <linux/init.h>
+#include <linux/mm.h>
+#include <linux/module.h>
+#include <linux/seq_file.h>
+#include <linux/slab.h>
 
 #include <asm/cache.h>
 #include <asm/hardware.h>	/* for register_parisc_driver() stuff */
@@ -45,6 +43,8 @@
 #include <asm/parisc-device.h>
 
 struct system_cpuinfo_parisc boot_cpu_data;
+EXPORT_SYMBOL(boot_cpu_data);
+
 struct cpuinfo_parisc cpu_data[NR_CPUS];
 
 /*
@@ -105,11 +105,11 @@ static int __init processor_probe(struct parisc_device *dev)
 		status = pdc_pat_cell_module(&bytecnt, dev->pcell_loc,
 			dev->mod_index, PA_VIEW, &pa_pdc_cell);
 
-		ASSERT(PDC_OK == status);
+		BUG_ON(PDC_OK != status);
 
 		/* verify it's the same as what do_pat_inventory() found */
-		ASSERT(dev->mod_info == pa_pdc_cell.mod_info);
-		ASSERT(dev->pmod_loc == pa_pdc_cell.mod_location);
+		BUG_ON(dev->mod_info != pa_pdc_cell.mod_info);
+		BUG_ON(dev->pmod_loc != pa_pdc_cell.mod_location);
 
 		txn_addr = pa_pdc_cell.mod[0];   /* id_eid for IO sapic */
 
@@ -122,7 +122,7 @@ static int __init processor_probe(struct parisc_device *dev)
 		/* get the cpu number */
 		status = pdc_pat_cpu_get_number(&cpu_info, dev->hpa);
 
-		ASSERT(PDC_OK == status);
+		BUG_ON(PDC_OK != status);
 
 		if (cpu_info.cpu_num >= NR_CPUS) {
 			printk(KERN_WARNING "IGNORING CPU at 0x%x,"
