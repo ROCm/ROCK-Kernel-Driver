@@ -2,6 +2,10 @@
  * Copyright (C) 2002 Sistina Software (UK) Limited.
  *
  * This file is released under the GPL.
+ *
+ * Kcopyd provides a simple interface for copying an area of one
+ * block-device to one or more other block-devices, with an asynchronous
+ * completion notification.
  */
 
 #include <asm/atomic.h>

@@ -2,6 +2,10 @@
  * Copyright (C) 2001 Sistina Software
  *
  * This file is released under the GPL.
+ *
+ * Kcopyd provides a simple interface for copying an area of one
+ * block-device to one or more other block-devices, with an asynchronous
+ * completion notification.
  */
 
 #ifndef DM_KCOPYD_H
