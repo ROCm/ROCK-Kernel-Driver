@@ -22,10 +22,6 @@
    SMBus 2.0 support by Mark Studebaker <mdsxyz123@yahoo.com>                */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_CORE
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
