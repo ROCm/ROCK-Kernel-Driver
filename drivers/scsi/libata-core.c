@@ -1792,7 +1792,7 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 
 	dma_address = pci_map_single(ap->host_set->pdev, cmd->request_buffer,
 				     cmd->request_bufflen, dir);
-	if (pci_dma_error(dma_address))
+	if (pci_dma_mapping_error(dma_address))
 		return -1;
 
 	sg_dma_address(sg) = dma_address;
