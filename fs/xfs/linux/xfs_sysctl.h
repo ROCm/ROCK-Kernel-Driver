@@ -40,9 +40,9 @@
  */
 
 typedef struct xfs_sysctl_val {
-	ulong min;
-	ulong val;
-	ulong max;
+	int min;
+	int val;
+	int max;
 } xfs_sysctl_val_t;
 
 typedef struct xfs_param {

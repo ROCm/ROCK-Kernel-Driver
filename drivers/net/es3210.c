@@ -49,6 +49,7 @@ static const char version[] =
 	"es3210.c: Driver revision v0.03, 14/09/96\n";
 
 #include <linux/module.h>
+#include <linux/eisa.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>

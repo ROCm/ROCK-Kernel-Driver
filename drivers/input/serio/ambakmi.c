@@ -73,7 +73,7 @@ static int amba_kmi_open(struct serio *io)
 	writeb(kmi->divisor, KMICLKDIV);
 	writeb(KMICR_EN, KMICR);
 
-	ret = request_irq(kmi->irq, amba_kmi_int, 0, kmi->io.phys, kmi);
+	ret = request_irq(kmi->irq, amba_kmi_int, 0, "kmi-pl050", kmi);
 	if (ret) {
 		printk(KERN_ERR "kmi: failed to claim IRQ%d\n", kmi->irq);
 		writeb(0, KMICR);
@@ -108,11 +108,11 @@ static int amba_kmi_probe(struct amba_device *dev, void *id)
 	kmi->io.write	= amba_kmi_write;
 	kmi->io.open	= amba_kmi_open;
 	kmi->io.close	= amba_kmi_close;
-	kmi->io.name	= dev->dev.name;
+	kmi->io.name	= dev->dev.bus_id;
 	kmi->io.phys	= dev->dev.bus_id;
 	kmi->io.driver	= kmi;
 
-	kmi->res	= request_mem_region(dev->res.start, KMI_SIZE, kmi->io.phys);
+	kmi->res	= request_mem_region(dev->res.start, KMI_SIZE, "kmi-pl050");
 	if (!kmi->res) {
 		kfree(kmi);
 		return -EBUSY;
@@ -147,14 +147,12 @@ static int amba_kmi_remove(struct amba_device *dev)
 	return 0;
 }
 
-static int amba_kmi_resume(struct amba_device *dev, u32 level)
+static int amba_kmi_resume(struct amba_device *dev)
 {
 	struct amba_kmi_port *kmi = amba_get_drvdata(dev);
 
-	if (level == RESUME_ENABLE) {
-		/* kick the serio layer to rescan this port */
-		serio_rescan(&kmi->io);
-	}
+	/* kick the serio layer to rescan this port */
+	serio_rescan(&kmi->io);
 
 	return 0;
 }

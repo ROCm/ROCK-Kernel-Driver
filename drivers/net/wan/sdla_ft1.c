@@ -21,7 +21,6 @@
 *****************************************************************************/
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */

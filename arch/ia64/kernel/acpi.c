@@ -331,7 +331,7 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 
 #ifdef CONFIG_ACPI_NUMA
 
-#define SLIT_DEBUG
+#undef SLIT_DEBUG
 
 #define PXM_FLAG_LEN ((MAX_PXM_DOMAINS + 1)/32)
 

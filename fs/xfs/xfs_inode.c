@@ -3672,7 +3672,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 	SYNCHRONIZE();
 	ip->i_update_core = 1;
 	if (!(inode->i_state & I_LOCK))
-		mark_inode_dirty(inode);
+		mark_inode_dirty_sync(inode);
 }
 
 #ifdef XFS_ILOCK_TRACE

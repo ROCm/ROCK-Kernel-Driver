@@ -3,7 +3,6 @@
  *  Copyright (C) 1998 Elmer.Joandi@ut.ee, +37-255-13500	
  *  GNU General Public License applies
  */
-#include <linux/version.h>
 
 #include <linux/module.h>
 #include <linux/config.h>

@@ -227,7 +227,6 @@ static char rcsid[] =
 #include <linux/netdevice.h>
 #include <linux/spinlock.h>
 #include <linux/if.h>
-#include <linux/version.h>
 
 #include <net/syncppp.h>
 #include <net/arp.h>

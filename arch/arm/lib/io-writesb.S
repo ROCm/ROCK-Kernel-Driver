@@ -9,7 +9,26 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
-#include <asm/hardware.h>
+
+		.macro	outword, rd
+#ifndef __ARMEB__
+		strb	\rd, [r0]
+		mov	\rd, \rd, lsr #8
+		strb	\rd, [r0]
+		mov	\rd, \rd, lsr #8
+		strb	\rd, [r0]
+		mov	\rd, \rd, lsr #8
+		strb	\rd, [r0]
+#else
+		mov	lr, \rd, lsr #24
+		strb	lr, [r0]
+		mov	lr, \rd, lsr #16
+		strb	lr, [r0]
+		mov	lr, \rd, lsr #8
+		strb	lr, [r0]
+		strb	\rd, [r0]
+#endif
+		.endm
 
 .outsb_align:	rsb	ip, ip, #4
 		cmp	ip, r2
@@ -30,86 +49,37 @@ ENTRY(__raw_writesb)
 		ands	ip, r1, #3
 		bne	.outsb_align
 
-.outsb_aligned:	stmfd	sp!, {r4 - r6, lr}
+.outsb_aligned:	stmfd	sp!, {r4, r5, lr}
 
 		subs	r2, r2, #16
 		bmi	.outsb_no_16
 
-.outsb_16_lp:	ldmia	r1!, {r3 - r6}
-
-		strb	r3, [r0]
-		mov	r3, r3, lsr #8
-		strb	r3, [r0]
-		mov	r3, r3, lsr #8
-		strb	r3, [r0]
-		mov	r3, r3, lsr #8
-		strb	r3, [r0]
-
-		strb	r4, [r0]
-		mov	r4, r4, lsr #8
-		strb	r4, [r0]
-		mov	r4, r4, lsr #8
-		strb	r4, [r0]
-		mov	r4, r4, lsr #8
-		strb	r4, [r0]
-
-		strb	r5, [r0]
-		mov	r5, r5, lsr #8
-		strb	r5, [r0]
-		mov	r5, r5, lsr #8
-		strb	r5, [r0]
-		mov	r5, r5, lsr #8
-		strb	r5, [r0]
-
-		strb	r6, [r0]
-		mov	r6, r6, lsr #8
-		strb	r6, [r0]
-		mov	r6, r6, lsr #8
-		strb	r6, [r0]
-		mov	r6, r6, lsr #8
-		strb	r6, [r0]
-
+.outsb_16_lp:	ldmia	r1!, {r3, r4, r5, ip}
+		outword	r3
+		outword	r4
+		outword	r5
+		outword	ip
 		subs	r2, r2, #16
 		bpl	.outsb_16_lp
 
 		tst	r2, #15
-		LOADREGS(eqfd, sp!, {r4 - r6, pc})
+		LOADREGS(eqfd, sp!, {r4, r5, pc})
 
 .outsb_no_16:	tst	r2, #8
 		beq	.outsb_no_8
 
 		ldmia	r1!, {r3, r4}
-
-		strb	r3, [r0]
-		mov	r3, r3, lsr #8
-		strb	r3, [r0]
-		mov	r3, r3, lsr #8
-		strb	r3, [r0]
-		mov	r3, r3, lsr #8
-		strb	r3, [r0]
-
-		strb	r4, [r0]
-		mov	r4, r4, lsr #8
-		strb	r4, [r0]
-		mov	r4, r4, lsr #8
-		strb	r4, [r0]
-		mov	r4, r4, lsr #8
-		strb	r4, [r0]
+		outword	r3
+		outword	r4
 
 .outsb_no_8:	tst	r2, #4
 		beq	.outsb_no_4
 
 		ldr	r3, [r1], #4
-		strb	r3, [r0]
-		mov	r3, r3, lsr #8
-		strb	r3, [r0]
-		mov	r3, r3, lsr #8
-		strb	r3, [r0]
-		mov	r3, r3, lsr #8
-		strb	r3, [r0]
+		outword	r3
 
 .outsb_no_4:	ands	r2, r2, #3
-		LOADREGS(eqfd, sp!, {r4 - r6, pc})
+		LOADREGS(eqfd, sp!, {r4, r5, pc})
 
 		cmp	r2, #2
 		ldrb	r3, [r1], #1
@@ -119,4 +89,4 @@ ENTRY(__raw_writesb)
 		ldrgtb	r3, [r1]
 		strgtb	r3, [r0]
 
-		LOADREGS(fd, sp!, {r4 - r6, pc})
+		LOADREGS(fd, sp!, {r4, r5, pc})

@@ -104,6 +104,7 @@
 #include <linux/ioport.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/eisa.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>

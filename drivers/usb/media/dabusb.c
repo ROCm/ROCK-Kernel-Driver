@@ -89,7 +89,6 @@ static int dabusb_add_buf_tail (pdabusb_t s, struct list_head *dst, struct list_
 static void dump_urb (struct urb *urb)
 {
 	dbg("urb                   :%p", urb);
-	dbg("next                  :%p", urb->next);
 	dbg("dev                   :%p", urb->dev);
 	dbg("pipe                  :%08X", urb->pipe);
 	dbg("status                :%d", urb->status);
@@ -728,7 +727,7 @@ static int dabusb_probe (struct usb_interface *intf,
 	pdabusb_t s;
 
 	dbg("dabusb: probe: vendor id 0x%x, device id 0x%x ifnum:%d",
-	  usbdev->descriptor.idVendor, usbdev->descriptor.idProduct, ifnum);
+	  usbdev->descriptor.idVendor, usbdev->descriptor.idProduct, intf->altsetting->desc.bInterfaceNumber);
 
 	/* We don't handle multiple configurations */
 	if (usbdev->descriptor.bNumConfigurations != 1)
@@ -762,7 +761,7 @@ static int dabusb_probe (struct usb_interface *intf,
 			goto reject;
 		}
 	}
-	dbg("bound to interface: %d", ifnum);
+	dbg("bound to interface: %d", intf->altsetting->desc.bInterfaceNumber);
 	usb_set_intfdata (intf, s);
 	up (&s->mutex);
 

@@ -123,6 +123,7 @@ static const char version[] =
 #include <linux/config.h>	/* for CONFIG_IP_MULTICAST */
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
+#include <linux/delay.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -241,7 +242,7 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 
 	if (dev->irq < 2)
 	{
-		unsigned long irq_mask, delay;
+		unsigned long irq_mask;
 
 		irq_mask = probe_irq_on();
 		inb(RX_STATUS);		/* Clear pending interrupts. */
@@ -250,8 +251,7 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 
 		outb(0x00, AX_CMD);
 
-		delay = jiffies + HZ/50;
-		while (time_before(jiffies, delay)) ;
+		mdelay(20);
 		autoirq = probe_irq_off(irq_mask);
 
 		if (autoirq == 0)

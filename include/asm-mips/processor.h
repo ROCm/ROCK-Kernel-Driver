@@ -135,12 +135,6 @@ extern unsigned int vced_count, vcei_count;
 /*
  * Bus types (default is ISA, but people can check others with these..)
  */
-#ifdef CONFIG_EISA
-extern int EISA_bus;
-#else
-#define EISA_bus (0)
-#endif
-
 #define MCA_bus 0
 #define MCA_bus__is_a_macro /* for versions in ksyms.c */
 

@@ -1424,14 +1424,15 @@ static int usb_device_suspend(struct device *dev, u32 state)
 	struct usb_interface *intf;
 	struct usb_driver *driver;
 
-	if ((dev->driver == &usb_generic_driver) || 
+	if ((dev->driver == NULL) ||
+	    (dev->driver == &usb_generic_driver) ||
 	    (dev->driver_data == &usb_generic_driver_data))
 		return 0;
 
 	intf = to_usb_interface(dev);
 	driver = to_usb_driver(dev->driver);
 
-	if (driver && driver->suspend)
+	if (driver->suspend)
 		return driver->suspend(intf, state);
 	return 0;
 }
@@ -1441,14 +1442,15 @@ static int usb_device_resume(struct device *dev)
 	struct usb_interface *intf;
 	struct usb_driver *driver;
 
-	if ((dev->driver == &usb_generic_driver) || 
+	if ((dev->driver == NULL) ||
+	    (dev->driver == &usb_generic_driver) ||
 	    (dev->driver_data == &usb_generic_driver_data))
 		return 0;
 
 	intf = to_usb_interface(dev);
 	driver = to_usb_driver(dev->driver);
 
-	if (driver && driver->resume)
+	if (driver->resume)
 		return driver->resume(intf);
 	return 0;
 }

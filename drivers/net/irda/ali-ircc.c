@@ -89,7 +89,6 @@ static int  ali_ircc_close(struct ali_ircc_cb *self);
 
 static int  ali_ircc_setup(chipio_t *info);
 static int  ali_ircc_is_receiving(struct ali_ircc_cb *self);
-static int  ali_ircc_net_init(struct net_device *dev);
 static int  ali_ircc_net_open(struct net_device *dev);
 static int  ali_ircc_net_close(struct net_device *dev);
 static int  ali_ircc_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
@@ -255,14 +254,14 @@ static int ali_ircc_open(int i, chipio_t *info)
 	if ((ali_ircc_setup(info)) == -1)
 		return -1;
 		
-	/* Allocate new instance of the driver */
-	self = kmalloc(sizeof(struct ali_ircc_cb), GFP_KERNEL);
-	if (self == NULL) 
-	{
+	dev = alloc_netdev(sizeof(*self), "irda%d", irda_device_setup);
+	if (dev == NULL) {
 		ERROR("%s(), can't allocate memory for control block!\n", __FUNCTION__);
 		return -ENOMEM;
 	}
-	memset(self, 0, sizeof(struct ali_ircc_cb));
+
+	self = dev->priv;
+	self->netdev = dev;
 	spin_lock_init(&self->lock);
    
 	/* Need to store self somewhere */
@@ -282,9 +281,8 @@ static int ali_ircc_open(int i, chipio_t *info)
 	if (!request_region(self->io.fir_base, self->io.fir_ext, driver_name)) {
 		WARNING("%s(), can't get iobase of 0x%03x\n", __FUNCTION__,
 			self->io.fir_base);
-		dev_self[i] = NULL;
-		kfree(self);
-		return -ENODEV;
+		err = -ENODEV;
+		goto err_out1;
 	}
 
 	/* Initialize QoS for this device */
@@ -307,19 +305,17 @@ static int ali_ircc_open(int i, chipio_t *info)
 	/* Allocate memory if needed */
 	self->rx_buff.head = (__u8 *) kmalloc(self->rx_buff.truesize,
 					      GFP_KERNEL |GFP_DMA); 
-	if (self->rx_buff.head == NULL) 
-	{
-		kfree(self);
-		return -ENOMEM;
+	if (self->rx_buff.head == NULL) {
+		err = -ENOMEM;
+		goto err_out2;
 	}
 	memset(self->rx_buff.head, 0, self->rx_buff.truesize);
 	
 	self->tx_buff.head = (__u8 *) kmalloc(self->tx_buff.truesize, 
 					      GFP_KERNEL|GFP_DMA); 
 	if (self->tx_buff.head == NULL) {
-		kfree(self->rx_buff.head);
-		kfree(self);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_out3;
 	}
 	memset(self->tx_buff.head, 0, self->tx_buff.truesize);
 
@@ -332,28 +328,21 @@ static int ali_ircc_open(int i, chipio_t *info)
 	self->tx_fifo.len = self->tx_fifo.ptr = self->tx_fifo.free = 0;
 	self->tx_fifo.tail = self->tx_buff.head;
 
-	if (!(dev = dev_alloc("irda%d", &err))) {
-		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
-		return -ENOMEM;
-	}
-
-	dev->priv = (void *) self;
-	self->netdev = dev;
 	
+	/* Keep track of module usage */
+	SET_MODULE_OWNER(dev);
+
 	/* Override the network functions we need to use */
-	dev->init            = ali_ircc_net_init;
 	dev->hard_start_xmit = ali_ircc_sir_hard_xmit;
 	dev->open            = ali_ircc_net_open;
 	dev->stop            = ali_ircc_net_close;
 	dev->do_ioctl        = ali_ircc_net_ioctl;
 	dev->get_stats	     = ali_ircc_net_get_stats;
 
-	rtnl_lock();
-	err = register_netdevice(dev);
-	rtnl_unlock();
+	err = register_netdev(dev);
 	if (err) {
 		ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
-		return -1;
+		goto err_out4;
 	}
 	MESSAGE("IrDA: Registered device %s\n", dev->name);
 
@@ -370,6 +359,17 @@ static int ali_ircc_open(int i, chipio_t *info)
 	IRDA_DEBUG(2, "%s(), ----------------- End -----------------\n", __FUNCTION__);
 	
 	return 0;
+
+ err_out4:
+	kfree(self->tx_buff.head);
+ err_out3:
+	kfree(self->rx_buff.head);
+ err_out2:
+	release_region(self->io.fir_base, self->io.fir_ext);
+ err_out1:
+	dev_self[i] = NULL;
+	free_netdev(dev);
+	return err;
 }
 
 
@@ -390,8 +390,7 @@ static int __exit ali_ircc_close(struct ali_ircc_cb *self)
         iobase = self->io.fir_base;
 
 	/* Remove netdevice */
-	if (self->netdev)
-		unregister_netdev(self->netdev);
+	unregister_netdev(self->netdev);
 
 	/* Release the PORT that this driver is using */
 	IRDA_DEBUG(4, "%s(), Releasing Region %03x\n", __FUNCTION__, self->io.fir_base);
@@ -404,7 +403,7 @@ static int __exit ali_ircc_close(struct ali_ircc_cb *self)
 		kfree(self->rx_buff.head);
 
 	dev_self[self->index] = NULL;
-	kfree(self);
+	free_netdev(self->netdev);
 	
 	IRDA_DEBUG(2, "%s(), ----------------- End -----------------\n", __FUNCTION__);
 	
@@ -1288,29 +1287,6 @@ static int ali_ircc_sir_write(int iobase, int fifo_size, __u8 *buf, int len)
 	
         IRDA_DEBUG(2, "%s(), ----------------- End ------------------\n", __FUNCTION__ );	
 	return actual;
-}
-
-/*
- * Function ali_ircc_net_init (dev)
- *
- *    Initialize network device
- *
- */
-static int ali_ircc_net_init(struct net_device *dev)
-{
-	IRDA_DEBUG(2, "%s(), ---------------- Start ----------------\n", __FUNCTION__ );
-	
-	/* Keep track of module usage */
-	SET_MODULE_OWNER(dev);
-
-	/* Setup to be a normal IrDA network device driver */
-	irda_device_setup(dev);
-
-	/* Insert overrides below this line! */
-
-	IRDA_DEBUG(2, "%s(), ----------------- End ------------------\n", __FUNCTION__ );	
-	
-	return 0;
 }
 
 /*

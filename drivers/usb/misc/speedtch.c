@@ -21,7 +21,9 @@
  ******************************************************************************/
 
 /*
- *  Written by Johan Verrept, maintained by Duncan Sands (duncan.sands@wanadoo.fr)
+ *  Written by Johan Verrept, maintained by Duncan Sands (duncan.sands@free.fr)
+ *
+ *  1.7+:	- See the check-in logs
  *
  *  1.6:	- No longer opens a connection if the firmware is not loaded
  *  		- Added support for the speedtouch 330
@@ -84,6 +86,11 @@
 
 #include <linux/usb.h>
 
+#ifdef DEBUG
+#define DEBUG_ON(x)	BUG_ON(x)
+#else
+#define DEBUG_ON(x)	do { if (x); } while (0)
+#endif
 
 #ifdef VERBOSE_DEBUG
 static int udsl_print_packet (const unsigned char *data, int len);
@@ -94,9 +101,9 @@ static int udsl_print_packet (const unsigned char *data, int len);
 #define vdbg(arg...)
 #endif
 
-#define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@wanadoo.fr>"
+#define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@free.fr>"
 #define DRIVER_DESC	"Alcatel SpeedTouch USB driver"
-#define DRIVER_VERSION	"1.6"
+#define DRIVER_VERSION	"1.7"
 
 static const char udsl_driver_name [] = "speedtch";
 
@@ -109,10 +116,10 @@ static const char udsl_driver_name [] = "speedtch";
 #define UDSL_MAX_SND_BUFS		8
 #define UDSL_MAX_RCV_BUF_SIZE		1024 /* ATM cells */
 #define UDSL_MAX_SND_BUF_SIZE		1024 /* ATM cells */
-#define UDSL_DEFAULT_RCV_URBS		1
-#define UDSL_DEFAULT_SND_URBS		1
-#define UDSL_DEFAULT_RCV_BUFS		2
-#define UDSL_DEFAULT_SND_BUFS		2
+#define UDSL_DEFAULT_RCV_URBS		2
+#define UDSL_DEFAULT_SND_URBS		2
+#define UDSL_DEFAULT_RCV_BUFS		4
+#define UDSL_DEFAULT_SND_BUFS		4
 #define UDSL_DEFAULT_RCV_BUF_SIZE	64 /* ATM cells */
 #define UDSL_DEFAULT_SND_BUF_SIZE	64 /* ATM cells */
 
@@ -351,7 +358,7 @@ static void udsl_extract_cells (struct udsl_instance_data *instance, unsigned ch
 			dbg ("udsl_extract_cells: buffer overrun (max_pdu: %u, skb->len %u, vcc: 0x%p)", vcc_data->max_pdu, skb->len, vcc);
 			/* discard cells already received */
 			skb_trim (skb, 0);
-			BUG_ON (vcc_data->max_pdu < ATM_CELL_PAYLOAD);
+			DEBUG_ON (vcc_data->max_pdu < ATM_CELL_PAYLOAD);
 		}
 
 		memcpy (skb->tail, source + ATM_CELL_HEADER, ATM_CELL_PAYLOAD);
@@ -498,7 +505,7 @@ static unsigned int udsl_write_cells (unsigned int howmany, struct sk_buff *skb,
 		memset (target, 0, ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER);
 		target += ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER;
 
-		BUG_ON (--ctrl->num_cells);
+		DEBUG_ON (--ctrl->num_cells);
 	}
 
 	memcpy (target, ctrl->aal5_trailer, ATM_AAL5_TRAILER);
@@ -535,7 +542,7 @@ static void udsl_complete_receive (struct urb *urb, struct pt_regs *regs)
 
 	vdbg ("udsl_complete_receive: urb 0x%p, status %d, actual_length %d, filled_cells %u, rcv 0x%p, buf 0x%p", urb, urb->status, urb->actual_length, buf->filled_cells, rcv, buf);
 
-	BUG_ON (buf->filled_cells > rcv_buf_size);
+	DEBUG_ON (buf->filled_cells > rcv_buf_size);
 
 	/* may not be in_interrupt() */
 	spin_lock_irqsave (&instance->receive_lock, flags);
@@ -1216,8 +1223,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 		count = 0;
 		spin_lock_irq (&instance->receive_lock);
 		list_for_each (pos, &instance->spare_receivers)
-			if (++count > num_rcv_urbs)
-				panic (__FILE__ ": memory corruption detected at line %d!\n", __LINE__);
+			DEBUG_ON (++count > num_rcv_urbs);
 		spin_unlock_irq (&instance->receive_lock);
 
 		dbg ("udsl_usb_disconnect: found %u spare receivers", count);
@@ -1253,8 +1259,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 		count = 0;
 		spin_lock_irq (&instance->send_lock);
 		list_for_each (pos, &instance->spare_senders)
-			if (++count > num_snd_urbs)
-				panic (__FILE__ ": memory corruption detected at line %d!\n", __LINE__);
+			DEBUG_ON (++count > num_snd_urbs);
 		spin_unlock_irq (&instance->send_lock);
 
 		dbg ("udsl_usb_disconnect: found %u spare senders", count);

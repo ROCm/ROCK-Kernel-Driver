@@ -101,12 +101,6 @@ extern struct cpuinfo_parisc cpu_data[NR_CPUS];
 
 #define CPU_HVERSION ((boot_cpu_data.hversion >> 4) & 0x0FFF)
 
-#ifdef CONFIG_EISA
-extern int EISA_bus;
-#else
-#define EISA_bus 0
-#endif
-
 #define MCA_bus 0
 #define MCA_bus__is_a_macro /* for versions in ksyms.c */
 

@@ -341,7 +341,7 @@ static void ipaq_read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
-	if (urb->actual_length) {
+	if (tty && urb->actual_length) {
 		for (i = 0; i < urb->actual_length ; ++i) {
 			/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
 			if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
