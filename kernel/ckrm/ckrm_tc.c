@@ -205,7 +205,9 @@ ckrm_set_taskclass(struct task_struct *tsk, ckrm_task_class_t *newcls,
 		if (newcls == (void*) -1) {
 			tsk->taskclass = newcls;
 			ckrm_task_unlock(tsk);
-			goto out;
+			// still need to get out of old class
+			newcls = NULL;
+			goto rc_handling;
 		}
 	}	
 
@@ -224,7 +226,8 @@ ckrm_set_taskclass(struct task_struct *tsk, ckrm_task_class_t *newcls,
 
 	ckrm_task_unlock(tsk);
 
-	clstype = class_isa(newcls);                      // Hubertus .. can hardcode ckrm_CT_taskclass
+ rc_handling:
+	clstype = &CT_taskclass;
 	if (clstype->bit_res_ctlrs) {   // avoid running through the entire list if non is registered
 		for (i = 0; i < clstype->max_resid; i++) {
 			if (clstype->res_ctlrs[i] == NULL) 
