@@ -81,6 +81,7 @@ masquerade_target(struct sk_buff **pskb,
 	enum ip_conntrack_info ctinfo;
 	const struct ip_nat_multi_range *mr;
 	struct ip_nat_multi_range newrange;
+	struct rtable *rt;
 	u_int32_t newsrc;
 
 	IP_NF_ASSERT(hooknum == NF_IP_POST_ROUTING);
@@ -95,7 +96,8 @@ masquerade_target(struct sk_buff **pskb,
 	                    || ctinfo == IP_CT_RELATED + IP_CT_IS_REPLY));
 
 	mr = targinfo;
-	newsrc = inet_select_addr(out, 0, RT_SCOPE_UNIVERSE);
+	rt = (struct rtable *)(*pskb)->dst;
+	newsrc = inet_select_addr(out, rt->rt_gateway, RT_SCOPE_UNIVERSE);
 	if (!newsrc) {
 		printk("MASQUERADE: %s ate my IP address\n", out->name);
 		return NF_DROP;
