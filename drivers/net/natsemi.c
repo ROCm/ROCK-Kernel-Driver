@@ -131,6 +131,7 @@
 		* lengthen EEPROM timeout, and always warn about timeouts
 		  (Manfred Spraul)
 		* comments update (Manfred)
+		* do the right thing on a phy-reset (Manfred and Tim)
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
@@ -683,6 +684,7 @@ static void do_cable_magic(struct net_device *dev);
 static void undo_cable_magic(struct net_device *dev);
 static void check_link(struct net_device *dev);
 static void netdev_timer(unsigned long data);
+static void dump_ring(struct net_device *dev);
 static void tx_timeout(struct net_device *dev);
 static int alloc_ring(struct net_device *dev);
 static void refill_rx(struct net_device *dev);
@@ -1355,6 +1357,9 @@ static void netdev_timer(unsigned long data)
 					"re-initializing\n", dev->name);
 			disable_irq(dev->irq);
 			spin_lock_irq(&np->lock);
+			natsemi_stop_rxtx(dev);
+			dump_ring(dev);
+			reinit_ring(dev);
 			init_registers(dev);
 			spin_unlock_irq(&np->lock);
 			enable_irq(dev->irq);
