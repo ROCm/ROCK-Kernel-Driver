@@ -127,6 +127,7 @@ struct acpi_processor {
 	acpi_handle		handle;
 	u32			acpi_id;
 	u32			id;
+	u32			pblk;
 	int			performance_platform_limit;
 	struct acpi_processor_flags flags;
 	struct acpi_processor_power power;

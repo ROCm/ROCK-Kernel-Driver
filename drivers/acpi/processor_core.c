@@ -514,10 +514,8 @@ acpi_processor_get_info (
 		pr->throttling.address = object.processor.pblk_address;
 		pr->throttling.duty_offset = acpi_fadt.duty_offset;
 		pr->throttling.duty_width = acpi_fadt.duty_width;
-		pr->power.states[ACPI_STATE_C2].address =
-			object.processor.pblk_address + 4;
-		pr->power.states[ACPI_STATE_C3].address =
-			object.processor.pblk_address + 5;
+
+		pr->pblk = object.processor.pblk_address;
 
 		/*
 		 * We don't care about error returns - we just try to mark

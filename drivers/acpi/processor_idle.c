@@ -423,142 +423,184 @@ acpi_processor_set_power_policy (
 }
 
 
-int acpi_processor_get_power_info (
-	struct acpi_processor	*pr)
+static int acpi_processor_get_power_info_fadt (struct acpi_processor *pr)
 {
-	int			result = 0;
-
-	ACPI_FUNCTION_TRACE("acpi_processor_get_power_info");
+	ACPI_FUNCTION_TRACE("acpi_processor_get_power_info_fadt");
 
 	if (!pr)
 		return_VALUE(-EINVAL);
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-		"lvl2[0x%08x] lvl3[0x%08x]\n",
-		pr->power.states[ACPI_STATE_C2].address,
-		pr->power.states[ACPI_STATE_C3].address));
+	if (!pr->pblk)
+		return_VALUE(-ENODEV);
 
-	/* TBD: Support ACPI 2.0 objects */
-
-	/*
-	 * C0
-	 * --
-	 * This state exists only as filler in our array.
-	 */
-	pr->power.states[ACPI_STATE_C0].valid = 1;
-
-	/*
-	 * C1
-	 * --
-	 * ACPI requires C1 support for all processors.
-	 *
-	 * TBD: What about PROC_C1?
-	 */
-	pr->power.states[ACPI_STATE_C1].valid = 1;
+	/* if info is obtained from pblk/fadt, type equals state */
 	pr->power.states[ACPI_STATE_C1].type = ACPI_STATE_C1;
+	pr->power.states[ACPI_STATE_C2].type = ACPI_STATE_C2;
+	pr->power.states[ACPI_STATE_C3].type = ACPI_STATE_C3;
+
+	/* the C0 state only exists as a filler in our array,
+	 * and all processors need to support C1 */
+	pr->power.states[ACPI_STATE_C0].valid = 1;
+	pr->power.states[ACPI_STATE_C1].valid = 1;
+
+	/* determine C2 and C3 address from pblk */
+	pr->power.states[ACPI_STATE_C2].address = pr->pblk + 4;
+	pr->power.states[ACPI_STATE_C3].address = pr->pblk + 5;
+
+	/* determine latencies from FADT */
+	pr->power.states[ACPI_STATE_C2].latency = acpi_fadt.plvl2_lat;
+	pr->power.states[ACPI_STATE_C3].latency = acpi_fadt.plvl3_lat;
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+			  "lvl2[0x%08x] lvl3[0x%08x]\n",
+			  pr->power.states[ACPI_STATE_C2].address,
+			  pr->power.states[ACPI_STATE_C3].address));
+
+	return_VALUE(0);
+}
+
+
+static void acpi_processor_power_verify_c2(struct acpi_processor_cx *cx)
+{
+	ACPI_FUNCTION_TRACE("acpi_processor_get_power_verify_c2");
+
+	if (!cx->address)
+		return_VOID;
 
 	/*
-	 * C2
-	 * --
-	 * We're (currently) only supporting C2 on UP systems.
-	 *
-	 * TBD: Support for C2 on MP (P_LVL2_UP).
+	 * C2 latency must be less than or equal to 100
+	 * microseconds.
 	 */
-	if (pr->power.states[ACPI_STATE_C2].address) {
+	else if (cx->latency > ACPI_PROCESSOR_MAX_C2_LATENCY) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+				  "latency too large [%d]\n",
+				  cx->latency));
+		return_VOID;
+	}
 
-		pr->power.states[ACPI_STATE_C2].latency = acpi_fadt.plvl2_lat;
-
-		/*
-		 * C2 latency must be less than or equal to 100 microseconds.
-		 */
-		if (acpi_fadt.plvl2_lat > ACPI_PROCESSOR_MAX_C2_LATENCY)
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-				"C2 latency too large [%d]\n",
-				acpi_fadt.plvl2_lat));
-		/*
-		 * Only support C2 on UP systems (see TBD above).
-		 */
-		else if (errata.smp)
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-				"C2 not supported in SMP mode\n"));
-
-
-		/*
-		 * Otherwise we've met all of our C2 requirements.
-		 * Normalize the C2 latency to expidite policy.
-		 */
-		else {
-			pr->power.states[ACPI_STATE_C2].valid = 1;
-			pr->power.states[ACPI_STATE_C2].type = ACPI_STATE_C2;
-			pr->power.states[ACPI_STATE_C2].latency_ticks =
-				US_TO_PM_TIMER_TICKS(acpi_fadt.plvl2_lat);
-		}
+	/* We're (currently) only supporting C2 on UP */
+	else if (errata.smp) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+				  "C2 not supported in SMP mode\n"));
+		return_VOID;
 	}
 
 	/*
-	 * C3
-	 * --
-	 * TBD: Investigate use of WBINVD on UP/SMP system in absence of
-	 *	bm_control.
+	 * Otherwise we've met all of our C2 requirements.
+	 * Normalize the C2 latency to expidite policy
 	 */
-	if (pr->power.states[ACPI_STATE_C3].address) {
+	cx->valid = 1;
+	cx->latency_ticks = US_TO_PM_TIMER_TICKS(cx->latency);
 
-		pr->power.states[ACPI_STATE_C3].latency = acpi_fadt.plvl3_lat;
+	return_VOID;
+}
 
-		/*
-		 * C3 latency must be less than or equal to 1000 microseconds.
-		 */
-		if (acpi_fadt.plvl3_lat > ACPI_PROCESSOR_MAX_C3_LATENCY)
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-				"C3 latency too large [%d]\n",
-				acpi_fadt.plvl3_lat));
-		/*
-		 * Only support C3 when bus mastering arbitration control
-		 * is present (able to disable bus mastering to maintain
-		 * cache coherency while in C3).
-		 */
-		else if (!pr->flags.bm_control)
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-				"C3 support requires bus mastering control\n"));
-		/*
-		 * Only support C3 on UP systems, as bm_control is only viable
-		 * on a UP system and flushing caches (e.g. WBINVD) is simply
-		 * too costly (at this time).
-		 */
-		else if (errata.smp)
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-				"C3 not supported in SMP mode\n"));
-		/*
-		 * PIIX4 Erratum #18: We don't support C3 when Type-F (fast)
-		 * DMA transfers are used by any ISA device to avoid livelock.
-		 * Note that we could disable Type-F DMA (as recommended by
-		 * the erratum), but this is known to disrupt certain ISA
-		 * devices thus we take the conservative approach.
-		 */
-		else if (errata.piix4.fdma) {
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-				"C3 not supported on PIIX4 with Type-F DMA\n"));
-		}
 
-		/*
-		 * Otherwise we've met all of our C3 requirements.
-		 * Normalize the C2 latency to expidite policy.  Enable
-		 * checking of bus mastering status (bm_check) so we can
-		 * use this in our C3 policy.
-		 */
-		else {
-			pr->power.states[ACPI_STATE_C3].valid = 1;
-			pr->power.states[ACPI_STATE_C3].type = ACPI_STATE_C3;
-			pr->power.states[ACPI_STATE_C3].latency_ticks =
-				US_TO_PM_TIMER_TICKS(acpi_fadt.plvl3_lat);
-			pr->flags.bm_check = 1;
+static void acpi_processor_power_verify_c3(
+	struct acpi_processor *pr,
+	struct acpi_processor_cx *cx)
+{
+	ACPI_FUNCTION_TRACE("acpi_processor_get_power_verify_c3");
+
+	if (!cx->address)
+		return_VOID;
+
+	/*
+	 * C3 latency must be less than or equal to 1000
+	 * microseconds.
+	 */
+	else if (cx->latency > ACPI_PROCESSOR_MAX_C3_LATENCY) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+				  "latency too large [%d]\n",
+				  cx->latency));
+		return_VOID;
+	}
+
+	/* bus mastering control is necessary */
+	else if (!pr->flags.bm_control) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+				  "C3 support requires bus mastering control\n"));
+		return_VOID;
+	}
+
+	/* We're (currently) only supporting C2 on UP */
+	else if (errata.smp) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+				  "C3 not supported in SMP mode\n"));
+		return_VOID;
+	}
+
+	/*
+	 * PIIX4 Erratum #18: We don't support C3 when Type-F (fast)
+	 * DMA transfers are used by any ISA device to avoid livelock.
+	 * Note that we could disable Type-F DMA (as recommended by
+	 * the erratum), but this is known to disrupt certain ISA
+	 * devices thus we take the conservative approach.
+	 */
+	else if (errata.piix4.fdma) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+			"C3 not supported on PIIX4 with Type-F DMA\n"));
+		return_VOID;
+	}
+
+	/*
+	 * Otherwise we've met all of our C3 requirements.
+	 * Normalize the C3 latency to expidite policy.  Enable
+	 * checking of bus mastering status (bm_check) so we can
+	 * use this in our C3 policy
+	 */
+	cx->valid = 1;
+	cx->latency_ticks = US_TO_PM_TIMER_TICKS(cx->latency);
+	pr->flags.bm_check = 1;
+
+	return_VOID;
+}
+
+
+static int acpi_processor_power_verify(struct acpi_processor *pr)
+{
+	unsigned int i;
+	for (i=1; i < ACPI_PROCESSOR_MAX_POWER; i++) {
+		struct acpi_processor_cx *cx = &pr->power.states[i];
+
+		switch (cx->type) {
+
+		case ACPI_STATE_C2:
+			acpi_processor_power_verify_c2(cx);
+			break;
+
+		case ACPI_STATE_C3:
+			acpi_processor_power_verify_c3(pr, cx);
+			break;
 		}
 	}
+
+	return 0;
+}
+
+int acpi_processor_get_power_info (
+	struct acpi_processor	*pr)
+{
+	unsigned int i;
+	int result;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_get_power_info");
+
+	/* NOTE: the idle thread may not be running while calling
+	 * this function */
+
+	for (i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++)
+		memset(pr->power.states, 0, sizeof(struct acpi_processor_cx));
+
+	acpi_processor_get_power_info_fadt(pr);
+
+	acpi_processor_power_verify(pr);
+
 
 	/*
 	 * Set Default Policy
 	 * ------------------
-	 * Now that we know which state are supported, set the default
+	 * Now that we know which states are supported, set the default
 	 * policy.  Note that this policy can be changed dynamically
 	 * (e.g. encourage deeper sleeps to conserve battery life when
 	 * not on AC).
@@ -568,13 +610,15 @@ int acpi_processor_get_power_info (
 		return_VALUE(result);
 
 	/*
-	 * If this processor supports C2 or C3 we denote it as being 'power
-	 * manageable'.  Note that there's really no policy involved for
-	 * when only C1 is supported.
+	 * if one state of type C2 or C3 is available, mark this
+	 * CPU as being "idle manageable"
 	 */
-	if (pr->power.states[ACPI_STATE_C2].valid
-		|| pr->power.states[ACPI_STATE_C3].valid)
-		pr->flags.power = 1;
+
+	for (i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++) {
+		if ((pr->power.states[i].valid) &&
+		    (pr->power.states[i].type >= ACPI_STATE_C2))
+			pr->flags.power = 1;
+	}
 
 	return_VALUE(0);
 }
