@@ -498,7 +498,9 @@ else
 CFLAGS		+= -O2
 endif
 
-ifndef CONFIG_FRAME_POINTER
+ifdef CONFIG_FRAME_POINTER
+CFLAGS		+= -fno-omit-frame-pointer
+else
 CFLAGS		+= -fomit-frame-pointer
 endif
 
