@@ -66,7 +66,7 @@ static int atmtcp_send_control(struct atm_vcc *vcc,int type,
 	*(struct atm_vcc **) &new_msg->vcc = vcc;
 	old_test = test_bit(flag,&vcc->flags);
 	out_vcc->push(out_vcc,skb);
-	add_wait_queue(&vcc->sleep,&wait);
+	add_wait_queue(vcc->sk->sk_sleep, &wait);
 	while (test_bit(flag,&vcc->flags) == old_test) {
 		mb();
 		out_vcc = PRIV(vcc->dev) ? PRIV(vcc->dev)->vcc : NULL;
@@ -78,7 +78,7 @@ static int atmtcp_send_control(struct atm_vcc *vcc,int type,
 		schedule();
 	}
 	current->state = TASK_RUNNING;
-	remove_wait_queue(&vcc->sleep,&wait);
+	remove_wait_queue(vcc->sk->sk_sleep, &wait);
 	return error;
 }
 
@@ -90,7 +90,7 @@ static int atmtcp_recv_control(const struct atmtcp_control *msg)
 	vcc->vpi = msg->addr.sap_addr.vpi;
 	vcc->vci = msg->addr.sap_addr.vci;
 	vcc->qos = msg->qos;
-	vcc->reply = msg->result;
+	vcc->sk->sk_err = -msg->result;
 	switch (msg->type) {
 	    case ATMTCP_CTRL_OPEN:
 		change_bit(ATM_VF_READY,&vcc->flags);
@@ -103,7 +103,7 @@ static int atmtcp_recv_control(const struct atmtcp_control *msg)
 		    msg->type);
 		return -EINVAL;
 	}
-	wake_up(&vcc->sleep);
+	wake_up(vcc->sk->sk_sleep);
 	return 0;
 }
 
@@ -134,7 +134,7 @@ static int atmtcp_v_open(struct atm_vcc *vcc,short vpi,int vci)
 	clear_bit(ATM_VF_READY,&vcc->flags); /* just in case ... */
 	error = atmtcp_send_control(vcc,ATMTCP_CTRL_OPEN,&msg,ATM_VF_READY);
 	if (error) return error;
-	return vcc->reply;
+	return -vcc->sk->sk_err;
 }
 
 
@@ -257,7 +257,7 @@ static void atmtcp_c_close(struct atm_vcc *vcc)
 		walk = atm_sk(s);
 		if (walk->dev != atmtcp_dev)
 			continue;
-		wake_up(&walk->sleep);
+		wake_up(walk->sk->sk_sleep);
 	}
 	read_unlock(&vcc_sklist_lock);
 }

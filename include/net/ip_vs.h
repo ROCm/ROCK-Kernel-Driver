@@ -887,7 +887,6 @@ extern int sysctl_ip_vs_cache_bypass;
 extern int sysctl_ip_vs_expire_nodest_conn;
 extern int sysctl_ip_vs_sync_threshold[2];
 extern int sysctl_ip_vs_nat_icmp_send;
-extern atomic_t ip_vs_dropentry;
 extern struct ip_vs_stats ip_vs_stats;
 
 extern struct ip_vs_service *
@@ -902,7 +901,6 @@ extern struct ip_vs_dest *
 ip_vs_lookup_real_service(__u16 protocol, __u32 daddr, __u16 dport);
 extern int ip_vs_use_count_inc(void);
 extern void ip_vs_use_count_dec(void);
-extern void update_defense_level(void);
 extern int ip_vs_control_init(void);
 extern void ip_vs_control_cleanup(void);
 

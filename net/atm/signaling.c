@@ -61,7 +61,7 @@ static void sigd_put_skb(struct sk_buff *skb)
 #endif
 	atm_force_charge(sigd,skb->truesize);
 	skb_queue_tail(&sigd->sk->sk_receive_queue,skb);
-	wake_up(&sigd->sleep);
+	sigd->sk->sk_data_ready(sigd->sk, skb->len);
 }
 
 
@@ -103,7 +103,8 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 	vcc = *(struct atm_vcc **) &msg->vcc;
 	switch (msg->type) {
 		case as_okay:
-			vcc->reply = msg->reply;
+			vcc->sk->sk_err = -msg->reply;
+			clear_bit(ATM_VF_WAITING, &vcc->flags);
 			if (!*vcc->local.sas_addr.prv &&
 			    !*vcc->local.sas_addr.pub) {
 				vcc->local.sas_family = AF_ATMSVC;
@@ -123,8 +124,8 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 		case as_error:
 			clear_bit(ATM_VF_REGIS,&vcc->flags);
 			clear_bit(ATM_VF_READY,&vcc->flags);
-			vcc->reply = msg->reply;
 			vcc->sk->sk_err = -msg->reply;
+			clear_bit(ATM_VF_WAITING, &vcc->flags);
 			break;
 		case as_indicate:
 			vcc = *(struct atm_vcc **) &msg->listen_vcc;
@@ -137,19 +138,16 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 			}
 			vcc->sk->sk_ack_backlog++;
 			skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-			if (vcc->callback) {
-				DPRINTK("waking vcc->sleep 0x%p\n",
-				    &vcc->sleep);
-				vcc->callback(vcc);
-			}
+			DPRINTK("waking vcc->sk->sk_sleep 0x%p\n", vcc->sk->sk_sleep);
+			vcc->sk->sk_state_change(vcc->sk);
 as_indicate_complete:
 			release_sock(vcc->sk);
 			return 0;
 		case as_close:
 			set_bit(ATM_VF_RELEASED,&vcc->flags);
 			clear_bit(ATM_VF_READY,&vcc->flags);
-			vcc->reply = msg->reply;
 			vcc->sk->sk_err = -msg->reply;
+			clear_bit(ATM_VF_WAITING, &vcc->flags);
 			break;
 		case as_modify:
 			modify_qos(vcc,msg);
@@ -159,7 +157,7 @@ as_indicate_complete:
 			    (int) msg->type);
 			return -EINVAL;
 	}
-	if (vcc->callback) vcc->callback(vcc);
+	vcc->sk->sk_state_change(vcc->sk);
 	dev_kfree_skb(skb);
 	return 0;
 }
@@ -205,9 +203,9 @@ static void purge_vcc(struct atm_vcc *vcc)
 	if (vcc->sk->sk_family == PF_ATMSVC &&
 	    !test_bit(ATM_VF_META,&vcc->flags)) {
 		set_bit(ATM_VF_RELEASED,&vcc->flags);
-		vcc->reply = -EUNATCH;
 		vcc->sk->sk_err = EUNATCH;
-		wake_up(&vcc->sleep);
+		clear_bit(ATM_VF_WAITING, &vcc->flags);
+		vcc->sk->sk_state_change(vcc->sk);
 	}
 }
 

@@ -178,7 +178,7 @@ static struct notifier_block *netdev_chain;
  *	Device drivers call our routines to queue packets here. We empty the
  *	queue in the local softnet handler.
  */
-struct softnet_data softnet_data[NR_CPUS] __cacheline_aligned;
+DEFINE_PER_CPU(struct softnet_data, softnet_data) = { 0, };
 
 #ifdef CONFIG_NET_FASTROUTE
 int netdev_fastroute;
@@ -1280,34 +1280,35 @@ static void get_sample_stats(int cpu)
 	unsigned long rd;
 	int rq;
 #endif
-	int blog = softnet_data[cpu].input_pkt_queue.qlen;
-	int avg_blog = softnet_data[cpu].avg_blog;
+	struct softnet_data *sd = &per_cpu(softnet_data, cpu);
+	int blog = sd->input_pkt_queue.qlen;
+	int avg_blog = sd->avg_blog;
 
 	avg_blog = (avg_blog >> 1) + (blog >> 1);
 
 	if (avg_blog > mod_cong) {
 		/* Above moderate congestion levels. */
-		softnet_data[cpu].cng_level = NET_RX_CN_HIGH;
+		sd->cng_level = NET_RX_CN_HIGH;
 #ifdef RAND_LIE
 		rd = net_random();
 		rq = rd % netdev_max_backlog;
 		if (rq < avg_blog) /* unlucky bastard */
-			softnet_data[cpu].cng_level = NET_RX_DROP;
+			sd->cng_level = NET_RX_DROP;
 #endif
 	} else if (avg_blog > lo_cong) {
-		softnet_data[cpu].cng_level = NET_RX_CN_MOD;
+		sd->cng_level = NET_RX_CN_MOD;
 #ifdef RAND_LIE
 		rd = net_random();
 		rq = rd % netdev_max_backlog;
 			if (rq < avg_blog) /* unlucky bastard */
-				softnet_data[cpu].cng_level = NET_RX_CN_HIGH;
+				sd->cng_level = NET_RX_CN_HIGH;
 #endif
 	} else if (avg_blog > no_cong)
-		softnet_data[cpu].cng_level = NET_RX_CN_LOW;
+		sd->cng_level = NET_RX_CN_LOW;
 	else  /* no congestion */
-		softnet_data[cpu].cng_level = NET_RX_SUCCESS;
+		sd->cng_level = NET_RX_SUCCESS;
 
-	softnet_data[cpu].avg_blog = avg_blog;
+	sd->avg_blog = avg_blog;
 }
 
 #ifdef OFFLINE_SAMPLE
@@ -1357,7 +1358,7 @@ int netif_rx(struct sk_buff *skb)
 	 */
 	local_irq_save(flags);
 	this_cpu = smp_processor_id();
-	queue = &softnet_data[this_cpu];
+	queue = &__get_cpu_var(softnet_data);
 
 	netdev_rx_stat[this_cpu].total++;
 	if (queue->input_pkt_queue.qlen <= netdev_max_backlog) {
@@ -1445,14 +1446,14 @@ static __inline__ void skb_bond(struct sk_buff *skb)
 
 static void net_tx_action(struct softirq_action *h)
 {
-	int cpu = smp_processor_id();
+	struct softnet_data *sd = &__get_cpu_var(softnet_data);
 
-	if (softnet_data[cpu].completion_queue) {
+	if (sd->completion_queue) {
 		struct sk_buff *clist;
 
 		local_irq_disable();
-		clist = softnet_data[cpu].completion_queue;
-		softnet_data[cpu].completion_queue = NULL;
+		clist = sd->completion_queue;
+		sd->completion_queue = NULL;
 		local_irq_enable();
 
 		while (clist) {
@@ -1464,12 +1465,12 @@ static void net_tx_action(struct softirq_action *h)
 		}
 	}
 
-	if (softnet_data[cpu].output_queue) {
+	if (sd->output_queue) {
 		struct net_device *head;
 
 		local_irq_disable();
-		head = softnet_data[cpu].output_queue;
-		softnet_data[cpu].output_queue = NULL;
+		head = sd->output_queue;
+		sd->output_queue = NULL;
 		local_irq_enable();
 
 		while (head) {
@@ -1611,8 +1612,7 @@ static int process_backlog(struct net_device *backlog_dev, int *budget)
 {
 	int work = 0;
 	int quota = min(backlog_dev->quota, *budget);
-	int this_cpu = smp_processor_id();
-	struct softnet_data *queue = &softnet_data[this_cpu];
+	struct softnet_data *queue = &__get_cpu_var(softnet_data);
 	unsigned long start_time = jiffies;
 
 	for (;;) {
@@ -1673,7 +1673,7 @@ job_done:
 static void net_rx_action(struct softirq_action *h)
 {
 	int this_cpu = smp_processor_id();
-	struct softnet_data *queue = &softnet_data[this_cpu];
+	struct softnet_data *queue = &__get_cpu_var(softnet_data);
 	unsigned long start_time = jiffies;
 	int budget = netdev_max_backlog;
 
@@ -2979,7 +2979,7 @@ static int __init net_dev_init(void)
 	for (i = 0; i < NR_CPUS; i++) {
 		struct softnet_data *queue;
 
-		queue = &softnet_data[i];
+		queue = &per_cpu(softnet_data, i);
 		skb_queue_head_init(&queue->input_pkt_queue);
 		queue->throttle = 0;
 		queue->cng_level = 0;
