@@ -294,9 +294,6 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 		 * to current session. */
 		xfrm_init_tempsel(x, fl, tmpl, daddr, saddr, family);
 
-		memcpy(&x->sel.daddr, fl->fl6_dst, sizeof(struct in6_addr));
-		memcpy(&x->sel.saddr, fl->fl6_src, sizeof(struct in6_addr));
-
 		if (km_query(x, tmpl, pol) == 0) {
 			x->km.state = XFRM_STATE_ACQ;
 			list_add_tail(&x->bydst, xfrm_state_bydst+h);
