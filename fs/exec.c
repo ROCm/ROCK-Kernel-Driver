@@ -819,8 +819,7 @@ int prepare_binprm(struct linux_binprm *bprm)
 	}
 
 	/* fill in binprm security blob */
-	retval = security_ops->bprm_set_security(bprm);
-	if (retval)
+	if ((retval = security_bprm_set(bprm)))
 		return retval;
 
 	memset(bprm->buf,0,BINPRM_BUF_SIZE);
@@ -868,7 +867,7 @@ void compute_creds(struct linux_binprm *bprm)
 	if(do_unlock)
 		unlock_kernel();
 
-	security_ops->bprm_compute_creds(bprm);
+	security_bprm_compute_creds(bprm);
 }
 
 void remove_arg_zero(struct linux_binprm *bprm)
@@ -937,8 +936,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 	    }
 	}
 #endif
-	retval = security_ops->bprm_check_security(bprm);
-	if (retval) 
+	if ((retval = security_bprm_check(bprm)))
 		return retval;
 
 	/* kernel module loader fixup */
@@ -1034,8 +1032,7 @@ int do_execve(char * filename, char ** argv, char ** envp, struct pt_regs * regs
 	if ((retval = bprm.envc) < 0)
 		goto out_mm;
 
-	retval = security_ops->bprm_alloc_security(&bprm);
-	if (retval) 
+	if ((retval = security_bprm_alloc(&bprm)))
 		goto out;
 
 	retval = prepare_binprm(&bprm);
@@ -1058,7 +1055,7 @@ int do_execve(char * filename, char ** argv, char ** envp, struct pt_regs * regs
 	retval = search_binary_handler(&bprm,regs);
 	if (retval >= 0) {
 		/* execve success */
-		security_ops->bprm_free_security(&bprm);
+		security_bprm_free(&bprm);
 		return retval;
 	}
 
@@ -1071,7 +1068,7 @@ out:
 	}
 
 	if (bprm.security)
-		security_ops->bprm_free_security(&bprm);
+		security_bprm_free(&bprm);
 
 out_mm:
 	mmdrop(bprm.mm);
