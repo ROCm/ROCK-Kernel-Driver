@@ -112,21 +112,13 @@ int llc_conn_ac_conn_confirm(struct sock *sk, struct sk_buff *skb)
 static int llc_conn_ac_data_confirm(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-	struct llc_sap *sap = llc->sap;
-	struct llc_prim_if_block *prim = &sap->llc_cfm_prim;
-	union llc_u_prim_data *prim_data = prim->data;
 
-	prim_data->data.sk     = sk;
-	prim_data->data.pri    = 0;
-	prim_data->data.link   = llc->link;
-	prim_data->data.status = LLC_STATUS_RECEIVED;
-	prim_data->data.skb    = NULL;
-	prim->data	       = prim_data;
-	prim->prim	       = LLC_DATA_PRIM;
-	prim->sap	       = sap;
-	ev->flag	       = 1;
-	ev->cfm_prim	       = prim;
+	/*
+	 * FIXME: find better way to tell upper layer that the packet was
+	 * confirmed by the other endpoint
+	 */
+	ev->flag     = LLC_DATA_PRIM + 1;
+	ev->cfm_prim = (void *)1;
 	return 0;
 }
 

@@ -97,14 +97,6 @@ struct llc_prim_flow_ctrl {
 	u32	     amount;
 };
 
-struct llc_prim_data {
-	struct sock    *sk;
-	u16		link;
-	u8		pri;
-	struct sk_buff *skb;		/* pointer to frame */
-	u8	 	status;		/* reason */
-};
-
  /* Sending data in conection-less mode */
 struct llc_prim_unit_data {
 	struct llc_addr	saddr;
@@ -133,7 +125,6 @@ union llc_u_prim_data {
 	struct llc_prim_disc	  disc;
 	struct llc_prim_reset	  res;
 	struct llc_prim_flow_ctrl fc;
-	struct llc_prim_data	  data;		/* data */
 	struct llc_prim_unit_data udata;	/* unit data */
 	struct llc_prim_xid	  xid;
 	struct llc_prim_test	  test;

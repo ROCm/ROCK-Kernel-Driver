@@ -58,7 +58,13 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	struct llc_prim_if_block *ind_prim = ev->ind_prim;
 	struct llc_prim_if_block *cfm_prim = ev->cfm_prim;
 
-	llc_conn_free_ev(skb);
+	/*
+	 * FIXME: this will vanish as soon I get rid of the double sock crap
+	 */
+	if (flag != LLC_DATA_PRIM + 1)
+		llc_conn_free_ev(skb);
+	else if (ind_prim && cfm_prim)
+		skb_get(skb);
 #ifdef THIS_BREAKS_DISCONNECT_NOTIFICATION_BADLY
 	/* check if the connection was freed by the state machine by
 	 * means of llc_conn_disc */
@@ -71,25 +77,41 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	if (!flag)   /* indicate or confirm not required */
 		goto out;
 	rc = 0;
-	if (ind_prim) /* indication required */
-		llc->sap->ind(ind_prim);
+	if (ind_prim) { /* indication required */
+		/*
+		 * FIXME: this will be saner as soon I get rid of the double
+		 *	  sock crap
+		 */
+		if (flag == LLC_DATA_PRIM + 1) {
+			struct sock *upper = llc_sk(skb->sk)->handler;
+
+			skb->sk = upper;
+			if (sock_queue_rcv_skb(upper, skb)) {
+				printk(KERN_ERR
+				       "%s: sock_queue_rcv_skb failed!\n",
+				       __FUNCTION__);
+				kfree_skb(skb);
+			}
+		} else
+			llc->sap->ind(ind_prim);
+	}
 	if (!cfm_prim)  /* confirmation not required */
 		goto out;
 	/* data confirm has preconditions */
-	if (cfm_prim->prim != LLC_DATA_PRIM) {
+	/* FIXME: see FIXMEs above */
+	if (flag != LLC_DATA_PRIM + 1) {
 		llc->sap->conf(cfm_prim);
 		goto out;
 	}
 	if (!llc_data_accept_state(llc->state)) {
 		/* In this state, we can send I pdu */
-		/* FIXME: check if we don't need to see if sk->lock.users != 0
-		 * is needed here
-		 */
-		rc = llc->sap->conf(cfm_prim);
-		if (rc) /* confirmation didn't accept by upper layer */
-			llc->failed_data_req = 1;
+		struct sock* upper = llc_sk(skb->sk)->handler;
+
+		if (upper)
+			wake_up(upper->sleep);
 	} else
-		llc->failed_data_req = 1;
+		rc = llc->failed_data_req = 1;
+	kfree_skb(skb);
 out:
 	return rc;
 }
@@ -114,24 +136,10 @@ void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb)
 void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-	struct llc_sap *sap = llc->sap;
-	struct llc_prim_if_block *prim = &sap->llc_ind_prim;
-	union llc_u_prim_data *prim_data = prim->data;
 
-	prim_data->data.sk   = sk;
-	prim_data->data.pri  = 0;
-	prim_data->data.skb  = skb;
-	prim_data->data.link = llc->link;
-	prim->data	     = prim_data;
-	prim->prim	     = LLC_DATA_PRIM;
-	prim->sap	     = sap;
-	ev->flag	     = 1;
-	/*
-	 * Saving prepd prim in event for future use in
-	 * llc_conn_state_process
-	 */
-	ev->ind_prim	     = prim;
+	/* FIXME: indicate that we should send this to the upper layer */
+	ev->flag     = LLC_DATA_PRIM + 1;
+	ev->ind_prim = (void *)1;
 }
 
 /**

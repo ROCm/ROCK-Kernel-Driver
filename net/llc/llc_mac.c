@@ -133,6 +133,7 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 			llc_sap_assign_sock(sap, sk);
 			sock_hold(sk);
 		}
+		skb->sk = sk;
 		bh_lock_sock(sk);
 		if (!sk->lock.users)
 			rc = llc_pdu_router(llc_sk(sk)->sap, sk, skb,

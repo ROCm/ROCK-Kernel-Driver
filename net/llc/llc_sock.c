@@ -1424,44 +1424,6 @@ out:;
 }
 
 /**
- *	llc_ui_ind_data - handle DATA indication
- *	@prim: Primitive block provided by the llc layer.
- *
- *	handle CONNECT indication.
- */
-static void llc_ui_ind_data(struct llc_prim_if_block *prim)
-{
-	struct llc_prim_data *prim_data = &prim->data->data;
-	struct sk_buff *skb = prim_data->skb;
-	struct sockaddr_llc *llc_ui = llc_ui_skb_cb(skb);
-	struct sock* sk = llc_sk(prim_data->sk)->handler;
-
-	if (!sk)
-		goto out;
-	sock_hold(sk);
-	if (sk->type != SOCK_STREAM || sk->state != TCP_ESTABLISHED)
-		goto out_put;
-	/* save primitive for use by the user. */
-	llc_ui->sllc_family = AF_LLC;
-	llc_ui->sllc_arphrd = skb->dev->type;
-	llc_ui->sllc_test   = 0;
-	llc_ui->sllc_xid    = 0;
-	llc_ui->sllc_ua     = 0;
-	llc_ui->sllc_dsap   = llc_ui_sk(sk)->sap->laddr.lsap;
-	memcpy(llc_ui->sllc_dmac, llc_sk(prim_data->sk)->laddr.mac,
-	       IFHWADDRLEN);
-	llc_ui->sllc_ssap = llc_sk(prim_data->sk)->daddr.lsap;
-	memcpy(llc_ui->sllc_smac, llc_sk(prim_data->sk)->daddr.mac,
-	       IFHWADDRLEN);
-	/* queue skb to the user. */
-	if (sock_queue_rcv_skb(sk, skb))
-		kfree_skb(skb);
-out_put:
-	sock_put(sk);
-out:;
-}
-
-/**
  *	llc_ui_ind_disc - handle DISC indication
  *	@prim: Primitive block provided by the llc layer.
  *
@@ -1510,7 +1472,9 @@ static int llc_ui_indicate(struct llc_prim_if_block *prim)
 		case LLC_CONN_PRIM:
 			llc_ui_ind_conn(prim);		break;
 		case LLC_DATA_PRIM:
-			llc_ui_ind_data(prim);		break;
+			printk(KERN_ERR "%s: shouldn't happen, LLC_DATA_PRIM "
+					"is gone for ->ind()...\n", __FUNCTION__);
+			break;
 		case LLC_DISC_PRIM:
 			llc_ui_ind_disc(prim);		break;
 		case LLC_RESET_PRIM:
@@ -1554,21 +1518,6 @@ out:;
 }
 
 /**
- *	llc_ui_conf_data - handle DATA confirm.
- *	@prim: Primitive block provided by the llc layer.
- *
- *	handle DATA confirm.
- */
-static void llc_ui_conf_data(struct llc_prim_if_block *prim)
-{
-	struct llc_prim_data *prim_data = &prim->data->data;
-	struct sock* sk = llc_sk(prim_data->sk)->handler;
-
-	if (sk)
-		wake_up(sk->sleep);
-}
-
-/**
  *	llc_ui_conf_disc - handle DISC confirm.
  *	@prim: Primitive block provided by the llc layer.
  *
@@ -1607,7 +1556,9 @@ static int llc_ui_confirm(struct llc_prim_if_block *prim)
 		case LLC_CONN_PRIM:
 			llc_ui_conf_conn(prim);		break;
 		case LLC_DATA_PRIM:
-			llc_ui_conf_data(prim);		break;
+			printk(KERN_ERR "%s: shouldn't happen, LLC_DATA_PRIM "
+					"is gone for ->conf()...\n", __FUNCTION__);
+			break;
 		case LLC_DISC_PRIM:
 			llc_ui_conf_disc(prim);		break;
 		case LLC_RESET_PRIM:			break;
