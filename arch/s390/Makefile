@@ -13,14 +13,28 @@
 # Copyright (C) 1994 by Linus Torvalds
 #
 
+ifdef CONFIG_ARCH_S390_31
 LDFLAGS		:= -m elf_s390
+LDFLAGS_BLOB	:= --format binary --oformat elf32-s390
+CFLAGS		+= -m31
+UTS_MACHINE	:= s390
+endif
+
+ifdef CONFIG_ARCH_S390X
+LDFLAGS		:= -m elf64_s390
+MODFLAGS	+= -fpic -D__PIC__
+LDFLAGS_BLOB	:= --format binary --oformat elf64-s390
+CFLAGS		+= -m64
+UTS_MACHINE	:= s390x
+endif
+
 OBJCOPYFLAGS	:= -O binary
 LDFLAGS_vmlinux := -e start
-LDFLAGS_BLOB	:= --format binary --oformat elf32-s390
+CFLAGS 		+= -pipe -fno-strength-reduce -finline-limit-10000 -Wno-sign-compare 
 
-CFLAGS += -pipe -fno-strength-reduce -finline-limit=10000 -Wno-sign-compare
-
-head-y := arch/$(ARCH)/kernel/head.o arch/$(ARCH)/kernel/init_task.o
+head-$(CONFIG_ARCH_S390_31)	+= arch/$(ARCH)/kernel/head.o
+head-$(CONFIG_ARCH_S390X)	+= arch/$(ARCH)/kernel/head64.o
+head-y				+= arch/$(ARCH)/kernel/init_task.o
 
 core-y		+= arch/$(ARCH)/mm/ arch/$(ARCH)/kernel/
 libs-y		+= arch/$(ARCH)/lib/

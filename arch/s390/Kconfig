@@ -7,10 +7,6 @@ config MMU
 	bool
 	default y
 
-config UID16
-	bool
-	default y
-
 config RWSEM_GENERIC_SPINLOCK
 	bool
 
@@ -26,17 +22,28 @@ mainmenu "Linux Kernel Configuration"
 config ARCH_S390
 	bool
 	default y
-	help
-	  Select this option, if you want to run the Kernel on one of IBM's
-	  mainframes of the S/390 generation. You should have installed the
-	  s390-compiler released by IBM (based on gcc-2.95.1) before.
+
+config UID16
+	bool
+	default y
+	depends on ARCH_S390X = 'n'
 
 source "init/Kconfig"
-
 
 menu "Base setup"
 
 comment "Processor type and features"
+
+config ARCH_S390X
+	bool "64 bit kernel"
+	help
+	  Select this option if you have a 64 bit IBM zSeries machine
+	  and want to use the 64 bit addressing mode.
+
+config ARCH_S390_31
+	bool
+	depends on ARCH_S390X = 'n'
+	default y
 
 config SMP
 	bool "Symmetric multi-processing support"
@@ -51,32 +58,15 @@ config SMP
 	  singleprocessor machines. On a singleprocessor machine, the kernel
 	  will run faster if you say N here.
 
-	  Note that if you say Y here and choose architecture "586" or
-	  "Pentium" under "Processor family", the kernel will not work on 486
-	  architectures. Similarly, multiprocessor kernels for the "PPro"
-	  architecture may not work on all Pentium based boards.
-
-	  People using multiprocessor machines who say Y here should also say
-	  Y to "Enhanced Real Time Clock Support", below. The "Advanced Power
-	  Management" code will be disabled if you say Y here.
-
 	  See also the <file:Documentation/smp.tex>,
-	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
-	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+	  <file:Documentation/smp.txt> and the SMP-HOWTO available at
 	  <http://www.linuxdoc.org/docs.html#howto>.
 
-	  If you don't know what to do here, say N.
-
-config MATHEMU
-	bool "IEEE FPU emulation"
-	help
-	  This option is required for IEEE compliant floating point arithmetic
-	  on the Alpha. The only time you would ever not say Y is to say M in
-	  order to debug the code. Say Y unless you know what you are doing.
+	  Even if you don't know what to do here, say Y.
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"
-	depends on SMP
+	depends on SMP && ARCH_S390X = 'n'
 	default "32"
 	help
 	  This allows you to specify the maximum number of CPUs which this
@@ -85,13 +75,54 @@ config NR_CPUS
 
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
+	
+config NR_CPUS
+	int "Maximum number of CPUs (2-64)"
+	depends on SMP && ARCH_S390X
+	default "64"
+	help
+	  This allows you to specify the maximum number of CPUs which this
+	  kernel will support.  The maximum supported value is 64 and the
+	  minimum value which makes sense is 2.
+
+	  This is purely to save memory - each supported CPU adds
+	  approximately sixteen kilobytes to the kernel image.
+
+config MATHEMU
+	bool "IEEE FPU emulation"
+	depends on ARCH_S390X = n
+	help
+	  This option is required for IEEE compliant floating point arithmetic
+	  on older S/390 machines. Say Y unless you know your machine doesn't 
+	  need this.
+
+config S390_SUPPORT
+	bool "Kernel support for 31 bit emulation"
+	depends on ARCH_S390X
+	help
+	  Select this option if you want to enable your system kernel to
+	  handle system-calls from ELF binaries for 31 bit ESA.  This option
+	  (and some other stuff like libraries and such) is needed for
+	  executing 31 bit applications.  It is safe to say "Y".
+
+config COMPAT
+	bool
+	depends on S390_SUPPORT
+	default y
+
+config BINFMT_ELF32
+	tristate "Kernel support for 31 bit ELF binaries"
+	depends on S390_SUPPORT
+	help
+	  This allows you to run 32-bit Linux/ELF binaries on your zSeries
+	  in 64 bit mode. Everybody wants this; say Y.
 
 comment "I/O subsystem configuration"
 
 config MACHCHK_WARNING
 	bool "Process warning machine checks"
 	help
-	  Select this option if you want the machine check handler on IBM S/390 or 
+	  Select this option if you want the machine check handler on IBM S/390 or
 	  zSeries to process warning machine checks (e.g. on power failures). 
 	  If unsure, say "Y".
 
@@ -144,14 +175,14 @@ choice
 	prompt "IPL method generated into head.S"
 	depends on IPL
 	default IPL_TAPE
-
-config IPL_TAPE
-	bool "tape"
 	help
 	  Select "tape" if you want to IPL the image from a Tape.
 
 	  Select "vm_reader" if you are running under VM/ESA and want
 	  to IPL the image from the emulated card reader.
+
+config IPL_TAPE
+	bool "tape"
 
 config IPL_VM
 	bool "vm_reader"
