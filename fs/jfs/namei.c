@@ -997,19 +997,10 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 	down(&JFS_IP(dip)->commit_sem);
 	down(&JFS_IP(ip)->commit_sem);
 
-	if ((rc = dtSearch(dip, &dname, &ino, &btstack, JFS_CREATE)))
-		goto out3;
-
 	tblk = tid_to_tblock(tid);
 	tblk->xflag |= COMMIT_CREATE;
 	tblk->ino = ip->i_ino;
 	tblk->u.ixpxd = JFS_IP(ip)->ixpxd;
-
-	/*
-	 * create entry for symbolic link in parent directory
-	 */
-
-	ino = ip->i_ino;
 
 	/* fix symlink access permission
 	 * (dir_create() ANDs in the u.u_cmask, 
@@ -1087,8 +1078,15 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 		ip->i_blocks = LBLK2PBLK(sb, xlen);
 	}
 
-	if ((rc = dtInsert(tid, dip, &dname, &ino, &btstack))) {
-		jfs_err("jfs_symlink: dtInsert returned %d", rc);
+	/*
+	 * create entry for symbolic link in parent directory
+	 */
+	rc = dtSearch(dip, &dname, &ino, &btstack, JFS_CREATE);
+	if (rc == 0) {
+		ino = ip->i_ino;
+		rc = dtInsert(tid, dip, &dname, &ino, &btstack);
+	}
+	if (rc) {
 		if (xlen)
 			dbFree(ip, extent, xlen);
 		txAbort(tid, 0);
@@ -1326,7 +1324,7 @@ static int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			/* Linelock header of dtree */
 			tlck = txLock(tid, old_ip,
 				    (struct metapage *) &JFS_IP(old_ip)->bxflag,
-				      tlckDTREE | tlckBTROOT);
+				      tlckDTREE | tlckBTROOT | tlckRELINK);
 			dtlck = (struct dt_lock *) & tlck->lock;
 			ASSERT(dtlck->index == 0);
 			lv = & dtlck->lv[0];

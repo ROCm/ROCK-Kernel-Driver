@@ -1916,25 +1916,18 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		/*
 		 *      write log records
 		 */
-		/*
-		 * allocate entries XAD[lwm:next]:
+		/* log after-image for logredo():
+		 *
+		 * logredo() will update bmap for alloc of new/extended
+		 * extents (XAD_NEW|XAD_EXTEND) of XAD[lwm:next) from
+		 * after-image of XADlist;
+		 * logredo() resets (XAD_NEW|XAD_EXTEND) flag when
+		 * applying the after-image to the meta-data page.
 		 */
-		if (lwm < next) {
-			/* log after-image for logredo():
-			 * logredo() will update bmap for alloc of new/extended
-			 * extents (XAD_NEW|XAD_EXTEND) of XAD[lwm:next) from
-			 * after-image of XADlist;
-			 * logredo() resets (XAD_NEW|XAD_EXTEND) flag when
-			 * applying the after-image to the meta-data page.
-			 */
-			lrd->type = cpu_to_le16(LOG_REDOPAGE);
-			PXDaddress(pxd, mp->index);
-			PXDlength(pxd,
-				  mp->logical_size >> tblk->sb->
-				  s_blocksize_bits);
-			lrd->backchain =
-			    cpu_to_le32(lmLog(log, tblk, lrd, tlck));
-		}
+		lrd->type = cpu_to_le16(LOG_REDOPAGE);
+		PXDaddress(pxd, mp->index);
+		PXDlength(pxd, mp->logical_size >> tblk->sb->s_blocksize_bits);
+		lrd->backchain = cpu_to_le32(lmLog(log, tblk, lrd, tlck));
 
 		/*
 		 * truncate entry XAD[twm == next - 1]:

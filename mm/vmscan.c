@@ -758,23 +758,33 @@ static int
 shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
 		int *total_scanned, struct page_state *ps)
 {
-	unsigned long ratio;
+	unsigned long scan_active;
 	int count;
 
 	/*
 	 * Try to keep the active list 2/3 of the size of the cache.  And
 	 * make sure that refill_inactive is given a decent number of pages.
 	 *
-	 * The "ratio+1" here is important.  With pagecache-intensive workloads
-	 * the inactive list is huge, and `ratio' evaluates to zero all the
-	 * time.  Which pins the active list memory.  So we add one to `ratio'
-	 * just to make sure that the kernel will slowly sift through the
-	 * active list.
+	 * The "scan_active + 1" here is important.  With pagecache-intensive
+	 * workloads the inactive list is huge, and `ratio' evaluates to zero
+	 * all the time.  Which pins the active list memory.  So we add one to
+	 * `scan_active' just to make sure that the kernel will slowly sift
+	 * through the active list.
 	 */
-	ratio = (unsigned long)SWAP_CLUSTER_MAX * zone->nr_active /
-				((zone->nr_inactive | 1) * 2);
+	if (zone->nr_active >= 4*(zone->nr_inactive*2 + 1)) {
+		/* Don't scan more than 4 times the inactive list scan size */
+		scan_active = 4*max_scan;
+	} else {
+		unsigned long long tmp;
 
-	atomic_add(ratio+1, &zone->nr_scan_active);
+		/* Cast to long long so the multiply doesn't overflow */
+
+		tmp = (unsigned long long)max_scan * zone->nr_active;
+		do_div(tmp, zone->nr_inactive*2 + 1);
+		scan_active = (unsigned long)tmp;
+	}
+
+	atomic_add(scan_active + 1, &zone->nr_scan_active);
 	count = atomic_read(&zone->nr_scan_active);
 	if (count >= SWAP_CLUSTER_MAX) {
 		atomic_set(&zone->nr_scan_active, 0);
@@ -823,7 +833,7 @@ shrink_caches(struct zone **zones, int priority, int *total_scanned,
 		if (zone->all_unreclaimable && priority != DEF_PRIORITY)
 			continue;	/* Let kswapd poll it */
 
-		max_scan = zone->nr_inactive >> priority;
+		max_scan = (zone->nr_inactive + zone->nr_inactive) >> priority;
 		ret += shrink_zone(zone, max_scan, gfp_mask, total_scanned, ps);
 	}
 	return ret;
@@ -876,8 +886,6 @@ int try_to_free_pages(struct zone **zones,
 			ret = 1;
 			goto out;
 		}
-		if (!(gfp_mask & __GFP_FS))
-			break;		/* Let the caller handle it */
 		/*
 		 * Try to write back as many pages as we just scanned.  Not
 		 * sure if that makes sense, but it's an attempt to avoid
@@ -988,7 +996,8 @@ scan:
 					all_zones_ok = 0;
 			}
 			zone->temp_priority = priority;
-			max_scan = zone->nr_inactive >> priority;
+			max_scan = (zone->nr_active + zone->nr_inactive)
+								>> priority;
 			reclaimed = shrink_zone(zone, max_scan, GFP_KERNEL,
 					&total_scanned, ps);
 			total_scanned += pages_scanned;

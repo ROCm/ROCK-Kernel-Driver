@@ -1830,6 +1830,11 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 	if (!page_has_buffers(page)) {
 		if (!PageUptodate(page))
 			buffer_error();
+		if (current->flags & PF_MEMALLOC) {
+			redirty_page_for_writepage(wbc, page);
+			unlock_page(page);
+			return 0;
+		}
 		create_empty_buffers(page, 1 << inode->i_blkbits,
 					(1 << BH_Dirty)|(1 << BH_Uptodate));
 	}
@@ -1898,7 +1903,7 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 		if (wbc->sync_mode != WB_SYNC_NONE || !wbc->nonblocking) {
 			lock_buffer(bh);
 		} else if (test_set_buffer_locked(bh)) {
-			__set_page_dirty_nobuffers(page);
+			redirty_page_for_writepage(wbc, page);
 			continue;
 		}
 		if (test_clear_buffer_dirty(bh)) {
