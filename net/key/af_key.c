@@ -274,13 +274,13 @@ static inline void pfkey_hdr_dup(struct sadb_msg *new, struct sadb_msg *orig)
 	*new = *orig;
 }
 
-static void pfkey_error(struct sadb_msg *orig, int err)
+static int pfkey_error(struct sadb_msg *orig, int err, struct sock *sk)
 {
 	struct sk_buff *skb = alloc_skb(sizeof(struct sadb_msg) + 16, GFP_KERNEL);
 	struct sadb_msg *hdr;
 
 	if (!skb)
-		return;
+		return -ENOBUFS;
 
 	/* Woe be to the platform trying to support PFKEY yet
 	 * having normal errnos outside the 1-255 range, inclusive.
@@ -301,7 +301,9 @@ static void pfkey_error(struct sadb_msg *orig, int err)
 	hdr->sadb_msg_len = (sizeof(struct sadb_msg) /
 			     sizeof(uint64_t));
 
-	pfkey_broadcast(skb, GFP_KERNEL, BROADCAST_ALL, NULL);
+	pfkey_broadcast(skb, GFP_KERNEL, BROADCAST_ONE, sk);
+
+	return 0;
 }
 
 static u8 sadb_ext_min_len[] = {
@@ -716,7 +718,7 @@ static struct sk_buff * pfkey_xfrm_state2msg(struct xfrm_state *x, int add_keys,
 		struct algo_desc *a = ealg_get_byname(x->ealg->alg_name);
 		sa->sadb_sa_encrypt = a ? a->desc.sadb_alg_id : 0;
 	}
-	sa->sadb_sa_flags = SADB_SAFLAGS_PFS;
+	sa->sadb_sa_flags = 0;
 
 	/* hard time */
 	if (hsc & 2) {
@@ -1538,6 +1540,7 @@ static struct sk_buff * pfkey_xfrm_policy2msg(struct xfrm_policy *xp, int dir)
 		}
 	}
 	hdr->sadb_msg_len = size / sizeof(uint64_t);
+	hdr->sadb_msg_reserved = atomic_read(&xp->refcnt);
 	return skb;
 }
 
@@ -1638,7 +1641,6 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	out_hdr->sadb_msg_type = hdr->sadb_msg_type;
 	out_hdr->sadb_msg_satype = 0;
 	out_hdr->sadb_msg_errno = 0;
-	out_hdr->sadb_msg_reserved = 0;
 	out_hdr->sadb_msg_seq = hdr->sadb_msg_seq;
 	out_hdr->sadb_msg_pid = hdr->sadb_msg_pid;
 	pfkey_broadcast(out_skb, GFP_ATOMIC, BROADCAST_ALL, sk);
@@ -1703,7 +1705,6 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 	out_hdr->sadb_msg_type = SADB_X_SPDDELETE;
 	out_hdr->sadb_msg_satype = 0;
 	out_hdr->sadb_msg_errno = 0;
-	out_hdr->sadb_msg_reserved = 0;
 	out_hdr->sadb_msg_seq = hdr->sadb_msg_seq;
 	out_hdr->sadb_msg_pid = hdr->sadb_msg_pid;
 	pfkey_broadcast(out_skb, GFP_ATOMIC, BROADCAST_ALL, sk);
@@ -1750,7 +1751,6 @@ static int pfkey_spdget(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	out_hdr->sadb_msg_type = hdr->sadb_msg_type;
 	out_hdr->sadb_msg_satype = 0;
 	out_hdr->sadb_msg_errno = 0;
-	out_hdr->sadb_msg_reserved = 0;
 	out_hdr->sadb_msg_seq = hdr->sadb_msg_seq;
 	out_hdr->sadb_msg_pid = hdr->sadb_msg_pid;
 	pfkey_broadcast(out_skb, GFP_ATOMIC, BROADCAST_ALL, sk);
@@ -1780,7 +1780,6 @@ static int dump_sp(struct xfrm_policy *xp, int dir, int count, void *ptr)
 	out_hdr->sadb_msg_type = SADB_X_SPDDUMP;
 	out_hdr->sadb_msg_satype = SADB_SATYPE_UNSPEC;
 	out_hdr->sadb_msg_errno = 0;
-	out_hdr->sadb_msg_reserved = 0;
 	out_hdr->sadb_msg_seq = count;
 	out_hdr->sadb_msg_pid = data->hdr->sadb_msg_pid;
 	pfkey_broadcast(out_skb, GFP_ATOMIC, BROADCAST_ONE, data->sk);
@@ -1995,7 +1994,7 @@ static int pfkey_send_notify(struct xfrm_state *x, int hard)
 	out_hdr->sadb_msg_seq = 0;
 	out_hdr->sadb_msg_pid = 0;
 
-	pfkey_broadcast(out_skb, GFP_KERNEL, BROADCAST_REGISTERED, NULL);
+	pfkey_broadcast(out_skb, GFP_ATOMIC, BROADCAST_REGISTERED, NULL);
 	return 0;
 }
 
@@ -2166,8 +2165,8 @@ static int pfkey_sendmsg(struct kiocb *kiocb,
 	err = pfkey_process(sk, skb, hdr);
 
 out:
-	if (err && hdr)
-		pfkey_error(hdr, err);
+	if (err && hdr && pfkey_error(hdr, err, sk) == 0)
+		err = 0;
 	if (skb)
 		kfree_skb(skb);
 
