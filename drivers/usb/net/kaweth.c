@@ -612,8 +612,6 @@ static int kaweth_open(struct net_device *net)
 	struct kaweth_device *kaweth = (struct kaweth_device *)net->priv;
 	int res;
 
-	kaweth_dbg("Dev usage: %d", kaweth->dev->refcnt.counter);
-
 	kaweth_dbg("Opening network device.");
 
 	res = kaweth_resubmit_rx_urb(kaweth, GFP_KERNEL);
@@ -657,9 +655,6 @@ static int kaweth_close(struct net_device *net)
 	usb_unlink_urb(kaweth->rx_urb);
 
 	kaweth->status &= ~KAWETH_STATUS_CLOSING;
-
-
-	printk("Dev usage: %d", kaweth->dev->refcnt.counter);
 
 	return 0;
 }
