@@ -221,9 +221,9 @@ int fsync_super(struct super_block *sb)
 	lock_super(sb);
 	if (sb->s_dirt && sb->s_op->write_super)
 		sb->s_op->write_super(sb);
+	unlock_super(sb);
 	if (sb->s_op->sync_fs)
 		sb->s_op->sync_fs(sb, 1);
-	unlock_super(sb);
 	sync_blockdev(sb->s_bdev);
 	sync_inodes_sb(sb, 1);
 

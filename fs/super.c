@@ -192,8 +192,6 @@ void generic_shutdown_super(struct super_block *sb)
 
 		if (sop->write_super && sb->s_dirt)
 			sop->write_super(sb);
-		if (sop->sync_fs)
-			sop->sync_fs(sb, 1);
 		if (sop->put_super)
 			sop->put_super(sb);
 
@@ -327,11 +325,12 @@ restart:
 			continue;
 		sb->s_need_sync_fs = 0;
 		if (sb->s_flags & MS_RDONLY)
-			continue;	/* hm.  Was remounted r/w meanwhile */
+			continue;	/* hm.  Was remounted r/o meanwhile */
 		sb->s_count++;
 		spin_unlock(&sb_lock);
 		down_read(&sb->s_umount);
-		sb->s_op->sync_fs(sb, wait);
+		if (sb->s_root)
+			sb->s_op->sync_fs(sb, wait);
 		drop_super(sb);
 		goto restart;
 	}
