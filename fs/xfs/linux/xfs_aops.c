@@ -566,7 +566,7 @@ xfs_submit_page(
 	int			i;
 
 	BUG_ON(PageWriteback(page));
-	SetPageWriteback(page);
+	set_page_writeback(page);
 	clear_page_dirty(page);
 	unlock_page(page);
 

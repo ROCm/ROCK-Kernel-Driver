@@ -1829,7 +1829,7 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 	} while ((bh = bh->b_this_page) != head);
 
 	BUG_ON(PageWriteback(page));
-	SetPageWriteback(page);		/* Keeps try_to_free_buffers() away */
+	set_page_writeback(page);	/* Keeps try_to_free_buffers() away */
 	unlock_page(page);
 
 	/*
@@ -1892,7 +1892,7 @@ recover:
 	} while ((bh = bh->b_this_page) != head);
 	SetPageError(page);
 	BUG_ON(PageWriteback(page));
-	SetPageWriteback(page);
+	set_page_writeback(page);
 	unlock_page(page);
 	do {
 		struct buffer_head *next = bh->b_this_page;

@@ -604,3 +604,45 @@ int __clear_page_dirty(struct page *page)
 	}
 	return TestClearPageDirty(page);
 }
+
+int test_clear_page_writeback(struct page *page)
+{
+	struct address_space *mapping = page->mapping;
+	int ret;
+
+	if (mapping) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		ret = TestClearPageWriteback(page);
+		if (ret)
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_WRITEBACK);
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+	} else {
+		ret = TestClearPageWriteback(page);
+	}
+	return ret;
+}
+
+int test_set_page_writeback(struct page *page)
+{
+	struct address_space *mapping = page->mapping;
+	int ret;
+
+	if (mapping) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		ret = TestSetPageWriteback(page);
+		if (!ret)
+			radix_tree_tag_set(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_WRITEBACK);
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+	} else {
+		ret = TestSetPageWriteback(page);
+	}
+	return ret;
+
+}
+EXPORT_SYMBOL(test_set_page_writeback);

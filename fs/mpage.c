@@ -546,7 +546,7 @@ alloc_new:
 	}
 
 	BUG_ON(PageWriteback(page));
-	SetPageWriteback(page);
+	set_page_writeback(page);
 	unlock_page(page);
 	if (boundary || (first_unmapped != blocks_per_page)) {
 		bio = mpage_bio_submit(WRITE, bio);

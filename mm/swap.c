@@ -70,7 +70,7 @@ int rotate_reclaimable_page(struct page *page)
 		list_add_tail(&page->lru, &zone->inactive_list);
 		inc_page_state(pgrotated);
 	}
-	if (!TestClearPageWriteback(page))
+	if (!test_clear_page_writeback(page))
 		BUG();
 	spin_unlock_irqrestore(&zone->lru_lock, flags);
 	return 0;

@@ -363,8 +363,7 @@ void end_page_writeback(struct page *page)
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
 
 	if (!TestClearPageReclaim(page) || rotate_reclaimable_page(page)) {
-		smp_mb__before_clear_bit();
-		if (!TestClearPageWriteback(page))
+		if (!test_clear_page_writeback(page))
 			BUG();
 		smp_mb__after_clear_bit();
 	}
