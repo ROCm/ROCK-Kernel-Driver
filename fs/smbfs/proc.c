@@ -2309,16 +2309,14 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 	 */
 	mask = param + 12;
 
-	mask_len = smb_encode_path(server, mask, SMB_MAXPATHLEN+1, dir, &star);
-	if (mask_len < 0) {
-		result = mask_len;
+	result = smb_encode_path(server, mask, SMB_MAXPATHLEN+1, dir, &star);
+	if (result <= 0)
 		goto out_free;
-	}
-	mask_len--;	/* mask_len is strlen, not #bytes */
+	mask_len = result - 1;	/* mask_len is strlen, not #bytes */
+	result = 0;
 	first = 1;
 	VERBOSE("starting mask_len=%d, mask=%s\n", mask_len, mask);
 
-	result = 0;
 	entries_seen = 2;
 	ff_eos = 0;
 
@@ -2464,8 +2462,6 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 			/*
 			 * Update the mask string for the next message.
 			 */
-			if (mask_len < 0)
-				mask_len = 0;
 			if (mask_len > 255)
 				mask_len = 255;
 			if (mask_len)
