@@ -67,22 +67,11 @@ out:
 }
 
 EXPORT_SYMBOL(add_gendisk);
+EXPORT_SYMBOL(del_gendisk);
 
-
-/**
- * del_gendisk - remove partitioning information from kernel list
- * @gp: per-device partitioning information
- *
- * This function unregisters the partitioning information in @gp
- * with the kernel.
- */
-void
-del_gendisk(struct gendisk *disk)
+void unlink_gendisk(struct gendisk *disk)
 {
 	struct gendisk **p;
-
-	driverfs_remove_partitions(disk);
-	wipe_partitions(disk);
 	write_lock(&gendisk_lock);
 	for (p = &gendisk_head; *p; p = &((*p)->next))
 		if (*p == disk)
@@ -90,11 +79,7 @@ del_gendisk(struct gendisk *disk)
 	if (*p)
 		*p = (*p)->next;
 	write_unlock(&gendisk_lock);
-	devfs_register_partitions(disk, 1);
 }
-
-EXPORT_SYMBOL(del_gendisk);
-
 
 /**
  * get_gendisk - get partitioning information for a given device

@@ -89,6 +89,7 @@ struct gendisk {
 /* drivers/block/genhd.c */
 extern void add_gendisk(struct gendisk *gp);
 extern void del_gendisk(struct gendisk *gp);
+extern void unlink_gendisk(struct gendisk *gp);
 extern struct gendisk *get_gendisk(kdev_t dev);
 static inline unsigned long get_start_sect(struct block_device *bdev)
 {
@@ -244,8 +245,8 @@ struct unixware_disklabel {
 
 char *disk_name (struct gendisk *hd, int part, char *buf);
 
-extern void devfs_register_partitions (struct gendisk *dev, int unregister);
-extern void driverfs_remove_partitions (struct gendisk *hd);
+extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
+extern void update_partition(struct gendisk *disk, int part);
 
 static inline unsigned int disk_index (kdev_t dev)
 {

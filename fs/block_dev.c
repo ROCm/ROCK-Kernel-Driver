@@ -527,22 +527,13 @@ int check_disk_change(struct block_device *bdev)
 
 int full_check_disk_change(struct block_device *bdev)
 {
-	int res;
+	int res = 0;
 	if (bdev->bd_contains != bdev)
 		BUG();
 	down(&bdev->bd_sem);
-	res = check_disk_change(bdev);
-	if (bdev->bd_invalidated && !bdev->bd_part_count) {
-		struct gendisk *disk = get_gendisk(to_kdev_t(bdev->bd_dev));
-		int p;
-		bdev->bd_invalidated = 0;
-		for (p = 1; p < 1<<disk->minor_shift; p++) {
-			disk->part[p].start_sect = 0;
-			disk->part[p].nr_sects = 0;
-		}
-		res = invalidate_device(to_kdev_t(bdev->bd_dev), 1);
-		if (disk->part[0].nr_sects)
-			check_partition(disk, bdev);
+	if (check_disk_change(bdev)) {
+		rescan_partitions(get_gendisk(to_kdev_t(bdev->bd_dev)), bdev);
+		res = 1;
 	}
 	up(&bdev->bd_sem);
 	return res;
@@ -654,17 +645,8 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			inode->i_data.backing_dev_info = bdi;
 			bdev->bd_inode->i_data.backing_dev_info = bdi;
 		}
-		if (bdev->bd_invalidated && !bdev->bd_part_count) {
-			int p;
-			bdev->bd_invalidated = 0;
-			for (p = 1; p < 1<<g->minor_shift; p++) {
-				g->part[p].start_sect = 0;
-				g->part[p].nr_sects = 0;
-			}
-			invalidate_device(dev, 1);
-			if (g->part[0].nr_sects)
-				check_partition(g, bdev);
-		}
+		if (bdev->bd_invalidated)
+			rescan_partitions(g, bdev);
 	} else {
 		down(&bdev->bd_contains->bd_sem);
 		bdev->bd_contains->bd_part_count++;
@@ -799,7 +781,7 @@ static int blkdev_reread_part(struct block_device *bdev)
 {
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *disk = get_gendisk(dev);
-	int p, res;
+	int res = 0;
 
 	if (!disk || !disk->minor_shift || bdev != bdev->bd_contains)
 		return -EINVAL;
@@ -807,21 +789,7 @@ static int blkdev_reread_part(struct block_device *bdev)
 		return -EACCES;
 	if (down_trylock(&bdev->bd_sem))
 		return -EBUSY;
-	if (bdev->bd_part_count) {
-		up(&bdev->bd_sem);
-		return -EBUSY;
-	}
-	for (p = 1; p < 1 << disk->minor_shift; p++) {
-		disk->part[p].start_sect = 0;
-		disk->part[p].nr_sects = 0;
-	}
-	res = invalidate_device(dev, 1);
-	if (!res) {
-		if (bdev->bd_op->revalidate)
-			bdev->bd_op->revalidate(dev);
-		if (disk->part[0].nr_sects)
-			check_partition(disk, bdev);
-	}
+	res = rescan_partitions(disk, bdev);
 	up(&bdev->bd_sem);
 	return res;
 }
