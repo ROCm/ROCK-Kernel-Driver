@@ -541,8 +541,6 @@ static __init int sis_router_probe(struct irq_router *r, struct pci_dev *router,
 	r->name = "SIS";
 	r->get = pirq_sis_get;
 	r->set = pirq_sis_set;
-	DBG("PCI: Detecting SiS router at %02x:%02x\n",
-	    rt->rtr_bus, rt->rtr_devfn);
 	return 1;
 }
 
