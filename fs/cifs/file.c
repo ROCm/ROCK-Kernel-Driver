@@ -1978,7 +1978,7 @@ int cifs_prepare_write(struct file *file, struct page *page,
 {
 	int rc = 0;
         loff_t offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
-	cERROR(1,("prepare write for page %p from %d to %d",page,from,to));
+	cFYI(1,("prepare write for page %p from %d to %d",page,from,to));
 	if (!PageUptodate(page)) {
 	/*	if (to - from != PAGE_CACHE_SIZE) {
 			void *kaddr = kmap_atomic(page, KM_USER0);
@@ -1994,6 +1994,9 @@ int cifs_prepare_write(struct file *file, struct page *page,
 
 		/* might as well read a page, it is fast enough */
 		rc = cifs_readpage_worker(file,page,&offset);
+		/* if this returns an error should we try using another
+		file handle if there is one - how would we lock it
+		to prevent close of that handle racing with this read? */
 	}
 
 	/* BB should we pass any errors back? e.g. if we do not have read access to the file */
