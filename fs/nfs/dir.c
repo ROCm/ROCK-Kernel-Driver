@@ -1299,19 +1299,6 @@ nfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	dfprintk(VFS, "NFS: symlink(%s/%ld, %s, %s)\n", dir->i_sb->s_id,
 		dir->i_ino, dentry->d_name.name, symname);
 
-	error = -ENAMETOOLONG;
-	switch (NFS_PROTO(dir)->version) {
-		case 2:
-			if (strlen(symname) > NFS2_MAXPATHLEN)
-				goto out;
-			break;
-		case 3:
-			if (strlen(symname) > NFS3_MAXPATHLEN)
-				goto out;
-		default:
-			break;
-	}
-
 #ifdef NFS_PARANOIA
 if (dentry->d_inode)
 printk("nfs_proc_symlink: %s/%s not negative!\n",
@@ -1341,8 +1328,6 @@ dentry->d_parent->d_name.name, dentry->d_name.name);
 		d_drop(dentry);
 	}
 	unlock_kernel();
-
-out:
 	return error;
 }
 

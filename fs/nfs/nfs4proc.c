@@ -1092,12 +1092,14 @@ static int nfs4_proc_symlink(struct inode *dir, struct qstr *name,
 		.fattr = fattr,
 	};
 	struct rpc_message msg = {
-		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CREATE],
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_SYMLINK],
 		.rpc_argp = &arg,
 		.rpc_resp = &res,
 	};
 	int			status;
 
+	if (path->len > NFS4_MAXPATHLEN)
+		return -ENAMETOOLONG;
 	arg.u.symlink = path;
 	fattr->valid = 0;
 	

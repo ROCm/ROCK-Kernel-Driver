@@ -84,6 +84,7 @@ static int nfs_stat_to_errno(int);
 				((3+NFS4_FHSIZE) >> 2))
 #define encode_getattr_maxsz    (op_encode_hdr_maxsz + 3)
 #define nfs4_name_maxsz		(1 + ((3 + NFS4_MAXNAMLEN) >> 2))
+#define nfs4_path_maxsz		(1 + ((3 + NFS4_MAXPATHLEN) >> 2))
 #define nfs4_fattr_bitmap_maxsz (36 + 2 * nfs4_name_maxsz)
 #define decode_getattr_maxsz    (op_decode_hdr_maxsz + 3 + \
                                 nfs4_fattr_bitmap_maxsz)
@@ -118,8 +119,13 @@ static int nfs_stat_to_errno(int);
 #define encode_link_maxsz	(op_encode_hdr_maxsz + \
 				nfs4_name_maxsz)
 #define decode_link_maxsz	(op_decode_hdr_maxsz + 5)
+#define encode_symlink_maxsz	(op_encode_hdr_maxsz + \
+				1 + nfs4_name_maxsz + \
+				nfs4_path_maxsz + \
+				nfs4_fattr_bitmap_maxsz)
+#define decode_symlink_maxsz	(op_decode_hdr_maxsz + 8)
 #define encode_create_maxsz	(op_encode_hdr_maxsz + \
-				2 + 2 * nfs4_name_maxsz + \
+				2 + nfs4_name_maxsz + \
 				nfs4_fattr_bitmap_maxsz)
 #define decode_create_maxsz	(op_decode_hdr_maxsz + 8)
 #define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
@@ -313,6 +319,16 @@ static int nfs_stat_to_errno(int);
 				decode_savefh_maxsz + \
 				decode_putfh_maxsz + \
 				decode_link_maxsz)
+#define NFS4_enc_symlink_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_symlink_maxsz + \
+				encode_getattr_maxsz + \
+				encode_getfh_maxsz)
+#define NFS4_dec_symlink_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				decode_symlink_maxsz + \
+				decode_getattr_maxsz + \
+				decode_getfh_maxsz)
 #define NFS4_enc_create_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_create_maxsz + \
@@ -1241,6 +1257,14 @@ static int nfs4_xdr_enc_create(struct rpc_rqst *req, uint32_t *p, const struct n
 	status = encode_getfh(&xdr);
 out:
 	return status;
+}
+
+/*
+ * Encode SYMLINK request
+ */
+static int nfs4_xdr_enc_symlink(struct rpc_rqst *req, uint32_t *p, const struct nfs4_create_arg *args)
+{
+	return nfs4_xdr_enc_create(req, p, args);
 }
 
 /*
@@ -3204,6 +3228,14 @@ out:
 }
 
 /*
+ * Decode SYMLINK response
+ */
+static int nfs4_xdr_dec_symlink(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_create_res *res)
+{
+	return nfs4_xdr_dec_create(rqstp, p, res);
+}
+
+/*
  * Decode GETATTR response
  */
 static int nfs4_xdr_dec_getattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_getattr_res *res)
@@ -3793,6 +3825,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(REMOVE,		enc_remove,	dec_remove),
   PROC(RENAME,		enc_rename,	dec_rename),
   PROC(LINK,		enc_link,	dec_link),
+  PROC(SYMLINK,		enc_symlink,	dec_symlink),
   PROC(CREATE,		enc_create,	dec_create),
   PROC(PATHCONF,	enc_pathconf,	dec_pathconf),
   PROC(STATFS,		enc_statfs,	dec_statfs),

@@ -540,6 +540,8 @@ nfs3_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 	};
 	int			status;
 
+	if (path->len > NFS3_MAXPATHLEN)
+		return -ENAMETOOLONG;
 	dprintk("NFS call  symlink %s -> %s\n", name->name, path->name);
 	dir_attr.valid = 0;
 	fattr->valid = 0;
