@@ -2424,6 +2424,7 @@ static int es1968_suspend(snd_card_t *card, unsigned int state)
 		return 0;
 
 	snd_pcm_suspend_all(chip->pcm);
+	snd_ac97_suspend(chip->ac97);
 	snd_es1968_bob_stop(chip);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;

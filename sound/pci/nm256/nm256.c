@@ -1289,6 +1289,7 @@ static int nm256_suspend(snd_card_t *card, unsigned int state)
 	nm256_t *chip = snd_magic_cast(nm256_t, card->pm_private_data, return -EINVAL);
 
 	snd_pcm_suspend_all(chip->pcm);
+	snd_ac97_suspend(chip->ac97);
 	chip->coeffs_current = 0;
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;

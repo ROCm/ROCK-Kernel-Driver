@@ -3792,6 +3792,11 @@ static int snd_cs46xx_suspend(snd_card_t *card, unsigned int state)
 	snd_pcm_suspend_all(chip->pcm);
 	// chip->ac97_powerdown = snd_cs46xx_codec_read(chip, AC97_POWER_CONTROL);
 	// chip->ac97_general_purpose = snd_cs46xx_codec_read(chip, BA0_AC97_GENERAL_PURPOSE);
+
+	snd_ac97_suspend(chip->ac97[CS46XX_PRIMARY_CODEC_INDEX]);
+	if (chip->ac97[CS46XX_SECONDARY_CODEC_INDEX])
+		snd_ac97_suspend(chip->ac97[CS46XX_SECONDARY_CODEC_INDEX]);
+
 	amp_saved = chip->amplifier;
 	/* turn off amp */
 	chip->amplifier_ctrl(chip, -chip->amplifier);
@@ -3827,6 +3832,8 @@ static int snd_cs46xx_resume(snd_card_t *card, unsigned int state)
 #endif
 
 	snd_ac97_resume(chip->ac97[CS46XX_PRIMARY_CODEC_INDEX]);
+	if (chip->ac97[CS46XX_SECONDARY_CODEC_INDEX])
+		snd_ac97_resume(chip->ac97[CS46XX_SECONDARY_CODEC_INDEX]);
 
 	if (amp_saved)
 		chip->amplifier_ctrl(chip, 1); /* turn amp on */

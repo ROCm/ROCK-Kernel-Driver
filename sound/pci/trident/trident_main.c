@@ -3958,6 +3958,11 @@ static int snd_trident_suspend(snd_card_t *card, unsigned int state)
 		snd_pcm_suspend_all(trident->foldback);
 	if (trident->spdif)
 		snd_pcm_suspend_all(trident->spdif);
+
+	snd_ac97_suspend(trident->ac97);
+	if (trident->ac97_sec)
+		snd_ac97_suspend(trident->ac97_sec);
+
 	switch (trident->device) {
 	case TRIDENT_DEVICE_ID_DX:
 	case TRIDENT_DEVICE_ID_NX:
@@ -3992,6 +3997,8 @@ static int snd_trident_resume(snd_card_t *card, unsigned int state)
 	}
 
 	snd_ac97_resume(trident->ac97);
+	if (trident->ac97_sec)
+		snd_ac97_resume(trident->ac97_sec);
 
 	/* restore some registers */
 	outl(trident->musicvol_wavevol, TRID_REG(trident, T4D_MUSICVOL_WAVEVOL));

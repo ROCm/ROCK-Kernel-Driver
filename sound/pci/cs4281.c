@@ -2046,6 +2046,11 @@ static int cs4281_suspend(snd_card_t *card, unsigned int state)
 
 	snd_pcm_suspend_all(chip->pcm);
 
+	if (chip->ac97)
+		snd_ac97_suspend(chip->ac97);
+	if (chip->ac97_secondary)
+		snd_ac97_suspend(chip->ac97_secondary);
+
 	ulCLK = snd_cs4281_peekBA0(chip, BA0_CLKCR1);
 	ulCLK |= CLKCR1_CKRA;
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);

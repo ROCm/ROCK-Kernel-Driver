@@ -2420,6 +2420,7 @@ static int m3_suspend(snd_card_t *card, unsigned int state)
 		return 0;
 
 	snd_pcm_suspend_all(chip->pcm);
+	snd_ac97_suspend(chip->ac97);
 
 	big_mdelay(10); /* give the assp a chance to idle.. */
 

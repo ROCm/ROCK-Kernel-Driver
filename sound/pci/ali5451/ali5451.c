@@ -1915,6 +1915,9 @@ static int ali_suspend(snd_card_t *card, unsigned int state)
 	if (! im)
 		return 0;
 
+	snd_pcm_suspend_all(chip->pcm);
+	snd_ac97_suspend(chip->ac97);
+
 	spin_lock_irq(&chip->reg_lock);
 	
 	im->regs[ALI_MISCINT >> 2] = inl(ALI_REG(chip, ALI_MISCINT));
@@ -1969,14 +1972,15 @@ static int ali_resume(snd_card_t *card, unsigned int state)
 		outl(im->regs[i], ALI_REG(chip, i*4));
 	}
 	
-	snd_ac97_resume(chip->ac97);
-	
 	// start HW channel
 	outl(im->regs[ALI_START >> 2], ALI_REG(chip, ALI_START));
 	// restore IRQ enable bits
 	outl(im->regs[ALI_MISCINT >> 2], ALI_REG(chip, ALI_MISCINT));
 	
 	spin_unlock_irq(&chip->reg_lock);
+
+	snd_ac97_resume(chip->ac97);
+	
 	return 0;
 }
 #endif /* CONFIG_PM */
