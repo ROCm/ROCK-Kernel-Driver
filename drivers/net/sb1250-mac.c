@@ -2721,7 +2721,7 @@ static void sbmac_set_rx_mode(struct net_device *dev)
 static int sbmac_mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct sbmac_softc *sc = netdev_priv(dev);
-	u16 *data = (u16 *)&rq->ifr_data;
+	u16 *data = (u16 *)&rq->ifr_ifru;
 	unsigned long flags;
 	int retval;
 	

@@ -650,7 +650,7 @@ static int ethtool_get_stats(struct net_device *dev, void __user *useraddr)
 int dev_ethtool(struct ifreq *ifr)
 {
 	struct net_device *dev = __dev_get_by_name(ifr->ifr_name);
-	void __user *useraddr = (void __user *) ifr->ifr_data;
+	void __user *useraddr = ifr->ifr_data;
 	u32 ethcmd;
 
 	/*
