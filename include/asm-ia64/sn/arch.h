@@ -20,8 +20,6 @@ typedef u64	hubreg_t;
 typedef u64	mmr_t;
 typedef u64	nic_t;
 
-#define CNODE_TO_CPU_BASE(_cnode)	(sn_get_node_first_cpu(_cnode))
-
 #define NASID_TO_COMPACT_NODEID(nasid)  (nasid_to_cnodeid(nasid))
 #define COMPACT_TO_NASID_NODEID(cnode)  (cnodeid_to_nasid(cnode))
 
@@ -34,9 +32,7 @@ typedef u64	nic_t;
 #define	INVALID_PARTID		((partid_t)-1)
 
 extern cpuid_t cnodetocpu(cnodeid_t);
-void   sn_flush_all_caches(long addr, long bytes);
-
-extern int     is_fine_dirmode(void);
-
+extern void sn_flush_all_caches(long addr, long bytes);
+extern int is_fine_dirmode(void);
 
 #endif /* _ASM_IA64_SN_ARCH_H */

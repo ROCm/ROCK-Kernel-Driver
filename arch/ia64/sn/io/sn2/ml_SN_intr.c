@@ -12,6 +12,7 @@
 #include <asm/smp.h>
 #include <asm/irq.h>
 #include <asm/hw_irq.h>
+#include <asm/topology.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/hcl.h>
@@ -36,25 +37,6 @@ extern irqpda_t	*irqpdaindr;
 extern cnodeid_t master_node_get(vertex_hdl_t vhdl);
 extern nasid_t master_nasid;
 
-cpuid_t
-sn_get_node_first_cpu(cnodeid_t cnode) {
-	int cpuid = -1, slice;
-
-	for (slice = CPUS_PER_NODE - 1; slice >= 0; slice--) {
-		cpuid = cnode_slice_to_cpuid(cnode, slice);
-		if (cpuid == NR_CPUS)
-			continue;
-		if (!cpu_online(cpuid))
-			continue;
-		break;
-	}
-	if (slice < 0) {
-		return CPU_NONE;
-	}
-	return cpuid;
-}
-
-
 /*  Initialize some shub registers for interrupts, both IO and error. */
 void intr_init_vecblk(cnodeid_t node)
 {
@@ -78,13 +60,13 @@ void intr_init_vecblk(cnodeid_t node)
 		HUB_S((unsigned long *)GLOBAL_MMR_ADDR(nasid, SH_INT_NODE_ID_CONFIG),
 			node_id_config.sh_int_node_id_config_regval);
 		cnode = nasid_to_cnodeid(master_nasid);
-		cpu = sn_get_node_first_cpu(cnode);
+		cpu = first_cpu(node_to_cpumask(cnode));
 		cpu = cpu_physical_id(cpu);
 		SAL_CALL(ret_stuff, SN_SAL_REGISTER_CE, nasid, cpu, master_nasid,0,0,0,0);
 		if (ret_stuff.status < 0)
 			printk("%s: SN_SAL_REGISTER_CE SAL_CALL failed\n",__FUNCTION__);
 	} else {
-		cpu = sn_get_node_first_cpu(node);
+		cpu = first_cpu(node_to_cpumask(node));
 		cpu = cpu_physical_id(cpu);
 	}
 
