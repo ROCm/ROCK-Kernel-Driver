@@ -73,8 +73,8 @@ static int cs5520_get_info(char *buffer, char **addr, off_t offset, int count)
 	 * at that point bibma+0x2 et bibma+0xa are byte registers
 	 * to investigate:
 	 */
-	c0 = inb((unsigned short)bmiba + 0x02);
-	c1 = inb((unsigned short)bmiba + 0x0a);
+	c0 = inb(bmiba + 0x02);
+	c1 = inb(bmiba + 0x0a);
 	
 	p += sprintf(p, "\nCyrix CS55x0 IDE\n");
 	p += sprintf(p, "--------------- Primary Channel "
@@ -203,7 +203,7 @@ static unsigned int __devinit init_chipset_cs5520(struct pci_dev *dev, const cha
 
 static void __devinit cs5520_init_setup_dma(struct pci_dev *dev, ide_pci_device_t *d, ide_hwif_t *hwif)
 {
-	u32 bmide = pci_resource_start(dev, 2);	/* Not the usual 4 */
+	unsigned long bmide = pci_resource_start(dev, 2);	/* Not the usual 4 */
 	if(hwif->mate && hwif->mate->dma_base)	/* Second channel at primary + 8 */
 		bmide += 8;
 	ide_setup_dma(hwif, bmide, 8);

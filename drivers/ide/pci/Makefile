@@ -15,7 +15,6 @@ obj-$(CONFIG_BLK_DEV_HPT366)		+= hpt366.o
 obj-$(CONFIG_BLK_DEV_IDE_ICSIDE)	+= icside.o
 obj-$(CONFIG_BLK_DEV_IT8172)		+= it8172.o
 obj-$(CONFIG_BLK_DEV_NS87415)		+= ns87415.o
-obj-$(CONFIG_BLK_DEV_NFORCE)		+= nvidia.o
 obj-$(CONFIG_BLK_DEV_OPTI621)		+= opti621.o
 obj-$(CONFIG_BLK_DEV_PDC202XX_OLD)	+= pdc202xx_old.o
 obj-$(CONFIG_BLK_DEV_PDC202XX_NEW)	+= pdc202xx_new.o

@@ -312,8 +312,8 @@ typedef struct {
 * must be set to the number of IXJ_CADENCE_ELEMENTS in the array.  The
 * termination variable defines what to do at the end of a cadence, the
 * options are to play the cadence once and stop, to repeat the last
-* element of the cadence indefinatly, or to repeat the entire cadence
-* indefinatly.  The ce variable is a pointer to the array of IXJ_TONE
+* element of the cadence indefinitely, or to repeat the entire cadence
+* indefinitely.  The ce variable is a pointer to the array of IXJ_TONE
 * structures.  If the freq0 variable is non-zero, the tone table contents
 * for the tone_index are updated to the frequencies and gains defined.  It
 * should be noted that DTMF tones cannot be reassigned, so if DTMF tone

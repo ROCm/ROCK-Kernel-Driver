@@ -301,7 +301,7 @@
 
 /* START OF USER DEFINABLE OPTIONS */
 
-#define DEBUG            1	/* Enable debugging output */
+#define DEBUG            0	/* Enable debugging output */
 #define ENABLE_PARITY    1	/* Enable SCSI Parity */
 #define FIFO_COUNT       2	/* Number of 512 byte blocks before INTR */
 #define DO_DETECT        0	/* Do device detection here (see scsi.c) */

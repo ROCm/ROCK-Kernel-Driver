@@ -18,7 +18,7 @@
 
 void __init ide_init_adma100 (ide_hwif_t *hwif)
 {
-	u32  phy_admctl = pci_resource_start(hwif->pci_dev, 4) + 0x80 + (hwif->channel * 0x20);
+	unsigned long  phy_admctl = pci_resource_start(hwif->pci_dev, 4) + 0x80 + (hwif->channel * 0x20);
 	void *v_admctl;
 
 	hwif->autodma = 0;		// not compatible with normal IDE DMA transfers

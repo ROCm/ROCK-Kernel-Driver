@@ -96,7 +96,7 @@ static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
 
 	for (i = 0; i < n_piix_devs; i++) {
 		struct pci_dev *dev	= piix_devs[i];
-		u32 bibma = pci_resource_start(dev, 4);
+		unsigned long bibma = pci_resource_start(dev, 4);
 	        u16 reg40 = 0, psitre = 0, reg42 = 0, ssitre = 0;
 		u8  c0 = 0, c1 = 0, reg54 = 0, reg55 = 0;
 		u8  reg44 = 0, reg48 = 0, reg4a = 0, reg4b = 0;
@@ -155,8 +155,8 @@ static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
 		 * at that point bibma+0x2 et bibma+0xa are byte registers
 		 * to investigate:
 		 */
-		c0 = inb((unsigned short)bibma + 0x02);
-		c1 = inb((unsigned short)bibma + 0x0a);
+		c0 = inb(bibma + 0x02);
+		c1 = inb(bibma + 0x0a);
 
 		p += sprintf(p, "--------------- Primary Channel "
 				"---------------- Secondary Channel "

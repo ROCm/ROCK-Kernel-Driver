@@ -1686,6 +1686,8 @@ static int rtl8139_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	entry = tp->cur_tx % NUM_TX_DESC;
 
 	if (likely(len < TX_BUF_SIZE)) {
+		if (len < ETH_ZLEN)
+			memset(tp->tx_buf[entry], 0, ETH_ZLEN);
 		skb_copy_and_csum_dev(skb, tp->tx_buf[entry]);
 		dev_kfree_skb(skb);
 	} else {

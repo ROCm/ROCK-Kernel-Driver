@@ -3008,6 +3008,12 @@ static int wavelan_packet_xmit(struct sk_buff *skb, device * dev)
 	       (unsigned) skb);
 #endif
 
+	if (skb->len < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+	}
+
 	/*
 	 * Block a timer-based transmit from overlapping.
 	 * In other words, prevent reentering this routine.

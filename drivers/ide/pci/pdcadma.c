@@ -43,7 +43,7 @@ static int pdcadma_get_info (char *buffer, char **addr, off_t offset, int count)
 
 	for (i = 0; i < n_pdc_devs; i++) {
 		struct pci_dev *dev	= pdc_devs[i];
-		u32 bibma = pci_resource_start(dev, 4);
+		unsigned long bibma = pci_resource_start(dev, 4);
 
 		p += sprintf(p, "\n                                "
 			"PDC ADMA %04X Chipset.\n", dev->device);

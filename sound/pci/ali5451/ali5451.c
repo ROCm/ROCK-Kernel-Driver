@@ -67,7 +67,7 @@ MODULE_PARM_DESC(pcm_channels, "PCM Channels");
 MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",default:32,allows:{{1,32}}");
 
 /*
- *  Debug part definations
+ *  Debug part definitions
  */
 
 //#define ALI_DEBUG

@@ -1130,17 +1130,23 @@ static int eepro_send_packet(struct sk_buff *skb, struct net_device *dev)
 	struct eepro_local *lp = (struct eepro_local *)dev->priv;
 	unsigned long flags;
 	int ioaddr = dev->base_addr;
+	short length = skb->len;
 
 	if (net_debug > 5)
 		printk(KERN_DEBUG  "%s: entering eepro_send_packet routine.\n", dev->name);
 
+	if (length < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+		length = ETH_ZLEN;
+	}
 	netif_stop_queue (dev);
 
 	eepro_dis_int(ioaddr);
 	spin_lock_irqsave(&lp->lock, flags);
 
 	{
-		short length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 		unsigned char *buf = skb->data;
 
 		if (hardware_send_packet(dev, buf, length))

@@ -1052,10 +1052,16 @@ static int eth16i_tx(struct sk_buff *skb, struct net_device *dev)
 	struct eth16i_local *lp = (struct eth16i_local *)dev->priv;
 	int ioaddr = dev->base_addr;
 	int status = 0;
-	ushort length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
+	ushort length = skb->len;
 	unsigned char *buf = skb->data;
 	unsigned long flags;
 
+	if (length < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+		length = ETH_ZLEN;
+	}
 
 	netif_stop_queue(dev);
 		

@@ -1052,7 +1052,7 @@ static int ray_dev_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     ray_dev_t *local = dev->priv;
     dev_link_t *link = local->finder;
-    short length;
+    short length = skb->len;
 
     if (!(link->state & DEV_PRESENT)) {
         DEBUG(2,"ray_dev_start_xmit - device not present\n");
@@ -1068,7 +1068,13 @@ static int ray_dev_start_xmit(struct sk_buff *skb, struct net_device *dev)
         }
     }
 
-    length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
+    if (length < ETH_ZLEN)
+    {
+    	skb = skb_padto(skb, ETH_ZLEN);
+    	if (skb == NULL)
+    		return 0;
+    	length = ETH_ZLEN;
+    }
     switch (ray_hw_xmit( skb->data, length, dev, DATA_TYPE)) {
         case XMIT_NO_CCS:
         case XMIT_NEED_AUTH:

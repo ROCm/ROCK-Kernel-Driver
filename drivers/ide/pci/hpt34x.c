@@ -64,7 +64,7 @@ static int hpt34x_get_info (char *buffer, char **addr, off_t offset, int count)
 			"HPT34X Chipset.\n");
 	for (i = 0; i < n_hpt34x_devs; i++) {
 		struct pci_dev *dev = hpt34x_devs[i];
-		u32 bibma = pci_resource_start(dev, 4);
+		unsigned long bibma = pci_resource_start(dev, 4);
 		u8  c0 = 0, c1 = 0;
 
 		/*

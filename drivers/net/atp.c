@@ -200,7 +200,7 @@ static void get_node_ID(struct net_device *dev);
 static unsigned short eeprom_op(long ioaddr, unsigned int cmd);
 static int net_open(struct net_device *dev);
 static void hardware_init(struct net_device *dev);
-static void write_packet(long ioaddr, int length, unsigned char *packet, int mode);
+static void write_packet(long ioaddr, int length, unsigned char *packet, int pad, int mode);
 static void trigger_send(long ioaddr, int length);
 static int	atp_send_packet(struct sk_buff *skb, struct net_device *dev);
 static void atp_interrupt(int irq, void *dev_id, struct pt_regs *regs);
@@ -499,15 +499,23 @@ static void trigger_send(long ioaddr, int length)
 	write_reg(ioaddr, CMR1, CMR1_Xmit);
 }
 
-static void write_packet(long ioaddr, int length, unsigned char *packet, int data_mode)
+static void write_packet(long ioaddr, int length, unsigned char *packet, int pad_len, int data_mode)
 {
-    length = (length + 1) & ~1;		/* Round up to word length. */
+    if (length & 1)
+    {
+    	length++;
+    	pad_len++;
+    }
+
     outb(EOC+MAR, ioaddr + PAR_DATA);
     if ((data_mode & 1) == 0) {
 		/* Write the packet out, starting with the write addr. */
 		outb(WrAddr+MAR, ioaddr + PAR_DATA);
 		do {
 			write_byte_mode0(ioaddr, *packet++);
+		} while (--length > pad_len) ;
+		do {
+			write_byte_mode0(ioaddr, 0);
 		} while (--length > 0) ;
     } else {
 		/* Write the packet out in slow mode. */
@@ -521,8 +529,10 @@ static void write_packet(long ioaddr, int length, unsigned char *packet, int dat
 		outbyte >>= 4;
 		outb(outbyte & 0x0f, ioaddr + PAR_DATA);
 		outb(Ctrl_HNibWrite + Ctrl_IRQEN, ioaddr + PAR_CONTROL);
-		while (--length > 0)
+		while (--length > pad_len)
 			write_byte_mode1(ioaddr, *packet++);
+		while (--length > 0)
+			write_byte_mode1(ioaddr, 0);
     }
     /* Terminate the Tx frame.  End of write: ECB. */
     outb(0xff, ioaddr + PAR_DATA);
@@ -564,7 +574,7 @@ static int atp_send_packet(struct sk_buff *skb, struct net_device *dev)
 	write_reg_high(ioaddr, IMR, 0);
 	spin_unlock_irqrestore(&lp->lock, flags);
 
-	write_packet(ioaddr, length, skb->data, dev->if_port);
+	write_packet(ioaddr, length, skb->data, length-skb->len, dev->if_port);
 
 	lp->pac_cnt_in_tx_buf++;
 	if (lp->tx_unit_busy == 0) {

@@ -315,7 +315,7 @@ static int ide_pci_enable(struct pci_dev *dev, ide_pci_device_t *d)
 				"Could not enable device.\n", d->name);
 			return -EBUSY;
 		} else
-			printk(KERN_WARNING "%s: Not fully BIOS configured!\n", d->name);
+			printk(KERN_WARNING "%s: BIOS configuration fixed.\n", d->name);
 	}
 
 	/*
@@ -482,7 +482,7 @@ static void ide_hwif_setup_dma(struct pci_dev *dev, ide_pci_device_t *d, ide_hwi
 	if ((d->autodma == AUTODMA) ||
 	    ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE &&
 	     (dev->class & 0x80))) {
-		u32 dma_base = ide_get_or_set_dma_base(hwif);
+		unsigned long dma_base = ide_get_or_set_dma_base(hwif);
 		if (dma_base && !(pcicmd & PCI_COMMAND_MASTER)) {
 			/*
  			 * Set up BM-DMA capability
