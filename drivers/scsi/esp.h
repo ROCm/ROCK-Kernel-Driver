@@ -77,8 +77,8 @@ struct scsi_cmnd;
 
 /* We get one of these for each ESP probed. */
 struct esp {
-	unsigned long		eregs;		/* ESP controller registers */
-	unsigned long		dregs;		/* DMA controller registers */
+	void __iomem		*eregs;		/* ESP controller registers */
+	void __iomem		*dregs;		/* DMA controller registers */
 	struct sbus_dma		*dma;		/* DMA controller sw state */
 	struct Scsi_Host	*ehost;		/* Backpointer to SCSI Host */
 	struct sbus_dev		*sdev;		/* Pointer to SBus entry */
