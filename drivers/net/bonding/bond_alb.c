@@ -146,6 +146,7 @@ static inline void tlb_init_table_entry(struct tlb_client_info *entry, int save_
 			BOND_TLB_REBALANCE_INTERVAL;
 		entry->tx_bytes = 0;
 	}
+
 	entry->tx_slave = NULL;
 	entry->next = TLB_NULL_INDEX;
 	entry->prev = TLB_NULL_INDEX;
@@ -164,6 +165,7 @@ static void tlb_clear_slave(struct bonding *bond, struct slave *slave, int save_
 	u32 index;
 
 	_lock_tx_hashtbl(bond);
+
 	/* clear slave from tx_hashtbl */
 	tx_hash_table = BOND_ALB_INFO(bond).tx_hashtbl;
 
@@ -173,6 +175,7 @@ static void tlb_clear_slave(struct bonding *bond, struct slave *slave, int save_
 		tlb_init_table_entry(&tx_hash_table[index], save_load);
 		index = next_index;
 	}
+
 	_unlock_tx_hashtbl(bond);
 
 	tlb_init_slave(slave);
@@ -199,9 +202,11 @@ static int tlb_initialize(struct bonding *bond)
 	}
 
 	memset(bond_info->tx_hashtbl, 0, size);
+
 	for (i = 0; i < TLB_HASH_TABLE_SIZE; i++) {
 		tlb_init_table_entry(&bond_info->tx_hashtbl[i], 1);
 	}
+
 	_unlock_tx_hashtbl(bond);
 
 	return 0;
@@ -213,8 +218,10 @@ static void tlb_deinitialize(struct bonding *bond)
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 
 	_lock_tx_hashtbl(bond);
+
 	kfree(bond_info->tx_hashtbl);
 	bond_info->tx_hashtbl = NULL;
+
 	_unlock_tx_hashtbl(bond);
 }
 
@@ -326,7 +333,6 @@ static void rlb_update_entry_from_arp(struct bonding *bond, struct arp_pkt *arp)
 	if ((client_info->assigned) &&
 	    (client_info->ip_src == arp->ip_dst) &&
 	    (client_info->ip_dst == arp->ip_src)) {
-
 		/* update the clients MAC address */
 		memcpy(client_info->mac_dst, arp->mac_src, ETH_ALEN);
 		client_info->ntt = 1;
@@ -409,10 +415,12 @@ static void rlb_teach_disabled_mac_on_primary(struct bonding *bond, u8 addr[])
 	if (!bond->curr_active_slave) {
 		return;
 	}
+
 	if (!bond->alb_info.primary_is_promisc) {
 		bond->alb_info.primary_is_promisc = 1;
 		dev_set_promiscuity(bond->curr_active_slave->dev, 1);
 	}
+
 	bond->alb_info.rlb_promisc_timeout_counter = 0;
 
 	alb_send_learning_packets(bond->curr_active_slave, addr);
@@ -435,7 +443,6 @@ static void rlb_clear_slave(struct bonding *bond, struct slave *slave)
 	index = bond_info->rx_hashtbl_head;
 	for (; index != RLB_NULL_INDEX; index = next_index) {
 		next_index = rx_hash_table[index].next;
-
 		if (rx_hash_table[index].slave == slave) {
 			struct slave *assigned_slave = rlb_next_rx_slave(bond);
 
@@ -464,9 +471,11 @@ static void rlb_clear_slave(struct bonding *bond, struct slave *slave)
 	_unlock_rx_hashtbl(bond);
 
 	write_lock(&bond->curr_slave_lock);
+
 	if (slave != bond->curr_active_slave) {
 		rlb_teach_disabled_mac_on_primary(bond, slave->dev->dev_addr);
 	}
+
 	write_unlock(&bond->curr_slave_lock);
 }
 
@@ -600,7 +609,6 @@ struct slave *rlb_choose_channel(struct bonding *bond, struct arp_pkt *arp)
 		if ((client_info->ip_src == arp->ip_src) &&
 		    (client_info->ip_dst == arp->ip_dst)) {
 			/* the entry is already assigned to this client */
-
 			if (memcmp(arp->mac_dst, mac_bcast, ETH_ALEN)) {
 				/* update mac address from arp */
 				memcpy(client_info->mac_dst, arp->mac_dst, ETH_ALEN);
@@ -679,7 +687,6 @@ static struct slave *rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 		}
 		dprintk("Server sent ARP Reply packet\n");
 	} else if (arp->op_code == __constant_htons(ARPOP_REQUEST)) {
-
 		/* Create an entry in the rx_hashtbl for this client as a
 		 * place holder.
 		 * When the arp reply is received the entry will be updated
@@ -767,6 +774,7 @@ static int rlb_initialize(struct bonding *bond)
 	for (i = 0; i < RLB_HASH_TABLE_SIZE; i++) {
 		rlb_init_table_entry(bond_info->rx_hashtbl + i);
 	}
+
 	_unlock_rx_hashtbl(bond);
 
 	/*initialize packet type*/
@@ -787,8 +795,10 @@ static void rlb_deinitialize(struct bonding *bond)
 	dev_remove_pack(&(bond_info->rlb_pkt_type));
 
 	_lock_rx_hashtbl(bond);
+
 	kfree(bond_info->rx_hashtbl);
 	bond_info->rx_hashtbl = NULL;
+
 	_unlock_rx_hashtbl(bond);
 }
 
@@ -816,14 +826,15 @@ static void alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
 
 		data = skb_put(skb, size);
 		memcpy(data, &pkt, size);
+
 		skb->mac.raw = data;
 		skb->nh.raw = data + ETH_HLEN;
 		skb->protocol = pkt.type;
 		skb->priority = TC_PRIO_CONTROL;
 		skb->dev = slave->dev;
+
 		dev_queue_xmit(skb);
 	}
-
 }
 
 /* hw is a boolean parameter that determines whether we should try and
@@ -991,6 +1002,7 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
 				break;
 			}
 		}
+
 		if (found) {
 			/* a slave was found that is using the mac address
 			 * of the new slave
@@ -1001,6 +1013,7 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
 			       slave->dev->name);
 			return -EINVAL;
 		}
+
 		return 0;
 	}
 
@@ -1178,7 +1191,6 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 		hash_start = (char*)&(skb->nh.iph->daddr);
 		hash_size = sizeof(skb->nh.iph->daddr);
 		break;
-
 	case ETH_P_IPV6:
 		if (memcmp(eth_data->h_dest, mac_bcast, ETH_ALEN) == 0) {
 			do_tx_balance = 0;
@@ -1188,7 +1200,6 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 		hash_start = (char*)&(skb->nh.ipv6h->daddr);
 		hash_size = sizeof(skb->nh.ipv6h->daddr);
 		break;
-
 	case ETH_P_IPX:
 		if (ipx_hdr(skb)->ipx_checksum !=
 		    __constant_htons(IPX_NO_CHECKSUM)) {
@@ -1210,14 +1221,12 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 		hash_start = (char*)eth_data->h_dest;
 		hash_size = ETH_ALEN;
 		break;
-
 	case ETH_P_ARP:
 		do_tx_balance = 0;
 		if (bond_info->rlb_enabled) {
 			tx_slave = rlb_arp_xmit(skb, bond);
 		}
 		break;
-
 	default:
 		do_tx_balance = 0;
 		break;
@@ -1290,9 +1299,11 @@ void bond_alb_monitor(struct bonding *bond)
 		 * read.
 		 */
 		read_lock(&bond->curr_slave_lock);
+
 		bond_for_each_slave(bond, slave, i) {
 			alb_send_learning_packets(slave,slave->dev->dev_addr);
 		}
+
 		read_unlock(&bond->curr_slave_lock);
 
 		bond_info->lp_counter = 0;
@@ -1300,7 +1311,9 @@ void bond_alb_monitor(struct bonding *bond)
 
 	/* rebalance tx traffic */
 	if (bond_info->tx_rebalance_counter >= BOND_TLB_REBALANCE_TICKS) {
+
 		read_lock(&bond->curr_slave_lock);
+
 		bond_for_each_slave(bond, slave, i) {
 			tlb_clear_slave(bond, slave, 1);
 			if (slave == bond->curr_active_slave) {
@@ -1310,7 +1323,9 @@ void bond_alb_monitor(struct bonding *bond)
 				bond_info->unbalanced_load = 0;
 			}
 		}
+
 		read_unlock(&bond->curr_slave_lock);
+
 		bond_info->tx_rebalance_counter = 0;
 	}
 
@@ -1322,6 +1337,7 @@ void bond_alb_monitor(struct bonding *bond)
 		 * sets the promiscuity.
 		 */
 		write_lock(&bond->curr_slave_lock);
+
 		if (bond_info->primary_is_promisc &&
 		    (++bond_info->rlb_promisc_timeout_counter >= RLB_PROMISC_TIMEOUT)) {
 
@@ -1334,6 +1350,7 @@ void bond_alb_monitor(struct bonding *bond)
 			dev_set_promiscuity(bond->curr_active_slave->dev, -1);
 			bond_info->primary_is_promisc = 0;
 		}
+
 		write_unlock(&bond->curr_slave_lock);
 
 		if (bond_info->rlb_rebalance) {
