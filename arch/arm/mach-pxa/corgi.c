@@ -34,6 +34,7 @@
 #include <asm/arch/pxa-regs.h>
 #include <asm/arch/irq.h>
 #include <asm/arch/mmc.h>
+#include <asm/arch/udc.h>
 #include <asm/arch/corgi.h>
 
 #include <asm/hardware/scoop.h>
@@ -192,6 +193,27 @@ static struct pxamci_platform_data corgi_mci_platform_data = {
 };
 
 
+/*
+ * USB Device Controller
+ */
+static void corgi_udc_command(int cmd)
+{
+	switch(cmd)	{
+	case PXA2XX_UDC_CMD_CONNECT:
+		GPSR(CORGI_GPIO_USB_PULLUP) = GPIO_bit(CORGI_GPIO_USB_PULLUP);
+		break;
+	case PXA2XX_UDC_CMD_DISCONNECT:
+		GPCR(CORGI_GPIO_USB_PULLUP) = GPIO_bit(CORGI_GPIO_USB_PULLUP);
+		break;
+	}
+}
+
+static struct pxa2xx_udc_mach_info udc_info __initdata = {
+	/* no connect GPIO; corgi can't tell connection status */
+	.udc_command		= corgi_udc_command,
+};
+
+
 static struct platform_device *devices[] __initdata = {
 	&corgiscoop_device,
 	&corgissp_device,
@@ -221,6 +243,8 @@ static void __init corgi_init(void)
 	else
 		corgi_fb_info.phadadj=-1;
 
+	pxa_gpio_mode(CORGI_GPIO_USB_PULLUP | GPIO_OUT);
+ 	pxa_set_udc_info(&udc_info);
 	pxa_set_mci_info(&corgi_mci_platform_data);
 
 	platform_add_devices(devices, ARRAY_SIZE(devices));
