@@ -206,238 +206,238 @@ enum wl3501_status {
 #define WL3501_ESSID_MAX_LEN (IW_ESSID_MAX_SIZE + 2)
 
 struct wl3501_tx_hdr {
-	u16		tx_cnt;
-	unsigned char	sync[16];
-	u16		sfd;
-	unsigned char	signal;
-	unsigned char	service;
-	u16		len;
-	u16		crc16;
-	u16		frame_ctrl;
-	u16		duration_id;
-	unsigned char	addr1[ETH_ALEN];
-	unsigned char	addr2[ETH_ALEN];
-	unsigned char	addr3[ETH_ALEN];
-	u16		seq_ctrl;
-	unsigned char	addr4[ETH_ALEN];
+	u16	tx_cnt;
+	u8	sync[16];
+	u16	sfd;
+	u8	signal;
+	u8	service;
+	u16	len;
+	u16	crc16;
+	u16	frame_ctrl;
+	u16	duration_id;
+	u8	addr1[ETH_ALEN];
+	u8	addr2[ETH_ALEN];
+	u8	addr3[ETH_ALEN];
+	u16	seq_ctrl;
+	u8	addr4[ETH_ALEN];
 };
 
 struct wl3501_rx_hdr {
-	u16		rx_next_blk;
-	u16		rc_next_frame_blk;
-	unsigned char	rx_blk_ctrl;
-	unsigned char	rx_next_frame;
-	unsigned char	rx_next_frame1;
-	unsigned char	rssi;
-	unsigned char	time[8];
-	unsigned char	signal;
-	unsigned char	service;
-	u16		len;
-	u16		crc16;
-	u16		frame_ctrl;
-	u16		duration;
-	unsigned char	addr1[ETH_ALEN];
-	unsigned char	addr2[ETH_ALEN];
-	unsigned char	addr3[ETH_ALEN];
-	u16		seq;
-	unsigned char	addr4[ETH_ALEN];
+	u16	rx_next_blk;
+	u16	rc_next_frame_blk;
+	u8	rx_blk_ctrl;
+	u8	rx_next_frame;
+	u8	rx_next_frame1;
+	u8	rssi;
+	char	time[8];
+	u8	signal;
+	u8	service;
+	u16	len;
+	u16	crc16;
+	u16	frame_ctrl;
+	u16	duration;
+	u8	addr1[ETH_ALEN];
+	u8	addr2[ETH_ALEN];
+	u8	addr3[ETH_ALEN];
+	u16	seq;
+	u8	addr4[ETH_ALEN];
 };
 
 struct wl3501_start_req {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	bss_type;
-	u16		beacon_period;
-	u16		dtim_period;
-	u16		probe_delay;
-	u16		cap_info;
-	unsigned char	ssid[WL3501_ESSID_MAX_LEN];
-	unsigned char	bss_basic_rate_set[10];
-	unsigned char	operational_rate_set[10];
-	unsigned char	cf_pset[8];
-	unsigned char	phy_pset[3];
-	unsigned char	ibss_pset[4];
+	u16	next_blk;
+	u8	sig_id;
+	u8	bss_type;
+	u16	beacon_period;
+	u16	dtim_period;
+	u16	probe_delay;
+	u16	cap_info;
+	char	ssid[WL3501_ESSID_MAX_LEN];
+	u8	bss_basic_rate_set[10];
+	u8	operational_rate_set[10];
+	u8	cf_pset[8];
+	u8	phy_pset[3];
+	u8	ibss_pset[4];
 };
 
 struct wl3501_assoc_req {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		timeout;
-	u16		cap_info;
-	u16		listen_interval;
-	unsigned char	mac_addr[ETH_ALEN];
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	timeout;
+	u16	cap_info;
+	u16	listen_interval;
+	u8	mac_addr[ETH_ALEN];
 };
 
 struct wl3501_assoc_confirm {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		status;
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	status;
 };
 
 struct wl3501_assoc_ind {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	mac_addr[ETH_ALEN];
+	u16	next_blk;
+	u8	sig_id;
+	u8	mac_addr[ETH_ALEN];
 };
 
 struct wl3501_auth_req {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		type;
-	u16		timeout;
-	unsigned char	mac_addr[ETH_ALEN];
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	type;
+	u16	timeout;
+	u8	mac_addr[ETH_ALEN];
 };
 
 struct wl3501_auth_confirm {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		type;
-	u16		status;
-	unsigned char	mac_addr[ETH_ALEN];
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	type;
+	u16	status;
+	u8	mac_addr[ETH_ALEN];
 };
 
 struct wl3501_get_req {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		mib_attrib;
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	mib_attrib;
 };
 
 struct wl3501_get_confirm {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		mib_status;
-	u16		mib_attrib;
-	unsigned char	mib_value[100];
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	mib_status;
+	u16	mib_attrib;
+	u8	mib_value[100];
 };
 
 struct wl3501_join_req {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	unsigned char	operational_rate_set[10];
-	u16		reserved2;
-	u16		timeout;
-	u16		probe_delay;
-	unsigned char	timestamp[8];
-	unsigned char	local_time[8];
-	u16		beacon_period;
-	u16		dtim_period;
-	u16		cap_info;
-	unsigned char	bss_type;
-	unsigned char	bssid[ETH_ALEN];
-	unsigned char	ssid[WL3501_ESSID_MAX_LEN];
-	unsigned char	phy_pset[3];
-	unsigned char	cf_pset[8];
-	unsigned char	ibss_pset[4];
-	unsigned char	bss_basic_rate_set[10];
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u8	operational_rate_set[10];
+	u16	reserved2;
+	u16	timeout;
+	u16	probe_delay;
+	u8	timestamp[8];
+	u8	local_time[8];
+	u16	beacon_period;
+	u16	dtim_period;
+	u16	cap_info;
+	u8	bss_type;
+	u8	bssid[ETH_ALEN];
+	char	ssid[WL3501_ESSID_MAX_LEN];
+	u8	phy_pset[3];
+	u8	cf_pset[8];
+	u8	ibss_pset[4];
+	u8	bss_basic_rate_set[10];
 };
 
 struct wl3501_join_confirm {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		status;
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	status;
 };
 
 struct wl3501_pwr_mgmt_req {
-	u16		next_blk;
-	unsigned char	sig_id;
-	u8		pwr_save;
-	u8		wake_up;
-	u8		receive_dtims;
+	u16	next_blk;
+	u8	sig_id;
+	u8	pwr_save;
+	u8	wake_up;
+	u8	receive_dtims;
 };
 
 struct wl3501_pwr_mgmt_confirm {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		status;
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	status;
 };
 
 struct wl3501_scan_req {
 	u16			next_blk;
-	unsigned char		sig_id;
-	unsigned char		bss_type;
+	u8			sig_id;
+	u8			bss_type;
 	u16			probe_delay;
 	u16			min_chan_time;
 	u16			max_chan_time;
-	unsigned char		chan_list[14];
-	unsigned char		bssid[ETH_ALEN];
-	unsigned char		ssid[WL3501_ESSID_MAX_LEN];
+	u8			chan_list[14];
+	u8			bssid[ETH_ALEN];
+	char			ssid[WL3501_ESSID_MAX_LEN];
 	enum wl3501_scan_type	scan_type;
 };
 
 struct wl3501_scan_confirm {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		status;
-	unsigned char	timestamp[8];
-	unsigned char	localtime[8];
-	u16		beacon_period;
-	u16		dtim_period;
-	u16		cap_info;
-	unsigned char	bss_type;
-	unsigned char	bssid[ETH_ALEN];
-	unsigned char	ssid[WL3501_ESSID_MAX_LEN];
-	unsigned char	phy_pset[3];
-	unsigned char	cf_pset[8];
-	unsigned char	ibss_pset[4];
-	unsigned char	bss_basic_rate_set[10];
-	unsigned char	rssi;
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	status;
+	char	timestamp[8];
+	char	localtime[8];
+	u16	beacon_period;
+	u16	dtim_period;
+	u16	cap_info;
+	u8	bss_type;
+	u8	bssid[ETH_ALEN];
+	char	ssid[WL3501_ESSID_MAX_LEN];
+	u8	phy_pset[3];
+	u8	cf_pset[8];
+	u8	ibss_pset[4];
+	u8	bss_basic_rate_set[10];
+	u8	rssi;
 };
 
 struct wl3501_start_confirm {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		status;
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	status;
 };
 
 struct wl3501_md_req {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	routing;
-	u16		data;
-	u16		size;
-	unsigned char	pri;
-	unsigned char	service_class;
-	unsigned char	daddr[ETH_ALEN];
-	unsigned char	saddr[ETH_ALEN];
+	u16	next_blk;
+	u8	sig_id;
+	u8	routing;
+	u16	data;
+	u16	size;
+	u8	pri;
+	u8	service_class;
+	u8	daddr[ETH_ALEN];
+	u8	saddr[ETH_ALEN];
 };
 
 struct wl3501_md_ind {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	routing;
-	u16		data;
-	u16		size;
-	unsigned char	reception;
-	unsigned char	pri;
-	unsigned char	service_class;
-	unsigned char	daddr[ETH_ALEN];
-	unsigned char	saddr[ETH_ALEN];
+	u16	next_blk;
+	u8	sig_id;
+	u8	routing;
+	u16	data;
+	u16	size;
+	u8	reception;
+	u8	pri;
+	u8	service_class;
+	u8	daddr[ETH_ALEN];
+	u8	saddr[ETH_ALEN];
 };
 
 struct wl3501_md_confirm {
-	u16		next_blk;
-	unsigned char	sig_id;
-	unsigned char	reserved;
-	u16		data;
-	unsigned char	status;
-	unsigned char	pri;
-	unsigned char	service_class;
+	u16	next_blk;
+	u8	sig_id;
+	u8	reserved;
+	u16	data;
+	u8	status;
+	u8	pri;
+	u8	service_class;
 };
 
 struct wl3501_resync_req {
-	u16		next_blk;
-	unsigned char	sig_id;
+	u16	next_blk;
+	u8	sig_id;
 };
 
 /* Definitions for supporting clone adapters. */
@@ -511,7 +511,7 @@ struct wl3501_80211_tx_hdr {
 
 struct wl3501_card {
 	int				base_addr;
-	unsigned char			mac_addr[ETH_ALEN];
+	u8				mac_addr[ETH_ALEN];
 	spinlock_t			lock;
 	wait_queue_head_t		wait;
 	struct wl3501_get_confirm	sig_get_confirm;
@@ -528,18 +528,18 @@ struct wl3501_card {
 	u16				esbq_confirm_end;
 	u16				esbq_confirm;
 	u8				essid[WL3501_ESSID_MAX_LEN];
-	unsigned char			bssid[ETH_ALEN];
+	u8				bssid[ETH_ALEN];
 	int				net_type;
 	u8				keep_essid[WL3501_ESSID_MAX_LEN];
-	unsigned char			nick[32];
-	unsigned char			card_name[32];
-	unsigned char			firmware_date[32];
+	char				nick[32];
+	char				card_name[32];
+	char				firmware_date[32];
 	u8				chan;
 	u8				cap_info;
 	u16				start_seg;
 	u16				bss_cnt;
 	u16				join_sta_bss;
-	unsigned char			rssi;
+	u8				rssi;
 	u8				adhoc_times;
 	u8				reg_domain;
 	u8				version[2];

@@ -523,7 +523,7 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 		pdata += 12;
 		sig.data = bf;
 		if (((*pdata) * 256 + (*(pdata + 1))) > 1500) {
-			unsigned char addr4[ETH_ALEN] = {
+			u8 addr4[ETH_ALEN] = {
 				[0] = 0xAA, [1] = 0xAA, [2] = 0x03, [4] = 0x00,
 			};
 
@@ -956,7 +956,7 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 {
 	struct wl3501_md_ind sig;
 	struct sk_buff *skb;
-	unsigned char rssi, addr4[ETH_ALEN];
+	u8 rssi, addr4[ETH_ALEN];
 	u16 pkt_len;
 
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
@@ -1662,8 +1662,7 @@ static int wl3501_set_wap(struct net_device *dev, struct iw_request_info *info,
 			  union iwreq_data *wrqu, char *extra)
 {
 	struct wl3501_card *this = dev->priv;
-	static const unsigned char bcast[ETH_ALEN] =
-					{ 255, 255, 255, 255, 255, 255 };
+	static const u8 bcast[ETH_ALEN] = { 255, 255, 255, 255, 255, 255 };
 	int rc = -EINVAL;
 
 	/* FIXME: we support other ARPHRDs...*/
@@ -1946,29 +1945,29 @@ static dev_link_t *wl3501_attach(void)
 		goto out;
 	memset(link, 0, sizeof(struct dev_link_t));
 	init_timer(&link->release);
-	link->release.function = wl3501_release;
-	link->release.data = (unsigned long)link;
+	link->release.function	= wl3501_release;
+	link->release.data	= (unsigned long)link;
 
 	/* The io structure describes IO port mapping */
-	link->io.NumPorts1 = 16;
-	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
-	link->io.IOAddrLines = 5;
+	link->io.NumPorts1	= 16;
+	link->io.Attributes1	= IO_DATA_PATH_WIDTH_8;
+	link->io.IOAddrLines	= 5;
 
 	/* Interrupt setup */
-	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-	link->irq.IRQInfo2 = wl3501_irq_mask;
+	link->irq.Attributes	= IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
+	link->irq.IRQInfo1	= IRQ_INFO2_VALID | IRQ_LEVEL_ID;
+	link->irq.IRQInfo2	= wl3501_irq_mask;
 	if (wl3501_irq_list[0] != -1)
 		for (i = 0; i < 4; i++)
 			link->irq.IRQInfo2 |= 1 << wl3501_irq_list[i];
 	link->irq.Handler = wl3501_interrupt;
 
 	/* General socket configuration */
-	link->conf.Attributes = CONF_ENABLE_IRQ;
-	link->conf.Vcc = 50;
-	link->conf.IntType = INT_MEMORY_AND_IO;
-	link->conf.ConfigIndex = 1;
-	link->conf.Present = PRESENT_OPTION;
+	link->conf.Attributes	= CONF_ENABLE_IRQ;
+	link->conf.Vcc		= 50;
+	link->conf.IntType	= INT_MEMORY_AND_IO;
+	link->conf.ConfigIndex	= 1;
+	link->conf.Present	= PRESENT_OPTION;
 
 	dev = alloc_etherdev(sizeof(struct wl3501_card));
 	if (!dev)
@@ -1987,16 +1986,18 @@ static dev_link_t *wl3501_attach(void)
 	link->priv = link->irq.Instance = dev;
 
 	/* Register with Card Services */
-	link->next = wl3501_dev_list;
-	wl3501_dev_list = link;
-	client_reg.dev_info = &wl3501_dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
-	client_reg.EventMask = CS_EVENT_CARD_INSERTION |
-	    CS_EVENT_RESET_PHYSICAL |
-	    CS_EVENT_CARD_RESET | CS_EVENT_CARD_REMOVAL |
-	    CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
+	link->next		 = wl3501_dev_list;
+	wl3501_dev_list		 = link;
+	client_reg.dev_info	 = &wl3501_dev_info;
+	client_reg.Attributes	 = INFO_IO_CLIENT | INFO_CARD_SHARE;
+	client_reg.EventMask	 = CS_EVENT_CARD_INSERTION |
+				   CS_EVENT_RESET_PHYSICAL |
+				   CS_EVENT_CARD_RESET |
+				   CS_EVENT_CARD_REMOVAL |
+				   CS_EVENT_PM_SUSPEND |
+				   CS_EVENT_PM_RESUME;
 	client_reg.event_handler = wl3501_event;
-	client_reg.Version = 0x0210;
+	client_reg.Version	 = 0x0210;
 	client_reg.event_callback_args.client_data = link;
 	ret = CardServices(RegisterClient, &link->handle, &client_reg);
 	if (ret) {
@@ -2030,20 +2031,20 @@ static void wl3501_config(dev_link_t *link)
 	client_handle_t handle = link->handle;
 	struct net_device *dev = link->priv;
 	int i = 0, j, last_fn, last_ret;
-	unsigned char buf[64];
+	unsigned char bf[64];
 	struct wl3501_card *this;
 
 	/* This reads the card's CONFIG tuple to find its config registers. */
-	tuple.Attributes = 0;
-	tuple.DesiredTuple = CISTPL_CONFIG;
+	tuple.Attributes	= 0;
+	tuple.DesiredTuple	= CISTPL_CONFIG;
 	CS_CHECK(GetFirstTuple, handle, &tuple);
-	tuple.TupleData = buf;
-	tuple.TupleDataMax = 64;
-	tuple.TupleOffset = 0;
+	tuple.TupleData		= bf;
+	tuple.TupleDataMax	= sizeof(bf);
+	tuple.TupleOffset	= 0;
 	CS_CHECK(GetTupleData, handle, &tuple);
 	CS_CHECK(ParseTuple, handle, &tuple, &parse);
-	link->conf.ConfigBase = parse.config.base;
-	link->conf.Present = parse.config.rmask[0];
+	link->conf.ConfigBase	= parse.config.base;
+	link->conf.Present	= parse.config.rmask[0];
 
 	/* Configure card */
 	link->state |= DEV_CONFIG;
