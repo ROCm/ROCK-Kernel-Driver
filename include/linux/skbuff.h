@@ -231,15 +231,8 @@ struct sk_buff {
 				pkt_type,
 				ip_summed;
 	__u32			priority;
-	atomic_t		users;
 	unsigned short		protocol,
 				security;
-	unsigned int		truesize;
-
-	unsigned char		*head,
-				*data,
-				*tail,
-				*end;
 
 	void			(*destructor)(struct sk_buff *skb);
 #ifdef CONFIG_NETFILTER
@@ -261,6 +254,14 @@ struct sk_buff {
 #ifdef CONFIG_NET_SCHED
        __u32			tc_index;               /* traffic control index */
 #endif
+
+	/* These elements must be at the end, see alloc_skb() for details.  */
+	unsigned int		truesize;
+	atomic_t		users;
+	unsigned char		*head,
+				*data,
+				*tail,
+				*end;
 };
 
 #define SK_WMEM_MAX	65535
