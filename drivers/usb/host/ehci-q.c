@@ -706,8 +706,7 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 	/* (re)start the async schedule? */
 	head = ehci->async;
-	if (ehci->async_idle)
-		del_timer (&ehci->watchdog);
+	timer_action_done (ehci, TIMER_ASYNC_OFF);
 	if (!head->qh_next.qh) {
 		u32	cmd = readl (&ehci->regs->command);
 
@@ -733,8 +732,6 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 	qh->qh_state = QH_STATE_LINKED;
 	/* qtd completions reported later by interrupt */
-
-	ehci->async_idle = 0;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -915,7 +912,7 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 	struct ehci_qh		*qh = ehci->reclaim;
 	struct ehci_qh		*next;
 
-	del_timer (&ehci->watchdog);
+	timer_action_done (ehci, TIMER_IAA_WATCHDOG);
 
 	// qh->hw_next = cpu_to_le32 (qh->qh_dma);
 	qh->qh_state = QH_STATE_IDLE;
@@ -940,12 +937,8 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 		 * active but idle for a while once it empties.
 		 */
 		if (HCD_IS_RUNNING (ehci->hcd.state)
-				&& ehci->async->qh_next.qh == 0
-				&& !timer_pending (&ehci->watchdog)) {
-			ehci->async_idle = 1;
-			mod_timer (&ehci->watchdog,
-					jiffies + EHCI_ASYNC_JIFFIES);
-		}
+				&& ehci->async->qh_next.qh == 0)
+			timer_action (ehci, TIMER_ASYNC_OFF);
 	}
 
 	if (next)
@@ -980,6 +973,7 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 			wmb ();
 			// handshake later, if we need to
 		}
+		timer_action_done (ehci, TIMER_ASYNC_OFF);
 		return;
 	} 
 
@@ -1005,9 +999,8 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	ehci->reclaim_ready = 0;
 	cmd |= CMD_IAAD;
 	writel (cmd, &ehci->regs->command);
-	/* posted write need not be known to HC yet ... */
-
-	mod_timer (&ehci->watchdog, jiffies + EHCI_WATCHDOG_JIFFIES);
+	(void) readl (&ehci->regs->command);
+	timer_action (ehci, TIMER_IAA_WATCHDOG);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1016,10 +1009,11 @@ static void
 scan_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
 	struct ehci_qh		*qh;
-	int			unlink_delay = 0;
+	enum ehci_timer_action	action = TIMER_IO_WATCHDOG;
 
 	if (!++(ehci->stamp))
 		ehci->stamp++;
+	timer_action_done (ehci, TIMER_ASYNC_SHRINK);
 rescan:
 	qh = ehci->async->qh_next.qh;
 	if (likely (qh != 0)) {
@@ -1051,17 +1045,14 @@ rescan:
 			 */
 			if (list_empty (&qh->qtd_list)) {
 				if (qh->stamp == ehci->stamp)
-					unlink_delay = 1;
-				else if (!ehci->reclaim) {
+					action = TIMER_ASYNC_SHRINK;
+				else if (!ehci->reclaim)
 					start_unlink_async (ehci, qh);
-					unlink_delay = 0;
-				}
 			}
 
 			qh = qh->qh_next.qh;
 		} while (qh);
 	}
-
-	if (unlink_delay && !timer_pending (&ehci->watchdog))
-		mod_timer (&ehci->watchdog, jiffies + EHCI_WATCHDOG_JIFFIES/2);
+	if (action == TIMER_ASYNC_SHRINK)
+		timer_action (ehci, TIMER_ASYNC_SHRINK);
 }

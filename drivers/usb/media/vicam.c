@@ -1101,28 +1101,6 @@ static int vicam_read_proc_gain(char *page, char **start, off_t off,
 				((struct vicam_camera *)data)->gain);
 }
 
-static int vicam_write_proc_shutter(struct file *file, const char *buffer,
-				unsigned long count, void *data)
-{
-	struct vicam_camera *cam = (struct vicam_camera *)data;
-	
-	cam->shutter_speed = simple_strtoul(buffer, NULL, 10);
-
-	return count;
-}
-
-static int vicam_write_proc_gain(struct file *file, const char *buffer,
-				unsigned long count, void *data)
-{
-	struct vicam_camera *cam = (struct vicam_camera *)data;
-	
-	cam->gain = simple_strtoul(buffer, NULL, 10);
-
-	return count;
-}
-
-
-
 static void
 vicam_create_proc_root(void)
 {
@@ -1164,21 +1142,17 @@ vicam_create_proc_entry(struct vicam_camera *cam)
 	if ( !cam->proc_dir ) return; // We should probably return an error here
 	
 	ent =
-	    create_proc_entry("shutter", S_IFREG | S_IRUGO | S_IWUSR,
-			      cam->proc_dir);
+	    create_proc_entry("shutter", S_IFREG | S_IRUGO, cam->proc_dir);
 	if (ent) {
 		ent->data = cam;
 		ent->read_proc = vicam_read_proc_shutter;
-		ent->write_proc = vicam_write_proc_shutter;
 		ent->size = 64;
 	}
 
-	ent = create_proc_entry("gain", S_IFREG | S_IRUGO | S_IWUSR,
-					cam->proc_dir);
+	ent = create_proc_entry("gain", S_IFREG | S_IRUGO , cam->proc_dir);
 	if ( ent ) {
 		ent->data = cam;
 		ent->read_proc = vicam_read_proc_gain;
-		ent->write_proc = vicam_write_proc_gain;
 		ent->size = 64;
 	}
 }
