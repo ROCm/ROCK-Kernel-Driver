@@ -1019,6 +1019,13 @@ config MMTIMER
 	  The mmtimer device memory gives userspace access to the
 	  Altix realtime clock.
 
+config VTUNE
+	tristate "Intel VTune sampling driver"
+	depends on X86 || X86_64 || IA64
+	default n
+	help
+	  Intel VTune sampling driver.
+
 endmenu
 
 source "drivers/char/lirc/Kconfig"
