@@ -18,20 +18,6 @@
 #define CLOCK_TXINT	3	/* Internal TX and external RX clock */
 #define CLOCK_TXFROMRX	4	/* TX clock derived from external RX clock */
 
-typedef struct {
-	unsigned int clock_rate; /* bits per second */
-	unsigned int clock_type; /* internal, external, TX-internal etc. */
-	unsigned short loopback;
-}sync_serial_settings;		/* V.35, V.24, X.21 */
-
-typedef struct {
-	unsigned int clock_rate; /* bits per second */
-	unsigned int clock_type; /* internal, external, TX-internal etc. */
-	unsigned short loopback;
-	unsigned int slot_map;
-}te1_settings;			/* T1, E1 */
-
-
 
 #define ENCODING_DEFAULT	0 /* Default (current) setting */
 #define ENCODING_NRZ		1
@@ -50,37 +36,10 @@ typedef struct {
 #define PARITY_CRC32_PR0_CCITT	6 /* CRC32, initial value 0x00000000 */
 #define PARITY_CRC32_PR1_CCITT	7 /* CRC32, initial value 0xFFFFFFFF */
 
-typedef struct {
-	unsigned short encoding;
-	unsigned short parity;
-}raw_hdlc_proto;
-
-
 #define LMI_DEFAULT		0 /* Default (current) setting */
 #define LMI_NONE		1 /* No LMI, all PVCs are static */
 #define LMI_ANSI		2 /* ANSI Annex D */
 #define LMI_CCITT		3 /* ITU-T Annex A */
-
-typedef struct {
-	unsigned int t391;
-	unsigned int t392;
-	unsigned int n391;
-	unsigned int n392;
-	unsigned int n393;
-	unsigned short lmi;
-	unsigned short dce;	/* 1 for DCE (network side) operation */
-}fr_proto;
-
-typedef struct {
-	unsigned int dlci;
-}fr_proto_pvc;			/* for creating/deleting FR PVCs */
-
-
-typedef struct {
-	unsigned int interval;
-	unsigned int timeout;
-}cisco_proto;
-
 
 /* PPP doesn't need any info now - supply length = 0 to ioctl */
 
@@ -90,6 +49,7 @@ typedef struct {
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <net/syncppp.h>
+#include <linux/hdlc/ioctl.h>
 
 #define HDLC_MAX_MTU 1500	/* Ethernet 1500 bytes */
 #define HDLC_MAX_MRU (HDLC_MAX_MTU + 10) /* max 10 bytes for FR */

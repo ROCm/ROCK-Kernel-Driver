@@ -21,6 +21,7 @@
 
 #include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
 #include <linux/socket.h>		/* for "struct sockaddr" et al	*/
+#include <linux/hdlc/ioctl.h>
 
 /* Standard interface flags (netdevice->flags). */
 #define	IFF_UP		0x1		/* interface is up		*/
@@ -95,10 +96,15 @@ struct ifmap
 struct if_settings
 {
 	unsigned int type;	/* Type of physical device or protocol */
-	unsigned int data_length; /* device/protocol data length */
-	void * data;		/* pointer to data, ignored if length = 0 */
+	union {
+		/* {atm/eth/dsl}_settings anyone ? */
+		union hdlc_settings ifsu_hdlc;
+		union line_settings ifsu_line;
+	} ifs_ifsu;
 };
 
+#define ifs_hdlc	ifs_ifsu.ifsu_hdlc
+#define ifs_line	ifs_ifsu.ifsu_line
 
 /*
  * Interface request structure used for socket
@@ -129,7 +135,7 @@ struct ifreq
 		char	ifru_slave[IFNAMSIZ];	/* Just fits the size */
 		char	ifru_newname[IFNAMSIZ];
 		char *	ifru_data;
-		struct	if_settings ifru_settings;
+		struct	if_settings *ifru_settings;
 	} ifr_ifru;
 };
 
