@@ -81,7 +81,7 @@ static struct usb_serial_device_type cyberjack_device = {
 	num_bulk_in:		1,
 	num_bulk_out:		1,
 	num_ports:		1,
-	startup:		cyberjack_startup,
+	attach:		cyberjack_startup,
 	shutdown:		cyberjack_shutdown,
 	open:			cyberjack_open,
 	close:			cyberjack_close,

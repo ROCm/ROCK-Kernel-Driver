@@ -134,7 +134,7 @@ static struct usb_serial_device_type pl2303_device = {
 	read_bulk_callback:	pl2303_read_bulk_callback,
 	read_int_callback:	pl2303_read_int_callback,
 	write_bulk_callback:	pl2303_write_bulk_callback,
-	startup:		pl2303_startup,
+	attach:			pl2303_startup,
 	shutdown:		pl2303_shutdown,
 };
 

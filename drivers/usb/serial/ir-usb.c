@@ -139,7 +139,7 @@ struct usb_serial_device_type ir_device = {
 	num_bulk_out:		1,
 	num_ports:		1,
 	set_termios:		ir_set_termios,
-	startup:		ir_startup,
+	attach:			ir_startup,
 	open:			ir_open,
 	close:			ir_close,
 	write:			ir_write,

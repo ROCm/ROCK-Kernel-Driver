@@ -136,7 +136,7 @@ static struct usb_serial_device_type kl5kusb105d_device = {
 	ioctl:		     klsi_105_ioctl,
 	set_termios:	     klsi_105_set_termios,
 	/*break_ctl:	     klsi_105_break_ctl,*/
-	startup:	     klsi_105_startup,
+	attach:		     klsi_105_startup,
 	shutdown:	     klsi_105_shutdown,
 	throttle:	     klsi_105_throttle,
 	unthrottle:	     klsi_105_unthrottle,

@@ -517,7 +517,7 @@ static struct usb_serial_device_type digi_acceleport_2_device = {
 	ioctl:				digi_ioctl,
 	set_termios:			digi_set_termios,
 	break_ctl:			digi_break_ctl,
-	startup:			digi_startup,
+	attach:				digi_startup,
 	shutdown:			digi_shutdown,
 };
 
@@ -541,7 +541,7 @@ static struct usb_serial_device_type digi_acceleport_4_device = {
 	ioctl:				digi_ioctl,
 	set_termios:			digi_set_termios,
 	break_ctl:			digi_break_ctl,
-	startup:			digi_startup,
+	attach:				digi_startup,
 	shutdown:			digi_shutdown,
 };
 

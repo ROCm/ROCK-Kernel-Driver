@@ -122,7 +122,7 @@ static struct usb_serial_device_type empeg_device = {
 	close:			empeg_close,
 	throttle:		empeg_throttle,
 	unthrottle:		empeg_unthrottle,
-	startup:		empeg_startup,
+	attach:			empeg_startup,
 	shutdown:		empeg_shutdown,
 	ioctl:			empeg_ioctl,
 	set_termios:		empeg_set_termios,

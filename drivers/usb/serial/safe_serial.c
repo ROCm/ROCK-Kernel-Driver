@@ -409,7 +409,7 @@ static struct usb_serial_device_type safe_device = {
 	write:			safe_write,
 	write_room:		safe_write_room,
 	read_bulk_callback:	safe_read_bulk_callback,
-	startup:		safe_startup,
+	attach:			safe_startup,
 };
 
 static int __init safe_init (void)

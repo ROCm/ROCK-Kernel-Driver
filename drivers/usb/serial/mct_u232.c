@@ -158,7 +158,7 @@ static struct usb_serial_device_type mct_u232_device = {
 	ioctl:		     mct_u232_ioctl,
 	set_termios:	     mct_u232_set_termios,
 	break_ctl:	     mct_u232_break_ctl,
-	startup:	     mct_u232_startup,
+	attach:		     mct_u232_startup,
 	shutdown:	     mct_u232_shutdown,
 };
 

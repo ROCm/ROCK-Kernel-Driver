@@ -99,7 +99,7 @@ struct usb_serial_device_type ipaq_device = {
 	num_ports:		1,
 	open:			ipaq_open,
 	close:			ipaq_close,
-	startup:		ipaq_startup,
+	attach:			ipaq_startup,
 	shutdown:		ipaq_shutdown,
 	write:			ipaq_write,
 	write_room:		ipaq_write_room,

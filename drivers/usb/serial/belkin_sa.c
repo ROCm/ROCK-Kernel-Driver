@@ -129,7 +129,7 @@ static struct usb_serial_device_type belkin_device = {
 	ioctl:			belkin_sa_ioctl,
 	set_termios:		belkin_sa_set_termios,
 	break_ctl:		belkin_sa_break_ctl,
-	startup:		belkin_sa_startup,
+	attach:			belkin_sa_startup,
 	shutdown:		belkin_sa_shutdown,
 };
 

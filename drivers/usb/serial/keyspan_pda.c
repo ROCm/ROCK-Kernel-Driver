@@ -811,7 +811,7 @@ static struct usb_serial_device_type keyspan_pda_fake_device = {
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
 	num_ports:		1,
-	startup:		keyspan_pda_fake_startup,
+	attach:			keyspan_pda_fake_startup,
 };
 #endif
 
@@ -824,7 +824,7 @@ static struct usb_serial_device_type xircom_pgs_fake_device = {
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
 	num_ports:		1,
-	startup:		keyspan_pda_fake_startup,
+	attach:			keyspan_pda_fake_startup,
 };
 #endif
 
@@ -848,7 +848,7 @@ static struct usb_serial_device_type keyspan_pda_device = {
 	ioctl:			keyspan_pda_ioctl,
 	set_termios:		keyspan_pda_set_termios,
 	break_ctl:		keyspan_pda_break_ctl,
-	startup:		keyspan_pda_startup,
+	attach:			keyspan_pda_startup,
 	shutdown:		keyspan_pda_shutdown,
 };
 

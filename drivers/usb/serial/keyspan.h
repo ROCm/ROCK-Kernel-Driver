@@ -479,7 +479,7 @@ static struct usb_serial_device_type keyspan_pre_device = {
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
 	num_ports:		1,
-	startup:		keyspan_fake_startup,
+	attach:			keyspan_fake_startup,
 };
 
 static struct usb_serial_device_type keyspan_1port_device = {
@@ -500,7 +500,7 @@ static struct usb_serial_device_type keyspan_1port_device = {
 	ioctl:			keyspan_ioctl,
 	set_termios:		keyspan_set_termios,
 	break_ctl:		keyspan_break_ctl,
-	startup:		keyspan_startup,
+	attach:			keyspan_startup,
 	shutdown:		keyspan_shutdown,
 };
 
@@ -521,7 +521,7 @@ static struct usb_serial_device_type keyspan_2port_device = {
 	unthrottle:		keyspan_rx_unthrottle,
 	ioctl:			keyspan_ioctl,
 	set_termios:		keyspan_set_termios,
-	startup:		keyspan_startup,
+	attach:			keyspan_startup,
 	shutdown:		keyspan_shutdown,
 };
 
@@ -543,7 +543,7 @@ static struct usb_serial_device_type keyspan_4port_device = {
 	ioctl:			keyspan_ioctl,
 	set_termios:		keyspan_set_termios,
 	break_ctl:		keyspan_break_ctl,
-	startup:		keyspan_startup,
+	attach:			keyspan_startup,
 	shutdown:		keyspan_shutdown,
 };
 

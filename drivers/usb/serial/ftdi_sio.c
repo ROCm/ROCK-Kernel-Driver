@@ -189,7 +189,7 @@ static struct usb_serial_device_type ftdi_sio_device = {
 	ioctl:			ftdi_sio_ioctl,
 	set_termios:		ftdi_sio_set_termios,
 	break_ctl:		ftdi_sio_break_ctl,
-	startup:		ftdi_sio_startup,
+	attach:			ftdi_sio_startup,
         shutdown:               ftdi_sio_shutdown,
 };
 
@@ -210,7 +210,7 @@ static struct usb_serial_device_type ftdi_8U232AM_device = {
 	ioctl:			ftdi_sio_ioctl,
 	set_termios:		ftdi_sio_set_termios,
 	break_ctl:		ftdi_sio_break_ctl,
-	startup:		ftdi_8U232AM_startup,
+	attach:			ftdi_8U232AM_startup,
         shutdown:               ftdi_sio_shutdown,
 };
 
