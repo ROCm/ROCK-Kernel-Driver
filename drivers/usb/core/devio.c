@@ -1206,6 +1206,7 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return -ENODEV;
 	}
 	down(&(ps->dev->serialize));
+
 	switch (cmd) {
 	case USBDEVFS_CONTROL:
 		ret = proc_control(ps, (void __user *)arg);

@@ -533,12 +533,12 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	 * get_descriptor or something on pipe 0 after our CBW and before
 	 * our CSW, and then we get a stall, we have trouble)
 	 */
-
-	down (&(us->pusb_dev->serialize));
-
+ 
 	/* send the command to the transport layer */
+	down(&(us->pusb_dev->serialize));
 	srb->resid = 0;
 	result = us->transport(srb, us);
+	up(&(us->pusb_dev->serialize));
 
 	/* if the command gets aborted by the higher layers, we need to
 	 * short-circuit all other processing
@@ -553,13 +553,13 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("-- transport indicates error, resetting\n");
 		us->transport_reset(us);
 		srb->result = DID_ERROR << 16;
-		goto End_Transport;
+		return;
 	}
 
 	/* if the transport provided its own sense data, don't auto-sense */
 	if (result == USB_STOR_TRANSPORT_NO_SENSE) {
 		srb->result = SAM_STAT_CHECK_CONDITION;
-		goto End_Transport;
+		return;
 	}
 
 	srb->result = SAM_STAT_GOOD;
@@ -657,9 +657,11 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		srb->serial_number ^= 0x80000000;
 
 		/* issue the auto-sense command */
+		down(&(us->pusb_dev->serialize));
 		old_resid = srb->resid;
 		srb->resid = 0;
 		temp_result = us->transport(us->srb, us);
+		up(&(us->pusb_dev->serialize));
 
 		/* let's clean up right away */
 		srb->resid = old_resid;
@@ -685,7 +687,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 			if (!(us->flags & US_FL_SCM_MULT_TARG))
 				us->transport_reset(us);
 			srb->result = DID_ERROR << 16;
-			goto End_Transport;
+			return;
 		}
 
 		US_DEBUGP("-- Result from auto-sense is %d\n", temp_result);
@@ -717,7 +719,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 			srb->sense_buffer[0] = 0x0;
 		}
 	}
-	goto End_Transport;
+	return;
 
 	/* abort processing: the bulk-only transport requires a reset
 	 * following an abort */
@@ -729,9 +731,6 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		clear_bit(US_FLIDX_ABORTING, &us->flags);
 		us->transport_reset(us);
 	}
-
-  End_Transport:
-	up(&(us->pusb_dev->serialize));
 }
 
 /* Stop the current URB transfer */
