@@ -81,13 +81,13 @@
 
 /* Forward declarations for internal helper functions. */
 static int sctp_writeable(struct sock *sk);
-static inline int sctp_wspace(sctp_association_t *asoc);
+static inline int sctp_wspace(struct sctp_association *asoc);
 static inline void sctp_set_owner_w(sctp_chunk_t *chunk);
 static void sctp_wfree(struct sk_buff *skb);
-static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
+static int sctp_wait_for_sndbuf(struct sctp_association *, long *timeo_p,
 				int msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
-static int sctp_wait_for_connect(sctp_association_t *asoc, long *timeo_p);
+static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
 static inline int sctp_verify_addr(struct sock *, union sctp_addr *, int);
 static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
@@ -158,7 +158,7 @@ static struct sctp_af *sctp_sockaddr_af(struct sctp_opt *opt,
 /* Bind a local address either to an endpoint or to an association.  */
 SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
 	sctp_bind_addr_t *bp = &ep->base.bind_addr;
 	struct sctp_af *af;
@@ -454,7 +454,7 @@ err_bindx_add:
  */
 int sctp_bindx_rem(struct sock *sk, struct sockaddr_storage *addrs, int addrcnt)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
 	int cnt;
 	sctp_bind_addr_t *bp = &ep->base.bind_addr;
@@ -662,6 +662,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 
 	/* Clean up any skbs sitting on the receive queue.  */
 	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sctp_sk(sk)->pd_lobby);
 
 	/* This will run the backlog queue.  */
 	sctp_release_sock(sk);
@@ -714,7 +715,7 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *, sctp_cmsgs_t *);
 SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 			     struct msghdr *msg, int msg_len)
 {
-	sctp_opt_t *sp;
+	struct sctp_opt *sp;
 	sctp_endpoint_t *ep;
 	sctp_association_t *new_asoc=NULL, *asoc=NULL;
 	struct sctp_transport *transport;
@@ -1117,7 +1118,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 			     int len, int noblock, int flags, int *addr_len)
 {
 	struct sctp_ulpevent *event = NULL;
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 	struct sk_buff *skb;
 	int copied;
 	int err = 0;
@@ -1176,7 +1177,6 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 	/* If skb's length exceeds the user's buffer, update the skb and
 	 * push it back to the receive_queue so that the next call to
 	 * recvmsg() will return the remaining data. Don't set MSG_EOR.
-	 * Otherwise, set MSG_EOR indicating the end of a message.
 	 */
 	if (skb_len > copied) {
 		msg->msg_flags &= ~MSG_EOR;
@@ -1184,6 +1184,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 			goto out_free;
 		sctp_skb_pull(skb, copied);
 		skb_queue_head(&sk->receive_queue, skb);
+
 		/* When only partial message is copied to the user, increase
 		 * rwnd by that amount. If all the data in the skb is read,
 		 * rwnd is updated when the skb's destructor is called via
@@ -1191,9 +1192,11 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 		 */
 		sctp_assoc_rwnd_increase(event->asoc, copied);
 		goto out;
-	} else {
-		 msg->msg_flags |= MSG_EOR;
-	}
+	} else if ((event->msg_flags & MSG_NOTIFICATION) ||
+		   (event->msg_flags & MSG_EOR))
+		msg->msg_flags |= MSG_EOR;
+	else
+		msg->msg_flags &= ~MSG_EOR;
 
 out_free:
 	sctp_ulpevent_free(event); /* Free the skb. */
@@ -1231,7 +1234,7 @@ static inline int sctp_setsockopt_set_events(struct sock *sk, char *optval,
 static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 					    int optlen)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 
 	/* Applicable to UDP-style socket only */
 	if (SCTP_SOCKET_TCP == sp->type)
@@ -1353,7 +1356,7 @@ static inline int sctp_setsockopt_set_default_send_param(struct sock *sk,
 	asoc->defaults.timetolive = info.sinfo_timetolive;
 	return 0;
 }
-				
+
 /* API 6.2 setsockopt(), getsockopt()
  *
  * Applications use setsockopt() and getsockopt() to set or retrieve
@@ -1481,7 +1484,7 @@ out_nounlock:
 SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 			     int addr_len)
 {
-	sctp_opt_t *sp;
+	struct sctp_opt *sp;
 	sctp_endpoint_t *ep;
 	sctp_association_t *asoc;
 	struct sctp_transport *transport;
@@ -1603,7 +1606,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 {
 	sctp_endpoint_t *ep;
 	sctp_protocol_t *proto;
-	sctp_opt_t *sp;
+	struct sctp_opt *sp;
 
 	SCTP_DEBUG_PRINTK("sctp_init_sock(sk: %p)\n", sk);
 
@@ -1632,7 +1635,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
-	 * FIXME: This are not used yet.
+	 * FIXME: These are not used yet.
 	 */
 	sp->rtoinfo.srto_initial = proto->rto_initial;
 	sp->rtoinfo.srto_max     = proto->rto_max;
@@ -1669,6 +1672,11 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	 */
 	sp->autoclose         = 0;
 	sp->pf = sctp_get_pf_specific(sk->family);
+
+	/* Control variables for partial data delivery. */
+	sp->pd_mode           = 0;
+	skb_queue_head_init(&sp->pd_lobby);
+
 	/* Create a per socket endpoint structure.  Even if we
 	 * change the data structure relationships, this may still
 	 * be useful for storing pre-connect address information.
@@ -1823,8 +1831,8 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	struct sock *newsk;
 	struct socket *tmpsock;
 	sctp_endpoint_t *newep;
-	sctp_opt_t *oldsp = sctp_sk(oldsk);
-	sctp_opt_t *newsp;
+	struct sctp_opt *oldsp = sctp_sk(oldsk);
+	struct sctp_opt *newsp;
 	struct sk_buff *skb, *tmp;
 	struct sctp_ulpevent *event;
 	int err = 0;
@@ -1865,6 +1873,43 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 			__skb_unlink(skb, skb->list);
 			__skb_queue_tail(&newsk->receive_queue, skb);
 		}
+	}
+
+	/* Clean up an messages pending delivery due to partial
+	 * delivery.   Three cases:
+	 * 1) No partial deliver;  no work.
+	 * 2) Peeling off partial delivery; keep pd_lobby in new pd_lobby.
+	 * 3) Peeling off non-partial delivery; move pd_lobby to recieve_queue.
+	 */
+	skb_queue_head_init(&newsp->pd_lobby);
+	sctp_sk(newsk)->pd_mode = assoc->ulpq.pd_mode;;
+
+	if (sctp_sk(oldsk)->pd_mode) {
+		struct sk_buff_head *queue;
+
+		/* Decide which queue to move pd_lobby skbs to. */
+		if (assoc->ulpq.pd_mode) {
+			queue = &newsp->pd_lobby;
+		} else
+			queue = &newsk->receive_queue;
+
+		/* Walk through the pd_lobby, looking for skbs that
+		 * need moved to the new socket.
+		 */
+		sctp_skb_for_each(skb, &oldsp->pd_lobby, tmp) {
+			event = sctp_skb2event(skb);
+			if (event->asoc == assoc) {
+				__skb_unlink(skb, skb->list);
+				__skb_queue_tail(queue, skb);
+			}
+		}
+
+		/* Clear up any skbs waiting for the partial
+		 * delivery to finish.
+		 */
+		if (assoc->ulpq.pd_mode)
+			sctp_clear_pd(oldsk);
+
 	}
 
 	/* Set the type of socket to indicate that it is peeled off from the
@@ -2438,7 +2483,7 @@ static int sctp_get_port(struct sock *sk, unsigned short snum)
  */
 SCTP_STATIC int sctp_seqpacket_listen(struct sock *sk, int backlog)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 	sctp_endpoint_t *ep = sp->ep;
 
 	/* Only UDP style sockets that are not peeled off are allowed to

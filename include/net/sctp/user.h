@@ -368,6 +368,7 @@ struct sctp_rcv_pdapi_event {
 	sctp_assoc_t pdapi_assoc_id;
 };
 
+enum { SCTP_PARTIAL_DELIVERY_ABORTED=0, };
 
 /*
  * Described in Section 7.3
@@ -415,8 +416,8 @@ enum sctp_sn_type {
 	SCTP_SN_TYPE_BASE     = (1<<15),
 	SCTP_ASSOC_CHANGE,
 	SCTP_PEER_ADDR_CHANGE,
-	SCTP_REMOTE_ERROR,
 	SCTP_SEND_FAILED,
+	SCTP_REMOTE_ERROR,
 	SCTP_SHUTDOWN_EVENT,
 	SCTP_PARTIAL_DELIVERY_EVENT,
 	SCTP_ADAPTION_INDICATION,

@@ -92,7 +92,7 @@ fail:
 sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
 				    struct sock *sk, int priority)
 {
-	sctp_opt_t *sp = sctp_sk(sk);
+	struct sctp_opt *sp = sctp_sk(sk);
 	memset(ep, 0, sizeof(sctp_endpoint_t));
 
 	/* Initialize the base structure. */

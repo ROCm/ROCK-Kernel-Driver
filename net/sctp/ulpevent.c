@@ -628,14 +628,12 @@ struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(sctp_association_t *asoc,
 	if (!event)
 		goto fail_init;
 
-	for (list = skb_shinfo(skb)->frag_list; list; list = list->next) {
-		/* Note: Not clearing the entire event struct as
-		 * this is just a fragment of the real event.  However,
-		 * we still need to do rwnd accounting. 
-		 */
+	/* Note:  Not clearing the entire event struct as
+	 * this is just a fragment of the real event.  However,
+	 * we still need to do rwnd accounting. 
+	 */
+	for (list = skb_shinfo(skb)->frag_list; list; list = list->next)
 		sctp_ulpevent_set_owner_r(list, asoc);
-	}
-
 
 	info = (struct sctp_sndrcvinfo *) &event->sndrcvinfo;
 
@@ -729,6 +727,64 @@ struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(sctp_association_t *asoc,
 fail_init:
 	kfree_skb(skb);
 
+fail:
+	return NULL;
+}
+
+/* Create a partial delivery related event. 
+ *
+ * 5.3.1.7 SCTP_PARTIAL_DELIVERY_EVENT
+ *
+ *   When a reciever is engaged in a partial delivery of a
+ *   message this notification will be used to inidicate
+ *   various events.
+ */
+struct sctp_ulpevent *sctp_ulpevent_make_pdapi(
+	const sctp_association_t *asoc, __u32 indication, int priority)
+{
+	struct sctp_ulpevent *event;
+	struct sctp_rcv_pdapi_event *pd;
+	struct sk_buff *skb;
+
+	event = sctp_ulpevent_new(sizeof(struct sctp_assoc_change),
+				  MSG_NOTIFICATION, priority);
+	if (!event)
+		goto fail;
+
+	skb = sctp_event2skb(event);
+	pd = (struct sctp_rcv_pdapi_event *)
+		skb_put(skb, sizeof(struct sctp_rcv_pdapi_event));
+
+	/* pdapi_type
+	 *   It should be SCTP_PARTIAL_DELIVERY_EVENT
+	 *
+	 * pdapi_flags: 16 bits (unsigned integer)
+	 *   Currently unused.
+	 */
+	pd->pdapi_type = SCTP_PARTIAL_DELIVERY_EVENT;
+	pd->pdapi_flags = 0;
+
+	/* pdapi_length: 32 bits (unsigned integer)
+	 *
+	 * This field is the total length of the notification data, including
+	 * the notification header.  It will generally be sizeof (struct
+	 * sctp_rcv_pdapi_event).
+	 */
+	pd->pdapi_length = sizeof(struct sctp_rcv_pdapi_event);
+
+        /*  pdapi_indication: 32 bits (unsigned integer)
+	 *
+	 * This field holds the indication being sent to the application.
+	 */
+	pd->pdapi_indication = indication;
+
+	/*  pdapi_assoc_id: sizeof (sctp_assoc_t)
+	 * 
+	 * The association id field, holds the identifier for the association.
+	 */
+	pd->pdapi_assoc_id = sctp_assoc2id(asoc);
+
+	return event;
 fail:
 	return NULL;
 }

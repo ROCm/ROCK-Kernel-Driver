@@ -84,6 +84,7 @@ struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *ulpq,
 	ulpq->asoc = asoc;
 	skb_queue_head_init(&ulpq->reasm);
 	skb_queue_head_init(&ulpq->lobby);
+	ulpq->pd_mode  = 0;
 	ulpq->malloced = 0;
 
 	return ulpq;
@@ -96,15 +97,16 @@ void sctp_ulpq_flush(struct sctp_ulpq *ulpq)
 	struct sk_buff *skb;
 	struct sctp_ulpevent *event;
 
-	while ((skb = skb_dequeue(&ulpq->lobby))) {
-		event = (struct sctp_ulpevent *) skb->cb;
+	while ((skb = __skb_dequeue(&ulpq->lobby))) {
+		event = sctp_skb2event(skb);
 		sctp_ulpevent_free(event);
 	}
 
-	while ((skb = skb_dequeue(&ulpq->reasm))) {
-		event = (struct sctp_ulpevent *) skb->cb;
+	while ((skb = __skb_dequeue(&ulpq->reasm))) {
+		event = sctp_skb2event(skb);
 		sctp_ulpevent_free(event);
 	}
+
 }
 
 /* Dispose of a ulpqueue.  */
@@ -117,7 +119,7 @@ void sctp_ulpq_free(struct sctp_ulpq *ulpq)
 
 /* Process an incoming DATA chunk.  */
 int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
-			    int priority)
+			int priority)
 {
 	struct sk_buff_head temp;
 	sctp_data_chunk_t *hdr;
@@ -125,12 +127,7 @@ int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
 
 	hdr = (sctp_data_chunk_t *) chunk->chunk_hdr;
 
-	/* FIXME: Instead of event being the skb clone, we really should
-	 * have a new skb based chunk structure that we can convert to
-	 * an event.  Temporarily, I'm carrying a few chunk fields in
-	 * the event to allow reassembly.  Its too painful to change
-	 * everything at once.  --jgrimm
-	 */
+	/* Create an event from the incoming chunk. */
 	event = sctp_ulpevent_make_rcvmsg(chunk->asoc, chunk, priority);
 	if (!event)
 		return -ENOMEM;
@@ -139,10 +136,10 @@ int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
 	event = sctp_ulpq_reasm(ulpq, event);
 
 	/* Do ordering if needed.  */
-	if (event) {
+	if ((event) && (event->msg_flags & MSG_EOR)){
 		/* Create a temporary list to collect chunks on.  */
 		skb_queue_head_init(&temp);
-		skb_queue_tail(&temp, sctp_event2skb(event));
+		__skb_queue_tail(&temp, sctp_event2skb(event));
 
 		event = sctp_ulpq_order(ulpq, event);
 	}
@@ -154,10 +151,40 @@ int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
 	return 0;
 }
 
+/* Clear the partial delivery mode for this socket.   Note: This
+ * assumes that no association is currently in partial delivery mode.
+ */
+int sctp_clear_pd(struct sock *sk)
+{
+	struct sctp_opt *sp;
+	sp = sctp_sk(sk);
+
+	sp->pd_mode = 0;
+	if (!skb_queue_empty(&sp->pd_lobby)) {
+		struct list_head *list;
+		sctp_skb_list_tail(&sp->pd_lobby, &sk->receive_queue);
+		list = (struct list_head *)&sctp_sk(sk)->pd_lobby;
+		INIT_LIST_HEAD(list);
+		return 1;
+	}
+	return 0;
+}
+
+/* Clear the pd_mode and restart any pending messages waiting for delivery. */
+static int sctp_ulpq_clear_pd(struct sctp_ulpq *ulpq)
+{
+	ulpq->pd_mode = 0;
+	return sctp_clear_pd(ulpq->asoc->base.sk);
+}
+
+
+
 /* Add a new event for propogation to the ULP.  */
 int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 {
 	struct sock *sk = ulpq->asoc->base.sk;
+	struct sk_buff_head *queue;
+	int clear_pd = 0;
 
 	/* If the socket is just going to throw this away, do not
 	 * even try to deliver it.
@@ -169,16 +196,41 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 	if (!sctp_ulpevent_is_enabled(event, &sctp_sk(sk)->subscribe))
 		goto out_free;
 
+	/* If we are in partial delivery mode, post to the lobby until
+	 * partial delivery is cleared, unless, of course _this_ is
+	 * the association the cause of the partial delivery.
+	 */
+
+	if (!sctp_sk(sk)->pd_mode) {
+		queue = &sk->receive_queue;
+	} else if (ulpq->pd_mode) {
+		if (event->msg_flags & MSG_NOTIFICATION)
+		       	queue = &sctp_sk(sk)->pd_lobby;
+		else {
+			clear_pd = event->msg_flags & MSG_EOR;
+			queue = &sk->receive_queue;
+		}
+	} else
+		queue = &sctp_sk(sk)->pd_lobby;
+
+
 	/* If we are harvesting multiple skbs they will be
 	 * collected on a list.
 	 */
 	if (sctp_event2skb(event)->list)
-		sctp_skb_list_tail(sctp_event2skb(event)->list, 
-				   &sk->receive_queue);
+		sctp_skb_list_tail(sctp_event2skb(event)->list, queue);
 	else
-		skb_queue_tail(&sk->receive_queue, sctp_event2skb(event));
+		skb_queue_tail(queue, sctp_event2skb(event));
 
-	wake_up_interruptible(sk->sleep);
+	/* Did we just complete partial delivery and need to get
+	 * rolling again?  Move pending data to the receive
+	 * queue.
+	 */
+	if (clear_pd)
+		sctp_ulpq_clear_pd(ulpq);
+
+	if (queue == &sk->receive_queue)
+		wake_up_interruptible(sk->sleep);
 	return 1;
 
 out_free:
@@ -192,7 +244,7 @@ out_free:
 /* 2nd Level Abstractions */
 
 /* Helper function to store chunks that need to be reassembled.  */
-static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq, 
+static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq,
 					 struct sctp_ulpevent *event)
 {
 	struct sk_buff *pos, *tmp;
@@ -212,7 +264,7 @@ static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq,
 
 	/* If the queue is empty, we have a different function to call.  */
 	if (skb_peek(&ulpq->reasm))
-		__skb_insert(sctp_event2skb(event), pos->prev, pos, 
+		__skb_insert(sctp_event2skb(event), pos->prev, pos,
 			     &ulpq->reasm);
 	else
 		__skb_queue_tail(&ulpq->reasm, sctp_event2skb(event));
@@ -233,7 +285,10 @@ static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *
 	struct sk_buff *list = skb_shinfo(f_frag)->frag_list;
 
 	/* Store the pointer to the 2nd skb */
-	pos = f_frag->next;
+	if (f_frag == l_frag)
+		pos = NULL;
+	else
+		pos = f_frag->next;
 
 	/* Get the last skb in the f_frag's frag_list if present. */
 	for (last = list; list; last = list, list = list->next);
@@ -248,7 +303,8 @@ static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *
 
 	/* Remove the first fragment from the reassembly queue.  */
 	__skb_unlink(f_frag, f_frag->list);
-	do {
+	while (pos) {
+
 		pnext = pos->next;
 
 		/* Update the len and data_len fields of the first fragment. */
@@ -264,12 +320,13 @@ static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *
 
 		pos->next = pnext;
 		pos = pnext;
-	} while (1);
+	};
 
-	event = (struct sctp_ulpevent *) f_frag->cb;
+	event = sctp_skb2event(f_frag);
 
 	return event;
 }
+
 
 /* Helper function to check if an incoming chunk has filled up the last
  * missing fragment in a SCTP datagram and return the corresponding event.
@@ -282,7 +339,7 @@ static inline struct sctp_ulpevent *sctp_ulpq_retrieve_reassembled(struct sctp_u
 	__u32 ctsn, next_tsn;
 	struct sctp_ulpevent *retval = NULL;
 
-	/* Initialized to 0 just to avoid compiler warning message. Will
+	/* Initialized to 0 just to avoid compiler warning message.  Will
 	 * never be used with this value. It is referenced only after it
 	 * is set when we find the first fragment of a message.
 	 */
@@ -298,7 +355,7 @@ static inline struct sctp_ulpevent *sctp_ulpq_retrieve_reassembled(struct sctp_u
 	 * start the next pass when we find another first fragment.
 	 */
 	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
-		cevent = (struct sctp_ulpevent *) pos->cb;
+		cevent = sctp_skb2event(pos);
 		ctsn = cevent->sndrcvinfo.sinfo_tsn;
 
 		switch (cevent->msg_flags & SCTP_DATA_FRAG_MASK) {
@@ -315,7 +372,7 @@ static inline struct sctp_ulpevent *sctp_ulpq_retrieve_reassembled(struct sctp_u
 			break;
 
 		case SCTP_DATA_LAST_FRAG:
-			if ((first_frag) && (ctsn == next_tsn))
+			if (first_frag && (ctsn == next_tsn))
 				retval = sctp_make_reassembled_event(
 						first_frag, pos);
 			else
@@ -326,14 +383,78 @@ static inline struct sctp_ulpevent *sctp_ulpq_retrieve_reassembled(struct sctp_u
 		/* We have the reassembled event. There is no need to look
 		 * further.
 		 */
-		if (retval)
+		if (retval) {
+			retval->msg_flags |= MSG_EOR;
 			break;
+		}
 	}
 
 	return retval;
 }
 
-/* Helper function to reassemble chunks. Hold chunks on the reasm queue that
+/* Retrieve the next set of fragments of a partial message. */
+static inline struct sctp_ulpevent *sctp_ulpq_retrieve_partial(struct sctp_ulpq *ulpq)
+{
+	struct sk_buff *pos, *tmp, *last_frag, *first_frag;
+	struct sctp_ulpevent *cevent;
+	__u32 ctsn, next_tsn;
+	int is_last;
+	struct sctp_ulpevent *retval;
+
+	/* The chunks are held in the reasm queue sorted by TSN.
+	 * Walk through the queue sequentially and look for the first
+	 * sequence of fragmented chunks.
+	 */
+
+	if (skb_queue_empty(&ulpq->reasm))
+		return NULL;
+
+	last_frag = first_frag = NULL;
+	retval = NULL;
+	next_tsn = 0;
+	is_last = 0;
+
+	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
+		cevent = sctp_skb2event(pos);
+		ctsn = cevent->sndrcvinfo.sinfo_tsn;
+
+		switch (cevent->msg_flags & SCTP_DATA_FRAG_MASK) {
+		case SCTP_DATA_MIDDLE_FRAG:
+			if (!first_frag) {
+				first_frag = pos;
+				next_tsn = ctsn + 1;
+				last_frag = pos;
+			} else if (next_tsn == ctsn)
+				next_tsn++;
+			else
+				goto done;
+			break;
+		case SCTP_DATA_LAST_FRAG:
+			if (!first_frag)
+				first_frag = pos;
+			else if (ctsn != next_tsn)
+				goto done;
+			last_frag = pos;
+			is_last = 1;
+			goto done;
+		default:
+			return NULL;
+		};
+	}
+
+	/* We have the reassembled event. There is no need to look
+	 * further.
+	 */
+done:
+	retval = sctp_make_reassembled_event(first_frag, last_frag);
+	if (is_last)
+		retval->msg_flags |= MSG_EOR;
+
+	return retval;
+}
+
+
+/* Helper function to reassemble chunks.  Hold chunks on the reasm queue that
  * need reassembling.
  */
 static inline struct sctp_ulpevent *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
@@ -341,19 +462,83 @@ static inline struct sctp_ulpevent *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
 {
 	struct sctp_ulpevent *retval = NULL;
 
-	/* FIXME: We should be using some new chunk structure here
-	 * instead of carrying chunk fields in the event structure.
-	 * This is temporary as it is too painful to change everything
-	 * at once.
-	 */
-
 	/* Check if this is part of a fragmented message.  */
-	if (SCTP_DATA_NOT_FRAG == (event->msg_flags & SCTP_DATA_FRAG_MASK))
+	if (SCTP_DATA_NOT_FRAG == (event->msg_flags & SCTP_DATA_FRAG_MASK)) {
+		event->msg_flags |= MSG_EOR;
 		return event;
+	}
 
 	sctp_ulpq_store_reasm(ulpq, event);
-	retval = sctp_ulpq_retrieve_reassembled(ulpq);
+	if (!ulpq->pd_mode)
+		retval = sctp_ulpq_retrieve_reassembled(ulpq);
+	else {
+		__u32 ctsn, ctsnap;
 
+		/* Do not even bother unless this is the next tsn to
+		 * be delivered.
+		 */
+		ctsn = event->sndrcvinfo.sinfo_tsn;
+		ctsnap = sctp_tsnmap_get_ctsn(&ulpq->asoc->peer.tsn_map);
+		if (TSN_lte(ctsn, ctsnap))
+			retval = sctp_ulpq_retrieve_partial(ulpq);
+	}
+
+	return retval;
+}
+
+/* Retrieve the first part (sequential fragments) for partial delivery.  */
+static inline struct sctp_ulpevent *sctp_ulpq_retrieve_first(struct sctp_ulpq *ulpq)
+{
+	struct sk_buff *pos, *tmp, *last_frag, *first_frag;
+	struct sctp_ulpevent *cevent;
+	__u32 ctsn, next_tsn;
+	struct sctp_ulpevent *retval;
+
+	/* The chunks are held in the reasm queue sorted by TSN.
+	 * Walk through the queue sequentially and look for a sequence of
+	 * fragmented chunks that start a datagram.
+	 */
+
+	if (skb_queue_empty(&ulpq->reasm))
+		return NULL;
+
+	last_frag = first_frag = NULL;
+	retval = NULL;
+	next_tsn = 0;
+
+	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
+		cevent = sctp_skb2event(pos);
+		ctsn = cevent->sndrcvinfo.sinfo_tsn;
+
+		switch (cevent->msg_flags & SCTP_DATA_FRAG_MASK) {
+		case SCTP_DATA_FIRST_FRAG:
+			if (!first_frag) {
+				first_frag = pos;
+				next_tsn = ctsn + 1;
+				last_frag = pos;
+			} else
+				goto done;
+			break;
+
+		case SCTP_DATA_MIDDLE_FRAG:
+			if (!first_frag)
+				return NULL;
+			if (ctsn == next_tsn) {
+				next_tsn++;
+				last_frag = pos;
+			} else
+				goto done;
+			break;
+		default:
+			return NULL;
+		};
+	}
+
+	/* We have the reassembled event. There is no need to look
+	 * further.
+	 */
+done:
+	retval = sctp_make_reassembled_event(first_frag, last_frag);
 	return retval;
 }
 
@@ -392,7 +577,7 @@ static inline void sctp_ulpq_retrieve_ordered(struct sctp_ulpq *ulpq,
 
 		/* Found it, so mark in the ssnmap. */
 		sctp_ssn_next(in, sid);
-	       
+
 		__skb_unlink(pos, pos->list);
 
 		/* Attach all gathered skbs to the event.  */
@@ -412,7 +597,6 @@ static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
 	sid = event->sndrcvinfo.sinfo_stream;
 	ssn = event->sndrcvinfo.sinfo_ssn;
 
-
 	/* Find the right place in this list.  We store them by
 	 * stream ID and then by SSN.
 	 */
@@ -429,7 +613,7 @@ static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
 
 	/* If the queue is empty, we have a different function to call.  */
 	if (skb_peek(&ulpq->lobby))
-		__skb_insert(sctp_event2skb(event), pos->prev, pos, 
+		__skb_insert(sctp_event2skb(event), pos->prev, pos,
 			     &ulpq->lobby);
 	else
 		__skb_queue_tail(&ulpq->lobby, sctp_event2skb(event));
@@ -440,12 +624,6 @@ static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *ulpq,
 {
 	__u16 sid, ssn;
 	struct sctp_stream *in;
-
-	/* FIXME: We should be using some new chunk structure here
-	 * instead of carrying chunk fields in the event structure.
-	 * This is temporary as it is too painful to change everything
-	 * at once.
-	 */
 
 	/* Check if this message needs ordering.  */
 	if (SCTP_DATA_UNORDERED & event->msg_flags)
@@ -474,4 +652,55 @@ static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *ulpq,
 	sctp_ulpq_retrieve_ordered(ulpq, event);
 
 	return event;
+}
+
+/* Partial deliver the first message as there is pressure on rwnd. */
+void sctp_ulpq_partial_delivery(struct sctp_ulpq *ulpq,
+				struct sctp_chunk *chunk, int priority)
+{
+	struct sctp_ulpevent *event;
+
+	/* Are we already in partial delivery mode?  */
+	if (!sctp_sk(ulpq->asoc->base.sk)->pd_mode) {
+
+		/* Is partial delivery possible?  */
+		event = sctp_ulpq_retrieve_first(ulpq);
+		/* Send event to the ULP.   */
+		if (event) {
+			sctp_ulpq_tail_event(ulpq, event);
+			sctp_sk(ulpq->asoc->base.sk)->pd_mode = 1;
+			ulpq->pd_mode = 1;
+			return;
+		}
+	}
+
+	/* Assert:  Either already in partial delivery mode or partial
+	 * delivery wasn't possible, so now the only recourse is
+	 * to renege.  FIXME: Add renege support starts here.
+	 */
+}
+
+/* Notify the application if an association is aborted and in
+ * partial delivery mode.  Send up any pending received messages.
+ */
+void sctp_ulpq_abort_pd(struct sctp_ulpq *ulpq, int priority)
+{
+	struct sctp_ulpevent *ev = NULL;
+	struct sock *sk;
+
+	if (!ulpq->pd_mode)
+		return;
+
+	sk = ulpq->asoc->base.sk;
+	if (sctp_ulpevent_type_enabled(SCTP_PARTIAL_DELIVERY_EVENT,
+				       &sctp_sk(sk)->subscribe))
+		ev = sctp_ulpevent_make_pdapi(ulpq->asoc,
+					      SCTP_PARTIAL_DELIVERY_ABORTED,
+					      priority);
+	if (ev)
+		skb_queue_tail(&sk->receive_queue, sctp_event2skb(ev));
+
+	/* If there is data waiting, send it up the socket now. */
+	if (sctp_ulpq_clear_pd(ulpq) || ev)
+		wake_up_interruptible(sk->sleep);
 }

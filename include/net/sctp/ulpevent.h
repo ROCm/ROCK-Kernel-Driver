@@ -103,6 +103,10 @@ struct sctp_ulpevent *sctp_ulpevent_make_shutdown_event(
 	__u16 flags,
 	int priority);
 
+struct sctp_ulpevent *sctp_ulpevent_make_pdapi(
+	const struct sctp_association *asoc,
+	__u32 indication, int priority);
+
 struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(struct sctp_association *asoc,
 	struct sctp_chunk *chunk,
 	int priority);
@@ -111,19 +115,24 @@ void sctp_ulpevent_read_sndrcvinfo(const struct sctp_ulpevent *event,
 	struct msghdr *);
 __u16 sctp_ulpevent_get_notification_type(const struct sctp_ulpevent *event);
 
-
+/* Is this event type enabled? */
+static inline int sctp_ulpevent_type_enabled(__u16 sn_type,
+					     struct sctp_event_subscribe *mask)
+{
+	char *amask = (char *) mask;
+	return amask[sn_type - SCTP_SN_TYPE_BASE];
+}
 
 /* Given an event subscription, is this event enabled? */
 static inline int sctp_ulpevent_is_enabled(const struct sctp_ulpevent *event,
-				const struct sctp_event_subscribe *mask)
+					   struct sctp_event_subscribe *mask)
 {
-	const char *amask = (const char *) mask;
 	__u16 sn_type;
 	int enabled = 1;
 
 	if (sctp_ulpevent_is_notification(event)) {
 		sn_type = sctp_ulpevent_get_notification_type(event);
-		enabled = amask[sn_type - SCTP_SN_TYPE_BASE];
+		enabled = sctp_ulpevent_type_enabled(sn_type, mask);
 	}
 	return enabled;
 }

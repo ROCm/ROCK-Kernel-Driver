@@ -124,7 +124,6 @@ typedef struct sctp_association sctp_association_t;
 typedef struct sctp_packet sctp_packet_t;
 typedef struct sctp_chunk sctp_chunk_t;
 typedef struct sctp_bind_addr sctp_bind_addr_t;
-typedef struct sctp_opt sctp_opt_t;
 typedef struct sctp_endpoint_common sctp_endpoint_common_t;
 
 #include <net/sctp/tsnmap.h>
@@ -249,10 +248,10 @@ struct sctp_af {
 					 int optname,
 					 char *optval,
 					 int *optlen);
-	struct dst_entry *(*get_dst)	(sctp_association_t *asoc,
+	struct dst_entry *(*get_dst)	(struct sctp_association *asoc,
 					 union sctp_addr *daddr,
 					 union sctp_addr *saddr);
-	void 		(*get_saddr)	(sctp_association_t *asoc,
+	void 		(*get_saddr)	(struct sctp_association *asoc,
 					 struct dst_entry *dst,
 					 union sctp_addr *daddr,
 				 	 union sctp_addr *saddr);	 
@@ -310,6 +309,9 @@ struct sctp_opt {
 	/* What kind of a socket is this? */
 	sctp_socket_type_t type;
 
+	/* PF_ family specific functions.  */
+	struct sctp_pf *pf;
+
 	/* What is our base endpointer? */
 	sctp_endpoint_t *ep;
 
@@ -323,7 +325,10 @@ struct sctp_opt {
 	__u32 autoclose;
 	__u8 nodelay;
 	__u8 disable_fragments;
-	struct sctp_pf *pf;
+	__u8 pd_mode;
+
+	/* Receive to here while partial delivery is in effect. */
+	struct sk_buff_head pd_lobby;
 };
 
 

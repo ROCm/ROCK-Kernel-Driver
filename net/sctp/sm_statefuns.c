@@ -264,7 +264,7 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 
 	if (sctp_assoc_set_bind_addr_from_ep(new_asoc, GFP_ATOMIC) < 0)
 		goto nomem_ack;
-	
+
 	repl = sctp_make_init_ack(new_asoc, chunk, GFP_ATOMIC, len);
 	if (!repl)
 		goto nomem_ack;
@@ -1540,11 +1540,11 @@ static sctp_disposition_t sctp_sf_do_dupcook_d(const sctp_endpoint_t *ep,
 				SCTP_ULPEVENT(ev));
 	}
 	sctp_add_cmd_sf(commands, SCTP_CMD_TRANSMIT, SCTP_NULL());
-	
+
 	repl = sctp_make_cookie_ack(new_asoc, chunk);
 	if (!repl)
 		goto nomem;
-	
+
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(repl));
 	sctp_add_cmd_sf(commands, SCTP_CMD_TRANSMIT, SCTP_NULL());
 
@@ -2241,6 +2241,7 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 	sctp_datahdr_t *data_hdr;
 	sctp_chunk_t *err;
 	size_t datalen;
+	sctp_verb_t deliver;
 	int tmp;
 	__u32 tsn;
 
@@ -2307,10 +2308,32 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 	datalen = ntohs(chunk->chunk_hdr->length);
 	datalen -= sizeof(sctp_data_chunk_t);
 
+	deliver = SCTP_CMD_CHUNK_ULP;
+
+	/* Think about partial delivery. */
+	if ((datalen >= asoc->rwnd) && (!asoc->ulpq.pd_mode)) {
+
+		/* Even if we don't accept this chunk there is
+		 * memory pressure.
+		 */
+		sctp_add_cmd_sf(commands, SCTP_CMD_CHUNK_PD, SCTP_NULL());
+	}
+
 	if (asoc->rwnd_over || (datalen > asoc->rwnd + asoc->frag_point)) {
-		SCTP_DEBUG_PRINTK("Discarding tsn: %u datalen: %Zd, "
-				  "rwnd: %d\n", tsn, datalen, asoc->rwnd);
-		goto discard_force;
+	
+
+		/* There is absolutely no room, but this is the most
+		 * important tsn that we are waiting on, try to 
+		 * to partial deliver or renege to make room. 
+		 */
+		if ((sctp_tsnmap_get_ctsn(&asoc->peer.tsn_map) + 1) == tsn) {
+			deliver = SCTP_CMD_CHUNK_PD;
+		} else {
+			SCTP_DEBUG_PRINTK("Discard tsn: %u len: %Zd, "
+					  "rwnd: %d\n", tsn, datalen, 
+					  asoc->rwnd);
+			goto discard_force;
+		}
 	}
 
 	/*
@@ -2335,10 +2358,11 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 		return SCTP_DISPOSITION_CONSUME;
 	}
 
-	/* We are accepting this DATA chunk.  */
-
-	/* Record the fact that we have received this TSN.  */
-	sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_TSN, SCTP_U32(tsn));
+	/* If definately accepting the DATA chunk, record its TSN, otherwise
+	 * wait for renege processing. 
+	 */
+	if (deliver != SCTP_CMD_CHUNK_PD)
+		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_TSN, SCTP_U32(tsn));
 
 	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
 	 *
@@ -2352,10 +2376,9 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 		err = sctp_make_op_error(asoc, chunk, SCTP_ERROR_INV_STRM,
 					 &data_hdr->stream,
 					 sizeof(data_hdr->stream));
-		if (err) {
+		if (err)
 			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
 					SCTP_CHUNK(err));
-		}
 		goto discard_noforce;
 	}
 
@@ -2363,7 +2386,8 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 	 * SCTP_CMD_CHUNK_ULP cmd before the SCTP_CMD_GEN_SACK, as the SACK
 	 * chunk needs the updated rwnd.
 	 */
-	sctp_add_cmd_sf(commands, SCTP_CMD_CHUNK_ULP, SCTP_CHUNK(chunk));
+	sctp_add_cmd_sf(commands, deliver, SCTP_CHUNK(chunk));
+
 	if (asoc->autoclose) {
 		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_RESTART,
 				SCTP_TO(SCTP_EVENT_TIMEOUT_AUTOCLOSE));
