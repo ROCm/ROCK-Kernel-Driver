@@ -2,7 +2,7 @@
  *
  * Module Name: dswexec - Dispatcher method execution callbacks;
  *                        dispatch to interpreter.
- *              $Revision: 92 $
+ *              $Revision: 94 $
  *
  *****************************************************************************/
 
@@ -113,10 +113,10 @@ acpi_ds_get_predicate_value (
 	 * Result of predicate evaluation currently must
 	 * be a number
 	 */
-	if (obj_desc->common.type != ACPI_TYPE_INTEGER) {
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Bad predicate (not a number) Obj_desc=%p State=%p Type=%X\n",
-			obj_desc, walk_state, obj_desc->common.type));
+			obj_desc, walk_state, ACPI_GET_OBJECT_TYPE (obj_desc)));
 
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
@@ -124,7 +124,7 @@ acpi_ds_get_predicate_value (
 
 	/* Truncate the predicate to 32-bits if necessary */
 
-	acpi_ex_truncate_for32bit_table (obj_desc, walk_state);
+	acpi_ex_truncate_for32bit_table (obj_desc);
 
 	/*
 	 * Save the result of the predicate evaluation on
@@ -605,7 +605,7 @@ acpi_ds_exec_end_op (
 	 * ACPI 2.0 support for 64-bit integers: Truncate numeric
 	 * result value if we are executing from a 32-bit ACPI table
 	 */
-	acpi_ex_truncate_for32bit_table (walk_state->result_obj, walk_state);
+	acpi_ex_truncate_for32bit_table (walk_state->result_obj);
 
 	/*
 	 * Check if we just completed the evaluation of a

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 123 $
+ *       $Revision: 124 $
  *
  *****************************************************************************/
 
@@ -262,7 +262,7 @@
 
 /* Macro to test the object type */
 
-#define ACPI_GET_OBJECT_TYPE(d)         (((acpi_operand_object *)(void *)d)->common.type)
+#define ACPI_GET_OBJECT_TYPE(d)         (((acpi_operand_object *)(void *)(d))->common.type)
 
 /* Macro to check the table flags for SINGLE or MULTIPLE tables are allowed */
 

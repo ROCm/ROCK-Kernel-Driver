@@ -220,14 +220,12 @@ static int hci_unlink_urb (struct urb * urb)
 		/* URB active? */
 
 		if (urb->transfer_flags & (USB_ASYNC_UNLINK | USB_TIMEOUT_KILLED)) {
-			/* asynchron with callback */
-
-			list_del (&urb->urb_list);	/* relink the urb to the del list */
-			list_add (&urb->urb_list, &hci->del_list);
+			/* asynchronous with callback */
+			/* relink the urb to the del list */
+			list_move (&urb->urb_list, &hci->del_list);
 			spin_unlock_irqrestore (&usb_urb_lock, flags);
-
 		} else {
-			/* synchron without callback */
+			/* synchronous without callback */
 
 			add_wait_queue (&hci->waitq, &wait);
 
@@ -235,8 +233,8 @@ static int hci_unlink_urb (struct urb * urb)
 			comp = urb->complete;
 			urb->complete = NULL;
 
-			list_del (&urb->urb_list);	/* relink the urb to the del list */
-			list_add (&urb->urb_list, &hci->del_list);
+			/* relink the urb to the del list */
+			list_move(&urb->urb_list, &hci->del_list);
 
 			spin_unlock_irqrestore (&usb_urb_lock, flags);
 
@@ -560,10 +558,9 @@ static struct urb *qu_next_urb (hci_t * hci, struct urb * urb, int resub_ok)
 	epd_t *ed = &hci_dev->ed[qu_pipeindex (urb->pipe)];
 
 	DBGFUNC ("enter qu_next_urb\n");
-	list_del (&urb->urb_list);
-	INIT_LIST_HEAD (&urb->urb_list);
-	if (ed->pipe_head == urb) {
+	list_del_init(&urb->urb_list);
 
+	if (ed->pipe_head == urb) {
 #ifdef HC_URB_TIMEOUT
 		if (urb->timeout)
 			del_timer (&ed->timeout);
@@ -574,8 +571,7 @@ static struct urb *qu_next_urb (hci_t * hci, struct urb * urb, int resub_ok)
 
 		if (!list_empty (&ed->urb_queue)) {
 			urb = list_entry (ed->urb_queue.next, struct urb, urb_list);
-			list_del (&urb->urb_list);
-			INIT_LIST_HEAD (&urb->urb_list);
+			list_del_init (&urb->urb_list);
 			ed->pipe_head = urb;
 			qu_queue_active_urb (hci, urb, ed);
 		} else {
@@ -756,8 +752,7 @@ static int sh_schedule_trans (hci_t * hci, int isSOF)
 		 * only when the new SOF happens */
 
 		lh = hci->bulk_list.next;
-		list_del (&hci->bulk_list);
-		list_add (&hci->bulk_list, lh);
+		list_move (&hci->bulk_list, lh);
 	}
 	return 0;
 }

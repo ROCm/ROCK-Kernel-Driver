@@ -51,6 +51,8 @@ struct thread_info {
 
 /* how to get the thread information struct from C */
 
+#define THREAD_SIZE (2*PAGE_SIZE)
+
 static inline struct thread_info *current_thread_info(void)
 { 
 	struct thread_info *ti;
@@ -66,7 +68,6 @@ static inline struct thread_info *stack_thread_info(void)
 }
 
 /* thread information allocation */
-#define THREAD_SIZE (2*PAGE_SIZE)
 #define alloc_thread_info() ((struct thread_info *) __get_free_pages(GFP_KERNEL,1))
 #define free_thread_info(ti) free_pages((unsigned long) (ti), 1)
 #define get_thread_info(ti) get_task_struct((ti)->task)
@@ -75,6 +76,7 @@ static inline struct thread_info *stack_thread_info(void)
 #else /* !__ASSEMBLY__ */
 
 /* how to get the thread information struct from ASM */
+/* only works on the process stack. otherwise get it via the PDA. */
 #define GET_THREAD_INFO(reg) \
 	movq $-8192, reg; \
 	andq %rsp, reg

@@ -200,7 +200,6 @@ MODULE_PARM(drive3,"1-7i");
 /* set up defines for blk.h,  why don't all drivers do it this way ? */
 
 #define MAJOR_NR   major
-#define DEVICE_NAME "PF"
 #define DEVICE_NR(device) minor(device)
 #define DEVICE_OFF(device)
 
@@ -841,10 +840,8 @@ static void do_pf_request (request_queue_t * q)
 
         if (pf_busy) return;
 repeat:
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
         pf_unit = unit = DEVICE_NR(CURRENT->rq_dev);
         pf_block = CURRENT->sector;
@@ -852,7 +849,7 @@ repeat:
         pf_count = CURRENT->current_nr_sectors;
 
         if ((pf_unit >= PF_UNITS) || (pf_block+pf_count > PF.capacity)) {
-                end_request(0);
+                end_request(CURRENT, 0);
                 goto repeat;
         }
 
@@ -864,7 +861,7 @@ repeat:
         if (pf_cmd == READ) pi_do_claimed(PI,do_pf_read);
         else if (pf_cmd == WRITE) pi_do_claimed(PI,do_pf_write);
         else {  pf_busy = 0;
-		end_request(0);
+		end_request(CURRENT, 0);
                 goto repeat;
         }
 }
@@ -874,7 +871,7 @@ static void pf_next_buf( int unit )
 {	long	saved_flags;
 
 	spin_lock_irqsave(&pf_spin_lock,saved_flags);
-	end_request(1);
+	end_request(CURRENT, 1);
 	if (!pf_run) { spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
 		       return; 
 	}
@@ -915,7 +912,7 @@ static void do_pf_read_start( void )
 			return;
                 }
 		spin_lock_irqsave(&pf_spin_lock,saved_flags);
-                end_request(0);
+                end_request(CURRENT, 0);
                 pf_busy = 0;
 		do_pf_request(NULL);
 		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
@@ -941,7 +938,7 @@ static void do_pf_read_drq( void )
                         return;
                 }
 		spin_lock_irqsave(&pf_spin_lock,saved_flags);
-                end_request(0);
+                end_request(CURRENT, 0);
                 pf_busy = 0;
 		do_pf_request(NULL);
 		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
@@ -956,7 +953,7 @@ static void do_pf_read_drq( void )
         }
         pi_disconnect(PI);
 	spin_lock_irqsave(&pf_spin_lock,saved_flags); 
-        end_request(1);
+        end_request(CURRENT, 1);
         pf_busy = 0;
 	do_pf_request(NULL);
 	spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
@@ -982,7 +979,7 @@ static void do_pf_write_start( void )
 			return;
                 }
 		spin_lock_irqsave(&pf_spin_lock,saved_flags);
-                end_request(0);
+                end_request(CURRENT, 0);
                 pf_busy = 0;
 		do_pf_request(NULL);
 		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
@@ -999,7 +996,7 @@ static void do_pf_write_start( void )
                         return;
                 }
 		spin_lock_irqsave(&pf_spin_lock,saved_flags);
-                end_request(0);
+                end_request(CURRENT, 0);
                 pf_busy = 0;
 		do_pf_request(NULL);
 		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
@@ -1029,7 +1026,7 @@ static void do_pf_write_done( void )
                         return;
                 }
 		spin_lock_irqsave(&pf_spin_lock,saved_flags);
-                end_request(0);
+                end_request(CURRENT, 0);
                 pf_busy = 0;
 		do_pf_request(NULL);
 		spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
@@ -1037,7 +1034,7 @@ static void do_pf_write_done( void )
         }
         pi_disconnect(PI);
 	spin_lock_irqsave(&pf_spin_lock,saved_flags);
-        end_request(1);
+        end_request(CURRENT, 1);
         pf_busy = 0;
 	do_pf_request(NULL);
 	spin_unlock_irqrestore(&pf_spin_lock,saved_flags);

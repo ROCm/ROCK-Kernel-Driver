@@ -28,6 +28,7 @@
 #include <linux/videodev.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+#include <linux/init.h>
 
 #include "bttv.h"
 #include "audiochip.h"

@@ -141,17 +141,17 @@ static inline void set_ldt_desc(unsigned n, void *addr, int size)
 /*
  * load one particular LDT into the current CPU
  */
-extern inline void load_LDT (struct mm_struct *mm)
+extern inline void load_LDT (mm_context_t *pc)
 {
 	int cpu = smp_processor_id();
-	void *segments = mm->context.segments;
+	int count = pc->size;
 
-	if (!segments) {
+	if (!count) {
 		clear_LDT(cpu);
 		return;
 	}
 		
-	set_ldt_desc(cpu, segments, LDT_ENTRIES);
+	set_ldt_desc(cpu, pc->ldt, count);
 	__load_LDT(cpu);
 }
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisply - debug display commands
- *              $Revision: 73 $
+ *              $Revision: 75 $
  *
  ******************************************************************************/
 
@@ -300,9 +300,9 @@ acpi_db_decode_internal_object (
 		return;
 	}
 
-	acpi_os_printf (" %s", acpi_ut_get_type_name (obj_desc->common.type));
+	acpi_os_printf (" %s", acpi_ut_get_object_type_name (obj_desc));
 
-	switch (obj_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_INTEGER:
 
 		acpi_os_printf (" %8.8X%8.8X", ACPI_HIDWORD (obj_desc->integer.value),
@@ -396,7 +396,7 @@ acpi_db_display_internal_object (
 
 	case ACPI_DESC_TYPE_OPERAND:
 
-		type = obj_desc->common.type;
+		type = ACPI_GET_OBJECT_TYPE (obj_desc);
 		if (type > INTERNAL_TYPE_MAX) {
 			acpi_os_printf (" Type %hX [Invalid Type]", type);
 			return;
@@ -404,25 +404,9 @@ acpi_db_display_internal_object (
 
 		/* Decode the ACPI object type */
 
-		switch (obj_desc->common.type) {
+		switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 		case INTERNAL_TYPE_REFERENCE:
 			switch (obj_desc->reference.opcode) {
-			case AML_ZERO_OP:
-				acpi_os_printf ("[Const]         Zero (0) [Null Target]", 0);
-				break;
-
-			case AML_ONES_OP:
-				acpi_os_printf ("[Const]         Ones (0xFFFFFFFFFFFFFFFF) [No Limit]");
-				break;
-
-			case AML_ONE_OP:
-				acpi_os_printf ("[Const]         One (1)");
-				break;
-
-			case AML_REVISION_OP:
-				acpi_os_printf ("[Const]         Revision (%X)", ACPI_CA_SUPPORT_LEVEL);
-				break;
-
 			case AML_LOCAL_OP:
 				acpi_os_printf ("[Local%d] ", obj_desc->reference.offset);
 				if (walk_state) {
@@ -451,6 +435,8 @@ acpi_db_display_internal_object (
 				break;
 
 			default:
+				acpi_os_printf ("Unknown Reference opcode %X\n",
+					obj_desc->reference.opcode);
 				break;
 
 			}

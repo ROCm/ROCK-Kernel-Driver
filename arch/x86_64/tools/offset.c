@@ -24,7 +24,6 @@ int main(void)
 	output("#ifndef ASM_OFFSET_H\n");
 	output("#define ASM_OFFSET_H 1\n"); 
 
-	// task struct entries needed by entry.S
 #define ENTRY(entry) outconst("#define tsk_" #entry " %0", offsetof(struct task_struct, entry))
 	ENTRY(state);
 	ENTRY(flags); 
@@ -43,24 +42,8 @@ int main(void)
 	ENTRY(irqcount);
 	ENTRY(cpunumber);
 	ENTRY(irqstackptr);
-	ENTRY(__softirq_pending); 
-	ENTRY(__local_irq_count);
-	ENTRY(__local_bh_count);
-	ENTRY(__ksoftirqd_task);
-	ENTRY(level4_pgt);
-	ENTRY(me);
 #undef ENTRY
-	output("#ifdef __ASSEMBLY__"); 
-#define CONST(t) outconst("#define " #t " %0", t)
-	CONST(TASK_SIZE);
-	CONST(SIGCHLD); 
-	CONST(CLONE_VFORK); 
-	CONST(CLONE_VM); 
-#undef CONST
-	output("#endif"); 
-
 	output("#endif\n"); 
 
 	return(0); 
 } 
-

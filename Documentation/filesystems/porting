@@ -215,3 +215,16 @@ not protected by the conditions above is risky even in the old tree - you
 had been relying on BKL and that's prone to screwups.  Old tree had quite
 a few holes of that kind - unprotected access to ->d_parent leading to
 anything from oops to silent memory corruption.
+
+---
+[mandatory]
+
+	FS_NOMOUNT is gone.  If you use it - just set MS_NOUSER in flags
+(see rootfs for one kind of solution and bdev/socket/pipe for another).
+
+---
+[recommended]
+
+	Use bdev_read_only(bdev) instead of is_read_only(kdev).  The latter
+is still alive, but only because of the mess in drivers/s390/block/dasd.c.
+As soon as it gets fixed is_read_only() will die.

@@ -29,6 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/console.h>
 #include <linux/spinlock.h>
+#include <linux/root_dev.h>
 
 #include <asm/segment.h>
 #include <asm/system.h>
@@ -377,7 +378,7 @@ void __init setup_arch(char **cmdline_p)
 
 	if (!root_flags)
 		root_mountflags &= ~MS_RDONLY;
-	ROOT_DEV = to_kdev_t(root_dev);
+	ROOT_DEV = root_dev;
 #ifdef CONFIG_BLK_DEV_INITRD
 	rd_image_start = ram_flags & RAMDISK_IMAGE_START_MASK;
 	rd_prompt = ((ram_flags & RAMDISK_PROMPT_FLAG) != 0);

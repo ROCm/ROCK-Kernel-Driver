@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utobject - ACPI object create/delete/size/cache routines
- *              $Revision: 73 $
+ *              $Revision: 76 $
  *
  *****************************************************************************/
 
@@ -37,10 +37,9 @@
  *
  * FUNCTION:    Acpi_ut_create_internal_object_dbg
  *
- * PARAMETERS:  Address             - Address of the memory to deallocate
- *              Component           - Component type of caller
- *              Module              - Source file name of caller
- *              Line                - Line number of caller
+ * PARAMETERS:  Module_name         - Source file name of caller
+ *              Line_number         - Line number of caller
+ *              Component_id        - Component type of caller
  *              Type                - ACPI Type of the new object
  *
  * RETURN:      Object              - The new object.  Null on failure
@@ -119,7 +118,7 @@ acpi_ut_create_internal_object_dbg (
  *
  * FUNCTION:    Acpi_ut_valid_internal_object
  *
- * PARAMETERS:  Operand             - Object to be validated
+ * PARAMETERS:  Object              - Object to be validated
  *
  * RETURN:      Validate a pointer to be an acpi_operand_object
  *
@@ -180,7 +179,6 @@ acpi_ut_valid_internal_object (
  * PARAMETERS:  Module_name         - Caller's module name (for error output)
  *              Line_number         - Caller's line number (for error output)
  *              Component_id        - Caller's component ID (for error output)
- *              Message             - Error message to use on failure
  *
  * RETURN:      Pointer to newly allocated object descriptor.  Null on error
  *
@@ -209,7 +207,6 @@ acpi_ut_allocate_object_desc_dbg (
 		return_PTR (NULL);
 	}
 
-
 	/* Mark the descriptor type */
 
 	ACPI_SET_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_OPERAND);
@@ -225,7 +222,7 @@ acpi_ut_allocate_object_desc_dbg (
  *
  * FUNCTION:    Acpi_ut_delete_object_desc
  *
- * PARAMETERS:  Object          - Acpi internal object to be deleted
+ * PARAMETERS:  Object          - An Acpi internal object to be deleted
  *
  * RETURN:      None.
  *
@@ -260,7 +257,7 @@ acpi_ut_delete_object_desc (
  *
  * PARAMETERS:  None
  *
- * RETURN:      Status
+ * RETURN:      None
  *
  * DESCRIPTION: Purge the global state object cache.  Used during subsystem
  *              termination.
@@ -284,12 +281,12 @@ acpi_ut_delete_object_cache (
  * FUNCTION:    Acpi_ut_get_simple_object_size
  *
  * PARAMETERS:  *Internal_object    - Pointer to the object we are examining
- *              *Ret_length         - Where the length is returned
+ *              *Obj_length         - Where the length is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: This function is called to determine the space required to
- *              contain a simple object for return to an API user.
+ *              contain a simple object for return to an external user.
  *
  *              The length includes the object structure plus any additional
  *              needed space.
@@ -315,7 +312,6 @@ acpi_ut_get_simple_object_size (
 		return_ACPI_STATUS (AE_OK);
 	}
 
-
 	/* Start with the length of the Acpi object */
 
 	length = sizeof (acpi_object);
@@ -327,16 +323,13 @@ acpi_ut_get_simple_object_size (
 		return_ACPI_STATUS (status);
 	}
 
-
 	/*
 	 * The final length depends on the object type
 	 * Strings and Buffers are packed right up against the parent object and
 	 * must be accessed bytewise or there may be alignment problems on
 	 * certain processors
 	 */
-
-	switch (internal_object->common.type) {
-
+	switch (ACPI_GET_OBJECT_TYPE (internal_object)) {
 	case ACPI_TYPE_STRING:
 
 		length += (ACPI_SIZE) internal_object->string.length + 1;
@@ -362,15 +355,6 @@ acpi_ut_get_simple_object_size (
 	case INTERNAL_TYPE_REFERENCE:
 
 		switch (internal_object->reference.opcode) {
-		case AML_ZERO_OP:
-		case AML_ONE_OP:
-		case AML_ONES_OP:
-		case AML_REVISION_OP:
-
-			/* These Constant opcodes will be resolved to Integers */
-
-			break;
-
 		case AML_INT_NAMEPATH_OP:
 
 			/*
@@ -384,7 +368,7 @@ acpi_ut_get_simple_object_size (
 
 			/*
 			 * No other reference opcodes are supported.
-			 * Notably, Locals and Args are not supported, by this may be
+			 * Notably, Locals and Args are not supported, but this may be
 			 * required eventually.
 			 */
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -399,11 +383,10 @@ acpi_ut_get_simple_object_size (
 	default:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unsupported type=%X in object %p\n",
-			internal_object->common.type, internal_object));
+			ACPI_GET_OBJECT_TYPE (internal_object), internal_object));
 		status = AE_TYPE;
 		break;
 	}
-
 
 	/*
 	 * Account for the space required by the object rounded up to the next
@@ -422,7 +405,7 @@ acpi_ut_get_simple_object_size (
  *
  * PARAMETERS:  ACPI_PKG_CALLBACK
  *
- * RETURN:      Status          - the status of the call
+ * RETURN:      Status
  *
  * DESCRIPTION: Get the length of one package element.
  *
@@ -481,12 +464,12 @@ acpi_ut_get_element_length (
  * FUNCTION:    Acpi_ut_get_package_object_size
  *
  * PARAMETERS:  *Internal_object    - Pointer to the object we are examining
- *              *Ret_length         - Where the length is returned
+ *              *Obj_length         - Where the length is returned
  *
  * RETURN:      Status
  *
  * DESCRIPTION: This function is called to determine the space required to
- *              contain a package object for return to an API user.
+ *              contain a package object for return to an external user.
  *
  *              This is moderately complex since a package contains other
  *              objects including packages.
@@ -535,7 +518,7 @@ acpi_ut_get_package_object_size (
  * FUNCTION:    Acpi_ut_get_object_size
  *
  * PARAMETERS:  *Internal_object    - Pointer to the object we are examining
- *              *Ret_length         - Where the length will be returned
+ *              *Obj_length         - Where the length will be returned
  *
  * RETURN:      Status
  *
@@ -556,7 +539,7 @@ acpi_ut_get_object_size(
 
 
 	if ((ACPI_GET_DESCRIPTOR_TYPE (internal_object) == ACPI_DESC_TYPE_OPERAND) &&
-		(internal_object->common.type == ACPI_TYPE_PACKAGE)) {
+		(ACPI_GET_OBJECT_TYPE (internal_object) == ACPI_TYPE_PACKAGE)) {
 		status = acpi_ut_get_package_object_size (internal_object, obj_length);
 	}
 	else {

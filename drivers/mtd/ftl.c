@@ -94,7 +94,6 @@ MODULE_PARM(shuffle_freq, "i");
 
 /* Funky stuff for setting up a block device */
 #define MAJOR_NR		FTL_MAJOR
-#define DEVICE_NAME		"ftl"
 #define DEVICE_OFF(device)
 
 #define DEVICE_NR(minor)	((minor)>>5)
@@ -1192,10 +1191,8 @@ static void do_ftl_request(request_arg_t)
 
     do {
 	//	    sti();
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
 	minor = minor(CURRENT->rq_dev);
 
@@ -1231,7 +1228,7 @@ static void do_ftl_request(request_arg_t)
 	  CURRENT->sector += CURRENT->current_nr_sectors;
 	}
 	
-	end_request((ret == 0) ? 1 : 0);
+	end_request(CURRENT, (ret == 0) ? 1 : 0);
     } while (1);
 } /* do_ftl_request */
 

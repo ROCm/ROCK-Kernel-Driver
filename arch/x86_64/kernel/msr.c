@@ -41,6 +41,7 @@
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
+#include <asm/cpufeature.h>
 
 /* Note: "err" is handled in a funny way below.  Otherwise one version
    of gcc or another breaks. */
@@ -57,7 +58,7 @@ static inline int wrmsr_eio(u32 reg, u32 eax, u32 edx)
 	       "	jmp 2b\n"
 	       ".previous\n"
 	       ".section __ex_table,\"a\"\n"
-	       "	.align 4\n"
+	       "	.align 8\n"
 	       "	.quad 1b,3b\n"
 	       ".previous"
 	       : "=&bDS" (err)
@@ -236,7 +237,7 @@ static int msr_open(struct inode *inode, struct file *file)
   
   if ( !(cpu_online_map & (1UL << cpu)) )
     return -ENXIO;		/* No such CPU */
-  if ( !test_bit(X86_FEATURE_MSR, &c->x86_capability) )
+  if ( !cpu_has(c, X86_FEATURE_MSR) )
     return -EIO;		/* MSR not supported */
   
   return 0;

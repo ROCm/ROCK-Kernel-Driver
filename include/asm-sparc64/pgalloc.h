@@ -35,11 +35,11 @@ static __inline__ void free_pgd_fast(pgd_t *pgd)
 	struct page *page = virt_to_page(pgd);
 
 	preempt_disable();
-	if (!page->pprev_hash) {
-		(unsigned long *)page->next_hash = pgd_quicklist;
+	if (!page->lru.prev) {
+		(unsigned long *)page->lru.next = pgd_quicklist;
 		pgd_quicklist = (unsigned long *)page;
 	}
-	(unsigned long)page->pprev_hash |=
+	(unsigned long)page->lru.prev |=
 		(((unsigned long)pgd & (PAGE_SIZE / 2)) ? 2 : 1);
 	pgd_cache_size++;
 	preempt_enable();
@@ -51,7 +51,7 @@ static __inline__ pgd_t *get_pgd_fast(void)
 
 	preempt_disable();
         if ((ret = (struct page *)pgd_quicklist) != NULL) {
-                unsigned long mask = (unsigned long)ret->pprev_hash;
+                unsigned long mask = (unsigned long)ret->lru.prev;
 		unsigned long off = 0;
 
 		if (mask & 1)
@@ -60,9 +60,9 @@ static __inline__ pgd_t *get_pgd_fast(void)
 			off = PAGE_SIZE / 2;
 			mask &= ~2;
 		}
-		(unsigned long)ret->pprev_hash = mask;
+		(unsigned long)ret->lru.prev = mask;
 		if (!mask)
-			pgd_quicklist = (unsigned long *)ret->next_hash;
+			pgd_quicklist = (unsigned long *)ret->lru.next;
                 ret = (struct page *)(__page_address(ret) + off);
                 pgd_cache_size--;
 		preempt_enable();
@@ -74,10 +74,10 @@ static __inline__ pgd_t *get_pgd_fast(void)
 		if (page) {
 			ret = (struct page *)page_address(page);
 			clear_page(ret);
-			(unsigned long)page->pprev_hash = 2;
+			(unsigned long)page->lru.prev = 2;
 
 			preempt_disable();
-			(unsigned long *)page->next_hash = pgd_quicklist;
+			(unsigned long *)page->lru.next = pgd_quicklist;
 			pgd_quicklist = (unsigned long *)page;
 			pgd_cache_size++;
 			preempt_enable();

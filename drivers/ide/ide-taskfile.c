@@ -233,7 +233,8 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 		    ar->cmd == WIN_MULTWRITE_EXT) {
 			ide_startstop_t startstop;
 
-			if (ide_wait_stat(&startstop, drive, rq, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
+			if (ata_status_poll(drive, DATA_READY, drive->bad_wstat,
+						WAIT_DRQ, rq, &startstop)) {
 				printk(KERN_ERR "%s: no DRQ after issuing %s\n",
 						drive->name, drive->mult_count ? "MULTWRITE" : "WRITE");
 				return startstop;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 86 $
+ *              $Revision: 87 $
  *
  *****************************************************************************/
 
@@ -64,9 +64,11 @@ acpi_ex_setup_region (
 
 	rgn_desc = obj_desc->common_field.region_obj;
 
-	if (ACPI_TYPE_REGION != rgn_desc->common.type) {
+	if (ACPI_GET_OBJECT_TYPE (rgn_desc) != ACPI_TYPE_REGION) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %X (%s)\n",
-			rgn_desc->common.type, acpi_ut_get_type_name (rgn_desc->common.type)));
+			ACPI_GET_OBJECT_TYPE (rgn_desc),
+			acpi_ut_get_object_type_name (rgn_desc)));
+
 		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 	}
 
@@ -298,7 +300,7 @@ acpi_ex_field_datum_io (
 	 * Bank_fields  - Write to a Bank Register, then read/write from/to an Op_region
 	 * Index_fields - Write to an Index Register, then read/write from/to a Data Register
 	 */
-	switch (obj_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case ACPI_TYPE_BUFFER_FIELD:
 		/*
 		 * If the Buffer_field arguments have not been previously evaluated,
@@ -416,7 +418,7 @@ acpi_ex_field_datum_io (
 	default:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p, Wrong object type - %s\n",
-			obj_desc, acpi_ut_get_type_name (obj_desc->common.type)));
+			obj_desc, acpi_ut_get_object_type_name (obj_desc)));
 		status = AE_AML_INTERNAL;
 		break;
 	}

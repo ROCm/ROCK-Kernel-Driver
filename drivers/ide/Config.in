@@ -109,7 +109,8 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
 	      EXT_DIRECT	CONFIG_IDE_EXT_DIRECT"	8xx_PCCARD
    fi
 
-   bool '  Other IDE chipset support' CONFIG_IDE_CHIPSETS
+   # assume no ISA -> also no VLB
+   dep_bool '  Other ISA/VLB IDE chipset support' CONFIG_IDE_CHIPSETS $CONFIG_ISA
    if [ "$CONFIG_IDE_CHIPSETS" = "y" ]; then
       comment 'Note: most of these also require special kernel boot parameters'
       bool '    ALI M14xx support' CONFIG_BLK_DEV_ALI14XX

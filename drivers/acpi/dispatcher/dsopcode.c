@@ -2,7 +2,7 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 79 $
+ *              $Revision: 80 $
  *
  *****************************************************************************/
 
@@ -396,10 +396,10 @@ acpi_ds_init_buffer_field (
 
 	/* Host object must be a Buffer */
 
-	if (buffer_desc->common.type != ACPI_TYPE_BUFFER) {
+	if (ACPI_GET_OBJECT_TYPE (buffer_desc) != ACPI_TYPE_BUFFER) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Target of Create Field is not a Buffer object - %s\n",
-			acpi_ut_get_type_name (buffer_desc->common.type)));
+			acpi_ut_get_object_type_name (buffer_desc)));
 
 		status = AE_AML_OPERAND_TYPE;
 		goto cleanup;
@@ -1021,7 +1021,7 @@ acpi_ds_exec_end_control_op (
 			 * Allow references created by the Index operator to return unchanged.
 			 */
 			if ((ACPI_GET_DESCRIPTOR_TYPE (walk_state->results->results.obj_desc[0]) == ACPI_DESC_TYPE_OPERAND) &&
-				((walk_state->results->results.obj_desc [0])->common.type == INTERNAL_TYPE_REFERENCE) &&
+				(ACPI_GET_OBJECT_TYPE (walk_state->results->results.obj_desc [0]) == INTERNAL_TYPE_REFERENCE) &&
 				((walk_state->results->results.obj_desc [0])->reference.opcode != AML_INDEX_OP)) {
 				status = acpi_ex_resolve_to_value (&walk_state->results->results.obj_desc [0], walk_state);
 				if (ACPI_FAILURE (status)) {

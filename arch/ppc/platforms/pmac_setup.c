@@ -53,6 +53,7 @@
 #include <linux/pmu.h>
 #include <linux/irq.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 
 #include <asm/processor.h>
 #include <asm/sections.h>
@@ -348,10 +349,10 @@ pmac_setup_arch(void)
 #endif
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
-		ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
+		ROOT_DEV = Root_RAM0;
 	else
 #endif
-		ROOT_DEV = to_kdev_t(DEFAULT_ROOT_DEVICE);
+		ROOT_DEV = DEFAULT_ROOT_DEVICE;
 
 #ifdef CONFIG_SMP
 	/* Check for Core99 */
@@ -475,7 +476,7 @@ note_bootable_part(kdev_t dev, int part, int goodness)
 	if (!initializing)
 		return;
 	if ((goodness <= current_root_goodness) &&
-	    !kdev_same(ROOT_DEV, to_kdev_t(DEFAULT_ROOT_DEVICE)))
+	    ROOT_DEV != DEFAULT_ROOT_DEVICE)
 		return;
 	p = strstr(saved_command_line, "root=");
 	if (p != NULL && (p == saved_command_line || p[-1] == ' '))
@@ -486,7 +487,7 @@ note_bootable_part(kdev_t dev, int part, int goodness)
 		found_boot = 1;
 	}
 	if (kdev_same(boot_dev, NODEV) || kdev_same(dev, boot_dev)) {
-		ROOT_DEV = mk_kdev(major(dev), minor(dev) + part);
+		ROOT_DEV = MKDEV(major(dev), minor(dev) + part);
 		boot_dev = NODEV;
 		current_root_goodness = goodness;
 	}

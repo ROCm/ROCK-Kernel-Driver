@@ -345,7 +345,7 @@ void snd_printd(const char *format, ...);
 #else /* !CONFIG_SND_DEBUG */
 
 #define snd_printd(fmt, args...)	/* nothing */
-#define snd_assert(expr, args...)	/* nothing */
+#define snd_assert(expr, args...)	(void)(expr)
 #define snd_runtime_check(expr, args...) do { if (!(expr)) { args; } } while (0)
 
 #endif /* CONFIG_SND_DEBUG */

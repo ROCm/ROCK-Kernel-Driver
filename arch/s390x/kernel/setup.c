@@ -33,6 +33,7 @@
 #include <linux/blk.h>
 #endif
 #include <linux/bootmem.h>
+#include <linux/root_dev.h>
 #include <linux/console.h>
 #include <linux/seq_file.h>
 #include <asm/uaccess.h>
@@ -318,7 +319,7 @@ void __init setup_arch(char **cmdline_p)
 	       "We are running under VM (64 bit mode)\n" :
 	       "We are running native (64 bit mode)\n");
 
-        ROOT_DEV = to_kdev_t(0x0100);
+        ROOT_DEV = Root_RAM0;
         memory_start = (unsigned long) &_end;    /* fixit if use $CODELO etc*/
 	memory_end = memory_size & ~0x200000UL;  /* detected in head.s */
         init_mm.start_code = PAGE_OFFSET;

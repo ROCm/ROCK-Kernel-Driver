@@ -17,8 +17,8 @@ typedef unsigned short __u16;
 typedef __signed__ int __s32;
 typedef unsigned int __u32;
 
-typedef __signed__ long __s64;
-typedef unsigned long  __u64;
+typedef __signed__ long long __s64;
+typedef unsigned long long  __u64;
 
 /*
  * These aren't exported outside the kernel to avoid name space clashes
@@ -34,8 +34,8 @@ typedef unsigned short u16;
 typedef signed int s32;
 typedef unsigned int u32;
 
-typedef signed long s64;
-typedef unsigned long u64;
+typedef signed long long s64;
+typedef unsigned long long u64;
 
 #define BITS_PER_LONG 64
 

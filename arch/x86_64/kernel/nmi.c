@@ -50,15 +50,19 @@ int __init check_nmi_watchdog (void)
 
 	printk(KERN_INFO "testing NMI watchdog ... ");
 
-	for (j = 0; j < NR_CPUS; ++j) 
-		counts[j] = cpu_pda[cpu_logical_map(j)].__nmi_count; 
+	for (j = 0; j < NR_CPUS; ++j) {
+		cpu = cpu_logical_map(j); 
+		counts[cpu] = cpu_pda[cpu].__nmi_count; 
+	}
 	sti();
 	mdelay((10*1000)/nmi_hz); // wait 10 ticks
 
 	for (j = 0; j < smp_num_cpus; j++) {
 		cpu = cpu_logical_map(j);
-		if (nmi_count(cpu) - counts[j] <= 5) {
-			printk("CPU#%d: NMI appears to be stuck!\n", cpu);
+		if (cpu_pda[cpu].__nmi_count - counts[cpu] <= 5) {
+			printk("CPU#%d: NMI appears to be stuck (%d)!\n", 
+			       cpu,
+			       cpu_pda[cpu].__nmi_count);
 			return -1;
 		}
 	}

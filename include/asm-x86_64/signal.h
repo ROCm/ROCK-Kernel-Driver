@@ -1,6 +1,7 @@
 #ifndef _ASMx8664_SIGNAL_H
 #define _ASMx8664_SIGNAL_H
 
+#ifndef __ASSEMBLY__
 #include <linux/types.h>
 #include <linux/linkage.h>
 
@@ -33,6 +34,7 @@ asmlinkage int do_signal(struct pt_regs *regs, sigset_t *oldset);
 typedef unsigned long sigset_t;
 
 #endif /* __KERNEL__ */
+#endif
 
 #define SIGHUP		 1
 #define SIGINT		 2
@@ -131,6 +133,7 @@ typedef unsigned long sigset_t;
 #define SIG_UNBLOCK        1	/* for unblocking signals */
 #define SIG_SETMASK        2	/* for setting the signal mask */
 
+#ifndef __ASSEMBLY__
 /* Type of a signal handler.  */
 typedef void (*__sighandler_t)(int);
 
@@ -199,6 +202,7 @@ extern __inline__ int sigfindinword(unsigned long word)
 	__asm__("bsfq %1,%0" : "=r"(word) : "rm"(word) : "cc");
 	return word;
 }
+#endif
 #endif
 #endif /* __KERNEL__ */
 

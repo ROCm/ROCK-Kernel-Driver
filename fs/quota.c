@@ -105,14 +105,14 @@ static struct super_block *resolve_dev(const char *path)
 	int ret;
 	mode_t mode;
 	struct nameidata nd;
-	kdev_t dev;
+	struct block_device *bdev;
 	struct super_block *sb;
 
 	ret = user_path_walk(path, &nd);
 	if (ret)
 		goto out;
 
-	dev = nd.dentry->d_inode->i_rdev;
+	bdev = nd.dentry->d_inode->i_bdev;
 	mode = nd.dentry->d_inode->i_mode;
 	path_release(&nd);
 
@@ -120,7 +120,7 @@ static struct super_block *resolve_dev(const char *path)
 	if (!S_ISBLK(mode))
 		goto out;
 	ret = -ENODEV;
-	sb = get_super(dev);
+	sb = get_super(bdev);
 	if (!sb)
 		goto out;
 	return sb;

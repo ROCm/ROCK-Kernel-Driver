@@ -1,5 +1,5 @@
 /*
- *  acpi_utils.c - ACPI Utility Functions ($Revision: 5 $)
+ *  acpi_utils.c - ACPI Utility Functions ($Revision: 7 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -425,24 +425,16 @@ acpi_evaluate_reference (
 
 		element = &(package->package.elements[i]);
 
-		if (!element || (element->type != ACPI_TYPE_STRING)) {
+		if (!element || (element->type != ACPI_TYPE_ANY)) {
 			status = AE_BAD_DATA;
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid element in package (not a device reference)\n"));
 			acpi_util_eval_error(handle, pathname, status);
 			break;
 		}
 
-		/* Convert reference (e.g. "\_PR_.CPU_") to acpi_handle. */
+		/* Get the  acpi_handle. */
 
-		status = acpi_get_handle(handle, element->string.pointer,
-			&(list->handles[i]));
-		if (ACPI_FAILURE(status)) {
-			status = AE_BAD_DATA;
-			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Unable to resolve device reference [%s]\n", element->string.pointer));
-			acpi_util_eval_error(handle, pathname, status);
-			break;
-		}
-
+		list->handles[i] = element->reference.handle;
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Resolved reference [%s]->[%p]\n", element->string.pointer, list->handles[i]));
 	}
 

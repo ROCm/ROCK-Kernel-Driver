@@ -837,10 +837,8 @@ void nftl_request(RQFUNC_ARG)
 	int res;
 
 	while (1) {
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		req = CURRENT;
 		
@@ -928,7 +926,7 @@ void nftl_request(RQFUNC_ARG)
 	repeat: 
 		DEBUG(MTD_DEBUG_LEVEL3, "end_request(%d)\n", res);
 		spin_lock_irq(QUEUE->queue_lock);
-		end_request(res);
+		end_request(CURRENT, res);
 	}
 }
 

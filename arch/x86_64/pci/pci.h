@@ -1,5 +1,5 @@
 /*
- *	Low-Level PCI Access for i386 machines.
+ *	Low-Level PCI Access for x86-64 machines.
  *
  *	(c) 1999 Martin Mares <mj@ucw.cz>
  */
@@ -26,8 +26,6 @@
 
 extern unsigned int pci_probe;
 
-/* pci-i386.c */
-
 extern unsigned int pcibios_max_latency;
 
 void pcibios_resource_survey(void);
@@ -38,9 +36,6 @@ int pcibios_enable_resources(struct pci_dev *);
 extern int pcibios_last_bus;
 extern struct pci_bus *pci_root_bus;
 extern struct pci_ops *pci_root_ops;
-
-struct irq_routing_table *pcibios_get_irq_routing_table(void);
-int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 
 /* pci-irq.c */
 
@@ -69,8 +64,10 @@ struct irq_routing_table {
 
 extern unsigned int pcibios_irq_mask;
 
-extern int pci_use_acpi_routing;
+extern int pcibios_scanned;
+extern spinlock_t pci_config_lock;
 
-void pcibios_irq_init(void);
 void pcibios_fixup_irqs(void);
-void pcibios_enable_irq(struct pci_dev *dev);
+int pirq_enable_irq(struct pci_dev *dev);
+
+extern int (*pcibios_enable_irq)(struct pci_dev *dev);

@@ -2,12 +2,17 @@
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
 #
+# Note: ISA is disabled and will hopefully never be enabled.
+# If you managed to buy an ISA x86-64 box you'll have to fix all the
+# ISA drivers you need yourself. 
+#
+
 mainmenu_name "Linux Kernel Configuration"
 
 define_bool CONFIG_X86_64 y
 
 define_bool CONFIG_X86 y
-define_bool CONFIG_ISA y
+define_bool CONFIG_ISA n
 define_bool CONFIG_SBUS n
 
 define_bool CONFIG_UID16 y
@@ -22,7 +27,8 @@ source init/Config.in
 mainmenu_option next_comment
 comment 'Processor type and features'
 choice 'Processor family' \
-	"AMD-Hammer			CONFIG_MK8" CONFIG_MK8
+	"AMD-Hammer			CONFIG_MK8 \
+	 Generic-x86-64			CONFIG_GENERIC_CPU" AMD-Hammer
 	
 #
 # Define implied options from the CPU selection here
@@ -44,8 +50,10 @@ define_bool CONFIG_X86_LOCAL_APIC y
 #currently broken:
 #bool 'MTRR (Memory Type Range Register) support' CONFIG_MTRR
 bool 'Symmetric multi-processing support' CONFIG_SMP
-bool 'Preemptible Kernel' CONFIG_PREEMPT
-if [ "$CONFIG_SMP" = "y" -a "$CONFIG_X86_CMPXCHG" = "y" ]; then
+if [ "$CONFIG_SMP" = "n" ]; then
+   bool 'Preemptible Kernel' CONFIG_PREEMPT
+fi
+if [ "$CONFIG_SMP" = "y" ]; then
     define_bool CONFIG_HAVE_DEC_LOCK y
 fi
 
@@ -56,9 +64,17 @@ endmenu
 
 mainmenu_option next_comment
 
-comment 'General options'
+comment 'Power management options'
+
+bool 'Power Management support' CONFIG_PM
 
 source drivers/acpi/Config.in
+
+endmenu
+
+mainmenu_option next_comment
+
+comment 'Bus options (PCI etc.)'
 
 bool 'PCI support' CONFIG_PCI
 if [ "$CONFIG_PCI" = "y" ]; then
@@ -77,14 +93,18 @@ else
    define_bool CONFIG_PCMCIA n
 fi
 
+endmenu
+
+mainmenu_option next_comment
+
+comment 'Executable file formats / Emulations'
+
 if [ "$CONFIG_PROC_FS" = "y" ]; then
    define_bool CONFIG_KCORE_ELF y
 fi
 #tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
-
-bool 'Power Management support' CONFIG_PM
 
 bool 'IA32 Emulation' CONFIG_IA32_EMULATION
 
@@ -94,7 +114,7 @@ source drivers/mtd/Config.in
 
 source drivers/parport/Config.in
 
-source drivers/pnp/Config.in
+#source drivers/pnp/Config.in
 
 source drivers/block/Config.in
 
@@ -142,9 +162,10 @@ if [ "$CONFIG_NET" = "y" ]; then
    bool 'Network device support' CONFIG_NETDEVICES
    if [ "$CONFIG_NETDEVICES" = "y" ]; then
       source drivers/net/Config.in
-      if [ "$CONFIG_ATM" = "y" ]; then
-         source drivers/atm/Config.in
-      fi
+# ATM seems to be largely 64bit unsafe and also unmaintained - disable it for now.
+#      if [ "$CONFIG_ATM" = "y" ]; then
+#         source drivers/atm/Config.in
+#      fi
    fi
    endmenu
 fi
@@ -155,14 +176,7 @@ source net/irda/Config.in
 
 source drivers/isdn/Config.in
 
-mainmenu_option next_comment
-comment 'Old CD-ROM drivers (not SCSI, not IDE)'
-
-bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
-if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
-   source drivers/cdrom/Config.in
-fi
-endmenu
+# no support for non IDE/SCSI cdroms as they were all ISA only
 
 #
 # input before char - char/joystick depends on it. As does USB.

@@ -33,6 +33,7 @@
 #include <linux/ioport.h>
 #include <linux/console.h>
 #include <linux/mc146818rtc.h>
+#include <linux/root_dev.h>
 
 #include <asm/cpu.h>
 #include <asm/bootinfo.h>
@@ -104,7 +105,7 @@ void __init au1000_setup(void)
 	ioport_resource.end = au1000_resources.lcd.end;
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+	ROOT_DEV = Root_RAM0;
 #endif
 
 	outl(PC_CNTRL_E0 | PC_CNTRL_EN0 | PC_CNTRL_EN0, PC_COUNTER_CNTRL);

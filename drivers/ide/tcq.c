@@ -327,6 +327,8 @@ static ide_startstop_t check_service(struct ata_device *drive, struct request *r
 
 static ide_startstop_t dmaq_complete(struct ata_device *drive, struct request *rq)
 {
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
 	u8 dma_stat;
 
 	/*
@@ -348,7 +350,14 @@ static ide_startstop_t dmaq_complete(struct ata_device *drive, struct request *r
 		printk("%s: bad DMA status (dma_stat=%x)\n", drive->name, dma_stat);
 
 	TCQ_PRINTK("%s: ending %p, tag %d\n", __FUNCTION__, rq, rq->tag);
-	__ide_end_request(drive, rq, !dma_stat, rq->nr_sectors);
+
+	/* FIXME: this locking should encompass the above register
+	 * file access too.
+	 */
+
+	spin_lock_irqsave(ch->lock, flags);
+	__ata_end_request(drive, rq, !dma_stat, rq->nr_sectors);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	/*
 	 * we completed this command, check if we can service a new command

@@ -92,6 +92,8 @@
 #include <asm/atari_stram.h>
 
 #define MAJOR_NR FLOPPY_MAJOR
+#define DEVICE_NAME "floppy"
+#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 
@@ -632,7 +634,7 @@ static void fd_error( void )
 	CURRENT->errors++;
 	if (CURRENT->errors >= MAX_ERRORS) {
 		printk(KERN_ERR "fd%d: too many errors.\n", SelectedDrive );
-		end_request( 0 );
+		end_request(CURRENT, 0);
 	}
 	else if (CURRENT->errors == RECALIBRATE_ERRORS) {
 		printk(KERN_WARNING "fd%d: recalibrating\n", SelectedDrive );
@@ -757,7 +759,7 @@ static void do_fd_action( int drive )
 			/* all sectors finished */
 			CURRENT->nr_sectors -= CURRENT->current_nr_sectors;
 			CURRENT->sector += CURRENT->current_nr_sectors;
-			end_request( 1 );
+			end_request(CURRENT, 1);
 			redo_fd_request();
 			return;
 		    }
@@ -1164,7 +1166,7 @@ static void fd_rwsec_done1(int status)
 		/* all sectors finished */
 		CURRENT->nr_sectors -= CURRENT->current_nr_sectors;
 		CURRENT->sector += CURRENT->current_nr_sectors;
-		end_request( 1 );
+		end_request(CURRENT, 1);
 		redo_fd_request();
 	}
 	return;
@@ -1466,7 +1468,7 @@ repeat:
 	if (!UD.connected) {
 		/* drive not connected */
 		printk(KERN_ERR "Unknown Device: fd%d\n", drive );
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 		
@@ -1482,12 +1484,12 @@ repeat:
 		/* user supplied disk type */
 		if (--type >= NUM_DISK_MINORS) {
 			printk(KERN_WARNING "fd%d: invalid disk format", drive );
-			end_request( 0 );
+			end_request(CURRENT, 0);
 			goto repeat;
 		}
 		if (minor2disktype[type].drive_types > DriveType)  {
 			printk(KERN_WARNING "fd%d: unsupported disk format", drive );
-			end_request( 0 );
+			end_request(CURRENT, 0);
 			goto repeat;
 		}
 		type = minor2disktype[type].index;
@@ -1497,7 +1499,7 @@ repeat:
 	}
 	
 	if (CURRENT->sector + 1 > UDT->blocks) {
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 

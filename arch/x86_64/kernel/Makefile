@@ -12,11 +12,6 @@ obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
 		pci-dma.o x8664_ksyms.o i387.o syscall.o vsyscall.o \
 		setup64.o bluesmoke.o bootflag.o
 
-ifdef CONFIG_PCI
-obj-y			+= pci-x86_64.o
-obj-y			+= pci-pc.o pci-irq.o
-endif
-
 obj-$(CONFIG_MTRR)	+= mtrr.o
 obj-$(CONFIG_X86_MSR)	+= msr.o
 obj-$(CONFIG_X86_CPUID)	+= cpuid.o

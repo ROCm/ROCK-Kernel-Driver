@@ -236,7 +236,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 			set_device_ro(dev, intval);
 			return 0;
 		case BLKROGET:
-			intval = (is_read_only(dev) != 0);
+			intval = (bdev_read_only(bdev) != 0);
 			return put_user(intval, (int *)(arg));
 
 		case BLKRASET:

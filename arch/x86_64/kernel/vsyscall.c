@@ -47,14 +47,14 @@
 
 #define __vsyscall(nr) __attribute__ ((unused,__section__(".vsyscall_" #nr)))
 
-//#define NO_VSYSCALL 1
+#define NO_VSYSCALL 1
 
 #ifdef NO_VSYSCALL
 #include <asm/unistd.h>
 
 static int errno __section_vxtime_sequence; 
 
-__syscall2(static inline int,int,gettimeofday,struct timeval *,tv,struct timezone *,tz)
+static inline _syscall2(int,gettimeofday,struct timeval *,tv,struct timezone *,tz)
 
 #else
 static inline void timeval_normalize(struct timeval * tv)
@@ -148,28 +148,11 @@ static int __vsyscall(0) vgettimeofday(struct timeval * tv, struct timezone * tz
 
 static time_t __vsyscall(1) vtime(time_t * t)
 {
-#ifdef NO_VSYSCALL
 	struct timeval tv; 
-	gettimeofday(&tv,NULL); 
-	if (t) *t = tv.tv_sec; 
-	return tv.tv_sec; 
-#else
-	long sequence;
-	time_t __time;
-
-	do {
-		sequence = __vxtime_sequence[1];
-		rmb();
-
-		__time = __xtime.tv_sec;
-
-		rmb();
-	} while (sequence != __vxtime_sequence[0]);
-
+	vgettimeofday(&tv,NULL); 
 	if (t)
-		*t = __time;
-	return __time;
-#endif
+		*t = tv.tv_sec; 
+	return tv.tv_sec;
 }
 
 static long __vsyscall(2) venosys_0(void)

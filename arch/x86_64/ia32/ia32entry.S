@@ -24,9 +24,6 @@
 
 /*
  * 32bit SYSCALL instruction entry. 	
- * It'll probably kill you because it destroys your segments.
- * Should coredump here, but the next instruction will likely do 
- * that anyways.
  */ 	
 ENTRY(ia32_cstar_target)
 	movq $-ENOSYS,%rax
@@ -117,6 +114,7 @@ ENTRY(ia32_ptregs_common)
 
 	.data
 	.align 8
+	.globl ia32_sys_call_table
 ia32_sys_call_table:
 	.quad ni_syscall	/* 0  -  old "setup" system call*/
 	.quad sys_exit
@@ -143,7 +141,7 @@ ia32_sys_call_table:
 	.quad sys_oldumount	/* old_umount  */
 	.quad sys_setuid16
 	.quad sys_getuid16
-	.quad ni_syscall	/* stime */		/* 25 */
+	.quad sys_stime		/* stime */		/* 25 */
 	.quad sys32_ptrace	/* ptrace */
 	.quad sys_alarm		/* XXX sign extension??? */ 
 	.quad ni_syscall	/* (old)fstat */
@@ -240,7 +238,7 @@ ia32_sys_call_table:
 	.quad stub32_sigreturn
 	.quad stub32_clone		/* 120 */
 	.quad sys_setdomainname
-	.quad sys_newuname
+	.quad sys32_newuname
 	.quad sys_modify_ldt
 	.quad sys32_adjtimex
 	.quad sys32_mprotect		/* 125 */

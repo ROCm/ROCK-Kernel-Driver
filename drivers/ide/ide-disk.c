@@ -91,104 +91,99 @@ static int lba_capacity_is_ok(struct hd_driveid *id)
 }
 
 /*
- * Handler for command with PIO data-in phase
+ * Handler for command with PIO data-in phase.
  */
 static ide_startstop_t task_in_intr(struct ata_device *drive, struct request *rq)
 {
 	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
-	char *buf = NULL;
+	int ret;
+
+	spin_lock_irqsave(ch->lock, flags);
 
 	if (!ata_status(drive, DATA_READY, BAD_R_STAT)) {
-		if (drive->status & (ERR_STAT|DRQ_STAT))
+		if (drive->status & (ERR_STAT|DRQ_STAT)) {
+			spin_unlock_irqrestore(ch->lock, flags);
+
 			return ata_error(drive, rq, __FUNCTION__);
+		}
 
 		if (!(drive->status & BUSY_STAT)) {
-#if 0
-			printk("task_in_intr to Soon wait for next interrupt\n");
-#endif
-
-			/* FIXME: this locking should encompass the above register
-			 * file access too.
-			 */
-
-			spin_lock_irqsave(ch->lock, flags);
+//			printk("task_in_intr to Soon wait for next interrupt\n");
 			ata_set_handler(drive, task_in_intr, WAIT_CMD, NULL);
 			spin_unlock_irqrestore(ch->lock, flags);
 
 			return ide_started;
 		}
 	}
-	buf = ide_map_rq(rq, &flags);
-#if 0
-	printk("Read: %p, rq->current_nr_sectors: %d\n", buf, (int) rq->current_nr_sectors);
-#endif
 
-	ata_read(drive, buf, SECTOR_WORDS);
-	ide_unmap_rq(rq, buf, &flags);
+//	printk("Read: %p, rq->current_nr_sectors: %d\n", buf, (int) rq->current_nr_sectors);
+	{
+		unsigned long flags;
+		char *buf;
+
+		buf = ide_map_rq(rq, &flags);
+		ata_read(drive, buf, SECTOR_WORDS);
+		ide_unmap_rq(rq, buf, &flags);
+	}
 
 	/* First segment of the request is complete. note that this does not
 	 * necessarily mean that the entire request is done!! this is only true
-	 * if ide_end_request() returns 0.
+	 * if ata_end_request() returns 0.
 	 */
 
-	if (--rq->current_nr_sectors <= 0) {
-#if 0
-		printk("Request Ended stat: %02x\n", drive->status);
-#endif
-		if (!ide_end_request(drive, rq, 1))
-			return ide_stopped;
+	if (--rq->current_nr_sectors <= 0 && !__ata_end_request(drive, rq, 1, 0)) {
+//		printk("Request Ended stat: %02x\n", drive->status);
+		ret = ide_stopped;
+	} else {
+		/* still data left to transfer */
+		ata_set_handler(drive, task_in_intr,  WAIT_CMD, NULL);
+
+		ret = ide_started;
 	}
-
-	/* FIXME: this locking should encompass the above register
-	 * file access too.
-	 */
-
-	spin_lock_irqsave(ch->lock, flags);
-	/* still data left to transfer */
-	ata_set_handler(drive, task_in_intr,  WAIT_CMD, NULL);
 	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ret;
 }
 
 /*
- * Handler for command with PIO data-out phase
+ * Handler for command with PIO data-out phase.
  */
 static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *rq)
 {
 	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
-	char *buf = NULL;
-
-	if (!ata_status(drive, DRIVE_READY, drive->bad_wstat))
-		return ata_error(drive, rq, __FUNCTION__);
-
-	if (!rq->current_nr_sectors)
-		if (!ide_end_request(drive, rq, 1))
-			return ide_stopped;
-
-	if ((rq->nr_sectors == 1) != (drive->status & DRQ_STAT)) {
-		buf = ide_map_rq(rq, &flags);
-#if 0
-		printk("write: %p, rq->current_nr_sectors: %d\n", buf, (int) rq->current_nr_sectors);
-#endif
-
-		ata_write(drive, buf, SECTOR_WORDS);
-		ide_unmap_rq(rq, buf, &flags);
-		rq->errors = 0;
-		rq->current_nr_sectors--;
-	}
-
-	/* FIXME: this locking should encompass the above register
-	 * file access too.
-	 */
+	int ret;
 
 	spin_lock_irqsave(ch->lock, flags);
-	ata_set_handler(drive, task_out_intr, WAIT_CMD, NULL);
+	if (!ata_status(drive, DRIVE_READY, drive->bad_wstat)) {
+		spin_unlock_irqrestore(ch->lock, flags);
+
+		return ata_error(drive, rq, __FUNCTION__);
+	}
+
+	if (!rq->current_nr_sectors && !__ata_end_request(drive, rq, 1, 0)) {
+		ret = ide_stopped;
+	} else {
+		if ((rq->nr_sectors == 1) != (drive->status & DRQ_STAT)) {
+			unsigned long flags;
+			char *buf;
+
+//			printk("write: %p, rq->current_nr_sectors: %d\n", buf, (int) rq->current_nr_sectors);
+			buf = ide_map_rq(rq, &flags);
+			ata_write(drive, buf, SECTOR_WORDS);
+			ide_unmap_rq(rq, buf, &flags);
+
+			rq->errors = 0;
+			--rq->current_nr_sectors;
+		}
+		ata_set_handler(drive, task_out_intr, WAIT_CMD, NULL);
+
+		ret = ide_started;
+	}
 	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ret;
 }
 
 /*
@@ -198,63 +193,68 @@ static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request 
 {
 	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
-	char *buf = NULL;
-	unsigned int msect;
-	unsigned int nsect;
-
-	if (!ata_status(drive, DATA_READY, BAD_R_STAT)) {
-		if (drive->status & (ERR_STAT|DRQ_STAT))
-			return ata_error(drive, rq, __FUNCTION__);
-
-		/* FIXME: this locking should encompass the above register
-		 * file access too.
-		 */
-
-		spin_lock_irqsave(ch->lock, flags);
-		/* no data yet, so wait for another interrupt */
-		ata_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
-		spin_unlock_irqrestore(ch->lock, flags);
-
-		return ide_started;
-	}
-
-	/* (ks/hs): Fixed Multi-Sector transfer */
-	msect = drive->mult_count;
-
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-
-		buf = ide_map_rq(rq, &flags);
-
-#if 0
-		printk("Multiread: %p, nsect: %d , rq->current_nr_sectors: %d\n",
-			buf, nsect, rq->current_nr_sectors);
-#endif
-		ata_read(drive, buf, nsect * SECTOR_WORDS);
-		ide_unmap_rq(rq, buf, &flags);
-		rq->errors = 0;
-		rq->current_nr_sectors -= nsect;
-		msect -= nsect;
-		if (!rq->current_nr_sectors) {
-			if (!ide_end_request(drive, rq, 1))
-				return ide_stopped;
-		}
-	} while (msect);
-
-	/* FIXME: this locking should encompass the above register
-	 * file access too.
-	 */
+	int ret;
 
 	spin_lock_irqsave(ch->lock, flags);
-	/*
-	 * more data left
-	 */
-	ata_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
+	if (!ata_status(drive, DATA_READY, BAD_R_STAT)) {
+		if (drive->status & (ERR_STAT|DRQ_STAT)) {
+			spin_unlock_irqrestore(ch->lock, flags);
+
+			return ata_error(drive, rq, __FUNCTION__);
+		}
+
+		/* no data yet, so wait for another interrupt */
+		ata_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
+
+		ret = ide_started;
+	} else {
+		unsigned int msect;
+
+		/* (ks/hs): Fixed Multi-Sector transfer */
+		msect = drive->mult_count;
+
+		do {
+			unsigned int nsect;
+
+			nsect = rq->current_nr_sectors;
+			if (nsect > msect)
+				nsect = msect;
+
+#if 0
+			printk("Multiread: %p, nsect: %d , rq->current_nr_sectors: %d\n",
+					buf, nsect, rq->current_nr_sectors);
+#endif
+			{
+				unsigned long flags;
+				char *buf;
+
+				buf = ide_map_rq(rq, &flags);
+				ata_read(drive, buf, nsect * SECTOR_WORDS);
+				ide_unmap_rq(rq, buf, &flags);
+			}
+
+			rq->errors = 0;
+			rq->current_nr_sectors -= nsect;
+			msect -= nsect;
+
+			/* FIXME: this seems buggy */
+			if (!rq->current_nr_sectors) {
+				if (!__ata_end_request(drive, rq, 1, 0)) {
+					spin_unlock_irqrestore(ch->lock, flags);
+
+					return ide_stopped;
+				}
+			}
+		} while (msect);
+
+		/* more data left */
+		ata_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
+
+		ret = ide_started;
+	}
 	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_started;
+	return ret;
 }
 
 static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request *rq)
@@ -262,9 +262,9 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
 	int ok;
-	int mcount = drive->mult_count;
-	ide_startstop_t startstop;
+	int ret;
 
+	spin_lock_irqsave(ch->lock, flags);
 
 	/*
 	 * FIXME: the drive->status checks here seem to be messy.
@@ -277,80 +277,67 @@ static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request
 
 	if (!ok || !rq->nr_sectors) {
 		if (drive->status & (ERR_STAT | DRQ_STAT)) {
-			startstop = ata_error(drive, rq, __FUNCTION__);
-
-			return startstop;
-		}
-	}
-
-	if (!rq->nr_sectors) {
-		__ide_end_request(drive, rq, 1, rq->hard_nr_sectors);
-		rq->bio = NULL;
-
-		return ide_stopped;
-	}
-
-	if (!ok) {
-		/* no data yet, so wait for another interrupt */
-		if (!ch->handler) {
-			/* FIXME: this locking should encompass the above register
-			 * file access too.
-			 */
-
-			spin_lock_irqsave(ch->lock, flags);
-			ata_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
 			spin_unlock_irqrestore(ch->lock, flags);
+
+			return ata_error(drive, rq, __FUNCTION__);
 		}
-
-		return ide_started;
 	}
+	if (!rq->nr_sectors) {
+		__ata_end_request(drive, rq, 1, rq->hard_nr_sectors);
+		rq->bio = NULL;
+		ret = ide_stopped;
+	} else if (!ok) {
+		/* no data yet, so wait for another interrupt */
+		if (!ch->handler)
+			ata_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+		ret = ide_started;
+	} else {
+		int mcount = drive->mult_count;
 
-	do {
-		char *buffer;
-		int nsect = rq->current_nr_sectors;
-		unsigned long flags;
+		do {
+			char *buf;
+			int nsect = rq->current_nr_sectors;
+			unsigned long flags;
 
-		if (nsect > mcount)
-			nsect = mcount;
-		mcount -= nsect;
+			if (nsect > mcount)
+				nsect = mcount;
+			mcount -= nsect;
 
-		buffer = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
-		rq->sector += nsect;
-		rq->nr_sectors -= nsect;
-		rq->current_nr_sectors -= nsect;
+			buf = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
+			rq->sector += nsect;
+			rq->nr_sectors -= nsect;
+			rq->current_nr_sectors -= nsect;
 
-		/* Do we move to the next bio after this? */
-		if (!rq->current_nr_sectors) {
-			/* remember to fix this up /jens */
-			struct bio *bio = rq->bio->bi_next;
+			/* Do we move to the next bio after this? */
+			if (!rq->current_nr_sectors) {
+				/* remember to fix this up /jens */
+				struct bio *bio = rq->bio->bi_next;
 
-			/* end early if we ran out of requests */
-			if (!bio) {
-				mcount = 0;
-			} else {
-				rq->bio = bio;
-				rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+				/* end early if we ran out of requests */
+				if (!bio) {
+					mcount = 0;
+				} else {
+					rq->bio = bio;
+					rq->current_nr_sectors = bio_iovec(bio)->bv_len >> 9;
+				}
 			}
-		}
 
-		/*
-		 * Ok, we're all setup for the interrupt re-entering us on the
-		 * last transfer.
-		 */
-		ata_write(drive, buffer, nsect * SECTOR_WORDS);
-		bio_kunmap_irq(buffer, &flags);
-	} while (mcount);
+			/*
+			 * Ok, we're all setup for the interrupt re-entering us on the
+			 * last transfer.
+			 */
+			ata_write(drive, buf, nsect * SECTOR_WORDS);
+			bio_kunmap_irq(buffer, &flags);
+		} while (mcount);
 
-	rq->errors = 0;
-	if (!ch->handler) {
-		/* FIXME: this locking should encompass the above register
-		 * file access too.
-		 */
+		rq->errors = 0;
 
-		spin_lock_irqsave(ch->lock, flags);
-		ata_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
-		spin_unlock_irqrestore(ch->lock, flags);
+		if (!ch->handler)
+			ata_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
+
+		ret = ide_started;
 	}
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ide_started;
 }
@@ -571,23 +558,33 @@ static ide_startstop_t lba48_do_request(struct ata_device *drive, struct request
  */
 static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
-	/*
-	 * Wait until all request have bin finished.
-	 */
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
+	int ret;
 
+	/* make sure all request have bin finished
+	 * FIXME: this check doesn't make sense go! */
 	while (drive->blocked) {
 		yield();
 		printk(KERN_ERR "ide: Request while drive blocked?");
 	}
 
+	/* FIXME: Move this lock entiery upstream. */
+	spin_lock_irqsave(ch->lock, flags);
+
+	/* FIXME: this check doesn't make sense */
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "idedisk_do_request - bad command");
-		ide_end_request(drive, rq, 0);
+		__ata_end_request(drive, rq, 0, 0);
+		spin_unlock_irqrestore(ch->lock, flags);
+
 		return ide_stopped;
 	}
 
 	if (IS_PDC4030_DRIVE) {
 		extern ide_startstop_t promise_do_request(struct ata_device *, struct request *, sector_t);
+
+		spin_unlock_irqrestore(drive->channel->lock, flags);
 
 		return promise_do_request(drive, rq, block);
 	}
@@ -596,10 +593,7 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 	 * start a tagged operation
 	 */
 	if (drive->using_tcq) {
-		unsigned long flags;
 		int ret;
-
-		spin_lock_irqsave(drive->channel->lock, flags);
 
 		ret = blk_queue_start_tag(&drive->queue, rq);
 
@@ -608,27 +602,27 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 		if (ata_pending_commands(drive) > drive->max_last_depth)
 			drive->max_last_depth = ata_pending_commands(drive);
 
-		spin_unlock_irqrestore(drive->channel->lock, flags);
-
 		if (ret) {
 			BUG_ON(!ata_pending_commands(drive));
+			spin_unlock_irqrestore(ch->lock, flags);
+
 			return ide_started;
 		}
 	}
 
-	/* 48-bit LBA */
 	if ((drive->id->cfs_enable_2 & 0x0400) && (drive->addressing))
-		return lba48_do_request(drive, rq, block);
+		ret = lba48_do_request(drive, rq, block);
+	else if (drive->select.b.lba)
+		ret = lba28_do_request(drive, rq, block);
+	else
+		ret = chs_do_request(drive, rq, block);
 
-	/* 28-bit LBA */
-	if (drive->select.b.lba)
-		return lba28_do_request(drive, rq, block);
+	spin_unlock_irqrestore(ch->lock, flags);
 
-	/* 28-bit CHS */
-	return chs_do_request(drive, rq, block);
+	return ret;
 }
 
-static int idedisk_open (struct inode *inode, struct file *filp, struct ata_device *drive)
+static int idedisk_open(struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	MOD_INC_USE_COUNT;
 	if (drive->removable && drive->usage == 1) {
@@ -648,10 +642,11 @@ static int idedisk_open (struct inode *inode, struct file *filp, struct ata_devi
 				drive->doorlocking = 0;
 		}
 	}
+
 	return 0;
 }
 
-static int idedisk_flushcache(struct ata_device *drive)
+static int flush_cache(struct ata_device *drive)
 {
 	struct ata_taskfile args;
 
@@ -661,6 +656,7 @@ static int idedisk_flushcache(struct ata_device *drive)
 		args.cmd = WIN_FLUSH_CACHE_EXT;
 	else
 		args.cmd = WIN_FLUSH_CACHE;
+
 	return ide_raw_taskfile(drive, &args);
 }
 
@@ -680,7 +676,7 @@ static void idedisk_release(struct inode *inode, struct file *filp, struct ata_d
 		}
 	}
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-		if (idedisk_flushcache(drive))
+		if (flush_cache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
 	MOD_DEC_USE_COUNT;
@@ -1244,15 +1240,27 @@ static void idedisk_setup(struct ata_device *drive)
 
 static int idedisk_cleanup(struct ata_device *drive)
 {
+	int ret;
+
 	if (!drive)
 	    return 0;
 
-	put_device(&drive->device);
-	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-		if (idedisk_flushcache(drive))
+	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache) {
+		if (flush_cache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
-	return ide_unregister_subdriver(drive);
+	}
+	ret = ide_unregister_subdriver(drive);
+
+	/* FIXME: This is killing the kernel with BUG 185 at asm/spinlocks.h
+	 * horribly.  Check whatever we did REGISTER the device properly
+	 * in front?
+	 */
+#if 0
+	put_device(&drive->device);
+#endif
+
+	return ret;
 }
 
 static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)

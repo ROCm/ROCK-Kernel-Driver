@@ -23,6 +23,7 @@
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
 #include <asm/tlbflush.h>
+#include <asm/mmu_context.h>
 
 #include <asm/irq.h>
 #include <asm/page.h>

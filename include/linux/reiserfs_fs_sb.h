@@ -194,7 +194,6 @@ struct reiserfs_journal {
   struct reiserfs_journal_cnode *j_last ; /* newest journal block */
   struct reiserfs_journal_cnode *j_first ; /*  oldest journal block.  start here for traverse */
 
-  kdev_t               j_dev;
   struct file         *j_dev_file;
   struct block_device *j_dev_bd;  
   int j_1st_reserved_block;     /* first block on s_dev of reserved area journal */        
@@ -456,7 +455,6 @@ int reiserfs_resize(struct super_block *, unsigned long) ;
 #define SB_JOURNAL_MAX_BATCH(s)      (SB_JOURNAL(s)->s_journal_max_batch)
 #define SB_JOURNAL_MAX_COMMIT_AGE(s) (SB_JOURNAL(s)->s_journal_max_commit_age)
 #define SB_JOURNAL_MAX_TRANS_AGE(s)  (SB_JOURNAL(s)->s_journal_max_trans_age)
-#define SB_JOURNAL_DEV(s)            (SB_JOURNAL(s)->j_dev)
 
 /* A safe version of the "bdevname", which returns the "s_id" field of
  * a superblock or else "Null superblock" if the super block is NULL.

@@ -195,6 +195,8 @@ static struct pci_socket_ops ti_ops = {
 #define ti_sysctl(socket)	((socket)->private[0])
 #define ti_cardctl(socket)	((socket)->private[1])
 #define ti_devctl(socket)	((socket)->private[2])
+#define ti_diag(socket)		((socket)->private[3])
+#define ti_irqmux(socket)	((socket)->private[4])
 
 static int ti113x_open(pci_socket_t *socket)
 {
@@ -235,7 +237,6 @@ static struct pci_socket_ops ti113x_ops = {
 	yenta_proc_setup
 };
 
-#define ti_diag(socket)		((socket)->private[0])
 
 static int ti1250_open(pci_socket_t *socket)
 {
@@ -244,16 +245,22 @@ static int ti1250_open(pci_socket_t *socket)
 	ti_diag(socket) &= ~(TI1250_DIAG_PCI_CSC | TI1250_DIAG_PCI_IREQ);
 	if (socket->cb_irq)
 		ti_diag(socket) |= TI1250_DIAG_PCI_CSC | TI1250_DIAG_PCI_IREQ;
-	ti_open(socket);
+	ti113x_open(socket);
 	return 0;
 }
 
 static int ti1250_init(pci_socket_t *socket)
 {
 	yenta_init(socket);
-
+	ti113x_init(socket);
+	ti_irqmux(socket) = config_readl(socket, TI122X_IRQMUX);
+	ti_irqmux(socket) = (ti_irqmux(socket) & ~0x0f) | 0x02; /* route INTA */
+	if (!(ti_sysctl(socket) & TI122X_SCR_INTRTIE))
+		ti_irqmux(socket) |= 0x20; /* route INTB */
+	
+	config_writel(socket, TI122X_IRQMUX, ti_irqmux(socket));
+		
 	config_writeb(socket, TI1250_DIAGNOSTIC, ti_diag(socket));
-	ti_intctl(socket);
 	return 0;
 }
 

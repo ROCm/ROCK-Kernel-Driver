@@ -247,7 +247,8 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	if (pdc4030_cmd(drive, PROMISE_GET_CONFIG)) {
 		return 0;
 	}
-	if (ide_wait_stat(&startstop, drive, NULL, DATA_READY,BAD_W_STAT,WAIT_DRQ)) {
+	if (ata_status_poll(drive, DATA_READY, BAD_W_STAT,
+				WAIT_DRQ, NULL, &startstop)) {
 		printk(KERN_INFO
 			"%s: Failed Promise read config!\n",hwif->name);
 		return 0;
@@ -407,7 +408,8 @@ read_next:
 	rq->nr_sectors -= nsect;
 	total_remaining = rq->nr_sectors;
 	if ((rq->current_nr_sectors -= nsect) <= 0) {
-		ide_end_request(drive, rq, 1);
+		/* FIXME: no queue locking above! */
+		ata_end_request(drive, rq, 1);
 	}
 
 	/*
@@ -461,13 +463,11 @@ read_next:
  */
 static ide_startstop_t promise_complete_pollfunc(struct ata_device *drive, struct request *rq)
 {
+	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
 
 	if (!ata_status(drive, 0, BUSY_STAT)) {
 		if (time_before(jiffies, ch->poll_timeout)) {
-			unsigned long flags;
-			struct ata_channel *ch = drive->channel;
-
 			/* FIXME: this locking should encompass the above
 			 * register file access too.
 			 */
@@ -488,7 +488,13 @@ static ide_startstop_t promise_complete_pollfunc(struct ata_device *drive, struc
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: Write complete - end_request\n", drive->name);
 #endif
-	__ide_end_request(drive, rq, 1, rq->nr_sectors);
+	/* FIXME: this locking should encompass the above
+	 * register file access too.
+	 */
+
+	spin_lock_irqsave(ch->lock, flags);
+	__ata_end_request(drive, rq, 1, rq->nr_sectors);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ide_stopped;
 }
@@ -653,7 +659,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 	/* Check that it's a regular command. If not, bomb out early. */
 	if (!(rq->flags & REQ_CMD)) {
 		blk_dump_rq_flags(rq, "pdc4030 bad flags");
-		ide_end_request(drive, rq, 0);
+		ata_end_request(drive, rq, 0);
 
 		return ide_stopped;
 	}
@@ -721,7 +727,8 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
  *	call the promise_write function to deal with writing the data out
  * NOTE: No interrupts are generated on writes. Write completion must be polled
  */
-		if (ide_wait_stat(&startstop, drive, rq, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
+		if (ata_status_poll(drive, DATA_READY, drive->bad_wstat,
+					WAIT_DRQ, rq, &startstop )) {
 			printk(KERN_ERR "%s: no DRQ after issuing "
 			       "PROMISE_WRITE\n", drive->name);
 			return startstop;
@@ -733,7 +740,8 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 
 	default:
 		printk(KERN_ERR "pdc4030: command not READ or WRITE! Huh?\n");
-		ide_end_request(drive, rq, 0);
+		/* FIXME: This should already run under the lock. */
+		ata_end_request(drive, rq, 0);
 		return ide_stopped;
 	}
 }

@@ -1,7 +1,7 @@
 #ifndef PWC_IOCTL_H
 #define PWC_IOCTL_H
 
-/* (C) 2001 Nemosoft Unv.    webcam@smcc.demon.nl
+/* (C) 2001-2002 Nemosoft Unv.    webcam@smcc.demon.nl
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,7 +18,9 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-/*
+/*         This is pwc-ioctl.h belonging to PWC 8.7                        */
+
+/* 
    Changes
    2001/08/03  Alvarado   Added ioctl constants to access methods for 
                           changing white balance and red/blue gains
@@ -52,6 +54,14 @@
 #define PWC_FPS_SNAPSHOT	0x00400000
 
 
+
+struct pwc_probe
+{
+	char name[32];
+	int type;
+};
+
+
 /* pwc_whitebalance.mode values */
 #define PWC_WB_INDOOR		0
 #define PWC_WB_OUTDOOR		1
@@ -63,9 +73,9 @@
    Set mode to one of the PWC_WB_* values above.
    *red and *blue are the respective gains of these colour components inside 
    the camera; range 0..65535
-   When mode == PWC_WB_MANUAL, manual_red and manual_blue are set or read; 
+   When 'mode' == PWC_WB_MANUAL, 'manual_red' and 'manual_blue' are set or read; 
    otherwise undefined.
-   read_red and read_blue are read-only.
+   'read_red' and 'read_blue' are read-only.
 */   
    
 struct pwc_whitebalance
@@ -75,6 +85,17 @@ struct pwc_whitebalance
 	int read_red, read_blue;	/* R/O */
 };
 
+/* 
+   'control_speed' and 'control_delay' are used in automatic whitebalance mode,
+   and tell the camera how fast it should react to changes in lighting, and 
+   with how much delay. Valid values are 0..65535.
+*/
+struct pwc_wb_speed
+{
+	int control_speed;
+	int control_delay;
+
+};
 
 /* Used with VIDIOCPWC[SG]LED */
 struct pwc_leds
@@ -104,6 +125,19 @@ struct pwc_leds
  /* Get preferred compression quality */
 #define VIDIOCPWCGCQUAL		_IOR('v', 195, int)
 
+
+ /* This is a probe function; since so many devices are supported, it
+    becomes difficult to include all the names in programs that want to
+    check for the enhanced Philips stuff. So in stead, try this PROBE;
+    it returns a structure with the original name, and the corresponding 
+    Philips type.
+    To use, fill the structure with zeroes, call PROBE and if that succeeds,
+    compare the name with that returned from VIDIOCGCAP; they should be the
+    same. If so, you can be assured it is a Philips (OEM) cam and the type
+    is valid.
+ */    
+#define VIDIOCPWCPROBE		_IOR('v', 199, struct pwc_probe)
+
  /* Set AGC (Automatic Gain Control); int < 0 = auto, 0..65535 = fixed */
 #define VIDIOCPWCSAGC		_IOW('v', 200, int)
  /* Get AGC; int < 0 = auto; >= 0 = fixed, range 0..65535 */
@@ -115,9 +149,28 @@ struct pwc_leds
 #define VIDIOCPWCSAWB           _IOW('v', 202, struct pwc_whitebalance)
 #define VIDIOCPWCGAWB           _IOR('v', 202, struct pwc_whitebalance)
 
- /* Turn LED on/off ; int range 0..65535 */
+ /* Auto WB speed */
+#define VIDIOCPWCSAWBSPEED	_IOW('v', 203, struct pwc_wb_speed)
+#define VIDIOCPWCGAWBSPEED	_IOR('v', 203, struct pwc_wb_speed)
+
+ /* LEDs on/off/blink; int range 0..65535 */
 #define VIDIOCPWCSLED           _IOW('v', 205, struct pwc_leds)
- /* Get state of LED; int range 0..65535 */
 #define VIDIOCPWCGLED           _IOR('v', 205, struct pwc_leds)
+
+  /* Contour (sharpness); int < 0 = auto, 0..65536 = fixed */
+#define VIDIOCPWCSCONTOUR	_IOW('v', 206, int)
+#define VIDIOCPWCGCONTOUR	_IOR('v', 206, int)
+
+  /* Backlight compensation; 0 = off, otherwise on */
+#define VIDIOCPWCSBACKLIGHT	_IOW('v', 207, int)
+#define VIDIOCPWCGBACKLIGHT	_IOR('v', 207, int)
+
+  /* Flickerless mode; = 0 off, otherwise on */
+#define VIDIOCPWCSFLICKER	_IOW('v', 208, int)
+#define VIDIOCPWCGFLICKER	_IOR('v', 208, int)  
+
+  /* Dynamic noise reduction; 0 off, 3 = high noise reduction */
+#define VIDIOCPWCSDYNNOISE	_IOW('v', 209, int)
+#define VIDIOCPWCGDYNNOISE	_IOR('v', 209, int)
 
 #endif

@@ -198,6 +198,8 @@ History:
 #include <asm/io.h>
 
 #define MAJOR_NR CM206_CDROM_MAJOR
+#define DEVICE_NR(device) (minor(device))
+
 #include <linux/blk.h>
 
 #undef DEBUG
@@ -856,15 +858,13 @@ static void do_cm206_request(request_queue_t * q)
 	uch *source, *dest;
 
 	while (1) {		/* repeat until all requests have been satisfied */
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		if (CURRENT->cmd != READ) {
 			debug(("Non-read command %d on cdrom\n",
 			       CURRENT->cmd));
-			end_request(0);
+			end_request(CURRENT, 0);
 			continue;
 		}
 		spin_unlock_irq(q->queue_lock);
@@ -895,7 +895,7 @@ static void do_cm206_request(request_queue_t * q)
 			}
 		}
 		spin_lock_irq(q->queue_lock);
-		end_request(!error);
+		end_request(CURRENT, !error);
 	}
 }
 

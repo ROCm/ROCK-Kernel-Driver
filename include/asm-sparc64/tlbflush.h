@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <asm/mmu_context.h>
 
 /* TLB flush operations. */
 
@@ -22,43 +23,43 @@ extern void __flush_tlb_kernel_range(unsigned long start, unsigned long end);
 	__flush_tlb_kernel_range(start,end)
 
 #define flush_tlb_mm(__mm) \
-do { if(CTX_VALID((__mm)->context)) \
+do { if (CTX_VALID((__mm)->context)) \
 	__flush_tlb_mm(CTX_HWBITS((__mm)->context), SECONDARY_CONTEXT); \
-} while(0)
+} while (0)
 
 #define flush_tlb_range(__vma, start, end) \
-do { if(CTX_VALID((__vma)->vm_mm->context)) { \
+do { if (CTX_VALID((__vma)->vm_mm->context)) { \
 	unsigned long __start = (start)&PAGE_MASK; \
 	unsigned long __end = PAGE_ALIGN(end); \
 	__flush_tlb_range(CTX_HWBITS((__vma)->vm_mm->context), __start, \
 			  SECONDARY_CONTEXT, __end, PAGE_SIZE, \
 			  (__end - __start)); \
      } \
-} while(0)
+} while (0)
 
 #define flush_tlb_vpte_range(__mm, start, end) \
-do { if(CTX_VALID((__mm)->context)) { \
+do { if (CTX_VALID((__mm)->context)) { \
 	unsigned long __start = (start)&PAGE_MASK; \
 	unsigned long __end = PAGE_ALIGN(end); \
 	__flush_tlb_range(CTX_HWBITS((__mm)->context), __start, \
 			  SECONDARY_CONTEXT, __end, PAGE_SIZE, \
 			  (__end - __start)); \
      } \
-} while(0)
+} while (0)
 
 #define flush_tlb_page(vma, page) \
 do { struct mm_struct *__mm = (vma)->vm_mm; \
-     if(CTX_VALID(__mm->context)) \
+     if (CTX_VALID(__mm->context)) \
 	__flush_tlb_page(CTX_HWBITS(__mm->context), (page)&PAGE_MASK, \
 			 SECONDARY_CONTEXT); \
-} while(0)
+} while (0)
 
 #define flush_tlb_vpte_page(mm, addr) \
 do { struct mm_struct *__mm = (mm); \
-     if(CTX_VALID(__mm->context)) \
+     if (CTX_VALID(__mm->context)) \
 	__flush_tlb_page(CTX_HWBITS(__mm->context), (addr)&PAGE_MASK, \
 			 SECONDARY_CONTEXT); \
-} while(0)
+} while (0)
 
 #else /* CONFIG_SMP */
 

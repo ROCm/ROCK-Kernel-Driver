@@ -160,35 +160,35 @@ decode_sattr3(u32 *p, struct iattr *iap)
 static inline u32 *
 encode_fattr3(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 {
-	struct inode	*inode = fhp->fh_dentry->d_inode;
+	struct vfsmount *mnt = fhp->fh_export->ex_mnt;
+	struct dentry	*dentry = fhp->fh_dentry;
+	struct kstat stat;
 
-	*p++ = htonl(nfs3_ftypes[(inode->i_mode & S_IFMT) >> 12]);
-	*p++ = htonl((u32) inode->i_mode);
-	*p++ = htonl((u32) inode->i_nlink);
-	*p++ = htonl((u32) nfsd_ruid(rqstp, inode->i_uid));
-	*p++ = htonl((u32) nfsd_rgid(rqstp, inode->i_gid));
-	if (S_ISLNK(inode->i_mode) && inode->i_size > NFS3_MAXPATHLEN) {
+	vfs_getattr(mnt, dentry, &stat);
+
+	*p++ = htonl(nfs3_ftypes[(stat.mode & S_IFMT) >> 12]);
+	*p++ = htonl((u32) stat.mode);
+	*p++ = htonl((u32) stat.nlink);
+	*p++ = htonl((u32) nfsd_ruid(rqstp, stat.uid));
+	*p++ = htonl((u32) nfsd_rgid(rqstp, stat.gid));
+	if (S_ISLNK(stat.mode) && stat.size > NFS3_MAXPATHLEN) {
 		p = xdr_encode_hyper(p, (u64) NFS3_MAXPATHLEN);
 	} else {
-		p = xdr_encode_hyper(p, (u64) inode->i_size);
+		p = xdr_encode_hyper(p, (u64) stat.size);
 	}
-	if (inode->i_blksize == 0 && inode->i_blocks == 0)
-		/* Minix file system(?) i_size is (hopefully) close enough */
-		p = xdr_encode_hyper(p, (u64)(inode->i_size +511)& ~511);
-	else
-		p = xdr_encode_hyper(p, ((u64)inode->i_blocks) << 9);
-	*p++ = htonl((u32) major(inode->i_rdev));
-	*p++ = htonl((u32) minor(inode->i_rdev));
+	p = xdr_encode_hyper(p, ((u64)stat.blocks) << 9);
+	*p++ = htonl((u32) MAJOR(stat.rdev));
+	*p++ = htonl((u32) MINOR(stat.rdev));
 	if (rqstp->rq_reffh->fh_version == 1
 	    && rqstp->rq_reffh->fh_fsid_type == 1
 	    && (fhp->fh_export->ex_flags & NFSEXP_FSID))
 		p = xdr_encode_hyper(p, (u64) fhp->fh_export->ex_fsid);
 	else
-		p = xdr_encode_hyper(p, (u64) kdev_t_to_nr(inode->i_dev));
-	p = xdr_encode_hyper(p, (u64) inode->i_ino);
-	p = encode_time3(p, inode->i_atime);
-	p = encode_time3(p, lease_get_mtime(inode));
-	p = encode_time3(p, inode->i_ctime);
+		p = xdr_encode_hyper(p, (u64) stat.dev);
+	p = xdr_encode_hyper(p, (u64) stat.ino);
+	p = encode_time3(p, stat.atime);
+	p = encode_time3(p, lease_get_mtime(dentry->d_inode));
+	p = encode_time3(p, stat.ctime);
 
 	return p;
 }

@@ -244,7 +244,7 @@ static int idescsi_end_request(struct ata_device *drive, struct request *rq, int
 	unsigned long flags;
 
 	if (!(rq->flags & REQ_PC)) {
-		ide_end_request(drive, rq, uptodate);
+		ata_end_request(drive, rq, uptodate);
 		return 0;
 	}
 
@@ -399,29 +399,33 @@ static ide_startstop_t idescsi_transfer_pc(struct ata_device *drive, struct requ
 	struct Scsi_Host *host = drive->driver_data;
 	idescsi_scsi_t *scsi = idescsi_private(host);
 	struct atapi_packet_command *pc = scsi->pc;
-	byte ireason;
+	u8 ireason;
 	ide_startstop_t startstop;
+	int ret;
 
-	if (ide_wait_stat(&startstop, drive, rq, DRQ_STAT, BUSY_STAT, WAIT_READY)) {
+	if (ata_status_poll(drive, DRQ_STAT, BUSY_STAT,
+				WAIT_READY, rq, &startstop)) {
 		printk (KERN_ERR "ide-scsi: Strange, packet command initiated yet DRQ isn't asserted\n");
 		return startstop;
-	}
-	ireason = IN_BYTE (IDE_IREASON_REG);
-	if ((ireason & (IDESCSI_IREASON_IO | IDESCSI_IREASON_COD)) != IDESCSI_IREASON_COD) {
-		printk (KERN_ERR "ide-scsi: (IO,CoD) != (0,1) while issuing a packet command\n");
-		return ide_stopped;
 	}
 
 	/* FIXME: this locking should encompass the above register
 	 * file access too.
 	 */
-
 	spin_lock_irqsave(ch->lock, flags);
-	ata_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);	/* Set the interrupt routine */
+	ireason = IN_BYTE(IDE_IREASON_REG);
+
+	if ((ireason & (IDESCSI_IREASON_IO | IDESCSI_IREASON_COD)) != IDESCSI_IREASON_COD) {
+		printk (KERN_ERR "ide-scsi: (IO,CoD) != (0,1) while issuing a packet command\n");
+		ret = ide_stopped;
+	} else {
+		ata_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);
+		atapi_write(drive, scsi->pc->c, 12);
+		ret = ide_started;
+	}
 	spin_unlock_irqrestore(ch->lock, flags);
 
-	atapi_write(drive, scsi->pc->c, 12);			/* Send the actual packet */
-	return ide_started;
+	return ret;
 }
 
 /*

@@ -69,7 +69,4 @@
 
 #include "acgcc.h"
 
-#undef DEBUGGER_THREADING
-#define DEBUGGER_THREADING	DEBUGGER_SINGLE_THREADED
-
 #endif /* __ACLINUX_H__ */

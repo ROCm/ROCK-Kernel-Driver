@@ -232,7 +232,7 @@ int fsync_super(struct super_block *sb)
  */
 int fsync_bdev(struct block_device *bdev)
 {
-	struct super_block *sb = get_super(to_kdev_t(bdev->bd_dev));
+	struct super_block *sb = get_super(bdev);
 	if (sb) {
 		int res = fsync_super(sb);
 		drop_super(sb);

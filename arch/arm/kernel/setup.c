@@ -19,6 +19,7 @@
 #include <linux/seq_file.h>
 #include <linux/tty.h>
 #include <linux/init.h>
+#include <linux/root_dev.h>
 
 #include <asm/elf.h>
 #include <asm/hardware.h>
@@ -438,7 +439,7 @@ static int __init parse_tag_core(const struct tag *tag)
 	if (tag->hdr.size > 2) {
 		if ((tag->u.core.flags & 1) == 0)
 			root_mountflags &= ~MS_RDONLY;
-		ROOT_DEV = to_kdev_t(tag->u.core.rootdev);
+		ROOT_DEV = tag->u.core.rootdev;
 	}
 	return 0;
 }

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 104 $
+ *              $Revision: 106 $
  *
  *****************************************************************************/
 
@@ -64,7 +64,7 @@ acpi_ex_get_object_reference (
 	switch (ACPI_GET_DESCRIPTOR_TYPE (obj_desc)) {
 	case ACPI_DESC_TYPE_OPERAND:
 
-		if (obj_desc->common.type != INTERNAL_TYPE_REFERENCE) {
+		if (ACPI_GET_OBJECT_TYPE (obj_desc) != INTERNAL_TYPE_REFERENCE) {
 			*return_desc = NULL;
 			status = AE_TYPE;
 			goto cleanup;
@@ -184,9 +184,9 @@ acpi_ex_concat_template (
 	ACPI_MEMCPY (new_buf, obj_desc1->buffer.pointer, length1);
 	ACPI_MEMCPY (new_buf + length1, obj_desc2->buffer.pointer, length2);
 
-	/*
-	 * Point the return object to the new buffer
-	 */
+	/* Complete the buffer object initialization */
+
+	return_desc->common.flags  = AOPOBJ_DATA_VALID;
 	return_desc->buffer.pointer = (u8 *) new_buf;
 	return_desc->buffer.length = (u32) (length1 + length2);
 
@@ -243,21 +243,22 @@ acpi_ex_do_concatenate (
 
 	/*
 	 * There are three cases to handle:
-	 * 1) Two Integers concatenated to produce a buffer
-	 * 2) Two Strings concatenated to produce a string
-	 * 3) Two Buffers concatenated to produce a buffer
+	 *
+	 * 1) Two Integers concatenated to produce a new Buffer
+	 * 2) Two Strings concatenated to produce a new String
+	 * 3) Two Buffers concatenated to produce a new Buffer
 	 */
-	switch (obj_desc1->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc1)) {
 	case ACPI_TYPE_INTEGER:
 
-		/* Result of two integers is a buffer */
+		/* Result of two Integers is a Buffer */
 
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
 		if (!return_desc) {
 			return (AE_NO_MEMORY);
 		}
 
-		/* Need enough space for two integers */
+		/* Need enough buffer space for two integers */
 
 		return_desc->buffer.length = acpi_gbl_integer_byte_width * 2;
 		new_buf = ACPI_MEM_CALLOCATE (return_desc->buffer.length);
@@ -267,8 +268,6 @@ acpi_ex_do_concatenate (
 			status = AE_NO_MEMORY;
 			goto cleanup;
 		}
-
-		return_desc->buffer.pointer = (u8 *) new_buf;
 
 		/* Convert the first integer */
 
@@ -286,10 +285,16 @@ acpi_ex_do_concatenate (
 			this_integer >>= 8;
 		}
 
+		/* Complete the buffer object initialization */
+
+		return_desc->common.flags  = AOPOBJ_DATA_VALID;
+		return_desc->buffer.pointer = (u8 *) new_buf;
 		break;
 
 
 	case ACPI_TYPE_STRING:
+
+		/* Result of two Strings is a String */
 
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_STRING);
 		if (!return_desc) {
@@ -307,11 +312,13 @@ acpi_ex_do_concatenate (
 			goto cleanup;
 		}
 
+		/* Concatenate the strings */
+
 		ACPI_STRCPY (new_buf, obj_desc1->string.pointer);
 		ACPI_STRCPY (new_buf + obj_desc1->string.length,
 				  obj_desc2->string.pointer);
 
-		/* Point the return object to the new string */
+		/* Complete the String object initialization */
 
 		return_desc->string.pointer = new_buf;
 		return_desc->string.length = obj_desc1->string.length +
@@ -321,7 +328,7 @@ acpi_ex_do_concatenate (
 
 	case ACPI_TYPE_BUFFER:
 
-		/* Operand0 is a buffer */
+		/* Result of two Buffers is a Buffer */
 
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
 		if (!return_desc) {
@@ -337,22 +344,26 @@ acpi_ex_do_concatenate (
 			goto cleanup;
 		}
 
+		/* Concatenate the buffers */
+
 		ACPI_MEMCPY (new_buf, obj_desc1->buffer.pointer,
 				  obj_desc1->buffer.length);
 		ACPI_MEMCPY (new_buf + obj_desc1->buffer.length, obj_desc2->buffer.pointer,
 				   obj_desc2->buffer.length);
 
-		/*
-		 * Point the return object to the new buffer
-		 */
+		/* Complete the buffer object initialization */
 
+		return_desc->common.flags  = AOPOBJ_DATA_VALID;
 		return_desc->buffer.pointer = (u8 *) new_buf;
 		return_desc->buffer.length = obj_desc1->buffer.length +
-				  obj_desc2->buffer.length;
+				   obj_desc2->buffer.length;
 		break;
 
 
 	default:
+
+		/* Invalid object type, should not happen here */
+
 		status = AE_AML_INTERNAL;
 		return_desc = NULL;
 	}

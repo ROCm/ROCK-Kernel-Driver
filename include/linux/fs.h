@@ -89,11 +89,6 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 
 /* public flags for file_system_type */
 #define FS_REQUIRES_DEV 1 
-#define FS_NO_DCACHE	2 /* Only dcache the necessary things. */
-#define FS_NO_PRELIM	4 /* prevent preloading of dentries, even if
-			   * FS_NO_DCACHE is not set.
-			   */
-#define FS_NOMOUNT	16 /* Never mount from userland */
 #define FS_ODD_RENAME	32768	/* Temporary stuff; will go away as soon
 				  * as nfs_rename() will be cleaned up
 				  */
@@ -632,7 +627,7 @@ extern spinlock_t sb_lock;
 #define S_BIAS (1<<30)
 struct super_block {
 	struct list_head	s_list;		/* Keep this first */
-	kdev_t			s_dev;
+	dev_t			s_dev;		/* search index; _not_ kdev_t */
 	unsigned long		s_blocksize;
 	unsigned long		s_old_blocksize;
 	unsigned char		s_blocksize_bits;
@@ -969,6 +964,8 @@ struct super_block *sget(struct file_system_type *type,
 			int (*test)(struct super_block *,void *),
 			int (*set)(struct super_block *,void *),
 			void *data);
+struct super_block *get_sb_pseudo(struct file_system_type *, char *,
+			struct super_operations *ops, unsigned long);
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \
@@ -1223,6 +1220,7 @@ extern int submit_bh(int, struct buffer_head *);
 struct bio;
 extern int submit_bio(int, struct bio *);
 extern int is_read_only(kdev_t);
+extern int bdev_read_only(struct block_device *);
 extern int set_blocksize(struct block_device *, int);
 extern int sb_set_blocksize(struct super_block *, int);
 extern int sb_min_blocksize(struct super_block *, int);
@@ -1248,6 +1246,7 @@ extern int page_follow_link(struct dentry *, struct nameidata *);
 extern int page_symlink(struct inode *inode, const char *symname, int len);
 extern struct inode_operations page_symlink_inode_operations;
 extern void generic_fillattr(struct inode *, struct kstat *);
+extern int vfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 
 extern int vfs_readdir(struct file *, filldir_t, void *);
 
@@ -1256,10 +1255,9 @@ extern int vfs_lstat(char *, struct kstat *);
 extern int vfs_fstat(unsigned int, struct kstat *);
 
 extern struct file_system_type *get_fs_type(const char *name);
-extern struct super_block *get_super(kdev_t);
+extern struct super_block *get_super(struct block_device *);
+extern struct super_block *user_get_super(dev_t);
 extern void drop_super(struct super_block *sb);
-extern kdev_t ROOT_DEV;
-extern char root_device_name[];
 
 extern int dcache_dir_open(struct inode *, struct file *);
 extern int dcache_dir_close(struct inode *, struct file *);

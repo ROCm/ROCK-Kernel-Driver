@@ -22,6 +22,7 @@
 #include <linux/seq_file.h>
 #include <linux/ioport.h>
 #include <linux/tty.h>
+#include <linux/root_dev.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
@@ -372,7 +373,7 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	if ((initrd_start == 0) && r3 && r4 && r4 != 0xdeadbeef) {
 		initrd_start = (r3 >= KERNELBASE) ? r3 : (unsigned long)__va(r3);
 		initrd_end = initrd_start + r4;
-		ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
+		ROOT_DEV = Root_RAM0;
 		initrd_below_start_ok = 1;
 	}
 #endif
@@ -463,7 +464,7 @@ int parse_bootinfo(void)
 		case BI_INITRD:
 			initrd_start = (unsigned long)__va(rec->data[0]);
 			initrd_end = initrd_start + rec->data[1];
-			ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
+			ROOT_DEV = Root_RAM0;
 			initrd_below_start_ok = 1;
 			break;
 #endif /* CONFIG_BLK_DEV_INITRD */
