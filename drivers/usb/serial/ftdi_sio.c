@@ -1488,16 +1488,8 @@ static void ftdi_close (struct usb_serial_port *port, struct file *filp)
 	} /* Note change no line if hupcl is off */
 	
 	/* shutdown our bulk read */
-	if (port->read_urb) {
-		if (usb_unlink_urb (port->read_urb) < 0) {
-			/* Generally, this isn't an error.  If the previous
-			   read bulk callback occurred (or is about to occur)
-			   while the port was being closed or was throtted
-			   (and is still throttled), the read urb will not
-			   have been submitted. */
-			dbg("%s - failed to unlink read urb (generally not an error)", __FUNCTION__);
-		}
-	}
+	if (port->read_urb)
+		usb_kill_urb(port->read_urb);
 } /* ftdi_close */
 
 
