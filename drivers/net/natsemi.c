@@ -123,6 +123,7 @@
 		* only do cable_magic on 83815 and early 83816 (Tim Hockin)
 		* create a function for rx refill (Manfred Spraul)
 		* combine drain_ring and init_ring (Manfred Spraul)
+		* oom handling (Manfred Spraul)
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
@@ -646,6 +647,7 @@ struct netdev_private {
 	unsigned int cur_rx, dirty_rx;		/* Producer/consumer ring indices */
 	unsigned int cur_tx, dirty_tx;
 	unsigned int rx_buf_sz;				/* Based on MTU+slack. */
+	int oom;
 	/* These values are keep track of the transceiver/media in use. */
 	unsigned int full_duplex;
 	/* Rx filter. */
@@ -1350,6 +1352,17 @@ static void netdev_timer(unsigned long data)
 		check_link(dev);
 		spin_unlock_irq(&np->lock);
 	}
+	if (np->oom) {
+		disable_irq(dev->irq);
+		np->oom = 0;
+		refill_rx(dev);
+		enable_irq(dev->irq);
+		if (!np->oom) {
+			writel(RxOn, dev->base_addr + ChipCmd);
+		} else {
+			next_tick = 1;
+		}
+	}
 	mod_timer(&np->timer, jiffies + next_tick);
 }
 
@@ -1441,7 +1454,8 @@ static void refill_rx(struct net_device *dev)
 	}
 	if (np->cur_rx - np->dirty_rx == RX_RING_SIZE) {
 		if (netif_msg_rx_err(np))
-			printk(KERN_INFO "%s: OOM.\n", dev->name);
+			printk(KERN_INFO "%s: going OOM.\n", dev->name);
+		np->oom = 1;
 	}
 }
 
@@ -1465,6 +1479,7 @@ static void init_ring(struct net_device *dev)
 	np->dirty_rx = 0;
 	np->cur_rx = RX_RING_SIZE;
 	np->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 32);
+	np->oom = 0;
 	np->rx_head_desc = &np->rx_ring[0];
 
 	/* Please be carefull before changing this loop - at least gcc-2.95.1
@@ -1771,7 +1786,10 @@ static void netdev_rx(struct net_device *dev)
 	refill_rx(dev);
  
  	/* Restart Rx engine if stopped. */
-	writel(RxOn, dev->base_addr + ChipCmd);
+	if (np->oom)
+		mod_timer(&np->timer, jiffies + 1);
+	else
+		writel(RxOn, dev->base_addr + ChipCmd);
 }
 
 static void netdev_error(struct net_device *dev, int intr_status)
