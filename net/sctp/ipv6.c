@@ -76,6 +76,8 @@
 
 #include <asm/uaccess.h>
 
+extern struct notifier_block sctp_inetaddr_notifier;
+
 /* FIXME: This macro needs to be moved to a common header file. */
 #define NIP6(addr) \
         ntohs((addr)->s6_addr16[0]), \
@@ -570,6 +572,9 @@ int sctp_v6_init(void)
 	/* Register the SCTP specfic AF_INET6 functions. */
 	sctp_register_af(&sctp_ipv6_specific);
 
+	/* Register notifier for inet6 address additions/deletions. */ 
+	register_inet6addr_notifier(&sctp_inetaddr_notifier);
+
 	return 0;
 }
 
@@ -579,4 +584,5 @@ void sctp_v6_exit(void)
 	list_del(&sctp_ipv6_specific.list);
 	inet6_del_protocol(&sctpv6_protocol, IPPROTO_SCTP);
 	inet6_unregister_protosw(&sctpv6_protosw);
+	unregister_inet6addr_notifier(&sctp_inetaddr_notifier);
 }

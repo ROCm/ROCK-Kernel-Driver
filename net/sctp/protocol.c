@@ -785,9 +785,8 @@ int sctp_init(void)
 	INIT_LIST_HEAD(&sctp_proto.local_addr_list);
 	sctp_proto.local_addr_lock = SPIN_LOCK_UNLOCKED;
 
-	/* Register notifiers for inet and inet6 address events. */ 
+	/* Register notifier for inet address additions/deletions. */ 
 	register_inetaddr_notifier(&sctp_inetaddr_notifier);
-	register_inet6addr_notifier(&sctp_inetaddr_notifier);
 
 	sctp_get_local_addr_list(&sctp_proto);
 
@@ -818,9 +817,8 @@ void sctp_exit(void)
 	 * up all the remaining associations and all that memory.
 	 */
 
-	/* Unregister notifiers for inet and inet6 address events. */
+	/* Unregister notifier for inet address additions/deletions. */
 	unregister_inetaddr_notifier(&sctp_inetaddr_notifier);
-	unregister_inet6addr_notifier(&sctp_inetaddr_notifier);
 
 	/* Free the local address list.  */
 	sctp_free_local_addr_list(&sctp_proto);
