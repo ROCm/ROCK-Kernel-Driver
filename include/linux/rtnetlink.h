@@ -198,10 +198,11 @@ enum rtattr_type_t
 	RTA_MULTIPATH,
 	RTA_PROTOINFO,
 	RTA_FLOW,
-	RTA_CACHEINFO
+	RTA_CACHEINFO,
+	RTA_SESSION,
 };
 
-#define RTA_MAX RTA_CACHEINFO
+#define RTA_MAX RTA_SESSION
 
 #define RTM_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct rtmsg))))
 #define RTM_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct rtmsg))
@@ -284,6 +285,25 @@ enum
 
 #define RTAX_MAX RTAX_REORDERING
 
+struct rta_session
+{
+	__u8	proto;
+
+	union {
+		struct {
+			__u16	sport;
+			__u16	dport;
+		} ports;
+
+		struct {
+			__u8	type;
+			__u8	code;
+			__u16	ident;
+		} icmpt;
+
+		__u32		spi;
+	} u;
+};
 
 
 /*********************************************************
@@ -559,7 +579,7 @@ struct rtnetlink_link
 extern struct rtnetlink_link * rtnetlink_links[NPROTO];
 extern int rtnetlink_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb);
 extern int rtnetlink_send(struct sk_buff *skb, u32 pid, u32 group, int echo);
-extern int rtnetlink_put_metrics(struct sk_buff *skb, unsigned *metrics);
+extern int rtnetlink_put_metrics(struct sk_buff *skb, u32 *metrics);
 
 extern void __rta_fill(struct sk_buff *skb, int attrtype, int attrlen, const void *data);
 
