@@ -34,6 +34,8 @@
 #include <linux/string.h>
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
+#include "xattr.h"
+#include "acl.h"
 
 /*
  * SEARCH_FROM_ZERO forces each block allocation to search from the start
@@ -2199,7 +2201,11 @@ void ext3_read_inode(struct inode * inode)
 	struct buffer_head *bh;
 	int block;
 	
-	if(ext3_get_inode_loc(inode, &iloc))
+#ifdef CONFIG_EXT3_FS_POSIX_ACL
+	ei->i_acl = EXT3_ACL_NOT_CACHED;
+	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
+#endif
+	if (ext3_get_inode_loc(inode, &iloc))
 		goto bad_inode;
 	bh = iloc.bh;
 	raw_inode = iloc.raw_inode;
@@ -2491,13 +2497,8 @@ void ext3_write_inode(struct inode *inode, int wait)
  * be freed, so we have a strong guarantee that no future commit will
  * leave these blocks visible to the user.)  
  *
- * This is only needed for regular files.  rmdir() has its own path, and
- * we can never truncate a direcory except on final unlink (at which
- * point i_nlink is zero so recovery is easy.)
- *
- * Called with the BKL.  
+ * Called with inode->sem down.
  */
-
 int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
@@ -2517,7 +2518,8 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 
 	lock_kernel();
 
-	if (attr->ia_valid & ATTR_SIZE && attr->ia_size < inode->i_size) {
+	if (S_ISREG(inode->i_mode) &&
+	    attr->ia_valid & ATTR_SIZE && attr->ia_size < inode->i_size) {
 		handle_t *handle;
 
 		handle = ext3_journal_start(inode, 3);
@@ -2541,6 +2543,9 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 	 * orphan list manually. */
 	if (inode->i_nlink)
 		ext3_orphan_del(NULL, inode);
+
+	if (!rc && (ia_valid & ATTR_MODE))
+		rc = ext3_acl_chmod(inode);
 
 err_out:
 	ext3_std_error(inode->i_sb, error);

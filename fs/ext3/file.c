@@ -24,6 +24,7 @@
 #include <linux/ext3_fs.h>
 #include <linux/ext3_jbd.h>
 #include "xattr.h"
+#include "acl.h"
 
 /*
  * Called when an inode is released. Note that this is different
@@ -102,5 +103,6 @@ struct inode_operations ext3_file_inode_operations = {
 	.getxattr	= ext3_getxattr,
 	.listxattr	= ext3_listxattr,
 	.removexattr	= ext3_removexattr,
+	.permission	= ext3_permission,
 };
 

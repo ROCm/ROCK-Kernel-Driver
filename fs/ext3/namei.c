@@ -37,7 +37,7 @@
 #include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
 #include "xattr.h"
-
+#include "acl.h"
 
 /*
  * define how far ahead to read directories while searching them.
@@ -1624,7 +1624,10 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 	inode = ext3_new_inode (handle, dir, mode);
 	err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
-		init_special_inode(inode, mode, rdev);
+		init_special_inode(inode, inode->i_mode, rdev);
+#ifdef CONFIG_EXT3_FS_XATTR
+		inode->i_op = &ext3_special_inode_operations;
+#endif
 		err = ext3_add_nondir(handle, dentry, inode);
 		ext3_mark_inode_dirty(handle, inode);
 	}
@@ -2281,17 +2284,21 @@ struct inode_operations ext3_dir_inode_operations = {
 	.rmdir		= ext3_rmdir,
 	.mknod		= ext3_mknod,
 	.rename		= ext3_rename,
+	.setattr	= ext3_setattr,
 	.setxattr	= ext3_setxattr,	
 	.getxattr	= ext3_getxattr,	
 	.listxattr	= ext3_listxattr,	
 	.removexattr	= ext3_removexattr,
+	.permission	= ext3_permission,
 };
 
 struct inode_operations ext3_special_inode_operations = {
+	.setattr	= ext3_setattr,
 	.setxattr	= ext3_setxattr,
 	.getxattr	= ext3_getxattr,
 	.listxattr	= ext3_listxattr,
 	.removexattr	= ext3_removexattr,
+	.permission	= ext3_permission,
 };
 
  

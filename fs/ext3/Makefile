@@ -13,4 +13,8 @@ ifeq ($(CONFIG_EXT3_FS_XATTR),y)
 ext3-objs += xattr.o xattr_user.o
 endif
 
+ifeq ($(CONFIG_EXT3_FS_POSIX_ACL),y)
+ext3-objs += acl.o
+endif
+
 include $(TOPDIR)/Rules.make

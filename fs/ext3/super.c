@@ -31,6 +31,7 @@
 #include <linux/buffer_head.h>
 #include <asm/uaccess.h>
 #include "xattr.h"
+#include "acl.h"
 
 #ifdef CONFIG_JBD_DEBUG
 static int ext3_ro_after; /* Make fs read-only after this many jiffies */
@@ -428,6 +429,10 @@ static struct inode *ext3_alloc_inode(struct super_block *sb)
 	ei = kmem_cache_alloc(ext3_inode_cachep, SLAB_NOFS);
 	if (!ei)
 		return NULL;
+#ifdef CONFIG_EXT3_FS_POSIX_ACL
+	ei->i_acl = EXT3_ACL_NOT_CACHED;
+	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
+#endif
 	return &ei->vfs_inode;
 }
 
@@ -465,6 +470,26 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "ext3_inode_cache: not all structures were freed\n");
 }
 
+#ifdef CONFIG_EXT3_FS_POSIX_ACL
+
+static void ext3_clear_inode(struct inode *inode)
+{
+       if (EXT3_I(inode)->i_acl &&
+           EXT3_I(inode)->i_acl != EXT3_ACL_NOT_CACHED) {
+               posix_acl_release(EXT3_I(inode)->i_acl);
+               EXT3_I(inode)->i_acl = EXT3_ACL_NOT_CACHED;
+       }
+       if (EXT3_I(inode)->i_default_acl &&
+           EXT3_I(inode)->i_default_acl != EXT3_ACL_NOT_CACHED) {
+               posix_acl_release(EXT3_I(inode)->i_default_acl);
+               EXT3_I(inode)->i_default_acl = EXT3_ACL_NOT_CACHED;
+       }
+}
+
+#else
+# define ext3_clear_inode NULL
+#endif
+
 static struct super_operations ext3_sops = {
 	.alloc_inode	= ext3_alloc_inode,
 	.destroy_inode	= ext3_destroy_inode,
@@ -479,6 +504,7 @@ static struct super_operations ext3_sops = {
 	.unlockfs	= ext3_unlockfs,		/* BKL not held.  We take it */
 	.statfs		= ext3_statfs,		/* BKL not held. */
 	.remount_fs	= ext3_remount,		/* BKL held */
+	.clear_inode	= ext3_clear_inode,	/* BKL not needed. */
 };
 
 struct dentry *ext3_get_parent(struct dentry *child);
@@ -558,6 +584,13 @@ static int parse_options (char * options, struct ext3_sb_info *sbi,
 			set_opt (sbi->s_mount_opt, XATTR_USER);
 		else if (!strcmp (this_char, "nouser_xattr"))
 			clear_opt (sbi->s_mount_opt, XATTR_USER);
+		else
+#endif
+#ifdef CONFIG_EXT3_FS_POSIX_ACL
+		if (!strcmp(this_char, "acl"))
+			set_opt (sbi->s_mount_opt, POSIX_ACL);
+		else if (!strcmp(this_char, "noacl"))
+			clear_opt (sbi->s_mount_opt, POSIX_ACL);
 		else
 #endif
 		if (!strcmp (this_char, "bsddf"))
@@ -1028,6 +1061,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		set_opt(sbi->s_mount_opt, NO_UID32);
 	if (def_mount_opts & EXT3_DEFM_XATTR_USER)
 		set_opt(sbi->s_mount_opt, XATTR_USER);
+	if (def_mount_opts & EXT3_DEFM_ACL)
+		set_opt(sbi->s_mount_opt, POSIX_ACL);
 	if ((def_mount_opts & EXT3_DEFM_JMODE) == EXT3_DEFM_JMODE_DATA)
 		sbi->s_mount_opt |= EXT3_MOUNT_JOURNAL_DATA;
 	else if ((def_mount_opts & EXT3_DEFM_JMODE) == EXT3_DEFM_JMODE_ORDERED)
@@ -1045,6 +1080,9 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 
 	if (!parse_options ((char *) data, sbi, &journal_inum, 0))
 		goto failed_mount;
+
+	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
+		((sbi->s_mount_opt & EXT3_MOUNT_POSIX_ACL) ? MS_POSIXACL : 0);
 
 	if (le32_to_cpu(es->s_rev_level) == EXT3_GOOD_OLD_REV &&
 	    (EXT3_HAS_COMPAT_FEATURE(sb, ~0U) ||
@@ -1734,6 +1772,9 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 
 	if (sbi->s_mount_opt & EXT3_MOUNT_ABORT)
 		ext3_abort(sb, __FUNCTION__, "Abort forced by user");
+
+	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
+		((sbi->s_mount_opt & EXT3_MOUNT_POSIX_ACL) ? MS_POSIXACL : 0);
 
 	es = sbi->s_es;
 

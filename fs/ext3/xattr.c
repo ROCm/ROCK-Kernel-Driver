@@ -61,6 +61,7 @@
 #include <linux/quotaops.h>
 #include <asm/semaphore.h>
 #include "xattr.h"
+#include "acl.h"
 
 #define EXT3_EA_USER "user."
 
@@ -1105,15 +1106,27 @@ init_ext3_xattr(void)
 	err = ext3_xattr_register(EXT3_XATTR_INDEX_USER, &ext3_xattr_user_handler);
 	if (err)
 		return err;
+#ifdef CONFIG_EXT3_FS_POSIX_ACL
+	err = init_ext3_acl();
+	if (err)
+		goto out;
+#endif
 	ext3_xattr_cache = mb_cache_create("ext3_xattr", NULL,
 		sizeof(struct mb_cache_entry) +
 		sizeof(struct mb_cache_entry_index), 1, 6);
 	if (!ext3_xattr_cache) {
-		ext3_xattr_unregister(EXT3_XATTR_INDEX_USER, &ext3_xattr_user_handler);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto out1;
 	}
-
 	return 0;
+out1:
+#ifdef CONFIG_EXT3_FS_POSIX_ACL
+	exit_ext3_acl();
+out:
+#endif
+	ext3_xattr_unregister(EXT3_XATTR_INDEX_USER,
+			      &ext3_xattr_user_handler);
+	return err;
 }
 
 void
@@ -1122,6 +1135,8 @@ exit_ext3_xattr(void)
 	if (ext3_xattr_cache)
 		mb_cache_destroy(ext3_xattr_cache);
 	ext3_xattr_cache = NULL;
+#ifdef CONFIG_EXT3_FS_POSIX_ACL
+	exit_ext3_acl();
+#endif
 	ext3_xattr_unregister(EXT3_XATTR_INDEX_USER, &ext3_xattr_user_handler);
 }
-
