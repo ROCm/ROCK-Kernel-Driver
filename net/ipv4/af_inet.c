@@ -1066,8 +1066,8 @@ static int __init init_ipv4_mibs(void)
 {
 	net_statistics[0] = alloc_percpu(struct linux_mib);
 	net_statistics[1] = alloc_percpu(struct linux_mib);
-	ip_statistics[0] = alloc_percpu(struct ip_mib);
-	ip_statistics[1] = alloc_percpu(struct ip_mib);
+	ip_statistics[0] = alloc_percpu(struct ipstats_mib);
+	ip_statistics[1] = alloc_percpu(struct ipstats_mib);
 	icmp_statistics[0] = alloc_percpu(struct icmp_mib);
 	icmp_statistics[1] = alloc_percpu(struct icmp_mib);
 	tcp_statistics[0] = alloc_percpu(struct tcp_mib);
