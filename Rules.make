@@ -85,7 +85,105 @@ subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)
 real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m))) $(EXTRA_TARGETS)
 real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
 
-# Get things started.
+
+# We're called for one of three purposes:
+# o fastdep: build module version files (.ver) for $(export-objs) in
+#   the current directory
+# o modules_install: install the modules in the current directory
+# o build: When no target is given, first_rule is the default and
+#   will build the built-in and modular objects in this dir
+#   (or a subset thereof, depending on $(KBUILD_MODULES),$(KBUILD_BUILTIN)
+#   When targets are given directly (like foo.o), we just build these
+#   targets (That happens when someone does make some/dir/foo.[ois])
+
+ifeq ($(MAKECMDGOALS),fastdep)
+
+# ===========================================================================
+# Module versions
+# ===========================================================================
+
+ifneq "$(strip $(export-objs))" ""
+
+MODVERDIR := $(TOPDIR)/include/linux/modules/$(RELDIR)
+
+#
+# Added the SMP separator to stop module accidents between uniprocessor
+# and SMP Intel boxes - AC - from bits by Michael Chastain
+#
+
+ifdef CONFIG_SMP
+	genksyms_smp_prefix := -p smp_
+else
+	genksyms_smp_prefix := 
+endif
+
+# We don't track dependencies for .ver files, so we FORCE to check
+# them always (i.e. always at "make dep" time).
+
+quiet_cmd_create_ver = Creating include/linux/modules/$(RELDIR)/$*.ver
+cmd_create_ver = $(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< | \
+		 $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
+
+$(MODVERDIR)/%.ver: %.c FORCE
+	@mkdir -p $(dir $@)
+	@$(call cmd,cmd_create_ver)
+	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
+	  rm -f $@.tmp; \
+	else \
+	  touch $(TOPDIR)/include/linux/modversions.h; \
+	  mv -f $@.tmp $@; \
+	fi
+
+# updates .ver files but not modversions.h
+fastdep: $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
+ifneq ($(export-objs),)
+	@mkdir -p $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)
+	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
+endif
+
+# Descending when making module versions
+# ---------------------------------------------------------------------------
+
+fastdep-list := $(addprefix _sfdep_,$(subdir-ymn))
+
+.PHONY: fastdep $(fastdep-list)
+
+fastdep: $(fastdep-list)
+
+$(fastdep-list):
+	@$(MAKE) -C $(patsubst _sfdep_%,%,$@) fastdep
+
+
+endif # export-objs 
+
+else # ! fastdep
+ifeq ($(MAKECMDGOALS),modules_install)
+
+# ==========================================================================
+# Installing modules
+# ==========================================================================
+
+modinst-list := $(addprefix _modinst_,$(subdir-ym))
+
+.PHONY: modules_install _modinst_ $(modinst-list)
+
+modules_install: $(modinst-list)
+ifneq ($(obj-m),)
+	@echo Installing modules in $(MODLIB)/kernel/$(RELDIR)
+	@mkdir -p $(MODLIB)/kernel/$(RELDIR)
+	@cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
+else
+	@echo -n
+endif
+
+$(modinst-list):
+	@$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
+
+
+else # ! modules_install
+
+# ==========================================================================
+# Building
 # ==========================================================================
 
 # If a Makefile does define neither O_TARGET nor L_TARGET,
@@ -257,18 +355,6 @@ $(host-progs-multi): %: $(host-progs-multi-objs) FORCE
 	$(call if_changed,host_cc__o)
 
 
-# Descending when making module versions
-# ---------------------------------------------------------------------------
-
-fastdep-list := $(addprefix _sfdep_,$(subdir-ymn))
-
-.PHONY: fastdep $(fastdep-list)
-
-fastdep: $(fastdep-list)
-
-$(fastdep-list):
-	@$(MAKE) -C $(patsubst _sfdep_%,%,$@) fastdep
-
 # Descending when building
 # ---------------------------------------------------------------------------
 
@@ -281,24 +367,12 @@ sub_dirs: $(subdir-list)
 $(subdir-list):
 	@$(MAKE) -C $(patsubst _subdir_%,%,$@)
 
-# Descending and installing modules
-# ---------------------------------------------------------------------------
+endif # ! modules_install
+endif # ! fastdep
 
-modinst-list := $(addprefix _modinst_,$(subdir-ym))
-
-.PHONY: modules_install _modinst_ $(modinst-list)
-
-modules_install: $(modinst-list)
-ifneq ($(obj-m),)
-	@echo Installing modules in $(MODLIB)/kernel/$(RELDIR)
-	@mkdir -p $(MODLIB)/kernel/$(RELDIR)
-	@cp $(obj-m) $(MODLIB)/kernel/$(RELDIR)
-else
-	@echo -n
-endif
-
-$(modinst-list):
-	@$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
+# ===========================================================================
+# Generic stuff
+# ===========================================================================
 
 # Add FORCE to the prequisites of a target to force it to be always rebuilt.
 # ---------------------------------------------------------------------------
@@ -318,51 +392,6 @@ script:
 # Separate the object into "normal" objects and "exporting" objects
 # Exporting objects are: all objects that define symbol tables
 #
-
-ifdef CONFIG_MODVERSIONS
-ifneq "$(strip $(export-objs))" ""
-
-MODVERDIR := $(TOPDIR)/include/linux/modules/$(RELDIR)
-
-#
-# Added the SMP separator to stop module accidents between uniprocessor
-# and SMP Intel boxes - AC - from bits by Michael Chastain
-#
-
-ifdef CONFIG_SMP
-	genksyms_smp_prefix := -p smp_
-else
-	genksyms_smp_prefix := 
-endif
-
-# We don't track dependencies for .ver files, so we FORCE to check
-# them always (i.e. always at "make dep" time).
-
-quiet_cmd_create_ver = Creating include/linux/modules/$(RELDIR)/$*.ver
-cmd_create_ver = $(CC) $(CFLAGS) $(EXTRA_CFLAGS) -E -D__GENKSYMS__ $< | \
-		 $(GENKSYMS) $(genksyms_smp_prefix) -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
-
-$(MODVERDIR)/%.ver: %.c FORCE
-	@mkdir -p $(dir $@)
-	@$(call cmd,cmd_create_ver)
-	@if [ -r $@ ] && cmp -s $@ $@.tmp; then \
-	  rm -f $@.tmp; \
-	else \
-	  touch $(TOPDIR)/include/linux/modversions.h; \
-	  mv -f $@.tmp $@; \
-	fi
-
-# updates .ver files but not modversions.h
-fastdep: $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
-ifneq ($(export-objs),)
-	@mkdir -p $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)
-	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
-endif
-
-
-endif # export-objs 
-
-endif # CONFIG_MODVERSIONS
 
 # ---------------------------------------------------------------------------
 # Check if command line has changed
