@@ -1092,7 +1092,6 @@ static int kaweth_probe(
 
 err_intfdata:
 	usb_set_intfdata(intf, NULL);
-err_all:
 	usb_buffer_free(kaweth->dev, KAWETH_BUF_SIZE, (void *)kaweth->rx_buf, kaweth->rxbufferhandle);
 err_all_but_rxbuf:
 	usb_buffer_free(kaweth->dev, INTBUFFERSIZE, (void *)kaweth->intbuffer, kaweth->intbufferhandle);
