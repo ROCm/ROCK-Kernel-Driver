@@ -708,6 +708,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 
 	cifsInode = CIFS_I(mapping->host);
 	read_lock(&GlobalSMBSeslock); 
+	/* BB we should start at the end */
 	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);
 		if(open_file->closePend)
@@ -934,7 +935,6 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 	if((file->f_flags & O_ACCMODE) == O_WRONLY) {
 		cFYI(1,("attempting read on write only file instance"));
 	}
-
 
 	for (total_read = 0,current_offset=read_data; read_size > total_read;
 				total_read += bytes_read,current_offset+=bytes_read) {
@@ -1186,26 +1186,26 @@ static int cifs_readpage_worker(struct file *file, struct page *page, loff_t * p
 	char * read_data;
 	int rc;
 
-        page_cache_get(page);
-        read_data = kmap(page);
-        /* for reads over a certain size could initiate async read ahead */
+	page_cache_get(page);
+	read_data = kmap(page);
+	/* for reads over a certain size could initiate async read ahead */
                                                                                                                            
-        rc = cifs_read(file, read_data, PAGE_CACHE_SIZE, poffset);
+	rc = cifs_read(file, read_data, PAGE_CACHE_SIZE, poffset);
                                                                                                                            
-        if (rc < 0)
-                goto io_error;
-        else {
-                cFYI(1,("Bytes read %d ",rc));
-        }
+	if (rc < 0)
+		goto io_error;
+	else {
+		cFYI(1,("Bytes read %d ",rc));
+	}
                                                                                                                            
-        file->f_dentry->d_inode->i_atime = CURRENT_TIME;
+	file->f_dentry->d_inode->i_atime = CURRENT_TIME;
                                                                                                                            
-        if(PAGE_CACHE_SIZE > rc) {
-                memset(read_data+rc, 0, PAGE_CACHE_SIZE - rc);
-        }
-        flush_dcache_page(page);
-        SetPageUptodate(page);
-        rc = 0;
+	if(PAGE_CACHE_SIZE > rc) {
+		memset(read_data+rc, 0, PAGE_CACHE_SIZE - rc);
+	}
+	flush_dcache_page(page);
+	SetPageUptodate(page);
+	rc = 0;
                                                                                                                            
 io_error:
         kunmap(page);
