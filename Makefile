@@ -706,7 +706,7 @@ MRPROPER_FILES += \
 	include/asm \
 	.hdepend $(TOPDIR)/include/linux/modversions.h \
 	tags TAGS kernel.spec \
-	.tmpversion
+	.tmp*
 
 # 	directories removed with 'make mrproper'
 MRPROPER_DIRS += \
