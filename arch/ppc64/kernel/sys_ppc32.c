@@ -67,21 +67,6 @@
 #include <asm/ppc32.h>
 #include <asm/mmu_context.h>
 
-extern unsigned long wall_jiffies;
-#define USEC_PER_SEC (1000000)
-
-/* 
- * These are the flags in the MSR that the user is allowed to change
- * by modifying the saved value of the MSR on the stack.  SE and BE
- * should not be in this list since gdb may want to change these.  I.e,
- * you should be able to step out of a signal handler to see what
- * instruction executes next after the signal handler completes.
- * Alternately, if you stepped into a signal handler, you should be
- * able to continue 'til the next breakpoint from within the signal
- * handler, even if the handler returns.
- */
-#define MSR_USERCHANGE	(MSR_FE0 | MSR_FE1)
-
 extern asmlinkage long sys_utime(char * filename, struct utimbuf * times);
 
 struct utimbuf32 {
@@ -1432,15 +1417,10 @@ asmlinkage long sys32_delete_module(const char *name_user)
 	return -ENOSYS;
 }
 
-/* Note: it is necessary to treat which as an unsigned int, 
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_query_module(const char *name_user, u32 which, char *buf, size_t bufsize, size_t *ret)
+asmlinkage long sys32_query_module(const char *name_user, int which, char *buf, size_t bufsize, size_t *ret)
 {
 	/* Let the program know about the new interface.  Not that it'll do them much good. */
-	if ((int)which == 0)
+	if (which == 0)
 		return 0;
 
 	return -ENOSYS;
@@ -3766,19 +3746,6 @@ asmlinkage long sys32_access(const char * filename, u32 mode)
 }
 
 
-extern asmlinkage int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6, struct pt_regs *regs);
-
-/* Note: it is necessary to treat p1, p2, p3, p4, p5, p7, and regs as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage int sys32_clone(u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, struct pt_regs *regs)
-{
-	return sys_clone((int)p1, (int)p2, (int)p3, (int)p4, (int)p5, (int)p6, regs);
-}
-
-
 extern asmlinkage long sys_creat(const char * pathname, int mode);
 
 /* Note: it is necessary to treat mode as an unsigned int,
@@ -3789,19 +3756,6 @@ extern asmlinkage long sys_creat(const char * pathname, int mode);
 asmlinkage long sys32_creat(const char * pathname, u32 mode)
 {
 	return sys_creat(pathname, (int)mode);
-}
-
-
-extern asmlinkage long sys_exit(int error_code);
-
-/* Note: it is necessary to treat error_code as an unsigned int,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_exit(u32 error_code)
-{
-	return sys_exit((int)error_code);
 }
 
 
@@ -3844,19 +3798,6 @@ extern asmlinkage long sys_waitpid(pid_t pid, unsigned int * stat_addr, int opti
 asmlinkage long sys32_waitpid(u32 pid, unsigned int * stat_addr, u32 options)
 {
 	return sys_waitpid((int)pid, stat_addr, (int)options);
-}
-
-
-extern asmlinkage int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6, struct pt_regs *regs);
-
-/* Note: it is necessary to treat p1, p2, p3, p4, p5, and p6 as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage int sys32_fork(u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, struct pt_regs *regs)
-{
-	return sys_fork((int)p1, (int)p2, (int)p3, (int)p4, (int)p5, (int)p6, regs);
 }
 
 
@@ -4003,20 +3944,6 @@ asmlinkage long sys32_readlink(const char * path, char * buf, u32 bufsiz)
 {
 	return sys_readlink(path, buf, (int)bufsiz);
 }
-
-
-extern asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg);
-
-/* Note: it is necessary to treat magic1 and magic2 as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_reboot(u32 magic1, u32 magic2, unsigned int cmd, void * arg)
-{
-	return sys_reboot((int)magic1, (int)magic2, cmd, arg);
-}
-
 
 extern asmlinkage long sys_sched_get_priority_max(int policy);
 
@@ -4174,19 +4101,6 @@ asmlinkage long sys32_ssetmask(u32 newmask)
 }
 
 
-extern asmlinkage long sys_swapon(const char * specialfile, int swap_flags);
-
-/* Note: it is necessary to treat swap_flags as an unsigned int,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_swapon(const char * specialfile, u32 swap_flags)
-{
-	return sys_swapon(specialfile, (int)swap_flags);
-}
-
-
 extern asmlinkage long sys_syslog(int type, char * buf, int len);
 
 /* Note: it is necessary to treat type and len as an unsigned int,
@@ -4223,19 +4137,6 @@ extern asmlinkage long sys_umount(char * name, int flags);
 asmlinkage long sys32_umount(char * name, u32 flags)
 {
 	return sys_umount(name, (int)flags);
-}
-
-
-extern asmlinkage int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6, struct pt_regs *regs);
-
-/* Note: it is necessary to treat p1, p2, p3, p4, p5, and p6 as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage int sys32_vfork(u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, struct pt_regs *regs)
-{
-	return sys_vfork((int)p1, (int)p2, (int)p3, (int)p4, (int)p5, (int)p6, regs);
 }
 
 
