@@ -3,7 +3,7 @@
  * 
  * Explicit pagetable population and nonlinear (random) mappings support.
  *
- * started by Ingo Molnar, Copyright (C) 2002
+ * started by Ingo Molnar, Copyright (C) 2002, 2003
  */
 
 #include <linux/mm.h>
@@ -13,6 +13,8 @@
 #include <linux/pagemap.h>
 #include <linux/swapops.h>
 #include <linux/rmap-locking.h>
+#include <linux/module.h>
+
 #include <asm/mmu_context.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
@@ -95,6 +97,8 @@ err_unlock:
 err:
 	return err;
 }
+EXPORT_SYMBOL(install_page);
+
 
 /***
  * sys_remap_file_pages - remap arbitrary pages of a shared backing store
