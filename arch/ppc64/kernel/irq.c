@@ -589,7 +589,7 @@ out:
 }
 
 #ifdef CONFIG_PPC_ISERIES
-int do_IRQ(struct pt_regs *regs)
+void do_IRQ(struct pt_regs *regs)
 {
 	struct paca_struct *lpaca;
 	struct ItLpQueue *lpq;
@@ -629,15 +629,13 @@ int do_IRQ(struct pt_regs *regs)
 		/* Signal a fake decrementer interrupt */
 		timer_interrupt(regs);
 	}
-
-	return 1; /* lets ret_from_int know we can do checks */
 }
 
 #else	/* CONFIG_PPC_ISERIES */
 
-int do_IRQ(struct pt_regs *regs)
+void do_IRQ(struct pt_regs *regs)
 {
-	int irq, first = 1;
+	int irq;
 
 	irq_enter();
 
@@ -656,25 +654,15 @@ int do_IRQ(struct pt_regs *regs)
 	}
 #endif
 
-	/*
-	 * Every arch is required to implement ppc_md.get_irq.
-	 * This function will either return an irq number or -1 to
-	 * indicate there are no more pending.  But the first time
-	 * through the loop this means there wasn't an IRQ pending.
-	 * The value -2 is for buggy hardware and means that this IRQ
-	 * has already been handled. -- Tom
-	 */
-	while ((irq = ppc_md.get_irq(regs)) >= 0) {
+	irq = ppc_md.get_irq(regs);
+
+	if (irq >= 0)
 		ppc_irq_dispatch_handler(regs, irq);
-		first = 0;
-	}
-	if (irq != -2 && first)
+	else
 		/* That's not SMP safe ... but who cares ? */
 		ppc_spurious_interrupts++;
 
 	irq_exit();
-
-	return 1; /* lets ret_from_int know we can do checks */
 }
 #endif	/* CONFIG_PPC_ISERIES */
 
