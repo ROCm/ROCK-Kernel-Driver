@@ -56,7 +56,8 @@
 
 
 /* Module and Version Information */
-#define DRIVER_VERSION "v1.00 (28/02/2004)"
+#define DRIVER_VERSION "1.00"
+#define DRIVER_DATE "12 Jun 2004"
 #define DRIVER_AUTHOR "Wim Van Sebroeck <wim@iguana.be>"
 #define DRIVER_DESC "Berkshire USB-PC Watchdog driver"
 #define DRIVER_LICENSE "GPL"
@@ -456,8 +457,8 @@ static int usb_pcwd_release(struct inode *inode, struct file *file)
 		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
 		usb_pcwd_keepalive(usb_pcwd_device);
 	}
-	clear_bit(0, &is_active);
 	expect_release = 0;
+	clear_bit(0, &is_active);
 	return 0;
 }
 
@@ -681,14 +682,11 @@ static int usb_pcwd_probe(struct usb_interface *interface, const struct usb_devi
 		((option_switches & 0x08) ? "ON" : "OFF"));
 
 	/* Check that the heartbeat value is within it's range ; if not reset to the default */
-	if (heartbeat < 1 || heartbeat > 0xFFFF) {
-		heartbeat = WATCHDOG_HEARTBEAT;
+	if (usb_pcwd_set_heartbeat(usb_pcwd, heartbeat)) {
+		usb_pcwd_set_heartbeat(usb_pcwd, WATCHDOG_HEARTBEAT);
 		printk(KERN_INFO PFX "heartbeat value must be 0<heartbeat<65536, using %d\n",
-			heartbeat);
+			WATCHDOG_HEARTBEAT);
 	}
-
-	/* Calculate the watchdog's heartbeat */
-	usb_pcwd_set_heartbeat(usb_pcwd, heartbeat);
 
 	retval = register_reboot_notifier(&usb_pcwd_notifier);
 	if (retval != 0) {
@@ -697,17 +695,17 @@ static int usb_pcwd_probe(struct usb_interface *interface, const struct usb_devi
 		goto error;
 	}
 
-	retval = misc_register(&usb_pcwd_miscdev);
-	if (retval != 0) {
-		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
-			WATCHDOG_MINOR, retval);
-		goto err_out_unregister_reboot;
-	}
-
 	retval = misc_register(&usb_pcwd_temperature_miscdev);
 	if (retval != 0) {
 		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
 			TEMP_MINOR, retval);
+		goto err_out_unregister_reboot;
+	}
+
+	retval = misc_register(&usb_pcwd_miscdev);
+	if (retval != 0) {
+		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			WATCHDOG_MINOR, retval);
 		goto err_out_misc_deregister;
 	}
 
@@ -720,7 +718,7 @@ static int usb_pcwd_probe(struct usb_interface *interface, const struct usb_devi
 	return 0;
 
 err_out_misc_deregister:
-	misc_deregister(&usb_pcwd_miscdev);
+	misc_deregister(&usb_pcwd_temperature_miscdev);
 err_out_unregister_reboot:
 	unregister_reboot_notifier(&usb_pcwd_notifier);
 error:
@@ -758,8 +756,8 @@ static void usb_pcwd_disconnect(struct usb_interface *interface)
 	usb_pcwd->exists = 0;
 
 	/* Deregister */
-	misc_deregister(&usb_pcwd_temperature_miscdev);
 	misc_deregister(&usb_pcwd_miscdev);
+	misc_deregister(&usb_pcwd_temperature_miscdev);
 	unregister_reboot_notifier(&usb_pcwd_notifier);
 
 	up (&usb_pcwd->sem);
@@ -791,7 +789,7 @@ static int __init usb_pcwd_init(void)
 		return result;
 	}
 
-	printk(KERN_INFO PFX DRIVER_DESC " " DRIVER_VERSION "\n");
+	printk(KERN_INFO PFX DRIVER_DESC " v" DRIVER_VERSION " (" DRIVER_DATE ")\n");
 	return 0;
 }
 
