@@ -1936,6 +1936,8 @@ Changes for patch v214
 
 - Switched to ISO C structure field initialisers
 
+- Switch to set_current_state() and move before add_wait_queue()
+
 - Updated README from master HTML file
 
 - Fixed devfs entry leak in <devfs_readdir> when *readdir fails

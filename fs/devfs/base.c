@@ -635,6 +635,7 @@
   v1.17
     20020721   Richard Gooch <rgooch@atnf.csiro.au>
 	       Switched to ISO C structure field initialisers.
+	       Switch to set_current_state() and move before add_wait_queue().
     20020722   Richard Gooch <rgooch@atnf.csiro.au>
 	       Fixed devfs entry leak in <devfs_readdir> when *readdir fails.
   v1.18
