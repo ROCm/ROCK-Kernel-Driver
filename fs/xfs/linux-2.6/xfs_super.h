@@ -133,4 +133,6 @@ extern int  xfs_blkdev_get(struct xfs_mount *, const char *,
 				struct block_device **);
 extern void xfs_blkdev_put(struct block_device *);
 
+extern struct export_operations linvfs_export_ops;
+
 #endif	/* __XFS_SUPER_H__ */
