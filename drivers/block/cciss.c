@@ -1509,8 +1509,8 @@ cciss_read_capacity(int ctlr, int logvol, ReadCapdata_struct *buf,
 		return_code = sendcmd(CCISS_READ_CAPACITY,
 			ctlr, buf, sizeof(*buf), 1, logvol, 0, NULL, TYPE_CMD);
 	if (return_code == IO_OK) {
-		*total_size = be32_to_cpu(*((__u32 *) &buf->total_size[0]))+1;
-		*block_size = be32_to_cpu(*((__u32 *) &buf->block_size[0]));
+		*total_size = be32_to_cpu(*((__be32 *) &buf->total_size[0]))+1;
+		*block_size = be32_to_cpu(*((__be32 *) &buf->block_size[0]));
 	} else { /* read capacity command failed */
 		printk(KERN_WARNING "cciss: read capacity failed\n");
 		*total_size = 0;
@@ -1844,13 +1844,13 @@ cleanup1:
 /*
  * Map (physical) PCI mem into (virtual) kernel space
  */
-static ulong remap_pci_mem(ulong base, ulong size)
+static void __iomem *remap_pci_mem(ulong base, ulong size)
 {
         ulong page_base        = ((ulong) base) & PAGE_MASK;
         ulong page_offs        = ((ulong) base) - page_base;
-        ulong page_remapped    = (ulong) ioremap(page_base, page_offs+size);
+        void __iomem *page_remapped = ioremap(page_base, page_offs+size);
 
-        return (ulong) (page_remapped ? (page_remapped + page_offs) : 0UL);
+        return page_remapped ? (page_remapped + page_offs) : NULL;
 }
 
 /* 
@@ -2410,9 +2410,9 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 #ifdef CCISS_DEBUG
 	printk("cfg offset = %x\n", cfg_offset);
 #endif /* CCISS_DEBUG */
-	c->cfgtable = (CfgTable_struct *) 
-		remap_pci_mem(pci_resource_start(pdev, cfg_base_addr_index)
-				+ cfg_offset, sizeof(CfgTable_struct));
+	c->cfgtable =  remap_pci_mem(pci_resource_start(pdev,
+				cfg_base_addr_index) + cfg_offset,
+				sizeof(CfgTable_struct));
 	c->board_id = board_id;
 
 #ifdef CCISS_DEBUG
@@ -2824,7 +2824,7 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	}
 	free_irq(hba[i]->intr, hba[i]);
 	pci_set_drvdata(pdev, NULL);
-	iounmap((void*)hba[i]->vaddr);
+	iounmap(hba[i]->vaddr);
 	cciss_unregister_scsi(i);  /* unhook from SCSI subsystem */
 	unregister_blkdev(COMPAQ_CISS_MAJOR+i, hba[i]->devname);
 	remove_proc_entry(hba[i]->devname, proc_cciss);	
