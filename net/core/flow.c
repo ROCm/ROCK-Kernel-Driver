@@ -267,8 +267,8 @@ void flow_cache_flush(void *object)
 
 	down(&flow_flush_sem);
 
-	smp_call_function(flow_cache_flush_per_cpu, &info, 1, 0);
 	local_bh_disable();
+	smp_call_function(flow_cache_flush_per_cpu, &info, 1, 0);
 	flow_cache_flush_per_cpu(&info);
 	local_bh_enable();
 
