@@ -203,7 +203,9 @@ acpi_os_get_physical_address(void *virt, acpi_physical_address *phys)
 	return AE_OK;
 }
 
-static char acpi_os_name[200] = ACPI_OS_NAME;
+#define ACPI_MAX_OVERRIDE_LEN 100
+
+static char acpi_os_name[ACPI_MAX_OVERRIDE_LEN];
 
 acpi_status
 acpi_os_predefined_override (const struct acpi_predefined_names *init_val,
@@ -213,8 +215,10 @@ acpi_os_predefined_override (const struct acpi_predefined_names *init_val,
 		return AE_BAD_PARAMETER;
 
 	*new_val = NULL;
-	if (!memcmp (init_val->name, "_OS_", 4))
+	if (!memcmp (init_val->name, "_OS_", 4) && strlen(acpi_os_name)) {
+		printk(KERN_INFO PREFIX "Overriding _OS definition\n");
 		*new_val = acpi_os_name;
+	}
 
 	return AE_OK;
 }
@@ -875,7 +879,7 @@ int __init
 acpi_os_name_setup(char *str)
 {
 	char *p = acpi_os_name;
-	int count = 199;
+	int count = ACPI_MAX_OVERRIDE_LEN-1;
 
 	if (!str || !*str)
 		return 0;
