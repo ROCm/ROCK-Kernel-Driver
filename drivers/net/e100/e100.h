@@ -91,6 +91,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/version.h>
 #include <linux/string.h>
 #include <linux/wait.h>
+#include <linux/reboot.h>
 #include <asm/io.h>
 #include <asm/unaligned.h>
 #include <asm/processor.h>
@@ -146,6 +147,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define E100_MAX_SCB_WAIT	100	/* Max udelays in wait_scb */
 #define E100_MAX_CU_IDLE_WAIT	50	/* Max udelays in wait_cus_idle */
+
+/* HWI feature related constant */
+#define HWI_MAX_LOOP                    100
+#define MAX_SAME_RESULTS		3
+#define HWI_REGISTER_GRANULARITY        80	/* register granularity = 80 Cm */
+#define HWI_NEAR_END_BOUNDARY           1000	/* Near end is defined as < 10 meters */
 
 /* CPUSAVER_BUNDLE_MAX: Sets the maximum number of frames that will be bundled.
  * In some situations, such as the TCP windowing algorithm, it may be
@@ -504,6 +511,7 @@ enum led_state_e {
 #define IS_ICH             0x00000020
 #define DF_SPEED_FORCED    0x00000040	/* set if speed is forced */
 #define LED_IS_ON	   0x00000080	/* LED is turned ON by the driver */
+#define DF_LINK_FC_TX_ONLY 0x00000100	/* Received PAUSE frames are honored*/
 
 typedef struct net_device_stats net_dev_stats_t;
 
@@ -987,6 +995,18 @@ struct e100_private {
 
 	rwlock_t isolate_lock;
 	int driver_isolated;
+	char *id_string;
+	char *cable_status;
+	char *mdix_status;
+
+	/* Variables for HWI */
+	int saved_open_circut;
+	int saved_short_circut;
+	int saved_distance;
+	int saved_i;
+	int saved_same;
+	unsigned char hwi_started;
+	struct timer_list hwi_timer;	/* hwi timer id */
 
 	u32 speed_duplex_caps;	/* adapter's speed/duplex capabilities */
 

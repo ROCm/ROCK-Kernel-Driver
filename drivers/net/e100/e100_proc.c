@@ -106,8 +106,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 static struct proc_dir_entry *adapters_proc_dir = 0;
 
 /* externs from e100_main.c */
-extern const char *e100_short_driver_name;
-extern const char *e100_version;
+extern char e100_short_driver_name[];
+extern char e100_driver_version[];
 extern struct net_device_stats *e100_get_stats(struct net_device *dev);
 extern char *e100_get_brand_msg(struct e100_private *bdp);
 extern void e100_mdi_write(struct e100_private *, u32, u32, u16);
@@ -191,7 +191,7 @@ read_descr(char *page, char **start, off_t off, int count, int *eof, void *data)
 	struct e100_private *bdp = data;
 	int len;
 
-	len = sprintf(page, "%s\n", e100_get_brand_msg(bdp));
+	len = sprintf(page, "%s\n", bdp->id_string);
 
 	return generic_read(page, start, off, count, eof, len);
 }
@@ -223,23 +223,15 @@ read_part_number(char *page, char **start, off_t off,
 static void
 set_led(struct e100_private *bdp, u16 led_mdi_op)
 {
-	spin_lock_bh(&bdp->mdi_access_lock);
-
 	e100_mdi_write(bdp, PHY_82555_LED_SWITCH_CONTROL,
 		       bdp->phy_addr, led_mdi_op);
-
-	spin_unlock_bh(&bdp->mdi_access_lock);
 
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(MDI_SLEEP_TIME);
 
-	spin_lock_bh(&bdp->mdi_access_lock);
-
 	/* turn led ownership to the chip */
 	e100_mdi_write(bdp, PHY_82555_LED_SWITCH_CONTROL,
 		       bdp->phy_addr, PHY_82555_LED_NORMAL_CONTROL);
-
-	spin_unlock_bh(&bdp->mdi_access_lock);
 }
 
 static int
@@ -351,6 +343,7 @@ read_info(char *page, char **start, off_t off, int count, int *eof, void *data)
 }
 
 #ifdef E100_EOU
+#ifdef MODULE
 /**********************
  *  parameter entries
  **********************/
@@ -677,6 +670,7 @@ static e100_proc_entry e100_proc_params[] = {
 	{"PollingMaxWork.val",      read_gen_prm, 0, bdp_prm_off(PollingMaxWork)},
 	{"", 0, 0, 0}
 };
+#endif  /* MODULE */
 #endif /* E100_EOU */
 
 static struct proc_dir_entry * __devinit
@@ -706,6 +700,7 @@ create_proc_rw(char *name, void *data, struct proc_dir_entry *parent,
 }
 
 #ifdef E100_EOU
+#ifdef MODULE
 static int __devinit
 create_proc_param_subdir(struct e100_private *bdp,
 			 struct proc_dir_entry *dev_dir)
@@ -755,7 +750,8 @@ remove_proc_param_subdir(struct proc_dir_entry *parent)
 
 	remove_proc_entry("LoadParameters", parent);
 }
-#endif /* E100_EOU */
+#endif /* MODULE */
+#endif
 
 void
 e100_remove_proc_subdir(struct e100_private *bdp)
@@ -781,9 +777,11 @@ e100_remove_proc_subdir(struct e100_private *bdp)
 			remove_proc_entry(pe->name, bdp->proc_parent);
 		}
 
-#ifdef E100_EOU
+#ifdef E100_EOU		
+#ifdef MODULE
 		remove_proc_param_subdir(bdp->proc_parent);
 #endif
+#endif		
 		remove_proc_entry(bdp->device->name, adapters_proc_dir);
 		bdp->proc_parent = NULL;
 	}
@@ -844,12 +842,14 @@ e100_create_proc_subdir(struct e100_private *bdp)
 		}
 	}
 
-#ifdef E100_EOU
+#ifdef E100_EOU	
+#ifdef MODULE
 	if (create_proc_param_subdir(bdp, dev_dir)) {
 		e100_remove_proc_subdir(bdp);
 		return -ENOMEM;
 	}
 #endif
+#endif	
 
 	return 0;
 }

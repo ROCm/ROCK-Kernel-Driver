@@ -93,6 +93,30 @@ Portions (C) 2002 Red Hat, Inc. under the terms of the GNU GPL v2.
 *                                                                     *
 **********************************************************************/
 
+/* Change Log
+ *
+ * 2.1.6        7/5/02
+ *   o Added device ID support for Dell LOM.
+ *   o Added device ID support for 82511QM mobile nics.
+ *   o Bug fix: ethtool get/set EEPROM routines modified to use byte
+ *     addressing rather than word addressing.
+ *   o Feature: added MDIX mode support for 82550 and up.
+ *   o Bug fix: added reboot notifer to setup WOL settings when
+ *     shutting system down.
+ *   o Cleanup: removed yield() redefinition (Andrew Morton, 
+ *     akpm@zip.com.au).
+ *   o Bug fix: flow control now working when link partner is 
+ *     autoneg capable but not flow control capable.
+ *   o Bug fix: added check for corrupted EEPROM
+ *   o Bug fix: don't report checksum offloading for the older
+ *     controllers that don't support the feature.
+ *   o Bug fix: calculate cable diagnostics when link goes down
+ *     rather than when queuering /proc file.
+ *   o Cleanup: move mdi_access_lock to local get/set mdi routines.
+ *
+ * 2.0.30       5/30/02
+ */
+
 #undef __NO_VERSION__
 
 #include <linux/config.h>
@@ -184,22 +208,23 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-
-#define E100_VERSION  "2.0.30-k1"
-
-#define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
-
-const char *e100_version = E100_VERSION;
-const char *e100_full_driver_name = E100_FULL_DRIVER_NAME E100_VERSION;
-char *e100_short_driver_name = "e100";
+char e100_driver_version[]="2.1.6-k1";
+const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
+char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
 
 #ifdef CONFIG_PM
-static int e100_save_state(struct pci_dev *pcid, u32 state);
+static int e100_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
 static int e100_suspend(struct pci_dev *pcid, u32 state);
-static int e100_enable_wake(struct pci_dev *pcid, u32 state, int enable);
 static int e100_resume(struct pci_dev *pcid);
+struct notifier_block e100_notifier = {
+        notifier_call:  e100_notify_reboot,
+        next:           NULL,
+        priority:       0
+};
 #endif
+
+static void e100_get_mdix_status(struct e100_private *bdp);
 
 /*********************************************************************/
 /*! This is a GCC extension to ANSI C.
@@ -250,6 +275,7 @@ static void e100_rd_pwa_no(struct e100_private *);
 extern u16 e100_eeprom_read(struct e100_private *, u16);
 extern void e100_eeprom_write_block(struct e100_private *, u16, u16 *, u16);
 extern u16 e100_eeprom_size(struct e100_private *);
+u16 e100_eeprom_calculate_chksum(struct e100_private *adapter);
 
 static unsigned char e100_clr_cntrs(struct e100_private *);
 static unsigned char e100_load_microcode(struct e100_private *);
@@ -391,6 +417,8 @@ u32 e100_rx_srv(struct e100_private *, u32, int *);
 void e100_polling_tasklet(unsigned long);
 
 void e100_watchdog(struct net_device *);
+static void e100_do_hwi(struct net_device *);
+static void e100_hwi_restore(struct e100_private *);
 void e100_refresh_txthld(struct e100_private *);
 void e100_manage_adaptive_ifs(struct e100_private *);
 void e100_clear_pools(struct e100_private *);
@@ -400,7 +428,7 @@ static inline tcb_t *e100_prepare_xmit_buff(struct e100_private *,
 static void e100_set_multi_exec(struct net_device *dev);
 
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
-MODULE_DESCRIPTION(E100_FULL_DRIVER_NAME E100_VERSION);
+MODULE_DESCRIPTION("Intel(R) PRO/100 Network Driver");
 MODULE_LICENSE("Dual BSD/GPL");
 
 E100_PARAM(TxDescriptors, "Number of transmit descriptors");
@@ -580,6 +608,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	struct net_device *dev = NULL;
 	struct e100_private *bdp = NULL;
 	int rc = 0;
+	u16 cal_checksum, read_checksum;
 
 	dev = alloc_etherdev(sizeof (struct e100_private));
 	if (dev == NULL) {
@@ -592,7 +621,8 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 
 	if (first_time) {
 		first_time = false;
-		printk(KERN_NOTICE "%s\n", e100_full_driver_name);
+        	printk(KERN_NOTICE "%s - version %s\n",
+	               e100_full_driver_name, e100_driver_version);
 		printk(KERN_NOTICE "%s\n", e100_copyright);
 		printk(KERN_NOTICE "\n");
 	}
@@ -621,6 +651,10 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	init_timer(&bdp->watchdog_timer);
 	bdp->watchdog_timer.data = (unsigned long) dev;
 	bdp->watchdog_timer.function = (void *) &e100_watchdog;
+
+	init_timer(&bdp->hwi_timer);
+	bdp->hwi_timer.data = (unsigned long) dev;
+	bdp->hwi_timer.function = (void *) &e100_do_hwi;
 
 	if ((rc = e100_pci_setup(pcid, bdp)) != 0) {
 		goto err_dealloc;
@@ -657,6 +691,16 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 		goto err_pci;
 	}
 
+       /* Check if checksum is valid */
+	cal_checksum = e100_eeprom_calculate_chksum(bdp);
+	read_checksum = e100_eeprom_read(bdp, (bdp->eeprom_size - 1));
+	if (cal_checksum != read_checksum) {
+                printk(KERN_ERR "e100: Corrupted EERPROM on instance #%d\n",
+			                       e100nics);
+                rc = -ENODEV;
+                goto err_pci;
+	}
+	
 	dev->irq = pcid->irq;
 	dev->open = &e100_open;
 	dev->hard_start_xmit = &e100_xmit_frame;
@@ -685,6 +729,17 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	printk(KERN_NOTICE
 	       "%s: %s\n", bdp->device->name, e100_get_brand_msg(bdp));
 	e100_print_brd_conf(bdp);
+	bdp->id_string = e100_get_brand_msg(bdp);
+	e100_get_mdix_status(bdp);
+
+	if (netif_carrier_ok(bdp->device)) 
+		bdp->cable_status = "Cable OK";
+	else {
+		if (bdp->rev_id < D102_REV_ID) 
+			bdp->cable_status = "Not supported";
+		else
+			bdp->cable_status = "Not available";
+	}
 
 	if (e100_create_proc_subdir(bdp) < 0) {
 		printk(KERN_ERR "Failed to create proc directory for %s\n",
@@ -786,27 +841,33 @@ static struct pci_driver e100_driver = {
 	id_table:       e100_id_table,
 	probe:          e100_found1,
 	remove:         __devexit_p(e100_remove1),
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM			
 	suspend:        e100_suspend,
 	resume:         e100_resume,
-	save_state:     e100_save_state,
-	enable_wake:    e100_enable_wake,
-#else
-	suspend:        NULL,
-	resume:         NULL,
 #endif
 };
 
 static int __init
 e100_init_module(void)
 {
-	return pci_module_init(&e100_driver);
+	int ret;
+        ret = pci_module_init(&e100_driver);
 
+#ifdef CONFIG_PM	
+	if(ret >= 0)
+		register_reboot_notifier(&e100_notifier);
+#endif	
+
+	return ret;
 }
 
 static void __exit
 e100_cleanup_module(void)
 {
+#ifdef CONFIG_PM	
+	unregister_reboot_notifier(&e100_notifier);
+#endif	
+
 	pci_unregister_driver(&e100_driver);
 }
 
@@ -1665,7 +1726,7 @@ e100_watchdog(struct net_device *dev)
 	if (!netif_running(dev)) {
 		goto exit;
 	}
-	spin_lock_bh(&(bdp->mdi_access_lock));
+	e100_get_mdix_status(bdp);
 
 	/* check if link state has changed */
 	if (e100_phy_check(bdp)) {
@@ -1677,11 +1738,38 @@ e100_watchdog(struct net_device *dev)
 			       "Half" : "Full");
 
 			e100_config_fc(bdp);
-			e100_config(bdp);	
+			e100_config(bdp);  
+			bdp->cable_status = "Cable OK";
 
 		} else {
 			printk(KERN_ERR "e100: %s NIC Link is Down\n",
 			       bdp->device->name);
+                	if (bdp->rev_id < D102_REV_ID)
+				bdp->cable_status = "Not supported";
+		        else {				
+				/* Initiate hwi, ie, cable diagnostic */
+				bdp->saved_open_circut = 0xffff;
+				bdp->saved_short_circut = 0xffff;
+				bdp->saved_distance = 0xffff;
+				bdp->saved_i = 0;
+				bdp->saved_same = 0;
+				bdp->hwi_started = 1;
+				
+				/* Disable MDI/MDI-X auto switching */
+                		e100_mdi_write(bdp, MII_NCONFIG, bdp->phy_addr,
+		                	MDI_MDIX_RESET_ALL_MASK);
+
+				/* Set to 100 Full as required by hwi test */
+				e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr,
+				       BMCR_SPEED100 | BMCR_FULLDPLX);
+
+				/* Enable and execute HWI test */
+				e100_mdi_write(bdp, HWI_CONTROL_REG, bdp->phy_addr,
+					(HWI_TEST_ENABLE | HWI_TEST_EXECUTE));
+
+				/* Launch hwi timer in 1 msec */
+				mod_timer(&(bdp->hwi_timer), jiffies + (HZ / 1000) );
+			}
 		}
 	}
 
@@ -1721,8 +1809,6 @@ e100_watchdog(struct net_device *dev)
 	}
 
 	wmb();
-
-	spin_unlock_bh(&(bdp->mdi_access_lock));
 
 	/* relaunch watchdog timer in 2 sec */
 	mod_timer(&(bdp->watchdog_timer), jiffies + (2 * HZ));
@@ -3051,8 +3137,10 @@ e100_print_brd_conf(struct e100_private *bdp)
 	/* Print the string if checksum Offloading was enabled */
 	if (bdp->flags & DF_CSUM_OFFLOAD)
 		printk(KERN_NOTICE "  Hardware receive checksums enabled\n");
-	else
-		printk(KERN_NOTICE "  Hardware receive checksums disabled\n");
+	else {
+		if (bdp->rev_id >= D101MA_REV_ID) 
+			printk(KERN_NOTICE "  Hardware receive checksums disabled\n");
+	}
 
 	if ((bdp->flags & DF_UCODE_LOADED))
 		printk(KERN_NOTICE "  cpu cycle saver enabled\n");
@@ -3150,6 +3238,13 @@ e100_isolate_driver(struct e100_private *bdp)
 	write_unlock_irq(&(bdp->isolate_lock));
 
 	del_timer_sync(&bdp->watchdog_timer);
+
+	del_timer_sync(&bdp->hwi_timer);
+	/* If in middle of cable diag, */
+	if (bdp->hwi_started) {
+		bdp->hwi_started = 0;
+		e100_hwi_restore(bdp);
+	}
 
 	if (netif_running(bdp->device))
 		netif_stop_queue(bdp->device);
@@ -3382,9 +3477,7 @@ e100_ethtool_get_settings(struct net_device *dev, struct ifreq *ifr)
 	}
 
 	if (bdp->speed_duplex_caps & SUPPORTED_MII) {
-		spin_lock_bh(&(bdp->mdi_access_lock));
 		e100_mdi_read(bdp, MII_ADVERTISE, bdp->phy_addr, &advert);
-		spin_unlock_bh(&(bdp->mdi_access_lock));
 
 		if (advert & ADVERTISE_10HALF)
 			ecmd.advertising |= ADVERTISED_10baseT_Half;
@@ -3495,9 +3588,7 @@ e100_ethtool_glink(struct net_device *dev, struct ifreq *ifr)
 	bdp = dev->priv;
 	info.cmd = ETHTOOL_GLINK;
 
-	spin_lock_bh(&(bdp->mdi_access_lock));
 	info.data = e100_get_link_state(bdp);
-	spin_unlock_bh(&(bdp->mdi_access_lock));
 
 	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
 		return -EFAULT;
@@ -3569,7 +3660,7 @@ e100_ethtool_get_drvinfo(struct net_device *dev, struct ifreq *ifr)
 	bdp = dev->priv;
 
 	strncpy(info.driver, e100_short_driver_name, sizeof (info.driver) - 1);
-	strncpy(info.version, e100_version, sizeof (info.version) - 1);
+	strncpy(info.version, e100_driver_version, sizeof (info.version) - 1);
 	strncpy(info.fw_version, e100_get_brand_msg(bdp),
 		sizeof (info.fw_version) - 1);
 	strncpy(info.bus_info, bdp->pdev->slot_name,
@@ -3595,8 +3686,9 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 	struct ethtool_eeprom ecmd;
 	u16 eeprom_data[256];
 	u16 *usr_eeprom_ptr;
-	u16 word_length, word_offset;
-	int i;
+	u16 first_word, last_word;
+	int i, max_len;
+	void *ptr;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -3609,39 +3701,49 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 	usr_eeprom_ptr =
 		(u16 *) (ifr->ifr_data + offsetof(struct ethtool_eeprom, data));
 
-	word_offset = (ecmd.offset >> 1);
-	if (word_offset >= bdp->eeprom_size)
+        max_len = bdp->eeprom_size * 2;
+	if ((ecmd.offset + ecmd.len) > max_len)
+		ecmd.len = (max_len - ecmd.offset);
+
+	first_word = ecmd.offset >> 1;
+	last_word = (ecmd.offset + ecmd.len - 1) >> 1;
+		
+	if (first_word >= bdp->eeprom_size)
 		return -EFAULT;
 
-	word_length =
-		min_t(u32, (ecmd.len >> 1), (bdp->eeprom_size - word_offset));
-
 	if (ecmd.cmd == ETHTOOL_GEEPROM) {
-		for (i = word_offset; i < (word_length + word_offset); i++)
-			eeprom_data[i] = e100_eeprom_read(bdp, i);
+        	for(i = 0; i <= (last_word - first_word); i++)
+			eeprom_data[i] = e100_eeprom_read(bdp, first_word + i);
 
-		ecmd.len = (word_length << 1);
 		ecmd.magic = E100_EEPROM_MAGIC;
 
 		if (copy_to_user(ifr->ifr_data, &ecmd, sizeof (ecmd)))
 			return -EFAULT;
 
-		if (copy_to_user(usr_eeprom_ptr, &(eeprom_data[word_offset]),
-				 (ecmd.len << 1)))
+		if (copy_to_user(usr_eeprom_ptr, eeprom_data, ecmd.len))
 			return -EFAULT;
 	} else {
 		if (ecmd.magic != E100_EEPROM_MAGIC)
 			return -EFAULT;
 
-		if (copy_from_user(&(eeprom_data[word_offset]), usr_eeprom_ptr,
-				   (ecmd.len << 1)))
-			return -EFAULT;
+		ptr = (void *)eeprom_data;
+        	if(ecmd.offset & 1) {
+                	/* need modification of first changed EEPROM word */
+                	/* only the second byte of the word is being modified */
+			eeprom_data[0] = e100_eeprom_read(bdp, first_word);
+                	ptr++;
+        	}
+        	if((ecmd.offset + ecmd.len) & 1) {
+	                /* need modification of last changed EEPROM word */
+	                /* only the first byte of the word is being modified */
+			eeprom_data[last_word - first_word] = 
+				e100_eeprom_read(bdp, last_word);
+		}
+        	if(copy_from_user(ptr, usr_eeprom_ptr, ecmd.len))
+	                return -EFAULT;
 
-		e100_eeprom_write_block(bdp, word_offset,
-					&(eeprom_data[word_offset]),
-					word_length);
-
-		ecmd.len = (word_length << 1);
+		e100_eeprom_write_block(bdp, first_word, eeprom_data,
+					last_word - first_word + 1);
 
 		if (copy_to_user(ifr->ifr_data, &ecmd, sizeof (ecmd)))
 			return -EFAULT;
@@ -3663,12 +3765,9 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 static void
 e100_led_control(struct e100_private *bdp, u16 led_mdi_op)
 {
-	spin_lock_bh(&bdp->mdi_access_lock);
-
 	e100_mdi_write(bdp, PHY_82555_LED_SWITCH_CONTROL,
 		       bdp->phy_addr, led_mdi_op);
 
-	spin_unlock_bh(&bdp->mdi_access_lock);
 }
 /**
  * e100_led_blink_callback
@@ -3965,10 +4064,8 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	case SIOCGMIIREG:
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		spin_lock_bh(&(bdp->mdi_access_lock));
 		e100_mdi_read(bdp, data_ptr->reg_num & 0x1f, bdp->phy_addr,
 			      &(data_ptr->val_out));
-		spin_unlock_bh(&(bdp->mdi_access_lock));
 		break;
 
 	case SIOCSMIIREG:
@@ -3977,10 +4074,8 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if (netif_running(dev)) {
 			return -EBUSY;
 		}
-		spin_lock_bh(&(bdp->mdi_access_lock));
 		e100_mdi_write(bdp, data_ptr->reg_num & 0x1f, bdp->phy_addr,
 			       data_ptr->val_in);
-		spin_unlock_bh(&(bdp->mdi_access_lock));
 		break;
 
 	default:
@@ -4149,17 +4244,22 @@ exit:
 
 #ifdef CONFIG_PM
 static int
-e100_save_state(struct pci_dev *pcid, u32 state)
+e100_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 {
-	struct net_device *dev;
-	struct e100_private *bdp;
-
-	/* Actually, PCI PM does NOT call this entry */
-	if (!(dev = (struct net_device *) pci_get_drvdata(pcid)))
-		return -1;
-	bdp = dev->priv;
-	pci_save_state(pcid, bdp->pci_state);
-	return 0;
+        struct pci_dev *pdev = NULL;
+        switch(event) {
+        case SYS_DOWN:
+        case SYS_HALT:
+        case SYS_POWER_OFF:
+                pci_for_each_dev(pdev) {
+                        if(pci_dev_driver(pdev) == &e100_driver) {
+				/* If net_device struct is allocated? */
+                                if (pci_get_drvdata(pdev))
+					e100_suspend(pdev, 3);
+                	}
+		}
+        }
+        return NOTIFY_DONE;
 }
 
 static int
@@ -4169,7 +4269,7 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 	struct e100_private *bdp = netdev->priv;
 
 	e100_isolate_driver(bdp);
-	e100_save_state(pcid, state);
+	pci_save_state(pcid, bdp->pci_state);
 
 	/* If wol is enabled */
 #ifdef ETHTOOL_GWOL
@@ -4218,12 +4318,126 @@ e100_resume(struct pci_dev *pcid)
 	return 0;
 }
 
-static int
-e100_enable_wake(struct pci_dev *pcid, u32 state, int enable)
-{
-	/* Driver doesn't need to do anything because it will enable */
-	/* wol when suspended.                                       */
-	/* Actually, PCI PM does NOT call this entry.                */
-	return 0;
-}
 #endif /* CONFIG_PM */
+
+static void
+e100_get_mdix_status(struct e100_private *bdp)
+{	
+	if (bdp->rev_id < D102_REV_ID) {
+		if (netif_carrier_ok(bdp->device))
+			bdp->mdix_status = "MDI";				
+		else			
+			bdp->mdix_status = "None";
+	} else {	
+		u16 ctrl_reg;
+		/* Read the MDIX control register */
+		e100_mdi_read(bdp, MII_NCONFIG, bdp->phy_addr, &ctrl_reg);
+		if (ctrl_reg & MDI_MDIX_CONFIG_IS_OK) {
+			if (ctrl_reg & MDI_MDIX_STATUS)
+				bdp->mdix_status = "MDI-X";
+			else
+				bdp->mdix_status = "MDI";
+		} else
+			bdp->mdix_status = "None";
+	}
+}
+
+static void
+e100_do_hwi(struct net_device *dev)
+{
+	struct e100_private *bdp = dev->priv;
+	u16 ctrl_reg;
+	int distance, open_circut, short_circut;
+
+	e100_mdi_read(bdp, HWI_CONTROL_REG, bdp->phy_addr, &ctrl_reg);
+
+	distance = ctrl_reg & HWI_TEST_DISTANCE;
+	open_circut = ctrl_reg & HWI_TEST_HIGHZ_PROBLEM;
+	short_circut = ctrl_reg & HWI_TEST_LOWZ_PROBLEM;
+
+	if ((distance == bdp->saved_distance) &&
+	    (open_circut == bdp->saved_open_circut) &&
+	    (short_circut == bdp->saved_short_circut)) 
+		bdp->saved_same++;
+	else {
+		bdp->saved_same = 0;
+		bdp->saved_distance = distance;
+		bdp->saved_open_circut = open_circut;
+		bdp->saved_short_circut = short_circut;
+	}
+		
+	if (bdp->saved_same == MAX_SAME_RESULTS) {
+		if ((open_circut && !(short_circut)) ||
+		    (!(open_circut) && short_circut)) {
+
+			u8 near_end = ((distance * HWI_REGISTER_GRANULARITY) <
+				       HWI_NEAR_END_BOUNDARY);
+			if (open_circut) {
+				if (near_end) 
+					bdp->cable_status = "Open Circut Near End";
+				else 
+					bdp->cable_status = "Open Circut Far End";
+			} else {
+				if (near_end) 
+					bdp->cable_status = "Short Circut Near End";
+				else 
+					bdp->cable_status = "Short Circut Far End";
+			}
+			goto done;
+		}
+	}
+	else if (bdp->saved_i == HWI_MAX_LOOP) {
+		bdp->cable_status = "Test failed";
+		goto done;
+	}
+		
+	/* Do another hwi test */
+	e100_mdi_write(bdp, HWI_CONTROL_REG, bdp->phy_addr,
+		       (HWI_TEST_ENABLE | HWI_TEST_EXECUTE));
+	bdp->saved_i++;
+	/* relaunch hwi timer in 1 msec */
+	mod_timer(&(bdp->hwi_timer), jiffies + (HZ / 1000) );
+	return;
+
+done:
+	e100_hwi_restore(bdp);
+	bdp->hwi_started = 0;
+	return;
+}
+
+static void e100_hwi_restore(struct e100_private *bdp)
+{
+	u16 control = 0;
+
+	/* Restore speed, duplex and autoneg before */
+	/* hwi test, i.e., cable diagnostic         */
+	
+	/* Reset hwi test */
+        e100_mdi_write(bdp, HWI_CONTROL_REG, bdp->phy_addr,					       HWI_RESET_ALL_MASK);
+				
+	if ((bdp->params.e100_speed_duplex == E100_AUTONEG) &&
+        	(bdp->rev_id >= D102_REV_ID)) 
+		/* Enable MDI/MDI-X auto switching */
+                e100_mdi_write(bdp, MII_NCONFIG, bdp->phy_addr,
+			MDI_MDIX_AUTO_SWITCH_ENABLE);
+
+	switch (bdp->params.e100_speed_duplex) {
+	case E100_SPEED_10_HALF:
+		break;
+	case E100_SPEED_10_FULL:
+		control = BMCR_FULLDPLX;
+		break;
+	case E100_SPEED_100_HALF:
+		control = BMCR_SPEED100;
+		break;
+	case E100_SPEED_100_FULL:
+		control = BMCR_SPEED100 | BMCR_FULLDPLX;
+		break;
+	case E100_AUTONEG:
+		control = BMCR_ANENABLE | BMCR_ANRESTART;
+		break;
+	}
+	/* Restore original speed/duplex */
+	e100_mdi_write(bdp, MII_BMCR, bdp->phy_addr, control);
+	return;
+}
