@@ -97,8 +97,6 @@ EXPORT_SYMBOL(irda_task_execute);
 EXPORT_SYMBOL(irda_task_next_state);
 EXPORT_SYMBOL(irda_task_delete);
 
-EXPORT_SYMBOL(irda_calc_crc16);
-EXPORT_SYMBOL(irda_crc16_table);
 EXPORT_SYMBOL(irda_start_timer);
 
 #ifdef CONFIG_IRDA_DEBUG

@@ -28,6 +28,6 @@ static inline __u16 irda_fcs(__u16 fcs, __u8 c)
 }
 
 /* Recompute the FCS with len bytes appended. */
-unsigned short irda_calc_crc16( __u16 fcs, __u8 const *buf, size_t len);
+__u16 irda_calc_crc16( __u16 fcs, __u8 const *buf, size_t len);
 
 #endif
