@@ -21,7 +21,10 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-philips-par.c,v 1.29 2003/01/21 08:08:16 kmalkki Exp $ */
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -158,7 +161,7 @@ static void i2c_parport_attach (struct parport *port)
 	}
 	memset (adapter, 0x00, sizeof(struct i2c_par));
 
-	/* printk(KERN_DEBUG "i2c-philips-par.o: attaching to %s\n", port->name); */
+	/* pr_debug("i2c-philips-par: attaching to %s\n", port->name); */
 
 	adapter->pdev = parport_register_device(port, "i2c-philips-par",
 						NULL, NULL, NULL, 
