@@ -16,9 +16,11 @@
 * General Public License for more details.
 *
 ******************************************************************************/
-#define QLA1280_VERSION      "3.23.34"
+#define QLA1280_VERSION      "3.23.35"
 /*****************************************************************************
     Revision History:
+    Rev  3.23.35 August 14, 2003, Jes Sorensen
+	- Build against 2.6
     Rev  3.23.34 July 23, 2003, Jes Sorensen
 	- Remove pointless TRUE/FALSE macros
 	- Clean up vchan handling
@@ -296,13 +298,11 @@
 #include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
-#include <linux/blk.h>
 #include <linux/stat.h>
 #include <linux/slab.h>
 #include <linux/pci_ids.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
-
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -312,7 +312,10 @@
 #include <asm/system.h>
 
 #if LINUX_VERSION_CODE < 0x020545
+#include <linux/blk.h>
 #include "sd.h"
+#else
+#include <scsi/scsi_host.h>
 #endif
 #include "scsi.h"
 #include "hosts.h"
@@ -634,11 +637,14 @@ static int ql_debug_level = 1;
  *************************************************************************/
 #define	PROC_BUF	&qla1280_buffer[len]
 
-int
-qla1280_proc_info(char *buffer, char **start, off_t offset, int length,
-		  int hostno, int inout)
+#if LINUX_VERSION_CODE < 0x020600
+int qla1280_proc_info(char *buffer, char **start, off_t offset, int length,
+		      int hostno, int inout)
+#else
+int qla1280_proc_info(struct Scsi_Host *host, char *buffer, char **start,
+		      off_t offset, int length, int inout)
+#endif
 {
-	struct Scsi_Host *host;
 	struct scsi_qla_host *ha;
 	int size = 0;
 	int len = 0;
@@ -647,7 +653,10 @@ qla1280_proc_info(char *buffer, char **start, off_t offset, int length,
 	struct scsi_lu *up;
 	uint32_t b, t, l;
 #endif
-
+#if LINUX_VERSION_CODE >= 0x020600
+	ha = (struct scsi_qla_host *)host->hostdata;
+#else
+	struct Scsi_Host *host;
 	/* Find the host that was specified */
 	for (ha = qla1280_hostlist; (ha != NULL)
 		     && ha->host->host_no != hostno; ha = ha->next) ;
@@ -664,6 +673,7 @@ qla1280_proc_info(char *buffer, char **start, off_t offset, int length,
 	}
 
 	host = ha->host;
+#endif
 
 	if (inout)
 		return -ENOSYS;
@@ -1828,7 +1838,7 @@ qla1280_done(struct scsi_qla_host *ha, struct srb ** done_q_first,
 		CMD_HANDLE(sp->cmd) = (unsigned char *)INVALID_HANDLE;
 		ha->actthreads--;
 
-#if LINUX_KERNEL_VERSION < 0x020500
+#if LINUX_VERSION_CODE < 0x020500
 		if (cmd->cmnd[0] == INQUIRY)
 			qla1280_get_target_options(cmd, ha);
 #endif
@@ -4497,7 +4507,7 @@ qla1280_rst_aen(struct scsi_qla_host *ha)
 }
 
 
-#if LINUX_KERNEL_VERSION < 0x020500
+#if LINUX_VERSION_CODE < 0x020500
 /*
  *
  */

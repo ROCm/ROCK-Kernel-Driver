@@ -340,6 +340,20 @@ static int sr_init_command(struct scsi_cmnd * SCpnt)
 		return 0;
 	}
 
+	{
+		struct scatterlist *sg = SCpnt->request_buffer;
+		int i, size = 0;
+		for (i = 0; i < SCpnt->use_sg; i++)
+			size += sg[i].length;
+
+		if (size != SCpnt->request_bufflen && SCpnt->use_sg) {
+			printk(KERN_ERR "sr: mismatch count %d, bytes %d\n",
+					size, SCpnt->request_bufflen);
+			if (SCpnt->request_bufflen > size)
+				SCpnt->request_bufflen = SCpnt->bufflen = size;
+		}
+	}
+
 	/*
 	 * request doesn't start on hw block boundary, add scatter pads
 	 */
@@ -361,8 +375,11 @@ static int sr_init_command(struct scsi_cmnd * SCpnt)
 	SCpnt->cmnd[1] = 0;
 	block = (unsigned int)SCpnt->request->sector / (s_size >> 9);
 
-	if (this_count > 0xffff)
+	if (this_count > 0xffff) {
 		this_count = 0xffff;
+		SCpnt->request_bufflen = SCpnt->bufflen =
+				this_count * s_size;
+	}
 
 	SCpnt->cmnd[2] = (unsigned char) (block >> 24) & 0xff;
 	SCpnt->cmnd[3] = (unsigned char) (block >> 16) & 0xff;
@@ -389,18 +406,6 @@ queue:
 	 * of capability to this function.
 	 */
 	SCpnt->done = rw_intr;
-
-	{
-		struct scatterlist *sg = SCpnt->request_buffer;
-		int i, size = 0;
-		for (i = 0; i < SCpnt->use_sg; i++)
-			size += sg[i].length;
-
-		if (size != SCpnt->request_bufflen && SCpnt->use_sg) {
-			printk("sr: mismatch count %d, bytes %d\n", size, SCpnt->request_bufflen);
-			SCpnt->request_bufflen = size;
-		}
-	}
 
 	/*
 	 * This indicates that the command is ready from our end to be

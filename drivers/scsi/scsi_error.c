@@ -1285,7 +1285,12 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 
       maybe_retry:
 
-	if ((++scmd->retries) < scmd->allowed) {
+	/* we requeue for retry because the error was retryable, and
+	 * the request was not marked fast fail.  Note that above,
+	 * even if the request is marked fast fail, we still requeue
+	 * for queue congestion conditions (QUEUE_FULL or BUSY) */
+	if ((++scmd->retries) < scmd->allowed 
+	    && !blk_noretry_request(scmd->request)) {
 		return NEEDS_RETRY;
 	} else {
 		/*

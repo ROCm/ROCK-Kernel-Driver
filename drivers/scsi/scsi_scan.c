@@ -656,12 +656,31 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
  **/
 static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 		uint channel, uint id, uint lun, int *bflagsp,
-		struct scsi_device **sdevp)
+		struct scsi_device **sdevp, int rescan)
 {
 	struct scsi_device *sdev;
 	struct scsi_request *sreq;
 	unsigned char *result;
 	int bflags, res = SCSI_SCAN_NO_RESPONSE;
+
+	/*
+	 * The rescan flag is used as an optimization, the first scan of a
+	 * host adapter calls into here with rescan == 0.
+	 */
+	if (rescan) {
+		sdev = scsi_find_device(host, channel, id, lun);
+		if (sdev) {
+			SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO
+				"scsi scan: device exists on <%d:%d:%d:%d>\n",
+				host->host_no, channel, id, lun));
+			if (sdevp)
+				*sdevp = sdev;
+			if (bflagsp)
+				*bflagsp = scsi_get_device_flags(sdev->vendor,
+								 sdev->model);
+			return SCSI_SCAN_LUN_PRESENT;
+		}
+	}
 
 	sdev = scsi_alloc_sdev(host, channel, id, lun);
 	if (!sdev)
@@ -737,7 +756,7 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
  *     Modifies sdevscan->lun.
  **/
 static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
-		uint id, int bflags, int lun0_res, int scsi_level)
+		uint id, int bflags, int lun0_res, int scsi_level, int rescan)
 {
 	unsigned int sparse_lun, lun, max_dev_lun;
 
@@ -806,7 +825,8 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
 	 */
 	for (lun = 1; lun < max_dev_lun; ++lun)
 		if ((scsi_probe_and_add_lun(shost, channel, id, lun,
-		      NULL, NULL) != SCSI_SCAN_LUN_PRESENT) && !sparse_lun)
+		      NULL, NULL, rescan) != SCSI_SCAN_LUN_PRESENT) &&
+		    !sparse_lun)
 			return;
 }
 
@@ -857,7 +877,8 @@ static int scsilun_to_int(struct scsi_lun *scsilun)
  *     0: scan completed (or no memory, so further scanning is futile)
  *     1: no report lun scan, or not configured
  **/
-static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags)
+static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
+				int rescan)
 {
 	char devname[64];
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
@@ -1011,7 +1032,7 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags)
 			int res;
 
 			res = scsi_probe_and_add_lun(sdev->host, sdev->channel,
-				sdev->id, lun, NULL, NULL);
+				sdev->id, lun, NULL, NULL, rescan);
 			if (res == SCSI_SCAN_NO_RESPONSE) {
 				/*
 				 * Got some results, but now none, abort.
@@ -1037,7 +1058,7 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags)
 	return 0;
 }
 #else
-# define scsi_report_lun_scan(sdev, blags)	(1)
+# define scsi_report_lun_scan(sdev, blags, rescan)	(1)
 #endif	/* CONFIG_SCSI_REPORT_LUNS */
 
 struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
@@ -1046,7 +1067,7 @@ struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 	struct scsi_device *sdev;
 	int res;
 
-	res = scsi_probe_and_add_lun(shost, channel, id, lun, NULL, &sdev);
+	res = scsi_probe_and_add_lun(shost, channel, id, lun, NULL, &sdev, 1);
 	if (res != SCSI_SCAN_LUN_PRESENT)
 		sdev = ERR_PTR(-ENODEV);
 	return sdev;
@@ -1083,7 +1104,7 @@ void scsi_rescan_device(struct device *dev)
  *     sequential scan of LUNs on the target id.
  **/
 static void scsi_scan_target(struct Scsi_Host *shost, unsigned int channel,
-			     unsigned int id)
+			     unsigned int id, unsigned int lun, int rescan)
 {
 	int bflags = 0;
 	int res;
@@ -1095,19 +1116,29 @@ static void scsi_scan_target(struct Scsi_Host *shost, unsigned int channel,
 		 */
 		return;
 
+	if (lun != SCAN_WILD_CARD) {
+		/*
+		 * Scan for a specific host/chan/id/lun.
+		 */
+		scsi_probe_and_add_lun(shost, channel, id, lun, NULL, NULL,
+				       rescan);
+		return;
+	}
+
 	/*
 	 * Scan LUN 0, if there is some response, scan further. Ideally, we
 	 * would not configure LUN 0 until all LUNs are scanned.
 	 */
-	res = scsi_probe_and_add_lun(shost, channel, id, 0, &bflags, &sdev);
+	res = scsi_probe_and_add_lun(shost, channel, id, 0, &bflags, &sdev,
+				     rescan);
 	if (res == SCSI_SCAN_LUN_PRESENT) {
-		if (scsi_report_lun_scan(sdev, bflags) != 0)
+		if (scsi_report_lun_scan(sdev, bflags, rescan) != 0)
 			/*
 			 * The REPORT LUN did not scan the target,
 			 * do a sequential scan.
 			 */
 			scsi_sequential_lun_scan(shost, channel, id, bflags,
-				       	res, sdev->scsi_level);
+				       	res, sdev->scsi_level, rescan);
 	} else if (res == SCSI_SCAN_TARGET_PRESENT) {
 		/*
 		 * There's a target here, but lun 0 is offline so we
@@ -1116,37 +1147,26 @@ static void scsi_scan_target(struct Scsi_Host *shost, unsigned int channel,
 		 * a default scsi level of SCSI_2
 		 */
 		scsi_sequential_lun_scan(shost, channel, id, BLIST_SPARSELUN,
-				SCSI_SCAN_TARGET_PRESENT, SCSI_2);
+				SCSI_SCAN_TARGET_PRESENT, SCSI_2, rescan);
 	}
 }
 
-/**
- * scsi_scan_host - scan the given adapter
- * @shost:	adapter to scan
- *
- * Description:
- *     Iterate and call scsi_scan_target to scan all possible target id's
- *     on all possible channels.
- **/
-void scsi_scan_host(struct Scsi_Host *shost)
+static void scsi_scan_channel(struct Scsi_Host *shost, unsigned int channel,
+			      unsigned int id, unsigned int lun, int rescan)
 {
-	uint channel, id, order_id;
+	uint order_id;
 
-	/*
-	 * The sdevscan host, channel, id and lun are filled in as
-	 * needed to scan.
-	 */
-	for (channel = 0; channel <= shost->max_channel; channel++) {
-		/*
-		 * XXX adapter drivers when possible (FCP, iSCSI)
-		 * could modify max_id to match the current max,
-		 * not the absolute max.
-		 *
-		 * XXX add a shost id iterator, so for example,
-		 * the FC ID can be the same as a target id
-		 * without a huge overhead of sparse id's.
-		 */
+	if (id == SCAN_WILD_CARD)
 		for (id = 0; id < shost->max_id; ++id) {
+			/*
+			 * XXX adapter drivers when possible (FCP, iSCSI)
+			 * could modify max_id to match the current max,
+			 * not the absolute max.
+			 *
+			 * XXX add a shost id iterator, so for example,
+			 * the FC ID can be the same as a target id
+			 * without a huge overhead of sparse id's.
+			 */
 			if (shost->reverse_ordering)
 				/*
 				 * Scan from high to low id.
@@ -1154,9 +1174,39 @@ void scsi_scan_host(struct Scsi_Host *shost)
 				order_id = shost->max_id - id - 1;
 			else
 				order_id = id;
-			scsi_scan_target(shost, channel, order_id);
+			scsi_scan_target(shost, channel, order_id, lun, rescan);
 		}
-	}
+	else
+		scsi_scan_target(shost, channel, id, lun, rescan);
+}
+
+int scsi_scan_host_selected(struct Scsi_Host *shost, unsigned int channel,
+			    unsigned int id, unsigned int lun, int rescan)
+{
+	SCSI_LOG_SCAN_BUS(3, printk (KERN_INFO "%s: <%u:%u:%u:%u>\n",
+		__FUNCTION__, shost->host_no, channel, id, lun));
+
+	if (((channel != SCAN_WILD_CARD) && (channel > shost->max_channel)) ||
+	    ((id != SCAN_WILD_CARD) && (id > shost->max_id)) ||
+	    ((lun != SCAN_WILD_CARD) && (lun > shost->max_lun)))
+		return -EINVAL;
+
+	if (channel == SCAN_WILD_CARD) 
+		for (channel = 0; channel <= shost->max_channel; channel++)
+			scsi_scan_channel(shost, channel, id, lun, rescan);
+	else
+		scsi_scan_channel(shost, channel, id, lun, rescan);
+	return 0;
+}
+
+/**
+ * scsi_scan_host - scan the given adapter
+ * @shost:	adapter to scan
+ **/
+void scsi_scan_host(struct Scsi_Host *shost)
+{
+	scsi_scan_host_selected(shost, SCAN_WILD_CARD, SCAN_WILD_CARD,
+				SCAN_WILD_CARD, 0);
 }
 
 void scsi_forget_host(struct Scsi_Host *shost)
