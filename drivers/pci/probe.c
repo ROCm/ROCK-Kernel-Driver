@@ -637,12 +637,6 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 {
 	struct pci_bus *b;
 
-	if (pci_find_bus(0, bus)) {
-		/* If we already got to this bus through a different bridge, ignore it */
-		DBG("PCI: Bus %02x already known\n", bus);
-		return NULL;
-	}
-
 	b = pci_alloc_bus();
 	if (!b)
 		return NULL;
@@ -655,6 +649,14 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 
 	b->sysdata = sysdata;
 	b->ops = ops;
+
+	if (pci_find_bus(pci_domain_nr(b), bus)) {
+		/* If we already got to this bus through a different bridge, ignore it */
+		DBG("PCI: Bus %02x already known\n", bus);
+		kfree(b->dev);
+		kfree(b);
+		return NULL;
+	}
 
 	list_add_tail(&b->node, &pci_root_buses);
 
