@@ -83,6 +83,33 @@
 #define AC97_VENDOR_ID1		0x7c	/* Vendor ID1 */
 #define AC97_VENDOR_ID2		0x7e	/* Vendor ID2 / revision */
 
+/* slot allocation */
+#define AC97_SLOT_TAG		0
+#define AC97_SLOT_CMD_ADDR	1
+#define AC97_SLOT_CMD_DATA	2
+#define AC97_SLOT_PCM_LEFT	3
+#define AC97_SLOT_PCM_RIGHT	4
+#define AC97_SLOT_MODEM_LINE1	5
+#define AC97_SLOT_PCM_CENTER	6
+#define AC97_SLOT_MIC		6	/* input */
+#define AC97_SLOT_SPDIF_LEFT1	6
+#define AC97_SLOT_PCM_SLEFT	7	/* surround left */
+#define AC97_SLOT_PCM_LEFT_0	7	/* double rate operation */
+#define AC97_SLOT_SPDIF_LEFT	7
+#define AC97_SLOT_PCM_SRIGHT	8	/* surround right */
+#define AC97_SLOT_PCM_RIGHT_0	8	/* double rate operation */
+#define AC97_SLOT_SPDIF_RIGHT	8
+#define AC97_SLOT_LFE		9
+#define AC97_SLOT_SPDIF_RIGHT1	9
+#define AC97_SLOT_MODEM_LINE2	10
+#define AC97_SLOT_PCM_LEFT_1	10	/* double rate operation */
+#define AC97_SLOT_SPDIF_LEFT2	10
+#define AC97_SLOT_HANDSET	11	/* output */
+#define AC97_SLOT_PCM_RIGHT_1	11	/* double rate operation */
+#define AC97_SLOT_SPDIF_RIGHT2	11
+#define AC97_SLOT_MODEM_GPIO	12	/* modem GPIO */
+#define AC97_SLOT_PCM_CENTER_1	12	/* double rate operation */
+
 /* basic capabilities (reset register) */
 #define AC97_BC_DEDICATED_MIC	0x0001	/* Dedicated Mic PCM In Channel */
 #define AC97_BC_RESERVED1	0x0002	/* Reserved (was Modem Line Codec support) */
@@ -280,6 +307,7 @@
 #define AC97_SCAP_CENTER_LFE_DAC (1<<3)	/* center and LFE DACs are present */
 #define AC97_SCAP_SKIP_AUDIO	(1<<4)	/* skip audio part of codec */
 #define AC97_SCAP_SKIP_MODEM	(1<<5)	/* skip modem part of codec */
+#define AC97_SCAP_INDEP_SDIN	(1<<6)	/* independent SDIN */
 
 /* ac97->flags */
 #define AC97_HAS_PC_BEEP	(1<<0)	/* force PC Speaker usage */
@@ -303,6 +331,32 @@
 typedef struct _snd_ac97_bus ac97_bus_t;
 typedef struct _snd_ac97 ac97_t;
 
+enum ac97_pcm_cfg {
+	AC97_PCM_CFG_FRONT = 2,
+	AC97_PCM_CFG_REAR = 10,		/* alias surround */
+	AC97_PCM_CFG_LFE = 11,		/* center + lfe */
+	AC97_PCM_CFG_40 = 4,		/* front + rear */
+	AC97_PCM_CFG_51 = 6,		/* front + rear + center/lfe */
+	AC97_PCM_CFG_SPDIF = 20
+};
+
+/* PCM allocation */
+struct ac97_pcm {
+	ac97_bus_t *bus;
+	unsigned int stream: 1,	   	   /* stream type: 1 = capture */
+		     exclusive: 1,	   /* exclusive mode, don't override with other pcms */
+		     copy_flag: 1;	   /* lowlevel driver must fill all entries */
+	unsigned short aslots;		   /* active slots */
+	unsigned int rates;		   /* available rates */
+	struct {
+		unsigned short slots;	   /* driver input: requested AC97 slot numbers */
+		unsigned short rslots[4];  /* allocated slots per codecs */
+		unsigned char rate_table[4];
+		ac97_t *codec[4];	   /* allocated codecs */
+	} r[2];				   /* 0 = standard rates, 1 = double rates */
+	unsigned long private_value;	   /* used by the hardware driver */
+};
+
 struct snd_ac97_build_ops {
 	int (*build_3d) (ac97_t *ac97);
 	int (*build_specific) (ac97_t *ac97);
@@ -321,8 +375,14 @@ struct _snd_ac97_bus {
 	void (*private_free) (ac97_bus_t *bus);
 	/* --- */
 	snd_card_t *card;
-	unsigned int num;	/* bus number */
-	unsigned int clock;	/* AC'97 clock (usually 48000Hz) */
+	unsigned short num;	/* bus number */
+	unsigned short vra: 1,	/* bridge supports VRA */
+		       isdin: 1;/* independent SDIN */
+	unsigned int clock;	/* AC'97 base clock (usually 48000Hz) */
+	spinlock_t bus_lock;	/* used mainly for slot allocation */
+	unsigned short used_slots[2][4]; /* actually used PCM slots */
+	unsigned short pcms_count; /* count of PCMs */
+	struct ac97_pcm *pcms;
 	ac97_t *codec[4];
 	snd_info_entry_t *proc;
 };
@@ -393,7 +453,6 @@ unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg);
 void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value);
 int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value);
 int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value);
-int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate);
 #ifdef CONFIG_PM
 void snd_ac97_suspend(ac97_t *ac97);
 void snd_ac97_resume(ac97_t *ac97);
@@ -416,5 +475,13 @@ struct ac97_quirk {
 };
 
 int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk);
+int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate);
+
+int snd_ac97_pcm_assign(ac97_bus_t *ac97,
+			unsigned short pcms_count,
+			struct ac97_pcm *pcms);
+int snd_ac97_pcm_open(struct ac97_pcm *pcm, unsigned int rate,
+		      enum ac97_pcm_cfg cfg, unsigned short slots);
+int snd_ac97_pcm_close(struct ac97_pcm *pcm);
 
 #endif /* __SOUND_AC97_CODEC_H */

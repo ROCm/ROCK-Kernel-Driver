@@ -983,6 +983,8 @@ static int snd_ac97_bus_free(ac97_bus_t *bus)
 {
 	if (bus) {
 		snd_ac97_bus_proc_done(bus);
+		if (bus->pcms)
+			kfree(bus->pcms);
 		if (bus->private_free)
 			bus->private_free(bus);
 		snd_magic_kfree(bus);
@@ -1666,6 +1668,7 @@ int snd_ac97_bus(snd_card_t * card, ac97_bus_t * _bus, ac97_bus_t ** rbus)
 	bus->card = card;
 	if (bus->clock == 0)
 		bus->clock = 48000;
+	spin_lock_init(&bus->bus_lock);
 	snd_ac97_bus_proc_init(bus);
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, bus, &ops)) < 0) {
 		snd_ac97_bus_free(bus);
@@ -1938,112 +1941,6 @@ int snd_ac97_mixer(ac97_bus_t * bus, ac97_t * _ac97, ac97_t ** rac97)
 	return 0;
 }
 
-/*
- *  PCM support
- */
-
-static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
-{
-	unsigned short old, bits, reg, mask;
-
-	if (! (ac97->ext_id & AC97_EI_SPDIF))
-		return -ENODEV;
-
-	if (ac97->flags & AC97_CS_SPDIF) {
-		switch (rate) {
-		case 48000: bits = 0; break;
-		case 44100: bits = 1 << AC97_SC_SPSR_SHIFT; break;
-		default: /* invalid - disable output */
-			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
-			return -EINVAL;
-		}
-		reg = AC97_CSR_SPDIF;
-		mask = 1 << AC97_SC_SPSR_SHIFT;
-	} else {
-		if (ac97->id == AC97_ID_CM9739 && rate != 48000) {
-			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
-			return -EINVAL;
-		}
-		switch (rate) {
-		case 44100: bits = AC97_SC_SPSR_44K; break;
-		case 48000: bits = AC97_SC_SPSR_48K; break;
-		case 32000: bits = AC97_SC_SPSR_32K; break;
-		default: /* invalid - disable output */
-			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
-			return -EINVAL;
-		}
-		reg = AC97_SPDIF;
-		mask = AC97_SC_SPSR_MASK;
-	}
-
-	spin_lock(&ac97->reg_lock);
-	old = ac97->regs[reg] & mask;
-	spin_unlock(&ac97->reg_lock);
-	if (old != bits) {
-		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
-		snd_ac97_update_bits(ac97, reg, mask, bits);
-	}
-	snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF);
-	return 0;
-}
-
-/**
- * snd_ac97_set_rate - change the rate of the given input/output.
- * @ac97: the ac97 instance
- * @reg: the register to change
- * @rate: the sample rate to set
- *
- * Changes the rate of the given input/output on the codec.
- * If the codec doesn't support VAR, the rate must be 48000 (except
- * for SPDIF).
- *
- * The valid registers are AC97_PMC_MIC_ADC_RATE,
- * AC97_PCM_FRONT_DAC_RATE, AC97_PCM_LR_ADC_RATE and AC97_SPDIF.
- * AC97_PCM_SURR_DAC_RATE and AC97_PCM_LFE_DAC_RATE are accepted
- * if the codec supports them.
- * The SPDIF register is a pseudo-register to change the rate of SPDIF
- * (only if supported).
- *
- * Returns zero if successful, or a negative error code on failure.
- */
-int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
-{
-	unsigned int tmp;
-	
-	switch (reg) {
-	case AC97_PCM_MIC_ADC_RATE:
-		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRM) == 0)	/* MIC VRA */
-			if (rate != 48000)
-				return -EINVAL;
-		break;
-	case AC97_PCM_FRONT_DAC_RATE:
-	case AC97_PCM_LR_ADC_RATE:
-		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRA) == 0)	/* VRA */
-			if (rate != 48000)
-				return -EINVAL;
-		break;
-	case AC97_PCM_SURR_DAC_RATE:
-		if (! (ac97->scaps & AC97_SCAP_SURROUND_DAC))
-			return -EINVAL;
-		break;
-	case AC97_PCM_LFE_DAC_RATE:
-		if (! (ac97->scaps & AC97_SCAP_CENTER_LFE_DAC))
-			return -EINVAL;
-		break;
-	case AC97_SPDIF:
-		return set_spdif_rate(ac97, rate);
-	default:
-		return -EINVAL;
-	}
-	tmp = ((unsigned int)rate * ac97->bus->clock) / 48000;
-	if (tmp > 65535)
-		return -EINVAL;
-	snd_ac97_update(ac97, reg, tmp & 0xffff);
-	snd_ac97_read(ac97, reg);
-	return 0;
-}
-
-
 #ifdef CONFIG_PM
 /**
  * snd_ac97_suspend - General suspend function for AC97 codec
@@ -2289,8 +2186,11 @@ EXPORT_SYMBOL(snd_ac97_update);
 EXPORT_SYMBOL(snd_ac97_update_bits);
 EXPORT_SYMBOL(snd_ac97_bus);
 EXPORT_SYMBOL(snd_ac97_mixer);
-EXPORT_SYMBOL(snd_ac97_set_rate);
+EXPORT_SYMBOL(snd_ac97_pcm_assign);
+EXPORT_SYMBOL(snd_ac97_pcm_open);
+EXPORT_SYMBOL(snd_ac97_pcm_close);
 EXPORT_SYMBOL(snd_ac97_tune_hardware);
+EXPORT_SYMBOL(snd_ac97_set_rate);
 #ifdef CONFIG_PM
 EXPORT_SYMBOL(snd_ac97_resume);
 #endif
