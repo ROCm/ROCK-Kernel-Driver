@@ -22,17 +22,20 @@ static struct subsys_attribute _name##_attr = __ATTR_RO(_name)
 static struct subsys_attribute _name##_attr = \
 	__ATTR(_name, 0644, _name##_show, _name##_store)
 
+#ifdef CONFIG_HOTPLUG
 static ssize_t hotplug_seqnum_show(struct subsystem *subsys, char *page)
 {
 	return sprintf(page, "%llu\n", hotplug_seqnum);
 }
 KERNEL_ATTR_RO(hotplug_seqnum);
-
+#endif
 
 static decl_subsys(kernel, NULL, NULL);
 
 static struct attribute * kernel_attrs[] = {
+#ifdef CONFIG_HOTPLUG
 	&hotplug_seqnum_attr.attr,
+#endif
 	NULL
 };
 
@@ -44,7 +47,8 @@ static int __init ksysfs_init(void)
 {
 	int error = subsystem_register(&kernel_subsys);
 	if (!error)
-		error = sysfs_create_group(&kernel_subsys.kset.kobj, &kernel_attr_group);
+		error = sysfs_create_group(&kernel_subsys.kset.kobj,
+					   &kernel_attr_group);
 
 	return error;
 }

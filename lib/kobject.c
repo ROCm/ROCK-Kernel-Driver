@@ -118,9 +118,9 @@ char * kobject_get_path(struct kset *kset, struct kobject *kobj, int gfp_mask)
 	return path;
 }
 
-u64 hotplug_seqnum;
 #ifdef CONFIG_HOTPLUG
 
+u64 hotplug_seqnum;
 #define BUFFER_SIZE	1024	/* should be enough memory for the env */
 #define NUM_ENVP	32	/* number of env pointers */
 static spinlock_t sequence_lock = SPIN_LOCK_UNLOCKED;
