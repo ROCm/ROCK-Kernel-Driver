@@ -533,15 +533,15 @@ fsyscall_table:
 	data8 fsys_fallback_syscall	// epoll_wait		// 1245
 	data8 fsys_fallback_syscall	// restart_syscall
 	data8 fsys_fallback_syscall	// semtimedop
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall				// 1250
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall
-	data8 fsys_fallback_syscall				// 1255
-	data8 fsys_fallback_syscall
+	data8 fsys_fallback_syscall	// timer_create
+	data8 fsys_fallback_syscall	// timer_settime
+	data8 fsys_fallback_syscall	// timer_gettime 	// 1250
+	data8 fsys_fallback_syscall	// timer_getoverrun
+	data8 fsys_fallback_syscall	// timer_delete
+	data8 fsys_fallback_syscall	// clock_settime
+	data8 fsys_fallback_syscall	// clock_gettime
+	data8 fsys_fallback_syscall	// clock_getres		// 1255
+	data8 fsys_fallback_syscall	// clock_nanosleep
 	data8 fsys_fallback_syscall
 	data8 fsys_fallback_syscall
 	data8 fsys_fallback_syscall
