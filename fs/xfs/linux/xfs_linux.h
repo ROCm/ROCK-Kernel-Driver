@@ -87,11 +87,15 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 	bh->b_end_io = linvfs_unwritten_done;
 }
 
-#define restricted_chown	xfs_params.restrict_chown
-#define irix_sgid_inherit	xfs_params.sgid_inherit
-#define irix_symlink_mode	xfs_params.symlink_mode
-#define xfs_panic_mask		xfs_params.panic_mask
-#define xfs_error_level		xfs_params.error_level
+#define xfs_refcache_size	xfs_params.refcache_size.val
+#define xfs_refcache_purge_count xfs_params.refcache_purge.val
+#define restricted_chown	xfs_params.restrict_chown.val
+#define irix_sgid_inherit	xfs_params.sgid_inherit.val
+#define irix_symlink_mode	xfs_params.symlink_mode.val
+#define xfs_panic_mask		xfs_params.panic_mask.val
+#define xfs_error_level		xfs_params.error_level.val
+#define xfs_syncd_interval	xfs_params.sync_interval.val
+#define xfs_stats_clear		xfs_params.stats_clear.val
 
 #define NBPP		PAGE_SIZE
 #define DPPSHFT		(PAGE_SHIFT - 9)
