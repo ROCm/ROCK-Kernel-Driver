@@ -18,6 +18,7 @@
 #include <linux/hash.h>
 #include <linux/swap.h>
 #include <linux/security.h>
+#include <linux/cdev.h>
 
 /*
  * This is needed for the following functions:
