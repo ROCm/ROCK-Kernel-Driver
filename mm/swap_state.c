@@ -14,7 +14,7 @@
 #include <linux/init.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
-#include <linux/buffer_head.h>	/* for block_sync_page()/block_flushpage() */
+#include <linux/buffer_head.h>	/* block_sync_page()/try_to_free_buffers() */
 
 #include <asm/pgtable.h>
 
@@ -150,11 +150,15 @@ void delete_from_swap_cache(struct page *page)
 {
 	swp_entry_t entry;
 
-	if (!PageLocked(page))
+	/*
+	 * I/O should have completed and nobody can have a ref against the
+	 * page's buffers
+	 */
+	BUG_ON(!PageLocked(page));
+	BUG_ON(PageWriteback(page));
+	if (page_has_buffers(page) && !try_to_free_buffers(page))
 		BUG();
-
-	block_flushpage(page, 0);
-
+  
 	entry.val = page->index;
 
 	write_lock(&swapper_space.page_lock);
@@ -219,7 +223,15 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 	void **pslot;
 	int err;
 
-	if (!PageLocked(page))
+	/*
+	 * Drop the buffers now, before taking the page_lock.  Because
+	 * mapping->private_lock nests outside mapping->page_lock.
+	 * This "must" succeed.  The page is locked and all I/O has completed
+	 * and nobody else has a ref against its buffers.
+	 */
+	BUG_ON(!PageLocked(page));
+	BUG_ON(PageWriteback(page));
+	if (page_has_buffers(page) && !try_to_free_buffers(page))
 		BUG();
 
 	write_lock(&swapper_space.page_lock);
@@ -229,10 +241,8 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 	if (!err) {
 		swp_entry_t entry;
 
-		block_flushpage(page, 0);
 		entry.val = page->index;
 		__delete_from_swap_cache(page);
-		swap_free(entry);
 
 		*pslot = page;
 		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
@@ -248,11 +258,16 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		/* fix that up */
 		list_del(&page->list);
 		list_add(&page->list, &mapping->dirty_pages);
+		write_unlock(&mapping->page_lock);
+		write_unlock(&swapper_space.page_lock);
+
+		/* Do this outside ->page_lock */
+		swap_free(entry);
+		return 0;
 	}
 
 	write_unlock(&mapping->page_lock);
 	write_unlock(&swapper_space.page_lock);
-
 	return err;
 }
 

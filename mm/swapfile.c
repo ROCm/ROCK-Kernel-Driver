@@ -16,7 +16,7 @@
 #include <linux/namei.h>
 #include <linux/shm.h>
 #include <linux/blkdev.h>
-#include <linux/buffer_head.h>		/* for block_flushpage() */
+#include <linux/buffer_head.h>		/* for try_to_free_buffers() */
 
 #include <asm/pgtable.h>
 #include <linux/swapops.h>
@@ -326,7 +326,9 @@ int remove_exclusive_swap_page(struct page *page)
 	swap_info_put(p);
 
 	if (retval) {
-		block_flushpage(page, 0);
+		BUG_ON(PageWriteback(page));
+		if (page_has_buffers(page) && !try_to_free_buffers(page))
+			BUG();
 		swap_free(entry);
 		page_cache_release(page);
 	}
