@@ -242,7 +242,7 @@ static int idescsi_end_request(struct ata_device *drive, struct request *rq, int
 		ide_end_request(drive, rq, uptodate);
 		return 0;
 	}
-	ide_end_drive_cmd(drive, rq, 0, 0);
+	ide_end_drive_cmd(drive, rq, 0);
 	if (rq->errors >= ERROR_MAX) {
 		pc->s.scsi_cmd->result = DID_ERROR << 16;
 		if (log)
@@ -286,7 +286,7 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 {
 	struct Scsi_Host *host = drive->driver_data;
 	idescsi_scsi_t *scsi = (idescsi_scsi_t *) host->hostdata[0];
-	byte status, ireason;
+	u8 ireason;
 	int bcount;
 	struct atapi_packet_command *pc=scsi->pc;
 	unsigned int temp;
@@ -303,13 +303,12 @@ static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request 
 		udma_stop(drive);
 	}
 
-	status = GET_STAT();						/* Clear the interrupt */
-
-	if ((status & DRQ_STAT) == 0) {					/* No more interrupts */
+	/* Clear the interrupt */
+	if (ata_status(drive, 0, DRQ_STAT)) {	/* No more interrupts */
 		if (test_bit(IDESCSI_LOG_CMD, &scsi->log))
 			printk (KERN_INFO "Packet command completed, %d bytes transferred\n", pc->actually_transferred);
 		ide__sti();
-		if (status & ERR_STAT)
+		if (drive->status & ERR_STAT)
 			rq->errors++;
 		idescsi_end_request(drive, rq, 1);
 		return ide_stopped;
@@ -411,7 +410,7 @@ static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request
 			dma_ok = !udma_read(drive, rq);
 	}
 
-	SELECT_DRIVE(drive->channel, drive);
+	ata_select(drive, 10);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE (drive->ctl,IDE_CONTROL_REG);
 	OUT_BYTE (dma_ok,IDE_FEATURE_REG);

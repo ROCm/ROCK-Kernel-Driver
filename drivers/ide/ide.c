@@ -258,21 +258,21 @@ static ide_startstop_t do_reset1(struct ata_device *, int); /* needed below */
 static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
 	struct ata_channel *ch = drive->channel;
-	u8 stat;
 
-	SELECT_DRIVE(ch,drive);
-	udelay (10);
+	ata_select(drive, 10);
 
-	if (OK_STAT(stat=GET_STAT(), 0, BUSY_STAT)) {
+	if (ata_status(drive, 0, BUSY_STAT))
 		printk("%s: ATAPI reset complete\n", drive->name);
-	} else {
+	else {
 		if (time_before(jiffies, ch->poll_timeout)) {
 			ide_set_handler (drive, atapi_reset_pollfunc, HZ/20, NULL);
+
 			return ide_started;	/* continue polling */
 		}
 		ch->poll_timeout = 0;	/* end of polling */
-		printk("%s: ATAPI reset timed out, status=0x%02x\n", drive->name, stat);
-		return do_reset1 (drive, 1);	/* do it the old fashioned way */
+		printk("%s: ATAPI reset timed out, status=0x%02x\n", drive->name, drive->status);
+
+		return do_reset1(drive, 1);	/* do it the old fashioned way */
 	}
 	ch->poll_timeout = 0;	/* done polling */
 
@@ -287,16 +287,18 @@ static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct req
 static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
 	struct ata_channel *ch = drive->channel;
-	u8 stat;
 
-	if (!OK_STAT(stat=GET_STAT(), 0, BUSY_STAT)) {
+	if (!ata_status(drive, 0, BUSY_STAT)) {
 		if (time_before(jiffies, ch->poll_timeout)) {
 			ide_set_handler(drive, reset_pollfunc, HZ/20, NULL);
+
 			return ide_started;	/* continue polling */
 		}
-		printk("%s: reset timed out, status=0x%02x\n", ch->name, stat);
+		printk("%s: reset timed out, status=0x%02x\n", ch->name, drive->status);
 		drive->failures++;
 	} else  {
+		u8 stat;
+
 		printk("%s: reset: ", ch->name);
 		if ((stat = GET_ERR()) == 1) {
 			printk("success\n");
@@ -360,8 +362,7 @@ static ide_startstop_t do_reset1(struct ata_device *drive, int do_not_try_atapi)
 	/* For an ATAPI device, first try an ATAPI SRST. */
 	if (drive->type != ATA_DISK && !do_not_try_atapi) {
 		check_crc_errors(drive);
-		SELECT_DRIVE(ch, drive);
-		udelay (20);
+		ata_select(drive, 20);
 		OUT_BYTE(WIN_SRST, IDE_COMMAND_REG);
 		ch->poll_timeout = jiffies + WAIT_WORSTCASE;
 		ide_set_handler(drive, atapi_reset_pollfunc, HZ/20, NULL);
@@ -430,20 +431,20 @@ static inline u32 read_24(struct ata_device *drive)
  *
  * Should be called under lock held.
  */
-void ide_end_drive_cmd(struct ata_device *drive, struct request *rq, u8 stat, u8 err)
+void ide_end_drive_cmd(struct ata_device *drive, struct request *rq, u8 err)
 {
 	if (rq->flags & REQ_DRIVE_CMD) {
 		u8 *args = rq->buffer;
-		rq->errors = !OK_STAT(stat, READY_STAT, BAD_STAT);
+		rq->errors = !ata_status(drive, READY_STAT, BAD_STAT);
 		if (args) {
-			args[0] = stat;
+			args[0] = drive->status;
 			args[1] = err;
 			args[2] = IN_BYTE(IDE_NSECTOR_REG);
 		}
 	} else if (rq->flags & REQ_DRIVE_ACB) {
 		struct ata_taskfile *args = rq->special;
 
-		rq->errors = !OK_STAT(stat, READY_STAT, BAD_STAT);
+		rq->errors = !ata_status(drive, READY_STAT, BAD_STAT);
 		if (args) {
 			args->taskfile.feature = err;
 			args->taskfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
@@ -451,7 +452,7 @@ void ide_end_drive_cmd(struct ata_device *drive, struct request *rq, u8 stat, u8
 			args->taskfile.low_cylinder = IN_BYTE(IDE_LCYL_REG);
 			args->taskfile.high_cylinder = IN_BYTE(IDE_HCYL_REG);
 			args->taskfile.device_head = IN_BYTE(IDE_SELECT_REG);
-			args->taskfile.command = stat;
+			args->taskfile.command = drive->status;
 			if ((drive->id->command_set_2 & 0x0400) &&
 			    (drive->id->cfs_enable_2 & 0x0400) &&
 			    (drive->addressing == 1)) {
@@ -641,7 +642,7 @@ ide_startstop_t ide_error(struct ata_device *drive, struct request *rq, const ch
 	/* retry only "normal" I/O: */
 	if (!(rq->flags & REQ_CMD)) {
 		rq->errors = 1;
-		ide_end_drive_cmd(drive, rq, stat, err);
+		ide_end_drive_cmd(drive, rq, err);
 		return ide_stopped;
 	}
 
@@ -664,8 +665,8 @@ ide_startstop_t ide_error(struct ata_device *drive, struct request *rq, const ch
 		if ((stat & DRQ_STAT) && rq_data_dir(rq) == READ)
 			try_to_flush_leftover_data(drive);
 	}
-	if (GET_STAT() & (BUSY_STAT|DRQ_STAT))
-		OUT_BYTE(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);	/* force an abort */
+	if (!ata_status(drive, 0, BUSY_STAT|DRQ_STAT))
+		OUT_BYTE(WIN_IDLEIMMEDIATE, IDE_COMMAND_REG);	/* force an abort */
 
 	if (rq->errors >= ERROR_MAX) {
 		if (ata_ops(drive) && ata_ops(drive)->end_request)
@@ -688,20 +689,19 @@ ide_startstop_t ide_error(struct ata_device *drive, struct request *rq, const ch
 static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *rq)
 {
 	u8 *args = rq->buffer;
-	u8 stat = GET_STAT();
 	int retries = 10;
 
 	ide__sti();	/* local CPU only */
-	if ((stat & DRQ_STAT) && args && args[3]) {
+	if (!ata_status(drive, 0, DRQ_STAT) && args && args[3]) {
 		ata_read(drive, &args[4], args[3] * SECTOR_WORDS);
 
-		while (((stat = GET_STAT()) & BUSY_STAT) && retries--)
+		while (!ata_status(drive, 0, BUSY_STAT) && retries--)
 			udelay(100);
 	}
 
-	if (!OK_STAT(stat, READY_STAT, BAD_STAT))
-		return ide_error(drive, rq, "drive_cmd", stat); /* already calls ide_end_drive_cmd */
-	ide_end_drive_cmd(drive, rq, stat, GET_ERR());
+	if (!ata_status(drive, READY_STAT, BAD_STAT))
+		return ide_error(drive, rq, "drive_cmd", drive->status); /* already calls ide_end_drive_cmd */
+	ide_end_drive_cmd(drive, rq, GET_ERR());
 
 	return ide_stopped;
 }
@@ -714,7 +714,7 @@ static void drive_cmd(struct ata_device *drive, u8 cmd, u8 nsect)
 	ide_set_handler(drive, drive_cmd_intr, WAIT_CMD, NULL);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
-	SELECT_MASK(drive->channel, drive, 0);
+	ata_mask(drive);
 	OUT_BYTE(nsect, IDE_NSECTOR_REG);
 	OUT_BYTE(cmd, IDE_COMMAND_REG);
 }
@@ -735,21 +735,21 @@ int ide_wait_stat(ide_startstop_t *startstop,
 		struct ata_device *drive, struct request *rq,
 		byte good, byte bad, unsigned long timeout)
 {
-	u8 stat;
 	int i;
 
 	/* bail early if we've exceeded max_failures */
 	if (drive->max_failures && (drive->failures > drive->max_failures)) {
 		*startstop = ide_stopped;
+
 		return 1;
 	}
 
 	udelay(1);	/* spec allows drive 400ns to assert "BUSY" */
-	if ((stat = GET_STAT()) & BUSY_STAT) {
+	if (!ata_status(drive, 0, BUSY_STAT)) {
 		timeout += jiffies;
-		while ((stat = GET_STAT()) & BUSY_STAT) {
+		while (!ata_status(drive, 0, BUSY_STAT)) {
 			if (time_after(jiffies, timeout)) {
-				*startstop = ide_error(drive, rq, "status timeout", stat);
+				*startstop = ide_error(drive, rq, "status timeout", drive->status);
 				return 1;
 			}
 		}
@@ -763,10 +763,10 @@ int ide_wait_stat(ide_startstop_t *startstop,
 	 */
 	for (i = 0; i < 10; i++) {
 		udelay(1);
-		if (OK_STAT((stat = GET_STAT()), good, bad))
+		if (ata_status(drive, good, bad))
 			return 0;
 	}
-	*startstop = ide_error(drive, rq, "status error", stat);
+	*startstop = ide_error(drive, rq, "status error", drive->status);
 
 	return 1;
 }
@@ -813,7 +813,7 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 	{
 		ide_startstop_t res;
 
-		SELECT_DRIVE(ch, drive);
+		ata_select(drive, 0);
 		if (ide_wait_stat(&res, drive, rq, drive->ready_stat,
 					BUSY_STAT|DRQ_STAT, WAIT_READY)) {
 			printk(KERN_WARNING "%s: drive not ready for command\n", drive->name);
@@ -905,7 +905,7 @@ args_error:
 #ifdef DEBUG
 	printk("%s: DRIVE_CMD (null)\n", drive->name);
 #endif
-	ide_end_drive_cmd(drive, rq, GET_STAT(), GET_ERR());
+	ide_end_drive_cmd(drive, rq, GET_ERR());
 
 	return ide_stopped;
 }
@@ -1279,7 +1279,7 @@ void ide_timer_expiry(unsigned long data)
 					startstop = ide_stopped;
 					dma_timeout_retry(drive, drive->rq);
 				} else
-					startstop = ide_error(drive, drive->rq, "irq timeout", GET_STAT());
+					startstop = ide_error(drive, drive->rq, "irq timeout", drive->status);
 			}
 			enable_irq(ch->irq);
 
@@ -1323,8 +1323,8 @@ static void unexpected_irq(int irq)
 	int i;
 
 	for (i = 0; i < MAX_HWIFS; ++i) {
-		u8 stat;
 		struct ata_channel *ch = &ide_hwifs[i];
+		struct ata_device *drive;
 
 		if (!ch->present)
 			continue;
@@ -1332,8 +1332,10 @@ static void unexpected_irq(int irq)
 		if (ch->irq != irq)
 			continue;
 
-		stat = IN_BYTE(ch->io_ports[IDE_STATUS_OFFSET]);
-		if (!OK_STAT(stat, READY_STAT, BAD_STAT)) {
+		/* FIXME: this is a bit weak */
+		drive = &ch->drives[0];
+
+		if (!ata_status(drive, READY_STAT, BAD_STAT)) {
 			/* Try to not flood the console with msgs */
 			static unsigned long last_msgtime;
 			static int count;
@@ -1342,7 +1344,7 @@ static void unexpected_irq(int irq)
 			if (time_after(jiffies, last_msgtime + HZ)) {
 				last_msgtime = jiffies;
 				printk("%s: unexpected interrupt, status=0x%02x, count=%d\n",
-						ch->name, stat, count);
+						ch->name, drive->status, count);
 			}
 		}
 	}

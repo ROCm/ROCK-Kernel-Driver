@@ -54,6 +54,12 @@
 #define AEC_IDE_ENABLE		0x4a
 #define AEC_UDMA_OLD		0x54
 
+#define AEC_BM_STAT_PCH		0x02
+#define AEC_BM_STAT_SCH		0x0a
+
+#define AEC_PLLCLK_ATA133	0x10
+#define AEC_CABLEPINS_INPUT	0x10
+
 static unsigned char aec_cyc2udma[17] = { 0, 0, 7, 6, 5, 4, 4, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1 };
 
 /*
@@ -146,6 +152,7 @@ static void aec62xx_tune_drive(struct ata_device *drive, unsigned char pio)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 static int aec62xx_dmaproc(struct ata_device *drive)
 {
+	u32 bmide = pci_resource_start(drive->channel->pci_dev, 4);
 	short speed;
 	int map;
 
@@ -155,7 +162,9 @@ static int aec62xx_dmaproc(struct ata_device *drive)
 		switch (drive->channel->pci_dev->device) {
 			case PCI_DEVICE_ID_ARTOP_ATP865R:
 			case PCI_DEVICE_ID_ARTOP_ATP865:
-				map |= XFER_UDMA_100 | XFER_UDMA_133;
+				/* Can't use these modes simultaneously,
+				   based on which PLL clock was chosen. */
+				map |= inb (bmide + AEC_BM_STAT_PCH) & AEC_PLLCLK_ATA133 ? XFER_UDMA_133 : XFER_UDMA_100;
 			case PCI_DEVICE_ID_ARTOP_ATP860R:
 			case PCI_DEVICE_ID_ARTOP_ATP860:
 				map |= XFER_UDMA_66;
@@ -172,10 +181,12 @@ static int aec62xx_dmaproc(struct ata_device *drive)
 /*
  * The initialization callback. Here we determine the IDE chip type
  * and initialize its drive independent registers.
+ * We return the IRQ assigned to the chip.
  */
 
 static unsigned int __init aec62xx_init_chipset(struct pci_dev *dev)
 {
+	u32 bmide = pci_resource_start(dev, 4);
 	unsigned char t;
 
 /*
@@ -202,8 +213,9 @@ static unsigned int __init aec62xx_init_chipset(struct pci_dev *dev)
 			/* Enable burst mode. */
 			pci_read_config_byte(dev, AEC_IDE_ENABLE, &t);
 			pci_write_config_byte(dev, AEC_IDE_ENABLE, t | 0x80);
-
 #endif
+			/* switch cable detection pins to input-only. */
+			outb (inb (bmide + AEC_BM_STAT_SCH) | AEC_CABLEPINS_INPUT, bmide + AEC_BM_STAT_SCH);
 	}
 
 /*
@@ -214,7 +226,7 @@ static unsigned int __init aec62xx_init_chipset(struct pci_dev *dev)
 	printk(KERN_INFO "AEC_IDE: %s (rev %02x) controller on pci%s\n",
 		dev->name, t, dev->slot_name);
 
-	return 0;
+	return dev->irq;
 }
 
 static unsigned int __init aec62xx_ata66_check(struct ata_channel *ch)

@@ -1864,7 +1864,7 @@ static int idetape_end_request(struct ata_device *drive, struct request *rq, int
 				idetape_increase_max_pipeline_stages (drive);
 		}
 	}
-	ide_end_drive_cmd(drive, rq, 0, 0);
+	ide_end_drive_cmd(drive, rq, 0);
 	if (remove_stage)
 		idetape_remove_stage_head (drive);
 	if (tape->active_data_request == NULL)
@@ -1991,7 +1991,8 @@ static ide_startstop_t idetape_pc_intr(struct ata_device *drive, struct request 
 		printk (KERN_INFO "ide-tape: Reached idetape_pc_intr interrupt handler\n");
 #endif
 
-	status.all = GET_STAT();					/* Clear the interrupt */
+	ata_status(drive, 0, 0);
+	status.all = drive->status;					/* Clear the interrupt */
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
@@ -2415,7 +2416,8 @@ static void idetape_media_access_finished(struct ata_device *drive, struct reque
 
 	if (tape->onstream)
 		printk(KERN_INFO "ide-tape: bug: onstream, media_access_finished\n");
-	status.all = GET_STAT();
+	ata_status(drive, 0, 0);
+	status.all = drive->status;
 	if (status.b.dsc) {
 		if (status.b.check) {					/* Error detected */
 			printk (KERN_ERR "ide-tape: %s: I/O error, ",tape->name);
@@ -2603,10 +2605,11 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 	tape->postponed_rq = NULL;
 
 	/*
-	 *	If the tape is still busy, postpone our request and service
-	 *	the other device meanwhile.
+	 * If the tape is still busy, postpone our request and service
+	 * the other device meanwhile.
 	 */
-	status.all = GET_STAT();
+	ata_status(drive, 0, 0);
+	status.all = drive->status;
 
 	/*
 	 * The OnStream tape drive doesn't support DSC. Assume

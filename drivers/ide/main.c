@@ -1293,6 +1293,7 @@ static int __init ata_module_init(void)
 	printk(KERN_INFO "ATA/ATAPI device driver v" VERSION "\n");
 
 	ide_devfs_handle = devfs_mk_dir(NULL, "ata", NULL);
+	devfs_mk_symlink(NULL, "ide", DEVFS_FL_DEFAULT, "ata", NULL, NULL);
 
 	/*
 	 * Because most of the ATA adapters represent the timings in unit of

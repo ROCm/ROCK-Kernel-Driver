@@ -39,10 +39,9 @@
  */
 ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
 {
-	u8 stat, dma_stat;
-
+	u8 dma_stat;
 	dma_stat = udma_stop(drive);
-	if (OK_STAT(stat = GET_STAT(),DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
+	if (ata_status(drive, DRIVE_READY, drive->bad_wstat | DRQ_STAT)) {
 		if (!dma_stat) {
 			__ide_end_request(drive, rq, 1, rq->nr_sectors);
 			return ide_stopped;
@@ -50,7 +49,7 @@ ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
 		printk(KERN_ERR "%s: dma_intr: bad DMA status (dma_stat=%x)\n",
 		       drive->name, dma_stat);
 	}
-	return ide_error(drive, rq, "dma_intr", stat);
+	return ide_error(drive, rq, "dma_intr", drive->status);
 }
 
 /*
@@ -130,8 +129,8 @@ static int dma_timer_expiry(struct ata_device *drive, struct request *rq)
 #endif
 
 	if (dma_stat & 2) {	/* ERROR */
-		u8 stat = GET_STAT();
-		return ide_error(drive, rq, "dma_timer_expiry", stat);
+		ata_status(drive, 0, 0);
+		return ide_error(drive, rq, "dma_timer_expiry", drive->status);
 	}
 	if (dma_stat & 1)	/* DMAing */
 		return WAIT_CMD;

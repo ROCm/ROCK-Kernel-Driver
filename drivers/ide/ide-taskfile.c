@@ -1,4 +1,5 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  *  Copyright (C) 2002		Marcin Dalecki <martin@dalecki.de>
  *  Copyright (C) 2000		Michael Cornwell <cornwell@acm.org>
  *  Copyright (C) 2000		Andre Hedrick <andre@linux-ide.org>
@@ -165,14 +166,15 @@ void ata_write(struct ata_device *drive, void *buffer, unsigned int wcount)
  */
 int drive_is_ready(struct ata_device *drive)
 {
-	byte stat = 0;
 	if (drive->waiting_for_dma)
 		return udma_irq_status(drive);
+
 #if 0
 	/* need to guarantee 400ns since last command was issued */
 	udelay(1);
 #endif
 
+	/* FIXME: promote this to the general status read method perhaps */
 #ifdef CONFIG_IDEPCI_SHARE_IRQ
 	/*
 	 * We do a passive status test under shared PCI interrupts on
@@ -181,12 +183,12 @@ int drive_is_ready(struct ata_device *drive)
 	 * about possible isa-pnp and pci-pnp issues yet.
 	 */
 	if (IDE_CONTROL_REG)
-		stat = GET_ALTSTAT();
+		drive->status = GET_ALTSTAT();
 	else
 #endif
-	stat = GET_STAT();	/* Note: this may clear a pending IRQ!! */
+	ata_status(drive, 0, 0);	/* Note: this may clear a pending IRQ!! */
 
-	if (stat & BUSY_STAT)
+	if (drive->status & BUSY_STAT)
 		return 0;	/* drive busy:  definitely not interrupting */
 
 	return 1;		/* drive ready: *might* be interrupting */
@@ -228,34 +230,36 @@ static ide_startstop_t pre_task_mulout_intr(struct ata_device *drive, struct req
 
 static ide_startstop_t task_mulout_intr(struct ata_device *drive, struct request *rq)
 {
-	u8 stat = GET_STAT();
+	int ok;
 	int mcount = drive->mult_count;
 	ide_startstop_t startstop;
 
+
 	/*
+	 * FIXME: the drive->status checks here seem to be messy.
+	 *
 	 * (ks/hs): Handle last IRQ on multi-sector transfer,
 	 * occurs after all data was sent in this chunk
 	 */
-	if (!rq->nr_sectors) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			startstop = ide_error(drive, rq, "task_mulout_intr", stat);
+
+	ok = ata_status(drive, DATA_READY, BAD_R_STAT);
+
+	if (!ok || !rq->nr_sectors) {
+		if (drive->status & (ERR_STAT | DRQ_STAT)) {
+			startstop = ide_error(drive, rq, __FUNCTION__, drive->status);
 
 			return startstop;
 		}
+	}
 
+	if (!rq->nr_sectors) {
 		__ide_end_request(drive, rq, 1, rq->hard_nr_sectors);
 		rq->bio = NULL;
 
 		return ide_stopped;
 	}
 
-	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
-		if (stat & (ERR_STAT | DRQ_STAT)) {
-			startstop = ide_error(drive, rq, "task_mulout_intr", stat);
-
-			return startstop;
-		}
-
+	if (!ok) {
 		/* no data yet, so wait for another interrupt */
 		if (!drive->channel->handler)
 			ide_set_handler(drive, task_mulout_intr, WAIT_CMD, NULL);
@@ -330,7 +334,7 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 	if (args->handler != task_mulout_intr) {
 		if (IDE_CONTROL_REG)
 			OUT_BYTE(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
-		SELECT_MASK(drive->channel, drive, 0);
+		ata_mask(drive);
 	}
 
 	if ((id->command_set_2 & 0x0400) &&
@@ -407,10 +411,9 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
  */
 ide_startstop_t recal_intr(struct ata_device *drive, struct request *rq)
 {
-	u8 stat;
+	if (!ata_status(drive, READY_STAT, BAD_STAT))
+		return ide_error(drive, rq, "recal_intr", drive->status);
 
-	if (!OK_STAT(stat = GET_STAT(),READY_STAT,BAD_STAT))
-		return ide_error(drive, rq, "recal_intr", stat);
 	return ide_stopped;
 }
 
@@ -419,19 +422,18 @@ ide_startstop_t recal_intr(struct ata_device *drive, struct request *rq)
  */
 ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
 {
-	u8 stat;
 	struct ata_taskfile *args = rq->special;
 
 	ide__sti();	/* local CPU only */
 
-	if (!OK_STAT(stat = GET_STAT(), READY_STAT, BAD_STAT)) {
+	if (!ata_status(drive, READY_STAT, BAD_STAT)) {
 		/* Keep quiet for NOP because it is expected to fail. */
 		if (args && args->taskfile.command != WIN_NOP)
-			return ide_error(drive, rq, "task_no_data_intr", stat);
+			return ide_error(drive, rq, "task_no_data_intr", drive->status);
 	}
 
 	if (args)
-		ide_end_drive_cmd(drive, rq, stat, GET_ERR());
+		ide_end_drive_cmd(drive, rq, GET_ERR());
 
 	return ide_stopped;
 }
@@ -441,42 +443,41 @@ ide_startstop_t task_no_data_intr(struct ata_device *drive, struct request *rq)
  */
 static ide_startstop_t task_in_intr(struct ata_device *drive, struct request *rq)
 {
-	u8 stat	= GET_STAT();
 	char *pBuf = NULL;
 	unsigned long flags;
 
-	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			return ide_error(drive, rq, "task_in_intr", stat);
-		}
-		if (!(stat & BUSY_STAT)) {
+	if (!ata_status(drive, DATA_READY, BAD_R_STAT)) {
+		if (drive->status & (ERR_STAT|DRQ_STAT))
+			return ide_error(drive, rq, __FUNCTION__, drive->status);
+
+		if (!(drive->status & BUSY_STAT)) {
 			DTF("task_in_intr to Soon wait for next interrupt\n");
 			ide_set_handler(drive, task_in_intr, WAIT_CMD, NULL);
+
 			return ide_started;
 		}
 	}
-	DTF("stat: %02x\n", stat);
+	DTF("stat: %02x\n", drive->status);
 	pBuf = ide_map_rq(rq, &flags);
 	DTF("Read: %p, rq->current_nr_sectors: %d\n", pBuf, (int) rq->current_nr_sectors);
 
 	ata_read(drive, pBuf, SECTOR_WORDS);
 	ide_unmap_rq(rq, pBuf, &flags);
 
-	/*
-	 * first segment of the request is complete. note that this does not
-	 * necessarily mean that the entire request is done!! this is only
-	 * true if ide_end_request() returns 0.
+	/* First segment of the request is complete. note that this does not
+	 * necessarily mean that the entire request is done!! this is only true
+	 * if ide_end_request() returns 0.
 	 */
+
 	if (--rq->current_nr_sectors <= 0) {
-		DTF("Request Ended stat: %02x\n", GET_STAT());
+		DTF("Request Ended stat: %02x\n", drive->status);
 		if (!ide_end_request(drive, rq, 1))
 			return ide_stopped;
 	}
 
-	/*
-	 * still data left to transfer
-	 */
+	/* still data left to transfer */
 	ide_set_handler(drive, task_in_intr,  WAIT_CMD, NULL);
+
 	return ide_started;
 }
 
@@ -511,18 +512,17 @@ static ide_startstop_t pre_task_out_intr(struct ata_device *drive, struct reques
  */
 static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *rq)
 {
-	u8 stat = GET_STAT();
 	char *pBuf = NULL;
 	unsigned long flags;
 
-	if (!OK_STAT(stat,DRIVE_READY,drive->bad_wstat))
-		return ide_error(drive, rq, "task_out_intr", stat);
+	if (!ata_status(drive, DRIVE_READY, drive->bad_wstat))
+		return ide_error(drive, rq, __FUNCTION__, drive->status);
 
 	if (!rq->current_nr_sectors)
 		if (!ide_end_request(drive, rq, 1))
 			return ide_stopped;
 
-	if ((rq->nr_sectors == 1) != (stat & DRQ_STAT)) {
+	if ((rq->nr_sectors == 1) != (drive->status & DRQ_STAT)) {
 		pBuf = ide_map_rq(rq, &flags);
 		DTF("write: %p, rq->current_nr_sectors: %d\n", pBuf, (int) rq->current_nr_sectors);
 
@@ -533,6 +533,7 @@ static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *r
 	}
 
 	ide_set_handler(drive, task_out_intr, WAIT_CMD, NULL);
+
 	return ide_started;
 }
 
@@ -541,14 +542,13 @@ static ide_startstop_t task_out_intr(struct ata_device *drive, struct request *r
  */
 static ide_startstop_t task_mulin_intr(struct ata_device *drive, struct request *rq)
 {
-	u8 stat;
 	char *pBuf = NULL;
 	unsigned int msect, nsect;
 	unsigned long flags;
 
-	if (!OK_STAT(stat = GET_STAT(),DATA_READY,BAD_R_STAT)) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			return ide_error(drive, rq, "task_mulin_intr", stat);
+	if (!ata_status(drive, DATA_READY, BAD_R_STAT)) {
+		if (drive->status & (ERR_STAT|DRQ_STAT)) {
+			return ide_error(drive, rq, __FUNCTION__, drive->status);
 		}
 		/* no data yet, so wait for another interrupt */
 		ide_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);

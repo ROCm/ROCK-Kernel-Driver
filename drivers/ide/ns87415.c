@@ -195,7 +195,7 @@ static void __init ide_init_ns87415(struct ata_channel *hwif)
 #ifdef __sparc_v9__
 		/*
 		 * XXX: Reset the device, if we don't it will not respond
-		 *      to SELECT_DRIVE() properly during first probe_hwif().
+		 *      to select properly during first probe.
 		 */
 		timeout = 10000;
 		outb(12, hwif->io_ports[IDE_CONTROL_OFFSET]);

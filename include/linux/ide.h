@@ -112,8 +112,6 @@ enum {
 #define GET_ALTSTAT()		IN_BYTE(IDE_CONTROL_REG)
 #define GET_FEAT()		IN_BYTE(IDE_NSECTOR_REG)
 
-#define OK_STAT(stat,good,bad)	(((stat)&((good)|(bad)))==(good))
-
 #define BAD_R_STAT		(BUSY_STAT   | ERR_STAT)
 #define BAD_W_STAT		(BAD_R_STAT  | WRERR_STAT)
 #define BAD_STAT		(BAD_R_STAT  | DRQ_STAT)
@@ -156,19 +154,6 @@ enum {
 #define WAIT_WORSTCASE	(30*HZ)		/* 30sec  - worst case when spinning up */
 #define WAIT_CMD	(10*HZ)		/* 10sec  - maximum wait for an IRQ to happen */
 #define WAIT_MIN_SLEEP	(2*HZ/100)	/* 20msec - minimum sleep time */
-
-#define SELECT_DRIVE(channel, drive)				\
-{								\
-	if (channel->selectproc)				\
-		channel->selectproc(drive);			\
-	OUT_BYTE((drive)->select.all, channel->io_ports[IDE_SELECT_OFFSET]); \
-}
-
-#define SELECT_MASK(channel, drive, mask)			\
-{								\
-	if (channel->maskproc)					\
-		channel->maskproc(drive,mask);			\
-}
 
 /*
  * Check for an interrupt and acknowledge the interrupt status
@@ -359,8 +344,12 @@ struct ata_device {
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned	addressing;	/* : 2; 0=28-bit, 1=48-bit, 2=64-bit */
 	byte		scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
+
 	select_t	select;		/* basic drive/head select reg value */
-	byte		ctl;		/* "normal" value for IDE_CONTROL_REG */
+
+	u8		ctl;		/* "normal" value for IDE_CONTROL_REG */
+	u8		status;		/* last retrived status value for device */
+
 	byte		ready_stat;	/* min status value for drive ready */
 	byte		mult_count;	/* current multiple sector setting */
 	byte		bad_wstat;	/* used for ignoring WRERR_STAT */
@@ -485,7 +474,7 @@ struct ata_channel {
 	void (*intrproc) (struct ata_device *);
 
 	/* special host masking for drive selection */
-	void (*maskproc) (struct ata_device *, int);
+	void (*maskproc) (struct ata_device *);
 
 	/* check host's drive quirk list */
 	int (*quirkproc) (struct ata_device *);
@@ -730,7 +719,7 @@ extern int ide_do_drive_cmd(struct ata_device *, struct request *, ide_action_t)
 /*
  * Clean up after success/failure of an explicit drive cmd.
  */
-extern void ide_end_drive_cmd(struct ata_device *, struct request *, u8, u8);
+extern void ide_end_drive_cmd(struct ata_device *, struct request *, u8);
 
 struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;
@@ -901,5 +890,11 @@ extern spinlock_t ide_lock;
 #define DRIVE_LOCK(drive)	((drive)->queue.queue_lock)
 
 extern int drive_is_ready(struct ata_device *drive);
+
+/* Low level device access functions. */
+
+extern void ata_select(struct ata_device *, unsigned long);
+extern void ata_mask(struct ata_device *);
+extern int ata_status(struct ata_device *, u8, u8);
 
 #endif

@@ -295,11 +295,10 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	struct ata_channel *hwif = drive->channel;
 	int i;
 	int error = 1;
-	u8 stat;
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
 	u8 unit = (drive->select.b.unit & 0x01);
-	outb(inb(hwif->dma_base+2) & ~(1<<(5+unit)), hwif->dma_base+2);
+	outb(inb(hwif->dma_base + 2) & ~(1 << (5 + unit)), hwif->dma_base + 2);
 #endif
 
 	/*
@@ -312,8 +311,8 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
          */
 	disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
 	udelay(1);
-	SELECT_DRIVE(drive->channel, drive);
-	SELECT_MASK(drive->channel, drive, 0);
+	ata_select(drive, 0);
+	ata_mask(drive);
 	udelay(1);
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl | 2, IDE_CONTROL_REG);
@@ -327,12 +326,12 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	/*
 	 * Wait for drive to become non-BUSY
 	 */
-	if ((stat = GET_STAT()) & BUSY_STAT) {
+	if (!ata_status(drive, 0, BUSY_STAT)) {
 		unsigned long flags, timeout;
 		__save_flags(flags);	/* local CPU only */
 		ide__sti();		/* local CPU only -- for jiffies */
 		timeout = jiffies + WAIT_CMD;
-		while ((stat = GET_STAT()) & BUSY_STAT) {
+		while (!ata_status(drive, 0, BUSY_STAT)) {
 			if (time_after(jiffies, timeout))
 				break;
 		}
@@ -348,18 +347,18 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	 */
 	for (i = 0; i < 10; i++) {
 		udelay(1);
-		if (OK_STAT((stat = GET_STAT()), DRIVE_READY, BUSY_STAT|DRQ_STAT|ERR_STAT)) {
+		if (ata_status(drive, DRIVE_READY, BUSY_STAT | DRQ_STAT | ERR_STAT)) {
 			error = 0;
 			break;
 		}
 	}
 
-	SELECT_MASK(drive->channel, drive, 0);
+	ata_mask(drive);
 
 	enable_irq(hwif->irq);
 
 	if (error) {
-		ide_dump_status(drive, NULL, "set_drive_speed_status", stat);
+		ide_dump_status(drive, NULL, "set_drive_speed_status", drive->status);
 		return error;
 	}
 
@@ -623,22 +622,23 @@ static int identify(struct ata_device *drive, u8 cmd)
 
 	mdelay(50);		/* wait for IRQ and DRQ_STAT */
 
-	if (OK_STAT(GET_STAT(),DRQ_STAT,BAD_R_STAT)) {
+	if (ata_status(drive, DRQ_STAT, BAD_R_STAT)) {
 		unsigned long flags;
-		__save_flags(flags);	/* local CPU only */
-		__cli();		/* local CPU only; some systems need this */
-		do_identify(drive, cmd); /* drive returned ID */
-		rc = 0;			/* drive responded with ID */
-		(void) GET_STAT();	/* clear drive IRQ */
-		__restore_flags(flags);	/* local CPU only */
+		__save_flags(flags);		/* local CPU only */
+		__cli();			/* local CPU only; some systems need this */
+		do_identify(drive, cmd);	/* drive returned ID */
+		rc = 0;				/* drive responded with ID */
+		ata_status(drive, 0, 0);	/* clear drive IRQ */
+		__restore_flags(flags);		/* local CPU only */
 	} else
 		rc = 2;			/* drive refused ID */
 
 out:
 	if (autoprobe) {
 		int irq;
+
 		OUT_BYTE(drive->ctl | 0x02, IDE_CONTROL_REG);	/* mask device irq */
-		GET_STAT();			/* clear drive IRQ */
+		ata_status(drive, 0, 0);			/* clear drive IRQ */
 		udelay(5);
 		irq = probe_irq_off(cookie);
 		if (!drive->channel->irq) {
@@ -684,43 +684,41 @@ static int do_probe(struct ata_device *drive, u8 cmd)
 		(cmd == WIN_IDENTIFY) ? "ATA" : "ATAPI");
 #endif
 	mdelay(50);	/* needed for some systems (e.g. crw9624 as drive0 with disk as slave) */
-	SELECT_DRIVE(ch, drive);
-	mdelay(50);
+	ata_select(drive, 50000);
 	select = IN_BYTE(IDE_SELECT_REG);
 	if (select != drive->select.all && !drive->present) {
 		if (drive->select.b.unit != 0) {
-			SELECT_DRIVE(ch, &ch->drives[0]);	/* exit with drive0 selected */
-			mdelay(50);		/* allow BUSY_STAT to assert & clear */
+			ata_select(&ch->drives[0], 50000);	/* exit with drive0 selected */
 		}
 		return 3;    /* no i/f present: mmm.. this should be a 4 -ml */
 	}
 
-	if (OK_STAT(GET_STAT(), READY_STAT, BUSY_STAT) || drive->present || cmd == WIN_PIDENTIFY)
-	{
+	if (ata_status(drive, READY_STAT, BUSY_STAT) || drive->present || cmd == WIN_PIDENTIFY)	{
 		if ((rc = identify(drive,cmd)))   /* send cmd and wait */
 			rc = identify(drive,cmd); /* failed: try again */
 		if (rc == 1 && cmd == WIN_PIDENTIFY && drive->autotune != 2) {
 			unsigned long timeout;
-			printk("%s: no response (status = 0x%02x), resetting drive\n", drive->name, GET_STAT());
+			printk("%s: no response (status = 0x%02x), resetting drive\n",
+					drive->name, drive->status);
 			mdelay(50);
-			OUT_BYTE (drive->select.all, IDE_SELECT_REG);
+			OUT_BYTE(drive->select.all, IDE_SELECT_REG);
 			mdelay(50);
 			OUT_BYTE(WIN_SRST, IDE_COMMAND_REG);
 			timeout = jiffies;
-			while ((GET_STAT() & BUSY_STAT) && time_before(jiffies, timeout + WAIT_WORSTCASE))
+			while (!ata_status(drive, 0, BUSY_STAT) && time_before(jiffies, timeout + WAIT_WORSTCASE))
 				mdelay(50);
 			rc = identify(drive, cmd);
 		}
 		if (rc == 1)
-			printk("%s: no response (status = 0x%02x)\n", drive->name, GET_STAT());
-		GET_STAT();		/* ensure drive irq is clear */
+			printk("%s: no response (status = 0x%02x)\n",
+					drive->name, drive->status);
+		ata_status(drive, 0, 0);	/* ensure drive irq is clear */
 	} else
 		rc = 3;				/* not present or maybe ATAPI */
 
 	if (drive->select.b.unit != 0) {
-		SELECT_DRIVE(ch, &ch->drives[0]);	/* exit with drive0 selected */
-		mdelay(50);
-		GET_STAT();		/* ensure drive irq is clear */
+		ata_select(&ch->drives[0], 50000);	/* exit with drive0 selected */
+		ata_status(drive, 0, 0);		/* ensure drive irq is clear */
 	}
 
 	return rc;
@@ -764,8 +762,7 @@ static void channel_probe(struct ata_channel *ch)
 			unsigned long timeout;
 
 			printk("%s: enabling %s -- ", drive->channel->name, drive->id->model);
-			SELECT_DRIVE(drive->channel, drive);
-			mdelay(50);
+			ata_select(drive, 50000);
 			OUT_BYTE(EXABYTE_ENABLE_NEST, IDE_COMMAND_REG);
 			timeout = jiffies + WAIT_WORSTCASE;
 			do {
@@ -774,10 +771,10 @@ static void channel_probe(struct ata_channel *ch)
 					return;
 				}
 				mdelay(50);
-			} while (GET_STAT() & BUSY_STAT);
+			} while (!ata_status(drive, 0, BUSY_STAT));
 			mdelay(50);
-			if (!OK_STAT(GET_STAT(), 0, BAD_STAT))
-				printk("failed (status = 0x%02x)\n", GET_STAT());
+			if (!ata_status(drive, 0, BAD_STAT))
+				printk("failed (status = 0x%02x)\n", drive->status);
 			else
 				printk("success\n");
 

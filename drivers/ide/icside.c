@@ -232,8 +232,9 @@ static iftype_t __init icside_identifyif (struct expansion_card *ec)
  * Handle routing of interrupts.  This is called before
  * we write the command to the drive.
  */
-static void icside_maskproc(struct ata_device *drive, int mask)
+static void icside_maskproc(struct ata_device *drive)
 {
+	const int mask = 0;
 	struct ata_channel *ch = drive->channel;
 	struct icside_state *state = ch->hw.priv;
 	unsigned long flags;
@@ -465,12 +466,9 @@ static int icside_dma_start(struct ata_device *drive, struct request *rq)
 static ide_startstop_t icside_dmaintr(struct ata_device *drive, struct request *rq)
 {
 	int dma_stat;
-	byte stat;
 
 	dma_stat = icside_dma_stop(drive);
-
-	stat = GET_STAT();			/* get drive status */
-	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
+	if (ata_status(drive, DRIVE_READY, drive->bad_wstat | DRQ_STAT)) {
 		if (!dma_stat) {
 			__ide_end_request(drive, rq, 1, rq->nr_sectors);
 			return ide_stopped;
@@ -478,7 +476,7 @@ static ide_startstop_t icside_dmaintr(struct ata_device *drive, struct request *
 		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n",
 		       drive->name, dma_stat);
 	}
-	return ide_error(drive, rq, "dma_intr", stat);
+	return ide_error(drive, rq, "dma_intr", drive->status);
 }
 
 static int
@@ -587,7 +585,8 @@ static int icside_irq_status(struct ata_device *drive)
 static void icside_dma_timeout(struct ata_device *drive)
 {
 	printk(KERN_ERR "ATA: %s: UDMA timeout occured:", drive->name);
-	ide_dump_status(drive, NULL, "UDMA timeout", GET_STAT());
+	ata_status(drive, 0, 0);
+	ide_dump_status(drive, NULL, "UDMA timeout", drive->status);
 }
 
 static void icside_irq_lost(struct ata_device *drive)

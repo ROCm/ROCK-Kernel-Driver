@@ -373,15 +373,13 @@ void __init ide_probe_for_pdc4030(void)
  */
 static ide_startstop_t promise_read_intr(struct ata_device *drive, struct request *rq)
 {
-	u8 stat;
 	int total_remaining;
 	unsigned int sectors_left, sectors_avail, nsect;
 	unsigned long flags;
 	char *to;
 
-	if (!OK_STAT(stat=GET_STAT(),DATA_READY,BAD_R_STAT)) {
-		return ide_error(drive, rq, "promise_read_intr", stat);
-	}
+	if (!ata_status(drive, DATA_READY, BAD_R_STAT))
+		return ide_error(drive, rq, "promise_read_intr", drive->status);
 
 read_again:
 	do {
@@ -427,10 +425,10 @@ read_next:
 	if (total_remaining > 0) {
 		if (sectors_avail)
 			goto read_next;
-		stat = GET_STAT();
-		if (stat & DRQ_STAT)
+		ata_status(drive, 0, 0);
+		if (drive->status & DRQ_STAT)
 			goto read_again;
-		if (stat & BUSY_STAT) {
+		if (drive->status & BUSY_STAT) {
 			ide_set_handler(drive, promise_read_intr, WAIT_CMD, NULL);
 #ifdef DEBUG_READ
 			printk(KERN_DEBUG "%s: promise_read: waiting for"
@@ -440,7 +438,7 @@ read_next:
 		}
 		printk(KERN_ERR "%s: Eeek! promise_read_intr: sectors left "
 		       "!DRQ !BUSY\n", drive->name);
-		return ide_error(drive, rq, "promise read intr", stat);
+		return ide_error(drive, rq, "promise read intr", drive->status);
 	}
 	return ide_stopped;
 }
@@ -457,7 +455,7 @@ static ide_startstop_t promise_complete_pollfunc(struct ata_device *drive, struc
 {
 	struct ata_channel *ch = drive->channel;
 
-	if (GET_STAT() & BUSY_STAT) {
+	if (!ata_status(drive, 0, BUSY_STAT)) {
 		if (time_before(jiffies, ch->poll_timeout)) {
 			ide_set_handler(drive, promise_complete_pollfunc, HZ/100, NULL);
 			return ide_started; /* continue polling... */
@@ -465,7 +463,7 @@ static ide_startstop_t promise_complete_pollfunc(struct ata_device *drive, struc
 		ch->poll_timeout = 0;
 		printk(KERN_ERR "%s: completion timeout - still busy!\n",
 		       drive->name);
-		return ide_error(drive, rq, "busy timeout", GET_STAT());
+		return ide_error(drive, rq, "busy timeout", drive->status);
 	}
 
 	ch->poll_timeout = 0;
@@ -543,7 +541,8 @@ static ide_startstop_t promise_write_pollfunc(struct ata_device *drive, struct r
 		}
 		ch->poll_timeout = 0;
 		printk(KERN_ERR "%s: write timed out!\n",drive->name);
-		return ide_error(drive, rq, "write timeout", GET_STAT());
+		ata_status(drive, 0, 0);
+		return ide_error(drive, rq, "write timeout", drive->status);
 	}
 
 	/*
@@ -554,7 +553,7 @@ static ide_startstop_t promise_write_pollfunc(struct ata_device *drive, struct r
 	ide_set_handler(drive, promise_complete_pollfunc, HZ/100, NULL);
 #ifdef DEBUG_WRITE
 	printk(KERN_DEBUG "%s: Done last 4 sectors - status = %02x\n",
-		drive->name, GET_STAT());
+		drive->name, drive->status);
 #endif
 	return ide_started;
 }
@@ -597,7 +596,7 @@ static ide_startstop_t promise_do_write(struct ata_device *drive, struct request
 		ide_set_handler(drive, promise_complete_pollfunc, HZ/100, NULL);
 #ifdef DEBUG_WRITE
 		printk(KERN_DEBUG "%s: promise_write: <= 4 sectors, "
-			"status = %02x\n", drive->name, GET_STAT());
+			"status = %02x\n", drive->name, drive->status);
 #endif
 		return ide_started;
 	}
@@ -612,7 +611,6 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 {
 	struct hd_drive_task_hdr *taskfile = &(args->taskfile);
 	unsigned long timeout;
-	byte stat;
 
 	/* Check that it's a regular command. If not, bomb out early. */
 	if (!(rq->flags & REQ_CMD)) {
@@ -623,7 +621,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
 
 	if (IDE_CONTROL_REG)
 		outb(drive->ctl, IDE_CONTROL_REG);  /* clear nIEN */
-	SELECT_MASK(drive->channel, drive, 0);
+	ata_mask(drive);
 
 	outb(taskfile->feature, IDE_FEATURE_REG);
 	outb(taskfile->sector_count, IDE_NSECTOR_REG);
@@ -649,8 +647,7 @@ ide_startstop_t do_pdc4030_io(struct ata_device *drive, struct ata_taskfile *arg
  */
 		timeout = jiffies + HZ/20; /* 50ms wait */
 		do {
-			stat=GET_STAT();
-			if (stat & DRQ_STAT) {
+			if (!ata_status(drive, 0, DRQ_STAT)) {
 				udelay(1);
 				return promise_read_intr(drive, rq);
 			}

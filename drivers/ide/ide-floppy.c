@@ -637,7 +637,7 @@ static int idefloppy_end_request(struct ata_device *drive, struct request *rq, i
 		return 0;
 	}
 	rq->errors = error;
-	ide_end_drive_cmd (drive, rq, 0, 0);
+	ide_end_drive_cmd (drive, rq, 0);
 
 	return 0;
 }
@@ -844,7 +844,8 @@ static ide_startstop_t idefloppy_pc_intr(struct ata_device *drive, struct reques
 	}
 #endif
 
-	status.all = GET_STAT();					/* Clear the interrupt */
+	ata_status(drive, 0, 0);
+	status.all = drive->status;					/* Clear the interrupt */
 
 	if (!status.b.drq) {						/* No more interrupts */
 #if IDEFLOPPY_DEBUG_LOG
@@ -1588,7 +1589,8 @@ static int idefloppy_get_format_progress(struct ata_device *drive,
 
 		__save_flags(flags);
 		__cli();
-		status.all=GET_STAT();
+		ata_status(drive, 0, 0);
+		status.all = drive->status;
 		__restore_flags(flags);
 
 		progress_indication= !status.b.dsc ? 0:0x10000;

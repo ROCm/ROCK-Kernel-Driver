@@ -395,21 +395,21 @@ wait_for_ready(struct ata_device *drive)
 {
 	/* Timeout bumped for some powerbooks */
 	int timeout = 2000;
-	byte stat;
 
-	while(--timeout) {
-		stat = GET_STAT();
-		if(!(stat & BUSY_STAT)) {
+	while (--timeout) {
+		if(ata_status(drive, 0, BUSY_STAT)) {
 			if (drive->ready_stat == 0)
 				break;
-			else if((stat & drive->ready_stat) || (stat & ERR_STAT))
+			else if((drive->status & drive->ready_stat)
+				|| (drive->status & ERR_STAT))
 				break;
 		}
 		mdelay(1);
 	}
-	if((stat & ERR_STAT) || timeout <= 0) {
-		if (stat & ERR_STAT) {
-			printk(KERN_ERR "ide_pmac: wait_for_ready, error status: %x\n", stat);
+	if((drive->status & ERR_STAT) || timeout <= 0) {
+		if (drive->status & ERR_STAT) {
+			printk(KERN_ERR "ide_pmac: wait_for_ready, error status: %x\n",
+				drive->status);
 		}
 		return 1;
 	}
@@ -417,7 +417,7 @@ wait_for_ready(struct ata_device *drive)
 }
 
 static int __pmac
-pmac_ide_do_setfeature(struct ata_device *drive, byte command)
+pmac_ide_do_setfeature(struct ata_device *drive, u8 command)
 {
 	int result = 1;
 	unsigned long flags;
@@ -425,11 +425,11 @@ pmac_ide_do_setfeature(struct ata_device *drive, byte command)
 
 	disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
 	udelay(1);
-	SELECT_DRIVE(drive->channel, drive);
-	SELECT_MASK(drive->channel, drive, 0);
+	ata_select(drive, 0);
+	ata_mask(drive);
 	udelay(1);
-	(void)GET_STAT(); /* Get rid of pending error state */
-	if(wait_for_ready(drive)) {
+	ata_status(drive, 0, 0); /* Get rid of pending error state */
+	if (wait_for_ready(drive)) {
 		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready before SET_FEATURE!\n");
 		goto out;
 	}
@@ -447,7 +447,7 @@ pmac_ide_do_setfeature(struct ata_device *drive, byte command)
 	if (result)
 		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready after SET_FEATURE !\n");
 out:
-	SELECT_MASK(drive->channel, drive, 0);
+	ata_mask(drive);
 	if (result == 0) {
 		drive->id->dma_ultra &= ~0xFF00;
 		drive->id->dma_mword &= ~0x0F00;
