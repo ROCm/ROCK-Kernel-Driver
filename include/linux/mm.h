@@ -631,6 +631,11 @@ extern void remove_shrinker(struct shrinker *shrinker);
  * the inlining and the symmetry break with pte_alloc_map() that does all
  * of this out-of-line.
  */
+/*
+ * The following ifdef needed to get the 4level-fixup.h header to work.
+ * Remove it when 4level-fixup.h has been removed.
+ */
+#ifndef __ARCH_HAS_4LEVEL_HACK 
 static inline pud_t *pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 {
 	if (pgd_none(*pgd))
@@ -644,6 +649,7 @@ static inline pmd_t *pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long a
 		return __pmd_alloc(mm, pud, address);
 	return pmd_offset(pud, address);
 }
+#endif
 
 extern void free_area_init(unsigned long * zones_size);
 extern void free_area_init_node(int nid, pg_data_t *pgdat,

@@ -12,6 +12,8 @@
  * the SpitFire page tables.
  */
 
+#include <asm-generic/4level-fixup.h>
+
 #include <linux/config.h>
 #include <asm/spitfire.h>
 #include <asm/asi.h>

@@ -1,6 +1,8 @@
 #ifndef _H8300_PGTABLE_H
 #define _H8300_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <asm/processor.h>
