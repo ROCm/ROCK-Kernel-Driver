@@ -63,7 +63,7 @@ int acpi_in_debugger;
 extern char line_buf[80];
 #endif /*ENABLE_DEBUGGER*/
 
-static int acpi_irq_irq;
+static unsigned int acpi_irq_irq;
 static OSD_HANDLER acpi_irq_handler;
 static void *acpi_irq_context;
 
@@ -241,23 +241,22 @@ acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 acpi_status
-acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
+acpi_os_install_interrupt_handler(u32 gsi, OSD_HANDLER handler, void *context)
 {
+	unsigned int irq;
+
 	/*
-	 * Ignore the irq from the core, and use the value in our copy of the
+	 * Ignore the GSI from the core, and use the value in our copy of the
 	 * FADT. It may not be the same if an interrupt source override exists
 	 * for the SCI.
 	 */
-	irq = acpi_fadt.sci_int;
-
-#if defined(CONFIG_IA64) || defined(CONFIG_PCI_USE_VECTOR)
-	irq = acpi_irq_to_vector(irq);
-	if (irq < 0) {
-		printk(KERN_ERR PREFIX "SCI (ACPI interrupt %d) not registered\n",
-		       acpi_fadt.sci_int);
+	gsi = acpi_fadt.sci_int;
+	if (acpi_gsi_to_irq(gsi, &irq) < 0) {
+		printk(KERN_ERR PREFIX "SCI (ACPI GSI %d) not registered\n",
+		       gsi);
 		return AE_OK;
 	}
-#endif
+
 	acpi_irq_handler = handler;
 	acpi_irq_context = context;
 	if (request_irq(irq, acpi_irq, SA_SHIRQ, "acpi", acpi_irq)) {
@@ -273,9 +272,6 @@ acpi_status
 acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
 {
 	if (irq) {
-#if defined(CONFIG_IA64) || defined(CONFIG_PCI_USE_VECTOR)
-		irq = acpi_irq_to_vector(irq);
-#endif
 		free_irq(irq, acpi_irq);
 		acpi_irq_handler = NULL;
 		acpi_irq_irq = 0;
