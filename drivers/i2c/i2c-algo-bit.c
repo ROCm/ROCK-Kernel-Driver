@@ -23,6 +23,8 @@
 
 /* $Id: i2c-algo-bit.c,v 1.44 2003/01/21 08:08:16 kmalkki Exp $ */
 
+/* #define DEBUG 1 */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -338,16 +340,14 @@ static int sendbytes(struct i2c_adapter *i2c_adap, struct i2c_msg *msg)
 
 	while (count > 0) {
 		c = *temp;
-		DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: %s sendbytes: writing %2.2X\n",
-			    i2c_adap->name, c&0xff));
+		DEB2(dev_dbg(&i2c_adap->dev, "sendbytes: writing %2.2X\n", c&0xff));
 		retval = i2c_outb(i2c_adap,c);
 		if ((retval>0) || (nak_ok && (retval==0)))  { /* ok or ignored NAK */
 			count--; 
 			temp++;
 			wrcount++;
 		} else { /* arbitration or no acknowledge */
-			printk(KERN_ERR "i2c-algo-bit.o: %s sendbytes: error - bailout.\n",
-			       i2c_adap->name);
+			dev_err(&i2c_adap->dev, "sendbytes: error - bailout.\n");
 			i2c_stop(adap);
 			return (retval<0)? retval : -EFAULT;
 			        /* got a better one ?? */
@@ -527,13 +527,12 @@ int i2c_bit_add_bus(struct i2c_adapter *adap)
 	struct i2c_algo_bit_data *bit_adap = adap->algo_data;
 
 	if (bit_test) {
-		int ret = test_bus(bit_adap, adap->name);
+		int ret = test_bus(bit_adap, adap->dev.name);
 		if (ret<0)
 			return -ENODEV;
 	}
 
-	DEB2(printk(KERN_DEBUG "i2c-algo-bit.o: hw routines for %s registered.\n",
-	            adap->name));
+	DEB2(dev_dbg(&adap->dev, "hw routines registered.\n"));
 
 	/* register new adapter to i2c module... */
 

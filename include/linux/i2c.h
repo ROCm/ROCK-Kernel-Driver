@@ -210,7 +210,6 @@ struct i2c_algorithm {
  */
 struct i2c_adapter {
 	struct module *owner;
-	char name[32];	/* some useful name to identify the adapter	*/
 	unsigned int id;/* == is algo->id | hwdep.struct->id, 		*/
 			/* for registered values see below		*/
 	struct i2c_algorithm *algo;/* the algorithm to access the bus	*/

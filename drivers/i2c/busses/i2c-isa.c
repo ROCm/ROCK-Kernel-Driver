@@ -39,9 +39,11 @@ static struct i2c_algorithm isa_algorithm = {
 /* There can only be one... */
 static struct i2c_adapter isa_adapter = {
 	.owner		= THIS_MODULE,
-	.name		= "ISA main adapter",
 	.id		= I2C_ALGO_ISA | I2C_HW_ISA,
 	.algo		= &isa_algorithm,
+	.dev		= {
+		.name	= "ISA main adapter",
+	},
 };
 
 static int __init i2c_isa_init(void)
