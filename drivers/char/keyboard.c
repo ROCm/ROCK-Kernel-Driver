@@ -894,9 +894,9 @@ static inline unsigned char getleds(void)
  * Aside from timing (which isn't really that important for
  * keyboard interrupts as they happen often), using the software
  * interrupt routines for this thing allows us to easily mask
- * this when we don't want any of the above to happen. Not yet
- * used, but this allows for easy and efficient race-condition
- * prevention later on.
+ * this when we don't want any of the above to happen.
+ * This allows for easy and efficient race-condition prevention
+ * for kbd_refresh_leds => input_event(dev, EV_LED, ...) => ...
  */
 
 static void kbd_bh(unsigned long dummy)
@@ -917,6 +917,22 @@ static void kbd_bh(unsigned long dummy)
 }
 
 DECLARE_TASKLET_DISABLED(keyboard_tasklet, kbd_bh, 0);
+
+/*
+ * This allows a newly plugged keyboard to pick the LED state.
+ */
+void kbd_refresh_leds(struct input_handle *handle)
+{
+	unsigned char leds = ledstate;
+
+	tasklet_disable(&keyboard_tasklet);
+	if (leds != 0xff) {
+		input_event(handle->dev, EV_LED, LED_SCROLLL, !!(leds & 0x01));
+		input_event(handle->dev, EV_LED, LED_NUML,    !!(leds & 0x02));
+		input_event(handle->dev, EV_LED, LED_CAPSL,   !!(leds & 0x04));
+	}
+	tasklet_enable(&keyboard_tasklet);
+}
 
 #if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_ALPHA) || defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64) || defined(CONFIG_PARISC)
 
@@ -1160,6 +1176,7 @@ static struct input_handle *kbd_connect(struct input_handler *handler,
 	handle->name = kbd_name;
 
 	input_open_device(handle);
+	kbd_refresh_leds(handle);
 
 	return handle;
 }
