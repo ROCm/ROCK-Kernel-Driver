@@ -21,7 +21,6 @@
  */
 
 #define	MEM_BASE	0x00000000	/* Memory base at address 0 */
-#define	MEM_SIZE	0x00400000	/* Memory size 4Mb */
 #define	VBR_BASE	MEM_BASE	/* Vector address */
 
 /*****************************************************************************/
@@ -78,9 +77,36 @@ _start:
 
 
 	/*
-	 *	Set to 4 meg for the Cadre III board (m5206e).
+	 *	SDRAM size for the Cadre III board (m5206e).
 	 */
+#if defined(CONFIG_RAMAUTO)
+	movea.l	#0x00000000,%a0
+	move.l	MCF_MBAR+MCFSIM_DCMR0,%d0
+	and.l	#0x00fe0000, %d0
+	beq	noaddr1
+	add.l	#0x00020000,%d0
+	move.l	%d0,%a0
+noaddr1:
+	move.l	MCF_MBAR+MCFSIM_DCMR1,%d0
+	and.l	#0x00fe0000, %d0
+	beq	noaddr2
+	add.l	#0x00020000,%d0
+	add.l	%d0,%a0
+noaddr2:
+
+#else
+
+#if defined(CONFIG_RAM32MB)
+#define MEM_SIZE	0x02000000	/* Memory size 32Mb */
+#elif defined(CONFIG_RAM16MB)
+#define MEM_SIZE	0x01000000	/* Memory size 16Mb */
+#elif defined(CONFIG_RAM8MB)
+#define MEM_SIZE	0x00800000	/* Memory size 8Mb */
+#else
+#define MEM_SIZE	0x00400000	/* Memory size 4Mb */
+#endif
 	move.l	#MEM_SIZE, %a0
+#endif
 
 	move.l	%a0, %d0			/* Mem end addr is in a0 */
 	move.l	%d0, %sp			/* Set up initial stack ptr */
