@@ -144,6 +144,14 @@ struct dmx_section_feed_s {
         int is_filtering; /* Set to non-zero when filtering in progress */ 
         struct dmx_demux_s* parent; /* Back-pointer */
         void* priv; /* Pointer to private data of the API client */ 
+
+        int check_crc;
+	u32 crc_val;
+
+        u8 secbuf[4096];
+        int secbufp;
+        int seclen;
+
         int (*set) (struct dmx_section_feed_s* feed, 
 		    __u16 pid, 
 		    size_t circular_buffer_size, 
@@ -162,16 +170,16 @@ typedef struct dmx_section_feed_s dmx_section_feed_t;
 /* Callback functions */ 
 /*--------------------------------------------------------------------------*/ 
 
-typedef int (*dmx_ts_cb) ( __u8 * buffer1, 
+typedef int (*dmx_ts_cb) ( const u8 * buffer1, 
 			   size_t buffer1_length,
-			   __u8 * buffer2, 
+			   const u8 * buffer2, 
 			   size_t buffer2_length,
 			   dmx_ts_feed_t* source, 
 			   dmx_success_t success); 
 
-typedef int (*dmx_section_cb) (	__u8 * buffer1,
+typedef int (*dmx_section_cb) (	const u8 * buffer1,
 				size_t buffer1_len,
-				__u8 * buffer2, 
+				const u8 * buffer2, 
 				size_t buffer2_len,
 			       	dmx_section_filter_t * source,
 			       	dmx_success_t success);
@@ -278,6 +286,9 @@ struct dmx_demux_s {
         int (*disconnect_frontend) (struct dmx_demux_s* demux); 
 
         int (*get_pes_pids) (struct dmx_demux_s* demux, __u16 *pids);
+
+        int (*get_stc) (struct dmx_demux_s* demux, unsigned int num,
+			uint64_t *stc, unsigned int *base);
 }; 
 typedef struct dmx_demux_s dmx_demux_t; 
 

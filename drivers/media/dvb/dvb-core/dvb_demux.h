@@ -25,6 +25,9 @@
 #ifndef _DVB_DEMUX_H_
 #define _DVB_DEMUX_H_
 
+#include <asm/semaphore.h>
+#include <linux/timer.h>
+
 #include "demux.h"
 
 #define DMX_TYPE_TS  0
@@ -59,6 +62,8 @@ struct dvb_demux_filter {
 };
 
 
+#define DMX_FEED_ENTRY(pos) list_entry(pos, struct dvb_demux_feed, list_head)
+
 struct dvb_demux_feed {
         union {
 	        dmx_ts_feed_t ts;
@@ -71,13 +76,13 @@ struct dvb_demux_feed {
 	} cb;
 
         struct dvb_demux *demux;
+	void *priv;
         int type;
         int state;
         u16 pid;
         u8 *buffer;
         int buffer_size;
         int descramble;
-        int check_crc;
 
         struct timespec timeout; 
         struct dvb_demux_filter *filter;
@@ -86,12 +91,11 @@ struct dvb_demux_feed {
         int ts_type;
         dmx_ts_pes_t pes_type;
 
-        u8 secbuf[4096];
-        int secbufp;
-        int seclen;
         int cc;
 
         u16 peslen;
+
+	struct list_head list_head;
 };
 
 struct dvb_demux {
@@ -99,10 +103,14 @@ struct dvb_demux {
         void *priv;
         int filternum;
         int feednum;
-        int (*start_feed)(struct dvb_demux_feed *);
-        int (*stop_feed)(struct dvb_demux_feed *);
-        int (*write_to_decoder)(struct dvb_demux_feed *, u8 *, size_t);
-
+        int (*start_feed) (struct dvb_demux_feed *feed);
+        int (*stop_feed) (struct dvb_demux_feed *feed);
+        int (*write_to_decoder) (struct dvb_demux_feed *feed,
+				 const u8 *buf, size_t len);
+	u32 (*check_crc32) (struct dvb_demux_feed *feed,
+			    const u8 *buf, size_t len);
+	void (*memcopy) (struct dvb_demux_feed *feed, u8 *dst,
+			 const u8 *src, size_t len);
   
         int users;
 #define MAX_DVB_DEMUX_USERS 10
@@ -117,7 +125,7 @@ struct dvb_demux {
         int recording; 
 
 #define DMX_MAX_PID 0x2000
-        struct dvb_demux_feed *pid2feed[DMX_MAX_PID+1];
+	struct list_head feed_list;
         u8 tsbuf[188];
         int tsbufp;
 
@@ -129,6 +137,7 @@ struct dvb_demux {
 int dvb_dmx_init(struct dvb_demux *dvbdemux);
 int dvb_dmx_release(struct dvb_demux *dvbdemux);
 void dvb_dmx_swfilter_packet(struct dvb_demux *dvbdmx, const u8 *buf);
-void dvb_dmx_swfilter_packets(struct dvb_demux *dvbdmx, const u8 *buf, int count);
+void dvb_dmx_swfilter_packets(struct dvb_demux *dvbdmx, const u8 *buf, size_t count);
+void dvb_dmx_swfilter(struct dvb_demux *demux, const u8 *buf, size_t count);
 
 #endif /* _DVB_DEMUX_H_ */

@@ -52,8 +52,10 @@ struct dvb_frontend {
 	int (*before_ioctl) (struct dvb_frontend *frontend, unsigned int cmd, void *arg);
 	int (*ioctl) (struct dvb_frontend *frontend, unsigned int cmd, void *arg);
 	int (*after_ioctl) (struct dvb_frontend *frontend, unsigned int cmd, void *arg);
+	void (*notifier_callback) (fe_status_t s, void *data);
 	struct dvb_i2c_bus *i2c;
 	void *before_after_data;   /*  can be used by hardware module... */
+	void *notifier_data;       /*  can be used by hardware module... */
 	void *data;                /*  can be used by hardware module... */
 };
 
