@@ -239,40 +239,28 @@ acpi_os_predefined_override (const struct acpi_predefined_names *init_val,
 static char *
 acpi_find_dsdt_initrd(void)
 {
-	static const char start_signature[] = "INITRDDSDT123DSDT123";
-	static const char end_signature[] =   "INITRDDSDT321DSDT321";
+	static const char signature[] = "INITRDDSDT123DSDT123";
 	char *dsdt_start = NULL;
 
 	if (initrd_start) {
-		char *dsdt_end = (char *)initrd_end - sizeof(end_signature);
-		char *data;
+		char *data = (char *)initrd_start;
 
 		printk(KERN_INFO PREFIX "Looking for DSDT in initrd...");
 
 		/* Search for the start signature */
-		for (data = (char *)initrd_start; data < dsdt_end; data++) {
-			if (!memcmp(data, start_signature, 
-				    sizeof(start_signature) - 1)) {
-				data += sizeof(start_signature);
+		while (data < (char *)initrd_end - sizeof(signature) - 4) {
+			if (!memcmp(data, signature, sizeof(signature) - 1)) {
+				data += sizeof(signature);
 				if (!memcmp(data, "DSDT", 4))
 					dsdt_start = data;
 				break;
 			}
+			data++;
 		}
-		if (dsdt_start != NULL) {
-			/* search for end signature in initrd
-			   This search is useful only for debug now that acpi 
-			   handle by itself the size of the table -eric */
-			while (dsdt_end > dsdt_start) {
-				if (!memcmp(dsdt_end, end_signature,
-					    sizeof(end_signature) - 1))
-					break;
-				dsdt_end--;
-			}
-			printk(" found at offset %zu with %zu bytes!\n",
-			       dsdt_start - (char *)initrd_start,
-			       dsdt_end - dsdt_start);
-		} else
+		if (dsdt_start != NULL)
+			printk(" found at offset %zu\n",
+			       dsdt_start - (char *)initrd_start);
+		else
 			printk(" not found!\n");
 	}
 	return dsdt_start;
