@@ -413,10 +413,6 @@ extern void ipt_unregister_target(struct ipt_target *target);
 extern int ipt_register_match(struct ipt_match *match);
 extern void ipt_unregister_match(struct ipt_match *match);
 
-extern struct ipt_target *
-__ipt_find_target_lock(const char *name, int *error);
-extern void __ipt_mutex_up(void);
-
 /* Furniture shopping... */
 struct ipt_table
 {
