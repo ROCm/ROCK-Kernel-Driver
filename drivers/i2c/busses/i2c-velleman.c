@@ -138,7 +138,7 @@ static int __init i2c_bitvelle_init(void)
 			return -ENODEV;
 		}
 	}
-	pr_debug("i2c-velleman: found device at %#x.\n",base);
+	pr_debug("i2c-velleman: found device at %#lx.\n",base);
 	return 0;
 }
 

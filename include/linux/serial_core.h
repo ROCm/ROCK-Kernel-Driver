@@ -84,6 +84,7 @@
 #include <linux/interrupt.h>
 #include <linux/circ_buf.h>
 #include <linux/spinlock.h>
+#include <linux/sched.h>
 
 struct uart_port;
 struct uart_info;

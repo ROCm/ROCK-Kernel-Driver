@@ -618,6 +618,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 		case IP_MSFILTER:
 		{
 			extern int sysctl_optmem_max;
+			extern int sysctl_igmp_max_msf;
 			struct ip_msfilter *msf;
 
 			if (optlen < IP_MSFILTER_SIZE(0))
@@ -636,9 +637,14 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				kfree(msf);
 				break;
 			}
-			if (IP_MSFILTER_SIZE(msf->imsf_numsrc) < 
-			    IP_MSFILTER_SIZE(0) ||
-			    IP_MSFILTER_SIZE(msf->imsf_numsrc) > optlen) {
+			/* numsrc >= (1G-4) overflow in 32 bits */
+			if (msf->imsf_numsrc >= 0x3ffffffcU ||
+			    msf->imsf_numsrc > sysctl_igmp_max_msf) {
+				kfree(msf);
+				err = -ENOBUFS;
+				break;
+			}
+			if (IP_MSFILTER_SIZE(msf->imsf_numsrc) > optlen) {
 				kfree(msf);
 				err = -EINVAL;
 				break;

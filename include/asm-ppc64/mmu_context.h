@@ -52,7 +52,7 @@ struct mmu_context_queue_t {
 	long head;
 	long tail;
 	long size;
-	mm_context_t elements[LAST_USER_CONTEXT];
+	mm_context_id_t elements[LAST_USER_CONTEXT];
 };
 
 extern struct mmu_context_queue_t mmu_context_queue;
@@ -83,7 +83,6 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 	long head;
 	unsigned long flags;
 	/* This does the right thing across a fork (I hope) */
-	unsigned long low_hpages = mm->context & CONTEXT_LOW_HPAGES;
 
 	spin_lock_irqsave(&mmu_context_queue.lock, flags);
 
@@ -93,8 +92,7 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 	}
 
 	head = mmu_context_queue.head;
-	mm->context = mmu_context_queue.elements[head];
-	mm->context |= low_hpages;
+	mm->context.id = mmu_context_queue.elements[head];
 
 	head = (head < LAST_USER_CONTEXT-1) ? head+1 : 0;
 	mmu_context_queue.head = head;
@@ -132,8 +130,7 @@ destroy_context(struct mm_struct *mm)
 #endif
 
 	mmu_context_queue.size++;
-	mmu_context_queue.elements[index] =
-		mm->context & ~CONTEXT_LOW_HPAGES;
+	mmu_context_queue.elements[index] = mm->context.id;
 
 	spin_unlock_irqrestore(&mmu_context_queue.lock, flags);
 }
@@ -211,8 +208,6 @@ static inline unsigned long
 get_vsid( unsigned long context, unsigned long ea )
 {
 	unsigned long ordinal, vsid;
-
-	context &= ~CONTEXT_LOW_HPAGES;
 
 	ordinal = (((ea >> 28) & 0x1fffff) * LAST_USER_CONTEXT) | context;
 	vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK;

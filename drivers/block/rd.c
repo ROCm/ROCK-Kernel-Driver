@@ -316,6 +316,7 @@ static void __exit rd_cleanup(void)
 		}
 		del_gendisk(rd_disks[i]);
 		put_disk(rd_disks[i]);
+		blk_cleanup_queue(rd_queue[i]);
 	}
 	devfs_remove("rd");
 	unregister_blkdev(RAMDISK_MAJOR, "ramdisk");
@@ -379,8 +380,10 @@ static int __init rd_init(void)
 out_queue:
 	unregister_blkdev(RAMDISK_MAJOR, "ramdisk");
 out:
-	while (i--)
+	while (i--) {
 		put_disk(rd_disks[i]);
+		blk_cleanup_queue(rd_queue[i]);
+	}
 	return err;
 }
 

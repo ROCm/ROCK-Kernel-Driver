@@ -28,7 +28,7 @@
 
 #include <linux/spinlock.h>
 
-#define CS_OWNER owner:
+#define CS_OWNER .owner =
 #define CS_THIS_MODULE THIS_MODULE,
 void cs46xx_null(struct pci_dev *pcidev) { return; }
 #define cs4x_mem_map_reserve(page) SetPageReserved(page)

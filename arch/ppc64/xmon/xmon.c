@@ -344,7 +344,7 @@ xmon(struct pt_regs *excp)
 #endif /* CONFIG_SMP */
 	set_msrd(msr);		/* restore interrupt enable */
 
-	return 0;
+	return 1;
 }
 
 int
