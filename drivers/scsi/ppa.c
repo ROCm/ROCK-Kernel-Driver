@@ -33,6 +33,7 @@ typedef struct {
 	unsigned int failed:1;	/* Failure flag                 */
 	unsigned wanted:1;	/* Parport sharing busy flag    */
 	wait_queue_head_t *waiting;
+	struct Scsi_Host *host;
 } ppa_struct;
 
 #include  "ppa.h"
@@ -42,7 +43,7 @@ static ppa_struct ppa_hosts[NO_HOSTS];
 
 static inline ppa_struct *ppa_dev(struct Scsi_Host *host)
 {
-	return &ppa_hosts[host->unique_id];
+	return *(ppa_struct **)&host->hostdata;
 }
 
 static spinlock_t arbitration_lock = SPIN_LOCK_UNLOCKED;
@@ -120,6 +121,7 @@ static int ppa_probe(ppa_struct *dev, struct parport *pb)
 	int err;
 	int modes, ppb, ppb_hi;
 
+	memset(dev, 0, sizeof(dev));
 	dev->base = -1;
 	dev->mode = PPA_AUTODETECT;
 	dev->recon_tmo = PPA_RECON_TMO;
@@ -197,7 +199,7 @@ static int ppa_probe(ppa_struct *dev, struct parport *pb)
 	INIT_WORK(&dev->ppa_tq, ppa_interrupt, dev);
 
 	err = -ENOMEM;
-	host = scsi_host_alloc(&ppa_template, 0);
+	host = scsi_host_alloc(&ppa_template, sizeof(ppa_struct *));
 	if (!host)
 		goto out;
 	list_add_tail(&host->sht_legacy_list, &ppa_template.legacy_hosts);
@@ -205,6 +207,8 @@ static int ppa_probe(ppa_struct *dev, struct parport *pb)
 	host->n_io_port = ports;
 	host->dma_channel = -1;
 	host->unique_id = dev - ppa_hosts;
+	*(ppa_struct **)&host->hostdata = dev;
+	dev->host = host;
 	err = scsi_add_host(host, NULL);
 	if (err)
 		goto out1;
