@@ -42,7 +42,6 @@
 struct hplance_private {
   struct lance_private lance;
   unsigned int scode;
-  void *base;
 };
 
 /* function prototypes... This is easy because all the grot is in the
@@ -91,15 +90,17 @@ struct net_device * __init hplance_probe(int unit)
         {
                 int scode = dio_find(DIO_ID_LAN);
                                 
-                if (!scode)
+                if (scode < 0)
                         break;
                 
 		dio_config_board(scode);
                 hplance_init(dev, scode);
 		if (!register_netdev(dev)) {
+#ifdef MODULE
 			struct hplance_private *lp = netdev_priv(dev);
 			lp->next_module = root_hplance_dev;
 			root_hplance_dev = lp;
+#endif
 			return dev;
 		}
 		cleanup_card(dev);
@@ -112,20 +113,24 @@ struct net_device * __init hplance_probe(int unit)
 static void __init hplance_init(struct net_device *dev, int scode)
 {
         const char *name = dio_scodetoname(scode);
-        void *va = dio_scodetoviraddr(scode);
+	unsigned long pa = dio_scodetophysaddr(scode);
+        unsigned long va = (pa + DIO_VIRADDRBASE);
         struct hplance_private *lp;
         int i;
         
-        printk("%s: %s; select code %d, addr", dev->name, name, scode);
+        printk(KERN_INFO "%s: %s; select code %d, addr", dev->name, name, scode);
 
         /* reset the board */
         out_8(va+DIO_IDOFF, 0xff);
         udelay(100);                              /* ariba! ariba! udelay! udelay! */
 
         /* Fill the dev fields */
-        dev->base_addr = (unsigned long)va;
+        dev->base_addr = va;
         dev->open = &hplance_open;
         dev->stop = &hplance_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+        dev->poll_controller = lance_poll;
+#endif
         dev->hard_start_xmit = &lance_start_xmit;
         dev->get_stats = &lance_get_stats;
         dev->set_multicast_list = &lance_set_multicast;
@@ -143,7 +148,7 @@ static void __init hplance_init(struct net_device *dev, int scode)
         
         lp = netdev_priv(dev);
         lp->lance.name = (char*)name;                   /* discards const, shut up gcc */
-        lp->lance.ll = (struct lance_regs *)(va + HPLANCE_REGOFF);
+        lp->lance.base = va;
         lp->lance.init_block = (struct lance_init_block *)(va + HPLANCE_MEMOFF); /* CPU addr */
         lp->lance.lance_init_block = 0;                 /* LANCE addr of same RAM */
         lp->lance.busmaster_regval = LE_C3_BSWP;        /* we're bigendian */
@@ -156,7 +161,6 @@ static void __init hplance_init(struct net_device *dev, int scode)
         lp->lance.rx_ring_mod_mask = RX_RING_MOD_MASK;
         lp->lance.tx_ring_mod_mask = TX_RING_MOD_MASK;
         lp->scode = scode;
-	lp->base = va;
 	printk(", irq %d\n", lp->lance.irq);
 }
 
@@ -165,53 +169,49 @@ static void __init hplance_init(struct net_device *dev, int scode)
  */
 static void hplance_writerap(void *priv, unsigned short value)
 {
-	struct hplance_private *lp = (struct hplance_private *)priv;
-        struct hplance_reg *hpregs = (struct hplance_reg *)lp->base;
-        do {
-                lp->lance.ll->rap = value;
-        } while ((hpregs->status & LE_ACK) == 0);
+	struct lance_private *lp = (struct lance_private *)priv;
+	do {
+		out_be16(lp->base + HPLANCE_REGOFF + LANCE_RAP, value);
+	} while ((in_8(lp->base + HPLANCE_STATUS) & LE_ACK) == 0);
 }
 
 static void hplance_writerdp(void *priv, unsigned short value)
 {
-	struct hplance_private *lp = (struct hplance_private *)priv;
-        struct hplance_reg *hpregs = (struct hplance_reg *)lp->base;
-        do {
-                lp->lance.ll->rdp = value;
-        } while ((hpregs->status & LE_ACK) == 0);
+	struct lance_private *lp = (struct lance_private *)priv;
+	do {
+		out_be16(lp->base + HPLANCE_REGOFF + LANCE_RDP, value);
+	} while ((in_8(lp->base + HPLANCE_STATUS) & LE_ACK) == 0);
 }
 
 static unsigned short hplance_readrdp(void *priv)
 {
-        unsigned short val;
-	struct hplance_private *lp = (struct hplance_private *)priv;
-        struct hplance_reg *hpregs = (struct hplance_reg *)lp->base;
-        do {
-                val = lp->lance.ll->rdp;
-        } while ((hpregs->status & LE_ACK) == 0);
-        return val;
+	struct lance_private *lp = (struct lance_private *)priv;
+	__u16 value;
+	do {
+		value = in_be16(lp->base + HPLANCE_REGOFF + LANCE_RDP);
+	} while ((in_8(lp->base + HPLANCE_STATUS) & LE_ACK) == 0);
+	return value;
 }
 
 static int hplance_open(struct net_device *dev)
 {
         int status;
-        struct hplance_private *lp = netdev_priv(dev);
-        struct hplance_reg *hpregs = (struct hplance_reg *)lp->base;
+        struct lance_private *lp = netdev_priv(dev);
         
         status = lance_open(dev);                 /* call generic lance open code */
         if (status)
                 return status;
         /* enable interrupts at board level. */
-        out_8(&(hpregs->status), LE_IE);
+        out_8(lp->base + HPLANCE_STATUS, LE_IE);
 
         return 0;
 }
 
 static int hplance_close(struct net_device *dev)
 {
-        struct hplance_private *lp = netdev_priv(dev);
-        struct hplance_reg *hpregs = (struct hplance_reg *)lp->base;
-        out_8(&(hpregs->status), 8);              /* disable interrupts at boardlevel */
+        struct lance_private *lp = netdev_priv(dev);
+
+        out_8(lp->base + HPLANCE_STATUS, 0);	/* disable interrupts at boardlevel */
         lance_close(dev);
         return 0;
 }
