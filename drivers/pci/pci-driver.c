@@ -199,6 +199,45 @@ static int pci_bus_match(struct device * dev, struct device_driver * drv)
 	return 0;
 }
 
+/**
+ * pci_get_dev - increments the reference count of the pci device structure
+ * @dev: the device being referenced
+ *
+ * Each live reference to a device should be refcounted.
+ *
+ * Drivers for PCI devices should normally record such references in
+ * their probe() methods, when they bind to a device, and release
+ * them by calling pci_put_dev(), in their disconnect() methods.
+ *
+ * A pointer to the device with the incremented reference counter is returned.
+ */
+struct pci_dev *pci_get_dev (struct pci_dev *dev)
+{
+	struct device *tmp;
+
+	if (!dev)
+		return NULL;
+
+	tmp = get_device(&dev->dev);
+	if (tmp)        
+		return to_pci_dev(tmp);
+	else
+		return NULL;
+}
+
+/**
+ * pci_put_dev - release a use of the pci device structure
+ * @dev: device that's been disconnected
+ *
+ * Must be called when a user of a device is finished with it.  When the last
+ * user of the device calls this function, the memory of the device is freed.
+ */
+void pci_put_dev(struct pci_dev *dev)
+{
+	if (dev)
+		put_device(&dev->dev);
+}
+
 struct bus_type pci_bus_type = {
 	.name		= "pci",
 	.match		= pci_bus_match,
@@ -217,3 +256,5 @@ EXPORT_SYMBOL(pci_register_driver);
 EXPORT_SYMBOL(pci_unregister_driver);
 EXPORT_SYMBOL(pci_dev_driver);
 EXPORT_SYMBOL(pci_bus_type);
+EXPORT_SYMBOL(pci_get_dev);
+EXPORT_SYMBOL(pci_put_dev);

@@ -556,6 +556,8 @@ void pci_read_bridge_bases(struct pci_bus *child);
 struct resource *pci_find_parent_resource(const struct pci_dev *dev, struct resource *res);
 int pci_setup_device(struct pci_dev *dev);
 int pci_get_interrupt_pin(struct pci_dev *dev, struct pci_dev **bridge);
+extern struct pci_dev *pci_get_dev(struct pci_dev *dev);
+extern void pci_put_dev(struct pci_dev *dev);
 
 /* Generic PCI functions exported to card drivers */
 

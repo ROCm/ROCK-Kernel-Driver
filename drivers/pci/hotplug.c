@@ -275,7 +275,7 @@ void pci_remove_bus_device(struct pci_dev *dev)
 	pci_proc_detach_device(dev);
 #endif
 
-	kfree(dev);
+	pci_put_dev(dev);
 }
 
 /**
