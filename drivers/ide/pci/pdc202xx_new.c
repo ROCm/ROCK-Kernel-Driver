@@ -234,62 +234,6 @@ static void pdcnew_new_reset (ide_drive_t *drive)
 		HWIF(drive)->channel ? "Secondary" : "Primary");
 }
 
-static void pdcnew_reset_host (ide_hwif_t *hwif)
-{
-//	unsigned long high_16	= hwif->dma_base - (8*(hwif->channel));
-	unsigned long high_16	= hwif->dma_master;
-	u8 udma_speed_flag	= hwif->INB(high_16|0x001f);
-
-	hwif->OUTB((udma_speed_flag | 0x10), (high_16|0x001f));
-	mdelay(100);
-	hwif->OUTB((udma_speed_flag & ~0x10), (high_16|0x001f));
-	mdelay(2000);	/* 2 seconds ?! */
-
-	printk(KERN_WARNING "PDC202XX: %s channel reset.\n",
-		hwif->channel ? "Secondary" : "Primary");
-}
-
-void pdcnew_reset (ide_drive_t *drive)
-{
-	ide_hwif_t *hwif	= HWIF(drive);
-	ide_hwif_t *mate	= hwif->mate;
-	
-	pdcnew_reset_host(hwif);
-	pdcnew_reset_host(mate);
-#if 0
-	/*
-	 * FIXME: Have to kick all the drives again :-/
-	 * What a pain in the ACE!
-	 */
-	if (hwif->present) {
-		u16 hunit = 0;
-		for (hunit = 0; hunit < MAX_DRIVES; ++hunit) {
-			ide_drive_t *hdrive = &hwif->drives[hunit];
-			if (hdrive->present) {
-				if (hwif->ide_dma_check)
-					hwif->ide_dma_check(hdrive);
-				else
-					hwif->tuneproc(hdrive, 5);
-			}
-		}
-	}
-	if (mate->present) {
-		u16 munit = 0;
-		for (munit = 0; munit < MAX_DRIVES; ++munit) {
-			ide_drive_t *mdrive = &mate->drives[munit];
-			if (mdrive->present) {
-				if (mate->ide_dma_check) 
-					mate->ide_dma_check(mdrive);
-				else
-					mate->tuneproc(mdrive, 5);
-			}
-		}
-	}
-#else
-	hwif->tuneproc(drive, 5);
-#endif
-}
-
 #ifdef CONFIG_PPC_PMAC
 static void __devinit apple_kiwi_init(struct pci_dev *pdev)
 {
