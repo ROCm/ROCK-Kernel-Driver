@@ -71,7 +71,8 @@ struct _snd_hdsp_firmware {
 	unsigned long firmware_data[24413];
 };
 
-#define SNDRV_HDSP_IOCTL_UPLOAD_FIRMWARE _IOW('H', 0x42, hdsp_firmware_t)
+/* This ioctl is marked bad because the type is bigger than the IOCTL description */
+#define SNDRV_HDSP_IOCTL_UPLOAD_FIRMWARE _IOW_BAD('H', 0x42, hdsp_firmware_t)
 
 typedef struct _snd_hdsp_version hdsp_version_t;
 
