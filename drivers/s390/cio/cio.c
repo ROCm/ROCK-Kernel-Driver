@@ -978,9 +978,9 @@ do_IRQ (struct pt_regs regs)
 		 */
 		if (tpi_info->adapter_IO == 1 &&
 		    tpi_info->int_type == IO_INTERRUPT_TYPE) {
-			irq_enter (cpu, -1);
+			irq_enter ();
 			do_adapter_IO (tpi_info->intparm);
-			irq_exit (cpu, -1);
+			irq_exit ();
 		} else {
 			unsigned int irq = tpi_info->irq;
 
@@ -1001,11 +1001,11 @@ do_IRQ (struct pt_regs regs)
 				return;
 			}
 
-			irq_enter (cpu, irq);
+			irq_enter ();
 			s390irq_spin_lock (irq);
 			s390_process_IRQ (irq);
 			s390irq_spin_unlock (irq);
-			irq_exit (cpu, irq);
+			irq_exit ();
 		}
 
 #ifdef CONFIG_FAST_IRQ

@@ -122,6 +122,16 @@ s390_request_irq (unsigned int irq,
 					 NULL, irqflags, devname, dev_id);
 }
 
+/*
+ * request_irq wrapper
+ */
+int
+request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+	    unsigned long irqflags, const char *devname, void *dev_id)
+{
+	return s390_request_irq(irq, handler, irqflags, devname, dev_id);
+}
+
 void
 s390_free_irq (unsigned int irq, void *dev_id)
 {
@@ -221,6 +231,15 @@ s390_free_irq (unsigned int irq, void *dev_id)
 				 irq);
 
 	}
+}
+
+/*
+ * free_irq wrapper.
+ */
+void
+free_irq(unsigned int irq, void *dev_id)
+{
+	s390_free_irq(irq, dev_id);
 }
 
 /*

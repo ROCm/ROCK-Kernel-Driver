@@ -596,21 +596,17 @@ ctc_tty_flush_buffer(struct tty_struct *tty)
 	ctc_tty_info *info;
 	unsigned long flags;
 
-#warning FIXME [kj] Consider using spinlocks.
-	save_flags(flags);
-	cli();
-	if (!tty) {
-		restore_flags(flags);
+	if (!tty)
 		return;
-	}
+	spin_lock_irqsave(&ctc_tty_lock, flags);
 	info = (ctc_tty_info *) tty->driver_data;
 	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_flush_buffer")) {
-		restore_flags(flags);
+		spin_unlock_irqrestore(&ctc_tty_lock, flags);
 		return;
 	}
 	skb_queue_purge(&info->tx_queue);
 	info->lsr |= UART_LSR_TEMT;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ctc_tty_lock, flags);
 	wake_up_interruptible(&tty->write_wait);
 	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
 	    tty->ldisc.write_wakeup)
@@ -689,10 +685,9 @@ ctc_tty_get_lsr_info(ctc_tty_info * info, uint * value)
 	uint result;
 	ulong flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ctc_tty_lock, flags);
 	status = info->lsr;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ctc_tty_lock, flags);
 	result = ((status & UART_LSR_TEMT) ? TIOCSER_TEMT : 0);
 	put_user(result, (uint *) value);
 	return 0;
@@ -708,10 +703,9 @@ ctc_tty_get_ctc_tty_info(ctc_tty_info * info, uint * value)
 	ulong flags;
 
 	control = info->mcr;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ctc_tty_lock, flags);
 	status = info->msr;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ctc_tty_lock, flags);
 	result = ((control & UART_MCR_RTS) ? TIOCM_RTS : 0)
 	    | ((control & UART_MCR_DTR) ? TIOCM_DTR : 0)
 	    | ((status & UART_MSR_DCD) ? TIOCM_CAR : 0)
@@ -942,11 +936,10 @@ ctc_tty_block_til_ready(struct tty_struct *tty, struct file *filp, ctc_tty_info 
 	printk(KERN_DEBUG "ctc_tty_block_til_ready before block: %s%d, count = %d\n",
 	       CTC_TTY_NAME, info->line, info->count);
 #endif
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ctc_tty_lock, flags);
 	if (!(tty_hung_up_p(filp)))
 		info->count--;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ctc_tty_lock, flags);
 	info->blocked_open++;
 	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -1053,16 +1046,14 @@ static void
 ctc_tty_close(struct tty_struct *tty, struct file *filp)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
-	unsigned long saveflags;
 	ulong flags;
 	ulong timeout;
 
 	if (!info || ctc_tty_paranoia_check(info, tty->device, "ctc_tty_close"))
 		return;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&ctc_tty_lock, flags);
 	if (tty_hung_up_p(filp)) {
-		restore_flags(flags);
+		spin_unlock_irqrestore(&ctc_tty_lock, flags);
 #ifdef CTC_DEBUG_MODEM_OPEN
 		printk(KERN_DEBUG "ctc_tty_close return after tty_hung_up_p\n");
 #endif
@@ -1086,7 +1077,7 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		info->count = 0;
 	}
 	if (info->count) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 #ifdef CTC_DEBUG_MODEM_OPEN
 		printk(KERN_DEBUG "ctc_tty_close after info->count != 0\n");
 #endif
@@ -1117,7 +1108,9 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		timeout = jiffies + HZ;
 		while (!(info->lsr & UART_LSR_TEMT)) {
 			set_current_state(TASK_INTERRUPTIBLE);
+			spin_unlock_irqrestore(&ctc_tty_lock, flags);
 			schedule_timeout(20);
+			spin_lock_irqsave(&ctc_tty_lock, flags);
 			if (time_after(jiffies,timeout))
 				break;
 		}
@@ -1127,9 +1120,7 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		tty->driver.flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
-	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	info->tty = 0;
-	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 	tty->closing = 0;
 	if (info->blocked_open) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -1138,7 +1129,7 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 	}
 	info->flags &= ~(CTC_ASYNC_NORMAL_ACTIVE | CTC_ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ctc_tty_lock, flags);
 #ifdef CTC_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "ctc_tty_close normal exit\n");
 #endif

@@ -2219,7 +2219,7 @@ hwc_interrupt_handler (struct pt_regs *regs, __u16 code)
 
 	u32 ext_int_param = hwc_ext_int_param ();
 
-	irq_enter (cpu, 0x2401);
+	irq_enter ();
 
 	if (hwc_data.flags & HWC_INIT) {
 
@@ -2240,7 +2240,7 @@ hwc_interrupt_handler (struct pt_regs *regs, __u16 code)
 		hwc_do_interrupt (ext_int_param);
 		spin_unlock (&hwc_data.lock);
 	}
-	irq_exit (cpu, 0x2401);
+	irq_exit ();
 }
 
 void 

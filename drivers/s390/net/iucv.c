@@ -302,7 +302,7 @@ iucv_dumpit(char *title, void *buf, int len)
 	if (debuglevel < 3)
 		return;
 
-	printk(KERN_DEBUG __FUNCTION__ ": %s\n", title);
+	printk(KERN_DEBUG "%s\n", title);
 	printk("  ");
 	for (i = 0; i < len; i++) {
 		if (!(i % 16) && i != 0)
@@ -318,7 +318,7 @@ iucv_dumpit(char *title, void *buf, int len)
 #define iucv_debug(lvl, fmt, args...) \
 do { \
 	if (debuglevel >= lvl) \
-		printk(KERN_DEBUG __FUNCTION__ ": " fmt "\n" , ## args); \
+		printk(KERN_DEBUG "%s: " fmt "\n", __FUNCTION__ , ## args); \
 } while (0)
 
 #else
@@ -2183,14 +2183,13 @@ static void
 iucv_irq_handler(struct pt_regs *regs, __u16 code)
 {
 	iucv_irqdata *irqdata;
-	int          cpu = smp_processor_id();
 
-	irq_enter(cpu, 0x4000);
+	irq_enter();
 
 	irqdata = kmalloc(sizeof(iucv_irqdata), GFP_ATOMIC);
 	if (!irqdata) {
 		printk(KERN_WARNING "%s: out of memory\n", __FUNCTION__);
-		irq_exit(cpu, 0x4000);
+		irq_exit();
 		return;
 	}
 
@@ -2206,7 +2205,7 @@ iucv_irq_handler(struct pt_regs *regs, __u16 code)
 		mark_bh(IMMEDIATE_BH);
 	}
 
-	irq_exit(cpu, 0x4000);
+	irq_exit();
 	return;
 }
 

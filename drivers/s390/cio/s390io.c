@@ -209,6 +209,15 @@ s390_init_IRQ (void)
 }
 
 /*
+ * init_IRQ wrapper
+ */
+void __init
+init_IRQ(void)
+{
+	s390_init_IRQ();
+}
+
+/*
  * dummy handler, used during init_IRQ() processing for compatibility only
  */
 static void
