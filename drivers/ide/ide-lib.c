@@ -300,7 +300,7 @@ static int ide_scan_pio_blacklist (char *model)
 }
 
 /**
- *	ide_get_best_pio_mode	-	get PIO mode fro drive
+ *	ide_get_best_pio_mode	-	get PIO mode from drive
  *	@driver: drive to consider
  *	@mode_wanted: preferred mode
  *	@max_mode: highest allowed
@@ -387,6 +387,15 @@ u8 ide_get_best_pio_mode (ide_drive_t *drive, u8 mode_wanted, u8 max_mode, ide_p
 
 EXPORT_SYMBOL_GPL(ide_get_best_pio_mode);
 
+/**
+ *	ide_toggle_bounce	-	handle bounce buffering
+ *	@drive: drive to update
+ *	@on: on/off boolean
+ *
+ *	Enable or disable bounce buffering for the device. Drives move
+ *	between PIO and DMA and that changes the rules we need.
+ */
+ 
 void ide_toggle_bounce(ide_drive_t *drive, int on)
 {
 	u64 addr = BLK_BOUNCE_HIGH;	/* dma64_addr_t */
@@ -402,3 +411,28 @@ void ide_toggle_bounce(ide_drive_t *drive, int on)
 }
 
 EXPORT_SYMBOL(ide_toggle_bounce);
+
+/**
+ *	ide_set_xfer_rate	-	set transfer rate
+ *	@drive: drive to set
+ *	@speed: speed to attempt to set
+ *	
+ *	General helper for setting the speed of an IDE device. This
+ *	function knows about user enforced limits from the configuration
+ *	which speedproc() does not.  High level drivers should never
+ *	invoke speedproc() directly.
+ */
+ 
+int ide_set_xfer_rate(ide_drive_t *drive, u8 rate)
+{
+#ifndef CONFIG_BLK_DEV_IDEDMA
+	rate = min(rate, (u8) XFER_PIO_4);
+#endif
+	if(HWIF(drive)->speedproc)
+		return HWIF(drive)->speedproc(drive, rate);
+	else
+		return -1;
+}
+
+EXPORT_SYMBOL_GPL(ide_set_xfer_rate);
+

@@ -403,7 +403,7 @@ static void
 setva(struct PStack *st, unsigned int nr)
 {
 	struct Layer2 *l2 = &st->l2;
-	int len;
+	struct sk_buff *skb;
 
 	while (l2->va != nr) {
 		(l2->va)++;
@@ -411,14 +411,11 @@ setva(struct PStack *st, unsigned int nr)
 			l2->va %= 128;
 		else
 			l2->va %= 8;
-		len = l2->windowar[l2->sow]->len;
-		if (PACKET_NOACK == l2->windowar[l2->sow]->pkt_type)
-			len = -1;
-		dev_kfree_skb(l2->windowar[l2->sow]);
+		skb = l2->windowar[l2->sow];
 		l2->windowar[l2->sow] = NULL;
 		l2->sow = (l2->sow + 1) % l2->window;
-		if (st->lli.l2writewakeup && (len >=0))
-			st->lli.l2writewakeup(st, len);
+		
+		L2L3(st, DL_DATA | CONFIRM, skb);
 	}
 }
 
@@ -1685,6 +1682,9 @@ isdnl2_l1l2(struct PStack *st, int pr, void *arg)
 			}
 			if (ret)
 				FreeSkb(skb);
+			break;
+		case (PH_DATA | CONFIRM):
+			dev_kfree_skb(skb);
 			break;
 		case (PH_PULL | CONFIRM):
 			FsmEvent(&st->l2.l2m, EV_L2_ACK_PULL, arg);

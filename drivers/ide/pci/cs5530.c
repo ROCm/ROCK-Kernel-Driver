@@ -135,8 +135,6 @@ static void cs5530_tuneproc (ide_drive_t *drive, u8 pio)	/* pio=255 means "autot
 	}
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
-
 /**
  *	cs5530_config_dma	-	select/set DMA and UDMA modes
  *	@drive: drive to tune
@@ -256,7 +254,6 @@ static int cs5530_config_dma (ide_drive_t *drive)
 	 */
 	return hwif->ide_dma_on(drive);	/* success */
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /**
  *	init_chipset_5530	-	set up 5530 bridge
@@ -396,13 +393,11 @@ static void __init init_hwif_cs5530 (ide_hwif_t *hwif)
 	hwif->ultra_mask = 0x07;
 	hwif->mwdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_check = &cs5530_config_dma;
 	if (!noautodma)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 /**

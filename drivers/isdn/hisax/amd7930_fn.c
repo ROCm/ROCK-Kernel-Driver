@@ -268,18 +268,6 @@ Amd7930_bh(void *data)
 }
 
 
-void
-Amd7930_sched_event(struct IsdnCardState *cs, int event) // ok
-{
-
-	if (cs->debug & L1_DEB_ISAC) {
-		debugl1(cs, "AMD7930: sched_event 0x%X", event);
-        }
-
-        test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->work);
-}
-
 static void
 Amd7930_empty_Dfifo(struct IsdnCardState *cs, int flag)
 {
@@ -339,7 +327,7 @@ Amd7930_empty_Dfifo(struct IsdnCardState *cs, int flag)
                                 /* throw damaged packets away, reset recieve-buffer, indicate RX */
 				ptr = cs->rcvbuf;
 				cs->rcvidx = 0;
-				Amd7930_sched_event(cs, D_RCVBUFREADY);
+				sched_d_event(cs, D_RCVBUFREADY);
 			}
                 }
 		/* Packet to long, overflow */
@@ -455,7 +443,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				Amd7930_sched_event(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
                         /* restart frame */
                         if (cs->tx_skb) {
 				skb_push(cs->tx_skb, cs->tx_cnt);
@@ -473,7 +461,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
 		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			Amd7930_sched_event(cs, D_CLEARBUSY);
+			sched_d_event(cs, D_CLEARBUSY);
                 /* restart TX-Frame */
                 if (cs->tx_skb) {
 			skb_push(cs->tx_skb, cs->tx_cnt);
@@ -494,7 +482,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
                 if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			Amd7930_sched_event(cs, D_CLEARBUSY);
+			sched_d_event(cs, D_CLEARBUSY);
 		if (cs->tx_skb) {
 			if (cs->tx_skb->len)
 				Amd7930_fill_Dfifo(cs);
@@ -523,7 +511,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
                 if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			Amd7930_sched_event(cs, D_CLEARBUSY);
+			sched_d_event(cs, D_CLEARBUSY);
 
                 if (cs->tx_skb) {
         		if (cs->debug & L1_DEB_ISAC)
@@ -541,7 +529,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
 			Amd7930_fill_Dfifo(cs);
 		}
                 else
-			Amd7930_sched_event(cs, D_XMTBUFREADY);
+			sched_d_event(cs, D_XMTBUFREADY);
 		/* AMD interrupts on */
                 AmdIrqOn(cs);
         }
@@ -556,7 +544,7 @@ void Amd7930_interrupt(struct IsdnCardState *cs, u8 irflags)
 
 		cs->dc.amd7930.ph_state = (lsr & 0x7) + 2;
 
-		Amd7930_sched_event(cs, D_L1STATECHANGE);
+		sched_d_event(cs, D_L1STATECHANGE);
 		/* AMD interrupts on */
                 AmdIrqOn(cs);
 	}
@@ -662,7 +650,7 @@ Amd7930_l1hw(struct PStack *st, int pr, void *arg)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				Amd7930_sched_event(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			break;
 		default:
 			if (cs->debug & L1_DEB_WARN)

@@ -179,10 +179,7 @@ avm_a1p_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u_char val, sval;
 
-	if (!cs) {
-		printk(KERN_WARNING "AVM A1 PCMCIA: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	while ((sval = (~bytein(cs->hw.avm.cfg_reg+ASL0_OFFSET) & ASL0_R_IRQPENDING))) {
 		if (cs->debug & L1_DEB_INTSTAT)
 			debugl1(cs, "avm IntStatus %x", sval);
@@ -203,6 +200,7 @@ avm_a1p_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	WriteISAC(cs, ISAC_MASK, 0x00);
 	WriteHSCX(cs, 0, HSCX_MASK, 0x00);
 	WriteHSCX(cs, 1, HSCX_MASK, 0x00);
+	spin_unlock(&cs->lock);
 }
 
 static int
@@ -224,10 +222,7 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 
 		case CARD_INIT:
 			byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,ASL0_W_TDISABLE|ASL0_W_TRESET|ASL0_W_IRQENABLE);
-			clear_pending_isac_ints(cs);
-			clear_pending_hscx_ints(cs);
-			inithscxisac(cs, 1);
-			inithscxisac(cs, 2);
+			inithscxisac(cs);
 			return 0;
 
 		case CARD_TEST:

@@ -26,7 +26,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptscsih.c,v 1.102 2002/10/03 13:10:14 pdelaney Exp $
+ *  $Id: mptscsih.c,v 1.103 2002/10/17 20:15:59 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -78,6 +78,9 @@
 #include <linux/reboot.h>	/* notifier code */
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,45)
+#include "../../scsi/sd.h"
+#endif
 
 #include "mptbase.h"
 #include "mptscsih.h"
@@ -198,7 +201,7 @@ static int	mptscsih_synchronize_cache(MPT_SCSI_HOST *hd, int portnum);
 static int	mptscsih_do_raid(MPT_SCSI_HOST *hd, u8 action, INTERNAL_CMD *io);
 static void	mptscsih_domainValidation(void *hd);
 static int	mptscsih_is_phys_disk(MPT_ADAPTER *ioc, int id);
-static void	mptscsih_qas_check(MPT_SCSI_HOST *hd);
+static void	mptscsih_qas_check(MPT_SCSI_HOST *hd, int id);
 static int	mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int target);
 static void	mptscsih_dv_parms(MPT_SCSI_HOST *hd, DVPARAMETERS *dv,void *pPage);
 static void	mptscsih_fillbuf(char *buffer, int size, int index, int width);
@@ -399,6 +402,9 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 		case MPI_IOCSTATUS_SCSI_DEVICE_NOT_THERE:	/* 0x0043 */
 			/* Spoof to SCSI Selection Timeout! */
 			sc->result = DID_NO_CONNECT << 16;
+
+			if (hd->sel_timeout[pScsiReq->TargetID] < 0xFFFF)
+				hd->sel_timeout[pScsiReq->TargetID]++;
 			break;
 
 		case MPI_IOCSTATUS_SCSI_TASK_TERMINATED:	/* 0x0048 */
@@ -1289,11 +1295,17 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
 				sh->max_sectors = MPT_SCSI_MAX_SECTORS;
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1) || defined CONFIG_HIGHIO
 				sh->highmem_io = 1;
 #endif
 				sh->this_id = this->pfacts[portnum].PortSCSIID;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,44)
+				/* OS entry to allow host drivers to force
+				 * a queue depth on a per device basis.
+				 */
+				sh->select_queue_depths = mptscsih_select_queue_depths;
+#endif
 				/* Required entry.
 				 */
 				sh->unique_id = this->id;
@@ -2546,14 +2558,13 @@ mptscsih_TMHandler(MPT_SCSI_HOST *hd, u8 type, u8 target, u8 lun, int ctx2abort,
 
 		/* Isse the Task Mgmt request.
 		 */
+		if (hd->hard_resets < -1)
+			hd->hard_resets++;
 		rc = mptscsih_IssueTaskMgmt(hd, type, target, lun, ctx2abort, sleepFlag);
 		if (rc) {
-#ifdef MPT_SCSI_USE_NEW_EH
-			hd->tmState = TM_STATE_ERROR;
-#endif
 			printk(MYIOC_s_INFO_FMT "Issue of TaskMgmt failed!\n", hd->ioc->name);
 		} else {
-			printk(MYIOC_s_INFO_FMT "Issue of TaskMgmt Successful!\n", hd->ioc->name);
+			dtmprintk((MYIOC_s_INFO_FMT "Issue of TaskMgmt Successful!\n", hd->ioc->name));
 		}
 	}
 #ifdef DROP_TEST
@@ -2681,7 +2692,6 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 {
 	MPT_SCSI_HOST	*hd;
 	MPT_FRAME_HDR	*mf;
-	unsigned long	 flags;
 	u32		 ctx2abort;
 	int		 scpnt_idx;
 
@@ -2696,10 +2706,11 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 		return FAILED;
 	}
 
-	printk(KERN_WARNING MYNAM ": %s: >> Attempting task abort! (sc=%p)\n",
-	       hd->ioc->name, SCpnt);
-	printk(KERN_WARNING MYNAM ": %s: IOs outstanding = %d\n",
-	       hd->ioc->name, atomic_read(&queue_depth));
+	printk(KERN_WARNING MYNAM ": %s: >> Attempting task abort! (sc=%p, numIOs=%d)\n",
+	       hd->ioc->name, SCpnt, atomic_read(&queue_depth));
+
+	if (hd->timeouts < -1)
+		hd->timeouts++;
 
 	/* Find this command
 	 */
@@ -2753,25 +2764,15 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 	ctx2abort = mf->u.frame.hwhdr.msgctxu.MsgContext;
 
 	hd->abortSCpnt = SCpnt;
-
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_ABORT_TASK,
-	                       SCpnt->target, SCpnt->lun, ctx2abort, CAN_SLEEP) 
-		< 0
-	    || hd->tmState == TM_STATE_ERROR) {
+	                       SCpnt->target, SCpnt->lun, ctx2abort, NO_SLEEP) 
+		< 0) {
 
 		/* The TM request failed and the subsequent FW-reload failed!
 		 * Fatal error case.
 		 */
 		printk(MYIOC_s_WARN_FMT "Error issuing abort task! (sc=%p)\n",
 		       hd->ioc->name, SCpnt);
-
-		/* If command not found, do not do callback,
-		 *  just return failed.  CHECKME
-		 */
-		if (hd->ScsiLookup[scpnt_idx] != NULL) {
-			SCpnt->result = STS_BUSY;
-			SCpnt->scsi_done(SCpnt);
-		}
 
 		/* We must clear our pending flag before clearing our state.
 		 */
@@ -2780,34 +2781,8 @@ mptscsih_abort(Scsi_Cmnd * SCpnt)
 
 		return FAILED;
 	}
+	return FAILED;
 
-	/* Our task management request will either complete or time out.  So we
-	 * spin until tmPending is != 1. If tmState is set to TM_STATE_ERROR, 
-	 * we encountered an error executing the task management request.
-	 */
-	while (hd->tmPending == 1){
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/4);
-	}
-	spin_lock_irqsave(&hd->ioc->FreeQlock, flags);
-	if (hd->tmState == TM_STATE_ERROR){
-		hd->tmState = TM_STATE_NONE;
-		spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-		nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_abort: "
-			   "TM timeout error! (sc=%p)\n",
-			   hd->ioc->name,
-			   SCpnt));
-		return FAILED;
-	}
-	hd->tmState = TM_STATE_NONE;
-	spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-
-	nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_abort: "
-		   "Abort was successful! (sc=%p)\n",
-		   hd->ioc->name,
-		   SCpnt));
-
-	return SUCCESS;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -2823,7 +2798,6 @@ int
 mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 {
 	MPT_SCSI_HOST	*hd;
-	unsigned long	 flags;
 
 	/* If we can't locate our host adapter structure, return FAILED status.
 	 */
@@ -2834,10 +2808,13 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 		return FAILED;
 	}
 
-	printk(KERN_WARNING MYNAM ": %s: >> Attempting target reset! (sc=%p)\n",
-	       hd->ioc->name, SCpnt);
-	printk(KERN_WARNING MYNAM ": %s: IOs outstanding = %d\n",
-	       hd->ioc->name, atomic_read(&queue_depth));
+	printk(KERN_WARNING MYNAM ": %s: >> Attempting target reset! (sc=%p, numIOs=%d)\n",
+	       hd->ioc->name, SCpnt, atomic_read(&queue_depth));
+
+	/* Unsupported for SCSI. Suppored for FCP
+	 */
+	if (hd->is_spi)
+		return FAILED;
 
 	/*  Wait a fixed amount of time for the TM pending flag to be cleared.
 	 *  If we time out, then we return a FAILED status to the caller.  This
@@ -2853,7 +2830,7 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 	}
 
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_TARGET_RESET,
-	                       SCpnt->target, 0, 0, CAN_SLEEP) 
+	                       SCpnt->target, 0, 0, NO_SLEEP) 
 		< 0){
 		/* The TM request failed and the subsequent FW-reload failed!
 		 * Fatal error case.
@@ -2864,34 +2841,8 @@ mptscsih_dev_reset(Scsi_Cmnd * SCpnt)
 		hd->tmState = TM_STATE_NONE;
 		return FAILED;
 	}
-
-	/* Our task management request will either complete or time out.  So we
-	 * spin until tmPending is != 1. If tmState is set to TM_STATE_ERROR, 
-	 * we encountered an error executing the task management request.
-	 */
-	while (hd->tmPending == 1){
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/4);
-	}
-	spin_lock_irqsave(&hd->ioc->FreeQlock, flags);
-	if (hd->tmState == TM_STATE_ERROR){
-		hd->tmState = TM_STATE_NONE;
-		spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-		nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_dev_reset: "
-			   "TM timeout error! (sc=%p)\n",
-			   hd->ioc->name,
-			   SCpnt));
-		return FAILED;
-	}
-	hd->tmState = TM_STATE_NONE;
-	spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-
-	nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_dev_reset: "
-		   "Device reset was successful! (sc=%p)\n",
-		   hd->ioc->name,
-		   SCpnt));
-
 	return SUCCESS;
+
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -2907,7 +2858,6 @@ int
 mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 {
 	MPT_SCSI_HOST	*hd;
-	unsigned long	 flags;
 
 	/* If we can't locate our host adapter structure, return FAILED status.
 	 */
@@ -2918,10 +2868,11 @@ mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 		return FAILED;
 	}
 
-	printk(KERN_WARNING MYNAM ": %s: >> Attempting bus reset! (sc=%p)\n",
-	       hd->ioc->name, SCpnt);
-	printk(KERN_WARNING MYNAM ": %s: IOs outstanding = %d\n",
-	       hd->ioc->name, atomic_read(&queue_depth));
+	printk(KERN_WARNING MYNAM ": %s: >> Attempting bus reset! (sc=%p, numIOs=%d)\n",
+	       hd->ioc->name, SCpnt, atomic_read(&queue_depth));
+
+	if (hd->timeouts < -1)
+		hd->timeouts++;
 
 	/*  Wait a fixed amount of time for the TM pending flag to be cleared.
 	 *  If we time out, then we return a FAILED status to the caller.  This
@@ -2932,13 +2883,13 @@ mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 		nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_bus_reset: "
 			   "Timed out waiting for previous TM to complete! "
 			   "(sc = %p)\n",
-			   hd->ioc->name, SCpnt ) );
+			   hd->ioc->name, SCpnt));
 		return FAILED;
 	}
 
 	/* We are now ready to execute the task management request. */
 	if (mptscsih_TMHandler(hd, MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS,
-	                       0, 0, 0, CAN_SLEEP) 
+	                       0, 0, 0, NO_SLEEP) 
 	    < 0){
 
 		/* The TM request failed and the subsequent FW-reload failed!
@@ -2951,32 +2902,6 @@ mptscsih_bus_reset(Scsi_Cmnd * SCpnt)
 		hd->tmState = TM_STATE_NONE;
 		return FAILED;
 	}
-
-	/* Our task management request will either complete or time out.  So we
-	 * spin until tmPending is != 1. If tmState is set to TM_STATE_ERROR, 
-	 * we encountered an error executing the task management request.
-	 */
-	while (hd->tmPending == 1){
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/4);
-	}
-	spin_lock_irqsave(&hd->ioc->FreeQlock, flags);
-	if (hd->tmState == TM_STATE_ERROR){
-		hd->tmState = TM_STATE_NONE;
-		spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-		nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_bus_reset: "
-			   "TM timeout error! (sc=%p)\n",
-			   hd->ioc->name,
-			   SCpnt));
-		return FAILED;
-	}
-	hd->tmState = TM_STATE_NONE;
-	spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-
-	nehprintk((KERN_WARNING MYNAM ": %s: mptscsih_bus_reset: "
-		   "Bus reset was successful! (sc=%p)\n",
-		   hd->ioc->name,
-		   SCpnt));
 
 	return SUCCESS;
 }
@@ -3013,7 +2938,7 @@ mptscsih_host_reset(Scsi_Cmnd *SCpnt)
 	/*  If our attempts to reset the host failed, then return a failed
 	 *  status.  The host will be taken off line by the SCSI mid-layer.
 	 */
-	if (mpt_HardResetHandler(hd->ioc, CAN_SLEEP) < 0){
+	if (mpt_HardResetHandler(hd->ioc, NO_SLEEP) < 0){
 		status = FAILED;
 	} else {
 		/*  Make sure TM pending is cleared and TM state is set to 
@@ -3056,9 +2981,7 @@ mptscsih_tm_pending_wait(MPT_SCSI_HOST * hd)
 			break;
 		}
 		spin_unlock_irqrestore(&hd->ioc->FreeQlock, flags);
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/4);
-
+		mdelay(250);
 	} while (--loop_count);
 
 	return status;
@@ -3092,6 +3015,9 @@ mptscsih_old_abort(Scsi_Cmnd *SCpnt)
 		SCpnt->scsi_done(SCpnt);
 		return SCSI_ABORT_NOT_RUNNING;
 	}
+
+	if (hd->timeouts < -1)
+		hd->timeouts++;
 
 	if ((scpnt_idx = SCPNT_TO_LOOKUP_IDX(SCpnt)) < 0) {
 		/* Cmd not found in ScsiLookup.
@@ -3166,7 +3092,7 @@ mptscsih_old_abort(Scsi_Cmnd *SCpnt)
 	SCpnt->host_scribble = (u8 *) MPT_INDEX_2_MFPTR (hd->ioc, scpnt_idx);
 
 	/* For the time being, force bus reset on any abort
-	 * requests for the 1030 FW.
+	 * requests for the 1030/1035 FW.
 	 */
 	if (hd->is_spi)
 		mf->u.frame.linkage.arg1 = MPI_SCSITASKMGMT_TASKTYPE_RESET_BUS;
@@ -3225,6 +3151,9 @@ mptscsih_old_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 		SCpnt->scsi_done(SCpnt);
 		return SCSI_RESET_SUCCESS;
 	}
+
+	if (hd->timeouts < -1)
+		hd->timeouts++;
 
 	if ((scpnt_idx = SCPNT_TO_LOOKUP_IDX(SCpnt)) < 0) {
 		/* Cmd not found in ScsiLookup.
@@ -3583,9 +3512,6 @@ mptscsih_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *m
 					}
 				}
 			}
-#ifdef MPT_SCSI_USE_NEW_EH
-			hd->tmState = TM_STATE_ERROR;
-#endif
 		} else {
 			dtmprintk((KERN_INFO "  SCSI TaskMgmt SUCCESS!\n"));
 
@@ -3629,6 +3555,9 @@ mptscsih_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *m
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
 	hd->tmPending = 0;
 	spin_unlock_irqrestore(&ioc->FreeQlock, flags);
+#ifdef MPT_SCSI_USE_NEW_EH
+	hd->tmState = TM_STATE_NONE;
+#endif
 
 	return 1;
 }
@@ -3638,14 +3567,18 @@ mptscsih_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *m
  *	This is anyones guess quite frankly.
  */
 int
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,45)
 mptscsih_bios_param(struct scsi_device * sdev, struct block_device *bdev,
 		sector_t capacity, int *ip)
 {
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
+mptscsih_bios_param(Disk * disk, struct block_device *bdev, int *ip)
+{
+	sector_t capacity = disk->capacity;
 #else
 mptscsih_bios_param(Disk * disk, kdev_t dev, int *ip)
 {
-	sector_t capacity = disk->capacity;
+	unsigned capacity = disk->capacity;
 #endif
 	int size;
 
@@ -3666,20 +3599,63 @@ mptscsih_bios_param(Disk * disk, kdev_t dev, int *ip)
  *	Called once per device the bus scan. Use it to force the queue_depth
  *	member to 1 if a device does not support Q tags.
  */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44)
 int
 mptscsih_slave_configure(Scsi_Device *device)
 {
+	struct Scsi_Host	*host = device->host;
 	VirtDevice		*pTarget;
-	pTarget = device->hostdata;
-	if (!device->tagged_supported ||
-	    !(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES)) {
-		scsi_adjust_queue_depth(device, 0, 1);
-	} else {
-		scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG,
-					       device->host->can_queue >> 1);
+	MPT_SCSI_HOST		*hd;
+
+	hd = (MPT_SCSI_HOST *)host->hostdata;
+	if (hd && (hd->Targets != NULL)) {
+		pTarget = hd->Targets[device->id];
+		if (pTarget) {
+			if (!device->tagged_supported ||
+			    !(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES)) {
+				scsi_adjust_queue_depth(device, 0, 1);
+			} else {
+				scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG, 
+							device->host->can_queue >> 1);
+			}
+		}
 	}
 	return 0;
 }
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44) */
+void
+mptscsih_select_queue_depths(struct Scsi_Host *sh, Scsi_Device *sdList)
+{
+	struct scsi_device	*device;
+	VirtDevice		*pTarget;
+	MPT_SCSI_HOST		*hd;
+	int			 ii, max;
+
+	for (device = sdList; device != NULL; device = device->next) {
+
+		if (device->host != sh)
+			continue;
+
+		hd = (MPT_SCSI_HOST *) sh->hostdata;
+		if (hd == NULL)
+			continue;
+
+		if (hd->Targets != NULL) {
+			if (hd->is_spi)
+				max = MPT_MAX_SCSI_DEVICES;
+			else
+				max = MPT_MAX_FC_DEVICES<256 ? MPT_MAX_FC_DEVICES : 255;
+
+			for (ii=0; ii < max; ii++) {
+				pTarget = hd->Targets[ii];
+				if (pTarget && !(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES)) {
+					device->queue_depth = 1;
+				}
+			}
+		}
+	}
+}
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44) */
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -4126,6 +4102,9 @@ mptscsih_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 		hd->resetPending = 0;
 		hd->numTMrequests = 0;
+#ifdef MPT_SCSI_USE_NEW_EH
+		hd->tmState = TM_STATE_NONE;
+#endif
 
 		/* 6. If there was an internal command,
 		 * wake this process up.
@@ -4167,10 +4146,13 @@ mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 		/* FIXME! */
 		break;
 	case MPI_EVENT_IOC_BUS_RESET:			/* 04 */
-		/* FIXME! */
-		break;
 	case MPI_EVENT_EXT_BUS_RESET:			/* 05 */
-		/* FIXME! */
+		hd = NULL;
+		if (ioc->sh) {
+			hd = (MPT_SCSI_HOST *) ioc->sh->hostdata;
+			if (hd && (hd->is_spi) && (hd->soft_resets < -1))
+				hd->soft_resets++;
+		}
 		break;
 	case MPI_EVENT_LOGOUT:				/* 09 */
 		/* FIXME! */
@@ -4804,9 +4786,10 @@ mptscsih_initTarget(MPT_SCSI_HOST *hd, int bus_id, int target_id, u8 lun, char *
 	}
 
 	if (vdev) {
-		if (hd->ioc->spi_data.isRaid & (1 << target_id))
+		if (hd->ioc->spi_data.isRaid & (1 << target_id)) {
 			vdev->raidVolume = 1;
-		else
+			ddvtprintk((KERN_INFO "RAID Volume @ id %d\n", target_id));
+		} else
 			vdev->raidVolume = 0;
 	}
 
@@ -4868,6 +4851,8 @@ void mptscsih_setTargetNegoParms(MPT_SCSI_HOST *hd, VirtDevice *target, char byt
 	u8 version, nfactor;
 	u8 noQas = 1;
 
+	ddvtprintk((KERN_INFO "set Target: (id %d) byte56 0x%x\n", id, byte56));
+
 	/* Set flags based on Inquiry data
 	 */
 	if (target->tflags & MPT_TARGET_FLAGS_VALID_INQUIRY) {
@@ -4886,12 +4871,18 @@ void mptscsih_setTargetNegoParms(MPT_SCSI_HOST *hd, VirtDevice *target, char byt
 				 */
 				if ((byte56 & 0x04) == 0)
 					factor = MPT_ULTRA2;
+				else if ((byte56 & 0x03) == 0)
+					factor = MPT_ULTRA160;
 				else
 					factor = MPT_ULTRA320;
 
-				/* bit 1 QAS support, non-raid only
+				/* If RAID, never disable QAS
+				 * else if non RAID, do not disable 
+				 *   QAS if bit 1 is set
+				 * bit 1 QAS support, non-raid only
+				 * bit 0 IU support
 				 */
-				if ((target->raidVolume == 0) && (byte56 & 0x02) != 0)
+				if ((target->raidVolume == 1) || ((byte56 & 0x02) != 0))
 					noQas = 0;
 
 				offset = pspi_data->maxSyncOffset;
@@ -4976,6 +4967,7 @@ void mptscsih_setTargetNegoParms(MPT_SCSI_HOST *hd, VirtDevice *target, char byt
 			VirtDevice	*vdev;
 			int ii;
 
+			ddvtprintk((KERN_INFO "Disabling QAS!\n"));
 			pspi_data->noQas = MPT_TARGET_NO_NEGO_QAS;
 			for (ii = 0; ii < id; ii++) {
 				vdev = hd->Targets[id];
@@ -5204,6 +5196,17 @@ mptscsih_writeSDP1(MPT_SCSI_HOST *hd, int portnum, int target_id, int flags)
 			//negoFlags = MPT_TARGET_NO_NEGO_SYNC;
 		}
 
+#ifndef MPTSCSIH_DISABLE_DOMAIN_VALIDATION
+		/* Force to async and narrow if DV has not been executed
+		 * for this ID
+		 */
+		if ((hd->ioc->spi_data.dvStatus[id] & MPT_SCSICFG_DV_NOT_DONE) != 0) {
+			width = 0;
+			factor = MPT_ASYNC;
+			offset = 0;
+		}
+#endif
+
 		/* If id is not a raid volume, get the updated
 		 * transmission settings from the target structure.
 		 */
@@ -5312,13 +5315,6 @@ static void mptscsih_taskmgmt_timeout(unsigned long data)
 	 * before deleting.
 	 */
 	del_timer(&hd->TMtimer);
-
-#ifdef MPT_SCSI_USE_NEW_EH
-	/* Set the error flag to 1 so that the function that started the
-	 * task management request knows it timed out.
-	 */
-	hd->tmState = TM_STATE_ERROR;
-#endif
 
 	/* Call the reset handler. Already had a TM request
 	 * timeout - so issue a diagnostic reset
@@ -5853,6 +5849,12 @@ mptscsih_do_cmd(MPT_SCSI_HOST *hd, INTERNAL_CMD *io)
 	else
 		pScsiReq->Control = cpu_to_le32(dir | MPI_SCSIIO_CONTROL_UNTAGGED);
 
+	if (cmd == CMD_RequestSense) {
+		pScsiReq->Control = cpu_to_le32(dir | MPI_SCSIIO_CONTROL_UNTAGGED);
+		ddvprintk((MYIOC_s_INFO_FMT "Untagged! 0x%2x\n",
+			hd->ioc->name, cmd));
+	}
+
 	for (ii=0; ii < 16; ii++)
 		pScsiReq->CDB[ii] = CDB[ii];
 
@@ -6184,7 +6186,7 @@ mptscsih_domainValidation(void *arg)
 					post_pendingQ_commands(hd);
 
 					if (hd->ioc->spi_data.noQas)
-						mptscsih_qas_check(hd);
+						mptscsih_qas_check(hd, id);
 				}
 			}
 		}
@@ -6218,7 +6220,7 @@ static int mptscsih_is_phys_disk(MPT_ADAPTER *ioc, int id)
 
 /* Write SDP1 if no QAS has been enabled
  */
-static void mptscsih_qas_check(MPT_SCSI_HOST *hd)
+static void mptscsih_qas_check(MPT_SCSI_HOST *hd, int id)
 {
 	VirtDevice *pTarget = NULL;
 	int ii;
@@ -6227,6 +6229,9 @@ static void mptscsih_qas_check(MPT_SCSI_HOST *hd)
 		return;
 
 	for (ii=0; ii < MPT_MAX_SCSI_DEVICES; ii++) {
+		if (ii == id)
+			continue;
+
 		if ((hd->ioc->spi_data.dvStatus[ii] & MPT_SCSICFG_DV_NOT_DONE) != 0)
 			continue;
 
@@ -6510,6 +6515,7 @@ mptscsih_doDv(MPT_SCSI_HOST *hd, int portnum, int id)
 					rc = hd->pLocal->completion;
 					if ((rc == MPT_SCANDV_GOOD) || (rc == MPT_SCANDV_SENSE)) {
 						dv.max.width = 0;
+						doFallback = 0;
 					} else
 						goto target_done;
 				}
@@ -7059,6 +7065,10 @@ target_done:
 		dv.cmd = MPT_SAVE;
 		mptscsih_dv_parms(hd, &dv, (void *)pcfg1Data);
 
+#if 0	
+	/* Double writes to SDP1 can cause problems, 
+	 * skip here since unnecessary
+	 */
 		/* Save the final negotiated settings to
 		 * SCSI device page 1.
 		 */
@@ -7067,13 +7077,14 @@ target_done:
 		cfg.action = MPI_CONFIG_ACTION_PAGE_WRITE_CURRENT;
 		cfg.dir = 1;
 		mpt_config(hd->ioc, &cfg);
+#endif
 	}
 
 	/* If this is a RAID Passthrough, enable internal IOs
 	 */
 	if (iocmd.flags & MPT_ICFLAG_PHYS_DISK) {
 		if (mptscsih_do_raid(hd, MPI_RAID_ACTION_ENABLE_PHYS_IO, &iocmd) < 0)
-			ddvprintk((MYIOC_s_ERR_FMT "RAID Queisce FAILED!\n", ioc->name));
+			ddvprintk((MYIOC_s_ERR_FMT "RAID Enable FAILED!\n", ioc->name));
 	}
 
 	/* Done with the DV scan of the current target
@@ -7227,8 +7238,7 @@ mptscsih_dv_parms(MPT_SCSI_HOST *hd, DVPARAMETERS *dv,void *pPage)
 			pPage1->Configuration = le32_to_cpu(configuration);
 		}
 		ddvprintk(("width %d, factor %x, offset %x request %x config %x\n",
-				dv->now.width, dv->now.factor,
-				dv->now.offset, val, configuration));
+				width, factor, offset, val, configuration));
 		break;
 
 	case MPT_FALLBACK:

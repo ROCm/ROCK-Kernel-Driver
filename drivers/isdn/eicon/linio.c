@@ -13,6 +13,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/interrupt.h>
 #include <linux/smp_lock.h>
 #include <asm/io.h>
 #include <asm/system.h>
@@ -67,8 +68,7 @@ int UxCardHandleGet(ux_diva_card_t **card, dia_card_t *cfg)
 	switch (cfg->bus_type)
 	{
 	case DIA_BUS_TYPE_PCI:
-		c->bus_num = cfg->bus_num;
-		c->func_num = cfg->func_num;
+		c->pdev = cfg->pdev;
 		c->io_base = cfg->io_base;
 		c->reset_base = cfg->reset_base;
 		c->card_type    = cfg->card_type;
@@ -625,16 +625,15 @@ void UxIsrRemove(ux_diva_card_t *card, void *dev_id)
 
 void UxPciConfigWrite(ux_diva_card_t *card, int size, int offset, void *value)
 {
-	switch (size)
-	{
+	switch (size) {
 	case sizeof(byte):
-		pcibios_write_config_byte(card->bus_num, card->func_num, offset, * (byte *) value);
+		pci_write_config_byte(card->pdev, offset, * (byte *) value);
 		break;
 	case sizeof(word):
-		pcibios_write_config_word(card->bus_num, card->func_num, offset, * (word *) value);
+		pci_write_config_word(card->pdev, offset, * (word *) value);
 		break;
 	case sizeof(dword):
-		pcibios_write_config_dword(card->bus_num, card->func_num, offset, * (dword *) value);
+		pci_write_config_dword(card->pdev, offset, * (dword *) value);
 		break;
 	default:
 		printk(KERN_WARNING "Divas: Invalid size in UxPciConfigWrite\n");
@@ -643,16 +642,15 @@ void UxPciConfigWrite(ux_diva_card_t *card, int size, int offset, void *value)
 
 void UxPciConfigRead(ux_diva_card_t *card, int size, int offset, void *value)
 {
-	switch (size)
-	{
+	switch (size) {
 	case sizeof(byte):
-		pcibios_read_config_byte(card->bus_num, card->func_num, offset, (byte *) value);
+		pci_read_config_byte(card->pdev, offset, (byte *) value);
 		break;
 	case sizeof(word):
-		pcibios_read_config_word(card->bus_num, card->func_num, offset, (word *) value);
+		pci_read_config_word(card->pdev, offset, (word *) value);
 		break;
 	case sizeof(dword):
-		pcibios_read_config_dword(card->bus_num, card->func_num, offset, (unsigned int *) value);
+		pci_read_config_dword(card->pdev, offset, (unsigned int *) value);
 		break;
 	default:
 		printk(KERN_WARNING "Divas: Invalid size in UxPciConfigRead\n");

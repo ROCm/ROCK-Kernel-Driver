@@ -1209,6 +1209,7 @@ fail_and_cleanup:
 				     bp->bblock_dvma);
 
 	unregister_netdev(dev);
+	kfree(dev->priv);
 	kfree(dev);
 	return -ENODEV;
 }

@@ -942,6 +942,8 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 	cs->status_write = cs->status_buf;
 	cs->status_end = cs->status_buf + HISAX_STATUS_BUFSIZE - 1;
 	cs->typ = card->typ;
+	spin_lock_init(&cs->lock);
+	SET_MODULE_OWNER(&cs->iif);
 	strcpy(cs->iif.id, id);
 	cs->iif.channels = 2;
 	cs->iif.maxbufsize = MAX_DATA_SIZE;
@@ -1769,6 +1771,7 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	hisax_d_if->cs = cs;
 	cs->hw.hisax_d_if = hisax_d_if;
 	cs->cardmsg = hisax_cardmsg;
+	cs->iif.owner = hisax_d_if->owner; // FIXME should be done before registering
 	INIT_WORK(&cs->work, hisax_bh, cs);
 	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
 	for (i = 0; i < 2; i++) {
@@ -1795,12 +1798,6 @@ void hisax_unregister(struct hisax_d_if *hisax_d_if)
 
 #include "isdnl1.h"
 
-static void hisax_sched_event(struct IsdnCardState *cs, int event)
-{
-	cs->event |= 1 << event;
-	schedule_work(&cs->work);
-}
-
 static void hisax_bh(void *data)
 {
 	struct IsdnCardState *cs = data;
@@ -1820,12 +1817,6 @@ static void hisax_bh(void *data)
 			L1L2(st, pr, NULL);
 		
 	}
-}
-
-static void hisax_b_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
 }
 
 static inline void D_L2L1(struct hisax_d_if *d_if, int pr, void *arg)
@@ -1850,15 +1841,15 @@ static void hisax_d_l1l2(struct hisax_if *ifc, int pr, void *arg)
 	switch (pr) {
 	case PH_ACTIVATE | INDICATION:
 		set_bit(0, &d_if->ph_state);
-		hisax_sched_event(cs, D_L1STATECHANGE);
+		sched_d_event(cs, D_L1STATECHANGE);
 		break;
 	case PH_DEACTIVATE | INDICATION:
 		clear_bit(0, &d_if->ph_state);
-		hisax_sched_event(cs, D_L1STATECHANGE);
+		sched_d_event(cs, D_L1STATECHANGE);
 		break;
 	case PH_DATA | INDICATION:
 		skb_queue_tail(&cs->rq, arg);
-		hisax_sched_event(cs, D_RCVBUFREADY);
+		sched_d_event(cs, D_RCVBUFREADY);
 		break;
 	case PH_DATA | CONFIRM:
 		skb = skb_dequeue(&cs->sq);
@@ -1876,7 +1867,7 @@ static void hisax_d_l1l2(struct hisax_if *ifc, int pr, void *arg)
 		break;
 	case PH_DATA_E | INDICATION:
 		skb_queue_tail(&d_if->erq, arg);
-		hisax_sched_event(cs, E_RCVBUFREADY);
+		sched_d_event(cs, E_RCVBUFREADY);
 		break;
 	default:
 		printk("pr %#x\n", pr);
@@ -1904,12 +1895,12 @@ static void hisax_b_l1l2(struct hisax_if *ifc, int pr, void *arg)
 		break;
 	case PH_DATA | INDICATION:
 		skb_queue_tail(&bcs->rqueue, arg);
-		hisax_b_sched_event(bcs, B_RCVBUFREADY);
+		sched_b_event(bcs, B_RCVBUFREADY);
 		break;
 	case PH_DATA | CONFIRM:
-		bcs->tx_cnt -= (int) arg;
-		if (bcs->st->lli.l1writewakeup)
-			bcs->st->lli.l1writewakeup(bcs->st, (int) arg);
+		skb = arg;
+		bcs->tx_cnt -= skb->truesize;
+		xmit_complete_b(bcs);
 		skb = skb_dequeue(&bcs->squeue);
 		if (skb) {
 			B_L2L1(b_if, PH_DATA | REQUEST, skb);
@@ -2050,33 +2041,6 @@ static void EChannel_proc_rcv(struct hisax_d_if *d_if)
 						skb->len);
 		}
 		dev_kfree_skb_any(skb);
-	}
-}
-
-void HiSax_mod_dec_use_count(struct IsdnCardState *cs)
-{
-	struct module *mod;
-
-	if (cs && cs->cardmsg == hisax_cardmsg) {
-		mod = cs->hw.hisax_d_if->owner;
-		if (mod)
-			__MOD_DEC_USE_COUNT(mod);
-	} else {
-		MOD_DEC_USE_COUNT;
-	}
-}
-
-void HiSax_mod_inc_use_count(struct IsdnCardState *cs)
-{
-	struct module *mod;
-
-	if (cs && cs->cardmsg == hisax_cardmsg) {
-		mod = cs->hw.hisax_d_if->owner;
-		if (mod)
-		// hope we do win the race...
-			try_inc_mod_count(mod);
-	} else {
-		MOD_INC_USE_COUNT;
 	}
 }
 

@@ -89,11 +89,7 @@ isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val;
 	int cnt = 5;
 
-	if (!cs) {
-		printk(KERN_WARNING "ISurf: Spurious interrupt!\n");
-		return;
-	}
-
+	spin_lock(&cs->lock);
 	val = readb(cs->hw.isurf.isar + ISAR_IRQBIT);
       Start_ISAR:
 	if (val & ISAR_IRQSTA)
@@ -121,6 +117,7 @@ isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writeb(0xFF, cs->hw.isurf.isac + ISAC_MASK);mb();
 	writeb(0, cs->hw.isurf.isac + ISAC_MASK);mb();
 	writeb(ISAR_IRQMSK, cs->hw.isurf.isar + ISAR_IRQBIT); mb();
+	spin_unlock(&cs->lock);
 }
 
 void
@@ -155,14 +152,9 @@ ISurf_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_isurf(cs);
 			return(0);
 		case CARD_INIT:
-			clear_pending_isac_ints(cs);
 			writeb(0, cs->hw.isurf.isar+ISAR_IRQBIT);mb();
 			initisac(cs);
 			initisar(cs);
-			/* Reenable ISAC IRQ */
-			cs->writeisac(cs, ISAC_MASK, 0);
-			/* RESET Receiver and Transmitter */
-			cs->writeisac(cs, ISAC_CMDR, 0x41);
 			return(0);
 		case CARD_TEST:
 			return(0);
@@ -180,8 +172,6 @@ isurf_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 			reset_isurf(cs, ISURF_ISAR_EA | ISURF_ISAC_RESET |
 				ISURF_ARCOFI_RESET);
 			initisac(cs);
-			cs->writeisac(cs, ISAC_MASK, 0);
-			cs->writeisac(cs, ISAC_CMDR, 0x41);
 		}
 		return(ret);
 	}

@@ -156,10 +156,7 @@ s0box_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val;
 	int count = 0;
 
-	if (!cs) {
-		printk(KERN_WARNING "Teles: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	val = readreg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[1], HSCX_ISTA);
       Start_HSCX:
 	if (val)
@@ -189,6 +186,7 @@ s0box_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.isac, ISAC_MASK, 0x0);
 	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[0], HSCX_MASK, 0x0);
 	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[1], HSCX_MASK, 0x0);
+	spin_unlock(&cs->lock);
 }
 
 void
@@ -207,7 +205,7 @@ S0Box_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_s0box(cs);
 			break;
 		case CARD_INIT:
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			break;
 		case CARD_TEST:
 			break;

@@ -49,7 +49,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptbase.c,v 1.122 2002/10/03 13:10:11 pdelaney Exp $
+ *  $Id: mptbase.c,v 1.123 2002/10/17 20:15:56 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -1156,7 +1156,7 @@ mpt_pci_scan(void)
 	dprintk((KERN_INFO MYNAM ": Checking for MPT adapters...\n"));
 
 	/*
-	 *  NOTE: The 929, 929X and 1030 will appear as 2 separate PCI devices,
+	 *  NOTE: The 929, 929X, 1030 and 1035 will appear as 2 separate PCI devices,
 	 *  one for each channel.
 	 */
 	pci_for_each_dev(pdev) {
@@ -1170,18 +1170,14 @@ mpt_pci_scan(void)
 		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC929X) &&
 		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC919X) &&
 		    (pdev->device != MPI_MANUFACTPAGE_DEVID_53C1030) &&
-#if 0
-		    /* FIXME! C103x family */
-		    (pdev->device != MPI_MANUFACTPAGE_DEVID_53C1030_ZC) &&
-		    (pdev->device != MPI_MANUFACTPAGE_DEVID_53C1035) &&
-#endif
+		    (pdev->device != MPI_MANUFACTPAGE_DEVID_1030_53C1035) &&
 		    1) {
 			dprintk((KERN_INFO MYNAM ": Skipping LSI device=%04xh\n", pdev->device));
 			continue;
 		}
 
 		/* GRRRRR
-		 * dual function devices (929, 929X, 1030) may be presented in Func 1,0 order,
+		 * dual function devices (929, 929X, 1030, 1035) may be presented in Func 1,0 order,
 		 * but we'd really really rather have them in Func 0,1 order.
 		 * Do some kind of look ahead here...
 		 */
@@ -1445,14 +1441,23 @@ mpt_adapter_install(struct pci_dev *pdev)
 		ioc->chip_type = C1030;
 		ioc->prod_name = "LSI53C1030";
 		{
+			u8 revision;
+
 			/* 1030 Chip Fix. Disable Split transactions
-			 * for PCIX. Set bits 4 - 6 to zero.
+			 * for PCIX. Set bits 4 - 6 to zero if Rev < C0( = 8)
 			 */
-			u16 pcixcmd = 0;
-			pci_read_config_word(pdev, 0x6a, &pcixcmd);
-			pcixcmd &= 0xFF8F;
-			pci_write_config_word(pdev, 0x6a, pcixcmd);
+			pci_read_config_byte(pdev, PCI_CLASS_REVISION, &revision);
+			if (revision < 0x08) {
+				u16 pcixcmd = 0;
+				pci_read_config_word(pdev, 0x6a, &pcixcmd);
+				pcixcmd &= 0xFF8F;
+				pci_write_config_word(pdev, 0x6a, pcixcmd);
+			}
 		}
+	}
+	else if (pdev->device == MPI_MANUFACTPAGE_DEVID_1030_53C1035) {
+		ioc->chip_type = C1035;
+		ioc->prod_name = "LSI53C1035";
 	}
 
 	sprintf(ioc->name, "ioc%d", ioc->id);
@@ -1500,9 +1505,10 @@ mpt_adapter_install(struct pci_dev *pdev)
 	mpt_adapters[ioc->id] = ioc;
 
 	/* NEW!  20010220 -sralston
-	 * Check for "bound ports" (929, 929X, 1030) to reduce redundant resets.
+	 * Check for "bound ports" (929, 929X, 1030, 1035) to reduce redundant resets.
 	 */
-	if ((ioc->chip_type == FC929) || (ioc->chip_type == C1030) || (ioc->chip_type == FC929X))
+	if ((ioc->chip_type == FC929) || (ioc->chip_type == C1030) 
+			|| (ioc->chip_type == C1035) || (ioc->chip_type == FC929X))
 		mpt_detect_bound_ports(ioc, pdev);
 
 	if ((r = mpt_do_ioc_recovery(ioc, MPT_HOSTEVENT_IOC_BRINGUP, CAN_SLEEP)) != 0) {
@@ -1746,7 +1752,7 @@ mpt_do_ioc_recovery(MPT_ADAPTER *ioc, u32 reason, int sleepFlag)
 /*
  *	mpt_detect_bound_ports - Search for PCI bus/dev_function
  *	which matches PCI bus/dev_function (+/-1) for newly discovered 929,
- *	929X or 1030.
+ *	929X, 1030 or 1035.
  *	@ioc: Pointer to MPT adapter structure
  *	@pdev: Pointer to (struct pci_dev) structure
  *
@@ -1806,8 +1812,7 @@ mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 		/* Disable the FW */
 		state = mpt_GetIocState(this, 1);
 		if (state == MPI_IOC_STATE_OPERATIONAL) {
-			if (SendIocReset(this, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, NO_SLEEP) != 0)
-				(void) KickStart(this, 1, NO_SLEEP);
+			SendIocReset(this, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, NO_SLEEP);
 		}
 
 		if (this->cached_fw != NULL) {
@@ -1818,7 +1823,6 @@ mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 					": firmware downloadboot failure (%d)!\n", state);
 			}
 		}
-
 
 		/* Disable adapter interrupts! */
 		CHIPREG_WRITE32(&this->chip->IntMask, 0xFFFFFFFF);
@@ -2291,9 +2295,6 @@ GetIocFacts(MPT_ADAPTER *ioc, int sleepFlag, int reason)
 			ioc->reply_sz = ioc->req_sz;
 			ioc->reply_depth = MIN(MPT_DEFAULT_REPLY_DEPTH, facts->ReplyQueueDepth);
 
-			/* 1030 - should we use a smaller DEFAULT_REPLY_DEPTH?
-			 * FIX
-			 */
 			dprintk((MYIOC_s_INFO_FMT "reply_sz=%3d, reply_depth=%4d\n",
 				ioc->name, ioc->reply_sz, ioc->reply_depth));
 			dprintk((MYIOC_s_INFO_FMT "req_sz  =%3d, req_depth  =%4d\n",
@@ -2891,6 +2892,7 @@ mpt_downloadboot(MPT_ADAPTER *ioc, int sleepFlag)
 	 */
 	diag0val = CHIPREG_READ32(&ioc->chip->Diagnostic);
 	while ((diag0val & MPI_DIAG_DRWE) == 0) {
+		CHIPREG_WRITE32(&ioc->chip->WriteSequence, 0xFF);
 		CHIPREG_WRITE32(&ioc->chip->WriteSequence, MPI_WRSEQ_1ST_KEY_VALUE);
 		CHIPREG_WRITE32(&ioc->chip->WriteSequence, MPI_WRSEQ_2ND_KEY_VALUE);
 		CHIPREG_WRITE32(&ioc->chip->WriteSequence, MPI_WRSEQ_3RD_KEY_VALUE);
@@ -3126,6 +3128,18 @@ KickStart(MPT_ADAPTER *ioc, int force, int sleepFlag)
 	int cnt = 0;
 
 	dprintk((KERN_WARNING MYNAM ": KickStarting %s!\n", ioc->name));
+	if ((int)ioc->chip_type > (int)FC929) {
+		/* Always issue a Msg Unit Reset first. This will clear some
+		 * SCSI bus hang conditions.
+		 */
+		SendIocReset(ioc, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, sleepFlag);
+
+		if (sleepFlag == CAN_SLEEP) {
+			schedule_timeout(HZ);
+		} else {
+			mdelay (1000);
+		}
+	}
 
 	hard_reset_done = mpt_diag_reset(ioc, force, sleepFlag);
 	if (hard_reset_done < 0)
@@ -5841,6 +5855,15 @@ fusion_exit(void)
 
 	while (! Q_IS_EMPTY(&MptAdapters)) {
 		this = MptAdapters.head;
+
+		/* Disable interrupts! */
+		CHIPREG_WRITE32(&this->chip->IntMask, 0xFFFFFFFF);
+
+		this->active = 0;
+
+		/* Clear any lingering interrupt */
+		CHIPREG_WRITE32(&this->chip->IntStatus, 0);
+
 		Q_DEL_ITEM(this);
 		mpt_adapter_dispose(this);
 	}

@@ -302,9 +302,8 @@ static struct slvl_board *slvl_init(int iobase, int irq, int txdma, int rxdma, i
 	if(request_dma(dev->chanA.rxdma, "SeaLevel (RX)")!=0)
 		goto dmafail;
 	
-	save_flags(flags);
-	cli();
-	
+	disable_irq(irq);
+		
 	/*
 	 *	Begin normal initialise
 	 */
@@ -312,7 +311,7 @@ static struct slvl_board *slvl_init(int iobase, int irq, int txdma, int rxdma, i
 	if(z8530_init(dev)!=0)
 	{
 		printk(KERN_ERR "Z8530 series device not found.\n");
-		restore_flags(flags);
+		enable_irq(irq);
 		goto dmafail2;
 	}
 	if(dev->type==Z85C30)
@@ -330,7 +329,7 @@ static struct slvl_board *slvl_init(int iobase, int irq, int txdma, int rxdma, i
 	 *	Now we can take the IRQ
 	 */
 	
-	restore_flags(flags);
+	enable_irq(irq);
 
 	for(u=0; u<2; u++)
 	{
@@ -446,7 +445,7 @@ static struct slvl_board *slvl_unit;
 
 int init_module(void)
 {
-	printk(KERN_INFO "SeaLevel Z85230 Synchronous Driver v 0.01.\n");
+	printk(KERN_INFO "SeaLevel Z85230 Synchronous Driver v 0.02.\n");
 	printk(KERN_INFO "(c) Copyright 1998, Building Number Three Ltd.\n");	
 	if((slvl_unit=slvl_init(io,irq, txdma, rxdma, slow))==NULL)
 		return -ENODEV;

@@ -636,11 +636,11 @@ NORET_TYPE void do_exit(long code)
 {
 	struct task_struct *tsk = current;
 
-	if (in_interrupt())
+	if (unlikely(in_interrupt()))
 		panic("Aiee, killing interrupt handler!");
-	if (!tsk->pid)
+	if (unlikely(!tsk->pid))
 		panic("Attempted to kill the idle task!");
-	if (tsk->pid == 1)
+	if (unlikely(tsk->pid == 1))
 		panic("Attempted to kill init!");
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);

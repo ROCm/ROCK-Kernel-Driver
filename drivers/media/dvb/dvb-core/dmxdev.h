@@ -64,7 +64,7 @@ typedef struct dmxdev_buffer_s {
 
 
 typedef struct dmxdev_filter_s {
-	dvb_device_t *dvbdev;
+	struct dvb_device *dvbdev;
 
         union {
 	        dmx_section_filter_t *sec;
@@ -102,8 +102,8 @@ typedef struct dmxdev_dvr_s {
 
 
 typedef struct dmxdev_s {
-	dvb_device_t *dvbdev;
-	dvb_device_t *dvr_dvbdev;
+	struct dvb_device *dvbdev;
+	struct dvb_device *dvr_dvbdev;
 
         dmxdev_filter_t *filter;
         dmxdev_dvr_t *dvr;
@@ -122,7 +122,7 @@ typedef struct dmxdev_s {
 } dmxdev_t;
 
 
-int DmxDevInit(dmxdev_t *dmxdev, dvb_adapter_t *);
-void DmxDevRelease(dmxdev_t *dmxdev);
+int dvb_dmxdev_init(dmxdev_t *dmxdev, struct dvb_adapter *);
+void dvb_dmxdev_release(dmxdev_t *dmxdev);
 
 #endif /* _DMXDEV_H_ */

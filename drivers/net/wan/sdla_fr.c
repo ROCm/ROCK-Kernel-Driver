@@ -162,14 +162,9 @@
 
 #include <linux/sdla_fr.h>		/* frame relay firmware API definitions */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
- #include <asm/uaccess.h>
- #include <linux/inetdevice.h>
- #include <linux/netdevice.h>
-
-#else
- #include <asm/segment.h>
-#endif
+#include <asm/uaccess.h>
+#include <linux/inetdevice.h>
+#include <linux/netdevice.h>
 
 #include <net/route.h>          	/* Dynamic Route Creation */
 #include <linux/etherdevice.h>		/* eth_type_trans() used for bridging */

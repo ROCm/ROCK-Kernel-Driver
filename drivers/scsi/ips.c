@@ -83,7 +83,7 @@
 /*            2.3.18 and later                                               */
 /*          - Sync with other changes from the 2.3 kernels                   */
 /* 4.00.06  - Fix timeout with initial FFDC command                          */
-/* 4.00.06a - Port to 2.4 (trivial) -- Christoph Hellwig <hch@caldera.de>    */
+/* 4.00.06a - Port to 2.4 (trivial) -- Christoph Hellwig <hch@infradead.org> */
 /* 4.10.00  - Add support for ServeRAID 4M/4L                                */
 /* 4.10.13  - Fix for dynamic unload and proc file system                    */
 /* 4.20.03  - Rename version to coincide with new release schedules          */
@@ -190,6 +190,7 @@
 #ifdef MODULE
    static char *ips = NULL;
    MODULE_PARM(ips, "s");
+   MODULE_LICENSE("GPL");
 #endif
 
 /*
@@ -856,7 +857,7 @@ ips_detect(Scsi_Host_Template *SHT) {
                       ips_name, ips_next_controller, mem_addr, mem_len);
 
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
-            if (check_mem_region(mem_addr, mem_len)) {
+            if (!request_mem_region(mem_addr, mem_len, "ips")) {
                /* Couldn't allocate io space */
                printk(KERN_WARNING "(%s%d) couldn't allocate IO space %x len %d.\n",
                       ips_name, ips_next_controller, io_addr, io_len);
@@ -866,7 +867,6 @@ ips_detect(Scsi_Host_Template *SHT) {
                continue;
             }
 
-            request_mem_region(mem_addr, mem_len, "ips");
 #endif
 
             base = mem_addr & PAGE_MASK;
@@ -884,7 +884,7 @@ ips_detect(Scsi_Host_Template *SHT) {
             DEBUG_VAR(1, "(%s%d) detect, IO region %x, size: %d",
                       ips_name, ips_next_controller, io_addr, io_len);
 
-            if (check_region(io_addr, io_len)) {
+            if (!request_region(io_addr, io_len, "ips")) {
                /* Couldn't allocate io space */
                printk(KERN_WARNING "(%s%d) couldn't allocate IO space %x len %d.\n",
                       ips_name, ips_next_controller, io_addr, io_len);
@@ -893,8 +893,6 @@ ips_detect(Scsi_Host_Template *SHT) {
 
                continue;
             }
-
-            request_region(io_addr, io_len, "ips");
          }
 
          /* get planer status */
@@ -7329,12 +7327,11 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
        uint32_t base;
        uint32_t offs;
 
-       if (check_mem_region(mem_addr, mem_len)) {
+       if (!request_mem_region(mem_addr, mem_len, "ips")) {
           printk(KERN_WARNING "Couldn't allocate IO Memory space %x len %d.\n", mem_addr, mem_len);
           return -1;
           }
 
-       request_mem_region(mem_addr, mem_len, "ips");
        base = mem_addr & PAGE_MASK;
        offs = mem_addr - base;
        ioremap_ptr = ioremap(base, PAGE_SIZE);
@@ -7346,11 +7343,10 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
 
     /* setup I/O mapped area (if applicable) */
     if (io_addr) {
-       if (check_region(io_addr, io_len)) {
+       if (!request_region(io_addr, io_len, "ips")) {
           printk(KERN_WARNING "Couldn't allocate IO space %x len %d.\n", io_addr, io_len);
           return -1;
        }
-       request_region(io_addr, io_len, "ips");
     }
 
     /* get the revision ID */

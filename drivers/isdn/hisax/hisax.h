@@ -278,8 +278,6 @@ struct Layer3 {
 struct LLInterface {
 	void (*l3l4) (struct PStack *, int, void *);
 	void *userdata;
-	void (*l1writewakeup) (struct PStack *, int);
-	void (*l2writewakeup) (struct PStack *, int);
 };
 
 
@@ -353,7 +351,6 @@ struct l3_process {
 struct hscx_hw {
 	int hscx;
 	int rcvidx;
-	int count;              /* Current skb sent count */
 	u_char *rcvbuf;         /* B-Channel receive Buffer */
 	u_char tsaxr0;
 	u_char tsaxr1;
@@ -362,7 +359,6 @@ struct hscx_hw {
 struct w6692B_hw {
 	int bchan;
 	int rcvidx;
-	int count;              /* Current skb sent count */
 	u_char *rcvbuf;         /* B-Channel receive Buffer */
 };
 
@@ -378,7 +374,6 @@ struct isar_reg {
 struct isar_hw {
 	int dpath;
 	int rcvidx;
-	int txcnt;
 	int mml;
 	u_char state;
 	u_char cmd;
@@ -413,7 +408,6 @@ struct hdlc_hw {
 	} ctrl;
 	u_int stat;
 	int rcvidx;
-	int count;              /* Current skb sent count */
 	u_char *rcvbuf;         /* B-Channel receive Buffer */
 };
 
@@ -489,8 +483,9 @@ struct BCState {
 	struct IsdnCardState *cs;
 	int tx_cnt;		/* B-Channel transmit counter */
 	struct sk_buff *tx_skb; /* B-Channel transmit Buffer */
-	struct sk_buff_head rqueue;	/* B-Channel receive Queue */
-	struct sk_buff_head squeue;	/* B-Channel send Queue */
+	struct sk_buff_head rqueue;	/* B-Channel receive queue */
+	struct sk_buff_head squeue;	/* B-Channel send queue */
+	struct sk_buff_head cmpl_queue;	/* B-Channel send complete queue */
 	struct PStack *st;
 	u_char *blog;
 	u_char *conmsg;
@@ -505,6 +500,7 @@ struct BCState {
 	int err_rdo;
 	int err_inv;
 #endif
+	int count;
 	union {
 		struct hscx_hw hscx;
 		struct hdlc_hw hdlc;
@@ -685,8 +681,6 @@ struct hfcPCI_hw {
         unsigned char bswapped;
         unsigned char nt_mode;
         int nt_timer;
-	unsigned char pci_bus;
-        unsigned char pci_device_fn;
         unsigned char *pci_io; /* start of PCI IO memory */
         void *fifos; /* FIFO memory */ 
         dma_addr_t fifos_dma;
@@ -872,7 +866,6 @@ struct icc_chip {
 #define FLG_TWO_DCHAN		4
 #define FLG_L1_DBUSY		5
 #define FLG_DBUSY_TIMER 	6
-#define FLG_LOCK_ATOMIC 	7
 #define FLG_ARCOFI_TIMER	8
 #define FLG_ARCOFI_ERROR	9
 #define FLG_HW_L1_UINT		10
@@ -881,6 +874,7 @@ struct icc_chip {
 struct IsdnCardState {
 	unsigned char typ;
 	unsigned char subtyp;
+	spinlock_t lock;
 	int protocol;
 	unsigned int irq;
 	unsigned long irq_flags;
@@ -930,6 +924,7 @@ struct IsdnCardState {
 	void   (*BC_Send_Data) (struct BCState *);
 	int    (*cardmsg) (struct IsdnCardState *, int, void *);
 	void   (*setstack_d) (struct PStack *, struct IsdnCardState *);
+	void   (*DC_Send_Data) (struct IsdnCardState *);
 	void   (*DC_Close) (struct IsdnCardState *);
 	void   (*irq_func) (int, void *, struct pt_regs *);
 	int    (*auxcmd) (struct IsdnCardState *, isdn_ctrl *);
@@ -1408,4 +1403,3 @@ L4L3(struct PStack *st, int pr, void *arg)
 {
 	st->l3.l4l3(st, pr, arg);
 }
-

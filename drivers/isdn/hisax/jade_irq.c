@@ -49,7 +49,6 @@ jade_empty_fifo(struct BCState *bcs, int count)
 {
 	u_char *ptr;
 	struct IsdnCardState *cs = bcs->cs;
-	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "jade_empty_fifo");
@@ -63,10 +62,8 @@ jade_empty_fifo(struct BCState *bcs, int count)
 	}
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	bcs->hw.hscx.rcvidx += count;
-	spin_lock_irqsave(&jade_irq_lock, flags);
 	READJADEFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
 	WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_RCMD, jadeRCMD_RMC);
-	spin_unlock_irqrestore(&jade_irq_lock, flags);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -83,41 +80,17 @@ jade_fill_fifo(struct BCState *bcs)
 	struct IsdnCardState *cs = bcs->cs;
 	int more, count;
 	int fifo_size = 32;
-	u_char *ptr;
-	unsigned long flags;
+	int hscx = bcs->hw.hscx.hscx;
+	unsigned char *p;
 
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "jade_fill_fifo");
-
-	if (!bcs->tx_skb)
-		return;
-	if (bcs->tx_skb->len <= 0)
+	p = xmit_fill_fifo_b(bcs, fifo_size, &count, &more);
+	if (!p)
 		return;
 
-	more = (bcs->mode == L1_MODE_TRANS) ? 1 : 0;
-	if (bcs->tx_skb->len > fifo_size) {
-		more = !0;
-		count = fifo_size;
-	} else
-		count = bcs->tx_skb->len;
-
-	waitforXFW(cs, bcs->hw.hscx.hscx);
-	spin_lock_irqsave(&jade_irq_lock, flags);
-	ptr = bcs->tx_skb->data;
-	skb_pull(bcs->tx_skb, count);
-	bcs->tx_cnt -= count;
-	bcs->hw.hscx.count += count;
-	WRITEJADEFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
-	WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, more ? jadeXCMD_XF : (jadeXCMD_XF|jadeXCMD_XME));
-	spin_unlock_irqrestore(&jade_irq_lock, flags);
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "jade_fill_fifo %c cnt %d",
-			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, bcs->blog);
-	}
+	waitforXFW(cs, hscx);
+	WRITEJADEFIFO(cs, hscx, p, count);
+	WriteJADECMDR(cs, hscx, jade_HDLC_XCMD,
+		      more ? jadeXCMD_XF : (jadeXCMD_XF|jadeXCMD_XME));
 }
 
 
@@ -164,7 +137,7 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 			}
 		}
 		bcs->hw.hscx.rcvidx = 0;
-		jade_sched_event(bcs, B_RCVBUFREADY);
+		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
 		jade_empty_fifo(bcs, fifo_size);
@@ -177,32 +150,18 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 				skb_queue_tail(&bcs->rqueue, skb);
 			}
 			bcs->hw.hscx.rcvidx = 0;
-			jade_sched_event(bcs, B_RCVBUFREADY);
+			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 	}
 	if (val & 0x10) {	/* XPR */
-		if (bcs->tx_skb) {
-			if (bcs->tx_skb->len) {
-				jade_fill_fifo(bcs);
-				return;
-			} else {
-				if (bcs->st->lli.l1writewakeup &&
-					(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.hscx.count);
-				dev_kfree_skb_irq(bcs->tx_skb);
-				bcs->hw.hscx.count = 0;
-				bcs->tx_skb = NULL;
-			}
-		}
-		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-			bcs->hw.hscx.count = 0;
-			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
-			jade_fill_fifo(bcs);
-		} else {
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			jade_sched_event(bcs, B_XMTBUFREADY);
-		}
+		xmit_xpr_b(bcs);
 	}
+}
+
+static void
+reset_xmit(struct BCState *bcs)
+{
+	WriteJADECMDR(bcs->cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, jadeXCMD_XRES);
 }
 
 static inline void
@@ -216,23 +175,7 @@ jade_int_main(struct IsdnCardState *cs, u_char val, int jade)
 		val &= ~jadeISR_RFO;
 	}
 	if (val & jadeISR_XDU) {
-		/* relevant in HDLC mode only */
-		/* don't reset XPR here */
-		if (bcs->mode == 1)
-			jade_fill_fifo(bcs);
-		else {
-			/* Here we lost an TX interrupt, so
-			   * restart transmitting the whole frame.
-			 */
-			if (bcs->tx_skb) {
-			   	skb_push(bcs->tx_skb, bcs->hw.hscx.count);
-				bcs->tx_cnt += bcs->hw.hscx.count;
-				bcs->hw.hscx.count = 0;
-			}
-			WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, jadeXCMD_XRES);
-			if (cs->debug & L1_DEB_WARN)
-				debugl1(cs, "JADE %c EXIR %x Lost TX", 'A'+jade, val);
-		}
+		xmit_xdu_b(bcs, reset_xmit);
 	}
 	if (val & (jadeISR_RME|jadeISR_RPF|jadeISR_XPR)) {
 		if (cs->debug & L1_DEB_HSCX)

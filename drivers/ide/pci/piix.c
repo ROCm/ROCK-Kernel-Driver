@@ -373,7 +373,7 @@ static int piix_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct pci_dev *dev	= hwif->pci_dev;
 	u8 maslave		= hwif->channel ? 0x42 : 0x40;
-	u8 speed	= ide_rate_filter(piix_ratemask(drive), xferspeed);
+	u8 speed		= ide_rate_filter(piix_ratemask(drive), xferspeed);
 	int a_speed		= 3 << (drive->dn * 4);
 	int u_flag		= 1 << drive->dn;
 	int v_flag		= 0x01 << drive->dn;
@@ -392,7 +392,6 @@ static int piix_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	pci_read_config_byte(dev, 0x55, &reg55);
 
 	switch(speed) {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_UDMA_4:
 		case XFER_UDMA_2:	u_speed = 2 << (drive->dn * 4); break;
 		case XFER_UDMA_5:
@@ -402,7 +401,6 @@ static int piix_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		case XFER_MW_DMA_2:
 		case XFER_MW_DMA_1:
 		case XFER_SW_DMA_2:	break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4:
 		case XFER_PIO_3:
 		case XFER_PIO_2:
@@ -443,8 +441,6 @@ static int piix_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	piix_tune_drive(drive, piix_dma_2_pio(speed));
 	return (ide_config_drive_speed(drive, speed));
 }
-
-#ifdef CONFIG_BLK_DEV_IDEDMA
 
 /**
  *	piix_config_drive_for_dma	-	configure drive for DMA
@@ -518,7 +514,6 @@ no_dma_set:
 	}
 	return hwif->ide_dma_on(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /**
  *	init_chipset_piix	-	set up the PIIX chipset
@@ -570,10 +565,8 @@ static unsigned int __devinit init_chipset_piix (struct pci_dev *dev, const char
  
 static void __init init_hwif_piix (ide_hwif_t *hwif)
 {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	u8 reg54h = 0, reg55h = 0, ata66 = 0;
 	u8 mask = hwif->channel ? 0xc0 : 0x30;
-#endif /* !CONFIG_BLK_DEV_IDEDMA */
 
 #ifndef CONFIG_IA64
 	if (!hwif->irq)
@@ -599,7 +592,6 @@ static void __init init_hwif_piix (ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x06;
 	hwif->swdma_mask = 0x04;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	switch(hwif->pci_dev->device) {
 		case PCI_DEVICE_ID_INTEL_82371MX:
 			hwif->mwdma_mask = 0x80;
@@ -630,7 +622,6 @@ static void __init init_hwif_piix (ide_hwif_t *hwif)
 
 	hwif->drives[1].autodma = hwif->autodma;
 	hwif->drives[0].autodma = hwif->autodma;
-#endif /* !CONFIG_BLK_DEV_IDEDMA */
 }
 
 /**

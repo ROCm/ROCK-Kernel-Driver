@@ -31,6 +31,7 @@
 #include <linux/signal.h>
 #include <linux/stat.h>
 #include <linux/version.h>
+#include <linux/interrupt.h>
 #include <linux/delay.h>
 
 #include "scsi.h"

@@ -97,6 +97,7 @@ static __inline__ void serio_cleanup(struct serio *serio)
 #define SERIO_8042	0x01000000UL
 #define SERIO_RS232	0x02000000UL
 #define SERIO_HIL_MLC	0x03000000UL
+#define SERIO_PC9800	0x04000000UL
 
 #define SERIO_PROTO	0xFFUL
 #define SERIO_MSC	0x01

@@ -139,10 +139,7 @@ bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val = 0;
 	I20_REGISTER_FILE *pI20_Regs;
 
-	if (!cs) {
-		printk(KERN_WARNING "HiSax: Telekom A4T: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
 
 	/* ISDN interrupt pending? */
@@ -169,6 +166,7 @@ bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		/* Reenable ISDN interrupt */
 		pI20_Regs->i20IntCtrl |= intISDN;
 	}
+	spin_unlock(&cs->lock);
 }
 
 void
@@ -243,8 +241,6 @@ BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_bkm(cs);
 			return (0);
 		case CARD_INIT:
-			clear_pending_isac_ints(cs);
-			clear_pending_jade_ints(cs);
 			initisac(cs);
 			initjade(cs);
 			/* Enable ints */

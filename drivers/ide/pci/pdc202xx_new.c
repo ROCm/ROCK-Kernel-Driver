@@ -165,7 +165,6 @@ static int pdcnew_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 			pci_read_config_byte(dev, (drive_pci), &AP);
 			pci_read_config_byte(dev, (drive_pci)|0x01, &BP);
 		}
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	} else {
 		if ((BP & 0xF0) && (CP & 0x0F)) {
 			/* clear DMA modes of upper 842 bits of B Register */
@@ -177,7 +176,6 @@ static int pdcnew_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 			pci_write_config_byte(dev, (drive_pci)|0x02, CP &~0x0F);
 			pci_read_config_byte(dev, (drive_pci)|0x02, &CP);
 		}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	}
 
 	pci_read_config_byte(dev, (drive_pci), &AP);
@@ -185,7 +183,6 @@ static int pdcnew_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	pci_read_config_byte(dev, (drive_pci)|0x02, &CP);
 
 	switch(speed) {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_UDMA_6:	speed = XFER_UDMA_5;
 		case XFER_UDMA_5:
 		case XFER_UDMA_4:	TB = 0x20; TC = 0x01; break;
@@ -199,7 +196,6 @@ static int pdcnew_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		case XFER_SW_DMA_2:	TB = 0x60; TC = 0x05; break;
 		case XFER_SW_DMA_1:	TB = 0x80; TC = 0x06; break;
 		case XFER_SW_DMA_0:	TB = 0xC0; TC = 0x0B; break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4:	TA = 0x01; TB = 0x04; break;
 		case XFER_PIO_3:	TA = 0x02; TB = 0x06; break;
 		case XFER_PIO_2:	TA = 0x03; TB = 0x08; break;
@@ -211,11 +207,9 @@ static int pdcnew_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	if (speed < XFER_SW_DMA_0) {
 		pci_write_config_byte(dev, (drive_pci), AP|TA);
 		pci_write_config_byte(dev, (drive_pci)|0x01, BP|TB);
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	} else {
 		pci_write_config_byte(dev, (drive_pci)|0x01, BP|TB);
 		pci_write_config_byte(dev, (drive_pci)|0x02, CP|TC);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	}
 
 #if PDC202XX_DECODE_REGISTER_INFO
@@ -243,28 +237,18 @@ static int pdcnew_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 static int pdcnew_new_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	u32 indexreg		= hwif->dma_vendor1;
 	u32 datareg		= hwif->dma_vendor3;
-#else /* !CONFIG_BLK_DEV_IDEDMA */
-	struct pci_dev *dev	= hwif->pci_dev;
-	u32 high_16		= pci_resource_start(dev, 4);
-	u32 indexreg		= high_16 + (hwif->channel ? 0x09 : 0x01);
-	u32 datareg		= (indexreg + 2);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	u8 thold		= 0x10;
 	u8 adj			= (drive->dn%2) ? 0x08 : 0x00;
 	u8 speed	= ide_rate_filter(pdcnew_ratemask(drive), xferspeed);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (speed == XFER_UDMA_2) {
 		hwif->OUTB((thold + adj), indexreg);
 		hwif->OUTB((hwif->INB(datareg) & 0x7f), datareg);
 	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	switch (speed) {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_UDMA_7:
 			speed = XFER_UDMA_6;
 		case XFER_UDMA_6:	set_ultra(0x1a, 0x01, 0xcb); break;
@@ -277,7 +261,6 @@ static int pdcnew_new_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		case XFER_MW_DMA_2:	set_ata2(0x69, 0x25); break;
 		case XFER_MW_DMA_1:	set_ata2(0x6b, 0x27); break;
 		case XFER_MW_DMA_0:	set_ata2(0xdf, 0x5f); break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4:	set_pio(0x23, 0x09, 0x25); break;
 		case XFER_PIO_3:	set_pio(0x27, 0x0d, 0x35); break;
 		case XFER_PIO_2:	set_pio(0x23, 0x26, 0x64); break;
@@ -301,7 +284,7 @@ static int config_chipset_for_pio (ide_drive_t *drive, u8 pio)
 {
 	u8 speed = 0;
 
-	pio = (pio == 5) ? 4 : pio;
+	if (pio == 5) pio = 4;
 	speed = XFER_PIO_0 + ide_get_best_pio_mode(drive, 255, pio, NULL);
         
 	return ((int) pdcnew_tune_chipset(drive, speed));
@@ -311,8 +294,6 @@ static void pdcnew_tune_drive (ide_drive_t *drive, u8 pio)
 {
 	(void) config_chipset_for_pio(drive, pio);
 }
-
-#ifdef CONFIG_BLK_DEV_IDEDMA
 
 static u8 pdcnew_new_cable_detect (ide_hwif_t *hwif)
 {
@@ -458,8 +439,6 @@ static int pdcnew_ide_dma_timeout(ide_drive_t *drive)
 	return __ide_dma_timeout(drive);
 }
 
-#endif /* CONFIG_BLK_DEV_IDEDMA */
-
 static void pdcnew_new_reset (ide_drive_t *drive)
 {
 	/*
@@ -471,12 +450,8 @@ static void pdcnew_new_reset (ide_drive_t *drive)
 
 static void pdcnew_reset_host (ide_hwif_t *hwif)
 {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 //	unsigned long high_16	= hwif->dma_base - (8*(hwif->channel));
 	unsigned long high_16	= hwif->dma_master;
-#else /* !CONFIG_BLK_DEV_IDEDMA */
-	unsigned long high_16	= pci_resource_start(hwif->pci_dev, 4);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	u8 udma_speed_flag	= hwif->INB(high_16|0x001f);
 
 	hwif->OUTB((udma_speed_flag | 0x10), (high_16|0x001f));
@@ -571,8 +546,6 @@ static void __init init_hwif_pdc202new (ide_hwif_t *hwif)
 	hwif->ultra_mask = 0x7f;
 	hwif->mwdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
-
 	hwif->ide_dma_check = &pdcnew_config_drive_xfer_rate;
 	hwif->ide_dma_lostirq = &pdcnew_ide_dma_lostirq;
 	hwif->ide_dma_timeout = &pdcnew_ide_dma_timeout;
@@ -581,7 +554,6 @@ static void __init init_hwif_pdc202new (ide_hwif_t *hwif)
 	if (!noautodma)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 #if PDC202_DEBUG_CABLE
 	printk("%s: %s-pin cable\n",
 		hwif->name, hwif->udma_four ? "80" : "40");

@@ -199,8 +199,8 @@ int ves1820_init (struct dvb_frontend *frontend)
 	u8 b0 [] = { 0xff };
 	u8 pwm;
 	int i;
-	struct i2c_msg msg [] = { { addr: 0x28, flags: 0, buf: b0, len: 1 },
-	                   { addr: 0x28, flags: I2C_M_RD, buf: &pwm, len: 1 } };
+	struct i2c_msg msg [] = { { addr: 0x50, flags: 0, buf: b0, len: 1 },
+	                   { addr: 0x50, flags: I2C_M_RD, buf: &pwm, len: 1 } };
         
         dprintk("VES1820: init chip\n");
 
@@ -433,12 +433,13 @@ int ves1820_ioctl (struct dvb_frontend *frontend, unsigned int cmd, void *arg)
 	}
 
 	case FE_READ_BER:
-		*((u32*) arg) = ves1820_readreg(frontend->i2c, 0x14) |
+	{
+		u32 ber = ves1820_readreg(frontend->i2c, 0x14) |
 			        (ves1820_readreg(frontend->i2c, 0x15) << 8) |
-			        (ves1820_readreg(frontend->i2c, 0x16) << 16);
-		/* XXX FIXME: scale!!*/
+			 ((ves1820_readreg(frontend->i2c, 0x16) & 0x0f) << 16);
+		*((u32*) arg) = 10 * ber;
 		break;
-
+	}
 	case FE_READ_SIGNAL_STRENGTH:
 	{
 		u8 gain = ves1820_readreg(frontend->i2c, 0x17);

@@ -57,14 +57,14 @@ static void ide_insl (ide_ioreg_t port, void *addr, u32 count)
 	insl(port, addr, count);
 }
 
-static void ide_outb (u8 addr, ide_ioreg_t port)
+static void ide_outb (u8 value, ide_ioreg_t port)
 {
-	outb(addr, port);
+	outb(value, port);
 }
 
-static void ide_outw (u16 addr, ide_ioreg_t port)
+static void ide_outw (u16 value, ide_ioreg_t port)
 {
-	outw(addr, port);
+	outw(value, port);
 }
 
 static void ide_outsw (ide_ioreg_t port, void *addr, u32 count)
@@ -72,14 +72,14 @@ static void ide_outsw (ide_ioreg_t port, void *addr, u32 count)
 	outsw(port, addr, count);
 }
 
-static void ide_outl (u32 addr, ide_ioreg_t port)
+static void ide_outl (u32 value, ide_ioreg_t port)
 {
-	outl(addr, port);
+	outl(value, port);
 }
 
 static void ide_outsl (ide_ioreg_t port, void *addr, u32 count)
 {
-	return outsl(port, addr, count);
+	outsl(port, addr, count);
 }
 
 void default_hwif_iops (ide_hwif_t *hwif)
@@ -819,9 +819,9 @@ int ide_config_drive_speed (ide_drive_t *drive, u8 speed)
 //	while (HWGROUP(drive)->busy)
 //		ide_delay_50ms();
 
-#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
+#if !defined(CONFIG_DMA_NONPCI)
 	hwif->ide_dma_host_off(drive);
-#endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
+#endif /* !(CONFIG_DMA_NONPCI) */
 
 	/*
 	 * Don't use ide_wait_cmd here - it will
@@ -887,12 +887,12 @@ int ide_config_drive_speed (ide_drive_t *drive, u8 speed)
 	drive->id->dma_mword &= ~0x0F00;
 	drive->id->dma_1word &= ~0x0F00;
 
-#if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
+#if !defined(CONFIG_DMA_NONPCI)
 	if (speed >= XFER_SW_DMA_0)
 		hwif->ide_dma_host_on(drive);
 	else
 		hwif->ide_dma_off(drive);
-#endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
+#endif /* !(CONFIG_DMA_NONPCI) */
 
 	switch(speed) {
 		case XFER_UDMA_7:   drive->id->dma_ultra |= 0x8080; break;
@@ -1057,8 +1057,7 @@ void check_dma_crc (ide_drive_t *drive)
 {
 	if (drive->crc_count) {
 		(void) HWIF(drive)->ide_dma_off_quietly(drive);
-		if ((HWIF(drive)->speedproc) != NULL)
-			HWIF(drive)->speedproc(drive, ide_auto_reduce_xfer(drive));
+		ide_set_xfer_rate(drive, ide_auto_reduce_xfer(drive));
 		if (drive->current_speed >= XFER_SW_DMA_0)
 			(void) HWIF(drive)->ide_dma_on(drive);
 	} else {

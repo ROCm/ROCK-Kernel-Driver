@@ -245,13 +245,18 @@ static int __init scx200_wdt_init(void)
 	sema_init(&open_semaphore, 1);
 
 	r = misc_register(&scx200_wdt_miscdev);
-	if (r)
+	if (r) {
+		release_region(SCx200_CB_BASE + SCx200_WDT_OFFSET,
+				SCx200_WDT_SIZE);
 		return r;
+	}
 
 	r = register_reboot_notifier(&scx200_wdt_notifier);
         if (r) {
                 printk(KERN_ERR NAME ": unable to register reboot notifier");
 		misc_deregister(&scx200_wdt_miscdev);
+		release_region(SCx200_CB_BASE + SCx200_WDT_OFFSET,
+				SCx200_WDT_SIZE);
                 return r;
         }
 

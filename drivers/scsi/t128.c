@@ -111,15 +111,17 @@
 #include <linux/sched.h>
 #include <asm/io.h>
 #include <linux/blk.h>
+#include <linux/interrupt.h>
+#include <linux/stat.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/delay.h>
+
 #include "scsi.h"
 #include "hosts.h"
 #include "t128.h"
 #define AUTOPROBE_IRQ
 #include "NCR5380.h"
-#include <linux/stat.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/delay.h>
 
 static struct override {
     unsigned long address;
@@ -143,7 +145,7 @@ static struct base {
 
 #define NO_BASES (sizeof (bases) / sizeof (struct base))
 
-static const struct signature {
+static struct signature {
     const char *string;
     int offset;
 } signatures[] __initdata = {

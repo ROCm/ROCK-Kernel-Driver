@@ -1,8 +1,9 @@
 /* 
-    Alps BSRU6 DVB QPSK frontend driver
+    Alps BSRU6 and LG TDQB-S00x DVB QPSK frontend driver
 
     Copyright (C) 2001-2002 Convergence Integrated Media GmbH
-	<ralph@convergence.de>, <holger@convergence.de>
+	<ralph@convergence.de>, <holger@convergence.de>,
+	<js@convergence.de>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,12 +33,16 @@ static int debug = 0;
 
 
 #define M_CLK (88000000UL)
-
 /* M=21, K=0, P=0, f_VCO = 4MHz*4*(M+1)/(K+1) = 352 MHz */
+
 
 static
 struct dvb_frontend_info bsru6_info = {
+#ifdef CONFIG_ALPS_BSRU6_IS_LG_TDQBS00X
+	name: "LG TDQB-S00x",
+#else
 	name: "Alps BSRU6",
+#endif
 	type: FE_QPSK,
 	frequency_min: 950000,
 	frequency_max: 2150000,
@@ -63,7 +68,8 @@ u8 init_tab [] = {
 	0x05, 0x35,   // SDAT:0 SCLT:0 I2CT:1
 	0x06, 0x00,   // DAC mode and MSB 
 	0x07, 0x00,   // DAC LSB
-	0x08, 0x43,   // DiSEqC
+//	0x08, 0x43,   // DiSEqC
+	0x08, 0x03,   // DiSEqC
 	0x09, 0x00,
 	0x0a, 0x42, 
 	0x0c, 0x51,   // QPSK reverse:1  Nyquist:0 OP0 val:1 OP0 con:1 OP1 val:1 OP1 con:1 
@@ -79,17 +85,20 @@ u8 init_tab [] = {
 	0x15, 0xc9,   // lock detector threshold
 	
 	0x16, 0x1d,
-	0x17, 0x0,
+	0x17, 0x00,
 	0x18, 0x14,
 	0x19, 0xf2,
 
 	0x1a, 0x11,
 
 	0x1b, 0x9c,
-	0x1c, 0x0,
-	0x1d, 0x0,
-	0x1e, 0xb,
+	0x1c, 0x00,
+	0x1d, 0x00,
+	0x1e, 0x0b,
+	0x1f, 0x50,
 
+	0x20, 0x00,
+	0x21, 0x00,
 	0x22, 0x00,
 	0x23, 0x00,
 	0x24, 0xff,
@@ -110,16 +119,37 @@ u8 init_tab [] = {
 	0x33, 0xfc,  // rs control
 	0x34, 0x93,  // error control
 
-	
 	0x0b, 0x00, 
-	0x27, 0x00, 0x2f, 0x00, 0x30, 0x00,
-	0x35, 0x00, 0x36, 0x00, 0x37, 0x00, 
-	0x38, 0x00, 0x39, 0x00, 0x3a, 0x00, 0x3b, 0x00, 
-	0x3c, 0x00, 0x3d, 0x00, 0x3e, 0x00, 0x3f, 0x00,
-	0x40, 0x00, 0x41, 0x00, 0x42, 0x00, 0x43, 0x00,
-	0x44, 0x00, 0x45, 0x00, 0x46, 0x00, 0x47, 0x00, 
-	0x48, 0x00, 0x49, 0x00, 0x4a, 0x00, 0x4b, 0x00, 
-	0x4c, 0x00, 0x4d, 0x00, 0x4e, 0x00, 0x4f, 0x00
+	0x27, 0x00,
+	0x2f, 0x00,
+	0x30, 0x00,
+	0x35, 0x00,
+	0x36, 0x00,
+	0x37, 0x00,
+	0x38, 0x00,
+	0x39, 0x00,
+	0x3a, 0x00,
+	0x3b, 0x00,
+	0x3c, 0x00,
+	0x3d, 0x00,
+	0x3e, 0x00,
+	0x3f, 0x00,
+	0x40, 0x00,
+	0x41, 0x00,
+	0x42, 0x00,
+	0x43, 0x00,
+	0x44, 0x00,
+	0x45, 0x00,
+	0x46, 0x00,
+	0x47, 0x00,
+	0x48, 0x00,
+	0x49, 0x00,
+	0x4a, 0x00,
+	0x4b, 0x00,
+	0x4c, 0x00,
+	0x4d, 0x00,
+	0x4e, 0x00,
+	0x4f, 0x00
 };
 
 
@@ -231,12 +261,27 @@ int stv0299_init (struct dvb_i2c_bus *i2c)
 
 
 static
-int stv0299_set_inversion (struct dvb_i2c_bus *i2c, int inversion)
+int stv0299_set_inversion (struct dvb_i2c_bus *i2c,
+			   fe_spectral_inversion_t inversion)
 {
 	u8 val;
 
 	dprintk ("%s\n", __FUNCTION__);
 
+#ifdef CONFIG_ALPS_BSRU6_IS_LG_TDQBS00X    /*  reversed I/Q pins  */
+	switch (inversion) {
+	case INVERSION_AUTO:
+		return -EOPNOTSUPP;
+	case INVERSION_OFF:
+		val = stv0299_readreg (i2c, 0x0c);
+		return stv0299_writereg (i2c, 0x0c, val & 0xfe);
+	case INVERSION_ON:
+		val = stv0299_readreg (i2c, 0x0c);
+		return stv0299_writereg (i2c, 0x0c, val | 0x01);
+	default:
+		return -EINVAL;
+	};
+#else
 	switch (inversion) {
 	case INVERSION_AUTO:
 		return -EOPNOTSUPP;
@@ -248,7 +293,8 @@ int stv0299_set_inversion (struct dvb_i2c_bus *i2c, int inversion)
 		return stv0299_writereg (i2c, 0x0c, val & 0xfe);
 	default:
 		return -EINVAL;
-	}
+	};
+#endif
 }
 
 
@@ -277,9 +323,10 @@ int stv0299_set_FEC (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 
 
 static
-fe_code_rate_t stv0299_get_FEC (struct dvb_i2c_bus *i2c)
+fe_code_rate_t stv0299_get_fec (struct dvb_i2c_bus *i2c)
 {
-	static fe_code_rate_t fec_tab [] = { FEC_2_3, FEC_3_4, FEC_5_6, FEC_7_8, FEC_1_2 };
+	static fe_code_rate_t fec_tab [] = { FEC_2_3, FEC_3_4, FEC_5_6,
+					     FEC_7_8, FEC_1_2 };
 	u8 index;
 
 	dprintk ("%s\n", __FUNCTION__);
@@ -343,6 +390,9 @@ int stv0299_send_diseqc_msg (struct dvb_i2c_bus *i2c,
 
 	dprintk ("%s\n", __FUNCTION__);
 
+	if (stv0299_wait_diseqc_idle (i2c, 100) < 0)
+		return -ETIMEDOUT;
+
 	val = stv0299_readreg (i2c, 0x08);
 
 	if (stv0299_writereg (i2c, 0x08, (val & ~0x7) | 0x6))  /* DiSEqC mode */
@@ -356,12 +406,7 @@ int stv0299_send_diseqc_msg (struct dvb_i2c_bus *i2c,
 			return -EREMOTEIO;
 	}
 
-	/* Shouldn't we wait for idle state (FE=1, FF=0) here to 
-	   make certain all bytes have been sent ? 
-	   Hmm, actually we should do that before all mode changes too ...
-	   if (stv0299_wait_diseqc_idle (i2c, 100) < 0) */ 
-
-	if (stv0299_wait_diseqc_fifo (i2c, 100) < 0)
+	if (stv0299_wait_diseqc_idle (i2c, 100) < 0)
 		return -ETIMEDOUT;
 
 	return 0;
@@ -375,10 +420,10 @@ int stv0299_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t burst)
 
 	dprintk ("%s\n", __FUNCTION__);
 
-	val = stv0299_readreg (i2c, 0x08);
-
-	if (stv0299_wait_diseqc_fifo (i2c, 100) < 0)
+	if (stv0299_wait_diseqc_idle (i2c, 100) < 0)
 		return -ETIMEDOUT;
+
+	val = stv0299_readreg (i2c, 0x08);
 
 	if (stv0299_writereg (i2c, 0x08, (val & ~0x7) | 0x2))   /* burst mode */
 		return -EREMOTEIO;
@@ -386,7 +431,7 @@ int stv0299_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t burst)
 	if (stv0299_writereg (i2c, 0x09, burst == SEC_MINI_A ? 0x00 : 0xff))
 		return -EREMOTEIO;
 
-	if (stv0299_wait_diseqc_fifo (i2c, 100) < 0)
+	if (stv0299_wait_diseqc_idle (i2c, 100) < 0)
 		return -ETIMEDOUT;
 
 	if (stv0299_writereg (i2c, 0x08, val))
@@ -402,6 +447,9 @@ int stv0299_set_tone (struct dvb_i2c_bus *i2c, fe_sec_tone_mode_t tone)
 	u8 val;
 
 	dprintk ("%s\n", __FUNCTION__);
+
+	if (stv0299_wait_diseqc_idle (i2c, 100) < 0)
+		return -ETIMEDOUT;
 
 	val = stv0299_readreg (i2c, 0x08);
 
@@ -445,8 +493,6 @@ int stv0299_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 	u32 tmp;
 	u8 aclk = 0xb4, bclk = 0x51;
 
-	dprintk ("%s\n", __FUNCTION__);
-
 	if (srate > M_CLK)
 		srate = M_CLK;
         if (srate < 500000)
@@ -477,7 +523,6 @@ int stv0299_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 
 	return 0;
 }
-
 
 
 static
@@ -608,7 +653,7 @@ int bsru6_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		p->frequency += derot_freq;
 		p->inversion = (stv0299_readreg (i2c, 0x0c) & 1) ?
 						INVERSION_OFF : INVERSION_ON;
-		p->u.qpsk.fec_inner = stv0299_get_FEC (i2c);
+		p->u.qpsk.fec_inner = stv0299_get_fec (i2c);
 		p->u.qpsk.symbol_rate = stv0299_get_symbolrate (i2c);
                 break;
         }
@@ -694,7 +739,7 @@ module_exit (exit_bsru6);
 
 MODULE_PARM(debug,"i");
 MODULE_PARM_DESC(debug, "enable verbose debug messages");
-MODULE_DESCRIPTION("BSRU6 DVB Frontend driver");
+MODULE_DESCRIPTION("Alps BSRU6/LG TDQB-S00x DVB Frontend driver");
 MODULE_AUTHOR("Ralph Metzler, Holger Waechtler");
 MODULE_LICENSE("GPL");
 

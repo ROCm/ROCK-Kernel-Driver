@@ -226,8 +226,7 @@ static inline void hscx_xpr_interrupt(struct hscx *hscx)
 	}
 	hscx->tx_cnt = 0;
 	hscx->tx_skb = NULL;
-	B_L1L2(hscx, PH_DATA | CONFIRM, (void *) skb->truesize);
-	dev_kfree_skb_irq(skb);
+	B_L1L2(hscx, PH_DATA | CONFIRM, skb);
 }
 
 static inline void hscx_exi_interrupt(struct hscx *hscx)

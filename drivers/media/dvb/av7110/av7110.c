@@ -89,7 +89,7 @@ static int  outcom(av7110_t *av7110, int type, int com, int num, ...);
 static void SetMode(av7110_t *av7110, int mode);
 
 void pes_to_ts(u8 const *buf, long int length, u16 pid, p2t_t *p);
-void p_to_t(u8 const *buf, long int length, u16 pid, u8 *counter, dvb_demux_feed_t *feed);
+void p_to_t(u8 const *buf, long int length, u16 pid, u8 *counter, struct dvb_demux_feed *feed);
 
 static u32 vidmem	= 0;
 static u32 vidlow	= 0;
@@ -392,9 +392,9 @@ static int arm_thread(void *data)
 
 
 static int
-record_cb(pes2ts_t *p2t, u8 *buf, size_t len)
+record_cb(dvb_filter_pes2ts_t *p2t, u8 *buf, size_t len)
 {
-        dvb_demux_feed_t *dvbdmxfeed=(dvb_demux_feed_t *) p2t->priv;
+        struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) p2t->priv;
 
         if (!(dvbdmxfeed->ts_type & TS_PACKET)) 
                 return 0;
@@ -404,13 +404,13 @@ record_cb(pes2ts_t *p2t, u8 *buf, size_t len)
                 return dvbdmxfeed->cb.ts(buf, len, 0, 0, 
                                          &dvbdmxfeed->feed.ts, DMX_OK); 
         else
-                return pes2ts(p2t, buf, len);
+                return dvb_filter_pes2ts(p2t, buf, len);
 }
 
 static int 
-pes2ts_cb(void *priv, unsigned char *data)
+dvb_filter_pes2ts_cb(void *priv, unsigned char *data)
 {
-        dvb_demux_feed_t *dvbdmxfeed=(dvb_demux_feed_t *) priv;
+        struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) priv;
         
         dvbdmxfeed->cb.ts(data, 188, 0, 0,
                           &dvbdmxfeed->feed.ts,
@@ -420,9 +420,9 @@ pes2ts_cb(void *priv, unsigned char *data)
 
 static int 
 AV_StartRecord(av7110_t *av7110, int av,
-               dvb_demux_feed_t *dvbdmxfeed)
+               struct dvb_demux_feed *dvbdmxfeed)
 {
-        dvb_demux_t *dvbdmx=dvbdmxfeed->demux;
+        struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
   
         if (av7110->playing||(av7110->rec_mode&av))
                 return -EBUSY;
@@ -432,20 +432,30 @@ AV_StartRecord(av7110_t *av7110, int av,
 
         switch (av7110->rec_mode) {
         case RP_AUDIO:
-                pes2ts_init(&av7110->p2t[0], dvbdmx->pesfilter[0]->pid,
-                            pes2ts_cb, (void *)dvbdmx->pesfilter[0]);
+                dvb_filter_pes2ts_init (&av7110->p2t[0],
+					dvbdmx->pesfilter[0]->pid,
+					dvb_filter_pes2ts_cb,
+					(void *)dvbdmx->pesfilter[0]);
                 outcom(av7110, COMTYPE_REC_PLAY, __Record, 2, AudioPES, 0);
                 break;
+
         case RP_VIDEO:
-                pes2ts_init(&av7110->p2t[1], dvbdmx->pesfilter[1]->pid,
-                            pes2ts_cb, (void *)dvbdmx->pesfilter[1]);
+                dvb_filter_pes2ts_init (&av7110->p2t[1],
+					dvbdmx->pesfilter[1]->pid,
+					dvb_filter_pes2ts_cb,
+					(void *)dvbdmx->pesfilter[1]);
                 outcom(av7110, COMTYPE_REC_PLAY, __Record, 2, VideoPES, 0);
                 break;
+
         case RP_AV:
-                pes2ts_init(&av7110->p2t[0], dvbdmx->pesfilter[0]->pid,
-                            pes2ts_cb, (void *)dvbdmx->pesfilter[0]);
-                pes2ts_init(&av7110->p2t[1], dvbdmx->pesfilter[1]->pid,
-                            pes2ts_cb, (void *)dvbdmx->pesfilter[1]);
+                dvb_filter_pes2ts_init (&av7110->p2t[0],
+					dvbdmx->pesfilter[0]->pid,
+					dvb_filter_pes2ts_cb,
+					(void *)dvbdmx->pesfilter[0]);
+                dvb_filter_pes2ts_init (&av7110->p2t[1],
+					dvbdmx->pesfilter[1]->pid,
+					dvb_filter_pes2ts_cb,
+					(void *)dvbdmx->pesfilter[1]);
                 outcom(av7110, COMTYPE_REC_PLAY, __Record, 2, AV_PES, 0);
                 break;
         }
@@ -463,8 +473,8 @@ AV_StartPlay(av7110_t *av7110, int av)
         outcom(av7110, COMTYPE_REC_PLAY, __Stop, 0);
 
         if (av7110->playing == RP_NONE) {
-                reset_ipack(&av7110->ipack[0]);
-                reset_ipack(&av7110->ipack[1]);
+                dvb_filter_ipack_reset(&av7110->ipack[0]);
+                dvb_filter_ipack_reset(&av7110->ipack[1]);
         }
 
         av7110->playing|=av;
@@ -814,7 +824,7 @@ void CI_handle(av7110_t *av7110, u8 *data, u16 len)
 static inline int
 DvbDmxFilterCallback(u8 * buffer1, size_t buffer1_len,
                      u8 * buffer2, size_t buffer2_len,
-                     dvb_demux_filter_t *dvbdmxfilter,
+                     struct dvb_demux_filter *dvbdmxfilter,
                      dmx_success_t success,
                      av7110_t *av7110)
 {
@@ -896,7 +906,7 @@ static void fidbirq(struct saa7146* saa, void *data)
 
         // FIXME: use bottom half or tasklet
         if (av7110->feeding && mem[0]==0x47)
-                DvbDmxSWFilterPackets(&av7110->demux, mem, 512);
+                dvb_dmx_swfilter_packets(&av7110->demux, mem, 512);
 }
 #else
 static
@@ -922,7 +932,7 @@ void fidbirq (unsigned long data)
         } else {
                 if (av7110->ttbp>1000*188 && av7110->ttbp<1024*188) {
                         if (av7110->feeding)
-                                DvbDmxSWFilterPackets(&av7110->demux, 
+                                dvb_dmx_swfilter_packets(&av7110->demux, 
                                                       mem+av7110->ttbp,
                                                       1024- av7110->ttbp / 188);
                 }
@@ -937,7 +947,7 @@ void fidbirq (unsigned long data)
 
         // FIXME: use bottom half or tasklet
         if (av7110->feeding && mem[0]==0x47)
-                DvbDmxSWFilterPackets(&av7110->demux, mem, num);
+                dvb_dmx_swfilter_packets(&av7110->demux, mem, num);
 }
 #endif
 
@@ -1001,7 +1011,7 @@ void debiirq (unsigned long data)
         switch (type&0xff) {
 
         case DATA_TS_RECORD:
-                DvbDmxSWFilterPackets(&av7110->demux, 
+                dvb_dmx_swfilter_packets(&av7110->demux, 
                                       (const u8 *)av7110->debi_virt, 
                                       av7110->debilen/188);
                 spin_lock(&av7110->debilock);
@@ -2008,8 +2018,8 @@ firmversion(av7110_t *av7110)
         av7110->arm_app=(buf[6] << 16) + buf[7];
         av7110->avtype=(buf[8] << 16) + buf[9];
 
-        printk ("av7110 (%d): AV711%d - firm %08x, rtsl %08x, vid %08x, app %08x\n", 
-		av7110->saa->dvb_adapter->num, av7110->avtype, av7110->arm_fw, 
+        printk ("DVB: AV711%d(%d) - firm %08x, rtsl %08x, vid %08x, app %08x\n",
+		av7110->avtype, av7110->saa->dvb_adapter->num, av7110->arm_fw, 
                 av7110->arm_rtsl, av7110->arm_vid, av7110->arm_app);
 
         return;
@@ -2483,9 +2493,12 @@ dvb_play(av7110_t *av7110, const u8 *buf,
                 if (umem) {
                         if (copy_from_user(av7110->kbuf[type], buf, n)) 
                                 return -EFAULT;
-                        instant_repack(av7110->kbuf[type], n, &av7110->ipack[type]);
-                } else
-                        instant_repack((u8 *)buf, n, &av7110->ipack[type]);
+                        dvb_filter_instant_repack(av7110->kbuf[type], n,
+						  &av7110->ipack[type]);
+                } else {
+                        dvb_filter_instant_repack((u8 *)buf, n,
+						  &av7110->ipack[type]);
+		}
                 todo -= n;
                 buf += n;
         }
@@ -2517,7 +2530,8 @@ dvb_aplay(av7110_t *av7110, const u8 *buf,
                         n=IPACKS*2;
                 if (copy_from_user(av7110->kbuf[type], buf, n)) 
                         return -EFAULT;
-                instant_repack(av7110->kbuf[type], n, &av7110->ipack[type]);
+                dvb_filter_instant_repack(av7110->kbuf[type], n,
+					  &av7110->ipack[type]);
 //                        memcpy(dvb->kbuf[type], buf, n); 
                 todo -= n;
                 buf += n;
@@ -2525,7 +2539,7 @@ dvb_aplay(av7110_t *av7110, const u8 *buf,
 	return count-todo;
 }
 
-void init_p2t(p2t_t *p, dvb_demux_feed_t *feed)
+void init_p2t(p2t_t *p, struct dvb_demux_feed *feed)
 {
 	memset(p->pes,0,TS_SIZE);
 	p->counter = 0;
@@ -2721,7 +2735,7 @@ int write_ts_header2(u16 pid, u8 *counter, int pes_start, u8 *buf, u8 length)
 
 
 void p_to_t(u8 const *buf, long int length, u16 pid, u8 *counter, 
-            dvb_demux_feed_t *feed)
+            struct dvb_demux_feed *feed)
 {
   
 	int l, pes_start;
@@ -3104,7 +3118,7 @@ static int dvb_mmap(struct file* file, struct vm_area_struct *vma)
 
 static unsigned int dvb_audio_poll(struct file *file, poll_table *wait)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         unsigned int mask=0;
 
@@ -3124,24 +3138,24 @@ static unsigned int dvb_audio_poll(struct file *file, poll_table *wait)
 
 
 static struct file_operations dvb_fops = {
-	ioctl:         dvb_ioctl,
-	mmap:          dvb_mmap,
-	llseek:        no_llseek    
+	.ioctl		= dvb_ioctl,
+	.mmap		= dvb_mmap,
+	.llseek		= no_llseek    
 };
 
 
 /* template for video_device-structure */
 static struct video_device dvb_template = {
-	owner:		THIS_MODULE,
-	name:	        "DVB Board",
-	type:	        VID_TYPE_TUNER		|
+	.owner		= THIS_MODULE,
+	.name		= "DVB Board",
+	.type		= VID_TYPE_TUNER	|
         	        VID_TYPE_CAPTURE	|
 	                VID_TYPE_OVERLAY	|
         	        VID_TYPE_CLIPPING	|
                 	VID_TYPE_FRAMERAM	|
 	                VID_TYPE_SCALES,
-	hardware:       VID_HARDWARE_SAA7146,
-	fops:		&dvb_fops
+	.hardware	= VID_HARDWARE_SAA7146,
+	.fops		= &dvb_fops
 };
 
 
@@ -3182,9 +3196,9 @@ static inline int vid_unregister(av7110_t *av7110)
  ******************************************************************************/
 
 static int 
-StartHWFilter(dvb_demux_filter_t *dvbdmxfilter)
+StartHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 {
-        dvb_demux_feed_t *dvbdmxfeed=dvbdmxfilter->feed;
+        struct dvb_demux_feed *dvbdmxfeed=dvbdmxfilter->feed;
         av7110_t *av7110=(av7110_t *) dvbdmxfeed->demux->priv;
         u16 buf[20];
         int ret, i;
@@ -3220,7 +3234,7 @@ StartHWFilter(dvb_demux_filter_t *dvbdmxfilter)
 }
 
 static int 
-StopHWFilter(dvb_demux_filter_t *dvbdmxfilter)
+StopHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 {
         av7110_t *av7110=(av7110_t *) dvbdmxfilter->feed->demux->priv;
         u16 buf[3];
@@ -3252,9 +3266,9 @@ StopHWFilter(dvb_demux_filter_t *dvbdmxfilter)
 
 
 static int 
-dvb_write_to_decoder(dvb_demux_feed_t *dvbdmxfeed, u8 *buf, size_t count)
+dvb_write_to_decoder(struct dvb_demux_feed *dvbdmxfeed, u8 *buf, size_t count)
 {
-        dvb_demux_t *dvbdmx=dvbdmxfeed->demux;
+        struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
         av7110_t *av7110=(av7110_t *) dvbdmx->priv;
         ipack *ipack=&av7110->ipack[dvbdmxfeed->pes_type];
 
@@ -3277,7 +3291,7 @@ dvb_write_to_decoder(dvb_demux_feed_t *dvbdmxfeed, u8 *buf, size_t count)
                 return -1;
         }
         if (buf[1]&0x40)
-                send_ipack_rest(ipack);
+                dvb_filter_ipack_flush(ipack);
 
         if (buf[3]&0x20) {  // adaptation field?
                 count-=buf[4]+1;
@@ -3287,14 +3301,15 @@ dvb_write_to_decoder(dvb_demux_feed_t *dvbdmxfeed, u8 *buf, size_t count)
                 }
         }
         
-        instant_repack(buf+4, count-4, &av7110->ipack[dvbdmxfeed->pes_type]);
+        dvb_filter_instant_repack(buf+4, count-4,
+				  &av7110->ipack[dvbdmxfeed->pes_type]);
         return 0;
 }
 
 static void
-dvb_feed_start_pid(dvb_demux_feed_t *dvbdmxfeed)
+dvb_feed_start_pid(struct dvb_demux_feed *dvbdmxfeed)
 {
-        dvb_demux_t *dvbdmx=dvbdmxfeed->demux;
+        struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
         av7110_t *av7110=(av7110_t *) dvbdmx->priv;
         u16 *pid=dvbdmx->pids, npids[5];
         int i;
@@ -3329,9 +3344,9 @@ dvb_feed_start_pid(dvb_demux_feed_t *dvbdmxfeed)
 }
 
 static void
-dvb_feed_stop_pid(dvb_demux_feed_t *dvbdmxfeed)
+dvb_feed_stop_pid(struct dvb_demux_feed *dvbdmxfeed)
 {
-        dvb_demux_t *dvbdmx=dvbdmxfeed->demux;
+        struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
         av7110_t *av7110=(av7110_t *) dvbdmx->priv;
         u16 *pid=dvbdmx->pids, npids[5];
         int i;
@@ -3365,9 +3380,9 @@ dvb_feed_stop_pid(dvb_demux_feed_t *dvbdmxfeed)
 }
 
 static int 
-dvb_start_feed(dvb_demux_feed_t *dvbdmxfeed)
+dvb_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 {
-        dvb_demux_t *dvbdmx=dvbdmxfeed->demux;
+        struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
         av7110_t *av7110=(av7110_t *) dvbdmx->priv;
 
         if (!dvbdmx->dmx.frontend)
@@ -3425,9 +3440,9 @@ dvb_start_feed(dvb_demux_feed_t *dvbdmxfeed)
 
 
 static int 
-dvb_stop_feed(dvb_demux_feed_t *dvbdmxfeed)
+dvb_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 {
-        dvb_demux_t *dvbdmx=dvbdmxfeed->demux;
+        struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
         av7110_t *av7110=(av7110_t *) dvbdmx->priv;
 
         if (av7110->saa->card_type>=DVB_CARD_TT_BUDGET) 
@@ -3468,8 +3483,8 @@ dvb_stop_feed(dvb_demux_feed_t *dvbdmxfeed)
 static void 
 restart_feeds(av7110_t *av7110)
 {
-        dvb_demux_t *dvbdmx=&av7110->demux;
-        dvb_demux_feed_t *feed;
+        struct dvb_demux *dvbdmx=&av7110->demux;
+        struct dvb_demux_feed *feed;
         int mode;
         int i;
 
@@ -3660,7 +3675,7 @@ ci_ll_read(ring_buffer_t *cibuf, struct file *file, char *buf, size_t count, lof
 static int 
 dvb_ca_open(struct inode *inode, struct file *file)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         int err=dvb_generic_open(inode, file);
 
@@ -3673,7 +3688,7 @@ dvb_ca_open(struct inode *inode, struct file *file)
 static unsigned 
 int dvb_ca_poll(struct file *file, poll_table *wait)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
 
         unsigned int mask=0;
@@ -3702,7 +3717,7 @@ static int
 dvb_ca_ioctl(struct inode *inode, struct file *file, 
              unsigned int cmd, void *parg)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         unsigned long arg=(unsigned long) parg;
 
@@ -3716,7 +3731,7 @@ dvb_ca_ioctl(struct inode *inode, struct file *file,
                 
         case CA_GET_CAP:
         {
-                ca_cap_t cap;
+                ca_caps_t cap;
                 
                 cap.slot_num=2;
 #ifdef NEW_CI
@@ -3788,7 +3803,7 @@ static ssize_t
 dvb_ca_write(struct file *file, const char *buf, 
              size_t count, loff_t *ppos)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         
         return ci_ll_write(&av7110->ci_wbuffer, file, buf, count, ppos);
@@ -3797,7 +3812,7 @@ dvb_ca_write(struct file *file, const char *buf,
 static ssize_t 
 dvb_ca_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
 
         return ci_ll_read(&av7110->ci_rbuffer, file, buf, count, ppos);
@@ -3812,7 +3827,7 @@ dvb_ca_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 
 static unsigned int dvb_video_poll(struct file *file, poll_table *wait)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         unsigned int mask=0;
 
@@ -3834,7 +3849,7 @@ static ssize_t
 dvb_video_write(struct file *file, const char *buf, 
                 size_t count, loff_t *ppos)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
 
         if (av7110->videostate.stream_source!=VIDEO_SOURCE_MEMORY) 
@@ -3847,7 +3862,7 @@ static ssize_t
 dvb_audio_write(struct file *file, const char *buf, 
                 size_t count, loff_t *ppos)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
 
         if (av7110->audiostate.stream_source!=AUDIO_SOURCE_MEMORY) {
@@ -3876,7 +3891,7 @@ play_iframe(av7110_t *av7110, u8 *buf, unsigned int len, int nonblock)
 	for (i=0; i<n; i++) 
                 dvb_play(av7110, buf, len, 0, 1, 1);
 
-	send_ipack_rest(&av7110->ipack[1]);
+	dvb_filter_ipack_flush(&av7110->ipack[1]);
 }
 
 
@@ -3884,7 +3899,7 @@ static int
 dvb_video_ioctl(struct inode *inode, struct file *file,
             unsigned int cmd, void *parg)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         unsigned long arg=(unsigned long) parg;
         int ret=0;
@@ -4041,7 +4056,7 @@ dvb_video_ioctl(struct inode *inode, struct file *file,
         
         case VIDEO_CLEAR_BUFFER:
                 ring_buffer_flush(&av7110->avout);
-                reset_ipack(&av7110->ipack[1]);
+                dvb_filter_ipack_reset(&av7110->ipack[1]);
                 
                 if (av7110->playing==RP_AV) {
                         outcom(av7110, COMTYPE_REC_PLAY, 
@@ -4073,7 +4088,7 @@ static int
 dvb_audio_ioctl(struct inode *inode, struct file *file,
             unsigned int cmd, void *parg)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         unsigned long arg=(unsigned long) parg;
         int ret=0;
@@ -4164,7 +4179,7 @@ dvb_audio_ioctl(struct inode *inode, struct file *file,
 
         case AUDIO_CLEAR_BUFFER:
                 ring_buffer_flush(&av7110->aout);
-                reset_ipack(&av7110->ipack[0]);
+                dvb_filter_ipack_reset(&av7110->ipack[0]);
                 if (av7110->playing==RP_AV)
                         outcom(av7110, COMTYPE_REC_PLAY, 
                                __Play, 2, AV_PES, 0);
@@ -4192,7 +4207,7 @@ static int
 dvb_osd_ioctl(struct inode *inode, struct file *file,
             unsigned int cmd, void *parg)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
 
 #ifdef CONFIG_DVB_AV7110_OSD
@@ -4204,7 +4219,7 @@ dvb_osd_ioctl(struct inode *inode, struct file *file,
 
 static int dvb_video_open(struct inode *inode, struct file *file)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         int err;
 
@@ -4220,7 +4235,7 @@ static int dvb_video_open(struct inode *inode, struct file *file)
 
 static int dvb_video_release(struct inode *inode, struct file *file)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
 
         AV_Stop(av7110, RP_VIDEO);
@@ -4229,7 +4244,7 @@ static int dvb_video_release(struct inode *inode, struct file *file)
 
 static int dvb_audio_open(struct inode *inode, struct file *file)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         int err=dvb_generic_open(inode, file);
 
@@ -4242,7 +4257,7 @@ static int dvb_audio_open(struct inode *inode, struct file *file)
 
 static int dvb_audio_release(struct inode *inode, struct file *file)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
         av7110_t *av7110=(av7110_t *) dvbdev->priv;
         
         AV_Stop(av7110, RP_AUDIO);
@@ -4256,75 +4271,70 @@ static int dvb_audio_release(struct inode *inode, struct file *file)
  ******************************************************************************/
 
 static struct file_operations dvb_video_fops = {
-	owner:		THIS_MODULE,
-        read:		0,
-	write:		dvb_video_write,
-	ioctl:		dvb_generic_ioctl,
-	open:		dvb_video_open,
-	release:	dvb_video_release,
-	poll:		dvb_video_poll,
+	.owner		= THIS_MODULE,
+	.write		= dvb_video_write,
+	.ioctl		= dvb_generic_ioctl,
+	.open		= dvb_video_open,
+	.release	= dvb_video_release,
+	.poll		= dvb_video_poll,
 };
 
-static dvb_device_t dvbdev_video = {
-        priv: 0,
-        users: 1,
-        writers: 1,
-        fops: &dvb_video_fops,
-        kernel_ioctl: dvb_video_ioctl,
+static struct dvb_device dvbdev_video = {
+	.priv		= 0,
+	.users		= 1,
+	.writers	= 1,
+	.fops		= &dvb_video_fops,
+	.kernel_ioctl	= dvb_video_ioctl,
 };
 
 static struct file_operations dvb_audio_fops = {
-	owner:		THIS_MODULE,
-        read:		0,
-	write:		dvb_audio_write,
-	ioctl:		dvb_generic_ioctl,
-	open:		dvb_audio_open,
-	release:	dvb_audio_release,
-	poll:		dvb_audio_poll,
+	.owner		= THIS_MODULE,
+	.write		= dvb_audio_write,
+	.ioctl		= dvb_generic_ioctl,
+	.open		= dvb_audio_open,
+	.release	= dvb_audio_release,
+	.poll		= dvb_audio_poll,
 };
 
-static dvb_device_t dvbdev_audio = {
-        priv: 0,
-        users: 1,
-        writers: 1,
-        fops: &dvb_audio_fops,
-        kernel_ioctl: dvb_audio_ioctl,
+static struct dvb_device dvbdev_audio = {
+	.priv		= 0,
+	.users		= 1,
+	.writers	= 1,
+	.fops		= &dvb_audio_fops,
+	.kernel_ioctl	= dvb_audio_ioctl,
 };
 
 static struct file_operations dvb_ca_fops = {
-	owner:		THIS_MODULE,
-        read:		dvb_ca_read,
-	write:		dvb_ca_write,
-	ioctl:		dvb_generic_ioctl,
-	open:		dvb_ca_open,
-	release:	dvb_generic_release,
-	poll:		dvb_ca_poll,
+	.owner		= THIS_MODULE,
+	.read		= dvb_ca_read,
+	.write		= dvb_ca_write,
+	.ioctl		= dvb_generic_ioctl,
+	.open		= dvb_ca_open,
+	.release	= dvb_generic_release,
+	.poll		= dvb_ca_poll,
 };
 
-static dvb_device_t dvbdev_ca = {
-        priv: 0,
-        users: 1,
-        writers: 1,
-        fops: &dvb_ca_fops,
-        kernel_ioctl: dvb_ca_ioctl,
+static struct dvb_device dvbdev_ca = {
+	.priv		= 0,
+	.users		= 1,
+	.writers	= 1,
+	.fops		= &dvb_ca_fops,
+	.kernel_ioctl	= dvb_ca_ioctl,
 };
 
 static struct file_operations dvb_osd_fops = {
-	owner:		THIS_MODULE,
-        read:		0,
-	write:		0,
-	ioctl:		dvb_generic_ioctl,
-	open:		dvb_generic_open,
-	release:	dvb_generic_release,
-	poll:		0,
+	.owner		= THIS_MODULE,
+	.ioctl		= dvb_generic_ioctl,
+	.open		= dvb_generic_open,
+	.release	= dvb_generic_release,
 };
 
-static dvb_device_t dvbdev_osd = {
-        priv: 0,
-        users: 1,
-        writers: 1,
-        fops: &dvb_osd_fops,
-        kernel_ioctl: dvb_osd_ioctl,
+static struct dvb_device dvbdev_osd = {
+	.priv		= 0,
+	.users		= 1,
+	.writers	= 1,
+	.fops		= &dvb_osd_fops,
+	.kernel_ioctl	= dvb_osd_ioctl,
 };
 
 
@@ -4359,7 +4369,7 @@ dvb_register(av7110_t *av7110)
 {
         int ret, i;
         dmx_frontend_t *dvbfront=&av7110->hw_frontend;
-        dvb_demux_t *dvbdemux=&av7110->demux;
+        struct dvb_demux *dvbdemux=&av7110->demux;
 
         if (av7110->registered)
                 return -1;
@@ -4414,7 +4424,7 @@ dvb_register(av7110_t *av7110)
                                              DMX_SECTION_FILTERING|
                                              DMX_MEMORY_BASED_FILTERING);
 
-                DvbDmxInit(&av7110->demux);
+                dvb_dmx_init(&av7110->demux);
 
 
                 dvbfront->id="hw_frontend";
@@ -4426,7 +4436,7 @@ dvb_register(av7110_t *av7110)
                 av7110->dmxdev.demux=&dvbdemux->dmx;
                 av7110->dmxdev.capabilities=0;
 
-                DmxDevInit(&av7110->dmxdev, av7110->dvb_adapter);
+                dvb_dmxdev_init(&av7110->dmxdev, av7110->dvb_adapter);
         }
 
         if (av7110->saa->card_type>=DVB_CARD_TT_BUDGET) {
@@ -4443,7 +4453,7 @@ dvb_register(av7110_t *av7110)
                                              DMX_SECTION_FILTERING|
                                              DMX_MEMORY_BASED_FILTERING);
 
-                DvbDmxInit(&av7110->demux);
+                dvb_dmx_init(&av7110->demux);
 
                 dvbfront->id="hw_frontend";
                 dvbfront->vendor="VLSI";
@@ -4454,7 +4464,7 @@ dvb_register(av7110_t *av7110)
                 av7110->dmxdev.demux=&dvbdemux->dmx;
                 av7110->dmxdev.capabilities=0;
 
-                DmxDevInit(&av7110->dmxdev, av7110->dvb_adapter);
+                dvb_dmxdev_init(&av7110->dmxdev, av7110->dvb_adapter);
         }
 
         ret=dvbdemux->dmx.add_frontend(&dvbdemux->dmx, 
@@ -4505,7 +4515,7 @@ dvb_register(av7110_t *av7110)
 static void 
 dvb_unregister(av7110_t *av7110)
 {
-        dvb_demux_t *dvbdemux=&av7110->demux;
+        struct dvb_demux *dvbdemux=&av7110->demux;
 
         if (!av7110->registered)
                 return;
@@ -4516,8 +4526,8 @@ dvb_unregister(av7110_t *av7110)
         dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &av7110->hw_frontend);
         dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &av7110->mem_frontend);
 
-        DmxDevRelease(&av7110->dmxdev);
-        DvbDmxRelease(&av7110->demux);
+        dvb_dmxdev_release(&av7110->dmxdev);
+        dvb_dmx_release(&av7110->demux);
 
 	if (av7110->saa->card_type==DVB_CARD_TT_SIEMENS) 
                 dvb_remove_frontend_notifier (av7110->dvb_adapter,
@@ -4584,9 +4594,9 @@ int av7110_attach (struct saa7146 *saa, void **av7110_ptr)
      
         av7110->vidmode=VIDEO_MODE_PAL;
 
-        init_ipack(&av7110->ipack[0], IPACKS, play_audio_cb);
+        dvb_filter_ipack_init(&av7110->ipack[0], IPACKS, play_audio_cb);
         av7110->ipack[0].data=(void *) av7110;
-        init_ipack(&av7110->ipack[1], IPACKS, play_video_cb);
+        dvb_filter_ipack_init(&av7110->ipack[1], IPACKS, play_video_cb);
         av7110->ipack[1].data=(void *) av7110;
         
 
@@ -4705,8 +4715,8 @@ int av7110_detach (struct saa7146 *saa, void** av7110_ptr)
 	saa7146_write(av7110->saa_mem, ISR,(MASK_19 | MASK_03));
 
 	ci_ll_release(&av7110->ci_rbuffer, &av7110->ci_wbuffer);
-	free_ipack(&av7110->ipack[0]);
-	free_ipack(&av7110->ipack[1]);
+	dvb_filter_ipack_free(&av7110->ipack[0]);
+	dvb_filter_ipack_free(&av7110->ipack[1]);
 	vfree(av7110->iobuf);
 	pci_free_consistent(av7110->saa->device, 8192, av7110->debi_virt,
 			    av7110->debi_bus);

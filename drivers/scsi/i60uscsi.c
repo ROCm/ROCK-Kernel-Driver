@@ -566,10 +566,10 @@ int orc_reset_scsi_bus(ORC_HCS * pHCB)
 	ORC_WR(pHCB->HCS_Base + ORC_HCTRL, SCSIRST);
 	if (waitSCSIRSTdone(pHCB) == FALSE) {
 		spin_unlock_irqrestore(&(pHCB->BitAllocFlagLock), flags);
-		return (SCSI_RESET_ERROR);
+		return FAILED;
 	} else {
 		spin_unlock_irqrestore(&(pHCB->BitAllocFlagLock), flags);
-		return (SCSI_RESET_SUCCESS);
+		return SUCCESS;
 	}
 }
 
@@ -581,7 +581,7 @@ int orc_reset_scsi_bus(ORC_HCS * pHCB)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target, unsigned int ResetFlags)
+int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target)
 {				/* I need Host Control Block Information */
 	ORC_SCB *pScb;
 	ESCB *pVirEscb;
@@ -608,11 +608,11 @@ int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target, unsi
 	if (i == ORC_MAXQUEUE) {
 		printk("Unable to Reset - No SCB Found\n");
 		spin_unlock_irqrestore(&(pHCB->BitAllocFlagLock), flags);
-		return (SCSI_RESET_NOT_RUNNING);
+		return FAILED;
 	}
 	if ((pScb = orc_alloc_scb(pHCB)) == NULL) {
 		spin_unlock_irqrestore(&(pHCB->BitAllocFlagLock), flags);
-		return (SCSI_RESET_NOT_RUNNING);
+		return FAILED;
 	}
 	pScb->SCB_Opcode = ORC_BUSDEVRST;
 	pScb->SCB_Target = target;
@@ -626,12 +626,10 @@ int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target, unsi
 	pScb->SCB_SGLen = 0;
 
 	pVirEscb->SCB_Srb = 0;
-	if (ResetFlags & SCSI_RESET_SYNCHRONOUS) {
-		pVirEscb->SCB_Srb = SCpnt;
-	}
+	pVirEscb->SCB_Srb = SCpnt;
 	orc_exec_scb(pHCB, pScb);	/* Start execute SCB            */
 	spin_unlock_irqrestore(&(pHCB->BitAllocFlagLock), flags);
-	return SCSI_RESET_PENDING;
+	return SUCCESS;
 }
 
 
@@ -838,21 +836,21 @@ int orc_abort_srb(ORC_HCS * hcsp, Scsi_Cmnd *SCpnt)
 		if ((pVirScb->SCB_Status) && (pVirEscb->SCB_Srb == SCpnt)) {
 			if (pVirScb->SCB_TagMsg == 0) {
 				spin_unlock_irqrestore(&(hcsp->BitAllocFlagLock), flags);
-				return (SCSI_ABORT_BUSY);
+				return FAILED;
 			} else {
 				if (abort_SCB(hcsp, pVirScb)) {
 					pVirEscb->SCB_Srb = NULL;
 					spin_unlock_irqrestore(&(hcsp->BitAllocFlagLock), flags);
-					return (SCSI_ABORT_SUCCESS);
+					return SUCCESS;
 				} else {
 					spin_unlock_irqrestore(&(hcsp->BitAllocFlagLock), flags);
-					return (SCSI_ABORT_NOT_RUNNING);
+					return FAILED;
 				}
 			}
 		}
 	}
 	spin_unlock_irqrestore(&(hcsp->BitAllocFlagLock), flags);
-	return (SCSI_ABORT_NOT_RUNNING);
+	return FAILED;
 }
 
 /***********************************************************************

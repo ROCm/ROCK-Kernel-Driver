@@ -90,7 +90,7 @@ dvb_unregister_frontend (int (*ioctl) (struct dvb_frontend *frontend,
  *  Return value: number of frontends where the ioctl's were applied.
  */
 extern int
-dvb_add_frontend_ioctls (struct dvb_adapter_s *adapter,
+dvb_add_frontend_ioctls (struct dvb_adapter *adapter,
 			 int (*before_ioctl) (struct dvb_frontend *frontend,
 					      unsigned int cmd, void *arg),
 			 int (*after_ioctl)  (struct dvb_frontend *frontend,
@@ -99,18 +99,18 @@ dvb_add_frontend_ioctls (struct dvb_adapter_s *adapter,
 
 
 extern void
-dvb_remove_frontend_ioctls (struct dvb_adapter_s *adapter,
+dvb_remove_frontend_ioctls (struct dvb_adapter *adapter,
 			    int (*before_ioctl) (struct dvb_frontend *frontend,
 					         unsigned int cmd, void *arg),
 			    int (*after_ioctl)  (struct dvb_frontend *frontend,
 					         unsigned int cmd, void *arg));
 
 extern int
-dvb_add_frontend_notifier (struct dvb_adapter_s *adapter,
+dvb_add_frontend_notifier (struct dvb_adapter *adapter,
 			   void (*callback) (fe_status_t s, void *data),
 			   void *data);
 extern void
-dvb_remove_frontend_notifier (struct dvb_adapter_s *adapter,
+dvb_remove_frontend_notifier (struct dvb_adapter *adapter,
 			      void (*callback) (fe_status_t s, void *data));
 
 #endif

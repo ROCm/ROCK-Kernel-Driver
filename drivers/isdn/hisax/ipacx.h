@@ -157,5 +157,6 @@
 
 extern void init_ipacx(struct IsdnCardState *cs, int part);
 extern void interrupt_ipacx(struct IsdnCardState *cs);
+extern void ipacx_fill_fifo(struct BCState *bcs);
 
 #endif

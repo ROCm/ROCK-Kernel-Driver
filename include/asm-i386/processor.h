@@ -221,6 +221,9 @@ static inline void clear_in_cr4 (unsigned long mask)
 /*
  *      NSC/Cyrix CPU configuration register indexes
  */
+
+#define CX86_PCR0 0x20
+#define CX86_GCR  0xb8
 #define CX86_CCR0 0xc0
 #define CX86_CCR1 0xc1
 #define CX86_CCR2 0xc2
@@ -229,6 +232,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define CX86_CCR5 0xe9
 #define CX86_CCR6 0xea
 #define CX86_CCR7 0xeb
+#define CX86_PCR1 0xf0
 #define CX86_DIR0 0xfe
 #define CX86_DIR1 0xff
 #define CX86_ARR_BASE 0xc4

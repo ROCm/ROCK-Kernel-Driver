@@ -57,7 +57,6 @@
 #include <linux/i2o.h>
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "../../scsi/sd.h"
 
 #if BITS_PER_LONG == 64
 #error FIXME: driver does not support 64-bit platforms
@@ -336,15 +335,10 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	return;
 }
 
-struct i2o_handler i2o_scsi_handler=
-{
-	i2o_scsi_reply,
-	NULL,
-	NULL,
-	NULL,
-	"I2O SCSI OSM",
-	0,
-	I2O_CLASS_SCSI_PERIPHERAL
+struct i2o_handler i2o_scsi_handler = {
+	.reply	= i2o_scsi_reply,
+	.name	= "I2O SCSI OSM",
+	.class	= I2O_CLASS_SCSI_PERIPHERAL,
 };
 
 /**
@@ -918,6 +912,7 @@ int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 	unsigned long msg;
 	u32 m;
 	int tid;
+	unsigned long timeout;
 	
 	printk(KERN_WARNING "i2o_scsi: Aborting command block.\n");
 	
@@ -930,21 +925,21 @@ int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 		return FAILED;
 	}
 	c = hostdata->controller;
-	
-	/*
-	 *	Obtain an I2O message. Right now we _have_ to obtain one
-	 *	until the scsi layer stuff is cleaned up.
-	 *
-	 *	FIXME: we are in error context so we could sleep retry
-	 * 	a bit and then bail in the improved scsi layer.
-	 */	
-	 
+
+	spin_unlock_irq(host->host_lock);
+		
+	timeout = jiffies+2*HZ;
 	do
 	{
-		mb();
 		m = le32_to_cpu(I2O_POST_READ32(c));
+		if(m != 0xFFFFFFFF)
+			break;
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(1);
+		mb();
 	}
-	while(m==0xFFFFFFFF);
+	while(time_before(jiffies, timeout));
+	
 	msg = c->mem_offset + m;
 	
 	i2o_raw_writel(FIVE_WORD_MSG_SIZE, msg);
@@ -955,6 +950,8 @@ int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 	wmb();
 	i2o_post_message(c,m);
 	wmb();
+	
+	spin_lock_irq(host->host_lock);
 	return SUCCESS;
 }
 
@@ -977,14 +974,20 @@ static int i2o_scsi_bus_reset(Scsi_Cmnd * SCpnt)
 	struct i2o_scsi_host *hostdata;
 	u32 m;
 	unsigned long msg;
+	unsigned long timeout;
 
+	
 	/*
 	 *	Find the TID for the bus
 	 */
 
-	printk(KERN_WARNING "i2o_scsi: Attempting to reset the bus.\n");
 	
 	host = SCpnt->host;
+
+	spin_unlock_irq(host->host_lock);
+
+	printk(KERN_WARNING "i2o_scsi: Attempting to reset the bus.\n");
+
 	hostdata = (struct i2o_scsi_host *)host->hostdata;
 	tid = hostdata->bus_task;
 	c = hostdata->controller;
@@ -994,15 +997,19 @@ static int i2o_scsi_bus_reset(Scsi_Cmnd * SCpnt)
 	 *	will be aborted by the IOP. We need to catch the reply
 	 *	possibly ?
 	 */
-	 
-	m = le32_to_cpu(I2O_POST_READ32(c));
+
+	timeout = jiffies+2*HZ;
+	do
+	{
+		m = le32_to_cpu(I2O_POST_READ32(c));
+		if(m != 0xFFFFFFFF)
+			break;
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(1);
+		mb();
+	}
+	while(time_before(jiffies, timeout));
 	
-	/*
-	 *	No free messages, try again next time - no big deal
-	 */
-	 
-	if(m == 0xFFFFFFFF)
-		return SCSI_RESET_PUNT;
 	
 	msg = c->mem_offset + m;
 	i2o_raw_writel(FOUR_WORD_MSG_SIZE|SGL_OFFSET_0, msg);
@@ -1012,7 +1019,12 @@ static int i2o_scsi_bus_reset(Scsi_Cmnd * SCpnt)
 	/* Now store unit,tid so we can tie the completion back to a specific device */
 	__raw_writel(c->unit << 16 | tid, msg+12);
 	wmb();
+
+	/* We want the command to complete after we return */	
+	spin_lock_irq(host->host_lock);
 	i2o_post_message(c,m);
+
+	/* Should we wait for the reset to complete ? */	
 	return SUCCESS;
 }
 
@@ -1044,8 +1056,9 @@ static int i2o_scsi_device_reset(Scsi_Cmnd * SCpnt)
 
 /**
  *	i2o_scsi_bios_param	-	Invent disk geometry
- *	@disk: device 
+ *	@sdev: scsi device 
  *	@dev: block layer device
+ *	@capacity: size in sectors
  *	@ip: geometry array
  *
  *	This is anyones guess quite frankly. We use the same rules everyone 

@@ -195,6 +195,7 @@ int __init macsonic_init(struct net_device* dev)
 	if ((lp->rba = (char *)
 	     kmalloc(SONIC_NUM_RRS * SONIC_RBSIZE, GFP_KERNEL | GFP_DMA)) == NULL) {
 		printk(KERN_ERR "%s: couldn't allocate receive buffers\n", dev->name);
+		kfree(lp);
 		return -ENOMEM;
 	}
 

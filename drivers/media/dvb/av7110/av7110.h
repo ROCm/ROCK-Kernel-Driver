@@ -479,7 +479,7 @@ typedef struct p2t_s {
         u8                counter;
         long int          pos;
         int               frags;
-        dvb_demux_feed_t *feed;
+        struct dvb_demux_feed *feed;
 } p2t_t;
 
 
@@ -561,7 +561,7 @@ typedef struct av7110_s {
 
         int                     vidmode;
         dmxdev_t                dmxdev;
-        dvb_demux_t             demux;
+        struct dvb_demux             demux;
         char                    demux_id[16];
 
         dmx_frontend_t          hw_frontend;
@@ -580,9 +580,9 @@ typedef struct av7110_s {
 #define TRICK_FREEZE 3
         struct audio_status      audiostate;
 
-        dvb_demux_filter_t     *handle2filter[32];
+        struct dvb_demux_filter     *handle2filter[32];
         p2t_t                   p2t_filter[MAXFILT];
-        pes2ts_t                p2t[2];
+        dvb_filter_pes2ts_t     p2t[2];
         struct ipack_s          ipack[2];
         u8                     *kbuf[2];
 
@@ -621,11 +621,11 @@ typedef struct av7110_s {
         ring_buffer_t       ci_wbuffer;
 
 
-        dvb_adapter_t       *dvb_adapter;
-        dvb_device_t        *video_dev;
-        dvb_device_t        *audio_dev;
-        dvb_device_t        *ca_dev;
-        dvb_device_t        *osd_dev;
+        struct dvb_adapter       *dvb_adapter;
+        struct dvb_device        *video_dev;
+        struct dvb_device        *audio_dev;
+        struct dvb_device        *ca_dev;
+        struct dvb_device        *osd_dev;
 
         int                 dsp_dev;
 } av7110_t;

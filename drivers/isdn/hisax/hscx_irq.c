@@ -43,15 +43,9 @@ waitforXFW(struct IsdnCardState *cs, int hscx)
 static inline void
 WriteHSCXCMDR(struct IsdnCardState *cs, int hscx, u_char data)
 {
-	long flags;
-
-	save_flags(flags);
-	cli();
 	waitforCEC(cs, hscx);
 	WRITEHSCX(cs, hscx, HSCX_CMDR, data);
-	restore_flags(flags);
 }
-
 
 
 static void
@@ -59,7 +53,6 @@ hscx_empty_fifo(struct BCState *bcs, int count)
 {
 	u_char *ptr;
 	struct IsdnCardState *cs = bcs->cs;
-	long flags;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "hscx_empty_fifo");
@@ -73,11 +66,8 @@ hscx_empty_fifo(struct BCState *bcs, int count)
 	}
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	bcs->hw.hscx.rcvidx += count;
-	save_flags(flags);
-	cli();
 	READHSCXFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
 	WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x80);
-	restore_flags(flags);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -95,8 +85,6 @@ hscx_fill_fifo(struct BCState *bcs)
 	int more, count;
 	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
 	u_char *ptr;
-	long flags;
-
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "hscx_fill_fifo");
@@ -114,15 +102,12 @@ hscx_fill_fifo(struct BCState *bcs)
 		count = bcs->tx_skb->len;
 
 	waitforXFW(cs, bcs->hw.hscx.hscx);
-	save_flags(flags);
-	cli();
 	ptr = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, count);
 	bcs->tx_cnt -= count;
-	bcs->hw.hscx.count += count;
+	bcs->count += count;
 	WRITEHSCXFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
 	WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, more ? 0x8 : 0xa);
-	restore_flags(flags);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -189,7 +174,7 @@ hscx_interrupt(struct IsdnCardState *cs, u_char val, u_char hscx)
 			}
 		}
 		bcs->hw.hscx.rcvidx = 0;
-		hscx_sched_event(bcs, B_RCVBUFREADY);
+		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
 		hscx_empty_fifo(bcs, fifo_size);
@@ -202,32 +187,18 @@ hscx_interrupt(struct IsdnCardState *cs, u_char val, u_char hscx)
 				skb_queue_tail(&bcs->rqueue, skb);
 			}
 			bcs->hw.hscx.rcvidx = 0;
-			hscx_sched_event(bcs, B_RCVBUFREADY);
+			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 	}
-	if (val & 0x10) {	/* XPR */
-		if (bcs->tx_skb) {
-			if (bcs->tx_skb->len) {
-				hscx_fill_fifo(bcs);
-				return;
-			} else {
-				if (bcs->st->lli.l1writewakeup &&
-					(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.hscx.count);
-				dev_kfree_skb_irq(bcs->tx_skb);
-				bcs->hw.hscx.count = 0; 
-				bcs->tx_skb = NULL;
-			}
-		}
-		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-			bcs->hw.hscx.count = 0;
-			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
-			hscx_fill_fifo(bcs);
-		} else {
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			hscx_sched_event(bcs, B_XMTBUFREADY);
-		}
+	if (val & 0x10) {
+		xmit_xpr_b(bcs);
 	}
+}
+
+static void
+reset_xmit(struct BCState *bcs)
+{
+	WriteHSCXCMDR(bcs->cs, bcs->hw.hscx.hscx, 0x01);
 }
 
 static inline void
@@ -237,30 +208,15 @@ hscx_int_main(struct IsdnCardState *cs, u_char val)
 	u_char exval;
 	struct BCState *bcs;
 
+	spin_lock(&cs->lock);
 	if (val & 0x01) {
 		bcs = cs->bcs + 1;
 		exval = READHSCX(cs, 1, HSCX_EXIR);
-		if (exval & 0x40) {
-			if (bcs->mode == 1)
-				hscx_fill_fifo(bcs);
-			else {
-#ifdef ERROR_STATISTIC
-				bcs->err_tx++;
-#endif
-				/* Here we lost an TX interrupt, so
-				   * restart transmitting the whole frame.
-				 */
-				if (bcs->tx_skb) {
-					skb_push(bcs->tx_skb, bcs->hw.hscx.count);
-					bcs->tx_cnt += bcs->hw.hscx.count;
-					bcs->hw.hscx.count = 0;
-				}
-				WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX B EXIR %x Lost TX", exval);
-			}
-		} else if (cs->debug & L1_DEB_HSCX)
+		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX B EXIR %x", exval);
+		if (exval & 0x40) {
+			xmit_xdu_b(bcs, reset_xmit);
+		}
 	}
 	if (val & 0xf8) {
 		if (cs->debug & L1_DEB_HSCX)
@@ -270,27 +226,11 @@ hscx_int_main(struct IsdnCardState *cs, u_char val)
 	if (val & 0x02) {
 		bcs = cs->bcs;
 		exval = READHSCX(cs, 0, HSCX_EXIR);
-		if (exval & 0x40) {
-			if (bcs->mode == L1_MODE_TRANS)
-				hscx_fill_fifo(bcs);
-			else {
-				/* Here we lost an TX interrupt, so
-				   * restart transmitting the whole frame.
-				 */
-#ifdef ERROR_STATISTIC
-				bcs->err_tx++;
-#endif
-				if (bcs->tx_skb) {
-					skb_push(bcs->tx_skb, bcs->hw.hscx.count);
-					bcs->tx_cnt += bcs->hw.hscx.count;
-					bcs->hw.hscx.count = 0;
-				}
-				WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX A EXIR %x Lost TX", exval);
-			}
-		} else if (cs->debug & L1_DEB_HSCX)
+		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX A EXIR %x", exval);
+		if (exval & 0x40) {
+			xmit_xdu_b(bcs, reset_xmit);
+		}
 	}
 	if (val & 0x04) {
 		exval = READHSCX(cs, 0, HSCX_ISTA);
@@ -298,4 +238,5 @@ hscx_int_main(struct IsdnCardState *cs, u_char val)
 			debugl1(cs, "HSCX A interrupt %x", exval);
 		hscx_interrupt(cs, exval, 0);
 	}
+	spin_unlock(&cs->lock);
 }

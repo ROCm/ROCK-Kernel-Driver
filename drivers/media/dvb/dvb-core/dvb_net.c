@@ -435,7 +435,7 @@ dvb_net_remove_if(dvb_net_t *dvbnet, int num)
 int dvb_net_ioctl(struct inode *inode, struct file *file, 
 		  unsigned int cmd, void *parg)
 {
-	dvb_device_t *dvbdev=(dvb_device_t *) file->private_data;
+	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
 	dvb_net_t *dvbnet=(dvb_net_t *) dvbdev->priv;
 
 	if (((file->f_flags&O_ACCMODE)==O_RDONLY))
@@ -462,21 +462,18 @@ int dvb_net_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct file_operations dvb_net_fops = {
-	owner:		THIS_MODULE,
-        read:		0,
-	write:		0,
-	ioctl:		dvb_generic_ioctl,
-	open:		dvb_generic_open,
-	release:	dvb_generic_release,
-	poll:		0,
+	.owner		= THIS_MODULE,
+	.ioctl		= dvb_generic_ioctl,
+	.open		= dvb_generic_open,
+	.release	= dvb_generic_release,
 };
 
-static dvb_device_t dvbdev_net = {
-        priv: 0,
-        users: 1,
-        writers: 1,
-        fops: &dvb_net_fops,
-        kernel_ioctl: dvb_net_ioctl,
+static struct dvb_device dvbdev_net = {
+	.priv		= 0,
+	.users		= 1,
+	.writers	= 1,
+	.fops		= &dvb_net_fops,
+	.kernel_ioctl	= dvb_net_ioctl,
 };
 
 void
@@ -493,7 +490,7 @@ dvb_net_release(dvb_net_t *dvbnet)
 }
 
 int
-dvb_net_init(dvb_adapter_t *adap, dvb_net_t *dvbnet, dmx_demux_t *demux)
+dvb_net_init(struct dvb_adapter *adap, dvb_net_t *dvbnet, dmx_demux_t *demux)
 {
 	int i;
 		

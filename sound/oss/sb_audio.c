@@ -602,8 +602,8 @@ static int sb16_audio_set_speed(int dev, int speed)
 
 	if (speed > 0)
 	{
-		if (speed < 5000)	/* which of these */
-			speed = 4000;	/* is correct ??? */
+		if (speed < 5000)
+			speed = 5000;
 
 		if (speed > max_speed)
 			speed = max_speed;

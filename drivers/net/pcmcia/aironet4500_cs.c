@@ -39,11 +39,6 @@ DRV_NAME ".c v" DRV_VERSION " 1/1/99 Elmer Joandi, elmer@ylenurme.ee.\n";
 #include <pcmcia/cistpl.h>
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ciscode.h>
-#if LINUX_VERSION_CODE < 0x20300
-#ifdef MODULE
-#include <pcmcia/k_compat.h>
-#endif
-#endif
 #include <pcmcia/ds.h>
 
 #include <asm/uaccess.h>

@@ -159,13 +159,13 @@ static void hpt34x_tune_drive (ide_drive_t *drive, u8 pio)
 	(void) hpt34x_tune_chipset(drive, (XFER_PIO_0 + pio));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 /*
  * This allows the configuration of ide_pci chipset registers
  * for cards that learn about the drive's UDMA, DMA, PIO capabilities
  * after the drive is reported by the OS.  Initally for designed for
  * HPT343 UDMA chipset by HighPoint|Triones Technologies, Inc.
  */
+
 static int config_chipset_for_dma (ide_drive_t *drive)
 {
 	u8 speed = ide_dma_speed(drive, hpt34x_ratemask(drive));
@@ -224,7 +224,6 @@ no_dma_set:
 #endif /* CONFIG_HPT34X_AUTODMA */
 	return hwif->ide_dma_on(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /*
  * If the BIOS does not set the IO base addaress to XX00, 343 will fail.
@@ -306,13 +305,11 @@ static void __init init_hwif_hpt34x (ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x07;
 	hwif->swdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_check = &hpt34x_config_drive_xfer_rate;
 	if (!noautodma)
 		hwif->autodma = (pcicmd & PCI_COMMAND_MEMORY) ? 1 : 0;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 static void __init init_dma_hpt34x (ide_hwif_t *hwif, unsigned long dmabase)

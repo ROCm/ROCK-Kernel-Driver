@@ -450,7 +450,6 @@ static int ali15x3_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 
 		if (speed < XFER_SW_DMA_0)
 			ali15x3_tune_drive(drive, speed);
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	} else {
 		pci_read_config_byte(dev, m5229_udma, &tmpbyte);
 		tmpbyte &= (0x0f << ((1-unit) << 2));
@@ -464,12 +463,10 @@ static int ali15x3_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 			tmpbyte |= 1;
 			pci_write_config_byte(dev, 0x4b, tmpbyte);
 		}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	}
 	return (ide_config_drive_speed(drive, speed));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 
 /**
  *	config_chipset_for_dma	-	set up DMA mode
@@ -562,7 +559,6 @@ static int ali15x3_dma_write (ide_drive_t *drive)
 		return 1;	/* try PIO instead of DMA */
 	return __ide_dma_write(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /**
  *	init_chipset_ali15x3	-	Initialise an ALi IDE controller
@@ -756,7 +752,6 @@ static void __init init_hwif_common_ali15x3 (ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x07;
 	hwif->swdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
         if (m5229_revision >= 0x20) {
                 /*
                  * M1543C or newer for DMAing
@@ -770,7 +765,6 @@ static void __init init_hwif_common_ali15x3 (ide_hwif_t *hwif)
 	}
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 /**
@@ -854,6 +848,12 @@ extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 static int __devinit alim15x3_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	ide_pci_device_t *d = &ali15x3_chipsets[id->driver_data];
+	
+	if(pci_find_device(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_IGP, NULL))
+	{
+		printk(KERN_ERR "Warning: ATI Radeon IGP Northbridge is not supported by Linux\n");
+		return 1;
+	}
 #if defined(CONFIG_SPARC64)
 	d->init_hwif = init_hwif_common_ali15x3;
 #endif /* CONFIG_SPARC64 */

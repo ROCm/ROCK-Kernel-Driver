@@ -298,6 +298,16 @@ BChannel_proc_rcv(struct BCState *bcs)
 	}
 }
 
+static void
+BChannel_proc_cmpl(struct BCState *bcs)
+{
+	struct sk_buff *skb;
+
+	while ((skb = skb_dequeue(&bcs->cmpl_queue))) {
+		L1L2(bcs->st, PH_DATA | CONFIRM, skb);
+	}
+}
+
 void
 BChannel_bh(void *data)
 {
@@ -307,6 +317,8 @@ BChannel_bh(void *data)
 		BChannel_proc_rcv(bcs);
 	if (test_and_clear_bit(B_XMTBUFREADY, &bcs->event))
 		BChannel_proc_xmt(bcs);
+	if (test_and_clear_bit(B_CMPLREADY, &bcs->event))
+		BChannel_proc_cmpl(bcs);
 }
 
 void

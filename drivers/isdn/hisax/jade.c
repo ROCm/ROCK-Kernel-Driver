@@ -134,49 +134,20 @@ modejade(struct BCState *bcs, int mode, int bc)
 	cs->BC_Write_Reg(cs, jade, jade_HDLC_IMR, 0x00);
 }
 
-void
-jade_sched_event(struct BCState *bcs, int event)
-{
-    bcs->event |= 1 << event;
-    schedule_work(&bcs->work);
-}
-
 static void
 jade_l2l1(struct PStack *st, int pr, void *arg)
 {
     struct sk_buff *skb = arg;
-    unsigned long flags;
 
     switch (pr) {
 	case (PH_DATA | REQUEST):
-		spin_lock_irqsave(&jade_lock, flags);
-		if (st->l1.bcs->tx_skb) {
-			skb_queue_tail(&st->l1.bcs->squeue, skb);
-			spin_unlock_irqrestore(&jade_lock, flags);
-		} else {
-			st->l1.bcs->tx_skb = skb;
-			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-			st->l1.bcs->hw.hscx.count = 0;
-			spin_unlock_irqrestore(&jade_lock, flags);
-			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-		}
+		xmit_data_req_b(st->l1.bcs, skb);
 		break;
 	case (PH_PULL | INDICATION):
-		if (st->l1.bcs->tx_skb) {
-			printk(KERN_WARNING "jade_l2l1: this shouldn't happen\n");
-			break;
-		}
-		test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-		st->l1.bcs->tx_skb = skb;
-		st->l1.bcs->hw.hscx.count = 0;
-		st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
+		xmit_pull_ind_b(st->l1.bcs, skb);
 		break;
 	case (PH_PULL | REQUEST):
-		if (!st->l1.bcs->tx_skb) {
-		    test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-		    L1L2(st, PH_PULL | CONFIRM, NULL);
-		} else
-		    test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+		xmit_pull_req_b(st);
 		break;
 	case (PH_ACTIVATE | REQUEST):
 		test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
@@ -263,40 +234,32 @@ setstack_jade(struct PStack *st, struct BCState *bcs)
 }
 
 void __init
-clear_pending_jade_ints(struct IsdnCardState *cs)
-{
-	int val;
-	char tmp[64];
-
-	cs->BC_Write_Reg(cs, 0, jade_HDLC_IMR, 0x00);
-	cs->BC_Write_Reg(cs, 1, jade_HDLC_IMR, 0x00);
-
-	val = cs->BC_Read_Reg(cs, 1, jade_HDLC_ISR);
-	sprintf(tmp, "jade B ISTA %x", val);
-	debugl1(cs, tmp);
-	val = cs->BC_Read_Reg(cs, 0, jade_HDLC_ISR);
-	sprintf(tmp, "jade A ISTA %x", val);
-	debugl1(cs, tmp);
-	val = cs->BC_Read_Reg(cs, 1, jade_HDLC_STAR);
-	sprintf(tmp, "jade B STAR %x", val);
-	debugl1(cs, tmp);
-	val = cs->BC_Read_Reg(cs, 0, jade_HDLC_STAR);
-	sprintf(tmp, "jade A STAR %x", val);
-	debugl1(cs, tmp);
-	/* Unmask ints */
-	cs->BC_Write_Reg(cs, 0, jade_HDLC_IMR, 0xF8);
-	cs->BC_Write_Reg(cs, 1, jade_HDLC_IMR, 0xF8);
-}
-
-void __init
 initjade(struct IsdnCardState *cs)
 {
+	int val;
+
 	cs->bcs[0].BC_SetStack = setstack_jade;
 	cs->bcs[1].BC_SetStack = setstack_jade;
 	cs->bcs[0].BC_Close = close_jadestate;
 	cs->bcs[1].BC_Close = close_jadestate;
 	cs->bcs[0].hw.hscx.hscx = 0;
 	cs->bcs[1].hw.hscx.hscx = 1;
+
+	cs->BC_Write_Reg(cs, 0, jade_HDLC_IMR, 0x00);
+	cs->BC_Write_Reg(cs, 1, jade_HDLC_IMR, 0x00);
+
+	val = cs->BC_Read_Reg(cs, 1, jade_HDLC_ISR);
+	debugl1(cs, "jade B ISTA %x", val);
+	val = cs->BC_Read_Reg(cs, 0, jade_HDLC_ISR);
+	debugl1(cs, "jade A ISTA %x", val);
+	val = cs->BC_Read_Reg(cs, 1, jade_HDLC_STAR);
+	debugl1(cs, "jade B STAR %x", val);
+	val = cs->BC_Read_Reg(cs, 0, jade_HDLC_STAR);
+	debugl1(cs, "jade A STAR %x", val);
+
+	/* Unmask ints */
+	cs->BC_Write_Reg(cs, 0, jade_HDLC_IMR, 0xF8);
+	cs->BC_Write_Reg(cs, 1, jade_HDLC_IMR, 0xF8);
 
 	/* Stop DSP audio tx/rx */
 	jade_write_indirect(cs, 0x11, 0x0f);

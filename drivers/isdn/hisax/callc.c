@@ -29,8 +29,6 @@ const char *lli_revision = "$Revision: 2.51.6.6 $";
 
 extern struct IsdnCard cards[];
 extern int nrcards;
-extern void HiSax_mod_dec_use_count(struct IsdnCardState *cs);
-extern void HiSax_mod_inc_use_count(struct IsdnCardState *cs);
 
 static int init_b_st(struct Channel *chanp, int incoming);
 static void release_b_st(struct Channel *chanp);
@@ -1068,7 +1066,6 @@ init_d_st(struct Channel *chanp)
 	setstack_isdnl2(st, tmp);
 	setstack_l3dc(st, chanp);
 	st->lli.userdata = chanp;
-	st->lli.l2writewakeup = NULL;
 	st->lli.l3l4 = dchan_l3l4;
 
 	return 0;
@@ -1186,13 +1183,30 @@ CallcFreeChan(struct IsdnCardState *csta)
 }
 
 static void
+ll_writewakeup(struct Channel *chanp, struct sk_buff *skb)
+{
+	isdn_ctrl ic;
+
+	if (skb->pkt_type != PACKET_NOACK) {
+		if (chanp->debug & 0x800)
+			link_debug(chanp, 0, "llwakeup: %d", skb->truesize);
+		ic.driver = chanp->cs->myid;
+		ic.command = ISDN_STAT_BSENT;
+		ic.arg = chanp->chan;
+		ic.parm.length = skb->truesize;
+		chanp->cs->iif.statcallb(&ic);
+	}
+	dev_kfree_skb(skb);
+}
+
+static void
 lldata_handler(struct PStack *st, int pr, void *arg)
 {
 	struct Channel *chanp = (struct Channel *) st->lli.userdata;
 	struct sk_buff *skb = arg;
 
 	switch (pr) {
-		case (DL_DATA  | INDICATION):
+		case (DL_DATA | INDICATION):
 			if (chanp->data_open) {
 				if (chanp->debug & 0x800)
 					link_debug(chanp, 0, "lldata: %d", skb->len);
@@ -1201,6 +1215,9 @@ lldata_handler(struct PStack *st, int pr, void *arg)
 				link_debug(chanp, 0, "lldata: channel not open");
 				dev_kfree_skb(skb);
 			}
+			break;
+		case (DL_DATA | CONFIRM):
+			ll_writewakeup(chanp, skb);
 			break;
 		case (DL_ESTABLISH | INDICATION):
 		case (DL_ESTABLISH | CONFIRM):
@@ -1234,6 +1251,9 @@ lltrans_handler(struct PStack *st, int pr, void *arg)
 				dev_kfree_skb(skb);
 			}
 			break;
+		case (PH_DATA | CONFIRM):
+			ll_writewakeup(chanp, skb);
+			break;
 		case (PH_ACTIVATE | INDICATION):
 		case (PH_ACTIVATE | CONFIRM):
 			FsmEvent(&chanp->fi, EV_BC_EST, NULL);
@@ -1247,21 +1267,6 @@ lltrans_handler(struct PStack *st, int pr, void *arg)
 				pr);
 			break;
 	}
-}
-
-static void
-ll_writewakeup(struct PStack *st, int len)
-{
-	struct Channel *chanp = st->lli.userdata;
-	isdn_ctrl ic;
-
-	if (chanp->debug & 0x800)
-		link_debug(chanp, 0, "llwakeup: %d", len);
-	ic.driver = chanp->cs->myid;
-	ic.command = ISDN_STAT_BSENT;
-	ic.arg = chanp->chan;
-	ic.parm.length = len;
-	chanp->cs->iif.statcallb(&ic);
 }
 
 static int
@@ -1314,8 +1319,6 @@ init_b_st(struct Channel *chanp, int incoming)
 			setstack_l3bc(st, chanp);
 			st->l3.l2l3 = lldata_handler;
 			st->lli.userdata = chanp;
-			st->lli.l1writewakeup = NULL;
-			st->lli.l2writewakeup = ll_writewakeup;
 			st->l2.l2m.debug = chanp->debug & 16;
 			st->l2.debug = chanp->debug & 64;
 			break;
@@ -1326,7 +1329,6 @@ init_b_st(struct Channel *chanp, int incoming)
 		case (ISDN_PROTO_L2_FAX):
 			st->l2.l1l2 = lltrans_handler;
 			st->lli.userdata = chanp;
-			st->lli.l1writewakeup = ll_writewakeup;
 			setstack_transl2(st);
 			setstack_l3bc(st, chanp);
 			break;
@@ -1584,22 +1586,6 @@ HiSax_command(isdn_ctrl * ic)
 					break;
 			}
 			break;
-		case (ISDN_CMD_LOCK):
-			HiSax_mod_inc_use_count(csta);
-#ifdef MODULE
-			if (csta->channel[0].debug & 0x400)
-				HiSax_putstatus(csta, "   LOCK ", "modcnt %lx",
-					MOD_USE_COUNT);
-#endif				/* MODULE */
-			break;
-		case (ISDN_CMD_UNLOCK):
-			HiSax_mod_dec_use_count(csta);
-#ifdef MODULE
-			if (csta->channel[0].debug & 0x400)
-				HiSax_putstatus(csta, " UNLOCK ", "modcnt %lx",
-					MOD_USE_COUNT);
-#endif				/* MODULE */
-			break;
 		case (ISDN_CMD_IOCTL):
 			switch (ic->arg) {
 				case (0):
@@ -1622,14 +1608,6 @@ HiSax_command(isdn_ctrl * ic)
 						csta->cardnr + 1, num);
 					printk(KERN_DEBUG "HiSax: delay card %d set to %d ms\n",
 						csta->cardnr + 1, num);
-					break;
-				case (3):
-					for (i = 0; i < *(unsigned int *) ic->parm.num; i++)
-						HiSax_mod_dec_use_count(NULL);
-					break;
-				case (4):
-					for (i = 0; i < *(unsigned int *) ic->parm.num; i++)
-						HiSax_mod_inc_use_count(NULL);
 					break;
 				case (5):	/* set card in leased mode */
 					num = *(unsigned int *) ic->parm.num;
@@ -1693,12 +1671,6 @@ HiSax_command(isdn_ctrl * ic)
 					}
 					L4L3(chanp->d_st, DL_ESTABLISH | REQUEST, NULL);
 					break;
-#ifdef MODULE
-				case (55):
-					MOD_USE_COUNT = 0;
-					HiSax_mod_inc_use_count(NULL);
-					break;
-#endif				/* MODULE */
 				case (11):
 					num = csta->debug & DEB_DLOG_HEX;
 					csta->debug = *(unsigned int *) ic->parm.num;

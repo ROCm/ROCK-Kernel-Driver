@@ -233,10 +233,7 @@ telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u_char val;
 
-	if (!cs) {
-		printk(KERN_WARNING "TelesPCI: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	val = readhscx(cs->hw.teles0.membase, 1, HSCX_ISTA);
 	if (val)
 		hscx_int_main(cs, val);
@@ -252,6 +249,7 @@ telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writeisac(cs->hw.teles0.membase, ISAC_MASK, 0x0);
 	writehscx(cs->hw.teles0.membase, 0, HSCX_MASK, 0x0);
 	writehscx(cs->hw.teles0.membase, 1, HSCX_MASK, 0x0);
+	spin_unlock(&cs->lock);
 }
 
 void
@@ -270,7 +268,7 @@ TelesPCI_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_telespci(cs);
 			return(0);
 		case CARD_INIT:
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			return(0);

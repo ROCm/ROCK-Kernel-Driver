@@ -148,14 +148,14 @@ void ide_tcq_intr_timeout(unsigned long data)
 	ide_hwif_t *hwif = HWIF(drive);
 	unsigned long flags;
 
-	printk("ide_tcq_intr_timeout: timeout waiting for %s interrupt\n", hwgroup->rq ? "completion" : "service");
+	printk(KERN_ERR "ide_tcq_intr_timeout: timeout waiting for %s interrupt\n", hwgroup->rq ? "completion" : "service");
 
 	spin_lock_irqsave(&ide_lock, flags);
 
 	if (!hwgroup->busy)
-		printk("ide_tcq_intr_timeout: hwgroup not busy\n");
+		printk(KERN_ERR "ide_tcq_intr_timeout: hwgroup not busy\n");
 	if (hwgroup->handler == NULL)
-		printk("ide_tcq_intr_timeout: missing isr!\n");
+		printk(KERN_ERR "ide_tcq_intr_timeout: missing isr!\n");
 
 	hwgroup->busy = 1;
 	spin_unlock_irqrestore(&ide_lock, flags);
@@ -261,7 +261,7 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 	hwif->OUTB(WIN_QUEUED_SERVICE, IDE_COMMAND_REG);
 
 	if (ide_tcq_wait_altstat(drive, &stat, BUSY_STAT)) {
-		printk("ide_service: BUSY clear took too long\n");
+		printk(KERN_ERR "ide_service: BUSY clear took too long\n");
 		ide_dump_status(drive, "ide_service", stat);
 		ide_tcq_invalidate_queue(drive);
 		return ide_stopped;
@@ -284,7 +284,7 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 	feat = hwif->INB(IDE_NSECTOR_REG);
 	if (feat & REL) {
 		HWGROUP(drive)->rq = NULL;
-		printk("%s: release in service\n", drive->name);
+		printk(KERN_ERR "%s: release in service\n", drive->name);
 		return ide_stopped;
 	}
 
@@ -307,7 +307,7 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 		return HWIF(drive)->ide_dma_queued_start(drive);
 	}
 
-	printk("ide_service: missing request for tag %d\n", tag);
+	printk(KERN_ERR "ide_service: missing request for tag %d\n", tag);
 	spin_unlock_irqrestore(&ide_lock, flags);
 	return ide_stopped;
 }
@@ -347,14 +347,14 @@ ide_startstop_t ide_dmaq_complete(ide_drive_t *drive, struct request *rq, byte s
 	 * must be end of I/O, check status and complete as necessary
 	 */
 	if (unlikely(!OK_STAT(stat, READY_STAT, drive->bad_wstat | DRQ_STAT))) {
-		printk("ide_dmaq_intr: %s: error status %x\n",drive->name,stat);
+		printk(KERN_ERR "ide_dmaq_intr: %s: error status %x\n",drive->name,stat);
 		ide_dump_status(drive, "ide_dmaq_complete", stat);
 		ide_tcq_invalidate_queue(drive);
 		return ide_stopped;
 	}
 
 	if (dma_stat)
-		printk("%s: bad DMA status (dma_stat=%x)\n", drive->name, dma_stat);
+		printk(KERN_WARNING "%s: bad DMA status (dma_stat=%x)\n", drive->name, dma_stat);
 
 	TCQ_PRINTK("ide_dmaq_complete: ending %p, tag %d\n", rq, rq->tag);
 	ide_end_request(drive, 1, rq->nr_sectors);
@@ -465,7 +465,7 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	args->command_type = ide_cmd_type_parser(args);
 
 	if (ide_raw_taskfile(drive, args, NULL)) {
-		printk("%s: failed to enable write cache\n", drive->name);
+		printk(KERN_WARNING "%s: failed to enable write cache\n", drive->name);
 		goto err;
 	}
 
@@ -479,7 +479,7 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	args->command_type = ide_cmd_type_parser(args);
 
 	if (ide_raw_taskfile(drive, args, NULL)) {
-		printk("%s: disabling release interrupt fail\n", drive->name);
+		printk(KERN_ERR "%s: disabling release interrupt fail\n", drive->name);
 		goto err;
 	}
 
@@ -493,7 +493,7 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	args->command_type = ide_cmd_type_parser(args);
 
 	if (ide_raw_taskfile(drive, args, NULL)) {
-		printk("%s: enabling service interrupt fail\n", drive->name);
+		printk(KERN_ERR "%s: enabling service interrupt fail\n", drive->name);
 		goto err;
 	}
 #endif
@@ -518,7 +518,7 @@ static int ide_enable_queued(ide_drive_t *drive, int on)
 	 */
 	if (!on) {
 		if (drive->using_tcq)
-			printk("%s: TCQ disabled\n", drive->name);
+			printk(KERN_INFO "%s: TCQ disabled\n", drive->name);
 
 		drive->using_tcq = 0;
 		return 0;
@@ -541,7 +541,7 @@ static int ide_enable_queued(ide_drive_t *drive, int on)
 	ide_tcq_check_autopoll(drive);
 
 	if (depth != drive->queue_depth)
-		printk("%s: tagged command queueing enabled, command queue depth %d\n", drive->name, drive->queue_depth);
+		printk(KERN_INFO "%s: tagged command queueing enabled, command queue depth %d\n", drive->name, drive->queue_depth);
 
 	drive->using_tcq = 1;
 	return 0;
@@ -588,7 +588,7 @@ int __ide_dma_queued_on(ide_drive_t *drive)
 		return 1;
 
 	if (ata_pending_commands(drive)) {
-		printk("ide-tcq; can't toggle tcq feature on busy drive\n");
+		printk(KERN_WARNING "ide-tcq; can't toggle tcq feature on busy drive\n");
 		return 1;
 	}
 
@@ -692,10 +692,10 @@ ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive)
 	TCQ_PRINTK("ide_dma: setting up queued tag=%d\n", rq->tag);
 
 	if (!hwgroup->busy)
-		printk("queued_rw: hwgroup not busy\n");
+		printk(KERN_ERR "queued_rw: hwgroup not busy\n");
 
 	if (ide_tcq_wait_dataphase(drive)) {
-		printk("timeout waiting for data phase\n");
+		printk(KERN_WARNING "timeout waiting for data phase\n");
 		return ide_stopped;
 	}
 

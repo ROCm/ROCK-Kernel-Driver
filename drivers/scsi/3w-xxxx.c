@@ -189,6 +189,7 @@ MODULE_LICENSE("GPL");
 #include <linux/smp.h>
 #include <linux/reboot.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
 
 #include <asm/errno.h>
 #include <asm/io.h>

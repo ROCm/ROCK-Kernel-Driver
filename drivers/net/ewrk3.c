@@ -332,8 +332,6 @@ static struct net_device *insert_device(struct net_device *dev, u_long iobase, i
 
 
 #ifdef MODULE
-int init_module(void);
-void cleanup_module(void);
 static int autoprobed = 1, loading_module = 1;
 
 #else
@@ -2083,7 +2081,25 @@ MODULE_PARM(irq, "0-21i");
 MODULE_PARM_DESC(io, "EtherWORKS 3 I/O base address(es)");
 MODULE_PARM_DESC(irq, "EtherWORKS 3 IRQ number(s)");
 
-int init_module(void)
+static void ewrk3_exit_module(void)
+{
+	int i;
+
+	for( i=0; i<ndevs; i++ ) {
+		unregister_netdev(ewrk3_devs[i]);
+		if (ewrk3_devs[i]->priv) {
+			kfree(ewrk3_devs[i]->priv);
+			ewrk3_devs[i]->priv = NULL;
+		}
+		ewrk3_devs[i]->irq = 0;
+
+		release_region(ewrk3_devs[i]->base_addr, EWRK3_TOTAL_SIZE);
+		kfree(ewrk3_devs[i]);
+		ewrk3_devs[i] = NULL;
+	}
+}
+
+static int ewrk3_init_module(void)
 {
 	int i=0;
 
@@ -2107,27 +2123,14 @@ int init_module(void)
 	return ndevs ? 0 : -EIO;
 
 error:
-	cleanup_module();
+	ewrk3_exit_module();
 	return -ENOMEM;
 }
 
-void cleanup_module(void)
-{
-	int i;
 
-	for( i=0; i<ndevs; i++ ) {
-		unregister_netdev(ewrk3_devs[i]);
-		if (ewrk3_devs[i]->priv) {
-			kfree(ewrk3_devs[i]->priv);
-			ewrk3_devs[i]->priv = NULL;
-		}
-		ewrk3_devs[i]->irq = 0;
-
-		release_region(ewrk3_devs[i]->base_addr, EWRK3_TOTAL_SIZE);
-		kfree(ewrk3_devs[i]);
-		ewrk3_devs[i] = NULL;
-	}
-}
+/* Hack for breakage in new module stuff */
+module_exit(ewrk3_exit_module);
+module_init(ewrk3_init_module);
 #endif				/* MODULE */
 MODULE_LICENSE("GPL");
 

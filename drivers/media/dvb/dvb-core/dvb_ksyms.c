@@ -9,11 +9,12 @@
 #include "dvb_net.h"
 
 
-EXPORT_SYMBOL(DmxDevInit);
-EXPORT_SYMBOL(DmxDevRelease);
-EXPORT_SYMBOL(DvbDmxInit);
-EXPORT_SYMBOL(DvbDmxRelease);
-EXPORT_SYMBOL(DvbDmxSWFilterPackets);
+EXPORT_SYMBOL(dvb_dmxdev_init);
+EXPORT_SYMBOL(dvb_dmxdev_release);
+EXPORT_SYMBOL(dvb_dmx_init);
+EXPORT_SYMBOL(dvb_dmx_release);
+EXPORT_SYMBOL(dvb_dmx_swfilter_packet);
+EXPORT_SYMBOL(dvb_dmx_swfilter_packets);
 
 EXPORT_SYMBOL(dvb_register_frontend);
 EXPORT_SYMBOL(dvb_unregister_frontend);
@@ -37,13 +38,12 @@ EXPORT_SYMBOL(dvb_unregister_device);
 EXPORT_SYMBOL(dvb_generic_ioctl);
 EXPORT_SYMBOL(dvb_generic_open);
 EXPORT_SYMBOL(dvb_generic_release);
-EXPORT_SYMBOL(generic_usercopy);
 
-EXPORT_SYMBOL(init_ipack);
-EXPORT_SYMBOL(reset_ipack);
-EXPORT_SYMBOL(free_ipack);
-EXPORT_SYMBOL(send_ipack_rest);
-EXPORT_SYMBOL(instant_repack);
-EXPORT_SYMBOL(pes2ts_init);
-EXPORT_SYMBOL(pes2ts);
+EXPORT_SYMBOL(dvb_filter_ipack_init);
+EXPORT_SYMBOL(dvb_filter_ipack_reset);
+EXPORT_SYMBOL(dvb_filter_ipack_free);
+EXPORT_SYMBOL(dvb_filter_ipack_flush);
+EXPORT_SYMBOL(dvb_filter_instant_repack);
+EXPORT_SYMBOL(dvb_filter_pes2ts_init);
+EXPORT_SYMBOL(dvb_filter_pes2ts);
 

@@ -141,10 +141,7 @@ ix1micro_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u_char val;
 
-	if (!cs) {
-		printk(KERN_WARNING "IX1: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	val = readreg(cs->hw.ix1.hscx_ale, cs->hw.ix1.hscx, HSCX_ISTA + 0x40);
       Start_HSCX:
 	if (val)
@@ -171,6 +168,7 @@ ix1micro_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.ix1.isac_ale, cs->hw.ix1.isac, ISAC_MASK, 0);
 	writereg(cs->hw.ix1.hscx_ale, cs->hw.ix1.hscx, HSCX_MASK, 0);
 	writereg(cs->hw.ix1.hscx_ale, cs->hw.ix1.hscx, HSCX_MASK + 0x40, 0);
+	spin_unlock(&cs->lock);
 }
 
 void
@@ -205,7 +203,7 @@ ix1_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_ix1micro(cs);
 			return(0);
 		case CARD_INIT:
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			return(0);

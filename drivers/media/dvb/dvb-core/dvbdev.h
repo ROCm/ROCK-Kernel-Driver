@@ -43,49 +43,48 @@
 #define DVB_DEVICE_OSD        8
 
 
-typedef struct dvb_adapter_s
-{
+struct dvb_adapter {
 	int num;
 	devfs_handle_t devfs_handle;
 	struct list_head list_head;
 	struct list_head device_list;
-} dvb_adapter_t;
+};
 
 
-typedef struct dvb_device
-{
+struct dvb_device {
 	struct list_head list_head;
 	struct file_operations *fops;
 	devfs_handle_t devfs_handle;
-	dvb_adapter_t *adapter;
+	struct dvb_adapter *adapter;
 	int type;
 	u32 id;
 
 	int users;
 	int writers;
 
-	/* don't really need those !? */
+        /* don't really need those !? -- FIXME: use video_usercopy  */
 	int (*kernel_ioctl)(struct inode *inode, struct file *file,
-			    unsigned int cmd, void *arg);  // FIXME: use generic_usercopy()
+			    unsigned int cmd, void *arg);
 
 	void *priv;
-} dvb_device_t;
+};
 
 
-int dvb_register_device(dvb_adapter_t *adap, dvb_device_t **pdvbdev, 
-			dvb_device_t *template, void *priv, int type);
-void dvb_unregister_device(struct dvb_device *dvbdev);
+extern int dvb_register_adapter (struct dvb_adapter **padap, char *name);
+extern int dvb_unregister_adapter (struct dvb_adapter *adap);
 
-int dvb_register_adapter(dvb_adapter_t **padap, char *name);
-int dvb_unregister_adapter(dvb_adapter_t *adap);
+extern int dvb_register_device (struct dvb_adapter *adap,
+				struct dvb_device **pdvbdev, 
+				const struct dvb_device *template,
+				void *priv,
+				int type);
 
-int dvb_generic_ioctl(struct inode *inode, struct file *file,
+extern void dvb_unregister_device (struct dvb_device *dvbdev);
+
+extern int dvb_generic_open (struct inode *inode, struct file *file);
+extern int dvb_generic_release (struct inode *inode, struct file *file);
+extern int dvb_generic_ioctl (struct inode *inode, struct file *file,
 		      unsigned int cmd, unsigned long arg);
-int dvb_generic_open(struct inode *inode, struct file *file);
-int dvb_generic_release(struct inode *inode, struct file *file);
-int generic_usercopy(struct inode *inode, struct file *file,
-		     unsigned int cmd, unsigned long arg,
-		     int (*func)(struct inode *inode, struct file *file,
-				 unsigned int cmd, void *arg));
 
-#endif /* #ifndef __DVBDEV_H */
+#endif /* #ifndef _DVBDEV_H_ */
+

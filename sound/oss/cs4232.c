@@ -382,10 +382,11 @@ static int cs4232_pnp_probe(struct pnp_dev *dev, const struct pnp_id *card_id, c
 	isapnpcfg->io_base	= dev->resource[0].start;
 	if (probe_cs4232(isapnpcfg,TRUE) == 0) {
 		printk(KERN_ERR "cs4232: ISA PnP card found, but not detected?\n");
+		kfree(isapnpcfg);
 		return -ENODEV;
 	}
 	attach_cs4232(isapnpcfg);
-	dev->driver_data = isapnpcfg;
+	pci_set_drvdata(dev,isapnpcfg);
 	return 0;
 }
 

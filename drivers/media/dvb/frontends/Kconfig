@@ -23,6 +23,30 @@ config DVB_ALPS_BSRV2
 	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
 
+config DVB_ALPS_TDLB7
+	tristate "Alps TDLB7 (OFDM)"
+	depends on DVB_CORE
+	help
+	  A DVB-T tuner module. Say Y when you want to support this frontend.
+
+	  This tuner module needs some microcode located in a file called 
+	  "Sc_main.mc" in the windows driver. Please pass the module parameter
+	  mcfile="/PATH/FILENAME" when loading alps_tdlb7.o.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+
+config DVB_ALPS_TDMB7
+	tristate "Alps BSRV2 (OFDM)"
+	depends on DVB_CORE
+	help
+	  A DVB-S tuner module. Say Y when you want to support this frontend.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+
 config DVB_GRUNDIG_29504_491
 	tristate "Grundig 29504-491 (QPSK)"
 	depends on DVB_CORE

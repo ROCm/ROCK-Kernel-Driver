@@ -103,8 +103,7 @@ typedef struct
 	int		card_id;	/* unique id assigned to this card */
 	int		card_type;	/* use DIA_CARD_TYPE_xxx above */
 	int		bus_type;	/* use DIA_BUS_TYPE_xxx above */
-	int		bus_num;	/* bus number (instance number of bus type) */
-	int		func_num;	/* adapter function number (PCI register) */
+	struct pci_dev *pdev;
 	int		slot;		/* slot number in bus */
 	unsigned char	irq;		/* IRQ number */
     int     reset_base; /* Reset register  for I/O mapped cards */

@@ -308,15 +308,12 @@ elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val;
 	int icnt=5;
 
-	if (!cs) {
-		printk(KERN_WARNING "Elsa: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	if ((cs->typ == ISDN_CTYPE_ELSA_PCMCIA) && (*cs->busy_flag == 1)) {
 	/* The card tends to generate interrupts while being removed
 	   causing us to just crash the kernel. bad. */
 		printk(KERN_WARNING "Elsa: card not available!\n");
-		return;
+		goto unlock;
 	}
 #if ARCOFI_USE
 	if (cs->hw.elsa.MFlag) {
@@ -378,6 +375,8 @@ elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.elsa.ale, cs->hw.elsa.hscx, HSCX_MASK, 0x0);
 	writereg(cs->hw.elsa.ale, cs->hw.elsa.hscx, HSCX_MASK + 0x40, 0x0);
 	writereg(cs->hw.elsa.ale, cs->hw.elsa.isac, ISAC_MASK, 0x0);
+ unlock:
+	spin_unlock(&cs->lock);
 }
 
 static void
@@ -679,7 +678,6 @@ Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			return(0);
 		case CARD_INIT:
 			cs->debug |= L1_DEB_IPAC;
-			inithscxisac(cs, 1);
 			if ((cs->subtyp == ELSA_QS1000) ||
 			    (cs->subtyp == ELSA_QS3000))
 			{
@@ -687,7 +685,7 @@ Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			}
 			if (cs->hw.elsa.trig)
 				byteout(cs->hw.elsa.trig, 0xff);
-			inithscxisac(cs, 2);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			if ((cs->subtyp == ELSA_PCMCIA) ||

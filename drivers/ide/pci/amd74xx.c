@@ -148,7 +148,6 @@ static int amd74xx_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	pio_timing	&= ~(0x03 << drive->dn);
 
 	switch(speed) {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_UDMA_7:
 		case XFER_UDMA_6:
 			speed = XFER_UDMA_5;
@@ -194,7 +193,6 @@ static int amd74xx_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		case XFER_SW_DMA_0:
 			dma_pio_timing |= 0xA8;
 			break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4:
 			dma_pio_timing |= 0x20;
 			break;
@@ -215,9 +213,7 @@ static int amd74xx_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 
 	pio_timing |= (0x03 << drive->dn);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	pci_write_config_byte(dev, drive_pci[drive->dn], ultra_timing);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	pci_write_config_byte(dev, drive_pci2[drive->dn], dma_pio_timing);
 	pci_write_config_byte(dev, 0x4c, pio_timing);
 
@@ -230,7 +226,6 @@ static void amd74xx_tune_drive (ide_drive_t *drive, u8 pio)
 	(void) amd74xx_tune_chipset(drive, (XFER_PIO_0 + pio));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 /*
  * This allows the configuration of ide_pci chipset registers
  * for cards that learn about the drive's UDMA, DMA, PIO capabilities
@@ -290,14 +285,11 @@ no_dma_set:
 	}
 	return hwif->ide_dma_on(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 static unsigned int __init init_chipset_amd74xx (struct pci_dev *dev, const char *name)
 {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (!amd74xx_swdma_check(dev))
 		printk("%s: disabling single-word DMA support (revision < C4)\n", name);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 #if defined(DISPLAY_VIPER_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!amd74xx_proc) {
@@ -348,11 +340,7 @@ static unsigned int __init ata66_amd74xx (ide_hwif_t *hwif)
 		default:
 			break;
 	}
-#ifdef CONFIG_AMD74XX_OVERRIDE
-	return(1);
-#else
 	return (unsigned int) ata66;
-#endif /* CONFIG_AMD74XX_OVERRIDE */
 }
 
 static void __init init_hwif_amd74xx (ide_hwif_t *hwif)
@@ -373,7 +361,6 @@ static void __init init_hwif_amd74xx (ide_hwif_t *hwif)
 	if (amd74xx_swdma_check(hwif->pci_dev))
 		hwif->swdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (!(hwif->udma_four))
 		hwif->udma_four = ata66_amd74xx(hwif);
 	hwif->ide_dma_check = &amd74xx_config_drive_xfer_rate;
@@ -381,7 +368,6 @@ static void __init init_hwif_amd74xx (ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 static void __init init_dma_amd74xx (ide_hwif_t *hwif, unsigned long dmabase)

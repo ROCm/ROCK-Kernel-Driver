@@ -895,7 +895,7 @@ nm256_resetAC97 (struct ac97_hwint *dev)
 
     /* Reset the mixer.  'Tis magic!  */
     nm256_writePort8 (card, 2, 0x6c0, 1);
-    nm256_writePort8 (card, 2, 0x6cc, 0x87);
+//  nm256_writePort8 (card, 2, 0x6cc, 0x87);	/* This crashes Dell latitudes */
     nm256_writePort8 (card, 2, 0x6cc, 0x80);
     nm256_writePort8 (card, 2, 0x6cc, 0x0);
 

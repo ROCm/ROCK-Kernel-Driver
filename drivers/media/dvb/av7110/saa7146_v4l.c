@@ -320,7 +320,6 @@ static int saa7146_v4l_command(struct saa7146* saa, void *p, unsigned int cmd, v
 						
 			/* set corresponding buffer to ´unused´ */
 			saa->frame_stat[i] = GBUFFER_UNUSED;
-printk ("saa7146_v4l.o: SAA7146_V4L_CSYNC, frame %i done.\n", i);
 
 			break;
 		}

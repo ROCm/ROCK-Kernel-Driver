@@ -307,10 +307,7 @@ diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val, sval;
 	int cnt=5;
 
-	if (!cs) {
-		printk(KERN_WARNING "Diva: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	while (((sval = bytein(cs->hw.diva.ctrl)) & DIVA_IRQ_REQ) && cnt) {
 		val = readreg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_ISTA + 0x40);
 		if (val)
@@ -328,6 +325,7 @@ diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, ISAC_MASK, 0x0);
 	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK, 0x0);
 	writereg(cs->hw.diva.hscx_adr, cs->hw.diva.hscx, HSCX_MASK + 0x40, 0x0);
+	spin_unlock(&cs->lock);
 }
 
 static void
@@ -456,46 +454,19 @@ static void
 Memhscx_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int more, count, cnt;
+	int more, count;
 	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
-	u_char *ptr,*p;
-	unsigned long flags;
+	unsigned char *p;
 
-
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hscx_fill_fifo");
-
-	if (!bcs->tx_skb)
-		return;
-	if (bcs->tx_skb->len <= 0)
+	p = xmit_fill_fifo_b(bcs, fifo_size, &count, &more);
+	if (!p)
 		return;
 
-	more = (bcs->mode == L1_MODE_TRANS) ? 1 : 0;
-	if (bcs->tx_skb->len > fifo_size) {
-		more = !0;
-		count = fifo_size;
-	} else
-		count = bcs->tx_skb->len;
-	cnt = count;
 	MemwaitforXFW(cs, bcs->hw.hscx.hscx);
-	spin_lock_irqsave(&diva_lock, flags);
-	p = ptr = bcs->tx_skb->data;
-	skb_pull(bcs->tx_skb, count);
-	bcs->tx_cnt -= count;
-	bcs->hw.hscx.count += count;
-	while(cnt--)
+	while (count--)
 		memwritereg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0,
 			*p++);
 	MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, more ? 0x8 : 0xa);
-	spin_unlock_irqrestore(&diva_lock, flags);
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "hscx_fill_fifo %c cnt %d",
-			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, bcs->blog);
-	}
 }
 
 static inline void
@@ -542,7 +513,7 @@ Memhscx_interrupt(struct IsdnCardState *cs, u_char val, u_char hscx)
 			}
 		}
 		bcs->hw.hscx.rcvidx = 0;
-		hscx_sched_event(bcs, B_RCVBUFREADY);
+		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
 		Memhscx_empty_fifo(bcs, fifo_size);
@@ -555,32 +526,18 @@ Memhscx_interrupt(struct IsdnCardState *cs, u_char val, u_char hscx)
 				skb_queue_tail(&bcs->rqueue, skb);
 			}
 			bcs->hw.hscx.rcvidx = 0;
-			hscx_sched_event(bcs, B_RCVBUFREADY);
+			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 	}
-	if (val & 0x10) {	/* XPR */
-		if (bcs->tx_skb) {
-			if (bcs->tx_skb->len) {
-				Memhscx_fill_fifo(bcs);
-				return;
-			} else {
-				if (bcs->st->lli.l1writewakeup &&
-					(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.hscx.count);
-				dev_kfree_skb_irq(bcs->tx_skb);
-				bcs->hw.hscx.count = 0; 
-				bcs->tx_skb = NULL;
-			}
-		}
-		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-			bcs->hw.hscx.count = 0;
-			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
-			Memhscx_fill_fifo(bcs);
-		} else {
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			hscx_sched_event(bcs, B_XMTBUFREADY);
-		}
+	if (val & 0x10) {
+		xmit_xpr_b(bcs);/* XPR */
 	}
+}
+
+static void
+Memhscx_reset_xmit(struct BCState *bcs)
+{
+	MemWriteHSCXCMDR(bcs->cs, bcs->hw.hscx.hscx, 0x01);
 }
 
 static inline void
@@ -594,23 +551,10 @@ Memhscx_int_main(struct IsdnCardState *cs, u_char val)
 		bcs = cs->bcs + 1;
 		exval = MemReadHSCX(cs, 1, HSCX_EXIR);
 		if (exval & 0x40) {
-			if (bcs->mode == 1)
-				Memhscx_fill_fifo(bcs);
-			else {
-				/* Here we lost an TX interrupt, so
-				   * restart transmitting the whole frame.
-				 */
-				if (bcs->tx_skb) {
-					skb_push(bcs->tx_skb, bcs->hw.hscx.count);
-					bcs->tx_cnt += bcs->hw.hscx.count;
-					bcs->hw.hscx.count = 0;
-				}
-				MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX B EXIR %x Lost TX", exval);
-			}
-		} else if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX B EXIR %x", exval);
+			if (cs->debug & L1_DEB_HSCX)
+				debugl1(cs, "HSCX B EXIR %x", exval);
+			xmit_xdu_b(bcs, Memhscx_reset_xmit);
+		}
 	}
 	if (val & 0xf8) {
 		if (cs->debug & L1_DEB_HSCX)
@@ -621,23 +565,10 @@ Memhscx_int_main(struct IsdnCardState *cs, u_char val)
 		bcs = cs->bcs;
 		exval = MemReadHSCX(cs, 0, HSCX_EXIR);
 		if (exval & 0x40) {
-			if (bcs->mode == L1_MODE_TRANS)
-				Memhscx_fill_fifo(bcs);
-			else {
-				/* Here we lost an TX interrupt, so
-				   * restart transmitting the whole frame.
-				 */
-				if (bcs->tx_skb) {
-					skb_push(bcs->tx_skb, bcs->hw.hscx.count);
-					bcs->tx_cnt += bcs->hw.hscx.count;
-					bcs->hw.hscx.count = 0;
-				}
-				MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x01);
-				if (cs->debug & L1_DEB_WARN)
-					debugl1(cs, "HSCX A EXIR %x Lost TX", exval);
-			}
-		} else if (cs->debug & L1_DEB_HSCX)
-			debugl1(cs, "HSCX A EXIR %x", exval);
+			if (cs->debug & L1_DEB_HSCX)
+				debugl1(cs, "HSCX A EXIR %x", exval);
+			xmit_xdu_b(bcs, Memhscx_reset_xmit);
+		}
 	}
 	if (val & 0x04) {	// ICA
 		exval = MemReadHSCX(cs, 0, HSCX_ISTA);
@@ -714,7 +645,7 @@ diva_irq_ipacx_pci(int intno, void *dev_id, struct pt_regs *regs)
 	cfg = (u_char *) cs->hw.diva.pci_cfg;
 	val = *cfg;
 	if (!(val &PITA_INT0_STATUS)) return; // other shared IRQ
-  interrupt_ipacx(cs);      // handler for chip
+	interrupt_ipacx(cs);      // handler for chip
 	*cfg = PITA_INT0_STATUS;  // Reset PLX interrupt
 }
 
@@ -860,7 +791,7 @@ Diva_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 				ireg = (unsigned int *)cs->hw.diva.pci_cfg;
 				*ireg = PITA_INT0_ENABLE;
 			}
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			return(0);
@@ -1163,7 +1094,7 @@ ready:
 		cs->writeisacfifo = &MemWriteISACfifo_IPACX;
 		cs->BC_Read_Reg  = &MemReadHSCX_IPACX;
 		cs->BC_Write_Reg = &MemWriteHSCX_IPACX;
-		cs->BC_Send_Data = 0; // function located in ipacx module
+		cs->BC_Send_Data = &ipacx_fill_fifo;
 		cs->irq_func = &diva_irq_ipacx_pci;
 		printk(KERN_INFO "Diva: IPACX Design Id: %x\n", 
             MemReadISAC_IPACX(cs, IPACX_ID) &0x3F);

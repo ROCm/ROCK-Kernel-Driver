@@ -27,26 +27,6 @@
 #ifndef IRDA_VLSI_FIR_H
 #define IRDA_VLSI_FIR_H
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,4)
-#ifdef CONFIG_PROC_FS
-/* PDE() introduced in 2.5.4 */
-#define PDE(inode) ((inode)->u.generic_ip)
-#endif
-#endif
-
-/*
- * #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,xx)
- *
- * missing pci-dma api call to give streaming dma buffer back to hw
- * patch floating on lkml - probably present in 2.5.26 or later
- * otherwise defining it as noop is ok, since the vlsi-ir is only
- * used on two oldish x86-based notebooks which are cache-coherent
- */
-#define pci_dma_prep_single(dev, addr, size, direction)	/* nothing */
-/*
- * #endif
- */
-
 /* ================================================================ */
 
 /* non-standard PCI registers */

@@ -1428,6 +1428,9 @@ static int saa_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 				if (copy_from_user(saa->dmavid2, vw.clips,
 						   VIDEO_CLIPMAP_SIZE))
 					return -EFAULT;
+			}
+			else if (vw.clipcount > 16384) {
+				return -EINVAL;
 			} else if (vw.clipcount > 0) {
 				if ((vcp = vmalloc(sizeof(struct video_clip) *
 					        (vw.clipcount))) == NULL)

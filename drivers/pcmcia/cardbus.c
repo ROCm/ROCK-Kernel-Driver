@@ -283,6 +283,8 @@ int cb_alloc(socket_info_t * s)
 		dev->hdr_type = hdr & 0x7f;
 
 		pci_setup_device(dev);
+		if (pci_enable_device(dev))
+			continue;
 
 		strcpy(dev->dev.bus_id, dev->slot_name);
 
@@ -300,7 +302,6 @@ int cb_alloc(socket_info_t * s)
 			pci_writeb(dev, PCI_INTERRUPT_LINE, irq);
 		}
 
-		pci_enable_device(dev); /* XXX check return */
 		device_register(&dev->dev);
 		pci_insert_device(dev, bus);
 	}

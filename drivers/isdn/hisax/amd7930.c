@@ -115,14 +115,7 @@ Bchan_xmt_bh(void *data)
 		dev_kfree_skb(bcs->hw.amd7930.tx_skb);
 		bcs->hw.amd7930.tx_skb = NULL;
 	}
-
-	if ((skb = skb_dequeue(&bcs->squeue))) {
-		Bchan_fill_fifo(bcs, skb);
-	} else {
-		clear_bit(BC_FLG_BUSY, &bcs->Flag);
-		bcs->event |= 1 << B_XMTBUFREADY;
-		schedule_work(&bcs->work);
-	}
+	xmit_ready_b(bcs);
 }
 
 static void

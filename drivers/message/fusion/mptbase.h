@@ -13,7 +13,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptbase.h,v 1.134 2002/10/03 13:10:12 pdelaney Exp $
+ *  $Id: mptbase.h,v 1.136 2002/10/21 13:51:54 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -80,8 +80,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2002 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"2.02.01.07"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.02.01.07"
+#define MPT_LINUX_VERSION_COMMON	"2.03.00.02"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.03.00.02"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -301,6 +301,7 @@ typedef enum {
 	FC919 = 0x0919,
 	FC929 = 0x0929,
 	C1030 = 0x1030,
+	C1035 = 0x1035,
 	FCUNK = 0xFBAD
 } CHIP_TYPE;
 
@@ -368,6 +369,7 @@ typedef struct _ScsiCmndTracker {
 typedef struct _VirtDevice {
 	struct _VirtDevice	*forw;
 	struct _VirtDevice	*back;
+	struct scsi_device	*device;
 	rwlock_t		 VdevLock;
 	int			 ref_cnt;
 	u8			 tflags;
@@ -912,6 +914,10 @@ typedef struct _MPT_SCSI_HOST {
 	MPT_FRAME_HDR		 *cmdPtr;		/* Ptr to nonOS request */
 	struct scsi_cmnd	 *abortSCpnt;
 	MPT_LOCAL_REPLY		  localReply;		/* internal cmd reply struct */
+	unsigned long		  hard_resets;		/* driver forced bus resets count */
+	unsigned long		  soft_resets;		/* fw/external bus resets count */
+	unsigned long		  timeouts;		/* cmd timeouts */
+	ushort			  sel_timeout[MPT_MAX_FC_DEVICES];
 } MPT_SCSI_HOST;
 
 /*

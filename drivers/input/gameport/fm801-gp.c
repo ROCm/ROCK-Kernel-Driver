@@ -116,7 +116,7 @@ static int __devinit fm801_gp_probe(struct pci_dev *pci, const struct pci_device
 	gameport_register_port(&gp->gameport);
 
 	printk(KERN_INFO "gameport: %s at pci%s speed %d kHz\n",
-		pci->name, pci->slot_name, gp->gameport.speed);
+		pci->dev.name, pci->slot_name, gp->gameport.speed);
 
 	return 0;
 }

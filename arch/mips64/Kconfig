@@ -693,7 +693,7 @@ config CROSSCOMPILE
 	  architecture than the one it is intended to run on.
 
 config MIPS_FPE_MODULE
-	bool "Build fp execption handler module"
+	bool "Build fp exception handler module"
 	depends on MODULES
 	help
 	  Build the floating point exception handler module. This option is

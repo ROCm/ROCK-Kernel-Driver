@@ -432,8 +432,7 @@ static void got_frame(struct BCState *bcs, int count) {
 		memcpy(skb_put(skb, count), bcs->hw.tiger.rcvbuf, count);
 		skb_queue_tail(&bcs->rqueue, skb);
 	}
-	bcs->event |= 1 << B_RCVBUFREADY;
-	schedule_work(&bcs->work);
+	sched_b_event(bcs, B_RCVBUFREADY);
 	
 	if (bcs->cs->debug & L1_DEB_RECEIVE_FRAME)
 		printframe(bcs->cs, bcs->hw.tiger.rcvbuf, count, "rec");
@@ -760,11 +759,7 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 			if (!bcs->tx_skb) {
 				debugl1(bcs->cs,"tiger write_raw: NULL skb s_cnt %d", s_cnt);
 			} else {
-				if (bcs->st->lli.l1writewakeup &&
-					(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->tx_skb->len);
-				dev_kfree_skb_any(bcs->tx_skb);
-				bcs->tx_skb = NULL;
+				xmit_complete_b(bcs);
 			}
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 			bcs->hw.tiger.free = cnt - s_cnt;
@@ -788,8 +783,7 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 						debugl1(bcs->cs, "tiger write_raw: fill rest %d",
 							cnt - s_cnt);
 				}
-				bcs->event |= 1 << B_XMTBUFREADY;
-				schedule_work(&bcs->work);
+				sched_b_event(bcs, B_XMTBUFREADY);
 			}
 		}
 	} else if (test_and_clear_bit(BC_FLG_NOFRAME, &bcs->Flag)) {
@@ -838,36 +832,16 @@ static void
 tiger_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			spin_lock_irqsave(&netjet_lock, flags);
-			if (st->l1.bcs->tx_skb) {
-				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				spin_unlock_irqrestore(&netjet_lock, flags);
-			} else {
-				st->l1.bcs->tx_skb = skb;
-				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-				spin_unlock_irqrestore(&netjet_lock, flags);
-			}
+			xmit_data_req_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | INDICATION):
-			if (st->l1.bcs->tx_skb) {
-				printk(KERN_WARNING "tiger_l2l1: this shouldn't happen\n");
-				break;
-			}
-			spin_lock_irqsave(&netjet_lock, flags);
-			st->l1.bcs->tx_skb = skb;
-			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-			spin_unlock_irqrestore(&netjet_lock, flags);
+			xmit_pull_ind_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | REQUEST):
-			if (!st->l1.bcs->tx_skb) {
-				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				L1L2(st, PH_PULL | CONFIRM, NULL);
-			} else
-				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+			xmit_pull_req_b(st);
 			break;
 		case (PH_ACTIVATE | REQUEST):
 			test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);

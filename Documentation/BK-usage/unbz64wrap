@@ -15,7 +15,7 @@ if mimencode -u < /dev/null > /dev/null 2>&1 ; then
 		case $LINE in
 		begin-base64*) SHOW=YES ;;
 		====) SHOW= ;;
-		*) [ "$SHOW" ] && echo $LINE ;;
+		*) [ "$SHOW" ] && echo "$LINE" ;;
 		esac
 	done | mimencode -u | bunzip2
 	exit $?

@@ -44,6 +44,12 @@
 static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
 
 /*
+ *	Is the SiS APIC rmw bug present ?
+ *	-1 = dont know, 0 = no, 1 = yes
+ */
+int sis_apic_bug = -1;
+
+/*
  * # of IRQ routing registers
  */
 int nr_ioapic_registers[MAX_IO_APICS];
@@ -122,7 +128,7 @@ static void __init replace_pin_at_irq(unsigned int irq,
 			break;						\
 		reg = io_apic_read(entry->apic, 0x10 + R + pin*2);	\
 		reg ACTION;						\
-		io_apic_modify(entry->apic, reg);			\
+		io_apic_modify(entry->apic, 0x10 + R + pin*2, reg);	\
 		if (!entry->next)					\
 			break;						\
 		entry = irq_2_pin + entry->next;			\
@@ -1738,6 +1744,18 @@ void __init setup_IO_APIC(void)
 	print_IO_APIC();
 }
 
+/*
+ *	Called after all the initialization is done. If we didnt find any
+ *	APIC bugs then we can allow the modify fast path
+ */
+ 
+static void __init io_apic_bug_finalize(void)
+{
+	if(sis_apic_bug == -1)
+		sis_apic_bug = 0;
+}
+
+late_initcall(io_apic_bug_finalize);
 
 /* --------------------------------------------------------------------------
                           ACPI-based IOAPIC Configuration

@@ -46,12 +46,36 @@
 #define		CARD_BUS(type)		((type>>4)&0xF)
 #define		CARD_PHASE(type)	(type&0xF)
 
+#define		TYPE_SI1_ISA		CARD_TYPE(BUS_ISA,SI1_Z280)
 #define		TYPE_SI2_ISA		CARD_TYPE(BUS_ISA,SI2_Z280)
 #define		TYPE_SI2_EISA		CARD_TYPE(BUS_EISA,SI2_Z280)
 #define		TYPE_SI2_PCI		CARD_TYPE(BUS_PCI,SI2_Z280)
 
 #define		TYPE_SX_ISA		CARD_TYPE(BUS_ISA,SI3_T225)
 #define		TYPE_SX_PCI		CARD_TYPE(BUS_PCI,SI3_T225)
+/*****************************************************************************
+******************************                  ******************************
+******************************   Phase 1 Z280   ******************************
+******************************                  ******************************
+*****************************************************************************/
+
+/* ISA board details... */
+#define		SI1_ISA_WINDOW_LEN	0x10000		/* 64 Kbyte shared memory window */
+//#define 	SI1_ISA_MEMORY_LEN	0x8000		/* Usable memory  - unused define*/
+//#define		SI1_ISA_ADDR_LOW	0x0A0000	/* Lowest address = 640 Kbyte */
+//#define		SI1_ISA_ADDR_HIGH	0xFF8000	/* Highest address = 16Mbyte - 32Kbyte */
+//#define		SI2_ISA_ADDR_STEP	SI2_ISA_WINDOW_LEN/* ISA board address step */
+//#define		SI2_ISA_IRQ_MASK	0x9800		/* IRQs 15,12,11 */
+
+/* ISA board, register definitions... */
+//#define		SI2_ISA_ID_BASE		0x7FF8			/* READ:  Board ID string */
+#define		SI1_ISA_RESET		0x8000		/* WRITE: Host Reset */
+#define		SI1_ISA_RESET_CLEAR	0xc000		/* WRITE: Host Reset clear*/
+#define		SI1_ISA_WAIT	        0x9000		/* WRITE: Host wait */
+#define		SI1_ISA_WAIT_CLEAR	0xd000		/* WRITE: Host wait clear */
+#define		SI1_ISA_INTCL        	0xa000		/* WRITE: Host Reset */
+#define		SI1_ISA_INTCL_CLEAR	0xe000		/* WRITE: Host Reset */
+
 
 /*****************************************************************************
 ******************************                  ******************************

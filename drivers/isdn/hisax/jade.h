@@ -130,7 +130,6 @@
 extern int JadeVersion(struct IsdnCardState *cs, char *s);
 extern void jade_sched_event(struct BCState *bcs, int event);
 extern void modejade(struct BCState *bcs, int mode, int bc);
-extern void clear_pending_jade_ints(struct IsdnCardState *cs);
 extern void initjade(struct IsdnCardState *cs);
 
 #endif	/* __JADE_H__ */

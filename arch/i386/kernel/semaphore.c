@@ -191,6 +191,10 @@ asm(
 ".align 4\n"
 ".globl __down_failed\n"
 "__down_failed:\n\t"
+#if defined(CONFIG_FRAME_POINTER)
+	"pushl %ebp\n\t"
+	"movl  %esp,%ebp\n\t"
+#endif
 	"pushl %eax\n\t"
 	"pushl %edx\n\t"
 	"pushl %ecx\n\t"
@@ -198,6 +202,10 @@ asm(
 	"popl %ecx\n\t"
 	"popl %edx\n\t"
 	"popl %eax\n\t"
+#if defined(CONFIG_FRAME_POINTER)
+	"movl %ebp,%esp\n\t"
+	"popl %ebp\n\t"
+#endif
 	"ret"
 );
 
@@ -206,11 +214,19 @@ asm(
 ".align 4\n"
 ".globl __down_failed_interruptible\n"
 "__down_failed_interruptible:\n\t"
+#if defined(CONFIG_FRAME_POINTER)
+	"pushl %ebp\n\t"
+	"movl  %esp,%ebp\n\t"
+#endif
 	"pushl %edx\n\t"
 	"pushl %ecx\n\t"
 	"call __down_interruptible\n\t"
 	"popl %ecx\n\t"
 	"popl %edx\n\t"
+#if defined(CONFIG_FRAME_POINTER)
+	"movl %ebp,%esp\n\t"
+	"popl %ebp\n\t"
+#endif
 	"ret"
 );
 
@@ -219,11 +235,19 @@ asm(
 ".align 4\n"
 ".globl __down_failed_trylock\n"
 "__down_failed_trylock:\n\t"
+#if defined(CONFIG_FRAME_POINTER)
+	"pushl %ebp\n\t"
+	"movl  %esp,%ebp\n\t"
+#endif
 	"pushl %edx\n\t"
 	"pushl %ecx\n\t"
 	"call __down_trylock\n\t"
 	"popl %ecx\n\t"
 	"popl %edx\n\t"
+#if defined(CONFIG_FRAME_POINTER)
+	"movl %ebp,%esp\n\t"
+	"popl %ebp\n\t"
+#endif
 	"ret"
 );
 

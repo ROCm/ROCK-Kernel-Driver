@@ -259,10 +259,7 @@ gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char valisac, valhscx;
 	int count = 0;
 
-	if (!cs) {
-		printk(KERN_WARNING "Gazel: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	do {
 		valhscx = ReadHSCX(cs, 1, HSCX_ISTA);
 		if (valhscx)
@@ -279,6 +276,7 @@ gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	WriteISAC(cs, ISAC_MASK, 0x0);
 	WriteHSCX(cs, 0, HSCX_MASK, 0x0);
 	WriteHSCX(cs, 1, HSCX_MASK, 0x0);
+	spin_unlock(&cs->lock);
 }
 
 
@@ -421,7 +419,7 @@ Gazel_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_gazel(cs);
 			return (0);
 		case CARD_INIT:
-			inithscxisac(cs, 1);
+			inithscxisac(cs);
 			if ((cs->subtyp==R647)||(cs->subtyp==R685)) {
 				int i;
 				for (i=0;i<(2+MAX_WAITING_CALLS);i++) {

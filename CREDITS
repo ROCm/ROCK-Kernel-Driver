@@ -1507,16 +1507,17 @@ S: Chapel Hill, North Carolina 27514-4818
 S: USA
 
 N: Dave Jones
+E: davej@codemonkey.org.uk
 E: davej@suse.de
 W: http://www.codemonkey.org.uk
 D: x86 errata/setup maintenance.
 D: Backport/Forwardport merge monkey.
 D: Various Janitor work.
 S: c/o SuSE Linux UK Ltd
-S: The Kinetic Centre
-S: Theobald Street
-S: Borehamwood
-S: Herts, WD6 4PJ
+S: Appleton House
+S: 139 King Street
+S: Hammersmith
+S: W6 9JG
 S: United Kingdom
 
 N: Ani Joshi

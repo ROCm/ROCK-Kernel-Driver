@@ -292,7 +292,6 @@ static int aec62xx_tune_chipset (ide_drive_t *drive, u8 speed)
 	}
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 static int config_chipset_for_dma (ide_drive_t *drive)
 {
 	u8 speed = ide_dma_speed(drive, aec62xx_ratemask(drive));	
@@ -303,7 +302,6 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	(void) aec62xx_tune_chipset(drive, speed);
 	return ide_dma_enable(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 static void aec62xx_tune_drive (ide_drive_t *drive, u8 pio)
 {
@@ -321,7 +319,6 @@ static void aec62xx_tune_drive (ide_drive_t *drive, u8 pio)
 	(void) aec62xx_tune_chipset(drive, speed);
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 static int aec62xx_config_drive_xfer_rate (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
@@ -405,7 +402,6 @@ static int aec62xx_irq_timeout (ide_drive_t *drive)
 #endif
 	return 0;
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 static unsigned int __init init_chipset_aec62xx (struct pci_dev *dev, const char *name)
 {
@@ -457,7 +453,6 @@ static void __init init_hwif_aec62xx (ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x07;
 	hwif->swdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_check	= &aec62xx_config_drive_xfer_rate;
 	hwif->ide_dma_lostirq	= &aec62xx_irq_timeout;
 	hwif->ide_dma_timeout	= &aec62xx_irq_timeout;
@@ -465,7 +460,6 @@ static void __init init_hwif_aec62xx (ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 static void __init init_dma_aec62xx (ide_hwif_t *hwif, unsigned long dmabase)

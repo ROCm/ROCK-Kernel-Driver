@@ -73,13 +73,6 @@ extern int                  zft_cmpr_register(struct zft_cmpr_ops *new_ops);
 extern struct zft_cmpr_ops *zft_cmpr_unregister(void);
 extern int                  zft_cmpr_lock(int try_to_load);
 
-#ifdef MODULE
-
-asmlinkage extern int  init_module(void);
-asmlinkage extern void cleanup_module(void);
-
-#endif
-
 #endif
 
 

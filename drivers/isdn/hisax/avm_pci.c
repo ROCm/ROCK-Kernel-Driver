@@ -191,13 +191,6 @@ struct BCState *Sel_BCS(struct IsdnCardState *cs, int channel)
 		return(NULL);
 }
 
-void inline
-hdlc_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
 void
 write_ctrl(struct BCState *bcs, int which) {
 
@@ -252,7 +245,7 @@ modehdlc(struct BCState *bcs, int mode, int bc)
 			bcs->hw.hdlc.ctrl.sr.cmd = HDLC_CMD_XRS;
 			write_ctrl(bcs, 1);
 			bcs->hw.hdlc.ctrl.sr.cmd = 0;
-			hdlc_sched_event(bcs, B_XMTBUFREADY);
+			sched_b_event(bcs, B_XMTBUFREADY);
 			break;
 		case (L1_MODE_HDLC):
 			bcs->mode = mode;
@@ -263,7 +256,7 @@ modehdlc(struct BCState *bcs, int mode, int bc)
 			bcs->hw.hdlc.ctrl.sr.cmd = HDLC_CMD_XRS;
 			write_ctrl(bcs, 1);
 			bcs->hw.hdlc.ctrl.sr.cmd = 0;
-			hdlc_sched_event(bcs, B_XMTBUFREADY);
+			sched_b_event(bcs, B_XMTBUFREADY);
 			break;
 	}
 }
@@ -323,35 +316,24 @@ static inline void
 hdlc_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int count, cnt =0;
+	int count, more, cnt =0;
 	int fifo_size = 32;
-	u_char *p;
-	u_int *ptr;
+	unsigned char *p;
+	unsigned int *ptr;
 
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hdlc_fill_fifo");
-	if (!bcs->tx_skb)
-		return;
-	if (bcs->tx_skb->len <= 0)
+	p = xmit_fill_fifo_b(bcs, fifo_size, &count, &more);
+	if (!p)
 		return;
 
-	bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_XME;
-	if (bcs->tx_skb->len > fifo_size) {
-		count = fifo_size;
-	} else {
-		count = bcs->tx_skb->len;
-		if (bcs->mode != L1_MODE_TRANS)
-			bcs->hw.hdlc.ctrl.sr.cmd |= HDLC_CMD_XME;
-	}
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hdlc_fill_fifo %d/%ld", count, bcs->tx_skb->len);
-	ptr = (u_int *) p = bcs->tx_skb->data;
-	skb_pull(bcs->tx_skb, count);
-	bcs->tx_cnt -= count;
-	bcs->hw.hdlc.count += count;
+	if (more)
+		bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_XME;
+	else
+		bcs->hw.hdlc.ctrl.sr.cmd |= HDLC_CMD_XME;
+
 	bcs->hw.hdlc.ctrl.sr.xml = ((count == fifo_size) ? 0 : count);
 	write_ctrl(bcs, 3);  /* sets the correct index too */
 	if (cs->subtyp == AVM_FRITZ_PCI) {
+		ptr = (unsigned int *) p;
 		while (cnt<count) {
 #ifdef __powerpc__
 #ifdef CONFIG_APUS
@@ -370,34 +352,28 @@ hdlc_fill_fifo(struct BCState *bcs)
 			cnt++;
 		}
 	}
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		if (cs->subtyp == AVM_FRITZ_PNP)
-			p = (u_char *) ptr;
-		t += sprintf(t, "hdlc_fill_fifo %c cnt %d",
-			     bcs->channel ? 'B' : 'A', count);
-		QuickHex(t, p, count);
-		debugl1(cs, bcs->blog);
-	}
 }
 
 static void
-fill_hdlc(struct BCState *bcs)
+reset_xmit(struct BCState *bcs)
 {
-	unsigned long flags;
-	spin_lock_irqsave(&avm_pci_lock, flags);
+	bcs->hw.hdlc.ctrl.sr.xml = 0;
+	bcs->hw.hdlc.ctrl.sr.cmd |= HDLC_CMD_XRS;
+	write_ctrl(bcs, 1);
+	bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_XRS;
+	write_ctrl(bcs, 1);
 	hdlc_fill_fifo(bcs);
-	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
 static inline void
-HDLC_irq(struct BCState *bcs, u_int stat) {
+HDLC_irq(struct BCState *bcs, u_int stat)
+{
 	int len;
 	struct sk_buff *skb;
 
 	if (bcs->cs->debug & L1_DEB_HSCX)
 		debugl1(bcs->cs, "ch%d stat %#x", bcs->channel, stat);
+
 	if (stat & HDLC_INT_RPR) {
 		if (stat & HDLC_STAT_RDO) {
 			if (bcs->cs->debug & L1_DEB_HSCX)
@@ -425,7 +401,7 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 						skb_queue_tail(&bcs->rqueue, skb);
 					}
 					bcs->hw.hdlc.rcvidx = 0;
-					hdlc_sched_event(bcs, B_RCVBUFREADY);
+					sched_b_event(bcs, B_RCVBUFREADY);
 				} else {
 					if (bcs->cs->debug & L1_DEB_HSCX)
 						debugl1(bcs->cs, "invalid frame");
@@ -437,46 +413,9 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 		}
 	}
 	if (stat & HDLC_INT_XDU) {
-		/* Here we lost an TX interrupt, so
-		 * restart transmitting the whole frame.
-		 */
-		if (bcs->tx_skb) {
-			skb_push(bcs->tx_skb, bcs->hw.hdlc.count);
-			bcs->tx_cnt += bcs->hw.hdlc.count;
-			bcs->hw.hdlc.count = 0;
-//			hdlc_sched_event(bcs, B_XMTBUFREADY);
-			if (bcs->cs->debug & L1_DEB_WARN)
-				debugl1(bcs->cs, "ch%d XDU", bcs->channel);
-		} else if (bcs->cs->debug & L1_DEB_WARN)
-			debugl1(bcs->cs, "ch%d XDU without skb", bcs->channel);
-		bcs->hw.hdlc.ctrl.sr.xml = 0;
-		bcs->hw.hdlc.ctrl.sr.cmd |= HDLC_CMD_XRS;
-		write_ctrl(bcs, 1);
-		bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_XRS;
-		write_ctrl(bcs, 1);
-		hdlc_fill_fifo(bcs);
+		xmit_xdu_b(bcs, reset_xmit);
 	} else if (stat & HDLC_INT_XPR) {
-		if (bcs->tx_skb) {
-			if (bcs->tx_skb->len) {
-				hdlc_fill_fifo(bcs);
-				return;
-			} else {
-				if (bcs->st->lli.l1writewakeup &&
-					(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.hdlc.count);
-				dev_kfree_skb_irq(bcs->tx_skb);
-				bcs->hw.hdlc.count = 0;
-				bcs->tx_skb = NULL;
-			}
-		}
-		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-			bcs->hw.hdlc.count = 0;
-			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
-			hdlc_fill_fifo(bcs);
-		} else {
-			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			hdlc_sched_event(bcs, B_XMTBUFREADY);
-		}
+		xmit_xpr_b(bcs);
 	}
 }
 
@@ -484,10 +423,9 @@ inline void
 HDLC_irq_main(struct IsdnCardState *cs)
 {
 	u_int stat;
-	long  flags;
 	struct BCState *bcs;
 
-	spin_lock_irqsave(&avm_pci_lock, flags);
+	spin_lock(&cs->lock);
 	if (cs->subtyp == AVM_FRITZ_PCI) {
 		stat = ReadHDLCPCI(cs, 0, HDLC_STATUS);
 	} else {
@@ -516,45 +454,23 @@ HDLC_irq_main(struct IsdnCardState *cs)
 		} else
 			HDLC_irq(bcs, stat);
 	}
-	spin_unlock_irqrestore(&avm_pci_lock, flags);
+	spin_unlock(&cs->lock);
 }
 
 void
 hdlc_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			spin_lock_irqsave(&avm_pci_lock, flags);
-			if (st->l1.bcs->tx_skb) {
-				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				spin_unlock_irqrestore(&avm_pci_lock, flags);
-			} else {
-				st->l1.bcs->tx_skb = skb;
-				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-				st->l1.bcs->hw.hdlc.count = 0;
-				spin_unlock_irqrestore(&avm_pci_lock, flags);
-				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-			}
+			xmit_data_req_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | INDICATION):
-			if (st->l1.bcs->tx_skb) {
-				printk(KERN_WARNING "hdlc_l2l1: this shouldn't happen\n");
-				break;
-			}
-			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-			st->l1.bcs->tx_skb = skb;
-			st->l1.bcs->hw.hdlc.count = 0;
-			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
+			xmit_pull_ind_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | REQUEST):
-			if (!st->l1.bcs->tx_skb) {
-				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
-				L1L2(st, PH_PULL | CONFIRM, NULL);
-			} else
-				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+			xmit_pull_req_b(st);
 			break;
 		case (PH_ACTIVATE | REQUEST):
 			test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
@@ -639,7 +555,7 @@ setstack_hdlc(struct PStack *st, struct BCState *bcs)
 }
 
 void __init
-clear_pending_hdlc_ints(struct IsdnCardState *cs)
+inithdlc(struct IsdnCardState *cs)
 {
 	u_int val;
 
@@ -666,11 +582,7 @@ clear_pending_hdlc_ints(struct IsdnCardState *cs)
 		val = ReadHDLCPnP(cs, 1, HDLC_STATUS + 3);
 		debugl1(cs, "HDLC 2 VIN %x", val);
 	}
-}
 
-void __init
-inithdlc(struct IsdnCardState *cs)
-{
 	cs->bcs[0].BC_SetStack = setstack_hdlc;
 	cs->bcs[1].BC_SetStack = setstack_hdlc;
 	cs->bcs[0].BC_Close = close_hdlcstate;
@@ -731,17 +643,12 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_region(cs->hw.avm.cfg_reg, 32);
 			return(0);
 		case CARD_INIT:
-			clear_pending_isac_ints(cs);
 			initisac(cs);
-			clear_pending_hdlc_ints(cs);
 			inithdlc(cs);
 			outb(AVM_STATUS0_DIS_TIMER | AVM_STATUS0_RES_TIMER,
 				cs->hw.avm.cfg_reg + 2);
-			WriteISAC(cs, ISAC_MASK, 0);
 			outb(AVM_STATUS0_DIS_TIMER | AVM_STATUS0_RES_TIMER |
 				AVM_STATUS0_ENA_IRQ, cs->hw.avm.cfg_reg + 2);
-			/* RESET Receiver and Transmitter */
-			WriteISAC(cs, ISAC_CMDR, 0x41);
 			return(0);
 		case CARD_TEST:
 			return(0);
@@ -880,7 +787,7 @@ ready:
 	cs->writeisac = &WriteISAC;
 	cs->readisacfifo = &ReadISACfifo;
 	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Send_Data = &fill_hdlc;
+	cs->BC_Send_Data = &hdlc_fill_fifo;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_pcipnp_interrupt;
 	ISACVersion(cs, (cs->subtyp == AVM_FRITZ_PCI) ? "AVM PCI:" : "AVM PnP:");

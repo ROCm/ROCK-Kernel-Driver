@@ -28,8 +28,7 @@ struct ux_diva_card_s
 	int		reset_base;
 	int		card_type;
 	byte		*mapped;
-	int		bus_num;
-	int		func_num;
+	struct pci_dev  *pdev;
 	int		slot;
 	int		irq;
 	byte		*pDRAM;

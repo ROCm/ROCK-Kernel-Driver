@@ -144,6 +144,7 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 	id->model[sizeof(id->model)-1] = '\0';
 	printk("%s: %s, ", drive->name, id->model);
 	drive->present = 1;
+	drive->dead = 0;
 
 	/*
 	 * Check for an ATAPI device
@@ -546,8 +547,24 @@ static inline u8 probe_for_drive (ide_drive_t *drive)
 	return 1;
 }
 
-#define hwif_check_region(addr, num) \
-	((hwif->mmio) ? check_mem_region((addr),(num)) : check_region((addr),(num)))
+static int hwif_check_region(ide_hwif_t *hwif, unsigned long addr, int num)
+{
+	int err;
+	
+	if(hwif->mmio)
+		err = check_mem_region(addr, num);
+	else
+		err = check_region(addr, num);
+		
+	if(err)
+	{
+		printk("%s: %s resource 0x%lX-0x%lX not free.\n",
+			hwif->name, hwif->mmio?"MMIO":"I/O", addr, addr+num-1);
+		mdelay(2000);
+	}
+	return err;
+}
+		
 
 static int hwif_check_regions (ide_hwif_t *hwif)
 {
@@ -556,14 +573,14 @@ static int hwif_check_regions (ide_hwif_t *hwif)
 
 	if (hwif->mmio == 2)
 		return 0;
-	addr_errs  = hwif_check_region(hwif->io_ports[IDE_DATA_OFFSET], 1);
+	addr_errs  = hwif_check_region(hwif, hwif->io_ports[IDE_DATA_OFFSET], 1);
 	for (i = IDE_ERROR_OFFSET; i <= IDE_STATUS_OFFSET; i++)
-		addr_errs += hwif_check_region(hwif->io_ports[i], 1);
+		addr_errs += hwif_check_region(hwif, hwif->io_ports[i], 1);
 	if (hwif->io_ports[IDE_CONTROL_OFFSET])
-		addr_errs += hwif_check_region(hwif->io_ports[IDE_CONTROL_OFFSET], 1);
+		addr_errs += hwif_check_region(hwif, hwif->io_ports[IDE_CONTROL_OFFSET], 1);
 #if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
 	if (hwif->io_ports[IDE_IRQ_OFFSET])
-		addr_errs += hwif_check_region(hwif->io_ports[IDE_IRQ_OFFSET], 1);
+		addr_errs += hwif_check_region(hwif, hwif->io_ports[IDE_IRQ_OFFSET], 1);
 #endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
 	/* If any errors are return, we drop the hwif interface. */
 	hwif->straight8 = 0;
@@ -629,7 +646,7 @@ void probe_hwif (ide_hwif_t *hwif)
 	}
 #endif
 
-	if ((hwif->chipset != ide_4drives || !hwif->mate->present) &&
+	if ((hwif->chipset != ide_4drives || !hwif->mate || !hwif->mate->present) &&
 #if CONFIG_BLK_DEV_PDC4030
 	    (hwif->chipset != ide_pdc4030 || hwif->channel == 0) &&
 #endif /* CONFIG_BLK_DEV_PDC4030 */
@@ -655,6 +672,13 @@ void probe_hwif (ide_hwif_t *hwif)
 	 * we'll install our IRQ driver much later...
 	 */
 	irqd = hwif->irq;
+	
+	if (irqd >= NR_IRQS)
+	{
+		printk(KERN_ERR "***WARNING***: Bogus interrupt reported. Probably a bug in the Linux ACPI\n");
+		printk(KERN_ERR "***WARNING***: Attempting to continue as best we can.\n");
+		irqd = 0;
+	}
 	if (irqd)
 		disable_irq(hwif->irq);
 
@@ -1058,6 +1082,7 @@ static void init_gendisk (ide_hwif_t *hwif)
 			 "%s","IDE Drive");
 		drive->gendev.parent = &hwif->gendev;
 		drive->gendev.bus = &ide_bus_type;
+		drive->gendev.driver_data = drive;
 		sprintf (name, "ide/host%d/bus%d/target%d/lun%d",
 			(hwif->channel && hwif->mate) ?
 			hwif->mate->index : hwif->index,

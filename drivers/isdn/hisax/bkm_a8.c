@@ -153,13 +153,10 @@ bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 	struct IsdnCardState *cs = dev_id;
 	u_char ista, val, icnt = 5;
 
-	if (!cs) {
-		printk(KERN_WARNING "HiSax: Scitel Quadro: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	ista = readreg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_ISTA);
 	if (!(ista & 0x3f)) /* not this IPAC */
-		return;
+		goto unlock;
       Start_IPAC:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
@@ -196,6 +193,8 @@ bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 		       sct_quadro_subtypes[cs->subtyp]);
 	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK, 0xFF);
 	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK, 0xC0);
+ unlock:
+	spin_unlock(&cs->lock);
 }
 
 
@@ -251,7 +250,7 @@ BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_INIT:
 			cs->debug |= L1_DEB_IPAC;
 			set_ipac_active(cs, 1);
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			/* Enable ints */
 			enable_bkm_int(cs, 1);
 			return (0);

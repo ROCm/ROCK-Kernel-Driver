@@ -392,7 +392,11 @@ static int __init init_tcic(void)
     printk(KERN_INFO "Databook TCIC-2 PCMCIA probe: ");
     sock = 0;
 
-    if (check_region(tcic_base, 16) == 0) {
+    if (!request_region(tcic_base, 16, "tcic-2")) {
+	printk("could not allocate ports,\n ");
+	return -ENODEV;
+    }
+    else {
 	tcic_setw(TCIC_ADDR, 0);
 	if (tcic_getw(TCIC_ADDR) == 0) {
 	    tcic_setw(TCIC_ADDR, 0xc3a5);
@@ -408,15 +412,12 @@ static int __init init_tcic(void)
 		if (tcic_getw(TCIC_ADDR) == 0xc3a5) sock = 2;
 	    }
 	}
-    } else
-	printk("could not allocate ports, ");
-
+    }
     if (sock == 0) {
 	printk("not found.\n");
+	release_region(tcic_base, 16);
 	return -ENODEV;
     }
-
-    request_region(tcic_base, 16, "tcic-2");
 
     sockets = 0;
     for (i = 0; i < sock; i++) {

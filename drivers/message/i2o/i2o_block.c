@@ -1669,7 +1669,6 @@ static int i2o_block_init(void)
 	if(i2o_install_handler(&i2o_block_handler)<0)
 	{
 		unregister_blkdev(MAJOR_NR, "i2o_block");
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		printk(KERN_ERR "i2o_block: unable to register OSM.\n");
 		return -EINVAL;
 	}
@@ -1682,8 +1681,7 @@ static int i2o_block_init(void)
 	evt_pid = kernel_thread(i2ob_evt, NULL, CLONE_SIGHAND);
 	if(evt_pid < 0)
 	{
-		printk(KERN_ERR 
-			"i2o_block: Could not initialize event thread.  Aborting\n");
+		printk(KERN_ERR "i2o_block: Could not initialize event thread.  Aborting\n");
 		i2o_remove_handler(&i2o_block_handler);
 		return 0;
 	}

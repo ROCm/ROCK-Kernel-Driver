@@ -251,7 +251,7 @@ static int svwks_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 
 	ide_hwif_t *hwif	= HWIF(drive);
 	struct pci_dev *dev	= hwif->pci_dev;
-	u8 speed	= ide_rate_filter(svwks_ratemask(drive), xferspeed);
+	u8 speed		= ide_rate_filter(svwks_ratemask(drive), xferspeed);
 	u8 pio			= ide_get_best_pio_mode(drive, 255, 5, NULL);
 	u8 unit			= (drive->select.b.unit & 0x01);
 	u8 csb5			= svwks_csb_check(dev);
@@ -259,6 +259,13 @@ static int svwks_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	u8 dma_timing		= 0, pio_timing = 0;
 	u16 csb5_pio		= 0;
 
+	/* If we are about to put a disk into UDMA mode we screwed up.
+	   Our code assumes we never _ever_ do this on an OSB4 */
+	   
+	if(dev->device == PCI_DEVICE_ID_SERVERWORKS_OSB4 &&
+		drive->media != ide_disk && speed >= XFER_UDMA_0)
+			BUG();
+			
 	pci_read_config_byte(dev, drive_pci[drive->dn], &pio_timing);
 	pci_read_config_byte(dev, drive_pci2[drive->dn], &dma_timing);
 	pci_read_config_byte(dev, (0x56|hwif->channel), &ultra_timing);
@@ -331,7 +338,6 @@ oem_setup_failed:
 			csb5_pio   |= ((speed - XFER_PIO_0) << (4*drive->dn));
 			break;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_MW_DMA_2:
 		case XFER_MW_DMA_1:
 		case XFER_MW_DMA_0:
@@ -351,7 +357,6 @@ oem_setup_failed:
 			dma_timing   |= dma_modes[2];
 			ultra_timing |= ((udma_modes[speed - XFER_UDMA_0]) << (4*unit));
 			ultra_enable |= (0x01 << drive->dn);
-#endif
 		default:
 			break;
 	}
@@ -360,11 +365,9 @@ oem_setup_failed:
 	if (csb5)
 		pci_write_config_word(dev, 0x4A, csb5_pio);
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	pci_write_config_byte(dev, drive_pci2[drive->dn], dma_timing);
 	pci_write_config_byte(dev, (0x56|hwif->channel), ultra_timing);
 	pci_write_config_byte(dev, 0x54, ultra_enable);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	return (ide_config_drive_speed(drive, speed));
 }
@@ -412,7 +415,6 @@ static void svwks_tune_drive (ide_drive_t *drive, u8 pio)
 	(void) svwks_tune_chipset(drive, (XFER_PIO_0 + pio));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 static int config_chipset_for_dma (ide_drive_t *drive)
 {
 	u8 speed = ide_dma_speed(drive, svwks_ratemask(drive));
@@ -470,6 +472,12 @@ no_dma_set:
 
 static int svwks_ide_dma_end (ide_drive_t *drive)
 {
+	/*
+	 *	We never place the OSB4 into a UDMA mode with a disk
+	 *	medium, that means the UDMA "all my data is 4 byte shifted"
+	 *	problem cannot occur.
+	 */
+#if 0
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 dma_stat		= hwif->INB(hwif->dma_status);
 
@@ -483,9 +491,9 @@ static int svwks_ide_dma_end (ide_drive_t *drive)
 		while(1)
 			cpu_relax();
 	}
+#endif	
 	return __ide_dma_end(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 static unsigned int __init init_chipset_svwks (struct pci_dev *dev, const char *name)
 {
@@ -703,7 +711,6 @@ static void __init init_hwif_svwks (ide_hwif_t *hwif)
 		return;
 	}
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_check = &svwks_config_drive_xfer_rate;
 	if (hwif->pci_dev->device == PCI_DEVICE_ID_SERVERWORKS_OSB4IDE)
 		hwif->ide_dma_end = &svwks_ide_dma_end;
@@ -719,7 +726,6 @@ static void __init init_hwif_svwks (ide_hwif_t *hwif)
 	hwif->drives[1].autotune = (!(dma_stat & 0x40));
 //	hwif->drives[0].autodma = hwif->autodma;
 //	hwif->drives[1].autodma = hwif->autodma;
-#endif /* !CONFIG_BLK_DEV_IDEDMA */
 }
 
 /*

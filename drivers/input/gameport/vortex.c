@@ -127,7 +127,7 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
 	vortex->gameport.cooked_read = vortex_cooked_read;
 	vortex->gameport.open = vortex_open;
 
-	vortex->gameport.name = dev->name;
+	vortex->gameport.name = dev->dev.name;
 	vortex->gameport.phys = vortex->phys;
 	vortex->gameport.id.bustype = BUS_PCI;
 	vortex->gameport.id.vendor = dev->vendor;
@@ -146,7 +146,7 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
 	gameport_register_port(&vortex->gameport);
 	
 	printk(KERN_INFO "gameport: %s at pci%s speed %d kHz\n",
-		dev->name, dev->slot_name, vortex->gameport.speed);
+		dev->dev.name, dev->slot_name, vortex->gameport.speed);
 
 	return 0;
 }

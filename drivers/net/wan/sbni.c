@@ -194,7 +194,7 @@ static inline int __init
 sbni_isa_probe( struct net_device  *dev )
 {
 	if( dev->base_addr > 0x1ff
-	    &&  !check_region( dev->base_addr, SBNI_IO_EXTENT )
+	    &&  request_region( dev->base_addr, SBNI_IO_EXTENT, dev->name )
 	    &&  sbni_probe1( dev, dev->base_addr, dev->irq ) )
 
 		return  0;
@@ -249,7 +249,7 @@ sbni_probe( struct net_device  *dev )
 
 	for( i = 0;  netcard_portlist[ i ];  ++i ) {
 		int  ioaddr = netcard_portlist[ i ];
-		if( !check_region( ioaddr, SBNI_IO_EXTENT )
+		if( request_region( ioaddr, SBNI_IO_EXTENT, dev->name )
 		    &&  sbni_probe1( dev, ioaddr, 0 ))
 			return 0;
 	}
@@ -280,7 +280,7 @@ sbni_pci_probe( struct net_device  *dev )
 		pci_irq_line = pdev->irq;
 
 		/* Avoid already found cards from previous calls */
-		if( check_region( pci_ioaddr, SBNI_IO_EXTENT ) ) {
+		if( !pci_request_region( pci_ioaddr, SBNI_IO_EXTENT, dev->name ) ) {
 			pci_read_config_word( pdev, PCI_SUBSYSTEM_ID, &subsys );
 			if( subsys != 2  ||	/* Dual adapter is present */
 			    check_region( pci_ioaddr += 4, SBNI_IO_EXTENT ) )
@@ -309,9 +309,6 @@ static struct net_device * __init
 sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 {
 	struct net_local  *nl;
-
-	if( !request_region( ioaddr, SBNI_IO_EXTENT, dev->name ) )
-		return  0;
 
 	if( sbni_card_probe( ioaddr ) ) {
 		release_region( ioaddr, SBNI_IO_EXTENT );

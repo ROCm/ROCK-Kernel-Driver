@@ -95,7 +95,7 @@ const unsigned short base_addrs[BPP_NO] = { 0x278, 0x378, 0x3bc };
 /*
  * These are for data access.
  * Control lines accesses are hidden in set_bits() and get_bits().
- * The exeption is the probe procedure, which is system-dependent.
+ * The exception is the probe procedure, which is system-dependent.
  */
 #define bpp_outb_p(data, base)  outb_p((data), (base))
 #define bpp_inb(base)  inb(base)

@@ -1416,7 +1416,7 @@ static int zr36060_reset(struct zoran *zr)
 		zr36060_sleep(zr, 0);
 		post_office_write(zr, 3, 0, 0);
 		udelay(2);
-	default:
+	default:;
 	}
 	return 0;
 }
@@ -3758,7 +3758,7 @@ static int do_zoran_ioctl(struct zoran *zr, unsigned int cmd,
 			 *   Write the overlay mask if clips are wanted.
 			 */
 			 
-			if (vw.clipcount > 2048)
+			if (vw.clipcount < 0 || vw.clipcount > 2048)
 				return -EINVAL;
 			if (vw.clipcount) {
 				vcp =
