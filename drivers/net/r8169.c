@@ -1542,6 +1542,7 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (!(le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit)) {
 		dma_addr_t mapping;
+		u32 status;
 
 		mapping = pci_map_single(tp->pci_dev, skb->data, len,
 					 PCI_DMA_TODEVICE);
@@ -1549,8 +1550,10 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		tp->Tx_skbuff[entry] = skb;
 		tp->TxDescArray[entry].addr = cpu_to_le64(mapping);
 
-		tp->TxDescArray[entry].status = cpu_to_le32(OWNbit | FSbit |
-			LSbit | len | (EORbit * !((entry + 1) % NUM_TX_DESC)));
+		/* anti gcc 2.95.3 bugware */
+		status = OWNbit | FSbit | LSbit | len |
+			 (EORbit * !((entry + 1) % NUM_TX_DESC));
+		tp->TxDescArray[entry].status = cpu_to_le32(status);
 			
 		RTL_W8(TxPoll, 0x40);	//set polling bit
 
