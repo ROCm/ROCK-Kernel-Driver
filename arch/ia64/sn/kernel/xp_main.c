@@ -7,109 +7,26 @@
  */
 
 
-/***********************************************************************
+/*
  * Cross Partition (XP) base.
  *
  *	XP provides a base from which XPMEM and XPNET can interact
  *	with XPC, yet not be dependent on XPC.
  *
- **********************************************************************/
+ */
 
 
 #ifndef SN_PROM
-
 #include <linux/kernel.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
+#include <asm/sn/intr.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/xp.h>
-
-
-int __init xp_init(void);
-static void xp_init_xpc(void);
-
-void __exit xp_exit(void);
-static void xp_exit_xpc(void);
-
-
-/***********************************************************************
- * Intialize XP.
- *
- **********************************************************************/
-
-
-int __init
-xp_init(void)
-{
-	int ret;
-	int (* pior_func)(void *) = xp_nofault_PIOR;
-	int (* pior_err_func)(void) = xp_error_PIOR;
-
-
-	if (!ia64_platform_is("sn2"))
-		return -ENODEV;
-
-
-	/*
-	 * Register a nofault code region which performs a cross-partition
-	 * PIO read. If the PIO read times out, the MCA handler will consume
-	 * the error and return to a kernel-provided instruction to indicate
-	 * an error. This PIO read exists because it is guaranteed to timeout
-	 * if the destination is down (AMO operations do not timeout on at
-	 * least some CPUs on Shubs <= v1.2, which unfortunately we have to
-	 * work around).
-	 */
-	if ((ret = sn_register_nofault_code(*(u64 *) pior_func,
-					*(u64 *) pior_err_func,
-					*(u64 *) pior_err_func, 1, 1)) != 0) {
-		printk(KERN_ERR "XP: can't register nofault code, error=%d\n",
-			ret);
-	}
-
-
-	xp_init_xpc();
-
-	return 0;
-}
-
-
-/***********************************************************************
- * Terminate XP.
- *
- **********************************************************************/
-
-
-void __exit
-xp_exit(void)
-{
-	int (* pior_func)(void *) = xp_nofault_PIOR;
-	int (* pior_err_func)(void) = xp_error_PIOR;
-
-
-	xp_exit_xpc();
-
-
-	/* unregister the PIO nofault code region */
-	(void) sn_register_nofault_code(*(u64 *) pior_func,
-					*(u64 *) pior_err_func,
-					*(u64 *) pior_err_func, 1, 0);
-}
-
-
-/***********************************************************************
- * XPC related stuff.
- *
- **********************************************************************/
-
-
-#include <linux/interrupt.h>
-#include <asm/sn/intr.h>
-
-#else	/* ! SN_PROM */
-
+#else /* ! SN_PROM */
 #include "xp.h"
 #include "xpc_stubs.h"
-
-#endif 	/* ! SN_PROM */
+#endif /* ! SN_PROM */
 
 
 /*
@@ -122,7 +39,8 @@ xpc_registration_t xpc_registrations[XPC_NCHANNELS];
 /*
  * Initialize the XPC interface to inidicate that XPC isn't loaded.
  */
-static xpc_t xpc_notloaded(void);
+static xpc_t xpc_notloaded(void) { return xpcNotLoaded; }
+
 xpc_interface_t xpc_interface = {
 	(void (*)(int)) xpc_notloaded,
 	(void (*)(int)) xpc_notloaded,
@@ -138,8 +56,66 @@ xpc_interface_t xpc_interface = {
 #ifndef SN_PROM
 
 #ifdef CONFIG_KDB
-static int xpc_kdb_users(int, const char **, const char **, struct pt_regs *);
-static void xpc_kdb_print_users(xpc_registration_t *, int);
+
+static void
+xpc_kdb_print_users(xpc_registration_t *registration, int ch_number)
+{
+	kdb_printf("xpc_registrations[channel=%d] (0x%p):\n", ch_number,
+							(void *) registration);
+
+	kdb_printf("\t&sema=0x%p\n", (void *) &registration->sema);
+	kdb_printf("\tfunc=0x%p\n", (void *) registration->func);
+	kdb_printf("\tkey=0x%p\n", registration->key);
+	kdb_printf("\tnentries=%d\n", registration->nentries);
+	kdb_printf("\tmsg_size=%d\n", registration->msg_size);
+	kdb_printf("\tassigned_limit=%d\n", registration->assigned_limit);
+	kdb_printf("\tidle_limit=%d\n", registration->idle_limit);
+}
+
+
+/*
+ * Display current XPC users who have registered via xpc_connect().
+ *
+ *	xpcusers [ <channel> ]
+ */
+static int
+xpc_kdb_users(int argc, const char **argv, const char **envp,
+			struct pt_regs *regs)
+{
+	int ret;
+	xpc_registration_t *registration;
+	int ch_number;
+
+
+	if (argc > 1) {
+		return KDB_ARGCOUNT;
+
+	} else if (argc == 1) {
+		ret = kdbgetularg(argv[1], (unsigned long *) &ch_number);
+		if (ret) {
+			return ret;
+		}
+		if (ch_number < 0 || ch_number >= XPC_NCHANNELS) {
+			kdb_printf("invalid channel #\n");
+			return KDB_BADINT;
+		}
+		registration = &xpc_registrations[ch_number];
+		xpc_kdb_print_users(registration, ch_number);
+
+	} else {
+		for (ch_number = 0; ch_number < XPC_NCHANNELS; ch_number++) {
+			registration = &xpc_registrations[ch_number];
+
+			/* if !XPC_CHANNEL_REGISTERED(ch_number) */
+			if (registration->func == NULL) {
+				continue;
+			}
+			xpc_kdb_print_users(registration, ch_number);
+		}
+	}
+	return 0;
+}
+
 #endif /* CONFIG_KDB */
 
 
@@ -169,7 +145,7 @@ xp_exit_xpc(void)
 #endif /* CONFIG_KDB */
 }
 
-#endif 	/* ! SN_PROM */
+#endif /* ! SN_PROM */
 
 
 /*
@@ -212,13 +188,6 @@ xpc_clear_interface(void)
 					xpc_notloaded;
 	xpc_interface.partid_to_nasids = (xpc_t (*)(partid_t, void *))
 					xpc_notloaded;
-}
-
-
-static xpc_t
-xpc_notloaded(void)
-{
-	return xpcNotLoaded;
 }
 
 
@@ -339,86 +308,66 @@ xpc_disconnect(int ch_number)
 }
 
 
-#ifdef CONFIG_KDB
+#ifndef SN_PROM
 
-
-/*
- * Display current XPC users who have registered via xpc_connect().
- *
- *	xpcusers [ <channel> ]
- */
-static int
-xpc_kdb_users(int argc, const char **argv, const char **envp,
-			struct pt_regs *regs)
+int __init
+xp_init(void)
 {
 	int ret;
-	xpc_registration_t *registration;
-	int ch_number;
+	int (* pior_func)(void *) = xp_nofault_PIOR;
+	int (* pior_err_func)(void) = xp_error_PIOR;
 
 
-	if (argc > 1) {
-		return KDB_ARGCOUNT;
-
-	} else if (argc == 1) {
-		ret = kdbgetularg(argv[1], (unsigned long *) &ch_number);
-		if (ret) {
-			return ret;
-		}
-		if (ch_number < 0 || ch_number >= XPC_NCHANNELS) {
-			kdb_printf("invalid channel #\n");
-			return KDB_BADINT;
-		}
-		registration = &xpc_registrations[ch_number];
-		xpc_kdb_print_users(registration, ch_number);
-
-	} else {
-		for (ch_number = 0; ch_number < XPC_NCHANNELS; ch_number++) {
-			registration = &xpc_registrations[ch_number];
-
-			/* if !XPC_CHANNEL_REGISTERED(ch_number) */
-			if (registration->func == NULL) {
-				continue;
-			}
-			xpc_kdb_print_users(registration, ch_number);
-		}
+	if (!ia64_platform_is("sn2")) {
+		return -ENODEV;
 	}
+
+
+	/*
+	 * Register a nofault code region which performs a cross-partition
+	 * PIO read. If the PIO read times out, the MCA handler will consume
+	 * the error and return to a kernel-provided instruction to indicate
+	 * an error. This PIO read exists because it is guaranteed to timeout
+	 * if the destination is down (AMO operations do not timeout on at
+	 * least some CPUs on Shubs <= v1.2, which unfortunately we have to
+	 * work around).
+	 */
+	if ((ret = sn_register_nofault_code(*(u64 *) pior_func,
+					*(u64 *) pior_err_func,
+					*(u64 *) pior_err_func, 1, 1)) != 0) {
+		printk(KERN_ERR "XP: can't register nofault code, error=%d\n",
+			ret);
+	}
+
+
+	xp_init_xpc();
+
 	return 0;
 }
+module_init(xp_init);
 
 
-static void
-xpc_kdb_print_users(xpc_registration_t *registration, int ch_number)
+void __exit
+xp_exit(void)
 {
-	kdb_printf("xpc_registrations[channel=%d] (0x%p):\n", ch_number,
-							(void *) registration);
+	int (* pior_func)(void *) = xp_nofault_PIOR;
+	int (* pior_err_func)(void) = xp_error_PIOR;
 
-	kdb_printf("\t&sema=0x%p\n", (void *) &registration->sema);
-	kdb_printf("\tfunc=0x%p\n", (void *) registration->func);
-	kdb_printf("\tkey=0x%p\n", registration->key);
-	kdb_printf("\tnentries=%d\n", registration->nentries);
-	kdb_printf("\tmsg_size=%d\n", registration->msg_size);
-	kdb_printf("\tassigned_limit=%d\n", registration->assigned_limit);
-	kdb_printf("\tidle_limit=%d\n", registration->idle_limit);
+
+	xp_exit_xpc();
+
+
+	/* unregister the PIO nofault code region */
+	(void) sn_register_nofault_code(*(u64 *) pior_func,
+					*(u64 *) pior_err_func,
+					*(u64 *) pior_err_func, 1, 0);
 }
+module_exit(xp_exit);
 
-
-#endif /* CONFIG_KDB */
-
-
-/***********************************************************************
- * Kernel module suport.
- *
- **********************************************************************/
-
-
-#ifndef SN_PROM
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");
 MODULE_DESCRIPTION("Cross Partition (XP) base");
 MODULE_LICENSE("GPL");
-
-module_init(xp_init);
-module_exit(xp_exit);
 
 EXPORT_SYMBOL(xp_nofault_PIOR);
 EXPORT_SYMBOL(xpc_registrations);
@@ -428,5 +377,5 @@ EXPORT_SYMBOL(xpc_set_interface);
 EXPORT_SYMBOL(xpc_connect);
 EXPORT_SYMBOL(xpc_disconnect);
 
-#endif	/* ! SN_PROM */
+#endif /* ! SN_PROM */
 

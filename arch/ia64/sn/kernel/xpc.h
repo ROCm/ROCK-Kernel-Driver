@@ -11,12 +11,12 @@
  * Cross Partition Communication (XPC) structures and macros.
  */
 
-#ifndef _IA64_SN_XPC_H
-#define _IA64_SN_XPC_H
+#ifndef _IA64_SN_KERNEL_XPC_H
+#define _IA64_SN_KERNEL_XPC_H
 
 #define __XPC_MAIN__
 
-#ifdef	__KERNEL__
+#ifndef	SN_PROM
 #include <asm/pgtable.h>
 #include <linux/autoconf.h>
 #include <linux/interrupt.h>
@@ -25,7 +25,8 @@
 #include <linux/sysctl.h>
 #include <asm/processor.h>
 #include <asm/sn/xp.h>
-#else	/* __KERNEL__ */
+#include "xpc_dbgtk.h"
+#else /* ! SN_PROM */
 #include "libc/libc.h"
 #include "chipset/bte.h"
 #include "chipset/fetchop.h"
@@ -33,7 +34,7 @@
 #include <sys/SN/agent.h>
 #include <sys/types.h>
 #include "xp.h"
-#endif	/* __KERNEL__ */
+#endif /* ! SN_PROM */
 #include "xpc_stubs.h"
 
 
@@ -105,9 +106,12 @@ do {									\
 #define XPC_HB_DEFAULT_INTERVAL		5	/* incr HB every x secs */
 #define XPC_HB_CHECK_DEFAULT_TIMEOUT	20	/* check HB every x secs */
 
-/* define the process name in the task list and the CPU it is pinned to */
+/* define the process name of HB checker and the CPU it is pinned to */
 #define XPC_HB_CHECK_THREAD_NAME	"xpc_hb"
 #define XPC_HB_CHECK_CPU		0
+
+/* define the process name of the discovery thread */
+#define XPC_DISCOVERY_THREAD_NAME	"xpc_discovery"
 
 
 #define XPC_HB_ALLOWED(_p, _v)	((_v)->heartbeating_to_mask & (1UL << (_p)))
@@ -899,13 +903,11 @@ xpc_IPI_send(AMO_t *amo, u64 flag, long phys_cpuid, int vector)
  * (MAX_PARTITIONS) AMO variables for message notification (xpc_main.c) and
  * an additional 16 AMO variables for partition activation (xpc_hb.c).
  */
-extern AMO_t *xpc_amos_page;
-
-
 static __inline__ AMO_t *
 xpc_IPI_init(partid_t partid)
 {
-	AMO_t *part_amo = xpc_amos_page + partid;
+	extern xpc_vars_t *xpc_vars;
+	AMO_t *part_amo = xpc_vars->amos_page + partid;
 
 
 	xpc_IPI_receive(part_amo);
@@ -961,6 +963,7 @@ extern void xpc_activate_partition(xpc_partition_t *);
 
 
 /* found in xpc_partition.c */
+volatile extern int xpc_exiting;
 extern int xpc_hb_interval;
 extern int xpc_hb_check_interval;
 extern xpc_vars_t *xpc_vars;
@@ -998,5 +1001,5 @@ extern void xpc_kdb_register(void);
 extern void xpc_kdb_unregister(void);
 
 
-#endif /* _IA64_SN_XPC_H */
+#endif /* _IA64_SN_KERNEL_XPC_H */
 

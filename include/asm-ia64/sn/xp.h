@@ -6,20 +6,25 @@
  * Copyright (C) 2004 Silicon Graphics, Inc. All rights reserved.
  */
 
+
 /*
  * External Cross Partition (XP) structures and defines.
  */
 
-#ifndef _IA64_SN_XP_H
-#define _IA64_SN_XP_H
+
+#ifndef _ASM_IA64_SN_XP_H
+#define _ASM_IA64_SN_XP_H
 
 
 #ifndef	SN_PROM
+#include <linux/version.h>
 #include <linux/cache.h>
 #include <asm/sn/types.h>
-#else	/* ! SN_PROM */
+#include <asm/sn/bte.h>
+#include <asm/hardirq.h>
+#else /* ! SN_PROM */
 #include "xpc_types.h"
-#endif	/* ! SN_PROM */
+#endif /* ! SN_PROM */
 
 
 #ifdef CONFIG_KDB
@@ -33,7 +38,7 @@
 			#_expr, __FUNCTION__, __FILE__, __LINE__);	\
 		KDB_ENTER();						\
 	}
-#else	/* CONFIG_KDB */
+#else /* CONFIG_KDB */
 #ifndef	SN_PROM
 #define XP_ASSERT_ALWAYS(_expr)						\
 	if (!(_expr)) {							\
@@ -42,14 +47,14 @@
 			#_expr, __FUNCTION__, __FILE__, __LINE__);	\
 		BUG();							\
 	}
-#else	/* ! SN_PROM */
+#else /* ! SN_PROM */
 #define XP_ASSERT_ALWAYS(_expr)						\
 	if (!(_expr)) {							\
 		printf("XP_ASSERT %s failed at %s line %d\n",		\
 			#_expr, __FILE__, __LINE__);			\
 	}
-#endif	/* ! SN_PROM */
-#endif	/* CONFIG_KDB */
+#endif /* ! SN_PROM */
+#endif /* CONFIG_KDB */
 
 
 #ifdef XP_ASSERT_ON
@@ -69,10 +74,30 @@
 #define XP_NUM_NASID_WORDS	((XP_MAX_NASIDS + 63)/ 64)
 
 
-/***********************************************************************
- * XPC related stuff.
+/*
+ * Wrapper for bte_copy() that should it return a failure status will retry
+ * the bte_copy() once in the hope that the failure was due to a temporary
+ * aberration (i.e., the link going down temporarily).
  *
- **********************************************************************/
+ * See bte_copy for definition of the input parameters.
+ */
+static __inline__ bte_result_t
+xp_bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
+{
+	bte_result_t ret;
+
+
+	ret = bte_copy(src, dest, len, mode, notification);
+
+	if (ret != BTE_SUCCESS) {
+		if (!in_interrupt()) {
+			cond_resched();
+		}
+		ret = bte_copy(src, dest, len, mode, notification);
+	}
+
+	return ret;
+}
 
 
 /*
@@ -450,7 +475,7 @@ extern xpc_interface_t xpc_interface;
 #ifdef	SN_PROM
 extern int xpc_init(void);
 extern void xpc_exit(void);
-#endif	/* SN_PROM */
+#endif /* SN_PROM */
 
 extern xpc_t xpc_connect(int, xpc_channel_func_t, void *, u16, u16, u32, u32);
 extern void xpc_disconnect(int);
@@ -517,31 +542,11 @@ extern xpc_t xpc_partid_to_nasids(partid_t, void *);
 
 #ifdef	SN_PROM
 extern void xpc_poll(void);
-#endif	/* SN_PROM */
+#endif /* SN_PROM */
 
 extern int xp_nofault_PIOR(void *);
 extern int xp_error_PIOR(void);
 
-#define DECLARE_DPRINTK(_mn, _hl, _dcs, _dps, _sd)
-#define EXTERN_DPRINTK(_mn)
-#define REG_DPRINTK(_mn)
-#define UNREG_DPRINTK(_mn)
-#define DPRINTK(_mn, mask, fmt...)
-#define DPRINTK_ALWAYS(_mn, mask, fmt...) printk(fmt)
-#define DECLARE_DTRACE(_mn, _dtm, _sd)
-#define EXTERN_DTRACE(_mn)
-#define REG_DTRACE(_mn)
-#define UNREG_DTRACE(_mn)
-#define DTRACE(_mn, mask, cs, p1, p2)
-#define DTRACEI(_mn, mask, cs, p1, p2)
-#define DTRACE_L(_mn, mask, cs, p1, p2, p3, p4, p5, p6)
-#define DTRACEI_L(_mn, mask, cs, p1, p2, p3, p4, p5, p6)
-#define DECLARE_DCOUNTER(_pd, _cn)
-#define EXTERN_DCOUNTER(_cn)
-#define REG_DCOUNTER(_cn)
-#define UNREG_DCOUNTER(_cn)
-#define DCOUNT(_cn)
-#define DCOUNT_CLEAR(_cn)
 
+#endif /* _ASM_IA64_SN_XP_H */
 
-#endif /* _IA64_SN_XP_H */

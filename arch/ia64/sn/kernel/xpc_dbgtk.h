@@ -11,11 +11,13 @@
  * Cross Partition Communication (XPC)'s dbgtk related definitions.
  */
 
-#ifndef _IA64_SN_XPC_DBGTK_H
-#define _IA64_SN_XPC_DBGTK_H
+
+#ifndef _IA64_SN_KERNEL_XPC_DBGTK_H
+#define _IA64_SN_KERNEL_XPC_DBGTK_H
 
 
 //>>> #define DBGTK_USE_DPRINTK
+#include <asm/sn/xp_dbgtk.h>
 
 
 /*
@@ -27,12 +29,13 @@
 
 #define XPC_DBG_P_INIT		0x0000000000000010
 #define XPC_DBG_P_HEARTBEAT	0x0000000000000020
-#define XPC_DBG_P_ACT		0x0000000000000040
-#define XPC_DBG_P_DEACT		0x0000000000000080
+#define XPC_DBG_P_DISCOVERY	0x0000000000000040
+#define XPC_DBG_P_ACT		0x0000000000000080
 
 #define XPC_DBG_P_INITV		0x0000000000000100
 #define XPC_DBG_P_HEARTBEATV	0x0000000000000200
-#define XPC_DBG_P_ACTV		0x0000000000000400
+#define XPC_DBG_P_DISCOVERYV	0x0000000000000400
+#define XPC_DBG_P_ACTV		0x0000000000000800
 
 
 #define XPC_DBG_P_SET_DESCRIPTION "\n" \
@@ -40,19 +43,22 @@
 		"\t0x002 Error\n" \
 		"\t0x010 Initialization\n" \
 		"\t0x020 Heartbeat related\n" \
-		"\t0x040 Activation/Deact\n" \
+		"\t0x040 Discovery related\n" \
+		"\t0x080 Activation/Deact\n" \
 		"\t0x100 Verbose Initialization\n" \
 		"\t0x200 Verbose Heartbeat related\n" \
-		"\t0x400 Verbose Activation/Deact\n"
+		"\t0x400 Verbose Discovery related\n" \
+		"\t0x800 Verbose Activation/Deact\n"
 
 #define XPC_DBG_P_DEFCAPTURE_SETS	(XPC_DBG_P_CONSOLE | \
 					 XPC_DBG_P_ERROR | \
 					 XPC_DBG_P_INIT | \
 					 XPC_DBG_P_INITV | \
 					 XPC_DBG_P_HEARTBEAT | \
+					 XPC_DBG_P_DISCOVERY | \
+					 XPC_DBG_P_DISCOVERYV | \
 					 XPC_DBG_P_ACT | \
-					 XPC_DBG_P_ACTV | \
-					 XPC_DBG_P_DEACT)
+					 XPC_DBG_P_ACTV)
 
 #define XPC_DBG_P_DEFCONSOLE_SETS	(XPC_DBG_P_CONSOLE | \
 					 XPC_DBG_P_ERROR)
@@ -105,5 +111,5 @@ EXTERN_DPRINTK(xpc_part);
 EXTERN_DPRINTK(xpc_chan);
 
 
-#endif /* _IA64_SN_XPC_DBGTK_H */
+#endif /* _IA64_SN_KERNEL_XPC_DBGTK_H */
 

@@ -3,11 +3,11 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1999,2001-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1999,2001-2004 Silicon Graphics, Inc. All rights reserved.
  */
 
 
-/***********************************************************************
+/*
  * Cross Partition Network Interface (XPNET) support
  *
  *	XPNET provides a virtual network layered on top of the Cross
@@ -19,7 +19,7 @@
  *	pointers to a DMA-capable block that a remote partition should
  *	retrieve and pass to the upper level networking layer.
  *
- **********************************************************************/
+ */
 
 
 #include <linux/config.h>
@@ -41,6 +41,53 @@
 #include <asm/types.h>
 #include <asm/atomic.h>
 #include <asm/sn/xp.h>
+#include <asm/sn/xp_dbgtk.h>
+
+
+/* once Linux 2.4 is no longer supported, eliminate these gyrations */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) && \
+    LINUX_VERSION_CODE <  KERNEL_VERSION(2,5,0)
+
+/*
+ * Compatibilty function to enable this module to run on linux 2.4.
+ *
+ * alloc_netdev() does exist in 2.4, but since it is defined as a static in
+ * linux/linux/drivers/net/net_init.c the following is an attempt to get to
+ * it via alloc_etherdev(), which does mostly what we want. The dev->name is
+ * set to "eth%d" by alloc_etherdev(), so we switch it to what XPNET wants
+ * it to be before returning.
+ */
+static struct net_device *
+alloc_netdev(int sizeof_priv, const char *mask,
+	     void (*setup)(struct net_device *))
+{
+	extern struct net_device *alloc_etherdev(int);
+	struct net_device *dev;
+
+
+	XP_ASSERT(setup == ether_setup);
+	dev = alloc_etherdev(sizeof_priv);
+	strcpy(dev->name, mask);
+	return dev;
+}
+
+
+/*
+ * Compatibilty function to enable this module to run on linux 2.4.
+ */
+static void
+free_netdev(struct net_device *dev)
+{
+	XP_ASSERT(atomic_read(&dev->refcnt) == 0);
+	kfree(dev);
+}
+
+#else /* LINUX_VERSION_CODE == Linux 2.4 */
+
+#define EXPORT_NO_SYMBOLS
+
+#endif /* LINUX_VERSION_CODE == Linux 2.4 */
 
 
 /*
@@ -60,7 +107,7 @@
  */
 struct xpnet_message_s {
 	u16 version;		/* Version for this message */
-	u16 embedded_bytes;	/* #of bytes embedded in xpc message */
+	u16 embedded_bytes;	/* #of bytes embedded in XPC message */
 	u32 magic;		/* Special number indicating this is xpnet */
 	u64 buf_pa;		/* phys address of buffer to retrieve */
 	u32 size;		/* #of bytes in buffer */
@@ -200,8 +247,9 @@ static spinlock_t xpnet_broadcast_lock = SPIN_LOCK_UNLOCKED;
 DECLARE_DPRINTK(xpnet, 1000, XPNET_DBG_DEFCAPTURE_SETS,
 		XPNET_DBG_DEFCONSOLE_SETS, XPNET_DBG_SET_DESCRIPTION);
 
+
 /*
- * Packet was recevied by xpc and forwarded to us.
+ * Packet was recevied by XPC and forwarded to us.
  */
 static void
 xpnet_receive(partid_t partid, int channel, struct xpnet_message_s *msg)
@@ -214,7 +262,7 @@ xpnet_receive(partid_t partid, int channel, struct xpnet_message_s *msg)
 
 	if (!XPNET_VALID_MSG(msg)) {
 		/*
-		 * Packet with a different xpc version.  Ignore.
+		 * Packet with a different XPC version.  Ignore.
 		 */
 		xpc_received(partid, channel, (void *) msg);
 
@@ -259,7 +307,8 @@ xpnet_receive(partid_t partid, int channel, struct xpnet_message_s *msg)
 	/*
 	 * Move the data over from the the other side.
 	 */
-	if ((XPNET_VERSION_MINOR(msg->version) == 1) && (msg->embedded_bytes != 0)) {
+	if ((XPNET_VERSION_MINOR(msg->version) == 1) &&
+						(msg->embedded_bytes != 0)) {
 		DPRINTK(xpnet, XPNET_DBG_RECVV,
 			"copying embedded message. memcpy(0x%p, 0x%p, %lu)\n",
 			skb->data, &msg->data, (size_t) msg->embedded_bytes);
@@ -272,17 +321,19 @@ xpnet_receive(partid_t partid, int channel, struct xpnet_message_s *msg)
 			(void *)__pa((u64)skb->data & ~(L1_CACHE_BYTES - 1)),
 			msg->size);
 
-		bret = bte_copy(msg->buf_pa, __pa((u64)skb->data & ~(L1_CACHE_BYTES - 1)),
-				msg->size, BTE_NOTIFY, NULL);
+		bret = bte_copy(msg->buf_pa,
+				__pa((u64)skb->data & ~(L1_CACHE_BYTES - 1)),
+				msg->size, (BTE_NOTIFY | BTE_WACQUIRE), NULL);
 
 		if (bret != BTE_SUCCESS) {
 			// >>> Need better way of cleaning skb.  Currently skb
 			// >>> appears in_use and we can't just call
 			// >>> dev_kfree_skb.
 			DPRINTK_ALWAYS(xpnet, (XPNET_DBG_RECV | XPNET_DBG_ERROR),
-				KERN_ERR "XPNET: failed during bte_copy(0x%p, 0x%p, "
-				"0x%hx)\n", (void *)msg->buf_pa, 
-				(void *)__pa((u64)skb->data & ~(L1_CACHE_BYTES - 1)),
+				KERN_ERR "XPNET: failed during bte_copy(0x%p, "
+				"0x%p, 0x%hx)\n", (void *)msg->buf_pa,
+				(void *)__pa((u64)skb->data &
+							~(L1_CACHE_BYTES - 1)),
 				msg->size);
 			
 			xpc_received(partid, channel, (void *) msg);
@@ -319,7 +370,6 @@ xpnet_receive(partid_t partid, int channel, struct xpnet_message_s *msg)
 	netif_rx_ni(skb);
 	xpc_received(partid, channel, (void *) msg);
 }
-
 
 
 /*
@@ -493,7 +543,6 @@ xpnet_send_completed(xpc_t reason, partid_t partid, int channel, void *__qm)
 }
 
 
-
 /*
  * Network layer has formatted a packet (skb) and is ready to place it
  * "on the wire".  Prepare and send an xpnet_message_s to all partitions
@@ -635,7 +684,7 @@ xpnet_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		msg->buf_pa = __pa(start_addr);
 		
 		DPRINTK(xpnet, XPNET_DBG_SENDV,
-			"sending xpc message to %d:%d\n"
+			"sending XPC message to %d:%d\n"
 			"msg->buf_pa=0x%lx, msg->size=%u, "
 			"msg->leadin_ignore=%u, "
 			"msg->tailout_ignore=%u\n",
@@ -688,10 +737,6 @@ xpnet_dev_tx_timeout (struct net_device *dev)
 }
 
 
-MODULE_AUTHOR("Silicon Graphics, Inc.");
-MODULE_DESCRIPTION("Cross Partition Network adapter (XPNET)");
-MODULE_LICENSE("GPL");
-
 static int __init
 xpnet_init(void)
 {
@@ -705,7 +750,6 @@ xpnet_init(void)
 	DPRINTK_ALWAYS(xpnet, (XPNET_DBG_SETUP | XPNET_DBG_CONSOLE),
 		KERN_INFO "XPNET: registering network device %s\n",
 		XPNET_DEVICE_NAME);
-
 
 	/*
 	 * use ether_setup() to init the majority of our device
@@ -737,7 +781,8 @@ xpnet_init(void)
 	xpnet_device->dev_addr[XPNET_PARTID_OCTET] = sn_local_partid();
 	license_num = sn_partition_serial_number_val();
 	for (i = 3; i >= 0; i--) {
-		xpnet_device->dev_addr[XPNET_LICENSE_OCTET + i] = license_num & 0xff;
+		xpnet_device->dev_addr[XPNET_LICENSE_OCTET + i] =
+							license_num & 0xff;
 		license_num = license_num >> 8;
 	}
 
@@ -764,7 +809,6 @@ xpnet_init(void)
 module_init(xpnet_init);
 
 
-
 static void __exit
 xpnet_exit(void)
 {
@@ -779,3 +823,11 @@ xpnet_exit(void)
 	UNREG_DPRINTK(xpnet);
 }
 module_exit(xpnet_exit);
+
+
+MODULE_AUTHOR("Silicon Graphics, Inc.");
+MODULE_DESCRIPTION("Cross Partition Network adapter (XPNET)");
+MODULE_LICENSE("GPL");
+
+EXPORT_NO_SYMBOLS;
+

@@ -7,16 +7,16 @@
  */
 
 
-/***********************************************************************
+/*
  * Cross Partition Communication (XPC) channel support.
  *
  *	This is the part of XPC that manages the channels and
  *	sends/receives messages across them to/from other partitions.
  *
- **********************************************************************/
+ */
 
 
-#ifdef	__KERNEL__
+#ifndef	SN_PROM
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
@@ -24,44 +24,49 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <asm/sn/sn_sal.h>
-#else	/* __KERNEL__ */
+#else /* ! SN_PROM */
 #include "main/main.h"
 #include "libc/libc.h"
-#endif	/* __KERNEL__ */
-
+#endif /* ! SN_PROM */
 #include "xpc.h"
 
 
-
-static void xpc_initialize_channels(xpc_partition_t *, partid_t);
-static __inline__ xpc_t xpc_pull_remote_cachelines(xpc_partition_t *, void *,
-							const void *, size_t);
-static u64 xpc_get_IPI_flags(xpc_partition_t *);
-static void xpc_process_openclose_IPI(xpc_partition_t *, int, u8);
-static void xpc_process_disconnect(xpc_channel_t *, unsigned long *);
-static xpc_t xpc_connect_channel(xpc_channel_t *);
-static void xpc_process_connect(xpc_channel_t *, unsigned long *);
-static void xpc_process_msg_IPI(xpc_partition_t *, int);
-static void xpc_notify_senders(xpc_channel_t *, xpc_t, s64);
-static xpc_t xpc_allocate_msgqueues(xpc_channel_t *);
-static xpc_t xpc_allocate_local_msgqueue(xpc_channel_t *);
-static xpc_t xpc_allocate_remote_msgqueue(xpc_channel_t *);
-static void xpc_free_msgqueues(xpc_channel_t *);
-static xpc_t xpc_allocate_msg(xpc_channel_t *, u32, xpc_msg_t **);
-static xpc_t xpc_allocate_msg_wait(xpc_channel_t *);
-static xpc_t xpc_initiate_send(xpc_channel_t *, xpc_msg_t *, u8,
-				xpc_notify_func_t, void *);
-static void xpc_send_msgs(xpc_channel_t *, s64);
-static xpc_msg_t *xpc_get_deliverable_msg(xpc_channel_t *);
-static __inline__ xpc_msg_t *xpc_pull_remote_msg(xpc_channel_t *, s64);
-static void xpc_acknowledge_msgs(xpc_channel_t *, s64, u8);
+/*
+ * Set up the initial values for the XPartition Communication channels.
+ */
+static void
+xpc_initialize_channels(xpc_partition_t *part, partid_t partid)
+{
+	int ch_number;
+	xpc_channel_t *ch;
 
 
+	for (ch_number = 0; ch_number < part->nchannels; ch_number++) {
+		ch = &part->channels[ch_number];
 
-/***********************************************************************
- * Setup a partition's communication infrastructure.
- *
- **********************************************************************/
+		ch->partid = partid;
+		ch->number = ch_number;
+		ch->flags = XPC_C_DISCONNECTED;
+
+		ch->local_GP = &part->local_GPs[ch_number];
+		ch->local_openclose_args =
+					&part->local_openclose_args[ch_number];
+
+		atomic_set(&ch->kthreads_assigned, 0);
+		atomic_set(&ch->kthreads_idle, 0);
+		atomic_set(&ch->kthreads_active, 0);
+
+		atomic_set(&ch->references, 0);
+		atomic_set(&ch->n_to_notify, 0);
+
+		spin_lock_init(&ch->lock);
+		sema_init(&ch->msg_to_pull_sema, 1);	/* mutex */
+
+		atomic_set(&ch->n_on_msg_allocate_wq, 0);
+		init_waitqueue_head(&ch->msg_allocate_wq);
+		init_waitqueue_head(&ch->idle_wq);
+	}
+}
 
 
 /*
@@ -220,40 +225,39 @@ xpc_setup_infrastructure(xpc_partition_t *part)
 
 
 /*
- * Set up the initial values for the XPartition Communication channels.
+ * Create a wrapper that hides the underlying mechanism for pulling a cacheline
+ * (or multiple cachelines) from a remote partition.
+ *
+ * src must be a cacheline aligned physical address on the remote partition.
+ * dst must be a cacheline aligned virtual address on this partition.
+ * cnt must be an cacheline sized
  */
-static void
-xpc_initialize_channels(xpc_partition_t *part, partid_t partid)
+static __inline__ xpc_t
+xpc_pull_remote_cachelines(xpc_partition_t *part, void *dst, const void *src,
+				size_t cnt)
 {
-	int ch_number;
-	xpc_channel_t *ch;
+	bte_result_t bte_ret;
 
 
-	for (ch_number = 0; ch_number < part->nchannels; ch_number++) {
-		ch = &part->channels[ch_number];
+	XP_ASSERT(L1_CACHE_ALIGNED(src));
+	XP_ASSERT(L1_CACHE_ALIGNED(dst));
+	XP_ASSERT(L1_CACHE_ALIGNED(cnt));
 
-		ch->partid = partid;
-		ch->number = ch_number;
-		ch->flags = XPC_C_DISCONNECTED;
-
-		ch->local_GP = &part->local_GPs[ch_number];
-		ch->local_openclose_args =
-					&part->local_openclose_args[ch_number];
-
-		atomic_set(&ch->kthreads_assigned, 0);
-		atomic_set(&ch->kthreads_idle, 0);
-		atomic_set(&ch->kthreads_active, 0);
-
-		atomic_set(&ch->references, 0);
-		atomic_set(&ch->n_to_notify, 0);
-
-		spin_lock_init(&ch->lock);
-		sema_init(&ch->msg_to_pull_sema, 1);	/* mutex */
-
-		atomic_set(&ch->n_on_msg_allocate_wq, 0);
-		init_waitqueue_head(&ch->msg_allocate_wq);
-		init_waitqueue_head(&ch->idle_wq);
+	if (part->act_state == XPC_P_DEACTIVATING) {
+		return part->reason;
 	}
+
+	bte_ret = xp_bte_copy((u64) src, (u64) ia64_tpa((__u64) dst),
+				(u64) cnt, (BTE_NORMAL | BTE_WACQUIRE), NULL);
+	if (bte_ret == BTE_SUCCESS) {
+		return xpcSuccess;
+	}
+
+	DPRINTK(xpc_chan, (XPC_DBG_C_IPI | XPC_DBG_C_ERROR),
+		"xp_bte_copy() from partition %d failed, ret=%d\n",
+		XPC_PARTID(part), bte_ret);
+
+	return xpc_map_bte_errors(bte_ret);
 }
 
 
@@ -284,7 +288,7 @@ xpc_pull_remote_vars_part(xpc_partition_t *part)
 	remote_entry_cacheline_pa = (remote_entry_pa & ~(L1_CACHE_BYTES - 1));
 
 	pulled_entry = (xpc_vars_part_t *) ((u64) pulled_entry_cacheline +
-					(remote_entry_pa & (L1_CACHE_BYTES - 1)));
+				(remote_entry_pa & (L1_CACHE_BYTES - 1)));
 	
 	ret = xpc_pull_remote_cachelines(part, pulled_entry_cacheline,
 					(void *) remote_entry_cacheline_pa,
@@ -356,49 +360,6 @@ xpc_pull_remote_vars_part(xpc_partition_t *part)
 }
 
 
-/*
- * Create a wrapper that hides the underlying mechanism for pulling a cacheline
- * (or multiple cachelines) from a remote partition.
- *
- * src must be a cacheline aligned physical address on the remote partition.
- * dst must be a cacheline aligned virtual address on this partition.
- * cnt must be an cacheline sized
- */
-static __inline__ xpc_t
-xpc_pull_remote_cachelines(xpc_partition_t *part, void *dst, const void *src,
-				size_t cnt)
-{
-	bte_result_t bte_ret;
-
-
-	XP_ASSERT(L1_CACHE_ALIGNED(src));
-	XP_ASSERT(L1_CACHE_ALIGNED(dst));
-	XP_ASSERT(L1_CACHE_ALIGNED(cnt));
-
-	if (part->act_state == XPC_P_DEACTIVATING) {
-		return part->reason;
-	}
-
-	bte_ret = bte_copy((u64) src, (u64) ia64_tpa((__u64) dst), (u64) cnt,
-					(BTE_NORMAL | BTE_WACQUIRE), NULL);
-	if (bte_ret == BTE_SUCCESS) {
-		return xpcSuccess;
-	}
-
-	DPRINTK(xpc_chan, (XPC_DBG_C_IPI | XPC_DBG_C_ERROR),
-		"bte_copy() from partition %d failed, ret=%d\n",
-		XPC_PARTID(part), bte_ret);
-
-	return xpc_map_bte_errors(bte_ret);
-}
-
-
-/***********************************************************************
- * >>>Process channel activity
- *
- **********************************************************************/
-
-
 /* 
  * Check to see if there is any channel activity to/from the specified
  * partition.
@@ -424,77 +385,6 @@ xpc_check_for_channel_activity(xpc_partition_t *part)
 		XPC_PARTID(part), IPI_amo);
 
 	XPC_PROCESS_CHANNEL_ACTIVITY(part);
-}
-
-
-void
-xpc_process_channel_activity(xpc_partition_t *part)
-{
-	unsigned long irq_flags;
-	u64 IPI_amo, IPI_flags;
-	xpc_channel_t *ch;
-	int ch_number;
-
-
-	IPI_amo = xpc_get_IPI_flags(part);
-
-	/*
-	 * Initiate channel connections for registered channels.
-	 *
-	 * For each connected channel that has pending messages activate idle
-	 * kthreads and/or create new kthreads as needed.
-	 */
-
-	for (ch_number = 0; ch_number < part->nchannels; ch_number++) {
-		ch = &part->channels[ch_number];
-
-
-		/*
-		 * Process any open or close related IPI flags, and then deal
-		 * with connecting or disconnecting the channel as required.
-		 */
-
-		IPI_flags = XPC_GET_IPI_FLAGS(IPI_amo, ch_number);
-
-		if (XPC_ANY_OPENCLOSE_IPI_FLAGS_SET(IPI_flags)) {
-			xpc_process_openclose_IPI(part, ch_number, IPI_flags);
-		}
-
-
-		if (ch->flags & XPC_C_DISCONNECTING) {
-			spin_lock_irqsave(&ch->lock, irq_flags);
-			xpc_process_disconnect(ch, &irq_flags);
-			spin_unlock_irqrestore(&ch->lock, irq_flags);
-			continue;
-		}
-
-		if (part->act_state == XPC_P_DEACTIVATING) {
-			continue;
-		}
-
-		if (!(ch->flags & XPC_C_CONNECTED)) {
-			if (!(ch->flags & XPC_C_OPENREQUEST)) {
-				XP_ASSERT(!(ch->flags & XPC_C_SETUP));
-				(void) xpc_connect_channel(ch);
-			} else {
-				spin_lock_irqsave(&ch->lock, irq_flags);
-				xpc_process_connect(ch, &irq_flags);
-				spin_unlock_irqrestore(&ch->lock, irq_flags);
-			}
-			continue;
-		}
-
-
-		/*
-		 * Process any message related IPI flags, this may involve the
-		 * activation of kthreads to deliver any pending messages sent
-		 * from the other partition.
-		 */
-
-		if (XPC_ANY_MSG_IPI_FLAGS_SET(IPI_flags)) {
-			xpc_process_msg_IPI(part, ch_number);
-		}
-	}
 }
 
 
@@ -554,6 +444,331 @@ xpc_get_IPI_flags(xpc_partition_t *part)
 	}
 
 	return IPI_amo;
+}
+
+
+/*
+ * Allocate the local message queue and the notify queue.
+ */
+static xpc_t
+xpc_allocate_local_msgqueue(xpc_channel_t *ch)
+{
+	unsigned long irq_flags;
+	int nentries;
+	size_t nbytes;
+
+
+	// >>> may want to check for ch->flags & XPC_C_DISCONNECTING between
+	// >>> iterations of the for-loop, bail if set?
+
+	// >>> should we impose a minumum #of entries? like 4 or 8?
+	for (nentries = ch->local_nentries; nentries > 0; nentries--) {
+
+		nbytes = nentries * ch->msg_size;
+		ch->local_msgqueue = kmalloc(nbytes, GFP_KERNEL | GFP_DMA);
+		if (ch->local_msgqueue == NULL) {
+			continue;
+		}
+		XP_ASSERT(L1_CACHE_ALIGNED(ch->local_msgqueue));
+		memset(ch->local_msgqueue, 0, nbytes);
+
+		nbytes = nentries * sizeof(xpc_notify_t);
+		ch->notify_queue = kmalloc(nbytes, GFP_KERNEL | GFP_DMA);
+		if (ch->notify_queue == NULL) {
+			kfree(ch->local_msgqueue);
+			continue;
+		}
+
+		// >>> do these really need to be cache aligned ?
+		XP_ASSERT(L1_CACHE_ALIGNED(ch->notify_queue));
+		memset(ch->notify_queue, 0, nbytes);
+
+		spin_lock_irqsave(&ch->lock, irq_flags);
+		if (nentries < ch->local_nentries) {
+			DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
+				"nentries=%d local_nentries=%d, partid=%d, "
+				"channel=%d\n", nentries, ch->local_nentries,
+				ch->partid, ch->number);
+
+			ch->local_nentries = nentries;
+		}
+		spin_unlock_irqrestore(&ch->lock, irq_flags);
+		return xpcSuccess;
+	}
+
+	DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
+		"can't get memory for local message queue and notify queue, "
+		"partid=%d, channel=%d\n", ch->partid, ch->number);
+	return xpcNoMemory;
+}
+
+
+/*
+ * Allocate the cached remote message queue.
+ */
+static xpc_t
+xpc_allocate_remote_msgqueue(xpc_channel_t *ch)
+{
+	unsigned long irq_flags;
+	int nentries;
+	size_t nbytes;
+
+
+	XP_ASSERT(ch->remote_nentries > 0);
+
+	// >>> may want to check for ch->flags & XPC_C_DISCONNECTING between
+	// >>> iterations of the for-loop, bail if set?
+
+	// >>> should we impose a minumum #of entries? like 4 or 8?
+	for (nentries = ch->remote_nentries; nentries > 0; nentries--) {
+
+		nbytes = nentries * ch->msg_size;
+		ch->remote_msgqueue = kmalloc(nbytes, GFP_KERNEL | GFP_DMA);
+		if (ch->remote_msgqueue == NULL) {
+			continue;
+		}
+
+		XP_ASSERT(L1_CACHE_ALIGNED(ch->remote_msgqueue));
+		memset(ch->remote_msgqueue, 0, nbytes);
+
+		spin_lock_irqsave(&ch->lock, irq_flags);
+		if (nentries < ch->remote_nentries) {
+			DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
+				"nentries=%d remote_nentries=%d, partid=%d, "
+				"channel=%d\n", nentries, ch->remote_nentries,
+				 ch->partid, ch->number);
+
+			ch->remote_nentries = nentries;
+		}
+		spin_unlock_irqrestore(&ch->lock, irq_flags);
+		return xpcSuccess;
+	}
+
+	DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
+		"can't get memory for cached remote message queue, partid=%d, "
+		"channel=%d\n", ch->partid, ch->number);
+	return xpcNoMemory;
+}
+
+
+/*
+ * Allocate message queues and other stuff associated with a channel.
+ *
+ * Note: Assumes all of the channel sizes are filled in.
+ */
+static xpc_t
+xpc_allocate_msgqueues(xpc_channel_t *ch)
+{
+	unsigned long irq_flags;
+	int i;
+	xpc_t ret;
+
+
+	XP_ASSERT(!(ch->flags & XPC_C_SETUP));
+
+	if ((ret = xpc_allocate_local_msgqueue(ch)) != xpcSuccess) {
+		return ret;
+	}
+
+	if ((ret = xpc_allocate_remote_msgqueue(ch)) != xpcSuccess) {
+		kfree(ch->local_msgqueue);
+		ch->local_msgqueue = NULL;
+		kfree(ch->notify_queue);
+		ch->notify_queue = NULL;
+		return ret;
+	}
+
+	for (i = 0; i < ch->local_nentries; i++) {
+		/* use a semaphore as an event wait queue */
+		sema_init(&ch->notify_queue[i].sema, 0);
+	}
+
+	sema_init(&ch->teardown_sema, 0);	/* event wait */
+
+	spin_lock_irqsave(&ch->lock, irq_flags);
+	ch->flags |= XPC_C_SETUP;
+	spin_unlock_irqrestore(&ch->lock, irq_flags);
+
+	return xpcSuccess;
+}
+
+
+/*
+ * Process a connect message from a remote partition.
+ *
+ * Note: xpc_process_connect() is expecting to be called with the
+ * spin_lock_irqsave held and will leave it locked upon return.
+ */
+static void
+xpc_process_connect(xpc_channel_t *ch, unsigned long *irq_flags)
+{
+	xpc_t ret;
+
+
+	XP_ASSERT(spin_is_locked(&ch->lock));
+
+	if (!(ch->flags & XPC_C_OPENREQUEST) ||
+				!(ch->flags & XPC_C_ROPENREQUEST)) {
+		/* nothing more to do for now */
+		return;
+	}
+	XP_ASSERT(ch->flags & XPC_C_CONNECTING);
+
+	if (!(ch->flags & XPC_C_SETUP)) {
+		spin_unlock_irqrestore(&ch->lock, *irq_flags);
+		ret = xpc_allocate_msgqueues(ch);
+		spin_lock_irqsave(&ch->lock, *irq_flags);
+
+		if (ret != xpcSuccess) {
+			XPC_DISCONNECT_CHANNEL(ch, ret, irq_flags);
+		}
+		if (ch->flags & (XPC_C_CONNECTED | XPC_C_DISCONNECTING)) {
+			return;
+		}
+
+		XP_ASSERT(ch->flags & XPC_C_SETUP);
+		XP_ASSERT(ch->local_msgqueue != NULL);
+		XP_ASSERT(ch->remote_msgqueue != NULL);
+	}
+
+	if (!(ch->flags & XPC_C_OPENREPLY)) {
+		ch->flags |= XPC_C_OPENREPLY;
+		XPC_IPI_SEND_OPENREPLY(ch, irq_flags);
+	}
+
+	if (!(ch->flags & XPC_C_ROPENREPLY)) {
+		return;
+	}
+
+	XP_ASSERT(ch->remote_msgqueue_pa != 0);
+
+	ch->flags = (XPC_C_CONNECTED | XPC_C_SETUP);	/* clear all else */
+
+	DPRINTK_ALWAYS(xpc_chan, (XPC_DBG_C_CONNECT | XPC_DBG_C_CONSOLE),
+		KERN_INFO "XPC: channel %d to partition %d connected\n",
+		ch->number, ch->partid);
+
+	spin_unlock_irqrestore(&ch->lock, *irq_flags);
+	XPC_CONNECTED_CALLOUT(ch);
+	spin_lock_irqsave(&ch->lock, *irq_flags);
+}
+
+
+/*
+ * Free up message queues and other stuff that were allocated for the specified
+ * channel.
+ *
+ * Note: ch->reason and ch->reason_line are left set for debugging purposes,
+ * they're cleared when XPC_C_DISCONNECTED is cleared.
+ */
+static void
+xpc_free_msgqueues(xpc_channel_t *ch)
+{
+	XP_ASSERT(spin_is_locked(&ch->lock));
+	XP_ASSERT(atomic_read(&ch->n_to_notify) == 0);
+
+	ch->remote_msgqueue_pa = 0;
+	ch->func = NULL;
+	ch->key = NULL;
+	ch->msg_size = 0;
+	ch->local_nentries = 0;
+	ch->remote_nentries = 0;
+	ch->kthreads_assigned_limit = 0;
+	ch->kthreads_idle_limit = 0;
+
+	ch->local_GP->get = 0;
+	ch->local_GP->put = 0;
+	ch->remote_GP.get = 0;
+	ch->remote_GP.put = 0;
+	ch->w_local_GP.get = 0;
+	ch->w_local_GP.put = 0;
+	ch->w_remote_GP.get = 0;
+	ch->w_remote_GP.put = 0;
+	ch->next_msg_to_pull = 0;
+
+	if (ch->flags & XPC_C_SETUP) {
+		ch->flags &= ~XPC_C_SETUP;
+
+		DPRINTK(xpc_chan, XPC_DBG_C_TEARDOWN,
+			"ch->flags=0x%x, partid=%d, channel=%d\n", ch->flags,
+			ch->partid, ch->number);
+
+		kfree(ch->local_msgqueue);
+		ch->local_msgqueue = NULL;
+		kfree(ch->remote_msgqueue);
+		ch->remote_msgqueue = NULL;
+		kfree(ch->notify_queue);
+		ch->notify_queue = NULL;
+
+		/* in case someone is waiting for the teardown to complete */
+		up(&ch->teardown_sema);
+	}
+}
+
+
+/*
+ * spin_lock_irqsave() is expected to be held on entry.
+ */
+static void
+xpc_process_disconnect(xpc_channel_t *ch, unsigned long *irq_flags)
+{
+	xpc_partition_t *part = &xpc_partitions[ch->partid];
+	u32 ch_flags = ch->flags;
+
+
+	XP_ASSERT(spin_is_locked(&ch->lock));
+
+	if (!(ch->flags & XPC_C_DISCONNECTING)) {
+		return;
+	}
+
+	XP_ASSERT(ch->flags & XPC_C_CLOSEREQUEST);
+
+	/* make sure all activity has settled down first */
+
+	if (atomic_read(&ch->references) > 0) {
+		return;
+	}
+	XP_ASSERT(atomic_read(&ch->kthreads_assigned) == 0);
+
+	/* it's now safe to free the channel's message queues */
+
+	xpc_free_msgqueues(ch);
+	XP_ASSERT(!(ch->flags & XPC_C_SETUP));
+
+	if (part->act_state != XPC_P_DEACTIVATING) {
+
+		/* as long as the other side is up do the full protocol */
+
+		if (!(ch->flags & XPC_C_RCLOSEREQUEST)) {
+			return;
+		}
+
+		if (!(ch->flags & XPC_C_CLOSEREPLY)) {
+			ch->flags |= XPC_C_CLOSEREPLY;
+			XPC_IPI_SEND_CLOSEREPLY(ch, irq_flags);
+		}
+
+		if (!(ch->flags & XPC_C_RCLOSEREPLY)) {
+			return;
+		}
+	}
+
+	/* both sides are disconnected now */
+
+	ch->flags = XPC_C_DISCONNECTED;	/* clear all flags, but this one */
+
+	atomic_dec(&part->nchannels_active);
+
+	if (ch_flags & XPC_C_WASCONNECTED) {
+		DPRINTK_ALWAYS(xpc_chan, (XPC_DBG_C_DISCONNECT |
+							XPC_DBG_C_CONSOLE),
+			KERN_INFO "XPC: channel %d to partition %d "
+			"disconnected, reason=%s\n", ch->number, ch->partid,
+			xpc_get_ascii_reason_code(ch->reason));
+	}
+
+	XPC_DISCONNECTED_CALLOUT(ch, ch_flags, irq_flags);
 }
 
 
@@ -772,6 +987,149 @@ xpc_process_openclose_IPI(xpc_partition_t *part, int ch_number, u8 IPI_flags)
 
 
 /*
+ * Attempt to establish a channel connection to a remote partition.
+ */
+static xpc_t
+xpc_connect_channel(xpc_channel_t *ch)
+{
+	unsigned long irq_flags;
+	xpc_registration_t *registration = &xpc_registrations[ch->number];
+
+
+	if (down_interruptible(&registration->sema) != 0) {
+		return xpcInterrupted;
+	}
+
+	if (!XPC_CHANNEL_REGISTERED(ch->number)) {
+		up(&registration->sema);
+		return xpcUnregistered;
+	}
+
+	spin_lock_irqsave(&ch->lock, irq_flags);
+
+	XP_ASSERT(!(ch->flags & XPC_C_CONNECTED));
+	XP_ASSERT(!(ch->flags & XPC_C_OPENREQUEST));
+
+	if (ch->flags & XPC_C_DISCONNECTING) {
+		spin_unlock_irqrestore(&ch->lock, irq_flags);
+		up(&registration->sema);
+		return ch->reason;
+	}
+
+
+	/* add info from the channel connect registration to the channel */
+
+	ch->kthreads_assigned_limit = registration->assigned_limit;
+	ch->kthreads_idle_limit = registration->idle_limit;
+	XP_ASSERT(atomic_read(&ch->kthreads_assigned) == 0);
+	XP_ASSERT(atomic_read(&ch->kthreads_idle) == 0);
+	XP_ASSERT(atomic_read(&ch->kthreads_active) == 0);
+
+	ch->func = registration->func;
+	XP_ASSERT(registration->func != NULL);
+	ch->key = registration->key;
+
+	ch->local_nentries = registration->nentries;
+
+	if (ch->flags & XPC_C_ROPENREQUEST) {
+		if (registration->msg_size != ch->msg_size) { 
+			/* the local and remote sides aren't the same */
+
+			/*
+			 * Because XPC_DISCONNECT_CHANNEL() can block we're
+			 * forced to up the registration sema before we unlock
+			 * the channel lock. But that's okay here because we're
+			 * done with the part that required the registration
+			 * sema. XPC_DISCONNECT_CHANNEL() requires that the
+			 * channel lock be locked and will unlock and relock
+			 * the channel lock as needed.
+			 */
+			up(&registration->sema);
+			XPC_DISCONNECT_CHANNEL(ch, xpcUnequalMsgSizes,
+								&irq_flags);
+			spin_unlock_irqrestore(&ch->lock, irq_flags);
+			return xpcUnequalMsgSizes;
+		}
+	} else {
+		ch->msg_size = registration->msg_size;
+
+		XPC_SET_REASON(ch, 0, 0);
+		ch->flags &= ~XPC_C_DISCONNECTED;
+
+		atomic_inc(&xpc_partitions[ch->partid].nchannels_active);
+	}
+
+	up(&registration->sema);
+
+
+	/* initiate the connection */
+
+	ch->flags |= (XPC_C_OPENREQUEST | XPC_C_CONNECTING);
+	XPC_IPI_SEND_OPENREQUEST(ch, &irq_flags);
+
+	xpc_process_connect(ch, &irq_flags);
+
+	spin_unlock_irqrestore(&ch->lock, irq_flags);
+
+	return xpcSuccess;
+}
+
+
+#define XPC_DBG_C_NOTIFY ((reason == xpcMsgDelivered) ? \
+					XPC_DBG_C_IPI : XPC_DBG_C_DISCONNECT)
+
+
+/*
+ * Notify those who wanted to be notified upon delivery of their message.
+ */
+static void
+xpc_notify_senders(xpc_channel_t *ch, xpc_t reason, s64 put)
+{
+	xpc_notify_t *notify;
+	u8 notify_type;
+	s64 get = ch->w_remote_GP.get - 1;
+
+
+	while (++get < put && atomic_read(&ch->n_to_notify) > 0) {
+
+		notify = &ch->notify_queue[get % ch->local_nentries];
+
+		/*
+		 * See if the notify entry indicates it was associated with
+		 * a message who's sender wants to be notified. It is possible
+		 * that it is, but someone else is doing or has done the
+		 * notification.
+		 */
+		notify_type = notify->type;
+		if (notify_type == 0 ||
+				cmpxchg(&notify->type, notify_type, 0) !=
+								notify_type) {
+			continue;
+		}
+
+		XP_ASSERT(notify_type == XPC_N_CALL);
+
+		atomic_dec(&ch->n_to_notify);
+
+		DPRINTK(xpc_chan, XPC_DBG_C_NOTIFY,
+			"XPC_CALL_NOTIFY_FUNC() called, notify=0x%p, "
+			"msg_number=%ld, partid=%d, channel=%d\n",
+			(void *) notify, get, ch->partid, ch->number);
+
+		XPC_CALL_NOTIFY_FUNC(ch, notify, reason);
+
+		DPRINTK(xpc_chan, XPC_DBG_C_NOTIFY,
+			"XPC_CALL_NOTIFY_FUNC() returned, notify=0x%p, "
+			"msg_number=%ld, partid=%d, channel=%d\n",
+			(void *) notify, get, ch->partid, ch->number);
+	}
+}
+
+
+#undef XPC_DBG_C_NOTIFY
+
+
+/*
  *
  */
 static void
@@ -882,10 +1240,75 @@ xpc_process_msg_IPI(xpc_partition_t *part, int ch_number)
 }
 
 
-/***********************************************************************
- * Tear down a partition's communication infrastructure.
- *
- **********************************************************************/
+void
+xpc_process_channel_activity(xpc_partition_t *part)
+{
+	unsigned long irq_flags;
+	u64 IPI_amo, IPI_flags;
+	xpc_channel_t *ch;
+	int ch_number;
+
+
+	IPI_amo = xpc_get_IPI_flags(part);
+
+	/*
+	 * Initiate channel connections for registered channels.
+	 *
+	 * For each connected channel that has pending messages activate idle
+	 * kthreads and/or create new kthreads as needed.
+	 */
+
+	for (ch_number = 0; ch_number < part->nchannels; ch_number++) {
+		ch = &part->channels[ch_number];
+
+
+		/*
+		 * Process any open or close related IPI flags, and then deal
+		 * with connecting or disconnecting the channel as required.
+		 */
+
+		IPI_flags = XPC_GET_IPI_FLAGS(IPI_amo, ch_number);
+
+		if (XPC_ANY_OPENCLOSE_IPI_FLAGS_SET(IPI_flags)) {
+			xpc_process_openclose_IPI(part, ch_number, IPI_flags);
+		}
+
+
+		if (ch->flags & XPC_C_DISCONNECTING) {
+			spin_lock_irqsave(&ch->lock, irq_flags);
+			xpc_process_disconnect(ch, &irq_flags);
+			spin_unlock_irqrestore(&ch->lock, irq_flags);
+			continue;
+		}
+
+		if (part->act_state == XPC_P_DEACTIVATING) {
+			continue;
+		}
+
+		if (!(ch->flags & XPC_C_CONNECTED)) {
+			if (!(ch->flags & XPC_C_OPENREQUEST)) {
+				XP_ASSERT(!(ch->flags & XPC_C_SETUP));
+				(void) xpc_connect_channel(ch);
+			} else {
+				spin_lock_irqsave(&ch->lock, irq_flags);
+				xpc_process_connect(ch, &irq_flags);
+				spin_unlock_irqrestore(&ch->lock, irq_flags);
+			}
+			continue;
+		}
+
+
+		/*
+		 * Process any message related IPI flags, this may involve the
+		 * activation of kthreads to deliver any pending messages sent
+		 * from the other partition.
+		 */
+
+		if (XPC_ANY_MSG_IPI_FLAGS_SET(IPI_flags)) {
+			xpc_process_msg_IPI(part, ch_number);
+		}
+	}
+}
 
 
 /*
@@ -993,12 +1416,6 @@ xpc_teardown_infrastructure(xpc_partition_t *part)
 }
 
 
-/***********************************************************************
- * Connect a channel.
- *
- **********************************************************************/
-
-
 /*
  * Called by XP at the time of channel connection registration to cause
  * XPC to establish connections to all currently active partitions.
@@ -1038,302 +1455,6 @@ xpc_initiate_connect(int ch_number)
 }
 
 
-/*
- * Attempt to establish a channel connection to a remote partition.
- */
-static xpc_t
-xpc_connect_channel(xpc_channel_t *ch)
-{
-	unsigned long irq_flags;
-	xpc_registration_t *registration = &xpc_registrations[ch->number];
-
-
-	if (down_interruptible(&registration->sema) != 0) {
-		return xpcInterrupted;
-	}
-
-	if (!XPC_CHANNEL_REGISTERED(ch->number)) {
-		up(&registration->sema);
-		return xpcUnregistered;
-	}
-
-	spin_lock_irqsave(&ch->lock, irq_flags);
-
-	XP_ASSERT(!(ch->flags & XPC_C_CONNECTED));
-	XP_ASSERT(!(ch->flags & XPC_C_OPENREQUEST));
-
-	if (ch->flags & XPC_C_DISCONNECTING) {
-		spin_unlock_irqrestore(&ch->lock, irq_flags);
-		up(&registration->sema);
-		return ch->reason;
-	}
-
-
-	/* add info from the channel connect registration to the channel */
-
-	ch->kthreads_assigned_limit = registration->assigned_limit;
-	ch->kthreads_idle_limit = registration->idle_limit;
-	XP_ASSERT(atomic_read(&ch->kthreads_assigned) == 0);
-	XP_ASSERT(atomic_read(&ch->kthreads_idle) == 0);
-	XP_ASSERT(atomic_read(&ch->kthreads_active) == 0);
-
-	ch->func = registration->func;
-	XP_ASSERT(registration->func != NULL);
-	ch->key = registration->key;
-
-	ch->local_nentries = registration->nentries;
-
-	if (ch->flags & XPC_C_ROPENREQUEST) {
-		if (registration->msg_size != ch->msg_size) { 
-			/* the local and remote sides aren't the same */
-
-			/*
-			 * Because XPC_DISCONNECT_CHANNEL() can block we're
-			 * forced to up the registration sema before we unlock
-			 * the channel lock. But that's okay here because we're
-			 * done with the part that required the registration
-			 * sema. XPC_DISCONNECT_CHANNEL() requires that the
-			 * channel lock be locked and will unlock and relock
-			 * the channel lock as needed.
-			 */
-			up(&registration->sema);
-			XPC_DISCONNECT_CHANNEL(ch, xpcUnequalMsgSizes,
-								&irq_flags);
-			spin_unlock_irqrestore(&ch->lock, irq_flags);
-			return xpcUnequalMsgSizes;
-		}
-	} else {
-		ch->msg_size = registration->msg_size;
-
-		XPC_SET_REASON(ch, 0, 0);
-		ch->flags &= ~XPC_C_DISCONNECTED;
-
-		atomic_inc(&xpc_partitions[ch->partid].nchannels_active);
-	}
-
-	up(&registration->sema);
-
-
-	/* initiate the connection */
-
-	ch->flags |= (XPC_C_OPENREQUEST | XPC_C_CONNECTING);
-	XPC_IPI_SEND_OPENREQUEST(ch, &irq_flags);
-
-	xpc_process_connect(ch, &irq_flags);
-
-	spin_unlock_irqrestore(&ch->lock, irq_flags);
-
-	return xpcSuccess;
-}
-
-
-/*
- * Process a connect message from a remote partition.
- *
- * Note: xpc_process_connect() is expecting to be called with the
- * spin_lock_irqsave held and will leave it locked upon return.
- */
-static void
-xpc_process_connect(xpc_channel_t *ch, unsigned long *irq_flags)
-{
-	xpc_t ret;
-
-
-	XP_ASSERT(spin_is_locked(&ch->lock));
-
-	if (!(ch->flags & XPC_C_OPENREQUEST) ||
-				!(ch->flags & XPC_C_ROPENREQUEST)) {
-		/* nothing more to do for now */
-		return;
-	}
-	XP_ASSERT(ch->flags & XPC_C_CONNECTING);
-
-	if (!(ch->flags & XPC_C_SETUP)) {
-		spin_unlock_irqrestore(&ch->lock, *irq_flags);
-		ret = xpc_allocate_msgqueues(ch);
-		spin_lock_irqsave(&ch->lock, *irq_flags);
-
-		if (ret != xpcSuccess) {
-			XPC_DISCONNECT_CHANNEL(ch, ret, irq_flags);
-		}
-		if (ch->flags & (XPC_C_CONNECTED | XPC_C_DISCONNECTING)) {
-			return;
-		}
-
-		XP_ASSERT(ch->flags & XPC_C_SETUP);
-		XP_ASSERT(ch->local_msgqueue != NULL);
-		XP_ASSERT(ch->remote_msgqueue != NULL);
-	}
-
-	if (!(ch->flags & XPC_C_OPENREPLY)) {
-		ch->flags |= XPC_C_OPENREPLY;
-		XPC_IPI_SEND_OPENREPLY(ch, irq_flags);
-	}
-
-	if (!(ch->flags & XPC_C_ROPENREPLY)) {
-		return;
-	}
-
-	XP_ASSERT(ch->remote_msgqueue_pa != 0);
-
-	ch->flags = (XPC_C_CONNECTED | XPC_C_SETUP);	/* clear all else */
-
-	DPRINTK_ALWAYS(xpc_chan, (XPC_DBG_C_CONNECT | XPC_DBG_C_CONSOLE),
-		KERN_INFO "XPC: channel %d to partition %d connected\n",
-		ch->number, ch->partid);
-
-	spin_unlock_irqrestore(&ch->lock, *irq_flags);
-	XPC_CONNECTED_CALLOUT(ch);
-	spin_lock_irqsave(&ch->lock, *irq_flags);
-}
-
-
-/*
- * Allocate message queues and other stuff associated with a channel.
- *
- * Note: Assumes all of the channel sizes are filled in.
- */
-static xpc_t
-xpc_allocate_msgqueues(xpc_channel_t *ch)
-{
-	unsigned long irq_flags;
-	int i;
-	xpc_t ret;
-
-
-	XP_ASSERT(!(ch->flags & XPC_C_SETUP));
-
-	if ((ret = xpc_allocate_local_msgqueue(ch)) != xpcSuccess) {
-		return ret;
-	}
-
-	if ((ret = xpc_allocate_remote_msgqueue(ch)) != xpcSuccess) {
-		kfree(ch->local_msgqueue);
-		ch->local_msgqueue = NULL;
-		kfree(ch->notify_queue);
-		ch->notify_queue = NULL;
-		return ret;
-	}
-
-	for (i = 0; i < ch->local_nentries; i++) {
-		/* use a semaphore as an event wait queue */
-		sema_init(&ch->notify_queue[i].sema, 0);
-	}
-
-	sema_init(&ch->teardown_sema, 0);	/* event wait */
-
-	spin_lock_irqsave(&ch->lock, irq_flags);
-	ch->flags |= XPC_C_SETUP;
-	spin_unlock_irqrestore(&ch->lock, irq_flags);
-
-	return xpcSuccess;
-}
-
-
-/*
- * Allocate the local message queue and the notify queue.
- */
-static xpc_t
-xpc_allocate_local_msgqueue(xpc_channel_t *ch)
-{
-	unsigned long irq_flags;
-	int nentries;
-	size_t nbytes;
-
-
-	// >>> may want to check for ch->flags & XPC_C_DISCONNECTING between
-	// >>> iterations of the for-loop, bail if set?
-
-	// >>> should we impose a minumum #of entries? like 4 or 8?
-	for (nentries = ch->local_nentries; nentries > 0; nentries--) {
-
-		nbytes = nentries * ch->msg_size;
-		ch->local_msgqueue = kmalloc(nbytes, GFP_KERNEL | GFP_DMA);
-		if (ch->local_msgqueue == NULL) {
-			continue;
-		}
-		XP_ASSERT(L1_CACHE_ALIGNED(ch->local_msgqueue));
-		memset(ch->local_msgqueue, 0, nbytes);
-
-		nbytes = nentries * sizeof(xpc_notify_t);
-		ch->notify_queue = kmalloc(nbytes, GFP_KERNEL | GFP_DMA);
-		if (ch->notify_queue == NULL) {
-			kfree(ch->local_msgqueue);
-			continue;
-		}
-
-		// >>> do these really need to be cache aligned ?
-		XP_ASSERT(L1_CACHE_ALIGNED(ch->notify_queue));
-		memset(ch->notify_queue, 0, nbytes);
-
-		spin_lock_irqsave(&ch->lock, irq_flags);
-		if (nentries < ch->local_nentries) {
-			DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
-				"nentries=%d local_nentries=%d, partid=%d, "
-				"channel=%d\n", nentries, ch->local_nentries,
-				ch->partid, ch->number);
-
-			ch->local_nentries = nentries;
-		}
-		spin_unlock_irqrestore(&ch->lock, irq_flags);
-		return xpcSuccess;
-	}
-
-	DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
-		"can't get memory for local message queue and notify queue, "
-		"partid=%d, channel=%d\n", ch->partid, ch->number);
-	return xpcNoMemory;
-}
-
-
-/*
- * Allocate the cached remote message queue.
- */
-static xpc_t
-xpc_allocate_remote_msgqueue(xpc_channel_t *ch)
-{
-	unsigned long irq_flags;
-	int nentries;
-	size_t nbytes;
-
-
-	XP_ASSERT(ch->remote_nentries > 0);
-
-	// >>> may want to check for ch->flags & XPC_C_DISCONNECTING between
-	// >>> iterations of the for-loop, bail if set?
-
-	// >>> should we impose a minumum #of entries? like 4 or 8?
-	for (nentries = ch->remote_nentries; nentries > 0; nentries--) {
-
-		nbytes = nentries * ch->msg_size;
-		ch->remote_msgqueue = kmalloc(nbytes, GFP_KERNEL | GFP_DMA);
-		if (ch->remote_msgqueue == NULL) {
-			continue;
-		}
-
-		XP_ASSERT(L1_CACHE_ALIGNED(ch->remote_msgqueue));
-		memset(ch->remote_msgqueue, 0, nbytes);
-
-		spin_lock_irqsave(&ch->lock, irq_flags);
-		if (nentries < ch->remote_nentries) {
-			DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
-				"nentries=%d remote_nentries=%d, partid=%d, "
-				"channel=%d\n", nentries, ch->remote_nentries,
-				 ch->partid, ch->number);
-
-			ch->remote_nentries = nentries;
-		}
-		spin_unlock_irqrestore(&ch->lock, irq_flags);
-		return xpcSuccess;
-	}
-
-	DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
-		"can't get memory for cached remote message queue, partid=%d, "
-		"channel=%d\n", ch->partid, ch->number);
-	return xpcNoMemory;
-}
-
-
 void
 xpc_connected_callout(xpc_channel_t *ch)
 {
@@ -1341,10 +1462,6 @@ xpc_connected_callout(xpc_channel_t *ch)
 
 
 	/* let the registerer know that a connection has been established */
-
-	spin_lock_irqsave(&ch->lock, irq_flags);
-	ch->flags |= XPC_C_CONNECTCALLOUT;
-	spin_unlock_irqrestore(&ch->lock, irq_flags);
 
 	DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
 		"XPC_CALL_CHANNEL_FUNC() called, reason=xpcConnected, "
@@ -1356,13 +1473,11 @@ xpc_connected_callout(xpc_channel_t *ch)
 	DPRINTK(xpc_chan, XPC_DBG_C_CONNECT,
 		"XPC_CALL_CHANNEL_FUNC() returned, reason=xpcConnected, "
 		"partid=%d, channel=%d\n", ch->partid, ch->number);
+
+	spin_lock_irqsave(&ch->lock, irq_flags);
+	ch->flags |= XPC_C_CONNECTCALLOUT;
+	spin_unlock_irqrestore(&ch->lock, irq_flags);
 }
-
-
-/***********************************************************************
- * Disconnect a channel.
- *
- **********************************************************************/
 
 
 /*
@@ -1478,124 +1593,6 @@ xpc_disconnect_channel(const int line, xpc_channel_t *ch, xpc_t reason,
 }
 
 
-/*
- * spin_lock_irqsave() is expected to be held on entry.
- */
-static void
-xpc_process_disconnect(xpc_channel_t *ch, unsigned long *irq_flags)
-{
-	xpc_partition_t *part = &xpc_partitions[ch->partid];
-	u32 ch_flags = ch->flags;
-
-
-	XP_ASSERT(spin_is_locked(&ch->lock));
-
-	if (!(ch->flags & XPC_C_DISCONNECTING)) {
-		return;
-	}
-
-	XP_ASSERT(ch->flags & XPC_C_CLOSEREQUEST);
-
-	/* make sure all activity has settled down first */
-
-	if (atomic_read(&ch->references) > 0) {
-		return;
-	}
-	XP_ASSERT(atomic_read(&ch->kthreads_assigned) == 0);
-
-	/* it's now safe to free the channel's message queues */
-
-	xpc_free_msgqueues(ch);
-	XP_ASSERT(!(ch->flags & XPC_C_SETUP));
-
-	if (part->act_state != XPC_P_DEACTIVATING) {
-
-		/* as long as the other side is up do the full protocol */
-
-		if (!(ch->flags & XPC_C_RCLOSEREQUEST)) {
-			return;
-		}
-
-		if (!(ch->flags & XPC_C_CLOSEREPLY)) {
-			ch->flags |= XPC_C_CLOSEREPLY;
-			XPC_IPI_SEND_CLOSEREPLY(ch, irq_flags);
-		}
-
-		if (!(ch->flags & XPC_C_RCLOSEREPLY)) {
-			return;
-		}
-	}
-
-	/* both sides are disconnected now */
-
-	ch->flags = XPC_C_DISCONNECTED;	/* clear all flags, but this one */
-
-	atomic_dec(&part->nchannels_active);
-
-	if (ch_flags & XPC_C_WASCONNECTED) {
-		DPRINTK_ALWAYS(xpc_chan, (XPC_DBG_C_DISCONNECT |
-							XPC_DBG_C_CONSOLE),
-			KERN_INFO "XPC: channel %d to partition %d "
-			"disconnected, reason=%s\n", ch->number, ch->partid,
-			xpc_get_ascii_reason_code(ch->reason));
-	}
-
-	XPC_DISCONNECTED_CALLOUT(ch, ch_flags, irq_flags);
-}
-
-
-/*
- * Free up message queues and other stuff that were allocated for the specified
- * channel.
- *
- * Note: ch->reason and ch->reason_line are left set for debugging purposes,
- * they're cleared when XPC_C_DISCONNECTED is cleared.
- */
-static void
-xpc_free_msgqueues(xpc_channel_t *ch)
-{
-	XP_ASSERT(spin_is_locked(&ch->lock));
-	XP_ASSERT(atomic_read(&ch->n_to_notify) == 0);
-
-	ch->remote_msgqueue_pa = 0;
-	ch->func = NULL;
-	ch->key = NULL;
-	ch->msg_size = 0;
-	ch->local_nentries = 0;
-	ch->remote_nentries = 0;
-	ch->kthreads_assigned_limit = 0;
-	ch->kthreads_idle_limit = 0;
-
-	ch->local_GP->get = 0;
-	ch->local_GP->put = 0;
-	ch->remote_GP.get = 0;
-	ch->remote_GP.put = 0;
-	ch->w_local_GP.get = 0;
-	ch->w_local_GP.put = 0;
-	ch->w_remote_GP.get = 0;
-	ch->w_remote_GP.put = 0;
-	ch->next_msg_to_pull = 0;
-
-	if (ch->flags & XPC_C_SETUP) {
-		ch->flags &= ~XPC_C_SETUP;
-
-		DPRINTK(xpc_chan, XPC_DBG_C_TEARDOWN,
-			"ch->flags=0x%x, partid=%d, channel=%d\n", ch->flags,
-			ch->partid, ch->number);
-
-		kfree(ch->local_msgqueue);
-		ch->local_msgqueue = NULL;
-		kfree(ch->remote_msgqueue);
-		ch->remote_msgqueue = NULL;
-		kfree(ch->notify_queue);
-		ch->notify_queue = NULL;
-
-		/* in case someone is waiting for the teardown to complete */
-		up(&ch->teardown_sema);
-	}
-}
-
-
 void
 xpc_disconnected_callout(xpc_channel_t *ch)
 {
@@ -1618,45 +1615,48 @@ xpc_disconnected_callout(xpc_channel_t *ch)
 }
 
 
-/***********************************************************************
- * Send a message.
- *
- **********************************************************************/
-
-
 /*
- * Allocate an entry for a message from the message queue associated with the
- * specified channel. NOTE that this routine can sleep waiting for a message
- * entry to become available. To not sleep, pass in the XPC_NOWAIT flag.
- *
- * Arguments:
- *
- *	partid - ID of partition to which the channel is connected.
- *	ch_number - channel #.
- *	flags - see xpc.h for valid flags.
- *	payload - address of the allocated payload area pointer (filled in on
- * 	          return) in which the user-defined message is constructed.
+ * Wait for a message entry to become available for the specified channel,
+ * but don't wait any longer than 1 jiffy.
  */
-xpc_t
-xpc_allocate(partid_t partid, int ch_number, u32 flags, void **payload)
+static xpc_t
+xpc_allocate_msg_wait(xpc_channel_t *ch)
 {
-	xpc_partition_t *part = &xpc_partitions[partid];
-	xpc_t ret = xpcUnknownReason;
-	xpc_msg_t *msg;
+	xpc_t ret;
 
 
-	XP_ASSERT(partid > 0 && partid < MAX_PARTITIONS);
-	XP_ASSERT(ch_number >= 0 && ch_number < part->nchannels);
+	if (ch->flags & XPC_C_DISCONNECTING) {
+		XP_ASSERT(ch->reason != xpcInterrupted);  // >>> Is this true?
+		return ch->reason;
+	}
 
-	*payload = NULL;
+	// >>> It may be more cost effective if the normal kthreads simply call
+	// >>> interruptible_sleep_on() and then a separate timer function is
+	// >>> registered to wakeup at some interval and see if there are any
+	// >>> available. If yes, then it wakes up the sleepers; if no, it
+	// >>> fakes an IPI to ourselves and resets itself to wakeup later.
+	// >>> xpc_IPI_handler() would also be able to wake sleepers up if it
+	// >>> sees that there are available messages.
 
-	if (XPC_PART_REF(part)) {
-		ret = xpc_allocate_msg(&part->channels[ch_number], flags, &msg);
-		XPC_PART_DEREF(part);
+	// >>> In IRIX, XPC_ACQ_TO was set to 40 microseconds, which
+	// >>> would mean that the first timeout was 80 microseconds.
+	// >>> Dimitri was seeing differences in performance between
+	// >>> 20, 40 and 80 microsecond values for the timeout.
+	// >>> Linux timers are in jiffies which are in milliseconds,
+	// >>> which is of course a much coarser ganularity.
+	// >>> For now we're hardcoding the timeout to 1 jiffy.
 
-		if (msg != NULL) {
-			*payload = &msg->payload;
-		}
+	atomic_inc(&ch->n_on_msg_allocate_wq);
+	ret = interruptible_sleep_on_timeout(&ch->msg_allocate_wq, 1);
+	atomic_dec(&ch->n_on_msg_allocate_wq);
+
+	if (ch->flags & XPC_C_DISCONNECTING) {
+		ret = ch->reason;
+		XP_ASSERT(ch->reason != xpcInterrupted);  // >>> Is this true?
+	} else if (ret == 0) {
+		ret = xpcTimeout;
+	} else {
+		ret = xpcInterrupted;
 	}
 
 	return ret;
@@ -1774,49 +1774,186 @@ xpc_allocate_msg(xpc_channel_t *ch, u32 flags, xpc_msg_t **address_of_msg)
 
 
 /*
- * Wait for a message entry to become available for the specified channel,
- * but don't wait any longer than 1 jiffy.
+ * Allocate an entry for a message from the message queue associated with the
+ * specified channel. NOTE that this routine can sleep waiting for a message
+ * entry to become available. To not sleep, pass in the XPC_NOWAIT flag.
+ *
+ * Arguments:
+ *
+ *	partid - ID of partition to which the channel is connected.
+ *	ch_number - channel #.
+ *	flags - see xpc.h for valid flags.
+ *	payload - address of the allocated payload area pointer (filled in on
+ * 	          return) in which the user-defined message is constructed.
+ */
+xpc_t
+xpc_allocate(partid_t partid, int ch_number, u32 flags, void **payload)
+{
+	xpc_partition_t *part = &xpc_partitions[partid];
+	xpc_t ret = xpcUnknownReason;
+	xpc_msg_t *msg;
+
+
+	XP_ASSERT(partid > 0 && partid < MAX_PARTITIONS);
+	XP_ASSERT(ch_number >= 0 && ch_number < part->nchannels);
+
+	*payload = NULL;
+
+	if (XPC_PART_REF(part)) {
+		ret = xpc_allocate_msg(&part->channels[ch_number], flags, &msg);
+		XPC_PART_DEREF(part);
+
+		if (msg != NULL) {
+			*payload = &msg->payload;
+		}
+	}
+
+	return ret;
+}
+
+
+/*
+ * Now we actually send the messages that are ready to be sent by advancing
+ * the local message queue's Put value and then send an IPI to the recipient
+ * partition.
+ */
+static void
+xpc_send_msgs(xpc_channel_t *ch, s64 initial_put)
+{
+	xpc_msg_t *msg;
+	s64 put = initial_put + 1;
+	int send_IPI = 0;
+
+
+	while (1) {
+
+		while (1) {
+			if (put == ch->w_local_GP.put) {
+				break;
+			}
+
+			msg = (xpc_msg_t *) ((u64) ch->local_msgqueue +
+			       (put % ch->local_nentries) * ch->msg_size);
+
+			if (!(msg->flags & XPC_M_READY)) {
+				break;
+			}
+
+			put++;
+		}
+
+		if (put == initial_put) {
+			/* nothing's changed */
+			break;
+		}
+
+		if (cmpxchg_rel(&ch->local_GP->put, initial_put, put) !=
+								initial_put) {
+			/* someone else beat us to it */
+			XP_ASSERT(ch->local_GP->put > initial_put);
+			break;
+		}
+
+		/* we just set the new value of local_GP->put */
+
+		DPRINTK(xpc_chan, (XPC_DBG_C_SEND | XPC_DBG_C_GP),
+			"local_GP->put changed to %ld, partid=%d, channel=%d\n",
+			put, ch->partid, ch->number);
+
+		send_IPI = 1;
+
+		/*
+		 * We need to ensure that the message referenced by
+		 * local_GP->put is not XPC_M_READY or that local_GP->put
+		 * equals w_local_GP.put, so we'll go have a look.
+		 */
+		initial_put = put;
+	}
+
+	if (send_IPI) {
+		XPC_IPI_SEND_MSGREQUEST(ch);
+	}
+}
+
+
+/*
+ * Common code that does the actual sending of the message by advancing the
+ * local message queue's Put value and sends an IPI to the partition the
+ * message is being sent to.
  */
 static xpc_t
-xpc_allocate_msg_wait(xpc_channel_t *ch)
+xpc_initiate_send(xpc_channel_t *ch, xpc_msg_t *msg, u8 notify_type,
+			xpc_notify_func_t func, void *key)
 {
-	xpc_t ret;
+	xpc_t ret = xpcSuccess;
+	xpc_notify_t *notify = NULL;	// >>> to keep the compiler happy!!!!!
+	s64 put, msg_number = msg->number;
 
+
+	XP_ASSERT(notify_type != XPC_N_CALL || func != NULL);
+	XP_ASSERT((((u64) msg - (u64) ch->local_msgqueue) / ch->msg_size) ==
+					msg_number % ch->local_nentries);
+	XP_ASSERT(!(msg->flags & XPC_M_READY));
 
 	if (ch->flags & XPC_C_DISCONNECTING) {
-		XP_ASSERT(ch->reason != xpcInterrupted);  // >>> Is this true?
+		/* drop the reference grabbed in xpc_allocate_msg() */
+		XPC_MSGQUEUE_DEREF(ch);
 		return ch->reason;
 	}
 
-	// >>> It may be more cost effective if the normal kthreads simply call
-	// >>> interruptible_sleep_on() and then a separate timer function is
-	// >>> registered to wakeup at some interval and see if there are any
-	// >>> available. If yes, then it wakes up the sleepers; if no, it
-	// >>> fakes an IPI to ourselves and resets itself to wakeup later.
-	// >>> xpc_IPI_handler() would also be able to wake sleepers up if it
-	// >>> sees that there are available messages.
+	if (notify_type != 0) {
+		/*
+		 * Tell the remote side to send an ACK interrupt when the
+		 * message has been delivered.
+		 */
+		msg->flags |= XPC_M_INTERRUPT;
 
-	// >>> In IRIX, XPC_ACQ_TO was set to 40 microseconds, which
-	// >>> would mean that the first timeout was 80 microseconds.
-	// >>> Dimitri was seeing differences in performance between
-	// >>> 20, 40 and 80 microsecond values for the timeout.
-	// >>> Linux timers are in jiffies which are in milliseconds,
-	// >>> which is of course a much coarser ganularity.
-	// >>> For now we're hardcoding the timeout to 1 jiffy.
+		atomic_inc(&ch->n_to_notify);
 
-	atomic_inc(&ch->n_on_msg_allocate_wq);
-	ret = interruptible_sleep_on_timeout(&ch->msg_allocate_wq, 1);
-	atomic_dec(&ch->n_on_msg_allocate_wq);
+		notify = &ch->notify_queue[msg_number % ch->local_nentries];
+		notify->func = func;
+		notify->key = key;
+		notify->type = notify_type;
 
-	if (ch->flags & XPC_C_DISCONNECTING) {
-		ret = ch->reason;
-		XP_ASSERT(ch->reason != xpcInterrupted);  // >>> Is this true?
-	} else if (ret == 0) {
-		ret = xpcTimeout;
-	} else {
-		ret = xpcInterrupted;
+		// >>> is a mb() needed here?
+
+		if (ch->flags & XPC_C_DISCONNECTING) {
+			/*
+			 * An error occurred between our last error check and
+			 * this one. We will try to clear the type field from
+			 * the notify entry. If we succeed then
+			 * xpc_disconnect_channel() didn't already process
+			 * the notify entry.
+			 */
+			if (cmpxchg(&notify->type, notify_type, 0) ==
+								notify_type) {
+				atomic_dec(&ch->n_to_notify);
+				ret = ch->reason;
+			}
+
+			/* drop the reference grabbed in xpc_allocate_msg() */
+			XPC_MSGQUEUE_DEREF(ch);
+			return ret;
+		}
 	}
 
+	msg->flags |= XPC_M_READY;
+
+	/*
+	 * The preceding store of msg->flags must occur before the following
+	 * load of ch->local_GP->put.
+	 */
+	mb();
+
+	/* see if the message is next in line to be sent, if so send it */
+
+	put = ch->local_GP->put;
+	if (put == msg_number) {
+		xpc_send_msgs(ch, put);
+	}
+
+	/* drop the reference grabbed in xpc_allocate_msg() */
+	XPC_MSGQUEUE_DEREF(ch);
 	return ret;
 }
 
@@ -1914,248 +2051,6 @@ xpc_send_notify(partid_t partid, int ch_number, void *payload,
 }
 
 
-/*
- * Common code that does the actual sending of the message by advancing the
- * local message queue's Put value and sends an IPI to the partition the
- * message is being sent to.
- */
-static xpc_t
-xpc_initiate_send(xpc_channel_t *ch, xpc_msg_t *msg, u8 notify_type,
-			xpc_notify_func_t func, void *key)
-{
-	xpc_t ret = xpcSuccess;
-	xpc_notify_t *notify = NULL;	// >>> to keep the compiler happy!!!!!
-	s64 put, msg_number = msg->number;
-
-
-	XP_ASSERT(notify_type != XPC_N_CALL || func != NULL);
-	XP_ASSERT((((u64) msg - (u64) ch->local_msgqueue) / ch->msg_size) ==
-					msg_number % ch->local_nentries);
-	XP_ASSERT(!(msg->flags & XPC_M_READY));
-
-	if (ch->flags & XPC_C_DISCONNECTING) {
-		/* drop the reference grabbed in xpc_allocate_msg() */
-		XPC_MSGQUEUE_DEREF(ch);
-		return ch->reason;
-	}
-
-	if (notify_type != 0) {
-		/*
-		 * Tell the remote side to send an ACK interrupt when the
-		 * message has been delivered.
-		 */
-		msg->flags |= XPC_M_INTERRUPT;
-
-		atomic_inc(&ch->n_to_notify);
-
-		notify = &ch->notify_queue[msg_number % ch->local_nentries];
-		notify->func = func;
-		notify->key = key;
-		notify->type = notify_type;
-
-		// >>> is a mb() needed here?
-
-		if (ch->flags & XPC_C_DISCONNECTING) {
-			/*
-			 * An error occurred between our last error check and
-			 * this one. We will try to clear the type field from
-			 * the notify entry. If we succeed then
-			 * xpc_disconnect_channel() didn't already process
-			 * the notify entry.
-			 */
-			if (cmpxchg(&notify->type, notify_type, 0) ==
-								notify_type) {
-				atomic_dec(&ch->n_to_notify);
-				ret = ch->reason;
-			}
-
-			/* drop the reference grabbed in xpc_allocate_msg() */
-			XPC_MSGQUEUE_DEREF(ch);
-			return ret;
-		}
-	}
-
-	msg->flags |= XPC_M_READY;
-
-	/*
-	 * The preceding store of msg->flags must occur before the following
-	 * load of ch->local_GP->put.
-	 */
-	mb();
-
-	/* see if the message is next in line to be sent, if so send it */
-
-	put = ch->local_GP->put;
-	if (put == msg_number) {
-		xpc_send_msgs(ch, put);
-	}
-
-	/* drop the reference grabbed in xpc_allocate_msg() */
-	XPC_MSGQUEUE_DEREF(ch);
-	return ret;
-}
-
-
-/*
- * Now we actually send the messages that are ready to be sent by advancing
- * the local message queue's Put value and then send an IPI to the recipient
- * partition.
- */
-static void
-xpc_send_msgs(xpc_channel_t *ch, s64 initial_put)
-{
-	xpc_msg_t *msg;
-	s64 put = initial_put + 1;
-	int send_IPI = 0;
-
-
-	while (1) {
-
-		while (1) {
-			if (put == ch->w_local_GP.put) {
-				break;
-			}
-
-			msg = (xpc_msg_t *) ((u64) ch->local_msgqueue +
-			       (put % ch->local_nentries) * ch->msg_size);
-
-			if (!(msg->flags & XPC_M_READY)) {
-				break;
-			}
-
-			put++;
-		}
-
-		if (put == initial_put) {
-			/* nothing's changed */
-			break;
-		}
-
-		if (cmpxchg_rel(&ch->local_GP->put, initial_put, put) !=
-								initial_put) {
-			/* someone else beat us to it */
-			XP_ASSERT(ch->local_GP->put > initial_put);
-			break;
-		}
-
-		/* we just set the new value of local_GP->put */
-
-		DPRINTK(xpc_chan, (XPC_DBG_C_SEND | XPC_DBG_C_GP),
-			"local_GP->put changed to %ld, partid=%d, channel=%d\n",
-			put, ch->partid, ch->number);
-
-		send_IPI = 1;
-
-		/*
-		 * We need to ensure that the message referenced by
-		 * local_GP->put is not XPC_M_READY or that local_GP->put
-		 * equals w_local_GP.put, so we'll go have a look.
-		 */
-		initial_put = put;
-	}
-
-	if (send_IPI) {
-		XPC_IPI_SEND_MSGREQUEST(ch);
-	}
-}
-
-
-/***********************************************************************
- * Receive a message.
- *
- **********************************************************************/
-
-
-/*
- * Deliver a message to its intended recipient.
- */
-void
-xpc_deliver_msg(xpc_channel_t *ch)
-{
-	xpc_msg_t *msg;
-
-
-	if ((msg = xpc_get_deliverable_msg(ch)) != NULL) {
-
-		/*
-		 * This ref is taken to protect the payload itself from being
-		 * freed before the user is finished with it, which the user
-		 * indicates by calling xpc_received().
-		 */
-		XPC_MSGQUEUE_REF(ch);
-
-		atomic_inc(&ch->kthreads_active);
-
-		DPRINTK(xpc_chan, XPC_DBG_C_RECEIVE,
-			"XPC_CALL_CHANNEL_FUNC() called, msg=0x%p, "
-			"msg_number=%ld, partid=%d, channel=%d\n",
-			(void *) msg, msg->number, ch->partid, ch->number);
-
-		/* deliver the message to its intended recipient */
-		XPC_CALL_CHANNEL_FUNC(ch, xpcMsgReceived, &msg->payload);
-
-		DPRINTK(xpc_chan, XPC_DBG_C_RECEIVE,
-			"XPC_CALL_CHANNEL_FUNC() returned, msg=0x%p, "
-			"msg_number=%ld, partid=%d, channel=%d\n",
-			(void *) msg, msg->number, ch->partid, ch->number);
-
-		atomic_dec(&ch->kthreads_active);
-	}
-}
-
-
-/*
- * Get a message to be delivered.
- */
-static xpc_msg_t *
-xpc_get_deliverable_msg(xpc_channel_t *ch)
-{
-	xpc_msg_t *msg = NULL;
-	s64 get;
-
-
-	do {
-		if (ch->flags & XPC_C_DISCONNECTING) {
-			break;
-		}
-
-		get = ch->w_local_GP.get;
-		if (get == ch->w_remote_GP.put) {
-			break;
-		}
-
-		/* There are messages waiting to be pulled and delivered.
-		 * We need to try to secure one for ourselves. We'll do this
-		 * by trying to increment w_local_GP.get and hope that no one
-		 * else beats us to it. If they do, we'll we'll simply have
-		 * to try again for the next one.
-	 	 */
-
-		if (cmpxchg(&ch->w_local_GP.get, get, get + 1) == get) {
-			/* we got the entry referenced by get */
-
-			DPRINTK(xpc_chan, (XPC_DBG_C_RECEIVE | XPC_DBG_C_GP),
-				"w_local_GP.get changed to %ld, partid=%d, "
-				"channel=%d\n", get + 1,
-				ch->partid, ch->number);
-
-			/* pull the message from the remote partition */
-
-			msg = xpc_pull_remote_msg(ch, get);
-
-			XP_ASSERT(msg == NULL || msg->number == get);
-			XP_ASSERT(msg == NULL || !(msg->flags & XPC_M_DONE));
-			XP_ASSERT(msg == NULL || msg->flags & XPC_M_READY);
-
-			break;
-		}
-
-	} while (1);
-
-	return msg;
-}
-
-
 static __inline__ xpc_msg_t *
 xpc_pull_remote_msg(xpc_channel_t *ch, s64 get)
 {
@@ -2220,62 +2115,92 @@ xpc_pull_remote_msg(xpc_channel_t *ch, s64 get)
 
 
 /*
- * Acknowledge receipt of a delivered message.
- *
- * If a message has XPC_M_INTERRUPT set, send an interrupt to the partition
- * that sent the message.
- *
- * This function, although called by users, does not call XPC_PART_REF() to
- * ensure that the partition infrastructure is in place. It relies on the
- * fact that we called XPC_MSGQUEUE_REF() in xpc_deliver_msg().
- *
- * Arguments:
- *
- *	partid - ID of partition to which the channel is connected.
- *	ch_number - channel # message received on.
- *	payload - pointer to the payload area allocated via xpc_allocate().
+ * Get a message to be delivered.
+ */
+static xpc_msg_t *
+xpc_get_deliverable_msg(xpc_channel_t *ch)
+{
+	xpc_msg_t *msg = NULL;
+	s64 get;
+
+
+	do {
+		if (ch->flags & XPC_C_DISCONNECTING) {
+			break;
+		}
+
+		get = ch->w_local_GP.get;
+		if (get == ch->w_remote_GP.put) {
+			break;
+		}
+
+		/* There are messages waiting to be pulled and delivered.
+		 * We need to try to secure one for ourselves. We'll do this
+		 * by trying to increment w_local_GP.get and hope that no one
+		 * else beats us to it. If they do, we'll we'll simply have
+		 * to try again for the next one.
+	 	 */
+
+		if (cmpxchg(&ch->w_local_GP.get, get, get + 1) == get) {
+			/* we got the entry referenced by get */
+
+			DPRINTK(xpc_chan, (XPC_DBG_C_RECEIVE | XPC_DBG_C_GP),
+				"w_local_GP.get changed to %ld, partid=%d, "
+				"channel=%d\n", get + 1,
+				ch->partid, ch->number);
+
+			/* pull the message from the remote partition */
+
+			msg = xpc_pull_remote_msg(ch, get);
+
+			XP_ASSERT(msg == NULL || msg->number == get);
+			XP_ASSERT(msg == NULL || !(msg->flags & XPC_M_DONE));
+			XP_ASSERT(msg == NULL || msg->flags & XPC_M_READY);
+
+			break;
+		}
+
+	} while (1);
+
+	return msg;
+}
+
+
+/*
+ * Deliver a message to its intended recipient.
  */
 void
-xpc_received(partid_t partid, int ch_number, void *payload)
+xpc_deliver_msg(xpc_channel_t *ch)
 {
-	xpc_partition_t *part = &xpc_partitions[partid];
-	xpc_channel_t *ch;
-	xpc_msg_t *msg = XPC_MSG_ADDRESS(payload);
-	s64 get, msg_number = msg->number;
+	xpc_msg_t *msg;
 
 
-	XP_ASSERT(partid > 0 && partid < MAX_PARTITIONS);
-	XP_ASSERT(ch_number >= 0 && ch_number < part->nchannels);
+	if ((msg = xpc_get_deliverable_msg(ch)) != NULL) {
 
-	ch = &part->channels[ch_number];
+		/*
+		 * This ref is taken to protect the payload itself from being
+		 * freed before the user is finished with it, which the user
+		 * indicates by calling xpc_received().
+		 */
+		XPC_MSGQUEUE_REF(ch);
 
-	DPRINTK(xpc_chan, XPC_DBG_C_RECEIVE,
-		"msg=0x%p, msg_number=%ld, partid=%d, channel=%d\n",
-		(void *) msg, msg_number, ch->partid, ch->number);
+		atomic_inc(&ch->kthreads_active);
 
-	XP_ASSERT((((u64) msg - (u64) ch->remote_msgqueue) / ch->msg_size) ==
-					msg_number % ch->remote_nentries);
-	XP_ASSERT(!(msg->flags & XPC_M_DONE));
+		DPRINTK(xpc_chan, XPC_DBG_C_RECEIVE,
+			"XPC_CALL_CHANNEL_FUNC() called, msg=0x%p, "
+			"msg_number=%ld, partid=%d, channel=%d\n",
+			(void *) msg, msg->number, ch->partid, ch->number);
 
-	msg->flags |= XPC_M_DONE;
+		/* deliver the message to its intended recipient */
+		XPC_CALL_CHANNEL_FUNC(ch, xpcMsgReceived, &msg->payload);
 
-	/*
-	 * The preceding store of msg->flags must occur before the following
-	 * load of ch->local_GP->get.
-	 */
-	mb();
+		DPRINTK(xpc_chan, XPC_DBG_C_RECEIVE,
+			"XPC_CALL_CHANNEL_FUNC() returned, msg=0x%p, "
+			"msg_number=%ld, partid=%d, channel=%d\n",
+			(void *) msg, msg->number, ch->partid, ch->number);
 
-	/*
-	 * See if this message is next in line to be acknowledged as having
-	 * been delivered.
-	 */
-	get = ch->local_GP->get;
-	if (get == msg_number) {
-		xpc_acknowledge_msgs(ch, get, msg->flags);
+		atomic_dec(&ch->kthreads_active);
 	}
-
-	/* the call to XPC_MSGQUEUE_REF() was done by xpc_deliver_msg()  */
-	XPC_MSGQUEUE_DEREF(ch);
 }
 
 
@@ -2344,56 +2269,62 @@ xpc_acknowledge_msgs(xpc_channel_t *ch, s64 initial_get, u8 msg_flags)
 }
 
 
-#define XPC_DBG_C_NOTIFY ((reason == xpcMsgDelivered) ? \
-					XPC_DBG_C_IPI : XPC_DBG_C_DISCONNECT)
-
-
 /*
- * Notify those who wanted to be notified upon delivery of their message.
+ * Acknowledge receipt of a delivered message.
+ *
+ * If a message has XPC_M_INTERRUPT set, send an interrupt to the partition
+ * that sent the message.
+ *
+ * This function, although called by users, does not call XPC_PART_REF() to
+ * ensure that the partition infrastructure is in place. It relies on the
+ * fact that we called XPC_MSGQUEUE_REF() in xpc_deliver_msg().
+ *
+ * Arguments:
+ *
+ *	partid - ID of partition to which the channel is connected.
+ *	ch_number - channel # message received on.
+ *	payload - pointer to the payload area allocated via xpc_allocate().
  */
-static void
-xpc_notify_senders(xpc_channel_t *ch, xpc_t reason, s64 put)
+void
+xpc_received(partid_t partid, int ch_number, void *payload)
 {
-	xpc_notify_t *notify;
-	u8 notify_type;
-	s64 get = ch->w_remote_GP.get - 1;
+	xpc_partition_t *part = &xpc_partitions[partid];
+	xpc_channel_t *ch;
+	xpc_msg_t *msg = XPC_MSG_ADDRESS(payload);
+	s64 get, msg_number = msg->number;
 
 
-	while (++get < put && atomic_read(&ch->n_to_notify) > 0) {
+	XP_ASSERT(partid > 0 && partid < MAX_PARTITIONS);
+	XP_ASSERT(ch_number >= 0 && ch_number < part->nchannels);
 
-		notify = &ch->notify_queue[get % ch->local_nentries];
+	ch = &part->channels[ch_number];
 
-		/*
-		 * See if the notify entry indicates it was associated with
-		 * a message who's sender wants to be notified. It is possible
-		 * that it is, but someone else is doing or has done the
-		 * notification.
-		 */
-		notify_type = notify->type;
-		if (notify_type == 0 ||
-				cmpxchg(&notify->type, notify_type, 0) !=
-								notify_type) {
-			continue;
-		}
+	DPRINTK(xpc_chan, XPC_DBG_C_RECEIVE,
+		"msg=0x%p, msg_number=%ld, partid=%d, channel=%d\n",
+		(void *) msg, msg_number, ch->partid, ch->number);
 
-		XP_ASSERT(notify_type == XPC_N_CALL);
+	XP_ASSERT((((u64) msg - (u64) ch->remote_msgqueue) / ch->msg_size) ==
+					msg_number % ch->remote_nentries);
+	XP_ASSERT(!(msg->flags & XPC_M_DONE));
 
-		atomic_dec(&ch->n_to_notify);
+	msg->flags |= XPC_M_DONE;
 
-		DPRINTK(xpc_chan, XPC_DBG_C_NOTIFY,
-			"XPC_CALL_NOTIFY_FUNC() called, notify=0x%p, "
-			"msg_number=%ld, partid=%d, channel=%d\n",
-			(void *) notify, get, ch->partid, ch->number);
+	/*
+	 * The preceding store of msg->flags must occur before the following
+	 * load of ch->local_GP->get.
+	 */
+	mb();
 
-		XPC_CALL_NOTIFY_FUNC(ch, notify, reason);
-
-		DPRINTK(xpc_chan, XPC_DBG_C_NOTIFY,
-			"XPC_CALL_NOTIFY_FUNC() returned, notify=0x%p, "
-			"msg_number=%ld, partid=%d, channel=%d\n",
-			(void *) notify, get, ch->partid, ch->number);
+	/*
+	 * See if this message is next in line to be acknowledged as having
+	 * been delivered.
+	 */
+	get = ch->local_GP->get;
+	if (get == msg_number) {
+		xpc_acknowledge_msgs(ch, get, msg->flags);
 	}
+
+	/* the call to XPC_MSGQUEUE_REF() was done by xpc_deliver_msg()  */
+	XPC_MSGQUEUE_DEREF(ch);
 }
-
-
-#undef XPC_DBG_C_NOTIFY
 
