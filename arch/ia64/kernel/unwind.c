@@ -324,7 +324,7 @@ unw_access_gr (struct unw_frame_info *info, int regnum, unsigned long *val, char
 		} else {
 			/* access a scratch register */
 			pt = get_scratch_regs(info);
-			addr = (unsigned long *) (pt + pt_regs_off(regnum));
+			addr = (unsigned long *) ((unsigned long)pt + pt_regs_off(regnum));
 			if (info->pri_unat_loc)
 				nat_addr = info->pri_unat_loc;
 			else
