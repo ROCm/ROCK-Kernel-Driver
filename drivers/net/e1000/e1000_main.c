@@ -625,18 +625,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	   (hw->mac_type == e1000_82547_rev_2))
 		hw->phy_init_script = 1;
 
-	/* Media type - copper or fiber */
-
-	if(hw->mac_type >= e1000_82543) {
-		uint32_t status = E1000_READ_REG(hw, STATUS);
-
-		if(status & E1000_STATUS_TBIMODE)
-			hw->media_type = e1000_media_type_fiber;
-		else
-			hw->media_type = e1000_media_type_copper;
-	} else {
-		hw->media_type = e1000_media_type_fiber;
-	}
+	e1000_set_media_type(hw);
 
 	if(hw->mac_type < e1000_82543)
 		hw->report_tx_early = 0;
