@@ -35,15 +35,11 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/init.h>
-#include <linux/smp_lock.h>
 
 #include <linux/ppp_defs.h>
 #include <linux/ppp-comp.h>
 
 #include <linux/zlib.h>
-
-static spinlock_t comp_free_list_lock = SPIN_LOCK_UNLOCKED;
-static LIST_HEAD(comp_free_list);
 
 /*
  * State for a Deflate (de)compressor.
@@ -56,7 +52,6 @@ struct ppp_deflate_state {
     int		debug;
     z_stream	strm;
     struct compstat stats;
-    struct list_head list;
 };
 
 #define DEFLATE_OVHD	2		/* Deflate overhead/packet */
@@ -81,27 +76,6 @@ static void	z_comp_reset __P((void *state));
 static void	z_decomp_reset __P((void *state));
 static void	z_comp_stats __P((void *state, struct compstat *stats));
 
-static void z_comp_delayedfree(void *arg)
-{
-	struct ppp_deflate_state *state;
-
-	spin_lock_bh(&comp_free_list_lock);
-	while(!list_empty(&comp_free_list)) {
-		state = list_entry(comp_free_list.next, struct ppp_deflate_state, list);
-		list_del(&state->list);
-		spin_unlock_bh(&comp_free_list_lock);
-		if (state->strm.workspace)
-			vfree(state->strm.workspace);
-		kfree(state);
-		spin_lock_bh(&comp_free_list_lock);
-	}
-	spin_unlock_bh(&comp_free_list_lock);
-}
-
-static struct tq_struct z_comp_task = {
-	routine: z_comp_delayedfree
-};
-
 static void
 z_comp_free(arg)
     void *arg;
@@ -110,12 +84,9 @@ z_comp_free(arg)
 
 	if (state) {
 		zlib_deflateEnd(&state->strm);
-
-		spin_lock_bh(&comp_free_list_lock);
-		list_add(&state->list, &comp_free_list);
-		spin_unlock_bh(&comp_free_list_lock);
-
-		schedule_task(&z_comp_task);
+		if (state->strm.workspace)
+			vfree(state->strm.workspace);
+		kfree(state);
 		MOD_DEC_USE_COUNT;
 	}
 }
@@ -616,8 +587,6 @@ void __exit deflate_cleanup(void)
 {
 	ppp_unregister_compressor(&ppp_deflate);
 	ppp_unregister_compressor(&ppp_deflate_draft);
-	/* Ensure that any deflate state pending free is actually freed */
-	flush_scheduled_tasks();
 }
 
 module_init(deflate_init);
