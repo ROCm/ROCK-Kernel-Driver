@@ -2131,6 +2131,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
 
   INIT_LIST_HEAD(&SB_JOURNAL(p_s_sb)->j_bitmap_nodes) ;
   INIT_LIST_HEAD(&SB_JOURNAL(p_s_sb)->j_dirty_buffers) ;
+  spin_lock_init(&SB_JOURNAL(p_s_sb)->j_dirty_buffers_lock) ;
   reiserfs_allocate_list_bitmaps(p_s_sb, SB_JOURNAL(p_s_sb)->j_list_bitmap, 
                                  SB_BMAP_NR(p_s_sb)) ;
   allocate_bitmap_nodes(p_s_sb) ;
@@ -3125,7 +3126,8 @@ printk("journal-2020: do_journal_end: BAD desc->j_len is ZERO\n") ;
   SB_JOURNAL_LIST_INDEX(p_s_sb) = jindex ;
 
   /* write any buffers that must hit disk before this commit is done */
-  fsync_buffers_list(NULL, &(SB_JOURNAL(p_s_sb)->j_dirty_buffers)) ;
+  fsync_buffers_list(&(SB_JOURNAL(p_s_sb)->j_dirty_buffers_lock),
+		     &(SB_JOURNAL(p_s_sb)->j_dirty_buffers)) ;
 
   /* honor the flush and async wishes from the caller */
   if (flush) {

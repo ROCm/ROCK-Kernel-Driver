@@ -49,15 +49,6 @@ static struct bh_wait_queue_head {
 } ____cacheline_aligned_in_smp bh_wait_queue_heads[1<<BH_WAIT_TABLE_ORDER];
 
 /*
- * Several of these buffer list functions are exported to filesystems,
- * so we do funny things with the spinlocking to support those
- * filesystems while still using inode->i_bufferlist_lock for
- * most applications.
- * FIXME: put a spinlock in the reiserfs journal and kill this lock.
- */
-static spinlock_t global_bufferlist_lock = SPIN_LOCK_UNLOCKED;
-
-/*
  * Debug/devel support stuff
  */
 
@@ -448,8 +439,6 @@ out:
 void buffer_insert_list(spinlock_t *lock,
 		struct buffer_head *bh, struct list_head *list)
 {
-	if (lock == NULL)
-		lock = &global_bufferlist_lock;
 	spin_lock(lock);
 	list_del(&bh->b_inode_buffers);
 	list_add(&bh->b_inode_buffers, list);
@@ -701,14 +690,10 @@ static int osync_buffers_list(spinlock_t *lock, struct list_head *list)
 	struct list_head *p;
 	int err = 0;
 
-	if (lock == NULL)
-		lock = &global_bufferlist_lock;
-
 	spin_lock(lock);
 repeat:
-	for (p = list->prev; 
-	     bh = BH_ENTRY(p), p != list;
-	     p = bh->b_inode_buffers.prev) {
+	list_for_each_prev(p, list) {
+		bh = BH_ENTRY(p);
 		if (buffer_locked(bh)) {
 			get_bh(bh);
 			spin_unlock(lock);
@@ -749,9 +734,6 @@ int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 	struct list_head tmp;
 	int err = 0, err2;
 
-	if (lock == NULL)
-		lock = &global_bufferlist_lock;
-	
 	INIT_LIST_HEAD(&tmp);
 
 	spin_lock(lock);

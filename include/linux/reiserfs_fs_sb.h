@@ -241,6 +241,7 @@ struct reiserfs_journal {
   int j_used_bitmap_nodes ;
   struct list_head j_bitmap_nodes ;
   struct list_head j_dirty_buffers ;
+  spinlock_t j_dirty_buffers_lock ; /* protects j_dirty_buffers */
   struct reiserfs_list_bitmap j_list_bitmap[JOURNAL_NUM_BITMAPS] ;	/* array of bitmaps to record the deleted blocks */
   struct reiserfs_journal_list j_journal_list[JOURNAL_LIST_COUNT] ;	    /* array of all the journal lists */
   struct reiserfs_journal_cnode *j_hash_table[JOURNAL_HASH_SIZE] ; 	    /* hash table for real buffer heads in current trans */ 
