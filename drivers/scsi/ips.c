@@ -247,8 +247,8 @@ struct proc_dir_entry proc_scsi_ips = {
 #else
     #define IPS_SG_ADDRESS(sg)      (page_address((sg)->page) ? \
                                      page_address((sg)->page)+(sg)->offset : 0)
-    #define IPS_LOCK_SAVE(lock,flags) spin_lock(lock)
-    #define IPS_UNLOCK_RESTORE(lock,flags) spin_unlock(lock)
+    #define IPS_LOCK_SAVE(lock,flags) do{spin_lock(lock);(void)flags;}while(0)
+    #define IPS_UNLOCK_RESTORE(lock,flags) do{spin_unlock(lock);(void)flags;}while(0)
 #endif
 
 #define IPS_DMA_DIR(scb) ((!scb->scsi_cmd || ips_is_passthru(scb->scsi_cmd) || \
@@ -1880,9 +1880,9 @@ ips_slave_attach(Scsi_Device *SDptr)
    int          min;
 
    ha = IPS_HA(SDptr->host);
-   if (SDptr->tagged_supported) {
+   if (SDptr->tagged_supported && SDptr->type == TYPE_DISK) {
       min = ha->max_cmds / 2;
-      if (min <= 16)
+      if (ha->enq->ucLogDriveCount <= 2)
          min = ha->max_cmds - 1;
       scsi_adjust_queue_depth(SDptr, MSG_ORDERED_TAG, min);
    }
@@ -4762,7 +4762,7 @@ ips_inquiry(ips_ha_t *ha, ips_scb_t *scb) {
    inquiry.ResponseDataFormat = IPS_SCSI_INQ_RD_REV2;
    inquiry.AdditionalLength = 31;
    inquiry.Flags[0] = IPS_SCSI_INQ_Address16;
-   inquiry.Flags[1] = IPS_SCSI_INQ_WBus16 | IPS_SCSI_INQ_Sync;
+   inquiry.Flags[1] = IPS_SCSI_INQ_WBus16 | IPS_SCSI_INQ_Sync | IPS_SCSI_INQ_CmdQue;
    strncpy(inquiry.VendorId, "IBM     ", 8);
    strncpy(inquiry.ProductId, "SERVERAID       ", 16);
    strncpy(inquiry.ProductRevisionLevel, "1.00", 4);
