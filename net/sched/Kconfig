@@ -37,7 +37,7 @@ config NET_SCH_CLK_GETTIMEOFDAY
 
 config NET_SCH_CLK_CPU
 	bool "CPU cycle counter"
-	depends on X86_TSC || X86_64 || SPARC64 || PPC64 || IA64
+	depends on X86_TSC || X86_64 || ALPHA || SPARC64 || PPC64 || IA64
 	help
 	  Say Y here if you want to use the CPU's cycle counter as clock source.
 	  This is a cheap and high resolution clock source, but on some
@@ -47,6 +47,7 @@ config NET_SCH_CLK_CPU
 	  The useable cycle counters are:
 
 	  	x86/x86_64	- Timestamp Counter
+		alpha		- Cycle Counter
 		sparc64		- %ticks register
 		ppc64		- Time base
 		ia64		- Interval Time Counter
@@ -212,7 +213,9 @@ config NET_SCH_NETEM
 	  testing applications or protocols.
 
 	  To compile this driver as a module, choose M here: the module
-	  will be called sch_delay.
+	  will be called sch_netem.
+
+	  If unsure, say N.
 
 config NET_SCH_INGRESS
 	tristate "Ingress Qdisc"
