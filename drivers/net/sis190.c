@@ -76,6 +76,8 @@ static int multicast_filter_limit = 32;
 
 #define NUM_TX_DESC	64	/* Number of Tx descriptor registers */
 #define NUM_RX_DESC	64	/* Number of Rx descriptor registers */
+#define TX_DESC_TOTAL_SIZE	(NUM_TX_DESC * sizeof (struct TxDesc))
+#define RX_DESC_TOTAL_SIZE	(NUM_RX_DESC * sizeof (struct RxDesc))
 #define RX_BUF_SIZE	1536	/* Rx Buffer size */
 
 #define SiS190_MIN_IO_SIZE 0x80
@@ -311,12 +313,8 @@ struct sis190_private {
 	unsigned long cur_rx;	/* Index into the Rx descriptor buffer of next Rx pkt. */
 	unsigned long cur_tx;	/* Index into the Tx descriptor buffer of next Rx pkt. */
 	unsigned long dirty_tx;
-	void *tx_desc_raw;		/* Tx descriptor buffer */
-	dma_addr_t tx_dma_raw;
-	dma_addr_t tx_dma_aligned;
-	void *rx_desc_raw;		/* Rx descriptor buffer */
-	dma_addr_t rx_dma_raw;
-	dma_addr_t rx_dma_aligned;
+	dma_addr_t tx_dma;
+	dma_addr_t rx_dma;
 	struct TxDesc *TxDescArray;	/* Index of 256-alignment Tx Descriptor buffer */
 	struct RxDesc *RxDescArray;	/* Index of 256-alignment Rx Descriptor buffer */
 	unsigned char *RxBufferRings;	/* Index of Rx Buffer  */
@@ -715,54 +713,50 @@ static int
 SiS190_open(struct net_device *dev)
 {
 	struct sis190_private *tp = dev->priv;
-	int retval;
-	u8 diff;
 	int rc;
 
-	retval =
-	    request_irq(dev->irq, SiS190_interrupt, SA_SHIRQ, dev->name, dev);
-	if (retval) {
-		return retval;
-	}
+	rc = request_irq(dev->irq, SiS190_interrupt, SA_SHIRQ, dev->name, dev);
+	if (rc)
+		goto out;
 
-	tp->tx_desc_raw = pci_alloc_consistent(tp->pci_dev,
-		(NUM_TX_DESC * sizeof (struct TxDesc)) + 256,
-		&tp->tx_dma_raw);
-	if (!tp->tx_desc_raw) {
+	/*
+	 * Rx and Tx descriptors need 256 bytes alignment.
+	 * pci_alloc_consistent() guarantees a stronger alignment.
+	 */
+	tp->TxDescArray = pci_alloc_consistent(tp->pci_dev, TX_DESC_TOTAL_SIZE,
+		&tp->tx_dma);
+	if (!tp->TxDescArray) {
 		rc = -ENOMEM;
 		goto err_out;
 	}
-	// Tx Desscriptor needs 256 bytes alignment;
-	diff = 256 - (tp->tx_dma_raw - ((tp->tx_dma_raw >> 8) << 8));
-	tp->tx_dma_aligned = tp->tx_dma_raw + diff;
-	tp->TxDescArray = (struct TxDesc *) (tp->tx_desc_raw + diff);
 
-	tp->rx_desc_raw = pci_alloc_consistent(tp->pci_dev,
-		(NUM_RX_DESC * sizeof (struct RxDesc)) + 256,
-		&tp->rx_dma_raw);
-	if (!tp->rx_desc_raw) {
+	tp->RxDescArray = pci_alloc_consistent(tp->pci_dev, RX_DESC_TOTAL_SIZE,
+		&tp->rx_dma);
+	if (!tp->RxDescArray) {
 		rc = -ENOMEM;
 		goto err_out_free_tx;
 	}
-	// Rx Desscriptor needs 256 bytes alignment;
-	diff = 256 - (tp->rx_dma_raw - ((tp->rx_dma_raw >> 8) << 8));
-	tp->rx_dma_aligned = tp->rx_dma_raw + diff;
-	tp->RxDescArray = (struct RxDesc *) (tp->rx_desc_raw + diff);
 
 	tp->RxBufferRings = kmalloc(RX_BUF_SIZE * NUM_RX_DESC, GFP_KERNEL);
 	if (tp->RxBufferRings == NULL) {
-		printk(KERN_INFO "Allocate RxBufferRing failed\n");
+		printk(KERN_INFO "%s: allocate RxBufferRing failed\n",
+			dev->name);
+		rc = -ENOMEM;
+		goto err_out_free_rx;
 	}
 
 	SiS190_init_ring(dev);
 	SiS190_hw_start(dev);
 
-	return 0;
+out:
+	return rc;
 
+err_out_free_rx:
+	pci_free_consistent(tp->pci_dev, RX_DESC_TOTAL_SIZE, tp->RxDescArray,
+		tp->rx_dma);
 err_out_free_tx:
-	pci_free_consistent(tp->pci_dev,
-		(NUM_TX_DESC * sizeof (struct TxDesc)) + 256,
-		tp->tx_desc_raw, tp->tx_dma_raw);
+	pci_free_consistent(tp->pci_dev, TX_DESC_TOTAL_SIZE, tp->TxDescArray,
+		tp->tx_dma);
 err_out:
 	free_irq(dev->irq, dev);
 	return rc;
@@ -781,10 +775,10 @@ SiS190_hw_start(struct net_device *dev)
 	SiS_W32(IntrControl, 0x0);
 
 	SiS_W32(0x0, 0x01a00);
-	SiS_W32(0x4, tp->tx_dma_aligned);
+	SiS_W32(0x4, tp->tx_dma);
 
 	SiS_W32(0x10, 0x1a00);
-	SiS_W32(0x14, tp->rx_dma_aligned);
+	SiS_W32(0x14, tp->rx_dma);
 
 	SiS_W32(0x20, 0xffffffff);
 	SiS_W32(0x24, 0x0);
@@ -1142,12 +1136,10 @@ SiS190_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 
 	SiS190_tx_clear(tp);
-	pci_free_consistent(tp->pci_dev,
-		(NUM_TX_DESC * sizeof (struct TxDesc)) + 256,
-		tp->tx_desc_raw, tp->tx_dma_raw);
-	pci_free_consistent(tp->pci_dev,
-		(NUM_RX_DESC * sizeof (struct RxDesc)) + 256,
-		tp->rx_desc_raw, tp->rx_dma_raw);
+	pci_free_consistent(tp->pci_dev, TX_DESC_TOTAL_SIZE, tp->TxDescArray,
+		tp->tx_dma);
+	pci_free_consistent(tp->pci_dev, RX_DESC_TOTAL_SIZE, tp->RxDescArray,
+		tp->rx_dma);
 	tp->TxDescArray = NULL;
 	tp->RxDescArray = NULL;
 	kfree(tp->RxBufferRings);
