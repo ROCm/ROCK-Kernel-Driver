@@ -8,7 +8,6 @@
 
 #ifndef _PARPORT_H_
 #define _PARPORT_H_
-#include <linux/sched.h>
 
 /* Start off with user-visible constants */
 
@@ -97,13 +96,14 @@ typedef enum {
 /* The rest is for the kernel only */
 #ifdef __KERNEL__
 
-#include <linux/wait.h>
+#include <linux/config.h>
+#include <linux/jiffies.h>
+#include <linux/proc_fs.h>
 #include <linux/spinlock.h>
+#include <linux/wait.h>
 #include <asm/system.h>
 #include <asm/ptrace.h>
 #include <asm/semaphore.h>
-#include <linux/proc_fs.h>
-#include <linux/config.h>
 
 #define PARPORT_NEED_GENERIC_OPS
 
