@@ -1926,39 +1926,24 @@ struct blkpg_ioctl_arg32 {
 
 static int blkpg_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	struct blkpg_ioctl_arg a;
-	struct blkpg_ioctl_arg32 *ua32;
-	struct blkpg_partition p;
-	struct blkpg_partition *up32;
+	struct blkpg_ioctl_arg32 __user *ua32 = compat_ptr(arg);
+	struct blkpg_ioctl_arg __user *a = compat_alloc_user_space(sizeof(*a));
 	compat_caddr_t udata;
+	compat_int_t n;
 	int err;
-	mm_segment_t old_fs = get_fs();
 	
-	ua32 = compat_ptr(arg);
-	err = get_user(a.op, &ua32->op);
-	err |= __get_user(a.flags, &ua32->flags);
-	err |= __get_user(a.datalen, &ua32->datalen);
-	err |= __get_user(udata, &ua32->data);
-	up32 = compat_ptr(udata);
+	err = get_user(n, &ua32->op);
+	err |= put_user(n, &a->op);
+	err |= get_user(n, &ua32->flags);
+	err |= put_user(n, &a->flags);
+	err |= get_user(n, &ua32->datalen);
+	err |= put_user(n, &a->datalen);
+	err |= get_user(udata, &ua32->data);
+	err |= put_user(compat_ptr(udata), &a->data);
 	if (err)
 		return err;
 
-	switch (a.op) {
-	case BLKPG_ADD_PARTITION:
-	case BLKPG_DEL_PARTITION:
-		if (a.datalen < sizeof(struct blkpg_partition))
-			return -EINVAL;
-                if (copy_from_user(&p, up32, sizeof(struct blkpg_partition)))
-			return -EFAULT;
-		a.data = &p;
-		set_fs (KERNEL_DS);
-		err = sys_ioctl(fd, cmd, (unsigned long)&a);
-		set_fs (old_fs);
-		break;
-	default:
-		return -EINVAL;
-	}                                        
-	return err;
+	return sys_ioctl(fd, cmd, (unsigned long)a);
 }
 
 static int ioc_settimeout(unsigned int fd, unsigned int cmd, unsigned long arg)
