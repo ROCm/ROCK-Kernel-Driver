@@ -274,7 +274,7 @@ static inline void do_new_sigreturn (struct pt_regs *regs)
 	return;
 
 segv_and_exit:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void do_sigreturn(struct pt_regs *regs)
@@ -341,7 +341,7 @@ asmlinkage void do_sigreturn(struct pt_regs *regs)
 	return;
 
 segv_and_exit:
-	send_sig(SIGSEGV, current, 1);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void do_rt_sigreturn(struct pt_regs *regs)
@@ -401,7 +401,7 @@ asmlinkage void do_rt_sigreturn(struct pt_regs *regs)
 	spin_unlock_irq(&current->sighand->siglock);
 	return;
 segv:
-	send_sig(SIGSEGV, current, 1);
+	force_sig(SIGSEGV, current);
 }
 
 /* Checks if the fp is valid */
@@ -549,7 +549,7 @@ setup_frame(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *old
 sigill_and_return:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 
@@ -663,7 +663,7 @@ new_setup_frame(struct k_sigaction *ka, struct pt_regs *regs,
 sigill_and_return:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signo, current);
 }
 
 static inline void
@@ -746,7 +746,7 @@ new_setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 sigill:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signo, current);
 }
 
 /* Setup a Solaris stack frame */
@@ -876,7 +876,7 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 sigill_and_return:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 asmlinkage int svr4_getcontext(svr4_ucontext_t __user *uc, struct pt_regs *regs)
@@ -889,7 +889,7 @@ asmlinkage int svr4_getcontext(svr4_ucontext_t __user *uc, struct pt_regs *regs)
 	synchronize_user_stack();
 
 	if (current_thread_info()->w_saved)
-		goto sigsegv_and_return;
+		return -EFAULT;
 
 	err = clear_user(uc, sizeof(*uc));
 	if (err)
@@ -930,9 +930,6 @@ asmlinkage int svr4_getcontext(svr4_ucontext_t __user *uc, struct pt_regs *regs)
 	 * we have already stuffed all of it with sync_user_stack
 	 */
 	return (err ? -EFAULT : 0);
-
-sigsegv_and_return:
-	do_exit(SIGSEGV);
 }
 
 /* Set the context for a svr4 application, this is Solaris way to sigreturn */
@@ -1018,7 +1015,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 	return (err ? -EFAULT : 0);
 
 sigsegv_and_return:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 static inline void

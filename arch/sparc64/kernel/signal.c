@@ -135,7 +135,7 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 
 	return;
 do_sigsegv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void sparc64_get_context(struct pt_regs *regs)
@@ -226,7 +226,7 @@ asmlinkage void sparc64_get_context(struct pt_regs *regs)
 
 	return;
 do_sigsegv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 struct rt_signal_frame {
@@ -439,7 +439,7 @@ void do_rt_sigreturn(struct pt_regs *regs)
 	spin_unlock_irq(&current->sighand->siglock);
 	return;
 segv:
-	send_sig(SIGSEGV, current, 1);
+	force_sig(SIGSEGV, current);
 }
 
 /* Checks if the fp is valid */
@@ -565,7 +565,7 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 sigill:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signo, current);
 }
 
 static inline void handle_signal(unsigned long signr, struct k_sigaction *ka,

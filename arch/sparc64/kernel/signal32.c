@@ -345,7 +345,7 @@ void do_new_sigreturn32(struct pt_regs *regs)
 	return;
 
 segv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void do_sigreturn32(struct pt_regs *regs)
@@ -415,7 +415,7 @@ asmlinkage void do_sigreturn32(struct pt_regs *regs)
 	return;
 
 segv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
@@ -507,7 +507,7 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	spin_unlock_irq(&current->sighand->siglock);
 	return;
 segv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 /* Checks if the fp is valid */
@@ -668,7 +668,7 @@ setup_frame32(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *o
 	return;
 
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 
@@ -819,7 +819,7 @@ static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 sigill:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signo, current);
 }
 
 /* Setup a Solaris stack frame */
@@ -943,7 +943,7 @@ setup_svr4_frame32(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	return;
 
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 asmlinkage int
@@ -1094,7 +1094,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 
 	return -EINTR;
 sigsegv:
-	do_exit(SIGSEGV);
+	return -EFAULT;
 }
 
 static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
@@ -1233,7 +1233,7 @@ static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 sigill:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 static inline void handle_signal32(unsigned long signr, struct k_sigaction *ka,
