@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.21 2004/07/02 16:31:22 ptiedem Exp $
+ * $Id: ctctty.c,v 1.24 2004/07/15 16:03:08 ptiedem Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -104,7 +104,7 @@ ctc_tty_try_read(ctc_tty_info * info, struct sk_buff *skb)
 	int len;
 	struct tty_struct *tty;
 
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 5, __FUNCTION__);
 	if ((tty = info->tty)) {
 		if (info->mcr & UART_MCR_RTS) {
 			c = TTY_FLIPBUF_SIZE - tty->flip.count;
@@ -134,7 +134,7 @@ ctc_tty_readmodem(ctc_tty_info *info)
 	int ret = 1;
 	struct tty_struct *tty;
 
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 5, __FUNCTION__);
 	if ((tty = info->tty)) {
 		if (info->mcr & UART_MCR_RTS) {
 			int c = TTY_FLIPBUF_SIZE - tty->flip.count;
@@ -168,7 +168,7 @@ ctc_tty_setcarrier(struct net_device *netdev, int on)
 {
 	int i;
 
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if ((!driver) || ctc_tty_shuttingdown)
 		return;
 	for (i = 0; i < CTC_TTY_MAX_DEVICES; i++)
@@ -189,7 +189,7 @@ ctc_tty_netif_rx(struct sk_buff *skb)
 	int i;
 	ctc_tty_info *info = NULL;
 
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 5, __FUNCTION__);
 	if (!skb)
 		return;
 	if ((!skb->dev) || (!driver) || ctc_tty_shuttingdown) {
@@ -254,7 +254,7 @@ ctc_tty_tint(ctc_tty_info * info)
 	int wake = 1;
 	int rc;
 
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if (!info->netdev) {
 		if (skb)
 			kfree_skb(skb);
@@ -347,7 +347,7 @@ ctc_tty_inject(ctc_tty_info *info, char c)
 	int skb_res;
 	struct sk_buff *skb;
 	
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if (ctc_tty_shuttingdown)
 		return;
 	skb_res = info->netdev->hard_header_len + sizeof(info->mcr) +
@@ -368,7 +368,7 @@ ctc_tty_inject(ctc_tty_info *info, char c)
 static void
 ctc_tty_transmit_status(ctc_tty_info *info)
 {
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 5, __FUNCTION__);
 	if (ctc_tty_shuttingdown)
 		return;
 	info->flags |= CTC_ASYNC_TX_LINESTAT;
@@ -382,7 +382,7 @@ ctc_tty_change_speed(ctc_tty_info * info)
 	unsigned int quot;
 	int i;
 
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 3, __FUNCTION__);
 	if (!info->tty || !info->tty->termios)
 		return;
 	cflag = info->tty->termios->c_cflag;
@@ -421,7 +421,7 @@ ctc_tty_change_speed(ctc_tty_info * info)
 static int
 ctc_tty_startup(ctc_tty_info * info)
 {
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 3, __FUNCTION__);
 	if (info->flags & CTC_ASYNC_INITIALIZED)
 		return 0;
 #ifdef CTC_DEBUG_MODEM_OPEN
@@ -464,7 +464,7 @@ ctc_tty_stopdev(unsigned long data)
 static void
 ctc_tty_shutdown(ctc_tty_info * info)
 {
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 3, __FUNCTION__);
 	if (!(info->flags & CTC_ASYNC_INITIALIZED))
 		return;
 #ifdef CTC_DEBUG_MODEM_OPEN
@@ -497,7 +497,7 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 	int total = 0;
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 5, __FUNCTION__);
 	if (ctc_tty_shuttingdown)
 		goto ex;
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_write"))
@@ -575,7 +575,7 @@ ctc_tty_flush_buffer(struct tty_struct *tty)
 	ctc_tty_info *info;
 	unsigned long flags;
 
-	DBF_TEXT(trace, 2, __FUNCTION__);
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if (!tty)
 		goto ex;
 	spin_lock_irqsave(&ctc_tty_lock, flags);
@@ -601,6 +601,7 @@ ctc_tty_flush_chars(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if (ctc_tty_shuttingdown)
 		return;
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_flush_chars"))
@@ -623,6 +624,7 @@ ctc_tty_throttle(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_throttle"))
 		return;
 	info->mcr &= ~UART_MCR_RTS;
@@ -636,6 +638,7 @@ ctc_tty_unthrottle(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_unthrottle"))
 		return;
 	info->mcr |= UART_MCR_RTS;
@@ -667,6 +670,7 @@ ctc_tty_get_lsr_info(ctc_tty_info * info, uint __user *value)
 	uint result;
 	ulong flags;
 
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	spin_lock_irqsave(&ctc_tty_lock, flags);
 	status = info->lsr;
 	spin_unlock_irqrestore(&ctc_tty_lock, flags);
@@ -684,6 +688,7 @@ static int ctc_tty_tiocmget(struct tty_struct *tty, struct file *file)
 	uint result;
 	ulong flags;
 
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_ioctl"))
 		return -ENODEV;
 	if (tty->flags & (1 << TTY_IO_ERROR))
@@ -708,6 +713,7 @@ ctc_tty_tiocmset(struct tty_struct *tty, struct file *file,
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_ioctl"))
 		return -ENODEV;
 	if (tty->flags & (1 << TTY_IO_ERROR))
@@ -736,6 +742,7 @@ ctc_tty_ioctl(struct tty_struct *tty, struct file *file,
 	int error;
 	int retval;
 
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_ioctl"))
 		return -ENODEV;
 	if (tty->flags & (1 << TTY_IO_ERROR))
@@ -803,6 +810,8 @@ ctc_tty_set_termios(struct tty_struct *tty, struct termios *old_termios)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 	unsigned int cflag = tty->termios->c_cflag;
+
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	ctc_tty_change_speed(info);
 
 	/* Handle transition to B0 */
@@ -840,6 +849,7 @@ ctc_tty_block_til_ready(struct tty_struct *tty, struct file *filp, ctc_tty_info 
 	unsigned long flags;
 	int retval;
 
+	DBF_TEXT(trace, 4, __FUNCTION__);
 	/*
 	 * If the device is in the middle of being closed, then block
 	 * until it's done, and then try again.
@@ -944,6 +954,7 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 	int retval,
 	 line;
 
+	DBF_TEXT(trace, 3, __FUNCTION__);
 	line = tty->index;
 	if (line < 0 || line > CTC_TTY_MAX_DEVICES)
 		return -ENODEV;
@@ -990,7 +1001,7 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 	ulong flags;
 	ulong timeout;
-
+	DBF_TEXT(trace, 3, __FUNCTION__);
 	if (!info || ctc_tty_paranoia_check(info, tty->name, "ctc_tty_close"))
 		return;
 	spin_lock_irqsave(&ctc_tty_lock, flags);
@@ -1080,6 +1091,7 @@ ctc_tty_hangup(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *)tty->driver_data;
 	unsigned long saveflags;
+	DBF_TEXT(trace, 3, __FUNCTION__);
 	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_hangup"))
 		return;
 	ctc_tty_shutdown(info);
@@ -1103,6 +1115,7 @@ ctc_tty_task(unsigned long arg)
 	unsigned long saveflags;
 	int again;
 
+	DBF_TEXT(trace, 3, __FUNCTION__);
 	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	if ((!ctc_tty_shuttingdown) && info) {
 		again = ctc_tty_tint(info);
@@ -1140,6 +1153,7 @@ ctc_tty_init(void)
 	ctc_tty_info *info;
 	struct tty_driver *device;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	driver = kmalloc(sizeof(ctc_tty_driver), GFP_KERNEL);
 	if (driver == NULL) {
 		printk(KERN_WARNING "Out of memory in ctc_tty_modem_init\n");
@@ -1199,6 +1213,7 @@ ctc_tty_register_netdev(struct net_device *dev) {
 	char *err;
 	char *p;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	if ((!dev) || (!dev->name)) {
 		printk(KERN_WARNING
 		       "ctc_tty_register_netdev called "
@@ -1246,6 +1261,7 @@ ctc_tty_unregister_netdev(struct net_device *dev) {
 	unsigned long saveflags;
 	ctc_tty_info *info = NULL;
 
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	for (i = 0; i < CTC_TTY_MAX_DEVICES; i++)
 		if (driver->info[i].netdev == dev) {
@@ -1264,6 +1280,7 @@ void
 ctc_tty_cleanup(void) {
 	unsigned long saveflags;
 	
+	DBF_TEXT(trace, 2, __FUNCTION__);
 	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	ctc_tty_shuttingdown = 1;
 	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);

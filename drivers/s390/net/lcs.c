@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.83 $	 $Date: 2004/06/30 12:48:14 $
+ *    $Revision: 1.84 $	 $Date: 2004/07/14 07:23:15 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.83 $"
+#define VERSION_LCS_C  "$Revision: 1.84 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 static char debug_buffer[255];
@@ -1420,7 +1420,7 @@ lcs_resetcard(struct lcs_card *card)
 				   card->dev->name);
 			return 0;
 		}
-		schedule_timeout(3 * HZ);
+		msleep(30);
 	}
 	PRINT_ERR("Error in Reseting LCS card!\n");
 	return -EIO;

@@ -4788,6 +4788,7 @@ zfcp_fsf_req_create(struct zfcp_adapter *adapter, u32 fsf_cmd, int req_flags,
 
 	if (!atomic_test_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status)) {
 		write_unlock_irqrestore(&req_queue->queue_lock, *lock_flags);
+		ret = -EIO;
 		goto failed_sbals;
 	}
 
