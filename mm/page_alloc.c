@@ -2012,6 +2012,7 @@ static int __init init_per_zone_pages_min(void)
 	if (min_free_kbytes > 16384)
 		min_free_kbytes = 16384;
 	setup_per_zone_pages_min();
+	setup_per_zone_lowmem_reserve();
 	return 0;
 }
 module_init(init_per_zone_pages_min)
