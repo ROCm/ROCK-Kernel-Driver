@@ -2,44 +2,11 @@
  *  linux/arch/i386/kernel/reboot.c
  */
 
-#define __KERNEL_SYSCALLS__
-#include <stdarg.h>
-
-#include <linux/errno.h>
-#include <linux/sched.h>
-#include <linux/fs.h>
-#include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/smp.h>
-#include <linux/smp_lock.h>
-#include <linux/stddef.h>
-#include <linux/unistd.h>
-#include <linux/ptrace.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
-#include <linux/user.h>
-#include <linux/a.out.h>
-#include <linux/interrupt.h>
-#include <linux/config.h>
 #include <linux/delay.h>
-#include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/mc146818rtc.h>
-
 #include <asm/uaccess.h>
-#include <asm/pgtable.h>
-#include <asm/system.h>
-#include <asm/io.h>
-#include <asm/ldt.h>
-#include <asm/processor.h>
-#include <asm/i387.h>
-#include <asm/desc.h>
-#ifdef CONFIG_MATH_EMULATION
-#include <asm/math_emu.h>
-#endif
-
-#include <linux/irq.h>
-#include <linux/err.h>
 
 /*
  * Power off function, if any
@@ -148,7 +115,7 @@ static unsigned char real_mode_switch [] =
 	0x66, 0x0f, 0x20, 0xc3,			/*    movl  %cr0,%ebx        */
 	0x66, 0x81, 0xe3, 0x00, 0x00, 0x00, 0x60,	/*    andl  $0x60000000,%ebx */
 	0x74, 0x02,				/*    jz    f                */
-	0x0f, 0x08,				/*    invd                   */
+	0x0f, 0x09,				/*    wbinvd                 */
 	0x24, 0x10,				/* f: andb  $0x10,al         */
 	0x66, 0x0f, 0x22, 0xc0			/*    movl  %eax,%cr0        */
 };
