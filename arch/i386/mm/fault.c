@@ -56,12 +56,16 @@ good_area:
 
 	for (;;) {
 	survive:
-		{
-			int fault = handle_mm_fault(current->mm, vma, start, 1);
-			if (!fault)
+		switch (handle_mm_fault(current->mm, vma, start, 1)) {
+			case VM_FAULT_SIGBUS:
 				goto bad_area;
-			if (fault < 0)
+			case VM_FAULT_OOM:
 				goto out_of_memory;
+			case VM_FAULT_MINOR:
+			case VM_FAULT_MAJOR:
+				break;
+			default:
+				BUG();
 		}
 		if (!size)
 			break;
@@ -239,16 +243,18 @@ good_area:
 	 * the fault.
 	 */
 	switch (handle_mm_fault(mm, vma, address, write)) {
-	case 1:
-		tsk->min_flt++;
-		break;
-	case 2:
-		tsk->maj_flt++;
-		break;
-	case 0:
-		goto do_sigbus;
-	default:
-		goto out_of_memory;
+		case VM_FAULT_MINOR:
+			tsk->min_flt++;
+			break;
+		case VM_FAULT_MAJOR:
+			tsk->maj_flt++;
+			break;
+		case VM_FAULT_SIGBUS:
+			goto do_sigbus;
+		case VM_FAULT_OOM:
+			goto out_of_memory;
+		default:
+			BUG();
 	}
 
 	/*

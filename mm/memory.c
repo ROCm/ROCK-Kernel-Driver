@@ -503,18 +503,18 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 			while (!(map = follow_page(mm, start, write))) {
 				spin_unlock(&mm->page_table_lock);
 				switch (handle_mm_fault(mm, vma, start, write)) {
-				case 1:
+				case VM_FAULT_MINOR:
 					tsk->min_flt++;
 					break;
-				case 2:
+				case VM_FAULT_MAJOR:
 					tsk->maj_flt++;
 					break;
-				case 0:
-					if (i) return i;
-					return -EFAULT;
+				case VM_FAULT_SIGBUS:
+					return i ? i : -EFAULT;
+				case VM_FAULT_OOM:
+					return i ? i : -ENOMEM;
 				default:
-					if (i) return i;
-					return -ENOMEM;
+					BUG();
 				}
 				spin_lock(&mm->page_table_lock);
 			}
@@ -968,7 +968,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 			establish_pte(vma, address, page_table, pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
 			pte_unmap(page_table);
 			spin_unlock(&mm->page_table_lock);
-			return 1;	/* Minor fault */
+			return VM_FAULT_MINOR;
 		}
 	}
 	pte_unmap(page_table);
@@ -1002,16 +1002,21 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	spin_unlock(&mm->page_table_lock);
 	page_cache_release(new_page);
 	page_cache_release(old_page);
-	return 1;	/* Minor fault */
+	return VM_FAULT_MINOR;
 
 bad_wp_page:
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 	printk(KERN_ERR "do_wp_page: bogus page at address %08lx\n", address);
-	return -1;
+	/*
+	 * This should really halt the system so it can be debugged or
+	 * at least the kernel stops what it's doing before it corrupts
+	 * data, but for the moment just pretend this is OOM.
+	 */
+	return VM_FAULT_OOM;
 no_mem:
 	page_cache_release(old_page);
-	return -1;
+	return VM_FAULT_OOM;
 }
 
 static void vmtruncate_list(list_t *head, unsigned long pgoff)
@@ -1135,7 +1140,7 @@ static int do_swap_page(struct mm_struct * mm,
 	struct page *page;
 	swp_entry_t entry = pte_to_swp_entry(orig_pte);
 	pte_t pte;
-	int ret = 1;
+	int ret = VM_FAULT_MINOR;
 
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
@@ -1148,17 +1153,19 @@ static int do_swap_page(struct mm_struct * mm,
 			 * Back out if somebody else faulted in this pte while
 			 * we released the page table lock.
 			 */
-			int retval;
 			spin_lock(&mm->page_table_lock);
 			page_table = pte_offset_map(pmd, address);
-			retval = pte_same(*page_table, orig_pte) ? -1 : 1;
+			if (pte_same(*page_table, orig_pte))
+				ret = VM_FAULT_OOM;
+			else
+				ret = VM_FAULT_MINOR;
 			pte_unmap(page_table);
 			spin_unlock(&mm->page_table_lock);
-			return retval;
+			return ret;
 		}
 
 		/* Had to read the page from swap area: Major fault */
-		ret = 2;
+		ret = VM_FAULT_MAJOR;
 	}
 
 	lock_page(page);
@@ -1174,7 +1181,7 @@ static int do_swap_page(struct mm_struct * mm,
 		spin_unlock(&mm->page_table_lock);
 		unlock_page(page);
 		page_cache_release(page);
-		return 1;
+		return VM_FAULT_MINOR;
 	}
 
 	/* The page isn't present yet, go ahead with the fault. */
@@ -1232,7 +1239,7 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 			pte_unmap(page_table);
 			page_cache_release(page);
 			spin_unlock(&mm->page_table_lock);
-			return 1;
+			return VM_FAULT_MINOR;
 		}
 		mm->rss++;
 		flush_page_to_ram(page);
@@ -1246,10 +1253,10 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, addr, entry);
 	spin_unlock(&mm->page_table_lock);
-	return 1;	/* Minor fault */
+	return VM_FAULT_MINOR;
 
 no_mem:
-	return -1;
+	return VM_FAULT_OOM;
 }
 
 /*
@@ -1277,10 +1284,11 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, 0);
 
-	if (new_page == NULL)	/* no page was available -- SIGBUS */
-		return 0;
+	/* no page was available -- either SIGBUS or OOM */
+	if (new_page == NOPAGE_SIGBUS)
+		return VM_FAULT_SIGBUS;
 	if (new_page == NOPAGE_OOM)
-		return -1;
+		return VM_FAULT_OOM;
 
 	/*
 	 * Should we do an early C-O-W break?
@@ -1289,7 +1297,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		struct page * page = alloc_page(GFP_HIGHUSER);
 		if (!page) {
 			page_cache_release(new_page);
-			return -1;
+			return VM_FAULT_OOM;
 		}
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
@@ -1325,13 +1333,13 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		pte_unmap(page_table);
 		page_cache_release(new_page);
 		spin_unlock(&mm->page_table_lock);
-		return 1;
+		return VM_FAULT_MINOR;
 	}
 
 	/* no need to invalidate: a not-present page shouldn't be cached */
 	update_mmu_cache(vma, address, entry);
 	spin_unlock(&mm->page_table_lock);
-	return 2;	/* Major fault */
+	return VM_FAULT_MAJOR;
 }
 
 /*
@@ -1383,7 +1391,7 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 	establish_pte(vma, address, pte, entry);
 	pte_unmap(pte);
 	spin_unlock(&mm->page_table_lock);
-	return 1;
+	return VM_FAULT_MINOR;
 }
 
 /*
@@ -1411,7 +1419,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 			return handle_pte_fault(mm, vma, address, write_access, pte, pmd);
 	}
 	spin_unlock(&mm->page_table_lock);
-	return -1;
+	return VM_FAULT_OOM;
 }
 
 /*
