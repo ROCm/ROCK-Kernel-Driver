@@ -174,16 +174,5 @@ void __init gayle_init(void)
 	    }
 	} else
 	    release_mem_region(res_start, res_n);
-
-#if 1 /* TESTING */
-	if (i == 1) {
-	    volatile u_short *addr = (u_short *)base;
-	    u_short data;
-	    printk("+++ Probing for IDE doubler... ");
-	    *addr = 0xffff;
-	    data = *addr;
-	    printk("probe returned 0x%02x (PLEASE REPORT THIS!!)\n", data);
-	}
-#endif /* TESTING */
     }
 }
