@@ -103,7 +103,8 @@ extern int 			ndisc_ifinfo_sysctl_change(ctl_table *ctl,
 							   int write,
 							   struct file * filp,
 							   void __user *buffer,
-							   size_t *lenp);
+							   size_t *lenp,
+							   loff_t *ppos);
 #endif
 
 extern void 			inet6_ifinfo_notify(int event,

@@ -3003,13 +3003,13 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 
 static
 int addrconf_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
-			   void __user *buffer, size_t *lenp)
+			   void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int *valp = ctl->data;
 	int val = *valp;
 	int ret;
 
-	ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+	ret = proc_dointvec(ctl, write, filp, buffer, lenp, ppos);
 
 	if (write && *valp != val && valp != &ipv6_devconf_dflt.forwarding) {
 		struct inet6_dev *idev = NULL;
