@@ -970,9 +970,6 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 					   0;
 #endif
 
-	/* Note: spin_lock_irqsave is held by caller... */
-	spin_unlock(cmd->device->host->host_lock);
-
 	ap = (struct ata_port *) &cmd->device->host->hostdata[0];
 
 	DPRINTK("CDB (%u:%d,%d,%d) %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
@@ -989,8 +986,6 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 		done(cmd);
 		goto out;
 	}
-
-	spin_lock(&ap->host_set->lock);
 
 	dev = &ap->device[cmd->device->id];
 
@@ -1105,10 +1100,8 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 			break;
 	}
 
-out_unlock:
-	spin_unlock(&ap->host_set->lock);
+out_unlock:		/* I will kill this soon... reduces 2.4 diff */
 out:
-	spin_lock(cmd->device->host->host_lock);
 	return 0;
 }
 
