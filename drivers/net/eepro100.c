@@ -833,6 +833,10 @@ static int speedo_found1(struct pci_dev *pdev,
 	sp->phy[0] = eeprom[6];
 	sp->phy[1] = eeprom[7];
 	sp->rx_bug = (eeprom[3] & 0x03) == 3 ? 0 : 1;
+	if (((pdev->device > 0x1030 && (pdev->device < 0x1039))) 
+	    || (pdev->device == 0x2449)) {
+	    	sp->chip_id = 1;
+	}
 
 	if (sp->rx_bug)
 		printk(KERN_INFO "  Receiver lock-up workaround activated.\n");
@@ -1375,7 +1379,7 @@ speedo_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* workaround for hardware bug on 10 mbit half duplex */
 
-	if ((sp->partner==0) && (sp->chip_id==1)) {
+	if ((sp->partner == 0) || (sp->chip_id == 1)) {
 		wait_for_cmd_done(ioaddr + SCBCmd);
 		outb(0 , ioaddr + SCBCmd);
 	}
