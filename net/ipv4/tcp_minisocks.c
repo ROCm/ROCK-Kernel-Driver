@@ -766,6 +766,9 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newtp->snd_cwnd = 2;
 		newtp->snd_cwnd_cnt = 0;
 
+		newtp->bictcp.cnt = 0;
+		newtp->bictcp.last_max_cwnd = newtp->bictcp.last_cwnd = 0;
+
 		newtp->frto_counter = 0;
 		newtp->frto_highmark = 0;
 
