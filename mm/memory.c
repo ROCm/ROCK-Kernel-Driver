@@ -1433,10 +1433,8 @@ retry:
 	 */
 	if (write_access && !(vma->vm_flags & VM_SHARED)) {
 		struct page * page = alloc_page(GFP_HIGHUSER);
-		if (!page) {
-			page_cache_release(new_page);
+		if (!page)
 			goto oom;
-		}
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
 		lru_cache_add_active(page);
@@ -1493,6 +1491,7 @@ retry:
 	spin_unlock(&mm->page_table_lock);
 	goto out;
 oom:
+	page_cache_release(new_page);
 	ret = VM_FAULT_OOM;
 out:
 	pte_chain_free(pte_chain);
