@@ -288,7 +288,6 @@ static Scsi_Host_Template k2_sata_sht = {
 	.proc_info		= k2_sata_proc_info,
 #endif
 	.bios_param		= ata_std_bios_param,
-	.ordered_flush		= 1,
 };
 
 
