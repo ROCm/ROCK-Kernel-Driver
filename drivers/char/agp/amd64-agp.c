@@ -109,6 +109,7 @@ static int amd64_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 		pte |= GPTE_VALID | GPTE_COHERENT;
 
 		writel(pte, agp_bridge->gatt_table+j);
+		readl(agp_bridge->gatt_table+j);	/* PCI Posting. */
 	}
 	amd64_tlbflush(mem);
 	return 0;
