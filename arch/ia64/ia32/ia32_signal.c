@@ -22,6 +22,7 @@
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 #include <linux/wait.h>
+#include <linux/compat.h>
 
 #include <asm/uaccess.h>
 #include <asm/rse.h>
@@ -592,8 +593,8 @@ sys32_sigprocmask (int how, unsigned int *set, unsigned int *oset)
 }
 
 asmlinkage long
-sys32_rt_sigtimedwait (sigset32_t *uthese, siginfo_t32 *uinfo, struct timespec32 *uts,
-		       unsigned int sigsetsize)
+sys32_rt_sigtimedwait (sigset32_t *uthese, siginfo_t32 *uinfo,
+		struct compat_timespec *uts, unsigned int sigsetsize)
 {
 	extern asmlinkage long sys_rt_sigtimedwait (const sigset_t *, siginfo_t *,
 						    const struct timespec *, size_t);

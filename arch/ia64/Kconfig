@@ -418,6 +418,11 @@ config IA32_SUPPORT
 	  run IA-32 Linux binaries on an IA-64 Linux system.
 	  If in doubt, say Y.
 
+config COMPAT
+	bool
+	depends on IA32_SUPPORT
+	default y
+
 config PERFMON
 	bool "Performance monitor support"
 	help

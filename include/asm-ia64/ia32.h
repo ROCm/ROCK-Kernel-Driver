@@ -12,10 +12,7 @@
  */
 
 /* 32bit compatibility types */
-typedef unsigned int	__kernel_size_t32;
-typedef int		__kernel_ssize_t32;
 typedef int		__kernel_ptrdiff_t32;
-typedef int		__kernel_time_t32;
 typedef int		__kernel_clock_t32;
 typedef int		__kernel_pid_t32;
 typedef unsigned short	__kernel_ipc_pid_t32;
@@ -40,11 +37,6 @@ typedef __kernel_fsid_t	__kernel_fsid_t32;
 #define IA32_PAGE_ALIGN(addr)	(((addr) + IA32_PAGE_SIZE - 1) & IA32_PAGE_MASK)
 #define IA32_CLOCKS_PER_SEC	100	/* Cast in stone for IA32 Linux */
 #define IA32_TICK(tick)		((unsigned long long)(tick) * IA32_CLOCKS_PER_SEC / CLOCKS_PER_SEC)
-
-struct timespec32 {
-	int	tv_sec;
-	int	tv_nsec;
-};
 
 /* fcntl.h */
 struct flock32 {

@@ -20,7 +20,6 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/signal.h>
-#include <linux/utime.h>
 #include <linux/resource.h>
 #include <linux/times.h>
 #include <linux/utsname.h>
@@ -48,6 +47,7 @@
 #include <linux/ptrace.h>
 #include <linux/stat.h>
 #include <linux/ipc.h>
+#include <linux/compat.h>
 
 #include <asm/types.h>
 #include <asm/uaccess.h>
@@ -699,88 +699,18 @@ sys32_fstatfs (unsigned int fd, struct statfs32 *buf)
 	return ret;
 }
 
-struct timeval32
-{
-    int tv_sec, tv_usec;
-};
-
-struct itimerval32
-{
-    struct timeval32 it_interval;
-    struct timeval32 it_value;
-};
-
 static inline long
-get_tv32 (struct timeval *o, struct timeval32 *i)
+get_tv32 (struct timeval *o, struct compat_timeval *i)
 {
 	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
 		(__get_user(o->tv_sec, &i->tv_sec) | __get_user(o->tv_usec, &i->tv_usec)));
 }
 
 static inline long
-put_tv32 (struct timeval32 *o, struct timeval *i)
+put_tv32 (struct compat_timeval *o, struct timeval *i)
 {
 	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
 		(__put_user(i->tv_sec, &o->tv_sec) | __put_user(i->tv_usec, &o->tv_usec)));
-}
-
-static inline long
-get_it32 (struct itimerval *o, struct itimerval32 *i)
-{
-	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
-		(__get_user(o->it_interval.tv_sec, &i->it_interval.tv_sec) |
-		 __get_user(o->it_interval.tv_usec, &i->it_interval.tv_usec) |
-		 __get_user(o->it_value.tv_sec, &i->it_value.tv_sec) |
-		 __get_user(o->it_value.tv_usec, &i->it_value.tv_usec)));
-}
-
-static inline long
-put_it32 (struct itimerval32 *o, struct itimerval *i)
-{
-	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
-		(__put_user(i->it_interval.tv_sec, &o->it_interval.tv_sec) |
-		 __put_user(i->it_interval.tv_usec, &o->it_interval.tv_usec) |
-		 __put_user(i->it_value.tv_sec, &o->it_value.tv_sec) |
-		 __put_user(i->it_value.tv_usec, &o->it_value.tv_usec)));
-}
-
-extern int do_getitimer (int which, struct itimerval *value);
-
-asmlinkage long
-sys32_getitimer (int which, struct itimerval32 *it)
-{
-	struct itimerval kit;
-	int error;
-
-	error = do_getitimer(which, &kit);
-	if (!error && put_it32(it, &kit))
-		error = -EFAULT;
-
-	return error;
-}
-
-extern int do_setitimer (int which, struct itimerval *, struct itimerval *);
-
-asmlinkage long
-sys32_setitimer (int which, struct itimerval32 *in, struct itimerval32 *out)
-{
-	struct itimerval kin, kout;
-	int error;
-
-	if (in) {
-		if (get_it32(&kin, in))
-			return -EFAULT;
-	} else
-		memset(&kin, 0, sizeof(kin));
-
-	error = do_setitimer(which, &kin, out ? &kout : NULL);
-	if (error || !out)
-		return error;
-	if (put_it32(out, &kout))
-		return -EFAULT;
-
-	return 0;
-
 }
 
 asmlinkage unsigned long
@@ -804,42 +734,11 @@ sys32_alarm (unsigned int seconds)
 /* Translations due to time_t size differences.  Which affects all
    sorts of things, like timeval and itimerval.  */
 
-struct utimbuf_32 {
-	int	atime;
-	int	mtime;
-};
-
-extern asmlinkage long sys_utimes(char * filename, struct timeval * utimes);
-extern asmlinkage long sys_gettimeofday (struct timeval *tv, struct timezone *tz);
-
-asmlinkage long
-sys32_utime (char *filename, struct utimbuf_32 *times32)
-{
-	mm_segment_t old_fs = get_fs();
-	struct timeval tv[2], *tvp;
-	long ret;
-
-	if (times32) {
-		if (get_user(tv[0].tv_sec, &times32->atime))
-			return -EFAULT;
-		tv[0].tv_usec = 0;
-		if (get_user(tv[1].tv_sec, &times32->mtime))
-			return -EFAULT;
-		tv[1].tv_usec = 0;
-		set_fs(KERNEL_DS);
-		tvp = tv;
-	} else
-		tvp = NULL;
-	ret = sys_utimes(filename, tvp);
-	set_fs(old_fs);
-	return ret;
-}
-
 extern struct timezone sys_tz;
 extern int do_sys_settimeofday (struct timeval *tv, struct timezone *tz);
 
 asmlinkage long
-sys32_gettimeofday (struct timeval32 *tv, struct timezone *tz)
+sys32_gettimeofday (struct compat_timeval *tv, struct timezone *tz)
 {
 	if (tv) {
 		struct timeval ktv;
@@ -855,7 +754,7 @@ sys32_gettimeofday (struct timeval32 *tv, struct timezone *tz)
 }
 
 asmlinkage long
-sys32_settimeofday (struct timeval32 *tv, struct timezone *tz)
+sys32_settimeofday (struct compat_timeval *tv, struct timezone *tz)
 {
 	struct timeval ktv;
 	struct timezone ktz;
@@ -1005,7 +904,7 @@ out:
 #define ROUND_UP_TIME(x,y) (((x)+(y)-1)/(y))
 
 asmlinkage long
-sys32_select (int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval32 *tvp32)
+sys32_select (int n, fd_set *inp, fd_set *outp, fd_set *exp, struct compat_timeval *tvp32)
 {
 	fd_set_bits fds;
 	char *bits;
@@ -1112,28 +1011,7 @@ sys32_old_select (struct sel_arg_struct *arg)
 	if (copy_from_user(&a, arg, sizeof(a)))
 		return -EFAULT;
 	return sys32_select(a.n, (fd_set *) A(a.inp), (fd_set *) A(a.outp), (fd_set *) A(a.exp),
-			    (struct timeval32 *) A(a.tvp));
-}
-
-extern asmlinkage long sys_nanosleep (struct timespec *rqtp, struct timespec *rmtp);
-
-asmlinkage long
-sys32_nanosleep (struct timespec32 *rqtp, struct timespec32 *rmtp)
-{
-	struct timespec t;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-
-	if (get_user (t.tv_sec, &rqtp->tv_sec) || get_user (t.tv_nsec, &rqtp->tv_nsec))
-		return -EFAULT;
-	set_fs(KERNEL_DS);
-	ret = sys_nanosleep(&t, rmtp ? &t : NULL);
-	set_fs(old_fs);
-	if (rmtp && ret == -EINTR) {
-		if (put_user(t.tv_sec, &rmtp->tv_sec) || put_user(t.tv_nsec, &rmtp->tv_nsec))
-			return -EFAULT;
-	}
-	return ret;
+			    (struct compat_timeval *) A(a.tvp));
 }
 
 struct iovec32 { unsigned int iov_base; int iov_len; };
@@ -1306,7 +1184,7 @@ struct msghdr32 {
 };
 
 struct cmsghdr32 {
-	__kernel_size_t32 cmsg_len;
+	compat_size_t cmsg_len;
 	int               cmsg_level;
 	int               cmsg_type;
 };
@@ -1371,7 +1249,7 @@ get_cmsghdr32 (struct msghdr *kmsg, unsigned char *stackbuf, struct sock *sk, si
 {
 	struct cmsghdr *kcmsg, *kcmsg_base;
 	__kernel_size_t kcmlen, tmp;
-	__kernel_size_t32 ucmlen;
+	compat_size_t ucmlen;
 	struct cmsghdr32 *ucmsg;
 	long err;
 
@@ -1895,10 +1773,10 @@ extern asmlinkage long sys_getsockname(int fd, struct sockaddr *usockaddr,
 extern asmlinkage long sys_getpeername(int fd, struct sockaddr *usockaddr,
 				      int *usockaddr_len);
 extern asmlinkage long sys_send(int fd, void *buff, size_t len, unsigned flags);
-extern asmlinkage long sys_sendto(int fd, u32 buff, __kernel_size_t32 len,
+extern asmlinkage long sys_sendto(int fd, u32 buff, compat_size_t len,
 				   unsigned flags, u32 addr, int addr_len);
 extern asmlinkage long sys_recv(int fd, void *ubuf, size_t size, unsigned flags);
-extern asmlinkage long sys_recvfrom(int fd, u32 ubuf, __kernel_size_t32 size,
+extern asmlinkage long sys_recvfrom(int fd, u32 ubuf, compat_size_t size,
 				     unsigned flags, u32 addr, u32 addr_len);
 extern asmlinkage long sys_setsockopt(int fd, int level, int optname,
 				     char *optval, int optlen);
@@ -2020,8 +1898,8 @@ struct ipc64_perm32 {
 
 struct semid_ds32 {
 	struct ipc_perm32 sem_perm;               /* permissions .. see ipc.h */
-	__kernel_time_t32 sem_otime;              /* last semop time */
-	__kernel_time_t32 sem_ctime;              /* last change time */
+	compat_time_t   sem_otime;              /* last semop time */
+	compat_time_t   sem_ctime;              /* last change time */
 	u32 sem_base;              /* ptr to first semaphore in array */
 	u32 sem_pending;          /* pending operations to be processed */
 	u32 sem_pending_last;    /* last pending operation */
@@ -2031,9 +1909,9 @@ struct semid_ds32 {
 
 struct semid64_ds32 {
 	struct ipc64_perm32 sem_perm;
-	__kernel_time_t32 sem_otime;
+	compat_time_t   sem_otime;
 	unsigned int __unused1;
-	__kernel_time_t32 sem_ctime;
+	compat_time_t   sem_ctime;
 	unsigned int __unused2;
 	unsigned int sem_nsems;
 	unsigned int __unused3;
@@ -2044,9 +1922,9 @@ struct msqid_ds32 {
 	struct ipc_perm32 msg_perm;
 	u32 msg_first;
 	u32 msg_last;
-	__kernel_time_t32 msg_stime;
-	__kernel_time_t32 msg_rtime;
-	__kernel_time_t32 msg_ctime;
+	compat_time_t   msg_stime;
+	compat_time_t   msg_rtime;
+	compat_time_t   msg_ctime;
 	u32 wwait;
 	u32 rwait;
 	unsigned short msg_cbytes;
@@ -2058,11 +1936,11 @@ struct msqid_ds32 {
 
 struct msqid64_ds32 {
 	struct ipc64_perm32 msg_perm;
-	__kernel_time_t32 msg_stime;
+	compat_time_t   msg_stime;
 	unsigned int __unused1;
-	__kernel_time_t32 msg_rtime;
+	compat_time_t   msg_rtime;
 	unsigned int __unused2;
-	__kernel_time_t32 msg_ctime;
+	compat_time_t   msg_ctime;
 	unsigned int __unused3;
 	unsigned int msg_cbytes;
 	unsigned int msg_qnum;
@@ -2076,9 +1954,9 @@ struct msqid64_ds32 {
 struct shmid_ds32 {
 	struct ipc_perm32 shm_perm;
 	int shm_segsz;
-	__kernel_time_t32 shm_atime;
-	__kernel_time_t32 shm_dtime;
-	__kernel_time_t32 shm_ctime;
+	compat_time_t   shm_atime;
+	compat_time_t   shm_dtime;
+	compat_time_t   shm_ctime;
 	__kernel_ipc_pid_t32 shm_cpid;
 	__kernel_ipc_pid_t32 shm_lpid;
 	unsigned short shm_nattch;
@@ -2086,12 +1964,12 @@ struct shmid_ds32 {
 
 struct shmid64_ds32 {
 	struct ipc64_perm shm_perm;
-	__kernel_size_t32 shm_segsz;
-	__kernel_time_t32 shm_atime;
+	compat_size_t shm_segsz;
+	compat_time_t   shm_atime;
 	unsigned int __unused1;
-	__kernel_time_t32 shm_dtime;
+	compat_time_t   shm_dtime;
 	unsigned int __unused2;
-	__kernel_time_t32 shm_ctime;
+	compat_time_t   shm_ctime;
 	unsigned int __unused3;
 	__kernel_pid_t32 shm_cpid;
 	__kernel_pid_t32 shm_lpid;
@@ -2616,8 +2494,8 @@ sys32_time (int *tloc)
 }
 
 struct rusage32 {
-	struct timeval32 ru_utime;
-	struct timeval32 ru_stime;
+	struct compat_timeval ru_utime;
+	struct compat_timeval ru_stime;
 	int    ru_maxrss;
 	int    ru_ixrss;
 	int    ru_idrss;
@@ -3731,7 +3609,7 @@ sys32_sysinfo (struct sysinfo32 *info)
 }
 
 asmlinkage long
-sys32_sched_rr_get_interval (pid_t pid, struct timespec32 *interval)
+sys32_sched_rr_get_interval (pid_t pid, struct compat_timespec *interval)
 {
 	extern asmlinkage long sys_sched_rr_get_interval (pid_t, struct timespec *);
 	mm_segment_t old_fs = get_fs();
@@ -4331,7 +4209,7 @@ struct timex32 {
 	u32 modes;
 	s32 offset, freq, maxerror, esterror;
 	s32 status, constant, precision, tolerance;
-	struct timeval32 time;
+	struct compat_timeval time;
 	s32 tick;
 	s32 ppsfreq, jitter, shift, stabil;
 	s32 jitcnt, calcnt, errcnt, stbcnt;
