@@ -583,7 +583,6 @@ static void exit_notify(void)
 	 *	jobs, send them a SIGHUP and then a SIGCONT.  (POSIX 3.2.2.2)
 	 */
 
-	current->state = TASK_ZOMBIE;
 	if (current->exit_signal != -1)
 		do_notify_parent(current, current->exit_signal);
 
@@ -592,6 +591,8 @@ static void exit_notify(void)
 	while (!list_empty(&current->ptrace_children))
 		zap_thread(list_entry(current->ptrace_children.next,struct task_struct,ptrace_list), current, 1);
 	BUG_ON(!list_empty(&current->children));
+
+	current->state = TASK_ZOMBIE;
 	/*
 	 * No need to unlock IRQs, we'll schedule() immediately
 	 * anyway. In the preemption case this also makes it
@@ -697,9 +698,9 @@ asmlinkage long sys_exit_group(int error_code)
 	do_exit(sig->group_exit_code);
 }
 
-static inline int eligible_child(pid_t pid, int options, task_t *p)
+static int eligible_child(pid_t pid, int options, task_t *p)
 {
-	if (pid>0) {
+	if (pid > 0) {
 		if (p->pid != pid)
 			return 0;
 	} else if (!pid) {
@@ -724,6 +725,12 @@ static inline int eligible_child(pid_t pid, int options, task_t *p)
 	 * using a signal other than SIGCHLD.) */
 	if (((p->exit_signal != SIGCHLD) ^ ((options & __WCLONE) != 0))
 	    && !(options & __WALL))
+		return 0;
+	/*
+	 * Do not consider thread group leaders that are
+	 * in a non-empty thread group:
+	 */
+	if (current->tgid != p->tgid && delay_group_leader(p))
 		return 0;
 
 	if (security_ops->task_wait(p))
@@ -781,8 +788,12 @@ repeat:
 				current->cstime += p->stime + p->cstime;
 				read_unlock(&tasklist_lock);
 				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
-				if (!retval && stat_addr)
-					retval = put_user(p->exit_code, stat_addr);
+				if (!retval && stat_addr) {
+					if (p->sig->group_exit)
+						retval = put_user(p->sig->group_exit_code, stat_addr);
+					else
+						retval = put_user(p->exit_code, stat_addr);
+				}
 				if (retval)
 					goto end_wait4; 
 				retval = p->pid;

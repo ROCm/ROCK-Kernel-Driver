@@ -219,8 +219,6 @@ struct signal_struct {
 	/* thread group exit support */
 	int			group_exit;
 	int			group_exit_code;
-
-	struct completion	group_exit_done;
 };
 
 /*
@@ -316,6 +314,7 @@ struct task_struct {
 	struct task_struct *parent;	/* parent process */
 	struct list_head children;	/* list of my children */
 	struct list_head sibling;	/* linkage in my parent's children list */
+	struct task_struct *group_leader;
 	struct list_head thread_group;
 
 	/* PID hash table linkage. */
@@ -826,6 +825,9 @@ static inline task_t *prev_thread(task_t *p)
 }
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
+
+#define delay_group_leader(p) \
+	(p->tgid == p->pid && !list_empty(&p->thread_group))
 
 extern void unhash_process(struct task_struct *p);
 

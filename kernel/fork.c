@@ -628,7 +628,6 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 	atomic_set(&sig->count, 1);
 	sig->group_exit = 0;
 	sig->group_exit_code = 0;
-	init_completion(&sig->group_exit_done);
 	memcpy(sig->action, current->sig->action, sizeof(sig->action));
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
@@ -672,6 +671,12 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	if (clone_flags & CLONE_THREAD)
 		clone_flags |= CLONE_SIGHAND;
+	/*
+	 * Detached threads can only be started up within the thread
+	 * group.
+	 */
+	if (clone_flags & CLONE_DETACHED)
+		clone_flags |= CLONE_THREAD;
 
 	retval = security_ops->task_create(clone_flags);
 	if (retval)
@@ -843,6 +848,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 * Let it rip!
 	 */
 	p->tgid = p->pid;
+	p->group_leader = p;
 	INIT_LIST_HEAD(&p->thread_group);
 	INIT_LIST_HEAD(&p->ptrace_children);
 	INIT_LIST_HEAD(&p->ptrace_list);
@@ -870,6 +876,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 			goto bad_fork_cleanup_namespace;
 		}
 		p->tgid = current->tgid;
+		p->group_leader = current->group_leader;
 		list_add(&p->thread_group, &current->thread_group);
 		spin_unlock(&current->sig->siglock);
 	}
