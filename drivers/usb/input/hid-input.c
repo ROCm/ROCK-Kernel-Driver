@@ -185,7 +185,9 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			break;
 
 		case HID_UP_LED:
-			map_led((usage->hid - 1) & 0xf);
+			if (usage->hid - 1 >= LED_MAX)
+				goto ignore;
+			map_led(usage->hid - 1);
 			break;
 
 		case HID_UP_DIGITIZER:
@@ -231,7 +233,6 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 
 		case HID_UP_CONSUMER:	/* USB HUT v1.1, pages 56-62 */
 
-			set_bit(EV_REP, input->evbit);
 			switch (usage->hid & HID_USAGE) {
 				case 0x000: goto ignore;
 				case 0x034: map_key_clear(KEY_SLEEP);		break;
@@ -268,6 +269,7 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 				case 0x226: map_key_clear(KEY_STOP);		break;
 				case 0x227: map_key_clear(KEY_REFRESH);		break;
 				case 0x22a: map_key_clear(KEY_BOOKMARKS);	break;
+				case 0x238: map_rel(REL_HWHEEL);		break;
 				default:    goto unknown;
 			}
 			break;
@@ -288,9 +290,13 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 				case 0x084: map_key_clear(KEY_FINANCE);		break;
 				case 0x085: map_key_clear(KEY_SPORT);		break;
 				case 0x086: map_key_clear(KEY_SHOP);	        break;
-				default:    goto unknown;
+				default:    goto ignore;
 			}
 			break;
+
+		case HID_UP_MSVENDOR:
+
+			goto ignore;
 			
 		case HID_UP_PID:
 

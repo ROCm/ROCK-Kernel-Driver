@@ -181,6 +181,7 @@ struct hid_item {
 #define HID_UP_DIGITIZER 	0x000d0000
 #define HID_UP_PID 		0x000f0000
 #define HID_UP_HPVENDOR         0xff7f0000
+#define HID_UP_MSVENDOR		0xff000000
 
 #define HID_USAGE		0x0000ffff
 
