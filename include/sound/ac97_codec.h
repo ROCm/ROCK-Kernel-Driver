@@ -355,6 +355,7 @@
 #define AC97_SCAP_SKIP_MODEM	(1<<5)	/* skip modem part of codec */
 #define AC97_SCAP_INDEP_SDIN	(1<<6)	/* independent SDIN */
 #define AC97_SCAP_INV_EAPD	(1<<7)	/* inverted EAPD */
+#define AC97_SCAP_DETECT_BY_VENDOR (1<<8) /* use vendor registers for read tests */
 
 /* ac97->flags */
 #define AC97_HAS_PC_BEEP	(1<<0)	/* force PC Speaker usage */

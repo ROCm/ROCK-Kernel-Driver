@@ -68,6 +68,7 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 static int buggy_irq[SNDRV_CARDS];
+static int xbox[SNDRV_CARDS];
 static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
@@ -82,6 +83,8 @@ module_param_array(ac97_quirk, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 module_param_array(buggy_irq, bool, boot_devs, 0444);
 MODULE_PARM_DESC(buggy_irq, "Enable workaround for buggy interrupts on some motherboards.");
+module_param_array(xbox, bool, boot_devs, 0444);
+MODULE_PARM_DESC(xbox, "Set to 1 for Xbox, if you have problems with the AC'97 codec detection.");
 
 /*
  *  Direct registers
@@ -405,6 +408,7 @@ struct _snd_intel8x0 {
 	    in_sdin_init: 1;
 	int fix_nocache: 1; /* workaround for 440MX */
 	int buggy_irq: 1; /* workaround for buggy mobos */
+	int xbox: 1;	  /* workaround for Xbox AC'97 detection */
 
 	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
@@ -1907,6 +1911,8 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	ac97.private_data = chip;
 	ac97.private_free = snd_intel8x0_mixer_free_ac97;
 	ac97.scaps = AC97_SCAP_SKIP_MODEM;
+	if (chip->xbox)
+		ac97.scaps |= AC97_SCAP_DETECT_BY_VENDOR;
 	if (chip->device_type != DEVICE_ALI) {
 		glob_sta = igetdword(chip, ICHREG(GLOB_STA));
 		ops = &standard_bus_ops;
@@ -2691,6 +2697,8 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	}
 	if (buggy_irq[dev])
 		chip->buggy_irq = 1;
+	if (xbox[dev])
+		chip->xbox = 1;
 
 	if ((err = snd_intel8x0_mixer(chip, ac97_clock[dev], ac97_quirk[dev])) < 0) {
 		snd_card_free(card);
