@@ -325,7 +325,7 @@ befs_read_inode(struct inode *inode)
 		   befs_ino->i_inode_num.allocation_group,
 		   befs_ino->i_inode_num.start, befs_ino->i_inode_num.len);
 
-	bh = befs_bread_iaddr(sb, befs_ino->i_inode_num);
+	bh = befs_bread(sb, inode->i_ino);
 	if (!bh) {
 		befs_error(sb, "unable to read inode block - "
 			   "inode = %lu", inode->i_ino);
