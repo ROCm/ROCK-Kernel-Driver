@@ -34,9 +34,13 @@ extern int (*set_rtc)(void);
 static struct i2c_client *rtc_client;
 static const unsigned char days_in_mon[] = 
 	{ 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-static unsigned int rtc_epoch = 1900;
 
 #define CMOS_CHECKSUM	(63)
+
+/*
+ * Acorn machines store the year in the static RAM at
+ * location 128.
+ */
 #define CMOS_YEAR	(64 + 128)
 
 static inline int rtc_command(int cmd, void *data)
@@ -50,51 +54,89 @@ static inline int rtc_command(int cmd, void *data)
 }
 
 /*
+ * Update the century + year bytes in the CMOS RAM, ensuring
+ * that the check byte is correctly adjusted for the change.
+ */
+static int rtc_update_year(unsigned int new_year)
+{
+	unsigned char yr[2], chk;
+	struct mem cmos_year  = { CMOS_YEAR, sizeof(yr), yr };
+	struct mem cmos_check = { CMOS_CHECKSUM, 1, &chk };
+	int ret;
+
+	ret = rtc_command(MEM_READ, &cmos_check);
+	if (ret)
+		goto out;
+	ret = rtc_command(MEM_READ, &cmos_year);
+	if (ret)
+		goto out;
+
+	chk -= yr[1] + yr[0];
+
+	yr[1] = new_year / 100;
+	yr[0] = new_year % 100;
+
+	chk += yr[1] + yr[0];
+
+	ret = rtc_command(MEM_WRITE, &cmos_year);
+	if (ret == 0)
+		ret = rtc_command(MEM_WRITE, &cmos_check);
+ out:
+	return ret;
+}
+
+/*
  * Read the current RTC time and date, and update xtime.
  */
 static void get_rtc_time(struct rtc_tm *rtctm, unsigned int *year)
 {
 	unsigned char ctrl, yr[2];
 	struct mem rtcmem = { CMOS_YEAR, sizeof(yr), yr };
+	int real_year, year_offset;
 
 	/*
 	 * Ensure that the RTC is running.
 	 */
 	rtc_command(RTC_GETCTRL, &ctrl);
 	if (ctrl & 0xc0) {
-		unsigned char new_ctrl;
+		unsigned char new_ctrl = ctrl & ~0xc0;
 
-		new_ctrl = ctrl & ~0xc0;
-
-		printk("RTC: resetting control %02X -> %02X\n",
+		printk(KERN_WARNING "RTC: resetting control %02x -> %02x\n",
 		       ctrl, new_ctrl);
 
 		rtc_command(RTC_SETCTRL, &new_ctrl);
 	}
 
+	if (rtc_command(RTC_GETDATETIME, rtctm) ||
+	    rtc_command(MEM_READ, &rtcmem))
+		return;
+
+	real_year = yr[0];
+
 	/*
-	 * Acorn machines store the year in
-	 * the static RAM at location 192.
+	 * The RTC year holds the LSB two bits of the current
+	 * year, which should reflect the LSB two bits of the
+	 * CMOS copy of the year.  Any difference indicates
+	 * that we have to correct the CMOS version.
 	 */
-	if (rtc_command(MEM_READ, &rtcmem))
-		return;
+	year_offset = rtctm->year_off - (real_year & 3);
+	if (year_offset < 0)
+		/*
+		 * RTC year wrapped.  Adjust it appropriately.
+		 */
+		year_offset += 4;
 
-	if (rtc_command(RTC_GETDATETIME, rtctm))
-		return;
-
-	*year = yr[1] * 100 + yr[0];
+	*year = real_year + year_offset + yr[1] * 100;
 }
 
 static int set_rtc_time(struct rtc_tm *rtctm, unsigned int year)
 {
-	unsigned char yr[2], leap, chk;
-	struct mem cmos_year  = { CMOS_YEAR, sizeof(yr), yr };
-	struct mem cmos_check = { CMOS_CHECKSUM, 1, &chk };
+	unsigned char leap;
 	int ret;
 
 	leap = (!(year % 4) && (year % 100)) || !(year % 400);
 
-	if (rtctm->mon > 12 || rtctm->mday == 0)
+	if (rtctm->mon > 12 || rtctm->mon == 0 || rtctm->mday == 0)
 		return -EINVAL;
 
 	if (rtctm->mday > (days_in_mon[rtctm->mon] + (rtctm->mon == 2 && leap)))
@@ -103,21 +145,16 @@ static int set_rtc_time(struct rtc_tm *rtctm, unsigned int year)
 	if (rtctm->hours >= 24 || rtctm->mins >= 60 || rtctm->secs >= 60)
 		return -EINVAL;
 
+	/*
+	 * The RTC's own 2-bit year must reflect the least
+	 * significant two bits of the CMOS year.
+	 */
+	rtctm->year_off = (year % 100) & 3;
+
 	ret = rtc_command(RTC_SETDATETIME, rtctm);
-	if (ret == 0) {
-		rtc_command(MEM_READ, &cmos_check);
-		rtc_command(MEM_READ, &cmos_year);
+	if (ret == 0)
+		ret = rtc_update_year(year);
 
-		chk -= yr[1] + yr[0];
-
-		yr[1] = year / 100;
-		yr[0] = year % 100;
-
-		chk += yr[1] + yr[0];
-
-		rtc_command(MEM_WRITE, &cmos_year);
-		rtc_command(MEM_WRITE, &cmos_check);
-	}
 	return ret;
 }
 
@@ -189,13 +226,12 @@ static int rtc_ioctl(struct inode *inode, struct file *file,
 		rtc_raw.hours    = rtctm.tm_hour;
 		rtc_raw.mday     = rtctm.tm_mday;
 		rtc_raw.mon      = rtctm.tm_mon + 1;
-		rtc_raw.year_off = 2;
 		year             = rtctm.tm_year + 1900;
 		return set_rtc_time(&rtc_raw, year);
 		break;
 
 	case RTC_EPOCH_READ:
-		return put_user(rtc_epoch, (unsigned long *)arg);
+		return put_user(1900, (unsigned long *)arg);
 
 	}
 	return -EINVAL;

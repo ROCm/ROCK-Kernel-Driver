@@ -14,8 +14,6 @@
  * devices.  This is the "generic" version.  The PCI specific version
  * is in pci.h
  */
-extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle, unsigned long flags);
-extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
 extern void consistent_sync(void *kaddr, size_t size, int rw);
 
 /*
@@ -99,12 +97,26 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, int gfp)
  * References to memory and mappings associated with cpu_addr/handle
  * during and after this call executing are illegal.
  */
-static inline void
+extern void
 dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
-		  dma_addr_t handle)
-{
-	consistent_free(cpu_addr, size, handle);
-}
+		  dma_addr_t handle);
+
+/**
+ * dma_alloc_writecombine - allocate writecombining memory for DMA
+ * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+ * @size: required memory size
+ * @handle: bus-specific DMA address
+ *
+ * Allocate some uncached, buffered memory for a device for
+ * performing DMA.  This function allocates pages, and will
+ * return the CPU-viewed address, and sets @handle to be the
+ * device-viewed address.
+ */
+extern void *
+dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, int gfp);
+
+#define dma_free_writecombine(dev,size,cpu_addr,handle) \
+	dma_free_coherent(dev,size,cpu_addr,handle)
 
 /**
  * dma_map_single - map a single buffer for streaming DMA
