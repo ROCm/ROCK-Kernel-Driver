@@ -1435,8 +1435,8 @@ __scsi_mode_sense(struct scsi_request *sreq, int dbd, int modepage,
 		} else {
 			data->length = buffer[0] + 1;
 			data->medium_type = buffer[1];
-			data->device_specific = buffer[3];
-			data->block_descriptor_length = buffer[4];
+			data->device_specific = buffer[2];
+			data->block_descriptor_length = buffer[3];
 		}
 	}
 
