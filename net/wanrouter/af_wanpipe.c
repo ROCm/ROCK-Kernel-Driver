@@ -509,8 +509,6 @@ static struct sock *wanpipe_alloc_socket(void)
 	wan_opt->tx_timer.data	   = (unsigned long)sk;
 	wan_opt->tx_timer.function = wanpipe_delayed_transmit;
 
-	MOD_INC_USE_COUNT;
-
 	sock_init_data(NULL, sk);
 	return sk;
 }
@@ -846,7 +844,6 @@ static void wanpipe_destroy_timer(unsigned long data)
 		}
 		sock_put(sk);
 		atomic_dec(&wanpipe_socks_nr);
-		MOD_DEC_USE_COUNT;
 		return;
 	}
 
@@ -1032,7 +1029,6 @@ static int wanpipe_release(struct socket *sock)
 	}
 	sock_put(sk);
 	atomic_dec(&wanpipe_socks_nr);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1197,7 +1193,6 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 	}
 	sock_put(sk);
 	atomic_dec(&wanpipe_socks_nr);
-	MOD_DEC_USE_COUNT;
 	return;
 }
 
@@ -1237,7 +1232,6 @@ static void wanpipe_kill_sock_accept (struct sock *sk)
 	}
 	sock_put(sk);
 	atomic_dec(&wanpipe_socks_nr);
-	MOD_DEC_USE_COUNT;
 	return;
 }
 
@@ -1262,8 +1256,6 @@ static void wanpipe_kill_sock_irq (struct sock *sk)
 	}
 	sock_put(sk);
 	atomic_dec(&wanpipe_socks_nr);
-	MOD_DEC_USE_COUNT;
-	return;
 }
 
 
@@ -2579,6 +2571,7 @@ struct proto_ops wanpipe_ops = {
 static struct net_proto_family wanpipe_family_ops = {
 	.family = PF_WANPIPE,
 	.create = wanpipe_create,
+	.owner	= THIS_MODULE,
 };
 
 struct notifier_block wanpipe_netdev_notifier = {
