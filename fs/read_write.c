@@ -614,3 +614,6 @@ asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t 
 
 	return do_sendfile(out_fd, in_fd, NULL, count, 0);
 }
+
+EXPORT_SYMBOL(do_sync_read);
+EXPORT_SYMBOL(do_sync_write);
