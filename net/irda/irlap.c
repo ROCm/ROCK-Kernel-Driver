@@ -221,8 +221,11 @@ void irlap_close(struct irlap_cb *self)
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LAP_MAGIC, return;);
 
-	irlap_disconnect_indication(self, LAP_DISC_INDICATION);
+	/* We used to send a LAP_DISC_INDICATION here, but this was
+	 * racy. This has been move within irlmp_unregister_link()
+	 * itself. Jean II */
 
+	/* Kill the LAP and all LSAPs on top of it */
 	irlmp_unregister_link(self->saddr);
 	self->notify.instance = NULL;
 

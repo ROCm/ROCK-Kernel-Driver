@@ -321,15 +321,23 @@ void irlmp_unregister_link(__u32 saddr)
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
+	/* We must remove ourselves from the hashbin *first*. This ensure
+	 * that no more LSAPs will be open on this link and no discovery
+	 * will be triggered anymore. Jean II */
 	link = hashbin_remove(irlmp->links, saddr, NULL);
 	if (link) {
 		ASSERT(link->magic == LMP_LAP_MAGIC, return;);
 
+		/* Kill all the LSAPs on this link. Jean II */
+		link->reason = LAP_DISC_INDICATION;
+		link->daddr = DEV_ADDR_ANY;
+		irlmp_do_lap_event(link, LM_LAP_DISCONNECT_INDICATION, NULL);
+
 		/* Remove all discoveries discovered at this link */
 		irlmp_expire_discoveries(irlmp->cachelog, link->saddr, TRUE);
 
+		/* Final cleanup */
 		del_timer(&link->idle_timer);
-
 		link->magic = 0;
 		kfree(link);
 	}
