@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.15 $
+ * $Revision: 1.17 $
  */
 
 #include <linux/config.h>
@@ -424,10 +424,11 @@ dasd_create_device(struct ccw_device *cdev)
 	if (!(devmap = dasd_devmap_from_devno (devno)))
 		return ERR_PTR(-ENODEV);
 
-	device = dasd_alloc_device(devmap->devindex);
+	device = dasd_alloc_device();
 	if (IS_ERR(device))
 		return device;
 	atomic_set(&device->ref_count, 1);
+	device->devindex = devmap->devindex;
 	device->ro_flag = (devmap->features & DASD_FEATURE_READONLY) ? 1 : 0;
 	device->use_diag_flag = 1;
 
@@ -435,7 +436,6 @@ dasd_create_device(struct ccw_device *cdev)
 	if (cdev->dev.driver_data == NULL) {
 		get_device(&cdev->dev);
 		cdev->dev.driver_data = device;
-		device->gdp->driverfs_dev = &cdev->dev;
 		device->cdev = cdev;
 		rc = 0;
 	} else
@@ -483,7 +483,6 @@ dasd_delete_device(struct dasd_device *device)
 	/* Disconnect dasd_device structure from ccw_device structure. */
 	cdev = device->cdev;
 	device->cdev = NULL;
-	device->gdp->driverfs_dev = NULL;
 	cdev->dev.driver_data = NULL;
 
 	/* Put ccw_device structure. */

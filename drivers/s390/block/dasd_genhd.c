@@ -9,11 +9,10 @@
  *
  * Dealing with devices registered to multiple major numbers.
  *
- * $Revision: 1.31 $
+ * $Revision: 1.38 $
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/fs.h>
 #include <linux/blkpg.h>
@@ -99,10 +98,10 @@ dasd_unregister_major(struct major_info * mi)
 }
 
 /*
- * Allocate gendisk structure for devindex.
+ * Allocate and register gendisk structure for device.
  */
-struct gendisk *
-dasd_gendisk_alloc(int devindex)
+int
+dasd_gendisk_alloc(struct dasd_device *device)
 {
 	struct major_info *mi;
 	struct gendisk *gdp;
@@ -112,7 +111,7 @@ dasd_gendisk_alloc(int devindex)
 	mi = NULL;
 	while (1) {
 		spin_lock(&dasd_major_lock);
-		index = devindex;
+		index = device->devindex;
 		list_for_each_entry(mi, &dasd_major_info, list) {
 			if (index < DASD_PER_MAJOR)
 				break;
@@ -124,18 +123,19 @@ dasd_gendisk_alloc(int devindex)
 		rc = dasd_register_major(0);
 		if (rc) {
 			DBF_EXC(DBF_ALERT, "%s", "out of major numbers!");
-			return ERR_PTR(rc);
+			return rc;
 		}
 	}
 	
 	gdp = alloc_disk(1 << DASD_PARTN_BITS);
 	if (!gdp)
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 
 	/* Initialize gendisk structure. */
 	gdp->major = mi->major;
 	gdp->first_minor = index << DASD_PARTN_BITS;
 	gdp->fops = &dasd_device_operations;
+	gdp->driverfs_dev = &device->cdev->dev;
 
 	/*
 	 * Set device name.
@@ -144,61 +144,75 @@ dasd_gendisk_alloc(int devindex)
 	 *   dasdaaa - dasdzzz : 17576 devices, added up = 18278
 	 */
 	len = sprintf(gdp->disk_name, "dasd");
-	if (devindex > 25) {
-		if (devindex > 701)
+	if (device->devindex > 25) {
+		if (device->devindex > 701)
 			len += sprintf(gdp->disk_name + len, "%c",
-				       'a' + (((devindex - 702) / 676) % 26));
+				       'a'+(((device->devindex-702)/676)%26));
 		len += sprintf(gdp->disk_name + len, "%c",
-			       'a' + (((devindex - 26) / 26) % 26));
+			       'a'+(((device->devindex-26)/26)%26));
 	}
-	len += sprintf(gdp->disk_name + len, "%c", 'a' + (devindex % 26));
+	len += sprintf(gdp->disk_name + len, "%c", 'a'+(device->devindex%26));
 
-	return gdp;
+ 	sprintf(gdp->devfs_name, "dasd/%04x",
+		_ccw_device_get_device_number(device->cdev));
+
+	if (device->ro_flag)
+		set_disk_ro(gdp, 1);
+	gdp->private_data = device;
+	gdp->queue = device->request_queue;
+	device->gdp = gdp;
+	set_capacity(device->gdp, 0);
+	add_disk(device->gdp);
+	return 0;
 }
 
 /*
- * Return major number for device with device index devindex.
- */
-int dasd_gendisk_index_major(int devindex)
-{
-	struct major_info *mi;
-	int rc;
-
-	spin_lock(&dasd_major_lock);
-	rc = -ENODEV;
-	list_for_each_entry(mi, &dasd_major_info, list) {
-		if (devindex < DASD_PER_MAJOR) {
-			rc = mi->major;
-			break;
-		}
-		devindex -= DASD_PER_MAJOR;
-	}
-	spin_unlock(&dasd_major_lock);
-	return rc;
-}
-
-/*
- * Register disk to genhd. This will trigger a partition detection.
+ * Unregister and free gendisk structure for device.
  */
 void
-dasd_setup_partitions(struct dasd_device * device)
+dasd_gendisk_free(struct dasd_device *device)
 {
-	/* Make the disk known. */
-	set_capacity(device->gdp, device->blocks << device->s2b_shift);
-	device->gdp->queue = device->request_queue;
-	if (device->ro_flag)
-		set_disk_ro(device->gdp, 1);
-	add_disk(device->gdp);
+	del_gendisk(device->gdp);
+	put_disk(device->gdp);
+	device->gdp = 0;
 }
 
 /*
- * Remove all inodes in the system for a device and make the
- * partitions unusable by setting their size to zero.
+ * Trigger a partition detection.
+ */
+void
+dasd_scan_partitions(struct dasd_device * device)
+{
+	struct block_device *bdev;
+
+	/* Make the disk known. */
+	set_capacity(device->gdp, device->blocks << device->s2b_shift);
+	/* See fs/partition/check.c:register_disk,rescan_partitions */
+	bdev = bdget_disk(device->gdp, 0);
+	if (bdev) {
+		if (blkdev_get(bdev, FMODE_READ, 1, BDEV_RAW) >= 0) {
+			/* Can't call rescan_partitions directly. Use ioctl. */
+			ioctl_by_bdev(bdev, BLKRRPART, 0);
+			blkdev_put(bdev, BDEV_RAW);
+		}
+	}
+}
+
+/*
+ * Remove all inodes in the system for a device, delete the
+ * partitions and make device unusable by setting its size to zero.
  */
 void
 dasd_destroy_partitions(struct dasd_device * device)
 {
-	del_gendisk(device->gdp);
+	int p;
+
+	for (p = device->gdp->minors - 1; p > 0; p--) {
+		invalidate_partition(device->gdp, p);
+		delete_partition(device->gdp, p);
+	}
+	invalidate_partition(device->gdp, 0);
+	set_capacity(device->gdp, 0);
 }
 
 int
@@ -208,11 +222,13 @@ dasd_gendisk_init(void)
 
 	/* Register to static dasd major 94 */
 	rc = dasd_register_major(DASD_MAJOR);
-	if (rc != 0)
+	if (rc != 0) {
 		MESSAGE(KERN_WARNING,
 			"Couldn't register successfully to "
 			"major no %d", DASD_MAJOR);
-	return rc;
+		return rc;
+	}
+	return 0;
 }
 
 void
