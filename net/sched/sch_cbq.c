@@ -146,7 +146,9 @@ struct cbq_class
 	long			avgidle;
 	long			deficit;	/* Saved deficit for WRR */
 	unsigned long		penalized;
-	struct tc_stats		stats;
+	struct gnet_stats_basic bstats;
+	struct gnet_stats_queue qstats;
+	struct gnet_stats_rate_est rate_est;
 	spinlock_t		*stats_lock;
 	struct tc_cbq_xstats	xstats;
 
@@ -448,7 +450,7 @@ cbq_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 		kfree_skb(skb);
 	else {
 		cbq_mark_toplevel(q, cl);
-		cl->stats.drops++;
+		cl->qstats.drops++;
 	}
 #else
 	if ( NET_XMIT_DROP == ret) {
@@ -457,7 +459,7 @@ cbq_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 	if (cl != NULL) {
 		cbq_mark_toplevel(q, cl);
-		cl->stats.drops++;
+		cl->qstats.drops++;
 	}
 #endif
 	return ret;
@@ -491,7 +493,7 @@ cbq_requeue(struct sk_buff *skb, struct Qdisc *sch)
 		return 0;
 	}
 	sch->qstats.drops++;
-	cl->stats.drops++;
+	cl->qstats.drops++;
 	return ret;
 }
 
@@ -789,8 +791,8 @@ cbq_update(struct cbq_sched_data *q)
 		long avgidle = cl->avgidle;
 		long idle;
 
-		cl->stats.packets++;
-		cl->stats.bytes += len;
+		cl->bstats.packets++;
+		cl->bstats.bytes += len;
 
 		/*
 		   (now - last) is total time between packet right edges.
@@ -888,7 +890,7 @@ cbq_under_limit(struct cbq_class *cl)
 		   no another solution exists.
 		 */
 		if ((cl = cl->borrow) == NULL) {
-			this_cl->stats.overlimits++;
+			this_cl->qstats.overlimits++;
 			this_cl->overlimit(this_cl);
 			return NULL;
 		}
