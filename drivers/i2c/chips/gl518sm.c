@@ -37,10 +37,6 @@
  */
 
 #include <linux/config.h>
-#ifdef CONFIG_I2C_DEBUG_CHIP
-#define DEBUG	1
-#endif
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -151,7 +147,7 @@ static void gl518_init_client(struct i2c_client *client);
 static int gl518_detach_client(struct i2c_client *client);
 static int gl518_read_value(struct i2c_client *client, u8 reg);
 static int gl518_write_value(struct i2c_client *client, u8 reg, u16 value);
-static void gl518_update_client(struct i2c_client *client);
+static struct gl518_data *gl518_update_device(struct device *dev);
 
 /* This is the driver that will be inserted */
 static struct i2c_driver gl518_driver = {
@@ -176,18 +172,14 @@ static int gl518_id = 0;
 #define show(type, suffix, value)					\
 static ssize_t show_##suffix(struct device *dev, char *buf)		\
 {									\
-	struct i2c_client *client = to_i2c_client(dev);			\
-	struct gl518_data *data = i2c_get_clientdata(client);		\
-	gl518_update_client(client);					\
+	struct gl518_data *data = gl518_update_device(dev);		\
 	return sprintf(buf, "%d\n", type##_FROM_REG(data->value));	\
 }
 
 #define show_fan(suffix, value, index)					\
 static ssize_t show_##suffix(struct device *dev, char *buf)		\
 {									\
-	struct i2c_client *client = to_i2c_client(dev);			\
-	struct gl518_data *data = i2c_get_clientdata(client);		\
-	gl518_update_client(client);					\
+	struct gl518_data *data = gl518_update_device(dev);		\
 	return sprintf(buf, "%d\n", FAN_FROM_REG(data->value[index],	\
 		DIV_FROM_REG(data->fan_div[index])));			\
 }
@@ -307,29 +299,29 @@ static ssize_t set_fan_min2(struct device *dev, const char *buf, size_t count)
 	return count;
 }
 
-static DEVICE_ATTR(temp_input1, S_IRUGO, show_temp_input1, NULL);
-static DEVICE_ATTR(temp_max1, S_IWUSR|S_IRUGO, show_temp_max1, set_temp_max1);
-static DEVICE_ATTR(temp_hyst1, S_IWUSR|S_IRUGO,
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp_input1, NULL);
+static DEVICE_ATTR(temp1_max, S_IWUSR|S_IRUGO, show_temp_max1, set_temp_max1);
+static DEVICE_ATTR(temp1_max_hyst, S_IWUSR|S_IRUGO,
 	show_temp_hyst1, set_temp_hyst1);
-static DEVICE_ATTR(fan_auto1, S_IWUSR|S_IRUGO, show_fan_auto1, set_fan_auto1);
-static DEVICE_ATTR(fan_input1, S_IRUGO, show_fan_input1, NULL);
-static DEVICE_ATTR(fan_input2, S_IRUGO, show_fan_input2, NULL);
-static DEVICE_ATTR(fan_min1, S_IWUSR|S_IRUGO, show_fan_min1, set_fan_min1);
-static DEVICE_ATTR(fan_min2, S_IWUSR|S_IRUGO, show_fan_min2, set_fan_min2);
-static DEVICE_ATTR(fan_div1, S_IWUSR|S_IRUGO, show_fan_div1, set_fan_div1);
-static DEVICE_ATTR(fan_div2, S_IWUSR|S_IRUGO, show_fan_div2, set_fan_div2);
-static DEVICE_ATTR(in_input0, S_IRUGO, show_in_input0, NULL);
-static DEVICE_ATTR(in_input1, S_IRUGO, show_in_input1, NULL);
-static DEVICE_ATTR(in_input2, S_IRUGO, show_in_input2, NULL);
-static DEVICE_ATTR(in_input3, S_IRUGO, show_in_input3, NULL);
-static DEVICE_ATTR(in_min0, S_IWUSR|S_IRUGO, show_in_min0, set_in_min0);
-static DEVICE_ATTR(in_min1, S_IWUSR|S_IRUGO, show_in_min1, set_in_min1);
-static DEVICE_ATTR(in_min2, S_IWUSR|S_IRUGO, show_in_min2, set_in_min2);
-static DEVICE_ATTR(in_min3, S_IWUSR|S_IRUGO, show_in_min3, set_in_min3);
-static DEVICE_ATTR(in_max0, S_IWUSR|S_IRUGO, show_in_max0, set_in_max0);
-static DEVICE_ATTR(in_max1, S_IWUSR|S_IRUGO, show_in_max1, set_in_max1);
-static DEVICE_ATTR(in_max2, S_IWUSR|S_IRUGO, show_in_max2, set_in_max2);
-static DEVICE_ATTR(in_max3, S_IWUSR|S_IRUGO, show_in_max3, set_in_max3);
+static DEVICE_ATTR(fan1_auto, S_IWUSR|S_IRUGO, show_fan_auto1, set_fan_auto1);
+static DEVICE_ATTR(fan1_input, S_IRUGO, show_fan_input1, NULL);
+static DEVICE_ATTR(fan2_input, S_IRUGO, show_fan_input2, NULL);
+static DEVICE_ATTR(fan1_min, S_IWUSR|S_IRUGO, show_fan_min1, set_fan_min1);
+static DEVICE_ATTR(fan2_min, S_IWUSR|S_IRUGO, show_fan_min2, set_fan_min2);
+static DEVICE_ATTR(fan1_div, S_IWUSR|S_IRUGO, show_fan_div1, set_fan_div1);
+static DEVICE_ATTR(fan2_div, S_IWUSR|S_IRUGO, show_fan_div2, set_fan_div2);
+static DEVICE_ATTR(in0_input, S_IRUGO, show_in_input0, NULL);
+static DEVICE_ATTR(in1_input, S_IRUGO, show_in_input1, NULL);
+static DEVICE_ATTR(in2_input, S_IRUGO, show_in_input2, NULL);
+static DEVICE_ATTR(in3_input, S_IRUGO, show_in_input3, NULL);
+static DEVICE_ATTR(in0_min, S_IWUSR|S_IRUGO, show_in_min0, set_in_min0);
+static DEVICE_ATTR(in1_min, S_IWUSR|S_IRUGO, show_in_min1, set_in_min1);
+static DEVICE_ATTR(in2_min, S_IWUSR|S_IRUGO, show_in_min2, set_in_min2);
+static DEVICE_ATTR(in3_min, S_IWUSR|S_IRUGO, show_in_min3, set_in_min3);
+static DEVICE_ATTR(in0_max, S_IWUSR|S_IRUGO, show_in_max0, set_in_max0);
+static DEVICE_ATTR(in1_max, S_IWUSR|S_IRUGO, show_in_max1, set_in_max1);
+static DEVICE_ATTR(in2_max, S_IWUSR|S_IRUGO, show_in_max2, set_in_max2);
+static DEVICE_ATTR(in3_max, S_IWUSR|S_IRUGO, show_in_max3, set_in_max3);
 static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 static DEVICE_ATTR(beep_enable, S_IWUSR|S_IRUGO,
 	show_beep_enable, set_beep_enable);
@@ -353,7 +345,6 @@ static int gl518_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct i2c_client *new_client;
 	struct gl518_data *data;
 	int err = 0;
-	const char *name = "";
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA |
 				     I2C_FUNC_SMBUS_WORD_DATA))
@@ -393,10 +384,8 @@ static int gl518_detect(struct i2c_adapter *adapter, int address, int kind)
 		i = gl518_read_value(new_client, GL518_REG_REVISION);
 		if (i == 0x00) {
 			kind = gl518sm_r00;
-			name = "gl518sm";
 		} else if (i == 0x80) {
 			kind = gl518sm_r80;
-			name = "gl518sm";
 		} else {
 			if (kind <= 0)
 				dev_info(&adapter->dev,
@@ -408,7 +397,7 @@ static int gl518_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields */
-	strlcpy(new_client->name, name, I2C_NAME_SIZE);
+	strlcpy(new_client->name, "gl518sm", I2C_NAME_SIZE);
 	new_client->id = gl518_id++;
 	data->type = kind;
 	data->valid = 0;
@@ -424,28 +413,28 @@ static int gl518_detect(struct i2c_adapter *adapter, int address, int kind)
 	gl518_init_client((struct i2c_client *) new_client);
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_in_input0);
-	device_create_file(&new_client->dev, &dev_attr_in_input1);
-	device_create_file(&new_client->dev, &dev_attr_in_input2);
-	device_create_file(&new_client->dev, &dev_attr_in_input3);
-	device_create_file(&new_client->dev, &dev_attr_in_min0);
-	device_create_file(&new_client->dev, &dev_attr_in_min1);
-	device_create_file(&new_client->dev, &dev_attr_in_min2);
-	device_create_file(&new_client->dev, &dev_attr_in_min3);
-	device_create_file(&new_client->dev, &dev_attr_in_max0);
-	device_create_file(&new_client->dev, &dev_attr_in_max1);
-	device_create_file(&new_client->dev, &dev_attr_in_max2);
-	device_create_file(&new_client->dev, &dev_attr_in_max3);
-	device_create_file(&new_client->dev, &dev_attr_fan_auto1);
-	device_create_file(&new_client->dev, &dev_attr_fan_input1);
-	device_create_file(&new_client->dev, &dev_attr_fan_input2);
-	device_create_file(&new_client->dev, &dev_attr_fan_min1);
-	device_create_file(&new_client->dev, &dev_attr_fan_min2);
-	device_create_file(&new_client->dev, &dev_attr_fan_div1);
-	device_create_file(&new_client->dev, &dev_attr_fan_div2);
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_hyst1);
+	device_create_file(&new_client->dev, &dev_attr_in0_input);
+	device_create_file(&new_client->dev, &dev_attr_in1_input);
+	device_create_file(&new_client->dev, &dev_attr_in2_input);
+	device_create_file(&new_client->dev, &dev_attr_in3_input);
+	device_create_file(&new_client->dev, &dev_attr_in0_min);
+	device_create_file(&new_client->dev, &dev_attr_in1_min);
+	device_create_file(&new_client->dev, &dev_attr_in2_min);
+	device_create_file(&new_client->dev, &dev_attr_in3_min);
+	device_create_file(&new_client->dev, &dev_attr_in0_max);
+	device_create_file(&new_client->dev, &dev_attr_in1_max);
+	device_create_file(&new_client->dev, &dev_attr_in2_max);
+	device_create_file(&new_client->dev, &dev_attr_in3_max);
+	device_create_file(&new_client->dev, &dev_attr_fan1_auto);
+	device_create_file(&new_client->dev, &dev_attr_fan1_input);
+	device_create_file(&new_client->dev, &dev_attr_fan2_input);
+	device_create_file(&new_client->dev, &dev_attr_fan1_min);
+	device_create_file(&new_client->dev, &dev_attr_fan2_min);
+	device_create_file(&new_client->dev, &dev_attr_fan1_div);
+	device_create_file(&new_client->dev, &dev_attr_fan2_div);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max_hyst);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 	device_create_file(&new_client->dev, &dev_attr_beep_enable);
 	device_create_file(&new_client->dev, &dev_attr_beep_mask);
@@ -523,8 +512,9 @@ static int gl518_write_value(struct i2c_client *client, u8 reg, u16 value)
 		return i2c_smbus_write_byte_data(client, reg, value);
 }
 
-static void gl518_update_client(struct i2c_client *client)
+static struct gl518_data *gl518_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct gl518_data *data = i2c_get_clientdata(client);
 	int val;
 
@@ -590,6 +580,8 @@ static void gl518_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 static int __init sensors_gl518sm_init(void)

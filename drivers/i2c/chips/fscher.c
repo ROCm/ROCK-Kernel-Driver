@@ -26,6 +26,7 @@
  *  and Philip Edelbrock <phil@netroedge.com>
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -108,7 +109,7 @@ SENSORS_INSMOD_1(fscher);
 static int fscher_attach_adapter(struct i2c_adapter *adapter);
 static int fscher_detect(struct i2c_adapter *adapter, int address, int kind);
 static int fscher_detach_client(struct i2c_client *client);
-static void fscher_update_client(struct i2c_client *client);
+static struct fscher_data *fscher_update_device(struct device *dev);
 static void fscher_init_client(struct i2c_client *client);
 
 static int fscher_read_value(struct i2c_client *client, u8 reg);
@@ -160,71 +161,69 @@ static int fscher_id = 0;
  * Sysfs stuff
  */
 
-#define sysfs_r(kind, offset, reg) \
-static ssize_t show_##kind (struct fscher_data *, char *, int); \
-static ssize_t show_##kind##offset (struct device *, char *); \
-static ssize_t show_##kind##offset (struct device *dev, char *buf) \
+#define sysfs_r(kind, sub, offset, reg) \
+static ssize_t show_##kind##sub (struct fscher_data *, char *, int); \
+static ssize_t show_##kind##offset##sub (struct device *, char *); \
+static ssize_t show_##kind##offset##sub (struct device *dev, char *buf) \
+{ \
+	struct fscher_data *data = fscher_update_device(dev); \
+	return show_##kind##sub(data, buf, (offset)); \
+}
+
+#define sysfs_w(kind, sub, offset, reg) \
+static ssize_t set_##kind##sub (struct i2c_client *, struct fscher_data *, const char *, size_t, int, int); \
+static ssize_t set_##kind##offset##sub (struct device *, const char *, size_t); \
+static ssize_t set_##kind##offset##sub (struct device *dev, const char *buf, size_t count) \
 { \
 	struct i2c_client *client = to_i2c_client(dev); \
 	struct fscher_data *data = i2c_get_clientdata(client); \
-	fscher_update_client(client); \
-	return show_##kind(data, buf, (offset)); \
+	return set_##kind##sub(client, data, buf, count, (offset), reg); \
 }
 
-#define sysfs_w(kind, offset, reg) \
-static ssize_t set_##kind (struct i2c_client *, struct fscher_data *, const char *, size_t, int, int); \
-static ssize_t set_##kind##offset (struct device *, const char *, size_t); \
-static ssize_t set_##kind##offset (struct device *dev, const char *buf, size_t count) \
-{ \
-	struct i2c_client *client = to_i2c_client(dev); \
-	struct fscher_data *data = i2c_get_clientdata(client); \
-	return set_##kind(client, data, buf, count, (offset), reg); \
-}
+#define sysfs_rw_n(kind, sub, offset, reg) \
+sysfs_r(kind, sub, offset, reg) \
+sysfs_w(kind, sub, offset, reg) \
+static DEVICE_ATTR(kind##offset##sub, S_IRUGO | S_IWUSR, show_##kind##offset##sub, set_##kind##offset##sub);
 
-#define sysfs_rw_n(kind, offset, reg) \
-sysfs_r(kind, offset, reg) \
-sysfs_w(kind, offset, reg) \
-static DEVICE_ATTR(kind##offset, S_IRUGO | S_IWUSR, show_##kind##offset, set_##kind##offset);
+#define sysfs_rw(kind, sub, reg) \
+sysfs_r(kind, sub, 0, reg) \
+sysfs_w(kind, sub, 0, reg) \
+static DEVICE_ATTR(kind##sub, S_IRUGO | S_IWUSR, show_##kind##0##sub, set_##kind##0##sub);
 
-#define sysfs_rw(kind, reg) \
-sysfs_r(kind, 0, reg) \
-sysfs_w(kind, 0, reg) \
-static DEVICE_ATTR(kind, S_IRUGO | S_IWUSR, show_##kind##0, set_##kind##0);
+#define sysfs_ro_n(kind, sub, offset, reg) \
+sysfs_r(kind, sub, offset, reg) \
+static DEVICE_ATTR(kind##offset##sub, S_IRUGO, show_##kind##offset##sub, NULL);
 
-#define sysfs_ro_n(kind, offset, reg) \
-sysfs_r(kind, offset, reg) \
-static DEVICE_ATTR(kind##offset, S_IRUGO, show_##kind##offset, NULL);
-
-#define sysfs_ro(kind, reg) \
-sysfs_r(kind, 0, reg) \
-static DEVICE_ATTR(kind, S_IRUGO, show_##kind##0, NULL);
+#define sysfs_ro(kind, sub, reg) \
+sysfs_r(kind, sub, 0, reg) \
+static DEVICE_ATTR(kind, S_IRUGO, show_##kind##0##sub, NULL);
 
 #define sysfs_fan(offset, reg_status, reg_min, reg_ripple, reg_act) \
-sysfs_rw_n(pwm       , offset, reg_min) \
-sysfs_rw_n(fan_status, offset, reg_status) \
-sysfs_rw_n(fan_div   , offset, reg_ripple) \
-sysfs_ro_n(fan_input , offset, reg_act)
+sysfs_rw_n(fan, _pwm   , offset, reg_min) \
+sysfs_rw_n(fan, _status, offset, reg_status) \
+sysfs_rw_n(fan, _div   , offset, reg_ripple) \
+sysfs_ro_n(fan, _input , offset, reg_act)
 
 #define sysfs_temp(offset, reg_status, reg_act) \
-sysfs_rw_n(temp_status, offset, reg_status) \
-sysfs_ro_n(temp_input , offset, reg_act)
+sysfs_rw_n(temp, _status, offset, reg_status) \
+sysfs_ro_n(temp, _input , offset, reg_act)
     
 #define sysfs_in(offset, reg_act) \
-sysfs_ro_n(in_input, offset, reg_act)
+sysfs_ro_n(in, _input, offset, reg_act)
 
 #define sysfs_revision(reg_revision) \
-sysfs_ro(revision, reg_revision)
+sysfs_ro(revision, , reg_revision)
 
 #define sysfs_alarms(reg_events) \
-sysfs_ro(alarms, reg_events)
+sysfs_ro(alarms, , reg_events)
 
 #define sysfs_control(reg_control) \
-sysfs_rw(control, reg_control)
+sysfs_rw(control, , reg_control)
 
 #define sysfs_watchdog(reg_control, reg_status, reg_preset) \
-sysfs_rw(watchdog_control, reg_control) \
-sysfs_rw(watchdog_status , reg_status) \
-sysfs_rw(watchdog_preset , reg_preset)
+sysfs_rw(watchdog, _control, reg_control) \
+sysfs_rw(watchdog, _status , reg_status) \
+sysfs_rw(watchdog, _preset , reg_preset)
 
 sysfs_fan(1, FSCHER_REG_FAN0_STATE, FSCHER_REG_FAN0_MIN,
 	     FSCHER_REG_FAN0_RIPPLE, FSCHER_REG_FAN0_ACT)
@@ -248,21 +247,21 @@ sysfs_watchdog(FSCHER_REG_WDOG_CONTROL, FSCHER_REG_WDOG_STATE, FSCHER_REG_WDOG_P
   
 #define device_create_file_fan(client, offset) \
 do { \
-	device_create_file(&client->dev, &dev_attr_fan_status##offset); \
-	device_create_file(&client->dev, &dev_attr_pwm##offset); \
-	device_create_file(&client->dev, &dev_attr_fan_div##offset); \
-	device_create_file(&client->dev, &dev_attr_fan_input##offset); \
+	device_create_file(&client->dev, &dev_attr_fan##offset##_status); \
+	device_create_file(&client->dev, &dev_attr_fan##offset##_pwm); \
+	device_create_file(&client->dev, &dev_attr_fan##offset##_div); \
+	device_create_file(&client->dev, &dev_attr_fan##offset##_input); \
 } while (0)
 
 #define device_create_file_temp(client, offset) \
 do { \
-	device_create_file(&client->dev, &dev_attr_temp_status##offset); \
-	device_create_file(&client->dev, &dev_attr_temp_input##offset); \
+	device_create_file(&client->dev, &dev_attr_temp##offset##_status); \
+	device_create_file(&client->dev, &dev_attr_temp##offset##_input); \
 } while (0)
 
 #define device_create_file_in(client, offset) \
 do { \
-	device_create_file(&client->dev, &dev_attr_in_input##offset); \
+	device_create_file(&client->dev, &dev_attr_in##offset##_input); \
 } while (0)
 
 #define device_create_file_revision(client) \
@@ -415,8 +414,9 @@ static void fscher_init_client(struct i2c_client *client)
 	data->revision =  fscher_read_value(client, FSCHER_REG_REVISION);
 }
 
-static void fscher_update_client(struct i2c_client *client)
+static struct fscher_data *fscher_update_device(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
 	struct fscher_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
@@ -461,6 +461,8 @@ static void fscher_update_client(struct i2c_client *client)
 	}
 
 	up(&data->update_lock);
+
+	return data;
 }
 
 
@@ -484,7 +486,7 @@ static ssize_t show_fan_status(struct fscher_data *data, char *buf, int nr)
 	return sprintf(buf, "%u\n", data->fan_status[FAN_INDEX_FROM_NUM(nr)] & 0x04);
 }
 
-static ssize_t set_pwm(struct i2c_client *client, struct fscher_data *data,
+static ssize_t set_fan_pwm(struct i2c_client *client, struct fscher_data *data,
 		       const char *buf, size_t count, int nr, int reg)
 {
 	data->fan_min[FAN_INDEX_FROM_NUM(nr)] = simple_strtoul(buf, NULL, 10) & 0xff;
@@ -493,7 +495,7 @@ static ssize_t set_pwm(struct i2c_client *client, struct fscher_data *data,
 	return count;
 }
 
-static ssize_t show_pwm (struct fscher_data *data, char *buf, int nr)
+static ssize_t show_fan_pwm (struct fscher_data *data, char *buf, int nr)
 {
 	return sprintf(buf, "%u\n", data->fan_min[FAN_INDEX_FROM_NUM(nr)]);
 }
