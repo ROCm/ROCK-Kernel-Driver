@@ -42,7 +42,6 @@
 #include <linux/slab.h>
 #include <linux/jffs.h>
 #include <linux/fs.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/ioctl.h>
 #include <linux/stat.h>

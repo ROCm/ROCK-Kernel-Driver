@@ -22,15 +22,16 @@
  *  Assorted race fixes, rewrite of ext3_get_block() by Al Viro, 2000
  */
 
+#include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/time.h>
 #include <linux/ext3_jbd.h>
 #include <linux/jbd.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
+#include <linux/pagemap.h>
 #include <linux/quotaops.h>
-#include <linux/module.h>
+#include <linux/string.h>
 
 /*
  * SEARCH_FROM_ZERO forces each block allocation to search from the start
@@ -1078,14 +1079,8 @@ static int commit_write_fn(handle_t *handle, struct buffer_head *bh)
  * We need to pick up the new inode size which generic_commit_write gave us
  * `file' can be NULL - eg, when called from block_symlink().
  *
- * ext3 inode->i_dirty_buffers policy:  If we're journalling data we
- * definitely don't want them to appear on the inode at all - instead
- * we need to manage them at the JBD layer and we need to intercept
- * the relevant sync operations and translate them into journal operations.
- *
- * If we're not journalling data then we can just leave the buffers
- * on ->i_dirty_buffers.  If someone writes them out for us then thanks.
- * Otherwise we'll do it in commit, if we're using ordered data.
+ * ext3 never places buffers on inode->i_mapping->private_list.  metadata
+ * buffers are managed internally.
  */
 
 static int ext3_commit_write(struct file *file, struct page *page,
@@ -1331,7 +1326,7 @@ static int ext3_writepage(struct page *page)
 out_fail:
 	
 	unlock_kernel();
-	SetPageDirty(page);
+	set_page_dirty(page);
 	unlock_page(page);
 	return ret;
 }

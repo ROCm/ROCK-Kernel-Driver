@@ -709,7 +709,8 @@ W:	http://www.uni-mainz.de/~langm000/linux.html
 S:	Maintained
 
 IBM ServeRAID RAID DRIVER
-P:	Keith Mitchell
+P: 	Jack Hammer
+P:	Dave Jeffrey	
 M:	ipslinux@us.ibm.com
 W:	http://www.developer.ibm.com/welcome/netfinity/serveraid.html
 S:	Supported 

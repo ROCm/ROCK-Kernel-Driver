@@ -19,7 +19,6 @@
 #include <linux/major.h>
 #include <linux/mm.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/cdrom.h>

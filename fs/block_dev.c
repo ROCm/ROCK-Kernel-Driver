@@ -8,7 +8,6 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/mm.h>
-#include <linux/locks.h>
 #include <linux/fcntl.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
@@ -331,7 +330,7 @@ struct block_device *bdget(dev_t dev)
 			inode->i_bdev = new_bdev;
 			inode->i_data.a_ops = &def_blk_aops;
 			inode->i_data.gfp_mask = GFP_USER;
-			inode->i_data.ra_pages = &default_ra_pages;
+			inode->i_data.backing_dev_info = &default_backing_dev_info;
 			spin_lock(&bdev_lock);
 			bdev = bdfind(dev, head);
 			if (!bdev) {
@@ -594,11 +593,12 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			}
 		}
 	}
-	if (bdev->bd_inode->i_data.ra_pages == &default_ra_pages) {
-		unsigned long *ra_pages = blk_get_ra_pages(bdev);
-		if (ra_pages == NULL)
-			ra_pages = &default_ra_pages;
-		inode->i_data.ra_pages = ra_pages;
+	if (bdev->bd_inode->i_data.backing_dev_info ==
+				&default_backing_dev_info) {
+		struct backing_dev_info *bdi = blk_get_backing_dev_info(bdev);
+		if (bdi == NULL)
+			bdi = &default_backing_dev_info;
+		inode->i_data.backing_dev_info = bdi;
 	}
 	if (bdev->bd_op->open) {
 		ret = bdev->bd_op->open(inode, file);
@@ -624,7 +624,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 out2:
 	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
-		bdev->bd_inode->i_data.ra_pages = &default_ra_pages;
+		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
 			bdev->bd_contains = NULL;
@@ -698,7 +698,7 @@ int blkdev_put(struct block_device *bdev, int kind)
 		__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
 	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
-		bdev->bd_inode->i_data.ra_pages = &default_ra_pages;
+		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
 			bdev->bd_contains = NULL;

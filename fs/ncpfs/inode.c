@@ -21,7 +21,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/file.h>
 #include <linux/fcntl.h>
 #include <linux/slab.h>

@@ -31,7 +31,6 @@
 #include <linux/delay.h>
 #include <net/checksum.h>
 #include <linux/random.h>
-#include <linux/locks.h>
 #include <linux/kernel_stat.h>
 #include <asm/io.h>
 #include <linux/completion.h>

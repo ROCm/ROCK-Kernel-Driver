@@ -311,6 +311,11 @@ int remove_exclusive_swap_page(struct page *page)
 		write_lock(&swapper_space.page_lock);
 		if (page_count(page) - !!PagePrivate(page) == 2) {
 			__delete_from_swap_cache(page);
+			/*
+			 * NOTE: if/when swap gets buffer/page coherency
+			 * like other mappings, we'll need to mark the buffers
+			 * dirty here too.  set_page_dirty().
+			 */
 			SetPageDirty(page);
 			retval = 1;
 		}

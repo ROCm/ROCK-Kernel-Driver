@@ -7,7 +7,6 @@
 #include <linux/time.h>
 #include <linux/string.h>
 #include <linux/bfs_fs.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 
 #include "bfs_defs.h"

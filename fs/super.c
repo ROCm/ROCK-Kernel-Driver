@@ -22,11 +22,11 @@
 
 #include <linux/config.h>
 #include <linux/slab.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/acct.h>
 #include <linux/blkdev.h>
+#include <linux/quotaops.h>
 #include <asm/uaccess.h>
 
 void get_filesystem(struct file_system_type *fs);
@@ -48,6 +48,7 @@ static struct super_block *alloc_super(void)
 	if (s) {
 		memset(s, 0, sizeof(struct super_block));
 		INIT_LIST_HEAD(&s->s_dirty);
+		INIT_LIST_HEAD(&s->s_io);
 		INIT_LIST_HEAD(&s->s_locked_inodes);
 		INIT_LIST_HEAD(&s->s_files);
 		INIT_LIST_HEAD(&s->s_instances);
@@ -61,6 +62,8 @@ static struct super_block *alloc_super(void)
 		sema_init(&s->s_dquot.dqio_sem, 1);
 		sema_init(&s->s_dquot.dqoff_sem, 1);
 		s->s_maxbytes = MAX_NON_LFS;
+		s->dq_op = sb_dquot_ops;
+		s->s_qcop = sb_quotactl_ops;
 	}
 	return s;
 }
@@ -154,6 +157,9 @@ static int grab_super(struct super_block *s)
  *
  *	Associates superblock with fs type and puts it on per-type and global
  *	superblocks' lists.  Should be called with sb_lock held; drops it.
+ *
+ *	NOTE: the super_blocks ordering here is important: writeback wants
+ *	the blockdev superblock to be at super_blocks.next.
  */
 static void insert_super(struct super_block *s, struct file_system_type *type)
 {

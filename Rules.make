@@ -41,8 +41,7 @@ obj-m := $(filter-out $(obj-y),$(obj-m))
 #
 # Get things started.
 #
-first_rule: sub_dirs
-	$(MAKE) all_targets
+first_rule: all_targets
 
 both-m          := $(filter $(mod-subdirs), $(subdir-y))
 SUB_DIRS	:= $(subdir-y)
@@ -102,7 +101,13 @@ endif
 #
 #
 #
-all_targets: $(O_TARGET) $(L_TARGET)
+all_targets: $(O_TARGET) $(L_TARGET) sub_dirs
+
+# $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
+# in the local directory
+subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
+# Do build these objects, we need to descend into the directories
+$(subdir-obj-y): sub_dirs
 
 #
 # Rule to compile a set of .o files into one .o file

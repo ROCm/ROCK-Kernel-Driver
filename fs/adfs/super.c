@@ -16,7 +16,6 @@
 #include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/init.h>
 
 #include <asm/bitops.h>

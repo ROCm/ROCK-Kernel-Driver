@@ -25,7 +25,6 @@
 #include <linux/swap.h>
 #include <linux/pagemap.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/shmem_fs.h>
@@ -438,7 +437,8 @@ static int shmem_writepage(struct page * page)
 
 	if (!PageLocked(page))
 		BUG();
-	if (!PageLaunder(page))
+
+	if (!(current->flags & PF_MEMALLOC))
 		return fail_writepage(page);
 
 	mapping = page->mapping;

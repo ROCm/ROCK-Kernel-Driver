@@ -6,6 +6,7 @@
  *  adding & removing files & directories
  */
 
+#include <linux/pagemap.h>
 #include <linux/string.h>
 #include "hpfs_fn.h"
 

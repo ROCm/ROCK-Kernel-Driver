@@ -32,7 +32,6 @@
 #include <linux/fcntl.h>
 #include <linux/time.h>
 #include <linux/stat.h>
-#include <linux/locks.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>

@@ -50,7 +50,6 @@
 #include <linux/blkdev.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
-#include <linux/locks.h>
 #include <linux/module.h>
 #include <linux/stat.h>
 #include <linux/cdrom.h>

@@ -21,7 +21,6 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/config.h>
-#include <linux/locks.h>
 #include <linux/swap.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>

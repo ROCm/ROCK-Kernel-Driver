@@ -17,7 +17,6 @@
 #include <asm/uaccess.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
-#include <linux/locks.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
 
@@ -484,8 +483,6 @@ struct super_operations reiserfs_sops =
 {
   alloc_inode: reiserfs_alloc_inode,
   destroy_inode: reiserfs_destroy_inode,
-  read_inode: reiserfs_read_inode,
-  read_inode2: reiserfs_read_inode2,
   write_inode: reiserfs_write_inode,
   dirty_inode: reiserfs_dirty_inode,
   delete_inode: reiserfs_delete_inode,
@@ -1007,7 +1004,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
     int old_format = 0;
     unsigned long blocks;
     int jinit_done = 0 ;
-    struct reiserfs_iget4_args args ;
+    struct reiserfs_iget_args args ;
     struct reiserfs_super_block * rs;
     char *jdev_name;
     struct reiserfs_sb_info *sbi;
@@ -1069,11 +1066,17 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
         printk("clm-7000: Detected readonly device, marking FS readonly\n") ;
 	s->s_flags |= MS_RDONLY ;
     }
-    args.objectid = REISERFS_ROOT_PARENT_OBJECTID ;
-    root_inode = iget4 (s, REISERFS_ROOT_OBJECTID, 0, (void *)(&args));
+    args.objectid = REISERFS_ROOT_OBJECTID ;
+    args.dirid = REISERFS_ROOT_PARENT_OBJECTID ;
+    root_inode = iget5_locked (s, REISERFS_ROOT_OBJECTID, reiserfs_find_actor, reiserfs_init_locked_inode, (void *)(&args));
     if (!root_inode) {
 	printk ("reiserfs_fill_super: get root inode failed\n");
 	goto error;
+    }
+
+    if (root_inode->i_state & I_NEW) {
+	reiserfs_read_locked_inode(root_inode, &args);
+	unlock_new_inode(root_inode);
     }
 
     s->s_root = d_alloc_root(root_inode);  

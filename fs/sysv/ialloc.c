@@ -21,9 +21,9 @@
 
 #include <linux/kernel.h>
 #include <linux/stddef.h>
+#include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include "sysv.h"
 
 /* We don't trust the value of

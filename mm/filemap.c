@@ -42,7 +42,7 @@
  *
  *  pagemap_lru_lock
  *  ->i_shared_lock		(vmtruncate)
- *    ->i_bufferlist_lock	(__free_pte->__set_page_dirty_buffers)
+ *    ->private_lock		(__free_pte->__set_page_dirty_buffers)
  *      ->mapping->page_lock
  *      ->inode_lock		(__mark_inode_dirty)
  *        ->sb_lock		(fs/fs-writeback.c)
@@ -425,11 +425,14 @@ void invalidate_inode_pages2(struct address_space * mapping)
  *  - activate the page so that the page stealer
  *    doesn't try to write it out over and over
  *    again.
+ *
+ * NOTE!  The livelock in fdatasync went away, due to io_pages.
+ * So this function can now call set_page_dirty().
  */
 int fail_writepage(struct page *page)
 {
 	/* Only activate on memory-pressure, not fsync.. */
-	if (PageLaunder(page)) {
+	if (current->flags & PF_MEMALLOC) {
 		activate_page(page);
 		SetPageReferenced(page);
 	}
@@ -450,9 +453,7 @@ EXPORT_SYMBOL(fail_writepage);
  */
 int filemap_fdatawrite(struct address_space *mapping)
 {
-	if (mapping->a_ops->writeback_mapping)
-		return mapping->a_ops->writeback_mapping(mapping, NULL);
-	return generic_writeback_mapping(mapping, NULL);
+	return writeback_mapping(mapping, NULL);
 }
 
 /**
@@ -651,7 +652,6 @@ void unlock_page(struct page *page)
 void end_page_writeback(struct page *page)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	ClearPageLaunder(page);
 	smp_mb__before_clear_bit();
 	if (!TestClearPageWriteback(page))
 		BUG();

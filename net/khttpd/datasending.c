@@ -36,7 +36,6 @@ Return value:
 
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/locks.h>
 #include <linux/skbuff.h>
 
 #include <net/tcp.h>

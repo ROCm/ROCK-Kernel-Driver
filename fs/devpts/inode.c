@@ -17,7 +17,6 @@
 #include <linux/init.h>
 #include <linux/kdev_t.h>
 #include <linux/kernel.h>
-#include <linux/locks.h>
 #include <linux/major.h>
 #include <linux/slab.h>
 #include <linux/stat.h>

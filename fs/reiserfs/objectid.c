@@ -4,7 +4,6 @@
 
 #include <linux/config.h>
 #include <linux/string.h>
-#include <linux/locks.h>
 #include <linux/random.h>
 #include <linux/time.h>
 #include <linux/reiserfs_fs.h>

@@ -35,6 +35,7 @@
 #include <linux/blkpg.h>
 #include <linux/genhd.h>
 #include <linux/module.h>               /* for EXPORT_SYMBOL */
+#include <linux/backing-dev.h>
 
 #include <asm/uaccess.h>
 
@@ -219,7 +220,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 	unsigned short usval;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	int holder;
-	unsigned long *ra_pages;
+	struct backing_dev_info *bdi;
 
 	intval = block_ioctl(bdev, cmd, arg);
 	if (intval != -ENOTTY)
@@ -241,20 +242,20 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 		case BLKFRASET:
 			if(!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			ra_pages = blk_get_ra_pages(bdev);
-			if (ra_pages == NULL)
+			bdi = blk_get_backing_dev_info(bdev);
+			if (bdi == NULL)
 				return -ENOTTY;
-			*ra_pages = (arg * 512) / PAGE_CACHE_SIZE;
+			bdi->ra_pages = (arg * 512) / PAGE_CACHE_SIZE;
 			return 0;
 
 		case BLKRAGET:
 		case BLKFRAGET:
 			if (!arg)
 				return -EINVAL;
-			ra_pages = blk_get_ra_pages(bdev);
-			if (ra_pages == NULL)
+			bdi = blk_get_backing_dev_info(bdev);
+			if (bdi == NULL)
 				return -ENOTTY;
-			return put_user((*ra_pages * PAGE_CACHE_SIZE) / 512,
+			return put_user((bdi->ra_pages * PAGE_CACHE_SIZE) / 512,
 						(long *)arg);
 
 		case BLKSECTGET:

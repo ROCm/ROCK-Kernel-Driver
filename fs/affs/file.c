@@ -22,7 +22,6 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/dirent.h>
 #include <linux/fs.h>

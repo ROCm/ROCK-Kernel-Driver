@@ -11,7 +11,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/file.h>
-#include <linux/locks.h>
 #include <linux/limits.h>
 #include <linux/init.h>
 #define __NO_VERSION__

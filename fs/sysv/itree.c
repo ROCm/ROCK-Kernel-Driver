@@ -5,7 +5,6 @@
  *  AV, Sep--Dec 2000
  */
 
-#include <linux/locks.h>
 #include "sysv.h"
 
 enum {DIRECT = 10, DEPTH = 4};	/* Have triple indirect */

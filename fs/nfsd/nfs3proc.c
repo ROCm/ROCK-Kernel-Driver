@@ -9,7 +9,6 @@
 #include <linux/linkage.h>
 #include <linux/time.h>
 #include <linux/errno.h>
-#include <linux/locks.h>
 #include <linux/fs.h>
 #include <linux/ext2_fs.h>
 #include <linux/stat.h>

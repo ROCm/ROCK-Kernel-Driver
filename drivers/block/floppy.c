@@ -3859,7 +3859,9 @@ static int check_floppy_change(kdev_t dev)
 static int floppy_revalidate(kdev_t dev)
 {
 #define NO_GEOM (!current_type[drive] && !TYPE(dev))
+#if 0
 	struct buffer_head * bh;
+#endif
 	int drive=DRIVE(dev);
 	int cf;
 
