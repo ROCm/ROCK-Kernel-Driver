@@ -13,17 +13,17 @@
 #ifndef TGAFB_H
 #define TGAFB_H
 
-    /*
-     * TGA hardware description (minimal)
-     */
+/*
+ * TGA hardware description (minimal)
+ */
 
 #define TGA_TYPE_8PLANE			0
 #define TGA_TYPE_24PLANE		1
 #define TGA_TYPE_24PLUSZ		3
 
-    /*
-     * Offsets within Memory Space
-     */
+/*
+ * Offsets within Memory Space
+ */
 
 #define	TGA_ROM_OFFSET			0x0000000
 #define	TGA_REGS_OFFSET			0x0100000
@@ -52,9 +52,9 @@
 #define	TGA_CMD_STAT_REG		0x01f8
 
 
-    /* 
-     * useful defines for managing the registers
-     */
+/* 
+ * Useful defines for managing the registers
+ */
 
 #define TGA_HORIZ_ODD			0x80000000
 #define TGA_HORIZ_POLARITY		0x40000000
@@ -77,17 +77,17 @@
 #define TGA_VALID_CURSOR		0x04
 
 
-    /*
-     * useful defines for managing the ICS1562 PLL clock
-     */
+/*
+ * Useful defines for managing the ICS1562 PLL clock
+ */
 
 #define TGA_PLL_BASE_FREQ 		14318		/* .18 */
 #define TGA_PLL_MAX_FREQ 		230000
 
 
-    /*
-     * useful defines for managing the BT485 on the 8-plane TGA
-     */
+/*
+ * Useful defines for managing the BT485 on the 8-plane TGA
+ */
 
 #define	BT485_READ_BIT			0x01
 #define	BT485_WRITE_BIT			0x00
@@ -111,9 +111,9 @@
 #define	BT485_CUR_HIGH_Y		0x1e
 
 
-    /*
-     * useful defines for managing the BT463 on the 24-plane TGAs
-     */
+/*
+ * Useful defines for managing the BT463 on the 24-plane TGAs
+ */
 
 #define	BT463_ADDR_LO		0x0
 #define	BT463_ADDR_HI		0x1
@@ -139,61 +139,72 @@
 
 #define	BT463_WINDOW_TYPE_BASE	0x0300
 
+/*
+ * The framebuffer driver private data.
+ */
 
-    /*
-     * Macros for reading/writing TGA and RAMDAC registers
-     */
+struct tga_par {
+	/* PCI device.  */
+	struct pci_dev *pdev;
 
-#define TGA_WRITE_REG(v,r) \
-	{ writel((v), fb_info.tga_regs_base+(r)); mb(); }
+	/* Device dependent information.  */
+	void *tga_mem_base;
+	void *tga_fb_base;
+	void *tga_regs_base;
+	u8 tga_type;				/* TGA_TYPE_XXX */
+	u8 tga_chip_rev;			/* dc21030 revision */
 
-#define TGA_READ_REG(r) readl(fb_info.tga_regs_base+(r))
+	/* Remember blank mode.  */
+	u8 vesa_blanked;
 
-#define BT485_WRITE(v,r) \
-	  TGA_WRITE_REG((r),TGA_RAMDAC_SETUP_REG);		\
-	  TGA_WRITE_REG(((v)&0xff)|((r)<<8),TGA_RAMDAC_REG);
-
-#define BT463_LOAD_ADDR(a) \
-	TGA_WRITE_REG(BT463_ADDR_LO<<2, TGA_RAMDAC_SETUP_REG); \
-	TGA_WRITE_REG((BT463_ADDR_LO<<10)|((a)&0xff), TGA_RAMDAC_REG); \
-	TGA_WRITE_REG(BT463_ADDR_HI<<2, TGA_RAMDAC_SETUP_REG); \
-	TGA_WRITE_REG((BT463_ADDR_HI<<10)|(((a)>>8)&0xff), TGA_RAMDAC_REG);
-
-#define BT463_WRITE(m,a,v) \
-	BT463_LOAD_ADDR((a)); \
-	TGA_WRITE_REG(((m)<<2),TGA_RAMDAC_SETUP_REG); \
-	TGA_WRITE_REG(((m)<<10)|((v)&0xff),TGA_RAMDAC_REG);
-
-
-    /*
-     *  This structure describes the board.
-     */
-
-struct tgafb_info {
-    /* Use the generic framebuffer ops */
-    struct fb_info_gen gen;
-
-    /* Device dependent information */
-    u8 tga_type;					/* TGA_TYPE_XXX */
-    u8 tga_chip_rev;					/* dc21030 revision */
-    u64 tga_mem_base;
-    u64 tga_fb_base;
-    u64 tga_regs_base;
-    struct fb_var_screeninfo default_var;		/* default video mode */
+	/* Define the video mode.  */
+	u32 xres, yres;			/* resolution in pixels */
+	u32 htimings;			/* horizontal timing register */
+	u32 vtimings;			/* vertical timing register */
+	u32 pll_freq;			/* pixclock in mhz */
+	u32 bits_per_pixel;		/* bits per pixel */
+	u32 sync_on_green;		/* set if sync is on green */
 };
 
 
-    /*
-     *  This structure uniquely defines a video mode.
-     */
+/*
+ * Macros for reading/writing TGA and RAMDAC registers
+ */
 
-struct tgafb_par {
-    u32 xres, yres;				/* resolution in pixels */
-    u32 htimings;				/* horizontal timing register */
-    u32 vtimings;				/* vertical timing register */
-    u32 pll_freq;				/* pixclock in mhz */
-    u32 bits_per_pixel;				/* bits per pixel */
-    u32 sync_on_green;				/* set if sync is on green */
-};
+static inline void
+TGA_WRITE_REG(struct tga_par *par, u32 v, u32 r)
+{
+	writel(v, par->tga_regs_base +r);
+}
+
+static inline u32
+TGA_READ_REG(struct tga_par *par, u32 r)
+{
+	return readl(par->tga_regs_base +r);
+}
+
+static inline void
+BT485_WRITE(struct tga_par *par, u8 v, u8 r)
+{
+	TGA_WRITE_REG(par, r, TGA_RAMDAC_SETUP_REG);
+	TGA_WRITE_REG(par, v | (r << 8), TGA_RAMDAC_REG);
+}
+
+static inline void
+BT463_LOAD_ADDR(struct tga_par *par, u16 a)
+{
+	TGA_WRITE_REG(par, BT463_ADDR_LO<<2, TGA_RAMDAC_SETUP_REG);
+	TGA_WRITE_REG(par, (BT463_ADDR_LO<<10) | (a & 0xff), TGA_RAMDAC_REG);
+	TGA_WRITE_REG(par, BT463_ADDR_HI<<2, TGA_RAMDAC_SETUP_REG);
+	TGA_WRITE_REG(par, (BT463_ADDR_HI<<10) | (a >> 8), TGA_RAMDAC_REG);
+}
+
+static inline void
+BT463_WRITE(struct tga_par *par, u32 m, u16 a, u8 v)
+{
+	BT463_LOAD_ADDR(par, a);
+	TGA_WRITE_REG(par, m << 2, TGA_RAMDAC_SETUP_REG);
+	TGA_WRITE_REG(par, m << 10 | v, TGA_RAMDAC_REG);
+}
 
 #endif /* TGAFB_H */
