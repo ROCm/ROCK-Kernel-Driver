@@ -42,8 +42,6 @@ static void rif_check_expire(unsigned long dummy);
 
 #define TR_SR_DEBUG 0
 
-typedef struct rif_cache_s *rif_cache;
-
 /*
  *	Each RIF entry we learn is kept this way
  */
@@ -53,7 +51,7 @@ struct rif_cache_s {
 	int iface;
 	__u16 rcf;
 	__u16 rseg[8];
-	rif_cache next;
+	struct rif_cache_s *next;
 	unsigned long last_used;
 	unsigned char local_ring;
 };
@@ -65,7 +63,7 @@ struct rif_cache_s {
  *	up a lot.
  */
  
-static rif_cache rif_table[RIF_TABLE_SIZE];
+static struct rif_cache_s *rif_table[RIF_TABLE_SIZE];
 
 static spinlock_t rif_lock = SPIN_LOCK_UNLOCKED;
 
@@ -235,7 +233,7 @@ void tr_source_route(struct sk_buff *skb,struct trh_hdr *trh,struct net_device *
 {
 	int i, slack;
 	unsigned int hash;
-	rif_cache entry;
+	struct rif_cache_s *entry;
 	unsigned char *olddata;
 	unsigned char mcast_func_addr[] = {0xC0,0x00,0x00,0x04,0x00,0x00};
 	unsigned long flags ; 
@@ -325,7 +323,7 @@ static void tr_add_rif_info(struct trh_hdr *trh, struct net_device *dev)
 {
 	int i;
 	unsigned int hash, rii_p = 0;
-	rif_cache entry;
+	struct rif_cache_s *entry;
 
 
 	spin_lock_bh(&rif_lock);
@@ -426,7 +424,7 @@ static void rif_check_expire(unsigned long dummy)
 	
 	for(i=0; i < RIF_TABLE_SIZE;i++) 
 	{
-		rif_cache entry, *pentry=rif_table+i;	
+		struct rif_cache_s *entry, **pentry=rif_table+i;	
 		while((entry=*pentry)) 
 		{
 			/*
@@ -501,7 +499,7 @@ static void rif_seq_stop(struct seq_file *seq, void *v)
 static int rif_seq_show(struct seq_file *seq, void *v)
 {
 	int j, rcf_len, segment, brdgnmb;
-	rif_cache entry = v;
+	struct rif_cache_s *entry = v;
 
 	if (v == RIF_PROC_START)
 		seq_puts(seq,
