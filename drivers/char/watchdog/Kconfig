@@ -303,17 +303,55 @@ config W83877F_WDT
 config SC520_WDT
 	tristate "AMD Elan SC520 processor Watchdog"
 	depends on WATCHDOG
+	help
+	  This is the driver for the hardware watchdog built in to the
+	  AMD "Elan" SC520 microcomputer commonly used in embedded systems.
+	  This watchdog simply watches your kernel to make sure it doesn't
+	  freeze, and if it does, it reboots your computer after a certain
+	  amount of time.
+	
+	  You can compile this driver directly into the kernel, or use
+	  it as a module.  The module will be called sc520_wdt.o.
 
 config ALIM7101_WDT
 	tristate "ALi M7101 PMU Computer Watchdog"
 	depends on WATCHDOG
+	help
+	  This is the driver for the hardware watchdog on the ALi M7101 PMU
+	  as used in the x86 Cobalt servers.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module is called alim7101_wdt.o.  If you want to compile it as a
+	  module, say M here and read Documentation/modules.txt.  Most
+	  people will say N.
 
 config SC1200_WDT
 	tristate "National Semiconductor PC87307/PC97307 (ala SC1200) Watchdog"
 	depends on WATCHDOG
+	help
+	  This is a driver for National Semiconductor PC87307/PC97307 hardware
+	  watchdog cards as found on the SC1200. This watchdog is mainly used
+	  for power management purposes and can be used to power down the device
+	  during inactivity periods (includes interrupt activity monitoring).
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module is called sc1200wdt.o.  If you want to compile it as a
+	  module, say M here and read Documentation/modules.txt.  Most
+	  people will say N.
 
 config WAFER_WDT
 	tristate "ICP Wafer 5823 Single Board Computer Watchdog"
 	depends on WATCHDOG
+	help
+	  This is a driver for the hardware watchdog on the ICP Wafer 5823
+	  Single Board Computer (and probably other similar models).
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt. The module will be called
+	  wafer5823wdt.o
 
 endmenu
