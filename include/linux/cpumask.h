@@ -47,17 +47,21 @@
  * int cpumask_scnprintf(buf, len, mask) Format cpumask for printing
  * int cpumask_parse(ubuf, ulen, mask)	Parse ascii string as cpumask
  *
+ * for_each_cpu_mask(cpu, mask)		for-loop cpu over mask
+ *
  * int num_online_cpus()		Number of online CPUs
  * int num_possible_cpus()		Number of all possible CPUs
+ * int num_present_cpus()		Number of present CPUs
+ *
  * int cpu_online(cpu)			Is some cpu online?
  * int cpu_possible(cpu)		Is some cpu possible?
- * void cpu_set_online(cpu)		set cpu in cpu_online_map
- * void cpu_set_offline(cpu)		clear cpu in cpu_online_map
+ * int cpu_present(cpu)			Is some cpu present (can schedule)?
+ *
  * int any_online_cpu(mask)		First online cpu in mask
  *
- * for_each_cpu_mask(cpu, mask)		for-loop cpu over mask
  * for_each_cpu(cpu)			for-loop cpu over cpu_possible_map
  * for_each_online_cpu(cpu)		for-loop cpu over cpu_online_map
+ * for_each_present_cpu(cpu)		for-loop cpu over cpu_present_map
  *
  * Subtlety:
  * 1) The 'type-checked' form of cpu_isset() causes gcc (3.3.2, anyway)
@@ -336,19 +340,19 @@ extern cpumask_t cpu_online_map;
 extern cpumask_t cpu_present_map;
 
 #if NR_CPUS > 1
-#define num_online_cpus()    cpus_weight(cpu_online_map)
-#define num_possible_cpus()  cpus_weight(cpu_possible_map)
-#define num_present_cpus()   cpus_weight(cpu_present_map)
-#define cpu_online(cpu)      cpu_isset((cpu), cpu_online_map)
-#define cpu_possible(cpu)    cpu_isset((cpu), cpu_possible_map)
-#define cpu_present(cpu)     cpu_isset((cpu), cpu_present_map)
+#define num_online_cpus()	cpus_weight(cpu_online_map)
+#define num_possible_cpus()	cpus_weight(cpu_possible_map)
+#define num_present_cpus()	cpus_weight(cpu_present_map)
+#define cpu_online(cpu)		cpu_isset((cpu), cpu_online_map)
+#define cpu_possible(cpu)	cpu_isset((cpu), cpu_possible_map)
+#define cpu_present(cpu)	cpu_isset((cpu), cpu_present_map)
 #else
-#define num_online_cpus()    1
-#define num_possible_cpus()  1
-#define num_present_cpus()   1
-#define cpu_online(cpu)      ((cpu) == 0)
-#define cpu_possible(cpu)    ((cpu) == 0)
-#define cpu_present(cpu)     ((cpu) == 0)
+#define num_online_cpus()	1
+#define num_possible_cpus()	1
+#define num_present_cpus()	1
+#define cpu_online(cpu)		((cpu) == 0)
+#define cpu_possible(cpu)	((cpu) == 0)
+#define cpu_present(cpu)	((cpu) == 0)
 #endif
 
 #define any_online_cpu(mask)			\
