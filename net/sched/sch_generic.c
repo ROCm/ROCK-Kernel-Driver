@@ -479,15 +479,15 @@ static void __qdisc_destroy(struct rcu_head *head)
 	module_put(ops->owner);
 
 	dev_put(qdisc->dev);
-	if (!(qdisc->flags&TCQ_F_BUILTIN))
-		kfree((char *) qdisc - qdisc->padded);
+	kfree((char *) qdisc - qdisc->padded);
 }
 
 /* Under dev->queue_lock and BH! */
 
 void qdisc_destroy(struct Qdisc *qdisc)
 {
-	if (!atomic_dec_and_test(&qdisc->refcnt))
+	if (qdisc->flags & TCQ_F_BUILTIN ||
+		!atomic_dec_and_test(&qdisc->refcnt))
 		return;
 	list_del(&qdisc->list);
 	call_rcu(&qdisc->q_rcu, __qdisc_destroy);
