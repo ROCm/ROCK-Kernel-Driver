@@ -216,7 +216,21 @@ NCR_Q720_probe(struct device *dev)
 		goto out_free;
 	}
 	
-	mem_base = (__u32)ioremap(base_addr, mem_size);
+	if (dma_declare_coherent_memory(dev, base_addr, base_addr,
+					mem_size, DMA_MEMORY_MAP)
+	    != DMA_MEMORY_MAP) {
+		printk(KERN_ERR "NCR_Q720: DMA declare memory failed\n");
+		goto out_release_region;
+	}
+
+	/* The first 1k of the memory buffer is a memory map of the registers
+	 */
+	mem_base = (__u32)dma_mark_declared_memory_occupied(dev, base_addr,
+							    1024);
+	if (IS_ERR((void *)mem_base)) {
+		printk("NCR_Q720 failed to reserve memory mapped region\n");
+		goto out_release;
+	}
 
 	/* now also enable accesses in asr 2 */
 	asr2 = inb(io_base + 0x0a);
@@ -296,7 +310,8 @@ NCR_Q720_probe(struct device *dev)
 	return 0;
 
  out_release:
-	iounmap((void *)mem_base);
+	dma_release_declared_memory(dev);
+ out_release_region:
 	release_mem_region(base_addr, mem_size);
  out_free:
 	kfree(p);
@@ -321,7 +336,7 @@ NCR_Q720_remove(struct device *dev)
 		if(p->hosts[i])
 			NCR_Q720_remove_one(p->hosts[i]);
 
-	iounmap((void *)p->mem_base);
+	dma_release_declared_memory(dev);
 	release_mem_region(p->phys_mem_base, p->mem_size);
 	free_irq(p->irq, p);
 	kfree(p);

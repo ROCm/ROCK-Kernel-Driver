@@ -179,11 +179,26 @@ int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
 	return err;
 }
 
+#define IOREMAP_MAX_ORDER	(7 + PAGE_SHIFT)	/* 128 pages */
+
 struct vm_struct *__get_vm_area(unsigned long size, unsigned long flags,
 				unsigned long start, unsigned long end)
 {
 	struct vm_struct **p, *tmp, *area;
-	unsigned long addr = start;
+	unsigned long align = 1;
+	unsigned long addr;
+
+	if (flags & VM_IOREMAP) {
+		int bit = fls(size);
+
+		if (bit > IOREMAP_MAX_ORDER)
+			bit = IOREMAP_MAX_ORDER;
+		else if (bit < PAGE_SHIFT)
+			bit = PAGE_SHIFT;
+
+		align = 1ul << bit;
+	}
+	addr = ALIGN(start, align);
 
 	area = kmalloc(sizeof(*area), GFP_KERNEL);
 	if (unlikely(!area))
@@ -200,13 +215,17 @@ struct vm_struct *__get_vm_area(unsigned long size, unsigned long flags,
 
 	write_lock(&vmlist_lock);
 	for (p = &vmlist; (tmp = *p) != NULL ;p = &tmp->next) {
-		if ((unsigned long)tmp->addr < addr)
+		if ((unsigned long)tmp->addr < addr) {
+			if((unsigned long)tmp->addr + tmp->size >= addr)
+				addr = ALIGN(tmp->size + 
+					     (unsigned long)tmp->addr, align);
 			continue;
+		}
 		if ((size + addr) < addr)
 			goto out;
 		if (size + addr <= (unsigned long)tmp->addr)
 			goto found;
-		addr = tmp->size + (unsigned long)tmp->addr;
+		addr = ALIGN(tmp->size + (unsigned long)tmp->addr, align);
 		if (addr > end - size)
 			goto out;
 	}
