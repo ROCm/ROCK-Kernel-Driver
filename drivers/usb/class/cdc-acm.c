@@ -257,7 +257,7 @@ static void acm_read_bulk(struct urb *urb, struct pt_regs *regs)
 	if (urb->status)
 		dbg("nonzero read bulk status received: %d", urb->status);
 
-	if (!urb->status & !acm->throttle)  {
+	if (!urb->status && !acm->throttle)  {
 		for (i = 0; i < urb->actual_length && !acm->throttle; i++) {
 			/* if we insert more than TTY_FLIPBUF_SIZE characters,
 			 * we drop them. */
