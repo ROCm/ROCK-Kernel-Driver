@@ -2407,7 +2407,7 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 	return ret;
 }
 
-static void __devinit solo1_remove(struct pci_dev *dev)
+static void __devexit solo1_remove(struct pci_dev *dev)
 {
 	struct solo1_state *s = pci_get_drvdata(dev);
 	
@@ -2447,7 +2447,7 @@ static struct pci_driver solo1_driver = {
 	.name		= "ESS Solo1",
 	.id_table	= id_table,
 	.probe		= solo1_probe,
-	.remove		= solo1_remove,
+	.remove		= __devexit_p(solo1_remove),
 	.suspend	= solo1_suspend,
 	.resume		= solo1_resume,
 };
