@@ -37,6 +37,18 @@ filetype() {
 	return 0
 }
 
+print_mtime() {
+	local argv1="$1"
+	local my_mtime="0"
+
+	if [ -e "${argv1}" ]; then
+		my_mtime=$(find "${argv1}" -printf "%T@\n" | sort -r | head -n 1)
+	fi
+	
+	echo "# Last modified: ${my_mtime}"
+	echo
+}
+
 parse() {
 	local location="$1"
 	local name="${location/${srcdir}//}"
@@ -77,16 +89,19 @@ parse() {
 	return 0
 }
 
-if [ -z $1 ]; then
+if [ -z "$1" ]; then
 	simple_initramfs
-elif [ -f $1 ]; then
-	cat $1
-elif [ -d $1 ]; then
+elif [ -f "$1" ]; then
+	print_mtime "$1"
+	cat "$1"
+elif [ -d "$1" ]; then
 	srcdir=$(echo "$1" | sed -e 's://*:/:g')
 	dirlist=$(find "${srcdir}" -printf "%p %m %U %G\n" 2>/dev/null)
 
 	# If $dirlist is only one line, then the directory is empty
 	if [  "$(echo "${dirlist}" | wc -l)" -gt 1 ]; then
+		print_mtime "$1"
+		
 		echo "${dirlist}" | \
 		while read x; do
 			parse ${x}
