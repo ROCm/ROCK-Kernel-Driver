@@ -1209,7 +1209,7 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			rc = -EINVAL;
 			if (sk)
 				rc = sock_get_timestamp(sk, 
-						(struct timeval *)arg); 
+						(struct timeval __user *)arg); 
 			break;
 		case SIOCGIFADDR:
 		case SIOCSIFADDR:

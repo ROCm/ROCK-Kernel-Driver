@@ -1872,7 +1872,7 @@ static int ipx_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	case SIOCGSTAMP:
 		rc = -EINVAL;
 		if (sk) 
-			rc = sock_get_timestamp(sk, (struct timeval *)arg);
+			rc = sock_get_timestamp(sk, (struct timeval __user *)arg);
 		break;
 	case SIOCGIFDSTADDR:
 	case SIOCSIFDSTADDR:

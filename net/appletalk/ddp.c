@@ -1795,7 +1795,7 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			break;
 		}
 		case SIOCGSTAMP:
-			rc = sock_get_timestamp(sk, (struct timeval *)arg);
+			rc = sock_get_timestamp(sk, (struct timeval __user *)arg);
 			break;
 		/* Routing */
 		case SIOCADDRT:

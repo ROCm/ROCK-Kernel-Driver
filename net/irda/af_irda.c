@@ -1797,7 +1797,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	case SIOCGSTAMP:
 		if (sk != NULL)
-			return sock_get_timestamp(sk, (struct timeval *)arg);
+			return sock_get_timestamp(sk, (struct timeval __user *)arg);
 		return -EINVAL;
 
 	case SIOCGIFADDR:

@@ -665,7 +665,7 @@ static int econet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg
 
 	switch(cmd) {
 		case SIOCGSTAMP:
-			return sock_get_timestamp(sk,(struct timeval *)arg);
+			return sock_get_timestamp(sk,(struct timeval __user *)arg);
 
 		case SIOCSIFADDR:
 		case SIOCGIFADDR:

@@ -843,7 +843,7 @@ int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 		case SIOCGSTAMP:
-			err = sock_get_timestamp(sk, (struct timeval *)arg);
+			err = sock_get_timestamp(sk, (struct timeval __user *)arg);
 			break;
 		case SIOCADDRT:
 		case SIOCDELRT:

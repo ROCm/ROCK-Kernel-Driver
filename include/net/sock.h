@@ -1049,7 +1049,7 @@ static inline void net_timestamp(struct timeval *stamp)
 	}		
 } 
 
-extern int sock_get_timestamp(struct sock *, struct timeval *);
+extern int sock_get_timestamp(struct sock *, struct timeval __user *);
 
 /* 
  *	Enable debug/info messages 
