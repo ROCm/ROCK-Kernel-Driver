@@ -29,22 +29,26 @@
  * read_barrier_depends() prevents data-dependent loads being reordered
  *	across this point (nop on PPC).
  *
- * We can use the eieio instruction for wmb, but since it doesn't
- * give any ordering guarantees about loads, we have to use the
- * stronger but slower sync instruction for mb and rmb.
+ * We have to use the sync instructions for mb(), since lwsync doesn't
+ * order loads with respect to previous stores.  Lwsync is fine for
+ * rmb(), though.
+ * For wmb(), we use sync since wmb is used in drivers to order
+ * stores to system memory with respect to writes to the device.
+ * However, smp_wmb() can be a lighter-weight eieio barrier on
+ * SMP since it is only used to order updates to system memory.
  */
 #define mb()   __asm__ __volatile__ ("sync" : : : "memory")
 #define rmb()  __asm__ __volatile__ ("lwsync" : : : "memory")
-#define wmb()  __asm__ __volatile__ ("eieio" : : : "memory")
+#define wmb()  __asm__ __volatile__ ("sync" : : : "memory")
 #define read_barrier_depends()  do { } while(0)
 
-#define set_mb(var, value)	do { var = value; mb(); } while (0)
-#define set_wmb(var, value)	do { var = value; wmb(); } while (0)
+#define set_mb(var, value)	do { var = value; smp_mb(); } while (0)
+#define set_wmb(var, value)	do { var = value; smp_wmb(); } while (0)
 
 #ifdef CONFIG_SMP
 #define smp_mb()	mb()
 #define smp_rmb()	rmb()
-#define smp_wmb()	wmb()
+#define smp_wmb()	__asm__ __volatile__ ("eieio" : : : "memory")
 #define smp_read_barrier_depends()  read_barrier_depends()
 #else
 #define smp_mb()	__asm__ __volatile__("": : :"memory")
