@@ -232,7 +232,7 @@ static __inline__ int atmpvc_addr_in_use(struct sockaddr_atmpvc addr)
 struct atmif_sioc {
     int number;
     int length;
-    void *arg;
+    void __user *arg;
 };
 
 typedef unsigned short atm_backend_t;

@@ -170,6 +170,7 @@ struct nfsd3_readdirres {
 	u32 *			buffer;
 	int			buflen;
 	u32 *			offset;
+	u32 *			offset1;
 	struct svc_rqst *	rqstp;
 
 };

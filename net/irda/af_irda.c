@@ -1269,7 +1269,7 @@ static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
 	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
 	/* Note : socket.c set MSG_EOR on SEQPACKET sockets */
-	if (msg->msg_flags & ~(MSG_DONTWAIT | MSG_EOR))
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
@@ -1521,7 +1521,7 @@ static int irda_sendmsg_dgram(struct kiocb *iocb, struct socket *sock,
 
 	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
-	if (msg->msg_flags & ~MSG_DONTWAIT)
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
@@ -1593,7 +1593,7 @@ static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
 
 	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
-	if (msg->msg_flags & ~MSG_DONTWAIT)
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
@@ -1779,7 +1779,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
-		if (put_user(amount, (unsigned int *)arg))
+		if (put_user(amount, (unsigned int __user *)arg))
 			return -EFAULT;
 		return 0;
 	}
@@ -1790,7 +1790,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		/* These two are safe on a single CPU system as only user tasks fiddle here */
 		if ((skb = skb_peek(&sk->sk_receive_queue)) != NULL)
 			amount = skb->len;
-		if (put_user(amount, (unsigned int *)arg))
+		if (put_user(amount, (unsigned int __user *)arg))
 			return -EFAULT;
 		return 0;
 	}

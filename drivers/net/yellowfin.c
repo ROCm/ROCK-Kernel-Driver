@@ -1405,7 +1405,7 @@ static void set_rx_mode(struct net_device *dev)
 	outw(cfg_value | 0x1000, ioaddr + Cnfg);
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	struct yellowfin_private *np = dev->priv;
 	u32 ethcmd;
@@ -1433,11 +1433,11 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct yellowfin_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 
 	switch(cmd) {
 	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		data->phy_id = np->phys[0] & 0x1f;
 		/* Fall Through */

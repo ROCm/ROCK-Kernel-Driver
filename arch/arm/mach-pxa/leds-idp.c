@@ -19,6 +19,8 @@
 #include <asm/leds.h>
 #include <asm/system.h>
 
+#include <asm/arch/idp.h>
+
 #include "leds.h"
 
 #define LED_STATE_ENABLED	1

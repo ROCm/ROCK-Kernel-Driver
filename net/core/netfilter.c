@@ -504,14 +504,6 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 	unsigned int verdict;
 	int ret = 0;
 
-	if (skb->ip_summed == CHECKSUM_HW) {
-		if (outdev == NULL) {
-			skb->ip_summed = CHECKSUM_NONE;
-		} else {
-			skb_checksum_help(skb);
-		}
-	}
-
 	/* We may already have this, but read-locks nest anyway */
 	rcu_read_lock();
 

@@ -8,21 +8,8 @@
 #ifndef _SPARC_ESP_H
 #define _SPARC_ESP_H
 
-#include <linux/config.h>
-
-/* #include "scsi.h" */
-#include <scsi/scsi_cmnd.h>
-#include <scsi/scsi_device.h>
-#include <scsi/scsi_eh.h>
-#include <scsi/scsi_request.h>
-#include <scsi/scsi_tcq.h>
-#include <scsi/scsi.h>
-#include <scsi/scsi_host.h>
-
 /* For dvma controller register definitions. */
 #include <asm/dma.h>
-
-#define scsi_to_sbus_dma_dir(scsi_dir)	((int)(scsi_dir))
 
 /* The ESP SCSI controllers have their register sets in three
  * "classes":
@@ -85,6 +72,8 @@ struct esp_device {
   unsigned wide:1;
   unsigned disconnect:1;
 };
+
+struct scsi_cmnd;
 
 /* We get one of these for each ESP probed. */
 struct esp {

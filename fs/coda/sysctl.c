@@ -69,7 +69,7 @@ void reset_coda_cache_inv_stats( void )
 }
 
 int do_reset_coda_vfs_stats( ctl_table * table, int write, struct file * filp,
-			     void * buffer, size_t * lenp )
+			     void __user * buffer, size_t * lenp )
 {
 	if ( write ) {
 		reset_coda_vfs_stats();
@@ -83,7 +83,7 @@ int do_reset_coda_vfs_stats( ctl_table * table, int write, struct file * filp,
 }
 
 int do_reset_coda_cache_inv_stats( ctl_table * table, int write, 
-				   struct file * filp, void * buffer, 
+				   struct file * filp, void __user * buffer, 
 				   size_t * lenp )
 {
 	if ( write ) {
@@ -214,7 +214,7 @@ struct proc_dir_entry* proc_fs_coda;
 #define coda_proc_create(name,get_info) \
 	create_proc_info_entry(name, 0, proc_fs_coda, get_info)
 
-void coda_sysctl_init()
+void coda_sysctl_init(void)
 {
 	reset_coda_vfs_stats();
 	reset_coda_cache_inv_stats();
@@ -234,7 +234,7 @@ void coda_sysctl_init()
 #endif 
 }
 
-void coda_sysctl_clean() 
+void coda_sysctl_clean(void) 
 {
 
 #ifdef CONFIG_SYSCTL

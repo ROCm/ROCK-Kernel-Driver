@@ -577,11 +577,11 @@ struct aha152x_scdata {
 #define MSGO(i)			(HOSTDATA(shpnt)->msgo[i])
 #define MSGO_I			(HOSTDATA(shpnt)->msgo_i)
 #define MSGOLEN			(HOSTDATA(shpnt)->msgo_len)
-#define ADDMSGO(x)		(MSGOLEN<256 ? MSGO(MSGOLEN++)=x : aha152x_error(shpnt,"MSGO overflow"))
+#define ADDMSGO(x)		(MSGOLEN<256 ? (void)(MSGO(MSGOLEN++)=x) : aha152x_error(shpnt,"MSGO overflow"))
 
 #define MSGI(i)			(HOSTDATA(shpnt)->msgi[i])
 #define MSGILEN			(HOSTDATA(shpnt)->msgi_len)
-#define ADDMSGI(x)		(MSGILEN<256 ? MSGI(MSGILEN++)=x : aha152x_error(shpnt,"MSGI overflow"))
+#define ADDMSGI(x)		(MSGILEN<256 ? (void)(MSGI(MSGILEN++)=x) : aha152x_error(shpnt,"MSGI overflow"))
 
 #define DATA_LEN		(HOSTDATA(shpnt)->data_len)
 

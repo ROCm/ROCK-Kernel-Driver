@@ -1715,7 +1715,7 @@ static int rr_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return error;
 		
 	case SIOCRRID:
-		return put_user(0x52523032, (int *)(&rq->ifr_data[0]));
+		return put_user(0x52523032, (int __user *)rq->ifr_data);
 	default:
 		return error;
 	}

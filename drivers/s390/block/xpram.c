@@ -290,7 +290,7 @@ static int xpram_make_request(request_queue_t *q, struct bio *bio)
 	unsigned long bytes;
 	int i;
 
-	if ((bio->bi_sector & 3) != 0 || (bio->bi_size & 4095) != 0)
+	if ((bio->bi_sector & 7) != 0 || (bio->bi_size & 4095) != 0)
 		/* Request is not page-aligned. */
 		goto fail;
 	if ((bio->bi_size >> 12) > xdev->size)

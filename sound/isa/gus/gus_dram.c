@@ -26,7 +26,7 @@
 #include <sound/info.h>
 
 
-static int snd_gus_dram_poke(snd_gus_card_t *gus, char *_buffer,
+static int snd_gus_dram_poke(snd_gus_card_t *gus, char __user *_buffer,
 			     unsigned int address, unsigned int size)
 {
 	unsigned long flags;
@@ -57,13 +57,13 @@ static int snd_gus_dram_poke(snd_gus_card_t *gus, char *_buffer,
 }
 
 
-int snd_gus_dram_write(snd_gus_card_t *gus, char *buffer,
+int snd_gus_dram_write(snd_gus_card_t *gus, char __user *buffer,
 		       unsigned int address, unsigned int size)
 {
 	return snd_gus_dram_poke(gus, buffer, address, size);
 }
 
-static int snd_gus_dram_peek(snd_gus_card_t *gus, char *_buffer,
+static int snd_gus_dram_peek(snd_gus_card_t *gus, char __user *_buffer,
 			     unsigned int address, unsigned int size,
 			     int rom)
 {
@@ -95,7 +95,7 @@ static int snd_gus_dram_peek(snd_gus_card_t *gus, char *_buffer,
 	return 0;
 }
 
-int snd_gus_dram_read(snd_gus_card_t *gus, char *buffer,
+int snd_gus_dram_read(snd_gus_card_t *gus, char __user *buffer,
 		      unsigned int address, unsigned int size,
 		      int rom)
 {

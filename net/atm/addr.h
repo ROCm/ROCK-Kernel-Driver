@@ -13,6 +13,6 @@
 void atm_reset_addr(struct atm_dev *dev);
 int atm_add_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr);
 int atm_del_addr(struct atm_dev *dev,struct sockaddr_atmsvc *addr);
-int atm_get_addr(struct atm_dev *dev,struct sockaddr_atmsvc *u_buf,int size);
+int atm_get_addr(struct atm_dev *dev,struct sockaddr_atmsvc __user *buf,int size);
 
 #endif

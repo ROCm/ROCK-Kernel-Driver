@@ -848,13 +848,13 @@ static unsigned int boot_options = OPTION_NONE;
 static devfs_handle_t _devfs_walk_path(struct devfs_entry *dir,
 				       const char *name, int namelen,
 				       int traverse_symlink);
-static ssize_t devfsd_read(struct file *file, char *buf, size_t len,
+static ssize_t devfsd_read(struct file *file, char __user *buf, size_t len,
 			   loff_t * ppos);
 static int devfsd_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg);
 static int devfsd_close(struct inode *inode, struct file *file);
 #ifdef CONFIG_DEVFS_DEBUG
-static ssize_t stat_read(struct file *file, char *buf, size_t len,
+static ssize_t stat_read(struct file *file, char __user *buf, size_t len,
 			 loff_t * ppos);
 static struct file_operations stat_fops = {
 	.read = stat_read,
@@ -2579,7 +2579,7 @@ static struct file_system_type devfs_fs_type = {
 
 /*  File operations for devfsd follow  */
 
-static ssize_t devfsd_read(struct file *file, char *buf, size_t len,
+static ssize_t devfsd_read(struct file *file, char __user *buf, size_t len,
 			   loff_t * ppos)
 {
 	int done = FALSE;
@@ -2693,7 +2693,7 @@ static int devfsd_ioctl(struct inode *inode, struct file *file,
 	switch (cmd) {
 	case DEVFSDIOC_GET_PROTO_REV:
 		ival = DEVFSD_PROTOCOL_REVISION_KERNEL;
-		if (copy_to_user((void *)arg, &ival, sizeof ival))
+		if (copy_to_user((void __user *)arg, &ival, sizeof ival))
 			return -EFAULT;
 		break;
 	case DEVFSDIOC_SET_EVENT_MASK:
@@ -2732,7 +2732,7 @@ static int devfsd_ioctl(struct inode *inode, struct file *file,
 		/*break; */
 #ifdef CONFIG_DEVFS_DEBUG
 	case DEVFSDIOC_SET_DEBUG_MASK:
-		if (copy_from_user(&ival, (void *)arg, sizeof ival))
+		if (copy_from_user(&ival, (void __user *)arg, sizeof ival))
 			return -EFAULT;
 		devfs_debug = ival;
 		break;
@@ -2772,7 +2772,7 @@ static int devfsd_close(struct inode *inode, struct file *file)
 }				/*  End Function devfsd_close  */
 
 #ifdef CONFIG_DEVFS_DEBUG
-static ssize_t stat_read(struct file *file, char *buf, size_t len,
+static ssize_t stat_read(struct file *file, char __user *buf, size_t len,
 			 loff_t * ppos)
 {
 	ssize_t num;

@@ -154,8 +154,8 @@ static int modes_defined = FALSE;
 static OSST_buffer *new_tape_buffer(int, int, int);
 static int enlarge_buffer(OSST_buffer *, int);
 static void normalize_buffer(OSST_buffer *);
-static int append_to_buffer(const char *, OSST_buffer *, int);
-static int from_buffer(OSST_buffer *, char *, int);
+static int append_to_buffer(const char __user *, OSST_buffer *, int);
+static int from_buffer(OSST_buffer *, char __user *, int);
 static int osst_zero_buffer_tail(OSST_buffer *);
 static int osst_copy_to_buffer(OSST_buffer *, unsigned char *);
 static int osst_copy_from_buffer(OSST_buffer *, unsigned char *);
@@ -3157,13 +3157,13 @@ static void reset_state(OS_Scsi_Tape *STp)
 /* Entry points to osst */
 
 /* Write command */
-static ssize_t osst_write(struct file * filp, const char * buf, size_t count, loff_t *ppos)
+static ssize_t osst_write(struct file * filp, const char __user * buf, size_t count, loff_t *ppos)
 {
 	ssize_t        total, retval = 0;
 	ssize_t        i, do_count, blks, transfer;
 	int            write_threshold;
 	int            doing_write = 0;
-	const char   * b_point;
+	const char   __user * b_point;
 	Scsi_Request * SRpnt = NULL;
 	ST_mode      * STm;
 	ST_partstat  * STps;
@@ -3486,7 +3486,7 @@ out:
 
 
 /* Read command */
-static ssize_t osst_read(struct file * filp, char * buf, size_t count, loff_t *ppos)
+static ssize_t osst_read(struct file * filp, char __user * buf, size_t count, loff_t *ppos)
 {
 	ssize_t        total, retval = 0;
 	ssize_t        i, transfer;
@@ -5189,7 +5189,7 @@ static void normalize_buffer(OSST_buffer *STbuffer)
 
 /* Move data from the user buffer to the tape buffer. Returns zero (success) or
    negative error code. */
-static int append_to_buffer(const char *ubp, OSST_buffer *st_bp, int do_count)
+static int append_to_buffer(const char __user *ubp, OSST_buffer *st_bp, int do_count)
 {
 	int i, cnt, res, offset;
 
@@ -5222,7 +5222,7 @@ static int append_to_buffer(const char *ubp, OSST_buffer *st_bp, int do_count)
 
 /* Move data from the tape buffer to the user buffer. Returns zero (success) or
    negative error code. */
-static int from_buffer(OSST_buffer *st_bp, char *ubp, int do_count)
+static int from_buffer(OSST_buffer *st_bp, char __user *ubp, int do_count)
 {
 	int i, cnt, res, offset;
 

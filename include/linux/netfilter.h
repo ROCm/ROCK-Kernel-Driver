@@ -171,6 +171,12 @@ extern void nf_reinject(struct sk_buff *skb,
 			struct nf_info *info,
 			unsigned int verdict);
 
+extern inline struct ipt_target *
+ipt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
+extern inline struct ip6t_target *
+ip6t_find_target_lock(const char *name, int *error, struct semaphore *mutex);
+extern inline struct arpt_target *
+arpt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
 extern void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
 
 #ifdef CONFIG_NETFILTER_DEBUG

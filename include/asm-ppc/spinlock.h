@@ -65,7 +65,6 @@ static inline void _raw_spin_unlock(spinlock_t *lock)
 extern void _raw_spin_lock(spinlock_t *lock);
 extern void _raw_spin_unlock(spinlock_t *lock);
 extern int _raw_spin_trylock(spinlock_t *lock);
-extern unsigned long __spin_trylock(volatile unsigned long *lock);
 
 #endif
 
@@ -136,6 +135,26 @@ static __inline__ void _raw_read_unlock(rwlock_t *rw)
 	: "cr0", "memory");
 }
 
+static __inline__ int _raw_write_trylock(rwlock_t *rw)
+{
+	unsigned int tmp;
+
+	__asm__ __volatile__(
+"2:	lwarx	%0,0,%1		# write_trylock\n\
+	cmpwi	0,%0,0\n\
+	bne-	1f\n"
+	PPC405_ERR77(0,%1)
+"	stwcx.	%2,0,%1\n\
+	bne-	2b\n\
+	isync\n\
+1:"
+	: "=&r"(tmp)
+	: "r"(&rw->lock), "r"(-1)
+	: "cr0", "memory");
+
+	return tmp == 0;
+}
+
 static __inline__ void _raw_write_lock(rwlock_t *rw)
 {
 	unsigned int tmp;
@@ -169,6 +188,7 @@ extern void _raw_read_lock(rwlock_t *rw);
 extern void _raw_read_unlock(rwlock_t *rw);
 extern void _raw_write_lock(rwlock_t *rw);
 extern void _raw_write_unlock(rwlock_t *rw);
+extern int _raw_write_trylock(rwlock_t *rw);
 
 #endif
 

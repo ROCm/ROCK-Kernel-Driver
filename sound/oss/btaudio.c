@@ -327,6 +327,7 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
 {
 	struct btaudio *bta = file->private_data;
 	int ret,val=0,i=0;
+	void __user *argp = (void __user *)arg;
 
 	if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
@@ -334,7 +335,7 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
                 strlcpy(info.id,"bt878",sizeof(info.id));
                 strlcpy(info.name,"Brooktree Bt878 audio",sizeof(info.name));
                 info.modify_counter = bta->mixcount;
-                if (copy_to_user((void *)arg, &info, sizeof(info)))
+                if (copy_to_user(argp, &info, sizeof(info)))
                         return -EFAULT;
 		return 0;
 	}
@@ -343,16 +344,16 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
 		memset(&info,0,sizeof(info));
                 strlcpy(info.id,"bt878",sizeof(info.id)-1);
                 strlcpy(info.name,"Brooktree Bt878 audio",sizeof(info.name));
-                if (copy_to_user((void *)arg, &info, sizeof(info)))
+                if (copy_to_user(argp, &info, sizeof(info)))
                         return -EFAULT;
 		return 0;
 	}
 	if (cmd == OSS_GETVERSION)
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, (int __user *)argp);
 
 	/* read */
 	if (_SIOC_DIR(cmd) & _SIOC_WRITE)
-		if (get_user(val, (int *)arg))
+		if (get_user(val, (int __user *)argp))
 			return -EFAULT;
 
 	switch (cmd) {
@@ -421,7 +422,7 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
 	default:
 		return -EINVAL;
 	}
-	if (put_user(ret, (int *)arg))
+	if (put_user(ret, (int __user *)argp))
 		return -EFAULT;
 	return 0;
 }
@@ -503,7 +504,7 @@ static int btaudio_dsp_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
+static ssize_t btaudio_dsp_read(struct file *file, char __user *buffer,
 				size_t swcount, loff_t *ppos)
 {
 	struct btaudio *bta = file->private_data;
@@ -554,7 +555,7 @@ static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
 		} else if (!bta->analog) {
 			/* stereo => mono (digital audio) */
 			__s16 *src = (__s16*)(bta->buf_cpu + bta->read_offset);
-			__s16 *dst = (__s16*)(buffer + ret);
+			__s16 __user *dst = (__s16 __user *)(buffer + ret);
 			__s16 avg;
 			int n = ndst>>1;
 			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
@@ -565,13 +566,13 @@ static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
 			for (; n; n--, dst++) {
 				avg  = (__s16)le16_to_cpu(*src) / 2; src++;
 				avg += (__s16)le16_to_cpu(*src) / 2; src++;
-				__put_user(cpu_to_le16(avg),(__u16*)(dst));
+				__put_user(cpu_to_le16(avg),dst);
 			}
 
 		} else if (8 == bta->bits) {
 			/* copy + byte downsampling (audio A/D) */
 			__u8 *src = bta->buf_cpu + bta->read_offset;
-			__u8 *dst = buffer + ret;
+			__u8 __user *dst = buffer + ret;
 			int n = ndst;
 			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
 				if (0 == ret)
@@ -579,12 +580,12 @@ static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
 				break;
 			}
 			for (; n; n--, src += (1 << bta->sampleshift), dst++)
-				__put_user(*src,(__u8*)(dst));
+				__put_user(*src, dst);
 
 		} else {
 			/* copy + word downsampling (audio A/D) */
 			__u16 *src = (__u16*)(bta->buf_cpu + bta->read_offset);
-			__u16 *dst = (__u16*)(buffer + ret);
+			__u16 __user *dst = (__u16 __user *)(buffer + ret);
 			int n = ndst>>1;
 			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
 				if (0 == ret)
@@ -592,7 +593,7 @@ static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
 				break;
 			}
 			for (; n; n--, src += (1 << bta->sampleshift), dst++)
-				__put_user(*src,(__u16*)(dst));
+				__put_user(*src, dst);
 		}
 
 		ret     += ndst;
@@ -609,7 +610,7 @@ static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
 	return ret;
 }
 
-static ssize_t btaudio_dsp_write(struct file *file, const char *buffer,
+static ssize_t btaudio_dsp_write(struct file *file, const char __user *buffer,
 				 size_t count, loff_t *ppos)
 {
 	return -EINVAL;
@@ -620,15 +621,17 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 {
 	struct btaudio *bta = file->private_data;
 	int s, i, ret, val = 0;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	
         switch (cmd) {
         case OSS_GETVERSION:
-                return put_user(SOUND_VERSION, (int *)arg);
+                return put_user(SOUND_VERSION, p);
         case SNDCTL_DSP_GETCAPS:
 		return 0;
 
         case SNDCTL_DSP_SPEED:
-		if (get_user(val, (int*)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (bta->analog) {
 			for (s = 0; s < 16; s++)
@@ -656,14 +659,14 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 		/* fall through */
         case SOUND_PCM_READ_RATE:
 		if (bta->analog) {
-			return put_user(HWBASE_AD*4/bta->decimation>>bta->sampleshift, (int*)arg);
+			return put_user(HWBASE_AD*4/bta->decimation>>bta->sampleshift, p);
 		} else {
-			return put_user(bta->rate, (int*)arg);
+			return put_user(bta->rate, p);
 		}
 
         case SNDCTL_DSP_STEREO:
 		if (!bta->analog) {
-			if (get_user(val, (int*)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			bta->channels    = (val > 0) ? 2 : 1;
 			bta->sampleshift = (bta->channels == 2) ? 0 : 1;
@@ -681,11 +684,11 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 					       "btaudio: stereo=0 channels=1\n");
 			}
 		}
-		return put_user((bta->channels)-1, (int *)arg);
+		return put_user((bta->channels)-1, p);
 
         case SNDCTL_DSP_CHANNELS:
 		if (!bta->analog) {
-			if (get_user(val, (int*)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			bta->channels    = (val > 1) ? 2 : 1;
 			bta->sampleshift = (bta->channels == 2) ? 0 : 1;
@@ -696,16 +699,16 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 		}
 		/* fall through */
         case SOUND_PCM_READ_CHANNELS:
-		return put_user(bta->channels, (int *)arg);
+		return put_user(bta->channels, p);
 		
         case SNDCTL_DSP_GETFMTS: /* Returns a mask */
 		if (bta->analog)
-			return put_user(AFMT_S16_LE|AFMT_S8, (int*)arg);
+			return put_user(AFMT_S16_LE|AFMT_S8, p);
 		else
-			return put_user(AFMT_S16_LE, (int*)arg);
+			return put_user(AFMT_S16_LE, p);
 
         case SNDCTL_DSP_SETFMT: /* Selects ONE fmt*/
-		if (get_user(val, (int*)arg))
+		if (get_user(val, p))
 			return -EFAULT;
                 if (val != AFMT_QUERY) {
 			if (bta->analog)
@@ -722,10 +725,10 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 		if (debug)
 			printk(KERN_DEBUG "btaudio: fmt: bits=%d\n",bta->bits);
                 return put_user((bta->bits==16) ? AFMT_S16_LE : AFMT_S8,
-				(int*)arg);
+				p);
 		break;
         case SOUND_PCM_READ_BITS:
-		return put_user(bta->bits, (int*)arg);
+		return put_user(bta->bits, p);
 
         case SNDCTL_DSP_NONBLOCK:
                 file->f_flags |= O_NONBLOCK;
@@ -745,7 +748,7 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 			if (0 != (ret = make_risc(bta)))
 				return ret;
 		}
-		return put_user(bta->block_bytes>>bta->sampleshift,(int*)arg);
+		return put_user(bta->block_bytes>>bta->sampleshift,p);
 
         case SNDCTL_DSP_SYNC:
 		/* NOP */
@@ -764,7 +767,7 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 			       "returns %d/%d/%d/%d\n",
 			       info.fragsize, info.fragstotal,
 			       info.bytes, info.fragments);
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user(argp, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}

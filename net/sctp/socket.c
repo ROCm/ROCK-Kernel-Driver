@@ -1164,6 +1164,11 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	if (!asoc) {
 		SCTP_DEBUG_PRINTK("There is no association yet.\n");
 
+		if (sinfo_flags & (MSG_EOF | MSG_ABORT)) {
+			err = -EINVAL;
+			goto out_unlock;
+		}
+
 		/* Check for invalid stream against the stream counts,
 		 * either the default or the user specified stream counts.
 		 */
@@ -2799,7 +2804,7 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 
 	if (len != sizeof(struct sctp_paddrparams))
 		return -EINVAL;
-	if (copy_from_user(&params, optval, *optlen))	/* XXXXXX */
+	if (copy_from_user(&params, optval, len))
 		return -EFAULT;
 
 	trans = sctp_addr_id2transport(sk, &params.spp_address,
@@ -2969,7 +2974,7 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 	int cnt = 0;
 	struct sctp_getaddrs getaddrs;
 	struct sctp_sockaddr_entry *from;
-	void *to;
+	void __user *to;
 	union sctp_addr temp;
 	struct sctp_opt *sp = sctp_sk(sk);
 	int addrlen;
@@ -2996,7 +3001,7 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 		bp = &asoc->base.bind_addr;
 	}
 
-	to = (void *)getaddrs.addrs;
+	to = getaddrs.addrs;
 	list_for_each(pos, &bp->address_list) {
 		from = list_entry(pos,
 				struct sctp_sockaddr_entry,
@@ -4388,7 +4393,11 @@ out:
 	return err;
 
 do_error:
-	err = -ECONNREFUSED;
+	if (asoc->counters[SCTP_COUNTER_INIT_ERROR] + 1 >=
+					 	asoc->max_init_attempts)
+		err = -ETIMEDOUT;
+	else
+		err = -ECONNREFUSED;
 	goto out;
 
 do_interrupted:

@@ -1220,7 +1220,7 @@ static int fs_send (struct atm_vcc *atm_vcc, struct sk_buff *skb)
 /* Some function placeholders for functions we don't yet support. */
 
 #if 0
-static int fs_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
+static int fs_ioctl(struct atm_dev *dev,unsigned int cmd,void __user *arg)
 {
 	func_enter ();
 	func_exit ();
@@ -1229,7 +1229,7 @@ static int fs_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 
 
 static int fs_getsockopt(struct atm_vcc *vcc,int level,int optname,
-			 void *optval,int optlen)
+			 void __user *optval,int optlen)
 {
 	func_enter ();
 	func_exit ();
@@ -1238,7 +1238,7 @@ static int fs_getsockopt(struct atm_vcc *vcc,int level,int optname,
 
 
 static int fs_setsockopt(struct atm_vcc *vcc,int level,int optname,
-			 void *optval,int optlen)
+			 void __user *optval,int optlen)
 {
 	func_enter ();
 	func_exit ();

@@ -90,13 +90,4 @@ extern unsigned int get_lcdclk_frequency_10khz(void);
 
 #endif
 
-
-/*
- * Implementation specifics
- */
-
-#include "lubbock.h"
-#include "mainstone.h"
-#include "idp.h"
-
 #endif  /* _ASM_ARCH_HARDWARE_H */

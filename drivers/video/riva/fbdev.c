@@ -1620,14 +1620,27 @@ static int riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
 	struct riva_par *par = (struct riva_par *) info->par;
 	struct device_node *dp;
 	unsigned char *pedid = NULL;
+	unsigned char *disptype = NULL;
+	static char *propnames[] = {
+		"DFP,EDID", "LCD,EDID", "EDID", "EDID1", "EDID,B", "EDID,A", NULL };
+	int i;
 
 	dp = pci_device_to_OF_node(pd);
-	pedid = (unsigned char *)get_property(dp, "EDID,B", 0);
-
-	if (pedid) {
+	for (; dp != NULL; dp = dp->child) {
+		disptype = (unsigned char *)get_property(dp, "display-type", NULL);
+		if (disptype == NULL)
+			continue;
+		if (strncmp(disptype, "LCD", 3) != 0)
+			continue;
+		for (i = 0; propnames[i] != NULL; ++i) {
+			pedid = (unsigned char *)
+				get_property(dp, propnames[i], NULL);
+			if (pedid != NULL) {
 		par->EDID = pedid;
 		return 1;
-	} else
+			}
+		}
+	}
 		return 0;
 }
 #endif /* CONFIG_PPC_OF */

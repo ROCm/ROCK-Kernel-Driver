@@ -1579,7 +1579,7 @@ static irqreturn_t ali_interrupt(int irq, void *dev_id, struct pt_regs *regs)
    waiting to be copied to the user's buffer.  It is filled by the dma
    machine and drained by this loop. */
 
-static ssize_t ali_read(struct file *file, char *buffer,
+static ssize_t ali_read(struct file *file, char __user *buffer,
 			size_t count, loff_t * ppos)
 {
 	struct ali_state *state = (struct ali_state *) file->private_data;
@@ -1721,7 +1721,7 @@ done:
 /* in this loop, dmabuf.count signifies the amount of data that is waiting to be dma to
    the soundcard.  it is drained by the dma machine and filled by this loop. */
 static ssize_t ali_write(struct file *file,
-			 const char *buffer, size_t count, loff_t * ppos)
+			 const char __user *buffer, size_t count, loff_t * ppos)
 {
 	struct ali_state *state = (struct ali_state *) file->private_data;
 	struct ali_card *card = state ? state->card : 0;
@@ -1981,16 +1981,19 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 	unsigned int i_scr;
 	int val = 0, ret;
 	struct ac97_codec *codec = state->card->ac97_codec[0];
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
+
 #ifdef DEBUG
 	printk("ali_audio: ali_ioctl, arg=0x%x, cmd=",
-	       arg ? *(int *) arg : 0);
+	       arg ? *p : 0);
 #endif
 	switch (cmd) {
 	case OSS_GETVERSION:
 #ifdef DEBUG
 		printk("OSS_GETVERSION\n");
 #endif
-		return put_user(SOUND_VERSION, (int *) arg);
+		return put_user(SOUND_VERSION, p);
 	case SNDCTL_DSP_RESET:
 #ifdef DEBUG
 		printk("SNDCTL_DSP_RESET\n");
@@ -2058,7 +2061,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 #ifdef DEBUG
 		printk("SNDCTL_DSP_SPEED\n");
 #endif
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val >= 0) {
 			if (file->f_mode & FMODE_WRITE) {
@@ -2136,7 +2139,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 				spin_unlock_irqrestore(&state->card->lock, flags);
 			}
 		}
-		return put_user(dmabuf->rate, (int *) arg);
+		return put_user(dmabuf->rate, p);
 	case SNDCTL_DSP_STEREO:	/* set stereo or mono channel */
 #ifdef DEBUG
 		printk("SNDCTL_DSP_STEREO\n");
@@ -2153,7 +2156,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		if (dmabuf->enable & CONTROLLER_SPDIFOUT_RUNNING) {
 			stop_spdifout(state);
 		}
-		return put_user(1, (int *) arg);
+		return put_user(1, p);
 	case SNDCTL_DSP_GETBLKSIZE:
 		if (file->f_mode & FMODE_WRITE) {
 			if (codec_independent_spdif_locked > 0) {
@@ -2177,22 +2180,22 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETBLKSIZE %d\n", dmabuf->userfragsize);
 #endif
-		return put_user(dmabuf->userfragsize, (int *) arg);
+		return put_user(dmabuf->userfragsize, p);
 	case SNDCTL_DSP_GETFMTS:	/* Returns a mask of supported sample format */
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETFMTS\n");
 #endif
-		return put_user(AFMT_S16_LE, (int *) arg);
+		return put_user(AFMT_S16_LE, p);
 	case SNDCTL_DSP_SETFMT:	/* Select sample format */
 #ifdef DEBUG
 		printk("SNDCTL_DSP_SETFMT\n");
 #endif
-		return put_user(AFMT_S16_LE, (int *) arg);
+		return put_user(AFMT_S16_LE, p);
 	case SNDCTL_DSP_CHANNELS:	// add support 4,6 channel 
 #ifdef DEBUG
 		printk("SNDCTL_DSP_CHANNELS\n");
 #endif
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val > 0) {
 			if (dmabuf->enable & DAC_RUNNING) {
@@ -2208,7 +2211,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 				stop_adc(state);
 			}
 		} else {
-			return put_user(state->card->channels, (int *) arg);
+			return put_user(state->card->channels, p);
 		}
 
 		i_scr = inl(state->card->iobase + ALI_SCR);
@@ -2243,7 +2246,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 			val = ret;
 			break;
 		}
-		return put_user(val, (int *) arg);
+		return put_user(val, p);
 	case SNDCTL_DSP_POST:	/* the user has sent all data and is notifying us */
 		/* we update the swptr to the end of the last sg segment then return */
 #ifdef DEBUG
@@ -2270,7 +2273,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 	case SNDCTL_DSP_SUBDIVIDE:
 		if (dmabuf->subdivision)
 			return -EINVAL;
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != 1 && val != 2 && val != 4)
 			return -EINVAL;
@@ -2281,7 +2284,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		dmabuf->ready = 0;
 		return 0;
 	case SNDCTL_DSP_SETFRAGMENT:
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		dmabuf->ossfragsize = 1 << (val & 0xffff);
 		dmabuf->ossmaxfrags = (val >> 16) & 0xffff;
@@ -2360,7 +2363,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		       abinfo.bytes, abinfo.fragsize, abinfo.fragments,
 		       abinfo.fragstotal);
 #endif
-		return copy_to_user((void *) arg, &abinfo,
+		return copy_to_user(argp, &abinfo,
 				    sizeof(abinfo)) ? -EFAULT : 0;
 	case SNDCTL_DSP_GETOPTR:
 		if (!(file->f_mode & FMODE_WRITE))
@@ -2408,7 +2411,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		printk("SNDCTL_DSP_GETOPTR %d, %d, %d, %d\n", cinfo.bytes,
 		       cinfo.blocks, cinfo.ptr, dmabuf->count);
 #endif
-		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo))? -EFAULT : 0;
+		return copy_to_user(argp, &cinfo, sizeof(cinfo))? -EFAULT : 0;
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
 			return -EINVAL;
@@ -2425,7 +2428,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		       abinfo.bytes, abinfo.fragsize, abinfo.fragments,
 		       abinfo.fragstotal);
 #endif
-		return copy_to_user((void *) arg, &abinfo,
+		return copy_to_user(argp, &abinfo,
 				    sizeof(abinfo)) ? -EFAULT : 0;
 	case SNDCTL_DSP_GETIPTR:
 		if (!(file->f_mode & FMODE_READ))
@@ -2447,7 +2450,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		printk("SNDCTL_DSP_GETIPTR %d, %d, %d, %d\n", cinfo.bytes,
 		       cinfo.blocks, cinfo.ptr, dmabuf->count);
 #endif
-		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo))? -EFAULT: 0;
+		return copy_to_user(argp, &cinfo, sizeof(cinfo))? -EFAULT: 0;
 	case SNDCTL_DSP_NONBLOCK:
 #ifdef DEBUG
 		printk("SNDCTL_DSP_NONBLOCK\n");
@@ -2459,15 +2462,15 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		printk("SNDCTL_DSP_GETCAPS\n");
 #endif
 		return put_user(DSP_CAP_REALTIME | DSP_CAP_TRIGGER |
-				DSP_CAP_MMAP | DSP_CAP_BIND, (int *) arg);
+				DSP_CAP_MMAP | DSP_CAP_BIND, p);
 	case SNDCTL_DSP_GETTRIGGER:
 		val = 0;
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETTRIGGER 0x%x\n", dmabuf->trigger);
 #endif
-		return put_user(dmabuf->trigger, (int *) arg);
+		return put_user(dmabuf->trigger, p);
 	case SNDCTL_DSP_SETTRIGGER:
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			return -EFAULT;
 #if defined(DEBUG) || defined(DEBUG_MMAP)
 		printk("SNDCTL_DSP_SETTRIGGER 0x%x\n", val);
@@ -2586,27 +2589,27 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETODELAY %d\n", dmabuf->count);
 #endif
-		return put_user(val, (int *) arg);
+		return put_user(val, p);
 	case SOUND_PCM_READ_RATE:
 #ifdef DEBUG
 		printk("SOUND_PCM_READ_RATE %d\n", dmabuf->rate);
 #endif
-		return put_user(dmabuf->rate, (int *) arg);
+		return put_user(dmabuf->rate, p);
 	case SOUND_PCM_READ_CHANNELS:
 #ifdef DEBUG
 		printk("SOUND_PCM_READ_CHANNELS\n");
 #endif
-		return put_user(2, (int *) arg);
+		return put_user(2, p);
 	case SOUND_PCM_READ_BITS:
 #ifdef DEBUG
 		printk("SOUND_PCM_READ_BITS\n");
 #endif
-		return put_user(AFMT_S16_LE, (int *) arg);
+		return put_user(AFMT_S16_LE, p);
 	case SNDCTL_DSP_SETSPDIF:	/* Set S/PDIF Control register */
 #ifdef DEBUG
 		printk("SNDCTL_DSP_SETSPDIF\n");
 #endif
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		/* Check to make sure the codec supports S/PDIF transmitter */
 		if ((state->card->ac97_features & 4)) {
@@ -2625,12 +2628,12 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		else
 			printk(KERN_WARNING "ali_audio: S/PDIF transmitter not avalible.\n");
 #endif
-		return put_user(val, (int *) arg);
+		return put_user(val, p);
 	case SNDCTL_DSP_GETSPDIF:	/* Get S/PDIF Control register */
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETSPDIF\n");
 #endif
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		/* Check to make sure the codec supports S/PDIF transmitter */
 		if (!(state->card->ac97_features & 4)) {
@@ -2642,14 +2645,14 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 			val = ali_ac97_get(codec, AC97_SPDIF_CONTROL);
 		}
 
-		return put_user(val, (int *) arg);
+		return put_user(val, p);
 //end add support spdif out
 //add support 4,6 channel
 	case SNDCTL_DSP_GETCHANNELMASK:
 #ifdef DEBUG
 		printk("SNDCTL_DSP_GETCHANNELMASK\n");
 #endif
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		/* Based on AC'97 DAC support, not ICH hardware */
 		val = DSP_BIND_FRONT;
@@ -2659,12 +2662,12 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 			val |= DSP_BIND_SURR;
 		if (state->card->ac97_features & 0x0140)
 			val |= DSP_BIND_CENTER_LFE;
-		return put_user(val, (int *) arg);
+		return put_user(val, p);
 	case SNDCTL_DSP_BIND_CHANNEL:
 #ifdef DEBUG
 		printk("SNDCTL_DSP_BIND_CHANNEL\n");
 #endif
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val == DSP_BIND_QUERY) {
 			val = DSP_BIND_FRONT;	/* Always report this as being enabled */
@@ -2749,7 +2752,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 					val &= ~DSP_BIND_CENTER_LFE;
 			}
 		}
-		return put_user(val, (int *) arg);
+		return put_user(val, p);
 	case SNDCTL_DSP_MAPINBUF:
 	case SNDCTL_DSP_MAPOUTBUF:
 	case SNDCTL_DSP_SETSYNCRO:

@@ -1706,105 +1706,108 @@ static void destroy_queues (amb_dev * dev) {
 }
 
 /********** basic loader commands and error handling **********/
+// centisecond timeouts - guessing away here
+static unsigned int command_timeouts [] = {
+	[host_memory_test]     = 15,
+	[read_adapter_memory]  = 2,
+	[write_adapter_memory] = 2,
+	[adapter_start]        = 50,
+	[get_version_number]   = 10,
+	[interrupt_host]       = 1,
+	[flash_erase_sector]   = 1,
+	[adap_download_block]  = 1,
+	[adap_erase_flash]     = 1,
+	[adap_run_in_iram]     = 1,
+	[adap_end_download]    = 1
+};
+
+
+unsigned int command_successes [] = {
+	[host_memory_test]     = COMMAND_PASSED_TEST,
+	[read_adapter_memory]  = COMMAND_READ_DATA_OK,
+	[write_adapter_memory] = COMMAND_WRITE_DATA_OK,
+	[adapter_start]        = COMMAND_COMPLETE,
+	[get_version_number]   = COMMAND_COMPLETE,
+	[interrupt_host]       = COMMAND_COMPLETE,
+	[flash_erase_sector]   = COMMAND_COMPLETE,
+	[adap_download_block]  = COMMAND_COMPLETE,
+	[adap_erase_flash]     = COMMAND_COMPLETE,
+	[adap_run_in_iram]     = COMMAND_COMPLETE,
+	[adap_end_download]    = COMMAND_COMPLETE
+};
+  
+static  int decode_loader_result (loader_command cmd, u32 result)
+{
+	int res;
+	const char *msg;
+
+	if (result == command_successes[cmd])
+		return 0;
+
+	switch (result) {
+		case BAD_COMMAND:
+			res = -EINVAL;
+			msg = "bad command";
+			break;
+		case COMMAND_IN_PROGRESS:
+			res = -ETIMEDOUT;
+			msg = "command in progress";
+			break;
+		case COMMAND_PASSED_TEST:
+			res = 0;
+			msg = "command passed test";
+			break;
+		case COMMAND_FAILED_TEST:
+			res = -EIO;
+			msg = "command failed test";
+			break;
+		case COMMAND_READ_DATA_OK:
+			res = 0;
+			msg = "command read data ok";
+			break;
+		case COMMAND_READ_BAD_ADDRESS:
+			res = -EINVAL;
+			msg = "command read bad address";
+			break;
+		case COMMAND_WRITE_DATA_OK:
+			res = 0;
+			msg = "command write data ok";
+			break;
+		case COMMAND_WRITE_BAD_ADDRESS:
+			res = -EINVAL;
+			msg = "command write bad address";
+			break;
+		case COMMAND_WRITE_FLASH_FAILURE:
+			res = -EIO;
+			msg = "command write flash failure";
+			break;
+		case COMMAND_COMPLETE:
+			res = 0;
+			msg = "command complete";
+			break;
+		case COMMAND_FLASH_ERASE_FAILURE:
+			res = -EIO;
+			msg = "command flash erase failure";
+			break;
+		case COMMAND_WRITE_BAD_DATA:
+			res = -EINVAL;
+			msg = "command write bad data";
+			break;
+		default:
+			res = -EINVAL;
+			msg = "unknown error";
+			PRINTD (DBG_LOAD|DBG_ERR,
+				"decode_loader_result got %d=%x !",
+				result, result);
+			break;
+	}
+
+	PRINTK (KERN_ERR, "%s", msg);
+	return res;
+}
 
 static int __init do_loader_command (volatile loader_block * lb,
 				     const amb_dev * dev, loader_command cmd) {
-  // centisecond timeouts - guessing away here
-  unsigned int command_timeouts [] = {
-    [host_memory_test]     = 15,
-    [read_adapter_memory]  = 2,
-    [write_adapter_memory] = 2,
-    [adapter_start]        = 50,
-    [get_version_number]   = 10,
-    [interrupt_host]       = 1,
-    [flash_erase_sector]   = 1,
-    [adap_download_block]  = 1,
-    [adap_erase_flash]     = 1,
-    [adap_run_in_iram]     = 1,
-    [adap_end_download]    = 1
-  };
-  
-  unsigned int command_successes [] = {
-    [host_memory_test]     = COMMAND_PASSED_TEST,
-    [read_adapter_memory]  = COMMAND_READ_DATA_OK,
-    [write_adapter_memory] = COMMAND_WRITE_DATA_OK,
-    [adapter_start]        = COMMAND_COMPLETE,
-    [get_version_number]   = COMMAND_COMPLETE,
-    [interrupt_host]       = COMMAND_COMPLETE,
-    [flash_erase_sector]   = COMMAND_COMPLETE,
-    [adap_download_block]  = COMMAND_COMPLETE,
-    [adap_erase_flash]     = COMMAND_COMPLETE,
-    [adap_run_in_iram]     = COMMAND_COMPLETE,
-    [adap_end_download]    = COMMAND_COMPLETE
-  };
-  
-  int decode_loader_result (loader_command cmd, u32 result) {
-    int res;
-    const char * msg;
-    
-    if (result == command_successes[cmd])
-      return 0;
-    
-    switch (result) {
-      case BAD_COMMAND:
-	res = -EINVAL;
-	msg = "bad command";
-	break;
-      case COMMAND_IN_PROGRESS:
-	res = -ETIMEDOUT;
-	msg = "command in progress";
-	break;
-      case COMMAND_PASSED_TEST:
-	res = 0;
-	msg = "command passed test";
-	break;
-      case COMMAND_FAILED_TEST:
-	res = -EIO;
-	msg = "command failed test";
-	break;
-      case COMMAND_READ_DATA_OK:
-	res = 0;
-	msg = "command read data ok";
-	break;
-      case COMMAND_READ_BAD_ADDRESS:
-	res = -EINVAL;
-	msg = "command read bad address";
-	break;
-      case COMMAND_WRITE_DATA_OK:
-	res = 0;
-	msg = "command write data ok";
-	break;
-      case COMMAND_WRITE_BAD_ADDRESS:
-	res = -EINVAL;
-	msg = "command write bad address";
-	break;
-      case COMMAND_WRITE_FLASH_FAILURE:
-	res = -EIO;
-	msg = "command write flash failure";
-	break;
-      case COMMAND_COMPLETE:
-	res = 0;
-	msg = "command complete";
-	break;
-      case COMMAND_FLASH_ERASE_FAILURE:
-	res = -EIO;
-	msg = "command flash erase failure";
-	break;
-      case COMMAND_WRITE_BAD_DATA:
-	res = -EINVAL;
-	msg = "command write bad data";
-	break;
-      default:
-	res = -EINVAL;
-	msg = "unknown error";
-	PRINTD (DBG_LOAD|DBG_ERR, "decode_loader_result got %d=%x !",
-		result, result);
-	break;
-    }
-    
-    PRINTK (KERN_ERR, "%s", msg);
-    return res;
-  }
   
   unsigned long timeout;
   
@@ -1930,6 +1933,11 @@ static int __init loader_start (loader_block * lb,
 
 /********** reset card **********/
 
+static inline void sf (const char * msg)
+{
+	PRINTK (KERN_ERR, "self-test failed: %s", msg);
+}
+
 static int amb_reset (amb_dev * dev, int diags) {
   u32 word;
   
@@ -1974,9 +1982,6 @@ static int amb_reset (amb_dev * dev, int diags) {
     // XXX double check byte-order
     word = rd_mem (dev, offsetof(amb_mem, mb.loader.result));
     if (word & SELF_TEST_FAILURE) {
-      void sf (const char * msg) {
-	PRINTK (KERN_ERR, "self-test failed: %s", msg);
-      }
       if (word & GPINT_TST_FAILURE)
 	sf ("interrupt");
       if (word & SUNI_DATA_PATTERN_FAILURE)
@@ -2044,31 +2049,31 @@ static int __init ucode_init (loader_block * lb, amb_dev * dev) {
 }
 
 /********** give adapter parameters **********/
+  
+static inline u32 bus_addr(void * addr) {
+    return cpu_to_be32 (virt_to_bus (addr));
+}
 
 static int __init amb_talk (amb_dev * dev) {
   adap_talk_block a;
   unsigned char pool;
   unsigned long timeout;
   
-  u32 x (void * addr) {
-    return cpu_to_be32 (virt_to_bus (addr));
-  }
-  
   PRINTD (DBG_FLOW, "amb_talk %p", dev);
   
-  a.command_start = x (dev->cq.ptrs.start);
-  a.command_end   = x (dev->cq.ptrs.limit);
-  a.tx_start      = x (dev->txq.in.start);
-  a.tx_end        = x (dev->txq.in.limit);
-  a.txcom_start   = x (dev->txq.out.start);
-  a.txcom_end     = x (dev->txq.out.limit);
+  a.command_start = bus_addr (dev->cq.ptrs.start);
+  a.command_end   = bus_addr (dev->cq.ptrs.limit);
+  a.tx_start      = bus_addr (dev->txq.in.start);
+  a.tx_end        = bus_addr (dev->txq.in.limit);
+  a.txcom_start   = bus_addr (dev->txq.out.start);
+  a.txcom_end     = bus_addr (dev->txq.out.limit);
   
   for (pool = 0; pool < NUM_RX_POOLS; ++pool) {
     // the other "a" items are set up by the adapter
-    a.rec_struct[pool].buffer_start = x (dev->rxq[pool].in.start);
-    a.rec_struct[pool].buffer_end   = x (dev->rxq[pool].in.limit);
-    a.rec_struct[pool].rx_start     = x (dev->rxq[pool].out.start);
-    a.rec_struct[pool].rx_end       = x (dev->rxq[pool].out.limit);
+    a.rec_struct[pool].buffer_start = bus_addr (dev->rxq[pool].in.start);
+    a.rec_struct[pool].buffer_end   = bus_addr (dev->rxq[pool].in.limit);
+    a.rec_struct[pool].rx_start     = bus_addr (dev->rxq[pool].out.start);
+    a.rec_struct[pool].rx_end       = bus_addr (dev->rxq[pool].out.limit);
     a.rec_struct[pool].buffer_size = cpu_to_be32 (dev->rxq[pool].buffer_size);
   }
   
@@ -2111,15 +2116,10 @@ static void __init amb_ucode_version (amb_dev * dev) {
   minor = be32_to_cpu (cmd.args.version.minor);
   PRINTK (KERN_INFO, "microcode version is %u.%u", major, minor);
 }
-
-// get end station address
-static void __init amb_esi (amb_dev * dev, u8 * esi) {
-  u32 lower4;
-  u16 upper2;
-  command cmd;
   
-  // swap bits within byte to get Ethernet ordering
-  u8 bit_swap (u8 byte) {
+// swap bits within byte to get Ethernet ordering
+u8 bit_swap (u8 byte)
+{
     const u8 swap[] = {
       0x0, 0x8, 0x4, 0xc,
       0x2, 0xa, 0x6, 0xe,
@@ -2127,7 +2127,13 @@ static void __init amb_esi (amb_dev * dev, u8 * esi) {
       0x3, 0xb, 0x7, 0xf
     };
     return ((swap[byte & 0xf]<<4) | swap[byte>>4]);
-  }
+}
+
+// get end station address
+static void __init amb_esi (amb_dev * dev, u8 * esi) {
+  u32 lower4;
+  u16 upper2;
+  command cmd;
   
   cmd.request = cpu_to_be32 (SRB_GET_BIA);
   while (command_do (dev, &cmd)) {
@@ -2155,29 +2161,31 @@ static void __init amb_esi (amb_dev * dev, u8 * esi) {
   
   return;
 }
-
-static int __init amb_init (amb_dev * dev) {
-  loader_block lb;
   
-  void fixup_plx_window (void) {
-    // fix up the PLX-mapped window base address to match the block
-    unsigned long blb;
-    u32 mapreg;
-    blb = virt_to_bus (&lb);
-    // the kernel stack had better not ever cross a 1Gb boundary!
-    mapreg = rd_plain (dev, offsetof(amb_mem, stuff[10]));
-    mapreg &= ~onegigmask;
-    mapreg |= blb & onegigmask;
-    wr_plain (dev, offsetof(amb_mem, stuff[10]), mapreg);
-    return;
-  }
+static void fixup_plx_window (amb_dev *dev, loader_block *lb)
+{
+	// fix up the PLX-mapped window base address to match the block
+	unsigned long blb;
+	u32 mapreg;
+	blb = virt_to_bus(lb);
+	// the kernel stack had better not ever cross a 1Gb boundary!
+	mapreg = rd_plain (dev, offsetof(amb_mem, stuff[10]));
+	mapreg &= ~onegigmask;
+	mapreg |= blb & onegigmask;
+	wr_plain (dev, offsetof(amb_mem, stuff[10]), mapreg);
+	return;
+}
+
+static int __init amb_init (amb_dev * dev)
+{
+  loader_block lb;
   
   u32 version;
   
   if (amb_reset (dev, 1)) {
     PRINTK (KERN_ERR, "card reset failed!");
   } else {
-    fixup_plx_window ();
+    fixup_plx_window (dev, &lb);
     
     if (get_loader_version (&lb, dev, &version)) {
       PRINTK (KERN_INFO, "failed to get loader version");
@@ -2210,28 +2218,17 @@ static int __init amb_init (amb_dev * dev) {
   return -1;
 }
 
-static int __init amb_probe (void) {
-  struct pci_dev * pci_dev;
-  int devs;
-  
-  void __init do_pci_device (void) {
-    amb_dev * dev;
-    
-    // read resources from PCI configuration space
-    u8 irq = pci_dev->irq;
-    u32 * membase = bus_to_virt (pci_resource_start (pci_dev, 0));
-    u32 iobase = pci_resource_start (pci_dev, 1);
-    
-    void setup_dev (void) {
+static void setup_dev(amb_dev *dev, struct pci_dev *pci_dev) 
+{
       unsigned char pool;
       memset (dev, 0, sizeof(amb_dev));
       
       // set up known dev items straight away
       dev->pci_dev = pci_dev; 
       
-      dev->iobase = iobase;
-      dev->irq = irq; 
-      dev->membase = membase;
+      dev->iobase = pci_resource_start (pci_dev, 1);
+      dev->irq = pci_dev->irq; 
+      dev->membase = bus_to_virt(pci_resource_start(pci_dev, 0));
       
       // flags (currently only dead)
       dev->flags = 0;
@@ -2258,16 +2255,17 @@ static int __init amb_probe (void) {
       spin_lock_init (&dev->txq.lock);
       for (pool = 0; pool < NUM_RX_POOLS; ++pool)
 	spin_lock_init (&dev->rxq[pool].lock);
-    }
-    
-    void setup_pci_dev (void) {
+}
+
+static void setup_pci_dev(struct pci_dev *pci_dev)
+{
       unsigned char lat;
       
       /* XXX check return value */
-      pci_enable_device (pci_dev);
+      pci_enable_device(pci_dev);
 
       // enable bus master accesses
-      pci_set_master (pci_dev);
+      pci_set_master(pci_dev);
       
       // frobnicate latency (upwards, usually)
       pci_read_config_byte (pci_dev, PCI_LATENCY_TIMER, &lat);
@@ -2280,79 +2278,92 @@ static int __init amb_probe (void) {
 		"increasing", lat, MIN_PCI_LATENCY);
 	pci_write_config_byte (pci_dev, PCI_LATENCY_TIMER, MIN_PCI_LATENCY);
       }
-    }
-    
-    PRINTD (DBG_INFO, "found Madge ATM adapter (amb) at"
-	    " IO %x, IRQ %u, MEM %p", iobase, irq, membase);
-    
-    // check IO region
-    if (!request_region (iobase, AMB_EXTENT, DEV_LABEL)) {
-      PRINTK (KERN_ERR, "IO range already in use!");
-      return;
-    }
-    
-    dev = kmalloc (sizeof(amb_dev), GFP_KERNEL);
-    if (!dev) {
-      // perhaps we should be nice: deregister all adapters and abort?
-      PRINTK (KERN_ERR, "out of memory!");
-      release_region (iobase, AMB_EXTENT);
-      return;
-    }
-    
-    setup_dev();
-    
-    if (amb_init (dev)) {
-      PRINTK (KERN_ERR, "adapter initialisation failure");
-    } else {
-      
-      setup_pci_dev();
-      
-      // grab (but share) IRQ and install handler
-      if (request_irq (irq, interrupt_handler, SA_SHIRQ, DEV_LABEL, dev)) {
-	PRINTK (KERN_ERR, "request IRQ failed!");
-	// free_irq is at "endif"
-      } else {
-	
+}
+
+static int __init do_pci_device(struct pci_dev *pci_dev)
+{
+	amb_dev * dev;
+	int err;
+
+	// read resources from PCI configuration space
+	u8 irq = pci_dev->irq;
+	u32 * membase = bus_to_virt (pci_resource_start (pci_dev, 0));
+	u32 iobase = pci_resource_start (pci_dev, 1);
+
+	PRINTD (DBG_INFO, "found Madge ATM adapter (amb) at"
+		" IO %x, IRQ %u, MEM %p", iobase, irq, membase);
+
+	// check IO region
+	if (!request_region (iobase, AMB_EXTENT, DEV_LABEL)) {
+		PRINTK (KERN_ERR, "IO range already in use!");
+		return -EBUSY;
+	}
+
+	dev = kmalloc (sizeof(amb_dev), GFP_KERNEL);
+	if (!dev) {
+		PRINTK (KERN_ERR, "out of memory!");
+		err = -ENOMEM;
+		goto out;
+	}
+
+	setup_dev(dev, pci_dev);
+
+	if (amb_init (dev)) {
+		PRINTK (KERN_ERR, "adapter initialisation failure");
+		err = -EINVAL;
+		goto out1;
+	}
+
+	setup_pci_dev(pci_dev);
+
+	// grab (but share) IRQ and install handler
+	if (request_irq (irq, interrupt_handler, SA_SHIRQ, DEV_LABEL, dev)) {
+		PRINTK (KERN_ERR, "request IRQ failed!");
+		err = -EBUSY;
+		goto out2;
+	}
+
 	dev->atm_dev = atm_dev_register (DEV_LABEL, &amb_ops, -1, NULL);
 	if (!dev->atm_dev) {
-	  PRINTD (DBG_ERR, "failed to register Madge ATM adapter");
-	} else {
-	  
-	  PRINTD (DBG_INFO, "registered Madge ATM adapter (no. %d) (%p) at %p",
-		  dev->atm_dev->number, dev, dev->atm_dev);
-	  dev->atm_dev->dev_data = (void *) dev;
-	  
-	  // register our address
-	  amb_esi (dev, dev->atm_dev->esi);
-	  
-	  // 0 bits for vpi, 10 bits for vci
-	  dev->atm_dev->ci_range.vpi_bits = NUM_VPI_BITS;
-	  dev->atm_dev->ci_range.vci_bits = NUM_VCI_BITS;
-	  
-	  // update count and linked list
-	  ++devs;
-	  dev->prev = amb_devs;
-	  amb_devs = dev;
-	  
-	  // enable host interrupts
-	  interrupts_on (dev);
-	  
-	  // success
-	  return;
-	  
-	  // not currently reached
-	  atm_dev_deregister (dev->atm_dev);
-	} /* atm_dev_register */
-	
+		PRINTD (DBG_ERR, "failed to register Madge ATM adapter");
+		err = -EINVAL;
+		goto out3;
+	}
+
+	PRINTD (DBG_INFO, "registered Madge ATM adapter (no. %d) (%p) at %p",
+		dev->atm_dev->number, dev, dev->atm_dev);
+		dev->atm_dev->dev_data = (void *) dev;
+
+	// register our address
+	amb_esi (dev, dev->atm_dev->esi);
+
+	// 0 bits for vpi, 10 bits for vci
+	dev->atm_dev->ci_range.vpi_bits = NUM_VPI_BITS;
+	dev->atm_dev->ci_range.vci_bits = NUM_VCI_BITS;
+
+	// update linked list
+	dev->prev = amb_devs;
+	amb_devs = dev;
+
+	// enable host interrupts
+	interrupts_on (dev);
+
+	return 0;
+
+out3:
 	free_irq (irq, dev);
-      } /* request_irq */
-      
-      amb_reset (dev, 0);
-    } /* amb_init */
-    
-    kfree (dev);
-    release_region (iobase, AMB_EXTENT);
-  } /* kmalloc, end-of-fn */
+out2:
+	amb_reset (dev, 0);
+out1:
+	kfree (dev);
+out:
+	release_region (iobase, AMB_EXTENT);
+	return err;
+}
+
+static int __init amb_probe (void) {
+  struct pci_dev * pci_dev;
+  int devs;
   
   PRINTD (DBG_FLOW, "amb_probe");
   
@@ -2360,8 +2371,11 @@ static int __init amb_probe (void) {
   pci_dev = NULL;
   while ((pci_dev = pci_find_device
           (PCI_VENDOR_ID_MADGE, PCI_DEVICE_ID_MADGE_AMBASSADOR, pci_dev)
-          ))
-    do_pci_device();
+          )) {
+	if (do_pci_device(pci_dev) == 0)
+		devs++;
+  }
+
   
   pci_dev = NULL;
   while ((pci_dev = pci_find_device

@@ -330,18 +330,8 @@ setup_arch (char **cmdline_p)
 		setup_serial_hcdp(efi.hcdp);
 	}
 #endif
-	/*
-	 * Without HCDP, we won't discover any serial ports until the serial driver looks
-	 * in the ACPI namespace.  If ACPI claims there are some legacy devices, register
-	 * the legacy COM ports so serial console works earlier.  This is slightly dangerous
-	 * because we don't *really* know whether there's anything there, but we hope that
-	 * all new boxes will implement HCDP.
-	 */
-	{
-		extern unsigned char acpi_legacy_devices;
-		if (!efi.hcdp && acpi_legacy_devices)
-			setup_serial_legacy();
-	}
+	if (!efi.hcdp)
+		setup_serial_legacy();
 #endif
 
 #ifdef CONFIG_VT
@@ -634,6 +624,9 @@ cpu_init (void)
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_cpu_init();
 #endif
+
+	/* Clear ITC to eliminiate sched_clock() overflows in human time.  */
+	ia64_set_itc(0);
 
 	/* disable all local interrupt sources: */
 	ia64_set_itv(1 << 16);

@@ -845,21 +845,22 @@ static int mixer_ioctl(struct es1370_state *s, unsigned int cmd, unsigned long a
 	unsigned long flags;
 	int i, val;
 	unsigned char l, r, rl, rr;
+	int __user *p = (int __user *)arg;
 
 	VALIDATE_STATE(s);
 	if (cmd == SOUND_MIXER_PRIVATE1) {
 		/* enable/disable/query mixer preamp */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != -1) {
 			s->mix.micpreamp = !!val;
 			wrcodec(s, 0x19, s->mix.micpreamp);
 		}
-		return put_user(s->mix.micpreamp, (int *)arg);
+		return put_user(s->mix.micpreamp, p);
 	}
 	if (cmd == SOUND_MIXER_PRIVATE2) {
 		/* enable/disable/query use of linein as second lineout */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != -1) {
 			spin_lock_irqsave(&s->lock, flags);
@@ -870,11 +871,11 @@ static int mixer_ioctl(struct es1370_state *s, unsigned int cmd, unsigned long a
 			outl(s->ctrl, s->io+ES1370_REG_CONTROL);
 			spin_unlock_irqrestore(&s->lock, flags);
 		}
-		return put_user((s->ctrl & CTRL_XCTL0) ? 1 : 0, (int *)arg);
+		return put_user((s->ctrl & CTRL_XCTL0) ? 1 : 0, p);
 	}
 	if (cmd == SOUND_MIXER_PRIVATE3) {
 		/* enable/disable/query microphone impedance setting */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != -1) {
 			spin_lock_irqsave(&s->lock, flags);
@@ -885,14 +886,14 @@ static int mixer_ioctl(struct es1370_state *s, unsigned int cmd, unsigned long a
 			outl(s->ctrl, s->io+ES1370_REG_CONTROL);
 			spin_unlock_irqrestore(&s->lock, flags);
 		}
-		return put_user((s->ctrl & CTRL_XCTL1) ? 1 : 0, (int *)arg);
+		return put_user((s->ctrl & CTRL_XCTL1) ? 1 : 0, p);
 	}
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
 		strncpy(info.id, "ES1370", sizeof(info.id));
 		strncpy(info.name, "Ensoniq ES1370", sizeof(info.name));
 		info.modify_counter = s->mix.modcnt;
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
@@ -900,49 +901,49 @@ static int mixer_ioctl(struct es1370_state *s, unsigned int cmd, unsigned long a
 		_old_mixer_info info;
 		strncpy(info.id, "ES1370", sizeof(info.id));
 		strncpy(info.name, "Ensoniq ES1370", sizeof(info.name));
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
 	}
 	if (cmd == OSS_GETVERSION)
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, p);
 	if (_IOC_TYPE(cmd) != 'M' || _SIOC_SIZE(cmd) != sizeof(int))
                 return -EINVAL;
         if (_SIOC_DIR(cmd) == _SIOC_READ) {
                 switch (_IOC_NR(cmd)) {
                 case SOUND_MIXER_RECSRC: /* Arg contains a bit for each recording source */
-			return put_user(s->mix.recsrc, (int *)arg);
+			return put_user(s->mix.recsrc, p);
 			
                 case SOUND_MIXER_DEVMASK: /* Arg contains a bit for each supported device */
 			val = SOUND_MASK_IMIX;
 			for (i = 0; i < SOUND_MIXER_NRDEVICES; i++)
 				if (mixtable[i].avail)
 					val |= 1 << i;
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 
                 case SOUND_MIXER_RECMASK: /* Arg contains a bit for each supported recording source */
 			for (val = i = 0; i < SOUND_MIXER_NRDEVICES; i++)
 				if (mixtable[i].recmask)
 					val |= 1 << i;
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 			
                 case SOUND_MIXER_STEREODEVS: /* Mixer channels supporting stereo */
 			for (val = i = 0; i < SOUND_MIXER_NRDEVICES; i++)
 				if (mixtable[i].stereo)
 					val |= 1 << i;
-			return put_user(val, (int *)arg);
+			return put_user(val, p);
 			
                 case SOUND_MIXER_CAPS:
-			return put_user(0, (int *)arg);
+			return put_user(0, p);
 		
 		case SOUND_MIXER_IMIX:
-			return put_user(s->mix.imix, (int *)arg);
+			return put_user(s->mix.imix, p);
 
 		default:
 			i = _IOC_NR(cmd);
                         if (i >= SOUND_MIXER_NRDEVICES || !mixtable[i].avail)
                                 return -EINVAL;
-			return put_user(s->mix.vol[mixtable[i].volidx], (int *)arg);
+			return put_user(s->mix.vol[mixtable[i].volidx], p);
 		}
 	}
         if (_SIOC_DIR(cmd) != (_SIOC_READ|_SIOC_WRITE)) 
@@ -951,13 +952,13 @@ static int mixer_ioctl(struct es1370_state *s, unsigned int cmd, unsigned long a
 	switch (_IOC_NR(cmd)) {
 
 	case SOUND_MIXER_IMIX:
-		if (get_user(s->mix.imix, (int *)arg))
+		if (get_user(s->mix.imix, p))
 			return -EFAULT;
 		set_recsrc(s, s->mix.recsrc);
 		return 0;
 
 	case SOUND_MIXER_RECSRC: /* Arg contains a bit for each recording source */
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		set_recsrc(s, val);
 		return 0;
@@ -966,7 +967,7 @@ static int mixer_ioctl(struct es1370_state *s, unsigned int cmd, unsigned long a
 		i = _IOC_NR(cmd);
 		if (i >= SOUND_MIXER_NRDEVICES || !mixtable[i].avail)
 			return -EINVAL;
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		l = val & 0xff;
 		if (l > 100)
@@ -1015,7 +1016,7 @@ static int mixer_ioctl(struct es1370_state *s, unsigned int cmd, unsigned long a
 #else
 		s->mix.vol[mixtable[i].volidx] = val;
 #endif
-                return put_user(s->mix.vol[mixtable[i].volidx], (int *)arg);
+                return put_user(s->mix.vol[mixtable[i].volidx], p);
 	}
 }
 
@@ -1136,7 +1137,7 @@ static int drain_dac2(struct es1370_state *s, int nonblock)
 
 /* --------------------------------------------------------------------- */
 
-static ssize_t es1370_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t es1370_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct es1370_state *s = (struct es1370_state *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
@@ -1214,7 +1215,7 @@ out:
 	return ret;
 }
 
-static ssize_t es1370_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t es1370_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct es1370_state *s = (struct es1370_state *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
@@ -1386,13 +1387,15 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
         count_info cinfo;
 	int count;
 	int val, mapped, ret;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 
 	VALIDATE_STATE(s);
         mapped = ((file->f_mode & FMODE_WRITE) && s->dma_dac2.mapped) ||
 		((file->f_mode & FMODE_READ) && s->dma_adc.mapped);
 	switch (cmd) {
 	case OSS_GETVERSION:
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, p);
 
 	case SNDCTL_DSP_SYNC:
 		if (file->f_mode & FMODE_WRITE)
@@ -1403,7 +1406,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
 	case SNDCTL_DSP_GETCAPS:
-		return put_user(DSP_CAP_DUPLEX | DSP_CAP_REALTIME | DSP_CAP_TRIGGER | DSP_CAP_MMAP, (int *)arg);
+		return put_user(DSP_CAP_DUPLEX | DSP_CAP_REALTIME | DSP_CAP_TRIGGER | DSP_CAP_MMAP, p);
 		
         case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
@@ -1419,7 +1422,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
         case SNDCTL_DSP_SPEED:
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		if (val >= 0) {
 			if (s->open_mode & (~file->f_mode) & (FMODE_READ|FMODE_WRITE))
@@ -1436,10 +1439,10 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			outl(s->ctrl, s->io+ES1370_REG_CONTROL);
 			spin_unlock_irqrestore(&s->lock, flags);
 		}
-		return put_user(DAC2_DIVTOSR((s->ctrl & CTRL_PCLKDIV) >> CTRL_SH_PCLKDIV), (int *)arg);
+		return put_user(DAC2_DIVTOSR((s->ctrl & CTRL_PCLKDIV) >> CTRL_SH_PCLKDIV), p);
 		
         case SNDCTL_DSP_STEREO:
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		if (file->f_mode & FMODE_READ) {
 			stop_adc(s);
@@ -1466,7 +1469,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
         case SNDCTL_DSP_CHANNELS:
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		if (val != 0) {
 			if (file->f_mode & FMODE_READ) {
@@ -1492,13 +1495,13 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 				spin_unlock_irqrestore(&s->lock, flags);
 			}
 		}
-		return put_user((s->sctrl & ((file->f_mode & FMODE_READ) ? SCTRL_R1SMB : SCTRL_P2SMB)) ? 2 : 1, (int *)arg);
+		return put_user((s->sctrl & ((file->f_mode & FMODE_READ) ? SCTRL_R1SMB : SCTRL_P2SMB)) ? 2 : 1, p);
 		
 	case SNDCTL_DSP_GETFMTS: /* Returns a mask */
-                return put_user(AFMT_S16_LE|AFMT_U8, (int *)arg);
+                return put_user(AFMT_S16_LE|AFMT_U8, p);
 		
 	case SNDCTL_DSP_SETFMT: /* Selects ONE fmt*/
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != AFMT_QUERY) {
 			if (file->f_mode & FMODE_READ) {
@@ -1525,7 +1528,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 		}
 		return put_user((s->sctrl & ((file->f_mode & FMODE_READ) ? SCTRL_R1SEB : SCTRL_P2SEB)) ? 
-				AFMT_S16_LE : AFMT_U8, (int *)arg);
+				AFMT_S16_LE : AFMT_U8, p);
 		
 	case SNDCTL_DSP_POST:
                 return 0;
@@ -1536,10 +1539,10 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			val |= PCM_ENABLE_INPUT;
 		if (file->f_mode & FMODE_WRITE && s->ctrl & CTRL_DAC2_EN) 
 			val |= PCM_ENABLE_OUTPUT;
-		return put_user(val, (int *)arg);
+		return put_user(val, p);
 		
 	case SNDCTL_DSP_SETTRIGGER:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (file->f_mode & FMODE_READ) {
 			if (val & PCM_ENABLE_INPUT) {
@@ -1580,7 +1583,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
                 abinfo.fragstotal = s->dma_dac2.numfrag;
                 abinfo.fragments = abinfo.bytes >> s->dma_dac2.fragshift;      
 		spin_unlock_irqrestore(&s->lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
@@ -1597,7 +1600,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
                 abinfo.fragstotal = s->dma_adc.numfrag;
                 abinfo.fragments = abinfo.bytes >> s->dma_adc.fragshift;      
 		spin_unlock_irqrestore(&s->lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user(argp, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 		
         case SNDCTL_DSP_NONBLOCK:
                 file->f_flags |= O_NONBLOCK;
@@ -1614,7 +1617,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		spin_unlock_irqrestore(&s->lock, flags);
 		if (count < 0)
 			count = 0;
-		return put_user(count, (int *)arg);
+		return put_user(count, p);
 
         case SNDCTL_DSP_GETIPTR:
 		if (!(file->f_mode & FMODE_READ))
@@ -1632,7 +1635,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if (s->dma_adc.mapped)
 			s->dma_adc.count &= s->dma_adc.fragsize-1;
 		spin_unlock_irqrestore(&s->lock, flags);
-		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user(argp, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 
@@ -1652,7 +1655,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if (s->dma_dac2.mapped)
 			s->dma_dac2.count &= s->dma_dac2.fragsize-1;
 		spin_unlock_irqrestore(&s->lock, flags);
-		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user(argp, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 
@@ -1660,14 +1663,14 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if (file->f_mode & FMODE_WRITE) {
 			if ((val = prog_dmabuf_dac2(s)))
 				return val;
-			return put_user(s->dma_dac2.fragsize, (int *)arg);
+			return put_user(s->dma_dac2.fragsize, p);
 		}
 		if ((val = prog_dmabuf_adc(s)))
 			return val;
-		return put_user(s->dma_adc.fragsize, (int *)arg);
+		return put_user(s->dma_adc.fragsize, p);
 
         case SNDCTL_DSP_SETFRAGMENT:
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		if (file->f_mode & FMODE_READ) {
 			s->dma_adc.ossfragshift = val & 0xffff;
@@ -1695,7 +1698,7 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if ((file->f_mode & FMODE_READ && s->dma_adc.subdivision) ||
 		    (file->f_mode & FMODE_WRITE && s->dma_dac2.subdivision))
 			return -EINVAL;
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		if (val != 1 && val != 2 && val != 4)
 			return -EINVAL;
@@ -1706,15 +1709,15 @@ static int es1370_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
         case SOUND_PCM_READ_RATE:
-		return put_user(DAC2_DIVTOSR((s->ctrl & CTRL_PCLKDIV) >> CTRL_SH_PCLKDIV), (int *)arg);
+		return put_user(DAC2_DIVTOSR((s->ctrl & CTRL_PCLKDIV) >> CTRL_SH_PCLKDIV), p);
 
         case SOUND_PCM_READ_CHANNELS:
 		return put_user((s->sctrl & ((file->f_mode & FMODE_READ) ? SCTRL_R1SMB : SCTRL_P2SMB)) ?
-				2 : 1, (int *)arg);
+				2 : 1, p);
 
         case SOUND_PCM_READ_BITS:
 		return put_user((s->sctrl & ((file->f_mode & FMODE_READ) ? SCTRL_R1SEB : SCTRL_P2SEB)) ? 
-				16 : 8, (int *)arg);
+				16 : 8, p);
 
         case SOUND_PCM_WRITE_FILTER:
         case SNDCTL_DSP_SETSYNCRO:
@@ -1828,7 +1831,7 @@ static /*const*/ struct file_operations es1370_audio_fops = {
 
 /* --------------------------------------------------------------------- */
 
-static ssize_t es1370_write_dac(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t es1370_write_dac(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct es1370_state *s = (struct es1370_state *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
@@ -1961,11 +1964,12 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 	int count;
 	unsigned ctrl;
 	int val, ret;
+	int __user *p = (int __user *)arg;
 
 	VALIDATE_STATE(s);
 	switch (cmd) {
 	case OSS_GETVERSION:
-		return put_user(SOUND_VERSION, (int *)arg);
+		return put_user(SOUND_VERSION, p);
 
 	case SNDCTL_DSP_SYNC:
 		return drain_dac1(s, 0/*file->f_flags & O_NONBLOCK*/);
@@ -1974,7 +1978,7 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 		return -EINVAL;
 
 	case SNDCTL_DSP_GETCAPS:
-		return put_user(DSP_CAP_REALTIME | DSP_CAP_TRIGGER | DSP_CAP_MMAP, (int *)arg);
+		return put_user(DSP_CAP_REALTIME | DSP_CAP_TRIGGER | DSP_CAP_MMAP, p);
 		
         case SNDCTL_DSP_RESET:
 		stop_dac1(s);
@@ -1983,7 +1987,7 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 		return 0;
 
         case SNDCTL_DSP_SPEED:
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		if (val >= 0) {
 			stop_dac1(s);
@@ -1996,10 +2000,10 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 			outl(s->ctrl, s->io+ES1370_REG_CONTROL);
 			spin_unlock_irqrestore(&s->lock, flags);
 		}
-		return put_user(dac1_samplerate[(s->ctrl & CTRL_WTSRSEL) >> CTRL_SH_WTSRSEL], (int *)arg);
+		return put_user(dac1_samplerate[(s->ctrl & CTRL_WTSRSEL) >> CTRL_SH_WTSRSEL], p);
 		
         case SNDCTL_DSP_STEREO:
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		stop_dac1(s);
 		s->dma_dac1.ready = 0;
@@ -2013,7 +2017,7 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 		return 0;
 
         case SNDCTL_DSP_CHANNELS:
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		if (val != 0) {
 			if (s->dma_dac1.mapped)
@@ -2028,13 +2032,13 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 			outl(s->sctrl, s->io+ES1370_REG_SERIAL_CONTROL);
 			spin_unlock_irqrestore(&s->lock, flags);
 		}
-		return put_user((s->sctrl & SCTRL_P1SMB) ? 2 : 1, (int *)arg);
+		return put_user((s->sctrl & SCTRL_P1SMB) ? 2 : 1, p);
 		
         case SNDCTL_DSP_GETFMTS: /* Returns a mask */
-                return put_user(AFMT_S16_LE|AFMT_U8, (int *)arg);
+                return put_user(AFMT_S16_LE|AFMT_U8, p);
 		
         case SNDCTL_DSP_SETFMT: /* Selects ONE fmt*/
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val != AFMT_QUERY) {
 			stop_dac1(s);
@@ -2047,16 +2051,16 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 			outl(s->sctrl, s->io+ES1370_REG_SERIAL_CONTROL);
 			spin_unlock_irqrestore(&s->lock, flags);
 		}
-		return put_user((s->sctrl & SCTRL_P1SEB) ? AFMT_S16_LE : AFMT_U8, (int *)arg);
+		return put_user((s->sctrl & SCTRL_P1SEB) ? AFMT_S16_LE : AFMT_U8, p);
 
         case SNDCTL_DSP_POST:
                 return 0;
 
         case SNDCTL_DSP_GETTRIGGER:
-		return put_user((s->ctrl & CTRL_DAC1_EN) ? PCM_ENABLE_OUTPUT : 0, (int *)arg);
+		return put_user((s->ctrl & CTRL_DAC1_EN) ? PCM_ENABLE_OUTPUT : 0, p);
 						
 	case SNDCTL_DSP_SETTRIGGER:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		if (val & PCM_ENABLE_OUTPUT) {
 			if (!s->dma_dac1.ready && (ret = prog_dmabuf_dac1(s)))
@@ -2082,7 +2086,7 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
                 abinfo.fragstotal = s->dma_dac1.numfrag;
                 abinfo.fragments = abinfo.bytes >> s->dma_dac1.fragshift;      
 		spin_unlock_irqrestore(&s->lock, flags);
-		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
+		return copy_to_user((void __user *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
 
         case SNDCTL_DSP_NONBLOCK:
                 file->f_flags |= O_NONBLOCK;
@@ -2097,7 +2101,7 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 		spin_unlock_irqrestore(&s->lock, flags);
 		if (count < 0)
 			count = 0;
-		return put_user(count, (int *)arg);
+		return put_user(count, p);
 
         case SNDCTL_DSP_GETOPTR:
 		if (!s->dma_dac1.ready && (val = prog_dmabuf_dac1(s)) != 0)
@@ -2113,17 +2117,17 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 		if (s->dma_dac1.mapped)
 			s->dma_dac1.count &= s->dma_dac1.fragsize-1;
 		spin_unlock_irqrestore(&s->lock, flags);
-		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user((void __user *)arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 
         case SNDCTL_DSP_GETBLKSIZE:
 		if ((val = prog_dmabuf_dac1(s)))
 			return val;
-                return put_user(s->dma_dac1.fragsize, (int *)arg);
+                return put_user(s->dma_dac1.fragsize, p);
 
         case SNDCTL_DSP_SETFRAGMENT:
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		s->dma_dac1.ossfragshift = val & 0xffff;
 		s->dma_dac1.ossmaxfrags = (val >> 16) & 0xffff;
@@ -2138,7 +2142,7 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
         case SNDCTL_DSP_SUBDIVIDE:
 		if (s->dma_dac1.subdivision)
 			return -EINVAL;
-                if (get_user(val, (int *)arg))
+                if (get_user(val, p))
 			return -EFAULT;
 		if (val != 1 && val != 2 && val != 4)
 			return -EINVAL;
@@ -2146,13 +2150,13 @@ static int es1370_ioctl_dac(struct inode *inode, struct file *file, unsigned int
 		return 0;
 
         case SOUND_PCM_READ_RATE:
-		return put_user(dac1_samplerate[(s->ctrl & CTRL_WTSRSEL) >> CTRL_SH_WTSRSEL], (int *)arg);
+		return put_user(dac1_samplerate[(s->ctrl & CTRL_WTSRSEL) >> CTRL_SH_WTSRSEL], p);
 
         case SOUND_PCM_READ_CHANNELS:
-		return put_user((s->sctrl & SCTRL_P1SMB) ? 2 : 1, (int *)arg);
+		return put_user((s->sctrl & SCTRL_P1SMB) ? 2 : 1, p);
 
         case SOUND_PCM_READ_BITS:
-		return put_user((s->sctrl & SCTRL_P1SEB) ? 16 : 8, (int *)arg);
+		return put_user((s->sctrl & SCTRL_P1SEB) ? 16 : 8, p);
 
         case SOUND_PCM_WRITE_FILTER:
         case SNDCTL_DSP_SETSYNCRO:
@@ -2251,7 +2255,7 @@ static /*const*/ struct file_operations es1370_dac_fops = {
 
 /* --------------------------------------------------------------------- */
 
-static ssize_t es1370_midi_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t es1370_midi_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct es1370_state *s = (struct es1370_state *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
@@ -2314,7 +2318,7 @@ static ssize_t es1370_midi_read(struct file *file, char *buffer, size_t count, l
 	return ret;
 }
 
-static ssize_t es1370_midi_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t es1370_midi_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct es1370_state *s = (struct es1370_state *)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);

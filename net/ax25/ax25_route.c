@@ -253,7 +253,7 @@ out:
 	return err;
 }
 
-int ax25_rt_ioctl(unsigned int cmd, void *arg)
+int ax25_rt_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct ax25_route_opt_struct rt_option;
 	struct ax25_routes_struct route;

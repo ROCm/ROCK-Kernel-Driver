@@ -22,7 +22,6 @@
 #include <linux/cpufreq.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
-#include <linux/notifier.h>
 #include <linux/spinlock.h>
 
 #include <asm/hardware.h>
@@ -133,6 +132,39 @@ static int pxa2xx_pcmcia_set_timing(struct soc_pcmcia_socket *skt)
 	return pxa2xx_pcmcia_set_mcxx(skt, clk);
 }
 
+#ifdef CONFIG_CPU_FREQ
+
+static int
+pxa2xx_pcmcia_frequency_change(struct soc_pcmcia_socket *skt,
+			       unsigned long val,
+			       struct cpufreq_freqs *freqs)
+{
+#warning "it's not clear if this is right since the core CPU (N) clock has no effect on the memory (L) clock"
+	switch (val) {
+	case CPUFREQ_PRECHANGE:
+		if (freqs->new > freqs->old) {
+			debug(skt, 2, "new frequency %u.%uMHz > %u.%uMHz, "
+			       "pre-updating\n",
+			       freqs->new / 1000, (freqs->new / 100) % 10,
+			       freqs->old / 1000, (freqs->old / 100) % 10);
+			pxa2xx_pcmcia_set_mcxx(skt, freqs->new);
+		}
+		break;
+
+	case CPUFREQ_POSTCHANGE:
+		if (freqs->new < freqs->old) {
+			debug(skt, 2, "new frequency %u.%uMHz < %u.%uMHz, "
+			       "post-updating\n",
+			       freqs->new / 1000, (freqs->new / 100) % 10,
+			       freqs->old / 1000, (freqs->old / 100) % 10);
+			pxa2xx_pcmcia_set_mcxx(skt, freqs->new);
+		}
+		break;
+	}
+	return 0;
+}
+#endif
+
 int pxa2xx_drv_pcmcia_probe(struct device *dev)
 {
 	int ret;
@@ -181,6 +213,9 @@ int pxa2xx_drv_pcmcia_probe(struct device *dev)
 
 	/* Provide our PXA2xx specific timing routines. */
 	ops->set_timing  = pxa2xx_pcmcia_set_timing;
+#ifdef CONFIG_CPU_FREQ
+	ops->frequency_change = pxa2xx_pcmcia_frequency_change;
+#endif
 
 	ret = soc_common_drv_pcmcia_probe(dev, ops, first, nr);
 
@@ -227,101 +262,13 @@ static struct device_driver pxa2xx_pcmcia_driver = {
 	.bus		= &platform_bus_type,
 };
 
-#ifdef CONFIG_CPU_FREQ
-
-/*
- * When pxa2xx_pcmcia_notifier() decides that a MC{IO,MEM,ATT} adjustment (due
- * to a core clock frequency change) is needed, this routine establishes
- * new values consistent with the clock speed `clock'.
- */
-static void pxa2xx_pcmcia_update_mcxx(unsigned int clock)
-{
-	struct soc_pcmcia_socket *skt;
-
-	down(&soc_sockets_lock);
-	list_for_each_entry(skt, &soc_sockets, node) {
-		pxa2xx_pcmcia_set_mcxx(skt, clock);
-	}
-	up(&soc_sockets_lock);
-}
-
-/*
- * When changing the processor L clock frequency, it is necessary
- * to adjust the MCXX timings accordingly. We've recorded the timings
- * requested by Card Services, so this is just a matter of finding
- * out what our current speed is, and then recomputing the new MCXX
- * values.
- *
- * Returns: 0 on success, -1 on error
- */
-static int
-pxa2xx_pcmcia_notifier(struct notifier_block *nb, unsigned long val, void *data)
-{
-	struct cpufreq_freqs *freqs = data;
-
-#warning "it's not clear if this is right since the core CPU (N) clock has no effect on the memory (L) clock"
-	switch (val) {
-		case CPUFREQ_PRECHANGE:
-			if (freqs->new > freqs->old) {
-				debug( 2, "new frequency %u.%uMHz > %u.%uMHz, "
-						"pre-updating\n",
-						freqs->new / 1000, (freqs->new / 100) % 10,
-						freqs->old / 1000, (freqs->old / 100) % 10);
-				pxa2xx_pcmcia_update_mcxx(freqs->new);
-			}
-			break;
-
-		case CPUFREQ_POSTCHANGE:
-			if (freqs->new < freqs->old) {
-				debug( 2, "new frequency %u.%uMHz < %u.%uMHz, "
-						"post-updating\n",
-						freqs->new / 1000, (freqs->new / 100) % 10,
-						freqs->old / 1000, (freqs->old / 100) % 10);
-				pxa2xx_pcmcia_update_mcxx(freqs->new);
-			}
-			break;
-	}
-
-	return 0;
-}
-
-static struct notifier_block pxa2xx_pcmcia_notifier_block = {
-	.notifier_call	= pxa2xx_pcmcia_notifier
-};
-
-static int __init pxa2xx_pcmcia_cpufreq_init(void)
-{
-	int ret;
-
-	ret = cpufreq_register_notifier(&pxa2xx_pcmcia_notifier_block,
-					CPUFREQ_TRANSITION_NOTIFIER);
-	if (ret < 0)
-		printk(KERN_ERR "Unable to register CPU frequency change "
-				"notifier for PCMCIA (%d)\n", ret);
-	return ret;
-}
-
-static void __exit pxa2xx_pcmcia_cpufreq_exit(void)
-{
-	cpufreq_unregister_notifier(&pxa2xx_pcmcia_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
-}
-
-#else
-#define pxa2xx_pcmcia_cpufreq_init()
-#define pxa2xx_pcmcia_cpufreq_exit()
-#endif
-
 static int __init pxa2xx_pcmcia_init(void)
 {
-	int ret = driver_register(&pxa2xx_pcmcia_driver);
-	if (ret == 0)
-		pxa2xx_pcmcia_cpufreq_init();
-	return ret;
+	return driver_register(&pxa2xx_pcmcia_driver);
 }
 
 static void __exit pxa2xx_pcmcia_exit(void)
 {
-	pxa2xx_pcmcia_cpufreq_exit();
 	driver_unregister(&pxa2xx_pcmcia_driver);
 }
 

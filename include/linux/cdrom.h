@@ -237,9 +237,9 @@ struct cdrom_read
 struct cdrom_read_audio
 {
 	union cdrom_addr addr; /* frame address */
-	__u8 addr_format;    /* CDROM_LBA or CDROM_MSF */
+	__u8 addr_format;      /* CDROM_LBA or CDROM_MSF */
 	int nframes;           /* number of 2352-byte-frames to read at once */
-	__u8 *buf;           /* frame buffer (size: nframes*2352 bytes) */
+	__u8 __user *buf;      /* frame buffer (size: nframes*2352 bytes) */
 };
 
 /* This struct is used with the CDROMMULTISESSION ioctl */

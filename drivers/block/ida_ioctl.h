@@ -57,7 +57,7 @@ typedef struct {
 
 /* currently, sg_cnt is assumed to be 1: only the 0th element of sg is used */
 	struct {
-		void	*addr;
+		void	__user *addr;
 		size_t	size;
 	} sg[SG_MAX];
 	int	sg_cnt;

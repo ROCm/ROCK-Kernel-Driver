@@ -212,9 +212,9 @@ static int pt_open(struct inode *inode, struct file *file);
 static int pt_ioctl(struct inode *inode, struct file *file,
 		    unsigned int cmd, unsigned long arg);
 static int pt_release(struct inode *inode, struct file *file);
-static ssize_t pt_read(struct file *filp, char *buf,
+static ssize_t pt_read(struct file *filp, char __user *buf,
 		       size_t count, loff_t * ppos);
-static ssize_t pt_write(struct file *filp, const char *buf,
+static ssize_t pt_write(struct file *filp, const char __user *buf,
 			size_t count, loff_t * ppos);
 static int pt_detect(void);
 
@@ -710,12 +710,12 @@ static int pt_ioctl(struct inode *inode, struct file *file,
 	 unsigned int cmd, unsigned long arg)
 {
 	struct pt_unit *tape = file->private_data;
+	struct mtop __user *p = (void __user *)arg;
 	struct mtop mtop;
 
 	switch (cmd) {
 	case MTIOCTOP:
-		if (copy_from_user((char *) &mtop, (char *) arg,
-				   sizeof (struct mtop)))
+		if (copy_from_user(&mtop, p, sizeof(struct mtop)))
 			return -EFAULT;
 
 		switch (mtop.mt_op) {
@@ -764,7 +764,7 @@ pt_release(struct inode *inode, struct file *file)
 
 }
 
-static ssize_t pt_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
+static ssize_t pt_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 {
 	struct pt_unit *tape = filp->private_data;
 	struct pi_adapter *pi = tape->pi;
@@ -861,7 +861,7 @@ static ssize_t pt_read(struct file *filp, char *buf, size_t count, loff_t * ppos
 
 }
 
-static ssize_t pt_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
+static ssize_t pt_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 {
 	struct pt_unit *tape = filp->private_data;
 	struct pi_adapter *pi = tape->pi;

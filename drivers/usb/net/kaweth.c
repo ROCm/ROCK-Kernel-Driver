@@ -737,7 +737,7 @@ static int kaweth_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(net, (void __user *)rq->ifr_data);
+		return netdev_ethtool_ioctl(net, rq->ifr_data);
 	}
 	return -EOPNOTSUPP;
 }

@@ -532,6 +532,11 @@ int security_context_to_sid(char *scontext, u32 scontext_len, u32 *sid)
 	if (rc)
 		goto out_unlock;
 
+	if ((p - scontext2) < scontext_len) {
+		rc = -EINVAL;
+		goto out_unlock;
+	}
+
 	/* Check the validity of the new context. */
 	if (!policydb_context_isvalid(&policydb, &context)) {
 		rc = -EINVAL;
