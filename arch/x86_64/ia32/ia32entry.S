@@ -47,6 +47,7 @@
 ENTRY(ia32_cstar_target)
 	swapgs
 	movl	%esp,%r8d
+	movq	%r8,%gs:pda_oldrsp
 	movq	%gs:pda_kernelstack,%rsp
 	sti
 	SAVE_ARGS 8,1

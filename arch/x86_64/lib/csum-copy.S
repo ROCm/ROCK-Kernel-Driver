@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Andi Kleen
+ * Copyright 2002,2003 Andi Kleen, SuSE Labs.
  *	
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
@@ -8,7 +8,6 @@
  	#include <linux/linkage.h>
 	#include <asm/errno.h>
 
-//	#define FIX_ALIGNMENT 1
 /*
  * Checksum copy with exception handling.
  * On exceptions src_err_ptr or dst_err_ptr is set to -EFAULT and the 
@@ -26,17 +25,14 @@
  * eax  64bit sum. undefined in case of exception.
  * 
  * Wrappers need to take care of valid exception sum and zeroing.		 
+ * They also should align source or destination to 8 bytes.
  */
-
-/* for now - should vary this based on direction */
- #define prefetch prefetcht2
- #define movnti   movq
 
 	.macro source
 10:
 	.section __ex_table,"a"
 	.align 8
-	.quad 10b,bad_source
+	.quad 10b,.Lbad_source
 	.previous
 	.endm
 		
@@ -44,57 +40,74 @@
 20:
 	.section __ex_table,"a"
 	.align 8
-	.quad 20b,bad_dest
+	.quad 20b,.Lbad_dest
 	.previous
 	.endm
 			
-	.globl csum_partial_copy_generic
-	.p2align
-csum_partial_copy_generic:
-	prefetchnta (%rdi)
+	.macro ignore L=.Lignore
+30:
+	.section __ex_table,"a"
+	.align 8
+	.quad 30b,\L
+	.previous
+	.endm
 	
-	pushq %rbx
-	pushq %r12
-	pushq %r14
-	pushq %r15
-	movq %r8,%r14
-	movq %r9,%r15
+				
+	.globl csum_partial_copy_generic
+	.p2align 4
+csum_partial_copy_generic:
+	cmpl	 $3*64,%edx
+	jle	 .Lignore
+
+	ignore
+	prefetch (%rdi)
+	ignore
+	prefetch 1*64(%rdi)
+	ignore
+	prefetch 2*64(%rdi)
+	ignore
+	prefetch 3*64(%rdi)
+	ignore
+	prefetch 4*64(%rdi)
+	ignore
+	prefetchw (%rsi)
+	ignore
+	prefetchw 1*64(%rsi)
+	ignore
+	prefetchw 2*64(%rsi)
+	ignore
+	prefetchw 3*64(%rsi)
+	ignore
+	prefetchw 4*64(%rsi)
+
+.Lignore:		
+	subq  $7*8,%rsp
+	movq  %rbx,2*8(%rsp)
+	movq  %r12,3*8(%rsp)
+	movq  %r14,4*8(%rsp)
+	movq  %r13,5*8(%rsp)
+	movq  %rbp,6*8(%rsp)
+
+	movq  %r8,(%rsp)
+	movq  %r9,1*8(%rsp)
+	
 	movl  %ecx,%eax
 	movl  %edx,%ecx
 
-#ifdef FIX_ALIGNMENT
-	/* align source to 8 bytes */	
-	movl %edi,%r8d
-	andl $7,%r8d
-	jnz  bad_alignment	
-after_bad_alignment:
-#endif
-
-	movl  $64,%r10d
 	xorl  %r9d,%r9d
 	movq  %rcx,%r12
 
 	shrq  $6,%r12
-	/* loopcounter is maintained as one less to test efficiently for the
-	   previous to last iteration. This is needed to stop the prefetching. */
-	decq  %r12
-	js    handle_tail       /* < 64 */
-	jz    loop_no_prefetch  /* = 64 + X */ 
+	jz    .Lhandle_tail       /* < 64 */
+
+	clc
 	
 	/* main loop. clear in 64 byte blocks */
-	/* tries hard not to prefetch over the boundary */
-	/* r10:	64, r9: zero, r8: temp2, rbx: temp1, rax: sum, rcx: saved length */
+	/* r9: zero, r8: temp2, rbx: temp1, rax: sum, rcx: saved length */
 	/* r11:	temp3, rdx: temp4, r12 loopcnt */
-	.p2align
-loop:
-	/* Could prefetch more than one loop, but then it would be even
-	   trickier to avoid prefetching over the boundary. The hardware prefetch
-	   should take care of this anyways. The reason for this prefetch is
-	   just the non temporal hint to avoid cache pollution. Hopefully this
-	   will be handled properly by the hardware. */
-	prefetchnta 64(%rdi) 
-	
-loop_no_prefetch:
+	/* r10:	temp5, rbp: temp6, r14 temp7, r13 temp8 */
+	.p2align 4
+.Lloop:
 	source
 	movq  (%rdi),%rbx
 	source
@@ -104,175 +117,136 @@ loop_no_prefetch:
 	source
 	movq  24(%rdi),%rdx
 
-	dest
-	movnti %rbx,(%rsi)
-	dest
-	movnti %r8,8(%rsi)
-	dest
-	movnti %r11,16(%rsi)
-	dest
-	movnti %rdx,24(%rsi)
+	source
+	movq  32(%rdi),%r10
+	source
+	movq  40(%rdi),%rbp
+	source
+	movq  48(%rdi),%r14
+	source
+	movq  56(%rdi),%r13
 		
-	addq  %rbx,%rax
+	ignore 2f
+	prefetch 5*64(%rdi)
+2:							
+	adcq  %rbx,%rax
 	adcq  %r8,%rax
 	adcq  %r11,%rax
 	adcq  %rdx,%rax
+	adcq  %r10,%rax
+	adcq  %rbp,%rax
+	adcq  %r14,%rax
+	adcq  %r13,%rax
 
-	source
-	movq  32(%rdi),%rbx
-	source
-	movq  40(%rdi),%r8
-	source
-	movq  48(%rdi),%r11
-	source
-	movq  56(%rdi),%rdx
+	decl %r12d
 	
 	dest
-	movnti %rbx,32(%rsi)
+	movq %rbx,(%rsi)
 	dest
-	movnti %r8,40(%rsi)
+	movq %r8,8(%rsi)
 	dest
-	movnti %r11,48(%rsi)
+	movq %r11,16(%rsi)
 	dest
-	movnti %rdx,56(%rsi)
+	movq %rdx,24(%rsi)
 
-	adcq %rbx,%rax
-	adcq %r8,%rax
-	adcq %r11,%rax
-	adcq %rdx,%rax
+	dest
+	movq %r10,32(%rsi)
+	dest
+	movq %rbp,40(%rsi)
+	dest
+	movq %r14,48(%rsi)
+	dest
+	movq %r13,56(%rsi)
 	
-	adcq %r9,%rax	/* add in carry */
+	ignore 3f
+	prefetchw 5*64(%rsi)
+3:
 	
-	addq %r10,%rdi		
-	addq %r10,%rsi
+	leaq 64(%rdi),%rdi
+	leaq 64(%rsi),%rsi
 
-	decq %r12
-	jz   loop_no_prefetch	/* previous to last iteration? */
-	jns  loop
+	jnz   .Lloop
+
+	adcq  %r9,%rax
 
 	/* do last upto 56 bytes */
-handle_tail:
+.Lhandle_tail:
 	/* ecx:	count */
 	movl %ecx,%r10d
 	andl $63,%ecx
 	shrl $3,%ecx
-	jz 	 fold
+	jz 	 .Lfold
 	clc
-	movl $8,%edx
-loop_8:	
+	.p2align 4
+.Lloop_8:	
 	source
 	movq (%rdi),%rbx
 	adcq %rbx,%rax
-	dest
-	movnti %rbx,(%rsi)
-	leaq (%rsi,%rdx),%rsi /* preserve carry */
-	leaq (%rdi,%rdx),%rdi
 	decl %ecx
-	jnz	loop_8
+	dest
+	movq %rbx,(%rsi)
+	leaq 8(%rsi),%rsi /* preserve carry */
+	leaq 8(%rdi),%rdi
+	jnz	.Lloop_8
 	adcq %r9,%rax	/* add in carry */
 
-fold:
+.Lfold:
+	/* reduce checksum to 32bits */
 	movl %eax,%ebx
 	shrq $32,%rax
-	addq %rbx,%rax
+	addl %ebx,%eax
+	adcl %r9d,%eax
 
 	/* do last upto 6 bytes */	
-handle_7:
+.Lhandle_7:
 	movl %r10d,%ecx
 	andl $7,%ecx
 	shrl $1,%ecx
-	jz   handle_1
+	jz   .Lhandle_1
 	movl $2,%edx
 	xorl %ebx,%ebx
 	clc  
-loop_1:	
+	.p2align 4
+.Lloop_1:	
 	source
 	movw (%rdi),%bx
-	adcq %rbx,%rax
+	adcl %ebx,%eax
 	dest
-	movw %bx,(%rsi)
-	addq %rdx,%rdi
-	addq %rdx,%rsi
 	decl %ecx
-	jnz loop_1
-	adcw %r9w,%ax	/* add in carry */
+	movw %bx,(%rsi)
+	leaq 2(%rdi),%rdi
+	leaq 2(%rsi),%rsi
+	jnz .Lloop_1
+	adcl %r9d,%eax	/* add in carry */
 	
 	/* handle last odd byte */
-handle_1:	
+.Lhandle_1:
 	testl $1,%r10d
-	jz    ende
+	jz    .Lende
 	xorl  %ebx,%ebx
 	source
 	movb (%rdi),%bl
 	dest
 	movb %bl,(%rsi)
-	addw %bx,%ax
-	adcw %r9w,%ax		/* carry */
+	addl %ebx,%eax
+	adcl %r9d,%eax		/* carry */
 			
-ende:		
-	sfence
-	popq %r15
-	popq %r14
-	popq %r12
-	popq %rbx
+.Lende:
+	movq 2*8(%rsp),%rbx
+	movq 3*8(%rsp),%r12
+	movq 4*8(%rsp),%r14
+	movq 5*8(%rsp),%r13
+	movq 6*8(%rsp),%rbp
+	addq $7*8,%rsp
 	ret
 
-#ifdef FIX_ALIGNMENT
-	/* align source to 8 bytes. */
-	/* r8d:	unalignedness, ecx len */
-bad_alignment:
-	testl $1,%edi
-	jnz   odd_source
-
-	/* compute distance to next aligned position */
-	movl $8,%r8d
-	xchgl %r8d,%ecx
-	subl %r8d,%ecx
-
-	/* handle unaligned part */
-	shrl $1,%ecx
-	xorl %ebx,%ebx	
-	movl $2,%r10d
-align_loop:
-	source
-	movw (%rdi),%bx
-	addq %rbx,%rax	/* carry cannot happen */
-	dest
-	movw %bx,(%rsi)
-	addq %r10,%rdi
-	addq %r10,%rsi
-	decl %ecx
-	jnz align_loop
-	jmp after_bad_alignment
-
-	/* weird case. need to swap the sum at the end because the spec requires
-	   16 bit words of the sum to be always paired. 
-	   handle it recursively because it should be rather rare. */
-odd_source:
-	/* copy odd byte */
-	xorl %ebx,%ebx
-	source
-	movb (%rdi),%bl
-	addl %ebx,%eax       /* add to old checksum */
-	adcl $0,%ecx
-	dest
-	movb %al,(%rsi)
-	
-	/* fix arguments */
-	movl %eax,%ecx
-	incq %rsi
-	incq %rdi
-	decq %rdx 
-	call csum_partial_copy_generic
-	bswap %eax        /* this should work, but check */
-	jmp ende
-#endif
-
 	/* Exception handlers. Very simple, zeroing is done in the wrappers */
-bad_source:
-	movl $-EFAULT,(%r14)
-	jmp  ende
+.Lbad_source:
+	movq (%rsp),%rax
+	movl $-EFAULT,(%rax)
+	jmp  .Lende
 	
-bad_dest:
-	movl $-EFAULT,(%r15)
-	jmp ende
+.Lbad_dest:
+	movq 8(%rsp),%rax
+	movl $-EFAULT,(%rax)
+	jmp .Lende

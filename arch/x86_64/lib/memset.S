@@ -11,7 +11,7 @@
  */	
  	.globl __memset
 	.globl memset
-	.p2align
+	.p2align 4
 memset:	
 __memset:
 	movq %rdi,%r10
@@ -25,15 +25,16 @@ __memset:
 	/* align dst */
 	movl  %edi,%r9d		
 	andl  $7,%r9d	
-	jnz  bad_alignment
-after_bad_alignment:
+	jnz  .Lbad_alignment
+.Lafter_bad_alignment:
 	
-	movq %r11,%rcx
-	movl $64,%r8d
-	shrq $6,%rcx
-	jz	 handle_tail
+	movl %r11d,%ecx
+	shrl $6,%ecx
+	jz	 .Lhandle_tail
 
-loop_64:	
+	.p2align 4
+.Lloop_64:	
+	decl   %ecx
 	movq  %rax,(%rdi) 
 	movq  %rax,8(%rdi) 
 	movq  %rax,16(%rdi) 
@@ -42,43 +43,45 @@ loop_64:
 	movq  %rax,40(%rdi) 
 	movq  %rax,48(%rdi) 
 	movq  %rax,56(%rdi) 
-	addq    %r8,%rdi
-	decl   %ecx
-	jnz    loop_64
+	leaq  64(%rdi),%rdi
+	jnz    .Lloop_64
 
 	/* Handle tail in loops. The loops should be faster than hard
 	   to predict jump tables. */ 
-handle_tail:
+	.p2align 4	   
+.Lhandle_tail:
 	movl	%r11d,%ecx
 	andl    $63&(~7),%ecx
-	jz 	handle_7
+	jz 		.Lhandle_7
 	shrl	$3,%ecx
-loop_8:
-	movq  %rax,(%rdi) 
-	addq    $8,%rdi
+	.p2align 4
+.Lloop_8:
 	decl   %ecx
-	jnz    loop_8
+	movq  %rax,(%rdi)
+	leaq  8(%rdi),%rdi
+	jnz    .Lloop_8
 
-handle_7:
+.Lhandle_7:
 	movl	%r11d,%ecx
 	andl	$7,%ecx
-	jz      ende
-loop_1:
-	movb 	%al,(%rdi)
-	addq	$1,%rdi
+	jz      .Lende
+	.p2align 4
+.Lloop_1:
 	decl    %ecx
-	jnz     loop_1
+	movb 	%al,(%rdi)
+	leaq	1(%rdi),%rdi
+	jnz     .Lloop_1
 	
-ende:	
+.Lende:	
 	movq	%r10,%rax
 	ret
 
-bad_alignment:
+.Lbad_alignment:
 	cmpq $7,%r11
-	jbe	handle_7
+	jbe	.Lhandle_7
 	movq %rax,(%rdi)	/* unaligned store */
 	movq $8,%r8			
 	subq %r9,%r8 
 	addq %r8,%rdi
 	subq %r8,%r11
-	jmp after_bad_alignment
+	jmp .Lafter_bad_alignment

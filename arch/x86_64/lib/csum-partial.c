@@ -7,35 +7,39 @@
  
 #include <linux/compiler.h>
 #include <linux/module.h>
+#include <asm/checksum.h>
 
-/* Better way for this sought */
-static inline unsigned short from64to16(unsigned long x)
+#define __force_inline inline __attribute__((always_inline))
+
+static inline unsigned short from32to16(unsigned a) 
 {
-	/* add up 32-bit words for 33 bits */
-	x = (x & 0xffffffff) + (x >> 32);
-	/* add up 16-bit and 17-bit words for 17+c bits */
-	x = (x & 0xffff) + (x >> 16);
-	/* add up 16-bit and 2-bit for 16+c bit */
-	x = (x & 0xffff) + (x >> 16);
-	/* add up carry.. */
-	x = (x & 0xffff) + (x >> 16);
-	return x;
+	unsigned short b = a >> 16; 
+	asm("addw %w2,%w0\n\t"
+	    "adcw $0,%w0\n" 
+	    : "=r" (b)
+	    : "0" (b), "r" (a));
+	return b;
 }
 
 /*
  * Do a 64-bit checksum on an arbitrary memory area.
  * Returns a 32bit checksum.
  *
- * This isn't a great routine, but it's not _horrible_ either. 
- * We rely on the compiler to unroll.
+ * This isn't as time critical as it used to be because many NICs
+ * do hardware checksumming these days.
+ * 
+ * Things tried and found to not make it faster:
+ * Manual Prefetching
+ * Unrolling to an 128 bytes inner loop.
+ * Using interleaving with more registers to break the carry chains.
  */
-static inline unsigned do_csum(const unsigned char * buff, int len)
+static __force_inline unsigned do_csum(const unsigned char *buff, unsigned len)
 {
-	int odd, count;
+	unsigned odd, count;
 	unsigned long result = 0;
 
-	if (len <= 0)
-		goto out;
+	if (unlikely(len == 0))
+		return result; 
 	odd = 1 & (unsigned long) buff;
 	if (unlikely(odd)) {
 		result = *buff << 8;
@@ -45,7 +49,7 @@ static inline unsigned do_csum(const unsigned char * buff, int len)
 	count = len >> 1;		/* nr of 16-bit words.. */
 	if (count) {
 		if (2 & (unsigned long) buff) {
-			result += *(unsigned short *) buff;
+			result += *(unsigned short *)buff;
 			count--;
 			len -= 2;
 			buff += 2;
@@ -59,18 +63,41 @@ static inline unsigned do_csum(const unsigned char * buff, int len)
 				buff += 4;
 			}
 			count >>= 1;	/* nr of 64-bit words.. */
-			if (count) {
+
+			/* main loop using 64byte blocks */
 				unsigned long zero = 0; 
-				do {
-					asm("  addq %1,%0\n"
-					    "  adcq %2,%0\n" 
-					    : "=r" (result)
-					    : "m"  (*buff), "r" (zero),  "0" (result));
-					count--;
-					buff += 8;
-				} while (count);
-				result = (result & 0xffffffff) + (result >> 32);
+			unsigned count64 = count >> 3; 
+			while (count64) { 
+				asm("addq 0*8(%[src]),%[res]\n\t"
+				    "adcq 1*8(%[src]),%[res]\n\t"
+				    "adcq 2*8(%[src]),%[res]\n\t"
+				    "adcq 3*8(%[src]),%[res]\n\t"
+				    "adcq 4*8(%[src]),%[res]\n\t"
+				    "adcq 5*8(%[src]),%[res]\n\t"
+				    "adcq 6*8(%[src]),%[res]\n\t"
+				    "adcq 7*8(%[src]),%[res]\n\t"
+				    "adcq %[zero],%[res]"
+				    : [res] "=r" (result)
+				    : [src] "r" (buff), [zero] "r" (zero),
+				    "[res]" (result));
+				buff += 64;
+				count64--;
 			}
+
+			/* last upto 7 8byte blocks */
+			count %= 8; 
+			while (count) { 
+				asm("addq %1,%0\n\t"
+				    "adcq %2,%0\n" 
+					    : "=r" (result)
+				    : "m" (*(unsigned long *)buff), 
+				    "r" (zero),  "0" (result));
+				--count; 
+					buff += 8;
+			}
+			result = add32_with_carry(result>>32,
+						  result&0xffffffff); 
+
 			if (len & 4) {
 				result += *(unsigned int *) buff;
 				buff += 4;
@@ -83,10 +110,11 @@ static inline unsigned do_csum(const unsigned char * buff, int len)
 	}
 	if (len & 1)
 		result += *buff;
-	result = from64to16(result);
-	if (unlikely(odd))
-		return ((result >> 8) & 0xff) | ((result & 0xff) << 8);
-out:
+	result = add32_with_carry(result>>32, result & 0xffffffff); 
+	if (unlikely(odd)) { 
+		result = from32to16(result);
+		result = ((result >> 8) & 0xff) | ((result & 0xff) << 8);
+	}
 	return result;
 }
 
@@ -102,17 +130,10 @@ out:
  *
  * it's best to have buff aligned on a 64-bit boundary
  */
-unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
+unsigned csum_partial(const unsigned char *buff, unsigned len, unsigned sum)
 {
-	unsigned result = do_csum(buff, len);
-
-	/* add in old sum, and carry.. */
-	asm("addl %1,%0\n\t"
-	    "adcl $0,%0" : "=r" (result) : "r" (sum), "0" (result)); 
-	return result;
+	return add32_with_carry(do_csum(buff, len), sum); 
 }
-
-//EXPORT_SYMBOL(csum_partial);
 
 /*
  * this routine is used for miscellaneous IP-like checksums, mainly
@@ -123,4 +144,3 @@ unsigned short ip_compute_csum(unsigned char * buff, int len)
 	return ~csum_partial(buff,len,0); 
 }
 
-EXPORT_SYMBOL(ip_compute_csum);
