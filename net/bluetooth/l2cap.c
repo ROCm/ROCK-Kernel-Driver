@@ -1629,6 +1629,8 @@ static inline void l2cap_sig_channel(struct l2cap_conn *conn, struct sk_buff *sk
 	struct l2cap_cmd_hdr cmd;
 	int err = 0;
 
+	l2cap_raw_recv(conn, skb);
+
 	while (len >= L2CAP_CMD_HDR_SIZE) {
 		memcpy(&cmd, data, L2CAP_CMD_HDR_SIZE);
 		data += L2CAP_CMD_HDR_SIZE;
@@ -1670,7 +1672,6 @@ static inline void l2cap_sig_channel(struct l2cap_conn *conn, struct sk_buff *sk
 
 		case L2CAP_COMMAND_REJ:
 			/* FIXME: We should process this */
-			l2cap_raw_recv(conn, skb);
 			break;
 
 		case L2CAP_ECHO_REQ:
@@ -1680,11 +1681,10 @@ static inline void l2cap_sig_channel(struct l2cap_conn *conn, struct sk_buff *sk
 		case L2CAP_ECHO_RSP:
 		case L2CAP_INFO_REQ:
 		case L2CAP_INFO_RSP:
-			l2cap_raw_recv(conn, skb);
 			break;
 
 		default:
-			BT_ERR("Uknown signaling command 0x%2.2x", cmd.code);
+			BT_ERR("Unknown signaling command 0x%2.2x", cmd.code);
 			err = -EINVAL;
 			break;
 		}
