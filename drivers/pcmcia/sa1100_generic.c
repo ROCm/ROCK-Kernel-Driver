@@ -686,7 +686,7 @@ sa1100_pcmcia_get_mem_map(unsigned int sock, struct pccard_mem_map *map)
   DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
 
   if (map->map < MAX_WIN) {
-    *map = skt->mem_map[map->map];
+    *map = skt->pc_mem_map[map->map];
     ret = 0;
   }
 
@@ -754,7 +754,7 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
   map->sys_stop += start;
   map->sys_start = start;
 
-  skt->mem_map[map->map] = *map;
+  skt->pc_mem_map[map->map] = *map;
 
   return 0;
 }  /* sa1100_pcmcia_set_mem_map() */

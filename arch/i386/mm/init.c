@@ -440,8 +440,10 @@ void __init mem_init(void)
 	int tmp;
 	int bad_ppro;
 
+#ifndef CONFIG_DISCONTIGMEM
 	if (!mem_map)
 		BUG();
+#endif
 	
 	bad_ppro = ppro_with_ram_bug();
 
@@ -471,7 +473,7 @@ void __init mem_init(void)
 
 	printk("Memory: %luk/%luk available (%dk kernel code, %dk reserved, %dk data, %dk init, %ldk highmem)\n",
 		(unsigned long) nr_free_pages() << (PAGE_SHIFT-10),
-		max_mapnr << (PAGE_SHIFT-10),
+		num_physpages << (PAGE_SHIFT-10),
 		codesize >> 10,
 		reservedpages << (PAGE_SHIFT-10),
 		datasize >> 10,

@@ -46,8 +46,6 @@ extern plat_pg_data_t *plat_node_data[];
 
 #define PHYSADDR_TO_NID(pa)		ALPHA_PA_TO_NID(pa)
 #define PLAT_NODE_DATA(n)		(plat_node_data[(n)])
-#define PLAT_NODE_DATA_STARTNR(n)	\
-	(PLAT_NODE_DATA(n)->gendata.node_start_mapnr)
 #define PLAT_NODE_DATA_SIZE(n)		(PLAT_NODE_DATA(n)->gendata.node_size)
 
 #if 1

@@ -275,20 +275,9 @@ void __init set_highmem_pages_init(int bad_ppro)
 void __init set_max_mapnr_init(void)
 {
 #ifdef CONFIG_HIGHMEM
-	unsigned long lmax_mapnr;
-	int nid;
-	
-	highmem_start_page = mem_map + NODE_DATA(0)->node_zones[ZONE_HIGHMEM].zone_start_mapnr;
+	highmem_start_page = NODE_DATA(0)->node_zones[ZONE_HIGHMEM].zone_mem_map;
 	num_physpages = highend_pfn;
-
-	for (nid = 0; nid < numnodes; nid++) {
-		lmax_mapnr = node_startnr(nid) + node_size(nid);
-		if (lmax_mapnr > max_mapnr) {
-			max_mapnr = lmax_mapnr;
-		}
-	}
-	
 #else
-	max_mapnr = num_physpages = max_low_pfn;
+	num_physpages = max_low_pfn;
 #endif
 }

@@ -115,9 +115,11 @@ EXPORT_SYMBOL(vmalloc_32);
 EXPORT_SYMBOL(vmap);
 EXPORT_SYMBOL(vunmap);
 EXPORT_SYMBOL(vmalloc_to_page);
-EXPORT_SYMBOL(mem_map);
 EXPORT_SYMBOL(remap_page_range);
+#ifndef CONFIG_DISCONTIGMEM
+EXPORT_SYMBOL(mem_map);
 EXPORT_SYMBOL(max_mapnr);
+#endif
 EXPORT_SYMBOL(high_memory);
 EXPORT_SYMBOL(vmtruncate);
 EXPORT_SYMBOL(find_vma);

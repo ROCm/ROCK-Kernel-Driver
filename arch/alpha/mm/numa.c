@@ -286,7 +286,6 @@ void __init paging_init(void)
 	for (nid = 0; nid < numnodes; nid++) {
 		unsigned long start_pfn = plat_node_bdata[nid].node_boot_start >> PAGE_SHIFT;
 		unsigned long end_pfn = plat_node_bdata[nid].node_low_pfn;
-		unsigned long lmax_mapnr;
 
 		if (dma_local_pfn >= end_pfn - start_pfn)
 			zones_size[ZONE_DMA] = end_pfn - start_pfn;
@@ -295,11 +294,6 @@ void __init paging_init(void)
 			zones_size[ZONE_NORMAL] = (end_pfn - start_pfn) - dma_local_pfn;
 		}
 		free_area_init_node(nid, NODE_DATA(nid), NULL, zones_size, start_pfn, NULL);
-		lmax_mapnr = PLAT_NODE_DATA_STARTNR(nid) + PLAT_NODE_DATA_SIZE(nid);
-		if (lmax_mapnr > max_mapnr) {
-			max_mapnr = lmax_mapnr;
-			DBGDCONT("Grow max_mapnr to %ld\n", max_mapnr);
-		}
 	}
 
 	/* Initialize the kernel's ZERO_PGE. */

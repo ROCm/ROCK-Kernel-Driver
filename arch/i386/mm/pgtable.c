@@ -22,26 +22,29 @@
 
 void show_mem(void)
 {
-	int pfn, total = 0, reserved = 0;
+	int total = 0, reserved = 0;
 	int shared = 0, cached = 0;
 	int highmem = 0;
 	struct page *page;
+	pg_data_t *pgdat;
+	unsigned long i;
 
 	printk("Mem-info:\n");
 	show_free_areas();
 	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
-	pfn = max_mapnr;
-	while (pfn-- > 0) {
-		page = pfn_to_page(pfn);
-		total++;
-		if (PageHighMem(page))
-			highmem++;
-		if (PageReserved(page))
-			reserved++;
-		else if (PageSwapCache(page))
-			cached++;
-		else if (page_count(page))
-			shared += page_count(page) - 1;
+	for_each_pgdat(pgdat) {
+		for (i = 0; i < pgdat->node_size; ++i) {
+			page = pgdat->node_mem_map + i;
+			total++;
+			if (PageHighMem(page))
+				highmem++;
+			if (PageReserved(page))
+				reserved++;
+			else if (PageSwapCache(page))
+				cached++;
+			else if (page_count(page))
+				shared += page_count(page) - 1;
+		}
 	}
 	printk("%d pages of RAM\n", total);
 	printk("%d pages of HIGHMEM\n",highmem);

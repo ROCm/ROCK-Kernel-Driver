@@ -22,11 +22,21 @@ pg_data_t contig_page_data = { .bdata = &contig_bootmem_data };
  * Should be invoked with paramters (0, 0, unsigned long *[], start_paddr).
  */
 void __init free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
-	unsigned long *zones_size, unsigned long zone_start_pfn, 
+	unsigned long *zones_size, unsigned long node_start_pfn, 
 	unsigned long *zholes_size)
 {
-	free_area_init_core(0, &contig_page_data, &mem_map, zones_size, 
-				zone_start_pfn, zholes_size, pmap);
+	unsigned long size;
+
+	contig_page_data.node_id = 0;
+	contig_page_data.node_start_pfn = node_start_pfn;
+	calculate_totalpages (&contig_page_data, zones_size, zholes_size);
+	if (pmap == (struct page *)0) {
+		size = (pgdat->node_size + 1) * sizeof(struct page);
+		pmap = (struct page *) alloc_bootmem_node(pgdat, size);
+	}
+	contig_page_data.node_mem_map = pmap;
+	free_area_init_core(&contig_page_data, zones_size, zholes_size);
+	mem_map = contig_page_data.node_mem_map;
 }
 
 #endif /* !CONFIG_DISCONTIGMEM */
@@ -48,22 +58,26 @@ struct page * alloc_pages_node(int nid, unsigned int gfp_mask, unsigned int orde
  * Nodes can be initialized parallely, in no particular order.
  */
 void __init free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
-	unsigned long *zones_size, unsigned long zone_start_pfn, 
+	unsigned long *zones_size, unsigned long node_start_pfn, 
 	unsigned long *zholes_size)
 {
-	int i, size = 0;
-	struct page *discard;
+	int i;
+	unsigned long size;
 
-	if (mem_map == NULL)
-		mem_map = (struct page *)PAGE_OFFSET;
-
-	free_area_init_core(nid, pgdat, &discard, zones_size, zone_start_pfn,
-					zholes_size, pmap);
 	pgdat->node_id = nid;
+	pgdat->node_start_pfn = node_start_pfn;
+	calculate_totalpages (pgdat, zones_size, zholes_size);
+	if (pmap == (struct page *)0) {
+		size = (pgdat->node_size + 1) * sizeof(struct page); 
+		pmap = (struct page *) alloc_bootmem_node(pgdat, size);
+	}
+	pgdat->node_mem_map = pmap;
+	free_area_init_core(pgdat, zones_size, zholes_size);
 
 	/*
 	 * Get space for the valid bitmap.
 	 */
+	size = 0;
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		size += zones_size[i];
 	size = LONG_ALIGN((size + 7) >> 3);

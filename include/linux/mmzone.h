@@ -112,7 +112,6 @@ struct zone {
 	struct page		*zone_mem_map;
 	/* zone_start_pfn == zone_start_paddr >> PAGE_SHIFT */
 	unsigned long		zone_start_pfn;
-	unsigned long		zone_start_mapnr;
 
 	/*
 	 * rarely used fields:
@@ -163,7 +162,6 @@ typedef struct pglist_data {
 	unsigned long *valid_addr_bitmap;
 	struct bootmem_data *bdata;
 	unsigned long node_start_pfn;
-	unsigned long node_start_mapnr;
 	unsigned long node_size;
 	int node_id;
 	struct pglist_data *pgdat_next;
@@ -187,9 +185,10 @@ memclass(struct zone *pgzone, struct zone *classzone)
  * prototypes for the discontig memory code.
  */
 struct page;
-void free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
-  unsigned long *zones_size, unsigned long paddr, unsigned long *zholes_size,
-  struct page *pmap);
+extern void calculate_totalpages (pg_data_t *pgdat, unsigned long *zones_size,
+		unsigned long *zholes_size);
+extern void free_area_init_core(pg_data_t *pgdat, unsigned long *zones_size,
+		unsigned long *zholes_size);
 void get_zone_counts(unsigned long *active, unsigned long *inactive);
 
 extern pg_data_t contig_page_data;

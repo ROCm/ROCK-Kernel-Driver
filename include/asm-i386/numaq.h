@@ -32,17 +32,18 @@
 
 /*
  * for now assume that 64Gb is max amount of RAM for whole system
- *    64Gb * 1024Mb/Gb = 65536 Mb
- *    65536 Mb / 256Mb = 256
+ *    64Gb / 4096bytes/page = 16777216 pages
  */
+#define MAX_NR_PAGES 16777216
 #define MAX_ELEMENTS 256
-#define ELEMENT_REPRESENTS 8 /* 256 Mb */
+#define PAGES_PER_ELEMENT (16777216/256)
 
+#define pfn_to_pgdat(pfn) NODE_DATA(pfn_to_nid(pfn))
+#define PHYSADDR_TO_NID(pa) pfn_to_nid(pa >> PAGE_SHIFT)
 #define MAX_NUMNODES		8
 #ifdef CONFIG_NUMA
 #define _cpu_to_node(cpu) (cpu_to_logical_apicid(cpu) >> 4)
 #endif /* CONFIG_NUMA */
-extern int pa_to_nid(u64);
 extern int pfn_to_nid(unsigned long);
 extern void get_memcfg_numaq(void);
 #define get_memcfg_numa() get_memcfg_numaq()
