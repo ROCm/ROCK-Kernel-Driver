@@ -180,14 +180,14 @@ static int wait_on_page_writeback_range(struct address_space *mapping,
 	int ret = 0;
 	pgoff_t index;
 
-	if (end > start)
+	if (end < start)
 		return 0;
 
 	pagevec_init(&pvec, 0);
 	index = start;
 	while ((nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
-				PAGECACHE_TAG_WRITEBACK,
-				min(end - index + 1, (pgoff_t)PAGEVEC_SIZE)))) {
+			PAGECACHE_TAG_WRITEBACK,
+			min(end - index, (pgoff_t)PAGEVEC_SIZE-1) + 1))) {
 		unsigned i;
 
 		for (i = 0; i < nr_pages; i++) {
