@@ -233,14 +233,14 @@ struct pg_unit {
 	int busy;        	  /* write done, read expected */
 	int start;		  /* jiffies at command start */
 	int dlen;		  /* transfer size requested */
-	int timeout;		  /* timeout requested */
+	unsigned long timeout;	  /* timeout requested */
 	int status;		  /* last sense key */
 	int drive;		  /* drive */
 	unsigned long access;     /* count of active opens ... */
 	int present;		  /* device present ? */
 	char *bufptr;
 	char name[PG_NAMELEN];	  /* pg0, pg1, ... */
-	};
+};
 
 struct pg_unit pg[PG_UNITS];
 
@@ -292,43 +292,47 @@ static void pg_sleep( int cs )
 	schedule_timeout(cs);
 }
 
-static int pg_wait( int unit, int go, int stop, int tmo, char * msg )
-
-{       int j, r, e, s, p;
+static int pg_wait(int unit, int go, int stop, unsigned long tmo, char *msg)
+{
+	int j, r, e, s, p, to;
 
 	PG.status = 0;
 
 	j = 0;
-	while ((((r=RR(1,6))&go)||(stop&&(!(r&stop))))&&(time_before(jiffies,tmo))) {
-		if (j++ < PG_SPIN) udelay(PG_SPIN_DEL);
-		else pg_sleep(1);
+	while ((((r=RR(1,6))&go) || (stop&&(!(r&stop))))
+	       && time_before(jiffies,tmo)) {
+		if (j++ < PG_SPIN)
+			udelay(PG_SPIN_DEL);
+		else
+			pg_sleep(1);
 	}
 
-	if ((r&(STAT_ERR&stop))||time_after_eq(jiffies, tmo)) {
-	   s = RR(0,7);
-	   e = RR(0,1);
-	   p = RR(0,2);
-	   if (verbose > 1)
-	     printk("%s: %s: stat=0x%x err=0x%x phase=%d%s\n",
-		   PG.name,msg,s,e,p,time_after_eq(jiffies, tmo)?" timeout":"");
+	to = time_after_eq(jiffies, tmo);
 
-
-	   if (time_after_eq(jiffies, tmo)) e |= 0x100;
-	   PG.status = (e >> 4) & 0xff;
-	   return -1;
+	if ((r&(STAT_ERR&stop)) || to) {
+		s = RR(0,7);
+		e = RR(0,1);
+		p = RR(0,2);
+		if (verbose > 1)
+			printk("%s: %s: stat=0x%x err=0x%x phase=%d%s\n",
+			       PG.name, msg, s, e, p, to ? " timeout" : "");
+		if (to)
+			e |= 0x100;
+		PG.status = (e >> 4) & 0xff;
+		return -1;
 	}
 	return 0;
 }
 
-static int pg_command( int unit, char * cmd, int dlen, int tmo )
-
-{       int k;
+static int pg_command(int unit, char *cmd, int dlen, unsigned long tmo)
+{
+	int k;
 
 	pi_connect(PI);
 
 	WR(0,6,DRIVE);
 
-	if (pg_wait(unit,STAT_BUSY|STAT_DRQ,0,tmo,"before command")) {
+	if (pg_wait(unit, STAT_BUSY|STAT_DRQ, 0, tmo, "before command")) {
 		pi_disconnect(PI);
 		return -1;
 	}
@@ -337,15 +341,15 @@ static int pg_command( int unit, char * cmd, int dlen, int tmo )
 	WR(0,5,dlen / 256);
 	WR(0,7,0xa0);          /* ATAPI packet command */
 
-	if (pg_wait(unit,STAT_BUSY,STAT_DRQ,tmo,"command DRQ")) {
+	if (pg_wait(unit, STAT_BUSY, STAT_DRQ, tmo, "command DRQ")) {
 		pi_disconnect(PI);
 		return -1;
 	}
 
 	if (RR(0,2) != 1) {
-	   printk("%s: command phase error\n",PG.name);
-	   pi_disconnect(PI);
-	   return -1;
+		printk("%s: command phase error\n",PG.name);
+		pi_disconnect(PI);
+		return -1;
 	}
 
 	pi_write_block(PI,cmd,12);
@@ -358,27 +362,30 @@ static int pg_command( int unit, char * cmd, int dlen, int tmo )
 	return 0;
 }
 
-static int pg_completion( int unit, char * buf, int tmo)
+static int pg_completion(int unit, char *buf, unsigned long tmo)
+{
+	int r, d, n, p;
 
-{       int r, d, n, p;
-
-	r = pg_wait(unit,STAT_BUSY,STAT_DRQ|STAT_READY|STAT_ERR,
-			tmo,"completion");
+	r = pg_wait(unit, STAT_BUSY, STAT_DRQ|STAT_READY|STAT_ERR,
+		    tmo, "completion");
 
 	PG.dlen = 0;
 
 	while (RR(0,7)&STAT_DRQ) {
-	   d = (RR(0,4)+256*RR(0,5));
-	   n = ((d+3)&0xfffc);
-	   p = RR(0,2)&3;
-	   if (p == 0) pi_write_block(PI,buf,n);
-	   if (p == 2) pi_read_block(PI,buf,n);
-	   if (verbose > 1) printk("%s: %s %d bytes\n",PG.name,
-				    p?"Read":"Write",n);
-	   PG.dlen += (1-p)*d;
-	   buf += d;
-	   r = pg_wait(unit,STAT_BUSY,STAT_DRQ|STAT_READY|STAT_ERR,
-			tmo,"completion");
+		d = (RR(0,4)+256*RR(0,5));
+		n = ((d+3)&0xfffc);
+		p = RR(0,2)&3;
+		if (p == 0)
+			pi_write_block(PI,buf,n);
+		if (p == 2)
+			pi_read_block(PI,buf,n);
+		if (verbose > 1)
+			printk("%s: %s %d bytes\n", PG.name,
+			       p?"Read":"Write", n);
+		PG.dlen += (1-p)*d;
+		buf += d;
+		r = pg_wait(unit, STAT_BUSY, STAT_DRQ|STAT_READY|STAT_ERR,
+			    tmo, "completion");
 	}
 
 	pi_disconnect(PI); 
