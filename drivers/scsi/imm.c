@@ -758,7 +758,7 @@ static void imm_interrupt(void *data)
 	case DID_OK:
 		break;
 	case DID_NO_CONNECT:
-		printk("imm: no device at SCSI ID %i\n", cmd->target);
+		printk("imm: no device at SCSI ID %i\n", cmd->device->id);
 		break;
 	case DID_BUS_BUSY:
 		printk("imm: BUS BUSY - EPP timeout detected\n");
