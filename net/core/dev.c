@@ -2447,9 +2447,8 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 				return -EINVAL;
 			if (!netif_device_present(dev))
 				return -ENODEV;
-			dev_mc_add(dev, ifr->ifr_hwaddr.sa_data,
-				   dev->addr_len, 1);
-			return 0;
+			return dev_mc_add(dev, ifr->ifr_hwaddr.sa_data,
+					  dev->addr_len, 1);
 
 		case SIOCDELMULTI:
 			if (!dev->set_multicast_list ||
@@ -2457,9 +2456,8 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 				return -EINVAL;
 			if (!netif_device_present(dev))
 				return -ENODEV;
-			dev_mc_delete(dev, ifr->ifr_hwaddr.sa_data,
-				      dev->addr_len, 1);
-			return 0;
+			return dev_mc_delete(dev, ifr->ifr_hwaddr.sa_data,
+					     dev->addr_len, 1);
 
 		case SIOCGIFINDEX:
 			ifr->ifr_ifindex = dev->ifindex;
