@@ -76,21 +76,6 @@ static struct vm_region consistent_head = {
 	.vm_end		= CONSISTENT_END,
 };
 
-#if 0
-static void vm_region_dump(struct vm_region *head, char *fn)
-{
-	struct vm_region *c;
-
-	printk("Consistent Allocation Map (%s):\n", fn);
-	list_for_each_entry(c, &head->vm_list, vm_list) {
-		printk(" %p:  %08lx - %08lx   (0x%08x)\n", c,
-		       c->vm_start, c->vm_end, c->vm_end - c->vm_start);
-	}
-}
-#else
-#define vm_region_dump(head,fn)	do { } while(0)
-#endif
-
 static int vm_region_alloc(struct vm_region *head, struct vm_region *new, size_t size)
 {
 	unsigned long addr = head->vm_start, end = head->vm_end - size;
@@ -182,11 +167,9 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
 	 * consistent mapping region.
 	 */
 	spin_lock_irqsave(&consistent_lock, flags);
-	vm_region_dump(&consistent_head, "before alloc");
 
 	res = vm_region_alloc(&consistent_head, c, size);
 
-	vm_region_dump(&consistent_head, "after alloc");
 	spin_unlock_irqrestore(&consistent_lock, flags);
 
 	if (!res) {
@@ -260,7 +243,6 @@ void consistent_free(void *vaddr, size_t size, dma_addr_t handle)
 	size = PAGE_ALIGN(size);
 
 	spin_lock_irqsave(&consistent_lock, flags);
-	vm_region_dump(&consistent_head, "before free");
 
 	c = vm_region_find(&consistent_head, (unsigned long)vaddr);
 	if (!c)
@@ -300,7 +282,6 @@ void consistent_free(void *vaddr, size_t size, dma_addr_t handle)
 
 	list_del(&c->vm_list);
 
-	vm_region_dump(&consistent_head, "after free");
 	spin_unlock_irqrestore(&consistent_lock, flags);
 
 	kfree(c);
