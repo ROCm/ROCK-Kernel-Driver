@@ -221,6 +221,7 @@ static struct pci_bus * __devinit pci_alloc_bus(void)
 	b = kmalloc(sizeof(*b), GFP_KERNEL);
 	if (b) {
 		memset(b, 0, sizeof(*b));
+		INIT_LIST_HEAD(&b->node);
 		INIT_LIST_HEAD(&b->children);
 		INIT_LIST_HEAD(&b->devices);
 	}
@@ -477,10 +478,18 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 	return dev;
 }
 
-struct pci_dev * __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
+/**
+ * pci_scan_slot - scan a PCI slot on a bus for devices.
+ * @bus: PCI bus to scan
+ * @devfn: slot number to scan (must have zero function.)
+ *
+ * Scan a PCI slot on the specified PCI bus for devices, adding
+ * discovered devices to the @bus->devices list.  New devices
+ * will have an empty dev->global_list head.
+ */
+int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 {
-	struct pci_dev *first_dev = NULL;
-	int func;
+	int func, nr = 0;
 
 	for (func = 0; func < 8; func++, devfn++) {
 		struct pci_dev *dev;
@@ -489,22 +498,19 @@ struct pci_dev * __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 		if (!dev)
 			continue;
 
-		if (func == 0) {
-			first_dev = dev;
-		} else {
+		if (func != 0)
 			dev->multifunction = 1;
-		}
 
 		/* Fix up broken headers */
 		pci_fixup_device(PCI_FIXUP_HEADER, dev);
 
 		/*
-		 * Link the device to both the global PCI device chain and
-		 * the per-bus list of devices and add the /proc entry.
-		 * Note: this also runs the hotplug notifiers (bad!) --rmk
+		 * Add the device to our list of discovered devices
+		 * and the bus list for fixup functions, etc.
 		 */
-		device_register(&dev->dev);
-		pci_insert_device (dev, bus);
+		INIT_LIST_HEAD(&dev->global_list);
+		list_add_tail(&dev->bus_list, &bus->devices);
+		nr++;
 
 		/*
 		 * If this is a single function device,
@@ -513,17 +519,15 @@ struct pci_dev * __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 		if (!dev->multifunction)
 			break;
 	}
-	return first_dev;
+	return nr;
 }
 
-unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
+static unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 {
-	unsigned int devfn, max, pass;
-	struct list_head *ln;
+	unsigned int devfn, pass, max = bus->secondary;
 	struct pci_dev *dev;
 
 	DBG("Scanning bus %02x\n", bus->number);
-	max = bus->secondary;
 
 	/* Go find them, Rover! */
 	for (devfn = 0; devfn < 0x100; devfn += 8)
@@ -550,6 +554,20 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	 * Return how far we've got finding sub-buses.
 	 */
 	DBG("Bus scan for %02x returning with max=%02x\n", bus->number, max);
+	return max;
+}
+
+unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
+{
+	unsigned int max;
+
+	max = pci_scan_child_bus(bus);
+
+	/*
+	 * Make the discovered devices available.
+	 */
+	pci_bus_add_devices(bus);
+
 	return max;
 }
 

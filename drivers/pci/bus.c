@@ -12,6 +12,10 @@
 #include <linux/pci.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
+#include <linux/proc_fs.h>
+#include <linux/init.h>
+
+#include "pci.h"
 
 /**
  * pci_bus_alloc_resource - allocate a resource from a parent bus
@@ -64,6 +68,47 @@ pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
 	return ret;
 }
 
+/**
+ * pci_bus_add_devices - insert newly discovered PCI devices
+ * @bus: bus to check for new devices
+ *
+ * Add newly discovered PCI devices (which are on the bus->devices
+ * list) to the global PCI device list, add the sysfs and procfs
+ * entries.  Where a bridge is found, add the discovered bus to
+ * the parents list of child buses, and recurse.
+ *
+ * Call hotplug for each new devices.
+ */
+void __devinit pci_bus_add_devices(struct pci_bus *bus)
+{
+	struct pci_dev *dev;
+
+	list_for_each_entry(dev, &bus->devices, bus_list) {
+		/*
+		 * Skip already-present devices (which are on the
+		 * global device list.)
+		 */
+		if (!list_empty(&dev->global_list))
+			continue;
+
+		device_register(&dev->dev);
+		list_add_tail(&dev->global_list, &pci_devices);
+#ifdef CONFIG_PROC_FS
+		pci_proc_attach_device(dev);
+#endif
+		pci_create_sysfs_dev_files(dev);
+
+		/*
+		 * If there is an unattached subordinate bus, attach
+		 * it and then scan for unattached PCI devices.
+		 */
+		if (dev->subordinate && list_empty(&dev->subordinate->node)) {
+			list_add_tail(&dev->subordinate->node, &dev->bus->children);
+			pci_bus_add_devices(dev->subordinate);
+		}
+	}
+}
+
 void pci_enable_bridges(struct pci_bus *bus)
 {
 	struct pci_dev *dev;
@@ -78,4 +123,5 @@ void pci_enable_bridges(struct pci_bus *bus)
 }
 
 EXPORT_SYMBOL(pci_bus_alloc_resource);
+EXPORT_SYMBOL(pci_bus_add_devices);
 EXPORT_SYMBOL(pci_enable_bridges);

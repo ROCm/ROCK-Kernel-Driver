@@ -549,7 +549,8 @@ static inline struct pci_bus *pci_alloc_primary_bus(int bus)
 {
 	return pci_alloc_primary_bus_parented(NULL, bus);
 }
-struct pci_dev *pci_scan_slot(struct pci_bus *bus, int devfn);
+int pci_scan_slot(struct pci_bus *bus, int devfn);
+void pci_bus_add_devices(struct pci_bus *bus);
 int pci_proc_attach_device(struct pci_dev *dev);
 int pci_proc_detach_device(struct pci_dev *dev);
 int pci_proc_attach_bus(struct pci_bus *bus);
