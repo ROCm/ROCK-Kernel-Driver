@@ -222,13 +222,11 @@ tcf_hash_check(u32 index, struct tc_action *a, int ovr, int bind)
 {
 	struct tcf_st *p = NULL;
 	if (index && (p = tcf_hash_lookup(index)) != NULL) {
-		spin_lock(&p->lock);
 		if (bind) {
 			p->bindcnt++;
 			p->refcnt++;
 		}
-		spin_unlock(&p->lock);
-		a->priv = (void *) p;
+		a->priv = p;
 	}
 	return p;
 }

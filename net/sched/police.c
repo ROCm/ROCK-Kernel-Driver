@@ -189,12 +189,10 @@ static int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,
 
 	if (parm->index && (p = tcf_police_lookup(parm->index)) != NULL) {
 		a->priv = p;
-		spin_lock(&p->lock);
 		if (bind) {
 			p->bindcnt += 1;
 			p->refcnt += 1;
 		}
-		spin_unlock(&p->lock);
 		if (ovr)
 			goto override;
 		return ret;
