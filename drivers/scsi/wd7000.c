@@ -158,6 +158,11 @@
  * Clean up delay to udelay, and yielding sleeps
  * Make host reset actually reset the card
  * Make everything static
+ *
+ * 2003/02/12 - Christoph Hellwig <hch@infradead.org>
+ *
+ * Cleaned up host template defintion
+ * Removed now obsolete wd7000.h
  */
 
 #include <linux/module.h>
@@ -170,8 +175,8 @@
 #include <linux/ioport.h>
 #include <linux/proc_fs.h>
 #include <linux/blk.h>
-#include <linux/version.h>
 #include <linux/init.h>
+#include <linux/stat.h>
 
 #include <asm/system.h>
 #include <asm/dma.h>
@@ -179,8 +184,8 @@
 
 #include "scsi.h"
 #include "hosts.h"
-
 #include <scsi/scsicam.h>
+
 
 #define ANY2SCSI_INLINE		/* undef this to use old macros */
 #undef  WD7000_DEBUG		/* general debug                */
@@ -189,9 +194,6 @@
 #else
 #define dprintk(format,args...)
 #endif
-
-#include "wd7000.h"
-#include <linux/stat.h>
 
 /*
  *  Mailbox structure sizes.
@@ -210,6 +212,21 @@
  *  will should still work OK.
  */
 #define MAX_SCBS        32
+
+/*
+ *  In this version, sg_tablesize now defaults to WD7000_SG, and will
+ *  be set to SG_NONE for older boards.  This is the reverse of the
+ *  previous default, and was changed so that the driver-level
+ *  Scsi_Host_Template would reflect the driver's support for scatter/
+ *  gather.
+ *
+ *  Also, it has been reported that boards at Revision 6 support scatter/
+ *  gather, so the new definition of an "older" board has been changed
+ *  accordingly.
+ */
+#define WD7000_Q	16
+#define WD7000_SG	16
+
 
 /*
  *  WD7000-specific mailbox structure
@@ -1737,7 +1754,23 @@ MODULE_AUTHOR("Thomas Wuensche, John Boyd, Miroslav Zagorac");
 MODULE_DESCRIPTION("Driver for the WD7000 series ISA controllers");
 MODULE_LICENSE("GPL");
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = WD7000;
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "wd7000",
+	.proc_info		= wd7000_proc_info,
+	.name			= "Western Digital WD-7000",
+	.detect			= wd7000_detect,
+	.command		= wd7000_command,
+	.queuecommand		= wd7000_queuecommand,
+	.eh_bus_reset_handler	= wd7000_bus_reset,
+	.eh_device_reset_handler = wd7000_device_reset,
+	.eh_host_reset_handler	= wd7000_host_reset,
+	.bios_param		= wd7000_biosparam,
+	.can_queue		= WD7000_Q,
+	.this_id		= 7,
+	.sg_tablesize		= WD7000_SG,
+	.cmd_per_lun		= 1,
+	.unchecked_isa_dma	= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+};
 
 #include "scsi_module.c"

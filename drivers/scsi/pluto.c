@@ -287,7 +287,7 @@ int pluto_release(struct Scsi_Host *host)
 	struct pluto *pluto = (struct pluto *)host->hostdata;
 	fc_channel *fc = pluto->fc;
 
-	if (fc->module) __MOD_DEC_USE_COUNT(fc->module);
+	module_put(fc->module);
 	
 	fc->fcp_register(fc, TYPE_SCSI_FCP, 1);
 	PLND((" releasing pluto.\n"));

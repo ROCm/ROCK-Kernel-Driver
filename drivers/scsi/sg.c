@@ -2689,18 +2689,6 @@ static int sg_proc_devstrs_read(char *buffer, char **start, off_t offset,
 				int size, int *eof, void *data);
 static int sg_proc_devstrs_info(char *buffer, int *len, off_t * begin,
 				off_t offset, int size);
-static int sg_proc_host_read(char *buffer, char **start, off_t offset,
-			     int size, int *eof, void *data);
-static int sg_proc_host_info(char *buffer, int *len, off_t * begin,
-			     off_t offset, int size);
-static int sg_proc_hosthdr_read(char *buffer, char **start, off_t offset,
-				int size, int *eof, void *data);
-static int sg_proc_hosthdr_info(char *buffer, int *len, off_t * begin,
-				off_t offset, int size);
-static int sg_proc_hoststrs_read(char *buffer, char **start, off_t offset,
-				 int size, int *eof, void *data);
-static int sg_proc_hoststrs_info(char *buffer, int *len, off_t * begin,
-				 off_t offset, int size);
 static int sg_proc_version_read(char *buffer, char **start, off_t offset,
 				int size, int *eof, void *data);
 static int sg_proc_version_info(char *buffer, int *len, off_t * begin,
@@ -2708,7 +2696,6 @@ static int sg_proc_version_info(char *buffer, int *len, off_t * begin,
 static read_proc_t *sg_proc_leaf_reads[] = {
 	sg_proc_adio_read, sg_proc_dressz_read, sg_proc_debug_read,
 	sg_proc_dev_read, sg_proc_devhdr_read, sg_proc_devstrs_read,
-	sg_proc_host_read, sg_proc_hosthdr_read, sg_proc_hoststrs_read,
 	sg_proc_version_read
 };
 static write_proc_t *sg_proc_leaf_writes[] = {
@@ -3029,81 +3016,6 @@ sg_proc_devstrs_info(char *buffer, int *len, off_t * begin,
 				   scsidp->vendor, scsidp->model, scsidp->rev);
 		else
 			PRINT_PROC("<no active device>\n");
-	}
-	return 1;
-}
-
-static int
-sg_proc_host_read(char *buffer, char **start, off_t offset,
-		  int size, int *eof, void *data)
-{
-	SG_PROC_READ_FN(sg_proc_host_info);
-}
-
-static int
-sg_proc_host_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
-{
-	struct Scsi_Host *shp;
-	int k;
-
-	for (k = 0, shp = scsi_host_get_next(NULL); shp;
-	     shp = scsi_host_get_next(shp), ++k) {
-		for (; k < shp->host_no; ++k)
-			PRINT_PROC("-1\t-1\t-1\t-1\t-1\t-1\n");
-		PRINT_PROC("%u\t%hu\t%hd\t%hu\t%d\t%d\n",
-			   shp->unique_id, shp->host_busy, shp->cmd_per_lun,
-			   shp->sg_tablesize, (int) shp->unchecked_isa_dma,
-			   (int) shp->hostt->emulated);
-	}
-	return 1;
-}
-
-static int
-sg_proc_hosthdr_read(char *buffer, char **start, off_t offset,
-		     int size, int *eof, void *data)
-{
-	SG_PROC_READ_FN(sg_proc_hosthdr_info);
-}
-
-static int
-sg_proc_hosthdr_info(char *buffer, int *len, off_t * begin,
-		     off_t offset, int size)
-{
-	PRINT_PROC("uid\tbusy\tcpl\tscatg\tisa\temul\n");
-	return 1;
-}
-
-static int
-sg_proc_hoststrs_read(char *buffer, char **start, off_t offset,
-		      int size, int *eof, void *data)
-{
-	SG_PROC_READ_FN(sg_proc_hoststrs_info);
-}
-
-#define SG_MAX_HOST_STR_LEN 256
-
-static int
-sg_proc_hoststrs_info(char *buffer, int *len, off_t * begin,
-		      off_t offset, int size)
-{
-	struct Scsi_Host *shp;
-	int k;
-	char buff[SG_MAX_HOST_STR_LEN];
-	char *cp;
-
-	for (k = 0, shp = scsi_host_get_next(NULL); shp;
-	     shp = scsi_host_get_next(shp), ++k) {
-		for (; k < shp->host_no; ++k)
-			PRINT_PROC("<no active host>\n");
-		strncpy(buff, shp->hostt->info ? shp->hostt->info(shp) :
-			(shp->hostt->name ? shp->hostt->name : "<no name>"),
-			SG_MAX_HOST_STR_LEN);
-		buff[SG_MAX_HOST_STR_LEN - 1] = '\0';
-		for (cp = buff; *cp; ++cp) {
-			if ('\n' == *cp)
-				*cp = ' ';	/* suppress imbedded newlines */
-		}
-		PRINT_PROC("%s\n", buff);
 	}
 	return 1;
 }

@@ -9,13 +9,6 @@
 #ifndef _EATA_PIO_H
 #define _EATA_PIO_H
 
-#include <linux/blk.h>
-#include "scsi.h"
-#include "hosts.h"
-#include <scsi/scsicam.h>
-
-#include "eata_generic.h"
-
 #define VER_MAJOR 0
 #define VER_MINOR 0
 #define VER_SUB	  "1b"
@@ -56,23 +49,5 @@
 #else
 #define DBG(x, y)
 #endif
-
-static int eata_pio_detect(Scsi_Host_Template *);
-static int eata_pio_queue(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-static int eata_pio_abort(Scsi_Cmnd *);
-static int eata_pio_host_reset(Scsi_Cmnd *);
-static int eata_pio_proc_info(char *, char **, off_t, int, int, int);
-static int eata_pio_release(struct Scsi_Host *);
-
-#define EATA_PIO {							\
-	.proc_info         	= eata_pio_proc_info, /* procinfo	  */	\
-	.name              	= "EATA (Extended Attachment) PIO driver",\
-	.detect            	= eata_pio_detect,			\
-	.release           	= eata_pio_release,			\
-	.queuecommand      	= eata_pio_queue,				\
-	.eh_abort_handler  	= eata_pio_abort,				\
-	.eh_host_reset_handler	= eata_pio_host_reset,			\
-	.use_clustering    	= ENABLE_CLUSTERING 			\
-}
 
 #endif				/* _EATA_PIO_H */

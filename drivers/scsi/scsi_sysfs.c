@@ -14,6 +14,44 @@
 #include "scsi.h"
 #include "hosts.h"
 
+
+/*
+ * shost_show_function: macro to create an attr function that can be used to
+ * show a non-bit field.
+ */
+#define shost_show_function(field, format_string)			\
+static ssize_t								\
+show_##field (struct device *dev, char *buf)				\
+{									\
+	struct Scsi_Host *shost = to_scsi_host(dev);			\
+	return snprintf (buf, 20, format_string, shost->field);	\
+}
+
+/*
+ * shost_rd_attr: macro to create a function and attribute variable for a
+ * read only field.
+ */
+#define shost_rd_attr(field, format_string)				\
+	shost_show_function(field, format_string)				\
+static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
+
+/*
+ * Create the actual show/store functions and data structures.
+ */
+shost_rd_attr(unique_id, "%u\n");
+shost_rd_attr(host_busy, "%hu\n");
+shost_rd_attr(cmd_per_lun, "%hd\n");
+shost_rd_attr(sg_tablesize, "%hu\n");
+shost_rd_attr(unchecked_isa_dma, "%d\n");
+
+static struct device_attribute *const shost_attrs[] = {
+	&dev_attr_unique_id,
+	&dev_attr_host_busy,
+	&dev_attr_cmd_per_lun,
+	&dev_attr_sg_tablesize,
+	&dev_attr_unchecked_isa_dma,
+};
+
 /**
  * scsi_host_class_name_show - copy out the SCSI host name
  * @dev:		device to check
@@ -39,12 +77,21 @@ DEVICE_ATTR(class_name, S_IRUGO, scsi_host_class_name_show, NULL);
 
 static int scsi_host_class_add_dev(struct device * dev)
 {
+	int i;
+
 	device_create_file(dev, &dev_attr_class_name);
+	for (i = 0; i < ARRAY_SIZE(shost_attrs); i++)
+		device_create_file(dev, shost_attrs[i]);
+
 	return 0;
 }
 
 static void scsi_host_class_rm_dev(struct device * dev)
 {
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(shost_attrs); i++)
+		device_remove_file(dev, shost_attrs[i]);
 	device_remove_file(dev, &dev_attr_class_name);
 }
 
@@ -129,10 +176,10 @@ void scsi_upper_driver_unregister(struct Scsi_Device_Template *sdev_tp)
 
 
 /*
- * show_function: macro to create an attr function that can be used to
+ * sdev_show_function: macro to create an attr function that can be used to
  * show a non-bit field.
  */
-#define show_function(field, format_string)				\
+#define sdev_show_function(field, format_string)				\
 static ssize_t								\
 show_##field (struct device *dev, char *buf)				\
 {									\
@@ -146,7 +193,7 @@ show_##field (struct device *dev, char *buf)				\
  * read only field.
  */
 #define sdev_rd_attr(field, format_string)				\
-	show_function(field, format_string)				\
+	sdev_show_function(field, format_string)				\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
 
 
@@ -155,27 +202,27 @@ static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
  * read/write field.
  */
 #define sdev_rw_attr(field, format_string)				\
-	show_function(field, format_string)				\
+	sdev_show_function(field, format_string)				\
 									\
 static ssize_t								\
-store_##field (struct device *dev, const char *buf, size_t count)	\
+sdev_store_##field (struct device *dev, const char *buf, size_t count)	\
 {									\
 	struct scsi_device *sdev;					\
 	sdev = to_scsi_device(dev);					\
 	snscanf (buf, 20, format_string, &sdev->field);			\
 	return count;							\
 }									\
-static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, store_##field)
+static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, sdev_store_##field)
 
 /*
  * sdev_rd_attr: create a function and attribute variable for a
  * read/write bit field.
  */
 #define sdev_rw_attr_bit(field)						\
-	show_function(field, "%d\n")					\
+	sdev_show_function(field, "%d\n")					\
 									\
 static ssize_t								\
-store_##field (struct device *dev, const char *buf, size_t count)	\
+sdev_store_##field (struct device *dev, const char *buf, size_t count)	\
 {									\
 	int ret;							\
 	struct scsi_device *sdev;					\
@@ -187,7 +234,7 @@ store_##field (struct device *dev, const char *buf, size_t count)	\
 	}								\
 	return ret;							\
 }									\
-static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, store_##field)
+static DEVICE_ATTR(field, S_IRUGO | S_IWUSR, show_##field, sdev_store_##field)
 
 /*
  * scsi_sdev_check_buf_bit: return 0 if buf is "0", return 1 if buf is "1",

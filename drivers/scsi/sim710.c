@@ -328,7 +328,7 @@ struct eisa_driver sim710_eisa_driver = {
 
 static int __init sim710_init(void)
 {
-	int err = -ENODEV, err2;
+	int err = -ENODEV;
 
 #ifdef MODULE
 	if (sim710)
@@ -336,23 +336,17 @@ static int __init sim710_init(void)
 #endif
 
 #ifdef CONFIG_MCA
-	if (MCA_bus)
-		err = mca_register_driver(&sim710_mca_driver);
+	err = mca_register_driver(&sim710_mca_driver);
 #endif
 
 #ifdef CONFIG_EISA
-	err2 = eisa_driver_register(&sim710_eisa_driver);
-
-	/*
-	 * The eise_driver_register return values are strange.  I have
-	 * no idea why we don't just use river_register directly anyway..
-	 */
-	if (err2 == 1)
-		err2 = 0;	
+	err = eisa_driver_register(&sim710_eisa_driver);
 #endif
+	/* FIXME: what we'd really like to return here is -ENODEV if
+	 * no devices have actually been found.  Instead, the err
+	 * above actually only reports problems with kobject_register,
+	 * so for the moment return success */
 
-	if (err < 0 || err2 < 0)
-		return (err < 0) ? err : err2;
 	return 0;
 }
 
