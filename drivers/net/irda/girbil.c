@@ -29,7 +29,6 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
-#include <net/irda/irtty.h>
 
 static int  girbil_reset(struct irda_task *task);
 static void girbil_open(dongle_t *self, struct qos_info *qos);

@@ -32,7 +32,6 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/wrapper.h>
-#include <net/irda/irtty.h>
 #include <net/irda/crc.h>
 #include <net/irda/irlap.h>
 #include <net/irda/irlap_frame.h>

@@ -29,7 +29,6 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
-#include <net/irda/irtty.h>
 
 static void tekram_open(dongle_t *self, struct qos_info *qos);
 static void tekram_close(dongle_t *self);

@@ -41,7 +41,6 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
-#include <net/irda/irtty.h>
 
 #ifndef NDEBUG
 	#undef IRDA_DEBUG

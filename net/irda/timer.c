@@ -30,7 +30,7 @@
 
 #include <net/irda/timer.h>
 #include <net/irda/irda.h>
-#include <net/irda/irtty.h>
+#include <net/irda/irda_device.h>
 #include <net/irda/irlap.h>
 #include <net/irda/irlmp.h>
 
