@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/compiler.h>
 #include <linux/fs.h>
+#include <linux/aio.h>
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
@@ -1123,9 +1124,10 @@ success:
  * that can use the page cache directly.
  */
 static ssize_t
-__generic_file_read(struct file *filp, const struct iovec *iov,
+__generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		unsigned long nr_segs, loff_t *ppos)
 {
+	struct file *filp = iocb->ki_filp;
 	ssize_t retval;
 	unsigned long seg;
 	size_t count = iov_length(iov, nr_segs);
@@ -1189,11 +1191,25 @@ out:
 }
 
 ssize_t
-generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+generic_file_aio_read(struct kiocb *iocb, char *buf, size_t count, loff_t *ppos)
 {
 	struct iovec local_iov = { .iov_base = buf, .iov_len = count };
 
-	return __generic_file_read(filp, &local_iov, 1, ppos);
+	return __generic_file_aio_read(iocb, &local_iov, 1, ppos);
+}
+
+ssize_t
+generic_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+{
+	struct iovec local_iov = { .iov_base = buf, .iov_len = count };
+	struct kiocb kiocb;
+	ssize_t ret;
+
+	init_sync_kiocb(&kiocb, filp);
+	ret = __generic_file_aio_read(&kiocb, &local_iov, 1, ppos);
+	if (-EIOCBQUEUED == ret)
+		ret = wait_on_sync_kiocb(&kiocb);
+	return ret;
 }
 
 static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
@@ -2210,7 +2226,14 @@ ssize_t generic_file_write(struct file *file, const char *buf,
 ssize_t generic_file_readv(struct file *filp, const struct iovec *iov,
 			unsigned long nr_segs, loff_t *ppos)
 {
-	return __generic_file_read(filp, iov, nr_segs, ppos);
+	struct kiocb kiocb;
+	ssize_t ret;
+
+	init_sync_kiocb(&kiocb, filp);
+	ret = __generic_file_aio_read(&kiocb, iov, nr_segs, ppos);
+	if (-EIOCBQUEUED == ret)
+		ret = wait_on_sync_kiocb(&kiocb);
+	return ret;
 }
 
 ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
