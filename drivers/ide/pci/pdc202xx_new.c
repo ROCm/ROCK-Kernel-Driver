@@ -393,7 +393,7 @@ static int pdcnew_config_drive_xfer_rate (ide_drive_t *drive)
 
 	if (id && (id->capability & 1) && drive->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (hwif->ide_dma_bad_drive(drive))
+		if (__ide_dma_bad_drive(drive))
 			goto fast_ata_pio;
 		if (id->field_valid & 4) {
 			if (id->dma_ultra & hwif->ultra_mask) {
@@ -410,7 +410,7 @@ try_dma_modes:
 				if (!config_chipset_for_dma(drive))
 					goto no_dma_set;
 			}
-		} else if (hwif->ide_dma_good_drive(drive) &&
+		} else if (__ide_dma_good_drive(drive) &&
 			    (id->eide_dma_time < 150)) {
 				goto no_dma_set;
 			/* Consult the list of known "good" drives */
