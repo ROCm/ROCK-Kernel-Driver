@@ -217,6 +217,11 @@
  *	  Better fix in irnet_disconnect_indication() :
  *	  - if connected, kill pppd via hangup.
  *	  - if not connected, reenable ppp Tx, which trigger IrNET retry.
+ *
+ * v12 - 10.4.02 - Jean II
+ *	o Fix race condition in irnet_connect_indication().
+ *	  If the socket was already trying to connect, drop old connection
+ *	  and use new one only if acting as primary. See comments.
  */
 
 /***************************** INCLUDES *****************************/

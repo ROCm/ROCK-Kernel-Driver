@@ -1962,7 +1962,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
       Controller->MaxBlocksPerCommand;
   Controller->GenericDiskInfo.part = Controller->DiskPartitions;
   Controller->GenericDiskInfo.sizes = Controller->PartitionSizes;
-  blksize_size[MajorNumber] = Controller->BlockSizes;
   /*
     Complete initialization of the Generic Disk Information structure.
   */
@@ -2044,10 +2043,6 @@ static void DAC960_ComputeGenericDiskInfo(DAC960_Controller_T *Controller)
 	      LogicalDeviceInfo->ConfigurableDeviceSize;
 	  else GenericDiskInfo->part[MinorNumber].nr_sects = 0;
 	}
-      for (i = 0; i < DAC960_MaxPartitions; i++)
-	if (GenericDiskInfo->part[MinorNumber].nr_sects > 0)
-	  Controller->BlockSizes[MinorNumber + i] = BLOCK_SIZE;
-	else Controller->BlockSizes[MinorNumber + i] = 0;
     }
 }
 

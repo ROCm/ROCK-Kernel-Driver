@@ -1062,6 +1062,7 @@ static int __init init_blkmtd(void)
   int readonly = 0;
   int erase_size = CONFIG_MTD_BLKDEV_ERASESIZE;
   kdev_t rdev;
+  struct block_device *bdev;
   int err;
   int mode;
   int regions;
@@ -1127,11 +1128,16 @@ static int __init init_blkmtd(void)
     printk("blkmtd: attempting to use an MTD device as a block device\n");
     return 1;
   }
+  /* get the block device */
+  bdev = bdget(kdev_t_to_nr(mk_kdev(maj, min)));
+  err = blkdev_get(bdev, mode, 0, BDEV_RAW);
+  if (err)
+    return 1;
 
-  DEBUG(1, "blkmtd: devname = %s\n", __bdevname(rdev));
+  DEBUG(1, "blkmtd: devname = %s\n", bdevname(bdev));
   blocksize = BLOCK_SIZE;
 
-  blocksize = bs ? bs : block_size(rdev);
+  blocksize = bs ? bs : block_size(bdev);
   i = blocksize;
   blocksize_bits = 0;
   while(i != 1) {
@@ -1139,27 +1145,24 @@ static int __init init_blkmtd(void)
     i >>= 1;
   }
 
-  size = (count ? count*blocksize : blkdev_size_in_bytes(rdev));
+  size = count ? count*blocksize : bdev->bd_inode->i_size;
 
   DEBUG(1, "blkmtd: size = %ld\n", (long int)size);
 
   if(size == 0) {
     printk("blkmtd: cant determine size\n");
+    blkdev_put(bdev, BDEV_RAW);
     return 1;
   }
 
   mtd_rawdevice = (mtd_raw_dev_data_t *)kmalloc(sizeof(mtd_raw_dev_data_t), GFP_KERNEL);
   if(mtd_rawdevice == NULL) {
+    blkdev_put(bdev, BDEV_RAW);
     err = -ENOMEM;
     goto init_err;
   }
   memset(mtd_rawdevice, 0, sizeof(mtd_raw_dev_data_t));
-  /* get the block device */
-  mtd_rawdevice->binding = bdget(kdev_t_to_nr(mk_kdev(maj, min)));
-  err = blkdev_get(mtd_rawdevice->binding, mode, 0, BDEV_RAW);
-  if (err) {
-    goto init_err;
-  }
+  mtd_rawdevice->binding = bdev;
   mtd_rawdevice->totalsize = size;
   mtd_rawdevice->sector_size = blocksize;
   mtd_rawdevice->sector_bits = blocksize_bits;

@@ -241,7 +241,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 		case BLKFRASET:
 			if(!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			ra_pages = blk_get_ra_pages(dev);
+			ra_pages = blk_get_ra_pages(bdev);
 			if (ra_pages == NULL)
 				return -ENOTTY;
 			*ra_pages = (arg * 512) / PAGE_CACHE_SIZE;
@@ -251,7 +251,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 		case BLKFRAGET:
 			if (!arg)
 				return -EINVAL;
-			ra_pages = blk_get_ra_pages(dev);
+			ra_pages = blk_get_ra_pages(bdev);
 			if (ra_pages == NULL)
 				return -ENOTTY;
 			return put_user((*ra_pages * PAGE_CACHE_SIZE) / 512,
@@ -304,7 +304,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 
 		case BLKBSZGET:
 			/* get the logical block size (cf. BLKSSZGET) */
-			intval = block_size(dev);
+			intval = block_size(bdev);
 			return put_user(intval, (int *) arg);
 
 		case BLKBSZSET:
@@ -320,7 +320,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 				return -EINVAL;
 			if (bd_claim(bdev, &holder) < 0)
 				return -EBUSY;
-			set_blocksize(dev, intval);
+			set_blocksize(bdev, intval);
 			bd_release(bdev);
 			return 0;
 

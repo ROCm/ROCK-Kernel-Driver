@@ -271,7 +271,7 @@ Questions :
 	
 	If you wish to change the MAC address, you can set it with ifconfig:
 
-	  # ifconfig bond0 ha ether 00:11:22:33:44:55
+	  # ifconfig bond0 hw ether 00:11:22:33:44:55
 
 	The MAC address can be also changed by bringing down/up the device
 	and then changing its slaves (or their order):

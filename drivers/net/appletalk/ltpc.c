@@ -1092,15 +1092,18 @@ int __init ltpc_probe(struct net_device *dev)
 
 	/* probe for the IRQ line */
 	if (irq < 2) {
-		autoirq_setup(2);
+		unsigned long irq_mask, delay;
 
+		irq_mask = probe_irq_on();
 		/* reset the interrupt line */
 		inb_p(io+7);
 		inb_p(io+7);
 		/* trigger an interrupt (I hope) */
 		inb_p(io+6);
 
-		autoirq = autoirq_report(1);
+		delay = jiffies + HZ/50;
+		while (time_before(jiffies, delay)) ;
+		autoirq = probe_irq_off(irq_mask);
 
 		if (autoirq == 0) {
 			printk("ltpc: probe at %#x failed to detect IRQ line.\n",

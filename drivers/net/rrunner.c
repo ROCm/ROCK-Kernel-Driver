@@ -75,13 +75,13 @@ static inline void netif_start_queue(struct net_device *dev)
 #define rr_mark_net_bh(foo) mark_bh(foo)
 #define rr_if_busy(dev)     dev->tbusy
 #define rr_if_running(dev)  dev->start /* Currently unused. */
-#define rr_if_down(dev)     {do{dev->start = 0;}while (0);}
+#define rr_if_down(dev)     do { dev->start = 0; } while (0)
 #else
 #define NET_BH              0
-#define rr_mark_net_bh(foo) {do{} while(0);}
+#define rr_mark_net_bh(foo) do { } while(0)
 #define rr_if_busy(dev)     netif_queue_stopped(dev)
 #define rr_if_running(dev)  netif_running(dev)
-#define rr_if_down(dev)     {do{} while(0);}
+#define rr_if_down(dev)     do { } while(0)
 #endif
 
 #include "rrunner.h"

@@ -8,6 +8,7 @@
  *  (C) 1997-1998 Caldera, Inc.
  *  (C) 1998 James Banks
  *  (C) 1999-2001 Torben Mathiasen
+ *  (C) 2002 Samuel Chessman
  *
  *  This software may be used and distributed according to the terms
  *  of the GNU General Public License, incorporated herein by reference.
@@ -158,6 +159,11 @@
  *
  * 	v1.14a Jan 6, 2001   - Minor adjustments (spinlocks, etc.)
  *
+ *	Samuel Chessman <chessman@tux.org> New Maintainer!
+ *
+ *	v1.15 Apr 4, 2002    - Correct operation when aui=1 to be
+ *	                       10T half duplex no loopback
+ *	                       Thanks to Gunnar Eikman
  *******************************************************************************/
 
 #error Please convert me to Documentation/DMA-mapping.txt
@@ -189,7 +195,7 @@ static  int duplex[MAX_TLAN_BOARDS];
 static  int speed[MAX_TLAN_BOARDS];
 static  int boards_found;
 
-MODULE_AUTHOR("Maintainer: Torben Mathiasen <torben.mathiasen@compaq.com>");
+MODULE_AUTHOR("Maintainer: Samuel Chessman <chessman@tux.org>");
 MODULE_DESCRIPTION("Driver for TI ThunderLAN based ethernet PCI adapters");
 MODULE_LICENSE("GPL");
 
@@ -214,7 +220,7 @@ static  int		debug;
 static	int		bbuf;
 static	u8		*TLanPadBuffer;
 static	char		TLanSignature[] = "TLAN";
-static const char tlan_banner[] = "ThunderLAN driver v1.14a\n";
+static const char tlan_banner[] = "ThunderLAN driver v1.15\n";
 static int tlan_have_pci;
 static int tlan_have_eisa;
 
@@ -2601,12 +2607,12 @@ void TLan_PhyStartLink( struct net_device *dev )
 		TLan_SetTimer( dev, (40*HZ/1000), TLAN_TIMER_PHY_PDOWN );
 		return;
 	}  else if ( priv->phyNum == 0 ) {
+		control = 0;
         	TLan_MiiReadReg( dev, phy, TLAN_TLPHY_CTL, &tctl );
 		if ( priv->aui ) {
                 	tctl |= TLAN_TC_AUISEL;
 		} else { 
                 	tctl &= ~TLAN_TC_AUISEL;
-			control = 0;
 			if ( priv->duplex == TLAN_DUPLEX_FULL ) {
 				control |= MII_GC_DUPLEX;
 				priv->tlanFullDuplex = TRUE;
@@ -2614,8 +2620,8 @@ void TLan_PhyStartLink( struct net_device *dev )
 			if ( priv->speed == TLAN_SPEED_100 ) {
 				control |= MII_GC_SPEEDSEL;
 			}
-       			TLan_MiiWriteReg( dev, phy, MII_GEN_CTL, control );
 		}
+		TLan_MiiWriteReg( dev, phy, MII_GEN_CTL, control );
         	TLan_MiiWriteReg( dev, phy, TLAN_TLPHY_CTL, tctl );
 	}
 

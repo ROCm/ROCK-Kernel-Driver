@@ -2200,7 +2200,6 @@ void ide_unregister(struct ata_channel *ch)
 	 * Remove us from the kernel's knowledge.
 	 */
 	unregister_blkdev(ch->major, ch->name);
-	kfree(blksize_size[ch->major]);
 	blk_dev[ch->major].data = NULL;
 	blk_dev[ch->major].queue = NULL;
 	blk_clear(ch->major);

@@ -61,7 +61,6 @@ extern struct mem_info m68k_memory[NUM_MEMINFO];
 
 static u_long *z2ram_map    = NULL;
 static u_long z2ram_size    = 0;
-static int z2_blocksizes[Z2MINOR_COUNT];
 static int z2_sizes[Z2MINOR_COUNT];
 static int z2_count         = 0;
 static int chip_count       = 0;
@@ -361,13 +360,11 @@ z2_init( void )
 	    int i;
 
 	    for (i = 0; i < Z2MINOR_COUNT; i++) {
-		    z2_blocksizes[ i ] = 1024;
 		    z2_sizes[ i ] = 0;
 	    }
     }    
    
     blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUES, &z2ram_lock);
-    blksize_size[ MAJOR_NR ] = z2_blocksizes;
     blk_size[ MAJOR_NR ] = z2_sizes;
 
     return 0;

@@ -324,6 +324,12 @@ static inline int exec_permission_lite(struct inode *inode)
 	if (mode & MAY_EXEC)
 		return 0;
 
+	if ((inode->i_mode & S_IXUGO) && capable(CAP_DAC_OVERRIDE))
+		return 0;
+
+	if (S_ISDIR(inode->i_mode) && capable(CAP_DAC_READ_SEARCH))
+		return 0;
+
 	return -EACCES;
 }
 

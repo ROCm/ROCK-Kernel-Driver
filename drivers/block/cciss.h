@@ -85,7 +85,6 @@ struct ctlr_info
 	   // indexed by minor numbers
 	struct hd_struct hd[256];
 	int		 sizes[256];
-	int              blocksizes[256];
 #ifdef CONFIG_CISS_SCSI_TAPE
 	void *scsi_ctlr; /* ptr to structure containing scsi related stuff */
 #endif

@@ -2792,8 +2792,8 @@ int BusLogic_DetectHostAdapter(SCSI_Host_Template_T *HostTemplate)
 	released, thereby preventing it from being incorrectly identified as
 	any other type of Host Adapter.
       */
-      request_region(HostAdapter->IO_Address, HostAdapter->AddressCount,
-		     "BusLogic");
+      if (!request_region(HostAdapter->IO_Address, HostAdapter->AddressCount,
+		     "BusLogic")) continue;
       /*
 	Register the SCSI Host structure.
       */
@@ -2834,11 +2834,20 @@ int BusLogic_DetectHostAdapter(SCSI_Host_Template_T *HostTemplate)
 	  */
 	  release_region(HostAdapter->IO_Address,
 			 HostAdapter->AddressCount);
-	  request_region(HostAdapter->IO_Address,
-			 HostAdapter->AddressCount,
-			 HostAdapter->FullModelName);
-	  BusLogic_InitializeHostStructure(HostAdapter, Host);
-	  BusLogicHostAdapterCount++;
+	  if(!request_region(HostAdapter->IO_Address,
+			     HostAdapter->AddressCount,
+			     HostAdapter->FullModelName)) {
+		  printk(KERN_WARNING "BusLogic: Release and re-register of "
+			 "port 0x%04lx failed \n", HostAdapter->IO_Address);
+		  BusLogic_DestroyCCBs(HostAdapter);
+		  BusLogic_ReleaseResources(HostAdapter);
+		  BusLogic_UnregisterHostAdapter(HostAdapter);
+		  scsi_unregister(Host);
+	  }
+	  else {
+		  BusLogic_InitializeHostStructure(HostAdapter, Host);
+		  BusLogicHostAdapterCount++;
+	  }
 	}
       else
 	{

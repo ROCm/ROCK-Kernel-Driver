@@ -5947,7 +5947,7 @@ int sym_hcb_attach(hcb_p np, struct sym_fw *fw)
 	 */
 attach_failed:
 		sym_hcb_free(np);
-	return ENXIO;
+	return -ENXIO;
 }
 
 /*

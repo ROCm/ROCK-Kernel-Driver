@@ -185,7 +185,7 @@ Channel Register Offsets - Indexed - Internal - Fixed
 
 /* Old clock prescale definition and baud rates associated with it */
 
-#define CLOCK_PRESC 0x19  */        /* mod 9 (divide by 10) prescale */
+#define CLOCK_PRESC 0x19            /* mod 9 (divide by 10) prescale */
 #define BRD50             4607
 #define BRD75             3071
 #define BRD110            2094

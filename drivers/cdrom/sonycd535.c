@@ -1471,8 +1471,6 @@ static struct block_device_operations cdu_fops =
 	check_media_change:	cdu535_check_media_change,
 };
 
-static int sonycd535_block_size = CDU535_BLOCK_SIZE;
-
 /*
  * Initialize the driver.
  */
@@ -1549,19 +1547,20 @@ sony535_init(void)
 #endif
 			/* now ready to use interrupts, if available */
 			sony535_irq_used = tmp_irq;
-#ifndef MODULE
-/* This code is not in MODULEs by default, since the autoirq stuff might
- * not be in the module-accessible symbol table.
- */
+
 			/* A negative sony535_irq_used will attempt an autoirq. */
 			if (sony535_irq_used < 0) {
-				autoirq_setup(0);
+				unsigned long irq_mask, delay;
+
+				irq_mask = probe_irq_on();
 				enable_interrupts();
 				outb(0, read_status_reg);	/* does a reset? */
-				sony535_irq_used = autoirq_report(10);
+				delay = jiffies + HZ/10;
+				while (time_before(jiffies, delay)) ;
+
+				sony535_irq_used = probe_irq_off(irq_mask);
 				disable_interrupts();
 			}
-#endif
 			if (sony535_irq_used > 0) {
 			    if (request_irq(sony535_irq_used, cdu535_interrupt,
 								SA_INTERRUPT, CDU535_HANDLE, NULL)) {
@@ -1599,8 +1598,7 @@ sony535_init(void)
 				blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
 						do_cdu535_request,
 						&sonycd535_lock);
-				blksize_size[MAJOR_NR] = &sonycd535_block_size;
-
+				blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CDU535_BLOCK_SIZE);
 				sony_toc = (struct s535_sony_toc *)
 					kmalloc(sizeof *sony_toc, GFP_KERNEL);
 				if (sony_toc == NULL) {

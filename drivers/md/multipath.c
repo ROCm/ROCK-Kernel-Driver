@@ -738,43 +738,56 @@ static int __check_consistency (mddev_t *mddev, int row)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	int disks = MD_SB_DISKS;
-	kdev_t dev;
 	struct block_device *bdev;
-	struct buffer_head *bh = NULL;
 	int i, rc = 0;
-	char *buffer = NULL;
+	char *buffer;
+	struct page *page = NULL;
+	int first = 1;
+	int order = PAGE_CACHE_SHIFT-PAGE_SHIFT;
+
+	buffer = (char *) __get_free_pages(GFP_KERNEL, order);
+	if (!buffer)
+		return rc;
 
 	for (i = 0; i < disks; i++) {
+		struct address_space *mapping;
+		char *p;
 		if (!conf->multipaths[i].operational)
 			continue;
 		printk("(checking disk %d)\n",i);
-		dev = conf->multipaths[i].dev;
 		bdev = conf->multipaths[i].bdev;
-		set_blocksize(dev, 4096);
-		if ((bh = __bread(bdev, row / 4, 4096)) == NULL)
+		mapping = bdev->bd_inode->i_mapping;
+		page = read_cache_page(mapping, row/(PAGE_CACHE_SIZE/1024),
+				(filler_t *)mapping->a_ops->readpage, NULL);
+		if (IS_ERR(page)) {
+			page = NULL;
 			break;
-		if (!buffer) {
-			buffer = (char *) __get_free_page(GFP_KERNEL);
-			if (!buffer)
-				break;
-			memcpy(buffer, bh->b_data, 4096);
-		} else if (memcmp(buffer, bh->b_data, 4096)) {
+		}
+		wait_on_page_locked(page);
+		if (!PageUptodate(page))
+			break;
+		if (PageError(page))
+			break;
+		p = page_address(page);
+		if (first) {
+			memcpy(buffer, p, PAGE_CACHE_SIZE);
+			first = 0;
+		} else if (memcmp(buffer, p, PAGE_CACHE_SIZE)) {
 			rc = 1;
 			break;
 		}
-		bforget(bh);
+		page_cache_release(page);
 		fsync_bdev(bdev);
 		invalidate_bdev(bdev, 0);
-		bh = NULL;
+		page = NULL;
 	}
-	if (buffer)
-		free_page((unsigned long) buffer);
-	if (bh) {
-		bdev = bh->b_bdev;
-		bforget(bh);
+	if (page) {
+		bdev = page->mapping->host->i_bdev;
+		page_cache_release(page);
 		fsync_bdev(bdev);
 		invalidate_bdev(bdev, 0);
 	}
+	free_pages((unsigned long) buffer, order);
 	return rc;
 }
 

@@ -42,11 +42,48 @@
 #define TTP_PARAMETERS         0x80
 #define TTP_MORE               0x80
 
-#define DEFAULT_INITIAL_CREDIT 14
+/* Transmission queue sizes */
+/* Worst case scenario, two window of data - Jean II */
+#define TTP_TX_MAX_QUEUE	14
+/* We need to keep at least 5 frames to make sure that we can refill
+ * appropriately the LAP layer. LAP keeps only two buffers, and we need
+ * to have 7 to make a full window - Jean II */
+#define TTP_TX_LOW_THRESHOLD	5
+/* Most clients are synchronous with respect to flow control, so we can
+ * keep a low number of Tx buffers in TTP - Jean II */
+#define TTP_TX_HIGH_THRESHOLD	7
 
-#define TTP_LOW_THRESHOLD       4
-#define TTP_HIGH_THRESHOLD     10
-#define TTP_MAX_QUEUE          14
+/* Receive queue sizes */
+/* Minimum of credit that the peer should hold.
+ * If the peer has less credits than 9 frames, we will explicitely send
+ * him some credits (through irttp_give_credit() and a specific frame).
+ * Note that when we give credits it's likely that it won't be sent in
+ * this LAP window, but in the next one. So, we make sure that the peer
+ * has something to send while waiting for credits (one LAP window == 7
+ * + 1 frames while he process the credits). - Jean II */
+#define TTP_RX_MIN_CREDIT	8
+/* This is the default maximum number of credits held by the peer, so the
+ * default maximum number of frames he can send us before needing flow
+ * control answer from us (this may be negociated differently at TSAP setup).
+ * We want to minimise the number of times we have to explicitely send some
+ * credit to the peer, hoping we can piggyback it on the return data. In
+ * particular, it doesn't make sense for us to send credit more than once
+ * per LAP window.
+ * Moreover, giving credits has some latency, so we need strictly more than
+ * a LAP window, otherwise we may already have credits in our Tx queue.
+ * But on the other hand, we don't want to keep too many Rx buffer here
+ * before starting to flow control the other end, so make it exactly one
+ * LAP window + 1 + MIN_CREDITS. - Jean II */
+#define TTP_RX_DEFAULT_CREDIT	16
+/* Maximum number of credits we can allow the peer to have, and therefore
+ * maximum Rx queue size.
+ * Note that we try to deliver packets to the higher layer every time we
+ * receive something, so in normal mode the Rx queue will never contains
+ * more than one or two packets. - Jean II */
+#define TTP_RX_MAX_CREDIT	21
+
+/* What clients should use when calling ttp_open_tsap() */
+#define DEFAULT_INITIAL_CREDIT	TTP_RX_DEFAULT_CREDIT
 
 /* Some priorities for disconnect requests */
 #define P_NORMAL    0
@@ -90,7 +127,7 @@ struct tsap_cb {
 
 	struct net_device_stats stats;
 	struct timer_list todo_timer; 
-	
+
 	__u32 max_seg_size;     /* Max data that fit into an IrLAP frame */
 	__u8  max_header_size;
 
@@ -131,6 +168,7 @@ int irttp_disconnect_request(struct tsap_cb *self, struct sk_buff *skb,
 void irttp_flow_request(struct tsap_cb *self, LOCAL_FLOW flow);
 void irttp_status_indication(void *instance,
 			     LINK_STATUS link, LOCK_STATUS lock);
+void irttp_flow_indication(void *instance, void *sap, LOCAL_FLOW flow);
 struct tsap_cb *irttp_dup(struct tsap_cb *self, void *instance);
 
 static __inline __u32 irttp_get_saddr(struct tsap_cb *self)
@@ -157,6 +195,18 @@ static inline void irttp_listen(struct tsap_cb *self)
 {
 	irlmp_listen(self->lsap);
 	self->dtsap_sel = LSAP_ANY;
+}
+
+/* Return TRUE if the node is in primary mode (i.e. master)
+ * - Jean II */
+static inline int irttp_is_primary(struct tsap_cb *self)
+{
+	if ((self == NULL) ||
+	    (self->lsap == NULL) ||
+	    (self->lsap->lap == NULL) ||
+	    (self->lsap->lap->irlap == NULL))
+		return -2;
+	return(irlap_is_primary(self->lsap->lap->irlap));
 }
 
 extern struct irttp_cb *irttp;

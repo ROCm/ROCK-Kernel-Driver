@@ -2924,10 +2924,12 @@
 	0105  Cyclom_8Y above first megabyte
 	0200  Cyclom_Z below first megabyte
 	0201  Cyclom_Z above first megabyte
-	0300  PC300 RX 2
-	0301  PC300 RX 1
-	0310  PC300 TE 2
-	0311  PC300 TE 1
+	0300  PC300/RSV or /X21 (2 ports)
+	0301  PC300/RSV or /X21 (1 ports)
+	0310  PC300/TE (2 ports)
+	0311  PC300/TE (1 port)
+	0320  PC300/TE-M (2 ports)
+	0321  PC300/TE-M (1 port)
 120f  Essential Communications
 	0001  Roadrunner serial HIPPI
 1210  Hyperparallel Technologies

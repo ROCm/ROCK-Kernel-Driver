@@ -71,15 +71,6 @@ struct blk_dev_struct blk_dev[MAX_BLKDEV]; /* initialized by blk_dev_init() */
 int * blk_size[MAX_BLKDEV];
 
 /*
- * blksize_size contains the size of all block-devices:
- *
- * blksize_size[MAJOR][MINOR]
- *
- * if (!blksize_size[MAJOR]) then 1024 bytes is assumed.
- */
-int * blksize_size[MAX_BLKDEV];
-
-/*
  * How many reqeusts do we allocate per queue,
  * and how many do we "batch" on freeing them?
  */
@@ -117,10 +108,10 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
  *
  * Will return NULL if the request queue cannot be located.
  */
-unsigned long *blk_get_ra_pages(kdev_t dev)
+unsigned long *blk_get_ra_pages(struct block_device *bdev)
 {
 	unsigned long *ret = NULL;
-	request_queue_t *q = blk_get_queue(dev);
+	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
 
 	if (q)
 		ret = &q->ra_pages;

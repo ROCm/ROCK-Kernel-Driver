@@ -516,7 +516,7 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	} else {
 		s->s_flags = flags;
 		strncpy(s->s_id, bdevname(bdev), sizeof(s->s_id));
-		s->s_old_blocksize = block_size(dev);
+		s->s_old_blocksize = block_size(bdev);
 		sb_set_blocksize(s, s->s_old_blocksize);
 		error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 		if (error) {
@@ -540,7 +540,7 @@ void kill_block_super(struct super_block *sb)
 {
 	struct block_device *bdev = sb->s_bdev;
 	generic_shutdown_super(sb);
-	set_blocksize(to_kdev_t(bdev->bd_dev), sb->s_old_blocksize);
+	set_blocksize(bdev, sb->s_old_blocksize);
 	bd_release(bdev);
 	blkdev_put(bdev, BDEV_FS);
 }

@@ -73,8 +73,6 @@ int initrd_below_start_ok;
  */
 
 static unsigned long rd_length[NUM_RAMDISKS];	/* Size of RAM disks in bytes   */
-static int rd_hardsec[NUM_RAMDISKS];		/* Size of real blocks in bytes */
-static int rd_blocksizes[NUM_RAMDISKS];		/* Size of 1024 byte blocks :)  */
 static int rd_kbsize[NUM_RAMDISKS];	/* Size in blocks of 1024 bytes */
 static devfs_handle_t devfs_handle;
 static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
@@ -430,8 +428,6 @@ static int __init rd_init (void)
 	for (i = 0; i < NUM_RAMDISKS; i++) {
 		/* rd_size is given in kB */
 		rd_length[i] = rd_size << 10;
-		rd_hardsec[i] = rd_blocksize;
-		rd_blocksizes[i] = rd_blocksize;
 		rd_kbsize[i] = rd_size;
 	}
 	devfs_handle = devfs_mk_dir (NULL, "rd", NULL);
@@ -451,7 +447,6 @@ static int __init rd_init (void)
 			INITRD_MINOR, S_IFBLK | S_IRUSR, &rd_bd_op, NULL);
 #endif
 
-	blksize_size[MAJOR_NR] = rd_blocksizes;	/* Avoid set_blocksize() check */
 	blk_size[MAJOR_NR] = rd_kbsize;		/* Size of the RAM disk in kB  */
 
 	/* rd_size is given in kB */

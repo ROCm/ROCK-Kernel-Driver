@@ -25,13 +25,13 @@
 
 #define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
 
-static unsigned long max_block(kdev_t dev)
+static unsigned long max_block(struct block_device *bdev)
 {
 	unsigned int retval = ~0U;
-	loff_t sz = blkdev_size_in_bytes(dev);
+	loff_t sz = bdev->bd_inode->i_size;
 
 	if (sz) {
-		unsigned int size = block_size(dev);
+		unsigned int size = block_size(bdev);
 		unsigned int sizebits = blksize_bits(size);
 		retval = (sz >> sizebits);
 	}
@@ -53,10 +53,10 @@ static void kill_bdev(struct block_device *bdev)
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 }	
 
-int set_blocksize(kdev_t dev, int size)
+int set_blocksize(struct block_device *bdev, int size)
 {
 	int oldsize;
-	struct block_device *bdev;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
@@ -66,36 +66,22 @@ int set_blocksize(kdev_t dev, int size)
 	if (size < get_hardsect_size(dev))
 		return -EINVAL;
 
-	/* No blocksize array? Implies hardcoded BLOCK_SIZE */
-	if (!blksize_size[major(dev)]) {
-		if (size == BLOCK_SIZE)
-			return 0;
-		return -EINVAL;
-	}
-
-	oldsize = blksize_size[major(dev)][minor(dev)];
+	oldsize = bdev->bd_block_size;
 	if (oldsize == size)
 		return 0;
 
-	if (!oldsize && size == BLOCK_SIZE) {
-		blksize_size[major(dev)][minor(dev)] = size;
-		return 0;
-	}
-
 	/* Ok, we're actually changing the blocksize.. */
-	bdev = bdget(kdev_t_to_nr(dev));
 	sync_blockdev(bdev);
-	blksize_size[major(dev)][minor(dev)] = size;
+	bdev->bd_block_size = size;
 	bdev->bd_inode->i_blkbits = blksize_bits(size);
 	kill_bdev(bdev);
-	bdput(bdev);
 	return 0;
 }
 
 int sb_set_blocksize(struct super_block *sb, int size)
 {
 	int bits;
-	if (set_blocksize(sb->s_dev, size) < 0)
+	if (set_blocksize(sb->s_bdev, size) < 0)
 		return 0;
 	sb->s_blocksize = size;
 	for (bits = 9, size >>= 9; size >>= 1; bits++)
@@ -114,7 +100,7 @@ int sb_min_blocksize(struct super_block *sb, int size)
 
 static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer_head * bh, int create)
 {
-	if (iblock >= max_block(inode->i_rdev))
+	if (iblock >= max_block(inode->i_bdev))
 		return -EIO;
 
 	bh->b_bdev = inode->i_bdev;
@@ -333,7 +319,6 @@ struct block_device *bdget(dev_t dev)
 		struct inode *inode = new_inode(bd_mnt->mnt_sb);
 		if (inode) {
 			kdev_t kdev = to_kdev_t(dev);
-			unsigned long *ra_pages;
 
 			atomic_set(&new_bdev->bd_count,1);
 			new_bdev->bd_dev = dev;
@@ -346,10 +331,7 @@ struct block_device *bdget(dev_t dev)
 			inode->i_bdev = new_bdev;
 			inode->i_data.a_ops = &def_blk_aops;
 			inode->i_data.gfp_mask = GFP_USER;
-			ra_pages = blk_get_ra_pages(kdev);
-			if (ra_pages == NULL)
-				ra_pages = &default_ra_pages;
-			inode->i_data.ra_pages = ra_pages;
+			inode->i_data.ra_pages = &default_ra_pages;
 			spin_lock(&bdev_lock);
 			bdev = bdfind(dev, head);
 			if (!bdev) {
@@ -612,14 +594,29 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			}
 		}
 	}
+	if (bdev->bd_inode->i_data.ra_pages == &default_ra_pages) {
+		unsigned long *ra_pages = blk_get_ra_pages(bdev);
+		if (ra_pages == NULL)
+			ra_pages = &default_ra_pages;
+		inode->i_data.ra_pages = ra_pages;
+	}
 	if (bdev->bd_op->open) {
 		ret = bdev->bd_op->open(inode, file);
 		if (ret)
 			goto out2;
 	}
-	bdev->bd_openers++;
 	bdev->bd_inode->i_size = blkdev_size(dev);
-	bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
+	if (!bdev->bd_openers) {
+		unsigned bsize = bdev_hardsect_size(bdev);
+		while (bsize < PAGE_CACHE_SIZE) {
+			if (bdev->bd_inode->i_size & bsize)
+				break;
+			bsize <<= 1;
+		}
+		bdev->bd_block_size = bsize;
+		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
+	}
+	bdev->bd_openers++;
 	unlock_kernel();
 	up(&bdev->bd_sem);
 	return 0;
@@ -627,6 +624,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 out2:
 	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
+		bdev->bd_inode->i_data.ra_pages = &default_ra_pages;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
 			bdev->bd_contains = NULL;
@@ -700,6 +698,7 @@ int blkdev_put(struct block_device *bdev, int kind)
 		__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
 	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
+		bdev->bd_inode->i_data.ra_pages = &default_ra_pages;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
 			bdev->bd_contains = NULL;

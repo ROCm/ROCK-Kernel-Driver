@@ -751,15 +751,15 @@ int __init smc_findirq( int ioaddr )
 		timeout--;
 	}
 	/* there is really nothing that I can do here if timeout fails,
-	   as autoirq_report will return a 0 anyway, which is what I
+	   as probe_irq_off will return a 0 anyway, which is what I
 	   want in this case.   Plus, the clean up is needed in both
 	   cases.  */
 
 	/* DELAY HERE!
 	   On a fast machine, the status might change before the interrupt
 	   is given to the processor.  This means that the interrupt was
-	   never detected, and autoirq_report fails to report anything.
-	   This should fix autoirq_* problems.
+	   never detected, and probe_irq_off fails to report anything.
+	   This should fix probe_irq_* problems.
 	*/
 	SMC_DELAY();
 	SMC_DELAY();

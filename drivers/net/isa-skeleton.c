@@ -202,10 +202,10 @@ static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 	if (dev->irq == -1)
 		;	/* Do nothing: a user-level program will set it. */
 	else if (dev->irq < 2) {	/* "Auto-IRQ" */
-		autoirq_setup(0);
+		unsigned long irq_mask = probe_irq_on();
 		/* Trigger an interrupt here. */
 
-		dev->irq = autoirq_report(0);
+		dev->irq = probe_irq_off(irq_mask);
 		if (net_debug >= 2)
 			printk(" autoirq is %d", dev->irq);
 	} else if (dev->irq == 2)

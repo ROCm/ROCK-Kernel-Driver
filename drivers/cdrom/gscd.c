@@ -74,8 +74,6 @@
 #define gscd_port gscd		/* for compatible parameter passing with "insmod" */
 #include "gscd.h"
 
-static int gscd_blocksizes[1] = { 512 };
-
 static int gscdPresent = 0;
 
 static unsigned char gscd_buf[2048];	/* buffer for block size conversion */
@@ -1021,7 +1019,6 @@ int __init my_gscd_init(void)
 		       S_IFBLK | S_IRUGO | S_IWUGO, &gscd_fops, NULL);
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_gscd_request, &gscd_lock);
-	blksize_size[MAJOR_NR] = gscd_blocksizes;
 
 	disk_state = 0;
 	gscdPresent = 1;

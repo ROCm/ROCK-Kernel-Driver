@@ -235,18 +235,23 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
 		int reg4 = inb(ioaddr+4);
 		if (ancient || reg1 == 0xff) {	/* Ack!! No way to read the IRQ! */
 			short nic_addr = ioaddr+WD_NIC_OFFSET;
+			unsigned long irq_mask, delay;
 
 			/* We have an old-style ethercard that doesn't report its IRQ
 			   line.  Do autoirq to find the IRQ line. Note that this IS NOT
 			   a reliable way to trigger an interrupt. */
 			outb_p(E8390_NODMA + E8390_STOP, nic_addr);
 			outb(0x00, nic_addr+EN0_IMR);	/* Disable all intrs. */
-			autoirq_setup(0);
+			
+			irq_mask = probe_irq_on();
 			outb_p(0xff, nic_addr + EN0_IMR);	/* Enable all interrupts. */
 			outb_p(0x00, nic_addr + EN0_RCNTLO);
 			outb_p(0x00, nic_addr + EN0_RCNTHI);
 			outb(E8390_RREAD+E8390_START, nic_addr); /* Trigger it... */
-			dev->irq = autoirq_report(2);
+			delay = jiffies + HZ/50;
+			while (time_before(jiffies, delay)) ;
+			dev->irq = probe_irq_off(irq_mask);
+			
 			outb_p(0x00, nic_addr+EN0_IMR);	/* Mask all intrs. again. */
 
 			if (ei_debug > 2)
