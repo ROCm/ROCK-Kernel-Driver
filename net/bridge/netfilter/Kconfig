@@ -1,9 +1,16 @@
 #
 # Bridge netfilter configuration
 #
+
+menu "Bridge: Netfilter Configuration"
+	depends on BRIDGE && NETFILTER
+
 config BRIDGE_NF_EBTABLES
-	tristate "Bridge: ebtables"
-	depends on NETFILTER && BRIDGE
+	tristate "Ethernet Bridge tables (ebtables) support"
+	help
+	  ebtables is a general, extensible frame/packet identification
+	  framework. Say 'Y' or 'M' here if you want to do Ethernet
+	  filtering/NAT/brouting on the Ethernet bridge.
 #
 # tables
 #
@@ -172,3 +179,5 @@ config BRIDGE_EBT_LOG
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+endmenu
