@@ -71,11 +71,11 @@ libs-y				+= arch/sparc64/prom/ arch/sparc64/lib/
 # FIXME: is drivers- right?
 drivers-$(CONFIG_OPROFILE)	+= arch/sparc64/oprofile/
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/sparc64/boot $(1)
-
 tftpboot.img vmlinux.aout:
-	$(call makeboot,arch/sparc64/boot/$@)
+	$(Q)$(MAKE) $(build)=arch/sparc64/boot arch/sparc64/boot/$@
 
-archmrproper:
-archclean:
-
+define archhelp
+  echo  '* vmlinux       - Standard sparc64 kernel'
+  echo  '  vmlinux.aout  - a.out kernel for sparc64'
+  echo  '  tftpboot.img  - Image prepared for tftp'
+endef
