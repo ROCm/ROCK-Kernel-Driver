@@ -619,11 +619,11 @@ static int scsi_add_lun(Scsi_Device *sdev, char *inq_result, int *bflags)
 	if (inq_result[7] & 0x10)
 		sdev->sdtr = 1;
 
-	scsi_device_register(sdev);
-
 	sprintf(sdev->devfs_name, "scsi/host%d/bus%d/target%d/lun%d",
 				sdev->host->host_no, sdev->channel,
 				sdev->id, sdev->lun);
+
+	scsi_device_register(sdev);
 
 	/*
 	 * End driverfs/devfs code.
