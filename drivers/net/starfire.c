@@ -2179,11 +2179,10 @@ static void __devexit starfire_remove_one (struct pci_dev *pdev)
 	if (!dev)
 		BUG();
 
+	unregister_netdev(dev);
 	np = dev->priv;
 	if (np->queue_mem)
 		pci_free_consistent(pdev, np->queue_mem_size, np->queue_mem, np->queue_mem_dma);
-
-	unregister_netdev(dev);
 
 	/* XXX: add wakeup code -- requires firmware for MagicPacket */
 	pci_set_power_state(pdev, 3);	/* go to sleep in D3 mode */
