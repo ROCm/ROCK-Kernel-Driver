@@ -3432,7 +3432,7 @@ static struct block_device_operations idecd_ops = {
 /* options */
 char *ignore = NULL;
 
-MODULE_PARM(ignore, "s");
+module_param(ignore, charp, 0400);
 MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
 
 static int ide_cdrom_attach (ide_drive_t *drive)
