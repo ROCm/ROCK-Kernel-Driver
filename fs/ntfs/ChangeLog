@@ -21,6 +21,11 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
+2.1.20-WIP
+
+	- Implement extent mft record deallocation
+	  fs/ntfs/mft.c::ntfs_extent_mft_record_free().
+
 2.1.19 - Many cleanups, improvements, and a minor bug fix.
 
 	- Update ->setattr (fs/ntfs/inode.c::ntfs_setattr()) to refuse to
