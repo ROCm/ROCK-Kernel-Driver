@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mm/arm1020.S: MMU functions for ARM1020
+ *  linux/arch/arm/mm/proc-arm1020.S: MMU functions for ARM1020
  *
  *  Copyright (C) 2000 ARM Limited
  *  Copyright (C) 2000 Deep Blue Solutions Ltd.
@@ -29,6 +29,7 @@
 #include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
+#include <asm/pgtable.h>
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
 #include <asm/hardware.h>
@@ -379,19 +380,19 @@ ENTRY(cpu_arm1020_switch_mm)
 ENTRY(cpu_arm1020_set_pte)
 	str	r1, [r0], #-2048		@ linux version
 
-	eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
+	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
-	bic	r2, r1, #0xff0
-	bic	r2, r2, #3
-	orr	r2, r2, #HPTE_TYPE_SMALL
+	bic	r2, r1, #PTE_SMALL_AP_MASK
+	bic	r2, r2, #PTE_TYPE_MASK
+	orr	r2, r2, #PTE_TYPE_SMALL
 
-	tst	r1, #LPTE_USER			@ User?
-	orrne	r2, r2, #HPTE_AP_READ
+	tst	r1, #L_PTE_USER			@ User?
+	orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
 
-	tst	r1, #LPTE_WRITE | LPTE_DIRTY	@ Write and Dirty?
-	orreq	r2, r2, #HPTE_AP_WRITE
+	tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
+	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
 
-	tst	r1, #LPTE_PRESENT | LPTE_YOUNG	@ Present and Young?
+	tst	r1, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young?
 	movne	r2, #0
 
 #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
@@ -410,7 +411,7 @@ ENTRY(cpu_arm1020_set_pte)
 
 
 ENTRY(cpu_arm1020_name)
-	.ascii	"Arm1020"
+	.ascii	"ARM1020"
 #ifndef CONFIG_CPU_ICACHE_DISABLE
 	.ascii	"i"
 #endif
@@ -445,10 +446,8 @@ __arm1020_setup:
 /*
  * Clear out 'unwanted' bits (then put them in if we need them)
  */
-	bic	r0, r0, #0x0e00 		@ ....??r.........
-	bic	r0, r0, #0x0002 		@ ..............a.
-	bic	r0, r0, #0x000c 		@ W,D
-	bic	r0, r0, #0x1000 		@ I
+	bic	r0, r0, #0x1e00 		@ i...??r.........
+	bic	r0, r0, #0x000e 		@ ............wca.
 /*
  * Turn on what we want
  */
@@ -490,12 +489,12 @@ arm1020_processor_functions:
 
 	.type	cpu_arch_name, #object
 cpu_arch_name:
-	.asciz	"armv4t"
+	.asciz	"armv5t"
 	.size	cpu_arch_name, . - cpu_arch_name
 
 	.type	cpu_elf_name, #object
 cpu_elf_name:
-	.asciz	"v4"
+	.asciz	"v5"
 	.size	cpu_elf_name, . - cpu_elf_name
 	.align
 
@@ -503,8 +502,8 @@ cpu_elf_name:
 
 	.type	__arm1020_proc_info,#object
 __arm1020_proc_info:
-	.long	0x4100a200
-	.long	0xff00fff0
+	.long	0x4104a200			@ ARM 1020T (Architecture v5T)
+	.long	0xff0ffff0
 	.long	0x00000c02			@ mmuflags
 	b	__arm1020_setup
 	.long	cpu_arch_name

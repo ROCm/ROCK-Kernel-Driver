@@ -58,7 +58,7 @@
 # endif
 #endif
 
-#if defined(CONFIG_CPU_ARM720T)
+#ifdef CONFIG_CPU_ABRT_LV4T
 # ifdef CPU_ABORT_HANDLER
 #  define MULTI_ABORT 1
 # else
@@ -66,7 +66,7 @@
 # endif
 #endif
 
-#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100)
+#ifdef CONFIG_CPU_ABRT_EV4
 # ifdef CPU_ABORT_HANDLER
 #  define MULTI_ABORT 1
 # else
@@ -74,8 +74,7 @@
 # endif
 #endif
 
-#if defined(CONFIG_CPU_ARM920T) || defined(CONFIG_CPU_ARM922T) || \
-    defined(CONFIG_CPU_ARM1020)
+#ifdef CONFIG_CPU_ABRT_EV4T
 # ifdef CPU_ABORT_HANDLER
 #  define MULTI_ABORT 1
 # else
@@ -83,19 +82,19 @@
 # endif
 #endif
 
-#if defined(CONFIG_CPU_ARM926T)
+#ifdef CONFIG_CPU_ABRT_EV5TJ
 # ifdef CPU_ABORT_HANDLER
 #  define MULTI_ABORT 1
 # else
-#  define CPU_ABORT_HANDLER v5tej_early_abort
+#  define CPU_ABORT_HANDLER v5tj_early_abort
 # endif
 #endif
 
-#if defined(CONFIG_CPU_XSCALE)
+#ifdef CONFIG_CPU_ABORT_EV5T
 # ifdef CPU_ABORT_HANDLER
 #  define MULTI_ABORT 1
 # else
-#  define CPU_ABORT_HANDLER xscale_abort
+#  define CPU_ABORT_HANDLER v5t_early_abort
 # endif
 #endif
 

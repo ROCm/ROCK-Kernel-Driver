@@ -28,8 +28,6 @@
 #include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
-#include <linux/device.h>
-#include <linux/percpu.h>
 
 #include <asm/atomic.h>
 #include <asm/cache.h>
@@ -37,6 +35,8 @@
 
 #ifdef __KERNEL__
 #include <linux/config.h>
+#include <linux/device.h>
+#include <linux/percpu.h>
 
 struct divert_blk;
 struct vlan_group;

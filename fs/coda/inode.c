@@ -44,10 +44,9 @@ static struct inode *coda_alloc_inode(struct super_block *sb)
 	ei = (struct coda_inode_info *)kmem_cache_alloc(coda_inode_cachep, SLAB_KERNEL);
 	if (!ei)
 		return NULL;
-	memset(&ei->c_fid, 0, sizeof(struct ViceFid));
+	memset(&ei->c_fid, 0, sizeof(struct CodaFid));
 	ei->c_flags = 0;
-	INIT_LIST_HEAD(&ei->c_cilist);
-	memset(&ei->c_cached_cred, 0, sizeof(struct coda_cred));
+	ei->c_uid = 0;
 	ei->c_cached_perm = 0;
 	return &ei->vfs_inode;
 }
@@ -139,7 +138,7 @@ static int coda_fill_super(struct super_block *sb, void *data, int silent)
         struct inode *root = 0; 
 	struct coda_sb_info *sbi = NULL;
 	struct venus_comm *vc = NULL;
-        ViceFid fid;
+	struct CodaFid fid;
         int error;
 	int idx;
 
@@ -169,9 +168,7 @@ static int coda_fill_super(struct super_block *sb, void *data, int silent)
 
 	vc->vc_sb = sb;
 
-	sbi->sbi_sb = sb;
 	sbi->sbi_vcomm = vc;
-	INIT_LIST_HEAD(&sbi->sbi_cihead);
 
         sb->s_fs_info = sbi;
         sb->s_blocksize = 1024;	/* XXXXX  what do we put here?? */
@@ -218,7 +215,6 @@ static void coda_put_super(struct super_block *sb)
 
 	sbi = coda_sbp(sb);
 	sbi->sbi_vcomm->vc_sb = NULL;
-        list_del_init(&sbi->sbi_cihead);
 
 	printk("Coda: Bye bye.\n");
 	kfree(sbi);
@@ -226,9 +222,6 @@ static void coda_put_super(struct super_block *sb)
 
 static void coda_clear_inode(struct inode *inode)
 {
-	struct coda_inode_info *cii = ITOC(inode);
-
-	list_del_init(&cii->c_cilist);
 	coda_cache_clear_inode(inode);
 }
 

@@ -236,6 +236,9 @@ ENTRY(xscale_flush_user_cache_range)
  *
  *	- start  - virtual start address
  *	- end	 - virtual end address
+ *
+ *	Note: single I-cache line invalidation isn't used here since
+ *	it also trashes the mini I-cache used by JTAG debuggers.
  */
 ENTRY(xscale_coherent_kern_range)
 	bic	r0, r0, #CACHELINESIZE - 1
@@ -612,7 +615,7 @@ __xscale_setup:
 
 	.type	xscale_processor_functions, #object
 ENTRY(xscale_processor_functions)
-	.word	xscale_abort
+	.word	v5t_early_abort
 	.word	cpu_xscale_proc_init
 	.word	cpu_xscale_proc_fin
 	.word	cpu_xscale_reset

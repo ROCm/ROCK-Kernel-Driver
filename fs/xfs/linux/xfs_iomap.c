@@ -156,7 +156,7 @@ xfs_iomap(
 		if (flags & BMAP_IGNSTATE)
 			bmap_flags |= XFS_BMAPI_IGSTATE;
 		break;
-	case PBF_WRITE:
+	case BMAP_WRITE:
 		lockmode = XFS_ILOCK_EXCL|XFS_EXTSIZE_WR;
 		bmap_flags = 0;
 		XFS_ILOCK(mp, io, lockmode);
@@ -598,7 +598,7 @@ xfs_iomap_write_allocate(
 	count_fsb = map->br_blockcount;
 	map_start_fsb = offset_fsb;
 
-	XFS_STATS_ADD(xfsstats.xs_xstrat_bytes, XFS_FSB_TO_B(mp, count_fsb));
+	XFS_STATS_ADD(xs_xstrat_bytes, XFS_FSB_TO_B(mp, count_fsb));
 
 	while (count_fsb != 0) {
 		/*
@@ -689,7 +689,7 @@ xfs_iomap_write_allocate(
 						 imap[i].br_blockcount))) {
 				*map = imap[i];
 				*retmap = 1;
-				XFS_STATS_INC(xfsstats.xs_xstrat_quick);
+				XFS_STATS_INC(xs_xstrat_quick);
 				return 0;
 			}
 			count_fsb -= imap[i].br_blockcount;
