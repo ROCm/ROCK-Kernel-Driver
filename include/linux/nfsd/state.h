@@ -119,14 +119,14 @@ struct nfs4_replay {
 /*
 * nfs4_stateowner can either be an open_owner, or (eventually) a lock_owner
 *
-*    o so_peropenstate list is used to ensure no dangling nfs4_stateid
+*    o so_perfilestate list is used to ensure no dangling nfs4_stateid
 *              reverences when we release a stateowner.
 */
 struct nfs4_stateowner {
 	struct list_head        so_idhash;   /* hash by so_id */
 	struct list_head        so_strhash;   /* hash by op_name */
 	struct list_head        so_perclient; /* nfs4_client->cl_perclient */
-	struct list_head        so_peropenstate; /* list: nfs4_stateid */
+	struct list_head        so_perfilestate; /* list: nfs4_stateid */
 	u32                     so_id;
 	struct nfs4_client *    so_client;
 	u32                     so_seqid;    
@@ -145,7 +145,7 @@ struct nfs4_file {
 	struct list_head        fi_perfile; /* list: nfs4_stateid */
 	struct inode		*fi_inode;
 	u32                     fi_id;      /* used with stateowner->so_id 
-					     * for openstateid_hashtbl hash */
+					     * for stateid_hashtbl hash */
 };
 
 /*
@@ -155,9 +155,9 @@ struct nfs4_file {
 */
 
 struct nfs4_stateid {
-	struct list_head              st_hash; /* openstateid_hashtbl[]*/
-	struct list_head              st_perfile; /* file_hashtbl[]*/
-	struct list_head              st_peropenstate; /* nfs4_stateowner->so_peropenstate */
+	struct list_head              st_hash;
+	struct list_head              st_perfile;
+	struct list_head              st_perfilestate;
 	struct nfs4_stateowner      * st_stateowner;
 	struct nfs4_file            * st_file;
 	stateid_t                     st_stateid;
@@ -183,6 +183,6 @@ extern int nfs4_preprocess_stateid_op(struct svc_fh *current_fh,
 		stateid_t *stateid, int flags, struct nfs4_stateid **stpp);
 extern int nfs4_share_conflict(struct svc_fh *current_fh, 
 		unsigned int deny_type);
-extern void nfsd4_lock_state(void);
-extern void nfsd4_unlock_state(void);
+extern void nfs4_lock_state(void);
+extern void nfs4_unlock_state(void);
 #endif   /* NFSD4_STATE_H */
