@@ -163,6 +163,8 @@ static void e1000_clean_rx_irq(struct e1000_adapter *adapter);
 #endif
 static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter);
 static int e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
+static int e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,
+			   int cmd);
 static void e1000_enter_82542_rst(struct e1000_adapter *adapter);
 static void e1000_leave_82542_rst(struct e1000_adapter *adapter);
 static inline void e1000_rx_checksum(struct e1000_adapter *adapter,
@@ -2417,11 +2419,95 @@ static int
 e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 {
 	switch (cmd) {
+	case SIOCGMIIPHY:
+	case SIOCGMIIREG:
+	case SIOCSMIIREG:
+		return e1000_mii_ioctl(netdev, ifr, cmd);
 	case SIOCETHTOOL:
 		return e1000_ethtool_ioctl(netdev, ifr);
 	default:
 		return -EOPNOTSUPP;
 	}
+}
+
+/**
+ * e1000_mii_ioctl -
+ * @netdev:
+ * @ifreq:
+ * @cmd:
+ **/
+
+static int
+e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
+{
+	struct e1000_adapter *adapter = netdev->priv;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
+	int retval;
+	uint16_t mii_reg;
+	uint16_t spddplx;
+
+	if(adapter->hw.media_type == e1000_media_type_fiber)
+		return -EOPNOTSUPP;
+
+	switch (cmd) {
+	case SIOCGMIIPHY:
+		data->phy_id = adapter->hw.phy_addr;
+		break;
+	case SIOCGMIIREG:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		if (e1000_read_phy_reg(&adapter->hw, data->reg_num & 0x1F,
+				   &data->val_out))
+			return -EIO;
+		break;
+	case SIOCSMIIREG:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		if (data->reg_num & ~(0x1F))
+			return -EFAULT;
+		mii_reg = data->val_in;
+		if (e1000_write_phy_reg(&adapter->hw, data->reg_num,
+					data->val_in))
+			return -EIO;
+		if (adapter->hw.phy_type == e1000_phy_m88) {
+			switch (data->reg_num) {
+			case PHY_CTRL:
+				if(data->val_in & MII_CR_AUTO_NEG_EN) {
+					adapter->hw.autoneg = 1;
+					adapter->hw.autoneg_advertised = 0x2F;
+				} else {
+					if (data->val_in & 0x40)
+						spddplx = SPEED_1000;
+					else if (data->val_in & 0x2000)
+						spddplx = SPEED_100;
+					else
+						spddplx = SPEED_10;
+					spddplx += (data->val_in & 0x100)
+						   ? FULL_DUPLEX :
+						   HALF_DUPLEX;
+					retval = e1000_set_spd_dplx(adapter,
+								    spddplx);
+					if(retval)
+						return retval;
+				}
+				if(netif_running(adapter->netdev)) {
+					e1000_down(adapter);
+					e1000_up(adapter);
+				} else
+					e1000_reset(adapter);
+				break;
+			case M88E1000_PHY_SPEC_CTRL:
+			case M88E1000_EXT_PHY_SPEC_CTRL:
+				if (e1000_phy_reset(&adapter->hw))
+					return -EIO;
+				break;
+			}
+		}
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return E1000_SUCCESS;
 }
 
 /**
