@@ -18,6 +18,7 @@
 #include <linux/errno.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
+#include <linux/rtnetlink.h>
 
 #include <net/pkt_sched.h>
 
@@ -54,7 +55,7 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	pr_debug("netem_enqueue skb=%p @%lu\n", skb, jiffies);
 
 	/* Random packet drop 0 => none, ~0 => all */
-	if (q->loss >= net_random()) {
+	if (q->loss && q->loss >= net_random()) {
 		sch->stats.drops++;
 		return 0;	/* lie about loss so TCP doesn't know */
 	}
