@@ -634,13 +634,14 @@ cifs_init_request_bufs(void)
 {
 	if(CIFSMaxBufSize < 4096) {
 		CIFSMaxBufSize = 4096;
-		cFYI(1,("Buffer size set to minimum of 1 page (4096)"));
 	} else if (CIFSMaxBufSize > 1024*127) {
 		CIFSMaxBufSize = 1024 * 127;
-		cFYI(1,("Buffer size set to maximum"));
+	} else {
+		CIFSMaxBufSize &= 0x1FE00; /* Round size to even 512 byte mult*/
 	}
+/*	cERROR(1,("CIFSMaxBufSize %d 0x%x",CIFSMaxBufSize,CIFSMaxBufSize)); */
 	cifs_req_cachep = kmem_cache_create("cifs_request",
-					    CIFS_MAX_MSGSIZE +
+					    CIFSMaxBufSize +
 					    MAX_CIFS_HDR_SIZE, 0,
 					    SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (cifs_req_cachep == NULL)

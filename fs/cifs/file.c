@@ -1434,8 +1434,6 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			spin_unlock(&pTcon->stat_lock);
 #endif
 			if((int)(bytes_read & PAGE_CACHE_MASK) != bytes_read) {
-				cFYI(1,("Partial page %d of %d read to cache",i++,num_pages));
-
 				i++; /* account for partial page */
 
 				/* server copy of file can have smaller size than client */
@@ -1946,7 +1944,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 	pTcon = cifs_sb->tcon;
 	bufsize = pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE;
-	if(bufsize > CIFS_MAX_MSGSIZE) {
+	if(bufsize > CIFSMaxBufSize) {
 		rc = -EIO;
 		FreeXid(xid);
 		return rc;

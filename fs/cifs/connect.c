@@ -332,7 +332,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			} else {
 				if (/*(length != sizeof (struct smb_hdr) - 1)
 				    ||*/ (pdu_length >
-					CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE)
+					CIFSMaxBufSize + MAX_CIFS_HDR_SIZE)
 				    || (pdu_length <
 					sizeof (struct smb_hdr) - 1)
 				    ||

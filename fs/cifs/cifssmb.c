@@ -288,7 +288,7 @@ static int validate_t2(struct smb_t2_rsp * pSMB)
 					(char *)pSMB;
 				if((total_size <= (*(u16 *)pBCC)) && 
 				   (total_size < 
-					CIFS_MAX_MSGSIZE+MAX_CIFS_HDR_SIZE)) {
+					CIFSMaxBufSize+MAX_CIFS_HDR_SIZE)) {
 					return 0;
 				}
 				
@@ -341,7 +341,7 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 		/* probably no need to store and check maxvcs */
 		server->maxBuf =
 			min(le32_to_cpu(pSMBr->MaxBufferSize),
-			(__u32) CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE);
+			(__u32) CIFSMaxBufSize + MAX_CIFS_HDR_SIZE);
 		server->maxRw = le32_to_cpu(pSMBr->MaxRawSize);
 		cFYI(0, ("Max buf = %d ", ses->server->maxBuf));
 		GETU32(ses->server->sessid) = le32_to_cpu(pSMBr->SessionKey);
@@ -823,7 +823,7 @@ CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 		__u16 data_length = le16_to_cpu(pSMBr->DataLength);
 		*nbytes = data_length;
 		/*check that DataLength would not go beyond end of SMB */
-		if ((data_length > CIFS_MAX_MSGSIZE) 
+		if ((data_length > CIFSMaxBufSize) 
 				|| (data_length > count)) {
 			cFYI(1,("bad length %d for count %d",data_length,count));
 			rc = -EIO;
@@ -2359,7 +2359,7 @@ findFirstRetry:
 	pSMB->SearchAttributes =
 	    cpu_to_le16(ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM |
 			ATTR_DIRECTORY);
-	pSMB->SearchCount = cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_DIRECTORY_INFO));	/* should this be shrunk even more ? */
+	pSMB->SearchCount = cpu_to_le16(CIFSMaxBufSize / sizeof (FILE_DIRECTORY_INFO));	/* should this be shrunk even more ? */
 	pSMB->SearchFlags = cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
 
 	/* test for Unix extensions */
@@ -2475,7 +2475,7 @@ findFirst2Retry:
 	pSMB->SearchAttributes =
 	    cpu_to_le16(ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM |
 			ATTR_DIRECTORY);
-	pSMB->SearchCount= cpu_to_le16(CIFS_MAX_MSGSIZE/sizeof(FILE_UNIX_INFO));
+	pSMB->SearchCount= cpu_to_le16(CIFSMaxBufSize/sizeof(FILE_UNIX_INFO));
 	pSMB->SearchFlags = cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | 
 		CIFS_SEARCH_RETURN_RESUME);
 	pSMB->InformationLevel = cpu_to_le16(psrch_inf->info_level);
@@ -2576,7 +2576,7 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 	pSMB->SubCommand = cpu_to_le16(TRANS2_FIND_NEXT);
 	pSMB->SearchHandle = searchHandle;      /* always kept as le */
 	pSMB->SearchCount =
-		cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_UNIX_INFO));
+		cpu_to_le16(CIFSMaxBufSize / sizeof (FILE_UNIX_INFO));
 	/* test for Unix extensions */
 /*	if (tcon->ses->capabilities & CAP_UNIX) {
 		pSMB->InformationLevel = cpu_to_le16(SMB_FIND_FILE_UNIX);
@@ -2704,7 +2704,7 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	pSMB->SearchHandle = searchHandle;	/* always kept as le */
 	findParms->SearchCount = 0;	/* set to zero in case of error */
 	pSMB->SearchCount =
-	    cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_UNIX_INFO));
+	    cpu_to_le16(CIFSMaxBufSize / sizeof (FILE_UNIX_INFO));
 	/* test for Unix extensions */
 	if (tcon->ses->capabilities & CAP_UNIX) {
 		pSMB->InformationLevel = cpu_to_le16(SMB_FIND_FILE_UNIX);

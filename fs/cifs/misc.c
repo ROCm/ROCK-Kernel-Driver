@@ -351,7 +351,7 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 	     ("Entering checkSMB with Length: %x, smb_buf_length: %x ",
 	      length, len));
 	if (((unsigned int)length < 2 + sizeof (struct smb_hdr)) ||
-	    (len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4)) {
+	    (len > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE - 4)) {
 		if ((unsigned int)length < 2 + sizeof (struct smb_hdr)) {
 			cERROR(1, ("Length less than 2 + sizeof smb_hdr "));
 			if (((unsigned int)length >= sizeof (struct smb_hdr) - 1)
@@ -359,9 +359,9 @@ checkSMB(struct smb_hdr *smb, __u16 mid, int length)
 				return 0;	/* some error cases do not return wct and bcc */
 
 		}
-		if (len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4)
+		if (len > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE - 4)
 			cERROR(1,
-			       ("smb_buf_length greater than CIFS_MAX_MSGSIZE ... "));
+			       ("smb_buf_length greater than MaxBufSize"));
 		cERROR(1,
 		       ("bad smb detected. Illegal length. The mid=%d",
 			smb->Mid));

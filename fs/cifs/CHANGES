@@ -1,3 +1,9 @@
+Version 1.28
+------------
+Add module init parm for large SMB buffer size (to allow it to be changed
+from its default of 16K) which is especially useful for large file copy
+when mounting with the directio mount option.
+
 Version 1.27
 ------------
 Turn off DNOTIFY (directory change notification support) by default

@@ -267,7 +267,7 @@ CIFSSendRcv(const unsigned int xid, struct cifsSesInfo *ses,
 		return -ENOMEM;
 	}
 
-	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4) {
+	if (in_buf->smb_buf_length > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE - 4) {
 		up(&ses->server->tcpSem);
 		cERROR(1,
 		       ("Illegal length, greater than maximum frame, %d ",
@@ -397,7 +397,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return -ENOMEM;
 	}
 
-	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4) {
+	if (in_buf->smb_buf_length > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE - 4) {
 		up(&ses->server->tcpSem);
 		cERROR(1,
 		       ("Illegal length, greater than maximum frame, %d ",
@@ -494,7 +494,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return rc;
 	}
   
-	if (receive_len > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
+	if (receive_len > CIFSMaxBufSize + MAX_CIFS_HDR_SIZE) {
 		cERROR(1,
 		       ("Frame too large received.  Length: %d  Xid: %d",
 			receive_len, xid));
