@@ -915,9 +915,9 @@ static int solo1_open_mixdev(struct inode *inode, struct file *file)
 {
 	unsigned int minor = minor(inode->i_rdev);
 	struct solo1_state *s = NULL;
-	struct pci_dev *pci_dev;
+	struct pci_dev *pci_dev = NULL;
 
-	pci_for_each_dev(pci_dev) {
+	while ((pci_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL) {
 		struct pci_driver *drvr;
 		drvr = pci_dev_driver (pci_dev);
 		if (drvr != &solo1_driver)
@@ -1597,9 +1597,9 @@ static int solo1_open(struct inode *inode, struct file *file)
 	unsigned int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	struct solo1_state *s = NULL;
-	struct pci_dev *pci_dev;
+	struct pci_dev *pci_dev = NULL;
 	
-	pci_for_each_dev(pci_dev) {
+	while ((pci_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL) {
 		struct pci_driver *drvr;
 
 		drvr = pci_dev_driver(pci_dev);
@@ -1888,9 +1888,9 @@ static int solo1_midi_open(struct inode *inode, struct file *file)
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct solo1_state *s = NULL;
-	struct pci_dev *pci_dev;
+	struct pci_dev *pci_dev = NULL;
 
-	pci_for_each_dev(pci_dev) {
+	while ((pci_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL) {
 		struct pci_driver *drvr;
 
 		drvr = pci_dev_driver(pci_dev);
@@ -2113,9 +2113,9 @@ static int solo1_dmfm_open(struct inode *inode, struct file *file)
 	unsigned int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	struct solo1_state *s = NULL;
-	struct pci_dev *pci_dev;
+	struct pci_dev *pci_dev = NULL;
 
-	pci_for_each_dev(pci_dev) {
+	while ((pci_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci_dev)) != NULL) {
 		struct pci_driver *drvr;
 
 		drvr = pci_dev_driver(pci_dev);
