@@ -2571,7 +2571,8 @@ static int ata_thread (void *data)
 
 	printk(KERN_DEBUG "ata%u: thread exiting\n", ap->id);
 	ap->thr_pid = -1;
-        complete_and_exit (&ap->thr_exited, 0);
+	del_timer_sync(&ap->thr_timer);
+	complete_and_exit (&ap->thr_exited, 0);
 }
 
 /**
