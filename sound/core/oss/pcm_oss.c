@@ -944,6 +944,7 @@ static int snd_pcm_oss_sync1(snd_pcm_substream_t *substream, size_t size)
 {
 	snd_pcm_runtime_t *runtime;
 	ssize_t result = 0;
+	long res;
 	wait_queue_t wait;
 
 	runtime = substream->runtime;
@@ -960,12 +961,23 @@ static int snd_pcm_oss_sync1(snd_pcm_substream_t *substream, size_t size)
 			break;
 		result = 0;
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule();
+		snd_pcm_stream_lock_irq(substream);
+		res = runtime->status->state;
+		snd_pcm_stream_unlock_irq(substream);
+		if (res != SNDRV_PCM_STATE_RUNNING) {
+			set_current_state(TASK_RUNNING);
+			break;
+		}
+		res = schedule_timeout(10 * HZ);
 		if (signal_pending(current)) {
 			result = -ERESTARTSYS;
 			break;
 		}
-		set_current_state(TASK_RUNNING);
+		if (res == 0) {
+			snd_printk(KERN_ERR "OSS sync error - DMA timeout\n");
+			result = -EIO;
+			break;
+		}
 	}
 	remove_wait_queue(&runtime->sleep, &wait);
 	return result;
@@ -979,14 +991,14 @@ static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_format_t format;
 	unsigned long width;
-	size_t size;
+	size_t size, size1;
 
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	if (substream != NULL) {
 		if ((err = snd_pcm_oss_make_ready(substream)) < 0)
 			return err;
 		runtime = substream->runtime;
-		format = snd_pcm_oss_format_from(runtime->oss.format));
+		format = snd_pcm_oss_format_from(runtime->oss.format);
 		width = snd_pcm_format_physical_width(format);
 		if (runtime->oss.buffer_used > 0) {
 			size = (8 * (runtime->oss.period_bytes - runtime->oss.buffer_used) + 7) / width;
@@ -1010,7 +1022,7 @@ static int snd_pcm_oss_sync(snd_pcm_oss_file_t *pcm_oss_file)
 		while (size < size1) {
 			snd_pcm_format_set_silence(format,
 						   runtime->oss.buffer,
-						   (8 * runtime->oss.period_size + 7) / width);
+						   (8 * runtime->oss.period_bytes + 7) / width);
 			err = snd_pcm_oss_sync1(substream, runtime->oss.period_bytes);
 			if (err < 0)
 				return err;
