@@ -258,8 +258,9 @@
 #define __NR_utimes		251
 #define __NR_statfs64		252
 #define __NR_fstatfs64		253
+#define __NR_fadvise64_64	254
 
-#define __NR_syscalls		254
+#define __NR_syscalls		255
 
 #define __NR(n)	#n
 
