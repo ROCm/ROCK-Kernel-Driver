@@ -62,42 +62,8 @@ static void std_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port,
 	hw->io_ports[IDE_IRQ_OFFSET] = 0;
 }
 
-static int std_ide_request_irq(unsigned int irq,
-                                void (*handler)(int,void *, struct pt_regs *),
-                                unsigned long flags, const char *device,
-                                void *dev_id)
-{
-	return request_irq(irq, handler, flags, device, dev_id);
-}			
-
-static void std_ide_free_irq(unsigned int irq, void *dev_id)
-{
-	free_irq(irq, dev_id);
-}
-
-static int std_ide_check_region(ide_ioreg_t from, unsigned int extent)
-{
-	return check_region(from, extent);
-}
-
-static void std_ide_request_region(ide_ioreg_t from, unsigned int extent,
-                                    const char *name)
-{
-	request_region(from, extent, name);
-}
-
-static void std_ide_release_region(ide_ioreg_t from, unsigned int extent)
-{
-	release_region(from, extent);
-}
-
 struct ide_ops std_ide_ops = {
 	&std_ide_default_irq,
 	&std_ide_default_io_base,
-	&std_ide_init_hwif_ports,
-	&std_ide_request_irq,
-	&std_ide_free_irq,
-	&std_ide_check_region,
-	&std_ide_request_region,
-	&std_ide_release_region
+	&std_ide_init_hwif_ports
 };

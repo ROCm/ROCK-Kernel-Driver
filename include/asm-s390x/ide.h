@@ -40,12 +40,6 @@ typedef union {
 	} b;
 } control_t;
 
-#define ide_request_irq(irq,hand,flg,dev,id)	do {} while (0)
-#define ide_free_irq(irq,dev_id)		do {} while (0)
-#define ide_check_region(from,extent)		do {} while (0)
-#define ide_request_region(from,extent,name)	do {} while (0)
-#define ide_release_region(from,extent)		do {} while (0)
-
 /*
  * The following are not needed for the non-m68k ports
  */

@@ -30,42 +30,8 @@ static void no_ide_init_hwif_ports (hw_regs_t *hw, ide_ioreg_t data_port,
 {
 }
 
-static int no_ide_request_irq(unsigned int irq,
-                              void (*handler)(int,void *, struct pt_regs *),
-                              unsigned long flags, const char *device,
-                              void *dev_id)
-{
-	panic("no_no_ide_request_irq called - shouldn't happen");
-}			
-
-static void no_ide_free_irq(unsigned int irq, void *dev_id)
-{
-	panic("no_ide_free_irq called - shouldn't happen");
-}
-
-static int no_ide_check_region(ide_ioreg_t from, unsigned int extent)
-{
-	panic("no_ide_check_region called - shouldn't happen");
-}
-
-static void no_ide_request_region(ide_ioreg_t from, unsigned int extent,
-                                    const char *name)
-{
-	panic("no_ide_request_region called - shouldn't happen");
-}
-
-static void no_ide_release_region(ide_ioreg_t from, unsigned int extent)
-{
-	panic("no_ide_release_region called - shouldn't happen");
-}
-
 struct ide_ops no_ide_ops = {
 	&no_ide_default_irq,
 	&no_ide_default_io_base,
-	&no_ide_init_hwif_ports,
-	&no_ide_request_irq,
-	&no_ide_free_irq,
-	&no_ide_check_region,
-	&no_ide_request_region,
-	&no_ide_release_region
+	&no_ide_init_hwif_ports
 };

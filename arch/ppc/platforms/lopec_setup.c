@@ -154,13 +154,6 @@ lopec_ide_default_irq(ide_ioreg_t base)
 		return 0;
 }
 
-static void
-lopec_ide_request_region(ide_ioreg_t from, unsigned int to,
-			 const char *name)
-{
-	request_region(from, to, name);
-}
-
 static ide_ioreg_t
 lopec_ide_default_io_base(int index)
 {
@@ -168,19 +161,6 @@ lopec_ide_default_io_base(int index)
 		lopec_ide_probe();
 	return lopec_ide_regbase[index];
 }
-
-static int
-lopec_ide_check_region(ide_ioreg_t from, unsigned int to)
-{
-	return check_region(from, to);
-}
-
-static void
-lopec_ide_release_region(ide_ioreg_t from, unsigned int to)
-{
-	release_region(from, to);
-}
-
 
 static void __init
 lopec_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data,
@@ -350,9 +330,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_ID_MODULE)
 	ppc_ide_md.default_irq = lopec_ide_default_irq;
 	ppc_ide_md.default_io_base = lopec_ide_default_io_base;
-	ppc_ide_md.ide_request_region = lopec_ide_request_region;
-	ppc_ide_md.ide_check_region = lopec_ide_check_region;
-	ppc_ide_md.ide_release_region = lopec_ide_release_region;
 	ppc_ide_md.ide_init_hwif = lopec_ide_init_hwif_ports;
 #endif
 }

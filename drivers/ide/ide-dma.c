@@ -5,9 +5,7 @@
  *  May be copied or modified under the terms of the GNU General Public License
  *
  *  Special Thanks to Mark for his Six years of work.
- */
-
-/*
+*
  * This module provides support for the bus-master IDE DMA functions
  * of various PCI chipsets, including the Intel PIIX (i82371FB for
  * the 430 FX chipset), the PIIX3 (i82371SB for the 430 HX/VX and
@@ -209,71 +207,68 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 			__ide_end_request(drive, 1, rq->nr_sectors);
 			return ide_stopped;
 		}
-		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n", 
+		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n",
 		       drive->name, dma_stat);
 	}
 	return ide_error(drive, "dma_intr", stat);
-}
-
-static int ide_build_sglist(struct ata_channel *hwif, struct request *rq)
-{
-	request_queue_t *q = &hwif->drives[DEVICE_NR(rq->rq_dev) & 1].queue;
-	struct scatterlist *sg = hwif->sg_table;
-	int nents;
-
-	nents = blk_rq_map_sg(q, rq, hwif->sg_table);
-
-	if (rq->q && nents > rq->nr_phys_segments)
-		printk("ide-dma: received %d phys segments, build %d\n", rq->nr_phys_segments, nents);
-
-	if (rq_data_dir(rq) == READ)
-		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
-	else
-		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
-
-	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
 
 /*
  * FIXME: taskfiles should be a map of pages, not a long virt address... /jens
  * FIXME: I agree with Jens --mdcki!
  */
-static int raw_build_sglist(struct ata_channel *ch, struct request *rq)
+static int build_sglist(struct ata_channel *ch, struct request *rq)
 {
 	struct scatterlist *sg = ch->sg_table;
 	int nents = 0;
-	struct ata_taskfile *args = rq->special;
-#if 1
-	unsigned char *virt_addr = rq->buffer;
-	int sector_count = rq->nr_sectors;
-#else
-        nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
 
-	if (nents > rq->nr_segments)
-		printk("ide-dma: received %d segments, build %d\n", rq->nr_segments, nents);
+	if (rq->flags & REQ_DRIVE_ACB) {
+		struct ata_taskfile *args = rq->special;
+#if 1
+		unsigned char *virt_addr = rq->buffer;
+		int sector_count = rq->nr_sectors;
+#else
+		nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
+
+		if (nents > rq->nr_segments)
+			printk("ide-dma: received %d segments, build %d\n", rq->nr_segments, nents);
 #endif
 
-	if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
-		ch->sg_dma_direction = PCI_DMA_TODEVICE;
-	else
-		ch->sg_dma_direction = PCI_DMA_FROMDEVICE;
+		if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
+			ch->sg_dma_direction = PCI_DMA_TODEVICE;
+		else
+			ch->sg_dma_direction = PCI_DMA_FROMDEVICE;
 
-	if (sector_count > 128) {
+		/*
+		 * FIXME: This depends upon a hard coded page size!
+		 */
+		if (sector_count > 128) {
+			memset(&sg[nents], 0, sizeof(*sg));
+
+			sg[nents].page = virt_to_page(virt_addr);
+			sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
+			sg[nents].length = 128  * SECTOR_SIZE;
+			++nents;
+			virt_addr = virt_addr + (128 * SECTOR_SIZE);
+			sector_count -= 128;
+		}
 		memset(&sg[nents], 0, sizeof(*sg));
-
 		sg[nents].page = virt_to_page(virt_addr);
 		sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
-		sg[nents].length = 128  * SECTOR_SIZE;
-		nents++;
-		virt_addr = virt_addr + (128 * SECTOR_SIZE);
-		sector_count -= 128;
-	}
-	memset(&sg[nents], 0, sizeof(*sg));
-	sg[nents].page = virt_to_page(virt_addr);
-	sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
-	sg[nents].length =  sector_count  * SECTOR_SIZE;
-	nents++;
+		sg[nents].length =  sector_count  * SECTOR_SIZE;
+		++nents;
+	} else {
+		nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
 
+		if (rq->q && nents > rq->nr_phys_segments)
+			printk("ide-dma: received %d phys segments, build %d\n", rq->nr_phys_segments, nents);
+
+		if (rq_data_dir(rq) == READ)
+			ch->sg_dma_direction = PCI_DMA_FROMDEVICE;
+		else
+			ch->sg_dma_direction = PCI_DMA_TODEVICE;
+
+	}
 	return pci_map_sg(ch->pci_dev, sg, nents, ch->sg_dma_direction);
 }
 
@@ -295,11 +290,7 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 	int i;
 	struct scatterlist *sg;
 
-	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_ACB) {
-		hwif->sg_nents = i = raw_build_sglist(hwif, HWGROUP(drive)->rq);
-	} else {
-		hwif->sg_nents = i = ide_build_sglist(hwif, HWGROUP(drive)->rq);
-	}
+	hwif->sg_nents = i = build_sglist(hwif, HWGROUP(drive)->rq);
 	if (!i)
 		return 0;
 
@@ -333,7 +324,7 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 			if (is_trm290_chipset)
 				xcount = ((xcount >> 2) - 1) << 16;
 			if (xcount == 0x0000) {
-		        /* 
+		        /*
 			 * Most chipsets correctly interpret a length of
 			 * 0x0000 as 64KB, but at least one (e.g. CS5530)
 			 * misinterprets it as zero (!). So here we break
