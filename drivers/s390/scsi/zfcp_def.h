@@ -31,10 +31,8 @@
 #ifndef ZFCP_DEF_H
 #define ZFCP_DEF_H
 
-#ifdef __KERNEL__
-
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.41 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.48 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -64,7 +62,6 @@
 typedef u32 scsi_id_t;
 typedef u32 scsi_lun_t;
 
-#define ZFCP_FAKE_SCSI_COMPLETION_TIME	        (HZ / 3)
 #define ZFCP_ERP_SCSI_LOW_MEM_TIMEOUT           (100*HZ)
 #define ZFCP_SCSI_ER_TIMEOUT                    (100*HZ)
 #define ZFCP_SCSI_HOST_FLUSH_TIMEOUT            (1*HZ)
@@ -470,7 +467,6 @@ extern u32 flags_dump;
 #define ZFCP_STATUS_ADAPTER_ERP_THREAD_KILL	0x00000080
 #define ZFCP_STATUS_ADAPTER_ERP_PENDING		0x00000100
 #define ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED	0x00000200
-#define ZFCP_STATUS_ADAPTER_QUEUECOMMAND_BLOCK	0x00000400 
 
 #define ZFCP_STATUS_ADAPTER_SCSI_UP			\
 		(ZFCP_STATUS_COMMON_UNBLOCKED |	\
@@ -676,10 +672,7 @@ struct zfcp_adapter {
 	u32			hydra_version;	   /* Hydra version */
 	u32			fsf_lic_version;
 	struct Scsi_Host	*scsi_host;	   /* Pointer to mid-layer */
-        Scsi_Cmnd               *first_fake_cmnd;  /* Packets in flight list */
-	rwlock_t		fake_list_lock;    /* Lock for the above */
-	struct timer_list       fake_scsi_timer;   /* Starts processing of
-						      faked commands */
+
 	unsigned char		name[9];
 	struct list_head	port_list_head;	   /* remote port list */
 	struct list_head        port_remove_lh;    /* head of ports to be
@@ -692,9 +685,6 @@ struct zfcp_adapter {
 	rwlock_t		fsf_req_list_lock; /* lock for ops on list of
 						      FSF requests */
         atomic_t       		fsf_reqs_active;   /* # active FSF reqs */
-        atomic_t       		scsi_reqs_active;  /* # active SCSI reqs */
-	wait_queue_head_t	scsi_reqs_active_wq; /* can be used to wait for
-							fsf_reqs_active chngs */
 	struct zfcp_qdio_queue	request_queue;	   /* request queue */
 	u32			fsf_req_seq_no;	   /* FSF cmnd seq number */
 	wait_queue_head_t	request_wq;	   /* can be used to wait for
@@ -765,6 +755,8 @@ struct zfcp_unit {
 	struct zfcp_erp_action erp_action;     /* pending error recovery */
         atomic_t               erp_counter;
 	struct device          sysfs_device;   /* sysfs device */
+	atomic_t               scsi_add_work;  /* used to synchronize */
+	wait_queue_head_t      scsi_add_wq;    /* wait for scsi_add_device */
 };
 
 /* FSF request */
@@ -809,6 +801,14 @@ struct zfcp_data {
 	struct notifier_block	reboot_notifier;     /* used to register cleanup
 							functions */
 	atomic_t		loglevel;            /* current loglevel */
+#ifndef MODULE                                       /* initial parameters
+							needed if ipl from a
+							scsi device is wanted */
+	char                    init_busid[BUS_ID_SIZE];
+	wwn_t                   init_wwpn;
+	fcp_lun_t               init_fcp_lun;
+	int                     init_is_valid;
+#endif
 #ifdef ZFCP_STAT_REQSIZES                            /* Statistical accounting
 							of processed data */
 	struct list_head	read_req_head;
@@ -857,7 +857,7 @@ struct zfcp_statistics {
 
 #ifndef atomic_test_mask
 #define atomic_test_mask(mask, target) \
-           (atomic_read(target) & mask)
+           ((atomic_read(target) & mask) == mask)
 #endif
 
 extern void _zfcp_hex_dump(char *, int);
@@ -957,5 +957,4 @@ zfcp_adapter_wait(struct zfcp_adapter *adapter)
 	wait_event(adapter->remove_wq, atomic_read(&adapter->refcount) == 0);
 }
 
-#endif /* __KERNEL_- */
 #endif /* ZFCP_DEF_H */

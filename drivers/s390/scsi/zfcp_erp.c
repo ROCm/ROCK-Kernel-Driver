@@ -30,7 +30,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 #define ZFCP_LOG_AREA_PREFIX		ZFCP_LOG_AREA_PREFIX_ERP
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.33 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.39 $"
 
 #include "zfcp_ext.h"
 
@@ -108,6 +108,9 @@ static int zfcp_erp_action_dismiss(struct zfcp_erp_action *);
 static int zfcp_erp_action_enqueue(int, struct zfcp_adapter *,
 				   struct zfcp_port *, struct zfcp_unit *);
 static int zfcp_erp_action_dequeue(struct zfcp_erp_action *);
+static void zfcp_erp_action_cleanup(int, struct zfcp_adapter *,
+				    struct zfcp_port *, struct zfcp_unit *,
+				    int);
 
 static void zfcp_erp_action_ready(struct zfcp_erp_action *);
 static int  zfcp_erp_action_exists(struct zfcp_erp_action *);
@@ -1160,6 +1163,9 @@ zfcp_erp_strategy(struct zfcp_erp_action *erp_action)
 	write_unlock(&adapter->erp_lock);
 	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
 	
+	if (retval != ZFCP_ERP_CONTINUES)
+		zfcp_erp_action_cleanup(action, adapter, port, unit, retval);
+
 	/*
 	 * a few tasks remain when the erp queues are empty
 	 * (don't do that if the last action evaluated was dismissed
@@ -1451,6 +1457,66 @@ zfcp_erp_strategy_statechange_detected(atomic_t * target_status, u32 erp_status)
 	     !(ZFCP_STATUS_ERP_CLOSE_ONLY & erp_status));
 }
 
+/**
+ * zfcp_erp_scsi_add_device
+ * @data: pointer to a struct zfcp_unit
+ *
+ * Registers a logical unit with the SCSI stack.
+ */
+static void
+zfcp_erp_scsi_add_device(void *data)
+{
+	struct {
+		struct zfcp_unit  *unit;
+		struct work_struct work;
+	} *p;
+
+	p = data;
+	scsi_add_device(p->unit->port->adapter->scsi_host,
+			0, p->unit->port->scsi_id, p->unit->scsi_lun);
+	atomic_set(&p->unit->scsi_add_work, 0);
+	wake_up(&p->unit->scsi_add_wq);
+	zfcp_unit_put(p->unit);
+	kfree(p);
+}
+
+/**
+ * zfcp_erp_schedule_work
+ * @unit: pointer to unit which should be registered with SCSI stack
+ *
+ * Schedules work which registers a unit with the SCSI stack
+ */
+static int
+zfcp_erp_schedule_work(struct zfcp_unit *unit)
+{
+	struct {
+		struct zfcp_unit * unit;
+		struct work_struct work;
+	} *p;
+
+	if (atomic_compare_and_swap(0, 1, &unit->scsi_add_work))
+		return 0;
+
+	if ((p = kmalloc(sizeof(*p), GFP_KERNEL)) == NULL) {
+		ZFCP_LOG_NORMAL("error: Out of resources. Could not register "
+			      "the FCP-LUN 0x%Lx connected to "
+			      "the port with WWPN 0x%Lx connected to "
+			      "the adapter %s with the SCSI stack.\n",
+			      unit->fcp_lun,
+			      unit->port->wwpn,
+			      zfcp_get_busid_by_unit(unit));
+		atomic_set(&p->unit->scsi_add_work, 0);
+		return -ENOMEM;
+	}
+
+	zfcp_unit_get(unit);
+	memset(p, 0, sizeof(*p));
+	INIT_WORK(&p->work, zfcp_erp_scsi_add_device, p);
+	p->unit = unit;
+	schedule_work(&p->work);
+	return 0;
+}
+
 /*
  * function:	
  *
@@ -1468,10 +1534,6 @@ zfcp_erp_strategy_check_unit(struct zfcp_unit *unit, int result)
 	if (result == ZFCP_ERP_SUCCEEDED) {
 		atomic_set(&unit->erp_counter, 0);
 		zfcp_erp_unit_unblock(unit);
-		/* register unit with scsi stack */
-		if (!unit->device)
-			scsi_add_device(unit->port->adapter->scsi_host,
-					0, unit->port->scsi_id, unit->scsi_lun);
 	} else {
 		/* ZFCP_ERP_FAILED or ZFCP_ERP_EXIT */
 		atomic_inc(&unit->erp_counter);
@@ -1773,9 +1835,8 @@ zfcp_erp_port_reopen_all_internal(struct zfcp_adapter *adapter, int clear_mask)
 	struct zfcp_port *port;
 
 	list_for_each_entry(port, &adapter->port_list_head, list)
-	    if (atomic_test_mask(ZFCP_STATUS_PORT_NAMESERVER, &port->status)
-		!= ZFCP_STATUS_PORT_NAMESERVER)
-		zfcp_erp_port_reopen_internal(port, clear_mask);
+		if (!atomic_test_mask(ZFCP_STATUS_PORT_NAMESERVER, &port->status))
+			zfcp_erp_port_reopen_internal(port, clear_mask);
 
 	return retval;
 }
@@ -2333,8 +2394,8 @@ zfcp_erp_port_forced_strategy(struct zfcp_erp_action *erp_action)
 		 * open flag is unset - however, this is for readabilty ...
 		 */
 		if (atomic_test_mask((ZFCP_STATUS_PORT_PHYS_OPEN |
-				      ZFCP_STATUS_COMMON_OPEN), &port->status)
-		    == (ZFCP_STATUS_PORT_PHYS_OPEN | ZFCP_STATUS_COMMON_OPEN)) {
+				      ZFCP_STATUS_COMMON_OPEN),
+			             &port->status)) {
 			ZFCP_LOG_DEBUG("Port wwpn=0x%Lx is open -> trying "
 				       " close physical\n",
 				       port->wwpn);
@@ -2433,8 +2494,7 @@ zfcp_erp_port_strategy_open(struct zfcp_erp_action *erp_action)
 	int retval;
 
 	if (atomic_test_mask(ZFCP_STATUS_PORT_NAMESERVER,
-			     &erp_action->port->status)
-	    == ZFCP_STATUS_PORT_NAMESERVER)
+			     &erp_action->port->status))
 		retval = zfcp_erp_port_strategy_open_nameserver(erp_action);
 	else
 		retval = zfcp_erp_port_strategy_open_common(erp_action);
@@ -3041,6 +3101,12 @@ zfcp_erp_action_enqueue(int action,
 			goto out;
 		}
 		if (!atomic_test_mask
+		    (ZFCP_STATUS_COMMON_RUNNING, &port->status) ||
+		    atomic_test_mask
+		    (ZFCP_STATUS_COMMON_ERP_FAILED, &port->status)) {
+			goto out;
+		}
+		if (!atomic_test_mask
 		    (ZFCP_STATUS_COMMON_UNBLOCKED, &port->status)) {
 			stronger_action = ZFCP_ERP_ACTION_REOPEN_PORT;
 			unit = NULL;
@@ -3065,6 +3131,12 @@ zfcp_erp_action_enqueue(int action,
 			debug_text_event(adapter->erp_dbf, 4, "pf_actenq_drp");
 			debug_event(adapter->erp_dbf, 4, &port->wwpn,
 				    sizeof (wwn_t));
+			goto out;
+		}
+		if (!atomic_test_mask
+		    (ZFCP_STATUS_COMMON_RUNNING, &adapter->status) ||
+		    atomic_test_mask
+		    (ZFCP_STATUS_COMMON_ERP_FAILED, &adapter->status)) {
 			goto out;
 		}
 		if (!atomic_test_mask
@@ -3178,18 +3250,15 @@ zfcp_erp_action_dequeue(struct zfcp_erp_action *erp_action)
 	case ZFCP_ERP_ACTION_REOPEN_UNIT:
 		atomic_clear_mask(ZFCP_STATUS_COMMON_ERP_INUSE,
 				  &erp_action->unit->status);
-		zfcp_unit_put(erp_action->unit);
 		break;
 	case ZFCP_ERP_ACTION_REOPEN_PORT_FORCED:
 	case ZFCP_ERP_ACTION_REOPEN_PORT:
 		atomic_clear_mask(ZFCP_STATUS_COMMON_ERP_INUSE,
 				  &erp_action->port->status);
-		zfcp_port_put(erp_action->port);
 		break;
 	case ZFCP_ERP_ACTION_REOPEN_ADAPTER:
 		atomic_clear_mask(ZFCP_STATUS_COMMON_ERP_INUSE,
 				  &erp_action->adapter->status);
-		zfcp_adapter_put(adapter);
 		break;
 	default:
 		/* bug */
@@ -3197,6 +3266,39 @@ zfcp_erp_action_dequeue(struct zfcp_erp_action *erp_action)
 	}
 	return retval;
 }
+
+/**
+ * zfcp_erp_action_cleanup
+ *
+ * registers unit with scsi stack if appropiate and fixes reference counts
+ */
+
+static void
+zfcp_erp_action_cleanup(int action, struct zfcp_adapter *adapter,
+			struct zfcp_port *port, struct zfcp_unit *unit,
+			int result)
+{
+	if ((action == ZFCP_ERP_ACTION_REOPEN_UNIT)
+	    && (result == ZFCP_ERP_SUCCEEDED)
+	    && (!unit->device)) {
+		zfcp_erp_schedule_work(unit);
+	}
+	switch (action) {
+	case ZFCP_ERP_ACTION_REOPEN_UNIT:
+		zfcp_unit_put(unit);
+		break;
+	case ZFCP_ERP_ACTION_REOPEN_PORT_FORCED:
+	case ZFCP_ERP_ACTION_REOPEN_PORT:
+		zfcp_port_put(port);
+		break;
+	case ZFCP_ERP_ACTION_REOPEN_ADAPTER:
+		zfcp_adapter_put(adapter);
+		break;
+	default:
+		break;
+	}
+}
+
 
 /*
  * function:	

@@ -25,7 +25,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.17 $"
+#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.19 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -184,6 +184,18 @@ int
 zfcp_sysfs_unit_create_files(struct device *dev)
 {
 	return sysfs_create_group(&dev->kobj, &zfcp_unit_attr_group);
+}
+
+/** 
+ * zfcp_sysfs_remove_unit_files - remove sysfs unit files
+ * @dev: pointer to belonging device
+ *
+ * Remove all attributes of the sysfs representation of a unit.
+ */
+void
+zfcp_sysfs_unit_remove_files(struct device *dev)
+{
+	sysfs_remove_group(&dev->kobj, &zfcp_unit_attr_group);
 }
 
 #undef ZFCP_LOG_AREA
