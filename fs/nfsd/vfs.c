@@ -823,7 +823,7 @@ out:
  */
 int
 nfsd_commit(struct svc_rqst *rqstp, struct svc_fh *fhp,
-               off_t offset, unsigned long count)
+               loff_t offset, unsigned long count)
 {
 	struct file	file;
 	int		err;
