@@ -55,8 +55,6 @@ extern int usb_get_string(struct usb_device *dev, unsigned short langid, unsigne
 
 #undef HAVE_SUPPORT_ALSA
 
-#undef MOD_INC_EACH_PROBE
-
 /* ------------------------------------------------------------------------- */
 
 static int singlebyte = 0;
@@ -925,11 +923,6 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 	printk(KERN_INFO "usb-midi: Open Succeeded. minor= %d.\n", minor);
 #endif
 
-	/** Side-effect: module cannot be removed until USE_COUNT is 0. **/
-#ifndef MOD_INC_EACH_PROBE
-	MOD_INC_USE_COUNT;
-#endif
-
 	return 0; /** Success. **/
 }
 
@@ -978,15 +971,11 @@ static int usb_midi_release(struct inode *inode, struct file *file)
 	wake_up(&open_wait);
 
 	file->private_data = 0;
-	/** Sideeffect: Module cannot be removed until usecount is 0. */
-#ifndef MOD_INC_EACH_PROBE
-	MOD_DEC_USE_COUNT;
-#endif
-
 	return 0;
 }
 
 static struct file_operations usb_midi_fops = {
+	.owner =	THIS_MODULE,
 	.llseek =	usb_midi_llseek,
 	.read =		usb_midi_read,
 	.write =	usb_midi_write,
@@ -2040,10 +2029,6 @@ static int usb_midi_probe(struct usb_interface *intf,
 	list_add_tail(&s->mididev, &mididevs);
 	up(&open_sem);
 
-#ifdef MOD_INC_EACH_PROBE
-	MOD_INC_USE_COUNT;
-#endif
-
 	usb_set_intfdata (intf, s);
 	return 0;
 }
@@ -2081,11 +2066,6 @@ static void usb_midi_disconnect(struct usb_interface *intf)
 	}
 	release_midi_device(s);
 	wake_up(&open_wait);
-#ifdef MOD_INC_EACH_PROBE
-	MOD_DEC_USE_COUNT;
-#endif
-
-	return;
 }
 
 /* we want to look at all devices by hand */
@@ -2095,6 +2075,7 @@ static struct usb_device_id id_table[] = {
 };
 
 static struct usb_driver usb_midi_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"midi",
 	.probe =	usb_midi_probe,
 	.disconnect =	usb_midi_disconnect,
