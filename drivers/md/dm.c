@@ -339,8 +339,6 @@ static void __split_page(struct clone_info *ci, unsigned int len)
 	struct bio *clone, *bio = ci->bio;
 	struct bio_vec *bv = bio->bi_io_vec + ci->idx;
 
-	DMWARN("splitting page");
-
 	if (len > ci->sector_count)
 		len = ci->sector_count;
 
