@@ -1,0 +1,34 @@
+# ==========================================================================
+# Installing modules
+# ==========================================================================
+
+src := $(obj)
+
+.PHONY: modules_install
+modules_install:
+
+include .config
+
+include $(obj)/Makefile
+
+include scripts/Makefile.lib
+
+# ==========================================================================
+
+quiet_cmd_modules_install = INSTALL $(obj-m)
+      cmd_modules_install = mkdir -p $(MODLIB)/kernel/$(obj); \
+			    cp $(obj-m) $(MODLIB)/kernel/$(obj)
+
+modules_install: $(subdir-ym)
+ifneq ($(obj-m),)
+	$(call cmd,modules_install)
+else
+	@:
+endif
+
+# Descending
+# ---------------------------------------------------------------------------
+
+.PHONY: $(subdir-ym)
+$(subdir-ym):
+	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst obj=$@

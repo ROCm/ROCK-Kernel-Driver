@@ -15,6 +15,5 @@ irda-y := iriap.o iriap_event.o irlmp.o irlmp_event.o irlmp_frame.o \
 	  discovery.o parameters.o irsyms.o
 irda-$(CONFIG_PROC_FS) += irproc.o
 irda-$(CONFIG_SYSCTL) += irsysctl.o
-irda-objs := $(irda-y)
 
 include $(TOPDIR)/Rules.make
