@@ -485,25 +485,14 @@ static psmouse_ret_t synaptics_process_byte(struct psmouse *psmouse, struct pt_r
 /*****************************************************************************
  *	Driver initialization/cleanup functions
  ****************************************************************************/
-
-static inline void set_abs_params(struct input_dev *dev, int axis, int min, int max, int fuzz, int flat)
-{
-	dev->absmin[axis] = min;
-	dev->absmax[axis] = max;
-	dev->absfuzz[axis] = fuzz;
-	dev->absflat[axis] = flat;
-
-	set_bit(axis, dev->absbit);
-}
-
 static void set_input_params(struct input_dev *dev, struct synaptics_data *priv)
 {
 	int i;
 
 	set_bit(EV_ABS, dev->evbit);
-	set_abs_params(dev, ABS_X, XMIN_NOMINAL, XMAX_NOMINAL, 0, 0);
-	set_abs_params(dev, ABS_Y, YMIN_NOMINAL, YMAX_NOMINAL, 0, 0);
-	set_abs_params(dev, ABS_PRESSURE, 0, 255, 0, 0);
+	input_set_abs_params(dev, ABS_X, XMIN_NOMINAL, XMAX_NOMINAL, 0, 0);
+	input_set_abs_params(dev, ABS_Y, YMIN_NOMINAL, YMAX_NOMINAL, 0, 0);
+	input_set_abs_params(dev, ABS_PRESSURE, 0, 255, 0, 0);
 	set_bit(ABS_TOOL_WIDTH, dev->absbit);
 
 	set_bit(EV_KEY, dev->evbit);

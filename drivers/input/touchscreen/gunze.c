@@ -125,11 +125,9 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
 
 	init_input_dev(&gunze->dev);
 	gunze->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
-	gunze->dev.absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
 	gunze->dev.keybit[LONG(BTN_TOUCH)] = BIT(BTN_TOUCH);
-
-	gunze->dev.absmin[ABS_X] = 96;   gunze->dev.absmin[ABS_Y] = 72;
-	gunze->dev.absmax[ABS_X] = 4000; gunze->dev.absmax[ABS_Y] = 3000;
+	input_set_abs_params(&gunze->dev, ABS_X, 96, 4000, 0, 0);
+	input_set_abs_params(&gunze->dev, ABS_Y, 72, 3000, 0, 0);
 
 	gunze->serio = serio;
 	serio->private = gunze;

@@ -397,17 +397,12 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 		kfree(ts);
 		return;
 	}
+
 	/* Now we have things going we setup our input device */
 	ts->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS) | BIT(EV_LED) | BIT(EV_PWR);
-	ts->dev.absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
 	ts->dev.ledbit[0] = BIT(LED_SLEEP);
-
-	ts->dev.absmin[ABS_X] = 60;   ts->dev.absmin[ABS_Y] = 35;
-	ts->dev.absmax[ABS_X] = 985; ts->dev.absmax[ABS_Y] = 1024;
-	ts->dev.absfuzz[ABS_X] = 0; ts->dev.absfuzz[ABS_Y] = 0;
-
-	ts->serio = serio;
-	serio->private = ts;
+	input_set_abs_params(&ts->dev, ABS_X, 60, 985, 0, 0);
+	input_set_abs_params(&ts->dev, ABS_Y, 35, 1024, 0, 0);
 
 	set_bit(KEY_RECORD, ts->dev.keybit);
 	set_bit(KEY_Q, ts->dev.keybit);
@@ -421,6 +416,9 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 	set_bit(KEY_ENTER, ts->dev.keybit);
 	ts->dev.keybit[LONG(BTN_TOUCH)] |= BIT(BTN_TOUCH);
 	ts->dev.keybit[LONG(KEY_SUSPEND)] |= BIT(KEY_SUSPEND);
+
+	ts->serio = serio;
+	serio->private = ts;
 
 	sprintf(ts->phys, "%s/input0", serio->phys);
 

@@ -749,8 +749,6 @@ struct ff_effect {
 #define INPUT_KEYCODE(dev, scancode) ((dev->keycodesize == 1) ? ((u8*)dev->keycode)[scancode] : \
 	((dev->keycodesize == 2) ? ((u16*)dev->keycode)[scancode] : (((u32*)dev->keycode)[scancode])))
 
-#define init_input_dev(dev)	do { INIT_LIST_HEAD(&((dev)->h_list)); INIT_LIST_HEAD(&((dev)->node)); } while (0)
-
 #define SET_INPUT_KEYCODE(dev, scancode, val)			\
 		({	unsigned __old;				\
 		switch (dev->keycodesize) {			\
@@ -915,6 +913,12 @@ struct input_handle {
 #define to_handle(n) container_of(n,struct input_handle,d_node)
 #define to_handle_h(n) container_of(n,struct input_handle,h_node)
 
+static inline void init_input_dev(struct input_dev *dev)
+{
+	INIT_LIST_HEAD(&dev->h_list);
+	INIT_LIST_HEAD(&dev->node);
+}
+
 void input_register_device(struct input_dev *);
 void input_unregister_device(struct input_dev *);
 
@@ -932,14 +936,51 @@ int input_flush_device(struct input_handle* handle, struct file* file);
 
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value);
 
-#define input_report_key(a,b,c) input_event(a, EV_KEY, b, !!(c))
-#define input_report_rel(a,b,c) input_event(a, EV_REL, b, c)
-#define input_report_abs(a,b,c) input_event(a, EV_ABS, b, c)
-#define input_report_ff(a,b,c)	input_event(a, EV_FF, b, c)
-#define input_report_ff_status(a,b,c)	input_event(a, EV_FF_STATUS, b, c)
+static inline void input_report_key(struct input_dev *dev, unsigned int code, int value)
+{
+	input_event(dev, EV_KEY, code, !!value);
+}
 
-#define input_regs(a,b)		do { (a)->regs = (b); } while (0)
-#define input_sync(a)		do { input_event(a, EV_SYN, SYN_REPORT, 0); (a)->regs = NULL; } while (0)
+static inline void input_report_rel(struct input_dev *dev, unsigned int code, int value)
+{
+	input_event(dev, EV_REL, code, value);
+}
+
+static inline void input_report_abs(struct input_dev *dev, unsigned int code, int value)
+{
+	input_event(dev, EV_ABS, code, value);
+}
+
+static inline void input_report_ff(struct input_dev *dev, unsigned int code, int value)
+{
+	input_event(dev, EV_FF, code, value);
+}
+
+static inline void input_report_ff_status(struct input_dev *dev, unsigned int code, int value)
+{
+	input_event(dev, EV_FF_STATUS, code, value);
+}
+
+static inline void input_regs(struct input_dev *dev, struct pt_regs *regs)
+{
+	dev->regs = regs;
+}
+
+static inline void input_sync(struct input_dev *dev)
+{
+	input_event(dev, EV_SYN, SYN_REPORT, 0);
+	dev->regs = NULL;
+}
+
+static inline void input_set_abs_params(struct input_dev *dev, int axis, int min, int max, int fuzz, int flat)
+{
+	dev->absmin[axis] = min;
+	dev->absmax[axis] = max;
+	dev->absfuzz[axis] = fuzz;
+	dev->absflat[axis] = flat;
+
+	dev->absbit[LONG(axis)] |= BIT(axis);
+}
 
 extern struct class_simple *input_class;
 
