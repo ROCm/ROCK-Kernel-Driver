@@ -120,13 +120,13 @@ static int transfer_xor(struct loop_device *lo, int cmd, char *raw_buf,
 	return 0;
 }
 
-static int none_status(struct loop_device *lo, struct loop_info *info)
+static int none_status(struct loop_device *lo, const struct loop_info64 *info)
 {
 	lo->lo_flags |= LO_FLAGS_BH_REMAP;
 	return 0;
 }
 
-static int xor_status(struct loop_device *lo, struct loop_info *info)
+static int xor_status(struct loop_device *lo, const struct loop_info64 *info)
 {
 	if (info->lo_encrypt_key_size <= 0)
 		return -EINVAL;
@@ -215,7 +215,8 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 			 * The transfer failed, but we still write the data to
 			 * keep prepare/commit calls balanced.
 			 */
-			printk(KERN_ERR "loop: transfer error block %llu\n", (unsigned long long)index);
+			printk(KERN_ERR "loop: transfer error block %llu\n",
+			       (unsigned long long)index);
 			memset(kaddr + offset, 0, size);
 		}
 		flush_dcache_page(page);
@@ -270,7 +271,9 @@ struct lo_read_data {
 	int bsize;
 };
 
-static int lo_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size)
+static int
+lo_read_actor(read_descriptor_t *desc, struct page *page,
+	      unsigned long offset, unsigned long size)
 {
 	char *kaddr;
 	unsigned long count = desc->count;
@@ -284,7 +287,8 @@ static int lo_read_actor(read_descriptor_t * desc, struct page *page, unsigned l
 	kaddr = kmap(page);
 	if (lo_do_transfer(lo, READ, kaddr + offset, p->data, size, IV)) {
 		size = 0;
-		printk(KERN_ERR "loop: transfer error block %ld\n",page->index);
+		printk(KERN_ERR "loop: transfer error block %ld\n",
+		       page->index);
 		desc->error = -EINVAL;
 	}
 	kunmap(page);
@@ -297,7 +301,7 @@ static int lo_read_actor(read_descriptor_t * desc, struct page *page, unsigned l
 
 static int
 do_lo_receive(struct loop_device *lo,
-		struct bio_vec *bvec, int bsize, loff_t pos)
+	      struct bio_vec *bvec, int bsize, loff_t pos)
 {
 	struct lo_read_data cookie;
 	struct file *file;
@@ -330,8 +334,8 @@ lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 	return ret;
 }
 
-static inline unsigned long loop_get_iv(struct loop_device *lo,
-					unsigned long sector)
+static inline unsigned long
+loop_get_iv(struct loop_device *lo, unsigned long sector)
 {
 	int bs = lo->lo_blocksize;
 	unsigned long offset, IV;
@@ -358,6 +362,7 @@ static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 }
 
 static int loop_end_io_transfer(struct bio *, unsigned int, int);
+
 static void loop_put_buffer(struct bio *bio)
 {
 	/*
@@ -764,7 +769,8 @@ static int loop_release_xfer(struct loop_device *lo)
 	return err;
 }
 
-static int loop_init_xfer(struct loop_device *lo, int type,struct loop_info *i)
+static int
+loop_init_xfer(struct loop_device *lo, int type, const struct loop_info64 *i)
 {
 	int err = 0; 
 	if (type) {
@@ -822,9 +828,9 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	return 0;
 }
 
-static int loop_set_status(struct loop_device *lo, struct loop_info *arg)
+static int
+loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 {
-	struct loop_info info; 
 	int err;
 	unsigned int type;
 	loff_t offset;
@@ -834,23 +840,21 @@ static int loop_set_status(struct loop_device *lo, struct loop_info *arg)
 		return -EPERM;
 	if (lo->lo_state != Lo_bound)
 		return -ENXIO;
-	if (copy_from_user(&info, arg, sizeof (struct loop_info)))
-		return -EFAULT; 
-	if ((unsigned int) info.lo_encrypt_key_size > LO_KEY_SIZE)
+	if ((unsigned int) info->lo_encrypt_key_size > LO_KEY_SIZE)
 		return -EINVAL;
-	type = info.lo_encrypt_type; 
+	type = info->lo_encrypt_type; 
 	if (type >= MAX_LO_CRYPT || xfer_funcs[type] == NULL)
 		return -EINVAL;
-	if (type == LO_CRYPT_XOR && info.lo_encrypt_key_size == 0)
+	if (type == LO_CRYPT_XOR && info->lo_encrypt_key_size == 0)
 		return -EINVAL;
 
 	err = loop_release_xfer(lo);
 	if (!err) 
-		err = loop_init_xfer(lo, type, &info);
+		err = loop_init_xfer(lo, type, info);
 
 	offset = lo->lo_offset;
-	if (offset != info.lo_offset) {
-		lo->lo_offset = info.lo_offset;
+	if (offset != info->lo_offset) {
+		lo->lo_offset = info->lo_offset;
 		if (figure_loop_size(lo)){
 			err = -EFBIG;
 			lo->lo_offset = offset;
@@ -860,51 +864,147 @@ static int loop_set_status(struct loop_device *lo, struct loop_info *arg)
 	if (err)
 		return err;	
 
-	strncpy(lo->lo_name, info.lo_name, LO_NAME_SIZE);
+	strncpy(lo->lo_name, info->lo_name, LO_NAME_SIZE);
 
 	lo->transfer = xfer_funcs[type]->transfer;
 	lo->ioctl = xfer_funcs[type]->ioctl;
-	lo->lo_encrypt_key_size = info.lo_encrypt_key_size;
-	lo->lo_init[0] = info.lo_init[0];
-	lo->lo_init[1] = info.lo_init[1];
-	if (info.lo_encrypt_key_size) {
-		memcpy(lo->lo_encrypt_key, info.lo_encrypt_key, 
-		       info.lo_encrypt_key_size);
+	lo->lo_encrypt_key_size = info->lo_encrypt_key_size;
+	lo->lo_init[0] = info->lo_init[0];
+	lo->lo_init[1] = info->lo_init[1];
+	if (info->lo_encrypt_key_size) {
+		memcpy(lo->lo_encrypt_key, info->lo_encrypt_key, 
+		       info->lo_encrypt_key_size);
 		lo->lo_key_owner = current->uid; 
 	}	
 
 	return 0;
 }
 
-static int loop_get_status(struct loop_device *lo, struct loop_info *arg)
+static int
+loop_get_status(struct loop_device *lo, struct loop_info64 *info)
 {
 	struct file *file = lo->lo_backing_file;
-	struct loop_info info;
 	struct kstat stat;
 	int error;
 
 	if (lo->lo_state != Lo_bound)
 		return -ENXIO;
-	if (!arg)
-		return -EINVAL;
 	error = vfs_getattr(file->f_vfsmnt, file->f_dentry, &stat);
 	if (error)
 		return error;
-	memset(&info, 0, sizeof(info));
-	info.lo_number = lo->lo_number;
-	info.lo_device = stat.dev;
-	info.lo_inode = stat.ino;
-	info.lo_rdevice = lo->lo_device ? stat.rdev : stat.dev;
-	info.lo_offset = lo->lo_offset;
-	info.lo_flags = lo->lo_flags;
-	strncpy(info.lo_name, lo->lo_name, LO_NAME_SIZE);
-	info.lo_encrypt_type = lo->lo_encrypt_type;
+	memset(info, 0, sizeof(*info));
+	info->lo_number = lo->lo_number;
+	info->lo_device = stat.dev;
+	info->lo_inode = stat.ino;
+	info->lo_rdevice = lo->lo_device ? stat.rdev : stat.dev;
+	info->lo_offset = lo->lo_offset;
+	info->lo_flags = lo->lo_flags;
+	strncpy(info->lo_name, lo->lo_name, LO_NAME_SIZE);
+	info->lo_encrypt_type = lo->lo_encrypt_type;
 	if (lo->lo_encrypt_key_size && capable(CAP_SYS_ADMIN)) {
-		info.lo_encrypt_key_size = lo->lo_encrypt_key_size;
-		memcpy(info.lo_encrypt_key, lo->lo_encrypt_key,
+		info->lo_encrypt_key_size = lo->lo_encrypt_key_size;
+		memcpy(info->lo_encrypt_key, lo->lo_encrypt_key,
 		       lo->lo_encrypt_key_size);
 	}
-	return copy_to_user(arg, &info, sizeof(info)) ? -EFAULT : 0;
+	return 0;
+}
+
+static void
+loop_info64_from_old(const struct loop_info *info, struct loop_info64 *info64)
+{
+	info64->lo_number = info->lo_number;
+	info64->lo_device = info->lo_device;
+	info64->lo_inode = info->lo_inode;
+	info64->lo_rdevice = info->lo_rdevice;
+	info64->lo_offset = info->lo_offset;
+	info64->lo_encrypt_type = info->lo_encrypt_type;
+	info64->lo_encrypt_key_size = info->lo_encrypt_key_size;
+	info64->lo_flags = info->lo_flags;
+	info64->lo_init[0] = info->lo_init[0];
+	info64->lo_init[1] = info->lo_init[1];
+	memcpy(info64->lo_name, info->lo_name, LO_NAME_SIZE);
+	memcpy(info64->lo_encrypt_key, info->lo_encrypt_key, LO_KEY_SIZE);
+}
+
+static int
+loop_info64_to_old(const struct loop_info64 *info64, struct loop_info *info)
+{
+	info->lo_number = info64->lo_number;
+	info->lo_device = info64->lo_device;
+	info->lo_inode = info64->lo_inode;
+	info->lo_rdevice = info64->lo_rdevice;
+	info->lo_offset = info64->lo_offset;
+	info->lo_encrypt_type = info64->lo_encrypt_type;
+	info->lo_encrypt_key_size = info64->lo_encrypt_key_size;
+	info->lo_flags = info64->lo_flags;
+	info->lo_init[0] = info64->lo_init[0];
+	info->lo_init[1] = info64->lo_init[1];
+	memcpy(info->lo_name, info64->lo_name, LO_NAME_SIZE);
+	memcpy(info->lo_encrypt_key,info64->lo_encrypt_key,LO_KEY_SIZE);
+
+	/* error in case values were truncated */
+	if (info->lo_device != info64->lo_device ||
+	    info->lo_rdevice != info64->lo_rdevice ||
+	    info->lo_inode != info64->lo_inode ||
+	    info->lo_offset != info64->lo_offset)
+		return -EOVERFLOW;
+
+	return 0;
+}
+
+static int
+loop_set_status_old(struct loop_device *lo, const struct loop_info *arg)
+{
+	struct loop_info info;
+	struct loop_info64 info64;
+
+	if (copy_from_user(&info, arg, sizeof (struct loop_info)))
+		return -EFAULT;
+	loop_info64_from_old(&info, &info64);
+	return loop_set_status(lo, &info64);
+}
+
+static int
+loop_set_status64(struct loop_device *lo, const struct loop_info64 *arg)
+{
+	struct loop_info64 info64;
+
+	if (copy_from_user(&info64, arg, sizeof (struct loop_info64)))
+		return -EFAULT;
+	return loop_set_status(lo, &info64);
+}
+
+static int
+loop_get_status_old(struct loop_device *lo, struct loop_info *arg) {
+	struct loop_info info;
+	struct loop_info64 info64;
+	int err = 0;
+
+	if (!arg)
+		err = -EINVAL;
+	if (!err)
+		err = loop_get_status(lo, &info64);
+	if (!err)
+		err = loop_info64_to_old(&info64, &info);
+	if (!err && copy_to_user(arg, &info, sizeof(info)))
+		err = -EFAULT;
+
+	return err;
+}
+
+static int
+loop_get_status64(struct loop_device *lo, struct loop_info64 *arg) {
+	struct loop_info64 info64;
+	int err = 0;
+
+	if (!arg)
+		err = -EINVAL;
+	if (!err)
+		err = loop_get_status(lo, &info64);
+	if (!err && copy_to_user(arg, &info64, sizeof(info64)))
+		err = -EFAULT;
+
+	return err;
 }
 
 static int lo_ioctl(struct inode * inode, struct file * file,
@@ -922,10 +1022,16 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 		err = loop_clr_fd(lo, inode->i_bdev);
 		break;
 	case LOOP_SET_STATUS:
-		err = loop_set_status(lo, (struct loop_info *) arg);
+		err = loop_set_status_old(lo, (struct loop_info *) arg);
 		break;
 	case LOOP_GET_STATUS:
-		err = loop_get_status(lo, (struct loop_info *) arg);
+		err = loop_get_status_old(lo, (struct loop_info *) arg);
+		break;
+	case LOOP_SET_STATUS64:
+		err = loop_set_status64(lo, (struct loop_info64 *) arg);
+		break;
+	case LOOP_GET_STATUS64:
+		err = loop_get_status64(lo, (struct loop_info64 *) arg);
 		break;
 	default:
 		err = lo->ioctl ? lo->ioctl(lo, cmd, arg) : -EINVAL;
