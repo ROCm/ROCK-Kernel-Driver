@@ -43,6 +43,7 @@
 #include <net/ndisc.h>
 #include <net/ip6_route.h>
 #include <net/addrconf.h>
+#include <net/xfrm.h>
 
 
 
@@ -149,7 +150,14 @@ resubmit:
 
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
 	if ((ipprot = inet6_protos[hash]) != NULL) {
-		int ret = ipprot->handler(&skb);
+		int ret;
+		
+		if (!ipprot->no_policy &&
+		    !xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+			kfree_skb(skb);
+			return 0;
+		}
+		ret = ipprot->handler(&skb);
 		if (ret < 0) {
 			nexthdr = -ret;
 			goto resubmit;
@@ -157,9 +165,11 @@ resubmit:
 		IP6_INC_STATS_BH(Ip6InDelivers);
 	} else {
 		if (!raw_sk) {
-			IP6_INC_STATS_BH(Ip6InUnknownProtos);
-			icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR,
-					  offsetof(struct ipv6hdr, nexthdr));
+			if (xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+				IP6_INC_STATS_BH(Ip6InUnknownProtos);
+				icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR,
+						  offsetof(struct ipv6hdr, nexthdr));
+			}
 		} else {
 			IP6_INC_STATS_BH(Ip6InDelivers);
 			kfree_skb(skb);
