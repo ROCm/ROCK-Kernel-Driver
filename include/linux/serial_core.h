@@ -208,6 +208,7 @@ struct uart_state {
 #define USF_CLOSING_WAIT_NONE	(65535)
 
 	int			count;
+	int			pm_state;
 	struct uart_info	*info;
 	struct uart_port	*port;
 
@@ -301,6 +302,12 @@ void uart_unregister_port(struct uart_driver *reg, int line);
 int uart_register_port(struct uart_driver *reg, struct uart_port *port);
 int uart_add_one_port(struct uart_driver *reg, struct uart_port *port);
 int uart_remove_one_port(struct uart_driver *reg, struct uart_port *port);
+
+/*
+ * Power Management
+ */
+int uart_suspend_port(struct uart_driver *reg, struct uart_port *port, u32 level);
+int uart_resume_port(struct uart_driver *reg, struct uart_port *port, u32 level);
 
 #define uart_circ_empty(circ)		((circ)->head == (circ)->tail)
 #define uart_circ_clear(circ)		((circ)->head = (circ)->tail = 0)

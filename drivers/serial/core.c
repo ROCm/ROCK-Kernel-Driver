@@ -30,6 +30,7 @@
 #include <linux/console.h>
 #include <linux/serial_core.h>
 #include <linux/smp_lock.h>
+#include <linux/device.h>
 #include <linux/serial.h> /* for serial_state and serial_icounter_struct */
 
 #include <asm/irq.h>
@@ -53,6 +54,7 @@ static DECLARE_MUTEX(port_sem);
 
 static void uart_change_speed(struct uart_state *state, struct termios *old_termios);
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout);
+static void uart_change_pm(struct uart_state *state, int pm_state);
 
 /*
  * This routine is used by the interrupt handler to schedule processing in
@@ -1283,8 +1285,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 			set_current_state(TASK_RUNNING);
 		}
 	} else if (!port->cons || port->cons->index != port->line) {
-		if (port->ops->pm)
-			port->ops->pm(port, 3, 0);
+		uart_change_pm(state, 3);
 	}
 
 	/*
@@ -1613,11 +1614,8 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	/*
 	 * Make sure the device is in D0 state.
 	 */
-	if (state->count == 1) {
-		struct uart_port *port = state->port;
-		if (port->ops->pm)
-			port->ops->pm(port, 0, 3);
-	}
+	if (state->count == 1)
+		uart_change_pm(state, 0);
 
 	/*
 	 * Start up the serial port.
@@ -1874,6 +1872,99 @@ uart_set_options(struct uart_port *port, struct console *co,
 }
 #endif /* CONFIG_SERIAL_CORE_CONSOLE */
 
+static void uart_change_pm(struct uart_state *state, int pm_state)
+{
+	struct uart_port *port = state->port;
+	if (port->ops->pm)
+		port->ops->pm(port, pm_state, state->pm_state);
+	state->pm_state = pm_state;
+}
+
+int uart_suspend_port(struct uart_driver *drv, struct uart_port *port, u32 level)
+{
+	struct uart_state *state = drv->state + port->line;
+
+	down(&state->sem);
+
+	switch (level) {
+	case SUSPEND_SAVE_STATE:
+		if (state->info && state->info->flags & UIF_INITIALIZED) {
+			struct uart_ops *ops = port->ops;
+
+			spin_lock_irq(&port->lock);
+			ops->stop_tx(port, 0);
+			ops->set_mctrl(port, 0);
+			ops->stop_rx(port);
+			spin_unlock_irq(&port->lock);
+
+			/*
+			 * Wait for the transmitter to empty.
+			 */
+			while (!ops->tx_empty(port)) {
+				set_current_state(TASK_UNINTERRUPTIBLE);
+				schedule_timeout(10*HZ/1000);
+			}
+			set_current_state(TASK_RUNNING);
+
+			ops->shutdown(port);
+		}
+		break;
+
+	case SUSPEND_POWER_DOWN:
+		/*
+		 * Disable the console device before suspending.
+		 */
+		if (port->cons && port->cons->index == port->line)
+			port->cons->flags &= ~CON_ENABLED;
+
+		uart_change_pm(state, 3);
+		break;
+	}
+
+	up(&state->sem);
+
+	return 0;
+}
+
+int uart_resume_port(struct uart_driver *drv, struct uart_port *port, u32 level)
+{
+	struct uart_state *state = drv->state + port->line;
+
+	down(&state->sem);
+
+	switch (level) {
+	case RESUME_POWER_ON:
+		uart_change_pm(state, 0);
+
+		/*
+		 * Re-enable the console device after suspending.
+		 */
+		if (port->cons && port->cons->index == port->line) {
+			uart_change_speed(state, NULL);
+			port->cons->flags |= CON_ENABLED;
+		}
+		break;
+
+	case RESUME_RESTORE_STATE:
+		if (state->info && state->info->flags & UIF_INITIALIZED) {
+			struct uart_ops *ops = port->ops;
+
+			ops->set_mctrl(port, 0);
+			ops->startup(port);
+			uart_change_speed(state, NULL);
+			spin_lock_irq(&port->lock);
+			ops->set_mctrl(port, port->mctrl);
+			ops->start_tx(port, 0);
+			spin_unlock_irq(&port->lock);
+		}
+		break;
+	}
+
+	up(&state->sem);
+
+	return 0;
+}
+
 static inline void
 uart_report_port(struct uart_driver *drv, struct uart_port *port)
 {
@@ -1929,6 +2020,13 @@ uart_configure_port(struct uart_driver *drv, struct uart_state *state,
 		spin_lock_irqsave(&port->lock, flags);
 		port->ops->set_mctrl(port, 0);
 		spin_unlock_irqrestore(&port->lock, flags);
+
+		/*
+		 * Power down all ports by default, except the
+		 * console if we have one.
+		 */
+		if (!port->cons || port->cons->index != port->line)
+			uart_change_pm(state, 3);
 	}
 }
 
@@ -2336,6 +2434,8 @@ void uart_unregister_port(struct uart_driver *drv, int line)
 EXPORT_SYMBOL(uart_write_wakeup);
 EXPORT_SYMBOL(uart_register_driver);
 EXPORT_SYMBOL(uart_unregister_driver);
+EXPORT_SYMBOL(uart_suspend_port);
+EXPORT_SYMBOL(uart_resume_port);
 EXPORT_SYMBOL(uart_register_port);
 EXPORT_SYMBOL(uart_unregister_port);
 EXPORT_SYMBOL(uart_add_one_port);
