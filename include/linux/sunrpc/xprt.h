@@ -33,7 +33,7 @@
  * MAXREQS value: At 32 outstanding reqs with 8 megs of RAM, fragment
  * reassembly will frequently run out of memory.
  */
-#define RPC_MAXCONG		(16)
+#define RPC_MAXCONG		(64)
 #define RPC_MAXREQS		RPC_MAXCONG
 #define RPC_CWNDSCALE		(256)
 #define RPC_MAXCWND		(RPC_MAXCONG * RPC_CWNDSCALE)
