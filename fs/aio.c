@@ -992,7 +992,7 @@ asmlinkage long sys_io_submit(aio_context_t ctx_id, long nr,
 			break;
 		}
 
-		if (unlikely(__copy_from_user(&tmp, user_iocb, sizeof(tmp)))) {
+		if (unlikely(copy_from_user(&tmp, user_iocb, sizeof(tmp)))) {
 			ret = -EFAULT;
 			break;
 		}
