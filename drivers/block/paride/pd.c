@@ -591,6 +591,8 @@ static enum action do_pd_write_done(void)
 	return Ok;
 }
 
+/* special io requests */
+
 /* According to the ATA standard, the default CHS geometry should be
    available following a reset.  Some Western Digital drives come up
    in a mode where only LBA addresses are accepted until the device
@@ -660,7 +662,7 @@ static void pd_standby_off(struct pd_unit *disk)
 	pd_wait_for(disk, 0, DBMSG("after STANDBY"));
 }
 
-static int pd_identify(struct pd_unit *disk)
+static enum action pd_identify(struct pd_unit *disk)
 {
 	int j;
 	char id[PD_ID_LEN + 1];
@@ -671,8 +673,6 @@ static int pd_identify(struct pd_unit *disk)
    settings on the SLAVE drive.
 */
 
-	pi_connect(disk->pi);
-
 	if (disk->drive == 0)
 		pd_reset(disk);
 
@@ -680,10 +680,8 @@ static int pd_identify(struct pd_unit *disk)
 	pd_wait_for(disk, 0, DBMSG("before IDENT"));
 	pd_send_command(disk, 1, 0, 0, 0, 0, IDE_IDENTIFY);
 
-	if (pd_wait_for(disk, STAT_DRQ, DBMSG("IDENT DRQ")) & STAT_ERR) {
-		pi_disconnect(disk->pi);
-		return 0;
-	}
+	if (pd_wait_for(disk, STAT_DRQ, DBMSG("IDENT DRQ")) & STAT_ERR)
+		return Fail;
 	pi_read_block(disk->pi, pd_scratch, 512);
 	disk->can_lba = pd_scratch[99] & 2;
 	disk->sectors = le16_to_cpu(*(u16 *) (pd_scratch + 12));
@@ -716,9 +714,10 @@ static int pd_identify(struct pd_unit *disk)
 	if (!disk->standby)
 		pd_standby_off(disk);
 
-	pi_disconnect(disk->pi);
-	return 1;
+	return Ok;
 }
+
+/* end of io request engine */
 
 static void do_pd_request(request_queue_t * q)
 {
@@ -824,7 +823,7 @@ static int pd_check_media(struct gendisk *p)
 static int pd_revalidate(struct gendisk *p)
 {
 	struct pd_unit *disk = p->private_data;
-	if (pd_identify(disk))
+	if (pd_special_command(disk, pd_identify) == 0)
 		set_capacity(p, disk->capacity);
 	else
 		set_capacity(p, 0);
@@ -839,6 +838,8 @@ static struct block_device_operations pd_fops = {
 	.media_changed	= pd_check_media,
 	.revalidate_disk= pd_revalidate
 };
+
+/* probing */
 
 static void pd_probe_drive(struct pd_unit *disk)
 {
@@ -855,9 +856,9 @@ static void pd_probe_drive(struct pd_unit *disk)
 
 	if (disk->drive == -1) {
 		for (disk->drive = 0; disk->drive <= 1; disk->drive++)
-			if (pd_identify(disk))
+			if (pd_special_command(disk, pd_identify) == 0)
 				return;
-	} else if (pd_identify(disk))
+	} else if (pd_special_command(disk, pd_identify) == 0)
 		return;
 	disk->gd = NULL;
 	put_disk(p);
