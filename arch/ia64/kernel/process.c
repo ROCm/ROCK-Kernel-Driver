@@ -549,28 +549,15 @@ dump_fpu (struct pt_regs *pt, elf_fpregset_t dst)
 asmlinkage long
 sys_execve (char *filename, char **argv, char **envp, struct pt_regs *regs)
 {
-	unsigned long old_map_base, old_task_size;
-	long error;
-
-	/* we may be exec'ing a 64-bit<->32-bit process: reset map base, task-size: */
-	old_map_base  = current->thread.map_base;
-	old_task_size = current->thread.task_size;
-	current->thread.map_base  = DEFAULT_MAP_BASE;
-	current->thread.task_size = DEFAULT_TASK_SIZE;
+	int error;
 
 	filename = getname(filename);
 	error = PTR_ERR(filename);
-	if (!IS_ERR(filename)) {
+	if (IS_ERR(filename))
+		goto out;
 	error = do_execve(filename, argv, envp, regs);
 	putname(filename);
-	}
-
-	if (error < 0) {
-		/* oops, execve failed, switch back to old values... */
-		current->thread.map_base  = old_map_base;
-		current->thread.task_size = old_task_size;
-	}
-
+out:
 	return error;
 }
 
