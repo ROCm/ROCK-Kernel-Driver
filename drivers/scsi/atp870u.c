@@ -902,10 +902,12 @@ static void tscam(struct Scsi_Host *host)
 		0x38, 0x31, 0x32, 0x2b, 0x34, 0x2d, 0x2e, 0x27
 	};
 
-
+/*  I can't believe we need this before we've even done anything.  Remove it
+ *  and see if anyone bitches.
 	for (i = 0; i < 0x10; i++) {
 		udelay(0xffff);
 	}
+ */
 
 	tmport = dev->ioport + 1;
 	outb(0x08, tmport++);
@@ -993,8 +995,7 @@ wait_rdyok:
 	inb(0x80);		/* 2 deskew delay(45ns*2=90ns) */
 	val &= 0x007f;		/* no bsy  */
 	outw(val, tmport);
-	udelay(0xffff);		/* recommanded SCAM selection response time */
-	udelay(0xffff);
+	mdelay(128);
 	val &= 0x00fb;		/* after 1ms no msg */
 	outw(val, tmport);
 wait_nomsg:
@@ -2420,9 +2421,9 @@ static int atp870u_detect(Scsi_Host_Template * tpnt)
 			k = (inb(tmport) & 0xf3) | 0x10;
 			outb(k, tmport);
 			outb((k & 0xdf), tmport);
-			udelay(0x8000);
+			mdelay(32);
 			outb(k, tmport);
-			udelay(0x8000);
+			mdelay(32);
 			tmport = base_io;
 			outb((host_id | 0x08), tmport);
 			tmport += 0x18;
@@ -2539,9 +2540,9 @@ flash_ok:
 			outb(k, tmport);
 			tmport += 0x03;
 			outb(0x20, tmport);
-			udelay(0x8000);
+			mdelay(32);
 			outb(0, tmport);
-			udelay(0x8000);
+			mdelay(32);
 			tmport = base_io + 0x5b;
 			inb(tmport);
 			tmport -= 0x04;
@@ -2581,7 +2582,7 @@ flash_ok:
 			shpnt->n_io_port = 0x40;	/* Number of bytes of I/O space used */
 		}
 		shpnt->irq = irq;
-		restore_flags(flags);
+		spin_unlock_irqrestore(shpnt->host_lock, flags);
 		if (dev_id[h] == 0x8081) {
 			request_region(base_io, 0x60, "atp870u");	/* Register the IO ports that we use */
 		} else {
