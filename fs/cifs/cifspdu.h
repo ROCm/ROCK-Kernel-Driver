@@ -1046,6 +1046,8 @@ typedef union smb_com_transaction2 {
 
 /* PathInfo/FileInfo infolevels */
 #define SMB_INFO_STANDARD                   1
+#define SMB_SET_FILE_EA                     2
+#define SMB_QUERY_FILE_EA_SIZE              2
 #define SMB_INFO_QUERY_EAS_FROM_LIST        3
 #define SMB_INFO_QUERY_ALL_EAS              4
 #define SMB_INFO_IS_NAME_VALID              6

@@ -128,10 +128,10 @@ extern int CIFSSMBQFSUnixInfo(const int xid, struct cifsTconInfo *tcon,
 			const struct nls_table *nls_codepage);
 
 extern int CIFSSMBSetTimes(const int xid, struct cifsTconInfo *tcon,
-			char *fileName, FILE_BASIC_INFO * data,
+			const char *fileName, const FILE_BASIC_INFO * data,
 			const struct nls_table *nls_codepage);
 extern int CIFSSMBSetEOF(const int xid, struct cifsTconInfo *tcon,
-			char *fileName, __u64 size,int setAllocationSizeFlag,
+			const char *fileName, __u64 size,int setAllocationSizeFlag,
 			const struct nls_table *nls_codepage);
 extern int CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon,
 			 __u64 size, __u16 fileHandle,__u32 opener_pid, int AllocSizeFlag);
@@ -228,5 +228,9 @@ extern ssize_t CIFSSMBQAllEAs(const int xid, struct cifsTconInfo *tcon,
 extern ssize_t CIFSSMBQueryEA(const int xid,struct cifsTconInfo * tcon,
 		const unsigned char * searchName,const unsigned char * ea_name,
 		unsigned char * ea_value, size_t buf_size, 
+		const struct nls_table *nls_codepage);
+extern int CIFSSMBSetEA(const int xid, struct cifsTconInfo *tcon, 
+		const char *fileName, const char * ea_name, 
+		const void * ea_value, const __u16 ea_value_len, 
 		const struct nls_table *nls_codepage);
 #endif			/* _CIFSPROTO_H */

@@ -2287,7 +2287,7 @@ QFSInfoRetry:
 }
 
 int
-CIFSSMBQFSAttributeInfo(int xid, struct cifsTconInfo *tcon,
+CIFSSMBQFSAttributeInfo(const int xid, struct cifsTconInfo *tcon,
 			const struct nls_table *nls_codepage)
 {
 /* level 0x105  SMB_QUERY_FILE_SYSTEM_INFO */
@@ -2359,7 +2359,7 @@ QFSAttributeRetry:
 }
 
 int
-CIFSSMBQFSDeviceInfo(int xid, struct cifsTconInfo *tcon,
+CIFSSMBQFSDeviceInfo(const int xid, struct cifsTconInfo *tcon,
 		     const struct nls_table *nls_codepage)
 {
 /* level 0x104 SMB_QUERY_FILE_SYSTEM_INFO */
@@ -2432,7 +2432,7 @@ QFSDeviceRetry:
 }
 
 int
-CIFSSMBQFSUnixInfo(int xid, struct cifsTconInfo *tcon,
+CIFSSMBQFSUnixInfo(const int xid, struct cifsTconInfo *tcon,
 		   const struct nls_table *nls_codepage)
 {
 /* level 0x200  SMB_QUERY_CIFS_UNIX_INFO */
@@ -2512,7 +2512,7 @@ QFSUnixRetry:
    in Samba which this routine can run into */
 
 int
-CIFSSMBSetEOF(int xid, struct cifsTconInfo *tcon, char *fileName,
+CIFSSMBSetEOF(const int xid, struct cifsTconInfo *tcon, const char *fileName,
 	      __u64 size, int SetAllocation, const struct nls_table *nls_codepage)
 {
 	struct smb_com_transaction2_spi_req *pSMB = NULL;
@@ -2692,8 +2692,9 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 }
 
 int
-CIFSSMBSetTimes(int xid, struct cifsTconInfo *tcon, char *fileName,
-		FILE_BASIC_INFO * data, const struct nls_table *nls_codepage)
+CIFSSMBSetTimes(const int xid, struct cifsTconInfo *tcon, const char *fileName,
+		const FILE_BASIC_INFO * data, 
+		const struct nls_table *nls_codepage)
 {
 	TRANSACTION2_SPI_REQ *pSMB = NULL;
 	TRANSACTION2_SPI_RSP *pSMBr = NULL;
@@ -3286,6 +3287,108 @@ QEARetry:
 		cifs_buf_release(pSMB);
 	if (rc == -EAGAIN)
 		goto QEARetry;
+
+	return rc;
+}
+
+int
+CIFSSMBSetEA(const int xid, struct cifsTconInfo *tcon, const char *fileName,
+		const char * ea_name, const void * ea_value, 
+		const __u16 ea_value_len, const struct nls_table *nls_codepage)
+{
+	struct smb_com_transaction2_spi_req *pSMB = NULL;
+	struct smb_com_transaction2_spi_rsp *pSMBr = NULL;
+	struct fealist *parm_data;
+	int name_len;
+	int rc = 0;
+	int bytes_returned = 0;
+
+	cFYI(1, ("In SetEA"));
+SetEARetry:
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
+		      (void **) &pSMBr);
+	if (rc)
+		return rc;
+
+	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
+		name_len =
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, fileName, 530
+				  /* find define for this maxpathcomponent */
+				  , nls_codepage);
+		name_len++;	/* trailing null */
+		name_len *= 2;
+	} else {		/* BB improve the check for buffer overruns BB */
+		name_len = strnlen(fileName, 530);
+		name_len++;	/* trailing null */
+		strncpy(pSMB->FileName, fileName, name_len);
+	}
+
+	pSMB->ParameterCount = 6 + name_len;
+
+	/* done calculating parms using name_len of file name,
+	now use name_len to calculate length of ea name
+	we are going to create in the inode xattrs */
+	if(ea_name == NULL)
+		name_len = 0;
+	else
+		name_len = strnlen(ea_name,255);
+
+	pSMB->DataCount = sizeof(*parm_data) + ea_value_len + name_len + 1;
+	pSMB->MaxParameterCount = cpu_to_le16(2);
+	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find max SMB size from sess */
+	pSMB->MaxSetupCount = 0;
+	pSMB->Reserved = 0;
+	pSMB->Flags = 0;
+	pSMB->Timeout = 0;
+	pSMB->Reserved2 = 0;
+	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+                                     InformationLevel) - 4;
+	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+	pSMB->InformationLevel =
+		cpu_to_le16(SMB_SET_FILE_EA);
+
+	parm_data =
+		(struct fealist *) (((char *) &pSMB->hdr.Protocol) +
+				       pSMB->DataOffset);
+	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
+	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+	pSMB->SetupCount = 1;
+	pSMB->Reserved3 = 0;
+	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
+	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount + pSMB->DataCount;
+	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
+	parm_data->list_len = (__u32)(pSMB->DataCount);
+	parm_data->list[0].EA_flags = 0;
+	/* we checked above that name len is less than 255 */
+	parm_data->list[0].name_len = (__u8)name_len;;
+	/* EA names are always ASCII */
+	strncpy(parm_data->list[0].name,ea_name,name_len);
+	parm_data->list[0].name[name_len] = 0;
+	parm_data->list[0].value_len = cpu_to_le16(ea_value_len);
+	/* caller ensures that ea_value_len is less than 64K but
+	we need to ensure that it fits within the smb */
+
+	/*BB add length check that it would fit in negotiated SMB buffer size BB */
+	/* if(ea_value_len > buffer_size - 512 (enough for header)) */
+	memcpy(parm_data->list[0].name+name_len+1,ea_value,ea_value_len);
+
+	pSMB->TotalDataCount = pSMB->DataCount;
+	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	pSMB->TotalParameterCount = pSMB->ParameterCount;
+	pSMB->Reserved4 = 0;
+	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
+			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+	if (rc) {
+		cFYI(1, ("SetPathInfo (EA) returned %d", rc));
+	}
+
+	if (pSMB)
+		cifs_buf_release(pSMB);
+
+	if (rc == -EAGAIN)
+		goto SetEARetry;
 
 	return rc;
 }
