@@ -808,7 +808,6 @@ typedef struct {
 } r_vc_abr_entry;   
 
 #define MRM 3
-#define MIN(x,y)	((x) < (y)) ? (x) : (y)
 
 typedef struct srv_cls_param {
         u32 class_type;         /* CBR/VBR/ABR/UBR; use the enum above */
@@ -1017,13 +1016,8 @@ typedef struct iadev_t {
         spinlock_t            tx_lock;
         IARTN_Q               tx_return_q;
         u32                   close_pending;
-#if LINUX_VERSION_CODE >= 0x20303
         wait_queue_head_t    close_wait;
         wait_queue_head_t    timeout_wait;
-#else
-        struct wait_queue     *close_wait;
-        struct wait_queue     *timeout_wait;
-#endif
 	struct cpcs_trailer_desc *tx_buf;
         u16 num_tx_desc, tx_buf_sz, rate_limit;
         u32 tx_cell_cnt, tx_pkt_cnt;

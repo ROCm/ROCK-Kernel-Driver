@@ -436,7 +436,7 @@ ia_open_abr_vc(IADEV *dev, srv_cls_param_t *srv_p,
        if (crm == 0) crm = 1;
        f_abr_vc->f_crm = crm & 0xff;
        f_abr_vc->f_pcr = cellrate_to_float(srv_p->pcr);
-       icr = MIN( srv_p->icr, (srv_p->tbe > srv_p->frtt) ?
+       icr = min( srv_p->icr, (srv_p->tbe > srv_p->frtt) ?
 				((srv_p->tbe/srv_p->frtt)*1000000) :
 				(1000000/(srv_p->frtt/srv_p->tbe)));
        f_abr_vc->f_icr = cellrate_to_float(icr);
