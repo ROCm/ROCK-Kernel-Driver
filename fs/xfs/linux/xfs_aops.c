@@ -288,6 +288,8 @@ probe_unmapped_cluster(
 	 */
 	if (bh == head) {
 		tlast = inode->i_size >> PAGE_CACHE_SHIFT;
+		/* Prune this back to avoid pathological behavior */
+		tlast = min(tlast, startpage->index + 64);
 		for (tindex = startpage->index + 1; tindex < tlast; tindex++) {
 			len = probe_unmapped_page(mapping, tindex,
 							PAGE_CACHE_SIZE);
@@ -405,6 +407,7 @@ map_unwritten(
 		struct page		*page;
 
 		tlast = inode->i_size >> PAGE_CACHE_SHIFT;
+		tlast = min(tlast, start_page->index + pb->pb_page_count - 1);
 		for (tindex = start_page->index + 1; tindex < tlast; tindex++) {
 			page = probe_unwritten_page(mapping, tindex, mp, pb,
 					PAGE_CACHE_SIZE, &bs);
