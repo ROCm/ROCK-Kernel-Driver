@@ -85,7 +85,7 @@ static int reiserfs_sync_file(
   if (!S_ISREG(p_s_inode->i_mode))
       BUG ();
 
-  n_err = fsync_inode_buffers(p_s_inode) ;
+  n_err = sync_mapping_buffers(p_s_inode->i_mapping) ;
   reiserfs_commit_for_inode(p_s_inode) ;
   unlock_kernel() ;
   return ( n_err < 0 ) ? -EIO : 0;

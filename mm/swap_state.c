@@ -37,11 +37,10 @@ static struct address_space_operations swap_aops = {
 };
 
 /*
- * swapper_inode is needed only for for i_bufferlist_lock. This
- * avoid special-casing in other parts of the kernel.
+ * swapper_inode doesn't do anything much.  It is really only here to
+ * avoid some special-casing in other parts of the kernel.
  */
 static struct inode swapper_inode = {
-	i_bufferlist_lock:	SPIN_LOCK_UNLOCKED,
 	i_mapping:		&swapper_space,
 };
 
@@ -55,6 +54,8 @@ struct address_space swapper_space = {
 	host:		&swapper_inode,
 	a_ops:		&swap_aops,
 	i_shared_lock:	SPIN_LOCK_UNLOCKED,
+	private_lock:	SPIN_LOCK_UNLOCKED,
+	private_list:	LIST_HEAD_INIT(swapper_space.private_list),
 };
 
 #ifdef SWAP_CACHE_INFO

@@ -106,6 +106,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_data.dirtied_when = 0;
 		inode->i_mapping = &inode->i_data;
 		inode->i_data.ra_pages = &default_ra_pages;
+		inode->i_data.assoc_mapping = NULL;
 		if (sb->s_bdev)
 			inode->i_data.ra_pages = sb->s_bdev->bd_inode->i_mapping->ra_pages;
 		memset(&inode->u, 0, sizeof(inode->u));
@@ -139,13 +140,13 @@ void inode_init_once(struct inode *inode)
 	INIT_LIST_HEAD(&inode->i_data.locked_pages);
 	INIT_LIST_HEAD(&inode->i_data.io_pages);
 	INIT_LIST_HEAD(&inode->i_dentry);
-	INIT_LIST_HEAD(&inode->i_dirty_buffers);
 	INIT_LIST_HEAD(&inode->i_devices);
 	sema_init(&inode->i_sem, 1);
 	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
 	rwlock_init(&inode->i_data.page_lock);
 	spin_lock_init(&inode->i_data.i_shared_lock);
-	spin_lock_init(&inode->i_bufferlist_lock);
+	INIT_LIST_HEAD(&inode->i_data.private_list);
+	spin_lock_init(&inode->i_data.private_lock);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap_shared);
 }

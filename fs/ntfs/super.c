@@ -1510,6 +1510,13 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap);
 	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap_shared);
 	spin_lock_init(&vol->mftbmp_mapping.i_shared_lock);
+	/*
+	 * private_lock and private_list are unused by ntfs.  But they
+	 * are available.
+	 */
+	spin_lock_init(&vol->mftbmp_mapping.private_lock);
+	INIT_LIST_HEAD(&vol->mftbmp_mapping.private_list);
+	vol->mftbmp_mapping.assoc_mapping = NULL;
 	vol->mftbmp_mapping.dirtied_when = 0;
 	vol->mftbmp_mapping.gfp_mask = GFP_HIGHUSER;
 	vol->mftbmp_mapping.ra_pages =

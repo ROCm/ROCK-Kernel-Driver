@@ -50,7 +50,7 @@ struct buffer_head {
 	struct block_device *b_bdev;
 	bh_end_io_t *b_end_io;		/* I/O completion */
  	void *b_private;		/* reserved for b_end_io */
-	struct list_head     b_inode_buffers; /* list of inode dirty buffers */
+	struct list_head b_assoc_buffers; /* associated with another mapping */
 };
 
 
@@ -147,6 +147,8 @@ void create_empty_buffers(struct page *, unsigned long,
 void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
 void buffer_insert_list(spinlock_t *lock,
 			struct buffer_head *, struct list_head *);
+int sync_mapping_buffers(struct address_space *mapping);
+void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode);
 
 void mark_buffer_async_read(struct buffer_head *bh);
 void mark_buffer_async_write(struct buffer_head *bh);
@@ -217,14 +219,6 @@ static inline void put_bh(struct buffer_head *bh)
         atomic_dec(&bh->b_count);
 }
 
-static inline void
-mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
-{
-	mark_buffer_dirty(bh);
-	buffer_insert_list(&inode->i_bufferlist_lock,
-			bh, &inode->i_dirty_buffers);
-}
-
 /*
  * If an error happens during the make_request, this function
  * has to be recalled. It marks the buffer as clean and not
@@ -243,11 +237,6 @@ static inline void buffer_IO_error(struct buffer_head * bh)
 	bh->b_end_io(bh, buffer_uptodate(bh));
 }
 
-static inline int fsync_inode_buffers(struct inode *inode)
-{
-	return fsync_buffers_list(&inode->i_bufferlist_lock,
-				&inode->i_dirty_buffers);
-}
 
 static inline void brelse(struct buffer_head *buf)
 {

@@ -306,6 +306,7 @@ struct address_space_operations {
 };
 
 struct address_space {
+	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
 	rwlock_t		page_lock;	/* and rwlock protecting it */
 	struct list_head	clean_pages;	/* list of clean pages */
@@ -314,13 +315,15 @@ struct address_space {
 	struct list_head	io_pages;	/* being prepared for I/O */
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
-	struct inode		*host;		/* owner: inode, block_device */
 	list_t			i_mmap;		/* list of private mappings */
 	list_t			i_mmap_shared;	/* list of private mappings */
 	spinlock_t		i_shared_lock;  /* and spinlock protecting it */
 	unsigned long		dirtied_when;	/* jiffies of first page dirtying */
 	int			gfp_mask;	/* how to allocate the pages */
 	unsigned long 		*ra_pages;	/* device readahead */
+	spinlock_t		private_lock;	/* for use by the address_space */
+	struct list_head	private_list;	/* ditto */
+	struct address_space	*assoc_mapping;	/* ditto */
 };
 
 struct char_device {
@@ -350,10 +353,6 @@ struct inode {
 	struct list_head	i_hash;
 	struct list_head	i_list;
 	struct list_head	i_dentry;
-
-	struct list_head	i_dirty_buffers;   /* uses i_bufferlist_lock */
-	spinlock_t		i_bufferlist_lock;
-
 	unsigned long		i_ino;
 	atomic_t		i_count;
 	kdev_t			i_dev;

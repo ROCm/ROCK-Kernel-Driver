@@ -450,7 +450,7 @@ EXPORT_SYMBOL(write_one_page);
  * It's better to have clean pages accidentally attached to dirty_pages than to
  * leave dirty pages attached to clean_pages.
  *
- * We use i_bufferlist_lock to lock against try_to_free_buffers while using the
+ * We use private_lock to lock against try_to_free_buffers while using the
  * page's buffer list.  Also use this to protect against clean buffers being
  * added to the page after it was set dirty.
  *
@@ -462,18 +462,15 @@ EXPORT_SYMBOL(write_one_page);
  */
 int __set_page_dirty_buffers(struct page *page)
 {
+	struct address_space * const mapping = page->mapping;
 	int ret = 0;
-	struct address_space *mapping = page->mapping;
-	struct inode *inode;
 
 	if (mapping == NULL) {
 		SetPageDirty(page);
 		goto out;
 	}
 
-	inode = mapping->host;
-
-	spin_lock(&inode->i_bufferlist_lock);
+	spin_lock(&mapping->private_lock);
 
 	if (page_has_buffers(page) && !PageSwapCache(page)) {
 		struct buffer_head *head = page_buffers(page);
@@ -496,7 +493,7 @@ int __set_page_dirty_buffers(struct page *page)
 		__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 	}
 	
-	spin_unlock(&inode->i_bufferlist_lock);
+	spin_unlock(&mapping->private_lock);
 out:
 	return ret;
 }

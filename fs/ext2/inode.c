@@ -41,7 +41,8 @@ static int ext2_update_inode(struct inode * inode, int do_sync);
  */
 void ext2_put_inode (struct inode * inode)
 {
-	ext2_discard_prealloc (inode);
+	if (atomic_read(&inode->i_count) < 2)
+		ext2_discard_prealloc (inode);
 }
 
 /*
@@ -860,7 +861,7 @@ do_indirects:
 	}
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	if (IS_SYNC(inode)) {
-		fsync_inode_buffers(inode);
+		sync_mapping_buffers(inode->i_mapping);
 		ext2_sync_inode (inode);
 	} else {
 		mark_inode_dirty(inode);

@@ -37,7 +37,7 @@ int ext2_sync_file(struct file * file, struct dentry *dentry, int datasync)
 	struct inode *inode = dentry->d_inode;
 	int err;
 	
-	err  = fsync_inode_buffers(inode);
+	err  = sync_mapping_buffers(inode->i_mapping);
 	if (!(inode->i_state & I_DIRTY))
 		return err;
 	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))

@@ -467,43 +467,34 @@ void write_inode_now(struct inode *inode, int sync)
 /**
  * generic_osync_inode - flush all dirty data for a given inode to disk
  * @inode: inode to write
- * @datasync: if set, don't bother flushing timestamps
+ * @what:  what to write and wait upon
  *
  * This can be called by file_write functions for files which have the
- * O_SYNC flag set, to flush dirty writes to disk.  
+ * O_SYNC flag set, to flush dirty writes to disk.
+ *
+ * @what is a bitmask, specifying which part of the inode's data should be
+ * written and waited upon:
+ *
+ *    OSYNC_DATA:     i_mapping's dirty data
+ *    OSYNC_METADATA: the buffers at i_mapping->private_list
+ *    OSYNC_INODE:    the inode itself
  */
 
 int generic_osync_inode(struct inode *inode, int what)
 {
-	int err = 0, err2 = 0, need_write_inode_now = 0;
-	
-	/* 
-	 * WARNING
-	 *
-	 * Currently, the filesystem write path does not pass the
-	 * filp down to the low-level write functions.  Therefore it
-	 * is impossible for (say) __block_commit_write to know if
-	 * the operation is O_SYNC or not.
-	 *
-	 * Ideally, O_SYNC writes would have the filesystem call
-	 * ll_rw_block as it went to kick-start the writes, and we
-	 * could call osync_inode_buffers() here to wait only for
-	 * those IOs which have already been submitted to the device
-	 * driver layer.  As it stands, if we did this we'd not write
-	 * anything to disk since our writes have not been queued by
-	 * this point: they are still on the dirty LRU.
-	 * 
-	 * So, currently we will call fsync_inode_buffers() instead,
-	 * to flush _all_ dirty buffers for this inode to disk on 
-	 * every O_SYNC write, not just the synchronous I/Os.  --sct
-	 */
+	int err = 0;
+	int need_write_inode_now = 0;
+	int err2;
 
 	if (what & OSYNC_DATA)
-		writeback_single_inode(inode, 0, NULL);
-	if (what & (OSYNC_METADATA|OSYNC_DATA))
-		err = fsync_inode_buffers(inode);
+		err = filemap_fdatawrite(inode->i_mapping);
+	if (what & (OSYNC_METADATA|OSYNC_DATA)) {
+		err2 = sync_mapping_buffers(inode->i_mapping);
+		if (!err)
+			err = err2;
+	}
 	if (what & OSYNC_DATA) {
-		err2 = filemap_fdatawrite(inode->i_mapping);
+		err2 = filemap_fdatawait(inode->i_mapping);
 		if (!err)
 			err = err2;
 	}
