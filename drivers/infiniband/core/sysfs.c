@@ -197,6 +197,29 @@ static ssize_t rate_show(struct ib_port *p, struct port_attribute *unused,
 		       ib_width_enum_to_int(attr.active_width), speed);
 }
 
+static ssize_t phys_state_show(struct ib_port *p, struct port_attribute *unused,
+			       char *buf)
+{
+	struct ib_port_attr attr;
+
+	ssize_t ret;
+
+	ret = ib_query_port(p->ibdev, p->port_num, &attr);
+	if (ret)
+		return ret;
+
+	switch (attr.phys_state) {
+	case 1:  return sprintf(buf, "1: Sleep\n");
+	case 2:  return sprintf(buf, "2: Polling\n");
+	case 3:  return sprintf(buf, "3: Disabled\n");
+	case 4:  return sprintf(buf, "4: PortConfigurationTraining\n");
+	case 5:  return sprintf(buf, "5: LinkUp\n");
+	case 6:  return sprintf(buf, "6: LinkErrorRecovery\n");
+	case 7:  return sprintf(buf, "7: Phy Test\n");
+	default: return sprintf(buf, "%d: <unknown>\n", attr.phys_state);
+	}
+}
+
 static PORT_ATTR_RO(state);
 static PORT_ATTR_RO(lid);
 static PORT_ATTR_RO(lid_mask_count);
@@ -204,6 +227,7 @@ static PORT_ATTR_RO(sm_lid);
 static PORT_ATTR_RO(sm_sl);
 static PORT_ATTR_RO(cap_mask);
 static PORT_ATTR_RO(rate);
+static PORT_ATTR_RO(phys_state);
 
 static struct attribute *port_default_attrs[] = {
 	&port_attr_state.attr,
@@ -213,6 +237,7 @@ static struct attribute *port_default_attrs[] = {
 	&port_attr_sm_sl.attr,
 	&port_attr_cap_mask.attr,
 	&port_attr_rate.attr,
+	&port_attr_phys_state.attr,
 	NULL
 };
 
@@ -572,6 +597,18 @@ err:
 	return ret;
 }
 
+static ssize_t show_node_type(struct class_device *cdev, char *buf)
+{
+	struct ib_device *dev = container_of(cdev, struct ib_device, class_dev);
+
+	switch (dev->node_type) {
+	case IB_NODE_CA:     return sprintf(buf, "%d: CA\n", dev->node_type);
+	case IB_NODE_SWITCH: return sprintf(buf, "%d: switch\n", dev->node_type);
+	case IB_NODE_ROUTER: return sprintf(buf, "%d: router\n", dev->node_type);
+	default:             return sprintf(buf, "%d: <unknown>\n", dev->node_type);
+	}
+}
+
 static ssize_t show_sys_image_guid(struct class_device *cdev, char *buf)
 {
 	struct ib_device *dev = container_of(cdev, struct ib_device, class_dev);
@@ -606,10 +643,12 @@ static ssize_t show_node_guid(struct class_device *cdev, char *buf)
 		       be16_to_cpu(((u16 *) &attr.node_guid)[3]));
 }
 
+static CLASS_DEVICE_ATTR(node_type, S_IRUGO, show_node_type, NULL);
 static CLASS_DEVICE_ATTR(sys_image_guid, S_IRUGO, show_sys_image_guid, NULL);
 static CLASS_DEVICE_ATTR(node_guid, S_IRUGO, show_node_guid, NULL);
 
 static struct class_device_attribute *ib_class_attributes[] = {
+	&class_device_attr_node_type,
 	&class_device_attr_sys_image_guid,
 	&class_device_attr_node_guid
 };
