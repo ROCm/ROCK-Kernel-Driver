@@ -202,6 +202,9 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	memset(&elf_info[ei_index], 0,
 	       sizeof current->mm->saved_auxv - ei_index * sizeof elf_info[0]);
 
+	/* And advance past the AT_NULL entry.  */
+	ei_index += 2;
+
 	sp = STACK_ADD(p, ei_index);
 
 	items = (argc + 1) + (envc + 1);
