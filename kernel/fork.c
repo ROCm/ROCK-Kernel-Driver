@@ -1202,9 +1202,11 @@ long do_fork(unsigned long clone_flags,
 			clone_flags |= CLONE_PTRACE;
 	}
 
+#ifdef CONFIG_CKRM_TYPE_TASKCLASS
 	if (numtasks_get_ref(current->taskclass, 0) == 0) {
 		return -ENOMEM;
 	}
+#endif
 
 	p = copy_process(clone_flags, stack_start, regs, stack_size, parent_tidptr, child_tidptr);
 	/*
@@ -1276,7 +1278,9 @@ long do_fork(unsigned long clone_flags,
 			 */
 			set_need_resched();
 	} else {
+#ifdef CONFIG_CKRM_TYPE_TASKCLASS
 		numtasks_put_ref(current->taskclass);
+#endif
 	}
 	return pid;
 }

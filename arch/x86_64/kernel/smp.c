@@ -21,6 +21,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/interrupt.h>
 #include <linux/dump.h>
+#include <linux/module.h>
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
