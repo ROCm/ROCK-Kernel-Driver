@@ -443,8 +443,7 @@ core_voltage_post_transition(u32 reqvid)
 	return 0;
 }
 
-static inline int
-check_supported_cpu(void)
+static int check_supported_cpu(unsigned int cpu)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 	u32 eax, ebx, ecx, edx;
@@ -782,12 +781,23 @@ powernowk8_verify(struct cpufreq_policy *pol)
 static int __init
 powernowk8_cpu_init(struct cpufreq_policy *pol)
 {
+	int rc;
+
 	if (pol->cpu != 0) {
 		printk(KERN_ERR PFX "init not cpu 0\n");
 		return -ENODEV;
 	}
 
 	pol->governor = CPUFREQ_DEFAULT_GOVERNOR;
+
+	rc = find_psb_table();
+	if (rc)
+		return -ENODEV;
+
+	if (pending_bit_stuck()) {
+		printk(KERN_ERR PFX "failing init, change pending bit set\n");
+		goto err_out;
+	}
 
 	/* Take a crude guess here. 
 	 * That guess was in microseconds, so multply with 1000 */
@@ -813,6 +823,9 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 	       currfid, currvid);
 
 	return 0;
+
+err_out:
+	return -ENODEV;
 }
 
 static int __exit powernowk8_cpu_exit (struct cpufreq_policy *pol)
@@ -846,21 +859,22 @@ static struct cpufreq_driver cpufreq_amd64_driver = {
 /* driver entry point for init */
 static int __init powernowk8_init(void)
 {
-	int rc;
+	unsigned int i, supported_cpus = 0;
 
-	if (check_supported_cpu() == 0)
-		return -ENODEV;
-
-	rc = find_psb_table();
-	if (rc)
-		return rc;
-
-	if (pending_bit_stuck()) {
-		printk(KERN_ERR PFX "powernowk8_init fail, change pending bit set\n");
-		return -EIO;
+	for (i=0; i<NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
+		if (check_supported_cpu(i))
+			supported_cpus++;
 	}
 
-	return cpufreq_register_driver(&cpufreq_amd64_driver);
+	if (supported_cpus == num_online_cpus()) {
+		printk(KERN_INFO PFX "Found %d AMD Athlon 64 / Opteron processors (" VERSION ")\n",
+			supported_cpus);
+		return cpufreq_register_driver(&cpufreq_amd64_driver);
+	}
+
+	return -ENODEV;
 }
 
 /* driver entry point for term */
