@@ -1980,7 +1980,8 @@ static void __init serial8250_isa_init_ports(void)
 	}
 }
 
-static void __init serial8250_register_ports(struct uart_driver *drv)
+static void __init
+serial8250_register_ports(struct uart_driver *drv, struct device *dev)
 {
 	int i;
 
@@ -1991,6 +1992,7 @@ static void __init serial8250_register_ports(struct uart_driver *drv)
 
 		up->port.line = i;
 		up->port.ops = &serial8250_pops;
+		up->port.dev = dev;
 		init_timer(&up->timer);
 		up->timer.function = serial8250_timeout;
 
@@ -2157,60 +2159,6 @@ static struct uart_driver serial8250_reg = {
 	.cons			= SERIAL8250_CONSOLE,
 };
 
-/*
- * register_serial and unregister_serial allows for 16x50 serial ports to be
- * configured at run-time, to support PCMCIA modems.
- */
-
-static int __register_serial(struct serial_struct *req, int line)
-{
-	struct uart_port port;
-
-	port.iobase   = req->port;
-	port.membase  = req->iomem_base;
-	port.irq      = req->irq;
-	port.uartclk  = req->baud_base * 16;
-	port.fifosize = req->xmit_fifo_size;
-	port.regshift = req->iomem_reg_shift;
-	port.iotype   = req->io_type;
-	port.flags    = req->flags | UPF_BOOT_AUTOCONF;
-	port.mapbase  = req->iomap_base;
-	port.line     = line;
-
-	if (share_irqs)
-		port.flags |= UPF_SHARE_IRQ;
-
-	if (HIGH_BITS_OFFSET)
-		port.iobase |= (long) req->port_high << HIGH_BITS_OFFSET;
-
-	/*
-	 * If a clock rate wasn't specified by the low level
-	 * driver, then default to the standard clock rate.
-	 */
-	if (port.uartclk == 0)
-		port.uartclk = BASE_BAUD * 16;
-
-	return uart_register_port(&serial8250_reg, &port);
-}
-
-/**
- *	register_serial - configure a 16x50 serial port at runtime
- *	@req: request structure
- *
- *	Configure the serial port specified by the request. If the
- *	port exists and is in use an error is returned. If the port
- *	is not currently in the table it is added.
- *
- *	The port is then probed and if necessary the IRQ is autodetected
- *	If this fails an error is returned.
- *
- *	On success the port is ready to use and the line number is returned.
- */
-int register_serial(struct serial_struct *req)
-{
-	return __register_serial(req, -1);
-}
-
 int __init early_serial_setup(struct uart_port *port)
 {
 	if (port->line >= ARRAY_SIZE(serial8250_ports))
@@ -2220,18 +2168,6 @@ int __init early_serial_setup(struct uart_port *port)
 	serial8250_ports[port->line].port	= *port;
 	serial8250_ports[port->line].port.ops	= &serial8250_pops;
 	return 0;
-}
-
-/**
- *	unregister_serial - remove a 16x50 serial port at runtime
- *	@line: serial line number
- *
- *	Remove one serial port.  This may be called from interrupt
- *	context.
- */
-void unregister_serial(int line)
-{
-	uart_unregister_port(&serial8250_reg, line);
 }
 
 /*
@@ -2272,6 +2208,174 @@ void serial8250_resume_port(int line)
 	uart_resume_port(&serial8250_reg, &serial8250_ports[line].port);
 }
 
+static int serial8250_suspend(struct device *dev, u32 state, u32 level)
+{
+	int i;
+
+	if (level != SUSPEND_DISABLE)
+		return 0;
+
+	for (i = 0; i < UART_NR; i++) {
+		struct uart_8250_port *up = &serial8250_ports[i];
+
+		if (up->port.type != PORT_UNKNOWN && up->port.dev == dev)
+			uart_suspend_port(&serial8250_reg, &up->port);
+	}
+
+	return 0;
+}
+
+static int serial8250_resume(struct device *dev, u32 level)
+{
+	int i;
+
+	if (level != RESUME_ENABLE)
+		return 0;
+
+	for (i = 0; i < UART_NR; i++) {
+		struct uart_8250_port *up = &serial8250_ports[i];
+
+		if (up->port.type != PORT_UNKNOWN && up->port.dev == dev)
+			uart_resume_port(&serial8250_reg, &up->port);
+	}
+
+	return 0;
+}
+
+static struct device_driver serial8250_isa_driver = {
+	.name		= "serial8250",
+	.bus		= &platform_bus_type,
+
+	.suspend	= serial8250_suspend,
+	.resume		= serial8250_resume,
+};
+
+/*
+ * serial8250_register_port and serial8250_unregister_port allows for
+ * 16x50 serial ports to be configured at run-time, to support PCMCIA
+ * modems and PCI multiport cards.
+ */
+static DECLARE_MUTEX(serial_sem);
+
+/*
+ *	Are the two ports equivalent?
+ */
+static int uart_match_port(struct uart_port *port1, struct uart_port *port2)
+{
+	if (port1->iotype != port2->iotype)
+		return 0;
+
+	switch (port1->iotype) {
+	case UPIO_PORT:
+		return (port1->iobase == port2->iobase);
+	case UPIO_HUB6:
+		return (port1->iobase == port2->iobase) &&
+		       (port1->hub6   == port2->hub6);
+	case UPIO_MEM:
+		return (port1->membase == port2->membase);
+	}
+	return 0;
+}
+
+static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *port)
+{
+	int i;
+
+	/*
+	 * First, find a port entry which matches.
+	 */
+	for (i = 0; i < UART_NR; i++)
+		if (uart_match_port(&serial8250_ports[i].port, port))
+			return &serial8250_ports[i];
+
+	/*
+	 * We didn't find a matching entry, so look for the first
+	 * free entry.  We look for one which hasn't been previously
+	 * used (indicated by zero iobase).
+	 */
+	for (i = 0; i < UART_NR; i++)
+		if (serial8250_ports[i].port.type == PORT_UNKNOWN &&
+		    serial8250_ports[i].port.iobase == 0)
+			return &serial8250_ports[i];
+
+	/*
+	 * That also failed.  Last resort is to find any entry which
+	 * doesn't have a real port associated with it.
+	 */
+	for (i = 0; i < UART_NR; i++)
+		if (serial8250_ports[i].port.type == PORT_UNKNOWN)
+			return &serial8250_ports[i];
+
+	return NULL;
+}
+
+/**
+ *	serial8250_register_port - register a serial port
+ *	@port: serial port template
+ *
+ *	Configure the serial port specified by the request. If the
+ *	port exists and is in use, it is hung up and unregistered
+ *	first.
+ *
+ *	The port is then probed and if necessary the IRQ is autodetected
+ *	If this fails an error is returned.
+ *
+ *	On success the port is ready to use and the line number is returned.
+ */
+int serial8250_register_port(struct uart_port *port)
+{
+	struct uart_8250_port *uart;
+	int ret = -ENOSPC;
+
+	down(&serial_sem);
+
+	uart = serial8250_find_match_or_unused(port);
+	if (uart) {
+		uart_remove_one_port(&serial8250_reg, &uart->port);
+
+		uart->port.iobase   = port->iobase;
+		uart->port.membase  = port->membase;
+		uart->port.irq      = port->irq;
+		uart->port.uartclk  = port->uartclk;
+		uart->port.fifosize = port->fifosize;
+		uart->port.regshift = port->regshift;
+		uart->port.iotype   = port->iotype;
+		uart->port.flags    = port->flags | UPF_BOOT_AUTOCONF;
+		uart->port.mapbase  = port->mapbase;
+		if (port->dev)
+			uart->port.dev = port->dev;
+
+		ret = uart_add_one_port(&serial8250_reg, &uart->port);
+		if (ret == 0)
+			ret = uart->port.line;
+	}
+	up(&serial_sem);
+
+	return ret;
+}
+EXPORT_SYMBOL(serial8250_register_port);
+
+/**
+ *	serial8250_unregister_port - remove a 16x50 serial port at runtime
+ *	@line: serial line number
+ *
+ *	Remove one serial port.  This may not be called from interrupt
+ *	context.  We hand the port back to the our control.
+ */
+void serial8250_unregister_port(int line)
+{
+	struct uart_8250_port *uart = &serial8250_ports[line];
+
+	down(&serial_sem);
+	uart_remove_one_port(&serial8250_reg, &uart->port);
+	uart->port.flags &= ~UPF_BOOT_AUTOCONF;
+	uart->port.type = PORT_UNKNOWN;
+	uart->port.dev = NULL;
+	uart_add_one_port(&serial8250_reg, &uart->port);
+	up(&serial_sem);
+}
+EXPORT_SYMBOL(serial8250_unregister_port);
+
 static int __init serial8250_init(void)
 {
 	int ret, i;
@@ -2280,13 +2384,23 @@ static int __init serial8250_init(void)
 		"%d ports, IRQ sharing %sabled\n", (int) UART_NR,
 		share_irqs ? "en" : "dis");
 
+	ret = driver_register(&serial8250_isa_driver);
+	if (ret)
+		goto out;
+
 	for (i = 0; i < NR_IRQS; i++)
 		spin_lock_init(&irq_lists[i].lock);
 
 	ret = uart_register_driver(&serial8250_reg);
-	if (ret >= 0)
-		serial8250_register_ports(&serial8250_reg);
+	if (ret)
+		goto unreg;
 
+	serial8250_register_ports(&serial8250_reg, NULL);
+	goto out;
+
+ unreg:
+	driver_unregister(&serial8250_isa_driver);
+ out:
 	return ret;
 }
 
@@ -2298,13 +2412,12 @@ static void __exit serial8250_exit(void)
 		uart_remove_one_port(&serial8250_reg, &serial8250_ports[i].port);
 
 	uart_unregister_driver(&serial8250_reg);
+	driver_unregister(&serial8250_isa_driver);
 }
 
 module_init(serial8250_init);
 module_exit(serial8250_exit);
 
-EXPORT_SYMBOL(register_serial);
-EXPORT_SYMBOL(unregister_serial);
 EXPORT_SYMBOL(serial8250_get_irq_map);
 EXPORT_SYMBOL(serial8250_suspend_port);
 EXPORT_SYMBOL(serial8250_resume_port);
@@ -2321,3 +2434,61 @@ module_param_array(probe_rsa, ulong, probe_rsa_count, 0444);
 MODULE_PARM_DESC(probe_rsa, "Probe I/O ports for RSA");
 #endif
 MODULE_ALIAS_CHARDEV_MAJOR(TTY_MAJOR);
+
+/**
+ *	register_serial - configure a 16x50 serial port at runtime
+ *	@req: request structure
+ *
+ *	Configure the serial port specified by the request. If the
+ *	port exists and is in use an error is returned. If the port
+ *	is not currently in the table it is added.
+ *
+ *	The port is then probed and if necessary the IRQ is autodetected
+ *	If this fails an error is returned.
+ *
+ *	On success the port is ready to use and the line number is returned.
+ */
+int register_serial(struct serial_struct *req)
+{
+	struct uart_port port;
+
+	port.iobase   = req->port;
+	port.membase  = req->iomem_base;
+	port.irq      = req->irq;
+	port.uartclk  = req->baud_base * 16;
+	port.fifosize = req->xmit_fifo_size;
+	port.regshift = req->iomem_reg_shift;
+	port.iotype   = req->io_type;
+	port.flags    = req->flags | UPF_BOOT_AUTOCONF;
+	port.mapbase  = req->iomap_base;
+	port.dev      = NULL;
+
+	if (share_irqs)
+		port.flags |= UPF_SHARE_IRQ;
+
+	if (HIGH_BITS_OFFSET)
+		port.iobase |= (long) req->port_high << HIGH_BITS_OFFSET;
+
+	/*
+	 * If a clock rate wasn't specified by the low level
+	 * driver, then default to the standard clock rate.
+	 */
+	if (port.uartclk == 0)
+		port.uartclk = BASE_BAUD * 16;
+
+	return serial8250_register_port(&port);
+}
+EXPORT_SYMBOL(register_serial);
+
+/**
+ *	unregister_serial - remove a 16x50 serial port at runtime
+ *	@line: serial line number
+ *
+ *	Remove one serial port.  This may not be called from interrupt
+ *	context.  We hand the port back to our local PM control.
+ */
+void unregister_serial(int line)
+{
+	serial8250_unregister_port(line);
+}
+EXPORT_SYMBOL(unregister_serial);
