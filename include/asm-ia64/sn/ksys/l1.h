@@ -6,8 +6,8 @@
  * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
-#ifndef _ASM_SN_KSYS_L1_H
-#define _ASM_SN_KSYS_L1_H
+#ifndef _ASM_IA64_SN_KSYS_L1_H
+#define _ASM_IA64_SN_KSYS_L1_H
 
 #include <asm/sn/types.h>
 
@@ -128,4 +128,4 @@ int	iobrick_rack_bay_type_get( nasid_t nasid, unsigned int *rack,
 int	iobrick_module_get( nasid_t nasid );
 
 
-#endif /* _ASM_SN_KSYS_L1_H */
+#endif /* _ASM_IA64_SN_KSYS_L1_H */

@@ -238,7 +238,7 @@ int                     pciio_slot_inuse(vertex_hdl_t);
 
 #if !defined(DEV_FUNC)
 
-static pciio_provider_t *
+pciio_provider_t *
 pciio_to_provider_fns(vertex_hdl_t dev)
 {
     pciio_info_t            card_info;
@@ -261,9 +261,9 @@ pciio_to_provider_fns(vertex_hdl_t dev)
 
     if (provider_fns == NULL)
 #if defined(SUPPORT_PRINTING_V_FORMAT)
-	PRINT_PANIC("%v: provider_fns == NULL", dev);
+	panic("%v: provider_fns == NULL", dev);
 #else
-	PRINT_PANIC("0x%p: provider_fns == NULL", (void *)dev);
+	panic("0x%p: provider_fns == NULL", (void *)dev);
 #endif
 
     return provider_fns;
@@ -394,8 +394,8 @@ pciio_piospace_alloc(vertex_hdl_t dev,	/* Device requiring space */
 		     size_t byte_count,	/* Size of mapping */
 		     size_t align)
 {					/* Alignment needed */
-    if (align < NBPP)
-	align = NBPP;
+    if (align < PAGE_SIZE)
+	align = PAGE_SIZE;
     return DEV_FUNC(dev, piospace_alloc)
 	(dev, dev_desc, space, byte_count, align);
 }
@@ -1296,7 +1296,7 @@ pciio_device_win_alloc(struct resource *root_resource,
 	struct resource *new_res;
 	int status = 0;
 
-	new_res = (struct resource *) kmalloc( sizeof(struct resource), KM_NOSLEEP);
+	new_res = (struct resource *) kmalloc( sizeof(struct resource), GFP_KERNEL);
 
 	status = allocate_resource( root_resource, new_res,
 				    size, align /* Min start addr. */,

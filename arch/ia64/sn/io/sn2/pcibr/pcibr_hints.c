@@ -7,18 +7,8 @@
  */
 
 #include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/module.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/sn_cpuid.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/pci/bridge.h>
-#include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>

@@ -5,8 +5,8 @@
  *
  * Copyright (C) 1992-1997, 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
-#ifndef _ASM_SN_KSYS_ELSC_H
-#define _ASM_SN_KSYS_ELSC_H
+#ifndef _ASM_IA64_SN_KSYS_ELSC_H
+#define _ASM_IA64_SN_KSYS_ELSC_H
 
 /*
  * Error codes
@@ -36,4 +36,4 @@
 #define ELSC_ERROR_NVMAGIC	       (-124)	/* Bad magic no. in NVRAM   */
 #define ELSC_ERROR_MODULE	       (-125)	/* Moduleid processing err  */
 
-#endif /* _ASM_SN_KSYS_ELSC_H */
+#endif /* _ASM_IA64_SN_KSYS_ELSC_H */

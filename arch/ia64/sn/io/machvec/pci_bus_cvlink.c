@@ -6,36 +6,11 @@
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/config.h>
-#include <linux/init.h>
-#include <linux/types.h>
-#include <linux/pci.h>
-#include <linux/pci_ids.h>
-#include <linux/sched.h>
-#include <linux/ioport.h>
-#include <asm/sn/types.h>
+#include <linux/vmalloc.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/io.h>
-#include <asm/sn/driver.h>
 #include <asm/sn/iograph.h>
-#include <asm/param.h>
-#include <asm/sn/pio.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/sn_private.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/hcl_util.h>
-#include <asm/sn/intr.h>
-#include <asm/sn/xtalk/xtalkaddrs.h>
-#include <asm/sn/klconfig.h>
-#include <asm/sn/nodepda.h>
-#include <asm/sn/pci/pciio.h>
-#include <asm/sn/pci/pcibr.h>
-#include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
-#include <asm/sn/simulator.h>
 #include <asm/sn/sn_cpuid.h>
-#include <asm/sn/arch.h>
 
 extern int bridge_rev_b_data_check_disable;
 
@@ -195,12 +170,13 @@ printk("set_flush_addresses: xbow_buf_sync\n");
 
 struct sn_flush_nasid_entry flush_nasid_list[MAX_NASIDS];
 
-// Initialize the data structures for flushing write buffers after a PIO read.
-// The theory is: 
-// Take an unused int. pin and associate it with a pin that is in use.
-// After a PIO read, force an interrupt on the unused pin, forcing a write buffer flush
-// on the in use pin.  This will prevent the race condition between PIO read responses and 
-// DMA writes.
+/* Initialize the data structures for flushing write buffers after a PIO read.
+ * The theory is: 
+ * Take an unused int. pin and associate it with a pin that is in use.
+ * After a PIO read, force an interrupt on the unused pin, forcing a write buffer flush
+ * on the in use pin.  This will prevent the race condition between PIO read responses and 
+ * DMA writes.
+ */
 void
 sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot) {
 	nasid_t nasid; 
@@ -293,8 +269,9 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 		}
 	}
 
-	// if it's IO9, bus 1, we don't care about slots 1, 3, and 4.  This is
-	// because these are the IOC4 slots and we don't flush them.
+	/* if it's IO9, bus 1, we don't care about slots 1 and 4.  This is
+	 * because these are the IOC4 slots and we don't flush them.
+	 */
 	if (isIO9(nasid) && bus == 0 && (slot == 1 || slot == 4)) {
 		return;
 	}
@@ -331,23 +308,24 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	}
 	b = (bridge_t *)(NODE_SWIN_BASE(nasid, wid_num) | (bus << 23) );
 
-	// If it's IO9, then slot 2 maps to slot 7 and slot 6 maps to slot 8.
-	// To see this is non-trivial.  By drawing pictures and reading manuals and talking
-	// to HW guys, we can see that on IO9 bus 1, slots 7 and 8 are always unused.
-	// Further, since we short-circuit slots  1, 3, and 4 above, we only have to worry
-	// about the case when there is a card in slot 2.  A multifunction card will appear
-	// to be in slot 6 (from an interrupt point of view) also.  That's the  most we'll
-	// have to worry about.  A four function card will overload the interrupt lines in
-	// slot 2 and 6.  
-	// We also need to special case the 12160 device in slot 3.  Fortunately, we have
-	// a spare intr. line for pin 4, so we'll use that for the 12160.
-	// All other buses have slot 3 and 4 and slots 7 and 8 unused.  Since we can only
-	// see slots 1 and 2 and slots 5 and 6 coming through here for those buses (this
-	// is true only on Pxbricks with 2 physical slots per bus), we just need to add
-	// 2 to the slot number to find an unused slot.
-	// We have convinced ourselves that we will never see a case where two different cards
-	// in two different slots will ever share an interrupt line, so there is no need to
-	// special case this.
+	/* If it's IO9, then slot 2 maps to slot 7 and slot 6 maps to slot 8.
+	 * To see this is non-trivial.  By drawing pictures and reading manuals and talking
+	 * to HW guys, we can see that on IO9 bus 1, slots 7 and 8 are always unused.
+	 * Further, since we short-circuit slots  1, 3, and 4 above, we only have to worry
+	 * about the case when there is a card in slot 2.  A multifunction card will appear
+	 * to be in slot 6 (from an interrupt point of view) also.  That's the  most we'll
+	 * have to worry about.  A four function card will overload the interrupt lines in
+	 * slot 2 and 6.  
+	 * We also need to special case the 12160 device in slot 3.  Fortunately, we have
+	 * a spare intr. line for pin 4, so we'll use that for the 12160.
+	 * All other buses have slot 3 and 4 and slots 7 and 8 unused.  Since we can only
+	 * see slots 1 and 2 and slots 5 and 6 coming through here for those buses (this
+	 * is true only on Pxbricks with 2 physical slots per bus), we just need to add
+	 * 2 to the slot number to find an unused slot.
+	 * We have convinced ourselves that we will never see a case where two different cards
+	 * in two different slots will ever share an interrupt line, so there is no need to
+	 * special case this.
+	 */
 
 	if (isIO9(nasid) && wid_num == 0xc && bus == 0) {
 		if (slot == 2) {

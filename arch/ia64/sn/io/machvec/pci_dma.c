@@ -9,24 +9,7 @@
  * a description of how these routines should be used.
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
-#include <linux/mm.h>
-#include <linux/string.h>
-#include <linux/pci.h>
-#include <linux/slab.h>
 #include <linux/module.h>
-
-#include <asm/delay.h>
-#include <asm/io.h>
-#include <asm/sn/sgi.h>
-#include <asm/sn/io.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/pci/pcibr.h>
-#include <asm/sn/pci/pcibr_private.h>
-#include <asm/sn/driver.h>
-#include <asm/sn/types.h>
-#include <asm/sn/alenlist.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
 
 /*
@@ -128,10 +111,7 @@ find_sn_dma_map(dma_addr_t dma_addr, unsigned char busnum)
  *
  * This interface is usually used for "command" streams (e.g. the command
  * queue for a SCSI controller).  See Documentation/DMA-mapping.txt for
- * more information.  Note that this routine will always put a 32 bit
- * DMA address into @dma_handle.  This is because most devices
- * that are capable of 64 bit PCI DMA transactions can't do 64 bit _coherent_
- * DMAs, and unfortunately this interface has to cater to the LCD.  Oh well.
+ * more information.
  *
  * Also known as platform_pci_alloc_consistent() by the IA64 machvec code.
  */

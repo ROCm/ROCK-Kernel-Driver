@@ -5,8 +5,8 @@
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_CVLINK_H
-#define _ASM_SN_PCI_CVLINK_H
+#ifndef _ASM_IA64_SN_PCI_CVLINK_H
+#define _ASM_IA64_SN_PCI_CVLINK_H
 
 #include <asm/sn/types.h>
 #include <asm/sn/sgi.h>
@@ -69,4 +69,4 @@ struct ioports_to_tlbs_s {
 			ig:11;
 };
 
-#endif				/* _ASM_SN_PCI_CVLINK_H */
+#endif				/* _ASM_IA64_SN_PCI_CVLINK_H */

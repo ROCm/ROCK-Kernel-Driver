@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -107,9 +106,9 @@ typedef union ia64_sn2_pa {
 #define NASID_META_BITS		0	/* ???? */
 #define NASID_LOCAL_BITS	7	/* same router as SN1 */
 
-#define NODE_ADDRSPACE_SIZE     (UINT64_CAST 1 << NODE_SIZE_BITS)
-#define NASID_MASK              (UINT64_CAST NASID_BITMASK << NASID_SHFT)
-#define NASID_GET(_pa)          (int) ((UINT64_CAST (_pa) >>            \
+#define NODE_ADDRSPACE_SIZE     (1UL << NODE_SIZE_BITS)
+#define NASID_MASK              ((uint64_t) NASID_BITMASK << NASID_SHFT)
+#define NASID_GET(_pa)          (int) (((uint64_t) (_pa) >>            \
                                         NASID_SHFT) & NASID_BITMASK)
 #define PHYS_TO_DMA(x)          ( ((x & NASID_MASK) >> 2) |             \
                                   (x & (NODE_ADDRSPACE_SIZE - 1)) )
@@ -130,9 +129,9 @@ typedef union ia64_sn2_pa {
         : RAW_NODE_SWIN_BASE(nasid, widget))
 #else
 #define NODE_SWIN_BASE(nasid, widget) \
-     (NODE_IO_BASE(nasid) + (UINT64_CAST (widget) << SWIN_SIZE_BITS))
+     (NODE_IO_BASE(nasid) + ((uint64_t) (widget) << SWIN_SIZE_BITS))
 #define LOCAL_SWIN_BASE(widget) \
-	(UNCACHED | LOCAL_MMR_SPACE | ((UINT64_CAST (widget) << SWIN_SIZE_BITS)))
+	(UNCACHED | LOCAL_MMR_SPACE | (((uint64_t) (widget) << SWIN_SIZE_BITS)))
 #endif /* __ASSEMBLY__ */
 
 /*
@@ -142,12 +141,12 @@ typedef union ia64_sn2_pa {
  */
 
 #define BWIN_INDEX_BITS         3
-#define BWIN_SIZE               (UINT64_CAST 1 << BWIN_SIZE_BITS)
+#define BWIN_SIZE               (1UL << BWIN_SIZE_BITS)
 #define BWIN_SIZEMASK           (BWIN_SIZE - 1)
 #define BWIN_WIDGET_MASK        0x7
 #define NODE_BWIN_BASE0(nasid)  (NODE_IO_BASE(nasid) + BWIN_SIZE)
 #define NODE_BWIN_BASE(nasid, bigwin)   (NODE_BWIN_BASE0(nasid) +       \
-                        (UINT64_CAST (bigwin) << BWIN_SIZE_BITS))
+                        ((uint64_t) (bigwin) << BWIN_SIZE_BITS))
 
 #define BWIN_WIDGETADDR(addr)   ((addr) & BWIN_SIZEMASK)
 #define BWIN_WINDOWNUM(addr)    (((addr) >> BWIN_SIZE_BITS) & BWIN_WIDGET_MASK)

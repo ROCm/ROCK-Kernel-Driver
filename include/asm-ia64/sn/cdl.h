@@ -8,7 +8,9 @@
 #ifndef _ASM_IA64_SN_CDL_H
 #define _ASM_IA64_SN_CDL_H
 
+#ifdef __KERNEL__
 #include <asm/sn/sgi.h>
+#endif
 
 struct cdl {
 	int part_num;			/* Part part number */

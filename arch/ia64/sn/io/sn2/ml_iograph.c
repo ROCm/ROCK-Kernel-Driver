@@ -6,27 +6,16 @@
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/types.h>
-#include <linux/slab.h>
 #include <linux/ctype.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
-#include <asm/sn/io.h>
-#include <asm/sn/sn_cpuid.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/pci/bridge.h>
-#include <asm/sn/klconfig.h>
 #include <asm/sn/sn_private.h>
-#include <asm/sn/pci/pcibr.h>
-#include <asm/sn/xtalk/xtalk.h>
-#include <asm/sn/xtalk/xswitch.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/xtalk/xtalk_private.h>
+#include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/xtalk/xtalkaddrs.h>
+#include <asm/sn/ksys/l1.h>
 
 /* #define IOGRAPH_DEBUG */
 #ifdef IOGRAPH_DEBUG
@@ -47,7 +36,7 @@
  * xswitch vertex is created.
  */
 typedef struct xswitch_vol_s {
-	mutex_t xswitch_volunteer_mutex;
+	struct semaphore xswitch_volunteer_mutex;
 	int		xswitch_volunteer_count;
 	vertex_hdl_t	xswitch_volunteer[NUM_XSWITCH_VOLUNTEER];
 } *xswitch_vol_t;
@@ -110,7 +99,7 @@ volunteer_for_widgets(vertex_hdl_t xswitch, vertex_hdl_t master)
 	    return;
 	}
 
-	mutex_lock(&xvolinfo->xswitch_volunteer_mutex);
+	down(&xvolinfo->xswitch_volunteer_mutex);
 	ASSERT(xvolinfo->xswitch_volunteer_count < NUM_XSWITCH_VOLUNTEER);
 	xvolinfo->xswitch_volunteer[xvolinfo->xswitch_volunteer_count] = master;
 	xvolinfo->xswitch_volunteer_count++;
@@ -128,7 +117,7 @@ volunteer_for_widgets(vertex_hdl_t xswitch, vertex_hdl_t master)
 			xvolinfo->xswitch_volunteer[1] = hubv;
 		}
 	}
-	mutex_unlock(&xvolinfo->xswitch_volunteer_mutex);
+	up(&xvolinfo->xswitch_volunteer_mutex);
 }
 
 extern int xbow_port_io_enabled(nasid_t nasid, int widgetnum);
@@ -203,7 +192,7 @@ assign_widgets_to_volunteers(vertex_hdl_t xswitch, vertex_hdl_t hubv)
 				if (nasid == get_master_baseio_nasid())
 					goto do_assignment;
 			}
-			PRINT_PANIC("Nasid == %d, console nasid == %d",
+			panic("Nasid == %d, console nasid == %d",
 				nasid, get_master_baseio_nasid());
 		}
 
@@ -293,7 +282,7 @@ early_probe_for_widget(vertex_hdl_t hubv, xwidget_hwid_t hwid)
  *	
  */
 
-void
+static void
 io_xswitch_widget_init(vertex_hdl_t  	xswitchv,
 		       vertex_hdl_t	hubv,
 		       xwidgetnum_t	widgetnum)
@@ -742,13 +731,13 @@ io_init_node(cnodeid_t cnodeid)
 
 		/* Signal that we're done */
 		if (peer_sema) {
-			mutex_unlock(peer_sema);
+			up(peer_sema);
 		}
 		
 	}
 	else {
 	    /* Wait 'til master is done assigning widgets. */
-	    mutex_lock(&npdap->xbow_sema);
+	    down(&npdap->xbow_sema);
 	}
 
 #ifdef PROBE_TEST

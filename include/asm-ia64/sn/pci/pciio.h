@@ -5,24 +5,34 @@
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_PCIIO_H
-#define _ASM_SN_PCI_PCIIO_H
+#ifndef _ASM_IA64_SN_PCI_PCIIO_H
+#define _ASM_IA64_SN_PCI_PCIIO_H
 
 /*
  * pciio.h -- platform-independent PCI interface
  */
 
-#include <linux/config.h>
+#ifdef __KERNEL__
 #include <linux/ioport.h>
 #include <asm/sn/ioerror.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/hcl.h>
-
+#else
+#include <linux/ioport.h>
+#include <ioerror.h>
+#include <driver.h>
+#include <hcl.h>
+#endif
 
 #ifndef __ASSEMBLY__
 
+#ifdef __KERNEL__
 #include <asm/sn/dmamap.h>
 #include <asm/sn/alenlist.h>
+#else
+#include <dmamap.h>
+#include <alenlist.h>
+#endif
 
 typedef int pciio_vendor_id_t;
 
@@ -729,4 +739,17 @@ sn_pci_set_vchan(struct pci_dev *pci_dev,
 }
 
 #endif				/* C or C++ */
-#endif				/* _ASM_SN_PCI_PCIIO_H */
+
+
+/*
+ * Prototypes
+ */
+
+int snia_badaddr_val(volatile void *addr, int len, volatile void *ptr);
+nasid_t snia_get_console_nasid(void);
+nasid_t snia_get_master_baseio_nasid(void);
+/* XXX: should probably be called __sn2_pci_rrb_alloc */
+int snia_pcibr_rrb_alloc(struct pci_dev *pci_dev, int *count_vchan0, int *count_vchan1);
+pciio_endian_t snia_pciio_endian_set(struct pci_dev *pci_dev,
+	pciio_endian_t device_end, pciio_endian_t desired_end);
+#endif				/* _ASM_IA64_SN_PCI_PCIIO_H */

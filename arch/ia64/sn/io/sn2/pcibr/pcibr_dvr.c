@@ -6,30 +6,18 @@
  * Copyright (C) 2001-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/types.h>
-#include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
-#include <linux/ioport.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
-#include <asm/sn/sn_cpuid.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/klconfig.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
+
+#include <asm/sn/prio.h> 
 #include <asm/sn/sn_private.h>
 
 /*
@@ -955,8 +943,6 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
     picreg_t                int_enable_64;
     unsigned                rrb_fixed = 0;
 
-    int                     spl_level;
-
 #if PCI_FBBE
     int                     fast_back_to_back_enable;
 #endif
@@ -1324,7 +1310,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	 * for the lowest hunk of memory.
 	 */
 	xbase = xtalk_dmatrans_addr(xconn_vhdl, 0,
-				    paddr, _PAGESZ, 0);
+				    paddr, PAGE_SIZE, 0);
 
 	if (xbase != XIO_NOWHERE) {
 	    if (XIO_PACKED(xbase)) {
@@ -1354,7 +1340,6 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	 * ensure that we write and read without any interruption.
 	 * The read following the write is required for the Bridge war
 	 */
-	spl_level = splhi();
 #if IOPGSIZE == 4096
         bridge->p_wid_control_64 &= ~BRIDGE_CTRL_PAGE_SIZE;
 #elif IOPGSIZE == 16384
@@ -1363,7 +1348,6 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	<<<Unable to deal with IOPGSIZE >>>;
 #endif
 	bridge->b_wid_control;		/* inval addr bug war */
-	splx(spl_level);
 
 	/* Initialize internal mapping entries */
 	for (entry = 0; entry < pcibr_soft->bs_int_ate_size; entry++) {
@@ -1616,7 +1600,7 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
     /* Setup the Bus's PCI IO Root Resource. */
     pcibr_soft->bs_io_win_root_resource.start = PCIBR_BUS_IO_BASE;
     pcibr_soft->bs_io_win_root_resource.end = 0xffffffff;
-    res = (struct resource *) kmalloc( sizeof(struct resource), KM_NOSLEEP);
+    res = (struct resource *) kmalloc( sizeof(struct resource), GFP_KERNEL);
     if (!res)
 	panic("PCIBR:Unable to allocate resource structure\n");
 
@@ -1628,13 +1612,13 @@ pcibr_attach2(vertex_hdl_t xconn_vhdl, bridge_t *bridge,
 	panic("PCIBR:Unable to request_resource()\n");
 
     /* Setup the Small Window Root Resource */
-    pcibr_soft->bs_swin_root_resource.start = _PAGESZ;
+    pcibr_soft->bs_swin_root_resource.start = PAGE_SIZE;
     pcibr_soft->bs_swin_root_resource.end = 0x000FFFFF;
 
     /* Setup the Bus's PCI Memory Root Resource */
     pcibr_soft->bs_mem_win_root_resource.start = 0x200000;
     pcibr_soft->bs_mem_win_root_resource.end = 0xffffffff;
-    res = (struct resource *) kmalloc( sizeof(struct resource), KM_NOSLEEP);
+    res = (struct resource *) kmalloc( sizeof(struct resource), GFP_KERNEL);
     if (!res)
         panic("PCIBR:Unable to allocate resource structure\n");
 
@@ -1819,7 +1803,7 @@ pcibr_detach(vertex_hdl_t xconn)
     pciio_device_info_unregister(pcibr_vhdl,
 				 &(pcibr_soft->bs_noslot_info->f_c));
 
-    spin_lock_destroy(&pcibr_soft->bs_lock);
+/*  spin_lock_destroy(&pcibr_soft->bs_lock); */
     kfree(pcibr_soft->bs_name);
     
     /* Disconnect the error interrupt and free the xtalk resources 
@@ -2480,7 +2464,7 @@ pcibr_piospace_alloc(vertex_hdl_t pconn_vhdl,
     /*
      * Check for proper alignment
      */
-    ASSERT(alignment >= NBPP);
+    ASSERT(alignment >= PAGE_SIZE);
     ASSERT((alignment & (alignment - 1)) == 0);
 
     align_mask = alignment - 1;

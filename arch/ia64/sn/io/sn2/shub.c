@@ -9,11 +9,14 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/seq_file.h>
+#include <linux/sched.h>
 #include <asm/smp.h>
 #include <asm/irq.h>
 #include <asm/hw_irq.h>
 #include <asm/system.h>
 #include <asm/sn/sgi.h>
+#include <asm/uaccess.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
@@ -26,12 +29,12 @@
 #include <asm/sn/xtalk/xtalk.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/intr.h>
+#include <asm/sn/sn2/shub_mmr.h>
 #include <asm/sn/sn2/shub_mmr_t.h>
 #include <asm/sal.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/sndrv.h>
 #include <asm/sn/sn2/shubio.h>
-#include <asm/sn/sn2/shub_mmr.h>
 
 #define SHUB_NUM_ECF_REGISTERS 8
 

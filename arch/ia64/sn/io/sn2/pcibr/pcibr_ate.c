@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -8,29 +7,12 @@
  */
 
 #include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/module.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/sn_cpuid.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
-#include <asm/sn/sn_private.h>
-
-#ifndef LOCAL
-#define LOCAL           static
-#endif
 
 /*
  * functions
@@ -61,7 +43,7 @@ void ate_thaw(pcibr_dmamap_t pcibr_dmamap,
 #define ATE_NUM_ENTRIES(n) _ate_info[n]
 
 /* Possible choices for number of ATE entries in Bridge's SSRAM */
-LOCAL int               _ate_info[] =
+static int               _ate_info[] =
 {
     0,					/* 0 entries */
     8 * 1024,				/* 8K entries */
@@ -84,7 +66,6 @@ pcibr_init_ext_ate_ram(bridge_t *bridge)
     int                     num_entries, entry;
     int                     i, j;
     bridgereg_t             old_enable, new_enable;
-    int                     s;
 
     /* Probe SSRAM to determine its size. */
     old_enable = bridge->b_int_enable;
@@ -111,12 +92,10 @@ pcibr_init_ext_ate_ram(bridge_t *bridge)
      * The read following the write is required for the Bridge war
      */
 
-    s = splhi();
     bridge->b_wid_control = (bridge->b_wid_control
 			& ~BRIDGE_CTRL_SSRAM_SIZE_MASK)
 			| BRIDGE_CTRL_SSRAM_SIZE(largest_working_size);
     bridge->b_wid_control;		/* inval addr bug war */
-    splx(s);
 
     num_entries = ATE_NUM_ENTRIES(largest_working_size);
 

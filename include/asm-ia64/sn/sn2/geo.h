@@ -6,8 +6,8 @@
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#ifndef __SYS_SN_SN2_GEO_H__
-#define __SYS_SN_SN2_GEO_H__
+#ifndef _ASM_IA64_SN_SN2_GEO_H
+#define _ASM_IA64_SN_SN2_GEO_H
 
 /* Headers required by declarations in this file */
 
@@ -105,4 +105,4 @@ typedef union geoid_u {
 
 #define GEO_INVALID_STR		"<invalid>"
 
-#endif /* __SYS_SN_SN2_GEO_H__ */
+#endif /* _ASM_IA64_SN_SN2_GEO_H */

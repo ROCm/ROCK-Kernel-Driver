@@ -8,7 +8,6 @@
 #ifndef _ASM_IA64_SN_IOERROR_HANDLING_H
 #define _ASM_IA64_SN_IOERROR_HANDLING_H
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <asm/sn/sgi.h>
 
@@ -255,12 +254,13 @@ error_skip_point_mark(vertex_hdl_t  v)
 	 * one.								 
 	 */								 
 	if (v_error_skip_env_get(v, error_env) != GRAPH_SUCCESS) {	 
-		error_env = snia_kmem_zalloc(sizeof(label_t), KM_NOSLEEP);	 
+		error_env = kmalloc(sizeof(label_t), GFP_KERNEL);	 
 		/* Unable to allocate memory for jum buffer. This should 
 		 * be a very rare occurrence.				 
 		 */							 
 		if (!error_env)						 
 			return(-1);					 
+		memset(error_env, 0, sizeof(label_t));
 		/* Store the jump buffer information on the vertex.*/	 
 		if (v_error_skip_env_set(v, error_env, 0) != GRAPH_SUCCESS)
 			return(-2);					   

@@ -20,7 +20,6 @@
 #include <asm/sn/iograph.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/types.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pciio_private.h>
 #include <asm/sn/pci/pcibr.h>

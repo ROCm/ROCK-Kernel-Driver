@@ -5,8 +5,8 @@
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_PCIIO_PRIVATE_H
-#define _ASM_SN_PCI_PCIIO_PRIVATE_H
+#ifndef _ASM_IA64_SN_PCI_PCIIO_PRIVATE_H
+#define _ASM_IA64_SN_PCI_PCIIO_PRIVATE_H
 
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pci_defs.h>
@@ -15,8 +15,6 @@
  * pciio_private.h -- private definitions for pciio
  * PCI drivers should NOT include this file.
  */
-
-#ident "sys/PCI/pciio_private: $Revision: 1.13 $"
 
 /*
  * All PCI providers set up PIO using this information.
@@ -126,4 +124,4 @@ struct pciio_info_s {
 };
 
 extern char             pciio_info_fingerprint[];
-#endif				/* _ASM_SN_PCI_PCIIO_PRIVATE_H */
+#endif				/* _ASM_IA64_SN_PCI_PCIIO_PRIVATE_H */

@@ -66,7 +66,7 @@ void init_platform_nodepda(nodepda_t *npda, cnodeid_t node)
 	npda->npda_rip_last = &npda->npda_rip_first;
 	npda->geoid.any.type = GEO_TYPE_INVALID;
 
-	mutex_init_locked(&npda->xbow_sema); /* init it locked? */
+	init_MUTEX_LOCKED(&npda->xbow_sema); /* init it locked? */
 }
 
 void

@@ -5,17 +5,21 @@
  *
  * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc. All Rights Reserved.
  */
-#ifndef __ASM_SN_XTALK_XWIDGET_H__
-#define __ASM_SN_XTALK_XWIDGET_H__
+#ifndef _ASM_IA64_SN_XTALK_XWIDGET_H
+#define _ASM_IA64_SN_XTALK_XWIDGET_H
 
 /*
  * xwidget.h - generic crosstalk widget header file
  */
 
+#ifdef __KERNEL__
 #include <asm/sn/xtalk/xtalk.h>
 #ifndef __ASSEMBLY__
 #include <asm/sn/cdl.h>
 #endif /* __ASSEMBLY__ */
+#else
+#include <xtalk/xtalk.h>
+#endif
 
 #define WIDGET_ID			0x00
 #define WIDGET_STATUS			0x08
@@ -233,4 +237,4 @@ typedef struct v_widget_s {
 
 #endif				/* __ASSEMBLY__ */
 
-#endif				/* __ASM_SN_XTALK_XWIDGET_H__ */
+#endif				/* _ASM_IA64_SN_XTALK_XWIDGET_H */

@@ -29,8 +29,8 @@ typedef volatile ulong*	pioaddr_t;
 
 
 typedef struct piomap {
-	uint		pio_bus;
-	uint		pio_adap;
+	unsigned int	pio_bus;
+	unsigned int	pio_adap;
 	int		pio_flag;
 	int		pio_reg;
 	char		pio_name[7];	/* to identify the mapped device */

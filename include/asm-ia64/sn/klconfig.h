@@ -11,12 +11,6 @@
 #ifndef _ASM_IA64_SN_KLCONFIG_H
 #define _ASM_IA64_SN_KLCONFIG_H
 
-#include <linux/config.h>
-
-/*
- * klconfig.h
- */
-
 /*
  * The KLCONFIG structures store info about the various BOARDs found
  * during Hardware Discovery. In addition, it stores info about the

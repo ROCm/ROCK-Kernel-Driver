@@ -6,25 +6,15 @@
  * Copyright (C) 2001-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/module.h>
-#include <asm/sn/sgi.h>
+#include <linux/interrupt.h>
 #include <asm/sn/sn_cpuid.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/pci/bridge.h>
+#include <asm/sn/hcl_util.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
+#include <asm/sn/pci/pic.h>
 #include <asm/sn/sn_private.h>
 
 
@@ -38,7 +28,7 @@ extern void pcibr_driver_unreg_callback(vertex_hdl_t, int, int, int);
 /*
  * copy xwidget_info_t from conn_v to peer_conn_v
  */
-int
+static int
 pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
 							cnodeid_t xbow_peer)
 {
@@ -98,7 +88,7 @@ pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
  * If not successful, return zero and both buses will attach to the
  * vertex passed into pic_attach().
  */
-vertex_hdl_t
+static vertex_hdl_t
 pic_bus1_redist(nasid_t nasid, vertex_hdl_t conn_v)
 {
 	cnodeid_t cnode = NASID_TO_COMPACT_NODEID(nasid);

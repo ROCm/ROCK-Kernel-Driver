@@ -5,8 +5,8 @@
  *
  * Copyright (C) 1992-1997, 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
-#ifndef _ASM_SN_XTALK_XTALK_PRIVATE_H
-#define _ASM_SN_XTALK_XTALK_PRIVATE_H
+#ifndef _ASM_IA64_SN_XTALK_XTALK_PRIVATE_H
+#define _ASM_IA64_SN_XTALK_XTALK_PRIVATE_H
 
 #include <asm/sn/ioerror.h>        /* for error function and arg types */
 #include <asm/sn/xtalk/xwidget.h>
@@ -82,4 +82,4 @@ struct xwidget_info_s {
 
 extern char             widget_info_fingerprint[];
 
-#endif				/* _ASM_SN_XTALK_XTALK_PRIVATE_H */
+#endif				/* _ASM_IA64_SN_XTALK_XTALK_PRIVATE_H */

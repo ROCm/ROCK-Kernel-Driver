@@ -5,8 +5,8 @@
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_PCIBR_PRIVATE_H
-#define _ASM_SN_PCI_PCIBR_PRIVATE_H
+#ifndef _ASM_IA64_SN_PCI_PCIBR_PRIVATE_H
+#define _ASM_IA64_SN_PCI_PCIBR_PRIVATE_H
 
 /*
  * pcibr_private.h -- private definitions for pcibr
@@ -271,9 +271,9 @@ struct pcibr_intr_wrap_s {
 #define PCIBR_BUS_IO_MAX       0x0FFFFFFF
 #define PCIBR_BUS_IO_PAGE      0x100000
 
-#define PCIBR_BUS_SWIN_BASE    _PAGESZ
+#define PCIBR_BUS_SWIN_BASE    PAGE_SIZE
 #define PCIBR_BUS_SWIN_MAX     0x000FFFFF
-#define PCIBR_BUS_SWIN_PAGE    _PAGESZ
+#define PCIBR_BUS_SWIN_PAGE    PAGE_SIZE
 
 #define PCIBR_BUS_MEM_BASE     0x200000
 #define PCIBR_BUS_MEM_MAX      0x3FFFFFFF
@@ -435,7 +435,7 @@ struct pcibr_soft_s {
 	/* Shadow value for Device(x) register,
 	 * so we don't have to go to the chip.
 	 */
-	bridgereg_t             bss_device;
+	uint64_t		bss_device;
 
 	/* Number of sets on GBR/REALTIME bit outstanding
 	 * Used by Priority I/O for tracking reservations
@@ -648,17 +648,6 @@ struct pcibr_hints_s {
 
 #define pcibr_soft_get(v)       ((pcibr_soft_t)hwgraph_fastinfo_get((v)))
 #define pcibr_soft_set(v,i)     (hwgraph_fastinfo_set((v), (arbitrary_info_t)(i)))
-
-/*
- * mem alloc/free macros
- */
-#define NEWAf(ptr,n,f)	(ptr = snia_kmem_zalloc((n)*sizeof (*(ptr)), (f&PCIIO_NOSLEEP)?KM_NOSLEEP:KM_SLEEP))
-#define NEWA(ptr,n)	(ptr = snia_kmem_zalloc((n)*sizeof (*(ptr)), KM_SLEEP))
-#define DELA(ptr,n)	(kfree(ptr))
-
-#define NEWf(ptr,f)	NEWAf(ptr,1,f)
-#define NEW(ptr)	NEWA(ptr,1)
-#define DEL(ptr)	DELA(ptr,1)
 
 /*
  * Additional PIO spaces per slot are

@@ -5,11 +5,13 @@
  *
  * Copyright (C) 1992-1997, 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
-#ifndef _ASM_SN_XTALK_XTALK_H
-#define _ASM_SN_XTALK_XTALK_H
+#ifndef _ASM_IA64_SN_XTALK_XTALK_H
+#define _ASM_IA64_SN_XTALK_XTALK_H
 #include <linux/config.h>
 
+#ifdef __KERNEL__
 #include "asm/sn/sgi.h"
+#endif
 
 
 /*
@@ -18,7 +20,7 @@
 /*
  * User-level device driver visible types
  */
-typedef int            xwidgetnum_t;	/* xtalk widget number  (0..15) */
+typedef char            xwidgetnum_t;	/* xtalk widget number  (0..15) */
 
 #define XWIDGET_NONE		(-1)
 
@@ -396,4 +398,4 @@ typedef void		xtalk_iter_f(vertex_hdl_t vhdl);
 extern void		xtalk_iterate(char *prefix, xtalk_iter_f *func);
 
 #endif				/* __KERNEL__ */
-#endif				/* _ASM_SN_XTALK_XTALK_H */
+#endif				/* _ASM_IA64_SN_XTALK_XTALK_H */

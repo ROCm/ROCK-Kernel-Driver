@@ -6,6 +6,9 @@
  * Copyright (C) 2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
+#ifndef _ASM_IA64_SN_IOCONFIG_BUS_H
+#define _ASM_IA64_SN_IOCONFIG_BUS_H
+
 #define IOCONFIG_PCIBUS "/boot/efi/ioconfig_pcibus"
 #define POUND_CHAR                   '#'
 #define MAX_LINE_LEN	128
@@ -20,3 +23,5 @@ struct ioconfig_parm {
 struct  ascii_moduleid{
                 unsigned char   io_moduleid[8]; /* pci path name */
 };
+
+#endif	/* _ASM_IA64_SN_IOCONFIG_BUS_H */

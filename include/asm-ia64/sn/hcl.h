@@ -103,8 +103,6 @@ extern int hwgraph_path_lookup(vertex_hdl_t, char *, vertex_hdl_t *, char **);
 extern int hwgraph_info_export_LBL(vertex_hdl_t, char *, int);
 extern int hwgraph_info_unexport_LBL(vertex_hdl_t, char *);
 extern int hwgraph_info_remove_LBL(vertex_hdl_t, char *, arbitrary_info_t *);
-extern char * vertex_to_name(vertex_hdl_t, char *, uint);
-
-extern int init_hcl(void);
+extern char *vertex_to_name(vertex_hdl_t, char *, unsigned int);
 
 #endif /* _ASM_IA64_SN_HCL_H */

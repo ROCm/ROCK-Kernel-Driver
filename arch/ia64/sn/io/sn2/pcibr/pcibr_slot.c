@@ -7,25 +7,14 @@
  */
 
 #include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/module.h>
-#include <linux/pci.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/sn_cpuid.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
+#include <asm/uaccess.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
 
 extern pcibr_info_t     pcibr_info_get(vertex_hdl_t);
@@ -383,7 +372,7 @@ pcibr_slot_info_return(pcibr_soft_t             pcibr_soft,
     slotp->resp_p_int_enable = bridge->p_int_enable_64;
     slotp->resp_p_int_host = bridge->p_int_addr_64[slot];
 
-    if (COPYOUT(slotp, respp, sizeof(*respp))) {
+    if (copy_to_user(respp, respp, sizeof(*respp))) {
         return(EFAULT);
     }
 
@@ -1183,8 +1172,8 @@ pcibr_slot_addr_space_init(vertex_hdl_t pcibr_vhdl,
 
 	    align = (win) ? size : align_slot; 
 
-	    if (align < _PAGESZ)
-		align = _PAGESZ;        /* ie. 0x00004000 */
+	    if (align < PAGE_SIZE)
+		align = PAGE_SIZE;        /* ie. 0x00004000 */
  
 	    switch (space) {
 	    case PCIIO_SPACE_IO:

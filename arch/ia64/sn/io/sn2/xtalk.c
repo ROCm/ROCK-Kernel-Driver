@@ -308,7 +308,7 @@ null_xtalk_early_piotrans_addr(xwidget_part_num_t part_num,
 			       unsigned flags)
 {
 #if DEBUG
-    PRINT_PANIC("null_xtalk_early_piotrans_addr");
+    panic("null_xtalk_early_piotrans_addr");
 #endif
     return NULL;
 }
@@ -914,7 +914,7 @@ xwidget_unregister(vertex_hdl_t widget)
 
     /* Clean out the xwidget information */
     (void)kfree(widget_info->w_name);
-    BZERO((void *)widget_info, sizeof(widget_info));
+    memset((void *)widget_info, 0, sizeof(widget_info));
     DEL(widget_info);
     
     return(0);

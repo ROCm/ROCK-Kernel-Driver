@@ -8,13 +8,14 @@
 
 #include <linux/types.h>
 #include <linux/slab.h>
+#include <linux/init.h>
+#include <linux/string.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/io.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/module.h>
 #include <asm/sn/pci/pcibr.h>
@@ -119,8 +120,8 @@ module_t *module_lookup(moduleid_t id)
  *
  *   The node number is added to the list of nodes in the module.
  */
-
-module_t *module_add_node(geoid_t geoid, cnodeid_t cnodeid)
+static module_t * __init
+module_add_node(geoid_t geoid, cnodeid_t cnodeid)
 {
     module_t	       *m;
     int			i;
@@ -140,7 +141,7 @@ module_t *module_add_node(geoid_t geoid, cnodeid_t cnodeid)
 	m->id = moduleid;
 	spin_lock_init(&m->lock);
 
-	mutex_init_locked(&m->thdcnt);
+	init_MUTEX(&m->thdcnt);
 
 	/* Insert in sorted order by module number */
 
@@ -160,7 +161,8 @@ module_t *module_add_node(geoid_t geoid, cnodeid_t cnodeid)
     return m;
 }
 
-int module_probe_snum(module_t *m, nasid_t nasid)
+static int __init
+module_probe_snum(module_t *m, nasid_t nasid)
 {
     lboard_t	       *board;
     klmod_serial_num_t *comp;
@@ -228,7 +230,7 @@ int module_probe_snum(module_t *m, nasid_t nasid)
     }
 }
 
-void
+void __init
 io_module_init(void)
 {
     cnodeid_t		node;

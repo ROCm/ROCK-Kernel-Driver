@@ -5,10 +5,8 @@
  *
  * Copyright (c) 1992-1997,2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_PCI_DEFS_H
-#define _ASM_SN_PCI_PCI_DEFS_H
-
-#include <linux/config.h>
+#ifndef _ASM_IA64_SN_PCI_PCI_DEFS_H
+#define _ASM_IA64_SN_PCI_PCI_DEFS_H
 
 /* defines for the PCI bus architecture */
 
@@ -244,7 +242,7 @@
 
 #else
 
-extern uint pci_read(void * address, int type);
+extern unsigned int pci_read(void * address, int type);
 extern void pci_write(void * address, int data, int type);
 
 #define BYTE   1
@@ -328,24 +326,24 @@ typedef volatile struct pci_cfg_s {
 	uint16_t	dev_id;
 	uint16_t	cmd;
 	uint16_t	status;
-	uchar_t		rev;
-        uchar_t         prog_if;
-	uchar_t		sub_class;
-	uchar_t		class;
-	uchar_t		line_size;
-	uchar_t		lt;
-	uchar_t		hdr_type;
-	uchar_t		bist;
+	uint8_t		rev;
+	uint8_t         prog_if;
+	uint8_t		sub_class;
+	uint8_t		class;
+	uint8_t		line_size;
+	uint8_t		lt;
+	uint8_t		hdr_type;
+	uint8_t		bist;
 	uint32_t	bar[6];
 	uint32_t	cardbus;
 	uint16_t	subsys_vendor_id;
 	uint16_t	subsys_dev_id;
 	uint32_t	exp_rom;
 	uint32_t	res[2];
-	uchar_t		int_line;
-	uchar_t		int_pin;
-	uchar_t		min_gnt;
-	uchar_t		max_lat;
+	uint8_t		int_line;
+	uint8_t		int_pin;
+	uint8_t		min_gnt;
+	uint8_t		max_lat;
 } pci_cfg_t;
 
 /*
@@ -356,21 +354,21 @@ typedef volatile struct pci_cfg1_s {
 	uint16_t	dev_id;
 	uint16_t	cmd;
 	uint16_t	status;
-	uchar_t		rev;
-	uchar_t		prog_if;
-	uchar_t		sub_class;
-	uchar_t		class;
-	uchar_t		line_size;
-	uchar_t		lt;
-	uchar_t		hdr_type;
-	uchar_t		bist;
+	uint8_t		rev;
+	uint8_t		prog_if;
+	uint8_t		sub_class;
+	uint8_t		class;
+	uint8_t		line_size;
+	uint8_t		lt;
+	uint8_t		hdr_type;
+	uint8_t		bist;
 	uint32_t	bar[2];
-	uchar_t		pri_bus_num;
-	uchar_t		snd_bus_num;
-	uchar_t		sub_bus_num;
-	uchar_t		slt;
-	uchar_t		io_base;
-	uchar_t		io_limit;
+	uint8_t		pri_bus_num;
+	uint8_t		snd_bus_num;
+	uint8_t		sub_bus_num;
+	uint8_t		slt;
+	uint8_t		io_base;
+	uint8_t		io_limit;
 	uint16_t	snd_status;
 	uint16_t	mem_base;
 	uint16_t	mem_limit;
@@ -382,8 +380,8 @@ typedef volatile struct pci_cfg1_s {
 	uint16_t	io_limit_upper;
 	uint32_t	res;
 	uint32_t	exp_rom;
-	uchar_t		int_line;
-	uchar_t		int_pin;
+	uint8_t		int_line;
+	uint8_t		int_pin;
 	uint16_t	ppb_control;
 
 } pci_cfg1_t;
@@ -416,11 +414,11 @@ typedef volatile struct cap_pcix_stat_reg_s {
 } cap_pcix_stat_reg_t;
 
 typedef volatile struct cap_pcix_type0_s {
-	uchar_t			pcix_cap_id;
-	uchar_t			pcix_cap_nxt;
+	uint8_t			pcix_cap_id;
+	uint8_t			pcix_cap_nxt;
 	cap_pcix_cmd_reg_t	pcix_type0_command;
 	cap_pcix_stat_reg_t	pcix_type0_status;
 } cap_pcix_type0_t;
 
 #endif	/* __ASSEMBLY__ */
-#endif /* _ASM_SN_PCI_PCI_DEFS_H */
+#endif /* _ASM_IA64_SN_PCI_PCI_DEFS_H */

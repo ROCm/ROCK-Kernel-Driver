@@ -17,21 +17,7 @@
 #include <asm/sn/types.h>
 #endif 
 
-#ifndef __ASSEMBLY__
-
-#define PS_UINT_CAST		(__psunsigned_t)
-#define UINT64_CAST		(uint64_t)
 #define HUBREG_CAST		(volatile mmr_t *)
-
-#elif __ASSEMBLY__
-
-#define PS_UINT_CAST
-#define UINT64_CAST
-#define HUBREG_CAST
-
-#endif
-
-
 
 
 /*
@@ -39,7 +25,7 @@
  * node's address space.
  */
 
-#define NODE_OFFSET(_n)		(UINT64_CAST (_n) << NASID_SHFT)
+#define NODE_OFFSET(_n)		((uint64_t) (_n) << NASID_SHFT)
 
 #define NODE_CAC_BASE(_n)	(CAC_BASE  + NODE_OFFSET(_n))
 #define NODE_HSPEC_BASE(_n)	(HSPEC_BASE + NODE_OFFSET(_n))
@@ -55,7 +41,7 @@
 
 
 #define RAW_NODE_SWIN_BASE(nasid, widget)				\
-	(NODE_IO_BASE(nasid) + (UINT64_CAST (widget) << SWIN_SIZE_BITS))
+	(NODE_IO_BASE(nasid) + ((uint64_t) (widget) << SWIN_SIZE_BITS))
 
 #define WIDGETID_GET(addr)	((unsigned char)((addr >> SWIN_SIZE_BITS) & 0xff))
 
@@ -66,7 +52,7 @@
  */
 
 #define SWIN_SIZE_BITS		24
-#define SWIN_SIZE		(1UL<<24)
+#define SWIN_SIZE		(1UL << 24)
 #define	SWIN_SIZEMASK		(SWIN_SIZE - 1)
 #define	SWIN_WIDGET_MASK	0xF
 

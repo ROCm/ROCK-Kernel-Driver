@@ -5,8 +5,8 @@
  *
  * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc. All Rights Reserved.
  */
-#ifndef _ASM_SN_SN_XTALK_XBOW_H
-#define _ASM_SN_SN_XTALK_XBOW_H
+#ifndef _ASM_IA64_SN_XTALK_XBOW_H
+#define _ASM_IA64_SN_XTALK_XBOW_H
 
 /*
  * xbow.h - header file for crossbow chip and xbow section of xbridge
@@ -689,4 +689,4 @@ struct macrofield_s     xbow_macrofield[] =
 #endif				/* MACROFIELD_LINE */
 
 #endif				/* __ASSEMBLY__ */
-#endif                          /* _ASM_SN_SN_XTALK_XBOW_H */
+#endif                          /* _ASM_IA64_SN_XTALK_XBOW_H */

@@ -5,17 +5,8 @@
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_PIC_H
-#define _ASM_SN_PCI_PIC_H
-
-
-/*
- * The PIC ASIC is a follow-on to the Bridge and Xbridge ASICs.
- * It shares many of the same registers as those chips and therefore
- * the primary structure for the PIC will be bridge_s as defined
- * in irix/kern/sys/PCI/bridge.h.   This file is intended as a complement
- * to bridge.h, which includes this file.  
- */
+#ifndef _ASM_IA64_SN_PCI_PIC_H
+#define _ASM_IA64_SN_PCI_PIC_H
 
 /*
  * PIC AS DEVICE ZERO
@@ -65,13 +56,13 @@
  */
 
 
-#ifndef __ASSEMBLY__
-
-#ifdef __cplusplus
-extern "C" {
+#ifdef __KERNEL__
+#include <linux/types.h>
+#include <asm/sn/xtalk/xwidget.h>	/* generic widget header */
+#else
+#include <xtalk/xwidget.h>
 #endif
 
-// #include <sys/types.h>
 #include <asm/sn/pci/pciio.h>
 
 
@@ -1996,5 +1987,4 @@ typedef uint64_t picreg_t;
 		} pic_px_write_buf_valid_fld_s;
 	} pic_px_write_buf_valid_u_t;
 
-#endif				/* __ASSEMBLY__ */
-#endif                          /* _ASM_SN_PCI_PIC_H */
+#endif                          /* _ASM_IA64_SN_PCI_PIC_H */

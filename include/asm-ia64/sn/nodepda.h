@@ -12,7 +12,6 @@
 #include <linux/config.h>
 #include <asm/sn/sgi.h>
 #include <asm/irq.h>
-#include <asm/topology.h>
 #include <asm/sn/intr.h>
 #include <asm/sn/router.h>
 #include <asm/sn/pda.h>

@@ -7,27 +7,19 @@
  */
 
 #include <linux/types.h>
-#include <linux/slab.h>
-#include <linux/module.h>
+#include <linux/interrupt.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/sn_cpuid.h>
 #include <asm/sn/addrs.h>
-#include <asm/sn/arch.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/pci/bridge.h>
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
-#include <asm/sn/sn_private.h>
+
 
 extern int	hubii_check_widget_disabled(nasid_t, int);
+
+#define kdebug 0
 
 
 /* =====================================================================
@@ -41,12 +33,9 @@ extern int	hubii_check_widget_disabled(nasid_t, int);
 #define BRIDGE_PIOERR_TIMEOUT	40	/* Timeout in debug mode  */
 #endif
 #else
-#define BRIDGE_PIOERR_TIMEOUT	1	/* Timeout in non-debug mode                            */
+#define BRIDGE_PIOERR_TIMEOUT	1	/* Timeout in non-debug mode */
 #endif
 
-/* PIC has 64bit interrupt error registers, but BRIDGE has 32bit registers.
- * Thus 'bridge_errors_to_dump needs' to default to the larger of the two.
- */
 #ifdef  DEBUG
 #ifdef ERROR_DEBUG
 uint64_t bridge_errors_to_dump = ~BRIDGE_ISR_INT_MSK;
@@ -138,7 +127,7 @@ static struct reg_values       space_v[] =
     {PCIIO_SPACE_BAD, "BAD"},
     {0}
 };
-static struct reg_desc         space_desc[] =
+struct reg_desc         space_desc[] =
 {
     {0xFF, 0, "space", 0, space_v},
     {0}
@@ -658,7 +647,7 @@ pcibr_error_intr_handler(int irq, void *arg, struct pt_regs *ep)
 	entry = pcibr_list;
 	while (1) {
 	    if (entry == NULL) {
-		PRINT_PANIC("pcibr_error_intr_handler:\tmy parameter (0x%p) is not a pcibr_soft!", arg);
+		panic("pcibr_error_intr_handler:\tmy parameter (0x%p) is not a pcibr_soft!", arg);
 	    }
 	    if ((intr_arg_t) entry->bl_soft == arg)
 		break;
@@ -916,11 +905,11 @@ pcibr_error_intr_handler(int irq, void *arg, struct pt_regs *ep)
         (err_status & (BRIDGE_ISR_LLP_REC_SNERR | BRIDGE_ISR_LLP_REC_CBERR))) {
         printk("BRIDGE ERR_STATUS 0x%lx\n", err_status);
         pcibr_error_dump(pcibr_soft);
-        PRINT_PANIC("PCI Bridge Error interrupt killed the system");
+        panic("PCI Bridge Error interrupt killed the system");
     }
 
     if (err_status & BRIDGE_ISR_ERROR_FATAL) {
-	PRINT_PANIC("PCI Bridge Error interrupt killed the system");
+	panic("PCI Bridge Error interrupt killed the system");
 	    /*NOTREACHED */
     }
 

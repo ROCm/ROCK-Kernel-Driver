@@ -1,5 +1,4 @@
 /*
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -31,9 +30,7 @@
 typedef long clkreg_t;
 
 extern unsigned long sn_rtc_cycles_per_second;
-extern unsigned long sn_rtc_usec_per_cyc;
 extern unsigned long sn_rtc_per_itc;
-extern unsigned long sn_rtc_delta;
 
 
 #include <asm/sn/addrs.h>

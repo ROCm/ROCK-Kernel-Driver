@@ -37,7 +37,6 @@
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/pci/pic.h>
 
-extern int io_get_sh_swapper(nasid_t);
 #define BRIDGE_REG_GET32(reg) \
                 __swab32( *(volatile uint32_t *) (((uint64_t)reg)^4) )
 
@@ -46,11 +45,11 @@ extern int io_get_sh_swapper(nasid_t);
 
 /* I/O page size */
 
-#if _PAGESZ == 4096
+#if PAGE_SIZE == 4096
 #define IOPFNSHIFT		12	/* 4K per mapped page */
 #else
 #define IOPFNSHIFT		14	/* 16K per mapped page */
-#endif				/* _PAGESZ */
+#endif				/* PAGE_SIZE */
 
 #define IOPGSIZE		(1 << IOPFNSHIFT)
 #define IOPG(x)			((x) >> IOPFNSHIFT)

@@ -5,8 +5,8 @@
  *
  * Copyright (C) 1992-1997,2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  */
-#ifndef _ASM_SN_XTALK_XBOW_INFO_H
-#define _ASM_SN_XTALK_XBOW_INFO_H
+#ifndef _ASM_IA64_SN_XTALK_XBOW_INFO_H
+#define _ASM_IA64_SN_XTALK_XBOW_INFO_H
 
 #include <linux/types.h>
 

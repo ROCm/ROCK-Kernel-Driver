@@ -297,7 +297,7 @@ hubiio_crb_free(hubinfo_t hinfo, int crbnum)
 	* Wait till hub indicates it's done.
 	*/
 	while (REMOTE_HUB_L(hinfo->h_nasid, IIO_ICDR) & IIO_ICDR_PND)
-		us_delay(1);
+		udelay(1);
 
 }
 
