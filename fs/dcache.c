@@ -384,7 +384,11 @@ static void prune_dcache(int count)
 		dentry = list_entry(tmp, struct dentry, d_lru);
 
  		spin_lock(&dentry->d_lock);
-		/* leave inuse dentries */
+		/*
+		 * We found an inuse dentry which was not removed from
+		 * dentry_unused because of laziness during lookup.  Do not free
+		 * it - just keep it off the dentry_unused list.
+		 */
  		if (atomic_read(&dentry->d_count)) {
  			spin_unlock(&dentry->d_lock);
 			continue;
@@ -935,8 +939,9 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
  * rcu_read_lock() and rcu_read_unlock() are used to disable preemption while
  * lookup is going on.
  *
- * d_lru list is not updated, which can leave non-zero d_count dentries
- * around in d_lru list.
+ * dentry_unused list is not updated even if lookup finds the required dentry
+ * in there. It is updated in places such as prune_dcache, shrink_dcache_sb and
+ * select_parent. This laziness saves lookup from dcache_lock acquisition.
  *
  * d_lookup() is protected against the concurrent renames in some unrelated
  * directory using the seqlockt_t rename_lock.
