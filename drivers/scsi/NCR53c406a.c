@@ -619,6 +619,7 @@ static int __init NCR53c406a_setup(char *str)
 		printk("NCR53c406a: Setup called too many times.  Bad LILO params?\n");
 		return 0;
 	}
+	get_options(str, 4, ints);
 	if (ints[0] < 1 || ints[0] > 3) {
 		printk("NCR53c406a: Malformed command line\n");
 		printk("NCR53c406a: Usage: ncr53c406a=<PORTBASE>[,<IRQ>[,<FASTPIO>]]\n");
