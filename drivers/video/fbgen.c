@@ -129,12 +129,6 @@ void gen_set_disp(int con, struct fb_info *info)
 {
 	struct display *display = (con < 0) ? info->disp : (fb_display + con);
 
-	display->visual = info->fix.visual;
-	display->type	= info->fix.type;
-	display->type_aux = info->fix.type_aux;
-	display->ypanstep = info->fix.ypanstep;
-    	display->ywrapstep = info->fix.ywrapstep;
-    	display->line_length = info->fix.line_length;
 	if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR ||
 	    info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
 		display->can_soft_blank = info->fbops->fb_blank ? 1 : 0;

@@ -55,12 +55,6 @@ struct display {
     struct fb_var_screeninfo var;   /* variable infos. yoffset and vmode */
                                     /* are updated by fbcon.c */
     struct fb_cmap cmap;            /* colormap */
-    int visual;
-    int type;                       /* see FB_TYPE_* */
-    int type_aux;                   /* Interleave for interleaved Planes */
-    u_short ypanstep;               /* zero if no hardware ypan */
-    u_short ywrapstep;              /* zero if no hardware ywrap */
-    u_long line_length;             /* length of a line in bytes */
     u_short can_soft_blank;         /* zero if no hardware blanking */
     u_short inverse;                /* != 0 text black on white as default */
     struct display_switch *dispsw;  /* low level operations */
