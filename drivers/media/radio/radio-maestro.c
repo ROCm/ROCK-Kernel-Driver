@@ -270,7 +270,7 @@ static int radio_ioctl(struct inode *inode, struct file *file,
 	return ret;
 }
 
-inline static __u16 radio_install(struct pci_dev *pcidev);
+static __u16 radio_install(struct pci_dev *pcidev);
 
 MODULE_AUTHOR("Adam Tlalka, atlka@pg.gda.pl");
 MODULE_DESCRIPTION("Radio driver for the Maestro PCI sound card radio.");
@@ -324,7 +324,7 @@ inline static __u16 radio_power_on(struct radio_device *dev)
 	return (ofreq == radio_bits_get(dev));
 }
 
-inline static __u16 radio_install(struct pci_dev *pcidev)
+static __u16 radio_install(struct pci_dev *pcidev)
 {
 	if(((pcidev->class >> 8) & 0xffff) != PCI_CLASS_MULTIMEDIA_AUDIO)
 		return 0;
