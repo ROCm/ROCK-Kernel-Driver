@@ -160,9 +160,9 @@ grabbing facilities, you must either
   set aside the necessary memory during boot time. There seem to be
   several versions of this patch against various kernel versions
   floating around in the net, you may obtain one e.g. from:
-  http://www.polyware.nl/~middelin/patch/bigphysarea-2.2.1.tar.gz You
-  also have to compile your driver AFTER installing that patch in order
-  to get it working
+  http://www.polyware.nl/~middelin/hob-v4l.html#bigphysarea
+  You also have to compile your driver AFTER installing that patch in
+  order to get it working
 
   or
 
