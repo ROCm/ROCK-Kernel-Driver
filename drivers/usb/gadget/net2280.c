@@ -2642,7 +2642,7 @@ done:
 
 /*-------------------------------------------------------------------------*/
 
-static const struct pci_device_id __devinitdata pci_ids [] = { {
+static struct pci_device_id __devinitdata pci_ids [] = { {
 	.class = 	((PCI_CLASS_SERIAL_USB << 8) | 0xfe),
 	.class_mask = 	~0,
 	.vendor =	0x17cc,
