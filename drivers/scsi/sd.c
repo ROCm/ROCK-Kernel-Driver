@@ -581,8 +581,11 @@ static int sd_release(struct inode *inode, struct file *filp)
 		__MOD_DEC_USE_COUNT(sd_template.module);
 
 	/* check that we actually have a write back cache to synchronize */
-	if(sdkp->WCE)
+	if(sdkp->WCE) {
+		printk(KERN_NOTICE "Synchronizing SCSI cache: ");
 		sd_synchronize_cache(dsk_nr, 1);
+		printk("\n");
+	}
 		       
 	return 0;
 }
@@ -1548,6 +1551,7 @@ static void __exit exit_sd(void)
 static int sd_notifier(struct notifier_block *nbt, unsigned long event, void *buf)
 {
 	int i;
+	char *msg = "Synchronizing SCSI caches: ";
 
 	if (!(event == SYS_RESTART || event == SYS_HALT 
 	      || event == SYS_POWER_OFF))
@@ -1557,9 +1561,16 @@ static int sd_notifier(struct notifier_block *nbt, unsigned long event, void *bu
 
 		if (!sdkp || !sdkp->device)
 			continue;
-		if (sdkp->WCE)
+		if (sdkp->WCE) {
+			if(msg) {
+				printk(KERN_NOTICE "%s", msg);
+				msg = NULL;
+			}
 			sd_synchronize_cache(i, 1);
+		}
 	}
+	if(!msg)
+		printk("\n");
 
 	return NOTIFY_OK;
 }
@@ -1579,7 +1590,7 @@ static int sd_synchronize_cache(int index, int verbose)
 
 		sd_dskname(index, buf);
 
-		printk("%s: synchronizing cache...", buf);
+		printk("%s ", buf);
 	}
 
 	SRpnt = scsi_allocate_request(SDpnt);
@@ -1607,9 +1618,7 @@ static int sd_synchronize_cache(int index, int verbose)
 	the_result = SRpnt->sr_result;
 	scsi_release_request(SRpnt);
 	if(verbose) {
-		if(the_result == 0) {
-			printk("OK\n");
-		} else {
+		if(the_result != 0) {
 			printk("FAILED\n  status = %x, message = %02x, host = %d, driver = %02x\n  ",
 			       status_byte(the_result),
 			       msg_byte(the_result),
