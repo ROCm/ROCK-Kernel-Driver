@@ -501,7 +501,7 @@ static int tg3_readphy(struct tg3 *tp, int reg, u32 *val)
 		udelay(80);
 	}
 
-	*val = 0xffffffff;
+	*val = 0x0;
 
 	frame_val  = ((PHY_ADDR << MI_COM_PHY_ADDR_SHIFT) &
 		      MI_COM_PHY_ADDR_MASK);
