@@ -1,5 +1,5 @@
 /*
- * $Id: mtd_blkdevs.c,v 1.15 2003/06/23 12:00:08 dwmw2 Exp $
+ * $Id: mtd_blkdevs.c,v 1.16 2003/06/23 13:34:43 dwmw2 Exp $
  *
  * (C) 2003 David Woodhouse <dwmw2@infradead.org>
  *
@@ -344,8 +344,6 @@ void blktrans_notify_add(struct mtd_info *mtd)
 	if (mtd->type == MTD_ABSENT)
 		return;
 
-	printk("%s:%s %d: count %d\n", __FILE__, __func__, __LINE__, atomic_read(&mtd_table_mutex.count));
-
 	list_for_each(this, &blktrans_majors) {
 		struct mtd_blktrans_ops *tr = list_entry(this, struct mtd_blktrans_ops, list);
 
@@ -407,8 +405,6 @@ int register_mtd_blktrans(struct mtd_blktrans_ops *tr)
 
 	INIT_LIST_HEAD(&tr->devs);
 	list_add(&tr->list, &blktrans_majors);
-
-	printk("%s:%s %d: count %d\n", __FILE__, __func__, __LINE__, atomic_read(&mtd_table_mutex.count));
 
 	for (i=0; i<MAX_MTD_DEVICES; i++) {
 		if (mtd_table[i] && mtd_table[i]->type != MTD_ABSENT)
