@@ -749,7 +749,7 @@ ENTRY(ia64_leave_syscall)
 	ld8.fill r1=[r3],16	// load r1
 (pUStk) mov r17=1
 	;;
-	srlz.i			// M0  ensure interruption collection is off
+	srlz.d			// M0  ensure interruption collection is off
 	ld8.fill r13=[r3],16
 	nop.i 0
 	;;
