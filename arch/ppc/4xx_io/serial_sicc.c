@@ -1431,7 +1431,6 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
     save_flags(flags); cli();
 
     if (tty_hung_up_p(filp)) {
-        MOD_DEC_USE_COUNT;
         restore_flags(flags);
         return;
     }
@@ -1452,7 +1451,6 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
         state->count = 0;
     }
     if (state->count) {
-        MOD_DEC_USE_COUNT;
         restore_flags(flags);
         return;
     }
@@ -1495,7 +1493,6 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
     }
     info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
     wake_up_interruptible(&info->close_wait);
-    MOD_DEC_USE_COUNT;
 }
 
 static void siccuart_wait_until_sent(struct tty_struct *tty, int timeout)
@@ -1685,9 +1682,7 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
 
 
     // is this a line that we've got?
-    MOD_INC_USE_COUNT;
     if (line >= SERIAL_SICC_NR) {
-        MOD_DEC_USE_COUNT;
         return -ENODEV;
     }
 
@@ -1707,7 +1702,6 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
         if (tmp_buf)
             free_page(page);
         else if (!page) {
-            MOD_DEC_USE_COUNT;
             return -ENOMEM;
         }
         tmp_buf = (u_char *)page;
@@ -1720,7 +1714,6 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
         (info->flags & ASYNC_CLOSING)) {
         if (info->flags & ASYNC_CLOSING)
             interruptible_sleep_on(&info->close_wait);
-        MOD_DEC_USE_COUNT;
         return -EAGAIN;
     }
 
@@ -1729,13 +1722,11 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
      */
     retval = siccuart_startup(info);
     if (retval) {
-        MOD_DEC_USE_COUNT;
         return retval;
     }
 
     retval = block_til_ready(tty, filp, info);
     if (retval) {
-        MOD_DEC_USE_COUNT;
         return retval;
     }
 
@@ -1778,6 +1769,7 @@ int __init siccuart_init(void)
 	return -ENOMEM;
     printk("IBM Vesta SICC serial port driver V 0.1 by Yudong Yang and Yi Ge / IBM CRL .\n");
     siccnormal_driver->driver_name = "serial_sicc";
+    siccnormal_driver->owner = THIS_MODULE;
     siccnormal_driver->name = SERIAL_SICC_NAME;
     siccnormal_driver->major = SERIAL_SICC_MAJOR;
     siccnormal_driver->minor_start = SERIAL_SICC_MINOR;
