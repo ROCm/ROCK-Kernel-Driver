@@ -1,4 +1,6 @@
 /*
+ * handle saa7134 IR remotes via linux kernel input layer.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -13,9 +15,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/module.h>
@@ -101,6 +100,63 @@ static IR_KEYTAB_TYPE cinergy_codes[IR_KEYTAB_SIZE] = {
 	[ 0x23 ] = KEY_STOP,
 };
 
+/* Alfons Geser <a.geser@cox.net> */
+static IR_KEYTAB_TYPE eztv_codes[IR_KEYTAB_SIZE] = {
+        [ 18 ] = KEY_POWER,
+        [  1 ] = KEY_TV,             // DVR
+        [ 21 ] = KEY_VIDEO,          // DVD
+        [ 23 ] = KEY_AUDIO,          // music
+
+                                     // DVR mode / DVD mode / music mode
+
+        [ 27 ] = KEY_MUTE,           // mute
+        [  2 ] = KEY_RESERVED,       // MTS/SAP / audio /autoseek
+        [ 30 ] = KEY_RESERVED,       // closed captioning / subtitle / seek
+        [ 22 ] = KEY_ZOOM,           // full screen
+        [ 28 ] = KEY_RESERVED,       // video source / eject /delall
+        [ 29 ] = KEY_RESERVED,       // playback / angle /del
+        [ 47 ] = KEY_SEARCH,         // scan / menu / playlist
+        [ 48 ] = KEY_RESERVED,       // CH surfing / bookmark / memo
+
+        [ 49 ] = KEY_HELP,           // help
+        [ 50 ] = KEY_RESERVED,       // num/memo
+        [ 51 ] = KEY_ESC,            // cancel
+
+	[ 12 ] = KEY_UP,             // up
+	[ 16 ] = KEY_DOWN,           // down
+	[  8 ] = KEY_LEFT,           // left
+	[  4 ] = KEY_RIGHT,          // right
+	[  3 ] = KEY_ENTER,          // select
+
+	[ 31 ] = KEY_REWIND,         // rewind
+	[ 32 ] = KEY_PLAYPAUSE,      // play/pause
+	[ 41 ] = KEY_FORWARD,        // forward
+	[ 20 ] = KEY_RESERVED,       // repeat
+	[ 43 ] = KEY_RECORD,         // recording
+	[ 44 ] = KEY_STOP,           // stop
+	[ 45 ] = KEY_PLAY,           // play
+	[ 46 ] = KEY_RESERVED,       // snapshot
+
+        [  0 ] = KEY_KP0,
+        [  5 ] = KEY_KP1,
+        [  6 ] = KEY_KP2,
+        [  7 ] = KEY_KP3,
+        [  9 ] = KEY_KP4,
+        [ 10 ] = KEY_KP5,
+        [ 11 ] = KEY_KP6,
+        [ 13 ] = KEY_KP7,
+        [ 14 ] = KEY_KP8,
+        [ 15 ] = KEY_KP9,
+
+        [ 42 ] = KEY_VOLUMEUP,
+        [ 17 ] = KEY_VOLUMEDOWN,
+        [ 24 ] = KEY_CHANNELUP,      // CH.tracking up
+        [ 25 ] = KEY_CHANNELDOWN,    // CH.tracking down
+
+        [ 19 ] = KEY_KPENTER,        // enter
+        [ 33 ] = KEY_KPDOT,          // . (decimal dot)
+};
+
 /* ---------------------------------------------------------------------- */
 
 static int build_key(struct saa7134_dev *dev)
@@ -111,9 +167,15 @@ static int build_key(struct saa7134_dev *dev)
 	/* rising SAA7134_GPIO_GPRESCAN reads the status */
 	saa_clearb(SAA7134_GPIO_GPMODE3,SAA7134_GPIO_GPRESCAN);
 	saa_setb(SAA7134_GPIO_GPMODE3,SAA7134_GPIO_GPRESCAN);
-	gpio = saa_readl(SAA7134_GPIO_GPSTATUS0 >> 2);
-	data = ir_extract_bits(gpio, ir->mask_keycode);
 
+	gpio = saa_readl(SAA7134_GPIO_GPSTATUS0 >> 2);
+        if (ir->polling) {
+                if (ir->last_gpio == gpio)
+                        return 0;
+                ir->last_gpio = gpio;
+        }
+
+ 	data = ir_extract_bits(gpio, ir->mask_keycode);
 	printk("%s: build_key gpio=0x%x mask=0x%x data=%d\n",
 	       dev->name, gpio, ir->mask_keycode, data);
 
@@ -130,7 +192,21 @@ static int build_key(struct saa7134_dev *dev)
 
 void saa7134_input_irq(struct saa7134_dev *dev)
 {
+        struct saa7134_ir *ir = dev->remote;
+
+        if (!ir->polling)
+		build_key(dev);
+}
+
+static void saa7134_input_timer(unsigned long data)
+{
+	struct saa7134_dev *dev = (struct saa7134_dev*)data;
+	struct saa7134_ir *ir = dev->remote;
+	unsigned long timeout;
+
 	build_key(dev);
+	timeout = jiffies + (ir->polling * HZ / 1000);
+	mod_timer(&ir->timer, timeout);
 }
 
 int saa7134_input_init1(struct saa7134_dev *dev)
@@ -140,6 +216,7 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 	u32 mask_keycode = 0;
 	u32 mask_keydown = 0;
 	u32 mask_keyup   = 0;
+	int polling      = 0;
 	int ir_type      = IR_TYPE_OTHER;
 
 	/* detect & configure */
@@ -158,6 +235,13 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 		mask_keycode = 0x00003f;
 		mask_keyup   = 0x040000;
 		break;
+	case SAA7134_BOARD_ECS_TVP3XP:
+	case SAA7134_BOARD_ECS_TVP3XP_4CB5:
+                ir_codes     = eztv_codes;
+                mask_keycode = 0x00017c;
+                mask_keyup   = 0x000002;
+		polling      = 50; // ms
+                break;
 	}
 	if (NULL == ir_codes) {
 		printk("%s: Oops: IR config error [card=%d]\n",
@@ -174,6 +258,7 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 	ir->mask_keycode = mask_keycode;
 	ir->mask_keydown = mask_keydown;
 	ir->mask_keyup   = mask_keyup;
+        ir->polling      = polling;
 	
 	/* init input device */
 	snprintf(ir->name, sizeof(ir->name), "saa7134 IR (%s)",
@@ -196,6 +281,14 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 
 	/* all done */
 	dev->remote = ir;
+	if (ir->polling) {
+		init_timer(&ir->timer);
+		ir->timer.function = saa7134_input_timer;
+		ir->timer.data     = (unsigned long)dev;
+		ir->timer.expires  = jiffies + HZ;
+		add_timer(&ir->timer);
+	}
+
 	input_register_device(&dev->remote->dev);
 	printk("%s: registered input device for IR\n",dev->name);
 	return 0;
@@ -207,6 +300,8 @@ void saa7134_input_fini(struct saa7134_dev *dev)
 		return;
 	
 	input_unregister_device(&dev->remote->dev);
+	if (dev->remote->polling)
+		del_timer_sync(&dev->remote->timer);
 	kfree(dev->remote);
 	dev->remote = NULL;
 }

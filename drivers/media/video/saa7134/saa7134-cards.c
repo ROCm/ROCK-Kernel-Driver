@@ -834,7 +834,7 @@ struct saa7134_board saa7134_boards[] = {
 		}},
 	},
         [SAA7134_BOARD_ECS_TVP3XP] = {
-                .name           = "Elitegroup ECS TVP3XP FM1216 Tuner Card",
+                .name           = "Elitegroup ECS TVP3XP FM1216 Tuner Card(PAL-BG,FM) ",
                 .audio_clock    = 0x187de7,  // xtal 32.1 MHz
                 .tuner_type     = TUNER_PHILIPS_PAL,
                 .inputs         = {{
@@ -865,6 +865,82 @@ struct saa7134_board saa7134_boards[] = {
                         .amux   = LINE2,
                 },
         },
+        [SAA7134_BOARD_ECS_TVP3XP_4CB5] = {
+                .name           = "Elitegroup ECS TVP3XP FM1236 Tuner Card (NTSC,FM)",
+                .audio_clock    = 0x187de7,
+                .tuner_type     = TUNER_PHILIPS_NTSC,
+                .inputs         = {{
+                        .name   = name_tv,
+                        .vmux   = 1,
+                        .amux   = TV,
+                        .tv     = 1,
+                },{
+                        .name   = name_tv_mono,
+                        .vmux   = 1,
+                        .amux   = LINE2,
+                        .tv     = 1,
+                },{
+                        .name   = name_comp1,
+                        .vmux   = 3,
+                        .amux   = LINE1,
+                },{
+                        .name   = name_svideo,
+                        .vmux   = 8,
+                        .amux   = LINE1,
+                },{
+                        .name   = "CVid over SVid",
+                        .vmux   = 0,
+                        .amux   = LINE1,
+                }},
+                .radio = {
+                        .name   = name_radio,
+                        .amux   = LINE2,
+                },
+        },
+	[SAA7134_BOARD_AVACSSMARTTV] = {
+		/* Roman Pszonczenko <romka@kolos.math.uni.lodz.pl> */
+		.name           = "AVACS SmartTV",
+		.audio_clock    = 0x00187de7,
+		.tuner_type     = TUNER_PHILIPS_PAL,
+		.inputs         = {{
+			.name = name_tv,
+			.vmux = 1,
+			.amux = TV,
+			.tv   = 1,
+                },{
+			.name = name_tv_mono,
+			.vmux = 1,
+			.amux = LINE2,
+			.tv   = 1,
+		},{
+			.name = name_comp1,
+			.vmux = 0,
+			.amux = LINE2,
+		},{
+			.name = name_comp2,
+			.vmux = 3,
+			.amux = LINE2,
+		},{
+			.name = name_svideo,
+			.vmux = 8,
+			.amux = LINE2,
+		}},
+		.radio = {
+			.name = name_radio,
+			.amux = LINE2,
+			.gpio = 0x200000,
+		},
+	},
+	[SAA7134_BOARD_AVERMEDIA_DVD_EZMAKER] = {
+		/* Michael Smith <msmith@cbnco.com> */
+		.name           = "AVerMedia DVD EZMaker",
+		.audio_clock    = 0x00187de7,
+		.tuner_type     = TUNER_ABSENT,
+		.inputs         = {{
+			.name = name_comp1,
+			.vmux = 3,
+		}},
+	},
 };
 const unsigned int saa7134_bcount = ARRAY_SIZE(saa7134_boards);
 
@@ -1023,6 +1099,12 @@ struct pci_device_id saa7134_pci_tbl[] = {
                 .subvendor    = 0x1461, /* Avermedia Technologies Inc */
                 .subdevice    = 0x2115,
 		.driver_data  = SAA7134_BOARD_MD2819,
+	},{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7130,
+                .subvendor    = 0x1461, /* Avermedia Technologies Inc */
+                .subdevice    = 0x10ff,
+		.driver_data  = SAA7134_BOARD_AVERMEDIA_DVD_EZMAKER,
         },{
 		/* TransGear 3000TV */
 		.vendor       = PCI_VENDOR_ID_PHILIPS,
@@ -1042,6 +1124,12 @@ struct pci_device_id saa7134_pci_tbl[] = {
                 .subvendor    = 0x1019,
                 .subdevice    = 0x4cb4,
                 .driver_data  = SAA7134_BOARD_ECS_TVP3XP,
+        },{
+                .vendor       = PCI_VENDOR_ID_PHILIPS,
+                .device       = PCI_DEVICE_ID_PHILIPS_SAA7133,
+                .subvendor    = 0x1019,
+                .subdevice    = 0x4cb5,
+                .driver_data  = SAA7134_BOARD_ECS_TVP3XP_4CB5,
         },{
 		
 		/* --- boards without eeprom + subsystem ID --- */
@@ -1149,6 +1237,8 @@ int saa7134_board_init(struct saa7134_dev *dev)
 		break;
 	case SAA7134_BOARD_CINERGY400:
 	case SAA7134_BOARD_CINERGY600:
+	case SAA7134_BOARD_ECS_TVP3XP:
+	case SAA7134_BOARD_ECS_TVP3XP_4CB5:
 		dev->has_remote = 1;
 		break;
 	}

@@ -471,38 +471,8 @@ hub_dmamap_addr(	hub_dmamap_t dmamap,	/* use these mapping resources */
 }
 
 /*
- * Establish a DMA mapping using the resources allocated in a previous dmamap_alloc.
- * Return an appropriate crosstalk address list that maps to the specified physical 
- * address list.
- */
-/* ARGSUSED */
-alenlist_t
-hub_dmamap_list(hub_dmamap_t hub_dmamap,	/* use these mapping resources */
-		alenlist_t palenlist,		/* map this area of memory */
-		unsigned flags)
-{
-	vertex_hdl_t vhdl;
-
-	ASSERT(hub_dmamap->hdma_flags & HUB_DMAMAP_IS_VALID);
-
-	if (hub_dmamap->hdma_flags & HUB_DMAMAP_USED) {
-	    /* If the map is FIXED, re-use is OK. */
-	    if (!(hub_dmamap->hdma_flags & HUB_DMAMAP_IS_FIXED)) {
-		char name[MAXDEVNAME];
-		vhdl = hub_dmamap->hdma_xtalk_info.xd_dev;
-		printk(KERN_WARNING  "%s: hub_dmamap_list re-uses dmamap\n", vertex_to_name(vhdl, name, MAXDEVNAME));
-	    }
-	} else {
-		hub_dmamap->hdma_flags |= HUB_DMAMAP_USED;
-	}
-
-	/* There isn't actually any DMA mapping hardware on the hub.  */
-	return palenlist;
-}
-
-/*
  * Driver indicates that it has completed whatever DMA it may have started
- * after an earlier dmamap_addr or dmamap_list call.
+ * after an earlier dmamap_addr call.
  */
 void
 hub_dmamap_done(hub_dmamap_t hub_dmamap)	/* done with these mapping resources */
@@ -535,23 +505,6 @@ hub_dmatrans_addr(	vertex_hdl_t dev,	/* translate for this device */
 	return (PHYS_TO_DMA(paddr));
 }
 
-/*
- * Translate a list of IP27 addresses and lengths into a list of crosstalk 
- * addresses and lengths.  No actual hardware mapping takes place; the hub 
- * has no DMA mapping registers -- crosstalk addresses map directly.
- */
-/* ARGSUSED */
-alenlist_t
-hub_dmatrans_list(	vertex_hdl_t dev,	/* translate for this device */
-			device_desc_t dev_desc,	/* device descriptor */
-			alenlist_t palenlist,	/* system address/length list */
-			unsigned flags)		/* defined in dma.h */
-{
-	BUG();
-	/* no translation needed */
-	return palenlist;
-}
-
 /*ARGSUSED*/
 void
 hub_dmamap_drain(	hub_dmamap_t map)
@@ -567,15 +520,6 @@ hub_dmaaddr_drain(	vertex_hdl_t vhdl,
 {
     /* XXX- flush caches, if cache coherency WAR is needed */
 }
-
-/*ARGSUSED*/
-void
-hub_dmalist_drain(	vertex_hdl_t vhdl,
-			alenlist_t list)
-{
-    /* XXX- flush caches, if cache coherency WAR is needed */
-}
-
 
 
 /* CONFIGURATION MANAGEMENT */
@@ -768,28 +712,25 @@ hub_widget_flags_set(nasid_t		nasid,
  * crosstalk bus provider.
  */
 xtalk_provider_t hub_provider = {
-	(xtalk_piomap_alloc_f *)	hub_piomap_alloc,
-	(xtalk_piomap_free_f *)		hub_piomap_free,
-	(xtalk_piomap_addr_f *)		hub_piomap_addr,
-	(xtalk_piomap_done_f *)		hub_piomap_done,
-	(xtalk_piotrans_addr_f *)	hub_piotrans_addr,
+	.piomap_alloc	= (xtalk_piomap_alloc_f *) hub_piomap_alloc,
+	.piomap_free	= (xtalk_piomap_free_f *) hub_piomap_free,
+	.piomap_addr	= (xtalk_piomap_addr_f *) hub_piomap_addr,
+	.piomap_done	= (xtalk_piomap_done_f *) hub_piomap_done,
+	.piotrans_addr	= (xtalk_piotrans_addr_f *) hub_piotrans_addr,
 
-	(xtalk_dmamap_alloc_f *)	hub_dmamap_alloc,
-	(xtalk_dmamap_free_f *)		hub_dmamap_free,
-	(xtalk_dmamap_addr_f *)		hub_dmamap_addr,
-	(xtalk_dmamap_list_f *)		hub_dmamap_list,
-	(xtalk_dmamap_done_f *)		hub_dmamap_done,
-	(xtalk_dmatrans_addr_f *)	hub_dmatrans_addr,
-	(xtalk_dmatrans_list_f *)	hub_dmatrans_list,
-	(xtalk_dmamap_drain_f *)	hub_dmamap_drain,
-	(xtalk_dmaaddr_drain_f *)	hub_dmaaddr_drain,
-	(xtalk_dmalist_drain_f *)	hub_dmalist_drain,
+	.dmamap_alloc	= (xtalk_dmamap_alloc_f *) hub_dmamap_alloc,
+	.dmamap_free	= (xtalk_dmamap_free_f *) hub_dmamap_free,
+	.dmamap_addr	= (xtalk_dmamap_addr_f *) hub_dmamap_addr,
+	.dmamap_done	= (xtalk_dmamap_done_f *) hub_dmamap_done,
+	.dmatrans_addr	= (xtalk_dmatrans_addr_f *) hub_dmatrans_addr,
+	.dmamap_drain	= (xtalk_dmamap_drain_f *) hub_dmamap_drain,
+	.dmaaddr_drain	= (xtalk_dmaaddr_drain_f *) hub_dmaaddr_drain,
 
-	(xtalk_intr_alloc_f *)		hub_intr_alloc,
-	(xtalk_intr_alloc_f *)		hub_intr_alloc_nothd,
-	(xtalk_intr_free_f *)		hub_intr_free,
-	(xtalk_intr_connect_f *)	hub_intr_connect,
-	(xtalk_intr_disconnect_f *)	hub_intr_disconnect,
-	(xtalk_provider_startup_f *)	hub_provider_startup,
-	(xtalk_provider_shutdown_f *)	hub_provider_shutdown,
+	.intr_alloc	= (xtalk_intr_alloc_f *) hub_intr_alloc,
+	.intr_alloc_nothd = (xtalk_intr_alloc_f *) hub_intr_alloc_nothd,
+	.intr_free	= (xtalk_intr_free_f *)	hub_intr_free,
+	.intr_connect	= (xtalk_intr_connect_f *) hub_intr_connect,
+	.intr_disconnect = (xtalk_intr_disconnect_f *) hub_intr_disconnect,
+	.provider_startup = (xtalk_provider_startup_f *) hub_provider_startup,
+	.provider_shutdown = (xtalk_provider_shutdown_f *) hub_provider_shutdown,
 };

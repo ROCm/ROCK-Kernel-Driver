@@ -98,14 +98,14 @@ int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp)
 	if (!len)
 	    return 0;
 	if (!(cmap->red = kmalloc(size, GFP_ATOMIC)))
-	    return -1;
+	    goto fail;
 	if (!(cmap->green = kmalloc(size, GFP_ATOMIC)))
-	    return -1;
+	    goto fail;
 	if (!(cmap->blue = kmalloc(size, GFP_ATOMIC)))
-	    return -1;
+	    goto fail;
 	if (transp) {
 	    if (!(cmap->transp = kmalloc(size, GFP_ATOMIC)))
-		return -1;
+		goto fail;
 	} else
 	    cmap->transp = NULL;
     }
@@ -113,6 +113,10 @@ int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp)
     cmap->len = len;
     fb_copy_cmap(fb_default_cmap(len), cmap, 0);
     return 0;
+
+fail:
+    fb_dealloc_cmap(cmap);
+    return -1;
 }
 
 /**
@@ -126,14 +130,10 @@ int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp)
 
 void fb_dealloc_cmap(struct fb_cmap *cmap)
 {
-	if (cmap->red)
-		kfree(cmap->red);
-	if (cmap->green)
-		kfree(cmap->green);
-	if (cmap->blue)
-		kfree(cmap->blue);
-	if (cmap->transp)
-		kfree(cmap->transp);
+	kfree(cmap->red);
+	kfree(cmap->green);
+	kfree(cmap->blue);
+	kfree(cmap->transp);
 
 	cmap->red = cmap->green = cmap->blue = cmap->transp = NULL;
 	cmap->len = 0;

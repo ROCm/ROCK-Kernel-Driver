@@ -103,7 +103,7 @@ static struct board_type products[] = {
 /*define how many times we will try a command because of bus resets */
 #define MAX_CMD_RETRIES 3
 
-#define READ_AHEAD 	 128
+#define READ_AHEAD 	 256
 #define NR_CMDS		 384 /* #commands that can be outstanding */
 #define MAX_CTLR 8
 
@@ -2501,6 +2501,7 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 	if (!q)
 		goto clean4;
 
+	q->backing_dev_info.ra_pages = READ_AHEAD;
 	hba[i]->queue = q;
 	q->queuedata = hba[i];
 

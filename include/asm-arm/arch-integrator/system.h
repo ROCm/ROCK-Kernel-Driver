@@ -21,7 +21,7 @@
 #ifndef __ASM_ARCH_SYSTEM_H
 #define __ASM_ARCH_SYSTEM_H
 
-#include <asm/arch/platform.h>
+#include <asm/arch/cm.h>
 
 static inline void arch_idle(void)
 {
@@ -34,16 +34,11 @@ static inline void arch_idle(void)
 
 static inline void arch_reset(char mode)
 {
-	unsigned int hdr_ctrl =	(IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_CTRL_OFFSET);
-	unsigned int val;
-
 	/*
 	 * To reset, we hit the on-board reset register
 	 * in the system FPGA
 	 */
-	val = __raw_readl(hdr_ctrl);
-	val |= INTEGRATOR_HDR_CTRL_RESET;
-	__raw_writel(val, hdr_ctrl);
+	cm_control(CM_CTRL_RESET, CM_CTRL_RESET);
 }
 
 #endif

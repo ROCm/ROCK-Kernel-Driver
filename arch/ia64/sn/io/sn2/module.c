@@ -200,7 +200,7 @@ io_module_init(void)
 	board = find_lboard_nasid((lboard_t *) KL_CONFIG_INFO(nasid), nasid, KLTYPE_SNIA);
 	ASSERT(board);
 
-	HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, NULL, NULL, "Found Shub lboard 0x%lx nasid 0x%x cnode 0x%x \n", (unsigned long)board, (int)nasid, (int)node));
+	HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, NULL, NULL, "Found Shub lboard 0x%lx nasid 0x%x cnode 0x%x \n", (unsigned long)board, (int)nasid, (int)node);
 
 	m = module_add_node(board->brd_geoid, node);
 	if (! m->snum_valid && module_probe_snum(m, nasid, nasid))
@@ -219,7 +219,7 @@ io_module_init(void)
 				nasid, KLTYPE_SNIA);
 	ASSERT(board);
 
-	HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, NULL, NULL, "Found headless/memless lboard 0x%lx node %d nasid %d cnode %d\n", (unsigned long)board, node, (int)nasid, (int)node));
+	HWGRAPH_DEBUG(__FILE__, __FUNCTION__, __LINE__, NULL, NULL, "Found headless/memless lboard 0x%lx node %d nasid %d cnode %d\n", (unsigned long)board, node, (int)nasid, (int)node);
 
         m = module_add_node(board->brd_geoid, node);
 

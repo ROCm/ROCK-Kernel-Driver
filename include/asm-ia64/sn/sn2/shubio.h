@@ -3385,7 +3385,6 @@ typedef ii_icrb0_e_u_t icrbe_t;
 #define IO_PERF_SETS	32
 
 #if __KERNEL__
-#include <asm/sn/alenlist.h>
 #include <asm/sn/dmamap.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/xtalk/xtalk.h>
@@ -3530,11 +3529,6 @@ hub_dmamap_addr(        hub_dmamap_t dmamap,    /* use mapping resources */
                         paddr_t paddr,          /* map for this address */
                         size_t byte_count);     /* map this many bytes */
 
-extern alenlist_t
-hub_dmamap_list(        hub_dmamap_t dmamap,    /* use mapping resources */
-                        alenlist_t alenlist,    /* map this Addr/Length List */
-                        unsigned flags);
-
 extern void
 hub_dmamap_done(        hub_dmamap_t dmamap);   /* done w/ mapping resources */
 
@@ -3545,12 +3539,6 @@ hub_dmatrans_addr(      vertex_hdl_t dev,       /* translate for this device */
                         size_t byte_count,      /* length */
                         unsigned flags);                /* defined in dma.h */
 
-extern alenlist_t
-hub_dmatrans_list(      vertex_hdl_t dev,       /* translate for this device */
-                        device_desc_t dev_desc, /* device descriptor */
-                        alenlist_t palenlist,   /* system addr/length list */
-                        unsigned flags);                /* defined in dma.h */
-
 extern void
 hub_dmamap_drain(       hub_dmamap_t map);
 
@@ -3558,10 +3546,6 @@ extern void
 hub_dmaaddr_drain(      vertex_hdl_t vhdl,
                         paddr_t addr,
                         size_t bytes);
-
-extern void
-hub_dmalist_drain(      vertex_hdl_t vhdl,
-                        alenlist_t list);
 
 
 /* INTERRUPT MANAGEMENT */

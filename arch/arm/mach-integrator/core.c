@@ -11,10 +11,13 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/device.h>
+#include <linux/spinlock.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
+#include <asm/io.h>
 #include <asm/hardware/amba.h>
+#include <asm/arch/cm.h>
 
 static struct amba_device rtc_device = {
 	.dev		= {
@@ -25,7 +28,7 @@ static struct amba_device rtc_device = {
 		.end	= INTEGRATOR_RTC_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_RTCINT,
+	.irq		= { IRQ_RTCINT, NO_IRQ },
 	.periphid	= 0x00041030,
 };
 
@@ -38,7 +41,7 @@ static struct amba_device uart0_device = {
 		.end	= INTEGRATOR_UART0_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_UARTINT0,
+	.irq		= { IRQ_UARTINT0, NO_IRQ },
 	.periphid	= 0x0041010,
 };
 
@@ -51,7 +54,7 @@ static struct amba_device uart1_device = {
 		.end	= INTEGRATOR_UART1_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_UARTINT1,
+	.irq		= { IRQ_UARTINT1, NO_IRQ },
 	.periphid	= 0x0041010,
 };
 
@@ -64,7 +67,7 @@ static struct amba_device kmi0_device = {
 		.end	= KMI0_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_KMIINT0,
+	.irq		= { IRQ_KMIINT0, NO_IRQ },
 	.periphid	= 0x00041050,
 };
 
@@ -77,7 +80,7 @@ static struct amba_device kmi1_device = {
 		.end	= KMI1_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-	.irq		= IRQ_KMIINT1,
+	.irq		= { IRQ_KMIINT1, NO_IRQ },
 	.periphid	= 0x00041050,
 };
 
@@ -102,3 +105,25 @@ static int __init integrator_init(void)
 }
 
 arch_initcall(integrator_init);
+
+#define CM_CTRL	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_CTRL_OFFSET
+
+static spinlock_t cm_lock;
+
+/**
+ * cm_control - update the CM_CTRL register.
+ * @mask: bits to change
+ * @set: bits to set
+ */
+void cm_control(u32 mask, u32 set)
+{
+	unsigned long flags;
+	u32 val;
+
+	spin_lock_irqsave(&cm_lock, flags);
+	val = readl(CM_CTRL) & ~mask;
+	writel(val | set, CM_CTRL);
+	spin_unlock_irqrestore(&cm_lock, flags);
+}
+
+EXPORT_SYMBOL(cm_control);

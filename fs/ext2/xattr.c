@@ -741,25 +741,24 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 	if (header) {
 		new_bh = ext2_xattr_cache_find(inode, header);
 		if (new_bh) {
-			/*
-			 * We found an identical block in the cache. The
-			 * block returned is locked. The old block will
-			 * be released after updating the inode.
-			 */
-			ea_bdebug(new_bh, "%s block %lu",
-				(old_bh == new_bh) ? "keeping" : "reusing",
-				(unsigned long) new_bh->b_blocknr);
-			
-			error = -EDQUOT;
-			if (DQUOT_ALLOC_BLOCK(inode, 1)) {
-				unlock_buffer(new_bh);
-				goto cleanup;
+			/* We found an identical block in the cache. */
+			if (new_bh == old_bh) {
+				ea_bdebug(new_bh, "keeping this block");
+			} else {
+				/* The old block is released after updating
+				   the inode.  */
+				ea_bdebug(new_bh, "reusing block");
+
+				error = -EDQUOT;
+				if (DQUOT_ALLOC_BLOCK(inode, 1)) {
+					unlock_buffer(new_bh);
+					goto cleanup;
+				}
+				HDR(new_bh)->h_refcount = cpu_to_le32(1 +
+					le32_to_cpu(HDR(new_bh)->h_refcount));
+				ea_bdebug(new_bh, "refcount now=%d",
+					le32_to_cpu(HDR(new_bh)->h_refcount));
 			}
-			
-			HDR(new_bh)->h_refcount = cpu_to_le32(
-				le32_to_cpu(HDR(new_bh)->h_refcount) + 1);
-			ea_bdebug(new_bh, "refcount now=%d",
-				le32_to_cpu(HDR(new_bh)->h_refcount));
 			unlock_buffer(new_bh);
 		} else if (old_bh && header == HDR(old_bh)) {
 			/* Keep this block. No need to lock the block as we

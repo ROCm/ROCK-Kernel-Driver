@@ -119,10 +119,6 @@ extern iopaddr_t	pcibr_dmamap_addr(pcibr_dmamap_t dmamap,
 					  paddr_t paddr,
 					  size_t byte_count);
 
-extern alenlist_t	pcibr_dmamap_list(pcibr_dmamap_t dmamap,
-					  alenlist_t palenlist,
-					  unsigned flags);
-
 extern void		pcibr_dmamap_done(pcibr_dmamap_t dmamap);
 
 /*
@@ -139,19 +135,11 @@ extern iopaddr_t	pcibr_dmatrans_addr(vertex_hdl_t dev,
 					    size_t byte_count,
 					    unsigned flags);
 
-extern alenlist_t	pcibr_dmatrans_list(vertex_hdl_t dev,
-					    device_desc_t dev_desc,
-					    alenlist_t palenlist,
-					    unsigned flags);
-
 extern void		pcibr_dmamap_drain(pcibr_dmamap_t map);
 
 extern void		pcibr_dmaaddr_drain(vertex_hdl_t vhdl,
 					    paddr_t addr,
 					    size_t bytes);
-
-extern void		pcibr_dmalist_drain(vertex_hdl_t vhdl,
-					    alenlist_t list);
 
 typedef unsigned	pcibr_intr_ibit_f(pciio_info_t info,
 					  pciio_intr_line_t lines);

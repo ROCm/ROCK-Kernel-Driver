@@ -805,7 +805,6 @@ pciio_provider_t        pci_pic_provider =
     (pciio_dmatrans_addr_f *) pcibr_dmatrans_addr,
     (pciio_dmamap_drain_f *) pcibr_dmamap_drain,
     (pciio_dmaaddr_drain_f *) pcibr_dmaaddr_drain,
-    (pciio_dmalist_drain_f *) pcibr_dmalist_drain,
 
     (pciio_intr_alloc_f *) pcibr_intr_alloc,
     (pciio_intr_free_f *) pcibr_intr_free,

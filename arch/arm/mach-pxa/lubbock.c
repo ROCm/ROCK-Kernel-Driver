@@ -119,8 +119,34 @@ static struct platform_device sa1111_device = {
 	.resource	= sa1111_resources,
 };
 
+static struct resource smc91x_resources[] = {
+	[0] = {
+		.start	= 0x0c000000,
+		.end	= 0x0c0fffff,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= LUBBOCK_ETH_IRQ,
+		.end	= LUBBOCK_ETH_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[2] = {
+		.start	= 0x0e000000,
+		.end	= 0x0e0fffff,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device smc91x_device = {
+	.name		= "smc91x",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(smc91x_resources),
+	.resource	= smc91x_resources,
+};
+
 static struct platform_device *devices[] __initdata = {
 	&sa1111_device,
+	&smc91x_device,
 };
 
 static void __init lubbock_init(void)

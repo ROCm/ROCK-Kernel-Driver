@@ -25,6 +25,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/vio.h>
 #include <asm/hvcall.h>
+#include "open_pic.h"
 
 #define DBGENTER() pr_debug("%s entered\n", __FUNCTION__)
 
@@ -244,7 +245,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 	viodev->irq = (unsigned int) -1;
 	irq_p = (unsigned int *)get_property(of_node, "interrupts", 0);
 	if (irq_p) {
-		viodev->irq = irq_offset_up(*irq_p);
+		viodev->irq = openpic_to_irq(virt_irq_create_mapping(*irq_p));
 	}
 
 	/* init generic 'struct device' fields: */

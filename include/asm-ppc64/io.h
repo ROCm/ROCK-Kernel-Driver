@@ -34,6 +34,15 @@ extern unsigned long isa_io_base;
 extern unsigned long pci_io_base;
 
 #ifdef CONFIG_PPC_ISERIES
+/* __raw_* accessors aren't supported on iSeries */
+#define __raw_readb(addr)	{ BUG(); 0; }
+#define __raw_readw(addr)       { BUG(); 0; }
+#define __raw_readl(addr)       { BUG(); 0; }
+#define __raw_readq(addr)       { BUG(); 0; }
+#define __raw_writeb(v, addr)   { BUG(); 0; }
+#define __raw_writew(v, addr)   { BUG(); 0; }
+#define __raw_writel(v, addr)   { BUG(); 0; }
+#define __raw_writeq(v, addr)   { BUG(); 0; }
 #define readb(addr)		iSeries_Read_Byte((void*)(addr))  
 #define readw(addr)		iSeries_Read_Word((void*)(addr))  
 #define readl(addr)		iSeries_Read_Long((void*)(addr))
@@ -50,12 +59,22 @@ extern unsigned long pci_io_base;
 #define outw(data,addr)		writew(data,((unsigned long)(addr)))  
 #define outl(data,addr)		writel(data,((unsigned long)(addr)))
 #else
+#define __raw_readb(addr)       (*(volatile unsigned char *)(addr))
+#define __raw_readw(addr)       (*(volatile unsigned short *)(addr))
+#define __raw_readl(addr)       (*(volatile unsigned int *)(addr))
+#define __raw_readq(addr)       (*(volatile unsigned long *)(addr))
+#define __raw_writeb(v, addr)   (*(volatile unsigned char *)(addr) = (v))
+#define __raw_writew(v, addr)   (*(volatile unsigned short *)(addr) = (v))
+#define __raw_writel(v, addr)   (*(volatile unsigned int *)(addr) = (v))
+#define __raw_writeq(v, addr)   (*(volatile unsigned long *)(addr) = (v))
 #define readb(addr)		eeh_readb((void*)(addr))  
 #define readw(addr)		eeh_readw((void*)(addr))  
 #define readl(addr)		eeh_readl((void*)(addr))
+#define readq(addr)		eeh_readq((void*)(addr))
 #define writeb(data, addr)	eeh_writeb((data), ((void*)(addr)))
 #define writew(data, addr)	eeh_writew((data), ((void*)(addr)))
 #define writel(data, addr)	eeh_writel((data), ((void*)(addr)))
+#define writeq(data, addr)	eeh_writeq((data), ((void*)(addr)))
 #define memset_io(a,b,c)	eeh_memset_io((void *)(a),(b),(c))
 #define memcpy_fromio(a,b,c)	eeh_memcpy_fromio((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	eeh_memcpy_toio((void *)(a),(b),(c))
@@ -82,6 +101,7 @@ extern unsigned long pci_io_base;
 #define readb_relaxed(addr) readb(addr)
 #define readw_relaxed(addr) readw(addr)
 #define readl_relaxed(addr) readl(addr)
+#define readq_relaxed(addr) readq(addr)
 
 extern void _insb(volatile u8 *port, void *buf, int ns);
 extern void _outsb(volatile u8 *port, const void *buf, int ns);
@@ -186,21 +206,22 @@ static inline int in_8(volatile unsigned char *addr)
 {
 	int ret;
 
-	__asm__ __volatile__("eieio; lbz%U1%X1 %0,%1" : "=r" (ret) : "m" (*addr));
+	__asm__ __volatile__("lbz%U1%X1 %0,%1; twi 0,%0,0; isync" :
+			     "=r" (ret) : "m" (*addr));
 	return ret;
 }
 
 static inline void out_8(volatile unsigned char *addr, int val)
 {
-	__asm__ __volatile__("stb%U0%X0 %1,%0" : "=m" (*addr) : "r" (val));
+	__asm__ __volatile__("stb%U0%X0 %1,%0; eieio" : "=m" (*addr) : "r" (val));
 }
 
 static inline int in_le16(volatile unsigned short *addr)
 {
 	int ret;
 
-	__asm__ __volatile__("eieio; lhbrx %0,0,%1" : "=r" (ret) :
-			      "r" (addr), "m" (*addr));
+	__asm__ __volatile__("lhbrx %0,0,%1; twi 0,%0,0; isync" :
+			     "=r" (ret) : "r" (addr), "m" (*addr));
 	return ret;
 }
 
@@ -208,27 +229,28 @@ static inline int in_be16(volatile unsigned short *addr)
 {
 	int ret;
 
-	__asm__ __volatile__("eieio; lhz%U1%X1 %0,%1" : "=r" (ret) : "m" (*addr));
+	__asm__ __volatile__("lhz%U1%X1 %0,%1; twi 0,%0,0; isync" :
+			     "=r" (ret) : "m" (*addr));
 	return ret;
 }
 
 static inline void out_le16(volatile unsigned short *addr, int val)
 {
-	__asm__ __volatile__("sthbrx %1,0,%2" : "=m" (*addr) :
+	__asm__ __volatile__("sthbrx %1,0,%2; eieio" : "=m" (*addr) :
 			      "r" (val), "r" (addr));
 }
 
 static inline void out_be16(volatile unsigned short *addr, int val)
 {
-	__asm__ __volatile__("sth%U0%X0 %1,%0" : "=m" (*addr) : "r" (val));
+	__asm__ __volatile__("sth%U0%X0 %1,%0; eieio" : "=m" (*addr) : "r" (val));
 }
 
 static inline unsigned in_le32(volatile unsigned *addr)
 {
 	unsigned ret;
 
-	__asm__ __volatile__("eieio; lwbrx %0,0,%1" : "=r" (ret) :
-			     "r" (addr), "m" (*addr));
+	__asm__ __volatile__("lwbrx %0,0,%1; twi 0,%0,0; isync" :
+			     "=r" (ret) : "r" (addr), "m" (*addr));
 	return ret;
 }
 
@@ -236,19 +258,70 @@ static inline unsigned in_be32(volatile unsigned *addr)
 {
 	unsigned ret;
 
-	__asm__ __volatile__("eieio; lwz%U1%X1 %0,%1" : "=r" (ret) : "m" (*addr));
+	__asm__ __volatile__("lwz%U1%X1 %0,%1; twi 0,%0,0; isync" :
+			     "=r" (ret) : "m" (*addr));
 	return ret;
 }
 
 static inline void out_le32(volatile unsigned *addr, int val)
 {
-	__asm__ __volatile__("stwbrx %1,0,%2" : "=m" (*addr) :
+	__asm__ __volatile__("stwbrx %1,0,%2; eieio" : "=m" (*addr) :
 			     "r" (val), "r" (addr));
 }
 
 static inline void out_be32(volatile unsigned *addr, int val)
 {
-	__asm__ __volatile__("stw%U0%X0 %1,%0" : "=m" (*addr) : "r" (val));
+	__asm__ __volatile__("stw%U0%X0 %1,%0; eieio" : "=m" (*addr) : "r" (val));
+}
+
+static inline unsigned long in_le64(volatile unsigned long *addr)
+{
+	unsigned long tmp, ret;
+
+	__asm__ __volatile__(
+			     "ld %1,0(%2)\n"
+			     "twi 0,%1,0\n"
+			     "isync\n"
+			     "rldimi %0,%1,5*8,1*8\n"
+			     "rldimi %0,%1,3*8,2*8\n"
+			     "rldimi %0,%1,1*8,3*8\n"
+			     "rldimi %0,%1,7*8,4*8\n"
+			     "rldicl %1,%1,32,0\n"
+			     "rlwimi %0,%1,8,8,31\n"
+			     "rlwimi %0,%1,24,16,23\n"
+			     : "=r" (ret), "=r" (tmp) : "b" (addr) , "m" (*addr));
+	return ret;
+}
+
+static inline unsigned long in_be64(volatile unsigned long *addr)
+{
+	unsigned long ret;
+
+	__asm__ __volatile__("ld %0,0(%1); twi 0,%0,0; isync" :
+			     "=r" (ret) : "m" (*addr));
+	return ret;
+}
+
+static inline void out_le64(volatile unsigned long *addr, int val)
+{
+	unsigned long tmp;
+
+	__asm__ __volatile__(
+			     "rldimi %0,%1,5*8,1*8\n"
+			     "rldimi %0,%1,3*8,2*8\n"
+			     "rldimi %0,%1,1*8,3*8\n"
+			     "rldimi %0,%1,7*8,4*8\n"
+			     "rldicl %1,%1,32,0\n"
+			     "rlwimi %0,%1,8,8,31\n"
+			     "rlwimi %0,%1,24,16,23\n"
+			     "std %0,0(%2)\n"
+			     "eieio\n"
+			     : "=r" (tmp) : "r" (val), "b" (addr) , "m" (*addr));
+}
+
+static inline void out_be64(volatile unsigned long *addr, int val)
+{
+	__asm__ __volatile__("std %1,0(%0); eieio" : "=m" (*addr) : "r" (val));
 }
 
 #ifndef CONFIG_PPC_ISERIES 

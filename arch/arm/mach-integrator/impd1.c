@@ -188,7 +188,8 @@ static int impd1_probe(struct lm_device *dev)
 		d->res.start	= dev->resource.start + idev->offset;
 		d->res.end	= d->res.start + SZ_4K - 1;
 		d->res.flags	= IORESOURCE_MEM;
-		d->irq		= dev->irq;
+		d->irq[0]	= dev->irq;
+		d->irq[1]	= dev->irq;
 		d->periphid	= idev->id;
 
 		ret = amba_device_register(d, &dev->resource);

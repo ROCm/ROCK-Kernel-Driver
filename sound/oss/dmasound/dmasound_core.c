@@ -218,6 +218,10 @@ static int state_unit = -1;
 static int irq_installed;
 #endif /* MODULE */
 
+/* software implemented recording volume! */
+uint software_input_volume = SW_INPUT_VOLUME_SCALE * SW_INPUT_VOLUME_DEFAULT;
+EXPORT_SYMBOL(software_input_volume);
+
 /* control over who can modify resources shared between play/record */
 static mode_t shared_resource_owner;
 static int shared_resources_initialised;
@@ -237,6 +241,7 @@ static inline int sound_set_format(int format)
 {
 	return dmasound.mach.setFormat(format);
 }
+
 
 static int sound_set_speed(int speed)
 {
@@ -1264,15 +1269,13 @@ static int sq_ioctl(struct inode *inode, struct file *file, u_int cmd,
 			result = IOCTL_OUT(arg, format);
 			if (result < 0)
 				return result;
-			if (format != data)
+			if (format != data && data != AFMT_QUERY)
 				return -EINVAL;
 			return 0;
 		} else
 			return -EINVAL ;
-		break ;
 	case SNDCTL_DSP_SUBDIVIDE:
 		return -EINVAL ;
-		break;
 	case SNDCTL_DSP_SETFRAGMENT:
 		/* we can do this independently for the two queues - with the
 		   proviso that for fds opened O_RDWR we cannot separate the
