@@ -556,6 +556,264 @@ static u32 radeon_cp_microcode[][2] = {
 	{ 0000000000, 0000000000 },
 };
 
+static u32 R300_cp_microcode[][2] = {
+	{ 0x4200e000, 0000000000 },
+	{ 0x4000e000, 0000000000 },
+	{ 0x000000af, 0x00000008 },
+	{ 0x000000b3, 0x00000008 },
+	{ 0x6c5a504f, 0000000000 },
+	{ 0x4f4f497a, 0000000000 },
+	{ 0x5a578288, 0000000000 },
+	{ 0x4f91906a, 0000000000 },
+	{ 0x4f4f4f4f, 0000000000 },
+	{ 0x4fe24f44, 0000000000 },
+	{ 0x4f9c9c9c, 0000000000 },
+	{ 0xdc4f4fde, 0000000000 },
+	{ 0xa1cd4f4f, 0000000000 },
+	{ 0xd29d9d9d, 0000000000 },
+	{ 0x4f0f9fd7, 0000000000 },
+	{ 0x000ca000, 0x00000004 },
+	{ 0x000d0012, 0x00000038 },
+	{ 0x0000e8b4, 0x00000004 },
+	{ 0x000d0014, 0x00000038 },
+	{ 0x0000e8b6, 0x00000004 },
+	{ 0x000d0016, 0x00000038 },
+	{ 0x0000e854, 0x00000004 },
+	{ 0x000d0018, 0x00000038 },
+	{ 0x0000e855, 0x00000004 },
+	{ 0x000d001a, 0x00000038 },
+	{ 0x0000e856, 0x00000004 },
+	{ 0x000d001c, 0x00000038 },
+	{ 0x0000e857, 0x00000004 },
+	{ 0x000d001e, 0x00000038 },
+	{ 0x0000e824, 0x00000004 },
+	{ 0x000d0020, 0x00000038 },
+	{ 0x0000e825, 0x00000004 },
+	{ 0x000d0022, 0x00000038 },
+	{ 0x0000e830, 0x00000004 },
+	{ 0x000d0024, 0x00000038 },
+	{ 0x0000f0c0, 0x00000004 },
+	{ 0x000d0026, 0x00000038 },
+	{ 0x0000f0c1, 0x00000004 },
+	{ 0x000d0028, 0x00000038 },
+	{ 0x0000f041, 0x00000004 },
+	{ 0x000d002a, 0x00000038 },
+	{ 0x0000f184, 0x00000004 },
+	{ 0x000d002c, 0x00000038 },
+	{ 0x0000f185, 0x00000004 },
+	{ 0x000d002e, 0x00000038 },
+	{ 0x0000f186, 0x00000004 },
+	{ 0x000d0030, 0x00000038 },
+	{ 0x0000f187, 0x00000004 },
+	{ 0x000d0032, 0x00000038 },
+	{ 0x0000f180, 0x00000004 },
+	{ 0x000d0034, 0x00000038 },
+	{ 0x0000f393, 0x00000004 },
+	{ 0x000d0036, 0x00000038 },
+	{ 0x0000f38a, 0x00000004 },
+	{ 0x000d0038, 0x00000038 },
+	{ 0x0000f38e, 0x00000004 },
+	{ 0x0000e821, 0x00000004 },
+	{ 0x0140a000, 0x00000004 },
+	{ 0x00000043, 0x00000018 },
+	{ 0x00cce800, 0x00000004 },
+	{ 0x001b0001, 0x00000004 },
+	{ 0x08004800, 0x00000004 },
+	{ 0x001b0001, 0x00000004 },
+	{ 0x08004800, 0x00000004 },
+	{ 0x001b0001, 0x00000004 },
+	{ 0x08004800, 0x00000004 },
+	{ 0x0000003a, 0x00000008 },
+	{ 0x0000a000, 0000000000 },
+	{ 0x02c0a000, 0x00000004 },
+	{ 0x000ca000, 0x00000004 },
+	{ 0x00130000, 0x00000004 },
+	{ 0x000c2000, 0x00000004 },
+	{ 0xc980c045, 0x00000008 },
+	{ 0x2000451d, 0x00000004 },
+	{ 0x0000e580, 0x00000004 },
+	{ 0x000ce581, 0x00000004 },
+	{ 0x08004580, 0x00000004 },
+	{ 0x000ce581, 0x00000004 },
+	{ 0x0000004c, 0x00000008 },
+	{ 0x0000a000, 0000000000 },
+	{ 0x000c2000, 0x00000004 },
+	{ 0x0000e50e, 0x00000004 },
+	{ 0x00032000, 0x00000004 },
+	{ 0x00022056, 0x00000028 },
+	{ 0x00000056, 0x00000024 },
+	{ 0x0800450f, 0x00000004 },
+	{ 0x0000a050, 0x00000008 },
+	{ 0x0000e565, 0x00000004 },
+	{ 0x0000e566, 0x00000004 },
+	{ 0x00000057, 0x00000008 },
+	{ 0x03cca5b4, 0x00000004 },
+	{ 0x05432000, 0x00000004 },
+	{ 0x00022000, 0x00000004 },
+	{ 0x4ccce063, 0x00000030 },
+	{ 0x08274565, 0x00000004 },
+	{ 0x00000063, 0x00000030 },
+	{ 0x08004564, 0x00000004 },
+	{ 0x0000e566, 0x00000004 },
+	{ 0x0000005a, 0x00000008 },
+	{ 0x00802066, 0x00000010 },
+	{ 0x00202000, 0x00000004 },
+	{ 0x001b00ff, 0x00000004 },
+	{ 0x01000069, 0x00000010 },
+	{ 0x001f2000, 0x00000004 },
+	{ 0x001c00ff, 0x00000004 },
+	{ 0000000000, 0x0000000c },
+	{ 0x00000085, 0x00000030 },
+	{ 0x0000005a, 0x00000008 },
+	{ 0x0000e576, 0x00000004 },
+	{ 0x000ca000, 0x00000004 },
+	{ 0x00012000, 0x00000004 },
+	{ 0x00082000, 0x00000004 },
+	{ 0x1800650e, 0x00000004 },
+	{ 0x00092000, 0x00000004 },
+	{ 0x000a2000, 0x00000004 },
+	{ 0x000f0000, 0x00000004 },
+	{ 0x00400000, 0x00000004 },
+	{ 0x00000079, 0x00000018 },
+	{ 0x0000e563, 0x00000004 },
+	{ 0x00c0e5f9, 0x000000c2 },
+	{ 0x0000006e, 0x00000008 },
+	{ 0x0000a06e, 0x00000008 },
+	{ 0x0000e576, 0x00000004 },
+	{ 0x0000e577, 0x00000004 },
+	{ 0x0000e50e, 0x00000004 },
+	{ 0x0000e50f, 0x00000004 },
+	{ 0x0140a000, 0x00000004 },
+	{ 0x0000007c, 0x00000018 },
+	{ 0x00c0e5f9, 0x000000c2 },
+	{ 0x0000007c, 0x00000008 },
+	{ 0x0014e50e, 0x00000004 },
+	{ 0x0040e50f, 0x00000004 },
+	{ 0x00c0007f, 0x00000008 },
+	{ 0x0000e570, 0x00000004 },
+	{ 0x0000e571, 0x00000004 },
+	{ 0x0000e572, 0x0000000c },
+	{ 0x0000a000, 0x00000004 },
+	{ 0x0140a000, 0x00000004 },
+	{ 0x0000e568, 0x00000004 },
+	{ 0x000c2000, 0x00000004 },
+	{ 0x00000089, 0x00000018 },
+	{ 0x000b0000, 0x00000004 },
+	{ 0x18c0e562, 0x00000004 },
+	{ 0x0000008b, 0x00000008 },
+	{ 0x00c0008a, 0x00000008 },
+	{ 0x000700e4, 0x00000004 },
+	{ 0x00000097, 0x00000038 },
+	{ 0x000ca099, 0x00000030 },
+	{ 0x080045bb, 0x00000004 },
+	{ 0x000c209a, 0x00000030 },
+	{ 0x0800e5bc, 0000000000 },
+	{ 0x0000e5bb, 0x00000004 },
+	{ 0x0000e5bc, 0000000000 },
+	{ 0x00120000, 0x0000000c },
+	{ 0x00120000, 0x00000004 },
+	{ 0x001b0002, 0x0000000c },
+	{ 0x0000a000, 0x00000004 },
+	{ 0x0000e821, 0x00000004 },
+	{ 0x0000e800, 0000000000 },
+	{ 0x0000e821, 0x00000004 },
+	{ 0x0000e82e, 0000000000 },
+	{ 0x02cca000, 0x00000004 },
+	{ 0x00140000, 0x00000004 },
+	{ 0x000ce1cc, 0x00000004 },
+	{ 0x050de1cd, 0x00000004 },
+	{ 0x000000a7, 0x00000020 },
+	{ 0x4200e000, 0000000000 },
+	{ 0x000000ae, 0x00000038 },
+	{ 0x000ca000, 0x00000004 },
+	{ 0x00140000, 0x00000004 },
+	{ 0x000c2000, 0x00000004 },
+	{ 0x00160000, 0x00000004 },
+	{ 0x700ce000, 0x00000004 },
+	{ 0x001400aa, 0x00000008 },
+	{ 0x4000e000, 0000000000 },
+	{ 0x02400000, 0x00000004 },
+	{ 0x400ee000, 0x00000004 },
+	{ 0x02400000, 0x00000004 },
+	{ 0x4000e000, 0000000000 },
+	{ 0x000c2000, 0x00000004 },
+	{ 0x0240e51b, 0x00000004 },
+	{ 0x0080e50a, 0x00000005 },
+	{ 0x0080e50b, 0x00000005 },
+	{ 0x00220000, 0x00000004 },
+	{ 0x000700e4, 0x00000004 },
+	{ 0x000000c1, 0x00000038 },
+	{ 0x000c209a, 0x00000030 },
+	{ 0x0880e5bd, 0x00000005 },
+	{ 0x000c2099, 0x00000030 },
+	{ 0x0800e5bb, 0x00000005 },
+	{ 0x000c209a, 0x00000030 },
+	{ 0x0880e5bc, 0x00000005 },
+	{ 0x000000c4, 0x00000008 },
+	{ 0x0080e5bd, 0x00000005 },
+	{ 0x0000e5bb, 0x00000005 },
+	{ 0x0080e5bc, 0x00000005 },
+	{ 0x00210000, 0x00000004 },
+	{ 0x02800000, 0x00000004 },
+	{ 0x00c000c8, 0x00000018 },
+	{ 0x4180e000, 0x00000040 },
+	{ 0x000000ca, 0x00000024 },
+	{ 0x01000000, 0x0000000c },
+	{ 0x0100e51d, 0x0000000c },
+	{ 0x000045bb, 0x00000004 },
+	{ 0x000080c4, 0x00000008 },
+	{ 0x0000f3ce, 0x00000004 },
+	{ 0x0140a000, 0x00000004 },
+	{ 0x00cc2000, 0x00000004 },
+	{ 0x08c053cf, 0x00000040 },
+	{ 0x00008000, 0000000000 },
+	{ 0x0000f3d2, 0x00000004 },
+	{ 0x0140a000, 0x00000004 },
+	{ 0x00cc2000, 0x00000004 },
+	{ 0x08c053d3, 0x00000040 },
+	{ 0x00008000, 0000000000 },
+	{ 0x0000f39d, 0x00000004 },
+	{ 0x0140a000, 0x00000004 },
+	{ 0x00cc2000, 0x00000004 },
+	{ 0x08c0539e, 0x00000040 },
+	{ 0x00008000, 0000000000 },
+	{ 0x03c00830, 0x00000004 },
+	{ 0x4200e000, 0000000000 },
+	{ 0x0000a000, 0x00000004 },
+	{ 0x200045e0, 0x00000004 },
+	{ 0x0000e5e1, 0000000000 },
+	{ 0x00000001, 0000000000 },
+	{ 0x000700e1, 0x00000004 },
+	{ 0x0800e394, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+	{ 0000000000, 0000000000 },
+};
 
 int RADEON_READ_PLL(drm_device_t *dev, int addr)
 {
@@ -680,8 +938,7 @@ static void radeon_cp_load_microcode( drm_radeon_private_t *dev_priv )
 
 	RADEON_WRITE( RADEON_CP_ME_RAM_ADDR, 0 );
 
-	if (dev_priv->is_r200)
-	{
+	if (dev_priv->microcode_version==UCODE_R200) {
 		DRM_INFO("Loading R200 Microcode\n");
 		for ( i = 0 ; i < 256 ; i++ ) 
 		{
@@ -690,9 +947,16 @@ static void radeon_cp_load_microcode( drm_radeon_private_t *dev_priv )
 			RADEON_WRITE( RADEON_CP_ME_RAM_DATAL,
 				      R200_cp_microcode[i][0] );
 		}
-	}
-	else
-	{
+	} else if (dev_priv->microcode_version==UCODE_R300) {
+		DRM_INFO("Loading R300 Microcode\n");
+		for ( i = 0 ; i < 256 ; i++ ) 
+		{
+			RADEON_WRITE( RADEON_CP_ME_RAM_DATAH,
+				      R300_cp_microcode[i][1] );
+			RADEON_WRITE( RADEON_CP_ME_RAM_DATAL,
+				      R300_cp_microcode[i][0] );
+		}
+	} else {
 		for ( i = 0 ; i < 256 ; i++ ) {
 			RADEON_WRITE( RADEON_CP_ME_RAM_DATAH,
 				      radeon_cp_microcode[i][1] );
@@ -1002,14 +1266,8 @@ static void radeon_set_pcigart( drm_radeon_private_t *dev_priv, int on )
 
 static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 {
-	drm_radeon_private_t *dev_priv;
+	drm_radeon_private_t *dev_priv = dev->dev_private;;
 	DRM_DEBUG( "\n" );
-
-	dev_priv = drm_alloc( sizeof(drm_radeon_private_t), DRM_MEM_DRIVER );
-	if ( dev_priv == NULL )
-		return DRM_ERR(ENOMEM);
-
-	memset( dev_priv, 0, sizeof(drm_radeon_private_t) );
 
 	dev_priv->is_pci = init->is_pci;
 
@@ -1029,7 +1287,17 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		return DRM_ERR(EINVAL);
 	}
 
-	dev_priv->is_r200 = (init->func == RADEON_INIT_R200_CP);
+	switch(init->func) {
+	case RADEON_INIT_R200_CP:
+		dev_priv->microcode_version=UCODE_R200;
+		break;
+	case RADEON_INIT_R300_CP:
+		dev_priv->microcode_version=UCODE_R300;
+		break;
+	default:
+		dev_priv->microcode_version=UCODE_R100;
+	}
+	
 	dev_priv->do_boxes = 0;
 	dev_priv->cp_mode = init->cp_mode;
 
@@ -1078,7 +1346,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	 */
 	dev_priv->depth_clear.rb3d_cntl = (RADEON_PLANE_MASK_ENABLE |
 					   (dev_priv->color_fmt << 10) |
-					   (1<<15));
+					   (dev_priv->microcode_version == UCODE_R100 ? RADEON_ZBLOCK16 : 0));
 
 	dev_priv->depth_clear.rb3d_zstencilcntl = 
 		(dev_priv->depth_fmt |
@@ -1272,6 +1540,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 
 int radeon_do_cleanup_cp( drm_device_t *dev )
 {
+	drm_radeon_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG( "\n" );
 
 	/* Make sure interrupts are disabled here because the uninstall ioctl
@@ -1280,30 +1549,28 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 	 */
 	if ( dev->irq_enabled ) drm_irq_uninstall(dev);
 
-	if ( dev->dev_private ) {
-		drm_radeon_private_t *dev_priv = dev->dev_private;
-
 #if __OS_HAS_AGP
-		if ( !dev_priv->is_pci ) {
-			if ( dev_priv->cp_ring != NULL )
-				drm_core_ioremapfree( dev_priv->cp_ring, dev );
-			if ( dev_priv->ring_rptr != NULL )
-				drm_core_ioremapfree( dev_priv->ring_rptr, dev );
-			if ( dev->agp_buffer_map != NULL )
-				drm_core_ioremapfree( dev->agp_buffer_map, dev );
-		} else
-#endif
+	if ( !dev_priv->is_pci ) {
+		if ( dev_priv->cp_ring != NULL )
+			drm_core_ioremapfree( dev_priv->cp_ring, dev );
+		if ( dev_priv->ring_rptr != NULL )
+			drm_core_ioremapfree( dev_priv->ring_rptr, dev );
+		if ( dev->agp_buffer_map != NULL )
 		{
-			if (!drm_ati_pcigart_cleanup( dev,
-						dev_priv->phys_pci_gart,
-						dev_priv->bus_pci_gart ))
-				DRM_ERROR( "failed to cleanup PCI GART!\n" );
+			drm_core_ioremapfree( dev->agp_buffer_map, dev );
+			dev->agp_buffer_map = NULL;
 		}
-
-		drm_free( dev->dev_private, sizeof(drm_radeon_private_t),
-			   DRM_MEM_DRIVER );
-		dev->dev_private = NULL;
+	} else
+#endif
+	{
+		if (!drm_ati_pcigart_cleanup( dev,
+					      dev_priv->phys_pci_gart,
+					      dev_priv->bus_pci_gart ))
+			DRM_ERROR( "failed to cleanup PCI GART!\n" );
 	}
+	
+	/* only clear to the start of flags */
+	memset(dev_priv, 0, offsetof(drm_radeon_private_t, flags));
 
 	return 0;
 }
@@ -1360,6 +1627,7 @@ int radeon_cp_init( DRM_IOCTL_ARGS )
 	switch ( init.func ) {
 	case RADEON_INIT_CP:
 	case RADEON_INIT_R200_CP:
+	case RADEON_INIT_R300_CP:
 		return radeon_do_init_cp( dev, &init );
 	case RADEON_CLEANUP_CP:
 		return radeon_do_cleanup_cp( dev );
@@ -1440,7 +1708,7 @@ int radeon_cp_stop( DRM_IOCTL_ARGS )
 void radeon_do_release( drm_device_t *dev )
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
-	int ret;
+	int i, ret;
 
 	if (dev_priv) {
 		if (dev_priv->cp_running) {
@@ -1458,7 +1726,16 @@ void radeon_do_release( drm_device_t *dev )
 		}
 
 		/* Disable *all* interrupts */
-		RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );
+		if (dev_priv->mmio)	/* remove this after permanent addmaps */
+			RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );
+
+		if (dev_priv->mmio) {/* remove all surfaces */
+			for (i = 0; i < RADEON_MAX_SURFACES; i++) {
+				RADEON_WRITE(RADEON_SURFACE0_INFO + 16*i, 0);
+				RADEON_WRITE(RADEON_SURFACE0_LOWER_BOUND + 16*i, 0);
+				RADEON_WRITE(RADEON_SURFACE0_UPPER_BOUND + 16*i, 0);
+			}
+		}
 
 		/* Free memory heap structures */
 		radeon_mem_takedown( &(dev_priv->gart_heap) );
@@ -1741,4 +2018,43 @@ int radeon_cp_buffers( DRM_IOCTL_ARGS )
 	DRM_COPY_TO_USER_IOCTL( argp, d, sizeof(d) );
 
 	return ret;
+}
+
+int radeon_driver_preinit(struct drm_device *dev, unsigned long flags)
+{
+	drm_radeon_private_t *dev_priv;
+	int ret = 0;
+
+	dev_priv = drm_alloc(sizeof(drm_radeon_private_t), DRM_MEM_DRIVER);
+	if (dev_priv == NULL)
+		return DRM_ERR(ENOMEM);
+
+	memset(dev_priv, 0, sizeof(drm_radeon_private_t));
+	dev->dev_private = (void *)dev_priv;
+	dev_priv->flags = flags;
+
+	switch (flags & CHIP_FAMILY_MASK) {
+	case CHIP_R100:
+	case CHIP_RV200:
+	case CHIP_R200:
+	case CHIP_R300:
+		dev_priv->flags |= CHIP_HAS_HIERZ;
+		break;
+	default:
+	/* all other chips have no hierarchical z buffer */
+		break;
+	}
+	return ret;
+}
+
+int radeon_driver_postcleanup(struct drm_device *dev)
+{
+	drm_radeon_private_t *dev_priv = dev->dev_private;
+
+	DRM_DEBUG("\n");
+
+	drm_free(dev_priv, sizeof(*dev_priv), DRM_MEM_DRIVER);
+
+	dev->dev_private = NULL;
+	return 0;
 }

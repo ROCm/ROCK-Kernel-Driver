@@ -42,6 +42,12 @@
 #define DRIVER_DESC		"ATI Rage 128"
 #define DRIVER_DATE		"20030725"
 
+/* Interface history:
+ *
+ * ??  - ??
+ * 2.4 - Add support for ycbcr textures (no new ioctls)
+ * 2.5 - Add FLIP ioctl, disable FULLSCREEN.
+ */
 #define DRIVER_MAJOR		2
 #define DRIVER_MINOR		5
 #define DRIVER_PATCHLEVEL	0

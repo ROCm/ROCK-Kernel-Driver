@@ -74,18 +74,8 @@ static struct pci_device_id pciidlist[] = {
 	mga_PCI_IDS
 };
 
-static drm_ioctl_desc_t ioctls[] = {
-	[DRM_IOCTL_NR(DRM_MGA_INIT)]    = { mga_dma_init,    1, 1 },
-	[DRM_IOCTL_NR(DRM_MGA_FLUSH)]   = { mga_dma_flush,   1, 0 },
-	[DRM_IOCTL_NR(DRM_MGA_RESET)]   = { mga_dma_reset,   1, 0 },
-	[DRM_IOCTL_NR(DRM_MGA_SWAP)]    = { mga_dma_swap,    1, 0 },
-	[DRM_IOCTL_NR(DRM_MGA_CLEAR)]   = { mga_dma_clear,   1, 0 },
-	[DRM_IOCTL_NR(DRM_MGA_VERTEX)]  = { mga_dma_vertex,  1, 0 },
-	[DRM_IOCTL_NR(DRM_MGA_INDICES)] = { mga_dma_indices, 1, 0 },
-	[DRM_IOCTL_NR(DRM_MGA_ILOAD)]   = { mga_dma_iload,   1, 0 },
-	[DRM_IOCTL_NR(DRM_MGA_BLIT)]    = { mga_dma_blit,    1, 0 },
-	[DRM_IOCTL_NR(DRM_MGA_GETPARAM)]= { mga_getparam,    1, 0 },
-};
+extern drm_ioctl_desc_t mga_ioctls[];
+extern int mga_max_ioctl;
 
 static struct drm_driver driver = {
 	.driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL,
@@ -101,8 +91,7 @@ static struct drm_driver driver = {
 	.get_reg_ofs = drm_core_get_reg_ofs,
 	.postinit = postinit,
 	.version = version,
-	.ioctls = ioctls,
-	.num_ioctls = DRM_ARRAY_SIZE(ioctls),
+	.ioctls = mga_ioctls,
 	.dma_ioctl = mga_dma_buffers,
 	.fops = {
 		.owner = THIS_MODULE,
@@ -121,6 +110,7 @@ static struct drm_driver driver = {
 
 static int __init mga_init(void)
 {
+	driver.num_ioctls = mga_max_ioctl;
 	return drm_init(&driver);
 }
 
