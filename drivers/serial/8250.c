@@ -31,8 +31,8 @@
 #include <linux/console.h>
 #include <linux/sysrq.h>
 #include <linux/serial_reg.h>
-#include <linux/serialP.h>
 #include <linux/serial.h>
+#include <linux/serialP.h>
 #include <linux/delay.h>
 
 #include <asm/io.h>
@@ -1635,7 +1635,7 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	if (up->port.type != PORT_RSA && res_rsa)
 		release_resource(res_rsa);
 
-	if (up->port.type == PORT_UNKNOWN)
+	if (up->port.type == PORT_UNKNOWN && res_std)
 		release_resource(res_std);
 }
 
