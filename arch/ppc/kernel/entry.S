@@ -173,8 +173,10 @@ _GLOBAL(DoSyscall)
 	cmpli	0,r0,NR_syscalls
 	bge-	66f
 	rlwinm	r10,r1,0,0,18	/* current_thread_info() */
-	lwz	r10,TI_FLAGS(r10)
-	andi.	r10,r10,_TIF_SYSCALL_TRACE
+	lwz	r11,TI_FLAGS(r10)
+	rlwinm	r11,r11,0,~_TIF_FORCE_NOERROR
+	stw	r11,TI_FLAGS(r10)
+	andi.	r11,r11,_TIF_SYSCALL_TRACE
 	bne-	syscall_dotrace
 syscall_dotrace_cont:
 	lis	r10,sys_call_table@h
@@ -192,7 +194,11 @@ ret_from_syscall:
 	mr	r6,r3
 	li	r11,-_LAST_ERRNO
 	cmpl	0,r3,r11
+	rlwinm	r12,r1,0,0,18	/* current_thread_info() */
 	blt+	30f
+	lwz	r11,TI_FLAGS(r12)
+	andi.	r11,r11,_TIF_FORCE_NOERROR
+	bne	30f
 	neg	r3,r3
 	cmpi	0,r3,ERESTARTNOHAND
 	bne	22f
@@ -205,7 +211,6 @@ ret_from_syscall:
 30:	LOAD_MSR_KERNEL(r10,MSR_KERNEL)	/* doesn't include MSR_EE */
 	SYNC
 	MTMSRD(r10)
-	rlwinm	r12,r1,0,0,18	/* current_thread_info() */
 	lwz	r9,TI_FLAGS(r12)
 	andi.	r0,r9,(_TIF_SYSCALL_TRACE|_TIF_SIGPENDING|_TIF_NEED_RESCHED)
 	bne-	syscall_exit_work
