@@ -76,7 +76,7 @@ int i2o_driver_register(struct i2o_driver *drv)
 	int rc = 0;
 	unsigned long flags;
 
-	pr_debug("Register driver %s\n", drv->name);
+	pr_debug("i2o: Register driver %s\n", drv->name);
 
 	if (drv->event) {
 		drv->event_queue = create_workqueue(drv->name);
@@ -85,7 +85,8 @@ int i2o_driver_register(struct i2o_driver *drv)
 			       "for driver %s\n", drv->name);
 			return -EFAULT;
 		}
-		pr_debug("Event queue initialized for driver %s\n", drv->name);
+		pr_debug("i2o: Event queue initialized for driver %s\n",
+			 drv->name);
 	} else
 		drv->event_queue = NULL;
 
@@ -107,7 +108,8 @@ int i2o_driver_register(struct i2o_driver *drv)
 
 	spin_unlock_irqrestore(&i2o_drivers_lock, flags);
 
-	pr_debug("driver %s gets context id %d\n", drv->name, drv->context);
+	pr_debug("i2o: driver %s gets context id %d\n", drv->name,
+		 drv->context);
 
 	list_for_each_entry(c, &i2o_controllers, list) {
 		struct i2o_device *i2o_dev;
@@ -137,7 +139,7 @@ void i2o_driver_unregister(struct i2o_driver *drv)
 	struct i2o_controller *c;
 	unsigned long flags;
 
-	pr_debug("unregister driver %s\n", drv->name);
+	pr_debug("i2o: unregister driver %s\n", drv->name);
 
 	driver_unregister(&drv->driver);
 
@@ -157,7 +159,7 @@ void i2o_driver_unregister(struct i2o_driver *drv)
 	if (drv->event_queue) {
 		destroy_workqueue(drv->event_queue);
 		drv->event_queue = NULL;
-		pr_debug("event queue removed for %s\n", drv->name);
+		pr_debug("i2o: event queue removed for %s\n", drv->name);
 	}
 };
 
@@ -186,8 +188,8 @@ int i2o_driver_dispatch(struct i2o_controller *c, u32 m,
 		spin_unlock(&i2o_drivers_lock);
 
 		if (unlikely(!drv)) {
-			printk(KERN_WARNING "i2o: Spurious reply to unknown "
-			       "driver %d\n", context);
+			printk(KERN_WARNING "%s: Spurious reply to unknown "
+			       "driver %d\n", c->name, context);
 			return -EIO;
 		}
 
@@ -233,8 +235,8 @@ int i2o_driver_dispatch(struct i2o_controller *c, u32 m,
 				 " defined!\n", c->name, drv->name);
 		return -EIO;
 	} else
-		printk(KERN_WARNING "i2o: Spurious reply to unknown driver "
-		       "%d\n", readl(&msg->u.s.icntxt));
+		printk(KERN_WARNING "%s: Spurious reply to unknown driver "
+		       "%d\n", c->name, readl(&msg->u.s.icntxt));
 	return -EIO;
 }
 
@@ -336,7 +338,7 @@ int __init i2o_driver_init(void)
 		       ">=2 and <= 64 and a power of 2\n", i2o_max_drivers);
 		i2o_max_drivers = I2O_MAX_DRIVERS;
 	}
-	printk(KERN_INFO "i2o: max_drivers=%d\n", i2o_max_drivers);
+	printk(KERN_INFO "i2o: max drivers = %d\n", i2o_max_drivers);
 
 	i2o_drivers =
 	    kmalloc(i2o_max_drivers * sizeof(*i2o_drivers), GFP_KERNEL);

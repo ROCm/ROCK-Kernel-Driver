@@ -65,7 +65,9 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
 
-#define VERSION_STRING        "Version 0.1.2"
+#define OSM_NAME	"scsi-osm"
+#define OSM_VERSION	"$Rev$"
+#define OSM_DESCRIPTION	"I2O SCSI Peripheral OSM"
 
 static struct i2o_driver i2o_scsi_driver;
 
@@ -106,8 +108,7 @@ static struct i2o_scsi_host *i2o_scsi_host_alloc(struct i2o_controller *c)
 	}
 
 	if (!max_channel) {
-		printk(KERN_WARNING "scsi-osm: no channels found on %s\n",
-		       c->name);
+		osm_warn("no channels found on %s\n", c->name);
 		return ERR_PTR(-EFAULT);
 	}
 
@@ -116,7 +117,7 @@ static struct i2o_scsi_host *i2o_scsi_host_alloc(struct i2o_controller *c)
 
 	scsi_host = scsi_host_alloc(&i2o_scsi_host_template, size);
 	if (!scsi_host) {
-		printk(KERN_WARNING "scsi-osm: Could not allocate SCSI host\n");
+		osm_warn("Could not allocate SCSI host\n");
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -221,24 +222,23 @@ static int i2o_scsi_probe(struct device *dev)
 		return -EFAULT;
 
 	if (id >= scsi_host->max_id) {
-		printk(KERN_WARNING "scsi-osm: SCSI device id (%d) >= max_id "
-		       "of I2O host (%d)", id, scsi_host->max_id);
+		osm_warn("SCSI device id (%d) >= max_id of I2O host (%d)", id,
+			 scsi_host->max_id);
 		return -EFAULT;
 	}
 
 	if (i2o_parm_field_get(i2o_dev, 0, 4, &lun, 8) < 0)
 		return -EFAULT;
 	if (lun >= scsi_host->max_lun) {
-		printk(KERN_WARNING "scsi-osm: SCSI device id (%d) >= max_lun "
-		       "of I2O host (%d)", (unsigned int)lun,
-		       scsi_host->max_lun);
+		osm_warn("SCSI device id (%d) >= max_lun of I2O host (%d)",
+			 (unsigned int)lun, scsi_host->max_lun);
 		return -EFAULT;
 	}
 
 	parent = i2o_iop_find_device(c, i2o_dev->lct_data.parent_tid);
 	if (!parent) {
-		printk(KERN_WARNING "scsi-osm: can not find parent of device "
-		       "%03x\n", i2o_dev->lct_data.tid);
+		osm_warn("can not find parent of device %03x\n",
+			 i2o_dev->lct_data.tid);
 		return -EFAULT;
 	}
 
@@ -247,8 +247,8 @@ static int i2o_scsi_probe(struct device *dev)
 			channel = i;
 
 	if (channel == -1) {
-		printk(KERN_WARNING "scsi-osm: can not find channel of device "
-		       "%03x\n", i2o_dev->lct_data.tid);
+		osm_warn("can not find channel of device %03x\n",
+			 i2o_dev->lct_data.tid);
 		return -EFAULT;
 	}
 
@@ -256,13 +256,13 @@ static int i2o_scsi_probe(struct device *dev)
 	    __scsi_add_device(i2o_shost->scsi_host, channel, id, lun, i2o_dev);
 
 	if (!scsi_dev) {
-		printk(KERN_WARNING "scsi-osm: can not add SCSI device "
-		       "%03x\n", i2o_dev->lct_data.tid);
+		osm_warn("can not add SCSI device %03x\n",
+			 i2o_dev->lct_data.tid);
 		return -EFAULT;
 	}
 
-	pr_debug("Added new SCSI device %03x (cannel: %d, id: %d, lun: %d)\n",
-		 i2o_dev->lct_data.tid, channel, id, (unsigned int)lun);
+	osm_debug("added new SCSI device %03x (cannel: %d, id: %d, lun: %d)\n",
+		  i2o_dev->lct_data.tid, channel, id, (unsigned int)lun);
 
 	return 0;
 };
@@ -307,24 +307,24 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 
 		pmsg = i2o_msg_in_to_virt(c, pm);
 
-		printk(KERN_ERR "IOP fail.\n");
-		printk(KERN_ERR "From %d To %d Cmd %d.\n",
-		       (msg->u.head[1] >> 12) & 0xFFF,
-		       msg->u.head[1] & 0xFFF, msg->u.head[1] >> 24);
-		printk(KERN_ERR "Failure Code %d.\n", msg->body[0] >> 24);
+		osm_err("IOP fail.\n");
+		osm_err("From %d To %d Cmd %d.\n",
+			(msg->u.head[1] >> 12) & 0xFFF,
+			msg->u.head[1] & 0xFFF, msg->u.head[1] >> 24);
+		osm_err("Failure Code %d.\n", msg->body[0] >> 24);
 		if (msg->body[0] & (1 << 16))
-			printk(KERN_ERR "Format error.\n");
+			osm_err("Format error.\n");
 		if (msg->body[0] & (1 << 17))
-			printk(KERN_ERR "Path error.\n");
+			osm_err("Path error.\n");
 		if (msg->body[0] & (1 << 18))
-			printk(KERN_ERR "Path State.\n");
+			osm_err("Path State.\n");
 		if (msg->body[0] & (1 << 18))
 		{
-			printk(KERN_ERR "Congestion.\n");
+			osm_err("Congestion.\n");
 			err = DID_BUS_BUSY;
 		}
 
-		printk(KERN_DEBUG "Failing message is %p.\n", pmsg);
+		osm_debug("Failing message is %p.\n", pmsg);
 
 		cmd = i2o_cntxt_list_get(c, readl(&pmsg->u.s.tcntxt));
 		if (!cmd)
@@ -353,13 +353,12 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 
 	if (!cmd) {
 		if (st)
-			printk(KERN_WARNING "SCSI abort: %08X",
-			       le32_to_cpu(msg->body[0]));
-		printk(KERN_INFO "SCSI abort completed.\n");
+			osm_warn("SCSI abort: %08X", le32_to_cpu(msg->body[0]));
+		osm_info("SCSI abort completed.\n");
 		return -EFAULT;
 	}
 
-	pr_debug("Completed %ld\n", cmd->serial_number);
+	osm_debug("Completed %ld\n", cmd->serial_number);
 
 	if (st) {
 		u32 count, error;
@@ -370,13 +369,13 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 			count = le32_to_cpu(msg->body[1]);
 			if (count < cmd->underflow) {
 				int i;
-				printk(KERN_ERR "SCSI: underflow 0x%08X 0x%08X"
-				       "\n", count, cmd->underflow);
-				printk(KERN_DEBUG "Cmd: ");
+
+				osm_err("SCSI underflow 0x%08X 0x%08X\n", count,
+					cmd->underflow);
+				osm_debug("Cmd: ");
 				for (i = 0; i < 15; i++)
-					printk(KERN_DEBUG "%02X ",
-					       cmd->cmnd[i]);
-				printk(KERN_DEBUG ".\n");
+					pr_debug("%02X ", cmd->cmnd[i]);
+				pr_debug(".\n");
 				cmd->result = (DID_ERROR << 16);
 			}
 			break;
@@ -384,7 +383,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 		default:
 			error = le32_to_cpu(msg->body[0]);
 
-			printk(KERN_ERR "scsi-osm: SCSI error %08x\n", error);
+			osm_err("SCSI error %08x\n", error);
 
 			if ((error & 0xff) == 0x02 /*CHECK_CONDITION */ ) {
 				int i;
@@ -394,8 +393,8 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 				memcpy(cmd->sense_buffer, (void *)&msg->body[3],
 				       len);
 				for (i = 0; i <= len; i++)
-					printk(KERN_INFO "%02x\n",
-					       cmd->sense_buffer[i]);
+					osm_info("%02x\n",
+						 cmd->sense_buffer[i]);
 				if (cmd->sense_buffer[0] == 0x70
 				    && cmd->sense_buffer[2] == DATA_PROTECT) {
 					/* This is to handle an array failed */
@@ -467,21 +466,20 @@ static void i2o_scsi_notify_controller_add(struct i2o_controller *c)
 
 	i2o_shost = i2o_scsi_host_alloc(c);
 	if (IS_ERR(i2o_shost)) {
-		printk(KERN_ERR "scsi-osm: Could not initialize"
-		       " SCSI host\n");
+		osm_err("Could not initialize SCSI host\n");
 		return;
 	}
 
 	rc = scsi_add_host(i2o_shost->scsi_host, &c->device);
 	if (rc) {
-		printk(KERN_ERR "scsi-osm: Could not add SCSI " "host\n");
+		osm_err("Could not add SCSI host\n");
 		scsi_host_put(i2o_shost->scsi_host);
 		return;
 	}
 
 	c->driver_data[i2o_scsi_driver.context] = i2o_shost;
 
-	pr_debug("new I2O SCSI host added\n");
+	osm_debug("new I2O SCSI host added\n");
 };
 
 /**
@@ -503,12 +501,12 @@ static void i2o_scsi_notify_controller_remove(struct i2o_controller *c)
 
 	scsi_remove_host(i2o_shost->scsi_host);
 	scsi_host_put(i2o_shost->scsi_host);
-	pr_debug("I2O SCSI host removed\n");
+	pr_info("I2O SCSI host removed\n");
 };
 
 /* SCSI OSM driver struct */
 static struct i2o_driver i2o_scsi_driver = {
-	.name = "scsi-osm",
+	.name = OSM_NAME,
 	.reply = i2o_scsi_reply,
 	.classes = i2o_scsi_class_id,
 	.notify_controller_add = i2o_scsi_notify_controller_add,
@@ -561,7 +559,7 @@ static int i2o_scsi_queuecommand(struct scsi_cmnd *SCpnt,
 	SCpnt->scsi_done = done;
 
 	if (unlikely(!i2o_dev)) {
-		printk(KERN_WARNING "scsi-osm: no I2O device in request\n");
+		osm_warn("no I2O device in request\n");
 		SCpnt->result = DID_NO_CONNECT << 16;
 		done(SCpnt);
 		return 0;
@@ -569,8 +567,8 @@ static int i2o_scsi_queuecommand(struct scsi_cmnd *SCpnt,
 
 	tid = i2o_dev->lct_data.tid;
 
-	pr_debug("qcmd: Tid = %03x\n", tid);
-	pr_debug("Real scsi messages.\n");
+	osm_debug("qcmd: Tid = %03x\n", tid);
+	osm_debug("Real scsi messages.\n");
 
 	/*
 	 *      Obtain an I2O message. If there are none free then
@@ -702,7 +700,7 @@ static int i2o_scsi_queuecommand(struct scsi_cmnd *SCpnt,
 	/* Queue the message */
 	i2o_msg_post(c, m);
 
-	pr_debug("Issued %ld\n", SCpnt->serial_number);
+	osm_debug("Issued %ld\n", SCpnt->serial_number);
 
 	return 0;
 };
@@ -727,7 +725,7 @@ static int i2o_scsi_abort(struct scsi_cmnd *SCpnt)
 	int tid;
 	int status = FAILED;
 
-	printk(KERN_WARNING "i2o_scsi: Aborting command block.\n");
+	osm_warn("Aborting command block.\n");
 
 	i2o_dev = SCpnt->device->hostdata;
 	c = i2o_dev->iop;
@@ -777,8 +775,8 @@ static int i2o_scsi_bios_param(struct scsi_device *sdev,
 }
 
 static struct scsi_host_template i2o_scsi_host_template = {
-	.proc_name = "SCSI-OSM",
-	.name = "I2O SCSI Peripheral OSM",
+	.proc_name = OSM_NAME,
+	.name = OSM_DESCRIPTION,
 	.info = i2o_scsi_info,
 	.queuecommand = i2o_scsi_queuecommand,
 	.eh_abort_handler = i2o_scsi_abort,
@@ -788,15 +786,6 @@ static struct scsi_host_template i2o_scsi_host_template = {
 	.cmd_per_lun = 6,
 	.use_clustering = ENABLE_CLUSTERING,
 };
-
-/*
-int
-i2o_scsi_queuecommand(struct scsi_cmnd * cmd, void (*done) (struct scsi_cmnd *))
-{
-	printk(KERN_INFO "queuecommand\n");
-	return SCSI_MLQUEUE_HOST_BUSY;
-};
-*/
 
 /**
  *	i2o_scsi_init - SCSI OSM initialization function
@@ -809,12 +798,12 @@ static int __init i2o_scsi_init(void)
 {
 	int rc;
 
-	printk(KERN_INFO "I2O SCSI Peripheral OSM\n");
+	printk(KERN_INFO OSM_DESCRIPTION " v" OSM_VERSION "\n");
 
 	/* Register SCSI OSM into I2O core */
 	rc = i2o_driver_register(&i2o_scsi_driver);
 	if (rc) {
-		printk(KERN_ERR "scsi-osm: Could not register SCSI driver\n");
+		osm_err("Could not register SCSI driver\n");
 		return rc;
 	}
 
@@ -834,6 +823,8 @@ static void __exit i2o_scsi_exit(void)
 
 MODULE_AUTHOR("Red Hat Software");
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION(OSM_DESCRIPTION);
+MODULE_VERSION(OSM_VERSION);
 
 module_init(i2o_scsi_init);
 module_exit(i2o_scsi_exit);
