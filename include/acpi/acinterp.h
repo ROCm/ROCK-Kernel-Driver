@@ -118,6 +118,12 @@ acpi_ex_convert_to_ascii (
  */
 
 acpi_status
+acpi_ex_common_buffer_setup (
+	union acpi_operand_object       *obj_desc,
+	u32                             buffer_length,
+	u32                             *datum_count);
+
+acpi_status
 acpi_ex_extract_from_field (
 	union acpi_operand_object       *obj_desc,
 	void                            *buffer,
@@ -240,8 +246,8 @@ acpi_ex_do_concatenate (
 u8
 acpi_ex_do_logical_op (
 	u16                             opcode,
-	acpi_integer                    operand0,
-	acpi_integer                    operand1);
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       *obj_desc2);
 
 acpi_integer
 acpi_ex_do_math_op (
@@ -563,8 +569,11 @@ acpi_status
 acpi_ex_store_object_to_node (
 	union acpi_operand_object       *source_desc,
 	struct acpi_namespace_node      *node,
-	struct acpi_walk_state          *walk_state);
+	struct acpi_walk_state          *walk_state,
+	u8                              implicit_conversion);
 
+#define ACPI_IMPLICIT_CONVERSION        TRUE
+#define ACPI_NO_IMPLICIT_CONVERSION     FALSE
 
 /*
  * exstoren
