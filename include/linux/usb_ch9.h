@@ -79,6 +79,7 @@
 #define USB_DEVICE_B_HNP_ENABLE		3	/* dev may initiate HNP */
 #define USB_DEVICE_A_HNP_SUPPORT	4	/* RH port supports HNP */
 #define USB_DEVICE_A_ALT_HNP_SUPPORT	5	/* other RH port does */
+#define USB_DEVICE_DEBUG_MODE		6	/* (special devices only) */
 
 #define USB_ENDPOINT_HALT		0	/* IN/OUT will STALL */
 
@@ -320,6 +321,18 @@ struct usb_otg_descriptor {
 /* from usb_otg_descriptor.bmAttributes */
 #define USB_OTG_SRP		(1 << 0)
 #define USB_OTG_HNP		(1 << 1)	/* swap host/device roles */
+
+/*-------------------------------------------------------------------------*/
+
+/* USB_DT_DEBUG:  for special highspeed devices, replacing serial console */
+struct usb_debug_descriptor {
+	__u8  bLength;
+	__u8  bDescriptorType;
+
+	/* bulk endpoints with 8 byte maxpacket */
+	__u8  bDebugInEndpoint;
+	__u8  bDebugOutEndpoint;
+};
 
 /*-------------------------------------------------------------------------*/
 
