@@ -13,10 +13,8 @@
 #include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/hwgfs.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl_util.h>
 #include <asm/sn/nodepda.h>
 
@@ -114,6 +112,7 @@ master_node_get(vertex_hdl_t vhdl)
 	}
 }
 
+
 /*
 ** If the specified device represents a node, return its
 ** compact node ID; otherwise, return CNODEID_NONE.
@@ -152,23 +151,9 @@ mark_nodevertex_as_node(vertex_hdl_t vhdl, cnodeid_t cnodeid)
 		(void)hwgraph_edge_add( hwgraph_all_cnodes,
 					vhdl,
 					cnodeid_buffer);
+		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, hwgraph_all_cnodes, NULL, "Creating path vhdl1\n"));
 	}
 }
-
-/*
-** If the specified device represents a CPU, return its cpuid;
-** otherwise, return CPU_NONE.
-*/
-cpuid_t
-cpuvertex_to_cpuid(vertex_hdl_t vhdl)
-{
-	arbitrary_info_t cpuid = CPU_NONE;
-
-	(void)labelcl_info_get_LBL(vhdl, INFO_LBL_CPUID, NULL, &cpuid);
-
-	return((cpuid_t)cpuid);
-}
-
 
 /*
 ** dev_to_name converts a vertex_hdl_t into a canonical name.  If the vertex_hdl_t
@@ -187,5 +172,4 @@ dev_to_name(vertex_hdl_t dev, char *buf, uint buflen)
 {
         return(vertex_to_name(dev, buf, buflen));
 }
-
 

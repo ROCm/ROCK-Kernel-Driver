@@ -23,41 +23,16 @@
 #include <asm/io.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/hwgfs.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/simulator.h>
 
-#define HCL_NAME "SGI-HWGRAPH COMPATIBILITY DRIVER"
-#define HCL_TEMP_NAME "HCL_TEMP_NAME_USED_FOR_HWGRAPH_VERTEX_CREATE"
-#define HCL_TEMP_NAME_LEN 44 
-#define HCL_VERSION "1.0"
-
 #define vertex_hdl_t hwgfs_handle_t
+
 vertex_hdl_t hwgraph_root;
 vertex_hdl_t linux_busnum;
-
 extern int pci_bus_cvlink_init(void);
-
-/*
- * Debug flag definition.
- */
-#define OPTION_NONE             0x00
-#define HCL_DEBUG_NONE 0x00000
-#define HCL_DEBUG_ALL  0x0ffff
-#if defined(CONFIG_HCL_DEBUG)
-static unsigned int hcl_debug_init __initdata = HCL_DEBUG_NONE;
-#endif
-static unsigned int hcl_debug = HCL_DEBUG_NONE;
-#if defined(CONFIG_HCL_DEBUG) && !defined(MODULE)
-static unsigned int boot_options = OPTION_NONE;
-#endif
-
-invplace_t invplace_none = {
-	GRAPH_VERTEX_NONE,
-	GRAPH_VERTEX_PLACE_NONE,
-	NULL
-};
+unsigned long hwgraph_debug_mask;
 
 /*
  * init_hcl() - Boot time initialization.
@@ -70,11 +45,6 @@ int __init init_hcl(void)
 	extern int init_ioconfig_bus(void);
 	extern int init_hwgfs_fs(void);
 	int rv = 0;
-
-	if (IS_RUNNING_ON_SIMULATOR()) {
-		extern u64 klgraph_addr[];
-		klgraph_addr[0] = 0xe000003000030000;
-	}
 
 	init_hwgfs_fs();
 
@@ -108,57 +78,12 @@ int __init init_hcl(void)
 	}
 
 	/*
-	 * Initialize the ifconfgi_net driver that does network devices 
 	 * Persistent Naming.
 	 */
 	init_ioconfig_bus();
 
 	return 0;
 }
-
-
-/*
- * hcl_setup() - Process boot time parameters if given.
- *	"hcl="
- *	This routine gets called only if "hcl=" is given in the 
- *	boot line and before init_hcl().
- *
- *	We currently do not have any boot options .. when we do, 
- *	functionalities can be added here.
- *
- */
-static int __init hcl_setup(char *str)
-{
-    while ( (*str != '\0') && !isspace (*str) )
-    {
-#ifdef CONFIG_HCL_DEBUG
-        if (strncmp (str, "all", 3) == 0) {
-            hcl_debug_init |= HCL_DEBUG_ALL;
-            str += 3;
-        } else 
-        	return 0;
-#endif
-        if (*str != ',') return 0;
-        ++str;
-    }
-
-    return 1;
-
-}
-
-__setup("hcl=", hcl_setup);
-
-
-/*
- * Set device specific "fast information".
- *
- */
-void
-hwgraph_fastinfo_set(vertex_hdl_t de, arbitrary_info_t fastinfo)
-{
-	labelcl_info_replace_IDX(de, HWGRAPH_FASTINFO, fastinfo, NULL);
-}
-
 
 /*
  * Get device specific "fast information".
@@ -181,25 +106,6 @@ hwgraph_fastinfo_get(vertex_hdl_t de)
 		return(fastinfo);
 
 	return(0);
-}
-
-
-/*
- * hwgraph_connectpt_set - Sets the connect point handle in de to the 
- *	given connect_de handle.  By default, the connect point of the 
- *	node is the parent.  This effectively changes this assumption.
- */
-int
-hwgraph_connectpt_set(vertex_hdl_t de, vertex_hdl_t connect_de)
-{
-	int rv;
-
-	if (!de)
-		return(-1);
-
-	rv = labelcl_info_connectpt_set(de, connect_de);
-
-	return(rv);
 }
 
 
@@ -407,39 +313,6 @@ hwgraph_vertex_destroy(vertex_hdl_t de)
 	return(0);
 }
 
-#if 0
-/*
- * hwgraph_edge_add - This routines has changed from the original conext.
- * All it does now is to create a symbolic link from "from" to "to".
- */
-/* ARGSUSED */
-int
-hwgraph_edge_add(vertex_hdl_t from, vertex_hdl_t to, char *name)
-{
-
-	char *path, *link;
-	vertex_hdl_t handle = NULL;
-	int rv, i;
-
-	handle = hwgfs_find_handle(from, name, 0, 0, 0, 1);
-	if (handle) {
-		return(0);
-	}
-
-	path = kmalloc(1024, GFP_KERNEL);
-	memset(path, 0x0, 1024);
-	link = kmalloc(1024, GFP_KERNEL);
-	memset(path, 0x0, 1024);
-	i = hwgfs_generate_path (to, link, 1024);
-	rv = hwgfs_mk_symlink (from, (const char *)name, 
-			       DEVFS_FL_DEFAULT, link,
-			       &handle, NULL);
-	return(0);
-
-
-}
-#endif
-
 int
 hwgraph_edge_add(vertex_hdl_t from, vertex_hdl_t to, char *name)
 {
@@ -452,8 +325,14 @@ hwgraph_edge_add(vertex_hdl_t from, vertex_hdl_t to, char *name)
 	int i, count;
 
 	path = kmalloc(1024, GFP_KERNEL);
+	if (!path)
+		return -ENOMEM;
 	memset((char *)path, 0x0, 1024);
 	link = kmalloc(1024, GFP_KERNEL);
+	if (!link) {
+		kfree(path);
+		return -ENOMEM;
+	}
 	memset((char *)link, 0x0, 1024);
 
 	i = hwgfs_generate_path (from, path, 1024);
@@ -710,39 +589,6 @@ hwgraph_traverse(vertex_hdl_t de, char *path, vertex_hdl_t *found)
 }
 
 /*
- * hwgraph_path_to_vertex - Return the entry handle for the given 
- *	pathname .. assume traverse symlinks too!.
- */
-vertex_hdl_t
-hwgraph_path_to_vertex(char *path)
-{
-	return(hwgfs_find_handle(NULL,	/* start dir */
-			path,		/* path */
-		    	0,		/* major */
-		    	0,		/* minor */
-		    	0,		/* char | block */
-		    	1));		/* traverse symlinks */
-}
-
-/*
- * hwgraph_inventory_remove - Removes an inventory entry.
- *
- *	Remove an inventory item associated with a vertex.   It is the caller's
- *	responsibility to make sure that there are no races between removing
- *	inventory from a vertex and simultaneously removing that vertex.
-*/
-int
-hwgraph_inventory_remove(	vertex_hdl_t de,
-				int class,
-				int type,
-				major_t controller,
-				minor_t unit,
-				int state)
-{
-	return(0); /* Just a Stub for IRIX code. */
-}
-
-/*
  * Find the canonical name for a given vertex by walking back through
  * connectpt's until we hit the hwgraph root vertex (or until we run
  * out of buffer space or until something goes wrong).
@@ -791,32 +637,58 @@ hwgraph_vertex_name_get(vertex_hdl_t vhdl, char *buf, unsigned int buflen)
 char *
 vertex_to_name(vertex_hdl_t vhdl, char *buf, unsigned int buflen)
 {
-	if (hwgraph_vertex_name_get(vhdl, buf, buflen) == GRAPH_SUCCESS)
-		return(buf);
-	else
-		return(DEVNAME_UNKNOWN);
+        if (hwgraph_vertex_name_get(vhdl, buf, buflen) == GRAPH_SUCCESS)
+                return(buf);
+        else
+                return(DEVNAME_UNKNOWN);
 }
 
-graph_error_t
-hwgraph_edge_remove(vertex_hdl_t from, char *name, vertex_hdl_t *toptr)
+
+void
+hwgraph_debug(char *file, char * function, int line, vertex_hdl_t vhdl1, vertex_hdl_t vhdl2, char *format, ...)
 {
-	return(GRAPH_ILLEGAL_REQUEST);
-}
 
-graph_error_t
-hwgraph_vertex_unref(vertex_hdl_t vhdl)
-{
-	return(GRAPH_ILLEGAL_REQUEST);
-}
+	int pos;
+	char *hwpath;
+	va_list ap;
 
+	if ( !hwgraph_debug_mask )
+		return;
+
+	hwpath = kmalloc(MAXDEVNAME, GFP_KERNEL);
+	if (!hwpath) {
+		printk("HWGRAPH_DEBUG kmalloc fails at %d ", __LINE__);
+		return;
+	}
+
+	printk("HWGRAPH_DEBUG %s %s %d : ", file, function, line);
+
+	if (vhdl1){
+		memset(hwpath, 0, MAXDEVNAME);
+		pos = hwgfs_generate_path(vhdl1, hwpath, MAXDEVNAME);
+		printk("vhdl1 = %s : ", &hwpath[pos]);
+	}
+
+	if (vhdl2){
+		memset(hwpath, 0, MAXDEVNAME);
+		pos = hwgfs_generate_path(vhdl2, hwpath, MAXDEVNAME);
+		printk("vhdl2 = %s :", &hwpath[pos]);
+	}
+
+	memset(hwpath, 0, MAXDEVNAME);
+        va_start(ap, format);
+        vsnprintf(hwpath, 500, format, ap);
+        va_end(ap);
+	hwpath[MAXDEVNAME -1] = (char)0; /* Just in case. */
+        printk(" %s", hwpath);
+	kfree(hwpath);
+}
 
 EXPORT_SYMBOL(hwgraph_mk_dir);
 EXPORT_SYMBOL(hwgraph_path_add);
 EXPORT_SYMBOL(hwgraph_register);
 EXPORT_SYMBOL(hwgraph_vertex_destroy);
 EXPORT_SYMBOL(hwgraph_fastinfo_get);
-EXPORT_SYMBOL(hwgraph_fastinfo_set);
-EXPORT_SYMBOL(hwgraph_connectpt_set);
 EXPORT_SYMBOL(hwgraph_connectpt_get);
 EXPORT_SYMBOL(hwgraph_info_add_LBL);
 EXPORT_SYMBOL(hwgraph_info_remove_LBL);
