@@ -28,6 +28,7 @@
 #include <asm/system.h>
 #include <asm/sections.h>
 #include <asm/of_device.h>
+#include <linux/kthread.h>
 
 #undef DEBUG
 
@@ -70,9 +71,7 @@ static enum {ADT7460, ADT7467} therm_type;
 static int therm_bus, therm_address;
 static struct of_device * of_dev;
 static struct thermostat* thermostat;
-static pid_t monitor_thread_id;
-static int monitor_running;
-static struct completion monitor_task_compl;
+static struct task_struct *thread_therm = NULL;
 
 static int attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno);
 static void write_both_fan_speed(struct thermostat *th, int speed);
@@ -136,9 +135,8 @@ detach_thermostat(struct i2c_adapter *adapter)
 
 	th = thermostat;
 
-	if (monitor_running) {
-		monitor_running = 0;
-		wait_for_completion(&monitor_task_compl);
+	if (thread_therm != NULL) {
+		kthread_stop(thread_therm);
 	}
 		
 	printk(KERN_INFO "adt746x: Putting max temperatures back from %d, %d, %d,"
@@ -237,16 +235,9 @@ static int monitor_task(void *arg)
 #ifdef DEBUG
 	int mfan_speed;
 #endif
-	
-	lock_kernel();
-	daemonize("kfand");
-	unlock_kernel();
-	strcpy(current->comm, "thermostat");
-	monitor_running = 1;
-
-	while(monitor_running)
+	while(!kthread_should_stop())
 	{
-		msleep(2000);
+		msleep_interruptible(2000);
 
 		/* Check status */
 		/* local   : chip */
@@ -321,7 +312,6 @@ static int monitor_task(void *arg)
 #endif		
 	}
 
-	complete_and_exit(&monitor_task_compl, 0);
 	return 0;
 }
 
@@ -387,7 +377,7 @@ attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno)
 	thermostat = th;
 
 	if (i2c_attach_client(&th->clt)) {
-		printk("adt746x: Thermostat failed to attach client !\n");
+		printk(KERN_INFO "adt746x: Thermostat failed to attach client !\n");
 		thermostat = NULL;
 		kfree(th);
 		return -ENODEV;
@@ -403,10 +393,13 @@ attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno)
 		write_both_fan_speed(th, -1);
 	}
 	
-	init_completion(&monitor_task_compl);
-	
-	monitor_thread_id = kernel_thread(monitor_task, th,
-		SIGCHLD | CLONE_KERNEL);
+	thread_therm = kthread_run(monitor_task, th, "kfand");
+
+	if (thread_therm == ERR_PTR(-ENOMEM)) {
+		printk(KERN_INFO "adt746x: Kthread creation failed\n");
+		thread_therm = NULL;
+		return -ENOMEM;
+	}
 
 	return 0;
 }

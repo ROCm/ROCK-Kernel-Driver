@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: super.c,v 1.97 2004/07/16 15:17:57 dwmw2 Exp $
+ * $Id: super.c,v 1.99 2004/08/24 07:59:57 dwmw2 Exp $
  *
  */
 
@@ -130,7 +130,7 @@ static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
 		  mtd->index, mtd->name));
 
 	sb->s_op = &jffs2_super_operations;
-	sb->s_flags |= MS_NOATIME;
+	sb->s_flags = flags | MS_NOATIME;
 
 	ret = jffs2_do_fill_super(sb, data, (flags&MS_VERBOSE)?1:0);
 
@@ -330,6 +330,7 @@ static int __init init_jffs2_fs(void)
  out_compressors:
 	jffs2_compressors_exit();
  out:
+	kmem_cache_destroy(jffs2_inode_cachep);
 	return ret;
 }
 

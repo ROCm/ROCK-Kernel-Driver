@@ -179,26 +179,26 @@ int kprobe_exceptions_notify(struct notifier_block *self, unsigned long val,
 	switch (val) {
 	case DIE_DEBUG:
 		if (kprobe_handler(args->regs))
-			return NOTIFY_OK;
+			return NOTIFY_STOP;
 		break;
 	case DIE_DEBUG_2:
 		if (post_kprobe_handler(args->regs))
-			return NOTIFY_OK;
+			return NOTIFY_STOP;
 		break;
 	case DIE_GPF:
 		if (kprobe_running() &&
 		    kprobe_fault_handler(args->regs, args->trapnr))
-			return NOTIFY_OK;
+			return NOTIFY_STOP;
 		break;
 	case DIE_PAGE_FAULT:
 		if (kprobe_running() &&
 		    kprobe_fault_handler(args->regs, args->trapnr))
-			return NOTIFY_OK;
+			return NOTIFY_STOP;
 		break;
 	default:
 		break;
 	}
-	return NOTIFY_BAD;
+	return NOTIFY_DONE;
 }
 
 asmlinkage void kprobe_trap(unsigned long trap_level, struct pt_regs *regs)
@@ -216,7 +216,7 @@ asmlinkage void kprobe_trap(unsigned long trap_level, struct pt_regs *regs)
 	 */
 	if (notify_die((trap_level == 0x170) ? DIE_DEBUG : DIE_DEBUG_2,
 		       (trap_level == 0x170) ? "debug" : "debug_2",
-		       regs, 0, trap_level, SIGTRAP) != NOTIFY_OK)
+		       regs, 0, trap_level, SIGTRAP) != NOTIFY_STOP)
 		bad_trap(regs, trap_level);
 }
 

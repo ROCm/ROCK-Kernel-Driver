@@ -2,11 +2,10 @@
 #define _ASM_M32R_M32R_H_
 
 /*
- * Mitsubishi M32R processor
- * Copyright (C) 1997-2002, Mitsubishi Electric Corporation
+ * Renesas M32R processor
+ *
+ * Copyright (C) 2003, 2004  Renesas Technology Corp.
  */
-
-/* $Id$ */
 
 #include <linux/config.h>
 

@@ -47,7 +47,7 @@ of free memory left when userspace requests more memory.
 When this flag is 1, the kernel pretends there is always enough
 memory until it actually runs out.
 
-When this flag is 2, the kernel uses a "strict overcommit" 
+When this flag is 2, the kernel uses a "never overcommit"
 policy that attempts to prevent any overcommit of memory.  
 
 This feature can be very useful because there are a lot of

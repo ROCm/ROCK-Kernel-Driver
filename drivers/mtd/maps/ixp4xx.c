@@ -1,5 +1,5 @@
 /*
- * $Id: ixp4xx.c,v 1.4 2004/08/31 22:55:51 dsaxena Exp $
+ * $Id: ixp4xx.c,v 1.6 2004/09/17 00:25:06 gleixner Exp $
  *
  * drivers/mtd/maps/ixp4xx.c
  *
@@ -69,9 +69,22 @@ static void ixp4xx_copy_from(struct map_info *map, void *to,
 		dest[len - 1] = BYTE0(src[i]);
 }
 
+/*
+ * Unaligned writes are ignored, causing the 8-bit
+ * probe to fail and proceed to the 16-bit probe (which succeeds).
+ */
+static void ixp4xx_probe_write16(struct map_info *map, map_word d, unsigned long adr)
+{
+	if (!(adr & 1))
+	       *(__u16 *) (map->map_priv_1 + adr) = d.x[0];
+}
+
+/*
+ * Fast write16 function without the probing check above
+ */
 static void ixp4xx_write16(struct map_info *map, map_word d, unsigned long adr)
 {
-	*(__u16 *) (map->map_priv_1 + adr) = d.x[0];
+       *(__u16 *) (map->map_priv_1 + adr) = d.x[0];
 }
 
 struct ixp4xx_flash_info {
@@ -171,7 +184,7 @@ static int ixp4xx_flash_probe(struct device *_dev)
 	info->map.bankwidth = 2;
 	info->map.name = dev->dev.bus_id;
 	info->map.read = ixp4xx_read16,
-	info->map.write = ixp4xx_write16,
+	info->map.write = ixp4xx_probe_write16,
 	info->map.copy_from = ixp4xx_copy_from,
 
 	info->res = request_mem_region(dev->resource->start, 
@@ -184,7 +197,7 @@ static int ixp4xx_flash_probe(struct device *_dev)
 	}
 
 	info->map.map_priv_1 =
-	    (unsigned long) ioremap(dev->resource->start, 
+	    (void __iomem *) ioremap(dev->resource->start,
 				    dev->resource->end - dev->resource->start + 1);
 	if (!info->map.map_priv_1) {
 		printk(KERN_ERR "IXP4XXFlash: Failed to ioremap region\n");
@@ -199,6 +212,9 @@ static int ixp4xx_flash_probe(struct device *_dev)
 		goto Error;
 	}
 	info->mtd->owner = THIS_MODULE;
+
+	/* Use the fast version */
+	info->map.write = ixp4xx_write16,
 
 	err = parse_mtd_partitions(info->mtd, probes, &info->partitions, 0);
 	if (err > 0) {
