@@ -880,7 +880,7 @@ const snd_kcontrol_new_t snd_ac97_controls_spdif[5] = {
 		.info = snd_ac97_info_single,
 		.get = snd_ac97_get_single,
 		.put = snd_ac97_put_spsa,
-		.private_value = AC97_EXTENDED_STATUS | (4 << 8) | (3 << 16) | (0 << 24),
+		.private_value = AC97_SINGLE_VALUE(AC97_EXTENDED_STATUS, 4, 3, 0)
 	},
 };
 

@@ -1090,6 +1090,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 		.info = snd_ac97_info_single,
 		.get = snd_ac97_alc650_mic_get,
 		.put = snd_ac97_alc650_mic_put,
+		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
 	},
 };
 
@@ -1190,6 +1191,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc655[] = {
 		.info = snd_ac97_info_single,
 		.get = snd_ac97_alc655_mic_get,
 		.put = snd_ac97_alc655_mic_put,
+		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
 	},
 };
 
