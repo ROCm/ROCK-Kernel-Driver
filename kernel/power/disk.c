@@ -163,27 +163,27 @@ int pm_suspend_disk(void)
 
 	pr_debug("PM: snapshotting memory.\n");
 	in_suspend = 1;
-	local_irq_disable();
 	if ((error = swsusp_save()))
 		goto Done;
 
-	pr_debug("PM: writing image.\n");
+	if (in_suspend) {
+		pr_debug("PM: writing image.\n");
 
-	/*
-	 * FIXME: Leftover from swsusp. Are they necessary?
-	 */
-	mb();
-	barrier();
+		/*
+		 * FIXME: Leftover from swsusp. Are they necessary?
+		 */
+		mb();
+		barrier();
 
-	error = swsusp_write();
-	if (!error && in_suspend) {
-		error = power_down(pm_disk_mode);
-		pr_debug("PM: Power down failed.\n");
+		error = swsusp_write();
+		if (!error) {
+			error = power_down(pm_disk_mode);
+			pr_debug("PM: Power down failed.\n");
+		}
 	} else
 		pr_debug("PM: Image restored successfully.\n");
 	swsusp_free();
  Done:
-	local_irq_enable();
 	finish();
 	return error;
 }
@@ -217,7 +217,6 @@ static int pm_resume(void)
 
 	barrier();
 	mb();
-	local_irq_disable();
 
 	/* FIXME: The following (comment and mdelay()) are from swsusp.
 	 * Are they really necessary?
@@ -231,7 +230,6 @@ static int pm_resume(void)
 
 	pr_debug("PM: Restoring saved image.\n");
 	swsusp_restore();
-	local_irq_enable();
 	pr_debug("PM: Restore failed, recovering.n");
 	finish();
  Free:

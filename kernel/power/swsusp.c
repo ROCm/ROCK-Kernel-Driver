@@ -416,11 +416,12 @@ static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
 }
 
 
-static int suspend_prepare_image(void)
+int swsusp_suspend(void)
 {
 	struct sysinfo i;
 	unsigned int nr_needed_pages = 0;
 
+	read_swapfiles();
 	drain_local_pages();
 
 	pagedir_nosave = NULL;
@@ -486,12 +487,10 @@ static int suspend_prepare_image(void)
 static int suspend_save_image(void)
 {
 	int error;
-	local_irq_enable();
 	device_resume();
 	lock_swapdevices();
 	error = write_suspend_image();
 	lock_swapdevices();
-	local_irq_disable();
 	return error;
 }
 
@@ -515,34 +514,16 @@ int swsusp_resume(void)
 	if (!resume) {
 		save_processor_state();
 		SAVE_REGISTERS
-		swsusp_suspend();
-		return;
+		return swsusp_suspend();
 	}
 	GO_TO_SWAPPER_PAGE_TABLES
 	COPY_PAGES_BACK
 	RESTORE_REGISTERS
 	restore_processor_state();
-	swsusp_resume();
+	return swsusp_resume();
 
  */
 
-
-int swsusp_suspend(void)
-{
-	int error;
-	read_swapfiles();
-	error = suspend_prepare_image();
-	if (!error)
-		error = suspend_save_image();
-	if (error) {
-		printk(KERN_EMERG "%sSuspend failed, trying to recover...\n",
-		       name_suspend);
-		barrier();
-		mb();
-		mdelay(1000);
-	}
-	return error;
-}
 
 /* More restore stuff */
 
@@ -870,11 +851,18 @@ static int __init read_suspend_image(void)
 
 int swsusp_save(void) 
 {
+	int error;
+
 #if defined (CONFIG_HIGHMEM) || defined (COFNIG_DISCONTIGMEM)
 	printk("swsusp is not supported with high- or discontig-mem.\n");
 	return -EPERM;
 #endif
-	return arch_prepare_suspend();
+	if ((error = arch_prepare_suspend()))
+		return error;
+	local_irq_disable();
+	error = swsusp_arch_suspend(0);
+	local_irq_enable();
+	return error;
 }
 
 
@@ -890,7 +878,7 @@ int swsusp_save(void)
 
 int swsusp_write(void)
 {
-	return swsusp_arch_suspend(0);
+	return suspend_save_image();
 }
 
 
@@ -933,7 +921,11 @@ int __init swsusp_read(void)
 
 int __init swsusp_restore(void)
 {
-	return swsusp_arch_suspend(1);
+	int error;
+	local_irq_disable();
+	error = swsusp_arch_suspend(1);
+	local_irq_enable();
+	return error;
 }
 
 
