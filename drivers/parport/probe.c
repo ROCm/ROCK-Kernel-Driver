@@ -213,4 +213,3 @@ ssize_t parport_device_id (int devnum, char *buffer, size_t len)
 	parport_close (dev);
 	return retval;
 }
-EXPORT_SYMBOL(parport_device_id);
