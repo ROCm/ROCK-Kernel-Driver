@@ -31,6 +31,9 @@ ToDo/Notes:
 	- Get rid of the ugly transparent union in fs/ntfs/dir.c::ntfs_readdir()
 	  and ntfs_filldir() as per suggestion from Al Viro.
 	- Change '\0' and L'\0' to simply 0 as per advice from Linus Torvalds.
+	- Update ->truncate (fs/ntfs/inode.c::ntfs_truncate()) to check if the
+	  inode size has changed and to only output an error if so.
+	- Rename fs/ntfs/attrib.h::attribute_value_length() to ntfs_attr_size().
 
 2.1.18 - Fix scheduling latencies at mount time as well as an endianness bug.
 

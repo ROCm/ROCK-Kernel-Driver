@@ -680,7 +680,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 			goto unm_err_out;
 		}
 		/* Now allocate memory for the attribute list. */
-		ni->attr_list_size = (u32)attribute_value_length(ctx->attr);
+		ni->attr_list_size = (u32)ntfs_attr_size(ctx->attr);
 		ni->attr_list = ntfs_malloc_nofs(ni->attr_list_size);
 		if (!ni->attr_list) {
 			ntfs_error(vi->i_sb, "Not enough memory to allocate "
@@ -1794,7 +1794,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 			goto put_err_out;
 		}
 		/* Now allocate memory for the attribute list. */
-		ni->attr_list_size = (u32)attribute_value_length(ctx->attr);
+		ni->attr_list_size = (u32)ntfs_attr_size(ctx->attr);
 		ni->attr_list = ntfs_malloc_nofs(ni->attr_list_size);
 		if (!ni->attr_list) {
 			ntfs_error(sb, "Not enough memory to allocate buffer "
@@ -2284,12 +2284,38 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
  */
 void ntfs_truncate(struct inode *vi)
 {
-	// TODO: Implement...
-	ntfs_warning(vi->i_sb, "Eeek: i_size may have changed!  If you see "
-			"this right after a message from "
-			"ntfs_prepare_{,nonresident_}write() then just ignore "
-			"it.  Otherwise it is bad news.");
-	// TODO: reset i_size now!
+	ntfs_inode *ni = NTFS_I(vi);
+	ntfs_attr_search_ctx *ctx;
+	MFT_RECORD *m;
+
+	m = map_mft_record(ni);
+	if (IS_ERR(m)) {
+		ntfs_error(vi->i_sb, "Failed to map mft record for inode 0x%lx "
+				"(error code %ld).", vi->i_ino, PTR_ERR(m));
+		if (PTR_ERR(m) != ENOMEM)
+			make_bad_inode(vi);
+		return;
+	}
+	ctx = ntfs_attr_get_search_ctx(ni, m);
+	if (unlikely(!ctx)) {
+		ntfs_error(vi->i_sb, "Failed to allocate a search context: "
+				"Not enough memory");
+		// FIXME: We can't report an error code upstream.  So what do
+		// we do?!?  make_bad_inode() seems a bit harsh...
+		unmap_mft_record(ni);
+		goto out;
+	}
+	/* If the size has not changed there is nothing to do. */
+	if (ntfs_attr_size(ctx->attr) == i_size_read(vi))
+		goto out;
+	// TODO: Implement the truncate...
+	ntfs_error(vi->i_sb, "Inode size has changed but this is not "
+			"implemented yet.  Resetting inode size to old value. "
+			" This is most likely a bug in the ntfs driver!");
+	i_size_write(vi, ntfs_attr_size(ctx->attr)); 
+out:
+	ntfs_attr_put_search_ctx(ctx);
+	unmap_mft_record(ni);
 	return;
 }
 

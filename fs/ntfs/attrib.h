@@ -89,7 +89,7 @@ int ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 extern int load_attribute_list(ntfs_volume *vol, runlist *rl, u8 *al_start,
 		const s64 size, const s64 initialized_size);
 
-static inline s64 attribute_value_length(const ATTR_RECORD *a)
+static inline s64 ntfs_attr_size(const ATTR_RECORD *a)
 {
 	if (!a->non_resident)
 		return (s64)le32_to_cpu(a->data.resident.value_length);
