@@ -1076,7 +1076,7 @@ marvel_agp_info(void)
 	/*
 	 * Fill it in.
 	 */
-	agp->type = 0 /* FIXME: ALPHA_CORE_AGP */;
+	agp->type = ALPHA_CORE_AGP;
 	agp->hose = hose;
 	agp->private = NULL;
 	agp->ops = &marvel_agp_ops;
