@@ -415,6 +415,21 @@ config WDT_501_FAN
 comment "PCI-based Watchdog Cards"
 	depends on WATCHDOG && PCI
 
+config PCIPCWATCHDOG
+	tristate "Berkshire Products PCI-PC Watchdog"
+	depends on WATCHDOG && PCI
+	---help---
+	  This is the driver for the Berkshire Products PCI-PC Watchdog card.
+	  This card simply watches your kernel to make sure it doesn't freeze,
+	  and if it does, it reboots your computer after a certain amount of
+	  time. The card can also monitor the internal temperature of the PC.
+	  More info is available at <http://www.berkprod.com/pci_pc_watchdog.htm>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called pcwd_pci.
+
+	  Most people will say N.
+
 config WDTPCI
 	tristate "WDT PCI Watchdog timer"
 	depends on WATCHDOG && PCI
