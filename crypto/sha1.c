@@ -8,7 +8,7 @@
  * implementation written by Steve Raid.
  *
  * Copyright (c) Alan Smithee.
- * Copyright (c) McDonald <andrew@mcdonald.org.uk>
+ * Copyright (c) Andrew McDonald <andrew@mcdonald.org.uk>
  * Copyright (c) Jean-Francois Dive <jef@linuxbe.org>
  *
  * This program is free software; you can redistribute it and/or modify it
