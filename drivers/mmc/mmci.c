@@ -62,6 +62,7 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 static void mmci_stop_data(struct mmci_host *host)
 {
 	writel(0, host->base + MMCIDATACTRL);
+	writel(0, host->base + MMCIMASK1);
 	host->data = NULL;
 	host->buffer = NULL;
 }
@@ -100,6 +101,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	}
 
 	writel(datactrl, base + MMCIDATACTRL);
+	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
 	writel(irqmask, base + MMCIMASK1);
 }
 
@@ -216,15 +218,6 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
 				readsl(base + MMCIFIFO, host->buffer, count >> 2);
 				host->buffer += count;
 				host->size -= count;
-				if (host->size == 0)
-					host->buffer = NULL;
-			} else {
-				static int first = 1;
-				if (first) {
-					first = 0;
-					printk(KERN_ERR "MMCI: sinking excessive data\n");
-				}
-				readl(base + MMCIFIFO);
 			}
 		}
 
@@ -242,19 +235,21 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 			host->buffer += count;
 			host->size -= count;
-
-			/*
-			 * If we run out of data, disable the data IRQs;
-			 * this prevents a race where the FIFO becomes
-			 * empty before the chip itself has disabled the
-			 * data path.
-			 */
-			if (host->size == 0)
-				writel(0, base + MMCIMASK1);
 		}
 
 		ret = 1;
 	} while (status);
+
+	/*
+	 * If we run out of data, disable the data IRQs; this
+	 * prevents a race where the FIFO becomes empty before
+	 * the chip itself has disabled the data path, and
+	 * stops us racing with our data end IRQ.
+	 */
+	if (host->size == 0) {
+		writel(0, base + MMCIMASK1);
+		writel(readl(base + MMCIMASK0) | MCI_DATAENDMASK, base + MMCIMASK0);
+	}
 
 	return IRQ_RETVAL(ret);
 }
