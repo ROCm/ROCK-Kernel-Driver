@@ -466,7 +466,7 @@ int lance_open (struct net_device *dev)
                 return -EAGAIN;
 
         res = lance_reset(dev);
-	lp->devlock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&lp->devlock);
 	netif_start_queue (dev);
 
 	return res;
