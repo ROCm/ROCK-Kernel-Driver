@@ -630,13 +630,11 @@ int mga_do_cleanup_dma( drm_device_t *dev )
 {
 	DRM_DEBUG( "\n" );
 
-#if __HAVE_IRQ
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
 	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
-#endif
 
 	if ( dev->dev_private ) {
 		drm_mga_private_t *dev_priv = dev->dev_private;
@@ -813,7 +811,12 @@ static int mga_driver_dma_quiescent(drm_device_t *dev)
 
 void mga_driver_register_fns(drm_device_t *dev)
 {
-	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR;
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL;
 	dev->fn_tbl.pretakedown = mga_driver_pretakedown;
 	dev->fn_tbl.dma_quiescent = mga_driver_dma_quiescent;
+	dev->fn_tbl.vblank_wait = mga_driver_vblank_wait;
+	dev->fn_tbl.irq_preinstall = mga_driver_irq_preinstall;
+	dev->fn_tbl.irq_postinstall = mga_driver_irq_postinstall;
+	dev->fn_tbl.irq_uninstall = mga_driver_irq_uninstall;
+	dev->fn_tbl.irq_handler = mga_driver_irq_handler;
 }

@@ -35,16 +35,6 @@
 
 #include "drmP.h"
 
-
-#ifndef __HAVE_DMA_WAITQUEUE
-#define __HAVE_DMA_WAITQUEUE	0
-#endif
-#ifndef __HAVE_DMA_RECLAIM
-#define __HAVE_DMA_RECLAIM	0
-#endif
-
-#if __HAVE_DMA
-
 /**
  * Initialize the DMA data.
  * 
@@ -152,12 +142,11 @@ void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
 	buf->filp     = NULL;
 	buf->used     = 0;
 
-	if ( __HAVE_DMA_WAITQUEUE && waitqueue_active(&buf->dma_wait)) {
+	if (drm_core_check_feature(dev, DRIVER_DMA_QUEUE) && waitqueue_active(&buf->dma_wait)) {
 		wake_up_interruptible(&buf->dma_wait);
 	}
 }
 
-#if !__HAVE_DMA_RECLAIM
 /**
  * Reclaim the buffers.
  *
@@ -165,7 +154,7 @@ void DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf)
  *
  * Frees each buffer associated with \p filp not already on the hardware.
  */
-void DRM(reclaim_buffers)( struct file *filp )
+void DRM(core_reclaim_buffers)( struct file *filp )
 {
 	drm_file_t    *priv   = filp->private_data;
 	drm_device_t  *dev    = priv->dev;
@@ -189,29 +178,4 @@ void DRM(reclaim_buffers)( struct file *filp )
 		}
 	}
 }
-#endif
 
-#if !__HAVE_IRQ
-/* This stub DRM_IOCTL_CONTROL handler is for the drivers that used to require
- * IRQs for DMA but no longer do.  It maintains compatibility with the X Servers
- * that try to use the control ioctl by simply returning success.
- */
-int DRM(control)( struct inode *inode, struct file *filp,
-		  unsigned int cmd, unsigned long arg )
-{
-	drm_control_t ctl;
-
-	if ( copy_from_user( &ctl, (drm_control_t __user *)arg, sizeof(ctl) ) )
-		return -EFAULT;
-
-	switch ( ctl.func ) {
-	case DRM_INST_HANDLER:
-	case DRM_UNINST_HANDLER:
-		return 0;
-	default:
-		return -EINVAL;
-	}
-}
-#endif
-
-#endif /* __HAVE_DMA */

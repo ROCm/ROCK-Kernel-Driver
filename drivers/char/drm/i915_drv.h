@@ -73,6 +73,11 @@ extern int i915_irq_wait(DRM_IOCTL_ARGS);
 extern int i915_wait_irq(drm_device_t * dev, int irq_nr);
 extern int i915_emit_irq(drm_device_t * dev);
 
+extern irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS);
+extern void i915_driver_irq_preinstall(drm_device_t *dev);
+extern void i915_driver_irq_postinstall(drm_device_t *dev);
+extern void i915_driver_irq_uninstall(drm_device_t *dev);
+
 /* i915_mem.c */
 extern int i915_mem_alloc(DRM_IOCTL_ARGS);
 extern int i915_mem_free(DRM_IOCTL_ARGS);

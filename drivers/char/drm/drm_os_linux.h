@@ -58,13 +58,13 @@ struct no_agp_kern {
 static __inline__ int mtrr_add (unsigned long base, unsigned long size,
                                 unsigned int type, char increment)
 {
-    return -ENODEV;
+	return -ENODEV;
 }
 
 static __inline__ int mtrr_del (int reg, unsigned long base,
                                 unsigned long size)
 {
-    return -ENODEV;
+	return -ENODEV;
 }
 #define MTRR_TYPE_WRCOMB     1
 

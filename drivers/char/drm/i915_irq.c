@@ -17,7 +17,8 @@
 #define MAX_NOPID ((u32)~0)
 #define READ_BREADCRUMB(dev_priv)  (((u32*)(dev_priv->hw_status_page))[5])
 
-irqreturn_t DRM(irq_handler) (DRM_IRQ_ARGS) {
+irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
+{
 	drm_device_t *dev = (drm_device_t *) arg;
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	u16 temp;
@@ -135,7 +136,8 @@ int i915_irq_wait(DRM_IOCTL_ARGS)
 
 /* drm_dma.h hooks
 */
-void DRM(driver_irq_preinstall) (drm_device_t * dev) {
+void i915_driver_irq_preinstall(drm_device_t * dev)
+{
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 
 	I915_WRITE16(I915REG_HWSTAM, 0xfffe);
@@ -143,14 +145,16 @@ void DRM(driver_irq_preinstall) (drm_device_t * dev) {
 	I915_WRITE16(I915REG_INT_ENABLE_R, 0x0);
 }
 
-void DRM(driver_irq_postinstall) (drm_device_t * dev) {
+void i915_driver_irq_postinstall(drm_device_t * dev)
+{
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 
 	I915_WRITE16(I915REG_INT_ENABLE_R, USER_INT_FLAG);
 	DRM_INIT_WAITQUEUE(&dev_priv->irq_queue);
 }
 
-void DRM(driver_irq_uninstall) (drm_device_t * dev) {
+void i915_driver_irq_uninstall(drm_device_t * dev)
+{
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	if (!dev_priv)
 		return;

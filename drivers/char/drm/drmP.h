@@ -88,13 +88,11 @@
 #define DRIVER_USE_MTRR    0x4
 #define DRIVER_PCI_DMA     0x8
 #define DRIVER_SG          0x10
-
-#ifndef __HAVE_DMA
-#define __HAVE_DMA		0
-#endif
-#ifndef __HAVE_IRQ
-#define __HAVE_IRQ		0
-#endif
+#define DRIVER_HAVE_DMA    0x20
+#define DRIVER_HAVE_IRQ    0x40
+#define DRIVER_IRQ_SHARED  0x80
+#define DRIVER_IRQ_VBL     0x100
+#define DRIVER_DMA_QUEUE   0x200
 
 /***********************************************************************/
 /** \name Begin the DRM... */
@@ -533,7 +531,6 @@ typedef struct drm_ctx_list {
 	drm_file_t		*tag;   /**< associated fd private data */
 } drm_ctx_list_t;
 
-#ifdef __HAVE_VBL_IRQ
 
 typedef struct drm_vbl_sig {
 	struct list_head	head;
@@ -542,7 +539,6 @@ typedef struct drm_vbl_sig {
 	struct task_struct	*task;
 } drm_vbl_sig_t;
 
-#endif
 
 /** 
  * DRM device functions structure
@@ -565,7 +561,17 @@ struct drm_driver_fn {
 	int (*context_ctor)(struct drm_device *dev, int context);
  	int (*context_dtor)(struct drm_device *dev, int context);
  	int (*kernel_context_switch)(struct drm_device *dev, int old, int new);
- 	int (*kernel_context_switch_unlock)(struct drm_device *dev);
+	void (*kernel_context_switch_unlock)(struct drm_device *dev, drm_lock_t *lock);
+	int (*vblank_wait)(struct drm_device *dev, unsigned int *sequence);
+	/* these have to be filled in */
+	irqreturn_t (*irq_handler)( DRM_IRQ_ARGS );
+ 	void (*irq_preinstall)(struct drm_device *dev);
+ 	void (*irq_postinstall)(struct drm_device *dev);
+ 	void (*irq_uninstall)(struct drm_device *dev);
+	void (*reclaim_buffers)(struct file *filp);
+	unsigned long (*get_map_ofs)(drm_map_t *map);
+	unsigned long (*get_reg_ofs)(struct drm_device *dev);
+	void (*set_version)(struct drm_device *dev, drm_set_version_t *sv);
 };
 /**
  * DRM device structure.
@@ -655,13 +661,13 @@ typedef struct drm_device {
 	struct work_struct	work;
 	/** \name VBLANK IRQ support */
 	/*@{*/
-#ifdef __HAVE_VBL_IRQ
+
    	wait_queue_head_t vbl_queue;	/**< VBLANK wait queue */
    	atomic_t          vbl_received;
 	spinlock_t        vbl_lock;
 	drm_vbl_sig_t     vbl_sigs;	/**< signal list to send on VBLANK */
 	unsigned int      vbl_pending;
-#endif
+
 	/*@}*/
 	cycles_t	  ctx_start;
 	cycles_t	  lck_start;
@@ -864,7 +870,6 @@ extern int	     DRM(addmap)( struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg );
 extern int	     DRM(rmmap)( struct inode *inode, struct file *filp,
 				 unsigned int cmd, unsigned long arg );
-#if __HAVE_DMA
 extern int	     DRM(addbufs)( struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg );
 extern int	     DRM(infobufs)( struct inode *inode, struct file *filp,
@@ -881,31 +886,21 @@ extern int	     DRM(dma_setup)(drm_device_t *dev);
 extern void	     DRM(dma_takedown)(drm_device_t *dev);
 extern void	     DRM(free_buffer)(drm_device_t *dev, drm_buf_t *buf);
 extern void	     DRM(reclaim_buffers)( struct file *filp );
-#endif /* __HAVE_DMA */
 
 				/* IRQ support (drm_irq.h) */
-#if __HAVE_IRQ || __HAVE_DMA
 extern int           DRM(control)( struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg );
-#endif
-#if __HAVE_IRQ
 extern int           DRM(irq_install)( drm_device_t *dev );
 extern int           DRM(irq_uninstall)( drm_device_t *dev );
 extern irqreturn_t   DRM(irq_handler)( DRM_IRQ_ARGS );
 extern void          DRM(driver_irq_preinstall)( drm_device_t *dev );
 extern void          DRM(driver_irq_postinstall)( drm_device_t *dev );
 extern void          DRM(driver_irq_uninstall)( drm_device_t *dev );
-#ifdef __HAVE_VBL_IRQ
+
 extern int           DRM(wait_vblank)(struct inode *inode, struct file *filp,
 				      unsigned int cmd, unsigned long arg);
 extern int           DRM(vblank_wait)(drm_device_t *dev, unsigned int *vbl_seq);
 extern void          DRM(vbl_send_signals)( drm_device_t *dev );
-#endif
-#ifdef __HAVE_IRQ_BH
-extern void          DRM(irq_immediate_bh)( void *dev );
-#endif
-#endif
-
 
 				/* AGP/GART support (drm_agpsupport.h) */
 extern drm_agp_head_t *DRM(agp_init)(void);
@@ -997,6 +992,9 @@ static __inline__ void drm_core_dropmap(struct drm_map *map)
 {
 }
 /*@}*/
+
+extern unsigned long DRM(core_get_map_ofs)(drm_map_t *map);
+extern unsigned long DRM(core_get_reg_ofs)(struct drm_device *dev);
 
 #endif /* __KERNEL__ */
 #endif

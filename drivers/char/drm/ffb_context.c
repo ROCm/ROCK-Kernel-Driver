@@ -354,7 +354,7 @@ static void FFBWait(ffb_fbcPtr ffb)
 	} while (--limit);
 }
 
-int DRM(context_switch)(drm_device_t *dev, int old, int new)
+int ffb_driver_context_switch(drm_device_t *dev, int old, int new)
 {
 	ffb_dev_priv_t *fpriv = (ffb_dev_priv_t *) dev->dev_private;
 
@@ -380,7 +380,7 @@ int DRM(context_switch)(drm_device_t *dev, int old, int new)
         return 0;
 }
 
-int DRM(resctx)(struct inode *inode, struct file *filp, unsigned int cmd,
+int ffb_driver_resctx(struct inode *inode, struct file *filp, unsigned int cmd,
 		unsigned long arg)
 {
 	drm_ctx_res_t	res;
@@ -407,7 +407,7 @@ int DRM(resctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 }
 
 
-int DRM(addctx)(struct inode *inode, struct file *filp, unsigned int cmd,
+int ffb_driver_addctx(struct inode *inode, struct file *filp, unsigned int cmd,
 		unsigned long arg)
 {
 	drm_file_t	*priv	= filp->private_data;
@@ -428,7 +428,7 @@ int DRM(addctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	return 0;
 }
 
-int DRM(modctx)(struct inode *inode, struct file *filp, unsigned int cmd,
+int ffb_driver_modctx(struct inode *inode, struct file *filp, unsigned int cmd,
 		unsigned long arg)
 {
 	drm_file_t	*priv	= filp->private_data;
@@ -457,7 +457,7 @@ int DRM(modctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	return 0;
 }
 
-int DRM(getctx)(struct inode *inode, struct file *filp, unsigned int cmd,
+int ffb_driver_getctx(struct inode *inode, struct file *filp, unsigned int cmd,
 		unsigned long arg)
 {
 	drm_file_t	*priv	= filp->private_data;
@@ -489,7 +489,7 @@ int DRM(getctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	return 0;
 }
 
-int DRM(switchctx)(struct inode *inode, struct file *filp, unsigned int cmd,
+int ffb_driver_switchctx(struct inode *inode, struct file *filp, unsigned int cmd,
 		   unsigned long arg)
 {
 	drm_file_t	*priv	= filp->private_data;
@@ -499,10 +499,10 @@ int DRM(switchctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	if (copy_from_user(&ctx, (drm_ctx_t  __user *)arg, sizeof(ctx)))
 		return -EFAULT;
 	DRM_DEBUG("%d\n", ctx.handle);
-	return DRM(context_switch)(dev, dev->last_context, ctx.handle);
+	return ffb_driver_context_switch(dev, dev->last_context, ctx.handle);
 }
 
-int DRM(newctx)(struct inode *inode, struct file *filp, unsigned int cmd,
+int ffb_driver_newctx(struct inode *inode, struct file *filp, unsigned int cmd,
 		unsigned long arg)
 {
 	drm_ctx_t	ctx;
@@ -514,7 +514,7 @@ int DRM(newctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	return 0;
 }
 
-int DRM(rmctx)(struct inode *inode, struct file *filp, unsigned int cmd,
+int ffb_driver_rmctx(struct inode *inode, struct file *filp, unsigned int cmd,
 	       unsigned long arg)
 {
 	drm_ctx_t	ctx;
@@ -538,62 +538,14 @@ int DRM(rmctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	return 0;
 }
 
-static void ffb_driver_release(drm_device_t *dev)
+void ffb_set_context_ioctls(void)
 {
-	ffb_dev_priv_t *fpriv = (ffb_dev_priv_t *) dev->dev_private;
-	int context = _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock);
-	int idx;
+	DRM(ioctls)[DRM_IOCTL_NR(DRM_IOCTL_ADD_CTX)].func = ffb_driver_addctx;
+	DRM(ioctls)[DRM_IOCTL_NR(DRM_IOCTL_RM_CTX)].func = ffb_driver_rmctx;
+	DRM(ioctls)[DRM_IOCTL_NR(DRM_IOCTL_MOD_CTX)].func = ffb_driver_modctx;
+	DRM(ioctls)[DRM_IOCTL_NR(DRM_IOCTL_GET_CTX)].func = ffb_driver_getctx;
+	DRM(ioctls)[DRM_IOCTL_NR(DRM_IOCTL_SWITCH_CTX)].func = ffb_driver_switchctx;
+	DRM(ioctls)[DRM_IOCTL_NR(DRM_IOCTL_NEW_CTX)].func = ffb_driver_newctx;
+	DRM(ioctls)[DRM_IOCTL_NR(DRM_IOCTL_RES_CTX)].func = ffb_driver_resctx;
 
-	idx = context - 1;
-	if (fpriv &&
-	    context != DRM_KERNEL_CONTEXT &&
-	    fpriv->hw_state[idx] != NULL) {
-		kfree(fpriv->hw_state[idx]);
-		fpriv->hw_state[idx] = NULL;
-	}	
-}
-
-static int ffb_driver_presetup(drm_device_t *dev)
-{
-	int ret;
-	ret = ffb_presetup(dev);
-	if (_ret != 0) return ret;
-}
-
-static void ffb_driver_pretakedown(drm_device_t *dev)
-{
-	if (dev->dev_private) kfree(dev->dev_private);
-}
-
-static void ffb_driver_postcleanup(drm_device_t *dev)
-{
-	if (ffb_position != NULL) kfree(ffb_position);
-}
-
-static int ffb_driver_kernel_context_switch_unlock(struct drm_device *dev)
-{
-	dev->lock.filp = 0;
-	{
-		__volatile__ unsigned int *plock = &dev->lock.hw_lock->lock;
-		unsigned int old, new, prev, ctx;
-		
-		ctx = lock.context;
-		do {
-			old  = *plock;
-			new  = ctx;
-			prev = cmpxchg(plock, old, new);
-		} while (prev != old);
-	}
-	wake_up_interruptible(&dev->lock.lock_queue);
-}
-
-static void ffb_driver_register_fns(drm_device_t *dev)
-{
-	DRM(fops).get_unmapped_area = ffb_get_unmapped_area;
-	dev->fn_tbl.release = ffb_driver_release;
-	dev->fn_tbl.presetup = ffb_driver_presetup;
-	dev->fn_tbl.pretakedown = ffb_driver_pretakedown;
-	dev->fn_tbl.postcleanup = ffb_driver_postcleanup;
-	dev->fn_tbl.kernel_context_switch = ffb_context_switch;
-	dev->fn_tbl.kernel_context_switch_unlock = ffb_driver_kernel_context_switch_unlock;
 }
