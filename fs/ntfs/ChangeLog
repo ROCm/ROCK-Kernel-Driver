@@ -110,6 +110,14 @@ ToDo/Notes:
 	- Fix callers of fs/ntfs/aops.c::mark_ntfs_record_dirty() to call it
 	  with the ntfs inode which contains the page rather than the ntfs
 	  inode the mft record of which is in the page.
+	- Fix race condition in fs/ntfs/inode.c::ntfs_put_inode() by moving the
+	  index inode bitmap inode release code from there to
+	  fs/ntfs/inode.c::ntfs_clear_big_inode().  (Thanks to Christoph
+	  Hellwig for spotting this.)
+	- Fix race condition in fs/ntfs/inode.c::ntfs_put_inode() by taking the
+	  inode semaphore around the code thst sets ni->itype.index.bmp_ino to
+	  NULL and reorganize the code to optimize it a bit.  (Thanks to
+	  Christoph Hellwig for spotting this.)
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 

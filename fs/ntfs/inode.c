@@ -2095,37 +2095,24 @@ err_out:
  * dropped, we need to put the attribute inode for the directory index bitmap,
  * if it is present, otherwise the directory inode would remain pinned for
  * ever.
- *
- * If the inode @vi is an index inode with only one reference which is being
- * dropped, we need to put the attribute inode for the index bitmap, if it is
- * present, otherwise the index inode would disappear and the attribute inode
- * for the index bitmap would no longer be referenced from anywhere and thus it
- * would remain pinned for ever.
  */
 void ntfs_put_inode(struct inode *vi)
 {
-	ntfs_inode *ni;
-
-	if (S_ISDIR(vi->i_mode)) {
-		if (atomic_read(&vi->i_count) == 2) {
-			ni = NTFS_I(vi);
-			if (NInoIndexAllocPresent(ni) &&
-					ni->itype.index.bmp_ino) {
-				iput(ni->itype.index.bmp_ino);
-				ni->itype.index.bmp_ino = NULL;
+	if (S_ISDIR(vi->i_mode) && atomic_read(&vi->i_count) == 2) {
+		ntfs_inode *ni = NTFS_I(vi);
+		if (NInoIndexAllocPresent(ni)) {
+			struct inode *bvi = NULL;
+			down(&vi->i_sem);
+			if (atomic_read(&vi->i_count) == 2) {
+				bvi = ni->itype.index.bmp_ino;
+				if (bvi)
+					ni->itype.index.bmp_ino = NULL;
 			}
+			up(&vi->i_sem);
+			if (bvi)
+				iput(bvi);
 		}
-		return;
 	}
-	if (atomic_read(&vi->i_count) != 1)
-		return;
-	ni = NTFS_I(vi);
-	if (NInoAttr(ni) && (ni->type == AT_INDEX_ALLOCATION) &&
-			NInoIndexAllocPresent(ni) && ni->itype.index.bmp_ino) {
-		iput(ni->itype.index.bmp_ino);
-		ni->itype.index.bmp_ino = NULL;
-	}
-	return;
 }
 
 void __ntfs_clear_inode(ntfs_inode *ni)
@@ -2193,6 +2180,18 @@ void ntfs_clear_big_inode(struct inode *vi)
 {
 	ntfs_inode *ni = NTFS_I(vi);
 
+	/*
+	 * If the inode @vi is an index inode we need to put the attribute
+	 * inode for the index bitmap, if it is present, otherwise the index
+	 * inode would disappear and the attribute inode for the index bitmap
+	 * would no longer be referenced from anywhere and thus it would remain
+	 * pinned for ever.
+	 */
+	if (NInoAttr(ni) && (ni->type == AT_INDEX_ALLOCATION) &&
+			NInoIndexAllocPresent(ni) && ni->itype.index.bmp_ino) {
+		iput(ni->itype.index.bmp_ino);
+		ni->itype.index.bmp_ino = NULL;
+	}
 #ifdef NTFS_RW
 	if (NInoDirty(ni)) {
 		BOOL was_bad = (is_bad_inode(vi));
