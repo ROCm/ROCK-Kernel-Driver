@@ -127,14 +127,12 @@ static int hpfb_blank(int blank, struct fb_info *info)
 
 static void topcat_blit(int x0, int y0, int x1, int y1, int w, int h, int rr)
 {
-	if (rr >= 0)
-	{
+	if (rr >= 0) {
 		while (in_8(fb_regs + BUSY) & fb_bitmask)
 			;
 	}
 	out_8(fb_regs + TC_FBEN, fb_bitmask);
-	if (rr >= 0)
-	{
+	if (rr >= 0) {
 		out_8(fb_regs + TC_WEN, fb_bitmask);
 		out_8(fb_regs + WMRR, rr);
 	}
@@ -221,13 +219,11 @@ static int __init hpfb_init_one(unsigned long phys_base, unsigned long virt_base
 
 	fb_info.fix.smem_start = (in_8(fb_regs + fboff) << 16);
 
-	if (phys_base >= DIOII_BASE)
-	{
+	if (phys_base >= DIOII_BASE) {
 		fb_info.fix.smem_start += phys_base;
 	}
 
-	if (DIO_SECID(fb_regs) != DIO_ID2_TOPCAT)
-	{
+	if (DIO_SECID(fb_regs) != DIO_ID2_TOPCAT) {
 		/* This is the magic incantation the HP X server uses to make Catseye boards work. */
 		while (in_be16(fb_regs+0x4800) & 1)
 			;
@@ -299,8 +295,7 @@ static int __init hpfb_init_one(unsigned long phys_base, unsigned long virt_base
 
 	fb_alloc_cmap(&fb_info.cmap, 1 << hpfb_defined.bits_per_pixel, 0);
 
-	if (register_framebuffer(&fb_info) < 0)
-	{
+	if (register_framebuffer(&fb_info) < 0) {
 		fb_dealloc_cmap(&fb_info.cmap);
 		return 1;
 	}
@@ -322,6 +317,51 @@ static int __init hpfb_init_one(unsigned long phys_base, unsigned long virt_base
 /* 
  * Initialise the framebuffer
  */
+static int __devinit hpfb_dio_probe(struct dio_dev * d, const struct dio_device_id * ent)
+{
+	unsigned long paddr, vaddr;
+
+	paddr = d->resource.start;
+	if (!request_mem_region(d->resource.start, d->resource.end - d->resource.start, d->name))
+                return -EBUSY;
+
+	if (d->scode >= DIOII_SCBASE) {
+		vaddr = (unsigned long)ioremap(paddr, d->resource.end - d->resource.start);
+	} else {
+		vaddr = paddr + DIO_VIRADDRBASE;
+	}
+	printk(KERN_INFO "Topcat found at DIO select code %d "
+	       "(secondary id %02x)\n", d->scode, (d->id >> 8) & 0xff);
+	if (hpfb_init_one(paddr, vaddr)) {
+		if (d->scode >= DIOII_SCBASE)
+			iounmap((void *)vaddr);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static void __devexit hpfb_remove_one(struct dio_dev *d)
+{
+	unregister_framebuffer(&fb_info);
+	if (d->scode >= DIOII_SCBASE)
+		iounmap((void *)fb_regs);
+        release_mem_region(d->resource.start, d->resource.end - d->resource.start);
+}
+
+static struct dio_device_id hpfb_dio_tbl[] = {
+    { DIO_ENCODE_ID(DIO_ID_FBUFFER, DIO_ID2_LRCATSEYE) },
+    { DIO_ENCODE_ID(DIO_ID_FBUFFER, DIO_ID2_HRCCATSEYE) },
+    { DIO_ENCODE_ID(DIO_ID_FBUFFER, DIO_ID2_HRMCATSEYE) },
+    { DIO_ENCODE_ID(DIO_ID_FBUFFER, DIO_ID2_TOPCAT) },
+    { 0 }
+};
+
+static struct dio_driver hpfb_driver = {
+    .name      = "hpfb",
+    .id_table  = hpfb_dio_tbl,
+    .probe     = hpfb_dio_probe,
+    .remove    = __devexit_p(hpfb_remove_one),
+};
 
 int __init hpfb_init(void)
 {
@@ -347,63 +387,30 @@ int __init hpfb_init(void)
 	if (fb_get_options("hpfb", NULL))
 		return -ENODEV;
 
+	dio_module_init(&hpfb_driver);
+
 	fs = get_fs();
 	set_fs(KERNEL_DS);
 	err = get_user(i, (unsigned char *)INTFBVADDR + DIO_IDOFF);
 	set_fs(fs);
 
-	if (!err && (i == DIO_ID_FBUFFER) && topcat_sid_ok(sid = DIO_SECID(INTFBVADDR)))
-	{
+	if (!err && (i == DIO_ID_FBUFFER) && topcat_sid_ok(sid = DIO_SECID(INTFBVADDR))) {
+		if (!request_mem_region(INTFBPADDR, DIO_DEVSIZE, "Internal Topcat"))
+			return -EBUSY;
 		printk(KERN_INFO "Internal Topcat found (secondary id %02x)\n", sid);
-		if (hpfb_init_one(INTFBPADDR, INTFBVADDR))
-		{
+		if (hpfb_init_one(INTFBPADDR, INTFBVADDR)) {
 			return -ENOMEM;
 		}
 	}
-	else
-	{
-		int sc, size;
-		unsigned long paddr, vaddr;
-
-		if ((sc = dio_find(DIO_ENCODE_ID(DIO_ID_FBUFFER, DIO_ID2_LRCATSEYE))) < 0 &&
-		    (sc = dio_find(DIO_ENCODE_ID(DIO_ID_FBUFFER, DIO_ID2_HRCCATSEYE))) < 0 &&
-		    (sc = dio_find(DIO_ENCODE_ID(DIO_ID_FBUFFER, DIO_ID2_HRMCATSEYE))) < 0 &&
-		    (sc = dio_find(DIO_ENCODE_ID(DIO_ID_FBUFFER, DIO_ID2_TOPCAT))) < 0)
-		{
-			return -ENXIO;
-		}
-
-		dio_config_board(sc);
-		paddr = dio_scodetophysaddr(sc);
-
-		if (sc >= DIOII_SCBASE)
-		{
-			/* To find out the real size of the device we first need to map it. */
-			vaddr = (unsigned long)ioremap(paddr, PAGE_SIZE);
-			size = DIO_SIZE(sc, vaddr);
-			iounmap((void *)vaddr);
-			vaddr = (unsigned long)ioremap(paddr, size);
-		}
-		else
-		{
-			vaddr = paddr + DIO_VIRADDRBASE;
-			size = DIO_SIZE(sc, vaddr);
-		}
-		sid = DIO_SECID(vaddr);
-
-		printk(KERN_INFO "Topcat found at DIO select code %d "
-		       "(secondary id %02x)\n", sc, sid);
-		if (hpfb_init_one(paddr, vaddr))
-		{
-			if (sc >= DIOII_SCBASE)
-				iounmap((void *)vaddr);
-			dio_unconfig_board(sc);
-			return -ENOMEM;
-		}
-	}
-
 	return 0;
 }
 
+void __exit hpfb_cleanup_module(void)
+{
+	dio_unregister_driver(&hpfb_driver);
+}
+
 module_init(hpfb_init);
+module_exit(hpfb_cleanup_module);
+
 MODULE_LICENSE("GPL");

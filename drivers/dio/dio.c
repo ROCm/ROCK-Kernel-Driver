@@ -1,5 +1,6 @@
 /* Code to support devices on the DIO and DIO-II bus
  * Copyright (C) 05/1998 Peter Maydell <pmaydell@chiark.greenend.org.uk>
+ * Copyright (C) 2004 Jochen Friedrich <jochen@scram.de>
  * 
  * This code has basically these routines at the moment:
  * int dio_find(u_int deviceid)
@@ -23,14 +24,25 @@
  * This file is based on the way the Amiga port handles Zorro II cards, 
  * although we aren't so complicated...
  */
-#include <linux/config.h>
-#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/string.h>
 #include <linux/types.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/dio.h>
 #include <linux/slab.h>                         /* kmalloc() */
-#include <linux/init.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>                             /* readb() */
+
+struct dio_bus dio_bus = {
+	.resources = {
+		/* DIO range */
+		{ .name = "DIO mem", .start = 0x00600000, .end = 0x007fffff },
+		/* DIO-II range */
+		{ .name = "DIO-II mem", .start = 0x01000000, .end = 0x1fffffff }
+	},
+	.name = "DIO bus"
+};
 
 /* not a real config option yet! */
 #define CONFIG_DIO_CONSTANTS
@@ -99,30 +111,16 @@ static char dio_no_name[] = { 0 };
 
 #endif /* CONFIG_DIO_CONSTANTS */
 
-/* We represent all the DIO boards in the system with a linked list of these structs. */
-struct dioboard
+int __init dio_find(int deviceid)
 {
-        struct dioboard *next;                    /* link to next struct in list */
-        int ipl;                                  /* IPL of this board */
-        int configured;                           /* has this board been configured? */
-        int scode;                                /* select code of this board */
-        int id;                                   /* encoded ID */
-        const char *name;
-};
-
-static struct dioboard *blist = NULL;
-
-static int __init dio_find_slow(int deviceid)
-{
-	/* Called to find a DIO device before the full bus scan has run.  Basically
-	 * only used by the console driver.
+	/* Called to find a DIO device before the full bus scan has run.
+	 * Only used by the console driver.
 	 */
 	int scode, id;
 	u_char prid, secid, i;
 	mm_segment_t fs;
 
-	for (scode = 0; scode < DIO_SCMAX; scode++)
-	{
+	for (scode = 0; scode < DIO_SCMAX; scode++) {
 		void *va;
 		unsigned long pa;
 
@@ -142,8 +140,7 @@ static int __init dio_find_slow(int deviceid)
 		fs = get_fs();
 		set_fs(KERNEL_DS);
 
-                if (get_user(i, (unsigned char *)va + DIO_IDOFF))
-		{
+                if (get_user(i, (unsigned char *)va + DIO_IDOFF)) {
 			set_fs(fs);
 			if (scode >= DIOII_SCBASE)
 				iounmap(va);
@@ -153,16 +150,13 @@ static int __init dio_find_slow(int deviceid)
 		set_fs(fs);
 		prid = DIO_ID(va);
 
-                if (DIO_NEEDSSECID(prid))
-                {
+                if (DIO_NEEDSSECID(prid)) {
                         secid = DIO_SECID(va);
                         id = DIO_ENCODE_ID(prid, secid);
-                }
-                else
+                } else
 			id = prid;
 
-		if (id == deviceid)
-		{
+		if (id == deviceid) {
 			if (scode >= DIOII_SCBASE)
 				iounmap(va);
 			return scode;
@@ -172,35 +166,32 @@ static int __init dio_find_slow(int deviceid)
 	return -1;
 }
 
-int dio_find(int deviceid)
-{
-	if (blist)
-	{
-		/* fast way */
-		struct dioboard *b;
-		for (b = blist; b; b = b->next)
-			if (b->id == deviceid && b->configured == 0)
-				return b->scode;
-		return -1;
-	}
-	else
-	{
-		return dio_find_slow(deviceid);
-	}
-}
-
 /* This is the function that scans the DIO space and works out what
  * hardware is actually present.
  */
 static int __init dio_init(void)
 {
 	int scode;
-	struct dioboard *b, *bprev = NULL;
 	mm_segment_t fs;
-	char i;
-   
+	int i;
+	struct dio_dev *dev;
+
+	if (!MACH_IS_HP300)
+		return 0;
+
         printk(KERN_INFO "Scanning for DIO devices...\n");
-        
+
+	/* Initialize the DIO bus */ 
+	INIT_LIST_HEAD(&dio_bus.devices);
+	strcpy(dio_bus.dev.bus_id, "dio");
+	device_register(&dio_bus.dev);
+
+	/* Request all resources */
+	dio_bus.num_resources = (hp300_model == HP_320 ? 1 : 2);
+	for (i = 0; i < dio_bus.num_resources; i++)
+		request_resource(&iomem_resource, &dio_bus.resources[i]);
+
+	/* Register all devices */
         for (scode = 0; scode < DIO_SCMAX; ++scode)
         {
                 u_char prid, secid = 0;        /* primary, secondary ID bytes */
@@ -223,8 +214,7 @@ static int __init dio_init(void)
 		fs = get_fs();
 		set_fs(KERNEL_DS);
 
-                if (get_user(i, (unsigned char *)va + DIO_IDOFF))
-		{
+                if (get_user(i, (unsigned char *)va + DIO_IDOFF)) {
 			set_fs(fs);
 			if (scode >= DIOII_SCBASE)
 				iounmap(va);
@@ -234,40 +224,40 @@ static int __init dio_init(void)
 		set_fs(fs);
 
                 /* Found a board, allocate it an entry in the list */
-                b = kmalloc(sizeof(struct dioboard), GFP_KERNEL);
+		dev = kmalloc(sizeof(struct dio_dev), GFP_KERNEL);
+		if (!dev)
+			return 0;
+
+		memset(dev, 0, sizeof(struct dio_dev));
+		dev->bus = &dio_bus;
+		dev->dev.parent = &dio_bus.dev;
+		dev->dev.bus = &dio_bus_type;
+		dev->scode = scode;
+		dev->resource.start = pa;
+		dev->resource.end = pa + DIO_SIZE(scode, va);
+		sprintf(dev->dev.bus_id,"%02x", scode);
 
                 /* read the ID byte(s) and encode if necessary. */
 		prid = DIO_ID(va);
 
-                if (DIO_NEEDSSECID(prid))
-                {
+                if (DIO_NEEDSSECID(prid)) {
                         secid = DIO_SECID(va);
-                        b->id = DIO_ENCODE_ID(prid, secid);
-                }
-                else
-                        b->id = prid;
+                        dev->id = DIO_ENCODE_ID(prid, secid);
+                } else
+                        dev->id = prid;
 
-                b->configured = 0;
-                b->scode = scode;
-                b->ipl = DIO_IPL(va);
-                b->name = dio_getname(b->id);
-                printk(KERN_INFO "select code %3d: ipl %d: ID %02X", b->scode, b->ipl, prid);
+                dev->ipl = DIO_IPL(va);
+                strcpy(dev->name,dio_getname(dev->id));
+                printk(KERN_INFO "select code %3d: ipl %d: ID %02X", dev->scode, dev->ipl, prid);
                 if (DIO_NEEDSSECID(prid))
                         printk(":%02X", secid);
-                printk(": %s\n", b->name);
+                printk(": %s\n", dev->name);
 
 		if (scode >= DIOII_SCBASE)
 			iounmap(va);
-
-                b->next = NULL;
-
-                if (bprev)
-                        bprev->next = b;
-                else
-                        blist = b;
-                bprev = b;
+		device_register(&dev->dev);
+		dio_create_sysfs_dev_files(dev);
         }
-
 	return 0;
 }
 
@@ -278,77 +268,12 @@ subsys_initcall(dio_init);
  */
 unsigned long dio_scodetophysaddr(int scode)
 {
-        if (scode >= DIOII_SCBASE)
-        {
+        if (scode >= DIOII_SCBASE) {
                 return (DIOII_BASE + (scode - 132) * DIOII_DEVSIZE);
-        }
-        else if (scode > DIO_SCMAX || scode < 0)
+        } else if (scode > DIO_SCMAX || scode < 0)
                 return 0;
         else if (DIO_SCINHOLE(scode))
                 return 0;
 
         return (DIO_BASE + scode * DIO_DEVSIZE);
-}
-
-int dio_scodetoipl(int scode)
-{
-        struct dioboard *b;
-        for (b = blist; b; b = b->next)
-                if (b->scode == scode) 
-                        break;
-
-        if (!b)
-        {
-                printk(KERN_ERR "dio_scodetoipl: bad select code %d\n", scode);
-                return 0;
-        }
-        else
-                return b->ipl;
-}
-
-const char *dio_scodetoname(int scode)
-{
-        struct dioboard *b;
-        for (b = blist; b; b = b->next)
-                if (b->scode == scode) 
-                        break;
-
-        if (!b)
-        {
-                printk(KERN_ERR "dio_scodetoname: bad select code %d\n", scode);
-                return NULL;
-        }
-        else
-                return b->name;
-}
-
-void dio_config_board(int scode)
-{
-        struct dioboard *b;
-        for (b = blist; b; b = b->next)
-                if (b->scode == scode)
-                        break;
-
-        if (!b) 
-                printk(KERN_ERR "dio_config_board: bad select code %d\n", scode);
-        else if (b->configured)
-                printk(KERN_WARNING "dio_config_board: board at select code %d already configured\n", scode);
-        else
-                b->configured = 1;
-}
-
-void dio_unconfig_board(int scode)
-{
-        struct dioboard *b;
-        for (b = blist; b; b = b->next)
-                if (b->scode == scode) 
-                        break;
-
-        if (!b) 
-                printk(KERN_ERR "dio_unconfig_board: bad select code %d\n", scode);
-        else if (!b->configured)
-                printk(KERN_WARNING "dio_unconfig_board: board at select code %d not configured\n", 
-		       scode);
-        else 
-                b->configured = 0;
 }

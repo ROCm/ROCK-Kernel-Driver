@@ -22,17 +22,40 @@
 #warning CONFIG_8250 defined but neither CONFIG_HPDCA nor CONFIG_HPAPCI defined, are you sure?
 #endif
 
+#ifdef CONFIG_HPAPCI
 struct hp300_port
 {
 	struct hp300_port *next;	/* next port */
-	unsigned long dio_base;		/* start of DIO registers */
-	int scode;                      /* select code of this board */
 	int line;			/* line (tty) number */
 };
 
-extern int hp300_uart_scode;
-
 static struct hp300_port *hp300_ports;
+#endif
+
+#ifdef CONFIG_HPDCA
+
+static int __devinit hpdca_init_one(struct dio_dev *d,
+                                const struct dio_device_id *ent);
+static void __devexit hpdca_remove_one(struct dio_dev *d);
+
+static struct dio_device_id hpdca_dio_tbl[] = {
+	{ DIO_ID_DCA0 },
+	{ DIO_ID_DCA0REM },
+	{ DIO_ID_DCA1 },
+	{ DIO_ID_DCA1REM },
+	{ 0 }
+};
+
+static struct dio_driver hpdca_driver = {
+	.name      = "hpdca",
+	.id_table  = hpdca_dio_tbl,
+	.probe     = hpdca_init_one,
+	.remove    = __devexit_p(hpdca_remove_one),
+};
+
+#endif
+
+extern int hp300_uart_scode;
 
 /* Offset to UART registers from base of DCA */
 #define UART_OFFSET	17
@@ -73,7 +96,10 @@ int __init hp300_setup_serial_console(void)
 
 	memset(&port, 0, sizeof(port));
 
-	if (hp300_uart_scode < 0 || hp300_uart_scode > 256)
+	if (hp300_uart_scode < 0 || hp300_uart_scode > DIO_SCMAX)
+		return 0;
+
+	if (DIO_SCINHOLE(hp300_uart_scode))
 		return 0;
 
 	scode = hp300_uart_scode;
@@ -84,8 +110,7 @@ int __init hp300_setup_serial_console(void)
 	port.type = PORT_UNKNOWN;
 
 	/* Check for APCI console */
-	if (scode == 256)
-	{
+	if (scode == 256) {
 #ifdef CONFIG_HPAPCI
 		printk(KERN_INFO "Serial console is HP APCI 1\n");
 
@@ -99,8 +124,7 @@ int __init hp300_setup_serial_console(void)
 		return 0;
 #endif
 	}
-	else
-	{
+	else {
 #ifdef CONFIG_HPDCA
 		unsigned long pa = dio_scodetophysaddr(scode);
 		if (!pa) {
@@ -135,47 +159,89 @@ int __init hp300_setup_serial_console(void)
 }
 #endif /* CONFIG_SERIAL_8250_CONSOLE */
 
+#ifdef CONFIG_HPDCA
+static int __devinit hpdca_init_one(struct dio_dev *d,
+                                const struct dio_device_id *ent)
+{
+	struct serial_struct serial_req;
+	int line;
+
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+	if (hp300_uart_scode == d->scode) {
+		/* Already got it. */
+		return 0;
+	}
+#endif
+	memset(&serial_req, 0, sizeof(struct serial_struct));
+
+	/* Memory mapped I/O */
+	serial_req.io_type = SERIAL_IO_MEM;
+	serial_req.flags = UPF_SKIP_TEST | UPF_SHARE_IRQ | UPF_BOOT_AUTOCONF;
+	serial_req.irq = d->ipl;
+	serial_req.baud_base = HPDCA_BAUD_BASE;
+	serial_req.iomap_base = (d->resource.start + UART_OFFSET);
+	serial_req.iomem_base = (char *)(serial_req.iomap_base + DIO_VIRADDRBASE);
+	serial_req.iomem_reg_shift = 1;
+	line = register_serial(&serial_req);
+
+	if (line < 0) {
+		printk(KERN_NOTICE "8250_hp300: register_serial() DCA scode %d"
+		       " irq %d failed\n", d->scode, serial_req.irq);
+		return -ENOMEM;
+	}
+
+	/* Enable board-interrupts */
+	out_8(d->resource.start + DIO_VIRADDRBASE + DCA_IC, DCA_IC_IE);
+	dio_set_drvdata(d, (void *)line);
+
+	/* Reset the DCA */
+	out_8(d->resource.start + DIO_VIRADDRBASE + DCA_ID, 0xff);
+	udelay(100);
+
+	return 0;
+}
+#endif
+
 static int __init hp300_8250_init(void)
 {
 	static int called = 0;
-#ifdef CONFIG_HPDCA
-	int scode;
-#endif
-	int line, num_ports;
+	int num_ports;
+#ifdef CONFIG_HPAPCI
+	int line;
 	unsigned long base;
 	struct serial_struct serial_req;
 	struct hp300_port *port;
-
+	int i;
+#endif
 	if (called)
 		return -ENODEV;
 	called = 1;
+
+	if (!MACH_IS_HP300)
+		return -ENODEV;
+
 	num_ports = 0;
 
-	if (!MACH_IS_HP300) {
-		return -ENODEV;
-	}
-
 #ifdef CONFIG_HPDCA
-	while (1) {
-                /* We detect boards by looking for DIO boards which match a
-                 * given subset of IDs. dio_find() returns the board's scancode.
-                 * The scancode to physaddr mapping is a property of the hardware,
-                 * as is the scancode to IPL (interrupt priority) mapping.
-                 */
-                scode = dio_find(DIO_ID_DCA0);
-                if (scode < 0)
-			scode = dio_find(DIO_ID_DCA0REM);
-                if (scode < 0)
-			scode = dio_find(DIO_ID_DCA1);
-                if (scode < 0)
-			scode = dio_find(DIO_ID_DCA1REM);
-                if (scode < 0)
-			break;		/* no, none at all */
-
+	if (dio_module_init(&hpdca_driver) == 0)
+		num_ports++;
+#endif
+#ifdef CONFIG_HPAPCI
+	if (hp300_model < HP_400) {
+		if (!num_ports)
+			return -ENODEV;
+		return 0;
+	}
+	/* These models have the Frodo chip.
+	 * Port 0 is reserved for the Apollo Domain keyboard.
+	 * Port 1 is either the console or the DCA.
+	 */
+	for (i = 1; i < 4; i++) {
+		/* Port 1 is the console on a 425e, on other machines it's mapped to
+		 * DCA.
+		 */
 #ifdef CONFIG_SERIAL_8250_CONSOLE
-		if (hp300_uart_scode == scode) {
-			/* Already got it */
-			dio_config_board(scode);
+		if (i == 1) {
 			continue;
 		}
 #endif
@@ -186,109 +252,33 @@ static int __init hp300_8250_init(void)
 			return -ENOMEM;
 
 		memset(&serial_req, 0, sizeof(struct serial_struct));
-		
-		base = dio_scodetophysaddr(scode);
 
-                /* If we want to tell the DIO code that this board is configured,
-                 * we should do that here.
-                 */
-                dio_config_board(scode);
+		base = (FRODO_BASE + FRODO_APCI_OFFSET(i));
 
 		/* Memory mapped I/O */
 		serial_req.io_type = SERIAL_IO_MEM;
 		serial_req.flags = UPF_SKIP_TEST | UPF_SHARE_IRQ | UPF_BOOT_AUTOCONF;
-		serial_req.irq = dio_scodetoipl(scode);
-		serial_req.baud_base = HPDCA_BAUD_BASE;
-		serial_req.iomap_base = (base + UART_OFFSET);
+		/* XXX - no interrupt support yet */
+		serial_req.irq = 0;
+		serial_req.baud_base = HPAPCI_BAUD_BASE;
+		serial_req.iomap_base = base;
 		serial_req.iomem_base = (char *)(serial_req.iomap_base + DIO_VIRADDRBASE);
-		serial_req.iomem_reg_shift = 1;
-
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-		if (hp300_uart_scode != scode) {
-#endif
-                /* Reset the DCA */
-                out_8(base + DIO_VIRADDRBASE + DCA_ID, 0xff);
-                udelay(100);
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-		}
-#endif
+		serial_req.iomem_reg_shift = 2;
 
 		line = register_serial(&serial_req);
 
 		if (line < 0) {
-			printk(KERN_NOTICE "8250_hp300: register_serial() DCA scode %d"
-			       " irq %d failed\n", scode, serial_req.irq);
+			printk(KERN_NOTICE "8250_hp300: register_serial() APCI %d"
+			       " irq %d failed\n", i, serial_req.irq);
 			kfree(port);
 			continue;
 		}
 
-		/* Enable board-interrupts */
-		out_8(base + DIO_VIRADDRBASE + DCA_IC, DCA_IC_IE);
-
-		port->dio_base = base + DIO_VIRADDRBASE;
-		port->scode = scode;
 		port->line = line;
 		port->next = hp300_ports;
 		hp300_ports = port;
 
 		num_ports++;
-        }
-#endif
-
-#ifdef CONFIG_HPAPCI
-	if (hp300_model >= HP_400)
-	{
-		int i;
-
-		/* These models have the Frodo chip.
-		 * Port 0 is reserved for the Apollo Domain keyboard.
-		 * Port 1 is either the console or the DCA.
-		 */
-		for (i = 1; i < 4; i++) {
-			/* Port 1 is the console on a 425e, on other machines it's mapped to
-			 * DCA.
-			 */
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-			if (i == 1) {
-				continue;
-			}
-#endif
-
-			/* Create new serial device */
-			port = kmalloc(sizeof(struct hp300_port), GFP_KERNEL);
-			if (!port)
-				return -ENOMEM;
-
-			memset(&serial_req, 0, sizeof(struct serial_struct));
-
-			base = (FRODO_BASE + FRODO_APCI_OFFSET(i));
-
-			/* Memory mapped I/O */
-			serial_req.io_type = SERIAL_IO_MEM;
-			serial_req.flags = UPF_SKIP_TEST | UPF_SHARE_IRQ | UPF_BOOT_AUTOCONF;
-			/* XXX - no interrupt support yet */
-			serial_req.irq = 0;
-			serial_req.baud_base = HPAPCI_BAUD_BASE;
-			serial_req.iomap_base = base;
-			serial_req.iomem_base = (char *)(serial_req.iomap_base + DIO_VIRADDRBASE);
-			serial_req.iomem_reg_shift = 2;
-
-			line = register_serial(&serial_req);
-
-			if (line < 0) {
-				printk(KERN_NOTICE "8250_hp300: register_serial() APCI %d"
-				       " irq %d failed\n", i, serial_req.irq);
-				kfree(port);
-				continue;
-			}
-
-			port->dio_base = 0;
-			port->line = line;
-			port->next = hp300_ports;
-			hp300_ports = port;
-
-			num_ports++;
-		}
 	}
 #endif
 
@@ -299,28 +289,37 @@ static int __init hp300_8250_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_HPDCA
+static void __devexit hpdca_remove_one(struct dio_dev *d)
+{
+	int line;
+
+	line = (int) dio_get_drvdata(d);
+	if (d->resource.start) {
+		/* Disable board-interrupts */
+		out_8(d->resource.start + DIO_VIRADDRBASE + DCA_IC, 0);
+	}
+	unregister_serial(line);
+}
+#endif
+
 static void __exit hp300_8250_exit(void)
 {
+#ifdef CONFIG_HPAPCI
 	struct hp300_port *port, *to_free;
 
 	for (port = hp300_ports; port; ) {
 		unregister_serial(port->line);
-
-#ifdef CONFIG_HPDCA
-		if (port->dio_base) {
-			/* Disable board-interrupts */
-			out_8(port->dio_base + DCA_IC, 0);
-
-			dio_unconfig_board(port->scode);
-		}
-#endif
-
 		to_free = port;
 		port = port->next;
 		kfree(to_free);
 	}
 
 	hp300_ports = NULL;
+#endif
+#ifdef CONFIG_HPDCA
+	dio_unregister_driver(&hpdca_driver);
+#endif
 }
 
 module_init(hp300_8250_init);
