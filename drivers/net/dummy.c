@@ -104,7 +104,7 @@ static struct net_device **dummies;
 
 /* Number of dummy devices to be set up by this module. */
 module_param(numdummies, int, 0);
-MODULE_PARM_DESC(numdimmies, "Number of dummy psuedo devices");
+MODULE_PARM_DESC(numdummies, "Number of dummy pseudo devices");
 
 static int __init dummy_init_one(int index)
 {
