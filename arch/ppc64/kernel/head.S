@@ -596,7 +596,7 @@ DataAccess_common:
 	cmpi    0,r22,0xc
 
 	/* Segment fault on a bolted segment. Go off and map that segment. */
-	beq     .do_stab_bolted
+	beq-	.do_stab_bolted
 stab_bolted_user_return:
 	EXCEPTION_PROLOG_COMMON
 	ld      r3,_DSISR(r1)
@@ -606,7 +606,7 @@ stab_bolted_user_return:
 	rlwinm	r4,r3,32-23,29,29	/* DSISR_STORE -> _PAGE_RW */
 	ld      r3,_DAR(r1)             /* into the hash table */
 
-	beq	2f			/* If so handle it */
+	beq+	2f			/* If so handle it */
 	li	r4,0x300                /* Trap number */
 	bl	.do_stab_SI
 	b	1f
@@ -658,7 +658,7 @@ InstructionAccess_common:
 	EXCEPTION_PROLOG_COMMON
 
 	andis.	r0,r23,0x0020		/* no ste found? */
-	beq	2f
+	beq+	2f
 	mr	r3,r22			/* SRR0 at interrupt */
 	li	r4,0x400		/* Trap number       */
 	bl	.do_stab_SI
@@ -688,7 +688,7 @@ InstructionAccessSLB_common:
 	li	r4,0x480                /* Exception vector  */
 	bl	.ste_allocate
 	or.	r3,r3,r3		/* Check return code */
-	beq     fast_exception_return   /* Return if we succeeded */
+	beq+	fast_exception_return   /* Return if we succeeded */
 
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 #ifdef DO_SOFT_DISABLE
