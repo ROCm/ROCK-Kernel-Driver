@@ -650,6 +650,26 @@ int patch_ad1881(ac97_t * ac97)
 	return 0;
 }
 
+static const snd_kcontrol_new_t snd_ac97_controls_ad1885[] = {
+	AC97_SINGLE("Digital Mono Direct", AC97_AD_MISC, 11, 1, 0),
+	AC97_SINGLE("Digital Audio Mode", AC97_AD_MISC, 12, 1, 0),
+	AC97_SINGLE("Low Power Mixer", AC97_AD_MISC, 14, 1, 0),
+	AC97_SINGLE("Zero Fill DAC", AC97_AD_MISC, 15, 1, 0),
+};
+
+static int patch_ad1885_specific(ac97_t * ac97)
+{
+	int err;
+
+	if ((err = patch_build_controls(ac97, snd_ac97_controls_ad1885, ARRAY_SIZE(snd_ac97_controls_ad1885))) < 0)
+		return err;
+	return 0;
+}
+
+static struct snd_ac97_build_ops patch_ad1885_build_ops = {
+	.build_specific = &patch_ad1885_specific
+};
+
 int patch_ad1885(ac97_t * ac97)
 {
 	unsigned short jack;
@@ -661,6 +681,8 @@ int patch_ad1885(ac97_t * ac97)
 	/* turn off jack sense bits D8 & D9 */
 	jack = snd_ac97_read(ac97, AC97_AD_JACK_SPDIF);
 	snd_ac97_write_cache(ac97, AC97_AD_JACK_SPDIF, jack | 0x0300);
+
+	ac97->build_ops = &patch_ad1885_build_ops;
 	return 0;
 }
 

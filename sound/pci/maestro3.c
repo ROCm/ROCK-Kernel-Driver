@@ -1535,9 +1535,14 @@ static snd_pcm_uframes_t
 snd_m3_pcm_pointer(snd_pcm_substream_t * subs)
 {
 	m3_t *chip = snd_pcm_substream_chip(subs);
+	unsigned int ptr;
 	m3_dma_t *s = (m3_dma_t*)subs->runtime->private_data;
 	snd_assert(s != NULL, return 0);
-	return bytes_to_frames(subs->runtime, snd_m3_get_pointer(chip, s, subs));
+
+	spin_lock(&chip->reg_lock);
+	ptr = snd_m3_get_pointer(chip, s, subs);
+	spin_unlock(&chip->reg_lock);
+	return bytes_to_frames(subs->runtime, ptr);
 }
 
 

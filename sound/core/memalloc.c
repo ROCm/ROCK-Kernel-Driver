@@ -946,6 +946,25 @@ module_init(snd_mem_init)
 module_exit(snd_mem_exit)
 
 
+#ifndef MODULE
+
+/* format is: snd-page-alloc=enable */
+
+static int __init snd_mem_setup(char *str)
+{
+	static unsigned __initdata nr_dev = 0;
+
+	if (nr_dev >= SNDRV_CARDS)
+		return 0;
+	(void)(get_option(&str,&enable[nr_dev]) == 2);
+	nr_dev++;
+	return 1;
+}
+
+__setup("snd-page-alloc=", snd_mem_setup);
+
+#endif
+
 /*
  * exports
  */

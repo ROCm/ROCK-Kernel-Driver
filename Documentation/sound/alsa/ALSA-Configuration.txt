@@ -1303,6 +1303,9 @@ Proc interfaces (/proc/asound)
 	  - direct    don't use plugins
 	  - block     force block mode (rvplayer)
 	  - non-block force non-block mode
+	  - whole-frag  write only whole fragments (optimization affecting
+			playback only)
+	  - no-silence  do not fill silence ahead to avoid clicks
 
   Example: echo "x11amp 128 16384" > /proc/asound/card0/pcm0p/oss
            echo "squake 0 0 disable" > /proc/asound/card0/pcm0c/oss

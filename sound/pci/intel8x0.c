@@ -1002,7 +1002,7 @@ static int snd_intel8x0_pcm_open(snd_pcm_substream_t * substream, ichdev_t *ichd
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	static unsigned int i, rates[] = {
 		/* ATTENTION: these values depend on the definition in pcm.h! */
-		5512, 8000, 11025, 16000, 22050, 32000, 44100, 480000
+		5512, 8000, 11025, 16000, 22050, 32000, 44100, 48000
 	};
 	int err;
 
@@ -1558,6 +1558,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{ 0x1028, 0x0126, "Dell Optiplex GX260", AC97_TUNE_HP_ONLY },
 	{ 0x1734, 0x0088, "Fujitsu-Siemens D1522", AC97_TUNE_HP_ONLY },
 	{ 0x10f1, 0x2665, "Fujitsu-Siemens Celcius", AC97_TUNE_HP_ONLY },
+	{ 0x110a, 0x0056, "Fujitsu-Siemens Scenic", AC97_TUNE_HP_ONLY },
 	{ 0x8086, 0x4d44, "Intel D850EMV2", AC97_TUNE_HP_ONLY },
 	/* { 0x4144, 0x5360, "AMD64 Motherboard", AC97_TUNE_HP_ONLY }, */ /* FIXME: this seems invalid */
 	{ 0x1043, 0x80b0, "ASUS P4PE Mobo", AC97_TUNE_SWAP_SURROUND },

@@ -69,6 +69,15 @@ MODULE_DEVICES("{{ALSA,Dummy soundcard}}");
 #define USE_PERIODS_MAX		255
 #endif
 
+#if 0 /* simple AC97 bridge (intel8x0) with 48kHz AC97 only codec */
+#define USE_FORMATS		SNDRV_PCM_FMTBIT_S16_LE
+#define USE_CHANNELS_MIN	2
+#define USE_CHANNELS_MAX	2
+#define USE_RATE		SNDRV_PCM_RATE_48000
+#define USE_RATE_MIN		48000
+#define USE_RATE_MAX		48000
+#endif
+
 
 /* defaults */
 #ifndef MAX_BUFFER_SIZE
@@ -76,6 +85,11 @@ MODULE_DEVICES("{{ALSA,Dummy soundcard}}");
 #endif
 #ifndef USE_FORMATS
 #define USE_FORMATS 		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE)
+#endif
+#ifndef USE_RATE
+#define USE_RATE		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000
+#define USE_RATE_MIN		5500
+#define USE_RATE_MAX		48000
 #endif
 #ifndef USE_CHANNELS_MIN
 #define USE_CHANNELS_MIN 	1
@@ -271,9 +285,9 @@ static snd_pcm_hardware_t snd_card_dummy_playback =
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =		USE_FORMATS,
-	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	.rate_min =		5500,
-	.rate_max =		48000,
+	.rates =		USE_RATE,
+	.rate_min =		USE_RATE_MIN,
+	.rate_max =		USE_RATE_MAX,
 	.channels_min =		USE_CHANNELS_MIN,
 	.channels_max =		USE_CHANNELS_MAX,
 	.buffer_bytes_max =	MAX_BUFFER_SIZE,
@@ -289,9 +303,9 @@ static snd_pcm_hardware_t snd_card_dummy_capture =
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =		USE_FORMATS,
-	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
-	.rate_min =		5500,
-	.rate_max =		48000,
+	.rates =		USE_RATE,
+	.rate_min =		USE_RATE_MIN,
+	.rate_max =		USE_RATE_MAX,
 	.channels_min =		USE_CHANNELS_MIN,
 	.channels_max =		USE_CHANNELS_MAX,
 	.buffer_bytes_max =	MAX_BUFFER_SIZE,

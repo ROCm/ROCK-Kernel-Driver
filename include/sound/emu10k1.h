@@ -931,6 +931,7 @@ struct _snd_emu10k1 {
 	unsigned long port;			/* I/O port number */
 	struct resource *res_port;
 	int APS: 1,				/* APS flag */
+	    no_ac97: 1,				/* no AC'97 */
 	    tos_link: 1;			/* tos link detected */
 	unsigned int audigy;			/* is Audigy? */
 	unsigned int revision;			/* chip revision */

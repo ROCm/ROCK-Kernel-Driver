@@ -60,13 +60,11 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 			return;
 		snd_assert(runtime->silence_filled <= runtime->buffer_size, return);
 		noise_dist = snd_pcm_playback_hw_avail(runtime) + runtime->silence_filled;
-		if (noise_dist > (snd_pcm_sframes_t) runtime->silence_threshold)
+		if (noise_dist >= (snd_pcm_sframes_t) runtime->silence_threshold)
 			return;
 		frames = runtime->silence_threshold - noise_dist;
 		if (frames > runtime->silence_size)
 			frames = runtime->silence_size;
-		else
-			frames = runtime->silence_threshold;
 	} else {
 		if (new_hw_ptr == ULONG_MAX) {	/* initialization */
 			runtime->silence_filled = 0;
@@ -86,10 +84,9 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 			if ((snd_pcm_sframes_t)runtime->silence_start < 0)
 				runtime->silence_start += runtime->boundary;
 		}
-		frames = runtime->buffer_size;
+		frames = runtime->buffer_size - runtime->silence_filled;
 	}
-	snd_assert(frames >= runtime->silence_filled, return);
-	frames -= runtime->silence_filled;
+	snd_assert(frames <= runtime->buffer_size, return);
 	if (frames == 0)
 		return;
 	ofs = (runtime->silence_start + runtime->silence_filled) % runtime->buffer_size;

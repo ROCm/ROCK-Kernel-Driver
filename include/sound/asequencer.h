@@ -29,7 +29,7 @@
 #include <sound/asound.h>
 
 /** version of the sequencer */
-#define SNDRV_SEQ_VERSION SNDRV_PROTOCOL_VERSION (1, 0, 0)
+#define SNDRV_SEQ_VERSION SNDRV_PROTOCOL_VERSION (1, 0, 1)
 
 /**
  * definition of sequencer event types
@@ -604,6 +604,8 @@ struct sndrv_seq_remove_events {
 
 /* misc. conditioning flags */
 #define SNDRV_SEQ_PORT_FLG_GIVEN_PORT	(1<<0)
+#define SNDRV_SEQ_PORT_FLG_TIMESTAMP	(1<<1)
+#define SNDRV_SEQ_PORT_FLG_TIME_REAL	(1<<1)
 
 struct sndrv_seq_port_info {
 	struct sndrv_seq_addr addr;	/* client/port numbers */
@@ -620,7 +622,8 @@ struct sndrv_seq_port_info {
 
 	void *kernel;			/* reserved for kernel use (must be NULL) */
 	unsigned int flags;		/* misc. conditioning */
-	char reserved[60];		/* for future use */
+	unsigned char time_queue;	/* queue # for timestamping */
+	char reserved[59];		/* for future use */
 };
 
 

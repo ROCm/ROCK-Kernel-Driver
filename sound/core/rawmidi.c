@@ -1630,6 +1630,26 @@ static void __exit alsa_rawmidi_exit(void)
 module_init(alsa_rawmidi_init)
 module_exit(alsa_rawmidi_exit)
 
+#ifndef MODULE
+#ifdef CONFIG_SND_OSSEMUL
+/* format is: snd-rawmidi=midi_map,amidi_map */
+
+static int __init alsa_rawmidi_setup(char *str)
+{
+	static unsigned __initdata nr_dev = 0;
+
+	if (nr_dev >= SNDRV_CARDS)
+		return 0;
+	(void)(get_option(&str,&midi_map[nr_dev]) == 2 &&
+	       get_option(&str,&amidi_map[nr_dev]) == 2);
+	nr_dev++;
+	return 1;
+}
+
+__setup("snd-rawmidi=", alsa_rawmidi_setup);
+#endif /* CONFIG_SND_OSSEMUL */
+#endif /* ifndef MODULE */
+
 EXPORT_SYMBOL(snd_rawmidi_output_params);
 EXPORT_SYMBOL(snd_rawmidi_input_params);
 EXPORT_SYMBOL(snd_rawmidi_drop_output);

@@ -55,15 +55,13 @@ irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		if (status & IPR_CHANNELLOOP) {
 			int voice;
 			int voice_max = status & IPR_CHANNELNUMBERMASK;
-			int voice_max_l;
 			u32 val;
 			emu10k1_voice_t *pvoice = emu->voices;
 
 			val = snd_emu10k1_ptr_read(emu, CLIPL, 0);
-			voice_max_l = voice_max;
-			if (voice_max_l >= 0x20)
-				voice_max_l = 0x1f;
-			for (voice = 0; voice <= voice_max_l; voice++) {
+			for (voice = 0; voice <= voice_max; voice++) {
+				if (voice == 0x20)
+					val = snd_emu10k1_ptr_read(emu, CLIPH, 0);
 				if (val & 1) {
 					if (pvoice->use && pvoice->interrupt != NULL) {
 						pvoice->interrupt(emu, pvoice);
@@ -74,21 +72,6 @@ irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				}
 				val >>= 1;
 				pvoice++;
-			}
-			if (voice_max > 0x1f) {
-				val = snd_emu10k1_ptr_read(emu, CLIPH, 0);
-				for (; voice <= voice_max; voice++) {
-					if(val & 1) {
-						if (pvoice->use && pvoice->interrupt != NULL) {
-							pvoice->interrupt(emu, pvoice);
-							snd_emu10k1_voice_intr_ack(emu, voice);
-						} else {
-							snd_emu10k1_voice_intr_disable(emu, voice);
-						}
-					}
-					val >>= 1;
-					pvoice++;
-				}
 			}
 			status &= ~IPR_CHANNELLOOP;
 		}
@@ -150,9 +133,27 @@ irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			status &= ~IPR_FXDSP;
 		}
 		if (status) {
-			snd_printd(KERN_WARNING "emu10k1: unhandled interrupt: 0x%08x\n", status);
+			unsigned int bits;
+			snd_printk(KERN_ERR "emu10k1: unhandled interrupt: 0x%08x\n", status);
+			//make sure any interrupts we don't handle are disabled:
+			bits = INTE_FXDSPENABLE |
+				INTE_PCIERRORENABLE |
+				INTE_VOLINCRENABLE |
+				INTE_VOLDECRENABLE |
+				INTE_MUTEENABLE |
+				INTE_MICBUFENABLE |
+				INTE_ADCBUFENABLE |
+				INTE_EFXBUFENABLE |
+				INTE_GPSPDIFENABLE |
+				INTE_CDSPDIFENABLE |
+				INTE_INTERVALTIMERENB |
+				INTE_MIDITXENABLE |
+				INTE_MIDIRXENABLE;
+			if (emu->audigy)
+				bits |= INTE_A_MIDITXENABLE2 | INTE_A_MIDIRXENABLE2;
+			snd_emu10k1_intr_disable(emu, bits);
 		}
-		outl(orig_status, emu->port + IPR); /* ack */
+		outl(orig_status, emu->port + IPR); /* ack all */
 	}
 	return IRQ_RETVAL(handled);
 }

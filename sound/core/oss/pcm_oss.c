@@ -454,8 +454,18 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 	sw_params->sleep_min = 0;
 	sw_params->avail_min = runtime->period_size;
 	sw_params->xfer_align = 1;
-	sw_params->silence_threshold = 0;
-	sw_params->silence_size = 0;
+	if (atomic_read(&runtime->mmap_count) ||
+	    (substream->oss.setup && substream->oss.setup->nosilence)) {
+		sw_params->silence_threshold = 0;
+		sw_params->silence_size = 0;
+	} else {
+		snd_pcm_uframes_t frames;
+		frames = runtime->period_size + 16;
+		if (frames > runtime->buffer_size)
+			frames = runtime->buffer_size;
+		sw_params->silence_threshold = frames;
+		sw_params->silence_size = frames;
+	}
 
 	if ((err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_SW_PARAMS, sw_params)) < 0) {
 		snd_printd("SW_PARAMS failed: %i\n", err);
@@ -581,7 +591,7 @@ static int snd_pcm_oss_capture_position_fixup(snd_pcm_substream_t *substream, sn
 		if (err < 0)
 			break;
 		runtime = substream->runtime;
-		if (*delay <= runtime->buffer_size)
+		if (*delay <= (snd_pcm_sframes_t)runtime->buffer_size)
 			break;
 		/* in case of overrun, skip whole periods like OSS/Linux driver does */
 		/* until avail(delay) <= buffer_size */
@@ -802,8 +812,9 @@ static ssize_t snd_pcm_oss_write1(snd_pcm_substream_t *substream, const char *bu
 			buf += tmp;
 			bytes -= tmp;
 			xfer += tmp;
-			if (runtime->oss.buffer_used == runtime->oss.period_bytes) {
-				tmp = snd_pcm_oss_write2(substream, runtime->oss.buffer, runtime->oss.period_bytes, 1);
+			if (substream->oss.setup == NULL || !substream->oss.setup->wholefrag ||
+			    runtime->oss.buffer_used == runtime->oss.period_bytes) {
+				tmp = snd_pcm_oss_write2(substream, runtime->oss.buffer, runtime->oss.buffer_used, 1);
 				if (tmp <= 0)
 					return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 				runtime->oss.bytes += tmp;
@@ -2108,14 +2119,16 @@ static void snd_pcm_oss_proc_read(snd_info_entry_t *entry,
 	snd_pcm_oss_setup_t *setup = pstr->oss.setup_list;
 	down(&pstr->oss.setup_mutex);
 	while (setup) {
-		snd_iprintf(buffer, "%s %u %u%s%s%s%s\n",
+		snd_iprintf(buffer, "%s %u %u%s%s%s%s%s%s\n",
 			    setup->task_name,
 			    setup->periods,
 			    setup->period_size,
 			    setup->disable ? " disable" : "",
 			    setup->direct ? " direct" : "",
 			    setup->block ? " block" : "",
-			    setup->nonblock ? " non-block" : "");
+			    setup->nonblock ? " non-block" : "",
+			    setup->wholefrag ? " whole-frag" : "",
+			    setup->nosilence ? " no-silence" : "");
 		setup = setup->next;
 	}
 	up(&pstr->oss.setup_mutex);
@@ -2181,6 +2194,10 @@ static void snd_pcm_oss_proc_write(snd_info_entry_t *entry,
 				template.block = 1;
 			} else if (!strcmp(str, "non-block")) {
 				template.nonblock = 1;
+			} else if (!strcmp(str, "whole-frag")) {
+				template.wholefrag = 1;
+			} else if (!strcmp(str, "no-silence")) {
+				template.nosilence = 1;
 			}
 		} while (*str);
 		if (setup == NULL) {
@@ -2372,3 +2389,24 @@ static void __exit alsa_pcm_oss_exit(void)
 
 module_init(alsa_pcm_oss_init)
 module_exit(alsa_pcm_oss_exit)
+
+#ifndef MODULE
+
+/* format is: snd-pcm-oss=dsp_map,adsp_map[,nonblock_open] */
+
+static int __init alsa_pcm_oss_setup(char *str)
+{
+	static unsigned __initdata nr_dev = 0;
+
+	if (nr_dev >= SNDRV_CARDS)
+		return 0;
+	(void)(get_option(&str,&dsp_map[nr_dev]) == 2 &&
+	       get_option(&str,&adsp_map[nr_dev]) == 2);
+	(void)(get_option(&str,&nonblock_open) == 2);
+	nr_dev++;
+	return 1;
+}
+
+__setup("snd-pcm-oss=", alsa_pcm_oss_setup);
+
+#endif /* !MODULE */

@@ -2297,6 +2297,14 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, int iface_no)
 			 */
 			fp->attributes &= ~EP_CS_ATTR_SAMPLE_RATE;
 		}
+
+		/* workaround for M-Audio Audiophile USB */
+		if (dev->descriptor.idVendor == 0x0763 &&
+		    dev->descriptor.idProduct == 0x2003) {
+			/* doesn't set the sample rate attribute, but supports it */
+			fp->attributes |= EP_CS_ATTR_SAMPLE_RATE;
+		}
+
 		/*
 		 * plantronics headset and Griffin iMic have set adaptive-in
 		 * although it's really not...

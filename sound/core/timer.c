@@ -41,7 +41,7 @@
 #define DEFAULT_TIMER_LIMIT 2
 #endif
 
-int timer_limit = DEFAULT_TIMER_LIMIT;
+static int timer_limit = DEFAULT_TIMER_LIMIT;
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ALSA timer interface");
 MODULE_LICENSE("GPL");
@@ -1805,6 +1805,18 @@ static void __exit alsa_timer_exit(void)
 
 module_init(alsa_timer_init)
 module_exit(alsa_timer_exit)
+
+#ifndef MODULE
+/* format is: snd-timer=timer_limit */
+
+static int __init alsa_timer_setup(char *str)
+{
+	(void)(get_option(&str,&timer_limit) == 2);
+	return 1;
+}
+
+__setup("snd-timer=", alsa_timer_setup);
+#endif /* ifndef MODULE */
 
 EXPORT_SYMBOL(snd_timer_open);
 EXPORT_SYMBOL(snd_timer_close);
