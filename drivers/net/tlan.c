@@ -424,7 +424,7 @@ static void __devexit tlan_remove_one( struct pci_dev *pdev)
 		pci_free_consistent(priv->pciDev, priv->dmaSize, priv->dmaStorage, priv->dmaStorageDMA );
 	}
 
-	release_region( dev->base_addr, 0x10 );
+	pci_release_regions(pdev);
 	
 	kfree( dev );
 		
@@ -510,15 +510,25 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 	TLanPrivateInfo    *priv;
 	u8		   pci_rev;
 	u16		   device_id;
-	int		   reg;
+	int		   reg, rc = -ENODEV;
 
-	if (pdev && pci_enable_device(pdev))
-		return -EIO;
+	if (pdev) {
+		rc = pci_enable_device(pdev);
+		if (rc)
+			return rc;
 
-	dev = init_etherdev(NULL, sizeof(TLanPrivateInfo));
+		rc = pci_request_regions(pdev, TLanSignature);
+		if (rc) {
+			printk(KERN_ERR "TLAN: Could not reserve IO regions\n");
+			goto err_out;
+		}
+	}
+
+	dev = alloc_etherdev(sizeof(TLanPrivateInfo));
 	if (dev == NULL) {
 		printk(KERN_ERR "TLAN: Could not allocate memory for device.\n");
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto err_out_regions;
 	}
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
@@ -533,12 +543,10 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 
 		priv->adapter = &board_info[ent->driver_data];
 
-		if(pci_set_dma_mask(pdev, 0xFFFFFFFF))
-		{
+		rc = pci_set_dma_mask(pdev, 0xFFFFFFFF);
+		if (rc) {
 			printk(KERN_ERR "TLAN: No suitable PCI mapping available.\n");
-			unregister_netdev(dev);
-			kfree(dev);
-			return -ENODEV;
+			goto err_out_free_dev;
 		}
 
 		pci_read_config_byte ( pdev, PCI_REVISION_ID, &pci_rev);
@@ -553,9 +561,8 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 		}
 		if (!pci_io_base) {
 			printk(KERN_ERR "TLAN: No IO mappings available\n");
-			unregister_netdev(dev);
-			kfree(dev);
-			return -ENODEV;
+			rc = -EIO;
+			goto err_out_free_dev;
 		}
 		
 		dev->base_addr = pci_io_base;
@@ -605,12 +612,18 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 
 	spin_lock_init(&priv->lock);
 	
-	if (TLan_Init(dev)) {
+	rc = TLan_Init(dev);
+	if (rc) {
+		printk(KERN_ERR "TLAN: Could not set up device.\n");
+		goto err_out_free_dev;
+	}
+
+	rc = register_netdev(dev);
+	if (rc) {
 		printk(KERN_ERR "TLAN: Could not register device.\n");
-		unregister_netdev(dev);
-		kfree(dev);
-		return -EAGAIN;
-	} else {
+		goto err_out_uninit;
+	}
+
 	
 	TLanDevicesInstalled++;
 	boards_found++;
@@ -631,8 +644,19 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 			priv->adapter->deviceLabel,
 			priv->adapterRev);
 	return 0;
-	}
 
+err_out_uninit:
+	pci_free_consistent(priv->pciDev, priv->dmaSize, priv->dmaStorage,
+			    priv->dmaStorageDMA );
+err_out_free_dev:
+	kfree(dev);
+err_out_regions:
+	if (pdev)
+		pci_release_regions(pdev);
+err_out:
+	if (pdev)
+		pci_disable_device(pdev);
+	return rc;
 }
 
 
@@ -798,15 +822,6 @@ static int TLan_Init( struct net_device *dev )
 
 	priv = dev->priv;
 	
-	if (!priv->is_eisa)	/* EISA devices have already requested IO */
-		if (!request_region( dev->base_addr, 0x10, TLanSignature )) {
-			printk(KERN_ERR "TLAN: %s: IO port region 0x%lx size 0x%x in use.\n",
-				dev->name,
-				dev->base_addr,
-				0x10 );
-			return -EIO;
-		}
-	
 	if ( bbuf ) {
 		dma_size = ( TLAN_NUM_RX_LISTS + TLAN_NUM_TX_LISTS )
 	           * ( sizeof(TLanList) + TLAN_MAX_FRAME_SIZE );
@@ -820,7 +835,6 @@ static int TLan_Init( struct net_device *dev )
 	if ( priv->dmaStorage == NULL ) {
 		printk(KERN_ERR "TLAN:  Could not allocate lists and buffers for %s.\n",
 			dev->name );
-		release_region( dev->base_addr, 0x10 );
 		return -ENOMEM;
 	}
 	memset( priv->dmaStorage, 0, dma_size );
