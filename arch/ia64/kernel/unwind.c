@@ -736,7 +736,7 @@ static void
 desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave,
 	       struct unw_state_record *sr)
 {
-	int i;
+	int i, region_start;
 
 	if (!(sr->in_body || sr->first_region))
 		finish_prologue(sr);
@@ -748,19 +748,20 @@ desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave
 		return;
 	}
 
+	region_start = sr->region_start + sr->region_len;
+
 	for (i = 0; i < sr->epilogue_count; ++i)
 		pop(sr);
 	sr->epilogue_count = 0;
 	sr->epilogue_start = UNW_WHEN_NEVER;
 
-	if (!body)
-		push(sr);
-
-	sr->region_start += sr->region_len;
+	sr->region_start = region_start;
 	sr->region_len = rlen;
 	sr->in_body = body;
 
 	if (!body) {
+		push(sr);
+
 		for (i = 0; i < 4; ++i) {
 			if (mask & 0x8)
 				set_reg(sr->curr.reg + unw.save_order[i], UNW_WHERE_GR,
