@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-s3c2410/gpio.c
+/* linux/arch/arm/mach-s3c2410/clock.c
  *
  * Copyright (c) 2004 Simtec Electronics
  * Ben Dooks <ben@simtec.co.uk>
@@ -99,7 +99,9 @@ void clk_put(struct clk *clk)
 
 int clk_enable(struct clk *clk)
 {
-	s3c2410_clk_enable(clk->ctrlbit, 1);
+	if (clk->ctrlbit != 0)
+		s3c2410_clk_enable(clk->ctrlbit, 1);
+
 	return 0;
 }
 
@@ -240,6 +242,10 @@ static struct clk init_clocks[] = {
 	{ .name    = "spi",
 	  .parent  = &clk_p,
 	  .ctrlbit = S3C2410_CLKCON_SPI
+	},
+	{ .name    = "watchdog",
+	  .parent  = &clk_p,
+	  .ctrlbit = 0
 	}
 };
 
@@ -284,10 +290,10 @@ static int __init s3c2410_init_clocks(void)
 		printk(KERN_ERR "failed to register cpu fclk\n");
 
 	if (s3c2410_register_clock(&clk_h) < 0)
-		printk(KERN_ERR "failed to register cpu fclk\n");
+		printk(KERN_ERR "failed to register cpu hclk\n");
 
 	if (s3c2410_register_clock(&clk_p) < 0)
-		printk(KERN_ERR "failed to register cpu fclk\n");
+		printk(KERN_ERR "failed to register cpu pclk\n");
 
 	for (ptr = 0; ptr < ARRAY_SIZE(init_clocks); ptr++, clkp++) {
 		ret = s3c2410_register_clock(clkp);
