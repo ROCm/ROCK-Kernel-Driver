@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: nodemgmt.c,v 1.45 2001/09/20 08:05:05 dwmw2 Exp $
+ * $Id: nodemgmt.c,v 1.45.2.1 2002/02/23 14:13:34 dwmw2 Exp $
  *
  */
 
@@ -318,6 +318,15 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 
 	ACCT_PARANOIA_CHECK(jeb);
 
+	if (c->flags & JFFS2_SB_FLAG_MOUNTING) {
+		/* Mount in progress. Don't muck about with the block
+		   lists because they're not ready yet, and don't actually
+		   obliterate nodes that look obsolete. If they weren't 
+		   marked obsolete on the flash at the time they _became_
+		   obsolete, there was probably a reason for that. */
+		spin_unlock_bh(&c->erase_completion_lock);
+		return;
+	}
 	if (jeb == c->nextblock) {
 		D2(printk(KERN_DEBUG "Not moving nextblock 0x%08x to dirty/erase_pending list\n", jeb->offset));
 	} else if (jeb == c->gcblock) {

@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: read.c,v 1.13 2001/05/01 16:24:44 dwmw2 Exp $
+ * $Id: read.c,v 1.13.2.1 2002/02/01 23:32:33 dwmw2 Exp $
  *
  */
 
@@ -74,6 +74,12 @@ int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_full_dnode *fd, unsig
 		printk(KERN_WARNING "Node CRC %08x != calculated CRC %08x for node at %08x\n", ri->node_crc, crc, fd->raw->flash_offset & ~3);
 		ret = -EIO;
 		goto out_ri;
+	}
+	/* There was a bug where we wrote hole nodes out with csize/dsize
+	   swapped. Deal with it */
+	if (ri->compr == JFFS2_COMPR_ZERO && !ri->dsize && ri->csize) {
+		ri->dsize = ri->csize;
+		ri->csize = 0;
 	}
 
 	D1(if(ofs + len > ri->dsize) {
