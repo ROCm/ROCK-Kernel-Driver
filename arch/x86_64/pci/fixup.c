@@ -41,19 +41,6 @@ static void __devinit pci_fixup_ide_bases(struct pci_dev *d)
 	}
 }
 
-static void __devinit  pci_fixup_ide_trash(struct pci_dev *d)
-{
-	int i;
-
-	/*
-	 * There exist PCI IDE controllers which have utter garbage
-	 * in first four base registers. Ignore that.
-	 */
-	DBG("PCI: IDE base address trash cleared for %s\n", d->slot_name);
-	for(i=0; i<4; i++)
-		d->resource[i].start = d->resource[i].end = d->resource[i].flags = 0;
-}
-
 struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,		PCI_ANY_ID,			pci_fixup_ide_bases },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_NCR,	PCI_DEVICE_ID_NCR_53C810,	pci_fixup_ncr53c810 },
