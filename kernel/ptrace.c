@@ -16,6 +16,51 @@
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 
+int ptrace_attach(struct task_struct *task)
+{
+	task_lock(task);
+	if (task->pid <= 1)
+		goto bad;
+	if (task == current)
+		goto bad;
+	if (!task->mm)
+		goto bad;
+	if(((current->uid != task->euid) ||
+	    (current->uid != task->suid) ||
+	    (current->uid != task->uid) ||
+ 	    (current->gid != task->egid) ||
+ 	    (current->gid != task->sgid) ||
+ 	    (!cap_issubset(task->cap_permitted, current->cap_permitted)) ||
+ 	    (current->gid != task->gid)) && !capable(CAP_SYS_PTRACE))
+		goto bad;
+	rmb();
+	if (!task->mm->dumpable && !capable(CAP_SYS_PTRACE))
+		goto bad;
+	/* the same process cannot be attached many times */
+	if (task->ptrace & PT_PTRACED)
+		goto bad;
+
+	/* Go */
+	task->ptrace |= PT_PTRACED;
+	task_unlock(task);
+
+	write_lock_irq(&tasklist_lock);
+	if (task->p_pptr != current) {
+		REMOVE_LINKS(task);
+		task->p_pptr = current;
+		SET_LINKS(task);
+	}
+	write_unlock_irq(&tasklist_lock);
+
+	send_sig(SIGSTOP, task, 1);
+	return 0;
+
+bad:
+	task_unlock(task);
+	return -EPERM;
+}
+
+
 /*
  * Access another process' address space, one page at a time.
  */

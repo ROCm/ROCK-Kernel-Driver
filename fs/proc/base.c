@@ -645,6 +645,20 @@ static int proc_base_readdir(struct file * filp,
 
 /* building an inode */
 
+static int task_dumpable(struct task_struct *task)
+{
+	int dumpable = 0;
+	struct mm_struct *mm;
+
+	task_lock(task);
+	mm = task->mm;
+	if (mm)
+		dumpable = mm->dumpable;
+	task_unlock(task);
+	return dumpable;
+}
+
+
 static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_struct *task, int ino)
 {
 	struct inode * inode;
@@ -670,7 +684,7 @@ static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_st
 	inode->u.proc_i.task = task;
 	inode->i_uid = 0;
 	inode->i_gid = 0;
-	if (ino == PROC_PID_INO || task->mm->dumpable) {
+	if (ino == PROC_PID_INO || task_dumpable(task)) {
 		inode->i_uid = task->euid;
 		inode->i_gid = task->egid;
 	}

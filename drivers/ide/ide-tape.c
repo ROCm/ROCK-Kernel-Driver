@@ -419,6 +419,7 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 #include <linux/smp_lock.h>
+#include <linux/completion.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -978,7 +979,7 @@ typedef struct {
 	int logical_blk_num;			/* logical block number */
 	__u16 wrt_pass_cntr;			/* write pass counter */
 	__u32 update_frame_cntr;		/* update frame counter */
-	struct semaphore *sem;
+	struct completion *waiting;
 	int onstream_write_error;		/* write error recovery active */
 	int header_ok;				/* header frame verified ok */
 	int linux_media;			/* reading linux-specifc media */
@@ -1886,8 +1887,8 @@ static void idetape_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 						printk("ide-tape: %s: skipping over config parition..\n", tape->name);
 #endif
 					tape->onstream_write_error = OS_PART_ERROR;
-					if (tape->sem)
-						up(tape->sem);
+					if (tape->waiting)
+						complete(tape->waiting);
 				}
 			}
 			remove_stage = 1;
@@ -1903,8 +1904,8 @@ static void idetape_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 					tape->nr_pending_stages++;
 					tape->next_stage = tape->first_stage;
 					rq->current_nr_sectors = rq->nr_sectors;
-					if (tape->sem)
-						up(tape->sem);
+					if (tape->waiting)
+						complete(tape->waiting);
 				}
 			}
 		} else if (rq->cmd == IDETAPE_READ_RQ) {
@@ -3064,15 +3065,15 @@ static void idetape_init_stage (ide_drive_t *drive, idetape_stage_t *stage, int 
 }
 
 /*
- *	idetape_wait_for_request installs a semaphore in a pending request
+ *	idetape_wait_for_request installs a completion in a pending request
  *	and sleeps until it is serviced.
  *
  *	The caller should ensure that the request will not be serviced
- *	before we install the semaphore (usually by disabling interrupts).
+ *	before we install the completion (usually by disabling interrupts).
  */
 static void idetape_wait_for_request (ide_drive_t *drive, struct request *rq)
 {
-	DECLARE_MUTEX_LOCKED(sem);
+	DECLARE_COMPLETION(wait);
 	idetape_tape_t *tape = drive->driver_data;
 
 #if IDETAPE_DEBUG_BUGS
@@ -3081,12 +3082,12 @@ static void idetape_wait_for_request (ide_drive_t *drive, struct request *rq)
 		return;
 	}
 #endif /* IDETAPE_DEBUG_BUGS */
-	rq->sem = &sem;
-	tape->sem = &sem;
+	rq->waiting = &wait;
+	tape->waiting = &wait;
 	spin_unlock(&tape->spinlock);
-	down(&sem);
-	rq->sem = NULL;
-	tape->sem = NULL;
+	wait_for_completion(&wait);
+	rq->waiting = NULL;
+	tape->waiting = NULL;
 	spin_lock_irq(&tape->spinlock);
 }
 

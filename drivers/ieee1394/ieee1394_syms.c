@@ -18,7 +18,7 @@
 #include "ieee1394_core.h"
 #include "ieee1394_transactions.h"
 #include "highlevel.h"
-#include "guid.h"
+#include "nodemgr.h"
 
 EXPORT_SYMBOL(hpsb_register_lowlevel);
 EXPORT_SYMBOL(hpsb_unregister_lowlevel);
@@ -76,5 +76,5 @@ EXPORT_SYMBOL(highlevel_remove_host);
 EXPORT_SYMBOL(highlevel_host_reset);
 EXPORT_SYMBOL(highlevel_add_one_host);
 EXPORT_SYMBOL(hpsb_guid_get_handle);
-EXPORT_SYMBOL(hpsb_guid_localhost);
+EXPORT_SYMBOL(hpsb_get_host_by_ge);
 EXPORT_SYMBOL(hpsb_guid_fill_packet);

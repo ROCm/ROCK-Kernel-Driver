@@ -29,7 +29,7 @@
 #include "highlevel.h"
 #include "ieee1394_transactions.h"
 #include "csr.h"
-#include "guid.h"
+#include "nodemgr.h"
 
 
 atomic_t hpsb_generation = ATOMIC_INIT(0);
@@ -782,13 +782,13 @@ static int __init ieee1394_init(void)
 {
         init_hpsb_highlevel();
         init_csr();
-        init_ieee1394_guid();
+        init_ieee1394_nodemgr();
 	return 0;
 }
 
 static void __exit ieee1394_cleanup(void)
 {
-        cleanup_ieee1394_guid();
+        cleanup_ieee1394_nodemgr();
         cleanup_csr();
 }
 

@@ -320,38 +320,10 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 	    || (current->personality != PER_SUNOS && request == PTRACE_ATTACH)) {
 		unsigned long flags;
 
-		if(child == current) {
-			/* Try this under SunOS/Solaris, bwa haha
-			 * You'll never be able to kill the process. ;-)
-			 */
+		if (ptrace_attach(child)) {
 			pt_error_return(regs, EPERM);
 			goto out_tsk;
 		}
-		if((!child->mm->dumpable ||
-		    (current->uid != child->euid) ||
-		    (current->uid != child->uid) ||
-		    (current->uid != child->suid) ||
-		    (current->gid != child->egid) ||
-		    (current->gid != child->sgid) || 
-	 	    (!cap_issubset(child->cap_permitted, current->cap_permitted)) ||
-		    (current->gid != child->gid)) && !capable(CAP_SYS_PTRACE)) {
-			pt_error_return(regs, EPERM);
-			goto out_tsk;
-		}
-		/* the same process cannot be attached many times */
-		if (child->ptrace & PT_PTRACED) {
-			pt_error_return(regs, EPERM);
-			goto out_tsk;
-		}
-		child->ptrace |= PT_PTRACED;
-		write_lock_irqsave(&tasklist_lock, flags);
-		if(child->p_pptr != current) {
-			REMOVE_LINKS(child);
-			child->p_pptr = current;
-			SET_LINKS(child);
-		}
-		write_unlock_irqrestore(&tasklist_lock, flags);
-		send_sig(SIGSTOP, child, 1);
 		pt_succ_return(regs, 0);
 		goto out_tsk;
 	}

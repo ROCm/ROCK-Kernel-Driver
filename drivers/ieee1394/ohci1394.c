@@ -178,7 +178,7 @@ static struct pci_device_id ohci1394_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, ohci1394_pci_tbl);
 
 static char version[] __devinitdata =
-	"ohci1394.c:v0.50 15/Jul/01 Ben Collins <bcollins@debian.org>";
+	"v0.50 15/Jul/01 Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 MODULE_PARM(attempt_root,"i");
@@ -216,6 +216,7 @@ static u8 get_phy_reg(struct ti_ohci *ohci, u8 addr)
 	for (i = 0; i < OHCI_LOOP_COUNT; i++) {
 		if (reg_read(ohci, OHCI1394_PhyControl) & 0x80000000)
 			break;
+
 		mdelay(1);
 	}
 
@@ -243,6 +244,7 @@ static void set_phy_reg(struct ti_ohci *ohci, u8 addr, u8 data)
 		r = reg_read(ohci, OHCI1394_PhyControl);
 		if (!(r & 0x00004000))
 			break;
+
 		mdelay(1);
 	}
 
@@ -516,22 +518,6 @@ static int ohci_initialize(struct hpsb_host *host)
 	/* Set the configuration ROM mapping register */
 	reg_write(ohci, OHCI1394_ConfigROMmap, ohci->csr_config_rom_bus);
 
-	/* Set bus options */
-	reg_write(ohci, OHCI1394_BusOptions, 
-		  cpu_to_be32(ohci->csr_config_rom_cpu[2]));
-
-#if 0	
-	/* Write the GUID into the csr config rom */
-	ohci->csr_config_rom_cpu[3] = 
-		be32_to_cpu(reg_read(ohci, OHCI1394_GUIDHi));
-	ohci->csr_config_rom_cpu[4] = 
-		be32_to_cpu(reg_read(ohci, OHCI1394_GUIDLo));
-#endif
-
-	/* Write the config ROM header */
-	reg_write(ohci, OHCI1394_ConfigROMhdr, 
-		  cpu_to_be32(ohci->csr_config_rom_cpu[0]));
-
 	ohci->max_packet_size = 
 		1<<(((reg_read(ohci, OHCI1394_BusOptions)>>12)&0xf)+1);
 	PRINT(KERN_DEBUG, ohci->id, "Max packet size = %d bytes",
@@ -725,7 +711,7 @@ static void insert_packet(struct ti_ohci *ohci,
 			OHCI_DMA_ALLOC("single, block transmit packet");
 
 			if (ohci->payload_swap)
-				block_swab32(packet->data, packet->data_size>>2);
+				block_swab32(packet->data, packet->data_size >> 2);
 
                         d->prg_cpu[idx]->end.branchAddress = 0;
                         d->prg_cpu[idx]->end.status = 0;
@@ -1897,6 +1883,9 @@ static void ohci_init_config_rom(struct ti_ohci *ohci)
 	cf_put_1quad(&cr, reg_read(ohci, OHCI1394_GUIDLo));
 	cf_unit_end(&cr);
 
+	DBGMSG(ohci->id, "GUID: %08x:%08x\n", reg_read(ohci, OHCI1394_GUIDHi),
+		reg_read(ohci, OHCI1394_GUIDLo));
+
 	/* IEEE P1212 suggests the initial ROM header CRC should only
 	 * cover the header itself (and not the entire ROM). Since we use
 	 * this, then we can make our bus_info_len the same as the CRC
@@ -1991,6 +1980,7 @@ int ohci_compare_swap(struct ti_ohci *ohci, quadlet_t *data,
 	for (i = 0; i < OHCI_LOOP_COUNT; i++) {
 		if (reg_read(ohci, OHCI1394_CSRControl) & 0x80000000)
 			break;
+
 		mdelay(10);
 	}
 
@@ -2180,7 +2170,7 @@ static int __devinit ohci1394_add_one(struct pci_dev *dev, const struct pci_devi
 	if (ohci->ir_context == NULL)
 		FAIL("Failed to allocate IR context");
 
-        ohci->ISO_channel_usage= 0;
+	ohci->ISO_channel_usage = 0;
         spin_lock_init(&ohci->IR_channel_lock);
 
 	if (!request_irq(dev->irq, ohci_irq_handler, SA_SHIRQ,
@@ -2190,10 +2180,6 @@ static int __devinit ohci1394_add_one(struct pci_dev *dev, const struct pci_devi
 		FAIL("Failed to allocate shared interrupt %d", dev->irq);
 
 	ohci_init_config_rom(ohci);
-
-	DBGMSG(ohci->id, "The 1st byte at offset 0x404 is: 0x%02x",
-	       *((char *)ohci->csr_config_rom_cpu+4));
-
 
 	/* Tell the highlevel this host is ready */
 	highlevel_add_one_host (host);

@@ -1,7 +1,7 @@
 
 /* Common Flash Interface structures 
  * See http://support.intel.com/design/flash/technote/index.htm
- * $Id: cfi.h,v 1.21 2001/06/03 01:32:57 nico Exp $
+ * $Id: cfi.h,v 1.22 2001/07/06 09:29:07 dwmw2 Exp $
  */
 
 #ifndef __MTD_CFI_H__
@@ -10,6 +10,7 @@
 #include <linux/config.h>
 #include <linux/delay.h>
 #include <linux/types.h>
+#include <linux/interrupt.h>
 #include <linux/mtd/flashchip.h>
 #include <linux/mtd/cfi_endian.h>
 

@@ -45,6 +45,7 @@
 #include <linux/fs.h>
 #include <linux/tty.h>
 #include <linux/in6.h>
+#include <linux/completion.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -361,6 +362,10 @@ EXPORT_SYMBOL(irq_stat);	/* No separate irq_stat for s390, it is part of PSA */
 EXPORT_SYMBOL(add_wait_queue);
 EXPORT_SYMBOL(add_wait_queue_exclusive);
 EXPORT_SYMBOL(remove_wait_queue);
+
+/* completion handling */
+EXPORT_SYMBOL(wait_for_completion);
+EXPORT_SYMBOL(complete);
 
 /* The notion of irq probe/assignment is foreign to S/390 */
 

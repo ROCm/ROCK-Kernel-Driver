@@ -1,6 +1,24 @@
+/*
+ * Copyright (C) 2000	Andreas E. Bombe
+ *               2001	Ben Collins <bcollins@debian.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ */
 
-#ifndef _IEEE1394_GUID_H
-#define _IEEE1394_GUID_H
+#ifndef _IEEE1394_NODEMGR_H
+#define _IEEE1394_NODEMGR_H
 
 
 /*
@@ -11,8 +29,8 @@
  * associated with current nodes).
  */
 
-struct guid_entry;
-typedef struct guid_entry *hpsb_guid_t;
+struct node_entry;
+typedef struct node_entry *hpsb_guid_t;
 
 
 /*
@@ -32,7 +50,7 @@ hpsb_guid_t hpsb_guid_get_handle(u64 guid);
  * Note that the local GUID currently isn't collected, so this will always
  * return NULL.
  */
-struct hpsb_host *hpsb_guid_localhost(hpsb_guid_t handle);
+struct hpsb_host *hpsb_get_host_by_ge(hpsb_guid_t handle);
 
 /*
  * This will fill in the given, pre-initialised hpsb_packet with the current
@@ -48,7 +66,7 @@ struct hpsb_host *hpsb_guid_localhost(hpsb_guid_t handle);
 int hpsb_guid_fill_packet(hpsb_guid_t handle, struct hpsb_packet *pkt);
 
 
-void init_ieee1394_guid(void);
-void cleanup_ieee1394_guid(void);
+void init_ieee1394_nodemgr(void);
+void cleanup_ieee1394_nodemgr(void);
 
-#endif /* _IEEE1394_GUID_H */
+#endif /* _IEEE1394_NODEMGR_H */

@@ -1351,6 +1351,7 @@ static int add_card(struct pci_dev *dev)
 
         lynx->id = num_of_cards-1;
         lynx->dev = dev;
+	lynx->host->pdev = dev;
 
 	lynx->lock = SPIN_LOCK_UNLOCKED;
 	lynx->phy_reg_lock = SPIN_LOCK_UNLOCKED;

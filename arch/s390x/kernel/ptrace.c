@@ -247,31 +247,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		goto out;
 	if (request == PTRACE_ATTACH) 
 	{
-		if (child == current)
-			goto out;
-		if ((!child->mm->dumpable ||
-		     (current->uid != child->euid) ||
-		     (current->uid != child->suid) ||
-		     (current->uid != child->uid) ||
-		     (current->gid != child->egid) ||
-		     (current->gid != child->sgid)) && !capable(CAP_SYS_PTRACE))
-			goto out;
-		/* the same process cannot be attached many times */
-		if (child->ptrace & PT_PTRACED)
-			goto out;
-		child->ptrace |= PT_PTRACED;
-
-		write_lock_irqsave(&tasklist_lock, flags);
-		if (child->p_pptr != current) 
-		{
-			REMOVE_LINKS(child);
-			child->p_pptr = current;
-			SET_LINKS(child);
-		}
-		write_unlock_irqrestore(&tasklist_lock, flags);
-
-		send_sig(SIGSTOP, child, 1);
-		ret = 0;
+		ret = ptrace_attach(child);
 		goto out;
 	}
 	ret = -ESRCH;
@@ -433,31 +409,7 @@ asmlinkage int sys32_ptrace(long request, long pid, long addr, s32 data)
 		goto out;
 	if (request == PTRACE_ATTACH) 
 	{
-		if (child == current)
-			goto out;
-		if ((!child->mm->dumpable ||
-		     (current->uid != child->euid) ||
-		     (current->uid != child->suid) ||
-		     (current->uid != child->uid) ||
-		     (current->gid != child->egid) ||
-		     (current->gid != child->sgid)) && !capable(CAP_SYS_PTRACE))
-			goto out;
-		/* the same process cannot be attached many times */
-		if (child->ptrace & PT_PTRACED)
-			goto out;
-		child->ptrace |= PT_PTRACED;
-
-		write_lock_irqsave(&tasklist_lock, flags);
-		if (child->p_pptr != current) 
-		{
-			REMOVE_LINKS(child);
-			child->p_pptr = current;
-			SET_LINKS(child);
-		}
-		write_unlock_irqrestore(&tasklist_lock, flags);
-
-		send_sig(SIGSTOP, child, 1);
-		ret = 0;
+		ret = ptrace_attach(child);
 		goto out;
 	}
 	ret = -ESRCH;

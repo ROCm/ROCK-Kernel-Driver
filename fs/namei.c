@@ -1688,6 +1688,10 @@ int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 	error = -EINVAL;
 	if (is_subdir(new_dentry, old_dentry))
 		goto out_unlock;
+	/* Don't eat your daddy, dear... */
+	/* This also avoids locking issues */
+	if (old_dentry->d_parent == new_dentry)
+		goto out_unlock;
 	target = new_dentry->d_inode;
 	if (target) { /* Hastur! Hastur! Hastur! */
 		triple_down(&old_dir->i_zombie,

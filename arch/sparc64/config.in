@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.147 2001/07/18 07:52:34 davem Exp $
+# $Id: config.in,v 1.148 2001/07/20 07:10:35 davem Exp $
 # For a description of the syntax of this configuration file,
 # see the Configure script.
 #
@@ -207,7 +207,9 @@ fi
 endmenu
 
 source drivers/fc4/Config.in
+
 source drivers/message/fusion/Config.in
+
 source drivers/ieee1394/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
