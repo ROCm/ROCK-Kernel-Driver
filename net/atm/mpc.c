@@ -224,7 +224,7 @@ int atm_mpoa_delete_qos(struct atm_mpoa_qos *entry)
 	return 0;
 }
 
-void atm_mpoa_disp_qos(char *page, int *len)
+void atm_mpoa_disp_qos(char *page, ssize_t *len)
 {
 
 	unsigned char *ip;
