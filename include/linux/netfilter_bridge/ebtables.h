@@ -260,6 +260,7 @@ struct ebt_table
 	   unsigned int valid_hooks);
 	/* the data used by the kernel */
 	struct ebt_table_info *private;
+	struct module *me;
 };
 
 extern int ebt_register_table(struct ebt_table *table);

@@ -198,6 +198,7 @@
 #define SUNI_MT_IOTST		0x04	/* RW, enable test mode */
 #define SUNI_MT_DBCTRL		0x08	/* W, control data bus by CSB pin */
 #define SUNI_MT_PMCTST		0x10	/* W, PMC test mode */
+#define SUNI_MT_DS27_53		0x80	/* RW, select between 8- or 16- bit */
 
 
 #define SUNI_IDLE_PATTERN       0x6a    /* idle pattern */

@@ -15,6 +15,7 @@
  */
 #include <linux/init.h>
 #include <linux/crypto.h>
+#include <linux/errno.h>
 #include <linux/rwsem.h>
 #include <linux/slab.h>
 #include "internal.h"

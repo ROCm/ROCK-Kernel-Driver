@@ -643,7 +643,8 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		if (flags&MSG_PROBE)
 			goto out;
 		/* alloc skb with mtu as we do in the IPv4 stack for IPsec */
-		skb = sock_alloc_send_skb(sk, mtu, flags & MSG_DONTWAIT, &err);
+		skb = sock_alloc_send_skb(sk, mtu + LL_RESERVED_SPACE(dev),
+					  flags & MSG_DONTWAIT, &err);
 
 		if (skb == NULL) {
 			IP6_INC_STATS(Ip6OutDiscards);

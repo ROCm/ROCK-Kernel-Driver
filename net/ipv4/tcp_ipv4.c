@@ -1798,7 +1798,7 @@ process:
 	if (sk->state == TCP_TIME_WAIT)
 		goto do_time_wait;
 
-	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb))
+	if (!xfrm4_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_and_relse;
 
 	if (sk_filter(sk, skb, 0))
@@ -1820,7 +1820,7 @@ process:
 	return ret;
 
 no_tcp_socket:
-	if (!xfrm_policy_check(NULL, XFRM_POLICY_IN, skb))
+	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
 		goto discard_it;
 
 	if (skb->len < (th->doff << 2) || tcp_checksum_complete(skb)) {
@@ -1840,7 +1840,7 @@ discard_and_relse:
 	goto discard_it;
 
 do_time_wait:
-	if (!xfrm_policy_check(NULL, XFRM_POLICY_IN, skb))
+	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
 		goto discard_and_relse;
 
 	if (skb->len < (th->doff << 2) || tcp_checksum_complete(skb)) {

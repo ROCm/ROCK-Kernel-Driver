@@ -23,6 +23,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/errno.h>
 #include <asm/scatterlist.h>
 #include <linux/crypto.h>
 
