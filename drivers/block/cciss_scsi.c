@@ -1086,10 +1086,10 @@ cciss_scsi_do_report_phys_luns(ctlr_info_t *c,
 	cdb[3] = 0;
 	cdb[4] = 0;
 	cdb[5] = 0;
-	cdb[6] = (sizeof(*buf) >> 24) & 0xFF;  //MSB
-	cdb[7] = (sizeof(*buf) >> 16) & 0xFF;
-	cdb[8] = (sizeof(*buf) >> 8) & 0xFF;
-	cdb[9] = sizeof(*buf) & 0xFF;
+	cdb[6] = (bufsize >> 24) & 0xFF;  //MSB
+	cdb[7] = (bufsize >> 16) & 0xFF;
+	cdb[8] = (bufsize >> 8) & 0xFF;
+	cdb[9] = bufsize & 0xFF;
 	cdb[10] = 0;
 	cdb[11] = 0;
 
