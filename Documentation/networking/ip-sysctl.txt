@@ -185,7 +185,7 @@ tcp_stdurg - BOOLEAN
 	
 tcp_max_syn_backlog - INTEGER
 	Maximal number of remembered connection requests, which are
-	still did not receive an acknowledgement from connecting client.
+	still did not receive an acknowledgment from connecting client.
 	Default value is 1024 for systems with more than 128Mb of memory,
 	and 128 for low memory machines. If server suffers of overload,
 	try to increase this number.
