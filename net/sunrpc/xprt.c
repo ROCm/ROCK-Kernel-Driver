@@ -397,8 +397,10 @@ static void
 xprt_disconnect(struct rpc_xprt *xprt)
 {
 	dprintk("RPC:      disconnected transport %p\n", xprt);
+	spin_lock_bh(&xprt->sock_lock);
 	xprt_clear_connected(xprt);
 	rpc_wake_up_status(&xprt->pending, -ENOTCONN);
+	spin_unlock_bh(&xprt->sock_lock);
 }
 
 /*
@@ -986,10 +988,10 @@ tcp_state_change(struct sock *sk)
 		xprt->tcp_copied = 0;
 		xprt->tcp_flags = XPRT_COPY_RECM | XPRT_COPY_XID;
 
-		spin_lock(&xprt->sock_lock);
+		spin_lock_bh(&xprt->sock_lock);
 		if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->pending)
 			rpc_wake_up_task(xprt->snd_task);
-		spin_unlock(&xprt->sock_lock);
+		spin_unlock_bh(&xprt->sock_lock);
 		break;
 	case TCP_SYN_SENT:
 	case TCP_SYN_RECV:
@@ -1192,7 +1194,10 @@ xprt_transmit(struct rpc_task *task)
 		if (test_bit(SOCK_ASYNC_NOSPACE, &xprt->sock->flags)) {
 			/* Protect against races with xprt_write_space */
 			spin_lock_bh(&xprt->sock_lock);
-			if (test_bit(SOCK_NOSPACE, &xprt->sock->flags)) {
+			/* Don't race with disconnect */
+			if (!xprt_connected(xprt))
+				task->tk_status = -ENOTCONN;
+			else if (test_bit(SOCK_NOSPACE, &xprt->sock->flags)) {
 				task->tk_timeout = req->rq_timeout.to_current;
 				rpc_sleep_on(&xprt->pending, task, NULL, NULL);
 			}
@@ -1230,7 +1235,10 @@ xprt_transmit(struct rpc_task *task)
 	} else
 		task->tk_timeout = req->rq_timeout.to_current;
 	spin_lock_bh(&xprt->sock_lock);
-	if (!req->rq_received)
+	/* Don't race with disconnect */
+	if (!xprt_connected(xprt))
+		task->tk_status = -ENOTCONN;
+	else if (!req->rq_received)
 		rpc_sleep_on(&xprt->pending, task, NULL, xprt_timer);
 	__xprt_release_write(xprt, task);
 	spin_unlock_bh(&xprt->sock_lock);
