@@ -99,6 +99,8 @@ static void sctp_sock_migrate(struct sock *, struct sock *,
 			      struct sctp_association *, sctp_socket_type_t);
 static char *sctp_hmac_alg = SCTP_COOKIE_HMAC_ALG;
 
+extern kmem_cache_t *sctp_bucket_cachep;
+
 /* Look up the association by its id.  If this is not a UDP-style
  * socket, the ID field is always ignored.
  */
@@ -2721,7 +2723,7 @@ static void sctp_unhash(struct sock *sk)
  *
  * The port hash table (contained in the 'global' SCTP protocol storage
  * returned by struct sctp_protocol *sctp_get_protocol()). The hash
- * table is an array of 4096 lists (sctp_bind_hashbucket_t). Each
+ * table is an array of 4096 lists (sctp_bind_hashbucket). Each
  * list (the list number is the port number hashed out, so as you
  * would expect from a hash function, all the ports in a given list have
  * such a number that hashes out to the same list number; you were
@@ -2729,12 +2731,13 @@ static void sctp_unhash(struct sock *sk)
  * link to the socket (struct sock) that uses it, the port number and
  * a fastreuse flag (FIXME: NPI ipg).
  */
-static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head,
-					      unsigned short snum);
+static struct sctp_bind_bucket *sctp_bucket_create(
+	struct sctp_bind_hashbucket *head, unsigned short snum);
+
 static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 {
-	sctp_bind_hashbucket_t *head; /* hash list */
-	sctp_bind_bucket_t *pp; /* hash list port iterator */
+	struct sctp_bind_hashbucket *head; /* hash list */
+	struct sctp_bind_bucket *pp; /* hash list port iterator */
 	struct sctp_protocol *sctp = sctp_get_protocol();
 	unsigned short snum;
 	int ret;
@@ -3105,12 +3108,12 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
  * 2nd Level Abstractions
  ********************************************************************/
 
-static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head, unsigned short snum)
+static struct sctp_bind_bucket *sctp_bucket_create(
+	struct sctp_bind_hashbucket *head, unsigned short snum)
 {
-	sctp_bind_bucket_t *pp;
+	struct sctp_bind_bucket *pp;
 
-	SCTP_DEBUG_PRINTK( "sctp_bucket_create() begins, snum=%d\n", snum);
-	pp = kmalloc(sizeof(sctp_bind_bucket_t), GFP_ATOMIC);
+	pp = kmem_cache_alloc(sctp_bucket_cachep, SLAB_ATOMIC);
 	if (pp) {
 		pp->port = snum;
 		pp->fastreuse = 0;
@@ -3120,31 +3123,36 @@ static sctp_bind_bucket_t *sctp_bucket_create(sctp_bind_hashbucket_t *head, unsi
 		head->chain = pp;
 		pp->pprev = &head->chain;
 	}
-	SCTP_DEBUG_PRINTK("sctp_bucket_create() ends, pp=%p\n", pp);
 	return pp;
+}
+
+/* Caller must hold hashbucket lock for this tb with local BH disabled */
+static void sctp_bucket_destroy(struct sctp_bind_bucket *pp)
+{
+	if (pp->sk) {
+		if (pp->next)
+			pp->next->pprev = pp->pprev;
+		*(pp->pprev) = pp->next;
+		kmem_cache_free(sctp_bucket_cachep, pp);
+	}
 }
 
 /* FIXME: Commments! */
 static __inline__ void __sctp_put_port(struct sock *sk)
 {
 	struct sctp_protocol *sctp_proto = sctp_get_protocol();
-	sctp_bind_hashbucket_t *head =
+	struct sctp_bind_hashbucket *head =
 		&sctp_proto->port_hashtable[sctp_phashfn(inet_sk(sk)->num)];
-	sctp_bind_bucket_t *pp;
+	struct sctp_bind_bucket *pp;
 
 	sctp_spin_lock(&head->lock);
-	pp = (sctp_bind_bucket_t *) sk->prev;
+	pp = (struct sctp_bind_bucket *) sk->prev;
 	if (sk->bind_next)
 		sk->bind_next->bind_pprev = sk->bind_pprev;
 	*(sk->bind_pprev) = sk->bind_next;
 	sk->prev = NULL;
 	inet_sk(sk)->num = 0;
-	if (pp->sk) {
-		if (pp->next)
-			pp->next->pprev = pp->pprev;
-		*(pp->pprev) = pp->next;
-		kfree(pp);
-	}
+	sctp_bucket_destroy(pp);
 	sctp_spin_unlock(&head->lock);
 }
 

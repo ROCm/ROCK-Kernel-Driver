@@ -68,6 +68,8 @@
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
+extern kmem_cache_t *sctp_chunk_cachep;
+
 /* What was the inbound interface for this chunk? */
 int sctp_chunk_iif(const struct sctp_chunk *chunk)
 {
@@ -874,7 +876,7 @@ struct sctp_chunk *sctp_make_heartbeat(const struct sctp_association *asoc,
 				  const void *payload, const size_t paylen)
 {
 	struct sctp_chunk *retval = sctp_make_chunk(asoc, SCTP_CID_HEARTBEAT,
-					       0, paylen);
+						    0, paylen);
 
 	if (!retval)
 		goto nodata;
@@ -976,7 +978,9 @@ struct sctp_chunk *sctp_chunkify(struct sk_buff *skb,
 			    const struct sctp_association *asoc,
 			    struct sock *sk)
 {
-	struct sctp_chunk *retval = t_new(struct sctp_chunk, GFP_ATOMIC);
+	struct sctp_chunk *retval;
+
+	retval = kmem_cache_alloc(sctp_chunk_cachep, SLAB_ATOMIC);
 
 	if (!retval)
 		goto nodata;
@@ -1048,7 +1052,7 @@ const union sctp_addr *sctp_source(const struct sctp_chunk *chunk)
  * arguments, reserving enough space for a 'paylen' byte payload.
  */
 struct sctp_chunk *sctp_make_chunk(const struct sctp_association *asoc,
-			      __u8 type, __u8 flags, int paylen)
+				   __u8 type, __u8 flags, int paylen)
 {
 	struct sctp_chunk *retval;
 	sctp_chunkhdr_t *chunk_hdr;
@@ -1075,13 +1079,12 @@ struct sctp_chunk *sctp_make_chunk(const struct sctp_association *asoc,
 	}
 
 	retval->chunk_hdr = chunk_hdr;
-	retval->chunk_end = ((__u8 *)chunk_hdr) + sizeof(sctp_chunkhdr_t);
+	retval->chunk_end = ((__u8 *)chunk_hdr) + sizeof(struct sctp_chunkhdr);
 
 	/* Set the skb to the belonging sock for accounting.  */
 	skb->sk = sk;
 
 	return retval;
-
 nodata:
 	return NULL;
 }
@@ -1090,12 +1093,11 @@ nodata:
 /* Release the memory occupied by a chunk.  */
 static void sctp_chunk_destroy(struct sctp_chunk *chunk)
 {
-
 	/* Free the chunk skb data and the SCTP_chunk stub itself. */
 	dev_kfree_skb(chunk->skb);
 
-	kfree(chunk);
 	SCTP_DBG_OBJCNT_DEC(chunk);
+	kmem_cache_free(sctp_chunk_cachep, chunk);
 }
 
 /* Possibly, free the chunk.  */
