@@ -679,7 +679,7 @@ static int w83977af_pio_write(int iobase, __u8 *buf, int len, int fifo_size)
  *
  *    
  */
-void w83977af_dma_xmit_complete(struct w83977af_ir *self)
+static void w83977af_dma_xmit_complete(struct w83977af_ir *self)
 {
 	int iobase;
 	__u8 set;
