@@ -1287,10 +1287,6 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 
 	if (!len)
 		return 0;
-	ptr = kmem_zalloc(len, 0);
-	memcpy(ptr, dp, len);
-
-	in_f = (xfs_inode_log_format_t *)ptr;
 	item = trans->r_itemq;
 	if (item == 0) {
 		ASSERT(*(uint *)dp == XFS_TRANS_HEADER_MAGIC);
@@ -1299,6 +1295,11 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 		memcpy(&trans->r_theader, dp, len); /* d, s, l */
 		return 0;
 	}
+
+	ptr = kmem_alloc(len, 0);
+	memcpy(ptr, dp, len);
+	in_f = (xfs_inode_log_format_t *)ptr;
+
 	if (item->ri_prev->ri_total != 0 &&
 	     item->ri_prev->ri_total == item->ri_prev->ri_cnt) {
 		xlog_recover_add_item(&trans->r_itemq);

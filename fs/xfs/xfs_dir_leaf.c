@@ -648,7 +648,7 @@ xfs_dir_leaf_to_shortform(xfs_da_args_t *iargs)
 	retval = xfs_da_read_buf(iargs->trans, iargs->dp, 0, -1, &bp,
 					       XFS_DATA_FORK);
 	if (retval)
-		return(retval);
+		goto out;
 	ASSERT(bp != NULL);
 	memcpy(tmpbuffer, bp->data, XFS_LBSIZE(dp->i_mount));
 	leaf = (xfs_dir_leafblock_t *)tmpbuffer;
