@@ -13,7 +13,7 @@
  *
  *  and SPARC console subsystem
  *
- *      Copyright (C) 1995 Peter Zaitcev (zaitcev@lab.ipmce.su)
+ *      Copyright (C) 1995 Peter Zaitcev (zaitcev@yahoo.com)
  *      Copyright (C) 1995-1997 David S. Miller (davem@caip.rutgers.edu)
  *      Copyright (C) 1995-1996 Miguel de Icaza (miguel@nuclecu.unam.mx)
  *      Copyright (C) 1996 Dave Redman (djhr@tadpole.co.uk)

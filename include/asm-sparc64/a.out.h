@@ -1,4 +1,4 @@
-/* $Id: a.out.h,v 1.6 1999/08/04 07:04:21 jj Exp $ */
+/* $Id: a.out.h,v 1.7 2001/04/24 01:09:12 davem Exp $ */
 #ifndef __SPARC64_A_OUT_H__
 #define __SPARC64_A_OUT_H__
 
@@ -21,7 +21,7 @@ struct exec {
 	unsigned int a_drsize;
 };
 
-#endif __ASSEMBLY__
+#endif /* !__ASSEMBLY__ */
 
 /* Where in the file does the text information begin? */
 #define N_TXTOFF(x)     (N_MAGIC(x) == ZMAGIC ? 0 : sizeof (struct exec))

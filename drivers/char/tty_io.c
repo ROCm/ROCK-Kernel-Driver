@@ -149,7 +149,11 @@ extern long serial167_console_init(void);
 extern void console_8xx_init(void);
 extern int rs_8xx_init(void);
 extern void hwc_console_init(void);
+extern void hwc_tty_init(void);
 extern void con3215_init(void);
+extern void tty3215_init(void);
+extern void tub3270_con_init(void);
+extern void tub3270_initfunc(void);
 extern void rs285_console_init(void);
 extern void sa1100_rs_console_init(void);
 extern void sgi_serial_console_init(void);
@@ -2199,6 +2203,9 @@ void __init console_init(void)
 #ifdef CONFIG_3215
         con3215_init();
 #endif
+#ifdef CONFIG_3270_CONSOLE
+	tub3270_con_init();
+#endif
 #ifdef CONFIG_HWC
         hwc_console_init();
 #endif
@@ -2342,5 +2349,14 @@ void __init tty_init(void)
 #endif	
 #ifdef CONFIG_VT
 	vcs_init();
+#endif
+#ifdef CONFIG_3270
+	tub3270_initfunc();
+#endif
+#ifdef CONFIG_3215
+	tty3215_init();
+#endif
+#ifdef CONFIG_HWC
+	hwc_tty_init();
 #endif
 }

@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: route.c,v 1.49 2000/11/03 01:11:58 davem Exp $
+ *	$Id: route.c,v 1.50 2001/04/25 20:46:35 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -1394,6 +1394,7 @@ static int rt6_mtu_change_route(struct rt6_info *rt, void *p_arg)
 	   caused by addrconf/ndisc.
 	*/
 	if (rt->rt6i_dev == arg->dev &&
+	    rt->u.dst.pmtu > arg->mtu &&
 	    !(rt->u.dst.mxlock&(1<<RTAX_MTU)))
 		rt->u.dst.pmtu = arg->mtu;
 	rt->u.dst.advmss = max(arg->mtu - 60, ip6_rt_min_advmss);

@@ -1,4 +1,4 @@
-/* $Id: debuglocks.c,v 1.5 2000/05/09 17:40:14 davem Exp $
+/* $Id: debuglocks.c,v 1.6 2001/04/24 01:09:12 davem Exp $
  * debuglocks.c: Debugging versions of SMP locking primitives.
  *
  * Copyright (C) 1998 David S. Miller (davem@redhat.com)
@@ -123,14 +123,14 @@ wlock_again:
 		membar("#LoadLoad");
 	}
 	/* Try once to increment the counter.  */
-	__asm__ __volatile__("
-	ldx		[%0], %%g5
-	brlz,a,pn	%%g5, 2f
-	 mov		1, %0
-	add		%%g5, 1, %%g7
-	casx		[%0], %%g5, %%g7
-	sub		%%g5, %%g7, %0
-2:"	: "=r" (val)
+	__asm__ __volatile__(
+"	ldx		[%0], %%g5\n"
+"	brlz,a,pn	%%g5, 2f\n"
+"	 mov		1, %0\n"
+"	add		%%g5, 1, %%g7\n"
+"	casx		[%0], %%g5, %%g7\n"
+"	sub		%%g5, %%g7, %0\n"
+"2:"	: "=r" (val)
 	: "0" (&(rw->lock))
 	: "g5", "g7", "memory");
 	membar("#StoreLoad | #StoreStore");
@@ -151,13 +151,13 @@ void _do_read_unlock (rwlock_t *rw, char *str)
 	rw->reader_pc[cpu] = 0;
 runlock_again:
 	/* Spin trying to decrement the counter using casx.  */
-	__asm__ __volatile__("
-	ldx	[%0], %%g5
-	sub	%%g5, 1, %%g7
-	casx	[%0], %%g5, %%g7
-	membar	#StoreLoad | #StoreStore
-	sub	%%g5, %%g7, %0
-"	: "=r" (val)
+	__asm__ __volatile__(
+"	ldx	[%0], %%g5\n"
+"	sub	%%g5, 1, %%g7\n"
+"	casx	[%0], %%g5, %%g7\n"
+"	membar	#StoreLoad | #StoreStore\n"
+"	sub	%%g5, %%g7, %0\n"
+	: "=r" (val)
 	: "0" (&(rw->lock))
 	: "g5", "g7", "memory");
 	if (val) {
@@ -187,18 +187,18 @@ wlock_again:
 	}
 
 	/* Try to acuire the write bit.  */
-	__asm__ __volatile__("
-	mov	1, %%g3
-	sllx	%%g3, 63, %%g3
-	ldx	[%0], %%g5
-	brlz,pn	%%g5, 1f
-	 or	%%g5, %%g3, %%g7
-	casx	[%0], %%g5, %%g7
-	membar	#StoreLoad | #StoreStore
-	ba,pt	%%xcc, 2f
-	 sub	%%g5, %%g7, %0
-1:	mov	1, %0
-2:"	: "=r" (val)
+	__asm__ __volatile__(
+"	mov	1, %%g3\n"
+"	sllx	%%g3, 63, %%g3\n"
+"	ldx	[%0], %%g5\n"
+"	brlz,pn	%%g5, 1f\n"
+"	 or	%%g5, %%g3, %%g7\n"
+"	casx	[%0], %%g5, %%g7\n"
+"	membar	#StoreLoad | #StoreStore\n"
+"	ba,pt	%%xcc, 2f\n"
+"	 sub	%%g5, %%g7, %0\n"
+"1:	mov	1, %0\n"
+"2:"	: "=r" (val)
 	: "0" (&(rw->lock))
 	: "g3", "g5", "g7", "memory");
 	if (val) {
@@ -217,15 +217,15 @@ wlock_again:
 			show_write(str, rw, caller);
 			stuck = INIT_STUCK;
 		}
-		__asm__ __volatile__("
-		mov	1, %%g3
-		sllx	%%g3, 63, %%g3
-1:		ldx	[%0], %%g5
-		andn	%%g5, %%g3, %%g7
-		casx	[%0], %%g5, %%g7
-		cmp	%%g5, %%g7
-		bne,pn	%%xcc, 1b
-		 membar	#StoreLoad | #StoreStore"
+		__asm__ __volatile__(
+"		mov	1, %%g3\n"
+"		sllx	%%g3, 63, %%g3\n"
+"1:		ldx	[%0], %%g5\n"
+"		andn	%%g5, %%g3, %%g7\n"
+"		casx	[%0], %%g5, %%g7\n"
+"		cmp	%%g5, %%g7\n"
+"		bne,pn	%%xcc, 1b\n"
+"		 membar	#StoreLoad | #StoreStore"
 		: /* no outputs */
 		: "r" (&(rw->lock))
 		: "g3", "g5", "g7", "cc", "memory");
@@ -255,15 +255,15 @@ void _do_write_unlock(rwlock_t *rw)
 	rw->writer_pc = 0;
 	rw->writer_cpu = NO_PROC_ID;
 wlock_again:
-	__asm__ __volatile__("
-	mov	1, %%g3
-	sllx	%%g3, 63, %%g3
-	ldx	[%0], %%g5
-	andn	%%g5, %%g3, %%g7
-	casx	[%0], %%g5, %%g7
-	membar	#StoreLoad | #StoreStore
-	sub	%%g5, %%g7, %0
-"	: "=r" (val)
+	__asm__ __volatile__(
+"	mov	1, %%g3\n"
+"	sllx	%%g3, 63, %%g3\n"
+"	ldx	[%0], %%g5\n"
+"	andn	%%g5, %%g3, %%g7\n"
+"	casx	[%0], %%g5, %%g7\n"
+"	membar	#StoreLoad | #StoreStore\n"
+"	sub	%%g5, %%g7, %0\n"
+	: "=r" (val)
 	: "0" (&(rw->lock))
 	: "g3", "g5", "g7", "memory");
 	if (val) {

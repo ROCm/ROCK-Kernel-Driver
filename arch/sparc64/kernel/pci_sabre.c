@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.26 2001/04/17 01:19:23 davem Exp $
+/* $Id: pci_sabre.c,v 1.27 2001/04/24 05:14:12 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -215,6 +215,8 @@
 	 ((unsigned long)(DEVFN) << 8)  |	\
 	 ((unsigned long)(REG)))
 
+static int apb_present;
+
 static void *sabre_pci_config_mkaddr(struct pci_pbm_info *pbm,
 				     unsigned char bus,
 				     unsigned int devfn,
@@ -229,6 +231,9 @@ static void *sabre_pci_config_mkaddr(struct pci_pbm_info *pbm,
 
 static int sabre_out_of_range(unsigned char devfn)
 {
+	if (!apb_present)
+		return 0;
+
 	return (((PCI_SLOT(devfn) == 0) && (PCI_FUNC(devfn) > 0)) ||
 		((PCI_SLOT(devfn) == 1) && (PCI_FUNC(devfn) > 1)) ||
 		(PCI_SLOT(devfn) > 1));
@@ -238,6 +243,9 @@ static int __sabre_out_of_range(struct pci_pbm_info *pbm,
 				unsigned char bus,
 				unsigned char devfn)
 {
+	if (!apb_present)
+		return 0;
+
 	return ((pbm->parent == 0) ||
 		((pbm == &pbm->parent->pbm_B) &&
 		 (bus == pbm->pci_first_busno) &&
@@ -1108,7 +1116,9 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 {
 	static int once = 0;
 	struct pci_bus *sabre_bus;
+	struct pci_pbm_info *pbm;
 	struct list_head *walk;
+	int sabres_scanned;
 
 	/* The APB bridge speaks to the Sabre host PCI bridge
 	 * at 66Mhz, but the front side of APB runs at 33Mhz
@@ -1138,10 +1148,11 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 				 &p->pbm_A);
 	apb_init(p, sabre_bus);
 
+	sabres_scanned = 0;
+
 	walk = &sabre_bus->children;
 	for (walk = walk->next; walk != &sabre_bus->children; walk = walk->next) {
 		struct pci_bus *pbus = pci_bus_b(walk);
-		struct pci_pbm_info *pbm;
 
 		if (pbus->number == p->pbm_A.pci_first_busno) {
 			pbm = &p->pbm_A;
@@ -1149,6 +1160,8 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 			pbm = &p->pbm_B;
 		} else
 			continue;
+
+		sabres_scanned++;
 
 		pbus->sysdata = pbm;
 		pbm->pci_bus = pbus;
@@ -1158,6 +1171,19 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 		pci_fixup_irq(pbm, pbus);
 		pci_determine_66mhz_disposition(pbm, pbus);
 		pci_setup_busmastering(pbm, pbus);
+	}
+
+	if (!sabres_scanned) {
+		/* Hummingbird, no APBs. */
+		pbm = &p->pbm_A;
+		sabre_bus->sysdata = pbm;
+		pbm->pci_bus = sabre_bus;
+		pci_fill_in_pbm_cookies(sabre_bus, pbm, pbm->prom_node);
+		pci_record_assignments(pbm, sabre_bus);
+		pci_assign_unassigned(pbm, sabre_bus);
+		pci_fixup_irq(pbm, sabre_bus);
+		pci_determine_66mhz_disposition(pbm, sabre_bus);
+		pci_setup_busmastering(pbm, sabre_bus);
 	}
 
 	sabre_register_error_handlers(p);
@@ -1302,15 +1328,16 @@ static void __init pbm_register_toplevel_resources(struct pci_controller_info *p
 	}
 }
 
-static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node)
+static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node, u32 dma_begin)
 {
+	struct pci_pbm_info *pbm;
 	char namebuf[128];
 	u32 busrange[2];
-	int node;
+	int node, simbas_found;
 
+	simbas_found = 0;
 	node = prom_getchild(sabre_node);
 	while ((node = prom_searchsiblings(node, "pci")) != 0) {
-		struct pci_pbm_info *pbm;
 		int err;
 
 		err = prom_getproperty(node, "model", namebuf, sizeof(namebuf));
@@ -1324,6 +1351,7 @@ static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node)
 			prom_halt();
 		}
 
+		simbas_found++;
 		if (busrange[0] == 1)
 			pbm = &p->pbm_B;
 		else
@@ -1371,6 +1399,70 @@ static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node)
 		node = prom_getsibling(node);
 		if (!node)
 			break;
+	}
+	if (simbas_found == 0) {
+		int err;
+
+		/* No APBs underneath, probably this is a hummingbird
+		 * system.
+		 */
+		pbm = &p->pbm_A;
+		pbm->parent = p;
+		pbm->prom_node = sabre_node;
+		pbm->pci_first_busno = p->pci_first_busno;
+		pbm->pci_last_busno = p->pci_last_busno;
+		for (err = pbm->pci_first_busno;
+		     err <= pbm->pci_last_busno;
+		     err++)
+			pci_bus2pbm[err] = pbm;
+
+		prom_getstring(sabre_node, "name", pbm->prom_name, sizeof(pbm->prom_name));
+		err = prom_getproperty(sabre_node, "ranges",
+				       (char *) pbm->pbm_ranges,
+				       sizeof(pbm->pbm_ranges));
+		if (err != -1)
+			pbm->num_pbm_ranges =
+				(err / sizeof(struct linux_prom_pci_ranges));
+		else
+			pbm->num_pbm_ranges = 0;
+
+		err = prom_getproperty(sabre_node, "interrupt-map",
+				       (char *) pbm->pbm_intmap,
+				       sizeof(pbm->pbm_intmap));
+
+		if (err != -1) {
+			pbm->num_pbm_intmap = (err / sizeof(struct linux_prom_pci_intmap));
+			err = prom_getproperty(sabre_node, "interrupt-map-mask",
+					       (char *)&pbm->pbm_intmask,
+					       sizeof(pbm->pbm_intmask));
+			if (err == -1) {
+				prom_printf("Hummingbird: Fatal error, no interrupt-map-mask.\n");
+				prom_halt();
+			}
+		} else {
+			pbm->num_pbm_intmap = 0;
+			memset(&pbm->pbm_intmask, 0, sizeof(pbm->pbm_intmask));
+		}
+
+		/* Hack up top-level resources. */
+		pbm->io_space.start = p->controller_regs + SABRE_IOSPACE;
+		pbm->io_space.end   = pbm->io_space.start + (1UL << 16) - 1UL;
+		pbm->io_space.flags = IORESOURCE_IO;
+
+		pbm->mem_space.start = p->controller_regs + SABRE_MEMSPACE;
+		pbm->mem_space.end   = pbm->mem_space.start + (unsigned long)dma_begin - 1UL;
+		pbm->mem_space.flags = IORESOURCE_MEM;
+
+		if (request_resource(&ioport_resource, &pbm->io_space) < 0) {
+			prom_printf("Cannot register Hummingbird's IO space.\n");
+			prom_halt();
+		}
+		if (request_resource(&iomem_resource, &pbm->mem_space) < 0) {
+			prom_printf("Cannot register Hummingbird's MEM space.\n");
+			prom_halt();
+		}
+	} else {
+		apb_present = 1;
 	}
 }
 
@@ -1499,5 +1591,5 @@ void __init sabre_init(int pnode)
 	/*
 	 * Look for APB underneath.
 	 */
-	sabre_pbm_init(p, pnode);
+	sabre_pbm_init(p, pnode, vdma[0]);
 }

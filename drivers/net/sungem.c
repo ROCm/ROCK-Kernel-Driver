@@ -1,4 +1,4 @@
-/* $Id: sungem.c,v 1.12 2001/04/17 07:20:20 davem Exp $
+/* $Id: sungem.c,v 1.13 2001/04/20 08:16:28 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
@@ -36,6 +36,11 @@
 #include <asm/pbm.h>
 #endif
 
+#ifdef __powerpc__
+#include <asm/pci-bridge.h>
+#include <asm/prom.h>
+#endif
+
 #include "sungem.h"
 
 static char version[] __devinitdata =
@@ -64,11 +69,8 @@ static struct pci_device_id gem_pci_tbl[] __devinitdata = {
 	 */
 	{ PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_RIO_GEM,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
-#if 0
-	/* Need to figure this one out. */
-	{ PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_PPC_GEM,
+	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_UNI_N_GMAC,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
-#endif
 	{0, }
 };
 
@@ -188,13 +190,13 @@ static int gem_txmac_interrupt(struct net_device *dev, struct gem *gp, u32 gem_s
 		return 0;
 
 	if (txmac_stat & MAC_TXSTAT_URUN) {
-		printk("%s: TX MAC xmit underrun.\n",
+		printk(KERN_ERR "%s: TX MAC xmit underrun.\n",
 		       dev->name);
 		gp->net_stats.tx_fifo_errors++;
 	}
 
 	if (txmac_stat & MAC_TXSTAT_MPE) {
-		printk("%s: TX MAC max packet size error.\n",
+		printk(KERN_ERR "%s: TX MAC max packet size error.\n",
 		       dev->name);
 		gp->net_stats.tx_errors++;
 	}
@@ -226,7 +228,7 @@ static int gem_rxmac_interrupt(struct net_device *dev, struct gem *gp, u32 gem_s
 	u32 rxmac_stat = readl(gp->regs + MAC_RXSTAT);
 
 	if (rxmac_stat & MAC_RXSTAT_OFLW) {
-		printk("%s: RX MAC fifo overflow.\n",
+		printk(KERN_ERR "%s: RX MAC fifo overflow.\n",
 		       dev->name);
 		gp->net_stats.rx_over_errors++;
 		gp->net_stats.rx_fifo_errors++;
@@ -281,7 +283,8 @@ static int gem_pci_interrupt(struct net_device *dev, struct gem *gp, u32 gem_sta
 {
 	u32 pci_estat = readl(gp->regs + GREG_PCIESTAT);
 
-	if (gp->pdev->device == PCI_DEVICE_ID_SUN_GEM) {
+	if (gp->pdev->vendor == PCI_VENDOR_ID_SUN &&
+	    gp->pdev->device == PCI_DEVICE_ID_SUN_GEM) {
 		printk(KERN_ERR "%s: PCI error [%04x] ",
 		       dev->name, pci_estat);
 
@@ -1030,7 +1033,8 @@ static void gem_init_rings(struct gem *gp, int from_irq)
 
 static void gem_init_phy(struct gem *gp)
 {
-	if (gp->pdev->device == PCI_DEVICE_ID_SUN_GEM) {
+	if (gp->pdev->vendor == PCI_VENDOR_ID_SUN &&
+	    gp->pdev->device == PCI_DEVICE_ID_SUN_GEM) {
 		u32 val;
 
 		/* Init datapath mode register. */
@@ -1171,7 +1175,8 @@ static void gem_init_mac(struct gem *gp)
 	unsigned char *e = &gp->dev->dev_addr[0];
 	u32 rxcfg;
 
-	if (gp->pdev->device == PCI_DEVICE_ID_SUN_GEM)
+	if (gp->pdev->vendor == PCI_VENDOR_ID_SUN &&
+	    gp->pdev->device == PCI_DEVICE_ID_SUN_GEM)
 		writel(0x1bf0, gp->regs + MAC_SNDPAUSE);
 
 	writel(0x00, gp->regs + MAC_IPG0);
@@ -1471,14 +1476,10 @@ static int __devinit gem_check_invariants(struct gem *gp)
 	struct pci_dev *pdev = gp->pdev;
 	u32 mif_cfg = readl(gp->regs + MIF_CFG);
 
-	if (pdev->device == PCI_DEVICE_ID_SUN_RIO_GEM
-#if 0
-	    || pdev->device == PCI_DEVICE_ID_SUN_PPC_GEM
-#endif
-		) {
+	if (pdev->vendor == PCI_VENDOR_ID_SUN &&
+	    pdev->device == PCI_DEVICE_ID_SUN_RIO_GEM) {
 		/* One of the MII PHYs _must_ be present
-		 * as these chip versions have no gigabit
-		 * PHY.
+		 * as this chip has no gigabit PHY.
 		 */
 		if ((mif_cfg & (MIF_CFG_MDI0 | MIF_CFG_MDI1)) == 0) {
 			printk(KERN_ERR PFX "RIO GEM lacks MII phy, mif_cfg[%08x]\n",
@@ -1523,19 +1524,21 @@ static int __devinit gem_check_invariants(struct gem *gp)
 	gp->tx_fifo_sz = readl(gp->regs + TXDMA_FSZ) * 64;
 	gp->rx_fifo_sz = readl(gp->regs + RXDMA_FSZ) * 64;
 
-	if (pdev->device == PCI_DEVICE_ID_SUN_GEM) {
-		if (gp->tx_fifo_sz != (9 * 1024) ||
-		    gp->rx_fifo_sz != (20 * 1024)) {
-			printk(KERN_ERR PFX "GEM has bogus fifo sizes tx(%d) rx(%d)\n",
-			       gp->tx_fifo_sz, gp->rx_fifo_sz);
-			return -1;
-		}
-	} else {
-		if (gp->tx_fifo_sz != (2 * 1024) ||
-		    gp->rx_fifo_sz != (2 * 1024)) {
-			printk(KERN_ERR PFX "RIO GEM has bogus fifo sizes tx(%d) rx(%d)\n",
-			       gp->tx_fifo_sz, gp->rx_fifo_sz);
-			return -1;
+	if (pdev->vendor == PCI_VENDOR_ID_SUN) {
+		if (pdev->device == PCI_DEVICE_ID_SUN_GEM) {
+			if (gp->tx_fifo_sz != (9 * 1024) ||
+			    gp->rx_fifo_sz != (20 * 1024)) {
+				printk(KERN_ERR PFX "GEM has bogus fifo sizes tx(%d) rx(%d)\n",
+				       gp->tx_fifo_sz, gp->rx_fifo_sz);
+				return -1;
+			}
+		} else {
+			if (gp->tx_fifo_sz != (2 * 1024) ||
+			    gp->rx_fifo_sz != (2 * 1024)) {
+				printk(KERN_ERR PFX "RIO GEM has bogus fifo sizes tx(%d) rx(%d)\n",
+				       gp->tx_fifo_sz, gp->rx_fifo_sz);
+				return -1;
+			}
 		}
 	}
 
@@ -1569,7 +1572,7 @@ static int __devinit gem_check_invariants(struct gem *gp)
 	return 0;
 }
 
-static void __devinit gem_get_device_address(struct gem *gp)
+static int __devinit gem_get_device_address(struct gem *gp)
 {
 	struct net_device *dev = gp->dev;
 	struct pci_dev *pdev = gp->pdev;
@@ -1589,6 +1592,20 @@ static void __devinit gem_get_device_address(struct gem *gp)
 	if (node == -1)
 		memcpy(dev->dev_addr, idprom->id_ethaddr, 6);
 #endif
+#ifdef __powerpc__
+	struct device_node *gem_node;
+	unsigned char *addr;
+
+	gem_node = pci_device_to_OF_node(pdev);
+	addr = get_property(gem_node, "local-mac-address", NULL);
+	if (addr == NULL) {
+		printk("\n");
+		printk(KERN_ERR "%s: can't get mac-address\n", dev->name);
+		return -1;
+	}
+	memcpy(dev->dev_addr, addr, MAX_ADDR_LEN);
+#endif
+	return 0;
 }
 
 static int __devinit gem_init_one(struct pci_dev *pdev,
@@ -1602,6 +1619,9 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 
 	if (gem_version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
+
+	pci_enable_device(pdev);
+	pci_set_master(pdev);
 
 	gemreg_base = pci_resource_start(pdev, 0);
 	gemreg_len = pci_resource_len(pdev, 0);
@@ -1669,7 +1689,8 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	printk(KERN_INFO "%s: Sun GEM (PCI) 10/100/1000BaseT Ethernet ",
 	       dev->name);
 
-	gem_get_device_address(gp);
+	if (gem_get_device_address(gp))
+		goto err_out_iounmap;
 
 	for (i = 0; i < 6; i++)
 		printk("%2.2x%c", dev->dev_addr[i],

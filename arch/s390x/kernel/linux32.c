@@ -914,7 +914,7 @@ asmlinkage int sys32_quotactl(int cmd, const char *special, int id, unsigned lon
 {
 	int cmds = cmd >> SUBCMDSHIFT;
 	int err;
-	struct mem_dqblk d;
+	struct dqblk d;
 	mm_segment_t old_fs;
 	char *spec;
 	

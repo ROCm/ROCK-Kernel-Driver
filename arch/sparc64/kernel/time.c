@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.36 2001/03/15 08:51:24 anton Exp $
+/* $Id: time.c,v 1.37 2001/04/24 01:09:12 davem Exp $
  * time.c: UltraSparc timer and TOD clock support.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -145,23 +145,23 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		 * taking any chances.
 		 */
 		if (!SPARC64_USE_STICK) {
-		__asm__ __volatile__("
-			rd	%%tick_cmpr, %0
-			ba,pt	%%xcc, 1f
-			 add	%0, %2, %0
-			.align	64
-		     1: wr	%0, 0, %%tick_cmpr
-		        rd	%%tick_cmpr, %%g0
-			rd	%%tick, %1
-			mov	%1, %1"
+		__asm__ __volatile__(
+		"	rd	%%tick_cmpr, %0\n"
+		"	ba,pt	%%xcc, 1f\n"
+		"	 add	%0, %2, %0\n"
+		"	.align	64\n"
+		"1: 	wr	%0, 0, %%tick_cmpr\n"
+		"	rd	%%tick_cmpr, %%g0\n"
+		"	rd	%%tick, %1\n"
+		"	mov	%1, %1"
 			: "=&r" (timer_tick_compare), "=r" (ticks)
 			: "r" (timer_tick_offset));
 		} else {
-		__asm__ __volatile__("
-			rd	%%asr25, %0
-			add	%0, %2, %0
-			wr	%0, 0, %%asr25
-			rd	%%asr24, %1"
+		__asm__ __volatile__(
+		"	rd	%%asr25, %0\n"
+		"	add	%0, %2, %0\n"
+		"	wr	%0, 0, %%asr25\n"
+		"	rd	%%asr24, %1"
 			: "=&r" (timer_tick_compare), "=r" (ticks)
 			: "r" (timer_tick_offset));
 		}
@@ -188,15 +188,15 @@ void timer_tick_interrupt(struct pt_regs *regs)
 	 * Only keep timer_tick_offset uptodate, but don't set TICK_CMPR.
 	 */
 	if (!SPARC64_USE_STICK) {
-	__asm__ __volatile__("
-		rd	%%tick_cmpr, %0
-		add	%0, %1, %0"
+	__asm__ __volatile__(
+	"	rd	%%tick_cmpr, %0\n"
+	"	add	%0, %1, %0"
 		: "=&r" (timer_tick_compare)
 		: "r" (timer_tick_offset));
 	} else {
-	__asm__ __volatile__("
-		rd	%%asr25, %0
-		add	%0, %1, %0"
+	__asm__ __volatile__(
+	"	rd	%%asr25, %0\n"
+	"	add	%0, %1, %0"
 		: "=&r" (timer_tick_compare)
 		: "r" (timer_tick_offset));
 	}
@@ -578,11 +578,10 @@ static __inline__ unsigned long do_gettimeoffset(void)
 	unsigned long ticks;
 
 	if (!SPARC64_USE_STICK) {
-	__asm__ __volatile__("
-		rd	%%tick, %%g1
-		add	%1, %%g1, %0
-		sub	%0, %2, %0
-"
+	__asm__ __volatile__(
+	"	rd	%%tick, %%g1\n"
+	"	add	%1, %%g1, %0\n"
+	"	sub	%0, %2, %0\n"
 		: "=r" (ticks)
 		: "r" (timer_tick_offset), "r" (timer_tick_compare)
 		: "g1", "g2");

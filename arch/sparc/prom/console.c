@@ -3,7 +3,7 @@
  *            to/from the current console device using the PROM.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
- * Copyright (C) 1998 Pete Zaitcev <zaitcev@metabyte.com>
+ * Copyright (C) 1998 Pete Zaitcev <zaitcev@yahoo.com>
  */
 
 #include <linux/types.h>

@@ -106,6 +106,24 @@ static int reiserfs_sync_file(
   return ( n_err < 0 ) ? -EIO : 0;
 }
 
+static int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
+    struct inode *inode = dentry->d_inode ;
+    int error ;
+    if (attr->ia_valid & ATTR_SIZE) {
+	/* version 2 items will be caught by the s_maxbytes check
+	** done for us in vmtruncate
+	*/
+        if (inode_items_version(inode) == ITEM_VERSION_1 && 
+	    attr->ia_size > MAX_NON_LFS)
+            return -EFBIG ;
+    }
+
+    error = inode_change_ok(inode, attr) ;
+    if (!error)
+        inode_setattr(inode, attr) ;
+
+    return error ;
+}
 
 struct file_operations reiserfs_file_operations = {
     read:	generic_file_read,
@@ -119,6 +137,7 @@ struct file_operations reiserfs_file_operations = {
 
 struct  inode_operations reiserfs_file_inode_operations = {
     truncate:	reiserfs_vfs_truncate_file,
+    setattr:    reiserfs_setattr,
 };
 
 

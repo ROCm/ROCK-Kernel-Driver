@@ -2,7 +2,7 @@
  * su.c: Small serial driver for keyboard/mouse interface on sparc32/PCI
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
- * Copyright (C) 1998-1999  Pete Zaitcev   (zaitcev@metabyte.com)
+ * Copyright (C) 1998-1999  Pete Zaitcev   (zaitcev@yahoo.com)
  *
  * This is mainly a variation of drivers/char/serial.c,
  * credits go to authors mentioned therein.

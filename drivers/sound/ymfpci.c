@@ -6,7 +6,7 @@
  *
  *  This code is a result of high-speed collision
  *  between ymfpci.c of ALSA and cs46xx.c of Linux.
- *  -- Pete Zaitcev <zaitcev@metabyte.com>; 2000/09/18
+ *  -- Pete Zaitcev <zaitcev@yahoo.com>; 2000/09/18
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by

@@ -391,9 +391,11 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	struct in6_addr addr_buf;
         int len;
 	int err;
+	int send_llinfo;
 
 	len = sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
-	if (dev->addr_len)
+	send_llinfo = dev->addr_len && ipv6_addr_type(saddr) != IPV6_ADDR_ANY;
+	if (send_llinfo)
 		len += NDISC_OPT_SPACE(dev->addr_len);
 
 	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + dev->hard_header_len + 15,
@@ -427,7 +429,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	/* Set the target address. */
 	ipv6_addr_copy(&msg->target, solicit);
 
-	if (dev->addr_len)
+	if (send_llinfo)
 		ndisc_fill_option((void*)&msg->opt, ND_OPT_SOURCE_LL_ADDR, dev->dev_addr, dev->addr_len);
 
 	/* checksum */

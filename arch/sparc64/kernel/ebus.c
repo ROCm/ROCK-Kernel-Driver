@@ -1,4 +1,4 @@
-/* $Id: ebus.c,v 1.60 2001/03/15 02:11:09 davem Exp $
+/* $Id: ebus.c,v 1.61 2001/04/24 05:13:25 davem Exp $
  * ebus.c: PCI to EBus bridge device.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -192,6 +192,11 @@ void __init fill_ebus_device(int node, struct linux_ebus_device *dev)
 	printk(" [%s", dev->prom_name);
 
 	len = prom_getproperty(node, "reg", (void *)regs, sizeof(regs));
+	if (len == -1) {
+		dev->num_addrs = 0;
+		goto probe_interrupts;
+	}
+
 	if (len % sizeof(struct linux_prom_registers)) {
 		prom_printf("UGH: proplen for %s was %d, need multiple of %d\n",
 			    dev->prom_name, len,
@@ -216,6 +221,7 @@ void __init fill_ebus_device(int node, struct linux_ebus_device *dev)
 				 &dev->resource[i]);
 	}
 
+probe_interrupts:
 	len = prom_getproperty(node, "interrupts", (char *)&irqs, sizeof(irqs));
 	if ((len == -1) || (len == 0)) {
 		dev->num_irqs = 0;

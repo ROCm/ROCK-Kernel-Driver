@@ -121,12 +121,6 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_RMT_MASK	(MS_RDONLY|MS_NOSUID|MS_NODEV|MS_NOEXEC|\
 			MS_SYNCHRONOUS|MS_MANDLOCK|MS_NOATIME|MS_NODIRATIME)
 
-/*
- * Magic mount flag number. Has to be or-ed to the flag values.
- */
-#define MS_MGC_VAL 0xC0ED0000	/* magic flag number to indicate "new" flags */
-#define MS_MGC_MSK 0xffff0000	/* magic flag number mask */
-
 /* Inode flags - they have nothing to superblock flags now */
 
 #define S_SYNC		1	/* Writes are synced at once */

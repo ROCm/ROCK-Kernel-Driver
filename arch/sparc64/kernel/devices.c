@@ -77,6 +77,15 @@ void __init device_scan(void)
 	
 	prom_cpu_nodes[0] = prom_node_cpu;
 
+#ifndef CONFIG_SMP
+	{
+		extern unsigned long up_clock_tick;
+		up_clock_tick = prom_getintdefault(prom_node_cpu,
+						   "clock-frequency",
+						   0);
+	}
+#endif
+
 	central_probe();
 
 	cpu_probe();

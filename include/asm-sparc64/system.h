@@ -1,4 +1,4 @@
-/* $Id: system.h,v 1.62 2000/09/23 02:09:21 davem Exp $ */
+/* $Id: system.h,v 1.63 2001/04/24 01:09:12 davem Exp $ */
 #ifndef __SPARC64_SYSTEM_H
 #define __SPARC64_SYSTEM_H
 
@@ -216,15 +216,15 @@ do {	if (current->thread.flags & SPARC_FLAG_PERFCTR) {			\
 
 extern __inline__ unsigned long xchg32(__volatile__ unsigned int *m, unsigned int val)
 {
-	__asm__ __volatile__("
-	mov		%0, %%g5
-1:	lduw		[%2], %%g7
-	cas		[%2], %%g7, %0
-	cmp		%%g7, %0
-	bne,a,pn	%%icc, 1b
-	 mov		%%g5, %0
-	membar		#StoreLoad | #StoreStore
-"	: "=&r" (val)
+	__asm__ __volatile__(
+"	mov		%0, %%g5\n"
+"1:	lduw		[%2], %%g7\n"
+"	cas		[%2], %%g7, %0\n"
+"	cmp		%%g7, %0\n"
+"	bne,a,pn	%%icc, 1b\n"
+"	 mov		%%g5, %0\n"
+"	membar		#StoreLoad | #StoreStore\n"
+	: "=&r" (val)
 	: "0" (val), "r" (m)
 	: "g5", "g7", "cc", "memory");
 	return val;
@@ -232,15 +232,15 @@ extern __inline__ unsigned long xchg32(__volatile__ unsigned int *m, unsigned in
 
 extern __inline__ unsigned long xchg64(__volatile__ unsigned long *m, unsigned long val)
 {
-	__asm__ __volatile__("
-	mov		%0, %%g5
-1:	ldx		[%2], %%g7
-	casx		[%2], %%g7, %0
-	cmp		%%g7, %0
-	bne,a,pn	%%xcc, 1b
-	 mov		%%g5, %0
-	membar		#StoreLoad | #StoreStore
-"	: "=&r" (val)
+	__asm__ __volatile__(
+"	mov		%0, %%g5\n"
+"1:	ldx		[%2], %%g7\n"
+"	casx		[%2], %%g7, %0\n"
+"	cmp		%%g7, %0\n"
+"	bne,a,pn	%%xcc, 1b\n"
+"	 mov		%%g5, %0\n"
+"	membar		#StoreLoad | #StoreStore\n"
+	: "=&r" (val)
 	: "0" (val), "r" (m)
 	: "g5", "g7", "cc", "memory");
 	return val;

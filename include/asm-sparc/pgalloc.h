@@ -1,4 +1,4 @@
-/* $Id: pgalloc.h,v 1.11 2000/10/16 14:32:49 anton Exp $ */
+/* $Id: pgalloc.h,v 1.12 2001/04/26 02:36:35 davem Exp $ */
 #ifndef _SPARC_PGALLOC_H
 #define _SPARC_PGALLOC_H
 

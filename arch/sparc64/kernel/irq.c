@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.99 2001/03/22 02:19:23 davem Exp $
+/* $Id: irq.c,v 1.100 2001/04/24 01:09:12 davem Exp $
  * irq.c: UltraSparc IRQ handling/init/registry.
  *
  * Copyright (C) 1997  David S. Miller  (davem@caip.rutgers.edu)
@@ -1011,16 +1011,16 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 	 * purposes.  Also workaround BB_ERRATA_1 by doing a dummy
 	 * read back of %tick after writing it.
 	 */
-	__asm__ __volatile__("
-		sethi	%%hi(0x80000000), %%g1
-		ba,pt	%%xcc, 1f
-		 sllx	%%g1, 32, %%g1
-		.align	64
-	1:	rd	%%tick, %%g2
-		add	%%g2, 6, %%g2
-		andn	%%g2, %%g1, %%g2
-		wrpr	%%g2, 0, %%tick
-		rdpr	%%tick, %%g0"
+	__asm__ __volatile__(
+	"	sethi	%%hi(0x80000000), %%g1\n"
+	"	ba,pt	%%xcc, 1f\n"
+	"	 sllx	%%g1, 32, %%g1\n"
+	"	.align	64\n"
+	"1:	rd	%%tick, %%g2\n"
+	"	add	%%g2, 6, %%g2\n"
+	"	andn	%%g2, %%g1, %%g2\n"
+	"	wrpr	%%g2, 0, %%tick\n"
+	"	rdpr	%%tick, %%g0"
 	: /* no outputs */
 	: /* no inputs */
 	: "g1", "g2");
@@ -1035,32 +1035,32 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 	 * read back from %tick_cmpr right after writing to it. -DaveM
 	 */
 	if (!SPARC64_USE_STICK) {
-	__asm__ __volatile__("
-		rd	%%tick, %%g1
-		ba,pt	%%xcc, 1f
-		 add	%%g1, %0, %%g1
-		.align	64
-	1:	wr	%%g1, 0x0, %%tick_cmpr
-		rd	%%tick_cmpr, %%g0"
+	__asm__ __volatile__(
+	"	rd	%%tick, %%g1\n"
+	"	ba,pt	%%xcc, 1f\n"
+	"	 add	%%g1, %0, %%g1\n"
+	"	.align	64\n"
+	"1:	wr	%%g1, 0x0, %%tick_cmpr\n"
+	"	rd	%%tick_cmpr, %%g0"
 	: /* no outputs */
 	: "r" (timer_tick_offset)
 	: "g1");
 	} else {
 	/* Let the user get at STICK too. */
-	__asm__ __volatile__("
-		sethi	%%hi(0x80000000), %%g1
-		sllx	%%g1, 32, %%g1
-		rd	%%asr24, %%g2
-		andn	%%g2, %%g1, %%g2
-		wr	%%g2, 0, %%asr24"
+	__asm__ __volatile__(
+	"	sethi	%%hi(0x80000000), %%g1\n"
+	"	sllx	%%g1, 32, %%g1\n"
+	"	rd	%%asr24, %%g2\n"
+	"	andn	%%g2, %%g1, %%g2\n"
+	"	wr	%%g2, 0, %%asr24"
 	: /* no outputs */
 	: /* no inputs */
 	: "g1", "g2");
 
-	__asm__ __volatile__("
-		rd	%%asr24, %%g1
-		add	%%g1, %0, %%g1
-		wr	%%g1, 0x0, %%asr25"
+	__asm__ __volatile__(
+	"	rd	%%asr24, %%g1\n"
+	"	add	%%g1, %0, %%g1\n"
+	"	wr	%%g1, 0x0, %%asr25"
 	: /* no outputs */
 	: "r" (timer_tick_offset)
 	: "g1");
@@ -1170,13 +1170,13 @@ static void kill_prom_timer(void)
 	prom_timers->limit1 = 0;
 
 	/* Wheee, eat the interrupt packet too... */
-	__asm__ __volatile__("
-	mov	0x40, %%g2
-	ldxa	[%%g0] %0, %%g1
-	ldxa	[%%g2] %1, %%g1
-	stxa	%%g0, [%%g0] %0
-	membar	#Sync
-"	: /* no outputs */
+	__asm__ __volatile__(
+"	mov	0x40, %%g2\n"
+"	ldxa	[%%g0] %0, %%g1\n"
+"	ldxa	[%%g2] %1, %%g1\n"
+"	stxa	%%g0, [%%g0] %0\n"
+"	membar	#Sync\n"
+	: /* no outputs */
 	: "i" (ASI_INTR_RECEIVE), "i" (ASI_INTR_R)
 	: "g1", "g2");
 }

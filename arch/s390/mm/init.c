@@ -35,8 +35,6 @@
 #include <asm/pgalloc.h>
 #include <asm/dma.h>
 #include <asm/lowcore.h>
-#include <asm/tlb.h>
-
 
 static unsigned long totalram_pages;
 

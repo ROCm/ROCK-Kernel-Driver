@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: addrconf.c,v 1.60 2001/01/01 02:38:30 davem Exp $
+ *	$Id: addrconf.c,v 1.61 2001/04/25 20:46:34 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -266,6 +266,8 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 		in6_dev_hold(ndev);
 		write_unlock_bh(&addrconf_lock);
 
+		ipv6_mc_init_dev(ndev);
+
 #ifdef CONFIG_SYSCTL
 		neigh_sysctl_register(dev, ndev->nd_parms, NET_IPV6, NET_IPV6_NEIGH, "ipv6");
 		addrconf_sysctl_register(ndev, &ndev->cnf);
@@ -313,7 +315,9 @@ void inet6_ifa_finish_destroy(struct inet6_ifaddr *ifp)
 {
 	BUG_TRAP(ifp->if_next==NULL);
 	BUG_TRAP(ifp->lst_next==NULL);
+#ifdef NET_REFCNT_DEBUG
 	printk(KERN_DEBUG "inet6_ifa_finish_destroy\n");
+#endif
 
 	in6_dev_put(ifp->idev);
 
@@ -1415,7 +1419,7 @@ static void addrconf_rs_timer(unsigned long data)
 	}
 
 	spin_lock(&ifp->lock);
-	if (ifp->probes++ <= ifp->idev->cnf.rtr_solicits) {
+	if (ifp->probes++ < ifp->idev->cnf.rtr_solicits) {
 		struct in6_addr all_routers;
 
 		addrconf_mod_timer(ifp, AC_RS,

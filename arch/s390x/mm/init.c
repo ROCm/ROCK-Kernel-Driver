@@ -35,8 +35,6 @@
 #include <asm/pgalloc.h>
 #include <asm/dma.h>
 #include <asm/lowcore.h>
- 
-mmu_gather_t mmu_gathers[NR_CPUS];
 
 static unsigned long totalram_pages;
 

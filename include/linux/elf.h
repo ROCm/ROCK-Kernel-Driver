@@ -74,6 +74,8 @@ typedef __u64	Elf64_Word;
 
 #define EM_X8664	62	/* AMD x86-64 */
 
+#define EM_S390		22	/* IBM S/390 */
+
 #define EM_CRIS         76      /* Axis Communications 32-bit embedded processor */
 
 /*
@@ -83,9 +85,9 @@ typedef __u64	Elf64_Word;
 #define EM_ALPHA	0x9026
 
 /*
- * This is an interim value for S390 architecture
+ * This is the old interim value for S/390 architecture
  */
-#define EM_S390         0xA390
+#define EM_S390_OLD     0xA390
 
 /* This is the info that is needed to parse the dynamic section of the file */
 #define DT_NULL		0

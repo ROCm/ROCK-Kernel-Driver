@@ -11,7 +11,7 @@ case $1 in
     echo "	sizeof(struct $2_struct)," >> $4
   ;;
   -ints)
-    sed -n -e '/check_asm_data:/,/\.size/p' <$2 | sed -e 's/check_asm_data://' -e 's/\.size.*//' -e 's/\.long[ 	]\([0-9]*\)/\1,/' >>$3
+    sed -n -e '/check_asm_data:/,/\.size/p' <$2 | sed -e 's/check_asm_data://' -e 's/\.size.*//' -e 's/\.long[		]\([0-9]*\)/\1,/' | grep -v '\.ident' >>$3
   ;;
   *)
     exit 1

@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
  * Copyright (C) 1996 Eddie C. Dost   (ecd@skynet.be)
- * Fixes by Pete A. Zaitcev <zaitcev@metabyte.com>.
+ * Fixes by Pete A. Zaitcev <zaitcev@yahoo.com>.
  */
 
 #include <linux/errno.h>

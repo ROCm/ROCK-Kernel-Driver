@@ -69,29 +69,29 @@ extern __inline__ void down(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-	__asm__ __volatile__("
-	1:	lduw	[%0], %%g5
-		sub	%%g5, 1, %%g7
-		cas	[%0], %%g5, %%g7
-		cmp	%%g5, %%g7
-		bne,pn	%%icc, 1b
-		 cmp	%%g7, 1
-		bl,pn	%%icc, 3f
-		 membar	#StoreStore
-	2:
-		.subsection 2
-	3:	mov	%0, %%g5
-		save	%%sp, -160, %%sp
-		mov	%%g1, %%l1
-		mov	%%g2, %%l2
-		mov	%%g3, %%l3
-		call	%1
-		 mov	%%g5, %%o0
-		mov	%%l1, %%g1
-		mov	%%l2, %%g2
-		ba,pt	%%xcc, 2b
-		 restore %%l3, %%g0, %%g3
-		.previous\n"
+	__asm__ __volatile__(
+"	1:	lduw	[%0], %%g5\n"
+"		sub	%%g5, 1, %%g7\n"
+"		cas	[%0], %%g5, %%g7\n"
+"		cmp	%%g5, %%g7\n"
+"		bne,pn	%%icc, 1b\n"
+"		 cmp	%%g7, 1\n"
+"		bl,pn	%%icc, 3f\n"
+"		 membar	#StoreStore\n"
+"	2:\n"
+"		.subsection 2\n"
+"	3:	mov	%0, %%g5\n"
+"		save	%%sp, -160, %%sp\n"
+"		mov	%%g1, %%l1\n"
+"		mov	%%g2, %%l2\n"
+"		mov	%%g3, %%l3\n"
+"		call	%1\n"
+"		 mov	%%g5, %%o0\n"
+"		mov	%%l1, %%g1\n"
+"		mov	%%l2, %%g2\n"
+"		ba,pt	%%xcc, 2b\n"
+"		 restore %%l3, %%g0, %%g3\n"
+"		.previous\n"
 	: : "r" (sem), "i" (__down)
 	: "g5", "g7", "memory", "cc");
 }
@@ -103,30 +103,30 @@ extern __inline__ int down_interruptible(struct semaphore *sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-	__asm__ __volatile__("
-	1:	lduw	[%2], %%g5
-		sub	%%g5, 1, %%g7
-		cas	[%2], %%g5, %%g7
-		cmp	%%g5, %%g7
-		bne,pn	%%icc, 1b
-		 cmp	%%g7, 1
-		bl,pn	%%icc, 3f
-		 membar	#StoreStore
-	2:
-		.subsection 2
-	3:	mov	%2, %%g5
-		save	%%sp, -160, %%sp
-		mov	%%g1, %%l1
-		mov	%%g2, %%l2
-		mov	%%g3, %%l3
-		call	%3
-		 mov	%%g5, %%o0
-		mov	%%l1, %%g1
-		mov	%%l2, %%g2
-		mov	%%l3, %%g3
-		ba,pt	%%xcc, 2b
-		 restore %%o0, %%g0, %0
-		.previous\n"
+	__asm__ __volatile__(
+"	1:	lduw	[%2], %%g5\n"
+"		sub	%%g5, 1, %%g7\n"
+"		cas	[%2], %%g5, %%g7\n"
+"		cmp	%%g5, %%g7\n"
+"		bne,pn	%%icc, 1b\n"
+"		 cmp	%%g7, 1\n"
+"		bl,pn	%%icc, 3f\n"
+"		 membar	#StoreStore\n"
+"	2:\n"
+"		.subsection 2\n"
+"	3:	mov	%2, %%g5\n"
+"		save	%%sp, -160, %%sp\n"
+"		mov	%%g1, %%l1\n"
+"		mov	%%g2, %%l2\n"
+"		mov	%%g3, %%l3\n"
+"		call	%3\n"
+"		 mov	%%g5, %%o0\n"
+"		mov	%%l1, %%g1\n"
+"		mov	%%l2, %%g2\n"
+"		mov	%%l3, %%g3\n"
+"		ba,pt	%%xcc, 2b\n"
+"		 restore %%o0, %%g0, %0\n"
+"		.previous\n"
 	: "=r" (ret)
 	: "0" (ret), "r" (sem), "i" (__down_interruptible)
 	: "g5", "g7", "memory", "cc");
@@ -139,30 +139,30 @@ extern inline int down_trylock(struct semaphore *sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-	__asm__ __volatile__("
-	1:	lduw	[%2], %%g5
-		sub	%%g5, 1, %%g7
-		cas	[%2], %%g5, %%g7
-		cmp	%%g5, %%g7
-		bne,pn	%%icc, 1b
-		 cmp	%%g7, 1
-		bl,pn	%%icc, 3f
-		 membar	#StoreStore
-	2:
-		.subsection 2
-	3:	mov	%2, %%g5
-		save	%%sp, -160, %%sp
-		mov	%%g1, %%l1
-		mov	%%g2, %%l2
-		mov	%%g3, %%l3
-		call	%3
-		 mov	%%g5, %%o0
-		mov	%%l1, %%g1
-		mov	%%l2, %%g2
-		mov	%%l3, %%g3
-		ba,pt	%%xcc, 2b
-		 restore %%o0, %%g0, %0
-		.previous\n"
+	__asm__ __volatile__(
+"	1:	lduw	[%2], %%g5\n"
+"		sub	%%g5, 1, %%g7\n"
+"		cas	[%2], %%g5, %%g7\n"
+"		cmp	%%g5, %%g7\n"
+"		bne,pn	%%icc, 1b\n"
+"		 cmp	%%g7, 1\n"
+"		bl,pn	%%icc, 3f\n"
+"		 membar	#StoreStore\n"
+"	2:\n"
+"		.subsection 2\n"
+"	3:	mov	%2, %%g5\n"
+"		save	%%sp, -160, %%sp\n"
+"		mov	%%g1, %%l1\n"
+"		mov	%%g2, %%l2\n"
+"		mov	%%g3, %%l3\n"
+"		call	%3\n"
+"		 mov	%%g5, %%o0\n"
+"		mov	%%l1, %%g1\n"
+"		mov	%%l2, %%g2\n"
+"		mov	%%l3, %%g3\n"
+"		ba,pt	%%xcc, 2b\n"
+"		 restore %%o0, %%g0, %0\n"
+"		.previous\n"
 	: "=r" (ret)
 	: "0" (ret), "r" (sem), "i" (__down_trylock)
 	: "g5", "g7", "memory", "cc");
@@ -174,30 +174,30 @@ extern __inline__ void up(struct semaphore * sem)
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
-	__asm__ __volatile__("
-		membar	#StoreLoad | #LoadLoad
-	1:	lduw	[%0], %%g5
-		add	%%g5, 1, %%g7
-		cas	[%0], %%g5, %%g7
-		cmp	%%g5, %%g7
-		bne,pn	%%icc, 1b
-		 addcc	%%g7, 1, %%g0
-		ble,pn	%%icc, 3f
-		 nop
-	2:
-		.subsection 2
-	3:	mov	%0, %%g5
-		save	%%sp, -160, %%sp
-		mov	%%g1, %%l1
-		mov	%%g2, %%l2
-		mov	%%g3, %%l3
-		call	%1
-		 mov	%%g5, %%o0
-		mov	%%l1, %%g1
-		mov	%%l2, %%g2
-		ba,pt	%%xcc, 2b
-		 restore %%l3, %%g0, %%g3
-		.previous\n"
+	__asm__ __volatile__(
+"		membar	#StoreLoad | #LoadLoad\n"
+"	1:	lduw	[%0], %%g5\n"
+"		add	%%g5, 1, %%g7\n"
+"		cas	[%0], %%g5, %%g7\n"
+"		cmp	%%g5, %%g7\n"
+"		bne,pn	%%icc, 1b\n"
+"		 addcc	%%g7, 1, %%g0\n"
+"		ble,pn	%%icc, 3f\n"
+"		 nop\n"
+"	2:\n"
+"		.subsection 2\n"
+"	3:	mov	%0, %%g5\n"
+"		save	%%sp, -160, %%sp\n"
+"		mov	%%g1, %%l1\n"
+"		mov	%%g2, %%l2\n"
+"		mov	%%g3, %%l3\n"
+"		call	%1\n"
+"		 mov	%%g5, %%o0\n"
+"		mov	%%l1, %%g1\n"
+"		mov	%%l2, %%g2\n"
+"		ba,pt	%%xcc, 2b\n"
+"		 restore %%l3, %%g0, %%g3\n"
+"		.previous\n"
 	: : "r" (sem), "i" (__up)
 	: "g5", "g7", "memory", "cc");
 }

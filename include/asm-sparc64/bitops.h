@@ -1,4 +1,4 @@
-/* $Id: bitops.h,v 1.32 2001/04/14 01:12:16 davem Exp $
+/* $Id: bitops.h,v 1.33 2001/04/24 01:09:12 davem Exp $
  * bitops.h: Bit string operations on the V9.
  *
  * Copyright 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -42,12 +42,12 @@ extern __inline__ unsigned long ffz(unsigned long word)
 	unsigned long result;
 
 #ifdef ULTRA_HAS_POPULATION_COUNT	/* Thanks for nothing Sun... */
-	__asm__ __volatile__("
-	brz,pn	%0, 1f
-	 neg	%0, %%g1
-	xnor	%0, %%g1, %%g2
-	popc	%%g2, %0
-1:	" : "=&r" (result)
+	__asm__ __volatile__(
+"	brz,pn	%0, 1f\n"
+"	 neg	%0, %%g1\n"
+"	xnor	%0, %%g1, %%g2\n"
+"	popc	%%g2, %0\n"
+"1:	" : "=&r" (result)
 	  : "0" (word)
 	  : "g1", "g2");
 #else

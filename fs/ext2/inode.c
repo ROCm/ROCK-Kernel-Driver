@@ -397,13 +397,13 @@ static int ext2_alloc_branch(struct inode *inode,
 		 * the pointer to new one, then send parent to disk.
 		 */
 		bh = getblk(inode->i_dev, parent, blocksize);
-		if (!buffer_uptodate(bh))
-			wait_on_buffer(bh);
+		lock_buffer(bh);
 		memset(bh->b_data, 0, blocksize);
 		branch[n].bh = bh;
 		branch[n].p = (u32*) bh->b_data + offsets[n];
 		*branch[n].p = branch[n].key;
 		mark_buffer_uptodate(bh, 1);
+		unlock_buffer(bh);
 		mark_buffer_dirty_inode(bh, inode);
 		if (IS_SYNC(inode) || inode->u.ext2_i.i_osync) {
 			ll_rw_block (WRITE, 1, &bh);
@@ -587,10 +587,10 @@ struct buffer_head * ext2_getblk(struct inode * inode, long block, int create, i
 		struct buffer_head *bh;
 		bh = getblk(dummy.b_dev, dummy.b_blocknr, inode->i_sb->s_blocksize);
 		if (buffer_new(&dummy)) {
-			if (!buffer_uptodate(bh))
-				wait_on_buffer(bh);
+			lock_buffer(bh);
 			memset(bh->b_data, 0, inode->i_sb->s_blocksize);
 			mark_buffer_uptodate(bh, 1);
+			unlock_buffer(bh);
 			mark_buffer_dirty_inode(bh, inode);
 		}
 		return bh;

@@ -1,6 +1,10 @@
 #ifndef _LINUX_STRING_H_
 #define _LINUX_STRING_H_
 
+/* We don't want strings.h stuff being user by user stuff by accident */
+
+#ifdef __KERNEL__
+
 #include <linux/types.h>	/* for size_t */
 #include <linux/stddef.h>	/* for NULL */
 
@@ -80,4 +84,5 @@ extern void * memchr(const void *,int,__kernel_size_t);
 }
 #endif
 
+#endif
 #endif /* _LINUX_STRING_H_ */

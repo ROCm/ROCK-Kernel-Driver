@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: mcast.c,v 1.36 2001/03/03 01:20:10 davem Exp $
+ *	$Id: mcast.c,v 1.37 2001/04/25 20:46:34 davem Exp $
  *
  *	Based on linux/ipv4/igmp.c and linux/ipv4/ip_sockglue.c 
  *
@@ -624,7 +624,6 @@ void igmp6_timer_handler(unsigned long data)
 void ipv6_mc_down(struct inet6_dev *idev)
 {
 	struct ifmcaddr6 *i;
-	struct in6_addr maddr;
 
 	/* Withdraw multicast list */
 
@@ -632,24 +631,14 @@ void ipv6_mc_down(struct inet6_dev *idev)
 	for (i = idev->mc_list; i; i=i->next)
 		igmp6_group_dropped(i);
 	read_unlock_bh(&idev->lock);
-
-	/* Delete all-nodes address. */
-
-	ipv6_addr_all_nodes(&maddr);
-	ipv6_dev_mc_dec(idev->dev, &maddr);
 }
+
 
 /* Device going up */
 
 void ipv6_mc_up(struct inet6_dev *idev)
 {
 	struct ifmcaddr6 *i;
-	struct in6_addr maddr;
-
-	/* Add all-nodes address. */
-
-	ipv6_addr_all_nodes(&maddr);
-	ipv6_dev_mc_inc(idev->dev, &maddr);
 
 	/* Install multicast list, except for all-nodes (already installed) */
 
@@ -659,6 +648,17 @@ void ipv6_mc_up(struct inet6_dev *idev)
 	read_unlock_bh(&idev->lock);
 }
 
+/* IPv6 device initialization. */
+
+void ipv6_mc_init_dev(struct inet6_dev *idev)
+{
+	struct in6_addr maddr;
+
+	/* Add all-nodes address. */
+	ipv6_addr_all_nodes(&maddr);
+	ipv6_dev_mc_inc(idev->dev, &maddr);
+}
+
 /*
  *	Device is about to be destroyed: clean up.
  */
@@ -666,6 +666,11 @@ void ipv6_mc_up(struct inet6_dev *idev)
 void ipv6_mc_destroy_dev(struct inet6_dev *idev)
 {
 	struct ifmcaddr6 *i;
+	struct in6_addr maddr;
+
+	/* Delete all-nodes address. */
+	ipv6_addr_all_nodes(&maddr);
+	ipv6_dev_mc_dec(idev->dev, &maddr);
 
 	write_lock_bh(&idev->lock);
 	while ((i = idev->mc_list) != NULL) {

@@ -41,6 +41,13 @@ ifeq ($(ARCH),s390)
   SERIAL   =
 endif
 
+ifeq ($(ARCH),s390x)
+  KEYMAP   =
+  KEYBD    =
+  CONSOLE  =
+  SERIAL   =
+endif
+
 ifeq ($(ARCH),m68k)
    ifdef CONFIG_AMIGA
       KEYBD = amikeyb.o

@@ -2,7 +2,7 @@
  * head.S: The initial boot code for the Sparc port of Linux.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
- * Copyright (C) 1995,1999 Pete Zaitcev   (zaitcev@metabyte.com)
+ * Copyright (C) 1995,1999 Pete Zaitcev   (zaitcev@yahoo.com)
  * Copyright (C) 1996 Miguel de Icaza (miguel@nuclecu.unam.mx)
  * Copyright (C) 1997 Jakub Jelinek   (jj@sunsite.mff.cuni.cz)
  * Copyright (C) 1997 Michael A. Griffith (grif@acm.org)

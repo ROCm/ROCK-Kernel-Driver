@@ -1,4 +1,4 @@
-/* $Id: checksum.h,v 1.16 2000/01/31 01:26:54 davem Exp $ */
+/* $Id: checksum.h,v 1.17 2001/04/24 01:09:12 davem Exp $ */
 #ifndef __SPARC64_CHECKSUM_H
 #define __SPARC64_CHECKSUM_H
 
@@ -86,32 +86,32 @@ extern __inline__ unsigned short ip_fast_csum(__const__ unsigned char *iph,
 	 *       because GCC can legitimately use the same register for
 	 *       both operands.
 	 */
-	__asm__ __volatile__("
-	sub		%2, 4, %%g7		! IEU0
-	lduw		[%1 + 0x00], %0		! Load	Group
-	lduw		[%1 + 0x04], %%g2	! Load	Group
-	lduw		[%1 + 0x08], %%g3	! Load	Group
-	addcc		%%g2, %0, %0		! IEU1	1 Load Bubble + Group
-	lduw		[%1 + 0x0c], %%g2	! Load
-	addccc		%%g3, %0, %0		! Sngle	Group no Bubble
-	lduw		[%1 + 0x10], %%g3	! Load	Group
-	addccc		%%g2, %0, %0		! Sngle	Group no Bubble
-	addc		%0, %%g0, %0		! Sngle Group
-1:	addcc		%%g3, %0, %0		! IEU1	Group no Bubble
-	add		%1, 4, %1		! IEU0
-	addccc		%0, %%g0, %0		! Sngle Group no Bubble
-	subcc		%%g7, 1, %%g7		! IEU1	Group
-	be,a,pt		%%icc, 2f		! CTI
-	 sll		%0, 16, %%g2		! IEU0
-	lduw		[%1 + 0x10], %%g3	! Load	Group
-	ba,pt		%%xcc, 1b		! CTI
-	 nop					! IEU0
-2:	addcc		%0, %%g2, %%g2		! IEU1	Group
-	srl		%%g2, 16, %0		! IEU0	Group regdep	XXX Scheisse!
-	addc		%0, %%g0, %0		! Sngle	Group
-	xnor		%%g0, %0, %0		! IEU0	Group
-	srl		%0, 0, %0		! IEU0	Group		XXX Scheisse!
-"	: "=r" (sum), "=&r" (iph)
+	__asm__ __volatile__(
+"	sub		%2, 4, %%g7		! IEU0\n"
+"	lduw		[%1 + 0x00], %0		! Load	Group\n"
+"	lduw		[%1 + 0x04], %%g2	! Load	Group\n"
+"	lduw		[%1 + 0x08], %%g3	! Load	Group\n"
+"	addcc		%%g2, %0, %0		! IEU1	1 Load Bubble + Group\n"
+"	lduw		[%1 + 0x0c], %%g2	! Load\n"
+"	addccc		%%g3, %0, %0		! Sngle	Group no Bubble\n"
+"	lduw		[%1 + 0x10], %%g3	! Load	Group\n"
+"	addccc		%%g2, %0, %0		! Sngle	Group no Bubble\n"
+"	addc		%0, %%g0, %0		! Sngle Group\n"
+"1:	addcc		%%g3, %0, %0		! IEU1	Group no Bubble\n"
+"	add		%1, 4, %1		! IEU0\n"
+"	addccc		%0, %%g0, %0		! Sngle Group no Bubble\n"
+"	subcc		%%g7, 1, %%g7		! IEU1	Group\n"
+"	be,a,pt		%%icc, 2f		! CTI\n"
+"	 sll		%0, 16, %%g2		! IEU0\n"
+"	lduw		[%1 + 0x10], %%g3	! Load	Group\n"
+"	ba,pt		%%xcc, 1b		! CTI\n"
+"	 nop					! IEU0\n"
+"2:	addcc		%0, %%g2, %%g2		! IEU1	Group\n"
+"	srl		%%g2, 16, %0		! IEU0	Group regdep	XXX Scheisse!\n"
+"	addc		%0, %%g0, %0		! Sngle	Group\n"
+"	xnor		%%g0, %0, %0		! IEU0	Group\n"
+"	srl		%0, 0, %0		! IEU0	Group		XXX Scheisse!\n"
+	: "=r" (sum), "=&r" (iph)
 	: "r" (ihl), "1" (iph)
 	: "g2", "g3", "g7", "cc");
 	return sum;
@@ -122,12 +122,12 @@ extern __inline__ unsigned short csum_fold(unsigned int sum)
 {
 	unsigned int tmp;
 
-	__asm__ __volatile__("
-	addcc		%0, %1, %1
-	srl		%1, 16, %1
-	addc		%1, %%g0, %1
-	xnor		%%g0, %1, %0
-"	: "=&r" (sum), "=r" (tmp)
+	__asm__ __volatile__(
+"	addcc		%0, %1, %1\n"
+"	srl		%1, 16, %1\n"
+"	addc		%1, %%g0, %1\n"
+"	xnor		%%g0, %1, %0\n"
+	: "=&r" (sum), "=r" (tmp)
 	: "0" (sum), "1" (sum<<16)
 	: "cc");
 	return (sum & 0xffff);
@@ -139,12 +139,12 @@ extern __inline__ unsigned long csum_tcpudp_nofold(unsigned long saddr,
 						   unsigned short proto,
 						   unsigned int sum)
 {
-	__asm__ __volatile__("
-	addcc		%1, %0, %0
-	addccc		%2, %0, %0
-	addccc		%3, %0, %0
-	addc		%0, %%g0, %0
-"	: "=r" (sum), "=r" (saddr)
+	__asm__ __volatile__(
+"	addcc		%1, %0, %0\n"
+"	addccc		%2, %0, %0\n"
+"	addccc		%3, %0, %0\n"
+"	addc		%0, %%g0, %0\n"
+	: "=r" (sum), "=r" (saddr)
 	: "r" (daddr), "r" ((proto<<16)+len), "0" (sum), "1" (saddr)
 	: "cc");
 	return sum;
@@ -171,27 +171,27 @@ static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
 						     unsigned short proto,
 						     unsigned int sum) 
 {
-	__asm__ __volatile__ ("
-	addcc		%3, %4, %%g7
-	addccc		%5, %%g7, %%g7
-	lduw		[%2 + 0x0c], %%g2
-	lduw		[%2 + 0x08], %%g3
-	addccc		%%g2, %%g7, %%g7
-	lduw		[%2 + 0x04], %%g2
-	addccc		%%g3, %%g7, %%g7
-	lduw		[%2 + 0x00], %%g3
-	addccc		%%g2, %%g7, %%g7
-	lduw		[%1 + 0x0c], %%g2
-	addccc		%%g3, %%g7, %%g7
-	lduw		[%1 + 0x08], %%g3
-	addccc		%%g2, %%g7, %%g7
-	lduw		[%1 + 0x04], %%g2
-	addccc		%%g3, %%g7, %%g7
-	lduw		[%1 + 0x00], %%g3
-	addccc		%%g2, %%g7, %%g7
-	addccc		%%g3, %%g7, %0
-	addc		0, %0, %0
-"	: "=&r" (sum)
+	__asm__ __volatile__ (
+"	addcc		%3, %4, %%g7\n"
+"	addccc		%5, %%g7, %%g7\n"
+"	lduw		[%2 + 0x0c], %%g2\n"
+"	lduw		[%2 + 0x08], %%g3\n"
+"	addccc		%%g2, %%g7, %%g7\n"
+"	lduw		[%2 + 0x04], %%g2\n"
+"	addccc		%%g3, %%g7, %%g7\n"
+"	lduw		[%2 + 0x00], %%g3\n"
+"	addccc		%%g2, %%g7, %%g7\n"
+"	lduw		[%1 + 0x0c], %%g2\n"
+"	addccc		%%g3, %%g7, %%g7\n"
+"	lduw		[%1 + 0x08], %%g3\n"
+"	addccc		%%g2, %%g7, %%g7\n"
+"	lduw		[%1 + 0x04], %%g2\n"
+"	addccc		%%g3, %%g7, %%g7\n"
+"	lduw		[%1 + 0x00], %%g3\n"
+"	addccc		%%g2, %%g7, %%g7\n"
+"	addccc		%%g3, %%g7, %0\n"
+"	addc		0, %0, %0\n"
+	: "=&r" (sum)
 	: "r" (saddr), "r" (daddr), "r"(htonl(len)),
 	  "r"(htonl(proto)), "r"(sum)
 	: "g2", "g3", "g7", "cc");

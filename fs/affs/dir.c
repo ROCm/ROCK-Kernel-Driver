@@ -101,7 +101,7 @@ affs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	/* If the directory hasn't changed since the last call to readdir(),
 	 * we can jump directly to where we left off.
 	 */
-	ino = (u32)filp->private_data;
+	ino = (u32)(long)filp->private_data;
 	if (ino && filp->f_version == inode->i_version) {
 		pr_debug("AFFS: readdir() left off=%d\n", ino);
 		goto inside;
@@ -151,7 +151,7 @@ inside:
 readdir_done:
 	filp->f_pos = f_pos;
 	filp->f_version = inode->i_version;
-	filp->private_data = (void *)ino;
+	filp->private_data = (void *)(long)ino;
 	res = stored;
 
 readdir_out:

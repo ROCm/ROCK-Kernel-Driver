@@ -1,4 +1,4 @@
-/* $Id: rwsem.h,v 1.2 2001/04/19 01:52:04 davem Exp $
+/* $Id: rwsem.h,v 1.4 2001/04/26 02:36:36 davem Exp $
  * rwsem.h: R/W semaphores implemented using CAS
  *
  * Written by David S. Miller (davem@redhat.com), 2001.
@@ -13,7 +13,14 @@
 
 #ifdef __KERNEL__
 
+#include <linux/list.h>
+#include <linux/spinlock.h>
+
 struct rwsem_waiter;
+
+extern struct rw_semaphore *FASTCALL(rwsem_down_read_failed(struct rw_semaphore *sem));
+extern struct rw_semaphore *FASTCALL(rwsem_down_write_failed(struct rw_semaphore *sem));
+extern struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *));
 
 struct rw_semaphore {
 	signed int count;
@@ -24,12 +31,11 @@ struct rw_semaphore {
 #define RWSEM_ACTIVE_READ_BIAS		RWSEM_ACTIVE_BIAS
 #define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
 	spinlock_t		wait_lock;
-	struct rwsem_waiter	*wait_front;
-	struct rwsem_waiter	**wait_back;
+	struct list_head	wait_list;
 };
 
 #define __RWSEM_INITIALIZER(name) \
-{ RWSEM_UNLOCKED_VALUE, SPIN_LOCK_UNLOCKED, NULL, &(name).wait_front }
+{ RWSEM_UNLOCKED_VALUE, SPIN_LOCK_UNLOCKED, LIST_HEAD_INIT((name).wait_list) }
 
 #define DECLARE_RWSEM(name) \
 	struct rw_semaphore name = __RWSEM_INITIALIZER(name)
@@ -37,7 +43,8 @@ struct rw_semaphore {
 static inline void init_rwsem(struct rw_semaphore *sem)
 {
 	sem->count = RWSEM_UNLOCKED_VALUE;
-	init_waitqueue_head(&sem->wait);
+	spin_lock_init(&sem->wait_lock);
+	INIT_LIST_HEAD(&sem->wait_list);
 }
 
 static inline void __down_read(struct rw_semaphore *sem)
@@ -127,15 +134,14 @@ static inline void __up_read(struct rw_semaphore *sem)
 		"save		%%sp, -160, %%sp\n\t"
 		"mov		%%g2, %%l2\n\t"
 		"mov		%%g3, %%l3\n\t"
-		" mov		%%g7, %%o0\n\t"
 		"call		%1\n\t"
-		" mov		%%g5, %%o1\n\t"
+		" mov		%%g5, %%o0\n\t"
 		"mov		%%l2, %%g2\n\t"
 		"ba,pt		%%xcc, 2b\n\t"
 		" restore	%%l3, %%g0, %%g3\n\t"
 		".previous\n\t"
 		"! ending __up_read"
-		: : "r" (sem), "i" (rwsem_up_read_wake),
+		: : "r" (sem), "i" (rwsem_wake),
 		    "i" (RWSEM_ACTIVE_MASK)
 		: "g1", "g5", "g7", "memory", "cc");
 }
@@ -146,28 +152,31 @@ static inline void __up_write(struct rw_semaphore *sem)
 		"! beginning __up_write\n\t"
 		"sethi		%%hi(%2), %%g1\n\t"
 		"or		%%g1, %%lo(%2), %%g1\n"
-		"sub		%%g5, %%g5, %%g5\n\t"
-		"cas		[%0], %%g1, %%g5\n\t"
-		"cmp		%%g1, %%g5\n\t"
-		"bne,pn		%%icc, 1f\n\t"
+		"1:\tlduw	[%0], %%g5\n\t"
+		"sub		%%g5, %%g1, %%g7\n\t"
+		"cas		[%0], %%g5, %%g7\n\t"
+		"cmp		%%g5, %%g7\n\t"
+		"bne,pn		%%icc, 1b\n\t"
+		" sub		%%g7, %%g1, %%g7\n\t"
+		"cmp		%%g7, 0\n\t"
+		"bl,pn		%%icc, 3f\n\t"
 		" membar	#StoreStore\n"
 		"2:\n\t"
 		".subsection 2\n"
-		"3:\tmov	%0, %%g1\n\t"
+		"3:\tmov	%0, %%g5\n\t"
 		"save		%%sp, -160, %%sp\n\t"
 		"mov		%%g2, %%l2\n\t"
 		"mov		%%g3, %%l3\n\t"
-		"mov		%%g1, %%o0\n\t"
 		"call		%1\n\t"
-		" mov		%%g5, %%o1\n\t"
+		" mov		%%g5, %%o0\n\t"
 		"mov		%%l2, %%g2\n\t"
 		"ba,pt		%%xcc, 2b\n\t"
 		" restore	%%l3, %%g0, %%g3\n\t"
 		".previous\n\t"
 		"! ending __up_write"
-		: : "r" (sem), "i" (rwsem_up_write_wake),
+		: : "r" (sem), "i" (rwsem_wake),
 		    "i" (RWSEM_ACTIVE_WRITE_BIAS)
-		: "g1", "g5", "memory", "cc");
+		: "g1", "g5", "g7", "memory", "cc");
 }
 
 static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)

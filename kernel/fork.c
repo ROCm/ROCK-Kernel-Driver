@@ -652,7 +652,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 		goto bad_fork_cleanup_sighand;
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
-		goto bad_fork_cleanup_sighand;
+		goto bad_fork_cleanup_mm;
 	p->semundo = NULL;
 	
 	/* Our parent execution domain becomes current domain
@@ -708,6 +708,8 @@ fork_out:
 		down(&sem);
 	return retval;
 
+bad_fork_cleanup_mm:
+	exit_mm(p);
 bad_fork_cleanup_sighand:
 	exit_sighand(p);
 bad_fork_cleanup_fs:

@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.63 2001/03/09 22:04:25 davem Exp $
+/*  $Id: setup.c,v 1.64 2001/04/24 21:10:05 davem Exp $
  *  linux/arch/sparc64/kernel/setup.c
  *
  *  Copyright (C) 1995,1996  David S. Miller (davem@caip.rutgers.edu)
@@ -578,6 +578,10 @@ extern int smp_info(char *);
 extern int smp_bogo(char *);
 extern int mmu_info(char *);
 
+#ifndef CONFIG_SMP
+unsigned long up_clock_tick;
+#endif
+
 int get_cpuinfo(char *buffer)
 {
 	int cpuid=smp_processor_id();
@@ -592,7 +596,8 @@ int get_cpuinfo(char *buffer)
 	    "ncpus probed\t: %d\n"
 	    "ncpus active\t: %d\n"
 #ifndef CONFIG_SMP
-            "BogoMips\t: %lu.%02lu\n"
+            "Cpu0Bogo\t: %lu.%02lu\n"
+	    "Cpu0ClkTck\t: %016lx\n"
 #endif
 	    ,
             sparc_cpu_type[cpuid],
@@ -600,7 +605,8 @@ int get_cpuinfo(char *buffer)
             prom_rev, prom_prev >> 16, (prom_prev >> 8) & 0xff, prom_prev & 0xff,
 	    linux_num_cpus, smp_num_cpus
 #ifndef CONFIG_SMP
-            , loops_per_jiffy/(500000/HZ), (loops_per_jiffy/(5000/HZ)) % 100
+	    , loops_per_jiffy/(500000/HZ), (loops_per_jiffy/(5000/HZ)) % 100,
+	    up_clock_tick
 #endif
 	    );
 #ifdef CONFIG_SMP

@@ -492,7 +492,11 @@ static int read_super_block (struct super_block * s, int size)
     SB_BUFFER_WITH_SB (s) = bh;
     SB_DISK_SUPER_BLOCK (s) = rs;
     s->s_op = &reiserfs_sops;
-    s->s_maxbytes = 0xFFFFFFFF;	/* 4Gig */
+
+    /* new format is limited by the 32 bit wide i_blocks field, want to
+    ** be one full block below that.
+    */
+    s->s_maxbytes = (512LL << 32) - s->s_blocksize ;
     return 0;
 }
 

@@ -150,11 +150,11 @@ void reiserfs_unmap_buffer(struct buffer_head *bh) {
       BUG() ;
     }
     mark_buffer_clean(bh) ;
-    wait_on_buffer(bh) ;
-    // clear_bit(BH_Uptodate, &bh->b_state) ;
+    lock_buffer(bh) ;
     clear_bit(BH_Mapped, &bh->b_state) ;
     clear_bit(BH_Req, &bh->b_state) ;
     clear_bit(BH_New, &bh->b_state) ;
+    unlock_buffer(bh) ;
   }
 }
 

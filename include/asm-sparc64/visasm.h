@@ -1,4 +1,4 @@
-/* $Id: visasm.h,v 1.4 1999/04/19 01:25:55 davem Exp $ */
+/* $Id: visasm.h,v 1.5 2001/04/24 01:09:12 davem Exp $ */
 #ifndef _SPARC64_VISASM_H
 #define _SPARC64_VISASM_H
 
@@ -45,16 +45,16 @@
 
 #ifndef __ASSEMBLY__	
 extern __inline__ void save_and_clear_fpu(void) {
-	__asm__ __volatile__ ("
-		rd %%fprs, %%o5
-		andcc %%o5, %0, %%g0
-		be,pt %%icc, 299f
-		 sethi %%hi(298f), %%g7
-		ba VISenter	! Note. This cannot be bp, as it may be too far from VISenter.
-		 or %%g7, %%lo(298f), %%g7
-	298:	wr %%g0, 0, %%fprs
-	299:
-		" : : "i" (FPRS_FEF|FPRS_DU) :
+	__asm__ __volatile__ (
+"		rd %%fprs, %%o5\n"
+"		andcc %%o5, %0, %%g0\n"
+"		be,pt %%icc, 299f\n"
+"		 sethi %%hi(298f), %%g7\n"
+"		ba VISenter	! Note. This cannot be bp, as it may be too far from VISenter.\n"
+"		 or %%g7, %%lo(298f), %%g7\n"
+"	298:	wr %%g0, 0, %%fprs\n"
+"	299:\n"
+"		" : : "i" (FPRS_FEF|FPRS_DU) :
 		"o5", "g1", "g2", "g3", "g7", "cc");
 }
 #endif

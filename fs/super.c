@@ -1284,16 +1284,12 @@ static int copy_mount_options (const void *data, unsigned long *where)
 }
 
 /*
- * Flags is a 16-bit value that allows up to 16 non-fs dependent flags to
+ * Flags is a 32-bit value that allows up to 32 non-fs dependent flags to
  * be given to the mount() call (ie: read-only, no-dev, no-suid etc).
  *
  * data is a (void *) that can point to any structure up to
  * PAGE_SIZE-1 bytes, which can contain arbitrary fs-dependent
  * information (or be NULL).
- *
- * NOTE! As pre-0.97 versions of mount() didn't use this setup, the
- * flags used to have a special 16-bit magic number in the high word:
- * 0xC0ED. If this magic number is present, the high word is discarded.
  */
 long do_mount(char * dev_name, char * dir_name, char *type_page,
 		  unsigned long flags, void *data_page)
@@ -1304,10 +1300,6 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	struct super_block *sb;
 	int retval = 0;
 
-	/* Discard magic */
-	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)
-		flags &= ~MS_MGC_MSK;
- 
 	/* Basic sanity checks */
 
 	if (!dir_name || !*dir_name || !memchr(dir_name, 0, PAGE_SIZE))
@@ -1331,12 +1323,6 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 
 	if (!type_page || !memchr(type_page, 0, PAGE_SIZE))
 		return -EINVAL;
-
-#if 0	/* Can be deleted again. Introduced in patch-2.3.99-pre6 */
-	/* loopback mount? This is special - requires fewer capabilities */
-	if (strcmp(type_page, "bind")==0)
-		return do_loopback(dev_name, dir_name);
-#endif
 
 	/* for the rest we _really_ need capabilities... */
 	if (!capable(CAP_SYS_ADMIN))

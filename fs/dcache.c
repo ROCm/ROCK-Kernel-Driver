@@ -139,10 +139,6 @@ repeat:
 		goto kill_it;
 	list_add(&dentry->d_lru, &dentry_unused);
 	dentry_stat.nr_unused++;
-	/*
-	 * Update the timestamp
-	 */
-	dentry->d_reftime = jiffies;
 	spin_unlock(&dcache_lock);
 	return;
 
@@ -337,8 +333,8 @@ void prune_dcache(int count)
 		dentry = list_entry(tmp, struct dentry, d_lru);
 
 		/* If the dentry was recently referenced, don't free it. */
-		if (dentry->d_flags & DCACHE_REFERENCED) {
-			dentry->d_flags &= ~DCACHE_REFERENCED;
+		if (dentry->d_vfs_flags & DCACHE_REFERENCED) {
+			dentry->d_vfs_flags &= ~DCACHE_REFERENCED;
 			list_add(&dentry->d_lru, &dentry_unused);
 			continue;
 		}
@@ -610,6 +606,7 @@ struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
 	str[name->len] = 0;
 
 	atomic_set(&dentry->d_count, 1);
+	dentry->d_vfs_flags = 0;
 	dentry->d_flags = 0;
 	dentry->d_inode = NULL;
 	dentry->d_parent = NULL;
@@ -733,7 +730,7 @@ struct dentry * d_lookup(struct dentry * parent, struct qstr * name)
 				continue;
 		}
 		__dget_locked(dentry);
-		dentry->d_flags |= DCACHE_REFERENCED;
+		dentry->d_vfs_flags |= DCACHE_REFERENCED;
 		spin_unlock(&dcache_lock);
 		return dentry;
 	}
