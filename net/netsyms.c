@@ -148,9 +148,7 @@ EXPORT_SYMBOL(sock_rfree);
 EXPORT_SYMBOL(sock_wfree);
 EXPORT_SYMBOL(sock_wmalloc);
 EXPORT_SYMBOL(sock_rmalloc);
-EXPORT_SYMBOL(__skb_linearize);
 EXPORT_SYMBOL(skb_checksum);
-EXPORT_SYMBOL(skb_checksum_help);
 EXPORT_SYMBOL(skb_recv_datagram);
 EXPORT_SYMBOL(skb_free_datagram);
 EXPORT_SYMBOL(skb_copy_datagram);
@@ -227,16 +225,7 @@ EXPORT_SYMBOL(make_EII_client);
 EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
-/* for 801q VLAN support */
-#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
-EXPORT_SYMBOL(dev_change_flags);
-#endif
-
 EXPORT_SYMBOL(scm_detach_fds);
-
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-EXPORT_SYMBOL(br_handle_frame_hook);
-#endif
 
 #ifdef CONFIG_NET_DIVERT
 EXPORT_SYMBOL(alloc_divert_blk);
@@ -472,28 +461,10 @@ EXPORT_SYMBOL(tr_type_trans);
 #endif
 
 /* Device callback registration */
-EXPORT_SYMBOL(register_netdevice_notifier);
-EXPORT_SYMBOL(unregister_netdevice_notifier);
-EXPORT_SYMBOL(call_netdevice_notifiers);
 
 /* support for loadable net drivers */
 #ifdef CONFIG_NET
 EXPORT_SYMBOL(loopback_dev);
-EXPORT_SYMBOL(register_netdevice);
-EXPORT_SYMBOL(unregister_netdevice);
-EXPORT_SYMBOL(free_netdev);
-EXPORT_SYMBOL(synchronize_net);
-EXPORT_SYMBOL(netdev_state_change);
-EXPORT_SYMBOL(netdev_boot_setup_check);
-EXPORT_SYMBOL(dev_new_index);
-EXPORT_SYMBOL(dev_get_by_flags);
-EXPORT_SYMBOL(__dev_get_by_flags);
-EXPORT_SYMBOL(dev_get_by_index);
-EXPORT_SYMBOL(__dev_get_by_index);
-EXPORT_SYMBOL(dev_get_by_name);
-EXPORT_SYMBOL(__dev_get_by_name);
-EXPORT_SYMBOL(dev_getbyhwaddr);
-EXPORT_SYMBOL(netdev_set_master);
 EXPORT_SYMBOL(eth_type_trans);
 #ifdef CONFIG_FDDI
 EXPORT_SYMBOL(fddi_type_trans);
@@ -506,35 +477,12 @@ EXPORT_SYMBOL(__kfree_skb);
 EXPORT_SYMBOL(skb_clone);
 EXPORT_SYMBOL(skb_copy);
 EXPORT_SYMBOL(skb_pad);
-EXPORT_SYMBOL(netif_rx);
-EXPORT_SYMBOL(netif_receive_skb);
-EXPORT_SYMBOL(dev_add_pack);
-EXPORT_SYMBOL(dev_remove_pack);
-EXPORT_SYMBOL(__dev_remove_pack);
-EXPORT_SYMBOL(__dev_get);
-EXPORT_SYMBOL(dev_alloc);
-EXPORT_SYMBOL(dev_alloc_name);
 EXPORT_SYMBOL(__netdev_watchdog_up);
-#ifdef CONFIG_KMOD
-EXPORT_SYMBOL(dev_load);
-#endif
-EXPORT_SYMBOL(dev_ioctl);
-EXPORT_SYMBOL(dev_queue_xmit);
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-EXPORT_SYMBOL(netdev_dropping);
-EXPORT_SYMBOL(netdev_register_fc);
-EXPORT_SYMBOL(netdev_unregister_fc);
-EXPORT_SYMBOL(netdev_fc_xoff);
-#endif
 EXPORT_SYMBOL(dev_base);
 EXPORT_SYMBOL(dev_base_lock);
-EXPORT_SYMBOL(dev_open);
-EXPORT_SYMBOL(dev_close);
 EXPORT_SYMBOL(dev_mc_add);
 EXPORT_SYMBOL(dev_mc_delete);
 EXPORT_SYMBOL(dev_mc_upload);
-EXPORT_SYMBOL(dev_set_allmulti);
-EXPORT_SYMBOL(dev_set_promiscuity);
 EXPORT_SYMBOL(__kill_fasync);
 
 EXPORT_SYMBOL(rtnl);
@@ -547,10 +495,6 @@ EXPORT_SYMBOL(rtnl_unlock);
 
 #ifdef CONFIG_HIPPI
 EXPORT_SYMBOL(hippi_type_trans);
-#endif
-
-#ifdef CONFIG_NET_FASTROUTE
-EXPORT_SYMBOL(netdev_fastroute);
 #endif
 
 #ifdef CONFIG_SYSCTL
@@ -612,7 +556,6 @@ EXPORT_SYMBOL(ip_route_me_harder);
 #endif
 #endif
 
-EXPORT_SYMBOL(register_gifconf);
 
 EXPORT_PER_CPU_SYMBOL(softnet_data);
 
