@@ -1135,6 +1135,7 @@ typedef struct net_local {
 	unsigned short (*sifreadw)(struct net_device *, unsigned short);
 	void (*sifwritew)(struct net_device *, unsigned short, unsigned short);
 
+	spinlock_t lock;                /* SMP protection */
 	void *tmspriv;
 } NET_LOCAL;
 
