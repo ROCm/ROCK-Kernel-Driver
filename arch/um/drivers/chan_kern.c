@@ -399,11 +399,7 @@ struct chan_type {
 };
 
 struct chan_type chan_table[] = {
-#ifdef CONFIG_FD_CHAN
 	{ "fd", &fd_ops },
-#else
-	{ "fd", &not_configged_ops },
-#endif
 
 #ifdef CONFIG_NULL_CHAN
 	{ "null", &null_ops },
