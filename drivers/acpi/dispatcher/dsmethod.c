@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsmethod - Parser/Interpreter interface - control method parsing
- *              $Revision: 81 $
+ *              $Revision: 86 $
  *
  *****************************************************************************/
 
@@ -30,8 +30,6 @@
 #include "acdispat.h"
 #include "acinterp.h"
 #include "acnamesp.h"
-#include "actables.h"
-#include "acdebug.h"
 
 
 #define _COMPONENT          ACPI_DISPATCHER
@@ -78,7 +76,7 @@ acpi_ds_parse_method (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** Parsing [%4.4s] **** Named_obj=%p\n",
-		(char *) &((acpi_namespace_node *) obj_handle)->name, obj_handle));
+		((acpi_namespace_node *) obj_handle)->name.ascii, obj_handle));
 
 	/* Extract the method object from the method Node */
 
@@ -112,7 +110,7 @@ acpi_ds_parse_method (
 	/* Init new op with the method name and pointer back to the Node */
 
 	acpi_ps_set_name (op, node->name.integer);
-	op->node = node;
+	op->common.node = node;
 
 	/*
 	 * Get a new Owner_id for objects created by this method. Namespace
@@ -124,8 +122,7 @@ acpi_ds_parse_method (
 
 	/* Create and initialize a new walk state */
 
-	walk_state = acpi_ds_create_walk_state (owner_id,
-			   NULL, NULL, NULL);
+	walk_state = acpi_ds_create_walk_state (owner_id, NULL, NULL, NULL);
 	if (!walk_state) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
@@ -152,8 +149,9 @@ acpi_ds_parse_method (
 		return_ACPI_STATUS (status);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "**** [%4.4s] Parsed **** Named_obj=%p Op=%p\n",
-		(char *) &((acpi_namespace_node *) obj_handle)->name, obj_handle, op));
+	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
+		"**** [%4.4s] Parsed **** Named_obj=%p Op=%p\n",
+		((acpi_namespace_node *) obj_handle)->name.ascii, obj_handle, op));
 
 	acpi_ps_delete_parse_tree (op);
 	return_ACPI_STATUS (status);
@@ -348,8 +346,8 @@ acpi_ds_call_control_method (
 
 	this_walk_state->num_operands = 0;
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Starting nested execution, newstate=%p\n",
-		next_walk_state));
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+		"Starting nested execution, newstate=%p\n", next_walk_state));
 
 	return_ACPI_STATUS (AE_OK);
 
@@ -357,7 +355,7 @@ acpi_ds_call_control_method (
 	/* On error, we must delete the new walk state */
 
 cleanup:
-	acpi_ds_terminate_control_method (next_walk_state);
+	(void) acpi_ds_terminate_control_method (next_walk_state);
 	acpi_ds_delete_walk_state (next_walk_state);
 	return_ACPI_STATUS (status);
 
@@ -444,6 +442,10 @@ acpi_ds_terminate_control_method (
 	ACPI_FUNCTION_TRACE_PTR ("Ds_terminate_control_method", walk_state);
 
 
+	if (!walk_state) {
+		return (AE_BAD_PARAMETER);
+	}
+
 	/* The current method object was saved in the walk state */
 
 	obj_desc = walk_state->method_desc;
@@ -468,8 +470,14 @@ acpi_ds_terminate_control_method (
 	/* Signal completion of the execution of this method if necessary */
 
 	if (walk_state->method_desc->method.semaphore) {
-		acpi_os_signal_semaphore (
-			walk_state->method_desc->method.semaphore, 1);
+		status = acpi_os_signal_semaphore (
+				  walk_state->method_desc->method.semaphore, 1);
+		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_ERROR (("Could not signal method semaphore\n"));
+			status = AE_OK;
+
+			/* Ignore error and continue cleanup */
+		}
 	}
 
 	/* Decrement the thread count on the method parse tree */

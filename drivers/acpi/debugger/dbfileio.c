@@ -2,7 +2,7 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 60 $
+ *              $Revision: 63 $
  *
  ******************************************************************************/
 
@@ -28,8 +28,6 @@
 #include "acpi.h"
 #include "acdebug.h"
 #include "acnamesp.h"
-#include "acparser.h"
-#include "acevents.h"
 #include "actables.h"
 
 #ifdef ENABLE_DEBUGGER
@@ -167,7 +165,7 @@ acpi_db_open_debug_file (
  *
  ******************************************************************************/
 
-acpi_status
+static acpi_status
 acpi_db_load_table(
 	FILE                    *fp,
 	acpi_table_header       **table_ptr,
@@ -285,7 +283,7 @@ ae_local_load_table (
 
 	table_info.pointer = table_ptr;
 
-	status = acpi_tb_install_table (NULL, &table_info);
+	status = acpi_tb_install_table (&table_info);
 	if (ACPI_FAILURE (status)) {
 		/* Free table allocated by Acpi_tb_get_table */
 
@@ -371,7 +369,7 @@ acpi_db_load_acpi_table (
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_ALREADY_EXISTS) {
 			acpi_os_printf ("Table %4.4s is already installed\n",
-					  &acpi_gbl_db_table_ptr->signature);
+					  acpi_gbl_db_table_ptr->signature);
 		}
 		else {
 			acpi_os_printf ("Could not install table, %s\n",
@@ -382,7 +380,7 @@ acpi_db_load_acpi_table (
 	}
 
 	acpi_os_printf ("%4.4s at %p successfully installed and loaded\n",
-			  &acpi_gbl_db_table_ptr->signature, acpi_gbl_db_table_ptr);
+			  acpi_gbl_db_table_ptr->signature, acpi_gbl_db_table_ptr);
 
 	acpi_gbl_acpi_hardware_present = FALSE;
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psxface - Parser external interfaces
- *              $Revision: 61 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -140,7 +140,6 @@ acpi_psx_execute (
 	status = acpi_ps_parse_aml (walk_state);
 	acpi_ps_delete_parse_tree (op);
 
-
 	/*
 	 * 2) Execute the method.  Performs second pass parse simultaneously
 	 */
@@ -158,12 +157,11 @@ acpi_psx_execute (
 	/* Init new op with the method name and pointer back to the NS node */
 
 	acpi_ps_set_name (op, method_node->name.integer);
-	op->node = method_node;
+	op->common.node = method_node;
 
 	/* Create and initialize a new walk state */
 
-	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
-			   NULL, NULL, NULL);
+	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT, NULL, NULL, NULL);
 	if (!walk_state) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
@@ -185,7 +183,9 @@ acpi_psx_execute (
 		/* Take away the extra reference that we gave the parameters above */
 
 		for (i = 0; params[i]; i++) {
-			acpi_ut_update_object_reference (params[i], REF_DECREMENT);
+			/* Ignore errors, just do them all */
+
+			(void) acpi_ut_update_object_reference (params[i], REF_DECREMENT);
 		}
 	}
 

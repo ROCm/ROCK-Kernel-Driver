@@ -2,7 +2,7 @@
  *
  * Module Name: dswexec - Dispatcher method execution callbacks;
  *                        dispatch to interpreter.
- *              $Revision: 90 $
+ *              $Revision: 92 $
  *
  *****************************************************************************/
 
@@ -40,7 +40,7 @@
 /*
  * Dispatch table for opcode classes
  */
-ACPI_EXECUTE_OP         acpi_gbl_op_type_dispatch [] = {
+static ACPI_EXECUTE_OP      acpi_gbl_op_type_dispatch [] = {
 			 acpi_ex_opcode_1A_0T_0R,
 			 acpi_ex_opcode_1A_0T_1R,
 			 acpi_ex_opcode_1A_1T_0R,
@@ -200,13 +200,17 @@ acpi_ds_exec_begin_op (
 
 		op = *out_op;
 		walk_state->op = op;
-		walk_state->op_info = acpi_ps_get_opcode_info (op->opcode);
-		walk_state->opcode = op->opcode;
+		walk_state->opcode = op->common.aml_opcode;
+		walk_state->op_info = acpi_ps_get_opcode_info (op->common.aml_opcode);
 
 		if (acpi_ns_opens_scope (walk_state->op_info->object_type)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "(%s) Popping scope for Op %p\n",
 				acpi_ut_get_type_name (walk_state->op_info->object_type), op));
-			acpi_ds_scope_stack_pop (walk_state);
+
+			status = acpi_ds_scope_stack_pop (walk_state);
+			if (ACPI_FAILURE (status)) {
+				return_ACPI_STATUS (status);
+			}
 		}
 	}
 
@@ -241,7 +245,7 @@ acpi_ds_exec_begin_op (
 
 	/* We want to send namepaths to the load code */
 
-	if (op->opcode == AML_INT_NAMEPATH_OP) {
+	if (op->common.aml_opcode == AML_INT_NAMEPATH_OP) {
 		opcode_class = AML_CLASS_NAMED_OBJECT;
 	}
 
@@ -273,7 +277,7 @@ acpi_ds_exec_begin_op (
 			status = acpi_ds_load2_begin_op (walk_state, NULL);
 		}
 
-		if (op->opcode == AML_REGION_OP) {
+		if (op->common.aml_opcode == AML_REGION_OP) {
 			status = acpi_ds_result_stack_push (walk_state);
 		}
 		break;
@@ -336,11 +340,11 @@ acpi_ds_exec_end_op (
 	op_class = walk_state->op_info->class;
 
 	if (op_class == AML_CLASS_UNKNOWN) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown opcode %X\n", op->opcode));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown opcode %X\n", op->common.aml_opcode));
 		return_ACPI_STATUS (AE_NOT_IMPLEMENTED);
 	}
 
-	first_arg = op->value.arg;
+	first_arg = op->common.value.arg;
 
 	/* Init the walk state */
 
@@ -432,8 +436,11 @@ acpi_ds_exec_end_op (
 			/* 1 Operand, 0 External_result, 0 Internal_result */
 
 			status = acpi_ds_exec_end_control_op (walk_state, op);
+			if (ACPI_FAILURE (status)) {
+				break;
+			}
 
-			acpi_ds_result_stack_pop (walk_state);
+			status = acpi_ds_result_stack_pop (walk_state);
 			break;
 
 
@@ -451,7 +458,7 @@ acpi_ds_exec_end_op (
 
 			/* Next_op points to first argument op */
 
-			next_op = next_op->next;
+			next_op = next_op->common.next;
 
 			/*
 			 * Get the method's arguments and put them on the operand stack
@@ -503,26 +510,28 @@ acpi_ds_exec_end_op (
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 				"Executing Create_object (Buffer/Package) Op=%p\n", op));
 
-			switch (op->parent->opcode) {
+			switch (op->common.parent->common.aml_opcode) {
 			case AML_NAME_OP:
 
 				/*
 				 * Put the Node on the object stack (Contains the ACPI Name of
 				 * this object)
 				 */
-				walk_state->operands[0] = (void *) op->parent->node;
+				walk_state->operands[0] = (void *) op->common.parent->common.node;
 				walk_state->num_operands = 1;
 
-				status = acpi_ds_create_node (walk_state, op->parent->node, op->parent);
+				status = acpi_ds_create_node (walk_state, op->common.parent->common.node, op->common.parent);
 				if (ACPI_FAILURE (status)) {
 					break;
 				}
 
 				/* Fall through */
+				/*lint -fallthrough */
 
 			case AML_INT_EVAL_SUBTREE_OP:
 
-				status = acpi_ds_eval_data_object_operands (walk_state, op, acpi_ns_get_attached_object (op->parent->node));
+				status = acpi_ds_eval_data_object_operands (walk_state, op,
+						  acpi_ns_get_attached_object (op->common.parent->common.node));
 				break;
 
 			default:
@@ -552,7 +561,7 @@ acpi_ds_exec_end_op (
 				break;
 			}
 
-			if (op->opcode == AML_REGION_OP) {
+			if (op->common.aml_opcode == AML_REGION_OP) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 					"Executing Op_region Address/Length Op=%p\n", op));
 
@@ -585,7 +594,7 @@ acpi_ds_exec_end_op (
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Unimplemented opcode, class=%X type=%X Opcode=%X Op=%p\n",
-				op_class, op_type, op->opcode, op));
+				op_class, op_type, op->common.aml_opcode, op));
 
 			status = AE_NOT_IMPLEMENTED;
 			break;

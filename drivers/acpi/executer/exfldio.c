@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 84 $
+ *              $Revision: 86 $
  *
  *****************************************************************************/
 
@@ -27,8 +27,6 @@
 #include "acpi.h"
 #include "acinterp.h"
 #include "amlcode.h"
-#include "acnamesp.h"
-#include "achware.h"
 #include "acevents.h"
 #include "acdispat.h"
 
@@ -67,7 +65,7 @@ acpi_ex_setup_region (
 	rgn_desc = obj_desc->common_field.region_obj;
 
 	if (ACPI_TYPE_REGION != rgn_desc->common.type) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %x %s\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %X (%s)\n",
 			rgn_desc->common.type, acpi_ut_get_type_name (rgn_desc->common.type)));
 		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 	}
@@ -99,8 +97,8 @@ acpi_ex_setup_region (
 			 */
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Field [%4.4s] access width (%d bytes) too large for region [%4.4s] (length %X)\n",
-				(char *) &obj_desc->common_field.node->name, obj_desc->common_field.access_byte_width,
-				(char *) &rgn_desc->region.node->name, rgn_desc->region.length));
+				obj_desc->common_field.node->name.ascii, obj_desc->common_field.access_byte_width,
+				rgn_desc->region.node->name.ascii, rgn_desc->region.length));
 		}
 
 		/*
@@ -109,9 +107,9 @@ acpi_ex_setup_region (
 		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Field [%4.4s] Base+Offset+Width %X+%X+%X is beyond end of region [%4.4s] (length %X)\n",
-			(char *) &obj_desc->common_field.node->name, obj_desc->common_field.base_byte_offset,
+			obj_desc->common_field.node->name.ascii, obj_desc->common_field.base_byte_offset,
 			field_datum_byte_offset, obj_desc->common_field.access_byte_width,
-			(char *) &rgn_desc->region.node->name, rgn_desc->region.length));
+			rgn_desc->region.node->name.ascii, rgn_desc->region.length));
 
 		return_ACPI_STATUS (AE_AML_REGION_LIMIT);
 	}
@@ -235,7 +233,7 @@ acpi_ex_register_overflow (
 		return (FALSE);
 	}
 
-	if (value >= (acpi_integer) (1 << obj_desc->common_field.bit_length)) {
+	if (value >= ((acpi_integer) 1 << obj_desc->common_field.bit_length)) {
 		/*
 		 * The Value is larger than the maximum value that can fit into
 		 * the register.
@@ -343,7 +341,7 @@ acpi_ex_field_datum_io (
 		/* Ensure that the Bank_value is not beyond the capacity of the register */
 
 		if (acpi_ex_register_overflow (obj_desc->bank_field.bank_obj,
-				  obj_desc->bank_field.value)) {
+				  (acpi_integer) obj_desc->bank_field.value)) {
 			return_ACPI_STATUS (AE_AML_REGISTER_LIMIT);
 		}
 
@@ -363,7 +361,7 @@ acpi_ex_field_datum_io (
 		 * Region_field case and write the datum to the Operation Region
 		 */
 
-		/* No break; ! */
+		/*lint -fallthrough */
 
 
 	case INTERNAL_TYPE_REGION_FIELD:
@@ -387,7 +385,7 @@ acpi_ex_field_datum_io (
 		/* Ensure that the Index_value is not beyond the capacity of the register */
 
 		if (acpi_ex_register_overflow (obj_desc->index_field.index_obj,
-				  obj_desc->index_field.value)) {
+				  (acpi_integer) obj_desc->index_field.value)) {
 			return_ACPI_STATUS (AE_AML_REGISTER_LIMIT);
 		}
 
@@ -472,7 +470,7 @@ acpi_ex_write_with_update_rule (
 
 	/* If the mask is all ones, we don't need to worry about the update rule */
 
-	if (mask != ACPI_UINT32_MAX) {
+	if (mask != ACPI_INTEGER_MAX) {
 		/* Decode the update rule */
 
 		switch (obj_desc->common_field.field_flags & AML_FIELD_UPDATE_RULE_MASK) {
@@ -509,7 +507,7 @@ acpi_ex_write_with_update_rule (
 
 		default:
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"Write_with_update_rule: Unknown Update_rule setting: %x\n",
+				"Write_with_update_rule: Unknown Update_rule setting: %X\n",
 				(obj_desc->common_field.field_flags & AML_FIELD_UPDATE_RULE_MASK)));
 			return_ACPI_STATUS (AE_AML_OPERAND_VALUE);
 		}
@@ -579,6 +577,10 @@ acpi_ex_get_buffer_datum(
 
 		ACPI_MOVE_UNALIGNED64_TO_64 (datum, &(((u64 *) buffer) [offset]));
 		break;
+
+	default:
+		/* Should not get here */
+		break;
 	}
 }
 
@@ -630,6 +632,10 @@ acpi_ex_set_buffer_datum (
 	case ACPI_FIELD_QWORD_GRANULARITY:
 
 		ACPI_MOVE_UNALIGNED64_TO_64 (&(((u64 *) buffer)[offset]), &merged_datum);
+		break;
+
+	default:
+		/* Should not get here */
 		break;
 	}
 }
@@ -685,7 +691,7 @@ acpi_ex_extract_from_field (
 			   obj_desc->common_field.access_byte_width);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Byte_len=%x, Datum_len=%x, Byte_gran=%x\n",
+		"Byte_len=%X, Datum_len=%X, Byte_gran=%X\n",
 		byte_field_length, datum_count,obj_desc->common_field.access_byte_width));
 
 	/*
@@ -863,7 +869,7 @@ acpi_ex_insert_into_field (
 	datum_count = ACPI_ROUND_UP_TO (byte_field_length, obj_desc->common_field.access_byte_width);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Byte_len=%x, Datum_len=%x, Byte_gran=%x\n",
+		"Byte_len=%X, Datum_len=%X, Byte_gran=%X\n",
 		byte_field_length, datum_count, obj_desc->common_field.access_byte_width));
 
 	/*

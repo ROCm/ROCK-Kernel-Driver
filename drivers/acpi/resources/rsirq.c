@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsirq - IRQ resource descriptors
- *              $Revision: 24 $
+ *              $Revision: 28 $
  *
  ******************************************************************************/
 
@@ -60,7 +60,7 @@ acpi_rs_irq_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	u8                      index;
@@ -90,17 +90,23 @@ acpi_rs_irq_resource (
 	/* Decode the IRQ bits */
 
 	for (i = 0, index = 0; index < 16; index++) {
-		if((temp16 >> index) & 0x01) {
+		if ((temp16 >> index) & 0x01) {
 			output_struct->data.irq.interrupts[i] = index;
 			i++;
 		}
+	}
+
+	if (i == 0) {
+		/* Zero interrupts is invalid! */
+
+		return_ACPI_STATUS (AE_BAD_DATA);
 	}
 	output_struct->data.irq.number_of_interrupts = i;
 
 	/*
 	 * Calculate the structure size based upon the number of interrupts
 	 */
-	struct_size += (output_struct->data.irq.number_of_interrupts - 1) * 4;
+	struct_size += ((ACPI_SIZE) output_struct->data.irq.number_of_interrupts - 1) * 4;
 
 	/*
 	 * Point to Byte 3 if it is used
@@ -149,7 +155,7 @@ acpi_rs_irq_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure
@@ -279,10 +285,10 @@ acpi_rs_extended_irq_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
-	NATIVE_CHAR             *temp_ptr;
+	u8                      *temp_ptr;
 	u8                      index;
 	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_ext_irq);
 
@@ -351,8 +357,8 @@ acpi_rs_extended_irq_resource (
 	 * Cycle through every IRQ in the table
 	 */
 	for (index = 0; index < temp8; index++) {
-		output_struct->data.extended_irq.interrupts[index] =
-				(u32)*buffer;
+		ACPI_MOVE_UNALIGNED32_TO_32 (
+			&output_struct->data.extended_irq.interrupts[index], buffer);
 
 		/* Point to the next IRQ */
 
@@ -367,7 +373,7 @@ acpi_rs_extended_irq_resource (
 	 * stream that are default.
 	 */
 	if (*bytes_consumed >
-		(u32)(output_struct->data.extended_irq.number_of_interrupts * 4) + 5) {
+		((ACPI_SIZE) output_struct->data.extended_irq.number_of_interrupts * 4) + 5) {
 		/* Dereference the Index */
 
 		temp8 = *buffer;
@@ -383,7 +389,7 @@ acpi_rs_extended_irq_resource (
 		output_struct->data.extended_irq.resource_source.string_ptr =
 				(NATIVE_CHAR *)(output_struct + struct_size);
 
-		temp_ptr = output_struct->data.extended_irq.resource_source.string_ptr;
+		temp_ptr = (u8 *) output_struct->data.extended_irq.resource_source.string_ptr;
 
 		/* Copy the string into the buffer */
 
@@ -419,7 +425,7 @@ acpi_rs_extended_irq_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure
@@ -470,7 +476,7 @@ acpi_rs_extended_irq_stream (
 	/*
 	 * Set a pointer to the Length field - to be filled in later
 	 */
-	length_field = (u16 *)buffer;
+	length_field = ACPI_CAST_PTR (u16, buffer);
 	buffer += 2;
 
 	/*

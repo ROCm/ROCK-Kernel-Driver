@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 147 $
+ *              $Revision: 153 $
  *
  *****************************************************************************/
 
@@ -28,7 +28,6 @@
 #include "acinterp.h"
 #include "amlcode.h"
 #include "acnamesp.h"
-#include "actables.h"
 #include "acparser.h"
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -43,90 +42,6 @@
 
 /*****************************************************************************
  *
- * FUNCTION:    Acpi_ex_show_hex_value
- *
- * PARAMETERS:  Byte_count          - Number of bytes to print (1, 2, or 4)
- *              *Aml_start            - Address in AML stream of bytes to print
- *              Interpreter_mode    - Current running mode (load1/Load2/Exec)
- *              Lead_space          - # of spaces to print ahead of value
- *                                    0 => none ahead but one behind
- *
- * DESCRIPTION: Print Byte_count byte(s) starting at Aml_start as a single
- *              value, in hex.  If Byte_count > 1 or the value printed is > 9, also
- *              print in decimal.
- *
- ****************************************************************************/
-
-void
-acpi_ex_show_hex_value (
-	u32                     byte_count,
-	u8                      *aml_start,
-	u32                     lead_space)
-{
-	u32                     value;                  /*  Value retrieved from AML stream */
-	u32                     show_decimal_value;
-	u32                     length;                 /*  Length of printed field */
-	u8                      *current_aml_ptr = NULL; /* Pointer to current byte of AML value    */
-
-
-	ACPI_FUNCTION_TRACE ("Ex_show_hex_value");
-
-
-	if (!((ACPI_LV_LOAD & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer))) {
-		return;
-	}
-
-	if (!aml_start) {
-		ACPI_REPORT_ERROR (("Ex_show_hex_value: null pointer\n"));
-		return;
-	}
-
-	/*
-	 * AML numbers are always stored little-endian,
-	 * even if the processor is big-endian.
-	 */
-	for (current_aml_ptr = aml_start + byte_count,
-			value = 0;
-			current_aml_ptr > aml_start; ) {
-		value = (value << 8) + (u32)* --current_aml_ptr;
-	}
-
-	length = lead_space * byte_count + 2;
-	if (byte_count > 1) {
-		length += (byte_count - 1);
-	}
-
-	show_decimal_value = (byte_count > 1 || value > 9);
-	if (show_decimal_value) {
-		length += 3 + acpi_ex_digits_needed (value, 10);
-	}
-
-	for (length = lead_space; length; --length ) {
-		acpi_os_printf (" ");
-	}
-
-	while (byte_count--) {
-		acpi_os_printf ("%02x", *aml_start++);
-		if (byte_count) {
-			acpi_os_printf (" ");
-		}
-	}
-
-	if (show_decimal_value) {
-		acpi_os_printf (" [%d]", value);
-	}
-
-	if (0 == lead_space) {
-		acpi_os_printf (" ");
-	}
-
-	acpi_os_printf ("\n");
-	return_VOID;
-}
-
-
-/*****************************************************************************
- *
  * FUNCTION:    Acpi_ex_dump_operand
  *
  * PARAMETERS:  *Obj_desc         - Pointer to entry to be dumped
@@ -137,20 +52,22 @@ acpi_ex_show_hex_value (
  *
  ****************************************************************************/
 
-acpi_status
+void
 acpi_ex_dump_operand (
 	acpi_operand_object     *obj_desc)
 {
 	u8                      *buf = NULL;
 	u32                     length;
 	u32                     i;
+	acpi_operand_object     **element;
+	u16                     element_index;
 
 
 	ACPI_FUNCTION_NAME ("Ex_dump_operand")
 
 
 	if (!((ACPI_LV_EXEC & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer))) {
-		return (AE_OK);
+		return;
 	}
 
 	if (!obj_desc) {
@@ -160,19 +77,19 @@ acpi_ex_dump_operand (
 		 * code that dumps the stack expects something to be there!
 		 */
 		acpi_os_printf ("Null stack entry ptr\n");
-		return (AE_OK);
+		return;
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_NAMED) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p NS Node: ", obj_desc));
 		ACPI_DUMP_ENTRY (obj_desc, ACPI_LV_EXEC);
-		return (AE_OK);
+		return;
 	}
 
-	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_INTERNAL) {
+	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p is not a local object\n", obj_desc));
 		ACPI_DUMP_BUFFER (obj_desc, sizeof (acpi_operand_object));
-		return (AE_OK);
+		return;
 	}
 
 	/*  Obj_desc is a valid object */
@@ -265,7 +182,7 @@ acpi_ex_dump_operand (
 
 		case AML_INT_NAMEPATH_OP:
 			acpi_os_printf ("Reference.Node->Name %X\n",
-					 obj_desc->reference.node->name);
+					 obj_desc->reference.node->name.integer);
 			break;
 
 		default:
@@ -343,18 +260,13 @@ acpi_ex_dump_operand (
 		if (obj_desc->package.count &&
 			obj_desc->package.elements &&
 			acpi_dbg_level > 1) {
-			acpi_operand_object**element;
-			u16                 element_index;
-
 			for (element_index = 0, element = obj_desc->package.elements;
 				  element_index < obj_desc->package.count;
 				  ++element_index, ++element) {
 				acpi_ex_dump_operand (*element);
 			}
 		}
-
 		acpi_os_printf ("\n");
-
 		break;
 
 
@@ -389,7 +301,6 @@ acpi_ex_dump_operand (
 			acpi_os_printf ("%c",
 					 obj_desc->string.pointer[i]);
 		}
-
 		acpi_os_printf ("\"\n");
 		break;
 
@@ -429,13 +340,11 @@ acpi_ex_dump_operand (
 		{
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "*NULL* \n"));
 		}
-
 		else if (ACPI_TYPE_BUFFER !=
 				  obj_desc->buffer_field.buffer_obj->common.type)
 		{
 			acpi_os_printf ("*not a Buffer* \n");
 		}
-
 		else
 		{
 			ACPI_DUMP_STACK_ENTRY (obj_desc->buffer_field.buffer_obj);
@@ -490,13 +399,13 @@ acpi_ex_dump_operand (
 
 
 	default:
-		/*  unknown Obj_desc->Common.Type value   */
+		/* Unknown Obj_desc->Common.Type value */
 
 		acpi_os_printf ("Unknown Type %X\n", obj_desc->common.type);
 		break;
 	}
 
-	return (AE_OK);
+	return;
 }
 
 
@@ -540,7 +449,6 @@ acpi_ex_dump_operands (
 		note = "?";
 	}
 
-
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 		"************* Operand Stack Contents (Opcode [%s], %d Operands)\n",
 		ident, num_levels));
@@ -550,16 +458,12 @@ acpi_ex_dump_operands (
 		num_levels = 1;
 	}
 
-	/* Dump the stack starting at the top, working down */
+	/* Dump the operand stack starting at the top */
 
 	for (i = 0; num_levels > 0; i--, num_levels--)
 	{
 		obj_desc = &operands[i];
-
-		if (ACPI_FAILURE (acpi_ex_dump_operand (*obj_desc)))
-		{
-			break;
-		}
+		acpi_ex_dump_operand (*obj_desc);
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
@@ -611,7 +515,8 @@ acpi_ex_out_address (
 	char                    *title,
 	ACPI_PHYSICAL_ADDRESS   value)
 {
-#ifdef _IA16
+
+#if ACPI_MACHINE_WIDTH == 16
 	acpi_os_printf ("%20s : %p\n", title, value);
 #else
 	acpi_os_printf ("%20s : %8.8X%8.8X\n", title,
@@ -648,8 +553,7 @@ acpi_ex_dump_node (
 		}
 	}
 
-
-	acpi_os_printf ("%20s : %4.4s\n",     "Name", (char *) &node->name);
+	acpi_os_printf ("%20s : %4.4s\n",     "Name", node->name.ascii);
 	acpi_ex_out_string ("Type",           acpi_ut_get_type_name (node->type));
 	acpi_ex_out_integer ("Flags",         node->flags);
 	acpi_ex_out_integer ("Owner Id",      node->owner_id);
@@ -691,7 +595,7 @@ acpi_ex_dump_object_descriptor (
 		}
 	}
 
-	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_INTERNAL)
+	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND)
 	{
 		acpi_os_printf ("Ex_dump_object_descriptor: %p is not a valid ACPI object\n", obj_desc);
 		return;
@@ -709,7 +613,7 @@ acpi_ex_dump_object_descriptor (
 	{
 	case ACPI_TYPE_INTEGER:
 
-		acpi_os_printf ("%20s : %X%8.8X\n", "Value",
+		acpi_os_printf ("%20s : %8.8X%8.8X\n", "Value",
 				  ACPI_HIDWORD (obj_desc->integer.value),
 				  ACPI_LODWORD (obj_desc->integer.value));
 		break;
@@ -739,7 +643,7 @@ acpi_ex_dump_object_descriptor (
 
 		if (obj_desc->package.count > 0)
 		{
-			acpi_os_printf ("\n_package Contents:\n");
+			acpi_os_printf ("\nPackage Contents:\n");
 			for (i = 0; i < obj_desc->package.count; i++)
 			{
 				acpi_os_printf ("[%.3d] %p", i, obj_desc->package.elements[i]);
@@ -811,7 +715,7 @@ acpi_ex_dump_object_descriptor (
 
 		acpi_ex_out_integer ("Processor ID", obj_desc->processor.proc_id);
 		acpi_ex_out_integer ("Length",       obj_desc->processor.length);
-		acpi_ex_out_integer ("Address",      obj_desc->processor.address);
+		acpi_ex_out_address ("Address",      (ACPI_PHYSICAL_ADDRESS) obj_desc->processor.address);
 		acpi_ex_out_pointer ("Sys_handler",  obj_desc->processor.sys_handler);
 		acpi_ex_out_pointer ("Drv_handler",  obj_desc->processor.drv_handler);
 		acpi_ex_out_pointer ("Addr_handler", obj_desc->processor.addr_handler);
@@ -861,6 +765,10 @@ acpi_ex_dump_object_descriptor (
 			acpi_ex_out_integer ("Value",        obj_desc->index_field.value);
 			acpi_ex_out_pointer ("Index",        obj_desc->index_field.index_obj);
 			acpi_ex_out_pointer ("Data",         obj_desc->index_field.data_obj);
+			break;
+
+		default:
+			/* All object types covered above */
 			break;
 		}
 		break;

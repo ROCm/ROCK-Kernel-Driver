@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsmisc - Miscellaneous resource descriptors
- *              $Revision: 20 $
+ *              $Revision: 24 $
  *
  ******************************************************************************/
 
@@ -59,7 +59,7 @@ acpi_rs_end_tag_resource (
 	u8                      **output_buffer,
 	ACPI_SIZE               *structure_size)
 {
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	ACPI_SIZE               struct_size = ACPI_RESOURCE_LENGTH;
 
 
@@ -170,7 +170,7 @@ acpi_rs_vendor_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	u16                     temp16 = 0;
 	u8                      temp8 = 0;
 	u8                      index;
@@ -197,7 +197,7 @@ acpi_rs_vendor_resource (
 
 		/* Calculate bytes consumed */
 
-		*bytes_consumed = temp16 + 3;
+		*bytes_consumed = (ACPI_SIZE) temp16 + 3;
 
 		/* Point to the first vendor byte */
 
@@ -211,7 +211,7 @@ acpi_rs_vendor_resource (
 
 		/* Calculate bytes consumed */
 
-		*bytes_consumed = temp16 + 1;
+		*bytes_consumed = (ACPI_SIZE) temp16 + 1;
 
 		/* Point to the first vendor byte */
 
@@ -236,7 +236,7 @@ acpi_rs_vendor_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure
@@ -297,7 +297,7 @@ acpi_rs_vendor_stream (
 		 * Small Item, Set the descriptor field
 		 */
 		temp8 = 0x70;
-		temp8 |= linked_list->data.vendor_specific.length;
+		temp8 |= (u8) linked_list->data.vendor_specific.length;
 
 		*buffer = temp8;
 		buffer += 1;
@@ -350,7 +350,7 @@ acpi_rs_start_depend_fns_resource (
 	ACPI_SIZE               *structure_size)
 {
 	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	u8                      temp8 = 0;
 	ACPI_SIZE               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_start_dpf);
 
@@ -380,7 +380,7 @@ acpi_rs_start_depend_fns_resource (
 		output_struct->data.start_dpf.compatibility_priority = temp8 & 0x03;
 
 		if (3 == output_struct->data.start_dpf.compatibility_priority) {
-			return_ACPI_STATUS (AE_AML_ERROR);
+			return_ACPI_STATUS (AE_AML_BAD_RESOURCE_VALUE);
 		}
 
 		/*
@@ -389,7 +389,7 @@ acpi_rs_start_depend_fns_resource (
 		output_struct->data.start_dpf.performance_robustness = (temp8 >> 2) & 0x03;
 
 		if (3 == output_struct->data.start_dpf.performance_robustness) {
-			return_ACPI_STATUS (AE_AML_ERROR);
+			return_ACPI_STATUS (AE_AML_BAD_RESOURCE_VALUE);
 		}
 	}
 	else {
@@ -403,7 +403,7 @@ acpi_rs_start_depend_fns_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure
@@ -441,7 +441,7 @@ acpi_rs_end_depend_fns_resource (
 	u8                      **output_buffer,
 	ACPI_SIZE               *structure_size)
 {
-	acpi_resource           *output_struct = (acpi_resource *) *output_buffer;
+	acpi_resource           *output_struct = (void *) *output_buffer;
 	ACPI_SIZE               struct_size = ACPI_RESOURCE_LENGTH;
 
 
@@ -461,7 +461,7 @@ acpi_rs_end_depend_fns_resource (
 	/*
 	 * Set the Length parameter
 	 */
-	output_struct->length = struct_size;
+	output_struct->length = (u32) struct_size;
 
 	/*
 	 * Return the final size of the structure

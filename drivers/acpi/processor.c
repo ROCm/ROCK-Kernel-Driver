@@ -1,5 +1,5 @@
 /*
- * acpi_processor.c - ACPI Processor Driver ($Revision: 57 $)
+ * acpi_processor.c - ACPI Processor Driver ($Revision: 66 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -27,8 +27,6 @@
  *	3. Optimize by having scheduler determine business instead of
  *	   having us try to calculate it here.
  *	4. Need C1 timing -- must modify kernel (IRQ handler) to get this.
- *	5. Convert time values to ticks (initially) to avoid having to do
- *	   the math (acpi_get_timer_duration).
  */
 
 #include <linux/kernel.h>
@@ -40,6 +38,8 @@
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/delay.h>
+#include <linux/compatmac.h>
+#include <linux/proc_fs.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -52,6 +52,10 @@ MODULE_DESCRIPTION(ACPI_PROCESSOR_DRIVER_NAME);
 MODULE_LICENSE("GPL");
 
 #define PREFIX				"ACPI: "
+
+#define US_TO_PM_TIMER_TICKS(t)		((t * (PM_TIMER_FREQUENCY/1000)) / 1000)
+#define C2_OVERHEAD			4	/* 1us (3.579 ticks per us) */
+#define C3_OVERHEAD			4	/* 1us (3.579 ticks per us) */
 
 #define ACPI_PROCESSOR_BUSY_METRIC	10
 
@@ -90,6 +94,7 @@ struct acpi_processor_cx_policy {
 	int			state;
 	struct {
 		u32			time;
+		u32			ticks;
 		u32			count;
 		u32			bm;
 	}			threshold;
@@ -99,6 +104,7 @@ struct acpi_processor_cx {
 	u8			valid;
 	u32			address;
 	u32			latency;
+	u32			latency_ticks;
 	u32			power;
 	u32			usage;
 	struct acpi_processor_cx_policy promotion;
@@ -346,6 +352,20 @@ acpi_processor_errata (
                                 Power Management
    -------------------------------------------------------------------------- */
 
+static inline u32
+ticks_elapsed (
+	u32			t1,
+	u32			t2)
+{
+	if (t2 >= t1)
+		return (t2 - t1);
+	else if (!acpi_fadt.tmr_val_ext)
+		return (((0x00FFFFFF - t1) + t2) & 0x00FFFFFF);
+	else
+		return ((0xFFFFFFFF - t1) + t2);
+}
+
+
 static void
 acpi_processor_power_activate (
 	struct acpi_processor	*pr,
@@ -361,7 +381,7 @@ acpi_processor_power_activate (
 	switch (pr->power.state) {
 	case ACPI_STATE_C3:
 		/* Disable bus master reload */
-		acpi_hw_bit_register_write(ACPI_BITREG_BUS_MASTER_RLD, 0, ACPI_MTX_DO_NOT_LOCK);
+		acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0, ACPI_MTX_DO_NOT_LOCK);
 		break;
 	}
 
@@ -369,7 +389,7 @@ acpi_processor_power_activate (
 	switch (state) {
 	case ACPI_STATE_C3:
 		/* Enable bus master reload */
-		acpi_hw_bit_register_write(ACPI_BITREG_BUS_MASTER_RLD, 1, ACPI_MTX_DO_NOT_LOCK);
+		acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1, ACPI_MTX_DO_NOT_LOCK);
 		break;
 	}
 
@@ -385,9 +405,8 @@ acpi_processor_idle (void)
 	struct acpi_processor	*pr = NULL;
 	struct acpi_processor_cx *cx = NULL;
 	int			next_state = 0;
-	u32			start_ticks = 0;
-	u32			end_ticks = 0;
-	u32			time_elapsed = 0;
+	int			sleep_ticks = 0;
+	u32			t1, t2 = 0;
 
 	pr = processors[smp_processor_id()];
 	if (!pr)
@@ -408,13 +427,16 @@ acpi_processor_idle (void)
 	 * for demotion.
 	 */
 	if (pr->flags.bm_check) {
+		u32		bm_status = 0;
 
 		pr->power.bm_activity <<= 1;
-		pr->power.bm_activity &= 0xFFFFFFFE;
 
-		if (acpi_hw_bit_register_read(ACPI_BITREG_BUS_MASTER_STATUS, ACPI_MTX_DO_NOT_LOCK)) {
+		acpi_get_register(ACPI_BITREG_BUS_MASTER_STATUS, 
+			&bm_status, ACPI_MTX_DO_NOT_LOCK);
+		if (bm_status) {
 			pr->power.bm_activity++;
-			acpi_hw_bit_register_write(ACPI_BITREG_BUS_MASTER_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
+			acpi_set_register(ACPI_BITREG_BUS_MASTER_STATUS,
+				1, ACPI_MTX_DO_NOT_LOCK);
 		}
 		/*
 		 * PIIX4 Erratum #18: Note that BM_STS doesn't always reflect
@@ -426,12 +448,17 @@ acpi_processor_idle (void)
 				|| (inb_p(errata.piix4.bmisx + 0x0A) & 0x01))
 				pr->power.bm_activity++;
 		}
-
 		/*
 		 * Apply bus mastering demotion policy.  Automatically demote
 		 * to avoid a faulty transition.  Note that the processor 
 		 * won't enter a low-power state during this call (to this 
 		 * funciton) but should upon the next.
+		 *
+		 * TBD: A better policy might be to fallback to the demotion 
+		 *      state (use it for this quantum only) istead of 
+		 *      demoting -- and rely on duration as our sole demotion
+		 *      qualification.  This may, however, introduce DMA 
+		 *      issues (e.g. floppy DMA transfer overrun/underrun).
 		 */
 		if (pr->power.bm_activity & cx->demotion.threshold.bm) {
 			__sti();
@@ -457,49 +484,41 @@ acpi_processor_idle (void)
 		 *      go to an ISR rather than here.  Need to instrument
 		 *      base interrupt handler.
 		 */
-		time_elapsed = 0xFFFFFFFF;
+		sleep_ticks = 0xFFFFFFFF;
 		break;
 
 	case ACPI_STATE_C2:
-		/* See how long we're asleep for */
-		start_ticks = inl(acpi_fadt.Xpm_tmr_blk.address);
+		/* Get start time (ticks) */
+		t1 = inl(acpi_fadt.Xpm_tmr_blk.address);
 		/* Invoke C2 */
 		inb(pr->power.states[ACPI_STATE_C2].address);
 		/* Dummy op - must do something useless after P_LVL2 read */
-		end_ticks = inl(acpi_fadt.Xpm_tmr_blk.address);
-		/* Compute time elapsed */
-		end_ticks = inl(acpi_fadt.Xpm_tmr_blk.address);
+		t2 = inl(acpi_fadt.Xpm_tmr_blk.address);
+		/* Get end time (ticks) */
+		t2 = inl(acpi_fadt.Xpm_tmr_blk.address);
 		/* Re-enable interrupts */
 		__sti();
-		/*
-		 * Compute the amount of time asleep (in the Cx state).
-		 * TBD: Convert to PM timer ticks initially to avoid having
-		 *      to do the math (acpi_get_timer_duration).
-		 */
-		acpi_get_timer_duration(start_ticks, end_ticks, &time_elapsed);
+		/* Compute time (ticks) that we were actually asleep */
+		sleep_ticks = ticks_elapsed(t1, t2) - cx->latency_ticks - C2_OVERHEAD;
 		break;
 
 	case ACPI_STATE_C3:
 		/* Disable bus master arbitration */
-		acpi_hw_bit_register_write(ACPI_BITREG_ARB_DISABLE, 1, ACPI_MTX_DO_NOT_LOCK);
-		/* See how long we're asleep for */
-		start_ticks = inl(acpi_fadt.Xpm_tmr_blk.address);
+		acpi_set_register(ACPI_BITREG_ARB_DISABLE, 1, ACPI_MTX_DO_NOT_LOCK);
+		/* Get start time (ticks) */
+		t1 = inl(acpi_fadt.Xpm_tmr_blk.address);
 		/* Invoke C3 */
 		inb(pr->power.states[ACPI_STATE_C3].address);
 		/* Dummy op - must do something useless after P_LVL3 read */
-		end_ticks = inl(acpi_fadt.Xpm_tmr_blk.address);
-		/* Compute time elapsed */
-		end_ticks = inl(acpi_fadt.Xpm_tmr_blk.address);
+		t2 = inl(acpi_fadt.Xpm_tmr_blk.address);
+		/* Get end time (ticks) */
+		t2 = inl(acpi_fadt.Xpm_tmr_blk.address);
 		/* Enable bus master arbitration */
-		acpi_hw_bit_register_write(ACPI_BITREG_ARB_DISABLE, 0, ACPI_MTX_DO_NOT_LOCK);
+		acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0, ACPI_MTX_DO_NOT_LOCK);
 		/* Re-enable interrupts */
 		__sti();
-		/*
-		 * Compute the amount of time asleep (in the Cx state).
-		 * TBD: Convert to PM timer ticks initially to avoid having
-		 *      to do the math (acpi_get_timer_duration).
-		 */
-		acpi_get_timer_duration(start_ticks, end_ticks, &time_elapsed);
+		/* Compute time (ticks) that we were actually asleep */
+		sleep_ticks = ticks_elapsed(t1, t2) - cx->latency_ticks - C3_OVERHEAD;
 		break;
 
 	default:
@@ -517,7 +536,7 @@ acpi_processor_idle (void)
 	 * mastering activity may prevent promotions.
 	 */
 	if (cx->promotion.state) {
-		if (time_elapsed >= cx->promotion.threshold.time) {
+		if (sleep_ticks > cx->promotion.threshold.ticks) {
 			cx->promotion.count++;
  			cx->demotion.count = 0;
 			if (cx->promotion.count >= cx->promotion.threshold.count) {
@@ -539,11 +558,10 @@ acpi_processor_idle (void)
 	 * Demotion?
 	 * ---------
 	 * Track the number of shorts (time asleep is less than time threshold)
-	 * and demote when the usage threshold is reached.  Note that bus
-	 * mastering demotions are checked prior to state transitions (above).
+	 * and demote when the usage threshold is reached.
 	 */
 	if (cx->demotion.state) {
-		if (time_elapsed < cx->demotion.threshold.time) {
+		if (sleep_ticks < cx->demotion.threshold.ticks) {
 			cx->demotion.count++;
 			cx->promotion.count = 0;
 			if (cx->demotion.count >= cx->demotion.threshold.count) {
@@ -598,18 +616,18 @@ acpi_processor_set_power_policy (
 	 * Set the default C1 promotion and C2 demotion policies, where we
 	 * promote from C1 to C2 after several (10) successive C1 transitions,
 	 * as we cannot (currently) measure the time spent in C1. Demote from
-	 * C2 to C1 after experiencing several (3) 'shorts' (time spent in C2
-	 * is less than the C2 transtional latency).
+	 * C2 to C1 after experiencing several (4) 'shorts' (time spent in C2
+	 * is less than the C2 transtion latency).
 	 */
 	if (pr->power.states[ACPI_STATE_C2].valid) {
 		pr->power.states[ACPI_STATE_C1].promotion.threshold.count = 10;
-		pr->power.states[ACPI_STATE_C1].promotion.threshold.time =
-			pr->power.states[ACPI_STATE_C2].latency;
+		pr->power.states[ACPI_STATE_C1].promotion.threshold.ticks =
+			pr->power.states[ACPI_STATE_C2].latency_ticks;
 		pr->power.states[ACPI_STATE_C1].promotion.state = ACPI_STATE_C2;
 
-		pr->power.states[ACPI_STATE_C2].demotion.threshold.count = 3;
-		pr->power.states[ACPI_STATE_C2].demotion.threshold.time =
-			pr->power.states[ACPI_STATE_C2].latency;
+		pr->power.states[ACPI_STATE_C2].demotion.threshold.count = 4;
+		pr->power.states[ACPI_STATE_C2].demotion.threshold.ticks =
+			pr->power.states[ACPI_STATE_C2].latency_ticks;
 		pr->power.states[ACPI_STATE_C2].demotion.state = ACPI_STATE_C1;
 	}
 
@@ -617,21 +635,21 @@ acpi_processor_set_power_policy (
 	 * C2/C3
 	 * -----
 	 * Set default C2 promotion and C3 demotion policies, where we promote
-	 * from C2 to C3 after 4 cycles (0x0F) of no bus mastering activity
-	 * (while maintaining sleep time criteria).  Demote immediately on a
+	 * from C2 to C3 after several (4) cycles of no bus mastering activity
+	 * while maintaining sleep time criteria.  Demote immediately on a
 	 * short or whenever bus mastering activity occurs.
 	 */
 	if ((pr->power.states[ACPI_STATE_C2].valid) &&
 		(pr->power.states[ACPI_STATE_C3].valid)) {
-		pr->power.states[ACPI_STATE_C2].promotion.threshold.count = 1;
-		pr->power.states[ACPI_STATE_C2].promotion.threshold.time =
-			pr->power.states[ACPI_STATE_C3].latency;
+		pr->power.states[ACPI_STATE_C2].promotion.threshold.count = 4;
+		pr->power.states[ACPI_STATE_C2].promotion.threshold.ticks =
+			pr->power.states[ACPI_STATE_C3].latency_ticks;
 		pr->power.states[ACPI_STATE_C2].promotion.threshold.bm = 0x0F;
 		pr->power.states[ACPI_STATE_C2].promotion.state = ACPI_STATE_C3;
 
 		pr->power.states[ACPI_STATE_C3].demotion.threshold.count = 1;
-		pr->power.states[ACPI_STATE_C3].demotion.threshold.time =
-			pr->power.states[ACPI_STATE_C3].latency;
+		pr->power.states[ACPI_STATE_C3].demotion.threshold.ticks =
+			pr->power.states[ACPI_STATE_C3].latency_ticks;
 		pr->power.states[ACPI_STATE_C3].demotion.threshold.bm = 0x0F;
 		pr->power.states[ACPI_STATE_C3].demotion.state = ACPI_STATE_C2;
 	}
@@ -700,9 +718,13 @@ acpi_processor_get_power_info (
 				"C2 not supported in SMP mode\n"));
 		/*
 		 * Otherwise we've met all of our C2 requirements.
+		 * Normalize the C2 latency to expidite policy.
 		 */
-		else
+		else {
 			pr->power.states[ACPI_STATE_C2].valid = 1;
+			pr->power.states[ACPI_STATE_C2].latency_ticks = 
+				US_TO_PM_TIMER_TICKS(acpi_fadt.plvl2_lat);
+		}
 	}
 
 	/*
@@ -750,12 +772,15 @@ acpi_processor_get_power_info (
 				"C3 not supported on PIIX4 with Type-F DMA\n"));
 		}
 		/*
-		 * Otherwise we've met all of our C3 requirements.  Enable
+		 * Otherwise we've met all of our C3 requirements.  
+		 * Normalize the C2 latency to expidite policy.  Enable
 		 * checking of bus mastering status (bm_check) so we can 
 		 * use this in our C3 policy.
 		 */
 		else {
 			pr->power.states[ACPI_STATE_C3].valid = 1;
+			pr->power.states[ACPI_STATE_C3].latency_ticks = 
+				US_TO_PM_TIMER_TICKS(acpi_fadt.plvl3_lat);
 			pr->flags.bm_check = 1;
 		}
 	}
@@ -769,7 +794,7 @@ acpi_processor_get_power_info (
 	 * not on AC).
 	 */
 	result = acpi_processor_set_power_policy(pr);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	/*
@@ -1095,15 +1120,15 @@ acpi_processor_get_performance_info (
 	}
 
 	result = acpi_processor_get_performance_control(pr);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	result = acpi_processor_get_performance_states(pr);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	result = acpi_processor_get_platform_limit(pr);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	/* 
@@ -1319,19 +1344,19 @@ acpi_processor_get_throttling_info (
 	 */
 
 	result = acpi_processor_get_throttling(pr);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	if (pr->throttling.state) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Disabling throttling (was T%d)\n", 
 			pr->throttling.state));
 		result = acpi_processor_set_throttling(pr, 0);
-		if (0 != result)
+		if (result)
 			goto end;
 	}
 
 end:
-	if (0 != result)
+	if (result)
 		pr->flags.throttling = 0;
 
 	return_VALUE(result);
@@ -1366,7 +1391,7 @@ acpi_processor_apply_limit (
 			px = pr->limit.thermal.px;
 
 		result = acpi_processor_set_performance(pr, px);
-		if (0 != result)
+		if (result)
 			goto end;
 	}
 
@@ -1377,7 +1402,7 @@ acpi_processor_apply_limit (
 			tx = pr->limit.thermal.tx;
 
 		result = acpi_processor_set_throttling(pr, tx);
-		if (0 != result)
+		if (result)
 			goto end;
 	}
 
@@ -1390,7 +1415,7 @@ acpi_processor_apply_limit (
 		pr->limit.state.tx));
 
 end:
-	if (0 != result)
+	if (result)
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unable to set limit\n"));
 
 	return_VALUE(result);
@@ -1415,7 +1440,7 @@ acpi_processor_set_thermal_limit (
 		return_VALUE(-EINVAL);
 
 	result = acpi_bus_get_device(handle, &device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	pr = (struct acpi_processor *) acpi_driver_data(device);
@@ -1487,7 +1512,7 @@ end:
 	pr->limit.thermal.tx = tx;
 
 	result = acpi_processor_apply_limit(pr);
-	if (0 != result)
+	if (result)
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 			"Unable to set thermal limit\n"));
 
@@ -1518,9 +1543,6 @@ acpi_processor_get_limit_info (
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
-
-#include <linux/compatmac.h>
-#include <linux/proc_fs.h>
 
 struct proc_dir_entry		*acpi_processor_dir = NULL;
 
@@ -1677,7 +1699,7 @@ acpi_processor_read_performance (
 	p += sprintf(p, "states:\n");
 
 	for (i=0; i<pr->performance.state_count; i++)
-		p += sprintf(p, "   %cP%d:                  %d Mhz, %d mW, %d uS\n",
+		p += sprintf(p, "   %cP%d:                  %d MHz, %d mW, %d uS\n",
 			(i == pr->performance.state?'*':' '), i,
 			(u32) pr->performance.states[i].core_frequency,
 			(u32) pr->performance.states[i].power,
@@ -1718,7 +1740,7 @@ acpi_processor_write_performance (
 
 	result = acpi_processor_set_performance(pr, 
 		simple_strtoul(state_string, NULL, 0));
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	return_VALUE(count);
@@ -1805,7 +1827,7 @@ acpi_processor_write_throttling (
 	
 	result = acpi_processor_set_throttling(pr, 
 		simple_strtoul(state_string, NULL, 0));
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	return_VALUE(count);
@@ -2118,13 +2140,13 @@ acpi_processor_notify (
 	if (!pr)
 		return_VOID;
 
-	if (0 != acpi_bus_get_device(pr->handle, &device))
+	if (acpi_bus_get_device(pr->handle, &device))
 		return_VOID;
 
 	switch (event) {
 	case ACPI_PROCESSOR_NOTIFY_PERFORMANCE:
 		result = acpi_processor_get_platform_limit(pr);
-		if (0 == result)
+		if (!result)
 			acpi_processor_apply_limit(pr);
 
 		acpi_bus_generate_event(device, event, 
@@ -2169,11 +2191,11 @@ acpi_processor_add (
 	acpi_driver_data(device) = pr;
 
 	result = acpi_processor_get_info(pr);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	result = acpi_processor_add_fs(device);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	status = acpi_install_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY, 
@@ -2209,7 +2231,7 @@ acpi_processor_add (
 	printk(")\n");
 
 end:
-	if (0 != result) {
+	if (result) {
 		acpi_processor_remove_fs(device);
 		kfree(pr);
 	}
@@ -2266,7 +2288,7 @@ acpi_processor_init (void)
 	memset(&errata, 0, sizeof(errata));
 
 	result = acpi_bus_register_driver(&acpi_processor_driver);
-	if (0 > result)
+	if (result < 0)
 		return_VALUE(-ENODEV);
 
 	return_VALUE(0);
@@ -2281,7 +2303,7 @@ acpi_processor_exit (void)
 	ACPI_FUNCTION_TRACE("acpi_processor_exit");
 
 	result = acpi_bus_unregister_driver(&acpi_processor_driver);
-	if (0 == result)
+	if (!result)
 		remove_proc_entry(ACPI_PROCESSOR_CLASS, acpi_root_dir);
 
 	return_VOID;

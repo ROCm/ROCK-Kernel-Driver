@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utinit - Common ACPI subsystem initialization
- *              $Revision: 109 $
+ *              $Revision: 112 $
  *
  *****************************************************************************/
 
@@ -25,7 +25,6 @@
 
 
 #include "acpi.h"
-#include "achware.h"
 #include "acnamesp.h"
 #include "acevents.h"
 
@@ -56,7 +55,7 @@ acpi_ut_fadt_register_error (
 {
 
 	ACPI_REPORT_WARNING (
-		("Invalid FADT value %s=%lX at offset %lX FADT=%p\n",
+		("Invalid FADT value %s=%X at offset %X FADT=%p\n",
 		register_name, value, offset, acpi_gbl_FADT));
 }
 
@@ -181,7 +180,7 @@ acpi_ut_terminate (void)
  *
  ******************************************************************************/
 
-acpi_status
+void
 acpi_ut_subsystem_shutdown (void)
 {
 
@@ -191,7 +190,7 @@ acpi_ut_subsystem_shutdown (void)
 
 	if (acpi_gbl_shutdown) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "ACPI Subsystem is already terminated\n"));
-		return_ACPI_STATUS (AE_OK);
+		return_VOID;
 	}
 
 	/* Subsystem appears active, go ahead and shut it down */
@@ -213,7 +212,7 @@ acpi_ut_subsystem_shutdown (void)
 
 	/* Purge the local caches */
 
-	acpi_purge_cached_objects ();
+	(void) acpi_purge_cached_objects ();
 
 	/* Debug only - display leftover memory allocation, if any */
 
@@ -221,7 +220,7 @@ acpi_ut_subsystem_shutdown (void)
 	acpi_ut_dump_allocations (ACPI_UINT32_MAX, NULL);
 #endif
 
-	return_ACPI_STATUS (AE_OK);
+	return_VOID;
 }
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 59 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -25,11 +25,9 @@
 
 
 #include "acpi.h"
-#include "amlcode.h"
 #include "acparser.h"
 #include "acdispat.h"
 #include "acnamesp.h"
-#include "acinterp.h"
 
 #define _COMPONENT          ACPI_DISPATCHER
 	 ACPI_MODULE_NAME    ("dswstate")
@@ -126,12 +124,11 @@ acpi_ds_result_remove (
 		return (AE_NOT_EXIST);
 	}
 
-	if (index >= OBJ_NUM_OPERANDS) {
+	if (index >= OBJ_MAX_OPERAND) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Index out of range: %X State=%p Num=%X\n",
 			index, walk_state, state->results.num_results));
 	}
-
 
 	/* Check for a valid result object */
 
@@ -237,7 +234,7 @@ acpi_ds_result_pop_from_bottom (
 	acpi_operand_object     **object,
 	acpi_walk_state         *walk_state)
 {
-	u32                     index;
+	NATIVE_UINT             index;
 	acpi_generic_state      *state;
 
 
@@ -250,7 +247,6 @@ acpi_ds_result_pop_from_bottom (
 			"Warning: No result object pushed! State=%p\n", walk_state));
 		return (AE_NOT_EXIST);
 	}
-
 
 	if (!state->results.num_results) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No result objects! State=%p\n", walk_state));
@@ -273,7 +269,7 @@ acpi_ds_result_pop_from_bottom (
 
 	if (!*object) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null operand! State=%p #Ops=%X, Index=%X\n",
-			walk_state, state->results.num_results, index));
+			walk_state, state->results.num_results, (u32) index));
 		return (AE_AML_NO_RETURN_VALUE);
 	}
 
@@ -328,7 +324,6 @@ acpi_ds_result_push (
 			object, walk_state, state->results.num_results));
 		return (AE_BAD_PARAMETER);
 	}
-
 
 	state->results.obj_desc [state->results.num_results] = object;
 	state->results.num_results++;
@@ -694,7 +689,6 @@ acpi_ds_obj_stack_get_value (
 		return_PTR (NULL);
 	}
 
-
 	return_PTR (walk_state->operands[(NATIVE_UINT)(walk_state->num_operands - 1) -
 			  index]);
 }
@@ -727,7 +721,6 @@ acpi_ds_get_current_walk_state (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Ds_get_current_walk_state, =%p\n",
 		thread->walk_state_list));
-
 
 	return (thread->walk_state_list);
 }
@@ -918,7 +911,6 @@ acpi_ds_init_aml_walk (
 		walk_state->method_node             = method_node;
 		walk_state->method_desc             = acpi_ns_get_attached_object (method_node);
 
-
 		/* Push start scope on scope stack and make it current  */
 
 		status = acpi_ds_scope_stack_push (method_node, ACPI_TYPE_METHOD, walk_state);
@@ -928,13 +920,15 @@ acpi_ds_init_aml_walk (
 
 		/* Init the method arguments */
 
-		acpi_ds_method_data_init_args (params, MTH_NUM_ARGS, walk_state);
+		status = acpi_ds_method_data_init_args (params, MTH_NUM_ARGS, walk_state);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 	}
-
 	else {
 		/* Setup the current scope */
 
-		parser_state->start_node = parser_state->start_op->node;
+		parser_state->start_node = parser_state->start_op->common.node;
 		if (parser_state->start_node) {
 			/* Push start scope on scope stack and make it current  */
 
@@ -946,9 +940,8 @@ acpi_ds_init_aml_walk (
 		}
 	}
 
-	acpi_ds_init_callbacks (walk_state, pass_number);
-
-	return_ACPI_STATUS (AE_OK);
+	status = acpi_ds_init_callbacks (walk_state, pass_number);
+	return_ACPI_STATUS (status);
 }
 #endif
 
@@ -983,7 +976,6 @@ acpi_ds_delete_walk_state (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p is not a valid walk state\n", walk_state));
 		return;
 	}
-
 
 	if (walk_state->parser_state.scope) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p walk still has a scope list\n", walk_state));

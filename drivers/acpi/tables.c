@@ -31,8 +31,8 @@
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/irq.h>
+#include <linux/errno.h>
 #include <linux/acpi.h>
-#include <linux/err.h>
 
 #define PREFIX			"ACPI: "
 
@@ -73,8 +73,6 @@ static struct acpi_table_sdt	sdt;
 
 acpi_madt_entry_handler		madt_handlers[ACPI_MADT_ENTRY_COUNT];
 
-struct acpi_boot_flags	acpi_boot = {1, 0}; /* Enabled by default */
-
 
 void
 acpi_table_print (
@@ -88,12 +86,12 @@ acpi_table_print (
 
 	/* Some table signatures aren't good table names */
 
-	if (0 == strncmp((char *) &header->signature,
+	if (!strncmp((char *) &header->signature,
 		acpi_table_signatures[ACPI_APIC],
 		sizeof(header->signature))) {
 		name = "MADT";
 	}
-	else if (0 == strncmp((char *) &header->signature,
+	else if (!strncmp((char *) &header->signature,
 		acpi_table_signatures[ACPI_FACP],
 		sizeof(header->signature))) {
 		name = "FADT";
@@ -166,8 +164,8 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_lapic_addr_ovr *p =
 			(struct acpi_table_lapic_addr_ovr*) header;
-		printk(KERN_INFO PREFIX "LAPIC_ADDR_OVR (address[0x%016Lx])\n",
-			p->address);
+		printk(KERN_INFO PREFIX "LAPIC_ADDR_OVR (address[%p])\n",
+			(void *) (unsigned long) p->address);
 	}
 		break;
 
@@ -175,8 +173,8 @@ acpi_table_print_madt_entry (
 	{
 		struct acpi_table_iosapic *p =
 			(struct acpi_table_iosapic*) header;
-		printk(KERN_INFO PREFIX "IOSAPIC (id[0x%x] global_irq_base[0x%x] address[0x%016Lx])\n",
-			p->id, p->global_irq_base, p->address);
+		printk(KERN_INFO PREFIX "IOSAPIC (id[0x%x] global_irq_base[0x%x] address[%p])\n",
+			p->id, p->global_irq_base, (void *) (unsigned long) p->address);
 	}
 		break;
 
@@ -409,7 +407,7 @@ acpi_table_get_sdt (
 
 		acpi_table_print(header, sdt.entry[i].pa);
 
-		if (0 != acpi_table_compute_checksum(header, header->length)) {
+		if (acpi_table_compute_checksum(header, header->length)) {
 			printk(KERN_WARNING "  >>> ERROR: Invalid checksum\n");
 			continue;
 		}
@@ -417,7 +415,7 @@ acpi_table_get_sdt (
 		sdt.entry[i].size = header->length;
 
 		for (id = 0; id < ACPI_TABLE_COUNT; id++) {
-			if (0 == strncmp((char *) &header->signature,
+			if (!strncmp((char *) &header->signature,
 				acpi_table_signatures[id],
 				sizeof(header->signature))) {
 				sdt.entry[i].id = id;
@@ -426,44 +424,6 @@ acpi_table_get_sdt (
 	}
 
 	return 0;
-}
-
-
-static void __init
-acpi_table_parse_cmdline (
-	char		*cmdline)
-{
-	char		*p = NULL;
-
-	/* NOTE: We're called too early in the boot process to use __setup */
-
-	if (!cmdline || !(p = strstr(cmdline, "acpi_boot=")))
-		return;
-
-	p += 10;
-
-	while (*p && (*p != ' ')) {
-		if (0 == memcmp(p, "madt", 4)) {
-			printk(KERN_INFO PREFIX "MADT processing enabled\n");
-			acpi_boot.madt = 1;
-			p += 4;
-		}
-		else if (0 == memcmp(p, "on", 2)) {
-			printk(KERN_INFO PREFIX "Boot-time table processing enabled\n");
-			acpi_boot.madt = 1;
-			p += 2;
-		}
-		else if (0 == memcmp(p, "off", 2)) {
-			printk(KERN_INFO PREFIX "Boot-time table processing disabled\n");
-			acpi_boot.madt = 0;
-			p += 3;
-		}
-		else
-			p++;
-
-		if (*p == ',')
-			p ++;
-	}
 }
 
 
@@ -478,11 +438,10 @@ acpi_table_init (
 	memset(&sdt, 0, sizeof(struct acpi_table_sdt));
 	memset(&madt_handlers, 0, sizeof(madt_handlers));
 
-	acpi_table_parse_cmdline(cmdline);
-
 	/* Locate and map the Root System Description Table (RSDP) */
 
-	if ((0 != acpi_find_rsdp(&rsdp_phys)) || !rsdp_phys) {
+	rsdp_phys = acpi_find_rsdp();
+	if (!rsdp_phys) {
 		printk(KERN_ERR PREFIX "Unable to locate RSDP\n");
 		return -ENODEV;
 	}
@@ -501,15 +460,16 @@ acpi_table_init (
 	else
 		result = acpi_table_compute_checksum(rsdp, ((struct acpi20_table_rsdp *)rsdp)->length);
 
-	if (0 != result) {
+	if (result) {
 		printk(KERN_WARNING "  >>> ERROR: Invalid checksum\n");
 		return -ENODEV;
 	}
 
 	/* Locate and map the System Description table (RSDT/XSDT) */
 
-	if (0 != acpi_table_get_sdt(rsdp))
+	if (acpi_table_get_sdt(rsdp))
 		return -ENODEV;
 
 	return 0;
 }
+

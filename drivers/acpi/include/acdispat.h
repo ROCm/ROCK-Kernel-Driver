@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 52 $
+ *       $Revision: 54 $
  *
  *****************************************************************************/
 
@@ -58,6 +58,13 @@ acpi_ds_obj_stack_pop_object (
 /* dsopcode - support for late evaluation */
 
 acpi_status
+acpi_ds_execute_arguments (
+	acpi_namespace_node     *node,
+	acpi_namespace_node     *scope_node,
+	u32                     aml_length,
+	u8                      *aml_start);
+
+acpi_status
 acpi_ds_get_buffer_field_arguments (
 	acpi_operand_object     *obj_desc);
 
@@ -72,6 +79,35 @@ acpi_ds_get_buffer_arguments (
 acpi_status
 acpi_ds_get_package_arguments (
 	acpi_operand_object     *obj_desc);
+
+acpi_status
+acpi_ds_init_buffer_field (
+	u16                     aml_opcode,
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     *buffer_desc,
+	acpi_operand_object     *offset_desc,
+	acpi_operand_object     *length_desc,
+	acpi_operand_object     *result_desc);
+
+acpi_status
+acpi_ds_eval_buffer_field_operands (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op);
+
+acpi_status
+acpi_ds_eval_region_operands (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op);
+
+acpi_status
+acpi_ds_eval_data_object_operands (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
+	acpi_operand_object     *obj_desc);
+
+acpi_status
+acpi_ds_initialize_region (
+	acpi_handle             obj_handle);
 
 
 /* dsctrl - Parser/Interpreter interface, control stack routines */
@@ -107,6 +143,12 @@ acpi_ds_exec_end_op (
 
 
 /* dsfield - Parser/Interpreter interface for AML fields */
+
+acpi_status
+acpi_ds_get_field_names (
+	ACPI_CREATE_FIELD_INFO  *info,
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *arg);
 
 acpi_status
 acpi_ds_create_field (
@@ -180,7 +222,7 @@ acpi_ds_method_data_get_entry (
 	acpi_walk_state         *walk_state,
 	acpi_operand_object     ***node);
 
-acpi_status
+void
 acpi_ds_method_data_delete_all (
 	acpi_walk_state         *walk_state);
 
@@ -201,7 +243,7 @@ acpi_ds_method_data_get_value (
 	acpi_walk_state         *walk_state,
 	acpi_operand_object     **dest_desc);
 
-acpi_status
+void
 acpi_ds_method_data_delete_value (
 	u16                     opcode,
 	u32                     index,
@@ -220,7 +262,7 @@ acpi_ds_method_data_get_node (
 	acpi_walk_state         *walk_state,
 	acpi_namespace_node     **node);
 
-acpi_status
+void
 acpi_ds_method_data_init (
 	acpi_walk_state         *walk_state);
 
@@ -306,29 +348,6 @@ acpi_ds_create_node (
 	acpi_walk_state         *walk_state,
 	acpi_namespace_node     *node,
 	acpi_parse_object       *op);
-
-
-/* dsregn - Parser/Interpreter interface - Op Region parsing */
-
-acpi_status
-acpi_ds_eval_buffer_field_operands (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op);
-
-acpi_status
-acpi_ds_eval_region_operands (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op);
-
-acpi_status
-acpi_ds_eval_data_object_operands (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	acpi_operand_object     *obj_desc);
-
-acpi_status
-acpi_ds_initialize_region (
-	acpi_handle             obj_handle);
 
 
 /* dsutils - Parser/Interpreter interface utility routines */

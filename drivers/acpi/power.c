@@ -1,5 +1,5 @@
 /*
- *  acpi_power.c - ACPI Bus Power Management ($Revision: 34 $)
+ *  acpi_power.c - ACPI Bus Power Management ($Revision: 37 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -27,6 +27,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
+#include <linux/compatmac.h>
+#include <linux/proc_fs.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -81,7 +83,7 @@ acpi_power_get_context (
 		return_VALUE(-ENODEV);
 
 	result = acpi_bus_get_device(handle, &device);
-	if (0 != result) {
+	if (result) {
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Error getting context [%p]\n",
 			handle));
 		return_VALUE(result);
@@ -141,10 +143,10 @@ acpi_power_get_list_state (
 
 	for (i=0; i<list->count; i++) {
 		result = acpi_power_get_context(list->handles[i], &resource);
-		if (0 != result)
+		if (result)
 			return_VALUE(result);
 		result = acpi_power_get_state(resource);
-		if (0 != result)
+		if (result)
 			return_VALUE(result);
 
 		*state = resource->state;
@@ -172,7 +174,7 @@ acpi_power_on (
 	ACPI_FUNCTION_TRACE("acpi_power_on");
 
 	result = acpi_power_get_context(handle, &resource);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	resource->references++;
@@ -189,14 +191,14 @@ acpi_power_on (
 		return_VALUE(-ENODEV);
 
 	result = acpi_power_get_state(resource);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 	if (resource->state != ACPI_POWER_RESOURCE_STATE_ON)
 		return_VALUE(-ENOEXEC);
 
 	/* Update the power resource's _device_ power state */
 	result = acpi_bus_get_device(resource->handle, &device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 	device->power.state = ACPI_STATE_D0;
 
@@ -219,7 +221,7 @@ acpi_power_off (
 	ACPI_FUNCTION_TRACE("acpi_power_off");
 
 	result = acpi_power_get_context(handle, &resource);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 
 	if (resource->references)
@@ -243,14 +245,14 @@ acpi_power_off (
 		return_VALUE(-ENODEV);
 
 	result = acpi_power_get_state(resource);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 	if (resource->state != ACPI_POWER_RESOURCE_STATE_OFF)
 		return_VALUE(-ENOEXEC);
 
 	/* Update the power resource's _device_ power state */
 	result = acpi_bus_get_device(resource->handle, &device);
-	if (0 != result)
+	if (result)
 		return_VALUE(result);
 	device->power.state = ACPI_STATE_D3;
 
@@ -291,7 +293,7 @@ acpi_power_get_inferred_state (
 			continue;
 
 		result = acpi_power_get_list_state(list, &list_state);
-		if (0 != result)
+		if (result)
 			return_VALUE(result);
 
 		if (list_state == ACPI_POWER_RESOURCE_STATE_ON) {
@@ -339,7 +341,7 @@ acpi_power_transition (
 	 */
 	for (i=0; i<tl->count; i++) {
 		result = acpi_power_on(tl->handles[i]);
-		if (0 != result)
+		if (result)
 			goto end;
 	}
 
@@ -350,12 +352,12 @@ acpi_power_transition (
 	 */
 	for (i=0; i<cl->count; i++) {
 		result = acpi_power_off(cl->handles[i]);
-		if (0 != result)
+		if (result)
 			goto end;
 	}
 
 end:
-	if (0 != result)
+	if (result)
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
 			"Error transitioning device [%s] to D%d\n",
 			device->pnp.bus_id, state));
@@ -367,9 +369,6 @@ end:
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
-
-#include <linux/compatmac.h>
-#include <linux/proc_fs.h>
 
 struct proc_dir_entry		*acpi_power_dir = NULL;
 
@@ -522,7 +521,7 @@ acpi_power_add (
 	resource->order = acpi_object.power_resource.resource_order;
 
 	result = acpi_power_get_state(resource);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	switch (resource->state) {
@@ -538,14 +537,14 @@ acpi_power_add (
 	}
 
 	result = acpi_power_add_fs(device);
-	if (0 != result)
+	if (result)
 		goto end;
 	
 	printk(KERN_INFO PREFIX "%s [%s] (%s)\n", acpi_device_name(device),
 		acpi_device_bid(device), resource->state?"on":"off");
 
 end:
-	if (0 != result)
+	if (result)
 		kfree(resource);
 	
 	return_VALUE(result);
@@ -584,7 +583,7 @@ acpi_power_init (void)
 	INIT_LIST_HEAD(&acpi_power_resource_list);
 
 	result = acpi_bus_register_driver(&acpi_power_driver);
-	if (0 > result) {
+	if (result < 0) {
 		remove_proc_entry(ACPI_POWER_CLASS, acpi_root_dir);
 		return_VALUE(-ENODEV);
 	}
@@ -603,7 +602,7 @@ acpi_power_exit (void)
 	/* TBD: Empty acpi_power_resource_list */
 
 	result = acpi_bus_unregister_driver(&acpi_power_driver);
-	if (0 == result)
+	if (!result)
 		remove_proc_entry(ACPI_POWER_CLASS, acpi_root_dir);
 
 	return_VOID;

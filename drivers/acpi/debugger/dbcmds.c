@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbcmds - debug commands and output routines
- *              $Revision: 79 $
+ *              $Revision: 83 $
  *
  ******************************************************************************/
 
@@ -25,15 +25,11 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
 #include "acdispat.h"
 #include "amlcode.h"
 #include "acnamesp.h"
-#include "acparser.h"
 #include "acevents.h"
-#include "acinterp.h"
 #include "acdebug.h"
-#include "actables.h"
 #include "acresrc.h"
 
 #ifdef ENABLE_DEBUGGER
@@ -47,7 +43,7 @@
  * These object types map directly to the ACPI_TYPES
  */
 
-ARGUMENT_INFO         acpi_db_object_types [] =
+static ARGUMENT_INFO        acpi_db_object_types [] =
 { {"ANY"},
 	{"NUMBERS"},
 	{"STRINGS"},
@@ -97,13 +93,13 @@ acpi_db_walk_for_references (
 	/* Check for match against the namespace node itself */
 
 	if (node == (void *) obj_desc) {
-		acpi_os_printf ("Object is a Node [%4.4s]\n", &node->name);
+		acpi_os_printf ("Object is a Node [%4.4s]\n", node->name.ascii);
 	}
 
 	/* Check for match against the object attached to the node */
 
 	if (acpi_ns_get_attached_object (node) == obj_desc) {
-		acpi_os_printf ("Reference at Node->Object %p [%4.4s]\n", node, &node->name);
+		acpi_os_printf ("Reference at Node->Object %p [%4.4s]\n", node, node->name.ascii);
 	}
 
 	return (AE_OK);
@@ -135,7 +131,7 @@ acpi_db_find_references (
 
 	/* Search all nodes in namespace */
 
-	acpi_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
+	(void) acpi_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
 			  acpi_db_walk_for_references, (void *) obj_desc, NULL);
 }
 
@@ -275,8 +271,8 @@ acpi_db_set_method_breakpoint (
 	/* Get and verify the breakpoint address */
 
 	address = ACPI_STRTOUL (location, NULL, 16);
-	if (address <= op->aml_offset) {
-		acpi_os_printf ("Breakpoint %X is beyond current address %X\n", address, op->aml_offset);
+	if (address <= op->common.aml_offset) {
+		acpi_os_printf ("Breakpoint %X is beyond current address %X\n", address, op->common.aml_offset);
 	}
 
 	/* Save breakpoint in current walk */
@@ -482,6 +478,7 @@ acpi_db_send_notify (
 	u32                     value)
 {
 	acpi_namespace_node     *node;
+	acpi_status             status;
 
 
 	/* Translate name to an Named object */
@@ -499,7 +496,10 @@ acpi_db_send_notify (
 
 		 /* Send the notify */
 
-		acpi_ev_queue_notify_request (node, value);
+		status = acpi_ev_queue_notify_request (node, value);
+		if (ACPI_FAILURE (status)) {
+			acpi_os_printf ("Could not queue notify\n");
+		}
 		break;
 
 	default:
@@ -536,6 +536,7 @@ acpi_db_set_method_data (
 	u32                     value;
 	acpi_walk_state         *walk_state;
 	acpi_operand_object     *obj_desc;
+	acpi_status             status;
 
 
 	/* Validate Type_arg */
@@ -578,12 +579,16 @@ acpi_db_set_method_data (
 
 		/* Set a method argument */
 
-		if (index > MTH_NUM_ARGS) {
+		if (index > MTH_MAX_ARG) {
 			acpi_os_printf ("Arg%d - Invalid argument name\n", index);
 			return;
 		}
 
-		acpi_ds_store_object_to_local (AML_ARG_OP, index, obj_desc, walk_state);
+		status = acpi_ds_store_object_to_local (AML_ARG_OP, index, obj_desc, walk_state);
+		if (ACPI_FAILURE (status)) {
+			return;
+		}
+
 		obj_desc = walk_state->arguments[index].object;
 
 		acpi_os_printf ("Arg%d: ", index);
@@ -594,12 +599,16 @@ acpi_db_set_method_data (
 
 		/* Set a method local */
 
-		if (index > MTH_NUM_LOCALS) {
+		if (index > MTH_MAX_LOCAL) {
 			acpi_os_printf ("Local%d - Invalid local variable name\n", index);
 			return;
 		}
 
-		acpi_ds_store_object_to_local (AML_LOCAL_OP, index, obj_desc, walk_state);
+		status = acpi_ds_store_object_to_local (AML_LOCAL_OP, index, obj_desc, walk_state);
+		if (ACPI_FAILURE (status)) {
+			return;
+		}
+
 		obj_desc = walk_state->local_variables[index].object;
 
 		acpi_os_printf ("Local%d: ", index);
@@ -678,6 +687,10 @@ acpi_db_walk_for_specific_objects (
 		case ACPI_TYPE_BUFFER:
 			acpi_os_printf (" Length %X", obj_desc->buffer.length);
 			break;
+
+		default:
+			/* Ignore other object types */
+			break;
 		}
 	}
 
@@ -722,7 +735,7 @@ acpi_db_display_objects (
 
 	/* Walk the namespace from the root */
 
-	acpi_walk_namespace (type, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
+	(void) acpi_walk_namespace (type, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
 			   acpi_db_walk_for_specific_objects, (void *) &type, NULL);
 
 	acpi_db_set_output_destination (ACPI_DB_CONSOLE_OUTPUT);
@@ -762,7 +775,7 @@ acpi_db_walk_and_match_name (
 		/* Wildcard support */
 
 		if ((requested_name[i] != '?') &&
-			(requested_name[i] != ((NATIVE_CHAR *) (&((acpi_namespace_node *) obj_handle)->name))[i])) {
+			(requested_name[i] != ((acpi_namespace_node *) obj_handle)->name.ascii[i])) {
 			/* No match, just exit */
 
 			return (AE_OK);
@@ -812,7 +825,7 @@ acpi_db_find_name_in_namespace (
 
 	/* Walk the namespace from the root */
 
-	acpi_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
+	(void) acpi_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
 			   acpi_db_walk_and_match_name, name_arg, NULL);
 
 	acpi_db_set_output_destination (ACPI_DB_CONSOLE_OUTPUT);
@@ -899,7 +912,8 @@ void
 acpi_db_display_resources (
 	NATIVE_CHAR             *object_arg)
 {
-#ifndef _IA16
+#if ACPI_MACHINE_WIDTH != 16
+
 	acpi_operand_object     *obj_desc;
 	acpi_status             status;
 	acpi_buffer             return_obj;
@@ -964,7 +978,7 @@ get_crs:
 	}
 
 	else {
-		acpi_rs_dump_resource_list ((acpi_resource *) acpi_gbl_db_buffer);
+		acpi_rs_dump_resource_list (ACPI_CAST_PTR (acpi_resource, acpi_gbl_db_buffer));
 	}
 
 	status = acpi_set_current_resources (obj_desc, &return_obj);
@@ -997,7 +1011,7 @@ get_prs:
 	}
 
 	else {
-		acpi_rs_dump_resource_list ((acpi_resource *) acpi_gbl_db_buffer);
+		acpi_rs_dump_resource_list (ACPI_CAST_PTR (acpi_resource, acpi_gbl_db_buffer));
 	}
 
 
@@ -1009,5 +1023,90 @@ cleanup:
 
 }
 
+
+typedef struct
+{
+	u32                 nodes;
+	u32                 objects;
+} ACPI_INTEGRITY_INFO;
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_db_integrity_walk
+ *
+ * PARAMETERS:  Callback from Walk_namespace
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Examine one NS node for valid values.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_db_integrity_walk (
+	acpi_handle             obj_handle,
+	u32                     nesting_level,
+	void                    *context,
+	void                    **return_value)
+{
+	ACPI_INTEGRITY_INFO     *info = (ACPI_INTEGRITY_INFO *) context;
+	acpi_namespace_node     *node = (acpi_namespace_node *) obj_handle;
+	acpi_operand_object     *object;
+
+
+	info->nodes++;
+	if (ACPI_GET_DESCRIPTOR_TYPE (node) != ACPI_DESC_TYPE_NAMED) {
+		acpi_os_printf ("Invalid Descriptor Type for Node %p, Type = %X\n",
+			node, ACPI_GET_DESCRIPTOR_TYPE (node));
+	}
+
+	if (node->type > INTERNAL_TYPE_MAX) {
+		acpi_os_printf ("Invalid Object Type for Node %p, Type = %X\n",
+			node, node->type);
+	}
+
+	if (!acpi_ut_valid_acpi_name (node->name.integer)) {
+		acpi_os_printf ("Invalid Acpi_name for Node %p\n", node);
+	}
+
+	object = acpi_ns_get_attached_object (node);
+	if (object) {
+		info->objects++;
+		if (ACPI_GET_DESCRIPTOR_TYPE (object) != ACPI_DESC_TYPE_OPERAND) {
+			acpi_os_printf ("Invalid Descriptor Type for Object %p, Type = %X\n",
+				object, ACPI_GET_DESCRIPTOR_TYPE (object));
+		}
+	}
+
+
+	return (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_db_check_integrity
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Check entire namespace for data structure integrity
+ *
+ ******************************************************************************/
+
+void
+acpi_db_check_integrity (void)
+{
+	ACPI_INTEGRITY_INFO     info = {0,0};
+
+	/* Search all nodes in namespace */
+
+	(void) acpi_walk_namespace (ACPI_TYPE_ANY, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
+			  acpi_db_integrity_walk, (void *) &info, NULL);
+
+	acpi_os_printf ("Verified %d namespace nodes with %d Objects\n", info.nodes, info.objects);
+
+}
 
 #endif /* ENABLE_DEBUGGER */

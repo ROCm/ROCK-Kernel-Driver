@@ -1,5 +1,5 @@
 /*
- *  acpi_ksyms.c - ACPI Kernel Symbols ($Revision: 13 $)
+ *  acpi_ksyms.c - ACPI Kernel Symbols ($Revision: 15 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -80,9 +80,9 @@ EXPORT_SYMBOL(acpi_disable_event);
 EXPORT_SYMBOL(acpi_clear_event);
 EXPORT_SYMBOL(acpi_get_timer_duration);
 EXPORT_SYMBOL(acpi_get_timer);
-EXPORT_SYMBOL(acpi_hw_get_sleep_type_data);
-EXPORT_SYMBOL(acpi_hw_bit_register_read);
-EXPORT_SYMBOL(acpi_hw_bit_register_write);
+EXPORT_SYMBOL(acpi_get_sleep_type_data);
+EXPORT_SYMBOL(acpi_get_register);
+EXPORT_SYMBOL(acpi_set_register);
 EXPORT_SYMBOL(acpi_enter_sleep_state);
 EXPORT_SYMBOL(acpi_get_system_info);
 

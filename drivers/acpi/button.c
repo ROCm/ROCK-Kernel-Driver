@@ -1,5 +1,5 @@
 /*
- *  acpi_button.c - ACPI Button Driver ($Revision: 24 $)
+ *  acpi_button.c - ACPI Button Driver ($Revision: 29 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -27,6 +27,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
+#include <linux/compatmac.h>
+#include <linux/proc_fs.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -65,9 +67,6 @@ struct acpi_button {
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
-
-#include <linux/compatmac.h>
-#include <linux/proc_fs.h>
 
 static struct proc_dir_entry	*acpi_button_dir = NULL;
 
@@ -128,17 +127,17 @@ acpi_button_add_fs (
 	switch (button->type) {
 	case ACPI_BUTTON_TYPE_POWER:
 	case ACPI_BUTTON_TYPE_POWERF:
-		entry = proc_mkdir(ACPI_BUTTON_SUBCLASS_POWER, 
-			acpi_button_dir);
+			entry = proc_mkdir(ACPI_BUTTON_SUBCLASS_POWER, 
+				acpi_button_dir);
 		break;
 	case ACPI_BUTTON_TYPE_SLEEP:
 	case ACPI_BUTTON_TYPE_SLEEPF:
-		entry = proc_mkdir(ACPI_BUTTON_SUBCLASS_SLEEP, 
-			acpi_button_dir);
+			entry = proc_mkdir(ACPI_BUTTON_SUBCLASS_SLEEP, 
+				acpi_button_dir);
 		break;
 	case ACPI_BUTTON_TYPE_LID:
-		entry = proc_mkdir(ACPI_BUTTON_SUBCLASS_LID, 
-			acpi_button_dir);
+			entry = proc_mkdir(ACPI_BUTTON_SUBCLASS_LID, 
+				acpi_button_dir);
 		break;
 	}
 
@@ -234,6 +233,10 @@ acpi_button_add (
 	acpi_status		status = AE_OK;
 	struct acpi_button	*button = NULL;
 
+	static struct acpi_device *power_button;
+	static struct acpi_device *sleep_button;
+	static struct acpi_device *lid_button;
+
 	ACPI_FUNCTION_TRACE("acpi_button_add");
 
 	if (!device)
@@ -294,8 +297,40 @@ acpi_button_add (
 		goto end;
 	}
 
+	/*
+	 * Ensure only one button of each type is used.
+	 */
+	switch (button->type) {
+	case ACPI_BUTTON_TYPE_POWER:
+	case ACPI_BUTTON_TYPE_POWERF:
+		if (!power_button)
+			power_button = device;
+		else {
+			kfree(button);
+			return_VALUE(-ENODEV);
+		}
+		break;
+	case ACPI_BUTTON_TYPE_SLEEP:
+	case ACPI_BUTTON_TYPE_SLEEPF:
+		if (!sleep_button)
+			sleep_button = device;
+		else {
+			kfree(button);
+			return_VALUE(-ENODEV);
+		}
+		break;
+	case ACPI_BUTTON_TYPE_LID:
+		if (!lid_button)
+			lid_button = device;
+		else {
+			kfree(button);
+			return_VALUE(-ENODEV);
+		}
+		break;
+	}
+
 	result = acpi_button_add_fs(device);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	switch (button->type) {
@@ -331,7 +366,7 @@ acpi_button_add (
 		acpi_device_name(device), acpi_device_bid(device));
 
 end:
-	if (0 != result) {
+	if (result) {
 		acpi_button_remove_fs(device);
 		kfree(button);
 	}
@@ -389,7 +424,7 @@ acpi_button_init (void)
 	ACPI_FUNCTION_TRACE("acpi_button_init");
 
 	result = acpi_bus_register_driver(&acpi_button_driver);
-	if (0 > result)
+	if (result < 0)
 		return_VALUE(-ENODEV);
 
 	return_VALUE(0);

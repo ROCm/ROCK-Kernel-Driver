@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbutils - AML debugger utilities
- *              $Revision: 52 $
+ *              $Revision: 55 $
  *
  ******************************************************************************/
 
@@ -28,9 +28,6 @@
 #include "acparser.h"
 #include "amlcode.h"
 #include "acnamesp.h"
-#include "acparser.h"
-#include "acevents.h"
-#include "acinterp.h"
 #include "acdebug.h"
 #include "acdispat.h"
 
@@ -87,7 +84,7 @@ acpi_db_dump_buffer (
 	u32                     address)
 {
 
-	acpi_os_printf ("\n_location %X:\n", address);
+	acpi_os_printf ("\nLocation %X:\n", address);
 
 	acpi_dbg_level |= ACPI_LV_TABLES;
 	acpi_ut_dump_buffer (ACPI_TO_POINTER (address), 64, DB_BYTE_DISPLAY, ACPI_UINT32_MAX);
@@ -259,7 +256,7 @@ acpi_db_second_pass_parse (
 	acpi_parse_object       *root)
 {
 	acpi_parse_object       *op = root;
-	acpi_parse2_object      *method;
+	acpi_parse_object       *method;
 	acpi_parse_object       *search_op;
 	acpi_parse_object       *start_op;
 	acpi_status             status = AE_OK;
@@ -272,10 +269,11 @@ acpi_db_second_pass_parse (
 
 	acpi_os_printf ("Pass two parse ....\n");
 
-
 	while (op) {
-		if (op->opcode == AML_METHOD_OP) {
-			method = (acpi_parse2_object *) op;
+		if (op->common.aml_opcode == AML_METHOD_OP) {
+			method = op;
+
+			/* Create a new walk state for the parse */
 
 			walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
 					   NULL, NULL, NULL);
@@ -283,32 +281,32 @@ acpi_db_second_pass_parse (
 				return (AE_NO_MEMORY);
 			}
 
+			/* Init the Walk State */
 
 			walk_state->parser_state.aml        =
-			walk_state->parser_state.aml_start  = method->data;
+			walk_state->parser_state.aml_start  = method->named.data;
 			walk_state->parser_state.aml_end    =
-			walk_state->parser_state.pkg_end    = method->data + method->length;
+			walk_state->parser_state.pkg_end    = method->named.data + method->named.length;
 			walk_state->parser_state.start_scope = op;
 
 			walk_state->descending_callback     = acpi_ds_load1_begin_op;
 			walk_state->ascending_callback      = acpi_ds_load1_end_op;
 
+			/* Perform the AML parse */
 
 			status = acpi_ps_parse_aml (walk_state);
 
-
-			base_aml_offset = (method->value.arg)->aml_offset + 1;
-			start_op = (method->value.arg)->next;
+			base_aml_offset = (method->common.value.arg)->common.aml_offset + 1;
+			start_op = (method->common.value.arg)->common.next;
 			search_op = start_op;
 
 			while (search_op) {
-				search_op->aml_offset += base_aml_offset;
+				search_op->common.aml_offset += base_aml_offset;
 				search_op = acpi_ps_get_depth_next (start_op, search_op);
 			}
-
 		}
 
-		if (op->opcode == AML_REGION_OP) {
+		if (op->common.aml_opcode == AML_REGION_OP) {
 			/* TBD: [Investigate] this isn't quite the right thing to do! */
 			/*
 			 *

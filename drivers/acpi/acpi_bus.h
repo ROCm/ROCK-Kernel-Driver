@@ -1,5 +1,5 @@
 /*
- *  acpi_bus.h - ACPI Bus Driver ($Revision: 19 $)
+ *  acpi_bus.h - ACPI Bus Driver ($Revision: 21 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -56,9 +56,7 @@ acpi_status acpi_evaluate_reference (acpi_handle, acpi_string, acpi_object_list 
 #include <linux/proc_fs.h>
 
 #define ACPI_BUS_FILE_ROOT	"acpi"
-
 extern struct proc_dir_entry	*acpi_root_dir;
-
 extern FADT_DESCRIPTOR		acpi_fadt;
 
 enum acpi_bus_removal_type {

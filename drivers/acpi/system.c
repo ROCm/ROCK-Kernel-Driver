@@ -1,5 +1,5 @@
 /*
- *  acpi_system.c - ACPI System Driver ($Revision: 45 $)
+ *  acpi_system.c - ACPI System Driver ($Revision: 57 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -23,6 +23,8 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
+#define ACPI_C
+
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -32,6 +34,9 @@
 #include <linux/poll.h>
 #include <linux/delay.h>
 #include <linux/sysrq.h>
+#include <linux/compatmac.h>
+#include <linux/proc_fs.h>
+#include <linux/irq.h>
 #include <linux/pm.h>
 #include <linux/device.h>
 #include <linux/suspend.h>
@@ -185,7 +190,7 @@ acpi_system_save_state(
 #endif
 
 		/* flush caches */
-		wbinvd();
+		ACPI_FLUSH_CPU_CACHE();
 
 		/* Do arch specific saving of state. */
 		if (state > ACPI_STATE_S1) {
@@ -255,25 +260,37 @@ acpi_system_suspend(
 	u32			state)
 {
 	acpi_status		status = AE_ERROR;
+#if 0
 	unsigned long		flags = 0;
 
+	/* this is very broken, so don't do anything until it's fixed */
 	save_flags(flags);
 	
 	switch (state)
 	{
 	case ACPI_STATE_S1:
-		barrier();
-		status = acpi_enter_sleep_state(state);
+		/* do nothing */
 		break;
 
 	case ACPI_STATE_S2:
 	case ACPI_STATE_S3:
-		do_suspend_lowlevel(0);
+		save_processor_context();
+		/* TODO: this is horribly broken, fix it */
+		/* TODO: inline this function in acpi_suspend,or something. */
 		break;
 	}
 
-	acpi_restore_register_state();
+	barrier();
+	status = acpi_enter_sleep_state(state);
+
+acpi_sleep_done:
+
+	restore_processor_context();
+	fix_processor_context();
+
 	restore_flags(flags);
+#endif
+	printk("ACPI: ACPI-based suspend currently broken, aborting\n");
 
 	return status;
 }
@@ -294,8 +311,6 @@ acpi_suspend (
 	if (state < ACPI_STATE_S1 || state > ACPI_STATE_S5)
 		return AE_ERROR;
 
-	freeze_processes();
-
 	/* do we have a wakeup address for S2 and S3? */
 	if (state == ACPI_STATE_S2 || state == ACPI_STATE_S3) {
 		if (!acpi_wakeup_address)
@@ -311,7 +326,7 @@ acpi_suspend (
 
 	/* disable interrupts and flush caches */
 	ACPI_DISABLE_IRQS();
-	wbinvd();
+	ACPI_FLUSH_CPU_CACHE();
 
 	/* perform OS-specific sleep actions */
 	status = acpi_system_suspend(state);
@@ -329,8 +344,6 @@ acpi_suspend (
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((ACPI_PHYSICAL_ADDRESS) 0);
 
-	thaw_processes();
-
 	return status;
 }
 
@@ -340,10 +353,6 @@ acpi_suspend (
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
-
-#include <linux/compatmac.h>
-#include <linux/proc_fs.h>
-
 
 static int
 acpi_system_read_info (
@@ -423,40 +432,45 @@ acpi_system_read_event (
 	loff_t			*ppos)
 {
 	int			result = 0;
-	char			outbuf[ACPI_MAX_STRING];
-	int			size = 0;
 	struct acpi_bus_event	event;
+	static char		str[ACPI_MAX_STRING];
+	static int		chars_remaining = 0;
+	static char		*ptr;
+
 
 	ACPI_FUNCTION_TRACE("acpi_system_read_event");
 
-	memset(&event, 0, sizeof(struct acpi_bus_event));
+	if (!chars_remaining) {
+		memset(&event, 0, sizeof(struct acpi_bus_event));
 
-	if (count < ACPI_MAX_STRING)
-		goto end;
+		if ((file->f_flags & O_NONBLOCK)
+		    && (list_empty(&acpi_bus_event_list)))
+			return_VALUE(-EAGAIN);
 
-	if ((file->f_flags & O_NONBLOCK)
-	    && (list_empty(&acpi_bus_event_list)))
-		return_VALUE(-EAGAIN);
+		result = acpi_bus_receive_event(&event);
+		if (result) {
+			return_VALUE(-EIO);
+		}
 
-	result = acpi_bus_receive_event(&event);
-	if (0 != result) {
-		size = sprintf(outbuf, "error\n");
-		goto end;
+		chars_remaining = sprintf(str, "%s %s %08x %08x\n", 
+			event.device_class?event.device_class:"<unknown>",
+			event.bus_id?event.bus_id:"<unknown>", 
+			event.type, event.data);
+		ptr = str;
 	}
 
-	size = sprintf(outbuf, "%s %s %08x %08x\n", 
-		event.device_class?event.device_class:"<unknown>",
-		event.bus_id?event.bus_id:"<unknown>", 
-		event.type, 
-		event.data);
+	if (chars_remaining < count) {
+		count = chars_remaining;
+	}
 
-end:
-	if (copy_to_user(buffer, outbuf, size))
+	if (copy_to_user(buffer, ptr, count))
 		return_VALUE(-EFAULT);
 
-	*ppos += size;
+	*ppos += count;
+	chars_remaining -= count;
+	ptr += count;
 
-	return_VALUE(size);
+	return_VALUE(count);
 }
 
 static int
@@ -709,6 +723,7 @@ acpi_system_write_sleep (
 	if (!system->states[state])
 		return_VALUE(-ENODEV);
 
+	
 #ifdef CONFIG_SOFTWARE_SUSPEND
 	if (state == 4) {
 		software_suspend();
@@ -776,6 +791,30 @@ acpi_system_read_alarm (
 	BCD_TO_BIN(day);
 	BCD_TO_BIN(mo);
 	BCD_TO_BIN(yr);
+
+#if 0
+	/* we're trusting the FADT (see above)*/
+#else
+	/* If we're not trusting the FADT, we should at least make it
+	 * right for _this_ century... ehm, what is _this_ century?
+	 *
+	 * TBD:
+	 *  ASAP: find piece of code in the kernel, e.g. star tracker driver,
+	 *        which we can trust to determine the century correctly. Atom
+	 *        watch driver would be nice, too...
+	 *
+	 *  if that has not happened, change for first release in 2050:
+ 	 *        if (yr<50)
+	 *                yr += 2100;
+	 *        else
+	 *                yr += 2000;   // current line of code
+	 *
+	 *  if that has not happened either, please do on 2099/12/31:23:59:59
+	 *        s/2000/2100
+	 *
+	 */
+	yr += 2000;
+#endif
 
 	p += sprintf(p,"%4.4u-", yr);
 	p += (mo > 12)  ? sprintf(p, "**-")  : sprintf(p, "%2.2u-", mo);
@@ -979,7 +1018,7 @@ acpi_system_write_alarm (
 
 	spin_unlock_irq(&rtc_lock);
 
-	acpi_hw_bit_register_write(ACPI_BITREG_RT_CLOCK_ENABLE, 1, ACPI_MTX_LOCK);
+	acpi_set_register(ACPI_BITREG_RT_CLOCK_ENABLE, 1, ACPI_MTX_LOCK);
 
 	file->f_pos += count;
 
@@ -1181,35 +1220,36 @@ acpi_system_add (
 	acpi_driver_data(device) = system;
 
 	result = acpi_system_add_fs(device);
-	if (0 != result)
+	if (result)
 		goto end;
 
 	printk(KERN_INFO PREFIX "%s [%s] (supports", 
 		acpi_device_name(device), acpi_device_bid(device));
 	for (i=0; i<ACPI_S_STATE_COUNT; i++) {
 		u8 type_a, type_b;
-		status = acpi_hw_get_sleep_type_data(i, &type_a, &type_b);
+		status = acpi_get_sleep_type_data(i, &type_a, &type_b);
 		if (ACPI_SUCCESS(status)) {
 			system->states[i] = 1;
 			printk(" S%d", i);
 		}
 	}
 	printk(")\n");
-#ifdef CONFIG_SOFTWARE_SUSPEND
-	printk(KERN_INFO "Software suspend => we can do S4.");
-	system->states[4] = 1;
-#endif
 
 #ifdef CONFIG_PM
 	/* Install the soft-off (S5) handler. */
 	if (system->states[ACPI_STATE_S5]) {
 		pm_power_off = acpi_power_off;
 		register_sysrq_key('o', &sysrq_acpi_poweroff_op);
+
+		/* workaround: some systems don't claim S4 support, but they
+                   do support S5 (power-down). That is all we need, so
+		   indicate support. */
+		system->states[ACPI_STATE_S4] = 1;
 	}
 #endif
 
 end:
-	if (0 != result)
+	if (result)
 		kfree(system);
 
 	return_VALUE(result);
@@ -1254,7 +1294,7 @@ acpi_system_init (void)
 	ACPI_FUNCTION_TRACE("acpi_system_init");
 
 	result = acpi_bus_register_driver(&acpi_system_driver);
-	if (0 > result)
+	if (result < 0)
 		return_VALUE(-ENODEV);
 
 	return_VALUE(0);
