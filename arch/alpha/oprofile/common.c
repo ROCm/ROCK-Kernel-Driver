@@ -151,29 +151,40 @@ static struct oprofile_operations oprof_axp_ops = {
 int __init
 oprofile_arch_init(struct oprofile_operations **ops, enum oprofile_cpu *cpu)
 {
+	struct op_axp_model *lmodel = NULL;
+	const char *vername = NULL;
+
 	switch (implver()) {
 	case IMPLVER_EV4:
-		model = &op_model_ev4;
+		lmodel = &op_model_ev4;
+		vername = "EV4";
 		break;
 	case IMPLVER_EV5:
 		/* 21164PC has a slightly different set of events.
 		   Recognize the chip by the presence of the MAX insns.  */
-		if (!amask(AMASK_MAX))
-			model = &op_model_pca56;
-		else
-			model = &op_model_ev5;
+		if (!amask(AMASK_MAX)) {
+			lmodel = &op_model_pca56;
+			vername = "PCA56";
+		} else {
+			lmodel = &op_model_ev5;
+			vername = "EV5";
+		}
 		break;
 	case IMPLVER_EV6:
-		model = &op_model_ev6;
+		lmodel = &op_model_ev6;
+		vername = "EV6";
 		break;
-	default:
-		model = NULL;
 	}
 
-	if (!model)
+	if (!lmodel)
 		return ENODEV;
 
+	model = lmodel;
 	*ops = &oprof_axp_ops;
 	*cpu = model->cpu;
+
+	printk(KERN_INFO "oprofile: using %s performance monitoring.\n",
+	       vername);
+
 	return 0;
 }
