@@ -207,7 +207,6 @@ EXPORT_SYMBOL(pagebuf_trace_buf);
 
 typedef struct {
 	struct list_head	pb_hash;
-	int			pb_count;
 	spinlock_t		pb_hash_lock;
 } pb_hash_t;
 
@@ -378,26 +377,27 @@ _pagebuf_freepages(
 }
 
 /*
- *	_pagebuf_free_object
+ *	pagebuf_free
  *
- *	_pagebuf_free_object releases the contents specified buffer.
- *	The modification state of any associated pages is left unchanged.
+ *	pagebuf_free releases the specified buffer.  The modification
+ *	state of any associated pages is left unchanged.
  */
 void
-_pagebuf_free_object(
-	pb_hash_t		*hash,	/* hash bucket for buffer */
-	page_buf_t		*pb)	/* buffer to deallocate	*/
+pagebuf_free(
+	page_buf_t		*pb)
 {
 	page_buf_flags_t	pb_flags = pb->pb_flags;
+	pb_hash_t		*hash;
 
 	PB_TRACE(pb, "free_object", 0);
 	pb->pb_flags |= PBF_FREED;
 
-	if (hash) {
-		if (!list_empty(&pb->pb_hash_list)) {
-			hash->pb_count--;
+	if (pb->pb_flags & _PBF_LOCKABLE) {
+		hash = pb_hash(pb);
+
+		spin_lock(&hash->pb_hash_lock);
+		if (!list_empty(&pb->pb_hash_list))
 			list_del_init(&pb->pb_hash_list);
-		}
 		spin_unlock(&hash->pb_hash_lock);
 	}
 
@@ -668,7 +668,6 @@ _pagebuf_find(				/* find buffer for block	*/
 		_pagebuf_initialize(new_pb, target, range_base,
 				range_length, flags | _PBF_LOCKABLE);
 		new_pb->pb_hash_index = hval;
-		h->pb_count++;
 		list_add(&new_pb->pb_hash_list, &h->pb_hash);
 	} else {
 		PB_STATS_INC(pb_miss_locked);
@@ -1000,26 +999,6 @@ pagebuf_hold(
 }
 
 /*
- *	pagebuf_free
- *
- *	pagebuf_free releases the specified buffer.  The modification
- *	state of any associated pages is left unchanged.
- */
-void
-pagebuf_free(
-	page_buf_t		*pb)
-{
-	if (pb->pb_flags & _PBF_LOCKABLE) {
-		pb_hash_t	*h = pb_hash(pb);
-
-		spin_lock(&h->pb_hash_lock);
-		_pagebuf_free_object(h, pb);
-	} else {
-		_pagebuf_free_object(NULL, pb);
-	}
-}
-
-/*
  *	pagebuf_rele
  *
  *	pagebuf_rele releases a hold on the specified buffer.  If the
@@ -1029,44 +1008,28 @@ void
 pagebuf_rele(
 	page_buf_t		*pb)
 {
-	pb_hash_t		*h;
-
 	PB_TRACE(pb, "rele", pb->pb_relse);
-	if (pb->pb_flags & _PBF_LOCKABLE) {
-		h = pb_hash(pb);
-		spin_lock(&h->pb_hash_lock);
-	} else {
-		h = NULL;
-	}
 
 	if (atomic_dec_and_test(&pb->pb_hold)) {
 		int		do_free = 1;
 
 		if (pb->pb_relse) {
 			atomic_inc(&pb->pb_hold);
-			if (h)
-				spin_unlock(&h->pb_hash_lock);
 			(*(pb->pb_relse)) (pb);
 			do_free = 0;
 		}
 		if (pb->pb_flags & PBF_DELWRI) {
 			pb->pb_flags |= PBF_ASYNC;
 			atomic_inc(&pb->pb_hold);
-			if (h && do_free)
-				spin_unlock(&h->pb_hash_lock);
 			pagebuf_delwri_queue(pb, 0);
 			do_free = 0;
 		} else if (pb->pb_flags & PBF_FS_MANAGED) {
-			if (h)
-				spin_unlock(&h->pb_hash_lock);
 			do_free = 0;
 		}
 
 		if (do_free) {
-			_pagebuf_free_object(h, pb);
+			pagebuf_free(pb);
 		}
-	} else if (h) {
-		spin_unlock(&h->pb_hash_lock);
 	}
 }
 
