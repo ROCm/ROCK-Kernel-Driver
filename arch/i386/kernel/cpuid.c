@@ -158,35 +158,27 @@ static struct file_operations cpuid_fops = {
 	.open = cpuid_open,
 };
 
-static void cpuid_class_simple_device_remove(void)
-{
-	int i = 0;
-	for_each_online_cpu(i)
-		class_simple_device_remove(MKDEV(CPUID_MAJOR, i));
-	return;
-}
-
 static int cpuid_class_simple_device_add(int i) 
 {
 	int err = 0;
 	struct class_device *class_err;
 
 	class_err = class_simple_device_add(cpuid_class, MKDEV(CPUID_MAJOR, i), NULL, "cpu%d",i);
-	if (IS_ERR(class_err)) {
+	if (IS_ERR(class_err))
 		err = PTR_ERR(class_err);
-	}
 	return err;
 }
+
 static int __devinit cpuid_class_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu;
 
-	switch(action) {
+	switch (action) {
 	case CPU_ONLINE:
 		cpuid_class_simple_device_add(cpu);
 		break;
 	case CPU_DEAD:
-		cpuid_class_simple_device_remove();
+		class_simple_device_remove(MKDEV(CPUID_MAJOR, cpu));
 		break;
 	}
 	return NOTIFY_OK;
@@ -224,7 +216,10 @@ int __init cpuid_init(void)
 	goto out;
 
 out_class:
-	cpuid_class_simple_device_remove();
+	i = 0;
+	for_each_online_cpu(i) {
+		class_simple_device_remove(MKDEV(CPUID_MAJOR, i));
+	}
 	class_simple_destroy(cpuid_class);
 out_chrdev:
 	unregister_chrdev(CPUID_MAJOR, "cpu/cpuid");	
@@ -234,7 +229,10 @@ out:
 
 void __exit cpuid_exit(void)
 {
-	cpuid_class_simple_device_remove();
+	int cpu = 0;
+
+	for_each_online_cpu(cpu)
+		class_simple_device_remove(MKDEV(CPUID_MAJOR, cpu));
 	class_simple_destroy(cpuid_class);
 	unregister_chrdev(CPUID_MAJOR, "cpu/cpuid");
 	unregister_cpu_notifier(&cpuid_class_cpu_notifier);
