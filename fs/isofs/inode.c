@@ -715,6 +715,7 @@ root_found:
 	  }
 
 	s->s_magic = ISOFS_SUPER_MAGIC;
+	s->s_maxbytes = 0xffffffff; /* We can handle files up to 4 GB */
 
 	/* The CDROM is read-only, has no nodes (devices) on it, and since
 	   all of the files appear to be owned by root, we really do not want
