@@ -339,14 +339,17 @@ static int snd_pcm_hw_params(snd_pcm_substream_t *substream,
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return -ENXIO);
+	snd_pcm_stream_lock_irq(substream);
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_OPEN:
 	case SNDRV_PCM_STATE_SETUP:
 	case SNDRV_PCM_STATE_PREPARED:
 		break;
 	default:
+		snd_pcm_stream_unlock_irq(substream);
 		return -EBADFD;
 	}
+	snd_pcm_stream_unlock_irq(substream);
 #if defined(CONFIG_SND_PCM_OSS) || defined(CONFIG_SND_PCM_OSS_MODULE)
 	if (!substream->oss.oss)
 #endif
@@ -452,13 +455,16 @@ static int snd_pcm_hw_free(snd_pcm_substream_t * substream)
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return -ENXIO);
+	snd_pcm_stream_lock_irq(substream);
 	switch (runtime->status->state) {
 	case SNDRV_PCM_STATE_SETUP:
 	case SNDRV_PCM_STATE_PREPARED:
 		break;
 	default:
+		snd_pcm_stream_unlock_irq(substream);
 		return -EBADFD;
 	}
+	snd_pcm_stream_unlock_irq(substream);
 	if (atomic_read(&runtime->mmap_count))
 		return -EBADFD;
 	if (substream->ops->hw_free == NULL) {
@@ -473,11 +479,16 @@ static int snd_pcm_hw_free(snd_pcm_substream_t * substream)
 static int snd_pcm_sw_params(snd_pcm_substream_t * substream, snd_pcm_sw_params_t *params)
 {
 	snd_pcm_runtime_t *runtime;
+
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return -ENXIO);
-	if (runtime->status->state == SNDRV_PCM_STATE_OPEN)
+	snd_pcm_stream_lock_irq(substream);
+	if (runtime->status->state == SNDRV_PCM_STATE_OPEN) {
+		snd_pcm_stream_unlock_irq(substream);
 		return -EBADFD;
+	}
+	snd_pcm_stream_unlock_irq(substream);
 
 	if (params->tstamp_mode > SNDRV_PCM_TSTAMP_LAST)
 		return -EINVAL;
@@ -605,8 +616,12 @@ static int snd_pcm_channel_info(snd_pcm_substream_t * substream, snd_pcm_channel
 		return -EFAULT;
 	channel = info.channel;
 	runtime = substream->runtime;
-	if (runtime->status->state == SNDRV_PCM_STATE_OPEN)
+	snd_pcm_stream_lock_irq(substream);
+	if (runtime->status->state == SNDRV_PCM_STATE_OPEN) {
+		snd_pcm_stream_unlock_irq(substream);
 		return -EBADFD;
+	}
+	snd_pcm_stream_unlock_irq(substream);
 	if (channel >= runtime->channels)
 		return -EINVAL;
 	memset(&info, 0, sizeof(info));
@@ -1496,8 +1511,12 @@ static int snd_pcm_link(snd_pcm_substream_t *substream, int fd)
 	snd_pcm_file_t *pcm_file;
 	snd_pcm_substream_t *substream1;
 
-	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
+	snd_pcm_stream_lock_irq(substream);
+	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN) {
+		snd_pcm_stream_unlock_irq(substream);
 		return -EBADFD;
+	}
+	snd_pcm_stream_unlock_irq(substream);
 	file = snd_pcm_file_fd(fd);
 	if (!file)
 		return -EBADFD;

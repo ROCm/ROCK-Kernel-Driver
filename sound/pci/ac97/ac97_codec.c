@@ -1500,8 +1500,10 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	/* build Capture controls */
 	if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_control_capture_src, ac97))) < 0)
 		return err;
-	if ((err = snd_ac97_cmute_new(card, "Capture Switch", AC97_REC_GAIN, ac97)) < 0)
-		return err;
+	if (snd_ac97_try_bit(ac97, AC97_REC_GAIN, 15)) {
+		if ((err = snd_ac97_cmute_new(card, "Capture Switch", AC97_REC_GAIN, ac97)) < 0)
+			return err;
+	}
 	if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_control_capture_vol, ac97))) < 0)
 		return err;
 	snd_ac97_write_cache(ac97, AC97_REC_SEL, 0x0000);
@@ -1750,7 +1752,7 @@ static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
 		 */
 		/* test if we can write to the record gain volume register */
 		snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x8a05);
-		if (snd_ac97_read(ac97, AC97_REC_GAIN) == 0x8a05)
+		if ((snd_ac97_read(ac97, AC97_REC_GAIN) & 0x7fff) == 0x0a05)
 			return 0;
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
@@ -1896,7 +1898,7 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 		else {
 			err = ac97_reset_wait(ac97, HZ/2, 0);
 			if (err < 0)
-				err = ac97_reset_wait(ac97, 0, 1);
+				err = ac97_reset_wait(ac97, HZ/2, 1);
 		}
 		if (err < 0) {
 			snd_printk(KERN_WARNING "AC'97 %d does not respond - RESET\n", ac97->num);
@@ -1916,7 +1918,7 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 	if (!(ac97->scaps & AC97_SCAP_SKIP_AUDIO) && !(ac97->scaps & AC97_SCAP_AUDIO)) {
 		/* test if we can write to the record gain volume register */
 		snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x8a06);
-		if ((err = snd_ac97_read(ac97, AC97_REC_GAIN)) == 0x8a06)
+		if (((err = snd_ac97_read(ac97, AC97_REC_GAIN)) & 0x7fff) == 0x0a06)
 			ac97->scaps |= AC97_SCAP_AUDIO;
 	}
 	if (ac97->scaps & AC97_SCAP_AUDIO) {
