@@ -390,7 +390,7 @@ int eesoxscsi_proc_info(char *buffer, char **start, off_t offset,
 
 	pos += sprintf(buffer+pos, "\nAttached devices:\n");
 
-	for (scd = host->host_queue; scd; scd = scd->next) {
+	list_for_each_entry(scd, &host->my_devices, siblings) {
 		int len;
 
 		proc_print_scsidevice(scd, buffer, &len, pos);

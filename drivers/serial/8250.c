@@ -517,7 +517,7 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 	unsigned char save_lcr, save_mcr;
 	unsigned long flags;
 
-	if (!up->port.iobase && !up->port.membase)
+	if (!up->port.iobase && !up->port.mapbase && !up->port.membase)
 		return;
 
 	DEBUG_AUTOCONF("ttyS%d: autoconf (0x%04x, 0x%08lx): ",
@@ -1031,7 +1031,7 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
 
 		ret = request_irq(up->port.irq, serial8250_interrupt,
 				  irq_flags, "serial", i);
-		if (ret)
+		if (ret < 0)
 			serial_do_unlink(i, up);
 	}
 
@@ -1623,7 +1623,7 @@ static int serial8250_request_port(struct uart_port *port)
 	if (up->port.flags & UPF_RESOURCES) {
 		if (up->port.type == PORT_RSA) {
 			ret = serial8250_request_rsa_resource(up, &res_rsa);
-			if (ret)
+			if (ret < 0)
 				return ret;
 		}
 
@@ -1641,7 +1641,7 @@ static int serial8250_request_port(struct uart_port *port)
 			ret = -ENOMEM;
 	}
 
-	if (ret) {
+	if (ret < 0) {
 		if (res_rsa)
 			release_resource(res_rsa);
 		if (res)
@@ -1671,11 +1671,11 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	 */
 	if (up->port.flags & UPF_RESOURCES) {
 		ret = serial8250_request_std_resource(up, &res_std);
-		if (ret)
+		if (ret < 0)
 			return;
 
 		ret = serial8250_request_rsa_resource(up, &res_rsa);
-		if (ret)
+		if (ret < 0)
 			probeflags &= ~PROBE_RSA;
 	} else {
 		probeflags &= ~PROBE_RSA;
@@ -1950,6 +1950,7 @@ static int __register_serial(struct serial_struct *req, int line)
 	port.regshift = req->iomem_reg_shift;
 	port.iotype   = req->io_type;
 	port.flags    = req->flags | UPF_BOOT_AUTOCONF;
+	port.mapbase  = req->iomap_base;
 	port.line     = line;
 
 	if (share_irqs)
@@ -2029,11 +2030,10 @@ static int __init serial8250_init(void)
 		spin_lock_init(&irq_lists[i].lock);
 
 	ret = uart_register_driver(&serial8250_reg);
-	if (ret)
-		return ret;
+	if (ret >= 0)
+		serial8250_register_ports(&serial8250_reg);
 
-	serial8250_register_ports(&serial8250_reg);
-	return 0;
+	return ret;
 }
 
 static void __exit serial8250_exit(void)
