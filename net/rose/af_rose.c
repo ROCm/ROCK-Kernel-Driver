@@ -812,6 +812,8 @@ static int rose_connect(struct socket *sock, struct sockaddr *uaddr, int addr_le
 				schedule();
 				continue;
 			}
+			current->state = TASK_RUNNING;
+			remove_wait_queue(sk->sk_sleep, &wait);
 			return -ERESTARTSYS;
 		}
 		current->state = TASK_RUNNING;
@@ -863,8 +865,11 @@ static int rose_accept(struct socket *sock, struct socket *newsock, int flags)
 
 		current->state = TASK_INTERRUPTIBLE;
 		release_sock(sk);
-		if (flags & O_NONBLOCK)
+		if (flags & O_NONBLOCK) {
+			current->state = TASK_RUNNING;
+			remove_wait_queue(sk->sk_sleep, &wait);
 			return -EWOULDBLOCK;
+		}
 		if (!signal_pending(tsk)) {
 			schedule();
 			lock_sock(sk);
