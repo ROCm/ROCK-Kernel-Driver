@@ -44,6 +44,7 @@
 
 #include <asm/bug.h>
 
+#include <asm/vio.h>
 #include <asm/scatterlist.h>
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpEvent.h>
@@ -84,7 +85,7 @@ enum viocdsubtype {
 /*
  * Should probably make this a module parameter....sigh
  */
-#define VIOCD_MAX_CD 8
+#define VIOCD_MAX_CD	HVMAXARCHITECTEDVIRTUALCDROMS
 
 static const struct vio_error_entry viocd_err_table[] = {
 	{0x0201, EINVAL, "Invalid Range"},
@@ -144,6 +145,7 @@ static dma_addr_t unitinfo_dmaaddr;
 struct disk_info {
 	struct gendisk			*viocd_disk;
 	struct cdrom_device_info	viocd_info;
+	struct device			*dev;
 };
 static struct disk_info viocd_diskinfo[VIOCD_MAX_CD];
 
@@ -260,13 +262,13 @@ static void __init get_viocd_info(void)
 	for (i = 0; (i < VIOCD_MAX_CD) && viocd_unitinfo[i].rsrcname[0]; i++)
 		viocd_numdev++;
 
-	return;
-
 error_ret:
-	dma_free_coherent(iSeries_vio_dev,
-			sizeof(*viocd_unitinfo) * VIOCD_MAX_CD,
-			viocd_unitinfo, unitinfo_dmaaddr);
-	viocd_unitinfo = NULL;
+	if (viocd_numdev == 0) {
+		dma_free_coherent(iSeries_vio_dev,
+				sizeof(*viocd_unitinfo) * VIOCD_MAX_CD,
+				viocd_unitinfo, unitinfo_dmaaddr);
+		viocd_unitinfo = NULL;
+	}
 }
 
 static int viocd_open(struct cdrom_device_info *cdi, int purpose)
@@ -341,7 +343,7 @@ static int send_request(struct request *req)
 		return -1;
 	}
 
-	if (dma_map_sg(iSeries_vio_dev, &sg, 1, DMA_FROM_DEVICE) == 0) {
+	if (dma_map_sg(diskinfo->dev, &sg, 1, DMA_FROM_DEVICE) == 0) {
 		printk(VIOCD_KERN_WARNING "error allocating sg tce\n");
 		return -1;
 	}
@@ -513,8 +515,9 @@ return_complete:
 		 * Since this is running in interrupt mode, we need to
 		 * make sure we're not stepping on any global I/O operations
 		 */
+		di = &viocd_diskinfo[bevent->disk];
 		spin_lock_irqsave(&viocd_reqlock, flags);
-		dma_unmap_single(iSeries_vio_dev, bevent->token, bevent->len,
+		dma_unmap_single(di->dev, bevent->token, bevent->len,
 				DMA_FROM_DEVICE);
 		req = (struct request *)bevent->event.xCorrelationToken;
 		rwreq--;
@@ -565,12 +568,97 @@ static int __init find_capability(const char *type)
 	return entry->capability;
 }
 
-static int __init viocd_init(void)
+static int viocd_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 {
 	struct gendisk *gendisk;
 	int deviceno;
-	int ret = 0;
+	struct disk_info *d;
+	struct cdrom_device_info *c;
+	struct cdrom_info *ci;
+
+	deviceno = vdev->unit_address;
+	if (deviceno >= viocd_numdev)
+		return -ENODEV;
+
+	d = &viocd_diskinfo[deviceno];
+	c = &d->viocd_info;
+	ci = &viocd_unitinfo[deviceno];
+
+	c->ops = &viocd_dops;
+	c->speed = 4;
+	c->capacity = 1;
+	c->handle = d;
+	c->mask = ~find_capability(ci->type);
+	sprintf(c->name, VIOCD_DEVICE "%c", 'a' + deviceno);
+
+	if (register_cdrom(c) != 0) {
+		printk(VIOCD_KERN_WARNING "Cannot register viocd CD-ROM %s!\n",
+				c->name);
+		return 0;
+	}
+	printk(VIOCD_KERN_INFO "cd %s is iSeries resource %10.10s "
+			"type %4.4s, model %3.3s\n",
+			c->name, ci->rsrcname, ci->type, ci->model);
+	gendisk = alloc_disk(1);
+	if (gendisk == NULL) {
+		printk(VIOCD_KERN_WARNING "Cannot create gendisk for %s!\n",
+				c->name);
+		unregister_cdrom(c);
+		return 0;
+	}
+	gendisk->major = VIOCD_MAJOR;
+	gendisk->first_minor = deviceno;
+	strncpy(gendisk->disk_name, c->name,
+			sizeof(gendisk->disk_name));
+	snprintf(gendisk->devfs_name, sizeof(gendisk->devfs_name),
+			VIOCD_DEVICE_DEVFS "%d", deviceno);
+	gendisk->queue = viocd_queue;
+	gendisk->fops = &viocd_fops;
+	gendisk->flags = GENHD_FL_CD|GENHD_FL_REMOVABLE;
+	set_capacity(gendisk, 0);
+	gendisk->private_data = d;
+	d->viocd_disk = gendisk;
+	d->dev = &vdev->dev;
+	gendisk->driverfs_dev = d->dev;
+	add_disk(gendisk);
+
+	return 0;
+}
+
+static int viocd_remove(struct vio_dev *vdev)
+{
+	struct disk_info *d = &viocd_diskinfo[vdev->unit_address];
+
+	if (unregister_cdrom(&d->viocd_info) != 0)
+		printk(VIOCD_KERN_WARNING
+				"Cannot unregister viocd CD-ROM %s!\n",
+				d->viocd_info.name);
+	del_gendisk(d->viocd_disk);
+	put_disk(d->viocd_disk);
+	return 0;
+}
+
+/**
+ * viocd_device_table: Used by vio.c to match devices that we
+ * support.
+ */
+static struct vio_device_id viocd_device_table[] __devinitdata = {
+	{ "viocd", "" },
+	{ 0, }
+};
+
+MODULE_DEVICE_TABLE(vio, viocd_device_table);
+static struct vio_driver viocd_driver = {
+	.name = "viocd",
+	.id_table = viocd_device_table,
+	.probe = viocd_probe,
+	.remove = viocd_remove
+};
+
+static int __init viocd_init(void)
+{
 	struct proc_dir_entry *e;
+	int ret = 0;
 
 	if (viopath_hostLp == HvLpIndexInvalid) {
 		vio_set_hostlp();
@@ -583,8 +671,7 @@ static int __init viocd_init(void)
 			viopath_hostLp);
 
 	if (register_blkdev(VIOCD_MAJOR, VIOCD_DEVICE) != 0) {
-		printk(VIOCD_KERN_WARNING
-				"Unable to get major %d for %s\n",
+		printk(VIOCD_KERN_WARNING "Unable to get major %d for %s\n",
 				VIOCD_MAJOR, VIOCD_DEVICE);
 		return -EIO;
 	}
@@ -605,59 +692,19 @@ static int __init viocd_init(void)
 	if (viocd_numdev == 0)
 		goto out_undo_vio;
 
-	ret = -ENOMEM;
 	spin_lock_init(&viocd_reqlock);
 	viocd_queue = blk_init_queue(do_viocd_request, &viocd_reqlock);
-	if (viocd_queue == NULL)
-		goto out_unregister;
+	if (viocd_queue == NULL) {
+		ret = -ENOMEM;
+		goto out_free_info;
+	}
 	blk_queue_max_hw_segments(viocd_queue, 1);
 	blk_queue_max_phys_segments(viocd_queue, 1);
 	blk_queue_max_sectors(viocd_queue, 4096 / 512);
 
-	/* initialize units */
-	for (deviceno = 0; deviceno < viocd_numdev; deviceno++) {
-		struct disk_info *d = &viocd_diskinfo[deviceno];
-		struct cdrom_device_info *c = &d->viocd_info;
-		struct cdrom_info *ci = &viocd_unitinfo[deviceno];
-
-		c->ops = &viocd_dops;
-		c->speed = 4;
-		c->capacity = 1;
-		c->handle = d;
-		c->mask = ~find_capability(ci->type);
-		sprintf(c->name, VIOCD_DEVICE "%c", 'a' + deviceno);
-
-		if (register_cdrom(c) != 0) {
-			printk(VIOCD_KERN_WARNING
-					"Cannot register viocd CD-ROM %s!\n",
-					c->name);
-			continue;
-		}
-		printk(VIOCD_KERN_INFO "cd %s is iSeries resource %10.10s "
-				"type %4.4s, model %3.3s\n",
-				c->name, ci->rsrcname, ci->type, ci->model);
-		gendisk = alloc_disk(1);
-		if (gendisk == NULL) {
-			printk(VIOCD_KERN_WARNING
-					"Cannot create gendisk for %s!\n",
-					c->name);
-			unregister_cdrom(c);
-			continue;
-		}
-		gendisk->major = VIOCD_MAJOR;
-		gendisk->first_minor = deviceno;
-		strncpy(gendisk->disk_name, c->name,
-				sizeof(gendisk->disk_name));
-		snprintf(gendisk->devfs_name, sizeof(gendisk->devfs_name),
-				VIOCD_DEVICE_DEVFS "%d", deviceno);
-		gendisk->queue = viocd_queue;
-		gendisk->fops = &viocd_fops;
-		gendisk->flags = GENHD_FL_CD|GENHD_FL_REMOVABLE;
-		set_capacity(gendisk, 0);
-		gendisk->private_data = d;
-		d->viocd_disk = gendisk;
-		add_disk(gendisk);
-	}
+	ret = vio_register_driver(&viocd_driver);
+	if (ret)
+		goto out_cleanup_queue;
 
 	e = create_proc_entry("iSeries/viocd", S_IFREG|S_IRUGO, NULL);
 	if (e) {
@@ -667,6 +714,12 @@ static int __init viocd_init(void)
 
 	return 0;
 
+out_cleanup_queue:
+	blk_cleanup_queue(viocd_queue);
+out_free_info:
+	dma_free_coherent(iSeries_vio_dev,
+			sizeof(*viocd_unitinfo) * VIOCD_MAX_CD,
+			viocd_unitinfo, unitinfo_dmaaddr);
 out_undo_vio:
 	vio_clearHandler(viomajorsubtype_cdio);
 	viopath_close(viopath_hostLp, viomajorsubtype_cdio, MAX_CD_REQ + 2);
@@ -677,18 +730,8 @@ out_unregister:
 
 static void __exit viocd_exit(void)
 {
-	int deviceno;
-
 	remove_proc_entry("iSeries/viocd", NULL);
-	for (deviceno = 0; deviceno < viocd_numdev; deviceno++) {
-		struct disk_info *d = &viocd_diskinfo[deviceno];
-		if (unregister_cdrom(&d->viocd_info) != 0)
-			printk(VIOCD_KERN_WARNING
-					"Cannot unregister viocd CD-ROM %s!\n",
-					d->viocd_info.name);
-		del_gendisk(d->viocd_disk);
-		put_disk(d->viocd_disk);
-	}
+	vio_unregister_driver(&viocd_driver);
 	blk_cleanup_queue(viocd_queue);
 	if (viocd_unitinfo != NULL)
 		dma_free_coherent(iSeries_vio_dev,

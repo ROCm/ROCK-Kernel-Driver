@@ -235,6 +235,8 @@ static void probe_bus_iseries(void)
 	}
 	for (i = 0; i < HVMAXARCHITECTEDVIRTUALDISKS; i++)
 		vio_register_device_iseries("viodasd", i);
+	for (i = 0; i < HVMAXARCHITECTEDVIRTUALCDROMS; i++)
+		vio_register_device_iseries("viocd", i);
 }
 #endif
 
