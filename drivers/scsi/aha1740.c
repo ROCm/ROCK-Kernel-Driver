@@ -275,7 +275,7 @@ static irqreturn_t aha1740_intr_handle(int irq, void *dev_id,
 				dma_unmap_sg (&edev->dev,
 					      (struct scatterlist *) SCtmp->request_buffer,
 					      SCtmp->use_sg,
-					      scsi_to_dma_dir (SCtmp->sc_data_direction));
+					      SCtmp->sc_data_direction);
 			} else {
 				dma_unmap_single (&edev->dev,
 						  sgptr->buf_dma_addr,
@@ -433,7 +433,7 @@ static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 		sgpnt = (struct scatterlist *) SCpnt->request_buffer;
 		cptr = sgptr->sg_chain;
 		count = dma_map_sg (&host->edev->dev, sgpnt, SCpnt->use_sg,
-				    scsi_to_dma_dir(SCpnt->sc_data_direction));
+				    SCpnt->sc_data_direction);
 		for(i=0; i < count; i++) {
 			cptr[i].datalen = sg_dma_len (sgpnt + i);
 			cptr[i].dataptr = sg_dma_address (sgpnt + i);
@@ -570,7 +570,6 @@ static Scsi_Host_Template aha1740_template = {
 	.proc_name        = "aha1740",
 	.proc_info        = aha1740_proc_info,
 	.name             = "Adaptec 174x (EISA)",
-	.command          = aha1740_command,
 	.queuecommand     = aha1740_queuecommand,
 	.bios_param       = aha1740_biosparam,
 	.can_queue        = AHA1740_ECBS,
