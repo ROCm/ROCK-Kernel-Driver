@@ -409,6 +409,10 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG), DRIVE_READY, drive->bad_wstat)) {
 		return DRIVER(drive)->error(drive, "task_out_intr", stat);
 	}
+
+	if (((stat & DRQ_STAT) == 0) ^ !rq->current_nr_sectors)
+		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+
 	/*
 	 * Safe to update request for partial completions.
 	 * We have a good STATUS CHECK!!!
@@ -416,9 +420,8 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 	if (!rq->current_nr_sectors)
 		if (!DRIVER(drive)->end_request(drive, 1, 0))
 			return ide_stopped;
-	if ((rq->current_nr_sectors==1) ^ (stat & DRQ_STAT)) {
-		task_buffer_sectors(drive, rq, 1, IDE_PIO_OUT);
-	}
+
+	task_buffer_sectors(drive, rq, 1, IDE_PIO_OUT);
 	ide_set_handler(drive, &task_out_intr, WAIT_WORSTCASE, NULL);
 	return ide_started;
 }
@@ -461,18 +464,16 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	u8 stat				= hwif->INB(IDE_STATUS_REG);
 	struct request *rq		= HWGROUP(drive)->rq;
 
-	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT) || !rq->current_nr_sectors) {
-		if (stat & (ERR_STAT|DRQ_STAT)) {
-			return DRIVER(drive)->error(drive, "task_mulout_intr", stat);
-		}
-		/* Handle last IRQ, occurs after all data was sent. */
-		if (!rq->current_nr_sectors) {
-			DRIVER(drive)->end_request(drive, 1, 0);
-			return ide_stopped;
-		}
-		/* no data yet, so wait for another interrupt */
-		ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
-		return ide_started;
+	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat))
+		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+
+	if (((stat & DRQ_STAT) == 0) ^ !rq->current_nr_sectors)
+		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+
+	/* Handle last IRQ, occurs after all data was sent. */
+	if (!rq->current_nr_sectors) {
+		DRIVER(drive)->end_request(drive, 1, 0);
+		return ide_stopped;
 	}
 
 	task_buffer_multi_sectors(drive, rq, IDE_PIO_OUT);
