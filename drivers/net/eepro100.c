@@ -324,19 +324,6 @@ static inline void io_outw(unsigned int val, unsigned long port)
 #define outl writel
 #endif
 
-/* How to wait for the command unit to accept a command.
-   Typically this takes 0 ticks. */
-static inline void wait_for_cmd_done(long cmd_ioaddr)
-{
-	int wait = 1000;
-	do  udelay(1) ;
-	while(inb(cmd_ioaddr) && --wait >= 0);
-#ifndef final_version
-	if (wait < 0)
-		printk(KERN_ALERT "eepro100: wait_for_cmd_done timeout!\n");
-#endif
-}
-
 /* Offsets to the various registers.
    All accesses need not be longword aligned. */
 enum speedo_offsets {
@@ -566,6 +553,26 @@ static void speedo_show_state(struct net_device *dev);
 static int mii_ctrl[8] = { 0x3300, 0x3100, 0x0000, 0x0100,
 						   0x2000, 0x2100, 0x0400, 0x3100};
 #endif
+
+/* How to wait for the command unit to accept a command.
+   Typically this takes 0 ticks. */
+static inline unsigned char wait_for_cmd_done(struct net_device *dev)
+{
+	int wait = 1000;
+	long cmd_ioaddr = dev->base_addr + SCBCmd;
+	unsigned char r;
+
+	do  {
+		udelay(1);
+		r = inb(cmd_ioaddr);
+	} while(r && --wait >= 0);
+
+#ifndef final_version
+	if (wait < 0)
+		printk(KERN_ALERT "%s: wait_for_cmd_done timeout!\n", dev->name);
+#endif
+	return r;
+}
 
 static int __devinit eepro100_init_one (struct pci_dev *pdev,
 		const struct pci_device_id *ent)
@@ -1063,8 +1070,7 @@ static void speedo_resume(struct net_device *dev)
 	sp->tx_threshold = 0x01208000;
 
 	/* Set the segment registers to '0'. */
-	wait_for_cmd_done(ioaddr + SCBCmd);
-	if (inb(ioaddr + SCBCmd)) {
+	if (wait_for_cmd_done(dev) != 0) {
 		outl(PortPartialReset, ioaddr + SCBPort);
 		udelay(10);
 	}
@@ -1083,7 +1089,7 @@ static void speedo_resume(struct net_device *dev)
 
 	outb(CUStatsAddr, ioaddr + SCBCmd);
 	sp->lstats->done_marker = 0;
-	wait_for_cmd_done(ioaddr + SCBCmd);
+	wait_for_cmd_done(dev);
 
 	if (sp->rx_ringp[sp->cur_rx % RX_RING_SIZE] == NULL) {
 		if (netif_msg_rx_err(sp))
@@ -1142,8 +1148,7 @@ speedo_rx_soft_reset(struct net_device *dev)
 	long ioaddr;
 
 	ioaddr = dev->base_addr;
-	wait_for_cmd_done(ioaddr + SCBCmd);
-	if (inb(ioaddr + SCBCmd) != 0) {
+	if (wait_for_cmd_done(dev) != 0) {
 		printk("%s: previous command stalled\n", dev->name);
 		return;
 	}
@@ -1156,9 +1161,7 @@ speedo_rx_soft_reset(struct net_device *dev)
 
 	rfd->rx_buf_addr = 0xffffffff;
 
-	wait_for_cmd_done(ioaddr + SCBCmd);
-
-	if (inb(ioaddr + SCBCmd) != 0) {
+	if (wait_for_cmd_done(dev) != 0) {
 		printk("%s: RxAbort command stalled\n", dev->name);
 		return;
 	}
@@ -1464,13 +1467,13 @@ speedo_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* workaround for hardware bug on 10 mbit half duplex */
 
 	if ((sp->partner == 0) && (sp->chip_id == 1)) {
-		wait_for_cmd_done(ioaddr + SCBCmd);
+		wait_for_cmd_done(dev);
 		outb(0 , ioaddr + SCBCmd);
 		udelay(1);
 	}
 
 	/* Trigger the command unit resume. */
-	wait_for_cmd_done(ioaddr + SCBCmd);
+	wait_for_cmd_done(dev);
 	clear_suspend(sp->last_cmd);
 	/* We want the time window between clearing suspend flag on the previous
 	   command and resuming CU to be as small as possible.
@@ -1958,7 +1961,7 @@ speedo_get_stats(struct net_device *dev)
 			/* Take a spinlock to make wait_for_cmd_done and sending the
 			   command atomic.  --SAW */
 			spin_lock_irqsave(&sp->lock, flags);
-			wait_for_cmd_done(ioaddr + SCBCmd);
+			wait_for_cmd_done(dev);
 			outb(CUDumpStats, ioaddr + SCBCmd);
 			spin_unlock_irqrestore(&sp->lock, flags);
 		}
@@ -2151,7 +2154,7 @@ static void set_rx_mode(struct net_device *dev)
 			config_cmd_data[8] = 0;
 		}
 		/* Trigger the command unit resume. */
-		wait_for_cmd_done(ioaddr + SCBCmd);
+		wait_for_cmd_done(dev);
 		clear_suspend(last_cmd);
 		outb(CUResume, ioaddr + SCBCmd);
 		if ((int)(sp->cur_tx - sp->dirty_tx) >= TX_QUEUE_LIMIT) {
@@ -2188,7 +2191,7 @@ static void set_rx_mode(struct net_device *dev)
 			*setup_params++ = *eaddrs++;
 		}
 
-		wait_for_cmd_done(ioaddr + SCBCmd);
+		wait_for_cmd_done(dev);
 		clear_suspend(last_cmd);
 		/* Immediately trigger the command unit resume. */
 		outb(CUResume, ioaddr + SCBCmd);
@@ -2264,7 +2267,7 @@ static void set_rx_mode(struct net_device *dev)
 		pci_dma_sync_single(sp->pdev, mc_blk->frame_dma,
 				mc_blk->len, PCI_DMA_TODEVICE);
 
-		wait_for_cmd_done(ioaddr + SCBCmd);
+		wait_for_cmd_done(dev);
 		clear_suspend(last_cmd);
 		/* Immediately trigger the command unit resume. */
 		outb(CUResume, ioaddr + SCBCmd);
