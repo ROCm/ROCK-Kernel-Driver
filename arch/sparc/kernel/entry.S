@@ -1475,11 +1475,8 @@ linux_syscall_trace:
 
 	.globl	C_LABEL(ret_from_fork)
 C_LABEL(ret_from_fork):
-#if CONFIG_SMP || CONFIG_PREEMPT
-/* XXX Wrong location: call schedule_tail in every ret_sys_call. */
 	call	schedule_tail
 	 mov	%g3, %o0
-#endif
 	b	C_LABEL(ret_sys_call)
 	 ld	[%sp + REGWIN_SZ + PT_I0], %o0
 
