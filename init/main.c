@@ -331,15 +331,6 @@ static int __init init_setup(char *str)
 }
 __setup("init=", init_setup);
 
-static char *kinit_command;
-
-static int __init kinit_setup(char *str)
-{
-	kinit_command = str;
-	return 1;
-}
-__setup("kinit=", kinit_setup);
-
 extern void setup_arch(char **);
 extern void cpu_idle(void);
 
@@ -584,7 +575,6 @@ static void __init do_initcalls(void)
 	flush_scheduled_work();
 }
 
-asmlinkage long sys_access(const char __user * filename, int mode);
 /*
  * Ok, the machine is now initialized. None of the devices
  * have been touched yet, but the CPU subsystem is up and
@@ -648,13 +638,13 @@ static int init(void * unused)
 	smp_init();
 	do_basic_setup();
 
-	/*
-	 * check if there is an early userspace init, if yes
-	 * let it do all the work
-	 */
-	if (kinit_command || sys_access("/sbin/init", 0) == 0)
-		execute_command = kinit_command ? kinit_command : 0;
-	else
+       /*
+        * check if there is an early userspace init, if yes
+        * let it do all the work
+        */
+       if (sys_access("/init", 0) == 0)
+               execute_command = "/init";
+       else
 	prepare_namespace();
 
 	/*
