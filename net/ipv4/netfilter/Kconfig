@@ -42,6 +42,15 @@ config IP_NF_CT_PROTO_SCTP
 	  If you want to compile it as a module, say M here and read
 	  Documentation/modules.txt.  If unsure, say `N'.
 
+config IP_NF_CONNTRACK_MARK
+	bool  'Connection mark tracking support'
+	depends on IP_NF_CONNTRACK
+	help
+	  This option enables support for connection marks, used by the
+	  `CONNMARK' target and `connmark' match. Similar to the mark value
+	  of packets, but this mark value is kept in the conntrack session
+	  instead of the individual packets.
+	
 config IP_NF_FTP
 	tristate "FTP protocol support"
 	depends on IP_NF_CONNTRACK
@@ -342,6 +351,17 @@ config IP_NF_MATCH_SCTP
 	  If you want to compile it as a module, say M here and read
 	  Documentation/modules.txt.  If unsure, say `N'.
 
+config IP_NF_MATCH_CONNMARK
+	tristate  ' Connection mark match support'
+	depends on IP_NF_CONNTRACK_MARK && IP_NF_IPTABLES
+	help
+	  This option adds a `connmark' match, which allows you to match the
+	  connection mark value previously set for the session by `CONNMARK'. 
+	
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  The module will be called
+	  ipt_connmark.o.  If unsure, say `N'.
+
 # `filter', generic and specific targets
 config IP_NF_FILTER
 	tristate "Packet filtering"
@@ -363,6 +383,18 @@ config IP_NF_TARGET_REJECT
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config IP_NF_TARGET_CONNMARK
+	tristate  'CONNMARK target support'
+	depends on IP_NF_CONNTRACK_MARK && IP_NF_MANGLE
+	help
+	  This option adds a `CONNMARK' target, which allows one to manipulate
+	  the connection mark value.  Similar to the MARK target, but
+	  affects the connection mark value rather than the packet mark value.
+	
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  The module will be called
+	  ipt_CONNMARK.o.  If unsure, say `N'.
+	
 config IP_NF_TARGET_LOG
 	tristate "LOG target support"
 	depends on IP_NF_IPTABLES
@@ -607,6 +639,16 @@ config IP_NF_TARGET_CLASSIFY
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config IP_NF_TARGET_CLUSTERIP
+	tristate "CLUSTERIP target support"
+	depends on IP_NF_CONNTRACK_MARK && IP_NF_IPTABLES
+	help
+	  The CLUSTERIP target allows you to build load-balancing clusters of
+	  network servers without having a dedicated load-balancing
+	  router/server/switch.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
 # raw + specific targets
 config IP_NF_RAW
 	tristate  'raw table support (required for NOTRACK/TRACE)'
@@ -687,15 +729,4 @@ config IP_NF_COMPAT_IPFWADM
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
-config IP_NF_CONNTRACK_MARK
-	bool  'Connection mark tracking support'
-config IP_NF_TARGET_CONNMARK
-	tristate  'CONNMARK target support'
-	depends on IP_NF_MANGLE
-config IP_NF_MATCH_CONNMARK
-	tristate  ' Connection mark match support'
-	depends on IP_NF_IPTABLES
-	  help
-
 endmenu
-
