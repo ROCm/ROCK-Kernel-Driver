@@ -4380,8 +4380,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		"OSYNC",	/* 0x2000 */
 		"NOUUID",	/* 0x4000 */
 		"32BIT",	/* 0x8000 */
-		"IRIXSGID",	/* 0x10000 */
-		"NOLOGFLUSH",	/* 0x20000 */
+		"NOLOGFLUSH",	/* 0x10000 */
 		0
 	};
 

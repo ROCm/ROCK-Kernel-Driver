@@ -1097,14 +1097,13 @@ xfs_ialloc(
 
 	/*
 	 * If the group ID of the new file does not match the effective group
-	 * ID or one of the supplementary group IDs, the ISGID bit is
-	 * cleared if the "irixsgid" mount option is set.
+	 * ID or one of the supplementary group IDs, the ISGID bit is cleared
+	 * (and only if the irix_sgid_inherit compatibility variable is set).
 	 */
-	if (ip->i_d.di_mode & ISGID) {
-		if (!in_group_p((gid_t)ip->i_d.di_gid)
-		    && (ip->i_mount->m_flags & XFS_MOUNT_IRIXSGID)) {
-			ip->i_d.di_mode &= ~ISGID;
-		}
+	if ((irix_sgid_inherit) &&
+	    (ip->i_d.di_mode & ISGID) &&
+	    (!in_group_p((gid_t)ip->i_d.di_gid))) {
+		ip->i_d.di_mode &= ~ISGID;
 	}
 
 	ip->i_d.di_size = 0;

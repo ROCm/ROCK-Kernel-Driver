@@ -119,23 +119,6 @@ typedef struct xfs_gap {
 	xfs_extlen_t	xg_count_fsb;
 } xfs_gap_t;
 
-/*
- * This structure is used to hold common pieces of the buffer
- * and file for xfs_dio_write and xfs_dio_read.
- */
-typedef struct xfs_dio {
-	struct xfs_buf	*xd_bp;
-	bhv_desc_t	*xd_bdp;
-	struct xfs_inode *xd_ip;
-	struct xfs_iocore *xd_io;
-	struct cred	*xd_cr;
-	struct pm	*xd_pmp;
-	int		xd_blkalgn;
-	int		xd_ioflag;
-	xfs_off_t	xd_start;
-	size_t		xd_length;
-} xfs_dio_t;
-
 typedef struct dm_attrs_s {
 	__uint32_t	da_dmevmask;	/* DMIG event mask */
 	__uint16_t	da_dmstate;	/* DMIG state info */

@@ -42,7 +42,6 @@ struct xfs_inode;
 struct xfs_iocore;
 struct xfs_mount;
 struct xfs_trans;
-struct xfs_dio;
 struct pm;
 
 /*

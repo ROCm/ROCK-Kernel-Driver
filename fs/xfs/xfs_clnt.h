@@ -119,8 +119,7 @@ struct xfs_mount_args {
 #define XFSMNT_NOUUID		0x01000000	/* Ignore fs uuid */
 #define XFSMNT_32BITINODES	0x02000000	/* restrict inodes to 32
 						 * bits of address space */
-#define XFSMNT_IRIXSGID		0x04000000	/* Irix-style sgid inheritance */
-#define XFSMNT_NOLOGFLUSH	0x08000000	/* Don't flush for log blocks */
+#define XFSMNT_NOLOGFLUSH	0x04000000	/* Don't flush for log blocks */
 
 /* Did we get any args for CXFS to consume? */
 #define XFSARGS_FOR_CXFSARR(ap)		\

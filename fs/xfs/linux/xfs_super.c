@@ -92,8 +92,6 @@ STATIC struct export_operations linvfs_export_ops;
 #define MNTOPT_SUNIT	"sunit"		/* data volume stripe unit */
 #define MNTOPT_SWIDTH	"swidth"	/* data volume stripe width */
 #define MNTOPT_NORECOVERY "norecovery"	/* don't run XFS recovery */
-#define MNTOPT_OSYNCISDSYNC "osyncisdsync" /* o_sync == o_dsync on this fs */
-					   /* (this is now the default!) */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
 #define MNTOPT_QUOTA	"quota"		/* disk quotas */
 #define MNTOPT_MRQUOTA	"mrquota"	/* don't turnoff if SB has quotas on */
@@ -104,7 +102,6 @@ STATIC struct export_operations linvfs_export_ops;
 #define MNTOPT_GQUOTANOENF "gqnoenforce"/* group quota limit enforcement */
 #define MNTOPT_QUOTANOENF  "qnoenforce" /* same as uqnoenforce */
 #define MNTOPT_NOUUID	"nouuid"	/* Ignore FS uuid */
-#define MNTOPT_IRIXSGID "irixsgid"	/* Irix-style sgid inheritance */
 #define MNTOPT_NOLOGFLUSH  "nologflush"	/* Don't use hard flushes in
 					   log writing */
 #define MNTOPT_MTPT	"mtpt"		/* filesystem mount point */
@@ -175,9 +172,6 @@ xfs_parseargs(
 			args->iosizelog = (uint8_t) iosize;
 		} else if (!strcmp(this_char, MNTOPT_WSYNC)) {
 			args->flags |= XFSMNT_WSYNC;
-		} else if (!strcmp(this_char, MNTOPT_OSYNCISDSYNC)) {
-			/* no-op, this is now the default */
-printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 		} else if (!strcmp(this_char, MNTOPT_OSYNCISOSYNC)) {
 			args->flags |= XFSMNT_OSYNCISOSYNC;
 		} else if (!strcmp(this_char, MNTOPT_NORECOVERY)) {
@@ -212,10 +206,13 @@ printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 			dswidth = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
 			args->flags |= XFSMNT_NOUUID;
-		} else if (!strcmp(this_char, MNTOPT_IRIXSGID)) {
-			args->flags |= XFSMNT_IRIXSGID;
 		} else if (!strcmp(this_char, MNTOPT_NOLOGFLUSH)) {
 			args->flags |= XFSMNT_NOLOGFLUSH;
+		} else if (!strcmp(this_char, "osyncisdsync")) {
+			/* no-op, this is now the default */
+printk("XFS: osyncisdsync is now the default, option is deprecated.\n");
+		} else if (!strcmp(this_char, "irixsgid")) {
+printk("XFS: irixsgid is now a sysctl(2) variable, option is deprecated.\n");
 		} else {
 			printk("XFS: unknown mount option [%s].\n", this_char);
 			return rval;
@@ -260,6 +257,74 @@ printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 
 	args->logbufs = logbufs;
 	args->logbufsize = logbufsize;
+
+	return 0;
+}
+
+STATIC int
+xfs_showargs(
+	struct vfs		*vfsp,
+	struct seq_file		*m)
+{
+	static struct proc_xfs_info {
+		int	flag;
+		char	*str;
+	} xfs_info[] = {
+		/* the few simple ones we can get from the mount struct */
+		{ XFS_MOUNT_NOALIGN,		"," MNTOPT_NOALIGN },
+		{ XFS_MOUNT_NORECOVERY,		"," MNTOPT_NORECOVERY },
+		{ XFS_MOUNT_OSYNCISOSYNC,	"," MNTOPT_OSYNCISOSYNC },
+		{ XFS_MOUNT_NOUUID,		"," MNTOPT_NOUUID },
+		{ 0, NULL }
+	};
+	struct proc_xfs_info	*xfs_infop;
+	struct xfs_mount	*mp = XFS_BHVTOM(vfsp->vfs_fbhv);
+
+	for (xfs_infop = xfs_info; xfs_infop->flag; xfs_infop++) {
+		if (mp->m_flags & xfs_infop->flag)
+			seq_puts(m, xfs_infop->str);
+	}
+
+	if (mp->m_qflags & XFS_UQUOTA_ACCT) {
+		(mp->m_qflags & XFS_UQUOTA_ENFD) ?
+			seq_puts(m, "," MNTOPT_UQUOTA) :
+			seq_puts(m, "," MNTOPT_UQUOTANOENF);
+	}
+
+	if (mp->m_qflags & XFS_GQUOTA_ACCT) {
+		(mp->m_qflags & XFS_GQUOTA_ENFD) ?
+			seq_puts(m, "," MNTOPT_GQUOTA) :
+			seq_puts(m, "," MNTOPT_GQUOTANOENF);
+	}
+
+	if (mp->m_flags & XFS_MOUNT_DFLT_IOSIZE)
+		seq_printf(m, "," MNTOPT_BIOSIZE "=%d", mp->m_writeio_log);
+
+	if (mp->m_logbufs > 0)
+		seq_printf(m, "," MNTOPT_LOGBUFS "=%d", mp->m_logbufs);
+
+	if (mp->m_logbsize > 0)
+		seq_printf(m, "," MNTOPT_LOGBSIZE "=%d", mp->m_logbsize);
+
+	if (mp->m_ddev_targp->pbr_dev != mp->m_logdev_targp->pbr_dev)
+		seq_printf(m, "," MNTOPT_LOGDEV "=%s",
+				bdevname(mp->m_logdev_targp->pbr_bdev));
+
+	if (mp->m_rtdev_targp &&
+	    mp->m_ddev_targp->pbr_dev != mp->m_rtdev_targp->pbr_dev)
+		seq_printf(m, "," MNTOPT_RTDEV "=%s",
+				bdevname(mp->m_rtdev_targp->pbr_bdev));
+
+	if (mp->m_dalign > 0)
+		seq_printf(m, "," MNTOPT_SUNIT "=%d",
+				(int)XFS_FSB_TO_BB(mp, mp->m_dalign));
+
+	if (mp->m_swidth > 0)
+		seq_printf(m, "," MNTOPT_SWIDTH "=%d",
+				(int)XFS_FSB_TO_BB(mp, mp->m_swidth));
+
+	if (vfsp->vfs_flag & VFS_DMI)
+		seq_puts(m, "," MNTOPT_DMAPI);
 
 	return 0;
 }
@@ -695,72 +760,9 @@ linvfs_show_options(
 	struct seq_file		*m,
 	struct vfsmount		*mnt)
 {
-	vfs_t			*vfsp;
-	xfs_mount_t		*mp;
-	static struct proc_xfs_info {
-		int	flag;
-		char	*str;
-	} xfs_info[] = {
-		/* the few simple ones we can get from the mount struct */
-		{ XFS_MOUNT_NOALIGN,		",noalign" },
-		{ XFS_MOUNT_NORECOVERY,		",norecovery" },
-		{ XFS_MOUNT_OSYNCISOSYNC,	",osyncisosync" },
-		{ XFS_MOUNT_NOUUID,		",nouuid" },
-		{ XFS_MOUNT_IRIXSGID,		",irixsgid" },
-		{ 0, NULL }
-	};
-	struct proc_xfs_info	*xfs_infop;
+	vfs_t			*vfsp = LINVFS_GET_VFS(mnt->mnt_sb);
 
-	vfsp = LINVFS_GET_VFS(mnt->mnt_sb);
-	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
-
-	for (xfs_infop = xfs_info; xfs_infop->flag; xfs_infop++) {
-		if (mp->m_flags & xfs_infop->flag)
-			seq_puts(m, xfs_infop->str);
-	}
-
-	if (mp->m_qflags & XFS_UQUOTA_ACCT) {
-		seq_puts(m, ",uquota");
-		if (!(mp->m_qflags & XFS_UQUOTA_ENFD))
-			seq_puts(m, ",uqnoenforce");
-	}
-
-	if (mp->m_qflags & XFS_GQUOTA_ACCT) {
-		seq_puts(m, ",gquota");
-		if (!(mp->m_qflags & XFS_GQUOTA_ENFD))
-			seq_puts(m, ",gqnoenforce");
-	}
-
-	if (mp->m_flags & XFS_MOUNT_DFLT_IOSIZE)
-		seq_printf(m, ",biosize=%d", mp->m_writeio_log);
-
-	if (mp->m_logbufs > 0)
-		seq_printf(m, ",logbufs=%d", mp->m_logbufs);
-
-	if (mp->m_logbsize > 0)
-		seq_printf(m, ",logbsize=%d", mp->m_logbsize);
-
-	if (mp->m_ddev_targp->pbr_dev != mp->m_logdev_targp->pbr_dev)
-		seq_printf(m, ",logdev=%s",
-				bdevname(mp->m_logdev_targp->pbr_bdev));
-
-	if (mp->m_rtdev_targp &&
-	    mp->m_ddev_targp->pbr_dev != mp->m_rtdev_targp->pbr_dev)
-		seq_printf(m, ",rtdev=%s",
-				bdevname(mp->m_rtdev_targp->pbr_bdev));
-
-	if (mp->m_dalign > 0)
-		seq_printf(m, ",sunit=%d",
-				(int)XFS_FSB_TO_BB(mp, mp->m_dalign));
-
-	if (mp->m_swidth > 0)
-		seq_printf(m, ",swidth=%d",
-				(int)XFS_FSB_TO_BB(mp, mp->m_swidth));
-
-	if (vfsp->vfs_flag & VFS_DMI)
-		seq_puts(m, ",dmapi");
-
-	return 0;
+	return xfs_showargs(vfsp, m);
 }
 
 STATIC struct super_operations linvfs_sops = {

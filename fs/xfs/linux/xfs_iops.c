@@ -261,12 +261,11 @@ linvfs_symlink(
 
 	bzero(&va, sizeof(va));
 	va.va_type = VLNK;
-	va.va_mode = 0777 & ~current->fs->umask;
-	va.va_mask = AT_TYPE|AT_MODE; /* AT_PROJID? */
+	va.va_mode = irix_symlink_mode ? 0777 & ~current->fs->umask : S_IRWXUGO;
+	va.va_mask = AT_TYPE|AT_MODE;
 
 	error = 0;
-	VOP_SYMLINK(dvp, dentry, &va, (char *)symname,
-							&cvp, NULL, error);
+	VOP_SYMLINK(dvp, dentry, &va, (char *)symname, &cvp, NULL, error);
 	if (!error) {
 		ASSERT(cvp);
 		ASSERT(cvp->v_type == VLNK);
@@ -364,7 +363,7 @@ linvfs_readlink(
 }
 
 /*
- * careful here - this function can get called recusively, so
+ * careful here - this function can get called recursively, so
  * we need to be very careful about how much stack we use.
  * uio is kmalloced for this reason...
  */
