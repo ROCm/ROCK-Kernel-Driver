@@ -114,12 +114,12 @@ spinlock_t ide_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 static int ide_scan_direction;	/* THIS was formerly 2.2.x pci=reverse */
 #endif
 
-#if defined(__mc68000__) || defined(CONFIG_APUS)
+#ifdef ATA_ARCH_LOCK
 /*
  * This is used by the Atari code to obtain access to the IDE interrupt,
  * which is shared between several drivers.
  */
-static int irq_lock;
+int ide_irq_lock;
 #endif
 
 int noautodma = 0;
@@ -679,8 +679,8 @@ static int __init stridx (const char *s, char c)
  */
 static int __init match_parm (char *s, const char *keywords[], int vals[], int max_vals)
 {
-	static const char *decimal = "0123456789";
-	static const char *hex = "0123456789abcdef";
+	static const char decimal[] = "0123456789";
+	static const char hex[] = "0123456789abcdef";
 	int i, n;
 
 	if (*s++ == '=') {
@@ -1449,7 +1449,7 @@ static int __init ata_module_init(void)
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 # if defined(__mc68000__) || defined(CONFIG_APUS)
 	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET]) {
-		// ide_get_lock(&irq_lock, NULL, NULL);/* for atari only */
+		ide_get_lock(&ide_irq_lock, NULL, NULL);/* for atari only */
 		disable_irq(ide_hwifs[0].irq);	/* disable_irq_nosync ?? */
 //		disable_irq_nosync(ide_hwifs[0].irq);
 	}
@@ -1460,7 +1460,7 @@ static int __init ata_module_init(void)
 # if defined(__mc68000__) || defined(CONFIG_APUS)
 	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET]) {
 		enable_irq(ide_hwifs[0].irq);
-		ide_release_lock(&irq_lock);/* for atari only */
+		ide_release_lock(&ide_irq_lock);/* for atari only */
 	}
 # endif
 #endif

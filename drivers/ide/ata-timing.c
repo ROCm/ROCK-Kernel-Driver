@@ -137,6 +137,20 @@ short ata_timing_mode(struct ata_device *drive, int map)
 }
 
 /*
+ * Just get a pointer to the struct describing the timing values used commonly
+ * for a particular mode.
+ */
+struct ata_timing* ata_timing_data(short speed)
+{
+	struct ata_timing *t;
+
+	for (t = ata_timing; t->mode != speed; t++)
+		if (t->mode < 0)
+			return NULL;
+	return t;
+}
+
+/*
  * This is just unit conversion.
  */
 void ata_timing_quantize(struct ata_timing *t, struct ata_timing *q,
@@ -179,17 +193,15 @@ void ata_timing_merge(struct ata_timing *a, struct ata_timing *b,
 }
 
 /*
- * Just get a pointer to the struct describing the timing values used commonly
- * for a particular mode.
+ * Not all controllers can do separate timing for 8-bit command transfers
+ * and 16-bit data transfers.
  */
-struct ata_timing* ata_timing_data(short speed)
-{
-	struct ata_timing *t;
 
-	for (t = ata_timing; t->mode != speed; t++)
-		if (t->mode < 0)
-			return NULL;
-	return t;
+void ata_timing_merge_8bit(struct ata_timing *t)
+{
+	t->active = max(t->active, t->act8b);
+	t->recover = max(t->recover, t->rec8b);
+	t->cycle = max(t->cycle, t->cyc8b);
 }
 
 int ata_timing_compute(struct ata_device *drive, short speed, struct ata_timing *t,
@@ -203,6 +215,8 @@ int ata_timing_compute(struct ata_device *drive, short speed, struct ata_timing 
 
 	if (!(s = ata_timing_data(speed)))
 		return -EINVAL;
+
+	memcpy(t, s, sizeof(struct ata_timing));
 
 	/* If the drive is an EIDE drive, it can tell us it needs extended
 	 * PIO/MWDMA cycle timing.
@@ -229,7 +243,7 @@ int ata_timing_compute(struct ata_device *drive, short speed, struct ata_timing 
 	/* Convert the timing to bus clock counts.
 	 */
 
-	ata_timing_quantize(s, t, T, UT);
+	ata_timing_quantize(t, t, T, UT);
 
 	/* Even in DMA/UDMA modes we still use PIO access for IDENTIFY,
 	 * S.M.A.R.T and some other commands. We have to ensure that the DMA

@@ -564,7 +564,7 @@ static struct atm_dev lecatm_dev = {
         999,	    /*dummy device number*/
         NULL,NULL,  /*no VCCs*/
         NULL,NULL,  /*no data*/
-        { 0 },	    /*no flags*/
+        0,	    /*no flags*/
         NULL,	    /* no local address*/
         { 0 }	    /*no ESI or rest of the atm_dev struct things*/
 };
