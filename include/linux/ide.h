@@ -1513,64 +1513,6 @@ int ide_taskfile_ioctl(ide_drive_t *, unsigned int, unsigned long);
 int ide_cmd_ioctl(ide_drive_t *, unsigned int, unsigned long);
 int ide_task_ioctl(ide_drive_t *, unsigned int, unsigned long);
 
-#if 0
-
-#define IDEFLOPPY_PC_BUFFER_SIZE        256
-#define IDETAPE_PC_BUFFER_SIZE          256
-#define IDE_PC_BUFFER_SIZE          256
-
-typedef struct ide_packet_command_s {
-		/* Actual packet bytes */
-	u8 c[12];
-		/* On each retry, we increment retries */
-	int retries;
-		/* Error code */
-	int error;
-		/* Bytes to transfer */
-	int request_transfer;
-		/* Bytes actually transferred */
-	int actually_transferred;
-		/* Size of our data buffer */
-	int buffer_size;
-
-	struct buffer_head *bh;
-	u8 *b_data;
-		/* The corresponding request */
-	struct request *rq;
-# if 0
-		/* Scatter gather table */
-	struct scatterlist *sg;
-# endif
-	int b_count;
-		/* Data buffer */
-	u8 *buffer;
-		/* Pointer into the above buffer */
-	u8 *current_position;
-		/* Called when this packet command is completed */
-	ide_startstop_t (*callback) (ide_drive_t *);
-		/* Temporary buffer */
-	u8 pc_buffer[IDE_PC_BUFFER_SIZE];
-		/* Status/Action bit flags: long for set_bit */
-	unsigned long flags;
-} ide_pc_t;
-
-ide-cd orthoginal :-/
-struct packet_command {
-        char *buffer;
-        int buflen;
-        int stat;
-        int quiet;
-        int timeout;
-        struct request_sense *sense;
-        unsigned char c[12];
-};
-
-#endif
-
-#ifdef CONFIG_PKT_TASK_IOCTL
-extern int pkt_taskfile_ioctl(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
-#endif /* CONFIG_PKT_TASK_IOCTL */
-
 extern void ide_delay_50ms(void);
 extern int system_bus_clock(void);
 
