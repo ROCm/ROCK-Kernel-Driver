@@ -84,7 +84,7 @@ unsigned int sa11x0_getspeed(void)
 /*
  * We still need to provide this so building without cpufreq works.
  */ 
-unsigned int cpufreq_get(int cpu)
+unsigned int cpufreq_get(unsigned int cpu)
 {
 	return cclk_frequency_100khz[PPCR & 0xf] * 100;
 }
