@@ -22,11 +22,11 @@
 #undef  ISDN_DEBUG_MODEM_DUMP
 #undef  ISDN_DEBUG_MODEM_VOICE
 #undef  ISDN_DEBUG_AT
-#undef  ISDN_DEBUG_NET_DUMP
-#undef  ISDN_DEBUG_NET_DIAL
-#undef  ISDN_DEBUG_NET_ICALL
-#undef  ISDN_DEBUG_STATCALLB
-#undef  ISDN_DEBUG_COMMAND
+#define  ISDN_DEBUG_NET_DUMP
+#define  ISDN_DEBUG_NET_DIAL
+#define  ISDN_DEBUG_NET_ICALL
+#define  ISDN_DEBUG_STATCALLB
+#define  ISDN_DEBUG_COMMAND
 
 #ifdef ISDN_DEBUG_NET_DIAL
 #define dbg_net_dial(arg...) printk(KERN_DEBUG arg)
@@ -51,6 +51,8 @@ do { printk(KERN_WARNING "ISDN Bug at %s:%d\n", __FILE__, __LINE__); \
 } while(0)
 
 #define HERE printk("%s:%d (%s)\n", __FILE__, __LINE__, __FUNCTION__)
+
+extern struct list_head isdn_net_devs;
 
 /* Prototypes */
 extern void isdn_MOD_INC_USE_COUNT(void);
@@ -82,8 +84,6 @@ struct dial_info {
 	unsigned char *phone;
 };
 
-extern struct list_head isdn_net_devs;
-
 extern int   isdn_get_free_slot(int, int, int, int, int, char *);
 extern void  isdn_slot_free(int slot, int usage);
 extern void  isdn_slot_all_eaz(int slot);
@@ -100,8 +100,6 @@ extern void  isdn_slot_set_usage(int slot, int usage);
 extern char *isdn_slot_num(int slot);
 extern int   isdn_slot_m_idx(int slot);
 extern void  isdn_slot_set_m_idx(int slot, int midx);
-extern void  isdn_slot_set_rx_netdev(int sl, isdn_net_dev *nd);
-extern void  isdn_slot_set_st_netdev(int sl, isdn_net_dev *nd);
-extern isdn_net_dev *isdn_slot_rx_netdev(int sl);
-extern isdn_net_dev *isdn_slot_st_netdev(int sl);
+extern void  isdn_slot_set_idev(int sl, isdn_net_dev *);
+extern isdn_net_dev *isdn_slot_idev(int sl);
 extern int   isdn_hard_header_len(void);

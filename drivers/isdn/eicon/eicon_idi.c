@@ -1,4 +1,4 @@
-/* $Id: eicon_idi.c,v 1.41.6.4 2001/11/06 20:58:29 kai Exp $
+/* $Id: eicon_idi.c,v 1.1.4.1.2.4 2002/10/01 11:29:13 armin Exp $
  *
  * ISDN lowlevel-module for Eicon active cards.
  * IDI interface 
@@ -24,7 +24,7 @@
 
 #undef EICON_FULL_SERVICE_OKTETT
 
-char *eicon_idi_revision = "$Revision: 1.41.6.4 $";
+char *eicon_idi_revision = "$Revision: 1.1.4.1.2.4 $";
 
 eicon_manifbuf *manbuf;
 
