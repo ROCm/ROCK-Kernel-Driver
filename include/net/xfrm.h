@@ -8,6 +8,9 @@
 #include <net/dst.h>
 #include <net/route.h>
 
+extern struct semaphore xfrm_cfg_sem;
+
+
 /* Organization of SPD aka "XFRM rules"
    ------------------------------------
 
@@ -320,7 +323,7 @@ extern int xfrm_register_km(struct xfrm_mgr *km);
 extern int xfrm_unregister_km(struct xfrm_mgr *km);
 
 
-extern struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX];
+extern struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 
 static inline void xfrm_pol_hold(struct xfrm_policy *policy)
 {
@@ -429,16 +432,16 @@ static inline int xfrm_sk_clone_policy(struct sock *sk)
 	return 0;
 }
 
-extern void __xfrm_sk_free_policy(struct xfrm_policy *);
+extern void __xfrm_sk_free_policy(struct xfrm_policy *, int dir);
 
 static inline void xfrm_sk_free_policy(struct sock *sk)
 {
 	if (unlikely(sk->policy[0] != NULL)) {
-		__xfrm_sk_free_policy(sk->policy[0]);
+		__xfrm_sk_free_policy(sk->policy[0], 0);
 		sk->policy[0] = NULL;
 	}
 	if (unlikely(sk->policy[1] != NULL)) {
-		__xfrm_sk_free_policy(sk->policy[1]);
+		__xfrm_sk_free_policy(sk->policy[1], 1);
 		sk->policy[1] = NULL;
 	}
 }
@@ -477,7 +480,7 @@ extern int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *p
 extern struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl);
 extern int xfrm_flush_bundles(struct xfrm_state *x);
 
-extern wait_queue_head_t *km_waitq;
+extern wait_queue_head_t km_waitq;
 extern void km_warn_expired(struct xfrm_state *x);
 extern void km_expired(struct xfrm_state *x);
 extern int km_query(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *pol);

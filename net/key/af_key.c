@@ -30,6 +30,7 @@
 #define _X2KEY(x) ((x) == XFRM_INF ? 0 : (x))
 #define _KEY2X(x) ((x) == 0 ? XFRM_INF : (x))
 
+
 /* List of all pfkey sockets. */
 static struct sock * pfkey_table;
 static DECLARE_WAIT_QUEUE_HEAD(pfkey_table_wait);
@@ -871,10 +872,6 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	    !!ext_hdrs[SADB_EXT_LIFETIME_SOFT-1])
 		return ERR_PTR(-EINVAL);
 
-	/* XXX Do we need this check ? */
-	if (((struct sadb_address *) ext_hdrs[SADB_EXT_ADDRESS_SRC-1])->sadb_address_prefixlen != 32 ||
-	    ((struct sadb_address *) ext_hdrs[SADB_EXT_ADDRESS_DST-1])->sadb_address_prefixlen != 32)
-		return ERR_PTR(-EINVAL);
 	proto = pfkey_satype2proto(hdr->sadb_msg_satype);
 	if (proto == 0)
 		return ERR_PTR(-EINVAL);
@@ -1379,6 +1376,34 @@ static int pfkey_promisc(struct sock *sk, struct sk_buff *skb, struct sadb_msg *
 	return 0;
 }
 
+static int check_reqid(struct xfrm_policy *xp, int dir, int count, void *ptr)
+{
+	int i;
+	u16 reqid = *(u16*)ptr;
+
+	for (i=0; i<xp->xfrm_nr; i++) {
+		if (xp->xfrm_vec[i].reqid == reqid)
+			return -EEXIST;
+	}
+	return 0;
+}
+
+static u16 gen_reqid(void)
+{
+	u16 start;
+	static u16 reqid = IPSEC_MANUAL_REQID_MAX;
+
+	start = reqid;
+	do {
+		++reqid;
+		if (reqid == 0)
+			reqid = IPSEC_MANUAL_REQID_MAX+1;
+		if (xfrm_policy_walk(check_reqid, (void*)&reqid) != -EEXIST)
+			return reqid;
+	} while (reqid != start);
+	return 0;
+}
+
 static int
 parse_ipsecrequest(struct xfrm_policy *xp, struct sadb_x_ipsecrequest *rq)
 {
@@ -1395,7 +1420,14 @@ parse_ipsecrequest(struct xfrm_policy *xp, struct sadb_x_ipsecrequest *rq)
 	t->mode = rq->sadb_x_ipsecrequest_mode-1;
 	if (rq->sadb_x_ipsecrequest_level == IPSEC_LEVEL_USE)
 		t->optional = 1;
-	t->reqid = rq->sadb_x_ipsecrequest_reqid;
+	else if (rq->sadb_x_ipsecrequest_level == IPSEC_LEVEL_UNIQUE) {
+		t->reqid = rq->sadb_x_ipsecrequest_reqid;
+		if (t->reqid > IPSEC_MANUAL_REQID_MAX)
+			t->reqid = 0;
+		if (!t->reqid && !(t->reqid = gen_reqid()))
+			return -ENOBUFS;
+	}
+
 	/* addresses present only in tunnel mode */
 	if (t->mode) {
 		addr = (void*)(rq+1);
@@ -1544,6 +1576,8 @@ static struct sk_buff * pfkey_xfrm_policy2msg(struct xfrm_policy *xp, int dir)
 		rq->sadb_x_ipsecrequest_proto = t->id.proto;
 		rq->sadb_x_ipsecrequest_mode = t->mode+1;
 		rq->sadb_x_ipsecrequest_level = IPSEC_LEVEL_REQUIRE;
+		if (t->reqid)
+			rq->sadb_x_ipsecrequest_level = IPSEC_LEVEL_UNIQUE;
 		if (t->optional)
 			rq->sadb_x_ipsecrequest_level = IPSEC_LEVEL_USE;
 		rq->sadb_x_ipsecrequest_reqid = t->reqid;
@@ -1590,7 +1624,6 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	if (xp == NULL)
 		return -ENOBUFS;
 
-	xp->index = pol->sadb_x_policy_id;
 	xp->action = (pol->sadb_x_policy_type == IPSEC_POLICY_DISCARD ?
 		      XFRM_POLICY_BLOCK : XFRM_POLICY_ALLOW);
 
@@ -2013,6 +2046,18 @@ static int pfkey_send_notify(struct xfrm_state *x, int hard)
 	return 0;
 }
 
+static u32 get_acqseq(void)
+{
+	u32 res;
+	static u32 acqseq;
+	static spinlock_t acqseq_lock = SPIN_LOCK_UNLOCKED;
+
+	spin_lock_bh(&acqseq_lock);
+	res = (++acqseq ? : ++acqseq);
+	spin_unlock_bh(&acqseq_lock);
+	return res;
+}
+
 static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *xp, int dir)
 {
 	struct sk_buff *skb;
@@ -2020,7 +2065,6 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	struct sadb_address *addr;
 	struct sadb_x_policy *pol;
 	int size;
-	static u32 acqseq;
 	
 	size = sizeof(struct sadb_msg) +
 		sizeof(struct sadb_address)*2 + 
@@ -2043,10 +2087,9 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	hdr->sadb_msg_len = size / sizeof(uint64_t);
 	hdr->sadb_msg_errno = 0;
 	hdr->sadb_msg_reserved = 0;
-	hdr->sadb_msg_seq = (++acqseq ? : ++acqseq);
-	x->km.seq = acqseq;
+	hdr->sadb_msg_seq = x->km.seq = get_acqseq();
 	hdr->sadb_msg_pid = 0;
-	
+
 	/* src address */
 	addr = (struct sadb_address*) skb_put(skb, 
 					      sizeof(struct sadb_address)+sizeof(struct sockaddr_in));
@@ -2076,7 +2119,7 @@ static int pfkey_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *t, struct 
 	((struct sockaddr_in*)(addr + 1))->sin_addr.s_addr = 
 		x->id.daddr.xfrm4_addr;
 	((struct sockaddr_in*)(addr + 1))->sin_port = 0;
-	
+
 	pol = (struct sadb_x_policy *)  skb_put(skb, sizeof(struct sadb_x_policy));
 	pol->sadb_x_policy_len = sizeof(struct sadb_x_policy)/sizeof(uint64_t);
 	pol->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
@@ -2119,7 +2162,6 @@ static struct xfrm_policy *pfkey_compile_policy(int opt, u8 *data, int len, int 
 		return NULL;
 	}
 
-	xp->index = pol->sadb_x_policy_id;
 	xp->action = (pol->sadb_x_policy_type == IPSEC_POLICY_DISCARD ?
 		      XFRM_POLICY_BLOCK : XFRM_POLICY_ALLOW);
 
@@ -2171,7 +2213,9 @@ static int pfkey_sendmsg(struct kiocb *kiocb,
 	if (!hdr)
 		goto out;
 
+	down(&xfrm_cfg_sem);
 	err = pfkey_process(sk, skb, hdr);
+	up(&xfrm_cfg_sem);
 
 out:
 	if (err && hdr && pfkey_error(hdr, err, sk) == 0)
@@ -2179,7 +2223,7 @@ out:
 	if (skb)
 		kfree_skb(skb);
 
-	return err;
+	return err ? : len;
 }
 
 static int pfkey_recvmsg(struct kiocb *kiocb,
