@@ -1788,7 +1788,7 @@ static int l2cap_connect_ind(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 type)
 		if (sk->state != BT_LISTEN)
 			continue;
 
-		if (!bacmp(&bt_sk(sk)->src, bdaddr)) {
+		if (!bacmp(&bt_sk(sk)->src, &hdev->bdaddr)) {
 			lm1 |= (HCI_LM_ACCEPT | l2cap_pi(sk)->link_mode);
 			exact++;
 		} else if (!bacmp(&bt_sk(sk)->src, BDADDR_ANY))
