@@ -25,15 +25,11 @@ static DECLARE_RWSEM(_lock);
 
 static inline struct tt_internal *__find_target_type(const char *name)
 {
-	struct list_head *tih;
 	struct tt_internal *ti;
 
-	list_for_each(tih, &_targets) {
-		ti = list_entry(tih, struct tt_internal, list);
-
+	list_for_each_entry (ti, &_targets, list)
 		if (!strcmp(name, ti->tt.name))
 			return ti;
-	}
 
 	return NULL;
 }
@@ -100,6 +96,20 @@ static struct tt_internal *alloc_target(struct target_type *t)
 	return ti;
 }
 
+
+int dm_target_iterate(void (*iter_func)(struct target_type *tt,
+					void *param), void *param)
+{
+	struct tt_internal *ti;
+
+	down_read(&_lock);
+	list_for_each_entry (ti, &_targets, list)
+		iter_func(&ti->tt, param);
+	up_read(&_lock);
+
+	return 0;
+}
+
 int dm_register_target(struct target_type *t)
 {
 	int rv = 0;
@@ -157,13 +167,15 @@ static void io_err_dtr(struct dm_target *ti)
 	/* empty */
 }
 
-static int io_err_map(struct dm_target *ti, struct bio *bio)
+static int io_err_map(struct dm_target *ti, struct bio *bio,
+		      union map_info *map_context)
 {
 	return -EIO;
 }
 
 static struct target_type error_target = {
 	.name = "error",
+	.version = {1, 0, 1},
 	.ctr  = io_err_ctr,
 	.dtr  = io_err_dtr,
 	.map  = io_err_map,

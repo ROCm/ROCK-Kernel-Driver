@@ -33,6 +33,8 @@ static int kmsg_release(struct inode * inode, struct file * file)
 static ssize_t kmsg_read(struct file *file, char __user *buf,
 			 size_t count, loff_t *ppos)
 {
+	if ((file->f_flags & O_NONBLOCK) && !do_syslog(9, 0, 0))
+		return -EAGAIN;
 	return do_syslog(2, buf, count);
 }
 

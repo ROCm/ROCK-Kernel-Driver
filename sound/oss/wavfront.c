@@ -75,6 +75,7 @@
 #include <linux/smp_lock.h>
 #include <linux/ptrace.h>
 #include <linux/fcntl.h>
+#include <linux/syscalls.h>
 #include <linux/ioport.h>    
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>

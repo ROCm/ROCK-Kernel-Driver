@@ -66,7 +66,7 @@ extern void find_max_pfn(void);
 extern void one_highpage_init(struct page *, int, int);
 
 extern struct e820map e820;
-extern char _end;
+extern unsigned long init_pg_tables_end;
 extern unsigned long highend_pfn, highstart_pfn;
 extern unsigned long max_low_pfn;
 extern unsigned long totalram_pages;
@@ -237,7 +237,7 @@ unsigned long __init setup_memory(void)
 	reserve_pages = calculate_numa_remap_pages();
 
 	/* partially used pages are not usable - thus round upwards */
-	system_start_pfn = min_low_pfn = PFN_UP(__pa(&_end));
+	system_start_pfn = min_low_pfn = PFN_UP(init_pg_tables_end);
 
 	find_max_pfn();
 	system_max_low_pfn = max_low_pfn = find_max_low_pfn();

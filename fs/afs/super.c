@@ -53,6 +53,7 @@ static struct file_system_type afs_fs_type = {
 	.name		= "afs",
 	.get_sb		= afs_get_sb,
 	.kill_sb	= kill_anon_super,
+	.fs_flags	= FS_BINARY_MOUNTDATA,
 };
 
 static struct super_operations afs_super_ops = {

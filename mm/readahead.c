@@ -30,6 +30,7 @@ file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
 {
 	memset(ra, 0, sizeof(*ra));
 	ra->ra_pages = mapping->backing_dev_info->ra_pages;
+	ra->average = ra->ra_pages / 2;
 }
 
 EXPORT_SYMBOL(file_ra_state_init);
@@ -380,9 +381,18 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 		 */
 		first_access=1;
 		ra->next_size = max / 2;
+		ra->prev_page = offset;
+		ra->serial_cnt++;
 		goto do_io;
 	}
 
+	if (offset == ra->prev_page + 1) {
+		if (ra->serial_cnt <= (max * 2))
+			ra->serial_cnt++;
+	} else {
+		ra->average = (ra->average + ra->serial_cnt) / 2;
+		ra->serial_cnt = 1;
+	}
 	preoffset = ra->prev_page;
 	ra->prev_page = offset;
 
@@ -449,8 +459,12 @@ do_io:
 			  * accessed in the current window, there
 			  * is a high probability that around 'n' pages
 			  * shall be used in the next current window.
+			  *
+			  * To minimize lazy-readahead triggered
+			  * in the next current window, read in
+			  * an extra page.
 			  */
-			ra->next_size = preoffset - ra->start + 1;
+			ra->next_size = preoffset - ra->start + 2;
 		}
 		ra->start = offset;
 		ra->size = ra->next_size;
@@ -468,17 +482,34 @@ do_io:
 		}
 	} else {
 		/*
-		 * This read request is within the current window.  It is time
-		 * to submit I/O for the ahead window while the application is
-		 * crunching through the current window.
+		 * This read request is within the current window.  It may be
+		 * time to submit I/O for the ahead window while the
+		 * application is about to step into the ahead window.
 		 */
 		if (ra->ahead_start == 0) {
-			ra->ahead_start = ra->start + ra->size;
-			ra->ahead_size = ra->next_size;
-			actual = do_page_cache_readahead(mapping, filp,
+			/*
+			 * if the average io-size is less than maximum
+			 * readahead size of the file the io pattern is
+			 * sequential. Hence  bring in the readahead window
+			 * immediately.
+			 * Else the i/o pattern is random. Bring
+			 * in the readahead window only if the last page of
+			 * the current window is accessed (lazy readahead).
+			 */
+			unsigned long average = ra->average;
+
+			if (ra->serial_cnt > average)
+				average = (ra->serial_cnt + ra->average) / 2;
+
+			if ((average >= max) || (offset == (ra->start +
+							ra->size - 1))) {
+				ra->ahead_start = ra->start + ra->size;
+				ra->ahead_size = ra->next_size;
+				actual = do_page_cache_readahead(mapping, filp,
 					ra->ahead_start, ra->ahead_size);
-			check_ra_success(ra, ra->ahead_size,
-					actual, orig_next_size);
+				check_ra_success(ra, ra->ahead_size,
+						actual, orig_next_size);
+			}
 		}
 	}
 out:

@@ -46,10 +46,8 @@ extern int ints_inited;
 irqreturn_t q40_irq2_handler (int, void *, struct pt_regs *fp);
 
 
-extern irqreturn_t (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);
-
 static irqreturn_t q40_defhand (int irq, void *dev_id, struct pt_regs *fp);
-static irqreturn_t sys_default_handler(int lev, void *dev_id, struct pt_regs *regs);
+static irqreturn_t default_handler(int lev, void *dev_id, struct pt_regs *regs);
 
 
 #define DEVNAME_SIZE 24
@@ -96,7 +94,8 @@ void q40_init_IRQ (void)
 	}
 
 	/* setup handler for ISA ints */
-	sys_request_irq(IRQ2,q40_irq2_handler, 0, "q40 ISA and master chip", NULL);
+	cpu_request_irq(IRQ2, q40_irq2_handler, 0, "q40 ISA and master chip",
+			NULL);
 
 	/* now enable some ints.. */
 	master_outb(1,EXT_ENABLE_REG);  /* ISA IRQ 5-15 */
@@ -153,8 +152,8 @@ int q40_request_irq(unsigned int irq,
 	  }
 	else {
 	  /* Q40_IRQ_SAMPLE :somewhat special actions required here ..*/
-	  sys_request_irq(4,handler,flags,devname,dev_id);
-	  sys_request_irq(6,handler,flags,devname,dev_id);
+	  cpu_request_irq(4, handler, flags, devname, dev_id);
+	  cpu_request_irq(6, handler, flags, devname, dev_id);
 	  return 0;
 	}
 }
@@ -192,8 +191,8 @@ void q40_free_irq(unsigned int irq, void *dev_id)
 	  }
 	else
 	  { /* == Q40_IRQ_SAMPLE */
-	    sys_free_irq(4,dev_id);
-	    sys_free_irq(6,dev_id);
+	    cpu_free_irq(4, dev_id);
+	    cpu_free_irq(6, dev_id);
 	  }
 }
 
@@ -417,16 +416,16 @@ static irqreturn_t q40_defhand (int irq, void *dev_id, struct pt_regs *fp)
 	else master_outb(-1,KEYBOARD_UNLOCK_REG);
 	return IRQ_NONE;
 }
-static irqreturn_t sys_default_handler(int lev, void *dev_id, struct pt_regs *regs)
+static irqreturn_t default_handler(int lev, void *dev_id, struct pt_regs *regs)
 {
 	printk ("Uninitialised interrupt level %d\n", lev);
 	return IRQ_NONE;
 }
 
- irqreturn_t (*q40_sys_default_handler[SYS_IRQS]) (int, void *, struct pt_regs *) = {
-	 sys_default_handler,sys_default_handler,sys_default_handler,sys_default_handler,
-	 sys_default_handler,sys_default_handler,sys_default_handler,sys_default_handler
- };
+irqreturn_t (*q40_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
+	 default_handler, default_handler, default_handler, default_handler,
+	 default_handler, default_handler, default_handler, default_handler
+};
 
 
 void q40_enable_irq (unsigned int irq)

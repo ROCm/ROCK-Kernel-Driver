@@ -20,6 +20,9 @@ ufstype=type_of_ufs
 	44bsd	used in FreeBSD, NetBSD, OpenBSD
 		supported os read-write
 
+       ufs2    used in FreeBSD 5.x
+               supported os read-only
+
 	sun	used in SunOS (Solaris)
 		supported as read-write
 

@@ -64,17 +64,20 @@ new_module(char *modname)
 {
 	struct module *mod;
 	char *p;
+	size_t len;
 	
 	mod = NOFAIL(malloc(sizeof(*mod)));
 	memset(mod, 0, sizeof(*mod));
-	mod->name = NOFAIL(strdup(modname));
+	p = NOFAIL(strdup(modname));
+
+	len = strlen(p);
 
 	/* strip trailing .o */
-	p = strstr(mod->name, ".o");
-	if (p)
-		*p = 0;
+	if (len > 2 && p[len-2] == '.' && p[len-1] == 'o')
+		p[len -2] = '\0';
 
 	/* add to list */
+	mod->name = NOFAIL(strdup(p));
 	mod->next = modules;
 	modules = mod;
 

@@ -98,23 +98,38 @@ struct page_state {
 	unsigned long pgpgout;		/* Disk writes */
 	unsigned long pswpin;		/* swap reads */
 	unsigned long pswpout;		/* swap writes */
-	unsigned long pgalloc;		/* page allocations */
+	unsigned long pgalloc_high;	/* page allocations */
 
+	unsigned long pgalloc_normal;
+	unsigned long pgalloc_dma;
 	unsigned long pgfree;		/* page freeings */
 	unsigned long pgactivate;	/* pages moved inactive->active */
 	unsigned long pgdeactivate;	/* pages moved active->inactive */
+
 	unsigned long pgfault;		/* faults (major+minor) */
 	unsigned long pgmajfault;	/* faults (major only) */
+	unsigned long pgrefill_high;	/* inspected in refill_inactive_zone */
+	unsigned long pgrefill_normal;
+	unsigned long pgrefill_dma;
 
-	unsigned long pgscan;		/* pages scanned by page reclaim */
-	unsigned long pgrefill;		/* inspected in refill_inactive_zone */
-	unsigned long pgsteal;		/* total pages reclaimed */
+	unsigned long pgsteal_high;	/* total highmem pages reclaimed */
+	unsigned long pgsteal_normal;
+	unsigned long pgsteal_dma;
+	unsigned long pgscan_kswapd_high;/* total highmem pages scanned */
+	unsigned long pgscan_kswapd_normal;
+
+	unsigned long pgscan_kswapd_dma;
+	unsigned long pgscan_direct_high;/* total highmem pages scanned */
+	unsigned long pgscan_direct_normal;
+	unsigned long pgscan_direct_dma;
 	unsigned long pginodesteal;	/* pages reclaimed via inode freeing */
-	unsigned long kswapd_steal;	/* pages reclaimed by kswapd */
 
+	unsigned long slabs_scanned;	/* slab objects scanned */
+	unsigned long kswapd_steal;	/* pages reclaimed by kswapd */
 	unsigned long kswapd_inodesteal;/* reclaimed via kswapd inode freeing */
 	unsigned long pageoutrun;	/* kswapd's calls to page reclaim */
 	unsigned long allocstall;	/* direct reclaim calls */
+
 	unsigned long pgrotated;	/* pages rotated to tail of the LRU */
 } ____cacheline_aligned;
 
@@ -131,11 +146,24 @@ extern void get_full_page_state(struct page_state *ret);
 		local_irq_restore(flags);				\
 	} while (0)
 
+
 #define inc_page_state(member)	mod_page_state(member, 1UL)
 #define dec_page_state(member)	mod_page_state(member, 0UL - 1)
 #define add_page_state(member,delta) mod_page_state(member, (delta))
 #define sub_page_state(member,delta) mod_page_state(member, 0UL - (delta))
 
+#define mod_page_state_zone(zone, member, delta)			\
+	do {								\
+		unsigned long flags;					\
+		local_irq_save(flags);					\
+		if (is_highmem(zone))					\
+			__get_cpu_var(page_states).member##_high += (delta);\
+		else if (is_normal(zone))				\
+			__get_cpu_var(page_states).member##_normal += (delta);\
+		else							\
+			__get_cpu_var(page_states).member##_dma += (delta);\
+		local_irq_restore(flags);				\
+	} while (0)
 
 /*
  * Manipulation of page state flags

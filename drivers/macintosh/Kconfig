@@ -1,5 +1,6 @@
 
 menu "Macintosh device drivers"
+	depends on PPC || MAC
 
 config ADB
 	bool "Apple Desktop Bus (ADB) support"

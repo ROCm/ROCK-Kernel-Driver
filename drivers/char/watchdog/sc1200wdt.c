@@ -29,6 +29,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/ioport.h>
@@ -80,13 +81,13 @@ spinlock_t sc1200wdt_lock;	/* io port access serialisation */
 static int isapnp = 1;
 static struct pnp_dev *wdt_dev;
 
-MODULE_PARM(isapnp, "i");
+module_param(isapnp, int, 0);
 MODULE_PARM_DESC(isapnp, "When set to 0 driver ISA PnP support will be disabled");
 #endif
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "io port");
-MODULE_PARM(timeout, "i");
+module_param(timeout, int, 0);
 MODULE_PARM_DESC(timeout, "range is 0-255 minutes, default is 1");
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
@@ -95,7 +96,7 @@ static int nowayout = 1;
 static int nowayout = 0;
 #endif
 
-MODULE_PARM(nowayout,"i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 
@@ -453,32 +454,6 @@ static void __exit sc1200wdt_exit(void)
 #endif
 	release_region(io, io_len);
 }
-
-
-#ifndef MODULE
-static int __init sc1200wdt_setup(char *str)
-{
-	int ints[4];
-
-	str = get_options (str, ARRAY_SIZE(ints), ints);
-
-	if (ints[0] > 0) {
-		io = ints[1];
-		if (ints[0] > 1)
-			timeout = ints[2];
-
-#if defined CONFIG_PNP
-		if (ints[0] > 2)
-			isapnp = ints[3];
-#endif
-	}
-
-	return 1;
-}
-
-__setup("sc1200wdt=", sc1200wdt_setup);
-#endif /* MODULE */
-
 
 module_init(sc1200wdt_init);
 module_exit(sc1200wdt_exit);

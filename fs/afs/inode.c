@@ -188,6 +188,7 @@ inline int afs_iget(struct super_block *sb, struct afs_fid *fid,
 #endif
 
 	/* okay... it's a new inode */
+	inode->i_flags |= S_NOATIME;
 	vnode->flags |= AFS_VNODE_CHANGED;
 	ret = afs_inode_fetch_status(inode);
 	if (ret<0)

@@ -226,7 +226,7 @@ sysret_careful:
 	/* Handle a signal */ 
 sysret_signal:
 	sti
-	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME),%edx
+	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
 	jz    1f
 
 	/* Really a signal */
@@ -307,7 +307,7 @@ int_very_careful:
 	jmp int_restore_rest
 	
 int_signal:
-	testl $(_TIF_NOTIFY_RESUME|_TIF_SIGPENDING),%edx
+	testl $(_TIF_NOTIFY_RESUME|_TIF_SIGPENDING|_TIF_SINGLESTEP),%edx
 	jz 1f
 	movq %rsp,%rdi		# &ptregs -> arg1
 	xorl %esi,%esi		# oldset -> arg2
@@ -489,7 +489,7 @@ retint_careful:
 	jmp retint_check
 	
 retint_signal:
-	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME),%edx
+	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
 	jz    retint_swapgs
 	sti
 	SAVE_REST
@@ -572,6 +572,24 @@ ENTRY(spurious_interrupt)
 	jmp error_entry
 	.endm
 
+	/* error code is on the stack already */
+	/* handle NMI like exceptions that can happen everywhere */
+	.macro paranoidentry sym
+	SAVE_ALL
+	cld
+	movl $1,%ebx
+	movl  $MSR_GS_BASE,%ecx
+	rdmsr
+	testl %edx,%edx
+	js    1f
+	swapgs
+	xorl  %ebx,%ebx
+1:	movq %rsp,%rdi
+	movq ORIG_RAX(%rsp),%rsi
+	movq $-1,ORIG_RAX(%rsp)
+	call \sym
+	.endm
+	
 /*
  * Exception entry point. This expects an error code/orig_rax on the stack
  * and the exception handler in %rax.	
@@ -625,6 +643,7 @@ error_sti:
 	movq ORIG_RAX(%rsp),%rsi	/* get error code */ 
 	movq $-1,ORIG_RAX(%rsp)
 	call *%rax
+	/* ebx:	no swapgs flag (1: don't need swapgs, 0: need it) */	 
 error_exit:		
 	movl %ebx,%eax		
 	RESTORE_REST
@@ -776,48 +795,59 @@ ENTRY(simd_coprocessor_error)
 	zeroentry do_simd_coprocessor_error	
 
 ENTRY(device_not_available)
+	zeroentry math_state_restore
+
+	/* runs on exception stack */
+ENTRY(debug)
 	CFI_STARTPROC
-	pushq $-1	#error code
-	SAVE_ALL
-	movl  $1,%ebx
-	testl $3,CS(%rsp)
-	je 1f
-	xorl %ebx,%ebx
-	swapgs
-1:	movq  %cr0,%rax
-	leaq  math_state_restore(%rip),%rcx
-	leaq  math_emulate(%rip),%rdx
-	testl $0x4,%eax
-	cmoveq %rcx,%rdx
-	call  *%rdx
-	jmp  error_exit
+	pushq $0
+	CFI_ADJUST_CFA_OFFSET 8		
+	paranoidentry do_debug
+paranoid_stack_switch:	
+	testq %rax,%rax
+	jz paranoid_exit
+	/* switch back to process stack to restore the state ptrace touched */
+	movq %rax,%rsp	
+	jmp paranoid_exit
 	CFI_ENDPROC
 
-ENTRY(debug)
-	zeroentry do_debug
-
+	/* runs on exception stack */	
 ENTRY(nmi)
 	CFI_STARTPROC
 	pushq $-1
-	SAVE_ALL
-        /* NMI could happen inside the critical section of a swapgs,
-           so it is needed to use this expensive way to check. */
-        movl  $MSR_GS_BASE,%ecx
-        rdmsr
-        xorl  %ebx,%ebx
-        testl %edx,%edx
-        js    1f
-	swapgs
-	movl $1,%ebx
-1:	movq %rsp,%rdi # regs -> arg1
-	call do_nmi
-	/* XXX: should do preemption checks here */
+	CFI_ADJUST_CFA_OFFSET 8		
+	paranoidentry do_nmi
+	/* ebx:	no swapgs flag */
+paranoid_exit:
+	testl $3,CS(%rsp)
+	jnz   paranoid_userspace	
+	testl %ebx,%ebx				/* swapgs needed? */
+	jnz paranoid_restore
+paranoid_swapgs:	
 	cli
-	testl %ebx,%ebx
-	jz 2f
 	swapgs
-2:	RESTORE_ALL 8
+paranoid_restore:	
+	RESTORE_ALL 8
 	iretq
+paranoid_userspace:	
+	cli
+	GET_THREAD_INFO(%rcx)
+	movl threadinfo_flags(%rcx),%edx
+	testl $_TIF_NEED_RESCHED,%edx
+	jnz paranoid_resched
+	testl $(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SINGLESTEP),%edx
+	jnz paranoid_signal
+	jmp paranoid_swapgs
+paranoid_resched:		
+	sti
+	call schedule
+	jmp paranoid_exit
+paranoid_signal:		
+	sti
+	xorl %esi,%esi /* oldset */
+	movq %rsp,%rdi /* &pt_regs */
+	call do_notify_resume
+	jmp paranoid_exit
 	CFI_ENDPROC
 	
 ENTRY(int3)
@@ -838,8 +868,10 @@ ENTRY(coprocessor_segment_overrun)
 ENTRY(reserved)
 	zeroentry do_reserved
 
+	/* runs on exception stack */
 ENTRY(double_fault)
-	errorentry do_double_fault	
+	paranoidentry do_double_fault
+	jmp paranoid_stack_switch
 
 ENTRY(invalid_TSS)
 	errorentry do_invalid_TSS
@@ -847,8 +879,10 @@ ENTRY(invalid_TSS)
 ENTRY(segment_not_present)
 	errorentry do_segment_not_present
 
+	/* runs on exception stack */
 ENTRY(stack_segment)
-	errorentry do_stack_segment
+	paranoidentry do_stack_segment
+	jmp paranoid_stack_switch
 
 ENTRY(general_protection)
 	errorentry do_general_protection
@@ -862,8 +896,14 @@ ENTRY(divide_error)
 ENTRY(spurious_interrupt_bug)
 	zeroentry do_spurious_interrupt_bug
 
+	/* runs on exception stack */
 ENTRY(machine_check)
-       zeroentry do_machine_check      
+	CFI_STARTPROC
+	pushq $0
+	CFI_ADJUST_CFA_OFFSET 8	
+	paranoidentry do_machine_check
+	jmp paranoid_exit
+	CFI_ENDPROC
 
 ENTRY(call_debug)
        zeroentry do_call_debug

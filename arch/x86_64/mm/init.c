@@ -37,7 +37,9 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 
+#ifndef Dprintk
 #define Dprintk(x...)
+#endif
 
 extern char _stext[];
 
@@ -577,3 +579,32 @@ static __init int x8664_sysctl_init(void)
 }
 __initcall(x8664_sysctl_init);
 #endif
+
+/* Pseudo VMAs to allow ptrace access for the vsyscall pages.  x86-64 has two
+   different ones: one for 32bit and one for 64bit. Use the appropiate
+   for the target task. */
+
+static struct vm_area_struct gate_vma = {
+	.vm_start = VSYSCALL_START,
+	.vm_end = VSYSCALL_END,
+	.vm_page_prot = PAGE_READONLY
+};
+
+static struct vm_area_struct gate32_vma = {
+	.vm_start = VSYSCALL32_BASE,
+	.vm_end = VSYSCALL32_END,
+	.vm_page_prot = PAGE_READONLY
+};
+
+struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
+{
+	return test_tsk_thread_flag(tsk, TIF_IA32) ? &gate32_vma : &gate_vma;
+}
+
+int in_gate_area(struct task_struct *task, unsigned long addr)
+{
+	struct vm_area_struct *vma = &gate_vma;
+	if (test_tsk_thread_flag(task, TIF_IA32))
+		vma = &gate32_vma;
+	return (addr >= vma->vm_start) && (addr < vma->vm_end);
+}

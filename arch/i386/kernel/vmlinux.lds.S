@@ -105,9 +105,14 @@ SECTIONS
 	
   __bss_start = .;		/* BSS */
   .bss : { *(.bss) }
+  . = ALIGN(4);
   __bss_stop = .; 
 
   _end = . ;
+
+  /* This is where the kernel creates the early boot page tables */
+  . = ALIGN(4096);
+  pg0 = .;
 
   /* Sections to be discarded */
   /DISCARD/ : {

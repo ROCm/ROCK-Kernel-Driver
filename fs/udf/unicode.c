@@ -36,7 +36,7 @@ static int udf_translate_to_linux(uint8_t *, uint8_t *, int, uint8_t *, int);
 
 static int udf_char_to_ustr(struct ustr *dest, const uint8_t *src, int strlen)
 {
-	if ( (!dest) || (!src) || (!strlen) || (strlen >= UDF_NAME_LEN) )
+	if ( (!dest) || (!src) || (!strlen) || (strlen > UDF_NAME_LEN-2) )
 		return 0;
 	memset(dest, 0, sizeof(struct ustr));
 	memcpy(dest->u_name, src, strlen);
@@ -181,14 +181,14 @@ int udf_CS0toUTF8(struct ustr *utf_o, struct ustr *ocu_i)
 static int udf_UTF8toCS0(dstring *ocu, struct ustr *utf, int length)
 {
 	unsigned c, i, max_val, utf_char;
-	int utf_cnt;
-	int u_len = 0;
+	int utf_cnt, u_len;
 
 	memset(ocu, 0, sizeof(dstring) * length);
 	ocu[0] = 8;
 	max_val = 0xffU;
 
 try_again:
+	u_len = 0U;
 	utf_char = 0U;
 	utf_cnt = 0U;
 	for (i = 0U; i < utf->u_len; i++)
@@ -264,8 +264,8 @@ try_again:
 	if (utf_cnt)
 	{
 error_out:
-		printk(KERN_ERR "udf: bad UTF-8 character\n");
-		return 0;
+		ocu[++u_len] = '?';
+		printk(KERN_DEBUG "udf: bad UTF-8 character\n");
 	}
 
 	ocu[length - 1] = (uint8_t)u_len + 1;
@@ -318,21 +318,21 @@ static int udf_NLStoCS0(struct nls_table *nls, dstring *ocu, struct ustr *uni, i
 {
 	unsigned len, i, max_val;
 	uint16_t uni_char;
-	int uni_cnt;
-	int u_len = 0;
+	int u_len;
 
 	memset(ocu, 0, sizeof(dstring) * length);
 	ocu[0] = 8;
 	max_val = 0xffU;
 
 try_again:
-	uni_char = 0U;
-	uni_cnt = 0U;
+	u_len = 0U;
 	for (i = 0U; i < uni->u_len; i++)
 	{
 		len = nls->char2uni(&uni->u_name[i], uni->u_len-i, &uni_char);
+		if (len <= 0)
+			continue;
 
-		if (len == 2 && max_val == 0xff)
+		if (uni_char > max_val)
 		{
 			max_val = 0xffffU;
 			ocu[0] = (uint8_t)0x10U;
@@ -340,11 +340,9 @@ try_again:
 		}
 		
 		if (max_val == 0xffffU)
-		{
 			ocu[++u_len] = (uint8_t)(uni_char >> 8);
-			i++;
-		}
 		ocu[++u_len] = (uint8_t)(uni_char & 0xffU);
+		i += len - 1;
 	}
 
 	ocu[length - 1] = (uint8_t)u_len + 1;

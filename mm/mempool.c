@@ -209,6 +209,7 @@ repeat_alloc:
 	 * If the pool is less than 50% full and we can perform effective
 	 * page reclaim then try harder to allocate an element.
 	 */
+	mb();
 	if ((gfp_mask & __GFP_FS) && (gfp_mask != gfp_nowait) &&
 				(pool->curr_nr <= pool->min_nr/2)) {
 		element = pool->alloc(gfp_mask, pool->pool_data);
@@ -236,6 +237,7 @@ repeat_alloc:
 	blk_run_queues();
 
 	prepare_to_wait(&pool->wait, &wait, TASK_UNINTERRUPTIBLE);
+	mb();
 	if (!pool->curr_nr)
 		io_schedule();
 	finish_wait(&pool->wait, &wait);
@@ -256,6 +258,7 @@ void mempool_free(void *element, mempool_t *pool)
 {
 	unsigned long flags;
 
+	mb();
 	if (pool->curr_nr < pool->min_nr) {
 		spin_lock_irqsave(&pool->lock, flags);
 		if (pool->curr_nr < pool->min_nr) {

@@ -137,8 +137,8 @@ void free_irq(unsigned int irq, void *dev_id)
 
 EXPORT_SYMBOL(free_irq);
 
-int sys_request_irq(unsigned int irq, 
-                    irqreturn_t (*handler)(int, void *, struct pt_regs *), 
+int cpu_request_irq(unsigned int irq,
+                    irqreturn_t (*handler)(int, void *, struct pt_regs *),
                     unsigned long flags, const char *devname, void *dev_id)
 {
 	if (irq < IRQ1 || irq > IRQ7) {
@@ -169,7 +169,7 @@ int sys_request_irq(unsigned int irq,
 	return 0;
 }
 
-void sys_free_irq(unsigned int irq, void *dev_id)
+void cpu_free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq < IRQ1 || irq > IRQ7) {
 		printk("%s: Incorrect IRQ %d\n", __FUNCTION__, irq);
