@@ -734,8 +734,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* reserved for sys_io_getevents */
 	.llong .sys_ni_syscall		/* 230 - reserved for sys_io_submit */
 	.llong .sys_ni_syscall		/* reserved for sys_io_cancel */
-	.llong .sys_ni_syscall		/* reserved for alloc_hugepages */
-	.llong .sys_ni_syscall		/* reserved for free_hugepages */
+	.llong .sys_set_tid_address
+	.llong .ppc32_fadvise64
 	.llong .sys_exit_group
 	.llong .ppc32_lookup_dcookie	/* 245 */
 	.llong .sys_epoll_create
@@ -981,8 +981,8 @@ _GLOBAL(sys_call_table)
 	.llong .sys_io_getevents
 	.llong .sys_io_submit		/* 230 */
 	.llong .sys_io_cancel
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
+	.llong .sys_set_tid_address
+	.llong .sys_fadvise64
 	.llong .sys_exit_group
 	.llong .sys_lookup_dcookie	/* 235 */
 	.llong .sys_epoll_create
