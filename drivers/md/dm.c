@@ -5,6 +5,7 @@
  */
 
 #include "dm.h"
+#include "dm-bio-list.h"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -47,7 +48,7 @@ struct mapped_device {
 	 */
 	atomic_t pending;
 	wait_queue_head_t wait;
-	struct bio *deferred;
+ 	struct bio_list deferred;
 
 	/*
 	 * The current mapping.
@@ -195,8 +196,7 @@ static int queue_io(struct mapped_device *md, struct bio *bio)
 		return 1;
 	}
 
-	bio->bi_next = md->deferred;
-	md->deferred = bio;
+	bio_list_add(&md->deferred, bio);
 
 	up_write(&md->lock);
 	return 0;		/* deferred successfully */
@@ -822,8 +822,7 @@ int dm_resume(struct mapped_device *md)
 	dm_table_resume_targets(md->map);
 	clear_bit(DMF_SUSPENDED, &md->flags);
 	clear_bit(DMF_BLOCK_IO, &md->flags);
-	def = md->deferred;
-	md->deferred = NULL;
+	def = bio_list_get(&md->deferred);
 	up_write(&md->lock);
 
 	flush_deferred_io(def);
