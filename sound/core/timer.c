@@ -1512,7 +1512,6 @@ static int snd_timer_user_info(struct file *file, snd_timer_info_t *_info)
 
 static int snd_timer_user_params(struct file *file, snd_timer_params_t *_params)
 {
-	unsigned long flags;
 	snd_timer_user_t *tu;
 	snd_timer_params_t params;
 	snd_timer_t *t;
@@ -1548,18 +1547,17 @@ static int snd_timer_user_params(struct file *file, snd_timer_params_t *_params)
 		goto _end;
 	}
 	snd_timer_stop(tu->timeri);
-	spin_lock_irqsave(&t->lock, flags);
-	if (params.flags & SNDRV_TIMER_PSFLG_AUTO) {
+	spin_lock_irq(&t->lock);
+	tu->timeri->flags &= ~(SNDRV_TIMER_IFLG_AUTO|
+			       SNDRV_TIMER_IFLG_EXCLUSIVE|
+			       SNDRV_TIMER_IFLG_EARLY_EVENT);
+	if (params.flags & SNDRV_TIMER_PSFLG_AUTO)
 		tu->timeri->flags |= SNDRV_TIMER_IFLG_AUTO;
-	} else {
-		tu->timeri->flags &= ~SNDRV_TIMER_IFLG_AUTO;
-	}
-	if (params.flags & SNDRV_TIMER_PSFLG_EXCLUSIVE) {
+	if (params.flags & SNDRV_TIMER_PSFLG_EXCLUSIVE)
 		tu->timeri->flags |= SNDRV_TIMER_IFLG_EXCLUSIVE;
-	} else {
-		tu->timeri->flags &= ~SNDRV_TIMER_IFLG_EXCLUSIVE;
-	}
-	spin_unlock_irqrestore(&t->lock, flags);
+	if (params.flags & SNDRV_TIMER_PSFLG_EARLY_EVENT)
+		tu->timeri->flags |= SNDRV_TIMER_IFLG_EARLY_EVENT;
+	spin_unlock_irq(&t->lock);
 	if (params.queue_size > 0 && (unsigned int)tu->queue_size != params.queue_size) {
 		if (tu->tread) {
 			ttr = (snd_timer_tread_t *)kmalloc(params.queue_size * sizeof(snd_timer_tread_t), GFP_KERNEL);
@@ -1577,6 +1575,24 @@ static int snd_timer_user_params(struct file *file, snd_timer_params_t *_params)
 			}
 		}
 	}
+	tu->qhead = tu->qtail = tu->qused = 0;
+	if (tu->timeri->flags & SNDRV_TIMER_IFLG_EARLY_EVENT) {
+		if (tu->tread) {
+			snd_timer_tread_t tread;
+			tread.event = SNDRV_TIMER_EVENT_EARLY;
+			tread.tstamp.tv_sec = 0;
+			tread.tstamp.tv_nsec = 0;
+			tread.val = 0;
+			snd_timer_user_append_to_tqueue(tu, &tread);
+		} else {
+			snd_timer_read_t *r = &tu->queue[0];
+			r->resolution = 0;
+			r->ticks = 0;
+			tu->qused++;
+			tu->qtail++;
+		}
+		
+	}
 	tu->filter = params.filter;
 	tu->ticks = params.ticks;
 	err = 0;
@@ -1588,7 +1604,6 @@ static int snd_timer_user_params(struct file *file, snd_timer_params_t *_params)
 
 static int snd_timer_user_status(struct file *file, snd_timer_status_t *_status)
 {
-	unsigned long flags;
 	snd_timer_user_t *tu;
 	snd_timer_status_t status;
 	
@@ -1599,9 +1614,9 @@ static int snd_timer_user_status(struct file *file, snd_timer_status_t *_status)
 	status.resolution = snd_timer_resolution(tu->timeri);
 	status.lost = tu->timeri->lost;
 	status.overrun = tu->overrun;
-	spin_lock_irqsave(&tu->qlock, flags);
+	spin_lock_irq(&tu->qlock);
 	status.queue = tu->qused;
-	spin_unlock_irqrestore(&tu->qlock, flags);
+	spin_unlock_irq(&tu->qlock);
 	if (copy_to_user(_status, &status, sizeof(status)))
 		return -EFAULT;
 	return 0;
