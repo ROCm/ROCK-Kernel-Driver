@@ -205,6 +205,8 @@ nlm_compare_locks(struct file_lock *fl1, struct file_lock *fl2)
 	     &&(fl1->fl_type  == fl2->fl_type || fl2->fl_type == F_UNLCK);
 }
 
+extern struct lock_manager_operations nlmsvc_lock_operations;
+
 #endif /* __KERNEL__ */
 
 #endif /* LINUX_LOCKD_LOCKD_H */
