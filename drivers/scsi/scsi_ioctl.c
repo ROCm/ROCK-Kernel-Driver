@@ -151,6 +151,29 @@ static int ioctl_internal_command(Scsi_Device * dev, char *cmd,
 	return result;
 }
 
+int scsi_set_medium_removal(Scsi_Device *dev, char state)
+{
+	char scsi_cmd[MAX_COMMAND_SIZE];
+	int ret;
+
+	if (!dev->removable || !dev->lockable)
+	       return 0;
+
+	scsi_cmd[0] = ALLOW_MEDIUM_REMOVAL;
+	scsi_cmd[1] = (dev->scsi_level <= SCSI_2) ? (dev->lun << 5) : 0;
+	scsi_cmd[2] = 0;
+	scsi_cmd[3] = 0;
+	scsi_cmd[4] = state;
+	scsi_cmd[5] = 0;
+
+	ret = ioctl_internal_command(dev, scsi_cmd, IOCTL_NORMAL_TIMEOUT, NORMAL_RETRIES);
+
+	if (ret == 0)
+		dev->locked = state == SCSI_REMOVAL_PREVENT;
+
+	return ret;
+}
+
 /*
  * This interface is deprecated - users should use the scsi generic (sg)
  * interface instead, as this is a more flexible approach to performing
@@ -456,24 +479,9 @@ int scsi_ioctl(Scsi_Device * dev, int cmd, void *arg)
 		return scsi_ioctl_send_command((Scsi_Device *) dev,
 					     (Scsi_Ioctl_Command *) arg);
 	case SCSI_IOCTL_DOORLOCK:
-		if (!dev->removable || !dev->lockable)
-			return 0;
-		scsi_cmd[0] = ALLOW_MEDIUM_REMOVAL;
-		scsi_cmd[1] = cmd_byte1;
-		scsi_cmd[2] = scsi_cmd[3] = scsi_cmd[5] = 0;
-		scsi_cmd[4] = SCSI_REMOVAL_PREVENT;
-		return ioctl_internal_command((Scsi_Device *) dev, scsi_cmd,
-				   IOCTL_NORMAL_TIMEOUT, NORMAL_RETRIES);
-		break;
+		return scsi_set_medium_removal(dev, SCSI_REMOVAL_PREVENT);
 	case SCSI_IOCTL_DOORUNLOCK:
-		if (!dev->removable || !dev->lockable)
-			return 0;
-		scsi_cmd[0] = ALLOW_MEDIUM_REMOVAL;
-		scsi_cmd[1] = cmd_byte1;
-		scsi_cmd[2] = scsi_cmd[3] = scsi_cmd[5] = 0;
-		scsi_cmd[4] = SCSI_REMOVAL_ALLOW;
-		return ioctl_internal_command((Scsi_Device *) dev, scsi_cmd,
-				   IOCTL_NORMAL_TIMEOUT, NORMAL_RETRIES);
+		return scsi_set_medium_removal(dev, SCSI_REMOVAL_ALLOW);
 	case SCSI_IOCTL_TEST_UNIT_READY:
 		scsi_cmd[0] = TEST_UNIT_READY;
 		scsi_cmd[1] = cmd_byte1;

@@ -575,7 +575,7 @@ Enomem:
 
 void get_capabilities(Scsi_CD *cd)
 {
-	unsigned char cmd[6];
+	struct cdrom_generic_command cgc;
 	unsigned char *buffer;
 	int rc, n;
 
@@ -597,13 +597,18 @@ void get_capabilities(Scsi_CD *cd)
 		printk(KERN_ERR "sr: out of memory.\n");
 		return;
 	}
-	cmd[0] = MODE_SENSE;
-	cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		 ((cd->device->lun << 5) & 0xe0) : 0;
-	cmd[2] = 0x2a;
-	cmd[4] = 128;
-	cmd[3] = cmd[5] = 0;
-	rc = sr_do_ioctl(cd, cmd, buffer, 128, 1, SCSI_DATA_READ, NULL);
+	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	cgc.cmd[0] = MODE_SENSE;
+	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+		     ((cd->device->lun << 5) & 0xe0) : 0;
+	cgc.cmd[2] = 0x2a;
+	cgc.cmd[4] = 128;
+	cgc.buffer = buffer;
+	cgc.buflen = 128;
+	cgc.quiet = 1;
+	cgc.data_direction = SCSI_DATA_READ;
+	cgc.timeout = SR_TIMEOUT;
+	rc = sr_do_ioctl(cd, &cgc);
 
 	if (rc) {
 		/* failed, drive doesn't have capabilities mode page */
@@ -680,7 +685,10 @@ static int sr_packet(struct cdrom_device_info *cdi, struct cdrom_generic_command
 	if (device->scsi_level <= SCSI_2)
 		cgc->cmd[1] |= device->lun << 5;
 
-	cgc->stat = sr_do_ioctl(cdi->handle, cgc->cmd, cgc->buffer, cgc->buflen, cgc->quiet, cgc->data_direction, cgc->sense);
+	if (cgc->timeout <= 0)
+		cgc->timeout = IOCTL_TIMEOUT;
+
+	sr_do_ioctl(cdi->handle, cgc);
 
 	return cgc->stat;
 }

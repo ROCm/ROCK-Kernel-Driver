@@ -467,6 +467,7 @@ extern Scsi_Cmnd *scsi_end_request(Scsi_Cmnd * SCpnt, int uptodate,
 				   int sectors);
 extern struct Scsi_Device_Template *scsi_get_request_dev(struct request *);
 extern int scsi_init_cmd_errh(Scsi_Cmnd * SCpnt);
+extern void scsi_setup_cmd_retry(Scsi_Cmnd *SCpnt);
 extern int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
@@ -597,9 +598,10 @@ struct scsi_device {
 	unsigned changed:1;	/* Data invalid due to media change */
 	unsigned busy:1;	/* Used to prevent races */
 	unsigned lockable:1;	/* Able to prevent media removal */
+	unsigned locked:1;      /* Media removal disabled */
 	unsigned borken:1;	/* Tell the Seagate driver to be 
 				 * painfully slow on this device */
-//	unsigned disconnect:1;	/* can disconnect */
+	unsigned disconnect:1;	/* can disconnect */
 	unsigned soft_reset:1;	/* Uses soft reset option */
 	unsigned sdtr:1;	/* Device supports SDTR messages */
 	unsigned wdtr:1;	/* Device supports WDTR messages */

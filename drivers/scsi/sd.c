@@ -529,7 +529,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	if (sdp->removable)
 		if (sdp->access_count==1)
 			if (scsi_block_when_processing_errors(sdp))
-				scsi_ioctl(sdp, SCSI_IOCTL_DOORLOCK, NULL);
+				scsi_set_medium_removal(sdp, SCSI_REMOVAL_PREVENT);
 
 	return 0;
 
@@ -573,7 +573,7 @@ static int sd_release(struct inode *inode, struct file *filp)
 	if (sdp->removable) {
 		if (!sdp->access_count)
 			if (scsi_block_when_processing_errors(sdp))
-				scsi_ioctl(sdp, SCSI_IOCTL_DOORUNLOCK, NULL);
+				scsi_set_medium_removal(sdp, SCSI_REMOVAL_ALLOW);
 	}
 	if (sdp->host->hostt->module)
 		__MOD_DEC_USE_COUNT(sdp->host->hostt->module);
@@ -1623,7 +1623,6 @@ static int sd_synchronize_cache(int index, int verbose)
 	}
 
 	the_result = SRpnt->sr_result;
-	scsi_release_request(SRpnt);
 	if(verbose) {
 		if(the_result != 0) {
 			printk("FAILED\n  status = %x, message = %02x, host = %d, driver = %02x\n  ",
@@ -1636,6 +1635,7 @@ static int sd_synchronize_cache(int index, int verbose)
 
 		}
 	}
+	scsi_release_request(SRpnt);
 	return (the_result == 0);
 }
 
