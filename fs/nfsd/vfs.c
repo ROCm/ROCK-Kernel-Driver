@@ -141,10 +141,11 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 	/* Obtain dentry and export. */
 	err = fh_verify(rqstp, fhp, S_IFDIR, MAY_EXEC);
 	if (err)
-		goto out;
+		return err;
 
 	dparent = fhp->fh_dentry;
 	exp  = fhp->fh_export;
+	exp_get(exp);
 
 	err = nfserr_acces;
 
@@ -210,6 +211,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 		err = nfserr_noent;
 	dput(dentry);
 out:
+	exp_put(exp);
 	return err;
 
 out_nfserr:

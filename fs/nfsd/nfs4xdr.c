@@ -1686,6 +1686,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 			goto error;
 		}
 
+		exp_get(exp);
 		if (d_mountpoint(dentry)) {
 			if ((nfserr = nfsd_cross_mnt(cd->rd_rqstp, &dentry, 
 					 &exp))) {	
@@ -1697,6 +1698,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 			 * this call will be retried.
 			 */
 				dput(dentry);
+				exp_put(exp);
 				nfserr = nfserr_dropit;
 				goto error;
 			}
@@ -1707,6 +1709,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 				dentry, p, &buflen, cd->rd_bmval,
 				cd->rd_rqstp);
 		dput(dentry);
+		exp_put(exp);
 		if (!nfserr) {
 			p += buflen;
 			goto out;
