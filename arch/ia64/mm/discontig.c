@@ -327,6 +327,7 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 	cpus = early_nr_cpus_node(node);
 	phys_cpus = early_nr_phys_cpus_node(node);
 	pernodesize += PERCPU_PAGE_SIZE * cpus;
+	pernodesize += node * L1_CACHE_BYTES;
 	pernodesize += L1_CACHE_ALIGN(sizeof(pg_data_t));
 	pernodesize += L1_CACHE_ALIGN(sizeof(struct ia64_node_data));
 	pernodesize += L1_CACHE_ALIGN(sizeof(ia64_mca_cpu_t)) * phys_cpus;
@@ -341,6 +342,7 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 
 		cpu_data = (void *)pernode;
 		pernode += PERCPU_PAGE_SIZE * cpus;
+		pernode += node * L1_CACHE_BYTES;
 
 		mem_data[node].pgdat = __va(pernode);
 		pernode += L1_CACHE_ALIGN(sizeof(pg_data_t));
