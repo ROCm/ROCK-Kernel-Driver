@@ -1610,6 +1610,12 @@ M:	ollie@sis.com.tw
 L:	linux-net@vger.kernel.org
 S:	Supported
 
+SIS FRAMEBUFFER DRIVER
+P:	Thomas Winischhofer
+M:	thomas@winischhofer.net
+W:	http://www.winischhofer.net/linuxsisvga.shtml
+S:	Maintained	
+
 SMB FILESYSTEM
 P:	Urban Widmark
 M:	urban@teststation.com
