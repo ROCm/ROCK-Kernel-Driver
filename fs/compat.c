@@ -269,7 +269,7 @@ static void ioctl32_insert_translation(struct ioctl_trans *trans)
 		t = ioctl32_hash_table[hash];
 		while (t->next)
 			t = t->next;
-		trans->next = 0;
+		trans->next = NULL;
 		t->next = trans;
 	}
 }

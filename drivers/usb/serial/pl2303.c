@@ -62,7 +62,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.10"
+#define DRIVER_VERSION "v0.11"
 #define DRIVER_DESC "Prolific PL2303 USB to serial adaptor driver"
 
 
@@ -82,6 +82,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(DCU10_VENDOR_ID, DCU10_PRODUCT_ID) },
 	{ USB_DEVICE(SITECOM_VENDOR_ID, SITECOM_PRODUCT_ID) },
 	{ USB_DEVICE(ALCATEL_VENDOR_ID, ALCATEL_PRODUCT_ID) },
+	{ USB_DEVICE(SAMSUNG_VENDOR_ID, SAMSUNG_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -172,19 +173,37 @@ static struct usb_serial_device_type pl2303_device = {
 	.shutdown =		pl2303_shutdown,
 };
 
+enum pl2303_type {
+	type_0,		/* don't know the difference between type 0 and */
+	type_1,		/* type 1, until someone from prolific tells us... */
+	HX,		/* HX version of the pl2303 chip */
+};
+
 struct pl2303_private {
 	spinlock_t lock;
 	wait_queue_head_t delta_msr_wait;
 	u8 line_control;
 	u8 line_status;
 	u8 termios_initialized;
+	enum pl2303_type type;
 };
 
 
 static int pl2303_startup (struct usb_serial *serial)
 {
 	struct pl2303_private *priv;
+	enum pl2303_type type = type_0;
 	int i;
+
+	if (serial->dev->descriptor.bDeviceClass == 0x02)
+		type = type_0;
+	else if (serial->dev->descriptor.bMaxPacketSize0 == 0x40)
+		type = HX;
+	else if (serial->dev->descriptor.bDeviceClass == 0x00)
+		type = type_1;
+	else if (serial->dev->descriptor.bDeviceClass == 0xFF)
+		type = type_1;
+	dbg("device type: %d", type);
 
 	for (i = 0; i < serial->num_ports; ++i) {
 		priv = kmalloc (sizeof (struct pl2303_private), GFP_KERNEL);
@@ -193,6 +212,7 @@ static int pl2303_startup (struct usb_serial *serial)
 		memset (priv, 0x00, sizeof (struct pl2303_private));
 		spin_lock_init(&priv->lock);
 		init_waitqueue_head(&priv->delta_msr_wait);
+		priv->type = type;
 		usb_set_serial_port_data(serial->port[i], priv);
 	}
 	return 0;
@@ -395,20 +415,27 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	     buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
 
 	if (cflag & CRTSCTS) {
-		i = usb_control_msg (serial->dev, usb_sndctrlpipe (serial->dev, 0),
-				     VENDOR_WRITE_REQUEST, VENDOR_WRITE_REQUEST_TYPE,
-				     0x0, 0x41, NULL, 0, 100);
-		dbg ("0x40:0x1:0x0:0x41  %d", i);
+		__u16 index;
+		if (priv->type == HX)
+			index = 0x61;
+		else
+			index = 0x41;
+		i = usb_control_msg(serial->dev, 
+				    usb_sndctrlpipe(serial->dev, 0),
+				    VENDOR_WRITE_REQUEST,
+				    VENDOR_WRITE_REQUEST_TYPE,
+				    0x0, index, NULL, 0, 100);
+		dbg ("0x40:0x1:0x0:0x%x  %d", index, i);
 	}
 
 	kfree (buf);
-}       
-
+} 
 
 static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 {
 	struct termios tmp_termios;
 	struct usb_serial *serial = port->serial;
+	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned char *buf;
 	int result;
 
@@ -439,6 +466,18 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0x0404, 1);
 	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
 	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8383, 0);
+	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0, 1);
+	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 1, 0);
+ 
+	if (priv->type == HX) {
+		/* HX chip */
+		SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 2, 0x44);
+		/* reset upstream data pipes */
+          	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 8, 0);
+        	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 9, 0);
+	} else {
+		SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 2, 0x24);
+	}
 
 	kfree(buf);
 

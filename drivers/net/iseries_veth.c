@@ -81,8 +81,6 @@
 
 #include "iseries_veth.h"
 
-extern struct vio_dev *iSeries_veth_dev;
-
 MODULE_AUTHOR("Kyle Lucke <klucke@us.ibm.com>");
 MODULE_DESCRIPTION("iSeries Virtual ethernet driver");
 MODULE_LICENSE("GPL");
@@ -119,6 +117,7 @@ struct veth_msg {
 	int token;
 	unsigned long in_use;
 	struct sk_buff *skb;
+	struct device *dev;
 };
 
 struct veth_lpar_connection {
@@ -147,6 +146,7 @@ struct veth_lpar_connection {
 };
 
 struct veth_port {
+	struct device *dev;
 	struct net_device_stats stats;
 	u64 mac_addr;
 	HvLpIndexMap lpar_map;
@@ -843,7 +843,7 @@ static void veth_tx_timeout(struct net_device *dev)
 	spin_unlock_irqrestore(&port->pending_gate, flags);
 }
 
-struct net_device * __init veth_probe_one(int vlan)
+static struct net_device * __init veth_probe_one(int vlan, struct device *vdev)
 {
 	struct net_device *dev;
 	struct veth_port *port;
@@ -869,6 +869,7 @@ struct net_device * __init veth_probe_one(int vlan)
 		if (map & (0x8000 >> vlan))
 			port->lpar_map |= (1 << i);
 	}
+	port->dev = vdev;
 
 	dev->dev_addr[0] = 0x02;
 	dev->dev_addr[1] = 0x01;
@@ -892,6 +893,8 @@ struct net_device * __init veth_probe_one(int vlan)
 
 	dev->watchdog_timeo = 2 * (VETH_ACKTIMEOUT * HZ / 1000000);
 	dev->tx_timeout = veth_tx_timeout;
+
+	SET_NETDEV_DEV(dev, vdev);
 
 	rc = register_netdev(dev);
 	if (rc != 0) {
@@ -945,7 +948,7 @@ static int veth_transmit_to_one(struct sk_buff *skb, HvLpIndex rlp,
 	}
 
 	dma_length = skb->len;
-	dma_address = vio_map_single(iSeries_veth_dev, skb->data,
+	dma_address = dma_map_single(port->dev, skb->data,
 				     dma_length, DMA_TO_DEVICE);
 
 	if (dma_mapping_error(dma_address))
@@ -954,6 +957,7 @@ static int veth_transmit_to_one(struct sk_buff *skb, HvLpIndex rlp,
 	/* Is it really necessary to check the length and address
 	 * fields of the first entry here? */
 	msg->skb = skb;
+	msg->dev = port->dev;
 	msg->data.addr[0] = dma_address;
 	msg->data.len[0] = dma_length;
 	msg->data.eofmask = 1 << VETH_EOF_SHIFT;
@@ -1059,7 +1063,7 @@ static void veth_recycle_msg(struct veth_lpar_connection *cnx,
 		dma_address = msg->data.addr[0];
 		dma_length = msg->data.len[0];
 
-		vio_unmap_single(iSeries_veth_dev, dma_address, dma_length,
+		dma_unmap_single(msg->dev, dma_address, dma_length,
 				 DMA_TO_DEVICE);
 
 		if (msg->skb) {
@@ -1327,6 +1331,58 @@ static void veth_timed_ack(unsigned long ptr)
 	spin_unlock_irqrestore(&cnx->lock, flags);
 }
 
+static int veth_remove(struct vio_dev *vdev)
+{
+	int i = vdev->unit_address;
+	struct net_device *dev;
+
+	dev = veth_dev[i];
+	if (dev != NULL) {
+		veth_dev[i] = NULL;
+		unregister_netdev(dev);
+		free_netdev(dev);
+	}
+	return 0;
+}
+
+static int veth_probe(struct vio_dev *vdev, const struct vio_device_id *id)
+{
+	int i = vdev->unit_address;
+	struct net_device *dev;
+
+	dev = veth_probe_one(i, &vdev->dev);
+	if (dev == NULL) {
+		veth_remove(vdev);
+		return 1;
+	}
+	veth_dev[i] = dev;
+
+	/* Start the state machine on each connection, to commence
+	 * link negotiation */
+	for (i = 0; i < HVMAXARCHITECTEDLPS; i++)
+		if (veth_cnx[i])
+			veth_kick_statemachine(veth_cnx[i]);
+
+	return 0;
+}
+
+/**
+ * veth_device_table: Used by vio.c to match devices that we
+ * support.
+ */
+static struct vio_device_id veth_device_table[] __devinitdata = {
+	{ "vlan", "" },
+	{ NULL, NULL }
+};
+MODULE_DEVICE_TABLE(vio, veth_device_table);
+
+static struct vio_driver veth_driver = {
+	.name = "iseries_veth",
+	.id_table = veth_device_table,
+	.probe = veth_probe,
+	.remove = veth_remove
+};
+
 /*
  * Module initialization/cleanup
  */
@@ -1335,27 +1391,17 @@ void __exit veth_module_cleanup(void)
 {
 	int i;
 
+	vio_unregister_driver(&veth_driver);
+
 	for (i = 0; i < HVMAXARCHITECTEDLPS; ++i)
 		veth_destroy_connection(i);
 
 	HvLpEvent_unregisterHandler(HvLpEvent_Type_VirtualLan);
-
-	for (i = 0; i < HVMAXARCHITECTEDVIRTUALLANS; ++i) {
-		struct net_device *dev = veth_dev[i];
-
-		if (! dev)
-			continue;
-
-		veth_dev[i] = NULL;
-		unregister_netdev(dev);
-		free_netdev(dev);
-	}
 }
 module_exit(veth_module_cleanup);
 
 int __init veth_module_init(void)
 {
-	HvLpIndexMap vlan_map = HvLpConfig_getVirtualLanIndexMap();
 	int i;
 	int rc;
 
@@ -1369,31 +1415,9 @@ int __init veth_module_init(void)
 		}
 	}
 
-	for (i = 0; i < HVMAXARCHITECTEDVIRTUALLANS; ++i) {
-		struct net_device *dev;
-
-		if (! (vlan_map & (0x8000 >> i)))
-			continue;
-
-		dev = veth_probe_one(i);
-
-		if (! dev) {
-			veth_module_cleanup();
-			return rc;
-		}
-
-		veth_dev[i] = dev;
-	}
-
 	HvLpEvent_registerHandler(HvLpEvent_Type_VirtualLan,
 				  &veth_handle_event);
 
-	/* Start the state machine on each connection, to commence
-	 * link negotiation */
-	for (i = 0; i < HVMAXARCHITECTEDLPS; i++)
-		if (veth_cnx[i])
-			veth_kick_statemachine(veth_cnx[i]);
-
-	return 0;
+	return vio_register_driver(&veth_driver);
 }
 module_init(veth_module_init);

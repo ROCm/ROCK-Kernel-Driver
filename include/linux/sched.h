@@ -215,9 +215,6 @@ struct mm_struct {
 	unsigned long saved_auxv[40]; /* for /proc/PID/auxv */
 
 	unsigned dumpable:1;
-#ifdef CONFIG_HUGETLB_PAGE
-	int used_hugetlb;
-#endif
 	cpumask_t cpu_vm_mask;
 
 	/* Architecture-specific MM context */

@@ -54,7 +54,6 @@ DEFINE_PER_CPU(struct pda_s, pda_percpu);
 #define MAX_PHYS_MEMORY		(1UL << 49)     /* 1 TB */
 
 extern void bte_init_node (nodepda_t *, cnodeid_t);
-extern void bte_init_cpu (void);
 extern void sn_timer_init(void);
 extern unsigned long last_time_offset;
 extern void init_platform_hubinfo(nodepda_t **nodepdaindr);
@@ -496,8 +495,6 @@ sn_cpu_init(void)
 		buddy_nasid = cnodeid_to_nasid(numa_node_id() == numnodes-1 ? 0 : numa_node_id()+ 1);
 		pda->pio_shub_war_cam_addr = (volatile unsigned long*)GLOBAL_MMR_ADDR(nasid, SH_PI_CAM_CONTROL);
 	}
-
-	bte_init_cpu();
 }
 
 /*

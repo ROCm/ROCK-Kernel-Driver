@@ -1573,6 +1573,8 @@ static int gs_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctr
 	/* respond with data transfer before status phase? */
 	if (ret >= 0) {
 		req->length = ret;
+		req->zero = ret < ctrl->wLength
+				&& (ret % gadget->ep0->maxpacket) == 0;
 		ret = usb_ep_queue(gadget->ep0, req, GFP_ATOMIC);
 		if (ret < 0) {
 			printk(KERN_ERR

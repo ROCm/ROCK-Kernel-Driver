@@ -400,7 +400,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 		down_write(&sb->s_umount);
 		if (!(sb->s_flags & MS_RDONLY)) {
 			lock_kernel();
-			retval = do_remount_sb(sb, MS_RDONLY, 0, 0);
+			retval = do_remount_sb(sb, MS_RDONLY, NULL, 0);
 			unlock_kernel();
 		}
 		up_write(&sb->s_umount);

@@ -1978,14 +1978,24 @@ W:	http://mpeg.openprojects.net/
 W:	http://www.stradis.com/
 S:	Maintained
 
-SUPERH
-P:	Niibe Yutaka
-M:	gniibe@m17n.org
+SUPERH (sh)
+P:	Paul Mundt
+M:	lethal@linux-sh.org
 P:	Kazumoto Kojima
 M:	kkojima@rr.iij4u.or.jp
 L:	linux-sh@m17n.org
+W:	http://www.linux-sh.org
 W:	http://www.m17n.org/linux-sh/
 W:	http://www.rr.iij4u.or.jp/~kkojima/linux-sh4.html
+S:	Maintained
+
+SUPERH64 (sh64)
+P:	Paul Mundt
+M:	lethal@linux-sh.org
+P:	Richard Curnow
+M:	richard.curnow@superh.com
+L:	linuxsh-shmedia-dev@lists.sourceforge.net
+W:	http://www.linux-sh.org
 S:	Maintained
 
 SUN3/3X

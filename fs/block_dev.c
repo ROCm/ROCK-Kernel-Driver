@@ -64,8 +64,6 @@ static void kill_bdev(struct block_device *bdev)
 
 int set_blocksize(struct block_device *bdev, int size)
 {
-	int oldsize;
-
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
 		return -EINVAL;
@@ -74,15 +72,13 @@ int set_blocksize(struct block_device *bdev, int size)
 	if (size < bdev_hardsect_size(bdev))
 		return -EINVAL;
 
-	oldsize = bdev->bd_block_size;
-	if (oldsize == size)
-		return 0;
-
-	/* Ok, we're actually changing the blocksize.. */
-	sync_blockdev(bdev);
-	bdev->bd_block_size = size;
-	bdev->bd_inode->i_blkbits = blksize_bits(size);
-	kill_bdev(bdev);
+	/* Don't change the size if it is same as current */
+	if (bdev->bd_block_size != size) {
+		sync_blockdev(bdev);
+		bdev->bd_block_size = size;
+		bdev->bd_inode->i_blkbits = blksize_bits(size);
+		kill_bdev(bdev);
+	}
 	return 0;
 }
 
@@ -90,12 +86,15 @@ EXPORT_SYMBOL(set_blocksize);
 
 int sb_set_blocksize(struct super_block *sb, int size)
 {
-	int bits;
-	if (set_blocksize(sb->s_bdev, size) < 0)
+	int bits = 9; /* 2^9 = 512 */
+
+	if (set_blocksize(sb->s_bdev, size))
 		return 0;
+	/* If we get here, we know size is power of two
+	 * and it's value is between 512 and PAGE_SIZE */
 	sb->s_blocksize = size;
-	for (bits = 9, size >>= 9; size >>= 1; bits++)
-		;
+	for (size >>= 10; size; size >>= 1)
+		++bits;
 	sb->s_blocksize_bits = bits;
 	return sb->s_blocksize;
 }

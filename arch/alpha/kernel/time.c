@@ -523,7 +523,6 @@ EXPORT_SYMBOL(do_settimeofday);
  *      sets the minutes. Usually you won't notice until after reboot!
  */
 
-extern int abs(int);
 
 static int
 set_rtc_mmss(unsigned long nowtime)

@@ -708,6 +708,12 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 			srb->sense_buffer[0] = 0x0;
 		}
 	}
+
+	/* Did we transfer less than the minimum amount required? */
+	if (srb->result == SAM_STAT_GOOD &&
+			srb->request_bufflen - srb->resid < srb->underflow)
+		srb->result = (DID_ERROR << 16) | (SUGGEST_RETRY << 24);
+
 	return;
 
 	/* abort processing: the bulk-only transport requires a reset

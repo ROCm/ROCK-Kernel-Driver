@@ -29,7 +29,7 @@
 #define CODE
 #include "compat_ioctl.c"
 
-#define HANDLE_IOCTL(cmd,handler) { cmd, (ioctl_trans_handler_t)handler, 0 },
+#define HANDLE_IOCTL(cmd,handler) { cmd, (ioctl_trans_handler_t)handler, NULL },
 #define COMPATIBLE_IOCTL(cmd) HANDLE_IOCTL(cmd,sys_ioctl)
 
 #define IOCTL_TABLE_START \

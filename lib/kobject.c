@@ -37,7 +37,7 @@ static int populate_dir(struct kobject * kobj)
 	int i;
 	
 	if (t && t->default_attrs) {
-		for (i = 0; (attr = t->default_attrs[i]); i++) {
+		for (i = 0; (attr = t->default_attrs[i]) != NULL; i++) {
 			if ((error = sysfs_create_file(kobj,attr)))
 				break;
 		}

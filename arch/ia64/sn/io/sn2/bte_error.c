@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 
@@ -199,7 +199,7 @@ bte_error_handler(unsigned long _nodepda)
 		err_nodepda->bte_if[i].cleanup_active = 0;
 		BTE_PRINTK(("eh:%p:%d Unlocked %d\n", err_nodepda,
 			    smp_processor_id(), i));
-		spin_unlock(&pda->cpu_bte_if[i]->spinlock);
+		spin_unlock(&err_nodepda->bte_if[i].spinlock);
 	}
 
 	del_timer(recovery_timer);

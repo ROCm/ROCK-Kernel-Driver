@@ -50,7 +50,7 @@ static int load_script(struct linux_binprm *bprm,struct pt_regs *regs)
 	if (*cp == '\0') 
 		return -ENOEXEC; /* No interpreter name found */
 	i_name = cp;
-	i_arg = 0;
+	i_arg = NULL;
 	for ( ; *cp && (*cp != ' ') && (*cp != '\t'); cp++)
 		/* nothing */ ;
 	while ((*cp == ' ') || (*cp == '\t'))

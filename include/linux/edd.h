@@ -1,6 +1,6 @@
 /*
  * linux/include/linux/edd.h
- *  Copyright (C) 2002, 2003 Dell Inc.
+ *  Copyright (C) 2002, 2003, 2004 Dell Inc.
  *  by Matt Domsch <Matt_Domsch@dell.com>
  *
  * structures and definitions for the int 13h, ax={41,48}h
@@ -9,8 +9,8 @@
  * available at http://www.t13.org/docs2002/d1572r0.pdf.  It is
  * very similar to D1484 Revision 3 http://www.t13.org/docs2002/d1484r3.pdf
  *
- * In a nutshell, arch/{i386,x86_64}/boot/setup.S populates a scratch table
- * in the empty_zero_block that contains a list of BIOS-enumerated
+ * In a nutshell, arch/{i386,x86_64}/boot/setup.S populates a scratch
+ * table in the boot_params that contains a list of BIOS-enumerated
  * boot devices.
  * In arch/{i386,x86_64}/kernel/setup.c, this information is
  * transferred into the edd structure, and in drivers/firmware/edd.c, that
@@ -31,8 +31,8 @@
 #define _LINUX_EDD_H
 
 #define EDDNR 0x1e9		/* addr of number of edd_info structs at EDDBUF
-				   in empty_zero_block - treat this as 1 byte  */
-#define EDDBUF	0x600		/* addr of edd_info structs in empty_zero_block */
+				   in boot_params - treat this as 1 byte  */
+#define EDDBUF	0x600		/* addr of edd_info structs in boot_params */
 #define EDDMAXNR 6		/* number of edd_info structs starting at EDDBUF  */
 #define EDDEXTSIZE 8		/* change these if you muck with the structures */
 #define EDDPARMSIZE 74
@@ -42,9 +42,13 @@
 #define EDDMAGIC1 0x55AA
 #define EDDMAGIC2 0xAA55
 
-#define READ_SECTORS 0x02
-#define MBR_SIG_OFFSET 0x1B8
-#define DISK80_SIG_BUFFER 0x2cc
+
+#define READ_SECTORS 0x02         /* int13 AH=0x02 is READ_SECTORS command */
+#define EDD_MBR_SIG_OFFSET 0x1B8  /* offset of signature in the MBR */
+#define EDD_MBR_SIG_BUF    0x290  /* addr in boot params */
+#define EDD_MBR_SIG_MAX 16        /* max number of signatures to store */
+#define EDD_MBR_SIG_NR_BUF 0x1ea  /* addr of number of MBR signtaures at EDD_MBR_SIG_BUF
+				     in boot_params - treat this as 1 byte  */
 #ifndef __ASSEMBLY__
 
 #define EDD_EXT_FIXED_DISK_ACCESS           (1 << 0)
@@ -172,9 +176,14 @@ struct edd_info {
 	struct edd_device_params params;
 } __attribute__ ((packed));
 
-extern struct edd_info edd[EDDMAXNR];
-extern unsigned char eddnr;
-extern unsigned int edd_disk80_sig;
+struct edd {
+	unsigned int mbr_signature[EDD_MBR_SIG_MAX];
+	struct edd_info edd_info[EDDMAXNR];
+	unsigned char mbr_signature_nr;
+	unsigned char edd_info_nr;
+};
+
+extern struct edd edd;
 
 #endif				/*!__ASSEMBLY__ */
 
