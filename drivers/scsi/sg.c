@@ -246,7 +246,7 @@ sg_open(struct inode *inode, struct file *filp)
 	Sg_device *sdp;
 	Sg_fd *sfp;
 	int res;
-	int retval = -EBUSY;
+	int retval;
 
 	SCSI_LOG_TIMEOUT(3, printk("sg_open: dev=%d, flags=0x%x\n", dev, flags));
 	sdp = sg_get_dev(dev);
@@ -273,8 +273,10 @@ sg_open(struct inode *inode, struct file *filp)
 			retval = -EPERM; /* Can't lock it with read only access */
 			goto error_out;
 		}
-		if (sdp->headfp && (flags & O_NONBLOCK))
+		if (sdp->headfp && (flags & O_NONBLOCK)) {
+			retval = -EBUSY;
 			goto error_out;
+		}
 		res = 0;
 		__wait_event_interruptible(sdp->o_excl_wait,
 			((sdp->headfp || sdp->exclude) ? 0 : (sdp->exclude = 1)), res);
@@ -283,8 +285,10 @@ sg_open(struct inode *inode, struct file *filp)
 			goto error_out;
 		}
 	} else if (sdp->exclude) {	/* some other fd has an exclusive lock on dev */
-		if (flags & O_NONBLOCK)
+		if (flags & O_NONBLOCK) {
+			retval = -EBUSY;
 			goto error_out;
+		}
 		res = 0;
 		__wait_event_interruptible(sdp->o_excl_wait, (!sdp->exclude),
 					   res);
