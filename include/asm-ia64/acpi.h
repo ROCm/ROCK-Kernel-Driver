@@ -54,35 +54,47 @@
 #define ACPI_ENABLE_IRQS()  local_irq_enable()
 #define ACPI_FLUSH_CPU_CACHE()
 
-static inline int
-ia64_acpi_acquire_global_lock (unsigned int *lock)
-{
-	unsigned int old, new, val;
-	do {
-		old = *lock;
-		new = (((old & ~0x3) + 2) + ((old >> 1) & 0x1));
-		val = ia64_cmpxchg4_acq(lock, new, old);
-	} while (unlikely (val != old));
-	return (new < 3) ? -1 : 0;
-}
+#define ACPI_ACQUIRE_GLOBAL_LOCK(GLptr, Acq) \
+	do { \
+	__asm__ volatile ("1:  ld4      r29=[%1]\n"  \
+		";;\n"                  \
+		"mov    ar.ccv=r29\n"   \
+		"mov    r2=r29\n"       \
+		"shr.u  r30=r29,1\n"    \
+		"and    r29=-4,r29\n"   \
+		";;\n"                  \
+		"add    r29=2,r29\n"    \
+		"and    r30=1,r30\n"    \
+		";;\n"                  \
+		"add    r29=r29,r30\n"  \
+		";;\n"                  \
+		"cmpxchg4.acq   r30=[%1],r29,ar.ccv\n" \
+		";;\n"                  \
+		"cmp.eq p6,p7=r2,r30\n" \
+		"(p7) br.dpnt.few 1b\n" \
+		"cmp.gt p8,p9=3,r29\n"  \
+		";;\n"                  \
+		"(p8) mov %0=-1\n"      \
+		"(p9) mov %0=r0\n"      \
+		:"=r"(Acq):"r"(GLptr):"r2","r29","r30","memory"); \
+	} while (0)
 
-static inline int
-ia64_acpi_release_global_lock (unsigned int *lock)
-{
-	unsigned int old, new, val;
-	do {
-		old = *lock;
-		new = old & ~0x3;
-		val = ia64_cmpxchg4_acq(lock, new, old);
-	} while (unlikely (val != old));
-	return old & 0x1;
-}
-
-#define ACPI_ACQUIRE_GLOBAL_LOCK(GLptr, Acq)				\
-	((Acq) = ia64_acpi_acquire_global_lock((unsigned int *) GLptr))
-
-#define ACPI_RELEASE_GLOBAL_LOCK(GLptr, Acq)				\
-	((Acq) = ia64_acpi_release_global_lock((unsigned int *) GLptr))
+#define ACPI_RELEASE_GLOBAL_LOCK(GLptr, Acq) \
+	do { \
+	__asm__ volatile ("1:  ld4      r29=[%1]\n" \
+		";;\n"                  \
+		"mov    ar.ccv=r29\n"   \
+		"mov    r2=r29\n"       \
+		"and    r29=-4,r29\n"   \
+		";;\n"                  \
+		"cmpxchg4.acq   r30=[%1],r29,ar.ccv\n" \
+		";;\n"                  \
+		"cmp.eq p6,p7=r2,r30\n" \
+		"(p7) br.dpnt.few 1b\n" \
+		"and    %0=1,r2\n"      \
+		";;\n"                  \
+		:"=r"(Acq):"r"(GLptr):"r2","r29","r30","memory"); \
+	} while (0)
 
 const char *acpi_get_sysname (void);
 int acpi_request_vector (u32 int_type);

@@ -17,7 +17,6 @@
 #include <linux/time.h>
 #include <linux/interrupt.h>
 #include <linux/efi.h>
-#include <linux/profile.h>
 #include <linux/timex.h>
 
 #include <asm/delay.h>
@@ -38,6 +37,29 @@ u64 jiffies_64 = INITIAL_JIFFIES;
 unsigned long last_cli_ip;
 
 #endif
+
+static void
+do_profile (unsigned long ip)
+{
+	extern cpumask_t prof_cpu_mask;
+
+	if (!prof_buffer)
+		return;
+
+	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
+		return;
+
+	ip -= (unsigned long) _stext;
+	ip >>= prof_shift;
+	/*
+	 * Don't ignore out-of-bounds IP values silently, put them into the last
+	 * histogram slot, so if present, they will show up as a sharp peak.
+	 */
+	if (ip > prof_len - 1)
+		ip = prof_len - 1;
+
+	atomic_inc((atomic_t *) &prof_buffer[ip]);
+}
 
 static void
 itc_reset (void)
@@ -177,52 +199,6 @@ do_gettimeofday (struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
-/*
- * The profiling function is SMP safe. (nothing can mess
- * around with "current", and the profiling counters are
- * updated with atomic operations). This is especially
- * useful with a profiling multiplier != 1
- */
-static inline void
-ia64_do_profile (struct pt_regs * regs)
-{
-	unsigned long ip, slot;
-	extern unsigned long prof_cpu_mask;
-
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-
-	if (!prof_buffer)
-		return;
-
-	ip = instruction_pointer(regs);
-	/* Conserve space in histogram by encoding slot bits in address
-	 * bits 2 and 3 rather than bits 0 and 1.
-	 */
-	slot = ip & 3;
-	ip = (ip & ~3UL) + 4*slot;
-
-	/*
-	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
-	 * (default is all CPUs.)
-	 */
-	if (!cpu_isset(smp_processor_id(), prof_cpu_mask))
-		return;
-
-	ip -= (unsigned long) &_stext;
-	ip >>= prof_shift;
-	/*
-	 * Don't ignore out-of-bounds IP values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (ip > prof_len-1)
-		ip = prof_len-1;
-	atomic_inc((atomic_t *)&prof_buffer[ip]);
-}
-
 static irqreturn_t
 timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -234,9 +210,14 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 		printk(KERN_ERR "Oops: timer tick before it's due (itc=%lx,itm=%lx)\n",
 		       ia64_get_itc(), new_itm);
 
-	ia64_do_profile(regs);
-
 	while (1) {
+		/*
+		 * Do kernel PC profiling here.  We multiply the instruction number by
+		 * four so that we can use a prof_shift of 2 to get instruction-level
+		 * instead of just bundle-level accuracy.
+		 */
+		if (!user_mode(regs))
+			do_profile(regs->cr_iip + 4*ia64_psr(regs)->ri);
 
 #ifdef CONFIG_SMP
 		smp_do_timer(regs);

@@ -324,7 +324,7 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 				check_md = q;
 
 				if (check_md->attribute & EFI_MEMORY_WB)
-					trim_bottom(check_md, granule_addr);
+					trim_bottom(md, granule_addr);
 
 				if (check_md->phys_addr < granule_addr)
 					continue;

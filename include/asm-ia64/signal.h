@@ -2,7 +2,7 @@
 #define _ASM_IA64_SIGNAL_H
 
 /*
- * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
+ * Copyright (C) 1998-2001 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Unfortunately, this file is being included by bits/signal.h in
@@ -96,16 +96,7 @@
  * ar.rsc.loadrs is 14 bits, we can assume that they'll never take up
  * more than 16KB of space.
  */
-#if 1
-  /*
-   * This is a stupid typo: the value was _meant_ to be 131072 (0x20000), but I typed it
-   * in wrong. ;-(  To preserve backwards compatibility, we leave the kernel at the
-   * incorrect value and fix libc only.
-   */
-# define MINSIGSTKSZ	131027	/* min. stack size for sigaltstack() */
-#else
-# define MINSIGSTKSZ	131072	/* min. stack size for sigaltstack() */
-#endif
+#define MINSIGSTKSZ	131027	/* min. stack size for sigaltstack() */
 #define SIGSTKSZ	262144	/* default stack size for sigaltstack() */
 
 #ifdef __KERNEL__

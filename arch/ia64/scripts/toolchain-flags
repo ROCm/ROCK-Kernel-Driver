@@ -20,7 +20,7 @@ warning: your linker cannot handle cross-segment segment-relative relocations.
 EOF
 fi
 
-if ! $CC -c $dir/check-model.c -o $out 2>&1 | grep  __model__ | grep -q attrib
+if ! $CC -c $dir/check-model.c -o $out 2>&1 | grep -q 'attribute directive ignored'
 then
     CPPFLAGS="$CPPFLAGS -DHAVE_MODEL_SMALL_ATTRIBUTE"
 fi

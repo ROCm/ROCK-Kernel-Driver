@@ -24,7 +24,7 @@
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
-#include <asm/sn/sn_sal.h>
+#include <asm//sn/sn_sal.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/ioconfig_bus.h>
 
@@ -157,7 +157,7 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 	char *name;
 	char *temp;
 	char *next;
-	char *curr;
+	char *current;
 	char *line;
 	struct ascii_moduleid *moduleid;
 
@@ -166,10 +166,10 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 	name = kmalloc(125, GFP_KERNEL);
 	memset(name, 0, 125);
 	moduleid = table;
-	curr = file_contents;
-	while (nextline(curr, &next, line)){
+	current = file_contents;
+	while (nextline(current, &next, line)){
 
-		DBG("curr 0x%lx next 0x%lx\n", curr, next);
+		DBG("current 0x%lx next 0x%lx\n", current, next);
 
 		temp = line;
 		/*
@@ -182,7 +182,7 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 				break;
 
 		if (*temp == '\n') {
-			curr = next;
+			current = next;
 			memset(line, 0, 256);
 			continue;
 		}
@@ -191,7 +191,7 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 		 * Skip comment lines
 		 */
 		if (*temp == '#') {
-			curr = next;
+			current = next;
 			memset(line, 0, 256);
 			continue;
 		}
@@ -204,7 +204,7 @@ build_moduleid_table(char *file_contents, struct ascii_moduleid *table)
 		DBG("Found %s\n", name);
 		moduleid++;
 		free_entry++;
-		curr = next;
+		current = next;
 		memset(line, 0, 256);
 	}
 

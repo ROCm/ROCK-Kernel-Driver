@@ -76,7 +76,6 @@
 
 #define OFFSET4K(a)		((a) & 0xfff)
 #define PAGE_START(addr)	((addr) & PAGE_MASK)
-#define MINSIGSTKSZ_IA32	2048
 
 #define high2lowuid(uid) ((uid) > 65535 ? 65534 : (uid))
 #define high2lowgid(gid) ((gid) > 65535 ? 65534 : (gid))
@@ -2263,18 +2262,10 @@ sys32_sigaltstack (ia32_stack_t *uss32, ia32_stack_t *uoss32,
 			return -EFAULT;
 	uss.ss_sp = (void *) (long) buf32.ss_sp;
 	uss.ss_flags = buf32.ss_flags;
-	/* MINSIGSTKSZ is different for ia32 vs ia64. We lie here to pass the 
-           check and set it to the user requested value later */
-	if (buf32.ss_size < MINSIGSTKSZ_IA32) {
-		ret = -ENOMEM;
-		goto out;
-	}
-	uss.ss_size = MINSIGSTKSZ;
+	uss.ss_size = buf32.ss_size;
 	set_fs(KERNEL_DS);
 	ret = do_sigaltstack(uss32 ? &uss : NULL, &uoss, pt->r12);
- 	current->sas_ss_size = buf32.ss_size;	
 	set_fs(old_fs);
-out:
 	if (ret < 0)
 		return(ret);
 	if (uoss32) {

@@ -223,12 +223,6 @@ struct switch_stack {
 };
 
 #ifdef __KERNEL__
-/*
- * We use the ia64_psr(regs)->ri to determine which of the three
- * instructions in bundle (16 bytes) took the sample. Generate
- * the canonical representation by adding to instruction pointer.
- */
-# define instruction_pointer(regs) ((regs)->cr_iip + ia64_psr(regs)->ri)
   /* given a pointer to a task_struct, return the user's pt_regs */
 # define ia64_task_regs(t)		(((struct pt_regs *) ((char *) (t) + IA64_STK_OFFSET)) - 1)
 # define ia64_psr(regs)			((struct ia64_psr *) &(regs)->cr_ipsr)

@@ -27,14 +27,6 @@ GLOBAL_ENTRY(_start)
 	br.call.sptk.many rp=start_bootloader
 END(_start)
 
-/*
- * Set a break point on this function so that symbols are available to set breakpoints in
- * the kernel being debugged.
- */
-GLOBAL_ENTRY(debug_break)
-	br.ret.sptk.many b0
-END(debug_break)
-
 GLOBAL_ENTRY(ssc)
 	.regstk 5,0,0,0
 	mov r15=in4

@@ -227,7 +227,12 @@ struct ioc {
 static struct ioc *ioc_list;
 static int reserve_sba_gart = 1;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 #define sba_sg_address(sg)	(page_address((sg)->page) + (sg)->offset)
+#else
+#define sba_sg_address(sg)	((sg)->address ? (sg)->address : \
+                                  page_address((sg)->page) + (sg)->offset)
+#endif
 
 #ifdef FULL_VALID_PDIR
 static u64 prefetch_spill_page;

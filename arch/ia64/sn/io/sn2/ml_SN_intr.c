@@ -174,8 +174,8 @@ do_intr_reserve_level(cpuid_t cpu,
 			min_shared = 256;
 			for (i=IA64_SN2_FIRST_DEVICE_VECTOR; i < IA64_SN2_LAST_DEVICE_VECTOR; i++) {
 				/* Share with the same device class */
-				if (irqpdaindr->curr->vendor == irqpdaindr->device_dev[i]->vendor &&
-					irqpdaindr->curr->device == irqpdaindr->device_dev[i]->device &&
+				if (irqpdaindr->current->vendor == irqpdaindr->device_dev[i]->vendor &&
+					irqpdaindr->current->device == irqpdaindr->device_dev[i]->device &&
 					irqpdaindr->share_count[i] < min_shared) {
 						min_shared = irqpdaindr->share_count[i];
 						bit = i;

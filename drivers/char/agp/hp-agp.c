@@ -42,8 +42,6 @@
 /* AGP bridge need not be PCI device, but DRM thinks it is. */
 static struct pci_dev fake_bridge_dev;
 
-static int hp_zx1_gart_found;
-
 static struct aper_size_info_fixed hp_zx1_sizes[] =
 {
 	{0, 0, 0},		/* filled in by hp_zx1_fetch_size() */
@@ -388,6 +386,8 @@ hp_zx1_setup (u64 ioc_hpa, u64 lba_hpa)
 	struct agp_bridge_data *bridge;
 	int error;
 
+	printk(KERN_INFO PFX "Detected HP ZX1 AGP chipset (ioc=%lx, lba=%lx)\n", ioc_hpa, lba_hpa);
+
 	error = hp_zx1_ioc_init(ioc_hpa, lba_hpa);
 	if (error)
 		return error;
@@ -416,7 +416,7 @@ zx1_gart_probe (acpi_handle obj, u32 depth, void *context, void **ret)
 
 	status = hp_acpi_csr_space(obj, &lba_hpa, &length);
 	if (ACPI_FAILURE(status))
-		return AE_OK;
+		return 1;
 
 	/* Look for an enclosing IOC scope and find its CSR space */
 	handle = obj;
@@ -436,7 +436,7 @@ zx1_gart_probe (acpi_handle obj, u32 depth, void *context, void **ret)
 				else {
 					printk(KERN_ERR PFX "Detected HP ZX1 "
 					       "AGP LBA but no IOC.\n");
-					return AE_OK;
+					return status;
 				}
 			}
 		}
@@ -446,28 +446,22 @@ zx1_gart_probe (acpi_handle obj, u32 depth, void *context, void **ret)
 	} while (ACPI_SUCCESS(status));
 
 	if (hp_zx1_setup(sba_hpa + HP_ZX1_IOC_OFFSET, lba_hpa))
-		return AE_OK;
-
-	printk(KERN_INFO PFX "Detected HP ZX1 %s AGP chipset (ioc=%lx, lba=%lx)\n",
-		(char *) context, sba_hpa + HP_ZX1_IOC_OFFSET, lba_hpa);
-
-	hp_zx1_gart_found = 1;
-	return AE_CTRL_TERMINATE;
+		return 1;
+	return 0;
 }
 
 static int __init
 agp_hp_init (void)
 {
+	acpi_status status;
 
-	acpi_get_devices("HWP0003", zx1_gart_probe, "HWP0003", NULL);
-	if (hp_zx1_gart_found)
-		return 0;
-
-	acpi_get_devices("HWP0007", zx1_gart_probe, "HWP0007", NULL);
-	if (hp_zx1_gart_found)
-		return 0;
-
-	return -ENODEV;
+	status = acpi_get_devices("HWP0003", zx1_gart_probe, "HWP0003 AGP LBA", NULL);
+	if (!(ACPI_SUCCESS(status))) {
+		agp_bridge->type = NOT_SUPPORTED;
+		printk(KERN_INFO PFX "Failed to initialize zx1 AGP.\n");
+		return -ENODEV;
+	}
+	return 0;
 }
 
 static void __exit

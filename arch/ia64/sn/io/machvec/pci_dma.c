@@ -597,7 +597,7 @@ sn_dma_set_mask(struct device *dev, u64 dma_mask)
 	if (!sn_dma_supported(dev, dma_mask))
 		return 0;
 
-	*dev->dma_mask = dma_mask;
+	dev->dma_mask = dma_mask;
 	return 1;
 }
 EXPORT_SYMBOL(sn_dma_set_mask);

@@ -17,11 +17,10 @@
 #define SGI_II_ERROR			(0x31)
 #define SGI_XBOW_ERROR			(0x32)
 #define SGI_PCIBR_ERROR			(0x33)
-#define SGI_ACPI_SCI_INT		(0x34)
 #define SGI_XPC_NOTIFY			(0xe7)
 
 #define IA64_SN2_FIRST_DEVICE_VECTOR	(0x34)
-#define IA64_SN2_LAST_DEVICE_VECTOR	(0xe7)
+#define IA64_SN2_LAST_DEVICE_VECTOR	(0xe6)
 
 #define SN2_IRQ_RESERVED        (0x1)
 #define SN2_IRQ_CONNECTED       (0x2)

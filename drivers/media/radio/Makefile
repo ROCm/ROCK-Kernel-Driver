@@ -2,8 +2,6 @@
 # Makefile for the kernel character device drivers.
 #
 
-obj-y		:= dummy.o
-
 miropcm20-objs	:= miropcm20-rds-core.o miropcm20-radio.o
 
 obj-$(CONFIG_RADIO_AZTECH) += radio-aztech.o

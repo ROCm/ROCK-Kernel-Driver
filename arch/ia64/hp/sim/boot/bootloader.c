@@ -37,7 +37,15 @@ struct disk_stat {
 
 extern void jmp_to_kernel (unsigned long bp, unsigned long e_entry);
 extern struct ia64_boot_param *sys_fw_init (const char *args, int arglen);
-extern void debug_break (void);
+
+/*
+ * Set a break point on this function so that symbols are available to set breakpoints in
+ * the kernel being debugged.
+ */
+static void
+debug_break (void)
+{
+}
 
 static void
 cons_write (const char *buf)
