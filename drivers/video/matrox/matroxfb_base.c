@@ -68,7 +68,7 @@
  *               "Samuel Hocevar" <sam@via.ecp.fr>
  *                     Fixes
  *
- *               "Anton Altaparmakov"
+ *               "Anton Altaparmakov" <AntonA@bigfoot.com>
  *                     G400 MAX/non-MAX distinction
  *
  *               "Ken Aaker" <kdaaker@rchland.vnet.ibm.com>

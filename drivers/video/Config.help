@@ -77,6 +77,12 @@ CONFIG_FB_AMIGA
   module will be called amifb.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_FB_PM3
+  This is the frame buffer device driver for the 3DLabs Permedia3
+  chipset, used in Formac ProFormance III, 3DLabs Oxygen VX1 &
+  similar boards, 3DLabs Permedia3 Create!, Appian Jeronimo 2000
+  and maybe other boards.
+
 CONFIG_FB_AMIGA_OCS
   This enables support for the original Agnus and Denise video chips,
   found in the Amiga 1000 and most A500's and A2000's. If you intend
@@ -586,6 +592,12 @@ CONFIG_FB_SIS_315
 CONFIG_FB_IMSTT
   The IMS Twin Turbo is a PCI-based frame buffer card bundled with
   many Macintosh and compatible computers.
+
+CONFIG_FB_TX3912
+  The TX3912 is a Toshiba RISC processor based on the MIPS 3900 core
+  see <http://www.toshiba.com/taec/components/Generic/risc/tx3912.htm>.
+
+  Say Y here to enable kernel support for the on-board framebuffer.
 
 CONFIG_FB_VIRTUAL
   This is a `virtual' frame buffer device. It operates on a chunk of
