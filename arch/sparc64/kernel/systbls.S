@@ -27,7 +27,7 @@ sys_call_table32:
 /*25*/	.word sys_time, sys_ptrace, sys_alarm, sys32_sigaltstack, sys32_pause
 /*30*/	.word compat_sys_utime, sys_lchown, sys_fchown, sys_access, sys_nice
 	.word sys_chown, sys_sync, sys_kill, compat_sys_newstat, sys32_sendfile
-/*40*/	.word compat_sys_newlstat, sys_dup, sys_pipe, sys32_times, sys_getuid
+/*40*/	.word compat_sys_newlstat, sys_dup, sys_pipe, compat_sys_times, sys_getuid
 	.word sys_umount, sys32_setgid16, sys32_getgid16, sys_signal, sys32_geteuid16
 /*50*/	.word sys32_getegid16, sys_acct, sys_nis_syscall, sys_getgid, sys32_ioctl
 	.word sys_reboot, sys32_mmap2, sys_symlink, sys_readlink, sys32_execve
