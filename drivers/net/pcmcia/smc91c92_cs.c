@@ -2265,29 +2265,25 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
     return rc;
 }
 
-
-/*====================================================================*/
+static struct pcmcia_driver smc91c92_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "smc91c92_cs",
+	},
+	.attach		= smc91c92_attach,
+	.detach		= smc91c92_detach,
+};
 
 static int __init init_smc91c92_cs(void)
 {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_ERR
-	       "smc91c92_cs: Card Services release does not match!\n");
-	return -EINVAL;
-    }
-    register_pccard_driver(&dev_info, &smc91c92_attach, &smc91c92_detach);
-    return 0;
+	return pcmcia_register_driver(&smc91c92_cs_driver);
 }
 
 static void __exit exit_smc91c92_cs(void)
 {
-    DEBUG(0, "smc91c92_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-	smc91c92_detach(dev_list);
+	pcmcia_unregister_driver(&smc91c92_cs_driver);
+	while (dev_list != NULL)
+		smc91c92_detach(dev_list);
 }
 
 module_init(init_smc91c92_cs);

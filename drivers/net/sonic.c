@@ -170,7 +170,7 @@ static int sonic_send_packet(struct sk_buff *skb, struct net_device *dev)
  * The typical workload of the driver:
  * Handle the network interface interrupts.
  */
-static void sonic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sonic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	unsigned int base_addr = dev->base_addr;
@@ -179,7 +179,7 @@ static void sonic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (dev == NULL) {
 		printk("sonic_interrupt: irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	lp = (struct sonic_local *) dev->priv;
@@ -286,6 +286,7 @@ static void sonic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * clear interrupt bits and return
 	 */
 	SONIC_WRITE(SONIC_ISR, status);
+	return IRQ_HANDLED;
 }
 
 /*

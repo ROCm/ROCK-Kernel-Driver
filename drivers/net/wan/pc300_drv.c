@@ -285,7 +285,7 @@ static void rx_dma_buf_pt_init(pc300_t *, int);
 static void rx_dma_buf_init(pc300_t *, int);
 static void tx_dma_buf_check(pc300_t *, int);
 static void rx_dma_buf_check(pc300_t *, int);
-static void cpc_intr(int, void *, struct pt_regs *);
+static irqreturn_t cpc_intr(int, void *, struct pt_regs *);
 static struct net_device_stats *cpc_get_stats(struct net_device *);
 static int clock_rate_calc(uclong, uclong, int *);
 static uclong detect_ram(pc300_t *);
@@ -2366,7 +2366,7 @@ static void falc_intr(pc300_t * card)
 	}
 }
 
-static void cpc_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cpc_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	pc300_t *card;
 	volatile ucchar plx_status;
@@ -2375,14 +2375,14 @@ static void cpc_intr(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef PC300_DEBUG_INTR
 		printk("cpc_intr: spurious intr %d\n", irq);
 #endif
-		return;		/* spurious intr */
+		return IRQ_NONE;		/* spurious intr */
 	}
 
 	if (card->hw.rambase == 0) {
 #ifdef PC300_DEBUG_INTR
 		printk("cpc_intr: spurious intr2 %d\n", irq);
 #endif
-		return;		/* spurious intr */
+		return IRQ_NONE;		/* spurious intr */
 	}
 
 	switch (card->hw.type) {
@@ -2403,6 +2403,7 @@ static void cpc_intr(int irq, void *dev_id, struct pt_regs *regs)
 			}
 			break;
 	}
+	return IRQ_HANDLED;
 }
 
 void cpc_sca_status(pc300_t * card, int ch)

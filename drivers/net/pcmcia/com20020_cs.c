@@ -567,29 +567,26 @@ static int com20020_event(event_t event, int priority,
 } /* com20020_event */
 
 
-/*====================================================================*/
+
+static struct pcmcia_driver com20020_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "com20020_cs",
+	},
+	.attach		= com20020_attach,
+	.detach		= com20020_detach,
+};
 
 static int __init init_com20020_cs(void)
 {
-    servinfo_t serv;
-
-    DEBUG(0, "%s\n", VERSION);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "com20020_cs: Card Services release "
-	       "does not match!\n");
-        return -1;
-    }
-    register_pccard_driver(&dev_info, &com20020_attach, &com20020_detach);
-    return 0;
+	return pcmcia_register_driver(&com20020_cs_driver);
 }
 
 static void __exit exit_com20020_cs(void)
 {
-    DEBUG(0, "com20020_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-        com20020_detach(dev_list);
+	pcmcia_unregister_driver(&com20020_cs_driver);
+	while (dev_list != NULL)
+		com20020_detach(dev_list);
 }
 
 module_init(init_com20020_cs);

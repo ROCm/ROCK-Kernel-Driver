@@ -709,7 +709,8 @@ out:
 	spin_unlock(&lp->lock);
 }
 
-static void lance_interrupt(const int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+lance_interrupt(const int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct lance_private *lp = (struct lance_private *) dev->priv;
@@ -763,6 +764,7 @@ static void lance_interrupt(const int irq, void *dev_id, struct pt_regs *regs)
 
 	writereg(&ll->rdp, LE_C0_INEA);
 	writereg(&ll->rdp, LE_C0_INEA);
+	return IRQ_HANDLED;
 }
 
 struct net_device *last_dev = 0;
