@@ -142,7 +142,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->rto_max = proto->rto_max;
 	asoc->rto_min = proto->rto_min;
 
-	asoc->overall_error_threshold = 0;
+	asoc->overall_error_threshold = asoc->max_retrans;
 	asoc->overall_error_count = 0;
 
 	/* Initialize the maximum mumber of new data packets that can be sent
@@ -478,15 +478,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 
 	peer->partial_bytes_acked = 0;
 	peer->flight_size = 0;
-
 	peer->error_threshold = peer->max_retrans;
-
-	/* Update the overall error threshold value of the association
-	 * taking the new peer's error threshold into account.
-	 */
-	asoc->overall_error_threshold =
-		min(asoc->overall_error_threshold + peer->error_threshold,
-		    asoc->max_retrans);
 
 	/* By default, enable heartbeat for peer address. */
 	peer->hb_allowed = 1;
