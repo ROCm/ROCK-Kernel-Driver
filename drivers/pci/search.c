@@ -125,7 +125,7 @@ struct pci_dev * pci_get_slot(struct pci_bus *bus, unsigned int devfn)
 	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 
-	list_for_each(tmp, &bus->children) {
+	list_for_each(tmp, &bus->devices) {
 		dev = pci_dev_b(tmp);
 		if (dev->devfn == devfn)
 			goto out;
