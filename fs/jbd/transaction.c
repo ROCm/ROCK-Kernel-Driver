@@ -1756,6 +1756,14 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 	spin_lock(&journal->j_state_lock);
 	jbd_lock_bh_state(bh);
 	spin_lock(&journal->j_list_lock);
+
+	/*
+	 * Now we have the locks, check again to see whether kjournald has
+	 * taken the buffer off the transaction.
+	 */
+	if (!buffer_jbd(bh))
+		goto zap_buffer;
+
 	jh = bh2jh(bh);
 	transaction = jh->b_transaction;
 	if (transaction == NULL) {
