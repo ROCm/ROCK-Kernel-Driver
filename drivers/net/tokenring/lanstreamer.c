@@ -201,7 +201,7 @@ static int streamer_open(struct net_device *dev);
 static int streamer_xmit(struct sk_buff *skb, struct net_device *dev);
 static int streamer_close(struct net_device *dev);
 static void streamer_set_rx_mode(struct net_device *dev);
-static void streamer_interrupt(int irq, void *dev_id,
+static irqreturn_t streamer_interrupt(int irq, void *dev_id,
 			       struct pt_regs *regs);
 static struct net_device_stats *streamer_get_stats(struct net_device *dev);
 static int streamer_set_mac_address(struct net_device *dev, void *addr);
@@ -1021,7 +1021,7 @@ static void streamer_rx(struct net_device *dev)
 	}			/* end for all completed rx descriptors */
 }
 
-static void streamer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t streamer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct streamer_private *streamer_priv =
@@ -1142,6 +1142,7 @@ static void streamer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	} /* while() */		
 
 	spin_unlock(&streamer_priv->streamer_lock) ; 
+	return IRQ_HANDLED;
 }
 
 static int streamer_xmit(struct sk_buff *skb, struct net_device *dev)

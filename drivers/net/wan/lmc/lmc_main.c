@@ -117,7 +117,7 @@ static int lmc_rx (struct net_device *dev);
 static int lmc_open(struct net_device *dev);
 static int lmc_close(struct net_device *dev);
 static struct net_device_stats *lmc_get_stats(struct net_device *dev);
-static void lmc_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t lmc_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int lmc_set_config(struct net_device *dev, struct ifmap *map);
 static void lmc_initcsrs(lmc_softc_t * const sc, lmc_csrptr_t csr_base, size_t csr_size);
 static void lmc_softreset(lmc_softc_t * const);
@@ -1388,7 +1388,7 @@ static int lmc_ifdown (struct net_device *dev) /*fold00*/
 /* Interrupt handling routine.  This will take an incoming packet, or clean
  * up after a trasmit.
  */
-static void lmc_interrupt (int irq, void *dev_instance, struct pt_regs *regs) /*fold00*/
+static irqreturn_t lmc_interrupt (int irq, void *dev_instance, struct pt_regs *regs) /*fold00*/
 {
     struct net_device *dev = (struct net_device *) dev_instance;
     lmc_softc_t *sc;
@@ -1398,6 +1398,7 @@ static void lmc_interrupt (int irq, void *dev_instance, struct pt_regs *regs) /*
     unsigned int badtx;
     u32 firstcsr;
     int max_work = LMC_RXDESCS;
+    int handled = 0;
 
     lmc_trace(dev, "lmc_interrupt in");
 
@@ -1421,6 +1422,8 @@ static void lmc_interrupt (int irq, void *dev_instance, struct pt_regs *regs) /*
 
     /* always go through this loop at least once */
     while (csr & sc->lmc_intrmask) {
+	handled = 1;
+
         /*
          * Clear interrupt bits, we handle all case below
          */
@@ -1580,6 +1583,7 @@ lmc_int_fail_out:
     spin_unlock(&sc->lmc_lock);
 
     lmc_trace(dev, "lmc_interrupt out");
+    return IRQ_RETVAL(handled);
 }
 
 static int lmc_start_xmit (struct sk_buff *skb, struct net_device *dev) /*fold00*/
