@@ -944,7 +944,11 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		if (net_ratelimit())
 			printk(KERN_DEBUG "rt6_pmtu_discovery: invalid MTU value %d\n",
 			       pmtu);
-		return;
+		/* According to RFC1981, the PMTU is set to the IPv6 minimum
+		   link MTU if the node receives a Packet Too Big message
+		   reporting next-hop MTU that is less than the IPv6 minimum MTU.
+		   */
+		pmtu = IPV6_MIN_MTU;
 	}
 
 	rt = rt6_lookup(daddr, saddr, dev->ifindex, 0);
@@ -982,7 +986,13 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		nrt = rt6_cow(rt, daddr, saddr);
 		if (!nrt->u.dst.error) {
 			nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
-			dst_set_expires(&rt->u.dst, ip6_rt_mtu_expires);
+			/* According to RFC 1981, detecting PMTU increase shouldn't be
+			   happened within 5 mins, the recommended timer is 10 mins.
+			   Here this route expiration time is set to ip6_rt_mtu_expires
+			   which is 10 mins. After 10 mins the decreased pmtu is expired
+			   and detecting PMTU increase will be automatically happened.
+			 */
+			dst_set_expires(&nrt->u.dst, ip6_rt_mtu_expires);
 			nrt->rt6i_flags |= RTF_DYNAMIC|RTF_EXPIRES;
 			dst_release(&nrt->u.dst);
 		}
@@ -994,7 +1004,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		nrt->rt6i_dst.plen = 128;
 		nrt->u.dst.flags |= DST_HOST;
 		nrt->rt6i_nexthop = neigh_clone(rt->rt6i_nexthop);
-		dst_set_expires(&rt->u.dst, ip6_rt_mtu_expires);
+		dst_set_expires(&nrt->u.dst, ip6_rt_mtu_expires);
 		nrt->rt6i_flags |= RTF_DYNAMIC|RTF_CACHE|RTF_EXPIRES;
 		nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
 		rt6_ins(nrt);
@@ -1233,15 +1243,34 @@ struct rt6_mtu_change_arg
 static int rt6_mtu_change_route(struct rt6_info *rt, void *p_arg)
 {
 	struct rt6_mtu_change_arg *arg = (struct rt6_mtu_change_arg *) p_arg;
+	struct inet6_dev *idev;
 
 	/* In IPv6 pmtu discovery is not optional,
 	   so that RTAX_MTU lock cannot disable it.
 	   We still use this lock to block changes
 	   caused by addrconf/ndisc.
 	*/
+
+	idev = __in6_dev_get(arg->dev);
+	/* For administrative MTU increase, there is no way to discover
+	   IPv6 PMTU increase, so PMTU increase should be updated here.
+	   Since RFC 1981 doesn't include administrative MTU increase
+	   update PMTU increase is a MUST. (i.e. jumbo frame)
+	 */
+	/*
+	   If new MTU is less than route PMTU, this new MTU will be the
+	   lowest MTU in the path, update the route PMTU to refect PMTU
+	   decreases; if new MTU is greater than route PMTU, and the
+	   old MTU is the lowest MTU in the path, update the route PMTU
+	   to refect the increase. In this case if the other nodes' MTU
+	   also have the lowest MTU, TOO BIG MESSAGE will be lead to
+	   PMTU discouvery.
+	 */
 	if (rt->rt6i_dev == arg->dev &&
-	    rt->u.dst.metrics[RTAX_MTU-1] > arg->mtu &&
-	    !dst_metric_locked(&rt->u.dst, RTAX_MTU))
+	    !dst_metric_locked(&rt->u.dst, RTAX_MTU) &&
+            (dst_pmtu(&rt->u.dst) > arg->mtu ||
+             (dst_pmtu(&rt->u.dst) < arg->mtu &&
+	      dst_pmtu(&rt->u.dst) == idev->cnf.mtu6)))
 		rt->u.dst.metrics[RTAX_MTU-1] = arg->mtu;
 	rt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, arg->mtu - 60, ip6_rt_min_advmss);
 	if (rt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
