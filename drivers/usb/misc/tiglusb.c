@@ -383,7 +383,7 @@ tiglusb_probe (struct usb_interface *intf,
 		dev->descriptor.bcdDevice >> 8,
 		dev->descriptor.bcdDevice & 0xff);
 
-	dev_set_drvdata (&intf->dev, s);
+	usb_set_intfdata (intf, s);
 	return 0;
 }
 
@@ -392,9 +392,9 @@ tiglusb_disconnect (struct usb_interface *intf)
 {
 	char name[32];
 
-	ptiglusb_t s = dev_get_drvdata (&intf->dev);
+	ptiglusb_t s = usb_get_intfdata (intf);
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (!s || !s->dev) {
 		info ("bogus disconnect");
 		return;

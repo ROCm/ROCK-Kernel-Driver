@@ -635,7 +635,7 @@ static int unlink_simple (struct usbtest_dev *dev, int pipe, int len)
 static int
 usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *buf)
 {
-	struct usbtest_dev	*dev = dev_get_drvdata (&intf->dev);
+	struct usbtest_dev	*dev = usb_get_intfdata (intf);
 	struct usb_device	*udev = testdev_to_usbdev (dev);
 	struct usbtest_param	*param = buf;
 	int			retval = -EOPNOTSUPP;
@@ -957,7 +957,7 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 		}
 	}
 
-	dev_set_drvdata (&intf->dev, dev);
+	usb_set_intfdata (intf, dev);
 	info ("%s at %s ... %s speed {control%s%s} tests",
 			info->name, dev->id,
 			({ char *tmp;
@@ -972,11 +972,11 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 
 static void usbtest_disconnect (struct usb_interface *intf)
 {
-	struct usbtest_dev	*dev = dev_get_drvdata (&intf->dev);
+	struct usbtest_dev	*dev = usb_get_intfdata (intf);
 
 	down (&dev->sem);
 
-	dev_set_drvdata (&intf->dev, 0);
+	usb_set_intfdata (intf, NULL);
 	info ("unbound %s", dev->id);
 }
 
