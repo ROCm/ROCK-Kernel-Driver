@@ -124,70 +124,70 @@ static void arp_error_report(struct neighbour *neigh, struct sk_buff *skb);
 static void parp_redo(struct sk_buff *skb);
 
 static struct neigh_ops arp_generic_ops = {
-	family:			AF_INET,
-	solicit:		arp_solicit,
-	error_report:		arp_error_report,
-	output:			neigh_resolve_output,
-	connected_output:	neigh_connected_output,
-	hh_output:		dev_queue_xmit,
-	queue_xmit:		dev_queue_xmit,
+	.family =		AF_INET,
+	.solicit =		arp_solicit,
+	.error_report =		arp_error_report,
+	.output =		neigh_resolve_output,
+	.connected_output =	neigh_connected_output,
+	.hh_output =		dev_queue_xmit,
+	.queue_xmit =		dev_queue_xmit,
 };
 
 static struct neigh_ops arp_hh_ops = {
-	family:			AF_INET,
-	solicit:		arp_solicit,
-	error_report:		arp_error_report,
-	output:			neigh_resolve_output,
-	connected_output:	neigh_resolve_output,
-	hh_output:		dev_queue_xmit,
-	queue_xmit:		dev_queue_xmit,
+	.family =		AF_INET,
+	.solicit =		arp_solicit,
+	.error_report =		arp_error_report,
+	.output =		neigh_resolve_output,
+	.connected_output =	neigh_resolve_output,
+	.hh_output =		dev_queue_xmit,
+	.queue_xmit =		dev_queue_xmit,
 };
 
 static struct neigh_ops arp_direct_ops = {
-	family:			AF_INET,
-	output:			dev_queue_xmit,
-	connected_output:	dev_queue_xmit,
-	hh_output:		dev_queue_xmit,
-	queue_xmit:		dev_queue_xmit,
+	.family =		AF_INET,
+	.output =		dev_queue_xmit,
+	.connected_output =	dev_queue_xmit,
+	.hh_output =		dev_queue_xmit,
+	.queue_xmit =		dev_queue_xmit,
 };
 
 struct neigh_ops arp_broken_ops = {
-	family:			AF_INET,
-	solicit:		arp_solicit,
-	error_report:		arp_error_report,
-	output:			neigh_compat_output,
-	connected_output:	neigh_compat_output,
-	hh_output:		dev_queue_xmit,
-	queue_xmit:		dev_queue_xmit,
+	.family =		AF_INET,
+	.solicit =		arp_solicit,
+	.error_report =		arp_error_report,
+	.output =		neigh_compat_output,
+	.connected_output =	neigh_compat_output,
+	.hh_output =		dev_queue_xmit,
+	.queue_xmit =		dev_queue_xmit,
 };
 
 struct neigh_table arp_tbl = {
-	family:		AF_INET,
-	entry_size:	sizeof(struct neighbour) + 4,
-	key_len:	4,
-	hash:		arp_hash,
-	constructor:	arp_constructor,
-	proxy_redo:	parp_redo,
-	id:		"arp_cache",
-	parms: {
-		tbl:			&arp_tbl,
-		base_reachable_time:	30 * HZ,
-		retrans_time:		1 * HZ,
-		gc_staletime:		60 * HZ,
-		reachable_time:		30 * HZ,
-		delay_probe_time:	5 * HZ,
-		queue_len:		3,
-		ucast_probes:		3,
-		mcast_probes:		3,
-		anycast_delay:		1 * HZ,
-		proxy_delay:		(8 * HZ) / 10,
-		proxy_qlen:		64,
-		locktime:		1 * HZ,
+	.family =	AF_INET,
+	.entry_size =	sizeof(struct neighbour) + 4,
+	.key_len =	4,
+	.hash =		arp_hash,
+	.constructor =	arp_constructor,
+	.proxy_redo =	parp_redo,
+	.id =		"arp_cache",
+	.parms = {
+		.tbl =			&arp_tbl,
+		.base_reachable_time =	30 * HZ,
+		.retrans_time =	1 * HZ,
+		.gc_staletime =	60 * HZ,
+		.reachable_time =		30 * HZ,
+		.delay_probe_time =	5 * HZ,
+		.queue_len =		3,
+		.ucast_probes =	3,
+		.mcast_probes =	3,
+		.anycast_delay =	1 * HZ,
+		.proxy_delay =		(8 * HZ) / 10,
+		.proxy_qlen =		64,
+		.locktime =		1 * HZ,
 	},
-	gc_interval:	30 * HZ,
-	gc_thresh1:	128,
-	gc_thresh2:	512,
-	gc_thresh3:	1024,
+	.gc_interval =	30 * HZ,
+	.gc_thresh1 =	128,
+	.gc_thresh2 =	512,
+	.gc_thresh3 =	1024,
 };
 
 int arp_mc_map(u32 addr, u8 *haddr, struct net_device *dev, int dir)
@@ -1180,9 +1180,9 @@ void arp_ifdown(struct net_device *dev)
  */
 
 static struct packet_type arp_packet_type = {
-	type:	__constant_htons(ETH_P_ARP),
-	func:	arp_rcv,
-	data:	(void*) 1, /* understand shared skbs */
+	.type =	__constant_htons(ETH_P_ARP),
+	.func =	arp_rcv,
+	.data =	(void*) 1, /* understand shared skbs */
 };
 
 void __init arp_init (void)

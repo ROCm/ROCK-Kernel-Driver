@@ -391,24 +391,24 @@ static int svc_getsockopt(struct socket *sock,int level,int optname,
 
 
 static struct proto_ops SOCKOPS_WRAPPED(svc_proto_ops) = {
-	family:		PF_ATMSVC,
+	.family =	PF_ATMSVC,
 
-	release:	svc_release,
-	bind:		svc_bind,
-	connect:	svc_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		svc_accept,
-	getname:	svc_getname,
-	poll:		atm_poll,
-	ioctl:		atm_ioctl,
-	listen:		svc_listen,
-	shutdown:	svc_shutdown,
-	setsockopt:	svc_setsockopt,
-	getsockopt:	svc_getsockopt,
-	sendmsg:	atm_sendmsg,
-	recvmsg:	atm_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	svc_release,
+	.bind =		svc_bind,
+	.connect =	svc_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	svc_accept,
+	.getname =	svc_getname,
+	.poll =		atm_poll,
+	.ioctl =	atm_ioctl,
+	.listen =	svc_listen,
+	.shutdown =	svc_shutdown,
+	.setsockopt =	svc_setsockopt,
+	.getsockopt =	svc_getsockopt,
+	.sendmsg =	atm_sendmsg,
+	.recvmsg =	atm_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 
@@ -430,8 +430,8 @@ static int svc_create(struct socket *sock,int protocol)
 
 
 static struct net_proto_family svc_family_ops = {
-	family:	PF_ATMSVC,
-	create:	svc_create,
+	.family =PF_ATMSVC,
+	.create =svc_create,
 };
 
 

@@ -75,8 +75,8 @@ static char term_msg[]   = "***KERNEL:  Out of buffer space!***\n";
  */
 
 static struct file_operations vlan_fops = {
-	read:	vlan_proc_read,
-	ioctl: NULL, /* vlan_proc_ioctl */
+	.read =	vlan_proc_read,
+	.ioctl = NULL, /* vlan_proc_ioctl */
 };
 
 /*
@@ -84,8 +84,8 @@ static struct file_operations vlan_fops = {
  */
 
 static struct file_operations vlandev_fops = {
-	read:	vlan_proc_read,
-	ioctl:	NULL, /* vlan_proc_ioctl */
+	.read =	vlan_proc_read,
+	.ioctl =NULL, /* vlan_proc_ioctl */
 };
 
 /*

@@ -736,8 +736,8 @@ static void mpc_push(struct atm_vcc *vcc, struct sk_buff *skb)
 }
 
 static struct atmdev_ops mpc_ops = { /* only send is required */
-	close:	mpoad_close,
-	send:	msg_from_mpoad
+	.close =mpoad_close,
+	.send =	msg_from_mpoad
 };
 
 static struct atm_dev mpc_dev = {

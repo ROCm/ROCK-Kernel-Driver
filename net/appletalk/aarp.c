@@ -841,7 +841,7 @@ out0:	kfree_skb(skb);
 }
 
 static struct notifier_block aarp_notifier = {
-	notifier_call:	aarp_device_event,
+	.notifier_call =aarp_device_event,
 };
 
 static char aarp_snap_id[] = { 0x00, 0x00, 0x00, 0x80, 0xF3 };

@@ -123,13 +123,13 @@ static int ipip_fb_tunnel_init(struct net_device *dev);
 static int ipip_tunnel_init(struct net_device *dev);
 
 static struct net_device ipip_fb_tunnel_dev = {
-	name:	"tunl0",
-	init:	ipip_fb_tunnel_init,
+	.name =	"tunl0",
+	.init =	ipip_fb_tunnel_init,
 };
 
 static struct ip_tunnel ipip_fb_tunnel = {
-	dev:	&ipip_fb_tunnel_dev,
-	parms:	{ name:	"tunl0", }
+	.dev =	&ipip_fb_tunnel_dev,
+	.parms ={ name:	"tunl0", }
 };
 
 static struct ip_tunnel *tunnels_r_l[HASH_SIZE];
@@ -877,10 +877,10 @@ int __init ipip_fb_tunnel_init(struct net_device *dev)
 }
 
 static struct inet_protocol ipip_protocol = {
-	handler:	ipip_rcv,
-	err_handler:	ipip_err,
-	protocol:	IPPROTO_IPIP,
-	name:		"IPIP"
+	.handler =	ipip_rcv,
+	.err_handler =	ipip_err,
+	.protocol =	IPPROTO_IPIP,
+	.name =		"IPIP"
 };
 
 static char banner[] __initdata =

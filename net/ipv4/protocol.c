@@ -53,10 +53,10 @@
 #ifdef CONFIG_IP_MULTICAST
 
 static struct inet_protocol igmp_protocol = {
-	handler:	igmp_rcv,
-	next:		IPPROTO_PREVIOUS,
-	protocol:	IPPROTO_IGMP,
-	name:		"IGMP"
+	.handler =	igmp_rcv,
+	.next =		IPPROTO_PREVIOUS,
+	.protocol =	IPPROTO_IGMP,
+	.name =		"IGMP"
 };
 
 #undef  IPPROTO_PREVIOUS
@@ -65,32 +65,32 @@ static struct inet_protocol igmp_protocol = {
 #endif
 
 static struct inet_protocol tcp_protocol = {
-	handler:	tcp_v4_rcv,
-	err_handler:	tcp_v4_err,
-	next:		IPPROTO_PREVIOUS,
-	protocol:	IPPROTO_TCP,
-	name:		"TCP"
+	.handler =	tcp_v4_rcv,
+	.err_handler =	tcp_v4_err,
+	.next =		IPPROTO_PREVIOUS,
+	.protocol =	IPPROTO_TCP,
+	.name =		"TCP"
 };
 
 #undef  IPPROTO_PREVIOUS
 #define IPPROTO_PREVIOUS &tcp_protocol
 
 static struct inet_protocol udp_protocol = {
-	handler:	udp_rcv,
-	err_handler:	udp_err,
-	next:		IPPROTO_PREVIOUS,
-	protocol:	IPPROTO_UDP,
-	name:		"UDP"
+	.handler =	udp_rcv,
+	.err_handler =	udp_err,
+	.next =		IPPROTO_PREVIOUS,
+	.protocol =	IPPROTO_UDP,
+	.name =		"UDP"
 };
 
 #undef  IPPROTO_PREVIOUS
 #define IPPROTO_PREVIOUS &udp_protocol
 
 static struct inet_protocol icmp_protocol = {
-	handler:	icmp_rcv,
-	next:		IPPROTO_PREVIOUS,
-	protocol:	IPPROTO_ICMP,
-	name:		"ICMP"
+	.handler =	icmp_rcv,
+	.next =		IPPROTO_PREVIOUS,
+	.protocol =	IPPROTO_ICMP,
+	.name =		"ICMP"
 };
 
 #undef  IPPROTO_PREVIOUS

@@ -506,50 +506,50 @@ static int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 }
 
 struct proto_ops inet6_stream_ops = {
-	family:		PF_INET6,
+	.family =	PF_INET6,
 
-	release:	inet6_release,
-	bind:		inet6_bind,
-	connect:	inet_stream_connect,		/* ok		*/
-	socketpair:	sock_no_socketpair,		/* a do nothing	*/
-	accept:		inet_accept,			/* ok		*/
-	getname:	inet6_getname, 
-	poll:		tcp_poll,			/* ok		*/
-	ioctl:		inet6_ioctl,			/* must change  */
-	listen:		inet_listen,			/* ok		*/
-	shutdown:	inet_shutdown,			/* ok		*/
-	setsockopt:	inet_setsockopt,		/* ok		*/
-	getsockopt:	inet_getsockopt,		/* ok		*/
-	sendmsg:	inet_sendmsg,			/* ok		*/
-	recvmsg:	inet_recvmsg,			/* ok		*/
-	mmap:		sock_no_mmap,
-	sendpage:	tcp_sendpage
+	.release =	inet6_release,
+	.bind =		inet6_bind,
+	.connect =	inet_stream_connect,		/* ok		*/
+	.socketpair =	sock_no_socketpair,		/* a do nothing	*/
+	.accept =	inet_accept,			/* ok		*/
+	.getname =	inet6_getname, 
+	.poll =		tcp_poll,			/* ok		*/
+	.ioctl =	inet6_ioctl,			/* must change  */
+	.listen =	inet_listen,			/* ok		*/
+	.shutdown =	inet_shutdown,			/* ok		*/
+	.setsockopt =	inet_setsockopt,		/* ok		*/
+	.getsockopt =	inet_getsockopt,		/* ok		*/
+	.sendmsg =	inet_sendmsg,			/* ok		*/
+	.recvmsg =	inet_recvmsg,			/* ok		*/
+	.mmap =		sock_no_mmap,
+	.sendpage =	tcp_sendpage
 };
 
 struct proto_ops inet6_dgram_ops = {
-	family:		PF_INET6,
+	.family =	PF_INET6,
 
-	release:	inet6_release,
-	bind:		inet6_bind,
-	connect:	inet_dgram_connect,		/* ok		*/
-	socketpair:	sock_no_socketpair,		/* a do nothing	*/
-	accept:		sock_no_accept,			/* a do nothing	*/
-	getname:	inet6_getname, 
-	poll:		datagram_poll,			/* ok		*/
-	ioctl:		inet6_ioctl,			/* must change  */
-	listen:		sock_no_listen,			/* ok		*/
-	shutdown:	inet_shutdown,			/* ok		*/
-	setsockopt:	inet_setsockopt,		/* ok		*/
-	getsockopt:	inet_getsockopt,		/* ok		*/
-	sendmsg:	inet_sendmsg,			/* ok		*/
-	recvmsg:	inet_recvmsg,			/* ok		*/
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	inet6_release,
+	.bind =		inet6_bind,
+	.connect =	inet_dgram_connect,		/* ok		*/
+	.socketpair =	sock_no_socketpair,		/* a do nothing	*/
+	.accept =	sock_no_accept,			/* a do nothing	*/
+	.getname =	inet6_getname, 
+	.poll =		datagram_poll,			/* ok		*/
+	.ioctl =	inet6_ioctl,			/* must change  */
+	.listen =	sock_no_listen,			/* ok		*/
+	.shutdown =	inet_shutdown,			/* ok		*/
+	.setsockopt =	inet_setsockopt,		/* ok		*/
+	.getsockopt =	inet_getsockopt,		/* ok		*/
+	.sendmsg =	inet_sendmsg,			/* ok		*/
+	.recvmsg =	inet_recvmsg,			/* ok		*/
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 static struct net_proto_family inet6_family_ops = {
-	family:	PF_INET6,
-	create:	inet6_create,
+	.family =PF_INET6,
+	.create =inet6_create,
 };
 
 #ifdef MODULE
@@ -567,13 +567,13 @@ extern void ipv6_sysctl_unregister(void);
 #endif
 
 static struct inet_protosw rawv6_protosw = {
-	type:        SOCK_RAW,
-	protocol:    IPPROTO_IP,	/* wild card */
-	prot:        &rawv6_prot,
-	ops:         &inet6_dgram_ops,
-	capability:  CAP_NET_RAW,
-	no_check:    UDP_CSUM_DEFAULT,
-	flags:       INET_PROTOSW_REUSE,
+	.type =      SOCK_RAW,
+	.protocol =  IPPROTO_IP,	/* wild card */
+	.prot =      &rawv6_prot,
+	.ops =       &inet6_dgram_ops,
+	.capability =CAP_NET_RAW,
+	.no_check =  UDP_CSUM_DEFAULT,
+	.flags =     INET_PROTOSW_REUSE,
 };
 
 #define INETSW6_ARRAY_LEN (sizeof(inetsw6_array) / sizeof(struct inet_protosw))

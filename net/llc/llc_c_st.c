@@ -4896,51 +4896,51 @@ static struct llc_conn_state_trans *llc_temp_state_transitions[] = {
 /* Connection State Transition Table */
 struct llc_conn_state llc_conn_state_table[] = {
 	{
-		current_state:	LLC_CONN_STATE_ADM,
-		transitions:	llc_adm_state_transitions,
+		.current_state =LLC_CONN_STATE_ADM,
+		.transitions =	llc_adm_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_SETUP,
-		transitions:	llc_setup_state_transitions,
+		.current_state =LLC_CONN_STATE_SETUP,
+		.transitions =	llc_setup_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_NORMAL,
-		transitions:	llc_normal_state_transitions,
+		.current_state =LLC_CONN_STATE_NORMAL,
+		.transitions =	llc_normal_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_BUSY,
-		transitions:	llc_busy_state_transitions,
+		.current_state =LLC_CONN_STATE_BUSY,
+		.transitions =	llc_busy_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_REJ,
-		transitions:	llc_reject_state_transitions,
+		.current_state =LLC_CONN_STATE_REJ,
+		.transitions =	llc_reject_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_AWAIT,
-		transitions:	llc_await_state_transitions,
+		.current_state =LLC_CONN_STATE_AWAIT,
+		.transitions =	llc_await_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_AWAIT_BUSY,
-		transitions:	llc_await_busy_state_transitions,
+		.current_state =LLC_CONN_STATE_AWAIT_BUSY,
+		.transitions =	llc_await_busy_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_AWAIT_REJ,
-		transitions:	llc_await_rejct_state_transitions,
+		.current_state =LLC_CONN_STATE_AWAIT_REJ,
+		.transitions =	llc_await_rejct_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_D_CONN,
-		transitions:	llc_d_conn_state_transitions,
+		.current_state =LLC_CONN_STATE_D_CONN,
+		.transitions =	llc_d_conn_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_RESET,
-		transitions:	llc_rst_state_transitions,
+		.current_state =LLC_CONN_STATE_RESET,
+		.transitions =	llc_rst_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_ERROR,
-		transitions:	llc_error_state_transitions,
+		.current_state =LLC_CONN_STATE_ERROR,
+		.transitions =	llc_error_state_transitions,
 	},
 	{
-		current_state:	LLC_CONN_STATE_TEMP,
-		transitions:	llc_temp_state_transitions,
+		.current_state =LLC_CONN_STATE_TEMP,
+		.transitions =	llc_temp_state_transitions,
 	},
 };

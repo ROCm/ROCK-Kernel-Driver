@@ -2137,43 +2137,43 @@ out_no_bh:
 }
 
 struct proto tcpv6_prot = {
-	name:		"TCPv6",
-	close:		tcp_close,
-	connect:	tcp_v6_connect,
-	disconnect:	tcp_disconnect,
-	accept:		tcp_accept,
-	ioctl:		tcp_ioctl,
-	init:		tcp_v6_init_sock,
-	destroy:	tcp_v6_destroy_sock,
-	shutdown:	tcp_shutdown,
-	setsockopt:	tcp_setsockopt,
-	getsockopt:	tcp_getsockopt,
-	sendmsg:	tcp_sendmsg,
-	recvmsg:	tcp_recvmsg,
-	backlog_rcv:	tcp_v6_do_rcv,
-	hash:		tcp_v6_hash,
-	unhash:		tcp_unhash,
-	get_port:	tcp_v6_get_port,
+	.name =		"TCPv6",
+	.close =	tcp_close,
+	.connect =	tcp_v6_connect,
+	.disconnect =	tcp_disconnect,
+	.accept =	tcp_accept,
+	.ioctl =	tcp_ioctl,
+	.init =		tcp_v6_init_sock,
+	.destroy =	tcp_v6_destroy_sock,
+	.shutdown =	tcp_shutdown,
+	.setsockopt =	tcp_setsockopt,
+	.getsockopt =	tcp_getsockopt,
+	.sendmsg =	tcp_sendmsg,
+	.recvmsg =	tcp_recvmsg,
+	.backlog_rcv =	tcp_v6_do_rcv,
+	.hash =		tcp_v6_hash,
+	.unhash =	tcp_unhash,
+	.get_port =	tcp_v6_get_port,
 };
 
 static struct inet6_protocol tcpv6_protocol =
 {
-	handler:	tcp_v6_rcv,
-	err_handler:	tcp_v6_err,
-	protocol:	IPPROTO_TCP,
-	name:		"TCPv6",
+	.handler =	tcp_v6_rcv,
+	.err_handler =	tcp_v6_err,
+	.protocol =	IPPROTO_TCP,
+	.name =		"TCPv6",
 };
 
 extern struct proto_ops inet6_stream_ops;
 
 static struct inet_protosw tcpv6_protosw = {
-	type:        SOCK_STREAM,
-	protocol:    IPPROTO_TCP,
-	prot:        &tcpv6_prot,
-	ops:         &inet6_stream_ops,
-	capability:  -1,
-	no_check:    0,
-	flags:       INET_PROTOSW_PERMANENT,
+	.type =      SOCK_STREAM,
+	.protocol =  IPPROTO_TCP,
+	.prot =      &tcpv6_prot,
+	.ops =       &inet6_stream_ops,
+	.capability =-1,
+	.no_check =  0,
+	.flags =     INET_PROTOSW_PERMANENT,
 };
 
 void __init tcpv6_init(void)

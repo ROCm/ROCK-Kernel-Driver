@@ -79,11 +79,11 @@ void tcp_v4_send_check(struct sock *sk, struct tcphdr *th, int len,
 		       struct sk_buff *skb);
 
 struct tcp_hashinfo __cacheline_aligned tcp_hashinfo = {
-	__tcp_lhash_lock:     RW_LOCK_UNLOCKED,
-	__tcp_lhash_users:    ATOMIC_INIT(0),
+	.__tcp_lhash_lock =   RW_LOCK_UNLOCKED,
+	.__tcp_lhash_users =  ATOMIC_INIT(0),
 	__tcp_lhash_wait:
 	  __WAIT_QUEUE_HEAD_INITIALIZER(tcp_hashinfo.__tcp_lhash_wait),
-	__tcp_portalloc_lock: SPIN_LOCK_UNLOCKED
+	.__tcp_portalloc_lock = SPIN_LOCK_UNLOCKED
 };
 
 /*
@@ -1379,11 +1379,11 @@ static inline struct ip_options *tcp_v4_save_options(struct sock *sk,
 int sysctl_max_syn_backlog = 256;
 
 struct or_calltable or_ipv4 = {
-	family:		PF_INET,
-	rtx_syn_ack:	tcp_v4_send_synack,
-	send_ack:	tcp_v4_or_send_ack,
-	destructor:	tcp_v4_or_free,
-	send_reset:	tcp_v4_send_reset,
+	.family =	PF_INET,
+	.rtx_syn_ack =	tcp_v4_send_synack,
+	.send_ack =	tcp_v4_or_send_ack,
+	.destructor =	tcp_v4_or_free,
+	.send_reset =	tcp_v4_send_reset,
 };
 
 int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
@@ -1998,17 +1998,17 @@ int tcp_v4_tw_remember_stamp(struct tcp_tw_bucket *tw)
 }
 
 struct tcp_func ipv4_specific = {
-	queue_xmit:	ip_queue_xmit,
-	send_check:	tcp_v4_send_check,
-	rebuild_header:	tcp_v4_rebuild_header,
-	conn_request:	tcp_v4_conn_request,
-	syn_recv_sock:	tcp_v4_syn_recv_sock,
-	remember_stamp:	tcp_v4_remember_stamp,
-	net_header_len:	sizeof(struct iphdr),
-	setsockopt:	ip_setsockopt,
-	getsockopt:	ip_getsockopt,
-	addr2sockaddr:	v4_addr2sockaddr,
-	sockaddr_len:	sizeof(struct sockaddr_in),
+	.queue_xmit =	ip_queue_xmit,
+	.send_check =	tcp_v4_send_check,
+	.rebuild_header =tcp_v4_rebuild_header,
+	.conn_request =	tcp_v4_conn_request,
+	.syn_recv_sock =tcp_v4_syn_recv_sock,
+	.remember_stamp =tcp_v4_remember_stamp,
+	.net_header_len =sizeof(struct iphdr),
+	.setsockopt =	ip_setsockopt,
+	.getsockopt =	ip_getsockopt,
+	.addr2sockaddr =v4_addr2sockaddr,
+	.sockaddr_len =	sizeof(struct sockaddr_in),
 };
 
 /* NOTE: A lot of things set to zero explicitly by call to
@@ -2305,23 +2305,23 @@ out_no_bh:
 }
 
 struct proto tcp_prot = {
-	name:		"TCP",
-	close:		tcp_close,
-	connect:	tcp_v4_connect,
-	disconnect:	tcp_disconnect,
-	accept:		tcp_accept,
-	ioctl:		tcp_ioctl,
-	init:		tcp_v4_init_sock,
-	destroy:	tcp_v4_destroy_sock,
-	shutdown:	tcp_shutdown,
-	setsockopt:	tcp_setsockopt,
-	getsockopt:	tcp_getsockopt,
-	sendmsg:	tcp_sendmsg,
-	recvmsg:	tcp_recvmsg,
-	backlog_rcv:	tcp_v4_do_rcv,
-	hash:		tcp_v4_hash,
-	unhash:		tcp_unhash,
-	get_port:	tcp_v4_get_port,
+	.name =		"TCP",
+	.close =	tcp_close,
+	.connect =	tcp_v4_connect,
+	.disconnect =	tcp_disconnect,
+	.accept =	tcp_accept,
+	.ioctl =	tcp_ioctl,
+	.init =		tcp_v4_init_sock,
+	.destroy =	tcp_v4_destroy_sock,
+	.shutdown =	tcp_shutdown,
+	.setsockopt =	tcp_setsockopt,
+	.getsockopt =	tcp_getsockopt,
+	.sendmsg =	tcp_sendmsg,
+	.recvmsg =	tcp_recvmsg,
+	.backlog_rcv =	tcp_v4_do_rcv,
+	.hash =		tcp_v4_hash,
+	.unhash =	tcp_unhash,
+	.get_port =	tcp_v4_get_port,
 };
 
 
