@@ -21,6 +21,9 @@
  *	YOSHIFUJI Hideaki @USAGI:
  *		Fixed source address for MLD message based on
  *		<draft-ietf-magma-mld-source-02.txt>.
+ *	YOSHIFUJI Hideaki @USAGI:
+ *		- Ignore Queries for invalid addresses.
+ *		- MLD for link-local addresses.
  */
 
 #define __NO_VERSION__
@@ -409,6 +412,7 @@ int igmp6_event_query(struct sk_buff *skb)
 	unsigned long resptime;
 	struct inet6_dev *idev;
 	struct icmp6hdr *hdr;
+	int addr_type;
 
 	if (!pskb_may_pull(skb, sizeof(struct in6_addr)))
 		return -EINVAL;
@@ -424,6 +428,11 @@ int igmp6_event_query(struct sk_buff *skb)
 	resptime = (resptime<<10)/(1024000/HZ);
 
 	addrp = (struct in6_addr *) (hdr + 1);
+	addr_type = ipv6_addr_type(addrp);
+
+	if (addr_type != IPV6_ADDR_ANY &&
+	    !(addr_type&IPV6_ADDR_MULTICAST))
+		return -EINVAL;
 
 	idev = in6_dev_get(skb->dev);
 
@@ -431,7 +440,7 @@ int igmp6_event_query(struct sk_buff *skb)
 		return 0;
 
 	read_lock(&idev->lock);
-	if (ipv6_addr_any(addrp)) {
+	if (addr_type == IPV6_ADDR_ANY) {
 		for (ma = idev->mc_list; ma; ma=ma->next)
 			igmp6_group_queried(ma, resptime);
 	} else {
@@ -573,11 +582,9 @@ out:
 static void igmp6_join_group(struct ifmcaddr6 *ma)
 {
 	unsigned long delay;
-	int addr_type;
 
-	addr_type = ipv6_addr_type(&ma->mca_addr);
-
-	if ((addr_type & (IPV6_ADDR_LINKLOCAL|IPV6_ADDR_LOOPBACK)))
+	if (IPV6_ADDR_MC_SCOPE(&ma->mca_addr) < IPV6_ADDR_SCOPE_LINKLOCAL ||
+	    ipv6_addr_is_ll_all_nodes(&ma->mca_addr))
 		return;
 
 	igmp6_send(&ma->mca_addr, ma->idev->dev, ICMPV6_MGM_REPORT);
@@ -600,9 +607,8 @@ static void igmp6_leave_group(struct ifmcaddr6 *ma)
 {
 	int addr_type;
 
-	addr_type = ipv6_addr_type(&ma->mca_addr);
-
-	if ((addr_type & IPV6_ADDR_LINKLOCAL))
+	if (IPV6_ADDR_MC_SCOPE(&ma->mca_addr) < IPV6_ADDR_SCOPE_LINKLOCAL ||
+	    ipv6_addr_is_ll_all_nodes(&ma->mca_addr))
 		return;
 
 	if (ma->mca_flags & MAF_LAST_REPORTER)
