@@ -322,7 +322,7 @@ int usb_hcd_omap_probe (const struct hc_driver *driver,
 
 	retval = omap_start_hc(ohci, pdev);
 	if (retval < 0)
-		goto err2;
+		goto err1;
 
 	retval = hcd_buffer_create (hcd);
 	if (retval != 0) {
@@ -342,6 +342,7 @@ int usb_hcd_omap_probe (const struct hc_driver *driver,
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
+	hcd->self.release = &usb_hcd_release;
 	hcd->self.hcpriv = (void *) hcd;
 	hcd->self.bus_name = pdev->dev.bus_id;
 	hcd->product_desc = "OMAP OHCI";
@@ -359,9 +360,8 @@ int usb_hcd_omap_probe (const struct hc_driver *driver,
 
  err2:
 	hcd_buffer_destroy (hcd);
-	if (hcd)
-		driver->hcd_free(hcd);
  err1:
+	kfree(hcd);
 	omap_stop_hc(pdev);
 
 	release_mem_region(pdev->resource[0].start, 
@@ -387,8 +387,6 @@ int usb_hcd_omap_probe (const struct hc_driver *driver,
  */
 void usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
 {
-	void *base;
-
 	dev_info(&pdev->dev, "remove: state %x\n", hcd->state);
 
 	if (in_interrupt ())
@@ -409,9 +407,6 @@ void usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
 	free_irq (hcd->irq, hcd);
 
 	usb_deregister_bus (&hcd->self);
-
-	base = hcd->regs;
-	hcd->driver->hcd_free (hcd);
 
 	omap_stop_hc(pdev);
 
@@ -464,7 +459,6 @@ static const struct hc_driver ohci_omap_hc_driver = {
 	 * memory lifecycle (except per-request)
 	 */
 	.hcd_alloc =		ohci_hcd_alloc,
-	.hcd_free =		ohci_hcd_free,
 
 	/*
 	 * managing i/o requests and associated device resources
