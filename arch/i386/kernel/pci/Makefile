@@ -1,15 +1,19 @@
 O_TARGET        := pci.o
 
-obj-y   := dma.o i386.o
+obj-y		:= dma.o i386.o
 
 ifdef CONFIG_VISWS
-obj-y   += visws.o
+obj-y		+= visws.o
 else
-
-obj-y   += irq.o
-
-obj-y   += common.o 
-endif
+ifdef CONFIG_MULTIQUAD
+obj-y		+= numa.o
+else
+obj-$(CONFIG_PCI_BIOS)		+= pcbios.o
+obj-$(CONFIG_PCI_DIRECT)	+= direct.o
+obj-y		+= fixup.o
+endif		# CONFIG_MULTIQUAD
+obj-y		+= irq.o common.o
+endif		# CONFIG_VISWS
 
 export-objs     +=      $(obj-y)
 

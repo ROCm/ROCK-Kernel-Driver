@@ -495,7 +495,6 @@ struct pci_driver {
 #define pci_for_each_dev(dev) \
 	for(dev = pci_dev_g(pci_devices.next); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.next))
 
-void pcibios_init(void);
 void pcibios_fixup_bus(struct pci_bus *);
 int pcibios_enable_device(struct pci_dev *);
 char *pcibios_setup (char *str);

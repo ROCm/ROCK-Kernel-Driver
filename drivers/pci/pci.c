@@ -2031,8 +2031,6 @@ static int __devinit pci_init(void)
 {
 	struct pci_dev *dev;
 
-	pcibios_init();
-
 	pci_for_each_dev(dev) {
 		pci_fixup_device(PCI_FIXUP_FINAL, dev);
 	}
