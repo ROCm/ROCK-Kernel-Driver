@@ -116,8 +116,8 @@ void  sctp_init_cause(sctp_chunk_t *chunk, __u16 cause_code,
 	err.cause = cause_code;
 	len = sizeof(sctp_errhdr_t) + paylen;
 	padlen = len % 4;
-	len += padlen;
 	err.length  = htons(len);
+	len += padlen;
 	sctp_addto_chunk(chunk, sizeof(sctp_errhdr_t), &err);
 	chunk->subh.err_hdr = sctp_addto_chunk(chunk, paylen, payload);
 }
@@ -540,7 +540,7 @@ sctp_chunk_t *sctp_make_datafrag_empty(sctp_association_t *asoc,
 	dp.stream = htons(sinfo->sinfo_stream);
 	dp.ppid   = htonl(sinfo->sinfo_ppid);
 	dp.ssn    = htons(ssn);
-	
+
 	/* Set the flags for an unordered send.  */
 	if (sinfo->sinfo_flags & MSG_UNORDERED)
 		flags |= SCTP_DATA_UNORDERED;
@@ -552,7 +552,7 @@ sctp_chunk_t *sctp_make_datafrag_empty(sctp_association_t *asoc,
 
 	retval->subh.data_hdr = sctp_addto_chunk(retval, sizeof(dp), &dp);
 	memcpy(&retval->sinfo, sinfo, sizeof(struct sctp_sndrcvinfo));
-       
+
 nodata:
 	return retval;
 }
@@ -598,23 +598,9 @@ sctp_chunk_t *sctp_make_data_empty(sctp_association_t *asoc,
 				   const struct sctp_sndrcvinfo *sinfo,
 				   int data_len)
 {
-	__u16 ssn;
 	__u8 flags = SCTP_DATA_NOT_FRAG;
 
-	/* Sockets API Extensions for SCTP 5.2.2
-	 *  MSG_UNORDERED - This flag requests the un-ordered delivery of the
-	 *  message.  If this flag is clear, the datagram is considered an
-	 *  ordered send and a new ssn is generated.  The flags field is set
-	 *  in the inner routine - sctp_make_datafrag_empty().
-	 */
-//	if (sinfo->sinfo_flags & MSG_UNORDERED) {
-	ssn = 0;
-//	} else {
-//		ssn = __sctp_association_get_next_ssn(asoc,
-//						      sinfo->sinfo_stream);
-//	}
-
-	return sctp_make_datafrag_empty(asoc, sinfo, data_len, flags, ssn);
+	return sctp_make_datafrag_empty(asoc, sinfo, data_len, flags, 0);
 }
 
 /* Create a selective ackowledgement (SACK) for the given
@@ -714,6 +700,7 @@ nodata:
 	return retval;
 }
 
+/* FIXME: Comments. */
 sctp_chunk_t *sctp_make_shutdown(const sctp_association_t *asoc)
 {
 	sctp_chunk_t *retval;
@@ -1427,6 +1414,7 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 	 * for init collision case of lost COOKIE ACK.
 	 */
 	if (!asoc && tv_lt(bear_cookie->expiration, chunk->skb->stamp)) {
+		__u16 len;
 		/*
 		 * Section 3.3.10.3 Stale Cookie Error (3)
 		 *
@@ -1435,8 +1423,8 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 		 * Stale Cookie Error:  Indicates the receipt of a valid State
 		 * Cookie that has expired.
 		 */
-		*err_chk_p = sctp_make_op_error_space(asoc, chunk,
-						ntohs(chunk->chunk_hdr->length));
+		len = ntohs(chunk->chunk_hdr->length);
+		*err_chk_p = sctp_make_op_error_space(asoc, chunk, len);
 		if (*err_chk_p) {
 			suseconds_t usecs = (chunk->skb->stamp.tv_sec -
 				bear_cookie->expiration.tv_sec) * 1000000L +
@@ -1501,6 +1489,57 @@ malformed:
  * 3rd Level Abstractions
  ********************************************************************/
 
+/*
+ * Report a missing mandatory parameter.
+ */
+struct __sctp_missing {
+	__u32 num_missing;
+	__u16 type;
+}  __attribute__((packed));;
+static int sctp_process_missing_param(const sctp_association_t *asoc,
+				      sctp_param_t paramtype,
+				      sctp_chunk_t *chunk,
+				      sctp_chunk_t **err_chk_p)
+{
+	struct __sctp_missing report;
+	__u16 len;
+
+	len = WORD_ROUND(sizeof(report));
+
+	/* Make an ERROR chunk, preparing enough room for
+	 * returning multiple unknown parameters.
+	 */
+	if (!*err_chk_p)
+		*err_chk_p = sctp_make_op_error_space(asoc, chunk, len);
+
+	if (*err_chk_p) {
+		report.num_missing = htonl(1);
+		report.type = paramtype;
+		sctp_init_cause(*err_chk_p, SCTP_ERROR_INV_PARAM,
+				&report, sizeof(report));
+	}
+
+	/* Stop processing this chunk. */
+	return 0;
+}
+
+/* Report an Invalid Mandatory Parameter.  */
+static int sctp_process_inv_mandatory(const sctp_association_t *asoc,
+				      sctp_chunk_t *chunk,
+				      sctp_chunk_t **err_chk_p)
+{
+	/* Invalid Mandatory Parameter Error has no payload. */
+
+	if (!*err_chk_p)
+		*err_chk_p = sctp_make_op_error_space(asoc, chunk, 0);
+
+	if (*err_chk_p)
+		sctp_init_cause(*err_chk_p, SCTP_ERROR_INV_PARAM, NULL, 0);
+
+	/* Stop processing this chunk. */
+	return 0;
+}
+
 /* Do not attempt to handle the HOST_NAME parm.  However, do
  * send back an indicator to the peer.
  */
@@ -1511,9 +1550,7 @@ static int sctp_process_hn_param(const sctp_association_t *asoc,
 {
 	__u16 len = ntohs(param.p->length);
 
-	/* Make an ERROR chunk, preparing enough room for
-	 * returning multiple unknown parameters.
-	 */
+	/* Make an ERROR chunk. */
 	if (!*err_chk_p)
 		*err_chk_p = sctp_make_op_error_space(asoc, chunk, len);
 
@@ -1594,7 +1631,8 @@ static int sctp_process_unk_param(const sctp_association_t *asoc,
 		} else {
 			/* If there is no memory for generating the ERROR
 			 * report as specified, an ABORT will be triggered
-			 * to the peer and the association won't be established.
+			 * to the peer and the association won't be
+			 * established.
 			 */
 			retval = 0;
 		}
@@ -1657,12 +1695,33 @@ int sctp_verify_init(const sctp_association_t *asoc,
 		     sctp_chunk_t **err_chk_p)
 {
 	union sctp_params param;
+	int has_cookie = 0;
 
-	/* FIXME - Verify the fixed fields of the INIT chunk. Also, verify
-	 * the mandatory parameters somewhere here and generate either the
-	 * "Missing mandatory parameter" error or the "Invalid mandatory
-	 * parameter" error.
+	/* Verify stream values are non-zero. */
+	if ((0 == peer_init->init_hdr.num_outbound_streams) ||
+	    (0 == peer_init->init_hdr.num_inbound_streams)) {
+
+		sctp_process_inv_mandatory(asoc, chunk, err_chk_p);
+		return 0;
+	}
+
+	/* Check for missing mandatory parameters.  */
+	sctp_walk_params(param, peer_init, init_hdr.params) {
+
+		if (SCTP_PARAM_STATE_COOKIE == param.p->type)
+			has_cookie = 1;
+
+	} /* for (loop through all parameters) */
+
+	/* The only missing mandatory param possible today is
+	 * the state cookie for an INIT-ACK chunk.
 	 */
+	if ((SCTP_CID_INIT_ACK == cid) && !has_cookie) {
+
+		sctp_process_missing_param(asoc, SCTP_PARAM_STATE_COOKIE,
+					   chunk, err_chk_p);
+		return 0;
+	}
 
 	/* Find unrecognized parameters. */
 
@@ -1678,7 +1737,7 @@ int sctp_verify_init(const sctp_association_t *asoc,
 
 /* Unpack the parameters in an INIT packet into an association.
  * Returns 0 on failure, else success.
- * FIXME:  This is an association method. 
+ * FIXME:  This is an association method.
  */
 int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
 		      const union sctp_addr *peer_addr,
