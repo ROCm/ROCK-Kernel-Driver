@@ -43,13 +43,13 @@ choice
 	default PC
 
 config PC
-	bool PC
+	bool "IBM PC (and compatible)"
 	help
 	  Choose this option if your computer is a standard PC or compatible.
 
 config VOYAGER
-	bool "NCR Voyager Architecture"
-	---help---
+	bool "NCR Voyager"
+	help
 	  Voyager is a MCA based 32 way capable SMP architecture proprietary
 	  to NCR Corp.  Machine classes 345x/35xx/4100/51xx are voyager based.
 	  
@@ -59,7 +59,7 @@ config VOYAGER
 	  say N here otherwise the kernel you build will not be bootable.
 
 config X86_NUMAQ
-	bool "Multiquad (IBM/Sequent) NUMAQ support"
+	bool "IBM/Sequent NUMAQ"
 	help
 	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
 	  multiquad box. This changes the way that processors are bootstrapped,
@@ -68,7 +68,7 @@ config X86_NUMAQ
 	  email to Martin.Bligh@us.ibm.com
 
 config X86_SUMMIT
-	bool "IBM x440 (Summit/EXA) support"
+	bool "IBM x440 (Summit/EXA)"
 	help
 	  This option is needed for IBM systems that use the Summit/EXA chipset.
 	  In particular, it is needed for the x440.
@@ -77,7 +77,16 @@ config X86_SUMMIT
 
 # Visual Workstation support is utterly broken.
 # If you want to see it working mail an VW540 to hch@infradead.org 8)
-#bool 'SGI Visual Workstation support' CONFIG_VISWS
+#config X86_VISWS
+#	bool "SGI 320/540 (Visual Workstation)"
+#	help
+#	  The SGI Visual Workstation series is an IA32-based workstation
+#	  based on SGI systems chips with some legacy PC hardware attached.
+#
+#	  Say Y here to create a kernel to run on the SGI 320 or 540.
+#
+#	  A kernel compiled for the Visual Workstation will not run on PCs
+#	  and vice versa. See <file:Documentation/sgi-visws.txt> for details.
 
 endchoice
 
