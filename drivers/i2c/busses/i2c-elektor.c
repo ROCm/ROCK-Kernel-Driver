@@ -41,7 +41,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "i2c-pcf8584.h"
+#include "../i2c-pcf8584.h"
 
 #define DEFAULT_BASE 0x330
 

@@ -46,6 +46,16 @@ config I2C_AMD8111
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-amd8111.
 
+config I2C_ELEKTOR
+	tristate "Elektor ISA card"
+	depends on I2C_ALGOPCF && BROKEN_ON_SMP
+	help
+	  This supports the PCF8584 ISA bus I2C adapter.  Say Y if you own
+	  such an adapter.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-elektor.
+
 config I2C_ELV
 	tristate "ELV adapter"
 	depends on I2C_ALGOBIT && ISA

@@ -107,16 +107,6 @@ config I2C_ALGOPCF
 	  This support is also available as a module.  If so, the module 
 	  will be called i2c-algo-pcf.
 
-config I2C_ELEKTOR
-	tristate "Elektor ISA card"
-	depends on I2C_ALGOPCF && BROKEN_ON_SMP
-	help
-	  This supports the PCF8584 ISA bus I2C adapter.  Say Y if you own
-	  such an adapter.
-
-	  This support is also available as a module.  If so, the module 
-	  will be called i2c-elektor.
-
 config I2C_KEYWEST
 	tristate "Powermac Keywest I2C interface"
 	depends on I2C && PPC_PMAC
