@@ -407,20 +407,40 @@ int proc_ide_read_identify
 {
 	ide_drive_t	*drive = (ide_drive_t *)data;
 	int		len = 0, i = 0;
+	int		err = 0;
 
-	if (drive && !taskfile_lib_get_identify(drive, page)) {
+	len = sprintf(page, "\n");
+	
+	if (drive)
+	{
 		unsigned short *val = (unsigned short *) page;
-		char *out = ((char *)val) + (SECTOR_WORDS * 4);
-		page = out;
-		do {
-			out += sprintf(out, "%04x%c",
-				le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
-			val += 1;
-		} while (i < (SECTOR_WORDS * 2));
-		len = out - page;
+		
+		/*
+		 *	The current code can't handle a driverless
+		 *	identify query taskfile. Now the right fix is
+		 *	to add a 'default' driver but that is a bit
+		 *	more work. 
+		 *
+		 *	FIXME: this has to be fixed for hotswap devices
+		 */
+		 
+		if(DRIVER(drive))
+			err = taskfile_lib_get_identify(drive, page);
+		else	/* This relies on the ID changes */
+			val = (unsigned short *)drive->id;
+
+		if(!err)
+		{						
+			char *out = ((char *)page) + (SECTOR_WORDS * 4);
+			page = out;
+			do {
+				out += sprintf(out, "%04x%c",
+					le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
+				val += 1;
+			} while (i < (SECTOR_WORDS * 2));
+			len = out - page;
+		}
 	}
-	else
-		len = sprintf(page, "\n");
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
