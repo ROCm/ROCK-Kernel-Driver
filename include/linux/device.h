@@ -389,8 +389,8 @@ struct platform_device {
 	char		* name;
 	u32		id;
 	struct device	dev;
-	struct resource	res;
-	unsigned int	irq;
+	u32		num_resources;
+	struct resource	* resource;
 };
 
 extern int platform_device_register(struct platform_device *);
