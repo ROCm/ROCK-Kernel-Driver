@@ -42,6 +42,7 @@ struct dasd_devmap {
         unsigned int devindex;
         unsigned short features;
 	struct dasd_device *device;
+	struct ccw_device *cdev;
 };
 
 /*
@@ -330,6 +331,7 @@ dasd_add_busid(char *bus_id, int features)
 		strncpy(new->bus_id, bus_id, BUS_ID_SIZE);
 		new->features = features;
 		new->device = 0;
+		new->cdev = 0;
 		list_add(&new->list, &dasd_hashlists[hash]);
 		devmap = new;
 		new = 0;
@@ -386,6 +388,8 @@ dasd_forget_ranges(void)
 		list_for_each_entry_safe(devmap, n, &dasd_hashlists[i], list) {
 			if (devmap->device != NULL)
 				BUG();
+			if (devmap->cdev)
+				devmap->cdev->dev.driver_data = NULL;
 			list_del(&devmap->list);
 			kfree(devmap);
 		}
@@ -438,8 +442,10 @@ dasd_devmap_from_cdev(struct ccw_device *cdev)
 		return devmap;
 	}
 	devmap = dasd_add_busid(cdev->dev.bus_id, DASD_FEATURE_DEFAULT);
-	if (!IS_ERR(devmap))
+	if (!IS_ERR(devmap)) {
 		cdev->dev.driver_data = devmap;
+		devmap->cdev = cdev;
+	}
 	return devmap;
 }
 
@@ -525,9 +531,6 @@ dasd_delete_device(struct dasd_device *device)
 	/* Disconnect dasd_device structure from ccw_device structure. */
 	cdev = device->cdev;
 	device->cdev = NULL;
-
-	/* Disconnect dasd_devmap structure from ccw_device structure. */
-	cdev->dev.driver_data = NULL;
 
 	/* Put ccw_device structure. */
 	put_device(&cdev->dev);
