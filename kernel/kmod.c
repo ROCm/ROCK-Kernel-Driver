@@ -29,7 +29,7 @@
 #include <linux/completion.h>
 #include <linux/file.h>
 #include <linux/workqueue.h>
-
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 extern int max_threads, system_running;

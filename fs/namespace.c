@@ -19,7 +19,7 @@
 #include <linux/seq_file.h>
 #include <linux/namespace.h>
 #include <linux/namei.h>
-
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 extern struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);

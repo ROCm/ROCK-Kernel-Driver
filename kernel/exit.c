@@ -20,6 +20,7 @@
 #include <linux/binfmts.h>
 #include <linux/ptrace.h>
 #include <linux/profile.h>
+#include <linux/mount.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>

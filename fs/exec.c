@@ -43,6 +43,7 @@
 #include <linux/namei.h>
 #include <linux/proc_fs.h>
 #include <linux/ptrace.h>
+#include <linux/mount.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>

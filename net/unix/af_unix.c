@@ -112,6 +112,7 @@
 #include <linux/poll.h>
 #include <linux/smp_lock.h>
 #include <linux/rtnetlink.h>
+#include <linux/mount.h>
 #include <net/checksum.h>
 
 int sysctl_unix_max_dgram_qlen = 10;

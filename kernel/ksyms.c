@@ -53,6 +53,7 @@
 #include <linux/percpu.h>
 #include <linux/smp_lock.h>
 #include <linux/dnotify.h>
+#include <linux/mount.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)

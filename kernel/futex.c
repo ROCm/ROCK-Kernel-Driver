@@ -33,6 +33,7 @@
 #include <linux/init.h>
 #include <linux/futex.h>
 #include <linux/vcache.h>
+#include <linux/mount.h>
 
 #define FUTEX_HASHBITS 8
 

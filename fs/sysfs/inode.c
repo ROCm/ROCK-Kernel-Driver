@@ -34,7 +34,7 @@
 #include <linux/slab.h>
 #include <linux/backing-dev.h>
 #include <linux/kobject.h>
-
+#include <linux/mount.h>
 #include <asm/uaccess.h>
 
 /* Random magic number */

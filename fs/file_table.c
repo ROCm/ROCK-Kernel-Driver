@@ -14,6 +14,8 @@
 #include <linux/fs.h>
 #include <linux/security.h>
 #include <linux/eventpoll.h>
+#include <linux/mount.h>
+
 
 /* sysctl tunables... */
 struct files_stat_struct files_stat = {0, 0, NR_FILE};

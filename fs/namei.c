@@ -24,7 +24,7 @@
 #include <linux/smp_lock.h>
 #include <linux/personality.h>
 #include <linux/security.h>
-
+#include <linux/mount.h>
 #include <asm/namei.h>
 #include <asm/uaccess.h>
 

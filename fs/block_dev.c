@@ -20,6 +20,7 @@
 #include <linux/blkpg.h>
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
+#include <linux/mount.h>
 
 #include <asm/uaccess.h>
 

@@ -17,6 +17,7 @@
 #include <linux/namei.h>
 #include <linux/backing-dev.h>
 #include <linux/security.h>
+#include <linux/mount.h>
 
 #include <asm/uaccess.h>
 
