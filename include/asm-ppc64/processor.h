@@ -595,6 +595,8 @@ GLUE(GLUE(.LT,NAME),_procname_end):
 			asm volatile("mfasr %0" : "=r" (rval)); rval;})
 
 #ifndef __ASSEMBLY__
+extern unsigned long *_get_SP(void);
+
 extern int have_of;
 
 struct task_struct;
@@ -739,6 +741,15 @@ static inline void prefetchw(const void *x)
 
 #define cpu_has_noexecute()	(processor_type() == PV_POWER4 || \
 				 processor_type() == PV_POWER4p)
+
+/* XXX we have to call HV to set when in LPAR */
+#define cpu_has_dabr()		(1)
+
+#define cpu_has_iabr()		(processor_type() != PV_POWER4 && \
+				 processor_type() != PV_POWER4p)
+
+#define cpu_alignexc_sets_dsisr() (processor_type() != PV_POWER4 && \
+				 processor_type() != PV_POWER4p)
 
 #endif /* ASSEMBLY */
 

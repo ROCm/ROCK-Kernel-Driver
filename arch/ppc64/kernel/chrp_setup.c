@@ -261,8 +261,9 @@ chrp_progress(char *s, unsigned short hex)
 	struct device_node *root;
 	int width, *p;
 	char *os;
-	static int display_character, set_indicator;
+	static int display_character;
 	static int max_width;
+	static spinlock_t progress_lock = SPIN_LOCK_UNLOCKED;
 
 	if (!rtas.base)
 		return;
@@ -276,15 +277,9 @@ chrp_progress(char *s, unsigned short hex)
 		else
 			max_width = 0x10;
 		display_character = rtas_token("display-character");
-		set_indicator = rtas_token("set-indicator");
 	}
-	if (display_character == RTAS_UNKNOWN_SERVICE) {
-		/* use hex display */
-		if (set_indicator == RTAS_UNKNOWN_SERVICE)
-			return;
-		rtas_call(set_indicator, 3, 1, NULL, 6, 0, hex);
-		return;
-	}
+
+	spin_lock(&progress_lock);
 
 	rtas_call(display_character, 1, 1, NULL, '\r');
 
@@ -306,6 +301,8 @@ chrp_progress(char *s, unsigned short hex)
 	/* Blank to end of line. */
 	while ( width-- > 0 )
 		rtas_call(display_character, 1, 1, NULL, ' ' );
+
+	spin_unlock(&progress_lock);
 }
 
 extern void setup_default_decr(void);
