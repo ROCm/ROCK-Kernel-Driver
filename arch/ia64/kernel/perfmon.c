@@ -4322,6 +4322,7 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	ret = pfm_reserve_session(current, ctx->ctx_fl_system, the_cpu);
 	if (ret) goto error;
 
+	ret = -EBUSY;
 	/*
 	 * task is necessarily stopped at this point.
 	 *
@@ -4331,6 +4332,10 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	 *
 	 * XXX: needs to be atomic
 	 */
+	DPRINT(("[%d] before cmpxchg() old_ctx=%p new_ctx=%p\n",
+		current->pid, 
+		thread->pfm_context, ctx));
+
 	old = ia64_cmpxchg("acq", &thread->pfm_context, NULL, ctx, sizeof(pfm_context_t *));
 	if (old != NULL) {
 		DPRINT(("load_pid [%d] already has a context\n", req->load_pid));
@@ -4344,7 +4349,7 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	/*
 	 * link context to task
 	 */
-	ctx->ctx_task  = task;
+	ctx->ctx_task = task;
 
 	if (ctx->ctx_fl_system) {
 

@@ -25,7 +25,6 @@
 
 #include <asm/delay.h>
 #include <asm/elf.h>
-#include <asm/perfmon.h>
 #include <asm/pgalloc.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
