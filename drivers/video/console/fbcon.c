@@ -2654,13 +2654,12 @@ static void fbcon_fb_blanked(struct fb_info *info, int blank)
 		vc = vc_cons[ops->currcon].d;
 
 		if (CON_IS_VISIBLE(vc)) {
-			ops->blank_state = blank;
-
 			if (blank)
 				do_blank_screen(0);
 			else
 				do_unblank_screen(0);
 		}
+		ops->blank_state = blank;
 	}
 }
 
