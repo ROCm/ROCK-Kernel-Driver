@@ -375,6 +375,11 @@ config COMPAT
 	depends on IA32_SUPPORT
 	default y
 
+config HAVE_DEC_LOCK
+	bool
+	depends on (SMP || PREEMPT)
+	default y
+
 config PERFMON
 	bool "Performance monitor support"
 	help
