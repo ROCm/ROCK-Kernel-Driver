@@ -1048,6 +1048,7 @@ static int atalk_create(struct socket *sock, int protocol)
 	at = at_sk(sk) = kmalloc(sizeof(*at), GFP_KERNEL);
 	if (!at)
 		goto outsk;
+	memset(at, 0, sizeof(*at));
 	rc = 0;
 	sock->ops = &atalk_dgram_ops;
 	sock_init_data(sock, sk);
