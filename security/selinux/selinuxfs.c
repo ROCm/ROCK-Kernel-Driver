@@ -390,103 +390,31 @@ static ssize_t (*write_op[])(struct file *, char *, size_t) = {
 	[SEL_USER] = sel_write_user,
 };
 
-/* an argresp is stored in an allocated page and holds the
- * size of the argument or response, along with its content
- */
-struct argresp {
-	ssize_t size;
-	char data[0];
-};
-
-#define PAYLOAD_SIZE (PAGE_SIZE - sizeof(struct argresp))
-
-/*
- * transaction based IO methods.
- * The file expects a single write which triggers the transaction, and then
- * possibly a read which collects the result - which is stored in a
- * file-local buffer.
- */
-static ssize_t TA_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
+static ssize_t selinux_transaction_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
 {
 	ino_t ino =  file->f_dentry->d_inode->i_ino;
-	struct argresp *ar;
-	ssize_t rv = 0;
+	char *data;
+	ssize_t rv;
 
 	if (ino >= sizeof(write_op)/sizeof(write_op[0]) || !write_op[ino])
 		return -EINVAL;
-	if (file->private_data)
-		return -EINVAL; /* only one write allowed per open */
-	if (size > PAYLOAD_SIZE - 1) /* allow one byte for null terminator */
-		return -EFBIG;
 
-	ar = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	if (!ar)
-		return -ENOMEM;
-	memset(ar, 0, PAGE_SIZE); /* clear buffer, particularly last byte */
-	ar->size = 0;
-	down(&file->f_dentry->d_inode->i_sem);
-	if (file->private_data)
-		rv = -EINVAL;
-	else
-		file->private_data = ar;
-	up(&file->f_dentry->d_inode->i_sem);
-	if (rv) {
-		kfree(ar);
-		return rv;
-	}
-	if (copy_from_user(ar->data, buf, size))
-		return -EFAULT;
+	data = simple_transaction_get(file, buf, size);
+	if (IS_ERR(data))
+		return PTR_ERR(data);
 
-	rv =  write_op[ino](file, ar->data, size);
+	rv =  write_op[ino](file, data, size);
 	if (rv>0) {
-		ar->size = rv;
+		simple_transaction_set(file, rv);
 		rv = size;
 	}
 	return rv;
 }
 
-static ssize_t TA_read(struct file *file, char __user *buf, size_t size, loff_t *pos)
-{
-	struct argresp *ar;
-	ssize_t rv = 0;
-
-	if (file->private_data == NULL)
-		rv = TA_write(file, buf, 0, pos);
-	if (rv < 0)
-		return rv;
-
-	ar = file->private_data;
-	if (!ar)
-		return 0;
-	if (*pos >= ar->size)
-		return 0;
-	if (*pos + size > ar->size)
-		size = ar->size - *pos;
-	if (copy_to_user(buf, ar->data + *pos, size))
-		return -EFAULT;
-	*pos += size;
-	return size;
-}
-
-static int TA_open(struct inode *inode, struct file *file)
-{
-	file->private_data = NULL;
-	return 0;
-}
-
-static int TA_release(struct inode *inode, struct file *file)
-{
-	void *p = file->private_data;
-	file->private_data = NULL;
-	kfree(p);
-	return 0;
-}
-
 static struct file_operations transaction_ops = {
-	.write		= TA_write,
-	.read		= TA_read,
-	.open		= TA_open,
-	.release	= TA_release,
+	.write		= selinux_transaction_write,
+	.read		= simple_transaction_read,
+	.release	= simple_transaction_release,
 };
 
 /*
@@ -534,7 +462,8 @@ static ssize_t sel_write_access(struct file * file, char *buf, size_t size)
 	if (length < 0)
 		goto out2;
 
-	length = scnprintf(buf, PAYLOAD_SIZE, "%x %x %x %x %u",
+	length = scnprintf(buf, SIMPLE_TRANSACTION_LIMIT,
+			  "%x %x %x %x %u",
 			  avd.allowed, avd.decided,
 			  avd.auditallow, avd.auditdeny,
 			  avd.seqno);
@@ -588,7 +517,7 @@ static ssize_t sel_write_create(struct file * file, char *buf, size_t size)
 	if (length < 0)
 		goto out2;
 
-	if (len > PAYLOAD_SIZE) {
+	if (len > SIMPLE_TRANSACTION_LIMIT) {
 		printk(KERN_ERR "%s:  context size (%u) exceeds payload "
 		       "max\n", __FUNCTION__, len);
 		length = -ERANGE;
@@ -649,7 +578,7 @@ static ssize_t sel_write_relabel(struct file * file, char *buf, size_t size)
 	if (length < 0)
 		goto out2;
 
-	if (len > PAYLOAD_SIZE) {
+	if (len > SIMPLE_TRANSACTION_LIMIT) {
 		length = -ERANGE;
 		goto out3;
 	}
@@ -709,7 +638,7 @@ static ssize_t sel_write_user(struct file * file, char *buf, size_t size)
 			length = rc;
 			goto out3;
 		}
-		if ((length + len) >= PAYLOAD_SIZE) {
+		if ((length + len) >= SIMPLE_TRANSACTION_LIMIT) {
 			kfree(newcon);
 			length = -ERANGE;
 			goto out3;

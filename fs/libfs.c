@@ -469,6 +469,58 @@ ssize_t simple_read_from_buffer(void __user *to, size_t count, loff_t *ppos,
 	return count;
 }
 
+/*
+ * Transaction based IO.
+ * The file expects a single write which triggers the transaction, and then
+ * possibly a read which collects the result - which is stored in a
+ * file-local buffer.
+ */
+char *simple_transaction_get(struct file *file, const char __user *buf, size_t size)
+{
+	struct simple_transaction_argresp *ar;
+	static spinlock_t simple_transaction_lock = SPIN_LOCK_UNLOCKED;
+
+	if (size > SIMPLE_TRANSACTION_LIMIT - 1)
+		return ERR_PTR(-EFBIG);
+
+	ar = (struct simple_transaction_argresp *)get_zeroed_page(GFP_KERNEL);
+	if (!ar)
+		return ERR_PTR(-ENOMEM);
+
+	spin_lock(&simple_transaction_lock);
+
+	/* only one write allowed per open */
+	if (file->private_data) {
+		spin_unlock(&simple_transaction_lock);
+		free_page((unsigned long)ar);
+		return ERR_PTR(-EBUSY);
+	}
+
+	file->private_data = ar;
+
+	spin_unlock(&simple_transaction_lock);
+
+	if (copy_from_user(ar->data, buf, size))
+		return ERR_PTR(-EFAULT);
+
+	return ar->data;
+}
+
+ssize_t simple_transaction_read(struct file *file, char __user *buf, size_t size, loff_t *pos)
+{
+	struct simple_transaction_argresp *ar = file->private_data;
+
+	if (!ar)
+		return 0;
+	return simple_read_from_buffer(buf, size, pos, ar->data, ar->size);
+}
+
+int simple_transaction_release(struct inode *inode, struct file *file)
+{
+	free_page((unsigned long)file->private_data);
+	return 0;
+}
+
 EXPORT_SYMBOL(dcache_dir_close);
 EXPORT_SYMBOL(dcache_dir_lseek);
 EXPORT_SYMBOL(dcache_dir_open);
@@ -492,3 +544,6 @@ EXPORT_SYMBOL(simple_statfs);
 EXPORT_SYMBOL(simple_sync_file);
 EXPORT_SYMBOL(simple_unlink);
 EXPORT_SYMBOL(simple_read_from_buffer);
+EXPORT_SYMBOL(simple_transaction_get);
+EXPORT_SYMBOL(simple_transaction_read);
+EXPORT_SYMBOL(simple_transaction_release);
