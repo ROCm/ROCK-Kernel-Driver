@@ -1854,7 +1854,7 @@ int ip_route_output_slow(struct rtable **rp, const struct flowi *oldflp)
 			goto out;
 
 		/* I removed check for oif == dev_out->oif here.
-		   It was wrong by three reasons:
+		   It was wrong for two reasons:
 		   1. ip_dev_find(saddr) can return wrong iface, if saddr is
 		      assigned to multiple interfaces.
 		   2. Moreover, we are allowed to send packets with saddr

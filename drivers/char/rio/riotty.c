@@ -36,7 +36,6 @@ static char *_riotty_c_sccs_ = "@(#)riotty.c	1.3";
 
 #define __EXPLICIT_DEF_H__
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/errno.h>

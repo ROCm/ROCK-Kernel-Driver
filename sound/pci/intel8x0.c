@@ -1778,7 +1778,7 @@ static void do_delay(intel8x0_t *chip)
 
 static int snd_intel8x0_ich_chip_init(intel8x0_t *chip)
 {
-	signed long end_time;
+	unsigned long end_time;
 	unsigned int cnt, status, nstatus;
 	
 	/* put logic to right state */

@@ -60,7 +60,7 @@ formatting of data is heavily frowned upon. Doing these things may get
 you publically humiliated and your code rewritten without notice. 
 
 
-An attriubte definition is simply:
+An attribute definition is simply:
 
 struct attribute {
         char                    * name;
@@ -261,7 +261,7 @@ devices/ contains symlinks for each device discovered in the system
 that point to the device's directory under root/.
 
 drivers/ contains a directory for each device driver that is loaded
-for devices on that particular bus (this assmumes that drivers do not
+for devices on that particular bus (this assumes that drivers do not
 span multiple bus types).
 
 

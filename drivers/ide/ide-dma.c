@@ -75,7 +75,6 @@
  */
 
 #include <linux/config.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -419,7 +418,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
 	struct hd_driveid *id = drive->id;
 	ide_hwif_t *hwif = HWIF(drive);
 
-	if (id && (id->capability & 1) && hwif->autodma) {
+	if ((id->capability & 1) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (hwif->ide_dma_bad_drive(drive))
 			return hwif->ide_dma_off(drive);
@@ -977,14 +976,12 @@ int ide_mmio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 {
 	printk(KERN_INFO "    %s: MMIO-DMA at 0x%08lx-0x%08lx",
 		hwif->name, base, base + ports - 1);
-	if (check_mem_region(base, ports)) {
-		printk(" -- Error, MMIO ports already in use.\n");
-		return 1;
-	}
-	request_mem_region(base, ports, hwif->name);
+	if (!request_mem_region(base, ports, hwif->name))
+		goto fail;
 	hwif->dma_base = base;
 	if ((hwif->cds->extra) && (hwif->channel == 0)) {
-		request_region(base+16, hwif->cds->extra, hwif->cds->name);
+		if (!request_region(base+16, hwif->cds->extra, hwif->cds->name))
+			goto release_mem;
 		hwif->dma_extra = hwif->cds->extra;
 	}
 	
@@ -993,10 +990,18 @@ int ide_mmio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 	else
 		hwif->dma_master = base;
 	if (hwif->dma_base2) {
-		if (!check_mem_region(hwif->dma_base2, ports))
-			request_mem_region(hwif->dma_base2, ports, hwif->name);
+		if (!request_mem_region(hwif->dma_base2, ports, hwif->name))
+			goto release_io;
 	}
 	return 0;
+
+release_mem:
+	release_mem_region(base, ports);
+release_io:
+	release_region(base+16, hwif->cds->extra);
+fail:
+	printk(" -- Error, MMIO ports already in use.\n");
+	return 1;
 }
 
 int ide_iomio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)

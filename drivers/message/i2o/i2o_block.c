@@ -754,7 +754,7 @@ static int i2ob_evt(void *dummy)
 				 * hit the fan big time. The card seems to recover but loses
 				 * the pending writes. Deeply ungood except for testing fsck
 				 */
-				if(i2ob_dev[unit].i2odev->controller->bus.pci.promise)
+				if(i2ob_dev[unit].i2odev->controller->promise)
 					panic("I2O controller firmware failed. Reboot and force a filesystem check.\n");
 			default:
 				printk(KERN_INFO "%s: Received event 0x%X we didn't register for\n"
@@ -1140,10 +1140,10 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 		if(d->controller->battery == 0)
 			i2ob_dev[i].wcache = CACHE_WRITETHROUGH;
 
-		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.promise)
+		if(d->controller->promise)
 			i2ob_dev[i].wcache = CACHE_WRITETHROUGH;
 
-		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.short_req)
+		if(d->controller->short_req)
 		{
 			blk_queue_max_sectors(q, 8);
 			blk_queue_max_phys_segments(q, 8);

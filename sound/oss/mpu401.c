@@ -1762,13 +1762,13 @@ EXPORT_SYMBOL(mpuintr);
 
 static struct address_info cfg;
 
-static int __initdata io = -1;
-static int __initdata irq = -1;
+static int io = -1;
+static int irq = -1;
 
 MODULE_PARM(irq, "i");
 MODULE_PARM(io, "i");
 
-int __init init_mpu401(void)
+static int __init init_mpu401(void)
 {
 	int ret;
 	/* Can be loaded either for module use or to provide functions
@@ -1785,7 +1785,7 @@ int __init init_mpu401(void)
 	return 0;
 }
 
-void __exit cleanup_mpu401(void)
+static void __exit cleanup_mpu401(void)
 {
 	if (io != -1 && irq != -1) {
 		/* Check for use by, for example, sscape driver */

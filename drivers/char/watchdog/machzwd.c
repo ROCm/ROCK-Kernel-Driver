@@ -390,6 +390,9 @@ static int zf_open(struct inode *inode, struct file *file)
 				return -EBUSY;
 			}
 
+			if (nowayout)
+				MOD_INC_USE_COUNT;
+
 			zf_is_open = 1;
 
 			spin_unlock(&zf_lock);

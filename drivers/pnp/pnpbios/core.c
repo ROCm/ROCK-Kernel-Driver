@@ -969,7 +969,7 @@ int __init pnpbios_init(void)
 
 	spin_lock_init(&pnp_bios_lock);
 
-	if(pnpbios_disabled) {
+	if(pnpbios_disabled || (dmi_broken & BROKEN_PNP_BIOS)) {
 		printk(KERN_INFO "PnPBIOS: Disabled\n");
 		return -ENODEV;
 	}

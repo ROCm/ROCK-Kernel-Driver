@@ -422,7 +422,7 @@
  *		sharing a (fast) ATA-2 disk with any (slow) new ATAPI device.
  */
 
-#define IDETAPE_VERSION "1.17b"
+#define IDETAPE_VERSION "1.17b-ac1"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -2128,8 +2128,6 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 			if (temp > pc->buffer_size) {
 				printk(KERN_ERR "ide-tape: The tape wants to send us more data than expected - discarding data\n");
 				idetape_discard_data(drive, bcount.all);
-				if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
-					BUG();
 				ide_set_handler(drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);
 				return ide_started;
 			}
@@ -2156,8 +2154,6 @@ static ide_startstop_t idetape_pc_intr (ide_drive_t *drive)
 	if (tape->debug_level >= 2)
 		printk(KERN_INFO "ide-tape: [cmd %x] transferred %d bytes on that interrupt\n", pc->c[0], bcount.all);
 #endif
-	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
-		BUG();
 	ide_set_handler(drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);	/* And set the interrupt handler again */
 	return ide_started;
 }
@@ -2235,8 +2231,6 @@ static ide_startstop_t idetape_transfer_pc(ide_drive_t *drive)
 		return ide_do_reset(drive);
 	}
 	tape->cmd_start_time = jiffies;
-	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
-		BUG();
 	/* Set the interrupt routine */
 	ide_set_handler(drive, &idetape_pc_intr, IDETAPE_WAIT_CMD, NULL);
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -2325,8 +2319,6 @@ static ide_startstop_t idetape_issue_packet_command (ide_drive_t *drive, idetape
 	if (dma_ok)			/* Will begin DMA later */
 		set_bit(PC_DMA_IN_PROGRESS, &pc->flags);
 	if (test_bit(IDETAPE_DRQ_INTERRUPT, &tape->flags)) {
-		if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
-			BUG();
 		ide_set_handler(drive, &idetape_transfer_pc, IDETAPE_WAIT_CMD, NULL);
 		OUT_BYTE(WIN_PACKETCMD, IDE_COMMAND_REG);
 		return ide_started;
@@ -5605,15 +5597,16 @@ static int idetape_chrdev_release (struct inode *inode, struct file *filp)
  *
  *	0 	If this tape driver is not currently supported by us.
  */
-static int idetape_identify_device (ide_drive_t *drive,struct hd_driveid *id)
+static int idetape_identify_device (ide_drive_t *drive)
 {
 	struct idetape_id_gcw gcw;
+	struct hd_driveid *id = drive->id;
 #if IDETAPE_DEBUG_INFO
 	unsigned short mask,i;
 #endif /* IDETAPE_DEBUG_INFO */
 
-	if (!id)
-		return 0;
+	if (drive->id_read == 0)
+		return 1;
 
 	*((unsigned short *) &gcw) = id->config;
 
@@ -6287,7 +6280,7 @@ static int idetape_attach (ide_drive_t *drive)
 		goto failed;
 	if (drive->media != ide_tape)
 		goto failed;
-	if (!idetape_identify_device (drive, drive->id)) {
+	if (!idetape_identify_device (drive)) {
 		printk(KERN_ERR "ide-tape: %s: not supported by this version of ide-tape\n", drive->name);
 		goto failed;
 	}

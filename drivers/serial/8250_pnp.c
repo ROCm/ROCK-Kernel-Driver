@@ -188,6 +188,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"MVX00A1",		0	},
 	/* PC Rider K56 Phone System PnP */
 	{	"MVX00F2",		0	},
+	/* NEC 98NOTE SPEAKER PHONE FAX MODEM(33600bps) */
+	{	"nEC8241",		0	},
 	/* Pace 56 Voice Internal Plug & Play Modem */
 	{	"PMC2430",		0	},
 	/* Generic */
@@ -373,6 +375,9 @@ static int serial_pnp_guess_board(struct pnp_dev *dev, int *flags)
 			    ((port->min == 0x2f8) ||
 			     (port->min == 0x3f8) ||
 			     (port->min == 0x2e8) ||
+#ifdef CONFIG_X86_PC9800
+			     (port->min == 0x8b0) ||
+#endif
 			     (port->min == 0x3e8)))
 				return 0;
 	}

@@ -518,7 +518,7 @@ static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
 	if ((id != NULL) && ((id->capability & 1) != 0) && drive->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (hwif->ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
+			goto ata_pio;
 		if ((id->field_valid & 4) && (m5229_revision >= 0xC2)) {
 			if (id->dma_ultra & hwif->ultra_mask) {
 				/* Force if Capable UltraDMA */
@@ -540,12 +540,12 @@ try_dma_modes:
 			if (!config_chipset_for_dma(drive))
 				goto no_dma_set;
 		} else {
-			goto fast_ata_pio;
+			goto ata_pio;
 		}
-	} else if ((id->capability & 8) || (id->field_valid & 2)) {
-fast_ata_pio:
+	} else {
+ata_pio:
+		hwif->tuneproc(drive, 255);
 no_dma_set:
-		hwif->tuneproc(drive, 5);
 		return hwif->ide_dma_off_quietly(drive);
 	}
 	return hwif->ide_dma_on(drive);
@@ -752,6 +752,8 @@ static void __init init_hwif_common_ali15x3 (ide_hwif_t *hwif)
 		hwif->drives[1].autotune = 1;
 		return;
 	}
+
+	hwif->atapi_dma = 1;
 
 	if (m5229_revision > 0x20)
 		hwif->ultra_mask = 0x3f;

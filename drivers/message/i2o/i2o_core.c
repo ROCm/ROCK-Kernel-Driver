@@ -50,6 +50,9 @@
 
 #include <asm/io.h>
 #include <linux/reboot.h>
+#ifdef CONFIG_MTRR
+#include <asm/mtrr.h>
+#endif // CONFIG_MTRR
 
 #include "i2o_lan.h"
 
@@ -102,6 +105,8 @@ static int evt_running;
 static int i2o_dyn_lct(void *);
 
 void i2o_report_controller_unit(struct i2o_controller *, struct i2o_device *);
+
+static void i2o_pci_dispose(struct i2o_controller *c);
 
 /*
  * I2O System Table.  Contains information about
@@ -206,7 +211,6 @@ static struct notifier_block i2o_reboot_notifier =
  */
 
 static int verbose;
-MODULE_PARM(verbose, "i");
 
 /*
  * I2O Core reply handler
@@ -549,7 +553,8 @@ int i2o_delete_controller(struct i2o_controller *c)
 		if(__i2o_delete_device(c->devices)<0)
 		{
 			/* Shouldnt happen */
-			c->bus_disable(c);
+			I2O_IRQ_WRITE32(c, 0xFFFFFFFF);
+			c->enabled = 0;
 			up(&i2o_configuration_lock);
 			return -EBUSY;
 		}
@@ -584,7 +589,7 @@ int i2o_delete_controller(struct i2o_controller *c)
 			i2o_reset_controller(c);
 
 			/* Release IRQ */
-			c->destructor(c);
+			i2o_pci_dispose(c);
 
 			*p=c->next;
 			up(&i2o_configuration_lock);
@@ -1651,7 +1656,7 @@ static int i2o_reset_controller(struct i2o_controller *c)
 
 	for (iop = i2o_controller_chain; iop; iop = iop->next)
 	{
-		if(iop->type != I2O_TYPE_PCI || !iop->bus.pci.dpt)
+		if(!iop->dpt)
 			i2o_quiesce_controller(iop);
 	}
 
@@ -1911,65 +1916,62 @@ static int i2o_systab_send(struct i2o_controller *iop)
 	u32 msg[12];
 	dma_addr_t sys_tbl_phys;
 	int ret;
+	struct resource *root;
 	u32 *privbuf = kmalloc(16, GFP_KERNEL);
 	if(privbuf == NULL)
 		return -ENOMEM;
 	
-	if(iop->type == I2O_TYPE_PCI)
-	{
-		struct resource *root;
 		
-		if(iop->status_block->current_mem_size < iop->status_block->desired_mem_size)
+	if(iop->status_block->current_mem_size < iop->status_block->desired_mem_size)
+	{
+		struct resource *res = &iop->mem_resource;
+		res->name = iop->pdev->bus->name;
+		res->flags = IORESOURCE_MEM;
+		res->start = 0;
+		res->end = 0;
+		printk("%s: requires private memory resources.\n", iop->name);
+		root = pci_find_parent_resource(iop->pdev, res);
+		if(root==NULL)
+			printk("Can't find parent resource!\n");
+		if(root && allocate_resource(root, res, 
+				iop->status_block->desired_mem_size,
+				iop->status_block->desired_mem_size,
+				iop->status_block->desired_mem_size,
+				1<<20,	/* Unspecified, so use 1Mb and play safe */
+				NULL,
+				NULL)>=0)
 		{
-			struct resource *res = &iop->mem_resource;
-			res->name = iop->pdev->bus->name;
-			res->flags = IORESOURCE_MEM;
-			res->start = 0;
-			res->end = 0;
-			printk("%s: requires private memory resources.\n", iop->name);
-			root = pci_find_parent_resource(iop->pdev, res);
-			if(root==NULL)
-				printk("Can't find parent resource!\n");
-			if(root && allocate_resource(root, res, 
-					iop->status_block->desired_mem_size,
-					iop->status_block->desired_mem_size,
-					iop->status_block->desired_mem_size,
-					1<<20,	/* Unspecified, so use 1Mb and play safe */
-					NULL,
-					NULL)>=0)
-			{
-				iop->mem_alloc = 1;
-				iop->status_block->current_mem_size = 1 + res->end - res->start;
-				iop->status_block->current_mem_base = res->start;
-				printk(KERN_INFO "%s: allocated %ld bytes of PCI memory at 0x%08lX.\n", 
-					iop->name, 1+res->end-res->start, res->start);
-			}
+			iop->mem_alloc = 1;
+			iop->status_block->current_mem_size = 1 + res->end - res->start;
+			iop->status_block->current_mem_base = res->start;
+			printk(KERN_INFO "%s: allocated %ld bytes of PCI memory at 0x%08lX.\n", 
+				iop->name, 1+res->end-res->start, res->start);
 		}
-		if(iop->status_block->current_io_size < iop->status_block->desired_io_size)
+	}
+	if(iop->status_block->current_io_size < iop->status_block->desired_io_size)
+	{
+		struct resource *res = &iop->io_resource;
+		res->name = iop->pdev->bus->name;
+		res->flags = IORESOURCE_IO;
+		res->start = 0;
+		res->end = 0;
+		printk("%s: requires private memory resources.\n", iop->name);
+		root = pci_find_parent_resource(iop->pdev, res);
+		if(root==NULL)
+			printk("Can't find parent resource!\n");
+		if(root &&  allocate_resource(root, res, 
+				iop->status_block->desired_io_size,
+				iop->status_block->desired_io_size,
+				iop->status_block->desired_io_size,
+				1<<20,	/* Unspecified, so use 1Mb and play safe */
+				NULL,
+				NULL)>=0)
 		{
-			struct resource *res = &iop->io_resource;
-			res->name = iop->pdev->bus->name;
-			res->flags = IORESOURCE_IO;
-			res->start = 0;
-			res->end = 0;
-			printk("%s: requires private memory resources.\n", iop->name);
-			root = pci_find_parent_resource(iop->pdev, res);
-			if(root==NULL)
-				printk("Can't find parent resource!\n");
-			if(root &&  allocate_resource(root, res, 
-					iop->status_block->desired_io_size,
-					iop->status_block->desired_io_size,
-					iop->status_block->desired_io_size,
-					1<<20,	/* Unspecified, so use 1Mb and play safe */
-					NULL,
-					NULL)>=0)
-			{
-				iop->io_alloc = 1;
-				iop->status_block->current_io_size = 1 + res->end - res->start;
-				iop->status_block->current_mem_base = res->start;
-				printk(KERN_INFO "%s: allocated %ld bytes of PCI I/O at 0x%08lX.\n", 
-					iop->name, 1+res->end-res->start, res->start);
-			}
+			iop->io_alloc = 1;
+			iop->status_block->current_io_size = 1 + res->end - res->start;
+			iop->status_block->current_mem_base = res->start;
+			printk(KERN_INFO "%s: allocated %ld bytes of PCI I/O at 0x%08lX.\n", 
+				iop->name, 1+res->end-res->start, res->start);
 		}
 	}
 	else
@@ -3427,48 +3429,256 @@ static int i2o_reboot_event(struct notifier_block *n, unsigned long code, void
 }
 
 
-EXPORT_SYMBOL(i2o_controller_chain);
-EXPORT_SYMBOL(i2o_num_controllers);
-EXPORT_SYMBOL(i2o_find_controller);
-EXPORT_SYMBOL(i2o_unlock_controller);
-EXPORT_SYMBOL(i2o_status_get);
 
-EXPORT_SYMBOL(i2o_install_handler);
-EXPORT_SYMBOL(i2o_remove_handler);
 
-EXPORT_SYMBOL(i2o_install_controller);
-EXPORT_SYMBOL(i2o_delete_controller);
-EXPORT_SYMBOL(i2o_run_queue);
+/**
+ *	i2o_pci_dispose		-	Free bus specific resources
+ *	@c: I2O controller
+ *
+ *	Disable interrupts and then free interrupt, I/O and mtrr resources 
+ *	used by this controller. Called by the I2O core on unload.
+ */
+ 
+static void i2o_pci_dispose(struct i2o_controller *c)
+{
+	I2O_IRQ_WRITE32(c,0xFFFFFFFF);
+	if(c->irq > 0)
+		free_irq(c->irq, c);
+	iounmap(((u8 *)c->post_port)-0x40);
 
-EXPORT_SYMBOL(i2o_claim_device);
-EXPORT_SYMBOL(i2o_release_device);
-EXPORT_SYMBOL(i2o_device_notify_on);
-EXPORT_SYMBOL(i2o_device_notify_off);
+#ifdef CONFIG_MTRR
+	if(c->mtrr_reg0 > 0)
+		mtrr_del(c->mtrr_reg0, 0, 0);
+	if(c->mtrr_reg1 > 0)
+		mtrr_del(c->mtrr_reg1, 0, 0);
+#endif
+}
 
-EXPORT_SYMBOL(i2o_post_this);
-EXPORT_SYMBOL(i2o_post_wait);
-EXPORT_SYMBOL(i2o_post_wait_mem);
+/**
+ *	i2o_pci_interrupt	-	Bus specific interrupt handler
+ *	@irq: interrupt line
+ *	@dev_id: cookie
+ *
+ *	Handle an interrupt from a PCI based I2O controller. This turns out
+ *	to be rather simple. We keep the controller pointer in the cookie.
+ */
+ 
+static void i2o_pci_interrupt(int irq, void *dev_id, struct pt_regs *r)
+{
+	struct i2o_controller *c = dev_id;
+	i2o_run_queue(c);
+}	
 
-EXPORT_SYMBOL(i2o_query_scalar);
-EXPORT_SYMBOL(i2o_set_scalar);
-EXPORT_SYMBOL(i2o_query_table);
-EXPORT_SYMBOL(i2o_clear_table);
-EXPORT_SYMBOL(i2o_row_add_table);
-EXPORT_SYMBOL(i2o_issue_params);
+/**
+ *	i2o_pci_install		-	Install a PCI i2o controller
+ *	@dev: PCI device of the I2O controller
+ *
+ *	Install a PCI (or in theory AGP) i2o controller. Devices are
+ *	initialized, configured and registered with the i2o core subsystem. Be
+ *	very careful with ordering. There may be pending interrupts.
+ *
+ *	To Do: Add support for polled controllers
+ */
 
-EXPORT_SYMBOL(i2o_event_register);
-EXPORT_SYMBOL(i2o_event_ack);
+int __init i2o_pci_install(struct pci_dev *dev)
+{
+	struct i2o_controller *c=kmalloc(sizeof(struct i2o_controller),
+						GFP_KERNEL);
+	unsigned long mem;
+	u32 memptr = 0;
+	u32 size;
+	
+	int i;
 
-EXPORT_SYMBOL(i2o_report_status);
-EXPORT_SYMBOL(i2o_dump_message);
+	if(c==NULL)
+	{
+		printk(KERN_ERR "i2o: Insufficient memory to add controller.\n");
+		return -ENOMEM;
+	}
+	memset(c, 0, sizeof(*c));
 
-EXPORT_SYMBOL(i2o_get_class_name);
+	for(i=0; i<6; i++)
+	{
+		/* Skip I/O spaces */
+		if(!(pci_resource_flags(dev, i) & IORESOURCE_IO))
+		{
+			memptr = pci_resource_start(dev, i);
+			break;
+		}
+	}
+	
+	if(i==6)
+	{
+		printk(KERN_ERR "i2o: I2O controller has no memory regions defined.\n");
+		kfree(c);
+		return -EINVAL;
+	}
+	
+	size = dev->resource[i].end-dev->resource[i].start+1;	
+	/* Map the I2O controller */
+	
+	printk(KERN_INFO "i2o: PCI I2O controller at 0x%08X size=%d\n", memptr, size);
+	mem = (unsigned long)ioremap(memptr, size);
+	if(mem==0)
+	{
+		printk(KERN_ERR "i2o: Unable to map controller.\n");
+		kfree(c);
+		return -EINVAL;
+	}
 
-EXPORT_SYMBOL_GPL(i2o_sys_init);
+	c->irq = -1;
+	c->dpt = 0;
+	c->short_req = 0;
+	c->pdev = dev;
 
-MODULE_AUTHOR("Red Hat Software");
-MODULE_DESCRIPTION("I2O Core");
-MODULE_LICENSE("GPL");
+	c->irq_mask = mem+0x34;
+	c->post_port = mem+0x40;
+	c->reply_port = mem+0x44;
+
+	c->mem_phys = memptr;
+	c->mem_offset = mem;
+	
+	/*
+	 *	Cards that fall apart if you hit them with large I/O
+	 *	loads...
+	 */
+	 
+	if(dev->vendor == PCI_VENDOR_ID_NCR && dev->device == 0x0630)
+	{
+		c->short_req = 1;
+		printk(KERN_INFO "I2O: Symbios FC920 workarounds activated.\n");
+	}
+	if(dev->subsystem_vendor == PCI_VENDOR_ID_PROMISE)
+	{
+		c->promise = 1;
+		printk(KERN_INFO "I2O: Promise workarounds activated.\n");
+	}
+
+	/*
+	 *	Cards that go bananas if you quiesce them before you reset
+	 *	them
+	 */
+	 
+	if(dev->vendor == PCI_VENDOR_ID_DPT)
+		c->dpt=1;
+	
+	/* 
+	 * Enable Write Combining MTRR for IOP's memory region
+	 */
+#ifdef CONFIG_MTRR
+	c->mtrr_reg0 =
+		mtrr_add(c->mem_phys, size, MTRR_TYPE_WRCOMB, 1);
+	/*
+	 * If it is an INTEL i960 I/O processor then set the first 64K to
+	 * Uncacheable since the region contains the Messaging unit which
+	 * shouldn't be cached.
+	 */
+	c->mtrr_reg1 = -1;
+	if(dev->vendor == PCI_VENDOR_ID_INTEL || dev->vendor == PCI_VENDOR_ID_DPT)
+	{
+		printk(KERN_INFO "I2O: MTRR workaround for Intel i960 processor\n"); 
+		c->mtrr_reg1 =	mtrr_add(c->mem_phys, 65536, MTRR_TYPE_UNCACHABLE, 1);
+		if(c->mtrr_reg1< 0)
+		{
+			printk(KERN_INFO "i2o_pci: Error in setting MTRR_TYPE_UNCACHABLE\n");
+			mtrr_del(c->mtrr_reg0, c->mem_phys, size);
+			c->mtrr_reg0 = -1;
+		}
+	}
+
+#endif
+
+	I2O_IRQ_WRITE32(c,0xFFFFFFFF);
+
+	i = i2o_install_controller(c);
+	
+	if(i<0)
+	{
+		printk(KERN_ERR "i2o: Unable to install controller.\n");
+		kfree(c);
+		iounmap((void *)mem);
+		return i;
+	}
+
+	c->irq = dev->irq;
+	if(c->irq)
+	{
+		i=request_irq(dev->irq, i2o_pci_interrupt, SA_SHIRQ,
+			c->name, c);
+		if(i<0)
+		{
+			printk(KERN_ERR "%s: unable to allocate interrupt %d.\n",
+				c->name, dev->irq);
+			c->irq = -1;
+			i2o_delete_controller(c);
+			iounmap((void *)mem);
+			return -EBUSY;
+		}
+	}
+
+	printk(KERN_INFO "%s: Installed at IRQ%d\n", c->name, dev->irq);
+	I2O_IRQ_WRITE32(c,0x0);
+	c->enabled = 1;
+	return 0;	
+}
+
+static int dpt;
+
+/**
+ *	i2o_pci_scan	-	Scan the pci bus for controllers
+ *	
+ *	Scan the PCI devices on the system looking for any device which is a 
+ *	memory of the Intelligent, I2O class. We attempt to set up each such device
+ *	and register it with the core.
+ *
+ *	Returns the number of controllers registered
+ *
+ *	Note; Do not change this to a hot plug interface. I2O 1.5 itself
+ *	does not support hot plugging.
+ */
+ 
+int __init i2o_pci_scan(void)
+{
+	struct pci_dev *dev;
+	int count=0;
+	
+	printk(KERN_INFO "i2o: Checking for PCI I2O controllers...\n");
+
+	pci_for_each_dev(dev)	
+	{
+		if((dev->class>>8)!=PCI_CLASS_INTELLIGENT_I2O)
+			continue;
+		if(dev->vendor == PCI_VENDOR_ID_DPT && !dpt)
+		{
+			if(dev->device == 0xA501 || dev->device == 0xA511)
+			{
+				printk(KERN_INFO "i2o: Skipping Adaptec/DPT I2O raid with preferred native driver.\n");
+				continue;
+			}
+		}
+		if((dev->class&0xFF)>1)
+		{
+			printk(KERN_INFO "i2o: I2O Controller found but does not support I2O 1.5 (skipping).\n");
+			continue;
+		}
+		if (pci_enable_device(dev))
+			continue;
+		printk(KERN_INFO "i2o: I2O controller on bus %d at %d.\n",
+			dev->bus->number, dev->devfn);
+		if(pci_set_dma_mask(dev, 0xffffffff))
+		{
+			printk(KERN_WARNING "I2O controller on bus %d at %d : No suitable DMA available\n", dev->bus->number, dev->devfn);
+		 	continue;
+		}
+		pci_set_master(dev);
+		if(i2o_pci_install(dev)==0)
+			count++;
+	}
+	if(count)
+		printk(KERN_INFO "i2o: %d I2O controller%s found and installed.\n", count,
+			count==1?"":"s");
+	return count?count:-ENODEV;
+}
 
 static int i2o_core_init(void)
 {
@@ -3496,6 +3706,7 @@ static int i2o_core_init(void)
 	else
 		printk(KERN_INFO "I2O: Event thread created as pid %d\n", evt_pid);
 
+	i2o_pci_scan();
 	if(i2o_num_controllers)
 		i2o_sys_init();
 
@@ -3532,3 +3743,40 @@ static void i2o_core_exit(void)
 module_init(i2o_core_init);
 module_exit(i2o_core_exit);
 
+MODULE_PARM(dpt, "i");
+MODULE_PARM_DESC(dpt, "Set this if you want to drive DPT cards normally handled by dpt_i2o");
+MODULE_PARM(verbose, "i");
+MODULE_PARM_DESC(verbose, "Verbose diagnostics");
+
+MODULE_AUTHOR("Red Hat Software");
+MODULE_DESCRIPTION("I2O Core");
+MODULE_LICENSE("GPL");
+
+EXPORT_SYMBOL(i2o_controller_chain);
+EXPORT_SYMBOL(i2o_num_controllers);
+EXPORT_SYMBOL(i2o_find_controller);
+EXPORT_SYMBOL(i2o_unlock_controller);
+EXPORT_SYMBOL(i2o_status_get);
+EXPORT_SYMBOL(i2o_install_handler);
+EXPORT_SYMBOL(i2o_remove_handler);
+EXPORT_SYMBOL(i2o_install_controller);
+EXPORT_SYMBOL(i2o_delete_controller);
+EXPORT_SYMBOL(i2o_run_queue);
+EXPORT_SYMBOL(i2o_claim_device);
+EXPORT_SYMBOL(i2o_release_device);
+EXPORT_SYMBOL(i2o_device_notify_on);
+EXPORT_SYMBOL(i2o_device_notify_off);
+EXPORT_SYMBOL(i2o_post_this);
+EXPORT_SYMBOL(i2o_post_wait);
+EXPORT_SYMBOL(i2o_post_wait_mem);
+EXPORT_SYMBOL(i2o_query_scalar);
+EXPORT_SYMBOL(i2o_set_scalar);
+EXPORT_SYMBOL(i2o_query_table);
+EXPORT_SYMBOL(i2o_clear_table);
+EXPORT_SYMBOL(i2o_row_add_table);
+EXPORT_SYMBOL(i2o_issue_params);
+EXPORT_SYMBOL(i2o_event_register);
+EXPORT_SYMBOL(i2o_event_ack);
+EXPORT_SYMBOL(i2o_report_status);
+EXPORT_SYMBOL(i2o_dump_message);
+EXPORT_SYMBOL(i2o_get_class_name);

@@ -23,7 +23,7 @@
 #include <linux/i2o-dev.h>
 
 /* How many different OSM's are we allowing */
-#define MAX_I2O_MODULES		64
+#define MAX_I2O_MODULES		4
 
 /* How many OSMs can register themselves for device status updates? */
 #define I2O_MAX_MANAGERS	4
@@ -76,10 +76,16 @@ struct i2o_device
 };
 
 /*
- *	Resource data for each PCI I2O controller
+ * Each I2O controller has one of these objects
  */
-struct i2o_pci
+struct i2o_controller
 {
+	char name[16];
+	int unit;
+	int type;
+	int enabled;
+	
+	struct pci_dev *pdev;		/* PCI device */
 	int		irq;
 	int		short_req:1;	/* Use small block sizes        */
 	int		dpt:1;		/* Don't quiesce                */
@@ -88,25 +94,6 @@ struct i2o_pci
 	int		mtrr_reg0;
 	int		mtrr_reg1;
 #endif
-};
-
-/*
- * Transport types supported by I2O stack
- */
-#define I2O_TYPE_PCI		0x01		/* PCI I2O controller */
-
-
-/*
- * Each I2O controller has one of these objects
- */
-struct i2o_controller
-{
-	struct pci_dev *pdev;		/* PCI device */
-
-	char name[16];
-	int unit;
-	int type;
-	int enabled;
 
 	struct notifier_block *event_notifer;	/* Events */
 	atomic_t users;
@@ -143,22 +130,6 @@ struct i2o_controller
 
 	struct proc_dir_entry *proc_entry;	/* /proc dir */
 
-	union {					/* Bus information */
-		struct i2o_pci pci;
-	} bus;
-
-	/* Bus specific destructor */
-	void (*destructor)(struct i2o_controller *);
-
-	/* Bus specific attach/detach */
-	int (*bind)(struct i2o_controller *, struct i2o_device *);
-
-	/* Bus specific initiator */
-	int (*unbind)(struct i2o_controller *, struct i2o_device *);
-
-	/* Bus specific enable/disable */
-	void (*bus_enable)(struct i2o_controller *);
-	void (*bus_disable)(struct i2o_controller *);
 
 	void *page_frame;			/* Message buffers */
 	dma_addr_t page_frame_map;		/* Cache map */

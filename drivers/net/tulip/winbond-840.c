@@ -17,7 +17,7 @@
 	Support and updates available at
 	http://www.scyld.com/network/drivers.html
 
-	Do not remove the copyright infomation.
+	Do not remove the copyright information.
 	Do not change the version information unless an improvement has been made.
 	Merely removing my name, as Compex has done in the past, does not count
 	as an improvement.

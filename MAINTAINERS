@@ -728,7 +728,7 @@ S:	Odd fixes (e.g., new signatures)
 
 GDT SCSI DISK ARRAY CONTROLLER DRIVER
 P:	Achim Leubner
-M:	achim@vortex.de
+M:	achim.leubner@intel.com
 L:	linux-scsi@vger.kernel.org
 W:	http://www.icp-vortex.com/
 S:	Supported

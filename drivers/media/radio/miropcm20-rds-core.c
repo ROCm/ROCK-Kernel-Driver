@@ -13,8 +13,6 @@
  *        RDS support for MiroSound PCM20 radio
  */
 
-#define _NO_VERSION_
-
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/string.h>

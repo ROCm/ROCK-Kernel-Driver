@@ -27,12 +27,16 @@
  */
 
 #define CPIA_MAJ_VER	1
-#define CPIA_MIN_VER    2
-#define CPIA_PATCH_VER	2
+#define CPIA_MIN_VER   2
+#define CPIA_PATCH_VER	3
 
-#define CPIA_PP_MAJ_VER       1
-#define CPIA_PP_MIN_VER       2
-#define CPIA_PP_PATCH_VER     2
+#define CPIA_PP_MAJ_VER       CPIA_MAJ_VER
+#define CPIA_PP_MIN_VER       CPIA_MIN_VER
+#define CPIA_PP_PATCH_VER     CPIA_PATCH_VER
+
+#define CPIA_USB_MAJ_VER      CPIA_MAJ_VER
+#define CPIA_USB_MIN_VER      CPIA_MIN_VER
+#define CPIA_USB_PATCH_VER    CPIA_PATCH_VER
 
 #define CPIA_MAX_FRAME_SIZE_UNALIGNED	(352 * 288 * 4)   /* CIF at RGB32 */
 #define CPIA_MAX_FRAME_SIZE	((CPIA_MAX_FRAME_SIZE_UNALIGNED + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)) /* align above to PAGE_SIZE */

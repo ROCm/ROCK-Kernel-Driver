@@ -686,7 +686,7 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 	if( (vendor_cmd->rw_flag == VENDOR_READ_OPCODE) &&
 	     vendor_cmd->len )
         if(  copy_to_user( vendor_cmd->bufp, buf, vendor_cmd->len))
-		return( -EFAULT);
+		result = -EFAULT;
 
         if( buf) 
 	  kfree( buf);

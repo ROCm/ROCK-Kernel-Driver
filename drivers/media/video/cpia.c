@@ -23,7 +23,9 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/* #define _CPIA_DEBUG_		define for verbose debug output */
+/* define _CPIA_DEBUG_ for verbose debug output (see cpia.h) */
+/* #define _CPIA_DEBUG_  1 */  
+
 #include <linux/config.h>
 
 #include <linux/module.h>
@@ -1796,7 +1798,7 @@ static int do_command_extended(struct cam_data *cam, u16 command,
 
 	retval = cam->ops->transferCmd(cam->lowlevel_data, cmd, data);
 	if (retval)
-		LOG("%x - failed\n", command);
+		DBG("%x - failed\n", command);
 
 	return retval;
 }
@@ -2174,7 +2176,7 @@ static int parse_picture(struct cam_data *cam, int size)
 		}
 		if (ll == 1) {
 			if (*ibuf != EOL) {
-				LOG("EOL not found giving up after %d/%d"
+				DBG("EOL not found giving up after %d/%d"
 				    " bytes\n", origsize-size, origsize);
 				return -1;
 			}
@@ -3158,7 +3160,8 @@ static int reset_camera(struct cam_data *cam)
 
 static void put_cam(struct cpia_camera_ops* ops)
 {
-	module_put(ops->owner);
+	if (ops->owner)
+		module_put(ops->owner);
 }
 
 /* ------------------------- V4L interface --------------------- */
@@ -3173,16 +3176,15 @@ static int cpia_open(struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 
+	if (cam->open_count > 0) {
+		DBG("Camera already open\n");
+		return -EBUSY;
+	}
+
 	if (!try_module_get(cam->ops->owner))
 		return -ENODEV;
 
 	down(&cam->busy_lock);
-	err = -EBUSY;
-	if (cam->open_count > 0) {
-		DBG("Camera already open\n");
-		goto oops;
-	}
-	
 	err = -ENOMEM;
 	if (!cam->raw_image) {
 		cam->raw_image = rvmalloc(CPIA_MAX_IMAGE_SIZE);
@@ -3206,10 +3208,11 @@ static int cpia_open(struct inode *inode, struct file *file)
 		cam->ops->close(cam->lowlevel_data);
 		goto oops;
 	}
-
-	if(signal_pending(current))
-		return -EINTR;
 	
+	err = -EINTR;
+	if(signal_pending(current))
+		goto oops;
+
 	/* Set ownership of /proc/cpia/videoX to current user */
 	if(cam->proc_entry)
 		cam->proc_entry->uid = current->uid;
@@ -3451,6 +3454,14 @@ static int cpia_do_ioctl(struct inode *inode, struct file *file,
 			cam->params.colourParams.contrast = 80;
 		}
 
+		/* Adjust flicker control if necessary */
+		if(cam->params.flickerControl.allowableOverExposure < 0)
+			cam->params.flickerControl.allowableOverExposure = 
+				-find_over_exposure(cam->params.colourParams.brightness);
+		if(cam->params.flickerControl.flickerMode != 0)
+			cam->cmd_queue |= COMMAND_SETFLICKERCTRL;
+		
+
 		/* queue command to update camera */
 		cam->cmd_queue |= COMMAND_SETCOLOURPARAMS;
 		up(&cam->param_lock);
@@ -3600,7 +3611,7 @@ static int cpia_do_ioctl(struct inode *inode, struct file *file,
 	{
 		int *frame = arg;
 
-		//DBG("VIDIOCSYNC: %d\n", frame);
+		//DBG("VIDIOCSYNC: %d\n", *frame);
 
 		if (*frame<0 || *frame >= FRAME_NUM) {
 			retval = -EINVAL;
@@ -3628,52 +3639,53 @@ static int cpia_do_ioctl(struct inode *inode, struct file *file,
 	}
 
 	case VIDIOCGCAPTURE:
+	{
+		struct video_capture *vc = arg;
+
 		DBG("VIDIOCGCAPTURE\n");
-		if (copy_to_user(arg, &cam->vc, sizeof(struct video_capture)))
-			retval = -EFAULT;
+
+		*vc = cam->vc;
+
 		break;
+	}	
 
 	case VIDIOCSCAPTURE:
 	{
-		struct video_capture vc;
+		struct video_capture *vc = arg;
 
 		DBG("VIDIOCSCAPTURE\n");
-		if (copy_from_user(&vc, arg, sizeof(vc))) {
-			retval = -EFAULT;
-			break;
-		}
 
-		if (vc.decimation != 0) {    /* How should this be used? */
+		if (vc->decimation != 0) {    /* How should this be used? */
 			retval = -EINVAL;
 			break;
 		}
-		if (vc.flags != 0) {     /* Even/odd grab not supported */
+		if (vc->flags != 0) {     /* Even/odd grab not supported */
 			retval = -EINVAL;
 			break;
 		}
 		
 		/* Clip to the resolution we can set for the ROI
 		   (every 8 columns and 4 rows) */
-		vc.x      = vc.x      & ~(__u32)7;
-		vc.y      = vc.y      & ~(__u32)3;
-		vc.width  = vc.width  & ~(__u32)7;
-		vc.height = vc.height & ~(__u32)3;
+		vc->x      = vc->x      & ~(__u32)7;
+		vc->y      = vc->y      & ~(__u32)3;
+		vc->width  = vc->width  & ~(__u32)7;
+		vc->height = vc->height & ~(__u32)3;
 
-		if(vc.width == 0 || vc.height == 0 ||
-		   vc.x + vc.width  > cam->vw.width ||
-		   vc.y + vc.height > cam->vw.height) {
+		if(vc->width == 0 || vc->height == 0 ||
+		   vc->x + vc->width  > cam->vw.width ||
+		   vc->y + vc->height > cam->vw.height) {
 			retval = -EINVAL;
 			break;
 		}
 
-		DBG("%d,%d/%dx%d\n", vc.x,vc.y,vc.width, vc.height);
+		DBG("%d,%d/%dx%d\n", vc->x,vc->y,vc->width, vc->height);
 		
 		down(&cam->param_lock);
 		
-		cam->vc.x      = vc.x;
-		cam->vc.y      = vc.y;
-		cam->vc.width  = vc.width;
-		cam->vc.height = vc.height;
+		cam->vc.x      = vc->x;
+		cam->vc.y      = vc->y;
+		cam->vc.width  = vc->width;
+		cam->vc.height = vc->height;
 		
 		set_vw_size(cam);
 		cam->cmd_queue |= COMMAND_SETFORMAT;
@@ -3688,16 +3700,20 @@ static int cpia_do_ioctl(struct inode *inode, struct file *file,
 	
 	case VIDIOCGUNIT:
 	{
-		struct video_unit vu;
-		vu.video    = cam->vdev.minor;
-		vu.vbi      = VIDEO_NO_UNIT;
-		vu.radio    = VIDEO_NO_UNIT;
-		vu.audio    = VIDEO_NO_UNIT;
-		vu.teletext = VIDEO_NO_UNIT;
+		struct video_unit *vu = arg;
+
+		DBG("VIDIOCGUNIT\n");
+
+		vu->video    = cam->vdev.minor;
+		vu->vbi      = VIDEO_NO_UNIT;
+		vu->radio    = VIDEO_NO_UNIT;
+		vu->audio    = VIDEO_NO_UNIT;
+		vu->teletext = VIDEO_NO_UNIT;
+
 		break;
 	}
-		
 
+		
 	/* pointless to implement overlay with this camera */
 	case VIDIOCCAPTURE:
 	case VIDIOCGFBUF:
@@ -3728,12 +3744,13 @@ static int cpia_ioctl(struct inode *inode, struct file *file,
 	return video_usercopy(inode, file, cmd, arg, cpia_do_ioctl);
 }
 
+
 /* FIXME */
 static int cpia_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct video_device *dev = file->private_data;
 	unsigned long start = vma->vm_start;
-	unsigned long size  = vma->vm_end-vma->vm_start;
+	unsigned long size  = vma->vm_end - vma->vm_start;
 	unsigned long page, pos;
 	struct cam_data *cam = dev->priv;
 	int retval;
@@ -3956,9 +3973,6 @@ struct cam_data *cpia_register_camera(struct cpia_camera_ops *ops, void *lowleve
 		printk(KERN_DEBUG "video_register_device failed\n");
 		return NULL;
 	}
-#ifdef CONFIG_PROC_FS
-	create_proc_cpia_cam(camera);
-#endif
 
 	/* get version information from camera: open/reset/close */
 
@@ -3974,6 +3988,10 @@ struct cam_data *cpia_register_camera(struct cpia_camera_ops *ops, void *lowleve
 
 	/* close cpia */
 	camera->ops->close(camera->lowlevel_data);
+
+#ifdef CONFIG_PROC_FS
+	create_proc_cpia_cam(camera);
+#endif
 
 	printk(KERN_INFO "  CPiA Version: %d.%02d (%d.%d)\n",
 	       camera->params.version.firmwareVersion,
@@ -3997,6 +4015,7 @@ void cpia_unregister_camera(struct cam_data *cam)
 	DBG("unregistering video\n");
 	video_unregister_device(&cam->vdev);
 	if (cam->open_count) {
+		put_cam(cam->ops);
 		DBG("camera open -- setting ops to NULL\n");
 		cam->ops = NULL;
 	}
@@ -4019,9 +4038,6 @@ static int __init cpia_init(void)
 	proc_cpia_create();
 #endif
 
-#ifdef CONFIG_VIDEO_CPIA_PP
-	cpia_pp_init();
-#endif
 #ifdef CONFIG_KMOD
 #ifdef CONFIG_VIDEO_CPIA_PP_MODULE
 	request_module("cpia_pp");
@@ -4031,6 +4047,10 @@ static int __init cpia_init(void)
 	request_module("cpia_usb");
 #endif
 #endif	/* CONFIG_KMOD */
+
+#ifdef CONFIG_VIDEO_CPIA_PP
+	cpia_pp_init();
+#endif
 #ifdef CONFIG_VIDEO_CPIA_USB
 	cpia_usb_init();
 #endif

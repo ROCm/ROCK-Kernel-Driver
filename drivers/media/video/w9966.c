@@ -742,7 +742,7 @@ static int w9966_v4l_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOCGTUNER:
 	{
 		struct video_tuner *vtune = arg;
-		if(vtune->tuner != 0);
+		if(vtune->tuner != 0)
 			return -EINVAL;
 		strcpy(vtune->name, "no tuner");
 		vtune->rangelow = 0;

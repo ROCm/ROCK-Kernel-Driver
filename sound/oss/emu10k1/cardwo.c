@@ -108,95 +108,20 @@ static void query_format(struct emu10k1_wavedevice *wave_dev, struct wave_format
 	}
 
 	wave_fmt->bytesperchannel = wave_fmt->bitsperchannel >> 3;
+	wave_fmt->bytespersample = wave_fmt->channels * wave_fmt->bytesperchannel;
+	wave_fmt->bytespersec = wave_fmt->bytespersample * wave_fmt->samplingrate;
 
 	if (wave_fmt->channels == 2)
 		wave_fmt->bytespervoicesample = wave_fmt->channels * wave_fmt->bytesperchannel;
 	else
 		wave_fmt->bytespervoicesample = wave_fmt->bytesperchannel;
-
-	wave_fmt->bytespersample = wave_fmt->channels * wave_fmt->bytesperchannel;
-	wave_fmt->bytespersec = wave_fmt->bytespersample * wave_fmt->samplingrate;
-}
-
-/**
- * alloc_buffer -
- *
- * allocates the memory buffer for a voice. Two page tables are kept for each buffer.
- * One (dma_handle) keeps track of the host memory pages used and the other (virtualpagetable)
- * is passed to the device so that it can do DMA to host memory. 
- *
- */
-static int alloc_buffer(struct emu10k1_card *card, struct waveout_buffer *buffer, unsigned int voicenum)
-{
-	u32 pageindex, pagecount;
-	unsigned long busaddx;
-	int i;
-
-	DPD(2, "requested pages is: %d\n", buffer->pages);
-
-	if ((buffer->mem[voicenum].emupageindex =
-	 emu10k1_addxmgr_alloc(buffer->pages * PAGE_SIZE, card)) < 0)
-		return -1;
-
-	/* Fill in virtual memory table */
-	for (pagecount = 0; pagecount < buffer->pages; pagecount++) {
-		if ((buffer->mem[voicenum].addr[pagecount] =
-		 pci_alloc_consistent(card->pci_dev, PAGE_SIZE,
-		 &buffer->mem[voicenum].dma_handle[pagecount])) == NULL) {
-			buffer->pages = pagecount;
-			return -1;
-		}
-
-		DPD(2, "Virtual Addx: %p\n", buffer->mem[voicenum].addr[pagecount]);
-
-		for (i = 0; i < PAGE_SIZE / EMUPAGESIZE; i++) {
-			busaddx = buffer->mem[voicenum].dma_handle[pagecount] + i * EMUPAGESIZE;
-
-			DPD(3, "Bus Addx: %#lx\n", busaddx);
-
-			pageindex = buffer->mem[voicenum].emupageindex + pagecount * PAGE_SIZE / EMUPAGESIZE + i;
-
-			((u32 *) card->virtualpagetable.addr)[pageindex] = cpu_to_le32((busaddx * 2) | pageindex);
-		}
-	}
-
-	return 0;
-}
-
-/**
- * free_buffer -
- *
- * frees the memory buffer for a voice.
- */
-static void free_buffer(struct emu10k1_card *card, struct waveout_buffer *buffer, unsigned int voicenum)
-{
-	u32 pagecount, pageindex;
-	int i;
-
-	if (buffer->mem[voicenum].emupageindex < 0)
-		return;
-
-	for (pagecount = 0; pagecount < buffer->pages; pagecount++) {
-		pci_free_consistent(card->pci_dev, PAGE_SIZE,
-		 buffer->mem[voicenum].addr[pagecount],
-		 buffer->mem[voicenum].dma_handle[pagecount]);
-
-		for (i = 0; i < PAGE_SIZE / EMUPAGESIZE; i++) {
-			pageindex = buffer->mem[voicenum].emupageindex + pagecount * PAGE_SIZE / EMUPAGESIZE + i;
-			((u32 *) card->virtualpagetable.addr)[pageindex] =
-			 cpu_to_le32((card->silentpage.dma_handle * 2) | pageindex);
-		}
-	}
-
-	emu10k1_addxmgr_free(card, buffer->mem[voicenum].emupageindex);
-	buffer->mem[voicenum].emupageindex = -1;
 }
 
 static int get_voice(struct emu10k1_card *card, struct woinst *woinst, unsigned int voicenum)
 {
 	struct emu_voice *voice = &woinst->voice[voicenum];
-	/* Allocate voices here, if no voices available, return error.
-	 * Init voice_allocdesc first.*/
+
+	/* Allocate voices here, if no voices available, return error. */
 
 	voice->usage = VOICE_USAGE_PLAYBACK;
 
@@ -219,7 +144,7 @@ static int get_voice(struct emu10k1_card *card, struct woinst *woinst, unsigned 
 
 	DPD(2, "Initial pitch --> %#x\n", voice->initial_pitch);
 
-	voice->startloop = (woinst->buffer.mem[voicenum].emupageindex << 12) /
+	voice->startloop = (voice->mem.emupageindex << 12) /
 	 woinst->format.bytespervoicesample;
 	voice->endloop = voice->startloop + woinst->buffer.size / woinst->format.bytespervoicesample;
 	voice->start = voice->startloop;
@@ -297,12 +222,12 @@ int emu10k1_waveout_open(struct emu10k1_wavedevice *wave_dev)
 	struct woinst *woinst = wave_dev->woinst;
 	struct waveout_buffer *buffer = &woinst->buffer;
 	unsigned int voicenum;
-	u32 delay;
+	u16 delay;
 
 	DPF(2, "emu10k1_waveout_open()\n");
 
 	for (voicenum = 0; voicenum < woinst->num_voices; voicenum++) {
-		if (alloc_buffer(card, buffer, voicenum) < 0) {
+		if (emu10k1_voice_alloc_buffer(card, &woinst->voice[voicenum].mem, woinst->buffer.pages) < 0) {
 			ERROR();
 			emu10k1_waveout_close(wave_dev);
 			return -1;
@@ -324,7 +249,7 @@ int emu10k1_waveout_open(struct emu10k1_wavedevice *wave_dev)
 	delay = (48000 * woinst->buffer.fragment_size) /
 		 (woinst->format.samplingrate * woinst->format.bytespervoicesample);
 
-	emu10k1_timer_install(card, &woinst->timer, delay / 2);
+	emu10k1_timer_install(card, &woinst->timer, delay);
 
 	woinst->state = WAVE_STATE_OPEN;
 
@@ -345,7 +270,7 @@ void emu10k1_waveout_close(struct emu10k1_wavedevice *wave_dev)
 
 	for (voicenum = 0; voicenum < woinst->num_voices; voicenum++) {
 		emu10k1_voice_free(&woinst->voice[voicenum]);
-		free_buffer(card, &woinst->buffer, voicenum);
+		emu10k1_voice_free_buffer(card, &woinst->voice[voicenum].mem);
 	}
 
 	woinst->state = WAVE_STATE_CLOSED;
@@ -371,7 +296,7 @@ int emu10k1_waveout_setformat(struct emu10k1_wavedevice *wave_dev, struct wave_f
 	struct emu10k1_card *card = wave_dev->card;
 	struct woinst *woinst = wave_dev->woinst;
 	unsigned int voicenum;
-	u32 delay;
+	u16 delay;
 
 	DPF(2, "emu10k1_waveout_setformat()\n");
 
@@ -404,7 +329,7 @@ int emu10k1_waveout_setformat(struct emu10k1_wavedevice *wave_dev, struct wave_f
 		delay = (48000 * woinst->buffer.fragment_size) /
 			 (woinst->format.samplingrate * woinst->format.bytespervoicesample);
 
-		emu10k1_timer_install(card, &woinst->timer, delay / 2);
+		emu10k1_timer_install(card, &woinst->timer, delay);
 	}
 
 	return 0;
@@ -449,7 +374,7 @@ void emu10k1_waveout_getxfersize(struct woinst *woinst, u32 *total_free_bytes)
 
 	pending_bytes = buffer->size - buffer->free_bytes;
 
-	buffer->fill_silence = (pending_bytes < (signed) buffer->fragment_size) ? 1 : 0;
+	buffer->fill_silence = (pending_bytes < (signed) buffer->fragment_size * 2) ? 1 : 0;
 
 	if (pending_bytes > (signed) buffer->silence_bytes) {
 		*total_free_bytes = (buffer->free_bytes + buffer->silence_bytes);
@@ -483,17 +408,14 @@ static void copy_block(void **dst, u32 str, u8 *src, u32 len)
 
 	if (len > PAGE_SIZE - pgoff) {
 		k = PAGE_SIZE - pgoff;
-		if (__copy_from_user((u8 *)dst[pg] + pgoff, src, k))
-			return;
+		__copy_from_user((u8 *)dst[pg] + pgoff, src, k);
 		len -= k;
 		while (len > PAGE_SIZE) {
-			if (__copy_from_user(dst[++pg], src + k, PAGE_SIZE))
-				return;
+			__copy_from_user(dst[++pg], src + k, PAGE_SIZE);
 			k += PAGE_SIZE;
 			len -= PAGE_SIZE;
 		}
-		if (__copy_from_user(dst[++pg], src + k, len))
-			return;
+		__copy_from_user(dst[++pg], src + k, len);
 
 	} else
 		__copy_from_user((u8 *)dst[pg] + pgoff, src, len);
@@ -511,15 +433,14 @@ static void copy_ilv_block(struct woinst *woinst, u32 str, u8 *src, u32 len)
         unsigned int pg;
 	unsigned int pgoff;
 	unsigned int voice_num;
-	struct waveout_mem *mem = woinst->buffer.mem;
+	struct emu_voice *voice = woinst->voice;
 
 	pg = str / PAGE_SIZE;
 	pgoff = str % PAGE_SIZE;
 
 	while (len) { 
 		for (voice_num = 0; voice_num < woinst->num_voices; voice_num++) {
-			if (__copy_from_user((u8 *)(mem[voice_num].addr[pg]) + pgoff, src, woinst->format.bytespervoicesample))
-				return;
+			__copy_from_user((u8 *)(voice[voice_num].mem.addr[pg]) + pgoff, src, woinst->format.bytespervoicesample);
 			src += woinst->format.bytespervoicesample;
 		}
 
@@ -544,7 +465,7 @@ static void fill_block(struct woinst *woinst, u32 str, u8 data, u32 len)
 	unsigned int pg;
 	unsigned int pgoff;
 	unsigned int voice_num;
-        struct waveout_mem *mem = woinst->buffer.mem;
+        struct emu_voice *voice = woinst->voice;
 	unsigned int  k;
 
 	pg = str / PAGE_SIZE;
@@ -553,22 +474,22 @@ static void fill_block(struct woinst *woinst, u32 str, u8 data, u32 len)
 	if (len > PAGE_SIZE - pgoff) {
 		k = PAGE_SIZE - pgoff;
 		for (voice_num = 0; voice_num < woinst->num_voices; voice_num++)
-			memset((u8 *)mem[voice_num].addr[pg] + pgoff, data, k);
+			memset((u8 *)voice[voice_num].mem.addr[pg] + pgoff, data, k);
 		len -= k;
 		while (len > PAGE_SIZE) {
 			pg++;
 			for (voice_num = 0; voice_num < woinst->num_voices; voice_num++)
-				memset(mem[voice_num].addr[pg], data, PAGE_SIZE);
+				memset(voice[voice_num].mem.addr[pg], data, PAGE_SIZE);
 
 			len -= PAGE_SIZE;
 		}
 		pg++;
 		for (voice_num = 0; voice_num < woinst->num_voices; voice_num++)
-			memset(mem[voice_num].addr[pg], data, len);
+			memset(voice[voice_num].mem.addr[pg], data, len);
 
 	} else {
 		for (voice_num = 0; voice_num < woinst->num_voices; voice_num++)
-			memset((u8 *)mem[voice_num].addr[pg] + pgoff, data, len);
+			memset((u8 *)voice[voice_num].mem.addr[pg] + pgoff, data, len);
 	}
 }
 
@@ -582,6 +503,7 @@ static void fill_block(struct woinst *woinst, u32 str, u8 data, u32 len)
 void emu10k1_waveout_xferdata(struct woinst *woinst, u8 *data, u32 *size)
 {
 	struct waveout_buffer *buffer = &woinst->buffer;
+	struct voice_mem *mem = &woinst->voice[0].mem;
 	u32 sizetocopy, sizetocopy_now, start;
 	unsigned long flags;
 
@@ -610,14 +532,14 @@ void emu10k1_waveout_xferdata(struct woinst *woinst, u8 *data, u32 *size)
 			copy_ilv_block(woinst, start, data, sizetocopy_now);
 			copy_ilv_block(woinst, 0, data + sizetocopy_now * woinst->num_voices, sizetocopy);
 		} else {
-			copy_block(buffer->mem[0].addr, start, data, sizetocopy_now);
-			copy_block(buffer->mem[0].addr, 0, data + sizetocopy_now, sizetocopy);
+			copy_block(mem->addr, start, data, sizetocopy_now);
+			copy_block(mem->addr, 0, data + sizetocopy_now, sizetocopy);
 		}
 	} else {
 		if (woinst->num_voices > 1)
 			copy_ilv_block(woinst, start, data, sizetocopy);
 		else
-			copy_block(buffer->mem[0].addr, start, data, sizetocopy);
+			copy_block(mem->addr, start, data, sizetocopy);
 	}
 }
 
@@ -674,7 +596,7 @@ void emu10k1_waveout_update(struct woinst *woinst)
 {
 	u32 hw_pos;
 	u32 diff;
-	
+
 	/* There is no actual start yet */
 	if (!(woinst->state & WAVE_STATE_STARTED)) {
 		hw_pos = woinst->buffer.hw_pos;

@@ -164,6 +164,8 @@ STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
 AWK		= awk
+RPM 		:= $(shell if [ -x "/usr/bin/rpmbuild" ]; then echo rpmbuild; \
+		    	else echo rpm; fi)
 GENKSYMS	= scripts/genksyms/genksyms
 DEPMOD		= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
@@ -768,9 +770,7 @@ rpm:	clean spec
 	rm $(KERNELPATH) ; \
 	cd $(TOPDIR) ; \
 	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > .version ; \
-	RPM=`which rpmbuild`; \
-	if [ -z "$$RPM" ]; then RPM=rpm; fi; \
-	$$RPM -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
+	$(RPM) -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
 	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
 
 # Brief documentation of the typical targets used

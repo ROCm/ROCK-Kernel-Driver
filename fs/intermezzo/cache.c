@@ -20,7 +20,6 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>

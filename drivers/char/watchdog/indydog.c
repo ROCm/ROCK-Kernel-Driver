@@ -53,6 +53,9 @@ static int indydog_open(struct inode *inode, struct file *file)
 	if( test_and_set_bit(0,&indydog_alive) )
 		return -EBUSY;
 
+	if (nowayout)
+		MOD_INC_USE_COUNT;
+
 	/*
 	 *	Activate timer
 	 */
