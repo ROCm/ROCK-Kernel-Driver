@@ -1078,6 +1078,19 @@ sector_t bmap(struct inode * inode, sector_t block)
 	return res;
 }
 
+/*
+ * Return true if the filesystem which backs this inode considers the two
+ * passed timespecs to be sufficiently different to warrant flushing the
+ * altered time out to disk.
+ */
+static int inode_times_differ(struct inode *inode,
+			struct timespec *old, struct timespec *new)
+{
+	if (IS_ONE_SECOND(inode))
+		return old->tv_sec != new->tv_sec;
+	return !timespec_equal(old, new);
+}
+
 /**
  *	update_atime	-	update the access time
  *	@inode: inode accessed
@@ -1089,19 +1102,23 @@ sector_t bmap(struct inode * inode, sector_t block)
  
 void update_atime(struct inode *inode)
 {
-	struct timespec now = CURRENT_TIME; 
+	struct timespec now;
 
-	/* Can later do this more lazily with a per superblock interval */
-	if (timespec_equal(&inode->i_atime, &now))
-		return;
 	if (IS_NOATIME(inode))
 		return;
 	if (IS_NODIRATIME(inode) && S_ISDIR(inode->i_mode))
 		return;
 	if (IS_RDONLY(inode))
 		return;
-	inode->i_atime = now;
-	mark_inode_dirty_sync(inode);
+
+	now = current_kernel_time();
+	if (inode_times_differ(inode, &inode->i_atime, &now)) {
+		inode->i_atime = now;
+		mark_inode_dirty_sync(inode);
+	} else {
+		if (!timespec_equal(&inode->i_atime, &now))
+			inode->i_atime = now;
+	}
 }
 
 /**
@@ -1110,20 +1127,25 @@ void update_atime(struct inode *inode)
  *	@ctime_too: update ctime too
  *
  *	Update the mtime time on an inode and mark it for writeback.
- *	This function automatically handles read only file systems and media.
  *	When ctime_too is specified update the ctime too.
  */
 
 void inode_update_time(struct inode *inode, int ctime_too)
 {
-	struct timespec now = CURRENT_TIME; 
-	if (timespec_equal(&inode->i_mtime, &now) &&
-	    !(ctime_too && !timespec_equal(&inode->i_ctime, &now)))
-		return;
+	struct timespec now = current_kernel_time();
+	int sync_it = 0;
+
+	if (inode_times_differ(inode, &inode->i_mtime, &now))
+		sync_it = 1;
 	inode->i_mtime = now;
-	if (ctime_too) 
+
+	if (ctime_too) {
+		if (inode_times_differ(inode, &inode->i_ctime, &now))
+			sync_it = 1;
 		inode->i_ctime = now;
-	mark_inode_dirty_sync(inode);
+	}
+	if (sync_it)
+		mark_inode_dirty_sync(inode);
 }
 EXPORT_SYMBOL(inode_update_time);
 
