@@ -1,4 +1,4 @@
-obj-y = bugs.o checksum.o extable.o fault.o ksyms.o ldt.o ptrace.o \
+obj-y = bugs.o checksum.o fault.o ksyms.o ldt.o ptrace.o \
 	ptrace_user.o semaphore.o sigcontext.o syscalls.o sysrq.o time.o
 
 obj-$(CONFIG_HIGHMEM) += highmem.o
