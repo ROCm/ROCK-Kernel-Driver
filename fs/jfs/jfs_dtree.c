@@ -177,8 +177,8 @@ static int ciCompare(struct component_name * key, dtpage_t * p, int si,
 static void dtGetKey(dtpage_t * p, int i, struct component_name * key,
 		     int flag);
 
-static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
-			       int ri, struct component_name * key, int flag);
+static int ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
+			      int ri, struct component_name * key, int flag);
 
 static void dtInsertEntry(dtpage_t * p, int index, struct component_name * key,
 			  ddata_t * data, struct dt_lock **);
@@ -342,7 +342,6 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 	struct metapage *mp;
 	s64 offset;
 	uint page_offset;
-	int rc;
 	struct tlock *tlck;
 	s64 xaddr;
 
@@ -396,11 +395,11 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		 * Allocate the first block & add it to the xtree
 		 */
 		xaddr = 0;
-		if ((rc =
-		     xtInsert(tid, ip, 0, 0, sbi->nbperpage,
-			      &xaddr, 0))) {
+		if (xtInsert(tid, ip, 0, 0, sbi->nbperpage, &xaddr, 0)) {
 			jfs_warn("add_index: xtInsert failed!");
-			return -EPERM;
+			memcpy(&jfs_ip->i_dirtable, temp_table,
+			       sizeof (temp_table));
+			goto clean_up;
 		}
 		ip->i_size = PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
@@ -408,7 +407,9 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		if ((mp = get_index_page(ip, 0)) == 0) {
 			jfs_err("add_index: get_metapage failed!");
 			xtTruncate(tid, ip, 0, COMMIT_PWMAP);
-			return -EPERM;
+			memcpy(&jfs_ip->i_dirtable, temp_table,
+			       sizeof (temp_table));
+			goto clean_up;
 		}
 		tlck = txLock(tid, ip, mp, tlckDATA);
 		llck = (struct linelock *) & tlck->lock;
@@ -438,12 +439,9 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		 * This will be the beginning of a new page
 		 */
 		xaddr = 0;
-		if ((rc =
-		     xtInsert(tid, ip, 0, blkno, sbi->nbperpage,
-			      &xaddr, 0))) {
+		if (xtInsert(tid, ip, 0, blkno, sbi->nbperpage, &xaddr, 0)) {
 			jfs_warn("add_index: xtInsert failed!");
-			jfs_ip->next_index--;
-			return -EPERM;
+			goto clean_up;
 		}
 		ip->i_size += PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
@@ -457,7 +455,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 
 	if (mp == 0) {
 		jfs_err("add_index: get/read_metapage failed!");
-		return -EPERM;
+		goto clean_up;
 	}
 
 	lock_index(tid, ip, mp, index);
@@ -472,6 +470,12 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 	release_metapage(mp);
 
 	return index;
+
+      clean_up:
+
+	jfs_ip->next_index--;
+
+	return 0;
 }
 
 /*
@@ -1152,9 +1156,16 @@ static int dtSplitUp(tid_t tid,
 			if ((sp->header.flag & BT_ROOT && skip > 1) ||
 			    sp->header.prev != 0 || skip > 1) {
 				/* compute uppercase router prefix key */
-				ciGetLeafPrefixKey(lp,
-						   lp->header.nextindex - 1,
-						   rp, 0, &key, sbi->mntflag);
+				rc = ciGetLeafPrefixKey(lp,
+							lp->header.nextindex-1,
+							rp, 0, &key,
+							sbi->mntflag);
+				if (rc) {
+					DT_PUTPAGE(lmp);
+					DT_PUTPAGE(rmp);
+					DT_PUTPAGE(smp);
+					goto splitOut;
+				}
 			} else {
 				/* next to leftmost entry of
 				   lowest internal level */
@@ -3713,18 +3724,28 @@ static int ciCompare(struct component_name * key,	/* search key */
  *	     from two adjacent leaf entries
  *	     across page boundary
  *
- * return:
- *	Number of prefix bytes needed to distinguish b from a.
+ * return: non-zero on error
+ *	
  */
-static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
+static int ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
 			       int ri, struct component_name * key, int flag)
 {
 	int klen, namlen;
 	wchar_t *pl, *pr, *kname;
-	wchar_t lname[JFS_NAME_MAX + 1];
-	struct component_name lkey = { 0, lname };
-	wchar_t rname[JFS_NAME_MAX + 1];
-	struct component_name rkey = { 0, rname };
+	struct component_name lkey;
+	struct component_name rkey;
+
+	lkey.name = (wchar_t *) kmalloc((JFS_NAME_MAX + 1) * sizeof(wchar_t),
+					GFP_KERNEL);
+	if (lkey.name == NULL)
+		return -ENOSPC;
+
+	rkey.name = (wchar_t *) kmalloc((JFS_NAME_MAX + 1) * sizeof(wchar_t),
+					GFP_KERNEL);
+	if (rkey.name == NULL) {
+		kfree(lkey.name);
+		return -ENOSPC;
+	}
 
 	/* get left and right key */
 	dtGetKey(lp, li, &lkey, flag);
@@ -3749,7 +3770,7 @@ static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
 		*kname = *pr;
 		if (*pl != *pr) {
 			key->namlen = klen + 1;
-			return;
+			goto free_names;
 		}
 	}
 
@@ -3760,7 +3781,10 @@ static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
 	} else			/* l->namelen == r->namelen */
 		key->namlen = klen;
 
-	return;
+free_names:
+	kfree(lkey.name);
+	kfree(rkey.name);
+	return 0;
 }
 
 

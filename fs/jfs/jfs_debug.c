@@ -1,6 +1,6 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
- *   Portions Copyright (c) Christoph Hellwig, 2001-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2004
+ *   Portions Copyright (C) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -147,7 +147,7 @@ void jfs_proc_clean(void)
 	if (base) {
 		for (i = 0; i < NPROCENT; i++)
 			remove_proc_entry(Entries[i].name, base);
-		remove_proc_entry("jfs", base);
+		remove_proc_entry("jfs", proc_root_fs);
 	}
 }
 
