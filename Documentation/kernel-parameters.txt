@@ -713,6 +713,10 @@ running once the system is up.
 
 	noexec		[IA-64]
 
+	noexec		[i386]
+			noexec=on: enable non-executable mappings (default)
+			noexec=off: disable nn-executable mappings
+
 	nofxsr		[BUGS=IA-32]
 
 	nohighio	[BUGS=IA-32] Disable highmem block I/O.
