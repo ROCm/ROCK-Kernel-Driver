@@ -431,6 +431,15 @@ CONFIG_BLK_DEV_PIIX
   the kernel to change PIO, DMA and UDMA speeds and to configure
   the chip to optimum performance.
 
+CONFIG_BLK_DEV_PIIX_TRY133
+  The ICH2, ICH2-M, ICH3, ICH3-M, ICH3-S and CICH chips can support
+  UDMA133 in hardware, even though the specifications of the chips
+  say otherwise. By enabling this option, you allow the driver to
+  enable the UDMA133 mode on these chips.
+
+  If you want to stay on the safe side, say N here.
+  If you prefer maximum performance, say Y here.
+
 CONFIG_BLK_DEV_PDC202XX
   Promise Ultra33 or PDC20246
   Promise Ultra66 or PDC20262

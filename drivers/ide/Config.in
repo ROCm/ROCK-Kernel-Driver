@@ -61,6 +61,9 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
 	 dep_mbool '      HPT34X AUTODMA support (WIP)' CONFIG_HPT34X_AUTODMA $CONFIG_BLK_DEV_HPT34X $CONFIG_IDEDMA_PCI_WIP
 	 dep_bool '    HPT366 chipset support' CONFIG_BLK_DEV_HPT366 $CONFIG_BLK_DEV_IDEDMA_PCI
 	 dep_bool '    Intel and Efar (SMsC) chipset support' CONFIG_BLK_DEV_PIIX $CONFIG_BLK_DEV_IDEDMA_PCI
+	 if [ "$CONFIG_BLK_DEV_PIIX" = "y" ]; then
+	    dep_bool '      Use UDMA133 even on ICH2, ICH3 and CICH chips (EXPERIMENTAL)' CONFIG_BLK_DEV_PIIX_TRY133 $CONFIG_EXPERIMENTAL
+	 fi
 	 if [ "$CONFIG_MIPS_ITE8172" = "y" -o "$CONFIG_MIPS_IVR" = "y" ]; then
 	    dep_mbool '    IT8172 IDE support' CONFIG_BLK_DEV_IT8172 $CONFIG_BLK_DEV_IDEDMA_PCI
 	    dep_mbool '      IT8172 IDE Tuning support' CONFIG_IT8172_TUNING $CONFIG_BLK_DEV_IT8172 $CONFIG_IDEDMA_PCI_AUTO
