@@ -2158,6 +2158,7 @@ void mark_ntfs_record_dirty(struct page *page, const unsigned int ofs) {
 	}
 	end = ofs + ni->itype.index.block_size;
 	bh_size = ni->vol->sb->s_blocksize;
+	spin_lock(&page->mapping->private_lock);
 	bh = head = page_buffers(page);
 	do {
 		bh_ofs = bh_offset(bh);
@@ -2167,6 +2168,7 @@ void mark_ntfs_record_dirty(struct page *page, const unsigned int ofs) {
 			break;
 		set_buffer_dirty(bh);
 	} while ((bh = bh->b_this_page) != head);
+	spin_unlock(&page->mapping->private_lock);
 	__set_page_dirty_nobuffers(page);
 }
 

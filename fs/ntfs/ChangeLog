@@ -35,6 +35,9 @@ ToDo/Notes:
 	  ntfs_attr_size_bounds_check(), ntfs_attr_can_be_non_resident(), and
 	  ntfs_attr_can_be_resident(), which in turn use the new private helper
 	  ntfs_attr_find_in_attrdef().
+	- In fs/ntfs/aops.c::mark_ntfs_record_dirty(), take the
+	  mapping->private_lock around the dirtying of the buffer heads
+	  analagous to the way it is done in __set_page_dirty_buffers().
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
