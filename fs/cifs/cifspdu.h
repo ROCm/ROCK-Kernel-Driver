@@ -1645,14 +1645,14 @@ struct file_compression_info {
 struct cifs_posix_ace { /* access control entry (ACE) */
 	__u8  cifs_e_tag;
 	__u8  cifs_e_perm;
-	__u64 cifs_uid; /* or gid */
+	__le64 cifs_uid; /* or gid */
 }; 
 
 struct cifs_posix_acl { /* access conrol list  (ACL) */
 	__le16	version;
 	__le16	access_entry_count;  /* access ACL - count of entries */
 	__le16	default_entry_count; /* default ACL - count of entries */
-	struct cifs_posix_ace ace_array[1];
+	struct cifs_posix_ace ace_array[0];
 	/* followed by
 	struct cifs_posix_ace default_ace_arraay[] */
 };  /* level 0x204 */

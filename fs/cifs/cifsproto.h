@@ -234,8 +234,8 @@ extern int CIFSSMBSetEA(const int xid, struct cifsTconInfo *tcon,
 		const void * ea_value, const __u16 ea_value_len, 
 		const struct nls_table *nls_codepage);
 extern int CIFSSMBGetPosixACL(const int xid, struct cifsTconInfo *tcon,
-                        const unsigned char *searchName,
-                        char *acl_inf, const int buflen,
-                        const struct nls_table *nls_codepage);
+		const unsigned char *searchName,
+		char *acl_inf, const int buflen,const int acl_type,
+		const struct nls_table *nls_codepage);
 
 #endif			/* _CIFSPROTO_H */

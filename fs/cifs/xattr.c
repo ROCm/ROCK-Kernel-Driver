@@ -164,9 +164,6 @@ ssize_t cifs_getxattr(struct dentry * direntry, const char * ea_name,
          void * ea_value, size_t buf_size)
 {
 	ssize_t rc = -EOPNOTSUPP;
-#ifdef CONFIG_CIFS_POSIX
-	struct cifs_posix_ace * acl_inf;
-#endif
 #ifdef CONFIG_CIFS_XATTR
 	int xid;
 	struct cifs_sb_info *cifs_sb;
@@ -182,6 +179,8 @@ ssize_t cifs_getxattr(struct dentry * direntry, const char * ea_name,
 	if(sb == NULL)
 		return -EIO;
 	xid = GetXid();
+
+	cFYI(1,("getxattr %s with size %d",ea_name,buf_size));
 
 	cifs_sb = CIFS_SB(sb);
 	pTcon = cifs_sb->tcon;
@@ -210,31 +209,18 @@ ssize_t cifs_getxattr(struct dentry * direntry, const char * ea_name,
 		rc = CIFSSMBQueryEA(xid,pTcon,full_path,ea_name,ea_value,
 			buf_size, cifs_sb->local_nls);
 	} else if(strncmp(ea_name,POSIX_ACL_XATTR_ACCESS,strlen(POSIX_ACL_XATTR_ACCESS)) == 0) {
-
 #ifdef CONFIG_CIFS_POSIX
-		acl_inf = (struct cifs_posix_ace *)kmalloc(4096,GFP_KERNEL);
-		if(acl_inf == NULL)
-			rc = -ENOMEM;
-		else {
-			rc = CIFSSMBGetPosixACL(xid, pTcon, full_path,
-			(char *)acl_inf, 4096, cifs_sb->local_nls);
-			/* BB fixme - add parsing */
-			kfree(acl_inf);
-		}
+		rc = CIFSSMBGetPosixACL(xid, pTcon, full_path,
+				ea_value, buf_size, ACL_TYPE_ACCESS, 
+				cifs_sb->local_nls);
 #else 
 		cFYI(1,("query POSIX ACL not supported yet"));
 #endif /* CONFIG_CIFS_POSIX */
 	} else if(strncmp(ea_name,POSIX_ACL_XATTR_DEFAULT,strlen(POSIX_ACL_XATTR_DEFAULT)) == 0) {
 #ifdef CONFIG_CIFS_POSIX
-		acl_inf = (struct cifs_posix_ace *)kmalloc(4096,GFP_KERNEL);
-		if(acl_inf == NULL)
-			rc = -ENOMEM;
-		else {
-			rc = CIFSSMBGetPosixACL(xid, pTcon, full_path,
-			(char *)acl_inf, 4096, cifs_sb->local_nls);
-			/* BB fixme - add parsing */
-			kfree(acl_inf);
-		}
+		rc = CIFSSMBGetPosixACL(xid, pTcon, full_path,
+				ea_value, buf_size, ACL_TYPE_DEFAULT, 
+				cifs_sb->local_nls);
 #else 
 		cFYI(1,("query POSIX default ACL not supported yet"));
 #endif

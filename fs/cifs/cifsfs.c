@@ -495,6 +495,12 @@ struct inode_operations cifs_dir_inode_ops = {
 	.setattr = cifs_setattr,
 	.symlink = cifs_symlink,
 	.mknod   = cifs_mknod,
+#ifdef CONFIG_CIFS_XATTR
+	.setxattr = cifs_setxattr,
+	.getxattr = cifs_getxattr,
+	.listxattr = cifs_listxattr,
+	.removexattr = cifs_removexattr,
+#endif
 };
 
 struct inode_operations cifs_file_inode_ops = {

@@ -30,6 +30,7 @@
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/vfs.h>
+#include <linux/posix_acl_xattr.h>
 #include <asm/uaccess.h>
 #include "cifspdu.h"
 #include "cifsglob.h"
@@ -1586,10 +1587,75 @@ CIFSSMBQueryReparseLinkInfo(const int xid, struct cifsTconInfo *tcon,
 }
 
 #ifdef CONFIG_CIFS_POSIX
+
+static void cifs_convert_ace(posix_acl_xattr_entry * ace, struct cifs_posix_ace * cifs_ace)
+{
+	/* u8 cifs fields do not need le conversion */
+	ace->e_perm = (u16)cifs_ace->cifs_e_perm; 
+	ace->e_tag  = (u16)cifs_ace->cifs_e_tag;
+	ace->e_id   = (u32)le32_to_cpu(cifs_ace->cifs_uid);
+	/* cFYI(1,("perm %d tag %d id %d",ace->e_perm,ace->e_tag,ace->e_id)); */
+
+	return;
+}
+
+static int cifs_copy_posix_acl(char * trgt,char * src, const int buflen,const int acl_type,const int size_of_data_area)
+{
+	int size =  0;
+	int i;
+	__u16 count;
+	struct cifs_posix_ace * pACE;
+	struct cifs_posix_acl * cifs_acl = (struct cifs_posix_acl *)src;
+	posix_acl_xattr_header * local_acl = (posix_acl_xattr_header *)trgt;
+
+	if (le16_to_cpu(cifs_acl->version) != CIFS_ACL_VERSION)
+		return -EOPNOTSUPP;
+
+	if(acl_type & ACL_TYPE_ACCESS) {
+		count = le16_to_cpu(cifs_acl->access_entry_count);
+		pACE = &cifs_acl->ace_array[0];
+		size = sizeof(struct cifs_posix_acl);
+		size += sizeof(struct cifs_posix_ace) * count;
+		/* check if we would go beyond end of SMB */
+		if(size_of_data_area < size) {
+			cFYI(1,("bad CIFS POSIX ACL size %d vs. %d",size_of_data_area,size));
+			return -EINVAL;
+		}
+	} else if(acl_type & ACL_TYPE_DEFAULT) {
+		count = le16_to_cpu(cifs_acl->access_entry_count);
+		size = sizeof(struct cifs_posix_acl);
+		size += sizeof(struct cifs_posix_ace) * count;
+/* skip past access ACEs to get to default ACEs */
+		pACE = &cifs_acl->ace_array[count];
+		count = le16_to_cpu(cifs_acl->default_entry_count);
+		size += sizeof(struct cifs_posix_ace) * count;
+		/* check if we would go beyond end of SMB */
+		if(size_of_data_area < size)
+			return -EINVAL;
+	} else {
+		/* illegal type */
+		return -EINVAL;
+	}
+
+	size = posix_acl_xattr_size(count);
+	if(size > buflen) {
+	/* BB should we fill in as much data as we can first? */
+	/* seems odd that API was not designed so one could query ACL size */
+		return -ERANGE;
+	}
+
+	local_acl->a_version = POSIX_ACL_XATTR_VERSION;
+	for(i = 0;i < count ;i++) {
+		cifs_convert_ace(&local_acl->a_entries[i],pACE);
+		pACE ++;
+	}
+	return size;
+}
+
 int
 CIFSSMBGetPosixACL(const int xid, struct cifsTconInfo *tcon,
                         const unsigned char *searchName,
-                        char *acl_inf, const int buflen,
+                        char *acl_inf, const int buflen, const int acl_type,
                         const struct nls_table *nls_codepage)
 {
 /* SMB_QUERY_POSIX_ACL */
@@ -1662,9 +1728,9 @@ queryAclRetry:
 		else {
 			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 			__u16 count = le16_to_cpu(pSMBr->t2.DataCount);
-                                                                                                                               
-			memcpy(acl_inf,(char *)&pSMBr->hdr.Protocol+data_offset,
-			     min_t(const int, buflen, count));
+			rc = cifs_copy_posix_acl(acl_inf,
+				(char *)&pSMBr->hdr.Protocol+data_offset,
+				buflen,acl_type,count);
 		}
 	}
 	if (pSMB)
@@ -3641,7 +3707,7 @@ QEARetry:
 			   go beyond end of list */
 			__u16 data_offset = le16_to_cpu(pSMBr->t2.DataOffset);
 			struct fealist * ea_response_data;
-			rc = -ENOENT;
+			rc = -ENODATA;
 			/* validate_trans2_offsets() */
 			/* BB to check if(start of smb + data_offset > &bcc+ bcc)*/
 			ea_response_data = (struct fealist *)
