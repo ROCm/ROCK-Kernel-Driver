@@ -242,21 +242,12 @@ static int ite_gpio_open(struct inode *inode, struct file *file)
 	if (minor != GPIO_MINOR)
 		return -ENODEV;
 
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-
 	return 0;
 }
 
 
 static int ite_gpio_release(struct inode *inode, struct file *file)
 {
-
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-
 	return 0;
 }
 

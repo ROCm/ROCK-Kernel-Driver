@@ -2807,7 +2807,7 @@ static int i810_ac97_power_up_bus(struct i810_card *card)
 	return 1;
 }
 
-static int __init i810_ac97_init(struct i810_card *card)
+static int __devinit i810_ac97_init(struct i810_card *card)
 {
 	int num_ac97 = 0;
 	int ac97_id;
@@ -3011,7 +3011,7 @@ static int __init i810_ac97_init(struct i810_card *card)
 	return num_ac97;
 }
 
-static void __init i810_configure_clocking (void)
+static void __devinit i810_configure_clocking (void)
 {
 	struct i810_card *card;
 	struct i810_state *state;
@@ -3083,7 +3083,7 @@ config_out_nodmabuf:
 /* install the driver, we do not allocate hardware channel nor DMA buffer now, they are defered 
    until "ACCESS" time (in prog_dmabuf called by open/read/write/ioctl/mmap) */
    
-static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
+static int __devinit i810_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
 {
 	struct i810_card *card;
 

@@ -763,18 +763,17 @@ static int ad1889_open(struct inode *inode, struct file *file)
 	ad1889_set_wav_rate(ad1889_dev, 44100);
 	ad1889_set_wav_fmt(ad1889_dev, AFMT_S16_LE);
 	AD1889_WRITEW(ad1889_dev, AD_DSWADA, 0x0404); /* attenuation */
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static int ad1889_release(struct inode *inode, struct file *file)
 {
 	/* if we have state free it here */
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static struct file_operations ad1889_fops = {
+	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
 	.read		= ad1889_read,
 	.write		= ad1889_write,
@@ -792,13 +791,11 @@ static int ad1889_mixer_open(struct inode *inode, struct file *file)
 		return -ENODEV;
 
 	file->private_data = ad1889_dev->ac97_codec;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static int ad1889_mixer_release(struct inode *inode, struct file *file)
 {
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -810,6 +807,7 @@ static int ad1889_mixer_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct file_operations ad1889_mixer_fops = {
+	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
 	.ioctl		= ad1889_mixer_ioctl,
 	.open		= ad1889_mixer_open,

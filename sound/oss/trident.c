@@ -3957,7 +3957,7 @@ static int ali_reset_5451(struct trident_card *card)
 }
 
 /* AC97 codec initialisation. */
-static int __init trident_ac97_init(struct trident_card *card)
+static int __devinit trident_ac97_init(struct trident_card *card)
 {
 	int num_ac97 = 0;
 	unsigned long ready_2nd = 0;
@@ -4120,7 +4120,7 @@ static int trident_game_open(struct gameport *gameport, int mode)
 
 /* install the driver, we do not allocate hardware channel nor DMA buffer now, they are defered 
    until "ACCESS" time (in prog_dmabuf called by open/read/write/ioctl/mmap) */
-static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
+static int __devinit trident_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
 {
 	unsigned long iobase;
 	struct trident_card *card;

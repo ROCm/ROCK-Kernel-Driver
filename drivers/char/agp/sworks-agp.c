@@ -437,8 +437,8 @@ struct agp_bridge_driver sworks_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-static int __init agp_serverworks_probe(struct pci_dev *pdev,
-					const struct pci_device_id *ent)
+static int __devinit agp_serverworks_probe(struct pci_dev *pdev,
+					   const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
 	struct pci_dev *bridge_dev;
