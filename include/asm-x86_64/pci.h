@@ -44,8 +44,7 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 
 struct pci_dev;
 
-extern int iommu_setup(char *opt, char **end);
-
+extern int iommu_setup(char *opt);
 extern void pci_iommu_init(void);
 
 /* Allocate and map kernel buffer using consistent mode DMA for a device.
@@ -77,10 +76,11 @@ extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
  * Once the device is given the dma address, the device owns this memory
  * until either pci_unmap_single or pci_dma_sync_single is performed.
  */
-extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
-			  size_t size, int direction);
+extern dma_addr_t __pci_map_single(struct pci_dev *hwdev, void *ptr,
+			  size_t size, int direction, int flush);
 
-extern void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t addr,
+
+void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t addr,
 				   size_t size, int direction);
 
 /*
@@ -118,12 +118,16 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 	BUG_ON(direction == PCI_DMA_NONE); 
 } 
 
-#define PCI_DMA_BUS_IS_PHYS	0
+/* The PCI address space does equal the physical memory
+ * address space.  The networking and block device layers use
+ * this boolean for bounce buffer decisions.
+ */
+#define PCI_DMA_BUS_IS_PHYS	(0)
 
 
 #else
-static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
-					size_t size, int direction)
+static inline dma_addr_t __pci_map_single(struct pci_dev *hwdev, void *ptr,
+					size_t size, int direction, int flush)
 {
 	dma_addr_t addr; 
 
@@ -210,6 +214,11 @@ extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 			 int nents, int direction);
 
+static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
+			  size_t size, int direction)
+{
+	return __pci_map_single(hwdev,ptr,size,direction,1); 
+}
 
 #define pci_unmap_page pci_unmap_single
 

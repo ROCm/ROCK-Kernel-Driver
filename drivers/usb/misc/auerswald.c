@@ -72,9 +72,6 @@ do {			\
 #endif
 
 
-/* prefix for the device descriptors in /dev/usb */
-#define AU_PREFIX	"auer"
-
 /* Number of read buffers for each device */
 #define AU_RBUFFERS     10
 
@@ -243,7 +240,7 @@ typedef struct auerscon
 typedef struct
 {
 	struct semaphore 	mutex;         	    /* protection in user context */
-	char 			name[16];	    /* name of the /dev/usb entry */
+	char 			name[20];	    /* name of the /dev/usb entry */
 	unsigned int		dtindex;	    /* index in the device table */
 	devfs_handle_t 		devfs;	 	    /* devfs device node */
 	struct usb_device *	usbdev;      	    /* USB device handle */
@@ -259,9 +256,6 @@ typedef struct
 	unsigned int		version;	    /* Version of the device */
 	wait_queue_head_t 	bufferwait;         /* wait for a control buffer */
 } auerswald_t,*pauerswald_t;
-
-/* the global usb devfs handle */
-extern devfs_handle_t usb_devfs_handle;
 
 /* array of pointers to our devices that are currently connected */
 static pauerswald_t dev_table[AUER_MAX_DEVICES];
@@ -1440,7 +1434,7 @@ static int auerchar_open (struct inode *inode, struct file *file)
 
 	cp->open_count++;
 	ccp->auerdev = cp;
-	dbg("open %s as /dev/usb/%s", cp->dev_desc, cp->name);
+	dbg("open %s as /dev/%s", cp->dev_desc, cp->name);
 	up (&cp->mutex);
 
 	/* file IO stuff */
@@ -1970,7 +1964,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	}
 
 	/* Give the device a name */
-	sprintf (cp->name, AU_PREFIX "%d", dtindex);
+	sprintf (cp->name, "usb/auer%d", dtindex);
 
 	/* Store the index */
 	cp->dtindex = dtindex;
@@ -1978,8 +1972,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	up (&dev_table_mutex);
 
 	/* initialize the devfs node for this device and register it */
-	cp->devfs = devfs_register (usb_devfs_handle, cp->name,
-				    DEVFS_FL_DEFAULT, USB_MAJOR,
+	cp->devfs = devfs_register(NULL, cp->name, 0, USB_MAJOR,
 				    AUER_MINOR_BASE + dtindex,
 				    S_IFCHR | S_IRUGO | S_IWUGO,
 				    &auerswald_fops, NULL);
@@ -2089,7 +2082,7 @@ static void auerswald_disconnect (struct usb_interface *intf)
 		return;
 
 	down (&cp->mutex);
-	info ("device /dev/usb/%s now disconnecting", cp->name);
+	info ("device /dev/%s now disconnecting", cp->name);
 
 	/* remove from device table */
 	/* Nobody can open() this device any more */

@@ -103,6 +103,7 @@
  * entries are stored 1024 bytes below.
  */
 #define L_PTE_PRESENT		(1 << 0)
+#define L_PTE_FILE		(1 << 1)	/* only when !PRESENT */
 #define L_PTE_YOUNG		(1 << 1)
 #define L_PTE_BUFFERABLE	(1 << 2)	/* matches PTE */
 #define L_PTE_CACHEABLE		(1 << 3)	/* matches PTE */
@@ -173,6 +174,7 @@ static inline pte_t *pmd_page_kernel(pmd_t pmd)
 #define pte_exec(pte)			(pte_val(pte) & L_PTE_EXEC)
 #define pte_dirty(pte)			(pte_val(pte) & L_PTE_DIRTY)
 #define pte_young(pte)			(pte_val(pte) & L_PTE_YOUNG)
+#define pte_file(pte)			(pte_val(pte) & L_PTE_FILE)
 
 #define PTE_BIT_FUNC(fn,op)			\
 static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
@@ -195,6 +197,11 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
 #define pgprot_writecombine(prot) __pgprot(pgprot_val(prot) & ~L_PTE_CACHEABLE)
 
 #define pgtable_cache_init() do { } while (0)
+
+#define pte_to_pgoff(x)	(pte_val(x) >> 2)
+#define pgoff_to_pte(x)	__pte(((x) << 2) | L_PTE_FILE)
+
+#define PTE_FILE_MAX_BITS	30
 
 #endif /* __ASSEMBLY__ */
 

@@ -546,9 +546,11 @@ static struct i2c_algorithm smbus_algorithm = {
 
 static struct i2c_adapter i801_adapter = {
 	.owner		= THIS_MODULE,
-	.name		= "unset",
 	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_I801,
 	.algo		= &smbus_algorithm,
+	.dev		= {
+		.name	= "unset",
+	},
 };
 
 static struct pci_device_id i801_ids[] __devinitdata = {
@@ -597,8 +599,8 @@ static int __devinit i801_probe(struct pci_dev *dev, const struct pci_device_id 
 	/* set up the driverfs linkage to our parent device */
 	i801_adapter.dev.parent = &dev->dev;
 
-	sprintf(i801_adapter.name, "SMBus I801 adapter at %04x",
-		i801_smba);
+	snprintf(i801_adapter.dev.name, DEVICE_NAME_SIZE,
+		"SMBus I801 adapter at %04x", i801_smba);
 	return i2c_add_adapter(&i801_adapter);
 }
 

@@ -1,6 +1,6 @@
 /*
  *  include/linux/eventpoll.h ( Efficent event polling implementation )
- *  Copyright (C) 2001,...,2002	 Davide Libenzi
+ *  Copyright (C) 2001,...,2003	 Davide Libenzi
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,6 +19,9 @@
 #define EPOLL_CTL_ADD 1
 #define EPOLL_CTL_DEL 2
 #define EPOLL_CTL_MOD 3
+
+/* Set the Edge Triggered behaviour for the target file descriptor */
+#define EPOLLET (1 << 31)
 
 struct epoll_event {
 	__u32 events;

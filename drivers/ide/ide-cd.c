@@ -1749,8 +1749,8 @@ static ide_startstop_t cdrom_newpc_intr(ide_drive_t *drive)
 	/*
 	 * pad, if necessary
 	 */
-	if (len) {
-		while (len) {
+	if (len > 0) {
+		while (len > 0) {
 			int pad = 0;
 
 			xferfunc(drive, &pad, sizeof(pad));

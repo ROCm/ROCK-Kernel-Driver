@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  * Portions Copyright (c) 2002 Christoph Hellwig.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -46,7 +46,6 @@
 typedef struct semaphore	mutex_t;
 
 #define mutex_init(lock, type, name)		sema_init(lock, 1)
-#define init_mutex(ptr, type, name, sequence)	sema_init(lock, 1)
 #define mutex_destroy(lock)			sema_init(lock, -99)
 #define mutex_lock(lock, num)			down(lock)
 #define mutex_trylock(lock)			(down_trylock(lock) ? 0 : 1)

@@ -114,7 +114,7 @@ typedef	u32		compat_uptr_t;
 
 static inline void *compat_ptr(compat_uptr_t uptr)
 {
-	return (void *)uptr;
+	return (void *)(unsigned long)uptr;
 }
 
 #endif /* _ASM_PARISC_COMPAT_H */

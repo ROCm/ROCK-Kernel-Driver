@@ -1,6 +1,6 @@
 /*
- *    Disk Array driver for Compaq SMART2 Controllers
- *    Copyright 2000 Compaq Computer Corporation
+ *    Disk Array driver for HP SA 5xxx and 6xxx Controllers
+ *    Copyright 2000, 2002 Hewlett-Packard Development Company, L.P.
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
  *    along with this program; if not, write to the Free Software
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- *    Questions/Comments/Bugfixes to arrays@compaq.com
+ *    Questions/Comments/Bugfixes to Cciss-discuss@lists.sourceforge.net
  *
  */
 
@@ -69,6 +69,14 @@ const struct pci_device_id cciss_pci_device_id[] = {
                         0x0E11, 0x4082, 0, 0, 0},
 	{ PCI_VENDOR_ID_COMPAQ, PCI_DEVICE_ID_COMPAQ_CISSB,
                         0x0E11, 0x4083, 0, 0, 0},
+	{ PCI_VENDOR_ID_COMPAQ, PCI_DEVICE_ID_COMPAQ_CISSC,
+		0x0E11, 0x409A, 0, 0, 0},
+	{ PCI_VENDOR_ID_COMPAQ, PCI_DEVICE_ID_COMPAQ_CISSC,
+		0x0E11, 0x409B, 0, 0, 0},
+	{ PCI_VENDOR_ID_COMPAQ, PCI_DEVICE_ID_COMPAQ_CISSC,
+		0x0E11, 0x409C, 0, 0, 0},
+	{ PCI_VENDOR_ID_COMPAQ, PCI_DEVICE_ID_COMPAQ_CISSC,
+		0x0E11, 0x409D, 0, 0, 0},
 	{0,}
 };
 MODULE_DEVICE_TABLE(pci, cciss_pci_device_id);
@@ -80,10 +88,14 @@ MODULE_DEVICE_TABLE(pci, cciss_pci_device_id);
  *  access = Address of the struct of function pointers 
  */
 static struct board_type products[] = {
-	{ 0x40700E11, "Smart Array 5300",	&SA5_access },
+	{ 0x40700E11, "Smart Array 5300", &SA5_access },
 	{ 0x40800E11, "Smart Array 5i", &SA5B_access},
 	{ 0x40820E11, "Smart Array 532", &SA5B_access},
 	{ 0x40830E11, "Smart Array 5312", &SA5B_access},
+	{ 0x409A0E11, "Smart Array 641", &SA5_access},
+	{ 0x409B0E11, "Smart Array 642", &SA5_access},
+	{ 0x409C0E11, "Smart Array 6400", &SA5_access},
+	{ 0x409D0E11, "Smart Array 6400 EM", &SA5_access},
 };
 
 /* How long to wait (in millesconds) for board to go into simple mode */

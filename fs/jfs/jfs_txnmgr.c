@@ -380,8 +380,8 @@ tid_t txBegin(struct super_block *sb, int flag)
 
 	tblk = tid_to_tblock(t);
 
-	if ((tblk->next == 0) && (current != jfsCommitTask)) {
-		/* Save one tblk for jfsCommit thread */
+	if ((tblk->next == 0) && !(flag & COMMIT_FORCE)) {
+		/* Don't let a non-forced transaction take the last tblk */
 		jfs_info("txBegin: waiting for free tid");
 		INCREMENT(TxStat.txBegin_freetid);
 		TXN_SLEEP(&TxAnchor.freewait);
@@ -1553,12 +1553,10 @@ int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 void dtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	   struct tlock * tlck)
 {
-	struct inode *ip;
 	struct metapage *mp;
 	struct pxd_lock *pxdlock;
 	pxd_t *pxd;
 
-	ip = tlck->ip;
 	mp = tlck->mp;
 
 	/* initialize as REDOPAGE/NOREDOPAGE record format */
@@ -2894,7 +2892,6 @@ void txQuiesce(struct super_block *sb)
 	struct inode *ip;
 	struct jfs_inode_info *jfs_ip;
 	struct jfs_log *log = JFS_SBI(sb)->log;
-	int rc;
 	tid_t tid;
 
 	set_bit(log_QUIESCE, &log->flag);
@@ -2914,7 +2911,7 @@ restart:
 		TXN_UNLOCK();
 		tid = txBegin(ip->i_sb, COMMIT_INODE | COMMIT_FORCE);
 		down(&jfs_ip->commit_sem);
-		rc = txCommit(tid, 1, &ip, 0);
+		txCommit(tid, 1, &ip, 0);
 		txEnd(tid);
 		up(&jfs_ip->commit_sem);
 		/*
@@ -2994,8 +2991,7 @@ int jfs_sync(void *arg)
 				 * when it is committed
 				 */
 				TXN_UNLOCK();
-				tid = txBegin(ip->i_sb,
-					      COMMIT_INODE | COMMIT_FORCE);
+				tid = txBegin(ip->i_sb, COMMIT_INODE);
 				rc = txCommit(tid, 1, &ip, 0);
 				txEnd(tid);
 				up(&jfs_ip->commit_sem);

@@ -408,7 +408,7 @@ void __init setup_local_APIC (void)
 		if (maxlvt > 3)		/* Due to the Pentium erratum 3AP. */
 			apic_write(APIC_ESR, 0);
 		value = apic_read(APIC_ESR);
-		printk("ESR value before enabling vector: %08x\n", value);
+		Dprintk("ESR value before enabling vector: %08x\n", value);
 
 		value = ERROR_APIC_VECTOR;      // enables sending errors
 		apic_write_around(APIC_LVTERR, value);
@@ -418,7 +418,7 @@ void __init setup_local_APIC (void)
 		if (maxlvt > 3)
 			apic_write(APIC_ESR, 0);
 		value = apic_read(APIC_ESR);
-		printk("ESR value after enabling vector: %08x\n", value);
+		Dprintk("ESR value after enabling vector: %08x\n", value);
 	} else {
 		if (esr_disable)	
 			/* 
@@ -1080,9 +1080,10 @@ int __init APIC_init_uniprocessor (void)
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		check_nmi_watchdog();
 #ifdef CONFIG_X86_IO_APIC
-	if (smp_found_config)
-		if (!skip_ioapic_setup && nr_ioapics)
+	if (smp_found_config && !skip_ioapic_setup && nr_ioapics)
 			setup_IO_APIC();
+	else
+		nr_ioapics = 0;
 #endif
 	setup_boot_APIC_clock();
 

@@ -72,13 +72,15 @@ MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
 
-/* Define these values to match your device */
+/* Define these values to match your devices */
 #define USB_SKEL_VENDOR_ID	0xfff0
 #define USB_SKEL_PRODUCT_ID	0xfff0
 
 /* table of devices that work with this driver */
 static struct usb_device_id skel_table [] = {
 	{ USB_DEVICE(USB_SKEL_VENDOR_ID, USB_SKEL_PRODUCT_ID) },
+	/* "Gadget Zero" firmware runs under Linux */
+	{ USB_DEVICE(0x0525, 0xa4a0) },
 	{ }					/* Terminating entry */
 };
 
@@ -118,9 +120,6 @@ struct usb_skel {
 	struct semaphore	sem;			/* locks this structure */
 };
 
-
-/* the global usb devfs handle */
-extern devfs_handle_t usb_devfs_handle;
 
 /* prevent races between open() and disconnect() */
 static DECLARE_MUTEX (disconnect_sem);
@@ -514,7 +513,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	size_t buffer_size;
 	int i;
 	int retval;
-	char name[10];
+	char name[14];
 
 
 	/* See if the device offered us matches what we can accept */
@@ -609,9 +608,9 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	}
 
 	/* initialize the devfs node for this device and register it */
-	sprintf(name, "skel%d", dev->minor);
+	sprintf(name, "usb/skel%d", dev->minor);
 
-	dev->devfs = devfs_register (usb_devfs_handle, name,
+	dev->devfs = devfs_register(NULL, name,
 				     DEVFS_FL_DEFAULT, USB_MAJOR,
 				     dev->minor,
 				     S_IFCHR | S_IRUSR | S_IWUSR |
@@ -710,7 +709,7 @@ static int __init usb_skel_init(void)
 	/* register this driver with the USB subsystem */
 	result = usb_register(&skel_driver);
 	if (result < 0) {
-		err("usb_register failed for the "__FILE__" driver. Error number %d",
+		err("usb_register failed. Error number %d",
 		    result);
 		return -1;
 	}

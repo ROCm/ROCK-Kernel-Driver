@@ -997,11 +997,11 @@ ENTRY(fp_enter)
  * previous and next are guaranteed not to be the same.
  */
 ENTRY(__switch_to)
-		add	ip, r0, #TI_CPU_SAVE
-		ldr	r2, [r1, #TI_CPU_DOMAIN]!
+		add	ip, r1, #TI_CPU_SAVE
+		ldr	r3, [r2, #TI_CPU_DOMAIN]!
 		stmia	ip, {r4 - sl, fp, sp, lr}	@ Store most regs on stack
-		mcr	p15, 0, r2, c3, c0		@ Set domain register
-		ldmib	r1, {r4 - sl, fp, sp, pc}	@ Load all regs saved previously
+		mcr	p15, 0, r3, c3, c0, 0		@ Set domain register
+		ldmib	r2, {r4 - sl, fp, sp, pc}	@ Load all regs saved previously
 
 		__INIT
 /*

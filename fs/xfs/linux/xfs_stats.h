@@ -107,16 +107,7 @@ struct xfsstats {
 	__uint32_t		xs_attr_set;
 	__uint32_t		xs_attr_remove;
 	__uint32_t		xs_attr_list;
-# define XFSSTAT_END_QUOTA_OPS		(XFSSTAT_END_ATTRIBUTE_OPS+8)
-	__uint32_t		xs_qm_dqreclaims;
-	__uint32_t		xs_qm_dqreclaim_misses;
-	__uint32_t		xs_qm_dquot_dups;
-	__uint32_t		xs_qm_dqcachemisses;
-	__uint32_t		xs_qm_dqcachehits;
-	__uint32_t		xs_qm_dqwants;
-	__uint32_t		xs_qm_dqshake_reclaims;
-	__uint32_t		xs_qm_dqinact_reclaims;
-# define XFSSTAT_END_INODE_CLUSTER	(XFSSTAT_END_QUOTA_OPS+3)
+# define XFSSTAT_END_INODE_CLUSTER	(XFSSTAT_END_ATTRIBUTE_OPS+3)
 	__uint32_t		xs_iflush_count;
 	__uint32_t		xs_icluster_flushcnt;
 	__uint32_t		xs_icluster_flushinode;

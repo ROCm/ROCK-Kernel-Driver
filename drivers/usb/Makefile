@@ -14,6 +14,7 @@ obj-$(CONFIG_USB_SL811HS)	+= host/
 obj-$(CONFIG_USB_ACM)		+= class/
 obj-$(CONFIG_USB_AUDIO)		+= class/
 obj-$(CONFIG_USB_BLUETOOTH_TTY)	+= class/
+obj-$(CONFIG_USB_MIDI)		+= class/
 obj-$(CONFIG_USB_PRINTER)	+= class/
 
 obj-$(CONFIG_USB_STORAGE)	+= storage/

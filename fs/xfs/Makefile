@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+# Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of version 2 of the GNU General Public License as
@@ -29,13 +29,7 @@
 #
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
-# Makefile for XFS on Linux.
-#
 
-
-# This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
-# The code is wrong, local files should be included using "xfs.h", not <xfs.h>
-# but I am not going to change every file at the moment.
 EXTRA_CFLAGS +=	 -Ifs/xfs -funsigned-char
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
@@ -48,17 +42,22 @@ endif
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
 
-xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
-
-xfs-$(CONFIG_XFS_QUOTA)		+= xfs_dquot.o \
+xfs-$(CONFIG_XFS_QUOTA)		+= $(addprefix quota/, \
+				   xfs_dquot.o \
 				   xfs_dquot_item.o \
 				   xfs_trans_dquot.o \
 				   xfs_qm_syscalls.o \
-				   xfs_qm.o
+				   xfs_qm_bhv.o \
+				   xfs_qm.o)
 
+ifeq ($(CONFIG_XFS_QUOTA),y)
+xfs-$(CONFIG_PROC_FS)		+= quota/xfs_qm_stats.o
+endif
+
+xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
-xfs-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
-xfs-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
+xfs-$(CONFIG_XFS_POSIX_CAP)	+= xfs_cap.o
+xfs-$(CONFIG_XFS_POSIX_MAC)	+= xfs_mac.o
 xfs-$(CONFIG_PROC_FS)		+= linux/xfs_stats.o
 xfs-$(CONFIG_SYSCTL)		+= linux/xfs_sysctl.o
 
@@ -127,6 +126,7 @@ xfs-y				+= $(addprefix linux/, \
 				   xfs_iops.o \
 				   xfs_lrw.o \
 				   xfs_super.o \
+				   xfs_vfs.o \
 				   xfs_vnode.o)
 
 # Objects in support/
@@ -138,6 +138,10 @@ xfs-y				+= $(addprefix support/, \
 				   mrlock.o \
 				   qsort.o \
 				   uuid.o)
+
+# Quota and DMAPI stubs
+xfs-y				+= xfs_dmops.o \
+				   xfs_qmops.o
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to

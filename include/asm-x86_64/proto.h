@@ -6,6 +6,7 @@
 /* misc architecture specific prototypes */
 
 struct cpuinfo_x86; 
+struct pt_regs;
 
 extern void get_cpu_vendor(struct cpuinfo_x86*);
 extern void start_kernel(void);
@@ -41,6 +42,8 @@ extern void free_bootmem_generic(unsigned long phys, unsigned len);
 extern unsigned long end_pfn_map; 
 
 extern void show_stack(unsigned long * rsp);
+extern void show_trace(unsigned long * rsp);
+extern void show_registers(struct pt_regs *regs);
 
 extern void exception_table_check(void);
 

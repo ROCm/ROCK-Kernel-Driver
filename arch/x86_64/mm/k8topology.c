@@ -21,7 +21,7 @@
 #include <asm/pci-direct.h>
 #include <asm/numa.h>
 
-static int find_northbridge(void)
+static __init int find_northbridge(void)
 {
 	int num; 
 
@@ -45,7 +45,8 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 { 
 	unsigned long prevbase;
 	struct node nodes[MAXNODE];
-	int nodeid, numnodes, maxnode, i, nb; 
+	int nodeid, i, nb; 
+	int found = 0;
 
 	nb = find_northbridge(); 
 	if (nb < 0) 
@@ -53,12 +54,13 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 
 	printk(KERN_INFO "Scanning NUMA topology in Northbridge %d\n", nb); 
 
-	numnodes = (read_pci_config(0, nb, 0, 0x60 ) >> 4) & 3; 
+	numnodes = (1 << ((read_pci_config(0, nb, 0, 0x60 ) >> 4) & 3)); 
+
+	printk(KERN_INFO "Assuming %d nodes\n", numnodes - 1); 
 
 	memset(&nodes,0,sizeof(nodes)); 
 	prevbase = 0;
-	maxnode = -1; 
-	for (i = 0; i < MAXNODE; i++) { 
+	for (i = 0; i < numnodes; i++) { 
 		unsigned long base,limit; 
 
 		base = read_pci_config(0, nb, 1, 0x40 + i*8);
@@ -66,18 +68,16 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 
 		nodeid = limit & 3; 
 		if (!limit) { 
-			printk(KERN_INFO "Skipping node entry %d (base %lx)\n", i,			       base);
-			continue;
+			printk(KERN_ERR "Skipping node entry %d (base %lx)\n", i,			       base);
+			return -1;
 		}
 		if ((base >> 8) & 3 || (limit >> 8) & 3) {
 			printk(KERN_ERR "Node %d using interleaving mode %lx/%lx\n", 
 			       nodeid, (base>>8)&3, (limit>>8) & 3); 
 			return -1; 
 		}	
-		if (nodeid > maxnode) 
-			maxnode = nodeid; 
 		if ((1UL << nodeid) & nodes_present) { 
-			printk("Node %d already present. Skipping\n", nodeid);
+			printk(KERN_INFO "Node %d already present. Skipping\n", nodeid);
 			continue;
 		}
 
@@ -98,17 +98,19 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 			base = start; 
 		if (limit > end) 
 			limit = end; 
-		if (limit == base) 
+		if (limit == base) { 
+			printk(KERN_ERR "Empty node %d\n", nodeid); 
 			continue; 
+		}
 		if (limit < base) { 
-			printk(KERN_INFO"Node %d bogus settings %lx-%lx. Ignored.\n",
+			printk(KERN_ERR "Node %d bogus settings %lx-%lx.\n",
 			       nodeid, base, limit); 			       
-			continue; 
+			return -1;
 		} 
 		
 		/* Could sort here, but pun for now. Should not happen anyroads. */
 		if (prevbase > base) { 
-			printk(KERN_INFO "Node map not sorted %lx,%lx\n",
+			printk(KERN_ERR "Node map not sorted %lx,%lx\n",
 			       prevbase,base);
 			return -1;
 		}
@@ -116,23 +118,26 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 		printk(KERN_INFO "Node %d MemBase %016lx Limit %016lx\n", 
 		       nodeid, base, limit); 
 		
+		found++;
+		
 		nodes[nodeid].start = base; 
 		nodes[nodeid].end = limit;
 
 		prevbase = base;
 	} 
 
-	if (maxnode <= 0)
+	if (!found)
 		return -1; 
 
-	memnode_shift = compute_hash_shift(nodes,maxnode,end);
+	memnode_shift = compute_hash_shift(nodes);
 	if (memnode_shift < 0) { 
 		printk(KERN_ERR "No NUMA node hash function found. Contact maintainer\n"); 
 		return -1; 
 	} 
 	printk(KERN_INFO "Using node hash shift of %d\n", memnode_shift); 
 
-	early_for_all_nodes(i) { 
+	for (i = 0; i < numnodes; i++) { 
+		if (nodes[i].start != nodes[i].end)
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end); 
 	} 
 

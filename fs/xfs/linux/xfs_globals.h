@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -39,11 +39,10 @@
 
 extern uint64_t xfs_panic_mask;		/* set to cause more panics */
 
-extern unsigned long	xfs_physmem;
+extern unsigned long xfs_physmem;
+
+extern spinlock_t xfs_atomic_spin;
 
 extern struct cred *sys_cred;
-
-extern struct xfs_qm	*xfs_Gqm;
-extern mutex_t		xfs_Gqm_lock;
 
 #endif	/* __XFS_GLOBALS_H__ */

@@ -1210,6 +1210,10 @@ S: 25360 Georgia Tech Station
 S: Atlanta, Georgia 30332
 S: USA
 
+N: Brad Hards
+E: bradh@frogmouth.net
+D: Various USB bits, other minor patches
+
 N: Angelo Haritsis
 E: ah@computer.org
 D: kernel patches (serial, watchdog)

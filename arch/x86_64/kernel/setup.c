@@ -197,12 +197,15 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "acpi=off", 8))
 			acpi_disabled = 1;
 
+		if (!memcmp(from, "disableapic", 11))
+			disable_apic = 1;
+
 		if (!memcmp(from, "mem=", 4))
 			parse_memopt(from+4, &from); 
 
 #ifdef CONFIG_GART_IOMMU 
 		if (!memcmp(from,"iommu=",6)) { 
-			iommu_setup(from+6, &from); 
+			iommu_setup(from+6); 
 		}
 #endif
 

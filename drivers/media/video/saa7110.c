@@ -163,6 +163,7 @@ static	const unsigned char initseq[] = {
 	client=kmalloc(sizeof(*client), GFP_KERNEL);
 	if(client == NULL) 
 		return -ENOMEM;
+	memset(client, 0, sizeof(*client));
 	client_template.adapter = adap;
 	client_template.addr = addr;
 	memcpy(client, &client_template, sizeof(*client));
@@ -175,9 +176,9 @@ static	const unsigned char initseq[] = {
 
 	/* clear our private data */
 	memset(decoder, 0, sizeof(*decoder));
-	strcpy(client->name, IF_NAME);
+	strncpy(client->dev.name, IF_NAME, DEVICE_NAME_SIZE);
 	decoder->client = client;
-	client->data = decoder;
+	i2c_set_clientdata(client, decoder);
 	decoder->addr = addr;
 	decoder->norm = VIDEO_MODE_PAL;
 	decoder->input = 0;
@@ -189,7 +190,7 @@ static	const unsigned char initseq[] = {
 
 	rv = i2c_master_send(client, initseq, sizeof(initseq));
 	if (rv < 0)
-		printk(KERN_ERR "%s_attach: init status %d\n", client->name, rv);
+		printk(KERN_ERR "%s_attach: init status %d\n", client->dev.name, rv);
 	else {
 		i2c_smbus_write_byte_data(client,0x21,0x16);
 		i2c_smbus_write_byte_data(client,0x0D,0x04);
@@ -213,7 +214,7 @@ int saa7110_probe(struct i2c_adapter *adap)
 static
 int saa7110_detach(struct i2c_client *client)
 {
-	struct saa7110* decoder = client->data;
+	struct saa7110* decoder = i2c_get_clientdata(client);
 
 	i2c_detach_client(client);
 
@@ -232,7 +233,7 @@ int saa7110_detach(struct i2c_client *client)
 static
 int saa7110_command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
-	struct saa7110* decoder = client->data;
+	struct saa7110* decoder = i2c_get_clientdata(client);
 	int	v;
 
 	switch (cmd) {
@@ -251,7 +252,7 @@ int saa7110_command(struct i2c_client *client, unsigned int cmd, void *arg)
 
 	 case DECODER_GET_STATUS:
 		{
-			struct saa7110* decoder = client->data;
+			struct saa7110* decoder = i2c_get_clientdata(client);
 			int status;
 			int res = 0;
 
@@ -390,9 +391,11 @@ static struct i2c_driver i2c_driver_saa7110 =
 	.command 	= saa7110_command
 };
 static struct i2c_client client_template = {
-	.name 		= "saa7110_client",
 	.id 		= -1,
-	.driver 	= &i2c_driver_saa7110
+	.driver 	= &i2c_driver_saa7110,
+	.dev		= {
+		.name	= "saa7110_client",
+	},
 };
 
 static int saa7110_init(void)

@@ -347,17 +347,17 @@ static struct dentry_operations sockfs_dentry_operations = {
 /*
  *	Obtains the first available file descriptor and sets it up for use.
  *
- *	This functions creates file structure and maps it to fd space
+ *	This function creates file structure and maps it to fd space
  *	of current process. On success it returns file descriptor
  *	and file struct implicitly stored in sock->file.
  *	Note that another thread may close file descriptor before we return
  *	from this function. We use the fact that now we do not refer
  *	to socket after mapping. If one day we will need it, this
- *	function will inincrement ref. count on file by 1.
+ *	function will increment ref. count on file by 1.
  *
  *	In any case returned fd MAY BE not valid!
- *	This race condition is inavoidable
- *	with shared fd spaces, we cannot solve is inside kernel,
+ *	This race condition is unavoidable
+ *	with shared fd spaces, we cannot solve it inside kernel,
  *	but we take care of internal coherence yet.
  */
 

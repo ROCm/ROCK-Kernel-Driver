@@ -197,11 +197,23 @@ void make_slbe(unsigned long esid, unsigned long vsid, int large)
 
 	PMC_SW_PROCESSOR(stab_capacity_castouts); 
 
+	/* 
+	 * Never cast out the segment for our kernel stack. Since we
+	 * dont invalidate the ERAT we could have a valid translation
+	 * for the kernel stack during the first part of exception exit 
+	 * which gets invalidated due to a tlbie from another cpu at a
+	 * non recoverable point (after setting srr0/1) - Anton
+	 */
 	castout_entry = get_paca()->xStab_data.next_round_robin;
-	entry = castout_entry; 
-	castout_entry++; 
-	if (castout_entry >= naca->slb_size)
-		castout_entry = 1; 
+	do {
+		entry = castout_entry;
+		castout_entry++; 
+		if (castout_entry >= naca->slb_size)
+			castout_entry = 1; 
+		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
+	} while (esid_data.data.esid == GET_ESID((unsigned long)_get_SP()) &&
+			esid_data.data.v);
+
 	get_paca()->xStab_data.next_round_robin = castout_entry;
 
 	/* slbie not needed as the previous mapping is still valid. */
@@ -346,7 +358,12 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 {
 	if (cpu_has_slb()) {
-		if (!STAB_PRESSURE && test_thread_flag(TIF_32BIT)) {
+		/*
+		 * XXX disable 32bit slb invalidate optimisation until we fix
+		 * the issue where a 32bit app execed out of a 64bit app can
+		 * cause segments above 4GB not to be flushed - Anton
+		 */
+		if (0 && !STAB_PRESSURE && test_thread_flag(TIF_32BIT)) {
 			union {
 				unsigned long word0;
 				slb_dword0 data;

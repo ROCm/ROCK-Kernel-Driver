@@ -64,7 +64,6 @@ typedef struct xfs_trans_header {
 #define XFS_LI_BUF		0x123c	/* v2 bufs, variable sized inode bufs */
 #define XFS_LI_DQUOT		0x123d
 #define XFS_LI_QUOTAOFF		0x123e
-#define XFS_LI_RPC		0x123f	/* CXFS RPC return info */
 
 /*
  * Transaction types.  Used to distinguish types of buffers.
@@ -1014,10 +1013,7 @@ void		xfs_trans_log_efd_extent(xfs_trans_t *,
 					 struct xfs_efd_log_item *,
 					 xfs_fsblock_t,
 					 xfs_extlen_t);
-void		xfs_trans_log_create_rpc(xfs_trans_t *, int, xfs_ino_t);
-void		xfs_trans_log_setattr_rpc(xfs_trans_t *, int);
 int		xfs_trans_commit(xfs_trans_t *, uint flags, xfs_lsn_t *);
-void		xfs_trans_commit_async(struct xfs_mount *);
 void		xfs_trans_cancel(xfs_trans_t *, int);
 void		xfs_trans_ail_init(struct xfs_mount *);
 xfs_lsn_t	xfs_trans_push_ail(struct xfs_mount *, xfs_lsn_t);

@@ -836,8 +836,7 @@ struct dn_fib_table *dn_fib_get_table(int n, int create)
                 return NULL;
 
         if (in_interrupt() && net_ratelimit()) {
-                printk(KERN_DEBUG "DECnet: BUG! Attempt to create routing table 
-from interrupt\n"); 
+                printk(KERN_DEBUG "DECnet: BUG! Attempt to create routing table from interrupt\n"); 
                 return NULL;
         }
         if ((t = kmalloc(sizeof(struct dn_fib_table), GFP_KERNEL)) == NULL)

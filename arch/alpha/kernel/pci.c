@@ -285,7 +285,7 @@ common_swizzle(struct pci_dev *dev, u8 *pinp)
 			pin = bridge_swizzle(pin, PCI_SLOT(dev->devfn));
 			/* Move up the chain of bridges. */
 			dev = dev->bus->self;
-		} while (dev->bus->self);
+		} while (dev->bus->parent);
 		*pinp = pin;
 
 		/* The slot is the slot of the last bridge. */
@@ -410,10 +410,8 @@ common_init_pci(void)
 
 	if (pci_probe_only)
 		pcibios_claim_console_setup();
-	else	/* FIXME: `else' will be removed when
-		   pci_assign_unassigned_resources() is able to work
-		   correctly with [partially] allocated PCI tree. */
-		pci_assign_unassigned_resources();
+
+	pci_assign_unassigned_resources();
 	pci_fixup_irqs(alpha_mv.pci_swizzle, alpha_mv.pci_map_irq);
 }
 

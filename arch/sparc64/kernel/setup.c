@@ -44,6 +44,7 @@
 #include <asm/starfire.h>
 #include <asm/hardirq.h>
 #include <asm/mmu_context.h>
+#include <asm/timer.h>
 
 #ifdef CONFIG_IP_PNP
 #include <net/ipconfig.h>

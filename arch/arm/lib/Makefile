@@ -13,7 +13,7 @@ obj-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
 		   strnlen_user.o strchr.o strrchr.o testchangebit.o  \
 		   testclearbit.o testsetbit.o uaccess.o getuser.o    \
 		   putuser.o ashldi3.o ashrdi3.o lshrdi3.o muldi3.o   \
-		   ucmpdi2.o udivdi3.o lib1funcs.o
+		   ucmpdi2.o udivdi3.o lib1funcs.o div64.o
 obj-m		:=
 obj-n		:=
 

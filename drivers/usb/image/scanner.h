@@ -352,6 +352,4 @@ struct scn_usb_data {
 };
 #define to_scanner(d) container_of(d, struct scn_usb_data, kobj)
 
-extern devfs_handle_t usb_devfs_handle;
-
 static struct usb_driver scanner_driver;

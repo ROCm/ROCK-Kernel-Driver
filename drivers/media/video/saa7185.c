@@ -191,6 +191,7 @@ static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	client = kmalloc(sizeof(*client), GFP_KERNEL);
 	if (client == NULL)
 		return -ENOMEM;
+	memset(client, 0, sizeof(*client));
 	client_template.adapter = adap;
 	client_template.addr = addr;
 	memcpy(client, &client_template, sizeof(*client));
@@ -202,9 +203,9 @@ static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 
 
 	memset(encoder, 0, sizeof(*encoder));
-	strcpy(client->name, "saa7185");
+	strncpy(client->dev.name, "saa7185", DEVICE_NAME_SIZE);
 	encoder->client = client;
-	client->data = encoder;
+	i2c_set_clientdata(client, encoder);
 	encoder->addr = addr;
 	encoder->norm = VIDEO_MODE_NTSC;
 	encoder->enable = 1;
@@ -215,11 +216,11 @@ static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 					sizeof(init_ntsc));
 	}
 	if (i < 0) {
-		printk(KERN_ERR "%s_attach: init error %d\n", client->name,
+		printk(KERN_ERR "%s_attach: init error %d\n", client->dev.name,
 		       i);
 	} else {
 		printk(KERN_INFO "%s_attach: chip version %d\n",
-		       client->name, i2c_smbus_read_byte(client) >> 5);
+		       client->dev.name, i2c_smbus_read_byte(client) >> 5);
 	}
 	init_MUTEX(&encoder->lock);
 	i2c_attach_client(client);
@@ -233,7 +234,7 @@ static int saa7185_probe(struct i2c_adapter *adap)
 
 static int saa7185_detach(struct i2c_client *client)
 {
-	struct saa7185 *encoder = client->data;
+	struct saa7185 *encoder = i2c_get_clientdata(client);
 	i2c_detach_client(client);
 	i2c_smbus_write_byte_data(client, 0x61, (encoder->reg[0x61]) | 0x40);	/* SW: output off is active */
 	//i2c_smbus_write_byte_data(client, 0x3a, (encoder->reg[0x3a]) | 0x80); /* SW: color bar */
@@ -246,7 +247,7 @@ static int saa7185_detach(struct i2c_client *client)
 static int saa7185_command(struct i2c_client *client, unsigned int cmd,
 			   void *arg)
 {
-	struct saa7185 *encoder = client->data;
+	struct saa7185 *encoder = i2c_get_clientdata(client);
 
 	switch (cmd) {
 
@@ -365,9 +366,11 @@ static struct i2c_driver i2c_driver_saa7185 = {
 };
 
 static struct i2c_client client_template = {
-	.name 	= "saa7185_client",
 	.id 	= -1,
-	.driver = &i2c_driver_saa7185
+	.driver = &i2c_driver_saa7185,
+	.dev	= {
+		.name	= "saa7185_client",
+	},
 };
 
 static int saa7185_init(void)

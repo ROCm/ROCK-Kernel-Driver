@@ -15,6 +15,7 @@
 #include <asm/processor.h>
 #include <asm/proto.h>
 #include <asm/smp.h>
+#include <asm/bootsetup.h>
 
 /* Don't add a printk in there. printk relies on the PDA which is not initialized 
    yet. */
@@ -51,7 +52,7 @@ static void __init copy_bootdata(char *real_mode_data)
 		printk("old bootloader convention, maybe loadlin?\n");
 	}
 	command_line = (char *) ((u64)(new_data));
-	memcpy(saved_command_line, command_line, 2048);
+	memcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
 	printk("Bootdata ok (command line is %s)\n", saved_command_line);	
 }
 

@@ -186,8 +186,6 @@ static void usblp_dump(struct usblp *usblp) {
 }
 #endif
 
-extern devfs_handle_t usb_devfs_handle;			/* /dev/usb dir. */
-
 /* Quirks: various printer quirks are handled by this table & its flags. */
 
 struct quirk_printer_struct {
@@ -820,7 +818,7 @@ static int usblp_probe(struct usb_interface *intf,
 	struct usblp *usblp = 0;
 	int protocol;
 	int retval;
-	char name[6];
+	char name[10];
 
 	/* Malloc and start initializing usblp structure so we can use it
 	 * directly. */
@@ -909,8 +907,8 @@ static int usblp_probe(struct usb_interface *intf,
 #endif
 
 	/* If we have devfs, create with perms=660. */
-	sprintf(name, "lp%d", usblp->minor);
-	usblp->devfs = devfs_register(usb_devfs_handle, name,
+	sprintf(name, "usb/lp%d", usblp->minor);
+	usblp->devfs = devfs_register(NULL, name,
 				      DEVFS_FL_DEFAULT, USB_MAJOR,
 				      usblp->minor,
 				      S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |

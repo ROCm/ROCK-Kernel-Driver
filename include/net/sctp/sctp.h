@@ -356,7 +356,7 @@ for (pos = (head)->next;\
 static inline void sctp_skb_list_tail(struct sk_buff_head *list,
 				      struct sk_buff_head *head)
 {
-	int flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&head->lock, flags);
 	sctp_spin_lock(&list->lock);

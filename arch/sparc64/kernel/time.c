@@ -26,6 +26,8 @@
 #include <linux/profile.h>
 #include <linux/bcd.h>
 #include <linux/jiffies.h>
+#include <linux/cpufreq.h>
+#include <linux/percpu.h>
 
 #include <asm/oplib.h>
 #include <asm/mostek.h>
@@ -988,6 +990,73 @@ static unsigned long sparc64_init_timers(void (*cfunc)(int, void *, struct pt_re
 	return clock;
 }
 
+struct freq_table {
+	unsigned long udelay_val_ref;
+	unsigned long clock_tick_ref;
+	unsigned int ref_freq;
+};
+static DEFINE_PER_CPU(struct freq_table, sparc64_freq_table) = { 0, 0, 0 };
+
+unsigned long sparc64_get_clock_tick(unsigned int cpu)
+{
+	struct freq_table *ft = &per_cpu(sparc64_freq_table, cpu);
+
+	if (ft->clock_tick_ref)
+		return ft->clock_tick_ref;
+#ifdef CONFIG_SMP
+	return cpu_data[cpu].clock_tick;
+#else
+	return up_clock_tick;
+#endif
+}
+
+#ifdef CONFIG_CPU_FREQ
+
+static int sparc64_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
+				    void *data)
+{
+	struct cpufreq_freqs *freq = data;
+	unsigned int cpu = freq->cpu;
+	struct freq_table *ft = &per_cpu(sparc64_freq_table, cpu);
+
+#ifdef CONFIG_SMP
+	if (!ft->ref_freq) {
+		ft->ref_freq = freq->old;
+		ft->udelay_val_ref = cpu_data[cpu].udelay_val;
+		ft->clock_tick_ref = cpu_data[cpu].clock_tick;
+	}
+	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
+	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new)) {
+		cpu_data[cpu].udelay_val =
+			cpufreq_scale(ft->udelay_val_ref,
+				      ft->ref_freq,
+				      freq->new);
+		cpu_data[cpu].clock_tick =
+			cpufreq_scale(ft->clock_tick_ref,
+				      ft->ref_freq,
+				      freq->new);
+	}
+#else
+	/* In the non-SMP case, kernel/cpufreq.c takes care of adjusting
+	 * loops_per_jiffy.
+	 */
+	if (!ft->ref_freq) {
+		ft->ref_freq = freq->old;
+		ft->clock_tick_ref = up_clock_tick;
+	}
+	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
+	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new))
+		up_clock_tick = cpufreq_scale(ft->clock_tick_ref, ft->ref_freq, freq->new);
+#endif
+
+	return 0;
+}
+
+static struct notifier_block sparc64_cpufreq_notifier_block = {
+	.notifier_call	= sparc64_cpufreq_notifier
+};
+#endif
+
 /* The quotient formula is taken from the IA64 port. */
 void __init time_init(void)
 {
@@ -996,6 +1065,11 @@ void __init time_init(void)
 	timer_ticks_per_usec_quotient =
 		(((1000000UL << 30) +
 		  (clock / 2)) / clock);
+
+#ifdef CONFIG_CPU_FREQ
+	cpufreq_register_notifier(&sparc64_cpufreq_notifier_block,
+				  CPUFREQ_TRANSITION_NOTIFIER);
+#endif
 }
 
 static __inline__ unsigned long do_gettimeoffset(void)

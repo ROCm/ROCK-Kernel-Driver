@@ -16,14 +16,12 @@
 #include <linux/init.h>
 
 #include <asm/head.h>
+#include <asm/timer.h>
 
 static struct cpufreq_driver *cpufreq_us3_driver;
 
 struct us3_freq_percpu_info {
 	struct cpufreq_frequency_table table[4];
-	unsigned long udelay_val_ref;
-	unsigned long clock_tick_ref;
-	unsigned int ref_freq;
 };
 
 /* Indexed by cpu number. */
@@ -56,71 +54,9 @@ static void write_safari_cfg(unsigned long val)
 			     : "memory");
 }
 
-#ifndef CONFIG_SMP
-extern unsigned long up_clock_tick;
-unsigned long clock_tick_ref;
-unsigned int ref_freq;
-#endif
-
-static __inline__ unsigned long get_clock_tick(unsigned int cpu)
-{
-#ifdef CONFIG_SMP
-	if (us3_freq_table[cpu].clock_tick_ref)
-		return us3_freq_table[cpu].clock_tick_ref;
-	return cpu_data[cpu].clock_tick;
-#else
-	if (clock_tick_ref)
-		return clock_tick_ref;
-	return up_clock_tick;
-#endif
-}
-
-static int us3_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
-				void *data)
-{
-	struct cpufreq_freqs *freq = data;
-#ifdef CONFIG_SMP
-	unsigned int cpu = freq->cpu;
-
-	if (!us3_freq_table[cpu].ref_freq) {
-		us3_freq_table[cpu].ref_freq = freq->old;
-		us3_freq_table[cpu].udelay_val_ref = cpu_data[cpu].udelay_val;
-		us3_freq_table[cpu].clock_tick_ref = cpu_data[cpu].clock_tick;
-	}
-	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
-	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new)) {
-		cpu_data[cpu].udelay_val =
-			cpufreq_scale(us3_freq_table[cpu].udelay_val_ref,
-				      us3_freq_table[cpu].ref_freq,
-				      freq->new);
-		cpu_data[cpu].clock_tick =
-			cpufreq_scale(us3_freq_table[cpu].clock_tick_ref,
-				      us3_freq_table[cpu].ref_freq,
-				      freq->new);
-	}
-#else
-	/* In the non-SMP case, kernel/cpufreq.c takes care of adjusting
-	 * loops_per_jiffy.
-	 */
-	if (!ref_freq) {
-		ref_freq = freq->old;
-		clock_tick_ref = up_clock_tick;
-	}
-	if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
-	    (val == CPUFREQ_POSTCHANGE && freq->old > freq->new))
-		up_clock_tick = cpufreq_scale(clock_tick_ref, ref_freq, freq->new);
-#endif
-
-	return 0;
-}
-
-static struct notifier_block us3_cpufreq_notifier_block = {
-	.notifier_call	= us3_cpufreq_notifier
-};
-
 static unsigned long get_current_freq(unsigned int cpu, unsigned long safari_cfg)
 {
-	unsigned long clock_tick = get_clock_tick(cpu);
+	unsigned long clock_tick = sparc64_get_clock_tick(cpu);
 	unsigned long ret;
 
 	switch (safari_cfg & SAFARI_CFG_DIV_MASK) {
@@ -151,7 +87,7 @@ static void us3_set_cpu_divider_index(unsigned int cpu, unsigned int index)
 	cpus_allowed = current->cpus_allowed;
 	set_cpus_allowed(current, (1UL << cpu));
 
-	new_freq = get_clock_tick(cpu);
+	new_freq = sparc64_get_clock_tick(cpu);
 	switch (index) {
 	case 0:
 		new_bits = SAFARI_CFG_DIV_1;
@@ -186,17 +122,17 @@ static void us3_set_cpu_divider_index(unsigned int cpu, unsigned int index)
 	set_cpus_allowed(current, cpus_allowed);
 }
 
-static int us3freq_target(struct cpufreq_policy *policy,
+static int us3_freq_target(struct cpufreq_policy *policy,
 			  unsigned int target_freq,
 			  unsigned int relation)
 {
 	unsigned int new_index = 0;
 
 	if (cpufreq_frequency_table_target(policy,
-					      &us3_freq_table[policy->cpu].table[0],
-					      target_freq,
-					      relation,
-					      &new_index))
+					   &us3_freq_table[policy->cpu].table[0],
+					   target_freq,
+					   relation,
+					   &new_index))
 		return -EINVAL;
 
 	us3_set_cpu_divider_index(policy->cpu, new_index);
@@ -204,16 +140,16 @@ static int us3freq_target(struct cpufreq_policy *policy,
 	return 0;
 }
 
-static int us3freq_verify(struct cpufreq_policy *policy)
+static int us3_freq_verify(struct cpufreq_policy *policy)
 {
 	return cpufreq_frequency_table_verify(policy,
 					      &us3_freq_table[policy->cpu].table[0]);
 }
 
-static int __init us3freq_cpu_init(struct cpufreq_policy *policy)
+static int __init us3_freq_cpu_init(struct cpufreq_policy *policy)
 {
 	unsigned int cpu = policy->cpu;
-	unsigned long clock_tick = get_clock_tick(cpu);
+	unsigned long clock_tick = sparc64_get_clock_tick(cpu);
 	struct cpufreq_frequency_table *table =
 		&us3_freq_table[cpu].table[0];
 
@@ -233,7 +169,7 @@ static int __init us3freq_cpu_init(struct cpufreq_policy *policy)
 	return cpufreq_frequency_table_cpuinfo(policy, table);
 }
 
-static int __exit us3freq_cpu_exit(struct cpufreq_policy *policy)
+static int __exit us3_freq_cpu_exit(struct cpufreq_policy *policy)
 {
 	if (cpufreq_us3_driver)
 		us3_set_cpu_divider_index(policy->cpu, 0);
@@ -241,7 +177,7 @@ static int __exit us3freq_cpu_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
-static int __init us3freq_init(void)
+static int __init us3_freq_init(void)
 {
 	unsigned long manuf, impl, ver;
 	int ret;
@@ -253,9 +189,6 @@ static int __init us3freq_init(void)
 	if (manuf == CHEETAH_MANUF &&
 	    (impl == CHEETAH_IMPL || impl == CHEETAH_PLUS_IMPL)) {
 		struct cpufreq_driver *driver;
-
-		cpufreq_register_notifier(&us3_cpufreq_notifier_block,
-					  CPUFREQ_TRANSITION_NOTIFIER);
 
 		ret = -ENOMEM;
 		driver = kmalloc(sizeof(struct cpufreq_driver), GFP_KERNEL);
@@ -272,10 +205,10 @@ static int __init us3freq_init(void)
 		memset(us3_freq_table, 0,
 		       (NR_CPUS * sizeof(struct us3_freq_percpu_info)));
 
-		driver->verify = us3freq_verify;
-		driver->target = us3freq_target;
-		driver->init = us3freq_cpu_init;
-		driver->exit = us3freq_cpu_exit;
+		driver->verify = us3_freq_verify;
+		driver->target = us3_freq_target;
+		driver->init = us3_freq_cpu_init;
+		driver->exit = us3_freq_cpu_exit;
 		driver->owner = THIS_MODULE,
 		strcpy(driver->name, "UltraSPARC-III");
 
@@ -295,20 +228,16 @@ err_out:
 			kfree(us3_freq_table);
 			us3_freq_table = NULL;
 		}
-		cpufreq_unregister_notifier(&us3_cpufreq_notifier_block,
-					    CPUFREQ_TRANSITION_NOTIFIER);
 		return ret;
 	}
 
 	return -ENODEV;
 }
 
-static void __exit us3freq_exit(void)
+static void __exit us3_freq_exit(void)
 {
 	if (cpufreq_us3_driver) {
 		cpufreq_unregister_driver(cpufreq_us3_driver);
-		cpufreq_unregister_notifier(&us3_cpufreq_notifier_block,
-					    CPUFREQ_TRANSITION_NOTIFIER);
 
 		kfree(cpufreq_us3_driver);
 		cpufreq_us3_driver = NULL;
@@ -321,5 +250,5 @@ MODULE_AUTHOR("David S. Miller <davem@redhat.com>");
 MODULE_DESCRIPTION("cpufreq driver for UltraSPARC-III");
 MODULE_LICENSE("GPL");
 
-module_init(us3freq_init);
-module_exit(us3freq_exit);
+module_init(us3_freq_init);
+module_exit(us3_freq_exit);

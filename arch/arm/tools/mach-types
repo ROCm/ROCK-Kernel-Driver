@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Wed Mar 5 22:11:59 2003
+# Last update: Tue Mar 25 16:34:29 2003
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -305,3 +305,11 @@ meg03			ARCH_MEG03		MEG03			293
 pxa_whitechapel		ARCH_PXA_WHITECHAPEL	PXA_WHITECHAPEL		294
 nwsc			ARCH_NWSC		NWSC			295
 nwlarm			ARCH_NWLARM		NWLARM			296
+ixp425_mguard		ARCH_IXP425_MGUARD	IXP425_MGUARD		297
+pxa_netdcu4		ARCH_PXA_NETDCU4	PXA_NETDCU4		298
+ixdp2401		ARCH_IXDP2401		IXDP2401		299
+ixdp2801		ARCH_IXDP2801		IXDP2801		300
+zodiac			ARCH_ZODIAC		ZODIAC			301
+armmodul		ARCH_ARMMODUL		ARMMODUL		302
+ketop			SA1100_KETOP		KETOP			303
+av7200			ARCH_AV7200		AV7200			304

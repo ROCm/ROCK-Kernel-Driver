@@ -274,7 +274,7 @@ static void error(char *x)
 	puts(x);
 	puts("\n\n -- System halted");
 
-	while(1);	/* Halt */
+	while(1);
 }
 
 void setup_normal_output_buffer(void)
@@ -429,8 +429,6 @@ int decompress_kernel(struct moveparams *mv, void *rmode)
 	else setup_output_buffer_if_we_run_high(mv);
 
 	makecrc();
-	puts("Checking CPU type...");
-	check_cpu();
 	puts(".\nDecompressing Linux...");
 	gunzip();
 	puts("done.\nBooting the kernel.\n");

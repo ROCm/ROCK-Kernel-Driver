@@ -25,13 +25,15 @@
 #include <asm/mpspec.h>
 #include <asm/nmi.h>
 #include <asm/msr.h>
+#include <asm/proto.h>
+#include <asm/kdebug.h>
 
 extern void default_do_nmi(struct pt_regs *);
 
 unsigned int nmi_watchdog = NMI_LOCAL_APIC;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
-extern void show_registers(struct pt_regs *regs);
+int nmi_watchdog_disabled;
 
 #define K7_EVNTSEL_ENABLE	(1 << 22)
 #define K7_EVNTSEL_INT		(1 << 20)
@@ -251,15 +253,13 @@ void touch_nmi_watchdog (void)
 		alert_counter[i] = 0;
 }
 
-void nmi_watchdog_tick (struct pt_regs * regs)
+void nmi_watchdog_tick (struct pt_regs * regs, unsigned reason)
 {
+	if (nmi_watchdog_disabled)
+		return;
 
-	/*
-	 * Since current_thread_info()-> is always on the stack, and we
-	 * always switch the stack NMI-atomically, it's safe to use
-	 * smp_processor_id().
-	 */
-	int sum, cpu = smp_processor_id();
+	int sum, cpu = safe_smp_processor_id();
+
 	sum = read_pda(apic_timer_irqs);
 
 	if (last_irq_sums[cpu] == sum) {
@@ -269,6 +269,10 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 		 */
 		alert_counter[cpu]++;
 		if (alert_counter[cpu] == 5*nmi_hz) {
+			if (notify_die(DIE_NMI, "nmi", regs, reason, 2, SIGINT) == NOTIFY_BAD) { 
+				alert_counter[cpu] = 0; 
+				return;
+			} 
 			spin_lock(&nmi_print_lock);
 			/*
 			 * We are in trouble anyway, lets at least try

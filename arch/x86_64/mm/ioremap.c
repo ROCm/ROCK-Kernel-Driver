@@ -150,7 +150,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	 */
 	offset = phys_addr & ~PAGE_MASK;
 	phys_addr &= PAGE_MASK;
-	size = PAGE_ALIGN(last_addr) - phys_addr;
+	size = PAGE_ALIGN(last_addr+1) - phys_addr;
 
 	/*
 	 * Ok, go for it..

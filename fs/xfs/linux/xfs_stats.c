@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2001 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -61,7 +61,6 @@ xfs_read_xfsstats(
 		{ "xstrat",		XFSSTAT_END_WRITE_CONVERT	},
 		{ "rw",			XFSSTAT_END_READ_WRITE_OPS	},
 		{ "attr",		XFSSTAT_END_ATTRIBUTE_OPS	},
-		{ "qm",			XFSSTAT_END_QUOTA_OPS		},
 		{ "icluster",		XFSSTAT_END_INODE_CLUSTER	},
 		{ "vnodes",		XFSSTAT_END_VNODE_OPS		},
 	};
@@ -95,50 +94,17 @@ xfs_read_xfsstats(
 	return len;
 }
 
-STATIC int
-xfs_read_xfsquota(
-	char		*buffer,
-	char		**start,
-	off_t		offset,
-	int		count,
-	int		*eof,
-	void		*data)
-{
-	int		len;
-
-	/* maximum; incore; ratio free to inuse; freelist */
-	len = sprintf(buffer, "%d\t%d\t%d\t%u\n",
-			ndquot,
-			xfs_Gqm? atomic_read(&xfs_Gqm->qm_totaldquots) : 0,
-			xfs_Gqm? xfs_Gqm->qm_dqfree_ratio : 0,
-			xfs_Gqm? xfs_Gqm->qm_dqfreelist.qh_nelems : 0);
-
-	if (offset >= len) {
-		*start = buffer;
-		*eof = 1;
-		return 0;
-	}
-	*start = buffer + offset;
-	if ((len -= offset) > count)
-		return count;
-	*eof = 1;
-
-	return len;
-}
-
 void
 xfs_init_procfs(void)
 {
 	if (!proc_mkdir("fs/xfs", 0))
 		return;
 	create_proc_read_entry("fs/xfs/stat", 0, 0, xfs_read_xfsstats, NULL);
-	create_proc_read_entry("fs/xfs/xqm", 0, 0, xfs_read_xfsquota, NULL);
 }
 
 void
 xfs_cleanup_procfs(void)
 {
 	remove_proc_entry("fs/xfs/stat", NULL);
-	remove_proc_entry("fs/xfs/xqm", NULL);
 	remove_proc_entry("fs/xfs", NULL);
 }

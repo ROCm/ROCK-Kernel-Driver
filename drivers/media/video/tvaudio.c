@@ -161,22 +161,22 @@ static int chip_write(struct CHIPSTATE *chip, int subaddr, int val)
 	unsigned char buffer[2];
 
 	if (-1 == subaddr) {
-		dprintk("%s: chip_write: 0x%x\n", chip->c.name, val);
+		dprintk("%s: chip_write: 0x%x\n", chip->c.dev.name, val);
 		chip->shadow.bytes[1] = val;
 		buffer[0] = val;
 		if (1 != i2c_master_send(&chip->c,buffer,1)) {
 			printk(KERN_WARNING "%s: I/O error (write 0x%x)\n",
-			       chip->c.name, val);
+			       chip->c.dev.name, val);
 			return -1;
 		}
 	} else {
-		dprintk("%s: chip_write: reg%d=0x%x\n", chip->c.name, subaddr, val);
+		dprintk("%s: chip_write: reg%d=0x%x\n", chip->c.dev.name, subaddr, val);
 		chip->shadow.bytes[subaddr+1] = val;
 		buffer[0] = subaddr;
 		buffer[1] = val;
 		if (2 != i2c_master_send(&chip->c,buffer,2)) {
 			printk(KERN_WARNING "%s: I/O error (write reg%d=0x%x)\n",
-			       chip->c.name, subaddr, val);
+			       chip->c.dev.name, subaddr, val);
 			return -1;
 		}
 	}
@@ -201,10 +201,10 @@ static int chip_read(struct CHIPSTATE *chip)
 
 	if (1 != i2c_master_recv(&chip->c,&buffer,1)) {
 		printk(KERN_WARNING "%s: I/O error (read)\n",
-		       chip->c.name);
+		       chip->c.dev.name);
 		return -1;
 	}
-	dprintk("%s: chip_read: 0x%x\n",chip->c.name,buffer); 
+	dprintk("%s: chip_read: 0x%x\n",chip->c.dev.name,buffer); 
 	return buffer;
 }
 
@@ -220,11 +220,11 @@ static int chip_read2(struct CHIPSTATE *chip, int subaddr)
 
 	if (2 != i2c_transfer(chip->c.adapter,msgs,2)) {
 		printk(KERN_WARNING "%s: I/O error (read2)\n",
-		       chip->c.name);
+		       chip->c.dev.name);
 		return -1;
 	}
 	dprintk("%s: chip_read2: reg%d=0x%x\n",
-		chip->c.name,subaddr,read[0]); 
+		chip->c.dev.name,subaddr,read[0]); 
 	return read[0];
 }
 
@@ -237,7 +237,7 @@ static int chip_cmd(struct CHIPSTATE *chip, char *name, audiocmd *cmd)
 
 	/* update our shadow register set; print bytes if (debug > 0) */
 	dprintk("%s: chip_cmd(%s): reg=%d, data:",
-		chip->c.name,name,cmd->bytes[0]);
+		chip->c.dev.name,name,cmd->bytes[0]);
 	for (i = 1; i < cmd->count; i++) {
 		dprintk(" 0x%x",cmd->bytes[i]);
 		chip->shadow.bytes[i+cmd->bytes[0]] = cmd->bytes[i];
@@ -246,7 +246,7 @@ static int chip_cmd(struct CHIPSTATE *chip, char *name, audiocmd *cmd)
 
 	/* send data to the chip */
 	if (cmd->count != i2c_master_send(&chip->c,cmd->bytes,cmd->count)) {
-		printk(KERN_WARNING "%s: I/O error (%s)\n", chip->c.name, name);
+		printk(KERN_WARNING "%s: I/O error (%s)\n", chip->c.dev.name, name);
 		return -1;
 	}
 	return 0;
@@ -273,19 +273,19 @@ static int chip_thread(void *data)
 #ifdef CONFIG_SMP
 	lock_kernel();
 #endif
-	daemonize("%s", chip->c.name);
+	daemonize("%s", chip->c.dev.name);
 	chip->thread = current;
 #ifdef CONFIG_SMP
 	unlock_kernel();
 #endif
 
-	dprintk("%s: thread started\n", chip->c.name);
+	dprintk("%s: thread started\n", chip->c.dev.name);
 	if(chip->notify != NULL)
 		up(chip->notify);
 
 	for (;;) {
 		interruptible_sleep_on(&chip->wq);
-		dprintk("%s: thread wakeup\n", chip->c.name);
+		dprintk("%s: thread wakeup\n", chip->c.dev.name);
 		if (chip->done || signal_pending(current))
 			break;
 
@@ -301,7 +301,7 @@ static int chip_thread(void *data)
 	}
 
 	chip->thread = NULL;
-	dprintk("%s: thread exiting\n", chip->c.name);
+	dprintk("%s: thread exiting\n", chip->c.dev.name);
 	if(chip->notify != NULL)
 		up(chip->notify);
 
@@ -316,7 +316,7 @@ static void generic_checkmode(struct CHIPSTATE *chip)
 	if (mode == chip->prevmode)
 	    return;
 
-	dprintk("%s: thread checkmode\n", chip->c.name);
+	dprintk("%s: thread checkmode\n", chip->c.dev.name);
 	chip->prevmode = mode;
 
 	if (mode & VIDEO_SOUND_STEREO)
@@ -1339,7 +1339,7 @@ static int chip_attach(struct i2c_adapter *adap, int addr,
 	memcpy(&chip->c,&client_template,sizeof(struct i2c_client));
         chip->c.adapter = adap;
         chip->c.addr = addr;
-	chip->c.data = chip;
+	i2c_set_clientdata(&chip->c, chip);
 
 	/* find description for the chip */
 	dprintk("tvaudio: chip found @ i2c-addr=0x%x\n", addr<<1);
@@ -1364,7 +1364,7 @@ static int chip_attach(struct i2c_adapter *adap, int addr,
 		(desc->flags & CHIP_HAS_INPUTSEL)   ? " audiomux"    : "");
 
 	/* fill required data structures */
-	strcpy(chip->c.name,desc->name);
+	strncpy(chip->c.dev.name, desc->name, DEVICE_NAME_SIZE);
 	chip->type = desc-chiplist;
 	chip->shadow.count = desc->registers+1;
         chip->prevmode = -1;
@@ -1421,7 +1421,7 @@ static int chip_probe(struct i2c_adapter *adap)
 
 static int chip_detach(struct i2c_client *client)
 {
-	struct CHIPSTATE *chip = client->data;
+	struct CHIPSTATE *chip = i2c_get_clientdata(client);
 
 	del_timer(&chip->wt);
 	if (NULL != chip->thread) {
@@ -1447,10 +1447,10 @@ static int chip_command(struct i2c_client *client,
 			unsigned int cmd, void *arg)
 {
         __u16 *sarg = arg;
-	struct CHIPSTATE *chip = client->data;
+	struct CHIPSTATE *chip = i2c_get_clientdata(client);
 	struct CHIPDESC  *desc = chiplist + chip->type;
 
-	dprintk("%s: chip_command 0x%x\n",chip->c.name,cmd);
+	dprintk("%s: chip_command 0x%x\n",chip->c.dev.name,cmd);
 
 	switch (cmd) {
 	case AUDC_SET_INPUT:
@@ -1558,9 +1558,11 @@ static struct i2c_driver driver = {
 
 static struct i2c_client client_template =
 {
-        .name   = "(unset)",
 	.flags  = I2C_CLIENT_ALLOW_USE,
         .driver = &driver,
+        .dev	= {
+		.name	= "(unset)",
+	},
 };
 
 static int audiochip_init_module(void)

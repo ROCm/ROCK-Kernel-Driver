@@ -11,7 +11,7 @@ arch_prepare_suspend(void)
 {
 }
 
-/* image of the saved processor state */
+/* Image of the saved processor state. If you touch this, fix acpi_wakeup.S. */
 struct saved_context {
   	u16 ds, es, fs, gs, ss;
 	unsigned long gs_base, gs_kernel_base, fs_base;

@@ -881,6 +881,8 @@ static int unlink1 (struct usbtest_dev *dev, int pipe, int size, int async)
 
 	init_completion (&completion);
 	urb = simple_alloc_urb (testdev_to_usbdev (dev), pipe, size);
+	if (!urb)
+		return -ENOMEM;
 	if (async)
 		urb->transfer_flags |= URB_ASYNC_UNLINK;
 	urb->context = &completion;
@@ -1404,6 +1406,11 @@ static struct usb_device_id id_table [] = {
 
 	/* re-enumerated usb test device firmware */
 	{ USB_DEVICE (0xfff0, 0xfff0),
+		.driver_info = (unsigned long) &fw_info,
+		},
+
+	/* "Gadget Zero" firmware runs under Linux */
+	{ USB_DEVICE (0x0525, 0xa4a0),
 		.driver_info = (unsigned long) &fw_info,
 		},
 

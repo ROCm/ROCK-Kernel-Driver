@@ -10,14 +10,13 @@ obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
 		setup64.o bluesmoke.o bootflag.o e820.o reboot.o
 
 obj-$(CONFIG_MTRR)	+= mtrr/
+obj-$(CONFIG_ACPI)	+= acpi/
 obj-$(CONFIG_X86_MSR)	+= msr.o
 obj-$(CONFIG_X86_CPUID)	+= cpuid.o
 obj-$(CONFIG_SMP)	+= smp.o smpboot.o trampoline.o
 obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o  nmi.o
 obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o mpparse.o
 obj-$(CONFIG_SOFTWARE_SUSPEND)	+= suspend.o suspend_asm.o
-obj-$(CONFIG_ACPI)             += acpi.o
-obj-$(CONFIG_ACPI_SLEEP)       += wakeup.o
 obj-$(CONFIG_EARLY_PRINTK)    += early_printk.o
 obj-$(CONFIG_GART_IOMMU) += pci-gart.o aperture.o
 obj-$(CONFIG_DUMMY_IOMMU) += pci-nommu.o

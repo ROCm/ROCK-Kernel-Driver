@@ -171,20 +171,21 @@ static int saa5249_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 		return -ENOMEM;
 	}
 	memset(t, 0, sizeof(*t));
-	strcpy(client->name, IF_NAME);
+	strncpy(client->dev.name, IF_NAME, DEVICE_NAME_SIZE);
 	init_MUTEX(&t->lock);
 	
 	/*
 	 *	Now create a video4linux device
 	 */
 	 
-	client->data = vd=(struct video_device *)kmalloc(sizeof(struct video_device), GFP_KERNEL);
+	vd = (struct video_device *)kmalloc(sizeof(struct video_device), GFP_KERNEL);
 	if(vd==NULL)
 	{
 		kfree(t);
 		kfree(client);
 		return -ENOMEM;
 	}
+	i2c_set_clientdata(client, vd);
 	memcpy(vd, &saa_template, sizeof(*vd));
 		
 	for (pgbuf = 0; pgbuf < NUM_DAUS; pgbuf++) 
@@ -234,7 +235,7 @@ static int saa5249_probe(struct i2c_adapter *adap)
 
 static int saa5249_detach(struct i2c_client *client)
 {
-	struct video_device *vd=client->data;
+	struct video_device *vd = i2c_get_clientdata(client);
 	i2c_detach_client(client);
 	video_unregister_device(vd);
 	kfree(vd->priv);
@@ -264,9 +265,11 @@ static struct i2c_driver i2c_driver_videotext =
 };
 
 static struct i2c_client client_template = {
-	.name 		= "(unset)",
 	.id 		= -1,
-	.driver 	= &i2c_driver_videotext
+	.driver		= &i2c_driver_videotext,
+	.dev		= {
+		.name	= "(unset)",
+	},
 };
 
 /*

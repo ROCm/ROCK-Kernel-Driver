@@ -112,7 +112,7 @@ smp_setup_percpu_timer(int cpuid)
 static void __init
 wait_boot_cpu_to_stop(int cpuid)
 {
-	long stop = jiffies + 10*HZ;
+	unsigned long stop = jiffies + 10*HZ;
 
 	while (time_before(jiffies, stop)) {
 	        if (!smp_secondary_alive)
@@ -349,7 +349,7 @@ secondary_cpu_start(int cpuid, struct task_struct *idle)
 {
 	struct percpu_struct *cpu;
 	struct pcb_struct *hwpcb, *ipcb;
-	long timeout;
+	unsigned long timeout;
 	  
 	cpu = (struct percpu_struct *)
 		((char*)hwrpb
@@ -428,7 +428,7 @@ static int __init
 smp_boot_one_cpu(int cpuid)
 {
 	struct task_struct *idle;
-	long timeout;
+	unsigned long timeout;
 
 	/* Cook up an idler for this guy.  Note that the address we
 	   give to kernel_thread is irrelevant -- it's going to start
@@ -816,7 +816,7 @@ smp_call_function_on_cpu (void (*func) (void *info), void *info, int retry,
 			  int wait, unsigned long to_whom)
 {
 	struct smp_call_struct data;
-	long timeout;
+	unsigned long timeout;
 	int num_cpus_to_call;
 	
 	data.func = func;

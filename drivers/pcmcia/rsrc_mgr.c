@@ -60,7 +60,7 @@
 #define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
 
 INT_MODULE_PARM(probe_mem,	1);		/* memory probe? */
-#ifdef CONFIG_ISA
+#ifdef CONFIG_PCMCIA_PROBE
 INT_MODULE_PARM(probe_io,	1);		/* IO port probe? */
 INT_MODULE_PARM(mem_limit,	0x10000);
 #endif
@@ -83,7 +83,9 @@ static resource_map_t mem_db = { 0, 0, &mem_db };
 /* IO port resource database */
 static resource_map_t io_db = { 0, 0, &io_db };
 
-#ifdef CONFIG_ISA
+static DECLARE_MUTEX(rsrc_sem);
+
+#ifdef CONFIG_PCMCIA_PROBE
 
 typedef struct irq_info_t {
     u_int			Attributes;
@@ -269,7 +271,7 @@ static int sub_interval(resource_map_t *map, u_long base, u_long num)
     
 ======================================================================*/
 
-#ifdef CONFIG_ISA
+#ifdef CONFIG_PCMCIA_PROBE
 static void do_io_probe(ioaddr_t base, ioaddr_t num)
 {
     
@@ -333,15 +335,69 @@ static void do_io_probe(ioaddr_t base, ioaddr_t num)
 
 /*======================================================================
 
+    This is tricky... when we set up CIS memory, we try to validate
+    the memory window space allocations.
+    
+======================================================================*/
+
+/* Validation function for cards with a valid CIS */
+static int cis_readable(socket_info_t *s, u_long base)
+{
+    cisinfo_t info1, info2;
+    int ret;
+    s->cis_mem.sys_start = base;
+    s->cis_mem.sys_stop = base+s->cap.map_size-1;
+    s->cis_virt = ioremap(base, s->cap.map_size);
+    ret = pcmcia_validate_cis(s->clients, &info1);
+    /* invalidate mapping and CIS cache */
+    iounmap(s->cis_virt);
+    s->cis_used = 0;
+    if ((ret != 0) || (info1.Chains == 0))
+	return 0;
+    s->cis_mem.sys_start = base+s->cap.map_size;
+    s->cis_mem.sys_stop = base+2*s->cap.map_size-1;
+    s->cis_virt = ioremap(base+s->cap.map_size, s->cap.map_size);
+    ret = pcmcia_validate_cis(s->clients, &info2);
+    iounmap(s->cis_virt);
+    s->cis_used = 0;
+    return ((ret == 0) && (info1.Chains == info2.Chains));
+}
+
+/* Validation function for simple memory cards */
+static int checksum(socket_info_t *s, u_long base)
+{
+    int i, a, b, d;
+    s->cis_mem.sys_start = base;
+    s->cis_mem.sys_stop = base+s->cap.map_size-1;
+    s->cis_virt = ioremap(base, s->cap.map_size);
+    s->cis_mem.card_start = 0;
+    s->cis_mem.flags = MAP_ACTIVE;
+    s->ss_entry->set_mem_map(s->sock, &s->cis_mem);
+    /* Don't bother checking every word... */
+    a = 0; b = -1;
+    for (i = 0; i < s->cap.map_size; i += 44) {
+	d = readl(s->cis_virt+i);
+	a += d; b &= d;
+    }
+    iounmap(s->cis_virt);
+    return (b == -1) ? -1 : (a>>1);
+}
+
+static int checksum_match(socket_info_t *s, u_long base)
+{
+    int a = checksum(s, base), b = checksum(s, base+s->cap.map_size);
+    return ((a == b) && (a >= 0));
+}
+
+/*======================================================================
+
     The memory probe.  If the memory list includes a 64K-aligned block
     below 1MB, we probe in 64K chunks, and as soon as we accumulate at
     least mem_limit free space, we quit.
     
 ======================================================================*/
 
-static int do_mem_probe(u_long base, u_long num,
-			int (*is_valid)(u_long), int (*do_cksum)(u_long),
-			socket_info_t *s)
+static int do_mem_probe(u_long base, u_long num, socket_info_t *s)
 {
     u_long i, j, bad, fail, step;
 
@@ -349,18 +405,21 @@ static int do_mem_probe(u_long base, u_long num,
 	   base, base+num-1);
     bad = fail = 0;
     step = (num < 0x20000) ? 0x2000 : ((num>>4) & ~0x1fff);
+    /* cis_readable wants to map 2x map_size */
+    if (step < 2 * s->cap.map_size)
+	step = 2 * s->cap.map_size;
     for (i = j = base; i < base+num; i = j + step) {
 	if (!fail) {	
 	    for (j = i; j < base+num; j += step)
 		if ((check_mem_resource(j, step, s->cap.cb_dev) == 0) &&
-		    is_valid(j))
+		    cis_readable(s, j))
 		    break;
 	    fail = ((i == base) && (j == base+num));
 	}
 	if (fail) {
 	    for (j = i; j < base+num; j += 2*step)
 		if ((check_mem_resource(j, 2*step, s->cap.cb_dev) == 0) &&
-		    do_cksum(j) && do_cksum(j+step))
+		    checksum_match(s, j) && checksum_match(s, j + step))
 		    break;
 	}
 	if (i != j) {
@@ -374,16 +433,14 @@ static int do_mem_probe(u_long base, u_long num,
     return (num - bad);
 }
 
-#ifdef CONFIG_ISA
+#ifdef CONFIG_PCMCIA_PROBE
 
-static u_long inv_probe(int (*is_valid)(u_long),
-			int (*do_cksum)(u_long),
-			resource_map_t *m, socket_info_t *s)
+static u_long inv_probe(resource_map_t *m, socket_info_t *s)
 {
     u_long ok;
     if (m == &mem_db)
 	return 0;
-    ok = inv_probe(is_valid, do_cksum, m->next, s);
+    ok = inv_probe(m->next, s);
     if (ok) {
 	if (m->base >= 0x100000)
 	    sub_interval(&mem_db, m->base, m->num);
@@ -391,32 +448,36 @@ static u_long inv_probe(int (*is_valid)(u_long),
     }
     if (m->base < 0x100000)
 	return 0;
-    return do_mem_probe(m->base, m->num, is_valid, do_cksum, s);
+    return do_mem_probe(m->base, m->num, s);
 }
 
-void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
-		  int force_low, socket_info_t *s)
+void validate_mem(socket_info_t *s)
 {
     resource_map_t *m, *n;
     static u_char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
     static int hi = 0, lo = 0;
     u_long b, i, ok = 0;
-    
-    if (!probe_mem) return;
+    int force_low = !(s->cap.features & SS_CAP_PAGE_REGS);
+
+    if (!probe_mem)
+	return;
+
+    down(&rsrc_sem);
     /* We do up to four passes through the list */
     if (!force_low) {
-	if (hi++ || (inv_probe(is_valid, do_cksum, mem_db.next, s) > 0))
-	    return;
+	if (hi++ || (inv_probe(mem_db.next, s) > 0))
+	    goto out;
 	printk(KERN_NOTICE "cs: warning: no high memory space "
 	       "available!\n");
     }
-    if (lo++) return;
+    if (lo++)
+	goto out;
     for (m = mem_db.next; m != &mem_db; m = n) {
 	n = m->next;
 	/* Only probe < 1 MB */
 	if (m->base >= 0x100000) continue;
 	if ((m->base | m->num) & 0xffff) {
-	    ok += do_mem_probe(m->base, m->num, is_valid, do_cksum, s);
+	    ok += do_mem_probe(m->base, m->num, s);
 	    continue;
 	}
 	/* Special probe for 64K-aligned block */
@@ -426,28 +487,31 @@ void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
 		if (ok >= mem_limit)
 		    sub_interval(&mem_db, b, 0x10000);
 		else
-		    ok += do_mem_probe(b, 0x10000, is_valid, do_cksum, s);
+		    ok += do_mem_probe(b, 0x10000, s);
 	    }
 	}
     }
+ out:
+    up(&rsrc_sem);
 }
 
-#else /* CONFIG_ISA */
+#else /* CONFIG_PCMCIA_PROBE */
 
-void validate_mem(int (*is_valid)(u_long), int (*do_cksum)(u_long),
-		  int force_low, socket_info_t *s)
+void validate_mem(socket_info_t *s)
 {
     resource_map_t *m;
     static int done = 0;
     
-    if (!probe_mem || done++)
-	return;
-    for (m = mem_db.next; m != &mem_db; m = m->next)
-	if (do_mem_probe(m->base, m->num, is_valid, do_cksum, s))
-	    return;
+    if (probe_mem && done++ == 0) {
+	down(&rsrc_sem);
+	for (m = mem_db.next; m != &mem_db; m = m->next)
+	    if (do_mem_probe(m->base, m->num, s))
+		break;
+	up(&rsrc_sem);
+    }
 }
 
-#endif /* CONFIG_ISA */
+#endif /* CONFIG_PCMCIA_PROBE */
 
 /*======================================================================
 
@@ -467,7 +531,9 @@ int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
 {
     ioaddr_t try;
     resource_map_t *m;
-    
+    int ret = -1;
+
+    down(&rsrc_sem);
     for (m = io_db.next; m != &io_db; m = m->next) {
 	try = (m->base & ~(align-1)) + *base;
 	for (try = (try >= m->base) ? try : try+align;
@@ -475,12 +541,16 @@ int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
 	     try += align) {
 	    if (request_io_resource(try, num, name, s->cap.cb_dev) == 0) {
 		*base = try;
-		return 0;
+		ret = 0;
+		goto out;
 	    }
-	    if (!align) break;
+	    if (!align)
+		break;
 	}
     }
-    return -1;
+ out:
+    up(&rsrc_sem);
+    return ret;
 }
 
 int find_mem_region(u_long *base, u_long num, u_long align,
@@ -488,26 +558,35 @@ int find_mem_region(u_long *base, u_long num, u_long align,
 {
     u_long try;
     resource_map_t *m;
+    int ret = -1;
 
+    down(&rsrc_sem);
     while (1) {
 	for (m = mem_db.next; m != &mem_db; m = m->next) {
 	    /* first pass >1MB, second pass <1MB */
-	    if ((force_low != 0) ^ (m->base < 0x100000)) continue;
+	    if ((force_low != 0) ^ (m->base < 0x100000))
+		continue;
+
 	    try = (m->base & ~(align-1)) + *base;
 	    for (try = (try >= m->base) ? try : try+align;
 		 (try >= m->base) && (try+num <= m->base+m->num);
 		 try += align) {
 		if (request_mem_resource(try, num, name, s->cap.cb_dev) == 0) {
 		    *base = try;
-		    return 0;
+		    ret = 0;
+		    goto out;
 		}
-		if (!align) break;
+		if (!align)
+		    break;
 	    }
 	}
-	if (force_low) break;
+	if (force_low)
+	    break;
 	force_low++;
     }
-    return -1;
+ out:
+    up(&rsrc_sem);
+    return ret;
 }
 
 /*======================================================================
@@ -518,7 +597,7 @@ int find_mem_region(u_long *base, u_long num, u_long align,
     
 ======================================================================*/
 
-#ifdef CONFIG_ISA
+#ifdef CONFIG_PCMCIA_PROBE
 
 static void fake_irq(int i, void *d, struct pt_regs *r) { }
 static inline int check_irq(int irq)
@@ -532,66 +611,89 @@ static inline int check_irq(int irq)
 int try_irq(u_int Attributes, int irq, int specific)
 {
     irq_info_t *info = &irq_table[irq];
+    int ret = 0;
+
+    down(&rsrc_sem);
     if (info->Attributes & RES_ALLOCATED) {
 	switch (Attributes & IRQ_TYPE) {
 	case IRQ_TYPE_EXCLUSIVE:
-	    return CS_IN_USE;
+	    ret = CS_IN_USE;
+	    break;
 	case IRQ_TYPE_TIME:
 	    if ((info->Attributes & RES_IRQ_TYPE)
-		!= RES_IRQ_TYPE_TIME)
-		return CS_IN_USE;
-	    if (Attributes & IRQ_FIRST_SHARED)
-		return CS_BAD_ATTRIBUTE;
+		!= RES_IRQ_TYPE_TIME) {
+		ret = CS_IN_USE;
+		break;
+	    }
+	    if (Attributes & IRQ_FIRST_SHARED) {
+		ret = CS_BAD_ATTRIBUTE;
+		break;
+	    }
 	    info->Attributes |= RES_IRQ_TYPE_TIME | RES_ALLOCATED;
 	    info->time_share++;
 	    break;
 	case IRQ_TYPE_DYNAMIC_SHARING:
 	    if ((info->Attributes & RES_IRQ_TYPE)
-		!= RES_IRQ_TYPE_DYNAMIC)
-		return CS_IN_USE;
-	    if (Attributes & IRQ_FIRST_SHARED)
-		return CS_BAD_ATTRIBUTE;
+		!= RES_IRQ_TYPE_DYNAMIC) {
+		ret = CS_IN_USE;
+		break;
+	    }
+	    if (Attributes & IRQ_FIRST_SHARED) {
+		ret = CS_BAD_ATTRIBUTE;
+		break;
+	    }
 	    info->Attributes |= RES_IRQ_TYPE_DYNAMIC | RES_ALLOCATED;
 	    info->dyn_share++;
 	    break;
 	}
     } else {
-	if ((info->Attributes & RES_RESERVED) && !specific)
-	    return CS_IN_USE;
-	if (check_irq(irq) != 0)
-	    return CS_IN_USE;
+	if ((info->Attributes & RES_RESERVED) && !specific) {
+	    ret = CS_IN_USE;
+	    goto out;
+	}
+	if (check_irq(irq) != 0) {
+	    ret = CS_IN_USE;
+	    goto out;
+	}
 	switch (Attributes & IRQ_TYPE) {
 	case IRQ_TYPE_EXCLUSIVE:
 	    info->Attributes |= RES_ALLOCATED;
 	    break;
 	case IRQ_TYPE_TIME:
-	    if (!(Attributes & IRQ_FIRST_SHARED))
-		return CS_BAD_ATTRIBUTE;
+	    if (!(Attributes & IRQ_FIRST_SHARED)) {
+		ret = CS_BAD_ATTRIBUTE;
+		break;
+	    }
 	    info->Attributes |= RES_IRQ_TYPE_TIME | RES_ALLOCATED;
 	    info->time_share = 1;
 	    break;
 	case IRQ_TYPE_DYNAMIC_SHARING:
-	    if (!(Attributes & IRQ_FIRST_SHARED))
-		return CS_BAD_ATTRIBUTE;
+	    if (!(Attributes & IRQ_FIRST_SHARED)) {
+		ret = CS_BAD_ATTRIBUTE;
+		break;
+	    }
 	    info->Attributes |= RES_IRQ_TYPE_DYNAMIC | RES_ALLOCATED;
 	    info->dyn_share = 1;
 	    break;
 	}
     }
-    return 0;
+ out:
+    up(&rsrc_sem);
+    return ret;
 }
 
 #endif
 
 /*====================================================================*/
 
-#ifdef CONFIG_ISA
+#ifdef CONFIG_PCMCIA_PROBE
 
 void undo_irq(u_int Attributes, int irq)
 {
     irq_info_t *info;
 
     info = &irq_table[irq];
+    down(&rsrc_sem);
     switch (Attributes & IRQ_TYPE) {
     case IRQ_TYPE_EXCLUSIVE:
 	info->Attributes &= RES_RESERVED;
@@ -607,6 +709,7 @@ void undo_irq(u_int Attributes, int irq)
 	    info->Attributes &= RES_RESERVED;
 	break;
     }
+    up(&rsrc_sem);
 }
 
 #endif
@@ -629,6 +732,8 @@ static int adjust_memory(adjust_t *adj)
 	return CS_BAD_SIZE;
 
     ret = CS_SUCCESS;
+
+    down(&rsrc_sem);
     switch (adj->Action) {
     case ADD_MANAGED_RESOURCE:
 	ret = add_interval(&mem_db, base, num);
@@ -647,6 +752,7 @@ static int adjust_memory(adjust_t *adj)
     default:
 	ret = CS_UNSUPPORTED_FUNCTION;
     }
+    up(&rsrc_sem);
     
     return ret;
 }
@@ -655,7 +761,7 @@ static int adjust_memory(adjust_t *adj)
 
 static int adjust_io(adjust_t *adj)
 {
-    int base, num;
+    int base, num, ret = CS_SUCCESS;
     
     base = adj->resource.io.BasePort;
     num = adj->resource.io.NumPorts;
@@ -664,11 +770,14 @@ static int adjust_io(adjust_t *adj)
     if ((num <= 0) || (base+num > 0x10000) || (base+num <= base))
 	return CS_BAD_SIZE;
 
+    down(&rsrc_sem);
     switch (adj->Action) {
     case ADD_MANAGED_RESOURCE:
-	if (add_interval(&io_db, base, num) != 0)
-	    return CS_IN_USE;
-#ifdef CONFIG_ISA
+	if (add_interval(&io_db, base, num) != 0) {
+	    ret = CS_IN_USE;
+	    break;
+	}
+#ifdef CONFIG_PCMCIA_PROBE
 	if (probe_io)
 	    do_io_probe(base, num);
 #endif
@@ -677,18 +786,20 @@ static int adjust_io(adjust_t *adj)
 	sub_interval(&io_db, base, num);
 	break;
     default:
-	return CS_UNSUPPORTED_FUNCTION;
+	ret = CS_UNSUPPORTED_FUNCTION;
 	break;
     }
+    up(&rsrc_sem);
 
-    return CS_SUCCESS;
+    return ret;
 }
 
 /*====================================================================*/
 
 static int adjust_irq(adjust_t *adj)
 {
-#ifdef CONFIG_ISA
+    int ret = CS_SUCCESS;
+#ifdef CONFIG_PCMCIA_PROBE
     int irq;
     irq_info_t *info;
     
@@ -696,33 +807,41 @@ static int adjust_irq(adjust_t *adj)
     if ((irq < 0) || (irq > 15))
 	return CS_BAD_IRQ;
     info = &irq_table[irq];
-    
+
+    down(&rsrc_sem);
     switch (adj->Action) {
     case ADD_MANAGED_RESOURCE:
 	if (info->Attributes & RES_REMOVED)
 	    info->Attributes &= ~(RES_REMOVED|RES_ALLOCATED);
 	else
-	    if (adj->Attributes & RES_ALLOCATED)
-		return CS_IN_USE;
+	    if (adj->Attributes & RES_ALLOCATED) {
+		ret = CS_IN_USE;
+		break;
+	    }
 	if (adj->Attributes & RES_RESERVED)
 	    info->Attributes |= RES_RESERVED;
 	else
 	    info->Attributes &= ~RES_RESERVED;
 	break;
     case REMOVE_MANAGED_RESOURCE:
-	if (info->Attributes & RES_REMOVED)
-	    return 0;
-	if (info->Attributes & RES_ALLOCATED)
-	    return CS_IN_USE;
+	if (info->Attributes & RES_REMOVED) {
+	    ret = 0;
+	    break;
+	}
+	if (info->Attributes & RES_ALLOCATED) {
+	    ret = CS_IN_USE;
+	    break;
+	}
 	info->Attributes |= RES_ALLOCATED|RES_REMOVED;
 	info->Attributes &= ~RES_RESERVED;
 	break;
     default:
-	return CS_UNSUPPORTED_FUNCTION;
+	ret = CS_UNSUPPORTED_FUNCTION;
 	break;
     }
+    up(&rsrc_sem);
 #endif
-    return CS_SUCCESS;
+    return ret;
 }
 
 /*====================================================================*/

@@ -132,7 +132,7 @@ config ACPI_THERMAL
 	  may be damaged without it.
 
 config ACPI_NUMA
-	bool "NUMA support" if NUMA && (IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY)
+	bool "NUMA support" if NUMA && (IA64 && !IA64_HP_SIM || X86 && ACPI && !ACPI_HT_ONLY && !X86_64)
 	default y if IA64 && IA64_SGI_SN
 
 config ACPI_TOSHIBA

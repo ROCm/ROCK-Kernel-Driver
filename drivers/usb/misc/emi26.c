@@ -78,19 +78,28 @@ static int emi26_set_reset (struct usb_device *dev, unsigned char reset_bit)
 	return response;
 }
 
+#define FW_LOAD_SIZE		1023
+
 static int emi26_load_firmware (struct usb_device *dev)
 {
 	int err;
 	int i;
 	int pos = 0;	/* Position in hex record */
 	__u32 addr;	/* Address to write */
-	__u8 buf[1023];
+	__u8 *buf;
+
+	buf = kmalloc(FW_LOAD_SIZE, GFP_KERNEL);
+	if (!buf) {
+		err( "%s - error loading firmware: error = %d", __FUNCTION__, -ENOMEM);
+		err = -ENOMEM;
+		goto wraperr;
+	}
 
 	/* Assert reset (stop the CPU in the EMI) */
 	err = emi26_set_reset(dev,1);
 	if (err < 0) {
 		err( "%s - error loading firmware: error = %d", __FUNCTION__, err);
-		return err;
+		goto wraperr;
 	}
 
 	/* 1. We need to put the loader for the FPGA into the EZ-USB */
@@ -98,7 +107,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 		err = emi26_writememory(dev, g_Loader[i].address, g_Loader[i].data, g_Loader[i].length, ANCHOR_LOAD_INTERNAL);
 		if (err < 0) {
 			err("%s - error loading firmware: error = %d", __FUNCTION__, err);
-			return err;
+			goto wraperr;
 		}
 	}
 
@@ -113,7 +122,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 		addr = g_bitstream[pos].address;
 
 		/* intel hex records are terminated with type 0 element */
-		while ((g_bitstream[pos].type == 0) && (i + g_bitstream[pos].length < sizeof(buf))) {
+		while ((g_bitstream[pos].type == 0) && (i + g_bitstream[pos].length < FW_LOAD_SIZE)) {
 			memcpy(buf + i, g_bitstream[pos].data, g_bitstream[pos].length);
 			i += g_bitstream[pos].length;
 			pos++;
@@ -121,7 +130,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 		err = emi26_writememory(dev, addr, buf, i, ANCHOR_LOAD_FPGA);
 		if (err < 0) {
 			err("%s - error loading firmware: error = %d", __FUNCTION__, err);
-			return err;
+			goto wraperr;
 		}
 	} while (i > 0);
 
@@ -129,7 +138,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	err = emi26_set_reset(dev,1);
 	if (err < 0) {
 		err("%s - error loading firmware: error = %d", __FUNCTION__, err);
-		return err;
+		goto wraperr;
 	}
 
 	/* 3. We need to put the loader for the firmware into the EZ-USB (again...) */
@@ -137,7 +146,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 		err = emi26_writememory(dev, g_Loader[i].address, g_Loader[i].data, g_Loader[i].length, ANCHOR_LOAD_INTERNAL);
 		if (err < 0) {
 			err("%s - error loading firmware: error = %d", __FUNCTION__, err);
-			return err;
+			goto wraperr;
 		}
 	}
 
@@ -145,7 +154,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	err = emi26_set_reset(dev,0);
 	if (err < 0) {
 		err("%s - error loading firmware: error = %d", __FUNCTION__, err);
-		return err;
+		goto wraperr;
 	}
 
 	/* 4. We put the part of the firmware that lies in the external RAM into the EZ-USB */
@@ -154,7 +163,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 			err = emi26_writememory(dev, g_Firmware[i].address, g_Firmware[i].data, g_Firmware[i].length, ANCHOR_LOAD_EXTERNAL);
 			if (err < 0) {
 				err("%s - error loading firmware: error = %d", __FUNCTION__, err);
-				return err;
+				goto wraperr;
 			}
 		}
 	}
@@ -163,7 +172,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 	err = emi26_set_reset(dev,1);
 	if (err < 0) {
 		err("%s - error loading firmware: error = %d", __FUNCTION__, err);
-		return err;
+		goto wraperr;
 	}
 
 	for (i=0; g_Firmware[i].type == 0; i++) {
@@ -171,7 +180,7 @@ static int emi26_load_firmware (struct usb_device *dev)
 			err = emi26_writememory(dev, g_Firmware[i].address, g_Firmware[i].data, g_Firmware[i].length, ANCHOR_LOAD_INTERNAL);
 			if (err < 0) {
 				err("%s - error loading firmware: error = %d", __FUNCTION__, err);
-				return err;
+				goto wraperr;
 			}
 		}
 	}
@@ -180,12 +189,16 @@ static int emi26_load_firmware (struct usb_device *dev)
 	err = emi26_set_reset(dev,0);
 	if (err < 0) {
 		err("%s - error loading firmware: error = %d", __FUNCTION__, err);
-		return err;
+		goto wraperr;
 	}
 
 	/* return 1 to fail the driver inialization
 	 * and give real driver change to load */
 	return 1;
+
+wraperr:
+	kfree(buf);
+	return err;
 }
 
 static __devinitdata struct usb_device_id id_table [] = {

@@ -1270,8 +1270,8 @@ check_display(unsigned long mem)
 				break;
 
 #ifdef CONFIG_LOGO_LINUX_CLUT224
-		clut = RELOC(RELOC(&logo_linux_clut224)->clut);
-		for (i = 0; i < logo_linux_clut224.clutsize; i++, clut += 3)
+		clut = PTRRELOC(RELOC(logo_linux_clut224.clut));
+		for (i = 0; i < RELOC(logo_linux_clut224.clutsize); i++, clut += 3)
 			if (prom_set_color(ih, i + 32, clut[0], clut[1],
 					   clut[2]) != 0)
 				break;

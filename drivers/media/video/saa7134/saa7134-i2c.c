@@ -334,15 +334,19 @@ static struct i2c_algorithm saa7134_algo = {
 
 static struct i2c_adapter saa7134_adap_template = {
 	.owner         = THIS_MODULE,
-	.name	       = "saa7134",
 	.id            = I2C_ALGO_SAA7134,
 	.algo          = &saa7134_algo,
 	.client_register = attach_inform,
+	.dev		= {
+		.name	= "saa7134",
+	},
 };
 
 static struct i2c_client saa7134_client_template = {
-        .name = "saa7134 internal",
         .id   = -1,
+	.dev	= {
+		.name	= "saa7134 internal",
+	},
 };
 
 /* ----------------------------------------------------------- */
@@ -410,7 +414,7 @@ void saa7134_i2c_call_clients(struct saa7134_dev *dev,
 int saa7134_i2c_register(struct saa7134_dev *dev)
 {
 	dev->i2c_adap = saa7134_adap_template;
-	strcpy(dev->i2c_adap.name,dev->name);
+	strncpy(dev->i2c_adap.dev.name, dev->name, DEVICE_NAME_SIZE);
 	dev->i2c_adap.algo_data = dev;
 	i2c_add_adapter(&dev->i2c_adap);
 	

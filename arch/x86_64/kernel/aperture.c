@@ -105,7 +105,8 @@ void __init iommu_hole_init(void)
 	if (!fix && !fallback_aper_force) 
 		return; 
 
-	printk("Your BIOS is broken and doesn't leave a aperture memory hole\n");
+	printk("Your BIOS doesn't leave a aperture memory hole\n");
+	printk("Please enable the IOMMU option in the BIOS setup\n"); 
 	aper_alloc = allocate_aperture(); 
 	if (!aper_alloc) 
 		return; 

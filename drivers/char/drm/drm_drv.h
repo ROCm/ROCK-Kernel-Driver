@@ -545,9 +545,7 @@ static int __init drm_init( void )
 
 	drm_device_t *dev;
 	int i;
-#if __HAVE_CTX_BITMAP
 	int retcode;
-#endif
 	DRM_DEBUG( "\n" );
 
 #ifdef MODULE
@@ -581,8 +579,10 @@ static int __init drm_init( void )
 		init_timer( &dev->timer );
 		init_waitqueue_head( &dev->context_wait );
 
-		if ((DRM(minor)[i] = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)
-			return -EPERM;
+		if ((DRM(minor)[i] = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0) {
+			retcode = -EPERM;
+			goto fail_reg;
+		}
 		dev->device = MKDEV(DRM_MAJOR, DRM(minor)[i] );
 		dev->name   = DRIVER_NAME;
 
@@ -591,9 +591,8 @@ static int __init drm_init( void )
 #if __MUST_HAVE_AGP
 		if ( dev->agp == NULL ) {
 			DRM_ERROR( "Cannot initialize the agpgart module.\n" );
-			DRM(stub_unregister)(DRM(minor)[i]);
-			DRM(takedown)( dev );
-			return -ENOMEM;
+			retcode = -ENOMEM;
+			goto fail;
 		}
 #endif
 #if __REALLY_HAVE_MTRR
@@ -609,9 +608,7 @@ static int __init drm_init( void )
 		retcode = DRM(ctxbitmap_init)( dev );
 		if( retcode ) {
 			DRM_ERROR( "Cannot allocate memory for context bitmap.\n" );
-			DRM(stub_unregister)(DRM(minor)[i]);
-			DRM(takedown)( dev );
-			return retcode;
+			goto fail;
 		}
 #endif
 		DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d\n",
@@ -626,6 +623,17 @@ static int __init drm_init( void )
 	DRIVER_POSTINIT();
 
 	return 0;
+
+#if (__REALLY_HAVE_AGP && __MUST_HAVE_AGP) || __HAVE_CTX_BITMAP
+fail:
+	DRM(stub_unregister)(DRM(minor)[i]);
+	DRM(takedown)( dev );
+#endif
+
+fail_reg:
+	kfree (DRM(device));
+	kfree (DRM(minor));
+	return retcode;
 }
 
 /* drm_cleanup is called via cleanup_module at module unload time.

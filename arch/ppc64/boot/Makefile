@@ -79,7 +79,7 @@ $(obj)/vmlinux.initrd: vmlinux $(obj)/addRamDisk $(obj)/ramdisk.image.gz System.
 $(obj)/vmlinux.sminitrd: $(obj)/vmlinux.sm $(obj)/addRamDisk $(obj)/ramdisk.image.gz FORCE
 	$(call if_changed,ramdisk)
 
-$(obj)/sysmap.o: System.map $(obj)/piggyback
+$(obj)/sysmap.o: System.map $(obj)/piggyback FORCE
 	$(call if_changed,piggy)
 
 addsection = $(BOOTOBJCOPY) $(1) \
@@ -92,7 +92,7 @@ quiet_cmd_addnote = ADDNOTE $@
 quiet_cmd_piggy = PIGGY   $@
       cmd_piggy = $(obj)/piggyback $(@:.o=) < $< | $(BOOTAS) -o $@
 
-$(call gz-sec, $(required)): $(obj)/kernel-%.gz: %
+$(call gz-sec, $(required)): $(obj)/kernel-%.gz: % FORCE
 	$(call if_changed,gzip)
 
 $(obj)/kernel-initrd.gz: $(obj)/ramdisk.image.gz
@@ -101,7 +101,7 @@ $(obj)/kernel-initrd.gz: $(obj)/ramdisk.image.gz
 $(call src-sec, $(required) $(initrd)): $(obj)/kernel-%.c: $(obj)/kernel-%.gz
 	touch $@
 
-$(call obj-sec, $(required) $(initrd)): $(obj)/kernel-%.o: $(obj)/kernel-%.c
+$(call obj-sec, $(required) $(initrd)): $(obj)/kernel-%.o: $(obj)/kernel-%.c FORCE
 	$(call if_changed_dep,bootcc)
 	$(call addsection, $@)
 

@@ -1065,6 +1065,62 @@ static int devinet_sysctl_forward(ctl_table *ctl, int write,
 	return ret;
 }
 
+static int ipv4_doint_and_flush(ctl_table *ctl, int write,
+				struct file* filp, void *buffer,
+				size_t *lenp)
+{
+	int *valp = ctl->data;
+	int val = *valp;
+	int ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+
+	if (write && *valp != val)
+		rt_cache_flush(0);
+
+	return ret;
+}
+
+static int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
+					 void *oldval, size_t *oldlenp,
+					 void *newval, size_t newlen, 
+					 void **context)
+{
+	int *valp = table->data;
+	int new;
+
+	if (!newval || !newlen)
+		return 0;
+
+	if (newlen != sizeof(int))
+		return -EINVAL;
+
+	if (get_user(new, (int *)newval))
+		return -EFAULT;
+
+	if (new == *valp)
+		return 0;
+
+	if (oldval && oldlenp) {
+		size_t len;
+
+		if (get_user(len, oldlenp))
+			return -EFAULT;
+
+		if (len) {
+			if (len > table->maxlen)
+				len = table->maxlen;
+			if (copy_to_user(oldval, valp, len))
+				return -EFAULT;
+			if (put_user(len, oldlenp))
+				return -EFAULT;
+		}
+	}
+
+	*valp = new;
+	rt_cache_flush(0);
+	return 1;
+}
+
+
 static struct devinet_sysctl_table {
 	struct ctl_table_header *sysctl_header;
 	ctl_table		devinet_vars[17];
@@ -1192,7 +1248,8 @@ static struct devinet_sysctl_table {
 			.data =	&ipv4_devconf.no_xfrm,
 			.maxlen =		sizeof(int),
 			.mode =	0644,
-			.proc_handler =&proc_dointvec,
+			.proc_handler = &ipv4_doint_and_flush,
+			.strategy = &ipv4_doint_and_flush_strategy,
 		},
 		{
 			.ctl_name =	NET_IPV4_CONF_NOPOLICY,
@@ -1200,7 +1257,8 @@ static struct devinet_sysctl_table {
 			.data =	&ipv4_devconf.no_policy,
 			.maxlen =		sizeof(int),
 			.mode =	0644,
-			.proc_handler =&proc_dointvec,
+			.proc_handler = &ipv4_doint_and_flush,
+			.strategy = &ipv4_doint_and_flush_strategy,
 		},
 	},
 	.devinet_dev = {

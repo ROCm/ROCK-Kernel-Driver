@@ -129,9 +129,11 @@ static struct i2c_algo_bit_data bit_elv_data = {
 
 static struct i2c_adapter bit_elv_ops = {
 	.owner		= THIS_MODULE,
-	.name		= "ELV Parallel port adaptor",
 	.id		= I2C_HW_B_ELV,
 	.algo_data	= &bit_elv_data,
+	.dev		= {
+		.name	= "ELV Parallel port adaptor",
+	},
 };
 
 static int __init i2c_bitelv_init(void)
@@ -148,7 +150,7 @@ static int __init i2c_bitelv_init(void)
 			return -ENODEV;
 		}
 	} else {
-		bit_elv_ops.data=(void*)base;
+		i2c_set_adapdata(&bit_elv_ops, (void *)base);
 		if (bit_elv_init()==0) {
 			if(i2c_bit_add_bus(&bit_elv_ops) < 0)
 				return -ENODEV;

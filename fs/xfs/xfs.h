@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -66,6 +66,9 @@
 #include <xfs_dir.h>
 #include <xfs_dir2.h>
 #include <xfs_imap.h>
+#include <xfs_alloc.h>
+#include <xfs_dmapi.h>
+#include <xfs_quota.h>
 #include <xfs_mount.h>
 #include <xfs_alloc_btree.h>
 #include <xfs_bmap_btree.h>
@@ -77,17 +80,11 @@
 #include <xfs_dir2_sf.h>
 #include <xfs_dinode.h>
 #include <xfs_inode.h>
-#include <xfs_alloc.h>
 #include <xfs_bmap.h>
 #include <xfs_bit.h>
 #include <xfs_rtalloc.h>
 #include <xfs_error.h>
-#include <xfs_quota.h>
 #include <xfs_itable.h>
-#include <xfs_dqblk.h>
-#include <xfs_dquot_item.h>
-#include <xfs_dquot.h>
-#include <xfs_qm.h>
 #include <xfs_rw.h>
 #include <xfs_da_btree.h>
 #include <xfs_dir_leaf.h>
@@ -108,6 +105,5 @@
 #include <xfs_trans_priv.h>
 #include <xfs_trans_space.h>
 #include <xfs_utils.h>
-#include <xfs_dmapi.h>
 
 #endif	/* __XFS_H__ */

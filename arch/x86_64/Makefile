@@ -47,6 +47,10 @@ CFLAGS += -fno-reorder-blocks
 # should lower this a lot and see how much .text is saves	
 CFLAGS += -finline-limit=2000
 #CFLAGS += -g
+# don't enable this when you use kgdb:
+ifneq ($(CONFIG_X86_REMOTE_DEBUG),y)
+CFLAGS += -fno-asynchronous-unwind-tables
+endif
 
 head-y := arch/x86_64/kernel/head.o arch/x86_64/kernel/head64.o arch/x86_64/kernel/init_task.o
 

@@ -58,7 +58,7 @@
    We can slow the instruction pipeline for instructions coming via the
    gdt or the ldt if we want to.  I am not sure why this is an advantage */
 
-#define DR_CONTROL_RESERVED (0xFC00) /* Reserved by Intel */
+#define DR_CONTROL_RESERVED (0xFFFFFFFFFC00) /* Reserved by Intel */
 #define DR_LOCAL_SLOWDOWN (0x100)   /* Local slow the pipeline */
 #define DR_GLOBAL_SLOWDOWN (0x200)  /* Global slow the pipeline */
 
