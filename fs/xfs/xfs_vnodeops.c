@@ -3900,7 +3900,7 @@ xfs_finish_reclaim(
 	int		error;
 
 	if (vp && VN_BAD(vp))
-		return 0;
+		goto reclaim;
 
 	/* The hash lock here protects a thread in xfs_iget_core from
 	 * racing with us on linking the inode back with a vnode.
@@ -3948,8 +3948,7 @@ xfs_finish_reclaim(
 			 */
 			if (error) {
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				xfs_ireclaim(ip);
-				return (0);
+				goto reclaim;
 			}
 			xfs_iflock(ip); /* synchronize with xfs_iflush_done */
 		}
@@ -3968,6 +3967,7 @@ xfs_finish_reclaim(
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
 
+ reclaim:
 	xfs_ireclaim(ip);
 	return 0;
 }
