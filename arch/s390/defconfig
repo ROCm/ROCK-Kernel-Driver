@@ -223,6 +223,7 @@ CONFIG_S390_TAPE_BLOCK=y
 #
 CONFIG_S390_TAPE_34XX=m
 # CONFIG_VMLOGRDR is not set
+# CONFIG_MONREADER is not set
 
 #
 # Cryptographic devices

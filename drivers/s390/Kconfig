@@ -187,6 +187,12 @@ config VMLOGRDR
 	  *SYMPTOM.
 	  This driver depends on the IUCV support driver.
 
+config MONREADER
+	tristate "API for reading z/VM monitor service records"
+	depends on IUCV
+	help
+	  Character device driver for reading z/VM monitor service records
+
 endmenu
 
 menu "Cryptographic devices"
