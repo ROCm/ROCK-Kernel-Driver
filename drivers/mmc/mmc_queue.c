@@ -15,6 +15,9 @@
 #include <linux/mmc/host.h>
 #include "mmc_queue.h"
 
+#define MMC_QUEUE_EXIT		(1 << 0)
+#define MMC_QUEUE_SUSPENDED	(1 << 1)
+
 /*
  * Prepare a MMC request.  Essentially, this means passing the
  * preparation off to the media driver.  The media driver will
@@ -66,14 +69,9 @@ static int mmc_queue_thread(void *d)
 
 	daemonize("mmcqd");
 
-	spin_lock_irq(&current->sighand->siglock);
-	sigfillset(&current->blocked);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	mq->thread = current;
 	complete(&mq->thread_complete);
 
+	down(&mq->thread_sem);
 	add_wait_queue(&mq->thread_wq, &wait);
 	do {
 		struct request *req = NULL;
@@ -85,9 +83,11 @@ static int mmc_queue_thread(void *d)
 		spin_unlock(q->queue_lock);
 
 		if (!req) {
-			if (!mq->thread)
+			if (mq->flags & MMC_QUEUE_EXIT)
 				break;
+			up(&mq->thread_sem);
 			schedule();
+			down(&mq->thread_sem);
 			continue;
 		}
 		set_current_state(TASK_RUNNING);
@@ -95,6 +95,7 @@ static int mmc_queue_thread(void *d)
 		mq->issue_fn(mq, req);
 	} while (1);
 	remove_wait_queue(&mq->thread_wq, &wait);
+	up(&mq->thread_sem);
 
 	complete_and_exit(&mq->thread_complete, 0);
 	return 0;
@@ -160,17 +161,61 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock
 
 	return ret;
 }
-
 EXPORT_SYMBOL(mmc_init_queue);
 
 void mmc_cleanup_queue(struct mmc_queue *mq)
 {
-	mq->thread = NULL;
+	mq->flags |= MMC_QUEUE_EXIT;
 	wake_up(&mq->thread_wq);
 	wait_for_completion(&mq->thread_complete);
 	blk_cleanup_queue(mq->queue);
 
 	mq->card = NULL;
 }
-
 EXPORT_SYMBOL(mmc_cleanup_queue);
+
+/**
+ * mmc_queue_suspend - suspend a MMC request queue
+ * @mq: MMC queue to suspend
+ *
+ * Stop the block request queue, and wait for our thread to
+ * complete any outstanding requests.  This ensures that we
+ * won't suspend while a request is being processed.
+ */
+void mmc_queue_suspend(struct mmc_queue *mq)
+{
+	request_queue_t *q = mq->queue;
+	unsigned long flags;
+
+	if (!(mq->flags & MMC_QUEUE_SUSPENDED)) {
+		mq->flags |= MMC_QUEUE_SUSPENDED;
+
+		spin_lock_irqsave(q->queue_lock, flags);
+		blk_stop_queue(q);
+		spin_unlock_irqrestore(q->queue_lock, flags);
+
+		down(&mq->thread_sem);
+	}
+}
+EXPORT_SYMBOL(mmc_queue_suspend);
+
+/**
+ * mmc_queue_resume - resume a previously suspended MMC request queue
+ * @mq: MMC queue to resume
+ */
+void mmc_queue_resume(struct mmc_queue *mq)
+{
+	request_queue_t *q = mq->queue;
+	unsigned long flags;
+
+	if (mq->flags & MMC_QUEUE_SUSPENDED) {
+		mq->flags &= ~MMC_QUEUE_SUSPENDED;
+
+		up(&mq->thread_sem);
+
+		spin_lock_irqsave(q->queue_lock, flags);
+		blk_start_queue(q);
+		spin_unlock_irqrestore(q->queue_lock, flags);
+	}
+}
+EXPORT_SYMBOL(mmc_queue_resume);
