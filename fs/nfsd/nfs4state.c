@@ -665,9 +665,6 @@ out:
  * Open owner state (share locks)
  */
 
-#define ZERO_STATEID(stateid)       (!memcmp((stateid), &zerostateid, sizeof(stateid_t)))
-#define ONE_STATEID(stateid)        (!memcmp((stateid), &onestateid, sizeof(stateid_t)))
-
 /* hash tables for nfs4_stateowner */
 #define OWNER_HASH_BITS              8
 #define OWNER_HASH_SIZE             (1 << OWNER_HASH_BITS)
