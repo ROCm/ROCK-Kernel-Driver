@@ -386,8 +386,13 @@ acpi_table_parse (
 	for (i = 0; i < sdt_count; i++) {
 		if (sdt_entry[i].id != id)
 			continue;
-		handler(sdt_entry[i].pa, sdt_entry[i].size);
 		count++;
+		if (count == 1)
+			handler(sdt_entry[i].pa, sdt_entry[i].size);
+
+		else
+			printk(KERN_WARNING PREFIX "%d duplicate %s table ignored.\n",
+				count, acpi_table_signatures[id]);
 	}
 
 	return count;
