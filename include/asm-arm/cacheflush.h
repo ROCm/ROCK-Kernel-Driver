@@ -283,7 +283,7 @@ flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr)
  * flush_dcache_page is used when the kernel has written to the page
  * cache page at virtual address page->virtual.
  *
- * If this page isn't mapped (ie, page->mapping = NULL), or it has
+ * If this page isn't mapped (ie, page_mapping == NULL), or it has
  * userspace mappings (page->mapping->i_mmap or page->mapping->i_mmap_shared)
  * then we _must_ always clean + invalidate the dcache entries associated
  * with the kernel mapping.
@@ -292,14 +292,18 @@ flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr)
  * about to change to user space.  This is the same method as used on SPARC64.
  * See update_mmu_cache for the user space part.
  */
-#define mapping_mapped(map)	(!list_empty(&(map)->i_mmap) || \
-				 !list_empty(&(map)->i_mmap_shared))
+static inline int mapping_mapped(struct address_space *mapping)
+{
+	return	!prio_tree_empty(&mapping->i_mmap) ||
+		!prio_tree_empty(&mapping->i_mmap_shared) ||
+		!list_empty(&mapping->i_mmap_nonlinear);
+}
 
 extern void __flush_dcache_page(struct page *);
 
 static inline void flush_dcache_page(struct page *page)
 {
-	if (page->mapping && !mapping_mapped(page->mapping))
+	if (page_mapping(page) && !mapping_mapped(page->mapping))
 		set_bit(PG_dcache_dirty, &page->flags);
 	else
 		__flush_dcache_page(page);

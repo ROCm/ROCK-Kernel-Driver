@@ -55,18 +55,19 @@ asmlinkage int sys_cacheflush(void *addr, int bytes, int cache)
 
 void flush_dcache_page(struct page *page)
 {
+	struct address_space *mapping = page_mapping(page);
 	unsigned long addr;
 
-	if (page->mapping &&
-	    list_empty(&page->mapping->i_mmap) &&
-	    list_empty(&page->mapping->i_mmap_shared)) {
+	if (mapping &&
+	    prio_tree_empty(&mapping->i_mmap) &&
+	    prio_tree_empty(&mapping->i_mmap_shared) &&
+	    list_empty(&mapping->i_mmap_nonlinear)) {
 		SetPageDcacheDirty(page);
-
 		return;
 	}
 
 	/*
-	 * We could delay the flush for the !page->mapping case too.  But that
+	 * We could delay the flush for the !page_mapping case too.  But that
 	 * case is for exec env/arg pages and those are %99 certainly going to
 	 * get faulted into the tlb (and thus flushed) anyways.
 	 */
@@ -81,7 +82,7 @@ void __update_cache(struct vm_area_struct *vma, unsigned long address,
 	unsigned long pfn, addr;
 
 	pfn = pte_pfn(pte);
-	if (pfn_valid(pfn) && (page = pfn_to_page(pfn), page->mapping) &&
+	if (pfn_valid(pfn) && (page = pfn_to_page(pfn), page_mapping(page)) &&
 	    Page_dcache_dirty(page)) {
 		if (pages_do_alias((unsigned long)page_address(page),
 		                   address & PAGE_MASK)) {

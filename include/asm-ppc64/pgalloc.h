@@ -71,6 +71,7 @@ pte_alloc_one(struct mm_struct *mm, unsigned long address)
 		ptepage->index = address & PMD_MASK;
 		return ptepage;
 	}
+	return NULL;
 }
 		
 static inline void pte_free_kernel(pte_t *pte)
