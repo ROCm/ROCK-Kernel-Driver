@@ -80,6 +80,6 @@
 #define cpu_has_k6_mtrr        0
 #define cpu_has_cyrix_arr      0
 #define cpu_has_centaur_mcr    0
-
+#define cpu_has_clflush	       boot_cpu_has(X86_FEATURE_CLFLSH)
 
 #endif /* __ASM_X8664_CPUFEATURE_H */

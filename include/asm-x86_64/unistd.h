@@ -468,10 +468,22 @@ __SYSCALL(__NR_futex, sys_futex)
 __SYSCALL(__NR_sched_setaffinity, sys_sched_setaffinity)
 #define __NR_sched_getaffinity     204
 __SYSCALL(__NR_sched_getaffinity, sys_sched_getaffinity)
+#define __NR_set_thread_area	205
+__SYSCALL(__NR_set_thread_area, sys_set_thread_area)
+#define __NR_io_setup	206
+__SYSCALL(__NR_io_setup, sys_io_setup)
+#define __NR_io_destroy	207
+__SYSCALL(__NR_io_destroy, sys_io_destroy)
+#define __NR_io_getevents	208
+__SYSCALL(__NR_io_getevents, sys_io_getevents)
+#define __NR_io_submit	209
+__SYSCALL(__NR_io_submit, sys_io_submit)
+#define __NR_io_cancel	210
+__SYSCALL(__NR_io_cancel, sys_io_cancel)
+#define __NR_get_thread_area	211
+__SYSCALL(__NR_get_thread_area, sys_get_thread_area)
 
-
-#define __NR_syscall_max __NR_sched_getaffinity
-
+#define __NR_syscall_max __NR_get_thread_area
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */
@@ -529,7 +541,7 @@ long __res; \
 __asm__ volatile (__syscall \
 	: "=a" (__res) \
 	: "0" (__NR_##name),"D" ((long)(arg1)),"S" ((long)(arg2)), \
-		  "d" ((long)(arg3)) : __syscall_clobber, "r9" ); \
+		  "d" ((long)(arg3)) : __syscall_clobber); \
 __syscall_return(type,__res); \
 }
 
@@ -549,11 +561,25 @@ __syscall_return(type,__res); \
 type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5) \
 { \
 long __res; \
-__asm__ volatile ("movq %5,%%r10 ; movq %6,%%r9 ; " __syscall \
+__asm__ volatile ("movq %5,%%r10 ; movq %6,%%r8 ; " __syscall \
 	: "=a" (__res) \
 	: "0" (__NR_##name),"D" ((long)(arg1)),"S" ((long)(arg2)), \
 	  "d" ((long)(arg3)),"g" ((long)(arg4)),"g" ((long)(arg5)) : \
-	__syscall_clobber,"r8","r9","r10" ); \
+	__syscall_clobber,"r8","r10" ); \
+__syscall_return(type,__res); \
+}
+
+#define _syscall6(type,name,type1,arg1,type2,arg2,type3,arg3,type4,arg4, \
+	  type5,arg5,type6,arg6) \
+type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5,type6 arg6) \
+{ \
+long __res; \
+__asm__ volatile ("movq %5,%%r10 ; movq %6,%%r8 ; movq %7,%%r9" __syscall \
+	: "=a" (__res) \
+	: "0" (__NR_##name),"D" ((long)(arg1)),"S" ((long)(arg2)), \
+	  "d" ((long)(arg3)),"g" ((long)(arg4)),"g" ((long)(arg5), \
+	  "g" ((long)(arg6),) : \
+	__syscall_clobber,"r8","r10","r9" ); \
 __syscall_return(type,__res); \
 }
 

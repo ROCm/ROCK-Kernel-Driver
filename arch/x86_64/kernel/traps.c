@@ -36,6 +36,7 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/kdebug.h>
+#include <asm/processor.h>
 
 #include <asm/smp.h>
 #include <asm/pgalloc.h>
@@ -46,11 +47,6 @@
 asmlinkage int system_call(void);
 asmlinkage int kernel_syscall(void);
 extern void ia32_syscall(void);
-
-char doublefault_stack[4*1024]; 
-#ifndef CONFIG_SMP
-char stackfault_stack[4*1024];
-#endif
 
 extern struct gate_struct idt_table[256]; 
 
@@ -101,7 +97,7 @@ int printk_address(unsigned long address)
 	} 
 	if (!strcmp(modname, "kernel"))
 		modname = delim = ""; 		
-        return printk("[%016lx%s%s%s%s%+ld]",
+        return printk("<%016lx>{%s%s%s%s%+ld}",
 		      address,delim,modname,delim,symname,address-symstart); 
 } 
 #else
@@ -114,7 +110,6 @@ int printk_address(unsigned long address)
 
 #ifdef CONFIG_MODULES
 
-extern struct module *module_list;
 extern struct module kernel_module;
 
 static inline int kernel_text_address(unsigned long addr)
@@ -149,30 +144,59 @@ static inline int kernel_text_address(unsigned long addr)
 
 #endif
 
+static inline unsigned long *in_exception_stack(int cpu, unsigned long stack) 
+{ 
+	int k;
+	for (k = 0; k < N_EXCEPTION_STACKS; k++) {
+		unsigned long end = init_tss[cpu].ist[k] + EXCEPTION_STKSZ; 
+
+		if (stack >= init_tss[cpu].ist[k]  && stack <= end) 
+			return (unsigned long *)end;
+	}
+	return 0;
+} 
+
 /*
- * These constants are for searching for possible module text
- * segments. MODULE_RANGE is a guess of how much space is likely
- * to be vmalloced.
+ * x86-64 can have upto three kernel stacks: 
+ * process stack
+ * interrupt stack
+ * severe exception (double fault, nmi, stack fault) hardware stack
+ * Check and process them in order.
  */
-#define MODULE_RANGE (8*1024*1024)
 
 void show_trace(unsigned long *stack)
 {
 	unsigned long addr;
-	unsigned long *irqstack, *irqstack_end;
+	unsigned long *irqstack, *irqstack_end, *estack_end;
 	/* FIXME: should read the cpuid from the APIC; to still work with bogus %gs */
 	const int cpu = smp_processor_id();
 	int i;
 
-	printk("\nCall Trace: ");
+	printk("\nCall Trace:");
+	i = 0; 
+	
+	estack_end = in_exception_stack(cpu, (unsigned long)stack); 
+	if (estack_end) { 
+		while (stack < estack_end) { 
+			addr = *stack++; 
+			if (kernel_text_address(addr)) {  
+				i += printk_address(addr);
+				i += printk(" "); 
+				if (i > 50) {
+					printk("\n"); 
+					i = 0;
+				}
+			}
+		}
+		i += printk(" <EOE> "); 
+		i += 7;
+		stack = (unsigned long *) estack_end[-2]; 
+	}  
 
 	irqstack_end = (unsigned long *) (cpu_pda[cpu].irqstackptr);
 	irqstack = (unsigned long *) (cpu_pda[cpu].irqstackptr - IRQSTACKSIZE + 64);
 
-	i = 1;
 	if (stack >= irqstack && stack < irqstack_end) {
-		unsigned long *tstack;
-
 		printk("<IRQ> ");  
 		while (stack < irqstack_end) {
 			addr = *stack++;
@@ -195,13 +219,7 @@ void show_trace(unsigned long *stack)
 		} 
 		stack = (unsigned long *) (irqstack_end[-1]);
 		printk(" <EOI> ");
-#if 1
-		tstack = (unsigned long *)(current_thread_info()+1);
-		if (stack < tstack || (char*)stack > (char*)tstack+THREAD_SIZE) 
-			printk("\n" KERN_DEBUG 
-		       "no stack at the end of irqstack; stack:%p, curstack %p\n",
-			       stack, tstack); 
-#endif			       
+		i += 7;
 	} 
 
 	while (((long) stack & (THREAD_SIZE-1)) != 0) {
@@ -258,6 +276,15 @@ void show_stack(unsigned long * rsp)
 		printk("%016lx ", *stack++);
 	}
 	show_trace((unsigned long *)rsp);
+}
+
+/*
+ * The architecture-independent dump_stack generator
+ */
+void dump_stack(void)
+{
+	unsigned long dummy;
+	show_stack(&dummy);
 }
 
 void show_registers(struct pt_regs *regs)
@@ -322,6 +349,7 @@ void handle_BUG(struct pt_regs *regs)
 		return;
 	if (__get_user(tmp, f.filename))
 		f.filename = "unmapped filename"; 
+	printk("----------- [cut here ] --------- [please bite here ] ---------\n");
 	printk("Kernel BUG at %.50s:%d\n", f.filename, f.line); 	
 } 
 
@@ -377,6 +405,19 @@ static inline unsigned long get_cr2(void)
 static void do_trap(int trapnr, int signr, char *str, 
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
 {
+#ifdef CONFIG_CHECKING
+       { 
+               unsigned long gs; 
+               struct x8664_pda *pda = cpu_pda + stack_smp_processor_id(); 
+               rdmsrl(MSR_GS_BASE, gs); 
+               if (gs != (unsigned long)pda) { 
+                       wrmsrl(MSR_GS_BASE, pda); 
+                       printk("%s: wrong gs %lx expected %p rip %lx\n", str, gs, pda,
+			      regs->rip);
+               }
+       }
+#endif
+
 	if ((regs->cs & 3)  != 0) { 
 		struct task_struct *tsk = current;
 
@@ -452,6 +493,18 @@ extern void dump_pagetable(unsigned long);
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
+#ifdef CONFIG_CHECKING
+       { 
+               unsigned long gs; 
+               struct x8664_pda *pda = cpu_pda + stack_smp_processor_id(); 
+               rdmsrl(MSR_GS_BASE, gs); 
+               if (gs != (unsigned long)pda) { 
+                       wrmsrl(MSR_GS_BASE, pda); 
+                       printk("general protection handler: wrong gs %lx expected %p\n", gs, pda);
+               }
+       }
+#endif
+
 	if ((regs->cs & 3)!=0) { 
 		struct task_struct *tsk = current;
 		if (exception_trace)
@@ -501,8 +554,7 @@ static void io_check_error(unsigned char reason, struct pt_regs * regs)
 }
 
 static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
-{
-	printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
+{	printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
 	printk("Dazed and confused, but trying to continue\n");
 	printk("Do you have a strange power saving mode enabled?\n");
 }
@@ -532,6 +584,7 @@ asmlinkage void do_nmi(struct pt_regs * regs)
 		mem_parity_error(reason, regs);
 	if (reason & 0x40)
 		io_check_error(reason, regs);
+
 	/*
 	 * Reassert NMI in case it became active meanwhile
 	 * as it's edge-triggered.
@@ -547,6 +600,18 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 	unsigned long condition;
 	struct task_struct *tsk = current;
 	siginfo_t info;
+
+#ifdef CONFIG_CHECKING
+       { 
+               unsigned long gs; 
+               struct x8664_pda *pda = cpu_pda + stack_smp_processor_id(); 
+               rdmsrl(MSR_GS_BASE, gs); 
+               if (gs != (unsigned long)pda) { 
+                       wrmsrl(MSR_GS_BASE, pda); 
+                       printk("debug handler: wrong gs %lx expected %p\n", gs, pda);
+               }
+       }
+#endif
 
 	asm("movq %%db6,%0" : "=r" (condition));
 

@@ -18,12 +18,11 @@ struct x8664_pda {
 	char *irqstackptr;	/* top of irqstack */
 	unsigned long volatile *level4_pgt; 
 	unsigned int __softirq_pending;
-	unsigned int __local_irq_count;
-	unsigned int __local_bh_count;
 	unsigned int __nmi_count;	/* arch dependent */
 	struct task_struct * __ksoftirqd_task; /* waitqueue is too large */
 	struct mm_struct *active_mm;
 	int mmu_state;     
+	unsigned apic_timer_irqs;
 } ____cacheline_aligned;
 
 #define PDA_STACKOFFSET (5*8)

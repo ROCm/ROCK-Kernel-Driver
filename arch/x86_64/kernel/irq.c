@@ -18,7 +18,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
@@ -138,7 +137,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	struct irqaction * action;
 
 	seq_printf(p, "           ");
-	for (j=0; j<smp_num_cpus; j++)
+	for_each_cpu(j) 
 		seq_printf(p, "CPU%d       ",j);
 	seq_putc(p, '\n');
 
@@ -150,9 +149,9 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
-		for (j = 0; j < smp_num_cpus; j++)
+		for_each_cpu(j) 
 			seq_printf(p, "%10u ",
-				kstat.irqs[cpu_logical_map(j)][i]);
+				kstat.irqs[j][i]);
 #endif
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 		seq_printf(p, "  %s", action->name);
@@ -162,13 +161,13 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 	}
 	seq_printf(p, "NMI: ");
-	for (j = 0; j < smp_num_cpus; j++)
-		seq_printf(p, "%10u ", cpu_pda[cpu_logical_map(j)].__nmi_count);
+	for_each_cpu(j)
+		seq_printf(p, "%10u ", cpu_pda[j].__nmi_count);
 	seq_putc(p, '\n');
 #if CONFIG_X86_LOCAL_APIC
 	seq_printf(p, "LOC: ");
-	for (j = 0; j < smp_num_cpus; j++)
-		seq_printf(p, "%10u ", apic_timer_irqs[cpu_logical_map(j)]);
+	for_each_cpu(j)
+		seq_printf(p, "%10u ", cpu_pda[j].apic_timer_irqs);
 	seq_putc(p, '\n');
 #endif
 	seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
@@ -197,11 +196,7 @@ inline void synchronize_irq(unsigned int irq)
  */
 int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction * action)
 {
-	int status;
-
-	irq_enter(0, irq);
-
-	status = 1;	/* Force the "do bottom halves" bit */
+	int status = 1; /* Force the "do bottom halves" bit */
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
@@ -214,8 +209,6 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 	local_irq_disable();
-
-	irq_exit(0, irq);
 
 	return status;
 }
@@ -236,7 +229,7 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
  *	Unlike disable_irq(), this function does not ensure existing
  *	instances of the IRQ handler have completed before returning.
  *
- *	This function may be called from IRQ context.
+ *	This function must not be called from IRQ context.
  */
  
 inline void disable_irq_nosync(unsigned int irq)
@@ -334,6 +327,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 
 	if (irq > 256) BUG();
 
+	irq_enter(); 
 	kstat.irqs[cpu][irq]++;
 	spin_lock(&desc->lock);
 	desc->handler->ack(irq);
@@ -349,7 +343,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 	 * use the action we have.
 	 */
 	action = NULL;
-	if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
+	if (likely(!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))) {
 		action = desc->action;
 		status &= ~IRQ_PENDING; /* we commit to handling */
 		status |= IRQ_INPROGRESS; /* we are handling it */
@@ -362,7 +356,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 	   a different instance of this same irq, the other processor
 	   will take care of it.
 	 */
-	if (!action)
+	if (unlikely(!action))
 		goto out;
 
 	/*
@@ -380,7 +374,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 		handle_IRQ_event(irq, regs, action);
 		spin_lock(&desc->lock);
 		
-		if (!(desc->status & IRQ_PENDING))
+		if (unlikely(!(desc->status & IRQ_PENDING)))
 			break;
 		desc->status &= ~IRQ_PENDING;
 	}
@@ -394,8 +388,7 @@ out:
 	desc->handler->end(irq);
 	spin_unlock(&desc->lock);
 
-	if (softirq_pending(cpu))
-		do_softirq();
+	irq_exit();
 	return 1;
 }
 
@@ -459,7 +452,7 @@ int request_irq(unsigned int irq,
 		return -EINVAL;
 
 	action = (struct irqaction *)
-			kmalloc(sizeof(struct irqaction), GFP_KERNEL);
+			kmalloc(sizeof(struct irqaction), GFP_ATOMIC);
 	if (!action)
 		return -ENOMEM;
 
@@ -522,13 +515,7 @@ void free_irq(unsigned int irq, void *dev_id)
 			}
 			spin_unlock_irqrestore(&desc->lock,flags);
 
-#ifdef CONFIG_SMP
-			/* Wait to make sure it's not being used on another CPU */
-			while (desc->status & IRQ_INPROGRESS) {
-				barrier();
-				cpu_relax();
-			}
-#endif
+			synchronize_irq(irq);
 			kfree(action);
 			return;
 		}
@@ -580,7 +567,7 @@ unsigned long probe_irq_on(void)
 
 	/* Wait for longstanding interrupts to trigger. */
 	for (delay = jiffies + HZ/50; time_after(delay, jiffies); )
-		/* about 20ms delay */ synchronize_irq();
+		/* about 20ms delay */ barrier();
 
 	/*
 	 * enable any unassigned irqs
@@ -603,7 +590,7 @@ unsigned long probe_irq_on(void)
 	 * Wait for spurious interrupts to trigger
 	 */
 	for (delay = jiffies + HZ/10; time_after(delay, jiffies); )
-		/* about 100ms delay */ synchronize_irq();
+		/* about 100ms delay */ barrier();
 
 	/*
 	 * Now filter out any obviously spurious interrupts

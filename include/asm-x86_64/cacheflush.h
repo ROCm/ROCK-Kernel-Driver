@@ -1,5 +1,5 @@
-#ifndef _I386_CACHEFLUSH_H
-#define _I386_CACHEFLUSH_H
+#ifndef _X8664_CACHEFLUSH_H
+#define _X8664_CACHEFLUSH_H
 
 /* Keep includes the same across arches.  */
 #include <linux/mm.h>
@@ -18,4 +18,4 @@
 void global_flush_tlb(void); 
 int change_page_attr(struct page *page, int numpages, pgprot_t prot);
 
-#endif /* _I386_CACHEFLUSH_H */
+#endif /* _X8664_CACHEFLUSH_H */

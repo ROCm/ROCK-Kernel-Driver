@@ -13,6 +13,9 @@
 #define THREAD_SIZE (2*PAGE_SIZE)
 #define CURRENT_MASK (~(THREAD_SIZE-1))
 
+#define LARGE_PAGE_MASK (~(LARGE_PAGE_SIZE-1))
+#define LARGE_PAGE_SIZE (1UL << PMD_SHIFT)
+
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
@@ -55,6 +58,9 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define __START_KERNEL_map	0xffffffff80000000
 #define __PAGE_OFFSET           0x0000010000000000
 #define __PHYSICAL_MASK		0x000000ffffffffff
+
+#define KERNEL_TEXT_SIZE  (40UL*1024*1024)
+#define KERNEL_TEXT_START 0xffffffff80000000UL 
 
 #ifndef __ASSEMBLY__
 
@@ -108,7 +114,7 @@ extern __inline__ int get_order(unsigned long size)
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 #define pfn_valid(pfn)		((pfn) < max_mapnr)
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
-
+#define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
 
 #define VM_DATA_DEFAULT_FLAGS  (VM_READ | VM_WRITE | VM_EXEC | \
                                 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)

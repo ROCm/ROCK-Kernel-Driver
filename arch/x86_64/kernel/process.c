@@ -56,6 +56,7 @@
 #include <linux/irq.h>
 
 asmlinkage extern void ret_from_fork(void);
+int sys_arch_prctl(int code, unsigned long addr);
 
 unsigned long kernel_thread_flags = CLONE_VM;
 
@@ -163,9 +164,11 @@ void show_regs(struct pt_regs * regs)
 	unsigned int ds,cs,es; 
 
 	printk("\n");
+	print_modules();
 	printk("Pid: %d, comm: %.20s %s\n", current->pid, current->comm, print_tainted());
-	printk("RIP: %04lx:[<%016lx>]\n", regs->cs & 0xffff, regs->rip);
-	printk("RSP: %016lx  EFLAGS: %08lx\n", regs->rsp, regs->eflags);
+	printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
+	printk_address(regs->rip); 
+	printk("\nRSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp, regs->eflags);
 	printk("RAX: %016lx RBX: %016lx RCX: %016lx\n",
 	       regs->rax, regs->rbx, regs->rcx);
 	printk("RDX: %016lx RSI: %016lx RDI: %016lx\n",
@@ -255,6 +258,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	if (rsp == ~0) {
 		childregs->rsp = (unsigned long)childregs;
 	}
+	p->user_tid = NULL;
 
 	p->thread.rsp = (unsigned long) childregs;
 	p->thread.rsp0 = (unsigned long) (childregs+1);
@@ -281,6 +285,30 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 		       (IO_BITMAP_SIZE+1)*4);
 	} 
 
+	/*
+	 * Set a new TLS for the child thread?
+	 */
+	if (clone_flags & CLONE_SETTLS) {
+		struct n_desc_struct *desc;
+		struct user_desc info;
+		int idx;
+
+		if (copy_from_user(&info, test_thread_flag(TIF_IA32) ? 
+								  (void *)childregs->rsi : 
+								  (void *)childregs->rdx, sizeof(info)))
+			return -EFAULT;
+		if (LDT_empty(&info))
+			return -EINVAL;
+
+		idx = info.entry_number;
+		if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+			return -EINVAL;
+
+		desc = (struct n_desc_struct *)(p->thread.tls_array) + idx - GDT_ENTRY_TLS_MIN;
+		desc->a = LDT_entry_a(&info);
+		desc->b = LDT_entry_b(&info);
+	}
+
 	return 0;
 }
 
@@ -305,8 +333,8 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
-	struct tss_struct *tss = init_tss + smp_processor_id();
-
+	int cpu = smp_processor_id();  
+	struct tss_struct *tss = init_tss + cpu;
 
 	unlazy_fpu(prev_p);
 
@@ -317,6 +345,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
 	/* 
 	 * Switch DS and ES.
+	 * This won't pick up thread selector changes, but I guess that is ok.
 	 */
 	asm volatile("movl %%es,%0" : "=m" (prev->es)); 
 	if (unlikely(next->es | prev->es))
@@ -329,25 +358,38 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	/* 
 	 * Switch FS and GS.
 	 * XXX Check if this is safe on SMP (!= -> |)
+	 * Need to simplify this.
 	 */
 	{ 
 		unsigned int fsindex;
+		unsigned int gsindex;
 
 		asm volatile("movl %%fs,%0" : "=g" (fsindex)); 
-		if (unlikely(fsindex != next->fsindex)) /* or likely? */
-			loadsegment(fs, next->fsindex);
+		asm volatile("movl %%gs,%0" : "=g" (gsindex)); 
+
+		/*
+		 * Load the per-thread Thread-Local Storage descriptor.
+		 */
+		if (load_TLS(next, cpu)) {
+			loadsegment(fs,next->fsindex);
+			/* should find a way to optimize this away - it is
+			   slow */
+			goto loadgs;    
+		} else { 
+			if (fsindex  != next->fsindex)
+				loadsegment(fs,next->fsindex); 
+			if (gsindex != next->gsindex) {
+			loadgs:
+				load_gs_index(next->gsindex); 
+			} 	
+		}
+				
 		if (unlikely(fsindex != prev->fsindex))
 			prev->fs = 0;				
 		if ((fsindex != prev->fsindex) || (prev->fs != next->fs))
 			wrmsrl(MSR_FS_BASE, next->fs); 
 		prev->fsindex = fsindex;
-	}
-	{
-		unsigned int gsindex;
 
-		asm volatile("movl %%gs,%0" : "=g" (gsindex)); 
-		if (unlikely(gsindex != next->gsindex))
-			load_gs_index(next->gs); 
 		if (unlikely(gsindex != prev->gsindex)) 
 			prev->gs = 0;				
 		if (gsindex != prev->gsindex || prev->gs != next->gs)
@@ -362,6 +404,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	write_pda(oldrsp, next->userrsp); 
 	write_pda(pcurrent, next_p); 
 	write_pda(kernelstack, (unsigned long)next_p->thread_info + THREAD_SIZE - PDA_STACKOFFSET);
+
 
 	/*
 	 * Now maybe reload the debug registers
@@ -433,16 +476,16 @@ void set_personality_64bit(void)
 asmlinkage long sys_fork(struct pt_regs regs)
 {
 	struct task_struct *p;
-	p = do_fork(SIGCHLD, regs.rsp, &regs, 0);
+	p = do_fork(SIGCHLD, regs.rsp, &regs, 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
-asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, struct pt_regs regs)
+asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void *user_tid, struct pt_regs regs)
 {
 	struct task_struct *p;
 	if (!newsp)
 		newsp = regs.rsp;
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, user_tid);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -459,7 +502,7 @@ asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, struct
 asmlinkage long sys_vfork(struct pt_regs regs)
 {
 	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -494,7 +537,7 @@ unsigned long get_wchan(struct task_struct *p)
 #undef last_sched
 #undef first_sched
 
-asmlinkage int sys_arch_prctl(int code, unsigned long addr)
+int sys_arch_prctl(int code, unsigned long addr)
 { 
 	int ret = 0; 
 	unsigned long tmp; 
@@ -535,3 +578,115 @@ asmlinkage int sys_arch_prctl(int code, unsigned long addr)
 	return ret;	
 } 
 
+/*
+ * sys_alloc_thread_area: get a yet unused TLS descriptor index.
+ */
+static int get_free_idx(void)
+{
+	struct thread_struct *t = &current->thread;
+	int idx;
+
+	for (idx = 0; idx < GDT_ENTRY_TLS_ENTRIES; idx++)
+		if (desc_empty((struct n_desc_struct *)(t->tls_array) + idx))
+			return idx + GDT_ENTRY_TLS_MIN;
+	return -ESRCH;
+}
+
+/*
+ * Set a given TLS descriptor:
+ * When you want addresses > 32bit use arch_prctl() 
+ */
+asmlinkage int sys_set_thread_area(struct user_desc *u_info)
+{
+	struct thread_struct *t = &current->thread;
+	struct user_desc info;
+	struct n_desc_struct *desc;
+	int cpu, idx;
+
+	if (copy_from_user(&info, u_info, sizeof(info)))
+		return -EFAULT;
+	idx = info.entry_number;
+
+	/*
+	 * index -1 means the kernel should try to find and
+	 * allocate an empty descriptor:
+	 */
+	if (idx == -1) {
+		idx = get_free_idx();
+		if (idx < 0)
+			return idx;
+		if (put_user(idx, &u_info->entry_number))
+			return -EFAULT;
+	}
+
+	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+		return -EINVAL;
+
+	desc = ((struct n_desc_struct *)t->tls_array) + idx - GDT_ENTRY_TLS_MIN;
+
+	/*
+	 * We must not get preempted while modifying the TLS.
+	 */
+	cpu = get_cpu();
+
+	if (LDT_empty(&info)) {
+		desc->a = 0;
+		desc->b = 0;
+	} else {
+		desc->a = LDT_entry_a(&info);
+		desc->b = LDT_entry_b(&info);
+	}
+	load_TLS(t, cpu);
+
+	put_cpu();
+	return 0;
+}
+
+/*
+ * Get the current Thread-Local Storage area:
+ */
+
+#define GET_BASE(desc) ( \
+	(((desc)->a >> 16) & 0x0000ffff) | \
+	(((desc)->b << 16) & 0x00ff0000) | \
+	( (desc)->b        & 0xff000000)   )
+
+#define GET_LIMIT(desc) ( \
+	((desc)->a & 0x0ffff) | \
+	 ((desc)->b & 0xf0000) )
+	
+#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
+#define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
+#define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
+#define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)
+#define GET_PRESENT(desc)	(((desc)->b >> 15) & 1)
+#define GET_USEABLE(desc)	(((desc)->b >> 20) & 1)
+
+asmlinkage int sys_get_thread_area(struct user_desc *u_info)
+{
+	struct user_desc info;
+	struct n_desc_struct *desc;
+	int idx;
+
+	if (get_user(idx, &u_info->entry_number))
+		return -EFAULT;
+	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+		return -EINVAL;
+
+	desc = ((struct n_desc_struct *)current->thread.tls_array) + idx - GDT_ENTRY_TLS_MIN;
+
+	memset(&info, 0, sizeof(struct user_desc));
+	info.entry_number = idx;
+	info.base_addr = GET_BASE(desc);
+	info.limit = GET_LIMIT(desc);
+	info.seg_32bit = GET_32BIT(desc);
+	info.contents = GET_CONTENTS(desc);
+	info.read_exec_only = !GET_WRITABLE(desc);
+	info.limit_in_pages = GET_LIMIT_PAGES(desc);
+	info.seg_not_present = !GET_PRESENT(desc);
+	info.useable = GET_USEABLE(desc);
+
+	if (copy_to_user(u_info, &info, sizeof(info)))
+		return -EFAULT;
+	return 0;
+}

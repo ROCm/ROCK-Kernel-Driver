@@ -43,8 +43,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		*read_pda(level4_pgt) = __pa(next->pgd) | _PAGE_TABLE;
 		__flush_tlb();
 
-		if (next->context.size + prev->context.size) 
-			load_LDT(&next->context);
+		if (unlikely(next->context.ldt != prev->context.ldt)) 
+			load_LDT_nolock(&next->context, cpu);
 	}
 #ifdef CONFIG_SMP
 	else {
@@ -56,7 +56,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 			 * tlb flush IPI delivery. We must flush our tlb.
 			 */
 			local_flush_tlb();
-			load_LDT(&next->context);
+			load_LDT_nolock(&next->context, cpu);
 		}
 	}
 #endif

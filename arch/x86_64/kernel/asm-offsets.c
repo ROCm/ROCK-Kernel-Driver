@@ -24,15 +24,16 @@ int main(void)
 	ENTRY(state);
 	ENTRY(flags); 
 	ENTRY(thread); 
+	ENTRY(pid);
 	BLANK();
 #undef ENTRY
-#define ENTRY(entry) DEFINE(threadinfo__ ## entry, offsetof(struct thread_info, entry))
+#define ENTRY(entry) DEFINE(threadinfo_ ## entry, offsetof(struct thread_info, entry))
 	ENTRY(flags);
 	ENTRY(addr_limit);
 	ENTRY(preempt_count);
 	BLANK();
 #undef ENTRY
-#define ENTRY(entry) DEFINE(pda__ ## entry, offsetof(struct x8664_pda, entry))
+#define ENTRY(entry) DEFINE(pda_ ## entry, offsetof(struct x8664_pda, entry))
 	ENTRY(kernelstack); 
 	ENTRY(oldrsp); 
 	ENTRY(pcurrent); 

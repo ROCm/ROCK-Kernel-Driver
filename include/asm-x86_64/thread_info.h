@@ -35,15 +35,17 @@ struct thread_info {
 
 /*
  * macros/functions for gaining access to the thread information structure
+ * preempt_count needs to be 1 initially, until the scheduler is functional.
  */
 #ifndef __ASSEMBLY__
 #define INIT_THREAD_INFO(tsk)			\
 {						\
-	task:		&tsk,			\
-	exec_domain:	&default_exec_domain,	\
-	flags:		0,			\
-	cpu:		0,			\
-	addr_limit:	KERNEL_DS,		\
+	.task	       = &tsk,			\
+	.exec_domain   = &default_exec_domain,	\
+	.flags	       = 0,			\
+	.cpu	       = 0,			\
+	.preempt_count = 1,			\
+	.addr_limit     = KERNEL_DS,		\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)

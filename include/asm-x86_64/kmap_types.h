@@ -9,6 +9,8 @@ enum km_type {
 	KM_USER1,
 	KM_BIO_SRC_IRQ,
 	KM_BIO_DST_IRQ,
+	KM_IRQ0,
+	KM_IRQ1,
 	KM_TYPE_NR
 };
 

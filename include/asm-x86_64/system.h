@@ -39,6 +39,7 @@
 	__POP(rax) __POP(r15) __POP(r14) __POP(r13) __POP(r12) __POP(r11) __POP(r10) \
 	__POP(r9) __POP(r8)
 
+/* RED-PEN: pipeline stall on ret because it is not predicted */
 #define switch_to(prev,next,last) \
 	asm volatile(SAVE_CONTEXT						    \
 		     "movq %%rsp,%[prevrsp]\n\t"				    \
@@ -72,7 +73,7 @@ extern void load_gs_index(unsigned);
 		"jmp 2b\n"			\
 		".previous\n"			\
 		".section __ex_table,\"a\"\n\t"	\
-		".align 4\n\t"			\
+		".align 8\n\t"			\
 		".quad 1b,3b\n"			\
 		".previous"			\
 		: :"r" ((int)(value)))
@@ -241,33 +242,15 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define local_irq_enable()	__asm__ __volatile__("sti": : :"memory")
 /* used in the idle loop; sti takes one instruction cycle to complete */
 #define safe_halt()		__asm__ __volatile__("sti; hlt": : :"memory")
+#define irqs_disabled()			\
+({					\
+	unsigned long flags;		\
+	local_save_flags(flags);	\
+	!(flags & (1<<9));		\
+})
 
 /* For spinlocks etc */
 #define local_irq_save(x) 	do { warn_if_not_ulong(x); __asm__ __volatile__("# local_irq_save \n\t pushfq ; popq %0 ; cli":"=g" (x): /* no input */ :"memory"); } while (0)
-#define local_irq_restore(x)	__asm__ __volatile__("# local_irq_restore \n\t pushq %0 ; popfq": /* no output */ :"g" (x):"memory")
-
-#ifdef CONFIG_SMP
-
-extern void __global_cli(void);
-extern void __global_sti(void);
-extern unsigned long __global_save_flags(void);
-extern void __global_restore_flags(unsigned long);
-#define cli() __global_cli()
-#define sti() __global_sti()
-#define save_flags(x) ((x)=__global_save_flags())
-#define restore_flags(x) __global_restore_flags(x)
-
-#else
-
-#define cli() local_irq_disable()
-#define sti() local_irq_enable()
-#define save_flags(x) local_save_flags(x)
-#define restore_flags(x) local_irq_restore(x)
-
-#endif
-
-/* Default simics "magic" breakpoint */
-#define icebp() asm volatile("xchg %%bx,%%bx" ::: "ebx")
 
 /*
  * disable hlt during certain critical i/o operations

@@ -24,7 +24,7 @@
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
 
-unsigned int nmi_watchdog = NMI_NONE;
+unsigned int nmi_watchdog = NMI_LOCAL_APIC;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 extern void show_registers(struct pt_regs *regs);
@@ -43,22 +43,38 @@ extern void show_registers(struct pt_regs *regs);
 #define P6_EVENT_CPU_CLOCKS_NOT_HALTED	0x79
 #define P6_NMI_EVENT		P6_EVENT_CPU_CLOCKS_NOT_HALTED
 
+/* Why is there no CPUID flag for this? */
+static __init int cpu_has_lapic(void)
+{
+	switch (boot_cpu_data.x86_vendor) { 
+	case X86_VENDOR_INTEL:
+	case X86_VENDOR_AMD: 
+		return boot_cpu_data.x86 >= 6; 
+	/* .... add more cpus here or find a different way to figure this out. */	
+	default:
+		return 0;
+	} 	
+}
+
 int __init check_nmi_watchdog (void)
 {
 	int counts[NR_CPUS];
-	int j, cpu;
+	int cpu;
+
+	if (nmi_watchdog == NMI_LOCAL_APIC && !cpu_has_lapic())  {
+		nmi_watchdog = NMI_NONE;
+		return -1; 
+	}	
 
 	printk(KERN_INFO "testing NMI watchdog ... ");
 
-	for (j = 0; j < NR_CPUS; ++j) {
-		cpu = cpu_logical_map(j); 
+	for_each_cpu(cpu) { 
 		counts[cpu] = cpu_pda[cpu].__nmi_count; 
 	}
-	sti();
+	local_irq_enable();
 	mdelay((10*1000)/nmi_hz); // wait 10 ticks
 
-	for (j = 0; j < smp_num_cpus; j++) {
-		cpu = cpu_logical_map(j);
+	for_each_cpu(cpu) { 
 		if (cpu_pda[cpu].__nmi_count - counts[cpu] <= 5) {
 			printk("CPU#%d: NMI appears to be stuck (%d)!\n", 
 			       cpu,
@@ -84,26 +100,6 @@ static int __init setup_nmi_watchdog(char *str)
 
 	if (nmi >= NMI_INVALID)
 		return 0;
-	if (nmi == NMI_NONE)
-		nmi_watchdog = nmi;
-	/*
-	 * If any other x86 CPU has a local APIC, then
-	 * please test the NMI stuff there and send me the
-	 * missing bits. Right now Intel P6 and AMD K7 only.
-	 */
-	if ((nmi == NMI_LOCAL_APIC) &&
-			(boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) &&
-			(boot_cpu_data.x86 == 6))
-		nmi_watchdog = nmi;
-	if ((nmi == NMI_LOCAL_APIC) &&
-			(boot_cpu_data.x86_vendor == X86_VENDOR_AMD) &&
-			(boot_cpu_data.x86 == 6))
-		nmi_watchdog = nmi;
-	/*
-	 * We can enable the IO-APIC watchdog
-	 * unconditionally.
-	 */
-	if (nmi == NMI_IO_APIC)
 		nmi_watchdog = nmi;
 	return 1;
 }
@@ -167,6 +163,8 @@ static void __pminit setup_k7_watchdog(void)
 	int i;
 	unsigned int evntsel;
 
+	/* XXX should check these in EFER */
+
 	nmi_perfctr_msr = MSR_K7_PERFCTR0;
 
 	for(i = 0; i < 4; ++i) {
@@ -180,7 +178,7 @@ static void __pminit setup_k7_watchdog(void)
 		| K7_NMI_EVENT;
 
 	wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
-	Dprintk("setting K7_PERFCTR0 to %08lx\n", -(cpu_khz/nmi_hz*1000));
+	printk(KERN_INFO "watchdog: setting K7_PERFCTR0 to %08lx\n", -(cpu_khz/nmi_hz*1000));
 	wrmsr(MSR_K7_PERFCTR0, -(cpu_khz/nmi_hz*1000), -1);
 	apic_write(APIC_LVTPC, APIC_DM_NMI);
 	evntsel |= K7_EVNTSEL_ENABLE;
@@ -191,7 +189,11 @@ void __pminit setup_apic_nmi_watchdog (void)
 {
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
-		if (boot_cpu_data.x86 != 6)
+		if (boot_cpu_data.x86 < 6)
+			return;
+		/* Simics masquerades as AMD, but does not support 
+		   performance counters */
+		if (strstr(boot_cpu_data.x86_model_id, "Screwdriver"))
 			return;
 		setup_k7_watchdog();
 		break;
@@ -230,7 +232,7 @@ void touch_nmi_watchdog (void)
 	 * Just reset the alert counters, (other CPUs might be
 	 * spinning on locks we hold):
 	 */
-	for (i = 0; i < smp_num_cpus; i++)
+	for (i = 0; i < NR_CPUS; i++)
 		alert_counter[i] = 0;
 }
 
@@ -243,8 +245,7 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 	 * smp_processor_id().
 	 */
 	int sum, cpu = smp_processor_id();
-
-	sum = apic_timer_irqs[cpu];
+	sum = read_pda(apic_timer_irqs);
 
 	if (last_irq_sums[cpu] == sum) {
 		/*
