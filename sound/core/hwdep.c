@@ -327,7 +327,7 @@ static int snd_hwdep_dev_register(snd_device_t *device)
 		up(&register_mutex);
 		return err;
 	}
-#ifdef SNDRV_OSS_INFO_DEV_AUDIO
+#ifdef CONFIG_SND_OSSEMUL
 	hwdep->ossreg = 0;
 	if (hwdep->oss_type >= 0) {
 		if ((hwdep->oss_type == SNDRV_OSS_DEVICE_TYPE_DMFM) && (hwdep->device != 0)) {
@@ -359,7 +359,7 @@ static int snd_hwdep_dev_unregister(snd_device_t *device)
 		up(&register_mutex);
 		return -EINVAL;
 	}
-#ifdef SNDRV_OSS_INFO_DEV_AUDIO
+#ifdef CONFIG_SND_OSSEMUL
 	if (hwdep->ossreg)
 		snd_unregister_oss_device(hwdep->oss_type, hwdep->card, hwdep->device);
 #endif

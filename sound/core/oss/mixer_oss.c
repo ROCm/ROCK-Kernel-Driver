@@ -495,18 +495,25 @@ static void snd_mixer_oss_get_volume1_vol(snd_mixer_oss_file_t *fmixer,
 					  snd_kcontrol_t *kctl,
 					  int *left, int *right)
 {
-	snd_ctl_elem_info_t uinfo;
-	snd_ctl_elem_value_t uctl;
+	snd_ctl_elem_info_t *uinfo;
+	snd_ctl_elem_value_t *uctl;
 
 	snd_runtime_check(kctl != NULL, return);
-	memset(&uinfo, 0, sizeof(uinfo));
-	memset(&uctl, 0, sizeof(uctl));
-	snd_runtime_check(!kctl->info(kctl, &uinfo), return);
-	snd_runtime_check(!kctl->get(kctl, &uctl), return);
-	snd_runtime_check(uinfo.type != SNDRV_CTL_ELEM_TYPE_BOOLEAN || uinfo.value.integer.min != 0 || uinfo.value.integer.max != 1, return);
-	*left = snd_mixer_oss_conv1(uctl.value.integer.value[0], uinfo.value.integer.min, uinfo.value.integer.max, &pslot->volume[0]);
-	if (uinfo.count > 1)
-		*right = snd_mixer_oss_conv1(uctl.value.integer.value[1], uinfo.value.integer.min, uinfo.value.integer.max, &pslot->volume[1]);
+	uinfo = snd_kcalloc(sizeof(*uinfo), GFP_ATOMIC);
+	uctl = snd_kcalloc(sizeof(*uctl), GFP_ATOMIC);
+	if (uinfo == NULL || uctl == NULL)
+		goto __unalloc;
+	snd_runtime_check(!kctl->info(kctl, uinfo), goto __unalloc);
+	snd_runtime_check(!kctl->get(kctl, uctl), goto __unalloc);
+	snd_runtime_check(uinfo->type != SNDRV_CTL_ELEM_TYPE_BOOLEAN || uinfo->value.integer.min != 0 || uinfo->value.integer.max != 1, return);
+	*left = snd_mixer_oss_conv1(uctl->value.integer.value[0], uinfo->value.integer.min, uinfo->value.integer.max, &pslot->volume[0]);
+	if (uinfo->count > 1)
+		*right = snd_mixer_oss_conv1(uctl->value.integer.value[1], uinfo->value.integer.min, uinfo->value.integer.max, &pslot->volume[1]);
+      __unalloc:
+      	if (uctl)
+      		kfree(uctl);
+      	if (uinfo)
+      		kfree(uinfo);
 }
 
 static void snd_mixer_oss_get_volume1_sw(snd_mixer_oss_file_t *fmixer,
@@ -515,21 +522,28 @@ static void snd_mixer_oss_get_volume1_sw(snd_mixer_oss_file_t *fmixer,
 					 int *left, int *right,
 					 int route)
 {
-	snd_ctl_elem_info_t uinfo;
-	snd_ctl_elem_value_t uctl;
+	snd_ctl_elem_info_t *uinfo;
+	snd_ctl_elem_value_t *uctl;
 
 	snd_runtime_check(kctl != NULL, return);
-	memset(&uinfo, 0, sizeof(uinfo));
-	memset(&uctl, 0, sizeof(uctl));
-	snd_runtime_check(!kctl->info(kctl, &uinfo), return);
-	snd_runtime_check(!kctl->get(kctl, &uctl), return);
-	if (!uctl.value.integer.value[0]) {
+	uinfo = snd_kcalloc(sizeof(*uinfo), GFP_ATOMIC);
+	uctl = snd_kcalloc(sizeof(*uctl), GFP_ATOMIC);
+	if (uinfo == NULL || uctl == NULL)
+		goto __unalloc;
+	snd_runtime_check(!kctl->info(kctl, uinfo), goto __unalloc);
+	snd_runtime_check(!kctl->get(kctl, uctl), goto __unalloc);
+	if (!uctl->value.integer.value[0]) {
 		*left = 0;
-		if (uinfo.count == 1)
+		if (uinfo->count == 1)
 			*right = 0;
 	}
-	if (uinfo.count > 1 && !uctl.value.integer.value[route ? 3 : 1])
+	if (uinfo->count > 1 && !uctl->value.integer.value[route ? 3 : 1])
 		*right = 0;
+      __unalloc:
+      	if (uctl)
+      		kfree(uctl);
+      	if (uinfo)
+		kfree(uinfo);
 }
 
 static int snd_mixer_oss_get_volume1(snd_mixer_oss_file_t *fmixer,
@@ -566,21 +580,28 @@ static void snd_mixer_oss_put_volume1_vol(snd_mixer_oss_file_t *fmixer,
 					  snd_kcontrol_t *kctl,
 					  int left, int right)
 {
-	snd_ctl_elem_info_t uinfo;
-	snd_ctl_elem_value_t uctl;
+	snd_ctl_elem_info_t *uinfo;
+	snd_ctl_elem_value_t *uctl;
 	int res;
 
 	snd_runtime_check(kctl != NULL, return);
-	memset(&uinfo, 0, sizeof(uinfo));
-	memset(&uctl, 0, sizeof(uctl));
-	snd_runtime_check(!kctl->info(kctl, &uinfo), return);
-	snd_runtime_check(uinfo.type != SNDRV_CTL_ELEM_TYPE_BOOLEAN || uinfo.value.integer.min != 0 || uinfo.value.integer.max != 1, return);
-	uctl.value.integer.value[0] = snd_mixer_oss_conv2(left, uinfo.value.integer.min, uinfo.value.integer.max);
-	if (uinfo.count > 1)
-		uctl.value.integer.value[1] = snd_mixer_oss_conv2(right, uinfo.value.integer.min, uinfo.value.integer.max);
-	snd_runtime_check((res = kctl->put(kctl, &uctl)) >= 0, return);
+	uinfo = snd_kcalloc(sizeof(*uinfo), GFP_ATOMIC);
+	uctl = snd_kcalloc(sizeof(*uctl), GFP_ATOMIC);
+	if (uinfo == NULL || uctl == NULL)
+		goto __unalloc;
+	snd_runtime_check(!kctl->info(kctl, uinfo), goto __unalloc);
+	snd_runtime_check(uinfo->type != SNDRV_CTL_ELEM_TYPE_BOOLEAN || uinfo->value.integer.min != 0 || uinfo->value.integer.max != 1, return);
+	uctl->value.integer.value[0] = snd_mixer_oss_conv2(left, uinfo->value.integer.min, uinfo->value.integer.max);
+	if (uinfo->count > 1)
+		uctl->value.integer.value[1] = snd_mixer_oss_conv2(right, uinfo->value.integer.min, uinfo->value.integer.max);
+	snd_runtime_check((res = kctl->put(kctl, uctl)) >= 0, goto __unalloc);
 	if (res > 0)
 		snd_ctl_notify(fmixer->card, SNDRV_CTL_EVENT_MASK_VALUE, &kctl->id);
+      __unalloc:
+      	if (uctl)
+      		kfree(uctl);
+      	if (uinfo)
+		kfree(uinfo);
 }
 
 static void snd_mixer_oss_put_volume1_sw(snd_mixer_oss_file_t *fmixer,
@@ -589,27 +610,34 @@ static void snd_mixer_oss_put_volume1_sw(snd_mixer_oss_file_t *fmixer,
 					 int left, int right,
 					 int route)
 {
-	snd_ctl_elem_info_t uinfo;
-	snd_ctl_elem_value_t uctl;
+	snd_ctl_elem_info_t *uinfo;
+	snd_ctl_elem_value_t *uctl;
 	int res;
 
 	snd_runtime_check(kctl != NULL, return);
-	memset(&uinfo, 0, sizeof(uinfo));
-	memset(&uctl, 0, sizeof(uctl));
-	snd_runtime_check(!kctl->info(kctl, &uinfo), return);
-	if (uinfo.count > 1) {
-		uctl.value.integer.value[0] = left > 0 ? 1 : 0;
-		uctl.value.integer.value[route ? 3 : 1] = right > 0 ? 1 : 0;
+	uinfo = snd_kcalloc(sizeof(*uinfo), GFP_ATOMIC);
+	uctl = snd_kcalloc(sizeof(*uctl), GFP_ATOMIC);
+	if (uinfo == NULL || uctl == NULL)
+		goto __unalloc;
+	snd_runtime_check(!kctl->info(kctl, uinfo), goto __unalloc);
+	if (uinfo->count > 1) {
+		uctl->value.integer.value[0] = left > 0 ? 1 : 0;
+		uctl->value.integer.value[route ? 3 : 1] = right > 0 ? 1 : 0;
 		if (route) {
-			uctl.value.integer.value[1] =
-			uctl.value.integer.value[2] = 0;
+			uctl->value.integer.value[1] =
+			uctl->value.integer.value[2] = 0;
 		}
 	} else {
-		uctl.value.integer.value[0] = (left > 0 || right > 0) ? 1 : 0;
+		uctl->value.integer.value[0] = (left > 0 || right > 0) ? 1 : 0;
 	}
-	snd_runtime_check((res = kctl->put(kctl, &uctl)) >= 0, return);
+	snd_runtime_check((res = kctl->put(kctl, uctl)) >= 0, goto __unalloc);
 	if (res > 0)
 		snd_ctl_notify(fmixer->card, SNDRV_CTL_EVENT_MASK_VALUE, &kctl->id);
+      __unalloc:
+      	if (uctl)
+      		kfree(uctl);
+      	if (uinfo)
+		kfree(uinfo);
 }
 
 static int snd_mixer_oss_put_volume1(snd_mixer_oss_file_t *fmixer,
@@ -718,17 +746,21 @@ static int snd_mixer_oss_get_recsrc2(snd_mixer_oss_file_t *fmixer, int *active_i
 	snd_kcontrol_t *kctl;
 	snd_mixer_oss_slot_t *pslot;
 	struct slot *slot;
-	snd_ctl_elem_info_t uinfo;
-	snd_ctl_elem_value_t uctl;
+	snd_ctl_elem_info_t *uinfo;
+	snd_ctl_elem_value_t *uctl;
 	int err, idx;
 	
+	uinfo = snd_kcalloc(sizeof(*uinfo), GFP_KERNEL);
+	uctl = snd_kcalloc(sizeof(*uctl), GFP_KERNEL);
+	if (uinfo == NULL || uctl == NULL) {
+		err = -ENOMEM;
+		goto __unlock;
+	}
 	read_lock(&card->control_rwlock);
 	kctl = snd_mixer_oss_test_id(mixer, "Capture Source", 0);
-	snd_runtime_check(kctl != NULL, return -ENOENT);
-	memset(&uinfo, 0, sizeof(uinfo));
-	memset(&uctl, 0, sizeof(uctl));
-	snd_runtime_check(!(err = kctl->info(kctl, &uinfo)), read_unlock(&card->control_rwlock); return err);
-	snd_runtime_check(!(err = kctl->get(kctl, &uctl)), read_unlock(&card->control_rwlock); return err);
+	snd_runtime_check(kctl != NULL, err = -ENOENT; goto __unlock);
+	snd_runtime_check(!(err = kctl->info(kctl, uinfo)), goto __unlock);
+	snd_runtime_check(!(err = kctl->get(kctl, uctl)), goto __unlock);
 	read_unlock(&card->control_rwlock);
 	for (idx = 0; idx < 32; idx++) {
 		if (!(mixer->mask_recsrc & (1 << idx)))
@@ -739,12 +771,21 @@ static int snd_mixer_oss_get_recsrc2(snd_mixer_oss_file_t *fmixer, int *active_i
 			continue;
 		if (!(slot->present & SNDRV_MIXER_OSS_PRESENT_CAPTURE))
 			continue;
-		if (slot->capture_item == uctl.value.enumerated.item[0]) {
+		if (slot->capture_item == uctl->value.enumerated.item[0]) {
 			*active_index = idx;
 			break;
 		}
 	}
-	return 0;
+	err = 0;
+	goto __unalloc;
+      __unlock:
+      	read_unlock(&card->control_rwlock);
+      __unalloc:
+      	if (uctl)
+      		kfree(uctl);
+      	if (uinfo)
+      		kfree(uinfo);
+      	return err;
 }
 
 static int snd_mixer_oss_put_recsrc2(snd_mixer_oss_file_t *fmixer, int active_index)
@@ -754,16 +795,20 @@ static int snd_mixer_oss_put_recsrc2(snd_mixer_oss_file_t *fmixer, int active_in
 	snd_kcontrol_t *kctl;
 	snd_mixer_oss_slot_t *pslot;
 	struct slot *slot = NULL;
-	snd_ctl_elem_info_t uinfo;
-	snd_ctl_elem_value_t uctl;
+	snd_ctl_elem_info_t *uinfo;
+	snd_ctl_elem_value_t *uctl;
 	int err, idx;
 
+	uinfo = snd_kcalloc(sizeof(*uinfo), GFP_KERNEL);
+	uctl = snd_kcalloc(sizeof(*uctl), GFP_KERNEL);
+	if (uinfo == NULL || uctl == NULL) {
+		err = -ENOMEM;
+		goto __unlock;
+	}
 	read_lock(&card->control_rwlock);
 	kctl = snd_mixer_oss_test_id(mixer, "Capture Source", 0);
-	snd_runtime_check(kctl != NULL, read_unlock(&card->control_rwlock); return -ENOENT);
-	memset(&uinfo, 0, sizeof(uinfo));
-	memset(&uctl, 0, sizeof(uctl));
-	snd_runtime_check(!(err = kctl->info(kctl, &uinfo)), read_unlock(&card->control_rwlock); return err);
+	snd_runtime_check(kctl != NULL, err = -ENOENT; goto __unlock);
+	snd_runtime_check(!(err = kctl->info(kctl, uinfo)), goto __unlock);
 	for (idx = 0; idx < 32; idx++) {
 		if (!(mixer->mask_recsrc & (1 << idx)))
 			continue;
@@ -778,14 +823,19 @@ static int snd_mixer_oss_put_recsrc2(snd_mixer_oss_file_t *fmixer, int active_in
 		slot = NULL;
 	}
 	snd_runtime_check(slot != NULL, goto __unlock);
-	for (idx = 0; idx < uinfo.count; idx++)
-		uctl.value.enumerated.item[idx] = slot->capture_item;
-	snd_runtime_check((err = kctl->put(kctl, &uctl)) >= 0, );
+	for (idx = 0; idx < uinfo->count; idx++)
+		uctl->value.enumerated.item[idx] = slot->capture_item;
+	snd_runtime_check((err = kctl->put(kctl, uctl)) >= 0, );
 	if (err > 0)
 		snd_ctl_notify(fmixer->card, SNDRV_CTL_EVENT_MASK_VALUE, &kctl->id);
+	err = 0;
       __unlock:
 	read_unlock(&card->control_rwlock);
-	return 0;
+	if (uctl)
+		kfree(uctl);
+	if (uinfo)
+		kfree(uinfo);
+	return err;
 }
 
 struct snd_mixer_oss_assign_table {

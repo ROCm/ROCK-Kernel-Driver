@@ -426,25 +426,28 @@ static int snd_ctl_elem_info(snd_ctl_file_t *ctl, snd_ctl_elem_info_t *_info)
 
 static int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t *_control)
 {
-	snd_ctl_elem_value_t control;
+	snd_ctl_elem_value_t *control;
 	snd_kcontrol_t *kctl;
 	int result, indirect;
 	
-	if (copy_from_user(&control, _control, sizeof(control)))
+	control = kmalloc(sizeof(*control), GFP_KERNEL);
+	if (control == NULL)
+		return -ENOMEM;	
+	if (copy_from_user(control, _control, sizeof(*control)))
 		return -EFAULT;
 	read_lock(&card->control_rwlock);
-	kctl = snd_ctl_find_id(card, &control.id);
+	kctl = snd_ctl_find_id(card, &control->id);
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
 		indirect = kctl->access & SNDRV_CTL_ELEM_ACCESS_INDIRECT ? 1 : 0;
-		if (control.indirect != indirect) {
+		if (control->indirect != indirect) {
 			result = -EACCES;
 		} else {
 			if ((kctl->access & SNDRV_CTL_ELEM_ACCESS_READ) && kctl->get != NULL) {
-				result = kctl->get(kctl, &control);
+				result = kctl->get(kctl, control);
 				if (result >= 0)
-					control.id = kctl->id;
+					control->id = kctl->id;
 			} else
 				result = -EPERM;
 		}
@@ -453,25 +456,29 @@ static int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t *_control)
 	if (result >= 0)
 		if (copy_to_user(_control, &control, sizeof(control)))
 			return -EFAULT;
+	kfree(control);
 	return result;
 }
 
 static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_control)
 {
 	snd_card_t *card = file->card;
-	snd_ctl_elem_value_t control;
+	snd_ctl_elem_value_t *control;
 	snd_kcontrol_t *kctl;
 	int result, indirect;
-	
-	if (copy_from_user(&control, _control, sizeof(control)))
+
+	control = kmalloc(sizeof(*control), GFP_KERNEL);
+	if (control == NULL)
+		return -ENOMEM;	
+	if (copy_from_user(control, _control, sizeof(*control)))
 		return -EFAULT;
 	read_lock(&card->control_rwlock);
-	kctl = snd_ctl_find_id(card, &control.id);
+	kctl = snd_ctl_find_id(card, &control->id);
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
 		indirect = kctl->access & SNDRV_CTL_ELEM_ACCESS_INDIRECT ? 1 : 0;
-		if (control.indirect != indirect) {
+		if (control->indirect != indirect) {
 			result = -EACCES;
 		} else {
 			read_lock(&card->control_owner_lock);
@@ -480,9 +487,9 @@ static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_contr
 			    (kctl->owner != NULL && kctl->owner != file)) {
 				result = -EPERM;
 			} else {
-				result = kctl->put(kctl, &control);
+				result = kctl->put(kctl, control);
 				if (result >= 0)
-					control.id = kctl->id;
+					control->id = kctl->id;
 			}
 			read_unlock(&card->control_owner_lock);
 			if (result > 0) {
@@ -498,6 +505,7 @@ static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_contr
 	if (result >= 0)
 		if (copy_to_user(_control, &control, sizeof(control)))
 			return -EFAULT;
+	kfree(control);
 	return result;
 }
 
