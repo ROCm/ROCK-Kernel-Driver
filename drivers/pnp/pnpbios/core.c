@@ -680,7 +680,7 @@ static void add_irqresource(struct pnp_dev *dev, int irq)
 
 static void add_dmaresource(struct pnp_dev *dev, int dma)
 {
-	int i = 8;
+	int i = 0;
 	while (!(dev->dma_resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_DMA) i++;
 	if (i < DEVICE_COUNT_DMA) {
 		dev->dma_resource[i].start = (unsigned long) dma;
@@ -701,7 +701,7 @@ static void add_ioresource(struct pnp_dev *dev, int io, int len)
 
 static void add_memresource(struct pnp_dev *dev, int mem, int len)
 {
-	int i = 0;
+	int i = 8;
 	while (!(dev->resource[i].flags & IORESOURCE_UNSET) && i < DEVICE_COUNT_RESOURCE) i++;
 	if (i < DEVICE_COUNT_RESOURCE) {
 		dev->resource[i].start = (unsigned long) mem;
@@ -816,6 +816,7 @@ static unsigned char *node_current_resource_data_to_dev(struct pnp_bios_node *no
         } /* while */
 	end:
 	if ((dev->resource[0].start == 0) &&
+	    (dev->resource[8].start == 0) &&
 	    (dev->irq_resource[0].start == -1) &&
 	    (dev->dma_resource[0].start == -1))
 		dev->active = 0;
@@ -927,7 +928,6 @@ static void read_smtag_fport(unsigned char *p, int size, int depnum, struct pnp_
 
 static unsigned char *node_possible_resource_data_to_dev(unsigned char *p, struct pnp_bios_node *node, struct pnp_dev *dev)
 {
-	unsigned char *lastp = NULL;
 	int len, depnum, dependent;
 
 	if ((char *)p == NULL)
@@ -963,8 +963,7 @@ static unsigned char *node_possible_resource_data_to_dev(unsigned char *p, struc
 				break;
 			}
 			} /* switch */
-                        lastp = p+3;
-                        p = p + p[1] + p[2]*256 + 3;
+                        p += len + 3;
                         continue;
                 }
 		len = p[0] & 0x07;
@@ -1030,6 +1029,70 @@ static unsigned char *node_possible_resource_data_to_dev(unsigned char *p, struc
         return NULL;
 }
 
+/* pnp EISA ids */
+
+#define HEX(id,a) hex[((id)>>a) & 15]
+#define CHAR(id,a) (0x40 + (((id)>>a) & 31))
+//
+
+static void inline pnpid32_to_pnpid(u32 id, char *str)
+{
+	const char *hex = "0123456789abcdef";
+
+	id = be32_to_cpu(id);
+	str[0] = CHAR(id, 26);
+	str[1] = CHAR(id, 21);
+	str[2] = CHAR(id,16);
+	str[3] = HEX(id, 12);
+	str[4] = HEX(id, 8);
+	str[5] = HEX(id, 4);
+	str[6] = HEX(id, 0);
+	str[7] = '\0';
+
+	return;
+}
+//
+#undef CHAR
+#undef HEX
+
+static void node_id_data_to_dev(unsigned char *p, struct pnp_bios_node *node, struct pnp_dev *dev)
+{
+	int len;
+	struct pnp_id *dev_id;
+
+	if ((char *)p == NULL)
+		return;
+        while ( (char *)p < ((char *)node->data + node->size )) {
+
+                if( p[0] & 0x80 ) {// large item
+			len = (p[2] << 8) | p[1];
+                        p += len + 3;
+                        continue;
+                }
+		len = p[0] & 0x07;
+                switch ((p[0]>>3) & 0x0f) {
+		case 0x0f:
+		{
+        		return;
+			break;
+		}
+                case 0x03: // compatible ID
+                {
+			if (len != 4)
+				goto __skip;
+			dev_id =  pnpbios_kmalloc(sizeof (struct pnp_id), GFP_KERNEL);
+			if (!dev_id)
+				return;
+			pnpid32_to_pnpid(p[1] | p[2] << 8 | p[3] << 16 | p[4] << 24,dev_id->id);
+			pnp_add_id(dev_id, dev);
+			break;
+                }
+                } /* switch */
+		__skip:
+                p += len + 1;
+
+        } /* while */
+}
 
 /* pnp resource writing functions */
 
@@ -1314,31 +1377,6 @@ static int inline insert_device(struct pnp_dev *dev)
 	return 0;
 }
 
-#define HEX(id,a) hex[((id)>>a) & 15]
-#define CHAR(id,a) (0x40 + (((id)>>a) & 31))
-//
-
-static void inline pnpid32_to_pnpid(u32 id, char *str)
-{
-	const char *hex = "0123456789abcdef";
-
-	id = be32_to_cpu(id);
-	str[0] = CHAR(id, 26);
-	str[1] = CHAR(id, 21);
-	str[2] = CHAR(id,16);
-	str[3] = HEX(id, 12);
-	str[4] = HEX(id, 8);
-	str[5] = HEX(id, 4);
-	str[6] = HEX(id, 0);
-	str[7] = '\0';
-
-	return;
-}
-//
-#undef CHAR
-#undef HEX
-
-
 static void __init build_devlist(void)
 {
 	u8 nodenum;
@@ -1386,7 +1424,8 @@ static void __init build_devlist(void)
 		memcpy(dev_id->id,id,8);
 		pnp_add_id(dev_id, dev);
 		pos = node_current_resource_data_to_dev(node,dev);
-		node_possible_resource_data_to_dev(pos,node,dev);
+		pos = node_possible_resource_data_to_dev(pos,node,dev);
+		node_id_data_to_dev(pos,node,dev);
 
 		dev->protocol = &pnpbios_protocol;
 

@@ -82,7 +82,6 @@ void pnp_protocol_unregister(struct pnp_protocol *protocol)
 	list_del_init(&protocol->protocol_list);
 	spin_unlock(&pnp_lock);
 	device_unregister(&protocol->dev);
-	return;
 }
 
 /**
@@ -105,7 +104,6 @@ static void pnp_release_device(struct device *dmdev)
 		pnp_free_resources(dev->res);
 	pnp_free_ids(dev);
 	kfree(dev);
-	return;
 }
 
 /**
@@ -118,7 +116,7 @@ static void pnp_release_device(struct device *dmdev)
 int pnp_add_device(struct pnp_dev *dev)
 {
 	int error = 0;
-	if (!dev && !dev->protocol)
+	if (!dev || !dev->protocol)
 		return -EINVAL;
 	if (dev->card)
 		sprintf(dev->dev.bus_id, "%02x:%02x.%02x", dev->protocol->number,
@@ -158,7 +156,6 @@ void pnp_remove_device(struct pnp_dev *dev)
 	list_del_init(&dev->global_list);
 	list_del_init(&dev->dev_list);
 	spin_unlock(&pnp_lock);
-	return;
 }
 
 static int __init pnp_init(void)
