@@ -1065,8 +1065,8 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 
 static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
+	union line_settings *line = &ifr->ifr_settings->ifs_line;
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
-	struct if_settings *if_s = &ifr->ifr_settings;
 	const size_t size = sizeof(dpriv->settings);
 	int ret = 0;
 
@@ -1076,26 +1076,18 @@ static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (cmd != SIOCWANDEV)
 		return -EOPNOTSUPP;
 
-	switch(ifr->ifr_settings.type) {
+	switch(ifr->ifr_settings->type) {
 	case IF_GET_IFACE:
-		if_s->type = IF_IFACE_SYNC_SERIAL;
-		if (if_s->data_length == 0)
-			return 0;
-		if (if_s->data_length < size)
-			return -ENOMEM;
-		if (copy_to_user(if_s->data, &dpriv->settings, size))
+		ifr->ifr_settings->type = IF_IFACE_SYNC_SERIAL;
+		if (copy_to_user(&line->sync, &dpriv->settings, size))
 			return -EFAULT;
-		if_s->data_length = size;
 		break;
 
 	case IF_IFACE_SYNC_SERIAL:
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (if_s->data_length != size)
-			return -ENOMEM;
-
-		if (copy_from_user(&dpriv->settings, if_s->data, size))
+		if (copy_from_user(&dpriv->settings, &line->sync, size))
 			return -EFAULT;
 		ret = dscc4_set_iface(dev);
 		break;

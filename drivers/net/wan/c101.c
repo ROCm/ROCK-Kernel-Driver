@@ -179,9 +179,10 @@ static int c101_close(struct net_device *dev)
 
 static int c101_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
+	union line_settings *line = &ifr->ifr_settings->ifs_line;
+	const size_t size = sizeof(sync_serial_settings);
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
-	const size_t size = sizeof(sync_serial_settings);
 
 #ifdef CONFIG_HDLC_DEBUG_RINGS
 	if (cmd == SIOCDEVPRIVATE) {
@@ -192,28 +193,18 @@ static int c101_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (cmd != SIOCWANDEV)
 		return hdlc_ioctl(dev, ifr, cmd);
 
-	switch(ifr->ifr_settings.type) {
+	switch(ifr->ifr_settings->type) {
 	case IF_GET_IFACE:
-		ifr->ifr_settings.type = IF_IFACE_SYNC_SERIAL;
-		if (ifr->ifr_settings.data_length == 0)
-			return 0; /* return interface type only */
-		if (ifr->ifr_settings.data_length < size)
-			return -ENOMEM;	/* buffer too small */
-		if (copy_to_user(ifr->ifr_settings.data,
-				 &port->settings, size))
+		ifr->ifr_settings->type = IF_IFACE_SYNC_SERIAL;
+		if (copy_to_user(&line->sync, &port->settings, size))
 			return -EFAULT;
-		ifr->ifr_settings.data_length = size;
 		return 0;
 
 	case IF_IFACE_SYNC_SERIAL:
 		if(!capable(CAP_NET_ADMIN))
 			return -EPERM;
 
-		if (ifr->ifr_settings.data_length != size)
-			return -ENOMEM;	/* incorrect data length */
-
-		if (copy_from_user(&port->settings,
-				   ifr->ifr_settings.data, size))
+		if (copy_from_user(&port->settings, &line->sync, size))
 			return -EFAULT;
 		/* FIXME - put sanity checks here */
 		return c101_set_iface(port);

@@ -1013,25 +1013,19 @@ static int
 fst_set_iface ( struct fst_card_info *card, struct fst_port_info *port,
                 struct ifreq *ifr )
 {
+	union line_settings *line = &ifr->ifr_settings->ifs_line;
         sync_serial_settings sync;
         int i;
 
-        if ( ifr->ifr_settings.data_length != sizeof ( sync ))
-        {
-                return -ENOMEM;
-        }
-
-        if ( copy_from_user ( &sync, ifr->ifr_settings.data, sizeof ( sync )))
-        {
+        if ( copy_from_user ( &sync, &line->sync, sizeof ( sync )))
                 return -EFAULT;
-        }
 
         if ( sync.loopback )
                 return -EINVAL;
 
         i = port->index;
 
-        switch ( ifr->ifr_settings.type )
+        switch ( ifr->ifr_settings->type )
         {
         case IF_IFACE_V35:
                 FST_WRW ( card, portConfig[i].lineInterface, V35 );
@@ -1076,6 +1070,7 @@ static int
 fst_get_iface ( struct fst_card_info *card, struct fst_port_info *port,
                 struct ifreq *ifr )
 {
+	union line_settings *line = &ifr->ifr_settings->ifs_line;
         sync_serial_settings sync;
         int i;
 
@@ -1086,24 +1081,15 @@ fst_get_iface ( struct fst_card_info *card, struct fst_port_info *port,
         switch ( port->hwif )
         {
         case V35:
-                ifr->ifr_settings.type = IF_IFACE_V35;
+                ifr->ifr_settings->type = IF_IFACE_V35;
                 break;
         case V24:
-                ifr->ifr_settings.type = IF_IFACE_V24;
+                ifr->ifr_settings->type = IF_IFACE_V24;
                 break;
         case X21:
         default:
-                ifr->ifr_settings.type = IF_IFACE_X21;
+                ifr->ifr_settings->type = IF_IFACE_X21;
                 break;
-        }
-        if ( ifr->ifr_settings.data_length == 0 )
-        {
-                return 0;       /* only type requested */
-        }
-
-        if ( ifr->ifr_settings.data_length < sizeof ( sync ))
-        {
-                return -ENOMEM;
         }
 
         i = port->index;
@@ -1112,12 +1098,9 @@ fst_get_iface ( struct fst_card_info *card, struct fst_port_info *port,
         sync.clock_type = FST_RDB ( card, portConfig[i].internalClock );
         sync.loopback = 0;
 
-        if ( copy_to_user ( ifr->ifr_settings.data, &sync, sizeof ( sync )))
-        {
+        if ( copy_to_user (&line->sync, &sync, sizeof ( sync )))
                 return -EFAULT;
-        }
 
-        ifr->ifr_settings.data_length = sizeof ( sync );
         return 0;
 }
 
@@ -1241,7 +1224,7 @@ fst_ioctl ( struct net_device *dev, struct ifreq *ifr, int cmd )
                 return set_conf_from_info ( card, port, &info );
 
         case SIOCWANDEV:
-                switch ( ifr->ifr_settings.type )
+                switch ( ifr->ifr_settings->type )
                 {
                 case IF_GET_IFACE:
                         return fst_get_iface ( card, port, ifr );
