@@ -716,7 +716,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   }
 
   if (*mount_flags & MS_RDONLY) {
-    /* remount rean-only */
+    /* remount read-only */
     if (s->s_flags & MS_RDONLY)
       /* it is read-only already */
       return 0;
@@ -732,6 +732,10 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
     s->s_dirt = 0;
   } else {
+    /* remount read-write */
+    if (!(s->s_flags & MS_RDONLY))
+	return 0; /* We are read-write already */
+
     REISERFS_SB(s)->s_mount_state = sb_umount_state(rs) ;
     s->s_flags &= ~MS_RDONLY ; /* now it is safe to call journal_begin */
     journal_begin(&th, s, 10) ;
