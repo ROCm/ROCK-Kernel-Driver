@@ -92,12 +92,22 @@ static void sa1100_low_gpio_unmask(unsigned int irq)
 	ICMR |= 1 << irq;
 }
 
+static int sa1100_low_gpio_wake(unsigned int irq, unsigned int on)
+{
+	if (on)
+		PWER |= 1 << irq;
+	else
+		PWER &= ~(1 << irq);
+	return 0;
+}
+
 static struct irqchip sa1100_low_gpio_chip = {
 	.ack		= sa1100_low_gpio_ack,
 	.mask		= sa1100_low_gpio_mask,
 	.unmask		= sa1100_low_gpio_unmask,
 	.rerun		= sa1100_manual_rerun,
 	.type		= sa1100_gpio_type,
+	.wake		= sa1100_low_gpio_wake,
 };
 
 /*
@@ -166,12 +176,22 @@ static void sa1100_high_gpio_unmask(unsigned int irq)
 	GFER = GPIO_IRQ_falling_edge & GPIO_IRQ_mask;
 }
 
+static int sa1100_high_gpio_wake(unsigned int irq, unsigned int on)
+{
+	if (on)
+		PWER |= GPIO11_27_MASK(irq);
+	else
+		PWER &= ~GPIO11_27_MASK(irq);
+	return 0;
+}
+
 static struct irqchip sa1100_high_gpio_chip = {
 	.ack		= sa1100_high_gpio_ack,
 	.mask		= sa1100_high_gpio_mask,
 	.unmask		= sa1100_high_gpio_unmask,
 	.rerun		= sa1100_manual_rerun,
 	.type		= sa1100_gpio_type,
+	.wake		= sa1100_high_gpio_wake,
 };
 
 /*
@@ -252,5 +272,5 @@ void __init sa1100_init_irq(void)
 	 * We generally don't want the LCD IRQ being
 	 * enabled as soon as we request it.
 	 */
-	set_irq_flags(IRQ_LCD, IRQF_VALID | IRQF_NOAUTOEN);
+	set_irq_flags(IRQ_LCD, IRQF_VALID/* | IRQF_NOAUTOEN*/);
 }
