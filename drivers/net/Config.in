@@ -73,7 +73,6 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
    fi
    dep_tristate '  Sun BigMAC 10/100baseT support (EXPERIMENTAL)' CONFIG_SUNBMAC $CONFIG_SBUS $CONFIG_EXPERIMENTAL
    dep_tristate '  Sun QuadEthernet support' CONFIG_SUNQE $CONFIG_SBUS
-   dep_tristate '  Sun LANCE support' CONFIG_SUNLANCE $CONFIG_SBUS
    dep_tristate '  Sun GEM support' CONFIG_SUNGEM $CONFIG_PCI
    bool '  3COM cards' CONFIG_NET_VENDOR_3COM
    if [ "$CONFIG_NET_VENDOR_3COM" = "y" ]; then
