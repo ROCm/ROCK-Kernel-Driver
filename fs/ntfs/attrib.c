@@ -939,6 +939,9 @@ err_out:
  * Map the part of a run list containing the @vcn of the ntfs inode @ni.
  *
  * Return 0 on success and -errno on error.
+ *
+ * Locking: - The runlist must be unlocked on entry and is unlocked on return.
+ *	    - This function takes the lock for writing and modifies the runlist.
  */
 int ntfs_map_runlist(ntfs_inode *ni, VCN vcn)
 {
@@ -972,7 +975,7 @@ int ntfs_map_runlist(ntfs_inode *ni, VCN vcn)
 
 	down_write(&ni->runlist.lock);
 	/* Make sure someone else didn't do the work while we were sleeping. */
-	if (likely(vcn_to_lcn(ni->runlist.rl, vcn) <= LCN_RL_NOT_MAPPED)) {
+	if (likely(ntfs_vcn_to_lcn(ni->runlist.rl, vcn) <= LCN_RL_NOT_MAPPED)) {
 		runlist_element *rl;
 
 		rl = decompress_mapping_pairs(ni->vol, ctx->attr,
@@ -991,7 +994,7 @@ err_out:
 }
 
 /**
- * vcn_to_lcn - convert a vcn into a lcn given a run list
+ * ntfs_vcn_to_lcn - convert a vcn into a lcn given a run list
  * @rl:		run list to use for conversion
  * @vcn:	vcn to convert
  *
@@ -1009,9 +1012,11 @@ err_out:
  *  -2 = LCN_RL_NOT_MAPPED	This is part of the run list which has not been
  *				inserted into the run list yet.
  *  -3 = LCN_ENOENT		There is no such vcn in the attribute.
- *  -4 = LCN_EINVAL		Input parameter error (if debug enabled).
+ *
+ * Locking: - The caller must have locked the runlist (for reading or writing).
+ *	    - This function does not touch the lock.
  */
-LCN vcn_to_lcn(const runlist_element *rl, const VCN vcn)
+LCN ntfs_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 {
 	int i;
 
@@ -1253,13 +1258,13 @@ int load_attribute_list(ntfs_volume *vol, runlist *runlist, u8 *al_start,
 	rl = runlist->rl;
 	/* Read all clusters specified by the run list one run at a time. */
 	while (rl->length) {
-		lcn = vcn_to_lcn(rl, rl->vcn);
+		lcn = ntfs_vcn_to_lcn(rl, rl->vcn);
 		ntfs_debug("Reading vcn = 0x%llx, lcn = 0x%llx.",
 				(unsigned long long)rl->vcn,
 				(unsigned long long)lcn);
 		/* The attribute list cannot be sparse. */
 		if (lcn < 0) {
-			ntfs_error(sb, "vcn_to_lcn() failed. Cannot read "
+			ntfs_error(sb, "ntfs_vcn_to_lcn() failed. Cannot read "
 					"attribute list.");
 			goto err_out;
 		}

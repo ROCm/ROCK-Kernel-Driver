@@ -40,7 +40,6 @@ typedef enum {
 	LCN_HOLE		= -1,	/* Keep this as highest value or die! */
 	LCN_RL_NOT_MAPPED	= -2,
 	LCN_ENOENT		= -3,
-	LCN_EINVAL		= -4,
 } LCN_SPECIAL_VALUES;
 
 /**
@@ -77,7 +76,7 @@ extern runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
 
 extern int ntfs_map_runlist(ntfs_inode *ni, VCN vcn);
 
-extern LCN vcn_to_lcn(const runlist_element *rl, const VCN vcn);
+extern LCN ntfs_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
 extern BOOL find_attr(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic, const u8 *val,

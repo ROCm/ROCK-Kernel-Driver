@@ -600,7 +600,7 @@ lock_retry_remap:
 			/* Seek to element containing target vcn. */
 			while (rl->length && rl[1].vcn <= vcn)
 				rl++;
-			lcn = vcn_to_lcn(rl, vcn);
+			lcn = ntfs_vcn_to_lcn(rl, vcn);
 		} else
 			lcn = (LCN)LCN_RL_NOT_MAPPED;
 		ntfs_debug("Reading vcn = 0x%llx, lcn = 0x%llx.",
@@ -926,8 +926,8 @@ map_rl_err:
 
 rl_err:
 	up_read(&ni->runlist.lock);
-	ntfs_error(vol->sb, "vcn_to_lcn() failed. Cannot read compression "
-			"block.");
+	ntfs_error(vol->sb, "ntfs_vcn_to_lcn() failed. Cannot read "
+			"compression block.");
 	goto err_out;
 
 getblk_err:

@@ -137,8 +137,7 @@ void ntfs_debug_dump_runlist(const runlist_element *rl)
 {
 	int i;
 	const char *lcn_str[5] = { "LCN_HOLE         ", "LCN_RL_NOT_MAPPED",
-				   "LCN_ENOENT       ", "LCN_EINVAL       ",
-				   "LCN_unknown      " };
+				   "LCN_ENOENT       ", "LCN_unknown      " };
 
 	if (!debug_msgs)
 		return;
@@ -155,7 +154,7 @@ void ntfs_debug_dump_runlist(const runlist_element *rl)
 		if (lcn < (LCN)0) {
 			int index = -lcn - 1;
 
-			if (index > -LCN_EINVAL - 1)
+			if (index > -LCN_ENOENT - 1)
 				index = 4;
 			printk(KERN_DEBUG "%-16Lx %s %-16Lx%s\n",
 				(rl + i)->vcn, lcn_str[index],

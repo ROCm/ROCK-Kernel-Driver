@@ -232,7 +232,7 @@ lock_retry_remap:
 				/* Seek to element containing target vcn. */
 				while (rl->length && rl[1].vcn <= vcn)
 					rl++;
-				lcn = vcn_to_lcn(rl, vcn);
+				lcn = ntfs_vcn_to_lcn(rl, vcn);
 			} else
 				lcn = (LCN)LCN_RL_NOT_MAPPED;
 			/* Successful remap. */
@@ -266,15 +266,15 @@ lock_retry_remap:
 			}
 			/* Hard error, zero out region. */
 			SetPageError(page);
-			ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%llx) failed "
-					"with error code 0x%llx%s.",
+			ntfs_error(vol->sb, "ntfs_vcn_to_lcn(vcn = 0x%llx) "
+					"failed with error code 0x%llx%s.",
 					(unsigned long long)vcn,
 					(unsigned long long)-lcn,
 					is_retry ? " even after retrying" : "");
 			// FIXME: Depending on vol->on_errors, do something.
 		}
 		/*
-		 * Either iblock was outside lblock limits or vcn_to_lcn()
+		 * Either iblock was outside lblock limits or ntfs_vcn_to_lcn()
 		 * returned error. Just zero that portion of the page and set
 		 * the buffer uptodate.
 		 */
@@ -638,7 +638,7 @@ lock_retry_remap:
 			/* Seek to element containing target vcn. */
 			while (rl->length && rl[1].vcn <= vcn)
 				rl++;
-			lcn = vcn_to_lcn(rl, vcn);
+			lcn = ntfs_vcn_to_lcn(rl, vcn);
 		} else
 			lcn = (LCN)LCN_RL_NOT_MAPPED;
 		/* Successful remap. */
@@ -674,7 +674,7 @@ lock_retry_remap:
 		}
 		/* Failed to map the buffer, even after retrying. */
 		bh->b_blocknr = -1UL;
-		ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%llx) failed "
+		ntfs_error(vol->sb, "ntfs_vcn_to_lcn(vcn = 0x%llx) failed "
 				"with error code 0x%llx%s.",
 				(unsigned long long)vcn,
 				(unsigned long long)-lcn,
@@ -1404,7 +1404,7 @@ lock_retry_remap:
 				/* Seek to element containing target vcn. */
 				while (rl->length && rl[1].vcn <= vcn)
 					rl++;
-				lcn = vcn_to_lcn(rl, vcn);
+				lcn = ntfs_vcn_to_lcn(rl, vcn);
 			} else
 				lcn = (LCN)LCN_RL_NOT_MAPPED;
 			if (unlikely(lcn < 0)) {
@@ -1453,9 +1453,9 @@ lock_retry_remap:
 				 * retrying.
 				 */
 				bh->b_blocknr = -1UL;
-				ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%llx) "
-						"failed with error code "
-						"0x%llx%s.",
+				ntfs_error(vol->sb, "ntfs_vcn_to_lcn(vcn = "
+						"0x%llx) failed with error "
+						"code 0x%llx%s.",
 						(unsigned long long)vcn,
 						(unsigned long long)-lcn,
 						is_retry ? " even after "
