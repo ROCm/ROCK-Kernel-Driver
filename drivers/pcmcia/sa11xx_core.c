@@ -356,13 +356,10 @@ sa1100_pcmcia_register_callback(struct pcmcia_socket *sock,
 	struct sa1100_pcmcia_socket *skt = to_sa1100_socket(sock);
 
 	if (handler) {
-		if (!try_module_get(skt->ops->owner))
-			return -ENODEV;
 		skt->handler_info = info;
 		skt->handler = handler;
 	} else {
 		skt->handler = NULL;
-		module_put(skt->ops->owner);
 	}
 
 	return 0;
@@ -655,7 +652,6 @@ static CLASS_DEVICE_ATTR(status, S_IRUGO, show_status, NULL);
 
 
 static struct pccard_operations sa11xx_pcmcia_operations = {
-	.owner			= THIS_MODULE,
 	.init			= sa1100_pcmcia_sock_init,
 	.suspend		= sa1100_pcmcia_suspend,
 	.register_callback	= sa1100_pcmcia_register_callback,
@@ -765,6 +761,7 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 		memset(skt, 0, sizeof(*skt));
 
 		skt->socket.ss_entry = &sa11xx_pcmcia_operations;
+		skt->socket.owner = ops->owner;
 		skt->socket.dev.dev = dev;
 
 		INIT_WORK(&skt->work, sa1100_pcmcia_task_handler, skt);

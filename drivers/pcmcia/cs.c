@@ -235,11 +235,11 @@ static int register_callback(struct pcmcia_socket *s, void (*handler)(void *, un
 {
 	int error;
 
-	if (handler && !try_module_get(s->ss_entry->owner))
+	if (handler && !try_module_get(s->owner))
 		return -ENODEV;
 	error = s->ss_entry->register_callback(s, handler, info);
 	if (!handler)
-		module_put(s->ss_entry->owner);
+		module_put(s->owner);
 	return error;
 }
 

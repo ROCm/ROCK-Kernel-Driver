@@ -64,7 +64,6 @@ static struct pci_driver i82092aa_pci_drv = {
 
 /* the pccard structure and its functions */
 static struct pccard_operations i82092aa_operations = {
-	.owner			= THIS_MODULE,
 	.init 		 	= i82092aa_init,
 	.suspend	   	= i82092aa_suspend,
 	.register_callback 	= i82092aa_register_callback,
@@ -142,6 +141,7 @@ static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_devic
 		sockets[i].socket.map_size = 0x1000;
 		sockets[i].socket.irq_mask = 0;
 		sockets[i].socket.pci_irq  = dev->irq;
+		sockets[i].socket.owner = THIS_MODULE;
 
 		sockets[i].number = i;
 		

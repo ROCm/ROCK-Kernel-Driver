@@ -782,7 +782,6 @@ static int yenta_register_callback(struct pcmcia_socket *sock, void (*handler)(v
 
 
 static struct pccard_operations yenta_socket_operations = {
-	.owner			= THIS_MODULE,
 	.init			= yenta_init,
 	.suspend		= yenta_suspend,
 	.register_callback	= yenta_register_callback,
@@ -860,6 +859,7 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	socket->socket.ss_entry = &yenta_socket_operations;
 	socket->socket.dev.dev = &dev->dev;
 	socket->socket.driver_data = socket;
+	socket->socket.owner = THIS_MODULE;
 
 	/* prepare struct yenta_socket */
 	socket->dev = dev;
