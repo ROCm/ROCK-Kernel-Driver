@@ -123,8 +123,8 @@ cifs_open(struct inode *inode, struct file *file)
 				 to problems creating new read-only files */
 				if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
 					CIFSSMBUnixSetPerms(xid, pTcon, full_path, inode->i_mode,
-						0xFFFFFFFFFFFFFFFF,  
-						0xFFFFFFFFFFFFFFFF,
+						(__u64)-1, 
+						(__u64)-1,
 						cifs_sb->local_nls);
 				else {/* BB implement via Windows security descriptors */
 			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
@@ -351,8 +351,8 @@ cifs_write(struct file * file, const char *write_data,
 	   size_t write_size, loff_t * poffset)
 {
 	int rc = 0;
-	int bytes_written = 0;
-	int total_written;
+	unsigned int bytes_written = 0;
+	unsigned int total_written;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	int xid, long_op;
@@ -633,9 +633,9 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 	  loff_t * poffset)
 {
 	int rc = -EACCES;
-	int bytes_read = 0;
-	int total_read;
-	int current_read_size;
+	unsigned int bytes_read = 0;
+	unsigned int total_read;
+	unsigned int current_read_size;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	int xid;
@@ -742,13 +742,13 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		struct list_head *page_list, unsigned num_pages)
 {
 	int rc = -EACCES;
-	int xid,i;
+	int xid;
 	loff_t offset;
 	struct page * page;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	int bytes_read = 0;
-	unsigned int read_size;
+	unsigned int read_size,i;
 	char * smb_read_data = 0;
 	struct smb_com_read_rsp * pSMBr;
 	struct pagevec lru_pvec;
@@ -877,6 +877,8 @@ fill_in_inode(struct inode *tmp_inode,
 	      FILE_DIRECTORY_INFO * pfindData, int *pobject_type)
 {
 	struct cifsInodeInfo *cifsInfo = CIFS_I(tmp_inode);
+	struct cifs_sb_info *cifs_sb = CIFS_SB(tmp_inode->i_sb);
+
 	pfindData->ExtFileAttributes =
 	    le32_to_cpu(pfindData->ExtFileAttributes);
 	pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
@@ -894,7 +896,13 @@ fill_in_inode(struct inode *tmp_inode,
 	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->ChangeTime));
 	/* treat dos attribute of read-only as read-only mode bit e.g. 555? */
 	/* 2767 perms - indicate mandatory locking */
-	tmp_inode->i_mode = S_IALLUGO & ~(S_ISUID | S_IXGRP);
+		/* BB fill in uid and gid here? with help from winbind? 
+			or retrieve from NTFS stream extended attribute */
+	tmp_inode->i_uid = cifs_sb->mnt_uid;
+	tmp_inode->i_gid = cifs_sb->mnt_gid;
+	/* set default mode. will override for dirs below */
+	tmp_inode->i_mode = cifs_sb->mnt_file_mode;
+
 	cFYI(0,
 	     ("CIFS FFIRST: Attributes came in as 0x%x",
 	      pfindData->ExtFileAttributes));
@@ -905,7 +913,7 @@ fill_in_inode(struct inode *tmp_inode,
 	} else if (pfindData->ExtFileAttributes & ATTR_DIRECTORY) {
 		*pobject_type = DT_DIR;
 		/* override default perms since we do not lock dirs */
-		tmp_inode->i_mode = S_IRWXUGO;
+		tmp_inode->i_mode = cifs_sb->mnt_dir_mode;
 		tmp_inode->i_mode |= S_IFDIR;
 	} else {
 		*pobject_type = DT_REG;
@@ -1091,10 +1099,10 @@ int
 cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 {
 	int rc = 0;
-	int xid, i;
+	int xid;
 	int Unicode = FALSE;
 	int UnixSearch = FALSE;
-	unsigned int bufsize;
+	unsigned int bufsize, i;
 	__u16 searchHandle;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;

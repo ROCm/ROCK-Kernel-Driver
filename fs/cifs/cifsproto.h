@@ -49,7 +49,7 @@ extern int SendReceive(const unsigned int /* xid */ , struct cifsSesInfo *,
 extern int checkSMBhdr(struct smb_hdr *smb, __u16 mid);
 extern int checkSMB(struct smb_hdr *smb, __u16 mid, int length);
 extern int is_valid_oplock_break(struct smb_hdr *smb);
-extern int smbCalcSize(struct smb_hdr *ptr);
+extern unsigned int smbCalcSize(struct smb_hdr *ptr);
 extern int decode_negTokenInit(unsigned char *security_blob, int length,
 			enum securityEnum *secType);
 extern int map_smb_to_linux_error(struct smb_hdr *smb);
