@@ -127,6 +127,7 @@ extern unsigned long ioremap_bot, ioremap_base;
  */
 #define VMALLOC_OFFSET (0x1000000) /* 16M */
 #ifdef CONFIG_44x
+#include <asm/ibm44x.h>
 #define VMALLOC_START (((_ALIGN((long)high_memory, PPC44x_PIN_SIZE) + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1)))
 #else
 #define VMALLOC_START ((((long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1)))
