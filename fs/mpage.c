@@ -490,8 +490,7 @@ mpage_writepages(struct address_space *mapping,
 
 	write_lock(&mapping->page_lock);
 
-	list_splice(&mapping->dirty_pages, &mapping->io_pages);
-	INIT_LIST_HEAD(&mapping->dirty_pages);
+	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
 
         while (!list_empty(&mapping->io_pages) && !done) {
 		struct page *page = list_entry(mapping->io_pages.prev,
@@ -538,13 +537,10 @@ mpage_writepages(struct address_space *mapping,
 		page_cache_release(page);
 		write_lock(&mapping->page_lock);
 	}
-	if (!list_empty(&mapping->io_pages)) {
-		/*
-		 * Put the rest back, in the correct order.
-		 */
-		list_splice(&mapping->io_pages, mapping->dirty_pages.prev);
-		INIT_LIST_HEAD(&mapping->io_pages);
-	}
+	/*
+	 * Put the rest back, in the correct order.
+	 */
+	list_splice_init(&mapping->io_pages, mapping->dirty_pages.prev);
 	write_unlock(&mapping->page_lock);
 	if (bio)
 		mpage_bio_submit(WRITE, bio);

@@ -220,8 +220,7 @@ static void sync_sb_inodes(struct super_block *sb, int sync_mode,
 	struct list_head *head;
 	const unsigned long start = jiffies;	/* livelock avoidance */
 
-	list_splice(&sb->s_dirty, &sb->s_io);
-	INIT_LIST_HEAD(&sb->s_dirty);
+	list_splice_init(&sb->s_dirty, &sb->s_io);
 	head = &sb->s_io;
 	while ((tmp = head->prev) != head) {
 		struct inode *inode = list_entry(tmp, struct inode, i_list);
@@ -262,13 +261,10 @@ static void sync_sb_inodes(struct super_block *sb, int sync_mode,
 			break;
 	}
 out:
-	if (!list_empty(&sb->s_io)) {
-		/*
-		 * Put the rest back, in the correct order.
-		 */
-		list_splice(&sb->s_io, sb->s_dirty.prev);
-		INIT_LIST_HEAD(&sb->s_io);
-	}
+	/*
+	 * Put the rest back, in the correct order.
+	 */
+	list_splice_init(&sb->s_io, sb->s_dirty.prev);
 	return;
 }
 

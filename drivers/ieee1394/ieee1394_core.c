@@ -740,8 +740,7 @@ void abort_requests(struct hpsb_host *host)
         host->ops->devctl(host, CANCEL_REQUESTS, 0);
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
-        list_splice(&host->pending_packets, &llist);
-        INIT_LIST_HEAD(&host->pending_packets);
+        list_splice_init(&host->pending_packets, &llist);
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
         list_for_each(lh, &llist) {
