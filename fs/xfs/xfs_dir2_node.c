@@ -1348,6 +1348,7 @@ xfs_dir2_node_addname_int(
 	int			findex;		/* freespace entry index */
 	xfs_dir2_db_t		foundbno=0;	/* found freespace block no */
 	int			foundindex=0;	/* found freespace entry idx */
+	int			foundhole;	/* found hole in freespace */
 	xfs_dir2_free_t		*free=NULL;	/* freespace block structure */
 	xfs_dir2_db_t		ifbno;		/* initial freespace block no */
 	xfs_dir2_db_t		lastfbno=0;	/* highest freespace block no */
@@ -1363,6 +1364,7 @@ xfs_dir2_node_addname_int(
 	mp = dp->i_mount;
 	tp = args->trans;
 	length = XFS_DIR2_DATA_ENTSIZE(args->namelen);
+	foundhole = 0;
 	/*
 	 * If we came in with a freespace block that means that lookup
 	 * found an entry with our hash value.	This is the freespace
@@ -1452,11 +1454,12 @@ xfs_dir2_node_addname_int(
 			 * to avoid it.
 			 */
 			if ((error = xfs_da_read_buf(tp, dp,
-					XFS_DIR2_DB_TO_DA(mp, fbno), -1, &fbp,
+					XFS_DIR2_DB_TO_DA(mp, fbno), -2, &fbp,
 					XFS_DATA_FORK))) {
 				return error;
 			}
-			if (fbp == NULL) {
+			if (unlikely(fbp == NULL)) {
+				foundhole = 1;
 				continue;
 			}
 			free = fbp->data;
@@ -1475,7 +1478,7 @@ xfs_dir2_node_addname_int(
 			 * one is empty, remember this slot.
 			 */
 			if (foundindex == -1 &&
-			    INT_GET(free->bests[findex], ARCH_CONVERT) == NULLDATAOFF) {
+			    INT_GET(free->bests[findex], ARCH_CONVERT) == NULLDATAOFF && !foundhole) {
 				foundindex = findex;
 				foundbno = fbno;
 			}
@@ -1489,7 +1492,8 @@ xfs_dir2_node_addname_int(
 				 * remember this slot.
 				 */
 				if (foundindex == -1 &&
-				    findex < XFS_DIR2_MAX_FREE_BESTS(mp)) {
+				    findex < XFS_DIR2_MAX_FREE_BESTS(mp) &&
+				    !foundhole) {
 					foundindex = findex;
 					foundbno = fbno;
 				}
