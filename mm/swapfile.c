@@ -393,7 +393,7 @@ static inline void unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		pmd_clear(dir);
 		return;
 	}
-	pte = pte_offset(dir, address);
+	pte = pte_offset_map(dir, address);
 	offset += address & PMD_MASK;
 	address &= ~PMD_MASK;
 	end = address + size;
@@ -404,6 +404,7 @@ static inline void unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
+	pte_unmap(pte - 1);
 }
 
 /* mmlist_lock and vma->vm_mm->page_table_lock are held */

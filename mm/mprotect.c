@@ -13,6 +13,7 @@
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
+#include <linux/highmem.h>
 
 static inline void change_pte_range(pmd_t * pmd, unsigned long address,
 	unsigned long size, pgprot_t newprot)
@@ -27,7 +28,7 @@ static inline void change_pte_range(pmd_t * pmd, unsigned long address,
 		pmd_clear(pmd);
 		return;
 	}
-	pte = pte_offset(pmd, address);
+	pte = pte_offset_map(pmd, address);
 	address &= ~PMD_MASK;
 	end = address + size;
 	if (end > PMD_SIZE)
@@ -46,6 +47,7 @@ static inline void change_pte_range(pmd_t * pmd, unsigned long address,
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
+	pte_unmap(pte - 1);
 }
 
 static inline void change_pmd_range(pgd_t * pgd, unsigned long address,

@@ -5,15 +5,17 @@
 #include <asm/processor.h>
 #include <asm/fixmap.h>
 #include <linux/threads.h>
+#include <linux/highmem.h>
 
-#define pgd_quicklist (current_cpu_data.pgd_quick)
-#define pmd_quicklist (current_cpu_data.pmd_quick)
-#define pte_quicklist (current_cpu_data.pte_quick)
-#define pgtable_cache_size (current_cpu_data.pgtable_cache_sz)
-
-#define pmd_populate(mm, pmd, pte) \
+#define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
 
+static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
+{
+	set_pmd(pmd, __pmd(_PAGE_TABLE +
+		((unsigned long long)(pte - mem_map) <<
+			(unsigned long long) PAGE_SHIFT)));
+}
 /*
  * Allocate and free page tables.
  */
@@ -29,7 +31,7 @@ extern void *kmem_cache_alloc(struct kmem_cache_s *, int);
 extern void kmem_cache_free(struct kmem_cache_s *, void *);
 
 
-static inline pgd_t *get_pgd_slow(void)
+static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	int i;
 	pgd_t *pgd = kmem_cache_alloc(pae_pgd_cachep, GFP_KERNEL);
@@ -56,7 +58,7 @@ out_oom:
 
 #else
 
-static inline pgd_t *get_pgd_slow(void)
+static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
 
@@ -71,33 +73,7 @@ static inline pgd_t *get_pgd_slow(void)
 
 #endif /* CONFIG_X86_PAE */
 
-static inline pgd_t *get_pgd_fast(void)
-{
-	unsigned long *ret;
-
-	preempt_disable();
-	if ((ret = pgd_quicklist) != NULL) {
-		pgd_quicklist = (unsigned long *)(*ret);
-		ret[0] = 0;
-		pgtable_cache_size--;
-		preempt_enable();
-	} else {
-		preempt_enable();
-		ret = (unsigned long *)get_pgd_slow();
-	}
-	return (pgd_t *)ret;
-}
-
-static inline void free_pgd_fast(pgd_t *pgd)
-{
-	preempt_disable();
-	*(unsigned long *)pgd = (unsigned long) pgd_quicklist;
-	pgd_quicklist = (unsigned long *) pgd;
-	pgtable_cache_size++;
-	preempt_enable();
-}
-
-static inline void free_pgd_slow(pgd_t *pgd)
+static inline void pgd_free(pgd_t *pgd)
 {
 #if defined(CONFIG_X86_PAE)
 	int i;
@@ -110,48 +86,53 @@ static inline void free_pgd_slow(pgd_t *pgd)
 #endif
 }
 
-static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
+	int count = 0;
 	pte_t *pte;
-
-	pte = (pte_t *) __get_free_page(GFP_KERNEL);
-	if (pte)
-		clear_page(pte);
+   
+   	do {
+		pte = (pte_t *) __get_free_page(GFP_KERNEL);
+		if (pte)
+			clear_page(pte);
+		else {
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+	} while (!pte && (count++ < 10));
 	return pte;
 }
 
-static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm,
-					unsigned long address)
+static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	unsigned long *ret;
-
-	preempt_disable();
-	if ((ret = (unsigned long *)pte_quicklist) != NULL) {
-		pte_quicklist = (unsigned long *)(*ret);
-		ret[0] = ret[1];
-		pgtable_cache_size--;
-	}
-	preempt_enable();
-	return (pte_t *)ret;
+	int count = 0;
+	struct page *pte;
+   
+   	do {
+#if CONFIG_HIGHPTE
+		pte = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM, 0);
+#else
+		pte = alloc_pages(GFP_KERNEL, 0);
+#endif
+		if (pte)
+			clear_highpage(pte);
+		else {
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+	} while (!pte && (count++ < 10));
+	return pte;
 }
 
-static inline void pte_free_fast(pte_t *pte)
-{
-	preempt_disable();
-	*(unsigned long *)pte = (unsigned long) pte_quicklist;
-	pte_quicklist = (unsigned long *) pte;
-	pgtable_cache_size++;
-	preempt_enable();
-}
-
-static __inline__ void pte_free_slow(pte_t *pte)
+static inline void pte_free_kernel(pte_t *pte)
 {
 	free_page((unsigned long)pte);
 }
 
-#define pte_free(pte)		pte_free_slow(pte)
-#define pgd_free(pgd)		free_pgd_slow(pgd)
-#define pgd_alloc(mm)		get_pgd_fast()
+static inline void pte_free(struct page *pte)
+{
+	__free_page(pte);
+}
 
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is
@@ -159,14 +140,9 @@ static __inline__ void pte_free_slow(pte_t *pte)
  * (In the PAE case we free the pmds as part of the pgd.)
  */
 
-#define pmd_alloc_one_fast(mm, addr)	({ BUG(); ((pmd_t *)1); })
 #define pmd_alloc_one(mm, addr)		({ BUG(); ((pmd_t *)2); })
-#define pmd_free_slow(x)		do { } while (0)
-#define pmd_free_fast(x)		do { } while (0)
 #define pmd_free(x)			do { } while (0)
 #define pgd_populate(mm, pmd, pte)	BUG()
-
-extern int do_check_pgt_cache(int, int);
 
 /*
  * TLB flushing:

@@ -43,28 +43,6 @@ unsigned long highstart_pfn, highend_pfn;
 static unsigned long totalram_pages;
 static unsigned long totalhigh_pages;
 
-int do_check_pgt_cache(int low, int high)
-{
-	int freed = 0;
-	if(pgtable_cache_size > high) {
-		do {
-			if (pgd_quicklist) {
-				free_pgd_slow(get_pgd_fast());
-				freed++;
-			}
-			if (pmd_quicklist) {
-				pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-			if (pte_quicklist) {
-				pte_free_slow(pte_alloc_one_fast(NULL, 0));
-				freed++;
-			}
-		} while(pgtable_cache_size > low);
-	}
-	return freed;
-}
-
 /*
  * NOTE: pagetable_init alloc all the fixmap pagetables contiguous on the
  * physical space so we can cache the place of the first one and move
@@ -76,7 +54,7 @@ pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
 #define kmap_get_fixmap_pte(vaddr)					\
-	pte_offset(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
+	pte_offset_kernel(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
 
 void __init kmap_init(void)
 {
@@ -116,7 +94,6 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	printk("%ld pages in page table cache\n",pgtable_cache_size);
 	show_buffers();
 }
 
@@ -143,7 +120,7 @@ static inline void set_pte_phys (unsigned long vaddr,
 		printk("PAE BUG #01!\n");
 		return;
 	}
-	pte = pte_offset(pmd, vaddr);
+	pte = pte_offset_kernel(pmd, vaddr);
 	if (pte_val(*pte))
 		pte_ERROR(*pte);
 	pgprot_val(prot) = pgprot_val(PAGE_KERNEL) | pgprot_val(flags);
@@ -196,7 +173,7 @@ static void __init fixrange_init (unsigned long start, unsigned long end, pgd_t 
 			if (pmd_none(*pmd)) {
 				pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
 				set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)));
-				if (pte != pte_offset(pmd, 0))
+				if (pte != pte_offset_kernel(pmd, 0))
 					BUG();
 			}
 			vaddr += PMD_SIZE;
@@ -267,7 +244,7 @@ static void __init pagetable_init (void)
 				*pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
 			}
 			set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
-			if (pte_base != pte_offset(pmd, 0))
+			if (pte_base != pte_offset_kernel(pmd, 0))
 				BUG();
 
 		}
@@ -289,7 +266,7 @@ static void __init pagetable_init (void)
 
 	pgd = swapper_pg_dir + __pgd_offset(vaddr);
 	pmd = pmd_offset(pgd, vaddr);
-	pte = pte_offset(pmd, vaddr);
+	pte = pte_offset_kernel(pmd, vaddr);
 	pkmap_page_table = pte;
 #endif
 
@@ -398,7 +375,7 @@ void __init test_wp_bit(void)
 
 	pgd = swapper_pg_dir + __pgd_offset(vaddr);
 	pmd = pmd_offset(pgd, vaddr);
-	pte = pte_offset(pmd, vaddr);
+	pte = pte_offset_kernel(pmd, vaddr);
 	old_pte = *pte;
 	*pte = mk_pte_phys(0, PAGE_READONLY);
 	local_flush_tlb();

@@ -143,9 +143,15 @@ int DRM(sg_alloc)( struct inode *inode, struct file *filp,
 		if ( !pmd_present( *pmd ) )
 			goto failed;
 
-		pte = pte_offset( pmd, i );
-		if ( !pte_present( *pte ) )
+		preempt_disable();
+		pte = pte_offset_map( pmd, i );
+		if ( !pte_present( *pte ) ) {
+			pte_unmap(pte);
+			preempt_enable();
 			goto failed;
+		}
+		pte_unmap(pte);
+		preempt_enable();
 
 		entry->pagelist[j] = pte_page( *pte );
 

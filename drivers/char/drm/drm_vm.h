@@ -169,8 +169,15 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 	if( !pgd_present( *pgd ) ) return NOPAGE_OOM;
 	pmd = pmd_offset( pgd, i );
 	if( !pmd_present( *pmd ) ) return NOPAGE_OOM;
-	pte = pte_offset( pmd, i );
-	if( !pte_present( *pte ) ) return NOPAGE_OOM;
+	preempt_disable();
+	pte = pte_offset_map( pmd, i );
+	if( !pte_present( *pte ) ) {
+		pte_unmap(pte);
+		preempt_enable();
+		return NOPAGE_OOM;
+	}
+	pte_unmap(pte);
+	preempt_enable();
 
 	page = pte_page(*pte);
 	get_page(page);

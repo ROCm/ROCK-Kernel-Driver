@@ -97,8 +97,6 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 extern int acct_parm[];
 #endif
 
-extern int pgt_cache_water[];
-
 static int parse_table(int *, int, void *, size_t *, void *, size_t,
 		       ctl_table *, void **);
 static int proc_doutsstring(ctl_table *table, int write, struct file *filp,
@@ -268,8 +266,6 @@ static ctl_table vm_table[] = {
 	 sizeof(sysctl_overcommit_memory), 0644, NULL, &proc_dointvec},
 	{VM_PAGERDAEMON, "kswapd",
 	 &pager_daemon, sizeof(pager_daemon_t), 0644, NULL, &proc_dointvec},
-	{VM_PGT_CACHE, "pagetable_cache", 
-	 &pgt_cache_water, 2*sizeof(int), 0644, NULL, &proc_dointvec},
 	{VM_PAGE_CLUSTER, "page-cluster", 
 	 &page_cluster, sizeof(int), 0644, NULL, &proc_dointvec},
 	{0}

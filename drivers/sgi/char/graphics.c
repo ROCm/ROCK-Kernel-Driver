@@ -219,6 +219,7 @@ sgi_graphics_nopage (struct vm_area_struct *vma, unsigned long address, int
 	int board = GRAPHICS_CARD (vma->vm_dentry->d_inode->i_rdev);
 
 	unsigned long virt_add, phys_add;
+	struct page * page;
 
 #ifdef DEBUG
 	printk ("Got a page fault for board %d address=%lx guser=%lx\n", board,
@@ -245,8 +246,10 @@ sgi_graphics_nopage (struct vm_area_struct *vma, unsigned long address, int
 
 	pgd = pgd_offset(current->mm, address);
 	pmd = pmd_offset(pgd, address);
-	pte = pte_offset(pmd, address);
-	return pte_page(*pte);
+	pte = pte_kmap_offset(pmd, address);
+	page = pte_page(*pte);
+	pte_kunmap(pte);
+	return page;
 }
 
 /*

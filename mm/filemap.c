@@ -1974,7 +1974,7 @@ page_not_uptodate:
 /* Called with mm->page_table_lock held to protect against other
  * threads/the swapper from ripping pte's out from under us.
  */
-static inline int filemap_sync_pte(pte_t * ptep, struct vm_area_struct *vma,
+static inline int filemap_sync_pte(pte_t *ptep, pmd_t *pmdp, struct vm_area_struct *vma,
 	unsigned long address, unsigned int flags)
 {
 	pte_t pte = *ptep;
@@ -1990,11 +1990,10 @@ static inline int filemap_sync_pte(pte_t * ptep, struct vm_area_struct *vma,
 }
 
 static inline int filemap_sync_pte_range(pmd_t * pmd,
-	unsigned long address, unsigned long size, 
-	struct vm_area_struct *vma, unsigned long offset, unsigned int flags)
+	unsigned long address, unsigned long end, 
+	struct vm_area_struct *vma, unsigned int flags)
 {
-	pte_t * pte;
-	unsigned long end;
+	pte_t *pte;
 	int error;
 
 	if (pmd_none(*pmd))
@@ -2004,27 +2003,26 @@ static inline int filemap_sync_pte_range(pmd_t * pmd,
 		pmd_clear(pmd);
 		return 0;
 	}
-	pte = pte_offset(pmd, address);
-	offset += address & PMD_MASK;
-	address &= ~PMD_MASK;
-	end = address + size;
-	if (end > PMD_SIZE)
-		end = PMD_SIZE;
+	pte = pte_offset_map(pmd, address);
+	if ((address & PMD_MASK) != (end & PMD_MASK))
+		end = (address & PMD_MASK) + PMD_SIZE;
 	error = 0;
 	do {
-		error |= filemap_sync_pte(pte, vma, address + offset, flags);
+		error |= filemap_sync_pte(pte, pmd, vma, address, flags);
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
+
+	pte_unmap(pte - 1);
+
 	return error;
 }
 
 static inline int filemap_sync_pmd_range(pgd_t * pgd,
-	unsigned long address, unsigned long size, 
+	unsigned long address, unsigned long end, 
 	struct vm_area_struct *vma, unsigned int flags)
 {
 	pmd_t * pmd;
-	unsigned long offset, end;
 	int error;
 
 	if (pgd_none(*pgd))
@@ -2035,14 +2033,11 @@ static inline int filemap_sync_pmd_range(pgd_t * pgd,
 		return 0;
 	}
 	pmd = pmd_offset(pgd, address);
-	offset = address & PGDIR_MASK;
-	address &= ~PGDIR_MASK;
-	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
+	if ((address & PGDIR_MASK) != (end & PGDIR_MASK))
+		end = (address & PGDIR_MASK) + PGDIR_SIZE;
 	error = 0;
 	do {
-		error |= filemap_sync_pte_range(pmd, address, end - address, vma, offset, flags);
+		error |= filemap_sync_pte_range(pmd, address, end, vma, flags);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address && (address < end));
@@ -2062,11 +2057,11 @@ int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 	spin_lock(&vma->vm_mm->page_table_lock);
 
 	dir = pgd_offset(vma->vm_mm, address);
-	flush_cache_range(vma, end - size, end);
+	flush_cache_range(vma, address, end);
 	if (address >= end)
 		BUG();
 	do {
-		error |= filemap_sync_pmd_range(dir, address, end - address, vma, flags);
+		error |= filemap_sync_pmd_range(dir, address, end, vma, flags);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));

@@ -364,7 +364,8 @@ extern int zeromap_page_range(struct vm_area_struct *vma, unsigned long from, un
 
 extern int vmtruncate(struct inode * inode, loff_t offset);
 extern pmd_t *FASTCALL(__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address));
-extern pte_t *FASTCALL(pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
+extern pte_t *FASTCALL(pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
+extern pte_t *FASTCALL(pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
 extern int handle_mm_fault(struct mm_struct *mm,struct vm_area_struct *vma, unsigned long address, int write_access);
 extern int make_pages_present(unsigned long addr, unsigned long end);
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
@@ -380,7 +381,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long 
 
 /*
  * On a two-level page table, this ends up being trivial. Thus the
- * inlining and the symmetry break with pte_alloc() that does all
+ * inlining and the symmetry break with pte_alloc_map() that does all
  * of this out-of-line.
  */
 static inline pmd_t *pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
@@ -389,9 +390,6 @@ static inline pmd_t *pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long a
 		return __pmd_alloc(mm, pgd, address);
 	return pmd_offset(pgd, address);
 }
-
-extern int pgt_cache_water[2];
-extern int check_pgt_cache(void);
 
 extern void free_area_init(unsigned long * zones_size);
 extern void free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,

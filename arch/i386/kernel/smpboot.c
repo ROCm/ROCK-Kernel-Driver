@@ -146,10 +146,6 @@ void __init smp_store_cpu_info(int id)
 	struct cpuinfo_x86 *c = cpu_data + id;
 
 	*c = boot_cpu_data;
-	c->pte_quick = 0;
-	c->pmd_quick = 0;
-	c->pgd_quick = 0;
-	c->pgtable_cache_sz = 0;
 	identify_cpu(c);
 	/*
 	 * Mask B, Pentium, but not Pentium MMX

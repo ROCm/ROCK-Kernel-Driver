@@ -167,7 +167,7 @@ static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vm
 		return count;
 	}
 	
-	pte = pte_offset(dir, address);
+	pte = pte_offset_map(dir, address);
 	
 	pmd_end = (address + PMD_SIZE) & PMD_MASK;
 	if (end > pmd_end)
@@ -181,6 +181,7 @@ static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vm
 				count -= try_to_swap_out(mm, vma, address, pte, page, classzone);
 				if (!count) {
 					address += PAGE_SIZE;
+					pte++;
 					break;
 				}
 			}
@@ -188,6 +189,7 @@ static inline int swap_out_pmd(struct mm_struct * mm, struct vm_area_struct * vm
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
+	pte_unmap(pte - 1);
 	mm->swap_address = address;
 	return count;
 }
