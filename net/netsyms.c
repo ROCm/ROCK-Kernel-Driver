@@ -337,7 +337,7 @@ EXPORT_SYMBOL(xfrm_find_acq);
 EXPORT_SYMBOL(xfrm_alloc_spi);
 EXPORT_SYMBOL(xfrm_state_flush);
 EXPORT_SYMBOL(xfrm_policy_kill);
-EXPORT_SYMBOL(xfrm_policy_delete);
+EXPORT_SYMBOL(xfrm_policy_bysel);
 EXPORT_SYMBOL(xfrm_policy_insert);
 EXPORT_SYMBOL(xfrm_policy_walk);
 EXPORT_SYMBOL(xfrm_policy_flush);
