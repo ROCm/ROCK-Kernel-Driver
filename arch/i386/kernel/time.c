@@ -80,8 +80,7 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(i8253_lock);
 
-extern struct timer_opts timer_none;
-struct timer_opts* timer = &timer_none;
+struct timer_opts *cur_timer = &timer_none;
 
 /*
  * This version of gettimeofday has microsecond resolution
@@ -93,14 +92,14 @@ void do_gettimeofday(struct timeval *tv)
 	unsigned long usec, sec;
 
 	do {
+		unsigned long lost;
+
 		seq = read_seqbegin(&xtime_lock);
 
-		usec = timer->get_offset();
-		{
-			unsigned long lost = jiffies - wall_jiffies;
-			if (lost)
-				usec += lost * (1000000 / HZ);
-		}
+		usec = cur_timer->get_offset();
+		lost = jiffies - wall_jiffies;
+		if (lost)
+			usec += lost * (1000000 / HZ);
 		sec = xtime.tv_sec;
 		usec += (xtime.tv_nsec / 1000);
 	} while (read_seqretry(&xtime_lock, seq));
@@ -126,7 +125,7 @@ int do_settimeofday(struct timespec *tv)
 	 * wall time.  Discover what correction gettimeofday() would have
 	 * made, and then undo it!
 	 */
-	tv->tv_nsec -= timer->get_offset() * NSEC_PER_USEC;
+	tv->tv_nsec -= cur_timer->get_offset() * NSEC_PER_USEC;
 	tv->tv_nsec -= (jiffies - wall_jiffies) * TICK_NSEC;
 
 	while (tv->tv_nsec < 0) {
@@ -180,7 +179,7 @@ int timer_ack;
  */
 unsigned long long monotonic_clock(void)
 {
-	return timer->monotonic_clock();
+	return cur_timer->monotonic_clock();
 }
 EXPORT_SYMBOL(monotonic_clock);
 
@@ -189,7 +188,8 @@ EXPORT_SYMBOL(monotonic_clock);
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
-static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static inline void do_timer_interrupt(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_IO_APIC
 	if (timer_ack) {
@@ -259,7 +259,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	write_seqlock(&xtime_lock);
 
-	timer->mark_offset();
+	cur_timer->mark_offset();
  
 	do_timer_interrupt(irq, NULL, regs);
 
@@ -301,16 +301,13 @@ static int time_init_device(void)
 
 device_initcall(time_init_device);
 
-
 void __init time_init(void)
 {
-	
 	xtime.tv_sec = get_cmos_time();
 	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
 	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
 
-
-	timer = select_timer();
+	cur_timer = select_timer();
 	time_init_hook();
 }

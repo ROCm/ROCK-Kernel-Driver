@@ -25,4 +25,16 @@ extern struct timer_opts* select_timer(void);
 /* Modifiers for buggy PIT handling */
 
 extern int pit_latch_buggy;
+
+extern struct timer_opts *cur_timer;
+extern int timer_ack;
+
+/* list of externed timers */
+extern struct timer_opts timer_none;
+extern struct timer_opts timer_pit;
+extern struct timer_opts timer_tsc;
+#ifdef CONFIG_X86_CYCLONE_TIMER
+extern struct timer_opts timer_cyclone;
+#endif
+
 #endif

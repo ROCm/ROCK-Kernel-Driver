@@ -25,7 +25,7 @@ extern struct timer_opts* timer;
 
 void __delay(unsigned long loops)
 {
-	timer->delay(loops);
+	cur_timer->delay(loops);
 }
 
 inline void __const_udelay(unsigned long xloops)
