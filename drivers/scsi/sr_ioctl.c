@@ -331,6 +331,9 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 	int result;
 	unsigned char *buffer = kmalloc(32, GFP_KERNEL | SR_GFP_DMA(cd));
 
+	if (!buffer)
+		return -ENOMEM;
+
 	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
 	cgc.timeout = IOCTL_TIMEOUT;
 
