@@ -126,8 +126,7 @@ int __init nvram_init(void)
 	nvram_store = rtas_token("nvram-store");
 	printk(KERN_INFO "PPC64 nvram contains %d bytes\n", rtas_nvram_size);
 
-	misc_register(&nvram_dev);
-	return 0;
+	return misc_register(&nvram_dev);
 }
 
 void __exit nvram_cleanup(void)
