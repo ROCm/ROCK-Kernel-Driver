@@ -432,13 +432,13 @@ static int loop_end_io_transfer(struct bio *bio, unsigned int bytes_done, int er
 	return 0;
 }
 
-static struct bio *loop_copy_bio(struct bio *rbh, int gfp_mask)
+static struct bio *loop_copy_bio(struct bio *rbh)
 {
 	struct bio *bio;
 	struct bio_vec *bv;
 	int i;
 
-	bio = bio_alloc(gfp_mask, rbh->bi_vcnt);
+	bio = bio_alloc(__GFP_NOWARN, rbh->bi_vcnt);
 	if (!bio)
 		return NULL;
 
@@ -448,7 +448,7 @@ static struct bio *loop_copy_bio(struct bio *rbh, int gfp_mask)
 	__bio_for_each_segment(bv, rbh, i, 0) {
 		struct bio_vec *bbv = &bio->bi_io_vec[i];
 
-		bbv->bv_page = alloc_page(gfp_mask);
+		bbv->bv_page = alloc_page(__GFP_NOWARN|__GFP_HIGHMEM);
 		if (bbv->bv_page == NULL)
 			goto oom;
 
@@ -483,8 +483,7 @@ static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 		int flags = current->flags;
 
 		current->flags &= ~PF_MEMALLOC;
-		bio = loop_copy_bio(rbh,
-				    (GFP_ATOMIC & ~__GFP_HIGH) | __GFP_NOWARN);
+		bio = loop_copy_bio(rbh);
 		current->flags = flags;
 		if (bio == NULL)
 			blk_congestion_wait(WRITE, HZ/10);
