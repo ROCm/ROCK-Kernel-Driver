@@ -2174,7 +2174,8 @@ he_tasklet(unsigned long data)
 
 		switch (type) {
 			case ITYPE_RBRQ_THRESH:
-				hprintk("rbrq%d threshold\n", group);
+				HPRINTK("rbrq%d threshold\n", group);
+				/* fall through */
 			case ITYPE_RBRQ_TIMER:
 				if (he_service_rbrq(he_dev, group)) {
 					he_service_rbpl(he_dev, group);
@@ -2184,7 +2185,8 @@ he_tasklet(unsigned long data)
 				}
 				break;
 			case ITYPE_TBRQ_THRESH:
-				hprintk("tbrq%d threshold\n", group);
+				HPRINTK("tbrq%d threshold\n", group);
+				/* fall through */
 			case ITYPE_TPD_COMPLETE:
 				he_service_tbrq(he_dev, group);
 				break;
@@ -2197,17 +2199,16 @@ he_tasklet(unsigned long data)
 #endif /* USE_RBPS */
 				break;
 			case ITYPE_PHY:
+				HPRINTK("phy interrupt\n");
 #ifdef CONFIG_ATM_HE_USE_SUNI
 				HE_SPIN_UNLOCK(he_dev, flags);
 				if (he_dev->atm_dev->phy && he_dev->atm_dev->phy->interrupt)
 					he_dev->atm_dev->phy->interrupt(he_dev->atm_dev);
 				HE_SPIN_LOCK(he_dev, flags);
 #endif
-				HPRINTK("phy interrupt\n");
 				break;
 			case ITYPE_OTHER:
-				switch (type|group)
-				{
+				switch (type|group) {
 					case ITYPE_PARITY:
 						hprintk("parity error\n");
 						break;
@@ -2216,23 +2217,20 @@ he_tasklet(unsigned long data)
 						break;
 				}
 				break;
-			default:
-				if (he_dev->irq_head->isw == ITYPE_INVALID) {
-					/* see 8.1.1 -- check all queues */
+			case ITYPE_TYPE(ITYPE_INVALID):
+				/* see 8.1.1 -- check all queues */
 
-					HPRINTK("isw not updated 0x%x\n",
-						he_dev->irq_head->isw);
+				HPRINTK("isw not updated 0x%x\n", he_dev->irq_head->isw);
 
-					he_service_rbrq(he_dev, 0);
-					he_service_rbpl(he_dev, 0);
+				he_service_rbrq(he_dev, 0);
+				he_service_rbpl(he_dev, 0);
 #ifdef USE_RBPS
-					he_service_rbps(he_dev, 0);
+				he_service_rbps(he_dev, 0);
 #endif /* USE_RBPS */
-					he_service_tbrq(he_dev, 0);
-				}
-				else
-					hprintk("bad isw = 0x%x?\n",
-						he_dev->irq_head->isw);
+				he_service_tbrq(he_dev, 0);
+				break;
+			default:
+				hprintk("bad isw 0x%x?\n", he_dev->irq_head->isw);
 		}
 
 		he_dev->irq_head->isw = ITYPE_INVALID;
