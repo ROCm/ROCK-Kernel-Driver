@@ -8,6 +8,7 @@
 #define PSCHED_CLOCK_SOURCE	PSCHED_JIFFIES
 
 #include <linux/config.h>
+#include <linux/types.h>
 #include <linux/pkt_sched.h>
 #include <net/pkt_cls.h>
 
@@ -221,7 +222,7 @@ extern psched_time_t	psched_time_base;
 
 #define PSCHED_EXPORTLIST_2
 
-#if ~0UL == 0xFFFFFFFF
+#if BITS_PER_LONG <= 32
 
 #define PSCHED_WATCHER unsigned long
 
