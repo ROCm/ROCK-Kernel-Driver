@@ -755,7 +755,8 @@ static int NCR53c406a_bus_reset(Scsi_Cmnd * SCpnt)
 	return FAILED;
 }
 
-static int NCR53c406a_biosparm(Scsi_Disk * disk, struct block_device *dev,
+static int NCR53c406a_biosparm(struct scsi_disk *disk,
+                               struct block_device *dev,
 			       sector_t capacity, int *info_array)
 {
 	int size;

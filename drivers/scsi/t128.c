@@ -298,7 +298,7 @@ int __init t128_detect(Scsi_Host_Template * tpnt){
  * and matching the H_C_S coordinates to what DOS uses.
  */
 
-int t128_biosparam(struct scsi_device *₍sdev, struct block_device *bdev,
+int t128_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int * ip)
 {
   ip[0] = 64;
