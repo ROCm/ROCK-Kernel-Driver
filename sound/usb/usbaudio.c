@@ -87,7 +87,7 @@ MODULE_PARM_DESC(pid, "Product ID for the USB audio device.");
 MODULE_PARM_SYNTAX(pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
 MODULE_PARM(nrpacks, "i");
 MODULE_PARM_DESC(nrpacks, "Max. number of packets per URB.");
-MODULE_PARM_SYNTAX(nrpacks, SNDRV_ENABLED ",allows:{{2,10}}");
+MODULE_PARM_SYNTAX(nrpacks, SNDRV_ENABLED ",allows:{{1,10}}");
 MODULE_PARM(async_unlink, "i");
 MODULE_PARM_DESC(async_unlink, "Use async unlink mode.");
 MODULE_PARM_SYNTAX(async_unlink, SNDRV_BOOLEAN_TRUE_DESC);
@@ -2971,7 +2971,7 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 
 static int __init snd_usb_audio_init(void)
 {
-	if (nrpacks < 2 || nrpacks > MAX_PACKS) {
+	if (nrpacks < MIN_PACKS_URB || nrpacks > MAX_PACKS) {
 		printk(KERN_WARNING "invalid nrpacks value.\n");
 		return -EINVAL;
 	}
