@@ -265,7 +265,7 @@ typedef struct xfs_mount {
 #if XFS_BIG_FILESYSTEMS
 #define XFS_MOUNT_INO64		0x00000002
 #endif
-#define XFS_MOUNT_ROOTQCHECK	0x00000004
+			     /* 0x00000004	-- currently unused */
 			     /* 0x00000008	-- currently unused */
 #define XFS_MOUNT_FS_SHUTDOWN	0x00000010	/* atomic stop of all filesystem
 						   operations, typically for

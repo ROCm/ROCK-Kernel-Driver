@@ -560,7 +560,7 @@ xfs_mountfs(
 	xfs_daddr_t	d;
 	extern xfs_ioops_t xfs_iocore_xfs;	/* from xfs_iocore.c */
 	__uint64_t	ret64;
-	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
+	uint		quotaflags, quotaondisk;
 	uint		uquotaondisk = 0, gquotaondisk = 0;
 	boolean_t	needquotamount;
 	__int64_t	update_flags;
@@ -967,21 +967,13 @@ xfs_mountfs(
 
 	/*
 	 * Figure out if we'll need to do a quotacheck.
-	 * The requirements are a little different depending on whether
-	 * this fs is root or not.
 	 */
-	rootqcheck = (mp->m_dev == rootdev && quotaondisk && 
-		      ((mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT &&
-			(mp->m_sb.sb_qflags & XFS_UQUOTA_CHKD) == 0) ||
-		       (mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT &&
-			(mp->m_sb.sb_qflags & XFS_GQUOTA_CHKD) == 0)));
-	needquotacheck = rootqcheck ||	XFS_QM_NEED_QUOTACHECK(mp);
 	if (XFS_IS_QUOTA_ON(mp) || quotaondisk) {
 		/*
 		 * Call mount_quotas at this point only if we won't have to do
 		 * a quotacheck.
 		 */
-		if (quotaondisk && !needquotacheck) {
+		if (quotaondisk && !XFS_QM_NEED_QUOTACHECK(mp)) {
 			/*
 			 * If the xfs quota code isn't installed,
 			 * we have to reset the quotachk'd bit.
@@ -1020,10 +1012,6 @@ xfs_mountfs(
 	if (needquotamount) {
 		ASSERT(mp->m_qflags == 0);
 		mp->m_qflags = quotaflags;
-		rootqcheck = (mp->m_dev == rootdev && needquotacheck);
-		if (rootqcheck && (error = xfs_dev_is_read_only(mp,
-					"quotacheck")))
-			goto error2;
 		if (xfs_qm_mount_quotas(mp))
 			xfs_mount_reset_sbqflags(mp);
 	}

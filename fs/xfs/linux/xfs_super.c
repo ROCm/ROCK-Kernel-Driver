@@ -101,7 +101,6 @@ STATIC struct export_operations linvfs_export_ops;
 #define MNTOPT_NORECOVERY "norecovery"	/* don't run XFS recovery */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
 #define MNTOPT_QUOTA	"quota"		/* disk quotas */
-#define MNTOPT_MRQUOTA	"mrquota"	/* don't turnoff if SB has quotas on */
 #define MNTOPT_NOQUOTA	"noquota"	/* no quotas */
 #define MNTOPT_UQUOTA	"usrquota"	/* user quota enabled */
 #define MNTOPT_GQUOTA	"grpquota"	/* group quota enabled */
