@@ -44,7 +44,7 @@
 #endif /* CONFIG_ALL_PPC */
 
 #define DRV_NAME	"ata_k2"
-#define DRV_VERSION	"1.02"
+#define DRV_VERSION	"1.03"
 
 
 static u32 k2_sata_scr_read (struct ata_port *ap, unsigned int sc_reg)
