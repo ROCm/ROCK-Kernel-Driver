@@ -739,8 +739,7 @@ int snd_card_set_pm_callback(snd_card_t *card,
 	return 0;
 }
 
-#ifdef CONFIG_ISA
-static int snd_isa_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+static int snd_generic_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
 	snd_card_t *card = dev->data;
 
@@ -758,28 +757,29 @@ static int snd_isa_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data
 }
 
 /**
- * snd_card_set_isa_pm_callback - set the ISA power-management callbacks
+ * snd_card_set_dev_pm_callback - set the generic power-management callbacks
  * @card: soundcard structure
+ * @type: PM device type (PM_XXX)
  * @suspend: suspend callback function
  * @resume: resume callback function
  * @private_data: private data to pass to the callback functions
  *
  * Registers the power-management and sets the lowlevel callbacks for
- * the given ISA card.  These callbacks are called from the ALSA's
- * common PM handler and from the control API.
+ * the given card with the given PM type.  These callbacks are called
+ * from the ALSA's common PM handler and from the control API.
  */
-int snd_card_set_isa_pm_callback(snd_card_t *card,
+int snd_card_set_dev_pm_callback(snd_card_t *card, int type,
 				 int (*suspend)(snd_card_t *, unsigned int),
 				 int (*resume)(snd_card_t *, unsigned int),
 				 void *private_data)
 {
-	card->pm_dev = pm_register(PM_ISA_DEV, 0, snd_isa_pm_callback);
+	card->pm_dev = pm_register(type, 0, snd_generic_pm_callback);
 	if (! card->pm_dev)
 		return -ENOMEM;
 	card->pm_dev->data = card;
-	return snd_card_set_pm_callback(card, suspend, resume, private_data);
+	snd_card_set_pm_callback(card, suspend, resume, private_data);
+	return 0;
 }
-#endif
 
 #ifdef CONFIG_PCI
 int snd_card_pci_suspend(struct pci_dev *dev, u32 state)
