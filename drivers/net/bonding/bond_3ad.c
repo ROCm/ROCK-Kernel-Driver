@@ -47,6 +47,9 @@
  *	- Send LACPDU as highest priority packet to further fix the above
  *	  problem on very high Tx traffic load where packets may get dropped
  *	  by the slave.
+ *
+ * 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Code cleanup and style changes
  */
 
 //#define BONDING_DEBUG 1
@@ -2416,6 +2419,8 @@ int bond_3ad_xmit_xor(struct sk_buff *skb, struct net_device *dev)
 			skb->dev = slave->dev;			
 			skb->priority = 1;
 			dev_queue_xmit(skb);
+
+			goto out;
 		}
 	}
 

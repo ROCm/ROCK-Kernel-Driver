@@ -28,6 +28,9 @@
  * 2003/08/06 - Amir Noam <amir.noam at intel dot com>
  *	- Add support for setting bond's MAC address with special
  *	  handling required for ALB/TLB.
+ *
+ * 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Code cleanup and style changes
  */
 
 //#define BONDING_DEBUG 1
@@ -52,11 +55,11 @@
 
 
 #define ALB_TIMER_TICKS_PER_SEC	    10	/* should be a divisor of HZ */
-#define BOND_TLB_REBALANCE_INTERVAL 10	/* in seconds, periodic re-balancing
-					 * used for division - never set
+#define BOND_TLB_REBALANCE_INTERVAL 10	/* In seconds, periodic re-balancing.
+					 * Used for division - never set
 					 * to zero !!!
 					 */
-#define BOND_ALB_LP_INTERVAL	    1	/* in seconds periodic send of
+#define BOND_ALB_LP_INTERVAL	    1	/* In seconds, periodic send of
 					 * learning packets to the switch
 					 */
 
@@ -68,7 +71,7 @@
 
 #define TLB_HASH_TABLE_SIZE 256	/* The size of the clients hash table.
 				 * Note that this value MUST NOT be smaller
-				 * because the key hash table BYTE wide !
+				 * because the key hash table is BYTE wide !
 				 */
 
 
@@ -143,7 +146,7 @@ static inline void tlb_init_table_entry(struct tlb_client_info *entry, int save_
 {
 	if (save_load) {
 		entry->load_history = 1 + entry->tx_bytes /
-			BOND_TLB_REBALANCE_INTERVAL;
+				      BOND_TLB_REBALANCE_INTERVAL;
 		entry->tx_bytes = 0;
 	}
 
@@ -380,15 +383,18 @@ out:
 static struct slave *rlb_next_rx_slave(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
-	struct slave *rx_slave = NULL, *slave;
+	struct slave *rx_slave, *slave, *start_at;
 	int i = 0;
 
-	slave = bond_info->next_rx_slave;
-	if (!slave) {
-		slave = bond->first_slave;
+	if (bond_info->next_rx_slave) {
+		start_at = bond_info->next_rx_slave;
+	} else {
+		start_at = bond->first_slave;
 	}
 
-	bond_for_each_slave(bond, slave, i) {
+	rx_slave = NULL;
+
+	bond_for_each_slave_from(bond, slave, i, start_at) {
 		if (SLAVE_IS_OK(slave)) {
 			if (!rx_slave) {
 				rx_slave = slave;
@@ -906,7 +912,7 @@ static void alb_swap_mac_addr(struct bonding *bond, struct slave *slave1, struct
 	}
 
 	if (bond->alb_info.rlb_enabled && slaves_state_differ) {
-			/* A disabled slave was assigned an active mac addr */
+		/* A disabled slave was assigned an active mac addr */
 		rlb_teach_disabled_mac_on_primary(bond,
 						  disabled_slave->dev->dev_addr);
 	}
@@ -928,10 +934,8 @@ static void alb_swap_mac_addr(struct bonding *bond, struct slave *slave1, struct
  */
 static void alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *slave)
 {
-	struct slave *tmp_slave;
 	int perm_curr_diff;
 	int perm_bond_diff;
-	int i, found = 0;
 
 	perm_curr_diff = memcmp(slave->perm_hwaddr,
 				slave->dev->dev_addr,
@@ -939,7 +943,11 @@ static void alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *sla
 	perm_bond_diff = memcmp(slave->perm_hwaddr,
 				bond->dev->dev_addr,
 				ETH_ALEN);
+
 	if (perm_curr_diff && perm_bond_diff) {
+		struct slave *tmp_slave;
+		int i, found = 0;
+
 		bond_for_each_slave(bond, tmp_slave, i) {
 			if (!memcmp(slave->perm_hwaddr,
 				    tmp_slave->dev->dev_addr,
@@ -1017,8 +1025,8 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
 		return 0;
 	}
 
-	/* the slave's address is equal to the address of the bond
-	 * search for a spare address in the bond for this slave.
+	/* The slave's address is equal to the address of the bond.
+	 * Search for a spare address in the bond for this slave.
 	 */
 	free_mac_slave = NULL;
 
@@ -1469,7 +1477,7 @@ void bond_alb_handle_link_change(struct bonding *bond, struct slave *slave, char
 void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave)
 {
 	struct slave *swap_slave;
-	int i, found = 0;
+	int i;
 
 	if (bond->curr_active_slave == new_slave) {
 		return;
@@ -1492,18 +1500,19 @@ void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave
 	 * i.e. swap mac addresses of old curr_active_slave and new curr_active_slave
 	 */
 	if (!swap_slave) {
+		struct slave *tmp_slave;
 		/* find slave that is holding the bond's mac address */
-		bond_for_each_slave(bond, swap_slave, i) {
-			if (!memcmp(swap_slave->dev->dev_addr,
+		bond_for_each_slave(bond, tmp_slave, i) {
+			if (!memcmp(tmp_slave->dev->dev_addr,
 				    bond->dev->dev_addr, ETH_ALEN)) {
-				found = 1;
+				swap_slave = tmp_slave;
 				break;
 			}
 		}
 	}
 
 	/* curr_active_slave must be set before calling alb_swap_mac_addr */
-	if (found) {
+	if (swap_slave) {
 		/* swap mac address */
 		alb_swap_mac_addr(bond, swap_slave, new_slave);
 	} else {
@@ -1519,9 +1528,9 @@ int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr)
 {
 	struct bonding *bond = (struct bonding *)bond_dev->priv;
 	struct sockaddr *sa = addr;
-	struct slave *swap_slave;
+	struct slave *slave, *swap_slave;
 	int res;
-	int i, found = 0;
+	int i;
 
 	if (!is_valid_ether_addr(sa->sa_data)) {
 		return -EADDRNOTAVAIL;
@@ -1542,14 +1551,16 @@ int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr)
 		return 0;
 	}
 
-	bond_for_each_slave(bond, swap_slave, i) {
-		if (!memcmp(swap_slave->dev->dev_addr, bond_dev->dev_addr, ETH_ALEN)) {
-			found = 1;
+	swap_slave = NULL;
+
+	bond_for_each_slave(bond, slave, i) {
+		if (!memcmp(slave->dev->dev_addr, bond_dev->dev_addr, ETH_ALEN)) {
+			swap_slave = slave;
 			break;
 		}
 	}
 
-	if (found) {
+	if (swap_slave) {
 		alb_swap_mac_addr(bond, swap_slave, bond->curr_active_slave);
 	} else {
 		alb_set_slave_mac_addr(bond->curr_active_slave, bond_dev->dev_addr,

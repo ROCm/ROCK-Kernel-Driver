@@ -22,6 +22,9 @@
  *
  * 2003/05/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Added support for Transmit load balancing mode.
+ *
+ * 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Code cleanup and style changes
  */
 
 #ifndef _LINUX_BONDING_H
@@ -29,11 +32,12 @@
 
 #include <linux/timer.h>
 #include <linux/proc_fs.h>
+#include <linux/if_bonding.h>
 #include "bond_3ad.h"
 #include "bond_alb.h"
 
-#define DRV_VERSION	"2.4.1"
-#define DRV_RELDATE	"September 15, 2003"
+#define DRV_VERSION	"2.5.0"
+#define DRV_RELDATE	"December 1, 2003"
 #define DRV_NAME	"bonding"
 #define DRV_DESCRIPTION	"Ethernet Channel Bonding Driver"
 
@@ -68,6 +72,65 @@
 		     netif_running((slave)->dev)     && \
 		     ((slave)->link == BOND_LINK_UP) && \
 		     ((slave)->state == BOND_STATE_ACTIVE))
+
+
+#define USES_PRIMARY(mode)				\
+		(((mode) == BOND_MODE_ACTIVEBACKUP) ||	\
+		 ((mode) == BOND_MODE_TLB)          ||	\
+		 ((mode) == BOND_MODE_ALB))
+
+/*
+ * Less bad way to call ioctl from within the kernel; this needs to be
+ * done some other way to get the call out of interrupt context.
+ * Needs "ioctl" variable to be supplied by calling context.
+ */
+#define IOCTL(dev, arg, cmd) ({		\
+	int res = 0;			\
+	mm_segment_t fs = get_fs();	\
+	set_fs(get_ds());		\
+	res = ioctl(dev, arg, cmd);	\
+	set_fs(fs);			\
+	res; })
+
+/**
+ * bond_for_each_slave_from - iterate the slaves list from a starting point
+ * @bond:	the bond holding this list.
+ * @pos:	current slave.
+ * @cnt:	counter for max number of moves
+ * @start:	starting point.
+ *
+ * Caller must hold bond->lock
+ */
+#define bond_for_each_slave_from(bond, pos, cnt, start)	\
+	for (cnt = 0, pos = start;				\
+	     cnt < (bond)->slave_cnt;				\
+             cnt++, pos = (pos)->next)
+
+/**
+ * bond_for_each_slave_from_to - iterate the slaves list from start point to stop point
+ * @bond:	the bond holding this list.
+ * @pos:	current slave.
+ * @cnt:	counter for number max of moves
+ * @start:	start point.
+ * @stop:	stop point.
+ *
+ * Caller must hold bond->lock
+ */
+#define bond_for_each_slave_from_to(bond, pos, cnt, start, stop)	\
+	for (cnt = 0, pos = start;					\
+	     ((cnt < (bond)->slave_cnt) && (pos != (stop)->next));	\
+             cnt++, pos = (pos)->next)
+
+/**
+ * bond_for_each_slave - iterate the slaves list from head
+ * @bond:	the bond holding this list.
+ * @pos:	current slave.
+ * @cnt:	counter for max number of moves
+ *
+ * Caller must hold bond->lock
+ */
+#define bond_for_each_slave(bond, pos, cnt)	\
+		bond_for_each_slave_from(bond, pos, cnt, (bond)->first_slave)
 
 
 struct slave {
@@ -121,46 +184,6 @@ struct bonding {
 };
 
 /**
- * bond_for_each_slave_from - iterate the slaves list from a starting point
- * @bond:	the bond holding this list.
- * @pos:	current slave.
- * @cnt:	counter for max number of moves
- * @start:	starting point.
- *
- * Caller must hold bond->lock
- */
-#define bond_for_each_slave_from(bond, pos, cnt, start)	\
-	for (cnt = 0, pos = start;				\
-	     cnt < (bond)->slave_cnt;				\
-             cnt++, pos = (pos)->next)
-
-/**
- * bond_for_each_slave_from_to - iterate the slaves list from start point to stop point
- * @bond:	the bond holding this list.
- * @pos:	current slave.
- * @cnt:	counter for number max of moves
- * @start:	start point.
- * @stop:	stop point.
- *
- * Caller must hold bond->lock
- */
-#define bond_for_each_slave_from_to(bond, pos, cnt, start, stop)	\
-	for (cnt = 0, pos = start;					\
-	     ((cnt < (bond)->slave_cnt) && (pos != (stop)->next));	\
-             cnt++, pos = (pos)->next)
-
-/**
- * bond_for_each_slave - iterate the slaves list from head
- * @bond:	the bond holding this list.
- * @pos:	current slave.
- * @cnt:	counter for max number of moves
- *
- * Caller must hold bond->lock
- */
-#define bond_for_each_slave(bond, pos, cnt)	\
-		bond_for_each_slave_from(bond, pos, cnt, (bond)->first_slave)
-
-/**
  * Returns NULL if the net_device does not belong to any of the bond's slaves
  *
  * Caller must hold bond lock for read
@@ -188,9 +211,17 @@ extern inline struct bonding *bond_get_bond_by_slave(struct slave *slave)
 	return (struct bonding *)slave->dev->master->priv;
 }
 
-/* Forward declarations */
-void bond_set_slave_active_flags(struct slave *slave);
-void bond_set_slave_inactive_flags(struct slave *slave);
+extern inline void bond_set_slave_inactive_flags(struct slave *slave)
+{
+	slave->state = BOND_STATE_BACKUP;
+	slave->dev->flags |= IFF_NOARP;
+}
+
+extern inline void bond_set_slave_active_flags(struct slave *slave)
+{
+	slave->state = BOND_STATE_ACTIVE;
+	slave->dev->flags &= ~IFF_NOARP;
+}
 
 #endif /* _LINUX_BONDING_H */
 

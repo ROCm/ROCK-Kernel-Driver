@@ -28,6 +28,9 @@
  * 2003/05/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Renamed bond_3ad_link_status_changed() to
  *	  bond_3ad_handle_link_change() for compatibility with TLB.
+ *
+ * 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Code cleanup and style changes
  */
 
 #ifndef __BOND_3AD_H__
