@@ -436,13 +436,13 @@ gss_pipe_upcall(struct file *filp, struct rpc_pipe_msg *msg,
 	return mlen;
 }
 
+#define MSG_BUF_MAXSIZE 1024
+
 static ssize_t
 gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 {
-	char buf[1024];
 	struct xdr_netobj obj = {
 		.len	= mlen,
-		.data	= buf,
 	};
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct rpc_inode *rpci = RPC_I(inode);
@@ -458,11 +458,16 @@ gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 	int err;
 	int gss_err;
 
-	if (mlen > sizeof(buf))
-		return -ENOSPC;
-	left = copy_from_user(buf, src, mlen);
-	if (left)
-		return -EFAULT;
+	if (mlen > MSG_BUF_MAXSIZE)
+		return -EFBIG;
+	obj.data = kmalloc(mlen, GFP_KERNEL);
+	if (!obj.data)
+		return -ENOMEM;
+	left = copy_from_user(obj.data, src, mlen);
+	if (left) {
+		err = -EFAULT;
+		goto out;
+	}
 	clnt = rpci->private;
 	atomic_inc(&clnt->cl_users);
 	auth = clnt->cl_auth;
@@ -487,12 +492,15 @@ gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 	} else
 		spin_unlock(&gss_auth->lock);
 	rpc_release_client(clnt);
+	kfree(obj.data);
 	dprintk("RPC:      gss_pipe_downcall returning length %u\n", mlen);
 	return mlen;
 err:
 	if (ctx)
 		gss_destroy_ctx(ctx);
 	rpc_release_client(clnt);
+out:
+	kfree(obj.data);
 	dprintk("RPC:      gss_pipe_downcall returning %d\n", err);
 	return err;
 }
