@@ -181,6 +181,7 @@ repeat_lock_task:
 static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 {
 	_raw_spin_unlock_irqrestore(&rq->lock, *flags);
+	preempt_check_resched();
 }
 
 /*
