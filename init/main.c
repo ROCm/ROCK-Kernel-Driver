@@ -390,7 +390,6 @@ asmlinkage void __init start_kernel(void)
 	fork_init(mempages);
 	proc_caches_init();
 	vfs_caches_init(mempages);
-	buffer_init(mempages);
 	radix_tree_init();
 #if defined(CONFIG_ARCH_S390)
 	ccwcache_init();

@@ -592,9 +592,6 @@ repeat:
 			JBUFFER_TRACE(jh, "file as BJ_Reserved");
 			__journal_file_buffer(jh, transaction, BJ_Reserved);
 
-			/* And pull it off BUF_DIRTY, onto BUF_CLEAN */
-			refile_buffer(jh2bh(jh));
-
 			/*
 			 * The buffer is now hidden from bdflush.   It is
 			 * metadata against the current transaction.
@@ -812,8 +809,6 @@ int journal_get_create_access (handle_t *handle, struct buffer_head *bh)
 		jh->b_transaction = transaction;
 		JBUFFER_TRACE(jh, "file as BJ_Reserved");
 		__journal_file_buffer(jh, transaction, BJ_Reserved);
-		JBUFFER_TRACE(jh, "refile");
-		refile_buffer(jh2bh(jh));
 	} else if (jh->b_transaction == journal->j_committing_transaction) {
 		JBUFFER_TRACE(jh, "set next transaction");
 		jh->b_next_transaction = transaction;
@@ -1099,7 +1094,6 @@ int journal_dirty_metadata (handle_t *handle, struct buffer_head *bh)
 	
 	spin_lock(&journal_datalist_lock);
 	set_bit(BH_JBDDirty, &bh->b_state);
-	set_buffer_flushtime(bh);
 
 	J_ASSERT_JH(jh, jh->b_transaction != NULL);
 	
@@ -1691,7 +1685,7 @@ int journal_try_to_free_buffers(journal_t *journal,
 out:
 	ret = 0;
 	if (call_ttfb)
-		ret = try_to_free_buffers(page, gfp_mask);
+		ret = try_to_free_buffers(page);
 	return ret;
 }
 
@@ -1864,7 +1858,7 @@ zap_buffer:
 	if (buffer_dirty(bh))
 		mark_buffer_clean(bh);
 	J_ASSERT_BH(bh, !buffer_jdirty(bh));
-	clear_bit(BH_Uptodate, &bh->b_state);
+//	clear_bit(BH_Uptodate, &bh->b_state);
 	clear_bit(BH_Mapped, &bh->b_state);
 	clear_bit(BH_Req, &bh->b_state);
 	clear_bit(BH_New, &bh->b_state);
@@ -1913,7 +1907,7 @@ int journal_flushpage(journal_t *journal,
 	unlock_journal(journal);
 
 	if (!offset) {
-		if (!may_free || !try_to_free_buffers(page, 0))
+		if (!may_free || !try_to_free_buffers(page))
 			return 0;
 		J_ASSERT(!page_has_buffers(page));
 	}
@@ -2021,9 +2015,6 @@ void __journal_refile_buffer(struct journal_head *jh)
 	if (jh->b_transaction != NULL) {
 		__journal_file_buffer(jh, jh->b_transaction, BJ_Metadata);
 		J_ASSERT_JH(jh, jh->b_transaction->t_state == T_RUNNING);
-	} else {
-		/* Onto BUF_DIRTY for writeback */
-		refile_buffer(jh2bh(jh));
 	}
 }
 

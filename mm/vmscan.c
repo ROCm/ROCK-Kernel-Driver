@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <linux/highmem.h>
 #include <linux/file.h>
+#include <linux/writeback.h>
 #include <linux/compiler.h>
 
 #include <asm/pgalloc.h>
@@ -428,7 +429,8 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 
 		mapping = page->mapping;
 
-		if (PageDirty(page) && is_page_cache_freeable(page) && mapping) {
+		if (PageDirty(page) && is_page_cache_freeable(page) &&
+				page->mapping && (gfp_mask & __GFP_FS)) {
 			/*
 			 * It is not critical here to write it only if
 			 * the page is unmapped beause any direct writer
@@ -437,16 +439,30 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			 * pinned it and after the I/O to the page is finished,
 			 * so the direct writes to the page cannot get lost.
 			 */
+			struct address_space_operations *a_ops;
+			int (*writeback)(struct page *, int *);
 			int (*writepage)(struct page *);
 
-			writepage = mapping->a_ops->writepage;
-			if ((gfp_mask & __GFP_FS) && writepage) {
+			/*
+			 * There's no guarantee that writeback() will actually
+			 * start I/O against *this* page.  Which is broken if we're
+			 * trying to free memory in a particular zone.  FIXME.
+			 */
+			a_ops = mapping->a_ops;
+			writeback = a_ops->vm_writeback;
+			writepage = a_ops->writepage;
+			if (writeback || writepage) {
 				ClearPageDirty(page);
 				SetPageLaunder(page);
 				page_cache_get(page);
 				spin_unlock(&pagemap_lru_lock);
 
-				writepage(page);
+				if (writeback) {
+					int nr_to_write = WRITEOUT_PAGES;
+					writeback(page, &nr_to_write);
+				} else {
+					writepage(page);
+				}
 				page_cache_release(page);
 
 				spin_lock(&pagemap_lru_lock);

@@ -180,7 +180,9 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 	
-
+/*
+ * AKPM: fixme.  unneeded stuff here.
+ */
 static int __block_fsync(struct inode * inode)
 {
 	int ret, err;
@@ -759,6 +761,8 @@ struct address_space_operations def_blk_aops = {
 	sync_page: block_sync_page,
 	prepare_write: blkdev_prepare_write,
 	commit_write: blkdev_commit_write,
+	writeback_mapping: generic_writeback_mapping,
+	vm_writeback: generic_vm_writeback,
 	direct_IO: blkdev_direct_IO,
 };
 

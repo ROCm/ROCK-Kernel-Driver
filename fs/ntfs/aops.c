@@ -120,7 +120,7 @@ static int ntfs_file_read_block(struct page *page)
 	blocksize = 1 << blocksize_bits;
 
 	if (!page_has_buffers(page))
-		create_empty_buffers(page, blocksize);
+		create_empty_buffers(page, blocksize, 0);
 	bh = head = page_buffers(page);
 	if (!bh)
 		return -ENOMEM;
@@ -417,7 +417,7 @@ static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
 	blocksize_bits = vol->sb->s_blocksize_bits;
 
 	if (!page_has_buffers(page))
-		create_empty_buffers(page, blocksize);
+		create_empty_buffers(page, blocksize, 0);
 	bh = head = page_buffers(page);
 	if (!bh)
 		return -ENOMEM;
@@ -656,7 +656,7 @@ int ntfs_mst_readpage(struct file *dir, struct page *page)
 	blocksize = 1 << blocksize_bits;
 
 	if (!page_has_buffers(page))
-		create_empty_buffers(page, blocksize);
+		create_empty_buffers(page, blocksize, 0);
 	bh = head = page_buffers(page);
 	if (!bh)
 		return -ENOMEM;

@@ -62,8 +62,6 @@ static int __try_to_free_cp_buf(struct journal_head *jh)
 		__journal_remove_checkpoint(jh);
 		__journal_remove_journal_head(bh);
 		BUFFER_TRACE(bh, "release");
-		/* BUF_LOCKED -> BUF_CLEAN (fwiw) */
-		refile_buffer(bh);
 		__brelse(bh);
 		ret = 1;
 	}
@@ -149,8 +147,7 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 		/*
 		 * We used to test for (jh->b_list != BUF_CLEAN) here.
 		 * But unmap_underlying_metadata() can place buffer onto
-		 * BUF_CLEAN. Since refile_buffer() no longer takes buffers
-		 * off checkpoint lists, we cope with it here
+		 * BUF_CLEAN.
 		 */
 		/*
 		 * AKPM: I think the buffer_jdirty test is redundant - it
@@ -161,7 +158,6 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 			BUFFER_TRACE(bh, "remove from checkpoint");
 			__journal_remove_checkpoint(jh);
 			__journal_remove_journal_head(bh);
-			refile_buffer(bh);
 			__brelse(bh);
 			ret = 1;
 		}

@@ -123,10 +123,8 @@ static void init_journal_hash(struct super_block *p_s_sb) {
 ** more details.
 */
 static int reiserfs_clean_and_file_buffer(struct buffer_head *bh) {
-  if (bh) {
-    clear_bit(BH_Dirty, &bh->b_state) ;
-    refile_buffer(bh) ;
-  }
+  if (bh)
+    mark_buffer_clean(bh);
   return 0 ;
 }
 
@@ -1079,7 +1077,6 @@ free_cnode:
 	if (!buffer_uptodate(cn->bh)) {
 	  reiserfs_panic(s, "journal-949: buffer write failed\n") ;
 	}
-	refile_buffer(cn->bh) ;
         brelse(cn->bh) ;
       }
       cn = cn->next ;
@@ -3125,7 +3122,7 @@ printk("journal-2020: do_journal_end: BAD desc->j_len is ZERO\n") ;
   SB_JOURNAL_LIST_INDEX(p_s_sb) = jindex ;
 
   /* write any buffers that must hit disk before this commit is done */
-  fsync_buffers_list(&(SB_JOURNAL(p_s_sb)->j_dirty_buffers)) ;
+  fsync_buffers_list(NULL, &(SB_JOURNAL(p_s_sb)->j_dirty_buffers)) ;
 
   /* honor the flush and async wishes from the caller */
   if (flush) {

@@ -474,7 +474,6 @@ static struct buffer_head *raid5_build_block (struct stripe_head *sh, int i)
 
 	bh->b_state	= (1 << BH_Req) | (1 << BH_Mapped);
 	bh->b_size	= sh->size;
-	bh->b_list	= BUF_LOCKED;
 	return bh;
 }
 

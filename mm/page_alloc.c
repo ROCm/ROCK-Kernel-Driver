@@ -525,6 +525,33 @@ unsigned int nr_free_buffer_pages (void)
 	return sum;
 }
 
+/*
+ * Amount of free RAM allocatable as pagecache memory:
+ */
+unsigned int nr_free_pagecache_pages(void)
+{
+	pg_data_t *pgdat = pgdat_list;
+	unsigned int sum = 0;
+
+	do {
+		zonelist_t *zonelist = pgdat->node_zonelists +
+				(GFP_HIGHUSER & GFP_ZONEMASK);
+		zone_t **zonep = zonelist->zones;
+		zone_t *zone;
+
+		for (zone = *zonep++; zone; zone = *zonep++) {
+			unsigned long size = zone->size;
+			unsigned long high = zone->pages_high;
+			if (size > high)
+				sum += size - high;
+		}
+
+		pgdat = pgdat->node_next;
+	} while (pgdat);
+
+	return sum;
+}
+
 #if CONFIG_HIGHMEM
 unsigned int nr_free_highpages (void)
 {

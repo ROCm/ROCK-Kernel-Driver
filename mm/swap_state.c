@@ -36,12 +36,23 @@ static struct address_space_operations swap_aops = {
 	sync_page: block_sync_page,
 };
 
+/*
+ * swapper_inode is needed only for for i_bufferlist_lock. This
+ * avoid special-casing in other parts of the kernel.
+ */
+static struct inode swapper_inode = {
+	i_bufferlist_lock:	SPIN_LOCK_UNLOCKED,
+	i_mapping:		&swapper_space,
+};
+
 struct address_space swapper_space = {
 	page_tree:	RADIX_TREE_INIT(GFP_ATOMIC),
 	page_lock:	RW_LOCK_UNLOCKED,
 	clean_pages:	LIST_HEAD_INIT(swapper_space.clean_pages),
 	dirty_pages:	LIST_HEAD_INIT(swapper_space.dirty_pages),
+	io_pages:	LIST_HEAD_INIT(swapper_space.io_pages),
 	locked_pages:	LIST_HEAD_INIT(swapper_space.locked_pages),
+	host:		&swapper_inode,
 	a_ops:		&swap_aops,
 	i_shared_lock:	SPIN_LOCK_UNLOCKED,
 };

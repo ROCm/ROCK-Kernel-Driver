@@ -361,8 +361,6 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 
 #endif /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
 
-extern void FASTCALL(set_page_dirty(struct page *));
-
 /*
  * Error return values for the *_nopage functions
  */
@@ -404,6 +402,26 @@ extern int ptrace_check_attach(struct task_struct *task, int kill);
 
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
 		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas);
+
+int __set_page_dirty_buffers(struct page *page);
+int __set_page_dirty_nobuffers(struct page *page);
+
+/*
+ * If the mapping doesn't provide a set_page_dirty a_op, then
+ * just fall through and assume that it wants buffer_heads.
+ * FIXME: make the method unconditional.
+ */
+static inline int set_page_dirty(struct page *page)
+{
+	if (page->mapping) {
+		int (*spd)(struct page *);
+
+		spd = page->mapping->a_ops->set_page_dirty;
+		if (spd)
+			return (*spd)(page);
+	}
+	return __set_page_dirty_buffers(page);
+}
 
 /*
  * On a two-level page table, this ends up being trivial. Thus the
@@ -496,6 +514,9 @@ extern void truncate_inode_pages(struct address_space *, loff_t);
 extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned int);
 extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
+/* mm/page-writeback.c */
+int generic_writeback_mapping(struct address_space *mapping, int *nr_to_write);
+
 /* readahead.c */
 #define VM_MAX_READAHEAD	128	/* kbytes */
 #define VM_MIN_READAHEAD	16	/* kbytes (includes current page) */
@@ -549,9 +570,6 @@ static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * m
 }
 
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
-
-extern int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
-extern int pdflush_flush(unsigned long nr_pages);
 
 extern struct page * vmalloc_to_page(void *addr);
 extern unsigned long get_page_cache_size(void);

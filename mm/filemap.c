@@ -11,28 +11,18 @@
  */
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/shm.h>
-#include <linux/mman.h>
-#include <linux/locks.h>
-#include <linux/pagemap.h>
-#include <linux/swap.h>
-#include <linux/smp_lock.h>
-#include <linux/blkdev.h>
-#include <linux/file.h>
-#include <linux/swapctl.h>
-#include <linux/init.h>
-#include <linux/mm.h>
-#include <linux/iobuf.h>
 #include <linux/compiler.h>
 #include <linux/fs.h>
+#include <linux/mm.h>
+#include <linux/mman.h>
+#include <linux/pagemap.h>
+#include <linux/file.h>
+#include <linux/iobuf.h>
 #include <linux/hash.h>
-#include <linux/blkdev.h>
+#include <linux/writeback.h>
 
-#include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/mman.h>
-
-#include <linux/highmem.h>
 
 /*
  * Shared mappings implemented 30.11.1994. It's not fully working yet,
@@ -49,12 +39,16 @@
 
 /*
  * Lock ordering:
- *	pagemap_lru_lock ==> page_lock ==> i_shared_lock
+ *
+ *  pagemap_lru_lock
+ *  ->i_shared_lock		(vmtruncate)
+ *    ->i_bufferlist_lock	(__free_pte->__set_page_dirty_buffers)
+ *      ->unused_list_lock	(try_to_free_buffers)
+ *        ->mapping->page_lock
+ *      ->inode_lock		(__mark_inode_dirty)
+ *        ->sb_lock		(fs/fs-writeback.c)
  */
 spinlock_t pagemap_lru_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
-
-#define CLUSTER_PAGES		(1 << page_cluster)
-#define CLUSTER_OFFSET(x)	(((x) >> page_cluster) << page_cluster)
 
 /*
  * Remove a page from the page cache and free it. Caller has to make
@@ -95,26 +89,6 @@ static inline int sync_page(struct page *page)
 	if (mapping && mapping->a_ops && mapping->a_ops->sync_page)
 		return mapping->a_ops->sync_page(page);
 	return 0;
-}
-
-/*
- * Add a page to the dirty page list.
- */
-void set_page_dirty(struct page *page)
-{
-	if (!TestSetPageDirty(page)) {
-		struct address_space *mapping = page->mapping;
-
-		if (mapping) {
-			write_lock(&mapping->page_lock);
-			list_del(&page->list);
-			list_add(&page->list, &mapping->dirty_pages);
-			write_unlock(&mapping->page_lock);
-
-			if (mapping->host)
-				mark_inode_dirty_pages(mapping->host);
-		}
-	}
 }
 
 /**
@@ -194,20 +168,19 @@ static void truncate_complete_page(struct page *page)
 	/* Leave it on the LRU if it gets converted into anonymous buffers */
 	if (!PagePrivate(page) || do_flushpage(page, 0))
 		lru_cache_del(page);
-
-	/*
-	 * We remove the page from the page cache _after_ we have
-	 * destroyed all buffer-cache references to it. Otherwise some
-	 * other process might think this inode page is not in the
-	 * page cache and creates a buffer-cache alias to it causing
-	 * all sorts of fun problems ...  
-	 */
 	ClearPageDirty(page);
 	ClearPageUptodate(page);
 	remove_inode_page(page);
 	page_cache_release(page);
 }
 
+/*
+ * Writeback walks the page list in ->prev order, which is low-to-high file
+ * offsets in the common case where he file was written linearly. So truncate
+ * walks the page list in the opposite (->next) direction, to avoid getting
+ * into lockstep with writeback's cursor.  To prune as many pages as possible
+ * before the truncate cursor collides with the writeback cursor.
+ */
 static int truncate_list_pages(struct address_space *mapping,
 	struct list_head *head, unsigned long start, unsigned *partial)
 {
@@ -216,7 +189,7 @@ static int truncate_list_pages(struct address_space *mapping,
 	int unlocked = 0;
 
  restart:
-	curr = head->prev;
+	curr = head->next;
 	while (curr != head) {
 		unsigned long offset;
 
@@ -233,10 +206,10 @@ static int truncate_list_pages(struct address_space *mapping,
 			list_del(head);
 			if (!failed)
 				/* Restart after this page */
-				list_add_tail(head, curr);
+				list_add(head, curr);
 			else
 				/* Restart on this page */
-				list_add(head, curr);
+				list_add_tail(head, curr);
 
 			write_unlock(&mapping->page_lock);
 			unlocked = 1;
@@ -262,7 +235,7 @@ static int truncate_list_pages(struct address_space *mapping,
 			write_lock(&mapping->page_lock);
 			goto restart;
 		}
-		curr = curr->prev;
+		curr = curr->next;
 	}
 	return unlocked;
 }
@@ -284,10 +257,12 @@ void truncate_inode_pages(struct address_space * mapping, loff_t lstart)
 
 	write_lock(&mapping->page_lock);
 	do {
-		unlocked = truncate_list_pages(mapping,
-				&mapping->clean_pages, start, &partial);
+		unlocked |= truncate_list_pages(mapping,
+				&mapping->io_pages, start, &partial);
 		unlocked |= truncate_list_pages(mapping,
 				&mapping->dirty_pages, start, &partial);
+		unlocked = truncate_list_pages(mapping,
+				&mapping->clean_pages, start, &partial);
 		unlocked |= truncate_list_pages(mapping,
 				&mapping->locked_pages, start, &partial);
 	} while (unlocked);
@@ -305,6 +280,7 @@ static inline int invalidate_this_page2(struct address_space * mapping,
 	/*
 	 * The page is locked and we hold the mapping lock as well
 	 * so both page_count(page) and page_buffers stays constant here.
+	 * AKPM: fixme: No global lock any more.  Is this still OK?
 	 */
 	if (page_count(page) == 1 + !!page_has_buffers(page)) {
 		/* Restart after this page */
@@ -322,7 +298,7 @@ static inline int invalidate_this_page2(struct address_space * mapping,
 
 			page_cache_get(page);
 			write_unlock(&mapping->page_lock);
-			block_invalidate_page(page);
+			block_flushpage(page, 0);
 		} else
 			unlocked = 0;
 
@@ -394,6 +370,8 @@ void invalidate_inode_pages2(struct address_space * mapping)
 		unlocked |= invalidate_list_pages2(mapping,
 				&mapping->dirty_pages);
 		unlocked |= invalidate_list_pages2(mapping,
+				&mapping->io_pages);
+		unlocked |= invalidate_list_pages2(mapping,
 				&mapping->locked_pages);
 	} while (unlocked);
 	write_unlock(&mapping->page_lock);
@@ -449,6 +427,8 @@ int generic_buffer_fdatasync(struct inode *inode, unsigned long start_idx, unsig
 	/* writeout dirty buffers on pages from both clean and dirty lists */
 	retval = do_buffer_fdatasync(mapping, &mapping->dirty_pages,
 			start_idx, end_idx, writeout_one_page);
+	retval = do_buffer_fdatasync(mapping, &mapping->io_pages,
+			start_idx, end_idx, writeout_one_page);
 	retval |= do_buffer_fdatasync(mapping, &mapping->clean_pages,
 			start_idx, end_idx, writeout_one_page);
 	retval |= do_buffer_fdatasync(mapping, &mapping->locked_pages,
@@ -456,6 +436,8 @@ int generic_buffer_fdatasync(struct inode *inode, unsigned long start_idx, unsig
 
 	/* now wait for locked buffers on pages from both clean and dirty lists */
 	retval |= do_buffer_fdatasync(mapping, &mapping->dirty_pages,
+			start_idx, end_idx, waitfor_one_page);
+	retval |= do_buffer_fdatasync(mapping, &mapping->io_pages,
 			start_idx, end_idx, waitfor_one_page);
 	retval |= do_buffer_fdatasync(mapping, &mapping->clean_pages,
 			start_idx, end_idx, waitfor_one_page);
@@ -495,47 +477,17 @@ int fail_writepage(struct page *page)
 EXPORT_SYMBOL(fail_writepage);
 
 /**
- *      filemap_fdatasync - walk the list of dirty pages of the given address space
- *     	and writepage() all of them.
- * 
- *      @mapping: address space structure to write
+ *  filemap_fdatasync - walk the list of dirty pages of the given address space
+ *                      and writepage() all of them.
+ *
+ *  @mapping: address space structure to write
  *
  */
-int filemap_fdatasync(struct address_space * mapping)
+int filemap_fdatasync(struct address_space *mapping)
 {
-	int ret = 0;
-	int (*writepage)(struct page *) = mapping->a_ops->writepage;
-
-	write_lock(&mapping->page_lock);
-
-        while (!list_empty(&mapping->dirty_pages)) {
-		struct page *page = list_entry(mapping->dirty_pages.prev, struct page, list);
-
-		list_del(&page->list);
-		list_add(&page->list, &mapping->locked_pages);
-
-		if (!PageDirty(page))
-			continue;
-
-		page_cache_get(page);
-		write_unlock(&mapping->page_lock);
-
-		lock_page(page);
-
-		if (PageDirty(page)) {
-			int err;
-			ClearPageDirty(page);
-			err = writepage(page);
-			if (err && !ret)
-				ret = err;
-		} else
-			UnlockPage(page);
-
-		page_cache_release(page);
-		write_lock(&mapping->page_lock);
-	}
-	write_unlock(&mapping->page_lock);
-	return ret;
+	if (mapping->a_ops->writeback_mapping)
+		return mapping->a_ops->writeback_mapping(mapping, NULL);
+	return generic_writeback_mapping(mapping, NULL);
 }
 
 /**
@@ -2324,6 +2276,7 @@ unlock:
 
 		if (status < 0)
 			break;
+		balance_dirty_pages_ratelimited(mapping);
 	} while (count);
 done:
 	*ppos = pos;

@@ -107,7 +107,7 @@ inline void make_le_item_head (struct item_head * ih, const struct cpu_key * key
 static void add_to_flushlist(struct inode *inode, struct buffer_head *bh) {
     struct list_head *list = &(SB_JOURNAL(inode->i_sb)->j_dirty_buffers) ;
 
-    buffer_insert_list(bh, list) ;
+    buffer_insert_list(NULL, bh, list) ;
 }
 
 //
@@ -779,7 +779,13 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	    /* mark it dirty now to prevent commit_write from adding
 	    ** this buffer to the inode's dirty buffer list
 	    */
-	    __mark_buffer_dirty(unbh) ;
+		/*
+		 * AKPM: changed __mark_buffer_dirty to mark_buffer_dirty().
+		 * It's still atomic, but it sets the page dirty too,
+		 * which makes it eligible for writeback at any time by the
+		 * VM (which was also the case with __mark_buffer_dirty())
+		 */
+	    mark_buffer_dirty(unbh) ;
 		  
 	    //inode->i_blocks += inode->i_sb->s_blocksize / 512;
 	    //mark_tail_converted (inode);

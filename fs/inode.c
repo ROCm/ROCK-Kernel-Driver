@@ -6,17 +6,12 @@
 
 #include <linux/config.h>
 #include <linux/fs.h>
-#include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/dcache.h>
 #include <linux/init.h>
 #include <linux/quotaops.h>
 #include <linux/slab.h>
-#include <linux/cache.h>
-#include <linux/swap.h>
-#include <linux/swapctl.h>
-#include <linux/prefetch.h>
-#include <linux/locks.h>
+#include <linux/writeback.h>
 
 /*
  * New inode.c implementation.
@@ -55,8 +50,8 @@ static unsigned int i_hash_shift;
  * allowing for low-overhead inode sync() operations.
  */
 
-static LIST_HEAD(inode_in_use);
-static LIST_HEAD(inode_unused);
+LIST_HEAD(inode_in_use);
+LIST_HEAD(inode_unused);
 static struct list_head *inode_hashtable;
 static LIST_HEAD(anon_hash_chain); /* for inodes with NULL i_sb */
 
@@ -66,7 +61,7 @@ static LIST_HEAD(anon_hash_chain); /* for inodes with NULL i_sb */
  * NOTE! You also have to own the lock if you change
  * the i_state of an inode while it is in use..
  */
-static spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Statistics gathering..
@@ -108,6 +103,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_data.a_ops = &empty_aops;
 		inode->i_data.host = inode;
 		inode->i_data.gfp_mask = GFP_HIGHUSER;
+		inode->i_data.dirtied_when = 0;
 		inode->i_mapping = &inode->i_data;
 		inode->i_data.ra_pages = &default_ra_pages;
 		if (sb->s_bdev)
@@ -141,6 +137,7 @@ void inode_init_once(struct inode *inode)
 	INIT_LIST_HEAD(&inode->i_data.clean_pages);
 	INIT_LIST_HEAD(&inode->i_data.dirty_pages);
 	INIT_LIST_HEAD(&inode->i_data.locked_pages);
+	INIT_LIST_HEAD(&inode->i_data.io_pages);
 	INIT_LIST_HEAD(&inode->i_dentry);
 	INIT_LIST_HEAD(&inode->i_dirty_buffers);
 	INIT_LIST_HEAD(&inode->i_dirty_data_buffers);
@@ -149,6 +146,7 @@ void inode_init_once(struct inode *inode)
 	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
 	rwlock_init(&inode->i_data.page_lock);
 	spin_lock_init(&inode->i_data.i_shared_lock);
+	spin_lock_init(&inode->i_bufferlist_lock);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap_shared);
 }
@@ -162,57 +160,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		inode_init_once(inode);
 }
 
-/*
- * Put the inode on the super block's dirty list.
- *
- * CAREFUL! We mark it dirty unconditionally, but
- * move it onto the dirty list only if it is hashed.
- * If it was not hashed, it will never be added to
- * the dirty list even if it is later hashed, as it
- * will have been marked dirty already.
- *
- * In short, make sure you hash any inodes _before_
- * you start marking them dirty..
- */
- 
-/**
- *	__mark_inode_dirty -	internal function
- *	@inode: inode to mark
- *	@flags: what kind of dirty (i.e. I_DIRTY_SYNC)
- *	Mark an inode as dirty. Callers should use mark_inode_dirty or
- *  	mark_inode_dirty_sync.
- */
- 
-void __mark_inode_dirty(struct inode *inode, int flags)
-{
-	struct super_block * sb = inode->i_sb;
-
-	if (!sb)
-		return;
-
-	/* Don't do this for I_DIRTY_PAGES - that doesn't actually dirty the inode itself */
-	if (flags & (I_DIRTY_SYNC | I_DIRTY_DATASYNC)) {
-		if (sb->s_op && sb->s_op->dirty_inode)
-			sb->s_op->dirty_inode(inode);
-	}
-
-	/* avoid the locking if we can */
-	if ((inode->i_state & flags) == flags)
-		return;
-
-	spin_lock(&inode_lock);
-	if ((inode->i_state & flags) != flags) {
-		inode->i_state |= flags;
-		/* Only add valid (ie hashed) inodes to the dirty list */
-		if (!(inode->i_state & I_LOCK) && !list_empty(&inode->i_hash)) {
-			list_del(&inode->i_list);
-			list_add(&inode->i_list, &sb->s_dirty);
-		}
-	}
-	spin_unlock(&inode_lock);
-}
-
-static void __wait_on_inode(struct inode * inode)
+void __wait_on_inode(struct inode * inode)
 {
 	DECLARE_WAITQUEUE(wait, current);
 
@@ -227,20 +175,10 @@ repeat:
 	current->state = TASK_RUNNING;
 }
 
-static inline void wait_on_inode(struct inode *inode)
-{
-	if (inode->i_state & I_LOCK)
-		__wait_on_inode(inode);
-}
-
-
-static inline void write_inode(struct inode *inode, int sync)
-{
-	if (inode->i_sb && inode->i_sb->s_op && inode->i_sb->s_op->write_inode && !is_bad_inode(inode))
-		inode->i_sb->s_op->write_inode(inode, sync);
-}
-
-static inline void __iget(struct inode * inode)
+/*
+ * inode_lock must be held
+ */
+void __iget(struct inode * inode)
 {
 	if (atomic_read(&inode->i_count)) {
 		atomic_inc(&inode->i_count);
@@ -252,287 +190,6 @@ static inline void __iget(struct inode * inode)
 		list_add(&inode->i_list, &inode_in_use);
 	}
 	inodes_stat.nr_unused--;
-}
-
-static inline void __sync_one(struct inode *inode, int sync)
-{
-	unsigned dirty;
-
-	list_del(&inode->i_list);
-	list_add(&inode->i_list, &inode->i_sb->s_locked_inodes);
-
-	if (inode->i_state & I_LOCK)
-		BUG();
-
-	/* Set I_LOCK, reset I_DIRTY */
-	dirty = inode->i_state & I_DIRTY;
-	inode->i_state |= I_LOCK;
-	inode->i_state &= ~I_DIRTY;
-	spin_unlock(&inode_lock);
-
-	filemap_fdatasync(inode->i_mapping);
-
-	/* Don't write the inode if only I_DIRTY_PAGES was set */
-	if (dirty & (I_DIRTY_SYNC | I_DIRTY_DATASYNC))
-		write_inode(inode, sync);
-
-	filemap_fdatawait(inode->i_mapping);
-
-	spin_lock(&inode_lock);
-	inode->i_state &= ~I_LOCK;
-	if (!(inode->i_state & I_FREEING)) {
-		struct list_head *to;
-		if (inode->i_state & I_DIRTY)
-			to = &inode->i_sb->s_dirty;
-		else if (atomic_read(&inode->i_count))
-			to = &inode_in_use;
-		else
-			to = &inode_unused;
-		list_del(&inode->i_list);
-		list_add(&inode->i_list, to);
-	}
-	wake_up(&inode->i_wait);
-}
-
-static inline void sync_one(struct inode *inode, int sync)
-{
-	while (inode->i_state & I_LOCK) {
-		__iget(inode);
-		spin_unlock(&inode_lock);
-		__wait_on_inode(inode);
-		iput(inode);
-		spin_lock(&inode_lock);
-	}
-
-	__sync_one(inode, sync);
-}
-
-static inline void sync_list(struct list_head *head)
-{
-	struct list_head * tmp;
-
-	while ((tmp = head->prev) != head) 
-		__sync_one(list_entry(tmp, struct inode, i_list), 0);
-}
-
-static inline void wait_on_locked(struct list_head *head)
-{
-	struct list_head * tmp;
-	while ((tmp = head->prev) != head) {
-		struct inode *inode = list_entry(tmp, struct inode, i_list);
-		__iget(inode);
-		spin_unlock(&inode_lock);
-		__wait_on_inode(inode);
-		iput(inode);
-		spin_lock(&inode_lock);
-	}
-}
-
-static inline int try_to_sync_unused_list(struct list_head *head, int nr_inodes)
-{
-	struct list_head *tmp = head;
-	struct inode *inode;
-
-	while (nr_inodes && (tmp = tmp->prev) != head) {
-		inode = list_entry(tmp, struct inode, i_list);
-
-		if (!atomic_read(&inode->i_count)) {
-			__sync_one(inode, 0);
-			nr_inodes--;
-
-			/* 
-			 * __sync_one moved the inode to another list,
-			 * so we have to start looking from the list head.
-			 */
-			tmp = head;
-		}
-	}
-
-	return nr_inodes;
-}
-
-void sync_inodes_sb(struct super_block *sb)
-{
-	spin_lock(&inode_lock);
-	while (!list_empty(&sb->s_dirty)||!list_empty(&sb->s_locked_inodes)) {
-		sync_list(&sb->s_dirty);
-		wait_on_locked(&sb->s_locked_inodes);
-	}
-	spin_unlock(&inode_lock);
-}
-
-/*
- * Note:
- * We don't need to grab a reference to superblock here. If it has non-empty
- * ->s_dirty it's hadn't been killed yet and kill_super() won't proceed
- * past sync_inodes_sb() until both ->s_dirty and ->s_locked_inodes are
- * empty. Since __sync_one() regains inode_lock before it finally moves
- * inode from superblock lists we are OK.
- */
-
-void sync_unlocked_inodes(void)
-{
-	struct super_block * sb;
-	spin_lock(&inode_lock);
-	spin_lock(&sb_lock);
-	sb = sb_entry(super_blocks.next);
-	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
-		if (!list_empty(&sb->s_dirty)) {
-			spin_unlock(&sb_lock);
-			sync_list(&sb->s_dirty);
-			spin_lock(&sb_lock);
-		}
-	}
-	spin_unlock(&sb_lock);
-	spin_unlock(&inode_lock);
-}
-
-/*
- * Find a superblock with inodes that need to be synced
- */
-
-static struct super_block *get_super_to_sync(void)
-{
-	struct list_head *p;
-restart:
-	spin_lock(&inode_lock);
-	spin_lock(&sb_lock);
-	list_for_each(p, &super_blocks) {
-		struct super_block *s = list_entry(p,struct super_block,s_list);
-		if (list_empty(&s->s_dirty) && list_empty(&s->s_locked_inodes))
-			continue;
-		s->s_count++;
-		spin_unlock(&sb_lock);
-		spin_unlock(&inode_lock);
-		down_read(&s->s_umount);
-		if (!s->s_root) {
-			drop_super(s);
-			goto restart;
-		}
-		return s;
-	}
-	spin_unlock(&sb_lock);
-	spin_unlock(&inode_lock);
-	return NULL;
-}
-
-/**
- *	sync_inodes
- *	@dev: device to sync the inodes from.
- *
- *	sync_inodes goes through the super block's dirty list, 
- *	writes them out, and puts them back on the normal list.
- */
-
-void sync_inodes(void)
-{
-	struct super_block * s;
-	/*
-	 * Search the super_blocks array for the device(s) to sync.
-	 */
-	while ((s = get_super_to_sync()) != NULL) {
-		sync_inodes_sb(s);
-		drop_super(s);
-	}
-}
-
-static void try_to_sync_unused_inodes(unsigned long pexclusive)
-{
-	struct super_block * sb;
-	int nr_inodes = inodes_stat.nr_unused;
-
-	spin_lock(&inode_lock);
-	spin_lock(&sb_lock);
-	sb = sb_entry(super_blocks.next);
-	for (; nr_inodes && sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.next)) {
-		if (list_empty(&sb->s_dirty))
-			continue;
-		spin_unlock(&sb_lock);
-		nr_inodes = try_to_sync_unused_list(&sb->s_dirty, nr_inodes);
-		spin_lock(&sb_lock);
-	}
-	spin_unlock(&sb_lock);
-	spin_unlock(&inode_lock);
-	clear_bit(0, (unsigned long *)pexclusive);
-}
-
-/**
- *	write_inode_now	-	write an inode to disk
- *	@inode: inode to write to disk
- *	@sync: whether the write should be synchronous or not
- *
- *	This function commits an inode to disk immediately if it is
- *	dirty. This is primarily needed by knfsd.
- */
- 
-void write_inode_now(struct inode *inode, int sync)
-{
-	struct super_block * sb = inode->i_sb;
-
-	if (sb) {
-		spin_lock(&inode_lock);
-		sync_one(inode, sync);
-		spin_unlock(&inode_lock);
-		if (sync)
-			wait_on_inode(inode);
-	}
-	else
-		printk(KERN_ERR "write_inode_now: no super block\n");
-}
-
-/**
- * generic_osync_inode - flush all dirty data for a given inode to disk
- * @inode: inode to write
- * @datasync: if set, don't bother flushing timestamps
- *
- * This can be called by file_write functions for files which have the
- * O_SYNC flag set, to flush dirty writes to disk.  
- */
-
-int generic_osync_inode(struct inode *inode, int what)
-{
-	int err = 0, err2 = 0, need_write_inode_now = 0;
-	
-	/* 
-	 * WARNING
-	 *
-	 * Currently, the filesystem write path does not pass the
-	 * filp down to the low-level write functions.  Therefore it
-	 * is impossible for (say) __block_commit_write to know if
-	 * the operation is O_SYNC or not.
-	 *
-	 * Ideally, O_SYNC writes would have the filesystem call
-	 * ll_rw_block as it went to kick-start the writes, and we
-	 * could call osync_inode_buffers() here to wait only for
-	 * those IOs which have already been submitted to the device
-	 * driver layer.  As it stands, if we did this we'd not write
-	 * anything to disk since our writes have not been queued by
-	 * this point: they are still on the dirty LRU.
-	 * 
-	 * So, currently we will call fsync_inode_buffers() instead,
-	 * to flush _all_ dirty buffers for this inode to disk on 
-	 * every O_SYNC write, not just the synchronous I/Os.  --sct
-	 */
-
-	if (what & OSYNC_METADATA)
-		err = fsync_inode_buffers(inode);
-	if (what & OSYNC_DATA)
-		err2 = fsync_inode_data_buffers(inode);
-	if (!err)
-		err = err2;
-
-	spin_lock(&inode_lock);
-	if ((inode->i_state & I_DIRTY) &&
-	    ((what & OSYNC_INODE) || (inode->i_state & I_DIRTY_DATASYNC)))
-		need_write_inode_now = 1;
-	spin_unlock(&inode_lock);
-
-	if (need_write_inode_now)
-		write_inode_now(inode, 1);
-	else
-		wait_on_inode(inode);
-
-	return err;
 }
 
 /**
@@ -752,7 +409,7 @@ void prune_icache(int goal)
 		static unsigned long exclusive;
 
 		if (!test_and_set_bit(0, &exclusive)) {
-			if (pdflush_operation(try_to_sync_unused_inodes,
+			if (pdflush_operation(try_to_writeback_unused_inodes,
 						(unsigned long)&exclusive))
 				clear_bit(0, &exclusive);
 		}

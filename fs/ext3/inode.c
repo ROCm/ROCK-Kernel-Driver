@@ -1290,8 +1290,13 @@ static int ext3_writepage(struct page *page)
 
 	/* bget() all the buffers */
 	if (order_data) {
-		if (!page_has_buffers(page))
-			create_empty_buffers(page, inode->i_sb->s_blocksize);
+		if (!page_has_buffers(page)) {
+			if (!Page_Uptodate(page))
+				buffer_error();
+			create_empty_buffers(page,
+				inode->i_sb->s_blocksize,
+				(1 << BH_Dirty)|(1 << BH_Uptodate));
+		}
 		page_bufs = page_buffers(page);
 		walk_page_buffers(handle, page_bufs, 0,
 				PAGE_CACHE_SIZE, NULL, bget_one);
@@ -1394,7 +1399,7 @@ static int ext3_block_truncate_page(handle_t *handle,
 		goto out;
 
 	if (!page_has_buffers(page))
-		create_empty_buffers(page, blocksize);
+		create_empty_buffers(page, blocksize, 0);
 
 	/* Find the buffer that contains "offset" */
 	bh = page_buffers(page);
@@ -1448,7 +1453,7 @@ static int ext3_block_truncate_page(handle_t *handle,
 	} else {
 		if (ext3_should_order_data(inode))
 			err = ext3_journal_dirty_data(handle, bh, 0);
-		__mark_buffer_dirty(bh);
+		mark_buffer_dirty(bh);
 	}
 
 unlock:

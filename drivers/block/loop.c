@@ -548,8 +548,6 @@ static int loop_thread(void *data)
 	atomic_inc(&lo->lo_pending);
 	spin_unlock_irq(&lo->lo_lock);
 
-	current->flags |= PF_NOIO;
-
 	/*
 	 * up sem, we are running
 	 */

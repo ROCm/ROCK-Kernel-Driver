@@ -210,7 +210,6 @@ write_out_data_locked:
 				__journal_unfile_buffer(jh);
 				jh->b_transaction = NULL;
 				__journal_remove_journal_head(bh);
-				refile_buffer(bh);
 				__brelse(bh);
 			}
 		}
@@ -291,10 +290,6 @@ sync_datalist_empty:
 			jh->b_transaction = NULL;
 			__journal_remove_journal_head(bh);
 			BUFFER_TRACE(bh, "finished async writeout: refile");
-			/* It can sometimes be on BUF_LOCKED due to migration
-			 * from syncdata to asyncdata */
-			if (bh->b_list != BUF_CLEAN)
-				refile_buffer(bh);
 			__brelse(bh);
 		}
 	}
@@ -454,6 +449,7 @@ start_journal_io:
 				struct buffer_head *bh = wbuf[i];
 				set_bit(BH_Lock, &bh->b_state);
 				clear_bit(BH_Dirty, &bh->b_state);
+				mark_buffer_uptodate(bh, 1);
 				bh->b_end_io = journal_end_buffer_io_sync;
 				submit_bh(WRITE, bh);
 			}
@@ -592,6 +588,7 @@ start_journal_io:
 	JBUFFER_TRACE(descriptor, "write commit block");
 	{
 		struct buffer_head *bh = jh2bh(descriptor);
+		mark_buffer_uptodate(bh, 1);
 		ll_rw_block(WRITE, 1, &bh);
 		wait_on_buffer(bh);
 		__brelse(bh);		/* One for getblk() */

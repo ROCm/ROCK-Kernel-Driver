@@ -1409,6 +1409,11 @@ int submit_bh(int rw, struct buffer_head * bh)
 	BUG_ON(!buffer_mapped(bh));
 	BUG_ON(!bh->b_end_io);
 
+	if ((rw == READ || rw == READA) && buffer_uptodate(bh))
+		printk("%s: read of uptodate buffer\n", __FUNCTION__);
+	if (rw == WRITE && !buffer_uptodate(bh))
+		printk("%s: write of non-uptodate buffer\n", __FUNCTION__);
+		
 	set_bit(BH_Req, &bh->b_state);
 
 	/*
@@ -1465,6 +1470,7 @@ int submit_bh(int rw, struct buffer_head * bh)
  *  a multiple of the current approved size for the device.
  *
  **/
+
 void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 {
 	unsigned int major;
@@ -1513,7 +1519,6 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 			if (!atomic_set_buffer_clean(bh))
 				/* Hmmph! Nothing to write */
 				goto end_io;
-			__mark_buffer_clean(bh);
 			break;
 
 		case READA:

@@ -328,7 +328,6 @@ restart:
 			__journal_unfile_buffer(jh);
 			jh->b_transaction = NULL;
 			__journal_remove_journal_head(bh);
-			refile_buffer(bh);
 			__brelse(bh);
 			goto restart;
 		}
@@ -464,8 +463,6 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 		}
 	} while (!new_bh);
 	/* keep subsequent assertions sane */
-	new_bh->b_prev_free = 0;
-	new_bh->b_next_free = 0;
 	new_bh->b_state = 0;
 	init_buffer(new_bh, NULL, NULL);
 	atomic_set(&new_bh->b_count, 1);
