@@ -196,6 +196,22 @@ static void stop_ptraced_child(int pid, void *stack, int exitcode)
 		panic("check_ptrace : munmap failed, errno = %d", errno);
 }
 
+static int force_sysemu_disabled = 0;
+
+static int __init nosysemu_cmd_param(char *str, int* add)
+{
+	force_sysemu_disabled = 1;
+	return 0;
+}
+
+__uml_setup("nosysemu", nosysemu_cmd_param,
+		"nosysemu\n"
+		"    Turns off syscall emulation patch for ptrace (SYSEMU) on.\n"
+		"    SYSEMU is a performance-patch introduced by Laurent Vivier. It changes\n"
+		"    behaviour of ptrace() and helps reducing host context switch rate.\n"
+		"    To make it working, you need a kernel patch for your host, too.\n"
+		"    See http://perso.wanadoo.fr/laurent.vivier/UML/ for further information.\n");
+
 void __init check_ptrace(void)
 {
 	void *stack;
@@ -229,7 +245,6 @@ void __init check_ptrace(void)
 	stop_ptraced_child(pid, stack, 0);
 	printk("OK\n");
 
-#ifdef PTRACE_SYSEMU
 	printk("Checking syscall emulation patch for ptrace...");
 	use_sysemu = 0;
 	pid = start_ptraced_child(&stack);
@@ -252,8 +267,12 @@ void __init check_ptrace(void)
 
 		stop_ptraced_child(pid, stack, 0);
 
-		printk("OK\n");
-		use_sysemu = 1;
+		if (!force_sysemu_disabled) {
+			printk("found\n");
+			use_sysemu = 1;
+		} else {
+			printk("found but disabled\n");
+		}
 	}
 	else
 	{
@@ -261,7 +280,6 @@ void __init check_ptrace(void)
 		stop_ptraced_child(pid, stack, 1);
 	}
 
-# endif /* PTRACE_SYSEMU */
 }
 
 int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr)
