@@ -50,7 +50,7 @@ wait_piowc(void)
 
 	piows = pda->pio_write_status_addr;
 	do {
-		__asm__ __volatile__ ("mf.a" ::: "memory");
+		ia64_mfa();
 	} while (((ws = *piows) & SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK) != 
 			SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK);
 	return ws;
@@ -93,7 +93,8 @@ sn2_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 			if (is_headless_node(cnode))
 				continue;
 			if (cnode == mycnode) {
-				asm volatile ("ptc.ga %0,%1;;srlz.i;;" :: "r"(start), "r"(nbits<<2) : "memory");
+				ia64_ptcga(start, nbits<<2);
+				ia64_srlz_i();
 			} else {
 				nasid = cnodeid_to_nasid(cnode);
 				ptc0 = CHANGE_NASID(nasid, ptc0);

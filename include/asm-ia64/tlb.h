@@ -1,10 +1,10 @@
 #ifndef _ASM_IA64_TLB_H
 #define _ASM_IA64_TLB_H
 /*
+ * Based on <asm-generic/tlb.h>.
+ *
  * Copyright (C) 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
- *
- * This file was derived from asm-generic/tlb.h.
  */
 /*
  * Removing a translation from a page table (including TLB-shootdown) is a four-step
