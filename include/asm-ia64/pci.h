@@ -112,6 +112,10 @@ static inline int pci_name_bus(char *name, struct pci_bus *bus)
 	return 0;
 }
 
+static inline void pcibios_add_platform_entries(struct pci_dev *dev)
+{
+}
+
 /* generic pci stuff */
 #include <asm-generic/pci.h>
 
