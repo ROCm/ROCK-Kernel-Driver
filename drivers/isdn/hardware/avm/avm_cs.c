@@ -505,12 +505,12 @@ static int avmcs_event(event_t event, int priority,
 } /* avmcs_event */
 
 static struct pcmcia_driver avmcs_driver = {
-	.owner		= THIS_MODULE,
-	.drv		= {
-		.name	= "avmcs_cs",
+	.owner	= THIS_MODULE,
+	.drv	= {
+		.name	= "avm_cs",
 	},
-	.attach		= avmcs_attach,
-	.detach		= avmcs_detach,
+	.attach	= avmcs_attach,
+	.detach	= avmcs_detach,
 };
 
 static int __init avmcs_init(void)
