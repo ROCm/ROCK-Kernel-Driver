@@ -47,68 +47,38 @@ struct swap_list_t swap_list = {-1, -1};
 struct swap_info_struct swap_info[MAX_SWAPFILES];
 
 /*
- * Array of backing blockdevs, for swap_unplug_fn.  We need this because the
- * bdev->unplug_fn can sleep and we cannot hold swap_list_lock while calling
- * the unplug_fn.  And swap_list_lock cannot be turned into a semaphore.
+ * We need this because the bdev->unplug_fn can sleep and we cannot
+ * hold swap_list_lock while calling the unplug_fn. And swap_list_lock
+ * cannot be turned into a semaphore.
  */
-static DECLARE_MUTEX(swap_bdevs_sem);
-static struct block_device *swap_bdevs[MAX_SWAPFILES];
+static DECLARE_RWSEM(swap_unplug_sem);
 
 #define SWAPFILE_CLUSTER 256
 
-/*
- * Caller holds swap_bdevs_sem
- */
-static void install_swap_bdev(struct block_device *bdev)
-{
-	int i;
-
-	for (i = 0; i < MAX_SWAPFILES; i++) {
-		if (swap_bdevs[i] == NULL) {
-			swap_bdevs[i] = bdev;
-			return;
-		}
-	}
-	BUG();
-}
-
-static void remove_swap_bdev(struct block_device *bdev)
-{
-	int i;
-
-	for (i = 0; i < MAX_SWAPFILES; i++) {
-		if (swap_bdevs[i] == bdev) {
-			memcpy(&swap_bdevs[i], &swap_bdevs[i + 1],
-				(MAX_SWAPFILES - i - 1) * sizeof(*swap_bdevs));
-			swap_bdevs[MAX_SWAPFILES - 1] = NULL;
-			return;
-		}
-	}
-	BUG();
-}
-
-/*
- * Unlike a standard unplug_io_fn, swap_unplug_io_fn is never called
- * through swap's backing_dev_info (which is only used by shrink_list),
- * but directly from sync_page when PageSwapCache: and takes the page
- * as argument, so that it can find the right device from swp_entry_t.
- */
-void swap_unplug_io_fn(struct page *page)
+void swap_unplug_io_fn(struct backing_dev_info *unused_bdi, struct page * page)
 {
 	swp_entry_t entry;
 
-	down(&swap_bdevs_sem);
+	down_read(&swap_unplug_sem);
 	entry.val = page->private;
 	if (PageSwapCache(page)) {
-		struct block_device *bdev = swap_bdevs[swp_type(entry)];
+		struct block_device *bdev = swap_info[swp_type(entry)].bdev;
 		struct backing_dev_info *bdi;
 
-		if (bdev) {
-			bdi = bdev->bd_inode->i_mapping->backing_dev_info;
-			(*bdi->unplug_io_fn)(bdi);
-		}
+		/*
+		 * if the page is removed from swapcache from under us (with a
+		 * racy try_to_unuse/swapoff) we need an additional reference count
+		 * to avoid reading garbage from page->private above. If the
+		 * WARN_ON triggers during a swapoff it maybe the race condition and
+		 * it's harmless. However if it triggers without swapoff it signals
+		 * a problem.
+		 */
+		WARN_ON(page_count(page) <= 1);
+
+		bdi = bdev->bd_inode->i_mapping->backing_dev_info;
+		bdi->unplug_io_fn(bdi, page);
 	}
-	up(&swap_bdevs_sem);
+	up_read(&swap_unplug_sem);
 }
 
 static inline int scan_swap_map(struct swap_info_struct *si)
@@ -1134,6 +1104,11 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	current->flags |= PF_SWAPOFF;
 	err = try_to_unuse(type);
 	current->flags &= ~PF_SWAPOFF;
+
+	/* wait for any unplug function to finish */
+	down_write(&swap_unplug_sem);
+	up_write(&swap_unplug_sem);
+
 	if (err) {
 		/* re-insert swap space back into swap_list */
 		swap_list_lock();
@@ -1151,7 +1126,6 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 		swap_list_unlock();
 		goto out_dput;
 	}
-	down(&swap_bdevs_sem);
 	swap_list_lock();
 	swap_device_lock(p);
 	swap_file = p->swap_file;
@@ -1163,8 +1137,6 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	destroy_swap_extents(p);
 	swap_device_unlock(p);
 	swap_list_unlock();
-	remove_swap_bdev(p->bdev);
-	up(&swap_bdevs_sem);
 	vfree(swap_map);
 	if (S_ISBLK(mapping->host->i_mode)) {
 		struct block_device *bdev = I_BDEV(mapping->host);
@@ -1509,7 +1481,6 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	if (error)
 		goto bad_swap;
 
-	down(&swap_bdevs_sem);
 	swap_list_lock();
 	swap_device_lock(p);
 	p->flags = SWP_ACTIVE;
@@ -1535,8 +1506,6 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	}
 	swap_device_unlock(p);
 	swap_list_unlock();
-	install_swap_bdev(p->bdev);
-	up(&swap_bdevs_sem);
 	error = 0;
 	goto out;
 bad_swap:

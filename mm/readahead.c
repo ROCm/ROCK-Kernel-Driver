@@ -15,7 +15,7 @@
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
 
-void default_unplug_io_fn(struct backing_dev_info *bdi)
+void default_unplug_io_fn(struct backing_dev_info *bdi, struct page *page)
 {
 }
 EXPORT_SYMBOL(default_unplug_io_fn);

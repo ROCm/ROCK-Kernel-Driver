@@ -217,7 +217,8 @@ extern sector_t map_swap_page(struct swap_info_struct *, pgoff_t);
 extern struct swap_info_struct *get_swap_info_struct(unsigned);
 extern int can_share_swap_page(struct page *);
 extern int remove_exclusive_swap_page(struct page *);
-extern void swap_unplug_io_fn(struct page *);
+struct backing_dev_info;
+extern void swap_unplug_io_fn(struct backing_dev_info *, struct page * page);
 
 extern struct swap_list_t swap_list;
 extern spinlock_t swaplock;
@@ -251,7 +252,6 @@ extern spinlock_t swaplock;
 #define move_from_swap_cache(p, i, m)		1
 #define __delete_from_swap_cache(p)		/*NOTHING*/
 #define delete_from_swap_cache(p)		/*NOTHING*/
-#define swap_unplug_io_fn(p)			/*NOTHING*/
 
 static inline int remove_exclusive_swap_page(struct page *p)
 {

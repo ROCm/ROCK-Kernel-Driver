@@ -1199,7 +1199,8 @@ void generic_unplug_device(request_queue_t *q)
 
 EXPORT_SYMBOL(generic_unplug_device);
 
-static inline void blk_backing_dev_unplug(struct backing_dev_info *bdi)
+static inline void blk_backing_dev_unplug(struct backing_dev_info *bdi,
+					  struct page * page)
 {
 	request_queue_t *q = bdi->unplug_io_data;
 
