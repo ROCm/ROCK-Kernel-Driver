@@ -1473,8 +1473,9 @@ static ide_startstop_t cdrom_pc_intr (ide_drive_t *drive)
 		/* Keep count of how much data we've moved. */
 		rq->data += thislen;
 		rq->data_len -= thislen;
-		if (rq->cmd[0] == GPCMD_REQUEST_SENSE)
-			rq->sense_len++;
+
+		if (rq->flags & REQ_SENSE)
+			rq->sense_len += thislen;
 	} else {
 confused:
 		printk ("%s: cdrom_pc_intr: The drive "
@@ -1611,11 +1612,17 @@ static inline int cdrom_write_check_ireason(ide_drive_t *drive, int len, int ire
 
 static void post_transform_command(struct request *req)
 {
-	char *ibuf = req->data;
 	u8 *c = req->cmd;
+	char *ibuf;
 
 	if (!blk_pc_request(req))
 		return;
+
+	if (req->bio)
+		ibuf = bio_data(req->bio);
+	else
+		ibuf = req->data;
+
 	if (!ibuf)
 		return;
 
