@@ -238,6 +238,7 @@ mon_send_reply(struct mon_msg *monmsg, struct mon_private *monpriv)
 	atomic_dec(&monpriv->msglim_count);
 	if (likely(!monmsg->msglim_reached)) {
 		monmsg->pos = 0;
+		monmsg->mca_offset = 0;
 		monpriv->read_index = (monpriv->read_index + 1) %
 				      MON_MSGLIM;
 		atomic_dec(&monpriv->read_ready);
@@ -329,6 +330,7 @@ mon_next_message(struct mon_private *monpriv)
 		monmsg->replied_msglim = 0;
 		monmsg->msglim_reached = 0;
 		monmsg->pos = 0;
+		monmsg->mca_offset = 0;
 		P_WARNING("read, message limit reached\n");
 		monpriv->read_index = (monpriv->read_index + 1) %
 				      MON_MSGLIM;
@@ -501,6 +503,7 @@ mon_read(struct file *filp, char __user *data, size_t count, loff_t *ppos)
 	struct mon_private *monpriv = filp->private_data;
 	struct mon_msg *monmsg;
 	int ret;
+	u32 mce_start;
 
 	monmsg = mon_next_message(monpriv);
 	if (IS_ERR(monmsg))
@@ -520,13 +523,28 @@ mon_read(struct file *filp, char __user *data, size_t count, loff_t *ppos)
 	}
 
 	if (!monmsg->pos) {
-		monmsg->pos = mon_rec_start(monmsg);
+		monmsg->pos = mon_mca_start(monmsg) + monmsg->mca_offset;
 		mon_read_debug(monmsg, monpriv);
 	}
 	if (mon_check_mca(monmsg))
 		goto reply;
 
-	if (mon_rec_end(monmsg) > monmsg->pos) {
+	/* read monitor control element (12 bytes) first */
+	mce_start = mon_mca_start(monmsg) + monmsg->mca_offset;
+	if ((monmsg->pos >= mce_start) && (monmsg->pos < mce_start + 12)) {
+		count = min(count, (size_t) mce_start + 12 - monmsg->pos);
+		ret = copy_to_user(data, (void *) (unsigned long) monmsg->pos,
+				   count);
+		if (ret)
+			return -EFAULT;
+		monmsg->pos += count;
+		if (monmsg->pos == mce_start + 12)
+			monmsg->pos = mon_rec_start(monmsg);
+		goto out_copy;
+	}
+
+	/* read records */
+	if (monmsg->pos <= mon_rec_end(monmsg)) {
 		count = min(count, (size_t) mon_rec_end(monmsg) - monmsg->pos
 					    + 1);
 		ret = copy_to_user(data, (void *) (unsigned long) monmsg->pos,
@@ -534,14 +552,17 @@ mon_read(struct file *filp, char __user *data, size_t count, loff_t *ppos)
 		if (ret)
 			return -EFAULT;
 		monmsg->pos += count;
-		*ppos += count;
-		if (mon_rec_end(monmsg) == monmsg->pos)
+		if (monmsg->pos > mon_rec_end(monmsg))
 			mon_next_mca(monmsg);
-		return count;
+		goto out_copy;
 	}
 reply:
 	ret = mon_send_reply(monmsg, monpriv);
 	return ret;
+
+out_copy:
+	*ppos += count;
+	return count;
 }
 
 static unsigned int
