@@ -1245,7 +1245,9 @@ static struct file_operations proc_attr_operations = {
 	.readdir	= proc_attr_readdir,
 };
 
-static struct dentry *proc_attr_lookup(struct inode *dir, struct dentry *dentry){
+static struct dentry *proc_attr_lookup(struct inode *dir,
+				struct dentry *dentry, struct nameidata *nd)
+{
 	return proc_pident_lookup(dir, dentry, attr_stuff);
 }
 
