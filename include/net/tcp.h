@@ -970,6 +970,9 @@ extern int tcp_sync_mss(struct sock *sk, u32 pmtu);
 
 extern const char timer_bug_msg[];
 
+/* tcp_diag.c */
+extern void tcp_get_info(struct sock *, struct tcp_info *);
+
 /* Read 'sendfile()'-style from a TCP socket */
 typedef int (*sk_read_actor_t)(read_descriptor_t *, struct sk_buff *,
 				unsigned int, size_t);
