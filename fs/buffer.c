@@ -2079,11 +2079,10 @@ int block_truncate_page(struct address_space *mapping,
 
 	err = 0;
 	if (!buffer_mapped(bh)) {
-		/* Hole? Nothing to do */
-		if (buffer_uptodate(bh))
+		err = get_block(inode, iblock, bh, 0);
+		if (err)
 			goto unlock;
-		get_block(inode, iblock, bh, 0);
-		/* Still unmapped? Nothing to do */
+		/* unmapped? It's a hole - nothing to do */
 		if (!buffer_mapped(bh))
 			goto unlock;
 	}

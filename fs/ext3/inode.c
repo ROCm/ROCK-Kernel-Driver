@@ -1408,11 +1408,8 @@ static int ext3_block_truncate_page(handle_t *handle,
 
 	err = 0;
 	if (!buffer_mapped(bh)) {
-		/* Hole? Nothing to do */
-		if (buffer_uptodate(bh))
-			goto unlock;
 		ext3_get_block(inode, iblock, bh, 0);
-		/* Still unmapped? Nothing to do */
+		/* unmapped? It's a hole - nothing to do */
 		if (!buffer_mapped(bh))
 			goto unlock;
 	}
