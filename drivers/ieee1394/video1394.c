@@ -46,6 +46,7 @@
 #include <linux/mm.h>
 #include <linux/ioctl32.h>
 #include <linux/compat.h>
+#include <linux/cdev.h>
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
@@ -1231,6 +1232,7 @@ static int video1394_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static struct cdev video1394_cdev;
 static struct file_operations video1394_fops=
 {
 	.owner =	THIS_MODULE,
@@ -1445,18 +1447,18 @@ static void __exit video1394_exit_module (void)
 	hpsb_unregister_highlevel(&video1394_highlevel);
 
 	devfs_remove(VIDEO1394_DRIVER_NAME);
-	ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_VIDEO1394);
+	cdev_unmap(IEEE1394_VIDEO1394_DEV, 16);
+	cdev_del(&video1394_cdev);
 
 	PRINT_G(KERN_INFO, "Removed " VIDEO1394_DRIVER_NAME " module");
 }
 
 static int __init video1394_init_module (void)
 {
-	int ret;
-
-	ret = ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_VIDEO1394,
-					THIS_MODULE, &video1394_fops);
-	if (ret) {
+	cdev_init(&video1394_cdev, &video1394_fops);
+	video1394_cdev.owner = THIS_MODULE;
+	kobject_set_name(&video1394_cdev.kobj, VIDEO1394_DRIVER_NAME);
+	if (cdev_add(&video1394_cdev, IEEE1394_VIDEO1394_DEV, 16)) {
 		PRINT_G(KERN_ERR, "video1394: unable to get minor device block");
 		return -EIO;
         }
@@ -1496,3 +1498,4 @@ static int __init video1394_init_module (void)
 
 module_init(video1394_init_module);
 module_exit(video1394_exit_module);
+MODULE_ALIAS_CHARDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_VIDEO1394 * 16);
