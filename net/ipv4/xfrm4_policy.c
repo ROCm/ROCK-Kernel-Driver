@@ -47,10 +47,6 @@ __xfrm4_find_bundle(struct flowi *fl, struct rtable *rt, struct xfrm_policy *pol
 {
 	struct dst_entry *dst;
 
-	if (!fl->fl4_src)
-		fl->fl4_src = rt->rt_src;
-	if (!fl->fl4_dst)
-		fl->fl4_dst = rt->rt_dst;
 	read_lock_bh(&policy->lock);
 	for (dst = policy->bundles; dst; dst = dst->next) {
 		struct xfrm_dst *xdst = (struct xfrm_dst*)dst;
