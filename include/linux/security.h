@@ -814,6 +814,7 @@ struct security_operations {
 
 	int (*sb_alloc_security) (struct super_block * sb);
 	void (*sb_free_security) (struct super_block * sb);
+	int (*sb_kern_mount) (struct super_block *sb);
 	int (*sb_statfs) (struct super_block * sb);
 	int (*sb_mount) (char *dev_name, struct nameidata * nd,
 			 char *type, unsigned long flags, void *data);
@@ -1032,6 +1033,11 @@ static inline int security_sb_alloc (struct super_block *sb)
 static inline void security_sb_free (struct super_block *sb)
 {
 	security_ops->sb_free_security (sb);
+}
+
+static inline int security_sb_kern_mount (struct super_block *sb)
+{
+	return security_ops->sb_kern_mount (sb);
 }
 
 static inline int security_sb_statfs (struct super_block *sb)
@@ -1638,6 +1644,11 @@ static inline int security_sb_alloc (struct super_block *sb)
 
 static inline void security_sb_free (struct super_block *sb)
 { }
+
+static inline int security_sb_kern_mount (struct super_block *sb)
+{
+	return 0;
+}
 
 static inline int security_sb_statfs (struct super_block *sb)
 {

@@ -120,6 +120,11 @@ static void dummy_sb_free_security (struct super_block *sb)
 	return;
 }
 
+static int dummy_sb_kern_mount (struct super_block *sb)
+{
+	return 0;
+}
+
 static int dummy_sb_statfs (struct super_block *sb)
 {
 	return 0;
@@ -635,6 +640,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, bprm_check_security);
 	set_to_dummy_if_null(ops, sb_alloc_security);
 	set_to_dummy_if_null(ops, sb_free_security);
+	set_to_dummy_if_null(ops, sb_kern_mount);
 	set_to_dummy_if_null(ops, sb_statfs);
 	set_to_dummy_if_null(ops, sb_mount);
 	set_to_dummy_if_null(ops, sb_check_sb);
