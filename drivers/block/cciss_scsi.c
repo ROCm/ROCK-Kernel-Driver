@@ -1106,6 +1106,12 @@ cciss_update_non_disk_devices(int cntl_num, int hostno)
 		{
 		  case 0x01: /* sequential access, (tape) */
 		  case 0x08: /* medium changer */
+			if (ncurrent >= CCISS_MAX_SCSI_DEVS_PER_HBA) {
+				printk(KERN_INFO "cciss%d: %s ignored, "
+					"too many devices.\n", cntl_num,
+					DEVICETYPE(devtype));
+				break;
+			}
 			memcpy(&currentsd[ncurrent].scsi3addr[0], 
 				&scsi3addr[0], 8);
 			currentsd[ncurrent].devtype = devtype;
