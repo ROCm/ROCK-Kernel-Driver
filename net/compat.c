@@ -496,6 +496,7 @@ static int do_set_attach_filter(int fd, int level, int optname,
 	struct sock_fprog kfprog;
 	mm_segment_t old_fs;
 	compat_uptr_t uptr;
+	unsigned int fsize;
 	int ret;
 
 	if (!access_ok(VERIFY_READ, fprog32, sizeof(*fprog32)) ||
@@ -503,15 +504,14 @@ static int do_set_attach_filter(int fd, int level, int optname,
 	    __get_user(uptr, &fprog32->filter))
 		return -EFAULT;
 
-	kfprog.filter = compat_ptr(uptr);
-	/*
-	 * Since struct sock_filter is architecure independent,
-	 * we can just do the access_ok check and pass the
-	 * same pointer to the real syscall.
-	 */
-	if (!access_ok(VERIFY_READ, kfprog.filter,
-			kfprog.len * sizeof(struct sock_filter)))
+	fsize = kfprog.len * sizeof(struct sock_filter);
+	kfprog.filter = (struct sock_filter *)kmalloc(fsize, GFP_KERNEL);
+	if (kfprog.filter == NULL)
+		return -ENOMEM;
+	if (copy_from_user(kfprog.filter, compat_ptr(uptr), fsize)) {
+		kfree(kfprog.filter);
 		return -EFAULT;
+	}
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -519,6 +519,7 @@ static int do_set_attach_filter(int fd, int level, int optname,
 			     (char *)&kfprog, sizeof(kfprog));
 	set_fs(old_fs);
 
+	kfree(kfprog.filter);
 	return ret;
 }
 
