@@ -478,11 +478,11 @@ static ssize_t store_regs_in_max0(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(in0_input, S_IRUGO, show_regs_in_0, NULL)
+static DEVICE_ATTR(in0_input, S_IRUGO, show_regs_in_0, NULL);
 static DEVICE_ATTR(in0_min, S_IRUGO | S_IWUSR,
-	show_regs_in_min0, store_regs_in_min0)
+	show_regs_in_min0, store_regs_in_min0);
 static DEVICE_ATTR(in0_max, S_IRUGO | S_IWUSR,
-	show_regs_in_max0, store_regs_in_max0)
+	show_regs_in_max0, store_regs_in_max0);
 
 #define device_create_file_in(client, offset) \
 do { \
