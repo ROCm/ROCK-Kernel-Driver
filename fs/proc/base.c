@@ -328,6 +328,8 @@ static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 	struct mm_struct *mm = get_task_mm(task);
 	if (!mm)
 		goto out;
+	if (!mm->arg_end)
+		goto out;	/* Shh! No looking before we're done */
 
  	len = mm->arg_end - mm->arg_start;
  
