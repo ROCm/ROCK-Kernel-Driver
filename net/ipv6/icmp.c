@@ -557,22 +557,7 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 				    skb_checksum(skb, 0, skb->len, 0))) {
 			if (net_ratelimit())
 				printk(KERN_DEBUG "ICMPv6 checksum failed [%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x > %04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x]\n",
-				       ntohs(saddr->s6_addr16[0]),
-				       ntohs(saddr->s6_addr16[1]),
-				       ntohs(saddr->s6_addr16[2]),
-				       ntohs(saddr->s6_addr16[3]),
-				       ntohs(saddr->s6_addr16[4]),
-				       ntohs(saddr->s6_addr16[5]),
-				       ntohs(saddr->s6_addr16[6]),
-				       ntohs(saddr->s6_addr16[7]),
-				       ntohs(daddr->s6_addr16[0]),
-				       ntohs(daddr->s6_addr16[1]),
-				       ntohs(daddr->s6_addr16[2]),
-				       ntohs(daddr->s6_addr16[3]),
-				       ntohs(daddr->s6_addr16[4]),
-				       ntohs(daddr->s6_addr16[5]),
-				       ntohs(daddr->s6_addr16[6]),
-				       ntohs(daddr->s6_addr16[7]));
+				       NIP6(*saddr), NIP6(*daddr));
 			goto discard_it;
 		}
 	}

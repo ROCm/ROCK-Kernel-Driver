@@ -46,17 +46,6 @@
 /* Move to common area: it is shared with AH. */
 /* Common with AH after some work on arguments. */
 
-/* XXX no ipv6 esp specific */
-#define NIP6(addr) \
-	ntohs((addr).s6_addr16[0]),\
-	ntohs((addr).s6_addr16[1]),\
-	ntohs((addr).s6_addr16[2]),\
-	ntohs((addr).s6_addr16[3]),\
-	ntohs((addr).s6_addr16[4]),\
-	ntohs((addr).s6_addr16[5]),\
-	ntohs((addr).s6_addr16[6]),\
-	ntohs((addr).s6_addr16[7])
-
 static int get_offset(u8 *packet, u32 packet_len, u8 *nexthdr, struct ipv6_opt_hdr **prevhdr)
 {
 	u16 offset = sizeof(struct ipv6hdr);
