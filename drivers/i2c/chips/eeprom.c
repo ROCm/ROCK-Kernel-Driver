@@ -43,13 +43,6 @@ static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
 /* Insmod parameters */
 SENSORS_INSMOD_1(eeprom);
 
-static int checksum = 0;
-module_param(checksum, bool, 0);
-MODULE_PARM_DESC(checksum, "Only accept eeproms whose checksum is correct");
-
-
-/* EEPROM registers */
-#define EEPROM_REG_CHECKSUM	0x3f
 
 /* Size of EEPROM in bytes */
 #define EEPROM_SIZE		256
@@ -168,7 +161,6 @@ static int eeprom_attach_adapter(struct i2c_adapter *adapter)
 /* This function is called by i2c_detect */
 int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 {
-	int i, cs;
 	struct i2c_client *new_client;
 	struct eeprom_data *data;
 	int err = 0;
@@ -204,17 +196,6 @@ int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* prevent 24RF08 corruption */
 	i2c_smbus_write_quick(new_client, 0);
-
-	/* Now, we do the remaining detection. It is not there, unless you force
-	   the checksum to work out. */
-	if (checksum) {
-		cs = 0;
-		for (i = 0; i <= 0x3e; i++)
-			cs += i2c_smbus_read_byte_data(new_client, i);
-		cs &= 0xff;
-		if (i2c_smbus_read_byte_data (new_client, EEPROM_REG_CHECKSUM) != cs)
-			goto exit_kfree;
-	}
 
 	data->nature = UNKNOWN;
 	/* Detect the Vaio nature of EEPROMs.
