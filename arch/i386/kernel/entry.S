@@ -195,7 +195,7 @@ ENTRY(lcall27)
 
 
 ENTRY(ret_from_fork)
-#if CONFIG_SMP
+#if CONFIG_SMP || CONFIG_PREEMPT
 	call SYMBOL_NAME(schedule_tail)
 #endif
 	GET_THREAD_INFO(%ebx)

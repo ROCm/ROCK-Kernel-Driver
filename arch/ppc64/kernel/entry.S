@@ -311,7 +311,7 @@ _GLOBAL(_switch)
 	blr
 
 _GLOBAL(ret_from_fork)
-#ifdef CONFIG_SMP
+#if CONFIG_SMP || CONFIG_PREEMPT
 	bl	.schedule_tail
 #endif
 	clrrdi	r4,r1,THREAD_SHIFT
