@@ -4389,6 +4389,6 @@ static Scsi_Host_Template driver_template = {
 #ifdef CONFIG_SPARC64
 	.highmem_io		= 1,
 #endif
-}
+};
 
 #include "scsi_module.c"
