@@ -23,6 +23,23 @@ CONFIG_USB_HIDINPUT
 
   If unsure, say Y.
 
+CONFIG_HID_FF
+  Say Y here is you want force feedback support for a few hid devices. See
+  below for a list of supported devices.
+  See Documentation/input/ff.txt for a description of the force feedback API.
+
+  If unsure, say N.
+
+CONFIG_LOGITECH_RUMBLE
+  Say Y here if you have a Logitech WingMan Cordless rumble pad and if you
+  want to enable force feedback. Note: if you say N here, this device will
+  still be supported, but without force feedback.
+
+CONFIG_HID_PID
+  Say Y yes if you have a PID-compliant joystick and wish to enable force
+  feedback for it. The Microsoft Sidewinder Force Feedback 2 is one such
+  device.
+
 CONFIG_USB_HIDDEV
   Say Y here if you want to support HID devices (from the USB
   specification standpoint) that aren't strictly user interface
@@ -82,4 +99,18 @@ CONFIG_USB_WACOM
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called wacom.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_POWERMATE
+  Say Y here if you want to use  Griffin PowerMate or Contour Jog devices.
+  These are stainless steel dials which can measure clockwise and
+  anticlockwise rotation. The dial also acts as a pushbutton. The base
+  contains an LED which can be instructed to pulse or to switch to a
+  particular intensity.
+
+  You can download userspace tools from http://sowerbutts.com/powermate/
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called powermate.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
