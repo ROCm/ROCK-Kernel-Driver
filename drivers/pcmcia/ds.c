@@ -113,6 +113,8 @@ static spinlock_t pcmcia_dev_list_lock;
 
 static int major_dev = -1;
 
+static int unbind_request(struct pcmcia_bus_socket *s);
+
 /*====================================================================*/
 
 /* code which was in cs.c before */
@@ -354,7 +356,6 @@ static void pcmcia_put_dev(struct pcmcia_device *p_dev)
 static void pcmcia_release_dev(struct device *dev)
 {
 	struct pcmcia_device *p_dev = to_pcmcia_dev(dev);
-	p_dev->socket->pcmcia->device_count = 0;
 	pcmcia_put_bus_socket(p_dev->socket->pcmcia);
 	kfree(p_dev);
 }
@@ -466,8 +467,6 @@ static int send_event(struct pcmcia_socket *s, event_t event, int priority)
 static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
 {
 	struct pcmcia_bus_socket *s = skt->pcmcia;
-	struct pcmcia_device *p_dev;
-	unsigned long flags;
 	int ret = 0;
 
 	ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
@@ -478,11 +477,8 @@ static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
 	case CS_EVENT_CARD_REMOVAL:
 		s->state &= ~DS_SOCKET_PRESENT;
 	    	send_event(skt, event, priority);
+		unbind_request(s);
 		handle_event(s, event);
-		spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
-		list_for_each_entry(p_dev, &s->devices_list, socket_device_list)
-			p_dev->client->state |= CLIENT_STALE;
-		spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
 		break;
 	
 	case CS_EVENT_CARD_INSERTION:
@@ -859,38 +855,42 @@ static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, 
 
 /*====================================================================*/
 
-static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
+/* unbind _all_ devices attached to a given pcmcia_bus_socket. The
+ * drivers have been called with EVENT_CARD_REMOVAL before.
+ */
+static int unbind_request(struct pcmcia_bus_socket *s)
 {
 	struct pcmcia_device	*p_dev;
 	struct pcmcia_driver	*p_drv;
 	unsigned long		flags;
 
-	ds_dbg(2, "unbind_request(%d, '%s')\n", s->parent->sock,
-	       (char *)bind_info->dev_info);
+	ds_dbg(2, "unbind_request(%d)\n", s->parent->sock);
 
- restart:
-	/* unregister the pcmcia_device */
-	spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
-	list_for_each_entry(p_dev, &s->devices_list, socket_device_list) {
-		if (p_dev->func == bind_info->function) {
-			list_del(&p_dev->socket_device_list);
+	s->device_count = 0;
+
+	for (;;) {
+		/* unregister all pcmcia_devices registered with this socket*/
+		spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
+		if (list_empty(&s->devices_list)) {
 			spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
-
-			/* detach the "instance" */
-			p_drv = to_pcmcia_drv(p_dev->dev.driver);
-			if (p_drv) {
-				if ((p_drv->detach) && (p_dev->instance))
-					p_drv->detach(p_dev->instance);
-				module_put(p_drv->owner);
-			}
-
-			device_unregister(&p_dev->dev);
-
-			/* multiple devices may be registered to this "function" */
-			goto restart;
+ 			return 0;
 		}
+		p_dev = list_entry((&s->devices_list)->next, struct pcmcia_device, socket_device_list);
+		list_del(&p_dev->socket_device_list);
+		p_dev->client->state |= CLIENT_STALE;
+		spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+
+		/* detach the "instance" */
+		p_drv = to_pcmcia_drv(p_dev->dev.driver);
+		if (p_drv) {
+			if ((p_drv->detach) && (p_dev->instance))
+				p_drv->detach(p_dev->instance);
+			module_put(p_drv->owner);
+		}
+
+		device_unregister(&p_dev->dev);
 	}
-	spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+
 	return 0;
 } /* unbind_request */
 
@@ -1253,7 +1253,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	err = get_device_info(s, &buf.bind_info, 0);
 	break;
     case DS_UNBIND_REQUEST:
-	err = unbind_request(s, &buf.bind_info);
+	err = 0;
 	break;
     case DS_BIND_MTD:
 	if (!capable(CAP_SYS_ADMIN)) return -EPERM;
