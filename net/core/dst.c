@@ -169,6 +169,8 @@ struct dst_entry *dst_destroy(struct dst_entry * dst)
 	struct neighbour *neigh;
 	struct hh_cache *hh;
 
+	smp_rmb();
+
 again:
 	neigh = dst->neighbour;
 	hh = dst->hh;

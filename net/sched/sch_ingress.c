@@ -14,6 +14,7 @@
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/netfilter_ipv4.h>
+#include <linux/netfilter_ipv6.h>
 #include <linux/netfilter.h>
 #include <linux/smp.h>
 #include <net/pkt_sched.h>
@@ -271,6 +272,14 @@ static struct nf_hook_ops ing_ops = {
 	.priority       = NF_IP_PRI_FILTER + 1,
 };
 
+static struct nf_hook_ops ing6_ops = {
+	.hook           = ing_hook,
+	.owner		= THIS_MODULE,
+	.pf             = PF_INET6,
+	.hooknum        = NF_IP6_PRE_ROUTING,
+	.priority       = NF_IP6_PRI_FILTER + 1,
+};
+
 #endif
 #endif
 
@@ -297,6 +306,12 @@ static int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 			return -EINVAL;
 		}
 		nf_registered++;
+
+		if (nf_register_hook(&ing6_ops) < 0) {
+			printk("IPv6 ingress qdisc registration error, " \
+			    "disabling IPv6 support.\n");
+		} else
+			nf_registered++;
 	}
 #endif
 #endif
@@ -408,8 +423,11 @@ static void __exit ingress_module_exit(void)
 	unregister_qdisc(&ingress_qdisc_ops);
 #ifndef CONFIG_NET_CLS_ACT
 #ifdef CONFIG_NETFILTER
-	if (nf_registered)
+	if (nf_registered) {
 		nf_unregister_hook(&ing_ops);
+		if (nf_registered > 1)
+			nf_unregister_hook(&ing6_ops);
+	}
 #endif
 #endif
 }
