@@ -57,12 +57,13 @@
 #include <linux/pm.h>
 #include <linux/device.h>
 #include <linux/buffer_head.h>
+#include <linux/swapops.h>
+#include <linux/bootmem.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
-#include <linux/swapops.h>
 
 extern void signal_wake_up(struct task_struct *t);
 extern int sys_sync(void);
@@ -225,7 +226,7 @@ int freeze_processes(void)
 			todo++;
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
-		yield();
+		yield();			/* Yield is okay here */
 		if (time_after(jiffies, start_time + TIMEOUT)) {
 			printk( "\n" );
 			printk(KERN_ERR " stopping tasks failed (%d tasks remaining)\n", todo );
@@ -308,6 +309,9 @@ static void mark_swapfiles(swp_entry_t prev, int mode)
 	swp_entry_t entry;
 	union diskpage *cur;
 	struct page *page;
+
+	if (root_swap == 0xFFFF)  /* ignored */
+		return;
 
 	page = alloc_page(GFP_ATOMIC);
 	if (!page)
@@ -474,9 +478,9 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 #ifdef CONFIG_DISCONTIGMEM
 	panic("Discontingmem not supported");
 #else
-	BUG_ON (max_mapnr != num_physpages);
+	BUG_ON (max_pfn != num_physpages);
 #endif
-	for (pfn = 0; pfn < max_mapnr; pfn++) {
+	for (pfn = 0; pfn < max_pfn; pfn++) {
 		page = pfn_to_page(pfn);
 		if (PageHighMem(page))
 			panic("Swsusp not supported on highmem boxes. Send 1GB of RAM to <pavel@ucw.cz> and try again ;-).");
@@ -686,6 +690,7 @@ static int suspend_save_image(void)
 	if(nr_free_pages() < nr_needed_pages) {
 		printk(KERN_CRIT "%sCouldn't get enough free pages, on %d pages short\n",
 		       name_suspend, nr_needed_pages-nr_free_pages());
+		root_swap = 0xFFFF;
 		spin_unlock_irq(&suspend_pagedir_lock);
 		return 1;
 	}
