@@ -75,9 +75,9 @@ static kmem_cache_t *peer_cachep;
 
 #define node_height(x) x->avl_height
 static struct inet_peer peer_fake_node = {
-	avl_left : &peer_fake_node,
-	avl_right : &peer_fake_node,
-	avl_height : 0
+	.avl_left	= &peer_fake_node,
+	.avl_right	= &peer_fake_node,
+	.avl_height	= 0
 };
 #define peer_avl_empty (&peer_fake_node)
 static struct inet_peer *peer_root = peer_avl_empty;

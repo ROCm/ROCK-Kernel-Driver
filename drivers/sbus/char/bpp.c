@@ -1031,8 +1031,6 @@ static inline void freeLptPort(int idx)
 
 #endif
 
-static devfs_handle_t devfs_handle;
-
 static int __init bpp_init(void)
 {
 	int rc;
@@ -1046,14 +1044,18 @@ static int __init bpp_init(void)
 	if (rc < 0)
 		return rc;
 
-	for (idx = 0; idx < BPP_NO; idx += 1) {
+	for (idx = 0; idx < BPP_NO; idx++) {
 		instances[idx].opened = 0;
 		probeLptPort(idx);
 	}
-	devfs_handle = devfs_mk_dir (NULL, "bpp", NULL);
-	devfs_register_series (devfs_handle, "%u", BPP_NO, DEVFS_FL_DEFAULT,
-			       BPP_MAJOR, 0, S_IFCHR | S_IRUSR | S_IWUSR,
+	devfs_mk_dir (NULL, "bpp", NULL);
+	for (idx = 0; idx < BPP_NO; idx++) {
+		char name[16];
+		sprintf(name, "bpp/%d", idx);
+		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
+			       BPP_MAJOR, idx, S_IFCHR | S_IRUSR | S_IWUSR,
 			       &bpp_fops, NULL);
+	}
 
 	return 0;
 }
@@ -1062,10 +1064,12 @@ static void __exit bpp_cleanup(void)
 {
 	unsigned idx;
 
-	devfs_unregister (devfs_handle);
+	for (idx = 0; idx < BPP_NO; idx++)
+		devfs_remove("bpp/%d", idx);
+	devfs_remove("bpp");
 	unregister_chrdev(BPP_MAJOR, dev_name);
 
-	for (idx = 0 ;  idx < BPP_NO ;  idx += 1) {
+	for (idx = 0;  idx < BPP_NO; idx++) {
 		if (instances[idx].present)
 			freeLptPort(idx);
 	}

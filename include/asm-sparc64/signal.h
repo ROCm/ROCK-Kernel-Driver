@@ -8,6 +8,7 @@
 #ifndef __ASSEMBLY__
 #include <linux/personality.h>
 #include <linux/types.h>
+#include <linux/compat.h>
 #endif
 #endif
 
@@ -250,7 +251,7 @@ typedef struct sigaltstack {
 typedef struct sigaltstack32 {
 	u32			ss_sp;
 	int			ss_flags;
-	__kernel_size_t32	ss_size;
+	compat_size_t		ss_size;
 } stack_t32;
 
 #define HAVE_ARCH_GET_SIGNAL_TO_DELIVER

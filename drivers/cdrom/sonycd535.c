@@ -1445,7 +1445,6 @@ static int __init sony535_init(void)
 	int  got_result = 0;
 	int  tmp_irq;
 	int  i;
-	devfs_handle_t sony_devfs_handle;
 	int err;
 
 	/* Setting the base I/O address to 0 will disable it. */
@@ -1547,11 +1546,6 @@ static int __init sony535_init(void)
 		printk("IRQ%d, ", tmp_irq);
 	printk("using %d byte buffer\n", sony_buffer_size);
 
-	sony_devfs_handle = devfs_register (NULL, CDU535_HANDLE,
-					DEVFS_FL_DEFAULT,
-					MAJOR_NR, 0,
-					S_IFBLK | S_IRUGO | S_IWUGO,
-					&cdu_fops, NULL);
 	if (register_blkdev(MAJOR_NR, CDU535_HANDLE, &cdu_fops)) {
 		printk("Unable to get major %d for %s\n",
 				MAJOR_NR, CDU535_MESSAGE_NAME);
@@ -1595,6 +1589,10 @@ static int __init sony535_init(void)
 	}
 	cdu_disk->queue = &sonycd535_queue;
 	add_disk(cdu_disk);
+	devfs_register (NULL, CDU535_HANDLE, DEVFS_FL_DEFAULT,
+			cdu_disk->major, cdu_disk->first_minor,
+			S_IFBLK | S_IRUGO | S_IWUGO,
+			cdu_disk->fops, NULL);
 	return 0;
 
 out7:
@@ -1613,7 +1611,6 @@ out2:
 	blk_cleanup_queue(&sonycd535_queue);
 	unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
 out1:
-	devfs_unregister(sony_devfs_handle);
 	if (sony535_irq_used)
 		free_irq(sony535_irq_used, NULL);
 	return err;

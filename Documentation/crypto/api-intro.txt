@@ -176,7 +176,7 @@ and;
   Nettle (http://www.lysator.liu.se/~nisse/nettle/)
     Niels Möller
 
-Original developers of the initial set of crypto algorithms:
+Original developers of the crypto algorithms:
 
   Dana L. How (DES)
   Andrew Tridgell and Steve French (MD4)
@@ -184,17 +184,23 @@ Original developers of the initial set of crypto algorithms:
   Steve Reid (SHA1)
   Jean-Luc Cooke (SHA256)
   Kazunori Miyazawa / USAGI (HMAC)
-
-The DES code was subsequently redeveloped by:
-
+  Matthew Skala (Twofish)
+  
+DES algorithm contributors:
   Raimar Falke
   Gisle Sælensminde
   Niels Möller
 
-The Blowfish code was subsequently redeveloped by:
+Blowfish algorithm contributors:
   Herbert Valerio Riedel
   Kyle McMartin
 
+Twofish algorithm contributors:
+  Werner Koch
+  Marc Mutz
+
+SHA256 algorithm contributors:
+  Andrew McDonald
 
 Please send any credits updates or corrections to:
 James Morris <jmorris@intercode.com.au>

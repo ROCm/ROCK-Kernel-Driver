@@ -362,21 +362,24 @@ static struct file_operations coda_psdev_fops = {
 	.release	= coda_psdev_release,
 };
 
-static devfs_handle_t devfs_handle;
-
 static int init_coda_psdev(void)
 {
-	if(register_chrdev(CODA_PSDEV_MAJOR,"coda_psdev",
+	int i;
+	if (register_chrdev(CODA_PSDEV_MAJOR,"coda_psdev",
 				 &coda_psdev_fops)) {
               printk(KERN_ERR "coda_psdev: unable to get major %d\n", 
 		     CODA_PSDEV_MAJOR);
               return -EIO;
 	}
-	devfs_handle = devfs_mk_dir (NULL, "coda", NULL);
-	devfs_register_series (devfs_handle, "%u", MAX_CODADEVS, DEVFS_FL_NONE,
-			       CODA_PSDEV_MAJOR, 0,
+	devfs_mk_dir (NULL, "coda", NULL);
+	for (i = 0; i < MAX_CODADEVS; i++) {
+		char name[16];
+		sprintf(name, "coda/%d", i);
+		devfs_register(NULL, name, DEVFS_FL_NONE,
+			       CODA_PSDEV_MAJOR, i,
 			       S_IFCHR | S_IRUSR | S_IWUSR,
 			       &coda_psdev_fops, NULL);
+	}
 
 	coda_sysctl_init();
 
@@ -392,6 +395,7 @@ extern void coda_destroy_inodecache(void);
 static int __init init_coda(void)
 {
 	int status;
+	int i;
 	printk(KERN_INFO "Coda Kernel/Venus communications, v5.3.15, coda@cs.cmu.edu\n");
 
 	status = coda_init_inodecache();
@@ -410,7 +414,9 @@ static int __init init_coda(void)
 	}
 	return 0;
 out:
-	devfs_unregister(devfs_handle);
+	for (i = 0; i < MAX_CODADEVS; i++)
+		devfs_remove("coda/%d", i);
+	devfs_remove("coda");
 	unregister_chrdev(CODA_PSDEV_MAJOR,"coda_psdev");
 	coda_sysctl_clean();
 out1:
@@ -421,13 +427,15 @@ out2:
 
 static void __exit exit_coda(void)
 {
-        int err;
+        int err, i;
 
 	err = unregister_filesystem(&coda_fs_type);
         if ( err != 0 ) {
                 printk("coda: failed to unregister filesystem\n");
         }
-	devfs_unregister(devfs_handle);
+	for (i = 0; i < MAX_CODADEVS; i++)
+		devfs_remove("coda/%d", i);
+	devfs_remove("coda");
 	unregister_chrdev(CODA_PSDEV_MAJOR, "coda_psdev");
 	coda_sysctl_clean();
 	coda_destroy_inodecache();

@@ -344,9 +344,11 @@ static ssize_t disk_stat_read(struct gendisk * disk,
 		"%8u %8u %8llu %8u "
 		"%8u %8u %8u"
 		"\n",
-		disk->reads, disk->read_merges, (u64)disk->read_sectors,
+		disk->reads, disk->read_merges,
+		(unsigned long long)disk->read_sectors,
 		jiffies_to_msec(disk->read_ticks),
-		disk->writes, disk->write_merges, (u64)disk->write_sectors,
+		disk->writes, disk->write_merges,
+		(unsigned long long)disk->write_sectors,
 		jiffies_to_msec(disk->write_ticks),
 		disk->in_flight, jiffies_to_msec(disk->io_ticks),
 		jiffies_to_msec(disk->time_in_queue));

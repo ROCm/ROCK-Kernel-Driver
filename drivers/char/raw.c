@@ -104,7 +104,7 @@ raw_ioctl(struct inode *inode, struct file *filp,
 {
 	struct block_device *bdev = filp->private_data;
 
-	return blkdev_ioctl(bdev->bd_inode, NULL, command, arg);
+	return ioctl_by_bdev(bdev, command, arg);
 }
 
 /*
@@ -242,3 +242,4 @@ static void __exit raw_exit(void)
 
 module_init(raw_init);
 module_exit(raw_exit);
+MODULE_LICENSE("GPL");

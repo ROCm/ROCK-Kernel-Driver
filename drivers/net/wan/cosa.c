@@ -357,8 +357,6 @@ static void debug_status_out(struct cosa_data *cosa, int status);
 
 /* ---------- Initialization stuff ---------- */
 
-static devfs_handle_t devfs_handle;
-
 #ifdef MODULE
 int init_module(void)
 #else
@@ -387,15 +385,19 @@ static int __init cosa_init(void)
 		cosa_cards[i].num = -1;
 	for (i=0; io[i] != 0 && i < MAX_CARDS; i++)
 		cosa_probe(io[i], irq[i], dma[i]);
-	devfs_handle = devfs_mk_dir (NULL, "cosa", NULL);
-	devfs_register_series (devfs_handle, "%u", nr_cards, DEVFS_FL_DEFAULT,
-			       cosa_major, 0,
-			       S_IFCHR | S_IRUSR | S_IWUSR,
-			       &cosa_fops, NULL);
 	if (!nr_cards) {
 		printk(KERN_WARNING "cosa: no devices found.\n");
 		unregister_chrdev(cosa_major, "cosa");
 		return -ENODEV;
+	}
+	devfs_mk_dir (NULL, "cosa", NULL);
+	for (i=0; i<nr_cards; i++) {
+		char name[16];
+		sprintf(name, "cosa/%d", i);
+		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
+			       cosa_major, i,
+			       S_IFCHR | S_IRUSR | S_IWUSR,
+			       &cosa_fops, NULL);
 	}
 	return 0;
 }
@@ -404,11 +406,13 @@ static int __init cosa_init(void)
 void cleanup_module (void)
 {
 	struct cosa_data *cosa;
+	int i;
 	printk(KERN_INFO "Unloading the cosa module\n");
 
-	devfs_unregister (devfs_handle);
+	for (i=0; i<nr_cards; i++)
+		devfs_remove("cosa/%d", i);
+	devfs_remove("cosa");
 	for (cosa=cosa_cards; nr_cards--; cosa++) {
-		int i;
 		/* Clean up the per-channel data */
 		for (i=0; i<cosa->nchannels; i++) {
 			/* Chardev driver has no alloc'd per-channel data */

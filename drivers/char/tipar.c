@@ -90,7 +90,6 @@ static struct tipar_struct table[PP_NO];
 static int delay = IO_DELAY;	/* inter-bit delay in microseconds */
 static int timeout = TIMAXTIME;	/* timeout in tenth of seconds     */
 
-static devfs_handle_t devfs_handle;
 static unsigned int tp_count;	/* tipar count */
 static unsigned long opened;	/* opened devices */
 
@@ -422,7 +421,7 @@ tipar_setup(char *str)
 static int
 tipar_register(int nr, struct parport *port)
 {
-	char name[8];
+	char name[32];
 
 	/* Register our module into parport */
 	table[nr].dev = parport_register_device(port, "tipar",
@@ -433,11 +432,11 @@ tipar_register(int nr, struct parport *port)
 		return 1;
 
 	/* Use devfs, tree: /dev/ticables/par/[0..2] */
-	sprintf(name, "%d", nr);
+	sprintf(name, "ticables/par/%d", nr);
 	printk
 	    ("tipar: registering to devfs : major = %d, minor = %d, node = %s\n",
 	     TISER_MAJOR, (TIPAR_MINOR + nr), name);
-	devfs_register(devfs_handle, name, DEVFS_FL_DEFAULT, TIPAR_MAJOR,
+	devfs_register(NULL, name, DEVFS_FL_DEFAULT, TIPAR_MAJOR,
 		       TIPAR_MINOR + nr, S_IFCHR | S_IRUGO | S_IWUGO,
 		       &tipar_fops, NULL);
 
@@ -491,7 +490,7 @@ tipar_init_module(void)
 	}
 
 	/* Use devfs with tree: /dev/ticables/par/[0..2] */
-	devfs_handle = devfs_mk_dir(NULL, "ticables/par", NULL);
+	devfs_mk_dir(NULL, "ticables/par", NULL);
 
 	if (parport_register_driver(&tipar_driver)) {
 		printk("tipar: unable to register with parport\n");
@@ -509,14 +508,15 @@ tipar_cleanup_module(void)
 	/* Unregistering module */
 	parport_unregister_driver(&tipar_driver);
 
-	devfs_unregister(devfs_handle);
 	unregister_chrdev(TIPAR_MAJOR, "tipar");
 
 	for (i = 0; i < PP_NO; i++) {
 		if (table[i].dev == NULL)
 			continue;
 		parport_unregister_device(table[i].dev);
+		devfs_remove("ticables/par/%d", i);
 	}
+	devfs_remove("ticables/par");
 
 	printk("tipar: module unloaded !\n");
 }

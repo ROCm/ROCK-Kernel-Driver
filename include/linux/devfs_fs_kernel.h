@@ -11,22 +11,9 @@
 
 #define DEVFS_SUPER_MAGIC                0x1373
 
-#define IS_DEVFS_INODE(inode) (DEVFS_SUPER_MAGIC == (inode)->i_sb->s_magic)
-
-#define DEVFS_MINOR(inode) \
-    ({unsigned int m; /* evil GCC trickery */ \
-      ((inode)->i_sb && \
-       ((inode)->i_sb->s_magic==DEVFS_SUPER_MAGIC) && \
-       (devfs_get_maj_min(devfs_get_handle_from_inode((inode)),NULL,&m)==0) \
-      ) ? m : MINOR((inode)->r_dev); })
-
-
 #define DEVFS_FL_NONE           0x000 /* This helps to make code more readable
 				       */
-#define DEVFS_FL_HIDE           0x001 /* Do not show entry in directory list */
 #define DEVFS_FL_AUTO_DEVNUM    0x002 /* Automatically generate device number
-				       */
-#define DEVFS_FL_AOPEN_NOTIFY   0x004 /* Asynchronously notify devfsd on open
 				       */
 #define DEVFS_FL_REMOVABLE      0x008 /* This is a removable media device    */
 #define DEVFS_FL_WAIT           0x010 /* Wait for devfsd to finish           */
@@ -67,40 +54,23 @@ extern int devfs_mk_symlink (devfs_handle_t dir, const char *name,
 extern devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name,
 				    void *info);
 extern devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
-					unsigned int major,unsigned int minor,
-					char type, int traverse_symlinks);
-extern void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
-				       unsigned int major, unsigned int minor,
-				       char type, int traverse_symlinks);
-extern int devfs_get_flags (devfs_handle_t de, unsigned int *flags);
-extern int devfs_set_flags (devfs_handle_t de, unsigned int flags);
-extern int devfs_get_maj_min (devfs_handle_t de, 
-			      unsigned int *major, unsigned int *minor);
+					int traverse_symlinks);
 extern devfs_handle_t devfs_get_handle_from_inode (struct inode *inode);
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
-extern void *devfs_get_ops (devfs_handle_t de);
-extern void devfs_put_ops (devfs_handle_t de);
 extern int devfs_set_file_size (devfs_handle_t de, unsigned long size);
 extern void *devfs_get_info (devfs_handle_t de);
 extern int devfs_set_info (devfs_handle_t de, void *info);
 extern devfs_handle_t devfs_get_parent (devfs_handle_t de);
 extern devfs_handle_t devfs_get_first_child (devfs_handle_t de);
 extern devfs_handle_t devfs_get_next_sibling (devfs_handle_t de);
-extern void devfs_auto_unregister (devfs_handle_t master,devfs_handle_t slave);
-extern devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master);
 extern const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen);
 extern int devfs_only (void);
 extern int devfs_register_tape (devfs_handle_t de);
 extern void devfs_unregister_tape(int num);
-extern void devfs_register_series (devfs_handle_t dir, const char *format,
-				   unsigned int num_entries,
-				   unsigned int flags, unsigned int major,
-				   unsigned int minor_start,
-				   umode_t mode, void *ops, void *info);
 extern int devfs_alloc_major (char type);
 extern void devfs_dealloc_major (char type, int major);
-extern kdev_t devfs_alloc_devnum (char type);
-extern void devfs_dealloc_devnum (char type, kdev_t devnum);
+extern dev_t devfs_alloc_devnum (char type);
+extern void devfs_dealloc_devnum (char type, dev_t devnum);
 extern int devfs_alloc_unique_number (struct unique_numspace *space);
 extern void devfs_dealloc_unique_number (struct unique_numspace *space,
 					 int number);
@@ -147,35 +117,12 @@ static inline devfs_handle_t devfs_mk_dir (devfs_handle_t dir,
 }
 static inline devfs_handle_t devfs_get_handle (devfs_handle_t dir,
 					       const char *name,
-					       unsigned int major,
-					       unsigned int minor,
-					       char type,
 					       int traverse_symlinks)
 {
     return NULL;
 }
-static inline void devfs_find_and_unregister (devfs_handle_t dir,
-					      const char *name,
-					      unsigned int major,
-					      unsigned int minor,
-					      char type, int traverse_symlinks)
-{
-}
 static inline void devfs_remove(const char *fmt, ...)
 {
-}
-static inline int devfs_get_flags (devfs_handle_t de, unsigned int *flags)
-{
-    return 0;
-}
-static inline int devfs_set_flags (devfs_handle_t de, unsigned int flags)
-{
-    return 0;
-}
-static inline int devfs_get_maj_min (devfs_handle_t de, 
-				     unsigned int *major, unsigned int *minor)
-{
-    return 0;
 }
 static inline devfs_handle_t devfs_get_handle_from_inode (struct inode *inode)
 {
@@ -185,14 +132,6 @@ static inline int devfs_generate_path (devfs_handle_t de, char *path,
 				       int buflen)
 {
     return -ENOSYS;
-}
-static inline void *devfs_get_ops (devfs_handle_t de)
-{
-    return NULL;
-}
-static inline void devfs_put_ops (devfs_handle_t de)
-{
-    return;
 }
 static inline int devfs_set_file_size (devfs_handle_t de, unsigned long size)
 {
@@ -218,15 +157,6 @@ static inline devfs_handle_t devfs_get_next_sibling (devfs_handle_t de)
 {
     return NULL;
 }
-static inline void devfs_auto_unregister (devfs_handle_t master,
-					  devfs_handle_t slave)
-{
-    return;
-}
-static inline devfs_handle_t devfs_get_unregister_slave (devfs_handle_t master)
-{
-    return NULL;
-}
 static inline const char *devfs_get_name (devfs_handle_t de,
 					  unsigned int *namelen)
 {
@@ -243,17 +173,6 @@ static inline int devfs_register_tape (devfs_handle_t de)
 static inline void devfs_unregister_tape(int num)
 {
 }
-static inline void devfs_register_series (devfs_handle_t dir,
-					  const char *format,
-					  unsigned int num_entries,
-					  unsigned int flags,
-					  unsigned int major,
-					  unsigned int minor_start,
-					  umode_t mode, void *ops, void *info)
-{
-    return;
-}
-
 static inline int devfs_alloc_major (char type)
 {
     return -1;
@@ -264,12 +183,12 @@ static inline void devfs_dealloc_major (char type, int major)
     return;
 }
 
-static inline kdev_t devfs_alloc_devnum (char type)
+static inline dev_t devfs_alloc_devnum (char type)
 {
-    return NODEV;
+    return 0;
 }
 
-static inline void devfs_dealloc_devnum (char type, kdev_t devnum)
+static inline void devfs_dealloc_devnum (char type, dev_t devnum)
 {
     return;
 }

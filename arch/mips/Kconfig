@@ -913,7 +913,7 @@ source "drivers/scsi/Kconfig"
 endmenu
 
 
-if !DECSTATION" && !SGI_IP22
+if !DECSTATION && !SGI_IP22
 source "drivers/message/i2o/Kconfig"
 endif
 

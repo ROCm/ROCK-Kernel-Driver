@@ -14,6 +14,7 @@
 #include <linux/socket.h>
 #include <linux/file.h>
 #include <linux/net.h>
+#include <linux/compat.h>
 
 #include <asm/uaccess.h>
 #include <asm/string.h>
@@ -378,7 +379,7 @@ asmlinkage int solaris_sendmsg(int fd, struct sol_nmsghdr *user_msg, unsigned us
 	if(kern_msg.msg_controllen) {
 		struct sol_cmsghdr *ucmsg = (struct sol_cmsghdr *)kern_msg.msg_control;
 		unsigned long *kcmsg;
-		__kernel_size_t32 cmlen;
+		compat_size_t cmlen;
 
 		if(kern_msg.msg_controllen > sizeof(ctl) &&
 		   kern_msg.msg_controllen <= 256) {
@@ -392,7 +393,7 @@ asmlinkage int solaris_sendmsg(int fd, struct sol_nmsghdr *user_msg, unsigned us
 		*kcmsg++ = (unsigned long)cmlen;
 		err = -EFAULT;
 		if(copy_from_user(kcmsg, &ucmsg->cmsg_level,
-				  kern_msg.msg_controllen - sizeof(__kernel_size_t32)))
+				  kern_msg.msg_controllen - sizeof(compat_size_t)))
 			goto out_freectl;
 		kern_msg.msg_control = ctl_buf;
 	}

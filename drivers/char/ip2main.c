@@ -510,10 +510,8 @@ cleanup_module(void)
 			iiResetDelay( i2BoardPtrTable[i] );
 			/* free io addresses and Tibet */
 			release_region( ip2config.addr[i], 8 );
-#ifdef	CONFIG_DEVFS_FS
-			devfs_unregister (i2BoardPtrTable[i]->devfs_ipl_handle);
-			devfs_unregister (i2BoardPtrTable[i]->devfs_stat_handle);
-#endif
+			devfs_remove("ip2/ipl%d", i);
+			devfs_remove("ip2/stat%d", i);
 		}
 		/* Disable and remove interrupt handler. */
 		if ( (ip2config.irq[i] > 0) && have_requested_irq(ip2config.irq[i]) ) {	
@@ -521,6 +519,7 @@ cleanup_module(void)
 			clear_requested_irq( ip2config.irq[i]);
 		}
 	}
+	devfs_remove("ip2");
 	if ( ( err = tty_unregister_driver ( &ip2_tty_driver ) ) ) {
 		printk(KERN_ERR "IP2: failed to unregister tty driver (%d)\n", err);
 	}
@@ -574,7 +573,6 @@ int
 ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize) 
 {
 #ifdef	CONFIG_DEVFS_FS
-	static devfs_handle_t devfs_handle;
 	int j, box;
 #endif
 	int i;
@@ -869,10 +867,6 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 		/* Register the interrupt handler or poll handler, depending upon the
 		 * specified interrupt.
 		 */
-#ifdef	CONFIG_DEVFS_FS
-		if (!devfs_handle)
-			devfs_handle = devfs_mk_dir (NULL, "ip2", NULL);
-#endif
 
 		for( i = 0; i < IP2_MAX_BOARDS; ++i ) {
 #ifdef	CONFIG_DEVFS_FS
@@ -885,17 +879,15 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 
 #ifdef	CONFIG_DEVFS_FS
 			if ( NULL != ( pB = i2BoardPtrTable[i] ) ) {
-				sprintf( name, "ipl%d", i );
-				pB->devfs_ipl_handle =
-					devfs_register (devfs_handle, name,
+				sprintf( name, "ip2/ipl%d", i );
+				devfs_register(NULL, name,
 						DEVFS_FL_DEFAULT,
 						IP2_IPL_MAJOR, 4 * i,
 						S_IRUSR | S_IWUSR | S_IRGRP | S_IFCHR,
 						&ip2_ipl, NULL);
 
-				sprintf( name, "stat%d", i );
-				pB->devfs_stat_handle =
-					devfs_register (devfs_handle, name,
+				sprintf( name, "ip2/stat%d", i );
+				devfs_register(NULL, name,
 						DEVFS_FL_DEFAULT,
 						IP2_IPL_MAJOR, 4 * i + 1,
 						S_IRUSR | S_IWUSR | S_IRGRP | S_IFCHR,

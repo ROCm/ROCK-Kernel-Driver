@@ -45,14 +45,11 @@ const char *kallsyms_lookup(unsigned long addr,
 		for (i = 0; i < best; i++)
 			name += strlen(name)+1;
 
-		/* Base symbol size on next symbol, but beware aliases. */
-		symbol_end = (unsigned long)_etext;
-		for (i = best+1; i < kallsyms_num_syms; i++) {
-			if (kallsyms_addresses[i] != kallsyms_addresses[best]){
-				symbol_end = kallsyms_addresses[i];
-				break;
-			}
-		}
+		/* Base symbol size on next symbol. */
+		if (best + 1 < kallsyms_num_syms)
+			symbol_end = kallsyms_addresses[best + 1];
+		else
+			symbol_end = (unsigned long)_etext;
 
 		*symbolsize = symbol_end - kallsyms_addresses[best];
 		*modname = NULL;

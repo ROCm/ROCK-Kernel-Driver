@@ -30,9 +30,6 @@ struct hash_cell {
 	char *name;
 	char *uuid;
 	struct mapped_device *md;
-
-	/* I hate devfs */
-	devfs_handle_t devfs_entry;
 };
 
 #define NUM_BUCKETS 64
@@ -40,7 +37,6 @@ struct hash_cell {
 static struct list_head _name_buckets[NUM_BUCKETS];
 static struct list_head _uuid_buckets[NUM_BUCKETS];
 
-static devfs_handle_t _dev_dir;
 void dm_hash_remove_all(void);
 
 /*
@@ -60,14 +56,14 @@ int dm_hash_init(void)
 {
 	init_buckets(_name_buckets);
 	init_buckets(_uuid_buckets);
-	_dev_dir = devfs_mk_dir(0, DM_DIR, NULL);
+	devfs_mk_dir(NULL, DM_DIR, NULL);
 	return 0;
 }
 
 void dm_hash_exit(void)
 {
 	dm_hash_remove_all();
-	devfs_unregister(_dev_dir);
+	devfs_remove(DM_DIR);
 }
 
 /*-----------------------------------------------------------------
@@ -177,20 +173,20 @@ static void free_cell(struct hash_cell *hc)
  */
 static int register_with_devfs(struct hash_cell *hc)
 {
+	char name[32];
 	struct gendisk *disk = dm_disk(hc->md);
 
-	hc->devfs_entry =
-	    devfs_register(_dev_dir, hc->name, DEVFS_FL_CURRENT_OWNER,
-			   disk->major, disk->first_minor,
-			   S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
-			   &dm_blk_dops, NULL);
-
+	sprintf(name, DM_DIR "/%s", hc->name);
+	devfs_register(NULL, name, DEVFS_FL_CURRENT_OWNER,
+		       disk->major, disk->first_minor,
+		       S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
+		       &dm_blk_dops, NULL);
 	return 0;
 }
 
 static int unregister_with_devfs(struct hash_cell *hc)
 {
-	devfs_unregister(hc->devfs_entry);
+	devfs_remove(DM_DIR"/%s", hc->name);
 	return 0;
 }
 

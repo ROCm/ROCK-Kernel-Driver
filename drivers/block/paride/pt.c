@@ -285,8 +285,6 @@ void pt_init_units( void )
         }
 }
 
-static devfs_handle_t devfs_handle;
-
 #define	WR(c,r,v)	pi_write_regr(PI,c,r,v)
 #define	RR(c,r)		(pi_read_regr(PI,c,r))
 
@@ -915,20 +913,31 @@ static int __init pt_init(void)
 		return -1;
 	}
 
-	devfs_handle = devfs_mk_dir (NULL, "pt", NULL);
-	devfs_register_series (devfs_handle, "%u", 4, DEVFS_FL_DEFAULT,
-			       major, 0, S_IFCHR | S_IRUSR | S_IWUSR,
+	devfs_mk_dir (NULL, "pt", NULL);
+	for (unit=0;unit<PT_UNITS;unit++)
+		if (PT.present) {
+			char name[16];
+			sprintf(name, "pt/%d", unit);
+			devfs_register(NULL, name, DEVFS_FL_DEFAULT,
+			       major, unit, S_IFCHR | S_IRUSR | S_IWUSR,
 			       &pt_fops, NULL);
-	devfs_register_series (devfs_handle, "%un", 4, DEVFS_FL_DEFAULT,
-			       major, 128, S_IFCHR | S_IRUSR | S_IWUSR,
+			sprintf(name, "pt/%dn", unit);
+			devfs_register(NULL, name, DEVFS_FL_DEFAULT,
+			       major, 128 + unit, S_IFCHR | S_IRUSR | S_IWUSR,
 			       &pt_fops, NULL);
+		}
 	return 0;
 }
 
 static void __exit pt_exit(void)
 {
 	int unit;
-	devfs_unregister (devfs_handle);
+	for (unit=0;unit<PT_UNITS;unit++)
+		if (PT.present) {
+			devfs_remove("pt/%d", unit);
+			devfs_remove("pt/%dn", unit);
+		}
+	devfs_remove("pt");
 	unregister_chrdev(major,name);
 	for (unit=0;unit<PT_UNITS;unit++)
 		if (PT.present)

@@ -52,8 +52,6 @@ static char *DRIVERNAME = "Eicon DIVA - User IDI (http://www.melware.net)";
 static char *DRIVERLNAME = "diva_idi";
 char *DRIVERRELEASE = "2.0";
 
-static devfs_handle_t devfs_handle;
-
 extern int idifunc_init(void);
 extern void idifunc_finit(void);
 
@@ -171,8 +169,7 @@ static struct file_operations divas_idi_fops = {
 
 static void divas_idi_unregister_chrdev(void)
 {
-	if (devfs_handle)
-		devfs_unregister(devfs_handle);
+	devfs_remove("DivasIDI");
 	unregister_chrdev(major, "DivasIDI");
 }
 
@@ -184,10 +181,9 @@ static int DIVA_INIT_FUNCTION divas_idi_register_chrdev(void)
 		       DRIVERLNAME);
 		return (0);
 	}
-	devfs_handle =
-	    devfs_register(NULL, "DivasIDI", DEVFS_FL_DEFAULT, major, 0,
-			   S_IFCHR | S_IRUSR | S_IWUSR, &divas_idi_fops,
-			   NULL);
+	devfs_register(NULL, "DivasIDI", DEVFS_FL_DEFAULT, major, 0,
+		       S_IFCHR | S_IRUSR | S_IWUSR, &divas_idi_fops,
+		       NULL);
 
 	return (1);
 }

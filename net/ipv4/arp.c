@@ -1282,7 +1282,7 @@ static void arp_seq_stop(struct seq_file *seq, void *v)
 {
 	struct arp_iter_state* state = seq->private;
 
-	if (!state->is_pneigh)
+	if (!state->is_pneigh && v != (void *)1)
 		read_unlock_bh(&arp_tbl.lock);
 }
 

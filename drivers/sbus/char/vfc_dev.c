@@ -44,7 +44,6 @@
 #include <asm/vfc_ioctls.h>
 
 static struct file_operations vfc_fops;
-static devfs_handle_t devfs_handle;  /*  For the directory  */
 struct vfc_dev **vfc_dev_lst;
 static char vfcstr[]="vfc";
 static unsigned char saa9051_init_array[VFC_SAA9051_NR] = {
@@ -144,7 +143,7 @@ int init_vfc_devstruct(struct vfc_dev *dev, int instance)
 
 int init_vfc_device(struct sbus_dev *sdev,struct vfc_dev *dev, int instance)
 {
-	char devname[8];
+	char devname[16];
 
 	if(dev == NULL) {
 		printk(KERN_ERR "VFC: Bogus pointer passed\n");
@@ -168,8 +167,8 @@ int init_vfc_device(struct sbus_dev *sdev,struct vfc_dev *dev, int instance)
 	if (init_vfc_hw(dev))
 		return -EIO;
 
-	sprintf (devname, "%d", instance);
-	dev->de = devfs_register (devfs_handle, devname, DEVFS_FL_DEFAULT,
+	sprintf (devname, "vfc/%d", instance);
+	dev->de = devfs_register (NULL, devname, DEVFS_FL_DEFAULT,
 				  VFC_MAJOR, instance,
 				  S_IFCHR | S_IRUSR | S_IWUSR,
 				  &vfc_fops, NULL);
@@ -682,8 +681,7 @@ static int vfc_probe(void)
 		kfree(vfc_dev_lst);
 		return -EIO;
 	}
-	devfs_handle = devfs_mk_dir (NULL, "vfc", NULL);
-
+	devfs_mk_dir (NULL, "vfc", NULL);
 	instance = 0;
 	for_all_sbusdev(sdev, sbus) {
 		if (strcmp(sdev->prom_name, "vfc") == 0) {
@@ -723,7 +721,7 @@ static void deinit_vfc_device(struct vfc_dev *dev)
 {
 	if(dev == NULL)
 		return;
-	devfs_unregister (dev->de);
+	devfs_remove("vfc/%d", dev->instance);
 	sbus_iounmap((unsigned long)dev->regs, sizeof(struct vfc_regs));
 	kfree(dev);
 }
@@ -737,7 +735,7 @@ void cleanup_module(void)
 	for (devp = vfc_dev_lst; *devp; devp++)
 		deinit_vfc_device(*devp);
 
-	devfs_unregister (devfs_handle);
+	devfs_remove("vfc");
 	kfree(vfc_dev_lst);
 	return;
 }

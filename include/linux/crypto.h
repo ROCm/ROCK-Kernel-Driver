@@ -58,7 +58,6 @@
  */
 #define CRYPTO_UNSPEC			0
 #define CRYPTO_MAX_ALG_NAME		64
-#define CRYPTO_MAX_CIPHER_BLOCK_SIZE	16
 
 struct scatterlist;
 
@@ -135,6 +134,7 @@ struct cipher_tfm {
 	                   struct scatterlist *sg, unsigned int nsg);
 	int (*cit_decrypt)(struct crypto_tfm *tfm,
 	                   struct scatterlist *sg, unsigned int nsg);
+	void (*cit_xor_block)(u8 *dst, const u8 *src);
 };
 
 struct digest_tfm {

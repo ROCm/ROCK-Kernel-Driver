@@ -597,7 +597,7 @@ static int __init rd_load_image(char *from)
 #ifdef CONFIG_BLK_DEV_RAM
 	int in_fd, out_fd;
 	unsigned long rd_blocks, devblocks;
-	int nblocks, i;
+	int nblocks, i, disk;
 	char *buf;
 	unsigned short rotate = 0;
 #if !defined(CONFIG_ARCH_S390) && !defined(CONFIG_PPC_ISERIES)
@@ -640,7 +640,7 @@ static int __init rd_load_image(char *from)
 		rd_blocks >>= 1;
 
 	if (nblocks > rd_blocks) {
-		printk("RAMDISK: image too big! (%d/%d blocks)\n",
+		printk("RAMDISK: image too big! (%d/%ld blocks)\n",
 		       nblocks, rd_blocks);
 		goto done;
 	}
@@ -667,23 +667,23 @@ static int __init rd_load_image(char *from)
 		goto done;
 	}
 
-	printk(KERN_NOTICE "RAMDISK: Loading %d blocks [%d disk%s] into ram disk... ", 
+	printk(KERN_NOTICE "RAMDISK: Loading %d blocks [%ld disk%s] into ram disk... ", 
 		nblocks, ((nblocks-1)/devblocks)+1, nblocks>devblocks ? "s" : "");
-	for (i=0; i < nblocks; i++) {
+	for (i = 0, disk = 1; i < nblocks; i++) {
 		if (i && (i % devblocks == 0)) {
-			printk("done disk #%d.\n", i/devblocks);
+			printk("done disk #%d.\n", disk++);
 			rotate = 0;
 			if (close(in_fd)) {
 				printk("Error closing the disk.\n");
 				goto noclose_input;
 			}
-			change_floppy("disk #%d", i/devblocks+1);
+			change_floppy("disk #%d", disk);
 			in_fd = open(from, O_RDONLY, 0);
 			if (in_fd < 0)  {
 				printk("Error opening disk.\n");
 				goto noclose_input;
 			}
-			printk("Loading disk #%d... ", i/devblocks+1);
+			printk("Loading disk #%d... ", disk);
 		}
 		read(in_fd, buf, BLOCK_SIZE);
 		write(out_fd, buf, BLOCK_SIZE);

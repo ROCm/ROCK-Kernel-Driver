@@ -72,7 +72,7 @@ device_scan(void)
 		if (linux_num_cpus == 0) {
 			printk("No CPU nodes found, cannot continue.\n");
 			/* Probably a sun4e, Sun is trying to trick us ;-) */
-			halt();
+			prom_halt();
 		}
 		printk("Found %d CPU prom device tree node(s).\n", linux_num_cpus);
 	}

@@ -307,6 +307,7 @@ static void __exit cpqarray_exit(void)
 		for (j = 0; j < NWD; j++) {
 			if (ida_gendisk[i][j]->flags & GENHD_FL_UP)
 				del_gendisk(ida_gendisk[i][j]);
+			devfs_remove("ida/c%dd%d",i,j);
 			put_disk(ida_gendisk[i][j]);
 		}
 	}
@@ -437,7 +438,6 @@ Enomem2:
 	printk( KERN_ERR "cpqarray: out of memory");
 
 	if (!num_cntlrs_reg) {
-		devfs_remove("ida");
 		remove_proc_entry("cpqarray", proc_root_driver);
 		return -ENODEV;
 	}

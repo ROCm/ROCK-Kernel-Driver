@@ -214,7 +214,7 @@ static int raid0_run (mddev_t *mddev)
 	printk("raid0 : nb_zone is %d.\n", nb_zone);
 	conf->nr_zones = nb_zone;
 
-	printk("raid0 : Allocating %d bytes for hash.\n",
+	printk("raid0 : Allocating %Zd bytes for hash.\n",
 				nb_zone*sizeof(struct raid0_hash));
 	conf->hash_table = vmalloc (sizeof (struct raid0_hash)*nb_zone);
 	if (!conf->hash_table)

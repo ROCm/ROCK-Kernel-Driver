@@ -68,6 +68,20 @@ config CRYPTO_BLOWFISH
 	  See also:
 	  http://www.counterpane.com/blowfish.html
 
+config CRYPTO_TWOFISH
+	tristate "Twofish cipher algorithm"
+	depends on CRYPTO
+	help
+	  Twofish cipher algorithm.
+	  
+	  Twofish was submitted as an AES (Advanced Encryption Standard)
+	  candidate cipher by researchers at CounterPane Systems.  It is a
+	  16 round block cipher supporting key sizes of 128, 192, and 256
+	  bits.
+	  
+	  See also:
+	  http://www.counterpane.com/twofish.html
+
 config CRYPTO_TEST
 	tristate "Testing module"
 	depends on CRYPTO

@@ -499,8 +499,6 @@ static struct file_operations dsp56k_fops = {
 
 /****** Init and module functions ******/
 
-static devfs_handle_t devfs_handle;
-
 static char banner[] __initdata = KERN_INFO "DSP56k driver installed\n";
 
 static int __init dsp56k_init_driver(void)
@@ -514,10 +512,10 @@ static int __init dsp56k_init_driver(void)
 		printk("DSP56k driver: Unable to register driver\n");
 		return -ENODEV;
 	}
-	devfs_handle = devfs_register(NULL, "dsp56k", DEVFS_FL_DEFAULT,
-				      DSP56K_MAJOR, 0,
-				      S_IFCHR | S_IRUSR | S_IWUSR,
-				      &dsp56k_fops, NULL);
+	devfs_register(NULL, "dsp56k", DEVFS_FL_DEFAULT,
+		      DSP56K_MAJOR, 0,
+		      S_IFCHR | S_IRUSR | S_IWUSR,
+		      &dsp56k_fops, NULL);
 
 	printk(banner);
 	return 0;
@@ -527,7 +525,7 @@ module_init(dsp56k_init_driver);
 static void __exit dsp56k_cleanup_driver(void)
 {
 	unregister_chrdev(DSP56K_MAJOR, "dsp56k");
-	devfs_unregister(devfs_handle);
+	devfs_remove("dsp56k");
 }
 module_exit(dsp56k_cleanup_driver);
 

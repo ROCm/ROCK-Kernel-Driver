@@ -115,10 +115,10 @@
 /* #define IDEFLOPPY_DEBUG(fmt, args...) printk(KERN_INFO fmt, ## args) */
 #define IDEFLOPPY_DEBUG( fmt, args... )
 
-#ifndef IDEFLOPPY_DEBUG_LOG
-#define debug_log(fmt, args... ) do {} while(0)
-#else
+#if IDEFLOPPY_DEBUG_LOG
 #define debug_log printk
+#else
+#define debug_log(fmt, args... ) do {} while(0)
 #endif
 
 
