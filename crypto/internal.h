@@ -25,8 +25,8 @@ static inline void *crypto_kmap(struct page *page)
 
 static inline void crypto_kunmap(void *vaddr)
 {
-	return kunmap_atomic(vaddr, in_softirq() ?
-	                     KM_CRYPTO_SOFTIRQ : KM_CRYPTO_USER);
+	kunmap_atomic(vaddr, in_softirq() ?
+		      KM_CRYPTO_SOFTIRQ : KM_CRYPTO_USER);
 }
 
 static inline void crypto_yield(struct crypto_tfm *tfm)
