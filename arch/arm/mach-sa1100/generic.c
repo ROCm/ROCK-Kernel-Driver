@@ -99,6 +99,7 @@ unsigned int sa11x0_getspeed(void)
 {
 	return cclk_frequency_100khz[PPCR & 0xf] * 100;
 }
+EXPORT_SYMBOL(sa11x0_getspeed);
 #else
 /*
  * We still need to provide this so building without cpufreq works.

@@ -29,7 +29,7 @@
  *
  * First, the atomic bitops. These use native endian.
  */
-static inline void ____atomic_set_bit(unsigned int bit, unsigned long *p)
+static inline void ____atomic_set_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
 	unsigned long mask = 1UL << (bit & 31);
@@ -41,7 +41,7 @@ static inline void ____atomic_set_bit(unsigned int bit, unsigned long *p)
 	local_irq_restore(flags);
 }
 
-static inline void ____atomic_clear_bit(unsigned int bit, unsigned long *p)
+static inline void ____atomic_clear_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
 	unsigned long mask = 1UL << (bit & 31);
@@ -53,7 +53,7 @@ static inline void ____atomic_clear_bit(unsigned int bit, unsigned long *p)
 	local_irq_restore(flags);
 }
 
-static inline void ____atomic_change_bit(unsigned int bit, unsigned long *p)
+static inline void ____atomic_change_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
 	unsigned long mask = 1UL << (bit & 31);
@@ -66,7 +66,7 @@ static inline void ____atomic_change_bit(unsigned int bit, unsigned long *p)
 }
 
 static inline int
-____atomic_test_and_set_bit(unsigned int bit, unsigned long *p)
+____atomic_test_and_set_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
 	unsigned int res;
@@ -83,7 +83,7 @@ ____atomic_test_and_set_bit(unsigned int bit, unsigned long *p)
 }
 
 static inline int
-____atomic_test_and_clear_bit(unsigned int bit, unsigned long *p)
+____atomic_test_and_clear_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
 	unsigned int res;
@@ -100,7 +100,7 @@ ____atomic_test_and_clear_bit(unsigned int bit, unsigned long *p)
 }
 
 static inline int
-____atomic_test_and_change_bit(unsigned int bit, unsigned long *p)
+____atomic_test_and_change_bit(unsigned int bit, volatile unsigned long *p)
 {
 	unsigned long flags;
 	unsigned int res;
@@ -171,7 +171,7 @@ static inline int __test_and_change_bit(int nr, volatile unsigned long *p)
 /*
  * This routine doesn't need to be atomic.
  */
-static inline int __test_bit(int nr, const unsigned long * p)
+static inline int __test_bit(int nr, const volatile unsigned long * p)
 {
 	return (p[nr >> 5] >> (nr & 31)) & 1UL;
 }
@@ -204,24 +204,24 @@ static inline int __test_bit(int nr, const unsigned long * p)
 /*
  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
  */
-extern void _set_bit_le(int nr, unsigned long * p);
-extern void _clear_bit_le(int nr, unsigned long * p);
-extern void _change_bit_le(int nr, unsigned long * p);
-extern int _test_and_set_bit_le(int nr, unsigned long * p);
-extern int _test_and_clear_bit_le(int nr, unsigned long * p);
-extern int _test_and_change_bit_le(int nr, unsigned long * p);
+extern void _set_bit_le(int nr, volatile unsigned long * p);
+extern void _clear_bit_le(int nr, volatile unsigned long * p);
+extern void _change_bit_le(int nr, volatile unsigned long * p);
+extern int _test_and_set_bit_le(int nr, volatile unsigned long * p);
+extern int _test_and_clear_bit_le(int nr, volatile unsigned long * p);
+extern int _test_and_change_bit_le(int nr, volatile unsigned long * p);
 extern int _find_first_zero_bit_le(void * p, unsigned size);
 extern int _find_next_zero_bit_le(void * p, int size, int offset);
 
 /*
  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
  */
-extern void _set_bit_be(int nr, unsigned long * p);
-extern void _clear_bit_be(int nr, unsigned long * p);
-extern void _change_bit_be(int nr, unsigned long * p);
-extern int _test_and_set_bit_be(int nr, unsigned long * p);
-extern int _test_and_clear_bit_be(int nr, unsigned long * p);
-extern int _test_and_change_bit_be(int nr, unsigned long * p);
+extern void _set_bit_be(int nr, volatile unsigned long * p);
+extern void _clear_bit_be(int nr, volatile unsigned long * p);
+extern void _change_bit_be(int nr, volatile unsigned long * p);
+extern int _test_and_set_bit_be(int nr, volatile unsigned long * p);
+extern int _test_and_clear_bit_be(int nr, volatile unsigned long * p);
+extern int _test_and_change_bit_be(int nr, volatile unsigned long * p);
 extern int _find_first_zero_bit_be(void * p, unsigned size);
 extern int _find_next_zero_bit_be(void * p, int size, int offset);
 
