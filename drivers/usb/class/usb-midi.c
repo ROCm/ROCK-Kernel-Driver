@@ -936,7 +936,7 @@ static int usb_midi_release(struct inode *inode, struct file *file)
 
 	if ( m->open_mode & FMODE_WRITE ) {
 		m->open_mode &= ~FMODE_WRITE;
-		usb_unlink_urb( m->mout.ep->urb );
+		usb_kill_urb( m->mout.ep->urb );
 	}
 
 	if ( m->open_mode & FMODE_READ ) {
@@ -948,7 +948,7 @@ static int usb_midi_release(struct inode *inode, struct file *file)
 		if ( m->min.ep->readers == 0 &&
                      m->min.ep->urbSubmitted ) {
 			m->min.ep->urbSubmitted = 0;
-			usb_unlink_urb(m->min.ep->urb);
+			usb_kill_urb(m->min.ep->urb);
 		}
 	        spin_unlock_irqrestore( &m->min.ep->lock, flagsep );
 	}
@@ -1039,7 +1039,7 @@ static struct midi_in_endpoint *alloc_midi_in_endpoint( struct usb_device *d, in
 
 static int remove_midi_in_endpoint( struct midi_in_endpoint *min )
 {
-	usb_unlink_urb( min->urb );
+	usb_kill_urb( min->urb );
 	usb_free_urb( min->urb );
 	kfree( min->recvBuf );
 	kfree( min );
@@ -1099,7 +1099,7 @@ static struct midi_out_endpoint *alloc_midi_out_endpoint( struct usb_device *d, 
 
 static int remove_midi_out_endpoint( struct midi_out_endpoint *mout )
 {
-	usb_unlink_urb( mout->urb );
+	usb_kill_urb( mout->urb );
 	usb_free_urb( mout->urb );
 	kfree( mout->buf );
 	kfree( mout );
