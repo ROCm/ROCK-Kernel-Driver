@@ -489,13 +489,14 @@ static void scsi_free_sdev(struct scsi_device *sdev)
 		sdev->host->hostt->slave_destroy(sdev);
 	if (sdev->inquiry)
 		kfree(sdev->inquiry);
+	spin_lock_irqsave(sdev->host->host_lock, flags);
+	list_del(&sdev->starved_entry);
 	if (sdev->single_lun) {
-		spin_lock_irqsave(sdev->host->host_lock, flags);
 		sdev->sdev_target->starget_refcnt--;
 		if (sdev->sdev_target->starget_refcnt == 0)
 			kfree(sdev->sdev_target);
-		spin_unlock_irqrestore(sdev->host->host_lock, flags);
 	}
+	spin_unlock_irqrestore(sdev->host->host_lock, flags);
 
 	kfree(sdev);
 }
@@ -1275,7 +1276,7 @@ static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 			}
 		}
 		if (!starget) {
-			starget = kmalloc(sizeof(*starget), GFP_KERNEL);
+			starget = kmalloc(sizeof(*starget), GFP_ATOMIC);
 			if (!starget) {
 				printk(ALLOC_FAILURE_MSG, __FUNCTION__);
 				spin_unlock_irqrestore(sdev->host->host_lock,
