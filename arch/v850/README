@@ -1,7 +1,6 @@
 This port to the NEC V850E processor supports the following platforms:
 
-   + The gdb v850e simulator (CONFIG_V850E_SIM); see the subdirectory `sim'
-     for some more support files for this.
+   + The gdb v850e simulator (CONFIG_V850E_SIM).
 
    + The Midas labs RTE-V850E/MA1-CB evaluation board (CONFIG_RTE_CB_MA1),
      with untested support for the RTE-V850E/NB85E-CB board
