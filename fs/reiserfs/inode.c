@@ -1111,8 +1111,19 @@ void reiserfs_update_sd (struct reiserfs_transaction_handle *th,
     return;
 }
 
+/* reiserfs_read_inode2 is called to read the inode off disk, and it
+** does a make_bad_inode when things go wrong.  But, we need to make sure
+** and clear the key in the private portion of the inode, otherwise a
+** corresponding iput might try to delete whatever object the inode last
+** represented.
+*/
+static void reiserfs_make_bad_inode(struct inode *inode) {
+    memset(INODE_PKEY(inode), 0, KEY_SIZE);
+    make_bad_inode(inode);
+}
+
 void reiserfs_read_inode(struct inode *inode) {
-    make_bad_inode(inode) ;
+    reiserfs_make_bad_inode(inode) ;
 }
 
 
@@ -1132,7 +1143,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
     int retval;
 
     if (!p) {
-	make_bad_inode(inode) ;
+	reiserfs_make_bad_inode(inode) ;
 	return;
     }
 
@@ -1152,13 +1163,13 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
 	reiserfs_warning ("vs-13070: reiserfs_read_inode2: "
                     "i/o failure occurred trying to find stat data of %K\n",
                     &key);
-	make_bad_inode(inode) ;
+	reiserfs_make_bad_inode(inode) ;
 	return;
     }
     if (retval != ITEM_FOUND) {
 	/* a stale NFS handle can trigger this without it being an error */
 	pathrelse (&path_to_sd);
-	make_bad_inode(inode) ;
+	reiserfs_make_bad_inode(inode) ;
 	inode->i_nlink = 0;
 	return;
     }
@@ -1185,7 +1196,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
 			      "dead inode read from disk %K. "
 			      "This is likely to be race with knfsd. Ignore\n", 
 			      &key );
-	    make_bad_inode( inode );
+	    reiserfs_make_bad_inode( inode );
     }
 
     reiserfs_check_path(&path_to_sd) ; /* init inode should be relsing */

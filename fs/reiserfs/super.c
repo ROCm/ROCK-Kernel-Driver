@@ -746,9 +746,8 @@ static int read_super_block (struct super_block * s, int offset)
     //
     // ok, reiserfs signature (old or new) found in at the given offset
     //    
-    brelse (bh);
-    
     sb_set_blocksize (s, sb_blocksize(rs));
+    brelse (bh);
     
     bh = reiserfs_bread (s, offset / s->s_blocksize);
     if (!bh) {
