@@ -26,31 +26,30 @@
 static struct xor_block_template *active_template;
 
 void
-xor_block(unsigned int count, struct buffer_head **bh_ptr)
+xor_block(unsigned int count, unsigned int bytes, void **ptr)
 {
 	unsigned long *p0, *p1, *p2, *p3, *p4;
-	unsigned long bytes = bh_ptr[0]->b_size;
 
-	p0 = (unsigned long *) bh_ptr[0]->b_data;
-	p1 = (unsigned long *) bh_ptr[1]->b_data;
+	p0 = (unsigned long *) ptr[0];
+	p1 = (unsigned long *) ptr[1];
 	if (count == 2) {
 		active_template->do_2(bytes, p0, p1);
 		return;
 	}
 
-	p2 = (unsigned long *) bh_ptr[2]->b_data;
+	p2 = (unsigned long *) ptr[2];
 	if (count == 3) {
 		active_template->do_3(bytes, p0, p1, p2);
 		return;
 	}
 
-	p3 = (unsigned long *) bh_ptr[3]->b_data;
+	p3 = (unsigned long *) ptr[3];
 	if (count == 4) {
 		active_template->do_4(bytes, p0, p1, p2, p3);
 		return;
 	}
 
-	p4 = (unsigned long *) bh_ptr[4]->b_data;
+	p4 = (unsigned long *) ptr[4];
 	active_template->do_5(bytes, p0, p1, p2, p3, p4);
 }
 
