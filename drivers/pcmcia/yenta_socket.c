@@ -788,19 +788,19 @@ struct cardbus_type cardbus_type[] = {
 		.override	= ti113x_override,
 		.save_state	= ti_save_state,
 		.restore_state	= ti_restore_state,
-		.sock_init	= ti113x_init,
+		.sock_init	= ti_init,
 	},
 	[CARDBUS_TYPE_TI12XX]	= {
 		.override	= ti12xx_override,
 		.save_state	= ti_save_state,
 		.restore_state	= ti_restore_state,
-		.sock_init	= ti113x_init,
+		.sock_init	= ti_init,
 	},
 	[CARDBUS_TYPE_TI1250]	= {
 		.override	= ti1250_override,
 		.save_state	= ti_save_state,
 		.restore_state	= ti_restore_state,
-		.sock_init	= ti1250_init,
+		.sock_init	= ti_init,
 	},
 	[CARDBUS_TYPE_RICOH]	= {
 		.override	= ricoh_override,
