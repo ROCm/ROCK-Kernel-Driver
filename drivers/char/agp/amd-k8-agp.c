@@ -359,7 +359,7 @@ static __init int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 		if (i == MAX_HAMMER_GARTS) { 
 			printk(KERN_INFO "Too many northbridges for AGP\n");
 			return -1;
-	}
+		}
 	}
 	return i == 0 ? -1 : 0;
 }
