@@ -53,7 +53,6 @@
 #include "xfs_rw.h"
 
 #include <linux/dcache.h>
-#include <linux/mman.h> /* for PROT_WRITE */
 
 static struct vm_operations_struct linvfs_file_vm_ops;
 
