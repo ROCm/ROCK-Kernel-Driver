@@ -1955,21 +1955,6 @@ _GLOBAL(enable_64b_mode)
 	isync
 	blr
 
-/*
- * This subroutine clobbers r11, r12 and the LR
- */
-_GLOBAL(enable_32b_mode)
-	mfmsr   r11                      /* grab the current MSR */
-	li      r12,1
-	rldicr  r12,r12,MSR_SF_LG,(63-MSR_SF_LG)
-	andc	r11,r11,r12
-	li      r12,1
-	rldicr  r12,r12,MSR_ISF_LG,(63-MSR_ISF_LG)
-	andc	r11,r11,r12
-	mtmsrd  r11
-	isync
-	blr
-
 #ifdef CONFIG_PPC_PSERIES
 /*
  * This is where the main kernel code starts.
