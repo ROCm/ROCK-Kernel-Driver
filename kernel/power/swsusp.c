@@ -1204,6 +1204,14 @@ static int __init read_suspend_image(void)
 
 	if ((error = verify()))
 		return error;
+
+#ifdef CONFIG_BOOTSPLASH
+	{
+		extern int splash_verbose(void);
+		(void)splash_verbose();
+	}
+#endif
+
 	if ((error = read_pagedir()))
 		return error;
 	if ((error = data_read())) {
