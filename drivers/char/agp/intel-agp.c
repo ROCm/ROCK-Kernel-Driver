@@ -1473,6 +1473,11 @@ static struct pci_driver agp_intel_pci_driver = {
 static int __init agp_intel_init(void)
 {
 	int ret_val;
+	static int agp_initialised=0;
+
+	if (agp_initialised==1)
+		return 0;
+	agp_initialised=1;
 
 	ret_val = pci_module_init(&agp_intel_pci_driver);
 	if (ret_val)
