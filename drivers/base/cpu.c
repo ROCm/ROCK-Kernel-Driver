@@ -64,7 +64,6 @@ void unregister_cpu(struct cpu *cpu, struct node *root)
 
 	return;
 }
-EXPORT_SYMBOL(unregister_cpu);
 #else /* ... !CONFIG_HOTPLUG_CPU */
 static inline void register_cpu_control(struct cpu *cpu)
 {
@@ -96,9 +95,6 @@ int __devinit register_cpu(struct cpu *cpu, int num, struct node *root)
 		register_cpu_control(cpu);
 	return error;
 }
-#ifdef CONFIG_HOTPLUG_CPU
-EXPORT_SYMBOL(register_cpu);
-#endif
 
 
 
