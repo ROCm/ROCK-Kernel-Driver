@@ -48,8 +48,8 @@
 #define MSR_IA32_UCODE_WRITE		0x79
 #define MSR_IA32_UCODE_REV		0x8b
 
-#define MSR_IA32_PERFCTR0		0xc1
-#define MSR_IA32_PERFCTR1		0xc2
+#define MSR_P6_PERFCTR0		0xc1
+#define MSR_P6_PERFCTR1		0xc2
 
 #define MSR_IA32_BBL_CR_CTL		0x119
 
