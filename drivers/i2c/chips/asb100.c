@@ -36,7 +36,10 @@
     asb100	7	3	1	4	0x31	0x0694	yes	no
 */
 
-/* #define DEBUG 1 */
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_CHIP
+#define DEBUG	1
+#endif
 
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -1035,7 +1038,6 @@ static struct asb100_data *asb100_update_device(struct device *dev)
 
 static int __init asb100_init(void)
 {
-	printk(KERN_INFO "asb100 version %s\n", ASB100_VERSION);
 	return i2c_add_driver(&asb100_driver);
 }
 
