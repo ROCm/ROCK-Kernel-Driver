@@ -219,12 +219,16 @@ static struct as_io_context *alloc_as_io_context(void)
  */
 static struct io_context *as_get_io_context(void)
 {
-	struct io_context *ioc = get_io_context();
-	if (ioc && !ioc->aic)
+	struct io_context *ioc = get_io_context(GFP_ATOMIC);
+	if (ioc && !ioc->aic) {
 		ioc->aic = alloc_as_io_context();
+		if (!ioc->aic) {
+			put_io_context(ioc);
+			ioc = NULL;
+		}
+	}
 	return ioc;
 }
-
 
 /*
  * the back merge hash support functions
@@ -971,32 +975,26 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 static void as_remove_queued_request(request_queue_t *q, struct request *rq)
 {
 	struct as_rq *arq = RQ_DATA(rq);
+	const int data_dir = arq->is_sync;
+	struct as_data *ad = q->elevator.elevator_data;
 
-	if (!arq)
-		BUG();
-	else {
-		const int data_dir = arq->is_sync;
-		struct as_data *ad = q->elevator.elevator_data;
+	WARN_ON(arq->state != AS_RQ_QUEUED);
 
-		WARN_ON(arq->state != AS_RQ_QUEUED);
-
-		if (arq->io_context && arq->io_context->aic) {
-			BUG_ON(!atomic_read(&arq->io_context->aic->nr_queued));
-			atomic_dec(&arq->io_context->aic->nr_queued);
-		}
-
-		/*
-		 * Update the "next_arq" cache if we are about to remove its
-		 * entry
-		 */
-		if (ad->next_arq[data_dir] == arq)
-			ad->next_arq[data_dir] = as_find_next_arq(ad, arq);
-
-		list_del_init(&arq->fifo);
-		as_remove_merge_hints(q, arq);
-		as_del_arq_rb(ad, arq);
+	if (arq->io_context && arq->io_context->aic) {
+		BUG_ON(!atomic_read(&arq->io_context->aic->nr_queued));
+		atomic_dec(&arq->io_context->aic->nr_queued);
 	}
 
+	/*
+	 * Update the "next_arq" cache if we are about to remove its
+	 * entry
+	 */
+	if (ad->next_arq[data_dir] == arq)
+		ad->next_arq[data_dir] = as_find_next_arq(ad, arq);
+
+	list_del_init(&arq->fifo);
+	as_remove_merge_hints(q, arq);
+	as_del_arq_rb(ad, arq);
 }
 
 /*
@@ -1292,7 +1290,7 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 
 	arq->io_context = as_get_io_context();
 
-	if (arq->io_context && arq->io_context->aic) {
+	if (arq->io_context) {
 		atomic_inc(&arq->io_context->aic->nr_queued);
 		as_update_iohist(arq->io_context->aic, arq->request);
 	}

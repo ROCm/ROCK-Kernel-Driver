@@ -1360,7 +1360,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 {
 	struct request *rq = NULL;
 	struct request_list *rl = &q->rq;
-	struct io_context *ioc = get_io_context();
+	struct io_context *ioc = get_io_context(gfp_mask);
 
 	spin_lock_irq(q->queue_lock);
 	if (rl->count[rw]+1 >= q->nr_requests) {
@@ -1439,7 +1439,7 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 			struct io_context *ioc;
 
 			io_schedule();
-			ioc = get_io_context();
+			ioc = get_io_context(GFP_NOIO);
 			ioc_set_batching(ioc);
 			put_io_context(ioc);
 		}
@@ -2462,7 +2462,7 @@ void exit_io_context(void)
  * But weird things happen, so we disable local interrupts to ensure exclusive
  * access to *current.
  */
-struct io_context *get_io_context(void)
+struct io_context *get_io_context(int gfp_flags)
 {
 	struct task_struct *tsk = current;
 	unsigned long flags;
@@ -2482,8 +2482,9 @@ struct io_context *get_io_context(void)
 			tsk->io_context = ret;
 		}
 	}
+	if (ret)
+		atomic_inc(&ret->refcount);
 	local_irq_restore(flags);
-	atomic_inc(&ret->refcount);
 	return ret;
 }
 
