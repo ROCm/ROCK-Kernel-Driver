@@ -56,14 +56,25 @@ struct dvb_frontend {
 	void *data;                /*  can be used by hardware module... */
 };
 
+struct dvb_frontend_tune_settings {
+        int min_delay_ms;
+        int step_size;
+        int max_drift;
+        struct dvb_frontend_parameters parameters;
+};
+
 
 /**
  *   private frontend command ioctl's.
  *   keep them in sync with the public ones defined in linux/dvb/frontend.h
+ * 
+ *   FE_SLEEP. Ioctl used to put frontend into a low power mode.
+ *   FE_INIT. Ioctl used to initialise the frontend.
+ *   FE_GET_TUNE_SETTINGS. Get the frontend-specific tuning loop settings for the supplied set of parameters.
  */
 #define FE_SLEEP              _IO('v', 80)
 #define FE_INIT               _IO('v', 81)
-#define FE_RESET              _IO('v', 82)
+#define FE_GET_TUNE_SETTINGS  _IOWR('v', 83, struct dvb_frontend_tune_settings)
 
 
 extern int

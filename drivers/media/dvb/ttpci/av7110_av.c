@@ -975,7 +975,7 @@ static int dvb_video_ioctl(struct inode *inode, struct file *file,
 		if (av7110->videostate.stream_source == VIDEO_SOURCE_MEMORY)
 			av7110_av_stop(av7110, RP_VIDEO);
 		else
-			vidcom(av7110, 0x000e,
+			vidcom(av7110, VIDEO_CMD_STOP,
 			       av7110->videostate.video_blank ? 0 : 1);
 		av7110->trickmode = TRICK_NONE;
 		break;
@@ -984,7 +984,7 @@ static int dvb_video_ioctl(struct inode *inode, struct file *file,
 		av7110->trickmode = TRICK_NONE;
 		if (av7110->videostate.play_state == VIDEO_FREEZED) {
 			av7110->videostate.play_state = VIDEO_PLAYING;
-			vidcom(av7110, 0x000d, 0);
+			vidcom(av7110, VIDEO_CMD_PLAY, 0);
 		}
 
 		if (av7110->videostate.stream_source == VIDEO_SOURCE_MEMORY) {
@@ -993,10 +993,10 @@ static int dvb_video_ioctl(struct inode *inode, struct file *file,
 				av7110->playing &= ~RP_VIDEO;
 			}
 			av7110_av_start_play(av7110, RP_VIDEO);
-			vidcom(av7110, 0x000d, 0);
+			vidcom(av7110, VIDEO_CMD_PLAY, 0);
 		} else {
 			//av7110_av_stop(av7110, RP_VIDEO);
-			vidcom(av7110, 0x000d, 0);
+			vidcom(av7110, VIDEO_CMD_PLAY, 0);
 		}
 		av7110->videostate.play_state = VIDEO_PLAYING;
 		break;
@@ -1006,14 +1006,14 @@ static int dvb_video_ioctl(struct inode *inode, struct file *file,
 		if (av7110->playing & RP_VIDEO)
 			av7110_fw_cmd(av7110, COMTYPE_REC_PLAY, __Pause, 0);
 		else
-			vidcom(av7110, 0x0102, 1);
+			vidcom(av7110, VIDEO_CMD_FREEZE, 1);
 		av7110->trickmode = TRICK_FREEZE;
 		break;
 
 	case VIDEO_CONTINUE:
 		if (av7110->playing & RP_VIDEO)
 			av7110_fw_cmd(av7110, COMTYPE_REC_PLAY, __Continue, 0);
-		vidcom(av7110, 0x000d, 0);
+		vidcom(av7110, VIDEO_CMD_PLAY, 0);
 		av7110->videostate.play_state = VIDEO_PLAYING;
 		av7110->trickmode = TRICK_NONE;
 		break;
@@ -1094,7 +1094,7 @@ static int dvb_video_ioctl(struct inode *inode, struct file *file,
 			av7110_fw_cmd(av7110, COMTYPE_REC_PLAY,
 				      __Scan_I, 2, AV_PES, 0);
 		else
-			vidcom(av7110, 0x16, arg);
+			vidcom(av7110, VIDEO_CMD_FFWD, arg);
 		av7110->trickmode = TRICK_FAST;
 		av7110->videostate.play_state = VIDEO_PLAYING;
 		break;
@@ -1102,11 +1102,11 @@ static int dvb_video_ioctl(struct inode *inode, struct file *file,
 	case VIDEO_SLOWMOTION:
 		if (av7110->playing&RP_VIDEO) {
 			av7110_fw_cmd(av7110, COMTYPE_REC_PLAY, __Slow, 2, 0, 0);
-			vidcom(av7110, 0x22, arg);
+			vidcom(av7110, VIDEO_CMD_SLOW, arg);
 		} else {
-			vidcom(av7110, 0x0d, 0);
-			vidcom(av7110, 0x0e, 0);
-			vidcom(av7110, 0x22, arg);
+			vidcom(av7110, VIDEO_CMD_PLAY, 0);
+			vidcom(av7110, VIDEO_CMD_STOP, 0);
+			vidcom(av7110, VIDEO_CMD_SLOW, arg);
 		}
 		av7110->trickmode = TRICK_SLOW;
 		av7110->videostate.play_state = VIDEO_PLAYING;
@@ -1130,10 +1130,10 @@ static int dvb_video_ioctl(struct inode *inode, struct file *file,
 			if (av7110->trickmode == TRICK_SLOW) {
 				av7110_fw_cmd(av7110, COMTYPE_REC_PLAY,
 					      __Slow, 2, 0, 0);
-				vidcom(av7110, 0x22, arg);
+				vidcom(av7110, VIDEO_CMD_SLOW, arg);
 			}
 			if (av7110->trickmode == TRICK_FREEZE)
-				vidcom(av7110, 0x000e, 1);
+				vidcom(av7110, VIDEO_CMD_STOP, 1);
 		}
 		break;
 
@@ -1167,26 +1167,26 @@ static int dvb_audio_ioctl(struct inode *inode, struct file *file,
 		if (av7110->audiostate.stream_source == AUDIO_SOURCE_MEMORY)
 			av7110_av_stop(av7110, RP_AUDIO);
 		else
-			audcom(av7110, 1);
+			audcom(av7110, AUDIO_CMD_MUTE);
 		av7110->audiostate.play_state = AUDIO_STOPPED;
 		break;
 
 	case AUDIO_PLAY:
 		if (av7110->audiostate.stream_source == AUDIO_SOURCE_MEMORY)
 			av7110_av_start_play(av7110, RP_AUDIO);
-		audcom(av7110, 2);
+		audcom(av7110, AUDIO_CMD_UNMUTE);
 		av7110->audiostate.play_state = AUDIO_PLAYING;
 		break;
 
 	case AUDIO_PAUSE:
-		audcom(av7110, 1);
+		audcom(av7110, AUDIO_CMD_MUTE);
 		av7110->audiostate.play_state = AUDIO_PAUSED;
 		break;
 
 	case AUDIO_CONTINUE:
 		if (av7110->audiostate.play_state == AUDIO_PAUSED) {
 			av7110->audiostate.play_state = AUDIO_PLAYING;
-			audcom(av7110, 0x12);
+			audcom(av7110, AUDIO_CMD_MUTE | AUDIO_CMD_PCM16);
 		}
 		break;
 
@@ -1196,14 +1196,14 @@ static int dvb_audio_ioctl(struct inode *inode, struct file *file,
 
 	case AUDIO_SET_MUTE:
 	{
-		audcom(av7110, arg ? 1 : 2);
+		audcom(av7110, arg ? AUDIO_CMD_MUTE : AUDIO_CMD_UNMUTE);
 		av7110->audiostate.mute_state = (int) arg;
 		break;
 	}
 
 	case AUDIO_SET_AV_SYNC:
 		av7110->audiostate.AV_sync_state = (int) arg;
-		audcom(av7110, arg ? 0x0f : 0x0e);
+		audcom(av7110, arg ? AUDIO_CMD_SYNC_ON : AUDIO_CMD_SYNC_OFF);
 		break;
 
 	case AUDIO_SET_BYPASS_MODE:
@@ -1215,15 +1215,15 @@ static int dvb_audio_ioctl(struct inode *inode, struct file *file,
 
 		switch(av7110->audiostate.channel_select) {
 		case AUDIO_STEREO:
-			audcom(av7110, 0x80);
+			audcom(av7110, AUDIO_CMD_STEREO);
 			break;
 
 		case AUDIO_MONO_LEFT:
-			audcom(av7110, 0x100);
+			audcom(av7110, AUDIO_CMD_MONO_L);
 			break;
 
 		case AUDIO_MONO_RIGHT:
-			audcom(av7110, 0x200);
+			audcom(av7110, AUDIO_CMD_MONO_R);
 			break;
 
 		default:

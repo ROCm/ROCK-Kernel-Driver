@@ -44,11 +44,9 @@ struct saa7146_standard
 
 	int v_offset;	/* number of lines of vertical offset before processing */
 	int v_field;	/* number of lines in a field for HPS to process */
-	int v_calc;	/* number of vertical active lines */
 	
 	int h_offset;	/* horizontal offset of processing window */
 	int h_pixels;	/* number of horizontal pixels to process */
-	int h_calc;	/* number of horizontal active pixels */
 	
 	int v_max_out;
 	int h_max_out;
@@ -104,6 +102,9 @@ struct saa7146_fh {
 	unsigned int resources;	/* resource management for device open */
 };
 
+#define STATUS_OVERLAY	0x01
+#define STATUS_CAPTURE	0x02
+
 struct saa7146_vv
 {
 	int vbi_minor;
@@ -117,14 +118,17 @@ struct saa7146_vv
 
 	int video_minor;
 
+	int				video_status;
+	struct saa7146_fh		*video_fh;
+
 	/* video overlay */
 	struct v4l2_framebuffer		ov_fb;
 	struct saa7146_format		*ov_fmt;
 	struct saa7146_overlay		*ov_data;
+	struct saa7146_fh		*ov_suspend;
 
 	/* video capture */
 	struct saa7146_dmaqueue		video_q;
-	struct saa7146_fh		*streaming;
 	enum v4l2_field			last_field;
 
 	/* common: fixme? shouldn't this be in saa7146_fh?

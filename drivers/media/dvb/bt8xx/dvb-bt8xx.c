@@ -286,7 +286,7 @@ static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
 	
 	}
 
-	if ((result = dvb_register_adapter(&card->dvb_adapter, card->card_name)) < 0) {
+	if ((result = dvb_register_adapter(&card->dvb_adapter, card->card_name, THIS_MODULE)) < 0) {
 	
 		printk("dvb_bt8xx: dvb_register_adapter failed (errno = %d)\n", result);
 		

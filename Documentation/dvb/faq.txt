@@ -94,6 +94,11 @@ Some very frequently asked questions about linuxtv-dvb
 		MythTV - analog TV PVR, but now with DVB support, too
 		(with software MPEG decode)
 
+	http://dvbsnoop.sourceforge.net/
+		DVB sniffer program to monitor, analyze, debug, dump
+		or view dvb/mpeg/dsm-cc/mhp stream information (TS,
+		PES, SECTION)
+
 4. Can't get a signal tuned correctly
 
 	If you are using a Technotrend/Hauppauge DVB-C card *without* analog

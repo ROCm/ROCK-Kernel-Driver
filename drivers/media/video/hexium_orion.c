@@ -192,18 +192,18 @@ static struct {
 static struct saa7146_standard hexium_standards[] = {
 	{
 		.name	= "PAL", 	.id	= V4L2_STD_PAL,
-		.v_offset	= 16,	.v_field 	= 288,	.v_calc		= 576,
-		.h_offset	= 1,	.h_pixels 	= 680,	.h_calc		= 680+1,
+		.v_offset	= 16,	.v_field 	= 288,
+		.h_offset	= 1,	.h_pixels 	= 680,
 		.v_max_out	= 576,	.h_max_out	= 768,
 	}, {
 		.name	= "NTSC", 	.id	= V4L2_STD_NTSC,
-		.v_offset	= 16,	.v_field 	= 240,	.v_calc		= 480,
-		.h_offset	= 1,	.h_pixels 	= 640,	.h_calc		= 641+1,
+		.v_offset	= 16,	.v_field 	= 240,
+		.h_offset	= 1,	.h_pixels 	= 640,
 		.v_max_out	= 480,	.h_max_out	= 640,
 	}, {
 		.name	= "SECAM", 	.id	= V4L2_STD_SECAM,
-		.v_offset	= 16,	.v_field 	= 288,	.v_calc		= 576,
-		.h_offset	= 1,	.h_pixels 	= 720,	.h_calc		= 720+1,
+		.v_offset	= 16,	.v_field 	= 288,
+		.h_offset	= 1,	.h_pixels 	= 720,
 		.v_max_out	= 576,	.h_max_out	= 768,
 	}
 };		
@@ -237,7 +237,7 @@ static int hexium_probe(struct saa7146_dev *dev)
 	saa7146_write(dev, DD1_STREAM_B, 0x00000000);
 	saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
 
-	saa7146_i2c_adapter_prepare(dev, &hexium->i2c_adapter, SAA7146_I2C_BUS_BIT_RATE_480);
+	saa7146_i2c_adapter_prepare(dev, &hexium->i2c_adapter, I2C_ADAP_CLASS_TV_ANALOG, SAA7146_I2C_BUS_BIT_RATE_480);
 	if (i2c_add_adapter(&hexium->i2c_adapter) < 0) {
 		DEB_S(("cannot register i2c-device. skipping.\n"));
 		kfree(hexium);
