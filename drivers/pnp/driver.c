@@ -53,12 +53,11 @@ int compare_pnp_id(struct pnp_id *pos, const char *id)
 static const struct pnp_device_id * match_device(struct pnp_driver *drv, struct pnp_dev *dev)
 {
 	const struct pnp_device_id *drv_id = drv->id_table;
-	if (!drv)
+	if (!drv_id)
 		return NULL;
-	if (!dev)
-		return NULL;
-	while (*drv_id->id){
-		if (compare_pnp_id(dev->id,drv_id->id))
+
+	while (*drv_id->id) {
+		if (compare_pnp_id(dev->id, drv_id->id))
 			return drv_id;
 		drv_id++;
 	}
@@ -102,14 +101,18 @@ static int pnp_device_probe(struct device *dev)
 		return error;
 
 	if (pnp_dev->active == 0) {
-		if (!(pnp_drv->flags & PNP_DRIVER_DO_NOT_ACTIVATE)) {
+		if (!(pnp_drv->flags & PNP_DRIVER_RES_DO_NOT_CHANGE)) {
 			error = pnp_activate_dev(pnp_dev);
 			if (error < 0)
 				return error;
 		}
+	} else if (pnp_drv->flags & PNP_DRIVER_RES_DISABLE) {
+		error = pnp_disable_dev(pnp_dev);
+		if (error < 0)
+			return error;
 	}
 	error = 0;
-	if (pnp_drv->probe && pnp_dev->active) {
+	if (pnp_drv->probe) {
 		dev_id = match_device(pnp_drv, pnp_dev);
 		if (dev_id != NULL)
 			error = pnp_drv->probe(pnp_dev, dev_id);
@@ -117,9 +120,8 @@ static int pnp_device_probe(struct device *dev)
 	if (error >= 0){
 		pnp_dev->driver = pnp_drv;
 		error = 0;
-	}
-	else
-	goto fail;
+	} else
+		goto fail;
 	return error;
 
 fail:
