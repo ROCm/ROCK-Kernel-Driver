@@ -821,6 +821,7 @@ void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	      (int *)&c->x86_vendor_id[4]);
 		
 	get_cpu_vendor(c);
+
 	/* Initialize the standard set of capabilities */
 	/* Note that the vendor-specific code below might override */
 
@@ -869,7 +870,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		if (  xlvl >= 0x80860001 )
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}
-
 
 	/*
 	 * Vendor-specific initialization.  In this section we

@@ -458,6 +458,6 @@ static inline void __mwait(unsigned long eax, unsigned long ecx)
 	ti->task;					\
 })
 
-#define l1_cache_size() (boot_cpu_data.x86_clflush_size)
+#define cache_line_size() (boot_cpu_data.x86_clflush_size)
 
 #endif /* __ASM_X86_64_PROCESSOR_H */
