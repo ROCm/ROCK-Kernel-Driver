@@ -1055,3 +1055,4 @@ module_exit(sco_cleanup);
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth SCO ver " VERSION);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("bt-proto-2");
