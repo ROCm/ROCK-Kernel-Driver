@@ -147,15 +147,23 @@ static inline int rtc_set_time(struct rtc_ops *ops, struct rtc_time *tm)
 	return ops->set_time(tm);
 }
 
-static inline void rtc_read_alarm(struct rtc_ops *ops, struct rtc_wkalrm *alrm)
+static inline int rtc_read_alarm(struct rtc_ops *ops, struct rtc_wkalrm *alrm)
 {
-	memset(alrm, 0, sizeof(struct rtc_wkalrm));
-	ops->read_alarm(alrm);
+	int ret = -EINVAL;
+	if (ops->read_alarm) {
+		memset(alrm, 0, sizeof(struct rtc_wkalrm));
+		ops->read_alarm(alrm);
+		ret = 0;
+	}
+	return ret;
 }
 
 static inline int rtc_set_alarm(struct rtc_ops *ops, struct rtc_wkalrm *alrm)
 {
-	return ops->set_alarm(alrm);
+	int ret = -EINVAL;
+	if (ops->set_alarm)
+		ret = ops->set_alarm(alrm);
+	return ret;
 }
 
 void rtc_update(unsigned long num, unsigned long events)
@@ -233,11 +241,13 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct rtc_ops *ops = file->private_data;
 	struct rtc_time tm;
 	struct rtc_wkalrm alrm;
-	int ret;
+	int ret = -EINVAL;
 
 	switch (cmd) {
 	case RTC_ALM_READ:
-		rtc_read_alarm(ops, &alrm);
+		ret = rtc_read_alarm(ops, &alrm);
+		if (ret)
+			break;
 		ret = copy_to_user((void *)arg, &alrm.time, sizeof(tm));
 		if (ret)
 			ret = -EFAULT;
@@ -245,6 +255,10 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case RTC_ALM_SET:
 		ret = copy_from_user(&alrm.time, (void *)arg, sizeof(tm));
+		if (ret) {
+			ret = -EFAULT;
+			break;
+		}
 		alrm.enabled = 0;
 		alrm.pending = 0;
 		alrm.time.tm_mday = -1;
@@ -253,10 +267,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		alrm.time.tm_wday = -1;
 		alrm.time.tm_yday = -1;
 		alrm.time.tm_isdst = -1;
-		if (ret == 0)
-			ret = rtc_set_alarm(ops, &alrm);
-		else
-			ret = -EFAULT;
+		ret = rtc_set_alarm(ops, &alrm);
 		break;
 
 	case RTC_RD_TIME:
@@ -278,8 +289,8 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			ret = -EFAULT;
 		break;
 
-#ifndef rtc_epoch
 	case RTC_EPOCH_SET:
+#ifndef rtc_epoch
 		/*
 		 * There were no RTC clocks before 1900.
 		 */
@@ -293,8 +304,8 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		}
 		rtc_epoch = arg;
 		ret = 0;
-		break;
 #endif
+		break;
 
 	case RTC_EPOCH_READ:
 		ret = put_user(rtc_epoch, (unsigned long *)arg);
@@ -302,21 +313,26 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	case RTC_WKALM_SET:
 		ret = copy_from_user(&alrm, (void *)arg, sizeof(alrm));
-		if (ret == 0)
-			ret = rtc_set_alarm(ops, &alrm);
-		else
+		if (ret) {
 			ret = -EFAULT;
+			break;
+		}
+		ret = rtc_set_alarm(ops, &alrm);
 		break;
 
 	case RTC_WKALM_RD:
-		rtc_read_alarm(ops, &alrm);
+		ret = rtc_read_alarm(ops, &alrm);
+		if (ret)
+			break;
 		ret = copy_to_user((void *)arg, &alrm, sizeof(alrm));
 		if (ret)
 			ret = -EFAULT;
 		break;
 
 	default:
-		ret = ops->ioctl(cmd, arg);
+		if (ops->ioctl)
+			ret = ops->ioctl(cmd, arg);
+		break;
 	}
 	return ret;
 }
@@ -406,36 +422,39 @@ static int rtc_read_proc(char *page, char **start, off_t off, int count, int *eo
 		tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 		rtc_epoch);
 
-	rtc_read_alarm(ops, &alrm);
-	p += sprintf(p, "alrm_time\t: ");
-	if ((unsigned int)alrm.time.tm_hour <= 24)
-		p += sprintf(p, "%02d:", alrm.time.tm_hour);
-	else
-		p += sprintf(p, "**:");
-	if ((unsigned int)alrm.time.tm_min <= 59)
-		p += sprintf(p, "%02d:", alrm.time.tm_min);
-	else
-		p += sprintf(p, "**:");
-	if ((unsigned int)alrm.time.tm_sec <= 59)
-		p += sprintf(p, "%02d\n", alrm.time.tm_sec);
-	else
-		p += sprintf(p, "**\n");
+	if (rtc_read_alarm(ops, &alrm) == 0) {
+		p += sprintf(p, "alrm_time\t: ");
+		if ((unsigned int)alrm.time.tm_hour <= 24)
+			p += sprintf(p, "%02d:", alrm.time.tm_hour);
+		else
+			p += sprintf(p, "**:");
+		if ((unsigned int)alrm.time.tm_min <= 59)
+			p += sprintf(p, "%02d:", alrm.time.tm_min);
+		else
+			p += sprintf(p, "**:");
+		if ((unsigned int)alrm.time.tm_sec <= 59)
+			p += sprintf(p, "%02d\n", alrm.time.tm_sec);
+		else
+			p += sprintf(p, "**\n");
 
-	p += sprintf(p, "alrm_date\t: ");
-	if ((unsigned int)alrm.time.tm_year <= 200)
-		p += sprintf(p, "%04d-", alrm.time.tm_year + 1900);
-	else
-		p += sprintf(p, "****-");
-	if ((unsigned int)alrm.time.tm_mon <= 11)
-		p += sprintf(p, "%02d-", alrm.time.tm_mon + 1);
-	else
-		p += sprintf(p, "**-");
-	if ((unsigned int)alrm.time.tm_mday <= 31)
-		p += sprintf(p, "%02d\n", alrm.time.tm_mday);
-	else
-		p += sprintf(p, "**\n");
-	p += sprintf(p, "alrm_wakeup\t: %s\n", alrm.enabled ? "yes" : "no");
-	p += sprintf(p, "alrm_pending\t: %s\n", alrm.pending ? "yes" : "no");
+		p += sprintf(p, "alrm_date\t: ");
+		if ((unsigned int)alrm.time.tm_year <= 200)
+			p += sprintf(p, "%04d-", alrm.time.tm_year + 1900);
+		else
+			p += sprintf(p, "****-");
+		if ((unsigned int)alrm.time.tm_mon <= 11)
+			p += sprintf(p, "%02d-", alrm.time.tm_mon + 1);
+		else
+			p += sprintf(p, "**-");
+		if ((unsigned int)alrm.time.tm_mday <= 31)
+			p += sprintf(p, "%02d\n", alrm.time.tm_mday);
+		else
+			p += sprintf(p, "**\n");
+		p += sprintf(p, "alrm_wakeup\t: %s\n",
+			     alrm.enabled ? "yes" : "no");
+		p += sprintf(p, "alrm_pending\t: %s\n",
+			     alrm.pending ? "yes" : "no");
+	}
 
 	if (ops->proc)
 		p += ops->proc(p);
