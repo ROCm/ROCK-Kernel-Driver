@@ -352,10 +352,16 @@ static inline void balance_irq(int cpu, int irq)
 	unsigned long allowed_mask;
 	unsigned int new_cpu;
 		
-	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH && NO_BALANCE_IRQ)
-		return;
-	else if (irqbalance_disabled) 
+	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH)
+		irqbalance_disabled = NO_BALANCE_IRQ;
+	if (irqbalance_disabled) { 
+		static int warned;
+		if (warned == 0) {
+			printk("irqbalance disabled\n");
+			warned = 1;
+		} 
 		return; 
+	} 
 
 	allowed_mask = cpu_online_map & irq_affinity[irq];
 	new_cpu = move(cpu, allowed_mask, now, 1);

@@ -52,7 +52,7 @@ static void pfkey_sock_destruct(struct sock *sk)
 {
 	skb_queue_purge(&sk->receive_queue);
 
-	if (!test_bit(SOCK_DEAD, &sk->flags)) {
+	if (!sock_flag(sk, SOCK_DEAD)) {
 		printk("Attempt to release alive pfkey socket: %p\n", sk);
 		return;
 	}

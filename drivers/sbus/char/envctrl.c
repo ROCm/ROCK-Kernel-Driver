@@ -1053,7 +1053,7 @@ static int __init envctrl_init(void)
 	struct linux_ebus *ebus = NULL;
 	struct linux_ebus_device *edev = NULL;
 	struct linux_ebus_child *edev_child = NULL;
-	int i = 0;
+	int err, i = 0;
 
 	for_each_ebus(ebus) {
 		for_each_ebusdev(edev, ebus) {
@@ -1108,9 +1108,11 @@ done:
 	udelay(200);
 
 	/* Register the device as a minor miscellaneous device. */
-	if (misc_register(&envctrl_dev)) {
+	err = misc_register(&envctrl_dev);
+	if (err) {
 		printk("envctrl: Unable to get misc minor %d\n",
 		       envctrl_dev.minor);
+		goto out_iounmap;
 	}
 
 	/* Note above traversal routine post-incremented 'i' to accommodate 
@@ -1125,9 +1127,21 @@ done:
 			i2c_childlist[i].addr, (0 == i) ? ("\n") : (" "));
 	}
 
-	kernel_thread(kenvctrld, NULL, CLONE_FS | CLONE_FILES);
+	err = kernel_thread(kenvctrld, NULL, CLONE_FS | CLONE_FILES);
+	if (err)
+		goto out_deregister;
 
 	return 0;
+
+out_deregister:
+	misc_deregister(&envctrl_dev);
+out_iounmap:
+	iounmap(i2c);
+	for (i = 0; i < ENVCTRL_MAX_CPU * 2; i++) {
+		if (i2c_childlist[i].tables)
+			kfree(i2c_childlist[i].tables);
+	}
+	return err;
 #else
 	return -ENODEV;
 #endif

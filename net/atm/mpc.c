@@ -251,12 +251,13 @@ void atm_mpoa_disp_qos(char *page, int *len)
 
 static struct net_device *find_lec_by_itfnum(int itf)
 {
-	extern struct atm_lane_ops atm_lane_ops; /* in common.c */
-	
-	if (atm_lane_ops.get_lecs == NULL)
+	struct net_device *dev;
+	if (!try_atm_lane_ops())
 		return NULL;
 
-	return atm_lane_ops.get_lecs()[itf]; /* FIXME: something better */
+	dev = atm_lane_ops->get_lec(itf);
+	module_put(atm_lane_ops->owner);
+	return dev;
 }
 
 static struct mpoa_client *alloc_mpc(void)
@@ -779,9 +780,10 @@ int atm_mpoa_mpoad_attach (struct atm_vcc *vcc, int arg)
 
 	if (mpc->dev) { /* check if the lec is LANE2 capable */
 		priv = (struct lec_priv *)mpc->dev->priv;
-		if (priv->lane_version < 2)
+		if (priv->lane_version < 2) {
+			dev_put(mpc->dev);
 			mpc->dev = NULL;
-		else
+		} else
 			priv->lane2_ops->associate_indicator = lane2_assoc_ind;  
 	}
 
@@ -802,7 +804,7 @@ int atm_mpoa_mpoad_attach (struct atm_vcc *vcc, int arg)
 			send_set_mps_ctrl_addr(mpc->mps_ctrl_addr, mpc);
 	}
 
-	MOD_INC_USE_COUNT;
+	__module_get(THIS_MODULE);
 	return arg;
 }
 
@@ -839,6 +841,7 @@ static void mpoad_close(struct atm_vcc *vcc)
 		struct lec_priv *priv = (struct lec_priv *)mpc->dev->priv;
 		priv->lane2_ops->associate_indicator = NULL;
 		stop_mpc(mpc);
+		dev_put(mpc->dev);
 	}
 
 	mpc->in_ops->destroy_cache(mpc);
@@ -851,7 +854,7 @@ static void mpoad_close(struct atm_vcc *vcc)
 	
 	printk("mpoa: (%s) going down\n",
 		(mpc->dev) ? mpc->dev->name : "<unknown>");
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 
 	return;
 }
@@ -975,6 +978,7 @@ static int mpoa_event_listener(struct notifier_block *mpoa_notifier, unsigned lo
 		}
 		mpc->dev_num = priv->itfnum;
 		mpc->dev = dev;
+		dev_hold(dev);
 		dprintk("mpoa: (%s) was initialized\n", dev->name);
 		break;
 	case NETDEV_UNREGISTER:
@@ -984,6 +988,7 @@ static int mpoa_event_listener(struct notifier_block *mpoa_notifier, unsigned lo
 			break;
 		dprintk("mpoa: device (%s) was deallocated\n", dev->name);
 		stop_mpc(mpc);
+		dev_put(mpc->dev);
 		mpc->dev = NULL;
 		break;
 	case NETDEV_UP:
@@ -1393,13 +1398,18 @@ static void mpc_cache_check( unsigned long checking_time  )
 	return;
 }
 
-void atm_mpoa_init_ops(struct atm_mpoa_ops *ops)
+static struct atm_mpoa_ops __atm_mpoa_ops = {
+	.mpoad_attach =	atm_mpoa_mpoad_attach,
+	.vcc_attach =	atm_mpoa_vcc_attach,
+	.owner = THIS_MODULE
+};
+
+static __init int atm_mpoa_init(void)
 {
-	ops->mpoad_attach = atm_mpoa_mpoad_attach;
-	ops->vcc_attach = atm_mpoa_vcc_attach;
+	atm_mpoa_ops_set(&__atm_mpoa_ops);
 
 #ifdef CONFIG_PROC_FS
-	if(mpc_proc_init() != 0)
+	if (mpc_proc_init() != 0)
 		printk(KERN_INFO "mpoa: failed to initialize /proc/mpoa\n");
 	else
 		printk(KERN_INFO "mpoa: /proc/mpoa initialized\n");
@@ -1407,22 +1417,11 @@ void atm_mpoa_init_ops(struct atm_mpoa_ops *ops)
 
 	printk("mpc.c: " __DATE__ " " __TIME__ " initialized\n");
 
-	return;
-}
-
-#ifdef MODULE
-int init_module(void)
-{
-	extern struct atm_mpoa_ops atm_mpoa_ops;
-
-	atm_mpoa_init_ops(&atm_mpoa_ops);
-
 	return 0;
 }
 
-void cleanup_module(void)
+void __exit atm_mpoa_cleanup(void)
 {
-	extern struct atm_mpoa_ops atm_mpoa_ops;
 	struct mpoa_client *mpc, *tmp;
 	struct atm_mpoa_qos *qos, *nextqos;
 	struct lec_priv *priv;
@@ -1433,8 +1432,7 @@ void cleanup_module(void)
 
 	del_timer(&mpc_timer);
 	unregister_netdevice_notifier(&mpoa_notifier);
-	atm_mpoa_ops.mpoad_attach = NULL;
-	atm_mpoa_ops.vcc_attach = NULL;
+	atm_mpoa_ops_set(NULL);
 
 	mpc = mpcs;
 	mpcs = NULL;
@@ -1469,5 +1467,8 @@ void cleanup_module(void)
 
 	return;
 }
-#endif /* MODULE */
+
+module_init(atm_mpoa_init);
+module_exit(atm_mpoa_cleanup);
+
 MODULE_LICENSE("GPL");

@@ -1231,12 +1231,10 @@ static inline int irda_usb_close(struct irda_usb_cb *self)
 	ASSERT(self != NULL, return -1;);
 
 	/* Remove netdevice */
-	if (self->netdev) {
-		rtnl_lock();
-		unregister_netdevice(self->netdev);
-		self->netdev = NULL;
-		rtnl_unlock();
-	}
+	if (self->netdev)
+		unregister_netdev(self->netdev);
+	self->netdev = NULL;
+
 	/* Remove the speed buffer */
 	if (self->speed_buff != NULL) {
 		kfree(self->speed_buff);

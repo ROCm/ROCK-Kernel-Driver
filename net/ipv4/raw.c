@@ -450,8 +450,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		goto done;
 
 	err = -EACCES;
-	if (rt->rt_flags & RTCF_BROADCAST &&
-			!test_bit(SOCK_BROADCAST, &sk->flags))
+	if (rt->rt_flags & RTCF_BROADCAST && !sock_flag(sk, SOCK_BROADCAST))
 		goto done;
 
 	if (msg->msg_flags & MSG_CONFIRM)

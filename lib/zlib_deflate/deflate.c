@@ -164,11 +164,12 @@ local const config configuration_table[10] = {
     memset((charf *)s->head, 0, (unsigned)(s->hash_size-1)*sizeof(*s->head));
 
 /* ========================================================================= */
-int zlib_deflateInit_(strm, level, version, stream_size)
-    z_streamp strm;
-    int level;
-    const char *version;
-    int stream_size;
+int zlib_deflateInit_(
+	z_streamp strm,
+	int level,
+	const char *version,
+	int stream_size
+)
 {
     return zlib_deflateInit2_(strm, level, Z_DEFLATED, MAX_WBITS,
 			      DEF_MEM_LEVEL,
@@ -177,16 +178,16 @@ int zlib_deflateInit_(strm, level, version, stream_size)
 }
 
 /* ========================================================================= */
-int zlib_deflateInit2_(strm, level, method, windowBits, memLevel, strategy,
-		       version, stream_size)
-    z_streamp strm;
-    int  level;
-    int  method;
-    int  windowBits;
-    int  memLevel;
-    int  strategy;
-    const char *version;
-    int stream_size;
+int zlib_deflateInit2_(
+	z_streamp strm,
+	int  level,
+	int  method,
+	int  windowBits,
+	int  memLevel,
+	int  strategy,
+	const char *version,
+	int stream_size
+)
 {
     deflate_state *s;
     int noheader = 0;

@@ -442,12 +442,6 @@ done:
 	return err;
 }
 
-/* only AP+ systems have sys_aplib */
-asmlinkage int sys_aplib(void)
-{
-	return -ENOSYS;
-}
-
 asmlinkage int solaris_syscall(struct pt_regs *regs)
 {
 	static int count;

@@ -299,8 +299,9 @@ struct internal_state {
 };
 
 
-int inflateReset(z)
-z_stream *z;
+int inflateReset(
+	z_stream *z
+)
 {
   uLong c;
 
@@ -387,9 +388,10 @@ z_stream *z;
 #define NEEDBYTE {if(z->avail_in==0)goto empty;r=Z_OK;}
 #define NEXTBYTE (z->avail_in--,z->total_in++,*z->next_in++)
 
-int inflate(z, f)
-z_stream *z;
-int f;
+int inflate(
+	z_stream *z,
+	int f	
+)
 {
   int r;
   uInt b;
@@ -504,8 +506,9 @@ int f;
  * will have been updated if need be.
  */
 
-int inflateIncomp(z)
-z_stream *z;
+int inflateIncomp(
+	z_stream *z
+)
 {
     if (z->state->mode != BLOCKS)
 	return Z_DATA_ERROR;
@@ -513,8 +516,9 @@ z_stream *z;
 }
 
 
-int inflateSync(z)
-z_stream *z;
+int inflateSync(
+	z_stream *z
+)
 {
   uInt n;       /* number of bytes to look at */
   Bytef *p;     /* pointer to bytes */
@@ -737,10 +741,11 @@ local uInt border[] = { /* Order of the bit length code lengths */
  */
 
 
-local void inflate_blocks_reset(s, z, c)
-inflate_blocks_statef *s;
-z_stream *z;
-uLongf *c;
+local void inflate_blocks_reset(
+	inflate_blocks_statef *s,
+	z_stream *z,
+	uLongf *c
+)
 {
   if (s->checkfn != Z_NULL)
     *c = s->check;
@@ -762,10 +767,11 @@ uLongf *c;
 }
 
 
-local inflate_blocks_statef *inflate_blocks_new(z, c, w)
-z_stream *z;
-check_func c;
-uInt w;
+local inflate_blocks_statef *inflate_blocks_new(
+	z_stream *z,
+	check_func c,
+	uInt w
+)
 {
   inflate_blocks_statef *s;
 
@@ -786,10 +792,11 @@ uInt w;
 }
 
 
-local int inflate_blocks(s, z, r)
-inflate_blocks_statef *s;
-z_stream *z;
-int r;
+local int inflate_blocks(
+	inflate_blocks_statef *s,
+	z_stream *z,
+	int r
+)
 {
   uInt t;               /* temporary storage */
   uLong b;              /* bit buffer */
@@ -1049,10 +1056,11 @@ int r;
 }
 
 
-local int inflate_blocks_free(s, z, c)
-inflate_blocks_statef *s;
-z_stream *z;
-uLongf *c;
+local int inflate_blocks_free(
+	inflate_blocks_statef *s,
+	z_stream *z,
+	uLongf *c
+)
 {
   inflate_blocks_reset(s, z, c);
   ZFREE(z, s->window, s->end - s->window);
@@ -1069,9 +1077,10 @@ uLongf *c;
  * BLOCKS).  On exit, the output will also be caught up, and the checksum
  * will have been updated if need be.
  */
-local int inflate_addhistory(s, z)
-inflate_blocks_statef *s;
-z_stream *z;
+local int inflate_addhistory(
+	inflate_blocks_statef *s,
+	z_stream *z
+)
 {
     uLong b;              /* bit buffer */  /* NOT USED HERE */
     uInt k;               /* bits in bit buffer */ /* NOT USED HERE */
@@ -1220,15 +1229,16 @@ local uInt cpdext[] = { /* Extra bits for distance codes */
   uInt inflate_hufts;
 #endif
 
-local int huft_build(b, n, s, d, e, t, m, zs)
-uIntf *b;               /* code lengths in bits (all assumed <= BMAX) */
-uInt n;                 /* number of codes (assumed <= N_MAX) */
-uInt s;                 /* number of simple-valued codes (0..s-1) */
-uIntf *d;               /* list of base values for non-simple codes */
-uIntf *e;               /* list of extra bits for non-simple codes */  
-inflate_huft * FAR *t;  /* result: starting table */
-uIntf *m;               /* maximum lookup bits, returns actual */
-z_stream *zs;           /* for zalloc function */
+local int huft_build(
+	uIntf *b,               /* code lengths in bits (all assumed <= BMAX) */
+	uInt n,                 /* number of codes (assumed <= N_MAX) */
+	uInt s,                 /* number of simple-valued codes (0..s-1) */
+	uIntf *d,               /* list of base values for non-simple codes */
+	uIntf *e,               /* list of extra bits for non-simple codes */
+	inflate_huft * FAR *t,  /* result: starting table */
+	uIntf *m,               /* maximum lookup bits, returns actual */
+	z_stream *zs            /* for zalloc function */
+)
 /* Given a list of code lengths and a maximum table size, make a set of
    tables to decode that set of codes.  Return Z_OK on success, Z_BUF_ERROR
    if the given code set is incomplete (the tables are still built in this
@@ -1423,11 +1433,12 @@ z_stream *zs;           /* for zalloc function */
 }
 
 
-local int inflate_trees_bits(c, bb, tb, z)
-uIntf *c;               /* 19 code lengths */
-uIntf *bb;              /* bits tree desired/actual depth */
-inflate_huft * FAR *tb; /* bits tree result */
-z_stream *z;            /* for zfree function */
+local int inflate_trees_bits(
+	uIntf *c,               /* 19 code lengths */
+	uIntf *bb,              /* bits tree desired/actual depth */
+	inflate_huft * FAR *tb, /* bits tree result */
+	z_stream *z             /* for zfree function */
+)
 {
   int r;
 
@@ -1444,15 +1455,16 @@ z_stream *z;            /* for zfree function */
 }
 
 
-local int inflate_trees_dynamic(nl, nd, c, bl, bd, tl, td, z)
-uInt nl;                /* number of literal/length codes */
-uInt nd;                /* number of distance codes */
-uIntf *c;               /* that many (total) code lengths */
-uIntf *bl;              /* literal desired/actual bit depth */
-uIntf *bd;              /* distance desired/actual bit depth */
-inflate_huft * FAR *tl; /* literal/length tree result */
-inflate_huft * FAR *td; /* distance tree result */
-z_stream *z;            /* for zfree function */
+local int inflate_trees_dynamic(
+	uInt nl,                /* number of literal/length codes */
+	uInt nd,                /* number of distance codes */
+	uIntf *c,               /* that many (total) code lengths */
+	uIntf *bl,              /* literal desired/actual bit depth */
+	uIntf *bd,              /* distance desired/actual bit depth */
+	inflate_huft * FAR *tl, /* literal/length tree result */
+	inflate_huft * FAR *td, /* distance tree result */
+	z_stream *z             /* for zfree function */
+)
 {
   int r;
 
@@ -1529,11 +1541,12 @@ uInt n;
 }
 
 
-local int inflate_trees_fixed(bl, bd, tl, td)
-uIntf *bl;               /* literal desired/actual bit depth */
-uIntf *bd;               /* distance desired/actual bit depth */
-inflate_huft * FAR *tl;  /* literal/length tree result */
-inflate_huft * FAR *td;  /* distance tree result */
+local int inflate_trees_fixed(
+	uIntf *bl,               /* literal desired/actual bit depth */
+	uIntf *bd,               /* distance desired/actual bit depth */
+	inflate_huft * FAR *tl,  /* literal/length tree result */
+	inflate_huft * FAR *td   /* distance tree result */
+)
 {
   /* build fixed tables if not built already--lock out other instances */
   while (++fixed_lock > 1)
@@ -1651,10 +1664,13 @@ struct inflate_codes_state {
 };
 
 
-local inflate_codes_statef *inflate_codes_new(bl, bd, tl, td, z)
-uInt bl, bd;
-inflate_huft *tl, *td;
-z_stream *z;
+local inflate_codes_statef *inflate_codes_new(
+	uInt bl,
+	uInt bd,
+	inflate_huft *tl,
+	inflate_huft *td,
+	z_stream *z
+)
 {
   inflate_codes_statef *c;
 
@@ -1672,10 +1688,11 @@ z_stream *z;
 }
 
 
-local int inflate_codes(s, z, r)
-inflate_blocks_statef *s;
-z_stream *z;
-int r;
+local int inflate_codes(
+	inflate_blocks_statef *s,
+	z_stream *z,
+	int r
+)
 {
   uInt j;               /* temporary storage */
   inflate_huft *t;      /* temporary pointer */
@@ -1832,9 +1849,10 @@ int r;
 }
 
 
-local void inflate_codes_free(c, z)
-inflate_codes_statef *c;
-z_stream *z;
+local void inflate_codes_free(
+	inflate_codes_statef *c,
+	z_stream *z
+)
 {
   ZFREE(z, c, sizeof(struct inflate_codes_state));
   Tracev((stderr, "inflate:       codes free\n"));
@@ -1847,10 +1865,11 @@ z_stream *z;
  */
 
 /* copy as much as possible from the sliding window to the output area */
-local int inflate_flush(s, z, r)
-inflate_blocks_statef *s;
-z_stream *z;
-int r;
+local int inflate_flush(
+	inflate_blocks_statef *s,
+	z_stream *z,
+	int r
+)
 {
   uInt n;
   Bytef *p, *q;
@@ -1934,11 +1953,14 @@ int r;
    at least ten.  The ten bytes are six bytes for the longest length/
    distance pair plus four bytes for overloading the bit buffer. */
 
-local int inflate_fast(bl, bd, tl, td, s, z)
-uInt bl, bd;
-inflate_huft *tl, *td;
-inflate_blocks_statef *s;
-z_stream *z;
+local int inflate_fast(
+	uInt bl,
+	uInt bd,
+	inflate_huft *tl,
+	inflate_huft *td,
+	inflate_blocks_statef *s,
+	z_stream *z
+)
 {
   inflate_huft *t;      /* temporary pointer */
   uInt e;               /* extra bits or operation */

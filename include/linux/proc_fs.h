@@ -187,6 +187,9 @@ static inline struct proc_dir_entry *proc_net_create(const char *name, mode_t mo
 	get_info_t *get_info) {return NULL;}
 static inline void proc_net_remove(const char *name) {}
 
+static inline struct dentry *proc_pid_unhash(struct task_struct *p) { return NULL; }
+static inline void proc_pid_flush(struct dentry *proc_dentry) { }
+
 static inline struct proc_dir_entry *create_proc_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *parent) { return NULL; }
 
@@ -211,6 +214,14 @@ static inline void proc_tty_register_driver(struct tty_driver *driver) {};
 static inline void proc_tty_unregister_driver(struct tty_driver *driver) {};
 
 extern struct proc_dir_entry proc_root;
+
+static inline void kclist_add(struct kcore_list *new, void *addr, size_t size)
+{
+}
+static inline struct kcore_list * kclist_del(void *addr)
+{
+	return NULL;
+}
 
 #endif /* CONFIG_PROC_FS */
 

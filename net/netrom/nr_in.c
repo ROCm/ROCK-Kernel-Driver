@@ -90,7 +90,7 @@ static int nr_state1_machine(struct sock *sk, struct sk_buff *skb,
 		nr->n2count    = 0;
 		nr->window     = skb->data[20];
 		sk->state      = TCP_ESTABLISHED;
-		if (!test_bit(SOCK_DEAD, &sk->flags))
+		if (!sock_flag(sk, SOCK_DEAD))
 			sk->state_change(sk);
 		break;
 	}
