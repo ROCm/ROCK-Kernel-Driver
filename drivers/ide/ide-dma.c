@@ -523,8 +523,7 @@ int __ide_dma_off_quietly (ide_drive_t *drive)
 	if (HWIF(drive)->ide_dma_host_off(drive))
 		return 1;
 
-	if (drive->queue_setup)
-		HWIF(drive)->ide_dma_queued_off(drive);
+	HWIF(drive)->ide_dma_queued_off(drive);
 
 	return 0;
 }
@@ -585,8 +584,9 @@ int __ide_dma_on (ide_drive_t *drive)
 	if (HWIF(drive)->ide_dma_host_on(drive))
 		return 1;
 
-	if (drive->queue_setup)
-		HWIF(drive)->ide_dma_queued_on(drive);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+	HWIF(drive)->ide_dma_queued_on(drive);
+#endif
 
 	return 0;
 }

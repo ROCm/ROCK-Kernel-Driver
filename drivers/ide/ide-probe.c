@@ -983,7 +983,6 @@ static void ide_init_queue(ide_drive_t *drive)
 	 
 	blk_init_queue(q, do_ide_request, &ide_lock);
 	q->queuedata = HWGROUP(drive);
-	drive->queue_setup = 1;
 	blk_queue_segment_boundary(q, 0xffff);
 
 	if (!hwif->rqsize)
@@ -1005,10 +1004,6 @@ static void ide_init_queue(ide_drive_t *drive)
 static void ide_init_drive(ide_drive_t *drive)
 {
 	ide_toggle_bounce(drive, 1);
-
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-	HWIF(drive)->ide_dma_queued_on(drive);
-#endif
 }
 
 /*

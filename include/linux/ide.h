@@ -726,7 +726,6 @@ typedef struct ide_drive_s {
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 	unsigned vdma		: 1;	/* 1=doing PIO over DMA 0=doing normal DMA */
-	unsigned queue_setup	: 1;
 	unsigned addressing;		/*      : 3;
 					 *  0=28-bit
 					 *  1=48-bit
