@@ -6,11 +6,9 @@
  *	Copyright (c) 1997--1999 Martin Mares <mj@ucw.cz>
  */
 
-#include <linux/types.h>
-#include <linux/kernel.h>
 #include <linux/pci.h>
+#include <linux/module.h>
 #include <linux/proc_fs.h>
-#include <linux/init.h>
 #include <linux/seq_file.h>
 #include <linux/smp_lock.h>
 
@@ -615,3 +613,11 @@ static int __init pci_proc_init(void)
 }
 
 __initcall(pci_proc_init);
+
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL(pci_proc_attach_device);
+EXPORT_SYMBOL(pci_proc_detach_device);
+EXPORT_SYMBOL(pci_proc_attach_bus);
+EXPORT_SYMBOL(pci_proc_detach_bus);
+#endif
+

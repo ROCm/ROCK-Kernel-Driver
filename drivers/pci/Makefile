@@ -11,9 +11,11 @@
 
 O_TARGET := driver.o
 
-export-objs := pci.o
+obj-y		+= access.o probe.o pci.o pool.o quirks.o \
+			compat.o names.o pci-driver.o search.o
+obj-$(CONFIG_PM)  += power.o
+obj-$(CONFIG_HOTPLUG)  += hotplug.o
 
-obj-$(CONFIG_PCI) += pci.o quirks.o compat.o names.o pci-driver.o
 obj-$(CONFIG_PROC_FS) += proc.o
 
 ifndef CONFIG_SPARC64
@@ -34,6 +36,8 @@ obj-$(CONFIG_SGI_IP27) += setup-irq.o
 ifndef CONFIG_X86
 obj-y += syscall.o
 endif
+
+export-objs := $(obj-y)
 
 include $(TOPDIR)/Rules.make
 
