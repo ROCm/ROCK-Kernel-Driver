@@ -26,6 +26,7 @@
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/rcupdate.h>
 #include <net/route.h> /* for struct rtable and routing */
 #include <net/icmp.h> /* icmp_send */
 #include <asm/param.h> /* for HZ */
@@ -311,13 +312,25 @@ static int clip_constructor(struct neighbour *neigh)
 {
 	struct atmarp_entry *entry = NEIGH2ENTRY(neigh);
 	struct net_device *dev = neigh->dev;
-	struct in_device *in_dev = dev->ip_ptr;
+	struct in_device *in_dev;
+	struct neigh_parms *parms;
 
 	DPRINTK("clip_constructor (neigh %p, entry %p)\n",neigh,entry);
-	if (!in_dev) return -EINVAL;
 	neigh->type = inet_addr_type(entry->ip);
 	if (neigh->type != RTN_UNICAST) return -EINVAL;
-	if (in_dev->arp_parms) neigh->parms = in_dev->arp_parms;
+
+	rcu_read_lock();
+	in_dev = rcu_dereference(__in_dev_get(dev));
+	if (!in_dev) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+
+	parms = in_dev->arp_parms;
+	__neigh_parms_put(neigh->parms);
+	neigh->parms = neigh_parms_clone(parms);
+	rcu_read_unlock();
+
 	neigh->ops = &clip_neigh_ops;
 	neigh->output = neigh->nud_state & NUD_VALID ?
 	    neigh->ops->connected_output : neigh->ops->output;

@@ -1176,13 +1176,16 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 		/* check if we can remove this feature. It is broken. */
 		printk(KERN_WARNING "ax25_connect(): %s uses autobind, please contact jreuter@yaina.de\n",
 			current->comm);
-		if ((err = ax25_rt_autobind(ax25, &fsa->fsa_ax25.sax25_call)) < 0)
+		if ((err = ax25_rt_autobind(ax25, &fsa->fsa_ax25.sax25_call)) < 0) {
+			kfree(digi);
 			goto out;
+		}
 
 		ax25_fillin_cb(ax25, ax25->ax25_dev);
 		ax25_cb_add(ax25);
 	} else {
 		if (ax25->ax25_dev == NULL) {
+			kfree(digi);
 			err = -EHOSTUNREACH;
 			goto out;
 		}
@@ -1191,8 +1194,7 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 	if (sk->sk_type == SOCK_SEQPACKET &&
 	    (ax25t=ax25_find_cb(&ax25->source_addr, &fsa->fsa_ax25.sax25_call, digi,
 		    	 ax25->ax25_dev->dev))) {
-		if (digi != NULL)
-			kfree(digi);
+		kfree(digi);
 		err = -EADDRINUSE;		/* Already such a connection */
 		ax25_cb_put(ax25t);
 		goto out;

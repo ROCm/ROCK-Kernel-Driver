@@ -752,11 +752,11 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newtp->mdev = TCP_TIMEOUT_INIT;
 		newtp->rto = TCP_TIMEOUT_INIT;
 
-		newtp->packets_out = 0;
-		newtp->left_out = 0;
-		newtp->retrans_out = 0;
-		newtp->sacked_out = 0;
-		newtp->fackets_out = 0;
+		tcp_set_pcount(&newtp->packets_out, 0);
+		tcp_set_pcount(&newtp->left_out, 0);
+		tcp_set_pcount(&newtp->retrans_out, 0);
+		tcp_set_pcount(&newtp->sacked_out, 0);
+		tcp_set_pcount(&newtp->fackets_out, 0);
 		newtp->snd_ssthresh = 0x7fffffff;
 
 		/* So many TCP implementations out there (incorrectly) count the

@@ -1047,13 +1047,16 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
  * is not a big flaw.
  */
 
-static __inline__ unsigned int tcp_current_mss(struct sock *sk, int large)
+static inline unsigned int tcp_current_mss(struct sock *sk, int large)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct dst_entry *dst = __sk_dst_get(sk);
-	int mss_now = large && (sk->sk_route_caps & NETIF_F_TSO) &&
-		      !tp->urg_mode ?
-		tp->mss_cache : tp->mss_cache_std;
+	int do_large, mss_now;
+
+	do_large = (large &&
+		    (sk->sk_route_caps & NETIF_F_TSO) &&
+		    !tp->urg_mode);
+	mss_now = do_large ? tp->mss_cache : tp->mss_cache_std;
 
 	if (dst) {
 		u32 mtu = dst_pmtu(dst);
@@ -1181,11 +1184,75 @@ struct tcp_skb_cb {
 
 	__u16		urg_ptr;	/* Valid w/URG flags is set.	*/
 	__u32		ack_seq;	/* Sequence number ACK'd	*/
+	__u32		tso_factor;
 };
 
 #define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
 
 #include <net/tcp_ecn.h>
+
+/* Due to TSO, an SKB can be composed of multiple actual
+ * packets.  To keep these tracked properly, we use this.
+ */
+static inline int tcp_skb_pcount(struct sk_buff *skb)
+{
+	return TCP_SKB_CB(skb)->tso_factor;
+}
+
+static inline void tcp_inc_pcount(tcp_pcount_t *count, struct sk_buff *skb)
+{
+	count->val += tcp_skb_pcount(skb);
+}
+
+static inline void tcp_inc_pcount_explicit(tcp_pcount_t *count, int amt)
+{
+	count->val += amt;
+}
+
+static inline void tcp_dec_pcount_explicit(tcp_pcount_t *count, int amt)
+{
+	count->val -= amt;
+}
+
+static inline void tcp_dec_pcount(tcp_pcount_t *count, struct sk_buff *skb)
+{
+	count->val -= tcp_skb_pcount(skb);
+}
+
+static inline void tcp_dec_pcount_approx(tcp_pcount_t *count,
+					 struct sk_buff *skb)
+{
+	if (count->val) {
+		count->val -= tcp_skb_pcount(skb);
+		if ((int)count->val < 0)
+			count->val = 0;
+	}
+}
+
+static inline __u32 tcp_get_pcount(tcp_pcount_t *count)
+{
+	return count->val;
+}
+
+static inline void tcp_set_pcount(tcp_pcount_t *count, __u32 val)
+{
+	count->val = val;
+}
+
+static inline void tcp_packets_out_inc(struct sock *sk, struct tcp_opt *tp,
+				       struct sk_buff *skb)
+{
+	int orig = tcp_get_pcount(&tp->packets_out);
+
+	tcp_inc_pcount(&tp->packets_out, skb);
+	if (!orig)
+		tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
+}
+
+static inline void tcp_packets_out_dec(struct tcp_opt *tp, struct sk_buff *skb)
+{
+	tcp_dec_pcount(&tp->packets_out, skb);
+}
 
 /* This determines how many packets are "in the network" to the best
  * of our knowledge.  In many cases it is conservative, but where
@@ -1203,7 +1270,9 @@ struct tcp_skb_cb {
  */
 static __inline__ unsigned int tcp_packets_in_flight(struct tcp_opt *tp)
 {
-	return tp->packets_out - tp->left_out + tp->retrans_out;
+	return (tcp_get_pcount(&tp->packets_out) -
+		tcp_get_pcount(&tp->left_out) +
+		tcp_get_pcount(&tp->retrans_out));
 }
 
 /* Recalculate snd_ssthresh, we want to set it to:
@@ -1304,9 +1373,15 @@ static inline __u32 tcp_current_ssthresh(struct tcp_opt *tp)
 
 static inline void tcp_sync_left_out(struct tcp_opt *tp)
 {
-	if (tp->sack_ok && tp->sacked_out >= tp->packets_out - tp->lost_out)
-		tp->sacked_out = tp->packets_out - tp->lost_out;
-	tp->left_out = tp->sacked_out + tp->lost_out;
+	if (tp->sack_ok &&
+	    (tcp_get_pcount(&tp->sacked_out) >=
+	     tcp_get_pcount(&tp->packets_out) - tcp_get_pcount(&tp->lost_out)))
+		tcp_set_pcount(&tp->sacked_out,
+			       (tcp_get_pcount(&tp->packets_out) -
+				tcp_get_pcount(&tp->lost_out)));
+	tcp_set_pcount(&tp->left_out,
+		       (tcp_get_pcount(&tp->sacked_out) +
+			tcp_get_pcount(&tp->lost_out)));
 }
 
 extern void tcp_cwnd_application_limited(struct sock *sk);
@@ -1315,14 +1390,16 @@ extern void tcp_cwnd_application_limited(struct sock *sk);
 
 static inline void tcp_cwnd_validate(struct sock *sk, struct tcp_opt *tp)
 {
-	if (tp->packets_out >= tp->snd_cwnd) {
+	__u32 packets_out = tcp_get_pcount(&tp->packets_out);
+
+	if (packets_out >= tp->snd_cwnd) {
 		/* Network is feed fully. */
 		tp->snd_cwnd_used = 0;
 		tp->snd_cwnd_stamp = tcp_time_stamp;
 	} else {
 		/* Network starves. */
-		if (tp->packets_out > tp->snd_cwnd_used)
-			tp->snd_cwnd_used = tp->packets_out;
+		if (tcp_get_pcount(&tp->packets_out) > tp->snd_cwnd_used)
+			tp->snd_cwnd_used = tcp_get_pcount(&tp->packets_out);
 
 		if ((s32)(tcp_time_stamp - tp->snd_cwnd_stamp) >= tp->rto)
 			tcp_cwnd_application_limited(sk);
@@ -1388,9 +1465,11 @@ tcp_nagle_check(struct tcp_opt *tp, struct sk_buff *skb, unsigned mss_now, int n
 		!(TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN) &&
 		((nonagle&TCP_NAGLE_CORK) ||
 		 (!nonagle &&
-		  tp->packets_out &&
+		  tcp_get_pcount(&tp->packets_out) &&
 		  tcp_minshall_check(tp))));
 }
+
+extern void tcp_set_skb_tso_factor(struct sk_buff *, unsigned int, unsigned int);
 
 /* This checks if the data bearing packet SKB (usually sk->sk_send_head)
  * should be put on the wire right now.
@@ -1398,6 +1477,13 @@ tcp_nagle_check(struct tcp_opt *tp, struct sk_buff *skb, unsigned mss_now, int n
 static __inline__ int tcp_snd_test(struct tcp_opt *tp, struct sk_buff *skb,
 				   unsigned cur_mss, int nonagle)
 {
+	int pkts = TCP_SKB_CB(skb)->tso_factor;
+
+	if (!pkts) {
+		tcp_set_skb_tso_factor(skb, cur_mss, tp->mss_cache_std);
+		pkts = TCP_SKB_CB(skb)->tso_factor;
+	}
+
 	/*	RFC 1122 - section 4.2.3.4
 	 *
 	 *	We must queue if
@@ -1424,14 +1510,14 @@ static __inline__ int tcp_snd_test(struct tcp_opt *tp, struct sk_buff *skb,
 	 */
 	return (((nonagle&TCP_NAGLE_PUSH) || tp->urg_mode
 		 || !tcp_nagle_check(tp, skb, cur_mss, nonagle)) &&
-		((tcp_packets_in_flight(tp) < tp->snd_cwnd) ||
+		(((tcp_packets_in_flight(tp) + (pkts-1)) < tp->snd_cwnd) ||
 		 (TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN)) &&
 		!after(TCP_SKB_CB(skb)->end_seq, tp->snd_una + tp->snd_wnd));
 }
 
 static __inline__ void tcp_check_probe_timer(struct sock *sk, struct tcp_opt *tp)
 {
-	if (!tp->packets_out && !tp->pending)
+	if (!tcp_get_pcount(&tp->packets_out) && !tp->pending)
 		tcp_reset_xmit_timer(sk, TCP_TIME_PROBE0, tp->rto);
 }
 
@@ -1964,7 +2050,7 @@ static inline void tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
 static inline __u32 __tcp_westwood_bw_rttmin(const struct tcp_opt *tp)
 {
         return max((tp->westwood.bw_est) * (tp->westwood.rtt_min) /
-		   (__u32) (tp->mss_cache),
+		   (__u32) (tp->mss_cache_std),
 		   2U);
 }
 

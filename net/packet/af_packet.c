@@ -786,10 +786,12 @@ out:
 static int packet_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
-	struct packet_opt *po = pkt_sk(sk);
+	struct packet_opt *po;
 
 	if (!sk)
 		return 0;
+
+	po = pkt_sk(sk);
 
 	write_lock_bh(&packet_sklist_lock);
 	sk_del_node_init(sk);

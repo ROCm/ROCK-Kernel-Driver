@@ -1586,6 +1586,15 @@ D: Backport/Forwardport merge monkey.
 D: Various Janitor work.
 S: United Kingdom
 
+N: Martin Josfsson
+E: gandalf@wlug.westbo.se
+P: 1024D/F6B6D3B1 7610 7CED 5C34 4AA6 DBA2  8BE1 5A6D AF95 F6B6 D3B1
+D: netfilter: SAME target
+D: netfilter: helper target
+D: netfilter: various other hacks
+S: Ronneby
+S: Sweden
+
 N: Ani Joshi
 E: ajoshi@shell.unixbox.com
 D: fbdev hacking
@@ -1596,6 +1605,17 @@ D: Various small janitor fixes, cleanups etc.
 S: Lemnosvej 1, 3.tv
 S: 2300 Copenhagen S
 S: Denmark
+
+N: Jozsef Kadlecsik
+E: kadlec@blackhole.kfki.hu
+P: 1024D/470DB964 4CB3 1A05 713E 9BF7 FAC5  5809 DD8C B7B1 470D B964
+D: netfilter: TCP window tracking code
+D: netfilter: raw table
+D: netfilter: iprange match
+D: netfilter: new logging interfaces
+D: netfilter: various other hacks
+S: Tata
+S: Hungary
 
 N: Bernhard Kaindl
 E: bkaindl@netway.at
@@ -2145,6 +2165,16 @@ P: 1024D/357375CC 317C 58AC 1B39 2AB0 AB96  EB38 0B6F 731F 3573 75CC
 D: OV511 driver
 S: (address available on request)
 S: USA
+
+N: Patrick McHardy
+E: kaber@trash.net
+P: 1024D/12155E80 B128 7DE6 FF0A C2B2 48BE  AB4C C9D4 964E 1215 5E80
+D: netfilter: endless number of bugfixes
+D: netfilter: CLASSIFY target
+D: netfilter: addrtype match
+D: tc: HFSC scheduler
+S: Freiburg
+S: Germany
 
 N: Mike McLagan
 E: mike.mclagan@linux.org
@@ -2821,7 +2851,7 @@ S: Germany
 
 N: Paul `Rusty' Russell
 E: rusty@rustcorp.com.au
-W: http://www.samba.org/netfilter
+W: http://ozlabs.org/~rusty
 D: Ruggedly handsome.
 D: netfilter, ipchains with Michael Neuling.
 S: 52 Moore St
@@ -3404,6 +3434,18 @@ S: Computer Science Division
 S: UC Berkeley
 S: Berkeley, CA 94720-1776
 S: USA
+
+N: Harald Welte
+E: laforge@netfilter.org
+P: 1024D/30F48BFF DBDE 6912 8831 9A53 879B  9190 5DA5 C655 30F4 8BFF
+W: http://gnumonks.org/users/laforge
+D: netfilter: new nat helper infrastructure
+D: netfilter: ULOG, ECN, DSCP target
+D: netfilter: TTL match
+D: netfilter: IPv6 mangle table
+D: netfilter: various other hacks
+S: Berlin
+S: Germany
 
 N: Bill Wendling
 E: wendling@ganymede.isdn.uiuc.edu

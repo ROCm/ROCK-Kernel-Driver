@@ -35,6 +35,7 @@
 #include <linux/netfilter_decnet.h>
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>
+#include <linux/rcupdate.h>
 #include <asm/atomic.h>
 #include <net/neighbour.h>
 #include <net/dst.h>
@@ -134,13 +135,25 @@ static int dn_neigh_construct(struct neighbour *neigh)
 {
 	struct net_device *dev = neigh->dev;
 	struct dn_neigh *dn = (struct dn_neigh *)neigh;
-	struct dn_dev *dn_db = (struct dn_dev *)dev->dn_ptr;
+	struct dn_dev *dn_db;
+	struct neigh_parms *parms;
 
-	if (dn_db == NULL)
+	rcu_read_lock();
+	dn_db = rcu_dereference(dev->dn_ptr);
+	if (dn_db == NULL) {
+		rcu_read_unlock();
 		return -EINVAL;
+	}
 
-	if (dn_db->neigh_parms)
-		neigh->parms = dn_db->neigh_parms;
+	parms = dn_db->neigh_parms;
+	if (!parms) {
+		rcu_read_unlock();
+		return -EINVAL;
+	}
+
+	__neigh_parms_put(neigh->parms);
+	neigh->parms = neigh_parms_clone(parms);
+	rcu_read_unlock();
 
 	if (dn_db->use_long)
 		neigh->ops = &dn_long_ops;
