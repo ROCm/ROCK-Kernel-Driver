@@ -48,7 +48,7 @@
 #define __ASM_IBMSTBX_H__
 
 #include <linux/config.h>
-#include <platforms/ibm_ocp.h>
+#include <platforms/4xx/ibm_ocp.h>
 
 /* ibm405.h at bottom of this file */
 
@@ -282,7 +282,7 @@
 #define DCRN_OCMDSCR	(DCRN_OCM0_BASE + 0x3)	/* OCM Data Side Control */
 #endif
 
-#include <platforms/ibm405.h>
+#include <asm/ibm405.h>
 
 #endif				/* __ASM_IBMSTBX_H__ */
 #endif				/* __KERNEL__ */

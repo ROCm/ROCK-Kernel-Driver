@@ -39,7 +39,7 @@
 #include <linux/threads.h>
 #include <linux/param.h>
 #include <linux/string.h>
-#include <platforms/ibm405gp.h>
+#include <platforms/4xx/ibm405gp.h>
 
 const struct pcil0_regs *PCIL_ADDR[] = {
 	(struct pcil0_regs *) PCIL0_BASE,

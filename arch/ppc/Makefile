@@ -54,7 +54,7 @@ else
 endif
 
 core-y				+= arch/ppc/kernel/ arch/ppc/platforms/ \
-				   arch/ppc/mm/ arch/ppc/lib/
+				   arch/ppc/mm/ arch/ppc/lib/ arch/ppc/syslib/
 core-$(CONFIG_4xx)		+= arch/ppc/platforms/4xx/
 core-$(CONFIG_MATH_EMULATION)	+= arch/ppc/math-emu/
 core-$(CONFIG_XMON)		+= arch/ppc/xmon/

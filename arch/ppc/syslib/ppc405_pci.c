@@ -38,7 +38,7 @@
 #include <linux/init.h>
 #include <asm/ibm4xx.h>
 #include <asm/pci-bridge.h>
-#include <platforms/ibm_ocp.h>
+#include <platforms/4xx/ibm_ocp.h>
 
 #ifdef  CONFIG_DEBUG_BRINGUP
 #define DBG(x...) printk(x)

@@ -16,7 +16,7 @@
 #define __ASM_REDWOOD_H__
 
 /* Redwoods have an STB03xxx or STB04xxx core */
-#include <platforms/ibmstb3.h>
+#include <platforms/4xx/ibmstb3.h>
 
 #ifndef __ASSEMBLY__
 typedef struct board_info {
