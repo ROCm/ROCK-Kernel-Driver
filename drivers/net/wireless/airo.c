@@ -1027,6 +1027,7 @@ struct airo_info {
 	tdsRssiEntry *rssi;
 	struct semaphore sem;
 	struct task_struct *task;
+	struct work_struct stats_task;
 	struct work_struct promisc_task;
 	struct {
 		struct sk_buff *skb;
@@ -1459,29 +1460,41 @@ static int airo_start_xmit11(struct sk_buff *skb, struct net_device *dev) {
 	return 0;
 }
 
-struct net_device_stats *airo_get_stats(struct net_device *dev)
-{
-	struct airo_info *local =  dev->priv;
+static void airo_read_stats(struct airo_info *ai) {
 	StatsRid stats_rid;
 	u32 *vals = stats_rid.vals;
 
-	/* Get stats out of the card */
-	readStatsRid(local, &stats_rid, RID_STATS, 0);
+	if (down_trylock(&ai->sem) == 0) {
+		readStatsRid(ai, &stats_rid, RID_STATS, 0);
+		up(&ai->sem);
 
-	local->stats.rx_packets = vals[43] + vals[44] + vals[45];
-	local->stats.tx_packets = vals[39] + vals[40] + vals[41];
-	local->stats.rx_bytes = vals[92];
-	local->stats.tx_bytes = vals[91];
-	local->stats.rx_errors = vals[0] + vals[2] + vals[3] + vals[4];
-	local->stats.tx_errors = vals[42] + local->stats.tx_fifo_errors;
-	local->stats.multicast = vals[43];
-	local->stats.collisions = vals[89];
+		ai->stats.rx_packets = vals[43] + vals[44] + vals[45];
+		ai->stats.tx_packets = vals[39] + vals[40] + vals[41];
+		ai->stats.rx_bytes = vals[92];
+		ai->stats.tx_bytes = vals[91];
+		ai->stats.rx_errors = vals[0] + vals[2] + vals[3] + vals[4];
+		ai->stats.tx_errors = vals[42] + ai->stats.tx_fifo_errors;
+		ai->stats.multicast = vals[43];
+		ai->stats.collisions = vals[89];
 
-	/* detailed rx_errors: */
-	local->stats.rx_length_errors = vals[3];
-	local->stats.rx_crc_errors = vals[4];
-	local->stats.rx_frame_errors = vals[2];
-	local->stats.rx_fifo_errors = vals[0];
+		/* detailed rx_errors: */
+		ai->stats.rx_length_errors = vals[3];
+		ai->stats.rx_crc_errors = vals[4];
+		ai->stats.rx_frame_errors = vals[2];
+		ai->stats.rx_fifo_errors = vals[0];
+	} else {
+		ai->stats_task.routine = (void (*)(void *))airo_read_stats;
+		ai->stats_task.data = (void *)ai;
+		schedule_task(&ai->stats_task);
+	}
+}
+
+struct net_device_stats *airo_get_stats(struct net_device *dev)
+{
+	struct airo_info *local =  dev->priv;
+
+	/* Get stats out of the card if available */
+	airo_read_stats(local);
 
 	return &local->stats;
 }
