@@ -201,19 +201,24 @@ struct prio_array {
  */
 struct runqueue {
 	spinlock_t lock;
+
+	/*
+	 * nr_running and cpu_load should be in the same cacheline because
+	 * remote CPUs use both these fields when doing load calculation.
+	 */
+	unsigned long nr_running;
+#ifdef CONFIG_SMP
+	unsigned long cpu_load;
+#endif
 	unsigned long long nr_switches;
-	unsigned long nr_running, expired_timestamp, nr_uninterruptible;
+	unsigned long expired_timestamp, nr_uninterruptible;
 	unsigned long long timestamp_last_tick;
 	task_t *curr, *idle;
 	struct mm_struct *prev_mm;
 	prio_array_t *active, *expired, arrays[2];
 	int best_expired_prio;
-
 	atomic_t nr_iowait;
 
-#ifdef CONFIG_SMP
-	unsigned long cpu_load[NR_CPUS];
-#endif
 	/* For active balancing */
 	int active_balance;
 	int push_cpu;
@@ -605,35 +610,22 @@ void kick_process(task_t *p)
 
 EXPORT_SYMBOL_GPL(kick_process);
 /*
- * Return a low guess at the load of cpu. Update previous history if update
- * is true
+ * Return a low guess at the load of cpu.
  */
-static inline unsigned long get_low_cpu_load(int cpu, int update)
+static inline unsigned long get_low_cpu_load(int cpu)
 {
 	runqueue_t *rq = cpu_rq(cpu);
-	runqueue_t *this_rq = this_rq();
-	unsigned long nr = rq->nr_running << SCHED_LOAD_SHIFT;
-	unsigned long load = this_rq->cpu_load[cpu];
-	unsigned long ret = min(nr, load);
+	unsigned long load_now = rq->nr_running << SCHED_LOAD_SHIFT;
 
-	if (update)
-		this_rq->cpu_load[cpu] = (nr + load) / 2;
-
-	return ret;
+	return min(rq->cpu_load, load_now);
 }
 
-static inline unsigned long get_high_cpu_load(int cpu, int update)
+static inline unsigned long get_high_cpu_load(int cpu)
 {
 	runqueue_t *rq = cpu_rq(cpu);
-	runqueue_t *this_rq = this_rq();
-	unsigned long nr = rq->nr_running << SCHED_LOAD_SHIFT;
-	unsigned long load = this_rq->cpu_load[cpu];
-	unsigned long ret = max(nr, load);
+	unsigned long load_now = rq->nr_running << SCHED_LOAD_SHIFT;
 
-	if (update)
-		this_rq->cpu_load[cpu] = (nr + load) / 2;
-
-	return ret;
+	return max(rq->cpu_load, load_now);
 }
 
 #endif
@@ -724,8 +716,8 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 		goto out_activate;
 
 	/* Passive load balancing */
-	load = get_low_cpu_load(cpu, 1);
-	this_load = get_high_cpu_load(this_cpu, 1) + SCHED_LOAD_SCALE;
+	load = get_low_cpu_load(cpu);
+	this_load = get_high_cpu_load(this_cpu) + SCHED_LOAD_SCALE;
 	if (load > this_load) {
 		new_cpu = sched_balance_wake(this_cpu, p);
 		set_task_cpu(p, new_cpu);
@@ -1158,9 +1150,9 @@ static int sched_best_cpu(struct task_struct *p, struct sched_domain *domain)
 	for_each_cpu_mask(i, tmp) {
 		unsigned long load;
 		if (i == this_cpu)
-			load = get_low_cpu_load(i, 0);
+			load = get_low_cpu_load(i);
 		else
-			load = get_high_cpu_load(i, 0) + SCHED_LOAD_SCALE;
+			load = get_high_cpu_load(i) + SCHED_LOAD_SCALE;
 
 		if (min_load > load) {
 			best_cpu = i;
@@ -1349,7 +1341,6 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 {
 	unsigned long max_load, avg_load, total_load, this_load;
 	unsigned int total_pwr;
-	int modify;
 	struct sched_group *busiest = NULL, *this = NULL, *group = domain->groups;
 
 	max_load = 0;
@@ -1359,16 +1350,6 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 
 	if (group == NULL)
 		goto out_balanced;
-
-	/*
-	 * Don't modify when we newly become idle because that ruins our
-	 * statistics: its triggered by some value of nr_running (ie. 0).
-	 * Timer based balancing is a good statistic though.
-	 */
-	if (idle == NEWLY_IDLE)
-		modify = 0;
-	else
-		modify = 1;
 
 	do {
 		cpumask_t tmp;
@@ -1384,9 +1365,9 @@ find_busiest_group(struct sched_domain *domain, int this_cpu,
 		for_each_cpu_mask(i, tmp) {
 			/* Bias balancing toward cpus of our domain */
 			if (local_group) {
-				load = get_high_cpu_load(i, modify);
+				load = get_high_cpu_load(i);
 			} else
-				load = get_low_cpu_load(i, modify);
+				load = get_low_cpu_load(i);
 
 			nr_cpus++;
 			avg_load += load;
@@ -1502,7 +1483,7 @@ static runqueue_t *find_busiest_queue(struct sched_group *group)
 	for_each_cpu_mask(i, tmp) {
 		unsigned long load;
 
-		load = get_low_cpu_load(i, 0);
+		load = get_low_cpu_load(i);
 
 		if (load > max_load) {
 			max_load = load;
@@ -1730,11 +1711,17 @@ next_group:
 
 static void rebalance_tick(int this_cpu, runqueue_t *this_rq, enum idle_type idle)
 {
+	unsigned long old_load, this_load;
 	unsigned long j = jiffies + CPU_OFFSET(this_cpu);
 	struct sched_domain *domain = this_sched_domain();
 
 	if (unlikely(cpu_is_offline(this_cpu)))
 		return;
+
+	/* Update our load */
+	old_load = this_rq->cpu_load;
+	this_load = this_rq->nr_running << SCHED_LOAD_SHIFT;
+	this_rq->cpu_load = (old_load + this_load) / 2;
 
 	/* Run through all this CPU's domains */
 	do {
