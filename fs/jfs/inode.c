@@ -81,8 +81,7 @@ int jfs_commit_inode(struct inode *inode, int wait)
 	 * Don't commit if inode has been committed since last being
 	 * marked dirty, or if it has been deleted.
 	 */
-	if (test_cflag(COMMIT_Nolink, inode) ||
-	    !test_cflag(COMMIT_Dirty, inode))
+	if (inode->i_nlink == 0 || !test_cflag(COMMIT_Dirty, inode))
 		return 0;
 
 	if (isReadOnly(inode)) {
@@ -100,7 +99,13 @@ int jfs_commit_inode(struct inode *inode, int wait)
 
 	tid = txBegin(inode->i_sb, COMMIT_INODE);
 	down(&JFS_IP(inode)->commit_sem);
-	rc = txCommit(tid, 1, &inode, wait ? COMMIT_SYNC : 0);
+
+	/*
+	 * Retest inode state after taking commit_sem
+	 */
+	if (inode->i_nlink && test_cflag(COMMIT_Dirty, inode))
+		rc = txCommit(tid, 1, &inode, wait ? COMMIT_SYNC : 0);
+
 	txEnd(tid);
 	up(&JFS_IP(inode)->commit_sem);
 	return rc;
