@@ -40,6 +40,16 @@
 
 #define stripe_hash(conf, sect)	((conf)->stripe_hashtbl[((sect) >> STRIPE_SHIFT) & HASH_MASK])
 
+/* bio's attached to a stripe+device for I/O are linked together in bi_sector
+ * order without overlap.  There may be several bio's per stripe+device, and
+ * a bio could span several devices.
+ * When walking this list for a particular stripe+device, we must never proceed
+ * beyond a bio that extends past this device, as the next bio might no longer
+ * be valid.
+ * This macro is used to determine the 'next' bio in the list, given the sector
+ * of the current stripe+device
+ */
+#define r5_next_bio(bio, sect) ( ( bio->bi_sector + (bio->bi_size>>9) < sect + STRIPE_SECTORS) ? bio->bi_next : NULL)
 /*
  * The following can be used to debug the driver
  */
@@ -613,7 +623,7 @@ static void copy_data(int frombio, struct bio *bio,
 	int i;
 
 	for (;bio && bio->bi_sector < sector+STRIPE_SECTORS;
-		bio = bio->bi_next) {
+	      bio = r5_next_bio(bio, sector) ) {
 		int page_offset;
 		if (bio->bi_sector >= sector)
 			page_offset = (signed)(bio->bi_sector - sector) * 512;
@@ -738,7 +748,11 @@ static void compute_parity(struct stripe_head *sh, int method)
 	for (i = disks; i--;)
 		if (sh->dev[i].written) {
 			sector_t sector = sh->dev[i].sector;
-			copy_data(1, sh->dev[i].written, sh->dev[i].page, sector);
+			struct bio *wbi = sh->dev[i].written;
+			while (wbi && wbi->bi_sector < sector + STRIPE_SECTORS) {
+				copy_data(1, wbi, sh->dev[i].page, sector);
+				wbi = r5_next_bio(wbi, sector);
+			}
 
 			set_bit(R5_LOCKED, &sh->dev[i].flags);
 			set_bit(R5_UPTODATE, &sh->dev[i].flags);
@@ -791,8 +805,10 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 		bip = &sh->dev[dd_idx].towrite;
 	else
 		bip = &sh->dev[dd_idx].toread;
-	while (*bip && (*bip)->bi_sector < bi->bi_sector)
+	while (*bip && (*bip)->bi_sector < bi->bi_sector) {
+		BUG_ON((*bip)->bi_sector + ((*bip)->bi_size >> 9) > bi->bi_sector);
 		bip = & (*bip)->bi_next;
+	}
 /* FIXME do I need to worry about overlapping bion */
 	if (*bip && bi->bi_next && (*bip) != bi->bi_next)
 		BUG();
@@ -813,7 +829,7 @@ static void add_stripe_bio (struct stripe_head *sh, struct bio *bi, int dd_idx, 
 		for (bi=sh->dev[dd_idx].towrite;
 		     sector < sh->dev[dd_idx].sector + STRIPE_SECTORS &&
 			     bi && bi->bi_sector <= sector;
-		     bi = bi->bi_next) {
+		     bi = r5_next_bio(bi, sh->dev[dd_idx].sector)) {
 			if (bi->bi_sector + (bi->bi_size>>9) >= sector)
 				sector = bi->bi_sector + (bi->bi_size>>9);
 		}
@@ -883,7 +899,7 @@ static void handle_stripe(struct stripe_head *sh)
 			spin_unlock_irq(&conf->device_lock);
 			while (rbi && rbi->bi_sector < dev->sector + STRIPE_SECTORS) {
 				copy_data(0, rbi, dev->page, dev->sector);
-				rbi2 = rbi->bi_next;
+				rbi2 = r5_next_bio(rbi, dev->sector);
 				spin_lock_irq(&conf->device_lock);
 				if (--rbi->bi_phys_segments == 0) {
 					rbi->bi_next = return_bi;
@@ -928,7 +944,7 @@ static void handle_stripe(struct stripe_head *sh)
 			if (bi) to_write--;
 
 			while (bi && bi->bi_sector < sh->dev[i].sector + STRIPE_SECTORS){
-				struct bio *nextbi = bi->bi_next;
+				struct bio *nextbi = r5_next_bio(bi, sh->dev[i].sector);
 				clear_bit(BIO_UPTODATE, &bi->bi_flags);
 				if (--bi->bi_phys_segments == 0) {
 					md_write_end(conf->mddev);
@@ -941,7 +957,7 @@ static void handle_stripe(struct stripe_head *sh)
 			bi = sh->dev[i].written;
 			sh->dev[i].written = NULL;
 			while (bi && bi->bi_sector < sh->dev[i].sector + STRIPE_SECTORS) {
-				struct bio *bi2 = bi->bi_next;
+				struct bio *bi2 = r5_next_bio(bi, sh->dev[i].sector);
 				clear_bit(BIO_UPTODATE, &bi->bi_flags);
 				if (--bi->bi_phys_segments == 0) {
 					md_write_end(conf->mddev);
@@ -957,7 +973,7 @@ static void handle_stripe(struct stripe_head *sh)
 				sh->dev[i].toread = NULL;
 				if (bi) to_read--;
 				while (bi && bi->bi_sector < sh->dev[i].sector + STRIPE_SECTORS){
-					struct bio *nextbi = bi->bi_next;
+					struct bio *nextbi = r5_next_bio(bi, sh->dev[i].sector);
 					clear_bit(BIO_UPTODATE, &bi->bi_flags);
 					if (--bi->bi_phys_segments == 0) {
 						bi->bi_next = return_bi;
@@ -1000,7 +1016,7 @@ static void handle_stripe(struct stripe_head *sh)
 			    wbi = dev->written;
 			    dev->written = NULL;
 			    while (wbi && wbi->bi_sector < dev->sector + STRIPE_SECTORS) {
-				    wbi2 = wbi->bi_next;
+				    wbi2 = r5_next_bio(wbi, dev->sector);
 				    if (--wbi->bi_phys_segments == 0) {
 					    md_write_end(conf->mddev);
 					    wbi->bi_next = return_bi;
