@@ -1,6 +1,5 @@
 ToDo:
 	- Find and fix bugs.
-	- Enable NFS exporting of NTFS.
 	- Implement aops->set_page_dirty() in order to take control of buffer
 	  dirtying. Not having it means if page_has_buffers(), all buffers
 	  will be dirtied with the page. And if not they won't be. That is
@@ -20,10 +19,19 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
-2.1.7 - WIP
+2.1.7 - Enable NFS exporting of mounted NTFS volumes.
 
 	- Set i_generation in the VFS inode from the seq_no of the NTFS inode.
 	- Make ntfs_lookup() NFS export safe, i.e. use d_splice_alias(), etc.
+	- Implement ->get_dentry() in fs/ntfs/namei.c::ntfs_get_dentry() as the
+	  default doesn't allow inode number 0 which is a valid inode on NTFS
+	  and even if it did allow that it uses iget() instead of ntfs_iget()
+	  which makes it useless for us.
+	- Implement ->get_parent() in fs/ntfs/namei.c::ntfs_get_parent() as the
+	  default just returns -EACCES which is not very useful.
+	- Define export operations (->s_export_op) for NTFS (ntfs_export_ops)
+	  and set them up in the super block at mount time (super.c) this
+	  allows mounted NTFS volumes to be exported via NFS.
 
 2.1.6 - Fix minor bug in handling of compressed directories.
 

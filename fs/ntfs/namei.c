@@ -331,10 +331,133 @@ err_out:
    }
 }
 
-/*
+/**
  * Inode operations for directories.
  */
 struct inode_operations ntfs_dir_inode_ops = {
 	.lookup	= ntfs_lookup,	/* VFS: Lookup directory. */
 };
+
+/**
+ * ntfs_get_parent - find the dentry of the parent of a given directory dentry
+ * @child_dent:		dentry of the directory whose parent directory to find
+ *
+ * Find the dentry for the parent directory of the directory specified by the
+ * dentry @child_dent.  This function is called from
+ * fs/exportfs/expfs.c::find_exported_dentry() which in turn is called from the
+ * default ->decode_fh() which is export_decode_fh() in the same file.
+ *
+ * The code is based on the ext3 ->get_parent() implementation found in
+ * fs/ext3/namei.c::ext3_get_parent().
+ *
+ * Note: ntfs_get_parent() is called with @child_dent->d_inode->i_sem down.
+ *
+ * Return the dentry of the parent directory on success or the error code on
+ * error (IS_ERR() is true).
+ */
+struct dentry *ntfs_get_parent(struct dentry *child_dent)
+{
+	struct inode *vi = child_dent->d_inode;
+	ntfs_inode *ni = NTFS_I(vi);
+	MFT_RECORD *mrec;
+	attr_search_context *ctx;
+	ATTR_RECORD *attr;
+	FILE_NAME_ATTR *fn;
+	struct inode *parent_vi;
+	struct dentry *parent_dent;
+	unsigned long parent_ino;
+
+	ntfs_debug("Entering for inode %lu.", vi->i_ino);
+	/* Get the mft record of the inode belonging to the child dentry. */
+	mrec = map_mft_record(ni);
+	if (unlikely(IS_ERR(mrec)))
+		return (struct dentry *)mrec;
+	/* Find the first file name attribute in the mft record. */
+	ctx = get_attr_search_ctx(ni, mrec);
+	if (unlikely(!ctx)) {
+		unmap_mft_record(ni);
+		return ERR_PTR(-ENOMEM);
+	}
+try_next:
+	if (unlikely(!lookup_attr(AT_FILE_NAME, NULL, 0, IGNORE_CASE, 0,
+			NULL, 0, ctx))) {
+		put_attr_search_ctx(ctx);
+		unmap_mft_record(ni);
+		return ERR_PTR(-ENOENT);
+	}
+	attr = ctx->attr;
+	if (unlikely(attr->non_resident))
+		goto try_next;
+	fn = (FILE_NAME_ATTR *)((u8 *)attr +
+			le16_to_cpu(attr->data.resident.value_offset));
+	if (unlikely((u8 *)fn + le32_to_cpu(attr->data.resident.value_length) >=
+			(u8*)attr + le32_to_cpu(attr->length)))
+		goto try_next;
+	/* Get the inode number of the parent directory. */
+	parent_ino = MREF_LE(fn->parent_directory);
+	/* Release the search context and the mft record of the child. */
+	put_attr_search_ctx(ctx);
+	unmap_mft_record(ni);
+	/* Get the inode of the parent directory. */
+	parent_vi = ntfs_iget(vi->i_sb, parent_ino);
+	if (unlikely(IS_ERR(parent_vi) || is_bad_inode(parent_vi))) {
+		if (!IS_ERR(parent_vi))
+			iput(parent_vi);
+		return ERR_PTR(-EACCES);
+	}
+	/* Finally get a dentry for the parent directory and return it. */
+	parent_dent = d_alloc_anon(parent_vi);
+	if (unlikely(!parent_dent)) {
+		iput(parent_vi);
+		return ERR_PTR(-ENOMEM);
+	}
+	ntfs_debug("Done for inode %lu.", vi->i_ino);
+	return parent_dent;
+}
+
+/**
+ * ntfs_get_dentry - find a dentry for the inode from a file handle sub-fragment
+ * @sb:		super block identifying the mounted ntfs volume
+ * @fh:		the file handle sub-fragment
+ *
+ * Find a dentry for the inode given a file handle sub-fragment.  This function
+ * is called from fs/exportfs/expfs.c::find_exported_dentry() which in turn is
+ * called from the default ->decode_fh() which is export_decode_fh() in the
+ * same file.  The code is closely based on the default ->get_dentry() helper
+ * fs/exportfs/expfs.c::get_object().
+ *
+ * The @fh contains two 32-bit unsigned values, the first one is the inode
+ * number and the second one is the inode generation.
+ *
+ * Return the dentry on success or the error code on error (IS_ERR() is true).
+ */
+struct dentry *ntfs_get_dentry(struct super_block *sb, void *fh)
+{
+	struct inode *vi;
+	struct dentry *dent;
+	unsigned long ino = ((u32 *)fh)[0];
+	u32 gen = ((u32 *)fh)[1];
+
+	ntfs_debug("Entering for inode %lu, generation %u.", ino, gen);
+	vi = ntfs_iget(sb, ino);
+	if (unlikely(IS_ERR(vi)))
+		return (struct dentry *)vi;
+	if (unlikely(is_bad_inode(vi) || vi->i_generation != gen)) {
+		/* We didn't find the right inode. */
+		ntfs_debug("Inode %lu, bad count: %d %d or version %u %u.",
+				vi->i_ino, vi->i_nlink,
+				atomic_read(&vi->i_count), vi->i_generation,
+				gen);
+		iput(vi);
+		return ERR_PTR(-ESTALE);
+	}
+	/* Now find a dentry.  If possible, get a well-connected one. */
+	dent = d_alloc_anon(vi);
+	if (unlikely(!dent)) {
+		iput(vi);
+		return ERR_PTR(-ENOMEM);
+	}
+	ntfs_debug("Done for inode %lu, generation %u.", ino, gen);
+	return dent;
+}
 

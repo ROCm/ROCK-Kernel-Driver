@@ -196,7 +196,7 @@ struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no)
 	}
 	/*
 	 * There is no point in keeping bad inodes around if the failure was
-	 * due to ENOMEM. We want to be able to retry again layer.
+	 * due to ENOMEM. We want to be able to retry again later.
 	 */
 	if (err == -ENOMEM) {
 		iput(vi);
@@ -1137,7 +1137,8 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 					"the attribute is resident (mft_no "
 					"0x%lx, type 0x%x, name_len %i). "
 					"Please report you saw this message "
-					"to linux-ntfs-dev@lists.sf.net",
+					"to linux-ntfs-dev@lists."
+					"sourceforge.net",
 					vi->i_ino, ni->type, ni->name_len);
 			goto unm_err_out;
 		}
@@ -1157,8 +1158,9 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 						"type 0x%x, name_len %i). "
 						"Please report you saw this "
 						"message to linux-ntfs-dev@"
-						"lists.sf.net", vi->i_ino,
-						ni->type, ni->name_len);
+						"lists.sourceforge.net",
+						vi->i_ino, ni->type,
+						ni->name_len);
 				goto unm_err_out;
 			}
 			NInoSetCompressed(ni);
@@ -1169,7 +1171,8 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 						"(mft_no 0x%lx, type 0x%x, "
 						"name_len %i). Please report "
 						"you saw this message to "
-						"linux-ntfs-dev@lists.sf.net",
+						"linux-ntfs-dev@lists."
+						"sourceforge.net",
 						vi->i_ino, ni->type,
 						ni->name_len);
 				goto unm_err_out;
@@ -1224,8 +1227,9 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 						"type 0x%x, name_len %i). "
 						"Please report you saw this "
 						"message to linux-ntfs-dev@"
-						"lists.sf.net", vi->i_ino,
-						ni->type, ni->name_len);
+						"lists.sourceforge.net",
+						vi->i_ino, ni->type,
+						ni->name_len);
 				goto unm_err_out;
 			}
 			NInoSetEncrypted(ni);
@@ -1238,8 +1242,9 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 						"type 0x%x, name_len %i). "
 						"Please report you saw this "
 						"message to linux-ntfs-dev@"
-						"lists.sf.net", vi->i_ino,
-						ni->type, ni->name_len);
+						"lists.sourceforge.net",
+						vi->i_ino, ni->type,
+						ni->name_len);
 				goto unm_err_out;
 			}
 			NInoSetSparse(ni);
@@ -1541,7 +1546,8 @@ void ntfs_read_inode_mount(struct inode *vi)
 						"of $MFT is not in the base "
 						"mft record. Please report "
 						"you saw this message to "
-						"linux-ntfs-dev@lists.sf.net");
+						"linux-ntfs-dev@lists."
+						"sourceforge.net");
 				goto put_err_out;
 			} else {
 				/* Sequence numbers must match. */
@@ -1662,7 +1668,8 @@ void ntfs_read_inode_mount(struct inode *vi)
 						"Run chkdsk and if no errors "
 						"are found, please report you "
 						"saw this message to "
-						"linux-ntfs-dev@lists.sf.net");
+						"linux-ntfs-dev@lists."
+						"sourceforge.net");
 				put_attr_search_ctx(ctx);
 				/* Revert to the safe super operations. */
 				sb->s_op = &ntfs_mount_sops;
