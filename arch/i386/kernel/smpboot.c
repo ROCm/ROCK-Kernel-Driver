@@ -1161,8 +1161,12 @@ __init void arch_init_sched_domains(void)
 		int j;
 		first_cpu = last_cpu = NULL;
 
-		if (i != first_cpu(cpu_domain->span))
+		if (i != first_cpu(cpu_domain->span)) {
+			cpu_sched_domain(i)->flags |= SD_FLAG_SHARE_CPUPOWER;
+			cpu_sched_domain(first_cpu(cpu_domain->span))->flags |=
+				SD_FLAG_SHARE_CPUPOWER;
 			continue;
+		}
 
 		for_each_cpu_mask(j, cpu_domain->span) {
 			struct sched_group *cpu = &sched_group_cpus[j];
@@ -1281,8 +1285,12 @@ __init void arch_init_sched_domains(void)
 		int j;
 		first_cpu = last_cpu = NULL;
 
-		if (i != first_cpu(cpu_domain->span))
+		if (i != first_cpu(cpu_domain->span)) {
+			cpu_sched_domain(i)->flags |= SD_FLAG_SHARE_CPUPOWER;
+			cpu_sched_domain(first_cpu(cpu_domain->span))->flags |=
+				SD_FLAG_SHARE_CPUPOWER;
 			continue;
+		}
 
 		for_each_cpu_mask(j, cpu_domain->span) {
 			struct sched_group *cpu = &sched_group_cpus[j];

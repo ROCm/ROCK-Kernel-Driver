@@ -1772,6 +1772,25 @@ static inline void rebalance_tick(int this_cpu, runqueue_t *this_rq, enum idle_t
 }
 #endif
 
+#ifdef CONFIG_SCHED_SMT
+static inline int wake_priority_sleeper(runqueue_t *rq)
+{	/*
+	 * If an SMT sibling task has been put to sleep for priority
+	 * reasons reschedule the idle task to see if it can now run.
+	 */
+	if (rq->nr_running) {
+		resched_task(rq->idle);
+		return 1;
+	}
+	return 0;
+}
+#else
+static inline int wake_priority_sleeper(runqueue_t *rq)
+{
+	return 0;
+}
+#endif
+
 DEFINE_PER_CPU(struct kernel_stat, kstat);
 
 EXPORT_PER_CPU_SYMBOL(kstat);
@@ -1825,6 +1844,8 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			cpustat->iowait += sys_ticks;
 		else
 			cpustat->idle += sys_ticks;
+		if (wake_priority_sleeper(rq))
+			goto out;
 		rebalance_tick(cpu, rq, IDLE);
 		return;
 	}
@@ -1912,6 +1933,91 @@ out:
 	rebalance_tick(cpu, rq, NOT_IDLE);
 }
 
+#ifdef CONFIG_SCHED_SMT
+static inline void wake_sleeping_dependent(int cpu, runqueue_t *rq)
+{
+	int i;
+	struct sched_domain *sd = cpu_sched_domain(cpu);
+	cpumask_t sibling_map;
+
+	if (!(sd->flags & SD_FLAG_SHARE_CPUPOWER)) {
+		/* Not SMT */
+		return;
+	}
+
+	cpus_and(sibling_map, sd->span, cpu_online_map);
+	cpu_clear(cpu, sibling_map);
+	for_each_cpu_mask(i, sibling_map) {
+		runqueue_t *smt_rq;
+
+		smt_rq = cpu_rq(i);
+
+		/*
+		 * If an SMT sibling task is sleeping due to priority
+		 * reasons wake it up now.
+		 */
+		if (smt_rq->curr == smt_rq->idle && smt_rq->nr_running)
+			resched_task(smt_rq->idle);
+	}
+}
+
+static inline int dependent_sleeper(int cpu, runqueue_t *rq, task_t *p)
+{
+	int ret = 0, i;
+	struct sched_domain *sd = cpu_sched_domain(cpu);
+	cpumask_t sibling_map;
+
+	if (!(sd->flags & SD_FLAG_SHARE_CPUPOWER)) {
+		/* Not SMT */
+		return 0;
+	}
+
+	cpus_and(sibling_map, sd->span, cpu_online_map);
+	cpu_clear(cpu, sibling_map);
+	for_each_cpu_mask(i, sibling_map) {
+		runqueue_t *smt_rq;
+		task_t *smt_curr;
+
+		smt_rq = cpu_rq(i);
+		smt_curr = smt_rq->curr;
+
+		/*
+		 * If a user task with lower static priority than the
+		 * running task on the SMT sibling is trying to schedule,
+		 * delay it till there is proportionately less timeslice
+		 * left of the sibling task to prevent a lower priority
+		 * task from using an unfair proportion of the
+		 * physical cpu's resources. -ck
+		 */
+		if (((smt_curr->time_slice * (100 - sd->per_cpu_gain) / 100) >
+			task_timeslice(p) || rt_task(smt_curr)) &&
+			p->mm && smt_curr->mm && !rt_task(p))
+				ret |= 1;
+
+		/*
+		 * Reschedule a lower priority task on the SMT sibling,
+		 * or wake it up if it has been put to sleep for priority
+		 * reasons.
+		 */
+		if ((((p->time_slice * (100 - sd->per_cpu_gain) / 100) >
+			task_timeslice(smt_curr) || rt_task(p)) &&
+			smt_curr->mm && p->mm && !rt_task(smt_curr)) ||
+			(smt_curr == smt_rq->idle && smt_rq->nr_running))
+				resched_task(smt_curr);
+	}
+	return ret;
+}
+#else
+static inline void wake_sleeping_dependent(int cpu, runqueue_t *rq)
+{
+}
+
+static inline int dependent_sleeper(int cpu, runqueue_t *rq, task_t *p)
+{
+	return 0;
+}
+#endif
+
 /*
  * schedule() is the main scheduler function.
  */
@@ -1924,7 +2030,7 @@ asmlinkage void __sched schedule(void)
 	struct list_head *queue;
 	unsigned long long now;
 	unsigned long run_time;
-	int idx;
+	int cpu, idx;
 
 	/*
 	 * Test if we are atomic.  Since do_exit() needs to call into
@@ -1974,13 +2080,15 @@ need_resched:
 			deactivate_task(prev, rq);
 	}
 
+	cpu = smp_processor_id();
 	if (unlikely(!rq->nr_running)) {
 #ifdef CONFIG_SMP
-		idle_balance(smp_processor_id(), rq);
+		idle_balance(cpu, rq);
 #endif
 		if (!rq->nr_running) {
 			next = rq->idle;
 			rq->expired_timestamp = 0;
+			wake_sleeping_dependent(cpu, rq);
 			goto switch_tasks;
 		}
 	}
@@ -2000,6 +2108,11 @@ need_resched:
 	idx = sched_find_first_bit(array->bitmap);
 	queue = array->queue + idx;
 	next = list_entry(queue->next, task_t, run_list);
+
+	if (dependent_sleeper(cpu, rq, next)) {
+		next = rq->idle;
+		goto switch_tasks;
+	}
 
 	if (!rt_task(next) && next->activated > 0) {
 		unsigned long long delta = now - next->timestamp;

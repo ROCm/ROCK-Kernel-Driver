@@ -550,6 +550,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define SD_FLAG_EXEC		2	/* Balance on exec */
 #define SD_FLAG_WAKE		4	/* Balance on task wakeup */
 #define SD_FLAG_FASTMIGRATE	8	/* Sync wakes put task on waking CPU */
+#define SD_FLAG_SHARE_CPUPOWER	16	/* Domain members share cpu power */
 
 struct sched_group {
 	struct sched_group *next;	/* Must be a circular list */
@@ -575,6 +576,7 @@ struct sched_domain {
 	unsigned int imbalance_pct;	/* No balance until over watermark */
 	unsigned long long cache_hot_time; /* Task considered cache hot (ns) */
 	unsigned int cache_nice_tries;	/* Leave cache hot tasks for # tries */
+	unsigned int per_cpu_gain;	/* CPU % gained by adding domain cpus */
 	int flags;			/* See SD_FLAG_* */
 
 	/* Runtime fields. */
@@ -594,6 +596,7 @@ struct sched_domain {
 	.imbalance_pct		= 110,			\
 	.cache_hot_time		= 0,			\
 	.cache_nice_tries	= 0,			\
+	.per_cpu_gain		= 15,			\
 	.flags			= SD_FLAG_FASTMIGRATE | SD_FLAG_NEWIDLE | SD_FLAG_WAKE,\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
@@ -611,6 +614,7 @@ struct sched_domain {
 	.imbalance_pct		= 125,			\
 	.cache_hot_time		= (5*1000000/2),	\
 	.cache_nice_tries	= 1,			\
+	.per_cpu_gain		= 100,			\
 	.flags			= SD_FLAG_FASTMIGRATE | SD_FLAG_NEWIDLE,\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
@@ -629,6 +633,7 @@ struct sched_domain {
 	.imbalance_pct		= 125,			\
 	.cache_hot_time		= (10*1000000),		\
 	.cache_nice_tries	= 1,			\
+	.per_cpu_gain		= 100,			\
 	.flags			= SD_FLAG_EXEC,		\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
