@@ -44,6 +44,8 @@
 
 #ifdef CONFIG_XFS_QUOTA
 # define vfs_insertquota(vfs)	vfs_insertops(vfsp, &xfs_qmops)
+extern void xfs_qm_init(void);
+extern void xfs_qm_exit(void);
 # define vfs_initquota()	xfs_qm_init()
 # define vfs_exitquota()	xfs_qm_exit()
 #else

@@ -333,14 +333,14 @@ xfs_read(
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(ioflags & IO_INVIS)) {
-		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp), *offset, size,
-				      FILP_DELAY_FLAG(file), &locktype);
-		if (error) {
+		ret = XFS_SEND_DATA(mp, DM_EVENT_READ,
+					BHV_TO_VNODE(bdp), *offset, size,
+					FILP_DELAY_FLAG(file), &locktype);
+		if (ret) {
 			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-			return -error;
+			return -ret;
 		}
 	}
 

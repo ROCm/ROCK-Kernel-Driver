@@ -85,6 +85,7 @@
 #include <linux/seq_file.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
+#include <linux/version.h>
 
 #include <asm/page.h>
 #include <asm/div64.h>
