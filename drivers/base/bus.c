@@ -325,8 +325,9 @@ static int driver_attach(struct device_driver * drv)
 	list_for_each(entry,&bus->devices.list) {
 		struct device * dev = container_of(entry,struct device,bus_list);
 		if (!dev->driver) {
-			if (!bus_match(dev,drv) && dev->driver)
-				devclass_add_device(dev);
+			error = bus_match(dev,drv);
+			if (!error && dev->driver)
+				error = devclass_add_device(dev);
 		}
 	}
 	return error;
@@ -383,15 +384,18 @@ static void driver_detach(struct device_driver * drv)
 int bus_add_device(struct device * dev)
 {
 	struct bus_type * bus = get_bus(dev->bus);
+	int error = 0;
+
 	if (bus) {
 		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: add device %s\n",bus->name,dev->bus_id);
 		list_add_tail(&dev->bus_list,&dev->bus->devices.list);
-		device_attach(dev);
+		if ((error = device_attach(dev)))
+			list_del_init(&dev->bus_list);
 		up_write(&dev->bus->subsys.rwsem);
 		sysfs_create_link(&bus->devices.kobj,&dev->kobj,dev->bus_id);
 	}
-	return 0;
+	return error;
 }
 
 /**
@@ -425,19 +429,32 @@ void bus_remove_device(struct device * dev)
 int bus_add_driver(struct device_driver * drv)
 {
 	struct bus_type * bus = get_bus(drv->bus);
+	int error = 0;
+
 	if (bus) {
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
 
 		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
 		drv->kobj.kset = &bus->drivers;
-		kobject_register(&drv->kobj);
+
+		if ((error = kobject_register(&drv->kobj)))
+			goto Done;
 
 		down_write(&bus->subsys.rwsem);
-		devclass_add_driver(drv);
-		driver_attach(drv);
+		if (!(error = devclass_add_driver(drv))) {
+			if ((error = driver_attach(drv))) {
+				devclass_remove_driver(drv);
+			}
+		}
 		up_write(&bus->subsys.rwsem);
+
+	Done:
+		if (error) {
+			kobject_unregister(&drv->kobj);
+			put_bus(bus);
+		}
 	}
-	return 0;
+	return error;
 }
 
 

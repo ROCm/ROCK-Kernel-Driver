@@ -98,15 +98,19 @@ void devclass_remove_file(struct device_class * cls, struct devclass_attribute *
 int devclass_add_driver(struct device_driver * drv)
 {
 	struct device_class * cls = get_devclass(drv->devclass);
+	int error = 0;
+
 	if (cls) {
 		down_write(&cls->subsys.rwsem);
 		pr_debug("device class %s: adding driver %s:%s\n",
 			 cls->name,drv->bus->name,drv->name);
-		list_add_tail(&drv->class_list,&cls->drivers.list);
-		devclass_drv_link(drv);
+		error = devclass_drv_link(drv);
+		
+		if (!error)
+			list_add_tail(&drv->class_list,&cls->drivers.list);
 		up_write(&cls->subsys.rwsem);
 	}
-	return 0;
+	return error;
 }
 
 void devclass_remove_driver(struct device_driver * drv)
