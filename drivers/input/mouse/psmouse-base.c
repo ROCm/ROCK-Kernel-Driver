@@ -442,7 +442,7 @@ static int psmouse_probe(struct psmouse *psmouse)
  */
 
 	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS))
-		return -1;
+		printk(KERN_WARNING "psmouse.c: Failed to reset mouse on %s\n", psmouse->serio->phys);
 
 /*
  * And here we try to determine if it has any extensions over the
