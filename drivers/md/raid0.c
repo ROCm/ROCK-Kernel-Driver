@@ -144,7 +144,7 @@ static int create_strip_zones (mddev_t *mddev)
 
 		zone->nb_dev = c;
 		zone->size = (smallest->size - current_offset) * c;
-		printk("raid0: zone->nb_dev: %d, size: %ld\n",zone->nb_dev,zone->size);
+		printk("raid0: zone->nb_dev: %d, size: %llu\n",zone->nb_dev, (unsigned long long)zone->size);
 
 		if (!conf->smallest || (zone->size < conf->smallest->size))
 			conf->smallest = zone;
@@ -180,9 +180,15 @@ static int raid0_run (mddev_t *mddev)
 		goto out_free_conf;
 
 	printk("raid0 : md_size is %llu blocks.\n", (unsigned long long)md_size[mdidx(mddev)]);
-	printk("raid0 : conf->smallest->size is %ld blocks.\n", conf->smallest->size);
-	nb_zone = md_size[mdidx(mddev)]/conf->smallest->size +
-		(md_size[mdidx(mddev)] % conf->smallest->size ? 1 : 0);
+	printk("raid0 : conf->smallest->size is %llu blocks.\n", (unsigned long long)conf->smallest->size);
+	{
+#if __GNUC__ < 3
+		volatile
+#endif
+		sector_t s = md_size[mdidx(mddev)];
+		int round = sector_div(s, (unsigned long)conf->smallest->size) ? 1 : 0;
+		nb_zone = s + round;
+	}
 	printk("raid0 : nb_zone is %d.\n", nb_zone);
 	conf->nr_zones = nb_zone;
 
@@ -277,10 +283,16 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 	chunk_size = mddev->chunk_size >> 10;
 	chunksize_bits = ffz(~chunk_size);
 	block = bio->bi_sector >> 1;
-	hash = conf->hash_table + block / conf->smallest->size;
+	
+
+	{
+		sector_t x = block;
+		sector_div(x, (unsigned long)conf->smallest->size);
+		hash = conf->hash_table + x;
+	}
 
 	/* Sanity check */
-	if (chunk_size < (block % chunk_size) + (bio->bi_size >> 10))
+	if (chunk_size < (block & (chunk_size - 1)) + (bio->bi_size >> 10))
 		goto bad_map;
  
 	if (!hash)
@@ -297,8 +309,18 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 		zone = hash->zone0;
     
 	sect_in_chunk = bio->bi_sector & ((chunk_size<<1) -1);
-	chunk = (block - zone->zone_offset) / (zone->nb_dev << chunksize_bits);
-	tmp_dev = zone->dev[(block >> chunksize_bits) % zone->nb_dev];
+
+
+	{
+		sector_t x =  block - zone->zone_offset;
+
+		sector_div(x, (zone->nb_dev << chunksize_bits));
+		chunk = x;
+		BUG_ON(x != (sector_t)chunk);
+
+		x = block >> chunksize_bits;
+		tmp_dev = zone->dev[sector_div(x, zone->nb_dev)];
+	}
 	rsect = (((chunk << chunksize_bits) + zone->dev_offset)<<1)
 		+ sect_in_chunk;
  

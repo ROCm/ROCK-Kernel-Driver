@@ -3479,12 +3479,6 @@ void cleanup_module(void)
 }
 #endif
 
-#ifdef CONFIG_LBD
-extern u64 __udivdi3(u64, u64);
-extern u64 __umoddi3(u64, u64);
-EXPORT_SYMBOL(__udivdi3);
-EXPORT_SYMBOL(__umoddi3);
-#endif
 EXPORT_SYMBOL(md_size);
 EXPORT_SYMBOL(register_md_personality);
 EXPORT_SYMBOL(unregister_md_personality);

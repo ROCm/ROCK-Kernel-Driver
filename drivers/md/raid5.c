@@ -30,13 +30,15 @@
 
 #define NR_STRIPES		256
 #define STRIPE_SIZE		PAGE_SIZE
+#define STRIPE_SHIFT		(PAGE_SHIFT - 9)
 #define STRIPE_SECTORS		(STRIPE_SIZE>>9)
 #define	IO_THRESHOLD		1
 #define HASH_PAGES		1
 #define HASH_PAGES_ORDER	0
 #define NR_HASH			(HASH_PAGES * PAGE_SIZE / sizeof(struct stripe_head *))
 #define HASH_MASK		(NR_HASH - 1)
-#define stripe_hash(conf, sect)	((conf)->stripe_hashtbl[((sect) / STRIPE_SECTORS) & HASH_MASK])
+
+#define stripe_hash(conf, sect)	((conf)->stripe_hashtbl[((sect) >> STRIPE_SHIFT) & HASH_MASK])
 
 /*
  * The following can be used to debug the driver
@@ -482,7 +484,7 @@ static unsigned long raid5_compute_sector(sector_t r_sector, unsigned int raid_d
 			unsigned int data_disks, unsigned int * dd_idx,
 			unsigned int * pd_idx, raid5_conf_t *conf)
 {
-	sector_t stripe;
+	long stripe;
 	unsigned long chunk_number;
 	unsigned int chunk_offset;
 	sector_t new_sector;
@@ -493,8 +495,9 @@ static unsigned long raid5_compute_sector(sector_t r_sector, unsigned int raid_d
 	/*
 	 * Compute the chunk number and the sector offset inside the chunk
 	 */
-	chunk_number = r_sector / sectors_per_chunk;
-	chunk_offset = r_sector % sectors_per_chunk;
+	chunk_offset = sector_div(r_sector, sectors_per_chunk);
+	chunk_number = r_sector;
+	BUG_ON(r_sector != chunk_number);
 
 	/*
 	 * Compute the stripe number
@@ -548,11 +551,16 @@ static sector_t compute_blocknr(struct stripe_head *sh, int i)
 	int raid_disks = conf->raid_disks, data_disks = raid_disks - 1;
 	sector_t new_sector = sh->sector, check;
 	int sectors_per_chunk = conf->chunk_size >> 9;
-	sector_t stripe = new_sector / sectors_per_chunk;
-	int chunk_offset = new_sector % sectors_per_chunk;
+	long stripe;
+	int chunk_offset;
 	int chunk_number, dummy1, dummy2, dd_idx = i;
 	sector_t r_sector;
 
+	chunk_offset = sector_div(new_sector, sectors_per_chunk);
+	stripe = new_sector;
+	BUG_ON(new_sector != stripe);
+
+	
 	switch (conf->algorithm) {
 		case ALGORITHM_LEFT_ASYMMETRIC:
 		case ALGORITHM_RIGHT_ASYMMETRIC:
@@ -570,7 +578,7 @@ static sector_t compute_blocknr(struct stripe_head *sh, int i)
 	}
 
 	chunk_number = stripe * data_disks + i;
-	r_sector = chunk_number * sectors_per_chunk + chunk_offset;
+	r_sector = (sector_t)chunk_number * sectors_per_chunk + chunk_offset;
 
 	check = raid5_compute_sector (r_sector, raid_disks, data_disks, &dummy1, &dummy2, conf);
 	if (check != sh->sector || dummy1 != dd_idx || dummy2 != sh->pd_idx) {
@@ -1285,8 +1293,9 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 	struct stripe_head *sh;
 	int sectors_per_chunk = conf->chunk_size >> 9;
-	unsigned long stripe = sector_nr/sectors_per_chunk;
-	int chunk_offset = sector_nr % sectors_per_chunk;
+	sector_t x;
+	unsigned long stripe;
+	int chunk_offset;
 	int dd_idx, pd_idx;
 	unsigned long first_sector;
 	int raid_disks = conf->raid_disks;
@@ -1295,6 +1304,11 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 	if (sector_nr >= mddev->size <<1)
 		/* just being told to finish up .. nothing to do */
 		return 0;
+
+	x = sector_nr;
+	chunk_offset = sector_div(x, sectors_per_chunk);
+	stripe = x;
+	BUG_ON(x != stripe);
 
 	first_sector = raid5_compute_sector(stripe*data_disks*sectors_per_chunk
 		+ chunk_offset, raid_disks, data_disks, &dd_idx, &pd_idx, conf);
