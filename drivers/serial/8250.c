@@ -1707,6 +1707,7 @@ static void __init serial8250_isa_init_ports(void)
 		serial8250_ports[i].port.irq     = irq_cannonicalize(old_serial_port[i].irq);
 		serial8250_ports[i].port.uartclk = old_serial_port[i].base_baud * 16;
 		serial8250_ports[i].port.flags   = old_serial_port[i].flags;
+		serial8250_ports[i].port.hub6    = old_serial_port[i].hub6;
 		serial8250_ports[i].port.ops     = &serial8250_pops;
 	}
 }
