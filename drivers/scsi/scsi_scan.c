@@ -1080,8 +1080,12 @@ struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 
 void scsi_rescan_device(struct device *dev)
 {
-	struct scsi_driver *drv = to_scsi_driver(dev->driver);
+	struct scsi_driver *drv;
+	
+	if (!dev->driver)
+		return;
 
+	drv = to_scsi_driver(dev->driver);
 	if (try_module_get(drv->owner)) {
 		if (drv->rescan)
 			drv->rescan(dev);
