@@ -28,6 +28,11 @@ obj-$(CONFIG_MIPS) += setup-bus.o setup-irq.o
 obj-$(CONFIG_X86_VISWS) += setup-irq.o
 obj-$(CONFIG_PCI_MSI) += msi.o
 
+#
+# ACPI Related PCI FW Functions
+#
+obj-$(CONFIG_ACPI)    += pci-acpi.o
+
 # Cardbus & CompactPCI use setup-bus
 obj-$(CONFIG_HOTPLUG) += setup-bus.o
 
