@@ -10,10 +10,9 @@
 #define CYCLONE_TIMER_FREQ 100000000
 
 int use_cyclone;
-int __init cyclone_setup(char *str)
+void __init cyclone_setup(void)
 {
 	use_cyclone = 1;
-	return 1;
 }
 
 static u32* volatile cyclone_timer;	/* Cyclone MPMC0 register */

@@ -6,7 +6,7 @@
  *  Derived from drivers/mtd/spia.c
  * 	 Copyright (C) 2000 Steven J. Hill (sjhill@realitydiluted.com)
  * 
- * $Id: autcpu12.c,v 1.19 2004/07/12 15:02:15 dwmw2 Exp $
+ * $Id: autcpu12.c,v 1.20 2004/07/20 02:44:26 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -43,14 +43,6 @@
  * MTD structure for AUTCPU12 board
  */
 static struct mtd_info *autcpu12_mtd = NULL;
-
-/*
- * Module stuff
- */
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define autcpu12_init init_module
-#define autcpu12_cleanup cleanup_module
-#endif
 
 static int autcpu12_io_base = CS89712_VIRT_BASE;
 static int autcpu12_fio_pbase = AUTCPU12_PHYS_SMC;

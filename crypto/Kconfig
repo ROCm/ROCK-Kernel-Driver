@@ -118,7 +118,7 @@ config CRYPTO_SERPENT
 	  See also:
 	  http://www.cl.cam.ac.uk/~rja14/serpent.html
 
-config CRYPTO_AES_GENERIC
+config CRYPTO_AES
 	tristate "AES cipher algorithms"
 	depends on CRYPTO && !(X86 && !X86_64)
 	help
