@@ -304,7 +304,7 @@ static int __init speedstep_init(void)
 		return -ENODEV;
 	}
 
-	dprintk(KERN_DEBUG PFX "signature:0%.8lx, command:0lx%.8lx, event:0x%.8lx, perf_level:0x%.8lx.\n", 
+	dprintk(KERN_DEBUG PFX "signature:0x%.8lx, command:0x%.8lx, event:0x%.8lx, perf_level:0x%.8lx.\n", 
 		ist_info.signature, ist_info.command, ist_info.event, ist_info.perf_level);
 
 
