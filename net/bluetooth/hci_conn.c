@@ -74,6 +74,7 @@ void hci_acl_connect(struct hci_conn *conn)
 		cp.pscan_rep_mode = ie->data.pscan_rep_mode;
 		cp.pscan_mode     = ie->data.pscan_mode;
 		cp.clock_offset   = ie->data.clock_offset | __cpu_to_le16(0x8000);
+		memcpy(conn->dev_class, ie->data.dev_class, 3);
 	}
 
 	cp.pkt_type = __cpu_to_le16(hdev->pkt_type & ACL_PTYPE_MASK);

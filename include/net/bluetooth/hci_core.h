@@ -152,6 +152,7 @@ struct hci_conn {
 	__u16		 state;
 	__u8		 type;
 	__u8		 out;
+	__u8		 dev_class[3];
 	__u32		 link_mode;
 	unsigned long	 pend;
 	
