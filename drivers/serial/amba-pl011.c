@@ -44,7 +44,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/hardware/amba.h>
-#include <asm/hardware/clock.h>
 
 #if defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
@@ -69,7 +68,6 @@
  */
 struct uart_amba_port {
 	struct uart_port	port;
-	struct clk		*clk;
 	unsigned int		im;	/* interrupt mask */
 	unsigned int		old_status;
 };
@@ -354,18 +352,11 @@ static int pl011_startup(struct uart_port *port)
 	int retval;
 
 	/*
-	 * Try to enable the clock producer.
-	 */
-	retval = clk_enable(uap->clk);
-	if (retval)
-		goto out;
-
-	/*
 	 * Allocate the IRQ
 	 */
 	retval = request_irq(uap->port.irq, pl011_int, 0, "uart-pl011", uap);
 	if (retval)
-		goto clk_dis;
+		goto out;
 
 	writew(UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
 	       uap->port.membase + UART011_IFLS);
@@ -400,8 +391,6 @@ static int pl011_startup(struct uart_port *port)
 
 	return 0;
 
- clk_dis:
-	clk_disable(uap->clk);
  out:
 	return retval;
 }
@@ -436,11 +425,6 @@ static void pl011_shutdown(struct uart_port *port)
 	val = readw(uap->port.membase + UART011_LCRH);
 	val &= ~(UART01x_LCRH_BRK | UART01x_LCRH_FEN);
 	writew(val, uap->port.membase + UART011_LCRH);
-
-	/*
-	 * Shut down the clock producer
-	 */
-	clk_disable(uap->clk);
 }
 
 static void
@@ -701,10 +685,6 @@ static int __init pl011_console_setup(struct console *co, char *options)
 		co->index = 0;
 	uap = amba_ports[co->index];
 
-	ret = clk_enable(uap->clk);
-	if (ret)
-		return ret;
-
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
 	else
@@ -767,18 +747,16 @@ static int pl011_probe(struct amba_device *dev, void *id)
 	}
 
 	memset(uap, 0, sizeof(struct uart_amba_port));
-	uap->clk = clk_get(&dev->dev, "UARTCLK");
-	if (IS_ERR(uap->clk)) {
-		ret = PTR_ERR(uap->clk);
-		goto unmap;
-	}
-
 	uap->port.dev = &dev->dev;
 	uap->port.mapbase = dev->res.start;
 	uap->port.membase = base;
 	uap->port.iotype = UPIO_MEM;
 	uap->port.irq = dev->irq[0];
-	uap->port.uartclk = clk_get_rate(uap->clk);
+#if 0 /* FIXME */
+	uap->port.uartclk = 14745600;
+#else
+	uap->port.uartclk = 24000000;
+#endif
 	uap->port.fifosize = 16;
 	uap->port.ops = &amba_pl011_pops;
 	uap->port.flags = UPF_BOOT_AUTOCONF;
@@ -791,8 +769,6 @@ static int pl011_probe(struct amba_device *dev, void *id)
 	if (ret) {
 		amba_set_drvdata(dev, NULL);
 		amba_ports[i] = NULL;
-		clk_put(uap->clk);
- unmap:
 		iounmap(base);
  free:
 		kfree(uap);
@@ -815,7 +791,6 @@ static int pl011_remove(struct amba_device *dev)
 			amba_ports[i] = NULL;
 
 	iounmap(uap->port.membase);
-	clk_put(uap->clk);
 	kfree(uap);
 	return 0;
 }
