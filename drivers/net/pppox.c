@@ -36,22 +36,22 @@
 
 #include <asm/uaccess.h>
 
-static struct pppox_proto *proto[PX_MAX_PROTO+1];
+static struct pppox_proto *pppox_protos[PX_MAX_PROTO + 1];
 
 int register_pppox_proto(int proto_num, struct pppox_proto *pp)
 {
 	if (proto_num < 0 || proto_num > PX_MAX_PROTO)
 		return -EINVAL;
-	if (proto[proto_num])
+	if (pppox_protos[proto_num])
 		return -EALREADY;
-	proto[proto_num] = pp;
+	pppox_protos[proto_num] = pp;
 	return 0;
 }
 
 void unregister_pppox_proto(int proto_num)
 {
 	if (proto_num >= 0 && proto_num <= PX_MAX_PROTO)
-		proto[proto_num] = NULL;
+		pppox_protos[proto_num] = NULL;
 }
 
 void pppox_unbind_sock(struct sock *sk)
@@ -73,57 +73,56 @@ static int pppox_ioctl(struct socket* sock, unsigned int cmd,
 {
 	struct sock *sk = sock->sk;
 	struct pppox_opt *po = pppox_sk(sk);
-	int err = 0;
+	int rc = 0;
 
 	lock_sock(sk);
 
 	switch (cmd) {
-	case PPPIOCGCHAN:{
+	case PPPIOCGCHAN: {
 		int index;
-		err = -ENOTCONN;
+		rc = -ENOTCONN;
 		if (!(sk->state & PPPOX_CONNECTED))
 			break;
 
-		err = -EINVAL;
+		rc = -EINVAL;
 		index = ppp_channel_index(&po->chan);
 		if (put_user(index , (int *) arg))
 			break;
 
-		err = 0;
+		rc = 0;
 		sk->state |= PPPOX_BOUND;
 		break;
 	}
 	default:
-		if (proto[sk->protocol]->ioctl)
-			err = (*proto[sk->protocol]->ioctl)(sock, cmd, arg);
+		if (pppox_protos[sk->protocol]->ioctl)
+			rc = pppox_protos[sk->protocol]->ioctl(sock, cmd, arg);
 
 		break;
 	};
 
 	release_sock(sk);
-	return err;
+	return rc;
 }
 
 
 static int pppox_create(struct socket *sock, int protocol)
 {
-	int err = 0;
+	int rc = -EPROTOTYPE;
 
 	if (protocol < 0 || protocol > PX_MAX_PROTO)
-		return -EPROTOTYPE;
+		goto out;
 
-	if (proto[protocol] == NULL)
-		return -EPROTONOSUPPORT;
+	rc = -EPROTONOSUPPORT;
+	if (!pppox_protos[protocol])
+		goto out;
 
-	err = (*proto[protocol]->create)(sock);
-
-	if (err == 0) {
+	rc = pppox_protos[protocol]->create(sock);
+	if (!rc)
 		/* We get to set the ioctl handler. */
 		/* For everything else, pppox is just a shell. */
 		sock->ops->ioctl = pppox_ioctl;
-	}
-
-	return err;
+out:
+	return rc;
 }
 
 static struct net_proto_family pppox_proto_family = {
