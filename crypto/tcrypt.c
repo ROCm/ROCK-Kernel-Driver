@@ -2192,6 +2192,102 @@ out:
 	crypto_free_tfm(tfm);
 }
 
+void
+test_cast5(void)
+{
+	unsigned int ret, i, tsize;
+	u8 *p, *q, *key;
+	struct crypto_tfm *tfm;
+	struct cast5_tv *c5_tv;
+	struct scatterlist sg[1];
+
+	printk("\ntesting cast5 encryption\n");
+
+	tfm = crypto_alloc_tfm("cast5", 0);
+	if (tfm == NULL) {
+		printk("failed to load transform for cast5 (default ecb)\n");
+		return;
+	}
+
+	tsize = sizeof (cast5_enc_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, cast5_enc_tv_template, tsize);
+	c5_tv = (void *) tvmem;
+	for (i = 0; i < CAST5_ENC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n", i + 1, c5_tv[i].keylen * 8);
+		key = c5_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, c5_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+
+			if (!c5_tv[i].fail)
+				goto out;
+		}
+
+		p = c5_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = sizeof(c5_tv[i].plaintext);
+		ret = crypto_cipher_encrypt(tfm, sg, sg, sg[0].length);
+		if (ret) {
+			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, sizeof(c5_tv[i].ciphertext));
+
+		printk("%s\n", memcmp(q, c5_tv[i].ciphertext,
+			sizeof(c5_tv[i].ciphertext)) ? "fail" : "pass");
+	}
+	
+	tsize = sizeof (cast5_dec_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, cast5_dec_tv_template, tsize);
+	c5_tv = (void *) tvmem;
+	for (i = 0; i < CAST5_DEC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n", i + 1, c5_tv[i].keylen * 8);
+		key = c5_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, c5_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+
+			if (!c5_tv[i].fail)
+				goto out;
+		}
+
+		p = c5_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = sizeof(c5_tv[i].plaintext);
+		ret = crypto_cipher_decrypt(tfm, sg, sg, sg[0].length);
+		if (ret) {
+			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, sizeof(c5_tv[i].ciphertext));
+
+		printk("%s\n", memcmp(q, c5_tv[i].ciphertext,
+			sizeof(c5_tv[i].ciphertext)) ? "fail" : "pass");
+	}
+out:
+	crypto_free_tfm (tfm);
+}
+
 static void
 test_deflate(void)
 {
@@ -2304,6 +2400,7 @@ do_test(void)
 		test_sha384();
 		test_sha512();
 		test_deflate();
+		test_cast5();
 #ifdef CONFIG_CRYPTO_HMAC
 		test_hmac_md5();
 		test_hmac_sha1();
@@ -2361,6 +2458,10 @@ do_test(void)
 
 	case 13:
 		test_deflate();
+		break;
+
+	case 14:
+		test_cast5();
 		break;
 
 #ifdef CONFIG_CRYPTO_HMAC
