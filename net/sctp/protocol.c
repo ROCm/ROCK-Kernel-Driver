@@ -82,7 +82,7 @@ struct sock *sctp_get_ctl_sock(void)
 }
 
 /* Set up the proc fs entry for the SCTP protocol. */
-void sctp_proc_init(void)
+__init void sctp_proc_init(void)
 {
 	if (!proc_net_sctp) {
 		struct proc_dir_entry *ent;
@@ -223,37 +223,6 @@ end_copy:
 	return error;
 }
 
-/* Returns the dst cache entry for the given source and destination ip
- * addresses.
- */
-struct dst_entry *sctp_v4_get_dst(union sctp_addr *daddr,
-				  union sctp_addr *saddr)
-{
-	struct rtable *rt;
-	struct flowi fl;
-
-	memset(&fl, 0x0, sizeof(struct flowi));
-	fl.fl4_dst  = daddr->v4.sin_addr.s_addr;
-	fl.proto = IPPROTO_SCTP;
-
-	if (saddr)
-		fl.fl4_src = saddr->v4.sin_addr.s_addr;
-
-	SCTP_DEBUG_PRINTK("%s: DST:%u.%u.%u.%u, SRC:%u.%u.%u.%u - ",
-			  __FUNCTION__, NIPQUAD(fl.fl4_dst),
-			  NIPQUAD(fl.fl4_src));
-
-	if (ip_route_output_key(&rt, &fl)) {
-		SCTP_DEBUG_PRINTK("NO ROUTE\n");
-		return NULL;
-	}
-
-	SCTP_DEBUG_PRINTK("rt_dst:%u.%u.%u.%u, rt_src:%u.%u.%u.%u\n",
-			  NIPQUAD(rt->rt_src), NIPQUAD(rt->rt_dst));
-
-	return &rt->u.dst;
-}
-
 /* Initialize a sctp_addr from in incoming skb.  */
 static void sctp_v4_from_skb(union sctp_addr *addr, struct sk_buff *skb,
 			     int is_saddr)
@@ -292,10 +261,12 @@ static void sctp_v4_to_sk(union sctp_addr *addr, struct sock *sk)
 
 
 /* Initialize a sctp_addr from a dst_entry. */
-static void sctp_v4_dst_saddr(union sctp_addr *saddr, struct dst_entry *dst)
+static void sctp_v4_dst_saddr(union sctp_addr *saddr, struct dst_entry *dst,
+			      unsigned short port)
 {
 	struct rtable *rt = (struct rtable *)dst;
 	saddr->v4.sin_family = AF_INET;
+	saddr->v4.sin_port = port;
 	saddr->v4.sin_addr.s_addr = rt->rt_src;
 }
 
@@ -392,6 +363,108 @@ static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
 	}
 
 	return retval;
+}
+
+/* Returns a valid dst cache entry for the given source and destination ip
+ * addresses. If an association is passed, trys to get a dst entry with a
+ * source adddress that matches an address in the bind address list. 
+ */
+struct dst_entry *sctp_v4_get_dst(sctp_association_t *asoc,
+				  union sctp_addr *daddr,
+				  union sctp_addr *saddr)
+{
+	struct rtable *rt;
+	struct flowi fl;
+	sctp_bind_addr_t *bp;
+	rwlock_t *addr_lock;
+	struct sockaddr_storage_list *laddr;
+	struct list_head *pos;
+	struct dst_entry *dst = NULL;
+	union sctp_addr dst_saddr;
+
+	memset(&fl, 0x0, sizeof(struct flowi));
+	fl.fl4_dst  = daddr->v4.sin_addr.s_addr;
+	fl.proto = IPPROTO_SCTP;
+
+	if (saddr)
+		fl.fl4_src = saddr->v4.sin_addr.s_addr;
+
+	SCTP_DEBUG_PRINTK("%s: DST:%u.%u.%u.%u, SRC:%u.%u.%u.%u - ",
+			  __FUNCTION__, NIPQUAD(fl.fl4_dst),
+			  NIPQUAD(fl.fl4_src));
+
+	if (!ip_route_output_key(&rt, &fl)) {
+		dst = &rt->u.dst;
+	}
+
+	/* If there is no association or if a source address is passed, no
+	 * more validation is required.
+	 */
+	if (!asoc || saddr)
+		goto out;
+
+	bp = &asoc->base.bind_addr;
+	addr_lock = &asoc->base.addr_lock;
+
+	if (dst) {
+		/* Walk through the bind address list and look for a bind
+		 * address that matches the source address of the returned dst.
+		 */
+		sctp_read_lock(addr_lock);
+		list_for_each(pos, &bp->address_list) {
+			laddr = list_entry(pos, struct sockaddr_storage_list,
+					   list);
+			sctp_v4_dst_saddr(&dst_saddr, dst, bp->port);
+			if (sctp_v4_cmp_addr(&dst_saddr, &laddr->a))
+				goto out_unlock;
+		}
+		sctp_read_unlock(addr_lock);
+
+		/* None of the bound addresses match the source address of the
+		 * dst. So release it.
+		 */
+		dst_release(dst);
+		dst = NULL;
+	}
+
+	/* Walk through the bind address list and try to get a dst that
+	 * matches a bind address as the source address.
+	 */
+	sctp_read_lock(addr_lock);
+	list_for_each(pos, &bp->address_list) {
+		laddr = list_entry(pos, struct sockaddr_storage_list, list);
+
+		if (AF_INET == laddr->a.sa.sa_family) {
+			fl.fl4_src = laddr->a.v4.sin_addr.s_addr;
+			dst = sctp_v4_get_dst(asoc, daddr, &laddr->a);
+			if (!ip_route_output_key(&rt, &fl)) {
+				dst = &rt->u.dst;
+				goto out_unlock;
+			}
+		}
+	}
+
+out_unlock:
+	sctp_read_unlock(addr_lock);
+out:
+	if (dst)
+		SCTP_DEBUG_PRINTK("rt_dst:%u.%u.%u.%u, rt_src:%u.%u.%u.%u\n",
+			  	  NIPQUAD(rt->rt_dst), NIPQUAD(rt->rt_src));
+	else
+		SCTP_DEBUG_PRINTK("NO ROUTE\n");
+
+	return dst;
+}
+
+/* For v4, the source address is cached in the route entry(dst). So no need
+ * to cache it separately and hence this is an empty routine.
+ */
+void sctp_v4_get_saddr(sctp_association_t *asoc,
+		       struct dst_entry *dst,
+		       union sctp_addr *daddr,
+		       union sctp_addr *saddr)
+{
+
 }
 
 /* Event handler for inet address addition/deletion events.
@@ -545,6 +618,19 @@ static int sctp_inet_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 	return sctp_v4_available(addr);
 }
 
+/* Wrapper routine that calls the ip transmit routine. */
+static inline int sctp_v4_xmit(struct sk_buff *skb,
+			       struct sctp_transport *transport, int ipfragok)
+{
+	SCTP_DEBUG_PRINTK("%s: skb:%p, len:%d, "
+			  "src:%u.%u.%u.%u, dst:%u.%u.%u.%u\n",
+			  __FUNCTION__, skb, skb->len,
+			  NIPQUAD(((struct rtable *)skb->dst)->rt_src),
+			  NIPQUAD(((struct rtable *)skb->dst)->rt_dst));
+
+	return ip_queue_xmit(skb, ipfragok);
+}
+
 struct sctp_af sctp_ipv4_specific;
 
 static struct sctp_pf sctp_pf_inet = {
@@ -601,10 +687,11 @@ static struct inet_protocol sctp_protocol = {
 
 /* IPv4 address related functions.  */
 struct sctp_af sctp_ipv4_specific = {
-	.queue_xmit     = ip_queue_xmit,
+	.sctp_xmit      = sctp_v4_xmit,
 	.setsockopt     = ip_setsockopt,
 	.getsockopt     = ip_getsockopt,
 	.get_dst	= sctp_v4_get_dst,
+	.get_saddr	= sctp_v4_get_saddr,
 	.copy_addrlist  = sctp_v4_copy_addrlist,
 	.from_skb       = sctp_v4_from_skb,
 	.from_sk        = sctp_v4_from_sk,
@@ -688,7 +775,7 @@ static void cleanup_sctp_mibs(void)
 }
 
 /* Initialize the universe into something sensible.  */
-int sctp_init(void)
+__init int sctp_init(void)
 {
 	int i;
 	int status = 0;
@@ -750,13 +837,9 @@ int sctp_init(void)
 
 	/* Implementation specific variables. */
 
-	/* Initialize default stream count setup information.
-	 * Note: today the stream accounting data structures are very
-	 * fixed size, so one really does need to make sure that these have
-	 * upper/lower limits when changing.
-	 */
-	sctp_proto.max_instreams    = SCTP_MAX_STREAM;
-	sctp_proto.max_outstreams   = SCTP_MAX_STREAM;
+	/* Initialize default stream count setup information. */
+	sctp_proto.max_instreams    = SCTP_DEFAULT_INSTREAMS;
+	sctp_proto.max_outstreams   = SCTP_DEFAULT_OUTSTREAMS;
 
 	/* Allocate and initialize the association hash table.  */
 	sctp_proto.assoc_hashsize = 4096;
@@ -829,6 +912,7 @@ int sctp_init(void)
 
 	sctp_get_local_addr_list(&sctp_proto);
 
+	__unsafe(THIS_MODULE);
 	return 0;
 
 err_ctl_sock_init:
@@ -852,7 +936,7 @@ err_init_mibs:
 }
 
 /* Exit handler for the SCTP protocol.  */
-void sctp_exit(void)
+__exit void sctp_exit(void)
 {
 	/* BUG.  This should probably do something useful like clean
 	 * up all the remaining associations and all that memory.
@@ -889,4 +973,3 @@ module_exit(sctp_exit);
 MODULE_AUTHOR("Linux Kernel SCTP developers <lksctp-developers@lists.sourceforge.net>");
 MODULE_DESCRIPTION("Support for the SCTP protocol (RFC2960)");
 MODULE_LICENSE("GPL");
-

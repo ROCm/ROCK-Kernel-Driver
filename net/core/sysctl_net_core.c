@@ -36,59 +36,139 @@ extern char sysctl_divert_version[];
 
 ctl_table core_table[] = {
 #ifdef CONFIG_NET
-	{NET_CORE_WMEM_MAX, "wmem_max",
-	 &sysctl_wmem_max, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_RMEM_MAX, "rmem_max",
-	 &sysctl_rmem_max, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_WMEM_DEFAULT, "wmem_default",
-	 &sysctl_wmem_default, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_RMEM_DEFAULT, "rmem_default",
-	 &sysctl_rmem_default, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_DEV_WEIGHT, "dev_weight",
-	 &weight_p, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_MAX_BACKLOG, "netdev_max_backlog",
-	 &netdev_max_backlog, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_NO_CONG_THRESH, "no_cong_thresh",
-	 &no_cong, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_NO_CONG, "no_cong",
-	 &no_cong, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_LO_CONG, "lo_cong",
-	 &lo_cong, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_MOD_CONG, "mod_cong",
-	 &mod_cong, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
+	{
+		.ctl_name	= NET_CORE_WMEM_MAX,
+		.procname	= "wmem_max",
+		.data		= &sysctl_wmem_max,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_RMEM_MAX,
+		.procname	= "rmem_max",
+		.data		= &sysctl_rmem_max,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_WMEM_DEFAULT,
+		.procname	= "wmem_default",
+		.data		= &sysctl_wmem_default,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_RMEM_DEFAULT,
+		.procname	= "rmem_default",
+		.data		= &sysctl_rmem_default,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_DEV_WEIGHT,
+		.procname	= "dev_weight",
+		.data		= &weight_p,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_MAX_BACKLOG,
+		.procname	= "netdev_max_backlog",
+		.data		= &netdev_max_backlog,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_NO_CONG_THRESH,
+		.procname	= "no_cong_thresh",
+		.data		= &no_cong,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_NO_CONG,
+		.procname	= "no_cong",
+		.data		= &no_cong,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_LO_CONG,
+		.procname	= "lo_cong",
+		.data		= &lo_cong,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_MOD_CONG,
+		.procname	= "mod_cong",
+		.data		= &mod_cong,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
 #ifdef CONFIG_NET_FASTROUTE
-	{NET_CORE_FASTROUTE, "netdev_fastroute",
-	 &netdev_fastroute, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
+	{
+		.ctl_name	= NET_CORE_FASTROUTE,
+		.procname	= "netdev_fastroute",
+		.data		= &netdev_fastroute,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
 #endif
-	{NET_CORE_MSG_COST, "message_cost",
-	 &net_msg_cost, sizeof(int), 0644, NULL,
-	 &proc_dointvec_jiffies},
-	{NET_CORE_MSG_BURST, "message_burst",
-	 &net_msg_burst, sizeof(int), 0644, NULL,
-	 &proc_dointvec_jiffies},
-	{NET_CORE_OPTMEM_MAX, "optmem_max",
-	 &sysctl_optmem_max, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
-	{NET_CORE_HOT_LIST_LENGTH, "hot_list_length",
-	 &sysctl_hot_list_len, sizeof(int), 0644, NULL,
-	 &proc_dointvec},
+	{
+		.ctl_name	= NET_CORE_MSG_COST,
+		.procname	= "message_cost",
+		.data		= &net_msg_cost,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies
+	},
+	{
+		.ctl_name	= NET_CORE_MSG_BURST,
+		.procname	= "message_burst",
+		.data		= &net_msg_burst,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_jiffies
+	},
+	{
+		.ctl_name	= NET_CORE_OPTMEM_MAX,
+		.procname	= "optmem_max",
+		.data		= &sysctl_optmem_max,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= NET_CORE_HOT_LIST_LENGTH,
+		.procname	= "hot_list_length",
+		.data		= &sysctl_hot_list_len,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
 #ifdef CONFIG_NET_DIVERT
-	{NET_CORE_DIVERT_VERSION, "divert_version",
-	 (void *)sysctl_divert_version, 32, 0444, NULL,
-	 &proc_dostring},
+	{
+		.ctl_name	= NET_CORE_DIVERT_VERSION,
+		.procname	= "divert_version",
+		.data		= (void *)sysctl_divert_version,
+		.maxlen		= 32,
+		.mode		= 0444,
+		.proc_handler	= &proc_dostring
+	},
 #endif /* CONFIG_NET_DIVERT */
 #endif /* CONFIG_NET */
-	{ 0 }
+	{ .ctl_name = 0 }
 };
 #endif

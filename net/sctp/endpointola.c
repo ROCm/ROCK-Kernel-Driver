@@ -137,7 +137,6 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN] = 
 		sp->rtoinfo.srto_initial;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T3_RTX] = 0;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_T4_RTO] = 0;
 
 	/* sctpimpguide-05 Section 2.12.2
 	 * If the 'T5-shutdown-guard' timer is used, it SHOULD be set to the
@@ -152,8 +151,6 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
 		SCTP_DEFAULT_TIMEOUT_SACK;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_AUTOCLOSE] = 
 		sp->autoclose * HZ;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_PMTU_RAISE] = 
-		SCTP_DEFAULT_TIMEOUT_PMTU_RAISE;
 
 	/* Set up the default send/receive buffer space.  */
 
@@ -264,7 +261,7 @@ out:
 sctp_association_t *__sctp_endpoint_lookup_assoc(
 	const sctp_endpoint_t *endpoint,
 	const union sctp_addr *paddr,
-	sctp_transport_t **transport)
+	struct sctp_transport **transport)
 {
 	int rport;
 	sctp_association_t *asoc;
@@ -289,9 +286,10 @@ sctp_association_t *__sctp_endpoint_lookup_assoc(
 }
 
 /* Lookup association on an endpoint based on a peer address.  BH-safe.  */
-sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
-					       const union sctp_addr *paddr,
-					       sctp_transport_t **transport)
+sctp_association_t *sctp_endpoint_lookup_assoc(
+	const sctp_endpoint_t *ep,
+	const union sctp_addr *paddr,
+	struct sctp_transport **transport)
 {
 	sctp_association_t *asoc;
 
@@ -333,7 +331,7 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 {
 	sctp_association_t *asoc;
 	struct sock *sk;
-	sctp_transport_t *transport;
+	struct sctp_transport *transport;
 	sctp_chunk_t *chunk;
 	sctp_inqueue_t *inqueue;
 	sctp_subtype_t subtype;
