@@ -747,8 +747,10 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 	screenbuf_size = new_screen_size;
 
 	err = resize_screen(currcons, new_cols, new_rows);
-	if (err)
+	if (err) {
+		kfree(newscreen);
 		return err;
+	}
 
 	rlth = min(old_row_size, new_row_size);
 	rrem = new_row_size - rlth;
