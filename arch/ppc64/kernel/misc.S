@@ -499,7 +499,6 @@ SYSCALL(dup)
 SYSCALL(execve)
 SYSCALL(waitpid)
 
-#ifdef CONFIG_BINFMT_ELF32
 /* Why isn't this a) automatic, b) written in 'C'? */	
 	.balign 8
 _GLOBAL(sys_call_table32)
@@ -747,7 +746,6 @@ _GLOBAL(sys_call_table32)
 	.rept NR_syscalls-239
 		.llong .sys_ni_syscall
 	.endr
-#endif
 
 	.balign 8
 _GLOBAL(sys_call_table)

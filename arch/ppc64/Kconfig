@@ -187,9 +187,6 @@ config BINFMT_ELF
 	  executables used across different architectures and operating
 	  systems.
 
-config BINFMT_ELF32
-	tristate "Kernel support for 32-bit ELF binaries"
-
 config BINFMT_MISC
 	tristate "Kernel support for MISC binaries"
 	---help---
