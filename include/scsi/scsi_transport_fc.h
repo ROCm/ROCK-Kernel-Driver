@@ -185,6 +185,8 @@ struct fc_host_statistics {
 
 #define FC_FC4_LIST_SIZE		32
 #define FC_SYMBOLIC_NAME_SIZE		256
+#define FC_VERSION_STRING_SIZE		64
+#define FC_SERIAL_NUMBER_SIZE		80
 
 struct fc_host_attrs {
 	/* Fixed Attributes */
@@ -195,6 +197,11 @@ struct fc_host_attrs {
 	char symbolic_name[FC_SYMBOLIC_NAME_SIZE];
 	u32 supported_speeds;
 	u32 maxframe_size;
+	char hardware_version[FC_VERSION_STRING_SIZE];
+	char firmware_version[FC_VERSION_STRING_SIZE];
+	char serial_number[FC_SERIAL_NUMBER_SIZE];
+	char opt_rom_version[FC_VERSION_STRING_SIZE];
+	char driver_version[FC_VERSION_STRING_SIZE];
 
 	/* Dynamic Attributes */
 	u32 port_id;
@@ -226,6 +233,16 @@ struct fc_host_attrs {
 	(((struct fc_host_attrs *)(x)->shost_data)->supported_speeds)
 #define fc_host_maxframe_size(x)	\
 	(((struct fc_host_attrs *)(x)->shost_data)->maxframe_size)
+#define fc_host_hardware_version(x)	\
+	(((struct fc_host_attrs *)(x)->shost_data)->hardware_version)
+#define fc_host_firmware_version(x)	\
+	(((struct fc_host_attrs *)(x)->shost_data)->firmware_version)
+#define fc_host_serial_number(x)	\
+	(((struct fc_host_attrs *)(x)->shost_data)->serial_number)
+#define fc_host_opt_rom_version(x)	\
+	(((struct fc_host_attrs *)(x)->shost_data)->opt_rom_version)
+#define fc_host_driver_version(x)	\
+	(((struct fc_host_attrs *)(x)->shost_data)->driver_version)
 #define fc_host_port_id(x)	\
 	(((struct fc_host_attrs *)(x)->shost_data)->port_id)
 #define fc_host_port_type(x)	\
@@ -285,6 +302,11 @@ struct fc_function_template {
 	unsigned long	show_host_symbolic_name:1;
 	unsigned long	show_host_supported_speeds:1;
 	unsigned long	show_host_maxframe_size:1;
+	unsigned long	show_host_hardware_version:1;
+	unsigned long	show_host_firmware_version:1;
+	unsigned long	show_host_serial_number:1;
+	unsigned long	show_host_opt_rom_version:1;
+	unsigned long	show_host_driver_version:1;
 	/* host dynamic attributes */
 	unsigned long	show_host_port_id:1;
 	unsigned long	show_host_port_type:1;

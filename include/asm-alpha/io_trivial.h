@@ -26,7 +26,7 @@ IO_CONCAT(__IO_PREFIX,iowrite8)(u8 b, void __iomem *a)
 __EXTERN_INLINE void
 IO_CONCAT(__IO_PREFIX,iowrite16)(u16 b, void __iomem *a)
 {
-	__kernel_stb(b, *(volatile u16 __force *)a);
+	__kernel_stw(b, *(volatile u16 __force *)a);
 }
 #endif
 
@@ -66,7 +66,7 @@ IO_CONCAT(__IO_PREFIX,writeb)(u8 b, volatile void __iomem *a)
 __EXTERN_INLINE void
 IO_CONCAT(__IO_PREFIX,writew)(u16 b, volatile void __iomem *a)
 {
-	__kernel_stb(b, *(volatile u16 __force *)a);
+	__kernel_stw(b, *(volatile u16 __force *)a);
 }
 #elif IO_CONCAT(__IO_PREFIX,trivial_rw_bw) == 2
 __EXTERN_INLINE u8

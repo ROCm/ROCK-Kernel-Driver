@@ -116,6 +116,7 @@ u64 ppc64_pft_size;
 u64 ppc64_debug_switch;
 
 struct ppc64_caches ppc64_caches;
+EXPORT_SYMBOL_GPL(ppc64_caches);
 
 /*
  * These are used in binfmt_elf.c to put aux entries on the stack
@@ -1344,6 +1345,7 @@ early_param("xmon", early_xmon);
 
 void cpu_die(void)
 {
+	idle_task_exit();
 	if (ppc_md.cpu_die)
 		ppc_md.cpu_die();
 	local_irq_disable();

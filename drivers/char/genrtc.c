@@ -83,7 +83,7 @@ static unsigned char days_in_mo[] =
 static int irq_active;
 
 #ifdef CONFIG_GEN_RTC_X
-struct work_struct genrtc_task;
+static struct work_struct genrtc_task;
 static struct timer_list timer_task;
 
 static unsigned int oldsecs;
@@ -95,7 +95,7 @@ static void gen_rtc_timer(unsigned long data);
 static volatile int stask_active;              /* schedule_work */
 static volatile int ttask_active;              /* timer_task */
 static int stop_rtc_timers;                    /* don't requeue tasks */
-static spinlock_t gen_rtc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(gen_rtc_lock);
 
 static void gen_rtc_interrupt(unsigned long arg);
 

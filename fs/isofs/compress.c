@@ -28,7 +28,6 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
-#include <linux/cdrom.h>
 #include <linux/init.h>
 #include <linux/nls.h>
 #include <linux/ctype.h>

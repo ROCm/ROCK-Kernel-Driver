@@ -61,8 +61,8 @@
 #define VIOCONS_KERN_WARN	KERN_WARNING "viocons: "
 #define VIOCONS_KERN_INFO	KERN_INFO "viocons: "
 
-static spinlock_t consolelock = SPIN_LOCK_UNLOCKED;
-static spinlock_t consoleloglock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(consolelock);
+static DEFINE_SPINLOCK(consoleloglock);
 
 #ifdef CONFIG_MAGIC_SYSRQ
 static int vio_sysrq_pressed;

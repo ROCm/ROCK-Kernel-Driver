@@ -52,7 +52,7 @@ static int __initdata esstype   = 0; /* ESS chip type */
 static int __initdata acer 	= 0; /* Do acer notebook init? */
 static int __initdata sm_games 	= 0; /* Logitech soundman games? */
 
-struct sb_card_config *legacy = NULL;
+static struct sb_card_config *legacy = NULL;
 
 #ifdef CONFIG_PNP
 static int __initdata pnp       = 1;

@@ -40,6 +40,7 @@ static char *_riotty_c_sccs_ = "@(#)riotty.c	1.3";
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/tty.h>
+#include <linux/string.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/string.h>
@@ -97,6 +98,9 @@ static void RIOClearUp(struct Port *PortP);
 int RIOShortCommand(struct rio_info *p, struct Port *PortP, 
 			   int command, int len, int arg);
 
+#if 0
+static int RIOCookMode(struct ttystatics *);
+#endif
 
 extern int	conv_vb[];	/* now defined in ttymgr.c */
 extern int	conv_bv[];	/* now defined in ttymgr.c */
@@ -726,7 +730,8 @@ close_end:
 ** COOK_WELL if the line discipline must be used to do the processing
 ** COOK_MEDIUM if the card can do all the processing necessary.
 */
-int
+#if 0
+static int
 RIOCookMode(struct ttystatics *tp)
 {
 	/*
@@ -757,7 +762,7 @@ RIOCookMode(struct ttystatics *tp)
 	*/
 	return COOK_MEDIUM;
 }
-
+#endif
 
 static void
 RIOClearUp(PortP)
@@ -1011,8 +1016,8 @@ riotioctl(struct rio_info *p, struct tty_struct *tty, int cmd, caddr_t arg)
 				pseterr(EFAULT);
 			}
 			PortP->Xprint.XpOn[MAX_XP_CTRL_LEN-1] = '\0';
-			PortP->Xprint.XpLen = RIOStrlen(PortP->Xprint.XpOn)+
-												RIOStrlen(PortP->Xprint.XpOff);
+			PortP->Xprint.XpLen = strlen(PortP->Xprint.XpOn)+
+												strlen(PortP->Xprint.XpOff);
 			rio_spin_unlock_irqrestore(&PortP->portSem, flags);
 			return 0;
 
@@ -1026,8 +1031,8 @@ riotioctl(struct rio_info *p, struct tty_struct *tty, int cmd, caddr_t arg)
 				pseterr(EFAULT);
 			}
 			PortP->Xprint.XpOff[MAX_XP_CTRL_LEN-1] = '\0';
-			PortP->Xprint.XpLen = RIOStrlen(PortP->Xprint.XpOn)+
-										RIOStrlen(PortP->Xprint.XpOff);
+			PortP->Xprint.XpLen = strlen(PortP->Xprint.XpOn)+
+										strlen(PortP->Xprint.XpOff);
 			rio_spin_unlock_irqrestore(&PortP->portSem, flags);
 			return 0;
 

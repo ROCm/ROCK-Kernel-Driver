@@ -55,6 +55,15 @@
 #define NAME53C		"sym53c"
 #define NAME53C8XX	"sym53c8xx"
 
+/* SPARC just has to be different ... */
+#ifdef __sparc__
+#define IRQ_FMT "%s"
+#define IRQ_PRM(x) __irq_itoa(x)
+#else
+#define IRQ_FMT "%d"
+#define IRQ_PRM(x) (x)
+#endif
+
 struct sym_driver_setup sym_driver_setup = SYM_LINUX_DRIVER_SETUP;
 unsigned int sym_debug_flags = 0;
 
@@ -147,7 +156,7 @@ pci_get_base_address(struct pci_dev *pdev, int index, u_long *base)
 }
 
 /* This lock protects only the memory allocation/free.  */
-spinlock_t sym53c8xx_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t sym53c8xx_lock = SPIN_LOCK_UNLOCKED;
 
 static struct scsi_transport_template *sym2_transport_template = NULL;
 
@@ -285,7 +294,7 @@ void sym_xpt_done(struct sym_hcb *np, struct scsi_cmnd *ccb)
 	ccb->scsi_done(ccb);
 }
 
-void sym_xpt_done2(struct sym_hcb *np, struct scsi_cmnd *ccb, int cam_status)
+static void sym_xpt_done2(struct sym_hcb *np, struct scsi_cmnd *ccb, int cam_status)
 {
 	sym_set_cam_status(ccb, cam_status);
 	sym_xpt_done(np, ccb);
@@ -379,7 +388,7 @@ void sym_set_cam_result_error(struct sym_hcb *np, struct sym_ccb *cp, int resid)
 			/*
 			 *  Bounce back the sense data to user.
 			 */
-			bzero(&csio->sense_buffer, sizeof(csio->sense_buffer));
+			memset(&csio->sense_buffer, 0, sizeof(csio->sense_buffer));
 			memcpy(csio->sense_buffer, cp->sns_bbuf,
 			      min(sizeof(csio->sense_buffer),
 				  (size_t)SYM_SNS_BBUF_LEN));
@@ -513,7 +522,7 @@ static int sym_queue_command(struct sym_hcb *np, struct scsi_cmnd *ccb)
 	}
 
 	/*
-	 *  Retreive the target descriptor.
+	 *  Retrieve the target descriptor.
 	 */
 	tp = &np->target[ccb->device->id];
 
@@ -1277,7 +1286,7 @@ static int sym_user_command(struct sym_hcb *np, char *buffer, int length)
 	int		arg_len;
 	u_long 		target;
 
-	bzero(uc, sizeof(*uc));
+	memset(uc, 0, sizeof(*uc));
 
 	if (len > 0 && ptr[len-1] == '\n')
 		--len;
@@ -1467,18 +1476,8 @@ static int sym_host_info(struct sym_hcb *np, char *ptr, off_t offset, int len)
 	copy_info(&info, "Chip " NAME53C "%s, device id 0x%x, "
 			 "revision id 0x%x\n",
 			 np->s.chip_name, np->device_id, np->revision_id);
-	copy_info(&info, "At PCI address %s, "
-#ifdef __sparc__
-		"IRQ %s\n",
-#else
-		"IRQ %d\n",
-#endif
-		pci_name(np->s.device),
-#ifdef __sparc__
-		__irq_itoa(np->s.irq));
-#else
-		(int) np->s.irq);
-#endif
+	copy_info(&info, "At PCI address %s, IRQ " IRQ_FMT "\n",
+		pci_name(np->s.device), IRQ_PRM(np->s.irq));
 	copy_info(&info, "Min. period factor %d, %s SCSI BUS%s\n",
 			 (int) (np->minsync_dt ? np->minsync_dt : np->minsync),
 			 np->maxwide ? "Wide" : "Narrow",
@@ -1558,32 +1557,23 @@ static void sym_free_resources(struct sym_hcb *np)
  */
 static int sym_setup_bus_dma_mask(struct sym_hcb *np)
 {
-#if   SYM_CONF_DMA_ADDRESSING_MODE == 0
-	if (pci_set_dma_mask(np->s.device, 0xffffffffUL))
-		goto out_err32;
-#else
+#if SYM_CONF_DMA_ADDRESSING_MODE > 0
 #if   SYM_CONF_DMA_ADDRESSING_MODE == 1
-#define	PciDmaMask	0xffffffffffULL
+#define	DMA_DAC_MASK	0x000000ffffffffffULL /* 40-bit */
 #elif SYM_CONF_DMA_ADDRESSING_MODE == 2
-#define	PciDmaMask	0xffffffffffffffffULL
+#define	DMA_DAC_MASK	DMA_64BIT_MASK
 #endif
-	if (np->features & FE_DAC) {
-		if (!pci_set_dma_mask(np->s.device, PciDmaMask)) {
-			np->use_dac = 1;
-			printf_info("%s: using 64 bit DMA addressing\n",
-					sym_name(np));
-		} else {
-			if (pci_set_dma_mask(np->s.device, 0xffffffffUL))
-				goto out_err32;
-		}
+	if ((np->features & FE_DAC) &&
+			!pci_set_dma_mask(np->s.device, DMA_DAC_MASK)) {
+		np->use_dac = 1;
+		return 0;
 	}
-#undef	PciDmaMask
 #endif
-	return 0;
 
-out_err32:
-	printf_warning("%s: 32 BIT DMA ADDRESSING NOT SUPPORTED\n",
-			sym_name(np));
+	if (!pci_set_dma_mask(np->s.device, DMA_32BIT_MASK))
+		return 0;
+
+	printf_warning("%s: No suitable DMA available\n", sym_name(np));
 	return -1;
 }
 
@@ -1606,19 +1596,9 @@ static struct Scsi_Host * __devinit sym_attach(struct scsi_host_template *tpnt,
 	struct sym_fw *fw;
 
 	printk(KERN_INFO
-		"sym%d: <%s> rev 0x%x at pci %s "
-#ifdef __sparc__
-		"irq %s\n",
-#else
-		"irq %d\n",
-#endif
+		"sym%d: <%s> rev 0x%x at pci %s irq " IRQ_FMT "\n",
 		unit, dev->chip.name, dev->chip.revision_id,
-		pci_name(dev->pdev),
-#ifdef __sparc__
-		__irq_itoa(dev->s.irq));
-#else
-		dev->s.irq);
-#endif
+		pci_name(dev->pdev), IRQ_PRM(dev->s.irq));
 
 	/*
 	 *  Get the firmware for this chip.
@@ -1672,9 +1652,6 @@ static struct Scsi_Host * __devinit sym_attach(struct scsi_host_template *tpnt,
 	strlcpy(np->s.chip_name, dev->chip.name, sizeof(np->s.chip_name));
 	sprintf(np->s.inst_name, "sym%d", np->s.unit);
 
-	/*
-	 *  Ask/tell the system about DMA addressing.
-	 */
 	if (sym_setup_bus_dma_mask(np))
 		goto attach_failed;
 
@@ -2010,7 +1987,7 @@ sym_init_device(struct pci_dev *pdev, struct sym_device *device)
  * the preset SCSI ID (which may be zero) must be read in from
  * a special configuration space register of the 875.
  */
-void sym_config_pqs(struct pci_dev *pdev, struct sym_device *sym_dev)
+static void sym_config_pqs(struct pci_dev *pdev, struct sym_device *sym_dev)
 {
 	int slot;
 	u8 tmp;

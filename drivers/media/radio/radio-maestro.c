@@ -62,7 +62,7 @@
 #define BITS2FREQ(x)	((x) * FREQ_STEP - FREQ_IF)
 
 static int radio_nr = -1;
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 static int radio_ioctl(struct inode *inode, struct file *file,
 		       unsigned int cmd, unsigned long arg);
@@ -256,12 +256,12 @@ MODULE_AUTHOR("Adam Tlalka, atlka@pg.gda.pl");
 MODULE_DESCRIPTION("Radio driver for the Maestro PCI sound card radio.");
 MODULE_LICENSE("GPL");
 
-void __exit maestro_radio_exit(void)
+static void __exit maestro_radio_exit(void)
 {
 	video_unregister_device(&maestro_radio);
 }
 
-int __init maestro_radio_init(void)
+static int __init maestro_radio_init(void)
 {
 	register __u16 found=0;
 	struct pci_dev *pcidev = NULL;

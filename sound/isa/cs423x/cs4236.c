@@ -242,6 +242,8 @@ static struct pnp_card_device_id snd_cs423x_pnpids[] = {
 	{ .id = "CSCd937", .devs = { { "CSC0000" }, { "CSC0010" }, { "CSC0003" } } },
 	/* CS4235 without MPU401 */
 	{ .id = "CSCe825", .devs = { { "CSC0100" }, { "CSC0110" } } },
+	/* Unknown SiS530 - CS4235 */
+	{ .id = "CSC4825", .devs = { { "CSC0100" }, { "CSC0110" } } },
 	/* IBM IntelliStation M Pro 6898 11U - CS4236B */
 	{ .id = "CSCe835", .devs = { { "CSC0000" }, { "CSC0010" } } },
 	/* IBM PC 300PL Onboard - CS4236B */

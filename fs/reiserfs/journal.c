@@ -436,19 +436,6 @@ get_journal_hash_dev(struct super_block *sb,
   return (struct reiserfs_journal_cnode *)0 ;
 }
 
-/* returns a cnode with same size, block number and dev as bh in the current transaction hash.  NULL if not found */
-static inline struct reiserfs_journal_cnode *get_journal_hash(struct super_block *p_s_sb, struct buffer_head *bh) {
-  struct reiserfs_journal *journal = SB_JOURNAL (p_s_sb);
-  struct reiserfs_journal_cnode *cn ;
-  if (bh) {
-    cn =  get_journal_hash_dev(p_s_sb, journal->j_hash_table, bh->b_blocknr);
-  }
-  else {
-    return (struct reiserfs_journal_cnode *)0 ;
-  }
-  return cn ;
-}
-
 /*
 ** this actually means 'can this block be reallocated yet?'.  If you set search_all, a block can only be allocated
 ** if it is not in the current transaction, was not freed by the current transaction, and has no chance of ever
@@ -516,7 +503,7 @@ int reiserfs_in_journal(struct super_block *p_s_sb,
 
 /* insert cn into table
 */
-inline void insert_journal_hash(struct reiserfs_journal_cnode **table, struct reiserfs_journal_cnode *cn) {
+static inline void insert_journal_hash(struct reiserfs_journal_cnode **table, struct reiserfs_journal_cnode *cn) {
   struct reiserfs_journal_cnode *cn_orig ;
 
   cn_orig = journal_hash(table, cn->sb, cn->blocknr) ;
@@ -693,7 +680,7 @@ static int add_to_chunk(struct buffer_chunk *chunk, struct buffer_head *bh,
 }
 
 
-atomic_t nr_reiserfs_jh = ATOMIC_INIT(0);
+static atomic_t nr_reiserfs_jh = ATOMIC_INIT(0);
 static struct reiserfs_jh *alloc_jh(void) {
     struct reiserfs_jh *jh;
     while(1) {
@@ -1090,7 +1077,7 @@ static struct reiserfs_journal_list *find_newer_jl_for_cn(struct reiserfs_journa
   return NULL ;
 }
 
-void remove_journal_hash(struct super_block *, struct reiserfs_journal_cnode **,
+static void remove_journal_hash(struct super_block *, struct reiserfs_journal_cnode **,
 struct reiserfs_journal_list *, unsigned long, int);
 
 /*
@@ -2028,7 +2015,7 @@ abort_replay:
    Right now it is only used from journal code. But later we might use it
    from other places.
    Note: Do not use journal_getblk/sb_getblk functions here! */
-struct buffer_head * reiserfs_breada (struct block_device *dev, int block, int bufsize,
+static struct buffer_head * reiserfs_breada (struct block_device *dev, int block, int bufsize,
 			    unsigned int max_block)
 {
 	struct buffer_head * bhlist[BUFNR];
@@ -3848,7 +3835,7 @@ out:
   return journal->j_errno;
 }
 
-void
+static void
 __reiserfs_journal_abort_hard (struct super_block *sb)
 {
     struct reiserfs_journal *journal = SB_JOURNAL (sb);
@@ -3866,7 +3853,7 @@ __reiserfs_journal_abort_hard (struct super_block *sb)
 #endif
 }
 
-void
+static void
 __reiserfs_journal_abort_soft (struct super_block *sb, int errno)
 {
     struct reiserfs_journal *journal = SB_JOURNAL (sb);

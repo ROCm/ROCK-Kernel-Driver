@@ -505,7 +505,7 @@ int cdrom_get_media_event(struct cdrom_device_info *cdi,
  * the first prototypes used 0x2c as the page code for the mrw mode page,
  * subsequently this was changed to 0x03. probe the one used by this drive
  */
-int cdrom_mrw_probe_pc(struct cdrom_device_info *cdi)
+static int cdrom_mrw_probe_pc(struct cdrom_device_info *cdi)
 {
 	struct packet_command cgc;
 	char buffer[16];
@@ -526,7 +526,7 @@ int cdrom_mrw_probe_pc(struct cdrom_device_info *cdi)
 	return 1;
 }
 
-int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write)
+static int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write)
 {
 	struct packet_command cgc;
 	struct mrw_feature_desc *mfd;
@@ -680,7 +680,7 @@ static int cdrom_mrw_set_lba_space(struct cdrom_device_info *cdi, int space)
 	return 0;
 }
 
-int cdrom_get_random_writable(struct cdrom_device_info *cdi,
+static int cdrom_get_random_writable(struct cdrom_device_info *cdi,
 			      struct rwrt_feature_desc *rfd)
 {
 	struct packet_command cgc;
@@ -701,7 +701,7 @@ int cdrom_get_random_writable(struct cdrom_device_info *cdi,
 	return 0;
 }
 
-int cdrom_has_defect_mgt(struct cdrom_device_info *cdi)
+static int cdrom_has_defect_mgt(struct cdrom_device_info *cdi)
 {
 	struct packet_command cgc;
 	char buffer[16];
@@ -726,7 +726,7 @@ int cdrom_has_defect_mgt(struct cdrom_device_info *cdi)
 }
 
 
-int cdrom_is_random_writable(struct cdrom_device_info *cdi, int *write)
+static int cdrom_is_random_writable(struct cdrom_device_info *cdi, int *write)
 {
 	struct rwrt_feature_desc rfd;
 	int ret;
@@ -1076,6 +1076,8 @@ int open_for_data(struct cdrom_device_info * cdi)
 			}
 			cdinfo(CD_OPEN, "the tray is now closed.\n"); 
 		}
+		/* the door should be closed now, check for the disc */
+		ret = cdo->drive_status(cdi, CDSL_CURRENT);
 		if (ret!=CDS_DISC_OK) {
 			ret = -ENOMEDIUM;
 			goto clean_up_and_return;
@@ -3074,14 +3076,12 @@ EXPORT_SYMBOL(cdrom_mode_select);
 EXPORT_SYMBOL(cdrom_mode_sense);
 EXPORT_SYMBOL(init_cdrom_command);
 EXPORT_SYMBOL(cdrom_get_media_event);
-EXPORT_SYMBOL(cdrom_is_mrw);
-EXPORT_SYMBOL(cdrom_is_random_writable);
 
 #ifdef CONFIG_SYSCTL
 
 #define CDROM_STR_SIZE 1000
 
-struct cdrom_sysctl_settings {
+static struct cdrom_sysctl_settings {
 	char	info[CDROM_STR_SIZE];	/* general info */
 	int	autoclose;		/* close tray upon mount, etc */
 	int	autoeject;		/* eject on umount */
@@ -3090,7 +3090,7 @@ struct cdrom_sysctl_settings {
 	int	check;			/* check media type */
 } cdrom_sysctl_settings;
 
-int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
+static int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
                            void __user *buffer, size_t *lenp, loff_t *ppos)
 {
         int pos;
@@ -3193,7 +3193,7 @@ int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
    procfs/sysctl yet. When they are, this will naturally disappear. For now
    just update all drives. Later this will become the template on which
    new registered drives will be based. */
-void cdrom_update_settings(void)
+static void cdrom_update_settings(void)
 {
 	struct cdrom_device_info *cdi;
 
@@ -3271,7 +3271,7 @@ static int cdrom_sysctl_handler(ctl_table *ctl, int write, struct file * filp,
 }
 
 /* Place files in /proc/sys/dev/cdrom */
-ctl_table cdrom_table[] = {
+static ctl_table cdrom_table[] = {
 	{
 		.ctl_name	= DEV_CDROM_INFO,
 		.procname	= "info",
@@ -3323,7 +3323,7 @@ ctl_table cdrom_table[] = {
 	{ .ctl_name = 0 }
 };
 
-ctl_table cdrom_cdrom_table[] = {
+static ctl_table cdrom_cdrom_table[] = {
 	{
 		.ctl_name	= DEV_CDROM,
 		.procname	= "cdrom",
@@ -3335,7 +3335,7 @@ ctl_table cdrom_cdrom_table[] = {
 };
 
 /* Make sure that /proc/sys/dev is there */
-ctl_table cdrom_root_table[] = {
+static ctl_table cdrom_root_table[] = {
 	{
 		.ctl_name	= CTL_DEV,
 		.procname	= "dev",

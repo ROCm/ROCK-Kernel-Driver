@@ -189,8 +189,6 @@ enum {
 void snd_midi_process_event(snd_midi_op_t *ops, snd_seq_event_t *ev,
 			    snd_midi_channel_set_t *chanset);
 void snd_midi_channel_set_clear(snd_midi_channel_set_t *chset);
-void snd_midi_channel_init(snd_midi_channel_t *p, int n);
-snd_midi_channel_t *snd_midi_channel_init_set(int n);
 snd_midi_channel_set_t *snd_midi_channel_alloc_set(int n);
 void snd_midi_channel_free_set(snd_midi_channel_set_t *chset);
 

@@ -310,7 +310,7 @@ PTE_BIT_FUNC(mkyoung,   |= L_PTE_YOUNG);
 
 #define set_pmd(pmdp,pmd)		\
 	do {				\
-		*pmdp = pmd;		\
+		*(pmdp) = pmd;		\
 		flush_pmd_entry(pmdp);	\
 	} while (0)
 

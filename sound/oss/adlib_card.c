@@ -31,7 +31,7 @@ static struct address_info cfg;
 
 static int __initdata io = -1;
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 
 static int __init init_adlib(void)
 {

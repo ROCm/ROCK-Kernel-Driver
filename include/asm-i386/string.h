@@ -25,7 +25,6 @@
 
 /* AK: in fact I bet it would be better to move this stuff all out of line.
  */
-#if !defined(IN_STRING_C)
 
 #define __HAVE_ARCH_STRCPY
 static inline char * strcpy(char * dest,const char *src)
@@ -179,8 +178,6 @@ __asm__ __volatile__(
 	:"=g" (__res), "=&S" (d0), "=&a" (d1) :"0" (0),"1" (s),"2" (c));
 return __res;
 }
-
-#endif
 
 #define __HAVE_ARCH_STRLEN
 static inline size_t strlen(const char * s)

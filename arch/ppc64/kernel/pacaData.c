@@ -78,13 +78,16 @@ struct paca_struct paca[] = {
 #else
 	PACAINITDATA( 0, 1, NULL, STAB0_PHYS_ADDR, STAB0_VIRT_ADDR),
 #endif
+#if NR_CPUS > 1
 	PACAINITDATA( 1, 0, NULL, 0, 0),
 	PACAINITDATA( 2, 0, NULL, 0, 0),
 	PACAINITDATA( 3, 0, NULL, 0, 0),
+#if NR_CPUS > 4
 	PACAINITDATA( 4, 0, NULL, 0, 0),
 	PACAINITDATA( 5, 0, NULL, 0, 0),
 	PACAINITDATA( 6, 0, NULL, 0, 0),
 	PACAINITDATA( 7, 0, NULL, 0, 0),
+#if NR_CPUS > 8
 	PACAINITDATA( 8, 0, NULL, 0, 0),
 	PACAINITDATA( 9, 0, NULL, 0, 0),
 	PACAINITDATA(10, 0, NULL, 0, 0),
@@ -207,6 +210,9 @@ struct paca_struct paca[] = {
 	PACAINITDATA(125, 0, NULL, 0, 0),
 	PACAINITDATA(126, 0, NULL, 0, 0),
 	PACAINITDATA(127, 0, NULL, 0, 0),
+#endif
+#endif
+#endif
 #endif
 #endif
 };

@@ -25,6 +25,7 @@
 #include <linux/pci.h>
 #include <asm/pci-bridge.h>
 #include <asm/rtas.h>
+#include <asm/machdep.h>
 #include "../pci.h"		/* for pci_add_new_bus */
 
 #include "rpaphp.h"
@@ -168,6 +169,9 @@ rpaphp_fixup_new_pci_devices(struct pci_bus *bus, int fix_bus)
 		if (list_empty(&dev->global_list)) {
 			int i;
 			
+			/* Need to setup IOMMU tables */
+			ppc_md.iommu_dev_setup(dev);
+
 			if(fix_bus)
 				pcibios_fixup_device_resources(dev, bus);
 			pci_read_irq_line(dev);

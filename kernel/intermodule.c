@@ -14,7 +14,7 @@
  */
 
 static struct list_head ime_list = LIST_HEAD_INIT(ime_list);
-static spinlock_t ime_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ime_lock);
 static int kmalloc_failed;
 
 struct inter_module_entry {

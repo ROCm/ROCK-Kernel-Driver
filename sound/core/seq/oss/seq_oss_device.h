@@ -185,7 +185,6 @@ snd_seq_oss_fill_addr(seq_oss_devinfo_t *dp, snd_seq_event_t *ev,
 
 /* misc. functions for proc interface */
 char *enabled_str(int bool);
-char *filemode_str(int fmode);
 
 
 /* for debug */

@@ -5,7 +5,6 @@
 
 #include <signal.h>
 #include <errno.h>
-#include <asm/sigcontext.h>
 #include "sysdep/ptrace.h"
 #include "signal_user.h"
 #include "user_util.h"

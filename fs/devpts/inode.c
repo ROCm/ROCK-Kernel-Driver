@@ -31,7 +31,7 @@ static struct xattr_handler *devpts_xattr_handlers[] = {
 	NULL
 };
 
-struct inode_operations devpts_file_inode_operations = {
+static struct inode_operations devpts_file_inode_operations = {
 #ifdef CONFIG_DEVPTS_FS_XATTR
 	.setxattr	= generic_setxattr,
 	.getxattr	= generic_getxattr,

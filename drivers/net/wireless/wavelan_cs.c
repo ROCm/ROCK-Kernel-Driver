@@ -952,7 +952,7 @@ wv_diag(struct net_device *	dev)
 		  OP0_DIAGNOSE, SR0_DIAGNOSE_PASSED))
     ret = TRUE;
 
-#ifdef DEBUG_CONFIG_ERROR
+#ifdef DEBUG_CONFIG_ERRORS
   printk(KERN_INFO "wavelan_cs: i82593 Self Test failed!\n");
 #endif
   return(ret);
@@ -3465,7 +3465,7 @@ wv_ru_stop(struct net_device *	dev)
   /* If there was a problem */
   if(spin <= 0)
     {
-#ifdef DEBUG_CONFIG_ERROR
+#ifdef DEBUG_CONFIG_ERRORS
       printk(KERN_INFO "%s: wv_ru_stop(): The chip doesn't want to stop...\n",
 	     dev->name);
 #endif
@@ -4068,6 +4068,7 @@ wv_pcmcia_config(dev_link_t *	link)
 	     lp->mem, dev->irq, (u_int) dev->base_addr);
 #endif
 
+      SET_NETDEV_DEV(dev, &handle_to_dev(handle));
       i = register_netdev(dev);
       if(i != 0)
 	{
@@ -4688,7 +4689,6 @@ wavelan_attach(void)
 
   /* Register with Card Services */
   client_reg.dev_info = &dev_info;
-  client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
   client_reg.EventMask = 
     CS_EVENT_REGISTRATION_COMPLETE |
     CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |

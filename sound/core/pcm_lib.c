@@ -371,7 +371,7 @@ static inline unsigned int muldiv32(unsigned int a, unsigned int b,
 	return n;
 }
 
-int snd_interval_refine_min(snd_interval_t *i, unsigned int min, int openmin)
+static int snd_interval_refine_min(snd_interval_t *i, unsigned int min, int openmin)
 {
 	int changed = 0;
 	assert(!snd_interval_empty(i));
@@ -396,7 +396,7 @@ int snd_interval_refine_min(snd_interval_t *i, unsigned int min, int openmin)
 	return changed;
 }
 
-int snd_interval_refine_max(snd_interval_t *i, unsigned int max, int openmax)
+static int snd_interval_refine_max(snd_interval_t *i, unsigned int max, int openmax)
 {
 	int changed = 0;
 	assert(!snd_interval_empty(i));
@@ -474,7 +474,7 @@ int snd_interval_refine(snd_interval_t *i, const snd_interval_t *v)
 	return changed;
 }
 
-int snd_interval_refine_first(snd_interval_t *i)
+static int snd_interval_refine_first(snd_interval_t *i)
 {
 	assert(!snd_interval_empty(i));
 	if (snd_interval_single(i))
@@ -486,7 +486,7 @@ int snd_interval_refine_first(snd_interval_t *i)
 	return 1;
 }
 
-int snd_interval_refine_last(snd_interval_t *i)
+static int snd_interval_refine_last(snd_interval_t *i)
 {
 	assert(!snd_interval_empty(i));
 	if (snd_interval_single(i))
@@ -498,7 +498,7 @@ int snd_interval_refine_last(snd_interval_t *i)
 	return 1;
 }
 
-int snd_interval_refine_set(snd_interval_t *i, unsigned int val)
+static int snd_interval_refine_set(snd_interval_t *i, unsigned int val)
 {
 	snd_interval_t t;
 	t.empty = 0;
@@ -718,9 +718,9 @@ int snd_interval_ratnum(snd_interval_t *i,
  *
  * Returns non-zero if the value is changed, zero if not changed.
  */
-int snd_interval_ratden(snd_interval_t *i,
-		    unsigned int rats_count, ratden_t *rats,
-		    unsigned int *nump, unsigned int *denp)
+static int snd_interval_ratden(snd_interval_t *i,
+			       unsigned int rats_count, ratden_t *rats,
+			       unsigned int *nump, unsigned int *denp)
 {
 	unsigned int best_num, best_diff, best_den;
 	unsigned int k;
@@ -858,7 +858,7 @@ int snd_interval_list(snd_interval_t *i, unsigned int count, unsigned int *list,
         return changed;
 }
 
-int snd_interval_step(snd_interval_t *i, unsigned int min, unsigned int step)
+static int snd_interval_step(snd_interval_t *i, unsigned int min, unsigned int step)
 {
 	unsigned int n;
 	int changed = 0;
@@ -1856,80 +1856,6 @@ int snd_pcm_lib_ioctl(snd_pcm_substream_t *substream,
  *  Conditions
  */
 
-/**
- * snd_pcm_playback_ready - check whether the playback buffer is available
- * @substream: the pcm substream instance
- *
- * Checks whether enough free space is available on the playback buffer.
- *
- * Returns non-zero if available, or zero if not.
- */
-int snd_pcm_playback_ready(snd_pcm_substream_t *substream)
-{
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	return snd_pcm_playback_avail(runtime) >= runtime->control->avail_min;
-}
-
-/**
- * snd_pcm_capture_ready - check whether the capture buffer is available
- * @substream: the pcm substream instance
- *
- * Checks whether enough capture data is available on the capture buffer.
- *
- * Returns non-zero if available, or zero if not.
- */
-int snd_pcm_capture_ready(snd_pcm_substream_t *substream)
-{
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	return snd_pcm_capture_avail(runtime) >= runtime->control->avail_min;
-}
-
-/**
- * snd_pcm_playback_data - check whether any data exists on the playback buffer
- * @substream: the pcm substream instance
- *
- * Checks whether any data exists on the playback buffer. If stop_threshold
- * is bigger or equal to boundary, then this function returns always non-zero.
- *
- * Returns non-zero if exists, or zero if not.
- */
-int snd_pcm_playback_data(snd_pcm_substream_t *substream)
-{
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	
-	if (runtime->stop_threshold >= runtime->boundary)
-		return 1;
-	return snd_pcm_playback_avail(runtime) < runtime->buffer_size;
-}
-
-/**
- * snd_pcm_playback_empty - check whether the playback buffer is empty
- * @substream: the pcm substream instance
- *
- * Checks whether the playback buffer is empty.
- *
- * Returns non-zero if empty, or zero if not.
- */
-int snd_pcm_playback_empty(snd_pcm_substream_t *substream)
-{
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	return snd_pcm_playback_avail(runtime) >= runtime->buffer_size;
-}
-
-/**
- * snd_pcm_capture_empty - check whether the capture buffer is empty
- * @substream: the pcm substream instance
- *
- * Checks whether the capture buffer is empty.
- *
- * Returns non-zero if empty, or zero if not.
- */
-int snd_pcm_capture_empty(snd_pcm_substream_t *substream)
-{
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	return snd_pcm_capture_avail(runtime) == 0;
-}
-
 static void snd_pcm_system_tick_set(snd_pcm_substream_t *substream, 
 				    unsigned long ticks)
 {
@@ -2643,7 +2569,6 @@ snd_pcm_sframes_t snd_pcm_lib_readv(snd_pcm_substream_t *substream,
 EXPORT_SYMBOL(snd_interval_refine);
 EXPORT_SYMBOL(snd_interval_list);
 EXPORT_SYMBOL(snd_interval_ratnum);
-EXPORT_SYMBOL(snd_interval_ratden);
 EXPORT_SYMBOL(snd_interval_muldivk);
 EXPORT_SYMBOL(snd_interval_mulkdiv);
 EXPORT_SYMBOL(snd_interval_div);
@@ -2660,6 +2585,7 @@ EXPORT_SYMBOL(snd_pcm_hw_param_last);
 EXPORT_SYMBOL(snd_pcm_hw_param_near);
 EXPORT_SYMBOL(snd_pcm_hw_param_set);
 EXPORT_SYMBOL(snd_pcm_hw_refine);
+EXPORT_SYMBOL(snd_pcm_hw_params);
 EXPORT_SYMBOL(snd_pcm_hw_constraints_init);
 EXPORT_SYMBOL(snd_pcm_hw_constraints_complete);
 EXPORT_SYMBOL(snd_pcm_hw_constraint_list);
@@ -2674,10 +2600,6 @@ EXPORT_SYMBOL(snd_pcm_hw_rule_add);
 EXPORT_SYMBOL(snd_pcm_set_ops);
 EXPORT_SYMBOL(snd_pcm_set_sync);
 EXPORT_SYMBOL(snd_pcm_lib_ioctl);
-EXPORT_SYMBOL(snd_pcm_playback_ready);
-EXPORT_SYMBOL(snd_pcm_capture_ready);
-EXPORT_SYMBOL(snd_pcm_playback_data);
-EXPORT_SYMBOL(snd_pcm_capture_empty);
 EXPORT_SYMBOL(snd_pcm_stop);
 EXPORT_SYMBOL(snd_pcm_period_elapsed);
 EXPORT_SYMBOL(snd_pcm_lib_write);
@@ -2687,7 +2609,6 @@ EXPORT_SYMBOL(snd_pcm_lib_readv);
 EXPORT_SYMBOL(snd_pcm_lib_buffer_bytes);
 EXPORT_SYMBOL(snd_pcm_lib_period_bytes);
 /* pcm_memory.c */
-EXPORT_SYMBOL(snd_pcm_lib_preallocate_free);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_free_for_all);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_pages);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_pages_for_all);

@@ -107,7 +107,7 @@ int open_ubd_file(char *file, struct openflags *openflags,
 		  int *create_cow_out)
 {
 	time_t mtime;
-	__u64 size;
+	unsigned long long size;
 	__u32 version, align;
 	char *backing_file;
 	int fd, err, sectorsize, same, mode = 0644;

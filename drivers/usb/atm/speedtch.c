@@ -44,28 +44,8 @@
 
 #include "usb_atm.h"
 
-/*
-#define DEBUG
-#define VERBOSE_DEBUG
-*/
-
-#if !defined (DEBUG) && defined (CONFIG_USB_DEBUG)
-#	define DEBUG
-#endif
-
-#include <linux/usb.h>
-
 #if defined(CONFIG_FW_LOADER) || defined(CONFIG_FW_LOADER_MODULE)
 #	define USE_FW_LOADER
-#endif
-
-#ifdef VERBOSE_DEBUG
-static int udsl_print_packet(const unsigned char *data, int len);
-#define PACKETDEBUG(arg...)	udsl_print_packet (arg)
-#define vdbg(arg...)		dbg (arg)
-#else
-#define PACKETDEBUG(arg...)
-#define vdbg(arg...)
 #endif
 
 #define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@free.fr>"
@@ -594,7 +574,7 @@ static int speedtch_find_firmware(struct speedtch_instance_data
 				  const struct firmware **fw_p)
 {
 	char buf[24];
-	const u16 bcdDevice = instance->u.usb_dev->descriptor.bcdDevice;
+	const u16 bcdDevice = le16_to_cpu(instance->u.usb_dev->descriptor.bcdDevice);
 	const u8 major_revision = bcdDevice >> 8;
 	const u8 minor_revision = bcdDevice & 0xff;
 
@@ -737,11 +717,12 @@ static int speedtch_usb_probe(struct usb_interface *intf,
 	int ret, i;
 	char buf7[SIZE_7];
 
-	dbg("speedtch_usb_probe: trying device with vendor=0x%x, product=0x%x, ifnum %d", dev->descriptor.idVendor, dev->descriptor.idProduct, ifnum);
+	dbg("speedtch_usb_probe: trying device with vendor=0x%x, product=0x%x, ifnum %d",
+	    le16_to_cpu(dev->descriptor.idVendor),
+	    le16_to_cpu(dev->descriptor.idProduct), ifnum);
 
-	if ((dev->descriptor.bDeviceClass != USB_CLASS_VENDOR_SPEC) ||
-	    (dev->descriptor.idVendor != SPEEDTOUCH_VENDORID) ||
-	    (dev->descriptor.idProduct != SPEEDTOUCH_PRODUCTID) || (ifnum != 1))
+	if ((dev->descriptor.bDeviceClass != USB_CLASS_VENDOR_SPEC) || 
+	    (ifnum != 1))
 		return -ENODEV;
 
 	dbg("speedtch_usb_probe: device accepted");

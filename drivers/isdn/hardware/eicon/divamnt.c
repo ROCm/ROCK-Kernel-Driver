@@ -34,9 +34,9 @@ MODULE_SUPPORTED_DEVICE("DIVA card driver");
 MODULE_LICENSE("GPL");
 
 int buffer_length = 128;
-MODULE_PARM(buffer_length, "i");
+module_param(buffer_length, int, 0);
 unsigned long diva_dbg_mem = 0;
-MODULE_PARM(diva_dbg_mem, "l");
+module_param(diva_dbg_mem, ulong, 0);
 
 static char *DRIVERNAME =
     "Eicon DIVA - MAINT module (http://www.melware.net)";

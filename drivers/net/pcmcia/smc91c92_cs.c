@@ -66,7 +66,7 @@ static char *if_names[] = { "auto", "10baseT", "10base2"};
 MODULE_DESCRIPTION("SMC 91c92 series PCMCIA ethernet driver");
 MODULE_LICENSE("GPL");
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0)
 
 /*
   Transceiver/media type.
@@ -79,7 +79,7 @@ INT_MODULE_PARM(if_port, 0);
 /* Bit map of interrupts to choose from. */
 INT_MODULE_PARM(irq_mask, 0xdeb8);
 static int irq_list[4] = { -1 };
-MODULE_PARM(irq_list, "1-4i");
+module_param_array(irq_list, int, NULL, 0);
 
 #ifdef PCMCIA_DEBUG
 INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
@@ -120,7 +120,7 @@ struct smc_private {
     dev_node_t			node;
     struct sk_buff		*saved_skb;
     int				packets_waiting;
-    caddr_t			base;
+    void			__iomem *base;
     u_short			cfg;
     struct timer_list		media;
     int				watchdog, tx_err;
@@ -374,7 +374,6 @@ static dev_link_t *smc91c92_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask = CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
 	CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
@@ -1024,6 +1023,7 @@ static void smc91c92_config(dev_link_t *link)
 
     link->dev = &smc->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     if (register_netdev(dev) != 0) {
 	printk(KERN_ERR "smc91c92_cs: register_netdev() failed\n");
@@ -2263,8 +2263,7 @@ static int __init init_smc91c92_cs(void)
 static void __exit exit_smc91c92_cs(void)
 {
 	pcmcia_unregister_driver(&smc91c92_cs_driver);
-	while (dev_list != NULL)
-		smc91c92_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_smc91c92_cs);

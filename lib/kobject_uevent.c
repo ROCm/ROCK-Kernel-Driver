@@ -179,7 +179,7 @@ static inline int send_uevent(const char *signal, const char *obj,
 #ifdef CONFIG_HOTPLUG
 char hotplug_path[HOTPLUG_PATH_LEN] = "/sbin/hotplug";
 u64 hotplug_seqnum;
-static spinlock_t sequence_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sequence_lock);
 
 /**
  * kobject_hotplug - notify userspace by executing /sbin/hotplug

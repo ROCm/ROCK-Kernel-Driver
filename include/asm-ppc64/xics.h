@@ -18,6 +18,8 @@ void xics_init_IRQ(void);
 int xics_get_irq(struct pt_regs *);
 void xics_setup_cpu(void);
 void xics_cause_IPI(int cpu);
+void xics_request_IPIs(void);
+void xics_migrate_irqs_away(void);
 
 /* first argument is ignored for now*/
 void pSeriesLP_cppr_info(int n_cpu, u8 value);
@@ -27,5 +29,8 @@ struct xics_ipi_struct {
 } ____cacheline_aligned;
 
 extern struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
+
+extern unsigned int default_distrib_server;
+extern unsigned int interrupt_server_size;
 
 #endif /* _PPC64_KERNEL_XICS_H */

@@ -374,7 +374,7 @@ static int parse_audio_unit(mixer_build_t *state, int unitid);
 static int check_matrix_bitmap(unsigned char *bmap, int ich, int och, int num_outs)
 {
 	int idx = ich * num_outs + och;
-	return bmap[-(idx >> 3)] & (0x80 >> (idx & 7));
+	return bmap[idx >> 3] & (0x80 >> (idx & 7));
 }
 
 
@@ -573,7 +573,7 @@ static struct usb_feature_control_info audio_feature_info[] = {
 static void usb_mixer_elem_free(snd_kcontrol_t *kctl)
 {
 	if (kctl->private_data) {
-		kfree((void *)kctl->private_data);
+		kfree(kctl->private_data);
 		kctl->private_data = NULL;
 	}
 }
@@ -931,14 +931,14 @@ static int parse_audio_feature_unit(mixer_build_t *state, int unitid, unsigned c
  */
 
 static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
-				 int in_ch, int unitid)
+				 int in_pin, int in_ch, int unitid,
+				 usb_audio_term_t *iterm)
 {
 	usb_mixer_elem_info_t *cval;
-	unsigned int num_ins = desc[4];
-	unsigned int num_outs = desc[5 + num_ins];
+	unsigned int input_pins = desc[4];
+	unsigned int num_outs = desc[5 + input_pins];
 	unsigned int i, len;
 	snd_kcontrol_t *kctl;
-	usb_audio_term_t iterm;
 
 	if (check_ignored_ctl(state, unitid, 0))
 		return;
@@ -947,16 +947,13 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 	if (! cval)
 		return;
 
-	if (check_input_term(state, desc[5 + in_ch], &iterm) < 0)
-		return;
-
 	cval->chip = state->chip;
 	cval->ctrlif = state->ctrlif;
 	cval->id = unitid;
 	cval->control = in_ch + 1; /* based on 1 */
 	cval->val_type = USB_MIXER_S16;
 	for (i = 0; i < num_outs; i++) {
-		if (check_matrix_bitmap(desc + 9 + num_ins, in_ch, i, num_outs)) {
+		if (check_matrix_bitmap(desc + 9 + input_pins, in_ch, i, num_outs)) {
 			cval->cmask |= (1 << i);
 			cval->channels++;
 		}
@@ -975,9 +972,9 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 
 	len = check_mapped_name(state, unitid, 0, kctl->id.name, sizeof(kctl->id.name));
 	if (! len)
-		len = get_term_name(state, &iterm, kctl->id.name, sizeof(kctl->id.name), 0);
+		len = get_term_name(state, iterm, kctl->id.name, sizeof(kctl->id.name), 0);
 	if (! len)
-		len = sprintf(kctl->id.name, "Mixer Source %d", in_ch);
+		len = sprintf(kctl->id.name, "Mixer Source %d", in_ch + 1);
 	strlcat(kctl->id.name + len, " Volume", sizeof(kctl->id.name));
 
 	snd_printdd(KERN_INFO "[%d] MU [%s] ch = %d, val = %d/%d\n",
@@ -991,17 +988,44 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
  */
 static int parse_audio_mixer_unit(mixer_build_t *state, int unitid, unsigned char *desc)
 {
-	int num_ins, num_outs;
-	int i, err;
-	if (desc[0] < 12 || ! (num_ins = desc[4]) || ! (num_outs = desc[5 + num_ins]))
-		return -EINVAL;
+	usb_audio_term_t iterm;
+	int input_pins, num_ins, num_outs;
+	int pin, ich, err;
 
-	for (i = 0; i < num_ins; i++) {
-		err = parse_audio_unit(state, desc[5 + i]);
+	if (desc[0] < 11 || ! (input_pins = desc[4]) || ! (num_outs = desc[5 + input_pins])) {
+		snd_printk(KERN_ERR "invalid MIXER UNIT descriptor %d\n", unitid);
+		return -EINVAL;
+	}
+	/* no bmControls field (e.g. Maya44) -> ignore */
+	if (desc[0] <= 10 + input_pins) {
+		snd_printdd(KERN_INFO "MU %d has no bmControls field\n", unitid);
+		return 0;
+	}
+
+	num_ins = 0;
+	ich = 0;
+	for (pin = 0; pin < input_pins; pin++) {
+		err = parse_audio_unit(state, desc[5 + pin]);
 		if (err < 0)
 			return err;
-		if (check_matrix_bitmap(desc + 9 + num_ins, i, 0, num_outs))
-			build_mixer_unit_ctl(state, desc, i, unitid);
+		err = check_input_term(state, desc[5 + pin], &iterm);
+		if (err < 0)
+			return err;
+		num_ins += iterm.channels;
+		for (; ich < num_ins; ++ich) {
+			int och, ich_has_controls = 0;
+
+			for (och = 0; och < num_outs; ++och) {
+				if (check_matrix_bitmap(desc + 9 + input_pins,
+							ich, och, num_outs)) {
+					ich_has_controls = 1;
+					break;
+				}
+			}
+			if (ich_has_controls)
+				build_mixer_unit_ctl(state, desc, pin, ich,
+						     unitid, &iterm);
+		}
 	}
 	return 0;
 }
@@ -1490,12 +1514,12 @@ int snd_usb_create_mixer(snd_usb_audio_t *chip, int ctrlif)
 	state.buffer = hostif->extra;
 	state.buflen = hostif->extralen;
 	state.ctrlif = ctrlif;
-	state.vendor = dev->idVendor;
-	state.product = dev->idProduct;
+	state.vendor = le16_to_cpu(dev->idVendor);
+	state.product = le16_to_cpu(dev->idProduct);
 
 	/* check the mapping table */
 	for (map = usbmix_ctl_maps; map->vendor; map++) {
-		if (map->vendor == dev->idVendor && map->product == dev->idProduct) {
+		if (map->vendor == le16_to_cpu(dev->idVendor) && map->product == le16_to_cpu(dev->idProduct)) {
 			state.map = map->map;
 			chip->ignore_ctl_error = map->ignore_ctl_error;
 			break;

@@ -58,7 +58,6 @@
 		   ZR36057_ISR_JPEGRepIRQ )
 
 extern const struct zoran_format zoran_formats[];
-extern const int zoran_num_formats;
 
 extern int *zr_debug;
 
@@ -77,9 +76,12 @@ static int lml33dpath = 0;	/* 1 will use digital path in capture
 				 * load on Bt819 input, there will be
 				 * some image imperfections */
 
-MODULE_PARM(lml33dpath, "i");
+module_param(lml33dpath, bool, 0);
 MODULE_PARM_DESC(lml33dpath,
 		 "Use digital path capture mode (on LML33 cards)");
+
+static void
+zr36057_init_vfe (struct zoran *zr);
 
 /*
  * General Purpose I/O and Guest bus access
@@ -1723,7 +1725,7 @@ zr36057_restart (struct zoran *zr)
  * initialize video front end
  */
 
-void
+static void
 zr36057_init_vfe (struct zoran *zr)
 {
 	u32 reg;

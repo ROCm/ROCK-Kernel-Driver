@@ -67,13 +67,13 @@
 MODULE_DESCRIPTION("fmvj18x and compatible PCMCIA ethernet driver");
 MODULE_LICENSE("GPL");
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0)
 
 /* Bit map of interrupts to choose from */
 /* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
 INT_MODULE_PARM(irq_mask, 0xdeb8);
 static int irq_list[4] = { -1 };
-MODULE_PARM(irq_list, "1-4i");
+module_param_array(irq_list, int, NULL, 0);
 
 /* SRAM configuration */
 /* 0:4KB*2 TX buffer   else:8KB*2 TX buffer */
@@ -299,7 +299,6 @@ static dev_link_t *fmvj18x_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
 	CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -591,6 +590,7 @@ static void fmvj18x_config(dev_link_t *link)
     lp->cardtype = cardtype;
     link->dev = &lp->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     if (register_netdev(dev) != 0) {
 	printk(KERN_NOTICE "fmvj18x_cs: register_netdev() failed\n");
@@ -623,7 +623,7 @@ static int fmvj18x_get_hwinfo(dev_link_t *link, u_char *node_id)
 {
     win_req_t req;
     memreq_t mem;
-    u_char *base;
+    u_char __iomem *base;
     int i, j;
 
     /* Allocate a small memory window */
@@ -676,7 +676,7 @@ static int fmvj18x_setup_mfc(dev_link_t *link)
 {
     win_req_t req;
     memreq_t mem;
-    u_char *base;
+    u_char __iomem *base;
     int i, j;
     struct net_device *dev = link->priv;
     ioaddr_t ioaddr;
@@ -792,8 +792,7 @@ static int __init init_fmvj18x_cs(void)
 static void __exit exit_fmvj18x_cs(void)
 {
 	pcmcia_unregister_driver(&fmvj18x_cs_driver);
-	while (dev_list != NULL)
-		fmvj18x_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_fmvj18x_cs);

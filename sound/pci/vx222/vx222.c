@@ -61,8 +61,8 @@ enum {
 };
 
 static struct pci_device_id snd_vx222_ids[] = {
-	{ 0x10b5, 0x9050, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VX_PCI_VX222_OLD, },   /* PLX */
-	{ 0x10b5, 0x9030, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VX_PCI_VX222_NEW, },   /* PLX */
+	{ 0x10b5, 0x9050, 0x1369, PCI_ANY_ID, 0, 0, VX_PCI_VX222_OLD, },   /* PLX */
+	{ 0x10b5, 0x9030, 0x1369, PCI_ANY_ID, 0, 0, VX_PCI_VX222_NEW, },   /* PLX */
 	{ 0, }
 };
 
@@ -225,7 +225,11 @@ static int __devinit snd_vx222_probe(struct pci_dev *pci,
 	snd_printdd("%s at 0x%lx & 0x%lx, irq %i\n",
 		    card->shortname, vx->port[0], vx->port[1], vx->core.irq);
 
-	if ((err = snd_vx_hwdep_new(&vx->core)) < 0) {
+#ifdef SND_VX_FW_LOADER
+	vx->core.dev = &pci->dev;
+#endif
+
+	if ((err = snd_vx_setup_firmware(&vx->core)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -251,6 +255,7 @@ static struct pci_driver driver = {
 	.id_table = snd_vx222_ids,
 	.probe = snd_vx222_probe,
 	.remove = __devexit_p(snd_vx222_remove),
+	SND_PCI_PM_CALLBACKS
 };
 
 static int __init alsa_card_vx222_init(void)

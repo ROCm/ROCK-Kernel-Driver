@@ -1242,8 +1242,8 @@ plip_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 static int parport[PLIP_MAX] = { [0 ... PLIP_MAX-1] = -1 };
 static int timid;
 
-MODULE_PARM(parport, "1-" __MODULE_STRING(PLIP_MAX) "i");
-MODULE_PARM(timid, "1i");
+module_param_array(parport, int, NULL, 0);
+module_param(timid, int, 0);
 MODULE_PARM_DESC(parport, "List of parport device numbers to use by plip");
 
 static struct net_device *dev_plip[PLIP_MAX] = { NULL, };

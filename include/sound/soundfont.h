@@ -112,7 +112,6 @@ void snd_sf_free(snd_sf_list_t *sflist);
 
 int snd_soundfont_remove_samples(snd_sf_list_t *sflist);
 int snd_soundfont_remove_unlocked(snd_sf_list_t *sflist);
-int snd_soundfont_mem_used(snd_sf_list_t *sflist);
 
 int snd_soundfont_search_zone(snd_sf_list_t *sflist, int *notep, int vel,
 			      int preset, int bank,

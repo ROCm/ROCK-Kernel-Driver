@@ -1696,7 +1696,7 @@ void ess_mixer_reload (sb_devc *devc, int dev)
 	sb_common_mixer_set(devc, dev, left, right);
 }
 
-int es_rec_set_recmask(sb_devc * devc, int mask)
+static int es_rec_set_recmask(sb_devc * devc, int mask)
 {
 	int i, i_mask, cur_mask, diff_mask;
 	int value, left, right;

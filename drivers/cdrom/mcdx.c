@@ -77,8 +77,6 @@ static const char *mcdx_c_version
 #include <linux/blkdev.h>
 #include <linux/devfs_fs_kernel.h>
 
-/* for compatible parameter passing with "insmod" */
-#define	mcdx_drive_map mcdx
 #include "mcdx.h"
 
 #ifndef HZ
@@ -309,7 +307,14 @@ static int mcdx_drive_map[][2] = MCDX_DRIVEMAP;
 static struct s_drive_stuff *mcdx_stuffp[MCDX_NDRIVES];
 static spinlock_t mcdx_lock = SPIN_LOCK_UNLOCKED;
 static struct request_queue *mcdx_queue;
-MODULE_PARM(mcdx, "1-4i");
+
+/* You can only set the first two pairs, from old MODULE_PARM code.  */
+static int mcdx_set(const char *val, struct kernel_param *kp)
+{
+	get_options((char *)val, 4, (int *)mcdx_drive_map);
+	return 0;
+}
+module_param_call(mcdx, mcdx_set, NULL, NULL, 0);
 
 static struct cdrom_device_ops mcdx_dops = {
 	.open		= mcdx_open,

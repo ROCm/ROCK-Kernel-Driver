@@ -47,7 +47,6 @@ static void dummy_perf(struct pt_regs *regs)
 
 #else
 /* Ensure exceptions are disabled */
-#define MMCR0_PMXE      (1UL << (31 - 5))
 
 static void dummy_perf(struct pt_regs *regs)
 {

@@ -355,7 +355,7 @@ ENTRY(cpu_gdt_table)
 	.quad	0x008f9a000000ffff	/* __KERNEL_COMPAT32_CS */	
 	.quad	0x00af9a000000ffff	/* __KERNEL_CS */
 	.quad	0x00cf92000000ffff	/* __KERNEL_DS */
-	.quad	0x00cffe000000ffff	/* __USER32_CS */
+	.quad	0x00cffa000000ffff	/* __USER32_CS */
 	.quad	0x00cff2000000ffff	/* __USER_DS, __USER32_DS  */		
 	.quad	0x00affa000000ffff	/* __USER_CS */
 	.quad	0x00cf9a000000ffff	/* __KERNEL32_CS */

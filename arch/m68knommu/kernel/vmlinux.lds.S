@@ -124,9 +124,8 @@
 #endif
 
 /*
- *   The senTec COBRA5272 board has nearly the same
- *   memory layout as the M5272C3.
- *   We assume 16MB ram.
+ *	The senTec COBRA5272 board has nearly the same memory layout as 
+ *	the M5272C3. We assume 16MiB ram.
  */
 #if defined(CONFIG_COBRA5272)
 #define RAM_START   0x20000
@@ -139,8 +138,7 @@
 #endif
 
 /*
- *   The senTec COBRA5282 board has the same
- *   memory layout as the M5282EVB.
+ *	The senTec COBRA5282 board has the same memory layout as the M5282EVB.
  */
 #if defined(CONFIG_COBRA5282)
 #define  RAM_START   0x10000

@@ -111,7 +111,7 @@ static void start_adc(struct cs4281_state *s);
 // rather than 64k as some of the games work more responsively.
 // log base 2( buff sz = 32k).
 static unsigned long defaultorder = 3;
-MODULE_PARM(defaultorder, "i");
+module_param(defaultorder, ulong, 0);
 
 //
 // Turn on/off debugging compilation by commenting out "#define CSDEBUG"
@@ -159,8 +159,8 @@ MODULE_PARM(defaultorder, "i");
 #if CSDEBUG
 static unsigned long cs_debuglevel = 1;	// levels range from 1-9
 static unsigned long cs_debugmask = CS_INIT | CS_ERROR;	// use CS_DBGOUT with various mask values
-MODULE_PARM(cs_debuglevel, "i");
-MODULE_PARM(cs_debugmask, "i");
+module_param(cs_debuglevel, ulong, 0);
+module_param(cs_debugmask, ulong, 0);
 #endif
 #define CS_TRUE 	1
 #define CS_FALSE 	0
@@ -197,7 +197,7 @@ static const char invalid_magic[] =
 })
 
 //LIST_HEAD(cs4281_devs);
-struct list_head cs4281_devs = { &cs4281_devs, &cs4281_devs };
+static struct list_head cs4281_devs = { &cs4281_devs, &cs4281_devs };
 
 struct cs4281_state; 
 
@@ -1019,7 +1019,7 @@ static void printpipelines(struct cs4281_state *s)
 *  Suspend - save the ac97 regs, mute the outputs and power down the part.  
 *
 ****************************************************************************/
-void cs4281_ac97_suspend(struct cs4281_state *s)
+static void cs4281_ac97_suspend(struct cs4281_state *s)
 {
 	int Count,i;
 
@@ -1070,7 +1070,7 @@ void cs4281_ac97_suspend(struct cs4281_state *s)
 *  Resume - power up the part and restore its registers..  
 *
 ****************************************************************************/
-void cs4281_ac97_resume(struct cs4281_state *s)
+static void cs4281_ac97_resume(struct cs4281_state *s)
 {
 	int Count,i;
 
@@ -1143,7 +1143,7 @@ HWAC97codec::SavePowerState(void)
 } // SavePowerState
 */
 
-void cs4281_SuspendFIFO(struct cs4281_state *s, struct cs4281_pipeline *pl)
+static void cs4281_SuspendFIFO(struct cs4281_state *s, struct cs4281_pipeline *pl)
 {
  /*
  * We need to save the contents of the BASIC FIFO Registers.
@@ -1151,7 +1151,7 @@ void cs4281_SuspendFIFO(struct cs4281_state *s, struct cs4281_pipeline *pl)
 	pl->u32FCRn_Save = readl(s->pBA0 + pl->u32FCRnAddress);
 	pl->u32FSICn_Save = readl(s->pBA0 + pl->u32FSICnAddress);
 }
-void cs4281_ResumeFIFO(struct cs4281_state *s, struct cs4281_pipeline *pl)
+static void cs4281_ResumeFIFO(struct cs4281_state *s, struct cs4281_pipeline *pl)
 {
  /*
  * We need to restore the contents of the BASIC FIFO Registers.
@@ -1159,7 +1159,7 @@ void cs4281_ResumeFIFO(struct cs4281_state *s, struct cs4281_pipeline *pl)
 	writel(pl->u32FCRn_Save,s->pBA0 + pl->u32FCRnAddress);
 	writel(pl->u32FSICn_Save,s->pBA0 + pl->u32FSICnAddress);
 }
-void cs4281_SuspendDMAengine(struct cs4281_state *s, struct cs4281_pipeline *pl)
+static void cs4281_SuspendDMAengine(struct cs4281_state *s, struct cs4281_pipeline *pl)
 {
 	//
 	// We need to save the contents of the BASIC DMA Registers.
@@ -1171,7 +1171,7 @@ void cs4281_SuspendDMAengine(struct cs4281_state *s, struct cs4281_pipeline *pl)
 	pl->u32DCCn_Save = readl(s->pBA0 + pl->u32DCCnAddress);
 	pl->u32DCAn_Save = readl(s->pBA0 + pl->u32DCAnAddress);
 }
-void cs4281_ResumeDMAengine(struct cs4281_state *s, struct cs4281_pipeline *pl)
+static void cs4281_ResumeDMAengine(struct cs4281_state *s, struct cs4281_pipeline *pl)
 {
 	//
 	// We need to save the contents of the BASIC DMA Registers.
@@ -1184,7 +1184,7 @@ void cs4281_ResumeDMAengine(struct cs4281_state *s, struct cs4281_pipeline *pl)
 	writel( pl->u32DCAn_Save, s->pBA0 + pl->u32DCAnAddress);
 }
 
-int cs4281_suspend(struct cs4281_state *s)
+static int cs4281_suspend(struct cs4281_state *s)
 {
 	int i;
 	u32 u32CLKCR1;
@@ -1340,7 +1340,7 @@ int cs4281_suspend(struct cs4281_state *s)
 	return 0;
 }
 
-int cs4281_resume(struct cs4281_state *s)
+static int cs4281_resume(struct cs4281_state *s)
 {
 	int i;
 	unsigned temp1;
@@ -1695,7 +1695,7 @@ static void start_adc(struct cs4281_state *s)
 #define DMABUF_MINORDER 1	// ==> min buffer size = 8K.
 
 
-void dealloc_dmabuf(struct cs4281_state *s, struct dmabuf *db)
+static void dealloc_dmabuf(struct cs4281_state *s, struct dmabuf *db)
 {
 	struct page *map, *mapend;
 
@@ -4112,7 +4112,7 @@ static struct initvol {
 
 
 #ifndef NOT_CS4281_PM
-void __devinit cs4281_BuildFIFO(
+static void __devinit cs4281_BuildFIFO(
 	struct cs4281_pipeline *p, 
 	struct cs4281_state *s)
 {
@@ -4159,7 +4159,7 @@ void __devinit cs4281_BuildFIFO(
 
 }
 
-void __devinit cs4281_BuildDMAengine(
+static void __devinit cs4281_BuildDMAengine(
 	struct cs4281_pipeline *p, 
 	struct cs4281_state *s)
 {
@@ -4229,7 +4229,7 @@ void __devinit cs4281_BuildDMAengine(
 
 }
 
-void __devinit cs4281_InitPM(struct cs4281_state *s)
+static void __devinit cs4281_InitPM(struct cs4281_state *s)
 {
 	int i;
 	struct cs4281_pipeline *p;
@@ -4459,7 +4459,7 @@ static struct pci_device_id cs4281_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, cs4281_pci_tbl);
 
-struct pci_driver cs4281_pci_driver = {
+static struct pci_driver cs4281_pci_driver = {
 	.name	  = "cs4281",
 	.id_table = cs4281_pci_tbl,
 	.probe	  = cs4281_probe,
@@ -4468,7 +4468,7 @@ struct pci_driver cs4281_pci_driver = {
 	.resume	  = CS4281_RESUME_TBL,
 };
 
-int __init cs4281_init_module(void)
+static int __init cs4281_init_module(void)
 {
 	int rtn = 0;
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO 
@@ -4483,7 +4483,7 @@ int __init cs4281_init_module(void)
 	return rtn;
 }
 
-void __exit cs4281_cleanup_module(void)
+static void __exit cs4281_cleanup_module(void)
 {
 	pci_unregister_driver(&cs4281_pci_driver);
 #ifndef NOT_CS4281_PM
@@ -4503,9 +4503,3 @@ MODULE_LICENSE("GPL");
 module_init(cs4281_init_module);
 module_exit(cs4281_cleanup_module);
 
-#ifndef MODULE
-int __init init_cs4281(void)
-{
-	return cs4281_init_module();
-}
-#endif

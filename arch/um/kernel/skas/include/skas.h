@@ -29,10 +29,7 @@ extern int protect(int fd, unsigned long addr, unsigned long len,
 		   int r, int w, int x, int must_succeed);
 extern void user_signal(int sig, union uml_pt_regs *regs);
 extern int new_mm(int from);
-extern void save_registers(union uml_pt_regs *regs);
-extern void restore_registers(union uml_pt_regs *regs);
 extern void start_userspace(int cpu);
-extern void init_registers(int pid);
 
 #endif
 

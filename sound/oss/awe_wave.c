@@ -207,8 +207,8 @@ static awe_chan_info channels[AWE_MAX_CHANNELS];
 #define AWE_DEFAULT_MEM_SIZE	-1	/* autodetect */
 #endif
 
-int io = AWE_DEFAULT_BASE_ADDR; /* Emu8000 base address */
-int memsize = AWE_DEFAULT_MEM_SIZE; /* memory size in Kbytes */
+static int io = AWE_DEFAULT_BASE_ADDR; /* Emu8000 base address */
+static int memsize = AWE_DEFAULT_MEM_SIZE; /* memory size in Kbytes */
 #ifdef CONFIG_PNP
 static int isapnp = -1;
 #else
@@ -219,11 +219,11 @@ MODULE_AUTHOR("Takashi Iwai <iwai@ww.uni-erlangen.de>");
 MODULE_DESCRIPTION("SB AWE32/64 WaveTable driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "base i/o port of Emu8000");
-MODULE_PARM(memsize, "i");
+module_param(memsize, int, 0);
 MODULE_PARM_DESC(memsize, "onboard DRAM size in Kbytes");
-MODULE_PARM(isapnp, "i");
+module_param(isapnp, bool, 0);
 MODULE_PARM_DESC(isapnp, "use ISAPnP detection");
 
 /* DRAM start offset */
@@ -6113,12 +6113,12 @@ awe_detect(void)
 	return 0;
 }
 
-int __init attach_awe(void)
+static int __init attach_awe(void)
 {
 	return awe_detect() ? 0 : -ENODEV;
 }
 
-void __exit unload_awe(void)
+static void __exit unload_awe(void)
 {
 	pnp_unregister_driver(&awe_pnp_driver);
 	awe_dettach_device();

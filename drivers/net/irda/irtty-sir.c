@@ -39,10 +39,10 @@
 #include "sir-dev.h"
 #include "irtty-sir.h"
 
-MODULE_PARM(qos_mtt_bits, "i");
-MODULE_PARM_DESC(qos_mtt_bits, "Minimum Turn Time");
-
 static int qos_mtt_bits = 0x03;      /* 5 ms or more */
+
+module_param(qos_mtt_bits, int, 0);
+MODULE_PARM_DESC(qos_mtt_bits, "Minimum Turn Time");
 
 /* ------------------------------------------------------- */
 

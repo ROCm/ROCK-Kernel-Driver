@@ -321,7 +321,7 @@ static int grow_stripes(raid6_conf_t *conf, int num)
 			return 1;
 		memset(sh, 0, sizeof(*sh) + (devs-1)*sizeof(struct r5dev));
 		sh->raid_conf = conf;
-		sh->lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&sh->lock);
 
 		if (grow_buffers(sh, conf->raid_disks)) {
 			shrink_buffers(sh, conf->raid_disks);
@@ -1730,7 +1730,7 @@ static int run (mddev_t *mddev)
 		goto abort;
 	memset(conf->stripe_hashtbl, 0, HASH_PAGES * PAGE_SIZE);
 
-	conf->device_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&conf->device_lock);
 	init_waitqueue_head(&conf->wait_for_stripe);
 	INIT_LIST_HEAD(&conf->handle_list);
 	INIT_LIST_HEAD(&conf->delayed_list);

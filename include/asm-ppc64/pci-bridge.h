@@ -11,18 +11,10 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-struct device_node;
-struct pci_controller;
-
-/* Get the PCI host controller for an OF device */
-extern struct pci_controller*
-pci_find_hose_for_OF_device(struct device_node* node);
-
 /*
  * Structure of a PCI controller (host bridge)
  */
 struct pci_controller {
-	char what[8];                     /* Eye catcher      */
 	struct pci_bus *bus;
 	char is_dynamic;
 	void *arch_data;
@@ -49,21 +41,12 @@ struct pci_controller {
 	 */
 	struct resource io_resource;
 	struct resource mem_resources[3];
-	int mem_resource_count;
 	int global_number;		
 	int local_number;		
 	unsigned long buid;
 	unsigned long dma_window_base_cur;
 	unsigned long dma_window_size;
 };
-
-/*
- * pci_device_loc returns the bus number and device/function number
- * for a device on a PCI bus, given its device_node struct.
- * It returns 0 if OK, -1 on error.
- */
-extern int pci_device_loc(struct device_node *dev, unsigned char *bus_ptr,
-			  unsigned char *devfn_ptr);
 
 struct device_node *fetch_dev_dn(struct pci_dev *dev);
 
@@ -72,11 +55,20 @@ struct device_node *fetch_dev_dn(struct pci_dev *dev);
  */
 static inline struct device_node *pci_device_to_OF_node(struct pci_dev *dev)
 {
-	struct device_node *dn = (struct device_node *)(dev->sysdata);
-	if (dn->devfn == dev->devfn && dn->busno == (dev->bus->number&0xff))
+	struct device_node *dn = dev->sysdata;
+
+	if (dn->devfn == dev->devfn && dn->busno == dev->bus->number)
 		return dn;	/* fast path.  sysdata is good */
 	else
 		return fetch_dev_dn(dev);
+}
+
+static inline struct device_node *pci_bus_to_OF_node(struct pci_bus *bus)
+{
+	if (bus->self)
+		return pci_device_to_OF_node(bus->self);
+	else
+		return bus->sysdata; /* Must be root bus (PHB) */
 }
 
 extern void pci_process_bridge_OF_ranges(struct pci_controller *hose,
@@ -93,7 +85,6 @@ static inline struct pci_controller *pci_bus_to_host(struct pci_bus *bus)
 	BUG_ON(busdn == NULL);
 	return busdn->phb;
 }
-
 
 #endif
 #endif /* __KERNEL__ */

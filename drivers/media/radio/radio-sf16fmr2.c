@@ -408,9 +408,9 @@ MODULE_AUTHOR("Ziglio Frediano, freddy77@angelfire.com");
 MODULE_DESCRIPTION("A driver for the SF16FMR2 radio.");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "I/O address of the SF16FMR2 card (should be 0x384, if do not work try 0x284)");
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 static void __exit fmr2_cleanup_module(void)
 {

@@ -11,7 +11,7 @@
 #include <linux/device.h>
 #include "power.h"
 
-extern int sysdev_suspend(u32 state);
+extern int sysdev_suspend(pm_message_t state);
 
 /*
  * The entries in the dpm_active list are in a depth first order, simply
@@ -35,7 +35,7 @@ extern int sysdev_suspend(u32 state);
  *	@state:	Power state device is entering.
  */
 
-int suspend_device(struct device * dev, u32 state)
+int suspend_device(struct device * dev, pm_message_t state)
 {
 	int error = 0;
 
@@ -65,7 +65,7 @@ int suspend_device(struct device * dev, u32 state)
  *
  */
 
-int device_suspend(u32 state)
+int device_suspend(pm_message_t state)
 {
 	int error = 0;
 
@@ -118,7 +118,7 @@ EXPORT_SYMBOL_GPL(device_suspend);
  *	done, power down system devices.
  */
 
-int device_power_down(u32 state)
+int device_power_down(pm_message_t state)
 {
 	int error = 0;
 	struct device * dev;

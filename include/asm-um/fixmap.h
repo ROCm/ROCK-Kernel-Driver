@@ -64,13 +64,6 @@ extern unsigned long get_kmem_end(void);
 #define __fix_to_virt(x)	(FIXADDR_TOP - ((x) << PAGE_SHIFT))
 #define __virt_to_fix(x)      ((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
 
-/*
- * This is the range that is readable by user mode, and things
- * acting like user mode such as get_user_pages.
- */
-#define FIXADDR_USER_START	VSYSCALL_BASE
-#define FIXADDR_USER_END	VSYSCALL_END
-
 extern void __this_fixmap_does_not_exist(void);
 
 /*

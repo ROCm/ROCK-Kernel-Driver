@@ -206,14 +206,12 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
 		mask = AC97_SC_SPSR_MASK;
 	}
 
-	spin_lock(&ac97->reg_lock);
+	down(&ac97->reg_mutex);
 	old = snd_ac97_read(ac97, reg) & mask;
-	spin_unlock(&ac97->reg_lock);
 	if (old != bits) {
-		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
-		snd_ac97_update_bits(ac97, reg, mask, bits);
+		snd_ac97_update_bits_nolock(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
+		snd_ac97_update_bits_nolock(ac97, reg, mask, bits);
 		/* update the internal spdif bits */
-		spin_lock(&ac97->reg_lock);
 		sbits = ac97->spdif_status;
 		if (sbits & IEC958_AES0_PROFESSIONAL) {
 			sbits &= ~IEC958_AES0_PRO_FS;
@@ -231,9 +229,9 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
 			}
 		}
 		ac97->spdif_status = sbits;
-		spin_unlock(&ac97->reg_lock);
 	}
-	snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF);
+	snd_ac97_update_bits_nolock(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF);
+	up(&ac97->reg_mutex);
 	return 0;
 }
 

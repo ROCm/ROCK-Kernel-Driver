@@ -524,12 +524,8 @@ static int ultracam_probe(struct usb_interface *intf, const struct usb_device_id
 	if (dev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	/* Is it an IBM camera? */
-	if ((dev->descriptor.idVendor != ULTRACAM_VENDOR_ID) ||
-	    (dev->descriptor.idProduct != ULTRACAM_PRODUCT_ID))
-		return -ENODEV;
-
-	info("IBM Ultra camera found (rev. 0x%04x)", dev->descriptor.bcdDevice);
+	info("IBM Ultra camera found (rev. 0x%04x)",
+		le16_to_cpu(dev->descriptor.bcdDevice));
 
 	/* Validate found interface: must have one ISO endpoint */
 	nas = intf->num_altsetting;
@@ -569,7 +565,7 @@ static int ultracam_probe(struct usb_interface *intf, const struct usb_device_id
 			    interface->desc.bInterfaceNumber);
 			return -ENODEV;
 		}
-		if (endpoint->wMaxPacketSize == 0) {
+		if (le16_to_cpu(endpoint->wMaxPacketSize) == 0) {
 			if (inactInterface < 0)
 				inactInterface = i;
 			else {
@@ -579,15 +575,15 @@ static int ultracam_probe(struct usb_interface *intf, const struct usb_device_id
 		} else {
 			if (actInterface < 0) {
 				actInterface = i;
-				maxPS = endpoint->wMaxPacketSize;
+				maxPS = le16_to_cpu(endpoint->wMaxPacketSize);
 				if (debug > 0)
 					info("Active setting=%d. maxPS=%d.", i, maxPS);
 			} else {
 				/* Got another active alt. setting */
-				if (maxPS < endpoint->wMaxPacketSize) {
+				if (maxPS < le16_to_cpu(endpoint->wMaxPacketSize)) {
 					/* This one is better! */
 					actInterface = i;
-					maxPS = endpoint->wMaxPacketSize;
+					maxPS = le16_to_cpu(endpoint->wMaxPacketSize);
 					if (debug > 0) {
 						info("Even better ctive setting=%d. maxPS=%d.",
 						     i, maxPS);

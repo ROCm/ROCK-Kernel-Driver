@@ -59,9 +59,14 @@ pgd_t *pgd_offset_proc(struct mm_struct *mm, unsigned long address)
 	return(pgd_offset(mm, address));
 }
 
-pmd_t *pmd_offset_proc(pgd_t *pgd, unsigned long address)
+pud_t *pud_offset_proc(pgd_t *pgd, unsigned long address)
 {
-	return(pmd_offset(pgd, address));
+	return(pud_offset(pgd, address));
+}
+
+pmd_t *pmd_offset_proc(pud_t *pud, unsigned long address)
+{
+	return(pmd_offset(pud, address));
 }
 
 pte_t *pte_offset_proc(pmd_t *pmd, unsigned long address)
@@ -71,8 +76,11 @@ pte_t *pte_offset_proc(pmd_t *pmd, unsigned long address)
 
 pte_t *addr_pte(struct task_struct *task, unsigned long addr)
 {
-	return(pte_offset_kernel(pmd_offset(pgd_offset(task->mm, addr), addr), 
-				 addr));
+	pgd_t *pgd = pgd_offset(task->mm, addr);
+	pud_t *pud = pud_offset(pgd, addr);
+	pmd_t *pmd = pmd_offset(pud, addr);
+
+	return(pte_offset_map(pmd, addr));
 }
 
 /*

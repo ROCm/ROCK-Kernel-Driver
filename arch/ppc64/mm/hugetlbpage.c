@@ -745,7 +745,7 @@ void hugetlb_mm_free_pgd(struct mm_struct *mm)
 
 	pgdir = mm->context.huge_pgdir;
 	if (! pgdir)
-		return;
+		goto out;
 
 	mm->context.huge_pgdir = NULL;
 
@@ -768,6 +768,7 @@ void hugetlb_mm_free_pgd(struct mm_struct *mm)
 	BUG_ON(memcmp(pgdir, empty_zero_page, PAGE_SIZE));
 	kmem_cache_free(zero_cache, pgdir);
 
+ out:
 	spin_unlock(&mm->page_table_lock);
 }
 

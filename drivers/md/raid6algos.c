@@ -37,6 +37,10 @@ extern const struct raid6_calls raid6_sse1x2;
 extern const struct raid6_calls raid6_sse2x1;
 extern const struct raid6_calls raid6_sse2x2;
 extern const struct raid6_calls raid6_sse2x4;
+extern const struct raid6_calls raid6_altivec1;
+extern const struct raid6_calls raid6_altivec2;
+extern const struct raid6_calls raid6_altivec4;
+extern const struct raid6_calls raid6_altivec8;
 
 const struct raid6_calls * const raid6_algos[] = {
 	&raid6_intx1,
@@ -59,6 +63,12 @@ const struct raid6_calls * const raid6_algos[] = {
 	&raid6_sse2x1,
 	&raid6_sse2x2,
 	&raid6_sse2x4,
+#endif
+#ifdef CONFIG_ALTIVEC
+	&raid6_altivec1,
+	&raid6_altivec2,
+	&raid6_altivec4,
+	&raid6_altivec8,
 #endif
 	NULL
 };

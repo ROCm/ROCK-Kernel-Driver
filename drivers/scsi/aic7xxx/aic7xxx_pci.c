@@ -721,7 +721,7 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 	ahc->chip |= AHC_PCI;
 	ahc->description = entry->name;
 
-	ahc_power_state_change(ahc, AHC_POWER_STATE_D0);
+	pci_set_power_state(ahc->dev_softc, AHC_POWER_STATE_D0);
 
 	error = ahc_pci_map_registers(ahc);
 	if (error != 0)
@@ -2016,7 +2016,7 @@ static int
 ahc_pci_resume(struct ahc_softc *ahc)
 {
 
-	ahc_power_state_change(ahc, AHC_POWER_STATE_D0);
+	pci_set_power_state(ahc->dev_softc, AHC_POWER_STATE_D0);
 
 	/*
 	 * We assume that the OS has restored our register

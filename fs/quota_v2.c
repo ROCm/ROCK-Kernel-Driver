@@ -396,7 +396,7 @@ static int v2_write_dquot(struct dquot *dquot)
 	/* dq_off is guarded by dqio_sem */
 	if (!dquot->dq_off)
 		if ((ret = dq_insert_tree(dquot)) < 0) {
-			printk(KERN_ERR "VFS: Error %d occurred while creating quota.\n", ret);
+			printk(KERN_ERR "VFS: Error %zd occurred while creating quota.\n", ret);
 			return ret;
 		}
 	spin_lock(&dq_data_lock);

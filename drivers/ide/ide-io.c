@@ -454,9 +454,88 @@ void try_to_flush_leftover_data (ide_drive_t *drive)
 
 EXPORT_SYMBOL(try_to_flush_leftover_data);
 
-/*
- * FIXME Add an ATAPI error
- */
+static ide_startstop_t ide_ata_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
+{
+	ide_hwif_t *hwif = drive->hwif;
+
+	if (stat & BUSY_STAT || ((stat & WRERR_STAT) && !drive->nowerr)) {
+		/* other bits are useless when BUSY */
+		rq->errors |= ERROR_RESET;
+	} else if (stat & ERR_STAT) {
+		/* err has different meaning on cdrom and tape */
+		if (err == ABRT_ERR) {
+			if (drive->select.b.lba &&
+			    /* some newer drives don't support WIN_SPECIFY */
+			    hwif->INB(IDE_COMMAND_REG) == WIN_SPECIFY)
+				return ide_stopped;
+		} else if ((err & BAD_CRC) == BAD_CRC) {
+			/* UDMA crc error, just retry the operation */
+			drive->crc_count++;
+		} else if (err & (BBD_ERR | ECC_ERR)) {
+			/* retries won't help these */
+			rq->errors = ERROR_MAX;
+		} else if (err & TRK0_ERR) {
+			/* help it find track zero */
+			rq->errors |= ERROR_RECAL;
+		}
+	}
+
+	if ((stat & DRQ_STAT) && rq_data_dir(rq) == READ)
+		try_to_flush_leftover_data(drive);
+
+	if (hwif->INB(IDE_STATUS_REG) & (BUSY_STAT|DRQ_STAT))
+		/* force an abort */
+		hwif->OUTB(WIN_IDLEIMMEDIATE, IDE_COMMAND_REG);
+
+	if (rq->errors >= ERROR_MAX || blk_noretry_request(rq))
+		drive->driver->end_request(drive, 0, 0);
+	else {
+		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
+			++rq->errors;
+			return ide_do_reset(drive);
+		}
+		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
+			drive->special.b.recalibrate = 1;
+		++rq->errors;
+	}
+	return ide_stopped;
+}
+
+static ide_startstop_t ide_atapi_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
+{
+	ide_hwif_t *hwif = drive->hwif;
+
+	if (stat & BUSY_STAT || ((stat & WRERR_STAT) && !drive->nowerr)) {
+		/* other bits are useless when BUSY */
+		rq->errors |= ERROR_RESET;
+	} else {
+		/* add decoding error stuff */
+	}
+
+	if (hwif->INB(IDE_STATUS_REG) & (BUSY_STAT|DRQ_STAT))
+		/* force an abort */
+		hwif->OUTB(WIN_IDLEIMMEDIATE, IDE_COMMAND_REG);
+
+	if (rq->errors >= ERROR_MAX) {
+		drive->driver->end_request(drive, 0, 0);
+	} else {
+		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
+			++rq->errors;
+			return ide_do_reset(drive);
+		}
+		++rq->errors;
+	}
+
+	return ide_stopped;
+}
+
+ide_startstop_t
+__ide_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
+{
+	if (drive->media == ide_disk)
+		return ide_ata_error(drive, rq, stat, err);
+	return ide_atapi_error(drive, rq, stat, err);
+}
 
 /**
  *	ide_error	-	handle an error on the IDE
@@ -473,73 +552,32 @@ EXPORT_SYMBOL(try_to_flush_leftover_data);
  
 ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, u8 stat)
 {
-	ide_hwif_t *hwif;
 	struct request *rq;
 	u8 err;
 
 	err = ide_dump_status(drive, msg, stat);
+
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;
 
-	hwif = HWIF(drive);
 	/* retry only "normal" I/O: */
-	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
-		rq->errors = 1;
-		ide_end_drive_cmd(drive, stat, err);
-		return ide_stopped;
-	}
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
 		rq->errors = 1;
 		ide_end_drive_cmd(drive, stat, err);
 		return ide_stopped;
 	}
 
-	if (stat & BUSY_STAT || ((stat & WRERR_STAT) && !drive->nowerr)) {
-		 /* other bits are useless when BUSY */
+	return drive->driver->error(drive, rq, stat, err);
+}
+
+EXPORT_SYMBOL_GPL(ide_error);
+
+ide_startstop_t __ide_abort(ide_drive_t *drive, struct request *rq)
+{
+	if (drive->media != ide_disk)
 		rq->errors |= ERROR_RESET;
-	} else {
-		if (drive->media != ide_disk)
-			goto media_out;
 
-		if (stat & ERR_STAT) {
-			/* err has different meaning on cdrom and tape */
-			if (err == ABRT_ERR) {
-				if (drive->select.b.lba &&
-				    (hwif->INB(IDE_COMMAND_REG) == WIN_SPECIFY))
-					/* some newer drives don't
-					 * support WIN_SPECIFY
-					 */
-					return ide_stopped;
-			} else if ((err & BAD_CRC) == BAD_CRC) {
-				drive->crc_count++;
-				/* UDMA crc error -- just retry the operation */
-			} else if (err & (BBD_ERR | ECC_ERR)) {
-				/* retries won't help these */
-				rq->errors = ERROR_MAX;
-			} else if (err & TRK0_ERR) {
-				/* help it find track zero */
-				rq->errors |= ERROR_RECAL;
-			}
-		}
-media_out:
-		if ((stat & DRQ_STAT) && rq_data_dir(rq) != WRITE)
-			try_to_flush_leftover_data(drive);
-	}
-	if (hwif->INB(IDE_STATUS_REG) & (BUSY_STAT|DRQ_STAT)) {
-		/* force an abort */
-		hwif->OUTB(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);
-	}
-	if (rq->errors >= ERROR_MAX) {
-		DRIVER(drive)->end_request(drive, 0, 0);
-	} else {
-		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
-			++rq->errors;
-			return ide_do_reset(drive);
-		}
-		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
-			drive->special.b.recalibrate = 1;
-		++rq->errors;
-	}
+	DRIVER(drive)->end_request(drive, 0, 0);
 	return ide_stopped;
 }
 
@@ -559,28 +597,19 @@ media_out:
  
 ide_startstop_t ide_abort(ide_drive_t *drive, const char *msg)
 {
-	ide_hwif_t *hwif;
 	struct request *rq;
 
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;
 
-	hwif = HWIF(drive);
 	/* retry only "normal" I/O: */
-	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
-		rq->errors = 1;
-		ide_end_drive_cmd(drive, BUSY_STAT, 0);
-		return ide_stopped;
-	}
-	if (rq->flags & REQ_DRIVE_TASKFILE) {
+	if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
 		rq->errors = 1;
 		ide_end_drive_cmd(drive, BUSY_STAT, 0);
 		return ide_stopped;
 	}
 
-	rq->errors |= ERROR_RESET;
-	DRIVER(drive)->end_request(drive, 0, 0);
-	return ide_stopped;
+	return drive->driver->abort(drive, rq);
 }
 
 /**
@@ -634,7 +663,7 @@ static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 	}
 
 	if (!OK_STAT(stat, READY_STAT, BAD_STAT) && DRIVER(drive) != NULL)
-		return DRIVER(drive)->error(drive, "drive_cmd", stat);
+		return ide_error(drive, "drive_cmd", stat);
 		/* calls ide_end_drive_cmd */
 	ide_end_drive_cmd(drive, stat, hwif->INB(IDE_ERROR_REG));
 	return ide_stopped;
@@ -1181,7 +1210,7 @@ static ide_startstop_t ide_dma_timeout_retry(ide_drive_t *drive, int error)
 	if (error < 0) {
 		printk(KERN_WARNING "%s: DMA timeout error\n", drive->name);
 		(void)HWIF(drive)->ide_dma_end(drive);
-		ret = DRIVER(drive)->error(drive, "dma timeout error",
+		ret = ide_error(drive, "dma timeout error",
 						hwif->INB(IDE_STATUS_REG));
 	} else {
 		printk(KERN_WARNING "%s: DMA timeout retry\n", drive->name);
@@ -1212,7 +1241,7 @@ static ide_startstop_t ide_dma_timeout_retry(ide_drive_t *drive, int error)
 	rq->sector = rq->bio->bi_sector;
 	rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
 	rq->hard_cur_sectors = rq->current_nr_sectors;
-	rq->buffer = NULL;
+	rq->buffer = bio_data(rq->bio);
 out:
 	return ret;
 }
@@ -1304,7 +1333,7 @@ void ide_timer_expiry (unsigned long data)
 					startstop = ide_dma_timeout_retry(drive, wait);
 				} else
 					startstop =
-					DRIVER(drive)->error(drive, "irq timeout", hwif->INB(IDE_STATUS_REG));
+					ide_error(drive, "irq timeout", hwif->INB(IDE_STATUS_REG));
 			}
 			drive->service_time = jiffies - drive->service_start;
 			spin_lock_irq(&ide_lock);

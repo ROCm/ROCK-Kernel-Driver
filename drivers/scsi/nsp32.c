@@ -60,17 +60,17 @@
  * Module parameters
  */
 static int       trans_mode = 0;	/* default: BIOS */
-MODULE_PARM     (trans_mode, "i");
+module_param     (trans_mode, int, 0);
 MODULE_PARM_DESC(trans_mode, "transfer mode (0: BIOS(default) 1: Async 2: Ultra20M");
 #define ASYNC_MODE    1
 #define ULTRA20M_MODE 2
 
 static int       auto_param = 0;	/* default: ON */
-MODULE_PARM     (auto_param, "i");
+module_param     (auto_param, bool, 0);
 MODULE_PARM_DESC(auto_param, "AutoParameter mode (0: ON(default) 1: OFF)");
 
 static int       disc_priv  = 1;	/* default: OFF */
-MODULE_PARM     (disc_priv,  "i");
+module_param     (disc_priv, bool, 0);
 MODULE_PARM_DESC(disc_priv,  "disconnection privilege mode (0: ON 1: OFF(default))");
 
 MODULE_AUTHOR("YOKOTA Hiroshi <yokota@netlab.is.tsukuba.ac.jp>, GOTO Masanori <gotom@debian.or.jp>");

@@ -190,6 +190,12 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, int *peax
 			if (verify_area(VERIFY_READ, buf, sizeof(*buf)))
 				goto badframe;
 			err |= restore_i387(buf);
+		} else {
+			struct task_struct *me = current;
+			if (me->used_math) {
+				clear_fpu(me);
+				me->used_math = 0;
+			}
 		}
 	}
 

@@ -175,7 +175,7 @@ static int tt_setfreq(struct tt_device *dev, unsigned long freq1)
   	return 0;
 }
 
-int tt_getsigstr(struct tt_device *dev)		/* TODO */
+static int tt_getsigstr(struct tt_device *dev)		/* TODO */
 {
 	if (inb(io) & 2)	/* bit set = no signal present	*/
 		return 0;
@@ -325,9 +325,9 @@ static int __init terratec_init(void)
 MODULE_AUTHOR("R.OFFERMANNS & others");
 MODULE_DESCRIPTION("A driver for the TerraTec ActiveRadio Standalone radio card.");
 MODULE_LICENSE("GPL");
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "I/O address of the TerraTec ActiveRadio card (0x590 or 0x591)");
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 static void __exit terratec_cleanup_module(void)
 {

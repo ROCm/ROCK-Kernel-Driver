@@ -65,9 +65,6 @@ extern int  ftape_command_wait(qic117_cmd_t command,
 			       unsigned int timeout,
 			       int *status);
 extern int  ftape_parameter(unsigned int parameter);
-extern int  ftape_parameter_wait(unsigned int parameter,
-				 unsigned int timeout,
-				 int *status);
 extern int ftape_report_operation(int *status,
 				  qic117_cmd_t  command,
 				  int result_length);
@@ -80,7 +77,6 @@ extern int ftape_report_raw_drive_status(int *status);
 extern int ftape_report_status(int *status);
 extern int ftape_ready_wait(unsigned int timeout, int *status);
 extern int ftape_seek_head_to_track(unsigned int track);
-extern int ftape_in_error_state(int status);
 extern int ftape_set_data_rate(unsigned int new_rate, unsigned int qic_std);
 extern int ftape_report_error(unsigned int *error,
 			      qic117_cmd_t *command,

@@ -329,8 +329,8 @@ out:
 	return err;
 }
 
-static int snd_pcm_hw_params(snd_pcm_substream_t *substream,
-			     snd_pcm_hw_params_t *params)
+int snd_pcm_hw_params(snd_pcm_substream_t *substream,
+		      snd_pcm_hw_params_t *params)
 {
 	snd_pcm_runtime_t *runtime;
 	int err;
@@ -1445,7 +1445,7 @@ static int snd_pcm_drain(snd_pcm_substream_t *substream)
 
  _end:
 	snd_pcm_stream_unlock_irq(substream);
-	if (drec && drec != &drec_tmp)
+	if (drec != &drec_tmp)
 		kfree(drec);
  _unlock:
 	snd_power_unlock(card);
@@ -2020,7 +2020,7 @@ static int snd_pcm_open_file(struct file *file,
 	return 0;
 }
 
-int snd_pcm_open(struct inode *inode, struct file *file)
+static int snd_pcm_open(struct inode *inode, struct file *file)
 {
 	int cardnum = SNDRV_MINOR_CARD(iminor(inode));
 	int device = SNDRV_MINOR_DEVICE(iminor(inode));
@@ -2079,7 +2079,7 @@ int snd_pcm_open(struct inode *inode, struct file *file)
       	return err;
 }
 
-int snd_pcm_release(struct inode *inode, struct file *file)
+static int snd_pcm_release(struct inode *inode, struct file *file)
 {
 	snd_pcm_t *pcm;
 	snd_pcm_substream_t *substream;
@@ -2101,7 +2101,7 @@ int snd_pcm_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-snd_pcm_sframes_t snd_pcm_playback_rewind(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
+static snd_pcm_sframes_t snd_pcm_playback_rewind(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_sframes_t appl_ptr;
@@ -2150,7 +2150,7 @@ snd_pcm_sframes_t snd_pcm_playback_rewind(snd_pcm_substream_t *substream, snd_pc
 	return ret;
 }
 
-snd_pcm_sframes_t snd_pcm_capture_rewind(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
+static snd_pcm_sframes_t snd_pcm_capture_rewind(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_sframes_t appl_ptr;
@@ -2199,7 +2199,7 @@ snd_pcm_sframes_t snd_pcm_capture_rewind(snd_pcm_substream_t *substream, snd_pcm
 	return ret;
 }
 
-snd_pcm_sframes_t snd_pcm_playback_forward(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
+static snd_pcm_sframes_t snd_pcm_playback_forward(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_sframes_t appl_ptr;
@@ -2249,7 +2249,7 @@ snd_pcm_sframes_t snd_pcm_playback_forward(snd_pcm_substream_t *substream, snd_p
 	return ret;
 }
 
-snd_pcm_sframes_t snd_pcm_capture_forward(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
+static snd_pcm_sframes_t snd_pcm_capture_forward(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_sframes_t appl_ptr;
@@ -2835,7 +2835,7 @@ static ssize_t snd_pcm_writev(struct file *file, const struct iovec *_vector,
 	return result;
 }
 
-unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait)
+static unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait)
 {
 	snd_pcm_file_t *pcm_file;
 	snd_pcm_substream_t *substream;
@@ -2873,7 +2873,7 @@ unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait)
 	return mask;
 }
 
-unsigned int snd_pcm_capture_poll(struct file *file, poll_table * wait)
+static unsigned int snd_pcm_capture_poll(struct file *file, poll_table * wait)
 {
 	snd_pcm_file_t *pcm_file;
 	snd_pcm_substream_t *substream;

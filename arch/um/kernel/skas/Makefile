@@ -6,8 +6,6 @@
 obj-y := exec_kern.o mem.o mem_user.o mmu.o process.o process_kern.o \
 	syscall_kern.o syscall_user.o time.o tlb.o trap_user.o uaccess.o \
 
-subdir-y := util
-
 USER_OBJS = $(filter %_user.o,$(obj-y)) process.o time.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 

@@ -38,6 +38,8 @@
  *
  * int first_node(mask)			Number lowest set bit, or MAX_NUMNODES
  * int next_node(node, mask)		Next node past 'node', or MAX_NUMNODES
+ * int first_unset_node(mask)		First node not set in mask, or 
+ *					MAX_NUMNODES.
  *
  * nodemask_t nodemask_of_node(node)	Return nodemask with bit 'node' set
  * NODE_MASK_ALL			Initializer - all bits set
@@ -234,6 +236,13 @@ static inline int __next_node(int n, const nodemask_t *srcp, int nbits)
 	}								\
 	m;								\
 })
+
+#define first_unset_node(mask) __first_unset_node(&(mask))
+static inline int __first_unset_node(const nodemask_t *maskp)
+{
+	return min_t(int,MAX_NUMNODES,
+			find_first_zero_bit(maskp->bits, MAX_NUMNODES));
+}
 
 #define NODE_MASK_LAST_WORD BITMAP_LAST_WORD_MASK(MAX_NUMNODES)
 

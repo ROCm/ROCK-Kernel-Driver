@@ -355,7 +355,9 @@ int snd_pcm_plugin_build_rate(snd_pcm_plug_t *plug,
 		return err;
 	data = (rate_t *)plugin->extra_data;
 	data->get = getput_index(src_format->format);
+	snd_assert(data->get >= 0 && data->get < 4*2*2, return -EINVAL);
 	data->put = getput_index(dst_format->format);
+	snd_assert(data->put >= 0 && data->put < 4*2*2, return -EINVAL);
 
 	if (src_format->rate < dst_format->rate) {
 		data->pitch = ((src_format->rate << SHIFT) + (dst_format->rate >> 1)) / dst_format->rate;

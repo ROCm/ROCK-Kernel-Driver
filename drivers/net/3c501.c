@@ -892,8 +892,8 @@ static struct ethtool_ops netdev_ethtool_ops = {
 
 static struct net_device *dev_3c501;
 
-MODULE_PARM(io, "i");
-MODULE_PARM(irq, "i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
 MODULE_PARM_DESC(io, "EtherLink I/O base address");
 MODULE_PARM_DESC(irq, "EtherLink IRQ number");
 

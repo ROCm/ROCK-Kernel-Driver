@@ -68,23 +68,6 @@ kclist_add(struct kcore_list *new, void *addr, size_t size)
 	write_unlock(&kclist_lock);
 }
 
-struct kcore_list *
-kclist_del(void *addr)
-{
-	struct kcore_list *m, **p = &kclist;
-
-	write_lock(&kclist_lock);
-	for (m = *p; m; p = &m->next) {
-		if (m->addr == (unsigned long)addr) {
-			*p = m->next;
-			write_unlock(&kclist_lock);
-			return m;
-		}
-	}
-	write_unlock(&kclist_lock);
-	return NULL;
-}
-
 static size_t get_kcore_size(int *nphdr, size_t *elf_buflen)
 {
 	size_t try, size;
@@ -281,8 +264,7 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 	unsigned long start;
 
 	read_lock(&kclist_lock);
-	tsz =  get_kcore_size(&nphdr, &elf_buflen);
-	proc_root_kcore->size = size = tsz + elf_buflen;
+	proc_root_kcore->size = size = get_kcore_size(&nphdr, &elf_buflen);
 	if (buflen == 0 || *fpos >= size) {
 		read_unlock(&kclist_lock);
 		return 0;

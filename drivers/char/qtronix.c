@@ -350,7 +350,7 @@ static int handle_data(unsigned char *p_data)
 }
 
 
-spinlock_t kbd_controller_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(kbd_controller_lock);
 static unsigned char handle_kbd_event(void);
 
 

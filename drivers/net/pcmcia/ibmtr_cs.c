@@ -72,7 +72,7 @@
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
 "ibmtr_cs.c 1.10   1996/01/06 05:19:00 (Steve Kipisz)\n"
@@ -102,12 +102,12 @@ static u_long sramsize = 64;
 /* Ringspeed 4,16 */
 static int ringspeed = 16;
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(mmiobase, "i");
-MODULE_PARM(srambase, "i");
-MODULE_PARM(sramsize, "i");
-MODULE_PARM(ringspeed, "i");
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
+module_param(mmiobase, ulong, 0);
+module_param(srambase, ulong, 0);
+module_param(sramsize, ulong, 0);
+module_param(ringspeed, int, 0);
 MODULE_LICENSE("GPL");
 
 /*====================================================================*/
@@ -204,7 +204,6 @@ static dev_link_t *ibmtr_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
         CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
         CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -366,6 +365,7 @@ static void ibmtr_config(dev_link_t *link)
 
     link->dev = &info->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     i = ibmtr_probe_card(dev);
     if (i != 0) {
@@ -538,8 +538,7 @@ static int __init init_ibmtr_cs(void)
 static void __exit exit_ibmtr_cs(void)
 {
 	pcmcia_unregister_driver(&ibmtr_cs_driver);
-	while (dev_list != NULL)
-		ibmtr_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_ibmtr_cs);

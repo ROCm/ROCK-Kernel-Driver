@@ -63,13 +63,13 @@ MODULE_LICENSE("Dual MPL/GPL");
 
 /* Bit map of interrupts to choose from */
 static int irq_mask = 0xdeb8;
-MODULE_PARM(irq_mask, "i");
+module_param(irq_mask, int, 0);
 static int irq_list[4] = { -1 };
-MODULE_PARM(irq_list, "1-4i");
+module_param_array(irq_list, int, NULL, 0);
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
 "fdomain_cs.c 1.47 2001/10/13 00:08:52 (David Hinds)";
@@ -131,7 +131,6 @@ static dev_link_t *fdomain_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.event_handler = &fdomain_event;
     client_reg.EventMask =
 	CS_EVENT_RESET_REQUEST | CS_EVENT_CARD_RESET |
@@ -328,10 +327,7 @@ static int __init init_fdomain_cs(void)
 static void __exit exit_fdomain_cs(void)
 {
 	pcmcia_unregister_driver(&fdomain_cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		fdomain_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_fdomain_cs);

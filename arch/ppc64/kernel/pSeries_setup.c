@@ -80,7 +80,8 @@ extern void pSeries_get_boot_time(struct rtc_time *rtc_time);
 extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
 extern void find_udbg_vterm(void);
-extern void SystemReset_FWNMI(void), MachineCheck_FWNMI(void);	/* from head.S */
+extern void system_reset_fwnmi(void);	/* from head.S */
+extern void machine_check_fwnmi(void);	/* from head.S */
 extern void generic_find_legacy_serial_ports(u64 *physport,
 		unsigned int *default_speed);
 
@@ -92,6 +93,9 @@ extern unsigned long loops_per_jiffy;
 
 extern unsigned long ppc_proc_freq;
 extern unsigned long ppc_tb_freq;
+
+extern void pSeries_system_reset_exception(struct pt_regs *regs);
+extern int pSeries_machine_check_exception(struct pt_regs *regs);
 
 static volatile void __iomem * chrp_int_ack_special;
 struct mpic *pSeries_mpic;
@@ -119,8 +123,8 @@ static void __init fwnmi_init(void)
 	if (ibm_nmi_register == RTAS_UNKNOWN_SERVICE)
 		return;
 	ret = rtas_call(ibm_nmi_register, 2, 1, NULL,
-			__pa((unsigned long)SystemReset_FWNMI),
-			__pa((unsigned long)MachineCheck_FWNMI));
+			__pa((unsigned long)system_reset_fwnmi),
+			__pa((unsigned long)machine_check_fwnmi));
 	if (ret == 0)
 		fwnmi_active = 1;
 }
@@ -375,10 +379,7 @@ static void __init pSeries_init_early(void)
 	}
 
 
-	if (iommu_off)
-		pci_dma_init_direct();
-	else
-		tce_init_pSeries();
+	iommu_init_early_pSeries();
 
 	pSeries_discover_pic();
 
@@ -612,4 +613,6 @@ struct machdep_calls __initdata pSeries_md = {
 	.calibrate_decr		= pSeries_calibrate_decr,
 	.progress		= pSeries_progress,
 	.check_legacy_ioport	= pSeries_check_legacy_ioport,
+	.system_reset_exception = pSeries_system_reset_exception,
+	.machine_check_exception = pSeries_machine_check_exception,
 };

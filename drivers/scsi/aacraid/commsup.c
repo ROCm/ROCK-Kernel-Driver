@@ -768,28 +768,6 @@ void aac_printf(struct aac_dev *dev, u32 val)
 	memset(cp, 0,  256);
 }
 
-
-/**
- *	aac_handle_aif		-	Handle a message from the firmware
- *	@dev: Which adapter this fib is from
- *	@fibptr: Pointer to fibptr from adapter
- *
- *	This routine handles a driver notify fib from the adapter and
- *	dispatches it to the appropriate routine for handling.
- */
-
-static void aac_handle_aif(struct aac_dev * dev, struct fib * fibptr)
-{
-	struct hw_fib * hw_fib = fibptr->hw_fib;
-	/*
-	 * Set the status of this FIB to be Invalid parameter.
-	 *
-	 *	*(u32 *)fib->data = ST_INVAL;
-	 */
-	*(u32 *)hw_fib->data = cpu_to_le32(ST_OK);
-	fib_adapter_complete(fibptr, sizeof(u32));
-}
-
 /**
  *	aac_command_thread	-	command processing thread
  *	@dev: Adapter to monitor
@@ -859,7 +837,6 @@ int aac_command_thread(struct aac_dev * dev)
 			aifcmd = (struct aac_aifcmd *) hw_fib->data;
 			if (aifcmd->command == cpu_to_le32(AifCmdDriverNotify)) {
 				/* Handle Driver Notify Events */
-				aac_handle_aif(dev, fib);
 				*(u32 *)hw_fib->data = cpu_to_le32(ST_OK);
 				fib_adapter_complete(fib, sizeof(u32));
 			} else {
@@ -869,10 +846,6 @@ int aac_command_thread(struct aac_dev * dev)
 				   
 				u32 time_now, time_last;
 				unsigned long flagv;
-				
-				/* Sniff events */
-				if (aifcmd->command == cpu_to_le32(AifCmdEventNotify))
-					aac_handle_aif(dev, fib);
 				
 				time_now = jiffies/HZ;
 

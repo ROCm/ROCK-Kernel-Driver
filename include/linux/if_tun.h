@@ -45,6 +45,11 @@ struct tun_struct {
 
 	struct fasync_struct    *fasync;
 
+	unsigned long if_flags;
+	u8 dev_addr[ETH_ALEN];
+	u32 chr_filter[2];
+	u32 net_filter[2];
+
 #ifdef TUN_DEBUG	
 	int debug;
 #endif  

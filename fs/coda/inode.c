@@ -89,7 +89,7 @@ static int coda_remount(struct super_block *sb, int *flags, char *data)
 }
 
 /* exported operations */
-struct super_operations coda_super_operations =
+static struct super_operations coda_super_operations =
 {
 	.alloc_inode	= coda_alloc_inode,
 	.destroy_inode	= coda_destroy_inode,

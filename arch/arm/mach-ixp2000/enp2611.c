@@ -57,7 +57,7 @@ static void __init enp2611_timer_init(void)
 	ixp2000_init_time(50 * 1000 * 1000);
 }
 
-static struct enp2611_timer = {
+static struct sys_timer enp2611_timer = {
 	.init		= enp2611_timer_init,
 	.offset		= ixp2000_gettimeoffset,
 };

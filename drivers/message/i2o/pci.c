@@ -83,7 +83,7 @@ int i2o_dma_realloc(struct device *dev, struct i2o_dma *addr, size_t len,
  *	Remove all allocated DMA memory and unmap memory IO regions. If MTRR
  *	is enabled, also remove it again.
  */
-static void __devexit i2o_pci_free(struct i2o_controller *c)
+static void i2o_pci_free(struct i2o_controller *c)
 {
 	struct device *dev;
 

@@ -12,13 +12,16 @@ SHELL := /bin/bash
 filechk_gen_header = $<
 
 core-y			+= $(ARCH_DIR)/kernel/		\
-			   $(ARCH_DIR)/drivers/		\
-			   $(ARCH_DIR)/sys-$(SUBARCH)/
+			   $(ARCH_DIR)/drivers/
+
+clean-dirs := sys-$(SUBARCH)
 
 # Have to precede the include because the included Makefiles reference them.
 SYMLINK_HEADERS = archparam.h system.h sigcontext.h processor.h ptrace.h \
-	arch-signal.h module.h
+	arch-signal.h module.h vm-flags.h
 SYMLINK_HEADERS := $(foreach header,$(SYMLINK_HEADERS),include/asm-um/$(header))
+
+CLEAN_FILES += $(ARCH_SYMLINKS)
 
 ARCH_SYMLINKS = include/asm-um/arch $(ARCH_DIR)/include/sysdep $(ARCH_DIR)/os \
 	$(SYMLINK_HEADERS) $(ARCH_DIR)/include/uml-config.h
@@ -37,6 +40,9 @@ SYS_DIR		:= $(ARCH_DIR)/include/sysdep-$(SUBARCH)
 
 include $(srctree)/$(ARCH_DIR)/Makefile-$(SUBARCH)
 include $(srctree)/$(ARCH_DIR)/Makefile-os-$(OS)
+
+core-y += $(SUBARCH_CORE)
+libs-y += $(SUBARCH_LIBS)
 
 # -Derrno=kernel_errno - This turns all kernel references to errno into
 # kernel_errno to separate them from the libc errno.  This allows -fno-common
@@ -76,6 +82,11 @@ define archhelp
   echo '		   real kernel binary, the the "vmlinux" binary you'
   echo '		   find in the kernel root.'
 endef
+
+$(shell cd $(ARCH_DIR) && ln -sf Kconfig_$(SUBARCH) Kconfig_arch)
+
+CLEAN_FILES += $(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h \
+	$(TOPDIR)/$(ARCH_DIR)/os
 
 prepare: $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS) \
 	$(ARCH_DIR)/kernel/vmlinux.lds.S
@@ -137,7 +148,8 @@ USER_CFLAGS += -D_GNU_SOURCE
 #When cleaning we don't include .config, so we don't include
 #TT or skas makefiles and don't clean skas_ptregs.h.
 CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/include/uml-config.h \
-	$(GEN_HEADERS) $(ARCH_DIR)/include/skas_ptregs.h
+	$(GEN_HEADERS) $(ARCH_DIR)/include/skas_ptregs.h \
+	$(ARCH_DIR)/util/mk_constants $(ARCH_DIR)/util/mk_task
 
 MRPROPER_FILES += $(SYMLINK_HEADERS) $(ARCH_SYMLINKS) \
 	$(addprefix $(ARCH_DIR)/kernel/,$(KERN_SYMLINKS)) $(ARCH_DIR)/os

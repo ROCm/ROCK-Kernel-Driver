@@ -64,7 +64,6 @@ static unsigned int	mda_gfx_port;		/* Graphics control port */
 
 /* current hardware state */
 
-static int	mda_origin_loc=-1;
 static int	mda_cursor_loc=-1;
 static int	mda_cursor_size_from=-1;
 static int	mda_cursor_size_to=-1;
@@ -79,8 +78,8 @@ static int	mda_last_vc  = 16;
 
 static struct vc_data	*mda_display_fg = NULL;
 
-MODULE_PARM(mda_first_vc, "1-255i");
-MODULE_PARM(mda_last_vc,  "1-255i");
+module_param(mda_first_vc, int, 0);
+module_param(mda_last_vc, int, 0);
 
 /* MDA register values
  */
@@ -147,16 +146,6 @@ static int test_mda_b(unsigned char val, unsigned char reg)
 	return val;
 }
 #endif
-
-static inline void mda_set_origin(unsigned int location)
-{
-	if (mda_origin_loc == location)
-		return;
-
-	write_mda_w(location >> 1, 0x0c);
-
-	mda_origin_loc = location;
-}
 
 static inline void mda_set_cursor(unsigned int location) 
 {

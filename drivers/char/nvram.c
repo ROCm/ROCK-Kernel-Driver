@@ -133,7 +133,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-static spinlock_t nvram_state_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nvram_state_lock);
 static int nvram_open_cnt;	/* #times opened */
 static int nvram_open_mode;	/* special open modes */
 #define NVRAM_WRITE		1 /* opened for writing (exclusive) */

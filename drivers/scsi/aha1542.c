@@ -131,8 +131,8 @@ static int setup_dmaspeed[MAXBOARDS] __initdata = { -1, -1, -1, -1 };
 #if defined(MODULE)
 static int isapnp = 0;
 static int aha1542[] = {0x330, 11, 4, -1};
-MODULE_PARM(aha1542, "1-4i");
-MODULE_PARM(isapnp, "i");
+module_param_array(aha1542, int, NULL, 0);
+module_param(isapnp, bool, 0);
 
 static struct isapnp_device_id id_table[] __initdata = {
 	{

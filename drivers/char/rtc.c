@@ -177,7 +177,7 @@ static unsigned long rtc_max_user_freq = 64; /* > this, need CAP_SYS_RESOURCE */
 /*
  * rtc_task_lock nests inside rtc_lock.
  */
-static spinlock_t rtc_task_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rtc_task_lock);
 static rtc_task_t *rtc_callback = NULL;
 #endif
 

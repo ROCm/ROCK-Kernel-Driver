@@ -197,14 +197,6 @@ struct pci_bus *iop321_scan_bus(int nr, struct pci_sys_data *sys)
 
 void iop321_init(void)
 {
-#if CONFIG_ARCH_EP80219
-    *IOP321_ATUCR = 0x2;
-    *IOP321_OIOWTVR = 0x90000000;
-    *IOP321_IABAR0  = 0x00000004;
-    *IOP321_IABAR2  = 0xa000000c;
-    *IOP321_IALR2   = 0xe0000000;
-#endif
-
 	DBG("PCI:  Intel 80321 PCI init code.\n");
 	DBG("\tATU: IOP321_ATUCMD=0x%04x\n", *IOP321_ATUCMD);
 	DBG("\tATU: IOP321_OMWTVR0=0x%04x, IOP321_OIOWTVR=0x%04x\n",

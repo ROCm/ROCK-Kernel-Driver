@@ -673,7 +673,11 @@ running once the system is up.
 
 	mac53c9x=	[HW,SCSI]
 			Format: <num_esps>,<disconnect>,<nosync>,<can_queue>,<cmd_per_lun>,<sg_tablesize>,<hostid>,<use_tags>
-	
+
+	machvec=	[IA64]
+			Force the use of a particular machine-vector (machvec) in a generic
+			kernel.  Example: machvec=hpzx1_swiotlb
+
 	mad16=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma16>,<mpu_io>,<mpu_irq>,<joystick>
 
@@ -1342,8 +1346,12 @@ running once the system is up.
 	thash_entries=	[KNL,NET]
 			Set number of hash buckets for TCP connection
 
-	tipar=		[HW]
-			See header of drivers/char/tipar.c.
+	tipar.timeout=	[HW,PPT]
+			Set communications timeout in tenths of a second
+			(default 15).
+
+	tipar.delay=	[HW,PPT]
+			Set inter-bit delay in microseconds (default 10).
 
 	tiusb=		[HW,USB] Texas Instruments' USB GraphLink (aka SilverLink)
 			Format: <timeout>

@@ -35,10 +35,19 @@
  * - More errlogging support from Jon Mason <jonmason@us.ibm.com>
  * - Fix TSO issues on PPC64 machines -- Jon Mason <jonmason@us.ibm.com>
  *
- * 5.3.11	6/4/04
- * - ethtool register dump reads MANC register conditionally.
- *
- * 5.3.10	6/1/04
+ * 5.6.5 	11/01/04
+ * - Enabling NETIF_F_SG without checksum offload is illegal - 
+     John Mason <jdmason@us.ibm.com>
+ * 5.6.3        10/26/04
+ * - Remove redundant initialization - Jamal Hadi
+ * - Reset buffer_info->dma in tx resource cleanup logic
+ * 5.6.2	10/12/04
+ * - Avoid filling tx_ring completely - shemminger@osdl.org
+ * - Replace schedule_timeout() with msleep()/msleep_interruptible() -
+ *   nacc@us.ibm.com
+ * - Sparse cleanup - shemminger@osdl.org
+ * - Fix tx resource cleanup logic
+ * - LLTX support - ak@suse.de and hadi@cyberus.ca
  */
 
 char e1000_driver_name[] = "e1000";
@@ -48,7 +57,7 @@ char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
 #else
 #define DRIVERNAPI "-NAPI"
 #endif
-char e1000_driver_version[] = "5.5.4-k2"DRIVERNAPI;
+char e1000_driver_version[] = "5.6.10.1-k2"DRIVERNAPI;
 char e1000_copyright[] = "Copyright (c) 1999-2004 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -90,6 +99,7 @@ static struct pci_device_id e1000_pci_tbl[] = {
 	INTEL_E1000_ETHERNET_DEVICE(0x107A),
 	INTEL_E1000_ETHERNET_DEVICE(0x107B),
 	INTEL_E1000_ETHERNET_DEVICE(0x107C),
+	INTEL_E1000_ETHERNET_DEVICE(0x108A),
 	/* required last entry */
 	{0,}
 };
@@ -128,8 +138,6 @@ static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
 static struct net_device_stats * e1000_get_stats(struct net_device *netdev);
 static int e1000_change_mtu(struct net_device *netdev, int new_mtu);
 static int e1000_set_mac(struct net_device *netdev, void *p);
-static void e1000_irq_disable(struct e1000_adapter *adapter);
-static void e1000_irq_enable(struct e1000_adapter *adapter);
 static irqreturn_t e1000_intr(int irq, void *data, struct pt_regs *regs);
 static boolean_t e1000_clean_tx_irq(struct e1000_adapter *adapter);
 #ifdef CONFIG_E1000_NAPI
@@ -143,12 +151,9 @@ static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter);
 static int e1000_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
 static int e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,
 			   int cmd);
-void set_ethtool_ops(struct net_device *netdev);
+void e1000_set_ethtool_ops(struct net_device *netdev);
 static void e1000_enter_82542_rst(struct e1000_adapter *adapter);
 static void e1000_leave_82542_rst(struct e1000_adapter *adapter);
-static void e1000_rx_checksum(struct e1000_adapter *adapter,
-				struct e1000_rx_desc *rx_desc,
-				struct sk_buff *skb);
 static void e1000_tx_timeout(struct net_device *dev);
 static void e1000_tx_timeout_task(struct net_device *dev);
 static void e1000_smartspeed(struct e1000_adapter *adapter);
@@ -242,6 +247,33 @@ e1000_exit_module(void)
 
 module_exit(e1000_exit_module);
 
+/**
+ * e1000_irq_disable - Mask off interrupt generation on the NIC
+ * @adapter: board private structure
+ **/
+
+static inline void
+e1000_irq_disable(struct e1000_adapter *adapter)
+{
+	atomic_inc(&adapter->irq_sem);
+	E1000_WRITE_REG(&adapter->hw, IMC, ~0);
+	E1000_WRITE_FLUSH(&adapter->hw);
+	synchronize_irq(adapter->pdev->irq);
+}
+
+/**
+ * e1000_irq_enable - Enable default interrupt generation settings
+ * @adapter: board private structure
+ **/
+
+static inline void
+e1000_irq_enable(struct e1000_adapter *adapter)
+{
+	if(likely(atomic_dec_and_test(&adapter->irq_sem))) {
+		E1000_WRITE_REG(&adapter->hw, IMS, IMS_ENABLE_MASK);
+		E1000_WRITE_FLUSH(&adapter->hw);
+	}
+}
 
 int
 e1000_up(struct e1000_adapter *adapter)
@@ -443,7 +475,7 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->set_mac_address = &e1000_set_mac;
 	netdev->change_mtu = &e1000_change_mtu;
 	netdev->do_ioctl = &e1000_ioctl;
-	set_ethtool_ops(netdev);
+	e1000_set_ethtool_ops(netdev);
 	netdev->tx_timeout = &e1000_tx_timeout;
 	netdev->watchdog_timeo = 5 * HZ;
 #ifdef CONFIG_E1000_NAPI
@@ -475,8 +507,6 @@ e1000_probe(struct pci_dev *pdev,
 				   NETIF_F_HW_VLAN_TX |
 				   NETIF_F_HW_VLAN_RX |
 				   NETIF_F_HW_VLAN_FILTER;
-	} else {
-		netdev->features = NETIF_F_SG;
 	}
 
 #ifdef NETIF_F_TSO
@@ -1061,6 +1091,24 @@ e1000_free_tx_resources(struct e1000_adapter *adapter)
 	adapter->tx_ring.desc = NULL;
 }
 
+static inline void
+e1000_unmap_and_free_tx_resource(struct e1000_adapter *adapter,
+			struct e1000_buffer *buffer_info)
+{
+	struct pci_dev *pdev = adapter->pdev;
+	if(buffer_info->dma) {
+		pci_unmap_page(pdev,
+			       buffer_info->dma,
+			       buffer_info->length,
+			       PCI_DMA_TODEVICE);
+		buffer_info->dma = 0;
+	}
+	if(buffer_info->skb) {
+		dev_kfree_skb_any(buffer_info->skb);
+		buffer_info->skb = NULL;
+	}
+}
+
 /**
  * e1000_clean_tx_ring - Free Tx Buffers
  * @adapter: board private structure
@@ -1071,7 +1119,6 @@ e1000_clean_tx_ring(struct e1000_adapter *adapter)
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 	struct e1000_buffer *buffer_info;
-	struct pci_dev *pdev = adapter->pdev;
 	unsigned long size;
 	unsigned int i;
 
@@ -1079,17 +1126,7 @@ e1000_clean_tx_ring(struct e1000_adapter *adapter)
 
 	for(i = 0; i < tx_ring->count; i++) {
 		buffer_info = &tx_ring->buffer_info[i];
-		if(buffer_info->skb) {
-
-			pci_unmap_page(pdev,
-				       buffer_info->dma,
-				       buffer_info->length,
-				       PCI_DMA_TODEVICE);
-
-			dev_kfree_skb(buffer_info->skb);
-
-			buffer_info->skb = NULL;
-		}
+		e1000_unmap_and_free_tx_resource(adapter, buffer_info);
 	}
 
 	size = sizeof(struct e1000_buffer) * tx_ring->count;
@@ -1762,7 +1799,6 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	unsigned int mss = 0;
 	int count = 0;
 	unsigned int f;
-	nr_frags = skb_shinfo(skb)->nr_frags;
 	len -= skb->data_len;
 
 	if(unlikely(skb->len <= 0)) {
@@ -1811,7 +1847,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 
 	/* need: count + 2 desc gap to keep tail from touching
 	 * head, otherwise try next time */
-	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count + 2) {
+	if(unlikely(E1000_DESC_UNUSED(&adapter->tx_ring) < count + 2)) {
 		netif_stop_queue(netdev);
 		spin_unlock_irqrestore(&adapter->tx_lock, flags);
 		return NETDEV_TX_BUSY;
@@ -1843,6 +1879,10 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		tx_flags);
 
 	netdev->trans_start = jiffies;
+
+	/* Make sure there is space in the ring for the next send. */
+	if(unlikely(E1000_DESC_UNUSED(&adapter->tx_ring) < MAX_SKB_FRAGS + 2))
+		netif_stop_queue(netdev);
 
 	spin_unlock_irqrestore(&adapter->tx_lock, flags);
 	return NETDEV_TX_OK;
@@ -1904,9 +1944,9 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 	int max_frame = new_mtu + ENET_HEADER_SIZE + ETHERNET_FCS_SIZE;
 
 	if((max_frame < MINIMUM_ETHERNET_FRAME_SIZE) ||
-	   (max_frame > MAX_JUMBO_FRAME_SIZE)) {
-		DPRINTK(PROBE, ERR, "Invalid MTU setting\n");
-		return -EINVAL;
+		(max_frame > MAX_JUMBO_FRAME_SIZE)) {
+			DPRINTK(PROBE, ERR, "Invalid MTU setting\n");
+			return -EINVAL;
 	}
 
 	if(max_frame <= MAXIMUM_ETHERNET_FRAME_SIZE) {
@@ -2074,34 +2114,6 @@ e1000_update_stats(struct e1000_adapter *adapter)
 }
 
 /**
- * e1000_irq_disable - Mask off interrupt generation on the NIC
- * @adapter: board private structure
- **/
-
-static void
-e1000_irq_disable(struct e1000_adapter *adapter)
-{
-	atomic_inc(&adapter->irq_sem);
-	E1000_WRITE_REG(&adapter->hw, IMC, ~0);
-	E1000_WRITE_FLUSH(&adapter->hw);
-	synchronize_irq(adapter->pdev->irq);
-}
-
-/**
- * e1000_irq_enable - Enable default interrupt generation settings
- * @adapter: board private structure
- **/
-
-static void
-e1000_irq_enable(struct e1000_adapter *adapter)
-{
-	if(likely(atomic_dec_and_test(&adapter->irq_sem))) {
-		E1000_WRITE_REG(&adapter->hw, IMS, IMS_ENABLE_MASK);
-		E1000_WRITE_FLUSH(&adapter->hw);
-	}
-}
-
-/**
  * e1000_intr - Interrupt Handler
  * @irq: interrupt number
  * @data: pointer to a network interface device structure
@@ -2162,6 +2174,9 @@ e1000_clean(struct net_device *netdev, int *budget)
 	int tx_cleaned;
 	int work_done = 0;
 	
+	if (!netif_carrier_ok(netdev))
+		goto quit_polling;
+
 	tx_cleaned = e1000_clean_tx_irq(adapter);
 	e1000_clean_rx_irq(adapter, &work_done, work_to_do);
 
@@ -2171,7 +2186,7 @@ e1000_clean(struct net_device *netdev, int *budget)
 	/* if no Rx and Tx cleanup work was done, exit the polling mode */
 	if(!tx_cleaned || (work_done < work_to_do) || 
 				!netif_running(netdev)) {
-		netif_rx_complete(netdev);
+quit_polling:	netif_rx_complete(netdev);
 		e1000_irq_enable(adapter);
 		return 0;
 	}
@@ -2190,7 +2205,6 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 	struct net_device *netdev = adapter->netdev;
-	struct pci_dev *pdev = adapter->pdev;
 	struct e1000_tx_desc *tx_desc, *eop_desc;
 	struct e1000_buffer *buffer_info;
 	unsigned int i, eop;
@@ -2205,19 +2219,7 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 			tx_desc = E1000_TX_DESC(*tx_ring, i);
 			buffer_info = &tx_ring->buffer_info[i];
 
-			if(likely(buffer_info->dma)) {
-				pci_unmap_page(pdev,
-					       buffer_info->dma,
-					       buffer_info->length,
-					       PCI_DMA_TODEVICE);
-				buffer_info->dma = 0;
-			}
-
-			if(buffer_info->skb) {
-				dev_kfree_skb_any(buffer_info->skb);
-				buffer_info->skb = NULL;
-			}
-
+			e1000_unmap_and_free_tx_resource(adapter, buffer_info);
 			tx_desc->buffer_addr = 0;
 			tx_desc->lower.data = 0;
 			tx_desc->upper.data = 0;
@@ -2241,6 +2243,41 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	spin_unlock(&adapter->tx_lock);
 
 	return cleaned;
+}
+
+/**
+ * e1000_rx_checksum - Receive Checksum Offload for 82543
+ * @adapter: board private structure
+ * @rx_desc: receive descriptor
+ * @sk_buff: socket buffer with received data
+ **/
+
+static inline void
+e1000_rx_checksum(struct e1000_adapter *adapter,
+                  struct e1000_rx_desc *rx_desc,
+                  struct sk_buff *skb)
+{
+	/* 82543 or newer only */
+	if(unlikely((adapter->hw.mac_type < e1000_82543) ||
+	/* Ignore Checksum bit is set */
+	(rx_desc->status & E1000_RXD_STAT_IXSM) ||
+	/* TCP Checksum has not been calculated */
+	(!(rx_desc->status & E1000_RXD_STAT_TCPCS)))) {
+		skb->ip_summed = CHECKSUM_NONE;
+		return;
+	}
+
+	/* At this point we know the hardware did the TCP checksum */
+	/* now look at the TCP checksum error bit */
+	if(rx_desc->errors & E1000_RXD_ERR_TCPE) {
+		/* let the stack verify checksum errors */
+		skb->ip_summed = CHECKSUM_NONE;
+		adapter->hw_csum_err++;
+	} else {
+		/* TCP checksum is good */
+		skb->ip_summed = CHECKSUM_UNNECESSARY;
+		adapter->hw_csum_good++;
+	}
 }
 
 /**
@@ -2291,7 +2328,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		if(unlikely(!(rx_desc->status & E1000_RXD_STAT_EOP))) {
 			/* All receives must fit into a single buffer */
 			E1000_DBG("%s: Receive packet consumed multiple"
-				  " buffers\n", netdev->name);
+					" buffers\n", netdev->name);
 			dev_kfree_skb_irq(skb);
 			goto next_desc;
 		}
@@ -2376,8 +2413,8 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 	buffer_info = &rx_ring->buffer_info[i];
 
 	while(!buffer_info->skb) {
-
 		skb = dev_alloc_skb(adapter->rx_buffer_len + NET_IP_ALIGN);
+
 		if(unlikely(!skb)) {
 			/* Better luck next round */
 			break;
@@ -2585,41 +2622,6 @@ e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 		return -EOPNOTSUPP;
 	}
 	return E1000_SUCCESS;
-}
-
-/**
- * e1000_rx_checksum - Receive Checksum Offload for 82543
- * @adapter: board private structure
- * @rx_desc: receive descriptor
- * @sk_buff: socket buffer with received data
- **/
-
-static void
-e1000_rx_checksum(struct e1000_adapter *adapter,
-                  struct e1000_rx_desc *rx_desc,
-                  struct sk_buff *skb)
-{
-	/* 82543 or newer only */
-	if(unlikely((adapter->hw.mac_type < e1000_82543) ||
-	/* Ignore Checksum bit is set */
-	(rx_desc->status & E1000_RXD_STAT_IXSM) ||
-	/* TCP Checksum has not been calculated */
-	(!(rx_desc->status & E1000_RXD_STAT_TCPCS)))) {
-		skb->ip_summed = CHECKSUM_NONE;
-		return;
-	}
-
-	/* At this point we know the hardware did the TCP checksum */
-	/* now look at the TCP checksum error bit */
-	if(rx_desc->errors & E1000_RXD_ERR_TCPE) {
-		/* let the stack verify checksum errors */
-		skb->ip_summed = CHECKSUM_NONE;
-		adapter->hw_csum_err++;
-	} else {
-		/* TCP checksum is good */
-		skb->ip_summed = CHECKSUM_UNNECESSARY;
-		adapter->hw_csum_good++;
-	}
 }
 
 void

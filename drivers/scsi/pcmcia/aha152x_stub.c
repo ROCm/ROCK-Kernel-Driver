@@ -82,14 +82,14 @@ static int synchronous = 1;
 static int reset_delay = 100;
 static int ext_trans = 0;
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(host_id, "i");
-MODULE_PARM(reconnect, "i");
-MODULE_PARM(parity, "i");
-MODULE_PARM(synchronous, "i");
-MODULE_PARM(reset_delay, "i");
-MODULE_PARM(ext_trans, "i");
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
+module_param(host_id, int, 0);
+module_param(reconnect, int, 0);
+module_param(parity, int, 0);
+module_param(synchronous, int, 0);
+module_param(reset_delay, int, 0);
+module_param(ext_trans, int, 0);
 
 MODULE_LICENSE("Dual MPL/GPL");
 
@@ -145,7 +145,6 @@ static dev_link_t *aha152x_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.event_handler = &aha152x_event;
     client_reg.EventMask =
 	CS_EVENT_RESET_REQUEST | CS_EVENT_CARD_RESET |
@@ -347,10 +346,7 @@ static int __init init_aha152x_cs(void)
 static void __exit exit_aha152x_cs(void)
 {
 	pcmcia_unregister_driver(&aha152x_cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		aha152x_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_aha152x_cs);

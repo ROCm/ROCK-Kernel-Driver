@@ -58,13 +58,6 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 
-#ifndef bzero
-#define bzero(d, n)	memset((d), 0, (n))
-#endif
-
-/*
- *  General driver includes.
- */
 #include "sym_conf.h"
 #include "sym_defs.h"
 #include "sym_misc.h"
@@ -123,14 +116,6 @@
 typedef struct sym_tcb *tcb_p;
 typedef struct sym_lcb *lcb_p;
 typedef struct sym_ccb *ccb_p;
-typedef struct sym_hcb *hcb_p;
-
-/*
- *  Define a reference to the O/S dependent IO request.
- */
-typedef struct scsi_cmnd *cam_ccb_p;	/* Generic */
-typedef struct scsi_cmnd *cam_scsiio_p;/* SCSI I/O */
-
 
 /*
  *  IO functions definition for big/little endian CPU support.
@@ -525,7 +510,7 @@ sym_get_cam_status(struct scsi_cmnd *ccb)
 /*
  *  Async handler for negotiations.
  */
-void sym_xpt_async_nego_wide(hcb_p np, int target);
+void sym_xpt_async_nego_wide(struct sym_hcb *np, int target);
 #define sym_xpt_async_nego_sync(np, target)	\
 	sym_announce_transfer_rate(np, target)
 #define sym_xpt_async_nego_ppr(np, target)	\
@@ -534,14 +519,14 @@ void sym_xpt_async_nego_wide(hcb_p np, int target);
 /*
  *  Build CAM result for a successful IO and for a failed IO.
  */
-static __inline void sym_set_cam_result_ok(hcb_p np, ccb_p cp, int resid)
+static __inline void sym_set_cam_result_ok(struct sym_hcb *np, ccb_p cp, int resid)
 {
 	struct scsi_cmnd *cmd = cp->cam_ccb;
 
 	cmd->resid = resid;
 	cmd->result = (((DID_OK) << 16) + ((cp->ssss_status) & 0x7f));
 }
-void sym_set_cam_result_error(hcb_p np, ccb_p cp, int resid);
+void sym_set_cam_result_error(struct sym_hcb *np, ccb_p cp, int resid);
 
 /*
  *  Other O/S specific methods.
@@ -549,13 +534,12 @@ void sym_set_cam_result_error(hcb_p np, ccb_p cp, int resid);
 #define sym_cam_target_id(ccb)	(ccb)->target
 #define sym_cam_target_lun(ccb)	(ccb)->lun
 #define	sym_freeze_cam_ccb(ccb)	do { ; } while (0)
-void sym_xpt_done(hcb_p np, cam_ccb_p ccb);
-void sym_xpt_done2(hcb_p np, cam_ccb_p ccb, int cam_status);
+void sym_xpt_done(struct sym_hcb *np, struct scsi_cmnd *ccb);
 void sym_print_addr (ccb_p cp);
-void sym_xpt_async_bus_reset(hcb_p np);
-void sym_xpt_async_sent_bdr(hcb_p np, int target);
-int  sym_setup_data_and_start (hcb_p np, cam_scsiio_p csio, ccb_p cp);
-void sym_log_bus_error(hcb_p np);
-void sym_sniff_inquiry(hcb_p np, struct scsi_cmnd *cmd, int resid);
+void sym_xpt_async_bus_reset(struct sym_hcb *np);
+void sym_xpt_async_sent_bdr(struct sym_hcb *np, int target);
+int  sym_setup_data_and_start (struct sym_hcb *np, struct scsi_cmnd *csio, ccb_p cp);
+void sym_log_bus_error(struct sym_hcb *np);
+void sym_sniff_inquiry(struct sym_hcb *np, struct scsi_cmnd *cmd, int resid);
 
 #endif /* SYM_GLUE_H */

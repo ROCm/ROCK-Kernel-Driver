@@ -166,7 +166,7 @@ void hs7751rvoip_outb(unsigned char value, unsigned long port)
 
         if (PXSEG(port))
                 *(volatile unsigned char *)port = value;
-#if defined(CONFIG_HS7751RVOIP_CIDEC)
+#if defined(CONFIG_HS7751RVOIP_CODEC)
 	else if (codec_port(port))
 		*(volatile unsigned cjar *)((unsigned long)area6_io8_base+(port-CODEC_IO_BASE)) = value;
 #endif
@@ -180,7 +180,7 @@ void hs7751rvoip_outb_p(unsigned char value, unsigned long port)
 {
         if (PXSEG(port))
                 *(volatile unsigned char *)port = value;
-#if defined(CONFIG_HS7751RVOIP_CIDEC)
+#if defined(CONFIG_HS7751RVOIP_CODEC)
 	else if (codec_port(port))
 		*(volatile unsigned cjar *)((unsigned long)area6_io8_base+(port-CODEC_IO_BASE)) = value;
 #endif

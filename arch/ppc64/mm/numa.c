@@ -216,7 +216,7 @@ static int numa_setup_cpu(unsigned long lcpu)
 
 	numa_domain = of_node_numa_domain(cpu);
 
-	if (numa_domain >= numnodes) {
+	if (numa_domain >= num_online_nodes()) {
 		/*
 		 * POWER4 LPAR uses 0xffff as invalid node,
 		 * dont warn in this case.
@@ -345,8 +345,6 @@ new_range:
 			numa_domain = 0;
 		}
 
-		node_set_online(numa_domain);
-
 		if (max_domain < numa_domain)
 			max_domain = numa_domain;
 
@@ -361,14 +359,19 @@ new_range:
 				init_node_data[numa_domain].node_start_pfn +
 				init_node_data[numa_domain].node_spanned_pages;
 			if (shouldstart != (start / PAGE_SIZE)) {
-				printk(KERN_ERR "WARNING: Hole in node, "
-						"disabling region start %lx "
-						"length %lx\n", start, size);
-				continue;
+				/* Revert to non-numa for now */
+				printk(KERN_ERR
+				       "WARNING: Unexpected node layout: "
+				       "region start %lx length %lx\n",
+				       start, size);
+				printk(KERN_ERR "NUMA is disabled\n");
+				goto err;
 			}
 			init_node_data[numa_domain].node_spanned_pages +=
 				size / PAGE_SIZE;
 		} else {
+			node_set_online(numa_domain);
+
 			init_node_data[numa_domain].node_start_pfn =
 				start / PAGE_SIZE;
 			init_node_data[numa_domain].node_spanned_pages =
@@ -384,9 +387,18 @@ new_range:
 			goto new_range;
 	}
 
-	numnodes = max_domain + 1;
+	for (i = 0; i <= max_domain; i++)
+		node_set_online(i);
 
 	return 0;
+err:
+	/* Something has gone wrong; revert any setup we've done */
+	for_each_node(i) {
+		node_set_offline(i);
+		init_node_data[i].node_start_pfn = 0;
+		init_node_data[i].node_spanned_pages = 0;
+	}
+	return -1;
 }
 
 static void __init setup_nonnuma(void)
@@ -430,11 +442,8 @@ static void __init dump_numa_topology(void)
 	if (min_common_depth == -1 || !numa_enabled)
 		return;
 
-	for (node = 0; node < MAX_NUMNODES; node++) {
+	for_each_online_node(node) {
 		unsigned long i;
-
-		if (!node_online(node))
-			continue;
 
 		printk(KERN_INFO "Node %d Memory:", node);
 
@@ -519,7 +528,7 @@ void __init do_init_bootmem(void)
 
 	register_cpu_notifier(&ppc64_numa_nb);
 
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
 		unsigned long start_paddr, end_paddr;
 		int i;
 		unsigned long bootmem_paddr;
@@ -619,7 +628,7 @@ void __init paging_init(void)
 	memset(zones_size, 0, sizeof(zones_size));
 	memset(zholes_size, 0, sizeof(zholes_size));
 
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
 		unsigned long start_pfn;
 		unsigned long end_pfn;
 

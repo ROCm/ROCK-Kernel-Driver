@@ -19,6 +19,9 @@
 
 typedef struct {
 	volatile unsigned int lock;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } spinlock_t;
 
 #define SPIN_LOCK_UNLOCKED			(spinlock_t) { 0 }
@@ -116,6 +119,9 @@ do {											\
 typedef struct {
 	volatile unsigned int read_counter	: 31;
 	volatile unsigned int write_lock	:  1;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } rwlock_t;
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0 }
 
@@ -189,6 +195,8 @@ do {										\
 })
 
 #endif /* !ASM_SUPPORTED */
+
+#define _raw_read_trylock(lock) generic_raw_read_trylock(lock)
 
 #define _raw_write_unlock(x)								\
 ({											\

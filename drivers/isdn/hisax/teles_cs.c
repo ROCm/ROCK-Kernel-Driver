@@ -50,7 +50,7 @@ MODULE_LICENSE("GPL");
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args);
 static char *version =
 "teles_cs.c 2.10 2002/07/30 22:23:34 kkeil";
@@ -69,11 +69,11 @@ static u_long irq_mask = 0xdeb8;
 /* Newer, simpler way of listing specific interrupts */
 static int irq_list[4] = { -1 };
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
+module_param(irq_mask, ulong, 0);
+module_param_array(irq_list, int, NULL, 0);
 
 static int protocol = 2;        /* EURO-ISDN Default */
-MODULE_PARM(protocol, "i");
+module_param(protocol, int, 0);
 
 /*====================================================================*/
 
@@ -208,7 +208,6 @@ static dev_link_t *teles_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
         CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
         CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -522,10 +521,7 @@ static int __init init_teles_cs(void)
 static void __exit exit_teles_cs(void)
 {
 	pcmcia_unregister_driver(&teles_cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		teles_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_teles_cs);

@@ -184,25 +184,9 @@ extern int ac97_init (struct ac97_hwint *dev);
 extern int ac97_set_values (struct ac97_hwint *dev,
 			    struct ac97_mixer_value_list *value_list);
 
-/* Sets one mixer channel OSS_CHANNEL to the scaled value OSS_VALUE.
-   Returns the resulting (rescaled) value, or a negative value
-   representing an error code.
-
-   Stereo channels have two values in OSS_VALUE (the left value is in the
-   lower 8 bits, the right value is in the upper 8 bits). */
-extern int ac97_set_mixer (struct ac97_hwint *dev, int oss_channel,
-			   u16 oss_value);
-
-/* Return the contents of the specified AC97 register REG; it uses the
-   last-written value if it is available.  */
-extern int ac97_get_register (struct ac97_hwint *dev, u8 reg);
-
 /* Writes the specified VALUE to the AC97 register REG in the mixer.
    Takes care of setting the last-written cache as well.  */
 extern int ac97_put_register (struct ac97_hwint *dev, u8 reg, u16 value);
-
-/* Returns the last OSS value written to the OSS_CHANNEL mixer channel.  */
-extern int ac97_get_mixer_scaled (struct ac97_hwint *dev, int oss_channel);
 
 /* Default ioctl. */
 extern int ac97_mixer_ioctl (struct ac97_hwint *dev, unsigned int cmd,

@@ -60,7 +60,6 @@ typedef struct NewSectorMap {
 extern void update_bad_sector_map(__u8 * buffer);
 extern void ftape_extract_bad_sector_map(__u8 * buffer);
 extern SectorMap ftape_get_bad_sector_entry(int segment_id);
-extern void      ftape_put_bad_sector_entry(int segment_id, SectorMap mask);
 extern __u8 *ftape_find_end_of_bsm_list(__u8 * address);
 extern void ftape_init_bsm(void);
 

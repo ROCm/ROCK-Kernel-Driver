@@ -91,24 +91,7 @@ int emu10k1_mpuin_start(struct emu10k1_card *);
 int emu10k1_mpuin_stop(struct emu10k1_card *);
 int emu10k1_mpuin_reset(struct emu10k1_card *);
 
-int sblive_miStateInit(struct emu10k1_mpuin *);
-int sblive_miStateEntry(struct emu10k1_mpuin *, u8);
-int sblive_miStateParse(struct emu10k1_mpuin *, u8);
-int sblive_miState3Byte(struct emu10k1_mpuin *, u8);
-int sblive_miState3ByteKey(struct emu10k1_mpuin *, u8);
-int sblive_miState3ByteVel(struct emu10k1_mpuin *, u8);
-int sblive_miState2Byte(struct emu10k1_mpuin *, u8);
-int sblive_miState2ByteKey(struct emu10k1_mpuin *, u8);
-int sblive_miStateSysCommon2(struct emu10k1_mpuin *, u8);
-int sblive_miStateSysCommon2Key(struct emu10k1_mpuin *, u8);
-int sblive_miStateSysCommon3(struct emu10k1_mpuin *, u8);
-int sblive_miStateSysCommon3Key(struct emu10k1_mpuin *, u8);
-int sblive_miStateSysCommon3Vel(struct emu10k1_mpuin *, u8);
-int sblive_miStateSysExNorm(struct emu10k1_mpuin *, u8);
-int sblive_miStateSysReal(struct emu10k1_mpuin *, u8);
-
 int emu10k1_mpuin_irqhandler(struct emu10k1_card *);
 void emu10k1_mpuin_bh(unsigned long);
-int emu10k1_mpuin_callback(struct emu10k1_mpuin *card_mpuin, u32 msg, unsigned long data, u32 bytesvalid);
 
 #endif  /* _CARDMI_H */

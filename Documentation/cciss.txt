@@ -14,28 +14,29 @@ This driver is known to work with the following cards:
 	* SA 6400
 	* SA 6400 U320 Expansion Module
 	* SA 6i
-	* SA 6422
-	* SA V100
+	* SA P600
 
-If nodes are not already created in the /dev/cciss directory
+If nodes are not already created in the /dev/cciss directory, run as root:
 
-# mkdev.cciss [ctlrs]
-
-Where ctlrs is the number of controllers you have (defaults to 1 if not
-specified).
+# cd /dev
+# ./MAKEDEV cciss
 
 Device Naming:
 --------------
 
-You need some entries in /dev for the cciss device.  The mkdev.cciss script
+You need some entries in /dev for the cciss device.  The MAKEDEV script
 can make device nodes for you automatically.  Currently the device setup
 is as follows:
 
 Major numbers:
 	104	cciss0	
 	105	cciss1	
-	106	cciss2 
-	etc...
+	106	cciss2
+	105	cciss3
+	108	cciss4
+	109	cciss5
+	110	cciss6
+	111	cciss7
 
 Minor numbers:
         b7 b6 b5 b4 b3 b2 b1 b0
@@ -45,7 +46,7 @@ Minor numbers:
              |
              +-------------------- Logical Volume number
 
-The suggested device naming scheme is:
+The device naming scheme is:
 /dev/cciss/c0d0			Controller 0, disk 0, whole device
 /dev/cciss/c0d0p1		Controller 0, disk 0, partition 1
 /dev/cciss/c0d0p2		Controller 0, disk 0, partition 2
@@ -117,16 +118,13 @@ from the adapter, informing the SCSI mid layer may not be necessary.
 
 Note that the naming convention of the /proc filesystem entries 
 contains a number in addition to the driver name.  (E.g. "cciss0" 
-instead of just "cciss" which you might expect.)   This is because 
-of changes to the 2.4 kernel PCI interface related to PCI hot plug
-that imply the driver must register with the SCSI mid layer once per
-adapter instance rather than once per driver.
+instead of just "cciss" which you might expect.)
 
 Note: ONLY sequential access devices and medium changers are presented 
 as SCSI devices to the SCSI mid layer by the cciss driver.  Specifically, 
 physical SCSI disk drives are NOT presented to the SCSI mid layer.  The 
 physical SCSI disk drives are controlled directly by the array controller 
-hardware and it is important to prevent the OS from attempting to directly 
+hardware and it is important to prevent the kernel from attempting to directly
 access these devices too, as if the array controller were merely a SCSI 
 controller in the same way that we are allowing it to access SCSI tape drives.
 

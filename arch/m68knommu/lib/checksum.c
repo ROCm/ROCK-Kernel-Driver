@@ -31,6 +31,7 @@
 /* Revised by Kenneth Albanowski for m68knommu. Basic problem: unaligned access kills, so most
    of the assembly has to go. */
 
+#include <linux/module.h>
 #include <net/checksum.h>
 
 static inline unsigned short from32to16(unsigned long x)

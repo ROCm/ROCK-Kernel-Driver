@@ -153,11 +153,11 @@ MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("RealTek RTL8002/8012 parallel port Ethernet driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(max_interrupt_work, "i");
-MODULE_PARM(debug, "i");
-MODULE_PARM(io, "1-" __MODULE_STRING(NUM_UNITS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(NUM_UNITS) "i");
-MODULE_PARM(xcvr, "1-" __MODULE_STRING(NUM_UNITS) "i");
+module_param(max_interrupt_work, int, 0);
+module_param(debug, int, 0);
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(xcvr, int, NULL, 0);
 MODULE_PARM_DESC(max_interrupt_work, "ATP maximum events handled per interrupt");
 MODULE_PARM_DESC(debug, "ATP debug level (0-7)");
 MODULE_PARM_DESC(io, "ATP I/O base address(es)");

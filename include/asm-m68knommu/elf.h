@@ -61,22 +61,14 @@ typedef struct user_m68kfp_struct elf_fpregset_t;
 #define ELF_PLAT_INIT(_r, load_addr)	_r->a1 = 0
 
 #define USE_ELF_CORE_DUMP
-#ifndef CONFIG_SUN3
 #define ELF_EXEC_PAGESIZE	4096
-#else
-#define ELF_EXEC_PAGESIZE	8192
-#endif
 
 /* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
    use of this is to invoke "./ld.so someprog" to test out a new version of
    the loader.  We need to make sure that it is out of the way of the program
    that it will "exec", and that there is sufficient room for the brk.  */
 
-#ifndef CONFIG_SUN3
 #define ELF_ET_DYN_BASE         0xD0000000UL
-#else
-#define ELF_ET_DYN_BASE         0x0D800000UL
-#endif
 
 #define ELF_CORE_COPY_REGS(pr_reg, regs)				\
 	/* Bleech. */							\

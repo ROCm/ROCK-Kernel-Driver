@@ -44,7 +44,7 @@ void dpm_runtime_resume(struct device * dev)
  *	@state:	State to enter.
  */
 
-int dpm_runtime_suspend(struct device * dev, u32 state)
+int dpm_runtime_suspend(struct device * dev, pm_message_t state)
 {
 	int error = 0;
 
@@ -73,7 +73,7 @@ int dpm_runtime_suspend(struct device * dev, u32 state)
  *	always be able to tell, but we need accurate information to
  *	work reliably.
  */
-void dpm_set_power_state(struct device * dev, u32 state)
+void dpm_set_power_state(struct device * dev, pm_message_t state)
 {
 	down(&dpm_sem);
 	dev->power.power_state = state;

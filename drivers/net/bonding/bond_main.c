@@ -540,25 +540,25 @@ static char *lacp_rate	= NULL;
 static int arp_interval = BOND_LINK_ARP_INTERV;
 static char *arp_ip_target[BOND_MAX_ARP_TARGETS] = { NULL, };
 
-MODULE_PARM(max_bonds, "i");
+module_param(max_bonds, int, 0);
 MODULE_PARM_DESC(max_bonds, "Max number of bonded devices");
-MODULE_PARM(miimon, "i");
+module_param(miimon, int, 0);
 MODULE_PARM_DESC(miimon, "Link check interval in milliseconds");
-MODULE_PARM(updelay, "i");
+module_param(updelay, int, 0);
 MODULE_PARM_DESC(updelay, "Delay before considering link up, in milliseconds");
-MODULE_PARM(downdelay, "i");
+module_param(downdelay, int, 0);
 MODULE_PARM_DESC(downdelay, "Delay before considering link down, in milliseconds");
-MODULE_PARM(use_carrier, "i");
+module_param(use_carrier, int, 0);
 MODULE_PARM_DESC(use_carrier, "Use netif_carrier_ok (vs MII ioctls) in miimon; 0 for off, 1 for on (default)");
-MODULE_PARM(mode, "s");
+module_param(mode, charp, 0);
 MODULE_PARM_DESC(mode, "Mode of operation : 0 for round robin, 1 for active-backup, 2 for xor");
-MODULE_PARM(primary, "s");
+module_param(primary, charp, 0);
 MODULE_PARM_DESC(primary, "Primary network device to use");
-MODULE_PARM(lacp_rate, "s");
+module_param(lacp_rate, charp, 0);
 MODULE_PARM_DESC(lacp_rate, "LACPDU tx rate to request from 802.3ad partner (slow/fast)");
-MODULE_PARM(arp_interval, "i");
+module_param(arp_interval, int, 0);
 MODULE_PARM_DESC(arp_interval, "arp interval in milliseconds");
-MODULE_PARM(arp_ip_target, "1-" __MODULE_STRING(BOND_MAX_ARP_TARGETS) "s");
+module_param_array(arp_ip_target, charp, NULL, 0);
 MODULE_PARM_DESC(arp_ip_target, "arp targets in n.n.n.n form");
 
 /*----------------------------- Global variables ----------------------------*/

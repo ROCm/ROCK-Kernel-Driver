@@ -2610,23 +2610,19 @@ static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg) { return 0; };
 #endif
 
 /**
- * ipr_store_queue_depth - Change the device's queue depth
- * @dev:	device struct
- * @buf:	buffer
+ * ipr_change_queue_depth - Change the device's queue depth
+ * @sdev:	scsi device struct
+ * @qdepth:	depth to set
  *
  * Return value:
- * 	number of bytes printed to buffer
+ * 	actual depth set
  **/
-static ssize_t ipr_store_queue_depth(struct device *dev,
-				    const char *buf, size_t count)
+static int ipr_change_queue_depth(struct scsi_device *sdev, int qdepth)
 {
-	struct scsi_device *sdev = to_scsi_device(dev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)sdev->host->hostdata;
 	struct ipr_resource_entry *res;
-	int qdepth = simple_strtoul(buf, NULL, 10);
 	int tagged = 0;
 	unsigned long lock_flags = 0;
-	ssize_t len = -ENXIO;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 	res = (struct ipr_resource_entry *)sdev->hostdata;
@@ -2635,22 +2631,12 @@ static ssize_t ipr_store_queue_depth(struct device *dev,
 
 		if (ipr_is_gscsi(res) && res->tcq_active)
 			tagged = MSG_ORDERED_TAG;
-
-		len = strlen(buf);
 	}
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 	scsi_adjust_queue_depth(sdev, tagged, qdepth);
-	return len;
+	return qdepth;
 }
-
-static struct device_attribute ipr_queue_depth_attr = {
-	.attr = {
-		.name = 	"queue_depth",
-		.mode =		S_IRUSR | S_IWUSR,
-	},
-	.store = ipr_store_queue_depth
-};
 
 /**
  * ipr_show_tcq_enable - Show if the device is enabled for tcqing
@@ -2760,7 +2746,6 @@ static struct device_attribute ipr_adapter_handle_attr = {
 };
 
 static struct device_attribute *ipr_dev_attrs[] = {
-	&ipr_queue_depth_attr,
 	&ipr_tcqing_attr,
 	&ipr_adapter_handle_attr,
 	NULL,
@@ -3961,6 +3946,7 @@ static struct scsi_host_template driver_template = {
 	.slave_alloc = ipr_slave_alloc,
 	.slave_configure = ipr_slave_configure,
 	.slave_destroy = ipr_slave_destroy,
+	.change_queue_depth = ipr_change_queue_depth,
 	.bios_param = ipr_biosparam,
 	.can_queue = IPR_MAX_COMMANDS,
 	.this_id = -1,

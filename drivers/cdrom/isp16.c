@@ -72,10 +72,10 @@ static int isp16_cdrom_irq = ISP16_CDROM_IRQ;
 static int isp16_cdrom_dma = ISP16_CDROM_DMA;
 static char *isp16_cdrom_type = ISP16_CDROM_TYPE;
 
-MODULE_PARM(isp16_cdrom_base, "i");
-MODULE_PARM(isp16_cdrom_irq, "i");
-MODULE_PARM(isp16_cdrom_dma, "i");
-MODULE_PARM(isp16_cdrom_type, "s");
+module_param(isp16_cdrom_base, int, 0);
+module_param(isp16_cdrom_irq, int, 0);
+module_param(isp16_cdrom_dma, int, 0);
+module_param(isp16_cdrom_type, charp, 0);
 
 #ifdef MODULE
 void isp16_exit(void);

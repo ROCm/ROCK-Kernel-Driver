@@ -113,7 +113,7 @@ static int __init ixdp2800_pci_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 		 * Device behind the first bridge
 		 */
 		if(dev->bus->self->devfn == IXDP2X00_P2P_DEVFN) {
-			switch(PCI_SLOT(dev->devfn)) {
+			switch(dev->devfn) {
 				case IXDP2X00_PMC_DEVFN:
 					return IRQ_IXDP2800_PMC;	
 			

@@ -111,11 +111,6 @@ void __init maple_setup_arch(void)
 #ifdef CONFIG_SMP
 	smp_ops = &maple_smp_ops;
 #endif
-	/* Setup the PCI DMA to "direct" by default. May be overriden
-	 * by iommu later on
-	 */
-	pci_dma_init_direct();
-
 	/* Lookup PCI hosts */
        	maple_pci_init();
 
@@ -158,6 +153,8 @@ static void __init maple_init_early(void)
 
 	/* Setup interrupt mapping options */
 	ppc64_interrupt_controller = IC_OPEN_PIC;
+
+	iommu_init_early_u3();
 
 	DBG(" <- maple_init_early\n");
 }

@@ -122,8 +122,6 @@ typedef struct fm_xinstrument {
 
 #include "seq_instr.h"
 
-extern char *snd_seq_fm_id;
-
 int snd_seq_fm_init(snd_seq_kinstr_ops_t * ops,
 		    snd_seq_kinstr_ops_t * next);
 

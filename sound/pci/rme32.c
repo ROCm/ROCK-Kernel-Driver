@@ -1916,21 +1916,21 @@ static snd_kcontrol_new_t snd_rme32_controls[] = {
 		.private_value = IEC958_AES0_PROFESSIONAL | IEC958_AES0_PRO_EMPHASIS
 	},
 	{
-		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name =	"Input Connector",
 		.info =	snd_rme32_info_inputtype_control,
 		.get =	snd_rme32_get_inputtype_control,
 		.put =	snd_rme32_put_inputtype_control
 	},
 	{
-		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name =	"Loopback Input",
 		.info =	snd_rme32_info_loopback_control,
 		.get =	snd_rme32_get_loopback_control,
 		.put =	snd_rme32_put_loopback_control
 	},
 	{
-		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name =	"Sample Clock Source",
 		.info =	snd_rme32_info_clockmode_control,
 		.get =	snd_rme32_get_clockmode_control,

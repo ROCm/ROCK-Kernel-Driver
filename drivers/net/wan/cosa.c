@@ -238,11 +238,11 @@ static int irq[MAX_CARDS+1] = { -1, -1, -1, -1, -1, -1, 0, };
 static struct class_simple *cosa_class;
 
 #ifdef MODULE
-MODULE_PARM(io, "1-" __MODULE_STRING(MAX_CARDS) "i");
+module_param_array(io, int, NULL, 0);
 MODULE_PARM_DESC(io, "The I/O bases of the COSA or SRP cards");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_CARDS) "i");
+module_param_array(irq, int, NULL, 0);
 MODULE_PARM_DESC(irq, "The IRQ lines of the COSA or SRP cards");
-MODULE_PARM(dma, "1-" __MODULE_STRING(MAX_CARDS) "i");
+module_param_array(dma, int, NULL, 0);
 MODULE_PARM_DESC(dma, "The DMA channels of the COSA or SRP cards");
 
 MODULE_AUTHOR("Jan \"Yenya\" Kasprzak, <kas@fi.muni.cz>");
@@ -642,11 +642,11 @@ static void sppp_channel_init(struct channel_data *chan)
 		return;
 	}
 	chan->pppdev.dev = d;
-	sppp_attach(&chan->pppdev);
 	d->base_addr = chan->cosa->datareg;
 	d->irq = chan->cosa->irq;
 	d->dma = chan->cosa->dma;
 	d->priv = chan;
+	sppp_attach(&chan->pppdev);
 	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(d);

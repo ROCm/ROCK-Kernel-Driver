@@ -365,6 +365,7 @@ struct _snd_ice1712 {
 		/* AC97 register cache for Aureon */
 		struct aureon_spec {
 			unsigned short stac9744[64];
+			unsigned int cs8415_mux;
 			unsigned short master[2];
 			unsigned short vol[8];
 		} aureon;

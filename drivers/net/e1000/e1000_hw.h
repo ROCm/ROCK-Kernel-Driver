@@ -168,6 +168,12 @@ typedef enum {
 } e1000_downshift;
 
 typedef enum {
+    e1000_smart_speed_default = 0,
+    e1000_smart_speed_on,
+    e1000_smart_speed_off
+} e1000_smart_speed;
+
+typedef enum {
     e1000_polarity_reversal_enabled = 0,
     e1000_polarity_reversal_disabled,
     e1000_polarity_reversal_undefined = 0xFF
@@ -361,6 +367,7 @@ int32_t e1000_set_d3_lplu_state(struct e1000_hw *hw, boolean_t active);
 #define E1000_DEV_ID_82546GB_COPPER      0x1079
 #define E1000_DEV_ID_82546GB_FIBER       0x107A
 #define E1000_DEV_ID_82546GB_SERDES      0x107B
+#define E1000_DEV_ID_82546GB_PCIE        0x108A
 #define E1000_DEV_ID_82547EI             0x1019
 #define NODE_ADDRESS_SIZE 6
 #define ETH_LENGTH_OF_ADDRESS 6
@@ -1026,6 +1033,7 @@ struct e1000_hw {
     uint8_t perm_mac_addr[NODE_ADDRESS_SIZE];
     boolean_t disable_polarity_correction;
     boolean_t speed_downgraded;
+    e1000_smart_speed smart_speed;
     e1000_dsp_config dsp_config_state;
     boolean_t get_link_status;
     boolean_t serdes_link_down;

@@ -20,7 +20,7 @@
 #include <asm/tlbflush.h>
 
 
-rwlock_t vmlist_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(vmlist_lock);
 struct vm_struct *vmlist;
 
 static void unmap_area_pte(pmd_t *pmd, unsigned long address,

@@ -91,54 +91,6 @@ void pm_unregister(struct pm_dev *dev);
 void pm_unregister_all(pm_callback cback);
 
 /*
- * Device idle/use detection
- *
- * In general, drivers for all devices should call "pm_access"
- * before accessing the hardware (ie. before reading or modifying
- * a hardware register).  Request or packet-driven drivers should
- * additionally call "pm_dev_idle" when a device is not being used.
- *
- * Examples:
- * 1) A keyboard driver would call pm_access whenever a key is pressed
- * 2) A network driver would call pm_access before submitting
- *    a packet for transmit or receive and pm_dev_idle when its
- *    transfer and receive queues are empty.
- * 3) A VGA driver would call pm_access before it accesses any
- *    of the video controller registers
- *
- * Ultimately, the PM policy manager uses the access and idle
- * information to decide when to suspend individual devices
- * or when to suspend the entire system
- */
-
-/*
- * Description: Update device access time and wake up device, if necessary
- *
- * Parameters:
- *   dev - PM device previously returned from pm_register
- *
- * Details: If called from an interrupt handler pm_access updates
- *          access time but should never need to wake up the device
- *          (if device is generating interrupts, it should be awake
- *          already)  This is important as we can not wake up
- *          devices from an interrupt handler.
- */
-void pm_access(struct pm_dev *dev);
-
-/*
- * Description: Identify device as currently being idle
- *
- * Parameters:
- *   dev - PM device previously returned from pm_register
- *
- * Details: A call to pm_dev_idle might signal to the policy manager
- *          to put a device to sleep.  If a new device request arrives
- *          between the call to pm_dev_idle and the pm_callback
- *          callback, the driver should fail the pm_callback request.
- */
-void pm_dev_idle(struct pm_dev *dev);
-
-/*
  * Power management request callback
  *
  * Parameters:

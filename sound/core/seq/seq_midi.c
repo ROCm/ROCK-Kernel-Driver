@@ -43,10 +43,10 @@ Possible options for midisynth module:
 MODULE_AUTHOR("Frank van de Pol <fvdpol@coil.demon.nl>, Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture sequencer MIDI synth.");
 MODULE_LICENSE("GPL");
-int output_buffer_size = PAGE_SIZE;
+static int output_buffer_size = PAGE_SIZE;
 module_param(output_buffer_size, int, 0644);
 MODULE_PARM_DESC(output_buffer_size, "Output buffer size in bytes.");
-int input_buffer_size = PAGE_SIZE;
+static int input_buffer_size = PAGE_SIZE;
 module_param(input_buffer_size, int, 0644);
 MODULE_PARM_DESC(input_buffer_size, "Input buffer size in bytes.");
 
@@ -284,7 +284,7 @@ static int set_client_name(seq_midisynth_client_t *client, snd_card_t *card,
 }
 
 /* register new midi synth port */
-int
+static int
 snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 {
 	seq_midisynth_client_t *client;
@@ -423,7 +423,7 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 }
 
 /* release midi synth port */
-int
+static int
 snd_seq_midisynth_unregister_port(snd_seq_device_t *dev)
 {
 	seq_midisynth_client_t *client;

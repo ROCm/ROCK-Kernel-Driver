@@ -68,8 +68,6 @@ extern int dir_notify_enable;
 #endif
 
 #define NR_FILE  8192	/* this can well be larger on a larger system */
-#define NR_RESERVED_FILES 10 /* reserved for root */
-#define NR_SUPER 256
 
 #define MAY_EXEC 1
 #define MAY_WRITE 2
@@ -341,7 +339,7 @@ struct address_space {
 	struct prio_tree_root	i_mmap;		/* tree of private and shared mappings */
 	struct list_head	i_mmap_nonlinear;/*list VM_NONLINEAR mappings */
 	spinlock_t		i_mmap_lock;	/* protect tree, count, list */
-	atomic_t		truncate_count;	/* Cover race condition with truncate */
+	unsigned int		truncate_count;	/* Cover race condition with truncate */
 	unsigned long		nrpages;	/* number of total pages */
 	pgoff_t			writeback_index;/* writeback starts here */
 	struct address_space_operations *a_ops;	/* methods */
@@ -1345,8 +1343,8 @@ static inline void invalidate_remote_inode(struct inode *inode)
 	    S_ISLNK(inode->i_mode))
 		invalidate_inode_pages(inode->i_mapping);
 }
-extern void invalidate_inode_pages2(struct address_space *mapping);
-extern void write_inode_now(struct inode *, int);
+extern int invalidate_inode_pages2(struct address_space *mapping);
+extern int write_inode_now(struct inode *, int);
 extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_flush(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);

@@ -262,7 +262,7 @@ write_out_data:
 			__journal_file_buffer(jh, commit_transaction,
 						BJ_Locked);
 			jbd_unlock_bh_state(bh);
-			if (need_resched()) {
+			if (lock_need_resched(&journal->j_list_lock)) {
 				spin_unlock(&journal->j_list_lock);
 				goto write_out_data;
 			}
@@ -288,7 +288,7 @@ write_out_data:
 				jbd_unlock_bh_state(bh);
 				journal_remove_journal_head(bh);
 				put_bh(bh);
-				if (need_resched()) {
+				if (lock_need_resched(&journal->j_list_lock)) {
 					spin_unlock(&journal->j_list_lock);
 					goto write_out_data;
 				}
@@ -333,13 +333,12 @@ write_out_data:
 			jbd_unlock_bh_state(bh);
 		}
 		put_bh(bh);
-		if (need_resched()) {
-			spin_unlock(&journal->j_list_lock);
-			cond_resched();
-			spin_lock(&journal->j_list_lock);
-		}
+		cond_resched_lock(&journal->j_list_lock);
 	}
 	spin_unlock(&journal->j_list_lock);
+
+	if (err)
+		__journal_abort_hard(journal);
 
 	journal_write_revoke_records(journal, commit_transaction);
 
@@ -545,6 +544,8 @@ wait_for_iobuf:
 			wait_on_buffer(bh);
 			goto wait_for_iobuf;
 		}
+		if (cond_resched())
+			goto wait_for_iobuf;
 
 		if (unlikely(!buffer_uptodate(bh)))
 			err = -EIO;
@@ -599,6 +600,8 @@ wait_for_iobuf:
 			wait_on_buffer(bh);
 			goto wait_for_ctlbuf;
 		}
+		if (cond_resched())
+			goto wait_for_ctlbuf;
 
 		if (unlikely(!buffer_uptodate(bh)))
 			err = -EIO;
@@ -695,6 +698,7 @@ skip_commit: /* The journal should be unlocked by now. */
 	J_ASSERT(commit_transaction->t_shadow_list == NULL);
 	J_ASSERT(commit_transaction->t_log_list == NULL);
 
+restart_loop:
 	while (commit_transaction->t_forget) {
 		transaction_t *cp_transaction;
 		struct buffer_head *bh;
@@ -768,6 +772,8 @@ skip_commit: /* The journal should be unlocked by now. */
 			release_buffer_page(bh);
 		}
 		spin_unlock(&journal->j_list_lock);
+		if (cond_resched())
+			goto restart_loop;
 	}
 
 	/* Done with this transaction! */

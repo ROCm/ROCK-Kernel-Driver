@@ -12,6 +12,7 @@
  * Modifications:
  *	16-Sep-2004 BJD Copied from mach-h1940.c
  *	25-Oct-2004 BJD Updates for 2.6.10-rc1
+ *	10-Jan-2005 BJD Removed include of s3c2410.h s3c2440.h
 */
 
 #include <linux/kernel.h>
@@ -38,8 +39,6 @@
 #include <asm/arch/regs-serial.h>
 #include <asm/arch/regs-gpio.h>
 
-#include "s3c2410.h"
-#include "s3c2440.h"
 #include "clock.h"
 #include "devs.h"
 #include "cpu.h"
@@ -101,7 +100,7 @@ void __init rx3715_map_io(void)
 
 void __init rx3715_init_irq(void)
 {
-	s3c2410_init_irq();
+	s3c24xx_init_irq();
 }
 
 #ifdef CONFIG_PM
@@ -120,5 +119,5 @@ MACHINE_START(RX3715, "IPAQ-RX3715")
      MAPIO(rx3715_map_io)
      INITIRQ(rx3715_init_irq)
      INIT_MACHINE(rx3715_init_machine)
-     .timer		= &s3c2410_timer,
+	.timer		= &s3c24xx_timer,
 MACHINE_END

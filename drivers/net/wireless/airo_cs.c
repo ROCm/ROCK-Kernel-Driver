@@ -52,7 +52,7 @@
 */
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 static char *version = "$Revision: 1.2 $";
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args);
 #else
@@ -75,8 +75,8 @@ MODULE_DESCRIPTION("Support for Cisco/Aironet 802.11 wireless ethernet \
 		   with the airo module.");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_SUPPORTED_DEVICE("Aironet 4500, 4800 and Cisco 340 PCMCIA cards");
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
 
 /*====================================================================*/
 
@@ -89,7 +89,7 @@ MODULE_PARM(irq_list, "1-4i");
    event handler. 
 */
 
-struct net_device *init_airo_card( int, int, int );
+struct net_device *init_airo_card( int, int, int, struct device * );
 void stop_airo_card( struct net_device *, int );
 int reset_airo_card( struct net_device * );
 
@@ -225,7 +225,6 @@ static dev_link_t *airo_attach(void)
 	link->next = dev_list;
 	dev_list = link;
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -450,7 +449,7 @@ static void airo_config(dev_link_t *link)
 	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 	((local_info_t*)link->priv)->eth_dev = 
 		init_airo_card( link->irq.AssignedIRQ,
-				link->io.BasePort1, 1 );
+				link->io.BasePort1, 1, &handle_to_dev(handle) );
 	if (!((local_info_t*)link->priv)->eth_dev) goto cs_failed;
 	
 	/*
@@ -592,13 +591,7 @@ static int airo_cs_init(void)
 static void airo_cs_cleanup(void)
 {
 	pcmcia_unregister_driver(&airo_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			airo_release(dev_list);
-		airo_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 /*

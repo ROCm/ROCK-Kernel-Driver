@@ -57,7 +57,7 @@
 static const int clk = 1, data = 2, wren = 4, mo_st = 8, power = 16 ;
 
 static int radio_nr = -1;
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 
 #define FREQ_LO		 50*16000
@@ -335,12 +335,12 @@ static struct pci_driver maxiradio_driver = {
 	.remove		= __devexit_p(maxiradio_remove_one),
 };
 
-int __init maxiradio_radio_init(void)
+static int __init maxiradio_radio_init(void)
 {
 	return pci_module_init(&maxiradio_driver);
 }
 
-void __exit maxiradio_radio_exit(void)
+static void __exit maxiradio_radio_exit(void)
 {
 	pci_unregister_driver(&maxiradio_driver);
 }

@@ -222,6 +222,7 @@ befs_dump_super_block(const struct super_block *sb, befs_super_block * sup)
 #endif				//CONFIG_BEFS_DEBUG
 }
 
+#if 0
 /* unused */
 void
 befs_dump_small_data(const struct super_block *sb, befs_small_data * sd)
@@ -241,6 +242,7 @@ befs_dump_run(const struct super_block *sb, befs_block_run run)
 
 #endif				//CONFIG_BEFS_DEBUG
 }
+#endif  /*  0  */
 
 void
 befs_dump_index_entry(const struct super_block *sb, befs_btree_super * super)

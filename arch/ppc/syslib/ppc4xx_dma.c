@@ -48,7 +48,7 @@ ppc4xx_set_src_addr(int dmanr, phys_addr_t src_addr)
 		return;
 	}
 
-#ifdef PPC4xx_DMA64BIT
+#ifdef PPC4xx_DMA_64BIT
 	mtdcr(DCRN_DMASAH0 + dmanr*2, (u32)(src_addr >> 32));
 #else
 	mtdcr(DCRN_DMASA0 + dmanr*2, (u32)src_addr);
@@ -63,7 +63,7 @@ ppc4xx_set_dst_addr(int dmanr, phys_addr_t dst_addr)
 		return;
 	}
 
-#ifdef PPC4xx_DMA64BIT
+#ifdef PPC4xx_DMA_64BIT
 	mtdcr(DCRN_DMADAH0 + dmanr*2, (u32)(dst_addr >> 32));
 #else
 	mtdcr(DCRN_DMADA0 + dmanr*2, (u32)dst_addr);

@@ -23,7 +23,7 @@ EXPORT_SYMBOL(cap_bset);
  * This global lock protects task->cap_* for all tasks including current.
  * Locking rule: acquire this prior to tasklist_lock.
  */
-spinlock_t task_capability_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(task_capability_lock);
 
 /*
  * For sys_getproccap() and sys_setproccap(), any of the three

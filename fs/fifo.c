@@ -135,12 +135,8 @@ err_wr:
 	goto err;
 
 err:
-	if (!PIPE_READERS(*inode) && !PIPE_WRITERS(*inode)) {
-		struct pipe_inode_info *info = inode->i_pipe;
-		inode->i_pipe = NULL;
-		free_page((unsigned long)info->base);
-		kfree(info);
-	}
+	if (!PIPE_READERS(*inode) && !PIPE_WRITERS(*inode))
+		free_pipe_info(inode);
 
 err_nocleanup:
 	up(PIPE_SEM(*inode));

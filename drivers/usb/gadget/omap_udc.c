@@ -1,5 +1,5 @@
 /*
- * omap_udc.c -- for OMAP 1610 udc, with OTG support
+ * omap_udc.c -- for OMAP full speed udc; most chips support OTG.
  *
  * Copyright (C) 2004 Texas Instruments, Inc.
  * Copyright (C) 2004 David Brownell

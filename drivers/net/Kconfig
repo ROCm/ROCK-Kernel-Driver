@@ -691,6 +691,7 @@ config ELMC_II
 config VORTEX
 	tristate "3c590/3c900 series (592/595/597) \"Vortex/Boomerang\" support"
 	depends on NET_VENDOR_3COM && (PCI || EISA)
+	select MII
 	---help---
 	  This option enables driver support for a large number of 10mbps and
 	  10/100mbps EISA, PCI and PCMCIA 3Com network cards:
@@ -1398,16 +1399,6 @@ config EEPRO100
 	  <file:Documentation/networking/net-modules.txt>.  The module
 	  will be called eepro100.
 
-
-config EEPRO100_PIO
-	bool "Use PIO instead of MMIO" if !X86_VISWS
-	depends on EEPRO100
-	default y if X86_VISWS
-	help
-	  This instructs the driver to use programmed I/O ports (PIO) instead
-	  of PCI shared memory (MMIO).  This can possibly solve some problems
-	  in case your mainboard has memory consistency issues.  If unsure,
-	  say N.
 
 config E100
 	tristate "Intel(R) PRO/100+ support"

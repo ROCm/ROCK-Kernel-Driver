@@ -1,5 +1,5 @@
 Linux 2.4.2 Secure Attention Key (SAK) handling
-18 March 2001, Andrew Morton <andrewm@uow.edu.au>
+18 March 2001, Andrew Morton <akpm@osdl.org>
 
 An operating system's Secure Attention Key is a security tool which is
 provided as protection against trojan password capturing programs.  It
@@ -44,7 +44,7 @@ NOTES
    /dev/console opened.
 
    Unfortunately this includes a number of things which you don't
-   actually want killed.  This is because these appliccaitons are
+   actually want killed.  This is because these applications are
    incorrectly holding /dev/console open.  Be sure to complain to your
    Linux distributor about this!
 

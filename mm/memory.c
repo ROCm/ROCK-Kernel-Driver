@@ -190,10 +190,10 @@ static inline void clear_pgd_range(struct mmu_gather *tlb, pgd_t *pgd, unsigned 
 void clear_page_range(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	unsigned long addr = start, next;
-	unsigned long i, nr = pgd_index(end + PGDIR_SIZE-1) - pgd_index(start);
 	pgd_t * pgd = pgd_offset(tlb->mm, start);
+	unsigned long i;
 
-	for (i = 0; i < nr; i++) {
+	for (i = pgd_index(start); i <= pgd_index(end-1); i++) {
 		next = (addr + PGDIR_SIZE) & PGDIR_MASK;
 		if (next > end || next <= addr)
 			next = end;
@@ -612,19 +612,11 @@ static void unmap_page_range(struct mmu_gather *tlb,
 	tlb_end_vma(tlb, vma);
 }
 
-/* Dispose of an entire struct mmu_gather per rescheduling point */
-#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-#define ZAP_BLOCK_SIZE	(FREE_PTE_NR * PAGE_SIZE)
-#endif
-
-/* For UP, 256 pages at a time gives nice low latency */
-#if !defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-#define ZAP_BLOCK_SIZE	(256 * PAGE_SIZE)
-#endif
-
+#ifdef CONFIG_PREEMPT
+# define ZAP_BLOCK_SIZE	(8 * PAGE_SIZE)
+#else
 /* No preempt: go for improved straight-line efficiency */
-#if !defined(CONFIG_PREEMPT)
-#define ZAP_BLOCK_SIZE	(1024 * PAGE_SIZE)
+# define ZAP_BLOCK_SIZE	(1024 * PAGE_SIZE)
 #endif
 
 /**
@@ -663,7 +655,8 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 	unsigned long tlb_start = 0;	/* For tlb_finish_mmu */
 	int tlb_start_valid = 0;
 	int ret = 0;
-	int atomic = details && details->atomic;
+	spinlock_t *i_mmap_lock = details? details->i_mmap_lock: NULL;
+	int fullmm = tlb_is_full_mm(*tlbp);
 
 	for ( ; vma && vma->vm_start < end_addr; vma = vma->vm_next) {
 		unsigned long start;
@@ -701,16 +694,29 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 			zap_bytes -= block;
 			if ((long)zap_bytes > 0)
 				continue;
-			if (!atomic && need_resched()) {
-				int fullmm = tlb_is_full_mm(*tlbp);
-				tlb_finish_mmu(*tlbp, tlb_start, start);
-				cond_resched_lock(&mm->page_table_lock);
-				*tlbp = tlb_gather_mmu(mm, fullmm);
-				tlb_start_valid = 0;
+
+			tlb_finish_mmu(*tlbp, tlb_start, start);
+
+			if (need_resched() ||
+				need_lockbreak(&mm->page_table_lock) ||
+				(i_mmap_lock && need_lockbreak(i_mmap_lock))) {
+				if (i_mmap_lock) {
+					/* must reset count of rss freed */
+					*tlbp = tlb_gather_mmu(mm, fullmm);
+					details->break_addr = start;
+					goto out;
+				}
+				spin_unlock(&mm->page_table_lock);
+				cond_resched();
+				spin_lock(&mm->page_table_lock);
 			}
+
+			*tlbp = tlb_gather_mmu(mm, fullmm);
+			tlb_start_valid = 0;
 			zap_bytes = ZAP_BLOCK_SIZE;
 		}
 	}
+out:
 	return ret;
 }
 
@@ -924,6 +930,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		do {
 			struct page *map;
 			int lookup_write = write;
+
+			cond_resched_lock(&mm->page_table_lock);
 			while (!(map = follow_page(mm, start, lookup_write))) {
 				/*
 				 * Shortcut for anonymous pages. We don't want
@@ -1359,17 +1367,112 @@ no_new_page:
 }
 
 /*
- * Helper function for unmap_mapping_range().
+ * Helper functions for unmap_mapping_range().
+ *
+ * __ Notes on dropping i_mmap_lock to reduce latency while unmapping __
+ *
+ * We have to restart searching the prio_tree whenever we drop the lock,
+ * since the iterator is only valid while the lock is held, and anyway
+ * a later vma might be split and reinserted earlier while lock dropped.
+ *
+ * The list of nonlinear vmas could be handled more efficiently, using
+ * a placeholder, but handle it in the same way until a need is shown.
+ * It is important to search the prio_tree before nonlinear list: a vma
+ * may become nonlinear and be shifted from prio_tree to nonlinear list
+ * while the lock is dropped; but never shifted from list to prio_tree.
+ *
+ * In order to make forward progress despite restarting the search,
+ * vm_truncate_count is used to mark a vma as now dealt with, so we can
+ * quickly skip it next time around.  Since the prio_tree search only
+ * shows us those vmas affected by unmapping the range in question, we
+ * can't efficiently keep all vmas in step with mapping->truncate_count:
+ * so instead reset them all whenever it wraps back to 0 (then go to 1).
+ * mapping->truncate_count and vma->vm_truncate_count are protected by
+ * i_mmap_lock.
+ *
+ * In order to make forward progress despite repeatedly restarting some
+ * large vma, note the break_addr set by unmap_vmas when it breaks out:
+ * and restart from that address when we reach that vma again.  It might
+ * have been split or merged, shrunk or extended, but never shifted: so
+ * restart_addr remains valid so long as it remains in the vma's range.
+ * unmap_mapping_range forces truncate_count to leap over page-aligned
+ * values so we can save vma's restart_addr in its truncate_count field.
  */
-static inline void unmap_mapping_range_list(struct prio_tree_root *root,
+#define is_restart_addr(truncate_count) (!((truncate_count) & ~PAGE_MASK))
+
+static void reset_vma_truncate_counts(struct address_space *mapping)
+{
+	struct vm_area_struct *vma;
+	struct prio_tree_iter iter;
+
+	vma_prio_tree_foreach(vma, &iter, &mapping->i_mmap, 0, ULONG_MAX)
+		vma->vm_truncate_count = 0;
+	list_for_each_entry(vma, &mapping->i_mmap_nonlinear, shared.vm_set.list)
+		vma->vm_truncate_count = 0;
+}
+
+static int unmap_mapping_range_vma(struct vm_area_struct *vma,
+		unsigned long start_addr, unsigned long end_addr,
+		struct zap_details *details)
+{
+	unsigned long restart_addr;
+	int need_break;
+
+again:
+	restart_addr = vma->vm_truncate_count;
+	if (is_restart_addr(restart_addr) && start_addr < restart_addr) {
+		start_addr = restart_addr;
+		if (start_addr >= end_addr) {
+			/* Top of vma has been split off since last time */
+			vma->vm_truncate_count = details->truncate_count;
+			return 0;
+		}
+	}
+
+	details->break_addr = end_addr;
+	zap_page_range(vma, start_addr, end_addr - start_addr, details);
+
+	/*
+	 * We cannot rely on the break test in unmap_vmas:
+	 * on the one hand, we don't want to restart our loop
+	 * just because that broke out for the page_table_lock;
+	 * on the other hand, it does no test when vma is small.
+	 */
+	need_break = need_resched() ||
+			need_lockbreak(details->i_mmap_lock);
+
+	if (details->break_addr >= end_addr) {
+		/* We have now completed this vma: mark it so */
+		vma->vm_truncate_count = details->truncate_count;
+		if (!need_break)
+			return 0;
+	} else {
+		/* Note restart_addr in vma's truncate_count field */
+		vma->vm_truncate_count = details->break_addr;
+		if (!need_break)
+			goto again;
+	}
+
+	spin_unlock(details->i_mmap_lock);
+	cond_resched();
+	spin_lock(details->i_mmap_lock);
+	return -EINTR;
+}
+
+static inline void unmap_mapping_range_tree(struct prio_tree_root *root,
 					    struct zap_details *details)
 {
 	struct vm_area_struct *vma;
 	struct prio_tree_iter iter;
 	pgoff_t vba, vea, zba, zea;
 
+restart:
 	vma_prio_tree_foreach(vma, &iter, root,
 			details->first_index, details->last_index) {
+		/* Skip quickly over those we have already dealt with */
+		if (vma->vm_truncate_count == details->truncate_count)
+			continue;
+
 		vba = vma->vm_pgoff;
 		vea = vba + ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT) - 1;
 		/* Assume for now that PAGE_CACHE_SHIFT == PAGE_SHIFT */
@@ -1379,9 +1482,35 @@ static inline void unmap_mapping_range_list(struct prio_tree_root *root,
 		zea = details->last_index;
 		if (zea > vea)
 			zea = vea;
-		zap_page_range(vma,
+
+		if (unmap_mapping_range_vma(vma,
 			((zba - vba) << PAGE_SHIFT) + vma->vm_start,
-			(zea - zba + 1) << PAGE_SHIFT, details);
+			((zea - vba + 1) << PAGE_SHIFT) + vma->vm_start,
+				details) < 0)
+			goto restart;
+	}
+}
+
+static inline void unmap_mapping_range_list(struct list_head *head,
+					    struct zap_details *details)
+{
+	struct vm_area_struct *vma;
+
+	/*
+	 * In nonlinear VMAs there is no correspondence between virtual address
+	 * offset and file offset.  So we must perform an exhaustive search
+	 * across *all* the pages in each nonlinear VMA, not just the pages
+	 * whose virtual address lies outside the file truncation point.
+	 */
+restart:
+	list_for_each_entry(vma, head, shared.vm_set.list) {
+		/* Skip quickly over those we have already dealt with */
+		if (vma->vm_truncate_count == details->truncate_count)
+			continue;
+		details->nonlinear_vma = vma;
+		if (unmap_mapping_range_vma(vma, vma->vm_start,
+					vma->vm_end, details) < 0)
+			goto restart;
 	}
 }
 
@@ -1420,32 +1549,25 @@ void unmap_mapping_range(struct address_space *mapping,
 	details.nonlinear_vma = NULL;
 	details.first_index = hba;
 	details.last_index = hba + hlen - 1;
-	details.atomic = 1;	/* A spinlock is held */
 	if (details.last_index < details.first_index)
 		details.last_index = ULONG_MAX;
+	details.i_mmap_lock = &mapping->i_mmap_lock;
 
 	spin_lock(&mapping->i_mmap_lock);
-	/* Protect against page fault */
-	atomic_inc(&mapping->truncate_count);
+
+	/* Protect against page faults, and endless unmapping loops */
+	mapping->truncate_count++;
+	if (unlikely(is_restart_addr(mapping->truncate_count))) {
+		if (mapping->truncate_count == 0)
+			reset_vma_truncate_counts(mapping);
+		mapping->truncate_count++;
+	}
+	details.truncate_count = mapping->truncate_count;
 
 	if (unlikely(!prio_tree_empty(&mapping->i_mmap)))
-		unmap_mapping_range_list(&mapping->i_mmap, &details);
-
-	/*
-	 * In nonlinear VMAs there is no correspondence between virtual address
-	 * offset and file offset.  So we must perform an exhaustive search
-	 * across *all* the pages in each nonlinear VMA, not just the pages
-	 * whose virtual address lies outside the file truncation point.
-	 */
-	if (unlikely(!list_empty(&mapping->i_mmap_nonlinear))) {
-		struct vm_area_struct *vma;
-		list_for_each_entry(vma, &mapping->i_mmap_nonlinear,
-						shared.vm_set.list) {
-			details.nonlinear_vma = vma;
-			zap_page_range(vma, vma->vm_start,
-				vma->vm_end - vma->vm_start, &details);
-		}
-	}
+		unmap_mapping_range_tree(&mapping->i_mmap, &details);
+	if (unlikely(!list_empty(&mapping->i_mmap_nonlinear)))
+		unmap_mapping_range_list(&mapping->i_mmap_nonlinear, &details);
 	spin_unlock(&mapping->i_mmap_lock);
 }
 EXPORT_SYMBOL(unmap_mapping_range);
@@ -1673,9 +1795,10 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 		if (unlikely(anon_vma_prepare(vma)))
 			goto no_mem;
-		page = alloc_page_vma(GFP_HIGHZERO, vma, addr);
+		page = alloc_page_vma(GFP_HIGHUSER, vma, addr);
 		if (!page)
 			goto no_mem;
+		clear_user_highpage(page, addr);
 
 		spin_lock(&mm->page_table_lock);
 		page_table = pte_offset_map(pmd, addr);
@@ -1728,7 +1851,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct page * new_page;
 	struct address_space *mapping = NULL;
 	pte_t entry;
-	int sequence = 0;
+	unsigned int sequence = 0;
 	int ret = VM_FAULT_MINOR;
 	int anon = 0;
 
@@ -1740,10 +1863,10 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	if (vma->vm_file) {
 		mapping = vma->vm_file->f_mapping;
-		sequence = atomic_read(&mapping->truncate_count);
+		sequence = mapping->truncate_count;
 	}
-	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
 retry:
+	cond_resched();
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, &ret);
 
 	/* no page was available -- either SIGBUS or OOM */
@@ -1775,9 +1898,8 @@ retry:
 	 * invalidated this page.  If unmap_mapping_range got called,
 	 * retry getting the page.
 	 */
-	if (mapping &&
-	      (unlikely(sequence != atomic_read(&mapping->truncate_count)))) {
-		sequence = atomic_read(&mapping->truncate_count);
+	if (mapping && unlikely(sequence != mapping->truncate_count)) {
+		sequence = mapping->truncate_count;
 		spin_unlock(&mm->page_table_lock);
 		page_cache_release(new_page);
 		goto retry;

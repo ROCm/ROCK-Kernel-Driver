@@ -136,7 +136,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 	return(i);
 }
 
-rwlock_t vmlist_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(vmlist_lock);
 struct vm_struct *vmlist;
 
 void vfree(void *addr)

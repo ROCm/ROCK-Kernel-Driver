@@ -93,7 +93,6 @@ EXPORT_SYMBOL(arc_raw_proto);
 EXPORT_SYMBOL(arc_proto_null);
 EXPORT_SYMBOL(arcnet_unregister_proto);
 EXPORT_SYMBOL(arcnet_debug);
-EXPORT_SYMBOL(arcdev_setup);
 EXPORT_SYMBOL(alloc_arcdev);
 EXPORT_SYMBOL(arcnet_interrupt);
 
@@ -110,7 +109,7 @@ static struct net_device_stats *arcnet_get_stats(struct net_device *dev);
 static int go_tx(struct net_device *dev);
 
 static int debug = ARCNET_DEBUG;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_LICENSE("GPL");
 
 static int __init arcnet_init(void)
@@ -317,7 +316,7 @@ static int choose_mtu(void)
 
 
 /* Setup a struct device for ARCnet. */
-void arcdev_setup(struct net_device *dev)
+static void arcdev_setup(struct net_device *dev)
 {
 	dev->type = ARPHRD_ARCNET;
 	dev->hard_header_len = sizeof(struct archdr);

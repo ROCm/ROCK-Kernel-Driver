@@ -41,7 +41,7 @@ MODULE_LICENSE("GPL");
 */
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args);
 static char *version =
 "avma1_cs.c 1.00 1998/01/23 10:00:00 (Carsten Paeth)";
@@ -57,8 +57,8 @@ static int default_irq_list[11] = { 15, 13, 12, 11, 10, 9, 7, 5, 4, 3, -1 };
 static int irq_list[11] = { -1 };
 static int isdnprot = 2;
 
-MODULE_PARM(irq_list, "1-11i");
-MODULE_PARM(isdnprot, "1-4i");
+module_param_array(irq_list, int, NULL, 0);
+module_param(isdnprot, int, 0);
 
 /*====================================================================*/
 
@@ -193,7 +193,6 @@ static dev_link_t *avma1cs_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
 	CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -531,13 +530,7 @@ static int __init init_avma1_cs(void)
 static void __exit exit_avma1_cs(void)
 {
 	pcmcia_unregister_driver(&avma1cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			avma1cs_release(dev_list);
-		avma1cs_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_avma1_cs);

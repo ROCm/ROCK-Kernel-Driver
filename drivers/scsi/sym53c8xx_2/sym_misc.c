@@ -37,109 +37,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifdef __FreeBSD__
-#include <dev/sym/sym_glue.h>
-#else
 #include "sym_glue.h"
-#endif
-
-#ifdef	SYM_OPT_HANDLE_IO_TIMEOUT
-/*
- *  Optional CCB timeout handling.
- *
- *  This code is useful for O/Ses that allow or expect 
- *  SIMs (low-level drivers) to handle SCSI IO timeouts.
- *  It uses a power-of-two based algorithm of my own:) 
- *  that avoids scanning of lists, provided that:
- *
- *  - The IO does complete in less than half the associated
- *    timeout value.
- *  - The greatest delay between the queuing of the IO and 
- *    its completion is less than 
- *          (1<<(SYM_CONF_TIMEOUT_ORDER_MAX-1))/2 ticks.
- *
- *  For example, if tick is 1 second and the max order is 8,
- *  any IO that is completed within less than 64 seconds will 
- *  just be put into some list at queuing and be removed 
- *  at completion without any additionnal overhead.
- */
-
-/*
- *  Set a timeout condition on a CCB.
- */ 
-void sym_timeout_ccb(hcb_p np, ccb_p cp, u_int ticks)
-{
-	sym_remque(&cp->tmo_linkq);
-	cp->tmo_clock = np->tmo_clock + ticks;
-	if (!ticks) {
-		sym_insque_head(&cp->tmo_linkq, &np->tmo0_ccbq);
-	}
-	else {
-		int i = SYM_CONF_TIMEOUT_ORDER_MAX - 1;
-		while (i > 0) {
-			if (ticks >= (1<<(i+1)))
-				break;
-			--i;
-		}
-		if (!(np->tmo_actq & (1<<i)))
-			i += SYM_CONF_TIMEOUT_ORDER_MAX;
-		sym_insque_head(&cp->tmo_linkq, &np->tmo_ccbq[i]);
-	}
-}
-
-/*
- *  Walk a list of CCB and handle timeout conditions.
- *  Should never be called in normal situations.
- */
-static void sym_walk_ccb_tmo_list(hcb_p np, SYM_QUEHEAD *tmoq)
-{
-	SYM_QUEHEAD qtmp, *qp;
-	ccb_p cp;
-
-	sym_que_move(tmoq, &qtmp);
-	while ((qp = sym_remque_head(&qtmp)) != 0) {
-		sym_insque_head(qp, &np->tmo0_ccbq);
-		cp = sym_que_entry(qp, struct sym_ccb, tmo_linkq);
-		if (cp->tmo_clock     != np->tmo_clock &&
-		    cp->tmo_clock + 1 != np->tmo_clock)
-			sym_timeout_ccb(np, cp, cp->tmo_clock - np->tmo_clock);
-		else
-			sym_abort_ccb(np, cp, 1);
-	}
-}
-
-/*
- * Our clock handler called from the O/S specific side.
- */
-void sym_clock(hcb_p np)
-{
-	int i, j;
-	u_int tmp;
-
-	tmp = np->tmo_clock;
-	tmp ^= (++np->tmo_clock);
-
-	for (i = 0; i < SYM_CONF_TIMEOUT_ORDER_MAX; i++, tmp >>= 1) {
-		if (!(tmp & 1))
-			continue;
-		j = i;
-		if (np->tmo_actq & (1<<i))
-			j += SYM_CONF_TIMEOUT_ORDER_MAX;
-
-		if (!sym_que_empty(&np->tmo_ccbq[j])) {
-			sym_walk_ccb_tmo_list(np, &np->tmo_ccbq[j]);
-		}
-		np->tmo_actq ^= (1<<i);
-	}
-}
-#endif	/* SYM_OPT_HANDLE_IO_TIMEOUT */
-
 
 #ifdef	SYM_OPT_ANNOUNCE_TRANSFER_RATE
 /*
  *  Announce transfer rate if anything changed since last announcement.
  */
-void sym_announce_transfer_rate(hcb_p np, int target)
+void sym_announce_transfer_rate(struct sym_hcb *np, int target)
 {
 	tcb_p tp = &np->target[target];
 

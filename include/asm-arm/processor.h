@@ -19,7 +19,6 @@
 
 #ifdef __KERNEL__
 
-#include <asm/atomic.h>
 #include <asm/ptrace.h>
 #include <asm/procinfo.h>
 #include <asm/types.h>

@@ -817,7 +817,7 @@ sti_try_rom_generic(unsigned long address, unsigned long hpa, struct pci_dev *pd
 	}
 		    
 	memset(sti, 0, sizeof(*sti));
-	sti->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&sti->lock);
 
 test_rom:
 	/* if we can't read the ROM, bail out early.  Not being able
