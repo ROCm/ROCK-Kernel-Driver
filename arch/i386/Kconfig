@@ -273,6 +273,13 @@ config MVIAC3_2
 
 endchoice
 
+config X86_GENERIC
+       bool "Generic x86 support" 
+       help
+       	  Including some tuning for non selected x86 CPUs too.
+	  when it has moderate overhead. This is intended for generic 
+	  distributions kernels.
+
 #
 # Define implied options from the CPU selection here
 #
@@ -288,10 +295,10 @@ config X86_XADD
 
 config X86_L1_CACHE_SHIFT
 	int
+	default "7" if MPENTIUM4 || X86_GENERIC
 	default "4" if MELAN || M486 || M386
 	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2
 	default "6" if MK7 || MK8
-	default "7" if MPENTIUM4
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
@@ -361,16 +368,6 @@ config X86_USE_3DNOW
 config X86_OOSTORE
 	bool
 	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6
-	default y
-
-config X86_PREFETCH
-	bool
-	depends on MPENTIUMIII || MPENTIUM4 || MVIAC3_2
-	default y
-
-config X86_SSE2
-	bool
-	depends on MK8 || MPENTIUM4
 	default y
 
 config HUGETLB_PAGE
