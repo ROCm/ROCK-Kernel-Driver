@@ -47,10 +47,10 @@
 /* Drive specific timing taken from DOS driver v3.7 */
 
 struct qd65xx_timing_s {
-	char	offset;   /* ofset from the beginning of Model Number" */
+	s8	offset;   /* ofset from the beginning of Model Number" */
 	char	model[4];    /* 4 chars from Model number, no conversion */
-	short	active;   /* active time */
-	short	recovery; /* recovery time */
+	s16	active;   /* active time */
+	s16	recovery; /* recovery time */
 } qd65xx_timing [] = {
 	{ 30, "2040", 110, 225 },  /* Conner CP30204			*/
 	{ 30, "2045", 135, 225 },  /* Conner CP30254			*/
