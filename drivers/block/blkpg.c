@@ -213,7 +213,6 @@ extern int block_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg);
 int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 {
 	request_queue_t *q;
-	struct gendisk *g;
 	u64 ullval = 0;
 	int intval;
 	unsigned short usval;
@@ -252,20 +251,18 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 			return 0;
 
 		case BLKSSZGET:
-			/* get block device sector size as needed e.g. by fdisk */
+			/* get block device hardware sector size */
 			intval = get_hardsect_size(dev);
 			return put_user(intval, (int *) arg);
 
 		case BLKGETSIZE:
+			/* size in sectors, works up to 2 TB */
+			ullval = blkdev_size_in_bytes(dev);
+			return put_user((unsigned long)(ullval >> 9), (unsigned long *) arg);
 		case BLKGETSIZE64:
-			g = get_gendisk(dev);
-			if (g)
-				ullval = g->part[minor(dev)].nr_sects;
-
-			if (cmd == BLKGETSIZE)
-				return put_user((unsigned long)ullval, (unsigned long *)arg);
-			else
-				return put_user((u64)ullval << 9 , (u64 *)arg);
+			/* size in bytes */
+			ullval = blkdev_size_in_bytes(dev);
+			return put_user(ullval, (u64 *) arg);
 #if 0
 		case BLKRRPART: /* Re-read partition tables */
 			if (!capable(CAP_SYS_ADMIN)) 

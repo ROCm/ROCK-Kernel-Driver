@@ -313,7 +313,7 @@ extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist
 extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
 
-extern int * blk_size[MAX_BLKDEV];
+extern int * blk_size[MAX_BLKDEV];	/* in units of 1024 bytes */
 extern int * blksize_size[MAX_BLKDEV];
 
 #define MAX_PHYS_SEGMENTS 128
@@ -353,6 +353,7 @@ extern inline int get_hardsect_size(kdev_t dev)
 #define blk_finished_io(nsects)	do { } while (0)
 #define blk_started_io(nsects)	do { } while (0)
 
+/* assumes size > 256 */
 extern inline unsigned int blksize_bits(unsigned int size)
 {
 	unsigned int bits = 8;
@@ -374,6 +375,20 @@ extern inline unsigned int block_size(kdev_t dev)
 			retval = blksize_size[major][minor];
 	}
 	return retval;
+}
+
+static inline loff_t blkdev_size_in_bytes(kdev_t dev)
+{
+#if 0
+	if (blk_size_in_bytes[major(dev)])
+		return blk_size_in_bytes[major(dev)][minor(dev)];
+	else
+#endif
+	if (blk_size[major(dev)])
+		return (loff_t) blk_size[major(dev)][minor(dev)]
+			<< BLOCK_SIZE_BITS;
+	else
+		return 0;
 }
 
 typedef struct {struct page *v;} Sector;

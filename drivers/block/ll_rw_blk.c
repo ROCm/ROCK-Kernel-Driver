@@ -62,7 +62,7 @@ struct blk_dev_struct blk_dev[MAX_BLKDEV]; /* initialized by blk_dev_init() */
 
 /*
  * blk_size contains the size of all block-devices in units of 1024 byte
- * sectors:
+ * blocks:
  *
  * blk_size[MAJOR][MINOR]
  *
@@ -1274,32 +1274,27 @@ static inline void blk_partition_remap(struct bio *bio)
  * */
 void generic_make_request(struct bio *bio)
 {
-	int major = major(bio->bi_dev);
-	int minor = minor(bio->bi_dev);
 	request_queue_t *q;
-	sector_t minorsize = 0;
+	sector_t maxsector;
 	int ret, nr_sectors = bio_sectors(bio);
 
 	/* Test device or partition size, when known. */
-	if (blk_size[major])
-		minorsize = blk_size[major][minor];
-	if (minorsize) {
-		unsigned long maxsector = (minorsize << 1) + 1;
-		unsigned long sector = bio->bi_sector;
+	maxsector = (blkdev_size_in_bytes(bio->bi_dev) >> 9);
+	if (maxsector) {
+		sector_t sector = bio->bi_sector;
 
-		if (maxsector < nr_sectors || maxsector - nr_sectors < sector) {
-			if (blk_size[major][minor]) {
-				
-				/* This may well happen - the kernel calls
-				 * bread() without checking the size of the
-				 * device, e.g., when mounting a device. */
-				printk(KERN_INFO
-				       "attempt to access beyond end of device\n");
-				printk(KERN_INFO "%s: rw=%ld, want=%ld, limit=%Lu\n",
-				       kdevname(bio->bi_dev), bio->bi_rw,
-				       (sector + nr_sectors)>>1,
-				       (long long) blk_size[major][minor]);
-			}
+		if (maxsector < nr_sectors ||
+		    maxsector - nr_sectors < sector) {
+			/* This may well happen - the kernel calls
+			 * bread() without checking the size of the
+			 * device, e.g., when mounting a device. */
+			printk(KERN_INFO
+			       "attempt to access beyond end of device\n");
+			printk(KERN_INFO "%s: rw=%ld, want=%ld, limit=%Lu\n",
+			       kdevname(bio->bi_dev), bio->bi_rw,
+			       sector + nr_sectors,
+			       (long long) maxsector);
+
 			set_bit(BIO_EOF, &bio->bi_flags);
 			goto end_io;
 		}
