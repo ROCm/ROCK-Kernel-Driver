@@ -19,7 +19,7 @@ config USB_MDC800
 
 config USB_SCANNER
 	tristate "USB Scanner support (OBSOLETE)"
-	depends on USB
+	depends on USB && BROKEN
 	help
 	  Say Y here if you want to connect a USB scanner to your computer's
 	  USB port. Please read <file:Documentation/usb/scanner.txt> for more
