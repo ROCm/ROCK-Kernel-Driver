@@ -275,7 +275,7 @@ config USB_GADGETFS
 	  dynamically linked module called "gadgetfs".
 
 config USB_FILE_STORAGE
-	tristate "File-backed Storage Gadget (DEVELOPMENT)"
+	tristate "File-backed Storage Gadget"
 	# we don't support the SA1100 because of its limitations
 	depends on USB_GADGET_SA1100 = n
 	help
@@ -288,7 +288,7 @@ config USB_FILE_STORAGE
 	  dynamically linked module called "g_file_storage".
 
 config USB_FILE_STORAGE_TEST
-	bool "File-backed Storage Gadget test version"
+	bool "File-backed Storage Gadget testing version"
 	depends on USB_FILE_STORAGE
 	default n
 	help
