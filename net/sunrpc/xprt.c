@@ -585,7 +585,6 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 				rpc_update_rtt(&clnt->cl_rtt, timer,
 						(long)jiffies - req->rq_xtime);
 		}
-		rpc_clear_timeo(&clnt->cl_rtt);
 	}
 
 #ifdef RPC_PROFILE
@@ -1052,21 +1051,6 @@ out:
 }
 
 /*
- * Exponential backoff for UDP retries
- */
-static inline int
-xprt_expbackoff(struct rpc_task *task, struct rpc_rqst *req)
-{
-	int backoff;
-
-	req->rq_ntimeo++;
-	backoff = min(rpc_ntimeo(&task->tk_client->cl_rtt), XPRT_MAX_BACKOFF);
-	if (req->rq_ntimeo < (1 << backoff))
-		return 1;
-	return 0;
-}
-
-/*
  * RPC receive timeout handler.
  */
 static void
@@ -1079,14 +1063,7 @@ xprt_timer(struct rpc_task *task)
 	if (req->rq_received)
 		goto out;
 
-	if (!xprt->nocong) {
-		if (xprt_expbackoff(task, req)) {
-			rpc_add_timer(task, xprt_timer);
-			goto out_unlock;
-		}
-		rpc_inc_timeo(&task->tk_client->cl_rtt);
-		xprt_adjust_cwnd(req->rq_xprt, -ETIMEDOUT);
-	}
+	xprt_adjust_cwnd(req->rq_xprt, -ETIMEDOUT);
 	req->rq_nresend++;
 
 	dprintk("RPC: %4d xprt_timer (%s request)\n",
@@ -1096,7 +1073,6 @@ xprt_timer(struct rpc_task *task)
 out:
 	task->tk_timeout = 0;
 	rpc_wake_up_task(task);
-out_unlock:
 	spin_unlock(&xprt->sock_lock);
 }
 
@@ -1246,7 +1222,8 @@ xprt_transmit(struct rpc_task *task)
 	if (!xprt->nocong) {
 		task->tk_timeout = rpc_calc_rto(&clnt->cl_rtt,
 				task->tk_msg.rpc_proc->p_timer);
-		req->rq_ntimeo = 0;
+		task->tk_timeout <<= clnt->cl_timeout.to_retries
+			- req->rq_timeout.to_retries;
 		if (task->tk_timeout > req->rq_timeout.to_maxval)
 			task->tk_timeout = req->rq_timeout.to_maxval;
 	} else
