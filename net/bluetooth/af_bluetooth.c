@@ -356,7 +356,7 @@ static void __exit bluez_cleanup(void)
 	remove_proc_entry("bluetooth", NULL);
 }
 
-module_init(bluez_init);
+subsys_initcall(bluez_init);
 module_exit(bluez_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");

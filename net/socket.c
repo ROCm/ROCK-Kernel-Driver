@@ -1684,10 +1684,6 @@ extern void sk_init(void);
 extern void wanrouter_init(void);
 #endif
 
-#ifdef CONFIG_BLUEZ
-extern void bluez_init(void);
-#endif
-
 void __init sock_init(void)
 {
 	int i;
@@ -1747,10 +1743,6 @@ void __init sock_init(void)
 #endif
 #ifdef CONFIG_NETFILTER
 	netfilter_init();
-#endif
-
-#ifdef CONFIG_BLUEZ
-	bluez_init();
 #endif
 }
 
