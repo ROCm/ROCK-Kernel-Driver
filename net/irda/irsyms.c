@@ -97,7 +97,6 @@ EXPORT_SYMBOL(irda_task_execute);
 EXPORT_SYMBOL(irda_task_next_state);
 EXPORT_SYMBOL(irda_task_delete);
 
-EXPORT_SYMBOL(irda_start_timer);
 
 #ifdef CONFIG_IRDA_DEBUG
 __u32 irda_debug = IRDA_DEBUG_LEVEL;
