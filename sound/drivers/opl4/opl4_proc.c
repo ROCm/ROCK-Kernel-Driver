@@ -18,6 +18,7 @@
  */
 
 #include "opl4_local.h"
+#include <linux/vmalloc.h>
 #include <sound/info.h>
 
 #ifdef CONFIG_PROC_FS
@@ -59,7 +60,7 @@ static long snd_opl4_mem_proc_read(snd_info_entry_t *entry, void *file_private_d
 	if (file->f_pos + size > entry->size)
 		size = entry->size - file->f_pos;
 	if (size > 0) {
-		buf = kmalloc(size, GFP_KERNEL);
+		buf = vmalloc(size);
 		if (!buf)
 			return -ENOMEM;
 		snd_opl4_read_memory(opl4, buf, file->f_pos, size);
@@ -67,7 +68,7 @@ static long snd_opl4_mem_proc_read(snd_info_entry_t *entry, void *file_private_d
 			kfree(buf);
 			return -EFAULT;
 		}
-		kfree(buf);
+		vfree(buf);
 		file->f_pos += size;
 		return size;
 	}
@@ -85,7 +86,7 @@ static long snd_opl4_mem_proc_write(snd_info_entry_t *entry, void *file_private_
 	if (file->f_pos + size > entry->size)
 		size = entry->size - file->f_pos;
 	if (size > 0) {
-		buf = kmalloc(size, GFP_KERNEL);
+		buf = vmalloc(size);
 		if (!buf)
 			return -ENOMEM;
 		if (copy_from_user(buf, _buf, size)) {
@@ -93,7 +94,7 @@ static long snd_opl4_mem_proc_write(snd_info_entry_t *entry, void *file_private_
 			return -EFAULT;
 		}
 		snd_opl4_write_memory(opl4, buf, file->f_pos, size);
-		kfree(buf);
+		vfree(buf);
 		file->f_pos += size;
 		return size;
 	}
