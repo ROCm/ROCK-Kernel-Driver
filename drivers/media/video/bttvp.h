@@ -24,7 +24,7 @@
 #ifndef _BTTVP_H_
 #define _BTTVP_H_
 
-#define BTTV_VERSION_CODE KERNEL_VERSION(0,9,1)
+#define BTTV_VERSION_CODE KERNEL_VERSION(0,9,4)
 
 #include <linux/types.h>
 #include <linux/wait.h>
@@ -55,7 +55,7 @@
 
 #define RESOURCE_OVERLAY       1
 #define RESOURCE_VIDEO         2
-#define RESOURCE_VBI           3
+#define RESOURCE_VBI           4
 
 #define RAW_LINES            640
 #define RAW_BPL             1024
@@ -136,7 +136,10 @@ struct bttv_fh {
 
 	/* video capture */
 	struct videobuf_queue    cap;
-	struct bttv_buffer       buf;
+	/* struct bttv_buffer       buf; */
+	const struct bttv_format *fmt;
+	int                      width;
+	int                      height;
 
 	/* current settings */
 	const struct bttv_format *ovfmt;
@@ -255,7 +258,7 @@ struct bttv {
 	/* card configuration info */
         unsigned int nr;       /* dev nr (for printk("bttv%d: ...");  */
 	char name[8];          /* dev name */
-	int cardid;            /* pci subsystem id (bt878 based ones) */
+	unsigned int cardid;   /* pci subsystem id (bt878 based ones) */
 	int type;              /* card type (pointer into tvcards[])  */
         int tuner_type;        /* tuner chip type */
 	struct bttv_pll_info pll;
@@ -291,7 +294,6 @@ struct bttv {
 	int tvnorm,hue,contrast,bright,saturation;
 	struct video_buffer fbuf;
 	int field_count;
-	int digital_video;
 
 	/* various options */
 	int opt_combfilter;
@@ -334,7 +336,7 @@ struct bttv {
 	struct timer_list timeout;
 	int errors;
 
-	int user;
+	int users;
 	struct bttv_fh init;
 };
 

@@ -30,8 +30,9 @@ struct nfs_page {
 	struct rpc_cred		*wb_cred;
 	struct page		*wb_page;	/* page to read in/write out */
 	wait_queue_head_t	wb_wait;	/* wait queue */
-	unsigned long		wb_index;	/* Offset within mapping */
-	unsigned int		wb_offset,	/* Offset within page */
+	unsigned long		wb_index;	/* Offset >> PAGE_CACHE_SHIFT */
+	unsigned int		wb_offset,	/* Offset & ~PAGE_CACHE_MASK */
+				wb_pgbase,	/* Start of page data */
 				wb_bytes,	/* Length of request */
 				wb_count;	/* reference count */
 	unsigned long		wb_flags;

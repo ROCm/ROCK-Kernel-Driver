@@ -1119,11 +1119,7 @@ void fdc_isr(void)
 			}
 			ft_seek_completed = 1;
 			fdc_mode = fdc_idle;
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,0,16)
 		} else if (!waitqueue_active(&ftape_wait_intr)) {
-#else
-		} else if (!ftape_wait_intr) {
-#endif
 			if (ft_expected_stray_interrupts == 0) {
 				TRACE(ft_t_warn, "unexpected stray interrupt");
 			} else {
@@ -1154,23 +1150,12 @@ void fdc_isr(void)
 	 */
 	if (!ft_hide_interrupt) {
 		ft_interrupt_seen ++;
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,0,16)
 		if (waitqueue_active(&ftape_wait_intr)) {
 			wake_up_interruptible(&ftape_wait_intr);
 		}
-#else
-		if (ftape_wait_intr) {
-			wake_up_interruptible(&ftape_wait_intr);
-		}
-#endif
 	} else {
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,0,16)
 		TRACE(ft_t_flow, "hiding interrupt while %s", 
 		      waitqueue_active(&ftape_wait_intr) ? "waiting":"active");
-#else
-		TRACE(ft_t_flow, "hiding interrupt while %s", 
-		      ftape_wait_intr ? "waiting" : "active");
-#endif
 	}
 #ifdef TESTING
 	t0 = ftape_timediff(t0, ftape_timestamp());

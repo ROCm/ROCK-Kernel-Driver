@@ -62,17 +62,7 @@
 /* Addresses to scan */
 static unsigned short normal_i2c[] = {I2C_CLIENT_END};
 static unsigned short normal_i2c_range[] = {0x40,0x40,I2C_CLIENT_END};
-static unsigned short probe[2]        = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short probe_range[2]  = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore[2]       = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore_range[2] = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short force[2]        = { I2C_CLIENT_END, I2C_CLIENT_END };
-static struct i2c_client_address_data addr_data = {
-	normal_i2c, normal_i2c_range, 
-	probe, probe_range, 
-	ignore, ignore_range, 
-	force
-};
+I2C_CLIENT_INSMOD;
 
 /* insmod parameters */
 static int debug   = 0;    /* debug output */
@@ -145,17 +135,33 @@ MODULE_LICENSE("GPL");
 /* ----------------------------------------------------------------------- */
 /* functions for talking to the MSP3400C Sound processor                   */
 
+#ifndef I2C_M_IGNORE_NAK
+# define I2C_M_IGNORE_NAK 0x1000
+#endif
+
 static int msp3400c_reset(struct i2c_client *client)
 {
-        static char reset_off[3] = { 0x00, 0x80, 0x00 };
-        static char reset_on[3]  = { 0x00, 0x00, 0x00 };
-
-        i2c_master_send(client,reset_off,3);  /* XXX ignore errors here */
-        if (3 != i2c_master_send(client,reset_on, 3)) {
-		printk(KERN_ERR "msp3400: chip reset failed, penguin on i2c bus?\n");
-                return -1;
-	}
-        return 0;
+	/* reset and read revision code */
+	static char reset_off[3] = { 0x00, 0x80, 0x00 };
+	static char reset_on[3]  = { 0x00, 0x00, 0x00 };
+	static char write[3]     = { I2C_MSP3400C_DFP + 1, 0x00, 0x1e };
+	char read[2];
+	struct i2c_msg reset[2] = {
+		{ client->addr, I2C_M_IGNORE_NAK, 3, reset_off },
+		{ client->addr, I2C_M_IGNORE_NAK, 3, reset_on  },
+	};
+	struct i2c_msg test[2] = {
+		{ client->addr, 0,        3, write },
+		{ client->addr, I2C_M_RD, 2, read  },
+	};
+	
+	if ( (1 != i2c_transfer(client->adapter,&reset[0],1)) ||
+	     (1 != i2c_transfer(client->adapter,&reset[1],1)) ||
+	     (2 != i2c_transfer(client->adapter,test,2)) ) {
+		printk(KERN_ERR "msp3400: chip reset failed\n");
+		return -1;
+        }
+	return 0; 
 }
 
 static int
@@ -1213,19 +1219,20 @@ static int msp_probe(struct i2c_adapter *adap);
 static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg);
 
 static struct i2c_driver driver = {
-	.name		= "i2cmsp3400driver",
-	.id		= I2C_DRIVERID_MSP3400,
-	.flags		= I2C_DF_NOTIFY,
-	.attach_adapter	= msp_probe,
-	.detach_client	= msp_detach,
-	.command	= msp_command,
+	.owner          = THIS_MODULE,
+        .name           = "i2c msp3400 driver",
+        .id             = I2C_DRIVERID_MSP3400,
+        .flags          = I2C_DF_NOTIFY,
+        .attach_adapter = msp_probe,
+        .detach_client  = msp_detach,
+        .command        = msp_command,
 };
 
 static struct i2c_client client_template = 
 {
-	.name	= "(unset)",
-	.flags	= I2C_CLIENT_ALLOW_USE,
-	.driver	= &driver,
+	.name   = "(unset)",
+	.flags  = I2C_CLIENT_ALLOW_USE,
+        .driver = &driver,
 };
 
 static int msp_attach(struct i2c_adapter *adap, int addr,
@@ -1258,6 +1265,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr,
 	msp->bass   = 32768;
 	msp->treble = 32768;
 	msp->input  = -1;
+	msp->muted  = 1;
 	for (i = 0; i < DFP_COUNT; i++)
 		msp->dfp_regs[i] = -1;
 
@@ -1283,8 +1291,9 @@ static int msp_attach(struct i2c_adapter *adap, int addr,
 
 #if 0
 	/* this will turn on a 1kHz beep - might be useful for debugging... */
-	msp3400c_write(client,I2C_MSP3400C_DFP, 0x0014, 0x1040);
+	msp3400c_write(c,I2C_MSP3400C_DFP, 0x0014, 0x1040);
 #endif
+	msp3400c_setvolume(c,msp->muted,msp->left,msp->right);
 
 	sprintf(c->name,"MSP34%02d%c-%c%d",
 		(rev2>>8)&0xff, (rev1&0xff)+'@', ((rev1>>8)&0xff)+'@', rev2&0x1f);

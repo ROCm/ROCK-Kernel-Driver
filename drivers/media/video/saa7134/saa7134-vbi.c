@@ -114,7 +114,8 @@ static int buffer_activate(struct saa7134_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(struct file *file, struct videobuf_buffer *vb)
+static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
+			  enum v4l2_field field)
 {
 	struct saa7134_fh *fh   = file->private_data;
 	struct saa7134_dev *dev = fh->dev;
@@ -158,7 +159,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb)
 	buf->vb.state = STATE_PREPARED;
 	buf->top_seen = 0;
 	buf->activate = buffer_activate;
-	buf->vb.field = V4L2_FIELD_SEQ_TB;
+	buf->vb.field = field;
 	return 0;
 
  oops:
@@ -218,6 +219,7 @@ struct videobuf_queue_ops saa7134_vbi_qops = {
 int saa7134_vbi_init(struct saa7134_dev *dev)
 {
 	INIT_LIST_HEAD(&dev->vbi_q.queue);
+	init_timer(&dev->vbi_q.timeout);
 	dev->vbi_q.timeout.function = saa7134_buffer_timeout;
 	dev->vbi_q.timeout.data     = (unsigned long)(&dev->vbi_q);
 	dev->vbi_q.dev              = dev;

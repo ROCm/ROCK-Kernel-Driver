@@ -196,11 +196,7 @@ int fdc_command(const __u8 * cmd_data, int cmd_len)
 	fdc_usec_wait(FT_RQM_DELAY);	/* wait for valid RQM status */
 	save_flags(flags);
 	cli();
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,30)
 	if (!in_interrupt())
-#else
-	if (!intr_count)
-#endif
 		/* Yes, I know, too much comments inside this function
 		 * ...
 		 * 
@@ -264,19 +260,11 @@ int fdc_command(const __u8 * cmd_data, int cmd_len)
 		}
 	}
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,30)
 	if (!in_interrupt()) {
 		/* shouldn't be cleared if called from isr
 		 */
 		ft_interrupt_seen = 0;
 	}
-#else
-	if (!intr_count) {
-		/* shouldn't be cleared if called from isr
-		 */
-		ft_interrupt_seen = 0;
-	}
-#endif
 	while (count) {
 		result = fdc_write(*cmd_data);
 		if (result < 0) {
@@ -392,15 +380,9 @@ int fdc_interrupt_wait(unsigned int time)
 
 	TRACE_FUN(ft_t_fdc_dma);
 
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,0,16)
  	if (waitqueue_active(&ftape_wait_intr)) {
 		TRACE_ABORT(-EIO, ft_t_err, "error: nested call");
 	}
-#else
-	if (ftape_wait_intr) {
-		TRACE_ABORT(-EIO, ft_t_err, "error: nested call");
-	}
-#endif
 	/* timeout time will be up to USPT microseconds too long ! */
 	timeout = (1000 * time + FT_USPT - 1) / FT_USPT;
 

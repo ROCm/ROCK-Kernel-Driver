@@ -39,12 +39,11 @@
 		 __section__(".data.cacheline_aligned")))
 #endif
 
-#if defined(__KERNEL__) && !defined(__ASSEMBLY__)
+#ifndef __ASSEMBLY__
 extern void clean_dcache_range(unsigned long start, unsigned long stop);
 extern void flush_dcache_range(unsigned long start, unsigned long stop);
 extern void invalidate_dcache_range(unsigned long start, unsigned long stop);
 extern void flush_dcache_all(void);
-
 #endif /* __ASSEMBLY__ */
 
 /* prep registers for L2 */

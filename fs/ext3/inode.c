@@ -1405,10 +1405,11 @@ static int ext3_releasepage(struct page *page, int wait)
  * If the O_DIRECT write is intantiating holes inside i_size and the machine
  * crashes then stale disk data _may_ be exposed inside the file.
  */
-static int ext3_direct_IO(int rw, struct file *file,
+static int ext3_direct_IO(int rw, struct kiocb *iocb,
 			const struct iovec *iov, loff_t offset,
 			unsigned long nr_segs)
 {
+	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	handle_t *handle = NULL;
@@ -1437,8 +1438,8 @@ static int ext3_direct_IO(int rw, struct file *file,
 		}
 	}
 
-	ret = generic_direct_IO(rw, inode, inode->i_sb->s_bdev, iov, offset,
-				nr_segs, ext3_direct_io_get_blocks);
+	ret = blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov, 
+				offset, nr_segs, ext3_direct_io_get_blocks);
 
 out_stop:
 	if (handle) {

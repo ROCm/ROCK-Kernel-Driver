@@ -30,19 +30,6 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
- *	Version 1.0 (01/10/10) - A. Kuster
- *	Initial version	 - moved 40GP  specific out of ppc4xx.h
- *			- moved emac reg from ppc405_enet.h
- *
- *	Version 1.1 02/01/17 - A. Kuster
- *	Moved offsets to ibm405.h
- *
- *	Version 1.2 05/01/02 - Armin
- *	 added IIC_PORT_DFNS
- *
- *	Version 1.3 - armin
- *	  removed iic & uart num defines
- *	  and IIC_PORT_DFNS
  */
 
 #ifdef __KERNEL__
@@ -50,7 +37,6 @@
 #define __ASM_IBM405GP_H__
 
 #include <linux/config.h>
-#include <platforms/4xx/ibm_ocp.h>
 
 /* ibm405.h at bottom of this file */
 
@@ -88,6 +74,9 @@
 #define PPC4xx_ONB_IO_VADDR	PPC4xx_ONB_IO_PADDR
 #define PPC4xx_ONB_IO_SIZE	((uint)4*1024)
 
+#define OPB_BASE_START	0x40000000
+#define EBIU_BASE_START	0xF0100000
+
 /* serial port defines */
 #define RS_TABLE_SIZE	2
 
@@ -101,6 +90,13 @@
 #define OPB0_BASE	0xEF600600
 #define GPIO0_BASE	0xEF600700
 #define EMAC0_BASE	0xEF600800
+#define BL_MAC_WOL	9	/* WOL */
+#define BL_MAL_SERR	10	/* MAL SERR */
+#define BL_MAL_TXDE	13	/* MAL TXDE */
+#define BL_MAL_RXDE	14	/* MAL RXDE */
+#define BL_MAL_TXEOB	11	/* MAL TX EOB */
+#define BL_MAL_RXEOB	12	/* MAL RX EOB */
+#define BL_MAC_ETH0	15	/* MAC */
 
 #define EMAC_NUMS	1
 #define IIC0_IRQ	2
@@ -154,23 +150,25 @@
 #define  PSR_PCI_ASYNC_EN        0x00001000
 #define  PSR_PCI_ARBIT_EN        0x00000400
 
-#define CPM_IIC0		0x80000000	/* IIC interface */
-#define CPM_PCI			0x40000000	/* PCI bridge */
-#define CPM_CPU			0x20000000	/* processor core */
-#define CPM_DMA			0x10000000	/* DMA controller */
-#define CPM_BRG			0x08000000	/* PLB to OPB bridge */
-#define CPM_DCP			0x04000000	/* CodePack */
-#define CPM_EBC			0x02000000	/* ROM/SRAM peripheral controller */
-#define CPM_SDRAM0		0x01000000	/* SDRAM memory controller */
-#define CPM_PLB			0x00800000	/* PLB bus arbiter */
-#define CPM_GPIO0		0x00400000	/* General Purpose IO (??) */
-#define CPM_UART0		0x00200000	/* serial port 0 */
-#define CPM_UART1		0x00100000	/* serial port 1 */
-#define CPM_UIC			0x00080000	/* Universal Interrupt Controller */
-#define CPM_TMRCLK		0x00040000	/* CPU timers */
-#define CPM_EMAC_MM		0x00020000	/* on-chip ethernet MM unit */
-#define CPM_EMAC_RM		0x00010000	/* on-chip ethernet RM unit */
-#define CPM_EMAC_TM		0x00008000	/* on-chip ethernet TM unit */
+#define IBM_CPM_IIC0		0x80000000	/* IIC interface */
+#define IBM_CPM_PCI		0x40000000	/* PCI bridge */
+#define IBM_CPM_CPU		0x20000000	/* processor core */
+#define IBM_CPM_DMA		0x10000000	/* DMA controller */
+#define IBM_CPM_OPB		0x08000000	/* PLB to OPB bridge */
+#define IBM_CPM_DCP		0x04000000	/* CodePack */
+#define IBM_CPM_EBC		0x02000000	/* ROM/SRAM peripheral controller */
+#define IBM_CPM_SDRAM0		0x01000000	/* SDRAM memory controller */
+#define IBM_CPM_PLB		0x00800000	/* PLB bus arbiter */
+#define IBM_CPM_GPIO0		0x00400000	/* General Purpose IO (??) */
+#define IBM_CPM_UART0		0x00200000	/* serial port 0 */
+#define IBM_CPM_UART1		0x00100000	/* serial port 1 */
+#define IBM_CPM_UIC		0x00080000	/* Universal Interrupt Controller */
+#define IBM_CPM_TMRCLK		0x00040000	/* CPU timers */
+#define IBM_CPM_EMAC0		0x00020000	/* on-chip ethernet MM unit */
+#define DFLT_IBM4xx_PM		~(IBM_CPM_PCI | IBM_CPM_CPU | IBM_CPM_DMA \
+					| IBM_CPM_OPB | IBM_CPM_EBC \
+					| IBM_CPM_SDRAM0 | IBM_CPM_PLB \
+					| IBM_CPM_UIC | IBM_CPM_TMRCLK)
 
 #define DCRN_DMA0_BASE		0x100
 #define DCRN_DMA1_BASE		0x108

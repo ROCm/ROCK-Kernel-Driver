@@ -812,6 +812,24 @@ static int remove(struct dm_ioctl *param, struct dm_ioctl *user)
 		return -EINVAL;
 	}
 
+	/*
+	 * You may ask the interface to drop its reference to an
+	 * in use device.  This is no different to unlinking a
+	 * file that someone still has open.  The device will not
+	 * actually be destroyed until the last opener closes it.
+	 * The name and uuid of the device (both are interface
+	 * properties) will be available for reuse immediately.
+	 *
+	 * You don't want to drop a _suspended_ device from the
+	 * interface, since that will leave you with no way of
+	 * resuming it.
+	 */
+	if (dm_suspended(hc->md)) {
+		DMWARN("refusing to remove a suspended device.");
+		up_write(&_hash_lock);
+		return -EPERM;
+	}
+
 	__hash_remove(hc);
 	up_write(&_hash_lock);
 	return 0;
