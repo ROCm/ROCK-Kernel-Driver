@@ -1308,11 +1308,10 @@ S: USA
 
 N: Benjamin Herrenschmidt
 E: benh@kernel.crashing.org
-E: benh@mipsys.com
-D: Various parts of PPC & PowerMac
-S: 122, boulevard Baille
-S: 13005 Marseille
-S: France
+D: Various parts of PPC/PPC64 & PowerMac
+S: 312/107 Canberra Avenue
+S: Griffith, ACT 2603 
+S: Australia
 
 N: Sebastian Hetze
 E: she@lunetix.de
