@@ -176,12 +176,20 @@ static void
 destroy_conntrack(struct nf_conntrack *nfct)
 {
 	struct ip_conntrack *ct = (struct ip_conntrack *)nfct;
+	struct ip_conntrack_protocol *proto;
 
 	IP_NF_ASSERT(atomic_read(&nfct->use) == 0);
 	IP_NF_ASSERT(!timer_pending(&ct->timeout));
 
 	if (ct->master.master)
 		nf_conntrack_put(&ct->master);
+
+	/* To make sure we don't get any weird locking issues here:
+	 * destroy_conntrack() MUST NOT be called with a write lock
+	 * to ip_conntrack_lock!!! -HW */
+	proto = find_proto(ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.protonum);
+	if (proto && proto->destroy)
+		proto->destroy(ct);
 
 	if (ip_conntrack_destroyed)
 		ip_conntrack_destroyed(ct);

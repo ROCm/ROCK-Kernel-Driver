@@ -42,6 +42,9 @@ struct ip_conntrack_protocol
 	int (*new)(struct ip_conntrack *conntrack, struct iphdr *iph,
 		   size_t len);
 
+	/* Called when a conntrack entry is destroyed */
+	void (*destroy)(struct ip_conntrack *conntrack);
+
 	/* Module (if any) which this is connected to. */
 	struct module *me;
 };

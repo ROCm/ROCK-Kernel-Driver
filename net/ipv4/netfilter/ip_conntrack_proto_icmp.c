@@ -113,4 +113,4 @@ static int icmp_new(struct ip_conntrack *conntrack,
 struct ip_conntrack_protocol ip_conntrack_protocol_icmp
 = { { NULL, NULL }, IPPROTO_ICMP, "icmp",
     icmp_pkt_to_tuple, icmp_invert_tuple, icmp_print_tuple,
-    icmp_print_conntrack, icmp_packet, icmp_new, NULL };
+    icmp_print_conntrack, icmp_packet, icmp_new, NULL, NULL };

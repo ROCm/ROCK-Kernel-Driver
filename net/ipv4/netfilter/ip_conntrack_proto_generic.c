@@ -57,5 +57,5 @@ new(struct ip_conntrack *conntrack, struct iphdr *iph, size_t len)
 struct ip_conntrack_protocol ip_conntrack_generic_protocol
 = { { NULL, NULL }, 0, "unknown",
     generic_pkt_to_tuple, generic_invert_tuple, generic_print_tuple,
-    generic_print_conntrack, established, new, NULL };
+    generic_print_conntrack, established, new, NULL, NULL };
 

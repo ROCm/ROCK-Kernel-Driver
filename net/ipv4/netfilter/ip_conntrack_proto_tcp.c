@@ -230,4 +230,4 @@ static int tcp_new(struct ip_conntrack *conntrack,
 struct ip_conntrack_protocol ip_conntrack_protocol_tcp
 = { { NULL, NULL }, IPPROTO_TCP, "tcp",
     tcp_pkt_to_tuple, tcp_invert_tuple, tcp_print_tuple, tcp_print_conntrack,
-    tcp_packet, tcp_new, NULL };
+    tcp_packet, tcp_new, NULL, NULL };

@@ -71,4 +71,4 @@ static int udp_new(struct ip_conntrack *conntrack,
 struct ip_conntrack_protocol ip_conntrack_protocol_udp
 = { { NULL, NULL }, IPPROTO_UDP, "udp",
     udp_pkt_to_tuple, udp_invert_tuple, udp_print_tuple, udp_print_conntrack,
-    udp_packet, udp_new, NULL };
+    udp_packet, udp_new, NULL, NULL };
