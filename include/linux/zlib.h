@@ -33,10 +33,6 @@
 
 #include <linux/zconf.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define ZLIB_VERSION "1.1.3"
 
 /* 
@@ -639,9 +635,5 @@ extern int zlib_inflateInit2_ (z_streamp strm, int  windowBits,
 extern const char  * zlib_zError           (int err);
 extern int           zlib_inflateSyncPoint (z_streamp z);
 extern const uLong * zlib_get_crc_table    (void);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* _ZLIB_H */
