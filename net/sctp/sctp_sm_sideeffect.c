@@ -167,7 +167,6 @@ int sctp_side_effects(sctp_event_t event_type, sctp_subtype_t subtype,
 		      sctp_cmd_seq_t *commands,
 		      int priority)
 {
-	sctp_chunk_t *chunk = (sctp_chunk_t *) event_arg;
 	int error;
 
 	/* FIXME - Most of the dispositions left today would be categorized
