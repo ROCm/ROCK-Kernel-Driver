@@ -303,7 +303,6 @@ struct de_private {
 	struct net_device_stats net_stats;
 
 	struct pci_dev		*pdev;
-	u32			macmode;
 
 	u16			setup_frame[DE_SETUP_FRAME_WORDS];
 
@@ -732,7 +731,7 @@ static void __de_set_rx_mode (struct net_device *dev)
 	struct de_desc *txd;
 	struct de_desc *dummy_txd = NULL;
 
-	macmode = de->macmode & ~(AcceptAllMulticast | AcceptAllPhys);
+	macmode = dr32(MacMode) & ~(AcceptAllMulticast | AcceptAllPhys);
 
 	if (dev->flags & IFF_PROMISC) {	/* Set promiscuous. */
 		macmode |= AcceptAllMulticast | AcceptAllPhys;
@@ -805,10 +804,8 @@ static void __de_set_rx_mode (struct net_device *dev)
 	dw32(TxPoll, NormalTxPoll);
 
 out:
-	if (macmode != de->macmode) {
-		dw32 (MacMode, macmode);
-		de->macmode = macmode;
-	}
+	if (macmode != dr32(MacMode))
+		dw32(MacMode, macmode);
 }
 
 static void de_set_rx_mode (struct net_device *dev)
@@ -923,6 +920,7 @@ static void de_link_down(struct de_private *de)
 static void de_set_media (struct de_private *de)
 {
 	unsigned media = de->media_type;
+	u32 macmode = dr32(MacMode);
 
 	if (de_is_running(de))
 		BUG();
@@ -940,9 +938,9 @@ static void de_set_media (struct de_private *de)
 	mdelay(10);
 
 	if (media == DE_MEDIA_TP_FD)
-		de->macmode |= FullDuplex;
+		macmode |= FullDuplex;
 	else
-		de->macmode &= ~FullDuplex;
+		macmode &= ~FullDuplex;
 	
 	if (netif_msg_link(de)) {
 		printk(KERN_INFO "%s: set link %s\n"
@@ -951,9 +949,11 @@ static void de_set_media (struct de_private *de)
 		       de->dev->name, media_name[media],
 		       de->dev->name, dr32(MacMode), dr32(SIAStatus),
 		       dr32(CSR13), dr32(CSR14), dr32(CSR15),
-		       de->dev->name, de->macmode, de->media[media].csr13,
+		       de->dev->name, macmode, de->media[media].csr13,
 		       de->media[media].csr14, de->media[media].csr15);
 	}
+	if (macmode != dr32(MacMode))
+		dw32(MacMode, macmode);
 }
 
 static void de_next_media (struct de_private *de, u32 *media,
@@ -1235,11 +1235,12 @@ static void de_adapter_sleep (struct de_private *de)
 static int de_init_hw (struct de_private *de)
 {
 	struct net_device *dev = de->dev;
+	u32 macmode;
 	int rc;
 
 	de_adapter_wake(de);
 	
-	de->macmode = dr32(MacMode) & ~MacModeClear;
+	macmode = dr32(MacMode) & ~MacModeClear;
 
 	rc = de_reset_mac(de);
 	if (rc)
@@ -1250,7 +1251,7 @@ static int de_init_hw (struct de_private *de)
 	dw32(RxRingAddr, de->ring_dma);
 	dw32(TxRingAddr, de->ring_dma + (sizeof(struct de_desc) * DE_RX_RING_SIZE));
 
-	dw32(MacMode, RxTx | de->macmode);
+	dw32(MacMode, RxTx | macmode);
 
 	dr32(RxMissed); /* self-clearing */
 
@@ -1501,7 +1502,7 @@ static int __de_get_settings(struct de_private *de, struct ethtool_cmd *ecmd)
 		break;
 	}
 	
-	if (de->macmode & FullDuplex)
+	if (dr32(MacMode) & FullDuplex)
 		ecmd->duplex = DUPLEX_FULL;
 	else
 		ecmd->duplex = DUPLEX_HALF;
