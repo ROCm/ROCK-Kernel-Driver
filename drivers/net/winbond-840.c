@@ -347,7 +347,7 @@ struct netdev_private {
 	struct w840_rx_desc *rx_ring;
 	dma_addr_t	rx_addr[RX_RING_SIZE];
 	struct w840_tx_desc *tx_ring;
-	dma_addr_t	tx_addr[RX_RING_SIZE];
+	dma_addr_t	tx_addr[TX_RING_SIZE];
 	dma_addr_t ring_dma_addr;
 	/* The addresses of receive-in-place skbuffs. */
 	struct sk_buff* rx_skbuff[RX_RING_SIZE];
