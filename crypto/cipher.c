@@ -22,7 +22,7 @@
 
 typedef void (cryptfn_t)(void *, u8 *, const u8 *);
 typedef void (procfn_t)(struct crypto_tfm *, u8 *,
-                        u8*, cryptfn_t, int enc, void *);
+                        u8*, cryptfn_t, int enc, void *, int);
 
 static inline void xor_64(u8 *a, const u8 *b)
 {
@@ -78,7 +78,9 @@ static int crypt(struct crypto_tfm *tfm,
 
 		scatterwalk_copychunks(src_p, &walk_in, bsize, 0);
 
-		prfn(tfm, dst_p, src_p, crfn, enc, info);
+		prfn(tfm, dst_p, src_p, crfn, enc, info,
+		     scatterwalk_samebuf(&walk_in, &walk_out,
+					 src_p, dst_p));
 
 		scatterwalk_done(&walk_in, 0, nbytes);
 
@@ -92,8 +94,8 @@ static int crypt(struct crypto_tfm *tfm,
 	}
 }
 
-static void cbc_process(struct crypto_tfm *tfm,
-                        u8 *dst, u8 *src, cryptfn_t fn, int enc, void *info)
+static void cbc_process(struct crypto_tfm *tfm, u8 *dst, u8 *src,
+			cryptfn_t fn, int enc, void *info, int in_place)
 {
 	u8 *iv = info;
 	
@@ -106,9 +108,8 @@ static void cbc_process(struct crypto_tfm *tfm,
 		fn(crypto_tfm_ctx(tfm), dst, iv);
 		memcpy(iv, dst, crypto_tfm_alg_blocksize(tfm));
 	} else {
-		const int need_stack = (src == dst);
-		u8 stack[need_stack ? crypto_tfm_alg_blocksize(tfm) : 0];
-		u8 *buf = need_stack ? stack : dst;
+		u8 stack[in_place ? crypto_tfm_alg_blocksize(tfm) : 0];
+		u8 *buf = in_place ? stack : dst;
 
 		fn(crypto_tfm_ctx(tfm), buf, src);
 		tfm->crt_u.cipher.cit_xor_block(buf, iv);
@@ -119,7 +120,7 @@ static void cbc_process(struct crypto_tfm *tfm,
 }
 
 static void ecb_process(struct crypto_tfm *tfm, u8 *dst, u8 *src,
-                        cryptfn_t fn, int enc, void *info)
+			cryptfn_t fn, int enc, void *info, int in_place)
 {
 	fn(crypto_tfm_ctx(tfm), dst, src);
 }

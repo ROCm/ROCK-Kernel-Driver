@@ -33,6 +33,14 @@ static inline struct scatterlist *sg_next(struct scatterlist *sg)
 	return sg + 1;
 }
 
+static inline int scatterwalk_samebuf(struct scatter_walk *walk_in,
+				      struct scatter_walk *walk_out,
+				      void *src_p, void *dst_p)
+{
+	return walk_in->page == walk_out->page &&
+	       walk_in->data == src_p && walk_out->data == dst_p;
+}
+
 void *scatterwalk_whichbuf(struct scatter_walk *walk, unsigned int nbytes, void *scratch);
 void scatterwalk_start(struct scatter_walk *walk, struct scatterlist *sg);
 int scatterwalk_copychunks(void *buf, struct scatter_walk *walk, size_t nbytes, int out);
