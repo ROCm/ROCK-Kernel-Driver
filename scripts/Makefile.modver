@@ -14,25 +14,30 @@ modules := $(patsubst ./%,%,$(shell cd $(MODVERDIR); find . -name \*.ko))
 __modversions: $(modules)
 	@:
 
+# The final module link
+
 quiet_cmd_ld_ko_o = LD [M]  $@
       cmd_ld_ko_o = $(LD) $(LDFLAGS) $(LDFLAGS_MODULE) -o $@ 		\
 			  $(filter-out FORCE,$^)
 
 init/vermagic.o: ;
 
-$(modules): %.ko :%.o $(MODVERDIR)/%.o init/vermagic.o FORCE
+$(modules): %.ko :%.o %.ver.o init/vermagic.o FORCE
 	$(call if_changed,ld_ko_o)
 
 targets += $(modules)
 
+# Compile version info for unresolved symbols
 
 quiet_cmd_cc_o_c = CC      $@
       cmd_cc_o_c = $(CC) $(CFLAGS) -c -o $@ $<
 
-$(addprefix $(MODVERDIR)/,$(modules:.ko=.o)): %.o: %.c FORCE
+$(modules:.ko=.ver.o): %.ver.o: %.ver.c FORCE
 	$(call if_changed,cc_o_c)
 
-targets += $(addprefix $(MODVERDIR)/,$(modules:.ko=.o))
+targets += $(modules:.ko=.ver.o)
+
+# Generate C source with version info for unresolved symbols
 
 define rule_mkver_o_c
 	echo '  MKVER   $@';						\
@@ -48,11 +53,12 @@ define rule_mkver_o_c
 	) > $@
 endef
 
-$(addprefix $(MODVERDIR)/,$(modules:.ko=.c)):				\
-$(MODVERDIR)/%.c: %.o .tmp_all-versions FORCE
+$(modules:.ko=.ver.c): %.ver.c: %.o .tmp_all-versions FORCE
 	$(call if_changed_rule,mkver_o_c)
 
-targets += $(addprefix $(MODVERDIR)/,$(modules:.ko=.o.c))
+targets += $(modules:.ko=.ver.c))
+
+# Extract all checksums for all exported symbols
 
 export-objs := $(shell for m in vmlinux $(modules:.ko=.o); do objdump -h $$m | grep -q __ksymtab && echo $$m; done)
 
