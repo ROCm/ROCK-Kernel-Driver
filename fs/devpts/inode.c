@@ -11,135 +11,70 @@
  * ------------------------------------------------------------------------- */
 
 #include <linux/module.h>
-
-#include <linux/string.h>
-#include <linux/fs.h>
 #include <linux/init.h>
-#include <linux/kdev_t.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/slab.h>
-#include <linux/stat.h>
-#include <linux/tty.h>
-#include <asm/bitops.h>
-#include <asm/uaccess.h>
+#include <linux/fs.h>
+#include <linux/sched.h>
+#include <linux/namei.h>
 
-#include "devpts_i.h"
+#define DEVPTS_SUPER_MAGIC 0x1cd1
 
 static struct vfsmount *devpts_mnt;
+static struct dentry *devpts_root;
 
-static void devpts_put_super(struct super_block *sb)
-{
-	struct devpts_sb_info *sbi = SBI(sb);
-	struct inode *inode;
-	int i;
+static struct {
+	int setuid;
+	int setgid;
+	uid_t   uid;
+	gid_t   gid;
+	umode_t mode;
+} config = {mode: 0600};
 
-	for ( i = 0 ; i < sbi->max_ptys ; i++ ) {
-		if ( (inode = sbi->inodes[i]) ) {
-			if ( atomic_read(&inode->i_count) != 1 )
-				printk("devpts_put_super: badness: entry %d count %d\n",
-				       i, atomic_read(&inode->i_count));
-			inode->i_nlink--;
-			iput(inode);
-		}
-	}
-	kfree(sbi->inodes);
-	kfree(sbi);
-}
-
-static int devpts_remount (struct super_block * sb, int * flags, char * data);
-
-static struct super_operations devpts_sops = {
-	put_super:	devpts_put_super,
-	statfs:		simple_statfs,
-	remount_fs:	devpts_remount,
-};
-
-static int devpts_parse_options(char *options, struct devpts_sb_info *sbi)
+static int devpts_remount(struct super_block *sb, int *flags, char *data)
 {
 	int setuid = 0;
 	int setgid = 0;
 	uid_t uid = 0;
 	gid_t gid = 0;
 	umode_t mode = 0600;
-	char *this_char, *value;
+	char *this_char;
 
 	this_char = NULL;
-	while ((this_char = strsep(&options, ",")) != NULL) {
+	while ((this_char = strsep(&data, ",")) != NULL) {
+		int n;
+		char dummy;
 		if (!*this_char)
 			continue;
-		if ((value = strchr(this_char,'=')) != NULL)
-			*value++ = 0;
-		if (!strcmp(this_char,"uid")) {
-			if (!value || !*value)
-				return 1;
-			uid = simple_strtoul(value,&value,0);
-			if (*value)
-				return 1;
+		if (sscanf(this_char, "uid=%i%c", &n, &dummy) == 1) {
 			setuid = 1;
-		}
-		else if (!strcmp(this_char,"gid")) {
-			if (!value || !*value)
-				return 1;
-			gid = simple_strtoul(value,&value,0);
-			if (*value)
-				return 1;
+			uid = n;
+		} else if (sscanf(this_char, "gid=%i%c", &n, &dummy) == 1) {
 			setgid = 1;
+			gid = n;
+		} else if (sscanf(this_char, "mode=%o%c", &n, &dummy) == 1)
+			mode = n & ~S_IFMT;
+		else {
+			printk("devpts: called with bogus options\n");
+			return -EINVAL;
 		}
-		else if (!strcmp(this_char,"mode")) {
-			if (!value || !*value)
-				return 1;
-			mode = simple_strtoul(value,&value,8);
-			if (*value)
-				return 1;
-		}
-		else
-			return 1;
 	}
-	sbi->setuid  = setuid;
-	sbi->setgid  = setgid;
-	sbi->uid     = uid;
-	sbi->gid     = gid;
-	sbi->mode    = mode & ~S_IFMT;
+	config.setuid  = setuid;
+	config.setgid  = setgid;
+	config.uid     = uid;
+	config.gid     = gid;
+	config.mode    = mode;
 
 	return 0;
 }
 
-static int devpts_remount(struct super_block * sb, int * flags, char * data)
-{
-	struct devpts_sb_info *sbi = sb->u.generic_sbp;
-	int res = devpts_parse_options(data,sbi);
-	if (res) {
-		printk("devpts: called with bogus options\n");
-		return -EINVAL;
-	}
-	return 0;
-}
+static struct super_operations devpts_sops = {
+	statfs:		simple_statfs,
+	remount_fs:	devpts_remount,
+};
 
 static int devpts_fill_super(struct super_block *s, void *data, int silent)
 {
-	int error = -ENOMEM;
 	struct inode * inode;
-	struct devpts_sb_info *sbi;
 
-	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
-	if ( !sbi )
-		goto fail;
-	memset(sbi, 0, sizeof(*sbi));
-
-	sbi->magic  = DEVPTS_SBI_MAGIC;
-	sbi->max_ptys = unix98_max_ptys;
-	sbi->inodes = kmalloc(sizeof(struct inode *) * sbi->max_ptys, GFP_KERNEL);
-	if ( !sbi->inodes )
-		goto fail_free;
-	memset(sbi->inodes, 0, sizeof(struct inode *) * sbi->max_ptys);
-
-	if ( devpts_parse_options(data,sbi) && !silent) {
-		error = -EINVAL;
-		printk("devpts: called with bogus options\n");
-		goto fail_free;
-	}
-	s->u.generic_sbp = (void *) sbi;
 	s->s_blocksize = 1024;
 	s->s_blocksize_bits = 10;
 	s->s_magic = DEVPTS_SUPER_MAGIC;
@@ -147,27 +82,25 @@ static int devpts_fill_super(struct super_block *s, void *data, int silent)
 
 	inode = new_inode(s);
 	if (!inode)
-		goto fail_free;
+		goto fail;
 	inode->i_ino = 1;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	inode->i_blocks = 0;
 	inode->i_blksize = 1024;
 	inode->i_uid = inode->i_gid = 0;
 	inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO | S_IWUSR;
-	inode->i_op = &devpts_root_inode_operations;
-	inode->i_fop = &devpts_root_operations;
+	inode->i_op = &simple_dir_inode_operations;
+	inode->i_fop = &simple_dir_operations;
 	inode->i_nlink = 2;
 
-	s->s_root = d_alloc_root(inode);
+	devpts_root = s->s_root = d_alloc_root(inode);
 	if (s->s_root)
 		return 0;
 	
 	printk("devpts: get root dentry failed\n");
 	iput(inode);
-fail_free:
-	kfree(sbi);
 fail:
-	return error;
+	return -ENOMEM;
 }
 
 static struct super_block *devpts_get_sb(struct file_system_type *fs_type,
@@ -183,44 +116,52 @@ static struct file_system_type devpts_fs_type = {
 	kill_sb:	kill_anon_super,
 };
 
-void devpts_pty_new(int number, kdev_t device)
+/*
+ * The normal naming convention is simply /dev/pts/<number>; this conforms
+ * to the System V naming convention
+ */
+
+static struct dentry *get_node(int num)
 {
-	struct super_block *sb = devpts_mnt->mnt_sb;
-	struct devpts_sb_info *sbi = SBI(sb);
-	struct inode *inode;
-		
-	if ( sbi->inodes[number] )
-		return; /* Already registered, this does happen */
-		
-	inode = new_inode(sb);
+	char s[10];
+	struct dentry *root = devpts_root;
+	down(&root->d_inode->i_sem);
+	return lookup_one_len(s, root, sprintf(s, "%d", num));
+}
+
+void devpts_pty_new(int number, dev_t device)
+{
+	struct dentry *dentry;
+	struct inode *inode = new_inode(devpts_mnt->mnt_sb);
 	if (!inode)
 		return;
 	inode->i_ino = number+2;
-	inode->i_blocks = 0;
 	inode->i_blksize = 1024;
-	inode->i_uid = sbi->setuid ? sbi->uid : current->fsuid;
-	inode->i_gid = sbi->setgid ? sbi->gid : current->fsgid;
+	inode->i_uid = config.setuid ? config.uid : current->fsuid;
+	inode->i_gid = config.setgid ? config.gid : current->fsgid;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-	init_special_inode(inode, S_IFCHR|sbi->mode, kdev_t_to_nr(device));
+	init_special_inode(inode, S_IFCHR|config.mode, device);
 
-	if ( sbi->inodes[number] ) {
-		iput(inode);
-		return;
-	}
-	sbi->inodes[number] = inode;
+	dentry = get_node(number);
+	if (!IS_ERR(dentry) && !dentry->d_inode)
+		d_instantiate(dentry, inode);
+	up(&devpts_root->d_inode->i_sem);
 }
 
 void devpts_pty_kill(int number)
 {
-	struct super_block *sb = devpts_mnt->mnt_sb;
-	struct devpts_sb_info *sbi = SBI(sb);
-	struct inode *inode = sbi->inodes[number];
+	struct dentry *dentry = get_node(number);
 
-	if ( inode ) {
-		sbi->inodes[number] = NULL;
-		inode->i_nlink--;
-		iput(inode);
+	if (!IS_ERR(dentry)) {
+		struct inode *inode = dentry->d_inode;
+		if (inode) {
+			inode->i_nlink--;
+			d_delete(dentry);
+			dput(dentry);
+		}
+		dput(dentry);
 	}
+	up(&devpts_root->d_inode->i_sem);
 }
 
 static int __init init_devpts_fs(void)
@@ -231,22 +172,12 @@ static int __init init_devpts_fs(void)
 		err = PTR_ERR(devpts_mnt);
 		if (!IS_ERR(devpts_mnt))
 			err = 0;
-#ifdef MODULE
-		if ( !err ) {
-			devpts_upcall_new  = devpts_pty_new;
-			devpts_upcall_kill = devpts_pty_kill;
-		}
-#endif
 	}
 	return err;
 }
 
 static void __exit exit_devpts_fs(void)
 {
-#ifdef MODULE
-	devpts_upcall_new  = NULL;
-	devpts_upcall_kill = NULL;
-#endif
 	unregister_filesystem(&devpts_fs_type);
 	kern_umount(devpts_mnt);
 }
@@ -254,4 +185,3 @@ static void __exit exit_devpts_fs(void)
 module_init(init_devpts_fs)
 module_exit(exit_devpts_fs)
 MODULE_LICENSE("GPL");
-

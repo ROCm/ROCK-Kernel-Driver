@@ -383,7 +383,11 @@ int
 jffs_statfs(struct super_block *sb, struct statfs *buf)
 {
 	struct jffs_control *c = (struct jffs_control *) sb->u.generic_sbp;
-	struct jffs_fmcontrol *fmc = c->fmc;
+	struct jffs_fmcontrol *fmc;
+
+	lock_kernel();
+
+	fmc = c->fmc;
 
 	D2(printk("jffs_statfs()\n"));
 
@@ -401,6 +405,9 @@ jffs_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_ffree = buf->f_bfree;
 	/* buf->f_fsid = 0; */
 	buf->f_namelen = JFFS_MAX_NAME_LEN;
+
+	unlock_kernel();
+
 	return 0;
 }
 

@@ -16,10 +16,9 @@
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
 
-LD=$(CROSS_COMPILE)ld -m elf_i386
-OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
-LDFLAGS=-e stext
-LINKFLAGS =-T $(TOPDIR)/arch/i386/vmlinux.lds $(LDFLAGS)
+LDFLAGS		:= -m elf_i386
+OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
+LDFLAGS_vmlinux := -T arch/i386/vmlinux.lds -e stext
 
 CFLAGS += -pipe
 
@@ -115,7 +114,7 @@ SUBDIRS	+= arch/i386/pci
 DRIVERS	+= arch/i386/pci/pci.o
 endif
 
-MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
+MAKEBOOT = +$(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux: arch/i386/vmlinux.lds
 

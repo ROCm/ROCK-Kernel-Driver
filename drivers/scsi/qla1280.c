@@ -4236,7 +4236,7 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, srb_t * sp)
 				/* Set transfer direction (READ and WRITE) */
 				/* Linux doesn't tell us                   */
 				/*
-				 * For block devices, cmd->request.cmd has the operation
+				 * For block devices, cmd->request->cmd has the operation
 				 * For character devices, this isn't always set properly, so
 				 * we need to check data_cmnd[0].  This catches the conditions
 				 * for st.c, but not sg. Generic commands are pass down to us.
@@ -6241,7 +6241,7 @@ qla1280_print_scsi_cmd(Scsi_Cmnd * cmd)
 	       cmd->tag, cmd->flags, cmd->transfersize);
 	printk("  Pid=%li, SP=0x%p\n", cmd->pid, CMD_SP(cmd));
 	printk(" underflow size = 0x%x, direction=0x%x, req.cmd=0x%x \n",
-	       cmd->underflow, sp->dir, cmd->request.cmd);
+	       cmd->underflow, sp->dir, cmd->request->cmd);
 }
 
 /**************************************************************************

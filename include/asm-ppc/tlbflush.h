@@ -21,21 +21,20 @@ extern void _tlbie(unsigned long address);
 extern void _tlbia(void);
 
 #if defined(CONFIG_4xx)
-#define __tlbia()	asm volatile ("tlbia; sync" : : : "memory")
 
 static inline void flush_tlb_all(void)
-	{ __tlbia(); }
+	{ _tlbia(); }
 static inline void flush_tlb_mm(struct mm_struct *mm)
-	{ __tlbia(); }
+	{ _tlbia(); }
 static inline void flush_tlb_page(struct vm_area_struct *vma,
 				unsigned long vmaddr)
 	{ _tlbie(vmaddr); }
 static inline void flush_tlb_range(struct vm_area_struct *vma,
 				unsigned long start, unsigned long end)
-	{ __tlbia(); }
+	{ _tlbia(); }
 static inline void flush_tlb_kernel_range(unsigned long start,
 				unsigned long end)
-	{ __tlbia(); }
+	{ _tlbia(); }
 #define update_mmu_cache(vma, addr, pte)	do { } while (0)
 
 #elif defined(CONFIG_8xx)

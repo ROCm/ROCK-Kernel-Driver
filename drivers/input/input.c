@@ -61,8 +61,6 @@ static struct input_dev *input_dev;
 static struct input_handler *input_handler;
 static struct input_handler *input_table[8];
 static devfs_handle_t input_devfs_handle;
-static int input_number;
-static long input_devices[NBITS(INPUT_DEVICES)];
 
 #ifdef CONFIG_PROC_FS
 static struct proc_dir_entry *proc_bus_input_dir;
@@ -454,17 +452,8 @@ void input_register_device(struct input_dev *dev)
  * Add the device.
  */
 
-	if (input_number >= INPUT_DEVICES) {
-		printk(KERN_WARNING "input: ran out of input device numbers!\n");
-		dev->number = input_number;
-	} else {
-		dev->number = find_first_zero_bit(input_devices, INPUT_DEVICES);
-		set_bit(dev->number, input_devices);
-	}
-		
 	dev->next = input_dev;	
 	input_dev = dev;
-	input_number++;
 
 /*
  * Notify handlers.
@@ -493,7 +482,6 @@ void input_register_device(struct input_dev *dev)
 	input_devices_state++;
 	wake_up(&input_devices_poll_wait);
 #endif
-
 }
 
 void input_unregister_device(struct input_dev *dev)
@@ -508,7 +496,6 @@ void input_unregister_device(struct input_dev *dev)
  */
 	if (dev->pm_dev)
 		pm_unregister(dev->pm_dev);
-
 
 /*
  * Kill any pending repeat timers.
@@ -540,7 +527,6 @@ void input_unregister_device(struct input_dev *dev)
  */
 	input_find_and_remove(struct input_dev, input_dev, dev, next);
 
-	input_number--;
 /*
  * Notify /proc.
  */

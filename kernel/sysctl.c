@@ -258,6 +258,13 @@ static ctl_table kern_table[] = {
 	{0}
 };
 
+/* Constants for minimum and maximum testing in vm_table.
+   We use these as one-element integer vectors. */
+static int zero = 0;
+static int one = 1;
+static int one_hundred = 100;
+
+
 static ctl_table vm_table[] = {
 	{VM_OVERCOMMIT_MEMORY, "overcommit_memory", &sysctl_overcommit_memory,
 	 sizeof(sysctl_overcommit_memory), 0644, NULL, &proc_dointvec},
@@ -266,18 +273,37 @@ static ctl_table vm_table[] = {
 	{VM_PAGE_CLUSTER, "page-cluster", 
 	 &page_cluster, sizeof(int), 0644, NULL, &proc_dointvec},
 	{VM_DIRTY_BACKGROUND, "dirty_background_ratio",
-	&dirty_background_ratio, sizeof(dirty_background_ratio),
-	0644, NULL, &proc_dointvec},
+	 &dirty_background_ratio, sizeof(dirty_background_ratio),
+	 0644, NULL, &proc_dointvec_minmax,  &sysctl_intvec, NULL,
+	 &zero, &one_hundred },
 	{VM_DIRTY_ASYNC, "dirty_async_ratio", &dirty_async_ratio,
-	sizeof(dirty_async_ratio), 0644, NULL, &proc_dointvec},
+	 sizeof(dirty_async_ratio), 0644, NULL, &proc_dointvec_minmax,
+	 &sysctl_intvec, NULL, &zero, &one_hundred },
 	{VM_DIRTY_SYNC, "dirty_sync_ratio", &dirty_sync_ratio,
-	sizeof(dirty_sync_ratio), 0644, NULL, &proc_dointvec},
+	 sizeof(dirty_sync_ratio), 0644, NULL, &proc_dointvec_minmax,
+	 &sysctl_intvec, NULL, &zero, &one_hundred },
 	{VM_DIRTY_WB_CS, "dirty_writeback_centisecs",
-	&dirty_writeback_centisecs, sizeof(dirty_writeback_centisecs), 0644,
-	NULL, &proc_dointvec},
+	 &dirty_writeback_centisecs, sizeof(dirty_writeback_centisecs), 0644,
+	 NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL,
+	 /* Here, we define the range of possible values for
+	    dirty_writeback_centisecs.
+
+	    The default value is 5 seconds (500 centisec).  We will use 1
+	    centisec, the smallest possible value that could make any sort of
+	    sense.  If we allowed the user to set the interval to 0 seconds
+	    (which would presumably mean to chew up all of the CPU looking for
+	    dirty pages and writing them out, without taking a break), the
+	    interval would effectively become 1 second (100 centisecs), due to
+	    some nicely documented throttling code in wb_kupdate().
+
+	    There is no maximum legal value for dirty_writeback. */
+	 &one , NULL},
 	{VM_DIRTY_EXPIRE_CS, "dirty_expire_centisecs",
-	&dirty_expire_centisecs, sizeof(dirty_expire_centisecs), 0644,
-	NULL, &proc_dointvec},
+	 &dirty_expire_centisecs, sizeof(dirty_expire_centisecs), 0644,
+	 NULL, &proc_dointvec},
+	{ VM_NR_PDFLUSH_THREADS, "nr_pdflush_threads",
+	  &nr_pdflush_threads, sizeof nr_pdflush_threads,
+	  0444 /* read-only*/, NULL, &proc_dointvec},
 	{0}
 };
 

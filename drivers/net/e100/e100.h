@@ -1031,14 +1031,6 @@ extern unsigned char e100_selftest(struct e100_private *bdp, u32 *st_timeout,
 extern unsigned char e100_get_link_state(struct e100_private *bdp);
 extern unsigned char e100_wait_scb(struct e100_private *bdp);
 
-#ifndef yield
-#define yield()					\
-        do {					\
-                current->policy |= SCHED_YIELD;	\
-                schedule();			\
-        } while (0)                                     
-#endif
-
 extern void e100_deisolate_driver(struct e100_private *bdp,
 				  u8 recover, u8 full_reset);
 extern unsigned char e100_hw_reset_recover(struct e100_private *bdp,

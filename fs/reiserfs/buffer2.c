@@ -25,6 +25,13 @@ void wait_buffer_until_released (const struct buffer_head * bh)
 {
   int repeat_counter = 0;
 
+  /*
+   * FIXME! Temporary cludge until ReiserFS people tell what they
+   * actually are trying to protect against!
+   */
+  if (1)
+  	return;
+
   while (atomic_read (&(bh->b_count)) > 1) {
 
     if ( !(++repeat_counter % 30000000) ) {

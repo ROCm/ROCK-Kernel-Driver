@@ -193,7 +193,7 @@ static int hiddev_fasync(int fd, struct file *file, int on)
 static void hiddev_cleanup(struct hiddev *hiddev)
 {
 	devfs_unregister(hiddev->devfs);
-	usb_deregister_dev(&hiddev_driver, 1, hiddev->minor);
+	usb_deregister_dev(1, hiddev->minor);
 	hiddev_table[hiddev->minor] = NULL;
 	kfree(hiddev);
 }
@@ -626,21 +626,16 @@ int hiddev_connect(struct hid_device *hid)
 	if (i == hid->maxapplication)
 		return -1;
 
-	retval = usb_register_dev (&hiddev_driver, 1, &minor);
+	retval = usb_register_dev (&hiddev_fops, HIDDEV_MINOR_BASE, 1, &minor);
 	if (retval) {
-		if (retval != -ENODEV) {
-			err ("Not able to get a minor for this device.");
-			return -1;
-		}
-		for (minor = 0; minor < HIDDEV_MINORS && hiddev_table[minor]; minor++);
-		if (minor == HIDDEV_MINORS) {
-			printk(KERN_ERR "hiddev: no more free hiddev devices\n");
-			return -1;
-		}
+		err ("Not able to get a minor for this device.");
+		return -1;
 	}
 
-	if (!(hiddev = kmalloc(sizeof(struct hiddev), GFP_KERNEL)))
+	if (!(hiddev = kmalloc(sizeof(struct hiddev), GFP_KERNEL))) {
+		usb_deregister_dev (1, minor);
 		return -1;
+	}
 	memset(hiddev, 0, sizeof(struct hiddev));
 
 	init_waitqueue_head(&hiddev->wait);
@@ -708,9 +703,6 @@ static void *hiddev_usbd_probe(struct usb_device *dev, unsigned int ifnum,
 static /* const */ struct usb_driver hiddev_driver = {
 	name:		"hiddev",
 	probe:		hiddev_usbd_probe,
-	fops:		&hiddev_fops,
-	minor:		HIDDEV_MINOR_BASE,
-	num_minors:	HIDDEV_MINORS,
 };
 
 int __init hiddev_init(void)

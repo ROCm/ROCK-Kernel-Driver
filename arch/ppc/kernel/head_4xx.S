@@ -82,6 +82,7 @@ turn_on_mmu:
 	mtspr	SRR0,r0
 	SYNC
 	rfi				/* enables MMU */
+	b	.			/* prevent prefetch past rfi */
 
 /*
  * This area is used for temporarily saving registers during the
@@ -89,7 +90,28 @@ turn_on_mmu:
  */
 	. = 0xc0
 crit_save:
-	.space	8
+_GLOBAL(crit_r10)
+	.space	4
+_GLOBAL(crit_r11)
+	.space	4
+_GLOBAL(crit_sprg0)
+	.space	4
+_GLOBAL(crit_sprg1)
+	.space	4
+_GLOBAL(crit_sprg4)
+	.space	4
+_GLOBAL(crit_sprg5)
+	.space	4
+_GLOBAL(crit_sprg6)
+	.space	4
+_GLOBAL(crit_sprg7)
+	.space	4
+_GLOBAL(crit_pid)
+	.space	4
+_GLOBAL(crit_srr0)
+	.space	4
+_GLOBAL(crit_srr1)
+	.space	4
 
 /*
  * Exception vector entry code. This code runs with address translation
@@ -140,6 +162,59 @@ crit_save:
  * This is OK since we don't support SMP on these processors.
  */
 #define CRITICAL_EXCEPTION_PROLOG					     \
+	stw	r10,crit_r10@l(0);	/* save two registers to work with */\
+	stw	r11,crit_r11@l(0);					     \
+	mfspr	r10,SPRG0;						     \
+	stw	r10,crit_sprg0@l(0);					     \
+	mfspr	r10,SPRG1;						     \
+	stw	r10,crit_sprg1@l(0);					     \
+	mfspr	r10,SPRG4;						     \
+	stw	r10,crit_sprg4@l(0);					     \
+	mfspr	r10,SPRG5;						     \
+	stw	r10,crit_sprg5@l(0);					     \
+	mfspr	r10,SPRG6;						     \
+	stw	r10,crit_sprg6@l(0);					     \
+	mfspr	r10,SPRG7;						     \
+	stw	r10,crit_sprg7@l(0);					     \
+	mfspr	r10,SPRN_PID;						     \
+	stw	r10,crit_pid@l(0);					     \
+	mfspr	r10,SRR0;						     \
+	stw	r10,crit_srr0@l(0);					     \
+	mfspr	r10,SRR1;						     \
+	stw	r10,crit_srr1@l(0);					     \
+	mfcr	r10;			/* save CR in r10 for now	   */\
+	mfspr	r11,SPRN_SRR3;		/* check whether user or kernel    */\
+	andi.	r11,r11,MSR_PR;						     \
+	lis	r11,critical_stack_top@h;				     \
+	ori	r11,r11,critical_stack_top@l;				     \
+	beq	1f;							     \
+	/* COMING FROM USER MODE */					     \
+	mfspr	r11,SPRG3;		/* if from user, start at top of   */\
+	lwz	r11,THREAD_INFO-THREAD(r11); /* this thread's kernel stack */\
+	addi	r11,r11,THREAD_SIZE;					     \
+1:	subi	r11,r11,INT_FRAME_SIZE;	/* Allocate an exception frame     */\
+	tophys(r11,r11);						     \
+	stw	r10,_CCR(r11);          /* save various registers	   */\
+	stw	r12,GPR12(r11);						     \
+	stw	r9,GPR9(r11);						     \
+	mflr	r10;							     \
+	stw	r10,_LINK(r11);						     \
+	mfspr	r12,SPRN_DEAR;		/* save DEAR and ESR in the frame  */\
+	stw	r12,_DEAR(r11);		/* since they may have had stuff   */\
+	mfspr	r9,SPRN_ESR;		/* in them at the point where the  */\
+	stw	r9,_ESR(r11);		/* exception was taken		   */\
+	mfspr	r12,SRR2;						     \
+	stw	r1,GPR1(r11);						     \
+	mfspr	r9,SRR3;						     \
+	stw	r1,0(r11);						     \
+	tovirt(r1,r11);							     \
+	rlwinm	r9,r9,0,14,12;		/* clear MSR_WE (necessary?)	   */\
+	stw	r0,GPR0(r11);						     \
+	SAVE_4GPRS(3, r11);						     \
+	SAVE_2GPRS(7, r11)
+
+#if 0
+#define CRITICAL_EXCEPTION_PROLOG					     \
 	stw	r10,crit_save@l(0);	/* save two registers to work with */\
 	stw	r11,4+crit_save@l(0);					     \
 	mfcr	r10;			/* save CR in r10 for now	   */\
@@ -173,6 +248,7 @@ crit_save:
 	stw	r0,GPR0(r11);						     \
 	SAVE_4GPRS(3, r11);						     \
 	SAVE_2GPRS(7, r11)
+#endif
 
 /*
  * Exception vectors.
@@ -197,13 +273,14 @@ label:
 	START_EXCEPTION(n, label);				\
 	CRITICAL_EXCEPTION_PROLOG;				\
 	addi	r3,r1,STACK_FRAME_OVERHEAD;			\
-	EXC_XFER_TEMPLATE(hdlr, n+2, NOCOPY, transfer_to_handler_full, \
+	EXC_XFER_TEMPLATE(hdlr, n+2, (MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), \
+			  NOCOPY, transfer_to_handler_full, \
 			  ret_from_except_full)
 
-#define EXC_XFER_TEMPLATE(hdlr, trap, copyee, tfer, ret)	\
+#define EXC_XFER_TEMPLATE(hdlr, trap, msr, copyee, tfer, ret)	\
 	li	r10,trap;					\
 	stw	r10,TRAP(r11);					\
-	li	r10,MSR_KERNEL;					\
+	li	r10,msr;					\
 	copyee(r10, r9);					\
 	bl	tfer;		 				\
 	.long	hdlr;						\
@@ -213,19 +290,19 @@ label:
 #define NOCOPY(d, s)
 
 #define EXC_XFER_STD(n, hdlr)		\
-	EXC_XFER_TEMPLATE(hdlr, n, NOCOPY, transfer_to_handler_full, \
+	EXC_XFER_TEMPLATE(hdlr, n, MSR_KERNEL, NOCOPY, transfer_to_handler_full, \
 			  ret_from_except_full)
 
 #define EXC_XFER_LITE(n, hdlr)		\
-	EXC_XFER_TEMPLATE(hdlr, n+1, NOCOPY, transfer_to_handler, \
+	EXC_XFER_TEMPLATE(hdlr, n+1, MSR_KERNEL, NOCOPY, transfer_to_handler, \
 			  ret_from_except)
 
 #define EXC_XFER_EE(n, hdlr)		\
-	EXC_XFER_TEMPLATE(hdlr, n, COPY_EE, transfer_to_handler_full, \
+	EXC_XFER_TEMPLATE(hdlr, n, MSR_KERNEL, COPY_EE, transfer_to_handler_full, \
 			  ret_from_except_full)
 
 #define EXC_XFER_EE_LITE(n, hdlr)	\
-	EXC_XFER_TEMPLATE(hdlr, n+1, COPY_EE, transfer_to_handler, \
+	EXC_XFER_TEMPLATE(hdlr, n+1, MSR_KERNEL, COPY_EE, transfer_to_handler, \
 			  ret_from_except)
 
 
@@ -347,6 +424,7 @@ label:
 	mfspr	r10, SPRG0
 	PPC405_ERR77_SYNC
 	rfi			/* Should sync shadow TLBs */
+	b	.		/* prevent prefetch past rfi */
 
 2:
 	/* The bailout.  Restore registers to pre-exception conditions
@@ -615,6 +693,7 @@ label:
 	mfspr	r10, SPRG0
 	PPC405_ERR77_SYNC
 	rfi			/* Should sync shadow TLBs */
+	b	.		/* prevent prefetch past rfi */
 
 2:
 	/* The bailout.  Restore registers to pre-exception conditions
@@ -721,6 +800,7 @@ check_single_step_in_exception:
 
 	sync
 	rfci                            /* return to the exception handler  */
+	b	.			/* prevent prefetch past rfi */
 
 2:
 	mtcrf   0xff,r10                /* restore registers */
@@ -746,31 +826,18 @@ check_single_step_in_exception:
 	 * Actually, it will fit now, but oh well.....a common place
 	 * to load the TLB.
 	 */
+tlb_4xx_index:
+	.long	0
 finish_tlb_load:
-
-	/* Since it has a unified TLB, and we can take data faults on
-	 * instruction pages by copying data, we have to check if the
-	 * EPN is already in the TLB.
-	 */
-	tlbsx.	r9, 0, r10
-	beq	6f
-
 	/* load the next available TLB index.
 	*/
-	lis	r12, tlb_4xx_index@h
-	ori	r12, r12, tlb_4xx_index@l
-	tophys(r12, r12)
-	lwz	r9, 0(r12)
+	lwz	r9, tlb_4xx_index@l(0)
 	addi	r9, r9, 1
-#ifdef CONFIG_PIN_TLB
 	cmpwi	0, r9, 61		/* reserve entries 62, 63 for kernel */
 	ble	7f
 	li	r9, 0
 7:
-#else
-	andi.	r9, r9, (PPC4XX_TLB_SIZE-1)
-#endif
-	stw	r9, 0(r12)
+	stw	r9, tlb_4xx_index@l(0)
 
 6:
 	tlbwe	r11, r9, TLB_DATA		/* Load TLB LO */
@@ -804,6 +871,7 @@ finish_tlb_load:
 	mfspr	r10, SPRG0
 	PPC405_ERR77_SYNC
 	rfi			/* Should sync shadow TLBs */
+	b	.		/* prevent prefetch past rfi */
 
 /* extern void giveup_fpu(struct task_struct *prev)
  *
@@ -857,14 +925,11 @@ start_here:
 	mtspr	SRR0,r4
 	mtspr	SRR1,r3
 	rfi
+	b	.		/* prevent prefetch past rfi */
 
 /* Load up the kernel context */
 2:
 	SYNC			/* Force all PTE updates to finish */
-#ifndef CONFIG_PIN_TLB
-	tlbia			/* Clear all TLB entries */
-	sync			/* wait for tlbia/tlbie to finish */
-#endif
 
 	/* set up the PTE pointers for the Abatron bdiGDB.
 	*/
@@ -883,6 +948,7 @@ start_here:
 	mtspr	SRR0,r3
 	mtspr	SRR1,r4
 	rfi			/* enable MMU and jump to start_kernel */
+	b	.		/* prevent prefetch past rfi */
 
 /* Set up the initial MMU state so we can do the first level of
  * kernel initialization.  This maps the first 16 MBytes of memory 1:1
@@ -956,7 +1022,10 @@ _GLOBAL(set_context)
 	lwz	r5, 0xf0(r5)
 	stw	r4, 0x4(r5)
 #endif
+	sync
 	mtspr	SPRN_PID,r3
+	isync				/* Need an isync to flush shadow */
+					/* TLBs after changing PID */
 	blr
 
 /* We put a few things here that have to be page-aligned. This stuff
@@ -968,6 +1037,14 @@ _GLOBAL(empty_zero_page)
 	.space	4096
 _GLOBAL(swapper_pg_dir)
 	.space	4096
+
+	
+/* Stack for handling critical exceptions from kernel mode */
+	.section .bss
+critical_stack_bottom:
+	.space	4096
+critical_stack_top:
+	.previous
 
 /* This space gets a copy of optional info passed to us by the bootstrap
  * which is used to pass parameters into the kernel like root=/dev/sda1, etc.

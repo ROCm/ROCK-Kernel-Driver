@@ -8,6 +8,7 @@ CC = gcc-cris -mlinux -I $(TOPDIR)/include
 CFLAGS = -O2
 LD = gcc-cris -mlinux -nostdlib
 OBJCOPY = objcopy-cris
+OBJCOPYFLAGS = -O binary --remove-section=.bss
 
 all: rescue.bin testrescue.bin kimagerescue.bin
 
@@ -16,11 +17,11 @@ rescue: rescue.bin
 
 rescue.bin: head.o
 	$(LD) -T rescue.ld -o rescue.o head.o
-	$(OBJCOPY) -O binary --remove-section=.bss rescue.o rescue.bin
+	$(OBJCOPY) $(OBJCOPYFLAGS) rescue.o rescue.bin
 	cp rescue.bin $(TOPDIR)
 
 testrescue.bin: testrescue.o
-	$(OBJCOPY) -O binary --remove-section=.bss testrescue.o tr.bin
+	$(OBJCOPY) $(OBJCOPYFLAGS) testrescue.o tr.bin
 # Pad it to 784 bytes
 	dd if=/dev/zero of=tmp2423 bs=1 count=784
 	cat tr.bin tmp2423 >testrescue_tmp.bin
@@ -28,7 +29,7 @@ testrescue.bin: testrescue.o
 	rm tr.bin tmp2423 testrescue_tmp.bin
 
 kimagerescue.bin: kimagerescue.o
-	$(OBJCOPY) -O binary --remove-section=.bss kimagerescue.o ktr.bin
+	$(OBJCOPY) $(OBJCOPYFLAGS) kimagerescue.o ktr.bin
 # Pad it to 784 bytes, that's what the rescue loader expects
 	dd if=/dev/zero of=tmp2423 bs=1 count=784
 	cat ktr.bin tmp2423 >kimagerescue_tmp.bin

@@ -559,18 +559,19 @@ void flush_icache_page(struct vm_area_struct *vma, struct page *page)
 
 	if (page->mapping && !PageReserved(page)
 	    && !test_bit(PG_arch_1, &page->flags)) {
-		phys = ((page - mem_map) << PAGE_SHIFT) + PPC_MEMSTART;
+		phys = page_to_pfn(page) << PAGE_SHIFT;
 		__flush_dcache_icache_phys(phys);
 		set_bit(PG_arch_1, &page->flags);
 	}
 }
 
-void clear_user_page(void *page, unsigned long vaddr)
+void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
 }
 
-void copy_user_page(void *vto, void *vfrom, unsigned long vaddr)
+void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
+		    struct page *pg)
 {
 	copy_page(vto, vfrom);
 	__flush_dcache_icache(vto);

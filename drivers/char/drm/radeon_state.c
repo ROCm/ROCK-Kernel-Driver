@@ -30,8 +30,9 @@
 #define __NO_VERSION__
 #include "radeon.h"
 #include "drmP.h"
-#include "radeon_drv.h"
 #include "drm.h"
+#include "radeon_drm.h"
+#include "radeon_drv.h"
 #include <linux/delay.h>
 
 
@@ -47,12 +48,10 @@ static inline void radeon_emit_clip_rect( drm_radeon_private_t *dev_priv,
 	DRM_DEBUG( "   box:  x1=%d y1=%d  x2=%d y2=%d\n",
 		   box->x1, box->y1, box->x2, box->y2 );
 
-	BEGIN_RING( 4 );
-	OUT_RING( CP_PACKET0( RADEON_RE_TOP_LEFT, 0 ) );
+	BEGIN_RING( 3 );
+	OUT_RING( CP_PACKET3( RADEON_CNTL_SET_SCISSORS, 1 ));
 	OUT_RING( (box->y1 << 16) | box->x1 );
-	OUT_RING( CP_PACKET0( RADEON_RE_WIDTH_HEIGHT, 0 ) );
-/*	OUT_RING( ((box->y2 - 1) << 16) | (box->x2 - 1) );*/
-	OUT_RING( (box->y2 << 16) | box->x2 );
+	OUT_RING( ((box->y2 - 1) << 16) | (box->x2 - 1) );
 	ADVANCE_RING();
 }
 
@@ -669,7 +668,6 @@ static void radeon_cp_dispatch_vertex( drm_device_t *dev,
 	int i = 0;
 	RING_LOCALS;
 
-
 	DRM_DEBUG("%s: hwprim 0x%x vfmt 0x%x %d..%d %d verts\n",
 		  __FUNCTION__,
 		  prim->prim,
@@ -683,7 +681,6 @@ static void radeon_cp_dispatch_vertex( drm_device_t *dev,
 			   prim->prim, prim->numverts );
 		return;
 	}
-
 
 	do {
 		/* Emit the next cliprect */
@@ -906,6 +903,16 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 
 	ADVANCE_RING();
 
+#ifdef __BIG_ENDIAN
+	/* The Mesa texture functions provide the data in little endian as the
+	 * chip wants it, but we need to compensate for the fact that the CP
+	 * ring gets byte-swapped
+	 */
+	BEGIN_RING( 2 );
+	OUT_RING_REG( RADEON_RBBM_GUICNTL, RADEON_HOST_DATA_SWAP_32BIT );
+	ADVANCE_RING();
+#endif
+
 	/* Make a copy of the parameters in case we have to update them
 	 * for a multi-pass texture blit.
 	 */
@@ -1081,6 +1088,7 @@ static int radeon_do_init_pageflip( drm_device_t *dev )
 
 	dev_priv->page_flipping = 1;
 	dev_priv->current_page = 0;
+	dev_priv->sarea_priv->pfCurrentPage = dev_priv->current_page;
 
 	return 0;
 }
@@ -1095,6 +1103,7 @@ int radeon_do_cleanup_pageflip( drm_device_t *dev )
 
 	dev_priv->page_flipping = 0;
 	dev_priv->current_page = 0;
+	dev_priv->sarea_priv->pfCurrentPage = dev_priv->current_page;
 
 	return 0;
 }
@@ -1585,14 +1594,14 @@ static int radeon_emit_packets(
 	drm_radeon_cmd_header_t header,
 	drm_radeon_cmd_buffer_t *cmdbuf )
 {
-	int sz = packet[(int)header.packet.packet_id].len;
-	int reg = packet[(int)header.packet.packet_id].start;
+	int id = (int)header.packet.packet_id;
+	int sz = packet[id].len;
+	int reg = packet[id].start;
 	int *data = (int *)cmdbuf->buf;
 	RING_LOCALS;
    
 	if (sz * sizeof(int) > cmdbuf->bufsz) 
 		return -EINVAL;
-
 
 	BEGIN_RING(sz+1);
 	OUT_RING( CP_PACKET0( reg, (sz-1) ) );

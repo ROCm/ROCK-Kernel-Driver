@@ -2,7 +2,7 @@
 #define _INPUT_H
 
 /*
- * $Id: input.h,v 1.57 2002/01/02 11:59:56 vojtech Exp $
+ * $Id: input.h,v 1.68 2002/05/31 10:35:49 fsirl Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
@@ -322,11 +322,12 @@ struct input_event {
 #define KEY_FINANCE		219
 #define KEY_SPORT		220
 #define KEY_SHOP		221
-
-#define KEY_UNKNOWN		240
-
+#define KEY_ALTERASE		222
+#define KEY_CANCEL		223
 #define KEY_BRIGHTNESSDOWN	224
 #define KEY_BRIGHTNESSUP	225
+
+#define KEY_UNKNOWN		240
 
 #define BTN_MISC		0x100
 #define BTN_0			0x100
@@ -393,6 +394,10 @@ struct input_event {
 #define BTN_TOUCH		0x14a
 #define BTN_STYLUS		0x14b
 #define BTN_STYLUS2		0x14c
+
+#define BTN_WHEEL		0x150
+#define BTN_GEAR_DOWN		0x150
+#define BTN_GEAR_UP		0x151
 
 #define KEY_MAX			0x1ff
 
@@ -514,23 +519,19 @@ struct input_event {
  * Structures used in ioctls to upload effects to a device
  * The first structures are not passed directly by using ioctls.
  * They are sub-structures of the actually sent structure (called ff_effect)
- *
- * Ranges:
- *  0 <= __u16 <= 65535
- *  -32767 <= __s16 <= +32767     ! Not -32768 for lower bound !
  */
 
 struct ff_replay {
-	__u16 length;		/* Duration of an effect in ms. All other times are also expressed in ms */
-	__u16 delay;		/* Time to wait before to start playing an effect */
+	__u16 length; /* Duration of an effect in ms. All other times are also expressed in ms */
+	__u16 delay;  /* Time to wait before to start playing an effect */
 };
 
 struct ff_trigger {
-	__u16 button;		/* Number of button triggering an effect */
-	__u16 interval;		/* Time to wait before an effect can be re-triggered (ms) */
+	__u16 button;   /* Number of button triggering an effect */
+	__u16 interval; /* Time to wait before an effect can be re-triggered (ms) */
 };
 
-struct ff_shape {
+struct ff_envelope {
 	__u16 attack_length;	/* Duration of attack (ms) */
 	__u16 attack_level;	/* Level at beginning of attack */
 	__u16 fade_length;	/* Duration of fade (ms) */
@@ -539,41 +540,56 @@ struct ff_shape {
 
 /* FF_CONSTANT */
 struct ff_constant_effect {
-	__s16 level;		/* Strength of effect. Negative values are OK */
-	struct ff_shape shape;
+	__s16 level;	    /* Strength of effect. Negative values are OK */
+	struct ff_envelope envelope;
+};
+
+/* FF_RAMP */
+struct ff_ramp_effect {
+	__s16 start_level;
+	__s16 end_level;
+	struct ff_envelope envelope;
 };
 
 /* FF_SPRING of FF_FRICTION */
-struct ff_interactive_effect {
-/* Axis along which effect must be created. If null, the field named direction
- * is used
- * It is a bit array (ie to enable axes X and Y, use BIT(ABS_X) | BIT(ABS_Y)
- * It overrides the value of ff_effect::direction, which is used only if
- * axis == 0
- */
-	__u16 axis;
-
+struct ff_condition_effect {
 	__u16 right_saturation; /* Max level when joystick is on the right */
-	__u16 left_saturation;	/* Max level when joystick in on the left */
+	__u16 left_saturation;  /* Max level when joystick in on the left */
 
 	__s16 right_coeff;	/* Indicates how fast the force grows when the
 				   joystick moves to the right */
 	__s16 left_coeff;	/* Same for left side */
 
-	__u16 deadband;		/* Size of area where no force is produced */
-	__s16 center;		/* Position of dead dead zone */
+	__u16 deadband;	/* Size of area where no force is produced */
+	__s16 center;	/* Position of dead zone */
 
 };
 
 /* FF_PERIODIC */
 struct ff_periodic_effect {
-	__u16 waveform;		/* Kind of wave (sine, square...) */
-	__u16 period;		/* in ms */
+	__u16 waveform;	/* Kind of wave (sine, square...) */
+	__u16 period;	/* in ms */
 	__s16 magnitude;	/* Peak value */
-	__s16 offset;		/* Mean value of wave (roughly) */
+	__s16 offset;	/* Mean value of wave (roughly) */
 	__u16 phase;		/* 'Horizontal' shift */
 
-	struct ff_shape shape;
+	struct ff_envelope envelope;
+
+/* Only used if waveform == FF_CUSTOM */
+	__u32 custom_len;	/* Number of samples  */	
+	__s16 *custom_data;	/* Buffer of samples */
+/* Note: the data pointed by custom_data is copied by the driver. You can
+ * therefore dispose of the memory after the upload/update */
+};
+
+/* FF_RUMBLE */
+/* Some rumble pads have two motors of different weight.
+   strong_magnitude represents the magnitude of the vibration generated
+   by the heavy motor.
+*/
+struct ff_rumble_effect {
+	__u16 strong_magnitude;  /* Magnitude of the heavy motor */
+	__u16 weak_magnitude;    /* Magnitude of the light one */
 };
 
 /*
@@ -598,25 +614,12 @@ struct ff_effect {
 
 	union {
 		struct ff_constant_effect constant;
+		struct ff_ramp_effect ramp;
 		struct ff_periodic_effect periodic;
-		struct ff_interactive_effect interactive;
+		struct ff_condition_effect condition[2]; /* One for each axis */
+		struct ff_rumble_effect rumble;
 	} u;
 };
-
-/*
- * Buttons that can trigger effects. Use for example FF_BTN(BTN_TRIGGER) to
- * access the bitmap.
- */
-
-#define FF_BTN(x)	((x) - BTN_MISC + FF_BTN_OFFSET)
-#define FF_BTN_OFFSET	0x00
-
-/*
- * Force feedback axis mappings. Use FF_ABS() to access the bitmap.
- */
-
-#define FF_ABS(x)	((x) + FF_ABS_OFFSET)
-#define FF_ABS_OFFSET	0x40
 
 /*
  * Force feedback effect types
@@ -627,6 +630,9 @@ struct ff_effect {
 #define FF_CONSTANT	0x52
 #define FF_SPRING	0x53
 #define FF_FRICTION	0x54
+#define FF_DAMPER	0x55
+#define FF_INERTIA	0x56
+#define FF_RAMP		0x57
 
 /*
  * Force feedback periodic effect types
@@ -668,8 +674,6 @@ struct input_dev {
 	char *name;
 	char *phys;
 	char *uniq;
-	int number;
-
 	unsigned short idbus;
 	unsigned short idvendor;
 	unsigned short idproduct;
@@ -706,8 +710,6 @@ struct input_dev {
 	int absmin[ABS_MAX + 1];
 	int absfuzz[ABS_MAX + 1];
 	int absflat[ABS_MAX + 1];
-
-	int only_one_writer;
 
 	int (*open)(struct input_dev *dev);
 	void (*close)(struct input_dev *dev);

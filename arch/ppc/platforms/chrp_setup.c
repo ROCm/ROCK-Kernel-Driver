@@ -389,7 +389,6 @@ void __init chrp_init_IRQ(void)
 	int i;
 	unsigned long chrp_int_ack;
 	unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
-	int nmi_irq = -1;
 #if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)	
 	struct device_node *kbd;
 #endif
@@ -412,7 +411,7 @@ void __init chrp_init_IRQ(void)
 	OpenPIC_InitSenses = init_senses;
 	OpenPIC_NumInitSenses = NR_IRQS - NUM_8259_INTERRUPTS;
 
-	openpic_init(1, NUM_8259_INTERRUPTS, nmi_irq);
+	openpic_init(NUM_8259_INTERRUPTS);
 
 	for (i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
@@ -465,35 +464,6 @@ chrp_init2(void)
 #endif /* CONFIG_VT && (CONFIG_ADB_KEYBOARD || CONFIG_INPUT) */
 }
 
-/*
- * One of the main thing these mappings are needed for is so that
- * xmon can get to the serial port early on.  We probably should
- * handle the machines with the mpc106 as well as the python (F50)
- * and the GG2 (longtrail).  Actually we should look in the device
- * tree and do the right thing.
- */
-static void __init
-chrp_map_io(void)
-{
-	char *name;
-
-	/*
-	 * The code below tends to get removed, please don't take it out.
-	 * The F50 needs this mapping and it you take it out I'll track you
-	 * down and slap your hands.  If it causes problems please email me.
-	 *  -- Cort <cort@fsmlabs.com>
-	 */
-	name = get_property(find_path_device("/"), "name", NULL);
-	if (name && strncmp(name, "IBM-70", 6) == 0
-	    && strstr(name, "-F50")) {
-		io_block_mapping(0x80000000, 0x80000000, 0x10000000, _PAGE_IO);
-		io_block_mapping(0x90000000, 0x90000000, 0x10000000, _PAGE_IO);
-		return;
-	} else {
-		io_block_mapping(0xf8000000, 0xf8000000, 0x04000000, _PAGE_IO);
-	}
-}
-
 void __init
 chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	  unsigned long r6, unsigned long r7)
@@ -531,7 +501,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.calibrate_decr = chrp_calibrate_decr;
 
 	ppc_md.find_end_of_memory = pmac_find_end_of_memory;
-	ppc_md.setup_io_mappings = chrp_map_io;
 
 #ifdef CONFIG_VT
 	/* these are adjusted in chrp_init2 if we have an ADB keyboard */

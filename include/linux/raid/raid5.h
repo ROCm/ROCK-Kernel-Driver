@@ -192,7 +192,6 @@ struct stripe_head {
  
 
 struct disk_info {
-	kdev_t	dev;
 	struct block_device *bdev;
 	int	operational;
 	int	number;

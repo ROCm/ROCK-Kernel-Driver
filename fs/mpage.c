@@ -431,7 +431,7 @@ page_is_mapped:
 		unsigned nr_bvecs = MPAGE_BIO_MAX_SIZE / PAGE_CACHE_SIZE;
 
 		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
-					nr_bvecs, GFP_NOFS);
+					nr_bvecs, GFP_NOFS|__GFP_HIGH);
 		if (bio == NULL)
 			goto confused;
 	}
@@ -475,9 +475,44 @@ out:
 	return bio;
 }
 
-/*
- * This is a cut-n-paste of generic_writepages().  We _could_
- * generalise that function.  It'd get a bit messy.  We'll see.
+/**
+ * mpage_writepages - walk the list of dirty pages of the given
+ * address space and writepage() all of them.
+ * 
+ * @mapping: address space structure to write
+ * @nr_to_write: subtract the number of written pages from *@nr_to_write
+ * @get_block: the filesystem's block mapper function.
+ *             If this is NULL then use a_ops->writepage.  Otherwise, go
+ *             direct-to-BIO.
+ *
+ * This is a library function, which implements the writepages()
+ * address_space_operation.
+ *
+ * (The next two paragraphs refer to code which isn't here yet, but they
+ *  explain the presence of address_space.io_pages)
+ *
+ * Pages can be moved from clean_pages or locked_pages onto dirty_pages
+ * at any time - it's not possible to lock against that.  So pages which
+ * have already been added to a BIO may magically reappear on the dirty_pages
+ * list.  And generic_writepages() will again try to lock those pages.
+ * But I/O has not yet been started against the page.  Thus deadlock.
+ *
+ * To avoid this, the entire contents of the dirty_pages list are moved
+ * onto io_pages up-front.  We then walk io_pages, locking the
+ * pages and submitting them for I/O, moving them to locked_pages.
+ *
+ * This has the added benefit of preventing a livelock which would otherwise
+ * occur if pages are being dirtied faster than we can write them out.
+ *
+ * If a page is already under I/O, generic_writepages() skips it, even
+ * if it's dirty.  This is desirable behaviour for memory-cleaning writeback,
+ * but it is INCORRECT for data-integrity system calls such as fsync().  fsync()
+ * and msync() need to guarentee that all the data which was dirty at the time
+ * the call was made get new I/O started against them.  The way to do this is
+ * to run filemap_fdatawait() before calling filemap_fdatawrite().
+ *
+ * It's fairly rare for PageWriteback pages to be on ->dirty_pages.  It
+ * means that someone redirtied the page while it was under I/O.
  */
 int
 mpage_writepages(struct address_space *mapping,
@@ -487,11 +522,15 @@ mpage_writepages(struct address_space *mapping,
 	sector_t last_block_in_bio = 0;
 	int ret = 0;
 	int done = 0;
+	int (*writepage)(struct page *);
+
+	writepage = NULL;
+	if (get_block == NULL)
+		writepage = mapping->a_ops->writepage;
 
 	write_lock(&mapping->page_lock);
 
-	list_splice(&mapping->dirty_pages, &mapping->io_pages);
-	INIT_LIST_HEAD(&mapping->dirty_pages);
+	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
 
         while (!list_empty(&mapping->io_pages) && !done) {
 		struct page *page = list_entry(mapping->io_pages.prev,
@@ -516,8 +555,8 @@ mpage_writepages(struct address_space *mapping,
 
 		lock_page(page);
 
-		if (page->mapping && TestClearPageDirty(page) &&
-					!PageWriteback(page)) {
+		if (page->mapping && !PageWriteback(page) &&
+					TestClearPageDirty(page)) {
 			/* FIXME: batch this up */
 			if (!PageActive(page) && PageLRU(page)) {
 				spin_lock(&pagemap_lru_lock);
@@ -527,8 +566,13 @@ mpage_writepages(struct address_space *mapping,
 				}
 				spin_unlock(&pagemap_lru_lock);
 			}
-			bio = mpage_writepage(bio, page, get_block,
-					&last_block_in_bio, &ret);
+
+			if (writepage) {
+				ret = (*writepage)(page);
+			} else {
+				bio = mpage_writepage(bio, page, get_block,
+						&last_block_in_bio, &ret);
+			}
 			if (ret || (nr_to_write && --(*nr_to_write) <= 0))
 				done = 1;
 		} else {
@@ -538,13 +582,10 @@ mpage_writepages(struct address_space *mapping,
 		page_cache_release(page);
 		write_lock(&mapping->page_lock);
 	}
-	if (!list_empty(&mapping->io_pages)) {
-		/*
-		 * Put the rest back, in the correct order.
-		 */
-		list_splice(&mapping->io_pages, mapping->dirty_pages.prev);
-		INIT_LIST_HEAD(&mapping->io_pages);
-	}
+	/*
+	 * Put the rest back, in the correct order.
+	 */
+	list_splice_init(&mapping->io_pages, mapping->dirty_pages.prev);
 	write_unlock(&mapping->page_lock);
 	if (bio)
 		mpage_bio_submit(WRITE, bio);

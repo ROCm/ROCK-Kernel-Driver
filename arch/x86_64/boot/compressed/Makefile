@@ -33,7 +33,7 @@ misc.o: misc.c
 piggy.o:	$(SYSTEM)
 	tmppiggy=_tmp_$$$$piggy; \
 	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk; \
-	$(OBJCOPY) $(SYSTEM) $$tmppiggy; \
+	$(OBJCOPY) $(OBJCOPYFLAGS) $< $$tmppiggy; \
 	gzip -f -9 < $$tmppiggy > $$tmppiggy.gz; \
 	echo "SECTIONS { .data : { input_len = .; LONG(input_data_end - input_data) input_data = .; *(.data) input_data_end = .; }}" > $$tmppiggy.lnk; \
 	$(IA32_LD) -r -o piggy.o -b binary $$tmppiggy.gz -b elf32-i386 -T $$tmppiggy.lnk; \

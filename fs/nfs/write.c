@@ -1110,8 +1110,7 @@ nfs_commit_rpcsetup(struct list_head *head, struct nfs_write_data *data)
 	/* Set up the RPC argument and reply structs
 	 * NB: take care not to mess about with data->commit et al. */
 
-	list_splice(head, &data->pages);
-	INIT_LIST_HEAD(head);
+	list_splice_init(head, &data->pages);
 	first = nfs_list_entry(data->pages.next);
 	last = nfs_list_entry(data->pages.prev);
 	inode = first->wb_inode;

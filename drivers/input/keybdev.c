@@ -1,5 +1,5 @@
 /*
- * $Id: keybdev.c,v 1.16 2002/01/09 04:21:41 lethal Exp $
+ * $Id: keybdev.c,v 1.19 2002/03/13 10:09:20 vojtech Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
@@ -179,7 +179,7 @@ void panic_blink(void)
 	static unsigned long last_jiffie;
 	static char led;
 	/* Roughly 1/2s frequency. KDB uses about 1s. Make sure it is different. */
-	if (jiffies - last_jiffie > HZ/2) {
+	if (time_after(jiffies, last_jiffie + HZ/2)) {
 		led ^= 0x01 | 0x04;
 		keybdev_ledfunc(led);
 		last_jiffie = jiffies;

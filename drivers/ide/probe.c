@@ -1143,6 +1143,7 @@ static void channel_init(struct ata_channel *ch)
 	if (!gd)
 		goto err_kmalloc_gd;
 
+	memset(gd, 0, sizeof(struct gendisk));
 	gd->sizes = kmalloc(ATA_MINORS * sizeof(int), GFP_KERNEL);
 	if (!gd->sizes)
 		goto err_kmalloc_gd_sizes;
@@ -1171,18 +1172,6 @@ static void channel_init(struct ata_channel *ch)
 	gd->nr_real	= MAX_DRIVES;		/* current num real drives */
 	gd->next	= NULL;			/* linked list of major devs */
 	gd->fops        = ide_fops;             /* file operations */
-
-	gd->de_arr	= kmalloc(sizeof(*gd->de_arr) * MAX_DRIVES, GFP_KERNEL);
-	if (gd->de_arr)
-		memset(gd->de_arr, 0, sizeof(*gd->de_arr) * MAX_DRIVES);
-	else
-	    goto err_kmalloc_gd_de_arr;
-
-	gd->flags	= kmalloc(sizeof(*gd->flags) * MAX_DRIVES, GFP_KERNEL);
-	if (gd->flags)
-		memset(gd->flags, 0, sizeof(*gd->flags) * MAX_DRIVES);
-	else
-	    goto err_kmalloc_gd_flags;
 
 	ch->gd = gd;
 	add_gendisk(gd);

@@ -72,7 +72,7 @@ static int badness(struct task_struct *p)
 	 * very well in practice. This is not safe against jiffie wraps
 	 * but we don't care _that_ much...
 	 */
-	cpu_time = (p->times.tms_utime + p->times.tms_stime) >> (SHIFT_HZ + 3);
+	cpu_time = (p->utime + p->stime) >> (SHIFT_HZ + 3);
 	run_time = (jiffies - p->start_time) >> (SHIFT_HZ + 10);
 
 	points /= int_sqrt(cpu_time);

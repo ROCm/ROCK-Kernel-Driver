@@ -38,7 +38,7 @@ typedef struct {
 } __attribute__ ((__packed__)) ntfs_name;
 
 /* The little endian Unicode string $I30 as a global constant. */
-extern const uchar_t I30[5];
+extern uchar_t I30[5];
 
 extern MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni,
 		const uchar_t *uname, const int uname_len, ntfs_name **res);

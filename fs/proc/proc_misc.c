@@ -36,6 +36,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
+#include <linux/times.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -98,7 +99,7 @@ static int uptime_read_proc(char *page, char **start, off_t off,
 	int len;
 
 	uptime = jiffies;
-	idle = init_task.times.tms_utime + init_task.times.tms_stime;
+	idle = init_task.utime + init_task.stime;
 
 	/* The formula for the fraction parts really is ((t * 100) / HZ) % 100, but
 	   that would overflow about every five days at HZ == 100.
@@ -294,18 +295,21 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 #endif
 	}
 
-	len = sprintf(page, "cpu  %u %u %u %lu\n", user, nice, system,
-		      jif * num_online_cpus() - (user + nice + system));
+	len = sprintf(page, "cpu  %u %u %u %lu\n",
+		jiffies_to_clock_t(user),
+		jiffies_to_clock_t(nice),
+		jiffies_to_clock_t(system),
+		jiffies_to_clock_t(jif * num_online_cpus() - (user + nice + system)));
 	for (i = 0 ; i < NR_CPUS; i++){
 		if (!cpu_online(i)) continue;
 		len += sprintf(page + len, "cpu%d %u %u %u %lu\n",
 			i,
-			kstat.per_cpu_user[i],
-			kstat.per_cpu_nice[i],
-			kstat.per_cpu_system[i],
-			jif - (  kstat.per_cpu_user[i] \
+			jiffies_to_clock_t(kstat.per_cpu_user[i]),
+			jiffies_to_clock_t(kstat.per_cpu_nice[i]),
+			jiffies_to_clock_t(kstat.per_cpu_system[i]),
+			jiffies_to_clock_t(jif - (  kstat.per_cpu_user[i] \
 				   + kstat.per_cpu_nice[i] \
-				   + kstat.per_cpu_system[i]));
+				   + kstat.per_cpu_system[i])));
 	}
 	len += sprintf(page + len,
 		"page %u %u\n"

@@ -197,11 +197,11 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 	int this_count = SCpnt->bufflen >> 9;
 	int good_sectors = (result == 0 ? this_count : 0);
 	int block_sectors = 0;
-	int device_nr = DEVICE_NR(SCpnt->request.rq_dev);
+	int device_nr = DEVICE_NR(SCpnt->request->rq_dev);
 	Scsi_CD *SCp = &scsi_CDs[device_nr];
 
 #ifdef DEBUG
-	printk("sr.c done: %x %p\n", result, SCpnt->request.bh->b_data);
+	printk("sr.c done: %x %p\n", result, SCpnt->request->bh->b_data);
 #endif
 	/*
 	   Handle MEDIUM ERRORs or VOLUME OVERFLOWs that indicate partial success.
@@ -219,14 +219,14 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 		(SCpnt->sense_buffer[4] << 16) |
 		(SCpnt->sense_buffer[5] << 8) |
 		SCpnt->sense_buffer[6];
-		if (SCpnt->request.bio != NULL)
-			block_sectors = bio_sectors(SCpnt->request.bio);
+		if (SCpnt->request->bio != NULL)
+			block_sectors = bio_sectors(SCpnt->request->bio);
 		if (block_sectors < 4)
 			block_sectors = 4;
 		if (SCp->device->sector_size == 2048)
 			error_sector <<= 2;
 		error_sector &= ~(block_sectors - 1);
-		good_sectors = error_sector - SCpnt->request.sector;
+		good_sectors = error_sector - SCpnt->request->sector;
 		if (good_sectors < 0 || good_sectors >= this_count)
 			good_sectors = 0;
 		/*
@@ -266,14 +266,14 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	int dev, devm, block=0, this_count, s_size;
 	Scsi_CD *SCp;
 
-	devm = minor(SCpnt->request.rq_dev);
-	dev = DEVICE_NR(SCpnt->request.rq_dev);
+	devm = minor(SCpnt->request->rq_dev);
+	dev = DEVICE_NR(SCpnt->request->rq_dev);
 	SCp = &scsi_CDs[dev];
 
 	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %d, block = %d\n", devm, block));
 
 	if (dev >= sr_template.nr_dev || !SCp->device || !SCp->device->online) {
-		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", SCpnt->request.nr_sectors));
+		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", SCpnt->request->nr_sectors));
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
 		return 0;
 	}
@@ -286,8 +286,8 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 		return 0;
 	}
 
-	if (!(SCpnt->request.flags & REQ_CMD)) {
-		blk_dump_rq_flags(&SCpnt->request, "sr unsup command");
+	if (!(SCpnt->request->flags & REQ_CMD)) {
+		blk_dump_rq_flags(SCpnt->request, "sr unsup command");
 		return 0;
 	}
 
@@ -308,23 +308,23 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 		return 0;
 	}
 
-	if (rq_data_dir(&SCpnt->request) == WRITE) {
+	if (rq_data_dir(SCpnt->request) == WRITE) {
 		if (!SCp->device->writeable)
 			return 0;
 		SCpnt->cmnd[0] = WRITE_10;
 		SCpnt->sc_data_direction = SCSI_DATA_WRITE;
-	} else if (rq_data_dir(&SCpnt->request) == READ) {
+	} else if (rq_data_dir(SCpnt->request) == READ) {
 		SCpnt->cmnd[0] = READ_10;
 		SCpnt->sc_data_direction = SCSI_DATA_READ;
 	} else {
-		blk_dump_rq_flags(&SCpnt->request, "Unknown sr command");
+		blk_dump_rq_flags(SCpnt->request, "Unknown sr command");
 		return 0;
 	}
 
 	/*
 	 * request doesn't start on hw block boundary, add scatter pads
 	 */
-	if ((SCpnt->request.sector % (s_size >> 9)) || (SCpnt->request_bufflen % s_size)) {
+	if ((SCpnt->request->sector % (s_size >> 9)) || (SCpnt->request_bufflen % s_size)) {
 		printk("sr: unaligned transfer\n");
 		return 0;
 	}
@@ -334,13 +334,13 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 
 	SCSI_LOG_HLQUEUE(2, printk("sr%d : %s %d/%ld 512 byte blocks.\n",
                                    devm,
-		   (rq_data_dir(&SCpnt->request) == WRITE) ? "writing" : "reading",
-				 this_count, SCpnt->request.nr_sectors));
+		   (rq_data_dir(SCpnt->request) == WRITE) ? "writing" : "reading",
+				 this_count, SCpnt->request->nr_sectors));
 
 	SCpnt->cmnd[1] = (SCpnt->device->scsi_level <= SCSI_2) ?
 			 ((SCpnt->lun << 5) & 0xe0) : 0;
 
-	block = SCpnt->request.sector / (s_size >> 9);
+	block = SCpnt->request->sector / (s_size >> 9);
 
 	if (this_count > 0xffff)
 		this_count = 0xffff;
@@ -496,7 +496,7 @@ void get_sectorsize(int i)
 		cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
 			 ((SCp->device->lun << 5) & 0xe0) : 0;
 		memset((void *) &cmd[2], 0, 8);
-		SRpnt->sr_request.rq_status = RQ_SCSI_BUSY;	/* Mark as really busy */
+		SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;	/* Mark as really busy */
 		SRpnt->sr_cmd_len = 0;
 
 		memset(buffer, 0, 8);
@@ -522,8 +522,8 @@ void get_sectorsize(int i)
 		SCp->needs_sector_size = 1;
 	} else {
 #if 0
-		if (cdrom_get_last_written(mkdev(MAJOR_NR, i),
-					   &scsi_CDs[i].capacity))
+		if (cdrom_get_last_written(&SCp->cdi,
+					   &SCp->capacity))
 #endif
 			SCp->capacity = 1 + ((buffer[0] << 24) |
 						    (buffer[1] << 16) |
@@ -731,6 +731,32 @@ cleanup_devfs:
 	return 1;
 }
 
+/* Driverfs file support */
+static ssize_t sr_device_kdev_read(struct device *driverfs_dev, 
+				   char *page, size_t count, loff_t off)
+{
+	kdev_t kdev; 
+	kdev.value=(int)driverfs_dev->driver_data;
+	return off ? 0 : sprintf(page, "%x\n",kdev.value);
+}
+static struct driver_file_entry sr_device_kdev_file = {
+	name: "kdev",
+	mode: S_IRUGO,
+	show: sr_device_kdev_read,
+};
+
+static ssize_t sr_device_type_read(struct device *driverfs_dev, 
+				   char *page, size_t count, loff_t off) 
+{
+	return off ? 0 : sprintf (page, "CHR\n");
+}
+static struct driver_file_entry sr_device_type_file = {
+	name: "type",
+	mode: S_IRUGO,
+	show: sr_device_type_read,
+};
+
+
 void sr_finish()
 {
 	int i;
@@ -776,6 +802,20 @@ void sr_finish()
 
 		sprintf(name, "sr%d", i);
 		strcpy(SCp->cdi.name, name);
+		sprintf(SCp->cdi.cdrom_driverfs_dev.bus_id, "%s:cd",
+			SCp->device->sdev_driverfs_dev.bus_id);
+		sprintf(SCp->cdi.cdrom_driverfs_dev.name, "%scdrom",
+			SCp->device->sdev_driverfs_dev.name);
+		SCp->cdi.cdrom_driverfs_dev.parent = 
+			&SCp->device->sdev_driverfs_dev;
+		SCp->cdi.cdrom_driverfs_dev.bus = &scsi_driverfs_bus_type;
+		SCp->cdi.cdrom_driverfs_dev.driver_data = 
+			(void *)__mkdev(MAJOR_NR, i);
+		device_register(&SCp->cdi.cdrom_driverfs_dev);
+		device_create_file(&SCp->cdi.cdrom_driverfs_dev,
+				&sr_device_type_file);
+		device_create_file(&SCp->cdi.cdrom_driverfs_dev,
+				&sr_device_kdev_file);
                 SCp->cdi.de = devfs_register(SCp->device->de, "cd",
                                     DEVFS_FL_DEFAULT, MAJOR_NR, i,
                                     S_IFBLK | S_IRUGO | S_IWUGO,
@@ -816,7 +856,14 @@ static void sr_detach(Scsi_Device * SDp)
 
 static int __init init_sr(void)
 {
-	return scsi_register_device(&sr_template);
+	int rc;
+	rc = scsi_register_device(&sr_template);
+	if (!rc) {
+		sr_template.scsi_driverfs_driver.name = (char *)sr_template.tag;
+		sr_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
+		driver_register(&sr_template.scsi_driverfs_driver);
+	}
+	return rc;
 }
 
 static void __exit exit_sr(void)
@@ -833,6 +880,7 @@ static void __exit exit_sr(void)
 	blk_clear(MAJOR_NR);
 
 	sr_template.dev_max = 0;
+	remove_driver(&sr_template.scsi_driverfs_driver);
 }
 
 module_init(init_sr);
