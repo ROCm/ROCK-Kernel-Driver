@@ -113,7 +113,7 @@
 #define LPFC_DRIVER_NAME    "lpfc"
 
 #ifndef LPFC_DRIVER_VERSION
-#define LPFC_DRIVER_VERSION "2.10d"
+#define LPFC_DRIVER_VERSION "2.10e"
 #define OSGT_DRIVER_VERSION "1.08"
 #endif
 
@@ -196,6 +196,10 @@ extern int elx_pci_getadd(struct pci_dev *, int, unsigned long *);
 extern void elx_scsi_add_timer(Scsi_Cmnd *, int);
 
 int lpfc_mem_poolinit(elxHBA_t *);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+ssize_t lpfc_sysfs_info_show(struct device *, char *);
+#endif
 
 /* Binding Definitions: Max string size  */
 #define FC_MAX_DID_STRING       6
@@ -1400,13 +1404,16 @@ lpfc_slave_configure(Scsi_Device * scsi_devs)
 int
 lpfc_device_queue_depth(elxHBA_t * phba, Scsi_Device * device)
 {
+	elxCfgParam_t *clp;
+
+	clp = &phba->config[0];
 
 	if (device->tagged_supported) {
 #if LINUX_VERSION_CODE 	< KERNEL_VERSION(2,6,0)
 		device->tagged_queue = 1;
 #endif
 		device->current_tag = 0;
-		device->queue_depth = 32;	/* Substitute configuration parameter */
+		device->queue_depth = clp[ELX_CFG_DFT_LUN_Q_DEPTH].a_current;
 	} else {
 		device->queue_depth = 16;
 	}
@@ -9077,6 +9084,8 @@ fc_get_cfg_param(int brd, int param)
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+DEVICE_ATTR(info, S_IRUGO, lpfc_sysfs_info_show, NULL);
+
 static struct pci_device_id lpfc_id_table[] __devinitdata = {
 	{PCI_VENDOR_ID_EMULEX, PCI_DEVICE_ID_VIPER, PCI_ANY_ID, PCI_ANY_ID, 0,
 	 0, 0UL},
@@ -9124,6 +9133,8 @@ lpfc_pci_detect(struct pci_dev *pdev, const struct pci_device_id *pid)
 		pci_release_regions(pdev);
 		return -ENODEV;
 	}
+
+	device_create_file(&(pdev->dev), &dev_attr_info);
 	return 0;
 }
 
@@ -9137,6 +9148,9 @@ lpfc_pci_release(struct pci_dev *pdev)
 	host = pci_get_drvdata(pdev);
 	phba = (elxHBA_t *) host->hostdata[0];
 	instance = phba->brd_no;
+
+	/* removing hba's sysfs "info" attribute before driver unload */
+	device_remove_file(&(pdev->dev), &dev_attr_info);
 
 	/*
 	 *  detach the board
@@ -9193,6 +9207,15 @@ lpfc_exit(void)
 {
 	pci_unregister_driver(&lpfc_driver);
 	lpfc_diag_uninit();
+}
+
+ssize_t
+lpfc_sysfs_info_show(struct device *dev, char *buf)
+{
+	struct Scsi_Host *host;
+
+	host = pci_get_drvdata(to_pci_dev(dev));
+	return lpfc_proc_info(host, buf, 0, 0, 0, 0);
 }
 #endif
 

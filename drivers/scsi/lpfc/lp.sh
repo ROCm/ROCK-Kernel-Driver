@@ -1,6 +1,7 @@
 d=$1
 s=drivers/scsi/lpfc/
 n=drivers/net/lpfc/
+mkdir $s $n
 set -ex
 for i in \
 lpfcLINUXlan.c \

@@ -1515,6 +1515,11 @@ elx_os_prep_io(elxHBA_t * phba, ELX_SCSI_BUF_t * elx_cmd)
 #endif				/* endif powerpc */
 		seg_cnt = pci_map_sg(plxhba->pcidev, sgel_p, use_sg,
 				     scsi_to_pci_dma_dir(datadir));
+
+		/* return error if we cannot map sg list */
+		if (seg_cnt == 0) {
+			return (1);
+		}
 #ifdef powerpc			/* check for zero phys address, then remap to get diff ones */
 		for (sgel_p_t0 = sgel_p, i = 0; i < seg_cnt; sgel_p_t0++, i++) {
 			if (!scsi_sg_dma_address(sgel_p_t0)) {
@@ -2233,6 +2238,28 @@ elx_os_fcp_err_handle(ELX_SCSI_BUF_t * elx_cmd, elx_xlat_err_t * presult)
 		}
 	}
 
+	if ((fcprsp->rspStatus2 & SNS_LEN_VALID) && (fcprsp->rspSnsLen != 0)) {
+		uint32_t snsLen, rspLen;
+
+		rspLen = SWAP_DATA(fcprsp->rspRspLen);
+		snsLen = SWAP_DATA(fcprsp->rspSnsLen);
+		if (snsLen > MAX_ELX_SNS) {
+			snsLen = MAX_ELX_SNS;
+		}
+		memcpy(plun->sense, ((uint8_t *) & fcprsp->rspInfo0) + rspLen,
+		       snsLen);
+		plun->sense_length = snsLen;
+
+		/* then we return this sense info in the sense buffer for this cmd */
+		if (snsLen > SCSI_SENSE_BUFFERSIZE) {
+			snsLen = SCSI_SENSE_BUFFERSIZE;
+		}
+		memcpy(cmnd->sense_buffer, plun->sense, snsLen);
+		plun->sense_valid = 0;
+	} else {
+		fcprsp->rspSnsLen = 0;
+	}
+
 	if (fcprsp->rspStatus2 & RESID_UNDER) {
 		uint32_t len, resid;
 
@@ -2244,6 +2271,22 @@ elx_os_fcp_err_handle(ELX_SCSI_BUF_t * elx_cmd, elx_xlat_err_t * presult)
 		case READ_CAPACITY:
 		case FCP_SCSI_READ_DEFECT_LIST:
 		case MDACIOCTL_DIRECT_CMD:
+			/* If sense indicated 29,00, then we want to retry the cmd */
+			if ((fcprsp->rspStatus3 == SCSI_STAT_CHECK_COND) &&
+			    (fcprsp->rspStatus2 & SNS_LEN_VALID) &&
+			    (fcprsp->rspSnsLen != 0)) {
+				uint32_t i;
+				uint32_t cc;
+				uint32_t *lp;
+
+				i = SWAP_DATA(fcprsp->rspRspLen);
+				lp = (uint32_t
+				      *) (((uint8_t *) & fcprsp->rspInfo0) + i);
+				cc = (SWAP_DATA
+				      ((lp[3]) & SWAP_DATA(0xFF000000)));
+				if (cc == 0x29000000)
+					break;
+			}
 			/* No error */
 			fcprsp->rspSnsLen = 0;
 			return (scsi_status);
@@ -2265,28 +2308,6 @@ elx_os_fcp_err_handle(ELX_SCSI_BUF_t * elx_cmd, elx_xlat_err_t * presult)
 				return (scsi_status);
 			}
 		}
-	}
-
-	if ((fcprsp->rspStatus2 & SNS_LEN_VALID) && (fcprsp->rspSnsLen != 0)) {
-		uint32_t snsLen, rspLen;
-
-		rspLen = SWAP_DATA(fcprsp->rspRspLen);
-		snsLen = SWAP_DATA(fcprsp->rspSnsLen);
-		if (snsLen > MAX_ELX_SNS) {
-			snsLen = MAX_ELX_SNS;
-		}
-		memcpy(plun->sense, ((uint8_t *) & fcprsp->rspInfo0) + rspLen,
-		       snsLen);
-		plun->sense_length = snsLen;
-
-		/* then we return this sense info in the sense buffer for this cmd */
-		if (snsLen > SCSI_SENSE_BUFFERSIZE) {
-			snsLen = SCSI_SENSE_BUFFERSIZE;
-		}
-		memcpy(cmnd->sense_buffer, plun->sense, snsLen);
-		plun->sense_valid = 0;
-	} else {
-		fcprsp->rspSnsLen = 0;
 	}
 
 	scsi_status = (uint32_t) (fcprsp->rspStatus3);
@@ -2327,6 +2348,9 @@ elx_os_fcp_err_handle(ELX_SCSI_BUF_t * elx_cmd, elx_xlat_err_t * presult)
 					       elx_msgBlk0732.msgPreambleStr,	/* begin varargs */
 					       *lp, *(lp + 1), *(lp + 2), *(lp + 3));	/* end varargs */
 
+				/* since we retry the cmd here, any sense should be cleared */
+				memset(cmnd->sense_buffer, 0,
+				       SCSI_SENSE_BUFFERSIZE);
 				elx_sched_queue_command(phba, elx_cmd);
 				scsi_status = ELX_CMD_BEING_RETRIED;
 				break;

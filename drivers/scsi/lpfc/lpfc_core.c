@@ -8536,7 +8536,6 @@ lpfc_config_port_post(elxHBA_t * phba)
 				elx_sli_intr(phba);
 				isr_cnt = psli->slistat.sliIntr;
 			}
-			lpfc_els_chk_latt(phba, 0);
 			ELX_DRVR_UNLOCK(phba, iflag);
 		}
 		isr_cnt = psli->slistat.sliIntr;

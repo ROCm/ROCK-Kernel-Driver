@@ -6393,7 +6393,9 @@ elx_scsi_cmd_start(ELX_SCSI_BUF_t * elx_cmd)
 	elx_cmd->pLun->pnode = ndlp;
 	elx_cmd->cmd_cmpl = elx_os_return_scsi_cmd;
 
-	elx_os_prep_io(phba, elx_cmd);
+	if (elx_os_prep_io(phba, elx_cmd)) {
+		return 1;
+	}
 
 	/* ulpTimeout is only one byte */
 	if (elx_cmd->timeout > 0xff) {
