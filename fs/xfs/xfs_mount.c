@@ -635,7 +635,6 @@ xfs_mountfs(
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
 	int		readio_log, writeio_log;
-	vmap_t		vmap;
 	xfs_daddr_t	d;
 	__uint64_t	ret64;
 	__int64_t	update_flags;
@@ -979,7 +978,6 @@ xfs_mountfs(
 
 	ASSERT(rip != NULL);
 	rvp = XFS_ITOV(rip);
-	VMAP(rvp, vmap);
 
 	if (unlikely((rip->i_d.di_mode & S_IFMT) != S_IFDIR)) {
 		cmn_err(CE_WARN, "XFS: corrupted root inode");
@@ -1043,7 +1041,6 @@ xfs_mountfs(
 	 * Free up the root inode.
 	 */
 	VN_RELE(rvp);
-	vn_purge(rvp, &vmap);
  error3:
 	xfs_log_unmount_dealloc(mp);
  error2:
@@ -1076,8 +1073,6 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
 	int64_t		fsid;
 #endif
-
-	xfs_iflush_all(mp, XFS_FLUSH_ALL);
 
 	XFS_QM_DQPURGEALL(mp,
 		XFS_QMOPT_UQUOTA | XFS_QMOPT_GQUOTA | XFS_QMOPT_UMOUNTING);
