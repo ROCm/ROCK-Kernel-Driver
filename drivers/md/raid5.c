@@ -633,7 +633,6 @@ static void copy_data(int frombio, struct bio *bio,
 		else 
 			page_offset = (signed)(sector - bio->bi_sector) * -512;
 		bio_for_each_segment(bvl, bio, i) {
-			char *ba = __bio_kmap(bio, i);
 			int len = bio_iovec_idx(bio,i)->bv_len;
 			int clen;
 			int b_offset = 0;			
@@ -648,13 +647,16 @@ static void copy_data(int frombio, struct bio *bio,
 				clen = STRIPE_SIZE - page_offset;	
 			else clen = len;
 			
-			if (len > 0) {
+			if (clen > 0) {
+				char *ba = __bio_kmap(bio, i);
 				if (frombio)
 					memcpy(pa+page_offset, ba+b_offset, clen);
 				else
 					memcpy(ba+b_offset, pa+page_offset, clen);
-			}
-			__bio_kunmap(bio, i);
+				__bio_kunmap(bio, i);
+			}	
+			if (clen < len) /* hit end of page */
+				break;
 			page_offset +=  len;
 		}
 	}
