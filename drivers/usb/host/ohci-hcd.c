@@ -441,7 +441,8 @@ static int ohci_init (struct ohci_hcd *ohci)
 		while (ohci_readl (ohci, &ohci->regs->control) & OHCI_CTRL_IR) {
 			msleep (10);
 			if (--temp == 0) {
-				ohci_err (ohci, "USB HC TakeOver failed!\n");
+				ohci_err (ohci, "USB HC takeover failed!"
+					"  (BIOS/SMM bug)\n");
 				return -EBUSY;
 			}
 		}
