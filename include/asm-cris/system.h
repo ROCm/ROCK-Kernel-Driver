@@ -150,6 +150,8 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 #define mb() __asm__ __volatile__ ("" : : : "memory")
 #define rmb() mb()
 #define wmb() mb()
+#define set_mb(var, value)  do { var = value; mb(); } while (0)
+#define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
 #ifdef CONFIG_SMP
 #define smp_mb()        mb()

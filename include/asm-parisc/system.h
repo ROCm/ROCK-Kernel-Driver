@@ -120,6 +120,8 @@ static inline void set_eiem(unsigned long val)
 
 #define mb()  __asm__ __volatile__ ("sync" : : :"memory")
 #define wmb() mb()
+#define set_mb(var, value)  do { var = value; mb(); } while (0)
+#define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
 extern unsigned long __xchg(unsigned long, unsigned long *, int);
 

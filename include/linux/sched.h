@@ -106,23 +106,13 @@ extern unsigned long nr_uninterruptible(void);
 
 #define __set_task_state(tsk, state_value)		\
 	do { (tsk)->state = (state_value); } while (0)
-#ifdef CONFIG_SMP
 #define set_task_state(tsk, state_value)		\
 	set_mb((tsk)->state, (state_value))
-#else
-#define set_task_state(tsk, state_value)		\
-	__set_task_state((tsk), (state_value))
-#endif
 
 #define __set_current_state(state_value)			\
 	do { current->state = (state_value); } while (0)
-#ifdef CONFIG_SMP
 #define set_current_state(state_value)		\
 	set_mb(current->state, (state_value))
-#else
-#define set_current_state(state_value)		\
-	__set_current_state(state_value)
-#endif
 
 /*
  * Scheduling policies
