@@ -348,7 +348,6 @@
 #include <asm/system.h>
 
 #if LINUX_VERSION_CODE >= 0x020545
-#include <asm/cacheflush.h>	/* for flush_cache_all() */
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
@@ -2122,8 +2121,6 @@ qla1280_setup_chip(struct scsi_qla_host *ha)
 		for(i = 0; i < cnt; i++)
 			((uint16_t *)ha->request_ring)[i] =
 				cpu_to_le16(risc_code_address[i]);
-
-		flush_cache_all();
 
 		mb[0] = MBC_LOAD_RAM;
 		mb[1] = risc_address;

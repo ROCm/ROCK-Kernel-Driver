@@ -26,6 +26,7 @@
 #include <linux/mman.h>
 #include <linux/fs.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/jiffies.h>
 #include <linux/futex.h>
 #include <linux/ptrace.h>

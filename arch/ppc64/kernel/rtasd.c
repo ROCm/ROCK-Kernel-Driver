@@ -121,10 +121,11 @@ static int log_rtas_len(char * buf)
 
 		/* extended header */
 		len += err->extended_log_length;
-
-		if (len > rtas_error_log_max)
-			len = rtas_error_log_max;
 	}
+
+	if (len > rtas_error_log_max)
+		len = rtas_error_log_max;
+
 	return len;
 }
 

@@ -1654,18 +1654,41 @@ void ata_fill_sg(struct ata_queued_cmd *qc)
 {
 	struct scatterlist *sg = qc->sg;
 	struct ata_port *ap = qc->ap;
-	unsigned int i;
+	unsigned int idx, nelem;
 
 	assert(sg != NULL);
 	assert(qc->n_elem > 0);
 
-	for (i = 0; i < qc->n_elem; i++) {
-		ap->prd[i].addr = cpu_to_le32(sg_dma_address(&sg[i]));
-		ap->prd[i].flags_len = cpu_to_le32(sg_dma_len(&sg[i]));
-		VPRINTK("PRD[%u] = (0x%X, 0x%X)\n",
-			i, le32_to_cpu(ap->prd[i].addr), le32_to_cpu(ap->prd[i].flags_len));
+	idx = 0;
+	for (nelem = qc->n_elem; nelem; nelem--,sg++) {
+		u32 addr, boundary;
+		u32 sg_len, len;
+
+		/* determine if physical DMA addr spans 64K boundary.
+		 * Note h/w doesn't support 64-bit, so we unconditionally
+		 * truncate dma_addr_t to u32.
+		 */
+		addr = (u32) sg_dma_address(sg);
+		sg_len = sg_dma_len(sg);
+
+		while (sg_len) {
+			boundary = (addr & ~0xffff) + (0xffff + 1);
+			len = sg_len;
+			if ((addr + sg_len) > boundary)
+				len = boundary - addr;
+
+			ap->prd[idx].addr = cpu_to_le32(addr);
+			ap->prd[idx].flags_len = cpu_to_le32(len & 0xffff);
+			VPRINTK("PRD[%u] = (0x%X, 0x%X)\n", idx, addr, len);
+
+			idx++;
+			sg_len -= len;
+			addr += len;
+		}
 	}
-	ap->prd[qc->n_elem - 1].flags_len |= cpu_to_le32(ATA_PRD_EOT);
+
+	if (idx)
+		ap->prd[idx - 1].flags_len |= cpu_to_le32(ATA_PRD_EOT);
 }
 
 /**

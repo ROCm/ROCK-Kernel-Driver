@@ -33,6 +33,7 @@
 #include <linux/errno.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 
 #include <net/sock.h>
 
@@ -564,8 +565,6 @@ asmlinkage int sunos_pathconf(char *path, int name)
 }
 
 /* SunOS mount system call emulation */
-extern asmlinkage int
-sys_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp);
 
 asmlinkage int sunos_select(int width, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
 {
@@ -619,11 +618,6 @@ struct sunos_nfs_mount_args {
 	int        acdirmax;   /* attr cache dir max secs */
 	char       *netname;   /* server's netname */
 };
-
-
-extern asmlinkage int sys_connect(int fd, struct sockaddr *uservaddr, int addrlen);
-extern asmlinkage int sys_socket(int family, int type, int protocol);
-extern asmlinkage int sys_bind(int fd, struct sockaddr *umyaddr, int addrlen);
 
 
 /* Bind the socket on a local reserved port and connect it to the
@@ -814,8 +808,6 @@ out:
 	return ret;
 }
 
-extern asmlinkage int sys_setsid(void);
-extern asmlinkage int sys_setpgid(pid_t, pid_t);
 
 asmlinkage int sunos_setpgrp(pid_t pid, pid_t pgid)
 {
@@ -1006,8 +998,8 @@ asmlinkage int sunos_shmsys(int op, unsigned long arg1, unsigned long arg2,
 
 	switch(op) {
 	case 0:
-		/* sys_shmat(): attach a shared memory area */
-		rval = sys_shmat((int)arg1,(char *)arg2,(int)arg3,&raddr);
+		/* do_shmat(): attach a shared memory area */
+		rval = do_shmat((int)arg1,(char *)arg2,(int)arg3,&raddr);
 		if(!rval)
 			rval = (int) raddr;
 		break;
@@ -1049,15 +1041,6 @@ static inline int check_nonblock(int ret, int fd)
 	}
 	return ret;
 }
-
-extern asmlinkage ssize_t sys_read(unsigned int fd,char *buf,int count);
-extern asmlinkage ssize_t sys_write(unsigned int fd,char *buf,int count);
-extern asmlinkage int sys_recv(int fd, void * ubuf, int size, unsigned flags);
-extern asmlinkage int sys_send(int fd, void * buff, int len, unsigned flags);
-extern asmlinkage int sys_accept(int fd, struct sockaddr *sa, int *addrlen);
-extern asmlinkage int sys_readv(unsigned long fd, const struct iovec * vector, long count);
-extern asmlinkage int sys_writev(unsigned long fd, const struct iovec * vector, long count);
-
 
 asmlinkage int sunos_read(unsigned int fd,char *buf,int count)
 {
@@ -1163,9 +1146,6 @@ sunos_sigaction(int sig, const struct old_sigaction *act,
 	return ret;
 }
 
-
-extern asmlinkage int sys_setsockopt(int fd, int level, int optname, char *optval, int optlen);
-extern asmlinkage int sys_getsockopt(int fd, int level, int optname, char *optval, int *optlen);
 
 asmlinkage int sunos_setsockopt(int fd, int level, int optname, char *optval,
 				int optlen)

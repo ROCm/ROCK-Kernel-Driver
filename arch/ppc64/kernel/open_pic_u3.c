@@ -251,11 +251,13 @@ static inline void openpic2_set_sense(u_int irq, int sense)
 				 (sense ? OPENPIC_SENSE_LEVEL : 0));
 }
 
+#if 0	/* not used */
 static int openpic2_get_sense(u_int irq)
 {
 	return openpic2_readfield(&GET_ISU(irq).Vector_Priority,
 				  OPENPIC_SENSE_LEVEL) != 0;
 }
+#endif
 
 static void openpic2_end_irq(unsigned int irq_nr)
 {
@@ -280,13 +282,6 @@ struct hw_interrupt_type open_pic2 = {
 	NULL,
 	openpic2_end_irq,
 };
-
-void openpic2_init_irq_desc(int irq, irq_desc_t *desc)
-{
-	if (openpic2_get_sense(irq - open_pic2_irq_offset))
-		desc->status |= IRQ_LEVEL;
-	desc->handler = &open_pic2;
-}
 
 void __init openpic2_init(int offset)
 {
@@ -338,12 +333,18 @@ void __init openpic2_init(int offset)
 
 		pri = 8;
 		sense = (i < OpenPIC_NumInitSenses) ? OpenPIC_InitSenses[i]: 1;
+		if (sense)
+			irq_desc[i+offset].status = IRQ_LEVEL;
 
 		/* Enabled, Priority 8 or 9 */
 		openpic2_initirq(i, pri, i, !sense, sense);
 		/* Processor 0 */
 		openpic2_mapirq(i, 0x1);
 	}
+
+	/* Init descriptors */
+	for (i = offset; i < NumSources + offset; i++)
+		irq_desc[i].handler = &open_pic2;
 
 	/* Initialize the spurious interrupt */
 	openpic2_set_spurious(openpic2_vec_spurious);

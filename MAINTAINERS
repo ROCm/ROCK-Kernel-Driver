@@ -862,8 +862,8 @@ W:	http://www.nyx.net/~arobinso
 S:	Maintained
 
 HFS FILESYSTEM
-P:	Oliver Neukum
-M:	oliver@neukum.org
+P:	Roman Zippel
+M:	zippel@linux-m68k.org
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 

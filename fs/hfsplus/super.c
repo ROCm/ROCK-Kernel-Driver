@@ -224,11 +224,7 @@ static void hfsplus_put_super(struct super_block *sb)
 	brelse(HFSPLUS_SB(sb).s_vhbh);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static int hfsplus_statfs(struct super_block *sb, struct statfs *buf)
-#else
 static int hfsplus_statfs(struct super_block *sb, struct kstatfs *buf)
-#endif
 {
 	buf->f_type = HFSPLUS_SUPER_MAGIC;
 	buf->f_bsize = sb->s_blocksize;
@@ -276,12 +272,7 @@ static struct super_operations hfsplus_sops = {
 	.remount_fs	= hfsplus_remount,
 };
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-struct super_block *hfsplus_read_super(struct super_block *sb, void *data,
-				       int silent)
-#else
 static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
-#endif
 {
 	struct hfsplus_vh *vhdr;
 	struct hfsplus_sb_info *sbi;
@@ -296,12 +287,8 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 		goto out2;
 	}
 	memset(sbi, 0, sizeof(HFSPLUS_SB(sb)));
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	INIT_LIST_HEAD(&HFSPLUS_SB(sb).rsrc_inodes);
-#else
 	sb->s_fs_info = sbi;
 	INIT_HLIST_HEAD(&sbi->rsrc_inodes);
-#endif
 	fill_defaults(sbi);
 	if (!parse_options(data, sbi)) {
 		if (!silent)
@@ -309,10 +296,6 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 		err = -EINVAL;
 		goto out2;
 	}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	fill_current(sbi, &HFSPLUS_SB(sb));
-	kfree(sbi);
-#endif
 
 	/* Grab the volume header */
 	if (hfsplus_read_wrapper(sb)) {
@@ -345,11 +328,7 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 
 	/* Set up operations so we can load metadata */
 	sb->s_op = &hfsplus_sops;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	sb->s_maxbytes = (1ULL << 32) - 1;
-#else
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
-#endif
 
 	if ((vhdr->attributes & cpu_to_be32(HFSPLUS_VOL_INCNSTNT)) ||
 	    !(vhdr->attributes & cpu_to_be32(HFSPLUS_VOL_UNMNT))) {
@@ -429,20 +408,12 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 		mark_inode_dirty(HFSPLUS_SB(sb).hidden_dir);
 	}
 out:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	return sb;
-#else
 	return 0;
-#endif
 
 cleanup:
 	hfsplus_put_super(sb);
 out2:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	return NULL;
-#else
 	return err;
-#endif
 }
 
 MODULE_AUTHOR("Brad Boyer");
@@ -453,34 +424,16 @@ static kmem_cache_t *hfsplus_inode_cachep;
 
 static struct inode *hfsplus_alloc_inode(struct super_block *sb)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	return kmem_cache_alloc(hfsplus_inode_cachep, SLAB_KERNEL);
-#else
 	struct hfsplus_inode_info *i;
 
 	i = kmem_cache_alloc(hfsplus_inode_cachep, SLAB_KERNEL);
 	return i ? &i->vfs_inode : NULL;
-#endif
 }
 
 static void hfsplus_destroy_inode(struct inode *inode)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	kmem_cache_free(hfsplus_inode_cachep, inode);
-#else
 	kmem_cache_free(hfsplus_inode_cachep, &HFSPLUS_I(inode));
-#endif
 }
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-
-#define HFSPLUS_INODE_SIZE	(sizeof(struct hfsplus_inode_info) + offsetof(struct inode, u) + 8)
-
-static DECLARE_FSTYPE_DEV(hfsplus_fs_type, "hfsplus", hfsplus_read_super);
-
-EXPORT_NO_SYMBOLS;
-
-#else
 
 #define HFSPLUS_INODE_SIZE	sizeof(struct hfsplus_inode_info)
 
@@ -497,21 +450,13 @@ static struct file_system_type hfsplus_fs_type = {
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
-#endif
 
 static void hfsplus_init_once(void *p, kmem_cache_t *cachep, unsigned long flags)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	struct inode *i = p;
-
-	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) == SLAB_CTOR_CONSTRUCTOR)
-		inode_init_once(i);
-#else
 	struct hfsplus_inode_info *i = p;
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) == SLAB_CTOR_CONSTRUCTOR)
 		inode_init_once(&i->vfs_inode);
-#endif
 }
 
 static int __init init_hfsplus_fs(void)

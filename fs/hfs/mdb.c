@@ -1,14 +1,11 @@
 /*
- * linux/fs/hfs/mdb.c
+ *  linux/fs/hfs/mdb.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains functions for reading/writing the MDB.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
  */
 
 #include <linux/cdrom.h>

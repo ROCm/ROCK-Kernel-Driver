@@ -28,24 +28,6 @@ void fill_defaults(struct hfsplus_sb_info *opts)
 	opts->session = -1;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-/* Copy settings from one hfsplus_sb_info object to another */
-void fill_current(struct hfsplus_sb_info *curopts,
-		  struct hfsplus_sb_info *opts)
-{
-	if (!curopts || !opts)
-		return;
-
-	opts->creator = curopts->creator;
-	opts->type = curopts->type;
-	opts->umask = curopts->umask;
-	opts->uid = curopts->uid;
-	opts->gid = curopts->gid;
-	opts->part = curopts->part;
-	opts->session = curopts->session;
-}
-#endif
-
 /* convert a "four byte character" to a 32 bit int with error checks */
 static int fill_fourchar(u32 *result, char *input)
 {

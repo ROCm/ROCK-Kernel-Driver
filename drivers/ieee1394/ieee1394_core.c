@@ -77,18 +77,8 @@ static void dump_packet(const char *text, quadlet_t *data, int size)
 #define dump_packet(x,y,z)
 #endif
 
-static void run_packet_complete(struct hpsb_packet *packet)
-{
-	if (packet->complete_routine != NULL) {
-		void (*complete_routine)(void*) = packet->complete_routine;
-		void *complete_data = packet->complete_data;
+static void queue_packet_complete(struct hpsb_packet *packet);
 
-		packet->complete_routine = NULL;
-		packet->complete_data = NULL;
-		complete_routine(complete_data);
-	}
-	return;
-}
 
 /**
  * hpsb_set_packet_complete_task - set the task that runs when a packet
@@ -424,7 +414,7 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
 
         if (ackcode != ACK_PENDING || !packet->expect_response) {
                 packet->state = hpsb_complete;
-                run_packet_complete(packet);
+                queue_packet_complete(packet);
                 return;
         }
 
@@ -669,7 +659,7 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
         }
 
         packet->state = hpsb_complete;
-	run_packet_complete(packet);
+	queue_packet_complete(packet);
 }
 
 
@@ -949,7 +939,7 @@ void abort_requests(struct hpsb_host *host)
                 list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_ABORTED;
-		run_packet_complete(packet);
+		queue_packet_complete(packet);
         }
 }
 
@@ -983,14 +973,66 @@ void abort_timedouts(unsigned long __opaque)
                 list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_TIMEOUT;
-		run_packet_complete(packet);
+		queue_packet_complete(packet);
         }
 }
 
+static int khpsbpkt_pid = -1;
+static DECLARE_COMPLETION(khpsbpkt_complete);
+static LIST_HEAD(hpsbpkt_list);
+static DECLARE_MUTEX_LOCKED(khpsbpkt_sig);
+static spinlock_t khpsbpkt_lock = SPIN_LOCK_UNLOCKED;
+
+
+static void queue_packet_complete(struct hpsb_packet *packet)
+{
+	if (packet->complete_routine != NULL) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&khpsbpkt_lock, flags);
+		list_add_tail(&packet->list, &hpsbpkt_list);
+		spin_unlock_irqrestore(&khpsbpkt_lock, flags);
+
+		/* Signal the kernel thread to handle this */
+		up(&khpsbpkt_sig);
+	}
+	return;
+}
+
+static int hpsbpkt_thread(void *__hi)
+{
+	struct hpsb_packet *packet, *next;
+	unsigned long flags;
+
+	daemonize("khpsbpkt");
+	allow_signal(SIGTERM);
+
+	while (!down_interruptible(&khpsbpkt_sig)) {
+		spin_lock_irqsave(&khpsbpkt_lock, flags);
+		list_for_each_entry_safe(packet, next, &hpsbpkt_list, list) {
+			void (*complete_routine)(void*) = packet->complete_routine;
+			void *complete_data = packet->complete_data;
+
+			list_del(&packet->list);
+			packet->complete_routine = packet->complete_data = NULL;
+
+			complete_routine(complete_data);
+		}
+		spin_unlock_irqrestore(&khpsbpkt_lock, flags);
+	}
+
+	complete_and_exit(&khpsbpkt_complete, 0);
+}
 
 static int __init ieee1394_init(void)
 {
 	int i;
+
+	khpsbpkt_pid = kernel_thread(hpsbpkt_thread, NULL, CLONE_KERNEL);
+	if (khpsbpkt_pid < 0) {
+		HPSB_ERR("Failed to start hpsbpkt thread!\n");
+		return -ENOMEM;
+	}
 
 	devfs_mk_dir("ieee1394");
 
@@ -1033,6 +1075,11 @@ static void __exit ieee1394_cleanup(void)
 	for (i = 0; fw_bus_attrs[i]; i++)
 		bus_remove_file(&ieee1394_bus_type, fw_bus_attrs[i]);
 	bus_unregister(&ieee1394_bus_type);
+
+	if (khpsbpkt_pid >= 0) {
+		kill_proc(khpsbpkt_pid, SIGTERM, 1);
+		wait_for_completion(&khpsbpkt_complete);
+	}
 
 	kmem_cache_destroy(hpsb_packet_cache);
 

@@ -11,6 +11,7 @@
 #include <linux/apm_bios.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/syscalls.h>
 #include <linux/tty.h>
 #include <linux/ioctl32.h>
 
@@ -181,8 +182,6 @@ EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(__memcpy);
 
 /* syscall export needed for misdesigned sound drivers. */
-extern ssize_t sys_read(unsigned int fd, char * buf, size_t count);
-extern off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin);
 EXPORT_SYMBOL(sys_read);
 EXPORT_SYMBOL(sys_lseek);
 EXPORT_SYMBOL(sys_open);
@@ -197,6 +196,7 @@ EXPORT_SYMBOL(die_chain);
 
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_sibling_map);
+EXPORT_SYMBOL(smp_num_siblings);
 #endif
 
 extern void do_softirq_thunk(void);

@@ -1,16 +1,11 @@
 /*
- * linux/fs/hfs/extent.c
+ *  linux/fs/hfs/extent.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains the functions related to the extents B-tree.
- *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
  */
 
 #include <linux/pagemap.h>

@@ -22,6 +22,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
+#include <linux/syscalls.h>
 #include <linux/ipc.h>
 #include <linux/personality.h>
 
@@ -161,8 +162,6 @@ unsigned long get_fb_unmapped_area(struct file *filp, unsigned long orig_addr, u
 	return addr;
 }
 
-extern asmlinkage unsigned long sys_brk(unsigned long brk);
-
 asmlinkage unsigned long sparc_brk(unsigned long brk)
 {
 	/* People could try to be nasty and use ta 0x6d in 32bit programs */
@@ -254,7 +253,7 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 		switch (call) {
 		case SHMAT: {
 			ulong raddr;
-			err = sys_shmat (first, (char *) ptr, second, &raddr);
+			err = do_shmat (first, (char *) ptr, second, &raddr);
 			if (!err) {
 				if (put_user(raddr, (ulong __user *) third))
 					err = -EFAULT;
@@ -280,8 +279,6 @@ out:
 	return err;
 }
 
-extern asmlinkage int sys_newuname(struct new_utsname __user *name);
-
 asmlinkage int sparc64_newuname(struct new_utsname __user *name)
 {
 	int ret = sys_newuname(name);
@@ -291,8 +288,6 @@ asmlinkage int sparc64_newuname(struct new_utsname __user *name)
 	}
 	return ret;
 }
-
-extern asmlinkage long sys_personality(unsigned long);
 
 asmlinkage int sparc64_personality(unsigned long personality)
 {
@@ -586,9 +581,12 @@ long sparc_memory_ordering(unsigned long model, struct pt_regs *regs)
 	return 0;
 }
 
-asmlinkage int
-sys_rt_sigaction(int sig, const struct sigaction *act, struct sigaction *oact,
-		 void *restorer, size_t sigsetsize)
+asmlinkage long
+sys_rt_sigaction(int sig,
+		const struct sigaction __user *act,
+		struct sigaction __user *oact,
+		void __user *restorer,
+		size_t sigsetsize)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;

@@ -26,6 +26,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
+#include <asm/iommu.h>
 
 #include "pci.h"
 #include "pmac.h"
@@ -655,6 +656,11 @@ void __init pmac_pcibios_fixup(void)
 		pci_read_irq_line(dev);
 
 	pci_fix_bus_sysdata();
+
+#ifdef CONFIG_PMAC_DART
+	iommu_setup_pmac();
+#endif /* CONFIG_PMAC_DART */
+
 }
 
 static void __init pmac_fixup_phb_resources(void)

@@ -62,7 +62,7 @@ o  quota-tools            3.09                    # quota -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
 o  nfs-utils              1.0.5                   # showmount --version
-o  procps                 3.1.13                  # ps --version
+o  procps                 3.2.0                   # ps --version
 o  oprofile               0.5.3                   # oprofiled --version
 
 Kernel compilation

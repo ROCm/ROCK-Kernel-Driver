@@ -79,8 +79,7 @@ static int hfsplus_cat_build_record(hfsplus_cat_entry *entry, u32 cnid, struct i
 		folder->type = cpu_to_be16(HFSPLUS_FOLDER);
 		folder->id = cpu_to_be32(inode->i_ino);
 		folder->create_date = folder->content_mod_date =
-			folder->attribute_mod_date = folder->access_date =
-			hfsp_now2mt();
+			folder->attribute_mod_date = folder->access_date = hfsp_now2mt();
 		hfsplus_set_perms(inode, &folder->permissions);
 		if (inode == HFSPLUS_SB(inode->i_sb).hidden_dir)
 			/* invisible and namelocked */

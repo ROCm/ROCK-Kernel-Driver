@@ -1099,7 +1099,7 @@ static struct xfrm6_tunnel ip6ip6_handler = {
  * Return: 0 on success
  **/
 
-int __init ip6_tunnel_init(void)
+static int __init ip6_tunnel_init(void)
 {
 	int  err;
 
@@ -1130,7 +1130,7 @@ fail:
  * ip6_tunnel_cleanup - free resources and unregister protocol
  **/
 
-void ip6_tunnel_cleanup(void)
+static void __exit ip6_tunnel_cleanup(void)
 {
 	if (xfrm6_tunnel_deregister(&ip6ip6_handler) < 0)
 		printk(KERN_INFO "ip6ip6 close: can't deregister tunnel\n");
@@ -1138,7 +1138,5 @@ void ip6_tunnel_cleanup(void)
 	unregister_netdev(ip6ip6_fb_tnl_dev);
 }
 
-#ifdef MODULE
 module_init(ip6_tunnel_init);
 module_exit(ip6_tunnel_cleanup);
-#endif

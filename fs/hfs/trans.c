@@ -1,5 +1,5 @@
 /*
- * linux/fs/hfs/trans.c
+ *  linux/fs/hfs/trans.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
  * This file may be distributed under the terms of the GNU General Public License.
@@ -7,26 +7,6 @@
  * This file contains routines for converting between the Macintosh
  * character set and various other encodings.  This includes dealing
  * with ':' vs. '/' as the path-element separator.
- *
- * Latin-1 translation based on code contributed by Holger Schemel
- * (aeglos@valinor.owl.de).
- *
- * The '8-bit', '7-bit ASCII' and '7-bit alphanumeric' encodings are
- * implementations of the three encodings recommended by Apple in the
- * document "AppleSingle/AppleDouble Formats: Developer's Note
- * (9/94)".  This document is available from Apple's Technical
- * Information Library from the World Wide Web server
- * www.info.apple.com.
- *
- * The 'CAP' encoding is an implementation of the naming scheme used
- * by the Columbia AppleTalk Package, available for anonymous FTP from
- * ????.
- *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
  */
 
 #include "hfs_fs.h"

@@ -364,9 +364,6 @@ static void __init init_hwif_slc90e66 (ide_hwif_t *hwif)
 #endif /* !CONFIG_BLK_DEV_IDEDMA */
 }
 
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
-
-
 static int __devinit slc90e66_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	ide_pci_device_t *d = &slc90e66_chipsets[id->driver_data];

@@ -36,76 +36,76 @@
 
 /* global variables */
 extern struct device *iSeries_vio_dev;
-struct ibmvscsi_host_data *single_host_data = NULL; 
-
-/* ------------------------------------------------------------
- * Routines for managing the command/response queue
- */
+static struct ibmvscsi_host_data *single_host_data;
 
 /* ------------------------------------------------------------
  * Routines for direct interpartition interaction
  */
 struct VIOSRPLpEvent {
-    struct HvLpEvent lpevt;	/* 0x00-0x17          */
-    u32 reserved1;		/* 0x18-0x1B; unused  */
-    u16 version;		/* 0x1C-0x1D; unused  */
-    u16 subtype_rc;		/* 0x1E-0x1F; unused  */
-    struct VIOSRP_CRQ crq;	/* 0x20-0x3F          */
+	struct HvLpEvent lpevt;	/* 0x00-0x17          */
+	u32 reserved1;		/* 0x18-0x1B; unused  */
+	u16 version;		/* 0x1C-0x1D; unused  */
+	u16 subtype_rc;		/* 0x1E-0x1F; unused  */
+	struct VIOSRP_CRQ crq;	/* 0x20-0x3F          */
 };
 
-void ibmvscsi_task(unsigned long data) 
-{
-}
-
+/** 
+ * standard interface for handling logical partition events.
+ */
 static void ibmvscsi_handle_event(struct HvLpEvent *lpevt)
 {
 	struct VIOSRPLpEvent *evt = (struct VIOSRPLpEvent *)lpevt;
 
-	if(!evt) {
+	if (!evt) {
 		printk(KERN_ERR "ibmvscsi: received null event\n");
 		return;
 	}
 
 	if (single_host_data == NULL) {
-		printk(KERN_ERR "ibmvscsi: received event, no adapter present\n");
+		printk(KERN_ERR
+		       "ibmvscsi: received event, no adapter present\n");
 		return;
 	}
-	
+
 	ibmvscsi_handle_crq(&evt->crq, single_host_data);
 }
 
 /* ------------------------------------------------------------
  * Routines for driver initialization
  */
-int ibmvscsi_init_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
+int ibmvscsi_init_crq_queue(struct crq_queue *queue,
+			    struct ibmvscsi_host_data *hostdata)
 {
 	int rc;
 
 	rc = viopath_open(viopath_hostLp, viomajorsubtype_scsi, 0);
 	if (rc < 0) {
-		printk("viopath_open failed with rc %d in open_event_path\n", rc);
+		printk("viopath_open failed with rc %d in open_event_path\n",
+		       rc);
 		goto viopath_open_failed;
 	}
 
 	rc = vio_setHandler(viomajorsubtype_scsi, ibmvscsi_handle_event);
 	if (rc < 0) {
-		printk("vio_setHandler failed with rc %d in open_event_path\n", rc);
+		printk("vio_setHandler failed with rc %d in open_event_path\n",
+		       rc);
 		goto vio_setHandler_failed;
 	}
 	return 0;
 
-vio_setHandler_failed:
+      vio_setHandler_failed:
 	viopath_close(viopath_hostLp, viomajorsubtype_scsi,
-		IBMVSCSI_MAX_REQUESTS);
-viopath_open_failed:
+		      IBMVSCSI_MAX_REQUESTS);
+      viopath_open_failed:
 	return -1;
 }
 
-void ibmvscsi_release_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata)
+void ibmvscsi_release_crq_queue(struct crq_queue *queue,
+				struct ibmvscsi_host_data *hostdata)
 {
 	vio_clearHandler(viomajorsubtype_scsi);
 	viopath_close(viopath_hostLp, viomajorsubtype_scsi,
-		IBMVSCSI_MAX_REQUESTS);
+		      IBMVSCSI_MAX_REQUESTS);
 }
 
 /**
@@ -117,35 +117,28 @@ void ibmvscsi_release_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_da
 int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata, u64 word1, u64 word2)
 {
 	single_host_data = hostdata;
-	return HvCallEvent_signalLpEventFast(
-		viopath_hostLp,
-		HvLpEvent_Type_VirtualIo,
-		viomajorsubtype_scsi,
-		HvLpEvent_AckInd_NoAck,
-		HvLpEvent_AckType_ImmediateAck,
-		viopath_sourceinst(viopath_hostLp),
-		viopath_targetinst(viopath_hostLp),
-		0,
-		VIOVERSION << 16, word1, word2, 0, 0);
+	return HvCallEvent_signalLpEventFast(viopath_hostLp,
+					     HvLpEvent_Type_VirtualIo,
+					     viomajorsubtype_scsi,
+					     HvLpEvent_AckInd_NoAck,
+					     HvLpEvent_AckType_ImmediateAck,
+					     viopath_sourceinst(viopath_hostLp),
+					     viopath_targetinst(viopath_hostLp),
+					     0,
+					     VIOVERSION << 16, word1, word2, 0,
+					     0);
 }
 
-/**
- * ibmvscsi_register_driver:  the call back from the generic ibmvscsi code at startup
- * time.
- */
-int ibmvscsi_register_driver(void)
+int __init ibmvscsi_module_init(void)
 {
 	single_host_data = ibmvscsi_probe(iSeries_vio_dev);
 	return (single_host_data == NULL);
 }
 
-/**
- * ibmvscsi_unregister_driver:  the call back from the generic ibmvscsi code at shutdown
- * time.
- */
-void ibmvscsi_unregister_driver(void)
+void __exit ibmvscsi_module_exit(void)
 {
 	ibmvscsi_remove(single_host_data);
-}	
+}
 
-
+module_init(ibmvscsi_module_init);
+module_exit(ibmvscsi_module_exit);

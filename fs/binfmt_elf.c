@@ -36,6 +36,7 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/param.h>
@@ -198,7 +199,6 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	NEW_AUX_ENT(AT_GID, (elf_addr_t) tsk->gid);
 	NEW_AUX_ENT(AT_EGID, (elf_addr_t) tsk->egid);
  	NEW_AUX_ENT(AT_SECURE, (elf_addr_t) security_bprm_secureexec(bprm));
-	NEW_AUX_ENT(AT_NUMCPUS, num_online_cpus());
 	if (k_platform) {
 		NEW_AUX_ENT(AT_PLATFORM, (elf_addr_t)(long)u_platform);
 	}

@@ -789,7 +789,7 @@ static void register_nodes(void)
 #else
 static void register_nodes(void)
 {
-	return 0;
+	return;
 }
 #endif
 
@@ -817,13 +817,13 @@ static int __init topology_init(void)
 		parent = &node_devices[cpu_to_node(cpu)];
 #endif
 		ret = register_cpu(&per_cpu(cpu_devices, cpu), cpu, parent);
-		if (ret) 
+		if (ret)
 			printk(KERN_WARNING "topology_init: register_cpu %d "
 			       "failed (%d)\n", cpu, ret);
 
 		ret = sysdev_create_file(&per_cpu(cpu_devices, cpu).sysdev,
 					 &attr_physical_id);
-		if (ret) 
+		if (ret)
 			printk(KERN_WARNING "toplogy_init: sysdev_create_file "
 			       "%d failed (%d)\n", cpu, ret);
 	}

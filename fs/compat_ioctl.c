@@ -62,6 +62,7 @@
 #include <linux/if_tun.h>
 #include <linux/ctype.h>
 #include <linux/ioctl32.h>
+#include <linux/syscalls.h>
 #include <linux/ncp_fs.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>

@@ -67,7 +67,6 @@ static void openpic_disable_irq(u_int irq);
 static void openpic_initirq(u_int irq, u_int pri, u_int vector, int polarity,
 			    int is_level);
 static void openpic_mapirq(u_int irq, u_int cpumask);
-static int openpic_get_sense(u_int irq);
 
 static void find_ISUs(void);
 
@@ -76,7 +75,6 @@ static u_int NumSources;
 static int NumISUs;
 static int open_pic_irq_offset;
 static volatile unsigned char* chrp_int_ack_special;
-static int broken_ipi_registers;
 
 OpenPIC_SourcePtr ISU[OPENPIC_MAX_ISU];
 
@@ -165,25 +163,10 @@ unsigned int openpic_vec_spurious;
 
 #define GET_ISU(source)	ISU[(source) >> 4][(source) & 0xf]
 
-void
-openpic_init_irq_desc(int irq, irq_desc_t *desc)
-{
-	if (irq < open_pic_irq_offset) {
-		desc->handler = &i8259_pic;
-	} else if (irq >= openpic_vec_ipi
-		 && irq < openpic_vec_ipi + OPENPIC_NUM_IPI) {
-		desc->status |= IRQ_PER_CPU;
-		desc->handler = &open_pic_ipi;
-	} else {
-		if (openpic_get_sense(irq - open_pic_irq_offset))
-			desc->status |= IRQ_LEVEL;
-		desc->handler = &open_pic;
-	}
-}
-
 void __init pSeries_init_openpic(void)
 {
         struct device_node *np;
+        int i;
         unsigned int *addrp;
         unsigned char* chrp_int_ack_special = 0;
         unsigned char init_senses[NR_IRQS - NUM_ISA_INTERRUPTS];
@@ -206,6 +189,8 @@ void __init pSeries_init_openpic(void)
                 OpenPIC_NumInitSenses = NR_IRQS - NUM_ISA_INTERRUPTS;
         }
         openpic_init(1, NUM_ISA_INTERRUPTS, chrp_int_ack_special, nmi_irq);
+        for (i = 0; i < NUM_ISA_INTERRUPTS; i++)
+                irq_desc[i].handler = &i8259_pic;
 	of_node_put(np);
 }
 
@@ -261,6 +246,9 @@ static void openpic_safe_writefield(volatile u_int *addr, u_int mask,
 }
 
 #ifdef CONFIG_SMP
+
+static int broken_ipi_registers;
+
 static u_int openpic_read_IPI(volatile u_int* addr)
 {
         u_int val = 0;
@@ -390,6 +378,8 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 		/* Disabled, Priority 10..13 */
 		openpic_initipi(i, 10+i, openpic_vec_ipi+i);
 		/* IPIs are per-CPU */
+		irq_desc[openpic_vec_ipi+i].status |= IRQ_PER_CPU;
+		irq_desc[openpic_vec_ipi+i].handler = &open_pic_ipi;
 	}
 #endif
 
@@ -416,12 +406,18 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 
 		pri = (i == programmer_switch_irq)? 9: 8;
 		sense = (i < OpenPIC_NumInitSenses)? OpenPIC_InitSenses[i]: 1;
+		if (sense)
+			irq_desc[i+offset].status = IRQ_LEVEL;
 
 		/* Enabled, Priority 8 or 9 */
 		openpic_initirq(i, pri, i+offset, !sense, sense);
 		/* Processor 0 */
 		openpic_mapirq(i, 1 << get_hard_smp_processor_id(boot_cpuid));
 	}
+
+	/* Init descriptors */
+	for (i = offset; i < NumSources + offset; i++)
+		irq_desc[i].handler = &open_pic;
 
 	/* Initialize the spurious interrupt */
 	ppc64_boot_msg(0x24, "OpenPic Spurious");
@@ -830,13 +826,13 @@ static void openpic_set_sense(u_int irq, int sense)
 				OPENPIC_SENSE_LEVEL,
 				(sense ? OPENPIC_SENSE_LEVEL : 0));
 }
-#endif
 
 static int openpic_get_sense(u_int irq)
 {
 	return openpic_readfield(&GET_ISU(irq).Vector_Priority,
 				 OPENPIC_SENSE_LEVEL) != 0;
 }
+#endif
 
 static void openpic_end_irq(unsigned int irq_nr)
 {

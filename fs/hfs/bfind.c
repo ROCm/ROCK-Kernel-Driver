@@ -126,7 +126,7 @@ int hfs_brec_find(struct hfs_find_data *fd)
 	return res;
 
 invalid:
-	printk("HFS+-fs: inconsistency in B*Tree (%d,%d,%d,%u,%u)\n",
+	printk("HFS: inconsistency in B*Tree (%d,%d,%d,%u,%u)\n",
 		height, bnode->height, bnode->type, nidx, parent);
 	res = -EIO;
 release:

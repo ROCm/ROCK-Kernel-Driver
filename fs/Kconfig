@@ -1023,8 +1023,7 @@ config HFS_FS
 	  module will be called hfs.
 
 config HFSPLUS_FS
-	tristate "Apple Extended HFS file system support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL
+	tristate "Apple Extended HFS file system support"
 	select NLS
 	help
 	  If you say Y here, you will be able to mount extended format

@@ -205,7 +205,7 @@ acpi_enter_sleep_state_prep (
  *
  ******************************************************************************/
 
-acpi_status
+acpi_status asmlinkage
 acpi_enter_sleep_state (
 	u8                              sleep_state)
 {

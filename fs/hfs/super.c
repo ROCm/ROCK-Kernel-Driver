@@ -1,7 +1,8 @@
 /*
- * linux/fs/hfs/super.c
+ *  linux/fs/hfs/super.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains hfs_read_super(), some of the super_ops and
@@ -9,17 +10,6 @@
  * inode.c since they deal with inodes.
  *
  * Based on the minix file system code, (C) 1991, 1992 by Linus Torvalds
- *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
- *
- * The code in this file initializes some structures which contain
- * pointers by calling memset(&foo, 0, sizeof(foo)).
- * This produces the desired behavior only due to the non-ANSI
- * assumption that the machine representation of NULL is all zeros.
  */
 
 #include <linux/config.h>
@@ -88,11 +78,7 @@ static void hfs_put_super(struct super_block *sb)
  *
  * changed f_files/f_ffree to reflect the fs_ablock/free_ablocks.
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static int hfs_statfs(struct super_block *sb, struct statfs *buf)
-#else
 static int hfs_statfs(struct super_block *sb, struct kstatfs *buf)
-#endif
 {
 	buf->f_type = HFS_SUPER_MAGIC;
 	buf->f_bsize = sb->s_blocksize;
@@ -128,31 +114,20 @@ int hfs_remount(struct super_block *sb, int *flags, char *data)
 
 static struct inode *hfs_alloc_inode(struct super_block *sb)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	return kmem_cache_alloc(hfs_inode_cachep, SLAB_KERNEL);
-#else
 	struct hfs_inode_info *i;
 
 	i = kmem_cache_alloc(hfs_inode_cachep, SLAB_KERNEL);
 	return i ? &i->vfs_inode : NULL;
-#endif
 }
 
 static void hfs_destroy_inode(struct inode *inode)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	kmem_cache_free(hfs_inode_cachep, inode);
-#else
 	kmem_cache_free(hfs_inode_cachep, HFS_I(inode));
-#endif
 }
 
 static struct super_operations hfs_super_operations = {
 	.alloc_inode	= hfs_alloc_inode,
 	.destroy_inode	= hfs_destroy_inode,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	.read_inode2	= hfs_read_inode,
-#endif
 	.write_inode	= hfs_write_inode,
 	.clear_inode	= hfs_clear_inode,
 	.put_super	= hfs_put_super,
@@ -271,12 +246,7 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
  * hfs_btree_init() to get the necessary data about the extents and
  * catalog B-trees and, finally, reading the root inode into memory.
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-struct super_block *hfs_read_super(struct super_block *sb, void *data,
-				   int silent)
-#else
 static int hfs_fill_super(struct super_block *sb, void *data, int silent)
-#endif
 {
 	struct hfs_sb_info *sbi;
 	struct hfs_find_data fd;
@@ -284,18 +254,13 @@ static int hfs_fill_super(struct super_block *sb, void *data, int silent)
 	struct inode *root_inode;
 	int res;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	sbi = HFS_SB(sb);
-	memset(sbi, 0, sizeof(struct hfs_sb_info));
-	INIT_LIST_HEAD(&sbi->rsrc_inodes);
-#else
 	sbi = kmalloc(sizeof(struct hfs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
 	sb->s_fs_info = sbi;
 	memset(sbi, 0, sizeof(struct hfs_sb_info));
 	INIT_HLIST_HEAD(&sbi->rsrc_inodes);
-#endif
+
 	res = -EINVAL;
 	if (!parse_options((char *)data, sbi)) {
 		hfs_warn("hfs_fs: unable to parse mount options.\n");
@@ -334,36 +299,16 @@ static int hfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_root->d_op = &hfs_dentry_operations;
 
 	/* everything's okay */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	return sb;
-#else
 	return 0;
-#endif
 
 bail_no_root:
 	hfs_warn("hfs_fs: get root inode failed.\n");
 	hfs_mdb_put(sb);
 bail2:
 bail3:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	return NULL;
-#else
 	kfree(sbi);
 	return res;
-#endif
 }
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-
-#define HFS_INODE_SIZE      max(sizeof(struct inode), (sizeof(struct hfs_inode_info) + offsetof(struct inode, u)))
-
-static DECLARE_FSTYPE_DEV(hfs_fs_type, "hfs", hfs_read_super);
-
-EXPORT_NO_SYMBOLS;
-
-#else
-
-#define HFS_INODE_SIZE      sizeof(struct hfs_inode_info)
 
 static struct super_block *hfs_get_sb(struct file_system_type *fs_type,
 				      int flags, const char *dev_name, void *data)
@@ -379,21 +324,12 @@ static struct file_system_type hfs_fs_type = {
 	.fs_flags	= FS_REQUIRES_DEV,
 };
 
-#endif
-
 static void hfs_init_once(void *p, kmem_cache_t *cachep, unsigned long flags)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	struct inode *i = p;
-
-	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) == SLAB_CTOR_CONSTRUCTOR)
-		inode_init_once(i);
-#else
 	struct hfs_inode_info *i = p;
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) == SLAB_CTOR_CONSTRUCTOR)
 		inode_init_once(&i->vfs_inode);
-#endif
 }
 
 static int __init init_hfs_fs(void)
@@ -401,7 +337,7 @@ static int __init init_hfs_fs(void)
 	int err;
 
 	hfs_inode_cachep = kmem_cache_create("hfs_inode_cache",
-		HFS_INODE_SIZE, 0, SLAB_HWCACHE_ALIGN,
+		sizeof(struct hfs_inode_info), 0, SLAB_HWCACHE_ALIGN,
 		hfs_init_once, NULL);
 	if (!hfs_inode_cachep)
 		return -ENOMEM;

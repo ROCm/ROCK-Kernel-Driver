@@ -45,13 +45,13 @@ enum VIOSRP_CRQ_FORMATS {
 };
 
 struct VIOSRP_CRQ {
-	u8 valid;		// used by RPA
-	u8 format;		// SCSI vs out-of-band
+	u8 valid;		/* used by RPA */
+	u8 format;		/* SCSI vs out-of-band */
 	u8 reserved;
-	u8 status;		// non-scsi failure? (e.g. DMA failure)
-	u16 timeout;		// in seconds
-	u16 IU_length;		// in bytes
-	u64 IU_data_ptr;	// the TCE for transferring data
+	u8 status;		/* non-scsi failure? (e.g. DMA failure) */
+	u16 timeout;		/* in seconds */
+	u16 IU_length;		/* in bytes */
+	u64 IU_data_ptr;	/* the TCE for transferring data */
 };
 
 /* MADs are Management requests above and beyond the IUs defined in the SRP
@@ -115,12 +115,12 @@ union VIOSRP_IU {
 };
 
 struct MAD_ADAPTER_INFO_DATA {
-    char srp_version[8];
-    char partition_name[96];
-    u32 partition_number;
-    u32 mad_version;
-    u32 os_type;
-    u32 port_max_txu[8]; /* per-port maximum transfer */
+	char srp_version[8];
+	char partition_name[96];
+	u32 partition_number;
+	u32 mad_version;
+	u32 os_type;
+	u32 port_max_txu[8];	/* per-port maximum transfer */
 };
 
 #endif

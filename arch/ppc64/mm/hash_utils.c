@@ -61,6 +61,10 @@
  *
  */
 
+#ifdef CONFIG_PMAC_DART
+extern unsigned long dart_tablebase;
+#endif /* CONFIG_PMAC_DART */
+
 HTAB htab_data = {NULL, 0, 0, 0, 0};
 
 extern unsigned long _SDR1;
@@ -123,6 +127,7 @@ void __init htab_initialize(void)
 	unsigned long table, htab_size_bytes;
 	unsigned long pteg_count;
 	unsigned long mode_rw;
+	int i, use_largepages = 0;
 
 	/*
 	 * Calculate the required size of the htab.  We want the number of
@@ -165,18 +170,40 @@ void __init htab_initialize(void)
 
 	mode_rw = _PAGE_ACCESSED | _PAGE_COHERENT | PP_RWXX;
 
-	/* XXX we currently map kernel text rw, should fix this */
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
-	    && systemcfg->physicalMemorySize > 256*MB) {
-		create_pte_mapping((unsigned long)KERNELBASE, 
-				   KERNELBASE + 256*MB, mode_rw, 0);
-		create_pte_mapping((unsigned long)KERNELBASE + 256*MB, 
-				   KERNELBASE + (systemcfg->physicalMemorySize), 
-				   mode_rw, 1);
-	} else {
-		create_pte_mapping((unsigned long)KERNELBASE, 
-				   KERNELBASE+(systemcfg->physicalMemorySize), 
-				   mode_rw, 0);
+	/* On U3 based machines, we need to reserve the DART area and
+	 * _NOT_ map it to avoid cache paradoxes as it's remapped non
+	 * cacheable later on
+	 */
+	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+		use_largepages = 1;
+
+	/* add all physical memory to the bootmem map */
+	for (i=0; i < lmb.memory.cnt; i++) {
+		unsigned long base, size;
+
+		base = lmb.memory.region[i].physbase + KERNELBASE;
+		size = lmb.memory.region[i].size;
+
+#ifdef CONFIG_PMAC_DART
+		/* Do not map the DART space. Fortunately, it will be aligned
+		 * in such a way that it will not cross two lmb regions and will
+		 * fit within a single 16Mb page.
+		 * The DART space is assumed to be a full 16Mb region even if we
+		 * only use 2Mb of that space. We will use more of it later for
+		 * AGP GART. We have to use a full 16Mb large page.
+		 */
+		if (dart_tablebase != 0 && dart_tablebase >= base
+		    && dart_tablebase < (base + size)) {
+			if (base != dart_tablebase)
+				create_pte_mapping(base, dart_tablebase, mode_rw,
+						   use_largepages);
+			if ((base + size) > (dart_tablebase + 16*MB))
+				create_pte_mapping(dart_tablebase + 16*MB, base + size,
+						   mode_rw, use_largepages);
+			continue;
+		}
+#endif /* CONFIG_PMAC_DART */
+		create_pte_mapping(base, base + size, mode_rw, use_largepages);
 	}
 }
 #undef KB
@@ -326,8 +353,7 @@ void flush_hash_range(unsigned long context, unsigned long number, int local)
 		ppc_md.flush_hash_range(context, number, local);
 	} else {
 		int i;
-		struct ppc64_tlb_batch *batch =
-			&ppc64_tlb_batch[smp_processor_id()];
+		struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
 
 		for (i = 0; i < number; i++)
 			flush_hash_page(context, batch->addr[i], batch->pte[i],

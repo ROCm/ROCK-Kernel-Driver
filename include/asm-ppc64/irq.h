@@ -12,7 +12,7 @@
 #include <asm/atomic.h>
 
 /*
- * This definition means virtually nothing now and could/should go away.
+ * Maximum number of interrupt sources that we can handle.
  */
 #define NR_IRQS		512
 
@@ -20,54 +20,59 @@ extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
-/*
- * Valid interrupt numbers are from 0 to MAX_IRQS - 1.
- */
-#define MAX_IRQS	(1<<24)
+/* this number is used when no interrupt has been assigned */
+#define NO_IRQ			(-1)
 
-extern void *_get_irq_desc(unsigned int irq);
-extern void *_get_real_irq_desc(unsigned int irq);
-#define get_irq_desc(irq) ((irq_desc_t *)_get_irq_desc(irq))
-#define get_real_irq_desc(irq) ((irq_desc_t *)_get_real_irq_desc(irq))
+#define get_irq_desc(irq) (&irq_desc[(irq)])
 
-/* Define a way to iterate across irqs fairly efficiently. */
+/* Define a way to iterate across irqs. */
 #define for_each_irq(i) \
-	for ((i) = 0; (i) < MAX_IRQS; (i) = _next_irq(i))
-unsigned int _next_irq(unsigned int irq);
+	for ((i) = 0; (i) < NR_IRQS; ++(i))
 
-static __inline__ int irq_canonicalize(int irq)
+/* Interrupt numbers are virtual in case they are sparsely
+ * distributed by the hardware.
+ */
+extern unsigned int virt_irq_to_real_map[NR_IRQS];
+
+/* Create a mapping for a real_irq if it doesn't already exist.
+ * Return the virtual irq as a convenience.
+ */
+int virt_irq_create_mapping(unsigned int real_irq);
+void virt_irq_init(void);
+
+static inline unsigned int virt_irq_to_real(unsigned int virt_irq)
 {
-	return irq;
+	return virt_irq_to_real_map[virt_irq];
 }
 
 /*
  * Because many systems have two overlapping names spaces for
  * interrupts (ISA and XICS for example), and the ISA interrupts
  * have historically not been easy to renumber, we allow ISA
- * interrupts to take values 0 - 15, and shift up the remaining 
- * interrupts by 0x10.  
- *
- * This would be nice to remove at some point as it adds confusion
- * and adds a nasty end case if any platform native interrupts have 
- * values within 0x10 of the end of that namespace.
+ * interrupts to take values 0 - 15, and shift up the remaining
+ * interrupts by 0x10.
  */
-
 #define NUM_ISA_INTERRUPTS	0x10
 extern int __irq_offset_value;
 
-extern inline int irq_offset_up(int irq)
+static inline int irq_offset_up(int irq)
 {
 	return(irq + __irq_offset_value);
 }
 
-extern inline int irq_offset_down(int irq)
+static inline int irq_offset_down(int irq)
 {
 	return(irq - __irq_offset_value);
 }
 
-extern inline int irq_offset_value(void)
+static inline int irq_offset_value(void)
 {
 	return __irq_offset_value;
+}
+
+static __inline__ int irq_canonicalize(int irq)
+{
+	return irq;
 }
 
 #endif /* _ASM_IRQ_H */

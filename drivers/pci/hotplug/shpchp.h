@@ -390,8 +390,8 @@ static inline int wait_for_ctrl_irq (struct controller *ctrl)
 		/* Sleep for up to 1 second */
 		schedule_timeout(1*HZ);
 	} else {
-		/* Sleep for up to 1.5 second */
-		schedule_timeout(1.5*HZ);
+		/* Sleep for up to 2 seconds */
+		schedule_timeout(2*HZ);
 	}
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&ctrl->queue, &wait);

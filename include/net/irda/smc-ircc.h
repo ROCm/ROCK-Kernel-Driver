@@ -170,7 +170,6 @@ struct ircc_cb {
 	 * synchronised - Jean II */
 	
 	__u32 new_speed;
-	__u32 flags;               /* Interface flags */
 
 	int tx_buff_offsets[10];   /* Offsets between frames in tx_buff */
 	int tx_len;                /* Number of frames in tx_buff */

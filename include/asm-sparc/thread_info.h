@@ -53,6 +53,8 @@ struct thread_info {
 
 /*
  * macros/functions for gaining access to the thread information structure
+ *
+ * preempt_count needs to be 1 initially, until the scheduler is functional.
  */
 #define INIT_THREAD_INFO(tsk)				\
 {							\
@@ -61,6 +63,7 @@ struct thread_info {
 	.exec_domain	=	&default_exec_domain,	\
 	.flags		=	0,			\
 	.cpu		=	0,			\
+	.preempt_count	=	1,			\
 	.restart_block	= {				\
 		.fn	=	do_no_restart_syscall,	\
 	},						\

@@ -3615,6 +3615,27 @@ out:
 }
 #endif
 
+int esp_slave_alloc(Scsi_Device *SDptr)
+{
+	struct esp_device *esp_dev =
+		kmalloc(sizeof(struct esp_device), GFP_ATOMIC);
+
+	if (!esp_dev)
+		return -ENOMEM;
+	memset(esp_dev, 0, sizeof(struct esp_device));
+	SDptr->hostdata = esp_dev;
+	return 0;
+}
+
+void esp_slave_destroy(Scsi_Device *SDptr)
+{
+	struct NCR_ESP *esp = (struct NCR_ESP *) SDptr->host->hostdata;
+
+	esp->targets_present &= ~(1 << SDptr->id);
+	kfree(SDptr->hostdata);
+	SDptr->hostdata = NULL;
+}
+
 #ifdef MODULE
 int init_module(void) { return 0; }
 void cleanup_module(void) {}

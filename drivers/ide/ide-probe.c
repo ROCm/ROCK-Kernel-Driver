@@ -50,6 +50,7 @@
 #include <linux/spinlock.h>
 #include <linux/pci.h>
 #include <linux/kmod.h>
+#include <linux/pci.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -904,6 +905,7 @@ static int ide_init_queue(ide_drive_t *drive)
 	request_queue_t *q;
 	ide_hwif_t *hwif = HWIF(drive);
 	int max_sectors = 256;
+	int max_sg_entries = PRD_ENTRIES;
 
 	/*
 	 *	Our default set up assumes the normal IDE case,
@@ -926,11 +928,22 @@ static int ide_init_queue(ide_drive_t *drive)
 		max_sectors = hwif->rqsize;
 	blk_queue_max_sectors(q, max_sectors);
 
-	/* IDE DMA can do PRD_ENTRIES number of segments. */
-	blk_queue_max_hw_segments(q, PRD_ENTRIES);
+#ifdef CONFIG_PCI
+	/* When we have an IOMMU, we may have a problem where pci_map_sg()
+	 * creates segments that don't completely match our boundary
+	 * requirements and thus need to be broken up again. Because it
+	 * doesn't align properly neither, we may actually have to break up
+	 * to more segments than what was we got in the first place, a max
+	 * worst case is twice as many.
+	 * This will be fixed once we teach pci_map_sg() about our boundary
+	 * requirements, hopefully soon
+	 */
+	if (!PCI_DMA_BUS_IS_PHYS)
+		max_sg_entries >>= 1;
+#endif /* CONFIG_PCI */
 
-	/* This is a driver limit and could be eliminated. */
-	blk_queue_max_phys_segments(q, PRD_ENTRIES);
+	blk_queue_max_hw_segments(q, max_sg_entries);
+	blk_queue_max_phys_segments(q, max_sg_entries);
 
 	/* assign drive and gendisk queue */
 	drive->queue = q;

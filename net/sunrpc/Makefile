@@ -2,9 +2,9 @@
 # Makefile for Linux kernel SUN RPC
 #
 
-obj-$(CONFIG_SUNRPC_GSS) += auth_gss/
 
 obj-$(CONFIG_SUNRPC) += sunrpc.o
+obj-$(CONFIG_SUNRPC_GSS) += auth_gss/
 
 sunrpc-y := clnt.o xprt.o sched.o \
 	    auth.o auth_null.o auth_unix.o \

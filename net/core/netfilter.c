@@ -27,9 +27,6 @@
 #include <net/route.h>
 #include <linux/ip.h>
 
-#define __KERNEL_SYSCALLS__
-#include <linux/unistd.h>
-
 /* In this code, we can be waiting indefinitely for userspace to
  * service a packet if a hook returns NF_QUEUE.  We could keep a count
  * of skbuffs queued for userspace, and not deregister a hook unless

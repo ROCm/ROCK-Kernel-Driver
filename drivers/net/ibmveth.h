@@ -115,11 +115,8 @@ struct ibmveth_adapter {
     atomic_t not_replenishing;
 
     /* helper tasks */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
     struct work_struct replenish_task;
-#else    
-    struct tasklet_struct replenish_task;
-#endif
+
     /* adapter specific stats */
     u64 replenish_task_cycles;
     u64 replenish_no_mem;

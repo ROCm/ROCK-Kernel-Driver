@@ -337,7 +337,6 @@ void touch_nmi_watchdog (void)
 void nmi_watchdog_tick (struct pt_regs * regs, unsigned reason)
 {
 	int sum, cpu;
-	//static int count;
 
 	cpu = safe_smp_processor_id();
 	sum = read_pda(apic_timer_irqs);

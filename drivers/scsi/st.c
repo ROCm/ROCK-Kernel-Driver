@@ -17,7 +17,7 @@
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20040122";
+static char *verstr = "20040213";
 
 #include <linux/module.h>
 
@@ -76,6 +76,8 @@ static int try_wdio = TRUE;
 
 static int st_dev_max;
 static int st_nr_dev;
+
+static struct class_simple *st_sysfs_class;
 
 MODULE_AUTHOR("Kai Makisara");
 MODULE_DESCRIPTION("SCSI Tape Driver");
@@ -183,7 +185,7 @@ static int st_init_command(struct scsi_cmnd *);
 
 static void do_create_driverfs_files(void);
 static void do_remove_driverfs_files(void);
-
+static void do_create_class_files(Scsi_Tape *, int, int);
 
 static struct scsi_driver st_template = {
 	.owner			= THIS_MODULE,
@@ -3902,20 +3904,8 @@ static int st_probe(struct device *dev)
 			}
 			STm->cdevs[j] = cdev;
 
-			error = sysfs_create_link(&STm->cdevs[j]->kobj, &SDp->sdev_gendev.kobj,
-						  "device");
-			if (error) {
-				printk(KERN_ERR
-				       "st%d: Can't create sysfs link from SCSI device.\n",
-				       dev_num);
-			}
 		}
-	}
-	error = sysfs_create_link(&SDp->sdev_gendev.kobj, &tpnt->modes[0].cdevs[0]->kobj,
-				  "tape");
-	if (error) {
-		printk(KERN_ERR "st%d: Can't create sysfs link from SCSI device.\n",
-		       dev_num);
+		do_create_class_files(tpnt, dev_num, mode);
 	}
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
@@ -3941,11 +3931,14 @@ static int st_probe(struct device *dev)
 out_free_tape:
 	for (mode=0; mode < ST_NBR_MODES; mode++) {
 		STm = &(tpnt->modes[mode]);
+		sysfs_remove_link(&tpnt->device->sdev_gendev.kobj,
+				  "tape");
 		for (j=0; j < 2; j++) {
 			if (STm->cdevs[j]) {
 				if (cdev == STm->cdevs[j])
 					cdev = NULL;
-				sysfs_remove_link(&STm->cdevs[j]->kobj, "device");
+				class_simple_device_remove(MKDEV(SCSI_TAPE_MAJOR,
+								 TAPE_MINOR(i, mode, j)));
 				cdev_del(STm->cdevs[j]);
 			}
 		}
@@ -3981,13 +3974,14 @@ static int st_remove(struct device *dev)
 			st_nr_dev--;
 			write_unlock(&st_dev_arr_lock);
 			devfs_unregister_tape(tpnt->disk->number);
-			sysfs_remove_link(&SDp->sdev_gendev.kobj, "tape");
+			sysfs_remove_link(&tpnt->device->sdev_gendev.kobj,
+					  "tape");
 			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
 				devfs_remove("%s/mt%s", SDp->devfs_name, st_formats[mode]);
 				devfs_remove("%s/mt%sn", SDp->devfs_name, st_formats[mode]);
 				for (j=0; j < 2; j++) {
-					sysfs_remove_link(&tpnt->modes[mode].cdevs[j]->kobj,
-							  "device");
+					class_simple_device_remove(MKDEV(SCSI_TAPE_MAJOR,
+									 TAPE_MINOR(i, mode, j)));
 					cdev_del(tpnt->modes[mode].cdevs[j]);
 					tpnt->modes[mode].cdevs[j] = NULL;
 				}
@@ -4011,7 +4005,7 @@ static int st_remove(struct device *dev)
 
 static void st_intr(struct scsi_cmnd *SCpnt)
 {
-	scsi_io_completion(SCpnt, (SCpnt->result ? 0: SCpnt->bufflen >> 9), 1);
+	scsi_io_completion(SCpnt, (SCpnt->result ? 0: SCpnt->bufflen), 1);
 }
 
 /*
@@ -4052,13 +4046,23 @@ static int __init init_st(void)
 		"st: Version %s, fixed bufsize %d, s/g segs %d\n",
 		verstr, st_fixed_buffer_size, st_max_sg_segs);
 
+	st_sysfs_class = class_simple_create(THIS_MODULE, "scsi_tape");
+	if (IS_ERR(st_sysfs_class)) {
+		st_sysfs_class = NULL;
+		printk(KERN_ERR "Unable create sysfs class for SCSI tapes\n");
+		return 1;
+	}
+
 	if (!register_chrdev_region(MKDEV(SCSI_TAPE_MAJOR, 0),
 				    ST_MAX_TAPE_ENTRIES, "st")) {
 		if (scsi_register_driver(&st_template.gendrv) == 0) {
 			do_create_driverfs_files();
 			return 0;
 		}
+		if (st_sysfs_class)
+			class_simple_destroy(st_sysfs_class);		
 		unregister_chrdev_region(MKDEV(SCSI_TAPE_MAJOR, 0),
+
 					 ST_MAX_TAPE_ENTRIES);
 	}
 
@@ -4068,6 +4072,9 @@ static int __init init_st(void)
 
 static void __exit exit_st(void)
 {
+	if (st_sysfs_class)
+		class_simple_destroy(st_sysfs_class);
+	st_sysfs_class = NULL;
 	do_remove_driverfs_files();
 	scsi_unregister_driver(&st_template.gendrv);
 	unregister_chrdev_region(MKDEV(SCSI_TAPE_MAJOR, 0),
@@ -4080,7 +4087,7 @@ module_init(init_st);
 module_exit(exit_st);
 
 
-/* The sysfs interface. Read-only at the moment */
+/* The sysfs driver interface. Read-only at the moment */
 static ssize_t st_try_direct_io_show(struct device_driver *ddp, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%d\n", try_direct_io);
@@ -4123,6 +4130,99 @@ static void do_remove_driverfs_files(void)
 	driver_remove_file(driverfs, &driver_attr_max_sg_segs);
 	driver_remove_file(driverfs, &driver_attr_fixed_buffer_size);
 	driver_remove_file(driverfs, &driver_attr_try_direct_io);
+}
+
+
+/* The sysfs simple class interface */
+static ssize_t st_defined_show(struct class_device *class_dev, char *buf)
+{
+	ST_mode *STm = (ST_mode *)class_get_devdata(class_dev);
+	ssize_t l = 0;
+
+	l = snprintf(buf, PAGE_SIZE, "%d\n", STm->defined);
+	return l;
+}
+
+CLASS_DEVICE_ATTR(defined, S_IRUGO, st_defined_show, NULL);
+
+static ssize_t st_defblk_show(struct class_device *class_dev, char *buf)
+{
+	ST_mode *STm = (ST_mode *)class_get_devdata(class_dev);
+	ssize_t l = 0;
+
+	l = snprintf(buf, PAGE_SIZE, "%d\n", STm->default_blksize);
+	return l;
+}
+
+CLASS_DEVICE_ATTR(default_blksize, S_IRUGO, st_defblk_show, NULL);
+
+static ssize_t st_defdensity_show(struct class_device *class_dev, char *buf)
+{
+	ST_mode *STm = (ST_mode *)class_get_devdata(class_dev);
+	ssize_t l = 0;
+	char *fmt;
+
+	fmt = STm->default_density >= 0 ? "0x%02x\n" : "%d\n";
+	l = snprintf(buf, PAGE_SIZE, fmt, STm->default_density);
+	return l;
+}
+
+CLASS_DEVICE_ATTR(default_density, S_IRUGO, st_defdensity_show, NULL);
+
+static ssize_t st_defcompression_show(struct class_device *class_dev, char *buf)
+{
+	ST_mode *STm = (ST_mode *)class_get_devdata(class_dev);
+	ssize_t l = 0;
+
+	l = snprintf(buf, PAGE_SIZE, "%d\n", STm->default_compression - 1);
+	return l;
+}
+
+CLASS_DEVICE_ATTR(default_compression, S_IRUGO, st_defcompression_show, NULL);
+
+static void do_create_class_files(Scsi_Tape *STp, int dev_num, int mode)
+{
+	int rew, error;
+	struct class_device *st_class_member;
+
+	if (!st_sysfs_class)
+		return;
+
+	for (rew=0; rew < 2; rew++) {
+		st_class_member =
+			class_simple_device_add(st_sysfs_class,
+						MKDEV(SCSI_TAPE_MAJOR,
+						      TAPE_MINOR(dev_num, mode, rew)),
+						&STp->device->sdev_gendev, "%s",
+						STp->modes[mode].cdevs[rew]->kobj.name);
+		if (!st_class_member) {
+			printk(KERN_WARNING "st%d: class_simple_device_add failed\n",
+			       dev_num);
+			goto out;
+		}
+		class_set_devdata(st_class_member, &STp->modes[mode]);
+
+		class_device_create_file(st_class_member,
+					 &class_device_attr_defined);
+		class_device_create_file(st_class_member,
+					 &class_device_attr_default_blksize);
+		class_device_create_file(st_class_member,
+					 &class_device_attr_default_density);
+		class_device_create_file(st_class_member,
+					 &class_device_attr_default_compression);
+		if (mode == 0 && rew == 0) {
+			error = sysfs_create_link(&STp->device->sdev_gendev.kobj,
+						  &st_class_member->kobj,
+						  "tape");
+			if (error) {
+				printk(KERN_ERR
+				       "st%d: Can't create sysfs link from SCSI device.\n",
+				       dev_num);
+			}
+		}
+	}
+ out:
+	return;
 }
 
 

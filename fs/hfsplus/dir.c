@@ -19,11 +19,8 @@
 #include "hfsplus_raw.h"
 
 /* Find the entry inside dir named dentry->d_name */
-static struct dentry *hfsplus_lookup(struct inode *dir, struct dentry *dentry
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
-				     ,struct nameidata *nd
-#endif
-				     )
+static struct dentry *hfsplus_lookup(struct inode *dir, struct dentry *dentry,
+				     struct nameidata *nd)
 {
 	struct inode *inode = NULL;
 	struct hfs_find_data fd;
@@ -213,19 +210,6 @@ out:
 	return err;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static loff_t hfsplus_seek_dir(struct file *file, loff_t offset, int origin)
-{
-	loff_t res;
-
-	down(&file->f_dentry->d_inode->i_sem);
-	res = default_llseek(file, offset, origin);
-	up(&file->f_dentry->d_inode->i_sem);
-
-	return res;
-}
-#endif
-
 static int hfsplus_dir_release(struct inode *inode, struct file *file)
 {
 	struct hfsplus_readdir_data *rd = file->private_data;
@@ -236,11 +220,8 @@ static int hfsplus_dir_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-int hfsplus_create(struct inode *dir, struct dentry *dentry, int mode
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
-		, struct nameidata *nd
-#endif
-		)
+int hfsplus_create(struct inode *dir, struct dentry *dentry, int mode,
+		   struct nameidata *nd)
 {
 	struct inode *inode;
 	int res;
@@ -425,11 +406,7 @@ int hfsplus_symlink(struct inode *dir, struct dentry *dentry, const char *symnam
 	return res;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 int hfsplus_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
-#else
-int hfsplus_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
-#endif
 {
 	struct super_block *sb;
 	struct inode *inode;
@@ -489,10 +466,6 @@ struct file_operations hfsplus_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= hfsplus_readdir,
 	.ioctl          = hfsplus_ioctl,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	.llseek		= hfsplus_seek_dir,
-#else
 	.llseek		= generic_file_llseek,
-#endif
 	.release	= hfsplus_dir_release,
 };

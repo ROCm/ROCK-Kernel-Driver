@@ -45,9 +45,9 @@
 /*
  * Mask bit
  */
+
 #define	IOSAPIC_MASK_SHIFT		16
-#define	IOSAPIC_UNMASK			0
-#define	IOSAPIC_MSAK			1
+#define	IOSAPIC_MASK			(1<<IOSAPIC_MASK_SHIFT)
 
 #ifndef __ASSEMBLY__
 

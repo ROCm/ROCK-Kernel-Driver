@@ -12,11 +12,7 @@
 
 #include <linux/fs.h>
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#include <linux/locks.h>
-#else
 #include <linux/buffer_head.h>
-#endif
 #include "hfsplus_raw.h"
 
 #define DBG_BNODE_REFS	0x00000001
@@ -150,11 +146,7 @@ struct hfsplus_sb_info {
 	atomic_t inode_cnt;
 	u32 last_inode_cnt;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	struct list_head rsrc_inodes;
-#else
 	struct hlist_head rsrc_inodes;
-#endif
 };
 
 #define HFSPLUS_SB_WRITEBACKUP	0x0001
@@ -180,12 +172,8 @@ struct hfsplus_inode_info {
 	u8 userflags;
 
 	struct list_head open_dir_list;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	unsigned long phys_size;
-#else
 	loff_t phys_size;
 	struct inode vfs_inode;
-#endif
 };
 
 #define HFSPLUS_FLG_RSRC	0x0001
@@ -251,10 +239,6 @@ struct hfsplus_readdir_data {
 #define hfs_brec_read hfsplus_brec_read
 #define hfs_brec_goto hfsplus_brec_goto
 #define hfs_part_find hfsplus_part_find
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-typedef long sector_t;
-#endif
 
 /*
  * definitions for ext2 flag ioctls (linux really needs a generic
@@ -376,10 +360,6 @@ int hfsplus_read_wrapper(struct super_block *);
 int hfs_part_find(struct super_block *, sector_t *, sector_t *);
 
 /* access macros */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#define HFSPLUS_SB(sb)		(*(struct hfsplus_sb_info *)&(sb)->u)
-#define HFSPLUS_I(inode)	(*(struct hfsplus_inode_info *)&(inode)->u)
-#else
 /*
 static inline struct hfsplus_sb_info *HFSPLUS_SB(struct super_block *sb)
 {
@@ -392,7 +372,6 @@ static inline struct hfsplus_inode_info *HFSPLUS_I(struct inode *inode)
 */
 #define HFSPLUS_SB(super)	(*(struct hfsplus_sb_info *)(super)->s_fs_info)
 #define HFSPLUS_I(inode)	(*list_entry(inode, struct hfsplus_inode_info, vfs_inode))
-#endif
 
 #if 1
 #define hfsplus_kmap(p)		({ struct page *__p = (p); kmap(__p); })
@@ -424,37 +403,10 @@ static inline struct hfsplus_inode_info *HFSPLUS_I(struct inode *inode)
 #define __hfsp_ut2mt(t)		(cpu_to_be32(t + 2082844800U))
 
 /* compatibility */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#define PageUptodate(page)	Page_Uptodate(page)
-#define wait_on_page_locked(page) wait_on_page(page)
-#define get_seconds()		CURRENT_TIME
-#define page_symlink(i,n,l)		block_symlink(i,n,l)
-#define map_bh(bh, sb, block) ({				\
-	bh->b_dev = kdev_t_to_nr(sb->s_dev);			\
-	bh->b_blocknr = block;					\
-	bh->b_state |= (1UL << BH_Mapped);			\
-})
-#define set_buffer_new(bh)	(bh->b_state |= (1UL << BH_New))
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,21)
-#define new_inode(sb) ({					\
-	struct inode *inode = get_empty_inode();		\
-	if (inode) {						\
-		inode->i_sb = sb;				\
-		inode->i_dev = sb->s_dev;			\
-		inode->i_blkbits = sb->s_blocksize_bits;	\
-	}							\
-	inode;							\
-})
-#endif
-#define	hfsp_mt2ut(t)		__hfsp_mt2ut(t)
-#define hfsp_ut2mt(t)		__hfsp_ut2mt(t)
-#define hfsp_now2mt()		__hfsp_ut2mt(CURRENT_TIME)
-#else
 #define hfsp_mt2ut(t)		(struct timespec){ .tv_sec = __hfsp_mt2ut(t) }
 #define hfsp_ut2mt(t)		__hfsp_ut2mt((t).tv_sec)
 #define hfsp_now2mt()		__hfsp_ut2mt(get_seconds())
 
 #define kdev_t_to_nr(x)		(x)
-#endif
 
 #endif

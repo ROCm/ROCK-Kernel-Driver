@@ -39,7 +39,7 @@
 #include "pci_hotplug.h"
 
 
-static int debug = 1;
+static int debug;
 static struct semaphore rpaphp_sem;
 static LIST_HEAD (rpaphp_slot_head);
 static int num_slots;

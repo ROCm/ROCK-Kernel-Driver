@@ -2,13 +2,9 @@
 #include <linux/kernel.h>
 #include <linux/dirent.h>
 #include <linux/string.h>
+#include <linux/syscalls.h>
 
 #include "do_mounts.h"
-
-extern asmlinkage long sys_symlink(const char *old, const char *new);
-extern asmlinkage long sys_access(const char * filename, int mode);
-extern asmlinkage long sys_getdents64(unsigned int fd, void * dirent,
-				      unsigned int count);
 
 void __init mount_devfs(void)
 {
@@ -31,7 +27,8 @@ static int __init do_read_dir(int fd, void *buf, int len)
 	lseek(fd, 0, 0);
 
 	for (bytes = 0; bytes < len; bytes += n) {
-		n = sys_getdents64(fd, p + bytes, len - bytes);
+		n = sys_getdents64(fd, (struct linux_dirent64 *)(p + bytes),
+					len - bytes);
 		if (n < 0)
 			return n;
 		if (n == 0)

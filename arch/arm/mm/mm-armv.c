@@ -585,20 +585,31 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
 		create_mapping(io_desc + i);
 }
 
-static inline void free_memmap(int node, unsigned long start, unsigned long end)
+static inline void
+free_memmap(int node, unsigned long start_pfn, unsigned long end_pfn)
 {
+	struct page *start_pg, *end_pg;
 	unsigned long pg, pgend;
 
-	start = __phys_to_virt(start);
-	end   = __phys_to_virt(end);
+	/*
+	 * Convert start_pfn/end_pfn to a struct page pointer.
+	 */
+	start_pg = pfn_to_page(start_pfn);
+	end_pg = pfn_to_page(end_pfn);
 
-	pg    = PAGE_ALIGN((unsigned long)(virt_to_page(start)));
-	pgend = ((unsigned long)(virt_to_page(end))) & PAGE_MASK;
+	/*
+	 * Convert to physical addresses, and
+	 * round start upwards and end downwards.
+	 */
+	pg = PAGE_ALIGN(__pa(start_pg));
+	pgend = __pa(end_pg) & PAGE_MASK;
 
-	start = __virt_to_phys(pg);
-	end   = __virt_to_phys(pgend);
-
-	free_bootmem_node(NODE_DATA(node), start, end - start);
+	/*
+	 * If there are free pages between these,
+	 * free the section of the memmap array.
+	 */
+	if (pg < pgend)
+		free_bootmem_node(NODE_DATA(node), pg, pgend - pg);
 }
 
 static inline void free_unused_memmap_node(int node, struct meminfo *mi)
@@ -615,7 +626,12 @@ static inline void free_unused_memmap_node(int node, struct meminfo *mi)
 		if (mi->bank[i].size == 0 || mi->bank[i].node != node)
 			continue;
 
-		bank_start = mi->bank[i].start & PAGE_MASK;
+		bank_start = mi->bank[i].start >> PAGE_SHIFT;
+		if (bank_start < prev_bank_end) {
+			printk(KERN_ERR "MEM: unordered memory banks.  "
+				"Not freeing memmap.\n");
+			break;
+		}
 
 		/*
 		 * If we had a previous bank, and there is a space
@@ -625,7 +641,7 @@ static inline void free_unused_memmap_node(int node, struct meminfo *mi)
 			free_memmap(node, prev_bank_end, bank_start);
 
 		prev_bank_end = PAGE_ALIGN(mi->bank[i].start +
-					   mi->bank[i].size);
+					   mi->bank[i].size) >> PAGE_SHIFT;
 	}
 }
 

@@ -19,10 +19,24 @@ ENTRY(__raw_readsl)
 		ands	ip, r1, #3
 		bne	2f
 
-1:		ldr	r3, [r0]
-		str	r3, [r1], #4
-		subs	r2, r2, #1
-		bne	1b
+		subs	r2, r2, #4
+		bmi	1001f
+		stmfd	sp!, {r4, lr}
+1000:		ldr	r3, [r0, #0]
+		ldr	r4, [r0, #0]
+		ldr	ip, [r0, #0]
+		ldr	lr, [r0, #0]
+		subs	r2, r2, #4
+		stmia	r1!, {r3, r4, ip, lr}
+		bpl	1000b
+		ldmfd	sp!, {r4, lr}
+1001:		tst	r2, #2
+		ldrne	r3, [r0, #0]
+		ldrne	ip, [r0, #0]
+		stmneia	r1!, {r3, ip}
+		tst	r2, #1
+		ldrne	r3, [r0, #0]
+		strne	r3, [r1, #0]
 		mov	pc, lr
 
 2:		cmp	ip, #2

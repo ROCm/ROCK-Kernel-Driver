@@ -103,7 +103,7 @@ acpi_ex_get_object_reference (
 
 		default:
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference subtype %X\n",
+			ACPI_REPORT_ERROR (("Unknown Reference subtype in get ref %X\n",
 				obj_desc->reference.opcode));
 			return_ACPI_STATUS (AE_AML_INTERNAL);
 		}
@@ -121,8 +121,8 @@ acpi_ex_get_object_reference (
 
 	default:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p has invalid descriptor [%s]\n",
-				obj_desc, acpi_ut_get_descriptor_name (obj_desc)));
+		ACPI_REPORT_ERROR (("Invalid descriptor type in get ref: %X\n",
+				ACPI_GET_DESCRIPTOR_TYPE (obj_desc)));
 		return_ACPI_STATUS (AE_TYPE);
 	}
 
@@ -349,6 +349,8 @@ acpi_ex_do_concatenate (
 
 		/* Invalid object type, should not happen here */
 
+		ACPI_REPORT_ERROR (("Concat - invalid obj type: %X\n",
+				ACPI_GET_OBJECT_TYPE (obj_desc1)));
 		status = AE_AML_INTERNAL;
 		return_desc = NULL;
 	}

@@ -76,7 +76,7 @@
 #include <asm/iSeries/HvLpConfig.h>
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpEvent.h>
-#include <asm/iSeries/iSeries_dma.h>
+#include <asm/iommu.h>
 
 #include "iseries_veth.h"
 

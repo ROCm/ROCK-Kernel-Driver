@@ -25,6 +25,7 @@
 #include <linux/sem.h>
 #include <linux/msg.h>
 #include <linux/icmpv6.h>
+#include <linux/syscalls.h>
 #include <linux/sysctl.h>
 #include <linux/utime.h>
 #include <linux/utsname.h>
@@ -124,8 +125,6 @@ out:
 }
 
 
-asmlinkage long sys_truncate(const char * path, unsigned long length);
-
 asmlinkage int sys_truncate64(const char *path, unsigned int high,
 			      unsigned int low)
 {
@@ -133,8 +132,6 @@ asmlinkage int sys_truncate64(const char *path, unsigned int high,
 		return -EINVAL;
 	return sys_truncate(path, ((long) high << 32) | low);
 }
-
-asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length);
 
 asmlinkage int sys_ftruncate64(unsigned int fd, unsigned int high,
 			       unsigned int low)
@@ -413,8 +410,6 @@ xlate_dirent(void *dirent64, void *dirent32, long n)
 	return;
 }
 
-asmlinkage long sys_getdents(unsigned int fd, void * dirent, unsigned int count);
-
 asmlinkage long
 sys32_getdents(unsigned int fd, void * dirent32, unsigned int count)
 {
@@ -534,8 +529,6 @@ struct sysinfo32 {
 	u32 mem_unit;
 	char _f[8];
 };
-
-extern asmlinkage int sys_sysinfo(struct sysinfo *info);
 
 asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
 {
@@ -670,10 +663,6 @@ sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
 
 	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
-
-extern asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
-			          unsigned long offset_low, loff_t * result,
-			          unsigned int origin);
 
 asmlinkage int sys32_llseek(unsigned int fd, unsigned int offset_high,
 			    unsigned int offset_low, loff_t * result,
@@ -1057,10 +1046,6 @@ out_nofds:
 	return ret;
 }
 
-
-
-extern asmlinkage int sys_sched_rr_get_interval(pid_t pid,
-	struct timespec *interval);
 
 asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid,
 	struct compat_timespec *interval)
@@ -1460,7 +1445,7 @@ do_sys32_shmat (int first, int second, int third, int version, void *uptr)
 
 	if (version == 1)
 		return err;
-	err = sys_shmat (first, uptr, second, &raddr);
+	err = do_shmat (first, uptr, second, &raddr);
 	if (err)
 		return err;
 	err = put_user (raddr, uaddr);
@@ -1741,8 +1726,6 @@ asmlinkage long sys32_newuname(struct new_utsname * name)
 	return ret;
 }
 
-extern asmlinkage long sys_personality(unsigned long);
-
 asmlinkage int sys32_personality(unsigned long personality)
 {
 	int ret;
@@ -1861,8 +1844,6 @@ asmlinkage int sys32_adjtimex(struct timex32 *utp)
 	return ret;
 }
 
-extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
-
 asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset,
 	s32 count)
 {
@@ -1882,8 +1863,6 @@ asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset,
 		
 	return ret;
 }
-
-asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count);
 
 asmlinkage ssize_t sys32_readahead(int fd, u32 pad0, u64 a2, u64 a3,
                                    size_t count)

@@ -178,9 +178,6 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 	self->qos.min_turn_time.bits = qos_mtt_bits;
 	irda_qos_bits_to_value(&self->qos);
 	
-	self->flags = IFF_SIR|IFF_PIO;
-	self->mode = IRDA_IRLAP;
-
 	/* Bootstrap ZeroCopy Rx */
 	self->rx_buff.truesize = IRDA_SKB_MAX_MTU;
 	self->rx_buff.skb = __dev_alloc_skb(self->rx_buff.truesize,

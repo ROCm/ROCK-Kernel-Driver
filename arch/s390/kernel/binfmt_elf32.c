@@ -162,14 +162,6 @@ struct elf_prpsinfo32
 /*
 #define init_elf_binfmt init_elf32_binfmt
 */
-#undef CONFIG_BINFMT_ELF
-#ifdef CONFIG_BINFMT_ELF32
-#define CONFIG_BINFMT_ELF CONFIG_BINFMT_ELF32
-#endif
-#undef CONFIG_BINFMT_ELF_MODULE
-#ifdef CONFIG_BINFMT_ELF32_MODULE
-#define CONFIG_BINFMT_ELF_MODULE CONFIG_BINFMT_ELF32_MODULE
-#endif
 
 #undef start_thread
 #define start_thread                    start_thread31 

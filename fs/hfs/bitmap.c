@@ -1,19 +1,14 @@
 /*
- * linux/fs/hfs/bitmap.c
+ *  linux/fs/hfs/bitmap.c
  *
  * Copyright (C) 1996-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * Based on GPLed code Copyright (C) 1995  Michael Dreher
  *
  * This file contains the code to modify the volume bitmap:
  * search/set/clear bits.
- *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
  */
 
 #include "hfs_fs.h"

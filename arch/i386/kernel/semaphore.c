@@ -48,14 +48,12 @@
  *    we cannot lose wakeup events.
  */
 
-asmlinkage void
-__up(struct semaphore *sem)
+asmlinkage void __up(struct semaphore *sem)
 {
 	wake_up(&sem->wait);
 }
 
-asmlinkage void
-__down(struct semaphore * sem)
+asmlinkage void __down(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -92,8 +90,7 @@ __down(struct semaphore * sem)
 	tsk->state = TASK_RUNNING;
 }
 
-asmlinkage int
-__down_interruptible(struct semaphore * sem)
+asmlinkage int __down_interruptible(struct semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -156,8 +153,7 @@ __down_interruptible(struct semaphore * sem)
  * single "cmpxchg" without failure cases,
  * but then it wouldn't work on a 386.
  */
-asmlinkage int
-__down_trylock(struct semaphore * sem)
+asmlinkage int __down_trylock(struct semaphore * sem)
 {
 	int sleepers;
 	unsigned long flags;

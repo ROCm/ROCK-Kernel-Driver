@@ -29,20 +29,23 @@
  */
 #ifndef IBMVSCSI_H
 #define IBMVSCSI_H
-#include <scsi/scsi.h>
-#include <scsi/scsi_cmnd.h>
-#include <scsi/scsi_host.h>
-#include <linux/dma-mapping.h>
+#include <linux/types.h>
+#include <linux/list.h>
 #include <linux/completion.h>
+#include <linux/workqueue.h>
 #include "viosrp.h"
 
+struct scsi_cmnd;
+struct Scsi_Host;
 /**
  * Work out the number of scatter/gather buffers we support
  */
 static const struct SRP_CMD *fake_srp_cmd = NULL;
 enum {
 	IBMVSCSI_MAX_REQUESTS = 50,
-	MAX_INDIRECT_BUFS = (sizeof(fake_srp_cmd->additional_data) - sizeof(struct indirect_descriptor)) / sizeof(struct memory_descriptor)
+	MAX_INDIRECT_BUFS = (sizeof(fake_srp_cmd->additional_data) -
+			     sizeof(struct indirect_descriptor)) /
+	    sizeof(struct memory_descriptor)
 };
 
 /* ------------------------------------------------------------
@@ -58,16 +61,15 @@ struct crq_queue {
 
 /* a unit of work for the hosting partition */
 struct srp_event_struct {
-	union VIOSRP_IU *evt;		/* the actual SRP IU to send */
-	struct scsi_cmnd  *cmnd;		/* data to use for callback */
-	struct list_head list;		/* queued or sent list for active events*/
-	void (*done)(struct srp_event_struct *);	/* run done(this) when it comes back */
-	struct VIOSRP_CRQ crq;		/* points to *evt for DMA */
+	union VIOSRP_IU *evt;
+	struct scsi_cmnd *cmnd;
+	struct list_head list;
+	void (*done) (struct srp_event_struct *);
+	struct VIOSRP_CRQ crq;
 	struct ibmvscsi_host_data *hostdata;
 	char in_use;
-	/* for the queue case only: */
 	struct SRP_CMD cmd;
-	void (*cmnd_done)(struct scsi_cmnd *);	/* special _done_ passed with scsi cmd */
+	void (*cmnd_done) (struct scsi_cmnd *);
 	struct completion comp;
 };
 
@@ -75,7 +77,6 @@ struct srp_event_struct {
 struct event_pool {
 	struct srp_event_struct *events;
 	u32 size;
-	spinlock_t lock;
 	union VIOSRP_IU *iu_storage;
 	dma_addr_t iu_token;
 };
@@ -87,25 +88,22 @@ struct ibmvscsi_host_data {
 	struct event_pool pool;
 	struct crq_queue queue;
 	struct work_struct srp_task;
-	spinlock_t lock; /* lock for queues */
 	struct list_head sent;
 	struct Scsi_Host *host;
 };
 
-
-int ibmvscsi_register_driver(void);
-void ibmvscsi_unregister_driver(void);
-
 /* routines for managing a command/response queue */
-int ibmvscsi_init_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata);
-void ibmvscsi_release_crq_queue(struct crq_queue *queue, struct ibmvscsi_host_data *hostdata);
-void ibmvscsi_handle_crq(struct VIOSRP_CRQ *crq, struct ibmvscsi_host_data *hostdata);
-int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata, u64 word1, u64 word2);
+int ibmvscsi_init_crq_queue(struct crq_queue *queue,
+			    struct ibmvscsi_host_data *hostdata);
+void ibmvscsi_release_crq_queue(struct crq_queue *queue,
+				struct ibmvscsi_host_data *hostdata);
+void ibmvscsi_handle_crq(struct VIOSRP_CRQ *crq,
+			 struct ibmvscsi_host_data *hostdata);
+int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata,
+		      u64 word1, u64 word2);
 
 /* Probe/remove routines */
 struct ibmvscsi_host_data *ibmvscsi_probe(struct device *dev);
-int ibmvscsi_remove(struct ibmvscsi_host_data *hostdata);
+void ibmvscsi_remove(struct ibmvscsi_host_data *hostdata);
 
-void ibmvscsi_task(unsigned long data);
-
-#endif /* IBMVSCSI_H */
+#endif				/* IBMVSCSI_H */

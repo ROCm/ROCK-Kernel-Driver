@@ -29,7 +29,6 @@ extern void iSeries_setup_arch(void);
 extern void iSeries_setup_residual(struct seq_file *m, int cpu_id);
 extern void iSeries_get_cpuinfo(struct seq_file *m);
 extern void iSeries_init_IRQ(void);
-extern void iSeries_init_irq_desc(int irq, irq_desc_t *);
 extern int iSeries_get_irq(struct pt_regs *regs);
 extern void iSeries_restart(char *cmd);
 extern void iSeries_power_off(void);

@@ -1,7 +1,8 @@
 /*
- * linux/fs/hfs/string.c
+ *  linux/fs/hfs/string.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains the string comparison function for the
@@ -10,12 +11,6 @@
  * The code in this file is derived from code which is copyright
  * 1986, 1989, 1990 by Abacus Research and Development, Inc. (ARDI)
  * It is used here by the permission of ARDI's president Cliff Matthews.
- *
- * If you discover bugs in this code please notify both the author of the
- * Linux HFS file system: hargrove@sccm.stanford.edu (Paul H. Hargrove)
- * and the author of ARDI's HFS code: ctm@ardi.com (Clifford T. Matthews)
- *
- * "XXX" in a comment is a note to myself to consider changing something.
  */
 
 #include "hfs_fs.h"

@@ -47,6 +47,7 @@
 #include <linux/ipv6.h>
 #include <linux/in.h>
 #include <linux/icmpv6.h>
+#include <linux/syscalls.h>
 #include <linux/sysctl.h>
 #include <linux/binfmts.h>
 #include <linux/dnotify.h>
@@ -88,17 +89,6 @@
 	__ret;				\
 })
 
-extern asmlinkage long sys_chown(const char *, uid_t,gid_t);
-extern asmlinkage long sys_lchown(const char *, uid_t,gid_t);
-extern asmlinkage long sys_fchown(unsigned int, uid_t,gid_t);
-extern asmlinkage long sys_setregid(gid_t, gid_t);
-extern asmlinkage long sys_setgid(gid_t);
-extern asmlinkage long sys_setreuid(uid_t, uid_t);
-extern asmlinkage long sys_setuid(uid_t);
-extern asmlinkage long sys_setresuid(uid_t, uid_t, uid_t);
-extern asmlinkage long sys_setresgid(gid_t, gid_t, gid_t);
-extern asmlinkage long sys_setfsuid(uid_t);
-extern asmlinkage long sys_setfsgid(gid_t);
  
 asmlinkage long sys32_chown16(const char * filename, u16 user, u16 group)
 {
@@ -292,9 +282,7 @@ static inline long put_tv32(struct compat_timeval *o, struct timeval *i)
 		 __put_user(i->tv_usec, &o->tv_usec)));
 }
 
-extern asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on);
-
-asmlinkage int sys32_ioperm(u32 from, u32 num, int on)
+asmlinkage long sys32_ioperm(u32 from, u32 num, int on)
 {
 	return sys_ioperm((unsigned long)from, (unsigned long)num, on);
 }
@@ -642,7 +630,7 @@ static int do_sys32_shmat (int first, int second, int third, int version, void *
 
 	if (version == 1)
 		goto out;
-	err = sys_shmat (first, uptr, second, &raddr);
+	err = do_shmat (first, uptr, second, &raddr);
 	if (err)
 		goto out;
 	err = put_user (raddr, uaddr);
@@ -835,9 +823,6 @@ asmlinkage int sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u
 out:
 	return err;
 }
-
-extern asmlinkage long sys_truncate(const char * path, unsigned long length);
-extern asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length);
 
 asmlinkage int sys32_truncate64(const char * path, unsigned long high, unsigned long low)
 {
@@ -1344,8 +1329,6 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 	return err;
 }
 
-extern asmlinkage int sys_sysfs(int option, unsigned long arg1, unsigned long arg2);
-
 asmlinkage int sys32_sysfs(int option, u32 arg1, u32 arg2)
 {
 	return sys_sysfs(option, arg1, arg2);
@@ -1571,8 +1554,6 @@ struct sysinfo32 {
 	char _f[20-2*sizeof(int)-sizeof(int)];
 };
 
-extern asmlinkage int sys_sysinfo(struct sysinfo *info);
-
 asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
 {
 	struct sysinfo s;
@@ -1620,8 +1601,6 @@ asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
 	return ret;
 }
 
-extern asmlinkage int sys_sched_rr_get_interval(pid_t pid, struct timespec *interval);
-
 asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid, struct compat_timespec *interval)
 {
 	struct timespec t;
@@ -1635,8 +1614,6 @@ asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid, struct compat_times
 		return -EFAULT;
 	return ret;
 }
-
-extern asmlinkage int sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize);
 
 asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset_t *oset, compat_size_t sigsetsize)
 {
@@ -1671,8 +1648,6 @@ asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset
 	}
 	return 0;
 }
-
-extern asmlinkage int sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
 
 asmlinkage int sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 {
@@ -1780,9 +1755,6 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 
 	return ret;
 }
-
-extern asmlinkage int
-sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
 
 asmlinkage int
 sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
@@ -2114,14 +2086,10 @@ out:
 
 #ifdef CONFIG_MODULES
 
-extern asmlinkage long sys_init_module(void *, unsigned long, const char *);
-
 asmlinkage int sys32_init_module(void *umod, u32 len, const char *uargs)
 {
 	return sys_init_module(umod, len, uargs);
 }
-
-extern asmlinkage long sys_delete_module(const char *, unsigned int);
 
 asmlinkage int sys32_delete_module(const char *name_user, unsigned int flags)
 {
@@ -2364,7 +2332,6 @@ done:
 	return err;
 }
 #else /* !NFSD */
-extern asmlinkage long sys_ni_syscall(void);
 int asmlinkage sys32_nfsservctl(int cmd, void *notused, void *notused2)
 {
 	return sys_ni_syscall();
@@ -2457,17 +2424,6 @@ asmlinkage int sys32_pause(void)
 }
 
 /* PCI config space poking. */
-extern asmlinkage int sys_pciconfig_read(unsigned long bus,
-					 unsigned long dfn,
-					 unsigned long off,
-					 unsigned long len,
-					 unsigned char *buf);
-
-extern asmlinkage int sys_pciconfig_write(unsigned long bus,
-					  unsigned long dfn,
-					  unsigned long off,
-					  unsigned long len,
-					  unsigned char *buf);
 
 asmlinkage int sys32_pciconfig_read(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf)
 {
@@ -2487,9 +2443,6 @@ asmlinkage int sys32_pciconfig_write(u32 bus, u32 dfn, u32 off, u32 len, u32 ubu
 				   (unsigned char *)AA(ubuf));
 }
 
-extern asmlinkage int sys_prctl(int option, unsigned long arg2, unsigned long arg3,
-				unsigned long arg4, unsigned long arg5);
-
 asmlinkage int sys32_prctl(int option, u32 arg2, u32 arg3, u32 arg4, u32 arg5)
 {
 	return sys_prctl(option,
@@ -2499,12 +2452,6 @@ asmlinkage int sys32_prctl(int option, u32 arg2, u32 arg3, u32 arg4, u32 arg5)
 			 (unsigned long) arg5);
 }
 
-
-extern asmlinkage ssize_t sys_pread64(unsigned int fd, char * buf,
-				    size_t count, loff_t pos);
-
-extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char * buf,
-				     size_t count, loff_t pos);
 
 asmlinkage compat_ssize_t sys32_pread64(unsigned int fd, char *ubuf,
 				   compat_size_t count, u32 poshi, u32 poslo)
@@ -2517,8 +2464,6 @@ asmlinkage compat_ssize_t sys32_pwrite64(unsigned int fd, char *ubuf,
 {
 	return sys_pwrite64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
 }
-
-extern asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count);
 
 asmlinkage compat_ssize_t sys32_readahead(int fd, u32 offhi, u32 offlo, s32 count)
 {
@@ -2535,8 +2480,6 @@ long sys32_fadvise64_64(int fd, u32 offhi, u32 offlo, u32 lenhi, u32 lenlo, int 
 	return sys_fadvise64_64(fd, ((loff_t)AA(offhi)<<32)|AA(offlo),
 				((loff_t)AA(lenhi)<<32)|AA(lenlo), advice);
 }
-
-extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
 asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
 {
@@ -2556,8 +2499,6 @@ asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 c
 		
 	return ret;
 }
-
-extern asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t count);
 
 asmlinkage int sys32_sendfile64(int out_fd, int in_fd, compat_loff_t *offset, s32 count)
 {
@@ -2733,8 +2674,6 @@ out:
 	return ret;       
 }
 
-extern asmlinkage long sys_setpriority(int which, int who, int niceval);
-
 asmlinkage int sys_setpriority32(u32 which, u32 who, u32 niceval)
 {
 	return sys_setpriority((int) which,
@@ -2793,8 +2732,6 @@ asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 	return error;
 #endif
 }
-
-extern long sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
 
 long sys32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf, size_t len)
 {

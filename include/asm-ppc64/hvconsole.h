@@ -22,6 +22,8 @@
 #ifndef _PPC64_HVCONSOLE_H
 #define _PPC64_HVCONSOLE_H
 
+#include <linux/list.h>
+
 #define MAX_NR_HVC_CONSOLES	4
 
 extern int hvc_get_chars(int index, char *buf, int count);
@@ -29,6 +31,30 @@ extern int hvc_put_chars(int index, const char *buf, int count);
 extern int hvc_find_vterms(void);
 
 extern int hvc_instantiate(void);
+
+/* hvterm_get/put_chars() do not work with HVSI console protocol; present only
+ * for HVCS console server driver */
+extern int hvterm_get_chars(uint32_t vtermno, char *buf, int count);
+extern int hvterm_put_chars(uint32_t vtermno, const char *buf, int count);
+
+/* Converged Location Code length */
+#define HVCS_CLC_LENGTH	79
+
+struct hvcs_partner_info {
+	/* list management */
+	struct list_head node;
+	/* partner unit address */
+	unsigned int unit_address;
+	/*partner partition ID */
+	unsigned int partition_ID;
+	/* CLC (79 chars) + 1 Null-term char */
+	char location_code[HVCS_CLC_LENGTH + 1];
+};
+
+extern int hvcs_free_partner_info(struct list_head *head);
+extern int hvcs_get_partner_info(unsigned int unit_address, struct list_head *head);
+extern int hvcs_register_connection(unsigned int unit_address, unsigned int p_partition_ID, unsigned int p_unit_address);
+extern int hvcs_free_connection(unsigned int unit_address);
 
 #endif /* _PPC64_HVCONSOLE_H */
 

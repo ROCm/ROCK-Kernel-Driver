@@ -238,14 +238,13 @@ struct ti_ohci {
 
 static inline int cross_bound(unsigned long addr, unsigned int size)
 {
-	int cross=0;
-	if (size>PAGE_SIZE) {
-		cross = size/PAGE_SIZE;
-		size -= cross*PAGE_SIZE;
-	}
-	if ((PAGE_SIZE-addr%PAGE_SIZE)<size)
-		cross++;
-	return cross;
+	if (size > PAGE_SIZE)
+		return 1;
+
+	if (addr >> PAGE_SHIFT != (addr + size - 1) >> PAGE_SHIFT)
+		return 1;
+
+	return 0;
 }
 
 /*

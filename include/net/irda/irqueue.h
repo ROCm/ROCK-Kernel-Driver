@@ -41,7 +41,6 @@
  */
 #define HB_NOLOCK	0	/* No concurent access prevention */
 #define HB_LOCK		1	/* Prevent concurent write with global lock */
-#define HB_SORTED	4	/* Not yet supported */
 
 /*
  * Hash defines
@@ -81,13 +80,13 @@ hashbin_t *hashbin_new(int type);
 int      hashbin_delete(hashbin_t* hashbin, FREE_FUNC func);
 int      hashbin_clear(hashbin_t* hashbin, FREE_FUNC free_func);
 void     hashbin_insert(hashbin_t* hashbin, irda_queue_t* entry, long hashv, 
-			char* name);
-void*    hashbin_remove(hashbin_t* hashbin, long hashv, char* name);
+			const char* name);
+void*    hashbin_remove(hashbin_t* hashbin, long hashv, const char* name);
 void*    hashbin_remove_first(hashbin_t *hashbin);
 void*	 hashbin_remove_this( hashbin_t* hashbin, irda_queue_t* entry);
-void*    hashbin_find(hashbin_t* hashbin, long hashv, char* name);
-void*    hashbin_lock_find(hashbin_t* hashbin, long hashv, char* name);
-void*    hashbin_find_next(hashbin_t* hashbin, long hashv, char* name,
+void*    hashbin_find(hashbin_t* hashbin, long hashv, const char* name);
+void*    hashbin_lock_find(hashbin_t* hashbin, long hashv, const char* name);
+void*    hashbin_find_next(hashbin_t* hashbin, long hashv, const char* name,
 			   void ** pnext);
 irda_queue_t *hashbin_get_first(hashbin_t *hashbin);
 irda_queue_t *hashbin_get_next(hashbin_t *hashbin);

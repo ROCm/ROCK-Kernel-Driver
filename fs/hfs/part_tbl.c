@@ -1,16 +1,12 @@
 /*
- * linux/fs/hfs/part_tbl.c
+ *  linux/fs/hfs/part_tbl.c
  *
  * Copyright (C) 1996-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * Original code to handle the new style Mac partition table based on
  * a patch contributed by Holger Schemel (aeglos@valinor.owl.de).
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
- *
  */
 
 #include "hfs_fs.h"

@@ -38,6 +38,7 @@
 #include <linux/security.h>
 #include <linux/initrd.h>
 #include <linux/times.h>
+#include <linux/limits.h>
 #include <asm/uaccess.h>
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
@@ -70,6 +71,8 @@ extern int printk_ratelimit_burst;
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
 static int minolduid;
+
+static int ngroups_max = NGROUPS_MAX;
 
 #ifdef CONFIG_KMOD
 extern char modprobe_path[];
@@ -617,6 +620,14 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+	{
+		.ctl_name	= KERN_NGROUPS_MAX,
+		.procname	= "ngroups_max",
+		.data		= &ngroups_max,
+		.maxlen		= sizeof (int),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	},
 	{ .ctl_name = 0 }
 };
 
@@ -905,9 +916,6 @@ asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 
 	if (copy_from_user(&tmp, args, sizeof(tmp)))
 		return -EFAULT;
-
-	if (tmp.nlen < 0 || tmp.nlen > CTL_MAXNAME)
-		return -EINVAL;
 
 	lock_kernel();
 	error = do_sysctl(tmp.name, tmp.nlen, tmp.oldval, tmp.oldlenp,
@@ -2034,7 +2042,7 @@ int sysctl_jiffies(ctl_table *table, int __user *name, int nlen,
 #else /* CONFIG_SYSCTL */
 
 
-extern asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
+asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 {
 	return -ENOSYS;
 }

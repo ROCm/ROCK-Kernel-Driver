@@ -1,24 +1,15 @@
 /*
- * linux/fs/hfs/catalog.c
+ *  linux/fs/hfs/catalog.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains the functions related to the catalog B-tree.
  *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
  * Cache code shamelessly stolen from
  *     linux/fs/inode.c Copyright (C) 1991, 1992  Linus Torvalds
  *     re-shamelessly stolen Copyright (C) 1997 Linus Torvalds
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
- *
- * The code in this file initializes some structures by calling
- * memset(&foo, 0, sizeof(foo)).  This produces the desired behavior
- * only due to the non-ANSI assumption that the machine representation
  */
 
 #include "hfs_fs.h"

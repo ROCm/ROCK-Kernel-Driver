@@ -10,11 +10,10 @@
  */
 
 #define INCLUDES
+#include <linux/syscalls.h>
 #include "compat_ioctl.c"
 #include <asm/mtrr.h>
 #include <asm/ia32.h>
-
-extern asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 
 #define CODE
 #include "compat_ioctl.c"

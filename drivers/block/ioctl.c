@@ -138,7 +138,6 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 	struct block_device *bdev = inode->i_bdev;
 	struct gendisk *disk = bdev->bd_disk;
 	struct backing_dev_info *bdi;
-	int holder;
 	int ret, n;
 
 	switch (cmd) {
@@ -175,7 +174,7 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			return -EINVAL;
 		if (get_user(n, (int *) arg))
 			return -EFAULT;
-		if (bd_claim(bdev, &holder) < 0)
+		if (bd_claim(bdev, file) < 0)
 			return -EBUSY;
 		ret = set_blocksize(bdev, n);
 		bd_release(bdev);

@@ -47,7 +47,7 @@
 #include <asm/bitops.h>
 #include <asm/naca.h>
 #include <asm/pci.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/bootinfo.h>
 #include <asm/ppcdebug.h>
 #include <asm/btext.h>
@@ -516,6 +516,9 @@ prom_initialize_naca(unsigned long mem)
 	return mem;
 }
 
+#ifdef CONFIG_PMAC_DART
+static int dart_force_on;
+#endif
 
 static unsigned long __init
 prom_initialize_lmb(unsigned long mem)
@@ -528,6 +531,30 @@ prom_initialize_lmb(unsigned long mem)
 	union lmb_reg_property reg;
 	unsigned long lmb_base, lmb_size;
 	unsigned long num_regs, bytes_per_reg = (_prom->encode_phys_size*2)/8;
+	int nodart = 0;
+
+#ifdef CONFIG_PMAC_DART
+	char *opt;
+
+	opt = strstr(RELOC(cmd_line), RELOC("iommu="));
+	if (opt) {
+		prom_print(RELOC("opt is:"));
+		prom_print(opt);
+		prom_print(RELOC("\n"));
+		opt += 6;
+		while (*opt && *opt == ' ')
+			opt++;
+		if (!strncmp(opt, RELOC("off"), 3))
+			nodart = 1;
+		else if (!strncmp(opt, RELOC("force"), 5))
+			RELOC(dart_force_on) = 1;
+	}
+#else
+	nodart = 1;
+#endif /* CONFIG_PMAC_DART */
+
+	if (nodart)
+		prom_print(RELOC("DART disabled on PowerMac !\n"));
 
 	lmb_init();
 
@@ -553,8 +580,9 @@ prom_initialize_lmb(unsigned long mem)
 				lmb_base = ((unsigned long)reg.addrPM[i].address_hi) << 32;
 				lmb_base |= (unsigned long)reg.addrPM[i].address_lo;
 				lmb_size = reg.addrPM[i].size;
-				if (lmb_base > 0x80000000ull) {
-					prom_print(RELOC("Skipping memory above 2Gb for now, not yet supported\n"));
+				if (nodart && lmb_base > 0x80000000ull) {
+					prom_print(RELOC("Skipping memory above 2Gb for "
+							 "now, DART support disabled\n"));
 					continue;
 				}
 			} else if (_prom->encode_phys_size == 32) {
@@ -733,6 +761,34 @@ prom_dump_lmb(void)
 #endif /* DEBUG_PROM */
 
 
+#ifdef CONFIG_PMAC_DART
+void prom_initialize_dart_table(void)
+{
+	unsigned long offset = reloc_offset();
+	extern unsigned long dart_tablebase;
+	extern unsigned long dart_tablesize;
+
+	/* Only reserve DART space if machine has more than 2GB of RAM
+	 * or if requested with iommu=on on cmdline.
+	 */
+	if (lmb_end_of_DRAM() <= 0x80000000ull && !RELOC(dart_force_on))
+		return;
+
+	/* 512 pages is max DART tablesize. */
+	RELOC(dart_tablesize) = 1UL << 19;
+	/* 16MB (1 << 24) alignment. We allocate a full 16Mb chuck since we
+	 * will blow up an entire large page anyway in the kernel mapping
+	 */
+	RELOC(dart_tablebase) =
+		absolute_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
+
+	prom_print(RELOC("Dart at: "));
+	prom_print_hex(RELOC(dart_tablebase));
+	prom_print(RELOC("\n"));
+}
+#endif /* CONFIG_PMAC_DART */
+
+
 void
 prom_initialize_tce_table(void)
 {
@@ -795,15 +851,13 @@ prom_initialize_tce_table(void)
 		 * size to 4 MB.  This is enough to map 2GB of PCI DMA space.
 		 * By doing this, we avoid the pitfalls of trying to DMA to
 		 * MMIO space and the DMA alias hole.
-		 */
-		/* 
+		 *
 		 * On POWER4, firmware sets the TCE region by assuming
 		 * each TCE table is 8MB. Using this memory for anything
 		 * else will impact performance, so we always allocate 8MB.
 		 * Anton
-		 *
-		 * XXX FIXME use a cpu feature here
 		 */
+
 		minsize = 8UL << 20;
 
 		/* Align to the greater of the align or size */
@@ -925,10 +979,12 @@ prom_hold_cpus(unsigned long mem)
         unsigned long *spinloop     = __v2a(&__secondary_hold_spinloop);
         unsigned long *acknowledge  = __v2a(&__secondary_hold_acknowledge);
         unsigned long secondary_hold = (unsigned long)__v2a(*PTRRELOC((unsigned long *)__secondary_hold));
-        struct naca_struct *_naca = RELOC(naca);
         struct systemcfg *_systemcfg = RELOC(systemcfg);
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
+#ifdef CONFIG_SMP
+	struct naca_struct *_naca = RELOC(naca);
+#endif
 
 	/* On pmac, we just fill out the various global bitmasks and
 	 * arrays indicating our CPUs are here, they are actually started
@@ -1098,8 +1154,9 @@ prom_hold_cpus(unsigned long mem)
 			cpu_set(cpuid, RELOC(cpu_online_map));
 			cpu_set(cpuid, RELOC(cpu_present_at_boot));
 		}
-
-	next:
+#endif
+next:
+#ifdef CONFIG_SMP
 		/* Init paca for secondary threads.   They start later. */
 		for (i=1; i < cpu_threads; i++) {
 			cpuid++;
@@ -1198,9 +1255,9 @@ smt_setup(void)
 				sizeof(option));
 			if (option[0] != 0) {
 				found = 1;
-				if (!strcmp(option, RELOC("off")))	
+				if (!strcmp(option, RELOC("off")))
 					my_smt_enabled = SMT_OFF;
-				else if (!strcmp(option, RELOC("on")))	
+				else if (!strcmp(option, RELOC("on")))
 					my_smt_enabled = SMT_ON;
 				else
 					my_smt_enabled = SMT_DYNAMIC;
@@ -1539,6 +1596,11 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
 
+#ifdef CONFIG_PMAC_DART
+	if (_systemcfg->platform == PLATFORM_POWERMAC)
+		prom_initialize_dart_table();
+#endif
+
 #ifdef CONFIG_BOOTX_TEXT
 	if(_prom->disp_node) {
 		prom_print(RELOC("Setting up bi display...\n"));
@@ -1669,6 +1731,7 @@ check_display(unsigned long mem)
 	}
 	return DOUBLEWORD_ALIGN(mem);
 }
+
 
 static int __init
 prom_next_node(phandle *nodep)
@@ -1814,6 +1877,8 @@ void __init
 finish_device_tree(void)
 {
 	unsigned long mem = klimit;
+
+	virt_irq_init();
 
 	mem = finish_node(allnodes, mem, NULL, 0, 0);
 	dev_tree_size = mem - (unsigned long) allnodes;
@@ -2032,7 +2097,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 	unsigned int *ints;
 	int intlen, intrcells;
 	int i, j, n;
-	unsigned int *irq;
+	unsigned int *irq, virq;
 	struct device_node *ic;
 
 	ints = (unsigned int *) get_property(np, "interrupts", &intlen);
@@ -2050,7 +2115,13 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 		n = map_interrupt(&irq, &ic, np, ints, intrcells);
 		if (n <= 0)
 			continue;
-		np->intrs[i].line = irq_offset_up(irq[0]);
+		virq = virt_irq_create_mapping(irq[0]);
+		if (virq == NO_IRQ) {
+			printk(KERN_CRIT "Could not allocate interrupt "
+			       "number for %s\n", np->full_name);
+		} else
+			np->intrs[i].line = irq_offset_up(virq);
+
 		/* We offset irq numbers for the u3 MPIC by 128 in PowerMac */
 		if (systemcfg->platform == PLATFORM_POWERMAC && ic && ic->parent) {
 			char *name = get_property(ic->parent, "name", NULL);
@@ -2763,40 +2834,12 @@ int of_remove_node(struct device_node *np)
 	struct device_node *parent, *child;
 
 	parent = of_get_parent(np);
-
 	if (!parent)
 		return -EINVAL;
 
-	/* Make sure we are not recursively removing
-	 * more than one level of nodes.  We need to
-	 * allow this so we can remove a slot containing
-	 * an IOA.
-	 */
-	for (child = of_get_next_child(np, NULL);
-	     child != NULL;
-	     child = of_get_next_child(np, child)) {
-		struct device_node *grandchild;
-
-		if ((grandchild = of_get_next_child(child, NULL))) {
-			/* Too deep */
-			of_node_put(grandchild);
-			of_node_put(child);
-			return -EBUSY;
-		}
-	}
-
-	/* Now that we're reasonably sure that we won't
-	 * overflow our stack, remove any children of np.
-	 */
-	for (child = of_get_next_child(np, NULL);
-	     child != NULL;
-	     child = of_get_next_child(np, child)) {
-		int rc;
-
-		if ((rc = of_remove_node(child))) {
-			of_node_put(child);
-			return rc;
-		}
+	if ((child = of_get_next_child(np, NULL))) {
+		of_node_put(child);
+		return -EBUSY;
 	}
 
 	write_lock(&devtree_lock);
@@ -2873,6 +2916,53 @@ static void remove_node_proc_entries(struct device_node *np)
 }
 #endif /* CONFIG_PROC_DEVICETREE */
 
+/* 
+ * Fix up n_intrs and intrs fields in a new device node
+ *
+ */
+static int of_finish_dynamic_node_interrupts(struct device_node *node)
+{
+	int intrcells, intlen, i;
+	unsigned *irq, *ints, virq;
+	struct device_node *ic;
+
+	ints = (unsigned int *)get_property(node, "interrupts", &intlen);
+	intrcells = prom_n_intr_cells(node);
+	intlen /= intrcells * sizeof(unsigned int);
+	node->n_intrs = intlen;
+	node->intrs = kmalloc(sizeof(struct interrupt_info) * intlen,
+			      GFP_KERNEL);
+	if (!node->intrs) 
+		return -ENOMEM;
+
+	for (i = 0; i < intlen; ++i) {
+		int n, j;
+		node->intrs[i].line = 0;
+		node->intrs[i].sense = 1;
+		n = map_interrupt(&irq, &ic, node, ints, intrcells);
+		if (n <= 0)
+			continue;
+		virq = virt_irq_create_mapping(irq[0]);
+		if (virq == NO_IRQ) {
+			printk(KERN_CRIT "Could not allocate interrupt "
+			       "number for %s\n", node->full_name);
+			return -ENOMEM;
+		}
+		node->intrs[i].line = irq_offset_up(virq);
+		if (n > 1)
+			node->intrs[i].sense = irq[1];
+		if (n > 2) {
+			printk(KERN_DEBUG "hmmm, got %d intr cells for %s:", n,
+			       node->full_name);
+			for (j = 0; j < n; ++j)
+				printk(" %d", irq[j]);
+			printk("\n");
+		}
+		ints += intrcells;
+	}
+	return 0;
+}
+
 /*
  * Fix up the uninitialized fields in a new device node:
  * name, type, n_addrs, addrs, n_intrs, intrs, and pci-specific fields
@@ -2888,11 +2978,8 @@ static int of_finish_dynamic_node(struct device_node *node)
 {
 	struct device_node *parent = of_get_parent(node);
 	u32 *regs;
-	unsigned int *ints;
-	int intlen, intrcells;
-	int i, j, n, err = 0;
-	unsigned int *irq;
-	struct device_node *ic;
+	int err = 0;
+	phandle *ibm_phandle;
  
 	node->name = get_property(node, "name", 0);
 	node->type = get_property(node, "device_type", 0);
@@ -2907,6 +2994,10 @@ static int of_finish_dynamic_node(struct device_node *node)
 	 */
 	if (systemcfg->platform == PLATFORM_POWERMAC)
 		return -ENODEV;
+
+	/* fix up new node's linux_phandle field */
+	if ((ibm_phandle = (unsigned int *)get_property(node, "ibm,phandle", NULL)))
+		node->linux_phandle = *ibm_phandle;
 
 	/* do the work of interpret_pci_props */
 	if (parent->type && !strcmp(parent->type, "pci")) {
@@ -2937,40 +3028,9 @@ static int of_finish_dynamic_node(struct device_node *node)
 	}
 
 	/* now do the work of finish_node_interrupts */
-
-	ints = (unsigned int *) get_property(node, "interrupts", &intlen);
-	if (!ints) {
-		err = -ENODEV;	
-		goto out;
-	}
-
-	intrcells = prom_n_intr_cells(node);
-	intlen /= intrcells * sizeof(unsigned int);
-	node->n_intrs = intlen;
-	node->intrs = kmalloc(sizeof(struct interrupt_info) * intlen,
-			      GFP_KERNEL);
-	if (!node->intrs) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	for (i = 0; i < intlen; ++i) {
-		node->intrs[i].line = 0;
-		node->intrs[i].sense = 1;
-		n = map_interrupt(&irq, &ic, node, ints, intrcells);
-		if (n <= 0)
-			continue;
-		node->intrs[i].line = irq_offset_up(irq[0]);
-		if (n > 1)
-			node->intrs[i].sense = irq[1];
-		if (n > 2) {
-			printk(KERN_DEBUG "hmmm, got %d intr cells for %s:", n,
-			       node->full_name);
-			for (j = 0; j < n; ++j)
-				printk(" %d", irq[j]);
-			printk("\n");
-		}
-		ints += intrcells;
+	if (get_property(node, "interrupts", 0)) {
+		err = of_finish_dynamic_node_interrupts(node);
+		if (err) goto out;
 	}
 
        /* now do the rough equivalent of update_dn_pci_info, this
@@ -2986,15 +3046,15 @@ static int of_finish_dynamic_node(struct device_node *node)
                node->devfn = (regs[0] >> 8) & 0xff;
        }
 
-	/* fixing up tce_table */
+	/* fixing up iommu_table */
 
 	if(strcmp(node->name, "pci") == 0 &&
                 get_property(node, "ibm,dma-window", NULL)) {
                 node->bussubno = node->busno;
-                create_pci_bus_tce_table((unsigned long)node);
+                iommu_devnode_init(node);
         }
 	else
-		node->tce_table = parent->tce_table;
+		node->iommu_table = parent->iommu_table;
 
 out:
 	of_node_put(parent);

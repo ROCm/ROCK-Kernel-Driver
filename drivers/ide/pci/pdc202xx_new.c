@@ -612,9 +612,6 @@ static void __init init_hwif_pdc202new (ide_hwif_t *hwif)
 #endif /* PDC202_DEBUG_CABLE */
 }
 
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
-extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_device_t *);
-
 static void __init init_setup_pdcnew (struct pci_dev *dev, ide_pci_device_t *d)
 {
 	ide_setup_pci_device(dev, d);

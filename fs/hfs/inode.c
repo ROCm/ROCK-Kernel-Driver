@@ -1,26 +1,19 @@
 /*
- * linux/fs/hfs/inode.c
+ *  linux/fs/hfs/inode.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains inode-related functions which do not depend on
  * which scheme is being used to represent forks.
  *
  * Based on the minix file system code, (C) 1991, 1992 by Linus Torvalds
- *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
  */
 
 #include <linux/pagemap.h>
 #include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 #include <linux/mpage.h>
-#endif
 
 #include "hfs_fs.h"
 #include "btree.h"
@@ -29,17 +22,10 @@
 
 #define HFS_VALID_MODE_BITS  (S_IFREG | S_IFDIR | S_IRWXUGO)
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 static int hfs_writepage(struct page *page, struct writeback_control *wbc)
 {
 	return block_write_full_page(page, hfs_get_block, wbc);
 }
-#else
-static int hfs_writepage(struct page *page)
-{
-	return block_write_full_page(page, hfs_get_block);
-}
-#endif
 
 static int hfs_readpage(struct file *file, struct page *page)
 {
@@ -52,11 +38,7 @@ static int hfs_prepare_write(struct file *file, struct page *page, unsigned from
 				  &HFS_I(page->mapping->host)->phys_size);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static int hfs_bmap(struct address_space *mapping, long block)
-#else
 static sector_t hfs_bmap(struct address_space *mapping, sector_t block)
-#endif
 {
 	return generic_block_bmap(mapping, block, hfs_get_block);
 }
@@ -121,14 +103,6 @@ int hfs_releasepage(struct page *page, int mask)
 	return res;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static int hfs_direct_IO(int rw, struct inode *inode, struct kiobuf *iobuf,
-			 unsigned long blocknr, int blocksize)
-{
-	return generic_direct_IO(rw, inode, iobuf, blocknr,
-				 blocksize, hfs_get_block);
-}
-#else
 static int hfs_get_blocks(struct inode *inode, sector_t iblock, unsigned long max_blocks,
 			  struct buffer_head *bh_result, int create)
 {
@@ -155,7 +129,6 @@ static int hfs_writepages(struct address_space *mapping,
 {
 	return mpage_writepages(mapping, wbc, hfs_get_block);
 }
-#endif
 
 struct address_space_operations hfs_btree_aops = {
 	.readpage	= hfs_readpage,
@@ -175,9 +148,7 @@ struct address_space_operations hfs_aops = {
 	.commit_write	= generic_commit_write,
 	.bmap		= hfs_bmap,
 	.direct_IO	= hfs_direct_IO,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	.writepages	= hfs_writepages,
-#endif
 };
 
 /*
@@ -208,7 +179,6 @@ struct inode *hfs_new_inode(struct inode *dir, struct qstr *name, int mode)
 			HFS_SB(sb)->root_dirs++;
 		inode->i_op = &hfs_dir_inode_operations;
 		inode->i_fop = &hfs_dir_operations;
-		//INIT_LIST_HEAD(&HFS_I(inode).open_dir_list);
 	} else if (S_ISREG(inode->i_mode)) {
 		HFS_I(inode)->clump_blocks = HFS_SB(sb)->clumpablks;
 		HFS_SB(sb)->file_count++;
@@ -286,7 +256,6 @@ struct hfs_iget_data {
 	hfs_cat_rec *rec;
 };
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 int hfs_test_inode(struct inode *inode, void *data)
 {
 	struct hfs_iget_data *idata = data;
@@ -303,16 +272,11 @@ int hfs_test_inode(struct inode *inode, void *data)
 		return 1;
 	}
 }
-#endif
 
 /*
  * hfs_read_inode
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-void hfs_read_inode(struct inode *inode, void *data)
-#else
 int hfs_read_inode(struct inode *inode, void *data)
-#endif
 {
 	struct hfs_iget_data *idata = data;
 	struct hfs_sb_info *hsb = HFS_SB(inode->i_sb);
@@ -322,30 +286,6 @@ int hfs_read_inode(struct inode *inode, void *data)
 	HFS_I(inode)->rsrc_inode = NULL;
 	init_MUTEX(&HFS_I(inode)->extents_lock);
 	INIT_LIST_HEAD(&HFS_I(inode)->open_dir_list);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	if (inode->i_ino < HFS_FIRSTUSER_CNID) {
-		struct hfs_mdb *mdb = HFS_SB(inode->i_sb)->mdb;
-
-		switch (inode->i_ino) {
-		case HFS_ROOT_CNID:
-			break;
-		case HFS_EXT_CNID:
-			hfs_inode_read_fork(inode, mdb->drXTExtRec, mdb->drXTFlSize,
-					    mdb->drXTFlSize, be32_to_cpu(mdb->drXTClpSiz));
-			inode->i_mapping->a_ops = &hfs_btree_aops;
-			return;
-		case HFS_CAT_CNID:
-			hfs_inode_read_fork(inode, mdb->drCTExtRec, mdb->drCTFlSize,
-					    mdb->drCTFlSize, be32_to_cpu(mdb->drCTClpSiz));
-			inode->i_mapping->a_ops = &hfs_btree_aops;
-			return;
-		default:
-			make_bad_inode(inode);
-			return;
-		}
-	}
-#endif
 
 	/* Initialize the inode */
 	inode->i_uid = hsb->s_uid;
@@ -395,9 +335,7 @@ int hfs_read_inode(struct inode *inode, void *data)
 	default:
 		make_bad_inode(inode);
 	}
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 	return 0;
-#endif
 }
 
 /*
@@ -425,14 +363,9 @@ struct inode *hfs_iget(struct super_block *sb, struct hfs_cat_key *key, hfs_cat_
 	default:
 		return NULL;
 	}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	inode = iget4(sb, cnid, NULL, &data);
-	return inode;
-#else
 	inode = iget5_locked(sb, cnid, hfs_test_inode, hfs_read_inode, &data);
 	if (inode && (inode->i_state & I_NEW))
 		unlock_new_inode(inode);
-#endif
 	return inode;
 }
 
@@ -529,11 +462,8 @@ out:
 	hfs_find_exit(&fd);
 }
 
-static struct dentry *hfs_file_lookup(struct inode *dir, struct dentry *dentry
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
-		, struct nameidata *nd
-#endif
-		)
+static struct dentry *hfs_file_lookup(struct inode *dir, struct dentry *dentry,
+				      struct nameidata *nd)
 {
 	struct inode *inode = NULL;
 	hfs_cat_rec rec;
@@ -566,11 +496,7 @@ static struct dentry *hfs_file_lookup(struct inode *dir, struct dentry *dentry
 	HFS_I(inode)->rsrc_inode = dir;
 	HFS_I(dir)->rsrc_inode = inode;
 	igrab(dir);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	list_add(&inode->i_hash, &HFS_SB(dir->i_sb)->rsrc_inodes);
-#else
 	hlist_add_head(&inode->i_hash, &HFS_SB(dir->i_sb)->rsrc_inodes);
-#endif
 	mark_inode_dirty(inode);
 out:
 	d_add(dentry, inode);
@@ -585,11 +511,8 @@ void hfs_clear_inode(struct inode *inode)
 	}
 }
 
-static int hfs_permission(struct inode *inode, int mask
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
-		, struct nameidata *nd
-#endif
-		)
+static int hfs_permission(struct inode *inode, int mask,
+			  struct nameidata *nd)
 {
 	if (S_ISREG(inode->i_mode) && mask & MAY_EXEC)
 		return 0;

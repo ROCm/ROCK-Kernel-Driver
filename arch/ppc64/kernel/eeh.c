@@ -116,7 +116,7 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	 */
 	if (dn->eeh_config_addr) {
 		ret = rtas_call(ibm_read_slot_reset_state, 3, 3, rets,
-				dn->eeh_config_addr, BUID_HI(dn->phb->buid), 
+				dn->eeh_config_addr, BUID_HI(dn->phb->buid),
 				BUID_LO(dn->phb->buid));
 		if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
 			unsigned long	slot_err_ret;
@@ -124,11 +124,11 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 			memset(slot_err_buf, 0, RTAS_ERROR_LOG_MAX);
 			slot_err_ret = rtas_call(rtas_token("ibm,slot-error-detail"),
 						 8, 1, NULL, dn->eeh_config_addr,
-						 BUID_HI(dn->phb->buid), 
+						 BUID_HI(dn->phb->buid),
 						 BUID_LO(dn->phb->buid), NULL, 0,
 						 __pa(slot_err_buf), RTAS_ERROR_LOG_MAX,
 						 2 /* Permanent Error */);
-			
+
 			if (slot_err_ret == 0)
 				log_error(slot_err_buf, ERR_TYPE_RTAS_LOG, 1 /* Fatal */);
 
@@ -140,10 +140,10 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 			 * can use it here.
 			 */
 			if (panic_on_oops)
-				panic("EEH: MMIO failure (%ld) on device:\n%s\n", 
+				panic("EEH: MMIO failure (%ld) on device:\n%s\n",
 				      rets[0], pci_name(dev));
 			else
-				printk("EEH: MMIO failure (%ld) on device:\n%s\n", 
+				printk("EEH: MMIO failure (%ld) on device:\n%s\n",
 				       rets[0], pci_name(dev));
 		}
 	}

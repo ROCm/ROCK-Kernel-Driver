@@ -20,6 +20,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 
 #include <asm/page.h>
 #include <asm/semaphore.h>
@@ -48,14 +49,14 @@
 #include <asm/iSeries/HvLpConfig.h>
 #endif
 
-extern int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 extern int do_signal(sigset_t *, struct pt_regs *);
 
 int abs(int);
 
+#ifdef CONFIG_PPC_ISERIES
 extern struct pci_dev * iSeries_veth_dev;
-extern struct pci_dev * iSeries_pci_dev;
 extern struct device * iSeries_vio_dev;
+#endif
 
 EXPORT_SYMBOL(do_signal);
 EXPORT_SYMBOL(sys_ioctl);
@@ -158,9 +159,10 @@ EXPORT_SYMBOL(eeh_total_mmio_ffs);
 #endif /* CONFIG_PPC_ISERIES */
 #endif /* CONFIG_PCI */
 
+#ifdef CONFIG_PPC_ISERIES
 EXPORT_SYMBOL(iSeries_veth_dev);
-EXPORT_SYMBOL(iSeries_pci_dev);
 EXPORT_SYMBOL(iSeries_vio_dev);
+#endif /* CONFIG_PPC_ISERIES */
 
 EXPORT_SYMBOL(start_thread);
 EXPORT_SYMBOL(kernel_thread);
@@ -205,9 +207,12 @@ EXPORT_SYMBOL_NOVERS(memchr);
 EXPORT_SYMBOL(abs);
 
 EXPORT_SYMBOL(timer_interrupt);
+EXPORT_SYMBOL(irq_desc);
 EXPORT_SYMBOL(get_wchan);
 EXPORT_SYMBOL(console_drivers);
 
 EXPORT_SYMBOL(tb_ticks_per_usec);
 EXPORT_SYMBOL(paca);
 EXPORT_SYMBOL(proc_ppc64);
+EXPORT_SYMBOL(cur_cpu_spec);
+EXPORT_SYMBOL(systemcfg);

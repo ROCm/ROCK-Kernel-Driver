@@ -1,20 +1,9 @@
 /*
- * linux/include/linux/hfs_fs.h
+ *  linux/fs/hfs/hfs_fs.h
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
- *
- * The source code distribution of the Columbia AppleTalk Package for
- * UNIX, version 6.0, (CAP) was used as a specification of the
- * location and format of files used by CAP's Aufs.  No code from CAP
- * appears in hfs_fs.  hfs_fs is not a work ``derived'' from CAP in
- * the sense of intellectual property law.
- *
- * The source code distributions of Netatalk, versions 1.3.3b2 and
- * 1.4b2, were used as a specification of the location and format of
- * files used by Netatalk's afpd.  No code from Netatalk appears in
- * hfs_fs.  hfs_fs is not a work ``derived'' from Netatalk in the
- * sense of intellectual property law.
  */
 
 #ifndef _LINUX_HFS_FS_H
@@ -23,11 +12,7 @@
 #include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#include <linux/locks.h>
-#else
 #include <linux/buffer_head.h>
-#endif
 #include <linux/fs.h>
 
 #include <asm/byteorder.h>
@@ -81,12 +66,8 @@ struct hfs_inode_info {
 	hfs_extent_rec cached_extents;
 	u16 cached_start, cached_blocks;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	unsigned long phys_size;
-#else
 	loff_t phys_size;
 	struct inode vfs_inode;
-#endif
 };
 
 #define HFS_FLG_RSRC		0x0001
@@ -167,20 +148,12 @@ struct hfs_sb_info {
 
 	int fs_div;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	struct list_head rsrc_inodes;
-#else
 	struct hlist_head rsrc_inodes;
-#endif
 };
 
 #define HFS_FLG_BITMAP_DIRTY	0
 #define HFS_FLG_MDB_DIRTY	1
 #define HFS_FLG_ALT_MDB_DIRTY	2
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-typedef long sector_t;
-#endif
 
 /* bitmap.c */
 extern u32 hfs_vbm_search_free(struct super_block *, u32, u32 *);
@@ -224,9 +197,6 @@ extern struct address_space_operations hfs_aops;
 extern struct address_space_operations hfs_btree_aops;
 
 extern struct inode *hfs_new_inode(struct inode *, struct qstr *, int);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-extern void hfs_read_inode(struct inode *, void *);
-#endif
 extern void hfs_inode_write_fork(struct inode *, struct hfs_extent *, u32 *, u32 *);
 extern void hfs_write_inode(struct inode *, int);
 extern int hfs_inode_setattr(struct dentry *, struct iattr *);
@@ -272,44 +242,6 @@ extern struct timezone sys_tz;
 #define __hfs_u_to_mtime(sec)	cpu_to_be32(sec + 2082844800U - sys_tz.tz_minuteswest * 60)
 #define __hfs_m_to_utime(sec)	(be32_to_cpu(sec) - 2082844800U  + sys_tz.tz_minuteswest * 60)
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-
-#define	HFS_I(inode)	((struct hfs_inode_info *)&(inode)->u)
-#define	HFS_SB(sb)	((struct hfs_sb_info *)&(sb)->u)
-
-#define PageUptodate(page)	Page_Uptodate(page)
-#define wait_on_page_locked(page) wait_on_page(page)
-
-#define map_bh(bh, sb, block) ({				\
-	bh->b_dev = kdev_t_to_nr(sb->s_dev);			\
-	bh->b_blocknr = block;					\
-	bh->b_state |= (1UL << BH_Mapped);			\
-})
-#define set_buffer_new(bh)	(bh->b_state |= (1UL << BH_New))
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,21)
-#define new_inode(sb) ({					\
-	struct inode *__inode = get_empty_inode();		\
-	if (__inode) {						\
-		__inode->i_sb = sb;				\
-		__inode->i_dev = sb->s_dev;			\
-		__inode->i_blkbits = sb->s_blocksize_bits;	\
-	}							\
-	__inode;						\
-})
-#endif
-
-#define hfs_m_to_utime(time)	__hfs_m_to_utime(time)
-#define hfs_u_to_mtime(time)	__hfs_u_to_mtime(time)
-#define hfs_mtime()		__hfs_u_to_mtime(CURRENT_TIME)
-
-static inline const char *hfs_mdb_name(struct super_block *sb)
-{
-	return kdevname(sb->s_dev);
-}
-
-#else
-
 #define HFS_I(inode)	(list_entry(inode, struct hfs_inode_info, vfs_inode))
 #define HFS_SB(sb)	((struct hfs_sb_info *)(sb)->s_fs_info)
 
@@ -321,8 +253,6 @@ static inline const char *hfs_mdb_name(struct super_block *sb)
 {
 	return sb->s_id;
 }
-
-#endif
 
 static inline void hfs_bitmap_dirty(struct super_block *sb)
 {

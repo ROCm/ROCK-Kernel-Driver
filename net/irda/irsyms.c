@@ -159,7 +159,6 @@ EXPORT_SYMBOL(irda_device_dongle_cleanup);
 EXPORT_SYMBOL(irda_device_register_dongle);
 EXPORT_SYMBOL(irda_device_unregister_dongle);
 EXPORT_SYMBOL(irda_task_execute);
-EXPORT_SYMBOL(irda_task_kick);
 EXPORT_SYMBOL(irda_task_next_state);
 EXPORT_SYMBOL(irda_task_delete);
 
@@ -168,10 +167,6 @@ EXPORT_SYMBOL(async_unwrap_char);
 EXPORT_SYMBOL(irda_calc_crc16);
 EXPORT_SYMBOL(irda_crc16_table);
 EXPORT_SYMBOL(irda_start_timer);
-#ifdef CONFIG_ISA
-EXPORT_SYMBOL(setup_dma);
-#endif
-EXPORT_SYMBOL(infrared_mode);
 
 #ifdef CONFIG_IRTTY
 EXPORT_SYMBOL(irtty_set_dtr_rts);

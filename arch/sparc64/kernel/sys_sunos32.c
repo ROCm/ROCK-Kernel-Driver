@@ -33,6 +33,7 @@
 #include <linux/errno.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/page.h>
@@ -584,11 +585,6 @@ struct sunos_nfs_mount_args {
 	char       *netname;   /* server's netname */
 };
 
-extern asmlinkage int sys_mount(char *, char *, char *, unsigned long, void *);
-extern asmlinkage int sys_connect(int fd, struct sockaddr *uservaddr, int addrlen);
-extern asmlinkage int sys_socket(int family, int type, int protocol);
-extern asmlinkage int sys_bind(int fd, struct sockaddr *umyaddr, int addrlen);
-
 
 /* Bind the socket on a local reserved port and connect it to the
  * remote server.  This on Linux/i386 is done by the mount program,
@@ -781,8 +777,6 @@ out:
 	return ret;
 }
 
-extern asmlinkage int sys_setsid(void);
-extern asmlinkage int sys_setpgid(pid_t, pid_t);
 
 asmlinkage int sunos_setpgrp(pid_t pid, pid_t pgid)
 {
@@ -1139,8 +1133,8 @@ asmlinkage int sunos_shmsys(int op, u32 arg1, u32 arg2, u32 arg3)
 
 	switch(op) {
 	case 0:
-		/* sys_shmat(): attach a shared memory area */
-		rval = sys_shmat((int)arg1,(char *)A(arg2),(int)arg3,&raddr);
+		/* do_shmat(): attach a shared memory area */
+		rval = do_shmat((int)arg1,(char *)A(arg2),(int)arg3,&raddr);
 		if(!rval)
 			rval = (int) raddr;
 		break;
@@ -1200,11 +1194,6 @@ static inline int check_nonblock(int ret, int fd)
 	return ret;
 }
 
-extern asmlinkage ssize_t sys_read(unsigned int fd, char *buf, unsigned long count);
-extern asmlinkage ssize_t sys_write(unsigned int fd, char *buf, unsigned long count);
-extern asmlinkage int sys_recv(int fd, void *ubuf, size_t size, unsigned flags);
-extern asmlinkage int sys_send(int fd, void *buff, size_t len, unsigned flags);
-extern asmlinkage int sys_accept(int fd, struct sockaddr *sa, int *addrlen);
 extern asmlinkage int sys32_readv(u32 fd, u32 vector, s32 count);
 extern asmlinkage int sys32_writev(u32 fd, u32 vector, s32 count);
 
@@ -1301,9 +1290,6 @@ asmlinkage int sunos_sigaction (int sig, u32 act, u32 oact)
 
 	return ret;
 }
-
-extern asmlinkage int sys_setsockopt(int fd, int level, int optname,
-				     char *optval, int optlen);
 
 asmlinkage int sunos_setsockopt(int fd, int level, int optname, u32 optval,
 				int optlen)

@@ -52,7 +52,7 @@
 #include <asm/semaphore.h>
 #include <asm/hvcall.h>
 #include <asm/atomic.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/vio.h>
 #include <asm/uaccess.h>
 #include <linux/proc_fs.h>
@@ -96,18 +96,7 @@ static void ibmveth_proc_register_driver(void);
 static void ibmveth_proc_unregister_driver(void);
 static void ibmveth_proc_register_adapter(struct ibmveth_adapter *adapter);
 static void ibmveth_proc_unregister_adapter(struct ibmveth_adapter *adapter);
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 static irqreturn_t ibmveth_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
-#define INIT_BOTTOM_HALF(x,y,z) INIT_WORK(x, y, (void*)z)
-#define SCHEDULE_BOTTOM_HALF(x) schedule_work(x)
-#define KILL_BOTTOM_HALF(x) cancel_delayed_work(x); flush_scheduled_work()
-#else
-static void ibmveth_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
-#define INIT_BOTTOM_HALF(x,y,z) tasklet_init(x, y, (unsigned long)z)
-#define SCHEDULE_BOTTOM_HALF(x) tasklet_schedule(x)
-#define KILL_BOTTOM_HALF(x) tasklet_kill(x)
-#endif
 
 #ifdef CONFIG_PROC_FS
 #define IBMVETH_PROC_DIR "ibmveth"
@@ -289,7 +278,7 @@ static inline void ibmveth_schedule_replenishing(struct ibmveth_adapter *adapter
 {
 	if(ibmveth_is_replenishing_needed(adapter) && 
 	   (atomic_dec_if_positive(&adapter->not_replenishing) == 0)) {	
-		SCHEDULE_BOTTOM_HALF(&adapter->replenish_task);
+		schedule_work(&adapter->replenish_task);
 	}
 }
 
@@ -538,7 +527,10 @@ static int ibmveth_open(struct net_device *netdev)
 	ibmveth_debug_printk("registering irq 0x%x\n", netdev->irq);
 	if((rc = request_irq(netdev->irq, &ibmveth_interrupt, 0, netdev->name, netdev)) != 0) {
 		ibmveth_error_printk("unable to request irq 0x%x, rc %d\n", netdev->irq, rc);
-		h_free_logical_lan(adapter->vdev->unit_address);
+		do {
+			h_free_logical_lan(adapter->vdev->unit_address);
+		} while H_isLongBusy(rc);
+
 		ibmveth_cleanup(adapter);
 		return rc;
 	}
@@ -564,9 +556,12 @@ static int ibmveth_close(struct net_device *netdev)
 
 	free_irq(netdev->irq, netdev);
 
-	KILL_BOTTOM_HALF(&adapter->replenish_task);
+	cancel_delayed_work(&adapter->replenish_task);
+	flush_scheduled_work();
 
-	lpar_rc = h_free_logical_lan(adapter->vdev->unit_address);
+	do {
+		lpar_rc = h_free_logical_lan(adapter->vdev->unit_address);
+	} while H_isLongBusy(lpar_rc);
 
 	if(lpar_rc != H_Success)
 	{
@@ -627,6 +622,8 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	union ibmveth_buf_desc desc[IbmVethMaxSendFrags];
 	unsigned long lpar_rc;
 	int nfrags = 0, curfrag;
+	unsigned long correlator;
+	unsigned int retry_count;
 
 	if ((skb_shinfo(skb)->nr_frags + 1) > IbmVethMaxSendFrags) {
 		adapter->stats.tx_dropped++;
@@ -684,8 +681,8 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	}
 
 	/* send the frame. Arbitrarily set retrycount to 1024 */
-	unsigned long correlator = 0;
-	unsigned int retry_count = 1024;
+	correlator = 0;
+	retry_count = 1024;
 	do {
 		lpar_rc = h_send_logical_lan(adapter->vdev->unit_address,
 					     desc[0].desc,
@@ -923,7 +920,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 	adapter->mac_addr = 0;
 	memcpy(&adapter->mac_addr, mac_addr_p, 6);
 
-	adapter->liobn = dev->tce_table->index;
+	adapter->liobn = dev->iommu_table->it_index;
 	
 	netdev->irq = dev->irq;
 	netdev->open               = ibmveth_open;
@@ -945,7 +942,7 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 
 	ibmveth_debug_printk("adapter @ 0x%p\n", adapter);
 
-	INIT_BOTTOM_HALF(&adapter->replenish_task, (void*)ibmveth_replenish_task, adapter);
+	INIT_WORK(&adapter->replenish_task, (void*)ibmveth_replenish_task, (void*)adapter);
 
 	adapter->buffer_list_dma = NO_TCE;
 	adapter->filter_list_dma = NO_TCE;

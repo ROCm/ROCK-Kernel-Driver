@@ -11,6 +11,7 @@
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
+#include <linux/syscalls.h>
 #include <linux/init.h>
 #include <linux/file.h>
 #include <linux/fs.h>

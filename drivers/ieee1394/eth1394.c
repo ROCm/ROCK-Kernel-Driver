@@ -133,7 +133,7 @@ struct eth1394_node_info {
 };
 
 /* Our ieee1394 highlevel driver */
-#define ETH1394_DRIVER_NAME "IP/1394"
+#define ETH1394_DRIVER_NAME "ip1394"
 static const char driver_name[] = ETH1394_DRIVER_NAME;
 
 static kmem_cache_t *packet_task_cache;
@@ -776,9 +776,9 @@ static int ether1394_rebuild_header(struct sk_buff *skb)
  		return arp_find((unsigned char*)&eth->h_dest, skb);
 #endif	
 	default:
-		printk(KERN_DEBUG
-		       "%s: unable to resolve type %X addresses.\n", 
-		       dev->name, (int)eth->h_proto);
+		ETH1394_PRINT(KERN_DEBUG, dev->name,
+			      "unable to resolve type %04x addresses.\n", 
+			      eth->h_proto);
 		break;
 	}
 
@@ -899,10 +899,17 @@ static inline u16 ether1394_parse_encap(struct sk_buff *skb,
 			ntohl(arp1394->fifo_lo);
 		u8 max_rec = min(priv->host->csr.max_rec,
 				 (u8)(arp1394->max_rec));
-		u16 maxpayload = min(eth1394_speedto_maxpayload[arp1394->sspd],
-				     (u16)(1 << (max_rec + 1)));
+		int sspd = arp1394->sspd;
+		u16 maxpayload;
 		struct eth1394_node_ref *node;
 		struct eth1394_node_info *node_info;
+
+		/* Sanity check. MacOSX seems to be sending us 131 in this
+		 * field (atleast on my Panther G5). Not sure why. */
+		if (sspd > 5 || sspd < 0)
+			sspd = 0;
+
+		maxpayload = min(eth1394_speedto_maxpayload[sspd], (u16)(1 << (max_rec + 1)));
 
 		node = eth1394_find_node_guid(&priv->ip_node_list,
 					      be64_to_cpu(arp1394->s_uniq_id));
@@ -914,7 +921,7 @@ static inline u16 ether1394_parse_encap(struct sk_buff *skb,
 
 		/* Update our speed/payload/fifo_offset table */
 		node_info->maxpayload =	maxpayload;
-		node_info->sspd =	arp1394->sspd;
+		node_info->sspd =	sspd;
 		node_info->fifo =	fifo_addr;
 
 		/* Now that we're done with the 1394 specific stuff, we'll
@@ -1340,7 +1347,8 @@ static void ether1394_iso(struct hpsb_iso *iso)
 
 	nready = hpsb_iso_n_ready(iso);
 	for (i = 0; i < nready; i++) {
-		struct hpsb_iso_packet_info *info = &iso->infos[iso->first_packet + i];
+		struct hpsb_iso_packet_info *info =
+			&iso->infos[(iso->first_packet + i) % iso->buf_packets];
 		data = (quadlet_t*) (iso->data_buf.kvirt + info->offset);
 
 		/* skip over GASP header */
@@ -1659,10 +1667,15 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 		goto fail;
 	}
 
+	/* XXX Ignore this for now. Noticed that when MacOSX is the IRM,
+	 * it does not set our validity bit. We need to compensate for
+	 * that somewhere else, but not in eth1394. */
+#if 0
 	if ((priv->host->csr.broadcast_channel & 0xc0000000) != 0xc0000000) {
 		ret = -EAGAIN;
 		goto fail;
 	}
+#endif
 
 	if ((skb = skb_share_check (skb, kmflags)) == NULL) {
 		ret = -ENOMEM;
@@ -1684,7 +1697,7 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	     IN_MULTICAST(__constant_ntohl(skb->nh.iph->daddr)))) {
 		tx_type = ETH1394_GASP;
 		dest_node = LOCAL_BUS | ALL_NODES;
-		max_payload = priv->bc_maxpayload;
+		max_payload = priv->bc_maxpayload - ETHER1394_GASP_OVERHEAD;
 		BUG_ON(max_payload < (512 - ETHER1394_GASP_OVERHEAD));
 		dgl = priv->bc_dgl;
 		if (max_payload < dg_size + hdr_type_len[ETH1394_HDR_LF_UF])

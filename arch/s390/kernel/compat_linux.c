@@ -55,6 +55,7 @@
 #include <linux/ipv6.h>
 #include <linux/in.h>
 #include <linux/icmpv6.h>
+#include <linux/syscalls.h>
 #include <linux/sysctl.h>
 #include <linux/binfmts.h>
 #include <linux/compat.h>
@@ -71,17 +72,6 @@
 
 #include "compat_linux.h"
 
-extern asmlinkage long sys_chown(const char *, uid_t,gid_t);
-extern asmlinkage long sys_lchown(const char *, uid_t,gid_t);
-extern asmlinkage long sys_fchown(unsigned int, uid_t,gid_t);
-extern asmlinkage long sys_setregid(gid_t, gid_t);
-extern asmlinkage long sys_setgid(gid_t);
-extern asmlinkage long sys_setreuid(uid_t, uid_t);
-extern asmlinkage long sys_setuid(uid_t);
-extern asmlinkage long sys_setresuid(uid_t, uid_t, uid_t);
-extern asmlinkage long sys_setresgid(gid_t, gid_t, gid_t);
-extern asmlinkage long sys_setfsuid(uid_t);
-extern asmlinkage long sys_setfsgid(gid_t);
  
 /* For this source file, we want overflow handling. */
 
@@ -721,7 +711,7 @@ static int do_sys32_shmat (int first, int second, int third, int version, void *
 
 	if (version == 1)
 		goto out;
-	err = sys_shmat (first, uptr, second, &raddr);
+	err = do_shmat (first, uptr, second, &raddr);
 	if (err)
 		goto out;
 	err = put_user (raddr, uaddr);
@@ -924,9 +914,6 @@ asmlinkage int sys32_ipc (u32 call, int first, int second, int third, u32 ptr)
 out:
 	return err;
 }
-
-extern asmlinkage long sys_truncate(const char * path, unsigned long length);
-extern asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length);
 
 asmlinkage int sys32_truncate64(const char * path, unsigned long high, unsigned long low)
 {
@@ -1397,8 +1384,6 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 	return err;
 }
 
-extern asmlinkage int sys_sysfs(int option, unsigned long arg1, unsigned long arg2);
-
 asmlinkage int sys32_sysfs(int option, u32 arg1, u32 arg2)
 {
 	return sys_sysfs(option, arg1, arg2);
@@ -1572,9 +1557,7 @@ struct sysinfo32 {
         char _f[8];
 };
 
-extern asmlinkage int sys_sysinfo(struct sysinfo *info);
-
-asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
+asmlinkage int sys32_sysinfo(struct sysinfo32 __user *info)
 {
 	struct sysinfo s;
 	int ret, err;
@@ -1602,10 +1585,8 @@ asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
 	return ret;
 }
 
-extern asmlinkage int sys_sched_rr_get_interval(pid_t pid, struct timespec *interval);
-
 asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid,
-		struct compat_timespec *interval)
+				struct compat_timespec __user *interval)
 {
 	struct timespec t;
 	int ret;
@@ -1619,9 +1600,8 @@ asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid,
 	return ret;
 }
 
-extern asmlinkage int sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize);
-
-asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset_t *oset, compat_size_t sigsetsize)
+asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t __user *set,
+			compat_sigset_t __user *oset, compat_size_t sigsetsize)
 {
 	sigset_t s;
 	compat_sigset_t s32;
@@ -1655,9 +1635,8 @@ asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset
 	return 0;
 }
 
-extern asmlinkage int sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
-
-asmlinkage int sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
+asmlinkage int sys32_rt_sigpending(compat_sigset_t __user *set,
+				compat_size_t sigsetsize)
 {
 	sigset_t s;
 	compat_sigset_t s32;
@@ -1764,11 +1743,8 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 	return ret;
 }
 
-extern asmlinkage int
-sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
-
 asmlinkage int
-sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
+sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 __user *uinfo)
 {
 	siginfo_t info;
 	int ret;
@@ -1997,40 +1973,30 @@ out:
 
 #ifdef CONFIG_MODULES
 
-extern asmlinkage int sys_init_module(const char *name_user, struct module *mod_user);
-
-/* Hey, when you're trying to init module, take time and prepare us a nice 64bit
- * module structure, even if from 32bit modutils... Why to pollute kernel... :))
- */
-asmlinkage int sys32_init_module(const char *name_user, struct module *mod_user)
+asmlinkage int
+sys32_init_module(void __user *umod, unsigned long len,
+		const char __user *uargs)
 {
-	return sys_init_module(name_user, mod_user);
+	return sys_init_module(umod, len, uargs);
 }
 
-extern asmlinkage int sys_delete_module(const char *name_user);
-
-asmlinkage int sys32_delete_module(const char *name_user)
+asmlinkage int
+sys32_delete_module(const char __user *name_user, unsigned int flags)
 {
-	return sys_delete_module(name_user);
+	return sys_delete_module(name_user, flags);
 }
-
-struct module_info32 {
-	u32 addr;
-	u32 size;
-	u32 flags;
-	s32 usecount;
-};
 
 #else /* CONFIG_MODULES */
 
 asmlinkage int
-sys32_init_module(const char *name_user, struct module *mod_user)
+sys32_init_module(void __user *umod, unsigned long len,
+		const char __user *uargs)
 {
 	return -ENOSYS;
 }
 
 asmlinkage int
-sys32_delete_module(const char *name_user)
+sys32_delete_module(const char __user *name_user, unsigned int flags)
 {
 	return -ENOSYS;
 }
@@ -2194,10 +2160,6 @@ static int nfs_getfh32_res_trans(union nfsctl_res *kres, union nfsctl_res32 *res
 	return copy_to_user(res32, kres, sizeof(*res32)) ? -EFAULT : 0;
 }
 
-/*
-asmlinkage long sys_ni_syscall(void); 
-*/
-
 int asmlinkage sys32_nfsservctl(int cmd, struct nfsctl_arg32 *arg32, union nfsctl_res32 *res32)
 {
 	struct nfsctl_arg *karg = NULL;
@@ -2312,9 +2274,8 @@ asmlinkage int sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz
 	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
 
-asmlinkage int sys_utimes(char *, struct timeval *);
-
-asmlinkage int sys32_utimes(char *filename, struct compat_timeval *tvs)
+asmlinkage int sys32_utimes(char __user *filename,
+			struct compat_timeval __user *tvs)
 {
 	char *kfilename;
 	struct timeval ktvs[2];
@@ -2348,8 +2309,6 @@ asmlinkage int sys32_pause(void)
 	return -ERESTARTNOHAND;
 }
 
-extern asmlinkage int sys_prctl(int option, unsigned long arg2, unsigned long arg3,
-				unsigned long arg4, unsigned long arg5);
 
 asmlinkage int sys32_prctl(int option, u32 arg2, u32 arg3, u32 arg4, u32 arg5)
 {
@@ -2360,12 +2319,6 @@ asmlinkage int sys32_prctl(int option, u32 arg2, u32 arg3, u32 arg4, u32 arg5)
 			 (unsigned long) arg5);
 }
 
-
-extern asmlinkage ssize_t sys_pread64(unsigned int fd, char * buf,
-				    size_t count, loff_t pos);
-
-extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char * buf,
-				     size_t count, loff_t pos);
 
 asmlinkage compat_ssize_t sys32_pread64(unsigned int fd, char *ubuf,
 				 compat_size_t count, u32 poshi, u32 poslo)
@@ -2383,14 +2336,10 @@ asmlinkage compat_ssize_t sys32_pwrite64(unsigned int fd, char *ubuf,
 	return sys_pwrite64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
 }
 
-extern asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count);
-
 asmlinkage compat_ssize_t sys32_readahead(int fd, u32 offhi, u32 offlo, s32 count)
 {
 	return sys_readahead(fd, ((loff_t)AA(offhi) << 32) | AA(offlo), count);
 }
-
-extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
 asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
 {
@@ -2410,9 +2359,6 @@ asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 c
 		
 	return ret;
 }
-
-extern asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, 
-					 loff_t *offset, size_t count);
 
 asmlinkage int sys32_sendfile64(int out_fd, int in_fd, 
 				compat_loff_t *offset, s32 count)
@@ -2507,8 +2453,6 @@ asmlinkage int sys32_adjtimex(struct timex32 *utp)
 	return ret;
 }
 
-extern asmlinkage long sys_setpriority(int which, int who, int niceval);
-
 asmlinkage int sys_setpriority32(u32 which, u32 who, u32 niceval)
 {
 	return sys_setpriority((int) which,
@@ -2526,7 +2470,7 @@ struct __sysctl_args32 {
 	u32 __unused[4];
 };
 
-extern asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
+asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 {
 	struct __sysctl_args32 tmp;
 	int error;
@@ -2718,8 +2662,6 @@ out:
 	return error;
 }
 
-asmlinkage ssize_t sys_read(unsigned int fd, char * buf, size_t count);
-
 asmlinkage compat_ssize_t sys32_read(unsigned int fd, char * buf, size_t count)
 {
 	if ((compat_ssize_t) count < 0)
@@ -2727,8 +2669,6 @@ asmlinkage compat_ssize_t sys32_read(unsigned int fd, char * buf, size_t count)
 
 	return sys_read(fd, buf, count);
 }
-
-asmlinkage ssize_t sys_write(unsigned int fd, const char * buf, size_t count);
 
 asmlinkage compat_ssize_t sys32_write(unsigned int fd, char * buf, size_t count)
 {

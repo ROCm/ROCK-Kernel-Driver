@@ -184,6 +184,7 @@ struct tty_flip_buffer {
 #define I_IXANY(tty)	_I_FLAG((tty),IXANY)
 #define I_IXOFF(tty)	_I_FLAG((tty),IXOFF)
 #define I_IMAXBEL(tty)	_I_FLAG((tty),IMAXBEL)
+#define I_IUTF8(tty)	_I_FLAG((tty),IUTF8)
 
 #define O_OPOST(tty)	_O_FLAG((tty),OPOST)
 #define O_OLCUC(tty)	_O_FLAG((tty),OLCUC)

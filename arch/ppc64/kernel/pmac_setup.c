@@ -60,7 +60,7 @@
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/pci-bridge.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/machdep.h>
 #include <asm/dma.h>
 #include <asm/bootx.h>
@@ -72,7 +72,6 @@
 #include <asm/lmb.h>
 
 #include "pmac.h"
-#include "open_pic.h"
 
 static int current_root_goodness = -1;
 #define DEFAULT_ROOT_DEVICE Root_SDA1	/* sda1 - slightly silly choice */
@@ -127,7 +126,6 @@ void __pmac pmac_show_cpuinfo(struct seq_file *m)
 	/* print parsed model */
 	seq_printf(m, "detected as\t: %d (%s)\n", mbmodel, mbname);
 	seq_printf(m, "pmac flags\t: %08x\n", mbflags);
-	seq_printf(m, "memory\t\t: %luMB\n", lmb_phys_mem_size() >> 20);
 
 	/* Checks "l2cr-value" property in the registry */
 	np = find_devices("cpus");	
@@ -183,8 +181,9 @@ void __init pmac_setup_arch(void)
 #ifdef CONFIG_SMP
 	pmac_setup_smp();
 #endif
-	/* Setup the PCI DMA to "direct" for now, until we have proper
-	 * DART support and can deal with more than 2Gb of RAM
+
+	/* Setup the PCI DMA to "direct" by default. May be overriden
+	 * by iommu later on
 	 */
 	pci_dma_init_direct();
 
@@ -352,7 +351,6 @@ extern void openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 extern void openpic2_init(int offset);
 extern int openpic_get_irq(struct pt_regs *regs);
 extern int openpic2_get_irq(struct pt_regs *regs);
-extern void openpic2_init_irq_desc(int irq, irq_desc_t *desc);
 
 static int pmac_cascade_irq = -1;
 
@@ -418,14 +416,6 @@ static __init void pmac_init_IRQ(void)
 	of_node_put(irqctrler2);
 }
 
-static void pmac_init_irq_desc(int irq, irq_desc_t *desc)
-{
-	if (irq < 128)
-		openpic_init_irq_desc(irq, desc);
-	else
-		openpic2_init_irq_desc(irq, desc);
-}
-
 /* We cannot do request_irq too early ... Right now, we get the
  * cascade as a core_initcall, which should be fine for our needs
  */
@@ -456,7 +446,6 @@ void __init pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
        	ppc_md.get_cpuinfo    = pmac_show_cpuinfo;
 
 	ppc_md.init_IRQ       = pmac_init_IRQ;
-	ppc_md.init_irq_desc  = pmac_init_irq_desc;
 	ppc_md.get_irq        = openpic_get_irq;
 
 	ppc_md.pcibios_fixup  = pmac_pcibios_fixup;

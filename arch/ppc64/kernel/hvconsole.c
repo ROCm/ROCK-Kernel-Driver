@@ -20,13 +20,18 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/list.h>
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 #include <asm/hvconsole.h>
 #include <asm/termios.h>
 #include <asm/uaccess.h>
+#include <asm/io.h>
 
 #define __ALIGNED__	__attribute__((__aligned__(8)))
+
+#define HVCS_LONG_INVALID	0xFFFFFFFFFFFFFFFF
 
 struct vtty_struct {
 	uint32_t vtermno;
@@ -143,11 +148,11 @@ static void print_hdr(struct hvsi1_header *pkt)
 }
 
 /* normal hypervisor virtual console code */
-int hvterm_get_chars(struct vtty_struct *vtty, char *buf, int count)
+int hvterm_get_chars(uint32_t vtermno, char *buf, int count)
 {
 	unsigned long got;
 
-	if (plpar_hcall(H_GET_TERM_CHAR, vtty->vtermno, 0, 0, 0, &got,
+	if (plpar_hcall(H_GET_TERM_CHAR, vtermno, 0, 0, 0, &got,
 		(unsigned long *)buf, (unsigned long *)buf+1) == H_Success) {
 		/*
 		 * Work around a HV bug where it gives us a null
@@ -168,19 +173,35 @@ int hvterm_get_chars(struct vtty_struct *vtty, char *buf, int count)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(hvterm_get_chars);
 
-int hvterm_put_chars(struct vtty_struct *vtty, const char *buf, int count)
+/* wrapper exists just so that hvterm_get_chars() is callable by outside
+ * drivers without a vtty_struct */
+int hvc_hvterm_get_chars(struct vtty_struct *vtty, char *buf, int count)
+{
+	return hvterm_get_chars(vtty->vtermno, buf, count);
+}
+
+int hvterm_put_chars(uint32_t vtermno, const char *buf, int count)
 {
 	unsigned long *lbuf = (unsigned long *) buf;
 	long ret;
 
-	ret = plpar_hcall_norets(H_PUT_TERM_CHAR, vtty->vtermno, count, lbuf[0],
+	ret = plpar_hcall_norets(H_PUT_TERM_CHAR, vtermno, count, lbuf[0],
 				 lbuf[1]);
 	if (ret == H_Success)
 		return count;
 	if (ret == H_Busy)
 		return 0;
 	return -1;
+}
+EXPORT_SYMBOL(hvterm_put_chars);
+
+/* wrapper exists just so that hvterm_put_chars() is callable by outside
+ * drivers without a vtty_struct */
+int hvc_hvterm_put_chars(struct vtty_struct *vtty, const char *buf, int count)
+{
+	return hvterm_put_chars(vtty->vtermno, buf, count);
 }
 
 /* Host Virtual Serial Interface (HVSI) code */
@@ -247,7 +268,7 @@ static int hvsi1_load_chunk(struct vtty_struct *vtty)
 	return 1;
 }
 
-static int hvsi1_load_buffers(struct vtty_struct *vtty)
+static void hvsi1_load_buffers(struct vtty_struct *vtty)
 {
 	while (hvsi1_load_chunk(vtty))
 		; /* keep reading from hypervisor until there's no more */
@@ -336,7 +357,8 @@ static int hvsi1_handshake3(struct vtty_struct *vtty, char *databuf, int count)
 				/* send query response */
 				response.seqno = ++vtty->seqno;
 				response.query_seqno = query->seqno+1,
-				wrote = hvterm_put_chars(vtty, (char *)&response, response.len);
+				wrote = hvc_hvterm_put_chars(vtty, (char *)&response,
+					response.len);
 				if (wrote != response.len) {
 					/* uh oh, command didn't go through? */
 					printk(KERN_ERR "%s: couldn't send query response!\n",
@@ -455,7 +477,7 @@ static int hvsi1_send_dtr(struct vtty_struct *vtty, int set)
 	else
 		command.word = 0;
 
-	wrote = hvterm_put_chars(vtty, (char *)&command, command.len);
+	wrote = hvc_hvterm_put_chars(vtty, (char *)&command, command.len);
 	if (wrote != command.len) {
 		/* uh oh, command didn't go through? */
 		printk(KERN_ERR "%s: couldn't set DTR!\n", __FUNCTION__);
@@ -549,8 +571,8 @@ int hvc_find_vterms(void)
 		vtty = &vttys[count];
 		if (device_is_compatible(vty, "hvterm1")) {
 			vtty->vtermno = *vtermno;
-			vtty->get_chars = hvterm_get_chars;
-			vtty->put_chars = hvterm_put_chars;
+			vtty->get_chars = hvc_hvterm_get_chars;
+			vtty->put_chars = hvc_hvterm_put_chars;
 			vtty->ioctl = NULL;
 			hvc_instantiate();
 			count++;
@@ -568,3 +590,174 @@ int hvc_find_vterms(void)
 
 	return count;
 }
+
+/* Convert arch specific return codes into relevant errnos.  The hvcs
+ * functions aren't performance sensitive, so this conversion isn't an
+ * issue. */
+int hvcs_convert(long to_convert)
+{
+	switch (to_convert) {
+		case H_Success:
+			return 0;
+		case H_Parameter:
+			return -EINVAL;
+		case H_Hardware:
+			return -EIO;
+		case H_Busy:
+			return -EBUSY;
+		case H_Function: /* fall through */
+		default:
+			return -EPERM;
+	}
+}
+
+int hvcs_free_partner_info(struct list_head *head)
+{
+	struct hvcs_partner_info *pi;
+	struct list_head *element;
+
+	if(!head) {
+		return -EINVAL;
+	}
+
+	while (!list_empty(head)) {
+		element = head->next;
+		pi = list_entry(element,struct hvcs_partner_info,node);
+		list_del(element);
+		kfree(pi);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(hvcs_free_partner_info);
+
+/* Helper function for hvcs_get_partner_info */
+int hvcs_next_partner(unsigned int unit_address, unsigned long last_p_partition_ID, unsigned long last_p_unit_address, unsigned long *pi_buff)
+{
+	long retval;
+	retval = plpar_hcall_norets(H_VTERM_PARTNER_INFO, unit_address,
+			last_p_partition_ID,
+				last_p_unit_address, virt_to_phys(pi_buff));
+	return hvcs_convert(retval);
+}
+
+/* The unit_address parameter is the unit address of the vty-server@ vdevice
+ * in whose partner information the caller is interested.  This function
+ * uses a pointer to a list_head instance in which to store the partner info.
+ * This function returns Non-Zero on success, or if there is no partner info.
+ *
+ * Invocation of this function should always be followed by an invocation of
+ * hvcs_free_partner_info() using a pointer to the SAME list head instance
+ * that was used to store the partner_info list.
+ */
+int hvcs_get_partner_info(unsigned int unit_address, struct list_head *head)
+{
+	/* This is a page sized buffer to be passed to hvcall per invocation.
+	 * NOTE: the first long returned is unit_address.  The second long
+	 * returned is the partition ID and starting with pi_buff[2] are
+	 * HVCS_CLC_LENGTH characters, which are diff size than the unsigned
+	 * long, hence the casting mumbojumbo you see later. */
+	unsigned long	*pi_buff;
+	unsigned long	last_p_partition_ID;
+	unsigned long	last_p_unit_address;
+	struct hvcs_partner_info *next_partner_info = NULL;
+	int more = 1;
+	int retval;
+
+	/* invalid parameters */
+	if (!head)
+		return -EINVAL;
+
+	last_p_partition_ID = last_p_unit_address = HVCS_LONG_INVALID;
+	INIT_LIST_HEAD(head);
+
+	pi_buff = kmalloc(PAGE_SIZE, GFP_KERNEL);
+
+	if(!pi_buff)
+		return -ENOMEM;
+
+	do {
+		retval = hvcs_next_partner(unit_address, last_p_partition_ID,
+				last_p_unit_address, pi_buff);
+		if(retval) {
+			kfree(pi_buff);
+			pi_buff = 0;
+			/* don't indicate that we've failed if we have
+			 * any list elements. */
+			if(!list_empty(head))
+				return 0;
+			return retval;
+		}
+
+		last_p_partition_ID = pi_buff[0];
+		last_p_unit_address = pi_buff[1];
+
+		/* This indicates that there are no further partners */
+		if (last_p_partition_ID == HVCS_LONG_INVALID
+				&& last_p_unit_address == HVCS_LONG_INVALID)
+			break;
+
+		next_partner_info = kmalloc(sizeof(struct hvcs_partner_info),
+				GFP_KERNEL);
+
+		if (!next_partner_info) {
+			printk(KERN_WARNING "HVCONSOLE: kmalloc() failed to"
+				" allocate partner info struct.\n");
+			hvcs_free_partner_info(head);
+			kfree(pi_buff);
+			pi_buff = 0;
+			return -ENOMEM;
+		}
+
+		next_partner_info->unit_address
+			= (unsigned int)last_p_unit_address;
+		next_partner_info->partition_ID
+			= (unsigned int)last_p_partition_ID;
+
+		/* copy the Null-term char too */
+		strncpy(&next_partner_info->location_code[0],
+			(char *)&pi_buff[2],
+			strlen((char *)&pi_buff[2]) + 1);
+
+		list_add_tail(&(next_partner_info->node), head);
+		next_partner_info = NULL;
+
+	} while (more);
+
+	kfree(pi_buff);
+	pi_buff = 0;
+
+	return 0;
+}
+EXPORT_SYMBOL(hvcs_get_partner_info);
+
+/* If this function is called once and -EINVAL is returned it may
+ * indicate that the partner info needs to be refreshed for the
+ * target unit address at which point the caller must invoke
+ * hvcs_get_partner_info() and then call this function again.  If,
+ * for a second time, -EINVAL is returned then it indicates that
+ * there is probably already a partner connection registered to a
+ * different vty-server@ vdevice.  It is also possible that a second
+ * -EINVAL may indicate that one of the parms is not valid, for
+ * instance if the link was removed between the vty-server@ vdevice
+ * and the vty@ vdevice that you are trying to open.  Don't shoot the
+ * messenger.  Firmware implemented it this way.
+ */
+int hvcs_register_connection( unsigned int unit_address, unsigned int p_partition_ID, unsigned int p_unit_address)
+{
+	long retval;
+	retval = plpar_hcall_norets(H_REGISTER_VTERM, unit_address,
+				p_partition_ID, p_unit_address);
+	return hvcs_convert(retval);
+}
+EXPORT_SYMBOL(hvcs_register_connection);
+
+/* If -EBUSY is returned continue to call this function
+ * until 0 is returned */
+int hvcs_free_connection(unsigned int unit_address)
+{
+	long retval;
+	retval = plpar_hcall_norets(H_FREE_VTERM, unit_address);
+	return hvcs_convert(retval);
+}
+EXPORT_SYMBOL(hvcs_free_connection);

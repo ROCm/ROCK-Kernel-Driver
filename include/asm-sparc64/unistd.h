@@ -416,6 +416,9 @@ return -1; \
 }
 #ifdef __KERNEL_SYSCALLS__
 
+#include <linux/compiler.h>
+#include <linux/types.h>
+
 /*
  * we need this inline - forking from kernel space will result
  * in NO COPY ON WRITE (!!!), until an execve is executed. This
@@ -439,6 +442,18 @@ static __inline__ _syscall3(int,open,__const__ char *,file,int,flag,int,mode)
 static __inline__ _syscall1(int,close,int,fd)
 static __inline__ _syscall1(int,_exit,int,exitcode)
 static __inline__ _syscall3(pid_t,waitpid,pid_t,pid,int *,wait_stat,int,options)
+
+asmlinkage unsigned long sys_mmap(
+				unsigned long addr, unsigned long len,
+				unsigned long prot, unsigned long flags,
+				unsigned long fd, unsigned long off);
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
+struct sigaction;
+asmlinkage long sys_rt_sigaction(int sig,
+				const struct sigaction __user *act,
+				struct sigaction __user *oact,
+				void __user *restorer,
+				size_t sigsetsize);
 
 #endif /* __KERNEL_SYSCALLS__ */
 

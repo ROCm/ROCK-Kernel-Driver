@@ -15,15 +15,9 @@
 #ifndef MODULE_ARCH_VERMAGIC
 #define MODULE_ARCH_VERMAGIC ""
 #endif
-#ifdef ARCH_COMPILER_COMPATIBLE
-#define MODULE_COMPILER ""
-#else
-#define MODULE_COMPILER \
-	"gcc-" __stringify(__GNUC__) "." __stringify(__GNUC_MINOR__)
-#endif
 
 #define VERMAGIC_STRING 						\
 	UTS_RELEASE " "							\
 	MODULE_VERMAGIC_SMP MODULE_VERMAGIC_PREEMPT 			\
-	MODULE_ARCH_VERMAGIC
-
+	MODULE_ARCH_VERMAGIC 						\
+	"gcc-" __stringify(__GNUC__) "." __stringify(__GNUC_MINOR__)

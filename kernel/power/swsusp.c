@@ -59,6 +59,7 @@
 #include <linux/buffer_head.h>
 #include <linux/swapops.h>
 #include <linux/bootmem.h>
+#include <linux/syscalls.h>
 #include <linux/console.h>
 
 #include <asm/uaccess.h>
@@ -68,11 +69,7 @@
 
 #include "power.h"
 
-extern long sys_sync(void);
-
 unsigned char software_suspend_enabled = 0;
-
-asmlinkage extern void do_magic(int resume);
 
 #define NORESUME		1
 #define RESUME_SPECIFIED	2
@@ -619,7 +616,9 @@ asmlinkage void do_magic_resume_2(void)
 	PRINTK( "ok\n" );
 
 #ifdef SUSPEND_CONSOLE
+	acquire_console_sem();
 	update_screen(fg_console);	/* Hmm, is this the problem? */
+	release_console_sem();
 #endif
 }
 

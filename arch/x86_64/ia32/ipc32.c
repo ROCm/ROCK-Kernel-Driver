@@ -2,6 +2,7 @@
 #include <linux/sched.h>
 #include <linux/fs.h> 
 #include <linux/file.h> 
+#include <linux/syscalls.h>
 #include <linux/sem.h>
 #include <linux/msg.h>
 #include <linux/mm.h>
@@ -457,7 +458,7 @@ shmat32 (int first, int second, int third, int version, void *uptr)
 
 	if (version == 1)
 		return -EINVAL;	/* iBCS2 emulator entry point: unsupported */
-	err = sys_shmat(first, uptr, second, &raddr);
+	err = do_shmat(first, uptr, second, &raddr);
 	if (err)
 		return err;
 	return put_user(raddr, uaddr);

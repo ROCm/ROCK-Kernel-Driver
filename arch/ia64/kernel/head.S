@@ -818,7 +818,7 @@ END(ia64_delay_loop)
 
 GLOBAL_ENTRY(ia64_invoke_kernel_thread_helper)
 	.prologue
-	.save rp, r0		// this is the end of the call-chain
+	.save rp, r0				// this is the end of the call-chain
 	.body
 	alloc r2 = ar.pfs, 0, 0, 2, 0
 	mov out0 = r9

@@ -1,19 +1,14 @@
 /*
- * linux/fs/hfs/dir.c
+ *  linux/fs/hfs/dir.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains directory-related functions independent of which
  * scheme is being used to represent forks.
  *
  * Based on the minix file system code, (C) 1991, 1992 by Linus Torvalds
- *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
  */
 
 #include "hfs_fs.h"
@@ -22,11 +17,8 @@
 /*
  * hfs_lookup()
  */
-struct dentry *hfs_lookup(struct inode *dir, struct dentry *dentry
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
-		, struct nameidata *nd
-#endif
-		)
+struct dentry *hfs_lookup(struct inode *dir, struct dentry *dentry,
+			  struct nameidata *nd)
 {
 	hfs_cat_rec rec;
 	struct hfs_find_data fd;
@@ -89,12 +81,12 @@ int hfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	case 1:
 		hfs_bnode_read(fd.bnode, &entry, fd.entryoffset, fd.entrylength);
 		if (entry.type != HFS_CDR_THD) {
-			printk("HFS+-fs: bad catalog folder thread\n");
+			printk("HFS: bad catalog folder thread\n");
 			err = -EIO;
 			goto out;
 		}
 		//if (fd.entrylength < HFS_MIN_THREAD_SZ) {
-		//	printk("HFS+-fs: truncated catalog thread\n");
+		//	printk("HFS: truncated catalog thread\n");
 		//	err = -EIO;
 		//	goto out;
 		//}
@@ -113,7 +105,7 @@ int hfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	for (;;) {
 		if (be32_to_cpu(fd.key->cat.ParID) != inode->i_ino) {
-			printk("HFS+-fs: walked past end of dir\n");
+			printk("HFS: walked past end of dir\n");
 			err = -EIO;
 			goto out;
 		}
@@ -122,7 +114,7 @@ int hfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		len = hfs_mac2triv(strbuf, &fd.key->cat.CName);
 		if (type == HFS_CDR_DIR) {
 			if (fd.entrylength < sizeof(struct hfs_cat_dir)) {
-				printk("HFS+-fs: small dir entry\n");
+				printk("HFS: small dir entry\n");
 				err = -EIO;
 				goto out;
 			}
@@ -131,7 +123,7 @@ int hfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				break;
 		} else if (type == HFS_CDR_FIL) {
 			if (fd.entrylength < sizeof(struct hfs_cat_file)) {
-				printk("HFS+-fs: small file entry\n");
+				printk("HFS: small file entry\n");
 				err = -EIO;
 				goto out;
 			}
@@ -167,19 +159,6 @@ out:
 	return err;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static loff_t hfs_seek_dir(struct file *file, loff_t offset, int origin)
-{
-	loff_t res;
-
-	down(&file->f_dentry->d_inode->i_sem);
-	res = default_llseek(file, offset, origin);
-	up(&file->f_dentry->d_inode->i_sem);
-
-	return res;
-}
-#endif
-
 static int hfs_dir_release(struct inode *inode, struct file *file)
 {
 	struct hfs_readdir_data *rd = file->private_data;
@@ -198,11 +177,8 @@ static int hfs_dir_release(struct inode *inode, struct file *file)
  * a directory and return a corresponding inode, given the inode for
  * the directory and the name (and its length) of the new file.
  */
-int hfs_create(struct inode *dir, struct dentry *dentry, int mode
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
-		, struct nameidata *nd
-#endif
-		)
+int hfs_create(struct inode *dir, struct dentry *dentry, int mode,
+	       struct nameidata *nd)
 {
 	struct inode *inode;
 	int res;
@@ -336,11 +312,7 @@ int hfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 struct file_operations hfs_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= hfs_readdir,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	.llseek		= hfs_seek_dir,
-#else
 	.llseek		= generic_file_llseek,
-#endif
 	.release	= hfs_dir_release,
 };
 

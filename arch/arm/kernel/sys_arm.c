@@ -20,6 +20,7 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/stat.h>
+#include <linux/syscalls.h>
 #include <linux/mman.h>
 #include <linux/fs.h>
 #include <linux/file.h>
@@ -137,7 +138,6 @@ out:
  * Perform the select(nd, in, out, ex, tv) and mmap() system
  * calls.
  */
-extern asmlinkage int sys_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 
 struct sel_arg_struct {
 	unsigned long n;
@@ -210,7 +210,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, 
 		switch (version) {
 		default: {
 			ulong raddr;
-			ret = sys_shmat (first, (char *) ptr, second, &raddr);
+			ret = do_shmat (first, (char *) ptr, second, &raddr);
 			if (ret)
 				return ret;
 			return put_user (raddr, (ulong *) third);
@@ -218,7 +218,7 @@ asmlinkage int sys_ipc (uint call, int first, int second, int third, void *ptr, 
 		case 1:	/* iBCS2 emulator entry point */
 			if (!segment_eq(get_fs(), get_ds()))
 				return -EINVAL;
-			return sys_shmat (first, (char *) ptr,
+			return do_shmat (first, (char *) ptr,
 					  second, (ulong *) third);
 		}
 	case SHMDT: 

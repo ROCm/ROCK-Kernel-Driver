@@ -690,12 +690,6 @@ qla2x00_setup_chip(scsi_qla_host_t *ha)
 			for (i = 0; i < cnt; i++)
 				req_ring[i] = cpu_to_le16(risc_code[i]);
 
-			/*
-			 * Flush written firmware to the ha->request_ring buffer
-			 * before DMA.
-			 */
-			flush_cache_all();
-
 			if (fw_iter->addressing == FW_INFO_ADDR_NORMAL) {
 				rval = qla2x00_load_ram(ha,
 				    ha->request_dma, risc_address, cnt);

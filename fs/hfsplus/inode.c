@@ -12,9 +12,7 @@
 #include <linux/fs.h>
 #include <linux/pagemap.h>
 #include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 #include <linux/mpage.h>
-#endif
 
 #include "hfsplus_fs.h"
 #include "hfsplus_raw.h"
@@ -25,19 +23,11 @@ static int hfsplus_readpage(struct file *file, struct page *page)
 	return block_read_full_page(page, hfsplus_get_block);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 static int hfsplus_writepage(struct page *page, struct writeback_control *wbc)
 {
 	//printk("writepage: %lu\n", page->index);
 	return block_write_full_page(page, hfsplus_get_block, wbc);
 }
-#else
-static int hfsplus_writepage(struct page *page)
-{
-	//printk("writepage: %lu\n", page->index);
-	return block_write_full_page(page, hfsplus_get_block);
-}
-#endif
 
 static int hfsplus_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
 {
@@ -45,11 +35,7 @@ static int hfsplus_prepare_write(struct file *file, struct page *page, unsigned 
 		&HFSPLUS_I(page->mapping->host).phys_size);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static int hfsplus_bmap(struct address_space *mapping, long block)
-#else
 static sector_t hfsplus_bmap(struct address_space *mapping, sector_t block)
-#endif
 {
 	return generic_block_bmap(mapping, block, hfsplus_get_block);
 }
@@ -117,14 +103,6 @@ int hfsplus_releasepage(struct page *page, int mask)
 	return res;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static int hfsplus_direct_IO(int rw, struct inode *inode, struct kiobuf *iobuf,
-			     unsigned long blocknr, int blocksize)
-{
-	return generic_direct_IO(rw, inode, iobuf, blocknr,
-				 blocksize, hfsplus_get_block);
-}
-#else
 static int hfsplus_get_blocks(struct inode *inode, sector_t iblock, unsigned long max_blocks,
 			      struct buffer_head *bh_result, int create)
 {
@@ -151,7 +129,6 @@ static int hfsplus_writepages(struct address_space *mapping,
 {
 	return mpage_writepages(mapping, wbc, hfsplus_get_block);
 }
-#endif
 
 struct address_space_operations hfsplus_btree_aops = {
 	.readpage	= hfsplus_readpage,
@@ -171,16 +148,11 @@ struct address_space_operations hfsplus_aops = {
 	.commit_write	= generic_commit_write,
 	.bmap		= hfsplus_bmap,
 	.direct_IO	= hfsplus_direct_IO,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	.writepages	= hfsplus_writepages,
-#endif
 };
 
-static struct dentry *hfsplus_file_lookup(struct inode *dir, struct dentry *dentry
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
-					  ,struct nameidata *nd
-#endif
-		)
+static struct dentry *hfsplus_file_lookup(struct inode *dir, struct dentry *dentry,
+					  struct nameidata *nd)
 {
 	struct hfs_find_data fd;
 	struct super_block *sb = dir->i_sb;
@@ -215,11 +187,7 @@ static struct dentry *hfsplus_file_lookup(struct inode *dir, struct dentry *dent
 	HFSPLUS_I(inode).rsrc_inode = dir;
 	HFSPLUS_I(dir).rsrc_inode = inode;
 	igrab(dir);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	list_add(&inode->i_hash, &HFSPLUS_SB(sb).rsrc_inodes);
-#else
 	hlist_add_head(&inode->i_hash, &HFSPLUS_SB(sb).rsrc_inodes);
-#endif
 	mark_inode_dirty(inode);
 	{
 	void hfsplus_inode_check(struct super_block *sb);
@@ -284,11 +252,7 @@ static void hfsplus_set_perms(struct inode *inode, struct hfsplus_perm *perms)
 	perms->dev = cpu_to_be32(HFSPLUS_I(inode).dev);
 }
 
-static int hfsplus_permission(struct inode *inode, int mask
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
-		, struct nameidata *nd
-#endif
-		)
+static int hfsplus_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	/* MAY_EXEC is also used for lookup, if no x bit is set allow lookup,
 	 * open_exec has the same test, so it's still not executable, if a x bit
@@ -342,7 +306,6 @@ struct inode_operations hfsplus_file_inode_operations = {
 struct file_operations hfsplus_file_operations = {
 	.llseek 	= generic_file_llseek,
 	.read		= generic_file_read,
-	//.write	= hfsplus_file_write,
 	.write		= generic_file_write,
 	.mmap		= generic_file_mmap,
 	.fsync		= file_fsync,

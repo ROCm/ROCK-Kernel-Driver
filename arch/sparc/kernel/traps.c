@@ -260,7 +260,7 @@ void do_fpd_trap(struct pt_regs *regs, unsigned long pc, unsigned long npc,
 	} else {
 		fpload(&current->thread.float_regs[0], &current->thread.fsr);
 	}
-	current->flags |= PF_USEDFPU;
+	current_thread_info()->flags |= _TIF_USEDFPU;
 #endif
 }
 
@@ -291,7 +291,7 @@ void do_fpe_trap(struct pt_regs *regs, unsigned long pc, unsigned long npc,
 #ifndef CONFIG_SMP
 	if(!fpt) {
 #else
-        if(!(fpt->flags & PF_USEDFPU)) {
+        if(!(fpt->thread_info->flags & _TIF_USEDFPU)) {
 #endif
 		fpsave(&fake_regs[0], &fake_fsr, &fake_queue[0], &fake_depth);
 		regs->psr &= ~PSR_EF;
@@ -334,7 +334,7 @@ void do_fpe_trap(struct pt_regs *regs, unsigned long pc, unsigned long npc,
 	/* nope, better SIGFPE the offending process... */
 	       
 #ifdef CONFIG_SMP
-	fpt->flags &= ~PF_USEDFPU;
+	fpt->thread_info->flags &= ~_TIF_USEDFPU;
 #endif
 	if(psr & PSR_PS) {
 		/* The first fsr store/load we tried trapped,

@@ -11,14 +11,10 @@
  *
  */
 
-#define __KERNEL_SYSCALLS__
-
 #include <linux/kernel.h>
 #include <linux/jffs2.h>
 #include <linux/mtd/mtd.h>
 #include <linux/completion.h>
-#include <linux/sched.h>
-#include <linux/unistd.h>
 #include <linux/suspend.h>
 #include "nodelist.h"
 
@@ -124,11 +120,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 
 			case SIGKILL:
 				D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): SIGKILL received.\n"));
-			die:
-				spin_lock(&c->erase_completion_lock);
-				c->gc_task = NULL;
-				spin_unlock(&c->erase_completion_lock);
-				complete_and_exit(&c->gc_thread_exit, 0);
+				goto die;
 
 			case SIGHUP:
 				D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): SIGHUP received.\n"));
@@ -146,6 +138,11 @@ static int jffs2_garbage_collect_thread(void *_c)
 			goto die;
 		}
 	}
+ die:
+	spin_lock(&c->erase_completion_lock);
+	c->gc_task = NULL;
+	spin_unlock(&c->erase_completion_lock);
+	complete_and_exit(&c->gc_thread_exit, 0);
 }
 
 static int thread_should_wake(struct jffs2_sb_info *c)

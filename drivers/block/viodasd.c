@@ -6,154 +6,71 @@
  *           Stephen Rothwell <sfr@au1.ibm.com>
  *
  * (C) Copyright 2000-2004 IBM Corporation
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of the
  * License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA 
- ***************************************************************************
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
  * This routine provides access to disk space (termed "DASD" in historical
  * IBM terms) owned and managed by an OS/400 partition running on the
  * same box as this Linux partition.
  *
- * All disk operations are performed by sending messages back and forth to 
- * the OS/400 partition. 
- * 
- * This device driver can either use its own major number, or it can
- * pretend to be an IDE drive (grep 'IDE[0-9]_MAJOR' ../../include/linux/major.h).
- * This is controlled with a CONFIG option.  You can either call this an
- * elegant solution to the fact that a lot of software doesn't recognize
- * a new disk major number...or you can call this a really ugly hack.
- * Your choice.
+ * All disk operations are performed by sending messages back and forth to
+ * the OS/400 partition.
  */
-#include <linux/config.h>
 #include <linux/major.h>
 #include <linux/fs.h>
-#include <linux/blkpg.h>
-#include <linux/sched.h>
-#include <linux/timer.h>
-#include <asm/uaccess.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>
 #include <linux/hdreg.h>
-#include <linux/proc_fs.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
-#include <linux/seq_file.h>
+#include <linux/completion.h>
 
+#include <asm/uaccess.h>
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/iSeries/HvLpConfig.h>
 #include <asm/iSeries/vio.h>
-#include <asm/iSeries/iSeries_proc.h>
 
 MODULE_DESCRIPTION("iSeries Virtual DASD");
 MODULE_AUTHOR("Dave Boutcher");
 MODULE_LICENSE("GPL");
 
 /*
- * Decide if we are using our own major or pretending to be an IDE drive
- *
- * If we are using our own major, we only support 7 partitions per physical
- * disk....so with minor numbers 0-255 we get a maximum of 32 disks.  If we
- * are emulating IDE, we get 63 partitions per disk, with a maximum of 4
- * disks per major, but common practice is to place only 2 devices in /dev
- * for each IDE major, for a total of 20 (since there are 10 IDE majors).
+ * We only support 7 partitions per physical disk....so with minor
+ * numbers 0-255 we get a maximum of 32 disks.
  */
-
-#ifdef CONFIG_VIODASD_IDE
-static const int major_table[] = {
-	IDE0_MAJOR,
-	IDE1_MAJOR,
-	IDE2_MAJOR,
-	IDE3_MAJOR,
-	IDE4_MAJOR,
-	IDE5_MAJOR,
-	IDE6_MAJOR,
-	IDE7_MAJOR,
-	IDE8_MAJOR,
-	IDE9_MAJOR,
-};
-
-enum {
-	DEV_PER_MAJOR = 2,
-	PARTITION_SHIFT = 6,
-};
-
-static int major_to_index(int major)
-{
-	switch(major) {
-	case IDE0_MAJOR: return 0;
-	case IDE1_MAJOR: return 1;
-	case IDE2_MAJOR: return 2;
-	case IDE3_MAJOR: return 3;
-	case IDE4_MAJOR: return 4;
-	case IDE5_MAJOR: return 5;
-	case IDE6_MAJOR: return 6;
-	case IDE7_MAJOR: return 7;
-	case IDE8_MAJOR: return 8;
-	case IDE9_MAJOR: return 9;
-	default:
-		return -1;
-	}
-}
-
-#define VIOD_DEVICE_NAME	"ide"
-#define VIOD_GENHD_NAME		"hd"
-
-#else	/* !CONFIG_VIODASD_IDE */
-
-static const int major_table[] = {
-	VIODASD_MAJOR,
-};
-
-enum {
-	DEV_PER_MAJOR = 32,
-	PARTITION_SHIFT = 3,
-};
-
-static inline int major_to_index(int major)
-{
-	if (major != VIODASD_MAJOR)
-		return -1;
-	return 0;
-}
-
-#define VIOD_DEVICE_NAME	"viod"
-#ifdef CONFIG_DEVFS_FS
-#define VIOD_GENHD_NAME		"viod"
-#else
 #define VIOD_GENHD_NAME		"iseries/vd"
-#endif
+#define VIOD_GENHD_DEVFS_NAME	"iseries/disc"
 
-#endif	/* CONFIG_VIODASD_IDE */
+#define VIOD_VERS		"1.64"
 
-#define VIODASD_VERS	"1.61"
-
-#define VIOD_KERN_WARNING	KERN_WARNING_VIO VIOD_DEVICE_NAME ": "
-#define VIOD_KERN_INFO		KERN_INFO_VIO VIOD_DEVICE_NAME ": "
+#define VIOD_KERN_WARNING	KERN_WARNING "viod: "
+#define VIOD_KERN_INFO		KERN_INFO "viod: "
 
 enum {
-	NUM_MAJORS = sizeof(major_table) / sizeof(major_table[0]),
-	MAX_DISKNO = DEV_PER_MAJOR * NUM_MAJORS,
-	MAX_DISK_NAME = 16, /* maximum length of a gendisk->name */
+	PARTITION_SHIFT = 3,
+	MAX_DISKNO = 32,
+	MAX_DISK_NAME = sizeof(((struct gendisk *)0)->disk_name)
 };
 
-static int		viodasd_max_disk = MAX_DISKNO - 1;
+static int		viodasd_max_disk;
 static spinlock_t	viodasd_spinlock = SPIN_LOCK_UNLOCKED;
 
 #define VIOMAXREQ		16
@@ -163,35 +80,35 @@ static spinlock_t	viodasd_spinlock = SPIN_LOCK_UNLOCKED;
 
 extern struct device *iSeries_vio_dev;
 
-struct openData {
-	u64 mDiskLen;
-	u16 mMaxDisks;
-	u16 mCylinders;
-	u16 mTracks;
-	u16 mSectors;
-	u16 mBytesPerSector;
+struct open_data {
+	u64	disk_size;
+	u16	max_disk;
+	u16	cylinders;
+	u16	tracks;
+	u16	sectors;
+	u16	bytes_per_sector;
 };
 
-struct rwData {			// Used during rw
-	u64 mOffset;
+struct rw_data {
+	u64	offset;
 	struct {
-		u32 mToken;
-		u32 reserved;
-		u64 mLen;
-	} dmaInfo[VIOMAXBLOCKDMA];
+		u32	token;
+		u32	reserved;
+		u64	len;
+	} dma_info[VIOMAXBLOCKDMA];
 };
 
 struct vioblocklpevent {
-	struct HvLpEvent event;
-	u32 mReserved1;
-	u16 mVersion;
-	u16 mSubTypeRc;
-	u16 mDisk;
-	u16 mFlags;
+	struct HvLpEvent	event;
+	u32			reserved;
+	u16			version;
+	u16			sub_result;
+	u16			disk;
+	u16			flags;
 	union {
-		struct openData openData;
-		struct rwData rwData;
-		u64 changed;
+		struct open_data	open_data;
+		struct rw_data		rw_data;
+		u64			changed;
 	} u;
 };
 
@@ -207,12 +124,10 @@ enum vioblocksubtype {
 };
 
 struct viodasd_waitevent {
-	struct semaphore *sem;
-	int rc;
-	union {
-		int changed;	/* Used only for check_change */
-		u16 subRC;
-	} data;
+	struct completion	com;
+	int			rc;
+	u16			sub_result;
+	int			max_disk;	/* open */
 };
 
 static const struct vio_error_entry viodasd_err_table[] = {
@@ -246,145 +161,26 @@ static int num_req_outstanding;
  * This is our internal structure for keeping track of disk devices
  */
 struct viodasd_device {
-	int			useCount;
-	u16			cylinders;
-	u16			tracks;
-	u16			sectors;
-	u16			bytesPerSector;
-	u64			size;
-	int			readOnly;
-	int			registered;
-	struct request_queue	*queue;
-	spinlock_t		q_lock;
-	struct gendisk		*disk;
-	struct {
-		long tot;
-		long ntce[VIOMAXBLOCKDMA];
-	} stats[2];
+	u16		cylinders;
+	u16		tracks;
+	u16		sectors;
+	u16		bytes_per_sector;
+	u64		size;
+	int		read_only;
+	spinlock_t	q_lock;
+	struct gendisk	*disk;
 } viodasd_devices[MAX_DISKNO];
 
 /*
- * Handle reads from the proc file system
+ * External open entry point.
  */
-static int viodasd_show(struct seq_file *m, void *v)
+static int viodasd_open(struct inode *ino, struct file *fil)
 {
-	int i;
-	int j;
-
-	seq_printf(m, "viod %d possible devices\n", MAX_DISKNO);
-
-	for (i = 0; (i <= viodasd_max_disk) && (i < MAX_DISKNO); i++) {
-		if (viodasd_devices[i].stats[0].tot ||
-				viodasd_devices[i].stats[1].tot) {
-			seq_printf(m, "DISK %2.2d: rd %-10.10ld wr %-10.10ld\n",
-				    i, viodasd_devices[i].stats[0].tot,
-				    viodasd_devices[i].stats[1].tot);
-
-			seq_printf(m, "rd DMA: ");
-			for (j = 0; j < VIOMAXBLOCKDMA; j++)
-				seq_printf(m, " [%2.2d] %ld", j + 1,
-					viodasd_devices[i].stats[0].ntce[j]);
-
-			seq_printf(m, "\nwr DMA: ");
-			for (j = 0; j < VIOMAXBLOCKDMA; j++)
-				seq_printf(m, " [%2.2d] %ld", j + 1,
-					viodasd_devices[i].stats[1].ntce[j]);
-			seq_printf(m, "\n");
-		}
-	}
-
-	return 0;
-}
-
-static int viodasd_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, viodasd_show, NULL);
-}
-
-static struct file_operations viodasd_proc_fops = {
-	.open		= viodasd_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
-/*
- * setup our proc file system entries
- */
-void viodasd_proc_init(struct proc_dir_entry *iSeries_proc)
-{
-	struct proc_dir_entry *ent;
-
-	ent = create_proc_entry("viodasd", S_IFREG | S_IRUSR, iSeries_proc);
-	if (!ent)
-		return;
-	ent->owner = THIS_MODULE;
-	ent->proc_fops = &viodasd_proc_fops;
-}
-
-/*
- * clean up our proc file system entries
- */
-void viodasd_proc_delete(struct proc_dir_entry *iSeries_proc)
-{
-	remove_proc_entry("viodasd", iSeries_proc);
-}
-
-/*
- * End a request
- */
-static void viodasd_end_request(struct request *req, int uptodate,
-		int num_sectors)
-{
-	if (end_that_request_first(req, uptodate, num_sectors))
-		return;
-        add_disk_randomness(req->rq_disk);
-	end_that_request_last(req);
-}
-
-/*
- * This rebuilds the partition information for a single disk device
- */
-static int viodasd_revalidate(struct gendisk *gendisk)
-{
-	struct viodasd_device *device =
-		(struct viodasd_device *)gendisk->private_data;
-
-	set_capacity(gendisk, device->size >> 9);
-	return 0;
-}
-
-static void internal_register_disk(struct viodasd_device *d)
-{
-	if (d->registered)
-		return;
-	d->registered = 1;
-
-	printk(VIOD_KERN_INFO
-	       "Disk %2.2d size %luM, sectors %d, heads %d, cylinders %d, sectsize %d\n",
-               (int)(d - viodasd_devices), (unsigned long)d->size >> 20,
-	       (int)d->sectors, (int)d->tracks, (int)d->cylinders,
-	       (int)d->bytesPerSector);
-}
-
-/*
- * This is the actual open code.  It gets called from the external
- * open entry point, as well as from the init code when we're figuring
- * out what disks we have
- */
-static int internal_open(int device_no, u16 flags)
-{
-	struct gendisk *gendisk;
+	struct viodasd_device *d = ino->i_bdev->bd_disk->private_data;
 	HvLpEvent_Rc hvrc;
-	/* This semaphore is raised in the interrupt handler */
-	DECLARE_MUTEX_LOCKED(Semaphore);
-	struct viodasd_waitevent we = { .sem = &Semaphore };
+	struct viodasd_waitevent we;
 
-	/* Check that we are dealing with a valid hosting partition */
-	if (viopath_hostLp == HvLpIndexInvalid) {
-		printk(KERN_WARNING_VIO "Invalid hosting partition\n");
-		return -EIO;
-	}
+	init_completion(&we.com);
 
 	/* Send the open event to OS/400 */
 	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
@@ -394,130 +190,27 @@ static int internal_open(int device_no, u16 flags)
 			viopath_sourceinst(viopath_hostLp),
 			viopath_targetinst(viopath_hostLp),
 			(u64)(unsigned long)&we, VIOVERSION << 16,
-			((u64)device_no << 48) | ((u64)flags << 32), 0, 0, 0);
+			((u64)DEVICE_NO(d) << 48) /* | ((u64)flags << 32) */,
+			0, 0, 0);
 	if (hvrc != 0) {
-		printk(KERN_WARNING_VIO "bad rc on signalLpEvent %d\n",
-				(int)hvrc);
+		printk(VIOD_KERN_WARNING "HV open failed %d\n", (int)hvrc);
 		return -EIO;
 	}
 
-	/* Wait for the interrupt handler to get the response */
-	down(&Semaphore);
+	wait_for_completion(&we.com);
 
 	/* Check the return code */
 	if (we.rc != 0) {
 		const struct vio_error_entry *err =
-			vio_lookup_rc(viodasd_err_table, we.data.subRC);
-		/*
-		 * Temporary patch to quiet down the viodasd when drivers
-		 * are probing for drives, especially lvm.  Collin is aware
-		 * and is working on this.
-		 */
-#if 0
-		printk(KERN_WARNING_VIO "bad rc opening disk: %d:0x%04x (%s)\n",
-				(int)we.rc, we.data.subRC, err->msg);
-#endif
-		return -err->errno;
-	}
-	
-	/* Bump the use count */
-	viodasd_devices[device_no].useCount++;
+			vio_lookup_rc(viodasd_err_table, we.sub_result);
 
-	/* When we are probing, we have no gendisk structure yet ... */
-	gendisk = viodasd_devices[device_no].disk;
-	if (gendisk == NULL)
-		return 0;
-
-	/*
-	 * If this is the first open of this device, update the device
-	 * information.  If this is NOT the first open, assume that it
-	 * isn't changing
-	 */
-	if (viodasd_devices[device_no].useCount == 1) {
-		if (viodasd_devices[device_no].size > 0)
-                        set_capacity(gendisk,
-					viodasd_devices[device_no].size >> 9);
-	} else if (get_capacity(gendisk) !=
-			viodasd_devices[device_no].size >> 9)
-		/*
-		 * If the size of the device changed, weird things
-		 * are happening!
-		 */
-		printk(KERN_WARNING_VIO
-		       "disk size change (%d to %d sectors) for device %d\n",
-		       (int)get_capacity(gendisk),
-		       (int)viodasd_devices[device_no].size >> 9, device_no);
-
-	internal_register_disk(&viodasd_devices[device_no]);
-
-	return 0;
-}
-
-/*
- * This is the actual release code.  It gets called from the external
- * release entry point, as well as from the init code when we're figuring
- * out what disks we have.
- */
-static int internal_release(int device_no, u16 flags)
-{
-	HvLpEvent_Rc hvrc;
-
-	/* Send the event to OS/400.  We DON'T expect a response */
-	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
-			HvLpEvent_Type_VirtualIo,
-			viomajorsubtype_blockio | vioblockclose,
-			HvLpEvent_AckInd_NoAck, HvLpEvent_AckType_ImmediateAck,
-			viopath_sourceinst(viopath_hostLp),
-			viopath_targetinst(viopath_hostLp), 0,
-			VIOVERSION << 16,
-			((u64)device_no << 48) | ((u64)flags << 32), 0, 0, 0);
-	viodasd_devices[device_no].useCount--;
-	if (hvrc != 0) {
-		printk(KERN_WARNING_VIO
-		       "bad rc sending event to OS/400 %d\n", (int)hvrc);
+		printk(VIOD_KERN_WARNING
+				"bad rc opening disk: %d:0x%04x (%s)\n",
+				(int)we.rc, we.sub_result, err->msg);
 		return -EIO;
 	}
-	return 0;
-}
+	viodasd_max_disk = we.max_disk;
 
-
-static int inode_to_device_no(struct inode *ino, const char *func)
-{
-	int device_no = DEVICE_NO(ino->i_bdev->bd_disk->private_data);
-
-	/* sanity check */
-	if ((device_no > MAX_DISKNO) || (device_no < 0)) {
-		printk(KERN_WARNING_VIO
-		       "Invalid disk number %d in %s\n", device_no, func);
-		return -ENODEV;
-	}
-	return device_no;
-}
-
-/*
- * External open entry point.
- */
-static int viodasd_open(struct inode *ino, struct file *fil)
-{
-	int device_no;
-	int i;
-	int old_max_disk = viodasd_max_disk;
-
-	device_no = inode_to_device_no(ino, "open");
-	if (device_no < 0)
-		return device_no;
-
-	/* Call the actual open code */
-	/* always tell the HV we need write access */
-	if (internal_open(device_no, 0) != 0)
-		return -EIO;
-
-	/* For each new disk: */
-	/* update the disk's geometry via internal_open and register it */
-	for (i = old_max_disk + 1; i <= viodasd_max_disk; ++i) {
-		internal_open(i, vioblockflags_ro);
-		internal_release(i, vioblockflags_ro);
-	}
 	return 0;
 }
 
@@ -526,17 +219,25 @@ static int viodasd_open(struct inode *ino, struct file *fil)
  */
 static int viodasd_release(struct inode *ino, struct file *fil)
 {
-	int device_no;
+	struct viodasd_device *d = ino->i_bdev->bd_disk->private_data;
+	HvLpEvent_Rc hvrc;
 
-	device_no = inode_to_device_no(ino, "release");
-	if (device_no < 0)
-		return device_no;
-
-	/* Call the actual release code */
-	internal_release(device_no, 0);
-
+	/* Send the event to OS/400.  We DON'T expect a response */
+	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
+			HvLpEvent_Type_VirtualIo,
+			viomajorsubtype_blockio | vioblockclose,
+			HvLpEvent_AckInd_NoAck, HvLpEvent_AckType_ImmediateAck,
+			viopath_sourceinst(viopath_hostLp),
+			viopath_targetinst(viopath_hostLp),
+			0, VIOVERSION << 16,
+			((u64)DEVICE_NO(d) << 48) /* | ((u64)flags << 32) */,
+			0, 0, 0);
+	if (hvrc != 0)
+		printk(VIOD_KERN_WARNING "HV close call failed %d\n",
+				(int)hvrc);
 	return 0;
 }
+
 
 /* External ioctl entry point.
  */
@@ -570,15 +271,37 @@ static int viodasd_ioctl(struct inode *ino, struct file *fil,
 		cylinders = d->cylinders;
 		if (cylinders == 0)
 			cylinders = get_capacity(gendisk) / (sectors * heads);
-		__put_user(sectors, &geo->sectors);
-		__put_user(heads, &geo->heads);
-		__put_user(cylinders, &geo->cylinders);
-		__put_user(get_start_sect(ino->i_bdev), &geo->start);
-
+		if (__put_user(sectors, &geo->sectors) ||
+		    __put_user(heads, &geo->heads) ||
+		    __put_user(cylinders, &geo->cylinders) ||
+		    __put_user(get_start_sect(ino->i_bdev), &geo->start))
+			return -EFAULT;
 		return 0;
 	}
 
 	return -EINVAL;
+}
+
+/*
+ * Our file operations table
+ */
+static struct block_device_operations viodasd_fops = {
+	.owner = THIS_MODULE,
+	.open = viodasd_open,
+	.release = viodasd_release,
+	.ioctl = viodasd_ioctl,
+};
+
+/*
+ * End a request
+ */
+static void viodasd_end_request(struct request *req, int uptodate,
+		int num_sectors)
+{
+	if (end_that_request_first(req, uptodate, num_sectors))
+		return;
+	add_disk_randomness(req->rq_disk);
+	end_that_request_last(req);
 }
 
 /*
@@ -600,17 +323,6 @@ static int send_request(struct request *req)
 
 	start = (u64)req->sector << 9;
 
-	/* More paranoia checks */
-	if ((req->sector + req->nr_sectors) > get_capacity(req->rq_disk)) {
-		printk(KERN_WARNING_VIO "Invalid request offset & length\n");
-		printk(KERN_WARNING_VIO
-				"req->sector: %ld, req->nr_sectors: %ld\n",
-				req->sector, req->nr_sectors);
-		printk(KERN_WARNING_VIO "device: %s\n",
-				req->rq_disk->disk_name);
-		return -1;
-	}
-
 	if (rq_data_dir(req) == READ) {
 		direction = DMA_FROM_DEVICE;
 		viocmd = viomajorsubtype_blockio | vioblockread;
@@ -622,14 +334,10 @@ static int send_request(struct request *req)
 	}
 
         d = req->rq_disk->private_data;
-	/* Update totals */
-	d->stats[statindex].tot++;
 
 	/* Now build the scatter-gather list */
 	nsg = blk_rq_map_sg(req->q, req, sg);
 	nsg = dma_map_sg(iSeries_vio_dev, sg, nsg, direction);
-	/* Update stats */
-	d->stats[statindex].ntce[nsg - 1]++;
 
 	spin_lock_irqsave(&viodasd_spinlock, flags);
 	num_req_outstanding++;
@@ -644,18 +352,15 @@ static int send_request(struct request *req)
 				viopath_targetinst(viopath_hostLp),
 				(u64)(unsigned long)req, VIOVERSION << 16,
 				((u64)DEVICE_NO(d) << 48), start,
-				((u64)sg[0].dma_address) << 32,
-				sg[0].dma_length);
+				((u64)sg_dma_address(&sg[0])) << 32,
+				sg_dma_len(&sg[0]));
 	else {
 		bevent = (struct vioblocklpevent *)
 			vio_get_event_buffer(viomajorsubtype_blockio);
 		if (bevent == NULL) {
-			num_req_outstanding--;
-			spin_unlock_irqrestore(&viodasd_spinlock, flags);
-			dma_unmap_sg(iSeries_vio_dev, sg, nsg, direction);
-			printk(KERN_WARNING_VIO
+			printk(VIOD_KERN_WARNING
 			       "error allocating disk event buffer\n");
-			return -1;
+			goto error_ret;
 		}
 
 		/*
@@ -673,26 +378,26 @@ static int send_request(struct request *req)
 		bevent->event.xSourceLp = HvLpConfig_getLpIndex();
 		bevent->event.xTargetLp = viopath_hostLp;
 		bevent->event.xSizeMinus1 =
-			offsetof(struct vioblocklpevent, u.rwData.dmaInfo) +
-			(sizeof(bevent->u.rwData.dmaInfo[0]) * nsg) - 1;
+			offsetof(struct vioblocklpevent, u.rw_data.dma_info) +
+			(sizeof(bevent->u.rw_data.dma_info[0]) * nsg) - 1;
 		bevent->event.xSourceInstanceId =
 			viopath_sourceinst(viopath_hostLp);
 		bevent->event.xTargetInstanceId =
 			viopath_targetinst(viopath_hostLp);
 		bevent->event.xCorrelationToken = (u64)req;
-		bevent->mVersion = VIOVERSION;
-		bevent->mDisk = DEVICE_NO(d);
-		bevent->u.rwData.mOffset = start;
+		bevent->version = VIOVERSION;
+		bevent->disk = DEVICE_NO(d);
+		bevent->u.rw_data.offset = start;
 
 		/*
 		 * Copy just the dma information from the sg list
 		 * into the request
 		 */
 		for (sgindex = 0; sgindex < nsg; sgindex++) {
-			bevent->u.rwData.dmaInfo[sgindex].mToken =
-				sg[sgindex].dma_address;
-			bevent->u.rwData.dmaInfo[sgindex].mLen =
-				sg[sgindex].dma_length;
+			bevent->u.rw_data.dma_info[sgindex].token =
+				sg_dma_address(&sg[sgindex]);
+			bevent->u.rw_data.dma_info[sgindex].len =
+				sg_dma_len(&sg[sgindex]);
 		}
 
 		/* Send the request */
@@ -701,16 +406,19 @@ static int send_request(struct request *req)
 	}
 
 	if (hvrc != HvLpEvent_Rc_Good) {
-		num_req_outstanding--;
-		spin_unlock_irqrestore(&viodasd_spinlock, flags);
-		dma_unmap_sg(iSeries_vio_dev, sg, nsg, direction);
-		printk(KERN_WARNING_VIO
+		printk(VIOD_KERN_WARNING
 		       "error sending disk event to OS/400 (rc %d)\n",
 		       (int)hvrc);
-		return -1;
+		goto error_ret;
 	}
 	spin_unlock_irqrestore(&viodasd_spinlock, flags);
 	return 0;
+
+error_ret:
+	num_req_outstanding--;
+	spin_unlock_irqrestore(&viodasd_spinlock, flags);
+	dma_unmap_sg(iSeries_vio_dev, sg, nsg, direction);
+	return -1;
 }
 
 /*
@@ -720,15 +428,15 @@ static void do_viodasd_request(request_queue_t *q)
 {
 	struct request *req;
 
-	while ((req = elv_next_request(q)) != NULL) {
-		/*
-		 * If we already have the maximum number of requests
-		 * outstanding to OS/400 just bail out. We'll come
-		 * back later.
-		 */
-		if (num_req_outstanding >= VIOMAXREQ)
-			break;
-
+	/*
+	 * If we already have the maximum number of requests
+	 * outstanding to OS/400 just bail out. We'll come
+	 * back later.
+	 */
+	while (num_req_outstanding < VIOMAXREQ) {
+		req = elv_next_request(q);
+		if (req == NULL)
+			return;
 		/* dequeue the current request from the queue */
 		blkdev_dequeue_request(req);
 		/* check that request contains a valid command */
@@ -736,7 +444,6 @@ static void do_viodasd_request(request_queue_t *q)
 			viodasd_end_request(req, 0, req->hard_nr_sectors);
 			continue;
 		}
-
 		/* Try sending the request */
 		if (send_request(req) != 0)
 			viodasd_end_request(req, 0, req->hard_nr_sectors);
@@ -744,75 +451,111 @@ static void do_viodasd_request(request_queue_t *q)
 }
 
 /*
- * Check for changed disks
+ * Probe a single disk and fill in the viodasd_device structure
+ * for it.
  */
-static int viodasd_check_change(struct gendisk *gendisk)
+static void probe_disk(struct viodasd_device *d)
 {
-	struct viodasd_waitevent we;
 	HvLpEvent_Rc hvrc;
-	int device_no = DEVICE_NO(gendisk->private_data);
+	struct viodasd_waitevent we;
+	int dev_no = DEVICE_NO(d);
+	struct gendisk *g;
+	struct request_queue *q;
 
-	/* This semaphore is raised in the interrupt handler */
-	DECLARE_MUTEX_LOCKED(Semaphore);
-
-	/* Check that we are dealing with a valid hosting partition */
-	if (viopath_hostLp == HvLpIndexInvalid) {
-		printk(KERN_WARNING_VIO "Invalid hosting partition\n");
-		return -EIO;
-	}
-
-	we.sem = &Semaphore;
+	init_completion(&we.com);
 
 	/* Send the open event to OS/400 */
 	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
 			HvLpEvent_Type_VirtualIo,
-			viomajorsubtype_blockio | vioblockcheck,
+			viomajorsubtype_blockio | vioblockopen,
 			HvLpEvent_AckInd_DoAck, HvLpEvent_AckType_ImmediateAck,
 			viopath_sourceinst(viopath_hostLp),
 			viopath_targetinst(viopath_hostLp),
 			(u64)(unsigned long)&we, VIOVERSION << 16,
-			((u64)device_no << 48), 0, 0, 0);
+			((u64)dev_no << 48) | ((u64)vioblockflags_ro << 32),
+			0, 0, 0);
 	if (hvrc != 0) {
-		printk(KERN_WARNING_VIO "bad rc on signalLpEvent %d\n",
-				(int)hvrc);
-		return -EIO;
+		printk(VIOD_KERN_WARNING "bad rc on HV open %d\n", (int)hvrc);
+		return;
 	}
 
-	/* Wait for the interrupt handler to get the response */
-	down(&Semaphore);
+	wait_for_completion(&we.com);
 
-	/* Check the return code.  If bad, assume no change */
-	if (we.rc != 0) {
-		printk(KERN_WARNING_VIO
-				"bad rc %d on check_change. Assuming no change\n",
-				(int)we.rc);
-		return 0;
+	if (we.rc != 0)
+		return;
+	viodasd_max_disk = we.max_disk;
+
+	/* Send the close event to OS/400.  We DON'T expect a response */
+	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
+			HvLpEvent_Type_VirtualIo,
+			viomajorsubtype_blockio | vioblockclose,
+			HvLpEvent_AckInd_NoAck, HvLpEvent_AckType_ImmediateAck,
+			viopath_sourceinst(viopath_hostLp),
+			viopath_targetinst(viopath_hostLp),
+			0, VIOVERSION << 16,
+			((u64)dev_no << 48) | ((u64)vioblockflags_ro << 32),
+			0, 0, 0);
+	if (hvrc != 0) {
+		printk(VIOD_KERN_WARNING
+		       "bad rc sending event to OS/400 %d\n", (int)hvrc);
+		return;
+	}
+	printk(VIOD_KERN_INFO "disk %d: %lu sectors (%lu MB) "
+			"CHS=%d/%d/%d sector size %d\n",
+			dev_no, (unsigned long)(d->size >> 9),
+			(unsigned long)(d->size >> 20),
+			(int)d->cylinders, (int)d->tracks,
+			(int)d->sectors, (int)d->bytes_per_sector);
+	/* create the request queue for the disk */
+	spin_lock_init(&d->q_lock);
+	q = blk_init_queue(do_viodasd_request, &d->q_lock);
+	if (q == NULL) {
+		printk(VIOD_KERN_WARNING "cannot allocate queue for disk %d\n",
+				dev_no);
+		return;
+	}
+	g = alloc_disk(1 << PARTITION_SHIFT);
+	if (g == NULL) {
+		printk(VIOD_KERN_WARNING
+				"cannot allocate disk structure for disk %d\n",
+				dev_no);
+		blk_cleanup_queue(q);
+		return;
 	}
 
-	return we.data.changed;
+	d->disk = g;
+	blk_queue_max_hw_segments(q, VIOMAXBLOCKDMA);
+	blk_queue_max_phys_segments(q, VIOMAXBLOCKDMA);
+	blk_queue_max_sectors(q, VIODASD_MAXSECTORS);
+	g->major = VIODASD_MAJOR;
+	g->first_minor = dev_no << PARTITION_SHIFT;
+	if (dev_no >= 26)
+		snprintf(g->disk_name, sizeof(g->disk_name),
+				VIOD_GENHD_NAME "%c%c",
+				'a' + (dev_no / 26) - 1, 'a' + (dev_no % 26));
+	else
+		snprintf(g->disk_name, sizeof(g->disk_name),
+				VIOD_GENHD_NAME "%c", 'a' + (dev_no % 26));
+	snprintf(g->devfs_name, sizeof(g->devfs_name),
+			"%s%d", VIOD_GENHD_DEVFS_NAME, dev_no);
+	g->fops = &viodasd_fops;
+	g->queue = q;
+	g->private_data = d;
+	set_capacity(g, d->size >> 9);
+
+	/* register us in the global list */
+	add_disk(g);
 }
-
-/*
- * Our file operations table
- */
-static struct block_device_operations viodasd_fops = {
-	.owner = THIS_MODULE,
-	.open = viodasd_open,
-	.release = viodasd_release,
-	.ioctl = viodasd_ioctl,
-	.media_changed = viodasd_check_change,
-	.revalidate_disk = viodasd_revalidate
-};
 
 /* returns the total number of scatterlist elements converted */
 static int block_event_to_scatterlist(const struct vioblocklpevent *bevent,
 		struct scatterlist *sg, int *total_len)
 {
 	int i, numsg;
-	const struct rwData *rwData = &bevent->u.rwData;
+	const struct rw_data *rw_data = &bevent->u.rw_data;
 	static const int offset =
-		offsetof(struct vioblocklpevent, u.rwData.dmaInfo);
-	static const int element_size = sizeof(rwData->dmaInfo[0]);
+		offsetof(struct vioblocklpevent, u.rw_data.dma_info);
+	static const int element_size = sizeof(rw_data->dma_info[0]);
 
 	numsg = ((bevent->event.xSizeMinus1 + 1) - offset) / element_size;
 	if (numsg > VIOMAXBLOCKDMA)
@@ -821,10 +564,10 @@ static int block_event_to_scatterlist(const struct vioblocklpevent *bevent,
 	*total_len = 0;
 	memset(sg, 0, sizeof(sg[0]) * VIOMAXBLOCKDMA);
 
-	for (i = 0; (i < numsg) && (rwData->dmaInfo[i].mLen > 0); ++i) {
-		sg[i].dma_address = rwData->dmaInfo[i].mToken;
-		sg[i].dma_length = rwData->dmaInfo[i].mLen;
-		*total_len += rwData->dmaInfo[i].mLen;
+	for (i = 0; (i < numsg) && (rw_data->dma_info[i].len > 0); ++i) {
+		sg_dma_address(&sg[i]) = rw_data->dma_info[i].token;
+		sg_dma_len(&sg[i]) = rw_data->dma_info[i].len;
+		*total_len += rw_data->dma_info[i].len;
 	}
 	return i;
 }
@@ -836,25 +579,20 @@ static int block_event_to_scatterlist(const struct vioblocklpevent *bevent,
 static void viodasd_restart_all_queues_starting_from(int first_index)
 {
 	int i;
-	request_queue_t *q;
 
-	for (i = first_index + 1; i < MAX_DISKNO; ++i) {
-		q = viodasd_devices[i].queue;
-		if (q)
-			blk_run_queue(q);
-	}
-	for (i = 0; i <= first_index; ++i) {
-		q = viodasd_devices[i].queue;
-		if (q)
-			blk_run_queue(q);
-	}
+	for (i = first_index + 1; i < MAX_DISKNO; ++i)
+		if (viodasd_devices[i].disk)
+			blk_run_queue(viodasd_devices[i].disk->queue);
+	for (i = 0; i <= first_index; ++i)
+		if (viodasd_devices[i].disk)
+			blk_run_queue(viodasd_devices[i].disk->queue);
 }
 
 /*
  * For read and write requests, decrement the number of outstanding requests,
  * Free the DMA buffers we allocated.
  */
-static int viodasd_handleReadWrite(struct vioblocklpevent *bevent)
+static int viodasd_handle_read_write(struct vioblocklpevent *bevent)
 {
 	int num_sg, num_sect, pci_direction, total_len;
 	struct request *req;
@@ -887,15 +625,15 @@ static int viodasd_handleReadWrite(struct vioblocklpevent *bevent)
 	error = event->xRc != HvLpEvent_Rc_Good;
 	if (error) {
 		const struct vio_error_entry *err;
-		err = vio_lookup_rc(viodasd_err_table, bevent->mSubTypeRc);
-		printk(KERN_WARNING_VIO "read/write error %d:0x%04x (%s)\n",
-				event->xRc, bevent->mSubTypeRc, err->msg);
+		err = vio_lookup_rc(viodasd_err_table, bevent->sub_result);
+		printk(VIOD_KERN_WARNING "read/write error %d:0x%04x (%s)\n",
+				event->xRc, bevent->sub_result, err->msg);
 		num_sect = req->hard_nr_sectors;
 	}
 	qlock = req->q->queue_lock;
-	spin_lock(qlock);
+	spin_lock_irqsave(qlock, irq_flags);
 	viodasd_end_request(req, !error, num_sect);
-	spin_unlock(qlock);
+	spin_unlock_irqrestore(qlock, irq_flags);
 
 	/* Finally, try to get more requests off of this device's queue */
 	viodasd_restart_all_queues_starting_from(device_no);
@@ -904,7 +642,7 @@ static int viodasd_handleReadWrite(struct vioblocklpevent *bevent)
 }
 
 /* This routine handles incoming block LP events */
-static void vioHandleBlockEvent(struct HvLpEvent *event)
+static void handle_block_event(struct HvLpEvent *event)
 {
 	struct vioblocklpevent *bevent = (struct vioblocklpevent *)event;
 	struct viodasd_waitevent *pwe;
@@ -914,7 +652,7 @@ static void vioHandleBlockEvent(struct HvLpEvent *event)
 		return;
 	/* First, we should NEVER get an int here...only acks */
 	if (event->xFlags.xFunction == HvLpEvent_Function_Int) {
-		printk(KERN_WARNING_VIO
+		printk(VIOD_KERN_WARNING
 		       "Yikes! got an int in viodasd event handler!\n");
 		if (event->xFlags.xAckInd == HvLpEvent_AckInd_DoAck) {
 			event->xRc = HvLpEvent_Rc_InvalidSubtype;
@@ -928,159 +666,42 @@ static void vioHandleBlockEvent(struct HvLpEvent *event)
 		 * Handle a response to an open request.  We get all the
 		 * disk information in the response, so update it.  The
 		 * correlation token contains a pointer to a waitevent
-		 * structure that has a semaphore in it.  update the
+		 * structure that has a completion in it.  update the
 		 * return code in the waitevent structure and post the
-		 * semaphore to wake up the guy who sent the request
+		 * completion to wake up the guy who sent the request
 		 */
 		pwe = (struct viodasd_waitevent *)event->xCorrelationToken;
 		pwe->rc = event->xRc;
-		pwe->data.subRC = bevent->mSubTypeRc;
+		pwe->sub_result = bevent->sub_result;
 		if (event->xRc == HvLpEvent_Rc_Good) {
-			const struct openData *data = &bevent->u.openData;
+			const struct open_data *data = &bevent->u.open_data;
 			struct viodasd_device *device =
-				&viodasd_devices[bevent->mDisk];
-			device->readOnly =
-				bevent->mFlags & vioblockflags_ro;
-			device->size = data->mDiskLen;
-			device->cylinders = data->mCylinders;
-			device->tracks = data->mTracks;
-			device->sectors = data->mSectors;
-			device->bytesPerSector = data->mBytesPerSector;
-			viodasd_max_disk = data->mMaxDisks;
+				&viodasd_devices[bevent->disk];
+			device->read_only =
+				bevent->flags & vioblockflags_ro;
+			device->size = data->disk_size;
+			device->cylinders = data->cylinders;
+			device->tracks = data->tracks;
+			device->sectors = data->sectors;
+			device->bytes_per_sector = data->bytes_per_sector;
+			pwe->max_disk = data->max_disk;
 		}
-		up(pwe->sem);
+		complete(&pwe->com);
 		break;
 	case vioblockclose:
 		break;
-	case vioblockcheck:
-		pwe = (struct viodasd_waitevent *)event->xCorrelationToken;
-		pwe->rc = event->xRc;
-		pwe->data.changed = bevent->u.changed;
-		up(pwe->sem);
-		break;
-	case vioblockflush:
-		up((void *)event->xCorrelationToken);
-		break;
 	case vioblockread:
 	case vioblockwrite:
-		viodasd_handleReadWrite(bevent);
+		viodasd_handle_read_write(bevent);
 		break;
 
 	default:
-		printk(KERN_WARNING_VIO "invalid subtype!");
+		printk(VIOD_KERN_WARNING "invalid subtype!");
 		if (event->xFlags.xAckInd == HvLpEvent_AckInd_DoAck) {
 			event->xRc = HvLpEvent_Rc_InvalidSubtype;
 			HvCallEvent_ackLpEvent(event);
 		}
 	}
-}
-
-static const char *major_name(int major)
-{
-	static char major_names[NUM_MAJORS][MAX_DISK_NAME];
-	int index = major_to_index(major);
-
-	if (index < 0)
-		return NULL;
-	if (major_names[index][0] == '\0') {
-		if (index == 0)
-			strcpy(major_names[index], VIOD_GENHD_NAME);
-		else
-			sprintf(major_names[index], VIOD_GENHD_NAME"%d", index);
-	}
-	return major_names[index];
-}
-
-static const char *disk_names(int diskno)
-{
-        static char name[MAX_DISK_NAME];
-        char suffix[MAX_DISK_NAME];
-        int idx = 0;
-        int i, j;
-
-        /* convert the disk number to a letter(s) */
-        /* 0=a 25=z 26=aa 27=a, ....              */
-        do {
-                suffix[idx++] = 'a' + (diskno % 26);
-                diskno /= 26;
-        } while (diskno-- && (idx < MAX_DISK_NAME - 1));
-
-        suffix[idx] = 0;
-        /* reverse the array */
-        for (i = 0, j = idx - 1; i < j; i++, j--) {
-                char c = suffix[i];
-		suffix[i] = suffix[j];
-		suffix[j] = c;
-	}
-
-        /* put the name all together and return it */
-        snprintf(name, MAX_DISK_NAME, "%s%s", VIOD_GENHD_NAME, suffix);
-        return name;
-}
-
-static void viodasd_cleanup_major(int major)
-{
-	int i;
-
-        for (i = 0; i < DEV_PER_MAJOR; i++) {
-		int device_no = DEV_PER_MAJOR * major_to_index(major) + i;
-
-		blk_cleanup_queue(viodasd_devices[device_no].disk->queue);
-		del_gendisk(viodasd_devices[device_no].disk);
-		put_disk(viodasd_devices[device_no].disk);
-		kfree(viodasd_devices[device_no].disk);
-		unregister_blkdev(major, major_name(major));
-		viodasd_devices[device_no].disk = NULL;
-	}
-}
-
-/* in case of bad return code, caller must cleanup2() for this device */
-static int __init viodasd_init_major(int major)
-{
-	struct gendisk *gendisk;
-	struct request_queue *q;
-	int i;
-
-        /* register the block device */
-	if (register_blkdev(major, major_name(major))) {
-		printk(KERN_WARNING "Unable to get major number %d for %s\n",
-				major, major_name(major));
-		return -1;
-	}
-	for (i = 0; i < DEV_PER_MAJOR; i++) {
-		int deviceno = DEV_PER_MAJOR * major_to_index(major) + i;
-
-		/* create the request queue for the disk */
-		spin_lock_init(&viodasd_devices[deviceno].q_lock);
-		q = blk_init_queue(do_viodasd_request,
-				&viodasd_devices[deviceno].q_lock);
-		if (q == NULL)
-			return -ENOMEM;
-		blk_queue_max_hw_segments(q, VIOMAXBLOCKDMA);
-		blk_queue_max_sectors(q, VIODASD_MAXSECTORS);
-		viodasd_devices[deviceno].queue = q;
-
-		/* inialize the struct */
-		gendisk = alloc_disk(1 << PARTITION_SHIFT);
-		if (gendisk == NULL)
-			return -ENOMEM;
-		viodasd_devices[deviceno].disk = gendisk;
-		gendisk->major = major;
-		gendisk->first_minor = i * (1 << PARTITION_SHIFT);
-		strncpy(gendisk->disk_name, disk_names(deviceno),
-				MAX_DISK_NAME);
-		strncpy(gendisk->devfs_name, disk_names(deviceno),
-				MAX_DISK_NAME);
-		gendisk->fops = &viodasd_fops;
-		gendisk->queue = q;
-		gendisk->private_data = (void *)&viodasd_devices[deviceno];
-		set_capacity(gendisk, viodasd_devices[deviceno].size >> 9);
-
-		/* register us in the global list */
-		add_disk(gendisk);
-	}
-
-	return 0;
 }
 
 /*
@@ -1089,7 +710,7 @@ static int __init viodasd_init_major(int major)
  */
 static int __init viodasd_init(void)
 {
-	int i, j;
+	int i;
 
 	/* Try to open to our host lp */
 	if (viopath_hostLp == HvLpIndexInvalid)
@@ -1100,73 +721,66 @@ static int __init viodasd_init(void)
 		return -EIO;
 	}
 
-	printk(VIOD_KERN_INFO "Disk vers " VIODASD_VERS
-			", major %d, max disks %d, hosting partition %d\n",
-			major_table[0], MAX_DISKNO, viopath_hostLp);
+	printk(VIOD_KERN_INFO "vers " VIOD_VERS ", hosting partition %d\n",
+			viopath_hostLp);
 
+        /* register the block device */
+	if (register_blkdev(VIODASD_MAJOR, VIOD_GENHD_NAME)) {
+		printk(VIOD_KERN_WARNING
+				"Unable to get major number %d for %s\n",
+				VIODASD_MAJOR, VIOD_GENHD_NAME);
+		return -EIO;
+	}
 	/* Actually open the path to the hosting partition */
 	if (viopath_open(viopath_hostLp, viomajorsubtype_blockio,
 				VIOMAXREQ + 2)) {
-		printk(KERN_WARNING_VIO
+		printk(VIOD_KERN_WARNING
 		       "error opening path to host partition %d\n",
 		       viopath_hostLp);
+		unregister_blkdev(VIODASD_MAJOR, VIOD_GENHD_NAME);
 		return -EIO;
-	} else
-		printk(VIOD_KERN_INFO "opened path to hosting partition %d\n",
-				viopath_hostLp);
+	}
 
-	/*
-	 * Initialize our request handler
-	 */
-	vio_setHandler(viomajorsubtype_blockio, vioHandleBlockEvent);
+	/* Initialize our request handler */
+	vio_setHandler(viomajorsubtype_blockio, handle_block_event);
 
 	viodasd_max_disk = MAX_DISKNO - 1;
 	for (i = 0; (i <= viodasd_max_disk) && (i < MAX_DISKNO); i++) {
-		// Note that internal_open has side effects:
-		//  a) it updates the size of the disk
-		//  b) it updates viodasd_max_disk
-		//  c) it registers the disk if it has not done so already
-		if (internal_open(i, vioblockflags_ro) == 0)
-			internal_release(i, vioblockflags_ro);
+		/*
+		 * Note that probe_disk has side effects:
+		 *  a) it updates the size of the disk
+		 *  b) it updates viodasd_max_disk
+		 *  c) it registers the disk if it has not done so already
+		 */
+		probe_disk(&viodasd_devices[i]);
 	}
 
-	printk(VIOD_KERN_INFO "Currently %d disks connected\n",
-			(int)viodasd_max_disk + 1);
 	if (viodasd_max_disk > (MAX_DISKNO - 1))
-		printk(KERN_INFO_VIO "Only examining the first %d\n",
-		       MAX_DISKNO);
-
-	for (i = 0; i < NUM_MAJORS; ++i) {
-		int init_rc = viodasd_init_major(major_table[i]);
-		if (init_rc < 0) {
-			for (j = 0; j <= i; ++j)
-				viodasd_cleanup_major(major_table[j]);
-			return init_rc;
-		}
-	}
-
-	/* 
-	 * Create the proc entry
-	 */
-	iSeries_proc_callback(&viodasd_proc_init);
+		printk(VIOD_KERN_INFO
+			"Only examining the first %d of %d disks connected\n",
+			MAX_DISKNO, viodasd_max_disk + 1);
 
 	return 0;
 }
 module_init(viodasd_init);
 
-#if 0
 void viodasd_exit(void)
 {
 	int i;
-	for(i = 0; i < NUM_MAJORS; ++i)
-		viodasd_cleanup_major(major_table[i]);
+	struct viodasd_device *d;
 
-	CLEANIT(viodasd_devices);
-
+        for (i = 0; i < MAX_DISKNO; i++) {
+		d = &viodasd_devices[i];
+		if (d->disk) {
+			del_gendisk(d->disk);
+			put_disk(d->disk);
+			blk_cleanup_queue(d->disk->queue);
+			d->disk = NULL;
+		}
+	}
+	vio_clearHandler(viomajorsubtype_blockio);
+	unregister_blkdev(VIODASD_MAJOR, VIOD_GENHD_NAME);
 	viopath_close(viopath_hostLp, viomajorsubtype_blockio, VIOMAXREQ + 2);
-	iSeries_proc_callback(&viodasd_proc_delete);
-
 }
 
 module_exit(viodasd_exit);
-#endif

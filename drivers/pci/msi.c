@@ -142,6 +142,7 @@ static void set_msi_affinity(unsigned int vector, cpumask_t cpu_mask)
 	}
 }
 
+#ifdef CONFIG_IRQBALANCE
 static inline void move_msi(int vector)
 {
 	if (!cpus_empty(pending_irq_balance_cpumask[vector])) {
@@ -149,7 +150,8 @@ static inline void move_msi(int vector)
 		cpus_clear(pending_irq_balance_cpumask[vector]);
 	}
 }
-#endif
+#endif /* CONFIG_IRQBALANCE */
+#endif /* CONFIG_SMP */
 
 static void mask_MSI_irq(unsigned int vector)
 {

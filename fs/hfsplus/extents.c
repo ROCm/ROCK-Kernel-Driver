@@ -211,7 +211,7 @@ int hfsplus_get_block(struct inode *inode, sector_t iblock,
 	up(&HFSPLUS_I(inode).extents_lock);
 
 done:
-	dprint(DBG_EXTENT, "get_block(%lu): %lu - %u\n", inode->i_ino, iblock, dblock);
+	dprint(DBG_EXTENT, "get_block(%lu): %llu - %u\n", inode->i_ino, (long long)iblock, dblock);
 	mask = (1 << HFSPLUS_SB(sb).fs_shift) - 1;
 	map_bh(bh_result, sb, (dblock << HFSPLUS_SB(sb).fs_shift) + HFSPLUS_SB(sb).blockoffset + (iblock & mask));
 	if (create) {

@@ -35,6 +35,7 @@ EXPORT_SYMBOL(nr_cpus_in_node);
 
 struct pglist_data node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
+static unsigned long node0_io_hole_size;
 
 EXPORT_SYMBOL(node_data);
 
@@ -119,6 +120,7 @@ static int __init parse_numa_properties(void)
 		unsigned long size = 0;
 		int numa_domain;
 		int ranges;
+		int propsize;
 
 		tmp1 = (int *)get_property(memory, "reg", NULL);
 		if (!tmp1)
@@ -145,10 +147,21 @@ new_range:
 		if ((start + size) > MAX_MEMORY)
 			BUG();
 
+		/* Some versions of OF sometimes have an empty property for
+		 * associativity, so we need to get the size too.
+		 */
 		tmp2 = (int *)get_property(memory, "ibm,associativity",
-					   NULL);
+					   &propsize);
 		if (!tmp2)
 			continue;
+
+		if (!propsize) {
+			printk(KERN_INFO "Buggy OF? Empty ibm,associativity "
+			       "property for %s. Disabling NUMA.\n",
+			       memory->full_name);
+			goto err;
+		}
+
 		numa_domain = tmp2[depth];
 
 		/* FIXME */
@@ -209,7 +222,14 @@ err:
 
 static void __init setup_nonnuma(void)
 {
+	unsigned long top_of_ram = lmb_end_of_DRAM();
+	unsigned long total_ram = lmb_phys_mem_size();
 	unsigned long i;
+
+	printk(KERN_INFO "Top of RAM: 0x%lx, Total RAM: 0x%lx\n",
+	       top_of_ram, total_ram);
+	printk(KERN_INFO "Memory hole size: %ldMB\n",
+	       (top_of_ram - total_ram) >> 20);
 
 	for (i = 0; i < NR_CPUS; i++)
 		map_cpu_to_node(i, 0);
@@ -219,8 +239,10 @@ static void __init setup_nonnuma(void)
 	node_data[0].node_start_pfn = 0;
 	node_data[0].node_spanned_pages = lmb_end_of_DRAM() / PAGE_SIZE;
 
-	for (i = 0 ; i < lmb_end_of_DRAM(); i += MEMORY_INCREMENT)
+	for (i = 0 ; i < top_of_ram; i += MEMORY_INCREMENT)
 		numa_memory_lookup_table[i >> MEMORY_INCREMENT_SHIFT] = 0;
+
+	node0_io_hole_size = top_of_ram - total_ram;
 }
 
 void __init do_init_bootmem(void)
@@ -313,11 +335,12 @@ void __init do_init_bootmem(void)
 void __init paging_init(void)
 {
 	unsigned long zones_size[MAX_NR_ZONES];
-	int i, nid;
+	unsigned long zholes_size[MAX_NR_ZONES];
 	struct page *node_mem_map; 
+	int nid;
 
-	for (i = 1; i < MAX_NR_ZONES; i++)
-		zones_size[i] = 0;
+	memset(zones_size, 0, sizeof(zones_size));
+	memset(zholes_size, 0, sizeof(zholes_size));
 
 	for (nid = 0; nid < numnodes; nid++) {
 		unsigned long start_pfn;
@@ -327,8 +350,12 @@ void __init paging_init(void)
 		end_pfn = plat_node_bdata[nid].node_low_pfn;
 
 		zones_size[ZONE_DMA] = end_pfn - start_pfn;
-		dbg("free_area_init node %d %lx %lx\n", nid,
-				zones_size[ZONE_DMA], start_pfn);
+		zholes_size[ZONE_DMA] = 0;
+		if (nid == 0)
+			zholes_size[ZONE_DMA] = node0_io_hole_size;
+
+		dbg("free_area_init node %d %lx %lx (hole: %lx)\n", nid,
+		    zones_size[ZONE_DMA], start_pfn, zholes_size[ZONE_DMA]);
 
 		/* 
 		 * Give this empty node a dummy struct page to avoid
@@ -341,6 +368,6 @@ void __init paging_init(void)
 			node_mem_map = NULL;
 
 		free_area_init_node(nid, NODE_DATA(nid), node_mem_map,
-				    zones_size, start_pfn, NULL);
+				    zones_size, start_pfn, zholes_size);
 	}
 }

@@ -73,12 +73,4 @@ int  dma_region_mmap(struct dma_region *dma, struct file *file, struct vm_area_s
    relative to the beginning of the dma_region */
 dma_addr_t dma_region_offset_to_bus(struct dma_region *dma, unsigned long offset);
 
-/* round up a number of bytes to be a multiple of the PAGE_SIZE */
-static inline unsigned long round_up_to_page(unsigned long len)
-{
-	if (len % PAGE_SIZE)
-		len += PAGE_SIZE - (len % PAGE_SIZE);
-	return len;
-}
-
 #endif /* IEEE1394_DMA_H */

@@ -357,7 +357,7 @@ static ssize_t mce_write(struct file *f, const char __user *buf, size_t sz, loff
 static struct file_operations mce_chrdev_ops = {
 	.read = mce_read,
 	.ioctl = mce_ioctl,
-//	.write = mce_write
+	//.write = mce_write
 };
 
 static struct miscdevice mce_log_device = {

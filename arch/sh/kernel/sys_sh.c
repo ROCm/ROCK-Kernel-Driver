@@ -17,6 +17,7 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/stat.h>
+#include <linux/syscalls.h>
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
@@ -200,7 +201,7 @@ asmlinkage int sys_ipc(uint call, int first, int second,
 			switch (version) {
 			default: {
 				ulong raddr;
-				ret = sys_shmat (first, (char __user *) ptr,
+				ret = do_shmat (first, (char __user *) ptr,
 						 second, &raddr);
 				if (ret)
 					return ret;
@@ -209,7 +210,7 @@ asmlinkage int sys_ipc(uint call, int first, int second,
 			case 1:	/* iBCS2 emulator entry point */
 				if (!segment_eq(get_fs(), get_ds()))
 					return -EINVAL;
-				return sys_shmat (first, (char __user *) ptr,
+				return do_shmat (first, (char __user *) ptr,
 						  second, (ulong *) third);
 			}
 		case SHMDT: 
@@ -240,16 +241,12 @@ asmlinkage int sys_uname(struct old_utsname * name)
 asmlinkage ssize_t sys_pread_wrapper(unsigned int fd, char * buf,
 			     size_t count, long dummy, loff_t pos)
 {
-	extern asmlinkage ssize_t sys_pread64(unsigned int fd, char * buf,
-					size_t count, loff_t pos);
 	return sys_pread64(fd, buf, count, pos);
 }
 
 asmlinkage ssize_t sys_pwrite_wrapper(unsigned int fd, const char * buf,
 			      size_t count, long dummy, loff_t pos)
 {
-	extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char * buf,
-					size_t count, loff_t pos);
 	return sys_pwrite64(fd, buf, count, pos);
 }
 

@@ -16,13 +16,12 @@
 #include <linux/notifier.h>
 #include <linux/init.h>
 #include <linux/sysrq.h>
+#include <linux/syscalls.h>
 #include <linux/interrupt.h>
 #include <linux/nmi.h>
 #ifdef CONFIG_KEXEC
 #include <linux/kexec.h>
 #endif
-
-asmlinkage void sys_sync(void);	/* it's really int */
 
 int panic_timeout;
 int panic_on_oops;

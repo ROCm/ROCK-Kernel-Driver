@@ -395,7 +395,7 @@ static struct {
 };
 
 #define NUM_FB_DRIVERS	(sizeof(fb_drivers)/sizeof(*fb_drivers))
-#define FBPIXMAPSIZE	8192
+#define FBPIXMAPSIZE	16384
 
 extern const char *global_mode_option;
 
@@ -412,52 +412,54 @@ static int ofonly __initdata = 0;
 /*
  * Drawing helpers.
  */
-u8 sys_inbuf(u8 *src)
+u8 sys_inbuf(struct fb_info *info, u8 *src)
 {	
 	return *src;
 }
 
-void sys_outbuf(u8 *src, u8 *dst, unsigned int size)
+void sys_outbuf(struct fb_info *info, u8 *dst, u8 *src, unsigned int size)
 {
 	memcpy(dst, src, size);
 }	
 
-void move_buf_aligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch, 
-			u32 s_pitch, u32 height)
+void fb_move_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
+			u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
+			u32 height)
 {
 	int i;
 
 	for (i = height; i--; ) {
-		info->pixmap.outbuf(src, dst, s_pitch);
+		buf->outbuf(info, dst, src, s_pitch);
 		src += s_pitch;
 		dst += d_pitch;
 	}
 }
 
-void move_buf_unaligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch, 
-			u32 height, u32 mask, u32 shift_high, u32 shift_low,
-			u32 mod, u32 idx)
+void fb_move_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf,
+			u8 *dst, u32 d_pitch, u8 *src, u32 idx,
+			u32 height, u32 shift_high, u32 shift_low,
+			u32 mod)
 {
+	u8 mask = (u8) (0xfff << shift_high), tmp;
 	int i, j;
-	u8 tmp;
 
 	for (i = height; i--; ) {
 		for (j = 0; j < idx; j++) {
-			tmp = info->pixmap.inbuf(dst+j);
+			tmp = buf->inbuf(info, dst+j);
 			tmp &= mask;
 			tmp |= *src >> shift_low;
-			info->pixmap.outbuf(&tmp, dst+j, 1);
+			buf->outbuf(info, dst+j, &tmp, 1);
 			tmp = *src << shift_high;
-			info->pixmap.outbuf(&tmp, dst+j+1, 1);
+			buf->outbuf(info, dst+j+1, &tmp, 1);
 			src++;
 		}
-		tmp = info->pixmap.inbuf(dst+idx);
+		tmp = buf->inbuf(info, dst+idx);
 		tmp &= mask;
 		tmp |= *src >> shift_low;
-		info->pixmap.outbuf(&tmp, dst+idx, 1);
+		buf->outbuf(info, dst+idx, &tmp, 1);
 		if (shift_high < mod) {
 			tmp = *src << shift_high;
-			info->pixmap.outbuf(&tmp, dst+idx+1, 1);
+			buf->outbuf(info, dst+idx+1, &tmp, 1);
 		}	
 		src++;
 		dst += d_pitch;
@@ -468,10 +470,10 @@ void move_buf_unaligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch,
  * we need to lock this section since fb_cursor
  * may use fb_imageblit()
  */
-u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
+char* fb_get_buffer_offset(struct fb_info *info, struct fb_pixmap *buf, u32 size)
 {
-	struct fb_pixmap *buf = &info->pixmap;
 	u32 align = buf->buf_align - 1, offset;
+	char *addr = buf->addr;
 
 	/* If IO mapped, we need to sync before access, no sharing of
 	 * the pixmap is done
@@ -479,7 +481,7 @@ u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
 	if (buf->flags & FB_PIXMAP_IO) {
 		if (info->fbops->fb_sync && (buf->flags & FB_PIXMAP_SYNC))
 			info->fbops->fb_sync(info);
-		return 0;
+		return addr;
 	}
 
 	/* See if we fit in the remaining pixmap space */
@@ -495,8 +497,9 @@ u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
 		offset = 0;
 	}
 	buf->offset = offset + size;
+	addr += offset;
 
-	return offset;
+	return addr;
 }
 
 #ifdef CONFIG_LOGO
@@ -868,6 +871,15 @@ static void try_to_load(int fb)
 	request_module("fb%d", fb);
 }
 #endif /* CONFIG_KMOD */
+
+void
+fb_load_cursor_image(struct fb_info *info)
+{
+	unsigned int width = (info->cursor.image.width + 7) >> 3;
+	u8 *data = (u8 *) info->cursor.image.data;
+
+	info->sprite.outbuf(info, info->sprite.addr, data, width);
+}
 
 int
 fb_cursor(struct fb_info *info, struct fb_cursor *sprite)
@@ -1276,6 +1288,21 @@ register_framebuffer(struct fb_info *fb_info)
 	if (fb_info->pixmap.inbuf == NULL)
 		fb_info->pixmap.inbuf = sys_inbuf;
 
+	if (fb_info->sprite.addr == NULL) {
+		fb_info->sprite.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
+		if (fb_info->sprite.addr) {
+			fb_info->sprite.size = FBPIXMAPSIZE;
+			fb_info->sprite.buf_align = 1;
+			fb_info->sprite.scan_align = 1;
+			fb_info->sprite.flags = FB_PIXMAP_DEFAULT;
+		}
+	}
+	fb_info->sprite.offset = 0;
+	if (fb_info->sprite.outbuf == NULL)
+		fb_info->sprite.outbuf = sys_outbuf;
+	if (fb_info->sprite.inbuf == NULL)
+		fb_info->sprite.inbuf = sys_inbuf;
+
 	registered_fb[i] = fb_info;
 
 	devfs_mk_cdev(MKDEV(FB_MAJOR, i),
@@ -1304,8 +1331,10 @@ unregister_framebuffer(struct fb_info *fb_info)
 		return -EINVAL;
 	devfs_remove("fb/%d", i);
 
-	if (fb_info->pixmap.addr)
+	if (fb_info->pixmap.addr && (fb_info->pixmap.flags & FB_PIXMAP_DEFAULT))
 		kfree(fb_info->pixmap.addr);
+	if (fb_info->sprite.addr && (fb_info->sprite.flags & FB_PIXMAP_DEFAULT))
+		kfree(fb_info->sprite.addr);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
 	return 0;
@@ -1460,8 +1489,9 @@ EXPORT_SYMBOL(fb_set_var);
 EXPORT_SYMBOL(fb_blank);
 EXPORT_SYMBOL(fb_pan_display);
 EXPORT_SYMBOL(fb_get_buffer_offset);
-EXPORT_SYMBOL(move_buf_unaligned);
-EXPORT_SYMBOL(move_buf_aligned);
+EXPORT_SYMBOL(fb_move_buf_unaligned);
+EXPORT_SYMBOL(fb_move_buf_aligned);
+EXPORT_SYMBOL(fb_load_cursor_image);
 EXPORT_SYMBOL(fb_set_suspend);
 EXPORT_SYMBOL(fb_register_client);
 EXPORT_SYMBOL(fb_unregister_client);

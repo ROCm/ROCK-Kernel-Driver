@@ -22,6 +22,7 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 #include <linux/compat.h>
 #include <asm/kbio.h>
 
@@ -90,10 +91,7 @@ struct ifconf32 {
         compat_caddr_t  ifcbuf;
 };
 
-extern asmlinkage int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
-
 extern asmlinkage int compat_sys_ioctl(unsigned int, unsigned int, u32);
-extern asmlinkage int sys_setsid(void);
 
 asmlinkage int sunos_ioctl (int fd, u32 cmd, u32 arg)
 {

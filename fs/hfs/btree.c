@@ -1,5 +1,5 @@
 /*
- *  linux/fs/hfsplus/btree.c
+ *  linux/fs/hfs/btree.c
  *
  * Copyright (C) 2001
  * Brad Boyer (flar@allandria.com)
@@ -32,7 +32,7 @@ struct hfs_btree *hfs_btree_open(struct super_block *sb, u32 id, btree_keycmp ke
 	tree->sb = sb;
 	tree->cnid = id;
 	tree->keycmp = keycmp;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
+
 	tree->inode = iget_locked(sb, id);
 	if (!tree->inode)
 		goto free_tree;
@@ -58,11 +58,6 @@ struct hfs_btree *hfs_btree_open(struct super_block *sb, u32 id, btree_keycmp ke
 	}
 	}
 	unlock_new_inode(tree->inode);
-#else
-	tree->inode = iget(sb, id);
-	if (!tree->inode)
-		goto free_tree;
-#endif
 
 	mapping = tree->inode->i_mapping;
 	page = read_cache_page(mapping, 0, (filler_t *)mapping->a_ops->readpage, NULL);
@@ -119,7 +114,7 @@ void hfs_btree_close(struct hfs_btree *tree)
 		while ((node = tree->node_hash[i])) {
 			tree->node_hash[i] = node->next_hash;
 			if (atomic_read(&node->refcnt))
-				printk("HFS+: node %d:%d still has %d user(s)!\n",
+				printk("HFS: node %d:%d still has %d user(s)!\n",
 					node->tree->cnid, node->this, atomic_read(&node->refcnt));
 			hfs_bnode_free(node);
 			tree->node_hash_cnt--;

@@ -1,3 +1,10 @@
+/*
+ *  linux/fs/hfs/btree.h
+ *
+ * Copyright (C) 2001
+ * Brad Boyer (flar@allandria.com)
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
+ */
 
 #include "hfs_fs.h"
 
@@ -5,7 +12,7 @@ typedef int (*btree_keycmp)(const btree_key *, const btree_key *);
 
 #define NODE_HASH_SIZE  256
 
-/* An HFS+ BTree held in memory */
+/* A HFS BTree held in memory */
 struct hfs_btree {
 	struct super_block *sb;
 	struct inode *inode;
@@ -34,7 +41,7 @@ struct hfs_btree {
 	int node_hash_cnt;
 };
 
-/* An HFS+ BTree node in memory */
+/* A HFS BTree node in memory */
 struct hfs_bnode {
 	struct hfs_btree *tree;
 

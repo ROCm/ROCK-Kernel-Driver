@@ -51,7 +51,7 @@
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/pci-bridge.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/dma.h>
 #include <asm/machdep.h>
 #include <asm/irq.h>
@@ -252,11 +252,9 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
 		ppc_md.init_IRQ       = pSeries_init_openpic; 
-		ppc_md.init_irq_desc  = openpic_init_irq_desc;
 		ppc_md.get_irq        = openpic_get_irq;
 	} else {
 		ppc_md.init_IRQ       = xics_init_IRQ;
-		ppc_md.init_irq_desc  = xics_init_irq_desc;
 		ppc_md.get_irq        = xics_get_irq;
 	}
 

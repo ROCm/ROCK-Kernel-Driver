@@ -29,8 +29,28 @@
 #include <asm/hvcall.h>
 #include <asm/cputable.h>
 
-#define MODULE_VERSION "1.0"
+#define MODULE_VERS "1.1"
 #define MODULE_NAME "lparcfg"
+
+/* #define LPARCFG_DEBUG */
+
+/* find a better place for this function... */
+void log_plpar_hcall_return(unsigned long rc,char * tag)
+{
+	if (rc==0) /* success, return */
+		return;
+/* check for null tag ? */
+	if (rc == H_Hardware)
+		printk("plpar-hcall (%s) failed with hardware fault\n",tag);
+	else if (rc == H_Function)
+		printk("plpar-hcall (%s) failed; function not allowed\n",tag);
+	else if (rc == H_Authority)
+		printk("plpar-hcall (%s) failed; not authorized to this function\n",tag);
+	else
+		printk("plpar-hcall (%s) failed with unexpected rc(0x%lx)\n",tag,rc);
+
+}
+
 
 static struct proc_dir_entry *proc_ppc64_lparcfg;
 #define LPARCFG_BUFF_SIZE 4096
@@ -217,7 +237,7 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
  *          XXXX - reserved (0)
  *              XXXX - Group Number
  *                  XXXX - Pool Number.
- *  R7 (PPOONNMMLLKKJJII)
+ *  R7 (IIJJKKLLMMNNOOPP).
  *      XX - reserved. (0)
  *        XX - bit 0-6 reserved (0).   bit 7 is Capped indicator.
  *          XX - variable processor Capacity Weight
@@ -229,72 +249,132 @@ unsigned int h_get_ppp(unsigned long *entitled,unsigned long  *unallocated,unsig
 {
 	unsigned long rc;
 	rc = plpar_hcall_4out(H_GET_PPP,0,0,0,0,entitled,unallocated,aggregation,resource);
+
+	log_plpar_hcall_return(rc,"H_GET_PPP");
+
 	return 0;
 }
 
-/*
- * get_splpar_potential_characteristics().
- * Retrieve the potential_processors and max_entitled_capacity values
- * through the get-system-parameter rtas call.
- */
+unsigned int h_pic(unsigned long *pool_idle_time,unsigned long *num_procs)
+{
+	unsigned long rc;
+	unsigned long dummy;
+	rc = plpar_hcall(H_PIC,0,0,0,0,pool_idle_time,num_procs,&dummy);
+
+	log_plpar_hcall_return(rc,"H_PIC");
+
+	return 0;
+}
+
+/* prototyping h_purr functionality.  this may need to be moved into decrementer code. */
+unsigned int h_purr(unsigned long *purr)
+{
+	unsigned long rc;
+
+	unsigned long dummy;
+	rc = plpar_hcall(H_PURR, 0, 0, 0, 0,purr, &dummy, &dummy);
+
+	log_plpar_hcall_return(rc,"H_PURR");
+	return 0;
+}
+
 #define SPLPAR_CHARACTERISTICS_TOKEN 20
 #define SPLPAR_MAXLENGTH 1026*(sizeof(char))
-unsigned int get_splpar_potential_characteristics(void)
+
+/*
+ * parse_system_parameter_string()
+ * Retrieve the potential_processors, max_entitled_capacity and friends 
+ * through the get-system-parameter rtas call.  Replace keyword strings as
+ * necessary, and add the contents to 'buf'.
+ */
+unsigned long parse_system_parameter_string(unsigned long n, char * buf)
 {
-	/* return 0 for now.  Underlying rtas functionality is not yet complete. 12/01/2003*/
-	return 0; 
-#if 0 
 	long call_status;
 	unsigned long ret[2];
 
-	char * buffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
+	char * local_buffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
 
-	printk("token for ibm,get-system-parameter (0x%x)\n",rtas_token("ibm,get-system-parameter"));
-
-	call_status = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
-				NULL,
-				SPLPAR_CHARACTERISTICS_TOKEN,
-				&buffer,
-				SPLPAR_MAXLENGTH,
-				(void *)&ret);
+	{
+		spin_lock(&rtas_data_buf_lock);
+		memset(rtas_data_buf, 0, SPLPAR_MAXLENGTH); 
+		call_status = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
+					NULL,
+					SPLPAR_CHARACTERISTICS_TOKEN,
+					__pa(rtas_data_buf),
+					SPLPAR_MAXLENGTH,
+					(void *)&ret);
+		memcpy(local_buffer,rtas_data_buf, SPLPAR_MAXLENGTH);
+		spin_unlock(&rtas_data_buf_lock);
+	}
 
 	if (call_status!=0) {
-		printk("Error calling get-system-parameter (0x%lx)\n",call_status);
-		kfree(buffer);
-		return -1;
+		printk("%s %s Error calling get-system-parameter (0x%lx)\n",__FILE__,__FUNCTION__,call_status);
 	} else {
-		printk("get-system-parameter (%s)\n",buffer);
-		kfree(buffer);
-		/* TODO: Add code here to parse out value for system_potential_processors and partition_max_entitled_capacity */
-		return 1;
-	}
+		int splpar_strlen;
+#ifdef LPARCFG_DEBUG
+		printk("success calling get-system-parameter \n");
 #endif
+		splpar_strlen=local_buffer[0]*16+local_buffer[1];
+		local_buffer+=2; /* step over strlen value */
+
+		char * workbuffer = kmalloc(SPLPAR_MAXLENGTH, GFP_KERNEL);
+		int idx,w_idx;
+		memset(workbuffer, 0, SPLPAR_MAXLENGTH);
+		w_idx=0; idx=0;
+		while ((*local_buffer) && (idx<splpar_strlen)) {
+			workbuffer[w_idx++]=local_buffer[idx++];
+			if ((local_buffer[idx]==',')||(local_buffer[idx]=='\0')) {
+				workbuffer[w_idx]='\0';
+				if (w_idx) /* avoid the empty string */
+				{
+					n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+						      "%s\n",workbuffer);
+				}
+				memset(workbuffer, 0, SPLPAR_MAXLENGTH);
+				idx++; /* skip the comma */
+				w_idx=0;
+			} else if (local_buffer[idx]=='=') {
+				/* code here to replace workbuffer contents
+				 with different keyword strings */
+				if (0==strcmp(workbuffer,"MaxEntCap")) {
+					strcpy(workbuffer,"partition_max_entitled_capacity\0");
+					w_idx=strlen(workbuffer);
+				}
+				if (0==strcmp(workbuffer,"MaxPlatProcs")) {
+					strcpy(workbuffer,"system_potential_processors\0");
+					w_idx=strlen(workbuffer);
+				}
+			}
+		}
+		kfree(workbuffer);
+		local_buffer-=2; /* back up over strlen value */
+	}
+	kfree(local_buffer);
+	return n;
 }
 
 static int lparcfg_data(unsigned char *buf, unsigned long size)
 {
-	unsigned long n = 0;
-	int shared, max_entitled_capacity;
-	int processors, system_active_processors, system_potential_processors;
-	struct device_node *root;
+	unsigned long n = 0;		/* scnprintf index */
+	int system_active_processors;
+	struct device_node *rootdn;
 	const char *model = "";
 	const char *system_id = "";
 	unsigned int *lp_index_ptr, lp_index = 0;
 	struct device_node *rtas_node;
-	int *ip;
-	unsigned long h_entitled,h_unallocated,h_aggregation,h_resource;
+	int *lrdrp;
 
 	if((buf == NULL) || (size > LPARCFG_BUFF_SIZE)) {
 		return -EFAULT;
 	}
 	memset(buf, 0, size); 
 
-	root = find_path_device("/");
-	if (root) {
-		model = get_property(root, "model", NULL);
-		system_id = get_property(root, "system-id", NULL);
-		lp_index_ptr = (unsigned int *)get_property(root, "ibm,partition-no", NULL);
-		if(lp_index_ptr) lp_index = *lp_index_ptr;
+	rootdn = find_path_device("/");
+	if (rootdn) {
+		model = get_property(rootdn, "model", NULL);
+		system_id = get_property(rootdn, "system-id", NULL);
+		lp_index_ptr = (unsigned int *)get_property(rootdn, "ibm,partition-no", NULL);
+		if (lp_index_ptr) lp_index = *lp_index_ptr;
 	}
 
 	n  = scnprintf(buf, LPARCFG_BUFF_SIZE - n,
@@ -307,16 +387,20 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 		      "partition_id=%d\n", (int)lp_index); 
 
 	rtas_node = find_path_device("/rtas");
-	ip = (int *)get_property(rtas_node, "ibm,lrdr-capacity", NULL);
-	if (ip == NULL) {
+	lrdrp = (int *)get_property(rtas_node, "ibm,lrdr-capacity", NULL);
+
+	if (lrdrp == NULL) {
 		system_active_processors = systemcfg->processorCount; 
 	} else {
-		system_active_processors = *(ip + 4);
-	}
+		system_active_processors = *(lrdrp + 4);
+	} 
 
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
+		unsigned long h_entitled,h_unallocated,h_aggregation,h_resource;
+
 		h_get_ppp(&h_entitled,&h_unallocated,&h_aggregation,&h_resource);
-#ifdef DEBUG
+
+#ifdef LPARCFG_DEBUG
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "R4=0x%lx\n", h_entitled);
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
@@ -325,68 +409,93 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 			      "R6=0x%lx\n", h_aggregation);
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "R7=0x%lx\n", h_resource);
-#endif /* DEBUG */
-	}
+#endif /* LPARCFG_DEBUG */
 
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		system_potential_processors =  get_splpar_potential_characteristics();
+		/* this call handles the ibm,get-system-parameter contents */
+		n = parse_system_parameter_string(n,buf);
+
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
+			      "partition_entitled_capacity=%ld\n",
+			      h_entitled);
+
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
+			      "pool=%ld\n",
+			      (h_aggregation >> 0*8) & 0xffff);
+
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
+			      "group=%ld\n",
+			      (h_aggregation >> 2*8) & 0xffff);
+
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 			      "system_active_processors=%ld\n", 
 			      (h_resource >> 2*8) & 0xffff);
+
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "system_potential_processors=%d\n", 
-			      system_potential_processors);
-	} else {
-		system_potential_processors = system_active_processors;
+			      "pool_capacity=%ld\n",
+			      (h_resource >> 3*8) & 0xffff);
+
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "system_active_processors=%d\n", 
+			      "capacity_weight=%ld\n",
+			      (h_resource>>5*8) & 0xFF);
+
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
+			      "capped=%ld\n",
+			      (h_resource >> 6*8) & 0x40);
+
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
+			      "unallocated_variable_weight=%ld\n",
+			      (h_resource>>7*8) & 0xFF);
+
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
+			      "unallocated_capacity=%ld\n",
+			      h_unallocated);
+
+		unsigned long pool_idle_time,pool_procs;
+		h_pic(&pool_idle_time,&pool_procs);
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+			      "pool_idle_time=%ld\n",
+			      pool_idle_time);
+
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+			      "pool_num_procs=%ld\n",
+			      pool_procs);
+
+		unsigned long purr;
+		h_purr(&purr);
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+			      "purr=%ld\n",
+			      purr);
+
+	} else /* non SPLPAR case */ {
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n, 
+			      "system_active_processors=%d\n",
 			      system_active_processors);
+
 		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "system_potential_processors=%d\n", 
-			      system_potential_processors);
+			      "system_potential_processors=%d\n",
+			      system_active_processors);
+
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
+			      "partition_max_entitled_capacity=%d\n",
+			      100*system_active_processors);
+
+		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
+			      "partition_entitled_capacity=%d\n",
+			      system_active_processors*100);
 	}
 
-	processors = systemcfg->processorCount;
 	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-		      "partition_active_processors=%d\n", processors);  
+		      "partition_active_processors=%d\n",
+		      (int) systemcfg->processorCount);
+
 	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
 		      "partition_potential_processors=%d\n",
 		      system_active_processors);
 
-	/* max_entitled_capacity will come out of get_splpar_potential_characteristics() when that function is complete */
-	max_entitled_capacity = system_active_processors * 100; 
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "partition_entitled_capacity=%ld\n", h_entitled);
-	} else {
-		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "partition_entitled_capacity=%d\n", system_active_processors*100);
-	}
-
 	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-		      "partition_max_entitled_capacity=%d\n", 
-		      max_entitled_capacity);
+		      "shared_processor_mode=%d\n",
+		      paca[0].xLpPaca.xSharedProc);
 
-	shared = 0;
-	n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-		      "shared_processor_mode=%d\n", shared);
-
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "pool=%ld\n", (h_aggregation >> 0*8)&0xffff);
-
-		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "pool_capacity=%ld\n", (h_resource >> 3*8) &0xffff);
-
-		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "group=%ld\n", (h_aggregation >> 2*8)&0xffff);
-
-		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "capped=%ld\n", (h_resource >> 6*8)&0x40);
-
-		n += scnprintf(buf+n, LPARCFG_BUFF_SIZE - n,
-			      "capacity_weight=%d\n", (int)(h_resource>>5*8)&0xFF);
-	}
 	return 0;
 }
 

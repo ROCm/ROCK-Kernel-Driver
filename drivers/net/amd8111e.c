@@ -91,7 +91,7 @@ Revision History:
 
 #include "amd8111e.h"
 #define MODULE_NAME	"amd8111e"
-#define MODULE_VERSION	"3.0.3"
+#define MODULE_VERS	"3.0.3"
 MODULE_AUTHOR("Advanced Micro Devices, Inc.");
 MODULE_DESCRIPTION ("AMD8111 based 10/100 Ethernet Controller. Driver Version 3.0.3");
 MODULE_LICENSE("GPL");
@@ -1413,7 +1413,7 @@ static int amd8111e_ethtool_ioctl(struct net_device* dev, void* useraddr)
 	case ETHTOOL_GDRVINFO:{
 		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 		strcpy (info.driver, MODULE_NAME);
-		strcpy (info.version, MODULE_VERSION);
+		strcpy (info.version, MODULE_VERS);
 		memset(&info.fw_version, 0, sizeof(info.fw_version));
 		sprintf(info.fw_version,"%u",chip_version);
 		strcpy (info.bus_info, pci_name(pci_dev));
@@ -1931,7 +1931,7 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 	/*  display driver and device information */
 
     	chip_version = (readl(lp->mmio + CHIPID) & 0xf0000000)>>28;
-    	printk(KERN_INFO "%s: AMD-8111e Driver Version: %s\n",								 dev->name,MODULE_VERSION);
+    	printk(KERN_INFO "%s: AMD-8111e Driver Version: %s\n",								 dev->name,MODULE_VERS);
     	printk(KERN_INFO "%s: [ Rev %x ] PCI 10/100BaseT Ethernet ",							dev->name, chip_version);
     	for (i = 0; i < 6; i++)
 		printk("%2.2x%c",dev->dev_addr[i],i == 5 ? ' ' : ':');

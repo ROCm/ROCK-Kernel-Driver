@@ -11,6 +11,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/sockios.h>
+#include <linux/syscalls.h>
 #include <linux/tty.h>
 #include <linux/file.h>
 
@@ -26,9 +27,6 @@ struct irix_termios {
 	cc_t c_cc[NCCS];
 };
 
-extern asmlinkage int sys_ioctl(unsigned int fd, unsigned int cmd,
-				unsigned long arg);
-extern asmlinkage int sys_write(unsigned int fd,char * buf,unsigned int count);
 extern void start_tty(struct tty_struct *tty);
 static struct tty_struct *get_tty(int fd)
 {
