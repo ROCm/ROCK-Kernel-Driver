@@ -189,11 +189,8 @@ static inline void move_dquot_head(struct dquot *dquot)
 
 static inline void remove_free_dquot(struct dquot *dquot)
 {
-	/* sanity check */
-	if (list_empty(&dquot->dq_free)) {
-		printk("remove_free_dquot: dquot not on the free list??\n");
-		return;		/* J.K. Just don't do anything */
-	}
+	if (list_empty(&dquot->dq_free))
+		return;
 	list_del(&dquot->dq_free);
 	INIT_LIST_HEAD(&dquot->dq_free);
 	nr_free_dquots--;
@@ -330,24 +327,6 @@ out_lock:
 	unlock_dquot(dquot);
 }
 
-/*
- * Unhash and selectively clear the dquot structure,
- * but preserve the use count, list pointers, and
- * wait queue.
- */
-void clear_dquot(struct dquot *dquot)
-{
-	/* unhash it first */
-	remove_dquot_hash(dquot);
-	dquot->dq_sb = NULL;
-	dquot->dq_id = 0;
-	dquot->dq_dev = NODEV;
-	dquot->dq_type = -1;
-	dquot->dq_flags = 0;
-	dquot->dq_referenced = 0;
-	memset(&dquot->dq_dqb, 0, sizeof(struct dqblk));
-}
-
 /* Invalidate all dquots on the list, wait for all users. Note that this function is called
  * after quota is disabled so no new quota might be created. As we only insert to the end of
  * inuse list, we don't have to restart searching... */
@@ -363,6 +342,7 @@ restart:
 			continue;
 		if (dquot->dq_type != type)
 			continue;
+		dquot->dq_flags |= DQ_INVAL;
 		if (dquot->dq_count)
 			/*
 			 *  Wait for any users of quota. As we have already cleared the flags in
@@ -384,6 +364,7 @@ int sync_dquots(kdev_t dev, short type)
 	struct list_head *head;
 	struct dquot *dquot;
 
+	lock_kernel();
 restart:
 	for (head = inuse_list.next; head != &inuse_list; head = head->next) {
 		dquot = list_entry(head, struct dquot, dq_inuse);
@@ -405,6 +386,7 @@ restart:
 		goto restart;
 	}
 	dqstats.syncs++;
+	unlock_kernel();
 	return 0;
 }
 
@@ -428,7 +410,9 @@ static void prune_dqcache(int count)
 
 int shrink_dqcache_memory(int priority, unsigned int gfp_mask)
 {
+	lock_kernel();
 	prune_dqcache(nr_free_dquots / (priority + 1));
+	unlock_kernel();
 	kmem_cache_shrink(dquot_cachep);
 	return 0;
 }
@@ -465,12 +449,13 @@ we_slept:
 		return;
 	}
 	dquot->dq_count--;
-	/* Place at end of LRU free queue */
-	put_dquot_last(dquot);
+	/* If dquot is going to be invalidated invalidate_dquots() is going to free it so */
+	if (!(dquot->dq_flags & DQ_INVAL))
+		put_dquot_last(dquot);	/* Place at end of LRU free queue */
 	wake_up(&dquot->dq_wait_free);
 }
 
-struct dquot *get_empty_dquot(void)
+static struct dquot *get_empty_dquot(void)
 {
 	struct dquot *dquot;
 
@@ -633,9 +618,11 @@ put_it:
 /* Free list of dquots - called from inode.c */
 void put_dquot_list(struct list_head *tofree_head)
 {
-	struct list_head *act_head = tofree_head->next;
+	struct list_head *act_head;
 	struct dquot *dquot;
 
+	lock_kernel();
+	act_head = tofree_head->next;
 	/* So now we have dquots on the list... Just free them */
 	while (act_head != tofree_head) {
 		dquot = list_entry(act_head, struct dquot, dq_free);
@@ -644,6 +631,7 @@ void put_dquot_list(struct list_head *tofree_head)
 		INIT_LIST_HEAD(&dquot->dq_free);
 		dqput(dquot);
 	}
+	unlock_kernel();
 }
 
 static inline void dquot_incr_inodes(struct dquot *dquot, unsigned long number)
@@ -1289,6 +1277,7 @@ int quota_off(struct super_block *sb, short type)
 	short cnt;
 	struct quota_mount_options *dqopt = sb_dqopt(sb);
 
+	lock_kernel();
 	if (!sb)
 		goto out;
 
@@ -1313,6 +1302,7 @@ int quota_off(struct super_block *sb, short type)
 	}	
 	up(&dqopt->dqoff_sem);
 out:
+	unlock_kernel();
 	return 0;
 }
 

@@ -154,6 +154,7 @@ extern int dquot_root_squash;
 #define DQ_BLKS       0x10	/* uid/gid has been warned about blk limit */
 #define DQ_INODES     0x20	/* uid/gid has been warned about inode limit */
 #define DQ_FAKE       0x40	/* no limits only usage */
+#define DQ_INVAL      0x80	/* dquot is going to be invalidated */
 
 struct dquot {
 	struct list_head dq_hash;	/* Hash list in memory */

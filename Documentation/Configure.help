@@ -887,9 +887,15 @@ CONFIG_IDEDMA_PCI_AUTO
 
 IGNORE word93 Validation BITS
 CONFIG_IDEDMA_IVB
-  Since various rules were applied and created ... et al. as it
-  relates the detection of valid cable signals.  This is a result of
-  unclear terms in ATA-4 and ATA-5 standards.
+  There are unclear terms is ATA-4 and ATA-5 standards how certain
+  hardware (an 80c ribbon) should be detected. Different interpretations
+  of the standards have been released in hardware. This causes problems:
+  for example, a host with Ultra Mode 4 (or higher) will not run
+  in that mode with an 80c ribbon.
+
+  If you are experiencing compatibility or performance problems, you
+  MAY try to answering Y here. However, it does not necessarily solve
+  any of your problems, it could even cause more of them.
 
   It is normally safe to answer Y; however, the default is N.
 
