@@ -7,6 +7,7 @@
 #define __SPARC64_SPINLOCK_H
 
 #include <linux/config.h>
+#include <linux/threads.h>	/* For NR_CPUS */
 
 #ifndef __ASSEMBLY__
 
@@ -131,7 +132,7 @@ extern int __write_trylock(rwlock_t *);
 typedef struct {
 	unsigned long lock;
 	unsigned int writer_pc, writer_cpu;
-	unsigned int reader_pc[4];
+	unsigned int reader_pc[NR_CPUS];
 } rwlock_t;
 #define RW_LOCK_UNLOCKED	(rwlock_t) { 0, 0, 0xff, { 0, 0, 0, 0 } }
 #define rwlock_init(lp) do { *(lp) = RW_LOCK_UNLOCKED; } while(0)
