@@ -375,7 +375,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_printf(p, "%s", (irq_desc[i].status & IRQ_LEVEL) ? "Level " : "Edge  ");
 		seq_printf(p, "    %s", action->name);
 		for (action = action->next; action; action = action->next)
-				seq_printf(p, ", %s", action->name);
+			seq_printf(p, ", %s", action->name);
 		seq_putc(p, '\n');
 skip:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
@@ -684,7 +684,7 @@ static void register_irq_proc (unsigned int irq)
 	struct proc_dir_entry *entry;
 	char name [MAX_NAMELEN];
 
-	if (!root_irq_dir || (irq_desc[irq].handler == NULL))
+	if (!root_irq_dir || (irq_desc[irq].handler == NULL) || irq_dir[irq])
 		return;
 
 	memset(name, 0, MAX_NAMELEN);
