@@ -47,10 +47,9 @@
 #endif
 
 #ifdef NETIF_F_TSO
-/* XXX Disable until more performance analysis is done. */
-#define TG3_DO_TSO	0
+#define TG3_TSO_SUPPORT	1
 #else
-#define TG3_DO_TSO	0
+#define TG3_TSO_SUPPORT	0
 #endif
 
 #include "tg3.h"
@@ -2690,7 +2689,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 	base_flags = 0;
 	if (skb->ip_summed == CHECKSUM_HW)
 		base_flags |= TXD_FLAG_TCPUDP_CSUM;
-#if TG3_DO_TSO != 0
+#if TG3_TSO_SUPPORT != 0
 	mss = 0;
 	if (skb->len > (tp->dev->mtu + ETH_HLEN) &&
 	    (mss = skb_shinfo(skb)->tso_size) != 0) {
@@ -2897,7 +2896,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	base_flags = 0;
 	if (skb->ip_summed == CHECKSUM_HW)
 		base_flags |= TXD_FLAG_TCPUDP_CSUM;
-#if TG3_DO_TSO != 0
+#if TG3_TSO_SUPPORT != 0
 	mss = 0;
 	if (skb->len > (tp->dev->mtu + ETH_HLEN) &&
 	    (mss = skb_shinfo(skb)->tso_size) != 0) {
@@ -3886,7 +3885,7 @@ static int tg3_load_5701_a0_firmware_fix(struct tg3 *tp)
 	return 0;
 }
 
-#if TG3_DO_TSO != 0
+#if TG3_TSO_SUPPORT != 0
 
 #define TG3_TSO_FW_RELEASE_MAJOR	0x1
 #define TG3_TSO_FW_RELASE_MINOR		0x3
@@ -4474,7 +4473,7 @@ static int tg3_load_tso_firmware(struct tg3 *tp)
 	return 0;
 }
 
-#endif /* TG3_DO_TSO != 0 */
+#endif /* TG3_TSO_SUPPORT != 0 */
 
 /* tp->lock is held. */
 static void __tg3_set_mac_addr(struct tg3 *tp)
@@ -4673,7 +4672,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 		tw32(BUFMGR_DMA_DESC_POOL_ADDR, NIC_SRAM_DMA_DESC_POOL_BASE);
 		tw32(BUFMGR_DMA_DESC_POOL_SIZE, NIC_SRAM_DMA_DESC_POOL_SIZE);
 	}
-#if TG3_DO_TSO != 0
+#if TG3_TSO_SUPPORT != 0
 	else if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) {
 		int fw_len;
 
@@ -5034,7 +5033,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 			return err;
 	}
 
-#if TG3_DO_TSO != 0
+#if TG3_TSO_SUPPORT != 0
 	if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) {
 		err = tg3_load_tso_firmware(tp);
 		if (err)
@@ -6033,6 +6032,28 @@ static void tg3_set_msglevel(struct net_device *dev, u32 value)
 	tp->msg_enable = value;
 }
   
+static u32 tg3_get_tso(struct net_device *dev)
+{
+	return (dev->features & NETIF_F_TSO) != 0;
+}
+  
+static int tg3_set_tso(struct net_device *dev, u32 value)
+{
+	struct tg3 *tp = dev->priv;
+
+	if (!(tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE)) {
+		if (value)
+			return -EINVAL;
+		return 0;
+	} else {
+		if (!value)
+			dev->features &= ~NETIF_F_TSO;
+		else
+			dev->features |= NETIF_F_TSO;
+		return 0;
+	}
+}
+  
 static int tg3_nway_reset(struct net_device *dev)
 {
 	struct tg3 *tp = dev->priv;
@@ -6272,6 +6293,8 @@ static struct ethtool_ops tg3_ethtool_ops = {
 	.set_tx_csum		= tg3_set_tx_csum,
 	.get_sg			= ethtool_op_get_sg,
 	.set_sg			= ethtool_op_set_sg,
+	.get_tso		= tg3_get_tso,
+	.set_tso		= tg3_set_tso,
 };
 
 /* Chips other than 5700/5701 use the NVRAM for fetching info. */
@@ -7656,7 +7679,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 			DEFAULT_MB_HIGH_WATER_5705;
 	}
 
-#if TG3_DO_TSO != 0
+#if TG3_TSO_SUPPORT != 0
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 ||
 	    tp->pci_chip_rev_id == CHIPREV_ID_5705_A0 ||
@@ -7666,8 +7689,13 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	} else {
 		tp->tg3_flags2 |= TG3_FLG2_TSO_CAPABLE;
 	}
+
+	/* TSO is off by default, user can enable using ethtool.  */
+#if 0
 	if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE)
 		dev->features |= NETIF_F_TSO;
+#endif
+
 #endif
 
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5705_A1 &&
