@@ -1711,7 +1711,7 @@ static void snd_via82xx_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *bu
 	
 	snd_iprintf(buffer, "%s\n\n", chip->card->longname);
 	for (i = 0; i < 0xa0; i += 4) {
-		snd_iprintf(buffer, "%02x: %08x", i, inl(chip->port + i));
+		snd_iprintf(buffer, "%02x: %08x\n", i, inl(chip->port + i));
 	}
 }
 
