@@ -1232,7 +1232,7 @@ static int set_format(snd_usb_substream_t *subs, struct audioformat *fmt)
 				   dev->devnum, fmt->iface, fmt->altsetting);
 			return -EIO;
 		}
-		snd_printdd(KERN_INFO "setting usb interface %d:%d\n", fmt->iface, fmt->altset_idx);
+		snd_printdd(KERN_INFO "setting usb interface %d:%d\n", fmt->iface, fmt->altsetting);
 		subs->interface = fmt->iface;
 		subs->format = fmt->altset_idx;
 	}
@@ -1953,7 +1953,7 @@ static void proc_dump_substream_formats(snd_usb_substream_t *subs, snd_info_buff
 		struct audioformat *fp;
 		fp = list_entry(p, struct audioformat, list);
 		snd_iprintf(buffer, "  Interface %d\n", fp->iface);
-		snd_iprintf(buffer, "    Altset %d\n", fp->altset_idx);
+		snd_iprintf(buffer, "    Altset %d\n", fp->altsetting);
 		snd_iprintf(buffer, "    Format: %s\n", snd_pcm_format_name(fp->format));
 		snd_iprintf(buffer, "    Channels: %d\n", fp->channels);
 		snd_iprintf(buffer, "    Endpoint: %d %s (%s)\n",
