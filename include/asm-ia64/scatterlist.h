@@ -2,7 +2,7 @@
 #define _ASM_IA64_SCATTERLIST_H
 
 /*
- * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
+ * Copyright (C) 1998-1999, 2001-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -12,7 +12,6 @@ struct scatterlist {
 	/* These two are only valid if ADDRESS member of this struct is NULL.  */
 	struct page *page;
 	unsigned int offset;
-
 	unsigned int length;	/* buffer length */
 };
 

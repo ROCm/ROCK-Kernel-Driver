@@ -401,7 +401,7 @@ void ide_release(u_long arg)
     DEBUG(0, "ide_release(0x%p)\n", link);
 
     if (info->ndev) {
-	ide_unregister(info->hd);
+	ide_unregister(&ide_hwifs[info->hd]);
 	MOD_DEC_USE_COUNT;
     }
 

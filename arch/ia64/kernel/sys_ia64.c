@@ -2,8 +2,8 @@
  * This file contains various system calls that have different calling
  * conventions on different platforms.
  *
- * Copyright (C) 1999-2000 Hewlett-Packard Co
- * Copyright (C) 1999-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2000, 2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #include <linux/config.h>
 #include <linux/errno.h>
@@ -201,15 +201,13 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 	if (len == 0)
 		goto out;
 
-	/* don't permit mappings into unmapped space or the virtual page table of a region: */
+	/*
+	 * Don't permit mappings into unmapped space, the virtual page table of a region,
+	 * or across a region boundary.  Note: RGN_MAP_LIMIT is equal to 2^n-PAGE_SIZE
+	 * (for some integer n <= 61) and len > 0.
+	 */
 	roff = rgn_offset(addr);
-	if ((len | roff | (roff + len)) >= RGN_MAP_LIMIT) {
-		addr = -EINVAL;
-		goto out;
-	}
-
-	/* don't permit mappings that would cross a region boundary: */
-	if (rgn_index(addr) != rgn_index(addr + len)) {
+	if ((len > RGN_MAP_LIMIT) || (roff > (RGN_MAP_LIMIT - len))) {
 		addr = -EINVAL;
 		goto out;
 	}
@@ -275,74 +273,6 @@ ia64_create_module (const char *name_user, size_t size, long arg2, long arg3,
 		regs->r8 = 0;	/* ensure large addresses are not mistaken as failures... */
 	return addr;
 }
-
-#if 1
-/*
- * This is here for a while to keep compatibillity with the old stat()
- * call - it will be removed later once everybody migrates to the new
- * kernel stat structure that matches the glibc one - Jes
- */
-
-static int
-cp_ia64_old_stat (struct kstat *stat, struct ia64_oldstat *statbuf)
-{
-	struct ia64_oldstat tmp;
-	unsigned int blocks, indirect;
-
-	memset(&tmp, 0, sizeof(tmp));
-	tmp.st_dev = stat->dev;
-	tmp.st_ino = stat->ino;
-	tmp.st_mode = stat->mode;
-	tmp.st_nlink = stat->nlink;
-	SET_STAT_UID(tmp, stat->uid);
-	SET_STAT_GID(tmp, stat->gid);
-	tmp.st_rdev = stat->rdev;
-	tmp.st_size = stat->size;
-	tmp.st_atime = stat->atime;
-	tmp.st_mtime = stat->mtime;
-	tmp.st_ctime = stat->ctime;
-	tmp.st_blocks = stat->i_blocks;
-	tmp.st_blksize = stat->i_blksize;
-	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
-}
-
-asmlinkage long
-ia64_oldstat (char *filename, struct ia64_oldstat *statbuf)
-{
-	struct kstat stat;
-	int error = vfs_stat(filename, &stat);
-
-	if (!error)
-		error = cp_ia64_old_stat(&stat, statbuf);
-
-	return error;
-}
-
-asmlinkage long
-ia64_oldlstat (char *filename, struct ia64_oldstat *statbuf)
-{
-	struct kstat stat;
-	int error = vfs_lstat(filename, &stat);
-
-	if (!error)
-		error = cp_ia64_old_stat(&stat, statbuf);
-
-	return error;
-}
-
-asmlinkage long
-ia64_oldfstat (unsigned int fd, struct ia64_oldstat *statbuf)
-{
-	struct kstat stat;
-	int error = vfs_fstat(fd, &stat);
-
-	if (!error)
-		error = cp_ia64_old_stat(&stat, statbuf);
-
-	return error;
-}
-
-#endif
 
 #ifndef CONFIG_PCI
 

@@ -90,7 +90,7 @@ GLOBAL_ENTRY(ia64_sigtramp)
 (p8)	br.cond.spnt setup_rbs		// yup -> (clobbers r14, r15, and r16)
 back_from_setup_rbs:
 
-	.save ar.pfs, r8
+	.spillreg ar.pfs, r8
 	alloc r8=ar.pfs,0,0,3,0		// get CFM0, EC0, and CPL0 into r8
 	ld8 out0=[base0],16		// load arg0 (signum)
 	adds base1=(ARG1_OFF-(RBS_BASE_OFF+SIGCONTEXT_OFF)),base1

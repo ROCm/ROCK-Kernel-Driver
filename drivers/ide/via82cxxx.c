@@ -1,5 +1,5 @@
 /*
- * $Id: via82cxxx.c,v 3.33 2001/12/23 22:46:12 vojtech Exp $
+ * $Id: via82cxxx.c,v 3.34 2002/02/12 11:26:11 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
@@ -163,7 +163,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	via_print("----------VIA BusMastering IDE Configuration----------------");
 
-	via_print("Driver Version:                     3.33");
+	via_print("Driver Version:                     3.34");
 	via_print("South Bridge:                       VIA %s", via_config->name);
 
 	pci_read_config_byte(isa_dev, PCI_REVISION_ID, &t);
@@ -495,7 +495,7 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev)
 	if (via_clock < 20000 || via_clock > 50000) {
 		printk(KERN_WARNING "VP_IDE: User given PCI clock speed impossible (%d), using 33 MHz instead.\n", via_clock);
 		printk(KERN_WARNING "VP_IDE: Use ide0=ata66 if you want to assume 80-wire cable.\n");
-		via_clock = 33;
+		via_clock = 33333;
 	}
 
 /*

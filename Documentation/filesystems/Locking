@@ -121,10 +121,16 @@ by better scheme anyway.
 
 --------------------------- file_system_type ---------------------------
 prototypes:
-	struct super_block *(*read_super) (struct super_block *, void *, int);
+	struct super_block *(*get_sb) (struct file_system_type *, int, char *, void *);
+	void (*kill_sb) (struct super_block *);
 locking rules:
-may block	BKL	->s_lock	mount_sem
-yes		yes	yes		maybe
+		may block	BKL
+get_sb		yes		yes
+kill_sb		yes		yes
+
+->get_sb() returns error or a locked superblock (exclusive on ->s_umount).
+->kill_sb() takes a locked superblock, does all shutdown work on it,
+unlocks and drops the reference.
 
 --------------------------- address_space_operations --------------------------
 prototypes:

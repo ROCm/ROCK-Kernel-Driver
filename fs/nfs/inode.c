@@ -1155,6 +1155,7 @@ static struct file_system_type nfs_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"nfs",
 	get_sb:		nfs_get_sb,
+	kill_sb:	kill_anon_super,
 	fs_flags:	FS_ODD_RENAME,
 };
 

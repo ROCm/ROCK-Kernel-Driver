@@ -3,8 +3,8 @@
 /*
  * Pagetable related stuff.
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/config.h>
@@ -39,6 +39,22 @@
 
 extern void clear_page (void *page);
 extern void copy_page (void *to, void *from);
+
+/*
+ * clear_user_page() and copy_user_page() can't be inline functions because
+ * flush_dcache_page() can't be defined until later...
+ */
+#define clear_user_page(addr, vaddr, page)	\
+do {						\
+	clear_page(addr);			\
+	flush_dcache_page(page);		\
+} while (0)
+
+#define copy_user_page(to, from, vaddr, page)	\
+do {						\
+	copy_page((to), (from));		\
+	flush_dcache_page(page);		\
+} while (0)
 
 /*
  * Note: the MAP_NR_*() macro can't use __pa() because MAP_NR_*(X) MUST

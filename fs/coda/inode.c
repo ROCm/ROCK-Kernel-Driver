@@ -316,4 +316,5 @@ struct file_system_type coda_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"coda",
 	get_sb:		coda_get_sb,
+	kill_sb:	kill_anon_super,
 };

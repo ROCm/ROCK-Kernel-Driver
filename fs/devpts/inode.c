@@ -189,6 +189,7 @@ static struct file_system_type devpts_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"devpts",
 	get_sb:		devpts_get_sb,
+	kill_sb:	kill_anon_super,
 };
 
 void devpts_pty_new(int number, kdev_t device)

@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -13,6 +12,9 @@
 #include <linux/slab.h>
 #include <linux/ctype.h>
 #include <asm/sn/sgi.h>
+#include <asm/sn/sn_sal.h>
+#include <asm/sn/io.h>
+#include <asm/sn/sn_cpuid.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
@@ -29,8 +31,6 @@
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/xtalk/xtalk_private.h>
 #include <asm/sn/xtalk/xtalkaddrs.h>
-
-extern int maxnodes;
 
 /* #define IOGRAPH_DEBUG */
 #ifdef IOGRAPH_DEBUG
@@ -107,10 +107,10 @@ volunteer_for_widgets(devfs_handle_t xswitch, devfs_handle_t master)
 #ifdef LATER
 	    if (!is_headless_node_vertex(master)) {
 #if defined(SUPPORT_PRINTING_V_FORMAT)
-		PRINT_WARNING("volunteer for widgets: vertex %v has no info label",
+		printk(KERN_WARNING  "volunteer for widgets: vertex %v has no info label",
 			xswitch);
 #else
-		PRINT_WARNING("volunteer for widgets: vertex 0x%x has no info label",
+		printk(KERN_WARNING  "volunteer for widgets: vertex 0x%x has no info label",
 			xswitch);
 #endif
 	    }
@@ -155,11 +155,11 @@ assign_widgets_to_volunteers(devfs_handle_t xswitch, devfs_handle_t hubv)
 #ifdef LATER
 	    if (!is_headless_node_vertex(hubv)) {
 #if defined(SUPPORT_PRINTING_V_FORMAT)
-		PRINT_WARNING("assign_widgets_to_volunteers:vertex %v has "
+		printk(KERN_WARNING  "assign_widgets_to_volunteers:vertex %v has "
 			" no info label",
 			xswitch);
 #else
-		PRINT_WARNING("assign_widgets_to_volunteers:vertex 0x%x has "
+		printk(KERN_WARNING  "assign_widgets_to_volunteers:vertex 0x%x has "
 			" no info label",
 			xswitch);
 #endif
@@ -184,9 +184,6 @@ assign_widgets_to_volunteers(devfs_handle_t xswitch, devfs_handle_t hubv)
 	 */
 	for (widgetnum=HUB_WIDGET_ID_MIN; widgetnum <= HUB_WIDGET_ID_MAX; widgetnum++) {
 
-#ifndef BRINGUP
-		int i;
-#endif
 		/*
 		 * Ignore disabled/empty ports.
 		 */
@@ -244,7 +241,7 @@ iograph_early_init(void)
 	cnodeid_t cnode;
 	nasid_t nasid;
 	lboard_t *board;
-
+	
 	/*
 	 * Init. the board-to-hwgraph link early, so FRU analyzer
 	 * doesn't trip on leftover values if we panic early on.
@@ -266,55 +263,6 @@ iograph_early_init(void)
 
 	hubio_init();
 }
-
-#ifdef LATER
-/* There is an identical definition of this in os/scheduler/runq.c */
-#define INIT_COOKIE(cookie) cookie.must_run = 0; cookie.cpu = PDA_RUNANYWHERE
-/*
- * These functions absolutely doesn't belong here.  It's  here, though, 
- * until the scheduler provides a platform-independent version
- * that works the way it should.  The interface will definitely change, 
- * too.  Currently used only in this file and by io/cdl.c in order to
- * bind various I/O threads to a CPU on the proper node.
- */
-cpu_cookie_t
-setnoderun(cnodeid_t cnodeid)
-{
-	int i;
-	cpuid_t cpunum;
-	cpu_cookie_t cookie;
-
-	INIT_COOKIE(cookie);
-	if (cnodeid == CNODEID_NONE)
-		return(cookie);
-
-	/*
-	 * Do a setmustrun to one of the CPUs on the specified
-	 * node.
-	 */
-	if ((cpunum = CNODE_TO_CPU_BASE(cnodeid)) == CPU_NONE) {
-		return(cookie);
-	}
-
-	cpunum += CNODE_NUM_CPUS(cnodeid) - 1;
-
-	for (i = 0; i < CNODE_NUM_CPUS(cnodeid); i++, cpunum--) {
-
-		if (cpu_enabled(cpunum)) {
-			cookie = setmustrun(cpunum);
-			break;
-		}
-	}
-
-	return(cookie);
-}
-
-void
-restorenoderun(cpu_cookie_t cookie)
-{
-	restoremustrun(cookie);
-}
-#endif	/* LATER */
 
 #ifdef LINUX_KERNEL_THREADS
 static struct semaphore io_init_sema;
@@ -445,6 +393,7 @@ io_xswitch_widget_init(devfs_handle_t  	xswitchv,
 	slotid_t		slot;
 	lboard_t		*board = NULL;
 	char			buffer[16];
+	slotid_t get_widget_slotnum(int xbow, int widget);
 	
 	DBG("\nio_xswitch_widget_init: hubv 0x%p, xswitchv 0x%p, widgetnum 0x%x\n", hubv, xswitchv, widgetnum);
 	/*
@@ -507,6 +456,7 @@ DBG("io_xswitch_widget_init: Board 0x%p\n", board);
 {
 		lboard_t dummy;
 
+
 			if (board) {
 				DBG("io_xswitch_widget_init: Found KLTYPE_IOBRICK Board 0x%p brd_type 0x%x\n", board, board->brd_type);
 			} else {
@@ -517,7 +467,6 @@ DBG("io_xswitch_widget_init: Board 0x%p\n", board);
 }
 
 			/*
-			 * BRINGUP
 	 		 * Make sure we really want to say xbrick, pbrick,
 			 * etc. rather than XIO, graphics, etc.
 	 		 */
@@ -534,14 +483,10 @@ DBG("io_xswitch_widget_init: Board 0x%p\n", board);
 				"%cbrick" "/%s/%d",
 				buffer,
 #endif
-#ifdef BRINGUP
 
 				(board->brd_type == KLTYPE_IBRICK) ? 'I' :
 				(board->brd_type == KLTYPE_PBRICK) ? 'P' :
 				(board->brd_type == KLTYPE_XBRICK) ? 'X' : '?',
-#else
-				toupper(MODULE_GET_BTCHAR(NODEPDA(cnode)->module_id)),
-#endif /* BRINGUP */
 				EDGE_LBL_XTALK, widgetnum);
 		} 
 		
@@ -563,11 +508,7 @@ DBG("io_xswitch_widget_init: Board 0x%p\n", board);
 		 */
 		if (is_master_baseio(nasid,
 				     NODEPDA(cnode)->module_id,
-#ifdef BRINGUP
  				     get_widget_slotnum(0,widgetnum))) {
-#else
-	<<< BOMB! >>> Need a new way to get slot numbers on IP35/IP37
-#endif
 			extern void klhwg_baseio_inventory_add(devfs_handle_t,
 							       cnodeid_t);
 			module 	= NODEPDA(cnode)->module_id;
@@ -582,7 +523,6 @@ DBG("io_xswitch_widget_init: Board 0x%p\n", board);
 					(lboard_t *)KL_CONFIG_INFO(nasid),
 					module);
 				/*
-			 	 * BRINGUP
 				 * Change iobrick to correct i/o brick
 				 */
 #ifdef SUPPORT_PRINTING_M_FORMAT
@@ -594,11 +534,7 @@ DBG("io_xswitch_widget_init: Board 0x%p\n", board);
 					NODEPDA(cnode)->module_id,
 					EDGE_LBL_XTALK, widgetnum);
 			} else {
-#ifdef BRINGUP
 				slot = get_widget_slotnum(0, widgetnum);
-#else
-	<<< BOMB! Need a new way to get slot numbers on IP35/IP37
-#endif
 				board = get_board_name(nasid, module, slot,
 								new_name);
 				/*
@@ -729,41 +665,25 @@ io_link_xswitch_widgets(devfs_handle_t xswitchv, cnodeid_t cnodeid)
 		    GRAPH_SUCCESS)
 			continue;
 
-#if defined (CONFIG_SGI_IP35) || defined (CONFIG_IA64_SGI_SN1) || defined (CONFIG_IA64_GENERIC)
 		board = find_lboard_module((lboard_t *)KL_CONFIG_INFO(nasid),
 				NODEPDA(cnodeid)->module_id);
-#else
-		{
-		slotid_t	slot;
-		slot = get_widget_slotnum(xbow_num, widgetnum);
-		board = find_lboard_modslot((lboard_t *)KL_CONFIG_INFO(nasid),
-				    NODEPDA(cnodeid)->module_id, slot);
-		}
-#endif /* CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 */
 		if (board == NULL && peer_nasid != INVALID_NASID) {
 			/*
 			 * Try to find the board on our peer
 			 */
-#if defined (CONFIG_SGI_IP35) || defined (CONFIG_IA64_SGI_SN1) || defined (CONFIG_IA64_GENERIC)
 			board = find_lboard_module(
 				(lboard_t *)KL_CONFIG_INFO(peer_nasid),
 				NODEPDA(cnodeid)->module_id);
-
-#else
-			board = find_lboard_modslot((lboard_t *)KL_CONFIG_INFO(peer_nasid),
-						    NODEPDA(cnodeid)->module_id, slot);
-
-#endif /* CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 */
 		}
 		if (board == NULL) {
 #if defined(SUPPORT_PRINTING_V_FORMAT)
-			PRINT_WARNING("Could not find PROM info for vertex %v, "
+			printk(KERN_WARNING  "Could not find PROM info for vertex %v, "
 				"FRU analyzer may fail",
 				vhdl);
 #else
-			PRINT_WARNING("Could not find PROM info for vertex 0x%x, "
+			printk(KERN_WARNING  "Could not find PROM info for vertex 0x%p, "
 				"FRU analyzer may fail",
-				vhdl);
+				(void *)vhdl);
 #endif
 			return;
 		}
@@ -918,7 +838,6 @@ io_init_node(cnodeid_t cnodeid)
 		DBG("io_init_node: Found XBOW widget_partnum= 0x%x\n", widget_partnum);
 		npdap->basew_id = 0;
 
-#if defined(BRINGUP)
 	} else if (widget_partnum == XG_WIDGET_PART_NUM) {
 		/* 
 		 * OK, WTF do we do here if we have an XG direct connected to a HUB/Bedrock???
@@ -926,11 +845,10 @@ io_init_node(cnodeid_t cnodeid)
 		 */
 		npdap->basew_id = 0;
 		npdap->basew_id = (((*(volatile int32_t *)(NODE_SWIN_BASE(COMPACT_TO_NASID_NODEID(cnodeid), 0) + BRIDGE_WID_CONTROL))) & WIDGET_WIDGET_ID);
-#endif
 	} else { 
 		npdap->basew_id = (((*(volatile int32_t *)(NODE_SWIN_BASE(COMPACT_TO_NASID_NODEID(cnodeid), 0) + BRIDGE_WID_CONTROL))) & WIDGET_WIDGET_ID);
 
-		panic(" ****io_init_node: Unknown Widget Part Number 0x%x Widgt ID 0x%x attached to Hubv 0x%p ****\n", widget_partnum, npdap->basew_id, hubv);
+		panic(" ****io_init_node: Unknown Widget Part Number 0x%x Widgt ID 0x%x attached to Hubv 0x%p ****\n", widget_partnum, npdap->basew_id, (void *)hubv);
 
 		/*NOTREACHED*/
 	}
@@ -1037,13 +955,15 @@ io_init_node(cnodeid_t cnodeid)
 #define __DEVSTR3 	"/lun/0/disk/partition/"
 #define	__DEVSTR4	"/../ef"
 
-#if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || CONFIG_IA64_GENERIC
+#if defined(CONFIG_IA64_SGI_SN1)
 /*
  * Currently, we need to allow for 5 IBrick slots with 1 FC each
  * plus an internal 1394.
  *
  * ioconfig starts numbering SCSI's at NUM_BASE_IO_SCSI_CTLR.
  */
+#define NUM_BASE_IO_SCSI_CTLR 6
+#else
 #define NUM_BASE_IO_SCSI_CTLR 6
 #endif
 /*
@@ -1072,7 +992,6 @@ scsi_ctlr_nums_add(devfs_handle_t pci_vhdl)
 		for (i=0; i<NUM_BASE_IO_SCSI_CTLR; i++)
 			base_io_scsi_ctlr_vhdl[i] = GRAPH_VERTEX_NONE;
 	}
-#if CONFIG_SGI_IP35 || CONFIG_IA64_SGI_SN1 || CONFIG_IA64_GENERIC
 	{
 	/*
 	 * May want to consider changing the SN0 code, above, to work more like
@@ -1129,14 +1048,10 @@ scsi_ctlr_nums_add(devfs_handle_t pci_vhdl)
 
 	hwgraph_vertex_unref(base_ibrick_xbridge_vhdl);
 	}
-#else
-#pragma error Bomb!
-#endif
 }
 
 
 #include <asm/sn/ioerror_handling.h>
-extern devfs_handle_t 	ioc3_console_vhdl_get(void);
 devfs_handle_t		sys_critical_graph_root = GRAPH_VERTEX_NONE;
 
 /* Define the system critical vertices and connect them through
@@ -1251,6 +1166,7 @@ baseio_ctlr_num_set(void)
 {
 	char 			name[MAXDEVNAME];
 	devfs_handle_t		console_vhdl, pci_vhdl, enet_vhdl;
+	devfs_handle_t		ioc3_console_vhdl_get(void);
 
 
 	DBG("baseio_ctlr_num_set; FIXME\n");
@@ -1335,7 +1251,7 @@ sn00_rrb_alloc(devfs_handle_t vhdl, int *vendor_list)
 		rtn_val = pcibr_alloc_all_rrbs(vhdl, 0, 4,1, 4,0, 0,0, 0,0);
 	}
 	if (rtn_val)
-		PRINT_WARNING("sn00_rrb_alloc: pcibr_alloc_all_rrbs failed");
+		printk(KERN_WARNING  "sn00_rrb_alloc: pcibr_alloc_all_rrbs failed");
 
 	if ((vendor_list[5] != PCIIO_VENDOR_ID_NONE) && 
 	    (vendor_list[7] != PCIIO_VENDOR_ID_NONE)) {
@@ -1355,7 +1271,7 @@ sn00_rrb_alloc(devfs_handle_t vhdl, int *vendor_list)
 		rtn_val = pcibr_alloc_all_rrbs(vhdl, 1, 4,1, 4,0, 0,0, 0,0);
 	}
 	if (rtn_val)
-		PRINT_WARNING("sn00_rrb_alloc: pcibr_alloc_all_rrbs failed");
+		printk(KERN_WARNING  "sn00_rrb_alloc: pcibr_alloc_all_rrbs failed");
 }
 
 
@@ -1379,7 +1295,7 @@ init_all_devices(void)
 #endif
 
 	active = 0;
-	for (cnodeid = 0; cnodeid < maxnodes; cnodeid++) {
+	for (cnodeid = 0; cnodeid < numnodes; cnodeid++) {
 #ifdef LINUX_KERNEL_THREADS
 		char thread_name[16];
 		extern int io_init_pri;
@@ -1428,7 +1344,7 @@ init_all_devices(void)
 
 #endif /* LINUX_KERNEL_THREADS */
 
-	for (cnodeid = 0; cnodeid < maxnodes; cnodeid++)
+	for (cnodeid = 0; cnodeid < numnodes; cnodeid++)
 		/*
 	 	 * Update information generated by IO init.
 		 */

@@ -4,11 +4,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_SN1_HUBIO_NEXT_H
-#define _ASM_SN_SN1_HUBIO_NEXT_H
+#ifndef _ASM_IA64_SN_SN1_HUBIO_NEXT_H
+#define _ASM_IA64_SN_SN1_HUBIO_NEXT_H
 
 /*
  * Slightly friendlier names for some common registers.
@@ -64,7 +63,7 @@
 #define IIO_BTE_NOTIFY_0        IIO_IBNA_0   /* Also BTE notification 0 */
 #define IIO_BTE_INT_0           IIO_IBIA_0   /* Also BTE interrupt 0 */
 #define IIO_BTE_OFF_0           0            /* Base offset from BTE 0 regs. */
-#define IIO_BTE_OFF_1   IIO_IBLS_1 - IIO_IBLS_0 /* Offset from base to BTE 1 */
+#define IIO_BTE_OFF_1  (IIO_IBLS_1 - IIO_IBLS_0) /* Offset from base to BTE 1 */
 
 /* BTE register offsets from base */
 #define BTEOFF_STAT             0
@@ -78,11 +77,16 @@
 /* names used in hub_diags.c; carried over from SN0 */
 #define IIO_BASE_BTE0   IIO_IBLS_0		
 #define IIO_BASE_BTE1   IIO_IBLS_1		
-#if 0
-#define IIO_BASE        IIO_WID
-#define IIO_BASE_PERF   IIO_IPCR   /* IO Performance Control */
-#define IIO_PERF_CNT    IIO_IPPR   /* IO Performance Profiling */
-#endif
+
+/*
+ * Macro which takes the widget number, and returns the 
+ * IO PRB address of that widget.
+ * value _x is expected to be a widget number in the range 
+ * 0, 8 - 0xF
+ */
+#define	IIO_IOPRB(_x)	(IIO_IOPRB_0 + ( ( (_x) < HUB_WIDGET_ID_MIN ? \
+			(_x) : \
+			(_x) - (HUB_WIDGET_ID_MIN-1)) << 3) )
 
 
 /* GFX Flow Control Node/Widget Register */
@@ -139,7 +143,7 @@
  * redefined big window 7 as small window 0.
  XXX does this still apply for SN1??
  */
-#define HUB_NUM_BIG_WINDOW      IIO_NUM_ITTES - 1
+#define HUB_NUM_BIG_WINDOW      (IIO_NUM_ITTES - 1)
 
 /*
  * Use the top big window as a surrogate for the first small window
@@ -343,7 +347,7 @@
  * CRBs.
  */
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 /*
  * Easy access macros for CRBs, all 4 registers (A-D)
@@ -389,7 +393,7 @@ typedef ii_icrb0_d_u_t icrbd_t;
 #define icrbd_context   ii_icrb0_d_fld_s.id_context
 #define d_regvalue	ii_icrb0_d_regval
 
-#endif /* LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
 /* Number of widgets supported by hub */
 #define HUB_NUM_WIDGET          9
@@ -399,7 +403,7 @@ typedef ii_icrb0_d_u_t icrbd_t;
 #define HUB_WIDGET_PART_NUM     0xc110
 #define MAX_HUBS_PER_XBOW       2
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 /* A few more #defines for backwards compatibility */
 #define iprb_t          ii_iprb0_u_t
 #define iprb_regval     ii_iprb0_regval
@@ -430,11 +434,11 @@ typedef ii_icrb0_d_u_t icrbd_t;
 #define IO_PERF_SETS	32
 
 #if __KERNEL__
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 /* XXX moved over from SN/SN0/hubio.h -- each should be checked for SN1 */
 #include <asm/sn/alenlist.h>
 #include <asm/sn/dmamap.h>
-#include <asm/sn/iobus.h>
+#include <asm/sn/driver.h>
 #include <asm/sn/xtalk/xtalk.h>
 
 /* Bit for the widget in inbound access register */
@@ -699,12 +703,9 @@ hub_intr_free(hub_intr_t intr_hdl);
 
 extern int
 hub_intr_connect(       hub_intr_t intr_hdl,    /* xtalk intr resource hndl */
-                        intr_func_t intr_func,  /* xtalk intr handler */
-                        void *intr_arg,         /* arg to intr handler */
                         xtalk_intr_setfunc_t setfunc,
                                                 /* func to set intr hw */
-                        void *setfunc_arg,      /* arg to setfunc */
-                        void *thread);          /* intr thread to use */
+                        void *setfunc_arg);     /* arg to setfunc */
 
 extern void
 hub_intr_disconnect(hub_intr_t intr_hdl);
@@ -756,6 +757,6 @@ extern void hub_widgetdev_enable(devfs_handle_t, int);
 extern void hub_widgetdev_shutdown(devfs_handle_t, int);
 extern int  hub_dma_enabled(devfs_handle_t);
 
-#endif /* _LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 #endif /* _KERNEL */
-#endif  /* _ASM_SN_SN1_HUBIO_NEXT_H */
+#endif  /* _ASM_IA64_SN_SN1_HUBIO_NEXT_H */

@@ -4,12 +4,11 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
-#ifndef _ASM_SN_SN1_IP27CONFIG_H
-#define _ASM_SN_SN1_IP27CONFIG_H
+#ifndef _ASM_IA64_SN_SN1_IP27CONFIG_H
+#define _ASM_IA64_SN_SN1_IP27CONFIG_H
 
 
 /*
@@ -50,7 +49,7 @@
  */
 #define IP27_RTC_FREQ			1250	/* 800ns cycle time */
 
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 typedef	struct ip27config_s {		/* KEEP IN SYNC w/ start.s & below  */
     uint		time_const;	/* Time constant 		    */
@@ -110,9 +109,9 @@ typedef	struct {
  */
 #define CONFIG_12P4I_NODE(n)	(0)
 
-#endif /* _LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
-#if _LANGUAGE_ASSEMBLY
+#if __ASSEMBLY__
 	.struct		0		/* KEEP IN SYNC WITH C structure */
 
 ip27c_time_const:	.word	0
@@ -137,7 +136,7 @@ ip27c_pvers_vers:	.word	0
 ip27c_pvers_rev:	.word	0
 
 ip27c_config_type:	.word 	0	/* To recognize special configs */
-#endif /* _LANGUAGE_ASSEMBLY */
+#endif /* __ASSEMBLY__ */
 
 /*
  * R10000 Configuration Cycle - These define the SYSAD values used
@@ -245,7 +244,7 @@ ip27c_config_type:	.word 	0	/* To recognize special configs */
 
 #define CONFIG_FREQ_RTC	IP27C_KHZ(IP27_RTC_FREQ)
 
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 /* we are going to define all the known configs is a table
  * for building hex images we will pull out the particular
@@ -258,7 +257,7 @@ ip27c_config_type:	.word 	0	/* To recognize special configs */
  */
 
 /* these numbers are as the are ordered in the table below */
-#define	IP27_CONFIG_UNKNOWN -1
+#define	IP27_CONFIG_UNKNOWN (-1)
 #define IP27_CONFIG_SN1_1MB_200_400_200_TABLE 0
 #define IP27_CONFIG_SN00_4MB_100_200_133_TABLE 1
 #define IP27_CONFIG_SN1_4MB_200_400_267_TABLE 2
@@ -500,9 +499,9 @@ extern	config_modifiable_t	ip_config_table[];
 #define CONFIG_FPROM_WR	ip_config_table[IP27_CONFIG_SN1_4MB_180_360_240_TABLE].fprom_wr
 #endif /* IP27_CONFIG_SN1_4MB_180_360_240 */
 
-#endif /* _LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
-#if _LANGUAGE_ASSEMBLY
+#if __ASSEMBLY__
 
 /* these need to be in here since we need assembly definitions
  * for building hex images (as required by start.s)
@@ -653,6 +652,6 @@ extern	config_modifiable_t	ip_config_table[];
 #define CONFIG_FPROM_WR CONFIG_FPROM_ENABLE
 #endif /* IP27_CONFIG_SN1_4MB_180_360_240 */
 
-#endif /* _LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
-#endif /* _ASM_SN_SN1_IP27CONFIG_H */
+#endif /* _ASM_IA64_SN_SN1_IP27CONFIG_H */

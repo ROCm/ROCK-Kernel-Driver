@@ -4,13 +4,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Jack Steiner (steiner@sgi.com)
+ * Copyright (C) 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 
-#ifndef _ASM_SN_SGI_H
-#define _ASM_SN_SGI_H
+#ifndef _ASM_IA64_SN_SGI_H
+#define _ASM_IA64_SN_SGI_H
 
 #include <linux/config.h>
 
@@ -95,17 +94,12 @@ struct devfs_entry
 				 bigger. This is NULL-terminated  */
 };
 
-#define MIN(_a,_b)		((_a)<(_b)?(_a):(_b))
-
-typedef uint32_t app32_ptr_t;	/* needed by edt.h */
 typedef int64_t  __psint_t;	/* needed by klgraph.c */
 
 typedef enum { B_FALSE, B_TRUE } boolean_t;
 
 #define ctob(x)			((uint64_t)(x)*NBPC)
 #define btoc(x)			(((uint64_t)(x)+(NBPC-1))/NBPC)
-
-typedef __psunsigned_t nic_data_t;
 
 
 /*
@@ -128,10 +122,6 @@ typedef enum graph_error_e {
 #define VM_NOSLEEP 0x0001		/* needed kmem_alloc_node(), kmem_zalloc_node
 					 * calls */
 #define XG_WIDGET_PART_NUM      0xC102          /* KONA/xt_regs.h     XG_XT_PART_NUM_VALUE */
-
-#ifndef TO_PHYS_MASK
-#define TO_PHYS_MASK 0x0000000fffffffff
-#endif
 
 typedef uint64_t vhandl_t;
 
@@ -159,7 +149,7 @@ typedef uint64_t vhandl_t;
 typedef uint64_t mrlock_t;	/* needed by devsupport.c */
 
 #define HUB_PIO_CONVEYOR 0x1
-#define CNODEID_NONE (cnodeid_t)-1
+#define CNODEID_NONE ((cnodeid_t)-1)
 #define XTALK_PCI_PART_NUM "030-1275-"
 #define kdebug 0
 
@@ -177,7 +167,7 @@ typedef uint64_t mrlock_t;	/* needed by devsupport.c */
 #define kern_free(x)		kfree(x)
 
 typedef cpuid_t cpu_cookie_t;
-#define CPU_NONE		-1
+#define CPU_NONE		(-1)
 
 /*
  * mutext support mapping
@@ -225,9 +215,6 @@ mutex_spinlock(spinlock_t *sem) {
         } } while(0)
 #endif	/* DISABLE_ASSERT */
 
-#define PRINT_WARNING(x...)	do { printk("WARNING : "); printk(x); } while(0)
-#define PRINT_NOTICE(x...)	do { printk("NOTICE : "); printk(x); } while(0)
-#define PRINT_ALERT(x...)	do { printk("ALERT : "); printk(x); } while(0)
 #define PRINT_PANIC		panic
 
 #ifdef CONFIG_SMP
@@ -238,4 +225,4 @@ mutex_spinlock(spinlock_t *sem) {
 
 #include <asm/sn/hack.h>	/* for now */
 
-#endif	/* _ASM_SN_SGI_H */
+#endif /* _ASM_IA64_SN_SGI_H */

@@ -21,6 +21,7 @@ static struct file_system_type vfat_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"vfat",
 	get_sb:		vfat_get_sb,
+	kill_sb:	kill_block_super,
 	fs_flags:	FS_REQUIRES_DEV,
 };
 

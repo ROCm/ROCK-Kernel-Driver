@@ -1425,20 +1425,21 @@ static struct file_system_type shmem_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"shmem",
 	get_sb:		shmem_get_sb,
-	fs_flags:	FS_LITTER,
+	kill_sb:	kill_litter_super,
 };
 static struct file_system_type tmpfs_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"tmpfs",
 	get_sb:		shmem_get_sb,
-	fs_flags:	FS_LITTER,
+	kill_sb:	kill_litter_super,
 };
 #else
 static struct file_system_type tmpfs_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"tmpfs",
 	get_sb:		shmem_get_sb,
-	fs_flags:	FS_LITTER|FS_NOMOUNT,
+	kill_sb:	kill_litter_super,
+	fs_flags:	FS_NOMOUNT,
 };
 #endif
 static struct vfsmount *shm_mnt;

@@ -56,7 +56,9 @@ struct sigcontext {
 	unsigned long		sc_rbs_base;	/* NULL or new base of sighandler's rbs */
 	unsigned long		sc_loadrs;	/* see description above */
 
-	unsigned long		sc_rsvd[14];	/* reserved for future use */
+	unsigned long		sc_ar25;	/* rsvd for scratch use */
+	unsigned long		sc_ar26;	/* rsvd for scratch use */
+	unsigned long		sc_rsvd[12];	/* reserved for future use */
 	/*
 	 * The mask must come last so we can increase _NSIG_WORDS
 	 * without breaking binary compatibility.

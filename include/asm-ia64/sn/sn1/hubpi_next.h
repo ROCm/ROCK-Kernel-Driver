@@ -4,11 +4,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_SN1_HUBPI_NEXT_H
-#define _ASM_SN_SN1_HUBPI_NEXT_H
+#ifndef _ASM_IA64_SN_SN1_HUBPI_NEXT_H
+#define _ASM_IA64_SN_SN1_HUBPI_NEXT_H
 
 
 /* define for remote PI_1 space. It is always half of a node_addressspace
@@ -54,7 +53,7 @@
     ((sts) & (PI_CRB_STS_I | PI_CRB_STS_H) | \
      ((sts) & (PI_CRB_STS_A | PI_CRB_STS_R)) >> 1)
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 /*
  * format of error stack and error status registers.
  */
@@ -329,4 +328,4 @@ typedef union pi_err_stat1 {
 /* Error stack address shift, for use with pi_stk_fmt.sk_addr */
 #define ERR_STK_ADDR_SHFT	3
 
-#endif /* _ASM_SN_SN1_HUBPI_NEXT_H */
+#endif /* _ASM_IA64_SN_SN1_HUBPI_NEXT_H */

@@ -18,7 +18,8 @@
 #include <asm/sal.h>
 #include <asm/pal.h>
 
-spinlock_t sal_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t sal_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+unsigned long sal_platform_features;
 
 static struct {
 	void *addr;	/* function entry point */
@@ -76,7 +77,7 @@ ia64_sal_strerror (long status)
 	return str;
 }
 
-static void __init 
+static void __init
 ia64_sal_handler_init (void *entry_point, void *gpval)
 {
 	/* fill in the SAL procedure descriptor and point ia64_sal to it: */
@@ -102,7 +103,7 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 	if (strncmp(systab->signature, "SST_", 4) != 0)
 		printk("bad signature in system table!");
 
-	/* 
+	/*
 	 * revisions are coded in BCD, so %x does the job for us
 	 */
 	printk("SAL v%x.%02x: oem=%.32s, product=%.32s\n",
@@ -152,12 +153,12 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 		      case SAL_DESC_PLATFORM_FEATURE:
 		      {
 			      struct ia64_sal_desc_platform_feature *pf = (void *) p;
+			      sal_platform_features = pf->feature_mask;
 			      printk("SAL: Platform features ");
 
-			      if (pf->feature_mask & (1 << 0))
+			      if (pf->feature_mask & IA64_SAL_PLATFORM_FEATURE_BUS_LOCK)
 				      printk("BusLock ");
-
-			      if (pf->feature_mask & (1 << 1)) {
+			      if (pf->feature_mask & IA64_SAL_PLATFORM_FEATURE_IRQ_REDIR_HINT) {
 				      printk("IRQ_Redirection ");
 #ifdef CONFIG_SMP
 				      if (no_int_routing)
@@ -166,15 +167,17 @@ ia64_sal_init (struct ia64_sal_systab *systab)
 					      smp_int_redirect |= SMP_IRQ_REDIRECTION;
 #endif
 			      }
-			      if (pf->feature_mask & (1 << 2)) {
+			      if (pf->feature_mask & IA64_SAL_PLATFORM_FEATURE_IPI_REDIR_HINT) {
 				      printk("IPI_Redirection ");
 #ifdef CONFIG_SMP
-				      if (no_int_routing) 
+				      if (no_int_routing)
 					      smp_int_redirect &= ~SMP_IPI_REDIRECTION;
 				      else
 					      smp_int_redirect |= SMP_IPI_REDIRECTION;
 #endif
 			      }
+			      if (pf->feature_mask & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)
+				      printk("ITC_Drift ");
 			      printk("\n");
 			      break;
  		      }

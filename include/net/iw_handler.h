@@ -1,10 +1,10 @@
 /*
  * This file define the new driver API for Wireless Extensions
  *
- * Version :	2	6.12.01
+ * Version :	3	17.1.02
  *
  * Authors :	Jean Tourrilhes - HPL - <jt@hpl.hp.com>
- * Copyright (c) 2001 Jean Tourrilhes, All Rights Reserved.
+ * Copyright (c) 2001-2002 Jean Tourrilhes, All Rights Reserved.
  */
 
 #ifndef _IW_HANDLER_H
@@ -33,7 +33,7 @@
  *	o The user space interface is tied to ioctl because of the use
  *	  copy_to/from_user.
  *
- * New driver API (2001 -> onward) :
+ * New driver API (2002 -> onward) :
  * -------------------------------
  * The new driver API is just a bunch of standard functions (handlers),
  * each handling a specific Wireless Extension. The driver just export
@@ -206,7 +206,18 @@
  * will be needed...
  * I just plan to increment with each new version.
  */
-#define IW_HANDLER_VERSION	2
+#define IW_HANDLER_VERSION	3
+
+/*
+ * Changes :
+ *
+ * V2 to V3
+ * --------
+ *	- Move event definition in <linux/wireless.h>
+ *	- Add Wireless Event support :
+ *		o wireless_send_event() prototype
+ *		o iwe_stream_add_event/point() inline functions
+ */
 
 /**************************** CONSTANTS ****************************/
 
@@ -225,6 +236,7 @@
 #define IW_HEADER_TYPE_POINT	6	/* struct iw_point */
 #define IW_HEADER_TYPE_PARAM	7	/* struct iw_param */
 #define IW_HEADER_TYPE_ADDR	8	/* struct sockaddr */
+#define IW_HEADER_TYPE_QUAL	9	/* struct iw_quality */
 
 /* Handling flags */
 /* Most are not implemented. I just use them as a reminder of some
@@ -303,25 +315,6 @@ struct iw_handler_def
 	 * 'struct net_device' to here, to minimise bloat. */
 };
 
-/* ----------------------- WIRELESS EVENTS ----------------------- */
-/*
- * Currently we don't support events, so let's just plan for the
- * future...
- */
-
-/*
- * A Wireless Event.
- */
-// How do we define short header ? We don't want a flag on length.
-// Probably a flag on event ? Highest bit to zero...
-struct iw_event
-{
-	__u16		length;			/* Lenght of this stuff */
-	__u16		event;			/* Wireless IOCTL */
-	union	iwreq_data	header;		/* IOCTL fixed payload */
-	char		extra[0];		/* Optional IOCTL data */
-};
-
 /* ---------------------- IOCTL DESCRIPTION ---------------------- */
 /*
  * One of the main goal of the new interface is to deal entirely with
@@ -369,6 +362,88 @@ extern int dev_get_wireless_info(char * buffer, char **start, off_t offset,
 extern int wireless_process_ioctl(struct ifreq *ifr, unsigned int cmd);
 
 /* Second : functions that may be called by driver modules */
-/* None yet */
 
-#endif	/* _LINUX_WIRELESS_H */
+/* Send a single event to user space */
+extern void wireless_send_event(struct net_device *	dev,
+				unsigned int		cmd,
+				union iwreq_data *	wrqu,
+				char *			extra);
+
+/* We may need a function to send a stream of events to user space.
+ * More on that later... */
+
+/************************* INLINE FUNTIONS *************************/
+/*
+ * Function that are so simple that it's more efficient inlining them
+ */
+
+/*------------------------------------------------------------------*/
+/*
+ * Wrapper to add an Wireless Event to a stream of events.
+ */
+static inline char *
+iwe_stream_add_event(char *	stream,		/* Stream of events */
+		     char *	ends,		/* End of stream */
+		     struct iw_event *iwe,	/* Payload */
+		     int	event_len)	/* Real size of payload */
+{
+	/* Check if it's possible */
+	if((stream + event_len) < ends) {
+		iwe->len = event_len;
+		memcpy(stream, (char *) iwe, event_len);
+		stream += event_len;
+	}
+	return stream;
+}
+
+/*------------------------------------------------------------------*/
+/*
+ * Wrapper to add an short Wireless Event containing a pointer to a
+ * stream of events.
+ */
+static inline char *
+iwe_stream_add_point(char *	stream,		/* Stream of events */
+		     char *	ends,		/* End of stream */
+		     struct iw_event *iwe,	/* Payload */
+		     char *	extra)
+{
+	int	event_len = IW_EV_POINT_LEN + iwe->u.data.length;
+	/* Check if it's possible */
+	if((stream + event_len) < ends) {
+		iwe->len = event_len;
+		memcpy(stream, (char *) iwe, IW_EV_POINT_LEN);
+		memcpy(stream + IW_EV_POINT_LEN, extra, iwe->u.data.length);
+		stream += event_len;
+	}
+	return stream;
+}
+
+/*------------------------------------------------------------------*/
+/*
+ * Wrapper to add a value to a Wireless Event in a stream of events.
+ * Be careful, this one is tricky to use properly :
+ * At the first run, you need to have (value = event + IW_EV_LCP_LEN).
+ */
+static inline char *
+iwe_stream_add_value(char *	event,		/* Event in the stream */
+		     char *	value,		/* Value in event */
+		     char *	ends,		/* End of stream */
+		     struct iw_event *iwe,	/* Payload */
+		     int	event_len)	/* Real size of payload */
+{
+	/* Don't duplicate LCP */
+	event_len -= IW_EV_LCP_LEN;
+
+	/* Check if it's possible */
+	if((value + event_len) < ends) {
+		/* Add new value */
+		memcpy(value, (char *) iwe + IW_EV_LCP_LEN, event_len);
+		value += event_len;
+		/* Patch LCP */
+		iwe->len = value - event;
+		memcpy(event, (char *) iwe, IW_EV_LCP_LEN);
+	}
+	return value;
+}
+
+#endif	/* _IW_HANDLER_H */

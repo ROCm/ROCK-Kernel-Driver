@@ -4,11 +4,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PRIO_H
-#define _ASM_SN_PRIO_H
+#ifndef _ASM_IA64_SN_PRIO_H
+#define _ASM_IA64_SN_PRIO_H
+
+#include <linux/types.h>
 
 /*
  * Priority I/O function prototypes and macro definitions
@@ -33,6 +34,6 @@ extern int prioUnlock (void);
 
 /* Error returns */
 #define PRIO_SUCCESS     0
-#define PRIO_FAIL       -1 
+#define PRIO_FAIL       (-1) 
 
-#endif /* _ASM_SN_PRIO_H */
+#endif /* _ASM_IA64_SN_PRIO_H */

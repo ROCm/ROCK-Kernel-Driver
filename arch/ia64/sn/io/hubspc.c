@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992-1997, 2000-2002 Silicon Graphics, Inc.  All rights reserved.
  */
 
 /*
@@ -19,6 +18,8 @@
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <asm/sn/sgi.h>
+#include <asm/sn/io.h>
+#include <asm/sn/sn_cpuid.h>
 #include <linux/devfs_fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/io.h>
@@ -26,28 +27,18 @@
 #include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
-#include <asm/sn/mem_refcnt.h>
-#include <asm/sn/agent.h>
+#include <asm/sn/sn1/mem_refcnt.h>
 #include <asm/sn/addrs.h>
-
-
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-#include <asm/sn/sn1/ip27config.h>
-#include <asm/sn/sn1/hubdev.h>
+#include <asm/sn/snconfig.h>
+#include <asm/sn/sn1/hubspc.h>
 #include <asm/sn/ksys/elsc.h>
-#endif
-
-#include <asm/sn/hubspc.h>
+#include <asm/sn/simulator.h>
 
 
 /* Uncomment the following line for tracing */
 /* #define HUBSPC_DEBUG 1 */
 
 int hubspc_devflag = D_MP;
-
-extern void *device_info_get(devfs_handle_t device);
-extern void device_info_set(devfs_handle_t device, void *info);
-
 
 
 /***********************************************************************/
@@ -61,7 +52,7 @@ typedef struct cpuprom_info {
 }cpuprom_info_t;
 
 static cpuprom_info_t	*cpuprom_head;
-static spinlock_t	cpuprom_spinlock;
+spinlock_t	cpuprom_spinlock;
 #define	PROM_LOCK()	mutex_spinlock(&cpuprom_spinlock)
 #define	PROM_UNLOCK(s)	mutex_spinunlock(&cpuprom_spinlock, (s))
 
@@ -127,9 +118,8 @@ prominfo_nodeget(devfs_handle_t prom)
 	return 0;
 }
 
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
+#if defined(CONFIG_IA64_SGI_SN1)
 #define	SN_PROMVERSION		INV_IP35PROM
-#endif
 
 /* Add "detailed" labelled inventory information to the
  * prom vertex 
@@ -159,7 +149,6 @@ cpuprom_detailed_inventory_info_add(devfs_handle_t prom_dev,devfs_handle_t node)
 	cpuprom_inventory_info->im_rev = IP27CONFIG.pvers_rev;
 	cpuprom_inventory_info->im_version = IP27CONFIG.pvers_vers;
 
-
 	/* Store this info as labelled information hanging off the
 	 * prom device vertex
 	 */
@@ -172,41 +161,17 @@ cpuprom_detailed_inventory_info_add(devfs_handle_t prom_dev,devfs_handle_t node)
 				sizeof(invent_miscinfo_t));
 }
 
-int
-cpuprom_attach(devfs_handle_t node)
-{
-        devfs_handle_t prom_dev;
-
-        hwgraph_char_device_add(node, EDGE_LBL_PROM, "hubspc_", &prom_dev);
-#ifdef	HUBSPC_DEBUG
-	printf("hubspc: prom_attach hub: 0x%x prom: 0x%x\n", node, prom_dev);
-#endif	/* HUBSPC_DEBUG */
-	device_inventory_add(prom_dev, INV_PROM, SN_PROMVERSION,
-				(major_t)0, (minor_t)0, 0);
-
-	/* Add additional inventory info about the cpu prom like
-	 * revision & version numbers etc.
-	 */
-	cpuprom_detailed_inventory_info_add(prom_dev,node);
-        device_info_set(prom_dev, (void*)(ulong)HUBSPC_PROM);
-	prominfo_add(node, prom_dev);
-
-        return (0);
-}
-
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #define FPROM_CONFIG_ADDR	MD_JUNK_BUS_TIMING
 #define FPROM_ENABLE_MASK	MJT_FPROM_ENABLE_MASK
 #define FPROM_ENABLE_SHFT	MJT_FPROM_ENABLE_SHFT
 #define FPROM_SETUP_MASK	MJT_FPROM_SETUP_MASK
 #define FPROM_SETUP_SHFT	MJT_FPROM_SETUP_SHFT
-#endif
 
 /*ARGSUSED*/
 int
 cpuprom_map(devfs_handle_t dev, vhandl_t *vt, off_t addr, size_t len)
 {
-        int 		errcode;
+        int 		errcode = 0;
 	caddr_t 	kvaddr;
 	devfs_handle_t		node;
 	cnodeid_t 	cnode;
@@ -220,7 +185,7 @@ cpuprom_map(devfs_handle_t dev, vhandl_t *vt, off_t addr, size_t len)
 	kvaddr = hubdev_prombase_get(node);
 	cnode  = hubdev_cnodeid_get(node);
 #ifdef	HUBSPC_DEBUG
-	printf("cpuprom_map: hubnode %d kvaddr 0x%x\n", node, kvaddr);
+	printk("cpuprom_map: hubnode %d kvaddr 0x%x\n", node, kvaddr);
 #endif
 
 	if (len > RBOOT_SIZE)
@@ -251,6 +216,7 @@ cpuprom_map(devfs_handle_t dev, vhandl_t *vt, off_t addr, size_t len)
 	}
         return (errcode);
 }
+#endif	/* CONFIG_IA64_SGI_SN1 */
 
 /*ARGSUSED*/
 int
@@ -262,8 +228,6 @@ cpuprom_unmap(devfs_handle_t dev, vhandl_t *vt)
 /***********************************************************************/
 /* Base Hub Space Driver                                               */
 /***********************************************************************/
-
-// extern int l1_attach( devfs_handle_t );
 
 /*
  * hubspc_init
@@ -277,24 +241,21 @@ hubspc_init(void)
          */
 
         /* The reference counters */
+#if defined(CONFIG_IA64_SGI_SN1)
         hubdev_register(mem_refcnt_attach);
-
-	/* Prom space */
-	hubdev_register(cpuprom_attach);
+#endif
 
 #if defined(CONFIG_SERIAL_SGI_L1_PROTOCOL)
 	/* L1 system controller link */
 	if ( !IS_RUNNING_ON_SIMULATOR() ) {
 		/* initialize the L1 link */
-		void l1_cons_init( l1sc_t *sc );
-		elsc_t *get_elsc(void);
-
-		l1_cons_init((l1sc_t *)get_elsc());
+		extern void l1_init(void);
+		l1_init();
 	}
 #endif
 
 #ifdef	HUBSPC_DEBUG
-	printf("hubspc_init: Completed\n");
+	printk("hubspc_init: Completed\n");
 #endif	/* HUBSPC_DEBUG */
 	/* Initialize spinlocks */
 	mutex_spinlock_init(&cpuprom_spinlock);
@@ -304,26 +265,7 @@ hubspc_init(void)
 int
 hubspc_open(devfs_handle_t *devp, mode_t oflag, int otyp, cred_t *crp)
 {
-        int errcode = 0;
-        
-        switch ((hubspc_subdevice_t)(ulong)device_info_get(*devp)) {
-        case HUBSPC_REFCOUNTERS:
-                errcode = mem_refcnt_open(devp, oflag, otyp, crp);
-                break;
-
-        case HUBSPC_PROM:
-                break;
-
-        default:
-                errcode = ENODEV;
-        }
-
-#ifdef	HUBSPC_DEBUG
-	printf("hubspc_open: Completed open for type %d\n",
-               (hubspc_subdevice_t)(ulong)device_info_get(*devp));
-#endif	/* HUBSPC_DEBUG */
-
-        return (errcode);
+        return (0);
 }
 
 
@@ -331,25 +273,7 @@ hubspc_open(devfs_handle_t *devp, mode_t oflag, int otyp, cred_t *crp)
 int
 hubspc_close(devfs_handle_t dev, int oflag, int otyp, cred_t *crp)
 {
-        int errcode = 0;
-        
-        switch ((hubspc_subdevice_t)(ulong)device_info_get(dev)) {
-        case HUBSPC_REFCOUNTERS:
-                errcode = mem_refcnt_close(dev, oflag, otyp, crp);
-                break;
-
-        case HUBSPC_PROM:
-                break;
-        default:
-                errcode = ENODEV;
-        }
-
-#ifdef	HUBSPC_DEBUG
-	printf("hubspc_close: Completed close for type %d\n",
-               (hubspc_subdevice_t)(ulong)device_info_get(dev));
-#endif	/* HUBSPC_DEBUG */
-
-        return (errcode);
+        return (0);
 }
 
 /* ARGSUSED */
@@ -357,37 +281,12 @@ int
 hubspc_map(devfs_handle_t dev, vhandl_t *vt, off_t off, size_t len, uint prot)
 {
 	/*REFERENCED*/
-        hubspc_subdevice_t subdevice;
         int errcode = 0;
 
 	/* check validity of request */
 	if( len == 0 ) {
 		return ENXIO;
         }
-
-        subdevice = (hubspc_subdevice_t)(ulong)device_info_get(dev);
-
-#ifdef	HUBSPC_DEBUG
-	printf("hubspc_map: subdevice: %d vaddr: 0x%x phyaddr: 0x%x len: 0x%x\n",
-	       subdevice, v_getaddr(vt), off, len);
-#endif /* HUBSPC_DEBUG */
-
-        switch ((hubspc_subdevice_t)(ulong)device_info_get(dev)) {
-        case HUBSPC_REFCOUNTERS:
-                errcode = mem_refcnt_mmap(dev, vt, off, len, prot);
-                break;
-
-        case HUBSPC_PROM:
-		errcode = cpuprom_map(dev, vt, off, len);
-                break;
-        default:
-                errcode = ENODEV;
-        }
-
-#ifdef	HUBSPC_DEBUG
-	printf("hubspc_map finished: spctype: %d vaddr: 0x%x len: 0x%x\n",
-	       (hubspc_subdevice_t)(ulong)device_info_get(dev), v_getaddr(vt), len);
-#endif /* HUBSPC_DEBUG */
 
 	return errcode;
 }
@@ -396,21 +295,7 @@ hubspc_map(devfs_handle_t dev, vhandl_t *vt, off_t off, size_t len, uint prot)
 int
 hubspc_unmap(devfs_handle_t dev, vhandl_t *vt)
 {
-        int errcode = 0;
-        
-        switch ((hubspc_subdevice_t)(ulong)device_info_get(dev)) {
-        case HUBSPC_REFCOUNTERS:
-                errcode = mem_refcnt_unmap(dev, vt);
-                break;
-
-        case HUBSPC_PROM:
-                errcode = cpuprom_unmap(dev, vt);
-                break;
-
-        default:
-                errcode = ENODEV;
-        }
-	return errcode;
+	return (0);
 
 }
 
@@ -423,19 +308,6 @@ hubspc_ioctl(devfs_handle_t dev,
              cred_t *cred_p,
              int *rvalp)
 {
-        int errcode = 0;
-        
-        switch ((hubspc_subdevice_t)(ulong)device_info_get(dev)) {
-        case HUBSPC_REFCOUNTERS:
-                errcode = mem_refcnt_ioctl(dev, cmd, arg, mode, cred_p, rvalp);
-                break;
-
-        case HUBSPC_PROM:
-                break;
-
-        default:
-                errcode = ENODEV;
-        }
-	return errcode;
+	return (0);
 
 }

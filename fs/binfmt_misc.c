@@ -721,7 +721,7 @@ static struct file_system_type bm_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"binfmt_misc",
 	get_sb:		bm_get_sb,
-	fs_flags:	FS_LITTER,
+	kill_sb:	kill_litter_super,
 };
 
 static int __init init_misc_binfmt(void)

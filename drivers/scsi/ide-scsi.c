@@ -290,7 +290,7 @@ static int idescsi_end_request(ide_drive_t *drive, int uptodate)
 			if (!test_bit(PC_WRITING, &pc->flags) && pc->actually_transferred && pc->actually_transferred <= 1024 && pc->buffer) {
 				printk(", rst = ");
 				scsi_buf = pc->scsi_cmd->request_buffer;
-				hexdump(scsi_buf, min(16, pc->scsi_cmd->request_bufflen));
+				hexdump(scsi_buf, min(16U, pc->scsi_cmd->request_bufflen));
 			} else printk("\n");
 		}
 	}
@@ -307,7 +307,7 @@ static int idescsi_end_request(ide_drive_t *drive, int uptodate)
 
 static inline unsigned long get_timeout(idescsi_pc_t *pc)
 {
-	return max(WAIT_CMD, pc->timeout - jiffies);
+	return max((unsigned long) WAIT_CMD, pc->timeout - jiffies);
 }
 
 /*
@@ -565,7 +565,7 @@ static struct ata_operations idescsi_driver = {
 /*
  *	idescsi_init will register the driver for each scsi.
  */
-static int idescsi_init(void)
+int idescsi_init(void)
 {
 	ide_drive_t *drive;
 	idescsi_scsi_t *scsi;

@@ -1,7 +1,7 @@
 /*
  * Architecture-specific trap handling.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 05/12/00 grao <goutham.rao@intel.com> : added isr in siginfo for SIGFPE
@@ -32,6 +32,7 @@ register double f30 asm ("f30"); register double f31 asm ("f31");
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 
 #include <asm/hardirq.h>
@@ -133,6 +134,8 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 	/* SIGILL, SIGFPE, SIGSEGV, and SIGBUS want these field initialized: */
 	siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 	siginfo.si_imm = break_num;
+	siginfo.si_flags = 0;		/* clear __ISR_VALID */
+	siginfo.si_isr = 0;
 
 	switch (break_num) {
 	      case 0: /* unknown error */
@@ -352,6 +355,8 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 				siginfo.si_code = FPE_FLTDIV;
 			}
 			siginfo.si_isr = isr;
+			siginfo.si_flags = __ISR_VALID;
+			siginfo.si_imm = 0;
 			force_sig_info(SIGFPE, &siginfo, current);
 		}
 	} else {
@@ -372,6 +377,8 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 				siginfo.si_code = FPE_FLTRES;
 			}
 			siginfo.si_isr = isr;
+			siginfo.si_flags = __ISR_VALID;
+			siginfo.si_imm = 0;
 			force_sig_info(SIGFPE, &siginfo, current);
 		}
 	}
@@ -490,6 +497,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			siginfo.si_errno = 0;
 			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 			siginfo.si_imm = vector;
+			siginfo.si_flags = __ISR_VALID;
+			siginfo.si_isr = isr;
 			force_sig_info(SIGILL, &siginfo, current);
 			return;
 		}
@@ -517,6 +526,10 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		}
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
+		siginfo.si_flags = 0;
+		siginfo.si_isr = 0;
+		siginfo.si_addr = 0;
+		siginfo.si_imm = 0;
 		force_sig_info(SIGTRAP, &siginfo, current);
 		return;
 
@@ -528,6 +541,9 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			siginfo.si_errno = 0;
 			siginfo.si_code = FPE_FLTINV;
 			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_flags = __ISR_VALID;
+			siginfo.si_isr = isr;
+			siginfo.si_imm = 0;
 			force_sig_info(SIGFPE, &siginfo, current);
 		}
 		return;
@@ -537,6 +553,9 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			siginfo.si_signo = SIGILL;
 			siginfo.si_code = ILL_BADIADDR;
 			siginfo.si_errno = 0;
+			siginfo.si_flags = 0;
+			siginfo.si_isr = 0;
+			siginfo.si_imm = 0;
 			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 			force_sig_info(SIGILL, &siginfo, current);
 			return;

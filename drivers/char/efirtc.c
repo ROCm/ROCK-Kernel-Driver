@@ -40,7 +40,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-#define EFI_RTC_VERSION		"0.2"
+#define EFI_RTC_VERSION		"0.3"
 
 #define EFI_ISDST (EFI_TIME_ADJUST_DAYLIGHT|EFI_TIME_IN_DAYLIGHT)
 /*
@@ -315,56 +315,45 @@ efi_rtc_get_status(char *buf)
 	spin_unlock_irqrestore(&efi_rtc_lock,flags);
 
 	p += sprintf(p,
-		     "Time      :\n"
-		     "Year      : %u\n"
-		     "Month     : %u\n"
-		     "Day       : %u\n"
-		     "Hour      : %u\n"
-		     "Minute    : %u\n"
-		     "Second    : %u\n"
-		     "Nanosecond: %u\n"
-		     "Daylight  : %u\n",
-		     eft.year, eft.month, eft.day, eft.hour, eft.minute,
-		     eft.second, eft.nanosecond, eft.daylight);
+		     "Time          : %u:%u:%u.%09u\n"
+		     "Date          : %u-%u-%u\n"
+		     "Daylight      : %u\n",
+		     eft.hour, eft.minute, eft.second, eft.nanosecond, 
+		     eft.year, eft.month, eft.day,
+		     eft.daylight);
 
 	if ( eft.timezone == EFI_UNSPECIFIED_TIMEZONE)
-		p += sprintf(p, "Timezone  : unspecified\n");
+		p += sprintf(p, "Timezone       : unspecified\n");
 	else
 		/* XXX fixme: convert to string? */
-		p += sprintf(p, "Timezone  : %u\n", eft.timezone);
+		p += sprintf(p, "Timezone       : %u\n", eft.timezone);
 		
 
 	p += sprintf(p,
-		     "\nWakeup Alm:\n"
-		     "Enabled   : %s\n"
-		     "Pending   : %s\n"
-		     "Year      : %u\n"
-		     "Month     : %u\n"
-		     "Day       : %u\n"
-		     "Hour      : %u\n"
-		     "Minute    : %u\n"
-		     "Second    : %u\n"
-		     "Nanosecond: %u\n"
-		     "Daylight  : %u\n",
-		     enabled == 1 ? "Yes" : "No",
-		     pending == 1 ? "Yes" : "No",
-		     alm.year, alm.month, alm.day, alm.hour, alm.minute,
-		     alm.second, alm.nanosecond, alm.daylight);
+		     "Alarm Time     : %u:%u:%u.%09u\n"
+		     "Alarm Date     : %u-%u-%u\n"
+		     "Alarm Daylight : %u\n"
+		     "Enabled        : %s\n"
+		     "Pending        : %s\n",
+		     alm.hour, alm.minute, alm.second, alm.nanosecond, 
+		     alm.year, alm.month, alm.day, 
+		     alm.daylight,
+		     enabled == 1 ? "yes" : "no",
+		     pending == 1 ? "yes" : "no");
 
 	if ( eft.timezone == EFI_UNSPECIFIED_TIMEZONE)
-		p += sprintf(p, "Timezone  : unspecified\n");
+		p += sprintf(p, "Timezone       : unspecified\n");
 	else
 		/* XXX fixme: convert to string? */
-		p += sprintf(p, "Timezone  : %u\n", eft.timezone);
+		p += sprintf(p, "Timezone       : %u\n", alm.timezone);
 
 	/*
 	 * now prints the capabilities
 	 */
 	p += sprintf(p,
-		     "\nClock Cap :\n"
-		     "Resolution: %u\n"
-		     "Accuracy  : %u\n"
-		     "SetstoZero: %u\n",
+		     "Resolution     : %u\n"
+		     "Accuracy       : %u\n"
+		     "SetstoZero     : %u\n",
 		      cap.resolution, cap.accuracy, cap.sets_to_zero);
 
 	return  p - buf;
@@ -390,7 +379,7 @@ efi_rtc_init(void)
 
 	misc_register(&efi_rtc_dev);
 
-	create_proc_read_entry ("efirtc", 0, NULL, efi_rtc_read_proc, NULL);
+	create_proc_read_entry ("driver/efirtc", 0, NULL, efi_rtc_read_proc, NULL);
 
 	return 0;
 }

@@ -1,8 +1,8 @@
 /*
  * Kernel exception handling table support.  Derived from arch/alpha/mm/extable.c.
  *
- * Copyright (C) 1998, 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1998, 1999, 2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2001-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/config.h>
@@ -55,10 +55,12 @@ search_exception_table (unsigned long addr)
 	struct module *mp;
 
 	/* The kernel is the last "module" -- no need to treat it special. */
-	for (mp = module_list; mp ; mp = mp->next) {
+	for (mp = module_list; mp; mp = mp->next) {
 		if (!mp->ex_table_start)
 			continue;
 		archdata = (struct archdata *) mp->archdata_start;
+		if (!archdata)
+			continue;
 		entry = search_one_table(mp->ex_table_start, mp->ex_table_end - 1,
 					 addr, (unsigned long) archdata->gp);
 		if (entry) {

@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
 
 /************************************************************************
@@ -20,8 +19,8 @@
  ************************************************************************/
 
 
-#ifndef _ASM_SN_SN1_HUBIO_H
-#define _ASM_SN_SN1_HUBIO_H
+#ifndef _ASM_IA64_SN_SN1_HUBIO_H
+#define _ASM_IA64_SN_SN1_HUBIO_H
 
 
 #define    IIO_WID                   0x00400000    /*
@@ -762,7 +761,7 @@
 
 
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 /************************************************************************
  *                                                                      *
@@ -2942,15 +2941,15 @@ typedef union ii_ixss_u {
 typedef union ii_ilct_u {
 	bdrkreg_t	ii_ilct_regval;
 	struct  {
-		bdrkreg_t	i_rsvd                    :	 9;
-		bdrkreg_t	i_test_err_capture        :	 1;
-		bdrkreg_t	i_test_clear              :	 1;
-		bdrkreg_t	i_test_flit               :	 3;
-		bdrkreg_t	i_test_cberr              :	 1;
-		bdrkreg_t	i_test_valid              :	 1;
-		bdrkreg_t	i_test_data               :	20;
-		bdrkreg_t	i_test_mask               :	 8;
-		bdrkreg_t	i_test_seed               :	20;
+		bdrkreg_t	i_test_seed		  :	20;
+		bdrkreg_t	i_test_mask		  :	 8;
+		bdrkreg_t	i_test_data		  :	20;
+		bdrkreg_t	i_test_valid		  :	 1;
+		bdrkreg_t	i_test_cberr		  :	 1;
+		bdrkreg_t	i_test_flit		  :	 3;
+		bdrkreg_t	i_test_clear		  :	 1;
+		bdrkreg_t	i_test_err_capture	  :	 1;
+		bdrkreg_t	i_rsvd			  :	 9;
 	} ii_ilct_fld_s;
 } ii_ilct_u_t;
 
@@ -4935,7 +4934,7 @@ typedef union ii_ippr_u {
 
 
 
-#endif /* _LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
 /************************************************************************
  *                                                                      *
@@ -5014,4 +5013,4 @@ typedef union ii_ippr_u {
 
 
 
-#endif /* _ASM_SN_SN1_HUBIO_H */
+#endif /* _ASM_IA64_SN_SN1_HUBIO_H */

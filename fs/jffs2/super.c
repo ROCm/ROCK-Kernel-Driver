@@ -356,6 +356,7 @@ static struct file_system_type jffs2_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"jffs2",
 	get_sb:		jffs2_get_sb,
+	kill_sb:	kill_block_super,
 	fs_flags:	FS_REQUIRES_DEV,
 };
 

@@ -4,11 +4,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_SN1_HUBNI_NEXT_H
-#define _ASM_SN_SN1_HUBNI_NEXT_H
+#ifndef _ASM_IA64_SN_SN1_HUBNI_NEXT_H
+#define _ASM_IA64_SN_SN1_HUBNI_NEXT_H
 
 #define NI_LOCAL_ENTRIES        128
 #define NI_META_ENTRIES        1
@@ -67,7 +66,7 @@
 				 NPE_EXTLONG_MASK | NPE_EXTSHORT_MASK |\
 				 NPE_FIFOOVFLOW_MASK | NPE_TAILTO_MASK)
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 /* NI_PORT_HEADER[AB] registers (not automatically generated) */
 
 #ifdef LITTLE_ENDIAN
@@ -172,4 +171,4 @@ typedef union ni_port_header_b_u {
 				 0x6 << NPP_NULL_TIMEOUT_SHFT | \
 				 0x3f0 << NPP_MAX_BURST_SHFT)
 
-#endif  /* _ASM_SN_SN1_HUBNI_NEXT_H */
+#endif /* _ASM_IA64_SN_SN1_HUBNI_NEXT_H */

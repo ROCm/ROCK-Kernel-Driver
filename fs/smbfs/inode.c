@@ -719,6 +719,7 @@ static struct file_system_type smb_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"smbfs",
 	get_sb:		smb_get_sb,
+	kill_sb:	kill_anon_super,
 };
 
 static int __init init_smb_fs(void)
