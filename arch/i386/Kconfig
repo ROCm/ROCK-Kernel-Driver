@@ -75,6 +75,11 @@ config X86_SUMMIT
 
 	  If you don't have one of these computers, you should say N here.
 
+config ACPI_SRAT
+	bool
+	default y
+	depends on NUMA && X86_SUMMIT
+
 config X86_BIGSMP
 	bool "Support for other sub-arch SMP systems with more than 8 CPUs"
 	help
@@ -483,7 +488,7 @@ config NR_CPUS
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation Support"
-	depends on X86_NUMAQ
+	depends on (HIGHMEM64G && (X86_NUMAQ || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY)))
 
 config DISCONTIGMEM
 	bool

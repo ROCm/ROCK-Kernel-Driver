@@ -12,6 +12,8 @@
 
 #ifdef CONFIG_X86_NUMAQ
 #include <asm/numaq.h>
+#elif CONFIG_X86_SUMMIT
+#include <asm/srat.h>
 #else
 #define pfn_to_nid(pfn)		(0)
 #endif /* CONFIG_X86_NUMAQ */
