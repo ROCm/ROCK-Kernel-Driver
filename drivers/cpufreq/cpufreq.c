@@ -190,6 +190,18 @@ store_one(scaling_min_freq,min);
 store_one(scaling_max_freq,max);
 
 /**
+ * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
+ */
+static ssize_t show_cpuinfo_cur_freq (struct cpufreq_policy * policy, char *buf)
+{
+	unsigned int cur_freq = cpufreq_get(policy->cpu);
+	if (!cur_freq)
+		return sprintf(buf, "<unknown>");
+	return sprintf(buf, "%u\n", cur_freq);
+}
+
+
+/**
  * show_scaling_governor - show the current policy for the specified CPU
  */
 static ssize_t show_scaling_governor (struct cpufreq_policy * policy, char *buf)
@@ -269,6 +281,12 @@ struct freq_attr _name = { \
 	.show = show_##_name, \
 }
 
+#define define_one_ro0400(_name) \
+struct freq_attr _name = { \
+	.attr = { .name = __stringify(_name), .mode = 0400 }, \
+	.show = show_##_name, \
+}
+
 #define define_one_rw(_name) \
 struct freq_attr _name = { \
 	.attr = { .name = __stringify(_name), .mode = 0644 }, \
@@ -276,6 +294,7 @@ struct freq_attr _name = { \
 	.store = store_##_name, \
 }
 
+define_one_ro0400(cpuinfo_cur_freq);
 define_one_ro(cpuinfo_min_freq);
 define_one_ro(cpuinfo_max_freq);
 define_one_ro(scaling_available_governors);
@@ -396,6 +415,8 @@ static int cpufreq_add_dev (struct sys_device * sys_dev)
 		sysfs_create_file(&policy->kobj, &((*drv_attr)->attr));
 		drv_attr++;
 	}
+	if (cpufreq_driver->get)
+		sysfs_create_file(&policy->kobj, &cpuinfo_cur_freq.attr);
 	if (cpufreq_driver->target)
 		sysfs_create_file(&policy->kobj, &scaling_cur_freq.attr);
 
