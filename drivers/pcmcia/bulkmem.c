@@ -298,7 +298,7 @@ int MTDHelperEntry(int func, void *a1, void *a2)
     {
 	window_handle_t w;
         int ret = pcmcia_request_window(a1, a2, &w);
-        (window_handle_t *)a1 = w;
+        a1 = w;
 	return  ret;
     }
         break;
