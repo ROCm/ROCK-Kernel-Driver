@@ -35,13 +35,6 @@ extern unsigned long max_huge_pages;
 extern const unsigned long hugetlb_zero, hugetlb_infinity;
 extern int sysctl_hugetlb_shm_group;
 
-static inline void
-mark_mm_hugetlb(struct mm_struct *mm, struct vm_area_struct *vma)
-{
-	if (is_vm_hugetlb_page(vma))
-		mm->used_hugetlb = 1;
-}
-
 #ifndef ARCH_HAS_HUGEPAGE_ONLY_RANGE
 #define is_hugepage_only_range(addr, len)	0
 #define hugetlb_free_pgtables(tlb, prev, start, end) do { } while (0)
@@ -74,7 +67,6 @@ static inline unsigned long hugetlb_total_pages(void)
 #define is_hugepage_mem_enough(size)		0
 #define hugetlb_report_meminfo(buf)		0
 #define hugetlb_report_node_meminfo(n, buf)	0
-#define mark_mm_hugetlb(mm, vma)		do { } while (0)
 #define follow_huge_pmd(mm, addr, pmd, write)	NULL
 #define is_aligned_hugepage_range(addr, len)	0
 #define prepare_hugepage_range(addr, len)	(-EINVAL)

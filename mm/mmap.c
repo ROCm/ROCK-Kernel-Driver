@@ -317,7 +317,6 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (mapping)
 		spin_unlock(&mapping->i_mmap_lock);
 
-	mark_mm_hugetlb(mm, vma);
 	mm->map_count++;
 	validate_mm(mm);
 }
