@@ -1366,6 +1366,8 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	}
 #endif	
 	/* Initialize the boot-time allocator. */
+	max_pfn = max_low_pfn = end_pfn;
+	min_low_pfn = pfn_base;
 	bootmap_size = init_bootmem_node(NODE_DATA(0), bootmap_pfn, pfn_base, end_pfn);
 
 	/* Now register the available physical memory with the
