@@ -584,6 +584,7 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	mm_segment_t	oldfs;
 	int		err;
 	struct file	file;
+	struct inode	*inode;
 
 	err = nfsd_open(rqstp, fhp, S_IFREG, MAY_READ, &file);
 	if (err)
@@ -591,14 +592,15 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	err = nfserr_perm;
 	if (!file.f_op->read)
 		goto out_close;
+	inode = file.f_dentry->d_inode;
 #ifdef MSNFS
 	if ((fhp->fh_export->ex_flags & NFSEXP_MSNFS) &&
-		(!lock_may_read(file.f_dentry->d_inode, offset, *count)))
+		(!lock_may_read(inode, offset, *count)))
 		goto out_close;
 #endif
 
 	/* Get readahead parameters */
-	ra = nfsd_get_raparms(fhp->fh_export->ex_dev, fhp->fh_dentry->d_inode->i_ino);
+	ra = nfsd_get_raparms(inode->i_dev, inode->i_ino);
 	if (ra) {
 		file.f_reada = ra->p_reada;
 		file.f_ramax = ra->p_ramax;
