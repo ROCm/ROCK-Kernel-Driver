@@ -41,15 +41,15 @@
  *	processes trying to touch the journal while it is in transition.
  */
 
-static transaction_t * get_transaction (journal_t * journal, int is_try)
+static transaction_t *get_transaction(journal_t *journal)
 {
 	transaction_t * transaction;
 
-	transaction = jbd_kmalloc (sizeof (transaction_t), GFP_NOFS);
+	transaction = jbd_kmalloc(sizeof(*transaction), GFP_NOFS);
 	if (!transaction)
 		return NULL;
 	
-	memset (transaction, 0, sizeof (transaction_t));
+	memset(transaction, 0, sizeof(*transaction));
 	
 	transaction->t_journal = journal;
 	transaction->t_state = T_RUNNING;
@@ -120,7 +120,7 @@ repeat:
 	
 repeat_locked:
 	if (!journal->j_running_transaction)
-		get_transaction(journal, 0);
+		get_transaction(journal);
 	/* @@@ Error? */
 	J_ASSERT(journal->j_running_transaction);
 	
@@ -1277,15 +1277,14 @@ not_jbd:
  * and has the caller-specific data afterwards.
  */
 void journal_callback_set(handle_t *handle,
-			  void (*func)(struct journal_callback *jcb, int error),
-			  struct journal_callback *jcb)
+			void (*func)(struct journal_callback *jcb, int error),
+			struct journal_callback *jcb)
 {
-	lock_kernel();
+	spin_lock(&handle->h_transaction->t_jcb_lock);
 	list_add_tail(&jcb->jcb_list, &handle->h_jcb);
+	spin_unlock(&handle->h_transaction->t_jcb_lock);
 	jcb->jcb_func = func;
-	unlock_kernel();
 }
-
 
 /**
  * int journal_stop() - complete a transaction
@@ -1357,7 +1356,9 @@ int journal_stop(handle_t *handle)
 	}
 
 	/* Move callbacks from the handle to the transaction. */
+	spin_lock(&transaction->t_jcb_lock);
 	list_splice(&handle->h_jcb, &transaction->t_jcb);
+	spin_unlock(&transaction->t_jcb_lock);
 
 	/*
 	 * If the handle is marked SYNC, we need to set another commit
