@@ -1510,7 +1510,7 @@ int ip6t_register_table(struct ip6t_table *table)
 	/* save number of initial entries */
 	table->private->initial_entries = table->private->number;
 
-	table->lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&table->lock);
 	list_prepend(&ip6t_tables, table);
 
  unlock:

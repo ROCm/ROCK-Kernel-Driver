@@ -979,9 +979,9 @@ int ip6_del_rt(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 
 	rt6_reset_dflt_pointer(NULL);
 
+	err = fib6_del(rt, nlh, _rtattr);
 	dst_release(&rt->u.dst);
 
-	err = fib6_del(rt, nlh, _rtattr);
 	write_unlock_bh(&rt6_lock);
 
 	return err;

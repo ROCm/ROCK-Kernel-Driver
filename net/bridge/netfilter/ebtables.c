@@ -1168,7 +1168,7 @@ int ebt_register_table(struct ebt_table *table)
 	}
 
 	table->private = newinfo;
-	table->lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&table->lock);
 	ret = down_interruptible(&ebt_mutex);
 	if (ret != 0)
 		goto free_chainstack;

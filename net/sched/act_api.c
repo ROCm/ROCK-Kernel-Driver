@@ -88,7 +88,7 @@ int tcf_unregister_action(struct tc_action_ops *act)
 }
 
 /* lookup by name */
-struct tc_action_ops *tc_lookup_action_n(char *kind)
+static struct tc_action_ops *tc_lookup_action_n(char *kind)
 {
 
 	struct tc_action_ops *a = NULL;
@@ -111,7 +111,7 @@ struct tc_action_ops *tc_lookup_action_n(char *kind)
 }
 
 /* lookup by rtattr */
-struct tc_action_ops *tc_lookup_action(struct rtattr *kind)
+static struct tc_action_ops *tc_lookup_action(struct rtattr *kind)
 {
 
 	struct tc_action_ops *a = NULL;
@@ -134,8 +134,9 @@ struct tc_action_ops *tc_lookup_action(struct rtattr *kind)
 	return a;
 }
 
+#if 0
 /* lookup by id */
-struct tc_action_ops *tc_lookup_action_id(u32 type)
+static struct tc_action_ops *tc_lookup_action_id(u32 type)
 {
 	struct tc_action_ops *a = NULL;
 
@@ -155,6 +156,7 @@ struct tc_action_ops *tc_lookup_action_id(u32 type)
 
 	return a;
 }
+#endif
 
 int tcf_action_exec(struct sk_buff *skb,struct tc_action *act, struct tcf_result *res)
 {
@@ -504,7 +506,7 @@ static int act_get_notify(u32 pid, struct nlmsghdr *n,
 	return err;
 }
 
-int tcf_action_get_1(struct rtattr *rta, struct tc_action *a, struct nlmsghdr *n, u32 pid)
+static int tcf_action_get_1(struct rtattr *rta, struct tc_action *a, struct nlmsghdr *n, u32 pid)
 {
 	struct tc_action_ops *a_o;
 	char act_name[4 + IFNAMSIZ + 1];
@@ -571,7 +573,7 @@ err_out:
 	return err;
 }
 
-void cleanup_a (struct tc_action *act) 
+static void cleanup_a (struct tc_action *act) 
 {
 	struct tc_action *a;
 
@@ -587,7 +589,7 @@ void cleanup_a (struct tc_action *act)
 	}
 }
 
-struct tc_action_ops *get_ao(struct rtattr *kind, struct tc_action *a)
+static struct tc_action_ops *get_ao(struct rtattr *kind, struct tc_action *a)
 {
 	char act_name[4 + IFNAMSIZ + 1];
 	struct tc_action_ops *a_o = NULL;
@@ -622,7 +624,7 @@ struct tc_action_ops *get_ao(struct rtattr *kind, struct tc_action *a)
 	return a_o;
 }
 
-struct tc_action *create_a(int i)
+static struct tc_action *create_a(int i)
 {
 	struct tc_action *act = NULL;
 
@@ -639,7 +641,7 @@ struct tc_action *create_a(int i)
 	return act;
 }
 
-int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
+static int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
 {
 	struct sk_buff *skb;
 	unsigned char *b;
@@ -709,7 +711,7 @@ err_out:
 	return err;
 }
 
-int tca_action_gd(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int event )
+static int tca_action_gd(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int event )
 {
 
 	int s = 0;
@@ -793,7 +795,7 @@ nlmsg_failure:
 }
 
 
-int tcf_add_notify(struct tc_action *a, u32 pid, u32 seq, int event, unsigned flags) 
+static int tcf_add_notify(struct tc_action *a, u32 pid, u32 seq, int event, unsigned flags) 
 {
 	struct tcamsg *t;
 	struct nlmsghdr  *nlh;
@@ -840,7 +842,7 @@ nlmsg_failure:
 }
 
 	
-int tcf_action_add(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int ovr ) 
+static int tcf_action_add(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int ovr ) 
 {
 	int ret = 0;
 	struct tc_action *act = NULL;
@@ -923,7 +925,7 @@ static int tc_ctl_action(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 	return ret;
 }
 
-char *
+static char *
 find_dump_kind(struct nlmsghdr *n)
 {
 	struct rtattr *tb1, *tb2[TCA_ACT_MAX+1];

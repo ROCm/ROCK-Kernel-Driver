@@ -264,7 +264,7 @@ static void bcm203x_disconnect(struct usb_interface *intf)
 
 	BT_DBG("intf %p", intf);
 
-	usb_unlink_urb(data->urb);
+	usb_kill_urb(data->urb);
 
 	usb_set_intfdata(intf, NULL);
 

@@ -214,7 +214,7 @@ static int htable_create(struct ipt_hashlimit_info *minfo)
 	atomic_set(&hinfo->count, 0);
 	atomic_set(&hinfo->use, 1);
 	hinfo->rnd = 0;
-	hinfo->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&hinfo->lock);
 	hinfo->pde = create_proc_entry(minfo->name, 0, hashlimit_procdir);
 	if (!hinfo->pde) {
 		vfree(hinfo);

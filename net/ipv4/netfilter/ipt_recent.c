@@ -715,7 +715,7 @@ checkentry(const char *tablename,
 	curr_table = vmalloc(sizeof(struct recent_ip_tables));
 	if(curr_table == NULL) return -ENOMEM;
 
-	curr_table->list_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&curr_table->list_lock);
 	curr_table->next = NULL;
 	curr_table->count = 1;
 	curr_table->time_pos = 0;

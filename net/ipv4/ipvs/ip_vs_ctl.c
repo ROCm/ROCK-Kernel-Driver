@@ -746,8 +746,8 @@ ip_vs_new_dest(struct ip_vs_service *svc, struct ip_vs_dest_user *udest,
 	atomic_set(&dest->refcnt, 0);
 
 	INIT_LIST_HEAD(&dest->d_list);
-	dest->dst_lock = SPIN_LOCK_UNLOCKED;
-	dest->stats.lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dest->dst_lock);
+	spin_lock_init(&dest->stats.lock);
 	__ip_vs_update_dest(svc, dest, udest);
 	ip_vs_new_estimator(&dest->stats);
 
@@ -1062,8 +1062,8 @@ ip_vs_add_service(struct ip_vs_service_user *u, struct ip_vs_service **svc_p)
 	svc->netmask = u->netmask;
 
 	INIT_LIST_HEAD(&svc->destinations);
-	svc->sched_lock = RW_LOCK_UNLOCKED;
-	svc->stats.lock = SPIN_LOCK_UNLOCKED;
+	rwlock_init(&svc->sched_lock);
+	spin_lock_init(&svc->stats.lock);
 
 	/* Bind the scheduler */
 	ret = ip_vs_bind_scheduler(svc, sched);
@@ -2357,7 +2357,7 @@ int ip_vs_control_init(void)
 	}
 
 	memset(&ip_vs_stats, 0, sizeof(ip_vs_stats));
-	ip_vs_stats.lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&ip_vs_stats.lock);
 	ip_vs_new_estimator(&ip_vs_stats);
 
 	/* Hook the defense timer */

@@ -76,7 +76,7 @@ tcf_mirred_release(struct tcf_mirred *p, int bind)
 	return 0;
 }
 
-int
+static int
 tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int ovr, int bind)
 {
 	struct rtattr *tb[TCA_MIRRED_MAX];
@@ -151,7 +151,7 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int 
 
 }
 
-int
+static int
 tcf_mirred_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_mirred *p;
@@ -161,7 +161,7 @@ tcf_mirred_cleanup(struct tc_action *a, int bind)
 	return 0;
 }
 
-int
+static int
 tcf_mirred(struct sk_buff **pskb, struct tc_action *a)
 {
 	struct tcf_mirred *p;
@@ -236,7 +236,7 @@ bad_mirred:
 	return p->action;
 }
 
-int
+static int
 tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 {
 	unsigned char *b = skb->tail;
