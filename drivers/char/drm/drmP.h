@@ -98,9 +98,6 @@
 #ifndef __HAVE_DMA_WAITLIST
 #define __HAVE_DMA_WAITLIST	0
 #endif
-#ifndef __HAVE_DMA_FREELIST
-#define __HAVE_DMA_FREELIST	0
-#endif
 
 #define __REALLY_HAVE_AGP	(__HAVE_AGP && (defined(CONFIG_AGP) || \
 						defined(CONFIG_AGP_MODULE)))
