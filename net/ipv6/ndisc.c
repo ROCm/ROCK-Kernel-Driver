@@ -810,8 +810,11 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	 *	update / create cache entry
 	 *	for the source address
 	 */
-	neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, dev);
-
+	neigh = __neigh_lookup(&nd_tbl, saddr, dev, lladdr || !dev->addr_len);
+	if (neigh)
+		neigh_update(neigh, lladdr, NUD_STALE, 
+			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
+			     NEIGH_UPDATE_F_OVERRIDE);
 	if (neigh || !dev->hard_header) {
 		ndisc_send_na(dev, neigh, saddr, &msg->target,
 			      idev->cnf.forwarding, 
