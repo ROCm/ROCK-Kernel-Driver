@@ -118,13 +118,6 @@ xfs_iget_vnode_init(
 {
 	vp->v_vfsp  = XFS_MTOVFS(mp);
 	vp->v_type  = IFTOVT(ip->i_d.di_mode);
-
-	/* If we have a real type for an on-disk inode, we can set ops(&unlock)
-	 * now.	 If it's a new inode being created, xfs_ialloc will handle it.
-	 */
-	if (vp->v_type != VNON) {
-		linvfs_set_inode_ops(LINVFS_GET_IP(vp));
-	}
 }
 
 
@@ -159,7 +152,7 @@ xfs_iget_vnode_init(
  * bno -- the block number starting the buffer containing the inode,
  *	  if known (as by bulkstat), else 0.
  */
-int
+STATIC int
 xfs_iget_core(
 	vnode_t		*vp,
 	xfs_mount_t	*mp,
@@ -428,6 +421,14 @@ finish_inode:
 	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
 
 	*ipp = ip;
+
+	/*
+	 * If we have a real type for an on-disk inode, we can set ops(&unlock)
+	 * now.	 If it's a new inode being created, xfs_ialloc will handle it.
+	 */
+	if (vp->v_type != VNON) {
+		linvfs_set_inode_ops(LINVFS_GET_IP(vp));
+	}
 
 	/* Update the linux inode */
 	error = vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);
