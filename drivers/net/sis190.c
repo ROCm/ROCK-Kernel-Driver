@@ -85,7 +85,7 @@ static int multicast_filter_limit = 32;
 #define EhnMIIread      0x0000
 #define EhnMIIwrite     0x0020
 #define EhnMIIdataShift 16
-#define EhnMIIpmdShift  6      /* 7016 only */
+#define EhnMIIpmdShift  6	/* 7016 only */
 #define EhnMIIregShift  11
 #define EhnMIIreq       0x0010
 #define EhnMIInotDone   0x0010
@@ -148,37 +148,37 @@ static struct pci_device_id sis190_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, sis190_pci_tbl);
 
 enum SiS190_registers {
-	
-	TxControl=0x0,
-	TxDescStartAddr =0x4,
-	TxNextDescAddr =0x0c,
-	RxControl=0x10,
-	RxDescStartAddr =0x14,
-	RxNextDescAddr =0x1c,
-       IntrStatus = 0x20,
-       IntrMask = 0x24,
-       IntrControl = 0x28,
-       IntrTimer = 0x2c,
+
+	TxControl = 0x0,
+	TxDescStartAddr = 0x4,
+	TxNextDescAddr = 0x0c,
+	RxControl = 0x10,
+	RxDescStartAddr = 0x14,
+	RxNextDescAddr = 0x1c,
+	IntrStatus = 0x20,
+	IntrMask = 0x24,
+	IntrControl = 0x28,
+	IntrTimer = 0x2c,
 	PMControl = 0x30,
-       ROMControl=0x38,
-       ROMInterface=0x3c,
-       StationControl=0x40,
-       GMIIControl=0x44,
-       TxMacControl=0x50,
-       RxMacControl=0x60,
-       RxMacAddr=0x62,
-       RxHashTable=0x68,
-       RxWakeOnLan=0x70,
-       RxMPSControl=0x78,	
+	ROMControl = 0x38,
+	ROMInterface = 0x3c,
+	StationControl = 0x40,
+	GMIIControl = 0x44,
+	TxMacControl = 0x50,
+	RxMacControl = 0x60,
+	RxMacAddr = 0x62,
+	RxHashTable = 0x68,
+	RxWakeOnLan = 0x70,
+	RxMPSControl = 0x78,
 };
 
 enum sis190_register_content {
 	/*InterruptStatusBits */
-	
-	SoftInt=0x40000000,
-	Timeup=0x20000000,
+
+	SoftInt = 0x40000000,
+	Timeup = 0x20000000,
 	PauseFrame = 0x80000,
-	MagicPacket=0x40000,
+	MagicPacket = 0x40000,
 	WakeupFrame = 0x20000,
 	LinkChange = 0x10000,
 	RxQEmpty = 0x80,
@@ -188,7 +188,7 @@ enum sis190_register_content {
 	TxQ0Empty = 0x08,
 	TxQ0Int = 0x04,
 	RxHalt = 0x02,
-	TxHalt=0x01,	
+	TxHalt = 0x01,
 
 	/*RxStatusDesc */
 	RxRES = 0x00200000,
@@ -228,12 +228,12 @@ enum sis190_register_content {
 	RxFlowCtrl = 0x20,
 
 	_1000bpsF = 0x1c,
-        _1000bpsH = 0x0c,   
+	_1000bpsH = 0x0c,
 	_100bpsF = 0x18,
-        _100bpsH = 0x08, 
+	_100bpsH = 0x08,
 	_10bpsF = 0x14,
-        _10bpsH = 0x04,
-        
+	_10bpsH = 0x04,
+
 	LinkStatus = 0x02,
 	FullDup = 0x01,
 
@@ -285,8 +285,8 @@ enum _DescStatusBit {
 	INTbit = 0x40000000,
 	DEFbit = 0x200000,
 	CRCbit = 0x20000,
-	PADbit=0x10000,
-	ENDbit=0x80000000,
+	PADbit = 0x10000,
+	ENDbit = 0x80000000,
 };
 
 struct TxDesc {
@@ -329,7 +329,7 @@ MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "i");
 static int SiS190_open(struct net_device *dev);
 static int SiS190_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static irqreturn_t SiS190_interrupt(int irq, void *dev_instance,
-			      struct pt_regs *regs);
+				    struct pt_regs *regs);
 static void SiS190_init_ring(struct net_device *dev);
 static void SiS190_hw_start(struct net_device *dev);
 static int SiS190_close(struct net_device *dev);
@@ -338,34 +338,38 @@ static void SiS190_tx_timeout(struct net_device *dev);
 static struct net_device_stats *SiS190_get_stats(struct net_device *netdev);
 
 static const u32 sis190_intr_mask =
-     RxQEmpty | RxQInt |TxQ1Empty |	TxQ1Int | TxQ0Empty |	TxQ0Int |RxHalt | TxHalt;
-   
+    RxQEmpty | RxQInt | TxQ1Empty | TxQ1Int | TxQ0Empty | TxQ0Int | RxHalt |
+    TxHalt;
+
 void
 smdio_write(void *ioaddr, int RegAddr, int value)
 {
 
-    u32      l;
-    u16      i;
-    u32      pmd;
+	u32 l;
+	u16 i;
+	u32 pmd;
 
-    pmd=1;
-    
-    l=0;
-    l = EhnMIIwrite |(((u32)RegAddr)<<EhnMIIregShift) |EhnMIIreq | (((u32)value)<<EhnMIIdataShift)|(((u32)pmd)<<EhnMIIpmdShift);
+	pmd = 1;
 
-    SiS_W32(GMIIControl, l );
+	l = 0;
+	l = EhnMIIwrite | (((u32) RegAddr) << EhnMIIregShift) | EhnMIIreq |
+	    (((u32) value) << EhnMIIdataShift) | (((u32) pmd) <<
+						  EhnMIIpmdShift);
 
-    udelay(1000);   
-      
-    for ( i=0; i<1000; i++) {
-        if ( SiS_R32( GMIIControl ) & EhnMIInotDone ) {
-           udelay(100);
-        } else {
-            break;
-        }
-    }
+	SiS_W32(GMIIControl, l);
 
-    if(i>999) printk(KERN_ERR PFX "Phy write Error!!!\n");
+	udelay(1000);
+
+	for (i = 0; i < 1000; i++) {
+		if (SiS_R32(GMIIControl) & EhnMIInotDone) {
+			udelay(100);
+		} else {
+			break;
+		}
+	}
+
+	if (i > 999)
+		printk(KERN_ERR PFX "Phy write Error!!!\n");
 
 }
 
@@ -373,66 +377,66 @@ int
 smdio_read(void *ioaddr, int RegAddr)
 {
 
-    u32      l;
-    u16      i;
-    u32      pmd;
-    
-    pmd=1;
-    l=0;
-    l = EhnMIIread |EhnMIIreq  | (((u32)RegAddr)<<EhnMIIregShift) |(((u32)pmd)<<EhnMIIpmdShift);
-    
-    SiS_W32(GMIIControl, l );
-      
-    udelay(1000);
-    
-    for ( i=0; i<1000; i++) {
-        if ((l == SiS_R32(GMIIControl)) & EhnMIInotDone) {
-            udelay(100);
-        } else {
-            break;
-        }
+	u32 l;
+	u16 i;
+	u32 pmd;
 
-        if(i>999) printk(KERN_ERR PFX "Phy Read Error!!!\n");
-    }
-    l=SiS_R32(GMIIControl);    
-    
-    return( (u16) ( l>>EhnMIIdataShift ) );
-	
+	pmd = 1;
+	l = 0;
+	l = EhnMIIread | EhnMIIreq | (((u32) RegAddr) << EhnMIIregShift) |
+	    (((u32) pmd) << EhnMIIpmdShift);
+
+	SiS_W32(GMIIControl, l);
+
+	udelay(1000);
+
+	for (i = 0; i < 1000; i++) {
+		if ((l == SiS_R32(GMIIControl)) & EhnMIInotDone) {
+			udelay(100);
+		} else {
+			break;
+		}
+
+		if (i > 999)
+			printk(KERN_ERR PFX "Phy Read Error!!!\n");
+	}
+	l = SiS_R32(GMIIControl);
+
+	return ((u16) (l >> EhnMIIdataShift));
+
 }
 
 int
 ReadEEprom(void *ioaddr, u32 RegAddr)
 {
-    u16 	data;
-    u32 	i;
-    u32 	ulValue;
-    
-    if(!(SiS_R32(ROMControl)&BIT_1))
-    {
-        return 0;
-    }
+	u16 data;
+	u32 i;
+	u32 ulValue;
 
-    ulValue = (BIT_7 | (0x2 << 8) | (RegAddr << 10));
+	if (!(SiS_R32(ROMControl) & BIT_1)) {
+		return 0;
+	}
 
-    SiS_W32(ROMInterface, ulValue);
+	ulValue = (BIT_7 | (0x2 << 8) | (RegAddr << 10));
 
-    for(i=0 ; i < 200; i++)
-    {
-        
-        if(!(SiS_R32(ROMInterface)& BIT_7))
-            break;
+	SiS_W32(ROMInterface, ulValue);
 
-        udelay(1000);
-    }
-  
-    data = (u16)((SiS_R32(ROMInterface) & 0xffff0000) >> 16);
-    
-    return data;
+	for (i = 0; i < 200; i++) {
+
+		if (!(SiS_R32(ROMInterface) & BIT_7))
+			break;
+
+		udelay(1000);
+	}
+
+	data = (u16) ((SiS_R32(ROMInterface) & 0xffff0000) >> 16);
+
+	return data;
 }
 
 static int __devinit
 SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
-		   void **ioaddr_out)
+		  void **ioaddr_out)
 {
 	void *ioaddr = NULL;
 	struct net_device *dev;
@@ -448,7 +452,7 @@ SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 
 	// dev zeroed in init_etherdev 
 
- 	dev = alloc_etherdev(sizeof (*tp));
+	dev = alloc_etherdev(sizeof (*tp));
 	if (dev == NULL) {
 		printk(KERN_ERR PFX "unable to alloc new ethernet\n");
 		return -ENOMEM;
@@ -496,25 +500,24 @@ SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 		rc = -EIO;
 		goto err_out_free_res;
 	}
-
 	// Soft reset the chip. 
-	SiS_W32(IntrControl,0x8000);
+	SiS_W32(IntrControl, 0x8000);
 	udelay(1000);
-	SiS_W32(IntrControl,0x0);
-		
-	SiS_W32(TxControl,0x1a00);
-	SiS_W32(RxControl,0x1a00);	
+	SiS_W32(IntrControl, 0x0);
+
+	SiS_W32(TxControl, 0x1a00);
+	SiS_W32(RxControl, 0x1a00);
 	udelay(1000);
-	
+
 	*ioaddr_out = ioaddr;
 	*dev_out = dev;
 	return 0;
 
-err_out_free_res:
+      err_out_free_res:
 	pci_release_regions(pdev);
 
-err_out:
- 	pci_disable_device(pdev);
+      err_out:
+	pci_disable_device(pdev);
 	unregister_netdev(dev);
 	kfree(dev);
 	return rc;
@@ -528,14 +531,14 @@ SiS190_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	void *ioaddr = NULL;
 	static int board_idx = -1;
 	static int printed_version = 0;
-	int i,rc;
-        u16 reg31;
+	int i, rc;
+	u16 reg31;
 
 	assert(pdev != NULL);
 	assert(ent != NULL);
 
 	board_idx++;
-            
+
 	if (!printed_version) {
 		printk(KERN_INFO SiS190_DRIVER_NAME " loaded\n");
 		printed_version = 1;
@@ -551,24 +554,24 @@ SiS190_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	assert(dev != NULL);
 	assert(tp != NULL);
 
-    // Get MAC address //
-    // Read node address from the EEPROM
+	// Get MAC address //
+	// Read node address from the EEPROM
 
-        if(SiS_R32(ROMControl)&0x2){
+	if (SiS_R32(ROMControl) & 0x2) {
 
-            for (i=0; i< 6; i += 2){
-               SiS_W16(RxMacAddr+i,ReadEEprom(ioaddr, 3 + (i/2)));
-            }      
-      
-        }else{
-    
-	   SiS_W32(RxMacAddr,0x11111100);       //If 9346 does not exist
-	   SiS_W32(RxMacAddr+2,0x00111111);
-      	}
-      
+		for (i = 0; i < 6; i += 2) {
+			SiS_W16(RxMacAddr + i, ReadEEprom(ioaddr, 3 + (i / 2)));
+		}
+
+	} else {
+
+		SiS_W32(RxMacAddr, 0x11111100);	//If 9346 does not exist
+		SiS_W32(RxMacAddr + 2, 0x00111111);
+	}
+
 	for (i = 0; i < MAC_ADDR_LEN; i++) {
-		dev->dev_addr[i] = SiS_R8(RxMacAddr+i);
-	        printk("SiS_R8(RxMacAddr+%x)= %x ",i,SiS_R8(RxMacAddr+i));    
+		dev->dev_addr[i] = SiS_R8(RxMacAddr + i);
+		printk("SiS_R8(RxMacAddr+%x)= %x ", i, SiS_R8(RxMacAddr + i));
 	}
 
 	dev->open = SiS190_open;
@@ -614,69 +617,72 @@ SiS190_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	       dev->dev_addr[2], dev->dev_addr[3],
 	       dev->dev_addr[4], dev->dev_addr[5], dev->irq);
 
-               int val = smdio_read(ioaddr, PHY_AUTO_NEGO_REG);
+	int val = smdio_read(ioaddr, PHY_AUTO_NEGO_REG);
 
-			printk(KERN_INFO "%s: Auto-negotiation Enabled.\n",
-			       dev->name);
+	printk(KERN_INFO "%s: Auto-negotiation Enabled.\n", dev->name);
 
-			// enable 10/100 Full/Half Mode, leave PHY_AUTO_NEGO_REG bit4:0 unchanged
-			smdio_write(ioaddr, PHY_AUTO_NEGO_REG,
-				   PHY_Cap_10_Half | PHY_Cap_10_Full |
-				   PHY_Cap_100_Half | PHY_Cap_100_Full | (val &
-									  0x1F));
+	// enable 10/100 Full/Half Mode, leave PHY_AUTO_NEGO_REG bit4:0 unchanged
+	smdio_write(ioaddr, PHY_AUTO_NEGO_REG,
+		    PHY_Cap_10_Half | PHY_Cap_10_Full |
+		    PHY_Cap_100_Half | PHY_Cap_100_Full | (val & 0x1F));
 
-			// enable 1000 Full Mode
-			smdio_write(ioaddr, PHY_1000_CTRL_REG,
-				   PHY_Cap_1000_Full);
+	// enable 1000 Full Mode
+	smdio_write(ioaddr, PHY_1000_CTRL_REG, PHY_Cap_1000_Full);
 
-		// Enable auto-negotiation and restart auto-nigotiation
-		smdio_write(ioaddr, PHY_CTRL_REG,
-			   PHY_Enable_Auto_Nego | PHY_Restart_Auto_Nego);
-		udelay(100);
+	// Enable auto-negotiation and restart auto-nigotiation
+	smdio_write(ioaddr, PHY_CTRL_REG,
+		    PHY_Enable_Auto_Nego | PHY_Restart_Auto_Nego);
+	udelay(100);
 
-		// wait for auto-negotiation process
-		for (i = 10000; i > 0; i--) {
-			//check if auto-negotiation complete
-			if (smdio_read(ioaddr, PHY_STAT_REG) &
-			    PHY_Auto_Neco_Comp) {
-				udelay(100);
-		                reg31=smdio_read(ioaddr,31);
-	                        reg31 &= 0x1c;              //bit 4:2
-                                switch(reg31){                                
-                                   case _1000bpsF:
-                                       SiS_W16( 0x40, 0x1c01);
-                                       printk("SiS190 Link on 1000 bps Full Duplex mode. \n");                                       
-                                       break;                                       
-                                   case _1000bpsH:
-                                       SiS_W16( 0x40, 0x0c01);                                                                 
-                                       printk("SiS190 Link on 1000 bps Half Duplex mode. \n");                                       
-                                       break;                                       
-                                   case _100bpsF:
-                                       SiS_W16( 0x40, 0x1801);      
-                                       printk("SiS190 Link on 100 bps Full Duplex mode. \n");                                       
-                                       break;                                       
-                                   case _100bpsH:
-                                       SiS_W16( 0x40, 0x0801);                                             
-                                       printk("SiS190 Link on 100 bps Half Duplex mode. \n");                                       
-                                       break;                                       
-                                   case _10bpsF:
-                                       SiS_W16( 0x40, 0x1401);      
-                                       printk("SiS190 Link on 10 bps Full Duplex mode. \n");                                       
-                                       break;                                       
-                                   case _10bpsH:                                
-                                       SiS_W16( 0x40, 0x0401);                                             
-                                       printk("SiS190 Link on 10 bps Half Duplex mode. \n");                                       
-                                       break;                                                                              
-                                   default:
-                                       printk(KERN_ERR PFX "Error! SiS190 Can not detect mode !!! \n");
-                                       break;   
-                                   }
-                                  
+	// wait for auto-negotiation process
+	for (i = 10000; i > 0; i--) {
+		//check if auto-negotiation complete
+		if (smdio_read(ioaddr, PHY_STAT_REG) & PHY_Auto_Neco_Comp) {
+			udelay(100);
+			reg31 = smdio_read(ioaddr, 31);
+			reg31 &= 0x1c;	//bit 4:2
+			switch (reg31) {
+			case _1000bpsF:
+				SiS_W16(0x40, 0x1c01);
+				printk
+				    ("SiS190 Link on 1000 bps Full Duplex mode. \n");
 				break;
-			} else {
-				udelay(100);
+			case _1000bpsH:
+				SiS_W16(0x40, 0x0c01);
+				printk
+				    ("SiS190 Link on 1000 bps Half Duplex mode. \n");
+				break;
+			case _100bpsF:
+				SiS_W16(0x40, 0x1801);
+				printk
+				    ("SiS190 Link on 100 bps Full Duplex mode. \n");
+				break;
+			case _100bpsH:
+				SiS_W16(0x40, 0x0801);
+				printk
+				    ("SiS190 Link on 100 bps Half Duplex mode. \n");
+				break;
+			case _10bpsF:
+				SiS_W16(0x40, 0x1401);
+				printk
+				    ("SiS190 Link on 10 bps Full Duplex mode. \n");
+				break;
+			case _10bpsH:
+				SiS_W16(0x40, 0x0401);
+				printk
+				    ("SiS190 Link on 10 bps Half Duplex mode. \n");
+				break;
+			default:
+				printk(KERN_ERR PFX
+				       "Error! SiS190 Can not detect mode !!! \n");
+				break;
 			}
-		}		// end for-loop to wait for auto-negotiation process
+
+			break;
+		} else {
+			udelay(100);
+		}
+	}			// end for-loop to wait for auto-negotiation process
 	return 0;
 }
 
@@ -708,7 +714,7 @@ SiS190_open(struct net_device *dev)
 	int retval;
 	u8 diff;
 	u32 TxPhyAddr, RxPhyAddr;
-        
+
 	retval =
 	    request_irq(dev->irq, SiS190_interrupt, SA_SHIRQ, dev->name, dev);
 	if (retval) {
@@ -761,26 +767,26 @@ SiS190_hw_start(struct net_device *dev)
 
 	/* Soft reset the chip. */
 
-       SiS_W32(IntrControl,0x8000);
-       udelay(1000);
-       SiS_W32(IntrControl,0x0);
-	
-       SiS_W32( 0x0, 0x01a00);
-       SiS_W32( 0x4, virt_to_bus(tp->TxDescArray));
-       
-       SiS_W32( 0x10, 0x1a00);
-       SiS_W32( 0x14, virt_to_bus(tp->RxDescArray));
+	SiS_W32(IntrControl, 0x8000);
+	udelay(1000);
+	SiS_W32(IntrControl, 0x0);
 
-       SiS_W32( 0x20, 0xffffffff);
-       SiS_W32( 0x24, 0x0);
-       SiS_W16( 0x40, 0x1901);         //default is 100Mbps
-       SiS_W32( 0x44, 0x0);
-       SiS_W32( 0x50, 0x60);
-       SiS_W16( 0x60, 0x02);
-       SiS_W32( 0x68, 0x0);
-       SiS_W32( 0x6c, 0x0);
-       SiS_W32( 0x70, 0x0);
-       SiS_W32( 0x74, 0x0);
+	SiS_W32(0x0, 0x01a00);
+	SiS_W32(0x4, virt_to_bus(tp->TxDescArray));
+
+	SiS_W32(0x10, 0x1a00);
+	SiS_W32(0x14, virt_to_bus(tp->RxDescArray));
+
+	SiS_W32(0x20, 0xffffffff);
+	SiS_W32(0x24, 0x0);
+	SiS_W16(0x40, 0x1901);	//default is 100Mbps
+	SiS_W32(0x44, 0x0);
+	SiS_W32(0x50, 0x60);
+	SiS_W16(0x60, 0x02);
+	SiS_W32(0x68, 0x0);
+	SiS_W32(0x6c, 0x0);
+	SiS_W32(0x70, 0x0);
+	SiS_W32(0x74, 0x0);
 
 	// Set Rx Config register
 
@@ -792,12 +798,12 @@ SiS190_hw_start(struct net_device *dev)
 
 	/* Enable all known interrupts by setting the interrupt mask. */
 	SiS_W32(IntrMask, sis190_intr_mask);
-	
-	SiS_W32( 0x0, 0x1a01);
-        SiS_W32( 0x10, 0x1a1d);
-       
+
+	SiS_W32(0x0, 0x1a01);
+	SiS_W32(0x10, 0x1a1d);
+
 	netif_start_queue(dev);
-	
+
 }
 
 static void
@@ -811,25 +817,24 @@ SiS190_init_ring(struct net_device *dev)
 	tp->dirty_tx = 0;
 	memset(tp->TxDescArray, 0x0, NUM_TX_DESC * sizeof (struct TxDesc));
 	memset(tp->RxDescArray, 0x0, NUM_RX_DESC * sizeof (struct RxDesc));
-        
+
 	for (i = 0; i < NUM_TX_DESC; i++) {
 		tp->Tx_skbuff[i] = NULL;
 	}
 	for (i = 0; i < NUM_RX_DESC; i++) {
 
 		tp->RxDescArray[i].PSize = 0x0;
-			
+
 		if (i == (NUM_RX_DESC - 1))
-			tp->RxDescArray[i].buf_Len =
-			    BIT_31 + RX_BUF_SIZE;              //bit 31 is End bit
+			tp->RxDescArray[i].buf_Len = BIT_31 + RX_BUF_SIZE;	//bit 31 is End bit
 		else
 			tp->RxDescArray[i].buf_Len = RX_BUF_SIZE;
 
 		tp->RxBufferRing[i] = &(tp->RxBufferRings[i * RX_BUF_SIZE]);
 		tp->RxDescArray[i].buf_addr = virt_to_bus(tp->RxBufferRing[i]);
 		tp->RxDescArray[i].status = OWNbit | INTbit;
-                	
-	}        
+
+	}
 
 }
 
@@ -886,29 +891,33 @@ SiS190_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (skb == NULL)
 			return 0;
 	}
-	
+
 	spin_lock_irq(&tp->lock);
-        
+
 	if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
-	       tp->Tx_skbuff[entry] = skb;
-	       tp->TxDescArray[entry].buf_addr = virt_to_bus(skb->data);				
-		tp->TxDescArray[entry].PSize = ((skb->len > ETH_ZLEN) ? skb->len : ETH_ZLEN);
-		
-		if (entry != (NUM_TX_DESC - 1)){			
-			tp->TxDescArray[entry].buf_Len = tp->TxDescArray[entry].PSize;				
-		}else{
-             		tp->TxDescArray[entry].buf_Len = tp->TxDescArray[entry].PSize|ENDbit;             						
+		tp->Tx_skbuff[entry] = skb;
+		tp->TxDescArray[entry].buf_addr = virt_to_bus(skb->data);
+		tp->TxDescArray[entry].PSize =
+		    ((skb->len > ETH_ZLEN) ? skb->len : ETH_ZLEN);
+
+		if (entry != (NUM_TX_DESC - 1)) {
+			tp->TxDescArray[entry].buf_Len =
+			    tp->TxDescArray[entry].PSize;
+		} else {
+			tp->TxDescArray[entry].buf_Len =
+			    tp->TxDescArray[entry].PSize | ENDbit;
 		}
-		
-		tp->TxDescArray[entry].status |= (OWNbit | INTbit | DEFbit |CRCbit |PADbit);
-		
-		SiS_W32(TxControl,0x1a11);     //Start Send
-		
+
+		tp->TxDescArray[entry].status |=
+		    (OWNbit | INTbit | DEFbit | CRCbit | PADbit);
+
+		SiS_W32(TxControl, 0x1a11);	//Start Send
+
 		dev->trans_start = jiffies;
 
 		tp->cur_tx++;
 	}
-        
+
 	spin_unlock_irq(&tp->lock);
 
 	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx) {
@@ -920,7 +929,7 @@ SiS190_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static void
 SiS190_tx_interrupt(struct net_device *dev, struct sis190_private *tp,
-		     void *ioaddr)
+		    void *ioaddr)
 {
 	unsigned long dirty_tx, tx_left = 0;
 	int entry = tp->cur_tx % NUM_TX_DESC;
@@ -953,7 +962,7 @@ SiS190_tx_interrupt(struct net_device *dev, struct sis190_private *tp,
 
 static void
 SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
-		     void *ioaddr)
+		    void *ioaddr)
 {
 	int cur_rx;
 	struct sk_buff *skb;
@@ -968,11 +977,11 @@ SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 
 		if (tp->RxDescArray[cur_rx].PSize & 0x0080000) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
-			tp->stats.rx_errors++;			
+			tp->stats.rx_errors++;
 			tp->stats.rx_length_errors++;
-		}else if(!(tp->RxDescArray[cur_rx].PSize & 0x0010000)){
-               	printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
-			tp->stats.rx_errors++;			
+		} else if (!(tp->RxDescArray[cur_rx].PSize & 0x0010000)) {
+			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
+			tp->stats.rx_errors++;
 			tp->stats.rx_crc_errors++;
 		} else {
 			pkt_size =
@@ -988,12 +997,14 @@ SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 				skb->protocol = eth_type_trans(skb, dev);
 				netif_rx(skb);
 
-                            tp->RxDescArray[cur_rx].PSize =0x0;
-                            	
+				tp->RxDescArray[cur_rx].PSize = 0x0;
+
 				if (cur_rx == (NUM_RX_DESC - 1))
-					tp->RxDescArray[cur_rx].buf_Len = ENDbit+RX_BUF_SIZE;
+					tp->RxDescArray[cur_rx].buf_Len =
+					    ENDbit + RX_BUF_SIZE;
 				else
-					tp->RxDescArray[cur_rx].buf_Len = RX_BUF_SIZE;
+					tp->RxDescArray[cur_rx].buf_Len =
+					    RX_BUF_SIZE;
 
 				tp->RxDescArray[cur_rx].buf_addr =
 				    virt_to_bus(tp->RxBufferRing[cur_rx]);
@@ -1001,7 +1012,8 @@ SiS190_rx_interrupt(struct net_device *dev, struct sis190_private *tp,
 				tp->stats.rx_bytes += pkt_size;
 				tp->stats.rx_packets++;
 
-				tp->RxDescArray[cur_rx].status = OWNbit|INTbit;
+				tp->RxDescArray[cur_rx].status =
+				    OWNbit | INTbit;
 			} else {
 				printk(KERN_WARNING
 				       "%s: Memory squeeze, deferring packet.\n",
@@ -1032,13 +1044,12 @@ SiS190_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 	do {
 		status = SiS_R32(IntrStatus);
-                  
+
 		/* h/w no longer present (hotplug?) or major error, bail */
 
-		SiS_W32(IntrStatus,status);
+		SiS_W32(IntrStatus, status);
 
-		if ((status &
-		     (TxQ0Int | RxQInt)) == 0)
+		if ((status & (TxQ0Int | RxQInt)) == 0)
 			break;
 
 		// Rx interrupt 
@@ -1078,8 +1089,8 @@ SiS190_close(struct net_device *dev)
 
 	/* Stop the chip's Tx and Rx DMA processes. */
 
-	SiS_W32(TxControl,0x1a00);
-	SiS_W32(RxControl,0x1a00);
+	SiS_W32(TxControl, 0x1a00);
+	SiS_W32(RxControl, 0x1a00);
 
 	/* Disable interrupts by clearing the interrupt mask. */
 	SiS_W32(IntrMask, 0x0000);
@@ -1136,7 +1147,8 @@ SiS190_set_rx_mode(struct net_device *dev)
 		mc_filter[1] = mc_filter[0] = 0;
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
 		     i++, mclist = mclist->next) {
-			int bit_nr = ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26;
+			int bit_nr =
+			    ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26;
 			mc_filter[bit_nr >> 5] |= 1 << (bit_nr & 31);
 			rx_mode |= AcceptMulticast;
 		}
@@ -1147,7 +1159,7 @@ SiS190_set_rx_mode(struct net_device *dev)
 	tmp = rx_mode | 0x2;
 
 	SiS_W16(RxMacControl, tmp);
-	SiS_W32(RxHashTable , mc_filter[0]);
+	SiS_W32(RxHashTable, mc_filter[0]);
 	SiS_W32(RxHashTable + 4, mc_filter[1]);
 
 	spin_unlock_irqrestore(&tp->lock, flags);
@@ -1161,12 +1173,12 @@ SiS190_get_stats(struct net_device *dev)
 }
 
 static struct pci_driver sis190_pci_driver = {
-	.name		= MODULENAME,
-	.id_table	= sis190_pci_tbl,
-	.probe		= SiS190_init_one,
-	.remove		= SiS190_remove_one,
-	.suspend	= NULL,
-	.resume		= NULL,
+	.name = MODULENAME,
+	.id_table = sis190_pci_tbl,
+	.probe = SiS190_init_one,
+	.remove = SiS190_remove_one,
+	.suspend = NULL,
+	.resume = NULL,
 };
 
 static int __init
