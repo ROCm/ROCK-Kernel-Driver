@@ -51,6 +51,7 @@
 #define	PHY_GO			0x40
 
 #define	MII_TIMEOUT		10
+#define	INTBUFSIZE		8
 
 #define	RTL8150_REQT_READ	0xc0
 #define	RTL8150_REQT_WRITE	0x40
@@ -98,7 +99,7 @@ struct rtl8150 {
 	struct usb_ctrlrequest dr;
 	int intr_interval;
 	u16 rx_creg;
-	u8 intr_buff[8];
+	u8 *intr_buff;
 	u8 phy;
 };
 
@@ -646,7 +647,7 @@ static int rtl8150_open(struct net_device *netdev)
 	if ((res = usb_submit_urb(dev->rx_urb, GFP_KERNEL)))
 		warn("%s: rx_urb submit failed: %d", __FUNCTION__, res);
 	usb_fill_int_urb(dev->intr_urb, dev->udev, usb_rcvintpipe(dev->udev, 3),
-		     dev->intr_buff, sizeof(dev->intr_buff), intr_callback,
+		     dev->intr_buff, INTBUFSIZE, intr_callback,
 		     dev, dev->intr_interval);
 	if ((res = usb_submit_urb(dev->intr_urb, GFP_KERNEL)))
 		warn("%s: intr_urb submit failed: %d", __FUNCTION__, res);
@@ -790,8 +791,15 @@ static int rtl8150_probe(struct usb_interface *intf,
 	} else
 		memset(dev, 0, sizeof(rtl8150_t));
 
+	dev->intr_buff = kmalloc(INTBUFSIZE, GFP_KERNEL);
+	if (!dev->intr_buff) {
+		kfree(dev);
+		return -ENOMEM;
+	}
+
 	netdev = alloc_etherdev(0);
 	if (!netdev) {
+		kfree(dev->intr_buff);
 		kfree(dev);
 		err("Oh boy, out of memory again?!?");
 		return -ENOMEM;
@@ -843,6 +851,7 @@ out2:
 out1:
 	free_all_urbs(dev);
 out:
+	kfree(dev->intr_buff);
 	kfree(netdev);
 	kfree(dev);
 	return -EIO;
@@ -862,6 +871,7 @@ static void rtl8150_disconnect(struct usb_interface *intf)
 		if (dev->rx_skb)
 			dev_kfree_skb(dev->rx_skb);
 		kfree(dev->netdev);
+		kfree(dev->intr_buff);
 		kfree(dev);
 	}
 }
