@@ -621,7 +621,7 @@ static ssize_t power_write_file (struct file *file, const char *ubuff, size_t co
 
 	if (*offset < 0)
 		return -EINVAL;
-	if (count <= 0)
+	if (count == 0 || count > 16384)
 		return 0;
 	if (*offset != 0)
 		return 0;
@@ -732,7 +732,7 @@ static ssize_t attention_write_file (struct file *file, const char *ubuff, size_
 
 	if (*offset < 0)
 		return -EINVAL;
-	if (count <= 0)
+	if (count == 0 || count > 16384)
 		return 0;
 	if (*offset != 0)
 		return 0;
@@ -970,7 +970,7 @@ static ssize_t test_write_file (struct file *file, const char *ubuff, size_t cou
 
 	if (*offset < 0)
 		return -EINVAL;
-	if (count <= 0)
+	if (count == 0 || count > 16384)
 		return 0;
 	if (*offset != 0)
 		return 0;
