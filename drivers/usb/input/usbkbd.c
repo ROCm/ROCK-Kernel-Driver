@@ -282,7 +282,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 			 kbd->new, (maxp > 8 ? 8 : maxp),
 			 usb_kbd_irq, kbd, endpoint->bInterval);
 	kbd->irq->transfer_dma = kbd->new_dma;
-	kbd->irq->transfer_flags |= URB_NO_DMA_MAP;
+	kbd->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	kbd->cr->bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
 	kbd->cr->bRequest = 0x09;
@@ -325,7 +325,8 @@ static int usb_kbd_probe(struct usb_interface *iface,
 			     usb_kbd_led, kbd);
 	kbd->led->setup_dma = kbd->cr_dma;
 	kbd->led->transfer_dma = kbd->leds_dma;
-	kbd->led->transfer_flags |= URB_NO_DMA_MAP;
+	kbd->led->transfer_flags |= (URB_NO_TRANSFER_DMA_MAP
+				| URB_NO_SETUP_DMA_MAP);
 
 	input_register_device(&kbd->dev);
 

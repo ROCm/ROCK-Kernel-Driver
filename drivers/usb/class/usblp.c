@@ -858,8 +858,8 @@ static int usblp_probe(struct usb_interface *intf,
 	}
 
 	usblp->writebuf = usblp->readbuf = NULL;
-	usblp->writeurb->transfer_flags = URB_NO_DMA_MAP;
-	usblp->readurb->transfer_flags = URB_NO_DMA_MAP;
+	usblp->writeurb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
+	usblp->readurb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
 	/* Malloc write & read buffers.  We somewhat wastefully
 	 * malloc both regardless of bidirectionality, because the
 	 * alternate setting can be changed later via an ioctl. */

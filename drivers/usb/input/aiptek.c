@@ -330,7 +330,7 @@ aiptek_probe(struct usb_interface *intf,
 			 aiptek->data, aiptek->features->pktlen,
 			 aiptek->features->irq, aiptek, endpoint->bInterval);
 	aiptek->irq->transfer_dma = aiptek->data_dma;
-	aiptek->irq->transfer_flags |= URB_NO_DMA_MAP;
+	aiptek->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	input_register_device(&aiptek->dev);
 
