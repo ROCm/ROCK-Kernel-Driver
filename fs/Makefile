@@ -7,7 +7,7 @@
 
 O_TARGET := fs.o
 
-export-objs :=	open.o dcache.o buffer.o bio.o inode.o dquot.o mpage.o
+export-objs :=	open.o dcache.o buffer.o bio.o inode.o dquot.o mpage.o aio.o
 
 obj-y :=	open.o read_write.o devices.o file_table.o buffer.o \
 		bio.o super.o block_dev.o char_dev.o stat.o exec.o pipe.o \
