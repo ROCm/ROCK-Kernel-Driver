@@ -75,7 +75,6 @@ struct nfs4_callback {
 	unsigned short          cb_port;
 	u32                     cb_prog;
 	u32                     cb_ident;
-	struct xdr_netobj	cb_netid;
 	/* RPC client info */
 	u32			cb_set;     /* successful CB_NULL call */
 	struct rpc_program      cb_program;

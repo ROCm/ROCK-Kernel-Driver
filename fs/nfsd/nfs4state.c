@@ -420,17 +420,24 @@ gen_callback(struct nfs4_client *clp, struct nfsd4_setclientid *se)
 {
 	struct nfs4_callback *cb = &clp->cl_callback;
 
+	/* Currently, we only support tcp for the callback channel */
+	if ((se->se_callback_netid_len != 3) || memcmp((char *)se->se_callback_netid_val, "tcp", 3))
+		goto out_err;
+
 	if ( !(parse_ipv4(se->se_callback_addr_len, se->se_callback_addr_val,
-		         &cb->cb_addr, &cb->cb_port))) {
-		printk(KERN_INFO "NFSD: BAD callback address. client will not receive delegations\n");
-		cb->cb_parsed = 0;
-		return;
-	}
-	cb->cb_netid.len = se->se_callback_netid_len;
-	cb->cb_netid.data = se->se_callback_netid_val;
+	                 &cb->cb_addr, &cb->cb_port)))
+		goto out_err;
 	cb->cb_prog = se->se_callback_prog;
 	cb->cb_ident = se->se_callback_ident;
 	cb->cb_parsed = 1;
+	return;
+out_err:
+	printk(KERN_INFO "NFSD: this client (clientid %08x/%08x) "
+		"will not receive delegations\n",
+		clp->cl_clientid.cl_boot, clp->cl_clientid.cl_id);
+
+	cb->cb_parsed = 0;
+	return;
 }
 
 /*
