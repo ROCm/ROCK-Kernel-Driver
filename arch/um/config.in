@@ -1,0 +1,87 @@
+define_bool CONFIG_USERMODE y
+
+mainmenu_name "Linux/Usermode Kernel Configuration"
+
+define_bool CONFIG_ISA n
+define_bool CONFIG_SBUS n
+define_bool CONFIG_PCI n
+
+define_bool CONFIG_UID16 y
+
+define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
+
+mainmenu_option next_comment
+comment 'Code maturity level options'
+bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
+endmenu
+
+mainmenu_option next_comment
+comment 'General Setup'
+bool 'Networking support' CONFIG_NET
+bool 'System V IPC' CONFIG_SYSVIPC
+bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
+bool 'Sysctl support' CONFIG_SYSCTL
+tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
+tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
+tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
+tristate 'Host filesystem' CONFIG_HOSTFS
+bool 'Management console' CONFIG_MCONSOLE
+dep_bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ $CONFIG_MCONSOLE
+bool '2G/2G host address space split' CONFIG_HOST_2G_2G
+bool 'Symmetric multi-processing support' CONFIG_UML_SMP
+define_bool CONFIG_SMP $CONFIG_UML_SMP
+int 'Nesting level' CONFIG_NEST_LEVEL 0
+int 'Kernel address space size (in .5G units)' CONFIG_KERNEL_HALF_GIGS 1
+endmenu
+
+mainmenu_option next_comment
+comment 'Loadable module support'
+bool 'Enable loadable module support' CONFIG_MODULES
+if [ "$CONFIG_MODULES" = "y" ]; then
+# MODVERSIONS does not yet work in this architecture
+#   bool '  Set version information on all module symbols' CONFIG_MODVERSIONS
+    bool '  Kernel module loader' CONFIG_KMOD
+fi
+endmenu
+
+source arch/um/config_char.in
+
+source arch/um/config_block.in
+
+define_bool CONFIG_NETDEVICES $CONFIG_NET
+
+if [ "$CONFIG_NET" = "y" ]; then
+   source arch/um/config_net.in
+   source net/Config.in
+fi
+
+source fs/Config.in
+
+mainmenu_option next_comment
+comment 'SCSI support'
+
+tristate 'SCSI support' CONFIG_SCSI
+
+if [ "$CONFIG_SCSI" != "n" ]; then
+   # This gives us free_dma, which scsi.c wants.
+   define_bool CONFIG_GENERIC_ISA_DMA y
+   source arch/um/config_scsi.in
+fi
+endmenu
+
+source drivers/md/Config.in
+
+source drivers/mtd/Config.in
+
+mainmenu_option next_comment
+comment 'Kernel hacking'
+bool 'Debug memory allocations' CONFIG_DEBUG_SLAB
+bool 'Enable kernel debugging symbols' CONFIG_DEBUGSYM
+if [ "$CONFIG_XTERM_CHAN" = "y" ]; then
+   dep_bool 'Enable ptrace proxy' CONFIG_PT_PROXY $CONFIG_DEBUGSYM
+else 
+   define_bool CONFIG_PT_PROXY n
+fi
+dep_bool 'Enable gprof support' CONFIG_GPROF $CONFIG_DEBUGSYM
+dep_bool 'Enable gcov support' CONFIG_GCOV $CONFIG_DEBUGSYM
+endmenu

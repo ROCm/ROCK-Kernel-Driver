@@ -154,7 +154,13 @@ hpusbscsi_usb_disconnect (struct usb_device *dev, void *ptr)
 static struct usb_device_id hpusbscsi_usb_ids[] = {
 	{USB_DEVICE (0x03f0, 0x0701)},	/* HP 53xx */
 	{USB_DEVICE (0x03f0, 0x0801)},	/* HP 7400 */
-	{USB_DEVICE (0x0638, 0x026a)},	/*Scan Dual II */
+	{USB_DEVICE (0x0638, 0x0268)},  /*iVina 1200U */
+	{USB_DEVICE (0x0638, 0x026a)},  /*Scan Dual II */
+	{USB_DEVICE (0x0638, 0x0A13)},  /*Avision AV600U */
+	{USB_DEVICE (0x0638, 0x0A16)},  /*Avision DS610CU Scancopier */
+	{USB_DEVICE (0x0638, 0x0A18)},  /*Avision AV600U Plus */
+	{USB_DEVICE (0x0638, 0x0A23)},  /*Avision AV220 */
+	{USB_DEVICE (0x0638, 0x0A24)},  /*Avision AV210 */
 	{USB_DEVICE (0x0686, 0x4004)},  /*Minolta Elite II */
 	{}			/* Terminating entry */
 };

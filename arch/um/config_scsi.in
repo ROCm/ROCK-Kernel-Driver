@@ -1,0 +1,30 @@
+comment 'SCSI support type (disk, tape, CD-ROM)'
+
+dep_tristate '  SCSI disk support' CONFIG_BLK_DEV_SD $CONFIG_SCSI
+
+if [ "$CONFIG_BLK_DEV_SD" != "n" ]; then
+   int  'Maximum number of SCSI disks that can be loaded as modules' CONFIG_SD_EXTRA_DEVS 40
+fi
+
+dep_tristate '  SCSI tape support' CONFIG_CHR_DEV_ST $CONFIG_SCSI
+
+dep_tristate '  SCSI CD-ROM support' CONFIG_BLK_DEV_SR $CONFIG_SCSI
+
+if [ "$CONFIG_BLK_DEV_SR" != "n" ]; then
+   bool '    Enable vendor-specific extensions (for SCSI CDROM)' CONFIG_BLK_DEV_SR_VENDOR
+   int  'Maximum number of CDROM devices that can be loaded as modules' CONFIG_SR_EXTRA_DEVS 2
+fi
+dep_tristate '  SCSI generic support' CONFIG_CHR_DEV_SG $CONFIG_SCSI
+
+comment 'Some SCSI devices (e.g. CD jukebox) support multiple LUNs'
+
+#if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   bool '  Enable extra checks in new queueing code' CONFIG_SCSI_DEBUG_QUEUES
+#fi
+
+bool '  Probe all LUNs on each SCSI device' CONFIG_SCSI_MULTI_LUN
+  
+bool '  Verbose SCSI error reporting (kernel size +=12K)' CONFIG_SCSI_CONSTANTS
+bool '  SCSI logging facility' CONFIG_SCSI_LOGGING
+
+dep_tristate 'SCSI debugging host simulator (EXPERIMENTAL)' CONFIG_SCSI_DEBUG $CONFIG_SCSI

@@ -2457,7 +2457,7 @@ int ata_attach(ide_drive_t *drive)
 	}
 	spin_unlock(&drivers_lock);
 	spin_lock(&drives_lock);
-	list_add(&drive->list, &ata_unused);
+	list_add_tail(&drive->list, &ata_unused);
 	spin_unlock(&drives_lock);
 	return 1;
 }
