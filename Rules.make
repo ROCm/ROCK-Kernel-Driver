@@ -8,6 +8,23 @@ comma   := ,
 empty   :=
 space   := $(empty) $(empty)
 
+# Some bug traps
+# ---------------------------------------------------------------------------
+
+ifdef O_TARGET
+$(warning kbuild: Usage of O_TARGET is obsolete in 2.5. Please fix!
+endif
+
+ifdef L_TARGET
+ifneq ($(L_TARGET),lib.a)
+$(warning kbuild: L_TARGET ($(L_TARGET)) should be renamed to lib.a. Please fix!)
+endif
+endif
+
+ifdef list-multi
+$(warning kbuild: list-multi ($(list-multi)) is obsolete in 2.5. Please fix!)
+endif
+
 # Figure out paths
 # ---------------------------------------------------------------------------
 # Find the path relative to the toplevel dir, $(RELDIR), and express
@@ -84,16 +101,8 @@ __obj-y = $(filter-out export.o,$(obj-y))
 __obj-m = $(filter-out export.o,$(obj-m))
 
 # if $(foo-objs) exists, foo.o is a composite object 
-__multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(m:.o=-objs)), $(m))))
-__multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(m:.o=-objs)), $(m))))
-
-# FIXME: Rip this out later
-# Backwards compatibility: if a composite object is listed in
-# $(list-multi), skip it here, since the Makefile will have an explicit
-# link rule for it
-
-multi-used-y := $(filter-out $(list-multi),$(__multi-used-y))
-multi-used-m := $(filter-out $(list-multi),$(__multi-used-m))
+multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(m:.o=-objs)), $(m))))
+multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(m:.o=-objs)), $(m))))
 
 # Build list of the parts of our composite objects, our composite
 # objects depend on those (obviously)
