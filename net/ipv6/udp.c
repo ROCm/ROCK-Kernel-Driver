@@ -15,6 +15,7 @@
  *	Alexey Kuznetsov		allow both IPv4 and IPv6 sockets to bind
  *					a single port at the same time.
  *      Kazunori MIYAZAWA @USAGI:       change process style to use ip6_append_data
+ *      YOSHIFUJI Hideaki @USAGI:	convert /proc/net/udp6 to seq_file.
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -52,6 +53,9 @@
 
 #include <net/checksum.h>
 #include <net/xfrm.h>
+
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 DEFINE_SNMP_STAT(struct udp_mib, udp_stats_in6);
 
@@ -1116,10 +1120,10 @@ static struct inet6_protocol udpv6_protocol = {
 	.flags		=	INET6_PROTO_NOPOLICY|INET6_PROTO_FINAL,
 };
 
-#define LINE_LEN 190
-#define LINE_FMT "%-190s\n"
+/* ------------------------------------------------------------------------ */
+#ifdef CONFIG_PROC_FS
 
-static void get_udp6_sock(struct sock *sp, char *tmpbuf, int i)
+static void udp6_sock_seq_show(struct seq_file *seq, struct sock *sp, int bucket)
 {
 	struct inet_opt *inet = inet_sk(sp);
 	struct ipv6_pinfo *np = inet6_sk(sp);
@@ -1130,66 +1134,56 @@ static void get_udp6_sock(struct sock *sp, char *tmpbuf, int i)
 	src   = &np->rcv_saddr;
 	destp = ntohs(inet->dport);
 	srcp  = ntohs(inet->sport);
-	sprintf(tmpbuf,
-		"%4d: %08X%08X%08X%08X:%04X %08X%08X%08X%08X:%04X "
-		"%02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
-		i,
-		src->s6_addr32[0], src->s6_addr32[1],
-		src->s6_addr32[2], src->s6_addr32[3], srcp,
-		dest->s6_addr32[0], dest->s6_addr32[1],
-		dest->s6_addr32[2], dest->s6_addr32[3], destp,
-		sp->state, 
-		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
-		0, 0L, 0,
-		sock_i_uid(sp), 0,
-		sock_i_ino(sp),
-		atomic_read(&sp->refcnt), sp);
+	seq_printf(seq,
+		   "%4d: %08X%08X%08X%08X:%04X %08X%08X%08X%08X:%04X "
+		   "%02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p\n",
+		   bucket,
+		   src->s6_addr32[0], src->s6_addr32[1],
+		   src->s6_addr32[2], src->s6_addr32[3], srcp,
+		   dest->s6_addr32[0], dest->s6_addr32[1],
+		   dest->s6_addr32[2], dest->s6_addr32[3], destp,
+		   sp->state, 
+		   atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
+		   0, 0L, 0,
+		   sock_i_uid(sp), 0,
+		   sock_i_ino(sp),
+		   atomic_read(&sp->refcnt), sp);
 }
 
-int udp6_get_info(char *buffer, char **start, off_t offset, int length)
+static int udp6_seq_show(struct seq_file *seq, void *v)
 {
-	int len = 0, num = 0, i;
-	off_t pos = 0;
-	off_t begin;
-	char tmpbuf[LINE_LEN+2];
-
-	if (offset < LINE_LEN+1)
-		len += sprintf(buffer, LINE_FMT,
-			       "  sl  "						/* 6 */
-			       "local_address                         "		/* 38 */
-			       "remote_address                        "		/* 38 */
-			       "st tx_queue rx_queue tr tm->when retrnsmt"	/* 41 */
-			       "   uid  timeout inode");			/* 21 */
-										/*----*/
-										/*144 */
-	pos = LINE_LEN+1;
-	read_lock(&udp_hash_lock);
-	for (i = 0; i < UDP_HTABLE_SIZE; i++) {
-		struct sock *sk;
-
-		for (sk = udp_hash[i]; sk; sk = sk->next, num++) {
-			if (sk->family != PF_INET6)
-				continue;
-			pos += LINE_LEN+1;
-			if (pos <= offset)
-				continue;
-			get_udp6_sock(sk, tmpbuf, i);
-			len += sprintf(buffer+len, LINE_FMT, tmpbuf);
-			if(len >= length)
-				goto out;
-		}
-	}
-out:
-	read_unlock(&udp_hash_lock);
-	begin = len - (pos - offset);
-	*start = buffer + begin;
-	len -= begin;
-	if(len > length)
-		len = length;
-	if (len < 0)
-		len = 0; 
-	return len;
+	if (v == (void *)1)
+		seq_printf(seq,
+			   "  sl  "
+			   "local_address                         "
+			   "remote_address                        "
+			   "st tx_queue rx_queue tr tm->when retrnsmt"
+			   "   uid  timeout inode\n");
+	else
+		udp6_sock_seq_show(seq, v, ((struct udp_iter_state *)seq->private)->bucket);
+	return 0;
 }
+
+static struct file_operations udp6_seq_fops;
+static struct udp_seq_afinfo udp6_seq_afinfo = {
+	.owner		= THIS_MODULE,
+	.name		= "udp6",
+	.family		= AF_INET6,
+	.seq_show	= udp6_seq_show,
+	.seq_fops	= &udp6_seq_fops,
+};
+
+int __init udp6_proc_init(void)
+{
+	return udp_proc_register(&udp6_seq_afinfo);
+}
+
+void udp6_proc_exit(void) {
+	udp_proc_unregister(&udp6_seq_afinfo);
+}
+#endif /* CONFIG_PROC_FS */
+
+/* ------------------------------------------------------------------------ */
 
 struct proto udpv6_prot = {
 	.name =		"UDP",
