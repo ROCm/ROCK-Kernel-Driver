@@ -84,47 +84,39 @@ static int fw_classify(struct sk_buff *skb, struct tcf_proto *tp,
 	u32 id = 0;
 #endif
 
-	if (head == NULL)
-		goto old_method;
-
-	for (f=head->ht[fw_hash(id)]; f; f=f->next) {
-		if (f->id == id) {
-			*res = f->res;
+	if (head != NULL) {
+		for (f=head->ht[fw_hash(id)]; f; f=f->next) {
+			if (f->id == id) {
+				*res = f->res;
 #ifdef CONFIG_NET_CLS_ACT
 #ifdef CONFIG_NET_CLS_IND
-			if (0 != f->indev[0]) {
-				if  (NULL == skb->input_dev) {
+				if (!tcf_match_indev(skb, f->indev))
 					continue;
-				} else {
-					if (0 != strcmp(f->indev, skb->input_dev->name)) {
-						continue;
-					}
+#endif /* CONFIG_NET_CLS_IND */
+				if (f->action) {
+					int act_res = tcf_action_exec(skb, f->action, res);
+					if (act_res >= 0)
+						return act_res;
+					continue;
 				}
-			}
-#endif
-                               if (f->action) {
-                                       int pol_res = tcf_action_exec(skb, f->action, res);
-                                       if (pol_res >= 0)
-                                               return pol_res;
-                               } else
-#else
+#else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
-			if (f->police)
-				return tcf_police(skb, f->police);
-#endif
-#endif
+				if (f->police)
+					return tcf_police(skb, f->police);
+#endif /* CONFIG_NET_CLS_POLICE */
+#endif /* CONFIG_NET_CLS_ACT */
+				return 0;
+			}
+		}
+	} else {
+		/* old method */
+		if (id && (TC_H_MAJ(id) == 0 || !(TC_H_MAJ(id^tp->q->handle)))) {
+			res->classid = id;
+			res->class = 0;
 			return 0;
 		}
 	}
-	return -1;
 
-old_method:
-	if (id && (TC_H_MAJ(id) == 0 ||
-		     !(TC_H_MAJ(id^tp->q->handle)))) {
-		res->classid = id;
-		res->class = 0;
-		return 0;
-	}
 	return -1;
 }
 
