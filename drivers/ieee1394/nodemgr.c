@@ -1480,8 +1480,10 @@ static int nodemgr_host_thread(void *__hi)
 		unsigned int generation = 0;
 		int i;
 
-		if (hi->kill_me)
-			break;
+		if (hi->kill_me) {
+			up(&nodemgr_serialize);
+			goto caught_signal;
+		}
 
 		/* Pause for 1/4 second in 1/16 second intervals,
 		 * to make sure things settle down. */
