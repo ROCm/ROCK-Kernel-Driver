@@ -63,6 +63,7 @@ check_pgt_cache (void)
 	low = pgt_cache_water[0];
 	high = pgt_cache_water[1];
 
+	preempt_disable();
 	if (pgtable_cache_size > (u64) high) {
 		do {
 			if (pgd_quicklist)
@@ -71,6 +72,7 @@ check_pgt_cache (void)
 				free_page((unsigned long)pmd_alloc_one_fast(0, 0));
 		} while (pgtable_cache_size > (u64) low);
 	}
+	preempt_enable();
 }
 
 void
