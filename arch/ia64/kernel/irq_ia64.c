@@ -10,6 +10,8 @@
  *
  * 09/15/00 Goutham Rao <goutham.rao@intel.com> Implemented pci_irq_to_vector
  *                      PCI to vector allocation routine.
+ * 04/14/2004 Ashok Raj <ashok.raj@intel.com>
+ *						Added CPU Hotplug handling for IPF.
  */
 
 #include <linux/config.h>
@@ -85,6 +87,11 @@ assign_irq_vector (int irq)
 
 extern unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs);
 
+#ifdef CONFIG_SMP
+#	define IS_RESCHEDULE(vec)	(vec == IA64_IPI_RESCHEDULE)
+#else
+#	define IS_RESCHEDULE(vec)	(0)
+#endif
 /*
  * That's where the IVT branches when we get an external
  * interrupt. This branches to the correct hardware IRQ handler via
@@ -94,11 +101,6 @@ void
 ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 {
 	unsigned long saved_tpr;
-#ifdef CONFIG_SMP
-#	define IS_RESCHEDULE(vec)	(vec == IA64_IPI_RESCHEDULE)
-#else
-#	define IS_RESCHEDULE(vec)	(0)
-#endif
 
 #if IRQ_DEBUG
 	{
@@ -161,6 +163,54 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	 */
 	irq_exit();
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+/*
+ * This function emulates a interrupt processing when a cpu is about to be
+ * brought down.
+ */
+void ia64_process_pending_intr(void)
+{
+	ia64_vector vector;
+	unsigned long saved_tpr;
+	extern unsigned int vectors_in_migration[NR_IRQS];
+
+	vector = ia64_get_ivr();
+
+	 irq_enter();
+	 saved_tpr = ia64_getreg(_IA64_REG_CR_TPR);
+	 ia64_srlz_d();
+
+	 /*
+	  * Perform normal interrupt style processing
+	  */
+	while (vector != IA64_SPURIOUS_INT_VECTOR) {
+		if (!IS_RESCHEDULE(vector)) {
+			ia64_setreg(_IA64_REG_CR_TPR, vector);
+			ia64_srlz_d();
+
+			/*
+			 * Now try calling normal ia64_handle_irq as it would have got called
+			 * from a real intr handler. Try passing null for pt_regs, hopefully
+			 * it will work. I hope it works!.
+			 * Probably could shared code.
+			 */
+			vectors_in_migration[local_vector_to_irq(vector)]=0;
+			do_IRQ(local_vector_to_irq(vector), NULL);
+
+			/*
+			 * Disable interrupts and send EOI
+			 */
+			local_irq_disable();
+			ia64_setreg(_IA64_REG_CR_TPR, saved_tpr);
+		}
+		ia64_eoi();
+		vector = ia64_get_ivr();
+	}
+	irq_exit();
+}
+#endif
+
 
 #ifdef CONFIG_SMP
 extern irqreturn_t handle_IPI (int irq, void *dev_id, struct pt_regs *regs);

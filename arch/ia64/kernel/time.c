@@ -10,6 +10,7 @@
  */
 #include <linux/config.h>
 
+#include <linux/cpu.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -243,6 +244,10 @@ static irqreturn_t
 timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm;
+
+	if (unlikely(cpu_is_offline(smp_processor_id()))) {
+		return IRQ_HANDLED;
+	}
 
 	platform_timer_interrupt(irq, dev_id, regs);
 

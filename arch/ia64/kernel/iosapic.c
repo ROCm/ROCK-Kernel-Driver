@@ -32,6 +32,8 @@
  * 03/02/19	B. Helgaas	Make pcat_compat system-wide, not per-IOSAPIC.
  *				Remove iosapic_address & gsi_base from external interfaces.
  *				Rationalize __init/__devinit attributes.
+ * 04/12/04 Ashok Raj	<ashok.raj@intel.com> Intel Corporation 2004
+ *				Updated to work with irq migration necessary for CPU Hotplug
  */
 /*
  * Here is what the interrupt logic between a PCI device and the kernel looks like:
@@ -189,8 +191,10 @@ set_rte (unsigned int vector, unsigned int dest, int mask)
 	pol     = iosapic_intr_info[vector].polarity;
 	trigger = iosapic_intr_info[vector].trigger;
 	dmode   = iosapic_intr_info[vector].dmode;
+	vector &= (~IA64_IRQ_REDIRECTED);
 
 	redir = (dmode == IOSAPIC_LOWEST_PRIORITY) ? 1 : 0;
+
 #ifdef CONFIG_SMP
 	{
 		unsigned int irq;
@@ -312,9 +316,8 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 
 	spin_lock_irqsave(&iosapic_lock, flags);
 	{
-		/* get current delivery mode by reading the low32 */
-		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
 		low32 = iosapic_intr_info[vec].low32 & ~(7 << IOSAPIC_DELIVERY_SHIFT);
+
 		if (redir)
 		        /* change delivery mode to lowest priority */
 			low32 |= (IOSAPIC_LOWEST_PRIORITY << IOSAPIC_DELIVERY_SHIFT);

@@ -120,6 +120,8 @@ extern void smp_do_timer (struct pt_regs *regs);
 extern int smp_call_function_single (int cpuid, void (*func) (void *info), void *info,
 				     int retry, int wait);
 extern void smp_send_reschedule (int cpu);
+extern void lock_ipi_calllock(void);
+extern void unlock_ipi_calllock(void);
 
 #endif /* CONFIG_SMP */
 #endif /* _ASM_IA64_SMP_H */

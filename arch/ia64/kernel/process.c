@@ -7,6 +7,7 @@
 #define __KERNEL_SYSCALLS__	/* see <asm/unistd.h> */
 #include <linux/config.h>
 
+#include <linux/cpu.h>
 #include <linux/pm.h>
 #include <linux/elf.h>
 #include <linux/errno.h>
@@ -14,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/notifier.h>
 #include <linux/personality.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -22,13 +24,17 @@
 #include <linux/thread_info.h>
 #include <linux/unistd.h>
 #include <linux/efi.h>
+#include <linux/interrupt.h>
 
+#include <asm/cpu.h>
 #include <asm/delay.h>
 #include <asm/elf.h>
 #include <asm/ia32.h>
+#include <asm/irq.h>
 #include <asm/pgalloc.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
+#include <asm/tlbflush.h>
 #include <asm/uaccess.h>
 #include <asm/unwind.h>
 #include <asm/user.h>
@@ -180,6 +186,40 @@ default_idle (void)
 			safe_halt();
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+/* We don't actually take CPU down, just spin without interrupts. */
+static inline void play_dead(void)
+{
+	extern void ia64_cpu_local_tick (void);
+	/* Ack it */
+	__get_cpu_var(cpu_state) = CPU_DEAD;
+
+	/* We shouldn't have to disable interrupts while dead, but
+	 * some interrupts just don't seem to go away, and this makes
+	 * it "work" for testing purposes. */
+	max_xtp();
+	local_irq_disable();
+	/* Death loop */
+	while (__get_cpu_var(cpu_state) != CPU_UP_PREPARE)
+		cpu_relax();
+
+	/*
+	 * Enable timer interrupts from now on
+	 * Not required if we put processor in SAL_BOOT_RENDEZ mode.
+	 */
+	local_flush_tlb_all();
+	cpu_set(smp_processor_id(), cpu_online_map);
+	wmb();
+	ia64_cpu_local_tick ();
+	local_irq_enable();
+}
+#else
+static inline void play_dead(void)
+{
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 void __attribute__((noreturn))
 cpu_idle (void *unused)
 {
@@ -195,7 +235,6 @@ cpu_idle (void *unused)
 		if (!need_resched())
 			min_xtp();
 #endif
-
 		while (!need_resched()) {
 			if (mark_idle)
 				(*mark_idle)(1);
@@ -210,6 +249,8 @@ cpu_idle (void *unused)
 #endif
 		schedule();
 		check_pgt_cache();
+		if (cpu_is_offline(smp_processor_id()))
+			play_dead();
 	}
 }
 

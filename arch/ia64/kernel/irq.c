@@ -8,6 +8,12 @@
  * instead of just grabbing them. Thus setups with different IRQ numbers
  * shouldn't result in any weird surprises, and installing new handlers
  * should be easier.
+ *
+ * Copyright (C) Ashok Raj<ashok.raj@intel.com>, Intel Corporation 2004
+ *
+ * 4/14/2004: Added code to handle cpu migration and do safe irq
+ *			migration without lossing interrupts for iosapic
+ *			architecture.
  */
 
 /*
@@ -27,6 +33,7 @@
 #include <linux/timex.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/cpu.h>
 #include <linux/ctype.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
@@ -35,14 +42,17 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/kallsyms.h>
+#include <linux/notifier.h>
 
 #include <asm/atomic.h>
+#include <asm/cpu.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 #include <asm/delay.h>
 #include <asm/irq.h>
 
@@ -1005,6 +1015,99 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 }
 
 #endif /* CONFIG_SMP */
+
+#ifdef CONFIG_HOTPLUG_CPU
+unsigned int vectors_in_migration[NR_IRQS];
+
+/*
+ * Since cpu_online_map is already updated, we just need to check for
+ * affinity that has zeros
+ */
+static void migrate_irqs(void)
+{
+	cpumask_t	mask;
+	irq_desc_t *desc;
+	int 		irq, new_cpu;
+
+	for (irq=0; irq < NR_IRQS; irq++) {
+		desc = irq_descp(irq);
+
+		/*
+		 * No handling for now.
+		 * TBD: Implement a disable function so we can now
+		 * tell CPU not to respond to these local intr sources.
+		 * such as ITV,CPEI,MCA etc.
+		 */
+		if (desc->status == IRQ_PER_CPU)
+			continue;
+
+		cpus_and(mask, irq_affinity[irq], cpu_online_map);
+		if (any_online_cpu(mask) == NR_CPUS) {
+			/*
+			 * Save it for phase 2 processing
+			 */
+			vectors_in_migration[irq] = irq;
+
+			new_cpu = any_online_cpu(cpu_online_map);
+			mask = cpumask_of_cpu(new_cpu);
+
+			/*
+			 * Al three are essential, currently WARN_ON.. maybe panic?
+			 */
+			if (desc->handler && desc->handler->disable &&
+				desc->handler->enable && desc->handler->set_affinity) {
+				desc->handler->disable(irq);
+				desc->handler->set_affinity(irq, mask);
+				desc->handler->enable(irq);
+			} else {
+				WARN_ON((!(desc->handler) || !(desc->handler->disable) ||
+						!(desc->handler->enable) ||
+						!(desc->handler->set_affinity)));
+			}
+		}
+	}
+}
+
+void fixup_irqs(void)
+{
+	unsigned int irq;
+	extern void ia64_process_pending_intr(void);
+
+	ia64_set_itv(1<<16);
+	/*
+	 * Phase 1: Locate irq's bound to this cpu and
+	 * relocate them for cpu removal.
+	 */
+	migrate_irqs();
+
+	/*
+	 * Phase 2: Perform interrupt processing for all entries reported in
+	 * local APIC.
+	 */
+	ia64_process_pending_intr();
+
+	/*
+	 * Phase 3: Now handle any interrupts not captured in local APIC.
+	 * This is to account for cases that device interrupted during the time the
+	 * rte was being disabled and re-programmed.
+	 */
+	for (irq=0; irq < NR_IRQS; irq++) {
+		if (vectors_in_migration[irq]) {
+			vectors_in_migration[irq]=0;
+			do_IRQ(irq, NULL);
+		}
+	}
+
+	/*
+	 * Now let processor die. We do irq disable and max_xtp() to
+	 * ensure there is no more interrupts routed to this processor.
+	 * But the local timer interrupt can have 1 pending which we
+	 * take care in timer_interrupt().
+	 */
+	max_xtp();
+	local_irq_disable();
+}
+#endif
 
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)

@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/acpi.h>
 #include <linux/bootmem.h>
+#include <linux/cpu.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -22,10 +23,12 @@
 #include <linux/kernel.h>
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
+#include <linux/notifier.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
 #include <linux/efi.h>
+#include <linux/percpu.h>
 
 #include <asm/atomic.h>
 #include <asm/bitops.h>
@@ -44,6 +47,7 @@
 #include <asm/ptrace.h>
 #include <asm/sal.h>
 #include <asm/system.h>
+#include <asm/tlbflush.h>
 #include <asm/unistd.h>
 
 #define SMP_DEBUG 0
@@ -74,6 +78,11 @@ extern void start_ap (void);
 extern unsigned long ia64_iobase;
 
 task_t *task_for_booting_cpu;
+
+/*
+ * State for each CPU
+ */
+DEFINE_PER_CPU(int, cpu_state);
 
 /* Bitmasks of currently online, and possible CPUs */
 cpumask_t cpu_online_map;
@@ -281,11 +290,15 @@ smp_callin (void)
 	cpuid = smp_processor_id();
 	phys_id = hard_smp_processor_id();
 
-	if (cpu_test_and_set(cpuid, cpu_online_map)) {
+	if (cpu_online(cpuid)) {
 		printk(KERN_ERR "huh, phys CPU#0x%x, CPU#0x%x already present??\n",
 		       phys_id, cpuid);
 		BUG();
 	}
+
+	lock_ipi_calllock();
+	cpu_set(cpuid, cpu_online_map);
+	unlock_ipi_calllock();
 
 	smp_setup_percpu_timer();
 
@@ -357,29 +370,51 @@ fork_by_hand (void)
 	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, 0, 0, NULL, NULL);
 }
 
+struct create_idle {
+	struct task_struct *idle;
+	struct completion done;
+};
+
+void
+do_fork_idle(void *_c_idle)
+{
+	struct create_idle *c_idle = _c_idle;
+
+	c_idle->idle = fork_by_hand();
+	complete(&c_idle->done);
+}
+
 static int __devinit
 do_boot_cpu (int sapicid, int cpu)
 {
-	struct task_struct *idle;
 	int timeout;
+	struct create_idle c_idle;
+	DECLARE_WORK(work, do_fork_idle, &c_idle);
 
+	init_completion(&c_idle.done);
 	/*
 	 * We can't use kernel_thread since we must avoid to reschedule the child.
 	 */
-	idle = fork_by_hand();
-	if (IS_ERR(idle))
+	if (!keventd_up() || current_is_keventd())
+		work.func(work.data);
+	else {
+		schedule_work(&work);
+		wait_for_completion(&c_idle.done);
+	}
+
+	if (IS_ERR(c_idle.idle))
 		panic("failed fork for CPU %d", cpu);
-	wake_up_forked_process(idle);
+	wake_up_forked_process(c_idle.idle);
 
 	/*
 	 * We remove it from the pidhash and the runqueue
 	 * once we got the process:
 	 */
-	init_idle(idle, cpu);
+	init_idle(c_idle.idle, cpu);
 
-	unhash_process(idle);
+	unhash_process(c_idle.idle);
 
-	task_for_booting_cpu = idle;
+	task_for_booting_cpu = c_idle.idle;
 
 	Dprintk("Sending wakeup vector %lu to AP 0x%x/0x%x.\n", ap_wakeup_vector, cpu, sapicid);
 
@@ -438,8 +473,12 @@ smp_build_cpu_map (void)
 	int sapicid, cpu, i;
 	int boot_cpu_id = hard_smp_processor_id();
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++)
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		ia64_cpu_to_sapicid[cpu] = -1;
+#ifdef CONFIG_HOTPLUG_CPU
+		cpu_set(cpu, cpu_possible_map);
+#endif
+	}
 
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
 	cpus_clear(cpu_present_map);
@@ -546,6 +585,74 @@ void __devinit smp_prepare_boot_cpu(void)
 	cpu_set(smp_processor_id(), cpu_callin_map);
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+extern void fixup_irqs(void);
+/* must be called with cpucontrol mutex held */
+static int __devinit cpu_enable(unsigned int cpu)
+{
+	per_cpu(cpu_state,cpu) = CPU_UP_PREPARE;
+	wmb();
+
+	while (!cpu_online(cpu))
+		cpu_relax();
+	return 0;
+}
+
+int __cpu_disable(void)
+{
+	int cpu = smp_processor_id();
+
+	/*
+	 * dont permit boot processor for now
+	 */
+	if (cpu == 0)
+		return -EBUSY;
+
+	fixup_irqs();
+	local_flush_tlb_all();
+	printk ("Disabled cpu %u\n", smp_processor_id());
+	return 0;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	unsigned int i;
+
+	for (i = 0; i < 100; i++) {
+		/* They ack this in play_dead by setting CPU_DEAD */
+		if (per_cpu(cpu_state, cpu) == CPU_DEAD)
+		{
+			/*
+			 * TBD: Enable this when physical removal
+			 * or when we put the processor is put in
+			 * SAL_BOOT_RENDEZ mode
+			 * cpu_clear(cpu, cpu_callin_map);
+			 */
+			return;
+		}
+		current->state = TASK_UNINTERRUPTIBLE;
+		schedule_timeout(HZ/10);
+	}
+ 	printk(KERN_ERR "CPU %u didn't die...\n", cpu);
+}
+#else /* !CONFIG_HOTPLUG_CPU */
+static int __devinit cpu_enable(unsigned int cpu)
+{
+	return 0;
+}
+
+int __cpu_disable(void)
+{
+	return -ENOSYS;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	/* We said "no" in __cpu_disable */
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 void
 smp_cpus_done (unsigned int dummy)
 {
@@ -574,6 +681,17 @@ __cpu_up (unsigned int cpu)
 	if (sapicid == -1)
 		return -EINVAL;
 
+	/*
+	 * Already booted.. just enable and get outa idle lool
+	 */
+	if (cpu_isset(cpu, cpu_callin_map))
+	{
+		cpu_enable(cpu);
+		local_irq_enable();
+		while (!cpu_isset(cpu, cpu_online_map))
+			mb();
+		return 0;
+	}
 	/* Processor goes to start_secondary(), sets online flag */
 	ret = do_boot_cpu(sapicid, cpu);
 	if (ret < 0)
