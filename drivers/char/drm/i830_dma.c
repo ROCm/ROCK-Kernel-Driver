@@ -36,6 +36,8 @@
 #include "drmP.h"
 #include "i830_drv.h"
 #include <linux/interrupt.h>	/* For task queue support */
+#include <linux/delay.h>
+#include <linux/pagemap.h>
 
 /* in case we don't have a 2.3.99-pre6 kernel or later: */
 #ifndef VM_DONTCOPY
