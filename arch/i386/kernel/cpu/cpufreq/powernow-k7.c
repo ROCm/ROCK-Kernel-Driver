@@ -390,6 +390,10 @@ static struct cpufreq_driver powernow_driver = {
 
 static int __init powernow_init (void)
 {
+	if (dmi_broken & BROKEN_CPUFREQ) {
+		printk (KERN_INFO PFX "Disabled at boot time by DMI,\n");
+		return -ENODEV;
+	}
 	if (check_powernow()==0)
 		return -ENODEV;
 	return cpufreq_register_driver(&powernow_driver);
