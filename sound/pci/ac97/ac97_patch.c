@@ -1113,6 +1113,7 @@ static void check_ad1981_hp_jack_sense(ac97_t *ac97)
 	switch (subid) {
 	case 0x103c0890: /* HP nc6000 */
 	case 0x103c006d: /* HP nx9105 */
+	case 0x17340088: /* FSC Scenic-W */
 		/* enable headphone jack sense */
 		snd_ac97_update_bits(ac97, AC97_AD_JACK_SPDIF, 1<<11, 1<<11);
 		break;
