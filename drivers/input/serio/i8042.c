@@ -410,6 +410,7 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			/* work around hardware that doubles key releases */
 			if (index == i8042_last_release) {
 				dbg("i8042 skipped double release (%d)\n", index);
+				i8042_last_e0 = 0;
 				continue;
 			}
 			if (index == 0xaa || index == 0xb6)
