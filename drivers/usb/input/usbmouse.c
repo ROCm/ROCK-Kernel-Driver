@@ -104,8 +104,10 @@ static int usb_mouse_open(struct input_dev *dev)
 		return 0;
 
 	mouse->irq->dev = mouse->usbdev;
-	if (usb_submit_urb(mouse->irq, GFP_KERNEL))
+	if (usb_submit_urb(mouse->irq, GFP_KERNEL)) {
+		mouse->open--;
 		return -EIO;
+	}
 
 	return 0;
 }
