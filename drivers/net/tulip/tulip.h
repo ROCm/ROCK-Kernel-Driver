@@ -126,6 +126,7 @@ enum pci_cfg_driver_reg {
 	CFDD_Snooze = (1 << 30),
 };
 
+#define RxPollInt (RxIntr|RxNoBuf|RxDied|RxJabber)
 
 /* The bits in the CSR5 status registers, mostly interrupt sources. */
 enum status_bits {
@@ -251,9 +252,9 @@ enum t21143_csr6_bits {
    Making the Tx ring too large decreases the effectiveness of channel
    bonding and packet priority.
    There are no ill effects from too-large receive rings. */
-#define TX_RING_SIZE	16
-#define RX_RING_SIZE	32
 
+#define TX_RING_SIZE	32
+#define RX_RING_SIZE	128 
 #define MEDIA_MASK     31
 
 #define PKT_BUF_SZ		1536	/* Size of each temporary Rx buffer. */
@@ -343,17 +344,15 @@ struct tulip_private {
 	int flags;
 	struct net_device_stats stats;
 	struct timer_list timer;	/* Media selection timer. */
+	struct timer_list oom_timer;    /* Out of memory timer. */
 	u32 mc_filter[2];
 	spinlock_t lock;
 	spinlock_t mii_lock;
 	unsigned int cur_rx, cur_tx;	/* The next free ring entry */
 	unsigned int dirty_rx, dirty_tx;	/* The ring entries to be free()ed. */
 
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-#define RX_A_NBF_STOP 0xffffff3f /* To disable RX and RX-NOBUF ints. */
-        int fc_bit;
-        int mit_sel;
-        int mit_change; /* Signal for Interrupt Mitigtion */
+#ifdef 	CONFIG_TULIP_NAPI_HW_MITIGATION
+        int mit_on;
 #endif
 	unsigned int full_duplex:1;	/* Full-duplex operation requested. */
 	unsigned int full_duplex_lock:1;
@@ -415,6 +414,10 @@ extern unsigned int tulip_max_interrupt_work;
 extern int tulip_rx_copybreak;
 irqreturn_t tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 int tulip_refill_rx(struct net_device *dev);
+#ifdef CONFIG_TULIP_NAPI
+int tulip_poll(struct net_device *dev, int *budget);
+#endif
+
 
 /* media.c */
 int tulip_mdio_read(struct net_device *dev, int phy_id, int location);
@@ -438,6 +441,7 @@ extern int tulip_debug;
 extern const char * const medianame[];
 extern const char tulip_media_cap[];
 extern struct tulip_chip_table tulip_tbl[];
+void oom_timer(unsigned long data);
 extern u8 t21040_csr13[];
 
 #ifndef USE_IO_OPS

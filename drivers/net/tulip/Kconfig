@@ -68,6 +68,26 @@ config TULIP_MMIO
 	  obscure bugs if your mainboard has memory controller timing issues.
 	  If in doubt, say N.
 
+config TULIP_NAPI
+	bool "Use NAPI RX polling "
+	depends on TULIP
+	---help---
+	  This is of useful for servers and routers dealing with high network loads.
+ 
+	  See <file:Documentation/networking/NAPI_HOWTO.txt>.
+
+	  If in doubt, say N.
+
+config TULIP_NAPI_HW_MITIGATION
+	bool "Use Interrupt Mitigation "
+	depends on TULIP_NAPI
+	---help---
+	  Use HW to reduce RX interrupts. Not strict necessary since NAPI reduces
+	  RX interrupts but itself. Although this reduces RX interrupts even at
+	  low levels traffic at the cost of a small latency.
+
+	  If in doubt, say Y.
+
 config DE4X5
 	tristate "Generic DECchip & DIGITAL EtherWORKS PCI/EISA"
 	depends on NET_TULIP && (PCI || EISA)

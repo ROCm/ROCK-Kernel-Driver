@@ -14,11 +14,17 @@
 
 */
 
+#include <linux/config.h>
+
 #define DRV_NAME	"tulip"
+#ifdef CONFIG_TULIP_NAPI
+#define DRV_VERSION    "1.1.13-NAPI" /* Keep at least for test */
+#else
 #define DRV_VERSION	"1.1.13"
+#endif
 #define DRV_RELDATE	"May 11, 2002"
 
-#include <linux/config.h>
+
 #include <linux/module.h>
 #include "tulip.h"
 #include <linux/pci.h>
@@ -466,29 +472,16 @@ media_picked:
 	   to an alternate media type. */
 	tp->timer.expires = RUN_AT(next_tick);
 	add_timer(&tp->timer);
-}
-
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-/* Enable receiver */
-void tulip_xon(struct net_device *dev)
-{
-        struct tulip_private *tp = (struct tulip_private *)dev->priv;
-
-        clear_bit(tp->fc_bit, &netdev_fc_xoff);
-        if (netif_running(dev)){
-
-                tulip_refill_rx(dev);
-                outl(tulip_tbl[tp->chip_id].valid_intrs,  dev->base_addr+CSR7);
-        }
-}
+#ifdef CONFIG_TULIP_NAPI
+	init_timer(&tp->oom_timer);
+        tp->oom_timer.data = (unsigned long)dev;
+        tp->oom_timer.function = oom_timer;
 #endif
+}
 
 static int
 tulip_open(struct net_device *dev)
 {
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-        struct tulip_private *tp = (struct tulip_private *)dev->priv;
-#endif
 	int retval;
 
 	if ((retval = request_irq(dev->irq, &tulip_interrupt, SA_SHIRQ, dev->name, dev)))
@@ -497,10 +490,6 @@ tulip_open(struct net_device *dev)
 	tulip_init_ring (dev);
 
 	tulip_up (dev);
-
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-        tp->fc_bit = netdev_register_fc(dev, tulip_xon);
-#endif
 
 	netif_start_queue (dev);
 
@@ -582,10 +571,7 @@ static void tulip_tx_timeout(struct net_device *dev)
 #endif
 
 	/* Stop and restart the chip's Tx processes . */
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-        if (tp->fc_bit && test_bit(tp->fc_bit,&netdev_fc_xoff))
-                printk("BUG tx_timeout restarting rx when fc on\n");
-#endif
+
 	tulip_restart_rxtx(tp);
 	/* Trigger an immediate transmit demand. */
 	outl(0, ioaddr + CSR1);
@@ -742,7 +728,9 @@ static void tulip_down (struct net_device *dev)
 	unsigned long flags;
 
 	del_timer_sync (&tp->timer);
-
+#ifdef CONFIG_TULIP_NAPI
+	del_timer_sync (&tp->oom_timer);
+#endif
 	spin_lock_irqsave (&tp->lock, flags);
 
 	/* Disable interrupts by clearing the interrupt mask. */
@@ -781,13 +769,6 @@ static int tulip_close (struct net_device *dev)
 
 	netif_stop_queue (dev);
 
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-        if (tp->fc_bit) {
-                int bit = tp->fc_bit;
-                tp->fc_bit = 0;
-                netdev_unregister_fc(bit);
-        }
-#endif
 	tulip_down (dev);
 
 	if (tulip_debug > 1)
@@ -1629,6 +1610,10 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	dev->hard_start_xmit = tulip_start_xmit;
 	dev->tx_timeout = tulip_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+#ifdef CONFIG_TULIP_NAPI
+	dev->poll = tulip_poll;
+	dev->weight = 16;
+#endif
 	dev->stop = tulip_close;
 	dev->get_stats = tulip_get_stats;
 	dev->do_ioctl = private_ioctl;
