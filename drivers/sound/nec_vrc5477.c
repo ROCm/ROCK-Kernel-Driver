@@ -805,12 +805,6 @@ static void vrc5477_ac97_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 /* --------------------------------------------------------------------- */
 
-static loff_t vrc5477_ac97_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
-
 static int vrc5477_ac97_open_mixdev(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
@@ -852,7 +846,7 @@ static int vrc5477_ac97_ioctl_mixdev(struct inode *inode, struct file *file,
 
 static /*const*/ struct file_operations vrc5477_ac97_mixer_fops = {
 	owner:		THIS_MODULE,
-	llseek:		vrc5477_ac97_llseek,
+	llseek:		no_llseek,
 	ioctl:		vrc5477_ac97_ioctl_mixdev,
 	open:		vrc5477_ac97_open_mixdev,
 	release:	vrc5477_ac97_release_mixdev,
@@ -1618,7 +1612,7 @@ static int vrc5477_ac97_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations vrc5477_ac97_audio_fops = {
 	owner:	THIS_MODULE,
-	llseek:		vrc5477_ac97_llseek,
+	llseek:		no_llseek,
 	read:		vrc5477_ac97_read,
 	write:		vrc5477_ac97_write,
 	poll:		vrc5477_ac97_poll,

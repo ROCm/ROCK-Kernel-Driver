@@ -1553,15 +1553,6 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
 	return ret;
 }
 
-
-/* Seek is not supported */
-static loff_t auerchar_llseek (struct file *file, loff_t offset, int origin)
-{
-        dbg ("auerchar_seek");
-        return -ESPIPE;
-}
-
-
 /* Read data from the device */
 static ssize_t auerchar_read (struct file *file, char *buf, size_t count, loff_t * ppos)
 {
@@ -1843,7 +1834,7 @@ static int auerchar_release (struct inode *inode, struct file *file)
 static struct file_operations auerswald_fops =
 {
 	owner:		THIS_MODULE,
-	llseek:		auerchar_llseek,
+	llseek:		no_llseek,
 	read:		auerchar_read,
 	write:          auerchar_write,
 	ioctl:		auerchar_ioctl,

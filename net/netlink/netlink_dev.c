@@ -98,11 +98,6 @@ static ssize_t netlink_read(struct file * file, char * buf,
 	return sock_recvmsg(sock, &msg, count, msg.msg_flags);
 }
 
-static loff_t netlink_lseek(struct file * file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-
 static int netlink_open(struct inode * inode, struct file * file)
 {
 	unsigned int minor = minor(inode->i_rdev);
@@ -166,7 +161,7 @@ static int netlink_ioctl(struct inode *inode, struct file *file,
 
 static struct file_operations netlink_fops = {
 	owner:		THIS_MODULE,
-	llseek:		netlink_lseek,
+	llseek:		no_llseek,
 	read:		netlink_read,
 	write:		netlink_write,
 	poll:		netlink_poll,

@@ -38,46 +38,12 @@
 #include <linux/smp_lock.h>
 
 /*
- * Make sure the offset never goes beyond the 32-bit mark..
- */
-static long long ufs_file_lseek(
-	struct file *file,
-	long long offset,
-	int origin )
-{
-	long long retval;
-	struct inode *inode = file->f_dentry->d_inode;
-
-	lock_kernel();
-
-	switch (origin) {
-		case 2:
-			offset += inode->i_size;
-			break;
-		case 1:
-			offset += file->f_pos;
-	}
-	retval = -EINVAL;
-	/* make sure the offset fits in 32 bits */
-	if (((unsigned long long) offset >> 32) == 0) {
-		if (offset != file->f_pos) {
-			file->f_pos = offset;
-			file->f_reada = 0;
-			file->f_version = ++event;
-		}
-		retval = offset;
-	}
-	unlock_kernel();
-	return retval;
-}
-
-/*
  * We have mostly NULL's here: the current defaults are ok for
  * the ufs filesystem.
  */
  
 struct file_operations ufs_file_operations = {
-	llseek:		ufs_file_lseek,
+	llseek:		generic_file_llseek,
 	read:		generic_file_read,
 	write:		generic_file_write,
 	mmap:		generic_file_mmap,

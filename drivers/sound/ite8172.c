@@ -824,12 +824,6 @@ static void it8172_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 /* --------------------------------------------------------------------- */
 
-static loff_t it8172_llseek(struct file *file, loff_t offset, int origin)
-{
-    return -ESPIPE;
-}
-
-
 static int it8172_open_mixdev(struct inode *inode, struct file *file)
 {
     int minor = MINOR(inode->i_rdev);
@@ -870,7 +864,7 @@ static int it8172_ioctl_mixdev(struct inode *inode, struct file *file,
 
 static /*const*/ struct file_operations it8172_mixer_fops = {
     owner:	THIS_MODULE,
-    llseek:	it8172_llseek,
+    llseek:	no_llseek,
     ioctl:	it8172_ioctl_mixdev,
     open:	it8172_open_mixdev,
     release:	it8172_release_mixdev,
@@ -1633,7 +1627,7 @@ static int it8172_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations it8172_audio_fops = {
     owner:	THIS_MODULE,
-    llseek:	it8172_llseek,
+    llseek:	no_llseek,
     read:	it8172_read,
     write:	it8172_write,
     poll:	it8172_poll,

@@ -246,12 +246,6 @@ sigpipe:
 	return -EPIPE;
 }
 
-static loff_t
-pipe_lseek(struct file *file, loff_t offset, int orig)
-{
-	return -ESPIPE;
-}
-
 static ssize_t
 bad_pipe_r(struct file *filp, char *buf, size_t count, loff_t *ppos)
 {
@@ -381,7 +375,7 @@ pipe_rdwr_open(struct inode *inode, struct file *filp)
  * are also used in linux/fs/fifo.c to do operations on FIFOs.
  */
 struct file_operations read_fifo_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		pipe_read,
 	write:		bad_pipe_w,
 	poll:		fifo_poll,
@@ -391,7 +385,7 @@ struct file_operations read_fifo_fops = {
 };
 
 struct file_operations write_fifo_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		bad_pipe_r,
 	write:		pipe_write,
 	poll:		fifo_poll,
@@ -401,7 +395,7 @@ struct file_operations write_fifo_fops = {
 };
 
 struct file_operations rdwr_fifo_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		pipe_read,
 	write:		pipe_write,
 	poll:		fifo_poll,
@@ -411,7 +405,7 @@ struct file_operations rdwr_fifo_fops = {
 };
 
 struct file_operations read_pipe_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		pipe_read,
 	write:		bad_pipe_w,
 	poll:		pipe_poll,
@@ -421,7 +415,7 @@ struct file_operations read_pipe_fops = {
 };
 
 struct file_operations write_pipe_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		bad_pipe_r,
 	write:		pipe_write,
 	poll:		pipe_poll,
@@ -431,7 +425,7 @@ struct file_operations write_pipe_fops = {
 };
 
 struct file_operations rdwr_pipe_fops = {
-	llseek:		pipe_lseek,
+	llseek:		no_llseek,
 	read:		pipe_read,
 	write:		pipe_write,
 	poll:		pipe_poll,

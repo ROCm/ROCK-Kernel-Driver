@@ -18,6 +18,7 @@
 #include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/smp_lock.h>
 
 #include <linux/ncp_fs.h>
 #include "ncplib_kernel.h"

@@ -29,6 +29,7 @@
 #include <linux/hfs_fs_sb.h>
 #include <linux/hfs_fs_i.h>
 #include <linux/hfs_fs.h>
+#include <linux/smp_lock.h>
 
 /* prodos types */
 #define PRODOSI_FTYPE_DIR   0x0F
