@@ -30,9 +30,6 @@
  * inactive_dirty and inactive_clean lists are protected by the
  * pagemap_lru_lock, and *NOT* by the usual PG_locked_dontuse bit!
  *
- * PG_skip is used on sparc/sparc64 architectures to "skip" certain parts of
- * the address space.
- *
  * PG_error is set to indicate that an I/O error occurred on this page.
  *
  * PG_arch_1 is an architecture specific page state bit.  The generic code
@@ -60,14 +57,13 @@
 #define PG_active		 6
 #define PG_slab			 7	/* slab debug (Suparna wants this) */
 
-#define PG_skip			 8	/* kill me now: obsolete */
-#define PG_highmem		 9
-#define PG_checked		10	/* kill me in 2.5.<early>. */
-#define PG_arch_1		11
+#define PG_highmem		 8
+#define PG_checked		 9	/* kill me in 2.5.<early>. */
+#define PG_arch_1		10
+#define PG_reserved		11
 
-#define PG_reserved		12
-#define PG_launder		13	/* written out by VM pressure.. */
-#define PG_private		14	/* Has something at ->private */
+#define PG_launder		12	/* written out by VM pressure.. */
+#define PG_private		13	/* Has something at ->private */
 
 /*
  * Global page accounting.  One instance per CPU.

@@ -64,18 +64,6 @@ static struct meminfo meminfo __initdata = { 0, };
  */
 struct page *empty_zero_page;
 
-/* This is currently broken
- * PG_skip is used on sparc/sparc64 architectures to "skip" certain
- * parts of the address space.
- *
- * #define PG_skip	10
- * #define PageSkip(page) (machine_is_riscpc() && test_bit(PG_skip, &(page)->flags))
- *			if (PageSkip(page)) {
- *				page = page->next_hash;
- *				if (page == NULL)
- *					break;
- *			}
- */
 void show_mem(void)
 {
 	int free = 0, total = 0, reserved = 0;
