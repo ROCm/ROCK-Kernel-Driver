@@ -44,6 +44,7 @@
 #include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/sockios.h>
+#include <linux/spinlock.h>
 #include <linux/net.h>
 #include <net/ax25.h>
 #include <linux/inet.h>
@@ -56,6 +57,8 @@
 #include <linux/fcntl.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+
+static spinlock_t ax25_frag_lock = SPIN_LOCK_UNLOCKED;
 
 ax25_cb *ax25_send_frame(struct sk_buff *skb, int paclen, ax25_address *src, ax25_address *dest, ax25_digi *digi, struct net_device *dev)
 {
@@ -155,11 +158,9 @@ void ax25_output(ax25_cb *ax25, int paclen, struct sk_buff *skb)
 		frontlen = skb_headroom(skb);	/* Address space + CTRL */
 
 		while (skb->len > 0) {
-			save_flags(flags); 
-			cli();
-
+			spin_lock_irqsave(&ax25_frag_lock, flags);
 			if ((skbn = alloc_skb(paclen + 2 + frontlen, GFP_ATOMIC)) == NULL) {
-				restore_flags(flags);
+				spin_unlock_irqrestore(&ax25_frag_lock, flags);
 				printk(KERN_CRIT "AX.25: ax25_output - out of memory\n");
 				return;
 			}
@@ -167,7 +168,7 @@ void ax25_output(ax25_cb *ax25, int paclen, struct sk_buff *skb)
 			if (skb->sk != NULL)
 				skb_set_owner_w(skbn, skb->sk);
 			
-			restore_flags(flags);
+			spin_unlock_irqrestore(&ax25_frag_lock, flags);
 			
 			len = (paclen > skb->len) ? skb->len : paclen;
 
