@@ -232,6 +232,8 @@ static inline struct inode *VFS_I(ntfs_inode *ni)
 }
 
 extern struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no);
+extern struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
+		uchar_t *name, u32 name_len);
 
 extern struct inode *ntfs_alloc_big_inode(struct super_block *sb);
 extern void ntfs_destroy_big_inode(struct inode *inode);

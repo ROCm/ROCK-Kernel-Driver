@@ -75,15 +75,13 @@ typedef struct {
 	LCN mft_zone_start;		/* First cluster of the mft zone. */
 	LCN mft_zone_end;		/* First cluster beyond the mft zone. */
 	struct inode *mft_ino;		/* The VFS inode of $MFT. */
+
+	struct inode *mftbmp_ino;	/* Attribute inode for $MFT/$BITMAP. */
 	struct rw_semaphore mftbmp_lock; /* Lock for serializing accesses to the
 					    mft record bitmap ($MFT/$BITMAP). */
 	unsigned long nr_mft_records;	/* Number of mft records == number of
 					   bits in mft bitmap. */
-	struct address_space mftbmp_mapping; /* Page cache for $MFT/$BITMAP. */
-	run_list mftbmp_rl;		/* Run list for $MFT/$BITMAP. */
-	s64 mftbmp_size;		/* Data size of $MFT/$BITMAP. */
-	s64 mftbmp_initialized_size;	/* Initialized size of $MFT/$BITMAP. */
-	s64 mftbmp_allocated_size;	/* Allocated size of $MFT/$BITMAP. */
+
 	struct inode *mftmirr_ino;	/* The VFS inode of $MFTMirr. */
 	struct inode *lcnbmp_ino;	/* The VFS inode of $Bitmap. */
 	struct rw_semaphore lcnbmp_lock; /* Lock for serializing accesses to the

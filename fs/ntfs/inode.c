@@ -1316,7 +1316,7 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 	ni->nr_extents = -1;
 
 	put_attr_search_ctx(ctx);
-	unmap_mft_record(READ, ni);
+	unmap_mft_record(READ, base_ni);
 
 	ntfs_debug("Done.");
 	return 0;

@@ -17,15 +17,23 @@ ToDo:
 	- Consider if ntfs_file_read_compressed_block() shouldn't be coping
 	  with initialized_size < data_size. I don't think it can happen but
 	  it requires more careful consideration.
-	- CLEANUP: At the moment we have two copies of almost identical
-	  functions in aops.c, can merge them once fake inode address space
-	  based attribute i/o is further developed.
 	- CLEANUP: Modularising code in aops.c a bit, e.g. a-la get_block(),
 	  will be cleaner and make code reuse easier.
 	- Modify ntfs_read_locked_inode() to return an error code and update
 	  callers, i.e. ntfs_iget(), to pass that error code up instead of just
 	  using -EIO.
 	- Enable NFS exporting of NTFS.
+
+2.0.16 - Convert access to $MFT/$BITMAP to attribute inode API.
+
+	- Fix a stupid bug introduced in 2.0.15 where we were unmapping the
+	  wrong inode in fs/ntfs/inode.c::ntfs_attr_iget().
+	- Convert $MFT/$BITMAP access to attribute inode API and remove all
+	  remnants of the ugly mftbmp address space and operations hack. This
+	  means we finally have only one readpage function as well as only one
+	  async io completion handler. Yey! The mft bitmap is now just an
+	  attribute inode and is accessed from vol->mftbmp_ino just as if it
+	  were a normal file. Fake inodes rule. (-:
 
 2.0.15 - Fake inodes based attribute i/o via the pagecache, fixes and cleanups.
 
