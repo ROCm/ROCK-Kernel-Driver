@@ -947,40 +947,56 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			int nr_mapped = 0;
 			int max_scan;
 			int to_reclaim;
+			int reclaimed;
 
 			if (zone->all_unreclaimable && priority != DEF_PRIORITY)
 				continue;
 
-			if (nr_pages && to_free > 0) {	/* Software suspend */
+			if (nr_pages) {		/* Software suspend */
 				to_reclaim = min(to_free, SWAP_CLUSTER_MAX*8);
-			} else {			/* Zone balancing */
+			} else {		/* Zone balancing */
 				to_reclaim = zone->pages_high-zone->free_pages;
 				if (to_reclaim <= 0)
 					continue;
 			}
 			zone->temp_priority = priority;
-			all_zones_ok = 0;
 			max_scan = zone->nr_inactive >> priority;
 			if (max_scan < to_reclaim * 2)
 				max_scan = to_reclaim * 2;
 			if (max_scan < SWAP_CLUSTER_MAX)
 				max_scan = SWAP_CLUSTER_MAX;
-			to_free -= shrink_zone(zone, max_scan, GFP_KERNEL,
+			reclaimed = shrink_zone(zone, max_scan, GFP_KERNEL,
 					to_reclaim, &nr_mapped, ps);
 			if (i < ZONE_HIGHMEM) {
 				reclaim_state->reclaimed_slab = 0;
 				shrink_slab(max_scan + nr_mapped, GFP_KERNEL);
-				to_free -= reclaim_state->reclaimed_slab;
+				reclaimed += reclaim_state->reclaimed_slab;
 			}
+			to_free -= reclaimed;
 			if (zone->all_unreclaimable)
 				continue;
 			if (zone->pages_scanned > zone->present_pages * 2)
 				zone->all_unreclaimable = 1;
+			/*
+			 * If this scan failed to reclaim `to_reclaim' or more
+			 * pages, we're getting into trouble.  Need to scan
+			 * some more, and throttle kswapd.   Note that this zone
+			 * may now have sufficient free pages due to freeing
+			 * activity by some other process.   That's OK - we'll
+			 * pick that info up on the next pass through the loop.
+			 */
+			if (reclaimed < to_reclaim)
+				all_zones_ok = 0;
 		}
+		if (nr_pages && to_free > 0)
+			continue;	/* swsusp: need to do more work */
 		if (all_zones_ok)
-			break;
-		if (to_free > 0)
-			blk_congestion_wait(WRITE, HZ/10);
+			break;		/* kswapd: all done */
+		/*
+		 * OK, kswapd is getting into trouble.  Take a nap, then take
+		 * another pass across the zones.
+		 */
+		blk_congestion_wait(WRITE, HZ/10);
 	}
 
 	for (i = 0; i < pgdat->nr_zones; i++) {
