@@ -649,7 +649,7 @@ done_battery_state_ohare(struct adb_request* req)
 	unsigned int bat_flags = PMU_BATT_TYPE_HOOPER;
 	long pcharge, charge, vb, vmax, lmax;
 	long vmax_charging, vmax_charged;
-	long current, voltage, time, max;
+	long amperage, voltage, time, max;
 	int mb = pmac_call_feature(PMAC_FTR_GET_MB_INFO,
 			NULL, PMAC_MB_INFO_MODEL, 0);
 
@@ -676,10 +676,10 @@ done_battery_state_ohare(struct adb_request* req)
 			bat_flags |= PMU_BATT_CHARGING;
 		vb = (req->reply[1] << 8) | req->reply[2];
 		voltage = (vb * 265 + 72665) / 10;
-		current = req->reply[5];
+		amperage = req->reply[5];
 		if ((req->reply[0] & 0x01) == 0) {
-			if (current > 200)
-				vb += ((current - 200) * 15)/100;
+			if (amperage > 200)
+				vb += ((amperage - 200) * 15)/100;
 		} else if (req->reply[0] & 0x02) {
 			vb = (vb * 97) / 100;
 			vmax = vmax_charging;
@@ -694,19 +694,19 @@ done_battery_state_ohare(struct adb_request* req)
 			if (pcharge < charge)
 				charge = pcharge;
 		}
-		if (current > 0)
-			time = (charge * 16440) / current;
+		if (amperage > 0)
+			time = (charge * 16440) / amperage;
 		else
 			time = 0;
 		max = 100;
-		current = -current;
+		amperage = -amperage;
 	} else
-		charge = max = current = voltage = time = 0;
+		charge = max = amperage = voltage = time = 0;
 
 	pmu_batteries[pmu_cur_battery].flags = bat_flags;
 	pmu_batteries[pmu_cur_battery].charge = charge;
 	pmu_batteries[pmu_cur_battery].max_charge = max;
-	pmu_batteries[pmu_cur_battery].current = current;
+	pmu_batteries[pmu_cur_battery].amperage = amperage;
 	pmu_batteries[pmu_cur_battery].voltage = voltage;
 	pmu_batteries[pmu_cur_battery].time_remaining = time;
 }
@@ -734,7 +734,7 @@ done_battery_state_smart(struct adb_request* req)
 	 */
 	 
 	unsigned int bat_flags = PMU_BATT_TYPE_SMART;
-	int current;
+	int amperage;
 	unsigned int capa, max, voltage;
 	
 	if (req->reply[1] & 0x01)
@@ -749,12 +749,12 @@ done_battery_state_smart(struct adb_request* req)
 			case 3:
 			case 4: capa = req->reply[2];
 				max = req->reply[3];
-				current = *((signed char *)&req->reply[4]);
+				amperage = *((signed char *)&req->reply[4]);
 				voltage = req->reply[5];
 				break;
 			case 5: capa = (req->reply[2] << 8) | req->reply[3];
 				max = (req->reply[4] << 8) | req->reply[5];
-				current = *((signed short *)&req->reply[6]);
+				amperage = *((signed short *)&req->reply[6]);
 				voltage = (req->reply[8] << 8) | req->reply[9];
 				break;
 			default:
@@ -763,23 +763,23 @@ done_battery_state_smart(struct adb_request* req)
 				break;
 		}
 	} else
-		capa = max = current = voltage = 0;
+		capa = max = amperage = voltage = 0;
 
-	if ((req->reply[1] & 0x01) && (current > 0))
+	if ((req->reply[1] & 0x01) && (amperage > 0))
 		bat_flags |= PMU_BATT_CHARGING;
 
 	pmu_batteries[pmu_cur_battery].flags = bat_flags;
 	pmu_batteries[pmu_cur_battery].charge = capa;
 	pmu_batteries[pmu_cur_battery].max_charge = max;
-	pmu_batteries[pmu_cur_battery].current = current;
+	pmu_batteries[pmu_cur_battery].amperage = amperage;
 	pmu_batteries[pmu_cur_battery].voltage = voltage;
-	if (current) {
-		if ((req->reply[1] & 0x01) && (current > 0))
+	if (amperage) {
+		if ((req->reply[1] & 0x01) && (amperage > 0))
 			pmu_batteries[pmu_cur_battery].time_remaining
-				= ((max-capa) * 3600) / current;
+				= ((max-capa) * 3600) / amperage;
 		else
 			pmu_batteries[pmu_cur_battery].time_remaining
-				= (capa * 3600) / (-current);
+				= (capa * 3600) / (-amperage);
 	} else
 		pmu_batteries[pmu_cur_battery].time_remaining = 0;
 
@@ -861,7 +861,7 @@ proc_get_batt(char *page, char **start, off_t off,
 	p += sprintf(p, "max_charge : %d\n",
 		pmu_batteries[batnum].max_charge);
 	p += sprintf(p, "current    : %d\n",
-		pmu_batteries[batnum].current);
+		pmu_batteries[batnum].amperage);
 	p += sprintf(p, "voltage    : %d\n",
 		pmu_batteries[batnum].voltage);
 	p += sprintf(p, "time rem.  : %d\n",
