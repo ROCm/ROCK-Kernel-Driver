@@ -65,7 +65,6 @@ drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/
 drivers-$(CONFIG_IA64_GENERIC)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/ arch/ia64/hp/sim/
 
 boot := arch/ia64/boot
-tools := arch/ia64/tools
 
 .PHONY: boot compressed check
 
@@ -79,17 +78,17 @@ check: vmlinux
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
-	$(Q)$(MAKE) $(clean)=$(tools)
 
 CLEAN_FILES += include/asm-ia64/offsets.h vmlinux.gz bootloader
 
 prepare: include/asm-ia64/offsets.h
 
+include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
+	$(call filechk,gen-asm-offsets)
+
 boot:	lib/lib.a vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
 
-include/asm-ia64/offsets.h:
-	$(Q)$(MAKE) $(build)=$(tools) $@
 
 define archhelp
   echo '  compressed	- Build compressed kernel image'

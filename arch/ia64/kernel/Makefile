@@ -18,3 +18,11 @@ obj-$(CONFIG_IA64_PALINFO)	+= palinfo.o
 obj-$(CONFIG_IOSAPIC)		+= iosapic.o
 obj-$(CONFIG_MODULES)		+= module.o
 obj-$(CONFIG_SMP)		+= smp.o smpboot.o
+
+arch/$(ARCH)/kernel/asm-offsets.s: include/asm-$(ARCH)/.offsets.h.stamp
+
+include/asm-$(ARCH)/.offsets.h.stamp:
+	[ -s include/asm-$(ARCH)/offsets.h ] || echo "#define IA64_TASK_SIZE 0" > include/asm-$(ARCH)/offsets.h
+	touch $@
+
+CLEAN_FILES += include/asm-ia64/.offsets.h.stamp
