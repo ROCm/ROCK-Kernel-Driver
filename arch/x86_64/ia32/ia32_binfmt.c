@@ -32,7 +32,7 @@
 #define AT_SYSINFO 32
 #define AT_SYSINFO_EHDR		33
 
-int sysctl_vsyscall32;
+int sysctl_vsyscall32 = 1;
 
 #define ARCH_DLINFO do {  \
 	if (sysctl_vsyscall32) { \

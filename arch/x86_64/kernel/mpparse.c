@@ -880,6 +880,7 @@ extern FADT_DESCRIPTOR acpi_fadt;
 
 void __init mp_config_ioapic_for_sci(int irq)
 {
+#ifdef CONFIG_ACPI_INTERPRETER
 	int ioapic;
 	int ioapic_pin;
 	struct acpi_table_madt *madt;
@@ -939,6 +940,7 @@ found:
 	 */
 	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 
 		(flags.trigger == 1 ? 0 : 1), (flags.polarity == 1 ? 0 : 1));
+#endif
 }
 
 #ifdef CONFIG_ACPI_PCI

@@ -21,6 +21,7 @@ extern void syscall_init(void);
 
 extern void ia32_syscall(void);
 extern void ia32_cstar_target(void); 
+extern void ia32_sysenter_target(void); 
 
 extern void calibrate_delay(void);
 extern void cpu_idle(void);
@@ -68,6 +69,7 @@ extern void show_regs(struct pt_regs * regs);
 
 extern int map_syscall32(struct mm_struct *mm, unsigned long address);
 extern char *syscall32_page;
+extern void syscall32_cpu_init(void);
 
 extern void setup_node_bootmem(int nodeid, unsigned long start, unsigned long end);
 

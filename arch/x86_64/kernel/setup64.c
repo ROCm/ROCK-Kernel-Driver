@@ -202,7 +202,7 @@ void __init syscall_init(void)
 	wrmsrl(MSR_LSTAR, system_call); 
 
 #ifdef CONFIG_IA32_EMULATION   		
-	wrmsrl(MSR_CSTAR, ia32_cstar_target); 
+	syscall32_cpu_init ();
 #endif
 
 	/* Flags to clear on syscall */
@@ -285,9 +285,10 @@ void __init cpu_init (void)
 	/*
 	 * set up and load the per-CPU TSS
 	 */
-	for (v = 0; v < N_EXCEPTION_STACKS; v++) {
+	for (v = 1; v <= N_EXCEPTION_STACKS; v++) {
 		if (cpu) {
-			estacks = (char *)__get_free_pages(GFP_ATOMIC, 0);
+			estacks = (char *)__get_free_pages(GFP_ATOMIC, 
+						   EXCEPTION_STACK_ORDER);
 			if (!estacks)
 				panic("Cannot allocate exception stack %ld %d\n",
 				      v, cpu); 

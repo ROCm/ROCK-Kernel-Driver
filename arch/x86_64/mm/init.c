@@ -37,7 +37,9 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 
+#ifndef Dprintk
 #define Dprintk(x...)
+#endif
 
 extern char _stext[];
 

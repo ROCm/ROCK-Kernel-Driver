@@ -267,7 +267,9 @@ struct thread_struct {
 #define STACKFAULT_STACK 1
 #define DOUBLEFAULT_STACK 2 
 #define NMI_STACK 3 
-#define N_EXCEPTION_STACKS 3  /* hw limit: 7 */
+#define DEBUG_STACK 4 
+#define MCE_STACK 5
+#define N_EXCEPTION_STACKS 5  /* hw limit: 7 */
 #define EXCEPTION_STKSZ (PAGE_SIZE << EXCEPTION_STACK_ORDER)
 #define EXCEPTION_STACK_ORDER 0 
 
