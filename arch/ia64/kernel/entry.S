@@ -1329,9 +1329,9 @@ sys_call_table:
 	data8 sys_syslog
 	data8 sys_setitimer
 	data8 sys_getitimer
-	data8 ia64_ni_syscall			// 1120		/* was: ia64_oldstat */
-	data8 ia64_ni_syscall					/* was: ia64_oldlstat */
-	data8 ia64_ni_syscall					/* was: ia64_oldfstat */
+	data8 sys_ni_syscall			// 1120		/* was: ia64_oldstat */
+	data8 sys_ni_syscall					/* was: ia64_oldlstat */
+	data8 sys_ni_syscall					/* was: ia64_oldfstat */
 	data8 sys_vhangup
 	data8 sys_lchown
 	data8 sys_remap_file_pages		// 1125
@@ -1341,16 +1341,16 @@ sys_call_table:
 	data8 sys_setdomainname
 	data8 sys_newuname			// 1130
 	data8 sys_adjtimex
-	data8 ia64_ni_syscall					/* was: ia64_create_module */
+	data8 sys_ni_syscall					/* was: ia64_create_module */
 	data8 sys_init_module
 	data8 sys_delete_module
-	data8 ia64_ni_syscall			// 1135		/* was: sys_get_kernel_syms */
-	data8 ia64_ni_syscall					/* was: sys_query_module */
+	data8 sys_ni_syscall			// 1135		/* was: sys_get_kernel_syms */
+	data8 sys_ni_syscall					/* was: sys_query_module */
 	data8 sys_quotactl
 	data8 sys_bdflush
 	data8 sys_sysfs
 	data8 sys_personality			// 1140
-	data8 ia64_ni_syscall		// sys_afs_syscall
+	data8 sys_ni_syscall		// sys_afs_syscall
 	data8 sys_setfsuid
 	data8 sys_setfsgid
 	data8 sys_getdents
@@ -1468,26 +1468,26 @@ sys_call_table:
 	data8 sys_clock_nanosleep
 	data8 sys_fstatfs64
 	data8 sys_statfs64
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1260
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1265
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1270
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall			// 1275
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall			// 1260
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall			// 1265
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall			// 1270
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall			// 1275
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
+	data8 sys_ni_syscall
 
 	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls

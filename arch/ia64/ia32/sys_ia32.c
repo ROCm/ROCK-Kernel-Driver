@@ -2164,19 +2164,6 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 	return ret;
 }
 
-asmlinkage long sys_ni_syscall(void);
-
-asmlinkage long
-sys32_ni_syscall (int dummy0, int dummy1, int dummy2, int dummy3, int dummy4, int dummy5,
-		  int dummy6, int dummy7, int stack)
-{
-	struct pt_regs *regs = (struct pt_regs *)&stack;
-
-	printk(KERN_WARNING "IA32 syscall #%d issued, maybe we should implement it\n",
-	       (int)regs->r1);
-	return(sys_ni_syscall());
-}
-
 /*
  *  The IA64 maps 4 I/O ports for each 4K page
  */
