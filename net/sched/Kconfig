@@ -242,6 +242,7 @@ config NET_CLS_TCINDEX
 config NET_CLS_ROUTE4
 	tristate "Routing table based classifier"
 	depends on NET_CLS
+	select NET_CLS_ROUTE
 	help
 	  If you say Y here, you will be able to classify outgoing packets
 	  according to the route table entry they matched. If unsure, say Y.
@@ -251,8 +252,7 @@ config NET_CLS_ROUTE4
 
 config NET_CLS_ROUTE
 	bool
-	depends on NET_CLS_ROUTE4
-	default y
+	default n
 
 config NET_CLS_FW
 	tristate "Firewall based classifier"

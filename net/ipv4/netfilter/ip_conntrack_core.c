@@ -174,12 +174,11 @@ static void
 destroy_expect(struct ip_conntrack_expect *exp)
 {
 	DEBUGP("destroy_expect(%p) use=%d\n", exp, atomic_read(&exp->use));
-	IP_NF_ASSERT(atomic_read(&exp->use));
+	IP_NF_ASSERT(atomic_read(&exp->use) == 0);
 	IP_NF_ASSERT(!timer_pending(&exp->timeout));
 
 	kfree(exp);
 }
-
 
 inline void ip_conntrack_expect_put(struct ip_conntrack_expect *exp)
 {
@@ -716,7 +715,6 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 		DEBUGP("conntrack: expectation arrives ct=%p exp=%p\n",
 			conntrack, expected);
 		/* Welcome, Mr. Bond.  We've been expecting you... */
-		IP_NF_ASSERT(master_ct(conntrack));
 		__set_bit(IPS_EXPECTED_BIT, &conntrack->status);
 		conntrack->master = expected;
 		expected->sibling = conntrack;
@@ -949,9 +947,8 @@ ip_conntrack_expect_insert(struct ip_conntrack_expect *new,
 	atomic_set(&new->use, 1);
 
 	/* add to expected list for this connection */
-	list_add(&new->expected_list, &related_to->sibling_list);
+	list_add_tail(&new->expected_list, &related_to->sibling_list);
 	/* add to global list of expectations */
-
 	list_prepend(&ip_conntrack_expect_list, &new->list);
 	/* add and start timer if required */
 	if (related_to->helper->timeout) {
@@ -1005,7 +1002,6 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 
 	} else if (related_to->helper->max_expected && 
 		   related_to->expecting >= related_to->helper->max_expected) {
-		struct list_head *cur_item;
 		/* old == NULL */
 		if (!(related_to->helper->flags & 
 		      IP_CT_HELPER_F_REUSE_EXPECT)) {
@@ -1031,21 +1027,14 @@ int ip_conntrack_expect_related(struct ip_conntrack_expect *expect,
 		       NIPQUAD(related_to->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip));
  
 		/* choose the the oldest expectation to evict */
-		list_for_each(cur_item, &related_to->sibling_list) { 
-			struct ip_conntrack_expect *cur;
-
-			cur = list_entry(cur_item, 
-					 struct ip_conntrack_expect,
-					 expected_list);
-			if (cur->sibling == NULL) {
-				old = cur;
+		list_for_each_entry(old, &related_to->sibling_list, 
+		                                      expected_list)
+			if (old->sibling == NULL)
 				break;
-			}
-		}
 
-		/* (!old) cannot happen, since related_to->expecting is the
-		 * number of unconfirmed expects */
-		IP_NF_ASSERT(old);
+		/* We cannot fail since related_to->expecting is the number
+		 * of unconfirmed expectations */
+		IP_NF_ASSERT(old && old->sibling == NULL);
 
 		/* newnat14 does not reuse the real allocated memory
 		 * structures but rather unexpects the old and
