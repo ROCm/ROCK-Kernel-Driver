@@ -714,4 +714,16 @@ config SERIAL_MPC52xx_CONSOLE_BAUD
 	  This value is only used if the bootloader doesn't pass in the
 	  console baudrate
 
+config SERIAL_ICOM
+	tristate "IBM Multiport Serial Adapter"
+	depends on PPC_ISERIES || PPC_PSERIES
+	select SERIAL_CORE
+	help
+	  This driver is for a family of multiport serial adapters
+	  including 2 port RVX, 2 port internal modem, 4 port internal
+	  modem and a split 1 port RVX and 1 port internal modem.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called icom.
+
 endmenu
