@@ -1965,9 +1965,7 @@ static struct net_device_stats *lmc_get_stats (struct net_device *dev) /*fold00*
     return (struct net_device_stats *) &sc->stats;
 }
 
-#ifdef MODULE
-
-int init_module (void) /*fold00*/
+static int __init init_lmc(void)
 {
     printk ("lmc: module loaded\n");
 
@@ -1978,7 +1976,7 @@ int init_module (void) /*fold00*/
     return 0;
 }
 
-void cleanup_module (void) /*fold00*/
+static void __exit exit_lmc(void)
 {
     struct net_device *dev, *next;
     lmc_softc_t *sc;
@@ -2020,7 +2018,9 @@ void cleanup_module (void) /*fold00*/
     Lmc_root_dev = NULL;
     printk ("lmc module unloaded\n");
 }
-#endif
+
+module_init(init_lmc);
+module_exit(exit_lmc);
 
 unsigned lmc_mii_readreg (lmc_softc_t * const sc, unsigned devaddr, unsigned regno) /*fold00*/
 {
