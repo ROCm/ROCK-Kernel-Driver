@@ -127,11 +127,10 @@ void
 SystemResetException(struct pt_regs *regs)
 {
 	if (fwnmi_active) {
-		unsigned long *r3 = __va(regs->gpr[3]); /* for FWNMI debug */
-		struct rtas_error_log *errlog;
-
-		udbg_printf("FWNMI is active with save area at %016lx\n", r3);
-		errlog = FWNMI_get_errinfo(regs);
+		struct rtas_error_log *errhdr = FWNMI_get_errinfo(regs);
+		if (errhdr) {
+			/* XXX Should look at FWNMI information */
+		}
 		FWNMI_release_errinfo();
 	}
 

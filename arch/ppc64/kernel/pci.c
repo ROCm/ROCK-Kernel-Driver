@@ -392,6 +392,7 @@ pcibios_init(void)
 	iSeries_pcibios_init(); 
 #endif
 
+	ppc64_boot_msg(0x40, "PCI Probe");
 	printk("PCI: Probing PCI hardware\n");
 	PPCDBG(PPCDBG_BUSWALK,"PCI: Probing PCI hardware\n");
 
@@ -431,6 +432,7 @@ pcibios_init(void)
 
 	printk("PCI: Probing PCI hardware done\n");
 	PPCDBG(PPCDBG_BUSWALK,"PCI: Probing PCI hardware done.\n");
+	ppc64_boot_msg(0x41, "PCI Done");
 
 }
 
@@ -729,36 +731,6 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 	return ret;
 }
 
-/* Provide information on locations of various I/O regions in physical
- * memory.  Do this on a per-card basis so that we choose the right
- * root bridge.
- * Note that the returned IO or memory base is a physical address
- */
-
-long
-sys_pciconfig_iobase(long which, unsigned long bus, unsigned long devfn)
-{
-	struct pci_controller* hose = pci_bus_to_hose(bus);
-	long result = -EOPNOTSUPP;
-
-	if (!hose)
-		return -ENODEV;
-	
-	switch (which) {
-	case IOBASE_BRIDGE_NUMBER:
-		return (long)hose->first_busno;
-	case IOBASE_MEMORY:
-		return (long)hose->pci_mem_offset;
-	case IOBASE_IO:
-		return (long)hose->io_base_phys;
-	case IOBASE_ISA_IO:
-		return (long)isa_io_base;
-	case IOBASE_ISA_MEM:
-		return (long)isa_mem_base;
-	}
-
-	return result;
-}
 /************************************************************************/
 /* Formats the device information and location for service.             */
 /* - Pass in pci_dev* pointer to the device.                            */

@@ -1,6 +1,4 @@
 /*
- * 
- *
  * SMP support for ppc.
  *
  * Written by Cort Dougan (cort@cs.nmt.edu) borrowing a great
@@ -449,6 +447,9 @@ static struct call_data_struct {
 	int wait;
 } *call_data;
 
+/* delay of at least 8 seconds on 1GHz cpu */
+#define SMP_CALL_TIMEOUT (1UL << (30 + 3))
+
 /*
  * This function sends a 'generic call function' IPI to all other CPUs
  * in the system.
@@ -469,7 +470,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 { 
 	struct call_data_struct data;
 	int ret = -1, cpus = num_online_cpus()-1;
-	int timeout;
+	unsigned long timeout;
 
 	if (!cpus)
 		return 0;
@@ -483,47 +484,44 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	spin_lock(&call_lock);
 	call_data = &data;
+	wmb();
 	/* Send a message to all other CPUs and wait for them to respond */
 	smp_message_pass(MSG_ALL_BUT_SELF, PPC_MSG_CALL_FUNCTION, 0, 0);
 
 	/* Wait for response */
-	timeout = 8000000;
+	timeout = SMP_CALL_TIMEOUT;
 	while (atomic_read(&data.started) != cpus) {
 		HMT_low();
 		if (--timeout == 0) {
-			printk("smp_call_function on cpu %d: other cpus not responding (%d)\n",
-			       smp_processor_id(), atomic_read(&data.started));
-#ifdef CONFIG_XMON
-                        xmon(0);
-#endif
-#ifdef CONFIG_PPC_ISERIES
-			HvCall_terminateMachineSrc();
-#endif
+			if (debugger)
+				debugger(0);
+			printk("smp_call_function on cpu %d: other cpus not "
+			       "responding (%d)\n", smp_processor_id(),
+			       atomic_read(&data.started));
 			goto out;
 		}
-		barrier();
-		udelay(1);
 	}
 
 	if (wait) {
-		timeout = 1000000;
+		timeout = SMP_CALL_TIMEOUT;
 		while (atomic_read(&data.finished) != cpus) {
 			HMT_low();
 			if (--timeout == 0) {
-				printk("smp_call_function on cpu %d: other cpus not finishing (%d/%d)\n",
-				       smp_processor_id(), atomic_read(&data.finished), atomic_read(&data.started));
-#ifdef CONFIG_PPC_ISERIES
-				HvCall_terminateMachineSrc();
-#endif
+				if (debugger)
+					debugger(0);
+				printk("smp_call_function on cpu %d: other "
+				       "cpus not finishing (%d/%d)\n",
+				       smp_processor_id(),
+				       atomic_read(&data.finished),
+				       atomic_read(&data.started));
 				goto out;
 			}
-			barrier();
-			udelay(1);
 		}
 	}
+
 	ret = 0;
 
- out:
+out:
 	HMT_medium();
 	spin_unlock(&call_lock);
 	return ret;

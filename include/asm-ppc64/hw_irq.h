@@ -36,7 +36,10 @@ extern void __no_lpq_restore_flags(unsigned long);
 #else
 
 #define local_save_flags(flags)	((flags) = mfmsr())
-#define local_irq_restore(flags)	__mtmsrd((flags), 1)
+#define local_irq_restore(flags) do { \
+	__asm__ __volatile__("": : :"memory"); \
+	__mtmsrd((flags), 1); \
+} while(0)
 
 static inline void local_irq_disable(void)
 {

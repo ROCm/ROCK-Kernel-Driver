@@ -296,6 +296,8 @@ xics_init_IRQ( void )
 	struct device_node *np;
 	uint *ireg, ilen, indx=0;
 
+	ppc64_boot_msg(0x20, "XICS Init");
+
 	ibm_get_xive = rtas_token("ibm,get-xive");
 	ibm_set_xive = rtas_token("ibm,set-xive");
 	ibm_int_off = rtas_token("ibm,int-off");
@@ -413,6 +415,7 @@ nextnode:
 	request_irq(XICS_IPI + XICS_IRQ_OFFSET, xics_ipi_action, 0, "IPI", 0);
 	irq_desc[XICS_IPI+XICS_IRQ_OFFSET].status |= IRQ_PER_CPU;
 #endif
+	ppc64_boot_msg(0x21, "XICS Done");
 }
 
 void xics_isa_init(void)

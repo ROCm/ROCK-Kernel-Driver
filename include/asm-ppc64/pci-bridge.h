@@ -79,5 +79,23 @@ struct pci_controller {
 int pci_device_loc(struct device_node *dev, unsigned char *bus_ptr,
 		   unsigned char *devfn_ptr);
 
+struct device_node *fetch_dev_dn(struct pci_dev *dev);
+
+/* Get a device_node from a pci_dev.  This code must be fast except in the case
+ * where the sysdata is incorrect and needs to be fixed up (hopefully just once)
+ */
+static inline struct device_node *pci_device_to_OF_node(struct pci_dev *dev)
+{
+	struct device_node *dn = (struct device_node *)(dev->sysdata);
+	if (dn->devfn == dev->devfn && dn->busno == dev->bus->number)
+		return dn;	/* fast path.  sysdata is good */
+	else
+		return fetch_dev_dn(dev);
+}
+/* Use this macro after the PCI bus walk for max performance when it
+ * is known that sysdata is correct.
+ */
+#define PCI_GET_DN(dev) ((struct device_node *)((dev)->sysdata))
+
 #endif
 #endif /* __KERNEL__ */

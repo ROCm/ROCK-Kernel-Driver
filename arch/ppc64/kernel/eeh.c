@@ -156,8 +156,9 @@ void eeh_init(void)
 	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
 	ibm_read_slot_reset_state = rtas_token("ibm,read-slot-reset-state");
-	if (ibm_set_eeh_option != RTAS_UNKNOWN_SERVICE)
-		eeh_implemented = 1;
+
+	if (ibm_set_eeh_option == RTAS_UNKNOWN_SERVICE)
+		return;
 
 	if (eeh_force_off > eeh_force_on) {
 		/* User is forcing EEH off.  Be noisy if it is implemented. */

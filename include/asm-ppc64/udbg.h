@@ -17,6 +17,8 @@ int udbg_getc_poll(void);
 void udbg_puts(const char *s);
 int udbg_write(const char *s, int n);
 int udbg_read(char *buf, int buflen);
+struct console;
+void udbg_console_write(struct console *con, const char *s, unsigned int n);
 void udbg_puthex(unsigned long val);
 void udbg_printSP(const char *s);
 void udbg_printf(const char *fmt, ...);
