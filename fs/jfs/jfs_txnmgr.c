@@ -48,6 +48,8 @@
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
 #include <linux/suspend.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"
@@ -61,24 +63,21 @@
  *      transaction management structures
  */
 static struct {
-	/* tblock */
 	int freetid;		/* index of a free tid structure */
-	wait_queue_head_t freewait;	/* eventlist of free tblock */
-
-	/* tlock */
 	int freelock;		/* index first free lock word */
+	wait_queue_head_t freewait;	/* eventlist of free tblock */
 	wait_queue_head_t freelockwait;	/* eventlist of free tlock */
 	wait_queue_head_t lowlockwait;	/* eventlist of ample tlocks */
 	int tlocksInUse;	/* Number of tlocks in use */
-	int TlocksLow;		/* Indicates low number of available tlocks */
 	spinlock_t LazyLock;	/* synchronize sync_queue & unlock_queue */
 /*	struct tblock *sync_queue; * Transactions waiting for data sync */
-	struct tblock *unlock_queue;	/* Txns waiting to be released */
-	struct tblock *unlock_tail;	/* Tail of unlock_queue */
+	struct list_head unlock_queue;	/* Txns waiting to be released */
 	struct list_head anon_list;	/* inodes having anonymous txns */
 	struct list_head anon_list2;	/* inodes having anonymous txns
 					   that couldn't be sync'ed */
 } TxAnchor;
+
+int jfs_tlocks_low;		/* Indicates low number of available tlocks */
 
 #ifdef CONFIG_JFS_STATISTICS
 struct {
@@ -95,11 +94,19 @@ struct {
 #endif
 
 static int nTxBlock = 512;	/* number of transaction blocks */
-struct tblock *TxBlock;	        /* transaction block table */
+module_param(nTxBlock, int, 0);
+MODULE_PARM_DESC(nTxBlock,
+		 "Number of transaction blocks (default:512, max:65536)");
 
 static int nTxLock = 4096;	/* number of transaction locks */
-static int TxLockLWM = 4096*.4;	/* Low water mark for number of txLocks used */
-static int TxLockHWM = 4096*.8;	/* High water mark for number of txLocks used */
+module_param(nTxLock, int, 0);
+MODULE_PARM_DESC(nTxLock,
+		 "Number of transaction locks (default:4096, max:65536)");
+
+struct tblock *TxBlock;	        /* transaction block table */
+static int TxLockLWM;		/* Low water mark for number of txLocks used */
+static int TxLockHWM;		/* High water mark for number of txLocks used */
+static int TxLockVHWM;		/* Very High water mark */
 struct tlock *TxLock;           /* transaction lock table */
 
 
@@ -162,7 +169,6 @@ extern void lmSync(struct jfs_log *);
 extern int jfs_commit_inode(struct inode *, int);
 extern int jfs_stop_threads;
 
-struct task_struct *jfsCommitTask;
 extern struct completion jfsIOwait;
 
 /*
@@ -210,9 +216,9 @@ static lid_t txLockAlloc(void)
 		TXN_SLEEP(&TxAnchor.freelockwait);
 	TxAnchor.freelock = TxLock[lid].next;
 	HIGHWATERMARK(stattx.maxlid, lid);
-	if ((++TxAnchor.tlocksInUse > TxLockHWM) && (TxAnchor.TlocksLow == 0)) {
-		jfs_info("txLockAlloc TlocksLow");
-		TxAnchor.TlocksLow = 1;
+	if ((++TxAnchor.tlocksInUse > TxLockHWM) && (jfs_tlocks_low == 0)) {
+		jfs_info("txLockAlloc tlocks low");
+		jfs_tlocks_low = 1;
 		wake_up(&jfs_sync_thread_wait);
 	}
 
@@ -224,9 +230,9 @@ static void txLockFree(lid_t lid)
 	TxLock[lid].next = TxAnchor.freelock;
 	TxAnchor.freelock = lid;
 	TxAnchor.tlocksInUse--;
-	if (TxAnchor.TlocksLow && (TxAnchor.tlocksInUse < TxLockLWM)) {
-		jfs_info("txLockFree TlocksLow no more");
-		TxAnchor.TlocksLow = 0;
+	if (jfs_tlocks_low && (TxAnchor.tlocksInUse < TxLockLWM)) {
+		jfs_info("txLockFree jfs_tlocks_low no more");
+		jfs_tlocks_low = 0;
 		TXN_WAKEUP(&TxAnchor.lowlockwait);
 	}
 	TXN_WAKEUP(&TxAnchor.freelockwait);
@@ -245,12 +251,25 @@ int txInit(void)
 {
 	int k, size;
 
+	/* Verify tunable parameters */
+	if (nTxBlock < 16)
+		nTxBlock = 16;	/* No one should set it this low */
+	if (nTxBlock > 65536)
+		nTxBlock = 65536;
+	if (nTxLock < 256)
+		nTxLock = 256;	/* No one should set it this low */
+	if (nTxLock > 65536)
+		nTxLock = 65536;
 	/*
 	 * initialize transaction block (tblock) table
 	 *
 	 * transaction id (tid) = tblock index
 	 * tid = 0 is reserved.
 	 */
+	TxLockLWM = (nTxLock * 4) / 10;
+	TxLockHWM = (nTxLock * 8) / 10;
+	TxLockVHWM = (nTxLock * 9) / 10;
+
 	size = sizeof(struct tblock) * nTxBlock;
 	TxBlock = (struct tblock *) vmalloc(size);
 	if (TxBlock == NULL)
@@ -294,6 +313,9 @@ int txInit(void)
 	TxAnchor.tlocksInUse = 0;
 	INIT_LIST_HEAD(&TxAnchor.anon_list);
 	INIT_LIST_HEAD(&TxAnchor.anon_list2);
+
+	LAZY_LOCK_INIT();
+	INIT_LIST_HEAD(&TxAnchor.unlock_queue);
 
 	stattx.maxlid = 1;	/* statistics */
 
@@ -358,7 +380,7 @@ tid_t txBegin(struct super_block *sb, int flag)
 		 * unless COMMIT_FORCE or COMMIT_INODE (which may ultimately
 		 * free tlocks)
 		 */
-		if (TxAnchor.TlocksLow) {
+		if (TxAnchor.tlocksInUse > TxLockVHWM) {
 			INCREMENT(TxStat.txBegin_lockslow);
 			TXN_SLEEP(&TxAnchor.lowlockwait);
 			goto retry;
@@ -450,7 +472,7 @@ void txBeginAnon(struct super_block *sb)
 	/*
 	 * Don't begin transaction if we're getting starved for tlocks
 	 */
-	if (TxAnchor.TlocksLow) {
+	if (TxAnchor.tlocksInUse > TxLockVHWM) {
 		INCREMENT(TxStat.txBeginAnon_lockslow);
 		TXN_SLEEP(&TxAnchor.lowlockwait);
 		goto retry;
@@ -2559,6 +2581,7 @@ void txFreelock(struct inode *ip)
 	if (!jfs_ip->atlhead)
 		return;
 
+	TXN_LOCK();
 	xtlck = (struct tlock *) &jfs_ip->atlhead;
 
 	while ((lid = xtlck->next)) {
@@ -2579,10 +2602,9 @@ void txFreelock(struct inode *ip)
 		/*
 		 * If inode was on anon_list, remove it
 		 */
-		TXN_LOCK();
 		list_del_init(&jfs_ip->anon_inode_list);
-		TXN_UNLOCK();
 	}
+	TXN_UNLOCK();
 }
 
 
@@ -2707,50 +2729,54 @@ int jfs_lazycommit(void *arg)
 	int WorkDone;
 	struct tblock *tblk;
 	unsigned long flags;
+	struct jfs_sb_info *sbi;
 
 	daemonize("jfsCommit");
-
-	jfsCommitTask = current;
-
-	LAZY_LOCK_INIT();
-	TxAnchor.unlock_queue = TxAnchor.unlock_tail = 0;
 
 	complete(&jfsIOwait);
 
 	do {
 		LAZY_LOCK(flags);
-restart:
-		WorkDone = 0;
-		while ((tblk = TxAnchor.unlock_queue)) {
-			/*
-			 * We can't get ahead of user thread.  Spinning is
-			 * simpler than blocking/waking.  We shouldn't spin
-			 * very long, since user thread shouldn't be blocking
-			 * between lmGroupCommit & txEnd.
-			 */
-			WorkDone = 1;
+		while (!list_empty(&TxAnchor.unlock_queue)) {
+			WorkDone = 0;
+			list_for_each_entry(tblk, &TxAnchor.unlock_queue,
+					    cqueue) {
 
-			/*
-			 * Remove first transaction from queue
-			 */
-			TxAnchor.unlock_queue = tblk->cqnext;
-			tblk->cqnext = 0;
-			if (TxAnchor.unlock_tail == tblk)
-				TxAnchor.unlock_tail = 0;
+				sbi = JFS_SBI(tblk->sb);
+				/*
+				 * For each volume, the transactions must be
+				 * handled in order.  If another commit thread
+				 * is handling a tblk for this superblock,
+				 * skip it
+				 */
+				if (sbi->commit_state & IN_LAZYCOMMIT)
+					continue;
 
-			LAZY_UNLOCK(flags);
-			txLazyCommit(tblk);
+				sbi->commit_state |= IN_LAZYCOMMIT;
+				WorkDone = 1;
 
-			/*
-			 * We can be running indefinitely if other processors
-			 * are adding transactions to this list
-			 */
-			cond_resched();
-			LAZY_LOCK(flags);
+				/*
+				 * Remove transaction from queue
+				 */
+				list_del(&tblk->cqueue);
+
+				LAZY_UNLOCK(flags);
+				txLazyCommit(tblk);
+				LAZY_LOCK(flags);
+
+				sbi->commit_state &= ~IN_LAZYCOMMIT;
+				/*
+				 * Don't continue in the for loop.  (We can't
+				 * anyway, it's unsafe!)  We want to go back to
+				 * the beginning of the list.
+				 */
+				break;
+			}
+
+			/* If there was nothing to do, don't continue */
+			if (!WorkDone)
+				break;
 		}
-
-		if (WorkDone)
-			goto restart;
 
 		if (current->flags & PF_FREEZE) {
 			LAZY_UNLOCK(flags);
@@ -2767,7 +2793,7 @@ restart:
 		}
 	} while (!jfs_stop_threads);
 
-	if (TxAnchor.unlock_queue)
+	if (!list_empty(&TxAnchor.unlock_queue))
 		jfs_err("jfs_lazycommit being killed w/pending transactions!");
 	else
 		jfs_info("jfs_lazycommit being killed\n");
@@ -2780,14 +2806,14 @@ void txLazyUnlock(struct tblock * tblk)
 
 	LAZY_LOCK(flags);
 
-	if (TxAnchor.unlock_tail)
-		TxAnchor.unlock_tail->cqnext = tblk;
-	else
-		TxAnchor.unlock_queue = tblk;
-	TxAnchor.unlock_tail = tblk;
-	tblk->cqnext = 0;
+	list_add_tail(&tblk->cqueue, &TxAnchor.unlock_queue);
+	/*
+	 * Don't wake up a commit thread if there is already one servicing
+	 * this superblock.
+	 */
+	if (!(JFS_SBI(tblk->sb)->commit_state & IN_LAZYCOMMIT))
+		wake_up(&jfs_commit_thread_wait);
 	LAZY_UNLOCK(flags);
-	wake_up(&jfs_commit_thread_wait);
 }
 
 static void LogSyncRelease(struct metapage * mp)
@@ -2821,7 +2847,7 @@ static void LogSyncRelease(struct metapage * mp)
  *	completion
  *
  *	This does almost the same thing as jfs_sync below.  We don't
- *	worry about deadlocking when TlocksLow is set, since we would
+ *	worry about deadlocking when jfs_tlocks_low is set, since we would
  *	expect jfs_sync to get us out of that jam.
  */
 void txQuiesce(struct super_block *sb)
@@ -2912,7 +2938,7 @@ int jfs_sync(void *arg)
 		 * write each inode on the anonymous inode list
 		 */
 		TXN_LOCK();
-		while (TxAnchor.TlocksLow && !list_empty(&TxAnchor.anon_list)) {
+		while (jfs_tlocks_low && !list_empty(&TxAnchor.anon_list)) {
 			jfs_ip = list_entry(TxAnchor.anon_list.next,
 					    struct jfs_inode_info,
 					    anon_inode_list);
@@ -3008,18 +3034,16 @@ int jfs_txanchor_read(char *buffer, char **start, off_t offset, int length,
 		       "freelockwait = %s\n"
 		       "lowlockwait = %s\n"
 		       "tlocksInUse = %d\n"
-		       "TlocksLow = %d\n"
-		       "unlock_queue = 0x%p\n"
-		       "unlock_tail = 0x%p\n",
+		       "jfs_tlocks_low = %d\n"
+		       "unlock_queue is %sempty\n",
 		       TxAnchor.freetid,
 		       freewait,
 		       TxAnchor.freelock,
 		       freelockwait,
 		       lowlockwait,
 		       TxAnchor.tlocksInUse,
-		       TxAnchor.TlocksLow,
-		       TxAnchor.unlock_queue,
-		       TxAnchor.unlock_tail);
+		       jfs_tlocks_low,
+		       list_empty(&TxAnchor.unlock_queue) ? "" : "not ");
 
 	begin = offset;
 	*start = buffer + begin;
