@@ -36,7 +36,7 @@ typedef struct {
 
 #ifndef SPINLOCK_DEBUG
 
-static inline void spin_lock(spinlock_t *lock)
+static inline void _raw_spin_lock(spinlock_t *lock)
 {
 	unsigned long tmp;
 
@@ -59,23 +59,20 @@ static inline void spin_lock(spinlock_t *lock)
 	: "cr0", "memory");
 }
 
-static inline void spin_unlock(spinlock_t *lock)
+static inline void _raw_spin_unlock(spinlock_t *lock)
 {
 	__asm__ __volatile__("eieio		# spin_unlock": : :"memory");
 	lock->lock = 0;
 }
 
-#define spin_trylock(lock) (!test_and_set_bit(0,(lock)))
+#define _raw_spin_trylock(lock) (!test_and_set_bit(0,(lock)))
 
 #else
 
-extern void _spin_lock(spinlock_t *lock);
-extern void _spin_unlock(spinlock_t *lock);
-extern int spin_trylock(spinlock_t *lock);
+extern void _raw_spin_lock(spinlock_t *lock);
+extern void _raw_spin_unlock(spinlock_t *lock);
+extern int _raw_spin_trylock(spinlock_t *lock);
 extern unsigned long __spin_trylock(volatile unsigned long *lock);
-
-#define spin_lock(lp)			_spin_lock(lp)
-#define spin_unlock(lp)			_spin_unlock(lp)
 
 #endif
 
@@ -107,7 +104,7 @@ typedef struct {
 
 #ifndef SPINLOCK_DEBUG
 
-static __inline__ void read_lock(rwlock_t *rw)
+static __inline__ void _raw_read_lock(rwlock_t *rw)
 {
 	unsigned int tmp;
 
@@ -130,7 +127,7 @@ static __inline__ void read_lock(rwlock_t *rw)
 	: "cr0", "memory");
 }
 
-static __inline__ void read_unlock(rwlock_t *rw)
+static __inline__ void _raw_read_unlock(rwlock_t *rw)
 {
 	unsigned int tmp;
 
@@ -146,7 +143,7 @@ static __inline__ void read_unlock(rwlock_t *rw)
 	: "cr0", "memory");
 }
 
-static __inline__ void write_lock(rwlock_t *rw)
+static __inline__ void _raw_write_lock(rwlock_t *rw)
 {
 	unsigned int tmp;
 
@@ -169,7 +166,7 @@ static __inline__ void write_lock(rwlock_t *rw)
 	: "cr0", "memory");
 }
 
-static __inline__ void write_unlock(rwlock_t *rw)
+static __inline__ void _raw_write_unlock(rwlock_t *rw)
 {
 	__asm__ __volatile__("eieio		# write_unlock": : :"memory");
 	rw->lock = 0;
@@ -177,15 +174,10 @@ static __inline__ void write_unlock(rwlock_t *rw)
 
 #else
 
-extern void _read_lock(rwlock_t *rw);
-extern void _read_unlock(rwlock_t *rw);
-extern void _write_lock(rwlock_t *rw);
-extern void _write_unlock(rwlock_t *rw);
-
-#define read_lock(rw)		_read_lock(rw)
-#define write_lock(rw)		_write_lock(rw)
-#define write_unlock(rw)	_write_unlock(rw)
-#define read_unlock(rw)		_read_unlock(rw)
+extern void _raw_read_lock(rwlock_t *rw);
+extern void _raw_read_unlock(rwlock_t *rw);
+extern void _raw_write_lock(rwlock_t *rw);
+extern void _raw_write_unlock(rwlock_t *rw);
 
 #endif
 

@@ -25,6 +25,7 @@
 #include <asm/cputable.h>
 #include <asm/mmu.h>
 #include <asm/ppc_asm.h>
+#include <asm/thread_info.h>
 #include "ppc_defs.h"
 
 	.text
@@ -375,7 +376,8 @@ _GLOBAL(_tlbia)
 	SYNC
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,CPU(r2)
+	rlwinm	r8,r1,0,0,18
+	lwz	r8,TI_CPU(r8)
 	oris	r8,r8,10
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
@@ -420,7 +422,8 @@ _GLOBAL(_tlbie)
 	SYNC
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,CPU(r2)
+	rlwinm	r8,r1,0,0,18
+	lwz	r8,TI_CPU(r8)
 	oris	r8,r8,11
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
@@ -1231,6 +1234,18 @@ _GLOBAL(sys_call_table)
 	.long sys_mincore
 	.long sys_gettid
 	.long sys_tkill
+	.long sys_setxattr
+	.long sys_lsetxattr	/* 210 */
+	.long sys_fsetxattr
+	.long sys_getxattr
+	.long sys_lgetxattr
+	.long sys_fgetxattr
+	.long sys_listxattr	/* 215 */
+	.long sys_llistxattr
+	.long sys_flistxattr
+	.long sys_removexattr
+	.long sys_lremovexattr
+	.long sys_fremovexattr	/* 220 */
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall
 	.endr

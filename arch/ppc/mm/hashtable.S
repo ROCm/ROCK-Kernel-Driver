@@ -32,6 +32,7 @@
 #include <asm/pgtable.h>
 #include <asm/cputable.h>
 #include <asm/ppc_asm.h>
+#include <asm/thread_info.h>
 #include <kernel/ppc_defs.h>
 
 #ifdef CONFIG_SMP
@@ -63,9 +64,7 @@ hash_page:
 #ifdef CONFIG_SMP
 	addis	r2,r7,hash_table_lock@h
 	ori	r2,r2,hash_table_lock@l
-	mfspr	r5,SPRG3
-	lwz	r0,CPU-THREAD(r5)
-	oris	r0,r0,0x0fff
+	lis	r0,0x0fff
 	b	10f
 11:	lwz	r6,0(r2)
 	cmpwi	0,r6,0
@@ -215,8 +214,9 @@ _GLOBAL(add_hash_page)
 #ifdef CONFIG_SMP
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,CPU(r2)
-	oris	r8,r8,10
+	rlwinm	r8,r1,0,0,18
+	lwz	r8,TI_CPU(r8)
+	oris	r8,r8,12
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
 	bne-	11f
@@ -511,7 +511,8 @@ _GLOBAL(flush_hash_page)
 #ifdef CONFIG_SMP
 	lis	r9,hash_table_lock@h
 	ori	r9,r9,hash_table_lock@l
-	lwz	r8,CPU(r2)
+	rlwinm	r8,r1,0,0,18
+	lwz	r8,TI_CPU(r8)
 	oris	r8,r8,9
 10:	lwarx	r7,0,r9
 	cmpi	0,r7,0
