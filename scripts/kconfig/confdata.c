@@ -224,6 +224,20 @@ int conf_read(const char *name)
 	fclose(in);
 
 	for_all_symbols(i, sym) {
+		sym_calc_value(sym);
+		if (sym_has_value(sym)) {
+			if (sym->visible == no)
+				sym->flags |= SYMBOL_NEW;
+			switch (sym->type) {
+			case S_STRING:
+			case S_INT:
+			case S_HEX:
+				if (!sym_string_within_range(sym, sym->user.val))
+					sym->flags |= SYMBOL_NEW;
+			default:
+				break;
+			}
+		}
 		if (!sym_is_choice(sym))
 			continue;
 		prop = sym_get_choice_prop(sym);

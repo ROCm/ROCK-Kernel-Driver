@@ -25,6 +25,7 @@ P(sym_tristate_within_range,bool,(struct symbol *sym,tristate tri));
 P(sym_set_tristate_value,bool,(struct symbol *sym,tristate tri));
 P(sym_toggle_tristate_value,tristate,(struct symbol *sym));
 P(sym_string_valid,bool,(struct symbol *sym, const char *newval));
+P(sym_string_within_range,bool,(struct symbol *sym, const char *str));
 P(sym_set_string_value,bool,(struct symbol *sym, const char *newval));
 P(sym_is_changable,bool,(struct symbol *sym));
 P(sym_get_choice_prop,struct property *,(struct symbol *sym));

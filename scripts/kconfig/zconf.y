@@ -221,6 +221,7 @@ config_option: T_SELECT T_WORD if_expr T_EOL
 
 config_option: T_RANGE symbol symbol if_expr T_EOL
 {
+	menu_add_expr(P_RANGE, expr_alloc_comp(E_RANGE,$2, $3), $4);
 	printd(DEBUG_PARSE, "%s:%d:range\n", zconf_curname(), zconf_lineno());
 };
 

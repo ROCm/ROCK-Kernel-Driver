@@ -215,6 +215,7 @@ int expr_eq(struct expr *e1, struct expr *e2)
 		trans_count = old_count;
 		return res;
 	case E_CHOICE:
+	case E_RANGE:
 	case E_NONE:
 		/* panic */;
 	}
@@ -917,6 +918,7 @@ struct expr *expr_trans_compare(struct expr *e, enum expr_type type, struct symb
 	case E_SYMBOL:
 		return expr_alloc_comp(type, e->left.sym, sym);
 	case E_CHOICE:
+	case E_RANGE:
 	case E_NONE:
 		/* panic */;
 	}
@@ -1042,6 +1044,13 @@ void expr_print(struct expr *e, void (*fn)(void *, const char *), void *data, in
 			fn(data, " ^ ");
 			expr_print(e->left.expr, fn, data, E_CHOICE);
 		}
+		break;
+	case E_RANGE:
+		fn(data, "[");
+		fn(data, e->left.sym->name);
+		fn(data, " ");
+		fn(data, e->right.sym->name);
+		fn(data, "]");
 		break;
 	default:
 	  {
