@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_SN_PCI_PCIIO_H
 #define _ASM_SN_PCI_PCIIO_H
@@ -15,25 +14,22 @@
  */
 
 #include <asm/sn/ioerror.h>
-#include <asm/sn/iobus.h>
+#include <asm/sn/driver.h>
+#include <asm/sn/hcl.h>
 
 
-#if defined(_LANGUAGE_C) || defined(_LANGUAGE_C_PLUS_PLUS)
+#ifndef __ASSEMBLY__
 
 #include <asm/sn/dmamap.h>
 #include <asm/sn/alenlist.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef int pciio_vendor_id_t;
 
-#define PCIIO_VENDOR_ID_NONE	-1
+#define PCIIO_VENDOR_ID_NONE	(-1)
 
 typedef int pciio_device_id_t;
 
-#define PCIIO_DEVICE_ID_NONE	-1
+#define PCIIO_DEVICE_ID_NONE	(-1)
 
 typedef uint8_t pciio_bus_t;       /* PCI bus number (0..255) */
 typedef uint8_t pciio_slot_t;      /* PCI slot number (0..31, 255) */
@@ -387,10 +383,7 @@ typedef void
 pciio_intr_free_f       (pciio_intr_t intr_hdl);
 
 typedef int
-pciio_intr_connect_f    (pciio_intr_t intr_hdl,		/* pciio intr resource handle */
-			 intr_func_t intr_func,		/* pciio intr handler */
-			 intr_arg_t intr_arg,	/* arg to intr handler */
-			 void *thread);	/* intr thread to use */
+pciio_intr_connect_f    (pciio_intr_t intr_hdl);	/* pciio intr resource handle */
 
 typedef void
 pciio_intr_disconnect_f (pciio_intr_t intr_hdl);
@@ -729,8 +722,5 @@ extern size_t		pciio_info_rom_size_get(pciio_info_t);
 extern int              pciio_error_handler(devfs_handle_t, int, ioerror_mode_t, ioerror_t *);
 extern int		pciio_dma_enabled(devfs_handle_t);
 
-#ifdef __cplusplus
-};
-#endif
 #endif				/* C or C++ */
 #endif				/* _ASM_SN_PCI_PCIIO_H */

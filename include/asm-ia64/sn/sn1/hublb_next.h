@@ -4,11 +4,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_SN1_HUBLB_NEXT_H
-#define _ASM_SN_SN1_HUBLB_NEXT_H
+#ifndef _ASM_IA64_SN_SN1_HUBLB_NEXT_H
+#define _ASM_IA64_SN_SN1_HUBLB_NEXT_H
 
 /**********************************************************************
 
@@ -107,4 +106,4 @@
 #define  PIOTYPE_PROT_ERR       6       /* VECTOR_STATUS only               */
 #define  PIOTYPE_UNKNOWN        7       /* VECTOR_STATUS only               */
 
-#endif	/* _ASM_SN_SN1_HUBLB_NEXT_H */
+#endif /* _ASM_IA64_SN_SN1_HUBLB_NEXT_H */

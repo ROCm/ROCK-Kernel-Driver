@@ -7,8 +7,8 @@
  * probably would be better to clean up binfmt_elf.c so it does not
  * necessarily depend on there being a.out support.
  *
- * Copyright (C) 1998-2000 Hewlett-Packard Co
- * Copyright (C) 1998-2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/types.h>
@@ -31,7 +31,7 @@ struct exec {
 
 #ifdef __KERNEL__
 # include <asm/page.h>
-# define STACK_TOP	(0x8000000000000000UL + (1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)
+# define STACK_TOP	(0x6000000000000000UL + (1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)
 # define IA64_RBS_BOT	(STACK_TOP - 0x80000000L + PAGE_SIZE)	/* bottom of reg. backing store */
 #endif
 

@@ -1,8 +1,8 @@
 /*
  * Architecture-specific setup.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #define __KERNEL_SYSCALLS__	/* see <asm/unistd.h> */
 #include <linux/config.h>
@@ -12,14 +12,17 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/personality.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
+#include <linux/thread_info.h>
 #include <linux/unistd.h>
 
 #include <asm/delay.h>
 #include <asm/efi.h>
+#include <asm/elf.h>
 #include <asm/perfmon.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
@@ -27,6 +30,16 @@
 #include <asm/uaccess.h>
 #include <asm/unwind.h>
 #include <asm/user.h>
+
+#ifdef CONFIG_IA64_SGI_SN
+#include <asm/sn/idle.h>
+#endif
+
+#ifdef CONFIG_PERFMON
+# include <asm/perfmon.h>
+#endif
+
+#include "sigframe.h"
 
 static void
 do_show_stack (struct unw_frame_info *info, void *arg)
@@ -43,6 +56,15 @@ do_show_stack (struct unw_frame_info *info, void *arg)
 		unw_get_bsp(info, &bsp);
 		printk("[<%016lx>] sp=0x%016lx bsp=0x%016lx\n", ip, sp, bsp);
 	} while (unw_unwind(info) >= 0);
+}
+
+void
+show_trace_task (struct task_struct *task)
+{
+	struct unw_frame_info info;
+
+	unw_init_from_blocked_task(&info, task);
+	do_show_stack(&info, 0);
 }
 
 void
@@ -90,8 +112,8 @@ show_regs (struct pt_regs *regs)
 	printk("r26 : %016lx r27 : %016lx r28 : %016lx\n", regs->r26, regs->r27, regs->r28);
 	printk("r29 : %016lx r30 : %016lx r31 : %016lx\n", regs->r29, regs->r30, regs->r31);
 
-	/* print the stacked registers if cr.ifs is valid: */
-	if (regs->cr_ifs & 0x8000000000000000) {
+	if (user_mode(regs)) {
+		/* print the stacked registers */
 		unsigned long val, sof, *bsp, ndirty;
 		int i, is_nat = 0;
 
@@ -103,32 +125,61 @@ show_regs (struct pt_regs *regs)
 			printk("r%-3u:%c%016lx%s", 32 + i, is_nat ? '*' : ' ', val,
 			       ((i == sof - 1) || (i % 3) == 2) ? "\n" : " ");
 		}
-	}
-	if (!user_mode(regs))
+	} else
 		show_stack(0);
+}
+
+void
+do_notify_resume_user (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
+{
+#ifdef CONFIG_PERFMON
+	if (current->thread.pfm_ovfl_block_reset)
+		pfm_ovfl_block_reset();
+#endif
+
+	/* deal with pending signal delivery */
+	if (test_thread_flag(TIF_SIGPENDING))
+		ia64_do_signal(oldset, scr, in_syscall);
+}
+
+/*
+ * We use this if we don't have any better idle routine..
+ */
+static void
+default_idle (void)
+{
+	/* may want to do PAL_LIGHT_HALT here... */
 }
 
 void __attribute__((noreturn))
 cpu_idle (void *unused)
 {
 	/* endless idle loop with no priority at all */
-	init_idle();
-	current->nice = 20;
-
 	while (1) {
 #ifdef CONFIG_SMP
 		if (!need_resched())
 			min_xtp();
 #endif
-		while (!need_resched())
-			continue;
+
+		while (!need_resched()) {
+#ifdef CONFIG_IA64_SGI_SN
+			snidle();
+#endif
+			if (pm_idle)
+				(*pm_idle)();
+			else
+				default_idle();
+		}
+
+#ifdef CONFIG_IA64_SGI_SN
+		snidleoff();
+#endif
+
 #ifdef CONFIG_SMP
 		normal_xtp();
 #endif
 		schedule();
 		check_pgt_cache();
-		if (pm_idle)
-			(*pm_idle)();
 	}
 }
 
@@ -137,10 +188,14 @@ ia64_save_extra (struct task_struct *task)
 {
 	if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0)
 		ia64_save_debug_regs(&task->thread.dbr[0]);
+
 #ifdef CONFIG_PERFMON
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_save_regs(task);
+
+	if (local_cpu_data->pfm_syst_wide) pfm_syst_wide_update_task(task, 0);
 #endif
+
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
 		ia32_save_state(task);
 }
@@ -150,10 +205,14 @@ ia64_load_extra (struct task_struct *task)
 {
 	if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0)
 		ia64_load_debug_regs(&task->thread.dbr[0]);
+
 #ifdef CONFIG_PERFMON
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_load_regs(task);
+
+	if (local_cpu_data->pfm_syst_wide) pfm_syst_wide_update_task(task, 1);
 #endif
+
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
 		ia32_load_state(task);
 }
@@ -233,7 +292,7 @@ copy_thread (int nr, unsigned long clone_flags,
 
 	if (user_mode(child_ptregs)) {
 		if (user_stack_base) {
-			child_ptregs->r12 = user_stack_base + user_stack_size;
+			child_ptregs->r12 = user_stack_base + user_stack_size - 16;
 			child_ptregs->ar_bspstore = user_stack_base;
 			child_ptregs->ar_rnat = 0;
 			child_ptregs->loadrs = 0;
@@ -286,9 +345,15 @@ copy_thread (int nr, unsigned long clone_flags,
 	if (IS_IA32_PROCESS(ia64_task_regs(current)))
 		ia32_save_state(p);
 #endif
+
 #ifdef CONFIG_PERFMON
-	if (p->thread.pfm_context)
-		retval = pfm_inherit(p, child_ptregs);
+	/*
+	 * reset notifiers and owner check (may not have a perfmon context)
+	 */
+	atomic_set(&p->thread.pfm_notifiers_check, 0);
+	atomic_set(&p->thread.pfm_owners_check, 0);
+
+	if (current->thread.pfm_context) retval = pfm_inherit(p, child_ptregs);
 #endif
 	return retval;
 }
@@ -412,6 +477,16 @@ out:
 	return error;
 }
 
+void
+ia64_set_personality (struct elf64_hdr *elf_ex, int ibcs2_interpreter)
+{
+	set_personality(PER_LINUX);
+	if (elf_ex->e_flags & EF_IA_64_LINUX_EXECUTABLE_STACK)
+		current->thread.flags |= IA64_THREAD_XSTACK;
+	else
+		current->thread.flags &= ~IA64_THREAD_XSTACK;
+}
+
 pid_t
 kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 {
@@ -443,15 +518,15 @@ flush_thread (void)
 
 #ifdef CONFIG_PERFMON
 /*
- * By the time we get here, the task is detached from the tasklist. This is important
- * because it means that no other tasks can ever find it as a notifiied task, therfore
- * there is no race condition between this code and let's say a pfm_context_create().
- * Conversely, the pfm_cleanup_notifiers() cannot try to access a task's pfm context if
- * this other task is in the middle of its own pfm_context_exit() because it would alreayd
- * be out of the task list. Note that this case is very unlikely between a direct child
- * and its parents (if it is the notified process) because of the way the exit is notified
- * via SIGCHLD.
+ * by the time we get here, the task is detached from the tasklist. This is important
+ * because it means that no other tasks can ever find it as a notified task, therfore there
+ * is no race condition between this code and let's say a pfm_context_create().
+ * Conversely, the pfm_cleanup_notifiers() cannot try to access a task's pfm context if this
+ * other task is in the middle of its own pfm_context_exit() because it would already be out of
+ * the task list. Note that this case is very unlikely between a direct child and its parents
+ * (if it is the notified process) because of the way the exit is notified via SIGCHLD.
  */
+
 void
 release_thread (struct task_struct *task)
 {
@@ -460,6 +535,12 @@ release_thread (struct task_struct *task)
 
 	if (atomic_read(&task->thread.pfm_notifiers_check) > 0)
 		pfm_cleanup_notifiers(task);
+
+	if (atomic_read(&task->thread.pfm_owners_check) > 0)
+		pfm_cleanup_owners(task);
+
+	if (task->thread.pfm_smpl_buf_list)
+		pfm_cleanup_smpl_buf(task);
 }
 #endif
 
@@ -475,21 +556,13 @@ exit_thread (void)
 		ia64_set_fpu_owner(0);
 #endif
 #ifdef CONFIG_PERFMON
-       /* stop monitoring */
-	if ((current->thread.flags & IA64_THREAD_PM_VALID) != 0) {
-		/*
-		 * we cannot rely on switch_to() to save the PMU
-		 * context for the last time. There is a possible race
-		 * condition in SMP mode between the child and the
-		 * parent.  by explicitly saving the PMU context here
-		 * we garantee no race.  this call we also stop
-		 * monitoring
-		 */
+       /* if needed, stop monitoring and flush state to perfmon context */
+	if (current->thread.pfm_context) 
 		pfm_flush_regs(current);
-		/*
-		 * make sure that switch_to() will not save context again
-		 */
-		current->thread.flags &= ~IA64_THREAD_PM_VALID;
+
+	/* free debug register resources */
+	if ((current->thread.flags & IA64_THREAD_DBG_VALID) != 0) {
+		pfm_release_debug_registers(current);
 	}
 #endif
 }
@@ -570,4 +643,30 @@ machine_power_off (void)
 	if (pm_power_off)
 		pm_power_off();
 	machine_halt();
+}
+
+void __init
+init_task_struct_cache (void)
+{
+}
+
+struct task_struct *
+dup_task_struct(struct task_struct *orig)
+{
+	struct task_struct *tsk;
+
+	tsk = __get_free_pages(GFP_KERNEL, KERNEL_STACK_SIZE_ORDER);
+	if (!tsk)
+		return NULL;
+
+	memcpy(tsk, orig, sizeof(struct task_struct) + sizeof(struct thread_info));
+	tsk->thread_info = (struct thread_info *) ((char *) tsk + IA64_TASK_SIZE);
+	atomic_set(&tsk->usage, 1);
+	return tsk;
+}
+
+void
+__put_task_struct (struct task_struct *tsk)
+{
+	free_pages((unsigned long) tsk, KERNEL_STACK_SIZE_ORDER);
 }

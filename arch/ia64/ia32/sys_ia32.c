@@ -6,7 +6,7 @@
  * Copyright (C) 1999		Arun Sharma <arun.sharma@intel.com>
  * Copyright (C) 1997,1998	Jakub Jelinek (jj@sunsite.mff.cuni.cz)
  * Copyright (C) 1997		David S. Miller (davem@caip.rutgers.edu)
- * Copyright (C) 2000-2001 Hewlett-Packard Co
+ * Copyright (C) 2000-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * These routines maintain argument size conversion between 32bit and 64bit
@@ -74,6 +74,9 @@
 #define PAGE_START(addr)	((addr) & PAGE_MASK)
 #define PAGE_OFF(addr)		((addr) & ~PAGE_MASK)
 
+#define high2lowuid(uid) ((uid) > 65535 ? 65534 : (uid))
+#define high2lowgid(gid) ((gid) > 65535 ? 65534 : (gid))
+
 extern asmlinkage long sys_execve (char *, char **, char **, struct pt_regs *);
 extern asmlinkage long sys_mprotect (unsigned long, size_t, unsigned long);
 extern asmlinkage long sys_munmap (unsigned long, size_t);
@@ -82,6 +85,7 @@ extern unsigned long arch_get_unmapped_area (struct file *, unsigned long, unsig
 
 /* forward declaration: */
 asmlinkage long sys32_mprotect (unsigned int, unsigned int, int);
+asmlinkage unsigned long sys_brk(unsigned long);
 
 /*
  * Anything that modifies or inspects ia32 user virtual memory must hold this semaphore
@@ -400,7 +404,7 @@ emulate_mmap (struct file *file, unsigned long start, unsigned long len, int pro
 			return -EINVAL;
 		}
 		if (!(prot & PROT_WRITE) && sys_mprotect(pstart, pend - pstart, prot) < 0)
-			return EINVAL;
+			return -EINVAL;
 	}
 	return start;
 }
@@ -2578,6 +2582,7 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 	      default:
 		return -EINVAL;
 	}
+	return -EINVAL;
 }
 
 /*
@@ -3780,6 +3785,19 @@ sys32_personality (unsigned int personality)
 	ret = sys_personality(personality);
 	if (ret == PER_LINUX32)
 		ret = PER_LINUX;
+	return ret;
+}
+
+asmlinkage unsigned long
+sys32_brk (unsigned int brk)
+{
+	unsigned long ret, obrk;
+	struct mm_struct *mm = current->mm;
+
+	obrk = mm->brk;
+	ret = sys_brk(brk);
+	if (ret < obrk)
+		clear_user((void *) ret, PAGE_ALIGN(ret) - ret);
 	return ret;
 }
 

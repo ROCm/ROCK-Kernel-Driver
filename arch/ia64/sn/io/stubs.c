@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -21,6 +20,7 @@
 #include <asm/sn/pci/pciio.h>
 #include <asm/sn/slotnum.h>
 #include <asm/sn/vector.h>
+#include <asm/sn/nic.h>
 
 /******
  ****** hack defines ......
@@ -61,45 +61,45 @@ nic_bridge_vertex_info(devfs_handle_t v, nic_data_t mcr)
 }
 
 void *
-kmem_alloc_node(register size_t size, register int flags, cnodeid_t node)
+snia_kmem_alloc_node(register size_t size, register int flags, cnodeid_t node)
 {
         /* Allocates on node 'node' */
-	FIXME("kmem_alloc_node : use kmalloc");
+	FIXME("snia_kmem_alloc_node : use kmalloc");
 	return(kmalloc(size, GFP_KERNEL));
 }
 
 void *
-kmem_zalloc_node(register size_t size, register int flags, cnodeid_t node)
+snia_kmem_zalloc_node(register size_t size, register int flags, cnodeid_t node)
 {
-	FIXME("kmem_zalloc_node : use kmalloc");
+	FIXME("snia_kmem_zalloc_node : use kmalloc");
 	return(kmalloc(size, GFP_KERNEL));
 }
 
 void
-kmem_free(void *where, int size)
+snia_kmem_free(void *where, int size)
 {
-	FIXME("kmem_free : use kfree");
+	FIXME("snia_kmem_free : use kfree");
 	return(kfree(where));
 }
 
 
 void *
-kmem_zone_alloc(register zone_t *zone, int flags)
+snia_kmem_zone_alloc(register zone_t *zone, int flags)
 {
-	FIXME("kmem_zone_alloc : return null");
+	FIXME("snia_kmem_zone_alloc : return null");
 	return((void *)0);
 }
 
 void
-kmem_zone_free(register zone_t *zone, void *ptr)
+snia_kmem_zone_free(register zone_t *zone, void *ptr)
 {
-	FIXME("kmem_zone_free : no-op");
+	FIXME("snia_kmem_zone_free : no-op");
 }
 
 zone_t *
-kmem_zone_init(register int size, char *zone_name)
+snia_kmem_zone_init(register int size, char *zone_name)
 {
-	FIXME("kmem_zone_free : returns NULL");
+	FIXME("snia_kmem_zone_free : returns NULL");
 	return((zone_t *)0);
 }
 

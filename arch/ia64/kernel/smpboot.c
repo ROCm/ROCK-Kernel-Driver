@@ -70,6 +70,7 @@ extern void __init calibrate_delay(void);
 extern void start_ap(void);
 
 int cpucount;
+task_t *task_for_booting_cpu;
 
 /* Setup configured maximum number of CPUs to activate */
 static int max_cpus = -1;
@@ -378,7 +379,7 @@ start_secondary (void *unused)
 	smp_callin();
 	Dprintk("CPU %d is set to go.\n", smp_processor_id());
 	while (!atomic_read(&smp_commenced))
-		;
+		cpu_relax();
 
 	Dprintk("CPU %d is starting idle.\n", smp_processor_id());
 	return cpu_idle();
@@ -416,13 +417,13 @@ do_boot_cpu (int sapicid)
 	if (!idle)
 		panic("No idle process for CPU %d", cpu);
 
-	idle->processor = cpu;
-	ia64_cpu_to_sapicid[cpu] = sapicid;
-	idle->cpus_runnable = 1 << cpu; /* we schedule the first task manually */
+	init_idle(idle, cpu);
 
-	del_from_runqueue(idle);
+	ia64_cpu_to_sapicid[cpu] = sapicid;
+
 	unhash_process(idle);
-	init_tasks[cpu] = idle;
+
+	task_for_booting_cpu = idle;
 
 	Dprintk("Sending wakeup vector %u to AP 0x%x/0x%x.\n", ap_wakeup_vector, cpu, sapicid);
 
@@ -451,6 +452,17 @@ do_boot_cpu (int sapicid)
 	}
 }
 
+unsigned long cache_decay_ticks;	/* # of ticks an idle task is considered cache-hot */
+
+static void
+smp_tune_scheduling (void)
+{
+	cache_decay_ticks = 10;	/* XXX base this on PAL info and cache-bandwidth estimate */
+
+	printk("task migration cache decay timeout: %ld msecs.\n",
+	       (cache_decay_ticks + 1) * 1000 / HZ);
+}
+
 /*
  * Cycle through the APs sending Wakeup IPIs to boot each.
  */
@@ -470,8 +482,8 @@ smp_boot_cpus (void)
 	smp_setup_percpu_timer();
 
 	/*
-	* We have the boot CPU online for sure.
-	*/
+	 * We have the boot CPU online for sure.
+	 */
 	set_bit(0, &cpu_online_map);
 	set_bit(0, &cpu_callin_map);
 
@@ -480,9 +492,9 @@ smp_boot_cpus (void)
 
 	printk("Boot processor id 0x%x/0x%x\n", 0, boot_cpu_id);
 
-	global_irq_holder = 0;
-	current->processor = 0;
-	init_idle();
+	global_irq_holder = NO_PROC_ID;
+	current_thread_info()->cpu = 0;
+	smp_tune_scheduling();
 
 	/*
 	 * If SMP should be disabled, then really disable it!
@@ -493,7 +505,7 @@ smp_boot_cpus (void)
 		smp_num_cpus = 1;
 		goto smp_done;
 	}
-	if  (max_cpus != -1)
+	if (max_cpus != -1)
 		printk (KERN_INFO "Limiting CPUs to %d\n", max_cpus);
 
 	if (smp_boot_data.cpu_count > 1) {

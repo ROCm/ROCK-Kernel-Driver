@@ -4,11 +4,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_ALENLIST_H
-#define _ASM_SN_ALENLIST_H
+#ifndef _ASM_IA64_SN_ALENLIST_H
+#define _ASM_IA64_SN_ALENLIST_H
+
+#include <linux/types.h>
 
 /* Definition of Address/Length List */
 
@@ -51,7 +52,7 @@ typedef struct external_alenlist *external_alenlist_t;
 
 
 /* Return codes from alenlist routines.  */
-#define ALENLIST_FAILURE -1
+#define ALENLIST_FAILURE (-1)
 #define ALENLIST_SUCCESS 0
 
 
@@ -201,4 +202,4 @@ struct alenlist_cursor_s {
 }
 #endif
 
-#endif /* _ASM_SN_ALENLIST_H */
+#endif /* _ASM_IA64_SN_ALENLIST_H */

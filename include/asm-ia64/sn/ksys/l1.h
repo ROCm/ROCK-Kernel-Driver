@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992-1997,2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 #ifndef _ASM_SN_KSYS_L1_H
@@ -13,7 +12,8 @@
 
 #include <asm/sn/vector.h>
 #include <asm/sn/addrs.h>
-#include <asm/sn/sn1/bedrock.h>
+#include <asm/atomic.h>
+#include <asm/sn/sv.h>
 
 #define BRL1_QSIZE	128	/* power of 2 is more efficient */
 #define BRL1_BUFSZ	264	/* needs to be large enough
@@ -39,7 +39,7 @@ typedef struct sc_cq_s {
  * This value can't be confused with a network vector because the least-
  * significant nibble of a network vector cannot be greater than 8.
  */
-#define BRL1_LOCALUART	((net_vec_t)0xf)
+#define BRL1_LOCALHUB_UART	((net_vec_t)0xf)
 
 /* L1<->Bedrock reserved subchannels */
 
@@ -71,7 +71,14 @@ typedef struct sc_cq_s {
 
 
 struct l1sc_s;     
-typedef void (*brl1_notif_t)(struct l1sc_s *, int);
+/* Saved off interrupt frame */
+typedef struct brl1_intr_frame {
+	int bf_irq;		/* irq received */
+	void *bf_dev_id;	/* device information */
+	struct pt_regs *bf_regs; /* register frame */
+} brl1_intr_frame_t;
+
+typedef void (*brl1_notif_t)(int, void *, struct pt_regs *, struct l1sc_s *, int);
 typedef int  (*brl1_uartf_t)(struct l1sc_s *);
 
 /* structure for controlling a subchannel */
@@ -90,6 +97,7 @@ typedef struct brl1_sch_s {
 				 * continue */
     brl1_notif_t rx_notify;	/* notify higher layer that a packet has been
 				 * received */
+    brl1_intr_frame_t irq_frame; /* saved off irq information */
 } brl1_sch_t;
 
 /* br<->l1 protocol states */
@@ -101,7 +109,7 @@ typedef struct brl1_sch_s {
 #define BRL1_RESET	7
 
 
-#ifndef _LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLY__
 
 /*
  * l1sc_t structure-- tracks protocol state, open subchannels, etc.
@@ -118,6 +126,8 @@ typedef struct l1sc_s {
     brl1_uartf_t putc_f;	/* pointer to UART putc function */
     brl1_uartf_t getc_f;	/* pointer to UART getc function */
 
+    spinlock_t   send_lock;     /* arbitrates send synchronization */
+    spinlock_t   recv_lock;     /* arbitrates uart receive access */
     spinlock_t	 subch_lock;	/* arbitrates subchannel allocation */
     cpuid_t	 intr_cpu;	/* cpu that receives L1 interrupts */
 
@@ -327,15 +337,6 @@ int	sc_poll( l1sc_t *sc, int ch );
 void	sc_init( l1sc_t *sc, nasid_t nasid, net_vec_t uart );
 void	sc_intr_enable( l1sc_t *sc );
 
-int	_elscuart_putc( l1sc_t *sc, int c );
-int	_elscuart_getc( l1sc_t *sc );
-int	_elscuart_poll( l1sc_t *sc );
-int	_elscuart_readc( l1sc_t *sc );
-int	_elscuart_flush( l1sc_t *sc );
-int	_elscuart_probe( l1sc_t *sc );
-void	_elscuart_init( l1sc_t *sc );
-void	elscuart_syscon_listen( l1sc_t *sc );
-
 int	elsc_rack_bay_get(l1sc_t *e, uint *rack, uint *bay);
 int	elsc_rack_bay_type_get(l1sc_t *e, uint *rack, 
 			       uint *bay, uint *brick_type);
@@ -357,5 +358,5 @@ int	iobrick_pci_bus_pwr( l1sc_t *sc, int bus, int up );
 int	iobrick_sc_version( l1sc_t *sc, char *result );
 
 
-#endif /* !_LANGUAGE_ASSEMBLY */
+#endif /* !__ASSEMBLY__ */
 #endif /* _ASM_SN_KSYS_L1_H */

@@ -127,23 +127,21 @@ start_ap:
 #ifdef CONFIG_SMP
 	/*
 	 * Find the init_task for the currently booting CPU.  At poweron, and in
-	 * UP mode, cpucount is 0.
+	 * UP mode, task_for_booting_cpu is NULL.
 	 */
-	movl r3=cpucount
+	movl r3=task_for_booting_cpu
  	;;
-	ld4 r3=[r3]		// r3 <- smp_processor_id()
-	movl r2=init_tasks
+	ld8 r3=[r3]
+	movl r2=init_thread_union
 	;;
-	shladd r2=r3,3,r2
+	cmp.eq isBP,isAP=r3,r0
 	;;
-	ld8 r2=[r2]
+(isAP)	mov r2=r3
 #else
-	mov r3=0
-	movl r2=init_task_union
-	;;
+	movl r2=init_thread_union
+	cmp.eq isBP,isAP=r0,r0
 #endif
-	cmp4.ne isAP,isBP=r3,r0
-	;;			// RAW on r2
+	;;
 	extr r3=r2,0,61		// r3 == phys addr of task struct
 	mov r16=KERNEL_TR_PAGE_NUM
 	;;
@@ -180,10 +178,12 @@ start_ap:
 	.rodata
 alive_msg:
 	stringz "I'm alive and well\n"
+alive_msg_end:
 	.previous
 
 	alloc r2=ar.pfs,0,0,2,0
 	movl out0=alive_msg
+	movl out1=alive_msg_end-alive_msg-1
 	;;
 	br.call.sptk.many rp=early_printk
 1:	// force new bundle

@@ -4,11 +4,35 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_SN_PCI_CVLINK_H
 #define _ASM_SN_PCI_CVLINK_H
+
+#include <asm/sn/types.h>
+#include <asm/sn/hack.h>
+#include <asm/sn/sgi.h>
+#include <asm/sn/driver.h>
+#include <asm/sn/iograph.h>
+#include <asm/param.h>
+#include <asm/sn/pio.h>
+#include <asm/sn/xtalk/xwidget.h>
+#include <asm/sn/sn_private.h>
+#include <asm/sn/addrs.h>
+#include <asm/sn/invent.h>
+#include <asm/sn/hcl.h>
+#include <asm/sn/hcl_util.h>
+#include <asm/sn/intr.h>
+#include <asm/sn/xtalk/xtalkaddrs.h>
+#include <asm/sn/klconfig.h>
+#include <asm/sn/io.h>
+
+#include <asm/sn/pci/pciio.h>
+#include <asm/sn/pci/pcibr.h>
+#include <asm/sn/pci/pcibr_private.h>
+
+#define MAX_PCI_XWIDGET 256
+#define MAX_ATE_MAPS 1024
 
 #define SET_PCIA64(dev) \
 	(((struct sn1_device_sysdata *)((dev)->sysdata))->isa64) = 1
@@ -17,6 +41,12 @@
 #define IS_PCI32G(dev)	((dev)->dma_mask >= 0xffffffff)
 #define IS_PCI32L(dev)	((dev)->dma_mask < 0xffffffff)
 
+#define PCIDEV_VERTEX(pci_dev) \
+	(((struct sn1_device_sysdata *)((pci_dev)->sysdata))->vhdl)
+
+#define PCIBUS_VERTEX(pci_bus) \
+	(((struct sn1_widget_sysdata *)((pci_bus)->sysdata))->vhdl)
+
 struct sn1_widget_sysdata {
         devfs_handle_t  vhdl;
 };
@@ -24,6 +54,8 @@ struct sn1_widget_sysdata {
 struct sn1_device_sysdata {
         devfs_handle_t  vhdl;
 	int		isa64;
+	volatile unsigned int *dma_buf_sync;
+	volatile unsigned int *xbow_buf_sync;
 };
 
 struct sn1_dma_maps_s{

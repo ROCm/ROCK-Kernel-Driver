@@ -1,40 +1,42 @@
-/* $Id$
+
+/*
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 1999 Silicon Graphics, Inc.
- * Copyright (C) 1999 by Ralf Baechle
+ * Copyright (c) 1992-1999,2001 Silicon Graphics, Inc.  All rights reserved.
  */
-#ifndef _ASM_SN_ADDRS_H
-#define _ASM_SN_ADDRS_H
+
+
+#ifndef _ASM_IA64_SN_ADDRS_H
+#define _ASM_IA64_SN_ADDRS_H
 
 #include <linux/config.h>
 
-#if _LANGUAGE_C
-#include <linux/types.h>
-#endif /* _LANGUAGE_C */
-
-#if !defined(CONFIG_IA64_SGI_SN1) && !defined(CONFIG_IA64_GENERIC)
-#include <asm/addrspace.h>
-#include <asm/reg.h>
-#include <asm/sn/kldir.h>
-#endif	/* CONFIG_IA64_SGI_SN1 */
-
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
+#if defined (CONFIG_IA64_SGI_SN1)
 #include <asm/sn/sn1/addrs.h>
-#endif
+#elif defined (CONFIG_IA64_SGI_SN2)
+#include <asm/sn/sn2/addrs.h>
+#else
+#error <<<BOMB! addrs.h defined only for SN1, or SN2 >>>
+#endif /* !SN1 && !SN2 */
 
+#ifndef __ASSEMBLY__
+#include <asm/sn/types.h>
+#endif 
 
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 #define PS_UINT_CAST		(__psunsigned_t)
 #define UINT64_CAST		(uint64_t)
-
+#ifdef CONFIG_IA64_SGI_SN2
+#define HUBREG_CAST		(volatile mmr_t *)
+#else
 #define HUBREG_CAST		(volatile hubreg_t *)
+#endif
 
-#elif _LANGUAGE_ASSEMBLY
+#elif __ASSEMBLY__
 
 #define PS_UINT_CAST
 #define UINT64_CAST
@@ -43,18 +45,6 @@
 #endif
 
 
-#define NASID_GET_META(_n)	((_n) >> NASID_LOCAL_BITS)
-#if defined CONFIG_SGI_IP35 || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-#define NASID_GET_LOCAL(_n)	((_n) & 0x7f)
-#endif
-#define NASID_MAKE(_m, _l)	(((_m) << NASID_LOCAL_BITS) | (_l))
-
-#define NODE_ADDRSPACE_MASK	(NODE_ADDRSPACE_SIZE - 1)
-#define TO_NODE_ADDRSPACE(_pa)	(UINT64_CAST (_pa) & NODE_ADDRSPACE_MASK)
-
-#define CHANGE_ADDR_NASID(_pa, _nasid)	\
-		((UINT64_CAST (_pa) & ~NASID_MASK) | \
-		 (UINT64_CAST(_nasid) <<  NASID_SHFT))
 
 
 /*
@@ -62,7 +52,11 @@
  * node's address space.
  */
 
+#ifdef CONFIG_IA64_SGI_SN2	/* SN2 has an extra AS field between node offset and node id (nasid) */
+#define NODE_OFFSET(_n)		(UINT64_CAST (_n) << NASID_SHFT)
+#else
 #define NODE_OFFSET(_n)		(UINT64_CAST (_n) << NODE_SIZE_BITS)
+#endif
 
 #define NODE_CAC_BASE(_n)	(CAC_BASE   + NODE_OFFSET(_n))
 #define NODE_HSPEC_BASE(_n)	(HSPEC_BASE + NODE_OFFSET(_n))
@@ -118,11 +112,6 @@
 /*
  * The following define the major position-independent aliases used
  * in SN.
- *	UALIAS -- 256MB in size, reads in the UALIAS result in
- *			uncached references to the memory of the reader's node.
- *	CPU_UALIAS -- 128kb in size, the bottom part of UALIAS is flipped
- *			depending on which CPU does the access to provide
- *			all CPUs with unique uncached memory at low addresses.
  *	LBOOT  -- 256MB in size, reads in the LBOOT area result in
  *			uncached references to the local hub's boot prom and
  *			other directory-bus connected devices.
@@ -130,17 +119,7 @@
  *			references to the local hub's registers.
  */
 
-#define UALIAS_BASE		HSPEC_BASE
-#define UALIAS_SIZE		0x10000000	/* 256 Megabytes */
-#define CPU_UALIAS		0x20000		/* 128 Kilobytes */
-#define UALIAS_CPU_SIZE		(CPU_UALIAS / CPUS_PER_NODE)
-#define UALIAS_LIMIT		(UALIAS_BASE + UALIAS_SIZE)
-
-/*
- * The bottom of ualias space is flipped depending on whether you're
- * processor 0 or 1 within a node.
- */
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
+#if defined CONFIG_IA64_SGI_SN1
 #define LREG_BASE		(HSPEC_BASE + 0x10000000)
 #define LREG_SIZE		0x8000000  /* 128 MB */
 #define LREG_LIMIT		(LREG_BASE + LREG_SIZE)
@@ -151,7 +130,11 @@
 #endif
 
 #define	HUB_REGISTER_WIDGET	1
+#ifdef CONFIG_IA64_SGI_SN2
+#define IALIAS_BASE		LOCAL_SWIN_BASE(HUB_REGISTER_WIDGET)
+#else
 #define IALIAS_BASE		NODE_SWIN_BASE(0, HUB_REGISTER_WIDGET)
+#endif
 #define IALIAS_SIZE		0x800000	/* 8 Megabytes */
 #define IS_IALIAS(_a)		(((_a) >= IALIAS_BASE) &&		\
 				 ((_a) < (IALIAS_BASE + IALIAS_SIZE)))
@@ -160,7 +143,7 @@
  * Macro for referring to Hub's RBOOT space
  */
 
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
+#if defined CONFIG_IA64_SGI_SN1
 
 #define NODE_LREG_BASE(_n)	(NODE_HSPEC_BASE(_n) + 0x30000000)
 #define NODE_LREG_LIMIT(_n)	(NODE_LREG_BASE(_n) + LREG_SIZE)
@@ -172,168 +155,6 @@
 
 #endif
 
-/*
- * Macros for referring the Hub's back door space
- *
- *   These macros correctly process addresses in any node's space.
- *   WARNING: They won't work in assembler.
- *
- *   BDDIR_ENTRY_LO returns the address of the low double-word of the dir
- *                  entry corresponding to a physical (Cac or Uncac) address.
- *   BDDIR_ENTRY_HI returns the address of the high double-word of the entry.
- *   BDPRT_ENTRY    returns the address of the double-word protection entry
- *                  corresponding to the page containing the physical address.
- *   BDPRT_ENTRY_S  Stores the value into the protection entry.
- *   BDPRT_ENTRY_L  Load the value from the protection entry.
- *   BDECC_ENTRY    returns the address of the ECC byte corresponding to a
- *                  double-word at a specified physical address.
- *   BDECC_ENTRY_H  returns the address of the two ECC bytes corresponding to a
- *                  quad-word at a specified physical address.
- */
-#define NODE_BDOOR_BASE(_n)	(NODE_HSPEC_BASE(_n) + (NODE_ADDRSPACE_SIZE/2))
-
-#define NODE_BDECC_BASE(_n)	(NODE_BDOOR_BASE(_n))
-#define NODE_BDDIR_BASE(_n)	(NODE_BDOOR_BASE(_n) + (NODE_ADDRSPACE_SIZE/4))
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-/*
- * Bedrock's directory entries are a single word:  no low/high
- */
-
-#define BDDIR_ENTRY(_pa)	(HSPEC_BASE +				      \
-				  NODE_ADDRSPACE_SIZE * 7 / 8  		    | \
-				 UINT64_CAST (_pa)	& NASID_MASK	    | \
-				 UINT64_CAST (_pa) >> 3 & BDDIR_UPPER_MASK)
-
-#ifdef BRINGUP
-        /* minimize source changes by mapping *_LO() & *_HI()   */
-#define BDDIR_ENTRY_LO(_pa)     BDDIR_ENTRY(_pa)
-#define BDDIR_ENTRY_HI(_pa)     BDDIR_ENTRY(_pa)
-#endif /* BRINGUP */
-
-#define BDDIR_PAGE_MASK		(BDDIR_UPPER_MASK & 0x7ffff << 11)
-#define BDDIR_PAGE_BASE_MASK	(UINT64_CAST 0xfffffffffffff800)
-
-#ifdef _LANGUAGE_C
-
-#define BDPRT_ENTRY_ADDR(_pa, _rgn)      ((uint64_t *) ( (HSPEC_BASE +       \
-                                 NODE_ADDRSPACE_SIZE * 7 / 8 + 0x408)       | \
-                                (UINT64_CAST (_pa)      & NASID_MASK)        | \
-                                (UINT64_CAST (_pa) >> 3 & BDDIR_PAGE_MASK)   | \
-                                (UINT64_CAST (_pa) >> 3 & 0x3 << 4)          | \
-                                ((_rgn) & 0x1e) << 5))
-
-static __inline uint64_t BDPRT_ENTRY_L(paddr_t pa,uint32_t rgn) {
-	uint64_t word=*BDPRT_ENTRY_ADDR(pa,rgn);
-
-	if(rgn&0x20)			/*If the region is > 32, move it down*/
-		word = word >> 32;
-	if(rgn&0x1)			/*If the region is odd, get that part */
-		word = word >> 16;
-	word = word & 0xffff;		/*Get the 16 bits we are interested in*/
-
-	return word;
-}
-
-static __inline void BDPRT_ENTRY_S(paddr_t pa,uint32_t rgn,uint64_t val) {
-        uint64_t *addr=(uint64_t *)BDPRT_ENTRY_ADDR(pa,rgn);
-        uint64_t word,mask;
-
-        word=*addr;
-	mask=0;
-	if(rgn&0x1) {
-		mask|=0x0000ffff0000ffff;
-		val=val<<16;
-	}
-	else
-		mask|=0xffff0000ffff0000;
-	if(rgn&0x20) {
-		mask|=0x00000000ffffffff;
-		val=val<<32;
-	}
-	else
-		mask|=0xffffffff00000000;
-	word &= mask;
-	word |= val;
-
-	*(addr++)=word;
-	addr++;
-        *(addr++)=word;
-        addr++;
-        *(addr++)=word;
-        addr++;
-        *addr=word;
-}
-#endif	/*_LANGUAGE_C*/
-
-#define BDCNT_ENTRY(_pa)	(HSPEC_BASE +				      \
-				  NODE_ADDRSPACE_SIZE * 7 / 8 + 0x8    	    | \
-				 UINT64_CAST (_pa)	& NASID_MASK	    | \
-				 UINT64_CAST (_pa) >> 3 & BDDIR_PAGE_MASK   | \
-				 UINT64_CAST (_pa) >> 3 & 0x3 << 4)
-
-
-#ifdef    BRINGUP
-  /* little endian packing of ecc bytes requires a swizzle */ 
-  /* this is problemmatic for memory_init_ecc              */
-#endif /* BRINGUP */
-#define BDECC_ENTRY(_pa)	(HSPEC_BASE +				      \
-				  NODE_ADDRSPACE_SIZE * 5 / 8 		    | \
-				 UINT64_CAST (_pa)	& NASID_MASK	    | \
-				 UINT64_CAST (_pa) >> 3 & BDECC_UPPER_MASK    \
-				   		        ^ 0x7ULL)
-
-#define BDECC_SCRUB(_pa)	(HSPEC_BASE +				      \
-				  NODE_ADDRSPACE_SIZE / 2 		    | \
-				 UINT64_CAST (_pa)	& NASID_MASK	    | \
-				 UINT64_CAST (_pa) >> 3 & BDECC_UPPER_MASK    \
-				   		        ^ 0x7ULL)
-
-  /* address for Halfword backdoor ecc access. Note that   */
-  /* ecc bytes are packed in little endian order           */
-#define BDECC_ENTRY_H(_pa)	(HSPEC_BASE +                                 \
-				  NODE_ADDRSPACE_SIZE * 5 / 8		    | \
-				 UINT64_CAST (_pa)	 & NASID_MASK	    | \
-				 UINT64_CAST (_pa) >> 3 & BDECC_UPPER_MASK    \
-				   		        ^ 0x6ULL)
-
-/*
- * Macro to convert a back door directory, protection, page counter, or ecc
- * address into the raw physical address of the associated cache line
- * or protection page.
- */
-
-#define BDDIR_TO_MEM(_ba)	(UINT64_CAST  (_ba) & NASID_MASK            | \
-				 (UINT64_CAST (_ba) & BDDIR_UPPER_MASK) << 3)
-
-#ifdef BRINGUP
-/*
- * This can't be done since there are 4 entries per address so you'd end up
- * mapping back to 4 different physical addrs.
- */
-  
-#define BDPRT_TO_MEM(_ba) 	(UINT64_CAST  (_ba) & NASID_MASK	    | \
-				 (UINT64_CAST (_ba) & BDDIR_PAGE_MASK) << 3 | \
-				 (UINT64_CAST (_ba) & 0x3 << 4) << 3)
-#endif
-
-#define BDCNT_TO_MEM(_ba) 	(UINT64_CAST  (_ba) & NASID_MASK	    | \
-				 (UINT64_CAST (_ba) & BDDIR_PAGE_MASK) << 3 | \
-				 (UINT64_CAST (_ba) & 0x3 << 4) << 3)
-
-#define BDECC_TO_MEM(_ba)	(UINT64_CAST  (_ba) & NASID_MASK	    | \
-				 ((UINT64_CAST (_ba) ^ 0x7ULL)                \
-				                    & BDECC_UPPER_MASK) << 3 )
-
-#define BDECC_H_TO_MEM(_ba)	(UINT64_CAST  (_ba) & NASID_MASK	    | \
-				 ((UINT64_CAST (_ba) ^ 0x6ULL)                \
-				                    & BDECC_UPPER_MASK) << 3 )
-
-#define BDADDR_IS_DIR(_ba)	((UINT64_CAST  (_ba) & 0x8) == 0)
-#define BDADDR_IS_PRT(_ba)	((UINT64_CAST  (_ba) & 0x408) == 0x408)
-#define BDADDR_IS_CNT(_ba)	((UINT64_CAST  (_ba) & 0x8) == 0x8)
-
-#endif /* CONFIG_SGI_IP35 */
-
 
 /*
  * The following macros produce the correct base virtual address for
@@ -344,6 +165,36 @@ static __inline void BDPRT_ENTRY_S(paddr_t pa,uint32_t rgn,uint64_t val) {
  * for _x.
  */
 
+
+#ifdef CONFIG_IA64_SGI_SN2
+/*
+ * SN2 has II mmr's located inside small window space like SN0 & SN1,
+ * but has all other non-II mmr's located at the top of big window
+ * space, unlike SN0 & SN1.
+ */
+#define LOCAL_HUB_BASE(_x)	(LOCAL_MMR_ADDR(_x) | (((~(_x)) & BWIN_TOP)>>8))
+#define REMOTE_HUB_BASE(_x)						\
+        (UNCACHED | GLOBAL_MMR_SPACE |                                  \
+        (((~(_x)) & BWIN_TOP)>>8)    |                                       \
+        (((~(_x)) & BWIN_TOP)>>9)    | (_x))
+
+#define LOCAL_HUB(_x) (HUBREG_CAST LOCAL_HUB_BASE(_x))
+#define REMOTE_HUB(_n, _x)						\
+	(HUBREG_CAST (REMOTE_HUB_BASE(_x) | ((((long)(_n))<<NASID_SHFT))))
+
+#else	/* not CONFIG_IA64_SGI_SN2 */
+
+#define LOCAL_HUB(_x)		(HUBREG_CAST (IALIAS_BASE + (_x)))
+#define REMOTE_HUB(_n, _x)	(HUBREG_CAST (NODE_SWIN_BASE(_n, 1) +	\
+					      0x800000 + (_x)))
+#endif
+
+#ifdef CONFIG_IA64_SGI_SN1
+#define LOCAL_HSPEC(_x)		(HUBREG_CAST (LREG_BASE + (_x)))
+#define REMOTE_HSPEC(_n, _x)		(HUBREG_CAST (RREG_BASE(_n) + (_x)))
+#endif /* CONFIG_IA64_SGI_SN1 */
+
+
 /*
  * WARNING:
  *	When certain Hub chip workaround are defined, it's not sufficient
@@ -352,17 +203,29 @@ static __inline void BDPRT_ENTRY_S(paddr_t pa,uint32_t rgn,uint64_t val) {
  *	Otherwise, the recommended approach is to use *_HUB_L() and *_HUB_S().
  *	They're always safe.
  */
+#ifdef CONFIG_IA64_SGI_SN2
+#define LOCAL_HUB_ADDR(_x)							\
+	(((_x) & BWIN_TOP) ? (HUBREG_CAST (LOCAL_MMR_ADDR(_x)))		\
+	: (HUBREG_CAST (IALIAS_BASE + (_x))))
+#define REMOTE_HUB_ADDR(_n, _x)						\
+	(((_x) & BWIN_TOP) ? (HUBREG_CAST (GLOBAL_MMR_ADDR(_n, _x)))	\
+	: (HUBREG_CAST (NODE_SWIN_BASE(_n, 1) + 0x800000 + (_x))))
+#else
 #define LOCAL_HUB_ADDR(_x)	(HUBREG_CAST (IALIAS_BASE + (_x)))
 #define REMOTE_HUB_ADDR(_n, _x)	(HUBREG_CAST (NODE_SWIN_BASE(_n, 1) +	\
 					      0x800000 + (_x)))
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
+#endif
+#if CONFIG_IA64_SGI_SN1
 #define REMOTE_HUB_PI_ADDR(_n, _sn, _x)	(HUBREG_CAST (NODE_SWIN_BASE(_n, 1) +	\
 					      0x800000 + PIREG(_x, _sn)))
+#endif
+
+#ifdef CONFIG_IA64_SGI_SN1
 #define LOCAL_HSPEC_ADDR(_x)		(HUBREG_CAST (LREG_BASE + (_x)))
 #define REMOTE_HSPEC_ADDR(_n, _x)	(HUBREG_CAST (RREG_BASE(_n) + (_x)))
-#endif /* CONFIG_SGI_IP35 */
+#endif /* CONFIG_IA64_SGI_SN1 */
 
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 #define HUB_L(_a)			*(_a)
 #define	HUB_S(_a, _d)			*(_a) = (_d)
@@ -374,14 +237,14 @@ static __inline void BDPRT_ENTRY_S(paddr_t pa,uint32_t rgn,uint64_t val) {
 #define REMOTE_HUB_PI_L(_n, _sn, _r)	HUB_L(REMOTE_HUB_PI_ADDR((_n), (_sn), (_r)))
 #define REMOTE_HUB_PI_S(_n, _sn, _r, _d) HUB_S(REMOTE_HUB_PI_ADDR((_n), (_sn), (_r)), (_d))
 
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
+#ifdef CONFIG_IA64_SGI_SN1
 #define LOCAL_HSPEC_L(_r)	     HUB_L(LOCAL_HSPEC_ADDR(_r))
 #define LOCAL_HSPEC_S(_r, _d)	     HUB_S(LOCAL_HSPEC_ADDR(_r), (_d))
 #define REMOTE_HSPEC_L(_n, _r)	     HUB_L(REMOTE_HSPEC_ADDR((_n), (_r)))
 #define REMOTE_HSPEC_S(_n, _r, _d)   HUB_S(REMOTE_HSPEC_ADDR((_n), (_r)), (_d))
-#endif /* CONFIG_SGI_IP35 */
+#endif /* CONFIG_IA64_SGI_SN1 */
 
-#endif /* _LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
 /*
  * The following macros are used to get to a hub/bridge register, given
@@ -410,13 +273,8 @@ static __inline void BDPRT_ENTRY_S(paddr_t pa,uint32_t rgn,uint64_t val) {
 #define ARCS_SPB_SIZE		0x0400
 
 #define KLDIR_OFFSET		0x2000
-#ifndef __ia64
 #define KLDIR_ADDR(nasid)						\
-	TO_NODE_UNCAC((nasid), KLDIR_OFFSET)
-#else
-#define KLDIR_ADDR(nasid)                                               \
-        TO_NODE_CAC((nasid), KLDIR_OFFSET)
-#endif
+	TO_NODE_CAC((nasid), KLDIR_OFFSET)
 #define KLDIR_SIZE		0x0400
 
 
@@ -439,7 +297,7 @@ static __inline void BDPRT_ENTRY_S(paddr_t pa,uint32_t rgn,uint64_t val) {
 #define	KLI_KERN_XP		8
 #define	KLI_KERN_PARTID		9
 
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 #define KLD_BASE(nasid)		((kldir_ent_t *) KLDIR_ADDR(nasid))
 #define KLD_LAUNCH(nasid)	(KLD_BASE(nasid) + KLI_LAUNCH)
@@ -453,85 +311,23 @@ static __inline void BDPRT_ENTRY_S(paddr_t pa,uint32_t rgn,uint64_t val) {
 #define	KLD_KERN_XP(nasid)	(KLD_BASE(nasid) + KLI_KERN_XP)
 #define	KLD_KERN_PARTID(nasid)	(KLD_BASE(nasid) + KLI_KERN_PARTID)
 
-#define LAUNCH_OFFSET(nasid, slice)					\
-	(KLD_LAUNCH(nasid)->offset +					\
-	 KLD_LAUNCH(nasid)->stride * (slice))
-#define LAUNCH_ADDR(nasid, slice)					\
-	TO_NODE_UNCAC((nasid), LAUNCH_OFFSET(nasid, slice))
-#define LAUNCH_SIZE(nasid)	KLD_LAUNCH(nasid)->size
-
-#define NMI_OFFSET(nasid, slice)					\
-	(KLD_NMI(nasid)->offset +					\
-	 KLD_NMI(nasid)->stride * (slice))
-#define NMI_ADDR(nasid, slice)						\
-	TO_NODE_UNCAC((nasid), NMI_OFFSET(nasid, slice))
-#define NMI_SIZE(nasid)	KLD_NMI(nasid)->size
-
+#ifndef CONFIG_IA64_SGI_SN2
 #define KLCONFIG_OFFSET(nasid)	KLD_KLCONFIG(nasid)->offset
+#else
+#define KLCONFIG_OFFSET(nasid) \
+	ia64_sn_get_klconfig_addr(nasid)
+#endif /* CONFIG_IA64_SGI_SN2 */
+
 #define KLCONFIG_ADDR(nasid)						\
-	TO_NODE_UNCAC((nasid), KLCONFIG_OFFSET(nasid))
+	TO_NODE_CAC((nasid), KLCONFIG_OFFSET(nasid))
 #define KLCONFIG_SIZE(nasid)	KLD_KLCONFIG(nasid)->size
 
 #define GDA_ADDR(nasid)		KLD_GDA(nasid)->pointer
 #define GDA_SIZE(nasid)		KLD_GDA(nasid)->size
 
-#define SYMMON_STK_OFFSET(nasid, slice)					\
-	(KLD_SYMMON_STK(nasid)->offset +				\
-	 KLD_SYMMON_STK(nasid)->stride * (slice))
-#define SYMMON_STK_STRIDE(nasid)	KLD_SYMMON_STK(nasid)->stride
-
-#define SYMMON_STK_ADDR(nasid, slice)					\
-	TO_NODE_CAC((nasid), SYMMON_STK_OFFSET(nasid, slice))
-
-#define SYMMON_STK_SIZE(nasid)	KLD_SYMMON_STK(nasid)->stride
-
-#define SYMMON_STK_END(nasid)	(SYMMON_STK_ADDR(nasid, 0) + KLD_SYMMON_STK(nasid)->size)
-
-/* loading symmon 4k below UNIX. the arcs loader needs the topaddr for a
- * relocatable program
- */
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
-/* update master.d/sn1_elspec.dbg, SN1/addrs.h/DEBUGUNIX_ADDR, and
- * DBGLOADADDR in symmon's Makefile when changing this */
-#define UNIX_DEBUG_LOADADDR     0x310000
-#elif defined(SN0XXL)
-#define UNIX_DEBUG_LOADADDR     0x360000
-#else
-#define	UNIX_DEBUG_LOADADDR	0x300000
-#endif
-#define	SYMMON_LOADADDR(nasid)						\
-	TO_NODE(nasid, PHYS_TO_K0(UNIX_DEBUG_LOADADDR - 0x1000))
-
-#define FREEMEM_OFFSET(nasid)	KLD_FREEMEM(nasid)->offset
-#define FREEMEM_ADDR(nasid)	SYMMON_STK_END(nasid)
-/*
- * XXX
- * Fix this. FREEMEM_ADDR should be aware of if symmon is loaded.
- * Also, it should take into account what prom thinks to be a safe
- * address
-	PHYS_TO_K0(NODE_OFFSET(nasid) + FREEMEM_OFFSET(nasid))
- */
-#define FREEMEM_SIZE(nasid)	KLD_FREEMEM(nasid)->size
-
-#define PI_ERROR_OFFSET(nasid)	KLD_PI_ERROR(nasid)->offset
-#define PI_ERROR_ADDR(nasid)						\
-	TO_NODE_UNCAC((nasid), PI_ERROR_OFFSET(nasid))
-#define PI_ERROR_SIZE(nasid)	KLD_PI_ERROR(nasid)->size
-
 #define NODE_OFFSET_TO_K0(_nasid, _off)					\
 	(PAGE_OFFSET | NODE_OFFSET(_nasid) | (_off))
-#define K0_TO_NODE_OFFSET(_k0addr)					\
-	((__psunsigned_t)(_k0addr) & NODE_ADDRSPACE_MASK)
 
-#define KERN_VARS_ADDR(nasid)	KLD_KERN_VARS(nasid)->pointer
-#define KERN_VARS_SIZE(nasid)	KLD_KERN_VARS(nasid)->size
+#endif /* __ASSEMBLY__ */
 
-#define	KERN_XP_ADDR(nasid)	KLD_KERN_XP(nasid)->pointer
-#define	KERN_XP_SIZE(nasid)	KLD_KERN_XP(nasid)->size
-
-#define GPDA_ADDR(nasid)	TO_NODE_CAC(nasid, GPDA_OFFSET)
-
-#endif /* _LANGUAGE_C */
-
-
-#endif /* _ASM_SN_ADDRS_H */
+#endif /* _ASM_IA64_SN_ADDRS_H */

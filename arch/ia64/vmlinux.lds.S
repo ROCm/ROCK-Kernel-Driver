@@ -1,6 +1,6 @@
 #include <linux/config.h>
 
-#include <asm/page.h>
+#include <asm/ptrace.h>
 #include <asm/system.h>
 
 OUTPUT_FORMAT("elf64-ia64-little")
@@ -13,6 +13,8 @@ SECTIONS
 	*(.text.exit)
 	*(.data.exit)
 	*(.exitcall.exit)
+	*(.IA_64.unwind.text.exit)
+	*(.IA_64.unwind_info.text.exit)
 	}
 
   v = PAGE_OFFSET;	/* this symbol is here to make debugging easier... */
@@ -104,23 +106,23 @@ SECTIONS
         { *(.setup.init) }
   __setup_end = .;
   __initcall_start = .;
-  .initcall.init : AT(ADDR(.initcall1.init) - PAGE_OFFSET)
+  .initcall.init : AT(ADDR(.initcall.init) - PAGE_OFFSET)
 	{
-		 *(.initcall1.init) 
-		 *(.initcall2.init) 
-		 *(.initcall3.init) 
-		 *(.initcall4.init) 
-		 *(.initcall5.init) 
-		 *(.initcall6.init) 
-		 *(.initcall7.init) 
+		*(.initcall1.init)
+		*(.initcall2.init)
+		*(.initcall3.init)
+		*(.initcall4.init)
+		*(.initcall5.init)
+		*(.initcall6.init)
+		*(.initcall7.init)
 	}
   __initcall_end = .;
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
 
   /* The initial task and kernel stack */
-  init_task : AT(ADDR(init_task) - PAGE_OFFSET)
-	{ *(init_task) }
+  .data.init_task : AT(ADDR(.data.init_task) - PAGE_OFFSET)
+	{ *(.data.init_task) }
 
   .data.page_aligned : AT(ADDR(.data.page_aligned) - PAGE_OFFSET)
         { *(.data.idt) }

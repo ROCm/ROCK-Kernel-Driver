@@ -4,12 +4,11 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
 
-#ifndef _ASM_SN_SN1_SLOTNUM_H
-#define _ASM_SN_SN1_SLOTNUM_H
+#ifndef _ASM_IA64_SN_SN1_SLOTNUM_H
+#define _ASM_IA64_SN_SN1_SLOTNUM_H
 
 #define SLOTNUM_MAXLENGTH	16
 
@@ -85,4 +84,4 @@ extern int  slot_to_widget(int) ;
 
 #endif /* __KERNEL__ */
 
-#endif /* _ASM_SN_SN1_SLOTNUM_H */
+#endif /* _ASM_IA64_SN_SN1_SLOTNUM_H */

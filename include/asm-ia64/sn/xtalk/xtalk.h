@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992-1997, 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
  */
 #ifndef _ASM_SN_XTALK_XTALK_H
 #define _ASM_SN_XTALK_XTALK_H
@@ -18,19 +17,19 @@
  */
 typedef char            xwidgetnum_t;	/* xtalk widget number  (0..15) */
 
-#define XWIDGET_NONE		-1
+#define XWIDGET_NONE		(-1)
 
 typedef int xwidget_part_num_t;	/* xtalk widget part number */
 
-#define XWIDGET_PART_NUM_NONE	-1
+#define XWIDGET_PART_NUM_NONE	(-1)
 
 typedef int             xwidget_rev_num_t;	/* xtalk widget revision number */
 
-#define XWIDGET_REV_NUM_NONE	-1
+#define XWIDGET_REV_NUM_NONE	(-1)
 
 typedef int xwidget_mfg_num_t;	/* xtalk widget manufacturing ID */
 
-#define XWIDGET_MFG_NUM_NONE	-1
+#define XWIDGET_MFG_NUM_NONE	(-1)
 
 typedef struct xtalk_piomap_s *xtalk_piomap_t;
 
@@ -57,7 +56,7 @@ typedef struct xtalk_piomap_s *xtalk_piomap_t;
 #include <asm/sn/types.h>
 #include <asm/sn/alenlist.h>
 #include <asm/sn/ioerror.h>
-#include <asm/sn/iobus.h>
+#include <asm/sn/driver.h>
 #include <asm/sn/dmamap.h>
 
 struct xwidget_hwid_s;
@@ -205,14 +204,8 @@ xtalk_intr_free_f       (xtalk_intr_t intr_hdl);
 
 typedef int
 xtalk_intr_connect_f    (xtalk_intr_t intr_hdl,		/* xtalk intr resource handle */
-			 intr_func_t intr_func,		/* xtalk intr handler */
-			 void *intr_arg,	/* arg to intr handler */
 			 xtalk_intr_setfunc_f *setfunc,		/* func to set intr hw */
-			 void *setfunc_arg,	/* arg to setfunc. This must be */
-							/* sufficient to determine which */
-							/* interrupt on which board needs */
-							/* to be set. */
-			 void *thread);		/* which intr thread to use */
+			 void *setfunc_arg);	/* arg to setfunc */
 
 typedef void
 xtalk_intr_disconnect_f (xtalk_intr_t intr_hdl);
@@ -400,7 +393,6 @@ extern void		xtalk_iterate(char *prefix, xtalk_iter_f *func);
 
 extern int		xtalk_device_powerup(devfs_handle_t, xwidgetnum_t);
 extern int		xtalk_device_shutdown(devfs_handle_t, xwidgetnum_t);
-extern int		xtalk_device_inquiry(devfs_handle_t, xwidgetnum_t);
 
 #endif				/* __KERNEL__ */
 #endif				/* _ASM_SN_XTALK_XTALK_H */

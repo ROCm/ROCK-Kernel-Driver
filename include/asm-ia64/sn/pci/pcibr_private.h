@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_SN_PCI_PCIBR_PRIVATE_H
 #define _ASM_SN_PCI_PCIBR_PRIVATE_H
@@ -16,6 +15,7 @@
  * should ever peek into this file.
  */
 
+#include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pciio_private.h>
 #include <asm/sn/ksys/l1.h>
 
@@ -100,9 +100,6 @@ struct pcibr_intr_s {
 #define	bi_flags	bi_pi.pi_flags	/* PCIBR_INTR flags */
 #define	bi_dev		bi_pi.pi_dev	/* associated pci card */
 #define	bi_lines	bi_pi.pi_lines	/* which PCI interrupt line(s) */
-#define	bi_func		bi_pi.pi_func	/* handler function (when connected) */
-#define	bi_arg		bi_pi.pi_arg	/* handler parameter (when connected) */
-#define bi_tinfo	bi_pi.pi_tinfo	/* Thread info (when connected) */
 #define bi_mustruncpu	bi_pi.pi_mustruncpu /* Where we must run. */
 #define bi_irq		bi_pi.pi_irq	/* IRQ assigned. */
 #define bi_cpu		bi_pi.pi_cpu	/* cpu assigned. */
@@ -173,14 +170,17 @@ struct pcibr_intr_wrap_s {
  */
 
 struct pcibr_soft_s {
-    devfs_handle_t            bs_conn;	/* xtalk connection point */
-    devfs_handle_t            bs_vhdl;	/* vertex owned by pcibr */
+    devfs_handle_t          bs_conn;		/* xtalk connection point */
+    devfs_handle_t          bs_vhdl;		/* vertex owned by pcibr */
     int                     bs_int_enable;	/* Mask of enabled intrs */
-    bridge_t               *bs_base;	/* PIO pointer to Bridge chip */
-    char                   *bs_name;	/* hw graph name */
-    xwidgetnum_t            bs_xid;	/* Bridge's xtalk ID number */
-    devfs_handle_t            bs_master;	/* xtalk master vertex */
-    xwidgetnum_t            bs_mxid;	/* master's xtalk ID number */
+    bridge_t               *bs_base;		/* PIO pointer to Bridge chip */
+    char                   *bs_name;		/* hw graph name */
+    xwidgetnum_t            bs_xid;		/* Bridge's xtalk ID number */
+    devfs_handle_t          bs_master;		/* xtalk master vertex */
+    xwidgetnum_t            bs_mxid;		/* master's xtalk ID number */
+    pciio_slot_t            bs_first_slot;      /* first existing slot */
+    pciio_slot_t            bs_last_slot;       /* last existing slot */
+
 
     iopaddr_t               bs_dir_xbase;	/* xtalk address for 32-bit PCI direct map */
     xwidgetnum_t	    bs_dir_xport;	/* xtalk port for 32-bit PCI direct map */
@@ -190,7 +190,7 @@ struct pcibr_soft_s {
     short		    bs_int_ate_size;	/* number of internal ates */
     short		    bs_xbridge;		/* if 1 then xbridge */
 
-    int                     bs_rev_num;	/* revision number of Bridge */
+    int                     bs_rev_num;		/* revision number of Bridge */
 
     unsigned                bs_dma_flags;	/* revision-implied DMA flags */
 
@@ -253,6 +253,7 @@ struct pcibr_soft_s {
 	struct {
 	    pciio_space_t           bssd_space;
 	    iopaddr_t               bssd_base;
+            int                     bssd_ref_cnt;
 	} bss_devio;
 
 	/* Shadow value for Device(x) register,
@@ -312,7 +313,9 @@ struct pcibr_soft_s {
     int                     bs_rrb_fixed;
     int			    bs_rrb_avail[2];
     int			    bs_rrb_res[8];
-    int			    bs_rrb_valid[16];
+    int                     bs_rrb_res_dflt[8];
+    int                     bs_rrb_valid[16];
+    int                     bs_rrb_valid_dflt[16];
 
     struct {
 	/* Each Bridge interrupt bit has a single XIO
@@ -433,5 +436,42 @@ extern int              pcibr_prefetch_enable_rev, pcibr_wg_enable_rev;
 
 #define pcibr_soft_get(v)       ((pcibr_soft_t)hwgraph_fastinfo_get((v)))
 #define pcibr_soft_set(v,i)     (hwgraph_fastinfo_set((v), (arbitrary_info_t)(i)))
+
+/* Use io spin locks. This ensures that all the PIO writes from a particular
+ * CPU to a particular IO device are synched before the start of the next
+ * set of PIO operations to the same device.
+ */
+#define pcibr_lock(pcibr_soft)		io_splock(&pcibr_soft->bs_lock)
+#define pcibr_unlock(pcibr_soft,s)	io_spunlock(&pcibr_soft->bs_lock,s)
+
+/*
+ * mem alloc/free macros
+ */
+#define NEWAf(ptr,n,f)	(ptr = snia_kmem_zalloc((n)*sizeof (*(ptr)), (f&PCIIO_NOSLEEP)?KM_NOSLEEP:KM_SLEEP))
+#define NEWA(ptr,n)	(ptr = snia_kmem_zalloc((n)*sizeof (*(ptr)), KM_SLEEP))
+#define DELA(ptr,n)	(kfree(ptr))
+
+#define NEWf(ptr,f)	NEWAf(ptr,1,f)
+#define NEW(ptr)	NEWA(ptr,1)
+#define DEL(ptr)	DELA(ptr,1)
+
+typedef volatile unsigned *cfg_p;
+typedef volatile bridgereg_t *reg_p;
+
+#define PCIBR_RRB_SLOT_VIRTUAL  8
+#define PCIBR_VALID_SLOT(s)     (s < 8)
+#define PCIBR_D64_BASE_UNSET    (0xFFFFFFFFFFFFFFFF)
+#define PCIBR_D32_BASE_UNSET    (0xFFFFFFFF)
+#define INFO_LBL_PCIBR_ASIC_REV "_pcibr_asic_rev"
+
+#define PCIBR_SOFT_LIST 1
+#if PCIBR_SOFT_LIST
+typedef struct pcibr_list_s *pcibr_list_p;
+struct pcibr_list_s {
+	pcibr_list_p            bl_next;
+	pcibr_soft_t            bl_soft;
+	devfs_handle_t          bl_vhdl;
+};
+#endif /* PCIBR_SOFT_LIST */
 
 #endif				/* _ASM_SN_PCI_PCIBR_PRIVATE_H */

@@ -23,6 +23,9 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/unwind.h>
+#ifdef CONFIG_PERFMON
+#include <asm/perfmon.h>
+#endif
 
 /*
  * Bits in the PSR that we allow ptrace() to change:
@@ -755,11 +758,6 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 	} else {
 		/* access debug registers */
 
-		if (!(child->thread.flags & IA64_THREAD_DBG_VALID)) {
-			child->thread.flags |= IA64_THREAD_DBG_VALID;
-			memset(child->thread.dbr, 0, sizeof(child->thread.dbr));
-			memset(child->thread.ibr, 0, sizeof(child->thread.ibr));
-		}
 		if (addr >= PT_IBR) {
 			regnum = (addr - PT_IBR) >> 3;
 			ptr = &child->thread.ibr[0];
@@ -771,6 +769,31 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 		if (regnum >= 8) {
 			dprintk("ptrace: rejecting access to register address 0x%lx\n", addr);
 			return -1;
+		}
+#ifdef CONFIG_PERFMON
+		/* 
+		 * Check if debug registers are used 
+		 * by perfmon. This test must be done once we know that we can
+		 * do the operation, i.e. the arguments are all valid, but before
+		 * we start modifying the state.
+		 *
+		 * Perfmon needs to keep a count of how many processes are
+		 * trying to modify the debug registers for system wide monitoring
+		 * sessions.
+		 *
+		 * We also include read access here, because they may cause 
+		 * the PMU-installed debug register state (dbr[], ibr[]) to
+		 * be reset. The two arrays are also used by perfmon, but
+		 * we do not use IA64_THREAD_DBG_VALID. The registers are restored
+		 * by the PMU context switch code.
+		 */
+		if (pfm_use_debug_registers(child)) return -1;
+#endif
+
+		if (!(child->thread.flags & IA64_THREAD_DBG_VALID)) {
+			child->thread.flags |= IA64_THREAD_DBG_VALID;
+			memset(child->thread.dbr, 0, sizeof(child->thread.dbr));
+			memset(child->thread.ibr, 0, sizeof(child->thread.ibr));
 		}
 
 		ptr += regnum;
@@ -787,6 +810,260 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 	else
 		*data = *ptr;
 	return 0;
+}
+
+static long
+ptrace_getregs (struct task_struct *child, struct pt_all_user_regs *ppr)
+{
+	struct switch_stack *sw;
+	struct pt_regs *pt;
+	long ret, retval;
+	struct unw_frame_info info;
+	char nat = 0;
+	int i;
+
+	retval = verify_area(VERIFY_WRITE, ppr, sizeof(struct pt_all_user_regs));
+	if (retval != 0) {
+		return -EIO;
+	}
+
+	pt = ia64_task_regs(child);
+	sw = (struct switch_stack *) (child->thread.ksp + 16);
+	unw_init_from_blocked_task(&info, child);
+	if (unw_unwind_to_user(&info) < 0) {
+		return -EIO;
+	}
+
+	if (((unsigned long) ppr & 0x7) != 0) {
+		dprintk("ptrace:unaligned register address %p\n", ppr);
+		return -EIO;
+	}
+
+	retval = 0;
+
+	/* control regs */
+
+	retval |= __put_user(pt->cr_iip, &ppr->cr_iip);
+	retval |= access_uarea(child, PT_CR_IPSR, &ppr->cr_ipsr, 0);
+
+	/* app regs */
+
+	retval |= __put_user(pt->ar_pfs, &ppr->ar[PT_AUR_PFS]);
+	retval |= __put_user(pt->ar_rsc, &ppr->ar[PT_AUR_RSC]);
+	retval |= __put_user(pt->ar_bspstore, &ppr->ar[PT_AUR_BSPSTORE]);
+	retval |= __put_user(pt->ar_unat, &ppr->ar[PT_AUR_UNAT]);
+	retval |= __put_user(pt->ar_ccv, &ppr->ar[PT_AUR_CCV]);
+	retval |= __put_user(pt->ar_fpsr, &ppr->ar[PT_AUR_FPSR]);
+
+	retval |= access_uarea(child, PT_AR_EC, &ppr->ar[PT_AUR_EC], 0);
+	retval |= access_uarea(child, PT_AR_LC, &ppr->ar[PT_AUR_LC], 0);
+	retval |= access_uarea(child, PT_AR_RNAT, &ppr->ar[PT_AUR_RNAT], 0);
+	retval |= access_uarea(child, PT_AR_BSP, &ppr->ar[PT_AUR_BSP], 0);
+	retval |= access_uarea(child, PT_CFM, &ppr->cfm, 0);
+
+	/* gr1-gr3 */
+
+	retval |= __copy_to_user(&ppr->gr[1], &pt->r1, sizeof(long) * 3);
+
+	/* gr4-gr7 */
+
+	for (i = 4; i < 8; i++) {
+		retval |= unw_access_gr(&info, i, &ppr->gr[i], &nat, 0);
+	}
+
+	/* gr8-gr11 */
+
+	retval |= __copy_to_user(&ppr->gr[8], &pt->r8, sizeof(long) * 4);
+
+	/* gr12-gr15 */
+
+	retval |= __copy_to_user(&ppr->gr[12], &pt->r12, sizeof(long) * 4);
+
+	/* gr16-gr31 */
+
+	retval |= __copy_to_user(&ppr->gr[16], &pt->r16, sizeof(long) * 16);
+
+	/* b0 */
+
+	retval |= __put_user(pt->b0, &ppr->br[0]);
+
+	/* b1-b5 */
+
+	for (i = 1; i < 6; i++) {
+		retval |= unw_access_br(&info, i, &ppr->br[i], 0);
+	}
+
+	/* b6-b7 */
+
+	retval |= __put_user(pt->b6, &ppr->br[6]);
+	retval |= __put_user(pt->b7, &ppr->br[7]);
+
+	/* fr2-fr5 */
+
+	for (i = 2; i < 6; i++) {
+		retval |= access_fr(&info, i, 0, (unsigned long *) &ppr->fr[i], 0);
+		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 0);
+	}
+
+	/* fr6-fr9 */
+
+	retval |= __copy_to_user(&ppr->fr[6], &pt->f6, sizeof(struct ia64_fpreg) * 4);
+
+	/* fp scratch regs(10-15) */
+
+	retval |= __copy_to_user(&ppr->fr[10], &sw->f10, sizeof(struct ia64_fpreg) * 6);
+
+	/* fr16-fr31 */
+
+	for (i = 16; i < 32; i++) {
+		retval |= access_fr(&info, i, 0, (unsigned long *) &ppr->fr[i], 0);
+		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 0);
+	}
+
+	/* fph */
+
+	ia64_flush_fph(child);
+	retval |= __copy_to_user(&ppr->fr[32], &child->thread.fph, sizeof(ppr->fr[32]) * 96);
+
+	/*  preds */
+
+	retval |= __put_user(pt->pr, &ppr->pr);
+
+	/* nat bits */
+
+	retval |= access_uarea(child, PT_NAT_BITS, &ppr->nat, 0);
+
+	ret = retval ? -EIO : 0;
+	return ret;
+}
+
+static long
+ptrace_setregs (struct task_struct *child, struct pt_all_user_regs *ppr)
+{
+	struct switch_stack *sw;
+	struct pt_regs *pt;
+	long ret, retval;
+	struct unw_frame_info info;
+	char nat = 0;
+	int i;
+
+	retval = verify_area(VERIFY_READ, ppr, sizeof(struct pt_all_user_regs));
+	if (retval != 0) {
+		return -EIO;
+	}
+
+	pt = ia64_task_regs(child);
+	sw = (struct switch_stack *) (child->thread.ksp + 16);
+	unw_init_from_blocked_task(&info, child);
+	if (unw_unwind_to_user(&info) < 0) {
+		return -EIO;
+	}
+
+	if (((unsigned long) ppr & 0x7) != 0) {
+		dprintk("ptrace:unaligned register address %p\n", ppr);
+		return -EIO;
+	}
+
+	retval = 0;
+
+	/* control regs */
+
+	retval |= __get_user(pt->cr_iip, &ppr->cr_iip);
+	retval |= access_uarea(child, PT_CR_IPSR, &ppr->cr_ipsr, 1);
+
+	/* app regs */
+
+	retval |= __get_user(pt->ar_pfs, &ppr->ar[PT_AUR_PFS]);
+	retval |= __get_user(pt->ar_rsc, &ppr->ar[PT_AUR_RSC]);
+	retval |= __get_user(pt->ar_bspstore, &ppr->ar[PT_AUR_BSPSTORE]);
+	retval |= __get_user(pt->ar_unat, &ppr->ar[PT_AUR_UNAT]);
+	retval |= __get_user(pt->ar_ccv, &ppr->ar[PT_AUR_CCV]);
+	retval |= __get_user(pt->ar_fpsr, &ppr->ar[PT_AUR_FPSR]);
+
+	retval |= access_uarea(child, PT_AR_EC, &ppr->ar[PT_AUR_EC], 1);
+	retval |= access_uarea(child, PT_AR_LC, &ppr->ar[PT_AUR_LC], 1);
+	retval |= access_uarea(child, PT_AR_RNAT, &ppr->ar[PT_AUR_RNAT], 1);
+	retval |= access_uarea(child, PT_AR_BSP, &ppr->ar[PT_AUR_BSP], 1);
+	retval |= access_uarea(child, PT_CFM, &ppr->cfm, 1);
+
+	/* gr1-gr3 */
+
+	retval |= __copy_from_user(&pt->r1, &ppr->gr[1], sizeof(long) * 3);
+
+	/* gr4-gr7 */
+
+	for (i = 4; i < 8; i++) {
+		long ret = unw_get_gr(&info, i, &ppr->gr[i], &nat);
+		if (ret < 0) {
+			return ret;
+		}
+		retval |= unw_access_gr(&info, i, &ppr->gr[i], &nat, 1);
+	}
+
+	/* gr8-gr11 */
+
+	retval |= __copy_from_user(&pt->r8, &ppr->gr[8], sizeof(long) * 4);
+
+	/* gr12-gr15 */
+
+	retval |= __copy_from_user(&pt->r12, &ppr->gr[12], sizeof(long) * 4);
+
+	/* gr16-gr31 */
+
+	retval |= __copy_from_user(&pt->r16, &ppr->gr[16], sizeof(long) * 16);
+
+	/* b0 */
+
+	retval |= __get_user(pt->b0, &ppr->br[0]);
+
+	/* b1-b5 */
+
+	for (i = 1; i < 6; i++) {
+		retval |= unw_access_br(&info, i, &ppr->br[i], 1);
+	}
+
+	/* b6-b7 */
+
+	retval |= __get_user(pt->b6, &ppr->br[6]);
+	retval |= __get_user(pt->b7, &ppr->br[7]);
+
+	/* fr2-fr5 */
+
+	for (i = 2; i < 6; i++) {
+		retval |= access_fr(&info, i, 0, (unsigned long *) &ppr->fr[i], 1);
+		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 1);
+	}
+
+	/* fr6-fr9 */
+
+	retval |= __copy_from_user(&pt->f6, &ppr->fr[6], sizeof(ppr->fr[6]) * 4);
+
+	/* fp scratch regs(10-15) */
+
+	retval |= __copy_from_user(&sw->f10, &ppr->fr[10], sizeof(ppr->fr[10]) * 6);
+
+	/* fr16-fr31 */
+
+	for (i = 16; i < 32; i++) {
+		retval |= access_fr(&info, i, 0, (unsigned long *) &ppr->fr[i], 1);
+		retval |= access_fr(&info, i, 1, (unsigned long *) &ppr->fr[i] + 1, 1);
+	}
+
+	/* fph */
+
+	ia64_sync_fph(child);
+	retval |= __copy_from_user(&child->thread.fph, &ppr->fr[32], sizeof(ppr->fr[32]) * 96);
+
+	/* preds */
+
+	retval |= __get_user(pt->pr, &ppr->pr);
+
+	/* nat bits */
+
+	retval |= access_uarea(child, PT_NAT_BITS, &ppr->nat, 1);
+
+	ret = retval ? -EIO : 0;
+	return ret;
 }
 
 /*
@@ -916,9 +1193,9 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		if (data > _NSIG)
 			goto out_tsk;
 		if (request == PTRACE_SYSCALL)
-			child->ptrace |= PT_TRACESYS;
+			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		else
-			child->ptrace &= ~PT_TRACESYS;
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		child->exit_code = data;
 
 		/* make sure the single step/taken-branch trap bits are not set: */
@@ -959,7 +1236,7 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		if (data > _NSIG)
 			goto out_tsk;
 
-		child->ptrace &= ~PT_TRACESYS;
+		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		if (request == PTRACE_SINGLESTEP) {
 			ia64_psr(pt)->ss = 1;
 		} else {
@@ -979,12 +1256,28 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		ret = ptrace_detach(child, data);
 		goto out_tsk;
 
+	      case PTRACE_GETREGS:
+		ret = ptrace_getregs(child, (struct pt_all_user_regs*) data);
+		goto out_tsk;
+
+	      case PTRACE_SETREGS:
+		ret = ptrace_setregs(child, (struct pt_all_user_regs*) data);
+		goto out_tsk;
+
+	      case PTRACE_SETOPTIONS:
+		if (data & PTRACE_O_TRACESYSGOOD)
+			child->ptrace |= PT_TRACESYSGOOD;
+		else
+			child->ptrace &= ~PT_TRACESYSGOOD;
+		ret = 0;
+		break;
+
 	      default:
 		ret = -EIO;
 		goto out_tsk;
 	}
   out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
   out:
 	unlock_kernel();
 	return ret;
@@ -993,9 +1286,16 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 void
 syscall_trace (void)
 {
-	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS)) != (PT_PTRACED|PT_TRACESYS))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
 		return;
-	current->exit_code = SIGTRAP;
+	if (!(current->ptrace & PT_PTRACED))
+		return;
+	/*
+	 * The 0x80 provides a way for the tracing parent to distinguish between a syscall
+	 * stop and SIGTRAP delivery.
+	 */
+	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+					? 0x80 : 0);
 	set_current_state(TASK_STOPPED);
 	notify_parent(current, SIGCHLD);
 	schedule();

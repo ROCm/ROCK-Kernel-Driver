@@ -1,8 +1,8 @@
 /*
  * Utility to generate asm-ia64/offsets.h.
  *
- * Copyright (C) 1999-2001 Hewlett-Packard Co
- * Copyright (C) 1999-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Note that this file has dual use: when building the kernel
  * natively, the file is translated into a binary and executed.  When
@@ -44,6 +44,7 @@ struct
 tab[] =
   {
     { "IA64_TASK_SIZE",			sizeof (struct task_struct) },
+    { "IA64_THREAD_INFO_SIZE",		sizeof (struct thread_info) },
     { "IA64_PT_REGS_SIZE",		sizeof (struct pt_regs) },
     { "IA64_SWITCH_STACK_SIZE",		sizeof (struct switch_stack) },
     { "IA64_SIGINFO_SIZE",		sizeof (struct siginfo) },
@@ -51,14 +52,11 @@ tab[] =
     { "SIGFRAME_SIZE",			sizeof (struct sigframe) },
     { "UNW_FRAME_INFO_SIZE",		sizeof (struct unw_frame_info) },
     { "", 0 },			/* spacer */
-#error    { "IA64_TASK_PTRACE_OFFSET",	offsetof (struct task_struct, ptrace) },
-#error    { "IA64_TASK_SIGPENDING_OFFSET",	offsetof (struct task_struct, sigpending) },
-#error    { "IA64_TASK_NEED_RESCHED_OFFSET",	offsetof (struct task_struct, need_resched) },
-    { "IA64_TASK_PROCESSOR_OFFSET",	offsetof (struct task_struct, processor) },
+    { "IA64_TASK_PTRACE_OFFSET",	offsetof (struct task_struct, ptrace) },
     { "IA64_TASK_THREAD_OFFSET",	offsetof (struct task_struct, thread) },
     { "IA64_TASK_THREAD_KSP_OFFSET",	offsetof (struct task_struct, thread.ksp) },
 #ifdef CONFIG_PERFMON
-    { "IA64_TASK_PFM_MUST_BLOCK_OFFSET",offsetof(struct task_struct, thread.pfm_must_block) },
+    { "IA64_TASK_PFM_OVFL_BLOCK_RESET_OFFSET",offsetof(struct task_struct, thread.pfm_ovfl_block_reset) },
 #endif
     { "IA64_TASK_PID_OFFSET",		offsetof (struct task_struct, pid) },
     { "IA64_TASK_MM_OFFSET",		offsetof (struct task_struct, mm) },
@@ -197,7 +195,9 @@ main (int argc, char **argv)
      subtle ways should PT_PTRACED ever change.  Ditto for
      PT_TRACESYS_BIT. */
   printf ("#define PT_PTRACED_BIT\t\t\t%u\n", ffs (PT_PTRACED) - 1);
-  printf ("#define PT_TRACESYS_BIT\t\t\t%u\n\n", ffs (PT_TRACESYS) - 1);
+#if 0
+  printf ("#define PT_SYSCALLTRACE_BIT\t\t\t%u\n\n", ffs (PT_SYSCALLTRACE) - 1);
+#endif
 
   for (i = 0; i < sizeof (tab) / sizeof (tab[0]); ++i)
     {

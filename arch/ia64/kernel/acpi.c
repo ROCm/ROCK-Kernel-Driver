@@ -5,11 +5,11 @@
  * 'IA-64 Extensions to ACPI Specification' Revision 0.6
  *
  * Copyright (C) 1999 VA Linux Systems
- * Copyright (C) 1999,2000 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 2000 Hewlett-Packard Co.
- * Copyright (C) 2000 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999, 2000 Walt Drummond <drummond@valinux.com>
+ * Copyright (C) 2000, 2002 Hewlett-Packard Co.
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 2000 Intel Corp.
- * Copyright (C) 2000,2001 J.I. Lee <jung-ik.lee@intel.com>
+ * Copyright (C) 2000, 2001 J.I. Lee <jung-ik.lee@intel.com>
  *      ACPI based kernel configuration manager.
  *      ACPI 2.0 & IA64 ext 0.71
  */
@@ -43,6 +43,8 @@ int platform_irq_list[ACPI_MAX_PLATFORM_IRQS];
 /* These are ugly but will be reclaimed by the kernel */
 int __initdata available_cpus;
 int __initdata total_cpus;
+
+int __initdata pcat_compat;
 
 void (*pm_idle) (void);
 void (*pm_power_off) (void);
@@ -293,6 +295,16 @@ acpi20_parse_madt (acpi_madt_t *madt)
 	} else
 		printk("Lapic address set to default 0x%lx\n", ipi_base_addr);
 
+	/*
+	 * The PCAT_COMPAT flag indicates that the system has a dual-8259 compatible
+	 * setup.
+	 */
+#ifdef CONFIG_ITANIUM
+	pcat_compat = 1; /* fw on some Itanium systems is broken... */
+#else
+	pcat_compat = (madt->flags & MADT_PCAT_COMPAT);
+#endif
+
 	p = (char *) (madt + 1);
 	end = p + (madt->header.length - sizeof(acpi_madt_t));
 
@@ -319,17 +331,7 @@ acpi20_parse_madt (acpi_madt_t *madt)
 		      case ACPI20_ENTRY_IO_SAPIC:
 			iosapic = (acpi_entry_iosapic_t *) p;
 			if (iosapic_init)
-				/*
-				 * The PCAT_COMPAT flag indicates that the system has a
-				 * dual-8259 compatible setup.
-				 */
-				iosapic_init(iosapic->address, iosapic->irq_base,
-#ifdef CONFIG_ITANIUM
-					     1 /* fw on some Itanium systems is broken... */
-#else
-					     (madt->flags & MADT_PCAT_COMPAT)
-#endif
-					);
+				iosapic_init(iosapic->address, iosapic->irq_base, pcat_compat);
 			break;
 
 		      case ACPI20_ENTRY_PLATFORM_INT_SOURCE:
@@ -401,7 +403,7 @@ acpi20_parse (acpi20_rsdp_t *rsdp20)
 # ifdef CONFIG_ACPI
 	acpi_xsdt_t *xsdt;
 	acpi_desc_table_hdr_t *hdrp;
-	acpi_madt_t *madt;
+	acpi_madt_t *madt = NULL;
 	int tables, i;
 
 	if (strncmp(rsdp20->signature, ACPI_RSDP_SIG, ACPI_RSDP_SIG_LEN)) {

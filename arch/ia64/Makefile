@@ -25,7 +25,7 @@ CFLAGS_KERNEL := -mconstant-gp
 GCC_VERSION=$(shell $(CROSS_COMPILE)$(HOSTCC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | cut -f1 -d'.')
 
 ifneq ($(GCC_VERSION),2)
-	CFLAGS += -frename-registers --param max-inline-insns=400
+	CFLAGS += -frename-registers --param max-inline-insns=2000
 endif
 
 ifeq ($(CONFIG_ITANIUM_BSTEP_SPECIFIC),y)
@@ -58,7 +58,7 @@ ifdef CONFIG_IA64_SGI_SN
 	CFLAGS		+= -DBRINGUP
         SUBDIRS         :=      arch/$(ARCH)/sn/kernel	\
 				arch/$(ARCH)/sn/io	\
-				arch/$(ARCH)/sn/fprom	\
+				arch/$(ARCH)/sn/fakeprom	\
 				$(SUBDIRS)
         CORE_FILES      :=      arch/$(ARCH)/sn/kernel/sn.o	\
 				arch/$(ARCH)/sn/io/sgiio.o	\

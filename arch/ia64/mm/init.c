@@ -1,8 +1,8 @@
 /*
  * Initialize MMU support.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/swap.h>
 
+#include <asm/a.out.h>
 #include <asm/bitops.h>
 #include <asm/dma.h>
 #include <asm/efi.h>
@@ -37,10 +38,15 @@ unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 
 static unsigned long totalram_pages;
 
+static int pgt_cache_water[2] = { 25, 50 };
+
 int
-do_check_pgt_cache (int low, int high)
+check_pgt_cache (void)
 {
-	int freed = 0;
+	int low, high, freed = 0;
+
+	low = pgt_cache_water[0];
+	high = pgt_cache_water[1];
 
 	if (pgtable_cache_size > high) {
 		do {
@@ -48,8 +54,6 @@ do_check_pgt_cache (int low, int high)
 				free_page((unsigned long)pgd_alloc_one_fast(0)), ++freed;
 			if (pmd_quicklist)
 				free_page((unsigned long)pmd_alloc_one_fast(0, 0)), ++freed;
-			if (pte_quicklist)
-				free_page((unsigned long)pte_alloc_one_fast(0, 0)), ++freed;
 		} while (pgtable_cache_size > low);
 	}
 	return freed;
@@ -243,15 +247,16 @@ put_gate_page (struct page *page, unsigned long address)
 		pmd = pmd_alloc(&init_mm, pgd, address);
 		if (!pmd)
 			goto out;
-		pte = pte_alloc(&init_mm, pmd, address);
+		pte = pte_alloc_map(&init_mm, pmd, address);
 		if (!pte)
 			goto out;
 		if (!pte_none(*pte)) {
-			pte_ERROR(*pte);
+			pte_unmap(pte);
 			goto out;
 		}
 		flush_page_to_ram(page);
 		set_pte(pte, mk_pte(page, PAGE_GATE));
+		pte_unmap(pte);
 	}
   out:	spin_unlock(&init_mm.page_table_lock);
 	/* no need for flush_tlb */

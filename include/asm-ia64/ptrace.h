@@ -2,9 +2,9 @@
 #define _ASM_IA64_PTRACE_H
 
 /*
- * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
- * Copyright (C) 1998, 1999 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * 12/07/98	S. Eranian	added pt_regs & switch_stack
  * 12/21/98	D. Mosberger	updated to match latest code
@@ -39,7 +39,9 @@
  *	      |	(growing upwards)    |	 |
  *            |			     |	 |
  *	      +----------------------+	 |  ---	IA64_RBS_OFFSET
- *	      |			     |	 |  ^
+ *            |  struct thread_info  |	 |  ^
+ *	      +----------------------+	 |  |
+ *	      |			     |	 |  |
  *            |  struct task_struct  |	 |  |
  * current -> |			     |   |  |
  *	      +----------------------+ -------
@@ -58,19 +60,19 @@
  * (including register backing store and memory stack):
  */
 #if defined(CONFIG_IA64_PAGE_SIZE_4KB)
-# define IA64_TASK_STRUCT_LOG_NUM_PAGES		3
+# define KERNEL_STACK_SIZE_ORDER		3
 #elif defined(CONFIG_IA64_PAGE_SIZE_8KB)
-# define IA64_TASK_STRUCT_LOG_NUM_PAGES		2
+# define KERNEL_STACK_SIZE_ORDER		2
 #elif defined(CONFIG_IA64_PAGE_SIZE_16KB)
-# define IA64_TASK_STRUCT_LOG_NUM_PAGES		1
+# define KERNEL_STACK_SIZE_ORDER		1
 #else
-# define IA64_TASK_STRUCT_LOG_NUM_PAGES		0
+# define KERNEL_STACK_SIZE_ORDER		0
 #endif
 
-#define IA64_RBS_OFFSET			((IA64_TASK_SIZE + 15) & ~15)
-#define IA64_STK_OFFSET			((1 << IA64_TASK_STRUCT_LOG_NUM_PAGES)*PAGE_SIZE)
+#define IA64_RBS_OFFSET			((IA64_TASK_SIZE + IA64_THREAD_INFO_SIZE + 15) & ~15)
+#define IA64_STK_OFFSET			((1 << KERNEL_STACK_SIZE_ORDER)*PAGE_SIZE)
 
-#define INIT_TASK_SIZE			IA64_STK_OFFSET
+#define KERNEL_STACK_SIZE		IA64_STK_OFFSET
 
 #ifndef __ASSEMBLY__
 
@@ -247,7 +249,33 @@ force_successful_syscall_return (void)
 
 #endif /* !__KERNEL__ */
 
+/* pt_all_user_regs is used for PTRACE_GETREGS PTRACE_SETREGS */
+struct pt_all_user_regs {
+	unsigned long nat;
+	unsigned long cr_iip;
+	unsigned long cfm;
+	unsigned long cr_ipsr;
+	unsigned long pr;
+
+	unsigned long gr[32];
+	unsigned long br[8];
+	unsigned long ar[128];
+	struct ia64_fpreg fr[128];
+};
+
 #endif /* !__ASSEMBLY__ */
+
+/* indices to application-registers array in pt_all_user_regs */
+#define PT_AUR_RSC	16
+#define PT_AUR_BSP	17
+#define PT_AUR_BSPSTORE	18
+#define PT_AUR_RNAT	19
+#define PT_AUR_CCV	32
+#define PT_AUR_UNAT	36
+#define PT_AUR_FPSR	40
+#define PT_AUR_PFS	64
+#define PT_AUR_LC	65
+#define PT_AUR_EC	66
 
 /*
  * The numbers chosen here are somewhat arbitrary but absolutely MUST
@@ -256,5 +284,12 @@ force_successful_syscall_return (void)
 #define PTRACE_SINGLEBLOCK	12	/* resume execution until next branch */
 #define PTRACE_GETSIGINFO	13	/* get child's siginfo structure */
 #define PTRACE_SETSIGINFO	14	/* set child's siginfo structure */
+#define PTRACE_GETREGS		18	/* get all registers (pt_all_user_regs) in one shot */
+#define PTRACE_SETREGS		19	/* set all registers (pt_all_user_regs) in one shot */
+
+#define PTRACE_SETOPTIONS	21
+
+/* options set using PTRACE_SETOPTIONS */
+#define PTRACE_O_TRACESYSGOOD	0x00000001
 
 #endif /* _ASM_IA64_PTRACE_H */

@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc.
  * Copyright (C) 2000 by Colin Ngam
  */
 #ifndef _ASM_SN_SN_XTALK_XBOW_H
@@ -17,7 +17,7 @@
 #include <asm/sn/xtalk/xtalk.h>
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/xtalk/xswitch.h>
-#ifdef LANGUAGE_C
+#ifndef __ASSEMBLY__
 #include <asm/sn/xtalk/xbow_info.h>
 #endif
 
@@ -46,7 +46,7 @@
 
 #define MAX_XBOW_NAME 	16
 
-#if LANGUAGE_C
+#ifndef __ASSEMBLY__
 typedef uint32_t      xbowreg_t;
 
 #define XBOWCONST	(xbowreg_t)
@@ -236,7 +236,7 @@ typedef struct xbow_cfg_s {
 /* offset of arbitration register, given source widget id */
 #define XBOW_ARB_OFF(wid) 	(XBOW_ARB_IS_UPPER(wid) ? 0x1c : 0x24)
 
-#endif				/* LANGUAGE_C */
+#endif				/* __ASSEMBLY__ */
 
 #define	XBOW_WID_ID		WIDGET_ID
 #define	XBOW_WID_STAT		WIDGET_STATUS
@@ -402,7 +402,7 @@ typedef struct xbow_cfg_s {
 	(XWIDGET_PART_NUM(XWIDGET_ID_READ(nasid, 0)) == XXBOW_WIDGET_PART_NUM)
 
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 /*
  * XBOW Widget 0 Register formats.
  * Format for many of these registers are similar to the standard
@@ -891,5 +891,5 @@ struct macrofield_s     xbow_macrofield[] =
 
 #endif				/* MACROFIELD_LINE */
 
-#endif				/* _LANGUAGE_C */
+#endif				/* __ASSEMBLY__ */
 #endif                          /* _ASM_SN_SN_XTALK_XBOW_H */

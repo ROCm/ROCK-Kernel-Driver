@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc.
  * Copyright (C) 2000 by Colin Ngam
  */
 #ifndef __ASM_SN_XTALK_XWIDGET_H__
@@ -15,9 +15,9 @@
  */
 
 #include <asm/sn/xtalk/xtalk.h>
-#if LANGUAGE_C
+#ifndef __ASSEMBLY__
 #include <asm/sn/cdl.h>
-#endif /* LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
 #ifdef LITTLE_ENDIAN
 #define WIDGET_ID			0x00
@@ -115,7 +115,7 @@
  * widget target flush register are widget dependent thus will not be
  * defined here
  */
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 typedef uint32_t      widgetreg_t;
 
 /* widget configuration registers */
@@ -267,9 +267,6 @@ extern int              xwidget_register(struct xwidget_hwid_s *hwid,
 					 async_attach_t aa);
 
 extern int		xwidget_unregister(devfs_handle_t);
-extern void	        xwidget_error_register(devfs_handle_t xwidget,
-						error_handler_f * efunc,
-						error_handler_arg_t einfo);
 
 extern void             xwidget_reset(devfs_handle_t xwidget);
 extern void             xwidget_gfx_reset(devfs_handle_t xwidget);
@@ -289,6 +286,9 @@ extern xwidget_part_num_t xwidget_info_part_num_get(xwidget_info_t xwidget_info)
 extern xwidget_rev_num_t xwidget_info_rev_num_get(xwidget_info_t xwidget_info);
 extern xwidget_mfg_num_t xwidget_info_mfg_num_get(xwidget_info_t xwidget_info);
 
+extern xwidgetnum_t hub_widget_id(nasid_t);
+
+
 
 /*
  * TBD: DELETE THIS ENTIRE STRUCTURE!  Equivalent is now in
@@ -303,6 +303,6 @@ typedef struct v_widget_s {
 } v_widget_t;
 #endif				/* _KERNEL */
 
-#endif				/* _LANGUAGE_C */
+#endif				/* __ASSEMBLY__ */
 
 #endif				/* __ASM_SN_XTALK_XWIDGET_H__ */
