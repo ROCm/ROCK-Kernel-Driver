@@ -516,6 +516,9 @@ static u8 get_command(ide_drive_t *drive, struct request *rq, ide_task_t *task)
 			dma = 0;
 	}
 
+	if (!dma)
+		ide_init_sg_cmd(drive, rq);
+
 	if (rq_data_dir(rq) == READ) {
 		task->command_type = IDE_DRIVE_TASK_IN;
 		if (dma)
@@ -779,10 +782,6 @@ ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
 		ide_end_drive_cmd(drive, stat, err);
 		return ide_stopped;
 	}
-#ifdef CONFIG_IDE_TASKFILE_IO
-	/* make rq completion pointers new submission pointers */
-	blk_rq_prep_restart(rq);
-#endif
 
 	if (stat & BUSY_STAT || ((stat & WRERR_STAT) && !drive->nowerr)) {
 		/* other bits are useless when BUSY */
