@@ -53,11 +53,12 @@ static struct early_node_data mem_data[NR_NODES] __initdata;
 static void __init reassign_cpu_only_nodes(void)
 {
 	struct node_memblk_s *p;
-	int i, j, k, nnode, nid, cpu, cpunid;
+	int i, j, k, nnode, nid, cpu, cpunid, pxm;
 	u8 cslit, slit;
 	static DECLARE_BITMAP(nodes_with_mem, NR_NODES) __initdata;
 	static u8 numa_slit_fix[MAX_NUMNODES * MAX_NUMNODES] __initdata;
 	static int node_flip[NR_NODES] __initdata;
+	static int old_nid_map[NR_CPUS] __initdata;
 
 	for (nnode = 0, p = &node_memblk[0]; p < &node_memblk[num_node_memblks]; p++)
 		if (!test_bit(p->nid, (void *) nodes_with_mem)) {
@@ -104,9 +105,14 @@ static void __init reassign_cpu_only_nodes(void)
 
 		for (cpu = 0; cpu < NR_CPUS; cpu++)
 			if (node_cpuid[cpu].nid == i) {
-				/* For nodes not being reassigned just fix the cpu's nid. */
+				/*
+				 * For nodes not being reassigned just
+				 * fix the cpu's nid and reverse pxm map
+				 */
 				if (cpunid < numnodes) {
-					node_cpuid[cpu].nid = cpunid;
+					pxm = nid_to_pxm_map[i];
+					pxm_to_nid_map[pxm] =
+					          node_cpuid[cpu].nid = cpunid;
 					continue;
 				}
 
@@ -126,6 +132,8 @@ static void __init reassign_cpu_only_nodes(void)
 						}
 					}
 
+				/* save old nid map so we can update the pxm */
+				old_nid_map[cpu] = node_cpuid[cpu].nid;
 				node_cpuid[cpu].nid = k;
 			}
 	}
@@ -134,14 +142,19 @@ static void __init reassign_cpu_only_nodes(void)
 	 * Fixup temporary nid values for CPU-only nodes.
 	 */
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
-		if (node_cpuid[cpu].nid == (numnodes + numnodes))
-			node_cpuid[cpu].nid = nnode - 1;
-		else
-			for (i = 0; i < nnode; i++)
-				if (node_flip[i] == (node_cpuid[cpu].nid - numnodes)) {
-					node_cpuid[cpu].nid = i;
-					break;
-				}
+		if (node_cpuid[cpu].nid == (numnodes + numnodes)) {
+			pxm = nid_to_pxm_map[old_nid_map[cpu]];
+			pxm_to_nid_map[pxm] = node_cpuid[cpu].nid = nnode - 1;
+		} else {
+			for (i = 0; i < nnode; i++) {
+				if (node_flip[i] != (node_cpuid[cpu].nid - numnodes))
+					continue;
+
+				pxm = nid_to_pxm_map[old_nid_map[cpu]];
+				pxm_to_nid_map[pxm] = node_cpuid[cpu].nid = i;
+				break;
+			}
+		}
 
 	/*
 	 * Fix numa_slit by compressing from larger
