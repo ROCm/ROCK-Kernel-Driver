@@ -421,12 +421,12 @@ struct hlist_node {
 #define INIT_HLIST_HEAD(ptr) ((ptr)->first = NULL) 
 #define INIT_HLIST_NODE(ptr) ((ptr)->next = NULL, (ptr)->pprev = NULL)
 
-static __inline__ int hlist_unhashed(struct hlist_node *h) 
+static __inline__ int hlist_unhashed(const struct hlist_node *h) 
 { 
 	return !h->pprev;
 } 
 
-static __inline__ int hlist_empty(struct hlist_head *h) 
+static __inline__ int hlist_empty(const struct hlist_head *h) 
 { 
 	return !h->first;
 } 
