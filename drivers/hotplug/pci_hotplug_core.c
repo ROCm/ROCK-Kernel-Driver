@@ -36,6 +36,7 @@
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/mount.h>
 #include <linux/namei.h>
 #include <linux/pci.h>
 #include <linux/dnotify.h>
