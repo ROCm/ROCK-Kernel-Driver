@@ -150,7 +150,10 @@ Configuration pseudo-files:
 			point and if the uids user/password mapping
 			information is available. (default is 0)
   PacketSigningEnabled  If set to one, cifs packet signing is enabled
-			(default 0)
+			and will be used if the server requires 
+			it.  If set to two, cifs packet signing is
+			required even if the server considers packet
+			signing optional. (default 1)
   cifsFYI		If set to one, additional debug information is
 			logged to the system error log. (default 0)
   ExtendedSecurity	If set to one, SPNEGO session establishment
@@ -166,6 +169,7 @@ Configuration pseudo-files:
 			for one second improving performance of lookups
 			(default 1)
   OplockEnabled		If set to one, safe distributed caching enabled.
+			(default 1)
 
 These experimental features and tracing can be enabled by changing flags in /proc/fs/cifs
 (after the cifs module has been installed or built into the kernel, e.g. insmod cifs). 
