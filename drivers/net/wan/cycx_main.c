@@ -335,30 +335,6 @@ static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs)
 out:	return IRQ_NONE;
 }
 
-/*
- * This routine is called by the protocol-specific modules when network
- * interface is being open.  The only reason we need this, is because we
- * have to call MOD_INC_USE_COUNT, but cannot include 'module.h' where it's
- * defined more than once into the same kernel module.
- */
-void cyclomx_mod_inc_use_count(struct cycx_device *card)
-{
-	++card->open_cnt;
-	MOD_INC_USE_COUNT;
-}
-
-/*
- * This routine is called by the protocol-specific modules when network
- * interface is being closed.  The only reason we need this, is because we
- * have to call MOD_DEC_USE_COUNT, but cannot include 'module.h' where it's
- * defined more than once into the same kernel module.
- */
-void cyclomx_mod_dec_use_count(struct cycx_device *card)
-{
-	--card->open_cnt;
-	MOD_DEC_USE_COUNT;
-}
-
 /* Set WAN device state.  */
 void cyclomx_set_state(struct cycx_device *card, int state)
 {

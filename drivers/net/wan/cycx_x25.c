@@ -79,14 +79,17 @@
 #define CYCLOMX_X25_DEBUG 1
 
 #include <linux/version.h>
-#include <linux/kernel.h>	/* printk(), and other useful stuff */
-#include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
-#include <linux/string.h>	/* inline memset(), etc. */
-#include <linux/slab.h>	/* kmalloc(), kfree() */
-#include <linux/wanrouter.h>	/* WAN router definitions */
-#include <asm/byteorder.h>	/* htons(), etc. */
 #include <linux/if_arp.h>       /* ARPHRD_HWX25 */
+#include <linux/kernel.h>	/* printk(), and other useful stuff */
+#include <linux/module.h>	/* SET_MODULE_OWNER */
+#include <linux/string.h>	/* inline memset(), etc. */
+#include <linux/slab.h>		/* kmalloc(), kfree() */
+#include <linux/stddef.h>	/* offsetof(), etc. */
+#include <linux/wanrouter.h>	/* WAN router definitions */
+
+#include <asm/byteorder.h>	/* htons(), etc. */
+
 #include <linux/cyclomx.h>	/* Cyclom 2X common user API definitions */
 #include <linux/cycx_x25.h>	/* X.25 firmware API definitions */
 
@@ -458,7 +461,7 @@ static int del_if(struct wan_device *wandev, struct net_device *dev)
  * This routine is called only once for each interface, during Linux network
  * interface registration.  Returning anything but zero will fail interface
  * registration. */
-static int if_init (struct net_device *dev)
+static int if_init(struct net_device *dev)
 {
 	x25_channel_t *chan = dev->priv;
 	struct cycx_device *card = chan->card;
@@ -491,6 +494,7 @@ static int if_init (struct net_device *dev)
 
         /* Set transmit buffer queue length */
         dev->tx_queue_len = 10;
+	SET_MODULE_OWNER(dev);
 
 	/* Initialize socket buffers */
 	set_chan_state(dev, WAN_DISCONNECTED);
@@ -503,35 +507,27 @@ static int if_init (struct net_device *dev)
  * o if link is disconnected then initiate connection
  *
  * Return 0 if O.k. or errno.  */
-static int if_open (struct net_device *dev)
+static int if_open(struct net_device *dev)
 {
-	x25_channel_t *chan = dev->priv;
-	struct cycx_device *card = chan->card;
-
 	if (netif_running(dev))
 		return -EBUSY; /* only one open is allowed */ 
 
 	netif_start_queue(dev);
-	cyclomx_mod_inc_use_count(card);
-
 	return 0;
 }
 
 /* Close network interface.
  * o reset flags.
  * o if there's no more open channels then disconnect physical link. */
-static int if_close (struct net_device *dev)
+static int if_close(struct net_device *dev)
 {
 	x25_channel_t *chan = dev->priv;
-	struct cycx_device *card = chan->card;
 
 	netif_stop_queue(dev);
 	
 	if (chan->state == WAN_CONNECTED || chan->state == WAN_CONNECTING)
 		chan_disconnect(dev);
 		
-	cyclomx_mod_dec_use_count(card);
-
 	return 0;
 }
 
