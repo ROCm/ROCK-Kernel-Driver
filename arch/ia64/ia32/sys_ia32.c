@@ -1102,7 +1102,7 @@ struct shmid_ds32 {
 };
 
 struct shmid64_ds32 {
-	struct ipc64_perm shm_perm;
+	struct ipc64_perm32 shm_perm;
 	compat_size_t shm_segsz;
 	compat_time_t   shm_atime;
 	unsigned int __unused1;
