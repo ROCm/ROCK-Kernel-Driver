@@ -257,13 +257,6 @@ ppc_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
 	return sys_select(n, inp, outp, exp, tvp);
 }
 
-int sys_pause(void)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule();
-	return -ERESTARTNOHAND;
-}
-
 int sys_uname(struct old_utsname * name)
 {
 	int err = -EFAULT;

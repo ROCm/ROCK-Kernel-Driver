@@ -227,17 +227,6 @@ out:
 	return ret;
 }
 
-asmlinkage int sys_pause(void)
-{
-	
-	PPCDBG(PPCDBG_SYS64X, "sys_pause - entered - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-	current->state = TASK_INTERRUPTIBLE;
-	schedule();
-	
-	PPCDBG(PPCDBG_SYS64X, "sys_pause - exited - pid=%ld current=%lx comm=%s \n", current->pid, current, current->comm);
-	return -ERESTARTNOHAND;
-}
-
 static int __init set_fakeppc(char *str)
 {
 	if (*str)

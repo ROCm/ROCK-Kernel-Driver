@@ -105,8 +105,8 @@ typedef struct {
 	struct rw_semaphore mftbmp_lock; /* Lock for serializing accesses to the
 					    mft record bitmap ($MFT/$BITMAP). */
 	union {
-		s64 nr_mft_records;	/* Number of records in the mft. */
-		s64 nr_mft_bits;	/* Number of bits in mft bitmap. */
+		unsigned long nr_mft_records; /* Number of mft records. */
+		unsigned long nr_mft_bits; /* Number of bits in mft bitmap. */
 	} SN(vmm);
 	struct address_space mftbmp_mapping; /* Page cache for $MFT/$BITMAP. */
 	run_list mftbmp_rl;		/* Run list for $MFT/$BITMAP. */

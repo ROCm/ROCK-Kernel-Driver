@@ -14,28 +14,28 @@ if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
    bool '  HiSax Support for US NI1' CONFIG_HISAX_NI1
    int  '  Maximum number of cards supported by HiSax' CONFIG_HISAX_MAX_CARDS 8
    comment '  HiSax supported cards'
-   bool '  Teles 16.0/8.0' CONFIG_HISAX_16_0
+   bool '  Teles 16.0/8.0' CONFIG_HISAX_16_0 $CONFIG_ISA
    bool '  Teles 16.3 or PNP or PCMCIA' CONFIG_HISAX_16_3
    bool '  Teles PCI' CONFIG_HISAX_TELESPCI 
    bool '  Teles S0Box' CONFIG_HISAX_S0BOX 
-   bool '  AVM A1 (Fritz)' CONFIG_HISAX_AVM_A1
+   bool '  AVM A1 (Fritz)' CONFIG_HISAX_AVM_A1 $CONFIG_ISA
    bool '  AVM PnP/PCI (Fritz!PnP/PCI)' CONFIG_HISAX_FRITZPCI
    bool '  AVM A1 PCMCIA (Fritz)' CONFIG_HISAX_AVM_A1_PCMCIA
    bool '  Elsa cards' CONFIG_HISAX_ELSA
-   bool '  ITK ix1-micro Revision 2' CONFIG_HISAX_IX1MICROR2
+   bool '  ITK ix1-micro Revision 2' CONFIG_HISAX_IX1MICROR2 $CONFIG_ISA
    bool '  Eicon.Diehl Diva cards' CONFIG_HISAX_DIEHLDIVA
-   bool '  ASUSCOM ISA cards' CONFIG_HISAX_ASUSCOM
-   bool '  TELEINT cards' CONFIG_HISAX_TELEINT
-   bool '  HFC-S based cards' CONFIG_HISAX_HFCS
+   bool '  ASUSCOM ISA cards' CONFIG_HISAX_ASUSCOM $CONFIG_ISA
+   bool '  TELEINT cards' CONFIG_HISAX_TELEINT $CONFIG_ISA
+   bool '  HFC-S based cards' CONFIG_HISAX_HFCS $CONFIG_ISA
    bool '  Sedlbauer cards' CONFIG_HISAX_SEDLBAUER
-   bool '  USR Sportster internal TA' CONFIG_HISAX_SPORTSTER
-   bool '  MIC card' CONFIG_HISAX_MIC
+   bool '  USR Sportster internal TA' CONFIG_HISAX_SPORTSTER $CONFIG_ISA
+   bool '  MIC card' CONFIG_HISAX_MIC $CONFIG_ISA
    bool '  NETjet card' CONFIG_HISAX_NETJET
    bool '  NETspider U card' CONFIG_HISAX_NETJET_U
    bool '  Niccy PnP/PCI card' CONFIG_HISAX_NICCY
-   bool '  Siemens I-Surf card' CONFIG_HISAX_ISURF
-   bool '  HST Saphir card' CONFIG_HISAX_HSTSAPHIR
-   bool '  Telekom A4T card' CONFIG_HISAX_BKM_A4T
+   bool '  Siemens I-Surf card' CONFIG_HISAX_ISURF $CONFIG_ISA
+   bool '  HST Saphir card' CONFIG_HISAX_HSTSAPHIR $CONFIG_ISA
+   bool '  Telekom A4T card' CONFIG_HISAX_BKM_A4T 
    bool '  Scitel Quadro card' CONFIG_HISAX_SCT_QUADRO
    bool '  Gazel cards' CONFIG_HISAX_GAZEL
    bool '  HFC PCI-Bus cards' CONFIG_HISAX_HFC_PCI
@@ -52,6 +52,7 @@ if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
 
    dep_tristate 'Sedlbauer PCMCIA cards'                              CONFIG_HISAX_SEDLBAUER_CS  $CONFIG_ISDN_DRV_HISAX $CONFIG_PCMCIA
    dep_tristate 'ELSA PCMCIA MicroLink cards'                         CONFIG_HISAX_ELSA_CS       $CONFIG_ISDN_DRV_HISAX $CONFIG_PCMCIA
+   dep_tristate 'AVM A1 PCMCIA cards'                                 CONFIG_HISAX_AVM_A1_CS     $CONFIG_ISDN_DRV_HISAX $CONFIG_PCMCIA
    dep_tristate 'ST5481 USB ISDN modem (EXPERIMENTAL)'                CONFIG_HISAX_ST5481        $CONFIG_ISDN_DRV_HISAX $CONFIG_USB $CONFIG_EXPERIMENTAL
    dep_tristate 'AVM Fritz!Card PCI/PCIv2/PnP support (EXPERIMENTAL)' CONFIG_HISAX_FRITZ_PCIPNP  $CONFIG_ISDN_DRV_HISAX $CONFIG_EXPERIMENTAL
    dep_tristate 'AVM Fritz!Card classic support (EXPERIMENTAL)'       CONFIG_HISAX_FRITZ_CLASSIC $CONFIG_ISDN_DRV_HISAX  $CONFIG_EXPERIMENTAL

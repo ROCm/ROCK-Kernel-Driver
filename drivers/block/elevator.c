@@ -388,9 +388,41 @@ void __elv_add_request(request_queue_t *q, struct request *rq,
 	q->elevator.elevator_add_req_fn(q, rq, insert_here);
 }
 
-struct request *__elv_next_request(request_queue_t *q)
+static inline struct request *__elv_next_request(request_queue_t *q)
 {
 	return q->elevator.elevator_next_req_fn(q);
+}
+
+struct request *elv_next_request(request_queue_t *q)
+{
+	struct request *rq;
+
+	while ((rq = __elv_next_request(q))) {
+		rq->flags |= REQ_STARTED;
+
+		if (&rq->queuelist == q->last_merge)
+			q->last_merge = NULL;
+
+		if ((rq->flags & REQ_DONTPREP) || !q->prep_rq_fn)
+			break;
+
+		/*
+		 * all ok, break and return it
+		 */
+		if (!q->prep_rq_fn(q, rq))
+			break;
+
+		/*
+		 * prep said no-go, kill it
+		 */
+		blkdev_dequeue_request(rq);
+		if (end_that_request_first(rq, 0, rq->nr_sectors))
+			BUG();
+
+		end_that_request_last(rq);
+	}
+
+	return rq;
 }
 
 void elv_remove_request(request_queue_t *q, struct request *rq)
@@ -423,7 +455,7 @@ EXPORT_SYMBOL(elevator_linus);
 EXPORT_SYMBOL(elevator_noop);
 
 EXPORT_SYMBOL(__elv_add_request);
-EXPORT_SYMBOL(__elv_next_request);
+EXPORT_SYMBOL(elv_next_request);
 EXPORT_SYMBOL(elv_remove_request);
 EXPORT_SYMBOL(elevator_exit);
 EXPORT_SYMBOL(elevator_init);

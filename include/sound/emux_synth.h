@@ -25,7 +25,7 @@
 #include "seq_device.h"
 #include "soundfont.h"
 #include "seq_midi_emul.h"
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 #include "seq_oss.h"
 #endif
 #include "emux_legacy.h"
@@ -65,7 +65,7 @@ typedef struct snd_emux_operators {
 	void (*sample_reset)(snd_emux_t *emu);
 	int (*load_fx)(snd_emux_t *emu, int type, int arg, const void *data, long count);
 	void (*sysex)(snd_emux_t *emu, char *buf, int len, int parsed, snd_midi_channel_set_t *chset);
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 	int (*oss_ioctl)(snd_emux_t *emu, int cmd, int p1, int p2);
 #endif
 } snd_emux_operators_t;
@@ -102,6 +102,7 @@ struct snd_emux {
 	unsigned long flags;	/* other conditions */
 	int midi_ports;		/* number of virtual midi devices */
 	int midi_devidx;	/* device offset of virtual midi */
+	unsigned int linear_panning: 1; /* panning is linear (sbawe = 1, emu10k1 = 0) */
 
 	/* private */
 	int num_voices;		/* current number of voices */
@@ -124,7 +125,7 @@ struct snd_emux {
 	snd_info_entry_t *proc;
 #endif
 
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 	snd_seq_device_t *oss_synth;
 #endif
 };
@@ -145,7 +146,7 @@ struct snd_emux_port {
 #ifdef SNDRV_EMUX_USE_RAW_EFFECT
 	snd_emux_effect_table_t *effect;
 #endif
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 	snd_seq_oss_arg_t *oss_arg;
 #endif
 };

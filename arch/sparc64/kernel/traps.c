@@ -402,7 +402,7 @@ void __init cheetah_ecache_flush_init(void)
 {
 	unsigned long largest_size, smallest_linesize, order;
 	char type[16];
-	int node, highest_cpu, i;
+	int node, i;
 
 	/* Scan all cpu device tree nodes, note two values:
 	 * 1) largest E-cache size
@@ -458,15 +458,7 @@ void __init cheetah_ecache_flush_init(void)
 	}
 
 	/* Now allocate error trap reporting scoreboard. */
-	highest_cpu = 0;
-#ifdef CONFIG_SMP
-	for (i = 0; i < NR_CPUS; i++) {
-		if ((1UL << i) & cpu_present_map)
-			highest_cpu = i;
-	}
-#endif
-	highest_cpu++;
-	node = highest_cpu * (2 * sizeof(struct cheetah_err_info));
+	node = NR_CPUS * (2 * sizeof(struct cheetah_err_info));
 	for (order = 0; order < MAX_ORDER; order++) {
 		if ((PAGE_SIZE << order) >= node)
 			break;
@@ -483,7 +475,7 @@ void __init cheetah_ecache_flush_init(void)
 	/* Mark all AFSRs as invalid so that the trap handler will
 	 * log new new information there.
 	 */
-	for (i = 0; i < 2 * highest_cpu; i++)
+	for (i = 0; i < 2 * NR_CPUS; i++)
 		cheetah_error_log[i].afsr = CHAFSR_INVALID;
 
 	/* Now patch trap tables. */

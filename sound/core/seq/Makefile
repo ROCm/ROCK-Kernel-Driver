@@ -4,7 +4,9 @@
 #
 
 obj-$(CONFIG_SND) += instr/
-obj-$(CONFIG_SND_SEQUENCER_OSS) += oss/
+ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)
+  obj-$(CONFIG_SND_SEQUENCER) += oss/
+endif
 
 export-objs  := seq_device.o seq.o seq_ports.o seq_instr.o seq_midi_emul.o \
 		seq_midi_event.o seq_virmidi.o
@@ -21,7 +23,9 @@ snd-seq-dummy-objs := seq_dummy.o
 snd-seq-virmidi-objs := seq_virmidi.o
 
 obj-$(CONFIG_SND_SEQUENCER) += snd-seq.o snd-seq-device.o
-obj-$(CONFIG_SND_SEQUENCER_OSS) += snd-seq-midi-event.o
+ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)
+obj-$(CONFIG_SND_SEQUENCER) += snd-seq-midi-event.o
+endif
 obj-$(CONFIG_SND_SEQ_DUMMY) += snd-seq-dummy.o
 
 # Toplevel Module Dependency
@@ -69,5 +73,7 @@ obj-$(CONFIG_SND_CS46XX) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-mi
 obj-$(CONFIG_SND_EMU10K1) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-virmidi.o
 obj-$(CONFIG_SND_TRIDENT) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-instr.o
 obj-$(CONFIG_SND_YMFPCI) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-instr.o
+
+obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

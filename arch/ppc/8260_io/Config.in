@@ -5,8 +5,6 @@ mainmenu_option next_comment
 comment 'MPC8260 Communication Options'
 bool 'Enable SCC Console' CONFIG_SCC_CONSOLE
 if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
-  mainmenu_option next_comment
-  comment 'MPC8260 Communication Options'
   bool 'CPM SCC Ethernet' CONFIG_SCC_ENET
   if [ "$CONFIG_SCC_ENET" = "y" ]; then
   bool 'Ethernet on SCC1' CONFIG_SCC1_ENET

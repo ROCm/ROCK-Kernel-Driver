@@ -240,8 +240,7 @@ static inline void unmap_mft_record_page(ntfs_inode *ni)
  *
  * The mft record is now ours and we return a pointer to it. You need to check
  * the returned pointer with IS_ERR() and if that is true, PTR_ERR() will return
- * the error code. The following error codes are defined:
- * 	TODO: Fill in the possible error codes.
+ * the error code.
  *
  * NOTE: Caller is responsible for setting the mft record dirty before calling
  * unmap_mft_record(). This is obviously only necessary if the caller really
@@ -254,8 +253,7 @@ MFT_RECORD *map_mft_record(const int rw, ntfs_inode *ni)
 {
 	MFT_RECORD *m;
 
-	ntfs_debug("Entering for i_ino 0x%Lx, mapping for %s.",
-			(unsigned long long)ni->mft_no,
+	ntfs_debug("Entering for mft_no 0x%lx, mapping for %s.", ni->mft_no,
 			rw == READ ? "READ" : "WRITE");
 
 	/* Make sure the ntfs inode doesn't go away. */
@@ -318,8 +316,7 @@ void unmap_mft_record(const int rw, ntfs_inode *ni)
 
 	BUG_ON(!atomic_read(&ni->mft_count) || !page);
 
-	ntfs_debug("Entering for mft_no 0x%Lx, unmapping from %s.",
-			(unsigned long long)ni->mft_no,
+	ntfs_debug("Entering for mft_no 0x%lx, unmapping from %s.", ni->mft_no,
 			rw == READ ? "READ" : "WRITE");
 
 	/* Only release the actual page mapping if this is the last one. */
@@ -369,13 +366,12 @@ MFT_RECORD *map_extent_mft_record(ntfs_inode *base_ni, MFT_REF mref,
 	ntfs_inode *ni = NULL;
 	ntfs_inode **extent_nis = NULL;
 	int i;
-	u64 mft_no = MREF_LE(mref);
+	unsigned long mft_no = MREF_LE(mref);
 	u16 seq_no = MSEQNO_LE(mref);
 	BOOL destroy_ni = FALSE;
 
-	ntfs_debug("Mapping extent mft record 0x%Lx (base mft record 0x%Lx).",
-			(unsigned long long)mft_no,
-			(unsigned long long)base_ni->mft_no);
+	ntfs_debug("Mapping extent mft record 0x%lx (base mft record 0x%lx).",
+			mft_no, base_ni->mft_no);
 	/* Make sure the base ntfs inode doesn't go away. */
 	atomic_inc(&base_ni->count);
 	/*

@@ -39,7 +39,7 @@ struct _ntfs_inode {
 	s64 allocated_size;	/* Copy from $DATA/$INDEX_ALLOCATION. */
 	unsigned long state;	/* NTFS specific flags describing this inode.
 				   See fs/ntfs/ntfs.h:ntfs_inode_state_bits. */
-	u64 mft_no;		/* Mft record number (inode number). */
+	unsigned long mft_no;	/* Number of the mft record / inode. */
 	u16 seq_no;		/* Sequence number of the mft record. */
 	atomic_t count;		/* Inode reference count for book keeping. */
 	ntfs_volume *vol;	/* Pointer to the ntfs volume of this inode. */

@@ -17,8 +17,8 @@
 #include <asm/smp.h>
 #include <asm/spitfire.h>
 
-struct prom_cpuinfo linux_cpus[64] __initdata = { { 0 } };
-unsigned prom_cpu_nodes[64];
+struct prom_cpuinfo linux_cpus[NR_CPUS] __initdata = { { 0 } };
+unsigned prom_cpu_nodes[NR_CPUS];
 int linux_num_cpus = 0;
 
 extern void cpu_probe(void);

@@ -122,9 +122,12 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
-		for (j = 0; j < smp_num_cpus; j++)
+		for (j = 0; j < NR_CPUS; j++) {
+			if (!cpu_online(j))
+				continue;
 			seq_printf(p, "%10u ",
-				   kstat.irqs[cpu_logical_map(j)][i]);
+				   kstat.irqs[j][i]);
+		}
 #endif
 		seq_printf(p, " %s:%lx", action->name,
 			   get_ino_in_irqaction(action));
@@ -574,12 +577,18 @@ static void show(char * str)
 
 	printk("\n%s, CPU %d:\n", str, cpu);
 	printk("irq:  %d [ ", irqs_running());
-	for (i = 0; i < smp_num_cpus; i++)
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 		printk("%u ", __brlock_array[i][BR_GLOBALIRQ_LOCK]);
+	}
 	printk("]\nbh:   %d [ ",
 	       (spin_is_locked(&global_bh_lock) ? 1 : 0));
-	for (i = 0; i < smp_num_cpus; i++)
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 		printk("%u ", local_bh_count(i));
+	}
 	printk("]\n");
 }
 
@@ -743,8 +752,9 @@ static inline void redirect_intr(int cpu, struct ino_bucket *bp)
 	unsigned long cpu_mask = get_smpaff_in_irqaction(ap);
 	unsigned int buddy, ticks;
 
+	cpu_mask &= cpu_online_map;
 	if (cpu_mask == 0)
-		cpu_mask = ~0UL;
+		cpu_mask = cpu_online_map;
 
 	if (this_is_starfire != 0 ||
 	    bp->pil >= 10 || current->pid == 0)
@@ -753,27 +763,22 @@ static inline void redirect_intr(int cpu, struct ino_bucket *bp)
 	/* 'cpu' is the MID (ie. UPAID), calculate the MID
 	 * of our buddy.
 	 */
-	buddy = cpu_number_map(cpu) + 1;
-	if (buddy >= NR_CPUS ||
-	    cpu_logical_map(buddy) == -1)
+	buddy = cpu + 1;
+	if (buddy >= NR_CPUS)
 		buddy = 0;
 
 	ticks = 0;
 	while ((cpu_mask & (1UL << buddy)) == 0) {
-		buddy++;
-		if (buddy >= NR_CPUS ||
-		    cpu_logical_map(buddy) == -1)
-			buddy = cpu_logical_map(0);
+		if (++buddy >= NR_CPUS)
+			buddy = 0;
 		if (++ticks > NR_CPUS) {
 			put_smpaff_in_irqaction(ap, 0);
 			goto out;
 		}
 	}
 
-	if (buddy == cpu_number_map(cpu))
+	if (buddy == cpu)
 		goto out;
-
-	buddy = cpu_logical_map(buddy);
 
 	/* Voo-doo programming. */
 	if (cpu_data[buddy].idle_volume < FORWARD_VOLUME)
@@ -1140,22 +1145,28 @@ static int retarget_one_irq(struct irqaction *p, int goal_cpu)
 	unsigned long imap = bucket->imap;
 	unsigned int tid;
 
+	while (!cpu_online(goal_cpu)) {
+		if (++goal_cpu >= NR_CPUS)
+			goal_cpu = 0;
+	}
+
 	if (tlb_type == cheetah) {
-		tid = __cpu_logical_map[goal_cpu] << 26;
+		tid = goal_cpu << 26;
 		tid &= IMAP_AID_SAFARI;
 	} else if (this_is_starfire == 0) {
-		tid = __cpu_logical_map[goal_cpu] << 26;
+		tid = goal_cpu << 26;
 		tid &= IMAP_TID_UPA;
 	} else {
-		tid = (starfire_translate(imap, __cpu_logical_map[goal_cpu]) << 26);
+		tid = (starfire_translate(imap, goal_cpu) << 26);
 		tid &= IMAP_TID_UPA;
 	}
 	upa_writel(tid | IMAP_VALID, imap);
 
-	goal_cpu++;
-	if(goal_cpu >= NR_CPUS ||
-	   __cpu_logical_map[goal_cpu] == -1)
-		goal_cpu = 0;
+	while (!cpu_online(goal_cpu)) {
+		if (++goal_cpu >= NR_CPUS)
+			goal_cpu = 0;
+	}
+
 	return goal_cpu;
 }
 
@@ -1326,46 +1337,12 @@ out:
 	return 0;
 }
 
-static unsigned long hw_to_logical(unsigned long mask)
-{
-	unsigned long new_mask = 0UL;
-	int i;
-
-	for (i = 0; i < NR_CPUS; i++) {
-		if (mask & (1UL << i)) {
-			int logical = cpu_number_map(i);
-
-			new_mask |= (1UL << logical);
-		}
-	}
-
-	return new_mask;
-}
-
-static unsigned long logical_to_hw(unsigned long mask)
-{
-	unsigned long new_mask = 0UL;
-	int i;
-
-	for (i = 0; i < NR_CPUS; i++) {
-		if (mask & (1UL << i)) {
-			int hw = cpu_logical_map(i);
-
-			new_mask |= (1UL << hw);
-		}
-	}
-
-	return new_mask;
-}
-
 static int irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
 	struct ino_bucket *bp = ivector_table + (long)data;
 	struct irqaction *ap = bp->irq_info;
 	unsigned long mask = get_smpaff_in_irqaction(ap);
-
-	mask = logical_to_hw(mask);
 
 	if (count < HEX_DIGITS+1)
 		return -EINVAL;
@@ -1375,14 +1352,11 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 static inline void set_intr_affinity(int irq, unsigned long hw_aff)
 {
 	struct ino_bucket *bp = ivector_table + irq;
-	unsigned long aff = hw_to_logical(hw_aff);
 
-	/*
-	 * Users specify affinity in terms of cpu ids, which is what
-	 * is displayed via /proc/cpuinfo. As soon as we do this, 
-	 * handler_irq() might see and take action.
+	/* Users specify affinity in terms of hw cpu ids.
+	 * As soon as we do this, handler_irq() might see and take action.
 	 */
-	put_smpaff_in_irqaction((struct irqaction *)bp->irq_info, aff);
+	put_smpaff_in_irqaction((struct irqaction *)bp->irq_info, hw_aff);
 
 	/* Migration is simply done by the next cpu to service this
 	 * interrupt.
@@ -1393,7 +1367,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
 	int irq = (long) data, full_count = count, err;
-	unsigned long new_value;
+	unsigned long new_value, i;
 
 	err = parse_hex_value(buffer, count, &new_value);
 
@@ -1402,7 +1376,12 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	 * way to make the system unusable accidentally :-) At least
 	 * one online CPU still has to be targeted.
 	 */
-	new_value &= cpu_online_map;
+	for (i = 0; i < NR_CPUS; i++) {
+		if ((new_value & (1UL << i)) != 0 &&
+		    !cpu_online(i))
+			new_value &= ~(1UL << i);
+	}
+
 	if (!new_value)
 		return -EINVAL;
 

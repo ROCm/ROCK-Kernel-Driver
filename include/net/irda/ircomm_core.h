@@ -32,6 +32,7 @@
 #define IRCOMM_CORE_H
 
 #include <net/irda/irda.h>
+#include <net/irda/irqueue.h>
 #include <net/irda/ircomm_event.h>
 
 #define IRCOMM_MAGIC 0x98347298

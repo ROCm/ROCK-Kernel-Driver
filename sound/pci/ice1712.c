@@ -1206,6 +1206,7 @@ static void snd_ice1712_set_pro_rate(ice1712_t *ice, snd_pcm_substream_t *substr
 	outb(val, ICEMT(ice, RATE));
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_DELTA1010:
+	case ICE1712_SUBDEVICE_DELTA1010LT:	// check it --jk
 	case ICE1712_SUBDEVICE_DELTADIO2496:
 	case ICE1712_SUBDEVICE_DELTA66:
 	case ICE1712_SUBDEVICE_DELTA44:
@@ -3770,6 +3771,7 @@ static int __devinit snd_ice1712_chip_init(ice1712_t *ice)
 		has_i2c = 1;
 		/* follow thru */
 	case ICE1712_SUBDEVICE_DELTA1010:
+	case ICE1712_SUBDEVICE_STDSP24:
 		ice->num_adcs = ice->num_dacs = ice->num_total_dacs = 8;
 		break;
 	case ICE1712_SUBDEVICE_EWS88D:

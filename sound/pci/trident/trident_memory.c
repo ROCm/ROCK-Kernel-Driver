@@ -34,12 +34,12 @@
  * aligned pages in others
  */
 #define __set_tlb_bus(trident,page,ptr,addr) \
-	do { (trident)->tlb.entries[page] = (addr) & ~(SNDRV_TRIDENT_PAGE_SIZE-1); \
+	do { (trident)->tlb.entries[page] = cpu_to_le32((addr) & ~(SNDRV_TRIDENT_PAGE_SIZE-1)); \
 	     (trident)->tlb.shadow_entries[page] = (ptr); } while (0)
 #define __tlb_to_ptr(trident,page) \
 	(void*)((trident)->tlb.shadow_entries[page])
 #define __tlb_to_addr(trident,page) \
-	(dma_addr_t)((trident->tlb.entries[page]) & ~(SNDRV_TRIDENT_PAGE_SIZE - 1))
+	(dma_addr_t)le32_to_cpu((trident->tlb.entries[page]) & ~(SNDRV_TRIDENT_PAGE_SIZE - 1))
 
 #if PAGE_SIZE == 4096
 /* page size == SNDRV_TRIDENT_PAGE_SIZE */

@@ -597,7 +597,6 @@ static int cmd64x_udma_stop(struct ata_device *drive)
 	struct pci_dev *dev	= ch->pci_dev;
 	u8 jack_slap		= ((dev->device == PCI_DEVICE_ID_CMD_648) || (dev->device == PCI_DEVICE_ID_CMD_649)) ? 1 : 0;
 
-	drive->waiting_for_dma = 0;
 	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 	dma_stat = inb(dma_base+2);		/* get DMA status */
 	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
@@ -647,7 +646,6 @@ static int cmd646_1_udma_stop(struct ata_device *drive)
 	unsigned long dma_base = ch->dma_base;
 	u8 dma_stat;
 
-	drive->waiting_for_dma = 0;
 	dma_stat = inb(dma_base+2);		/* get DMA status */
 	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */

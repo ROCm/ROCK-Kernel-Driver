@@ -241,13 +241,6 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 	return error;
 }
 
-asmlinkage int sys_pause(void)
-{
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule();
-	return -ERESTARTNOHAND;
-}
-
 asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
 {
   return -ENOSYS;

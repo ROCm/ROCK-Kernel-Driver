@@ -28,20 +28,17 @@ struct irqaction {
    
 enum {
 	TIMER_BH = 0,
-	TQUEUE_BH,
-	DIGI_BH,
-	SERIAL_BH,
-	RISCOM8_BH,
-	SPECIALIX_BH,
-	AURORA_BH,
-	ESP_BH,
-	SCSI_BH,
-	IMMEDIATE_BH,
-	CYCLADES_BH,
-	CM206_BH,
-	JS_BH,
-	MACSERIAL_BH,
-	ISICOM_BH
+	TQUEUE_BH = 1,
+	DIGI_BH = 2,
+	SERIAL_BH = 3,
+	RISCOM8_BH = 4,
+	SPECIALIX_BH = 5,
+	AURORA_BH = 6,
+	ESP_BH = 7,
+	IMMEDIATE_BH = 9,
+	CYCLADES_BH = 10,
+	MACSERIAL_BH = 13,
+	ISICOM_BH = 14
 };
 
 #include <asm/hardirq.h>

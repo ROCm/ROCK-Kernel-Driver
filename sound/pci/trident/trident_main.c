@@ -3236,7 +3236,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 		}
 		memset(trident->tlb.silent_page, 0, SNDRV_TRIDENT_PAGE_SIZE);
 		for (i = 0; i < SNDRV_TRIDENT_MAX_PAGES; i++) {
-			trident->tlb.entries[i] = trident->tlb.silent_page_dmaaddr & ~(SNDRV_TRIDENT_PAGE_SIZE-1);
+			trident->tlb.entries[i] = cpu_to_le32(trident->tlb.silent_page_dmaaddr & ~(SNDRV_TRIDENT_PAGE_SIZE-1));
 			trident->tlb.shadow_entries[i] = (unsigned long)trident->tlb.silent_page;
 		}
 

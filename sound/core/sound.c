@@ -426,7 +426,7 @@ EXPORT_SYMBOL(snd_kmalloc_strdup);
 EXPORT_SYMBOL(snd_malloc_pages);
 EXPORT_SYMBOL(snd_malloc_pages_fallback);
 EXPORT_SYMBOL(snd_free_pages);
-#ifdef CONFIG_ISA
+#if defined(CONFIG_ISA) && ! defined(CONFIG_PCI)
 EXPORT_SYMBOL(snd_malloc_isa_pages);
 EXPORT_SYMBOL(snd_malloc_isa_pages_fallback);
 #endif
@@ -440,7 +440,7 @@ EXPORT_SYMBOL(copy_from_user_toio);
   /* init.c */
 EXPORT_SYMBOL(snd_cards_count);
 EXPORT_SYMBOL(snd_cards);
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 EXPORT_SYMBOL(snd_mixer_oss_notify_callback);
 #endif
 EXPORT_SYMBOL(snd_card_new);

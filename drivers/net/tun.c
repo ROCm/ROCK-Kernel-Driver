@@ -275,7 +275,7 @@ static __inline__ ssize_t tun_put_user(struct tun_struct *tun,
 		total += sizeof(pi);
 	}       
 
-	len = MIN(skb->len, len);
+	len = min(skb->len, len);
 
 	skb_copy_datagram_iovec(skb, 0, iv, len);
 	total += len;

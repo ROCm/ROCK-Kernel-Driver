@@ -12,7 +12,7 @@ snd-sb16-csp-objs := sb16_csp.o
 snd-sb8-objs := sb8.o
 snd-sb16-objs := sb16.o
 snd-sbawe-objs := sbawe.o emu8000.o
-snd-emu8000-synth-objs := emu8000_synth.o emu8000_callback.o emu8000_patch.o
+snd-emu8000-synth-objs := emu8000_synth.o emu8000_callback.o emu8000_patch.o emu8000_pcm.o
 snd-es968-objs := es968.o
 
 # Toplevel Module Dependency
@@ -31,5 +31,7 @@ endif
 ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_SBAWE) += snd-emu8000-synth.o
 endif
+
+obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

@@ -298,7 +298,6 @@ struct ata_device {
 	unsigned using_tcq	: 1;	/* disk is using queueing */
 	unsigned dsc_overlap	: 1;	/* flag: DSC overlap */
 
-	unsigned waiting_for_dma: 1;	/* dma currently in progress */
 	unsigned busy		: 1;	/* currently doing revalidate_disk() */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 
@@ -681,7 +680,8 @@ static inline void ide_unmap_rq(struct request *rq, char *to,
 		bio_kunmap_irq(to, flags);
 }
 
-extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *, char *);
+extern ide_startstop_t ata_special_intr(struct ata_device *, struct request *);
+extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *);
 
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_config_drive_speed(struct ata_device *, byte);
@@ -756,6 +756,8 @@ static inline void udma_start(struct ata_device *drive, struct request *rq)
 
 static inline int udma_stop(struct ata_device *drive)
 {
+	clear_bit(IDE_DMA, drive->channel->active);
+
 	return drive->channel->udma_stop(drive);
 }
 
@@ -764,7 +766,11 @@ static inline int udma_stop(struct ata_device *drive)
  */
 static inline ide_startstop_t udma_init(struct ata_device *drive, struct request *rq)
 {
-	return drive->channel->udma_init(drive, rq);
+	int ret = drive->channel->udma_init(drive, rq);
+	if (ret == ide_started)
+		set_bit(IDE_DMA, drive->channel->active);
+
+	return ret;
 }
 
 static inline int udma_irq_status(struct ata_device *drive)

@@ -53,7 +53,6 @@ struct _snd_seq_client {
 	char name[64];		/* client name */
 	int number;		/* client number */
 	unsigned int filter;	/* filter flags */
-	bitmap_member(client_filter, 256);
 	bitmap_member(event_filter, 256);
 	snd_use_lock_t use_lock;
 	int event_lost;

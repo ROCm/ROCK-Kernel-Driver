@@ -24,37 +24,13 @@ int this_is_starfire = 0;
 void check_if_starfire(void)
 {
 	int ssnode = prom_finddevice("/ssp-serial");
-	if(ssnode != 0 && ssnode != -1)
+	if (ssnode != 0 && ssnode != -1)
 		this_is_starfire = 1;
 }
 
 void starfire_cpu_setup(void)
 {
-	if (this_is_starfire) {
-/*
- * We do this in starfire_translate and xcall_deliver. When we fix our cpu
- * arrays to support > 64 processors we can use the real upaid instead
- * of the logical cpuid in __cpu_number_map etc, then we can get rid of
- * the translations everywhere. - Anton
- */
-#if 0
-		int i;
-
-		/*
-		 * Now must fixup cpu MIDs.  OBP gave us a logical
-		 * linear cpuid number, not the real upaid.
-		 */
-		for(i = 0; i < linux_num_cpus; i++) {
-			unsigned int mid = linux_cpus[i].mid;
-
-			mid = (((mid & 0x3c) << 1) |
-			       ((mid & 0x40) >> 4) |
-			       (mid & 0x3));
-
-			linux_cpus[i].mid = mid;
-		}
-#endif
-	}
+	/* Currently, nothing to do.  */
 }
 
 int starfire_hard_smp_processor_id(void)
@@ -84,7 +60,7 @@ void *starfire_hookup(int upaid)
 	unsigned long treg_base, hwmid, i;
 
 	p = kmalloc(sizeof(*p), GFP_KERNEL);
-	if(!p) {
+	if (!p) {
 		prom_printf("starfire_hookup: No memory, this is insane.\n");
 		prom_halt();
 	}
@@ -95,7 +71,7 @@ void *starfire_hookup(int upaid)
 	p->hwmid = hwmid;
 	treg_base += (hwmid << 33UL);
 	treg_base += 0x200UL;
-	for(i = 0; i < 32; i++) {
+	for (i = 0; i < 32; i++) {
 		p->imap_slots[i] = 0UL;
 		p->tregs[i] = treg_base + (i * 0x10UL);
 		/* Lets play it safe and not overwrite existing mappings */
@@ -117,20 +93,20 @@ unsigned int starfire_translate(unsigned long imap,
 	unsigned int i;
 
 	bus_hwmid = (((unsigned long)imap) >> 33) & 0x7f;
-	for(p = sflist; p != NULL; p = p->next)
-		if(p->hwmid == bus_hwmid)
+	for (p = sflist; p != NULL; p = p->next)
+		if (p->hwmid == bus_hwmid)
 			break;
-	if(p == NULL) {
+	if (p == NULL) {
 		prom_printf("XFIRE: Cannot find irqinfo for imap %016lx\n",
 			    ((unsigned long)imap));
 		prom_halt();
 	}
-	for(i = 0; i < 32; i++) {
-		if(p->imap_slots[i] == imap ||
-		   p->imap_slots[i] == 0UL)
+	for (i = 0; i < 32; i++) {
+		if (p->imap_slots[i] == imap ||
+		    p->imap_slots[i] == 0UL)
 			break;
 	}
-	if(i == 32) {
+	if (i == 32) {
 		printk("starfire_translate: Are you kidding me?\n");
 		panic("Lucy in the sky....");
 	}
@@ -138,8 +114,8 @@ unsigned int starfire_translate(unsigned long imap,
 
 	/* map to real upaid */
 	upaid = (((upaid & 0x3c) << 1) |
-	       ((upaid & 0x40) >> 4) |
-	       (upaid & 0x3));
+		 ((upaid & 0x40) >> 4) |
+		 (upaid & 0x3));
 
 	upa_writel(upaid, p->tregs[i]);
 

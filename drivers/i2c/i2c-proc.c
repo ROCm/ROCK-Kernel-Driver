@@ -32,15 +32,9 @@
 #include <linux/proc_fs.h>
 #include <linux/ioport.h>
 #include <asm/uaccess.h>
-
 #include <linux/i2c.h>
 #include <linux/i2c-proc.h>
-
 #include <linux/init.h>
-
-/* FIXME need i2c versioning */
-#define LM_DATE "20010825"
-#define LM_VERSION "2.6.1"
 
 #ifndef THIS_MODULE
 #define THIS_MODULE NULL
@@ -175,6 +169,7 @@ int i2c_register_entry(struct i2c_client *client, const char *prefix,
 		new_table[i].extra2 = client;
 
 	if (!(new_header = register_sysctl_table(new_table, 0))) {
+		printk(KERN_ERR "i2c-proc.o: error: sysctl interface not supported by kernel!\n");
 		kfree(new_table);
 		kfree(name);
 		return -ENOMEM;
@@ -189,7 +184,7 @@ int i2c_register_entry(struct i2c_client *client, const char *prefix,
 	    !new_header->ctl_table->child->child ||
 	    !new_header->ctl_table->child->child->de) {
 		printk
-		    ("i2c-proc.o: NULL pointer when trying to install fill_inode fix!\n");
+		    (KERN_ERR "i2c-proc.o: NULL pointer when trying to install fill_inode fix!\n");
 		return id;
 	}
 #endif				/* DEBUG */
@@ -629,7 +624,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 				    && (addr == this_force->force[j + 1])) {
 #ifdef DEBUG
 					printk
-					    ("i2c-proc.o: found force parameter for adapter %d, addr %04x\n",
+					    (KERN_DEBUG "i2c-proc.o: found force parameter for adapter %d, addr %04x\n",
 					     adapter_id, addr);
 #endif
 					if (
@@ -659,7 +654,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 			    && (addr == address_data->ignore[i + 1])) {
 #ifdef DEBUG
 				printk
-				    ("i2c-proc.o: found ignore parameter for adapter %d, "
+				    (KERN_DEBUG "i2c-proc.o: found ignore parameter for adapter %d, "
 				     "addr %04x\n", adapter_id, addr);
 #endif
 				found = 1;
@@ -679,7 +674,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 			    && (addr <= address_data->ignore_range[i + 2])) {
 #ifdef DEBUG
 				printk
-				    ("i2c-proc.o: found ignore_range parameter for adapter %d, "
+				    (KERN_DEBUG "i2c-proc.o: found ignore_range parameter for adapter %d, "
 				     "addr %04x\n", adapter_id, addr);
 #endif
 				found = 1;
@@ -698,7 +693,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 				if (addr == address_data->normal_isa[i]) {
 #ifdef DEBUG
 					printk
-					    ("i2c-proc.o: found normal isa entry for adapter %d, "
+					    (KERN_DEBUG "i2c-proc.o: found normal isa entry for adapter %d, "
 					     "addr %04x\n", adapter_id,
 					     addr);
 #endif
@@ -720,7 +715,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 				     0)) {
 #ifdef DEBUG
 					printk
-					    ("i2c-proc.o: found normal isa_range entry for adapter %d, "
+					    (KERN_DEBUG "i2c-proc.o: found normal isa_range entry for adapter %d, "
 					     "addr %04x", adapter_id, addr);
 #endif
 					found = 1;
@@ -734,7 +729,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 					found = 1;
 #ifdef DEBUG
 					printk
-					    ("i2c-proc.o: found normal i2c entry for adapter %d, "
+					    (KERN_DEBUG "i2c-proc.o: found normal i2c entry for adapter %d, "
 					     "addr %02x", adapter_id, addr);
 #endif
 				}
@@ -750,7 +745,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 				{
 #ifdef DEBUG
 					printk
-					    ("i2c-proc.o: found normal i2c_range entry for adapter %d, "
+					    (KERN_DEBUG "i2c-proc.o: found normal i2c_range entry for adapter %d, "
 					     "addr %04x\n", adapter_id, addr);
 #endif
 					found = 1;
@@ -767,7 +762,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 			    && (addr == address_data->probe[i + 1])) {
 #ifdef DEBUG
 				printk
-				    ("i2c-proc.o: found probe parameter for adapter %d, "
+				    (KERN_DEBUG "i2c-proc.o: found probe parameter for adapter %d, "
 				     "addr %04x\n", adapter_id, addr);
 #endif
 				found = 1;
@@ -786,7 +781,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 				found = 1;
 #ifdef DEBUG
 				printk
-				    ("i2c-proc.o: found probe_range parameter for adapter %d, "
+				    (KERN_DEBUG "i2c-proc.o: found probe_range parameter for adapter %d, "
 				     "addr %04x\n", adapter_id, addr);
 #endif
 			}
@@ -807,11 +802,14 @@ int i2c_detect(struct i2c_adapter *adapter,
 
 int __init sensors_init(void)
 {
-	printk("i2c-proc.o version %s (%s)\n", LM_VERSION, LM_DATE);
+	printk(KERN_INFO "i2c-proc.o version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	i2c_initialized = 0;
 	if (!
 	    (i2c_proc_header =
-	     register_sysctl_table(i2c_proc, 0))) return -ENOMEM;
+	     register_sysctl_table(i2c_proc, 0))) {
+		printk(KERN_ERR "i2c-proc.o: error: sysctl interface not supported by kernel!\n");
+		return -EPERM;
+	}
 	i2c_proc_header->ctl_table->child->de->owner = THIS_MODULE;
 	i2c_initialized++;
 	return 0;
@@ -847,4 +845,5 @@ int cleanup_module(void)
 {
 	return i2c_cleanup();
 }
+
 #endif				/* MODULE */

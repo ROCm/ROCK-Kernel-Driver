@@ -63,7 +63,7 @@ extern void pfault_interrupt(struct pt_regs *regs, __u16 error_code);
 static ext_int_info_t ext_int_pfault;
 #endif
 
-int kstack_depth_to_print = 20;
+static int kstack_depth_to_print = 20;
 
 /*
  * If the address is either in the .text section of the

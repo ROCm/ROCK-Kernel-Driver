@@ -60,43 +60,44 @@
 
 /* AEN strings */
 static char *tw_aen_string[] = {
-	"AEN queue empty",                      // 0x000
-	"Soft reset occurred",                  // 0x001
-	"Unit degraded: Unit #",                // 0x002
-	"Controller error",                     // 0x003 
-	"Rebuild failed: Unit #",               // 0x004
-	"Rebuild complete: Unit #",             // 0x005
-	"Incomplete unit detected: Unit #",     // 0x006
-	"Initialization complete: Unit #",      // 0x007
-	"Unclean shutdown detected: Unit #",    // 0x008
-	"ATA port timeout: Port #",             // 0x009
-	"Drive error: Port #",                  // 0x00A
-	"Rebuild started: Unit #",              // 0x00B 
-	"Initialization started: Unit #",       // 0x00C
-	"Logical unit deleted: Unit #",         // 0x00D
-	NULL,                                   // 0x00E unused
-	"SMART threshold exceeded: Port #",     // 0x00F
+	"INFO: AEN queue empty",                       // 0x000
+	"INFO: Soft reset occurred",                   // 0x001
+	"ERROR: Unit degraded: Unit #",                // 0x002
+	"ERROR: Controller error",                     // 0x003 
+	"ERROR: Rebuild failed: Unit #",               // 0x004
+	"INFO: Rebuild complete: Unit #",              // 0x005
+	"ERROR: Incomplete unit detected: Unit #",     // 0x006
+	"INFO: Initialization complete: Unit #",       // 0x007
+	"WARNING: Unclean shutdown detected: Unit #",  // 0x008
+	"WARNING: ATA port timeout: Port #",           // 0x009
+	"ERROR: Drive error: Port #",                  // 0x00A
+	"INFO: Rebuild started: Unit #",               // 0x00B 
+	"INFO: Initialization started: Unit #",        // 0x00C
+	"ERROR: Logical unit deleted: Unit #",         // 0x00D
+	NULL,                                          // 0x00E unused
+	"WARNING: SMART threshold exceeded: Port #",   // 0x00F
 	NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL,                             // 0x010-0x020 unused
-	"ATA UDMA downgrade: Port #",           // 0x021
-	"ATA UDMA upgrade: Port #",             // 0x022
-	"Sector repair occurred: Port #",       // 0x023
-	"SBUF integrity check failure",         // 0x024
-	"Lost cached write: Port #",            // 0x025
-	"Drive ECC error detected: Port #",     // 0x026
-	"DCB checksum error: Port #",           // 0x027
-	"DCB unsupported version: Port #",      // 0x028
-	"Verify started: Unit #",               // 0x029
-	"Verify failed: Port #",                // 0x02A
-	"Verify complete: Unit #",              // 0x02B
-	"Overwrote bad sector during rebuild: Port #",  //0x2C
-	"Encountered bad sector during rebuild: Port #", //0x2D
-	"Replacement drive is too small: Port #" //0x2E
+	NULL, NULL,                                    // 0x010-0x020 unused
+	"WARNING: ATA UDMA downgrade: Port #",         // 0x021
+	"WARNING: ATA UDMA upgrade: Port #",           // 0x022
+	"WARNING: Sector repair occurred: Port #",     // 0x023
+	"ERROR: SBUF integrity check failure",         // 0x024
+	"ERROR: Lost cached write: Port #",            // 0x025
+	"ERROR: Drive ECC error detected: Port #",     // 0x026
+	"ERROR: DCB checksum error: Port #",           // 0x027
+	"ERROR: DCB unsupported version: Port #",      // 0x028
+	"INFO: Verify started: Unit #",                // 0x029
+	"ERROR: Verify failed: Port #",                // 0x02A
+	"INFO: Verify complete: Unit #",               // 0x02B
+	"ERROR: Overwrote bad sector during rebuild: Port #",   //0x02C
+	"ERROR: Encountered bad sector during rebuild: Port #", //0x02D
+	"INFO: Replacement drive is too small: Port #",         //0x02E
+	"WARNING: Verify error: Unit not previously initialized: Unit #" //0x02F
 };
 
-#define TW_AEN_STRING_MAX                      0x02F
+#define TW_AEN_STRING_MAX                      0x030
 
 /*
    Sense key lookup table
@@ -225,11 +226,13 @@ static unsigned char tw_sense_table[][4] =
 #define TW_MAX_AEN_TRIES                      100
 #define TW_UNIT_ONLINE                        1
 #define TW_IN_INTR                            1
+#define TW_IN_IOCTL                           2
 #define TW_MAX_SECTORS                        256
 #define TW_AEN_WAIT_TIME                      1000
 #define TW_IOCTL_WAIT_TIME                    (1 * HZ) /* 1 second */
 #define TW_ISR_DONT_COMPLETE                  2
 #define TW_ISR_DONT_RESULT                    3
+#define TW_IOCTL_TIMEOUT                      25 /* 25 seconds */
 
 /* Macros */
 #define TW_STATUS_ERRORS(x) \

@@ -1,6 +1,8 @@
 #ifndef _ASM_IA64_SOFTIRQ_H
 #define _ASM_IA64_SOFTIRQ_H
 
+#include <linux/compiler.h>
+
 /*
  * Copyright (C) 1998-2001 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
@@ -13,7 +15,7 @@
 #define local_bh_enable()								\
 do {											\
 	__local_bh_enable();								\
-	if (__builtin_expect(local_softirq_pending(), 0) && really_local_bh_count() == 0)	\
+	if (unlikely(local_softirq_pending()) && really_local_bh_count() == 0)	\
 		do_softirq();								\
 } while (0)
 

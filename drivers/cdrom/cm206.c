@@ -345,6 +345,8 @@ inline void clear_ur(void)
 	}
 }
 
+static struct tasklet_struct cm206_tasklet;
+
 /* The interrupt handler. When the cm260 generates an interrupt, very
    much care has to be taken in reading out the registers in the right
    order; in case of a receive_buffer_full interrupt, first the
@@ -432,7 +434,7 @@ static void cm206_interrupt(int sig, void *dev_id, struct pt_regs *regs)
 	if (cd->background
 	    && (cd->adapter_last - cd->adapter_first == cd->max_sectors
 		|| cd->fifo_overflowed))
-		mark_bh(CM206_BH);	/* issue a stop read command */
+		tasklet_schedule(&cm206_tasklet);	/* issue a stop read command */
 	stats(interrupt);
 }
 
@@ -701,7 +703,7 @@ int read_sector(int start)
    4 c_stop waits for receive_buffer_full: 0xff
 */
 
-void cm206_bh(void)
+static void cm206_tasklet_func(unsigned long ignore)
 {
 	debug(("bh: %d\n", cd->background));
 	switch (cd->background) {
@@ -744,6 +746,8 @@ void cm206_bh(void)
 		cd->background = 0;
 	}
 }
+
+static DECLARE_TASKLET(cm206_tasklet, cm206_tasklet_func, 0);
 
 /* This command clears the dsb_possible_media_change flag, so we must 
  * retain it.
@@ -1503,7 +1507,6 @@ int __init cm206_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_cm206_request,
 		       &cm206_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
-	init_bh(CM206_BH, cm206_bh);
 
 	memset(cd, 0, sizeof(*cd));	/* give'm some reasonable value */
 	cd->sector_last = -1;	/* flag no data buffered */

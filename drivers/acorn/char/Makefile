@@ -20,5 +20,5 @@ obj-y		+= $(obj-$(MACHINE))
 
 include $(TOPDIR)/Rules.make
 
-%.c: %.map
+$(obj)/%.c: $(src)/%.map
 	loadkeys --mktable $< > $@

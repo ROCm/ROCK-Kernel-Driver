@@ -47,7 +47,7 @@ int snd_emux_new(snd_emux_t **remu)
 	init_MUTEX(&emu->register_mutex);
 
 	emu->client = -1;
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 	emu->oss_synth = NULL;
 #endif
 	emu->max_voices = 0;
@@ -92,7 +92,7 @@ int snd_emux_register(snd_emux_t *emu, snd_card_t *card, int index, char *name)
 	snd_emux_init_voices(emu);
 
 	snd_emux_init_seq(emu, card, index);
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 	snd_emux_init_seq_oss(emu);
 #endif
 	snd_emux_init_virmidi(emu, card);
@@ -122,7 +122,7 @@ int snd_emux_free(snd_emux_t *emu)
 	snd_emux_proc_free(emu);
 #endif
 	snd_emux_delete_virmidi(emu);
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 	snd_emux_detach_seq_oss(emu);
 #endif
 	snd_emux_detach_seq(emu);
@@ -148,6 +148,9 @@ EXPORT_SYMBOL(snd_emux_free);
 EXPORT_SYMBOL(snd_emux_terminate_all);
 EXPORT_SYMBOL(snd_emux_lock_voice);
 EXPORT_SYMBOL(snd_emux_unlock_voice);
+
+/* soundfont.c */
+EXPORT_SYMBOL(snd_sf_linear_to_log);
 
 
 /*

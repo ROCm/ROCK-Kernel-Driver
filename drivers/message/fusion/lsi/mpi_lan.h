@@ -6,7 +6,7 @@
  *          Title:  MPI LAN messages and structures
  *  Creation Date:  June 30, 2000
  *
- *    MPI Version:  01.01.03
+ *    MPI Version:  01.02.01
  *
  *  Version History
  *  ---------------
@@ -27,6 +27,7 @@
  *  11-02-00  01.01.01  Original release for post 1.0 work
  *  02-20-01  01.01.02  Started using MPI_POINTER.
  *  03-27-01  01.01.03  Added structure offset comments.
+ *  08-08-01  01.02.01  Original release for v1.2 work.
  *  --------------------------------------------------------------------------
  */
 

@@ -92,10 +92,7 @@ extern NORET_TYPE void ext2_panic (struct super_block *, const char *,
 extern void ext2_warning (struct super_block *, const char *, const char *, ...)
 	__attribute__ ((format (printf, 3, 4)));
 extern void ext2_update_dynamic_rev (struct super_block *sb);
-extern void ext2_put_super (struct super_block *);
 extern void ext2_write_super (struct super_block *);
-extern int ext2_remount (struct super_block *, int *, char *);
-extern int ext2_statfs (struct super_block *, struct statfs *);
 
 /*
  * Inodes and files operations

@@ -65,7 +65,7 @@ static struct socket *igmp6_socket;
 
 static void igmp6_join_group(struct ifmcaddr6 *ma);
 static void igmp6_leave_group(struct ifmcaddr6 *ma);
-void igmp6_timer_handler(unsigned long data);
+static void igmp6_timer_handler(unsigned long data);
 
 #define IGMP6_UNSOLICITED_IVAL	(10*HZ)
 
@@ -492,7 +492,7 @@ int igmp6_event_report(struct sk_buff *skb)
 	return 0;
 }
 
-void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
+static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 {
 	struct sock *sk = igmp6_socket->sk;
         struct sk_buff *skb;
@@ -608,7 +608,7 @@ static void igmp6_leave_group(struct ifmcaddr6 *ma)
 	spin_unlock_bh(&ma->mca_lock);
 }
 
-void igmp6_timer_handler(unsigned long data)
+static void igmp6_timer_handler(unsigned long data)
 {
 	struct ifmcaddr6 *ma = (struct ifmcaddr6 *) data;
 

@@ -863,6 +863,34 @@ static inline void recalc_sigpending(void)
 		clear_thread_flag(TIF_SIGPENDING);
 }
 
+/*
+ * Wrappers for p->thread_info->cpu access. No-op on UP.
+ */
+#ifdef CONFIG_SMP
+
+static inline unsigned int task_cpu(struct task_struct *p)
+{
+	return p->thread_info->cpu;
+}
+
+static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
+{
+	p->thread_info->cpu = cpu;
+}
+
+#else
+
+static inline unsigned int task_cpu(struct task_struct *p)
+{
+	return 0;
+}
+
+static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
+{
+}
+
+#endif /* CONFIG_SMP */
+
 #endif /* __KERNEL__ */
 
 #endif

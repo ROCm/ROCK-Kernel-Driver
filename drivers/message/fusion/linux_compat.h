@@ -11,6 +11,30 @@
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
+#ifndef rwlock_init
+#define rwlock_init(x) do { *(x) = RW_LOCK_UNLOCKED; } while(0)
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+#define SET_NICE(current,x)	do {(current)->nice = (x);} while (0)
+#else
+#define SET_NICE(current,x)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
+#define pci_enable_device(pdev)	(0)
+#define SCSI_DATA_UNKNOWN	0
+#define SCSI_DATA_WRITE		1
+#define SCSI_DATA_READ		2
+#define SCSI_DATA_NONE		3
+#endif
+
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
+#define pci_set_dma_mask(pdev, mask)	(0)
+#define scsi_set_pci_device(sh, pdev)	(0)
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 #	if LINUX_VERSION_CODE < KERNEL_VERSION(2,2,18)
 		typedef unsigned int dma_addr_t;
@@ -58,11 +82,32 @@ typedef void (*__cleanup_module_func_t)(void);
 	extern inline __cleanup_module_func_t __cleanup_module_inline(void) \
 	{ return x; }
 
-#else 
+#else
 #define module_init(x)	__initcall(x);
 #define module_exit(x)	__exitcall(x);
 #endif
 /* } block snipped from lk-2.2.18/include/linux/init.h */
+
+/* This block snipped from lk-2.2.18/include/linux/sched.h { */
+/*
+ * Used prior to schedule_timeout calls..
+ */
+#define __set_current_state(state_value)	do { current->state = state_value; } while (0)
+#ifdef __SMP__
+#define set_current_state(state_value)		do { __set_current_state(state_value); mb(); } while (0)
+#else
+#define set_current_state(state_value)		__set_current_state(state_value)
+#endif
+/* } block snipped from lk-2.2.18/include/linux/sched.h */
+
+/* procfs compat stuff... */
+#define proc_mkdir(x,y)			create_proc_entry(x, S_IFDIR, y)
+
+/* MUTEX compat stuff... */
+#define DECLARE_MUTEX(name)		struct semaphore name=MUTEX
+#define DECLARE_MUTEX_LOCKED(name)	struct semaphore name=MUTEX_LOCKED
+#define init_MUTEX(x)			*(x)=MUTEX
+#define init_MUTEX_LOCKED(x)		*(x)=MUTEX_LOCKED
 
 /* Wait queues. */
 #define DECLARE_WAIT_QUEUE_HEAD(name)	\
@@ -88,6 +133,17 @@ typedef void (*__cleanup_module_func_t)(void);
 
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif		/* LINUX_VERSION_CODE < KERNEL_VERSION(2,2,18) */
+
+
+/*
+ * Inclined to use:
+ *   #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,10)
+ * here, but MODULE_LICENSE defined in 2.4.9-6 and 2.4.9-13
+ * breaks the rule:-(
+ */
+#ifndef MODULE_LICENSE
+#define MODULE_LICENSE(license)
+#endif
 
 
 /* PCI/driver subsystem { */
@@ -119,26 +175,6 @@ typedef void (*__cleanup_module_func_t)(void);
 #define PCI_BASEADDR_SIZE(dev,idx)      (dev)->resource[idx].end - (dev)->resource[idx].start + 1
 #endif		/* } ifndef pci_for_each_dev */
 
-
-/* procfs compat stuff... */
-#ifdef CONFIG_PROC_FS
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,28)
-#define CREATE_PROCDIR_ENTRY(x,y)  create_proc_entry(x, S_IFDIR, y)
-/* This is a macro so we don't need to pull all the procfs
- * headers into this file. -DaveM
- */
-#define create_proc_read_entry(name, mode, base, __read_proc, __data) \
-({      struct proc_dir_entry *__res=create_proc_entry(name,mode,base); \
-        if (__res) { \
-                __res->read_proc=(__read_proc); \
-                __res->data=(__data); \
-        } \
-        __res; \
-})
-#else
-#define CREATE_PROCDIR_ENTRY(x,y)  proc_mkdir(x, y)
-#endif
-#endif
 
 /* Compatability for the 2.3.x PCI DMA API. */
 #ifndef PCI_DMA_BIDIRECTIONAL
@@ -193,6 +229,28 @@ static __inline__ int __get_order(unsigned long size)
 
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif /* PCI_DMA_BIDIRECTIONAL */
+
+/*
+ *  With the new command queuing code in the SCSI mid-layer we no longer have
+ *  to hold the io_request_lock spin lock when calling the scsi_done routine.
+ *  For now we only do this with the 2.5.1 kernel or newer.
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1)
+        #define MPT_HOST_LOCK(flags)
+        #define MPT_HOST_UNLOCK(flags)
+#else
+        #define MPT_HOST_LOCK(flags) \
+                spin_lock_irqsave(&io_request_lock, flags)
+        #define MPT_HOST_UNLOCK(flags) \
+                spin_unlock_irqrestore(&io_request_lock, flags)
+#endif
+
+/*
+ *  We use our new error handling code if the kernel version is 2.5.1 or newer.
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1)
+        #define MPT_SCSI_USE_NEW_EH
+#endif
 
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif /* _LINUX_COMPAT_H */

@@ -23,6 +23,7 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <sound/core.h>
@@ -37,6 +38,11 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 #define pmu_suspend()	/**/
 #define pmu_resume()	/**/
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
+#define request_OF_resource(io,num,str)  1
+#define release_OF_resource(io,num) /**/
 #endif
 
 
@@ -168,7 +174,7 @@ static void snd_pmac_pcm_set_format(pmac_t *chip)
 {
 	/* set up frequency and format */
 	out_le32(&chip->awacs->control, chip->control_mask | (chip->rate_index << 8));
-	out_le32(&chip->awacs->byteswap, chip->format == SNDRV_PCM_FORMAT_S16_LE);
+	out_le32(&chip->awacs->byteswap, chip->format == SNDRV_PCM_FORMAT_S16_LE ? 1 : 0);
 	if (chip->set_format)
 		chip->set_format(chip);
 }
@@ -327,15 +333,17 @@ inline
 static snd_pcm_uframes_t snd_pmac_pcm_pointer(pmac_t *chip, pmac_stream_t *rec,
 					      snd_pcm_substream_t *subs)
 {
-	int count;
+	int count = 0;
 
-#if 0 /* hmm.. how can we get the current dma pointer?? */
-	if (! rec->cmd.cmds[rec->cur_period].xfer_status) {
-		count = in_le16(&rec->cmd.cmds[rec->cur_period].res_count);
+#if 1 /* hmm.. how can we get the current dma pointer?? */
+	int stat;
+	volatile struct dbdma_cmd *cp = &rec->cmd.cmds[rec->cur_period];
+	stat = ld_le16(&cp->xfer_status);
+	if (stat & (ACTIVE|DEAD)) {
+		count = in_le16(&cp->res_count);
 		count = rec->period_size - count;
-	} else
+	}
 #endif
-		count = 0;
 	count += rec->cur_period * rec->period_size;
 	/*printk("pointer=%d\n", count);*/
 	return bytes_to_frames(subs->runtime, count);
@@ -547,8 +555,11 @@ static int snd_pmac_pcm_open(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substream
 		}
 	}
 	runtime->hw.formats = chip->formats_ok;
-	if (chip->can_duplex)
+	if (chip->can_capture) {
+		if (! chip->can_duplex)
+			runtime->hw.info |= SNDRV_PCM_INFO_HALF_DUPLEX;
 		runtime->hw.info |= SNDRV_PCM_INFO_JOINT_DUPLEX;
+	}
 	runtime->private_data = rec;
 	rec->substream = subs;
 
@@ -638,6 +649,13 @@ static snd_pcm_ops_t snd_pmac_capture_ops = {
 	pointer:	snd_pmac_capture_pointer,
 };
 
+static void pmac_pcm_free(snd_pcm_t *pcm)
+{
+#if 0
+	snd_pcm_lib_preallocate_free_for_all(pcm);
+#endif
+}
+
 int __init snd_pmac_pcm_new(pmac_t *chip)
 {
 	snd_pcm_t *pcm;
@@ -655,6 +673,7 @@ int __init snd_pmac_pcm_new(pmac_t *chip)
 		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_pmac_capture_ops);
 
 	pcm->private_data = chip;
+	pcm->private_free = pmac_pcm_free;
 	pcm->info_flags = 0;
 	strcpy(pcm->name, chip->card->shortname);
 	chip->pcm = pcm;
@@ -667,6 +686,11 @@ int __init snd_pmac_pcm_new(pmac_t *chip)
 	chip->capture.cur_formats = chip->formats_ok;
 	chip->playback.cur_freqs = chip->freqs_ok;
 	chip->capture.cur_freqs = chip->freqs_ok;
+
+#if 0
+	/* preallocate 64k buffer */
+	snd_pcm_lib_preallocate_pages_for_all(pcm, 64 * 1024, 64 * 1024, GFP_KERNEL);
+#endif
 
 	return 0;
 }
@@ -942,16 +966,16 @@ snd_pmac_ctrl_intr(int irq, void *devid, struct pt_regs *regs)
 	pmac_t *chip = snd_magic_cast(pmac_t, devid, return);
 	int ctrl = in_le32(&chip->awacs->control);
 
-	printk("pmac: control interrupt.. 0x%x\n", ctrl);
+	/*printk("pmac: control interrupt.. 0x%x\n", ctrl);*/
 	if (ctrl & MASK_PORTCHG) {
 		/* do something when headphone is plugged/unplugged? */
-		if (chip->port_change)
-			chip->port_change(chip);
+		if (chip->update_automute)
+			chip->update_automute(chip, 1);
 	}
 	if (ctrl & MASK_CNTLERR) {
 		int err = (in_le32(&chip->awacs->codec_stat) & MASK_ERRCODE) >> 16;
 		if (err && chip->model <= PMAC_SCREAMER)
-			snd_printk("error %x\n", err);
+			snd_printk(KERN_DEBUG "error %x\n", err);
 	}
 	/* Writing 1s to the CNTLERR and PORTCHG bits clears them... */
 	out_le32(&chip->awacs->control, ctrl);
@@ -959,7 +983,7 @@ snd_pmac_ctrl_intr(int irq, void *devid, struct pt_regs *regs)
 
 
 /*
- * feature
+ * a wrapper to feature call for compatibility
  */
 #if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
 static void snd_pmac_sound_feature(pmac_t *chip, int enable)
@@ -990,6 +1014,8 @@ static void snd_pmac_sound_feature(pmac_t *chip, int enable)
 
 static int snd_pmac_free(pmac_t *chip)
 {
+	int i;
+
 	/* stop sounds */
 	if (chip->initialized) {
 		snd_pmac_dbdma_reset(chip);
@@ -1026,6 +1052,12 @@ static int snd_pmac_free(pmac_t *chip)
 		iounmap((void*)chip->playback.dma);
 	if (chip->capture.dma)
 		iounmap((void*)chip->capture.dma);
+	if (chip->node) {
+		for (i = 0; i < 3; i++) {
+			if (chip->of_requested & (1 << i))
+				release_OF_resource(chip->node, i);
+		}
+	}
 	snd_magic_kfree(chip);
 	return 0;
 }
@@ -1038,6 +1070,33 @@ static int snd_pmac_dev_free(snd_device_t *device)
 {
 	pmac_t *chip = snd_magic_cast(pmac_t, device->device_data, return -ENXIO);
 	return snd_pmac_free(chip);
+}
+
+
+/*
+ * check the machine support byteswap (little-endian)
+ */
+
+static void __init detect_byte_swap(pmac_t *chip)
+{
+	struct device_node *mio;
+
+	/* if seems that Keylargo can't byte-swap  */
+	for (mio = chip->node->parent; mio; mio = mio->parent) {
+		if (strcmp(mio->name, "mac-io") == 0) {
+			if (device_is_compatible(mio, "Keylargo"))
+				chip->can_byte_swap = 0;
+			break;
+		}
+	}
+
+	/* it seems the Pismo & iBook can't byte-swap in hardware. */
+	if (machine_is_compatible("PowerBook3,1") ||
+	    machine_is_compatible("PowerBook2,1"))
+		chip->can_byte_swap = 0 ;
+
+	if (machine_is_compatible("PowerBook2,1"))
+		chip->can_duplex = 0;
 }
 
 
@@ -1063,13 +1122,6 @@ static int __init snd_pmac_detect(pmac_t *chip)
 	chip->freq_table = awacs_freqs;
 
 	chip->control_mask = MASK_IEPC | MASK_IEE | 0x11; /* default */
-
-	/* it seems the Pismo & iBook can't byte-swap in hardware. */
-	if (machine_is_compatible("PowerBook3,1") ||
-	    machine_is_compatible("PowerBook2,1"))
-		chip->can_byte_swap = 0 ;
-	if (machine_is_compatible("PowerBook2,1"))
-		chip->can_duplex = 0;
 
 	/* check machine type */
 	if (machine_is_compatible("AAPL,3400/2400")
@@ -1106,7 +1158,7 @@ static int __init snd_pmac_detect(pmac_t *chip)
 	/* This should be verified on older screamers */
 	if (device_is_compatible(sound, "screamer")) {
 		chip->model = PMAC_SCREAMER;
-		chip->can_byte_swap = 0;
+		// chip->can_byte_swap = 0; /* FIXME: check this */
 	}
 	if (device_is_compatible(sound, "burgundy")) {
 		chip->model = PMAC_BURGUNDY;
@@ -1116,14 +1168,15 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		chip->model = PMAC_DACA;
 		chip->can_capture = 0;  /* no capture */
 		chip->can_duplex = 0;
-		chip->can_byte_swap = 0; /* no le support */
+		// chip->can_byte_swap = 0; /* FIXME: check this */
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
-	if (device_is_compatible(sound, "tumbler")) {
+	if (device_is_compatible(sound, "tumbler") ||
+	    device_is_compatible(sound, "snapper")) {
 		chip->model = PMAC_TUMBLER;
 		chip->can_capture = 0;  /* no capture */
 		chip->can_duplex = 0;
-		chip->can_byte_swap = 0; /* no le support */
+		// chip->can_byte_swap = 0; /* FIXME: check this */
 		chip->num_freqs = 2;
 		chip->freq_table = tumbler_freqs;
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
@@ -1132,6 +1185,8 @@ static int __init snd_pmac_detect(pmac_t *chip)
 	if (prop)
 		chip->device_id = *prop;
 	chip->has_iic = (find_devices("perch") != NULL);
+
+	detect_byte_swap(chip);
 
 	/* look for a property saying what sample rates
 	   are available */
@@ -1157,9 +1212,90 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		/* assume only 44.1khz */
 		chip->freqs_ok = 1;
 	}
+
 	return 0;
 }
 
+/*
+ * exported - boolean info callbacks for ease of programming
+ */
+int snd_pmac_boolean_stereo_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 2;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+int snd_pmac_boolean_mono_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+#ifdef PMAC_SUPPORT_AUTOMUTE
+/*
+ * auto-mute
+ */
+static int pmac_auto_mute_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
+	ucontrol->value.integer.value[0] = chip->auto_mute;
+	return 0;
+}
+
+static int pmac_auto_mute_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
+	if (ucontrol->value.integer.value[0] != chip->auto_mute) {
+		chip->auto_mute = ucontrol->value.integer.value[0];
+		if (chip->update_automute)
+			chip->update_automute(chip, 1);
+		return 1;
+	}
+	return 0;
+}
+
+static int pmac_hp_detect_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	pmac_t *chip = snd_kcontrol_chip(kcontrol);
+	if (chip->detect_headphone)
+		ucontrol->value.integer.value[0] = chip->detect_headphone(chip);
+	else
+		ucontrol->value.integer.value[0] = 0;
+	return 0;
+}
+
+static snd_kcontrol_new_t auto_mute_controls[] __initdata = {
+	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
+	  name: "Auto Mute Switch",
+	  info: snd_pmac_boolean_mono_info,
+	  get: pmac_auto_mute_get,
+	  put: pmac_auto_mute_put,
+	},
+	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
+	  name: "Headphone Detection",
+	  access: SNDRV_CTL_ELEM_ACCESS_READ,
+	  info: snd_pmac_boolean_mono_info,
+	  get: pmac_hp_detect_get,
+	},
+};
+
+int __init snd_pmac_add_automute(pmac_t *chip)
+{
+	int err;
+	chip->auto_mute = 1;
+	err = snd_ctl_add(chip->card, snd_ctl_new1(&auto_mute_controls[0], chip));
+	if (err < 0)
+		return err;
+	chip->hp_detect_ctl = snd_ctl_new1(&auto_mute_controls[1], chip);
+	return snd_ctl_add(chip->card, chip->hp_detect_ctl);
+}
+#endif /* PMAC_SUPPORT_AUTOMUTE */
 
 /*
  * create and detect a pmac chip record
@@ -1168,7 +1304,7 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 {
 	pmac_t *chip;
 	struct device_node *np;
-	int err;
+	int i, err;
 	static snd_device_ops_t ops = {
 		dev_free:	snd_pmac_dev_free,
 	};
@@ -1203,26 +1339,38 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 		goto __error;
 	}
 
+	for (i = 0; i < 3; i++) {
+		static char *name[3] = { NULL, "- Tx DMA", "- Rx DMA" };
+		if (! request_OF_resource(np, i, name[i])) {
+			snd_printk(KERN_ERR "pmac: can't request resource %d!\n", i);
+			err = -ENODEV;
+			goto __error;
+		}
+		chip->of_requested |= (1 << i);
+	}
+
 	chip->awacs = (volatile struct awacs_regs *) ioremap(np->addrs[0].address, 0x1000);
 	chip->playback.dma = (volatile struct dbdma_regs *) ioremap(np->addrs[1].address, 0x100);
 	chip->capture.dma = (volatile struct dbdma_regs *) ioremap(np->addrs[2].address, 0x100);
-	if (request_irq(np->intrs[0].line, snd_pmac_ctrl_intr, 0,
-			"PMac", (void*)chip)) {
-		snd_printk("unable to grab IRQ %d\n", np->intrs[0].line);
-		err = -EBUSY;
-		goto __error;
+	if (chip->model <= PMAC_BURGUNDY) {
+		if (request_irq(np->intrs[0].line, snd_pmac_ctrl_intr, 0,
+				"PMac", (void*)chip)) {
+			snd_printk(KERN_ERR "pmac: unable to grab IRQ %d\n", np->intrs[0].line);
+			err = -EBUSY;
+			goto __error;
+		}
+		chip->irq = np->intrs[0].line;
 	}
-	chip->irq = np->intrs[0].line;
 	if (request_irq(np->intrs[1].line, snd_pmac_tx_intr, 0,
 			"PMac Output", (void*)chip)) {
-		snd_printk("unable to grab IRQ %d\n", np->intrs[1].line);
+		snd_printk(KERN_ERR "pmac: unable to grab IRQ %d\n", np->intrs[1].line);
 		err = -EBUSY;
 		goto __error;
 	}
 	chip->tx_irq = np->intrs[1].line;
 	if (request_irq(np->intrs[2].line, snd_pmac_rx_intr, 0,
 			"PMac Input", (void*)chip)) {
-		snd_printk("unable to grab IRQ %d\n", np->intrs[2].line);
+		snd_printk(KERN_ERR "pmac: unable to grab IRQ %d\n", np->intrs[2].line);
 		err = -EBUSY;
 		goto __error;
 	}
@@ -1277,8 +1425,6 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 	card->set_power_state = snd_pmac_set_power_state;
 	card->power_state_private_data = chip;
 #endif
-
-	chip->initialized = 1;
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0)
 		goto __error;

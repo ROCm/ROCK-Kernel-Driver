@@ -317,37 +317,13 @@ void snd_free_pages(void *ptr, unsigned long size)
 #endif
 }
 
-#ifdef CONFIG_ISA
-
-#ifndef CONFIG_ISA_USE_PCI_ALLOC_CONSISTENT
-#ifdef CONFIG_PCI
-#define CONFIG_ISA_USE_PCI_ALLOC_CONSISTENT
-#endif
-#endif
+#if defined(CONFIG_ISA) && ! defined(CONFIG_PCI)
 
 void *snd_malloc_isa_pages(unsigned long size, dma_addr_t *dma_addr)
 {
 	void *dma_area;
-
-#ifndef CONFIG_ISA_USE_PCI_ALLOC_CONSISTENT
 	dma_area = snd_malloc_pages(size, GFP_ATOMIC|GFP_DMA);
 	*dma_addr = dma_area ? isa_virt_to_bus(dma_area) : 0UL;
-#else
-	{
-		int pg;
-		for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
-		dma_area = pci_alloc_consistent(NULL, size, dma_addr);
-		if (dma_area != NULL) {
-			struct page *page = virt_to_page(dma_area);
-			struct page *last_page = page + (1 << pg);
-			while (page < last_page)
-				SetPageReserved(page++);
-#ifdef CONFIG_SND_DEBUG_MEMORY
-			snd_alloc_pages += 1 << pg;
-#endif
-		}
-	}
-#endif
 	return dma_area;
 }
 
@@ -356,26 +332,12 @@ void *snd_malloc_isa_pages_fallback(unsigned long size,
 				    unsigned long *res_size)
 {
 	void *dma_area;
-
-#ifndef CONFIG_ISA_USE_PCI_ALLOC_CONSISTENT
 	dma_area = snd_malloc_pages_fallback(size, GFP_ATOMIC|GFP_DMA, res_size);
 	*dma_addr = dma_area ? isa_virt_to_bus(dma_area) : 0UL;
 	return dma_area;
-#else
-	snd_assert(size > 0, return NULL);
-	snd_assert(res_size != NULL, return NULL);
-	do {
-		if ((dma_area = snd_malloc_isa_pages(size, dma_addr)) != NULL) {
-			*res_size = size;
-			return dma_area;
-		}
-		size >>= 1;
-	} while (size >= PAGE_SIZE);
-	return NULL;
-#endif
 }
 
-#endif
+#endif /* CONFIG_ISA && !CONFIG_PCI */
 
 #ifdef CONFIG_PCI
 

@@ -33,6 +33,7 @@
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
+#include <asm/mpspec.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 

@@ -68,7 +68,7 @@ struct icmpv6_mib icmpv6_statistics[NR_CPUS*2];
 
 struct socket *icmpv6_socket;
 
-int icmpv6_rcv(struct sk_buff *skb);
+static int icmpv6_rcv(struct sk_buff *skb);
 
 static struct inet6_protocol icmpv6_protocol = 
 {
@@ -204,7 +204,7 @@ static int is_ineligible(struct sk_buff *skb)
 	return 0;
 }
 
-int sysctl_icmpv6_time = 1*HZ; 
+static int sysctl_icmpv6_time = 1*HZ; 
 
 /* 
  * Check the ICMP output rate limit 
@@ -491,7 +491,7 @@ static void icmpv6_notify(struct sk_buff *skb, int type, int code, u32 info)
  *	Handle icmp messages
  */
 
-int icmpv6_rcv(struct sk_buff *skb)
+static int icmpv6_rcv(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 	struct in6_addr *saddr, *daddr;

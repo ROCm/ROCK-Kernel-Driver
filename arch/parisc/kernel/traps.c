@@ -58,8 +58,6 @@ void page_exception(void);
 #define VMALLOC_OFFSET (8*1024*1024)
 #define MODULE_RANGE (8*1024*1024)
 
-int kstack_depth_to_print = 24;
-
 static void printbinary(unsigned long x, int nbits)
 {
 	unsigned long mask = 1UL << (nbits - 1);

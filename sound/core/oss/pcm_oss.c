@@ -446,8 +446,8 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 		vfree(runtime->oss.buffer);
 	runtime->oss.buffer = vmalloc(runtime->oss.period_bytes);
 	runtime->oss.buffer_used = 0;
-	snd_assert(runtime->dma_area != NULL, return -EIO);
-	snd_pcm_format_set_silence(runtime->format, runtime->dma_area, bytes_to_samples(runtime, runtime->dma_bytes));
+	if (runtime->dma_area)
+		snd_pcm_format_set_silence(runtime->format, runtime->dma_area, bytes_to_samples(runtime, runtime->dma_bytes));
 	return 0;
 }
 

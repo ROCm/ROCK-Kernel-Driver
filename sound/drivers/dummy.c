@@ -20,7 +20,11 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 0)
 #include <linux/jiffies.h>
+#else
+#include <linux/sched.h>
+#endif
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/wait.h>

@@ -11,6 +11,7 @@
  * 
  *     Copyright (c) 1997-1999 Dag Brattli <dagb@cs.uit.no>,
  *     All Rights Reserved.
+ *     Copyright (c) 2000-2002 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -35,8 +36,10 @@
 #include <linux/skbuff.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irlap.h>
-#include <net/irda/qos.h>
+
+/* A few forward declarations (to make compiler happy) */
+struct irlap_cb;
+struct discovery_t;
 
 /* Frame types and templates */
 #define INVALID   0xff
@@ -80,14 +83,14 @@ struct xid_frame {
 	__u8  flags; /* Discovery flags */
 	__u8  slotnr;
 	__u8  version;
-} PACK;
+} IRDA_PACK;
 
 struct test_frame {
 	__u8 caddr;          /* Connection address */
 	__u8 control;
 	__u32 saddr;         /* Source device address */
 	__u32 daddr;         /* Destination device address */
-} PACK;
+} IRDA_PACK;
 
 struct ua_frame {
 	__u8 caddr;
@@ -95,12 +98,12 @@ struct ua_frame {
 
 	__u32 saddr; /* Source device address */
 	__u32 daddr; /* Dest device address */
-} PACK;
+} IRDA_PACK;
 	
 struct i_frame {
 	__u8 caddr;
 	__u8 control;
-} PACK;
+} IRDA_PACK;
 
 struct snrm_frame {
 	__u8  caddr;
@@ -108,11 +111,12 @@ struct snrm_frame {
 	__u32 saddr;
 	__u32 daddr;
 	__u8  ncaddr;
-} PACK;
+} IRDA_PACK;
 
 void irlap_queue_xmit(struct irlap_cb *self, struct sk_buff *skb);
 void irlap_send_discovery_xid_frame(struct irlap_cb *, int S, __u8 s, 
-				    __u8 command, discovery_t *discovery);
+				    __u8 command,
+				    struct discovery_t *discovery);
 void irlap_send_snrm_frame(struct irlap_cb *, struct qos_info *);
 void irlap_send_test_frame(struct irlap_cb *self, __u8 caddr, __u32 daddr, 
 			   struct sk_buff *cmd);

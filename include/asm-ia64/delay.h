@@ -15,6 +15,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/compiler.h>
 
 #include <asm/processor.h>
 
@@ -52,7 +53,7 @@ ia64_get_itc (void)
 
 	__asm__ __volatile__("mov %0=ar.itc" : "=r"(result) :: "memory");
 #ifdef CONFIG_ITANIUM
-	while (__builtin_expect ((__s32) result == -1, 0))
+	while (unlikely ((__s32) result == -1)
 		__asm__ __volatile__("mov %0=ar.itc" : "=r"(result) :: "memory");
 #endif
 	return result;

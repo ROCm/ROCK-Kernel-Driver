@@ -1129,7 +1129,7 @@ static int c4_add_card(struct capicardparams *p, struct pci_dev *dev,
 		goto err_free_dma;
 	}
 
-	card->mbase = ioremap_nocache(card->membase, 128);
+	card->mbase = ioremap(card->membase, 128);
 	if (card->mbase == 0) {
 		printk(KERN_NOTICE "c4: can't remap memory at 0x%lx\n",
 		       card->membase);

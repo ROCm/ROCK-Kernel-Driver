@@ -2,4 +2,4 @@
 # Config.in for ICN ISDN driver
 #
 
-dep_tristate       'ICN 2B and 4B support' CONFIG_ISDN_DRV_ICN $CONFIG_ISDN
+dep_tristate       'ICN 2B and 4B support' CONFIG_ISDN_DRV_ICN $CONFIG_ISDN $CONFIG_ISA

@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 23
+SUBLEVEL = 24
 EXTRAVERSION =
 
 # We are using a recursive build, so we need to do a little thinking
@@ -48,10 +48,34 @@ ifndef KBUILD_VERBOSE
   KBUILD_VERBOSE = 1
 endif
 
-# 	Decide whether to build built-in, modular, or both
+# 	Decide whether to build built-in, modular, or both.
+#	Normally, just do built-in.
 
-KBUILD_MODULES := 1
+KBUILD_MODULES :=
 KBUILD_BUILTIN := 1
+
+#	If we have only "make modules", don't compile built-in objects.
+
+ifeq ($(MAKECMDGOALS),modules)
+  KBUILD_BUILTIN :=
+endif
+
+#	If we have "make <whatever> modules", compile modules
+#	in addition to whatever we do anyway.
+
+ifneq ($(filter modules,$(MAKECMDGOALS)),)
+  KBUILD_MODULES := 1
+endif
+
+#	Just "make" or "make all" shall build modules as well
+
+ifeq ($(MAKECMDGOALS),)
+  KBUILD_MODULES := 1
+endif
+
+ifneq ($(filter all,$(MAKECMDGOALS)),)
+  KBUILD_MODULES := 1
+endif
 
 export KBUILD_MODULES KBUILD_BUILTIN
 
@@ -120,6 +144,8 @@ export CPPFLAGS EXPORT_FLAGS NOSTDINC_FLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
+SUBDIRS		:= init kernel mm fs ipc lib drivers sound net
+
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
 		    clean mrproper distclean \
@@ -182,7 +208,7 @@ endif
 
 # Link components for vmlinux
 # ---------------------------------------------------------------------------
-SUBDIRS		:= init kernel mm fs ipc lib drivers sound net
+
 INIT		:= init/init.o
 CORE_FILES	:= kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
 LIBS		:= lib/lib.a
@@ -254,6 +280,7 @@ $(SUBDIRS): .hdepend prepare
 
 .PHONY: prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
+	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -354,7 +381,7 @@ include/linux/modversions.h: scripts/fixdep prepare FORCE
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
 	   echo "#include <linux/modsetver.h>"; \
-	   for f in `cd .tmp_export-objs; find modules -name \*.ver -print | sort`; do \
+	   for f in `cd .tmp_export-objs; find modules -name SCCS -prune -o -name BitKeeper -prune -o -name \*.ver -print | sort`; do \
 	     echo "#include <linux/$${f}>"; \
 	   done; \
 	   echo "#endif"; \
@@ -384,8 +411,7 @@ MODFLAGS += -include $(HPATH)/linux/modversions.h
 endif
 
 .PHONY: modules
-modules:
-	@$(MAKE) KBUILD_BUILTIN= $(SUBDIRS)
+modules: $(SUBDIRS)
 
 #	Install modules
 
@@ -466,7 +492,9 @@ spec:
 #	   will become invalid
 
 rpm:	clean spec
-	find . \( -size 0 -o -name .depend -o -name .hdepend \) -type f -print | xargs rm -f
+	find . -name SCCS -prune -o -name BitKeeper -prune -o \
+		\( -size 0 -o -name .depend -o -name .hdepend \) \
+		-type f -print | xargs rm -f
 	set -e; \
 	cd $(TOPDIR)/.. ; \
 	ln -sf $(TOPDIR) $(KERNELPATH) ; \
@@ -549,6 +577,7 @@ CLEAN_FILES += \
 	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
 	drivers/char/conmakehash \
 	drivers/char/drm/*-mod.c \
+	drivers/char/defkeymap.c drivers/char/qtronixmap.c \
 	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
 	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
 	sound/oss/bin2hex sound/oss/hex2hex \
@@ -559,9 +588,12 @@ CLEAN_FILES += \
 	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
 	drivers/scsi/aic7xxx/aicasm/y.tab.h \
 	drivers/scsi/aic7xxx/aicasm/aicasm \
-	drivers/scsi/53c700_d.h \
-	net/khttpd/make_times_h \
-	net/khttpd/times.h \
+	drivers/scsi/53c700_d.h drivers/scsi/sim710_d.h \
+	drivers/scsi/53c7xx_d.h drivers/scsi/53c7xx_u.h \
+	drivers/scsi/53c8xx_d.h drivers/scsi/53c8xx_u.h \
+	net/802/cl2llc.c net/802/transit/pdutr.h net/802/transit/timertr.h \
+	net/802/pseudo/pseudocode.h \
+	net/khttpd/make_times_h net/khttpd/times.h \
 	submenu*
 
 # 	files removed with 'make mrproper'
@@ -599,23 +631,26 @@ include arch/$(ARCH)/Makefile
 
 clean:	archclean
 	@echo 'Cleaning up'
-	@find . \( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
-		   -name .\*.tmp -o -name .\*.d \) -type f -print \
+	@find . -name SCCS -prune -o -name BitKeeper -prune -o \
+		\( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
+		-name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
 	@rm -f $(CLEAN_FILES)
 	@$(MAKE) -C Documentation/DocBook clean
 
 mrproper: clean archmrproper
 	@echo 'Making mrproper'
-	@find . \( -name .depend -o -name .\*.cmd \) \
-		   -type f -print | xargs rm -f
+	@find . -name SCCS -prune -o -name BitKeeper -prune -o \
+		\( -name .depend -o -name .\*.cmd \) \
+		-type f -print | xargs rm -f
 	@rm -f $(MRPROPER_FILES)
 	@rm -rf $(MRPROPER_DIRS)
 	@$(MAKE) -C Documentation/DocBook mrproper
 
 distclean: mrproper
 	@echo 'Making distclean'
-	@find . \( -not -type d \) -and \
+	@find . -name SCCS -prune -o -name BitKeeper -prune -o \
+		\( -not -type d \) -and \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 	 	-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f \
@@ -625,16 +660,24 @@ distclean: mrproper
 # ---------------------------------------------------------------------------
 
 TAGS: FORCE
-	{ find include/asm-${ARCH} -name '*.h' -print ; \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
-	find $(SUBDIRS) init arch/${ARCH} -name '*.[chS]' ; } | grep -v SCCS | etags -
+	{ find include/asm-${ARCH} -name SCCS -prune -o -name BitKeeper -prune \
+		-o -name '*.h' -print ; \
+	find include -name SCCS -prune -o -name BitKeeper -prune -o \
+		-type d \( -name "asm-*" -o -name config \) -prune -o \
+		-name '*.h' -print ; \
+	find $(SUBDIRS) init arch/${ARCH} \
+		-name SCCS -prune -o -name BitKeeper -prune -o \
+		-name '*.[chS]' -print ; } | grep -v SCCS | etags -
 
 # 	Exuberant ctags works better with -I
 tags: FORCE
 	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
-	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
-	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
+	ctags $$CTAGSF `find include/asm-$(ARCH) -name SCCS -prune -o -name BitKeeper -prune -o -name '*.h' -print` && \
+	find include -name SCCS -prune -o -name BitKeeper -prune -o \
+		-type d \( -name "asm-*" -o -name config \) -prune -o \
+		-name '*.h' -print | xargs ctags $$CTAGSF -a && \
+	find $(SUBDIRS) init -name SCCS -prune -o -name BitKeeper -prune -o \
+		-name '*.[ch]' -print | xargs ctags $$CTAGSF -a
 
 # Documentation targets
 # ---------------------------------------------------------------------------
@@ -647,13 +690,19 @@ sgmldocs psdocs pdfdocs htmldocs:
 # ---------------------------------------------------------------------------
 
 checkconfig:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
+	find * -name SCCS -prune -o -name BitKeeper -prune -o \
+		-name '*.[hcS]' -type f -print | sort \
+		| xargs $(PERL) -w scripts/checkconfig.pl
 
 checkhelp:
-	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
+	find * -name SCCS -prune -o -name BitKeeper -prune -o \
+		-name [cC]onfig.in -print | sort \
+		| xargs $(PERL) -w scripts/checkhelp.pl
 
 checkincludes:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
+	find * -name SCCS -prune -o -name BitKeeper -prune -o \
+		-name '*.[hcS]' -type f -print | sort \
+		| xargs $(PERL) -w scripts/checkincludes.pl
 
 else # ifneq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 

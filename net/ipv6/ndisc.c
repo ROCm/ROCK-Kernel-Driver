@@ -312,7 +312,7 @@ ndisc_build_ll_hdr(struct sk_buff *skb, struct net_device *dev,
  *	Send a Neighbour Advertisement
  */
 
-void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
+static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 		   struct in6_addr *daddr, struct in6_addr *solicited_addr,
 		   int router, int solicited, int override, int inc_opt) 
 {

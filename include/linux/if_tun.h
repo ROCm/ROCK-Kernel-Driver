@@ -50,10 +50,6 @@ struct tun_struct {
 #endif  
 };
 
-#ifndef MIN
-#define MIN(a,b) ( (a)<(b) ? (a):(b) ) 
-#endif
-
 #endif /* __KERNEL__ */
 
 /* Read queue size */

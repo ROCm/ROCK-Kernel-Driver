@@ -34,7 +34,7 @@ static void update_voice(snd_emux_voice_t *vp, int update);
 static void reset_voice(snd_emux_t *emu, int ch);
 static void terminate_voice(snd_emux_voice_t *vp);
 static void sysex(snd_emux_t *emu, char *buf, int len, int parsed, snd_midi_channel_set_t *chset);
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 static int oss_ioctl(snd_emux_t *emu, int cmd, int p1, int p2);
 #endif
 static int load_fx(snd_emux_t *emu, int type, int mode, const void *buf, long len);
@@ -73,7 +73,7 @@ static snd_emux_operators_t emu8000_ops = {
 	sample_reset:	snd_emu8000_sample_reset,
 	load_fx:	load_fx,
 	sysex:		sysex,
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 	oss_ioctl:	oss_ioctl,
 #endif
 };
@@ -474,7 +474,7 @@ sysex(snd_emux_t *emu, char *buf, int len, int parsed, snd_midi_channel_set_t *c
 }
 
 
-#ifdef CONFIG_SND_OSSEMUL
+#ifdef CONFIG_SND_SEQUENCER_OSS
 /*
  * OSS ioctl callback
  */

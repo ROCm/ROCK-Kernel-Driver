@@ -11,7 +11,11 @@ host-progs 		:= gen_devlist
 
 include $(TOPDIR)/Rules.make
 
-names.o: devlist.h
+# Dependencies on generated files need to be listed explicitly
 
-devlist.h: zorro.ids gen-devlist
-	./gen-devlist <zorro.ids
+$(obj)/names.o: $(obj)/devlist.h
+
+# And that's how to generate them
+
+$(obj)/devlist.h: $(src)/zorro.ids $(obj)/gen-devlist
+	$(obj)/gen-devlist < $<

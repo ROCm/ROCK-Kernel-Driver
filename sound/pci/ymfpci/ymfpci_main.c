@@ -453,7 +453,8 @@ static int snd_ymfpci_pcm_voice_alloc(ymfpci_pcm_t *ypcm, int voices)
 
 static void snd_ymfpci_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 				      int rate, int w_16, unsigned long addr,
-				      unsigned int end, int eff2)
+				      unsigned int end,
+				      int output_front, int output_rear)
 {
 	u32 format;
 	u32 delta = snd_ymfpci_calc_delta(rate);
@@ -499,19 +500,20 @@ static void snd_ymfpci_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 		bank->eff3_gain_end = 0;
 
 		if (!stereo) {
-			if (!eff2) {
+			if (output_front) {
 				bank->left_gain = 
 				bank->right_gain =
 				bank->left_gain_end =
 				bank->right_gain_end = cpu_to_le32(0x40000000);
-			} else {
+			}
+			if (output_rear) {
 				bank->eff2_gain =
 				bank->eff2_gain_end =
 				bank->eff3_gain =
 				bank->eff3_gain_end = cpu_to_le32(0x40000000);
 			}
 		} else {
-			if (!eff2) {
+			if (output_front) {
 				if ((voice->number & 1) == 0) {
 					bank->left_gain =
 					bank->left_gain_end = cpu_to_le32(0x40000000);
@@ -520,7 +522,8 @@ static void snd_ymfpci_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 					bank->right_gain =
 					bank->right_gain_end = cpu_to_le32(0x40000000);
 				}
-			} else {
+			}
+			if (output_rear) {
 				if ((voice->number & 1) == 0) {
 					bank->eff3_gain =
 					bank->eff3_gain_end = cpu_to_le32(0x40000000);
@@ -534,13 +537,11 @@ static void snd_ymfpci_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 	}
 }
 
-static int snd_ymfpci_ac3_init(ymfpci_t *chip)
+static int __devinit snd_ymfpci_ac3_init(ymfpci_t *chip)
 {
 	unsigned char *ptr;
 	dma_addr_t ptr_addr;
 
-	if (chip->ac3_tmp_base != NULL)
-		return -EBUSY;
 	if ((ptr = snd_malloc_pci_pages(chip->pci, 4096, &ptr_addr)) == NULL)
 		return -ENOMEM;
 
@@ -568,7 +569,7 @@ static int snd_ymfpci_ac3_done(ymfpci_t *chip)
 	snd_ymfpci_writel(chip, YDSXGR_MAPOFEFFECT,
 			  snd_ymfpci_readl(chip, YDSXGR_MAPOFEFFECT) & ~(3 << 3));
 	spin_unlock_irq(&chip->reg_lock);
-	snd_ymfpci_irq_wait(chip);
+	// snd_ymfpci_irq_wait(chip);
 	if (chip->ac3_tmp_base) {
 		snd_free_pci_pages(chip->pci, 4096, chip->ac3_tmp_base, chip->ac3_tmp_base_addr);
 		chip->ac3_tmp_base = NULL;
@@ -579,7 +580,6 @@ static int snd_ymfpci_ac3_done(ymfpci_t *chip)
 static int snd_ymfpci_playback_hw_params(snd_pcm_substream_t * substream,
 					 snd_pcm_hw_params_t * hw_params)
 {
-	ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
 	int err;
@@ -588,9 +588,6 @@ static int snd_ymfpci_playback_hw_params(snd_pcm_substream_t * substream,
 		return err;
 	if ((err = snd_ymfpci_pcm_voice_alloc(ypcm, params_channels(hw_params))) < 0)
 		return err;
-	if (ypcm->spdif || ypcm->mode4ch)
-		if ((err = snd_ymfpci_ac3_init(chip)) < 0)
-			return err;
 	return 0;
 }
 
@@ -599,7 +596,6 @@ static int snd_ymfpci_playback_hw_free(snd_pcm_substream_t * substream)
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	ymfpci_pcm_t *ypcm;
-	
 	
 	if (runtime->private_data == NULL)
 		return 0;
@@ -616,8 +612,6 @@ static int snd_ymfpci_playback_hw_free(snd_pcm_substream_t * substream)
 		snd_ymfpci_voice_free(chip, ypcm->voices[0]);
 		ypcm->voices[0] = NULL;
 	}
-	if (ypcm->spdif || ypcm->mode4ch)
-		snd_ymfpci_ac3_done(chip);
 	return 0;
 }
 
@@ -639,7 +633,8 @@ static int snd_ymfpci_playback_prepare(snd_pcm_substream_t * substream)
 					  snd_pcm_format_width(runtime->format) == 16,
 					  runtime->dma_addr,
 					  ypcm->buffer_size,
-					  ypcm->spdif || ypcm->mode4ch);
+					  ypcm->output_front,
+					  ypcm->output_rear);
 	return 0;
 }
 
@@ -842,7 +837,7 @@ static void snd_ymfpci_pcm_free_substream(snd_pcm_runtime_t *runtime)
 		snd_magic_kfree(ypcm);
 }
 
-static int snd_ymfpci_playback_open(snd_pcm_substream_t * substream)
+static int snd_ymfpci_playback_open_1(snd_pcm_substream_t * substream)
 {
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -862,6 +857,53 @@ static int snd_ymfpci_playback_open(snd_pcm_substream_t * substream)
 	return 0;
 }
 
+/* call with spinlock held */
+static void ymfpci_open_extension(ymfpci_t *chip)
+{
+	if (! chip->rear_opened) {
+		if (! chip->spdif_opened) /* set AC3 */
+			snd_ymfpci_writel(chip, YDSXGR_MODE,
+					  snd_ymfpci_readl(chip, YDSXGR_MODE) | (1 << 30));
+		/* enable second codec (4CHEN) */
+		snd_ymfpci_writew(chip, YDSXGR_SECCONFIG,
+				  (snd_ymfpci_readw(chip, YDSXGR_SECCONFIG) & ~0x0330) | 0x0010);
+	}
+}
+
+/* call with spinlock held */
+static void ymfpci_close_extension(ymfpci_t *chip)
+{
+	if (! chip->rear_opened) {
+		if (! chip->spdif_opened)
+			snd_ymfpci_writel(chip, YDSXGR_MODE,
+					  snd_ymfpci_readl(chip, YDSXGR_MODE) & ~(1 << 30));
+		snd_ymfpci_writew(chip, YDSXGR_SECCONFIG,
+				  (snd_ymfpci_readw(chip, YDSXGR_SECCONFIG) & ~0x0330) & ~0x0010);
+	}
+}
+
+static int snd_ymfpci_playback_open(snd_pcm_substream_t * substream)
+{
+	ymfpci_t *chip = snd_pcm_substream_chip(substream);
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	ymfpci_pcm_t *ypcm;
+	unsigned long flags;
+	int err;
+	
+	if ((err = snd_ymfpci_playback_open_1(substream)) < 0)
+		return err;
+	ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return 0);
+	ypcm->output_front = 1;
+	ypcm->output_rear = chip->mode_dup4ch ? 1 : 0;
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	if (ypcm->output_rear) {
+		ymfpci_open_extension(chip);
+		chip->rear_opened++;
+	}
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	return 0;
+}
+
 static int snd_ymfpci_playback_spdif_open(snd_pcm_substream_t * substream)
 {
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
@@ -870,25 +912,23 @@ static int snd_ymfpci_playback_spdif_open(snd_pcm_substream_t * substream)
 	unsigned long flags;
 	int err;
 	
-	if ((err = snd_ymfpci_playback_open(substream)) < 0)
+	if ((err = snd_ymfpci_playback_open_1(substream)) < 0)
 		return err;
 	ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return 0);
-	ypcm->spdif = 1;
+	ypcm->output_front = 0;
+	ypcm->output_rear = 1;
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	snd_ymfpci_writew(chip, YDSXGR_SPDIFOUTCTRL,
 			  snd_ymfpci_readw(chip, YDSXGR_SPDIFOUTCTRL) | 2);
-	snd_ymfpci_writel(chip, YDSXGR_MODE,
-			  snd_ymfpci_readl(chip, YDSXGR_MODE) | (1 << 30));
+	ymfpci_open_extension(chip);
 	chip->spdif_pcm_bits = chip->spdif_bits;
 	snd_ymfpci_writel(chip, YDSXGR_SPDIFOUTSTATUS, chip->spdif_pcm_bits);
+	chip->spdif_opened++;
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
 	chip->spdif_pcm_ctl->access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE |
 		       SNDRV_CTL_EVENT_MASK_INFO, &chip->spdif_pcm_ctl->id);
-
-	/* FIXME? True value is 256/48 = 5.33333 ms */
-	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_PERIOD_TIME, 5333, UINT_MAX);
 	return 0;
 }
 
@@ -900,19 +940,15 @@ static int snd_ymfpci_playback_4ch_open(snd_pcm_substream_t * substream)
 	unsigned long flags;
 	int err;
 	
-	if ((err = snd_ymfpci_playback_open(substream)) < 0)
+	if ((err = snd_ymfpci_playback_open_1(substream)) < 0)
 		return err;
 	ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return 0);
-	ypcm->mode4ch = 1;
+	ypcm->output_front = 0;
+	ypcm->output_rear = 1;
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	snd_ymfpci_writew(chip, YDSXGR_SECCONFIG,
-			  (snd_ymfpci_readw(chip, YDSXGR_SECCONFIG) & ~0x0030) | 0x0010);
-	snd_ymfpci_writel(chip, YDSXGR_MODE,
-			  snd_ymfpci_readl(chip, YDSXGR_MODE) | (1 << 30));
+	ymfpci_open_extension(chip);
+	chip->rear_opened++;
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
-
-	/* FIXME? True value is 256/48 = 5.33333 ms */
-	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_PERIOD_TIME, 5333, UINT_MAX);
 	return 0;
 }
 
@@ -950,9 +986,24 @@ static int snd_ymfpci_capture_ac97_open(snd_pcm_substream_t * substream)
 	return snd_ymfpci_capture_open(substream, 1);
 }
 
-static int snd_ymfpci_playback_close(snd_pcm_substream_t * substream)
+static int snd_ymfpci_playback_close_1(snd_pcm_substream_t * substream)
 {
 	return 0;
+}
+
+static int snd_ymfpci_playback_close(snd_pcm_substream_t * substream)
+{
+	ymfpci_t *chip = snd_pcm_substream_chip(substream);
+	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, substream->runtime->private_data, return -ENXIO);
+	unsigned long flags;
+
+	spin_lock_irqsave(&chip->reg_lock, flags);
+	if (ypcm->output_rear && chip->rear_opened > 0) {
+		chip->rear_opened--;
+		ymfpci_close_extension(chip);
+	}
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	return snd_ymfpci_playback_close_1(substream);
 }
 
 static int snd_ymfpci_playback_spdif_close(snd_pcm_substream_t * substream)
@@ -961,8 +1012,8 @@ static int snd_ymfpci_playback_spdif_close(snd_pcm_substream_t * substream)
 	unsigned long flags;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	snd_ymfpci_writel(chip, YDSXGR_MODE,
-			  snd_ymfpci_readl(chip, YDSXGR_MODE) & ~(1 << 30));
+	chip->spdif_opened = 0;
+	ymfpci_close_extension(chip);
 	snd_ymfpci_writew(chip, YDSXGR_SPDIFOUTCTRL,
 			  snd_ymfpci_readw(chip, YDSXGR_SPDIFOUTCTRL) & ~2);
 	snd_ymfpci_writew(chip, YDSXGR_SPDIFOUTSTATUS, chip->spdif_bits);
@@ -970,7 +1021,7 @@ static int snd_ymfpci_playback_spdif_close(snd_pcm_substream_t * substream)
 	chip->spdif_pcm_ctl->access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 	snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE |
 		       SNDRV_CTL_EVENT_MASK_INFO, &chip->spdif_pcm_ctl->id);
-	return snd_ymfpci_playback_close(substream);
+	return snd_ymfpci_playback_close_1(substream);
 }
 
 static int snd_ymfpci_playback_4ch_close(snd_pcm_substream_t * substream)
@@ -979,12 +1030,12 @@ static int snd_ymfpci_playback_4ch_close(snd_pcm_substream_t * substream)
 	unsigned long flags;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	snd_ymfpci_writel(chip, YDSXGR_MODE,
-			  snd_ymfpci_readl(chip, YDSXGR_MODE) & ~(1 << 30));
-	snd_ymfpci_writew(chip, YDSXGR_SECCONFIG,
-			  (snd_ymfpci_readw(chip, YDSXGR_SECCONFIG) & ~0x0330) | 0x0010);
+	if (chip->rear_opened > 0) {
+		chip->rear_opened--;
+		ymfpci_close_extension(chip);
+	}
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
-	return snd_ymfpci_playback_close(substream);
+	return snd_ymfpci_playback_close_1(substream);
 }
 
 static int snd_ymfpci_capture_close(snd_pcm_substream_t * substream)
@@ -1446,6 +1497,36 @@ static int snd_ymfpci_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	return change;
 }
 
+/*
+ * 4ch duplication
+ */
+static int snd_ymfpci_info_dup4ch(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int snd_ymfpci_get_dup4ch(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
+	ucontrol->value.integer.value[0] = chip->mode_dup4ch;
+	return 0;
+}
+
+static int snd_ymfpci_put_dup4ch(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
+	int change;
+	change = (ucontrol->value.integer.value[0] != chip->mode_dup4ch);
+	if (change)
+		chip->mode_dup4ch = !!ucontrol->value.integer.value[0];
+	return change;
+}
+
+
 #define YMFPCI_CONTROLS (sizeof(snd_ymfpci_controls)/sizeof(snd_kcontrol_new_t))
 
 static snd_kcontrol_new_t snd_ymfpci_controls[] __devinitdata = {
@@ -1462,7 +1543,14 @@ YMFPCI_DOUBLE(SNDRV_CTL_NAME_IEC958("", CAPTURE,VOLUME), 0, YDSXGR_ZVLOOPVOL),
 YMFPCI_DOUBLE(SNDRV_CTL_NAME_IEC958("AC97 ",PLAYBACK,VOLUME), 1, YDSXGR_SPDIFOUTVOL),
 YMFPCI_DOUBLE(SNDRV_CTL_NAME_IEC958("",CAPTURE,VOLUME), 1, YDSXGR_SPDIFLOOPVOL),
 YMFPCI_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH), 0, YDSXGR_SPDIFOUTCTRL),
-YMFPCI_SINGLE(SNDRV_CTL_NAME_IEC958("",CAPTURE,SWITCH), 0, YDSXGR_SPDIFINCTRL)
+YMFPCI_SINGLE(SNDRV_CTL_NAME_IEC958("",CAPTURE,SWITCH), 0, YDSXGR_SPDIFINCTRL),
+{
+	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
+	name: "4ch Duplication",
+	info: snd_ymfpci_info_dup4ch,
+	get: snd_ymfpci_get_dup4ch,
+	put: snd_ymfpci_put_dup4ch,
+},
 };
 
 
@@ -1952,12 +2040,19 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 		snd_ymfpci_writew(chip, YDSXGR_GLOBALCTRL, ctrl & ~0x0007);
 	}
 
+	snd_ymfpci_ac3_done(chip);
+
 	/* Set PCI device to D3 state */
-	// pci_set_power_state(chip->pci, 3);
+#if 0
+	/* FIXME: temporarily disabled, otherwise we cannot fire up
+	 * the chip again unless reboot.  ACPI bug?
+	 */
+	pci_set_power_state(chip->pci, 3);
+#endif
 
 #ifdef CONFIG_PM
 	if (chip->saved_regs)
-		kfree(chip->saved_regs);
+		vfree(chip->saved_regs);
 #endif
 	if (chip->reg_area_virt)
 		iounmap((void *)chip->reg_area_virt);
@@ -2150,8 +2245,11 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 		return -EIO;
 	}
 
+	if ((err = snd_ymfpci_ac3_init(chip)) < 0)
+		return err;
+
 #ifdef CONFIG_PM
-	chip->saved_regs = kmalloc(YDSXGR_NUM_SAVED_REGS * sizeof(u32), GFP_KERNEL);
+	chip->saved_regs = vmalloc(YDSXGR_NUM_SAVED_REGS * sizeof(u32));
 	if (chip->saved_regs == NULL) {
 		snd_ymfpci_free(chip);
 		return -ENOMEM;

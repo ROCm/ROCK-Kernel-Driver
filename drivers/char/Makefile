@@ -216,13 +216,11 @@ host-progs := conmakehash
 
 include $(TOPDIR)/Rules.make
 
-consolemap_deftbl.c: $(FONTMAPFILE) conmakehash
-	./conmakehash $< > $@
+$(obj)/consolemap_deftbl.c: $(src)/$(FONTMAPFILE) $(obj)/conmakehash
+	$(obj)/conmakehash $< > $@
 
-.DELETE_ON_ERROR:
-
-defkeymap.c: defkeymap.map
+$(obj)/defkeymap.c: $(src)/defkeymap.map
 	set -e ; loadkeys --mktable $< | sed -e 's/^static *//' > $@
 
-qtronixmap.c: qtronixmap.map
+$(obj)/qtronixmap.c: $(src)/qtronixmap.map
 	set -e ; loadkeys --mktable $< | sed -e 's/^static *//' > $@

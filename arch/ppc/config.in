@@ -244,7 +244,7 @@ if [ "$CONFIG_40x" = "y" ]; then
    fi
 
    bool 'Blue Logic DMA' CONFIG_405_DMA
-   dep_bool 'Power Management support (experimental)' CONFIG_PM $CONFIG_EXPERIMENTAL
+   dep_bool 'Power Management support (EXPERIMENTAL)' CONFIG_PM $CONFIG_EXPERIMENTAL
 
    choice 'TTYS0 device and default console'	\
 	"UART0  CONFIG_UART0_TTYS0		\
@@ -311,7 +311,7 @@ define_bool CONFIG_SBUS n
 define_bool CONFIG_MCA n
 
 if [ "$CONFIG_4xx" = "y" -o "$CONFIG_8260" = "y" ]; then
-   bool "Enable PCI" CONFIG_PCI
+   bool "PCI support" CONFIG_PCI
    bool 'PC PS/2 style Keyboard' CONFIG_PC_KEYBOARD
 else
    if [ "$CONFIG_8xx" = "y" ]; then

@@ -39,6 +39,6 @@ obj-$(CONFIG_PHONE)		+= telephony/
 obj-$(CONFIG_MD)		+= md/
 obj-$(CONFIG_BLUEZ)		+= bluetooth/
 obj-$(CONFIG_HOTPLUG_PCI)	+= hotplug/
-obj-$(CONFIG_ISDN)		+= isdn/
+obj-$(CONFIG_ISDN_BOOL)		+= isdn/
 
 include $(TOPDIR)/Rules.make
