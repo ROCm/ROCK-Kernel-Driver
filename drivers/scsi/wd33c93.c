@@ -1871,10 +1871,7 @@ Scsi_Cmnd *cmd;
 int x,i;
 static int stop = 0;
 
-   for (instance=scsi_hostlist; instance; instance=instance->next) {
-      if (instance->host_no == hn)
-         break;
-      }
+   instance = scsi_host_hn_get(hn);
    if (!instance) {
       printk("*** Hmm... Can't find host #%d!\n",hn);
       return (-ESRCH);

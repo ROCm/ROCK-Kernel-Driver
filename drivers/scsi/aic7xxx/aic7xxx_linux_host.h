@@ -63,7 +63,6 @@ int		 ahc_linux_abort(Scsi_Cmnd *);
  * to do with card config are filled in after the card is detected.
  */
 #define AIC7XXX	{						\
-	next: NULL,						\
 	module: NULL,						\
 	proc_dir: NULL,						\
 	proc_info: ahc_linux_proc_info,				\

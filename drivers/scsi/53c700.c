@@ -1723,13 +1723,11 @@ NCR_700_proc_directory_info(char *proc_buf, char **startp,
 {
 	static char buf[4096];	/* 1 page should be sufficient */
 	int len = 0;
-	struct Scsi_Host *host = scsi_hostlist;
+	struct Scsi_Host *host;
 	struct NCR_700_Host_Parameters *hostdata;
 	Scsi_Device *SDp;
 
-	while(host != NULL && host->host_no != host_no)
-		host = host->next;
-
+	host = scsi_host_hn_get(host_no);
 	if(host == NULL)
 		return 0;
 
