@@ -65,6 +65,9 @@ ToDo/Notes:
 	  page itself.
 	- Update fs/ntfs/mft.c::write_mft_record_nolock() and sync_mft_mirror()
 	  to cope with the fact that there now are dirty buffers in mft pages.
+	- Update fs/ntfs/inode.c::ntfs_write_inode() to also use the helper
+	  mark_ntfs_record_dirty() and thus to set the buffers belonging to the
+	  mft record dirty as well as the page itself.
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 
