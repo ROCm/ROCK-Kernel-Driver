@@ -627,6 +627,8 @@ out:
 	remove_thread_group(current, current->sig);
 	spin_lock_irq(&current->sigmask_lock);
 	current->sig = newsig;
+	init_sigpending(&current->pending);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	if (atomic_dec_and_test(&oldsig->count))
