@@ -82,20 +82,7 @@ static int ioresources_show(struct seq_file *m, void *v)
 
 static int ioresources_open(struct file *file, struct resource *root)
 {
-	char *buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	struct seq_file *m;
-	int res;
-
-	if (!buf)
-		return -ENOMEM;
-	res = single_open(file, ioresources_show, root);
-	if (!res) {
-		m = file->private_data;
-		m->buf = buf;
-		m->size = PAGE_SIZE;
-	} else
-		kfree(buf);
-	return res;
+	return single_open(file, ioresources_show, root);
 }
 
 static int ioports_open(struct inode *inode, struct file *file)
