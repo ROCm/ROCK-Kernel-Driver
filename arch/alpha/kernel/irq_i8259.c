@@ -85,21 +85,21 @@ i8259a_end_irq(unsigned int irq)
 }
 
 struct hw_interrupt_type i8259a_irq_type = {
-	typename:	"XT-PIC",
-	startup:	i8259a_startup_irq,
-	shutdown:	i8259a_disable_irq,
-	enable:		i8259a_enable_irq,
-	disable:	i8259a_disable_irq,
-	ack:		i8259a_mask_and_ack_irq,
-	end:		i8259a_end_irq,
+	.typename	= "XT-PIC",
+	.startup	= i8259a_startup_irq,
+	.shutdown	= i8259a_disable_irq,
+	.enable		= i8259a_enable_irq,
+	.disable	= i8259a_disable_irq,
+	.ack		= i8259a_mask_and_ack_irq,
+	.end		= i8259a_end_irq,
 };
 
 void __init
 init_i8259a_irqs(void)
 {
 	static struct irqaction cascade = {
-		handler:	no_action,
-		name:		"cascade",
+		.handler	= no_action,
+		.name		= "cascade",
 	};
 
 	long i;

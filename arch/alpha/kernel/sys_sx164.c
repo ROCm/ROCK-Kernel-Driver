@@ -154,26 +154,26 @@ sx164_init_arch(void)
  */
 
 struct alpha_machine_vector sx164_mv __initmv = {
-	vector_name:		"SX164",
+	.vector_name		= "SX164",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_PYXIS_IO,
 	DO_CIA_BUS,
-	machine_check:		cia_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	DEFAULT_MEM_BASE,
-	pci_dac_offset:		PYXIS_DAC_OFFSET,
+	.machine_check		= cia_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= DEFAULT_MEM_BASE,
+	.pci_dac_offset		= PYXIS_DAC_OFFSET,
 
-	nr_irqs:		48,
-	device_interrupt:	pyxis_device_interrupt,
+	.nr_irqs		= 48,
+	.device_interrupt	= pyxis_device_interrupt,
 
-	init_arch:		sx164_init_arch,
-	init_irq:		sx164_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		sx164_init_pci,
-	kill_arch:		NULL,
-	pci_map_irq:		sx164_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= sx164_init_arch,
+	.init_irq		= sx164_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= sx164_init_pci,
+	.kill_arch		= NULL,
+	.pci_map_irq		= sx164_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(sx164)

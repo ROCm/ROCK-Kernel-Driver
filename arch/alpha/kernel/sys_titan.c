@@ -152,14 +152,14 @@ privateer_set_affinity(unsigned int irq, unsigned long affinity)
 }
 
 static struct hw_interrupt_type privateer_irq_type = {
-	typename:	"PRIVATEER",
-	startup:	privateer_startup_irq,
-	shutdown:	privateer_disable_irq,
-	enable:		privateer_enable_irq,
-	disable:	privateer_disable_irq,
-	ack:		privateer_disable_irq,
-	end:		privateer_end_irq,
-	set_affinity:	privateer_set_affinity,
+	.typename	= "PRIVATEER",
+	.startup	= privateer_startup_irq,
+	.shutdown	= privateer_disable_irq,
+	.enable		= privateer_enable_irq,
+	.disable	= privateer_disable_irq,
+	.ack		= privateer_disable_irq,
+	.end		= privateer_end_irq,
+	.set_affinity	= privateer_set_affinity,
 };
 
 static void
@@ -367,26 +367,26 @@ privateer_machine_check(unsigned long vector, unsigned long la_ptr,
  */
 
 struct alpha_machine_vector privateer_mv __initmv = {
-	vector_name:		"PRIVATEER",
+	.vector_name		= "PRIVATEER",
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TITAN_IO,
 	DO_TITAN_BUS,
-	machine_check:		privateer_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	DEFAULT_MEM_BASE,
-	pci_dac_offset:		TITAN_DAC_OFFSET,
+	.machine_check		= privateer_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= DEFAULT_MEM_BASE,
+	.pci_dac_offset		= TITAN_DAC_OFFSET,
 
-	nr_irqs:		80,	/* 64 + 16 */
-	device_interrupt:	privateer_device_interrupt,
+	.nr_irqs		= 80,	/* 64 + 16 */
+	.device_interrupt	= privateer_device_interrupt,
 
-	init_arch:		titan_init_arch,
-	init_irq:		privateer_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		privateer_init_pci,
-	kill_arch:		titan_kill_arch,
-	pci_map_irq:		privateer_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= titan_init_arch,
+	.init_irq		= privateer_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= privateer_init_pci,
+	.kill_arch		= titan_kill_arch,
+	.pci_map_irq		= privateer_map_irq,
+	.pci_swizzle		= common_swizzle,
 };
 ALIAS_MV(privateer)

@@ -71,13 +71,13 @@ pyxis_mask_and_ack_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type pyxis_irq_type = {
-	typename:	"PYXIS",
-	startup:	pyxis_startup_irq,
-	shutdown:	pyxis_disable_irq,
-	enable:		pyxis_enable_irq,
-	disable:	pyxis_disable_irq,
-	ack:		pyxis_mask_and_ack_irq,
-	end:		pyxis_end_irq,
+	.typename	= "PYXIS",
+	.startup	= pyxis_startup_irq,
+	.shutdown	= pyxis_disable_irq,
+	.enable		= pyxis_enable_irq,
+	.disable	= pyxis_disable_irq,
+	.ack		= pyxis_mask_and_ack_irq,
+	.end		= pyxis_end_irq,
 };
 
 void 

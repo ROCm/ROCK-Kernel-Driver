@@ -252,30 +252,30 @@ alphabook1_init_pci(void)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_BOOK1)
 struct alpha_machine_vector alphabook1_mv __initmv = {
-	vector_name:		"AlphaBook1",
+	.vector_name		= "AlphaBook1",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_LCA_IO,
 	DO_LCA_BUS,
-	machine_check:		lca_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= lca_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		16,
-	device_interrupt:	isa_device_interrupt,
+	.nr_irqs		= 16,
+	.device_interrupt	= isa_device_interrupt,
 
-	init_arch:		alphabook1_init_arch,
-	init_irq:		sio_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		alphabook1_init_pci,
-	kill_arch:		NULL,
-	pci_map_irq:		noname_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= alphabook1_init_arch,
+	.init_irq		= sio_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= alphabook1_init_pci,
+	.kill_arch		= NULL,
+	.pci_map_irq		= noname_map_irq,
+	.pci_swizzle		= common_swizzle,
 
-	sys: { sio: {
+	.sys = { .sio = {
 		/* NCR810 SCSI is 14, PCMCIA controller is 15.  */
-		route_tab:	0x0e0f0a0a,
+		.route_tab	= 0x0e0f0a0a,
 	}}
 };
 ALIAS_MV(alphabook1)
@@ -283,28 +283,28 @@ ALIAS_MV(alphabook1)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_AVANTI)
 struct alpha_machine_vector avanti_mv __initmv = {
-	vector_name:		"Avanti",
+	.vector_name		= "Avanti",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_APECS_IO,
 	DO_APECS_BUS,
-	machine_check:		apecs_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= apecs_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		16,
-	device_interrupt:	isa_device_interrupt,
+	.nr_irqs		= 16,
+	.device_interrupt	= isa_device_interrupt,
 
-	init_arch:		apecs_init_arch,
-	init_irq:		sio_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		noname_init_pci,
-	pci_map_irq:		noname_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= apecs_init_arch,
+	.init_irq		= sio_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= noname_init_pci,
+	.pci_map_irq		= noname_map_irq,
+	.pci_swizzle		= common_swizzle,
 
-	sys: { sio: {
-		route_tab:	0x0b0a0e0f,
+	.sys = { .sio = {
+		.route_tab	= 0x0b0a0e0f,
 	}}
 };
 ALIAS_MV(avanti)
@@ -312,27 +312,27 @@ ALIAS_MV(avanti)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_NONAME)
 struct alpha_machine_vector noname_mv __initmv = {
-	vector_name:		"Noname",
+	.vector_name		= "Noname",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_LCA_IO,
 	DO_LCA_BUS,
-	machine_check:		lca_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= lca_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		16,
-	device_interrupt:	srm_device_interrupt,
+	.nr_irqs		= 16,
+	.device_interrupt	= srm_device_interrupt,
 
-	init_arch:		lca_init_arch,
-	init_irq:		sio_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		noname_init_pci,
-	pci_map_irq:		noname_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= lca_init_arch,
+	.init_irq		= sio_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= noname_init_pci,
+	.pci_map_irq		= noname_map_irq,
+	.pci_swizzle		= common_swizzle,
 
-	sys: { sio: {
+	.sys = { .sio = {
 		/* For UDB, the only available PCI slot must not map to IRQ 9,
 		   since that's the builtin MSS sound chip. That PCI slot
 		   will map to PIRQ1 (for INTA at least), so we give it IRQ 15
@@ -342,7 +342,7 @@ struct alpha_machine_vector noname_mv __initmv = {
 		   they are co-indicated when the platform type "Noname" is
 		   selected... :-(  */
 
-		route_tab:	0x0b0a0f0d,
+		.route_tab	= 0x0b0a0f0d,
 	}}
 };
 ALIAS_MV(noname)
@@ -350,28 +350,28 @@ ALIAS_MV(noname)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_P2K)
 struct alpha_machine_vector p2k_mv __initmv = {
-	vector_name:		"Platform2000",
+	.vector_name		= "Platform2000",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_LCA_IO,
 	DO_LCA_BUS,
-	machine_check:		lca_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	APECS_AND_LCA_DEFAULT_MEM_BASE,
+	.machine_check		= lca_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= APECS_AND_LCA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		16,
-	device_interrupt:	srm_device_interrupt,
+	.nr_irqs		= 16,
+	.device_interrupt	= srm_device_interrupt,
 
-	init_arch:		lca_init_arch,
-	init_irq:		sio_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		noname_init_pci,
-	pci_map_irq:		p2k_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= lca_init_arch,
+	.init_irq		= sio_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= noname_init_pci,
+	.pci_map_irq		= p2k_map_irq,
+	.pci_swizzle		= common_swizzle,
 
-	sys: { sio: {
-		route_tab:	0x0b0a090f,
+	.sys = { .sio = {
+		.route_tab	= 0x0b0a090f,
 	}}
 };
 ALIAS_MV(p2k)
@@ -379,28 +379,28 @@ ALIAS_MV(p2k)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_XL)
 struct alpha_machine_vector xl_mv __initmv = {
-	vector_name:		"XL",
+	.vector_name		= "XL",
 	DO_EV4_MMU,
 	DO_DEFAULT_RTC,
 	DO_APECS_IO,
 	BUS(apecs),
-	machine_check:		apecs_machine_check,
-	max_dma_address:	ALPHA_XL_MAX_DMA_ADDRESS,
-	min_io_address:		DEFAULT_IO_BASE,
-	min_mem_address:	XL_DEFAULT_MEM_BASE,
+	.machine_check		= apecs_machine_check,
+	.max_dma_address	= ALPHA_XL_MAX_DMA_ADDRESS,
+	.min_io_address		= DEFAULT_IO_BASE,
+	.min_mem_address	= XL_DEFAULT_MEM_BASE,
 
-	nr_irqs:		16,
-	device_interrupt:	isa_device_interrupt,
+	.nr_irqs		= 16,
+	.device_interrupt	= isa_device_interrupt,
 
-	init_arch:		apecs_init_arch,
-	init_irq:		sio_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		noname_init_pci,
-	pci_map_irq:		noname_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= apecs_init_arch,
+	.init_irq		= sio_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= noname_init_pci,
+	.pci_map_irq		= noname_map_irq,
+	.pci_swizzle		= common_swizzle,
 
-	sys: { sio: {
-		route_tab:	0x0b0a090f,
+	.sys = { .sio = {
+		.route_tab	= 0x0b0a090f,
 	}}
 };
 ALIAS_MV(xl)
