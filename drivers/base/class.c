@@ -259,7 +259,6 @@ int class_device_add(struct class_device *class_dev)
 
 	/* first, register with generic layer. */
 	strncpy(class_dev->kobj.name, class_dev->class_id, KOBJ_NAME_LEN);
-	kobj_set_kset_s(class_dev, class_subsys);
 	kobj_set_kset_s(class_dev, class_obj_subsys);
 	if (parent)
 		class_dev->kobj.parent = &parent->subsys.kset.kobj;
