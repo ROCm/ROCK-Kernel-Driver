@@ -138,8 +138,8 @@ static struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_KALLSYMS
 	E(PROC_TGID_WCHAN,     "wchan",   S_IFREG|S_IRUGO),
 #endif
-	E(PROC_TGID_OOM_SCORE, "oom_score",S_IFREG|S_IRUSR),
-	E(PROC_TGID_OOM_ADJUST,"oom_adj", S_IFREG|S_IRUSR|S_IWUSR),
+	E(PROC_TGID_OOM_SCORE, "oom_score",S_IFREG|S_IRUGO),
+	E(PROC_TGID_OOM_ADJUST,"oom_adj", S_IFREG|S_IRUGO|S_IWUSR),
 	{0,0,NULL,0}
 };
 static struct pid_entry tid_base_stuff[] = {
@@ -165,8 +165,8 @@ static struct pid_entry tid_base_stuff[] = {
 #ifdef CONFIG_KALLSYMS
 	E(PROC_TID_WCHAN,      "wchan",   S_IFREG|S_IRUGO),
 #endif
-	E(PROC_TID_OOM_SCORE,  "oom_score",S_IFREG|S_IRUSR),
-	E(PROC_TID_OOM_ADJUST, "oom_adj", S_IFREG|S_IRUSR|S_IWUSR),
+	E(PROC_TID_OOM_SCORE,  "oom_score",S_IFREG|S_IRUGO),
+	E(PROC_TID_OOM_ADJUST, "oom_adj", S_IFREG|S_IRUGO|S_IWUSR),
 	{0,0,NULL,0}
 };
 
