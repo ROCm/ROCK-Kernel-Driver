@@ -3,6 +3,9 @@
 
 /* WARNING: These defines must be the same as what the Xserver uses.
  * if you change them, you must change the defines in the Xserver.
+ *
+ * KW: Actually, you can't ever change them because doing so would
+ * break backwards compatibility.
  */
 
 #ifndef _I830_DEFINES_
@@ -18,14 +21,12 @@
 #define I830_NR_TEX_REGIONS 64
 #define I830_LOG_MIN_TEX_REGION_SIZE 16
 
-/* if defining I830_ENABLE_4_TEXTURES, do it in i830_3d_reg.h, too */
-#if !defined(I830_ENABLE_4_TEXTURES)
+/* KW: These aren't correct but someone set them to two and then
+ * released the module.  Now we can't change them as doing so would
+ * break backwards compatibility.
+ */
 #define I830_TEXTURE_COUNT	2
-#define I830_TEXBLEND_COUNT	2	/* always same as TEXTURE_COUNT? */
-#else /* defined(I830_ENABLE_4_TEXTURES) */
-#define I830_TEXTURE_COUNT	4
-#define I830_TEXBLEND_COUNT	4	/* always same as TEXTURE_COUNT? */
-#endif /* I830_ENABLE_4_TEXTURES */
+#define I830_TEXBLEND_COUNT	I830_TEXTURE_COUNT
 
 #define I830_TEXBLEND_SIZE	12	/* (4 args + op) * 2 + COLOR_FACTOR */
 
@@ -57,6 +58,7 @@
 #define I830_UPLOAD_TEXBLEND_MASK	0xf00000
 #define I830_UPLOAD_TEX_PALETTE_N(n)    (0x1000000 << (n))
 #define I830_UPLOAD_TEX_PALETTE_SHARED	0x4000000
+#define I830_UPLOAD_STIPPLE         	0x8000000
 
 /* Indices into buf.Setup where various bits of state are mirrored per
  * context and per buffer.  These can be fired at the card as a unit,
@@ -73,7 +75,6 @@
  */
 
 #define I830_DESTREG_CBUFADDR 0
-/* Invarient */
 #define I830_DESTREG_DBUFADDR 1
 #define I830_DESTREG_DV0 2
 #define I830_DESTREG_DV1 3
@@ -109,6 +110,13 @@
 #define I830_CTXREG_MCSB1		16
 #define I830_CTX_SETUP_SIZE		17
 
+/* 1.3: Stipple state
+ */ 
+#define I830_STPREG_ST0 0
+#define I830_STPREG_ST1 1
+#define I830_STP_SETUP_SIZE 2
+
+
 /* Texture state (per tex unit)
  */
 
@@ -123,6 +131,18 @@
 #define I830_TEXREG_MLL	8	/* GFX_OP_MAP_LOD_LIMITS */
 #define I830_TEXREG_MCS	9	/* GFX_OP_MAP_COORD_SETS */
 #define I830_TEX_SETUP_SIZE 10
+
+#define I830_TEXREG_TM0LI      0 /* load immediate 2 texture map n */
+#define I830_TEXREG_TM0S0      1
+#define I830_TEXREG_TM0S1      2
+#define I830_TEXREG_TM0S2      3
+#define I830_TEXREG_TM0S3      4
+#define I830_TEXREG_TM0S4      5
+#define I830_TEXREG_NOP0       6       /* noop */
+#define I830_TEXREG_NOP1       7       /* noop */
+#define I830_TEXREG_NOP2       8       /* noop */
+#define __I830_TEXREG_MCS      9       /* GFX_OP_MAP_COORD_SETS -- shared */
+#define __I830_TEX_SETUP_SIZE   10
 
 #define I830_FRONT   0x1
 #define I830_BACK    0x2
@@ -199,7 +219,34 @@ typedef struct _drm_i830_sarea {
 	int ctxOwner;		/* last context to upload state */
 
 	int vertex_prim;
+
+        int pf_enabled;               /* is pageflipping allowed? */
+        int pf_active;               
+        int pf_current_page;	    /* which buffer is being displayed? */
+
+        int perf_boxes;             /* performance boxes to be displayed */
+   
+        /* Here's the state for texunits 2,3:
+	 */
+	unsigned int TexState2[I830_TEX_SETUP_SIZE];
+	unsigned int TexBlendState2[I830_TEXBLEND_SIZE];
+	unsigned int TexBlendStateWordsUsed2;
+
+	unsigned int TexState3[I830_TEX_SETUP_SIZE];
+	unsigned int TexBlendState3[I830_TEXBLEND_SIZE];
+	unsigned int TexBlendStateWordsUsed3;
+
+	unsigned int StippleState[I830_STP_SETUP_SIZE];
 } drm_i830_sarea_t;
+
+/* Flags for perf_boxes
+ */
+#define I830_BOX_RING_EMPTY    0x1 /* populated by kernel */
+#define I830_BOX_FLIP          0x2 /* populated by kernel */
+#define I830_BOX_WAIT          0x4 /* populated by kernel & client */
+#define I830_BOX_TEXTURE_LOAD  0x8 /* populated by kernel */
+#define I830_BOX_LOST_CONTEXT  0x10 /* populated by client */
+
 
 /* I830 specific ioctls
  * The device specific ioctl range is 0x40 to 0x79.
@@ -213,6 +260,11 @@ typedef struct _drm_i830_sarea {
 #define DRM_IOCTL_I830_SWAP		DRM_IO ( 0x46)
 #define DRM_IOCTL_I830_COPY		DRM_IOW( 0x47, drm_i830_copy_t)
 #define DRM_IOCTL_I830_DOCOPY		DRM_IO ( 0x48)
+#define DRM_IOCTL_I830_FLIP		DRM_IO ( 0x49)
+#define DRM_IOCTL_I830_IRQ_EMIT         DRM_IOWR(0x4a, drm_i830_irq_emit_t)
+#define DRM_IOCTL_I830_IRQ_WAIT         DRM_IOW( 0x4b, drm_i830_irq_wait_t)
+#define DRM_IOCTL_I830_GETPARAM         DRM_IOWR(0x4c, drm_i830_getparam_t)
+#define DRM_IOCTL_I830_SETPARAM         DRM_IOWR(0x4d, drm_i830_setparam_t)
 
 typedef struct _drm_i830_clear {
 	int clear_color;
@@ -247,5 +299,37 @@ typedef struct drm_i830_dma {
 	int request_size;
 	int granted;
 } drm_i830_dma_t;
+
+
+/* 1.3: Userspace can request & wait on irq's:
+ */
+typedef struct drm_i830_irq_emit {
+	int *irq_seq;
+} drm_i830_irq_emit_t;
+
+typedef struct drm_i830_irq_wait {
+	int irq_seq;
+} drm_i830_irq_wait_t;
+
+
+/* 1.3: New ioctl to query kernel params:
+ */
+#define I830_PARAM_IRQ_ACTIVE            1
+
+typedef struct drm_i830_getparam {
+	int param;
+	int *value;
+} drm_i830_getparam_t;
+
+
+/* 1.3: New ioctl to set kernel params:
+ */
+#define I830_SETPARAM_USE_MI_BATCHBUFFER_START            1
+
+typedef struct drm_i830_setparam {
+	int param;
+	int value;
+} drm_i830_setparam_t;
+
 
 #endif /* _I830_DRM_H_ */
