@@ -14,13 +14,6 @@ CFLAGS_pmac_setup.o	+= -I$(TOPDIR)/arch/$(ARCH)/mm
 
 export-objs			:= prep_setup.o
 
-obj-$(CONFIG_CEDER)		+= ceder.o ibmnp405l.o
-obj-$(CONFIG_CPCI405)		+= cpci405.o ibm405gp.o
-obj-$(CONFIG_EP405)		+= ep405.o ibm405gp.o 
-obj-$(CONFIG_REDWOOD_4)		+= redwood.o ibmstb3.o
-obj-$(CONFIG_REDWOOD_5)		+= redwood5.o ibmstb4.o
-obj-$(CONFIG_WALNUT)		+= walnut.o ibm405gp.o
-obj-$(CONFIG_ASH)		+= ash.o ibmnp405h.o
 obj-$(CONFIG_APUS)		+= apus_setup.o
 ifeq ($(CONFIG_APUS),y)
 obj-$(CONFIG_PCI)		+= apus_pci.o
