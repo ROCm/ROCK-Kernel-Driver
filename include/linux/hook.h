@@ -121,7 +121,7 @@ static inline void deactivate_asm_hook(struct hook *hook) { }
 #endif
 
 #ifndef IF_HOOK_ENABLED
-#define IF_HOOK_ENABLED(h, hk) _IF_HOOK_ENABLED(h, #hk) \
+#define IF_HOOK_ENABLED(h, hk) _IF_HOOK_ENABLED(h, #hk) 
 #define _IF_HOOK_ENABLED(h, hk) \
 	__asm__ __volatile__ (".global "hk"; "hk":"); \
 	if (unlikely(h.hook_flags & HOOK_ACTIVE))
