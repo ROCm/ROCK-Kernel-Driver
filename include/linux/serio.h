@@ -36,7 +36,7 @@ struct serio {
 	int (*open)(struct serio *);
 	void (*close)(struct serio *);
 
-	struct serio_dev *dev;
+	struct serio_dev *dev; /* Accessed from interrupt, writes must be protected by serio_lock */
 
 	struct list_head node;
 };
