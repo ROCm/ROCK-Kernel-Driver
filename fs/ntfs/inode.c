@@ -872,7 +872,7 @@ skip_large_dir_stuff:
 		/* Setup the operations for this inode. */
 		vi->i_op = &ntfs_dir_inode_ops;
 		vi->i_fop = &ntfs_dir_ops;
-		vi->i_mapping->a_ops = &ntfs_aops;
+		vi->i_mapping->a_ops = &ntfs_mst_aops;
 	} else {
 		/* It is a file. */
 		reinit_attr_search_ctx(ctx);
@@ -1249,7 +1249,10 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 	/* Setup the operations for this attribute inode. */
 	vi->i_op = NULL;
 	vi->i_fop = NULL;
-	vi->i_mapping->a_ops = &ntfs_aops;
+	if (NInoMstProtected(ni))
+		vi->i_mapping->a_ops = &ntfs_mst_aops;
+	else
+		vi->i_mapping->a_ops = &ntfs_aops;
 
 	if (!NInoCompressed(ni))
 		vi->i_blocks = ni->allocated_size >> 9;
