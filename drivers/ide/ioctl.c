@@ -345,8 +345,9 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 			if (!arg) {
 				if (ide_spin_wait_hwgroup(drive))
 					return -EBUSY;
-				else
-					return 0;
+				/* Do nothing, just unlock */
+				spin_unlock_irq(drive->channel->lock);
+				return 0;
 			}
 
 			return do_cmd_ioctl(drive, arg);
