@@ -98,7 +98,7 @@ struct Map *	MapP;
 
 	if ( !CmdBlkP ) {
 		rio_dprintk (RIO_DEBUG_CMD, "FOAD RTA: GetCmdBlk failed\n");
-		return ENXIO;
+		return -ENXIO;
 	}
 
 	CmdBlkP->Packet.dest_unit = MapP->ID;
@@ -113,7 +113,7 @@ struct Map *	MapP;
 
 	if ( RIOQueueCmdBlk( HostP, MapP->ID-1, CmdBlkP) == RIO_FAIL ) {
 		rio_dprintk (RIO_DEBUG_CMD, "FOAD RTA: Failed to queue foad command\n");
-		return EIO;
+		return -EIO;
 	}
 	return 0;
 }
@@ -131,7 +131,7 @@ struct Map *	MapP;
 
 	if ( !CmdBlkP ) {
 		rio_dprintk (RIO_DEBUG_CMD, "ZOMBIE RTA: GetCmdBlk failed\n");
-		return ENXIO;
+		return -ENXIO;
 	}
 
 	CmdBlkP->Packet.dest_unit = MapP->ID;
@@ -146,7 +146,7 @@ struct Map *	MapP;
 
 	if ( RIOQueueCmdBlk( HostP, MapP->ID-1, CmdBlkP) == RIO_FAIL ) {
 		rio_dprintk (RIO_DEBUG_CMD, "ZOMBIE RTA: Failed to queue zombie command\n");
-		return EIO;
+		return -EIO;
 	}
 	return 0;
 }
@@ -192,7 +192,7 @@ int (* func)( struct Host *HostP, struct Map *MapP );
 			}
 		}
 	}
-	return ENXIO;
+	return -ENXIO;
 }
 
 
@@ -206,7 +206,7 @@ caddr_t arg;
 	if ( copyin( (int)arg, (caddr_t)&IdRta, sizeof(IdRta) ) == COPYFAIL ) {
 		rio_dprintk (RIO_DEBUG_CMD, "RIO_IDENTIFY_RTA copy failed\n");
 		p->RIOError.Error = COPYIN_FAILED;
-		return EFAULT;
+		return -EFAULT;
 	}
 
 	for ( Host = 0 ; Host < p->RIONumHosts; Host++ ) {
@@ -238,7 +238,7 @@ caddr_t arg;
 
 						if ( !CmdBlkP ) {
 							rio_dprintk (RIO_DEBUG_CMD, "IDENTIFY RTA: GetCmdBlk failed\n");
-							return ENXIO;
+							return -ENXIO;
 						}
 		
 						CmdBlkP->Packet.dest_unit = MapP->ID;
@@ -252,7 +252,7 @@ caddr_t arg;
 		
 						if ( RIOQueueCmdBlk( HostP, MapP->ID-1, CmdBlkP) == RIO_FAIL ) {
 							rio_dprintk (RIO_DEBUG_CMD, "IDENTIFY RTA: Failed to queue command\n");
-							return EIO;
+							return -EIO;
 						}
 						return 0;
 					}
@@ -260,7 +260,7 @@ caddr_t arg;
 			}
 		}
 	} 
-	return ENOENT;
+	return -ENOENT;
 }
 
 
@@ -279,17 +279,17 @@ caddr_t arg;
 	if ( copyin( (int)arg, (caddr_t)&KillUnit, sizeof(KillUnit) ) == COPYFAIL ) {
 		rio_dprintk (RIO_DEBUG_CMD, "RIO_KILL_NEIGHBOUR copy failed\n");
 		p->RIOError.Error = COPYIN_FAILED;
-		return EFAULT;
+		return -EFAULT;
 	}
 
 	if ( KillUnit.Link > 3 )
-		return ENXIO;
+		return -ENXIO;
  
 	CmdBlkP = RIOGetCmdBlk();
 
 	if ( !CmdBlkP ) {
 		rio_dprintk (RIO_DEBUG_CMD, "UFOAD: GetCmdBlk failed\n");
-		return ENXIO;
+		return -ENXIO;
 	}
 
 	CmdBlkP->Packet.dest_unit = 0;
@@ -310,7 +310,7 @@ caddr_t arg;
 			if ( RIOQueueCmdBlk( HostP, RTAS_PER_HOST+KillUnit.Link,
 							CmdBlkP) == RIO_FAIL ) {
 				rio_dprintk (RIO_DEBUG_CMD, "UFOAD: Failed queue command\n");
-				return EIO;
+				return -EIO;
 			}
 			return 0;
 		}
@@ -320,14 +320,14 @@ caddr_t arg;
 				CmdBlkP->Packet.dest_unit = ID+1;
 				if ( RIOQueueCmdBlk( HostP, ID, CmdBlkP) == RIO_FAIL ) {
 					rio_dprintk (RIO_DEBUG_CMD, "UFOAD: Failed queue command\n");
-					return EIO;
+					return -EIO;
 				}
 				return 0;
 			}
 		}
 	}
 	RIOFreeCmdBlk( CmdBlkP );
-	return ENXIO;
+	return -ENXIO;
 }
 
 int
@@ -344,7 +344,7 @@ int Link;
 
 	if ( !CmdBlkP ) {
 		rio_dprintk (RIO_DEBUG_CMD, "SUSPEND BOOT ON RTA: GetCmdBlk failed\n");
-		return ENXIO;
+		return -ENXIO;
 	}
 
 	CmdBlkP->Packet.dest_unit = ID;
@@ -359,7 +359,7 @@ int Link;
 
 	if ( RIOQueueCmdBlk( HostP, ID - 1, CmdBlkP) == RIO_FAIL ) {
 		rio_dprintk (RIO_DEBUG_CMD, "SUSPEND BOOT ON RTA: Failed to queue iwait command\n");
-		return EIO;
+		return -EIO;
 	}
 	return 0;
 }
