@@ -1730,8 +1730,15 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 				if(SecurityBlob2->NegotiateFlags & NTLMSSP_NEGOTIATE_NTLMV2)
 					*pNTLMv2_flag = TRUE;
 
-/*				if(SecurityBlob2->NegotiateFlags & NTLMSSP_NEGOTIATE_SIGN)
-					always sign */ /* BB FIXME BB */
+				if((SecurityBlob2->NegotiateFlags & 
+					NTLMSSP_NEGOTIATE_ALWAYS_SIGN) 
+					|| (sign_CIFS_PDUs > 1))
+						ses->server->secMode |= 
+							SECMODE_SIGN_REQUIRED;	
+				if ((SecurityBlob2->NegotiateFlags & 
+					NTLMSSP_NEGOTIATE_SIGN) && (sign_CIFS_PDUs))
+						ses->server->secMode |= 
+							SECMODE_SIGN_ENABLED;
 
 				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
