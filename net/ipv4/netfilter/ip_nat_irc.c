@@ -41,10 +41,8 @@ static int ports_c;
 MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
 MODULE_DESCRIPTION("IRC (DCC) NAT helper");
 MODULE_LICENSE("GPL");
-#ifdef MODULE_PARM
 MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
 MODULE_PARM_DESC(ports, "port numbers of IRC servers");
-#endif
 
 /* protects irc part of conntracks */
 DECLARE_LOCK_EXTERN(ip_irc_lock);

@@ -785,14 +785,6 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 				do_end_request = 1;
 		} else if (sense_key == ILLEGAL_REQUEST ||
 			   sense_key == DATA_PROTECT) {
-			/*
-			 * check if this was a write protected media
-			 */
-			if (rq_data_dir(rq) == WRITE) {
-				printk("ide-cd: media marked write protected\n");
-				set_disk_ro(drive->disk, 1);
-			}
-
 			/* No point in retrying after an illegal
 			   request or data protect error.*/
 			ide_dump_status (drive, "command error", stat);
@@ -3248,9 +3240,8 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	nslots = ide_cdrom_probe_capabilities (drive);
 
 	/*
-	 * set correct block size and read-only for non-ram media
+	 * set correct block size
 	 */
-	set_disk_ro(drive->disk, !CDROM_CONFIG_FLAGS(drive)->ram);
 	blk_queue_hardsect_size(drive->queue, CD_FRAMESIZE);
 
 #if 0

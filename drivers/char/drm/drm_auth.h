@@ -194,7 +194,7 @@ int DRM(getmagic)(struct inode *inode, struct file *filp,
 	}
 
 	DRM_DEBUG("%u\n", auth.magic);
-	if (copy_to_user((drm_auth_t *)arg, &auth, sizeof(auth)))
+	if (copy_to_user((drm_auth_t __user *)arg, &auth, sizeof(auth)))
 		return -EFAULT;
 	return 0;
 }
@@ -218,7 +218,7 @@ int DRM(authmagic)(struct inode *inode, struct file *filp,
 	drm_auth_t	   auth;
 	drm_file_t	   *file;
 
-	if (copy_from_user(&auth, (drm_auth_t *)arg, sizeof(auth)))
+	if (copy_from_user(&auth, (drm_auth_t __user *)arg, sizeof(auth)))
 		return -EFAULT;
 	DRM_DEBUG("%u\n", auth.magic);
 	if ((file = DRM(find_file)(dev, auth.magic))) {

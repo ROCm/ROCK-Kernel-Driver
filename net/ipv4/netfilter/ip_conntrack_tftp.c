@@ -27,10 +27,8 @@ MODULE_LICENSE("GPL");
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
 static int ports_c;
-#ifdef MODULE_PARM
 MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
 MODULE_PARM_DESC(ports, "port numbers of tftp servers");
-#endif
 
 #if 0
 #define DEBUGP(format, args...) printk("%s:%s:" format, \

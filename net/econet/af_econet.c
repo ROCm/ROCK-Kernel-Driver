@@ -774,38 +774,22 @@ static int ec_queue_packet(struct sock *sk, struct sk_buff *skb,
 
 static void aun_send_response(__u32 addr, unsigned long seq, int code, int cb)
 {
-	struct sockaddr_in sin;
-	struct iovec iov;
-	struct aunhdr ah;
+	struct sockaddr_in sin = {
+		.sin_family = AF_INET,
+		.sin_port = htons(AUN_PORT),
+		.sin_addr = {.s_addr = addr}
+	};
+	struct aunhdr ah = {.code = code, .cb = cb, .handle = seq};
+	struct kvec iov = {.iov_base = (void *)&ah, .iov_len = sizeof(ah)};
 	struct msghdr udpmsg;
-	int err;
-	mm_segment_t oldfs;
 	
-	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(AUN_PORT);
-	sin.sin_addr.s_addr = addr;
-
-	ah.code = code;
-	ah.pad = 0;
-	ah.port = 0;
-	ah.cb = cb;
-	ah.handle = seq;
-
-	iov.iov_base = (void *)&ah;
-	iov.iov_len = sizeof(ah);
-
 	udpmsg.msg_name = (void *)&sin;
 	udpmsg.msg_namelen = sizeof(sin);
-	udpmsg.msg_iov = &iov;
-	udpmsg.msg_iovlen = 1;
 	udpmsg.msg_control = NULL;
 	udpmsg.msg_controllen = 0;
 	udpmsg.msg_flags=0;
 
-	oldfs = get_fs(); set_fs(KERNEL_DS);
-	err = sock_sendmsg(udpsock, &udpmsg, sizeof(ah));
-	set_fs(oldfs);
+	kernel_sendmsg(udpsock, &udpmsg, &iov, 1, sizeof(ah));
 }
 
 

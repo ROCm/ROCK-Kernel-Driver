@@ -677,5 +677,13 @@ config SERIAL_CPM_SMC2
 	help
 	  Select the is option to use SMC2 as a serial port
 
-endmenu
+config SERIAL_SGI_L1_CONSOLE
+	bool "SGI Altix L1 serial console support"
+	depends on IA64_GENERIC || IA64_SGI_SN2
+	select SERIAL_CORE
+	help
+		If you have an SGI Altix and you would like to use the system
+		controller serial port as your console (you want this!),
+		say Y.  Otherwise, say N.
 
+endmenu
