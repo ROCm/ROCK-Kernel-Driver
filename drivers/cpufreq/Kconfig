@@ -9,3 +9,30 @@ config CPU_FREQ_PROC_INTF
 	  For details, take a look at linux/Documentation/cpufreq. 
 	  
 	  If in doubt, say N.
+
+config CPU_FREQ_GOV_USERSPACE
+       tristate "'userspace' governor for userspace frequency scaling"
+       depends on CPU_FREQ
+       help
+	  Enable this cpufreq governor when you either want to set the
+	  CPU frequency manually or when an userspace programm shall
+          be able to set the CPU dynamically, like on LART 
+	  ( http://www.lart.tudelft.nl/ )
+
+	  For details, take a look at linux/Documentation/cpufreq. 
+
+	  If in doubt, say Y.
+
+config CPU_FREQ_24_API
+	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
+	depends on CPU_FREQ && SYSCTL && CPU_FREQ_GOV_USERSPACE
+	help
+	  This enables the /proc/sys/cpu/ sysctl interface for controlling
+	  the CPUFreq,"userspace" governor. This is the same interface
+	  as known from the.4.-kernel patches for CPUFreq, and offers
+	  the same functionality as long as "userspace" is the
+	  selected governor for the specified CPU.
+	
+	  For details, take a look at linux/Documentation/cpufreq. 
+
+	  If in doubt, say N.

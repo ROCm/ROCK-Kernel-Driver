@@ -29,6 +29,8 @@
 
 #ifdef CONFIG_NUMA
 
+#include <asm/mpspec.h>
+
 /* Mappings between logical cpu number and node number */
 extern volatile unsigned long node_2_cpu_mask[];
 extern volatile int cpu_2_node[];
@@ -60,6 +62,12 @@ static inline int node_to_first_cpu(int node)
 
 /* Returns the number of the first MemBlk on Node 'node' */
 #define node_to_memblk(node) (node)
+
+/* Returns the number of the node containing PCI bus 'bus' */
+static inline unsigned long pcibus_to_cpumask(int bus)
+{
+	return node_to_cpumask(mp_bus_id_to_node[bus]);
+}
 
 /* Cross-node load balancing interval. */
 #define NODE_BALANCE_RATE 100

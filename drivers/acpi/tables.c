@@ -379,6 +379,7 @@ acpi_table_get_sdt (
 
 		sdt.pa = ((struct acpi20_table_rsdp*)rsdp)->xsdt_address;
 
+		/* map in just the header */
 		header = (struct acpi_table_header *)
 			__acpi_map_table(sdt.pa, sizeof(struct acpi_table_header));
 
@@ -386,6 +387,15 @@ acpi_table_get_sdt (
 			printk(KERN_WARNING PREFIX "Unable to map XSDT header\n");
 			return -ENODEV;
 		}
+
+		/* remap in the entire table before processing */
+		mapped_xsdt = (struct acpi_table_xsdt *)
+			__acpi_map_table(sdt.pa, header->length);
+		if (!mapped_xsdt) {
+			printk(KERN_WARNING PREFIX "Unable to map XSDT\n");
+			return -ENODEV;
+		}
+		header = &mapped_xsdt->header;
 
 		if (strncmp(header->signature, "XSDT", 4)) {
 			printk(KERN_WARNING PREFIX "XSDT signature incorrect\n");
@@ -404,15 +414,6 @@ acpi_table_get_sdt (
 			sdt.count = ACPI_MAX_TABLES;
 		}
 
-		mapped_xsdt = (struct acpi_table_xsdt *)
-			__acpi_map_table(sdt.pa, header->length);
-		if (!mapped_xsdt) {
-			printk(KERN_WARNING PREFIX "Unable to map XSDT\n");
-			return -ENODEV;
-		}
-
-		header = &mapped_xsdt->header;
-
 		for (i = 0; i < sdt.count; i++)
 			sdt.entry[i].pa = (unsigned long) mapped_xsdt->entry[i];
 	}
@@ -425,12 +426,22 @@ acpi_table_get_sdt (
 
 		sdt.pa = rsdp->rsdt_address;
 
+		/* map in just the header */
 		header = (struct acpi_table_header *)
 			__acpi_map_table(sdt.pa, sizeof(struct acpi_table_header));
 		if (!header) {
 			printk(KERN_WARNING PREFIX "Unable to map RSDT header\n");
 			return -ENODEV;
 		}
+
+		/* remap in the entire table before processing */
+		mapped_rsdt = (struct acpi_table_rsdt *)
+			__acpi_map_table(sdt.pa, header->length);
+		if (!mapped_rsdt) {
+			printk(KERN_WARNING PREFIX "Unable to map RSDT\n");
+			return -ENODEV;
+		}
+		header = &mapped_rsdt->header;
 
 		if (strncmp(header->signature, "RSDT", 4)) {
 			printk(KERN_WARNING PREFIX "RSDT signature incorrect\n");
@@ -449,15 +460,6 @@ acpi_table_get_sdt (
 			sdt.count = ACPI_MAX_TABLES;
 		}
 
-		mapped_rsdt = (struct acpi_table_rsdt *)
-			__acpi_map_table(sdt.pa, header->length);
-		if (!mapped_rsdt) {
-			printk(KERN_WARNING PREFIX "Unable to map RSDT\n");
-			return -ENODEV;
-		}
-
-		header = &mapped_rsdt->header;
-
 		for (i = 0; i < sdt.count; i++)
 			sdt.entry[i].pa = (unsigned long) mapped_rsdt->entry[i];
 	}
@@ -471,12 +473,20 @@ acpi_table_get_sdt (
 
 	for (i = 0; i < sdt.count; i++) {
 
+		/* map in just the header */
 		header = (struct acpi_table_header *)
 			__acpi_map_table(sdt.entry[i].pa,
 				sizeof(struct acpi_table_header));
 		if (!header)
 			continue;
 
+		/* remap in the entire table before processing */
+		header = (struct acpi_table_header *)
+			__acpi_map_table(sdt.entry[i].pa,
+				header->length);
+		if (!header)
+			continue;
+	               
 		acpi_table_print(header, sdt.entry[i].pa);
 
 		if (acpi_table_compute_checksum(header, header->length)) {

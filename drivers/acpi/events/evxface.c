@@ -492,7 +492,7 @@ acpi_install_gpe_handler (
 	void                            *context)
 {
 	acpi_status                     status;
-	struct acpi_gpe_number_info     *gpe_number_info;
+	struct acpi_gpe_event_info      *gpe_event_info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_install_gpe_handler");
@@ -506,8 +506,8 @@ acpi_install_gpe_handler (
 
 	/* Ensure that we have a valid GPE number */
 
-	gpe_number_info = acpi_ev_get_gpe_number_info (gpe_number);
-	if (!gpe_number_info) {
+	gpe_event_info = acpi_ev_get_gpe_event_info (gpe_number);
+	if (!gpe_event_info) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
@@ -518,25 +518,25 @@ acpi_install_gpe_handler (
 
 	/* Make sure that there isn't a handler there already */
 
-	if (gpe_number_info->handler) {
+	if (gpe_event_info->handler) {
 		status = AE_ALREADY_EXISTS;
 		goto cleanup;
 	}
 
 	/* Install the handler */
 
-	gpe_number_info->handler = handler;
-	gpe_number_info->context = context;
-	gpe_number_info->type  = (u8) type;
+	gpe_event_info->handler = handler;
+	gpe_event_info->context = context;
+	gpe_event_info->type  = (u8) type;
 
 	/* Clear the GPE (of stale events), the enable it */
 
-	status = acpi_hw_clear_gpe (gpe_number);
+	status = acpi_hw_clear_gpe (gpe_event_info);
 	if (ACPI_FAILURE (status)) {
 		goto cleanup;
 	}
 
-	status = acpi_hw_enable_gpe (gpe_number);
+	status = acpi_hw_enable_gpe (gpe_event_info);
 
 
 cleanup:
@@ -564,7 +564,7 @@ acpi_remove_gpe_handler (
 	acpi_gpe_handler                handler)
 {
 	acpi_status                     status;
-	struct acpi_gpe_number_info     *gpe_number_info;
+	struct acpi_gpe_event_info      *gpe_event_info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_remove_gpe_handler");
@@ -578,14 +578,14 @@ acpi_remove_gpe_handler (
 
 	/* Ensure that we have a valid GPE number */
 
-	gpe_number_info = acpi_ev_get_gpe_number_info (gpe_number);
-	if (!gpe_number_info) {
+	gpe_event_info = acpi_ev_get_gpe_event_info (gpe_number);
+	if (!gpe_event_info) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
 	/* Disable the GPE before removing the handler */
 
-	status = acpi_hw_disable_gpe (gpe_number);
+	status = acpi_hw_disable_gpe (gpe_event_info);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -597,16 +597,16 @@ acpi_remove_gpe_handler (
 
 	/* Make sure that the installed handler is the same */
 
-	if (gpe_number_info->handler != handler) {
-		(void) acpi_hw_enable_gpe (gpe_number);
+	if (gpe_event_info->handler != handler) {
+		(void) acpi_hw_enable_gpe (gpe_event_info);
 		status = AE_BAD_PARAMETER;
 		goto cleanup;
 	}
 
 	/* Remove the handler */
 
-	gpe_number_info->handler = NULL;
-	gpe_number_info->context = NULL;
+	gpe_event_info->handler = NULL;
+	gpe_event_info->context = NULL;
 
 
 cleanup:

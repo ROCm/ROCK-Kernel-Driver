@@ -91,14 +91,6 @@ acpi_status
 acpi_ev_init_global_lock_handler (
 	void);
 
-struct acpi_gpe_register_info *
-acpi_ev_get_gpe_register_info (
-	u32                             gpe_number);
-
-struct acpi_gpe_number_info *
-acpi_ev_get_gpe_number_info (
-	u32                             gpe_number);
-
 u32
 acpi_ev_get_gpe_number_index (
 	u32                             gpe_number);
@@ -117,17 +109,17 @@ acpi_ev_notify_dispatch (
  * Evgpe - GPE handling and dispatch
  */
 
+struct acpi_gpe_event_info *
+acpi_ev_get_gpe_event_info (
+	u32                             gpe_number);
+
 acpi_status
 acpi_ev_gpe_initialize (
 	void);
 
-acpi_status
-acpi_ev_init_gpe_control_methods (
-	void);
-
 u32
 acpi_ev_gpe_dispatch (
-	u32                             gpe_number);
+	struct acpi_gpe_event_info      *gpe_event_info);
 
 u32
 acpi_ev_gpe_detect (

@@ -1,5 +1,5 @@
 /*
- * Driver for USB Scanners (linux-2.5.60)
+ * Driver for USB Scanners (linux-2.5.64)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  * Previously maintained by Brian Beattie
@@ -44,7 +44,7 @@
 
 // #define DEBUG
 
-#define DRIVER_VERSION "0.4.10"
+#define DRIVER_VERSION "0.4.11"
 #define DRIVER_DESC "USB Scanner Driver"
 
 #include <linux/usb.h>
@@ -99,7 +99,13 @@ static struct usb_device_id scanner_device_ids [] = {
 	/* Artec */
 	{ USB_DEVICE(0x05d8, 0x4001) },	/* Ultima 2000 */
 	{ USB_DEVICE(0x05d8, 0x4002) }, /* Ultima 2000 (GT6801 based) */
+	{ USB_DEVICE(0x05d8, 0x4003) }, /* E+ 48U */
+	{ USB_DEVICE(0x05d8, 0x4004) }, /* E+ Pro */
+	/* Avision */
+	{ USB_DEVICE(0x0638, 0x0a10) },	/* iVina FB1600 (=Umax Astra 4500) */
 	/* Benq: see Acer */
+	/* Brother */
+	{ USB_DEVICE(0x04f9, 0x0111) },	/* MFC 6800 */
 	/* Canon */
 	{ USB_DEVICE(0x04a9, 0x2201) }, /* CanoScan FB320U */
 	{ USB_DEVICE(0x04a9, 0x2202) }, /* CanoScan FB620U */
@@ -117,6 +123,10 @@ static struct usb_device_id scanner_device_ids [] = {
 	/* Compaq */
 	{ USB_DEVICE(0x049f, 0x0021) },	/* S200 */
 	/* Epson -- See Seiko/Epson below */
+	/* Fujitsu */
+	{ USB_DEVICE(0x04c5, 0x1041) }, /* fi-4220c USB/SCSI info:mza@mu-tec.de */
+	{ USB_DEVICE(0x04c5, 0x1042) }, /* fi-4120c USB/SCSI info:mza@mu-tec.de */
+	{ USB_DEVICE(0x04c5, 0x1029) }, /* fi-4010c USB AVision info:mza@mu-tec.de */
 	/* Genius */
 	{ USB_DEVICE(0x0458, 0x2001) },	/* ColorPage Vivid Pro */
 	{ USB_DEVICE(0x0458, 0x2007) },	/* ColorPage HR6 V2 */
@@ -149,6 +159,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0638, 0x0268) }, /* 1200U */
 	/* Lexmark */
 	{ USB_DEVICE(0x043d, 0x002d) }, /* X70/X73 */
+	/* Medion */
+	{ USB_DEVICE(0x0461, 0x0377) },	/* MD 5345 - repackaged Primax? */
 	/* Memorex */
 	{ USB_DEVICE(0x0461, 0x0346) }, /* 6136u - repackaged Primax ? */
 	/* Microtek */
@@ -202,7 +214,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x07b3, 0x0015) }, /* OpticPro U24 */
 	{ USB_DEVICE(0x07b3, 0x0016) }, /* Unknown */
 	{ USB_DEVICE(0x07b3, 0x0017) }, /* OpticPro UT12/UT16/UT24 */
-	{ USB_DEVICE(0x07b3, 0x0401) }, /* OpticPro 1248U */
+	{ USB_DEVICE(0x07b3, 0x0400) }, /* OpticPro 1248U */
+	{ USB_DEVICE(0x07b3, 0x0401) }, /* OpticPro 1248U (another one) */
 	/* Primax/Colorado */
 	{ USB_DEVICE(0x0461, 0x0300) },	/* G2-300 #1 */
 	{ USB_DEVICE(0x0461, 0x0301) },	/* G2E-300 #1 */
@@ -210,12 +223,15 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x0461, 0x0303) },	/* G2E-300 #2 */
 	{ USB_DEVICE(0x0461, 0x0340) },	/* Colorado USB 9600 */
 	{ USB_DEVICE(0x0461, 0x0341) },	/* Colorado 600u */
+	{ USB_DEVICE(0x0461, 0x0347) },	/* Primascan Colorado 2600u */
 	{ USB_DEVICE(0x0461, 0x0360) },	/* Colorado USB 19200 */
 	{ USB_DEVICE(0x0461, 0x0361) },	/* Colorado 1200u */
 	{ USB_DEVICE(0x0461, 0x0380) },	/* G2-600 #1 */
 	{ USB_DEVICE(0x0461, 0x0381) },	/* ReadyScan 636i */
 	{ USB_DEVICE(0x0461, 0x0382) },	/* G2-600 #2 */
 	{ USB_DEVICE(0x0461, 0x0383) },	/* G2E-600 */
+	/* Prolink */
+	{ USB_DEVICE(0x06dc, 0x0014) }, /* Winscan Pro 2448U */
 	/* Relisis */
 	// { USB_DEVICE(0x0475, 0x0103) },	/* Episode - undetected endpoint */
 	/* Seiko/Epson Corp. */
@@ -241,6 +257,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04b8, 0x011e) }, /* Perfection 1660 Photo */
 	{ USB_DEVICE(0x04b8, 0x0801) }, /* Stylus CX5200 */
 	{ USB_DEVICE(0x04b8, 0x0802) }, /* Stylus CX3200 */
+	/* SYSCAN */
+	{ USB_DEVICE(0x0a82, 0x4600) }, /* TravelScan 460/464 */
 	/* Umax */
 	{ USB_DEVICE(0x1606, 0x0010) },	/* Astra 1220U */
 	{ USB_DEVICE(0x1606, 0x0030) },	/* Astra 2000U */

@@ -1,5 +1,5 @@
 /*
- *  $Id: speedstep.c,v 1.68 2003/01/20 17:31:47 db Exp $
+ *  $Id: speedstep.c,v 1.70 2003/02/22 10:23:46 db Exp $
  *
  * (C) 2001  Dave Jones, Arjan van de ven.
  * (C) 2002 - 2003  Dominik Brodowski <linux@brodo.de>
@@ -29,8 +29,6 @@
 
 #include <asm/msr.h>
 
-
-static struct cpufreq_driver		speedstep_driver;
 
 /* speedstep_chipset:
  *   It is necessary to know which chipset is used. As accesses to 
@@ -629,9 +627,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 	policy->policy = (speed == speedstep_low_freq) ? 
 		CPUFREQ_POLICY_POWERSAVE : CPUFREQ_POLICY_PERFORMANCE;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-#ifdef CONFIG_CPU_FREQ_24_API
-	speedstep_driver.cpu_cur_freq[policy->cpu] = speed;
-#endif
+	policy->cur = speed;
 
 	return cpufreq_frequency_table_cpuinfo(policy, &speedstep_freqs[0]);
 }
@@ -686,7 +682,7 @@ static int __init speedstep_init(void)
 		return -ENODEV;
 	}
 
-	dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) support $Revision: 1.68 $\n");
+	dprintk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) support $Revision: 1.70 $\n");
 
 	/* activate speedstep support */
 	if (speedstep_activate())

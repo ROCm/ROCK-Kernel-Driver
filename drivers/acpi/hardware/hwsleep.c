@@ -250,7 +250,7 @@ acpi_enter_sleep_state (
 
 	/* Get current value of PM1A control */
 
-	status = acpi_hw_register_read (ACPI_MTX_LOCK, ACPI_REGISTER_PM1_CONTROL, &PM1Acontrol);
+	status = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1_CONTROL, &PM1Acontrol);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -268,12 +268,12 @@ acpi_enter_sleep_state (
 
 	/* Write #1: fill in SLP_TYP data */
 
-	status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
+	status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
-	status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
+	status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -287,12 +287,12 @@ acpi_enter_sleep_state (
 
 	ACPI_FLUSH_CPU_CACHE ();
 
-	status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
+	status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
-	status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
+	status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -308,7 +308,7 @@ acpi_enter_sleep_state (
 		 */
 		acpi_os_stall (10000000);
 
-		status = acpi_hw_register_write (ACPI_MTX_LOCK, ACPI_REGISTER_PM1_CONTROL,
+		status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1_CONTROL,
 				 sleep_enable_reg_info->access_bit_mask);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
@@ -318,7 +318,7 @@ acpi_enter_sleep_state (
 	/* Wait until we enter sleep state */
 
 	do {
-		status = acpi_get_register (ACPI_BITREG_WAKE_STATUS, &in_value, ACPI_MTX_LOCK);
+		status = acpi_get_register (ACPI_BITREG_WAKE_STATUS, &in_value, ACPI_MTX_DO_NOT_LOCK);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -327,13 +327,58 @@ acpi_enter_sleep_state (
 
 	} while (!in_value);
 
-	status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 0, ACPI_MTX_LOCK);
+	status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 0, ACPI_MTX_DO_NOT_LOCK);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 
 	return_ACPI_STATUS (AE_OK);
 }
+
+
+/******************************************************************************
+ *
+ * FUNCTION:    acpi_enter_sleep_state_s4bios
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Perform a S4 bios request.
+ *              THIS FUNCTION MUST BE CALLED WITH INTERRUPTS DISABLED
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_enter_sleep_state_s4bios (
+	void)
+{
+	u32                             in_value;
+	acpi_status                     status;
+
+
+	ACPI_FUNCTION_TRACE ("acpi_enter_sleep_state_s4bios");
+
+	acpi_set_register (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
+	acpi_hw_clear_acpi_status();
+
+	acpi_hw_disable_non_wakeup_gpes();
+
+	ACPI_FLUSH_CPU_CACHE();
+
+	status = acpi_os_write_port (acpi_gbl_FADT->smi_cmd, (acpi_integer) acpi_gbl_FADT->S4bios_req, 8);
+
+	do {
+		acpi_os_stall(1000);
+		status = acpi_get_register (ACPI_BITREG_WAKE_STATUS, &in_value, ACPI_MTX_DO_NOT_LOCK);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+	} while (!in_value);
+
+	return_ACPI_STATUS (AE_OK);
+}
+
 
 /******************************************************************************
  *

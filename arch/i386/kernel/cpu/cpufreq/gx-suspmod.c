@@ -116,7 +116,6 @@ struct gxfreq_params {
 	struct pci_dev *cs55x0;
 };
 
-static struct cpufreq_driver *gx_driver;
 static struct gxfreq_params *gx_params;
 static int stock_freq;
 
@@ -345,7 +344,7 @@ static int cpufreq_gx_verify(struct cpufreq_policy *policy)
 	unsigned int tmp_freq = 0;
 	u8 tmp1, tmp2;
 
-        if (!gx_driver || !stock_freq || !policy)
+        if (!stock_freq || !policy)
                 return -EINVAL;
 
 	policy->cpu = 0;
@@ -375,85 +374,42 @@ static int cpufreq_gx_verify(struct cpufreq_policy *policy)
 }
 
 /*
- *      cpufreq_gx_setpolicy:  
+ *      cpufreq_gx_target:  
  *
  */
-static int cpufreq_gx_setpolicy(struct cpufreq_policy *policy)
+static int cpufreq_gx_target(struct cpufreq_policy *policy,
+			     unsigned int target_freq,
+			     unsigned int relation)
 {
+	u8 tmp1, tmp2;
+	unsigned int tmp_freq;
 
-        if (!gx_driver || !stock_freq || !policy)
+        if (!stock_freq || !policy)
                 return -EINVAL;
 
 	policy->cpu = 0;
 
-	if (policy->policy == CPUFREQ_POLICY_POWERSAVE) {
-		/* here we need to make sure that we don't set the
-		 * frequency below policy->min (see comment in
-		 * cpufreq_gx_verify() - guarantee of processing 
-		 * capacity.
-		 */
-		u8 tmp1, tmp2;
-		unsigned int tmp_freq = gx_validate_speed(policy->min, &tmp1, &tmp2);
-		while (tmp_freq < policy->min) {
-			tmp_freq += stock_freq / max_duration;
-			tmp_freq = gx_validate_speed(tmp_freq, &tmp1, &tmp2);
-		}
-		gx_set_cpuspeed(tmp_freq);
-	} else {
-		gx_set_cpuspeed(policy->max);
+	tmp_freq = gx_validate_speed(target_freq, &tmp1, &tmp2);
+	while (tmp_freq < policy->min) {
+		tmp_freq += stock_freq / max_duration;
+		tmp_freq = gx_validate_speed(tmp_freq, &tmp1, &tmp2);
 	}
+	while (tmp_freq > policy->max) {
+		tmp_freq -= stock_freq / max_duration;
+		tmp_freq = gx_validate_speed(tmp_freq, &tmp1, &tmp2);
+	}
+
+	gx_set_cpuspeed(tmp_freq);
+
 	return 0;
 }
 
-/* 
- * cpufreq_gx_init:
- *   MediaGX/Geode GX initilize cpufreq driver
- */
-
-static int __init cpufreq_gx_init(void)
+static int cpufreq_gx_cpu_init(struct cpufreq_policy *policy)
 {
-	int maxfreq,ret,curfreq;
- 	struct cpufreq_driver *driver;
-	struct gxfreq_params *params;
-	struct pci_dev *gx_pci;
-	u32 class_rev;
+	int maxfreq, curfreq;
 
-	/* Test if we have the right hardware */
-	if ((gx_pci = gx_detect_chipset()) == NULL) 
+	if (!policy || policy->cpu != 0)
 		return -ENODEV;
-
-	/* check whether module parameters are sane */
-	if (max_duration > 0xff)
-		max_duration = 0xff;
-
-	dprintk("geode suspend modulation available.\n");
-
-	driver = kmalloc(sizeof(struct cpufreq_driver) + NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
-	if (driver == NULL) 
-		return -ENOMEM;
-	memset(driver, 0, sizeof(struct cpufreq_driver) +
-			NR_CPUS * sizeof(struct cpufreq_policy));
-
-	params = kmalloc(sizeof(struct gxfreq_params), GFP_KERNEL);
-	if (params == NULL) {
-		kfree(driver);
-		return -ENOMEM;
-	}
-	memset(params, 0, sizeof(struct gxfreq_params));
-
-	driver->policy = (struct cpufreq_policy *)(driver + 1);
-	params->cs55x0 = gx_pci;
-
-	/* keep cs55x0 configurations */
-	pci_read_config_byte(params->cs55x0, PCI_SUSCFG, &(params->pci_suscfg));
-	pci_read_config_byte(params->cs55x0, PCI_PMER1, &(params->pci_pmer1));
-	pci_read_config_byte(params->cs55x0, PCI_PMER2, &(params->pci_pmer2));
-	pci_read_config_byte(params->cs55x0, PCI_MODON, &(params->on_duration));
-	pci_read_config_byte(params->cs55x0, PCI_MODOFF, &(params->off_duration));
-        pci_read_config_dword(params->cs55x0, PCI_CLASS_REVISION, &class_rev);
-	params->pci_rev = class_rev && 0xff;
-
-	gx_params = params;
 
 	/* determine maximum frequency */
 	if (pci_busclk) {
@@ -470,28 +426,68 @@ static int __init cpufreq_gx_init(void)
 	dprintk("cpu current frequency is %dkHz.\n",curfreq);
 
 	/* setup basic struct for cpufreq API */
-#ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_cur_freq[0] = curfreq;
-#endif
-	driver->policy[0].cpu = 0;
+	policy->cpu = 0;
 
 	if (max_duration < POLICY_MIN_DIV)
-		driver->policy[0].min = maxfreq / max_duration;
+		policy->min = maxfreq / max_duration;
 	else
-		driver->policy[0].min = maxfreq / POLICY_MIN_DIV;
-	driver->policy[0].max = maxfreq;
-	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
-	driver->policy[0].cpuinfo.min_freq = maxfreq / max_duration;
-	driver->policy[0].cpuinfo.max_freq = maxfreq;
-	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-	driver->verify = &cpufreq_gx_verify;
-	driver->setpolicy = &cpufreq_gx_setpolicy;
-	strncpy(driver->name, "gx-suspmod", CPUFREQ_NAME_LEN);
+		policy->min = maxfreq / POLICY_MIN_DIV;
+	policy->max = maxfreq;
+	policy->cur = curfreq;
+	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
+	policy->cpuinfo.min_freq = maxfreq / max_duration;
+	policy->cpuinfo.max_freq = maxfreq;
+	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
-	gx_driver = driver;
+	return 0;
+}
 
-	if ((ret = cpufreq_register(driver))) { 
-		kfree(driver);
+/* 
+ * cpufreq_gx_init:
+ *   MediaGX/Geode GX initilize cpufreq driver
+ */
+static struct cpufreq_driver gx_suspmod_driver = {
+	.verify		= cpufreq_gx_verify,
+	.target		= cpufreq_gx_target,
+	.init		= cpufreq_gx_cpu_init,
+	.name		= "gx-suspmod",
+};
+
+static int __init cpufreq_gx_init(void)
+{
+	int ret;
+	struct gxfreq_params *params;
+	struct pci_dev *gx_pci;
+	u32 class_rev;
+
+	/* Test if we have the right hardware */
+	if ((gx_pci = gx_detect_chipset()) == NULL) 
+		return -ENODEV;
+
+	/* check whether module parameters are sane */
+	if (max_duration > 0xff)
+		max_duration = 0xff;
+
+	dprintk("geode suspend modulation available.\n");
+
+	params = kmalloc(sizeof(struct gxfreq_params), GFP_KERNEL);
+	if (params == NULL)
+		return -ENOMEM;
+	memset(params, 0, sizeof(struct gxfreq_params));
+
+	params->cs55x0 = gx_pci;
+	gx_params = params;
+
+	/* keep cs55x0 configurations */
+	pci_read_config_byte(params->cs55x0, PCI_SUSCFG, &(params->pci_suscfg));
+	pci_read_config_byte(params->cs55x0, PCI_PMER1, &(params->pci_pmer1));
+	pci_read_config_byte(params->cs55x0, PCI_PMER2, &(params->pci_pmer2));
+	pci_read_config_byte(params->cs55x0, PCI_MODON, &(params->on_duration));
+	pci_read_config_byte(params->cs55x0, PCI_MODOFF, &(params->off_duration));
+        pci_read_config_dword(params->cs55x0, PCI_CLASS_REVISION, &class_rev);
+	params->pci_rev = class_rev && 0xff;
+
+	if ((ret = cpufreq_register_driver(&gx_suspmod_driver))) { 
 		kfree(params);
 		return ret;                   /* register error! */
 	}
@@ -501,13 +497,8 @@ static int __init cpufreq_gx_init(void)
 
 static void __exit cpufreq_gx_exit(void)
 {
-	if (gx_driver) {
-		/* disable throttling */
-		gx_set_cpuspeed(stock_freq);
-		cpufreq_unregister();
-		kfree(gx_driver);
-		kfree(gx_params);
-	}
+	cpufreq_unregister_driver(&gx_suspmod_driver);
+	kfree(gx_params);
 }
 
 MODULE_AUTHOR ("Hiroshi Miura <miura@da-cha.org>");

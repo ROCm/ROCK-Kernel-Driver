@@ -47,6 +47,9 @@
 #ifndef node_to_memblk
 #define node_to_memblk(node)	(0)
 #endif
+#ifndef pcibus_to_cpumask
+#define pcibus_to_cpumask(bus)	(cpu_online_map)
+#endif
 
 /* Cross-node load balancing interval. */
 #ifndef NODE_BALANCE_RATE

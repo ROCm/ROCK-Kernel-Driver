@@ -79,7 +79,8 @@ static inline unsigned long apicid_to_cpu_present(int phys_apicid)
 	return (1ul << phys_apicid);
 }
 
-static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
+static inline int mpc_apic_id(struct mpc_config_processor *m, 
+			struct mpc_config_translation *translation_record)
 {
 	printk("Processor #%d %ld:%ld APIC version %d\n",
 			m->mpc_apicid,

@@ -239,9 +239,8 @@ acpi_tb_convert_fadt1 (
 	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm1b_cnt_blk, local_fadt->pm1_cnt_len, local_fadt->V1_pm1b_cnt_blk);
 	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm2_cnt_blk, local_fadt->pm2_cnt_len, local_fadt->V1_pm2_cnt_blk);
 	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xpm_tmr_blk, local_fadt->pm_tm_len, local_fadt->V1_pm_tmr_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe0_blk,  local_fadt->gpe0_blk_len, local_fadt->V1_gpe0_blk);
-	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe1_blk,  local_fadt->gpe1_blk_len, local_fadt->V1_gpe1_blk);
-
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe0_blk,  0,                     local_fadt->V1_gpe0_blk);
+	ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe1_blk,  0,                     local_fadt->V1_gpe1_blk);
 }
 
 
@@ -314,14 +313,15 @@ acpi_tb_convert_fadt2 (
 
 	if (!(local_fadt->xgpe0_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe0_blk,
-			local_fadt->gpe0_blk_len, local_fadt->V1_gpe0_blk);
+			0, local_fadt->V1_gpe0_blk);
 	}
 
 	if (!(local_fadt->xgpe1_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->xgpe1_blk,
-			local_fadt->gpe1_blk_len, local_fadt->V1_gpe1_blk);
+			0, local_fadt->V1_gpe1_blk);
 	}
 }
+
 
 /*******************************************************************************
  *

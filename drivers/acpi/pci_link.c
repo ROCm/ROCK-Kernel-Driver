@@ -90,42 +90,25 @@ static struct {
                             PCI Link Device Management
    -------------------------------------------------------------------------- */
 
-static int
-acpi_pci_link_get_possible (
-	struct acpi_pci_link	*link)
+static acpi_status
+acpi_pci_link_check_possible (
+	struct acpi_resource	*resource,
+	void			*context)
 {
-	int                     result = 0;
-	acpi_status		status = AE_OK;
-	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	struct acpi_resource	*resource = NULL;
+	struct acpi_pci_link	*link = (struct acpi_pci_link *) context;
 	int			i = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_pci_link_get_possible");
-
-	if (!link)
-		return_VALUE(-EINVAL);
-
-	status = acpi_get_possible_resources(link->handle, &buffer);
-	if (ACPI_FAILURE(status) || !buffer.pointer) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PRS\n"));
-		result = -ENODEV;
-		goto end;
-	}
-
-	resource = (struct acpi_resource *) buffer.pointer;
-
-	/* skip past dependent function resource (if present) */
-	if (resource->id == ACPI_RSTYPE_START_DPF)
-		resource = ACPI_NEXT_RESOURCE(resource);
+	ACPI_FUNCTION_TRACE("acpi_pci_link_check_possible");
 
 	switch (resource->id) {
+	case ACPI_RSTYPE_START_DPF:
+		return AE_OK;
 	case ACPI_RSTYPE_IRQ:
 	{
 		struct acpi_resource_irq *p = &resource->data.irq;
 		if (!p || !p->number_of_interrupts) {
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Blank IRQ resource\n"));
-			result = -ENODEV;
-			goto end;
+			return AE_OK;
 		}
 		for (i = 0; (i<p->number_of_interrupts && i<ACPI_PCI_LINK_MAX_POSSIBLE); i++) {
 			if (!p->interrupts[i]) {
@@ -143,8 +126,7 @@ acpi_pci_link_get_possible (
 		if (!p || !p->number_of_interrupts) {
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
 				"Blank IRQ resource\n"));
-			result = -ENODEV;
-			goto end;
+			return AE_OK;
 		}
 		for (i = 0; (i<p->number_of_interrupts && i<ACPI_PCI_LINK_MAX_POSSIBLE); i++) {
 			if (!p->interrupts[i]) {
@@ -159,18 +141,76 @@ acpi_pci_link_get_possible (
 	default:
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 			"Resource is not an IRQ entry\n"));
-		result = -ENODEV;
-		goto end;
-		break;
+		return AE_OK;
 	}
-	
+
+	return AE_CTRL_TERMINATE;
+}
+
+
+static int
+acpi_pci_link_get_possible (
+	struct acpi_pci_link	*link)
+{
+	acpi_status		status;
+
+	ACPI_FUNCTION_TRACE("acpi_pci_link_get_possible");
+
+	if (!link)
+		return_VALUE(-EINVAL);
+
+	status = acpi_walk_resources(link->handle, METHOD_NAME__PRS,
+			acpi_pci_link_check_possible, link);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PRS\n"));
+		return_VALUE(-ENODEV);
+	}
+
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 		"Found %d possible IRQs\n", link->irq.possible_count));
 
-end:
-	acpi_os_free(buffer.pointer);
+	return_VALUE(0);
+}
 
-	return_VALUE(result);
+
+static acpi_status
+acpi_pci_link_check_current (
+	struct acpi_resource	*resource,
+	void			*context)
+{
+	int			*irq = (int *) context;
+
+	ACPI_FUNCTION_TRACE("acpi_pci_link_check_current");
+
+	switch (resource->id) {
+	case ACPI_RSTYPE_IRQ:
+	{
+		struct acpi_resource_irq *p = &resource->data.irq;
+		if (!p || !p->number_of_interrupts) {
+			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
+				"Blank IRQ resource\n"));
+			return AE_OK;
+		}
+		*irq = p->interrupts[0];
+		break;
+	}
+	case ACPI_RSTYPE_EXT_IRQ:
+	{
+		struct acpi_resource_ext_irq *p = &resource->data.extended_irq;
+		if (!p || !p->number_of_interrupts) {
+			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
+				"Blank IRQ resource\n"));
+			return AE_OK;
+		}
+		*irq = p->interrupts[0];
+		break;
+	}
+	default:
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Resource isn't an IRQ\n"));
+		return AE_OK;
+	}
+	return AE_CTRL_TERMINATE;
 }
 
 
@@ -180,8 +220,6 @@ acpi_pci_link_get_current (
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
-	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	struct acpi_resource	*resource = NULL;
 	int			irq = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_link_get_current");
@@ -206,47 +244,16 @@ acpi_pci_link_get_current (
 	 * Query and parse _CRS to get the current IRQ assignment. 
 	 */
 
-	status = acpi_get_current_resources(link->handle, &buffer);
+	status = acpi_walk_resources(link->handle, METHOD_NAME__CRS,
+			acpi_pci_link_check_current, &irq);
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _CRS\n"));
 		result = -ENODEV;
 		goto end;
 	}
-	resource = (struct acpi_resource *) buffer.pointer;
-
-	switch (resource->id) {
-	case ACPI_RSTYPE_IRQ:
-	{
-		struct acpi_resource_irq *p = &resource->data.irq;
-		if (!p || !p->number_of_interrupts) {
-			ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
-				"Blank IRQ resource\n"));
-			result = -ENODEV;
-			goto end;
-		}
-		irq = p->interrupts[0];
-		break;
-	}
-	case ACPI_RSTYPE_EXT_IRQ:
-	{
-		struct acpi_resource_ext_irq *p = &resource->data.extended_irq;
-		if (!p || !p->number_of_interrupts) {
-			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
-				"Blank IRQ resource\n"));
-			result = -ENODEV;
-			goto end;
-		}
-		irq = p->interrupts[0];
-		break;
-	}
-	default:
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Resource isn't an IRQ\n"));
-		result = -ENODEV;
-		goto end;
-	}
 
 	if (!irq) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid use of IRQ 0\n"));
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "No IRQ resource found\n"));
 		result = -ENODEV;
 		goto end;
 	}
@@ -263,8 +270,6 @@ acpi_pci_link_get_current (
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Link at IRQ %d \n", link->irq.active));
 
 end:
-	acpi_os_free(buffer.pointer);
-
 	return_VALUE(result);
 }
 
