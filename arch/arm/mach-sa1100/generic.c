@@ -283,6 +283,16 @@ void sa11x0_set_flash_data(struct flash_platform_data *flash,
 	sa11x0mtd_device.num_resources = nr;
 }
 
+static struct platform_device sa11x0ir_device = {
+	.name		= "sa11x0-ir",
+	.id		= -1,
+};
+
+void sa11x0_set_irda_data(struct irda_platform_data *irda)
+{
+	sa11x0ir_device.dev.platform_data = irda;
+}
+
 static struct platform_device *sa11x0_devices[] __initdata = {
 	&sa11x0udc_device,
 	&sa11x0uart1_device,
@@ -297,6 +307,9 @@ static struct platform_device *sa11x0_devices[] __initdata = {
 static int __init sa1100_init(void)
 {
 	pm_power_off = sa1100_power_off;
+
+	if (sa11x0ir_device.dev.platform_data)
+		platform_device_register(&sa11x0ir_device);
 
 	return platform_add_devices(sa11x0_devices, ARRAY_SIZE(sa11x0_devices));
 }
