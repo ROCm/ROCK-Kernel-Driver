@@ -978,6 +978,7 @@ static void igmp6_group_queried(struct ifmcaddr6 *ma, unsigned long resptime)
 	ma->mca_timer.expires = jiffies + delay;
 	if (!mod_timer(&ma->mca_timer, jiffies + delay))
 		atomic_inc(&ma->mca_refcnt);
+	ma->mca_flags |= MAF_TIMER_RUNNING;
 }
 
 static void mld_marksources(struct ifmcaddr6 *pmc, int nsrcs,
