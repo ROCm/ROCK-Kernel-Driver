@@ -67,6 +67,7 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
+#include <asm/div64.h>
 
 /* FIXME: some day we shouldn't need to look in here! */
 
@@ -1073,16 +1074,56 @@ static unsigned long long sectors_to_MB(unsigned long long n)
 	return n;
 }
 
-/*
- * Tests if the drive supports Host Protected Area feature.
- * Returns true if supported, false otherwise.
- */
-static inline int idedisk_supports_host_protected_area(ide_drive_t *drive)
+static inline void idedisk_check_hpa_lba28(ide_drive_t *drive)
 {
-	int flag = (drive->id->cfs_enable_1 & 0x0400) ? 1 : 0;
-	if (flag)
-		printk(KERN_INFO "%s: host protected area => %d\n", drive->name, flag);
-	return flag;
+	unsigned long capacity, set_max;
+
+	capacity = drive->id->lba_capacity;
+	set_max = idedisk_read_native_max_address(drive);
+
+	if (set_max <= capacity)
+		return;
+
+	printk(KERN_INFO "%s: Host Protected Area detected.\n"
+			 "\tcurrent capacity is %ld sectors (%ld MB)\n"
+			 "\tnative  capacity is %ld sectors (%ld MB)\n",
+			 drive->name,
+			 capacity, (capacity - capacity/625 + 974)/1950,
+			 set_max, (set_max - set_max/625 + 974)/1950);
+#ifdef CONFIG_IDEDISK_STROKE
+	set_max = idedisk_set_max_address(drive, set_max);
+	if (set_max) {
+		drive->id->lba_capacity = set_max;
+		printk(KERN_INFO "%s: Host Protected Area disabled.\n",
+				 drive->name);
+	}
+#endif
+}
+
+static inline void idedisk_check_hpa_lba48(ide_drive_t *drive)
+{
+	unsigned long long capacity_2, set_max_ext;
+
+	capacity_2 = drive->id->lba_capacity_2;
+	set_max_ext = idedisk_read_native_max_address_ext(drive);
+
+	if (set_max_ext <= capacity_2)
+		return;
+
+	printk(KERN_INFO "%s: Host Protected Area detected.\n"
+			 "\tcurrent capacity is %lld sectors (%lld MB)\n"
+			 "\tnative  capacity is %lld sectors (%lld MB)\n",
+			 drive->name,
+			 capacity_2, sectors_to_MB(capacity_2),
+			 set_max_ext, sectors_to_MB(set_max_ext));
+#ifdef CONFIG_IDEDISK_STROKE
+	set_max_ext = idedisk_set_max_address_ext(drive, set_max_ext);
+	if (set_max_ext) {
+		drive->id->lba_capacity_2 = set_max_ext;
+		printk(KERN_INFO "%s: Host Protected Area disabled.\n",
+				 drive->name);
+	}
+#endif
 }
 
 /*
@@ -1099,64 +1140,43 @@ static inline int idedisk_supports_host_protected_area(ide_drive_t *drive)
  * in above order (i.e., if value of higher priority is available,
  * reset will be ignored).
  */
-#define IDE_STROKE_LIMIT	(32000*1024*2)
 static void init_idedisk_capacity (ide_drive_t  *drive)
 {
 	struct hd_driveid *id = drive->id;
-	unsigned long capacity, set_max;
-	unsigned long long capacity_2, set_max_ext;
+	/*
+	 * If this drive supports the Host Protected Area feature set,
+	 * then we may need to change our opinion about the drive's capacity.
+	 */
+	int hpa = (id->command_set_1 & 0x0400) && (id->cfs_enable_1 & 0x0400);
 
-	capacity_2 = capacity = drive->cyl * drive->head * drive->sect;
+	if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400)) {
+		/* drive speaks 48-bit LBA */
+		unsigned long long capacity_2;
 
-	(void) idedisk_supports_host_protected_area(drive);
-
-	if (id->cfs_enable_2 & 0x0400) {
+		drive->select.b.lba = 1;
+		if (hpa)
+			idedisk_check_hpa_lba48(drive);
 		capacity_2 = id->lba_capacity_2;
 		drive->head		= drive->bios_head = 255;
 		drive->sect		= drive->bios_sect = 63;
-		drive->select.b.lba	= 1;
-		set_max_ext = idedisk_read_native_max_address_ext(drive);
-		if (set_max_ext > capacity_2 && capacity_2 > IDE_STROKE_LIMIT) {
-#ifdef CONFIG_IDEDISK_STROKE
-			set_max_ext = idedisk_set_max_address_ext(drive, set_max_ext);
-			if (set_max_ext)
-				id->lba_capacity_2 = capacity_2 = set_max_ext;
-#else /* !CONFIG_IDEDISK_STROKE */
-			printk(KERN_INFO "%s: setmax_ext LBA %llu, native  %llu\n",
-				drive->name, set_max_ext, capacity_2);
-#endif /* CONFIG_IDEDISK_STROKE */
-		}
 		drive->cyl = (unsigned int) capacity_2 / (drive->head * drive->sect);
 		drive->bios_cyl		= drive->cyl;
 		drive->capacity48	= capacity_2;
 		drive->capacity		= (unsigned long) capacity_2;
-		return;
-	/* Determine capacity, and use LBA if the drive properly supports it */
 	} else if ((id->capability & 2) && lba_capacity_is_ok(id)) {
+		/* drive speaks 28-bit LBA */
+		unsigned long capacity;
+
+		drive->select.b.lba = 1;
+		if (hpa)
+			idedisk_check_hpa_lba28(drive);
 		capacity = id->lba_capacity;
 		drive->cyl = capacity / (drive->head * drive->sect);
-		drive->select.b.lba = 1;
-	} else {
 		drive->capacity = capacity;
-		return;
+	} else {
+		/* drive speaks boring old 28-bit CHS */
+		drive->capacity = drive->cyl * drive->head * drive->sect;
 	}
-
-	set_max = idedisk_read_native_max_address(drive);
-	if (set_max > capacity && capacity > IDE_STROKE_LIMIT) {
-#ifdef CONFIG_IDEDISK_STROKE
-		set_max = idedisk_set_max_address(drive, set_max);
-		if (set_max) {
-			drive->capacity = capacity = set_max;
-			drive->cyl = set_max / (drive->head * drive->sect);
-			drive->select.b.lba = 1;
-			drive->id->lba_capacity = capacity;
-		}
-#else /* !CONFIG_IDEDISK_STROKE */
-		printk(KERN_INFO "%s: setmax LBA %lu, native  %lu\n",
-			drive->name, set_max, capacity);
-#endif /* CONFIG_IDEDISK_STROKE */
-	}
-	drive->capacity = capacity;
 }
 
 static sector_t idedisk_capacity (ide_drive_t *drive)
