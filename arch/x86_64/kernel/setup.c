@@ -71,7 +71,7 @@ EXPORT_SYMBOL(acpi_disabled);
 #ifdef	CONFIG_ACPI_BOOT
 extern int __initdata acpi_ht;
 extern acpi_interrupt_flags	acpi_sci_flags;
-/* int __initdata acpi_force = 0; */
+int __initdata acpi_force = 0;
 #endif
 
 /* For PCI or other memory-mapped resources */
@@ -251,14 +251,14 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 
 		if (!memcmp(from, "acpi=force", 10)) { 
 			/* add later when we do DMI horrors: */
-			/* acpi_force = 1; */	
+			acpi_force = 1;
 			acpi_disabled = 0;
 		}
 
 		/* acpi=ht just means: do ACPI MADT parsing 
 		   at bootup, but don't enable the full ACPI interpreter */
 		if (!memcmp(from, "acpi=ht", 7)) { 
-			/* if (!acpi_force) */
+			if (!acpi_force)
 				disable_acpi();
 			acpi_ht = 1; 
 		}
