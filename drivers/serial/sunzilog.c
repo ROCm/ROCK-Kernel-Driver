@@ -1036,90 +1036,68 @@ static void __init sunzilog_alloc_tables(void)
 /* We used to attempt to use the address property of the Zilog device node
  * but that totally is not necessary on sparc64.
  */
-static struct zilog_layout * __init get_zs_sun4u(int chip, int node)
+static struct zilog_layout * __init get_zs_sun4u(int chip, int zsnode)
 {
-	unsigned long mapped_addr = 0xdeadbeefUL;
+	unsigned long mapped_addr;
 	unsigned int sun4u_ino;
-	int zsnode, seen;
+	struct sbus_bus *sbus = NULL;
+	struct sbus_dev *sdev = NULL;
+	int err;
 
-	zsnode = node;
-	seen = 0;
-	while (zsnode) {
-		int slave;
-
-		zsnode = prom_searchsiblings(zsnode, "zs");
-		if (zsnode == 0 || zsnode == -1)
-			break;
-		slave = prom_getintdefault(zsnode, "slave", -1);
-		if ((slave == chip) || (seen == chip)) {
-			struct sbus_bus *sbus = NULL;
-			struct sbus_dev *sdev = NULL;
-			int err;
-
-			if (central_bus == NULL) {
-				for_each_sbus(sbus) {
-					for_each_sbusdev(sdev, sbus) {
-						if (sdev->prom_node == zsnode)
-							goto found;
-					}
-				}
+	if (central_bus == NULL) {
+		for_each_sbus(sbus) {
+			for_each_sbusdev(sdev, sbus) {
+				if (sdev->prom_node == zsnode)
+					goto found;
 			}
-		found:
-			if (sdev == NULL && central_bus == NULL) {
-				prom_printf("SunZilog: sdev&&central == NULL for "
-					    "Zilog %d in get_zs_sun4u.\n", chip);
-				prom_halt();
-			}
-			if (central_bus == NULL) {
-				mapped_addr =
-					sbus_ioremap(&sdev->resource[0], 0,
-						     PAGE_SIZE,
-						     "Zilog Registers");
-			} else {
-				struct linux_prom_registers zsregs[1];
-
-				err = prom_getproperty(zsnode, "reg",
-						       (char *) &zsregs[0],
-						       sizeof(zsregs));
-				if (err == -1) {
-					prom_printf("SunZilog: Cannot map "
-						    "Zilog %d regs on "
-						    "central bus.\n", chip);
-					prom_halt();
-				}
-				apply_fhc_ranges(central_bus->child,
-						 &zsregs[0], 1);
-				apply_central_ranges(central_bus, &zsregs[0], 1);
-				mapped_addr =
-					(((u64)zsregs[0].which_io)<<32UL) |
-					((u64)zsregs[0].phys_addr);
-			}
-
-			if (zilog_irq == -1) {
-				if (central_bus) {
-					unsigned long iclr, imap;
-
-					iclr = central_bus->child->fhc_regs.uregs
-						+ FHC_UREGS_ICLR;
-					imap = central_bus->child->fhc_regs.uregs
-						+ FHC_UREGS_IMAP;
-					zilog_irq = build_irq(12, 0, iclr, imap);
-				} else {
-					err = prom_getproperty(zsnode, "interrupts",
-							       (char *) &sun4u_ino,
-							       sizeof(sun4u_ino));
-					zilog_irq = sbus_build_irq(sbus_root, sun4u_ino);
-				}
-			}
-			break;
 		}
-		zsnode = prom_getsibling(zsnode);
-		seen++;
+	}
+ found:
+	if (sdev == NULL && central_bus == NULL) {
+		prom_printf("SunZilog: sdev&&central == NULL for "
+			    "Zilog %d in get_zs_sun4u.\n", chip);
+		prom_halt();
+	}
+	if (central_bus == NULL) {
+		mapped_addr =
+			sbus_ioremap(&sdev->resource[0], 0,
+				     PAGE_SIZE,
+				     "Zilog Registers");
+	} else {
+		struct linux_prom_registers zsregs[1];
+
+		err = prom_getproperty(zsnode, "reg",
+				       (char *) &zsregs[0],
+				       sizeof(zsregs));
+		if (err == -1) {
+			prom_printf("SunZilog: Cannot map "
+				    "Zilog %d regs on "
+				    "central bus.\n", chip);
+			prom_halt();
+		}
+		apply_fhc_ranges(central_bus->child,
+				 &zsregs[0], 1);
+		apply_central_ranges(central_bus, &zsregs[0], 1);
+		mapped_addr =
+			(((u64)zsregs[0].which_io)<<32UL) |
+			((u64)zsregs[0].phys_addr);
 	}
 
-	if (zsnode == 0 || zsnode == -1) {
-		prom_printf("SunZilog: Cannot find Zilog %d in get_zs_sun4u.\n", chip);
-		prom_halt();
+	if (zilog_irq == -1) {
+		if (central_bus) {
+			unsigned long iclr, imap;
+
+			iclr = central_bus->child->fhc_regs.uregs
+				+ FHC_UREGS_ICLR;
+			imap = central_bus->child->fhc_regs.uregs
+				+ FHC_UREGS_IMAP;
+			zilog_irq = build_irq(12, 0, iclr, imap);
+		} else {
+			err = prom_getproperty(zsnode, "interrupts",
+					       (char *) &sun4u_ino,
+					       sizeof(sun4u_ino));
+			zilog_irq = sbus_build_irq(sbus_root, sun4u_ino);
+		}
 	}
 
 	return (struct zilog_layout *) mapped_addr;

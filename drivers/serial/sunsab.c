@@ -583,10 +583,22 @@ static void sunsab_shutdown(struct uart_port *port)
 	tmp &= ~SAB82532_MODE_RAC;
 	writeb(tmp, &up->regs->rw.mode);
 
+	/*
+	 * XXX FIXME
+	 *
+	 * If the chip is powered down here the system hangs/crashes during
+	 * reboot or shutdown.  This needs to be investigated further,
+	 * similar behaviour occurs in 2.4 when the driver is configured
+	 * as a module only.  One hint may be that data is sometimes
+	 * transmitted at 9600 baud during shutdown (regardless of the
+	 * speed the chip was configured for when the port was open).
+	 */
+#if 0
 	/* Power Down */	
 	tmp = readb(&up->regs->rw.ccr0);
 	tmp &= ~SAB82532_CCR0_PU;
 	writeb(tmp, &up->regs->rw.ccr0);
+#endif
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
 }
