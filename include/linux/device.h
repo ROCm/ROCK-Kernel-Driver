@@ -54,6 +54,9 @@ struct bus_type {
 	struct kset		drivers;
 	struct kset		devices;
 
+	struct bus_attribute	* bus_attrs;
+	struct device_attribute	* dev_attrs;
+
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);
 	int		(*hotplug) (struct device *dev, char **envp, 
@@ -142,6 +145,9 @@ struct class {
 	struct subsystem	subsys;
 	struct list_head	children;
 	struct list_head	interfaces;
+
+	struct class_attribute		* class_attrs;
+	struct class_device_attribute	* class_dev_attrs;
 
 	int	(*hotplug)(struct class_device *dev, char **envp, 
 			   int num_envp, char *buffer, int buffer_size);
