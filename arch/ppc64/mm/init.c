@@ -592,36 +592,24 @@ void __init mem_init(void)
  */
 void flush_dcache_page(struct page *page)
 {
+	/* avoid an atomic op if possible */
 	if (test_bit(PG_arch_1, &page->flags))
 		clear_bit(PG_arch_1, &page->flags);
-}
-
-void flush_icache_page(struct vm_area_struct *vma, struct page *page)
-{
-	if (cpu_has_noexecute())
-		return;
-
-	if ((vma->vm_flags & VM_EXEC) == 0)
-		return;
-
-	if (page->mapping && !PageReserved(page)
-	    && !test_bit(PG_arch_1, &page->flags)) {
-		__flush_dcache_icache(page_address(page));
-		set_bit(PG_arch_1, &page->flags);
-	}
 }
 
 void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
 
-	/* XXX we shouldnt have to do this, but glibc requires it */
-	if (cpu_has_noexecute()) {
-		if (test_bit(PG_arch_1, &pg->flags))
-			clear_bit(PG_arch_1, &pg->flags);
-	} else {
-		__flush_dcache_icache(page);
-	}
+	/*
+	 * We shouldnt have to do this, but some versions of glibc
+	 * require it (ld.so assumes zero filled pages are icache clean)
+	 * - Anton
+	 */
+
+	/* avoid an atomic op if possible */
+	if (test_bit(PG_arch_1, &pg->flags))
+		clear_bit(PG_arch_1, &pg->flags);
 }
 
 void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
@@ -630,20 +618,23 @@ void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 	copy_page(vto, vfrom);
 
 	/*
-	 * Unfortunately we havent always marked our GOT and PLT sections
-	 * as executable, so we need to flush all file regions - Anton
+	 * We should be able to use the following optimisation, however
+	 * there are two problems.
+	 * Firstly a bug in some versions of binutils meant PLT sections
+	 * were not marked executable.
+	 * Secondly the first word in the GOT section is blrl, used
+	 * to establish the GOT address. Until recently the GOT was
+	 * not marked executable.
+	 * - Anton
 	 */
 #if 0
 	if (!vma->vm_file && ((vma->vm_flags & VM_EXEC) == 0))
 		return;
 #endif
 
-	if (cpu_has_noexecute()) {
-		if (test_bit(PG_arch_1, &pg->flags))
-			clear_bit(PG_arch_1, &pg->flags);
-	} else {
-		__flush_dcache_icache(vto);
-	}
+	/* avoid an atomic op if possible */
+	if (test_bit(PG_arch_1, &pg->flags))
+		clear_bit(PG_arch_1, &pg->flags);
 }
 
 void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
@@ -674,6 +665,19 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	void *pgdir;
 	pte_t *ptep;
 	int local = 0;
+
+	/* handle i-cache coherency */
+	if (!cpu_has_noexecute()) {
+		unsigned long pfn = pte_pfn(pte);
+		if (pfn_valid(pfn)) {
+			struct page *page = pfn_to_page(pfn);
+			if (!PageReserved(page)
+			    && !test_bit(PG_arch_1, &page->flags)) {
+				__flush_dcache_icache(page_address(page));
+				set_bit(PG_arch_1, &page->flags);
+			}
+		}
+	}
 
 	/* We only want HPTEs for linux PTEs that have _PAGE_ACCESSED set */
 	if (!pte_young(pte))
