@@ -73,8 +73,6 @@ out:
 
 int do_truncate(struct dentry *dentry, loff_t length)
 {
-	struct inode *inode = dentry->d_inode;
-	int error;
 	struct iattr newattrs;
 
 	/* Not pretty: "inode->i_size" shouldn't really be signed. But it is. */
@@ -83,8 +81,7 @@ int do_truncate(struct dentry *dentry, loff_t length)
 
 	newattrs.ia_size = length;
 	newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;
-	error = notify_change(dentry, &newattrs);
-	return error;
+	return notify_change(dentry, &newattrs);
 }
 
 static inline long do_sys_truncate(const char * path, loff_t length)
