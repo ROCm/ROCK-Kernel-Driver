@@ -2438,9 +2438,13 @@ static struct pci_driver radeonfb_driver = {
 #endif /* CONFIG_PM */
 };
 
+int __init radeonfb_setup (char *options);
 
 int __init radeonfb_init (void)
 {
+#ifndef MODULE
+	radeonfb_setup(fb_get_options("radeonfb"));
+#endif
 	return pci_module_init (&radeonfb_driver);
 }
 
@@ -2485,9 +2489,9 @@ int __init radeonfb_setup (char *options)
 	return 0;
 }
 
+module_init(radeonfb_init);
 
 #ifdef MODULE
-module_init(radeonfb_init);
 module_exit(radeonfb_exit);
 #endif
 

@@ -90,7 +90,7 @@ TCP_ECN_check_ce(struct tcp_opt *tp, struct sk_buff *skb)
 		/* Funny extension: if ECT is not set on a segment,
 		 * it is surely retransmit. It is not in ECN RFC,
 		 * but Linux follows this rule. */
-		else if (!INET_ECN_is_capable((TCP_SKB_CB(skb)->flags)))
+		else if (INET_ECN_is_not_ect((TCP_SKB_CB(skb)->flags)))
 			tcp_enter_quickack_mode(tp);
 	}
 }

@@ -44,7 +44,6 @@
 #include <asm/kdebug.h>
 #include <asm/mbus.h>
 #include <asm/idprom.h>
-#include <asm/hardirq.h>
 #include <asm/machines.h>
 #include <asm/cpudata.h>
 #include <asm/setup.h>

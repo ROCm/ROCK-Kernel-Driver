@@ -748,6 +748,8 @@ int __init epson1355fb_init(void)
 	}
 	return ret;
 }
+
+module_init(epson1355fb_init);
 	
 #ifdef MODULE
 static void __exit epson1355fb_exit(void)
@@ -758,7 +760,6 @@ static void __exit epson1355fb_exit(void)
 
 /* ------------------------------------------------------------------------- */
 
-module_init(epson1355fb_init);
 module_exit(epson1355fb_exit);
 #endif
 

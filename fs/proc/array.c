@@ -130,8 +130,9 @@ static const char *task_state_array[] = {
 	"S (sleeping)",		/*  1 */
 	"D (disk sleep)",	/*  2 */
 	"T (stopped)",		/*  4 */
-	"Z (zombie)",		/*  8 */
-	"X (dead)"		/* 16 */
+	"T (tracing stop)",	/*  8 */
+	"Z (zombie)",		/* 16 */
+	"X (dead)"		/* 32 */
 };
 
 static inline const char * get_task_state(struct task_struct *tsk)
@@ -141,7 +142,8 @@ static inline const char * get_task_state(struct task_struct *tsk)
 					   TASK_UNINTERRUPTIBLE |
 					   TASK_ZOMBIE |
 					   TASK_DEAD |
-					   TASK_STOPPED);
+					   TASK_STOPPED |
+					   TASK_TRACED);
 	const char **p = &task_state_array[0];
 
 	while (state) {

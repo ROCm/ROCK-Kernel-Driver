@@ -3036,7 +3036,11 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * So we really do need to disable interrupts when taking
 	 * tx_lock here.
 	 */
-	spin_lock_irqsave(&tp->tx_lock, flags);
+	local_irq_save(flags);
+	if (!spin_trylock(&tp->tx_lock)) { 
+		local_irq_restore(flags);
+		return -1; 
+	} 
 
 	/* This is a hard error, log it. */
 	if (unlikely(TX_BUFFS_AVAIL(tp) <= (skb_shinfo(skb)->nr_frags + 1))) {
@@ -8255,6 +8259,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 
 	if (pci_using_dac)
 		dev->features |= NETIF_F_HIGHDMA;
+	dev->features |= NETIF_F_LLTX;
 #if TG3_VLAN_TAG_USED
 	dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
 	dev->vlan_rx_register = tg3_vlan_rx_register;

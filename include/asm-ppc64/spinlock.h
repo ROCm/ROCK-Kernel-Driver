@@ -25,6 +25,10 @@ typedef struct {
 	volatile unsigned int lock;
 } spinlock_t;
 
+typedef struct {
+	volatile signed int lock;
+} rwlock_t;
+
 #ifdef __KERNEL__
 #define SPIN_LOCK_UNLOCKED	(spinlock_t) { 0 }
 
@@ -55,7 +59,7 @@ static __inline__ void _raw_spin_unlock(spinlock_t *lock)
 /* We only yield to the hypervisor if we are in shared processor mode */
 #define SHARED_PROCESSOR (get_paca()->lppaca.xSharedProc)
 extern void __spin_yield(spinlock_t *lock);
-extern void __rw_yield(spinlock_t *lock);
+extern void __rw_yield(rwlock_t *lock);
 #else /* SPLPAR || ISERIES */
 #define __spin_yield(x)	barrier()
 #define __rw_yield(x)	barrier()
@@ -134,10 +138,6 @@ static void __inline__ _raw_spin_lock_flags(spinlock_t *lock, unsigned long flag
  * irq-safe write-lock, but readers can get non-irqsafe
  * read-locks.
  */
-typedef struct {
-	volatile signed int lock;
-} rwlock_t;
-
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0 }
 
 #define rwlock_init(x)		do { *(x) = RW_LOCK_UNLOCKED; } while(0)

@@ -61,51 +61,15 @@ softirq_pending(unsigned int cpu)
 #define SOFTIRQ_SHIFT	(PREEMPT_SHIFT + PREEMPT_BITS)
 #define HARDIRQ_SHIFT	(SOFTIRQ_SHIFT + SOFTIRQ_BITS)
 
-#define __MASK(x)	((1UL << (x))-1)
-
-#define PREEMPT_MASK	(__MASK(PREEMPT_BITS) << PREEMPT_SHIFT)
-#define SOFTIRQ_MASK	(__MASK(SOFTIRQ_BITS) << SOFTIRQ_SHIFT)
-#define HARDIRQ_MASK	(__MASK(HARDIRQ_BITS) << HARDIRQ_SHIFT)
-
-#define hardirq_count()	(preempt_count() & HARDIRQ_MASK)
-#define softirq_count()	(preempt_count() & SOFTIRQ_MASK)
-#define irq_count()	(preempt_count() & (HARDIRQ_MASK | SOFTIRQ_MASK))
-
-#define PREEMPT_OFFSET	(1UL << PREEMPT_SHIFT)
-#define SOFTIRQ_OFFSET	(1UL << SOFTIRQ_SHIFT)
-#define HARDIRQ_OFFSET	(1UL << HARDIRQ_SHIFT)
-
-/*
- * Are we doing bottom half or hardware interrupt processing?
- * Are we in a softirq context? Interrupt context?
- */
-#define in_irq()		(hardirq_count())
-#define in_softirq()		(softirq_count())
-#define in_interrupt()		(irq_count())
-
-
-#define hardirq_trylock()	(!in_interrupt())
-#define hardirq_endlock()	do { } while (0)
-
-#define irq_enter()							\
-do {									\
-	(preempt_count() += HARDIRQ_OFFSET);				\
-} while(0)
-	
-
 extern void do_call_softirq(void);
 extern void account_ticks(struct pt_regs *);
 
 #define invoke_softirq() do_call_softirq()
 
-#ifdef CONFIG_PREEMPT
-# define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
-# define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
-#else
-# define in_atomic()	(preempt_count() != 0)
-# define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
-#endif
-
+#define irq_enter()							\
+do {									\
+	(preempt_count() += HARDIRQ_OFFSET);				\
+} while(0)
 #define irq_exit()							\
 do {									\
 	preempt_count() -= IRQ_EXIT_OFFSET;				\

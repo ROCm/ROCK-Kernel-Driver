@@ -644,8 +644,8 @@ restart_int_handler:
         lctlg   %c0,%c15,0(%r10) # get new ctl regs
         lghi    %r10,__LC_AREGS_SAVE_AREA
         lam     %a0,%a15,0(%r10)
-        stosm   0(%r15),0x04           # now we can turn dat on
         lmg     %r6,%r15,__SF_GPRS(%r15) # load registers from clone
+        stosm   __SF_EMPTY(%r15),0x04    # now we can turn dat on
 	jg      start_secondary
 #else
 /*

@@ -162,13 +162,12 @@ static int red_ecn_mark(struct sk_buff *skb)
 
 	switch (skb->protocol) {
 	case __constant_htons(ETH_P_IP):
-		if (!INET_ECN_is_capable(skb->nh.iph->tos))
+		if (INET_ECN_is_not_ect(skb->nh.iph->tos))
 			return 0;
-		if (INET_ECN_is_not_ce(skb->nh.iph->tos))
-			IP_ECN_set_ce(skb->nh.iph);
+		IP_ECN_set_ce(skb->nh.iph);
 		return 1;
 	case __constant_htons(ETH_P_IPV6):
-		if (!INET_ECN_is_capable(ip6_get_dsfield(skb->nh.ipv6h)))
+		if (INET_ECN_is_not_ect(ip6_get_dsfield(skb->nh.ipv6h)))
 			return 0;
 		IP6_ECN_set_ce(skb->nh.ipv6h);
 		return 1;

@@ -37,6 +37,12 @@
 #include <asm/div64.h>
 #include <asm/timex.h>
 
+#ifdef CONFIG_TIME_INTERPOLATION
+static void time_interpolator_update(long delta_nsec);
+#else
+#define time_interpolator_update(x)
+#endif
+
 /*
  * per-CPU timer vector definitions:
  */
@@ -621,6 +627,9 @@ static void second_overflow(void)
 	if (xtime.tv_sec % 86400 == 0) {
 	    xtime.tv_sec--;
 	    wall_to_monotonic.tv_sec++;
+	    /* The timer interpolator will make time change gradually instead
+	     * of an immediate jump by one second.
+	     */
 	    time_interpolator_update(-NSEC_PER_SEC);
 	    time_state = TIME_OOP;
 	    clock_was_set();
@@ -632,6 +641,7 @@ static void second_overflow(void)
 	if ((xtime.tv_sec + 1) % 86400 == 0) {
 	    xtime.tv_sec++;
 	    wall_to_monotonic.tv_sec--;
+	    /* Use of time interpolator for a gradual change of time */
 	    time_interpolator_update(NSEC_PER_SEC);
 	    time_state = TIME_WAIT;
 	    clock_was_set();
@@ -1427,14 +1437,108 @@ void __init init_timers(void)
 }
 
 #ifdef CONFIG_TIME_INTERPOLATION
-volatile unsigned long last_nsec_offset;
-#ifndef __HAVE_ARCH_CMPXCHG
-spinlock_t last_nsec_offset_lock = SPIN_LOCK_UNLOCKED;
-#endif
 
 struct time_interpolator *time_interpolator;
 static struct time_interpolator *time_interpolator_list;
 static spinlock_t time_interpolator_lock = SPIN_LOCK_UNLOCKED;
+
+static inline unsigned long time_interpolator_get_cycles(unsigned int src)
+{
+	unsigned long (*x)(void);
+
+	switch (src)
+	{
+		case TIME_SOURCE_FUNCTION:
+			x = time_interpolator->addr;
+			return x();
+
+		case TIME_SOURCE_MMIO64	:
+			return readq(time_interpolator->addr);
+
+		case TIME_SOURCE_MMIO32	:
+			return readl(time_interpolator->addr);
+		default: return get_cycles();
+	}
+}
+
+static inline unsigned long time_interpolator_get_counter(void)
+{
+	unsigned int src = time_interpolator->source;
+
+	if (time_interpolator->jitter)
+	{
+		unsigned long lcycle;
+		unsigned long now;
+
+		do {
+			lcycle = time_interpolator->last_cycle;
+			now = time_interpolator_get_cycles(src);
+			if (lcycle && time_after(lcycle, now)) return lcycle;
+			/* Keep track of the last timer value returned. The use of cmpxchg here
+			 * will cause contention in an SMP environment.
+			 */
+		} while (unlikely(cmpxchg(&time_interpolator->last_cycle, lcycle, now) != lcycle));
+		return now;
+	}
+	else
+		return time_interpolator_get_cycles(src);
+}
+
+void time_interpolator_reset(void)
+{
+	time_interpolator->offset = 0;
+	time_interpolator->last_counter = time_interpolator_get_counter();
+}
+
+unsigned long time_interpolator_resolution(void)
+{
+	return NSEC_PER_SEC / time_interpolator->frequency;
+}
+
+#define GET_TI_NSECS(count,i) ((((count) - i->last_counter) * i->nsec_per_cyc) >> i->shift)
+
+unsigned long time_interpolator_get_offset(void)
+{
+	return time_interpolator->offset +
+		GET_TI_NSECS(time_interpolator_get_counter(), time_interpolator);
+}
+
+static void time_interpolator_update(long delta_nsec)
+{
+	unsigned long counter = time_interpolator_get_counter();
+	unsigned long offset = time_interpolator->offset + GET_TI_NSECS(counter, time_interpolator);
+
+	/* The interpolator compensates for late ticks by accumulating
+         * the late time in time_interpolator->offset. A tick earlier than
+	 * expected will lead to a reset of the offset and a corresponding
+	 * jump of the clock forward. Again this only works if the
+	 * interpolator clock is running slightly slower than the regular clock
+	 * and the tuning logic insures that.
+         */
+
+	if (delta_nsec < 0 || (unsigned long) delta_nsec < offset)
+		time_interpolator->offset = offset - delta_nsec;
+	else {
+		time_interpolator->skips++;
+		time_interpolator->ns_skipped += delta_nsec - offset;
+		time_interpolator->offset = 0;
+	}
+	time_interpolator->last_counter = counter;
+
+	/* Tuning logic for time interpolator invoked every minute or so.
+	 * Decrease interpolator clock speed if no skips occurred and an offset is carried.
+	 * Increase interpolator clock speed if we skip too much time.
+	 */
+	if (jiffies % INTERPOLATOR_ADJUST == 0)
+	{
+		if (time_interpolator->skips == 0 && time_interpolator->offset > TICK_NSEC)
+			time_interpolator->nsec_per_cyc--;
+		if (time_interpolator->ns_skipped > INTERPOLATOR_MAX_SKIP && time_interpolator->offset == 0)
+			time_interpolator->nsec_per_cyc++;
+		time_interpolator->skips = 0;
+		time_interpolator->ns_skipped = 0;
+	}
+}
 
 static inline int
 is_better_time_interpolator(struct time_interpolator *new)
@@ -1450,10 +1554,13 @@ register_time_interpolator(struct time_interpolator *ti)
 {
 	unsigned long flags;
 
+	ti->nsec_per_cyc = (NSEC_PER_SEC << ti->shift) / ti->frequency;
 	spin_lock(&time_interpolator_lock);
 	write_seqlock_irqsave(&xtime_lock, flags);
-	if (is_better_time_interpolator(ti))
+	if (is_better_time_interpolator(ti)) {
 		time_interpolator = ti;
+		time_interpolator_reset();
+	}
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 
 	ti->next = time_interpolator_list;
@@ -1485,6 +1592,7 @@ unregister_time_interpolator(struct time_interpolator *ti)
 		for (curr = time_interpolator_list; curr; curr = curr->next)
 			if (is_better_time_interpolator(curr))
 				time_interpolator = curr;
+		time_interpolator_reset();
 	}
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 	spin_unlock(&time_interpolator_lock);

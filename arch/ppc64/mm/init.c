@@ -654,20 +654,18 @@ module_init(setup_kcore);
 
 void __init mem_init(void)
 {
-#ifndef CONFIG_DISCONTIGMEM
-	unsigned long addr;
+#ifdef CONFIG_DISCONTIGMEM
+	int nid;
 #endif
-	int codepages = 0;
-	int datapages = 0;
-	int initpages = 0;
+	pg_data_t *pgdat;
+	unsigned long i;
+	struct page *page;
+	unsigned long reservedpages = 0, codesize, initsize, datasize, bsssize;
 
 	num_physpages = max_low_pfn;	/* RAM is assumed contiguous */
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
 
 #ifdef CONFIG_DISCONTIGMEM
-{
-	int nid;
-
         for (nid = 0; nid < numnodes; nid++) {
 		if (NODE_DATA(nid)->node_spanned_pages != 0) {
 			printk("freeing bootmem node %x\n", nid);
@@ -675,38 +673,34 @@ void __init mem_init(void)
 				free_all_bootmem_node(NODE_DATA(nid));
 		}
 	}
-
-	printk("Memory: %luk available (%dk kernel code, %dk data, %dk init) [%08lx,%08lx]\n",
-	       (unsigned long)nr_free_pages()<< (PAGE_SHIFT-10),
-	       codepages<< (PAGE_SHIFT-10), datapages<< (PAGE_SHIFT-10),
-	       initpages<< (PAGE_SHIFT-10),
-	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
-}
 #else
 	max_mapnr = num_physpages;
-
 	totalram_pages += free_all_bootmem();
+#endif
 
-	for (addr = KERNELBASE; addr < (unsigned long)__va(lmb_end_of_DRAM());
-	     addr += PAGE_SIZE) {
-		if (!PageReserved(virt_to_page(addr)))
-			continue;
-		if (addr < (unsigned long)_etext)
-			codepages++;
-
-		else if (addr >= (unsigned long)__init_begin
-			 && addr < (unsigned long)__init_end)
-			initpages++;
-		else if (addr < klimit)
-			datapages++;
+	for_each_pgdat(pgdat) {
+		for (i = 0; i < pgdat->node_spanned_pages; i++) {
+			page = pgdat->node_mem_map + i;
+			if (PageReserved(page))
+				reservedpages++;
+		}
 	}
 
-	printk("Memory: %luk available (%dk kernel code, %dk data, %dk init) [%08lx,%08lx]\n",
-	       (unsigned long)nr_free_pages()<< (PAGE_SHIFT-10),
-	       codepages<< (PAGE_SHIFT-10), datapages<< (PAGE_SHIFT-10),
-	       initpages<< (PAGE_SHIFT-10),
-	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
-#endif
+	codesize = (unsigned long)&_etext - (unsigned long)&_stext;
+	initsize = (unsigned long)&__init_end - (unsigned long)&__init_begin;
+	datasize = (unsigned long)&_edata - (unsigned long)&__init_end;
+	bsssize = (unsigned long)&__bss_stop - (unsigned long)&__bss_start;
+
+	printk(KERN_INFO "Memory: %luk/%luk available (%luk kernel code, "
+	       "%luk reserved, %luk data, %luk bss, %luk init)\n",
+		(unsigned long)nr_free_pages() << (PAGE_SHIFT-10),
+		num_physpages << (PAGE_SHIFT-10),
+		codesize >> 10,
+		reservedpages << (PAGE_SHIFT-10),
+		datasize >> 10,
+		bsssize >> 10,
+		initsize >> 10);
+
 	mem_init_done = 1;
 
 #ifdef CONFIG_PPC_ISERIES

@@ -789,8 +789,9 @@ cg6_setup(char *arg)
 	return 0;
 }
 
-#ifdef MODULE
 module_init(cg6_init);
+
+#ifdef MODULE
 module_exit(cg6_exit);
 #endif
 

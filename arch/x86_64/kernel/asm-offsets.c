@@ -7,8 +7,8 @@
 #include <linux/sched.h> 
 #include <linux/stddef.h>
 #include <linux/errno.h> 
+#include <linux/hardirq.h>
 #include <asm/pda.h>
-#include <asm/hardirq.h>
 #include <asm/processor.h>
 #include <asm/segment.h>
 #include <asm/thread_info.h>

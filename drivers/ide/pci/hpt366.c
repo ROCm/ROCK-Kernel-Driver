@@ -777,9 +777,6 @@ static int hpt3xx_tristate (ide_drive_t * drive, int state)
 	u8 reg59h = 0, reset	= (hwif->channel) ? 0x80 : 0x40;
 	u8 regXXh = 0, state_reg= (hwif->channel) ? 0x57 : 0x53;
 
-	if (!hwif)
-		return -EINVAL;
-
 //	hwif->bus_state = state;
 
 	pci_read_config_byte(dev, 0x59, &reg59h);
@@ -812,9 +809,6 @@ static int hpt370_busproc(ide_drive_t * drive, int state)
 	struct pci_dev *dev	= hwif->pci_dev;
 	u8 tristate = 0, resetmask = 0, bus_reg = 0;
 	u16 tri_reg;
-
-	if (!hwif)
-		return -EINVAL;
 
 	hwif->bus_state = state;
 

@@ -522,12 +522,13 @@ void AltivecUnavailableException(struct pt_regs *regs)
 
 /* Ensure exceptions are disabled */
 #define MMCR0_PMXE      (1UL << (31 - 5))
+#define MMCR0_PMAO      (1UL << (31 - 24))
 
 static void dummy_perf(struct pt_regs *regs)
 {
 	unsigned int mmcr0 = mfspr(SPRN_MMCR0);
 
-	mmcr0 &= ~MMCR0_PMXE;
+	mmcr0 &= ~(MMCR0_PMXE|MMCR0_PMAO);
 	mtspr(SPRN_MMCR0, mmcr0);
 }
 

@@ -309,6 +309,43 @@ unsigned long long monotonic_clock(void)
 }
 EXPORT_SYMBOL(monotonic_clock);
 
+static noinline void handle_lost_ticks(int lost, struct pt_regs *regs)
+{
+    static long lost_count;
+    static int warned;
+
+    if (report_lost_ticks) {
+	    printk(KERN_WARNING "time.c: Lost %d timer "
+		   "tick(s)! ", lost);
+	    print_symbol("rip %s)\n", regs->rip);
+    }
+
+    if (lost_count == 100 && !warned) {
+	    printk(KERN_WARNING
+		   "warning: many lost ticks.\n"
+		   KERN_WARNING "Your time source seems to be instable or "
+		   		"some driver is hogging interupts\n");
+	    print_symbol("rip %s\n", regs->rip);
+	    if (vxtime.mode == VXTIME_TSC && vxtime.hpet_address) {
+		    printk(KERN_WARNING "Falling back to HPET\n");
+		    vxtime.last = hpet_readl(HPET_T0_CMP) - hpet_tick;
+		    vxtime.mode = VXTIME_HPET;
+		    do_gettimeoffset = do_gettimeoffset_hpet;
+	    }
+	    /* else should fall back to PIT, but code missing. */
+	    warned = 1;
+    } else
+	    lost_count++;
+
+#ifdef CONFIG_CPU_FREQ
+    /* In some cases the CPU can change frequency without us noticing
+       (like going into thermal throttle)
+       Give cpufreq a change to catch up. */
+    if ((lost_count+1) % 25 == 0) {
+	    cpufreq_delayed_get();
+    }
+#endif
+}
 
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -371,28 +408,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	if (lost > 0) {
-		static long lost_count;
-
-		if (report_lost_ticks) {
-			printk(KERN_WARNING "time.c: Lost %d timer "
-			       "tick(s)! ", lost);
-			print_symbol("rip %s)\n", regs->rip);
-		}
-
-		if (lost_count == 100) {
-			printk(KERN_WARNING
-   "warning: many lost ticks.\n"
-   KERN_WARNING "Your time source seems to be instable or some driver is hogging interupts\n");
-			print_symbol("rip %s\n", regs->rip);
-			lost_count = 0;
-		} else
-			lost_count++;
-
-		if ((lost_count % 25) == 0) {
-#ifdef CONFIG_CPU_FREQ
-			cpufreq_delayed_get();
-#endif
-		}
+		handle_lost_ticks(lost, regs);
 		jiffies += lost;
 	}
 
@@ -563,9 +579,13 @@ static void handle_cpufreq_delayed_get(void *v)
  */
 static void cpufreq_delayed_get(void)
 {
+	static int warned;
 	if (cpufreq_init && !cpufreq_delayed_issched) {
 		cpufreq_delayed_issched = 1;
-		printk(KERN_DEBUG "Losing some ticks... checking if CPU frequency changed.\n");
+		if (!warned) {
+			warned = 1;
+			printk(KERN_DEBUG "Losing some ticks... checking if CPU frequency changed.\n");
+		}
 		schedule_work(&cpufreq_delayed_get_work);
 	}
 }

@@ -412,16 +412,43 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options,
 	}
 }
 
+/*
+ * for maximum compatability, we allow programs to use a single (compat)
+ * unsigned long bitmask if all cpus will fit. If not, you have to have
+ * at least the kernel size available.
+ */
+#define USE_COMPAT_ULONG_CPUMASK (NR_CPUS <= BITS_PER_COMPAT_LONG)
+
 asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid, 
 					     unsigned int len,
 					     compat_ulong_t __user *user_mask_ptr)
 {
-	unsigned long kern_mask;
+	cpumask_t kern_mask;
 	mm_segment_t old_fs;
 	int ret;
 
-	if (get_user(kern_mask, user_mask_ptr))
-		return -EFAULT;
+	if (USE_COMPAT_ULONG_CPUMASK) {
+		compat_ulong_t user_mask;
+
+		if (len < sizeof(user_mask))
+			return -EINVAL;
+
+		if (get_user(user_mask, user_mask_ptr))
+			return -EFAULT;
+
+		cpus_addr(kern_mask)[0] = user_mask;
+	} else {
+		unsigned long *k;
+
+		if (len < sizeof(kern_mask))
+			return -EINVAL;
+
+		k = cpus_addr(kern_mask);
+		ret = compat_get_bitmap(k, user_mask_ptr,
+					sizeof(kern_mask) * BITS_PER_LONG);
+		if (ret)
+			return ret;
+	}
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -436,9 +463,13 @@ asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 asmlinkage long compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 					     compat_ulong_t __user *user_mask_ptr)
 {
-	unsigned long kern_mask;
+	cpumask_t kern_mask;
 	mm_segment_t old_fs;
 	int ret;
+
+	if (len < (USE_COMPAT_ULONG_CPUMASK ? sizeof(compat_ulong_t)
+				: sizeof(kern_mask)))
+		return -EINVAL;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
@@ -447,10 +478,23 @@ asmlinkage long compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 				    (unsigned long __user *) &kern_mask);
 	set_fs(old_fs);
 
-	if (ret > 0) {
-		ret = sizeof(compat_ulong_t);
-		if (put_user(kern_mask, user_mask_ptr))
+	if (ret < 0)
+		return ret;
+
+	if (USE_COMPAT_ULONG_CPUMASK) {
+		if (put_user(&cpus_addr(kern_mask)[0], user_mask_ptr))
 			return -EFAULT;
+		ret = sizeof(compat_ulong_t);
+	} else {
+		unsigned long *k;
+
+		k = cpus_addr(kern_mask);
+		ret = compat_put_bitmap(user_mask_ptr, k,
+					sizeof(kern_mask) * BITS_PER_LONG);
+		if (ret)
+			return ret;
+
+		ret = sizeof(kern_mask);
 	}
 
 	return ret;
@@ -590,3 +634,83 @@ long compat_clock_nanosleep(clockid_t which_clock, int flags,
 
 /* timer_create is architecture specific because it needs sigevent conversion */
 
+long compat_get_bitmap(unsigned long *mask, compat_ulong_t __user *umask,
+		       unsigned long bitmap_size)
+{
+	int i, j;
+	unsigned long m;
+	compat_ulong_t um;
+	unsigned long nr_compat_longs;
+
+	/* align bitmap up to nearest compat_long_t boundary */
+	bitmap_size = ALIGN(bitmap_size, BITS_PER_COMPAT_LONG);
+
+	if (verify_area(VERIFY_READ, umask, bitmap_size / 8))
+		return -EFAULT;
+
+	nr_compat_longs = BITS_TO_COMPAT_LONGS(bitmap_size);
+
+	for (i = 0; i < BITS_TO_LONGS(bitmap_size); i++) {
+		m = 0;
+
+		for (j = 0; j < sizeof(m)/sizeof(um); j++) {
+			/*
+			 * We dont want to read past the end of the userspace
+			 * bitmap. We must however ensure the end of the
+			 * kernel bitmap is zeroed.
+			 */
+			if (nr_compat_longs-- > 0) {
+				if (__get_user(um, umask))
+					return -EFAULT;
+			} else {
+				um = 0;
+			}
+
+			umask++;
+			m |= (long)um << (j * BITS_PER_COMPAT_LONG);
+		}
+		*mask++ = m;
+	}
+
+	return 0;
+}
+
+long compat_put_bitmap(compat_ulong_t __user *umask, unsigned long *mask,
+		       unsigned long bitmap_size)
+{
+	int i, j;
+	unsigned long m;
+	compat_ulong_t um;
+	unsigned long nr_compat_longs;
+
+	/* align bitmap up to nearest compat_long_t boundary */
+	bitmap_size = ALIGN(bitmap_size, BITS_PER_COMPAT_LONG);
+
+	if (verify_area(VERIFY_WRITE, umask, bitmap_size / 8))
+		return -EFAULT;
+
+	nr_compat_longs = BITS_TO_COMPAT_LONGS(bitmap_size);
+
+	for (i = 0; i < BITS_TO_LONGS(bitmap_size); i++) {
+		m = *mask++;
+
+		for (j = 0; j < sizeof(m)/sizeof(um); j++) {
+			um = m;
+
+			/*
+			 * We dont want to write past the end of the userspace
+			 * bitmap.
+			 */
+			if (nr_compat_longs-- > 0) {
+				if (__put_user(um, umask))
+					return -EFAULT;
+			}
+
+			umask++;
+			m >>= 4*sizeof(um);
+			m >>= 4*sizeof(um);
+		}
+	}
+
+	return 0;
+}

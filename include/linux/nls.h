@@ -33,6 +33,31 @@ extern int utf8_mbstowcs(wchar_t *, const __u8 *, int);
 extern int utf8_wctomb(__u8 *, wchar_t, int);
 extern int utf8_wcstombs(__u8 *, const wchar_t *, int);
 
+static inline unsigned char nls_tolower(struct nls_table *t, unsigned char c)
+{
+	unsigned char nc = t->charset2lower[c];
+
+	return nc ? nc : c;
+}
+
+static inline unsigned char nls_toupper(struct nls_table *t, unsigned char c)
+{
+	unsigned char nc = t->charset2upper[c];
+
+	return nc ? nc : c;
+}
+
+static inline int nls_strnicmp(struct nls_table *t, const unsigned char *s1,
+		const unsigned char *s2, int len)
+{
+	while (len--) {
+		if (nls_tolower(t, *s1++) != nls_tolower(t, *s2++))
+			return 1;
+	}
+
+	return 0;
+}
+
 #define MODULE_ALIAS_NLS(name)	MODULE_ALIAS("nls_" __stringify(name))
 
 #endif /* _LINUX_NLS_H */

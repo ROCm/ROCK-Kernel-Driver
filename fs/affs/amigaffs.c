@@ -84,7 +84,8 @@ affs_remove_hash(struct inode *dir, struct buffer_head *rem_bh)
 {
 	struct super_block *sb;
 	struct buffer_head *bh;
-	u32 rem_ino, hash_ino, ino;
+	u32 rem_ino, hash_ino;
+	__be32 ino;
 	int offset, retval;
 
 	sb = dir->i_sb;
@@ -203,9 +204,9 @@ affs_remove_link(struct dentry *dentry)
 
 	while ((ino = be32_to_cpu(AFFS_TAIL(sb, bh)->link_chain)) != 0) {
 		if (ino == link_ino) {
-			ino = AFFS_TAIL(sb, link_bh)->link_chain;
-			AFFS_TAIL(sb, bh)->link_chain = ino;
-			affs_adjust_checksum(bh, be32_to_cpu(ino) - link_ino);
+			__be32 ino2 = AFFS_TAIL(sb, link_bh)->link_chain;
+			AFFS_TAIL(sb, bh)->link_chain = ino2;
+			affs_adjust_checksum(bh, be32_to_cpu(ino2) - link_ino);
 			mark_buffer_dirty_inode(bh, inode);
 			retval = 0;
 			/* Fix the link count, if bh is a normal header block without links */
@@ -341,12 +342,12 @@ done_unlock:
 u32
 affs_checksum_block(struct super_block *sb, struct buffer_head *bh)
 {
-	u32 *ptr = (u32 *)bh->b_data;
+	__be32 *ptr = (__be32 *)bh->b_data;
 	u32 sum;
 	int bsize;
 
 	sum = 0;
-	for (bsize = sb->s_blocksize / sizeof(u32); bsize > 0; bsize--)
+	for (bsize = sb->s_blocksize / sizeof(__be32); bsize > 0; bsize--)
 		sum += be32_to_cpu(*ptr++);
 	return sum;
 }
@@ -359,9 +360,10 @@ affs_checksum_block(struct super_block *sb, struct buffer_head *bh)
 void
 affs_fix_checksum(struct super_block *sb, struct buffer_head *bh)
 {
-	int cnt = sb->s_blocksize / sizeof(u32);
-	u32 *ptr = (u32 *)bh->b_data;
-	u32 checksum, *checksumptr;
+	int cnt = sb->s_blocksize / sizeof(__be32);
+	__be32 *ptr = (__be32 *)bh->b_data;
+	u32 checksum;
+	__be32 *checksumptr;
 
 	checksumptr = ptr + 5;
 	*checksumptr = 0;
@@ -384,9 +386,9 @@ secs_to_datestamp(time_t secs, struct affs_date *ds)
 	minute  = secs / 60;
 	secs   -= minute * 60;
 
-	ds->days = be32_to_cpu(days);
-	ds->mins = be32_to_cpu(minute);
-	ds->ticks = be32_to_cpu(secs * 50);
+	ds->days = cpu_to_be32(days);
+	ds->mins = cpu_to_be32(minute);
+	ds->ticks = cpu_to_be32(secs * 50);
 }
 
 mode_t

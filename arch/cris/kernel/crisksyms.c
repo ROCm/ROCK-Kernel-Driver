@@ -16,7 +16,6 @@
 #include <asm/uaccess.h>
 #include <asm/checksum.h>
 #include <asm/io.h>
-#include <asm/hardirq.h>
 #include <asm/delay.h>
 #include <asm/irq.h>
 #include <asm/pgtable.h>
@@ -91,8 +90,8 @@ EXPORT_SYMBOL(prepare_rx_descriptor);
 #undef memset
 extern void * memset(void *, int, __kernel_size_t);
 extern void * memcpy(void *, const void *, __kernel_size_t);
-EXPORT_SYMBOL_NOVERS(memcpy);
-EXPORT_SYMBOL_NOVERS(memset);
+EXPORT_SYMBOL(memcpy);
+EXPORT_SYMBOL(memset);
 
 #ifdef CONFIG_ETRAX_FAST_TIMER
 /* Fast timer functions */

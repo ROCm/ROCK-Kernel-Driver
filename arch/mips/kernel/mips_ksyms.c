@@ -26,36 +26,36 @@ extern long __strnlen_user_asm(const char *s);
 /*
  * String functions
  */
-EXPORT_SYMBOL_NOVERS(memchr);
-EXPORT_SYMBOL_NOVERS(memcmp);
-EXPORT_SYMBOL_NOVERS(memset);
-EXPORT_SYMBOL_NOVERS(memcpy);
-EXPORT_SYMBOL_NOVERS(memmove);
-EXPORT_SYMBOL_NOVERS(strcat);
-EXPORT_SYMBOL_NOVERS(strchr);
+EXPORT_SYMBOL(memchr);
+EXPORT_SYMBOL(memcmp);
+EXPORT_SYMBOL(memset);
+EXPORT_SYMBOL(memcpy);
+EXPORT_SYMBOL(memmove);
+EXPORT_SYMBOL(strcat);
+EXPORT_SYMBOL(strchr);
 #ifdef CONFIG_MIPS64
-EXPORT_SYMBOL_NOVERS(strncmp);
+EXPORT_SYMBOL(strncmp);
 #endif
-EXPORT_SYMBOL_NOVERS(strlen);
-EXPORT_SYMBOL_NOVERS(strpbrk);
-EXPORT_SYMBOL_NOVERS(strncat);
-EXPORT_SYMBOL_NOVERS(strnlen);
-EXPORT_SYMBOL_NOVERS(strrchr);
-EXPORT_SYMBOL_NOVERS(strstr);
+EXPORT_SYMBOL(strlen);
+EXPORT_SYMBOL(strpbrk);
+EXPORT_SYMBOL(strncat);
+EXPORT_SYMBOL(strnlen);
+EXPORT_SYMBOL(strrchr);
+EXPORT_SYMBOL(strstr);
 
 EXPORT_SYMBOL(kernel_thread);
 
 /*
  * Userspace access stuff.
  */
-EXPORT_SYMBOL_NOVERS(__copy_user);
-EXPORT_SYMBOL_NOVERS(__bzero);
-EXPORT_SYMBOL_NOVERS(__strncpy_from_user_nocheck_asm);
-EXPORT_SYMBOL_NOVERS(__strncpy_from_user_asm);
-EXPORT_SYMBOL_NOVERS(__strlen_user_nocheck_asm);
-EXPORT_SYMBOL_NOVERS(__strlen_user_asm);
-EXPORT_SYMBOL_NOVERS(__strnlen_user_nocheck_asm);
-EXPORT_SYMBOL_NOVERS(__strnlen_user_asm);
+EXPORT_SYMBOL(__copy_user);
+EXPORT_SYMBOL(__bzero);
+EXPORT_SYMBOL(__strncpy_from_user_nocheck_asm);
+EXPORT_SYMBOL(__strncpy_from_user_asm);
+EXPORT_SYMBOL(__strlen_user_nocheck_asm);
+EXPORT_SYMBOL(__strlen_user_asm);
+EXPORT_SYMBOL(__strnlen_user_nocheck_asm);
+EXPORT_SYMBOL(__strnlen_user_asm);
 
 EXPORT_SYMBOL(csum_partial);
 

@@ -1,0 +1,56 @@
+RCU Concepts
+
+
+The basic idea behind RCU is to split destructive operations into two
+parts, one that makes anyone from seeing the data item being destroyed,
+and one that actually carries out the destruction.  A "grace period"
+must elapse between the two parts, and this grace period must be long
+enough that any readers accessing the item being deleted have since
+dropped their references.  For example, an RCU-protected deletion from a
+linked list would first remove the item from the list, wait for a grace
+period to elapse, then free the element.  See the listRCU.txt file for
+more information on using RCU with linked lists.
+
+
+Frequently Asked Questions
+
+
+o	Why would anyone want to use RCU?
+
+	The advantage of RCU's two-part approach is that RCU readers need
+	not acquire any locks, perform any atomic instructions, write to
+	shared memory, or (on CPUs other than Alpha) execute any memory
+	barriers.  The fact that these operations are quite expensive
+	on modern CPUs is what gives RCU its performance advantages
+	in read-mostly situations.  The fact that RCU readers need not
+	acquire locks can also greatly simplify deadlock-avoidance code.
+
+
+o	How can the updater tell when a grace period has completed
+	if the RCU readers give no indication when they are done?
+
+	Just as with spinlocks, RCU readers are not permitted to
+	block, switch to user-mode execution, or enter the idle loop.
+	Therefore, as soon as a CPU is seen passing through any of these
+	three states, we know that that CPU has exited any previous RCU
+	read-side critical sections.  So, if we remove an item from a
+	linked list, and then wait until all CPUs have switched context,
+	executed in user mode, or executed in the idle loop, we can
+	safely free up that item.
+
+o	If I am running on a uniprocessor kernel, which can only do one
+	thing at a time, why should I wait for a grace period?
+
+	See the UP.txt file in this directory.
+
+o	How can I see where RCU is currently used in the Linux kernel?
+
+	Search for "rcu_read_lock", "call_rcu", and "synchronize_kernel".
+
+o	What guidelines should I follow when writing code that uses RCU?
+
+	See the checklist.txt file in this directory.
+
+o	Where can I find more information on RCU?
+
+	See the RTFP.txt file in this directory.

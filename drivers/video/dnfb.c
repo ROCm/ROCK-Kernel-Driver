@@ -294,4 +294,6 @@ int __init dnfb_init(void)
 	return ret;
 }
 
+module_init(dnfb_init);
+
 MODULE_LICENSE("GPL");

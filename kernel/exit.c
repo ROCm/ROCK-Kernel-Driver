@@ -555,6 +555,14 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 		if (p->state == TASK_ZOMBIE && p->exit_signal != -1 &&
 		    thread_group_empty(p))
 			do_notify_parent(p, p->exit_signal);
+		else if (p->state == TASK_TRACED) {
+			/*
+			 * If it was at a trace stop, turn it into
+			 * a normal stop since it's no longer being
+			 * traced.
+			 */
+			p->state = TASK_STOPPED;
+		}
 	}
 
 	/*
@@ -1164,7 +1172,7 @@ static int wait_task_stopped(task_t *p, int delayed_group_leader, int noreap,
 	 * race with the TASK_ZOMBIE case.
 	 */
 	exit_code = xchg(&p->exit_code, 0);
-	if (unlikely(p->state > TASK_STOPPED)) {
+	if (unlikely(p->state >= TASK_ZOMBIE)) {
 		/*
 		 * The task resumed and then died.  Let the next iteration
 		 * catch it in TASK_ZOMBIE.  Note that exit_code might
@@ -1245,6 +1253,10 @@ repeat:
 			flag = 1;
 
 			switch (p->state) {
+			case TASK_TRACED:
+				if (!(p->ptrace & PT_PTRACED))
+					continue;
+				/*FALLTHROUGH*/
 			case TASK_STOPPED:
 				if (!(options & WUNTRACED) &&
 				    !(p->ptrace & PT_PTRACED))

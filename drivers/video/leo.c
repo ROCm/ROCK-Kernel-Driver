@@ -654,8 +654,8 @@ leo_setup(char *arg)
 	return 0;
 }
 
-#ifdef MODULE
 module_init(leo_init);
+#ifdef MODULE
 module_exit(leo_exit);
 #endif
 

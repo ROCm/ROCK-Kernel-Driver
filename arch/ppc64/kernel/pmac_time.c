@@ -18,6 +18,7 @@
 #include <linux/time.h>
 #include <linux/adb.h>
 #include <linux/pmu.h>
+#include <linux/interrupt.h>
 
 #include <asm/sections.h>
 #include <asm/prom.h>
@@ -25,7 +26,6 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/machdep.h>
-#include <asm/hardirq.h>
 #include <asm/time.h>
 #include <asm/nvram.h>
 

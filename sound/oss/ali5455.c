@@ -65,7 +65,6 @@
 #include <linux/ac97_codec.h>
 #include <linux/interrupt.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 
 #ifndef PCI_DEVICE_ID_ALI_5455
 #define PCI_DEVICE_ID_ALI_5455	0x5455

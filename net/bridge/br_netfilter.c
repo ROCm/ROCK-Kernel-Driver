@@ -290,6 +290,62 @@ static void setup_pre_routing(struct sk_buff *skb)
 	skb->dev = bridge_parent(skb->dev);
 }
 
+/* We only check the length. A bridge shouldn't do any hop-by-hop stuff anyway */
+static int check_hbh_len(struct sk_buff *skb)
+{
+	unsigned char *raw = (u8*)(skb->nh.ipv6h+1);
+	u32 pkt_len;
+	int off = raw - skb->nh.raw;
+	int len = (raw[1]+1)<<3;
+
+	if ((raw + len) - skb->data > skb_headlen(skb))
+		goto bad;
+
+	off += 2;
+	len -= 2;
+
+	while (len > 0) {
+		int optlen = raw[off+1]+2;
+
+		switch (skb->nh.raw[off]) {
+		case IPV6_TLV_PAD0:
+			optlen = 1;
+			break;
+
+		case IPV6_TLV_PADN:
+			break;
+
+		case IPV6_TLV_JUMBO:
+			if (skb->nh.raw[off+1] != 4 || (off&3) != 2)
+				goto bad;
+
+			pkt_len = ntohl(*(u32*)(skb->nh.raw+off+2));
+
+			if (pkt_len > skb->len - sizeof(struct ipv6hdr))
+				goto bad;
+			if (pkt_len + sizeof(struct ipv6hdr) < skb->len) {
+				if (__pskb_trim(skb,
+				    pkt_len + sizeof(struct ipv6hdr)))
+					goto bad;
+				if (skb->ip_summed == CHECKSUM_HW)
+					skb->ip_summed = CHECKSUM_NONE;
+			}
+			break;
+		default:
+			if (optlen > len)
+				goto bad;
+			break;
+		}
+		off += optlen;
+		len -= optlen;
+	}
+	if (len == 0)
+		return 0;
+bad:
+	return -1;
+
+}
+
 /* Replicate the checks that IPv6 does on packet reception and pass the packet
  * to ip6tables, which doesn't support NAT, so things are fairly simple. */
 static unsigned int br_nf_pre_routing_ipv6(unsigned int hook,
@@ -316,18 +372,16 @@ static unsigned int br_nf_pre_routing_ipv6(unsigned int hook,
 	if (pkt_len || hdr->nexthdr != NEXTHDR_HOP) {
 		if (pkt_len + sizeof(struct ipv6hdr) > skb->len)
 			goto inhdr_error;
-		if (pkt_len + sizeof(struct ipv6hdr) < skb->len &&
-		    __pskb_trim(skb, pkt_len + sizeof(struct ipv6hdr)))
-			goto inhdr_error;
+		if (pkt_len + sizeof(struct ipv6hdr) < skb->len) {
+			if (__pskb_trim(skb, pkt_len + sizeof(struct ipv6hdr)))
+				goto inhdr_error;
+			if (skb->ip_summed == CHECKSUM_HW)
+				skb->ip_summed = CHECKSUM_NONE;
+		}
 	}
-	if (hdr->nexthdr == NEXTHDR_HOP) {
-		/* We only check the length. A bridge shouldn't do any
-		 * hop-by-hop stuff anyway. */
-		unsigned char *raw = (u8*)(skb->nh.ipv6h+1);
+	if (hdr->nexthdr == NEXTHDR_HOP && check_hbh_len(skb))
+			goto inhdr_error;
 
-		if ((raw + ((int)(raw[1]+1)<<3)) - skb->data > skb_headlen(skb))
-			goto inhdr_error;
-	}
 #ifdef CONFIG_NETFILTER_DEBUG
 	skb->nf_debug ^= (1 << NF_IP6_PRE_ROUTING);
 #endif

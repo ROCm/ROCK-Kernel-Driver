@@ -138,8 +138,8 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 		__show_trace(sp, (unsigned long) task->thread_info,
 			     (unsigned long) task->thread_info + THREAD_SIZE);
 	else
-		__show_trace(sp, S390_lowcore.thread_info - THREAD_SIZE,
-			     S390_lowcore.thread_info);
+		__show_trace(sp, S390_lowcore.thread_info,
+			     S390_lowcore.thread_info + THREAD_SIZE);
 	printk("\n");
 }
 

@@ -637,6 +637,7 @@ __cpu_up(unsigned int cpu)
 {
 	struct task_struct *idle;
         struct _lowcore    *cpu_lowcore;
+	struct stack_frame *sf;
         sigp_ccode          ccode;
 	int                 curr_cpu;
 
@@ -660,9 +661,14 @@ __cpu_up(unsigned int cpu)
 
 	idle = current_set[cpu];
         cpu_lowcore = lowcore_ptr[cpu];
-	cpu_lowcore->save_area[15] = idle->thread.ksp;
 	cpu_lowcore->kernel_stack = (unsigned long)
 		idle->thread_info + (THREAD_SIZE);
+	sf = (struct stack_frame *) (cpu_lowcore->kernel_stack
+				     - sizeof(struct pt_regs)
+				     - sizeof(struct stack_frame));
+	memset(sf, 0, sizeof(struct stack_frame));
+	sf->gprs[9] = (unsigned long) sf;
+	cpu_lowcore->save_area[15] = (unsigned long) sf;
 	__ctl_store(cpu_lowcore->cregs_save_area[0], 0, 15);
 	__asm__ __volatile__("stam  0,15,0(%0)"
 			     : : "a" (&cpu_lowcore->access_regs_save_area)

@@ -836,6 +836,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
 
 				list_del( &pos->head );
 				DRM(free)( pos, sizeof(*pos), DRM_MEM_CTXLIST );
+				--dev->ctx_count;
 			}
 		}
 	}

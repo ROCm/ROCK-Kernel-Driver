@@ -14,9 +14,9 @@
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/module.h>       /* for EXPORT_SYMBOL */
+#include <linux/hardirq.h>
 
 #include <asm/fpswa.h>
-#include <asm/hardirq.h>
 #include <asm/ia32.h>
 #include <asm/intrinsics.h>
 #include <asm/processor.h>

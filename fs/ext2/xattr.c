@@ -1071,7 +1071,7 @@ static inline void ext2_xattr_hash_entry(struct ext2_xattr_header *header,
 	}
 
 	if (entry->e_value_block == 0 && entry->e_value_size != 0) {
-		__u32 *value = (__u32 *)((char *)header +
+		__le32 *value = (__le32 *)((char *)header +
 			le16_to_cpu(entry->e_value_offs));
 		for (n = (le32_to_cpu(entry->e_value_size) +
 		     EXT2_XATTR_ROUND) >> EXT2_XATTR_PAD_BITS; n; n--) {

@@ -959,7 +959,7 @@ retry_cd_operation:
 	if (((result_buffer[0] & 0xf0) == 0x20)
 	    && (num_retries < MAX_CDU31A_RETRIES)) {
 		num_retries++;
-		msleep(100):
+		msleep(100);
 		goto retry_cd_operation;
 	}
 

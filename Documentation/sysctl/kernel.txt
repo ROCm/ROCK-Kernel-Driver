@@ -131,8 +131,8 @@ domainname and hostname, i.e.:
 # echo "darkstar" > /proc/sys/kernel/hostname
 # echo "mydomain" > /proc/sys/kernel/domainname
 has the same effect as
-# hostname "darkstar" > /proc/sys/kernel/hostname
-# domainname "mydomain" > /proc/sys/kernel/domainname
+# hostname "darkstar"
+# domainname "mydomain"
 
 Note, however, that the classic darkstar.frop.org has the
 hostname "darkstar" and DNS (Internet Domain Name Server)

@@ -414,7 +414,7 @@ int eeh_dn_check_failure(struct device_node *dn, struct pci_dev *dev)
 			dn->eeh_config_addr, BUID_HI(dn->phb->buid),
 			BUID_LO(dn->phb->buid));
 
-	if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
+	if (ret == 0 && rets[1] == 1 && (rets[0] == 2 || rets[0] == 4)) {
 		int log_event;
 
 		spin_lock_irqsave(&slot_errbuf_lock, flags);
@@ -434,8 +434,8 @@ int eeh_dn_check_failure(struct device_node *dn, struct pci_dev *dev)
 
 		spin_unlock_irqrestore(&slot_errbuf_lock, flags);
 
-		printk(KERN_ERR "EEH: MMIO failure (%d) on device:%s %s\n",
-		       rets[0], pci_name(dev), pci_pretty_name(dev));
+		printk(KERN_INFO "EEH: MMIO failure (%d) on device: %s %s\n",
+		       rets[0], dn->name, dn->full_name);
 		WARN_ON(1);
 
 		/*
@@ -446,12 +446,10 @@ int eeh_dn_check_failure(struct device_node *dn, struct pci_dev *dev)
 		 * can use it here.
 		 */
 		if (panic_on_oops) {
-			panic("EEH: MMIO failure (%d) on device:%s %s\n",
+			panic("EEH: MMIO failure (%d) on device: %s %s\n",
 			      rets[0], dn->name, dn->full_name);
 		} else {
 			__get_cpu_var(ignored_failures)++;
-			printk(KERN_INFO "EEH: MMIO failure (%d) on device:%s %s\n",
-			       rets[0], dn->name, dn->full_name);
 		}
 	} else {
 		__get_cpu_var(false_positives)++;

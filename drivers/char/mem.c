@@ -31,9 +31,6 @@
 # include <linux/efi.h>
 #endif
 
-#ifdef CONFIG_FB
-extern void fbmem_init(void);
-#endif
 #if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_CHAR)
 extern void tapechar_init(void);
 #endif
@@ -730,9 +727,6 @@ static int __init chr_dev_init(void)
 				S_IFCHR | devlist[i].mode, devlist[i].name);
 	}
 	
-#if defined (CONFIG_FB)
-	fbmem_init();
-#endif
 	return 0;
 }
 

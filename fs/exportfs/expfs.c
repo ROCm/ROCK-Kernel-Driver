@@ -283,7 +283,12 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 
 	/* drat - I just cannot find anything acceptable */
 	dput(result);
-	return ERR_PTR(-ESTALE);
+	/* It might be justifiable to return ESTALE here,
+	 * but the filehandle at-least looks reasonable good
+	 * and it just be a permission problem, so returning
+	 * -EACCESS is safer
+	 */
+	return ERR_PTR(-EACCES);
 
  err_target:
 	dput(target_dir);

@@ -811,26 +811,33 @@ int ip_append_data(struct sock *sk,
 		goto alloc_new_skb;
 
 	while (length > 0) {
-		if ((copy = mtu - skb->len) <= 0) {
+		/* Check if the remaining data fits into current packet. */
+		copy = mtu - skb->len;
+		if (copy < length)
+			copy = maxfraglen - skb->len;
+		if (copy <= 0) {
 			char *data;
 			unsigned int datalen;
 			unsigned int fraglen;
 			unsigned int fraggap;
 			unsigned int alloclen;
 			struct sk_buff *skb_prev;
-			BUG_TRAP(copy == 0);
-
 alloc_new_skb:
 			skb_prev = skb;
-			fraggap = 0;
 			if (skb_prev)
-				fraggap = mtu - maxfraglen;
+				fraggap = skb_prev->len - maxfraglen;
+			else
+				fraggap = 0;
 
-			datalen = mtu - fragheaderlen;
-			if (datalen > length + fraggap)
-				datalen = length + fraggap;
-
+			/*
+			 * If remaining data exceeds the mtu,
+			 * we know we need more fragment(s).
+			 */
+			datalen = length + fraggap;
+			if (datalen > mtu - fragheaderlen)
+				datalen = maxfraglen - fragheaderlen;
 			fraglen = datalen + fragheaderlen;
+
 			if ((flags & MSG_MORE) && 
 			    !(rt->u.dst.dev->features&NETIF_F_SG))
 				alloclen = mtu;
@@ -1026,18 +1033,22 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 
 	while (size > 0) {
 		int i;
-		if ((len = mtu - skb->len) <= 0) {
+
+		/* Check if the remaining data fits into current packet. */
+		len = mtu - skb->len;
+		if (len < size)
+			len = maxfraglen - skb->len;
+		if (len <= 0) {
 			struct sk_buff *skb_prev;
 			char *data;
 			struct iphdr *iph;
 			int alloclen;
 
-			BUG_TRAP(len == 0);
-
 			skb_prev = skb;
-			fraggap = 0;
 			if (skb_prev)
-				fraggap = mtu - maxfraglen;
+				fraggap = skb_prev->len - maxfraglen;
+			else
+				fraggap = 0;
 
 			alloclen = fragheaderlen + hh_len + fraggap + 15;
 			skb = sock_wmalloc(sk, alloclen, 1, sk->sk_allocation);

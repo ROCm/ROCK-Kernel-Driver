@@ -24,7 +24,6 @@
 
 #include <asm/debug.h>
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
 #define DEBUG_PROLOG_ENTRY -1
 
 /* typedefs */
@@ -435,7 +434,7 @@ static ssize_t debug_output(struct file *file,		/* file descriptor */
 
 	while(count < len){
 		size = debug_format_entry(p_info);
-		size = MIN((len - count), (size - entry_offset));
+		size = min((len - count), (size - entry_offset));
 
 		if(size){
 			if (copy_to_user(user_buf + count, 
@@ -723,7 +722,7 @@ debug_entry_t *debug_event_common(debug_info_t * id, int level, const void *buf,
 	spin_lock_irqsave(&id->lock, flags);
 	active = get_active_entry(id);
 	memset(DEBUG_DATA(active), 0, id->buf_size);
-	memcpy(DEBUG_DATA(active), buf, MIN(len, id->buf_size));
+	memcpy(DEBUG_DATA(active), buf, min(len, id->buf_size));
 	debug_finish_entry(id, active, level, 0);
 	spin_unlock_irqrestore(&id->lock, flags);
 
@@ -744,7 +743,7 @@ debug_entry_t *debug_exception_common(debug_info_t * id, int level,
 	spin_lock_irqsave(&id->lock, flags);
 	active = get_active_entry(id);
 	memset(DEBUG_DATA(active), 0, id->buf_size);
-	memcpy(DEBUG_DATA(active), buf, MIN(len, id->buf_size));
+	memcpy(DEBUG_DATA(active), buf, min(len, id->buf_size));
 	debug_finish_entry(id, active, level, 1);
 	spin_unlock_irqrestore(&id->lock, flags);
 
@@ -789,7 +788,7 @@ debug_entry_t *debug_sprintf_event(debug_info_t* id,
 	curr_event=(debug_sprintf_entry_t *) DEBUG_DATA(active);
 	va_start(ap,string);
 	curr_event->string=string;
-	for(idx=0;idx<MIN(numargs,((id->buf_size / sizeof(long))-1));idx++)
+	for(idx=0;idx<min(numargs,(int)(id->buf_size / sizeof(long))-1);idx++)
 		curr_event->args[idx]=va_arg(ap,long);
 	va_end(ap);
 	debug_finish_entry(id, active, level, 0);
@@ -821,7 +820,7 @@ debug_entry_t *debug_sprintf_exception(debug_info_t* id,
 	curr_event=(debug_sprintf_entry_t *)DEBUG_DATA(active);
 	va_start(ap,string);
 	curr_event->string=string;
-	for(idx=0;idx<MIN(numargs,((id->buf_size / sizeof(long))-1));idx++)
+	for(idx=0;idx<min(numargs,(int)(id->buf_size / sizeof(long))-1);idx++)
 		curr_event->args[idx]=va_arg(ap,long);
 	va_end(ap);
 	debug_finish_entry(id, active, level, 1);
@@ -1157,7 +1156,7 @@ int debug_sprintf_format_fn(debug_info_t * id, struct debug_view *view,
 	}
 
 	/* number of arguments used for sprintf (without the format string) */
-	num_used_args   = MIN(DEBUG_SPRINTF_MAX_ARGS, (num_longs - 1));
+	num_used_args   = min(DEBUG_SPRINTF_MAX_ARGS, (num_longs - 1));
 
 	memset(index,0, DEBUG_SPRINTF_MAX_ARGS * sizeof(int));
 

@@ -24,8 +24,7 @@ static inline void ipip_ecn_decapsulate(struct sk_buff *skb)
 	struct iphdr *outer_iph = skb->nh.iph;
 	struct iphdr *inner_iph = skb->h.ipiph;
 
-	if (INET_ECN_is_ce(outer_iph->tos) &&
-	    INET_ECN_is_not_ce(inner_iph->tos))
+	if (INET_ECN_is_ce(outer_iph->tos))
 		IP_ECN_set_ce(inner_iph);
 }
 

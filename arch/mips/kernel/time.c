@@ -29,7 +29,6 @@
 #include <asm/cpu.h>
 #include <asm/cpu-features.h>
 #include <asm/div64.h>
-#include <asm/hardirq.h>
 #include <asm/sections.h>
 #include <asm/time.h>
 

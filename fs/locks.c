@@ -1318,6 +1318,33 @@ out_unlock:
 }
 
 /**
+ * flock_lock_file_wait - Apply a FLOCK-style lock to a file
+ * @filp: The file to apply the lock to
+ * @fl: The lock to be applied
+ *
+ * Add a FLOCK style lock to a file.
+ */
+int flock_lock_file_wait(struct file *filp, struct file_lock *fl)
+{
+	int error;
+	might_sleep();
+	for (;;) {
+		error = flock_lock_file(filp, fl);
+		if ((error != -EAGAIN) || !(fl->fl_flags & FL_SLEEP))
+			break;
+		error = wait_event_interruptible(fl->fl_wait, !fl->fl_next);
+		if (!error)
+			continue;
+
+		locks_delete_block(fl);
+		break;
+	}
+	return error;
+}
+
+EXPORT_SYMBOL(flock_lock_file_wait);
+
+/**
  *	sys_flock: - flock() system call.
  *	@fd: the file descriptor to lock.
  *	@cmd: the type of lock to apply.
@@ -1365,17 +1392,12 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 	if (error)
 		goto out_free;
 
-	for (;;) {
-		error = flock_lock_file(filp, lock);
-		if ((error != -EAGAIN) || !can_sleep)
-			break;
-		error = wait_event_interruptible(lock->fl_wait, !lock->fl_next);
-		if (!error)
-			continue;
-
-		locks_delete_block(lock);
-		break;
-	}
+	if (filp->f_op && filp->f_op->flock)
+		error = filp->f_op->flock(filp,
+					  (can_sleep) ? F_SETLKW : F_SETLK,
+					  lock);
+	else
+		error = flock_lock_file_wait(filp, lock);
 
  out_free:
 	if (list_empty(&lock->fl_link)) {
@@ -1731,6 +1753,12 @@ void locks_remove_flock(struct file *filp)
 
 	if (!inode->i_flock)
 		return;
+
+	if (filp->f_op && filp->f_op->flock) {
+		struct file_lock fl = { .fl_flags = FL_FLOCK,
+					.fl_type = F_UNLCK };
+		filp->f_op->flock(filp, F_SETLKW, &fl);
+	}
 
 	lock_kernel();
 	before = &inode->i_flock;

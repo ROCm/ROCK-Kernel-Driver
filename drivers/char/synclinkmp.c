@@ -453,8 +453,6 @@ typedef struct _synclinkmp_info {
 #define CRCE	BIT2
 
 
-#define jiffies_from_ms(a) ((((a) * HZ)/1000)+1)
-
 /*
  * Global linked list of SyncLink devices
  */
@@ -2759,7 +2757,7 @@ static int startup(SLMP_INFO * info)
 
 	change_params(info);
 
-	info->status_timer.expires = jiffies + jiffies_from_ms(10);
+	info->status_timer.expires = jiffies + msecs_to_jiffies(10);
 	add_timer(&info->status_timer);
 
 	if (info->tty)
@@ -4317,7 +4315,7 @@ void tx_start(SLMP_INFO *info)
 			write_reg(info, TXDMA + DIR, 0x40);		/* enable Tx DMA interrupts (EOM) */
 			write_reg(info, TXDMA + DSR, 0xf2);		/* clear Tx DMA IRQs, enable Tx DMA */
 	
-			info->tx_timer.expires = jiffies + jiffies_from_ms(5000);
+			info->tx_timer.expires = jiffies + msecs_to_jiffies(5000);
 			add_timer(&info->tx_timer);
 		}
 		else {
@@ -5205,7 +5203,7 @@ int irq_test(SLMP_INFO *info)
 	timeout=100;
 	while( timeout-- && !info->irq_occurred ) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(jiffies_from_ms(10));
+		schedule_timeout(msecs_to_jiffies(10));
 	}
 
 	spin_lock_irqsave(&info->lock,flags);
@@ -5356,7 +5354,7 @@ int loopback_test(SLMP_INFO *info)
 	/* Set a timeout for waiting for interrupt. */
 	for ( timeout = 100; timeout; --timeout ) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(jiffies_from_ms(10));
+		schedule_timeout(msecs_to_jiffies(10));
 
 		if (rx_get_frame(info)) {
 			rc = TRUE;
@@ -5612,7 +5610,7 @@ void status_timeout(unsigned long context)
 
 	info->status_timer.data = (unsigned long)info;
 	info->status_timer.function = status_timeout;
-	info->status_timer.expires = jiffies + jiffies_from_ms(10);
+	info->status_timer.expires = jiffies + msecs_to_jiffies(10);
 	add_timer(&info->status_timer);
 }
 

@@ -12,7 +12,6 @@
 
 #include <linux/types.h>
 #include <linux/spinlock.h>
-#include <linux/timer.h>
 #include <linux/workqueue.h>
 #include <linux/cache.h>
  
@@ -42,7 +41,6 @@ struct oprofile_cpu_buffer {
 	unsigned long sample_received;
 	unsigned long sample_lost_overflow;
 	int cpu;
-	struct timer_list timer;
 	struct work_struct work;
 } ____cacheline_aligned;
 

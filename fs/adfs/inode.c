@@ -24,8 +24,9 @@
  * Lookup/Create a block at offset 'block' into 'inode'.  We currently do
  * not support creation of new blocks, so we return -EIO for this case.
  */
-int
-adfs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh, int create)
+static int
+adfs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh,
+	       int create)
 {
 	if (block < 0)
 		goto abort_negative;

@@ -52,7 +52,6 @@
 #include <asm/system.h>
 #include <asm/sections.h>
 #include <asm/irq.h>
-#include <asm/hardirq.h>
 #include <asm/pmac_feature.h>
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>

@@ -84,7 +84,7 @@ uint32_t udf_get_pblock_virt15(struct super_block *sb, uint32_t block, uint16_t 
 		return 0xFFFFFFFF;
 	}
 
-	loc = le32_to_cpu(((uint32_t *)bh->b_data)[index]);
+	loc = le32_to_cpu(((__le32 *)bh->b_data)[index]);
 
 	udf_release_data(bh);
 

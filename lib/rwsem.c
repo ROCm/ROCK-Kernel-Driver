@@ -255,10 +255,10 @@ struct rw_semaphore fastcall *rwsem_downgrade_wake(struct rw_semaphore *sem)
 	return sem;
 }
 
-EXPORT_SYMBOL_NOVERS(rwsem_down_read_failed);
-EXPORT_SYMBOL_NOVERS(rwsem_down_write_failed);
-EXPORT_SYMBOL_NOVERS(rwsem_wake);
-EXPORT_SYMBOL_NOVERS(rwsem_downgrade_wake);
+EXPORT_SYMBOL(rwsem_down_read_failed);
+EXPORT_SYMBOL(rwsem_down_write_failed);
+EXPORT_SYMBOL(rwsem_wake);
+EXPORT_SYMBOL(rwsem_downgrade_wake);
 #if RWSEM_DEBUG
 EXPORT_SYMBOL(rwsemtrace);
 #endif

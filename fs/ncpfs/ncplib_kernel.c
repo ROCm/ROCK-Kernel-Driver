@@ -1115,22 +1115,6 @@ ncp_ClearPhysicalRecord(struct ncp_server *server, const char *file_id,
  * from the vfat file system and hints from Petr Vandrovec.
  */
 
-inline unsigned char
-ncp__tolower(struct nls_table *t, unsigned char c)
-{
-	unsigned char nc = t->charset2lower[c];
-
-	return nc ? nc : c;
-}
-
-inline unsigned char
-ncp__toupper(struct nls_table *t, unsigned char c)
-{
-	unsigned char nc = t->charset2upper[c];
-
-	return nc ? nc : c;
-}
-
 int
 ncp__io2vol(struct ncp_server *server, unsigned char *vname, unsigned int *vlen,
 		const unsigned char *iname, unsigned int ilen, int cc)
@@ -1346,16 +1330,3 @@ ncp__vol2io(unsigned char *iname, unsigned int *ilen,
 }
 
 #endif
-
-inline int
-ncp_strnicmp(struct nls_table *t, const unsigned char *s1,
-					const unsigned char *s2, int n)
-{
-	int i;
-
-	for (i=0; i<n; i++)
-		if (ncp_tolower(t, s1[i]) != ncp_tolower(t, s2[i]))
-			return 1;
-
-	return 0;
-}

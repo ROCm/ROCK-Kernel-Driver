@@ -37,13 +37,23 @@ extern unsigned long __toc_start;
  * processors.  The processor VPD array needs one entry per physical
  * processor (not thread).
  */
+#ifdef CONFIG_PPC_ISERIES
+#define EXTRA_INITS(number, lpq)					    \
+	.lppaca_ptr = &paca[number].lppaca,				    \
+	.lpqueue_ptr = (lpq),		/* &xItLpQueue, */		    \
+	.reg_save_ptr = &paca[number].reg_save,				    \
+	.reg_save = {							    \
+		.xDesc = 0xd397d9e2,	/* "LpRS" */			    \
+		.xSize = sizeof(struct ItLpRegSave)			    \
+	},
+#else
+#define EXTRA_INITS(number, lpq)
+#endif
+
 #define PACAINITDATA(number,start,lpq,asrr,asrv)			    \
 {									    \
-	.lppaca_ptr = &paca[number].lppaca,				    \
-	.reg_save_ptr = &paca[number].reg_save,				    \
 	.lock_token = 0x8000,						    \
 	.paca_index = (number),		/* Paca Index */		    \
-	.lpqueue_ptr = (lpq),		/* &xItLpQueue, */		    \
 	.default_decr = 0x00ff0000,	/* Initial Decr */		    \
 	.kernel_toc = (unsigned long)(&__toc_start) + 0x8000UL,		    \
 	.stab_real = (asrr), 		/* Real pointer to segment table */ \
@@ -58,13 +68,10 @@ extern unsigned long __toc_start;
 		.xEndOfQuantum = 0xfffffffffffffffful,			    \
 		.xSLBCount = 64,					    \
 	},								    \
-	.reg_save = {							    \
-		.xDesc = 0xd397d9e2,	/* "LpRS" */			    \
-		.xSize = sizeof(struct ItLpRegSave)			    \
-	},								    \
+	EXTRA_INITS((number), (lpq))					    \
 }
 
-struct paca_struct paca[] __page_aligned = {
+struct paca_struct paca[] = {
 #ifdef CONFIG_PPC_ISERIES
 	PACAINITDATA( 0, 1, &xItLpQueue, 0, STAB0_VIRT_ADDR),
 #else

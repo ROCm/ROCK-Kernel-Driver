@@ -439,6 +439,9 @@ int __init mc68x328fb_setup(char *options)
 
 int __init mc68x328fb_init(void)
 {
+#ifndef MODULE
+	mc68x328fb_setup(fb_get_options("68328fb"));
+#endif
 	/*
 	 *  initialize the default mode from the LCD controller registers
 	 */
@@ -484,6 +487,8 @@ int __init mc68x328fb_init(void)
 	return 0;
 }
 
+module_init(mc68x328fb_init);
+
 #ifdef MODULE
 
 static void __exit mc68x328fb_cleanup(void)
@@ -491,7 +496,6 @@ static void __exit mc68x328fb_cleanup(void)
 	unregister_framebuffer(&fb_info);
 }
 
-module_init(mc68x328fb_init);
 module_exit(mc68x328fb_cleanup);
 
 MODULE_LICENSE("GPL");

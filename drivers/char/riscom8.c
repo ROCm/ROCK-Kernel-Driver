@@ -1174,7 +1174,7 @@ static int rc_write(struct tty_struct * tty, int from_user,
 			}
 
 			cli();
-			c = min_t(c, min(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
+			c = min_t(int, c, min(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
 					 SERIAL_XMIT_SIZE - port->xmit_head));
 			memcpy(port->xmit_buf + port->xmit_head, tmp_buf, c);
 			port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);

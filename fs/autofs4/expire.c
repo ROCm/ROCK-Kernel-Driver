@@ -146,10 +146,10 @@ resume:
 	return 1;
 }
 
-struct dentry *autofs4_check_leaves(struct vfsmount *mnt,
-				    struct dentry *parent,
-				    unsigned long timeout,
-				    int do_now)
+static struct dentry *autofs4_check_leaves(struct vfsmount *mnt,
+					   struct dentry *parent,
+					   unsigned long timeout,
+					   int do_now)
 {
 	struct dentry *this_parent = parent;
 	struct list_head *next;

@@ -24,7 +24,6 @@
 #include <asm/irq.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm/hardirq.h>
 #include <asm/sections.h>
 #include <asm/io.h>
 #include <asm/prom.h>
