@@ -92,7 +92,7 @@
 
 /*-------------------------------------------------------------------------*/
 
-#define DRIVER_VERSION		"19 Feb 2003"
+#define DRIVER_VERSION		"Bastille Day 2003"
 
 static const char shortname [] = "zero";
 static const char longname [] = "Gadget Zero";
@@ -160,18 +160,18 @@ static inline void hw_optimize (struct usb_gadget *gadget)
 #endif
 
 /*
- * PXA-250 UDC:  widely used in second gen Linux-capable PDAs.
+ * PXA-2xx UDC:  widely used in second gen Linux-capable PDAs.
  *
  * This has fifteen fixed-function full speed endpoints, and it
  * can support all USB transfer types.
  *
- * It only supports three configurations (numbered 1, 2, or 3)
- * with two interfaces each ... there's partial hardware support
- * for set_configuration and set_interface, preventing some more
- * interesting config/interface/endpoint arrangements.
+ * These supports three or four configurations, with fixed numbers.
+ * The hardware interprets SET_INTERFACE, net effect is that you
+ * can't use altsettings or reset the interfaces independently.
+ * So stick to a single interface.
  */
-#ifdef	CONFIG_USB_ZERO_PXA250
-#define CHIP			"pxa250"
+#ifdef	CONFIG_USB_ZERO_PXA2XX
+#define CHIP			"pxa2xx"
 #define DRIVER_VERSION_NUM	0x0103
 #define EP0_MAXPACKET		16
 static const char EP_OUT_NAME [] = "ep12out-bulk";
@@ -291,9 +291,12 @@ struct zero_dev {
 
 static unsigned buflen = 4096;
 static unsigned qlen = 32;
+static unsigned pattern = 0;
 
 module_param (buflen, uint, S_IRUGO|S_IWUSR);
 module_param (qlen, uint, S_IRUGO|S_IWUSR);
+module_param (pattern, uint, S_IRUGO|S_IWUSR);
+
 
 /*
  * Normally the "loopback" configuration is second (index 1) so
@@ -497,8 +500,8 @@ static struct usb_gadget_strings	stringtab = {
 
 /*
  * config descriptors are also handcrafted.  these must agree with code
- * that sets configurations, and with code managing interface altsettings.
- * other complexity may come from:
+ * that sets configurations, and with code managing interfaces and their
+ * altsettings.  other complexity may come from:
  *
  *  - high speed support, including "other speed config" rules
  *  - multiple configurations
@@ -506,7 +509,7 @@ static struct usb_gadget_strings	stringtab = {
  *  - embedded class or vendor-specific descriptors
  *
  * this handles high speed, and has a second config that could as easily
- * have been an alternate interface setting.
+ * have been an alternate interface setting (on most hardware).
  *
  * NOTE:  to demonstrate (and test) more USB capabilities, this driver
  * should include an altsetting to test interrupt transfers, including
@@ -608,16 +611,29 @@ check_read_data (
 	struct usb_request	*req
 )
 {
-	int i;
+	unsigned	i;
+	u8		*buf = req->buf;
 
-	for (i = 0; i < req->actual; i++) {
-		if (((u8 *)req->buf) [i] != 0) {
-			ERROR (dev, "nonzero OUT byte from host, "
-					"buf [%d] = %d\n",
-					i, ((u8 *)req->buf) [i]);
-			usb_ep_set_halt (ep);
-			return -EINVAL;
+	for (i = 0; i < req->actual; i++, buf++) {
+		switch (pattern) {
+		/* all-zeroes has no synchronization issues */
+		case 0:
+			if (*buf == 0)
+				continue;
+			break;
+		/* mod63 stays in sync with short-terminated transfers,
+		 * or otherwise when host and gadget agree on how large
+		 * each usb transfer request should be.  resync is done
+		 * with set_interface or set_config.
+		 */
+		case 1:
+			if (*buf == (u8)(i % 63))
+				continue;
+			break;
 		}
+		ERROR (dev, "bad OUT byte, buf [%d] = %d\n", i, *buf);
+		usb_ep_set_halt (ep);
+		return -EINVAL;
 	}
 	return 0;
 }
@@ -629,7 +645,18 @@ reinit_write_data (
 	struct usb_request	*req
 )
 {
-	memset (req->buf, 0, req->length);
+	unsigned	i;
+	u8		*buf = req->buf;
+
+	switch (pattern) {
+	case 0:
+		memset (req->buf, 0, req->length);
+		break;
+	case 1:
+		for  (i = 0; i < req->length; i++)
+			*buf++ = (u8) (i % 63);
+		break;
+	}
 }
 
 /* if there is only one request in the queue, there'll always be an
@@ -651,10 +678,13 @@ static void source_sink_complete (struct usb_ep *ep, struct usb_request *req)
 		break;
 
 	/* this endpoint is normally active while we're configured */
+	case -ECONNABORTED: 		/* hardware forced ep reset */
 	case -ECONNRESET:		/* request dequeued */
 	case -ESHUTDOWN:		/* disconnect from host */
 		VDEBUG (dev, "%s gone (%d), %d/%d\n", ep->name, status,
 				req->actual, req->length);
+		if (ep == dev->out_ep)
+			check_read_data (dev, ep, req);
 		free_ep_req (ep, req);
 		return;
 
@@ -692,6 +722,9 @@ source_sink_start_ep (struct usb_ep *ep, int gfp_flags)
 
 	memset (req->buf, 0, req->length);
 	req->complete = source_sink_complete;
+
+	if (strcmp (ep->name, EP_IN_NAME) == 0)
+		reinit_write_data (ep->driver_data, ep, req);
 
 	status = usb_ep_queue (ep, req, gfp_flags);
 	if (status) {
@@ -801,6 +834,8 @@ static void loopback_complete (struct usb_ep *ep, struct usb_request *req)
 	 * rely on the hardware driver to clean up on disconnect or
 	 * endpoint disable.
 	 */
+	case -ECONNABORTED: 		/* hardware forced ep reset */
+	case -ECONNRESET:		/* request dequeued */
 	case -ESHUTDOWN:		/* disconnect from host */
 		free_ep_req (ep, req);
 		return;
@@ -905,7 +940,7 @@ static void zero_reset_config (struct zero_dev *dev)
  *
  * note that some device controller hardware will constrain what this
  * code can do, perhaps by disallowing more than one configuration or
- * by limiting configuration choices (like the pxa250).
+ * by limiting configuration choices (like the pxa2xx).
  */
 static int
 zero_set_config (struct zero_dev *dev, unsigned number, int gfp_flags)
@@ -1046,7 +1081,8 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		break;
 
 	/* until we add altsetting support, or other interfaces,
-	 * only 0/0 are possible.
+	 * only 0/0 are possible.  pxa2xx only supports 0/0 (poorly)
+	 * and already killed pending endpoint I/O.
 	 */
 	case USB_REQ_SET_INTERFACE:
 		if (ctrl->bRequestType != USB_RECIP_INTERFACE)
