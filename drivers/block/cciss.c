@@ -135,7 +135,6 @@ static int register_new_disk(ctlr_info_t *h);
 
 static void cciss_getgeometry(int cntl_num);
 
-static inline void addQ(CommandList_struct **Qptr, CommandList_struct *c);
 static void start_io( ctlr_info_t *h);
 static int sendcmd( __u8 cmd, int ctlr, void *buff, size_t size,
 	unsigned int use_unit_num, unsigned int log_unit, __u8 page_code,
@@ -157,6 +156,36 @@ static struct block_device_operations cciss_fops  = {
 	.revalidate_disk= cciss_revalidate,
 };
 
+/*
+ * Enqueuing and dequeuing functions for cmdlists.
+ */
+static inline void addQ(CommandList_struct **Qptr, CommandList_struct *c)
+{
+        if (*Qptr == NULL) {
+                *Qptr = c;
+                c->next = c->prev = c;
+        } else {
+                c->prev = (*Qptr)->prev;
+                c->next = (*Qptr);
+                (*Qptr)->prev->next = c;
+                (*Qptr)->prev = c;
+        }
+}
+
+static inline CommandList_struct *removeQ(CommandList_struct **Qptr, 
+						CommandList_struct *c)
+{
+        if (c && c->next != c) {
+                if (*Qptr == c) *Qptr = c->next;
+                c->prev->next = c->next;
+                c->next->prev = c->prev;
+        } else {
+                *Qptr = NULL;
+        }
+        return c;
+}
+#ifdef CONFIG_PROC_FS
+
 #include "cciss_scsi.c"		/* For SCSI tape support */
 
 /*
@@ -167,7 +196,6 @@ static struct block_device_operations cciss_fops  = {
 #define RAID_UNKNOWN 6
 static const char *raid_label[] = {"0","4","1(0+1)","5","5+1","ADG",
 	                                   "UNKNOWN"};
-#ifdef CONFIG_PROC_FS
 
 static struct proc_dir_entry *proc_cciss;
 
@@ -257,7 +285,7 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
 }
 
 static int 
-cciss_proc_write(struct file *file, const char *buffer, 
+cciss_proc_write(struct file *file, const char __user *buffer, 
 			unsigned long count, void *data)
 {
 	unsigned char cmd[80];
@@ -462,6 +490,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	ctlr_info_t *host = get_host(disk);
 	drive_info_struct *drv = get_drv(disk);
 	int ctlr = host->ctlr;
+	void __user *argp = (void __user *)arg;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_ioctl: Called with cmd=%x %lx\n", cmd, arg);
@@ -478,8 +507,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                 } else
 			return -ENXIO;
                 driver_geo.start= get_start_sect(inode->i_bdev);
-                if (copy_to_user((void *) arg, &driver_geo,
-                                sizeof( struct hd_geometry)))
+                if (copy_to_user(argp, &driver_geo, sizeof(struct hd_geometry)))
                         return  -EFAULT;
                 return(0);
 	}
@@ -492,7 +520,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		pciinfo.bus = host->pdev->bus->number;
 		pciinfo.dev_fn = host->pdev->devfn;
 		pciinfo.board_id = host->board_id;
-		if (copy_to_user((void *) arg, &pciinfo,  sizeof( cciss_pci_info_struct )))
+		if (copy_to_user(argp, &pciinfo,  sizeof( cciss_pci_info_struct )))
 			return  -EFAULT;
 		return(0);
 	}	
@@ -502,7 +530,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		if (!arg) return -EINVAL;
 		intinfo.delay = readl(&host->cfgtable->HostWrite.CoalIntDelay);
 		intinfo.count = readl(&host->cfgtable->HostWrite.CoalIntCount);
-		if (copy_to_user((void *) arg, &intinfo, sizeof( cciss_coalint_struct )))
+		if (copy_to_user(argp, &intinfo, sizeof( cciss_coalint_struct )))
 			return -EFAULT;
                 return(0);
         }
@@ -514,7 +542,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 		if (!arg) return -EINVAL;	
 		if (!capable(CAP_SYS_ADMIN)) return -EPERM;
-		if (copy_from_user(&intinfo, (void *) arg, sizeof( cciss_coalint_struct)))
+		if (copy_from_user(&intinfo, argp, sizeof( cciss_coalint_struct)))
 			return -EFAULT;
 		if ( (intinfo.delay == 0 ) && (intinfo.count == 0))
 
@@ -550,7 +578,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		if (!arg) return -EINVAL;
 		for(i=0;i<16;i++)
 			NodeName[i] = readb(&host->cfgtable->ServerName[i]);
-                if (copy_to_user((void *) arg, NodeName, sizeof( NodeName_type)))
+                if (copy_to_user(argp, NodeName, sizeof( NodeName_type)))
                 	return  -EFAULT;
                 return(0);
         }
@@ -563,7 +591,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		if (!arg) return -EINVAL;
 		if (!capable(CAP_SYS_ADMIN)) return -EPERM;
 		
-		if (copy_from_user(NodeName, (void *) arg, sizeof( NodeName_type)))
+		if (copy_from_user(NodeName, argp, sizeof( NodeName_type)))
 			return -EFAULT;
 
 		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
@@ -593,7 +621,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 		if (!arg) return -EINVAL;
                 heartbeat = readl(&host->cfgtable->HeartBeat);
-                if (copy_to_user((void *) arg, &heartbeat, sizeof( Heartbeat_type)))
+                if (copy_to_user(argp, &heartbeat, sizeof( Heartbeat_type)))
                 	return -EFAULT;
                 return(0);
         }
@@ -603,7 +631,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 		if (!arg) return -EINVAL;
                 BusTypes = readl(&host->cfgtable->BusTypes);
-                if (copy_to_user((void *) arg, &BusTypes, sizeof( BusTypes_type) ))
+                if (copy_to_user(argp, &BusTypes, sizeof( BusTypes_type) ))
                 	return  -EFAULT;
                 return(0);
         }
@@ -614,7 +642,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		if (!arg) return -EINVAL;
 		memcpy(firmware, host->firm_ver, 4);
 
-                if (copy_to_user((void *) arg, firmware, sizeof( FirmwareVer_type)))
+                if (copy_to_user(argp, firmware, sizeof( FirmwareVer_type)))
                 	return -EFAULT;
                 return(0);
         }
@@ -624,7 +652,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
                 if (!arg) return -EINVAL;
 
-                if (copy_to_user((void *) arg, &DriverVer, sizeof( DriverVer_type) ))
+                if (copy_to_user(argp, &DriverVer, sizeof( DriverVer_type) ))
                 	return -EFAULT;
                 return(0);
         }
@@ -648,7 +676,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			if (disk->part[i]->nr_sects != 0)
 				luninfo.num_parts++;
 		}
- 		if (copy_to_user((void *) arg, &luninfo,
+ 		if (copy_to_user(argp, &luninfo,
  				sizeof(LogvolInfo_struct)))
  			return -EFAULT;
  		return(0);
@@ -672,7 +700,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	
 		if (!capable(CAP_SYS_RAWIO)) return -EPERM;
 
-		if (copy_from_user(&iocommand, (void *) arg, sizeof( IOCTL_Command_struct) ))
+		if (copy_from_user(&iocommand, argp, sizeof( IOCTL_Command_struct) ))
 			return -EFAULT;
 		if((iocommand.buf_size < 1) && 
 				(iocommand.Request.Type.Direction != XFER_NONE))
@@ -753,7 +781,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 		/* Copy the error information out */ 
 		iocommand.error_info = *(c->err_info);
-		if ( copy_to_user((void *) arg, &iocommand, sizeof( IOCTL_Command_struct) ) )
+		if ( copy_to_user(argp, &iocommand, sizeof( IOCTL_Command_struct) ) )
 		{
 			kfree(buff);
 			cmd_free(host, c, 0);
@@ -787,7 +815,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		DECLARE_COMPLETION(wait);
 		__u32   left;
 		__u32	sz;
-		BYTE    *data_ptr;
+		BYTE    __user *data_ptr;
 
 		if (!arg)
 			return -EINVAL;
@@ -799,7 +827,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			status = -ENOMEM;
 			goto cleanup1;
 		}
-		if (copy_from_user(ioc, (void *) arg, sizeof(*ioc))) {
+		if (copy_from_user(ioc, argp, sizeof(*ioc))) {
 			status = -EFAULT;
 			goto cleanup1;
 		}
@@ -831,7 +859,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			goto cleanup1;
 		}
 		left = ioc->buf_size;
-		data_ptr = (BYTE *) ioc->buf;
+		data_ptr = ioc->buf;
 		while (left) {
 			sz = (left > ioc->malloc_size) ? ioc->malloc_size : left;
 			buff_size[sg_used] = sz;
@@ -896,14 +924,14 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		}
 		/* Copy the error information out */
 		ioc->error_info = *(c->err_info);
-		if (copy_to_user((void *) arg, ioc, sizeof(*ioc))) {
+		if (copy_to_user(argp, ioc, sizeof(*ioc))) {
 			cmd_free(host, c, 0);
 			status = -EFAULT;
 			goto cleanup1;
 		}
 		if (ioc->Request.Type.Direction == XFER_READ) {
 			/* Copy the data out of the buffer we created */
-			BYTE *ptr = (BYTE  *) ioc->buf;
+			BYTE __user *ptr = ioc->buf;
 	        	for(i=0; i< sg_used; i++) {
 				if (copy_to_user(ptr, buff[i], buff_size[i])) {
 					cmd_free(host, c, 0);
@@ -1683,35 +1711,6 @@ static ulong remap_pci_mem(ulong base, ulong size)
         ulong page_remapped    = (ulong) ioremap(page_base, page_offs+size);
 
         return (ulong) (page_remapped ? (page_remapped + page_offs) : 0UL);
-}
-
-/*
- * Enqueuing and dequeuing functions for cmdlists.
- */
-static inline void addQ(CommandList_struct **Qptr, CommandList_struct *c)
-{
-        if (*Qptr == NULL) {
-                *Qptr = c;
-                c->next = c->prev = c;
-        } else {
-                c->prev = (*Qptr)->prev;
-                c->next = (*Qptr);
-                (*Qptr)->prev->next = c;
-                (*Qptr)->prev = c;
-        }
-}
-
-static inline CommandList_struct *removeQ(CommandList_struct **Qptr, 
-						CommandList_struct *c)
-{
-        if (c && c->next != c) {
-                if (*Qptr == c) *Qptr = c->next;
-                c->prev->next = c->next;
-                c->next->prev = c->prev;
-        } else {
-                *Qptr = NULL;
-        }
-        return c;
 }
 
 /* 
