@@ -558,18 +558,19 @@ no_dma_set:
 }
 
 /**
- *	ali15x3_dma_write	-	do a DMA IDE write
- *	@drive:	drive to issue write for
+ *	ali15x3_dma_setup	-	begin a DMA phase
+ *	@drive:	target device
  *
- *	Returns 1 if the DMA write cannot be performed, zero on 
- *	success.
+ *	Returns 1 if the DMA cannot be performed, zero on success.
  */
- 
-static int ali15x3_dma_write (ide_drive_t *drive)
+
+static int ali15x3_dma_setup(ide_drive_t *drive)
 {
-	if ((m5229_revision < 0xC2) && (drive->media != ide_disk))
-		return 1;	/* try PIO instead of DMA */
-	return __ide_dma_write(drive);
+	if (m5229_revision < 0xC2 && drive->media != ide_disk) {
+		if (rq_data_dir(drive->hwif->hwgroup->rq))
+			return 1;	/* try PIO instead of DMA */
+	}
+	return ide_dma_setup(drive);
 }
 
 /**
@@ -773,7 +774,7 @@ static void __init init_hwif_common_ali15x3 (ide_hwif_t *hwif)
                  * M1543C or newer for DMAing
                  */
                 hwif->ide_dma_check = &ali15x3_config_drive_for_dma;
-                hwif->ide_dma_write = &ali15x3_dma_write;
+		hwif->dma_setup = &ali15x3_dma_setup;
 		if (!noautodma)
 			hwif->autodma = 1;
 		if (!(hwif->udma_four))

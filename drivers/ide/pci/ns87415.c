@@ -101,22 +101,11 @@ static int ns87415_ide_dma_end (ide_drive_t *drive)
 	return (dma_stat & 7) != 4;
 }
 
-static int ns87415_ide_dma_read (ide_drive_t *drive)
+static int ns87415_ide_dma_setup(ide_drive_t *drive)
 {
 	/* select DMA xfer */
 	ns87415_prepare_drive(drive, 1);
-	if (!(__ide_dma_read(drive)))
-		return 0;
-	/* DMA failed: select PIO xfer */
-	ns87415_prepare_drive(drive, 0);
-	return 1;
-}
-
-static int ns87415_ide_dma_write (ide_drive_t *drive)
-{
-	/* select DMA xfer */
-	ns87415_prepare_drive(drive, 1);
-	if (!(__ide_dma_write(drive)))
+	if (!ide_dma_setup(drive))
 		return 0;
 	/* DMA failed: select PIO xfer */
 	ns87415_prepare_drive(drive, 0);
@@ -204,8 +193,7 @@ static void __init init_hwif_ns87415 (ide_hwif_t *hwif)
 		return;
 
 	hwif->OUTB(0x60, hwif->dma_status);
-	hwif->ide_dma_read = &ns87415_ide_dma_read;
-	hwif->ide_dma_write = &ns87415_ide_dma_write;
+	hwif->dma_setup = &ns87415_ide_dma_setup;
 	hwif->ide_dma_check = &ns87415_ide_dma_check;
 	hwif->ide_dma_end = &ns87415_ide_dma_end;
 

@@ -192,16 +192,13 @@ sgiioc4_clearirq(ide_drive_t * drive)
 	return intr_reg & 3;
 }
 
-static int
-sgiioc4_ide_dma_begin(ide_drive_t * drive)
+static void sgiioc4_ide_dma_start(ide_drive_t * drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	unsigned int reg = hwif->INL(hwif->dma_base + IOC4_DMA_CTRL * 4);
 	unsigned int temp_reg = reg | IOC4_S_DMA_START;
 
 	hwif->OUTL(temp_reg, hwif->dma_base + IOC4_DMA_CTRL * 4);
-
-	return 0;
 }
 
 static u32
@@ -574,35 +571,30 @@ use_pio_instead:
 	return 0;		/* revert to PIO for this request */
 }
 
-static int
-sgiioc4_ide_dma_read(ide_drive_t * drive)
+static int sgiioc4_ide_dma_setup(ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
 	unsigned int count = 0;
+	int ddir;
 
-	if (!(count = sgiioc4_build_dma_table(drive, rq, PCI_DMA_FROMDEVICE))) {
-		/* try PIO instead of DMA */
-		return 1;
-	}
-	/* Writes FROM the IOC4 TO Main Memory */
-	sgiioc4_configure_for_dma(IOC4_DMA_WRITE, drive);
+	if (rq_data_dir(rq))
+		ddir = PCI_DMA_TODEVICE;
+	else
+		ddir = PCI_DMA_FROMDEVICE;
 
-	return 0;
-}
-
-static int
-sgiioc4_ide_dma_write(ide_drive_t * drive)
-{
-	struct request *rq = HWGROUP(drive)->rq;
-	unsigned int count = 0;
-
-	if (!(count = sgiioc4_build_dma_table(drive, rq, PCI_DMA_TODEVICE))) {
+	if (!(count = sgiioc4_build_dma_table(drive, rq, ddir))) {
 		/* try PIO instead of DMA */
 		return 1;
 	}
 
-	sgiioc4_configure_for_dma(IOC4_DMA_READ, drive);
-	/* Writes TO the IOC4 FROM Main Memory */
+	if (rq_data_dir(rq))
+		/* Writes TO the IOC4 FROM Main Memory */
+		ddir = IOC4_DMA_READ;
+	else
+		/* Writes FROM the IOC4 TO Main Memory */
+		ddir = IOC4_DMA_WRITE;
+
+	sgiioc4_configure_for_dma(ddir, drive);
 
 	return 0;
 }
@@ -629,9 +621,8 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->quirkproc = NULL;
 	hwif->busproc = NULL;
 
-	hwif->ide_dma_read = &sgiioc4_ide_dma_read;
-	hwif->ide_dma_write = &sgiioc4_ide_dma_write;
-	hwif->ide_dma_begin = &sgiioc4_ide_dma_begin;
+	hwif->dma_setup = &sgiioc4_ide_dma_setup;
+	hwif->dma_start = &sgiioc4_ide_dma_start;
 	hwif->ide_dma_end = &sgiioc4_ide_dma_end;
 	hwif->ide_dma_check = &sgiioc4_ide_dma_check;
 	hwif->ide_dma_on = &sgiioc4_ide_dma_on;
