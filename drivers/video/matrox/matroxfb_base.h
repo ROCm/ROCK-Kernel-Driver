@@ -479,6 +479,7 @@ struct matrox_fb_info {
 	struct matrox_altout*	output;
 	void*			data;
 	unsigned int		mode;
+	unsigned int		default_src;
 			      } outputs[MATROXFB_MAX_OUTPUTS];
 
 #define MATROXFB_MAX_FB_DRIVERS		5
