@@ -76,10 +76,14 @@ static struct nfs_page * nfs_update_request(struct file*, struct inode *,
 					    unsigned int, unsigned int);
 static void nfs_writeback_done_partial(struct nfs_write_data *, int);
 static void nfs_writeback_done_full(struct nfs_write_data *, int);
+static int nfs_wait_on_write_congestion(struct address_space *, int);
+static int nfs_wait_on_requests(struct inode *, unsigned long, unsigned int);
 
 static kmem_cache_t *nfs_wdata_cachep;
 static mempool_t *nfs_wdata_mempool;
 static mempool_t *nfs_commit_mempool;
+
+static DECLARE_WAIT_QUEUE_HEAD(nfs_write_congestion);
 
 static __inline__ struct nfs_write_data *nfs_writedata_alloc(void)
 {
@@ -259,8 +263,7 @@ static int nfs_writepage_async(struct file *file, struct inode *inode,
 /*
  * Write an mmapped page to the server.
  */
-int
-nfs_writepage(struct page *page, struct writeback_control *wbc)
+int nfs_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct inode *inode = page->mapping->host;
 	unsigned long end_index;
@@ -298,8 +301,11 @@ do_it:
 	lock_kernel();
 	if (!IS_SYNC(inode) && inode_referenced) {
 		err = nfs_writepage_async(NULL, inode, page, 0, offset);
-		if (err >= 0)
+		if (err >= 0) {
 			err = 0;
+			if (wbc->for_reclaim)
+				err = WRITEPAGE_ACTIVATE;
+		}
 	} else {
 		err = nfs_writepage_sync(NULL, inode, page, 0, offset); 
 		if (err == offset)
@@ -307,32 +313,46 @@ do_it:
 	}
 	unlock_kernel();
 out:
-	unlock_page(page);
+	if (err != WRITEPAGE_ACTIVATE)
+		unlock_page(page);
 	if (inode_referenced)
 		iput(inode);
 	return err; 
 }
 
-int
-nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
+/*
+ * Note: causes nfs_update_request() to block on the assumption
+ * 	 that the writeback is generated due to memory pressure.
+ */
+int nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
+	struct backing_dev_info *bdi = mapping->backing_dev_info;
 	struct inode *inode = mapping->host;
-	int is_sync = !wbc->nonblocking;
 	int err;
 
 	err = generic_writepages(mapping, wbc);
 	if (err)
-		goto out;
+		return err;
+	while (test_and_set_bit(BDI_write_congested, &bdi->state) != 0) {
+		if (wbc->nonblocking)
+			return 0;
+		nfs_wait_on_write_congestion(mapping, 0);
+	}
 	err = nfs_flush_inode(inode, 0, 0, 0);
 	if (err < 0)
 		goto out;
-	if (wbc->sync_mode == WB_SYNC_HOLD)
-		goto out;
-	if (is_sync && wbc->sync_mode == WB_SYNC_ALL) {
-		err = nfs_wb_all(inode);
-	} else
-		nfs_commit_inode(inode, 0, 0, 0);
+	wbc->nr_to_write -= err;
+	if (!wbc->nonblocking && wbc->sync_mode == WB_SYNC_ALL) {
+		err = nfs_wait_on_requests(inode, 0, 0);
+		if (err < 0)
+			goto out;
+	}
+	err = nfs_commit_inode(inode, 0, 0, 0);
+	if (err > 0)
+		wbc->nr_to_write -= err;
 out:
+	clear_bit(BDI_write_congested, &bdi->state);
+	wake_up_all(&nfs_write_congestion);
 	return err;
 }
 
@@ -544,6 +564,38 @@ nfs_scan_commit(struct inode *inode, struct list_head *dst, unsigned long idx_st
 }
 #endif
 
+static int nfs_wait_on_write_congestion(struct address_space *mapping, int intr)
+{
+	struct backing_dev_info *bdi = mapping->backing_dev_info;
+	DEFINE_WAIT(wait);
+	int ret = 0;
+
+	might_sleep();
+
+	if (!bdi_write_congested(bdi))
+		return 0;
+	if (intr) {
+		struct rpc_clnt *clnt = NFS_CLIENT(mapping->host);
+		sigset_t oldset;
+
+		rpc_clnt_sigmask(clnt, &oldset);
+		prepare_to_wait(&nfs_write_congestion, &wait, TASK_INTERRUPTIBLE);
+		if (bdi_write_congested(bdi)) {
+			if (signalled())
+				ret = -ERESTARTSYS;
+			else
+				schedule();
+		}
+		rpc_clnt_sigunmask(clnt, &oldset);
+	} else {
+		prepare_to_wait(&nfs_write_congestion, &wait, TASK_UNINTERRUPTIBLE);
+		if (bdi_write_congested(bdi))
+			schedule();
+	}
+	finish_wait(&nfs_write_congestion, &wait);
+	return ret;
+}
+
 
 /*
  * Try to update any existing write request, or create one if there is none.
@@ -556,11 +608,14 @@ static struct nfs_page *
 nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 		   unsigned int offset, unsigned int bytes)
 {
+	struct nfs_server *server = NFS_SERVER(inode);
 	struct nfs_page		*req, *new = NULL;
 	unsigned long		rqend, end;
 
 	end = offset + bytes;
 
+	if (nfs_wait_on_write_congestion(page->mapping, server->flags & NFS_MOUNT_INTR))
+		return ERR_PTR(-ERESTARTSYS);
 	for (;;) {
 		/* Loop over all inode entries and see if we find
 		 * A request for the page we wish to update
