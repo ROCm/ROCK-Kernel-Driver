@@ -1154,7 +1154,8 @@ __setup("decr_overclock=", set_decr_overclock );
 static struct plat_serial8250_port serial_ports[MAX_LEGACY_SERIAL_PORTS+1];
 static unsigned int old_serial_count;
 
-void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
+void __init generic_find_legacy_serial_ports(u64 *physport,
+		unsigned int *default_speed)
 {
 	struct device_node *np;
 	u32 *sizeprop;
@@ -1172,7 +1173,7 @@ void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
 
 	DBG(" -> generic_find_legacy_serial_port()\n");
 
-	naca->serialPortAddr = 0;
+	*physport = 0;
 	if (default_speed)
 		*default_speed = 0;
 
@@ -1294,7 +1295,7 @@ void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
 				io_base = (io_base << 32) | rangesp[4];
 		}
 		if (io_base != 0) {
-			naca->serialPortAddr = io_base + reg->address;
+			*physport = io_base + reg->address;
 			if (default_speed && spd)
 				*default_speed = *spd;
 		}

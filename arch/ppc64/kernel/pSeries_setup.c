@@ -82,7 +82,8 @@ extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
 extern void find_udbg_vterm(void);
 extern void SystemReset_FWNMI(void), MachineCheck_FWNMI(void);	/* from head.S */
-extern void generic_find_legacy_serial_ports(unsigned int *default_speed);
+extern void generic_find_legacy_serial_ports(u64 *physport,
+		unsigned int *default_speed);
 
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 
@@ -345,6 +346,7 @@ static void __init pSeries_init_early(void)
 	void *comport;
 	int iommu_off = 0;
 	unsigned int default_speed;
+	u64 physport;
 
 	DBG(" -> pSeries_init_early()\n");
 
@@ -358,13 +360,13 @@ static void __init pSeries_init_early(void)
 			     get_property(of_chosen, "linux,iommu-off", NULL));
 	}
 
-	generic_find_legacy_serial_ports(&default_speed);
+	generic_find_legacy_serial_ports(&physport, &default_speed);
 
 	if (systemcfg->platform & PLATFORM_LPAR)
 		find_udbg_vterm();
-	else if (naca->serialPortAddr) {
+	else if (physport) {
 		/* Map the uart for udbg. */
-		comport = (void *)__ioremap(naca->serialPortAddr, 16, _PAGE_NO_CACHE);
+		comport = (void *)__ioremap(physport, 16, _PAGE_NO_CACHE);
 		udbg_init_uart(comport, default_speed);
 
 		ppc_md.udbg_putc = udbg_putc;

@@ -22,7 +22,6 @@ struct naca_struct {
 	u64 debug_switch;		/* Debug print control       0x20 */
 	u64 banner;                     /* Ptr to banner string      0x28 */
 	u64 log;                        /* Ptr to log buffer         0x30 */
-	u64 serialPortAddr;		/* Phy addr of serial port   0x38 */
 };
 
 extern struct naca_struct *naca;
