@@ -851,8 +851,45 @@ const static struct vt1724_pcm_reg vt1724_capture_spdif_reg = {
 	.pause = VT1724_RDMA1_PAUSE,
 };
 
+/* update spdif control bits; call with reg_lock */
+static void update_spdif_bits(ice1712_t *ice, unsigned int val)
+{
+	unsigned char cbit, disabled;
+
+	cbit = inb(ICEREG1724(ice, SPDIF_CFG));
+	disabled = cbit & ~VT1724_CFG_SPDIF_OUT_EN;
+	if (cbit != disabled)
+		outb(disabled, ICEREG1724(ice, SPDIF_CFG));
+	outw(val, ICEMT1724(ice, SPDIF_CTRL));
+	if (cbit != disabled)
+		outb(cbit, ICEREG1724(ice, SPDIF_CFG));
+	outw(val, ICEMT1724(ice, SPDIF_CTRL));
+}
+
+/* update SPDIF control bits according to the given rate */
+static void update_spdif_rate(ice1712_t *ice, unsigned int rate)
+{
+	unsigned int val, nval;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ice->reg_lock, flags);
+	nval = val = inw(ICEMT1724(ice, SPDIF_CTRL));
+	nval &= ~(7 << 12);
+	switch (rate) {
+	case 44100: break;
+	case 48000: nval |= 2 << 12; break;
+	case 32000: nval |= 3 << 12; break;
+	}
+	if (val != nval)
+		update_spdif_bits(ice, nval);
+	spin_unlock_irqrestore(&ice->reg_lock, flags);
+}
+
 static int snd_vt1724_playback_spdif_prepare(snd_pcm_substream_t * substream)
 {
+	ice1712_t *ice = snd_pcm_substream_chip(substream);
+	if (! ice->force_pdma4)
+		update_spdif_rate(ice, substream->runtime->rate);
 	return snd_vt1724_pcm_prepare(substream, &vt1724_playback_spdif_reg);
 }
 
@@ -1261,7 +1298,7 @@ static unsigned int encode_spdif_bits(snd_aes_iec958_t *diga)
 		}
 	} else {
 		/* consumer */
-		val |= diga->status[0] & 0x04; /* copyright */
+		val |= diga->status[1] & 0x04; /* copyright */
 		if ((diga->status[0] & IEC958_AES0_CON_EMPHASIS)== IEC958_AES0_CON_EMPHASIS_5015)
 			val |= 1U << 3;
 		val |= (unsigned int)(diga->status[1] & 0x3f) << 4; /* category */
@@ -1318,16 +1355,8 @@ static int snd_vt1724_spdif_default_put(snd_kcontrol_t * kcontrol,
 	val = encode_spdif_bits(&ucontrol->value.iec958);
 	spin_lock_irqsave(&ice->reg_lock, flags);
 	old = inw(ICEMT1724(ice, SPDIF_CTRL));
-	if (val != old) {
-		unsigned char cbit, disabled;
-		cbit = inb(ICEREG1724(ice, SPDIF_CFG));
-		disabled = cbit & ~VT1724_CFG_SPDIF_OUT_EN;
-		if (cbit != disabled)
-			outb(disabled, ICEREG1724(ice, SPDIF_CFG));
-		outw(val, ICEMT1724(ice, SPDIF_CTRL));
-		if (cbit != disabled)
-			outb(cbit, ICEREG1724(ice, SPDIF_CFG));
-	}
+	if (val != old)
+		update_spdif_bits(ice, val);
 	spin_unlock_irqrestore(&ice->reg_lock, flags);
 	return (val != old);
 }
