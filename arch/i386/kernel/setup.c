@@ -832,6 +832,13 @@ static unsigned long __init setup_memory(void)
 	 */
 	reserve_bootmem(0, PAGE_SIZE);
 
+    /* could be an AMD 768MPX chipset. Reserve a page  before VGA to prevent
+       PCI prefetch into it (errata #56). Usually the page is reserved anyways,
+       unless you have no PS/2 mouse plugged in. */
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
+	    boot_cpu_data.x86 == 6)
+	     reserve_bootmem(0xa0000 - 4096, 4096);
+
 #ifdef CONFIG_SMP
 	/*
 	 * But first pinch a few for the stack/trampoline stuff

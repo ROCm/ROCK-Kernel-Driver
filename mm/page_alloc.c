@@ -690,6 +690,42 @@ got_pg:
 
 EXPORT_SYMBOL(__alloc_pages);
 
+#ifdef CONFIG_NUMA
+/* Early boot: Everything is done by one cpu, but the data structures will be
+ * used by all cpus - spread them on all nodes.
+ */
+static __init unsigned long get_boot_pages(unsigned int gfp_mask, unsigned int order)
+{
+static int nodenr;
+	int i = nodenr;
+	struct page *page;
+
+	for (;;) {
+		if (i > nodenr + numnodes)
+			return 0;
+		if (node_present_pages(i%numnodes)) {
+			struct zone **z;
+			/* The node contains memory. Check that there is
+			 * memory in the intended zonelist.
+			 */
+			z = NODE_DATA(i%numnodes)->node_zonelists[gfp_mask & GFP_ZONEMASK].zones;
+			while (*z) {
+				if ( (*z)->free_pages > (1UL<<order))
+					goto found_node;
+				z++;
+			}
+		}
+		i++;
+	}
+found_node:
+	nodenr = i+1;
+	page = alloc_pages_node(i%numnodes, gfp_mask, order);
+	if (!page)
+		return 0;
+	return (unsigned long) page_address(page);
+}
+#endif
+
 /*
  * Common helper functions.
  */
@@ -697,6 +733,10 @@ fastcall unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int orde
 {
 	struct page * page;
 
+#ifdef CONFIG_NUMA
+	if (unlikely(!system_running))
+		return get_boot_pages(gfp_mask, order);
+#endif
 	page = alloc_pages(gfp_mask, order);
 	if (!page)
 		return 0;
@@ -1115,6 +1155,8 @@ static int __init find_next_best_node(int node, void *used_node_mask)
 	int best_node = -1;
 
 	for (i = 0; i < numnodes; i++) {
+		cpumask_t tmp;
+
 		/* Start from local node */
 		n = (node+i)%numnodes;
 
@@ -1126,7 +1168,8 @@ static int __init find_next_best_node(int node, void *used_node_mask)
 		val = node_distance(node, n);
 
 		/* Give preference to headless and unused nodes */
-		if (!cpus_empty(node_to_cpumask(n)))
+		tmp = node_to_cpumask(n);
+		if (!cpus_empty(tmp))
 			val += PENALTY_FOR_NODE_WITH_CPUS;
 
 		/* Slight preference for less loaded node */

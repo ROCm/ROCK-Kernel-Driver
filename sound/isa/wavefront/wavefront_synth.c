@@ -1913,11 +1913,11 @@ wavefront_reset_to_cleanliness (snd_wavefront_t *dev)
 	return (1);
 }
 
-#define __KERNEL_SYSCALLS__
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/unistd.h>
+#include <linux/syscalls.h>
 #include <asm/uaccess.h>
 
 static int errno;
@@ -1947,7 +1947,7 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 	fs = get_fs();
 	set_fs (get_ds());
 
-	if ((fd = open (path, 0, 0)) < 0) {
+	if ((fd = sys_open (path, 0, 0)) < 0) {
 		snd_printk ("Unable to load \"%s\".\n",
 			path);
 		return 1;
@@ -1956,7 +1956,7 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 	while (1) {
 		int x;
 
-		if ((x = read (fd, &section_length, sizeof (section_length))) !=
+		if ((x = sys_read (fd, &section_length, sizeof (section_length))) !=
 		    sizeof (section_length)) {
 			snd_printk ("firmware read error.\n");
 			goto failure;
@@ -1966,7 +1966,7 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 			break;
 		}
 
-		if (read (fd, section, section_length) != section_length) {
+		if (sys_read (fd, section, section_length) != section_length) {
 			snd_printk ("firmware section "
 				"read error.\n");
 			goto failure;
@@ -2005,12 +2005,12 @@ wavefront_download_firmware (snd_wavefront_t *dev, char *path)
 
 	}
 
-	close (fd);
+	sys_close (fd);
 	set_fs (fs);
 	return 0;
 
  failure:
-	close (fd);
+	sys_close (fd);
 	set_fs (fs);
 	snd_printk ("firmware download failed!!!\n");
 	return 1;

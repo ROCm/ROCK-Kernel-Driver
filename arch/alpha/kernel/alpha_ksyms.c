@@ -35,9 +35,6 @@
 #include <asm/cacheflush.h>
 #include <asm/vga.h>
 
-#define __KERNEL_SYSCALLS__
-#include <asm/unistd.h>
-
 extern struct hwrpb_struct *hwrpb;
 extern void dump_thread(struct pt_regs *, struct user *);
 extern spinlock_t rtc_lock;
