@@ -197,6 +197,8 @@ MODULE_PARM_DESC(enable, "Enable ESS Solo-1 soundcard.");
 
 typedef struct _snd_es1938 es1938_t;
 
+#define SAVED_REG_SIZE	32 /* max. number of registers to save */
+
 struct _snd_es1938 {
 	int irq;
 
@@ -217,6 +219,7 @@ struct _snd_es1938 {
 
 	struct pci_dev *pci;
 	snd_card_t *card;
+	snd_pcm_t *pcm;
 	snd_pcm_substream_t *capture_substream;
 	snd_pcm_substream_t *playback1_substream;
 	snd_pcm_substream_t *playback2_substream;
@@ -237,6 +240,9 @@ struct _snd_es1938 {
 
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 	struct gameport gameport;
+#endif
+#ifdef CONFIG_PM
+	unsigned char saved_regs[SAVED_REG_SIZE];
 #endif
 };
 
@@ -995,13 +1001,11 @@ static void snd_es1938_free_pcm(snd_pcm_t *pcm)
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
-static int __devinit snd_es1938_new_pcm(es1938_t *chip, int device, snd_pcm_t ** rpcm)
+static int __devinit snd_es1938_new_pcm(es1938_t *chip, int device)
 {
 	snd_pcm_t *pcm;
 	int err;
 
-	if (rpcm)
-		*rpcm = NULL;
 	if ((err = snd_pcm_new(chip->card, "es-1938-1946", device, 2, 1, &pcm)) < 0)
 		return err;
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_es1938_playback_ops);
@@ -1015,8 +1019,7 @@ static int __devinit snd_es1938_new_pcm(es1938_t *chip, int device, snd_pcm_t **
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
 					      snd_dma_pci_data(chip->pci), 64*1024, 64*1024);
 
-	if (rpcm)
-		*rpcm = pcm;
+	chip->pcm = pcm;
 	return 0;
 }
 
@@ -1337,8 +1340,90 @@ ES1938_SINGLE("Mic Boost (+26dB)", 0, 0x7d, 3, 1, 0)
 /* ---------------------------------------------------------------------------- */
 /* ---------------------------------------------------------------------------- */
 
+/*
+ * initialize the chip - used by resume callback, too
+ */
+static void snd_es1938_chip_init(es1938_t *chip)
+{
+	/* reset chip */
+	snd_es1938_reset(chip);
+
+	/* configure native mode */
+
+	/* enable bus master */
+	pci_set_master(chip->pci);
+
+	/* disable legacy audio */
+	pci_write_config_word(chip->pci, SL_PCI_LEGACYCONTROL, 0x805f);
+
+	/* set DDMA base */
+	pci_write_config_word(chip->pci, SL_PCI_DDMACONTROL, chip->ddma_port | 1);
+
+	/* set DMA/IRQ policy */
+	pci_write_config_dword(chip->pci, SL_PCI_CONFIG, 0);
+
+	/* enable Audio 1, Audio 2, MPU401 IRQ and HW volume IRQ*/
+	outb(0xf0, SLIO_REG(chip, IRQCONTROL));
+
+	/* reset DMA */
+	outb(0, SLDM_REG(chip, DMACLEAR));
+}
+
+#ifdef CONFIG_PM
+/*
+ * PM support
+ */
+
+static unsigned char saved_regs[SAVED_REG_SIZE+1] = {
+	0x14, 0x1a, 0x1c, 0x3a, 0x3c, 0x3e, 0x36, 0x38,
+	0x50, 0x52, 0x60, 0x61, 0x62, 0x63, 0x64, 0x68,
+	0x69, 0x6a, 0x6b, 0x6d, 0x6e, 0x6f, 0x7c, 0x7d,
+	0xa8, 0xb4,
+};
+
+
+static int es1938_suspend(snd_card_t *card, unsigned int state)
+{
+	es1938_t *chip = card->pm_private_data;
+	unsigned char *s, *d;
+
+	snd_pcm_suspend_all(chip->pcm);
+
+	/* save mixer-related registers */
+	for (s = saved_regs, d = chip->saved_regs; *s; s++, d++)
+		*d = snd_es1938_reg_read(chip, *s);
+
+	outb(0x00, SLIO_REG(chip, IRQCONTROL)); /* disable irqs */
+
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
+}
+
+static int es1938_resume(snd_card_t *card, unsigned int state)
+{
+	es1938_t *chip = card->pm_private_data;
+	unsigned char *s, *d;
+
+	pci_enable_device(chip->pci);
+	snd_es1938_chip_init(chip);
+
+	/* restore mixer-related registers */
+	for (s = saved_regs, d = chip->saved_regs; *s; s++, d++) {
+		if (*s < 0xa0)
+			snd_es1938_mixer_write(chip, *s, *d);
+		else
+			snd_es1938_write(chip, *s, *d);
+	}
+
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+	return 0;
+}
+#endif /* CONFIG_PM */
+
 static int snd_es1938_free(es1938_t *chip)
 {
+	/* disable irqs */
+	outb(0x00, SLIO_REG(chip, IRQCONTROL));
 	/*if (chip->rmidi)
 	  snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0);*/
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
@@ -1406,32 +1491,12 @@ static int __devinit snd_es1938_create(snd_card_t * card,
 	snd_printk("create: io: 0x%lx, sb: 0x%lx, vc: 0x%lx, mpu: 0x%lx, game: 0x%lx\n",
 		   chip->io_port, chip->sb_port, chip->vc_port, chip->mpu_port, chip->game_port);
 #endif
-	/* reset chip */
-	snd_es1938_reset(chip);
 
-	/* configure native mode */
-
-	/* enable bus master */
-	pci_set_master(pci);
-
-	/* disable legacy audio */
-	pci_write_config_word(pci, SL_PCI_LEGACYCONTROL, 0x805f);
-
-	/* set DDMA base */
 	chip->ddma_port = chip->vc_port + 0x00;		/* fix from Thomas Sailer */
-	pci_write_config_word(pci, SL_PCI_DDMACONTROL, chip->ddma_port | 1);
 
-	/* set DMA/IRQ policy */
-	pci_write_config_dword(pci, SL_PCI_CONFIG, 0);
+	snd_es1938_chip_init(chip);
 
-	/* enable Audio 1, Audio 2, MPU401 IRQ and HW volume IRQ*/
-	outb(0xf0, SLIO_REG(chip, IRQCONTROL));
-
-	/* reset DMA */
-	outb(0, SLDM_REG(chip, DMACLEAR));
-
-	/* enable bus mastering */
-	pci_set_master(pci);
+	snd_card_set_pm_callback(card, es1938_suspend, es1938_resume, chip);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_es1938_free(chip);
@@ -1517,19 +1582,15 @@ static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *r
 
 #define ES1938_DMA_SIZE 64
 
-static int __devinit snd_es1938_mixer(snd_pcm_t *pcm)
+static int __devinit snd_es1938_mixer(es1938_t *chip)
 {
 	snd_card_t *card;
-	es1938_t *chip;
 	unsigned int idx;
 	int err;
 
-	snd_assert(pcm != NULL && pcm->card != NULL, return -EINVAL);
+	card = chip->card;
 
-	card = pcm->card;
-	chip = snd_pcm_chip(pcm);
-
-	strcpy(card->mixername, pcm->name);
+	strcpy(card->mixername, "ESS Solo-1");
 
 	for (idx = 0; idx < ARRAY_SIZE(snd_es1938_controls); idx++) {
 		snd_kcontrol_t *kctl;
@@ -1565,7 +1626,6 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 	static int dev;
 	snd_card_t *card;
 	es1938_t *chip;
-	snd_pcm_t *pcm;
 	opl3_t *opl3;
 	int idx, err;
 
@@ -1598,11 +1658,11 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 		chip->revision,
 		chip->irq);
 
-	if ((err = snd_es1938_new_pcm(chip, 0, &pcm)) < 0) {
+	if ((err = snd_es1938_new_pcm(chip, 0)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
-	if ((err = snd_es1938_mixer(pcm)) < 0) {
+	if ((err = snd_es1938_mixer(chip)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -1654,6 +1714,7 @@ static struct pci_driver driver = {
 	.id_table = snd_es1938_ids,
 	.probe = snd_es1938_probe,
 	.remove = __devexit_p(snd_es1938_remove),
+	SND_PCI_PM_CALLBACKS
 };
 
 static int __init alsa_card_es1938_init(void)
