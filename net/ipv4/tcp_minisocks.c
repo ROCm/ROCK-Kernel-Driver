@@ -75,17 +75,16 @@ void tcp_timewait_kill(struct tcp_tw_bucket *tw)
 	/* Disassociate with bind bucket. */
 	bhead = &tcp_bhash[tcp_bhashfn(tw->num)];
 	spin_lock(&bhead->lock);
-	if ((tb = tw->tb) != NULL) {
-		if(tw->bind_next)
-			tw->bind_next->bind_pprev = tw->bind_pprev;
-		*(tw->bind_pprev) = tw->bind_next;
-		tw->tb = NULL;
-		if (tb->owners == NULL) {
-			if (tb->next)
-				tb->next->pprev = tb->pprev;
-			*(tb->pprev) = tb->next;
-			kmem_cache_free(tcp_bucket_cachep, tb);
-		}
+	tb = tw->tb;
+	if(tw->bind_next)
+		tw->bind_next->bind_pprev = tw->bind_pprev;
+	*(tw->bind_pprev) = tw->bind_next;
+	tw->tb = NULL;
+	if (tb->owners == NULL) {
+		if (tb->next)
+			tb->next->pprev = tb->pprev;
+		*(tb->pprev) = tb->next;
+		kmem_cache_free(tcp_bucket_cachep, tb);
 	}
 	spin_unlock(&bhead->lock);
 
@@ -304,29 +303,7 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 	struct tcp_bind_hashbucket *bhead;
 	struct sock **head, *sktw;
 
-	write_lock(&ehead->lock);
-
-	/* Step 1: Remove SK from established hash. */
-	if (sk->pprev) {
-		if(sk->next)
-			sk->next->pprev = sk->pprev;
-		*sk->pprev = sk->next;
-		sk->pprev = NULL;
-		sock_prot_dec_use(sk->prot);
-	}
-
-	/* Step 2: Hash TW into TIMEWAIT half of established hash table. */
-	head = &(ehead + tcp_ehash_size)->chain;
-	sktw = (struct sock *)tw;
-	if((sktw->next = *head) != NULL)
-		(*head)->pprev = &sktw->next;
-	*head = sktw;
-	sktw->pprev = head;
-	atomic_inc(&tw->refcnt);
-
-	write_unlock(&ehead->lock);
-
-	/* Step 3: Put TW into bind hash. Original socket stays there too.
+	/* Step 1: Put TW into bind hash. Original socket stays there too.
 	   Note, that any socket with inet_sk(sk)->num != 0 MUST be bound in
 	   binding cache, even if it is closed.
 	 */
@@ -339,6 +316,28 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 	tw->tb->owners = (struct sock*)tw;
 	tw->bind_pprev = &tw->tb->owners;
 	spin_unlock(&bhead->lock);
+
+	write_lock(&ehead->lock);
+
+	/* Step 2: Remove SK from established hash. */
+	if (sk->pprev) {
+		if(sk->next)
+			sk->next->pprev = sk->pprev;
+		*sk->pprev = sk->next;
+		sk->pprev = NULL;
+		sock_prot_dec_use(sk->prot);
+	}
+
+	/* Step 3: Hash TW into TIMEWAIT half of established hash table. */
+	head = &(ehead + tcp_ehash_size)->chain;
+	sktw = (struct sock *)tw;
+	if((sktw->next = *head) != NULL)
+		(*head)->pprev = &sktw->next;
+	*head = sktw;
+	sktw->pprev = head;
+	atomic_inc(&tw->refcnt);
+
+	write_unlock(&ehead->lock);
 }
 
 /* 
