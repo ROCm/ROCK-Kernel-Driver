@@ -976,6 +976,14 @@ config SCSI_SYM53C8XX_IOMAPPED
 	  the card.  This is significantly slower then using memory
 	  mapped IO.  Most people should answer N.
 
+config SCSI_LPFCDD
+	tristate "emulex fibrechannel disk"
+	depends on PCI && SCSI && (PPC_PSERIES || PPC_ISERIES || IA64 || X86)
+
+config SCSI_LPFNDD
+	tristate "emulex fibrechannel net"
+	depends on PCI && SCSI && (PPC_PSERIES || PPC_ISERIES || IA64 || X86)
+
 config SCSI_IPR
 	tristate "IBM Power Linux RAID adapter support"
 	depends on PCI && SCSI

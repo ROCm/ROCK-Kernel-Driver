@@ -116,6 +116,8 @@ obj-$(CONFIG_SCSI_SATA_PROMISE)	+= libata.o sata_promise.o
 obj-$(CONFIG_SCSI_SATA_SIL)	+= libata.o sata_sil.o
 obj-$(CONFIG_SCSI_SATA_VIA)	+= libata.o sata_via.o
 obj-$(CONFIG_SCSI_IBMVSCSI)	+= ibmvscsi/
+obj-$(CONFIG_SCSI_LPFCDD)	+= lpfc/
+obj-$(CONFIG_SCSI_LPFNDD)	+= lpfc/
 
 obj-$(CONFIG_ARM)		+= arm/
 
