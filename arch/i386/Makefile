@@ -48,25 +48,35 @@ cflags-$(CONFIG_MCYRIXIII)	+= $(call check_gcc,-falign-functions=0 -falign-jumps
 
 CFLAGS += $(cflags-y)
 
-ifdef CONFIG_VISWS
-MACHINE	:= mach-visws
-else
-MACHINE	:= mach-generic
-endif
+#default subarch .c files
+mcore-y  := mach-default
+
+#VISWS subarch support
+mflags-$(CONFIG_VISWS) := -Iinclude/asm-i386/mach-visws
+mcore-$(CONFIG_VISWS)  := mach-visws
+
+#NUMAQ subarch support
+mflags-$(CONFIG_X86_NUMAQ) := -Iinclude/asm-i386/mach-numaq
+mcore-$(CONFIG_X86_NUMAQ)  := mach-default
+
+#add other subarch support here
+
+#default subarch .h files
+mflags-y += -Iinclude/asm-i386/mach-default
 
 HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
 
 libs-y 					+= arch/i386/lib/
 core-y					+= arch/i386/kernel/ \
 					   arch/i386/mm/ \
-					   arch/i386/$(MACHINE)/
+					   arch/i386/$(mcore-y)/
 drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
 drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 # FIXME: is drivers- right ?
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 
-CFLAGS += -Iarch/i386/$(MACHINE)
-AFLAGS += -Iarch/i386/$(MACHINE)
+CFLAGS += $(mflags-y)
+AFLAGS += $(mflags-y)
 
 makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/i386/boot $(1)
 

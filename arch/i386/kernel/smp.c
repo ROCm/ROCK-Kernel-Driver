@@ -24,6 +24,7 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/smpboot.h>
+#include <mach_ipi.h>
 
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
@@ -225,54 +226,6 @@ static inline void send_IPI_mask_sequence(int mask, int vector)
 		}
 	}
 	local_irq_restore(flags);
-}
-
-static inline void send_IPI_mask(int mask, int vector)
-{
-	if (clustered_apic_mode) 
-		send_IPI_mask_sequence(mask, vector);
-	else
-		send_IPI_mask_bitmask(mask, vector);
-}
-
-static inline void send_IPI_allbutself(int vector)
-{
-	/*
-	 * if there are no other CPUs in the system then
-	 * we get an APIC send error if we try to broadcast.
-	 * thus we have to avoid sending IPIs in this case.
-	 */
-	if (!(num_online_cpus() > 1))
-		return;
-
-	if (clustered_apic_mode) {
-		// Pointless. Use send_IPI_mask to do this instead
-		int cpu;
-
-		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
-			if (cpu_online(cpu) && cpu != smp_processor_id())
-				send_IPI_mask(1 << cpu, vector);
-		}
-	} else {
-		__send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
-		return;
-	}
-}
-
-static inline void send_IPI_all(int vector)
-{
-	if (clustered_apic_mode) {
-		// Pointless. Use send_IPI_mask to do this instead
-		int cpu;
-
-		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
-			if (!cpu_online(cpu))
-				continue;
-			send_IPI_mask(1 << cpu, vector);
-		}
-	} else {
-		__send_IPI_shortcut(APIC_DEST_ALLINC, vector);
-	}
 }
 
 /*
