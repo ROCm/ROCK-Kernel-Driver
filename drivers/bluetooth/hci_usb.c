@@ -70,6 +70,9 @@
 static struct usb_driver hci_usb_driver; 
 
 static struct usb_device_id bluetooth_ids[] = {
+	/* Broadcom BCM2033 without firmware */
+	{ USB_DEVICE(0x0a5c, 0x2033), driver_info: HCI_IGNORE },
+
 	/* Digianswer device */
 	{ USB_DEVICE(0x08fd, 0x0001), driver_info: HCI_DIGIANSWER },
 
@@ -89,13 +92,6 @@ static struct usb_device_id bluetooth_ids[] = {
 };
 
 MODULE_DEVICE_TABLE (usb, bluetooth_ids);
-
-static struct usb_device_id ignore_ids[] = {
-	/* Broadcom BCM2033 without firmware */
-	{ USB_DEVICE(0x0a5c, 0x2033) },
-
-	{ }	/* Terminating entry */
-};
 
 struct _urb *_urb_alloc(int isoc, int gfp)
 {
@@ -792,9 +788,11 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	iface = udev->actconfig->interface[0];
 
-	/* Check our black list */
-	if (usb_match_id(intf, ignore_ids))
-		return -EIO;
+	if (id->driver_info & HCI_IGNORE)
+		return -ENODEV;
+
+	if (intf->altsetting->desc.bInterfaceNumber > 0)
+		return -ENODEV;
 
 	/* Check number of endpoints */
 	if (intf->altsetting[0].desc.bNumEndpoints < 3)
