@@ -435,6 +435,7 @@ asmlinkage void __init start_kernel(void)
 	page_address_init();
 	mem_init();
 	kmem_cache_init();
+	sort_main_extable();
 	if (late_time_init)
 		late_time_init();
 	calibrate_delay();

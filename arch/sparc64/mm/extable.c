@@ -9,6 +9,11 @@
 extern const struct exception_table_entry __start___ex_table[];
 extern const struct exception_table_entry __stop___ex_table[];
 
+void sort_extable(struct exception_table_entry *start,
+		  struct exception_table_entry *finish)
+{
+}
+
 /* Caller knows they are in a range if ret->fixup == 0 */
 const struct exception_table_entry *
 search_extable(const struct exception_table_entry *start,

@@ -404,10 +404,6 @@ int module_finalize(const Elf_Ehdr *hdr,
 	 */
 	list_add(&me->arch.bug_list, &module_bug_list);
 
-	sort_ex_table((struct exception_table_entry *)me->extable,
-		      (struct exception_table_entry *)me->extable +
-				me->num_exentries);
-
 	return 0;
 }
 

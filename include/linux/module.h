@@ -54,6 +54,9 @@ const struct exception_table_entry *
 search_extable(const struct exception_table_entry *first,
 	       const struct exception_table_entry *last,
 	       unsigned long value);
+void sort_extable(struct exception_table_entry *start,
+		  struct exception_table_entry *finish);
+void sort_main_extable(void);
 
 #ifdef MODULE
 #define ___module_cat(a,b) __mod_ ## a ## b

@@ -1395,6 +1395,7 @@ static struct module *load_module(void __user *umod,
 	struct module *mod;
 	long err = 0;
 	void *percpu = NULL, *ptr = NULL; /* Stops spurious gcc warning */
+	struct exception_table_entry *extable;
 
 	DEBUGP("load_module: umod=%p, len=%lu, uargs=%p\n",
 	       umod, len, uargs);
@@ -1611,10 +1612,6 @@ static struct module *load_module(void __user *umod,
 	}
 #endif
 
-  	/* Set up exception table */
-	mod->num_exentries = sechdrs[exindex].sh_size / sizeof(*mod->extable);
-	mod->extable = (void *)sechdrs[exindex].sh_addr;
-
 	/* Now do relocations. */
 	for (i = 1; i < hdr->e_shnum; i++) {
 		const char *strtab = (char *)sechdrs[strindex].sh_addr;
@@ -1636,6 +1633,11 @@ static struct module *load_module(void __user *umod,
 		if (err < 0)
 			goto cleanup;
 	}
+
+  	/* Set up and sort exception table */
+	mod->num_exentries = sechdrs[exindex].sh_size / sizeof(*mod->extable);
+	mod->extable = extable = (void *)sechdrs[exindex].sh_addr;
+	sort_extable(extable, extable + mod->num_exentries);
 
 	/* Finally, copy percpu area over. */
 	percpu_modcopy(mod->percpu, (void *)sechdrs[pcpuindex].sh_addr,
