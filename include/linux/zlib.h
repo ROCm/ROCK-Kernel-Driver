@@ -91,7 +91,7 @@ typedef z_stream *z_streamp;
    memory management. The compression library attaches no meaning to the
    opaque value.
 
-   zalloc must return Z_NULL if there is not enough memory for the object.
+   zalloc must return NULL if there is not enough memory for the object.
    If zlib is used in a multi-threaded application, zalloc and zfree must be
    thread safe.
 
@@ -153,8 +153,6 @@ typedef z_stream *z_streamp;
 #define Z_DEFLATED   8
 /* The deflate compression method (the only one supported in this version) */
 
-#define Z_NULL  0  /* for initializing zalloc, zfree, opaque */
-
                         /* basic functions */
 
 extern const char * zlib_zlibVersion (void);
@@ -176,7 +174,7 @@ extern int deflateInit (z_streamp strm, int level);
 
      Initializes the internal stream state for compression. The fields
    zalloc, zfree and opaque must be initialized before by the caller.
-   If zalloc and zfree are set to Z_NULL, deflateInit updates them to
+   If zalloc and zfree are set to NULL, deflateInit updates them to
    use default allocation functions.
 
      The compression level must be Z_DEFAULT_COMPRESSION, or between 0 and 9:
@@ -298,11 +296,11 @@ extern int zlib_inflateInit (z_streamp strm);
 
      Initializes the internal stream state for decompression. The fields
    next_in, avail_in, and workspace must be initialized before by
-   the caller. If next_in is not Z_NULL and avail_in is large enough (the exact
+   the caller. If next_in is not NULL and avail_in is large enough (the exact
    value depends on the compression method), inflateInit determines the
    compression method from the zlib header and allocates all data structures
    accordingly; otherwise the allocation will be deferred to the first call of
-   inflate.  If zalloc and zfree are set to Z_NULL, inflateInit updates them to
+   inflate.  If zalloc and zfree are set to NULL, inflateInit updates them to
    use default allocation functions.
 
      inflateInit returns Z_OK if success, Z_MEM_ERROR if there was not enough

@@ -71,7 +71,7 @@ void zlib_inflate_blocks_reset(
 	uLong *c
 )
 {
-  if (c != Z_NULL)
+  if (c != NULL)
     *c = s->check;
   if (s->mode == CODES)
     zlib_inflate_codes_free(s->sub.decode.codes, z);
@@ -79,8 +79,8 @@ void zlib_inflate_blocks_reset(
   s->bitk = 0;
   s->bitb = 0;
   s->read = s->write = s->window;
-  if (s->checkfn != Z_NULL)
-    z->adler = s->check = (*s->checkfn)(0L, (const Byte *)Z_NULL, 0);
+  if (s->checkfn != NULL)
+    z->adler = s->check = (*s->checkfn)(0L, (const Byte *)NULL, 0);
 }
 
 inflate_blocks_statef *zlib_inflate_blocks_new(
@@ -97,7 +97,7 @@ inflate_blocks_statef *zlib_inflate_blocks_new(
   s->end = s->window + w;
   s->checkfn = c;
   s->mode = TYPE;
-  zlib_inflate_blocks_reset(s, z, Z_NULL);
+  zlib_inflate_blocks_reset(s, z, NULL);
   return s;
 }
 
@@ -141,7 +141,7 @@ int zlib_inflate_blocks(
 
             zlib_inflate_trees_fixed(&bl, &bd, &tl, &td, z);
             s->sub.decode.codes = zlib_inflate_codes_new(bl, bd, tl, td, z);
-            if (s->sub.decode.codes == Z_NULL)
+            if (s->sub.decode.codes == NULL)
             {
               r = Z_MEM_ERROR;
               LEAVE
@@ -270,7 +270,7 @@ int zlib_inflate_blocks(
           s->sub.trees.index = i;
         }
       }
-      s->sub.trees.tb = Z_NULL;
+      s->sub.trees.tb = NULL;
       {
         uInt bl, bd;
         inflate_huft *tl, *td;
@@ -289,7 +289,7 @@ int zlib_inflate_blocks(
           r = t;
           LEAVE
         }
-        if ((c = zlib_inflate_codes_new(bl, bd, tl, td, z)) == Z_NULL)
+        if ((c = zlib_inflate_codes_new(bl, bd, tl, td, z)) == NULL)
         {
           r = Z_MEM_ERROR;
           LEAVE
@@ -333,7 +333,7 @@ int zlib_inflate_blocks_free(
 	z_streamp z
 )
 {
-  zlib_inflate_blocks_reset(s, z, Z_NULL);
+  zlib_inflate_blocks_reset(s, z, NULL);
   return Z_OK;
 }
 
@@ -351,7 +351,7 @@ void zlib_inflate_set_dictionary(
 
 /* Returns true if inflate is currently at the end of a block generated
  * by Z_SYNC_FLUSH or Z_FULL_FLUSH. 
- * IN assertion: s != Z_NULL
+ * IN assertion: s != NULL
  */
 int zlib_inflate_blocks_sync_point(
 	inflate_blocks_statef *s

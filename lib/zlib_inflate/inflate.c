@@ -18,12 +18,12 @@ int zlib_inflateReset(
 	z_streamp z
 )
 {
-  if (z == Z_NULL || z->state == Z_NULL || z->workspace == Z_NULL)
+  if (z == NULL || z->state == NULL || z->workspace == NULL)
     return Z_STREAM_ERROR;
   z->total_in = z->total_out = 0;
-  z->msg = Z_NULL;
+  z->msg = NULL;
   z->state->mode = z->state->nowrap ? BLOCKS : METHOD;
-  zlib_inflate_blocks_reset(z->state->blocks, z, Z_NULL);
+  zlib_inflate_blocks_reset(z->state->blocks, z, NULL);
   return Z_OK;
 }
 
@@ -32,11 +32,11 @@ int zlib_inflateEnd(
 	z_streamp z
 )
 {
-  if (z == Z_NULL || z->state == Z_NULL || z->workspace == Z_NULL)
+  if (z == NULL || z->state == NULL || z->workspace == NULL)
     return Z_STREAM_ERROR;
-  if (z->state->blocks != Z_NULL)
+  if (z->state->blocks != NULL)
     zlib_inflate_blocks_free(z->state->blocks, z);
-  z->state = Z_NULL;
+  z->state = NULL;
   return Z_OK;
 }
 
@@ -48,16 +48,16 @@ int zlib_inflateInit2_(
 	int stream_size
 )
 {
-  if (version == Z_NULL || version[0] != ZLIB_VERSION[0] ||
-      stream_size != sizeof(z_stream) || z->workspace == Z_NULL)
+  if (version == NULL || version[0] != ZLIB_VERSION[0] ||
+      stream_size != sizeof(z_stream) || z->workspace == NULL)
       return Z_VERSION_ERROR;
 
   /* initialize state */
-  if (z == Z_NULL)
+  if (z == NULL)
     return Z_STREAM_ERROR;
-  z->msg = Z_NULL;
+  z->msg = NULL;
   z->state = &WS(z)->internal_state;
-  z->state->blocks = Z_NULL;
+  z->state->blocks = NULL;
 
   /* handle undocumented nowrap option (no zlib header or check) */
   z->state->nowrap = 0;
@@ -77,8 +77,8 @@ int zlib_inflateInit2_(
 
   /* create inflate_blocks state */
   if ((z->state->blocks =
-      zlib_inflate_blocks_new(z, z->state->nowrap ? Z_NULL : zlib_adler32, (uInt)1 << w))
-      == Z_NULL)
+      zlib_inflate_blocks_new(z, z->state->nowrap ? NULL : zlib_adler32, (uInt)1 << w))
+      == NULL)
   {
     zlib_inflateEnd(z);
     return Z_MEM_ERROR;
@@ -125,7 +125,7 @@ int zlib_inflate(
   int r, trv;
   uInt b;
 
-  if (z == Z_NULL || z->state == Z_NULL || z->next_in == Z_NULL)
+  if (z == NULL || z->state == NULL || z->next_in == NULL)
     return Z_STREAM_ERROR;
   trv = f == Z_FINISH ? Z_BUF_ERROR : Z_OK;
   r = Z_BUF_ERROR;
@@ -260,7 +260,7 @@ int zlib_inflateSync(
   uLong r, w;   /* temporaries to save total_in and total_out */
 
   /* set up */
-  if (z == Z_NULL || z->state == Z_NULL)
+  if (z == NULL || z->state == NULL)
     return Z_STREAM_ERROR;
   if (z->state->mode != I_BAD)
   {
@@ -313,7 +313,7 @@ int zlib_inflateSyncPoint(
 	z_streamp z
 )
 {
-  if (z == Z_NULL || z->state == Z_NULL || z->state->blocks == Z_NULL)
+  if (z == NULL || z->state == NULL || z->state->blocks == NULL)
     return Z_STREAM_ERROR;
   return zlib_inflate_blocks_sync_point(z->state->blocks);
 }
@@ -352,7 +352,7 @@ static int zlib_inflate_addhistory(inflate_blocks_statef *s,
 	/* is there room until end of buffer? */
 	if (t > m) t = m;
 	/* update check information */
-	if (s->checkfn != Z_NULL)
+	if (s->checkfn != NULL)
 	    s->check = (*s->checkfn)(s->check, q, t);
 	memcpy(q, p, t);
 	q += t;

@@ -199,13 +199,13 @@ int zlib_deflateInit2_(
      * output size for (length,distance) codes is <= 24 bits.
      */
 
-    if (version == Z_NULL || version[0] != my_version[0] ||
+    if (version == NULL || version[0] != my_version[0] ||
         stream_size != sizeof(z_stream)) {
 	return Z_VERSION_ERROR;
     }
-    if (strm == Z_NULL) return Z_STREAM_ERROR;
+    if (strm == NULL) return Z_STREAM_ERROR;
 
-    strm->msg = Z_NULL;
+    strm->msg = NULL;
 
     if (level == Z_DEFAULT_COMPRESSION) level = 6;
 
@@ -266,7 +266,7 @@ int zlib_deflateSetDictionary(
     uInt n;
     IPos hash_head = 0;
 
-    if (strm == Z_NULL || strm->state == Z_NULL || dictionary == Z_NULL)
+    if (strm == NULL || strm->state == NULL || dictionary == NULL)
 	return Z_STREAM_ERROR;
 
     s = (deflate_state *) strm->state;
@@ -305,11 +305,11 @@ int zlib_deflateReset(
 {
     deflate_state *s;
     
-    if (strm == Z_NULL || strm->state == Z_NULL)
+    if (strm == NULL || strm->state == NULL)
         return Z_STREAM_ERROR;
 
     strm->total_in = strm->total_out = 0;
-    strm->msg = Z_NULL;
+    strm->msg = NULL;
     strm->data_type = Z_UNKNOWN;
 
     s = (deflate_state *)strm->state;
@@ -340,7 +340,7 @@ int zlib_deflateParams(
     compress_func func;
     int err = Z_OK;
 
-    if (strm == Z_NULL || strm->state == Z_NULL) return Z_STREAM_ERROR;
+    if (strm == NULL || strm->state == NULL) return Z_STREAM_ERROR;
     s = (deflate_state *) strm->state;
 
     if (level == Z_DEFAULT_COMPRESSION) {
@@ -396,7 +396,7 @@ static void flush_pending(
     if (len > strm->avail_out) len = strm->avail_out;
     if (len == 0) return;
 
-    if (strm->next_out != Z_NULL) {
+    if (strm->next_out != NULL) {
 	memcpy(strm->next_out, s->pending_out, len);
 	strm->next_out += len;
     }
@@ -418,13 +418,13 @@ int zlib_deflate(
     int old_flush; /* value of flush param for previous deflate call */
     deflate_state *s;
 
-    if (strm == Z_NULL || strm->state == Z_NULL ||
+    if (strm == NULL || strm->state == NULL ||
 	flush > Z_FINISH || flush < 0) {
         return Z_STREAM_ERROR;
     }
     s = (deflate_state *) strm->state;
 
-    if ((strm->next_in == Z_NULL && strm->avail_in != 0) ||
+    if ((strm->next_in == NULL && strm->avail_in != 0) ||
 	(s->status == FINISH_STATE && flush != Z_FINISH)) {
         return Z_STREAM_ERROR;
     }
@@ -555,7 +555,7 @@ int zlib_deflateEnd(
     int status;
     deflate_state *s;
 
-    if (strm == Z_NULL || strm->state == Z_NULL) return Z_STREAM_ERROR;
+    if (strm == NULL || strm->state == NULL) return Z_STREAM_ERROR;
     s = (deflate_state *) strm->state;
 
     status = s->status;
@@ -564,7 +564,7 @@ int zlib_deflateEnd(
       return Z_STREAM_ERROR;
     }
 
-    strm->state = Z_NULL;
+    strm->state = NULL;
 
     return status == BUSY_STATE ? Z_DATA_ERROR : Z_OK;
 }
@@ -586,7 +586,7 @@ int zlib_deflateCopy (
     deflate_workspace *mem;
 
 
-    if (source == Z_NULL || dest == Z_NULL || source->state == Z_NULL) {
+    if (source == NULL || dest == NULL || source->state == NULL) {
         return Z_STREAM_ERROR;
     }
 
@@ -968,7 +968,7 @@ static void fill_window(s)
 #define FLUSH_BLOCK_ONLY(s, eof) { \
    zlib_tr_flush_block(s, (s->block_start >= 0L ? \
                    (char *)&s->window[(unsigned)s->block_start] : \
-                   (char *)Z_NULL), \
+                   (char *)NULL), \
 		(ulg)((long)s->strstart - s->block_start), \
 		(eof)); \
    s->block_start = s->strstart; \
