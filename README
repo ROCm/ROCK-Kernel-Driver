@@ -67,12 +67,12 @@ INSTALLING the kernel:
  - You can also upgrade between 2.5.xx releases by patching.  Patches are
    distributed in the traditional gzip and the new bzip2 format.  To
    install by patching, get all the newer patch files, enter the
-   directory in which you unpacked the kernel source and execute:
+   top level directory of the kernel source (linux-2.5.xx) and execute:
 
-		gzip -cd patchXX.gz | patch -p0
+		gzip -cd ../patch-2.5.xx.gz | patch -p1
 
    or
-		bzip2 -dc patchXX.bz2 | patch -p0
+		bzip2 -dc ../patch-2.5.xx.bz2 | patch -p1
 
    (repeat xx for all versions bigger than the version of your current
    source tree, _in_order_) and you should be ok.  You may want to remove
@@ -148,8 +148,6 @@ CONFIGURING the kernel:
 
  - Check the top Makefile for further site-dependent configuration
    (default SVGA mode etc). 
-
- - Finally, do a "make dep" to set up all the dependencies correctly. 
 
 COMPILING the kernel:
 
