@@ -164,6 +164,7 @@ typedef __s64	Elf64_Sxword;
 #define AT_CLKTCK 17	/* frequency at which times() increments */
 
 #define AT_SECURE 23   /* secure mode boolean */
+#define AT_NUMCPUS 24  /* number of running cpus */
 
 typedef struct dynamic{
   Elf32_Sword d_tag;

@@ -7,4 +7,6 @@ struct mod_arch_specific {};
 #define Elf_Sym Elf64_Sym
 #define Elf_Ehdr Elf64_Ehdr
 
+#define ARCH_COMPILER_COMPATIBLE 1
+
 #endif 

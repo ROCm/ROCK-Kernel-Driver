@@ -14,7 +14,8 @@ config X86_64
 	default y
 	help
 	  Port to the x86-64 architecture. x86-64 is a 64-bit extension to the
-	  classical 32-bit x86 architecture. For details see http://www.x86-64.org
+	  classical 32-bit x86 architecture. For details see
+	  <http://www.x86-64.org/>.
 
 config 64BIT
 	def_bool y
@@ -92,7 +93,10 @@ config MK8
 	  Optimize for AMD Opteron/Athlon64/Hammer/K8 CPUs. 
 
 config MPSC
-       bool "Prescott/Nocona" 
+       bool "Intel x86-64" 
+       help
+	  Optimize for Intel IA32 with 64bit extension CPUs
+	  (Prescott/Nocona/Potomac)
        
 config GENERIC_CPU
 	bool "Generic-x86-64"

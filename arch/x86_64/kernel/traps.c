@@ -556,7 +556,7 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 		 * Ok, so this is none of the documented NMI sources,
 		 * so it must be the NMI watchdog.
 		 */
-		if (nmi_watchdog) {
+		if (nmi_watchdog > 0) {
 			nmi_watchdog_tick(regs,reason);
 			return;
 		}
