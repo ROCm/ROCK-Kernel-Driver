@@ -656,16 +656,9 @@ AC97_SINGLE("PC Speaker Playback Switch", AC97_PC_BEEP, 15, 1, 1),
 AC97_SINGLE("PC Speaker Playback Volume", AC97_PC_BEEP, 1, 15, 1)
 };
 
-static const snd_kcontrol_new_t snd_ac97_controls_phone[2] = {
-AC97_SINGLE("Phone Playback Switch", AC97_PHONE, 15, 1, 1),
-AC97_SINGLE("Phone Playback Volume", AC97_PHONE, 0, 15, 1)
-};
+static const snd_kcontrol_new_t snd_ac97_controls_mic_boost =
+	AC97_SINGLE("Mic Boost (+20dB)", AC97_MIC, 6, 1, 0);
 
-static const snd_kcontrol_new_t snd_ac97_controls_mic[3] = {
-AC97_SINGLE("Mic Playback Switch", AC97_MIC, 15, 1, 1),
-AC97_SINGLE("Mic Playback Volume", AC97_MIC, 0, 15, 1),
-AC97_SINGLE("Mic Boost (+20dB)", AC97_MIC, 6, 1, 0)
-};
 
 static const snd_kcontrol_new_t snd_ac97_control_capture_src = {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
@@ -1121,6 +1114,26 @@ static int snd_ac97_try_volume_mix(ac97_t * ac97, int reg)
 	return 1;		/* success, useable */
 }
 
+static void check_volume_resolution(ac97_t *ac97, int reg, unsigned char *lo_max, unsigned char *hi_max)
+{
+	unsigned short cbit[3] = { 0x20, 0x10, 0x01 };
+	unsigned char max[3] = { 63, 31, 15 };
+	int i;
+
+	*lo_max = *hi_max = 0;
+	for (i = 0 ; i < ARRAY_SIZE(cbit); i++) {
+		unsigned short val;
+		snd_ac97_write(ac97, reg, 0x8080 | cbit[i] | (cbit[i] << 8));
+		val = snd_ac97_read(ac97, reg);
+		if (! *lo_max && (val & cbit[i]))
+			*lo_max = max[i];
+		if (! *hi_max && (val & (cbit[i] << 8)))
+			*hi_max = max[i];
+		if (*lo_max && *hi_max)
+			break;
+	}
+}
+
 int snd_ac97_try_bit(ac97_t * ac97, int reg, int bit)
 {
 	unsigned short mask, val, orig, res;
@@ -1132,21 +1145,6 @@ int snd_ac97_try_bit(ac97_t * ac97, int reg, int bit)
 	res = snd_ac97_read(ac97, reg);
 	snd_ac97_write_cache(ac97, reg, orig);
 	return res == val;
-}
-
-static void snd_ac97_change_volume_params1(ac97_t * ac97, int reg, unsigned char *max)
-{
-	unsigned short val, val1;
-
-	*max = 63;
-	val = 0x8000 | 0x0020;
-	snd_ac97_write(ac97, reg, val);
-	val1 = snd_ac97_read(ac97, reg);
-	if (val != val1) {
-		*max = 31;
-	}
-	/* reset volume to zero */
-	snd_ac97_write_cache(ac97, reg, 0x8000);
 }
 
 /* check the volume resolution of center/lfe */
@@ -1163,34 +1161,6 @@ static void snd_ac97_change_volume_params2(ac97_t * ac97, int reg, int shift, un
 	}
 	/* reset volume to zero */
 	snd_ac97_write_cache(ac97, reg, 0x8080);
-}
-
-/* check whether the volume resolution is 4 or 5 bits */
-static void snd_ac97_change_volume_params3(ac97_t * ac97, int reg, unsigned char *max)
-{
-	unsigned short val, val1;
-
-	*max = 31;
-	val = 0x8000 | 0x0010;
-	snd_ac97_write(ac97, reg, val);
-	val1 = snd_ac97_read(ac97, reg);
-	if (val != val1) {
-		*max = 15;
-	}
-	/* reset volume to zero */
-	snd_ac97_write_cache(ac97, reg, 0x8000);
-}
-
-/* check whether the volume is mono or stereo */
-static int snd_ac97_is_stereo_vol(ac97_t *ac97, int reg)
-{
-	unsigned short val, val1, val2;
-	val = snd_ac97_read(ac97, reg);
-	val1 = val | 0x8000 | (0x01 << 8);
-	snd_ac97_write(ac97, reg, val1);
-	val2 = snd_ac97_read(ac97, reg);
-	snd_ac97_write(ac97, reg, val); /* restore */
-	return val1 == val2;
 }
 
 static inline int printable(unsigned int x)
@@ -1219,22 +1189,22 @@ snd_kcontrol_t *snd_ac97_cnew(const snd_kcontrol_new_t *_template, ac97_t * ac97
 static int snd_ac97_cmute_new(snd_card_t *card, char *name, int reg, ac97_t *ac97)
 {
 	snd_kcontrol_t *kctl;
-	int stereo = 0;
+	int err;
+	unsigned short val, val1, mute_mask;
 
 	if (! snd_ac97_valid_reg(ac97, reg))
 		return 0;
 
+	mute_mask = 0x8000;
+	val = snd_ac97_read(ac97, reg);
 	if (ac97->flags & AC97_STEREO_MUTES) {
 		/* check whether both mute bits work */
-		unsigned short val, val1;
-		val = snd_ac97_read(ac97, reg);
 		val1 = val | 0x8080;
 		snd_ac97_write(ac97, reg, val1);
 		if (val1 == snd_ac97_read(ac97, reg))
-			stereo = 1;
-		snd_ac97_write(ac97, reg, val);
+			mute_mask = 0x8080;
 	}
-	if (stereo) {
+	if (mute_mask == 0x8080) {
 		snd_kcontrol_new_t tmp = AC97_DOUBLE(name, reg, 15, 7, 1, 1);
 		tmp.index = ac97->num;
 		kctl = snd_ctl_new1(&tmp, ac97);
@@ -1243,50 +1213,68 @@ static int snd_ac97_cmute_new(snd_card_t *card, char *name, int reg, ac97_t *ac9
 		tmp.index = ac97->num;
 		kctl = snd_ctl_new1(&tmp, ac97);
 	}
-	return snd_ctl_add(card, kctl);
-}
-
-/*
- * create volumes for normal stereo controls
- */
-static int snd_ac97_cvol_new(snd_card_t *card, char *name, int reg, unsigned int max, ac97_t *ac97)
-{
-	int err;
-	snd_kcontrol_new_t tmp = AC97_DOUBLE(name, reg, 8, 0, (unsigned int)max, 1);
-	tmp.index = ac97->num;
-
-	if (! snd_ac97_valid_reg(ac97, reg))
-		return 0;
-	if ((err = snd_ctl_add(card, snd_ctl_new1(&tmp, ac97))) < 0)
+	err = snd_ctl_add(card, kctl);
+	if (err < 0)
 		return err;
-	snd_ac97_write_cache(ac97, reg,
-			     ((ac97->flags & AC97_STEREO_MUTES) ? 0x8080 : 0x8000) |
-			     (unsigned short)max | ((unsigned short)max << 8));
+	/* mute as default */
+	snd_ac97_write_cache(ac97, reg, val | mute_mask);
 	return 0;
 }
 
 /*
- * create mute-switch and volumes for normal stereo controls
+ * create a volume for normal stereo/mono controls
  */
-static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, int check_res, ac97_t *ac97)
+static int snd_ac97_cvol_new(snd_card_t *card, char *name, int reg, unsigned int lo_max,
+			     unsigned int hi_max, ac97_t *ac97)
+{
+	int err;
+	snd_kcontrol_t *kctl;
+
+	if (! snd_ac97_valid_reg(ac97, reg))
+		return 0;
+	if (hi_max) {
+		/* invert */
+		snd_kcontrol_new_t tmp = AC97_DOUBLE(name, reg, 8, 0, lo_max, 1);
+		tmp.index = ac97->num;
+		kctl = snd_ctl_new1(&tmp, ac97);
+	} else {
+		/* invert */
+		snd_kcontrol_new_t tmp = AC97_SINGLE(name, reg, 0, lo_max, 1);
+		tmp.index = ac97->num;
+		kctl = snd_ctl_new1(&tmp, ac97);
+	}
+	err = snd_ctl_add(card, kctl);
+	if (err < 0)
+		return err;
+	snd_ac97_write_cache(ac97, reg,
+			     (snd_ac97_read(ac97, reg) & 0x8080) |
+			     lo_max | (hi_max << 8));
+	return 0;
+}
+
+/*
+ * create a mute-switch and a volume for normal stereo/mono controls
+ */
+static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, ac97_t *ac97)
 {
 	int err;
 	char name[44];
-	unsigned char max;
+	unsigned char lo_max, hi_max;
 
 	if (! snd_ac97_valid_reg(ac97, reg))
 		return 0;
 
-	sprintf(name, "%s Switch", pfx);
-	if ((err = snd_ac97_cmute_new(card, name, reg, ac97)) < 0)
-		return err;
-	sprintf(name, "%s Volume", pfx);
-	if (check_res)
-		snd_ac97_change_volume_params1(ac97, reg, &max);
-	else
-		max = 31; /* 5bit */
-	if ((err = snd_ac97_cvol_new(card, name, reg, max, ac97)) < 0)
-		return err;
+	if (snd_ac97_try_bit(ac97, reg, 15)) {
+		sprintf(name, "%s Switch", pfx);
+		if ((err = snd_ac97_cmute_new(card, name, reg, ac97)) < 0)
+			return err;
+	}
+	check_volume_resolution(ac97, reg, &lo_max, &hi_max);
+	if (lo_max) {
+		sprintf(name, "%s Volume", pfx);
+		if ((err = snd_ac97_cvol_new(card, name, reg, lo_max, hi_max, ac97)) < 0)
+			return err;
+	}
 	return 0;
 }
 
@@ -1304,7 +1292,7 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	/* build master controls */
 	/* AD claims to remove this control from AD1887, although spec v2.2 does not allow this */
 	if (snd_ac97_try_volume_mix(ac97, AC97_MASTER)) {
-		if ((err = snd_ac97_cmix_new(card, "Master Playback", AC97_MASTER, 1, ac97)) < 0)
+		if ((err = snd_ac97_cmix_new(card, "Master Playback", AC97_MASTER, ac97)) < 0)
 			return err;
 	}
 
@@ -1336,32 +1324,20 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 
 	/* build surround controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_SURROUND_MASTER)) {
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_surround[0], ac97))) < 0)
+		if ((err = snd_ac97_cmix_new(card, "Surround Playback", AC97_SURROUND_MASTER, ac97)) < 0)
 			return err;
-		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_surround[1], ac97))) < 0)
-			return err;
-		snd_ac97_change_volume_params2(ac97, AC97_SURROUND_MASTER, 0, &max);
-		kctl->private_value &= ~(0xff << 16);
-		kctl->private_value |= (int)max << 16;
-		snd_ac97_write_cache(ac97, AC97_SURROUND_MASTER, 0x8080 | max | (max << 8));
 	}
 
 	/* build headphone controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_HEADPHONE)) {
-		if ((err = snd_ac97_cmix_new(card, "Headphone Playback", AC97_HEADPHONE, 1, ac97)) < 0)
+		if ((err = snd_ac97_cmix_new(card, "Headphone Playback", AC97_HEADPHONE, ac97)) < 0)
 			return err;
 	}
 	
 	/* build master mono controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_MASTER_MONO)) {
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_master_mono[0], ac97))) < 0)
+		if ((err = snd_ac97_cmix_new(card, "Master Mono Playback", AC97_MASTER_MONO, ac97)) < 0)
 			return err;
-		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_master_mono[1], ac97))) < 0)
-			return err;
-		snd_ac97_change_volume_params1(ac97, AC97_MASTER_MONO, &max);
-		kctl->private_value &= ~(0xff << 16);
-		kctl->private_value |= (int)max << 16;
-		snd_ac97_write_cache(ac97, AC97_MASTER_MONO, 0x8000 | max);
 	}
 	
 	/* build master tone controls */
@@ -1389,56 +1365,39 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	
 	/* build Phone controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_PHONE)) {
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_phone[0], ac97))) < 0)
+		if ((err = snd_ac97_cmix_new(card, "Phone Playback", AC97_PHONE, ac97)) < 0)
 			return err;
-		if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_phone[1], ac97))) < 0)
-			return err;
-		snd_ac97_change_volume_params3(ac97, AC97_PHONE, &max);
-		kctl->private_value &= ~(0xff << 16);
-		kctl->private_value |= (int)max << 16;
-		snd_ac97_write_cache(ac97, AC97_PHONE, 0x8000 | max);
 	}
 	
 	/* build MIC controls */
-	snd_ac97_change_volume_params3(ac97, AC97_MIC, &max);
-	if (snd_ac97_is_stereo_vol(ac97, AC97_MIC)) {
-		/* build stereo mic */
-		if ((err = snd_ac97_cmute_new(card, "Mic Playback Switch", AC97_MIC, ac97)) < 0)
+	if (snd_ac97_try_volume_mix(ac97, AC97_MIC)) {
+		if ((err = snd_ac97_cmix_new(card, "Mic Playback", AC97_MIC, ac97)) < 0)
 			return err;
-		if ((err = snd_ac97_cvol_new(card, "Mic Playback Volume", AC97_MIC, max, ac97)) < 0)
+		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_mic_boost, ac97))) < 0)
 			return err;
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_mic[2], ac97))) < 0)
-			return err;
-	} else {
-		/* build mono mic */
-		for (idx = 0; idx < 3; idx++) {
-			if ((err = snd_ctl_add(card, kctl = snd_ac97_cnew(&snd_ac97_controls_mic[idx], ac97))) < 0)
-				return err;
-			if (idx == 1) {		// volume
-				kctl->private_value &= ~(0xff << 16);
-				kctl->private_value |= (int)max << 16;
-			}
-		}
-		snd_ac97_write_cache(ac97, AC97_MIC, 0x8000 | max);
 	}
 
 	/* build Line controls */
-	if ((err = snd_ac97_cmix_new(card, "Line Playback", AC97_LINE, 0, ac97)) < 0)
-		return err;
+	if (snd_ac97_try_volume_mix(ac97, AC97_LINE)) {
+		if ((err = snd_ac97_cmix_new(card, "Line Playback", AC97_LINE, ac97)) < 0)
+			return err;
+	}
 	
 	/* build CD controls */
-	if ((err = snd_ac97_cmix_new(card, "CD Playback", AC97_CD, 0, ac97)) < 0)
-		return err;
+	if (snd_ac97_try_volume_mix(ac97, AC97_CD)) {
+		if ((err = snd_ac97_cmix_new(card, "CD Playback", AC97_CD, ac97)) < 0)
+			return err;
+	}
 	
 	/* build Video controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_VIDEO)) {
-		if ((err = snd_ac97_cmix_new(card, "Video Playback", AC97_VIDEO, 0, ac97)) < 0)
+		if ((err = snd_ac97_cmix_new(card, "Video Playback", AC97_VIDEO, ac97)) < 0)
 			return err;
 	}
 
 	/* build Aux controls */
 	if (snd_ac97_try_volume_mix(ac97, AC97_AUX)) {
-		if ((err = snd_ac97_cmix_new(card, "Aux Playback", AC97_AUX, 0, ac97)) < 0)
+		if ((err = snd_ac97_cmix_new(card, "Aux Playback", AC97_AUX, ac97)) < 0)
 			return err;
 	}
 
@@ -1470,15 +1429,8 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 		}
 		snd_ac97_write_cache(ac97, AC97_PCM, init_val);
 	} else {
-		if ((err = snd_ac97_cmute_new(card, "PCM Playback Switch", AC97_PCM, ac97)) < 0)
+		if ((err = snd_ac97_cmix_new(card, "PCM Playback", AC97_PCM, ac97)) < 0)
 			return err;
-		/* FIXME: C-Media chips have no PCM volume!! */
-		if (ac97->id == AC97_ID_CM9739)
-			snd_ac97_write_cache(ac97, AC97_PCM, 0x9f1f);
-		else {
-			if ((err = snd_ac97_cvol_new(card, "PCM Playback Volume", AC97_PCM, 31, ac97)) < 0)
-				return err;
-		}
 	}
 
 	/* build Capture controls */
