@@ -198,6 +198,17 @@ acpi_ut_evaluate_object (
 		break;
 	}
 
+	if ((acpi_gbl_enable_interpreter_slack) &&
+		(!expected_return_btypes)) {
+		/*
+		 * We received a return object, but one was not expected.  This can
+		 * happen frequently if the "implicit return" feature is enabled.
+		 * Just delete the return object and return AE_OK.
+		 */
+		acpi_ut_remove_reference (info.return_object);
+		return_ACPI_STATUS (AE_OK);
+	}
+
 	/* Is the return object one of the expected types? */
 
 	if (!(expected_return_btypes & return_btype)) {
