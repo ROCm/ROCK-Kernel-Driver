@@ -255,7 +255,7 @@ sn_mp_setup(void)
 	cnodeid_t	cnode;
 	cpuid_t		cpu;
 
-	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		/* Skip holes in CPU space */
 		if (cpu_enabled(cpu)) {
 			init_platform_pda(cpu);

@@ -1240,6 +1240,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 					  struct dst_entry *dst)
 {
 	struct ipv6_pinfo *newnp, *np = inet6_sk(sk);
+	struct tcp6_sock *newtcp6sk;
 	struct flowi fl;
 	struct inet_opt *newinet;
 	struct tcp_opt *newtp;
@@ -1256,9 +1257,14 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		if (newsk == NULL) 
 			return NULL;
 
+		newtcp6sk = (struct tcp6_sock *)newsk;
+		newtcp6sk->pinet6 = &newtcp6sk->inet6;
+
 		newinet = inet_sk(newsk);
 		newnp = inet6_sk(newsk);
 		newtp = tcp_sk(newsk);
+
+		memcpy(newnp, np, sizeof(struct ipv6_pinfo));
 
 		ipv6_addr_set(&newnp->daddr, 0, 0, htonl(0x0000FFFF),
 			      newinet->daddr);
@@ -1336,9 +1342,15 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	ip6_dst_store(newsk, dst, NULL);
 	sk->route_caps = dst->dev->features&~NETIF_F_IP_CSUM;
 
+	newtcp6sk = (struct tcp6_sock *)newsk;
+	newtcp6sk->pinet6 = &newtcp6sk->inet6;
+
 	newtp = tcp_sk(newsk);
 	newinet = inet_sk(newsk);
 	newnp = inet6_sk(newsk);
+
+	memcpy(newnp, np, sizeof(struct ipv6_pinfo));
+
 	ipv6_addr_copy(&newnp->daddr, &req->af.v6_req.rmt_addr);
 	ipv6_addr_copy(&newnp->saddr, &req->af.v6_req.loc_addr);
 	ipv6_addr_copy(&newnp->rcv_saddr, &req->af.v6_req.loc_addr);

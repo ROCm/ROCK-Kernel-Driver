@@ -1089,6 +1089,9 @@ void scsi_do_cmd(Scsi_Cmnd * SCpnt, const void *cmnd,
 	SCSI_LOG_MLQUEUE(3, printk("Leaving scsi_do_cmd()\n"));
 }
 
+void scsi_tasklet_func(unsigned long);
+static DECLARE_TASKLET(scsi_tasklet, scsi_tasklet_func, 0);
+
 /*
  * This function is the mid-level interrupt routine, which decides how
  *  to handle error conditions.  Each invocation of this function must
@@ -1186,7 +1189,7 @@ void scsi_done(Scsi_Cmnd * SCpnt)
 	/*
 	 * Mark the bottom half handler to be run.
 	 */
-	mark_bh(SCSI_BH);
+	tasklet_hi_schedule(&scsi_tasklet);
 }
 
 /*
@@ -1212,7 +1215,7 @@ void scsi_done(Scsi_Cmnd * SCpnt)
  * half queue.  Thus the only time we hold the lock here is when
  * we wish to atomically remove the contents of the queue.
  */
-void scsi_bottom_half_handler(void)
+void scsi_tasklet_func(unsigned long ignore)
 {
 	Scsi_Cmnd *SCpnt;
 	Scsi_Cmnd *SCnext;
@@ -2544,11 +2547,6 @@ static int __init init_scsi(void)
         if (scsihosts)
 		printk(KERN_INFO "scsi: host order: %s\n", scsihosts);	
 	scsi_host_no_init (scsihosts);
-	/*
-	 * This is where the processing takes place for most everything
-	 * when commands are completed.
-	 */
-	init_bh(SCSI_BH, scsi_bottom_half_handler);
 
 	return 0;
 }
@@ -2558,7 +2556,7 @@ static void __exit exit_scsi(void)
 	Scsi_Host_Name *shn, *shn2 = NULL;
 	int i;
 
-	remove_bh(SCSI_BH);
+	tasklet_kill(&scsi_tasklet);
 
         devfs_unregister (scsi_devfs_handle);
         for (shn = scsi_host_no_list;shn;shn = shn->next) {

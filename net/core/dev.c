@@ -1817,11 +1817,13 @@ static int dev_get_info(char *buffer, char **start, off_t offset, int length)
 static int dev_proc_stats(char *buffer, char **start, off_t offset,
 			  int length, int *eof, void *data)
 {
-	int i, lcpu;
+	int i;
 	int len = 0;
 
-	for (lcpu = 0; lcpu < smp_num_cpus; lcpu++) {
-		i = cpu_logical_map(lcpu);
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
+
 		len += sprintf(buffer + len, "%08x %08x %08x %08x %08x %08x "
 					     "%08x %08x %08x\n",
 			       netdev_rx_stat[i].total,

@@ -50,14 +50,15 @@ typedef enum {
 } ntfs_compression_constants;
 
 /**
- * ntfs_compression_buffers - per-CPU buffers for the decompression engine.
+ * ntfs_compression_buffer - one buffer for the decompression engine.
  */
-static u8 **ntfs_compression_buffers = NULL;
+static u8 *ntfs_compression_buffer = NULL;
+
+/* This spinlock which protects it */
+static spinlock_t ntfs_cb_lock = SPIN_LOCK_UNLOCKED;
 
 /**
- * allocate_compression_buffers - allocate the per-CPU decompression buffers
- *
- * Allocate the per-CPU buffers for the decompression engine.
+ * allocate_compression_buffers - allocate the decompression buffers
  *
  * Caller has to hold the ntfs_lock semaphore.
  *
@@ -67,30 +68,16 @@ int allocate_compression_buffers(void)
 {
 	int i, j;
 
-	BUG_ON(ntfs_compression_buffers);
+	BUG_ON(ntfs_compression_buffer);
 
-	ntfs_compression_buffers =  (u8**)kmalloc(smp_num_cpus * sizeof(u8*),
-			GFP_KERNEL);
-	if (!ntfs_compression_buffers)
+	ntfs_compression_buffer = vmalloc(NTFS_MAX_CB_SIZE);
+	if (!ntfs_compression_buffer)
 		return -ENOMEM;
-	for (i = 0; i < smp_num_cpus; i++) {
-		ntfs_compression_buffers[i] = (u8*)vmalloc(NTFS_MAX_CB_SIZE);
-		if (!ntfs_compression_buffers[i])
-			break;
-	}
-	if (i == smp_num_cpus)
-		return 0;
-	/* Allocation failed, cleanup and return error. */
-	for (j = 0; j < i; j++)
-		vfree(ntfs_compression_buffers[j]);
-	kfree(ntfs_compression_buffers);
-	return -ENOMEM;
+	return 0;
 }
 
 /**
- * free_compression_buffers - free the per-CPU decompression buffers
- *
- * Free the per-CPU buffers used by the decompression engine.
+ * free_compression_buffers - free the decompression buffers
  *
  * Caller has to hold the ntfs_lock semaphore.
  */
@@ -98,12 +85,9 @@ void free_compression_buffers(void)
 {
 	int i;
 
-	BUG_ON(!ntfs_compression_buffers);
-
-	for (i = 0; i < smp_num_cpus; i++)
-		vfree(ntfs_compression_buffers[i]);
-	kfree(ntfs_compression_buffers);
-	ntfs_compression_buffers = NULL;
+	BUG_ON(!ntfs_compression_buffer);
+	vfree(ntfs_compression_buffer);
+	ntfs_compression_buffer = NULL;
 }
 
 /**
@@ -188,8 +172,8 @@ do_next_sb:
 		ntfs_debug("Completed. Returning success (0).");
 		err = 0;
 return_error:
-		/* We can sleep from now on, so we reenable preemption. */
-		preempt_enable();
+		/* We can sleep from now on, so we drop lock. */
+		spin_unlock(&ntfs_cb_lock);
 		/* Second stage: finalize completed pages. */
 		for (i = 0; i < nr_completed_pages; i++) {
 			int di = completed_pages[i];
@@ -607,12 +591,10 @@ retry_remap:
 	}
 
 	/*
-	 * Get the compression buffer corresponding to the current CPU. We must
-	 * not sleep any more until we are finished with the compression buffer.
-	 * If on a preemptible kernel, now disable preemption.
-	 */
-	preempt_disable();
-	cb = ntfs_compression_buffers[smp_processor_id()];
+	 * Get the compression buffer. We must not sleep any more
+	 * until we are finished with it.  */
+	spin_lock(&ntfs_cb_lock);
+	cb = ntfs_compression_buffer;
 
 	BUG_ON(!cb);
 
@@ -647,8 +629,8 @@ retry_remap:
 	if (vcn == start_vcn - cb_clusters) {
 		/* Sparse cb, zero out page range overlapping the cb. */
 		ntfs_debug("Found sparse compression block.");
-		/* We can sleep from now on, so we reenable preemption. */
-		preempt_enable();
+		/* We can sleep from now on, so we drop lock. */
+		spin_unlock(&ntfs_cb_lock);
 		if (cb_max_ofs)
 			cb_max_page--;
 		for (; cur_page < cb_max_page; cur_page++) {
@@ -729,8 +711,8 @@ retry_remap:
 			cb_pos += cb_max_ofs - cur_ofs;
 			cur_ofs = cb_max_ofs;
 		}
-		/* We can sleep from now on, so we reenable preemption. */
-		preempt_enable();
+		/* We can sleep from now on, so drop lock. */
+		spin_unlock(&ntfs_cb_lock);
 		/* Second stage: finalize pages. */
 		for (; cur2_page < cb_max_page; cur2_page++) {
 			page = pages[cur2_page];
@@ -759,9 +741,8 @@ retry_remap:
 				cb_max_page, cb_max_ofs, xpage, &xpage_done,
 				cb_pos,	cb_size - (cb_pos - cb));
 		/*
-		 * We can sleep from now on, preemption already reenabled by
-		 * ntfs_decompess.
-		 */
+		 * We can sleep from now on, lock already dropped by
+		 * ntfs_decompress.  */
 		if (err) {
 			ntfs_error(vol->sb, "ntfs_decompress() failed in inode "
 					"0x%Lx with error code %i. Skipping "

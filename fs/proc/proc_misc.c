@@ -281,29 +281,32 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	unsigned int sum = 0, user = 0, nice = 0, system = 0;
 	int major, disk;
 
-	for (i = 0 ; i < smp_num_cpus; i++) {
-		int cpu = cpu_logical_map(i), j;
+	for (i = 0 ; i < NR_CPUS; i++) {
+		int j;
 
-		user += kstat.per_cpu_user[cpu];
-		nice += kstat.per_cpu_nice[cpu];
-		system += kstat.per_cpu_system[cpu];
+		if(!cpu_online(i)) continue;
+		user += kstat.per_cpu_user[i];
+		nice += kstat.per_cpu_nice[i];
+		system += kstat.per_cpu_system[i];
 #if !defined(CONFIG_ARCH_S390)
 		for (j = 0 ; j < NR_IRQS ; j++)
-			sum += kstat.irqs[cpu][j];
+			sum += kstat.irqs[i][j];
 #endif
 	}
 
 	len = sprintf(page, "cpu  %u %u %u %lu\n", user, nice, system,
-		      jif * smp_num_cpus - (user + nice + system));
-	for (i = 0 ; i < smp_num_cpus; i++)
+		      jif * num_online_cpus() - (user + nice + system));
+	for (i = 0 ; i < NR_CPUS; i++){
+		if (!cpu_online(i)) continue;
 		len += sprintf(page + len, "cpu%d %u %u %u %lu\n",
 			i,
-			kstat.per_cpu_user[cpu_logical_map(i)],
-			kstat.per_cpu_nice[cpu_logical_map(i)],
-			kstat.per_cpu_system[cpu_logical_map(i)],
-			jif - (  kstat.per_cpu_user[cpu_logical_map(i)] \
-				   + kstat.per_cpu_nice[cpu_logical_map(i)] \
-				   + kstat.per_cpu_system[cpu_logical_map(i)]));
+			kstat.per_cpu_user[i],
+			kstat.per_cpu_nice[i],
+			kstat.per_cpu_system[i],
+			jif - (  kstat.per_cpu_user[i] \
+				   + kstat.per_cpu_nice[i] \
+				   + kstat.per_cpu_system[i]));
+	}
 	len += sprintf(page + len,
 		"page %u %u\n"
 		"swap %u %u\n"

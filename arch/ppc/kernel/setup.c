@@ -147,8 +147,8 @@ int show_cpuinfo(struct seq_file *m, void *v)
 		/* Show summary information */
 #ifdef CONFIG_SMP
 		unsigned long bogosum = 0;
-		for (i = 0; i < smp_num_cpus; ++i)
-			if (cpu_online_map & (1 << i))
+		for (i = 0; i < NR_CPUS; ++i)
+			if (cpu_online(i))
 				bogosum += cpu_data[i].loops_per_jiffy;
 		seq_printf(m, "total bogomips\t: %lu.%02lu\n",
 			   bogosum/(500000/HZ), bogosum/(5000/HZ) % 100);

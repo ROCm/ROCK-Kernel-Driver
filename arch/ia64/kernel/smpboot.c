@@ -76,9 +76,6 @@ task_t *task_for_booting_cpu;
 /* Setup configured maximum number of CPUs to activate */
 static int max_cpus = -1;
 
-/* Total count of live CPUs */
-int smp_num_cpus = 1;
-
 /* Bitmask of currently online CPUs */
 volatile unsigned long cpu_online_map;
 
@@ -505,7 +502,6 @@ smp_boot_cpus (void)
 	if (!max_cpus || (max_cpus < -1)) {
 		printk(KERN_INFO "SMP mode deactivated.\n");
 		cpu_online_map =  1;
-		smp_num_cpus = 1;
 		goto smp_done;
 	}
 	if (max_cpus != -1)
@@ -534,8 +530,6 @@ smp_boot_cpus (void)
 			if (ia64_cpu_to_sapicid[cpu] == -1)
 				printk("phys CPU#%d not responding - cannot use it.\n", cpu);
 		}
-
-		smp_num_cpus = cpucount + 1;
 
 		/*
 		 * Allow the user to impress friends.
@@ -581,6 +575,5 @@ init_smp_config(void)
 		printk("SMP: Can't set SAL AP Boot Rendezvous: %s\n     Forcing UP mode\n",
 		       ia64_sal_strerror(sal_ret));
 		max_cpus = 0;
-		smp_num_cpus = 1;
 	}
 }

@@ -203,7 +203,7 @@ sn1_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 	int		backlog = 0;
 #endif
 
-	if (smp_num_cpus == 1) {
+	if (num_online_cpus() == 1) {
 		sn1_ptc_l_range(start, end, nbits);
 		return;
 	}
@@ -302,7 +302,7 @@ sn1_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 	params->end = end;
 	params->nbits = nbits;
 	params->rid = (unsigned int) ia64_get_rr(start);
-	atomic_set(&params->unfinished_count, smp_num_cpus);
+	atomic_set(&params->unfinished_count, num_online_cpus());
 
 	/* The atomic_set above can hit memory *after* the update
 	 * to ptcParamsEmpty below, which opens a timing window
@@ -425,7 +425,7 @@ init_sn1_smp_config(void)
 {
 	if (!ia64_ptc_domain_info)  {
 		printk("SMP: Can't find PTC domain info. Forcing UP mode\n");
-		smp_num_cpus = 1;
+		cpu_online_map = 1;
 		return;
 	}
 
