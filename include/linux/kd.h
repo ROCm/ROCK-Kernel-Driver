@@ -152,6 +152,12 @@ struct console_font_op {
 	unsigned char *data;	/* font data with height fixed to 32 */
 };
 
+struct console_font {
+	unsigned int width, height;	/* font size */
+	unsigned int charcount;
+	unsigned char *data;	/* font data with height fixed to 32 */
+};
+
 #define KD_FONT_OP_SET		0	/* Set font */
 #define KD_FONT_OP_GET		1	/* Get font */
 #define KD_FONT_OP_SET_DEFAULT	2	/* Set font to default, data points to name / NULL */

@@ -52,7 +52,7 @@ static int xcurs_correction = 29;
 static int newport_xsize;
 static int newport_ysize;
 
-static int newport_set_def_font(int unit, struct console_font_op *op);
+static int newport_set_def_font(int unit, struct console_font *op);
 
 #define BMASK(c) (c << 24)
 
@@ -531,7 +531,7 @@ static int newport_set_font(int unit, struct console_font_op *op)
 	return 0;
 }
 
-static int newport_set_def_font(int unit, struct console_font_op *op)
+static int newport_set_def_font(int unit, struct console_font *op)
 {
 	if (font_data[unit] != FONT_DATA) {
 		if (--REFCOUNT(font_data[unit]) == 0)
@@ -543,7 +543,7 @@ static int newport_set_def_font(int unit, struct console_font_op *op)
 	return 0;
 }
 
-static int newport_font_default(struct vc_data *vc, struct console_font_op *op)
+static int newport_font_default(struct vc_data *vc, struct console_font *op, char *name)
 {
 	return newport_set_def_font(vc->vc_num, op);
 }

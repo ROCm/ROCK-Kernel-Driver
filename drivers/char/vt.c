@@ -100,6 +100,7 @@
 #include <linux/workqueue.h>
 #include <linux/bootmem.h>
 #include <linux/pm.h>
+#include <linux/font.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -3139,17 +3140,31 @@ out:
 
 int con_font_default(int currcons, struct console_font_op *op)
 {
+	struct console_font font = {.width = op->width, .height = op->height};
+	char name[MAX_FONT_NAME];
+	char *s = name;
 	int rc;
 
 	if (vt_cons[currcons]->vc_mode != KD_TEXT)
 		return -EINVAL;
 
+	if (!op->data)
+		s = NULL;
+	else if (strncpy_from_user(name, op->data, MAX_FONT_NAME - 1) < 0)
+		return -EFAULT;
+	else
+		name[MAX_FONT_NAME - 1] = 0;
+
 	acquire_console_sem();
 	if (sw->con_font_default)
-		rc = sw->con_font_default(vc_cons[currcons].d, op);
+		rc = sw->con_font_default(vc_cons[currcons].d, &font, s);
 	else
 		rc = -ENOSYS;
 	release_console_sem();
+	if (!rc) {
+		op->width = font.width;
+		op->height = font.height;
+	}
 	return rc;
 }
 

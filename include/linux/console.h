@@ -19,6 +19,7 @@
 
 struct vc_data;
 struct console_font_op;
+struct console_font;
 struct module;
 
 /*
@@ -42,7 +43,7 @@ struct consw {
 	int	(*con_blank)(struct vc_data *, int, int);
 	int	(*con_font_set)(struct vc_data *, struct console_font_op *);
 	int	(*con_font_get)(struct vc_data *, struct console_font_op *);
-	int	(*con_font_default)(struct vc_data *, struct console_font_op *);
+	int	(*con_font_default)(struct vc_data *, struct console_font *, char *);
 	int	(*con_font_copy)(struct vc_data *, struct console_font_op *);
 	int	(*con_resize)(struct vc_data *, unsigned int, unsigned int);
 	int	(*con_set_palette)(struct vc_data *, unsigned char *);

@@ -2272,24 +2272,21 @@ static int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 	return fbcon_do_set_font(vc, op, new_data, 1);
 }
 
-static int fbcon_set_def_font(struct vc_data *vc, struct console_font_op *op)
+static int fbcon_set_def_font(struct vc_data *vc, struct console_font *font, char *name)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
-	char name[MAX_FONT_NAME];
 	struct font_desc *f;
+	struct console_font_op crap;
 
-	if (!op->data)
+	if (!name)
 		f = get_default_font(info->var.xres, info->var.yres);
-	else if (strncpy_from_user(name, op->data, MAX_FONT_NAME - 1) < 0)
-		return -EFAULT;
-	else {
-		name[MAX_FONT_NAME - 1] = 0;
-		if (!(f = find_font(name)))
-			return -ENOENT;
-	}
-	op->width = f->width;
-	op->height = f->height;
-	return fbcon_do_set_font(vc, op, f->data, 0);
+	else if (!(f = find_font(name)))
+		return -ENOENT;
+
+	crap.op = KD_FONT_OP_SET_DEFAULT;
+	crap.width = font->width = f->width;
+	crap.height = font->height = f->height;
+	return fbcon_do_set_font(vc, &crap, f->data, 0);
 }
 
 static u16 palette_red[16];
