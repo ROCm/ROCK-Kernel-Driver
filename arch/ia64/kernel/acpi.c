@@ -192,21 +192,19 @@ acpi_parse_lsapic (acpi_table_entry_header *header)
 
 	printk(KERN_INFO "CPU %d (0x%04x)", total_cpus, (lsapic->id << 8) | lsapic->eid);
 
-	if (lsapic->flags.enabled) {
-		available_cpus++;
+	if (!lsapic->flags.enabled)
+		printk(" disabled");
+	else if (available_cpus >= NR_CPUS)
+		printk(" ignored (increase NR_CPUS)");
+	else {
 		printk(" enabled");
 #ifdef CONFIG_SMP
-		smp_boot_data.cpu_phys_id[total_cpus] = (lsapic->id << 8) | lsapic->eid;
+		smp_boot_data.cpu_phys_id[available_cpus] = (lsapic->id << 8) | lsapic->eid;
 		if (hard_smp_processor_id()
-		    == (unsigned int) smp_boot_data.cpu_phys_id[total_cpus])
+		    == (unsigned int) smp_boot_data.cpu_phys_id[available_cpus])
 			printk(" (BSP)");
 #endif
-	}
-	else {
-		printk(" disabled");
-#ifdef CONFIG_SMP
-		smp_boot_data.cpu_phys_id[total_cpus] = -1;
-#endif
+		++available_cpus;
 	}
 
 	printk("\n");
@@ -695,11 +693,11 @@ acpi_boot_init (void)
 #endif
 
 #ifdef CONFIG_SMP
+	smp_boot_data.cpu_count = available_cpus;
 	if (available_cpus == 0) {
 		printk(KERN_INFO "ACPI: Found 0 CPUS; assuming 1\n");
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
-	smp_boot_data.cpu_count = total_cpus;
 
 	smp_build_cpu_map();
 # ifdef CONFIG_NUMA

@@ -449,7 +449,7 @@ smp_build_cpu_map (void)
 
 	for (cpu = 1, i = 0; i < smp_boot_data.cpu_count; i++) {
 		sapicid = smp_boot_data.cpu_phys_id[i];
-		if (sapicid == -1 || sapicid == boot_cpu_id)
+		if (sapicid == boot_cpu_id)
 			continue;
 		phys_cpu_present_map |= (1 << cpu);
 		ia64_cpu_to_sapicid[cpu] = sapicid;
