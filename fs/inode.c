@@ -128,6 +128,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		memset(&inode->i_dquot, 0, sizeof(inode->i_dquot));
 		inode->i_pipe = NULL;
 		inode->i_bdev = NULL;
+		inode->i_cdev = NULL;
 		inode->i_rdev = to_kdev_t(0);
 		inode->i_security = NULL;
 		if (security_inode_alloc(inode)) {
@@ -241,6 +242,8 @@ void clear_inode(struct inode *inode)
 		inode->i_sb->s_op->clear_inode(inode);
 	if (inode->i_bdev)
 		bd_forget(inode);
+	if (inode->i_cdev)
+		cd_forget(inode);
 	inode->i_state = I_CLEAR;
 }
 

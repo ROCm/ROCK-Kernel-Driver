@@ -2279,7 +2279,7 @@ int tty_register_driver(struct tty_driver *driver)
 	driver->cdev.owner = driver->owner;
 	error = cdev_add(&driver->cdev, dev, driver->num);
 	if (error) {
-		cdev_put(&driver->cdev);
+		kobject_del(&driver->cdev.kobj);
 		unregister_chrdev_region(dev, driver->num);
 		return error;
 	}

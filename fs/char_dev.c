@@ -67,27 +67,6 @@ int get_chrdev_list(char *page)
 }
 
 /*
- * Return the function table of a device, if present.
- * Load the driver if needed.
- * Increment the reference count of module in question.
- */
-static struct file_operations *get_chrfops(dev_t dev)
-{
-	struct file_operations *ret = NULL;
-	int index;
-	struct kobject *kobj = kobj_lookup(cdev_map, dev, &index);
-
-	if (kobj) {
-		struct cdev *p = container_of(kobj, struct cdev, kobj);
-		struct module *owner = p->owner;
-		ret = fops_get(p->ops);
-		cdev_put(p);
-		module_put(owner);
-	}
-	return ret;
-}
-
-/*
  * Register a single major with a specified minor range.
  *
  * If major == 0 this functions will dynamically allocate a major and return
@@ -238,7 +217,7 @@ int register_chrdev(unsigned int major, const char *name,
 
 	return major ? 0 : cd->major;
 out:
-	cdev_put(cdev);
+	kobject_put(&cdev->kobj);
 out2:
 	__unregister_chrdev_region(cd->major, 0, 256);
 	return err;
@@ -268,23 +247,74 @@ int unregister_chrdev(unsigned int major, const char *name)
 	return 0;
 }
 
+static spinlock_t cdev_lock = SPIN_LOCK_UNLOCKED;
 /*
  * Called every time a character special file is opened
  */
 int chrdev_open(struct inode * inode, struct file * filp)
 {
-	int ret = -ENODEV;
+	struct cdev *p;
+	struct cdev *new = NULL;
+	int ret = 0;
 
-	filp->f_op = get_chrfops(kdev_t_to_nr(inode->i_rdev));
-	if (filp->f_op) {
-		ret = 0;
-		if (filp->f_op->open != NULL) {
-			lock_kernel();
-			ret = filp->f_op->open(inode,filp);
-			unlock_kernel();
-		}
+	spin_lock(&cdev_lock);
+	p = inode->i_cdev;
+	if (!p) {
+		struct kobject *kobj;
+		int idx;
+		spin_unlock(&cdev_lock);
+		kobj = kobj_lookup(cdev_map, kdev_t_to_nr(inode->i_rdev), &idx);
+		if (!kobj)
+			return -ENODEV;
+		new = container_of(kobj, struct cdev, kobj);
+		spin_lock(&cdev_lock);
+		p = inode->i_cdev;
+		if (!p) {
+			inode->i_cdev = p = new;
+			inode->i_cindex = idx;
+			list_add(&inode->i_devices, &p->list);
+			new = NULL;
+		} else if (!cdev_get(p))
+			ret = -ENODEV;
+	} else if (!cdev_get(p))
+		ret = -ENODEV;
+	spin_unlock(&cdev_lock);
+	cdev_put(new);
+	if (ret)
+		return ret;
+	filp->f_op = fops_get(p->ops);
+	if (!filp->f_op) {
+		cdev_put(p);
+		return -ENODEV;
 	}
+	if (filp->f_op->open) {
+		lock_kernel();
+		ret = filp->f_op->open(inode,filp);
+		unlock_kernel();
+	}
+	if (ret)
+		cdev_put(p);
 	return ret;
+}
+
+void cd_forget(struct inode *inode)
+{
+	spin_lock(&cdev_lock);
+	list_del_init(&inode->i_devices);
+	inode->i_cdev = NULL;
+	spin_unlock(&cdev_lock);
+}
+
+void cdev_purge(struct cdev *cdev)
+{
+	spin_lock(&cdev_lock);
+	while (!list_empty(&cdev->list)) {
+		struct inode *inode;
+		inode = container_of(cdev->list.next, struct inode, i_devices);
+		list_del_init(&inode->i_devices);
+		inode->i_cdev = NULL;
+	}
+	spin_unlock(&cdev_lock);
 }
 
 /*
@@ -345,7 +375,7 @@ void cdev_unmap(dev_t dev, unsigned count)
 void cdev_del(struct cdev *p)
 {
 	kobject_del(&p->kobj);
-	cdev_put(p);
+	kobject_put(&p->kobj);
 }
 
 struct kobject *cdev_get(struct cdev *p)
@@ -361,13 +391,32 @@ struct kobject *cdev_get(struct cdev *p)
 	return kobj;
 }
 
+void cdev_put(struct cdev *p)
+{
+	if (p) {
+		kobject_put(&p->kobj);
+		module_put(p->owner);
+	}
+}
+
 static decl_subsys(cdev, NULL, NULL);
+
+static void cdev_default_release(struct kobject *kobj)
+{
+	struct cdev *p = container_of(kobj, struct cdev, kobj);
+	cdev_purge(p);
+}
 
 static void cdev_dynamic_release(struct kobject *kobj)
 {
 	struct cdev *p = container_of(kobj, struct cdev, kobj);
+	cdev_purge(p);
 	kfree(p);
 }
+
+static struct kobj_type ktype_cdev_default = {
+	.release	= cdev_default_release,
+};
 
 static struct kobj_type ktype_cdev_dynamic = {
 	.release	= cdev_dynamic_release,
@@ -385,6 +434,7 @@ struct cdev *cdev_alloc(void)
 	if (p) {
 		memset(p, 0, sizeof(struct cdev));
 		p->kobj.kset = &kset_dynamic;
+		INIT_LIST_HEAD(&p->list);
 		kobject_init(&p->kobj);
 	}
 	return p;
@@ -392,7 +442,9 @@ struct cdev *cdev_alloc(void)
 
 void cdev_init(struct cdev *cdev, struct file_operations *fops)
 {
+	INIT_LIST_HEAD(&cdev->list);
 	kobj_set_kset_s(cdev, cdev_subsys);
+	cdev->kobj.ktype = &ktype_cdev_default;
 	kobject_init(&cdev->kobj);
 	cdev->ops = fops;
 }
