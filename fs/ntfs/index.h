@@ -139,8 +139,8 @@ static inline void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
 	if (ictx->is_in_root)
 		mark_mft_record_dirty(ictx->actx->ntfs_ino);
 	else
-		mark_ntfs_record_dirty(ictx->idx_ni, ictx->page,
-			(u8*)ictx->ia - (u8*)page_address(ictx->page));
+		mark_ntfs_record_dirty(ictx->page,
+				(u8*)ictx->ia - (u8*)page_address(ictx->page));
 }
 
 #endif /* NTFS_RW */

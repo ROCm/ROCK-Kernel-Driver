@@ -95,8 +95,7 @@ static inline struct page *ntfs_map_page(struct address_space *mapping,
 
 #ifdef NTFS_RW
 
-extern void mark_ntfs_record_dirty(ntfs_inode *ni, struct page *page,
-		unsigned int rec_start);
+extern void mark_ntfs_record_dirty(struct page *page, const unsigned int ofs);
 
 #endif /* NTFS_RW */
 
