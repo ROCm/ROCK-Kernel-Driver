@@ -18,7 +18,8 @@
 #include <linux/notifier.h>
 #include <linux/threads.h>
 #include <linux/device.h>
-
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
 
 #define CPUFREQ_NAME_LEN 16
 
@@ -193,6 +194,13 @@ static inline void cpufreq_verify_within_limits(struct cpufreq_policy *policy, u
 		policy->min = policy->max;
 	return;
 }
+
+struct freq_attr {
+	struct attribute attr;
+	ssize_t (*show)(struct cpufreq_policy *, char *);
+	ssize_t (*store)(struct cpufreq_policy *, const char *, size_t count);
+};
+
 
 /*********************************************************************
  *                        CPUFREQ 2.6. INTERFACE                     *

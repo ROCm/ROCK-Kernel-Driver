@@ -23,6 +23,7 @@
 #include <linux/sysctl.h>
 #include <linux/types.h>
 #include <linux/fs.h>
+#include <linux/sysfs.h>
 
 #include <asm/uaccess.h>
 
@@ -465,23 +466,14 @@ static inline void cpufreq_sysctl_exit(void)
 
 
 /************************** sysfs interface ************************/
-static inline int to_cpu_nr (struct device *dev)
+static ssize_t show_speed (struct cpufreq_policy *policy, char *buf)
 {
-	struct sys_device * cpu_sys_dev = container_of(dev, struct sys_device, dev);
-	return (cpu_sys_dev->id);
-}
-
-static ssize_t show_speed (struct device *dev, char *buf)
-{
-	unsigned int cpu = to_cpu_nr(dev);
-
-	return sprintf (buf, "%u\n", cpu_cur_freq[cpu]);
+	return sprintf (buf, "%u\n", cpu_cur_freq[policy->cpu]);
 }
 
 static ssize_t 
-store_speed (struct device *dev, const char *buf, size_t count) 
+store_speed (struct cpufreq_policy *policy, const char *buf, size_t count) 
 {
-	unsigned int cpu = to_cpu_nr(dev);
 	unsigned int freq = 0;
 	unsigned int ret;
 
@@ -489,13 +481,16 @@ store_speed (struct device *dev, const char *buf, size_t count)
 	if (ret != 1)
 		return -EINVAL;
 
-	cpufreq_set(freq, cpu);
+	cpufreq_set(freq, policy->cpu);
 
 	return count;
 }
 
-static DEVICE_ATTR(scaling_setspeed, (S_IRUGO | S_IWUSR), show_speed, store_speed);
-
+static struct freq_attr freq_attr_scaling_setspeed = {
+	.attr = { .name = "scaling_setspeed", .mode = 0644 },
+	.show = show_speed,
+	.store = store_speed,
+};
 
 static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 				   unsigned int event)
@@ -511,7 +506,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_min_freq[cpu] = policy->min;
 		cpu_max_freq[cpu] = policy->max;
 		cpu_cur_freq[cpu] = policy->cur;
-		device_create_file (policy->dev, &dev_attr_scaling_setspeed);
+		sysfs_create_file (&policy->kobj, &freq_attr_scaling_setspeed.attr);
 		memcpy (&current_policy[cpu], policy, sizeof(struct cpufreq_policy));
 		up(&userspace_sem);
 		break;
@@ -520,7 +515,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_is_managed[cpu] = 0;
 		cpu_min_freq[cpu] = 0;
 		cpu_max_freq[cpu] = 0;
-		device_remove_file (policy->dev, &dev_attr_scaling_setspeed);
+		sysfs_remove_file (&policy->kobj, &freq_attr_scaling_setspeed.attr);
 		up(&userspace_sem);
 		module_put(THIS_MODULE);
 		break;

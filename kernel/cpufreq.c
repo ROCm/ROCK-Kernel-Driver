@@ -256,12 +256,6 @@ static ssize_t show_scaling_available_governors(struct cpufreq_policy * policy, 
 }
 
 
-struct freq_attr {
-	struct attribute attr;
-	ssize_t (*show)(struct cpufreq_policy *, char *);
-	ssize_t (*store)(struct cpufreq_policy *, const char *, size_t count);
-};
-
 #define define_one_ro(_name) \
 struct freq_attr _name = { \
 	.attr = { .name = __stringify(_name), .mode = 0444 }, \
