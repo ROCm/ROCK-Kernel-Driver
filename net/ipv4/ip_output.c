@@ -1003,7 +1003,7 @@ fail:
 }
 
 int
-generic_getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb)
+ip_generic_getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb)
 {
 	struct iovec *iov = from;
 
@@ -1095,7 +1095,7 @@ int ip_append_data(struct sock *sk,
 		opt = ipc->opt;
 		if (opt) {
 			if (inet->cork.opt == NULL)
-				inet->cork.opt = kmalloc(sizeof(struct ip_options)+40, GFP_KERNEL);
+				inet->cork.opt = kmalloc(sizeof(struct ip_options)+40, sk->allocation);
 			memcpy(inet->cork.opt, opt, sizeof(struct ip_options)+opt->optlen);
 			inet->cork.flags |= IPCORK_OPT;
 			inet->cork.addr = ipc->addr;
@@ -1129,7 +1129,6 @@ int ip_append_data(struct sock *sk,
 		return -EMSGSIZE;
 	}
 
-#if 0 /* Not now */
 	/*
 	 * transhdrlen > 0 means that this is the first fragment and we wish
 	 * it won't be fragmented in the future.
@@ -1139,7 +1138,6 @@ int ip_append_data(struct sock *sk,
 	    rt->u.dst.dev->features&(NETIF_F_IP_CSUM|NETIF_F_NO_CSUM|NETIF_F_HW_CSUM) &&
 	    !exthdrlen)
 		csummode = CHECKSUM_HW;
-#endif
 
 	inet->cork.length += length;
 
@@ -1151,6 +1149,7 @@ int ip_append_data(struct sock *sk,
 			char *data;
 			unsigned int datalen;
 			unsigned int fraglen;
+			unsigned int alloclen;
 			BUG_TRAP(copy == 0);
 
 alloc_new_skb:
@@ -1159,12 +1158,19 @@ alloc_new_skb:
 				datalen = length;
 
 			fraglen = datalen + fragheaderlen;
+			if ((flags & MSG_MORE) && 
+			    !(rt->u.dst.dev->features&NETIF_F_SG))
+				alloclen = maxfraglen;
+			else
+				alloclen = datalen + fragheaderlen;
 			if (!(flags & MSG_DONTWAIT) || transhdrlen) {
-				skb = sock_alloc_send_skb(sk, fraglen + hh_len + 15,
-							  (flags & MSG_DONTWAIT), &err);
+				skb = sock_alloc_send_skb(sk, 
+						alloclen + hh_len + 15,
+						(flags & MSG_DONTWAIT), &err);
 			} else {
-				skb = sock_wmalloc(sk, fraglen + hh_len + 15, 1,
-						   sk->allocation);
+				skb = sock_wmalloc(sk, 
+						alloclen + hh_len + 15, 1,
+						sk->allocation);
 				if (unlikely(skb == NULL))
 					err = -ENOBUFS;
 			}
@@ -1206,20 +1212,15 @@ alloc_new_skb:
 			continue;
 		}
 
-		if (!(rt->u.dst.dev->features&NETIF_F_SG)) {
-			int off;
-			if (!((skb->len - fragheaderlen) & 7))
-				goto alloc_new_skb;
+		if (copy > length)
+			copy = length;
 
-			/* 
-			 * Align the start address of the next IP fragment
-			 * on 8 byte boundary.
-			 */
-			copy = 8 - ((skb->len - fragheaderlen) & 7);
+		if (!(rt->u.dst.dev->features&NETIF_F_SG)) {
+			unsigned int off;
+
 			off = skb->len;
-			if (copy > length)
-				copy = length;
-			if (getfrag(from, skb_put(skb, copy), offset, copy, off, skb) < 0) {
+			if (getfrag(from, skb_put(skb, copy), 
+					offset, copy, off, skb) < 0) {
 				__skb_trim(skb, off);
 				err = -EFAULT;
 				goto error;
@@ -1230,9 +1231,6 @@ alloc_new_skb:
 			struct page *page = inet->sndmsg_page;
 			int off = inet->sndmsg_off;
 			unsigned int left;
-
-			if (copy > length)
-				copy = length;
 
 			if (page && (left = PAGE_SIZE - off) > 0) {
 				if (copy >= left)
@@ -1518,39 +1516,14 @@ void ip_flush_pending_frames(struct sock *sk)
 /*
  *	Fetch data from kernel space and fill in checksum if needed.
  */
-static int ip_reply_glue_bits(const void *dptr, char *to, unsigned int offset, 
-			      unsigned int fraglen, struct sk_buff *skb)
+static int ip_reply_glue_bits(void *dptr, char *to, int offset, 
+			      int len, int odd, struct sk_buff *skb)
 {
-        struct ip_reply_arg *dp = (struct ip_reply_arg*)dptr;
-	u16 *pktp = (u16 *)to;
-	struct iovec *iov; 
-	int len; 
-	int hdrflag = 1; 
+	unsigned int csum;
 
-	iov = &dp->iov[0]; 
-	if (offset >= iov->iov_len) { 
-		offset -= iov->iov_len;
-		iov++; 
-		hdrflag = 0; 
-	}
-	len = iov->iov_len - offset;
-	if (fraglen > len) { /* overlapping. */ 
-		dp->csum = csum_partial_copy_nocheck(iov->iov_base+offset, to, len,
-					     dp->csum);
-		offset = 0;
-		fraglen -= len; 
-		to += len; 
-		iov++;
-	}
-
-	dp->csum = csum_partial_copy_nocheck(iov->iov_base+offset, to, fraglen, 
-					     dp->csum); 
-
-	if (hdrflag && dp->csumoffset)
-		*(pktp + dp->csumoffset) = csum_fold(dp->csum); /* fill in checksum */
-	skb->ip_summed = CHECKSUM_NONE;
-
-	return 0;	       
+	csum = csum_partial_copy_nocheck(dptr+offset, to, len, 0);
+	skb->csum = csum_block_add(skb->csum, csum, odd);
+	return 0;  
 }
 
 /* 
@@ -1606,7 +1579,15 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 	inet->tos = skb->nh.iph->tos;
 	sk->priority = skb->priority;
 	sk->protocol = skb->nh.iph->protocol;
-	ip_build_xmit(sk, ip_reply_glue_bits, arg, len, &ipc, rt, MSG_DONTWAIT);
+	ip_append_data(sk, ip_reply_glue_bits, arg->iov->iov_base, len, 0,
+		       &ipc, rt, MSG_DONTWAIT);
+	if ((skb = skb_peek(&sk->write_queue)) != NULL) {
+		if (arg->csumoffset >= 0)
+			*((u16 *)skb->h.raw + arg->csumoffset) = csum_fold(csum_add(skb->csum, arg->csum));
+		skb->ip_summed = CHECKSUM_NONE;
+		ip_push_pending_frames(sk);
+	}
+
 	bh_unlock_sock(sk);
 
 	ip_rt_put(rt);
