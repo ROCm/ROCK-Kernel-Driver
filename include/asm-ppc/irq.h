@@ -6,10 +6,6 @@
 #include <asm/machdep.h>		/* ppc_md */
 #include <asm/atomic.h>
 
-extern void disable_irq(unsigned int);
-extern void disable_irq_nosync(unsigned int);
-extern void enable_irq(unsigned int);
-
 /*
  * These constants are used for passing information about interrupt
  * signal polarity and level/edge sensing to the low-level PIC chip
