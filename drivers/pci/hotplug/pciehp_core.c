@@ -57,9 +57,9 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-module_param(pciehp_debug, bool, 644);
-module_param(pciehp_poll_mode, bool, 644);
-module_param(pciehp_poll_time, int, 644);
+module_param(pciehp_debug, bool, 0644);
+module_param(pciehp_poll_mode, bool, 0644);
+module_param(pciehp_poll_time, int, 0644);
 MODULE_PARM_DESC(pciehp_debug, "Debugging mode enabled or not");
 MODULE_PARM_DESC(pciehp_poll_mode, "Using polling mechanism for hot-plug events or not");
 MODULE_PARM_DESC(pciehp_poll_time, "Polling mechanism frequency, in seconds");
