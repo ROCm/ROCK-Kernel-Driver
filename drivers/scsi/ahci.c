@@ -43,12 +43,13 @@
 
 enum {
 	AHCI_PCI_BAR		= 5,
-	AHCI_MAX_SG		= 512, /* hardware max is 64K */
+	AHCI_MAX_SG		= 168, /* hardware max is 64K */
 	AHCI_DMA_BOUNDARY	= 0xffffffff,
 	AHCI_USE_CLUSTERING	= 0,
-	AHCI_CMD_SLOT_SZ	= 32,
+	AHCI_CMD_SLOT_SZ	= 32 * 32,
 	AHCI_RX_FIS_SZ		= 256,
-	AHCI_CMD_TBL_SZ		= 128 + (AHCI_MAX_SG * 16),
+	AHCI_CMD_TBL_HDR	= 0x80,
+	AHCI_CMD_TBL_SZ		= AHCI_CMD_TBL_HDR + (AHCI_MAX_SG * 16),
 	AHCI_PORT_PRIV_DMA_SZ	= AHCI_CMD_SLOT_SZ + AHCI_CMD_TBL_SZ +
 				  AHCI_RX_FIS_SZ,
 	AHCI_IRQ_ON_SG		= (1 << 31),
@@ -174,10 +175,6 @@ static void ahci_port_stop(struct ata_port *ap);
 static void ahci_host_stop(struct ata_host_set *host_set);
 static void ahci_qc_prep(struct ata_queued_cmd *qc);
 static u8 ahci_check_status(struct ata_port *ap);
-static void ahci_tf_load(struct ata_port *ap, struct ata_taskfile *tf);
-static void ahci_tf_read(struct ata_port *ap, struct ata_taskfile *tf);
-
-static void ahci_exec_command(struct ata_port *ap, struct ata_taskfile *tf);
 static inline int ahci_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc);
 
 static Scsi_Host_Template ahci_sht = {
@@ -201,10 +198,7 @@ static Scsi_Host_Template ahci_sht = {
 static struct ata_port_operations ahci_ops = {
 	.port_disable		= ata_port_disable,
 
-	.tf_load		= ahci_tf_load,
-	.tf_read		= ahci_tf_read,
 	.check_status		= ahci_check_status,
-	.exec_command		= ahci_exec_command,
 	.dev_select		= ata_noop_dev_select,
 
 	.phy_reset		= ahci_phy_reset,
@@ -276,7 +270,7 @@ static int ahci_port_start(struct ata_port *ap)
 	struct ahci_host_priv *hpriv = ap->host_set->private_data;
 	struct ahci_port_priv *pp;
 	int rc;
-	void *mem, *mem2, *mmio = ap->host_set->mmio_base;
+	void *mem, *mmio = ap->host_set->mmio_base;
 	void *port_mmio = ahci_port_base(mmio, ap->port_no);
 	dma_addr_t mem_dma;
 
@@ -298,23 +292,33 @@ static int ahci_port_start(struct ata_port *ap)
 	}
 	memset(mem, 0, AHCI_PORT_PRIV_DMA_SZ);
 
+	/*
+	 * First item in chunk of DMA memory: 32-slot command table,
+	 * 32 bytes each in size
+	 */
+	pp->cmd_slot = mem;
+	pp->cmd_slot_dma = mem_dma;
+
+	mem += AHCI_CMD_SLOT_SZ;
+	mem_dma += AHCI_CMD_SLOT_SZ;
+
+	/*
+	 * Second item: Received-FIS area
+	 */
 	pp->rx_fis = mem;
 	pp->rx_fis_dma = mem_dma;
 
 	mem += AHCI_RX_FIS_SZ;
 	mem_dma += AHCI_RX_FIS_SZ;
 
+	/*
+	 * Third item: data area for storing a single command
+	 * and its scatter-gather table
+	 */
 	pp->cmd_tbl = mem;
 	pp->cmd_tbl_dma = mem_dma;
 
-	mem2 = mem + 0x80;
-	pp->cmd_tbl_sg = mem2;
-
-	mem += AHCI_CMD_TBL_SZ;
-	mem_dma += AHCI_CMD_TBL_SZ;
-
-	pp->cmd_slot = mem;
-	pp->cmd_slot_dma = mem_dma;
+	pp->cmd_tbl_sg = mem + AHCI_CMD_TBL_HDR;
 
 	ap->private_data = pp;
 
@@ -364,7 +368,7 @@ static void ahci_port_stop(struct ata_port *ap)
 
 	ap->private_data = NULL;
 	pci_free_consistent(pdev, AHCI_PORT_PRIV_DMA_SZ,
-			    pp->rx_fis, pp->rx_fis_dma);
+			    pp->cmd_slot, pp->cmd_slot_dma);
 	kfree(pp);
 	ata_port_stop(ap);
 }
@@ -483,10 +487,10 @@ static void ahci_qc_prep(struct ata_queued_cmd *qc)
 		break;
 	}
 
-	pp->cmd_slot->opts = cpu_to_le32(opts);
-	pp->cmd_slot->status = 0;
-	pp->cmd_slot->tbl_addr = cpu_to_le32(pp->cmd_tbl_dma & 0xffffffff);
-	pp->cmd_slot->tbl_addr_hi = cpu_to_le32((pp->cmd_tbl_dma >> 16) >> 16);
+	pp->cmd_slot[0].opts = cpu_to_le32(opts);
+	pp->cmd_slot[0].status = 0;
+	pp->cmd_slot[0].tbl_addr = cpu_to_le32(pp->cmd_tbl_dma & 0xffffffff);
+	pp->cmd_slot[0].tbl_addr_hi = cpu_to_le32((pp->cmd_tbl_dma >> 16) >> 16);
 
 	/*
 	 * Fill in command table information.  First, the header,
@@ -675,28 +679,6 @@ static int ahci_qc_issue(struct ata_queued_cmd *qc)
 	readl(mmio + PORT_CMD_ISSUE);	/* flush */
 
 	return 0;
-}
-
-static void ahci_tf_read(struct ata_port *ap, struct ata_taskfile *tf)
-{
-	struct ahci_port_priv *pp = ap->private_data;
-	ata_tf_from_fis(pp->rx_fis + RX_FIS_D2H_REG, tf);
-}
-
-static void ahci_tf_load(struct ata_port *ap, struct ata_taskfile *tf)
-{
-	/* do everything in exec command */
-}
-
-static void ahci_exec_command(struct ata_port *ap, struct ata_taskfile *tf)
-{
-	struct ahci_port_priv *pp = ap->private_data;
-	void *mmio = (void *) ap->ioaddr.cmd_addr;
-
-	ata_tf_to_fis(tf, pp->cmd_tbl, 0);
-
-	writel(1, mmio + PORT_CMD_ISSUE);
-	readl(mmio + PORT_CMD_ISSUE);	/* flush */
 }
 
 static void ahci_setup_port(struct ata_ioports *port, unsigned long base,
