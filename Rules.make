@@ -208,11 +208,6 @@ first_rule: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
 # Only happens in Makefiles which override the default first_rule:
 modkern_cflags := $(CFLAGS_KERNEL)
 
-$(real-objs-y)        : modkern_cflags := $(CFLAGS_KERNEL)
-$(real-objs-y:.o=.i)  : modkern_cflags := $(CFLAGS_KERNEL)
-$(real-objs-y:.o=.s)  : modkern_cflags := $(CFLAGS_KERNEL)
-$(real-objs-y:.o=.lst): modkern_cflags := $(CFLAGS_KERNEL)
-
 $(real-objs-m)        : modkern_cflags := $(CFLAGS_MODULE)
 $(real-objs-m:.o=.i)  : modkern_cflags := $(CFLAGS_MODULE)
 $(real-objs-m:.o=.lst): modkern_cflags := $(CFLAGS_MODULE)
@@ -256,9 +251,6 @@ cmd_cc_lst_c     = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makels
 
 # FIXME (s.a.)
 modkern_aflags := $(AFLAGS_KERNEL)
-
-$(real-objs-y)      : modkern_aflags := $(AFLAGS_KERNEL)
-$(real-objs-y:.o=.s): modkern_aflags := $(AFLAGS_KERNEL)
 
 $(real-objs-m)      : modkern_aflags := $(AFLAGS_MODULE)
 $(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
@@ -380,12 +372,6 @@ endif # ! fastdep
 .PHONY: FORCE
 
 FORCE:
-
-#
-# This is useful for testing
-# FIXME: really?
-script:
-	$(SCRIPT)
 
 #
 # This sets version suffixes on exported symbols
