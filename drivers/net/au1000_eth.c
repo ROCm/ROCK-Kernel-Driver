@@ -819,9 +819,9 @@ free_region:
 				MAX_BUF_SIZE * (NUM_TX_BUFFS+NUM_RX_BUFFS));
 	if (dev->priv != NULL)
 		kfree(dev->priv);
-	kfree(dev);
 	printk(KERN_ERR "%s: au1000_probe1 failed.  Returns %d\n",
 	       dev->name, retval);
+	kfree(dev);
 	return retval;
 }
 

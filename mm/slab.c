@@ -126,7 +126,7 @@
  * Bufctl's are used for linking objs within a slab
  * linked offsets.
  *
- * This implementaion relies on "struct page" for locating the cache &
+ * This implementation relies on "struct page" for locating the cache &
  * slab an object belongs to.
  * This allows the bufctl structure to be small (one int), but limits
  * the number of objects a slab (not a cache) can contain when off-slab
