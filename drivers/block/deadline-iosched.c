@@ -767,7 +767,7 @@ static int deadline_init(request_queue_t *q, elevator_t *e)
 struct deadline_fs_entry {
 	struct attribute attr;
 	ssize_t (*show)(struct deadline_data *, char *);
-	ssize_t (*store)(struct deadline_data *, const char *);
+	ssize_t (*store)(struct deadline_data *, const char *, size_t);
 };
 
 static ssize_t
@@ -777,13 +777,12 @@ deadline_var_show(unsigned int var, char *page)
 }
 
 static ssize_t
-deadline_var_store(unsigned int *var, const char *page)
+deadline_var_store(unsigned int *var, const char *page, size_t count)
 {
 	char *p = (char *) page;
-	int ret = strlen(p);
 
 	*var = simple_strtoul(p, &p, 10);
-	return ret;
+	return count;
 }
 
 #define SHOW_FUNCTION(__FUNC, __VAR)					\
@@ -799,9 +798,9 @@ SHOW_FUNCTION(deadline_fifobatch_show, dd->fifo_batch);
 #undef SHOW_FUNCTION
 
 #define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX)				\
-static ssize_t __FUNC(struct deadline_data *dd, const char *page)	\
+static ssize_t __FUNC(struct deadline_data *dd, const char *page, size_t count)	\
 {									\
-	int ret = deadline_var_store(__PTR, (page));			\
+	int ret = deadline_var_store(__PTR, (page), count);		\
 	if (*(__PTR) < (MIN))						\
 		*(__PTR) = (MIN);					\
 	else if (*(__PTR) > (MAX))					\
@@ -853,15 +852,12 @@ static struct attribute *default_attrs[] = {
 #define to_deadline(atr) container_of((atr), struct deadline_fs_entry, attr)
 
 static ssize_t
-deadline_attr_show(struct kobject *kobj, struct attribute *attr, char *page,
-		   size_t length, loff_t offset)
+deadline_attr_show(struct kobject *kobj, struct attribute *attr, char *page)
 {
 	elevator_t *e = container_of(kobj, elevator_t, kobj);
 	struct deadline_fs_entry *entry = to_deadline(attr);
 
 	if (!entry->show)
-		return 0;
-	if (offset)
 		return 0;
 
 	return entry->show(e->elevator_data, page);
@@ -869,17 +865,15 @@ deadline_attr_show(struct kobject *kobj, struct attribute *attr, char *page,
 
 static ssize_t
 deadline_attr_store(struct kobject *kobj, struct attribute *attr,
-		    const char *page, size_t length, loff_t offset)
+		    const char *page, size_t length)
 {
 	elevator_t *e = container_of(kobj, elevator_t, kobj);
 	struct deadline_fs_entry *entry = to_deadline(attr);
 
 	if (!entry->store)
 		return -EINVAL;
-	if (offset)
-		return 0;
 
-	return entry->store(e->elevator_data, page);
+	return entry->store(e->elevator_data, page, length);
 }
 
 static struct sysfs_ops deadline_sysfs_ops = {
