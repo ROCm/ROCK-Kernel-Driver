@@ -357,6 +357,12 @@ static struct quotactl_ops cifs_quotactl_ops = {
 };
 #endif
 
+static int cifs_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_NODIRATIME;
+	return 0;
+}
+
 struct super_operations cifs_super_ops = {
 	.read_inode = cifs_read_inode,
 	.put_super = cifs_put_super,
@@ -369,6 +375,7 @@ struct super_operations cifs_super_ops = {
    us with the same number of releases (closes) as opens */
 	.show_options = cifs_show_options,
 /*    .umount_begin   = cifs_umount_begin, *//* consider adding in the future */
+	.remount_fs = cifs_remount,
 };
 
 static struct super_block *

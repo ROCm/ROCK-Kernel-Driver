@@ -734,6 +734,12 @@ void __exit fat_destroy_inodecache(void)
 		printk(KERN_INFO "fat_inode_cache: not all structures were freed\n");
 }
 
+static int fat_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_NODIRATIME;
+	return 0;
+}
+
 static struct super_operations fat_sops = { 
 	.alloc_inode	= fat_alloc_inode,
 	.destroy_inode	= fat_destroy_inode,
@@ -742,6 +748,7 @@ static struct super_operations fat_sops = {
 	.put_super	= fat_put_super,
 	.statfs		= fat_statfs,
 	.clear_inode	= fat_clear_inode,
+	.remount_fs	= fat_remount,
 
 	.read_inode	= make_bad_inode,
 
