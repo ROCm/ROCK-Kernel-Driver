@@ -586,10 +586,21 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	// work.need_resched etc. mustn't get changed by this CPU before it returns to
 	// user- or fsys-mode:
 (pUStk)	cmp.eq.unc p6,p0=r0,r0			// p6 <- pUStk
+#ifdef CONFIG_PREEMPT
+	rsm psr.i				// disable interrupts
+	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
+(pKStk) adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
+	;;
+(pKStk) ld4  r21=[r20]			// preempt_count ->r21
+	;;
+(pKStk)	cmp4.eq	p6,p0=r21,r0		// p6 <- preempt_count == 0
+	;;
+#else // CONFIG_PREEMPT
 (pUStk)	rsm psr.i
 	;;
 (pUStk)	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
+#endif // CONFIG_PREEMPT
 .work_processed:
 (p6)	ld4 r18=[r17]				// load current_thread_info()->flags
 	adds r2=PT(R8)+16,r12
@@ -810,15 +821,27 @@ skip_rbs_switch:
 .work_pending:
 	tbit.z p6,p0=r18,TIF_NEED_RESCHED		// current_thread_info()->need_resched==0?
 (p6)	br.cond.sptk.few .notify
+#ifdef CONFIG_PREEMPT
+(pKStk)	dep r21=-1,r0,PREEMPT_ACTIVE_BIT,1
+	;;
+(pKStk) st4 [r20]=r21
+	ssm  psr.i		// enable interrupts
+#endif
+	
 #if __GNUC__ < 3
 	br.call.spnt.many rp=invoke_schedule
 #else
 	br.call.spnt.many rp=schedule
 #endif
 .ret9:	cmp.eq p6,p0=r0,r0				// p6 <- 1
-	rsm psr.i
+	rsm psr.i		// disable interrupts
 	;;
 	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
+#if CONFIG_PREEMPT
+(pKStk)	adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
+	;;
+(pKStk)	st4 [r20]=r0	// preempt_count() <- 0
+#endif
 	br.cond.sptk.many .work_processed		// re-check
 
 .notify:

@@ -93,7 +93,7 @@ ia32_load_state (struct task_struct *t)
 {
 	unsigned long eflag, fsr, fcr, fir, fdr, csd, ssd, tssd;
 	struct pt_regs *regs = ia64_task_regs(t);
-	int nr = smp_processor_id();	/* LDT and TSS depend on CPU number: */
+	int nr = get_cpu();	/* LDT and TSS depend on CPU number: */
 
 	eflag = t->thread.eflag;
 	fsr = t->thread.fsr;
@@ -119,6 +119,7 @@ ia32_load_state (struct task_struct *t)
 
 	regs->r17 = (_TSS(nr) << 48) | (_LDT(nr) << 32) | (__u32) regs->r17;
 	regs->r30 = load_desc(_LDT(nr));				/* LDTD */
+	put_cpu();
 }
 
 /*

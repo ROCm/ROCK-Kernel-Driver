@@ -1523,6 +1523,7 @@ pfm_write_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 	 * Cannot do anything before PMU is enabled 
 	 */
 	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
+	preempt_disable();
 
 	/* XXX: ctx locking may be required here */
 
@@ -1599,10 +1600,12 @@ pfm_write_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 				ctx->ctx_used_pmds[0],
 				ctx->ctx_soft_pmds[cnum].reset_pmds[0]));
 	}
-
+	preempt_enable();
 	return 0;
 
 abort_mission:
+	preempt_enable();
+
 	/*
 	 * for now, we have only one possibility for error
 	 */
@@ -1647,6 +1650,7 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 	DBprintk(("ctx_last_cpu=%d for [%d]\n", atomic_read(&ctx->ctx_last_cpu), task->pid));
 
 	for (i = 0; i < count; i++, req++) {
+		int me;
 #if __GNUC__ < 3
 		foo = __get_user(cnum, &req->reg_num);
 		if (foo) return -EFAULT;
@@ -1674,13 +1678,16 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 		 * PMU state is still in the local live register due to lazy ctxsw.
 		 * If true, then we read directly from the registers.
 		 */
-		if (atomic_read(&ctx->ctx_last_cpu) == smp_processor_id()){
+		me = get_cpu();
+		if (atomic_read(&ctx->ctx_last_cpu) == me){
 			ia64_srlz_d();
 			val = ia64_get_pmd(cnum);
 			DBprintk(("reading pmd[%u]=0x%lx from hw\n", cnum, val));
 		} else {
 			val = th->pmd[cnum];
 		}
+
+
 		if (PMD_IS_COUNTING(cnum)) {
 			/*
 			 * XXX: need to check for overflow
@@ -1701,6 +1708,8 @@ pfm_read_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count
 		}
 
 		PFM_REG_RETFLAG_SET(reg_flags, ret);
+
+		put_cpu();
 
 		DBprintk(("read pmd[%u] ret=%d value=0x%lx pmc=0x%lx\n", 
 					cnum, ret, val, ia64_get_pmc(cnum)));
@@ -1839,6 +1848,7 @@ pfm_restart(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 			ctx->ctx_fl_frozen,
 			ctx->ctx_ovfl_regs[0]));
 
+		preempt_disable();
 		pfm_reset_regs(ctx, ctx->ctx_ovfl_regs, PFM_PMD_LONG_RESET);
 
 		ctx->ctx_ovfl_regs[0] = 0UL;
@@ -1856,6 +1866,8 @@ pfm_restart(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 
 		/* simply unfreeze */
 		pfm_unfreeze_pmu();
+
+		preempt_enable();
 
 		return 0;
 	} 
@@ -1914,6 +1926,7 @@ pfm_stop(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 				ctx->ctx_fl_system, PMU_OWNER(),
 				current));
 
+	preempt_disable();
 	/* simply stop monitoring but not the PMU */
 	if (ctx->ctx_fl_system) {
 
@@ -1941,6 +1954,7 @@ pfm_stop(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 		 */
 		ia64_psr(regs)->up = 0;
 	}
+	preempt_enable();
 	return 0;
 }
 
@@ -1953,6 +1967,7 @@ pfm_disable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 
 	if (!CTX_IS_ENABLED(ctx)) return -EINVAL;
 
+	preempt_disable();
 	/*
 	 * stop monitoring, freeze PMU, and save state in context
 	 * this call will clear IA64_THREAD_PM_VALID for per-task sessions.
@@ -1973,6 +1988,7 @@ pfm_disable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 	DBprintk(("enabling psr.sp for [%d]\n", current->pid));
 
 	ctx->ctx_flags.state = PFM_CTX_DISABLED;
+	preempt_enable();
 
 	return 0;
 }
@@ -2322,6 +2338,7 @@ pfm_start(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 		return -EINVAL;
 	}
 
+	preempt_disable();
 	if (ctx->ctx_fl_system) {
 		
 		PFM_CPUINFO_SET(PFM_CPUINFO_DCR_PP);
@@ -2339,6 +2356,7 @@ pfm_start(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 
 	} else {
 		if ((task->thread.flags & IA64_THREAD_PM_VALID) == 0) {
+			preempt_enable();
 			printk(KERN_DEBUG "perfmon: pfm_start task flag not set for [%d]\n",
 			       task->pid);
 			return -EINVAL;
@@ -2352,6 +2370,7 @@ pfm_start(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 		ia64_srlz_i();
 	}
 
+	preempt_enable();
 	return 0;
 }
 
@@ -2359,8 +2378,12 @@ static int
 pfm_enable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, 
 	   struct pt_regs *regs)
 {
+	int me;
+
 	/* we don't quite support this right now */
 	if (task != current) return -EINVAL;
+
+	me = get_cpu();  /* make sure we're not migrated or preempted */
 
 	if (ctx->ctx_fl_system == 0 && PMU_OWNER()  && PMU_OWNER() != current) 
 		pfm_lazy_save_regs(PMU_OWNER());
@@ -2405,10 +2428,12 @@ pfm_enable(struct task_struct *task, pfm_context_t *ctx, void *arg, int count,
 	SET_PMU_OWNER(task);
 
 	ctx->ctx_flags.state = PFM_CTX_ENABLED;
-	atomic_set(&ctx->ctx_last_cpu, smp_processor_id());
+	atomic_set(&ctx->ctx_last_cpu, me);
 
 	/* simply unfreeze */
 	pfm_unfreeze_pmu();
+
+	put_cpu();
 
 	return 0;
 }
@@ -2826,7 +2851,7 @@ pfm_record_sample(struct task_struct *task, pfm_context_t *ctx, unsigned long ov
 	 * initialize entry header
 	 */
 	h->pid  = current->pid;
-	h->cpu  = smp_processor_id();
+	h->cpu  = get_cpu();
 	h->last_reset_value = ovfl_mask ? ctx->ctx_soft_pmds[ffz(~ovfl_mask)].lval : 0UL;
 	h->ip   = regs ? regs->cr_iip | ((regs->cr_ipsr >> 41) & 0x3): 0x0UL;
 	h->regs = ovfl_mask; 			/* which registers overflowed */
@@ -2853,7 +2878,7 @@ pfm_record_sample(struct task_struct *task, pfm_context_t *ctx, unsigned long ov
 		DBprintk_ovfl(("e=%p pmd%d =0x%lx\n", (void *)e, j, *e));
 		e++;
 	}
-	pfm_stats[smp_processor_id()].pfm_recorded_samples_count++;
+	pfm_stats[h->cpu].pfm_recorded_samples_count++;
 
 	/*
 	 * make the new entry visible to user, needs to be atomic
@@ -2870,9 +2895,11 @@ pfm_record_sample(struct task_struct *task, pfm_context_t *ctx, unsigned long ov
 		/*
 		 * XXX: must reset buffer in blocking mode and lost notified
 		 */
-		pfm_stats[smp_processor_id()].pfm_full_smpl_buffer_count++;
+		pfm_stats[h->cpu].pfm_full_smpl_buffer_count++;
+		put_cpu();
 		return 1;
 	}
+	put_cpu();
 	return 0;
 }
 
@@ -2904,6 +2931,8 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 	 * valid one, i.e. the one that caused the interrupt.
 	 */
 
+	preempt_disable();
+
 	t   = &task->thread;
 
 	/*
@@ -2913,6 +2942,7 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 	if ((t->flags & IA64_THREAD_PM_VALID) == 0 && ctx->ctx_fl_system == 0) {
 		printk(KERN_DEBUG "perfmon: Spurious overflow interrupt: process %d not "
 		       "using perfmon\n", task->pid);
+		preempt_enable_no_resched();
 		return 0x1;
 	}
 	/*
@@ -2921,6 +2951,7 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 	if ((pmc0 & 0x1) == 0) {
 		printk(KERN_DEBUG "perfmon: pid %d pmc0=0x%lx assumption error for freeze bit\n",
 		       task->pid, pmc0);
+		preempt_enable_no_resched();
 		return 0x0;
 	}
 
@@ -3003,6 +3034,7 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 	if (ovfl_notify == 0UL) {
 		if (ovfl_pmds) 
 			pfm_reset_regs(ctx, &ovfl_pmds, PFM_PMD_SHORT_RESET);
+		preempt_enable_no_resched();
 		return 0x0UL;
 	}
 
@@ -3038,6 +3070,7 @@ pfm_overflow_handler(struct task_struct *task, pfm_context_t *ctx, u64 pmc0, str
 		t->pfm_ovfl_block_reset,
 		ctx->ctx_fl_trap_reason));
 
+	preempt_enable_no_resched();
 	return 0x1UL;
 }
 
@@ -3048,13 +3081,14 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 	struct task_struct *task;
 	pfm_context_t *ctx;
 
-	pfm_stats[smp_processor_id()].pfm_ovfl_intr_count++;
+	pfm_stats[get_cpu()].pfm_ovfl_intr_count++;
 
 	/*
 	 * if an alternate handler is registered, just bypass the default one
 	 */
 	if (pfm_alternate_intr_handler) {
 		(*pfm_alternate_intr_handler->handler)(irq, arg, regs);
+		put_cpu();
 		return;
 	}
 
@@ -3079,6 +3113,7 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 		if (!ctx) {
 			printk(KERN_DEBUG "perfmon: Spurious overflow interrupt: process %d has "
 			       "no PFM context\n", task->pid);
+			put_cpu();
 			return;
 		}
 
@@ -3104,6 +3139,7 @@ pfm_interrupt_handler(int irq, void *arg, struct pt_regs *regs)
 	} else {
 		pfm_stats[smp_processor_id()].pfm_spurious_ovfl_intr_count++;
 	}
+	put_cpu_no_resched();
 }
 
 /* for debug only */
@@ -3174,6 +3210,7 @@ pfm_syst_wide_update_task(struct task_struct *task, unsigned long info, int is_c
 	unsigned long dcr;
 	unsigned long dcr_pp;
 
+	preempt_disable();
 	dcr_pp = info & PFM_CPUINFO_DCR_PP ? 1 : 0;
 
 	/*
@@ -3184,6 +3221,7 @@ pfm_syst_wide_update_task(struct task_struct *task, unsigned long info, int is_c
 		regs = (struct pt_regs *)((unsigned long) task + IA64_STK_OFFSET);
 		regs--;
 		ia64_psr(regs)->pp = is_ctxswin ? dcr_pp : 0;
+		preempt_enable();
 		return;
 	}
 	/*
@@ -3199,6 +3237,7 @@ pfm_syst_wide_update_task(struct task_struct *task, unsigned long info, int is_c
 			ia64_set_dcr(dcr & ~IA64_DCR_PP);
 			pfm_clear_psr_pp();
 			ia64_srlz_i();
+			preempt_enable();
 			return;
 		}
 		/* 
@@ -3212,6 +3251,7 @@ pfm_syst_wide_update_task(struct task_struct *task, unsigned long info, int is_c
 		pfm_set_psr_pp();
 		ia64_srlz_i();
 	}
+	preempt_enable();
 }
 
 void
@@ -3221,6 +3261,8 @@ pfm_save_regs (struct task_struct *task)
 	unsigned long mask;
 	u64 psr;
 	int i;
+
+	preempt_disable();
 
 	ctx = task->thread.pfm_context;
 
@@ -3275,6 +3317,7 @@ pfm_save_regs (struct task_struct *task)
 	 */
 	atomic_set(&ctx->ctx_last_cpu, -1);
 #endif
+	preempt_enable();
 }
 
 static void
@@ -3285,6 +3328,7 @@ pfm_lazy_save_regs (struct task_struct *task)
 	unsigned long mask;
 	int i;
 
+	preempt_disable();
 	DBprintk(("on [%d] by [%d]\n", task->pid, current->pid));
 
 	t   = &task->thread;
@@ -3311,6 +3355,7 @@ pfm_lazy_save_regs (struct task_struct *task)
 
 	/* not owned by this CPU */
 	atomic_set(&ctx->ctx_last_cpu, -1);
+	preempt_enable();
 }
 
 void
@@ -3323,11 +3368,14 @@ pfm_load_regs (struct task_struct *task)
 	u64 psr;
 	int i;
 
+	preempt_disable();
+
 	owner = PMU_OWNER();
 	ctx   = task->thread.pfm_context;
 	t     = &task->thread;
 
 	if (ctx == NULL) {
+		preempt_enable();
 		printk("perfmon: pfm_load_regs: null ctx for [%d]\n", task->pid);
 		return;
 	}
@@ -3366,7 +3414,7 @@ pfm_load_regs (struct task_struct *task)
 
 		psr = ctx->ctx_saved_psr;
 		pfm_set_psr_l(psr);
-
+		preempt_enable();
 		return;
 	}
 
@@ -3428,6 +3476,7 @@ pfm_load_regs (struct task_struct *task)
 	 * restore the psr we changed in pfm_save_regs()
 	 */
 	psr = ctx->ctx_saved_psr;
+	preempt_enable();
 	pfm_set_psr_l(psr);
 }
 
@@ -3445,6 +3494,7 @@ pfm_reset_pmu(struct task_struct *task)
 		printk("perfmon: invalid task in pfm_reset_pmu()\n");
 		return;
 	}
+	preempt_disable();
 
 	/* Let's make sure the PMU is frozen */
 	pfm_freeze_pmu();
@@ -3527,6 +3577,7 @@ pfm_reset_pmu(struct task_struct *task)
 	ctx->ctx_used_dbrs[0] = 0UL;
 
 	ia64_srlz_d();
+	preempt_enable();
 }
 
 /*
@@ -3556,6 +3607,7 @@ pfm_flush_regs (struct task_struct *task)
 	 */
 	if (ctx->ctx_flags.state == PFM_CTX_DISABLED) return;
 
+	preempt_disable();
 	/*
 	 * stop monitoring:
 	 * This is the only way to stop monitoring without destroying overflow
@@ -3683,7 +3735,7 @@ pfm_flush_regs (struct task_struct *task)
 	 * indicates that context has been saved
 	 */
 	atomic_set(&ctx->ctx_last_cpu, -1);
-
+	preempt_enable();
 }
 
 
@@ -3706,6 +3758,7 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 	ctx    = task->thread.pfm_context;
 	thread = &task->thread;
 
+	preempt_disable();
 	/*
 	 * make sure child cannot mess up the monitoring session
 	 */
@@ -3759,6 +3812,8 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 		 * never be here when system wide is running anyway
 		 */
 	 	ia64_psr(regs)->up = 0;
+
+		preempt_enable();
 
 		/* copy_thread() clears IA64_THREAD_PM_VALID */
 		return 0;
@@ -3865,6 +3920,8 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 		thread->flags |= IA64_THREAD_PM_VALID;
 	}
 
+	preempt_enable();
+
 	return 0;
 }
 
@@ -3886,6 +3943,7 @@ pfm_context_exit(struct task_struct *task)
 	/*
 	 * check sampling buffer
 	 */
+	preempt_disable();
 	if (ctx->ctx_psb) {
 		pfm_smpl_buffer_desc_t *psb = ctx->ctx_psb;
 
@@ -3978,6 +4036,7 @@ pfm_context_exit(struct task_struct *task)
 	}
 
 	UNLOCK_CTX(ctx);
+	preempt_enable();
 
 	pfm_unreserve_session(task, ctx->ctx_fl_system, 1UL << ctx->ctx_cpu);
 
@@ -4156,17 +4215,27 @@ pfm_install_alternate_syswide_subsystem(pfm_intr_handler_desc_t *hdl)
 {
 	int ret;
 
+
 	/* some sanity checks */
-	if (hdl == NULL || hdl->handler == NULL) return -EINVAL;
+	if (hdl == NULL || hdl->handler == NULL) {
+		return -EINVAL;
+	}
 
 	/* do the easy test first */
-	if (pfm_alternate_intr_handler) return -EBUSY;
+	if (pfm_alternate_intr_handler) {
+		return -EBUSY;
+	}
 
+	preempt_disable();
 	/* reserve our session */
 	ret = pfm_reserve_session(NULL, 1, cpu_online_map);
-	if (ret) return ret;
+	if (ret) {
+		preempt_enable();
+		return ret;
+	}
 
 	if (pfm_alternate_intr_handler) {
+		preempt_enable();
 		printk(KERN_DEBUG "perfmon: install_alternate, intr_handler not NULL "
 		       "after reserve\n");
 		return -EINVAL;
@@ -4174,23 +4243,29 @@ pfm_install_alternate_syswide_subsystem(pfm_intr_handler_desc_t *hdl)
 
 	pfm_alternate_intr_handler = hdl;
 
+	preempt_enable();
 	return 0;
 }
 
 int
 pfm_remove_alternate_syswide_subsystem(pfm_intr_handler_desc_t *hdl)
 {
-	if (hdl == NULL) return -EINVAL;
+	if (hdl == NULL)
+		return -EINVAL;
 
 	/* cannot remove someone else's handler! */
-	if (pfm_alternate_intr_handler != hdl) return -EINVAL;
+	if (pfm_alternate_intr_handler != hdl) 
+		return -EINVAL;
 
+	preempt_disable();
 	pfm_alternate_intr_handler = NULL;
 
 	/* 
 	 * XXX: assume cpu_online_map has not changed since reservation 
 	 */
 	pfm_unreserve_session(NULL, 1, cpu_online_map);
+
+	preempt_enable();
 
 	return 0;
 }
@@ -4272,8 +4347,9 @@ void
 pfm_init_percpu(void)
 {
 	int i;
+	int me = get_cpu();
 
-	if (smp_processor_id() == 0)
+	if (me == 0)
 		register_percpu_irq(IA64_PERFMON_VECTOR, &perfmon_irqaction);
 
 	ia64_set_pmv(IA64_PERFMON_VECTOR);
@@ -4297,6 +4373,7 @@ pfm_init_percpu(void)
 		if (PMD_IS_IMPL(i) == 0) continue;
 		ia64_set_pmd(i, 0UL);
 	}
+	put_cpu();
 	pfm_freeze_pmu();
 }
 
