@@ -743,10 +743,6 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_epoll_wait
 	.llong .sys_remap_file_pages
 
-	.rept NR_syscalls-239
-		.llong .sys_ni_syscall
-	.endr
-
 	.balign 8
 _GLOBAL(sys_call_table)
 	.llong .sys_restart_syscall	/* 0 */
@@ -989,7 +985,3 @@ _GLOBAL(sys_call_table)
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
 	.llong .sys_remap_file_pages
-
-	.rept NR_syscalls-239
-		.llong .sys_ni_syscall
-	.endr
