@@ -804,7 +804,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct msdos_sb_info *sbi;
 	u16 logical_sector_size;
 	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
-	int debug, first;
+	int debug;
 	unsigned int media;
 	long error;
 	char buf[50];
@@ -1005,27 +1005,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 	brelse(bh);
 
-	/* validity check of FAT */
-	first = __fat_access(sb, 0, -1);
-	if (first < 0) {
-		error = first;
-		goto out_fail;
-	}
-	if (FAT_FIRST_ENT(sb, media) == first) {
-		/* all is as it should be */
-	} else if (media == 0xf8 && FAT_FIRST_ENT(sb, 0xfe) == first) {
-		/* bad, reported on pc9800 */
-	} else if (media == 0xf0 && FAT_FIRST_ENT(sb, 0xf8) == first) {
-		/* bad, reported with a MO disk on win95/me */
-	} else if (first == 0) {
-		/* bad, reported with a SmartMedia card */
-	} else {
-		if (!silent)
-			printk(KERN_ERR "FAT: invalid first entry of FAT "
-			       "(0x%x != 0x%x)\n",
-			       FAT_FIRST_ENT(sb, media), first);
-		goto out_invalid;
-	}
+	/*
+	 * The low byte of FAT's first entry must have same value with
+	 * media-field.  But in real world, too many devices is
+	 * writing wrong value.  So, removed that validity check.
+	 *
+	 * if (FAT_FIRST_ENT(sb, media) != first)
+	 */
 
 	error = -EINVAL;
 	sprintf(buf, "cp%d", sbi->options.codepage);
