@@ -150,9 +150,9 @@ struct request_queue
 
 	/*
 	 * The VM-level readahead tunable for this device.  In
-	 * units of 512-byte sectors.
+	 * units of PAGE_CACHE_SIZE pages.
 	 */
-	unsigned ra_sectors;
+	unsigned long ra_pages;
 
 	/*
 	 * The queue owner gets to use this for whatever they like.
@@ -310,8 +310,7 @@ extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
 extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn);
-extern int blk_set_readahead(struct block_device *bdev, unsigned sectors);
-extern unsigned blk_get_readahead(struct block_device *bdev);
+extern unsigned long *blk_get_ra_pages(kdev_t kdev);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);

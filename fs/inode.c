@@ -109,6 +109,9 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_data.host = inode;
 		inode->i_data.gfp_mask = GFP_HIGHUSER;
 		inode->i_mapping = &inode->i_data;
+		inode->i_data.ra_pages = &default_ra_pages;
+		if (sb->s_bdev)
+			inode->i_data.ra_pages = sb->s_bdev->bd_inode->i_mapping->ra_pages;
 		memset(&inode->u, 0, sizeof(inode->u));
 	}
 	return inode;

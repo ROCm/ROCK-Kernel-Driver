@@ -349,6 +349,8 @@ struct block_device *bdget(dev_t dev)
 		struct inode *inode = new_inode(bd_mnt->mnt_sb);
 		if (inode) {
 			kdev_t kdev = to_kdev_t(dev);
+			unsigned long *ra_pages;
+
 			atomic_set(&new_bdev->bd_count,1);
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_op = NULL;
@@ -360,6 +362,10 @@ struct block_device *bdget(dev_t dev)
 			inode->i_bdev = new_bdev;
 			inode->i_data.a_ops = &def_blk_aops;
 			inode->i_data.gfp_mask = GFP_USER;
+			ra_pages = blk_get_ra_pages(kdev);
+			if (ra_pages == NULL)
+				ra_pages = &default_ra_pages;
+			inode->i_data.ra_pages = ra_pages;
 			spin_lock(&bdev_lock);
 			bdev = bdfind(dev, head);
 			if (!bdev) {

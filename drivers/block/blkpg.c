@@ -219,6 +219,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 	unsigned short usval;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	int holder;
+	unsigned long *ra_pages;
 
 	intval = block_ioctl(bdev, cmd, arg);
 	if (intval != -ENOTTY)
@@ -240,13 +241,21 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 		case BLKFRASET:
 			if(!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			return blk_set_readahead(bdev, arg);
+			ra_pages = blk_get_ra_pages(dev);
+			if (ra_pages == NULL)
+				return -ENOTTY;
+			*ra_pages = (arg * 512) / PAGE_CACHE_SIZE;
+			return 0;
 
 		case BLKRAGET:
 		case BLKFRAGET:
 			if (!arg)
 				return -EINVAL;
-			return put_user(blk_get_readahead(bdev), (long *)arg);
+			ra_pages = blk_get_ra_pages(dev);
+			if (ra_pages == NULL)
+				return -ENOTTY;
+			return put_user((*ra_pages * PAGE_CACHE_SIZE) / 512,
+						(long *)arg);
 
 		case BLKSECTGET:
 			if ((q = blk_get_queue(dev)) == NULL)

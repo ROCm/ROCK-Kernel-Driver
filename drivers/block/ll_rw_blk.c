@@ -109,46 +109,21 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
 }
 
 /**
- * blk_set_readahead - set a queue's readahead tunable
- * @dev:	device
- * @sectors:	readahead, in 512 byte sectors
- *
- * Returns zero on success, else negative errno
- */
-int blk_set_readahead(struct block_device *bdev, unsigned sectors)
-{
-	int ret = -EINVAL;
-	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
-
-	if (q) {
-		q->ra_sectors = sectors;
-		blk_put_queue(q);
-		ret = 0;
-	}
-	return ret;
-}
-
-/**
- * blk_get_readahead - query a queue's readahead tunable
+ * blk_get_ra_pages - get the address of a queue's readahead tunable
  * @dev:	device
  *
- * Locates the passed device's request queue and returns its
+ * Locates the passed device's request queue and returns the address of its
  * readahead setting.
  *
- * The returned value is in units of 512 byte sectors.
- *
- * Will return zero if the queue has never had its readahead
- * setting altered.
+ * Will return NULL if the request queue cannot be located.
  */
-unsigned blk_get_readahead(struct block_device *bdev)
+unsigned long *blk_get_ra_pages(kdev_t dev)
 {
-	unsigned ret = 0;
-	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
+	unsigned long *ret = NULL;
+	request_queue_t *q = blk_get_queue(dev);
 
-	if (q) {
-		ret = q->ra_sectors;
-		blk_put_queue(q);
-	}
+	if (q)
+		ret = &q->ra_pages;
 	return ret;
 }
 
@@ -187,7 +162,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->max_phys_segments = MAX_PHYS_SEGMENTS;
 	q->max_hw_segments = MAX_HW_SEGMENTS;
 	q->make_request_fn = mfn;
-	q->ra_sectors = VM_MAX_READAHEAD << (10 - 9);	/* kbytes->sectors */
+	q->ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 

@@ -632,6 +632,7 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 			goto cleanup_file;
 	}
 
+	f->f_ra.ra_pages = *inode->i_mapping->ra_pages;
 	f->f_dentry = dentry;
 	f->f_vfsmnt = mnt;
 	f->f_pos = 0;

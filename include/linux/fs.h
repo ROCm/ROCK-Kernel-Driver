@@ -398,6 +398,7 @@ struct address_space {
 	list_t			i_mmap_shared;	/* list of private mappings */
 	spinlock_t		i_shared_lock;  /* and spinlock protecting it */
 	int			gfp_mask;	/* how to allocate the pages */
+	unsigned long 		*ra_pages;	/* device readahead */
 };
 
 struct char_device {
@@ -513,6 +514,7 @@ struct file_ra_state {
 	unsigned long prev_page;	/* Cache last read() position */
 	unsigned long ahead_start;	/* Ahead window */
 	unsigned long ahead_size;
+	unsigned long ra_pages;		/* Maximum readahead window */
 };
 
 struct file {
