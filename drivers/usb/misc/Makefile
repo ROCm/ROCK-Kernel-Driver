@@ -6,11 +6,9 @@
 O_TARGET	:= usb-misc.o
 
 obj-$(CONFIG_USB_AUERSWALD)	+= auerswald.o
-obj-$(CONFIG_USB_DABUSB)	+= dabusb.o
 obj-$(CONFIG_USB_EMI26)		+= emi26.o
 obj-$(CONFIG_USB_RIO500)	+= rio500.o
 obj-$(CONFIG_USB_TIGL)		+= tiglusb.o
 obj-$(CONFIG_USB_USS720)	+= uss720.o
-obj-$(CONFIG_USB_WACOM)		+= wacom.o
 
 include $(TOPDIR)/Rules.make

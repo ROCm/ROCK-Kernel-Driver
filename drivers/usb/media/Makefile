@@ -8,6 +8,7 @@ export-objs	:= ov511.o pwc-uncompress.o
 
 pwc-objs	:= pwc-if.o pwc-misc.o pwc-ctrl.o pwc-uncompress.o
 
+obj-$(CONFIG_USB_DABUSB)	+= dabusb.o
 obj-$(CONFIG_USB_DSBR)		+= dsbr100.o
 obj-$(CONFIG_USB_IBMCAM)	+= ibmcam.o usbvideo.o ultracam.o
 obj-$(CONFIG_USB_KONICAWC)	+= konicawc.o usbvideo.o
