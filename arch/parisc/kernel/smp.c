@@ -486,24 +486,6 @@ void __init smp_callin(void)
 }
 
 /*
- * Create the idle task for a new Slave CPU.  DO NOT use kernel_thread()
- * because that could end up calling schedule(). If it did, the new idle
- * task could get scheduled before we had a chance to remove it from the
- * run-queue...
- */
-static struct task_struct *fork_by_hand(void)
-{
-	struct pt_regs regs;  
-
-	/*
-	 * don't care about the regs settings since
-	 * we'll never reschedule the forked task.
-	 */
-	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
-}
-
-
-/*
  * Bring one cpu online.
  */
 int __init smp_boot_one_cpu(int cpuid)
@@ -521,13 +503,10 @@ int __init smp_boot_one_cpu(int cpuid)
 	 * Sheesh . . .
 	 */
 
-	idle = fork_by_hand();
 	if (IS_ERR(idle))
 		panic("SMP: fork failed for CPU:%d", cpuid);
 
-	wake_up_forked_process(idle);
-	init_idle(idle, cpuid);
-	unhash_process(idle);
+	idle = fork_idle(cpunum);
 	idle->thread_info->cpu = cpuid;
 
 	/* Let _start know what logical CPU we're booting

@@ -42,6 +42,7 @@
 #include <linux/dcache.h>
 
 #include <asm/uaccess.h>
+#include <asm/processor.h>
 
 #ifdef CONFIG_ROOT_NFS
 #include <linux/nfs_fs.h>
@@ -141,6 +142,10 @@ static ctl_table dev_table[];
 extern ctl_table random_table[];
 #ifdef CONFIG_UNIX98_PTYS
 extern ctl_table pty_table[];
+#endif
+
+#ifdef HAVE_ARCH_PICK_MMAP_LAYOUT
+int sysctl_legacy_va_layout;
 #endif
 
 /* /proc declarations: */
@@ -289,7 +294,7 @@ static ctl_table kern_table[] = {
 		.procname	= "tainted",
 		.data		= &tainted,
 		.maxlen		= sizeof(int),
-		.mode		= 0644,
+		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
 	{
@@ -783,6 +788,18 @@ static ctl_table vm_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &zero,
 	},
+#ifdef HAVE_ARCH_PICK_MMAP_LAYOUT
+	{
+		.ctl_name	= VM_LEGACY_VA_LAYOUT,
+		.procname	= "legacy_va_layout",
+		.data		= &sysctl_legacy_va_layout,
+		.maxlen		= sizeof(sysctl_legacy_va_layout),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
+	},
+#endif
 	{ .ctl_name = 0 }
 };
 

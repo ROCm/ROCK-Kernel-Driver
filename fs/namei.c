@@ -1094,8 +1094,12 @@ static inline int check_sticky(struct inode *dir, struct inode *inode)
 static inline int may_delete(struct inode *dir,struct dentry *victim,int isdir)
 {
 	int error;
-	if (!victim->d_inode || victim->d_parent->d_inode != dir)
+
+	if (!victim->d_inode)
 		return -ENOENT;
+
+	BUG_ON(victim->d_parent->d_inode != dir);
+
 	error = permission(dir,MAY_WRITE | MAY_EXEC, NULL);
 	if (error)
 		return error;

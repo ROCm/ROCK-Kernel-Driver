@@ -347,6 +347,17 @@ config PCI_MMCONFIG
 	depends on PCI
 	select ACPI_BOOT
 
+config UNORDERED_IO
+       bool "Unordered IO mapping access"
+       depends on EXPERIMENTAL
+       select UNORDERED_IO
+       help
+         Use unordered stores to access IO memory mappings in device drivers.
+	 Still very experimental. When a driver works on IA64/ppc64/pa-risc it should
+	 work with this option, but it makes the drivers behave differently
+	 from i386. Requires that the driver writer used memory barriers
+	 properly.
+
 source "drivers/pci/Kconfig"
 
 source "drivers/pcmcia/Kconfig"

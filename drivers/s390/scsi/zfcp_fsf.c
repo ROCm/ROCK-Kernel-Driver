@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.55 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.59 $"
 
 #include "zfcp_ext.h"
 
@@ -48,7 +48,7 @@ static int zfcp_fsf_status_read_handler(struct zfcp_fsf_req *);
 static int zfcp_fsf_send_ct_handler(struct zfcp_fsf_req *);
 static int zfcp_fsf_send_els_handler(struct zfcp_fsf_req *);
 static int zfcp_fsf_control_file_handler(struct zfcp_fsf_req *);
-static inline int zfcp_fsf_req_create_sbal_check(
+static inline int zfcp_fsf_req_sbal_check(
 	unsigned long *, struct zfcp_qdio_queue *, int);
 static inline int zfcp_use_one_sbal(
 	struct scatterlist *, int, struct scatterlist *, int);
@@ -79,9 +79,8 @@ static u32 fsf_qtcb_type[] = {
 };
 
 static const char zfcp_act_subtable_type[5][8] = {
-	{"unknown"}, {"OS"}, {"WWPN"}, {"DID"}, {"LUN"}
+	"unknown", "OS", "WWPN", "DID", "LUN"
 };
-
 
 /****************************************************************/
 /*************** FSF related Functions  *************************/
@@ -1863,6 +1862,10 @@ static int zfcp_fsf_send_els_handler(struct zfcp_fsf_req *fsf_req)
 			/* ERP strategy will escalate */
 			debug_text_event(adapter->erp_dbf, 1, "fsf_sq_ulp");
 			fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
+			retval =
+			  zfcp_handle_els_rjt(header->fsf_status_qual.word[1],
+					      (struct zfcp_ls_rjt_par *)
+					      &header->fsf_status_qual.word[2]);
 			break;
 		case FSF_SQ_RETRY_IF_POSSIBLE:
 			ZFCP_LOG_FLAGS(2, "FSF_SQ_RETRY_IF_POSSIBLE\n");
@@ -1970,8 +1973,6 @@ skip_fsfstatus:
 
 	if (send_els->handler != 0)
 		send_els->handler(send_els->handler_data);
-
-	kfree(send_els);
 
 	return retval;
 }
@@ -4157,87 +4158,6 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	}
 
  skip_fsfstatus:
-#if 0
-	/*
-	 * This nasty chop at the problem is not working anymore
-	 * as we do not adjust the retry count anylonger in order
-	 * to have a number of retries that avoids I/O errors.
-	 * The manipulation of the retry count has been removed
-	 * in favour of a safe tape device handling. We must not
-	 * sent SCSI commands more than once to a device if no
-	 * retries are permitted by the high level driver. Generally
-	 * speaking, it was a mess to change retry counts. So it is
-	 * fine that this sort of workaround is gone.
-	 * Then, we had to face a certain number of immediate retries in case of
-	 * busy and queue full conditions (see below).
-	 * This is not acceptable
-	 * for the latter. Queue full conditions are used
-	 * by devices to indicate to a host that the host can rely
-	 * on the completion (or timeout) of at least one outstanding
-	 * command as a suggested trigger for command retries.
-	 * Busy conditions require a different trigger since
-	 * no commands are outstanding for that initiator from the
-	 * devices perspective.
-	 * The drawback of mapping a queue full condition to a
-	 * busy condition is the chance of wasting all retries prior
-	 * to the time when the device indicates that a command
-	 * rejected due to a queue full condition should be re-driven.
-	 * This case would lead to unnecessary I/O errors that
-	 * have to be considered fatal if for example ext3's
-	 * journaling would be torpedoed by such an avoidable
-	 * I/O error.
-	 * So, what issues are there with not mapping a queue-full
-	 * condition to a busy condition?
-	 * Due to the 'exclusive LUN'
-	 * policy enforced by the zSeries FCP channel, this 
-	 * Linux instance is the only initiator with regard to
-	 * this adapter. It is safe to rely on the information
-	 * 'don't disturb me now ... and btw. no other commands
-	 * pending for you' (= queue full) sent by the LU,
-	 * since no other Linux can use this LUN via this adapter
-	 * at the same time. If there is a potential race
-	 * introduced by the FCP channel by not inhibiting Linux A
-	 * to give up a LU with commands pending while Linux B
-	 * grabs this LU and sends commands  - thus providing
-	 * an exploit at the 'exclusive LUN' policy - then this
-	 * issue has to be considered a hardware problem. It should
-	 * be tracked as such if it really occurs. Even if the
-	 * FCP Channel spec. begs exploiters to wait for the
-	 * completion of all request sent to a LU prior to
-	 * closing this LU connection.
-	 * This spec. statement in conjunction with
-	 * the 'exclusive LUN' policy is not consistent design.
-	 * Another issue is how resource constraints for SCSI commands
-	 * might be handled by the FCP channel (just guessing for now).
-	 * If the FCP channel would always map resource constraints,
-	 * e.g. no free FC exchange ID due to I/O stress caused by
-	 * other sharing Linux instances, to faked queue-full
-	 * conditions then this would be a misinterpretation and
-	 * violation of SCSI standards.
-	 * If there are SCSI stack races as indicated below
-	 * then they need to be fixed just there.
-	 * Providing all issue above are not applicable or will
-	 * be fixed appropriately, removing the following hack
-	 * is the right thing to do.
-	 */
-
-	/*
-	 * Note: This is a rather nasty chop at the problem. We cannot 
-	 * risk adding to the mlqueue however as this will block the 
-	 * device. If it is the last outstanding command for this host
-	 * it will remain blocked indefinitely. This would be quite possible
-	 * on the zSeries FCP adapter.
-	 * Also, there exists a race with scsi_insert_special relying on 
-	 * scsi_request_fn to recalculate some command data which may not 
-	 * happen when q->plugged is true in scsi_request_fn
-	 */
-	if (status_byte(scpnt->result) == QUEUE_FULL) {
-		ZFCP_LOG_DEBUG("Changing QUEUE_FULL to BUSY....\n");
-		scpnt->result &= ~(QUEUE_FULL << 1);
-		scpnt->result |= (BUSY << 1);
-	}
-#endif
-
 	ZFCP_LOG_DEBUG("scpnt->result =0x%x\n", scpnt->result);
 
 	zfcp_cmd_dbf_event_scsi("response", scpnt);
@@ -4682,8 +4602,8 @@ zfcp_fsf_req_wait_and_cleanup(struct zfcp_fsf_req *fsf_req,
 }
 
 static inline int
-zfcp_fsf_req_create_sbal_check(unsigned long *flags,
-			       struct zfcp_qdio_queue *queue, int needed)
+zfcp_fsf_req_sbal_check(unsigned long *flags,
+			struct zfcp_qdio_queue *queue, int needed)
 {
 	write_lock_irqsave(&queue->queue_lock, *flags);
 	if (likely(atomic_read(&queue->free_count) >= needed))
@@ -4713,29 +4633,24 @@ zfcp_fsf_req_qtcb_init(struct zfcp_fsf_req *fsf_req, u32 fsf_cmd)
  * @adapter: adapter for which request queue is examined
  * @req_flags: flags indicating whether to wait for needed SBAL or not
  * @lock_flags: lock_flags is queue_lock is taken
- *
- * locking: on success the queue_lock for the request queue of the adapter
- *	is held
+ * Return: 0 on success, otherwise -EIO, or -ERESTARTSYS
+ * Locks: lock adapter->request_queue->queue_lock on success
  */
 static int
 zfcp_fsf_req_sbal_get(struct zfcp_adapter *adapter, int req_flags,
 		      unsigned long *lock_flags)
 {
-        int condition;
+        long ret;
         struct zfcp_qdio_queue *req_queue = &adapter->request_queue;
 
         if (unlikely(req_flags & ZFCP_WAIT_FOR_SBAL)) {
-                wait_event_interruptible_timeout(adapter->request_wq,
-						 (condition =
-						  zfcp_fsf_req_create_sbal_check
-						  (lock_flags, req_queue, 1)),
-						 ZFCP_SBAL_TIMEOUT);
-                if (!condition) {
-                        return -EIO;
-		}
-        } else if (!zfcp_fsf_req_create_sbal_check(lock_flags, req_queue, 1)) {
+                ret = wait_event_interruptible_timeout(adapter->request_wq,
+			zfcp_fsf_req_sbal_check(lock_flags, req_queue, 1),
+						       ZFCP_SBAL_TIMEOUT);
+		if (ret < 0)
+			return ret;
+        } else if (!zfcp_fsf_req_sbal_check(lock_flags, req_queue, 1))
                 return -EIO;
-	}
 
         return 0;
 }

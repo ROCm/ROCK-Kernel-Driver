@@ -301,6 +301,9 @@ MODULE_AUTHOR("Eric Youngdale, Andi Kleen");
 
 #define elf_addr_t __u32
 
+#undef TASK_SIZE
+#define TASK_SIZE 0xffffffff
+
 static void elf32_init(struct pt_regs *);
 
 #include "../../../fs/binfmt_elf.c" 

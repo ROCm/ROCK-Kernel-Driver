@@ -16,8 +16,10 @@ struct thread_info;
 #define CURRENT_THREAD(dummy) (((unsigned long) &dummy) & \
 			        (PAGE_MASK << CONFIG_KERNEL_STACK_ORDER))
 
-#define current ({ int dummy; \
-                   ((struct thread_info *) CURRENT_THREAD(dummy))->task; })
+#define current_thread \
+	({ int dummy; ((struct thread_info *) CURRENT_THREAD(dummy)); })
+
+#define current (current_thread->task)
 
 #endif /* __ASSEMBLY__ */
 

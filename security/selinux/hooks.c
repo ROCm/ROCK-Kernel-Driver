@@ -43,6 +43,7 @@
 #include <linux/kd.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv6.h>
+#include <linux/tty.h>
 #include <net/icmp.h>
 #include <net/ip.h>		/* for sysctl_local_port_range[] */
 #include <net/tcp.h>		/* struct or_callable used in sock_rcv_skb */
@@ -62,7 +63,6 @@
 #include <linux/nfs_mount.h>
 #include <net/ipv6.h>
 #include <linux/hugetlb.h>
-#include <linux/major.h>
 #include <linux/personality.h>
 
 #include "avc.h"
@@ -87,7 +87,7 @@ __setup("enforcing=", enforcing_setup);
 #endif
 
 #ifdef CONFIG_SECURITY_SELINUX_BOOTPARAM
-int selinux_enabled = 1;
+int selinux_enabled = CONFIG_SECURITY_SELINUX_BOOTPARAM_VALUE;
 
 static int __init selinux_enabled_setup(char *str)
 {
@@ -1266,6 +1266,12 @@ static inline u32 file_to_av(struct file *file)
 int inode_security_set_sid(struct inode *inode, u32 sid)
 {
 	struct inode_security_struct *isec = inode->i_security;
+	struct superblock_security_struct *sbsec = inode->i_sb->s_security;
+
+	if (!sbsec->initialized) {
+		/* Defer initialization to selinux_complete_init. */
+		return 0;
+	}
 
 	down(&isec->sem);
 	isec->sclass = inode_mode_to_security_class(inode->i_mode);
@@ -1726,71 +1732,39 @@ static void selinux_bprm_free_security(struct linux_binprm *bprm)
 	kfree(bsec);
 }
 
-/* Create an open file that refers to the null device.
-   Derived from the OpenWall LSM. */
-struct file *open_devnull(void)
-{
-	struct inode *inode;
-	struct dentry *dentry;
-	struct file *file = NULL;
-	struct inode_security_struct *isec;
-	dev_t dev;
-
-	inode = new_inode(current->fs->rootmnt->mnt_sb);
-	if (!inode)
-		goto out;
-
-	dentry = dget(d_alloc_root(inode));
-	if (!dentry)
-		goto out_iput;
-
-	file = get_empty_filp();
-	if (!file)
-		goto out_dput;
-
-	dev = MKDEV(MEM_MAJOR, 3); /* null device */
-
-	inode->i_uid = current->fsuid;
-	inode->i_gid = current->fsgid;
-	inode->i_blksize = PAGE_SIZE;
-	inode->i_blocks = 0;
-	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-	inode->i_state = I_DIRTY; /* so that mark_inode_dirty won't touch us */
-
-	isec = inode->i_security;
-	isec->sid = SECINITSID_DEVNULL;
-	isec->sclass = SECCLASS_CHR_FILE;
-	isec->initialized = 1;
-
-	file->f_flags = O_RDWR;
-	file->f_mode = FMODE_READ | FMODE_WRITE;
-	file->f_dentry = dentry;
-	file->f_vfsmnt = mntget(current->fs->rootmnt);
-	file->f_pos = 0;
-
-	init_special_inode(inode, S_IFCHR | S_IRUGO | S_IWUGO, dev);
-	if (inode->i_fop->open(inode, file))
-		goto out_fput;
-
-out:
-	return file;
-out_fput:
-	mntput(file->f_vfsmnt);
-	put_filp(file);
-out_dput:
-	dput(dentry);
-out_iput:
-	iput(inode);
-	file = NULL;
-	goto out;
-}
+extern struct vfsmount *selinuxfs_mount;
+extern struct dentry *selinux_null;
 
 /* Derived from fs/exec.c:flush_old_files. */
 static inline void flush_unauthorized_files(struct files_struct * files)
 {
 	struct avc_audit_data ad;
 	struct file *file, *devnull = NULL;
+	struct tty_struct *tty = current->signal->tty;
 	long j = -1;
+
+	if (tty) {
+		file_list_lock();
+		file = list_entry(tty->tty_files.next, typeof(*file), f_list);
+		if (file) {
+			/* Revalidate access to controlling tty.
+			   Use inode_has_perm on the tty inode directly rather
+			   than using file_has_perm, as this particular open
+			   file may belong to another process and we are only
+			   interested in the inode-based check here. */
+			struct inode *inode = file->f_dentry->d_inode;
+			if (inode_has_perm(current, inode,
+					   FILE__READ | FILE__WRITE,
+					   NULL, NULL)) {
+				/* Reset controlling tty. */
+				current->signal->tty = NULL;
+				current->signal->tty_old_pgrp = 0;
+			}
+		}
+		file_list_unlock();
+	}
+
+	/* Revalidate access to inherited open files. */
 
 	AVC_AUDIT_DATA_INIT(&ad,FS);
 
@@ -1826,7 +1800,7 @@ static inline void flush_unauthorized_files(struct files_struct * files)
 					if (devnull) {
 						atomic_inc(&devnull->f_count);
 					} else {
-						devnull = open_devnull();
+						devnull = dentry_open(dget(selinux_null), mntget(selinuxfs_mount), O_RDWR);
 						if (!devnull) {
 							put_unused_fd(fd);
 							fput(file);
@@ -3082,6 +3056,7 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 				goto out;
 			AVC_AUDIT_DATA_INIT(&ad,NET);
 			ad.u.net.sport = htons(snum);
+			ad.u.net.family = family;
 			err = avc_has_perm(isec->sid, sid,
 					   isec->sclass,
 					   SOCKET__NAME_BIND, NULL, &ad);

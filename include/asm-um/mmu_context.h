@@ -26,8 +26,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	unsigned cpu = smp_processor_id();
 
 	if(prev != next){
-		clear_bit(cpu, &prev->cpu_vm_mask);
-		set_bit(cpu, &next->cpu_vm_mask);
+		cpu_clear(cpu, prev->cpu_vm_mask);
+		cpu_set(cpu, next->cpu_vm_mask);
 		if(next != &init_mm)
 			CHOOSE_MODE((void) 0, 
 				    switch_mm_skas(next->context.skas.mm_fd));

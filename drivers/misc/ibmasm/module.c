@@ -62,10 +62,17 @@ static int __init ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_
 	int result = -ENOMEM;
 	struct service_processor *sp;
 
+	if (pci_enable_device(pdev)) {
+		printk(KERN_ERR "%s: can't enable PCI device at %s\n",
+			DRIVER_NAME, pci_name(pdev));
+		return -ENODEV;
+	}
+
 	sp = kmalloc(sizeof(struct service_processor), GFP_KERNEL);
 	if (sp == NULL) {
 		dev_err(&pdev->dev, "Failed to allocate memory\n");
-		return result;
+		result = -ENOMEM;
+		goto error_kmalloc;
 	}
 	memset(sp, 0, sizeof(struct service_processor));
 
@@ -148,6 +155,8 @@ error_heartbeat:
 	ibmasm_event_buffer_exit(sp);
 error_eventbuffer:
 	kfree(sp);
+error_kmalloc:
+	pci_disable_device(pdev);
 
 	return result;
 }
@@ -166,6 +175,7 @@ static void __exit ibmasm_remove_one(struct pci_dev *pdev)
 	iounmap(sp->base_address);
 	ibmasm_event_buffer_exit(sp);
 	kfree(sp);
+	pci_disable_device(pdev);
 }
 
 static struct pci_device_id ibmasm_pci_table[] =

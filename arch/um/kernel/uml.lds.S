@@ -1,5 +1,5 @@
 #include <asm-generic/vmlinux.lds.h>
-	
+
 OUTPUT_FORMAT(ELF_FORMAT)
 OUTPUT_ARCH(ELF_ARCH)
 ENTRY(_start)
@@ -9,7 +9,6 @@ SECTIONS
 {
   . = START + SIZEOF_HEADERS;
 
-  . = ALIGN(4096);
   __binary_start = .;
 #ifdef MODE_TT
   .thread_private : {
@@ -26,11 +25,16 @@ SECTIONS
   . = ALIGN(4096);		/* Init code and data */
   _stext = .;
   __init_begin = .;
-  .text.init : { *(.text.init) }
+  .init.text : {
+	_sinittext = .;
+	*(.init.text)
+	_einittext = .;
+  }
   . = ALIGN(4096);
   .text      :
   {
     *(.text)
+    SCHED_TEXT
     /* .gnu.warning sections are handled specially by elf32.em.  */
     *(.gnu.warning)
     *(.gnu.linkonce.t*)
@@ -38,7 +42,7 @@ SECTIONS
 
   #include "asm/common.lds.S"
 
-  .data.init : { *(.data.init) }
+  init.data : { *(init.data) }
   .data    :
   {
     . = ALIGN(KERNEL_STACK_SIZE);		/* init_task */
@@ -66,12 +70,12 @@ SECTIONS
   _edata  =  .;
   PROVIDE (edata = .);
   . = ALIGN(0x1000);
-  .sbss      : 
+  .sbss      :
   {
    __bss_start = .;
    PROVIDE(_bss_start = .);
-   *(.sbss) 
-   *(.scommon) 
+   *(.sbss)
+   *(.scommon)
   }
   .bss       :
   {

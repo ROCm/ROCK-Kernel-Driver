@@ -41,7 +41,7 @@ struct timezone {
  * Have the 32 bit jiffies value wrap 5 minutes after boot
  * so jiffies wrap bugs show up earlier.
  */
-#define INITIAL_JIFFIES ((unsigned long)(unsigned int) (-300*HZ))
+#define INITIAL_JIFFIES ((unsigned long)(0))
 
 /*
  * Change timeval to jiffies, trying to avoid the

@@ -14,6 +14,9 @@ extern void *um_kmalloc_atomic(int size);
 extern void kfree(void *ptr);
 extern int in_aton(char *str);
 extern int open_gdb_chan(void);
+extern int strlcpy(char *, const char *, int);
+extern void *um_vmalloc(int size);
+extern void vfree(void *ptr);
 
 #endif
 

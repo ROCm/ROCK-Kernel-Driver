@@ -15,6 +15,7 @@
 #include <linux/tty.h>
 #include <linux/namespace.h>
 #include <linux/security.h>
+#include <linux/cpu.h>
 #include <linux/acct.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
@@ -56,8 +57,6 @@ void release_task(struct task_struct * p)
 	struct dentry *proc_dentry;
 
 repeat: 
-	BUG_ON(p->state < TASK_ZOMBIE);
- 
 	atomic_dec(&p->user->processes);
 	spin_lock(&p->proc_lock);
 	proc_dentry = proc_pid_unhash(p);
@@ -755,9 +754,8 @@ static void exit_notify(struct task_struct *tsk)
 	state = TASK_ZOMBIE;
 	if (tsk->exit_signal == -1 && tsk->ptrace == 0)
 		state = TASK_DEAD;
-	tsk->state = state;
-	tsk->flags |= PF_DEAD;
-
+	else
+		tsk->state = state;
 	/*
 	 * Clear these here so that update_process_times() won't try to deliver
 	 * itimer, profile or rlimit signals to this task while it is in late exit.
@@ -767,19 +765,14 @@ static void exit_notify(struct task_struct *tsk)
 	tsk->rlim[RLIMIT_CPU].rlim_cur = RLIM_INFINITY;
 
 	/*
-	 * In the preemption case it must be impossible for the task
-	 * to get runnable again, so use "_raw_" unlock to keep
-	 * preempt_count elevated until we schedule().
-	 *
-	 * To avoid deadlock on SMP, interrupts must be unmasked.  If we
-	 * don't, subsequently called functions (e.g, wait_task_inactive()
-	 * via release_task()) will spin, with interrupt flags
-	 * unwittingly blocked, until the other task sleeps.  That task
-	 * may itself be waiting for smp_call_function() to answer and
-	 * complete, and with interrupts blocked that will never happen.
+	 * Get a reference to it so that we can set the state
+	 * as the last step. The state-setting only matters if the
+	 * current task is releasing itself, to trigger the final
+	 * put_task_struct() in finish_task_switch(). (thread self-reap)
 	 */
-	_raw_write_unlock(&tasklist_lock);
-	local_irq_enable();
+	get_task_struct(tsk);
+
+	write_unlock_irq(&tasklist_lock);
 
 	list_for_each_safe(_p, _n, &ptrace_dead) {
 		list_del_init(_p);
@@ -788,9 +781,23 @@ static void exit_notify(struct task_struct *tsk)
 	}
 
 	/* If the process is dead, release it - nobody will wait for it */
-	if (state == TASK_DEAD)
+	if (state == TASK_DEAD) {
+		lock_cpu_hotplug();
 		release_task(tsk);
+		write_lock_irq(&tasklist_lock);
+		/*
+		 * No preemption may happen from this point on,
+		 * or CPU hotplug (and task exit) breaks:
+		 */
+		unlock_cpu_hotplug();
+		tsk->state = state;
+		_raw_write_unlock(&tasklist_lock);
+		local_irq_enable();
+	} else
+		preempt_disable();
 
+	tsk->flags |= PF_DEAD;
+	put_task_struct(tsk);
 }
 
 asmlinkage NORET_TYPE void do_exit(long code)

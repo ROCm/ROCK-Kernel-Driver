@@ -2271,10 +2271,12 @@ static int __init apm_init(void)
 	}
 	if ((num_online_cpus() > 1) && !power_off && !smp) {
 		printk(KERN_NOTICE "apm: disabled - APM is not SMP safe.\n");
+		apm_info.disabled = 1;
 		return -ENODEV;
 	}
 	if (PM_IS_ACTIVE()) {
 		printk(KERN_NOTICE "apm: overridden by ACPI.\n");
+		apm_info.disabled = 1;
 		return -ENODEV;
 	}
 	pm_active = 1;

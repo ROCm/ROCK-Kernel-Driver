@@ -108,11 +108,8 @@ EXPORT_SYMBOL(pcibios_penalize_isa_irq);
 EXPORT_SYMBOL(pci_mem_start);
 #endif
 
-#ifdef CONFIG_X86_USE_3DNOW
-EXPORT_SYMBOL(_mmx_memcpy);
-EXPORT_SYMBOL(mmx_clear_page);
-EXPORT_SYMBOL(mmx_copy_page);
-#endif
+EXPORT_SYMBOL(copy_page);
+EXPORT_SYMBOL(clear_page);
 
 EXPORT_SYMBOL(cpu_pda);
 #ifdef CONFIG_SMP
@@ -182,10 +179,17 @@ EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(__memcpy);
 EXPORT_SYMBOL_NOVERS(memcmp);
 
-/* syscall export needed for misdesigned sound drivers. */
-EXPORT_SYMBOL(sys_read);
-EXPORT_SYMBOL(sys_lseek);
-EXPORT_SYMBOL(sys_open);
+#ifdef CONFIG_RWSEM_XCHGADD_ALGORITHM
+/* prototypes are wrong, these are assembly with custom calling functions */
+extern void rwsem_down_read_failed_thunk(void);
+extern void rwsem_wake_thunk(void);
+extern void rwsem_downgrade_thunk(void);
+extern void rwsem_down_write_failed_thunk(void);
+EXPORT_SYMBOL(rwsem_down_read_failed_thunk);
+EXPORT_SYMBOL(rwsem_wake_thunk);
+EXPORT_SYMBOL(rwsem_downgrade_thunk);
+EXPORT_SYMBOL(rwsem_down_write_failed_thunk);
+#endif
 
 EXPORT_SYMBOL(empty_zero_page);
 
@@ -211,10 +215,9 @@ EXPORT_SYMBOL(init_level4_pgt);
 extern unsigned long __supported_pte_mask;
 EXPORT_SYMBOL(__supported_pte_mask);
 
-EXPORT_SYMBOL(clear_page);
-
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(flush_tlb_page);
 EXPORT_SYMBOL_GPL(flush_tlb_all);
 #endif
 
+EXPORT_SYMBOL(cpu_khz);

@@ -6,6 +6,12 @@
 #include "linux/sched.h"
 #include "linux/slab.h"
 #include "linux/ptrace.h"
+#include "linux/proc_fs.h"
+#include "linux/file.h"
+#include "linux/errno.h"
+#include "linux/init.h"
+#include "asm/uaccess.h"
+#include "asm/atomic.h"
 #include "kern_util.h"
 #include "time_user.h"
 #include "signal_user.h"
@@ -16,6 +22,61 @@
 #include "frame.h"
 #include "kern.h"
 #include "mode.h"
+
+static atomic_t using_sysemu;
+int sysemu_supported;
+
+void set_using_sysemu(int value)
+{
+	atomic_set(&using_sysemu, sysemu_supported && value);
+}
+
+int get_using_sysemu(void)
+{
+	return atomic_read(&using_sysemu);
+}
+
+int proc_read_sysemu(char *buf, char **start, off_t offset, int size,int *eof, void *data)
+{
+	if (snprintf(buf, size, "%d\n", get_using_sysemu()) < size) /*No overflow*/
+		*eof = 1;
+
+	return strlen(buf);
+}
+
+int proc_write_sysemu(struct file *file,const char *buf, unsigned long count,void *data)
+{
+	char tmp[2];
+
+	if (copy_from_user(tmp, buf, 1))
+		return -EFAULT;
+
+	if (tmp[0] == '0' || tmp[0] == '1')
+		set_using_sysemu(tmp[0] - '0');
+	return count; /*We use the first char, but pretend to write everything*/
+}
+
+int __init make_proc_sysemu(void)
+{
+	struct proc_dir_entry *ent;
+	if (mode_tt || !sysemu_supported)
+		return 0;
+
+	ent = create_proc_entry("sysemu", 0600, &proc_root);
+
+	if (ent == NULL)
+	{
+		printk("Failed to register /proc/sysemu\n");
+		return(0);
+	}
+
+	ent->read_proc  = proc_read_sysemu;
+	ent->write_proc = proc_write_sysemu;
+
+	return 0;
+}
+
+late_initcall(make_proc_sysemu);
 
 int singlestepping_skas(void)
 {
@@ -61,11 +122,13 @@ void new_thread_handler(int sig)
 	thread_wait(&current->thread.mode.skas.switch_buf, 
 		    current->thread.mode.skas.fork_buf);
 
-#ifdef CONFIG_SMP
-	schedule_tail(NULL);
-#endif
+	if(current->thread.prev_sched != NULL)
+		schedule_tail(current->thread.prev_sched);
 	current->thread.prev_sched = NULL;
 
+	/* The return value is 1 if the kernel thread execs a process,
+	 * 0 if it just exits
+	 */
 	n = run_kernel_thread(fn, arg, &current->thread.exec_buf);
 	if(n == 1)
 		userspace(&current->thread.regs.regs);
@@ -93,11 +156,11 @@ void fork_handler(int sig)
 		    current->thread.mode.skas.fork_buf);
   	
 	force_flush_all();
-#ifdef CONFIG_SMP
+	if(current->thread.prev_sched == NULL)
+		panic("blech");
+
 	schedule_tail(current->thread.prev_sched);
-#endif
 	current->thread.prev_sched = NULL;
-	unblock_signals();
 
 	userspace(&current->thread.regs.regs);
 }
@@ -136,7 +199,7 @@ int copy_thread_skas(int nr, unsigned long clone_flags, unsigned long sp,
 
 void init_idle_skas(void)
 {
-	cpu_tasks[current->thread_info->cpu].pid = os_getpid();
+	cpu_tasks[current_thread->cpu].pid = os_getpid();
 	default_idle();
 }
 
@@ -160,11 +223,11 @@ static int start_kernel_proc(void *unused)
 
 int start_uml_skas(void)
 {
-	start_userspace();
+	start_userspace(0);
 	capture_signal_stack();
+	uml_idle_timer();
 
 	init_new_thread_signals(1);
-	idle_timer();
 
 	init_task.thread.request.u.thread.proc = start_kernel_proc;
 	init_task.thread.request.u.thread.arg = NULL;
@@ -175,12 +238,14 @@ int start_uml_skas(void)
 
 int external_pid_skas(struct task_struct *task)
 {
-	return(userspace_pid);
+#warning Need to look up userspace_pid by cpu
+	return(userspace_pid[0]);
 }
 
 int thread_pid_skas(struct task_struct *task)
 {
-	return(userspace_pid);
+#warning Need to look up userspace_pid by cpu
+	return(userspace_pid[0]);
 }
 
 /*

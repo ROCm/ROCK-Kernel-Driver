@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.65 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.66 $"
 
 #include "zfcp_ext.h"
 
@@ -430,7 +430,7 @@ zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 	u64 dbf_fsf_req = 0;
 	u64 dbf_fsf_status = 0;
 	u64 dbf_fsf_qual[2] = { 0, 0 };
-	char dbf_result[ZFCP_ABORT_DBF_LENGTH] = { "##undef" };
+	char dbf_result[ZFCP_ABORT_DBF_LENGTH] = "##undef";
 
 	memset(dbf_opcode, 0, ZFCP_ABORT_DBF_LENGTH);
 	memcpy(dbf_opcode,

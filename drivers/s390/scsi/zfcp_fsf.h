@@ -227,6 +227,10 @@
 #define FSF_HBA_PORTSTATE_LINKDOWN		0x00000006
 #define FSF_HBA_PORTSTATE_ERROR			0x00000007
 
+/* IO states of adapter */
+#define FSF_IOSTAT_NPORT_RJT			0x00000004
+#define FSF_IOSTAT_FABRIC_RJT			0x00000005
+#define FSF_IOSTAT_LS_RJT			0x00000009
 
 struct fsf_queue_designator;
 struct fsf_status_read_buffer;

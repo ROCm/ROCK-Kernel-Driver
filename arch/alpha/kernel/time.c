@@ -366,7 +366,7 @@ time_init(void)
 		BCD_TO_BIN(year);
 	}
 
-	/* PC-like is standard; used for year < 20 || year >= 70 */
+	/* PC-like is standard; used for year >= 70 */
 	epoch = 1900;
 	if (year < 20)
 		epoch = 2000;

@@ -100,7 +100,7 @@ struct gendisk {
 	struct timer_rand_state *random;
 	int policy;
 
-	unsigned sync_io;		/* RAID */
+	atomic_t sync_io;		/* RAID */
 	unsigned long stamp, stamp_idle;
 	int in_flight;
 #ifdef	CONFIG_SMP

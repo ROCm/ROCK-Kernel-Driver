@@ -388,20 +388,17 @@ int bio_uncopy_user(struct bio *bio)
 	struct bio_vec *bvec;
 	int i, ret = 0;
 
-	if (bio_data_dir(bio) == READ) {
-		char *uaddr = bio->bi_private;
+	char *uaddr = bio->bi_private;
 
-		__bio_for_each_segment(bvec, bio, i, 0) {
-			char *addr = page_address(bvec->bv_page);
+	__bio_for_each_segment(bvec, bio, i, 0) {
+		char *addr = page_address(bvec->bv_page);
+		if (bio_data_dir(bio) == READ && !ret &&
+		    copy_to_user(uaddr, addr, bvec->bv_len))
+			ret = -EFAULT;
 
-			if (!ret && copy_to_user(uaddr, addr, bvec->bv_len))
-				ret = -EFAULT;
-
-			__free_page(bvec->bv_page);
-			uaddr += bvec->bv_len;
-		}
+		__free_page(bvec->bv_page);
+		uaddr += bvec->bv_len;
 	}
-
 	bio_put(bio);
 	return ret;
 }
@@ -457,6 +454,7 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 	 */
 	if (!ret) {
 		if (!write_to_vm) {
+			unsigned long p = uaddr;
 			bio->bi_rw |= (1 << BIO_RW);
 			/*
 	 		 * for a write, copy in data to kernel pages
@@ -465,8 +463,9 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 			bio_for_each_segment(bvec, bio, i) {
 				char *addr = page_address(bvec->bv_page);
 
-				if (copy_from_user(addr, (char *) uaddr, bvec->bv_len))
+				if (copy_from_user(addr, (char *) p, bvec->bv_len))
 					goto cleanup;
+				p += bvec->bv_len;
 			}
 		}
 

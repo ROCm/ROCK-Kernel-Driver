@@ -1,5 +1,5 @@
 # 
-# Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
+# Copyright (C) 2002 - 2003 Jeff Dike (jdike@addtoit.com)
 # Licensed under the GPL
 #
 
@@ -7,7 +7,7 @@ extra-y := unmap_fin.o
 
 obj-y = exec_kern.o exec_user.o gdb.o ksyms.o mem.o mem_user.o process_kern.o \
 	syscall_kern.o syscall_user.o time.o tlb.o tracer.o trap_user.o \
-	uaccess_user.o sys-$(SUBARCH)/
+	uaccess.o uaccess_user.o sys-$(SUBARCH)/
 
 obj-$(CONFIG_PT_PROXY) += gdb_kern.o ptproxy/
 
@@ -27,5 +27,3 @@ $(obj)/unmap.o: $(src)/unmap.c
 
 $(obj)/unmap_fin.o : $(src)/unmap.o
 	ld -r -o $@ $< -lc -L/usr/lib
-
-clean :

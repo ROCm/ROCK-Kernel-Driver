@@ -48,7 +48,10 @@ extern int um_execve(const char *file, char *const argv[], char *const env[]);
 	set_fs(KERNEL_DS);			\
 	ret = sys(args);			\
 	set_fs(fs);				\
-	return ret;
+	if (ret >= 0)				\
+		return ret;			\
+	errno = -(long)ret;			\
+	return -1;
 
 static inline long open(const char *pathname, int flags, int mode) 
 {

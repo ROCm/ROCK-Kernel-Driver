@@ -78,12 +78,6 @@ struct stat64 {
 	unsigned long long	st_ino;
 } __attribute__((packed));
 
-
-typedef union sigval32 {
-	int sival_int;
-	unsigned int sival_ptr;
-} sigval_t32;
-
 typedef struct siginfo32 {
 	int si_signo;
 	int si_errno;
@@ -102,7 +96,7 @@ typedef struct siginfo32 {
 		struct {
 			int _tid;		/* timer id */
 			int _overrun;		/* overrun count */
-			sigval_t32 _sigval;	/* same as below */
+			compat_sigval_t _sigval;	/* same as below */
 			int _sys_private;	/* not to be passed to user */
 			int _overrun_incr;	/* amount to add to overrun */
 		} _timer;
@@ -111,7 +105,7 @@ typedef struct siginfo32 {
 		struct {
 			unsigned int _pid;	/* sender's pid */
 			unsigned int _uid;	/* sender's uid */
-			sigval_t32 _sigval;
+			compat_sigval_t _sigval;
 		} _rt;
 
 		/* SIGCHLD */

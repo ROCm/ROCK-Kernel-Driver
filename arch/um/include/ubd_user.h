@@ -9,7 +9,7 @@
 
 #include "os.h"
 
-enum ubd_req { UBD_READ, UBD_WRITE };
+enum ubd_req { UBD_READ, UBD_WRITE, UBD_MMAP };
 
 struct io_thread_req {
 	enum ubd_req op;
@@ -20,8 +20,10 @@ struct io_thread_req {
 	char *buffer;
 	int sectorsize;
 	unsigned long sector_mask;
-	unsigned long cow_offset;
+	unsigned long long cow_offset;
 	unsigned long bitmap_words[2];
+	int map_fd;
+	unsigned long long map_offset;
 	int error;
 };
 
@@ -31,7 +33,7 @@ extern int open_ubd_file(char *file, struct openflags *openflags,
 			 int *create_cow_out);
 extern int create_cow_file(char *cow_file, char *backing_file, 
 			   struct openflags flags, int sectorsize, 
-			   int *bitmap_offset_out, 
+			   int alignment, int *bitmap_offset_out,
 			   unsigned long *bitmap_len_out,
 			   int *data_offset_out);
 extern int read_cow_bitmap(int fd, void *buf, int offset, int len);
@@ -39,7 +41,6 @@ extern int read_ubd_fs(int fd, void *buffer, int len);
 extern int write_ubd_fs(int fd, char *buffer, int len);
 extern int start_io_thread(unsigned long sp, int *fds_out);
 extern void do_io(struct io_thread_req *req);
-extern int ubd_is_dir(char *file);
 
 static inline int ubd_test_bit(__u64 bit, unsigned char *data)
 {

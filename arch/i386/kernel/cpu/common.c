@@ -559,13 +559,11 @@ void __init cpu_init (void)
 
 	load_esp0(t, thread);
 	set_tss_desc(cpu,t);
-	per_cpu(cpu_gdt_table,cpu)[GDT_ENTRY_TSS].b &= 0xfffffdff;
 	load_TR_desc();
 	load_LDT(&init_mm.context);
 
 	/* Set up doublefault TSS pointer in the GDT */
 	__set_tss_desc(cpu, GDT_ENTRY_DOUBLEFAULT_TSS, &doublefault_tss);
-	per_cpu(cpu_gdt_table, cpu)[GDT_ENTRY_DOUBLEFAULT_TSS].b &= 0xfffffdff;
 
 	/* Clear %fs and %gs. */
 	asm volatile ("xorl %eax, %eax; movl %eax, %fs; movl %eax, %gs");

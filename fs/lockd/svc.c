@@ -409,13 +409,13 @@ MODULE_DESCRIPTION("NFS file locking service version " LOCKD_VERSION ".");
 MODULE_LICENSE("GPL");
 
 module_param_call(nlm_grace_period, param_set_grace_period, param_get_ulong,
-		  &nlm_grace_period, 644);
+		  &nlm_grace_period, 0644);
 module_param_call(nlm_timeout, param_set_timeout, param_get_ulong,
-		  &nlm_timeout, 644);
+		  &nlm_timeout, 0644);
 module_param_call(nlm_udpport, param_set_port, param_get_int,
-		  &nlm_udpport, 644);
+		  &nlm_udpport, 0644);
 module_param_call(nlm_tcpport, param_set_port, param_get_int,
-		  &nlm_tcpport, 644);
+		  &nlm_tcpport, 0644);
 
 /*
  * Initialising and terminating the module.

@@ -50,6 +50,7 @@
 #include <linux/miscdevice.h>
 #include <linux/serial_core.h>
 
+#include <asm/io.h>
 #include <asm/sn/simulator.h>
 #include <asm/sn/sn2/sn_private.h>
 #include <asm/sn/sn_sal.h>
@@ -1086,7 +1087,9 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 			spin_unlock_irqrestore(&port->sc_port.lock, flags);
 
 			puts_raw_fixed(port->sc_ops->sal_puts_raw, s, count);
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 		}
+#endif
 	}
 	else {
 		/* Not yet registered with serial core - simple case */

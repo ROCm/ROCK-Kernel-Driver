@@ -356,10 +356,10 @@ Generally, inline functions are preferable to macros resembling functions.
 
 Macros with multiple statements should be enclosed in a do - while block:
 
-#define macrofun(a,b,c) 			\
+#define macrofun(a, b, c) 			\
 	do {					\
 		if (a == 5)			\
-			do_this(b,c);		\
+			do_this(b, c);		\
 	} while (0)
 
 Things to avoid when using macros:

@@ -406,7 +406,7 @@ static int read_disk_sb(mdk_rdev_t * rdev)
 	return 0;
 
 fail:
-	printk(KERN_ERR "md: disabled device %s, could not read superblock.\n",
+	printk(KERN_WARNING "md: disabled device %s, could not read superblock.\n",
 		bdevname(rdev->bdev,b));
 	return -EINVAL;
 }
@@ -1075,20 +1075,24 @@ static void unbind_rdev_from_array(mdk_rdev_t * rdev)
 /*
  * prevent the device from being mounted, repartitioned or
  * otherwise reused by a RAID array (or any other kernel
- * subsystem), by opening the device. [simply getting an
- * inode is not enough, the SCSI module usage code needs
- * an explicit open() on the device]
+ * subsystem), by bd_claiming the device.
  */
 static int lock_rdev(mdk_rdev_t *rdev, dev_t dev)
 {
 	int err = 0;
 	struct block_device *bdev;
+	char b[BDEVNAME_SIZE];
 
 	bdev = open_by_devnum(dev, FMODE_READ|FMODE_WRITE);
-	if (IS_ERR(bdev))
+	if (IS_ERR(bdev)) {
+		printk(KERN_ERR "md: could not open %s.\n",
+			__bdevname(dev, b));
 		return PTR_ERR(bdev);
+	}
 	err = bd_claim(bdev, rdev);
 	if (err) {
+		printk(KERN_ERR "md: could not bd_claim %s.\n",
+			bdevname(bdev, b));
 		blkdev_put(bdev);
 		return err;
 	}
@@ -1150,10 +1154,7 @@ static void export_array(mddev_t *mddev)
 
 static void print_desc(mdp_disk_t *desc)
 {
-	char b[BDEVNAME_SIZE];
-
-	printk(" DISK<N:%d,%s(%d,%d),R:%d,S:%d>\n", desc->number,
-		__bdevname(MKDEV(desc->major, desc->minor), b),
+	printk(" DISK<N:%d,(%d,%d),R:%d,S:%d>\n", desc->number,
 		desc->major,desc->minor,desc->raid_disk,desc->state);
 }
 
@@ -1345,8 +1346,7 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int super_format, int super_mi
 
 	rdev = (mdk_rdev_t *) kmalloc(sizeof(*rdev), GFP_KERNEL);
 	if (!rdev) {
-		printk(KERN_ERR "md: could not alloc mem for %s!\n", 
-			__bdevname(newdev, b));
+		printk(KERN_ERR "md: could not alloc mem for new device!\n");
 		return ERR_PTR(-ENOMEM);
 	}
 	memset(rdev, 0, sizeof(*rdev));
@@ -1355,11 +1355,9 @@ static mdk_rdev_t *md_import_device(dev_t newdev, int super_format, int super_mi
 		goto abort_free;
 
 	err = lock_rdev(rdev, newdev);
-	if (err) {
-		printk(KERN_ERR "md: could not lock %s.\n",
-			__bdevname(newdev, b));
+	if (err)
 		goto abort_free;
-	}
+
 	rdev->desc_nr = -1;
 	rdev->faulty = 0;
 	rdev->in_sync = 0;
@@ -1648,6 +1646,8 @@ static int do_md_run(mddev_t * mddev)
 	mddev->pers = pers[pnum];
 	spin_unlock(&pers_lock);
 
+	mddev->resync_max_sectors = mddev->size << 1; /* may be over-ridden by personality */
+
 	err = mddev->pers->run(mddev);
 	if (err) {
 		printk(KERN_ERR "md: pers->run() failed ...\n");
@@ -1915,11 +1915,9 @@ static int autostart_array(dev_t startdev)
 	mdk_rdev_t *start_rdev = NULL, *rdev;
 
 	start_rdev = md_import_device(startdev, 0, 0);
-	if (IS_ERR(start_rdev)) {
-		printk(KERN_WARNING "md: could not import %s!\n",
-			__bdevname(startdev, b));
+	if (IS_ERR(start_rdev))
 		return err;
-	}
+
 
 	/* NOTE: this can only work for 0.90.0 superblocks */
 	sb = (mdp_super_t*)page_address(start_rdev->sb_page);
@@ -1950,12 +1948,9 @@ static int autostart_array(dev_t startdev)
 		if (MAJOR(dev) != desc->major || MINOR(dev) != desc->minor)
 			continue;
 		rdev = md_import_device(dev, 0, 0);
-		if (IS_ERR(rdev)) {
-			printk(KERN_WARNING "md: could not import %s,"
-				" trying to run array nevertheless.\n",
-				__bdevname(dev, b));
+		if (IS_ERR(rdev))
 			continue;
-		}
+
 		list_add(&rdev->same_set, &pending_raid_disks);
 	}
 
@@ -2187,42 +2182,6 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 	return 0;
 }
 
-static int hot_generate_error(mddev_t * mddev, dev_t dev)
-{
-	char b[BDEVNAME_SIZE];
-	struct request_queue *q;
-	mdk_rdev_t *rdev;
-
-	if (!mddev->pers)
-		return -ENODEV;
-
-	printk(KERN_INFO "md: trying to generate %s error in %s ... \n",
-		__bdevname(dev, b), mdname(mddev));
-
-	rdev = find_rdev(mddev, dev);
-	if (!rdev) {
-		/* MD_BUG(); */ /* like hell - it's not a driver bug */
-		return -ENXIO;
-	}
-
-	if (rdev->desc_nr == -1) {
-		MD_BUG();
-		return -EINVAL;
-	}
-	if (!rdev->in_sync)
-		return -ENODEV;
-
-	q = bdev_get_queue(rdev->bdev);
-	if (!q) {
-		MD_BUG();
-		return -ENODEV;
-	}
-	printk(KERN_INFO "md: okay, generating error!\n");
-//	q->oneshot_error = 1; // disabled for now
-
-	return 0;
-}
-
 static int hot_remove_disk(mddev_t * mddev, dev_t dev)
 {
 	char b[BDEVNAME_SIZE];
@@ -2230,9 +2189,6 @@ static int hot_remove_disk(mddev_t * mddev, dev_t dev)
 
 	if (!mddev->pers)
 		return -ENODEV;
-
-	printk(KERN_INFO "md: trying to remove %s from %s ... \n",
-		__bdevname(dev, b), mdname(mddev));
 
 	rdev = find_rdev(mddev, dev);
 	if (!rdev)
@@ -2260,9 +2216,6 @@ static int hot_add_disk(mddev_t * mddev, dev_t dev)
 
 	if (!mddev->pers)
 		return -ENODEV;
-
-	printk(KERN_INFO "md: trying to hot-add %s to %s ... \n",
-		__bdevname(dev, b), mdname(mddev));
 
 	if (mddev->major_version != 0) {
 		printk(KERN_WARNING "%s: HOT_ADD may only be used with"
@@ -2523,7 +2476,6 @@ static int set_disk_faulty(mddev_t *mddev, dev_t dev)
 static int md_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
-	char b[BDEVNAME_SIZE];
 	int err = 0;
 	void __user *argp = (void __user *)arg;
 	struct hd_geometry __user *loc = argp;
@@ -2582,8 +2534,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		}
 		err = autostart_array(new_decode_dev(arg));
 		if (err) {
-			printk(KERN_WARNING "md: autostart %s failed!\n",
-				__bdevname(arg, b));
+			printk(KERN_WARNING "md: autostart failed!\n");
 			goto abort;
 		}
 		goto done;
@@ -2724,9 +2675,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 				err = add_new_disk(mddev, &info);
 			goto done_unlock;
 		}
-		case HOT_GENERATE_ERROR:
-			err = hot_generate_error(mddev, new_decode_dev(arg));
-			goto done_unlock;
+
 		case HOT_REMOVE_DISK:
 			err = hot_remove_disk(mddev, new_decode_dev(arg));
 			goto done_unlock;
@@ -2953,6 +2902,7 @@ void md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 	if (!mddev->pers->error_handler)
 		return;
 	mddev->pers->error_handler(mddev,rdev);
+	set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 	md_wakeup_thread(mddev->thread);
 }
@@ -2985,7 +2935,11 @@ static void status_resync(struct seq_file *seq, mddev_t * mddev)
 	unsigned long max_blocks, resync, res, dt, db, rt;
 
 	resync = (mddev->curr_resync - atomic_read(&mddev->recovery_active))/2;
-	max_blocks = mddev->size;
+
+	if (test_bit(MD_RECOVERY_SYNC, &mddev->recovery))
+		max_blocks = mddev->resync_max_sectors >> 1;
+	else
+		max_blocks = mddev->size;
 
 	/*
 	 * Should not happen.
@@ -3221,11 +3175,6 @@ int unregister_md_personality(int pnum)
 	return 0;
 }
 
-void md_sync_acct(mdk_rdev_t *rdev, unsigned long nr_sectors)
-{
-	rdev->bdev->bd_contains->bd_disk->sync_io += nr_sectors;
-}
-
 static int is_mddev_idle(mddev_t *mddev)
 {
 	mdk_rdev_t * rdev;
@@ -3238,8 +3187,12 @@ static int is_mddev_idle(mddev_t *mddev)
 		struct gendisk *disk = rdev->bdev->bd_contains->bd_disk;
 		curr_events = disk_stat_read(disk, read_sectors) + 
 				disk_stat_read(disk, write_sectors) - 
-				disk->sync_io;
-		if ((curr_events - rdev->last_events) > 32) {
+				atomic_read(&disk->sync_io);
+		/* Allow some slack between valud of curr_events and last_events,
+		 * as there are some uninteresting races.
+		 * Note: the following is an unsigned comparison.
+		 */
+		if ((curr_events - rdev->last_events + 32) > 64) {
 			rdev->last_events = curr_events;
 			idle = 0;
 		}
@@ -3373,7 +3326,14 @@ static void md_do_sync(mddev_t *mddev)
 		}
 	} while (mddev->curr_resync < 2);
 
-	max_sectors = mddev->size << 1;
+	if (test_bit(MD_RECOVERY_SYNC, &mddev->recovery))
+		/* resync follows the size requested by the personality,
+		 * which default to physical size, but can be virtual size
+		 */
+		max_sectors = mddev->resync_max_sectors;
+	else
+		/* recovery follows the physical size of devices */
+		max_sectors = mddev->size << 1;
 
 	printk(KERN_INFO "md: syncing RAID array %s\n", mdname(mddev));
 	printk(KERN_INFO "md: minimum _guaranteed_ reconstruction speed:"
@@ -3731,7 +3691,6 @@ void md_autodetect_dev(dev_t dev)
 
 static void autostart_arrays(int part)
 {
-	char b[BDEVNAME_SIZE];
 	mdk_rdev_t *rdev;
 	int i;
 
@@ -3741,11 +3700,9 @@ static void autostart_arrays(int part)
 		dev_t dev = detected_devices[i];
 
 		rdev = md_import_device(dev,0, 0);
-		if (IS_ERR(rdev)) {
-			printk(KERN_ALERT "md: could not import %s!\n",
-				__bdevname(dev, b));
+		if (IS_ERR(rdev))
 			continue;
-		}
+
 		if (rdev->faulty) {
 			MD_BUG();
 			continue;
@@ -3796,7 +3753,6 @@ module_exit(md_exit)
 EXPORT_SYMBOL(register_md_personality);
 EXPORT_SYMBOL(unregister_md_personality);
 EXPORT_SYMBOL(md_error);
-EXPORT_SYMBOL(md_sync_acct);
 EXPORT_SYMBOL(md_done_sync);
 EXPORT_SYMBOL(md_write_start);
 EXPORT_SYMBOL(md_write_end);

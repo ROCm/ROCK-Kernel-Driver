@@ -24,7 +24,8 @@
 #define MISC_MCELOG_MINOR 227
 #define NR_BANKS 5
 
-static int mce_disabled __initdata;
+static int mce_dont_init;
+
 /* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic,
    3: never panic or exit (for testing only) */
 static int tolerant = 1;
@@ -113,9 +114,8 @@ static void mce_panic(char *msg, struct mce *backup, unsigned long start)
 
 static int mce_available(struct cpuinfo_x86 *c)
 {
-	return !mce_disabled && 
-		test_bit(X86_FEATURE_MCE, &c->x86_capability) &&
-		test_bit(X86_FEATURE_MCA, &c->x86_capability);
+	return test_bit(X86_FEATURE_MCE, &c->x86_capability) &&
+	       test_bit(X86_FEATURE_MCA, &c->x86_capability);
 }
 
 /* 
@@ -127,8 +127,9 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	struct mce m, panicm;
 	int nowayout = (tolerant < 1); 
 	int kill_it = 0;
-	u64 mcestart;
+	u64 mcestart = 0;
 	int i;
+	int panicm_found = 0;
 
 	if (regs)
 		notify_die(DIE_NMI, "machine check", regs, error_code, 255, SIGKILL);
@@ -138,17 +139,11 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	memset(&m, 0, sizeof(struct mce));
 	m.cpu = hard_smp_processor_id();
 	rdmsrl(MSR_IA32_MCG_STATUS, m.mcgstatus);
-	if (!regs && (m.mcgstatus & MCG_STATUS_MCIP))
-		return;
 	if (!(m.mcgstatus & MCG_STATUS_RIPV))
 		kill_it = 1;
-	if (regs) {
-		m.rip = regs->rip;
-		m.cs = regs->cs;
-	}
 	
 	rdtscll(mcestart);
-	mb();
+	barrier();
 
 	for (i = 0; i < banks; i++) {
 		if (!bank[i])
@@ -156,52 +151,62 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		
 		m.misc = 0; 
 		m.addr = 0;
+		m.bank = i;
+		m.tsc = 0;
 
 		rdmsrl(MSR_IA32_MC0_STATUS + i*4, m.status);
 		if ((m.status & MCI_STATUS_VAL) == 0)
 			continue;
-		/* Should be implied by the banks check above, but
-		   check it anyways */
-		if ((m.status & MCI_STATUS_EN) == 0)
-			continue;
 
-		/* Did this bank cause the exception? */
-		/* Assume that the bank with uncorrectable errors did it,
-		   and that there is only a single one. */
-		if (m.status & MCI_STATUS_UC) {
-			panicm = m;
-		} else {
-			m.rip = 0;
-			m.cs = 0;
+		if (m.status & MCI_STATUS_EN) {
+			/* In theory _OVER could be a nowayout too, but
+			   assume any overflowed errors were no fatal. */
+			nowayout |= !!(m.status & MCI_STATUS_PCC);
+			kill_it |= !!(m.status & MCI_STATUS_UC);
 		}
-
-		/* In theory _OVER could be a nowayout too, but
-		   assume any overflowed errors were no fatal. */
-		nowayout |= !!(m.status & MCI_STATUS_PCC);
-		kill_it |= !!(m.status & MCI_STATUS_UC);
-		m.bank = i;
 
 		if (m.status & MCI_STATUS_MISCV)
 			rdmsrl(MSR_IA32_MC0_MISC + i*4, m.misc);
 		if (m.status & MCI_STATUS_ADDRV)
 			rdmsrl(MSR_IA32_MC0_ADDR + i*4, m.addr);
 
-		rdtscll(m.tsc);
+		if (regs && (m.mcgstatus & MCG_STATUS_RIPV)) {
+			m.rip = regs->rip;
+			m.cs = regs->cs;
+		} else {
+			m.rip = 0;
+			m.cs = 0;
+		}
+
+		if (error_code != -1)
+			rdtscll(m.tsc);
 		wrmsrl(MSR_IA32_MC0_STATUS + i*4, 0);
 		mce_log(&m);
+
+		/* Did this bank cause the exception? */
+		/* Assume that the bank with uncorrectable errors did it,
+		   and that there is only a single one. */
+		if ((m.status & MCI_STATUS_UC) && (m.status & MCI_STATUS_EN)) {
+			panicm = m;
+			panicm_found = 1;
+		}
 	}
-	wrmsrl(MSR_IA32_MCG_STATUS, 0);
 
 	/* Never do anything final in the polling timer */
 	if (!regs)
-		return;
+		goto out;
+
+	/* If we didn't find an uncorrectable error, pick
+	   the last one (shouldn't happen, just being safe). */
+	if (!panicm_found)
+		panicm = m;
 	if (nowayout)
-		mce_panic("Machine check", &m, mcestart);
+		mce_panic("Machine check", &panicm, mcestart);
 	if (kill_it) {
 		int user_space = 0;
 
 		if (m.mcgstatus & MCG_STATUS_RIPV)
-			user_space = m.rip && (m.cs & 3);
+			user_space = panicm.rip && (panicm.cs & 3);
 		
 		/* When the machine was in user space and the CPU didn't get
 		   confused it's normally not necessary to panic, unless you 
@@ -214,18 +219,15 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		    (unsigned)current->pid <= 1)
 			mce_panic("Uncorrected machine check", &panicm, mcestart);
 
-		/* do_exit takes an awful lot of locks and has as slight risk 
-		   of deadlocking. If you don't want that don't set tolerant >= 2 */
+		/* do_exit takes an awful lot of locks and has as
+		   slight risk of deadlocking. If you don't want that
+		   don't set tolerant >= 2 */
 		if (tolerant < 3)
 			do_exit(SIGBUS);
 	}
-}
 
-static void mce_clear_all(void)
-{
-	int i;
-	for (i = 0; i < banks; i++)
-		wrmsrl(MSR_IA32_MC0_STATUS + i*4, 0);
+ out:
+	/* Last thing done in the machine check exception to clear state. */
 	wrmsrl(MSR_IA32_MCG_STATUS, 0);
 }
 
@@ -268,22 +270,25 @@ static void mce_init(void *dummy)
 	int i;
 
 	rdmsrl(MSR_IA32_MCG_CAP, cap);
-	if (cap & MCG_CTL_P)
-		wrmsr(MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
-
 	banks = cap & 0xff;
 	if (banks > NR_BANKS) { 
 		printk(KERN_INFO "MCE: warning: using only %d banks\n", banks);
 		banks = NR_BANKS; 
 	}
 
-	mce_clear_all(); 
+	/* Log the machine checks left over from the previous reset.
+	   This also clears all registers */
+	do_machine_check(NULL, -1);
+
+	set_in_cr4(X86_CR4_MCE);
+
+	if (cap & MCG_CTL_P)
+		wrmsr(MSR_IA32_MCG_CTL, 0xffffffff, 0xffffffff);
+
 	for (i = 0; i < banks; i++) {
 		wrmsrl(MSR_IA32_MC0_CTL+4*i, bank[i]);
 		wrmsrl(MSR_IA32_MC0_STATUS+4*i, 0);
 	}	
-
-	set_in_cr4(X86_CR4_MCE);
 }
 
 /* Add per CPU specific workarounds here */
@@ -307,7 +312,9 @@ void __init mcheck_init(struct cpuinfo_x86 *c)
 
 	mce_cpu_quirks(c); 
 
-	if (test_and_set_bit(smp_processor_id(), &mce_cpus) || !mce_available(c))
+	if (mce_dont_init ||
+	    test_and_set_bit(smp_processor_id(), &mce_cpus) ||
+	    !mce_available(c))
 		return;
 
 	mce_init(NULL);
@@ -410,15 +417,16 @@ static struct miscdevice mce_log_device = {
 
 static int __init mcheck_disable(char *str)
 {
-	mce_disabled = 1;
+	mce_dont_init = 1;
 	return 0;
 }
 
-/* mce=off disable machine check */
+/* mce=off disables machine check. Note you can reenable it later
+   using sysfs */
 static int __init mcheck_enable(char *str)
 {
 	if (!strcmp(str, "off"))
-		mce_disabled = 1;
+		mce_dont_init = 1;
 	else
 		printk("mce= argument %s ignored. Please use /sys", str); 
 	return 0;
@@ -434,7 +442,6 @@ __setup("mce", mcheck_enable);
 /* On resume clear all MCE state. Don't want to see leftovers from the BIOS. */
 static int mce_resume(struct sys_device *dev)
 {
-	mce_clear_all();
 	on_each_cpu(mce_init, NULL, 1, 1);
 	return 0;
 }
@@ -492,7 +499,7 @@ static __init int mce_init_device(void)
 	if (!err)
 		err = sysdev_register(&device_mce);
 	if (!err) { 
-		/* could create per CPU objects, but is not worth it. */
+		/* could create per CPU objects, but it is not worth it. */
 		sysdev_create_file(&device_mce, &attr_bank0ctl); 
 		sysdev_create_file(&device_mce, &attr_bank1ctl); 
 		sysdev_create_file(&device_mce, &attr_bank2ctl); 

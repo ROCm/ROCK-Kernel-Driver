@@ -267,7 +267,7 @@ paging_init (void)
 	efi_memmap_walk(find_largest_hole, (u64 *)&max_gap);
 	if (max_gap < LARGE_GAP) {
 		vmem_map = (struct page *) 0;
-		free_area_init_node(0, &contig_page_data, NULL, zones_size, 0,
+		free_area_init_node(0, &contig_page_data, zones_size, 0,
 				    zholes_size);
 		mem_map = contig_page_data.node_mem_map;
 	} else {
@@ -280,7 +280,8 @@ paging_init (void)
 		vmem_map = (struct page *) vmalloc_end;
 		efi_memmap_walk(create_mem_map_page_table, 0);
 
-		free_area_init_node(0, &contig_page_data, vmem_map, zones_size,
+		contig_page_data.node_mem_map = vmem_map;
+		free_area_init_node(0, &contig_page_data, zones_size,
 				    0, zholes_size);
 
 		mem_map = contig_page_data.node_mem_map;

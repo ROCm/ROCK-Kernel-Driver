@@ -19,11 +19,16 @@
 void do_exec(int old_pid, int new_pid)
 {
 	unsigned long regs[FRAME_SIZE];
+	int err;
 
 	if((ptrace(PTRACE_ATTACH, new_pid, 0, 0) < 0) ||
-	   (ptrace(PTRACE_CONT, new_pid, 0, 0) < 0) ||
-	   (waitpid(new_pid, 0, WUNTRACED) < 0))
+	   (ptrace(PTRACE_CONT, new_pid, 0, 0) < 0))
 		tracer_panic("do_exec failed to attach proc - errno = %d",
+			     errno);
+
+	CATCH_EINTR(err = waitpid(new_pid, 0, WUNTRACED));
+	if (err < 0)
+		tracer_panic("do_exec failed to attach proc in waitpid - errno = %d",
 			     errno);
 
 	if(ptrace_getregs(old_pid, regs) < 0)

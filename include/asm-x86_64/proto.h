@@ -82,7 +82,6 @@ extern int unhandled_signal(struct task_struct *tsk, int sig);
 
 extern void select_idle_routine(const struct cpuinfo_x86 *c);
 extern void swiotlb_init(void);
-extern int swiotlb;
 
 extern unsigned long max_mapnr;
 extern unsigned long end_pfn; 
@@ -103,6 +102,8 @@ extern int fallback_aper_force;
 extern int iommu_aperture;
 extern int iommu_aperture_disabled;
 extern int iommu_aperture_allowed;
+extern int fix_aperture;
+extern int force_iommu;
 
 extern void smp_local_timer_interrupt(struct pt_regs * regs);
 

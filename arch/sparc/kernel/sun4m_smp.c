@@ -173,18 +173,9 @@ void __init smp4m_boot_cpus(void)
 			int timeout;
 
 			/* Cook up an idler for this guy. */
-			kernel_thread(start_secondary, NULL, CLONE_IDLETASK);
-
+			p = fork_idle(i);
 			cpucount++;
-
-			p = prev_task(&init_task);
-
-			init_idle(p, i);
-
 			current_set[i] = p->thread_info;
-
-			unhash_process(p);
-
 			/* See trampoline.S for details... */
 			entry += ((i-1) * 3);
 

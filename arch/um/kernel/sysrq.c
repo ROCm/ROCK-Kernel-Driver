@@ -44,6 +44,11 @@ void dump_stack(void)
 }
 EXPORT_SYMBOL(dump_stack);
 
+void show_stack(struct task_struct *task, unsigned long *sp)
+{
+	show_trace(sp);
+}
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

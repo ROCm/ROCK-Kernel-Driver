@@ -812,10 +812,6 @@ config PREEMPT
 config HIGHMEM
 	bool "High memory support"
 
-config KERNEL_ELF
-	bool
-	default y
-
 source "fs/Kconfig.binfmt"
 
 config PROC_DEVICETREE

@@ -232,7 +232,7 @@ asmlinkage int m68k_clone(struct pt_regs *regs)
 	child_tidptr = (int *)regs->d4;
 	if (!newsp)
 		newsp = rdusp();
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0,
+	return do_fork(clone_flags, newsp, regs, 0,
 		       parent_tidptr, child_tidptr);
 }
 

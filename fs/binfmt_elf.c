@@ -703,10 +703,12 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	if (elf_read_implies_exec(elf_ex, have_pt_gnu_stack))
 		current->personality |= READ_IMPLIES_EXEC;
 
+	arch_pick_mmap_layout(current->mm);
+
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
 	current->mm->rss = 0;
-	current->mm->free_area_cache = TASK_UNMAPPED_BASE;
+	current->mm->free_area_cache = current->mm->mmap_base;
 	retval = setup_arg_pages(bprm, executable_stack);
 	if (retval < 0) {
 		send_sig(SIGKILL, current, 0);

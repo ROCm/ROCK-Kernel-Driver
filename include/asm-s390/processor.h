@@ -76,6 +76,8 @@ extern struct task_struct *last_task_used_math;
 
 #define MM_VM_SIZE(mm)		DEFAULT_TASK_SIZE
 
+#define HAVE_ARCH_PICK_MMAP_LAYOUT
+
 typedef struct {
         __u32 ar4;
 } mm_segment_t;

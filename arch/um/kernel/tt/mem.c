@@ -18,7 +18,7 @@ void before_mem_tt(unsigned long brk_start)
 	if(!jail || debug)
 		remap_data(UML_ROUND_DOWN(&_stext), UML_ROUND_UP(&_etext), 1);
 	remap_data(UML_ROUND_DOWN(&_sdata), UML_ROUND_UP(&_edata), 1);
-	remap_data(UML_ROUND_DOWN(&__bss_start), UML_ROUND_UP(brk_start), 1);
+	remap_data(UML_ROUND_DOWN(&__bss_start), UML_ROUND_UP(&_end), 1);
 }
 
 #ifdef CONFIG_HOST_2G_2G

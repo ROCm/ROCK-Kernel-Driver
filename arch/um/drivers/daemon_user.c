@@ -53,7 +53,8 @@ static int connect_to_switch(struct daemon_data *pri)
 	struct request_v3 req;
 	int fd, n, err;
 
-	if((pri->control = socket(AF_UNIX, SOCK_STREAM, 0)) < 0){
+	pri->control = socket(AF_UNIX, SOCK_STREAM, 0);
+	if(pri->control < 0){
 		printk("daemon_open : control socket failed, errno = %d\n", 
 		       errno);		
 		return(-errno);
@@ -67,7 +68,8 @@ static int connect_to_switch(struct daemon_data *pri)
 		goto out;
 	}
 
-	if((fd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0){
+	fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if(fd < 0){
 		printk("daemon_open : data socket failed, errno = %d\n", 
 		       errno);
 		err = -errno;
@@ -91,18 +93,18 @@ static int connect_to_switch(struct daemon_data *pri)
 	req.version = SWITCH_VERSION;
 	req.type = REQ_NEW_CONTROL;
 	req.sock = *local_addr;
-	n = write(pri->control, &req, sizeof(req));
+	n = os_write_file(pri->control, &req, sizeof(req));
 	if(n != sizeof(req)){
-		printk("daemon_open : control setup request returned %d, "
-		       "errno = %d\n", n, errno);
+		printk("daemon_open : control setup request failed, err = %d\n",
+		       -n);
 		err = -ENOTCONN;
 		goto out;		
 	}
 
-	n = read(pri->control, sun, sizeof(*sun));
+	n = os_read_file(pri->control, sun, sizeof(*sun));
 	if(n != sizeof(*sun)){
-		printk("daemon_open : read of data socket returned %d, "
-		       "errno = %d\n", n, errno);
+		printk("daemon_open : read of data socket failed, err = %d\n",
+		       -n);
 		err = -ENOTCONN;
 		goto out_close;		
 	}
@@ -111,9 +113,9 @@ static int connect_to_switch(struct daemon_data *pri)
 	return(fd);
 
  out_close:
-	close(fd);
+	os_close_file(fd);
  out:
-	close(pri->control);
+	os_close_file(pri->control);
 	return(err);
 }
 
@@ -153,8 +155,8 @@ static void daemon_remove(void *data)
 {
 	struct daemon_data *pri = data;
 
-	close(pri->fd);
-	close(pri->control);
+	os_close_file(pri->fd);
+	os_close_file(pri->control);
 	if(pri->data_addr != NULL) kfree(pri->data_addr);
 	if(pri->ctl_addr != NULL) kfree(pri->ctl_addr);
 	if(pri->local_addr != NULL) kfree(pri->local_addr);

@@ -284,9 +284,6 @@ SECTIONS {
 		__setup_start = .;
 		*(.init.setup)
 		__setup_end = .;
-		__start___param = .;
-		*(__param)
-		__stop___param = .;
 		__initcall_start = .;
 		*(.initcall1.init)
 		*(.initcall2.init)

@@ -14,7 +14,7 @@ MODE_INCLUDE += -I$(TOPDIR)/$(ARCH_DIR)/kernel/skas/include
 LINK_SKAS = -Wl,-rpath,/lib 
 LD_SCRIPT_SKAS = dyn.lds
 
-GEN_HEADERS += $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h
+GEN_HEADERS += $(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h
 
-$(ARCH_DIR)/kernel/skas/include/skas_ptregs.h :
-	$(MAKE) -C $(ARCH_DIR)/kernel/skas include/skas_ptregs.h
+$(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h :
+	$(Q)$(MAKE) $(build)=$(ARCH_DIR)/kernel/skas $@

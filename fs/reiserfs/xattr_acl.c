@@ -289,8 +289,14 @@ reiserfs_set_acl(struct inode *inode, int type, struct posix_acl *acl)
             error = reiserfs_xattr_set(inode, name, value, size, 0);
 	} else {
             error = reiserfs_xattr_del (inode, name);
-            if (error == -ENODATA)
+            if (error == -ENODATA) {
+                /* This may seem odd here, but it means that the ACL was set
+                 * with a value representable with mode bits. If there was
+                 * an ACL before, reiserfs_xattr_del already dirtied the inode.
+                 */
+                mark_inode_dirty (inode);
                 error = 0;
+            }
         }
 
 	if (value)

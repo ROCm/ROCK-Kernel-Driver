@@ -1,5 +1,5 @@
 /*
- * Dynamic DMA mapping support. Common code
+ * Dynamic DMA mapping support.
  */
 
 #include <linux/types.h>
@@ -24,38 +24,37 @@
  * Device ownership issues as mentioned above for pci_map_single are
  * the same here.
  */
-int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-			     int nents, int direction)
+int dma_map_sg(struct device *hwdev, struct scatterlist *sg,
+	       int nents, int direction)
 {
 	int i;
 
-	BUG_ON(direction == PCI_DMA_NONE);
+	BUG_ON(direction == DMA_NONE);
  	for (i = 0; i < nents; i++ ) {
 		struct scatterlist *s = &sg[i];
 		BUG_ON(!s->page); 
-			s->dma_address = pci_map_page(hwdev, s->page, s->offset, 
-						      s->length, direction); 
+		s->dma_address = virt_to_bus(page_address(s->page) +s->offset);
 		s->dma_length = s->length;
 	}
 	return nents;
 }
 
-EXPORT_SYMBOL(pci_map_sg);
+EXPORT_SYMBOL(dma_map_sg);
 
 /* Unmap a set of streaming mode DMA translations.
  * Again, cpu read rules concerning calls here are the same as for
  * pci_unmap_single() above.
  */
-void pci_unmap_sg(struct pci_dev *dev, struct scatterlist *sg, 
-				  int nents, int dir)
+void dma_unmap_sg(struct device *dev, struct scatterlist *sg,
+		  int nents, int dir)
 {
 	int i;
 	for (i = 0; i < nents; i++) { 
 		struct scatterlist *s = &sg[i];
 		BUG_ON(s->page == NULL); 
 		BUG_ON(s->dma_address == 0); 
-		pci_unmap_single(dev, s->dma_address, s->dma_length, dir); 
+		dma_unmap_single(dev, s->dma_address, s->dma_length, dir);
 	} 
 }
 
-EXPORT_SYMBOL(pci_unmap_sg);
+EXPORT_SYMBOL(dma_unmap_sg);

@@ -21,6 +21,7 @@
 #include "sysdep/sigcontext.h"
 #include "frame_user.h"
 #include "kern_util.h"
+#include "user_util.h"
 #include "ptrace_user.h"
 #include "os.h"
 
@@ -40,7 +41,7 @@ static int capture_stack(int (*child)(void *arg), void *arg, void *sp,
 	/* Wait for it to stop itself and continue it with a SIGUSR1 to force 
 	 * it into the signal handler.
 	 */
-	n = waitpid(pid, &status, WUNTRACED);
+	CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
 	if(n < 0){
 		printf("capture_stack : waitpid failed - errno = %d\n", errno);
 		exit(1);
@@ -60,7 +61,7 @@ static int capture_stack(int (*child)(void *arg), void *arg, void *sp,
 	 * At this point, the handler has stuffed the addresses of
 	 * sig, sc, and SA_RESTORER in raw.
 	 */
-	n = waitpid(pid, &status, WUNTRACED);
+	CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
 	if(n < 0){
 		printf("capture_stack : waitpid failed - errno = %d\n", errno);
 		exit(1);
@@ -82,7 +83,8 @@ static int capture_stack(int (*child)(void *arg), void *arg, void *sp,
 		       errno);
 		exit(1);
 	}
-	if(waitpid(pid, &status, 0) < 0){
+	CATCH_EINTR(n = waitpid(pid, &status, 0));
+	if(n < 0){
 		printf("capture_stack : waitpid failed - errno = %d\n", errno);
 		exit(1);
 	}
@@ -279,7 +281,7 @@ void capture_signal_stack(void)
 	struct sc_frame_raw raw_sc;
 	struct si_frame_raw raw_si;
 	void *stack, *sigstack;
-	unsigned long top, sig_top, base;
+	unsigned long top, base;
 
 	stack = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC,
 		     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -292,7 +294,6 @@ void capture_signal_stack(void)
 	}
 
 	top = (unsigned long) stack + PAGE_SIZE - sizeof(void *);
-	sig_top = (unsigned long) sigstack + PAGE_SIZE;
 
 	/* Get the sigcontext, no sigrestorer layout */
 	raw_sc.restorer = 0;

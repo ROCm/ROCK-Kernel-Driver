@@ -58,16 +58,17 @@ void bust_spinlocks(int yes)
 /* Sometimes the CPU reports invalid exceptions on prefetch.
    Check that here and ignore.
    Opcode checker based on code by Richard Brunner */
-static int is_prefetch(struct pt_regs *regs, unsigned long addr)
+static noinline int is_prefetch(struct pt_regs *regs, unsigned long addr,
+				unsigned long error_code)
 { 
 	unsigned char *instr = (unsigned char *)(regs->rip);
 	int scan_more = 1;
 	int prefetch = 0; 
 	unsigned char *max_instr = instr + 15;
 
-	/* Avoid recursive faults for this common case */
-	if (regs->rip == addr)
-		return 0; 
+	/* If it was a exec fault ignore */
+	if (error_code & (1<<4))
+		return 0;
 	
 	/* Code segments in LDT could have a non zero base. Don't check
 	   when that's possible */
@@ -218,6 +219,18 @@ int unhandled_signal(struct task_struct *tsk, int sig)
 		(tsk->sighand->action[sig-1].sa.sa_handler == SIG_DFL);
 }
 
+static noinline void pgtable_bad(unsigned long address, struct pt_regs *regs,
+				 unsigned long error_code)
+{
+	oops_begin();
+	printk(KERN_ALERT "%s: Corrupted page table at address %lx\n",
+	       current->comm, address);
+	dump_pagetable(address);
+	__die("Bad pagetable", regs, error_code);
+	oops_end();
+	do_exit(SIGKILL);
+}
+
 int page_fault_trace; 
 int exception_trace = 1;
 
@@ -268,11 +281,32 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	mm = tsk->mm;
 	info.si_code = SEGV_MAPERR;
 
-	/* 5 => page not present and from supervisor mode */
-	if (unlikely(!(error_code & 5) &&
-		     ((address >= VMALLOC_START && address <= VMALLOC_END) ||
-		      (address >= MODULES_VADDR && address <= MODULES_END))))
-		goto vmalloc_fault;
+
+	/*
+	 * We fault-in kernel-space virtual memory on-demand. The
+	 * 'reference' page table is init_mm.pgd.
+	 *
+	 * NOTE! We MUST NOT take any locks for this case. We may
+	 * be in an interrupt or a critical region, and should
+	 * only copy the information from the master page table,
+	 * nothing more.
+	 *
+	 * This verifies that the fault happens in kernel space
+	 * (error_code & 4) == 0, and that the fault was not a
+	 * protection error (error_code & 1) == 0.
+	 */
+	if (unlikely(address >= TASK_SIZE)) {
+		if (!(error_code & 5))
+			goto vmalloc_fault;
+		/*
+		 * Don't take the mm semaphore here. If we fixup a prefetch
+		 * fault we could otherwise deadlock.
+		 */
+		goto bad_area_nosemaphore;
+	}
+
+	if (unlikely(error_code & (1 << 3)))
+		goto page_table_corruption;
 
 	/*
 	 * If we're in an interrupt or have no user
@@ -351,18 +385,18 @@ bad_area:
 bad_area_nosemaphore:
 
 #ifdef CONFIG_IA32_EMULATION
-		/* 32bit vsyscall. map on demand. */
-		if (test_thread_flag(TIF_IA32) && 
+	/* 32bit vsyscall. map on demand. */
+	if (test_thread_flag(TIF_IA32) &&
 	    address >= 0xffffe000 && address < 0xffffe000 + PAGE_SIZE) { 
-			if (map_syscall32(mm, address) < 0) 
-				goto out_of_memory2;
-			return;
-		} 			
+		if (map_syscall32(mm, address) < 0)
+			goto out_of_memory2;
+		return;
+	}
 #endif
 
 	/* User mode accesses just cause a SIGSEGV */
 	if (error_code & 4) {
-		if (is_prefetch(regs, address))
+		if (is_prefetch(regs, address, error_code))
 			return;
 
 		/* Work around K8 erratum #100 K8 in compat mode
@@ -376,7 +410,7 @@ bad_area_nosemaphore:
 			return;
 
 		if (exception_trace && unhandled_signal(tsk, SIGSEGV)) {
-		printk(KERN_INFO 
+			printk(KERN_INFO
 		       "%s[%d]: segfault at %016lx rip %016lx rsp %016lx error %lx\n",
 					tsk->comm, tsk->pid, address, regs->rip,
 					regs->rsp, error_code);
@@ -407,7 +441,7 @@ no_context:
 	 * Hall of shame of CPU/BIOS bugs.
 	 */
 
- 	if (is_prefetch(regs, address))
+ 	if (is_prefetch(regs, address, error_code))
  		return;
 
 	if (is_errata93(regs, address))
@@ -481,10 +515,8 @@ vmalloc_fault:
 		 * is really there and when yes flush the local TLB. 
 		 */
 		pgd = pgd_offset_k(address);
-		if (pgd != current_pgd_offset_k(address)) 
-			BUG(); 
 		if (!pgd_present(*pgd))
-				goto bad_area_nosemaphore;
+			goto bad_area_nosemaphore;
 		pmd = pmd_offset(pgd, address);
 		if (!pmd_present(*pmd))
 			goto bad_area_nosemaphore;
@@ -495,4 +527,7 @@ vmalloc_fault:
 		__flush_tlb_all();		
 		return;
 	}
+
+page_table_corruption:
+	pgtable_bad(address, regs, error_code);
 }
