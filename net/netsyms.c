@@ -570,6 +570,7 @@ EXPORT_SYMBOL(netif_rx);
 EXPORT_SYMBOL(netif_receive_skb);
 EXPORT_SYMBOL(dev_add_pack);
 EXPORT_SYMBOL(dev_remove_pack);
+EXPORT_SYMBOL(__dev_remove_pack);
 EXPORT_SYMBOL(dev_get);
 EXPORT_SYMBOL(dev_alloc);
 EXPORT_SYMBOL(dev_alloc_name);

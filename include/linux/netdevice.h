@@ -456,7 +456,7 @@ struct packet_type
 	int			(*func) (struct sk_buff *, struct net_device *,
 					 struct packet_type *);
 	void			*data;	/* Private to the packet type		*/
-	struct packet_type	*next;
+	struct list_head	list;
 };
 
 
@@ -472,6 +472,7 @@ extern int 			netdev_boot_setup_check(struct net_device *dev);
 extern struct net_device    *dev_getbyhwaddr(unsigned short type, char *hwaddr);
 extern void		dev_add_pack(struct packet_type *pt);
 extern void		dev_remove_pack(struct packet_type *pt);
+extern void		__dev_remove_pack(struct packet_type *pt);
 extern int		dev_get(const char *name);
 extern struct net_device	*dev_get_by_flags(unsigned short flags,
 						  unsigned short mask);
