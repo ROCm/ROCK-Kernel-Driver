@@ -519,7 +519,7 @@ sys32_munmap (unsigned int start, unsigned int len)
 #if PAGE_SHIFT <= IA32_PAGE_SHIFT
 	ret = sys_munmap(start, end - start);
 #else
-	if (start > end)
+	if (start >= end)
 		return -EINVAL;
 
 	start = PAGE_ALIGN(start);
