@@ -9,6 +9,7 @@
 #include <linux/smp.h>
 #include <linux/config.h>
 #include <linux/irq.h>
+#include <linux/tqueue.h>
 #include <asm/processor.h> 
 #include <asm/system.h>
 #include <asm/msr.h>
@@ -273,9 +274,6 @@ static void mce_checkregs (void *info)
 {
 	u32 low, high;
 	int i;
-	unsigned int *cpu = info;
-
-	BUG_ON (*cpu != smp_processor_id());
 
 	for (i=0; i<banks; i++) {
 		rdmsr(MSR_IA32_MC0_STATUS+i*4, low, high);
@@ -293,24 +291,32 @@ static void mce_checkregs (void *info)
 	}
 }
 
+static void do_mce_timer(void *data)
+{ 
+	preempt_disable(); 
+	mce_checkregs(NULL);
+	smp_call_function (mce_checkregs, NULL, 1, 1);
+	preempt_enable();
+	mce_timer.expires = jiffies + MCE_RATE;
+	add_timer (&mce_timer);
+} 
+
+static struct tq_struct mce_task = { 
+	routine: do_mce_timer	
+};
 
 static void mce_timerfunc (unsigned long data)
 {
-	unsigned int i;
-
-	for (i=0; i<NR_CPUS; i++) {
-		if (!cpu_online(i))
-			continue;
-		if (i == smp_processor_id())
-			mce_checkregs(&i);
-		else
-			smp_call_function (mce_checkregs, &i, 1, 1);
+#ifdef CONFIG_SMP
+	if (num_online_cpus() > 1) { 
+		schedule_task(&mce_task); 
+		return;
 	}
-
-	/* Refresh the timer. */
+#endif
+	mce_checkregs(NULL);
 	mce_timer.expires = jiffies + MCE_RATE;
 	add_timer (&mce_timer);
-}
+}	
 #endif
 
 
@@ -446,7 +452,7 @@ void __init mcheck_init(struct cpuinfo_x86 *c)
 	{
 		case X86_VENDOR_AMD:
 			/* AMD K7 machine check is Intel like */
-			if(c->x86 == 6) {
+			if(c->x86 == 6 || c->x86 == 15) {
 				intel_mcheck_init(c);
 #ifdef CONFIG_X86_MCE_NONFATAL
 				if (timerset == 0) {
