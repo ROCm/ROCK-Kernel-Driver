@@ -173,7 +173,7 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
      if (get_user(pid, &header->pid))
 	     return -EFAULT; 
 
-     if (pid && !capable(CAP_SETPCAP))
+     if (pid && pid != current->pid && !capable(CAP_SETPCAP))
              return -EPERM;
 
      if (copy_from_user(&effective, &data->effective, sizeof(effective)) ||
