@@ -308,3 +308,32 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
 	return -ENOSYS;
 }
+
+/*
+ * Set a given TLS descriptor:
+ */
+asmlinkage int sys_set_thread_area(struct user_desc *u_info)
+{
+	return -ENOSYS;
+}
+
+
+/*
+ * Get the current Thread-Local Storage area:
+ */
+
+asmlinkage int sys_get_thread_area(struct user_desc *u_info)
+{
+	return -ENOSYS;
+}
+
+
+asmlinkage unsigned long sys_alloc_hugepages(int key, unsigned long addr, unsigned long len, int prot, int flag)
+{
+	return -ENOMEM;
+}
+
+asmlinkage int sys_free_hugepages(unsigned long addr)
+{
+	return -EINVAL;
+}

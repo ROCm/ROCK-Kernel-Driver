@@ -701,8 +701,28 @@
 #define __NR_gettid             (__NR_Linux + 206)
 #define __NR_readahead          (__NR_Linux + 207)
 #define __NR_tkill		(__NR_Linux + 208)
+#define __NR_sendfile64		(__NR_Linux + 209)
+#define __NR_futex		(__NR_Linux + 210)
+#define __NR_sched_setaffinity	(__NR_Linux + 211)
+#define __NR_sched_getaffinity	(__NR_Linux + 212)
+#define __NR_set_thread_area	(__NR_Linux + 213)
+#define __NR_get_thread_area	(__NR_Linux + 214)
+#define __NR_io_setup		(__NR_Linux + 215)
+#define __NR_io_destroy		(__NR_Linux + 216)
+#define __NR_io_getevents	(__NR_Linux + 217)
+#define __NR_io_submit		(__NR_Linux + 218)
+#define __NR_io_cancel		(__NR_Linux + 219)
+#define __NR_alloc_hugepages	(__NR_Linux + 220)
+#define __NR_free_hugepages	(__NR_Linux + 221)
+#define __NR_exit_group		(__NR_Linux + 222)
+#define __NR_lookup_dcookie	(__NR_Linux + 223)
+#define __NR_epoll_create	(__NR_Linux + 224)
+#define __NR_epoll_ctl		(__NR_Linux + 225)
+#define __NR_epoll_wait		(__NR_Linux + 226)
+#define __NR_remap_file_pages	(__NR_Linux + 227)
 
-#define __NR_Linux_syscalls     208
+
+#define __NR_Linux_syscalls     228
 
 #define HPUX_GATEWAY_ADDR       0xC0000004
 #define LINUX_GATEWAY_ADDR      0x100

@@ -238,7 +238,7 @@ pcibios_update_resource(
 	if (res->flags & IORESOURCE_IO) {
 		barval = PCI_PORT_ADDR(res->start);
 	} else if (res->flags & IORESOURCE_MEM) {
-		barval = PCI_BUS_ADDR(HBA_DATA(dev->bus->sysdata), res->start);
+		barval = PCI_BUS_ADDR(HBA_DATA(dev->bus->dev->platform_data), res->start);
 	} else {
 		panic("pcibios_update_resource() WTF? flags not IO or MEM");
 	}
@@ -350,7 +350,7 @@ void __devinit pcibios_fixup_pbus_ranges(
 	struct pbus_set_ranges_data *ranges
 	)
 {
-	struct pci_hba_data *hba = HBA_DATA(bus->sysdata);
+	struct pci_hba_data *hba = HBA_DATA(bus->dev->platform_data);
 
 	/*
 	** I/O space may see busnumbers here. Something
@@ -486,24 +486,6 @@ pcibios_setup_host_bridge(struct pci_bus *bus)
 #endif
 }
 
-
-/*
-** Mostly copied from drivers/pci/setup-bus.c:pci_assign_unassigned_resources()
-*/
-void __devinit
-pcibios_assign_unassigned_resources(struct pci_bus *bus)
-{
-	/* from drivers/pci/setup-bus.c */
-	extern void pbus_assign_resources(struct pci_bus *bus, struct pbus_set_ranges_data *ranges);
-
-	struct pbus_set_ranges_data ranges;
-
-	ranges.io_end = ranges.io_start
-				= bus->resource[0]->start + PCIBIOS_MIN_IO;
-	ranges.mem_end = ranges.mem_start
-				= bus->resource[1]->start + PCIBIOS_MIN_MEM;
-	pbus_assign_resources(bus, &ranges);
-}
 
 /*
 ** PARISC specific (unfortunately)

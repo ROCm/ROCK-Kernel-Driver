@@ -86,9 +86,9 @@ EXPORT_SYMBOL(pdc_iodc_read);
 #include <asm/io.h>
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
-EXPORT_SYMBOL(memcpy_toio);
-EXPORT_SYMBOL(memcpy_fromio);
-EXPORT_SYMBOL(memset_io);
+EXPORT_SYMBOL(__memcpy_toio);
+EXPORT_SYMBOL(__memcpy_fromio);
+EXPORT_SYMBOL(__memset_io);
 
 #if defined(CONFIG_PCI) || defined(CONFIG_ISA)
 EXPORT_SYMBOL(inb);
@@ -141,7 +141,6 @@ extern void $$divU(void);
 extern void $$remI(void);
 extern void $$remU(void);
 extern void $$mulI(void);
-extern void $$mulU(void);
 extern void $$divU_3(void);
 extern void $$divU_5(void);
 extern void $$divU_6(void);
@@ -166,9 +165,6 @@ EXPORT_SYMBOL_NOVERS($$divU);
 EXPORT_SYMBOL_NOVERS($$remI);
 EXPORT_SYMBOL_NOVERS($$remU);
 EXPORT_SYMBOL_NOVERS($$mulI);
-#ifndef __LP64__
-EXPORT_SYMBOL_NOVERS($$mulU);
-#endif
 EXPORT_SYMBOL_NOVERS($$divU_3);
 EXPORT_SYMBOL_NOVERS($$divU_5);
 EXPORT_SYMBOL_NOVERS($$divU_6);
@@ -215,3 +211,10 @@ extern void $$dyncall(void);
 EXPORT_SYMBOL_NOVERS($$dyncall);
 #endif
 
+#ifdef CONFIG_PROFILING
+EXPORT_SYMBOL_GPL(register_profile_notifier);
+EXPORT_SYMBOL_GPL(unregister_profile_notifier);
+#endif
+
+#include <asm/pgtable.h>
+EXPORT_SYMBOL_NOVERS(vmalloc_start);

@@ -103,7 +103,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 		if (current->ptrace & PT_PTRACED)
 			goto out;
 
-		ret = security_ops->ptrace(current->parent, current);
+		ret = security_ptrace(current->parent, current);
 		if (ret) 
 			goto out;
 

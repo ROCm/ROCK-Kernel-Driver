@@ -140,10 +140,7 @@ struct thread_struct {
  * Return saved PC of a blocked thread.  This is used by ps mostly.
  */
 
-static inline unsigned long thread_saved_pc(struct task_struct *t)
-{
-	return 0xabcdef;
-}
+unsigned long thread_saved_pc(struct task_struct *t);
 
 /*
  * Start user thread in another space.

@@ -84,13 +84,6 @@ static __inline__ void ide_init_default_hwifs(void)
 #define ide_request_region(from,extent,name)	request_region((from), (extent), (name))
 #define ide_release_region(from,extent)		release_region((from), (extent))
 
-/*
- * The following are not needed for the non-m68k ports
- */
-#define ide_ack_intr(hwif)		(1)
-#define ide_release_lock(lock)		do {} while (0)
-#define ide_get_lock(lock, hdlr, data)	do {} while (0)
-
 #endif /* __KERNEL__ */
 
 #endif /* __ASM_PARISC_IDE_H */

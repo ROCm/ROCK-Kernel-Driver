@@ -37,8 +37,8 @@
 #if BITS_PER_LONG == 32
 #define LDD_KERNEL(ptr)		BUG()
 #define LDD_USER(ptr)		BUG()
-#define STD_KERNEL(x, ptr) __put_kernel_asm64(x,ptr)
-#define STD_USER(x, ptr) __put_user_asm64(x,ptr)
+#define STD_KERNEL(x, ptr) __put_kernel_asm64((u32)x,ptr)
+#define STD_USER(x, ptr) __put_user_asm64((u32)x,ptr)
 #else
 #define LDD_KERNEL(ptr) __get_kernel_asm("ldd",ptr)
 #define LDD_USER(ptr) __get_user_asm("ldd",ptr)
@@ -60,9 +60,6 @@ struct exception_table_entry {
 	unsigned long addr;  /* address of insn that is allowed to fault.   */
 	long skip;           /* pcoq skip | r9 clear flag | r8 -EFAULT flag */
 };
-
-extern const struct exception_table_entry 
-    *search_exception_table(unsigned long addr);
 
 #define __get_user(x,ptr)                               \
 ({                                                      \

@@ -38,13 +38,11 @@
 #include <asm/thread_info.h>
 
 #ifdef __LP64__
-#define FRAME_SIZE	128
 #define CMPIB           cmpib,*
 #define CMPB            cmpb,*
 
 	.level 2.0w
 #else
-#define FRAME_SIZE	64
 #define CMPIB           cmpib,
 #define CMPB            cmpb,
 
@@ -147,7 +145,7 @@
 
 	mfctl   %cr30, %r1
 	tophys  %r1,%r9
-	LDREG	0(%r9), %r1		/* thread_info -> task_struct */
+	LDREG	TI_TASK(%r9), %r1	/* thread_info -> task_struct */
 	tophys  %r1,%r9
 	ldo     TASK_REGS(%r9),%r9
 	STREG   %r30, PT_GR30(%r9)
@@ -499,9 +497,7 @@ fault_vector_11:
 #endif
 
 	.import		handle_interruption,code
-	.import		handle_real_interruption,code
 	.import		do_cpu_irq_mask,code
-	.import		parisc_stopkernel,code
 
 	/*
 	 * r26 = function to be called
@@ -529,7 +525,7 @@ __kernel_thread:
 	STREG	%r2, PT_GR27(%r1)	/* Store childs %dp */
 	ldd	16(%r26), %r26
 
-	STREG	%r22, PT_GR22(%r1)	/* Store childs %dp */
+	STREG	%r22, PT_GR22(%r1)	/* save r22 (arg5) */
 	copy	%r0, %r22		/* user_tid */
 #endif
 	STREG	%r26, PT_GR26(%r1)  /* Store function & argument for child */
@@ -568,7 +564,7 @@ ret_from_kernel_thread:
 	nop
 #endif
 
-	LDREG	-THREAD_SZ_ALGN(%r30), %r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN(%r30), %r1
 	LDREG	TASK_PT_GR25(%r1), %r26
 #ifdef __LP64__
 	LDREG	TASK_PT_GR27(%r1), %r27
@@ -629,11 +625,7 @@ _switch_to:
 
 	STREG	%r30, TASK_PT_KSP(%r26)
 	LDREG	TASK_PT_KSP(%r25), %r30
-#ifdef __LP64__
-	LDREG	8(%r25), %r25
-#else
-	LDREG	4(%r25), %r25
-#endif
+	LDREG	TASK_THREAD_INFO(%r25), %r25
 	bv	%r0(%r2)
 	mtctl   %r25,%cr30
 
@@ -667,7 +659,7 @@ _switch_to_ret:
 	.export	syscall_exit_rfi
 syscall_exit_rfi:
 	mfctl   %cr30,%r16
-	LDREG	0(%r16), %r16		/* thread_info -> task_struct */
+	LDREG	TI_TASK(%r16), %r16	/* thread_info -> task_struct */
 	ldo	TASK_REGS(%r16),%r16
 	/* Force iaoq to userspace, as the user has had access to our current
 	 * context via sigcontext. Also Filter the PSW for the same reason.
@@ -824,8 +816,6 @@ intr_do_signal:
 	ldo	-16(%r30),%r29			/* Reference param save area */
 #endif
 
-#warning TAUSQ FIXME - review 2.5 signal return path changes
-
 	bl	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
@@ -954,11 +944,11 @@ skip_save_ior:
 	ldo		-16(%r30),%r29	/* Reference param save area */
 #endif
 
-	ldil		L%intr_restore, %r2
+	ldil		L%intr_check_sig, %r2
 	copy		%r25, %r16	/* save pt_regs */
 
 	b		handle_interruption
-	ldo		R%intr_restore(%r2), %r2
+	ldo		R%intr_check_sig(%r2), %r2
 
 
 	/*
@@ -1985,8 +1975,7 @@ dtlb_fault:
 	.export sys_fork_wrapper
 	.export child_return
 sys_fork_wrapper:
-	mfctl	%cr30,%r1		/* get pt regs */
-	LDREG	0(%r1),%r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30), %r1
 	ldo	TASK_REGS(%r1),%r1
 	reg_save %r1
 	mfctl	%cr27, %r3
@@ -2011,9 +2000,8 @@ sys_fork_wrapper:
 	LDREG	-RP_OFFSET-FRAME_SIZE(%r30),%r2
 wrapper_exit:
 	ldo	-FRAME_SIZE(%r30),%r30		/* get the stackframe */
-	mfctl	%cr30,%r1		/* get pt regs */
-	LDREG	0(%r1),%r1
-	ldo	TASK_REGS(%r1),%r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1
+	ldo	TASK_REGS(%r1),%r1	 /* get pt regs */
 
 	LDREG	PT_CR27(%r1), %r3
 	mtctl	%r3, %cr27
@@ -2031,18 +2019,16 @@ child_return:
 	nop
 #endif
 
-	mfctl	%cr30,%r2
-	LDREG	0(%r2),%r2
-	LDREG	TASK_PT_GR19(%r2),%r2
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE-FRAME_SIZE(%r30), %r1
+	LDREG	TASK_PT_GR19(%r1),%r2
 	b	wrapper_exit
 	copy	%r0,%r28
 
 	
 	.export sys_clone_wrapper
 sys_clone_wrapper:
-	mfctl	%cr30,%r1		/* get pt regs */
-	LDREG	0(%r1),%r1
-	ldo	TASK_REGS(%r1),%r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1
+	ldo	TASK_REGS(%r1),%r1	/* get pt regs */
 	reg_save %r1
 	mfctl	%cr27, %r3
 	STREG	%r3, PT_CR27(%r1)
@@ -2063,9 +2049,8 @@ sys_clone_wrapper:
 
 	.export sys_vfork_wrapper
 sys_vfork_wrapper:
-	mfctl	%cr30,%r1		/* get pt regs */
-	LDREG	0(%r1),%r1
-	ldo	TASK_REGS(%r1),%r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1
+	ldo	TASK_REGS(%r1),%r1	/* get pt regs */
 	reg_save %r1
 	mfctl	%cr27, %r3
 	STREG	%r3, PT_CR27(%r1)
@@ -2087,9 +2072,8 @@ sys_vfork_wrapper:
 
 	
 	.macro  execve_wrapper execve
-	mfctl	%cr30,%r1		/* get pt regs */
-	LDREG	0(%r1),%r1
-	ldo	TASK_REGS(%r1),%r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1
+	ldo	TASK_REGS(%r1),%r1	/* get pt regs */
 
 	/*
 	 * Do we need to save/restore r3-r18 here?
@@ -2137,9 +2121,8 @@ sys32_execve_wrapper:
 
 	.export sys_rt_sigreturn_wrapper
 sys_rt_sigreturn_wrapper:
-	mfctl	%cr30,%r26		/* get pt regs */
-	LDREG	0(%r26),%r26
-	ldo	TASK_REGS(%r26),%r26
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r26
+	ldo	TASK_REGS(%r26),%r26	/* get pt regs */
 	/* Don't save regs, we are going to restore them from sigcontext. */
 	STREG	%r2, -RP_OFFSET(%r30)
 #ifdef __LP64__
@@ -2155,9 +2138,8 @@ sys_rt_sigreturn_wrapper:
 	LDREG	-RP_OFFSET(%r30), %r2
 
 	/* FIXME: I think we need to restore a few more things here. */
-	mfctl	%cr30,%r1		/* get pt regs */
-	LDREG	0(%r1),%r1
-	ldo	TASK_REGS(%r1),%r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1
+	ldo	TASK_REGS(%r1),%r1	/* get pt regs */
 	reg_restore %r1
 
 	/* If the signal was received while the process was blocked on a
@@ -2170,8 +2152,8 @@ sys_rt_sigreturn_wrapper:
 	.export sys_sigaltstack_wrapper
 sys_sigaltstack_wrapper:
 	/* Get the user stack pointer */
-	mfctl	%cr30,%r24
-	LDREG	0(%r24),%r24
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1
+	ldo	TASK_REGS(%r1),%r24	/* get pt regs */
 	LDREG	TASK_PT_GR30(%r24),%r24
 	STREG	%r2, -RP_OFFSET(%r30)
 #ifdef __LP64__
@@ -2192,8 +2174,7 @@ sys_sigaltstack_wrapper:
 	.export sys32_sigaltstack_wrapper
 sys32_sigaltstack_wrapper:
 	/* Get the user stack pointer */
-	mfctl	%cr30,%r24
-	LDREG	0(%r24),%r24
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r24
 	LDREG	TASK_PT_GR30(%r24),%r24
 	STREG	%r2, -RP_OFFSET(%r30)
 	ldo	FRAME_SIZE(%r30), %r30
@@ -2208,9 +2189,8 @@ sys32_sigaltstack_wrapper:
 
 	.export sys_rt_sigsuspend_wrapper
 sys_rt_sigsuspend_wrapper:
-	mfctl	%cr30,%r24		/* get pt regs */
-	LDREG	0(%r24),%r24
-	ldo	TASK_REGS(%r24),%r24
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30), %r1
+	ldo	TASK_REGS(%r1),%r24
 	reg_save %r24
 
 	STREG	%r2, -RP_OFFSET(%r30)
@@ -2226,8 +2206,7 @@ sys_rt_sigsuspend_wrapper:
 	ldo	-FRAME_SIZE(%r30), %r30
 	LDREG	-RP_OFFSET(%r30), %r2
 
-	mfctl	%cr30,%r1		/* get pt regs */
-	LDREG	0(%r1),%r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30), %r1
 	ldo	TASK_REGS(%r1),%r1
 	reg_restore %r1
 
@@ -2247,7 +2226,7 @@ syscall_exit:
 	/* save return value now */
 
 	mfctl     %cr30, %r1
-	LDREG     0(%r1),%r1
+	LDREG     TI_TASK(%r1),%r1
 	STREG     %r28,TASK_PT_GR28(%r1)
 
 	/* Save other hpux returns if personality is PER_HPUX */
@@ -2297,25 +2276,17 @@ syscall_check_resched:
 
 	/* check for reschedule */
 
-	LDREG  TI_FLAGS-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r19	/* long */
-	bb,<,n %r19, 31-TIF_NEED_RESCHED, syscall_do_resched /* forward */
+	LDREG	TI_FLAGS-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r19	/* long */
+	bb,<,n	%r19, 31-TIF_NEED_RESCHED, syscall_do_resched /* forward */
 
 syscall_check_sig:
-	/* These should be the same effect, but which is faster? */
-#if 1
-	mfctl   %cr30,%r1
-#else
-	ldo     -THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1    /* get thread info ptr */
-#endif
-	/* check for pending signals */
-	LDREG    TI_FLAGS(%r1),%r19
-	bb,<,n   %r19, 31-TIF_SIGPENDING, syscall_do_signal /* forward */
+	LDREG	TI_FLAGS-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r19    /* get ti flags */
+	bb,<,n	%r19, 31-TIF_SIGPENDING, syscall_do_signal /* forward */
 
 syscall_restore:
-	mfctl   %cr30,%r1
-	LDREG	TI_FLAGS(%r1), %r19		/* Are we being ptraced? */
+	LDREG	TI_FLAGS-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r19    /* get ti flags */
 	bb,<	%r19, 31-TIF_SYSCALL_TRACE,syscall_restore_rfi
-	LDREG	0(%r1),%r1		  	   /* delay slot! */
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1	/* delay slot! */
 	ldo	TASK_PT_FR31(%r1),%r19		   /* reload fpregs */
 	rest_fp	%r19
 
@@ -2444,7 +2415,7 @@ syscall_do_signal:
 	   FIXME: After this point the process structure should be
 	   consistent with all the relevant state of the process
 	   before the syscall.  We need to verify this. */
-	LDREG	0(%r1),%r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1 
 	ldo	TASK_REGS(%r1), %r25		/* struct pt_regs *regs */
 	reg_save %r25
 
@@ -2453,12 +2424,10 @@ syscall_do_signal:
 #ifdef __LP64__
 	ldo	-16(%r30),%r29			/* Reference param save area */
 #endif
-#warning TAUSQ FIXME, this is wrong
 	bl	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
-	mfctl	%cr30,%r1			/* reload task ptr */
-	LDREG	0(%r1),%r1
+	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1
 	ldo	TASK_REGS(%r1), %r20		/* reload pt_regs */
 	reg_restore %r20
 

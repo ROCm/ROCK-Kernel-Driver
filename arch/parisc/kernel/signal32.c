@@ -1,5 +1,6 @@
 /* mostly borrowed from kernel/signal.c */
 #include <linux/config.h>
+#include <linux/compat.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/unistd.h>
@@ -175,7 +176,7 @@ sys32_rt_sigaction(int sig, const struct sigaction32 *act, struct sigaction32 *o
 typedef struct {
 	unsigned int ss_sp;
 	int ss_flags;
-	__kernel_size_t32 ss_size;
+	compat_size_t ss_size;
 } stack_t32;
 
 int 

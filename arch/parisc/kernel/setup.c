@@ -136,15 +136,15 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_CHASSIS_LCD_LED
 	/* initialize the LCD/LED after boot_cpu_data is available ! */
-        led_init();				/* LCD/LED initialization */
+	led_init();		/* LCD/LED initialization */
 #endif
 
 #ifdef CONFIG_PA11
 	dma_ops_init();
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
-        conswitchp = &dummy_con;        /* we use take_over_console() later ! */
+#if defined(CONFIG_VT) && defined(CONFIG_DUMMY_CONSOLE)
+	conswitchp = &dummy_con;	/* we use take_over_console() later ! */
 #endif
 
 }
@@ -185,7 +185,7 @@ struct seq_operations cpuinfo_op = {
 	.show	= show_cpuinfo
 };
 
-static void parisc_proc_mkdir(void)
+static void __init parisc_proc_mkdir(void)
 {
 	/*
 	** Can't call proc_mkdir() until after proc_root_init() has been
@@ -236,7 +236,7 @@ static struct resource global_broadcast = {
 	.flags	= IORESOURCE_MEM,
 };
 
-int __init parisc_init_resources(void)
+static int __init parisc_init_resources(void)
 {
 	int result;
 
@@ -270,6 +270,7 @@ int __init parisc_init_resources(void)
 extern void gsc_init(void);
 extern void processor_init(void);
 extern void ccio_init(void);
+extern void hppb_init(void);
 extern void dino_init(void);
 extern void iosapic_init(void);
 extern void lba_init(void);
@@ -321,6 +322,11 @@ static int __init parisc_init(void)
 #ifdef CONFIG_EISA
 	eisa_init();
 #endif
+
+#if defined(CONFIG_HPPB)
+	hppb_init();
+#endif
+
 #if defined(CONFIG_GSC_DINO)
 	dino_init();
 #endif

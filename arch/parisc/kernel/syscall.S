@@ -23,12 +23,6 @@
 #endif
 	.text
 
-#ifdef __LP64__
-#define FRAME_SIZE	128
-#else
-#define FRAME_SIZE	64
-#endif
-
 	.import syscall_exit,code
 	.import syscall_exit_rfi,code
 	.export linux_gateway_page
@@ -99,9 +93,9 @@ linux_gateway_entry:
 	 */
 
 	mtsp	%r0,%sr7			/* get kernel space into sr7 */
-	STREG	%r1,0(%r30)			/* Stick r1 (usp) here for now */
-	mfctl	%cr30,%r1			/*  get task ptr in %r1 */
-	LDREG	0(%r1),%r1
+	STREGM	%r1,FRAME_SIZE(%r30)		/* save r1 (usp) here for now */
+	mfctl	%cr30,%r1			/* get task ptr in %r1 */
+	LDREG	TI_TASK(%r1),%r1
 
 	/* Save some registers for sigcontext and potential task
 	   switch (see entry.S for the details of which ones are
@@ -110,7 +104,7 @@ linux_gateway_entry:
 	   PSW value is stored.  This is needed for gdb and sys_ptrace. */
 	STREG	%r0,  TASK_PT_PSW(%r1)
 	STREG	%r2,  TASK_PT_GR2(%r1)		/* preserve rp */
-	LDREG	0(%r30), %r2			/* get users sp back */
+	LDREGM	-FRAME_SIZE(%r30), %r2		/* get users sp back */
 	STREG	%r2,  TASK_PT_GR30(%r1)		/* ... and save it */
 	STREG	%r19, TASK_PT_GR19(%r1)
 	STREG	%r20, TASK_PT_GR20(%r1)
@@ -204,7 +198,7 @@ tracesys:
 	 * in the saved PSW.
 	 */
 	ldo     -THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1      /* get task ptr */
-	LDREG	0(%r1), %r1
+	LDREG	TI_TASK(%r1), %r1
 	ssm	0,%r2
 	STREG	%r2,TASK_PT_PSW(%r1)		/* Lower 8 bits only!! */
 	mfsp	%sr0,%r2
@@ -255,7 +249,7 @@ tracesys_next:
 	ldo     R%sys_call_table(%r1), %r19
 
 	ldo     -THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1      /* get task ptr */
-	LDREG	0(%r1), %r1
+	LDREG	TI_TASK(%r1), %r1
 	LDREG   TASK_PT_GR20(%r1), %r20
 	LDREG   TASK_PT_GR26(%r1), %r26		/* Restore the users args */
 	LDREG   TASK_PT_GR25(%r1), %r25
@@ -292,14 +286,14 @@ tracesys_next:
 	
 tracesys_exit:
 	ldo     -THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1      /* get task ptr */
-	LDREG	0(%r1), %r1
+	LDREG	TI_TASK(%r1), %r1
 #ifdef __LP64__
 	ldo	-16(%r30),%r29			/* Reference param save area */
 #endif
 	bl	syscall_trace, %r2
 	STREG   %r28,TASK_PT_GR28(%r1)          /* save return value now */
 	ldo     -THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1      /* get task ptr */
-	LDREG	0(%r1), %r1
+	LDREG	TI_TASK(%r1), %r1
 	LDREG   TASK_PT_GR28(%r1), %r28		/* Restore return val. */
 
 	ldil	L%syscall_exit,%r1
@@ -332,11 +326,13 @@ tracesys_sigexit:
 #define ENTRY_DIFF(_name_) .dword sys32_##_name_
 #define ENTRY_UHOH(_name_) .dword sys32_##unimplemented
 #define ENTRY_OURS(_name_) .dword parisc_##_name_
+#define ENTRY_COMP(_name_) .dword compat_sys_##_name_
 #else
 #define ENTRY_SAME(_name_) .word sys_##_name_
 #define ENTRY_DIFF(_name_) .word sys_##_name_
 #define ENTRY_UHOH(_name_) .word sys_##_name_
 #define ENTRY_OURS(_name_) .word parisc_##_name_
+#define ENTRY_COMP(_name_) .word sys_##_name_
 #endif
 
 	.align 8
@@ -363,7 +359,7 @@ sys_call_table:
 	ENTRY_SAME(lchown)
 	ENTRY_SAME(socket)
 	/* struct stat is MAYBE identical wide and narrow ?? */
-	ENTRY_DIFF(newstat)
+	ENTRY_COMP(newstat)
 	ENTRY_DIFF(lseek)
 	ENTRY_SAME(getpid)		/* 20 */
 	/* the 'void * data' parameter may need re-packing in wide */
@@ -378,10 +374,10 @@ sys_call_table:
 	ENTRY_SAME(ptrace)
 	ENTRY_SAME(alarm)
 	/* see stat comment */
-	ENTRY_DIFF(newfstat)
+	ENTRY_COMP(newfstat)
 	ENTRY_SAME(pause)
 	/* struct utimbuf uses time_t which might vary */
-	ENTRY_DIFF(utime)		/* 30 */
+	ENTRY_COMP(utime)		/* 30 */
 	/* struct sockaddr... */
 	ENTRY_SAME(connect)
 	ENTRY_SAME(listen)
@@ -396,7 +392,7 @@ sys_call_table:
 	ENTRY_SAME(rmdir)		/* 40 */
 	ENTRY_SAME(dup)
 	ENTRY_SAME(pipe)
-	ENTRY_DIFF(times)
+	ENTRY_COMP(times)
 	/* struct sockaddr... */
 	ENTRY_SAME(getsockname)
 	/* it seems possible brk() could return a >4G pointer... */
@@ -447,7 +443,7 @@ sys_call_table:
 	ENTRY_SAME(sendto)
 	ENTRY_SAME(symlink)
 	/* see stat comment */
-	ENTRY_DIFF(newlstat)
+	ENTRY_COMP(newlstat)
 	ENTRY_SAME(readlink)	/* 85 */
 	/* suspect we'll need some work for narrow shlibs on wide kernel */
 	/* NOTE this doesn't get used when I boot 32-bit userspace */
@@ -474,8 +470,8 @@ sys_call_table:
 	ENTRY_SAME(syslog)
 	/* even though manpage says struct timeval contains longs, ours has
 	 * time_t and suseconds_t -- both of which are safe wide/narrow */
-	ENTRY_DIFF(setitimer)
-	ENTRY_DIFF(getitimer)	/* 105 */
+	ENTRY_COMP(setitimer)
+	ENTRY_COMP(getitimer)	/* 105 */
 	ENTRY_SAME(capget)
 	ENTRY_SAME(capset)
 	ENTRY_OURS(pread64)
@@ -501,13 +497,10 @@ sys_call_table:
 	ENTRY_SAME(mprotect)	/* 125 */
 	/* old_sigset_t forced to 32 bits.  Beware glibc sigset_t */
 	ENTRY_DIFF(sigprocmask)
-	ENTRY_SAME(create_module)
-	/* struct module contains longs, but insmod builds a 64 bit struct
-	 * if running under a 64 bit kernel */
+	ENTRY_SAME(ni_syscall)		/* create_module */
 	ENTRY_SAME(init_module)
 	ENTRY_SAME(delete_module)
-	/* struct kernel_sym contains a long. Linus never heard of size_t? */
-	ENTRY_DIFF(get_kernel_syms)	/* 130 */
+	ENTRY_SAME(ni_syscall)		/* 130: get_kernel_syms */
 	/* time_t inside struct dqblk */
 	ENTRY_DIFF(quotactl) /* -- FIXME, doesn't work */
 	ENTRY_SAME(getpgid)
@@ -551,13 +544,12 @@ sys_call_table:
 	 * carefully, like timeval for example (which is about the same).
 	 * Unfortunately it contains a long :-( */
 	ENTRY_DIFF(sched_rr_get_interval)
-	ENTRY_DIFF(nanosleep)
+	ENTRY_COMP(nanosleep)
 	ENTRY_SAME(mremap)
 	ENTRY_SAME(setresuid)
 	ENTRY_SAME(getresuid)	/* 165 */
 	ENTRY_DIFF(sigaltstack_wrapper)
-	/* struct passed back to user can contain long symbol values */
-	ENTRY_DIFF(query_module)
+	ENTRY_SAME(ni_syscall)		/* query_module */
 	ENTRY_SAME(poll)
 	/* structs contain pointers and an in_addr... */
 	ENTRY_DIFF(nfsservctl)
@@ -609,11 +601,31 @@ sys_call_table:
 #else
 	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(ni_syscall)
-	ENTRY_SAME(ni_syscall)
+	ENTRY_SAME(ni_syscall)		/* 205 */
 #endif
 	ENTRY_SAME(gettid)             
 	ENTRY_SAME(readahead)          
 	ENTRY_SAME(ni_syscall)		/* tkill */
+
+	ENTRY_SAME(sendfile64)
+	ENTRY_SAME(futex)		/* 210 */
+	ENTRY_SAME(sched_setaffinity)
+	ENTRY_SAME(sched_getaffinity)
+	ENTRY_SAME(set_thread_area)
+	ENTRY_SAME(get_thread_area)
+	ENTRY_SAME(io_setup)		/* 215 */
+	ENTRY_SAME(io_destroy)
+	ENTRY_SAME(io_getevents)
+	ENTRY_SAME(io_submit)
+	ENTRY_SAME(io_cancel)
+	ENTRY_SAME(alloc_hugepages)	/* 220 */
+	ENTRY_SAME(free_hugepages)
+	ENTRY_SAME(exit_group)
+	ENTRY_DIFF(lookup_dcookie)
+	ENTRY_SAME(epoll_create)
+	ENTRY_SAME(epoll_ctl)		/* 225 */
+	ENTRY_SAME(epoll_wait)
+ 	ENTRY_SAME(remap_file_pages)
 .end
 
 	/* Make sure nothing else is placed on this page */
