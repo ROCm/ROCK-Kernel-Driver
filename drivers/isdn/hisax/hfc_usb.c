@@ -1350,7 +1350,7 @@ static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_
 	struct usb_device *dev= interface_to_usbdev(intf);
 	hfcusb_data *context;
 	struct usb_host_interface *iface = intf->cur_altsetting;
-	struct usb_host_interface *iface_used;
+	struct usb_host_interface *iface_used = NULL;
 	struct usb_host_endpoint *ep;
 	int ifnum = iface->desc.bInterfaceNumber;
 	int i, idx, alt_idx, probe_alt_setting, vend_idx, cfg_used, *vcf, attr, cfg_found, cidx, ep_addr;
