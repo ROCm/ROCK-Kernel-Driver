@@ -2665,11 +2665,13 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				if (decapsulate(apriv,&micbuf,(etherHead*)buffer,len)) {
 badmic:
 					dev_kfree_skb_irq (skb);
+#else
+				if (0) {
+#endif
 badrx:
 					OUT4500( apriv, EVACK, EV_RX);
 					goto exitrx;
 				}
-#endif
 			}
 #if WIRELESS_EXT > 15
 #ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
