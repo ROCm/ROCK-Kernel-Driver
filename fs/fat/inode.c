@@ -1047,7 +1047,7 @@ out_fail:
 
 int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 {
-	int free, nr;
+	int free, nr, ret;
        
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		free = MSDOS_SB(sb)->free_clusters;
@@ -1057,9 +1057,14 @@ int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 			free = MSDOS_SB(sb)->free_clusters;
 		else {
 			free = 0;
-			for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++)
-				if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
+			for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++) {
+				ret = fat_access(sb, nr, -1);
+				if (ret < 0) {
+					unlock_fat(sb);
+					return ret;
+				} else if (ret == FAT_ENT_FREE)
 					free++;
+			}
 			MSDOS_SB(sb)->free_clusters = free;
 		}
 		unlock_fat(sb);
