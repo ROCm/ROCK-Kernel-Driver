@@ -22,6 +22,7 @@ ACPI_MODULE_NAME		("sleep")
 u8 sleep_states[ACPI_S_STATE_COUNT];
 
 extern void do_suspend_lowlevel_s4bios(int);
+extern void do_suspend_lowlevel(int);
 
 /**
  * acpi_system_restore_state - OS-specific restoration of state
@@ -71,10 +72,6 @@ acpi_system_restore_state (
  * First, we call to the device driver layer to save device state.
  * Once we have that, we save whatevery processor and kernel state we
  * need to memory.
- * If we're entering S4, we then write the memory image to disk.
- *
- * Only then is it safe for us to power down devices, since we may need
- * the disks and upstream buses to write to.
  */
 acpi_status
 acpi_system_save_state(
@@ -185,12 +182,11 @@ acpi_system_suspend(
 		status = acpi_enter_sleep_state(state);
 		break;
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
 	case ACPI_STATE_S2:
 	case ACPI_STATE_S3:
 		do_suspend_lowlevel(0);
 		break;
-#endif
+
 	case ACPI_STATE_S4:
 		do_suspend_lowlevel_s4bios(0);
 		break;
