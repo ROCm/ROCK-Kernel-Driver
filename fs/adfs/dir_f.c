@@ -9,7 +9,6 @@
  *
  *  E and F format directory handling
  */
-#include <linux/version.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/adfs_fs.h>
