@@ -5,8 +5,6 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-#define DISPLAY_AEC62XX_TIMINGS
-
 struct chipset_bus_clock_list_entry {
 	byte		xfer_speed;
 	byte		chipset_settings;
