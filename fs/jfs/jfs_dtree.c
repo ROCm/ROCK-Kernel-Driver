@@ -2830,6 +2830,67 @@ void dtInitRoot(tid_t tid, struct inode *ip, u32 idotdot)
 	return;
 }
 
+/*
+ *	add_missing_indices()
+ *
+ * function: Fix dtree page in which one or more entries has an invalid index.
+ *	     fsck.jfs should really fix this, but it currently does not.
+ *	     Called from jfs_readdir when bad index is detected.
+ */
+static void add_missing_indices(struct inode *inode, s64 bn)
+{
+	struct ldtentry *d;
+	struct dt_lock *dtlck;
+	int i;
+	uint index;
+	struct lv *lv;
+	struct metapage *mp;
+	dtpage_t *p;
+	int rc;
+	s8 *stbl;
+	tid_t tid;
+	struct tlock *tlck;
+
+	tid = txBegin(inode->i_sb, 0);
+
+	DT_GETPAGE(inode, bn, mp, PSIZE, p, rc);
+
+	if (rc) {
+		printk(KERN_ERR "DT_GETPAGE failed!\n");
+		goto end;
+	}
+	BT_MARK_DIRTY(mp, inode);
+
+	ASSERT(p->header.flag & BT_LEAF);
+
+	tlck = txLock(tid, inode, mp, tlckDTREE | tlckENTRY);
+	dtlck = (struct dt_lock *) &tlck->lock;
+
+	stbl = DT_GETSTBL(p);
+	for (i = 0; i < p->header.nextindex; i++) {
+		d = (struct ldtentry *) &p->slot[stbl[i]];
+		index = le32_to_cpu(d->index);
+		if ((index < 2) || (index >= JFS_IP(inode)->next_index)) {
+			d->index = cpu_to_le32(add_index(tid, inode, bn, i));
+			if (dtlck->index >= dtlck->maxcnt)
+				dtlck = (struct dt_lock *) txLinelock(dtlck);
+			lv = dtlck->lv;
+			lv->offset = stbl[i];
+			lv->length = 1;
+			dtlck->index++;
+		}
+	}
+
+	DT_PUTPAGE(mp);
+	(void) txCommit(tid, 1, &inode, 0);
+end:
+	txEnd(tid);
+}
+
+/*
+ * Buffer to hold directory entry info while traversing a dtree page
+ * before being fed to the filldir function
+ */
 struct jfs_dirent {
 	loff_t position;
 	int ino;
@@ -2837,6 +2898,9 @@ struct jfs_dirent {
 	char name[0];
 };
 
+/*
+ * function to determine next variable-sized jfs_dirent in buffer
+ */
 inline struct jfs_dirent *next_jfs_dirent(struct jfs_dirent *dirent)
 {
 	return (struct jfs_dirent *)
@@ -2886,7 +2950,8 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	uint loop_count = 0;
 	struct jfs_dirent *jfs_dirent;
 	int jfs_dirents;
-	int overflow;
+	int overflow, fix_page, page_fixed = 0;
+	static int unique_pos = 2;	/* If we can't fix broken index */
 
 	if (filp->f_pos == DIREND)
 		return 0;
@@ -3046,7 +3111,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	while (1) {
 		jfs_dirent = (struct jfs_dirent *) dirent_buf;
 		jfs_dirents = 0;
-		overflow = 0;
+		overflow = fix_page = 0;
 
 		stbl = DT_GETSTBL(p);
 
@@ -3066,8 +3131,32 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			jfs_dirent->ino = le32_to_cpu(d->inumber);
 
 			if (do_index) {
-				jfs_dirent->position = le32_to_cpu(d->index);
 				len = min(d_namleft, DTLHDRDATALEN);
+				jfs_dirent->position = le32_to_cpu(d->index);
+				/*
+				 * d->index should always be valid, but it
+				 * isn't.  fsck.jfs doesn't create the
+				 * directory index for the lost+found
+				 * directory.  Rather than let it go,
+				 * we can try to fix it.
+				 */
+				if ((jfs_dirent->position < 2) ||
+				    (jfs_dirent->position >=
+				     JFS_IP(ip)->next_index)) {
+					if (!page_fixed && !isReadOnly(ip)) {
+						fix_page = 1;
+						/*
+						 * setting overflow and setting
+						 * index to i will cause the
+						 * same page to be processed
+						 * again starting here
+						 */
+						overflow = 1;
+						index = i;
+						break;
+					}
+					jfs_dirent->position = unique_pos++;
+				}
 			} else {
 				jfs_dirent->position = dtpos;
 				len = min(d_namleft, DTLHDRDATALEN_LEGACY);
@@ -3120,6 +3209,7 @@ skip_one:
 					dtoffset->index = 0;
 				}
 			}
+			page_fixed = 0;
 		}
 
 		/* unpin previous leaf page */
@@ -3133,6 +3223,11 @@ skip_one:
 				    jfs_dirent->ino, DT_UNKNOWN))
 				goto out;
 			jfs_dirent = next_jfs_dirent(jfs_dirent);
+		}
+
+		if (fix_page) {
+			add_missing_indices(ip, bn);
+			page_fixed = 1;
 		}
 
 		if (!overflow && (bn == 0)) {
