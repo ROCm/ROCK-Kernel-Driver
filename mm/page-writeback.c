@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <linux/sysrq.h>
 #include <linux/backing-dev.h>
+#include <linux/blkdev.h>
 #include <linux/mpage.h>
 #include <linux/notifier.h>
 #include <linux/smp.h>
@@ -172,33 +173,47 @@ static void background_writeout(unsigned long _min_pages)
 		.sync_mode	= WB_SYNC_NONE,
 		.older_than_this = NULL,
 		.nr_to_write	= 0,
+		.nonblocking	= 1,
 	};
 
 	CHECK_EMERGENCY_SYNC
 
 	background_thresh = (dirty_background_ratio * total_pages) / 100;
-
-	do {
+	for ( ; ; ) {
 		struct page_state ps;
+
 		get_page_state(&ps);
 		if (ps.nr_dirty < background_thresh && min_pages <= 0)
 			break;
+		wbc.encountered_congestion = 0;
 		wbc.nr_to_write = MAX_WRITEBACK_PAGES;
 		writeback_inodes(&wbc);
 		min_pages -= MAX_WRITEBACK_PAGES - wbc.nr_to_write;
-	} while (wbc.nr_to_write <= 0);
+		if (wbc.nr_to_write == MAX_WRITEBACK_PAGES) {
+			/* Wrote nothing */
+			if (wbc.encountered_congestion)
+				blk_congestion_wait(WRITE, HZ/10);
+			else
+				break;
+		}
+	}
 	blk_run_queues();
 }
 
 /*
- * Start heavy writeback of everything.
+ * Start writeback of `nr_pages' pages.  If `nr_pages' is zero, write back
+ * the whole world.  Returns 0 if a pdflush thread was dispatched.  Returns
+ * -1 if all pdflush threads were busy.
  */
-void wakeup_bdflush(void)
+int wakeup_bdflush(long nr_pages)
 {
-	struct page_state ps;
+	if (nr_pages == 0) {
+		struct page_state ps;
 
-	get_page_state(&ps);
-	pdflush_operation(background_writeout, ps.nr_dirty);
+		get_page_state(&ps);
+		nr_pages = ps.nr_dirty;
+	}
+	return pdflush_operation(background_writeout, nr_pages);
 }
 
 static struct timer_list wb_timer;
@@ -223,25 +238,36 @@ static void wb_kupdate(unsigned long arg)
 	unsigned long oldest_jif;
 	unsigned long start_jif;
 	unsigned long next_jif;
+	long nr_to_write;
 	struct page_state ps;
 	struct writeback_control wbc = {
 		.bdi		= NULL,
 		.sync_mode	= WB_SYNC_NONE,
 		.older_than_this = &oldest_jif,
 		.nr_to_write	= 0,
+		.nonblocking	= 1,
 	};
 
 	sync_supers();
-	get_page_state(&ps);
 
+	get_page_state(&ps);
 	oldest_jif = jiffies - (dirty_expire_centisecs * HZ) / 100;
 	start_jif = jiffies;
 	next_jif = start_jif + (dirty_writeback_centisecs * HZ) / 100;
-	wbc.nr_to_write = ps.nr_dirty;
-	writeback_inodes(&wbc);
+	nr_to_write = ps.nr_dirty;
+	while (nr_to_write > 0) {
+		wbc.encountered_congestion = 0;
+		wbc.nr_to_write = MAX_WRITEBACK_PAGES;
+		writeback_inodes(&wbc);
+		if (wbc.nr_to_write == MAX_WRITEBACK_PAGES) {
+			if (wbc.encountered_congestion)
+				blk_congestion_wait(WRITE, HZ);
+			else
+				break;	/* All the old data is written */
+		}
+		nr_to_write -= MAX_WRITEBACK_PAGES - wbc.nr_to_write;
+	}
 	blk_run_queues();
-	yield();
-
 	if (time_before(next_jif, jiffies + HZ))
 		next_jif = jiffies + HZ;
 	mod_timer(&wb_timer, next_jif);
@@ -493,7 +519,6 @@ int __set_page_dirty_buffers(struct page *page)
 		buffer_error();
 
 	spin_lock(&mapping->private_lock);
-
 	if (page_has_buffers(page)) {
 		struct buffer_head *head = page_buffers(page);
 		struct buffer_head *bh = head;
@@ -506,6 +531,7 @@ int __set_page_dirty_buffers(struct page *page)
 			bh = bh->b_this_page;
 		} while (bh != head);
 	}
+	spin_unlock(&mapping->private_lock);
 
 	if (!TestSetPageDirty(page)) {
 		write_lock(&mapping->page_lock);
@@ -519,7 +545,6 @@ int __set_page_dirty_buffers(struct page *page)
 		__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 	}
 	
-	spin_unlock(&mapping->private_lock);
 out:
 	return ret;
 }

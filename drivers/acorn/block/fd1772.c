@@ -1542,7 +1542,7 @@ static struct block_device_operations floppy_fops =
 static struct gendisk *floppy_find(int minor)
 {
 	int drive = minor & 3;
-	if ((minor>> 2) > NUM_DISK_TYPES || minor >= FD_MAX_UNITS)
+	if ((minor>> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)
 		return NULL;
 	return &disks[drive];
 }

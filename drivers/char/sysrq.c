@@ -28,7 +28,8 @@
 #include <linux/smp_lock.h>
 #include <linux/module.h>
 #include <linux/suspend.h>
-#include <linux/buffer_head.h>		/* for fsync_bdev()/wakeup_bdflush() */
+#include <linux/writeback.h>
+#include <linux/buffer_head.h>		/* for fsync_bdev() */
 
 #include <linux/spinlock.h>
 
@@ -227,7 +228,7 @@ static void sysrq_handle_sync(int key, struct pt_regs *pt_regs,
 			      struct tty_struct *tty) 
 {
 	emergency_sync_scheduled = EMERG_SYNC;
-	wakeup_bdflush();
+	wakeup_bdflush(0);
 }
 static struct sysrq_key_op sysrq_sync_op = {
 	handler:	sysrq_handle_sync,
@@ -239,7 +240,7 @@ static void sysrq_handle_mountro(int key, struct pt_regs *pt_regs,
 				 struct tty_struct *tty) 
 {
 	emergency_sync_scheduled = EMERG_REMOUNT;
-	wakeup_bdflush();
+	wakeup_bdflush(0);
 }
 static struct sysrq_key_op sysrq_mountro_op = {
 	handler:	sysrq_handle_mountro,

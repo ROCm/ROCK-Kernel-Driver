@@ -492,7 +492,6 @@ static void __exit xpram_exit(void)
 	int i;
 	for (i = 0; i < xpram_devs; i++)
 		del_gendisk(xpram_disks + i);
-	blk_clear(XPRAM_MAJOR);
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_unregister(xpram_devfs_handle);
 	unregister_sys_device(&xpram_sys_device);

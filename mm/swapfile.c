@@ -918,6 +918,26 @@ out:
 	return ret;
 }
 
+#if 0	/* We don't need this yet */
+#include <linux/backing-dev.h>
+int page_queue_congested(struct page *page)
+{
+	struct backing_dev_info *bdi;
+
+	BUG_ON(!PageLocked(page));	/* It pins the swap_info_struct */
+
+	bdi = page->mapping->backing_dev_info;
+	if (PageSwapCache(page)) {
+		swp_entry_t entry = { .val = page->index };
+		struct swap_info_struct *sis;
+
+		sis = get_swap_info_struct(swp_type(entry));
+		bdi = sis->bdev->bd_inode->i_mapping->backing_dev_info;
+	}
+	return bdi_write_congested(bdi);
+}
+#endif
+
 asmlinkage long sys_swapoff(const char * specialfile)
 {
 	struct swap_info_struct * p = NULL;

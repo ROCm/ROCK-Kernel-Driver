@@ -1466,10 +1466,8 @@ static void __exit exit_sd(void)
 			vfree(sd_dsk_arr[k]);
 		vfree(sd_dsk_arr);
 	}
-	for (k = 0; k < N_USED_SD_MAJORS; k++) {
+	for (k = 0; k < N_USED_SD_MAJORS; k++)
 		blk_dev[SD_MAJOR(k)].queue = NULL;
-		blk_clear(SD_MAJOR(k));
-	}
 	sd_template.dev_max = 0;
 	remove_driver(&sd_template.scsi_driverfs_driver);
 }

@@ -206,6 +206,7 @@ extern struct bio *bio_copy(struct bio *, int, int);
 extern inline void bio_init(struct bio *);
 
 extern int bio_add_page(struct bio *, struct page *, unsigned int,unsigned int);
+extern int bio_get_nr_vecs(struct block_device *);
 
 #ifdef CONFIG_HIGHMEM
 /*

@@ -901,7 +901,7 @@ static void update_state(void)
 static struct gendisk gscd_disk = {
 	.major = MAJOR_NR,
 	.first_minor = 0,
-	,minor_shift = 0,
+	.minor_shift = 0,
 	.fops = &gscd_fops,
 	.major_name = "gscd"
 };

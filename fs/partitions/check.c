@@ -362,7 +362,7 @@ static void devfs_create_cdrom(struct gendisk *dev)
 		pos = devfs_generate_path(dev->disk_de, rname+3, sizeof(rname)-3);
 		if (pos >= 0) {
 			strncpy(rname + pos, "../", 3);
-			devfs_mk_symlink(devfs_handle, vname,
+			devfs_mk_symlink(cdroms, vname,
 					 DEVFS_FL_DEFAULT,
 					 rname + pos, &slave, NULL);
 			devfs_auto_unregister(dev->de, slave);

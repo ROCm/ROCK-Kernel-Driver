@@ -652,8 +652,6 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			bdev->bd_offset = 0;
 			if (g)
 				sect = get_capacity(g);
-			else if (blk_size[major(dev)])
-				sect = blk_size[major(dev)][minor(dev)] << 1;
 			bd_set_size(bdev, (loff_t)sect << 9);
 			bdi = blk_get_backing_dev_info(bdev);
 			if (bdi == NULL)

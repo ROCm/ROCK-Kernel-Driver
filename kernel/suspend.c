@@ -81,7 +81,6 @@ unsigned char software_suspend_enabled = 0;
 #define TIMEOUT	(6 * HZ)			/* Timeout for stopping processes */
 #define ADDRESS(x) ((unsigned long) phys_to_virt(((x) << PAGE_SHIFT)))
 
-extern void wakeup_bdflush(void);
 extern int C_A_D;
 
 /* References to section boundaries */

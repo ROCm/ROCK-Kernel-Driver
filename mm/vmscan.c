@@ -21,9 +21,11 @@
 #include <linux/file.h>
 #include <linux/writeback.h>
 #include <linux/suspend.h>
+#include <linux/blkdev.h>
 #include <linux/buffer_head.h>		/* for try_to_release_page() */
 #include <linux/mm_inline.h>
 #include <linux/pagevec.h>
+#include <linux/backing-dev.h>
 #include <linux/rmap-locking.h>
 
 #include <asm/pgalloc.h>
@@ -32,11 +34,11 @@
 
 /*
  * The "priority" of VM scanning is how much of the queues we
- * will scan in one go. A value of 6 for DEF_PRIORITY implies
- * that we'll scan 1/64th of the queues ("queue_length >> 6")
+ * will scan in one go. A value of 12 for DEF_PRIORITY implies
+ * that we'll scan 1/4096th of the queues ("queue_length >> 12")
  * during a normal aging round.
  */
-#define DEF_PRIORITY (6)
+#define DEF_PRIORITY 12
 
 #ifdef ARCH_HAS_PREFETCH
 #define prefetch_prev_lru_page(_page, _base, _field)			\
@@ -95,7 +97,7 @@ static inline int is_page_cache_freeable(struct page *page)
 
 static /* inline */ int
 shrink_list(struct list_head *page_list, int nr_pages,
-		unsigned int gfp_mask, int priority, int *max_scan)
+		unsigned int gfp_mask, int *max_scan)
 {
 	struct address_space *mapping;
 	LIST_HEAD(ret_pages);
@@ -117,11 +119,22 @@ shrink_list(struct list_head *page_list, int nr_pages,
 		BUG_ON(PageActive(page));
 		may_enter_fs = (gfp_mask & __GFP_FS) ||
 				(PageSwapCache(page) && (gfp_mask & __GFP_IO));
+
+		/*
+		 * If the page is mapped into pagetables then wait on it, to
+		 * throttle this allocator to the rate at which we can clear
+		 * MAP_SHARED data.  This will also throttle against swapcache
+		 * writes.
+		 */
 		if (PageWriteback(page)) {
-			if (may_enter_fs)
-				wait_on_page_writeback(page);  /* throttling */
-			else
-				goto keep_locked;
+			if (may_enter_fs) {
+				if (page->pte.direct ||
+					page->mapping->backing_dev_info ==
+						current->backing_dev_info) {
+					wait_on_page_writeback(page);
+				}
+			}
+			goto keep_locked;
 		}
 
 		pte_chain_lock(page);
@@ -172,14 +185,42 @@ shrink_list(struct list_head *page_list, int nr_pages,
 		 * will write it.  So we're back to page-at-a-time writepage
 		 * in LRU order.
 		 */
-		if (PageDirty(page) && is_page_cache_freeable(page) &&
-					mapping && may_enter_fs) {
+		/*
+		 * If the page is dirty, only perform writeback if that write
+		 * will be non-blocking.  To prevent this allocation from being
+		 * stalled by pagecache activity.  But note that there may be
+		 * stalls if we need to run get_block().  We could test
+		 * PagePrivate for that.
+		 *
+		 * If this process is currently in generic_file_write() against
+		 * this page's queue, we can perform writeback even if that
+		 * will block.
+		 *
+		 * If the page is swapcache, write it back even if that would
+		 * block, for some throttling. This happens by accident, because
+		 * swap_backing_dev_info is bust: it doesn't reflect the
+		 * congestion state of the swapdevs.  Easy to fix, if needed.
+		 * See swapfile.c:page_queue_congested().
+		 */
+		if (PageDirty(page)) {
 			int (*writeback)(struct page *,
 					struct writeback_control *);
+			struct backing_dev_info *bdi;
 			const int cluster_size = SWAP_CLUSTER_MAX;
 			struct writeback_control wbc = {
 				.nr_to_write = cluster_size,
 			};
+
+			if (!is_page_cache_freeable(page))
+				goto keep_locked;
+			if (!mapping)
+				goto keep_locked;
+			if (!may_enter_fs)
+				goto keep_locked;
+			bdi = mapping->backing_dev_info;
+			if (bdi != current->backing_dev_info &&
+					bdi_write_congested(bdi))
+				goto keep_locked;
 
 			writeback = mapping->a_ops->vm_writeback;
 			if (writeback == NULL)
@@ -279,7 +320,7 @@ keep:
  */
 static /* inline */ int
 shrink_cache(int nr_pages, struct zone *zone,
-		unsigned int gfp_mask, int priority, int max_scan)
+		unsigned int gfp_mask, int max_scan)
 {
 	LIST_HEAD(page_list);
 	struct pagevec pvec;
@@ -298,11 +339,13 @@ shrink_cache(int nr_pages, struct zone *zone,
 	spin_lock_irq(&zone->lru_lock);
 	while (max_scan > 0 && nr_pages > 0) {
 		struct page *page;
-		int n = 0;
+		int nr_taken = 0;
+		int nr_scan = 0;
 
-		while (n < nr_to_process && !list_empty(&zone->inactive_list)) {
+		while (nr_scan++ < nr_to_process &&
+				!list_empty(&zone->inactive_list)) {
 			page = list_entry(zone->inactive_list.prev,
-					struct page, lru);
+						struct page, lru);
 
 			prefetchw_prev_lru_page(page,
 						&zone->inactive_list, flags);
@@ -318,18 +361,17 @@ shrink_cache(int nr_pages, struct zone *zone,
 			}
 			list_add(&page->lru, &page_list);
 			page_cache_get(page);
-			n++;
+			nr_taken++;
 		}
-		zone->nr_inactive -= n;
+		zone->nr_inactive -= nr_taken;
 		spin_unlock_irq(&zone->lru_lock);
 
-		if (list_empty(&page_list))
+		if (nr_taken == 0)
 			goto done;
 
-		max_scan -= n;
-		KERNEL_STAT_ADD(pgscan, n);
-		nr_pages = shrink_list(&page_list, nr_pages,
-					gfp_mask, priority, &max_scan);
+		max_scan -= nr_scan;
+		KERNEL_STAT_ADD(pgscan, nr_scan);
+		nr_pages = shrink_list(&page_list,nr_pages,gfp_mask,&max_scan);
 
 		if (nr_pages <= 0 && list_empty(&page_list))
 			goto done;
@@ -420,6 +462,15 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 			}
 			pte_chain_unlock(page);
 		}
+		/*
+		 * FIXME: need to consider page_count(page) here if/when we
+		 * reap orphaned pages via the LRU (Daniel's locking stuff)
+		 */
+		if (total_swap_pages == 0 && !page->mapping &&
+						!PagePrivate(page)) {
+			list_add(&page->lru, &l_active);
+			continue;
+		}
 		list_add(&page->lru, &l_inactive);
 		pgdeactivate++;
 	}
@@ -470,11 +521,10 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 }
 
 static /* inline */ int
-shrink_zone(struct zone *zone, int priority,
-	unsigned int gfp_mask, int nr_pages)
+shrink_zone(struct zone *zone, int max_scan,
+		unsigned int gfp_mask, int nr_pages)
 {
 	unsigned long ratio;
-	int max_scan;
 
 	/* This is bogus for ZONE_HIGHMEM? */
 	if (kmem_cache_reap(gfp_mask) >= nr_pages)
@@ -497,43 +547,50 @@ shrink_zone(struct zone *zone, int priority,
 		atomic_sub(SWAP_CLUSTER_MAX, &zone->refill_counter);
 		refill_inactive_zone(zone, SWAP_CLUSTER_MAX);
 	}
-
-	max_scan = zone->nr_inactive / priority;
-	nr_pages = shrink_cache(nr_pages, zone,
-				gfp_mask, priority, max_scan);
-
-	if (nr_pages <= 0)
-		return 0;
-
-	wakeup_bdflush();
-
-	shrink_dcache_memory(priority, gfp_mask);
-
-	/* After shrinking the dcache, get rid of unused inodes too .. */
-	shrink_icache_memory(1, gfp_mask);
-#ifdef CONFIG_QUOTA
-	shrink_dqcache_memory(DEF_PRIORITY, gfp_mask);
-#endif
-
+	nr_pages = shrink_cache(nr_pages, zone, gfp_mask, max_scan);
 	return nr_pages;
 }
 
 static int
 shrink_caches(struct zone *classzone, int priority,
-		int gfp_mask, int nr_pages)
+		int *total_scanned, int gfp_mask, int nr_pages)
 {
 	struct zone *first_classzone;
 	struct zone *zone;
 
 	first_classzone = classzone->zone_pgdat->node_zones;
-	zone = classzone;
-	while (zone >= first_classzone && nr_pages > 0) {
-		if (zone->free_pages <= zone->pages_high) {
-			nr_pages = shrink_zone(zone, priority,
-					gfp_mask, nr_pages);
-		}
-		zone--;
+	for (zone = classzone; zone >= first_classzone; zone--) {
+		int max_scan;
+		int to_reclaim;
+		int unreclaimed;
+
+		to_reclaim = zone->pages_high - zone->free_pages;
+		if (to_reclaim < 0)
+			continue;	/* zone has enough memory */
+
+		if (to_reclaim > SWAP_CLUSTER_MAX)
+			to_reclaim = SWAP_CLUSTER_MAX;
+
+		if (to_reclaim < nr_pages)
+			to_reclaim = nr_pages;
+
+		/*
+		 * If we cannot reclaim `nr_pages' pages by scanning twice
+		 * that many pages then fall back to the next zone.
+		 */
+		max_scan = zone->nr_inactive >> priority;
+		if (max_scan < to_reclaim * 2)
+			max_scan = to_reclaim * 2;
+		unreclaimed = shrink_zone(zone, max_scan, gfp_mask, to_reclaim);
+		nr_pages -= to_reclaim - unreclaimed;
+		*total_scanned += max_scan;
 	}
+
+	shrink_dcache_memory(priority, gfp_mask);
+	shrink_icache_memory(1, gfp_mask);
+#ifdef CONFIG_QUOTA
+	shrink_dqcache_memory(DEF_PRIORITY, gfp_mask);
+#endif
 	return nr_pages;
 }
 
@@ -564,12 +621,25 @@ try_to_free_pages(struct zone *classzone,
 	KERNEL_STAT_INC(pageoutrun);
 
 	for (priority = DEF_PRIORITY; priority; priority--) {
-		nr_pages = shrink_caches(classzone, priority,
+		int total_scanned = 0;
+
+		nr_pages = shrink_caches(classzone, priority, &total_scanned,
 					gfp_mask, nr_pages);
 		if (nr_pages <= 0)
 			return 1;
+		if (total_scanned == 0)
+			return 1;	/* All zones had enough free memory */
 		if (!(gfp_mask & __GFP_FS))
-			break;
+			break;		/* Let the caller handle it */
+		/*
+		 * Try to write back as many pages as we just scanned.  Not
+		 * sure if that makes sense, but it's an attempt to avoid
+		 * creating IO storms unnecessarily
+		 */
+		wakeup_bdflush(total_scanned);
+
+		/* Take a nap, wait for some writeback to complete */
+		blk_congestion_wait(WRITE, HZ/4);
 	}
 	if (gfp_mask & __GFP_FS)
 		out_of_memory();

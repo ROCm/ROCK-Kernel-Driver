@@ -1037,7 +1037,6 @@ static void xd_done (void)
 	for (i = 0; i < xd_drives; i++)
 		del_gendisk(xd_gendisk + i);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	blk_clear(MAJOR_NR);
 	release_region(xd_iobase,4);
 }
 

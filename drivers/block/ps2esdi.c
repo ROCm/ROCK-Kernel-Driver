@@ -184,7 +184,6 @@ int __init ps2esdi_init(void)
 			" device, releasing resources\n");
 		unregister_blkdev(MAJOR_NR, "ed");
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		blk_clear(MAJOR_NR);
 		return error;
 	}
 	return 0;
@@ -236,7 +235,6 @@ cleanup_module(void) {
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	for (i = 0; i < ps2esdi_drives; i++)
 		del_gendisk(ps2esdi_gendisk + i);
-	blk_clear(MAJOR_NR);
 }
 #endif /* MODULE */
 

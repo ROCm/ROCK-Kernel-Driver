@@ -322,6 +322,29 @@ oom:
 }
 
 /**
+ *	bio_get_nr_vecs		- return approx number of vecs
+ *	@bdev:  I/O target
+ *
+ *	Return the approximate number of pages we can send to this target.
+ *	There's no guarentee that you will be able to fit this number of pages
+ *	into a bio, it does not account for dynamic restrictions that vary
+ *	on offset.
+ */
+int bio_get_nr_vecs(struct block_device *bdev)
+{
+	request_queue_t *q = bdev_get_queue(bdev);
+	int nr_pages;
+
+	nr_pages = q->max_sectors >> (PAGE_SHIFT - 9);
+	if (nr_pages > q->max_phys_segments)
+		nr_pages = q->max_phys_segments;
+	if (nr_pages > q->max_hw_segments)
+		nr_pages = q->max_hw_segments;
+
+	return nr_pages;
+}
+
+/**
  *	bio_add_page	-	attempt to add page to bio
  *	@bio: destination bio
  *	@page: page to add
@@ -635,3 +658,4 @@ EXPORT_SYMBOL(bio_clone);
 EXPORT_SYMBOL(bio_phys_segments);
 EXPORT_SYMBOL(bio_hw_segments);
 EXPORT_SYMBOL(bio_add_page);
+EXPORT_SYMBOL(bio_get_nr_vecs);
