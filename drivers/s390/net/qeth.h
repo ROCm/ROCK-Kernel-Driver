@@ -14,7 +14,7 @@
 
 #define QETH_NAME " qeth"
 
-#define VERSION_QETH_H "$Revision: 1.58 $"
+#define VERSION_QETH_H "$Revision: 1.60 $"
 
 /******************** CONFIG STUFF ***********************/
 //#define QETH_DBF_LIKE_HELL
@@ -287,6 +287,12 @@
 /* flags for the header: */
 #define QETH_HEADER_PASSTHRU	0x10
 #define QETH_HEADER_IPV6	0x80
+
+#define QETH_ETH_MAC_V4      0x0100 /* like v4 */
+#define QETH_ETH_MAC_V6      0x3333 /* like v6 */
+/* tr mc mac is longer, but that will be enough to detect mc frames */
+#define QETH_TR_MAC_NC       0xc000 /* non-canonical */
+#define QETH_TR_MAC_C        0x0300 /* canonical */
 
 #define QETH_CAST_FLAGS		0x07
 #define QETH_CAST_UNICAST	6
@@ -888,8 +894,8 @@ struct qeth_card {	/* pointed to by dev->priv */
 	atomic_t is_open;	/* card is in use */
 
 	/* prevents deadlocks :-O */
-	spinlock_t softsetup_lock;
-	spinlock_t hardsetup_lock;
+	struct semaphore softsetup_sema;
+	struct semaphore hardsetup_sema;
 	spinlock_t ioctl_lock;
 	atomic_t softsetup_thread_is_running;
 	struct semaphore softsetup_thread_sem;
