@@ -182,6 +182,8 @@ ramdisk.txt
 	- short guide on how to set up and use the RAM disk.
 riscom8.txt
 	- notes on using the RISCom/8 multi-port serial driver.
+rocket.txt
+	- info on installing/using the Comtrol RocketPort multiport serial driver
 rtc.txt
 	- notes on how to use the Real Time Clock (aka CMOS clock) driver.
 s390/
