@@ -19,7 +19,7 @@
 
 #define DRV_NAME		"3c527"
 #define DRV_VERSION		"0.7-SMP"
-#define DRV_RELDATE		"2003/09/17"
+#define DRV_RELDATE		"2003/09/21"
 
 static const char *version =
 DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " Richard Procter <rnp@paradise.net.nz>\n";
@@ -177,8 +177,8 @@ struct mc32_local
 	struct mc32_ring_desc rx_ring[RX_RING_LEN];	/* Host Receive ring */
 
 	atomic_t tx_count;	/* buffers left */
-	volatile u16 tx_ring_head; /* index to tx en-queue end */
-	u16 tx_ring_tail;          /* index to tx de-queue end */
+	atomic_t tx_ring_head;  /* index to tx en-queue end */
+	u16 tx_ring_tail;       /* index to tx de-queue end */
 
 	u16 rx_ring_tail;       /* index to rx de-queue end */ 
 
@@ -836,7 +836,8 @@ static void mc32_load_tx_ring(struct net_device *dev)
 	/* see mc32_tx_ring */
 
 	atomic_set(&lp->tx_count, TX_RING_LEN-1); 
-	lp->tx_ring_head=lp->tx_ring_tail=0; 
+	atomic_set(&lp->tx_ring_head, 0); 
+	lp->tx_ring_tail=0; 
 } 
 
 
@@ -865,7 +866,8 @@ static void mc32_flush_tx_ring(struct net_device *dev)
 	}
 
 	atomic_set(&lp->tx_count, 0); 
-	lp->tx_ring_tail=lp->tx_ring_head=0;
+	atomic_set(&lp->tx_ring_head, 0); 
+	lp->tx_ring_tail=0;
 }
  	
 
@@ -1002,17 +1004,19 @@ static void mc32_timeout(struct net_device *dev)
  *
  *      We do not disable interrupts or acquire any locks; this can
  *      run concurrently with mc32_tx_ring(), and the function itself
- *      is serialised at a higher layer. However, this makes it
- *      crucial that we update lp->tx_ring_head only after we've
- *      established a valid packet in the tx ring (and is why we mark
- *      tx_ring_head volatile).
- *
- **/
+ *      is serialised at a higher layer. However, similarly for the
+ *      card itself, we must ensure that we update tx_ring_head only
+ *      after we've established a valid packet on the tx ring (and
+ *      before we let the card "see" it, to prevent it racing with the
+ *      irq handler).
+ * 
+ */
+
 static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
 	struct mc32_local *lp = (struct mc32_local *)dev->priv;
-	u16 head = lp->tx_ring_head;
-
+	u32 head = atomic_read(&lp->tx_ring_head);
+	
 	volatile struct skb_header *p, *np;
 
 	netif_stop_queue(dev);
@@ -1022,7 +1026,6 @@ static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	skb = skb_padto(skb, ETH_ZLEN);
-
 	if (skb == NULL) {
 		netif_wake_queue(dev);
 		return 0;
@@ -1036,13 +1039,12 @@ static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 	head = next_tx(head);
 
 	/* NP is the buffer we will be loading */
-	np=lp->tx_ring[head].p;
-
+	np=lp->tx_ring[head].p; 
+	
 	/* We will need this to flush the buffer out */
-	lp->tx_ring[lp->tx_ring_head].skb = skb;
-   	   
-	np->length = unlikely(skb->len < ETH_ZLEN) ? ETH_ZLEN : skb->len;
-			
+	lp->tx_ring[head].skb=skb;
+
+	np->length      = unlikely(skb->len < ETH_ZLEN) ? ETH_ZLEN : skb->len;			
 	np->data	= isa_virt_to_bus(skb->data);
 	np->status	= 0;
 	np->control     = CONTROL_EOP | CONTROL_EOL;     
@@ -1050,11 +1052,11 @@ static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 		
 	/*
 	 * The new frame has been setup; we can now
-	 * let the card and interrupt handler "see" it
+	 * let the interrupt handler and card "see" it
 	 */
 
+	atomic_set(&lp->tx_ring_head, head); 
 	p->control     &= ~CONTROL_EOL;
-	lp->tx_ring_head= head;
 
 	netif_wake_queue(dev);
 	return 0;
@@ -1236,7 +1238,7 @@ static void mc32_tx_ring(struct net_device *dev)
 	 * condition with 'queue full'
 	 */
 
-	while (lp->tx_ring_tail != lp->tx_ring_head)  
+	while (lp->tx_ring_tail != atomic_read(&lp->tx_ring_head))  
 	{   
 		u16 t; 
 
@@ -1388,9 +1390,7 @@ static irqreturn_t mc32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 				if (lp->mc_reload_wait) 
 					mc32_reset_multicast_list(dev);
 			}
-			else {
-				complete(&lp->execution_cmd);
-			}
+			else complete(&lp->execution_cmd);
 		}
 		if(status&2)
 		{
