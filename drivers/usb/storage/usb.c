@@ -338,10 +338,16 @@ static int usb_stor_control_thread(void * __us)
 		/* lock the device pointers */
 		down(&(us->dev_semaphore));
 
+		/* don't do anything if we are disconnecting */
+		if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+			US_DEBUGP("No command during disconnect\n");
+			us->srb->result = DID_BAD_TARGET << 16;
+		}
+
 		/* reject the command if the direction indicator 
 		 * is UNKNOWN
 		 */
-		if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
+		else if (us->srb->sc_data_direction == SCSI_DATA_UNKNOWN) {
 			US_DEBUGP("UNKNOWN data direction\n");
 			us->srb->result = DID_ERROR << 16;
 		}

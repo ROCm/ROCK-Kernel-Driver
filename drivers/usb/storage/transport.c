@@ -1065,6 +1065,10 @@ static int usb_stor_reset_common(struct us_data *us,
 	schedule_timeout(HZ*6);
 	set_current_state(TASK_RUNNING);
 	down(&us->dev_semaphore);
+	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+		US_DEBUGP("Reset interrupted by disconnect\n");
+		return FAILED;
+	}
 
 	US_DEBUGP("Soft reset: clearing bulk-in endpoint halt\n");
 	result = usb_stor_clear_halt(us, us->recv_bulk_pipe);
