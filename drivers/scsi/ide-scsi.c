@@ -491,7 +491,6 @@ static void idescsi_ide_release (struct inode *inode, struct file *filp, ide_dri
 }
 
 static ide_drive_t *idescsi_drives[MAX_HWIFS * MAX_DRIVES];
-static int idescsi_initialized = 0;
 
 static void idescsi_add_settings(ide_drive_t *drive)
 {
@@ -539,16 +538,20 @@ static int idescsi_cleanup (ide_drive_t *drive)
 	return 0;
 }
 
+static int idescsi_reinit(ide_drive_t *drive);
+
 /*
  *	IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idescsi_driver = {
+	owner:			THIS_MODULE,
 	name:			"ide-scsi",
 	version:		IDESCSI_VERSION,
 	media:			ide_scsi,
 	busy:			0,
 	supports_dma:		1,
 	supports_dsc_overlap:	0,
+	reinit:			idescsi_reinit,
 	cleanup:		idescsi_cleanup,
 	standby:		NULL,
 	flushcache:		NULL,
@@ -563,53 +566,36 @@ static ide_driver_t idescsi_driver = {
 	capacity:		NULL,
 	special:		NULL,
 	proc:			NULL,
+	drives:			LIST_HEAD_INIT(idescsi_driver.drives),
 };
 
-int idescsi_init (void);
-static ide_module_t idescsi_module = {
-	IDE_DRIVER_MODULE,
-	idescsi_init,
-	&idescsi_driver,
-	NULL
-};
-
-/*
- *	idescsi_init will register the driver for each scsi.
- */
-int idescsi_init (void)
+static int idescsi_reinit(ide_drive_t *drive)
 {
-	ide_drive_t *drive;
 	idescsi_scsi_t *scsi;
-	byte media[] = {TYPE_DISK, TYPE_TAPE, TYPE_PROCESSOR, TYPE_WORM, TYPE_ROM, TYPE_SCANNER, TYPE_MOD, 255};
-	int i, failed, id;
+	int id;
 
-	if (idescsi_initialized)
-		return 0;
-	idescsi_initialized = 1;
-	for (i = 0; i < MAX_HWIFS * MAX_DRIVES; i++)
-		idescsi_drives[i] = NULL;
-	MOD_INC_USE_COUNT;
-	for (i = 0; media[i] != 255; i++) {
-		failed = 0;
-		while ((drive = ide_scan_devices (media[i], idescsi_driver.name, NULL, failed++)) != NULL) {
-
-			if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
-				printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
-				continue;
-			}
-			if (ide_register_subdriver (drive, &idescsi_driver, IDE_SUBDRIVER_VERSION)) {
-				printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
-				kfree (scsi);
-				continue;
-			}
-			for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++);
-				idescsi_setup (drive, scsi, id);
-			failed--;
-		}
+	if (!strstr("ide-scsi", drive->driver_req))
+		goto failed;
+	if (!drive->present)
+		goto failed;
+	/* we accept everything except ide-disk */
+	if (drive->media == ide_disk)
+		goto failed;
+	if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
+		printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
+		goto failed;
 	}
-	ide_register_module(&idescsi_module);
-	MOD_DEC_USE_COUNT;
+	if (ide_register_subdriver (drive, &idescsi_driver, IDE_SUBDRIVER_VERSION)) {
+		printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
+		kfree (scsi);
+		goto failed;
+	}
+	for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++)
+		;
+	idescsi_setup (drive, scsi, id);
 	return 0;
+failed:
+	return 1;
 }
 
 int idescsi_detect (Scsi_Host_Template *host_template)
@@ -857,27 +843,15 @@ static Scsi_Host_Template idescsi_template = {
 
 static int __init init_idescsi_module(void)
 {
-	idescsi_init();
+	ide_register_driver(&idescsi_driver);
 	scsi_register_host(&idescsi_template);
 	return 0;
 }
 
 static void __exit exit_idescsi_module(void)
 {
-	ide_drive_t *drive;
-	byte media[] = {TYPE_DISK, TYPE_TAPE, TYPE_PROCESSOR, TYPE_WORM, TYPE_ROM, TYPE_SCANNER, TYPE_MOD, 255};
-	int i, failed;
-
 	scsi_unregister_host(&idescsi_template);
-	for (i = 0; media[i] != 255; i++) {
-		failed = 0;
-		while ((drive = ide_scan_devices (media[i], idescsi_driver.name, &idescsi_driver, failed)) != NULL)
-			if (idescsi_cleanup (drive)) {
-				printk ("%s: exit_idescsi_module() called while still busy\n", drive->name);
-				failed++;
-			}
-	}
-	ide_unregister_module(&idescsi_module);
+	ide_unregister_driver(&idescsi_driver);
 }
 
 module_init(init_idescsi_module);

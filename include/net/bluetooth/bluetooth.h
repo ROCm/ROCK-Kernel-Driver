@@ -73,16 +73,12 @@
 
 extern void bluez_dump(char *pref, __u8 *buf, int count);
 
-#if __GNUC__ <= 2 && __GNUC_MINOR__ < 95
-#define __func__ __FUNCTION__
-#endif
-
 #define BT_INFO(fmt, arg...) printk(KERN_INFO fmt "\n" , ## arg)
-#define BT_DBG(fmt, arg...)  printk(KERN_INFO "%s: " fmt "\n" , __func__ , ## arg)
-#define BT_ERR(fmt, arg...)  printk(KERN_ERR  "%s: " fmt "\n" , __func__ , ## arg)
+#define BT_DBG(fmt, arg...)  printk(KERN_INFO "%s: " fmt "\n" , __FUNCTION__ , ## arg)
+#define BT_ERR(fmt, arg...)  printk(KERN_ERR  "%s: " fmt "\n" , __FUNCTION__ , ## arg)
 
 #ifdef HCI_DATA_DUMP
-#define BT_DMP(buf, len)    bluez_dump(__func__, buf, len)
+#define BT_DMP(buf, len)    bluez_dump(__FUNCTION__, buf, len)
 #else
 #define BT_DMP(D...)
 #endif

@@ -334,7 +334,6 @@ void ia64_elf32_init(struct pt_regs *regs);
 #define ELF_PLAT_INIT(_r)	ia64_elf32_init(_r)
 
 #define elf_addr_t	u32
-#define elf_caddr_t	u32
 
 /* ELF register definitions.  This is needed for core dump support.  */
 

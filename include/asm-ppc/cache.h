@@ -21,13 +21,15 @@
 #define LG_L1_CACHE_LINE_SIZE	7
 #define MAX_COPY_PREFETCH	1
 #else
-#define	L1_CACHE_LINE_SIZE  32
+#define	L1_CACHE_LINE_SIZE	32
 #define LG_L1_CACHE_LINE_SIZE	5
 #define MAX_COPY_PREFETCH	4
 #endif
 
 #define	L1_CACHE_BYTES L1_CACHE_LINE_SIZE
+#define L1_CACHE_SHIFT LG_L1_CACHE_LINE_SIZE
 #define	SMP_CACHE_BYTES L1_CACHE_BYTES
+#define L1_CACHE_SHIFT_MAX 7	/* largest L1 which this arch supports */
 
 #define	L1_CACHE_ALIGN(x)       (((x)+(L1_CACHE_BYTES-1))&~(L1_CACHE_BYTES-1))
 #define	L1_CACHE_PAGES		8

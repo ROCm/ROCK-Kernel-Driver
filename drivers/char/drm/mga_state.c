@@ -662,7 +662,7 @@ static void mga_dma_dispatch_swap( drm_device_t *dev )
 
 	FLUSH_DMA();
 
-	DRM_DEBUG( "%s... done.\n", __func__ );
+	DRM_DEBUG( "%s... done.\n", __FUNCTION__ );
 }
 
 static void mga_dma_dispatch_vertex( drm_device_t *dev, drm_buf_t *buf )
@@ -1023,7 +1023,7 @@ int mga_dma_iload( DRM_IOCTL_ARGS )
 #if 0
 	if ( mga_do_wait_for_idle( dev_priv ) < 0 ) {
 		if ( MGA_DMA_DEBUG )
-			DRM_INFO( "%s: -EBUSY\n", __func__ );
+			DRM_INFO( "%s: -EBUSY\n", __FUNCTION__ );
 		return DRM_ERR(EBUSY);
 	}
 #endif

@@ -470,7 +470,6 @@ typedef struct ide_drive_s {
 	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
 	unsigned no_io_32bit	: 1;	/* disallow enabling 32bit I/O */
 	unsigned nobios		: 1;	/* flag: do not probe bios for drive */
-	unsigned revalidate	: 1;	/* request revalidation */
 	unsigned atapi_overlap	: 1;	/* flag: ATAPI overlap (not supported) */
 	unsigned nice0		: 1;	/* flag: give obvious excess bandwidth */
 	unsigned nice2		: 1;	/* flag: give a share in our own bandwidth */
@@ -530,6 +529,7 @@ typedef struct ide_drive_s {
 	byte		acoustic;	/* acoustic management */
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
+	struct list_head list;
 } ide_drive_t;
 
 /*
@@ -889,6 +889,7 @@ read_proc_t proc_ide_read_geometry;
 #define IDE_SUBDRIVER_VERSION	1
 
 typedef struct ide_driver_s {
+	struct module			*owner;
 	const char			*name;
 	const char			*version;
 	byte				media;
@@ -913,10 +914,11 @@ typedef struct ide_driver_s {
 	unsigned long	(*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
 	ide_proc_entry_t        *proc;
-	int		(*init)(void);
 	int		(*reinit)(ide_drive_t *);
 	void		(*ata_prebuilder)(ide_drive_t *);
 	void		(*atapi_prebuilder)(ide_drive_t *);
+	struct list_head drives;
+	struct list_head drivers;
 } ide_driver_t;
 
 #define DRIVER(drive)		((drive)->driver)
@@ -926,7 +928,6 @@ typedef struct ide_driver_s {
  */
 #define IDE_CHIPSET_MODULE		0	/* not supported yet */
 #define IDE_PROBE_MODULE		1
-#define IDE_DRIVER_MODULE		2
 
 typedef int	(ide_module_init_proc)(void);
 
@@ -947,7 +948,6 @@ typedef struct ide_module_s {
  */
 #ifndef _IDE_C
 extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
-extern	ide_module_t	*ide_modules;
 extern	ide_module_t	*ide_probe;
 #endif
 extern int noautodma;
@@ -1210,37 +1210,16 @@ extern struct block_device_operations ide_fops[];
 extern ide_proc_entry_t generic_subdriver_entries[];
 #endif
 
-int ide_reinit_drive (ide_drive_t *drive);
+int ata_attach(ide_drive_t *drive);
 
 #ifdef _IDE_C
 #ifdef CONFIG_BLK_DEV_IDE
 int ideprobe_init (void);
 #endif /* CONFIG_BLK_DEV_IDE */
-#ifdef CONFIG_BLK_DEV_IDEDISK
-int idedisk_reinit (ide_drive_t *drive);
-int idedisk_init (void);
-#endif /* CONFIG_BLK_DEV_IDEDISK */
-#ifdef CONFIG_BLK_DEV_IDECD
-int ide_cdrom_reinit (ide_drive_t *drive);
-int ide_cdrom_init (void);
-#endif /* CONFIG_BLK_DEV_IDECD */
-#ifdef CONFIG_BLK_DEV_IDETAPE
-int idetape_reinit (ide_drive_t *drive);
-int idetape_init (void);
-#endif /* CONFIG_BLK_DEV_IDETAPE */
-#ifdef CONFIG_BLK_DEV_IDEFLOPPY
-int idefloppy_reinit (ide_drive_t *drive);
-int idefloppy_init (void);
-#endif /* CONFIG_BLK_DEV_IDEFLOPPY */
-#ifdef CONFIG_BLK_DEV_IDESCSI
-int idescsi_reinit (ide_drive_t *drive);
-int idescsi_init (void);
-#endif /* CONFIG_BLK_DEV_IDESCSI */
 #endif /* _IDE_C */
 
-int ide_register_module (ide_module_t *module);
-void ide_unregister_module (ide_module_t *module);
-ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *driver, int n);
+int ide_register_driver(ide_driver_t *driver);
+void ide_unregister_driver(ide_driver_t *driver);
 int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version);
 int ide_unregister_subdriver (ide_drive_t *drive);
 int ide_replace_subdriver(ide_drive_t *drive, const char *driver);

@@ -28,7 +28,7 @@
  *
  * Note that the referenced bit, the page->lru list_head and the active,
  * inactive_dirty and inactive_clean lists are protected by the
- * pagemap_lru_lock, and *NOT* by the usual PG_locked bit!
+ * zone->lru_lock, and *NOT* by the usual PG_locked bit!
  *
  * PG_error is set to indicate that an I/O error occurred on this page.
  *
@@ -76,8 +76,6 @@ extern struct page_state {
 	unsigned long nr_dirty;
 	unsigned long nr_writeback;
 	unsigned long nr_pagecache;
-	unsigned long nr_active;	/* on active_list LRU */
-	unsigned long nr_inactive;	/* on inactive_list LRU */
 	unsigned long nr_page_table_pages;
 	unsigned long nr_reverse_maps;
 } ____cacheline_aligned_in_smp page_states[NR_CPUS];
@@ -163,6 +161,7 @@ extern void get_page_state(struct page_state *ret);
 #define SetPageActive(page)	set_bit(PG_active, &(page)->flags)
 #define ClearPageActive(page)	clear_bit(PG_active, &(page)->flags)
 #define TestClearPageActive(page) test_and_clear_bit(PG_active, &(page)->flags)
+#define TestSetPageActive(page) test_and_set_bit(PG_active, &(page)->flags)
 
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
 #define SetPageSlab(page)	set_bit(PG_slab, &(page)->flags)

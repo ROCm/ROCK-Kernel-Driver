@@ -48,6 +48,8 @@
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
 #include <linux/skbuff.h>
+#include <linux/ethtool.h>
+#include <asm/uaccess.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -1224,7 +1226,32 @@ AP to AP        1    1        dest AP    src AP          dest     source
         }
     }
 } /* end encapsulate_frame */
+
+
 /*===========================================================================*/
+
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+	
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strncpy(info.driver, "ray_cs", sizeof(info.driver)-1);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	}
+	
+	return -EOPNOTSUPP;
+}
+
+/*====================================================================*/
+
 static int ray_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
     ray_dev_t *local = (ray_dev_t *)dev->priv;
@@ -1242,6 +1269,10 @@ static int ray_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
     /* Validate the command */
     switch (cmd)
     {
+    case SIOCETHTOOL:
+      err = netdev_ethtool_ioctl(dev, (void *) ifr->ifr_data);
+      break;
+
 #if WIRELESS_EXT > 7
       /* --------------- WIRELESS EXTENSIONS --------------- */
       /* Get name */
