@@ -170,7 +170,7 @@ static void __sctp_get_local_addr_list(struct sctp_protocol *proto)
 
 static void sctp_get_local_addr_list(struct sctp_protocol *proto)
 {
-	long flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&sctp_proto.local_addr_lock, flags);
 	__sctp_get_local_addr_list(&sctp_proto);
@@ -193,7 +193,7 @@ static void __sctp_free_local_addr_list(struct sctp_protocol *proto)
 /* Free the existing local addresses.  */
 static void sctp_free_local_addr_list(struct sctp_protocol *proto)
 {
-	long flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&proto->local_addr_lock, flags);
 	__sctp_free_local_addr_list(proto);
@@ -208,7 +208,7 @@ int sctp_copy_local_addr_list(struct sctp_protocol *proto,
 	struct sockaddr_storage_list *addr;
 	int error = 0;
 	struct list_head *pos;
-	long flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&proto->local_addr_lock, flags);
 	list_for_each(pos, &proto->local_addr_list) {
@@ -233,7 +233,6 @@ int sctp_copy_local_addr_list(struct sctp_protocol *proto,
 
 end_copy:
 	sctp_spin_unlock_irqrestore(&proto->local_addr_lock, flags);
-
 	return error;
 }
 
@@ -383,7 +382,7 @@ static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
  * addresses. If an association is passed, trys to get a dst entry with a
  * source adddress that matches an address in the bind address list.
  */
-struct dst_entry *sctp_v4_get_dst(sctp_association_t *asoc,
+struct dst_entry *sctp_v4_get_dst(struct sctp_association *asoc,
 				  union sctp_addr *daddr,
 				  union sctp_addr *saddr)
 {
@@ -480,6 +479,12 @@ void sctp_v4_get_saddr(sctp_association_t *asoc,
 
 }
 
+/* What interface did this skb arrive on? */
+int sctp_v4_skb_iif(const struct sk_buff *skb) 
+{
+     	return ((struct rtable *)skb->dst)->rt_iif;  
+}
+
 /* Create and initialize a new sk for the socket returned by accept(). */ 
 struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 				      struct sctp_association *asoc)
@@ -538,10 +543,10 @@ out:
 /* Event handler for inet address addition/deletion events.
  * Basically, whenever there is an event, we re-build our local address list.
  */
-static int sctp_inetaddr_event(struct notifier_block *this, unsigned long event,
+static int sctp_inetaddr_event(struct notifier_block *this, unsigned long ev,
 			       void *ptr)
 {
-	long flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&sctp_proto.local_addr_lock, flags);
 	__sctp_free_local_addr_list(&sctp_proto);
@@ -689,6 +694,14 @@ static int sctp_inet_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 	return sctp_v4_available(addr);
 }
 
+/* Verify that sockaddr looks sendable.  Common verification has already 
+ * been taken care of.
+ */
+static int sctp_inet_send_verify(struct sctp_opt *opt, union sctp_addr *addr)
+{
+	return 1;
+}
+
 /* Fill in Supported Address Type information for INIT and INIT-ACK
  * chunks.  Returns number of addresses supported.
  */
@@ -721,6 +734,7 @@ static struct sctp_pf sctp_pf_inet = {
 	.af_supported  = sctp_inet_af_supported,
 	.cmp_addr      = sctp_inet_cmp_addr,
 	.bind_verify   = sctp_inet_bind_verify,
+	.send_verify   = sctp_inet_send_verify,
 	.supported_addrs = sctp_inet_supported_addrs,
 	.create_accept_sk = sctp_v4_create_accept_sk,
 	.af            = &sctp_ipv4_specific,
@@ -797,6 +811,7 @@ struct sctp_af sctp_ipv4_specific = {
 	.is_any         = sctp_v4_is_any,
 	.available      = sctp_v4_available,
 	.scope          = sctp_v4_scope,
+	.skb_iif        = sctp_v4_skb_iif,
 	.net_header_len = sizeof(struct iphdr),
 	.sockaddr_len   = sizeof(struct sockaddr_in),
 	.sa_family      = AF_INET,
@@ -873,6 +888,10 @@ __init int sctp_init(void)
 {
 	int i;
 	int status = 0;
+
+	/* SCTP_DEBUG sanity check. */
+	if (!sctp_sanity_check())
+		return -EINVAL;
 
 	/* Add SCTP to inet_protos hash table.  */
 	if (inet_add_protocol(&sctp_protocol, IPPROTO_SCTP) < 0)

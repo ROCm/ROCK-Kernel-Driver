@@ -38,7 +38,6 @@
  * be incorporated into the next SCTP release.
  */
 
-
 #ifndef __sctp_ulpevent_h__
 #define __sctp_ulpevent_h__
 
@@ -50,6 +49,7 @@ struct sctp_ulpevent {
 	struct sctp_association *asoc;
 	struct sctp_sndrcvinfo sndrcvinfo;
 	int msg_flags;
+	int iif;
 };
 
 /* Retrieve the skb this event sits inside of. */
@@ -61,9 +61,9 @@ static inline struct sk_buff *sctp_event2skb(struct sctp_ulpevent *ev)
 /* Retrieve & cast the event sitting inside the skb. */
 static inline struct sctp_ulpevent *sctp_skb2event(struct sk_buff *skb)
 {
-	return (struct sctp_ulpevent *)skb->cb; 
+	return (struct sctp_ulpevent *)skb->cb;
 }
-	
+
 struct sctp_ulpevent *sctp_ulpevent_new(int size, int flags, int priority);
 struct sctp_ulpevent *sctp_ulpevent_init(struct sctp_ulpevent *, int flags);
 void sctp_ulpevent_free(struct sctp_ulpevent *);
