@@ -1152,8 +1152,9 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 
 void __init UNEXPECTED_IO_APIC(void)
 {
-	printk(KERN_WARNING " WARNING: unexpected IO-APIC, please mail\n");
-	printk(KERN_WARNING "          to linux-smp@vger.kernel.org\n");
+	printk(KERN_WARNING "INFO: unexpected IO-APIC, please file a report at\n");
+	printk(KERN_WARNING "      http://bugzilla.kernel.org\n");
+	printk(KERN_WARNING "      if your kernel is less than 3 months old.\n");
 }
 
 void __init print_IO_APIC(void)
