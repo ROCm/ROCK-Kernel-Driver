@@ -2458,6 +2458,20 @@ sctp_disposition_t sctp_sf_eat_data_fast_4_4(const struct sctp_endpoint *ep,
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 	}
 
+	error = sctp_eat_data(asoc, chunk, commands );
+	switch (error) {
+	case SCTP_IERROR_NO_ERROR:
+	case SCTP_IERROR_HIGH_TSN:
+	case SCTP_IERROR_DUP_TSN:
+	case SCTP_IERROR_IGNORE_TSN:
+	case SCTP_IERROR_BAD_STREAM:
+		break;
+	case SCTP_IERROR_NO_DATA:
+		goto consume;
+	default:
+		BUG();
+	}
+
 	/* Go a head and force a SACK, since we are shutting down. */
 
 	/* Implementor's Guide.
@@ -4741,8 +4755,8 @@ int sctp_eat_data(const struct sctp_association *asoc,
 		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_DATA));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+		SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 		return SCTP_IERROR_NO_DATA;
 	}
 
@@ -4756,9 +4770,9 @@ int sctp_eat_data(const struct sctp_association *asoc,
 	 * if we renege and the chunk arrives again.
 	 */
 	if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
-		SCTP_INC_STATS(SctpInUnorderChunks);
+		SCTP_INC_STATS(SCTP_MIB_INUNORDERCHUNKS);
 	else
-		SCTP_INC_STATS(SctpInOrderChunks);
+		SCTP_INC_STATS(SCTP_MIB_INORDERCHUNKS);
 
 	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
 	 *
