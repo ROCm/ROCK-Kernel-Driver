@@ -322,6 +322,152 @@ static long snd_emu10k1_fx8010_read(snd_info_entry_t *entry, void *file_private_
 	return 0;
 }
 
+#ifdef CONFIG_SND_DEBUG
+static void snd_emu_proc_io_reg_read(snd_info_entry_t *entry,
+				     snd_info_buffer_t * buffer)
+{
+	emu10k1_t *emu = entry->private_data;
+	unsigned long value;
+	unsigned long flags;
+	int i;
+	snd_iprintf(buffer, "IO Registers:\n\n");
+	for(i = 0; i < 0x40; i+=4) {
+		spin_lock_irqsave(&emu->emu_lock, flags);
+		value = inl(emu->port + i);
+		spin_unlock_irqrestore(&emu->emu_lock, flags);
+		snd_iprintf(buffer, "%02X: %08lX\n", i, value);
+	}
+}
+
+static void snd_emu_proc_io_reg_write(snd_info_entry_t *entry,
+                                      snd_info_buffer_t * buffer)
+{
+	emu10k1_t *emu = entry->private_data;
+	unsigned long flags;
+	char line[64];
+	u32 reg, val;
+	while (!snd_info_get_line(buffer, line, sizeof(line))) {
+		if (sscanf(line, "%x %x", &reg, &val) != 2)
+			continue;
+		if ((reg < 0x40) && (reg >=0) && (val <= 0xffffffff) ) {
+			spin_lock_irqsave(&emu->emu_lock, flags);
+			outl(val, emu->port + (reg & 0xfffffffc));
+			spin_unlock_irqrestore(&emu->emu_lock, flags);
+		}
+	}
+}
+
+static unsigned int snd_ptr_read(emu10k1_t * emu,
+				 unsigned int iobase,
+				 unsigned int reg,
+				 unsigned int chn)
+{
+	unsigned long flags;
+	unsigned int regptr, val;
+
+	regptr = (reg << 16) | chn;
+
+	spin_lock_irqsave(&emu->emu_lock, flags);
+	outl(regptr, emu->port + iobase + PTR);
+	val = inl(emu->port + iobase + DATA);
+	spin_unlock_irqrestore(&emu->emu_lock, flags);
+	return val;
+}
+
+static void snd_ptr_write(emu10k1_t *emu,
+			  unsigned int iobase,
+			  unsigned int reg,
+			  unsigned int chn,
+			  unsigned int data)
+{
+	unsigned int regptr;
+	unsigned long flags;
+
+	regptr = (reg << 16) | chn;
+
+	spin_lock_irqsave(&emu->emu_lock, flags);
+	outl(regptr, emu->port + iobase + PTR);
+	outl(data, emu->port + iobase + DATA);
+	spin_unlock_irqrestore(&emu->emu_lock, flags);
+}
+
+
+static void snd_emu_proc_ptr_reg_read(snd_info_entry_t *entry,
+				      snd_info_buffer_t * buffer, int iobase, int offset, int length)
+{
+	emu10k1_t *emu = entry->private_data;
+	unsigned long value;
+	int i,j;
+	if (offset+length > 0x80) {
+		snd_iprintf(buffer, "Input values out of range\n");
+		return;
+	}
+	snd_iprintf(buffer, "Registers 0x%x\n", iobase);
+	for(i = offset; i < offset+length; i++) {
+		snd_iprintf(buffer, "%02X: ",i);
+		for (j = 0; j < 4; j++) {
+			if(iobase == 0)
+                		value = snd_ptr_read(emu, 0, i, j);
+			else
+                		value = snd_ptr_read(emu, 0x20, i, j);
+			snd_iprintf(buffer, "%08lX ", value);
+		}
+		snd_iprintf(buffer, "\n");
+	}
+}
+
+static void snd_emu_proc_ptr_reg_write(snd_info_entry_t *entry,
+				       snd_info_buffer_t * buffer, int iobase)
+{
+	emu10k1_t *emu = entry->private_data;
+	char line[64];
+	unsigned int reg, channel_id , val;
+	while (!snd_info_get_line(buffer, line, sizeof(line))) {
+		if (sscanf(line, "%x %x %x", &reg, &channel_id, &val) != 3)
+			continue;
+		if ((reg < 0x80) && (reg >=0) && (val <= 0xffffffff) && (channel_id >=0) && (channel_id <= 3) )
+			snd_ptr_write(emu, iobase, reg, channel_id, val);
+	}
+}
+
+static void snd_emu_proc_ptr_reg_write00(snd_info_entry_t *entry,
+					 snd_info_buffer_t * buffer)
+{
+	snd_emu_proc_ptr_reg_write(entry, buffer, 0);
+}
+
+static void snd_emu_proc_ptr_reg_write20(snd_info_entry_t *entry,
+					 snd_info_buffer_t * buffer)
+{
+	snd_emu_proc_ptr_reg_write(entry, buffer, 0x20);
+}
+	
+
+static void snd_emu_proc_ptr_reg_read00a(snd_info_entry_t *entry,
+					 snd_info_buffer_t * buffer)
+{
+	snd_emu_proc_ptr_reg_read(entry, buffer, 0, 0, 0x40);
+}
+
+static void snd_emu_proc_ptr_reg_read00b(snd_info_entry_t *entry,
+					 snd_info_buffer_t * buffer)
+{
+	snd_emu_proc_ptr_reg_read(entry, buffer, 0, 0x40, 0x40);
+}
+
+static void snd_emu_proc_ptr_reg_read20a(snd_info_entry_t *entry,
+					 snd_info_buffer_t * buffer)
+{
+	snd_emu_proc_ptr_reg_read(entry, buffer, 0x20, 0, 0x40);
+}
+
+static void snd_emu_proc_ptr_reg_read20b(snd_info_entry_t *entry,
+					 snd_info_buffer_t * buffer)
+{
+	snd_emu_proc_ptr_reg_read(entry, buffer, 0x20, 0x40, 0x40);
+}
+#endif
+
 static struct snd_info_entry_ops snd_emu10k1_proc_ops_fx8010 = {
 	.read = snd_emu10k1_fx8010_read,
 };
@@ -329,6 +475,33 @@ static struct snd_info_entry_ops snd_emu10k1_proc_ops_fx8010 = {
 int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 {
 	snd_info_entry_t *entry;
+#ifdef CONFIG_SND_DEBUG
+	if (! snd_card_proc_new(emu->card, "io_regs", &entry)) {
+		snd_info_set_text_ops(entry, emu, 1024, snd_emu_proc_io_reg_read);
+		entry->c.text.write_size = 64;
+		entry->c.text.write = snd_emu_proc_io_reg_write;
+	}
+	if (! snd_card_proc_new(emu->card, "ptr_regs00a", &entry)) {
+		snd_info_set_text_ops(entry, emu, 1024, snd_emu_proc_ptr_reg_read00a);
+		entry->c.text.write_size = 64;
+		entry->c.text.write = snd_emu_proc_ptr_reg_write00;
+	}
+	if (! snd_card_proc_new(emu->card, "ptr_regs00b", &entry)) {
+		snd_info_set_text_ops(entry, emu, 1024, snd_emu_proc_ptr_reg_read00b);
+		entry->c.text.write_size = 64;
+		entry->c.text.write = snd_emu_proc_ptr_reg_write00;
+	}
+	if (! snd_card_proc_new(emu->card, "ptr_regs20a", &entry)) {
+		snd_info_set_text_ops(entry, emu, 1024, snd_emu_proc_ptr_reg_read20a);
+		entry->c.text.write_size = 64;
+		entry->c.text.write = snd_emu_proc_ptr_reg_write20;
+	}
+	if (! snd_card_proc_new(emu->card, "ptr_regs20b", &entry)) {
+		snd_info_set_text_ops(entry, emu, 1024, snd_emu_proc_ptr_reg_read20b);
+		entry->c.text.write_size = 64;
+		entry->c.text.write = snd_emu_proc_ptr_reg_write20;
+	}
+#endif
 	
 	if (! snd_card_proc_new(emu->card, "emu10k1", &entry))
 		snd_info_set_text_ops(entry, emu, 2048, snd_emu10k1_proc_read);
