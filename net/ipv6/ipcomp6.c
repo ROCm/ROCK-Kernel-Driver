@@ -140,11 +140,15 @@ static int ipcomp6_output(struct sk_buff **pskb)
 
 	spin_lock_bh(&x->lock);
 
-	err = xfrm_check_output(x, *pskb, AF_INET6);
+	err = xfrm_state_check(x, *pskb);
 	if (err)
 		goto error;
 
 	if (x->props.mode) {
+		err = xfrm6_tunnel_check_size(*pskb);
+		if (err)
+			goto error;
+
 		hdr_len = sizeof(struct ipv6hdr);
 		nexthdr = IPPROTO_IPV6;
 		iph = (*pskb)->nh.ipv6h;

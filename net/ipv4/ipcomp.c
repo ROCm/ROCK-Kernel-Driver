@@ -164,12 +164,16 @@ static int ipcomp_output(struct sk_buff **pskb)
 	}
 
 	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, *pskb, AF_INET);
+	err = xfrm_state_check(x, *pskb);
 	if (err)
 		goto error;
 
-	/* Don't bother compressing */
-	if (!x->props.mode) {
+	if (x->props.mode) {
+		err = xfrm4_tunnel_check_size(*pskb);
+		if (err)
+			goto error;
+	} else {
+		/* Don't bother compressing */
 		iph = (*pskb)->nh.iph;
 		hdr_len = iph->ihl * 4;
 	}
