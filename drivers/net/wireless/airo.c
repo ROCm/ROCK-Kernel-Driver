@@ -2658,6 +2658,8 @@ static int PC4500_writerid(struct airo_info *ai, u16 rid,
 	u16 status;
 	int rc = SUCCESS;
 
+	*(u16*)pBuf = cpu_to_le16((u16)len);
+
 	if (lock) {
 		if (down_interruptible(&ai->sem))
 			return ERROR;
