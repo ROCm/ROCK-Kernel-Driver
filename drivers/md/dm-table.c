@@ -23,12 +23,12 @@ struct dm_table {
 	atomic_t holders;
 
 	/* btree table */
-	int depth;
-	int counts[MAX_DEPTH];	/* in nodes */
+	unsigned int depth;
+	unsigned int counts[MAX_DEPTH];	/* in nodes */
 	sector_t *index[MAX_DEPTH];
 
-	int num_targets;
-	int num_allocated;
+	unsigned int num_targets;
+	unsigned int num_allocated;
 	sector_t *highs;
 	struct dm_target *targets;
 
@@ -56,14 +56,6 @@ struct dm_table {
 };
 
 /*
- * Ceiling(n / size)
- */
-static inline unsigned long div_up(unsigned long n, unsigned long size)
-{
-	return dm_round_up(n, size) / size;
-}
-
-/*
  * Similar to ceiling(log_size(n))
  */
 static unsigned int int_log(unsigned long n, unsigned long base)
@@ -71,35 +63,46 @@ static unsigned int int_log(unsigned long n, unsigned long base)
 	int result = 0;
 
 	while (n > 1) {
-		n = div_up(n, base);
+		n = dm_div_up(n, base);
 		result++;
 	}
 
 	return result;
 }
 
-#define __HIGH(l, r) if (*(l) < (r)) *(l) = (r)
-#define __LOW(l, r) if (*(l) == 0 || *(l) > (r)) *(l) = (r)
+/*
+ * Returns the minimum that is _not_ zero, unless both are zero.
+ */
+#define min_not_zero(l, r) (l == 0) ? r : ((r == 0) ? l : min(l, r))
 
 /*
  * Combine two io_restrictions, always taking the lower value.
  */
-
 static void combine_restrictions_low(struct io_restrictions *lhs,
 				     struct io_restrictions *rhs)
 {
-	__LOW(&lhs->max_sectors, rhs->max_sectors);
-	__LOW(&lhs->max_phys_segments, rhs->max_phys_segments);
-	__LOW(&lhs->max_hw_segments, rhs->max_hw_segments);
-	__HIGH(&lhs->hardsect_size, rhs->hardsect_size);
-	__LOW(&lhs->max_segment_size, rhs->max_segment_size);
-	__LOW(&lhs->seg_boundary_mask, rhs->seg_boundary_mask);
+	lhs->max_sectors =
+		min_not_zero(lhs->max_sectors, rhs->max_sectors);
+
+	lhs->max_phys_segments =
+		min_not_zero(lhs->max_phys_segments, rhs->max_phys_segments);
+
+	lhs->max_hw_segments =
+		min_not_zero(lhs->max_hw_segments, rhs->max_hw_segments);
+
+	lhs->hardsect_size = max(lhs->hardsect_size, rhs->hardsect_size);
+
+	lhs->max_segment_size =
+		min_not_zero(lhs->max_segment_size, rhs->max_segment_size);
+
+	lhs->seg_boundary_mask =
+		min_not_zero(lhs->seg_boundary_mask, rhs->seg_boundary_mask);
 }
 
 /*
  * Calculate the index of the child node of the n'th node k'th key.
  */
-static inline int get_child(int n, int k)
+static inline unsigned int get_child(unsigned int n, unsigned int k)
 {
 	return (n * CHILDREN_PER_NODE) + k;
 }
@@ -107,7 +110,8 @@ static inline int get_child(int n, int k)
 /*
  * Return the n'th node of level l from table t.
  */
-static inline sector_t *get_node(struct dm_table *t, int l, int n)
+static inline sector_t *get_node(struct dm_table *t,
+				 unsigned int l, unsigned int n)
 {
 	return t->index[l] + (n * KEYS_PER_NODE);
 }
@@ -116,7 +120,7 @@ static inline sector_t *get_node(struct dm_table *t, int l, int n)
  * Return the highest key that you could lookup from the n'th
  * node on level l of the btree.
  */
-static sector_t high(struct dm_table *t, int l, int n)
+static sector_t high(struct dm_table *t, unsigned int l, unsigned int n)
 {
 	for (; l < t->depth - 1; l++)
 		n = get_child(n, CHILDREN_PER_NODE - 1);
@@ -131,15 +135,15 @@ static sector_t high(struct dm_table *t, int l, int n)
  * Fills in a level of the btree based on the highs of the level
  * below it.
  */
-static int setup_btree_index(int l, struct dm_table *t)
+static int setup_btree_index(unsigned int l, struct dm_table *t)
 {
-	int n, k;
+	unsigned int n, k;
 	sector_t *node;
 
-	for (n = 0; n < t->counts[l]; n++) {
+	for (n = 0U; n < t->counts[l]; n++) {
 		node = get_node(t, l, n);
 
-		for (k = 0; k < KEYS_PER_NODE; k++)
+		for (k = 0U; k < KEYS_PER_NODE; k++)
 			node[k] = high(t, l + 1, get_child(n, k));
 	}
 
@@ -169,7 +173,7 @@ static void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size)
  * highs, and targets are managed as dynamic arrays during a
  * table load.
  */
-static int alloc_targets(struct dm_table *t, int num)
+static int alloc_targets(struct dm_table *t, unsigned int num)
 {
 	sector_t *n_highs;
 	struct dm_target *n_targets;
@@ -237,9 +241,7 @@ static void free_devices(struct list_head *devices)
 
 void table_destroy(struct dm_table *t)
 {
-	int i;
-
-	DMWARN("destroying table");
+	unsigned int i;
 
 	/* destroying the table counts as an event */
 	dm_table_event(t);
@@ -481,13 +483,31 @@ int dm_get_device(struct dm_target *ti, const char *path, sector_t start,
 		request_queue_t *q = bdev_get_queue((*result)->bdev);
 		struct io_restrictions *rs = &ti->limits;
 
-		/* combine the device limits low */
-		__LOW(&rs->max_sectors, q->max_sectors);
-		__LOW(&rs->max_phys_segments, q->max_phys_segments);
-		__LOW(&rs->max_hw_segments, q->max_hw_segments);
-		__HIGH(&rs->hardsect_size, q->hardsect_size);
-		__LOW(&rs->max_segment_size, q->max_segment_size);
-		__LOW(&rs->seg_boundary_mask, q->seg_boundary_mask);
+		/*
+		 * Combine the device limits low.
+		 *
+		 * FIXME: if we move an io_restriction struct
+		 *        into q this would just be a call to
+		 *        combine_restrictions_low()
+		 */
+		rs->max_sectors =
+			min_not_zero(rs->max_sectors, q->max_sectors);
+
+		rs->max_phys_segments =
+			min_not_zero(rs->max_phys_segments,
+				     q->max_phys_segments);
+
+		rs->max_hw_segments =
+			min_not_zero(rs->max_hw_segments, q->max_hw_segments);
+
+		rs->hardsect_size = max(rs->hardsect_size, q->hardsect_size);
+
+		rs->max_segment_size =
+			min_not_zero(rs->max_segment_size, q->max_segment_size);
+
+		rs->seg_boundary_mask =
+			min_not_zero(rs->seg_boundary_mask,
+				     q->seg_boundary_mask);
 	}
 
 	return r;
@@ -628,12 +648,13 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 
 static int setup_indexes(struct dm_table *t)
 {
-	int i, total = 0;
+	int i;
+	unsigned int total = 0;
 	sector_t *indexes;
 
 	/* allocate the space for *all* the indexes */
 	for (i = t->depth - 2; i >= 0; i--) {
-		t->counts[i] = div_up(t->counts[i + 1], CHILDREN_PER_NODE);
+		t->counts[i] = dm_div_up(t->counts[i + 1], CHILDREN_PER_NODE);
 		total += t->counts[i];
 	}
 
@@ -656,10 +677,11 @@ static int setup_indexes(struct dm_table *t)
  */
 int dm_table_complete(struct dm_table *t)
 {
-	int leaf_nodes, r = 0;
+	int r = 0;
+	unsigned int leaf_nodes;
 
 	/* how many indexes will the btree have ? */
-	leaf_nodes = div_up(t->num_targets, KEYS_PER_NODE);
+	leaf_nodes = dm_div_up(t->num_targets, KEYS_PER_NODE);
 	t->depth = 1 + int_log(leaf_nodes, CHILDREN_PER_NODE);
 
 	/* leaf layer has already been set up */
@@ -682,7 +704,7 @@ sector_t dm_table_get_size(struct dm_table *t)
 	return t->num_targets ? (t->highs[t->num_targets - 1] + 1) : 0;
 }
 
-struct dm_target *dm_table_get_target(struct dm_table *t, int index)
+struct dm_target *dm_table_get_target(struct dm_table *t, unsigned int index)
 {
 	if (index > t->num_targets)
 		return NULL;
@@ -695,7 +717,7 @@ struct dm_target *dm_table_get_target(struct dm_table *t, int index)
  */
 struct dm_target *dm_table_find_target(struct dm_table *t, sector_t sector)
 {
-	int l, n = 0, k = 0;
+	unsigned int l, n = 0, k = 0;
 	sector_t *node;
 
 	for (l = 0; l < t->depth; l++) {
@@ -743,6 +765,31 @@ void dm_table_add_wait_queue(struct dm_table *t, wait_queue_t *wq)
 {
 	add_wait_queue(&t->eventq, wq);
 }
+
+void dm_table_suspend_targets(struct dm_table *t)
+{
+	int i;
+
+	for (i = 0; i < t->num_targets; i++) {
+		struct dm_target *ti = t->targets + i;
+
+		if (ti->type->suspend)
+			ti->type->suspend(ti);
+	}
+}
+
+void dm_table_resume_targets(struct dm_table *t)
+{
+	int i;
+
+	for (i = 0; i < t->num_targets; i++) {
+		struct dm_target *ti = t->targets + i;
+
+		if (ti->type->resume)
+			ti->type->resume(ti);
+	}
+}
+
 
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);

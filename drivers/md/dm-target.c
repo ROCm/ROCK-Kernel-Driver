@@ -109,9 +109,10 @@ int dm_register_target(struct target_type *t)
 		return -ENOMEM;
 
 	down_write(&_lock);
-	if (__find_target_type(t->name))
+	if (__find_target_type(t->name)) {
+		kfree(ti);
 		rv = -EEXIST;
-	else
+	} else
 		list_add(&ti->list, &_targets);
 
 	up_write(&_lock);
@@ -146,7 +147,7 @@ int dm_unregister_target(struct target_type *t)
  * io-err: always fails an io, useful for bringing
  * up LVs that have holes in them.
  */
-static int io_err_ctr(struct dm_target *ti, int argc, char **args)
+static int io_err_ctr(struct dm_target *ti, unsigned int argc, char **args)
 {
 	return 0;
 }

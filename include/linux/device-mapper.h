@@ -17,7 +17,8 @@ typedef enum { STATUSTYPE_INFO, STATUSTYPE_TABLE } status_type_t;
  * In the constructor the target parameter will already have the
  * table, type, begin and len fields filled in.
  */
-typedef int (*dm_ctr_fn) (struct dm_target *target, int argc, char **argv);
+typedef int (*dm_ctr_fn) (struct dm_target *target,
+			  unsigned int argc, char **argv);
 
 /*
  * The destructor doesn't need to free the dm_target, just
@@ -32,8 +33,12 @@ typedef void (*dm_dtr_fn) (struct dm_target *ti);
  * > 0: simple remap complete
  */
 typedef int (*dm_map_fn) (struct dm_target *ti, struct bio *bio);
+
+typedef void (*dm_suspend_fn) (struct dm_target *ti);
+typedef void (*dm_resume_fn) (struct dm_target *ti);
+
 typedef int (*dm_status_fn) (struct dm_target *ti, status_type_t status_type,
-			     char *result, int maxlen);
+			     char *result, unsigned int maxlen);
 
 void dm_error(const char *message);
 
@@ -55,6 +60,8 @@ struct target_type {
 	dm_ctr_fn ctr;
 	dm_dtr_fn dtr;
 	dm_map_fn map;
+	dm_suspend_fn suspend;
+	dm_resume_fn resume;
 	dm_status_fn status;
 };
 
