@@ -23,40 +23,70 @@ setup. If there is no EEPROM, the driver uses default values.
 Both can be overriden by command line parameters (module or kernel
 parameters).
 
-The syntax is as follows:
- dc395x = AdapterID, SpeedIdx, DevMode, AdaptMode, Tags, DelayReset
+The following parameters are available:
 
-AdapterID : Host Adapter SCSI ID
-SpeedIdx  : 0,1,...7 = 20,13.3,10,8,6.7,5.8,5,4 MHz               [ 7]
-DevMode   : Bitmap for Dev Cfg                                    [63]
-AdaptMode : Bitmap for Adapter Cfg                                [47]
-Tags      : The number of tags is 1<<x, if x has been specified   [ 4]
-DelayReset: The seconds to not accept commands after a SCSI Reset [ 1]
+ - safe
+   Default: 0, Acceptable values: 0 or 1
 
-DevMode bit definition:
-   Bit Val(hex) Val(dec)  Meaning
-   *0	 0x01	    1	  Parity check
-   *1	 0x02	    2	  Synchronous Negotiation
-   *2	 0x04	    4	  Disconnection
-   *3	 0x08	    8	  Send Start command on startup. (Not used)
-   *4	 0x10	   16	  Tagged Command Queueing
-   *5	 0x20	   32	  Wide Negotiation
+   If safe is set to 1 then the adapter will use conservative
+   ("safe") default settings. This sets:
 
-AdaptMode bit definition
-   Bit Val(hex) Val(dec)  Meaning
-   *0	 0x01	    1	  Support more than two drives. (Not used)
-   *1	 0x02	    2	  Use DOS compatible mapping for HDs greater than 1GB.
-   *2	 0x04	    4	  Reset SCSI Bus on startup.
-   *3	 0x08	    8	  Active Negation: Improves SCSI Bus noise immunity.
-    4	 0x10	   16	  Immediate return on BIOS seek command. (Not used)
- (*)5	 0x20	   32	  Check for LUNs >= 1.
+		shortcut for dc395x=7,4,9,15,2,10
 
-If you set AdapterID to -1, the adapter will use conservative
-("safe") default settings instead; more precisely, dc395x=-1 is a
-shortcut for dc395x=7,4,9,15,2,10
+ - adapter_id
+   Default: 7, Acceptable values: 0 to 15
 
-If you specify -2 for a value, it will be ignored. You don't need to
-specify all six parameters.
+   Sets the host adapter SCSI ID.
+
+ - max_speed
+   Default: 1, Acceptable value: 0 to 7
+   0 = 20   Mhz
+   1 = 12.2 Mhz
+   2 = 10   Mhz
+   3 = 8    Mhz
+   4 = 6.7  Mhz
+   5 = 5.8  Hhz
+   6 = 5    Mhz
+   7 = 4    Mhz
+
+ - dev_mode
+   Bitmap for device configuration
+
+   DevMode bit definition:
+      Bit Val(hex) Val(dec)  Meaning
+      *0    0x01       1     Parity check
+      *1    0x02       2     Synchronous Negotiation
+      *2    0x04       4     Disconnection
+      *3    0x08       8     Send Start command on startup. (Not used)
+      *4    0x10      16     Tagged Command Queueing
+      *5    0x20      32     Wide Negotiation
+
+ - adapter_mode
+   Bitmap for adapter configuration
+
+   AdaptMode bit definition
+      Bit Val(hex) Val(dec)  Meaning
+      *0    0x01       1     Support more than two drives. (Not used)
+      *1    0x02       2     Use DOS compatible mapping for HDs greater than 1GB.
+      *2    0x04       4     Reset SCSI Bus on startup.
+      *3    0x08       8     Active Negation: Improves SCSI Bus noise immunity.
+       4    0x10      16     Immediate return on BIOS seek command. (Not used)
+    (*)5    0x20      32     Check for LUNs >= 1.
+
+ - tags
+   Default: 3, Acceptable values: 0-5
+   
+   The number of tags is 1<<x, if x has been specified
+
+ - reset_delay
+   Default: 1, Acceptable values: 0-180
+
+   The seconds to not accept commands after a SCSI Reset
+
+
+For the built  in driver the parameters should be prefixed with
+dc395x. (eg "dc395x.safe=1")
+
 
 Copyright
 ---------
