@@ -105,7 +105,7 @@ static void crypto_exit_ops(struct crypto_tfm *tfm)
 		crypto_exit_digest_ops(tfm);
 		break;
 		
-	case CRYPTO_ALG_TYPE_COMP:
+	case CRYPTO_ALG_TYPE_COMPRESS:
 		crypto_exit_compress_ops(tfm);
 		break;
 	
