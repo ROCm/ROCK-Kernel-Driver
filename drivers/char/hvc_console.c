@@ -629,7 +629,7 @@ static int __devinit hvc_probe(
 	kobject_init(&hp->kobj);
 	hp->kobj.ktype = &hvc_kobj_type;
 
-	hp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&hp->lock);
 	spin_lock(&hvc_structs_lock);
 	hp->index = ++hvc_count;
 	list_add_tail(&(hp->next), &hvc_structs);

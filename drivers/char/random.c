@@ -540,7 +540,7 @@ static int create_entropy_store(int size, const char *name,
 		return -ENOMEM;
 	}
 	memset(r->pool, 0, POOLBYTES);
-	r->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&r->lock);
 	r->name = name;
 	*ret_bucket = r;
 	return 0;

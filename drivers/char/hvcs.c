@@ -631,7 +631,7 @@ static int __devinit hvcs_probe(
 	/* hvcsd->tty is zeroed out with the memset */
 	memset(hvcsd, 0x00, sizeof(*hvcsd));
 
-	hvcsd->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&hvcsd->lock);
 	/* Automatically incs the refcount the first time */
 	kobject_init(&hvcsd->kobj);
 	/* Set up the callback for terminating the hvcs_struct's life */
