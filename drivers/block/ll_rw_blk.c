@@ -47,7 +47,10 @@ static kmem_cache_t *request_cachep;
 static LIST_HEAD(blk_plug_list);
 static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
-static wait_queue_head_t congestion_wqh[2];
+static wait_queue_head_t congestion_wqh[2] = {
+		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[0]),
+		__WAIT_QUEUE_HEAD_INITIALIZER(congestion_wqh[1])
+	};
 
 /*
  * Controlling structure to kblockd
@@ -2825,8 +2828,6 @@ void kblockd_flush(void)
 
 int __init blk_dev_init(void)
 {
-	int i;
-
 	kblockd_workqueue = create_workqueue("kblockd");
 	if (!kblockd_workqueue)
 		panic("Failed to create kblockd\n");
@@ -2838,9 +2839,6 @@ int __init blk_dev_init(void)
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
-
-	for (i = 0; i < ARRAY_SIZE(congestion_wqh); i++)
-		init_waitqueue_head(&congestion_wqh[i]);
 	return 0;
 }
 
