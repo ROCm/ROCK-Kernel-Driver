@@ -91,9 +91,6 @@ int register_blkdev(unsigned int major, const char *name)
 	struct blk_major_name **n, *p;
 	int index, ret = 0;
 
-	if (devfs_only())
-		return 0;
-
 	/* temporary */
 	if (major == 0) {
 		down_read(&block_subsys.rwsem);
@@ -141,12 +138,8 @@ int register_blkdev(unsigned int major, const char *name)
 int unregister_blkdev(unsigned int major, const char *name)
 {
 	struct blk_major_name **n, *p;
-	int index;
+	int index = major_to_index(major);
 	int ret = 0;
-
-	if (devfs_only())
-		return 0;
-	index = major_to_index(major);
 
 	down_write(&block_subsys.rwsem);
 	for (n = &major_names[index]; *n; n = &(*n)->next)
