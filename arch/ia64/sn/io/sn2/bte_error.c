@@ -62,36 +62,11 @@ bte_crb_error_handler(vertex_hdl_t hub_v, int btenum,
 	 * in the bte handle structure for the thread excercising the
 	 * interface to consume.
 	 */
-	switch (ioe->ie_errortype) {
-	case IIO_ICRB_ECODE_PERR:
-		bte->bh_error = BTEFAIL_POISON;
-		break;
-	case IIO_ICRB_ECODE_WERR:
-		bte->bh_error = BTEFAIL_PROT;
-		break;
-	case IIO_ICRB_ECODE_AERR:
-		bte->bh_error = BTEFAIL_ACCESS;
-		break;
-	case IIO_ICRB_ECODE_TOUT:
-		bte->bh_error = BTEFAIL_TOUT;
-		break;
-	case IIO_ICRB_ECODE_XTERR:
-		bte->bh_error = BTEFAIL_XTERR;
-		break;
-	case IIO_ICRB_ECODE_DERR:
-		bte->bh_error = BTEFAIL_DIR;
-		break;
-	case IIO_ICRB_ECODE_PWERR:
-	case IIO_ICRB_ECODE_PRERR:
-		/* NO BREAK */
-	default:
-		bte->bh_error = BTEFAIL_ERROR;
-	}
-
+	bte->bh_error = ioe->ie_errortype + BTEFAIL_OFFSET;
 	bte->bte_error_count++;
 
-	BTE_PRINTK(("Got an error on cnode %d bte %d\n",
-		    bte->bte_cnode, bte->bte_num));
+	BTE_PRINTK(("Got an error on cnode %d bte %d: HW error type 0x%x\n",
+		    bte->bte_cnode, bte->bte_num, ioe->ie_errortype));
 	bte_error_handler((unsigned long) hinfo->h_nodepda);
 }
 

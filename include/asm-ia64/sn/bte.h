@@ -81,16 +81,25 @@
 
 
 /* Possible results from bte_copy and bte_unaligned_copy */
+/* The following error codes map into the BTE hardware codes
+ * IIO_ICRB_ECODE_* (in shubio.h). The hardware uses
+ * an error code of 0 (IIO_ICRB_ECODE_DERR), but we want zero
+ * to mean BTE_SUCCESS, so add one (BTEFAIL_OFFSET) to the error
+ * codes to give the following error codes.
+ */
+#define BTEFAIL_OFFSET	1
+
 typedef enum {
 	BTE_SUCCESS,		/* 0 is success */
+	BTEFAIL_DIR,		/* Directory error due to IIO access*/
+	BTEFAIL_POISON,		/* poison error on IO access (write to poison page) */
+	BTEFAIL_WERR,		/* Write error (ie WINV to a Read only line) */
+	BTEFAIL_ACCESS,		/* access error (protection violation) */
+	BTEFAIL_PWERR,		/* Partial Write Error */
+	BTEFAIL_PRERR,		/* Partial Read Error */
+	BTEFAIL_TOUT,		/* CRB Time out */
+	BTEFAIL_XTERR,		/* Incoming xtalk pkt had error bit */
 	BTEFAIL_NOTAVAIL,	/* BTE not available */
-	BTEFAIL_POISON,		/* poison page */
-	BTEFAIL_PROT,		/* Protection violation */
-	BTEFAIL_ACCESS,		/* access error */
-	BTEFAIL_TOUT,		/* Time out */
-	BTEFAIL_XTERR,		/* Diretory error */
-	BTEFAIL_DIR,		/* Diretory error */
-	BTEFAIL_ERROR,		/* Generic error */
 } bte_result_t;
 
 
