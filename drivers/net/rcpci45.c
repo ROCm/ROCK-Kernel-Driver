@@ -76,10 +76,6 @@ static char version[] __initdata =
 
 #define NEW_MULTICAST
 
-/* PCI/45 Configuration space values */
-#define RC_PCI45_VENDOR_ID  0x4916
-#define RC_PCI45_DEVICE_ID  0x1960
-
 #define MAX_ETHER_SIZE        1520
 #define MAX_NMBR_RCV_BUFFERS    96
 #define RC_POSTED_BUFFERS_LOW_MARK MAX_NMBR_RCV_BUFFERS-16
@@ -117,7 +113,7 @@ static void RCreboot_callback (U32, U32, U32, struct net_device *);
 static int RC_allocate_and_post_buffers (struct net_device *, int);
 
 static struct pci_device_id rcpci45_pci_table[] __devinitdata = {
-	{RC_PCI45_VENDOR_ID, RC_PCI45_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID,},
+	{ PCI_VENDOR_ID_REDCREEK, PCI_DEVICE_ID_RC45, PCI_ANY_ID, PCI_ANY_ID,},
 	{}
 };
 MODULE_DEVICE_TABLE (pci, rcpci45_pci_table);
@@ -207,7 +203,7 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * messages. Thus, we need contiguous physical pages of
 	 * memory.
 	 */
-	pDpa->msgbuf = kmalloc (MSG_BUF_SIZE, GFP_DMA|GFP_ATOMIC|GFP_KERNEL);
+	pDpa->msgbuf = kmalloc (MSG_BUF_SIZE, GFP_DMA | GFP_KERNEL);
 	if (!pDpa->msgbuf) {
 		printk (KERN_ERR "(rcpci45 driver:) \
 			Could not allocate %d byte memory for the \
@@ -1000,7 +996,7 @@ RC_allocate_and_post_buffers (struct net_device *dev, int numBuffers)
 	}
 
 	p = (PU32) kmalloc (sizeof (U32) + numBuffers * sizeof (singleB),
-			    GFP_DMA|GFP_ATOMIC|GFP_KERNEL);
+			    GFP_DMA | GFP_ATOMIC);
 
 	if (!p) {
 		printk (KERN_WARNING "%s unable to allocate TCB\n",
