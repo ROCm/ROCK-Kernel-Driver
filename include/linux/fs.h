@@ -648,7 +648,6 @@ struct quota_mount_options
 #include <linux/ext3_fs_sb.h>
 #include <linux/hpfs_fs_sb.h>
 #include <linux/ntfs_fs_sb.h>
-#include <linux/iso_fs_sb.h>
 #include <linux/sysv_fs_sb.h>
 #include <linux/affs_fs_sb.h>
 #include <linux/ufs_fs_sb.h>
@@ -697,7 +696,6 @@ struct super_block {
 		struct ext3_sb_info	ext3_sb;
 		struct hpfs_sb_info	hpfs_sb;
 		struct ntfs_sb_info	ntfs_sb;
-		struct isofs_sb_info	isofs_sb;
 		struct sysv_sb_info	sysv_sb;
 		struct affs_sb_info	affs_sb;
 		struct ufs_sb_info	ufs_sb;
