@@ -108,10 +108,10 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
  *
  * Will return NULL if the request queue cannot be located.
  */
-unsigned long *blk_get_ra_pages(kdev_t dev)
+unsigned long *blk_get_ra_pages(struct block_device *bdev)
 {
 	unsigned long *ret = NULL;
-	request_queue_t *q = blk_get_queue(dev);
+	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
 
 	if (q)
 		ret = &q->ra_pages;
