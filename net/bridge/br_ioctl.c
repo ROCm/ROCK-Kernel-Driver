@@ -15,7 +15,7 @@
 
 #include <linux/kernel.h>
 #include <linux/if_bridge.h>
-#include <linux/inetdevice.h>
+#include <linux/netdevice.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
 

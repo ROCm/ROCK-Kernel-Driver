@@ -98,9 +98,6 @@ struct __fdb_entry
 
 #include <linux/netdevice.h>
 
-struct net_bridge;
-struct net_bridge_port;
-
 extern void brioctl_set(int (*ioctl_hook)(unsigned long));
 extern int (*br_handle_frame_hook)(struct sk_buff *skb);
 extern int (*br_should_route_hook)(struct sk_buff **pskb);

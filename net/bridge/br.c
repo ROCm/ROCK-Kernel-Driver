@@ -20,8 +20,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/init.h>
-#include <linux/if_bridge.h>
-#include <asm/uaccess.h>
+
 #include "br_private.h"
 
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)

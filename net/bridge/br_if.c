@@ -15,13 +15,11 @@
 
 #include <linux/kernel.h>
 #include <linux/if_arp.h>
-#include <linux/if_bridge.h>
-#include <linux/inetdevice.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/rtnetlink.h>
 #include <net/sock.h>
-#include <asm/uaccess.h>
+
 #include "br_private.h"
 
 /* Limited to 256 ports because of STP protocol pdu */

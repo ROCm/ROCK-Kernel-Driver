@@ -16,7 +16,6 @@
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
-#include <linux/if_bridge.h>
 #include <linux/netfilter_bridge.h>
 #include "br_private.h"
 
