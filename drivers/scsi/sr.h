@@ -36,6 +36,9 @@ typedef struct scsi_cd {
 	unsigned readcd_known:1;	/* drive supports READ_CD (0xbe) */
 	unsigned readcd_cdda:1;	/* reading audio data using READ_CD */
 	struct cdrom_device_info cdi;
+	/* We hold gendisk and scsi_device references on probe and use
+	 * the refs on this kobj to decide when to release them */
+	struct kobject kobj;
 	struct gendisk *disk;
 } Scsi_CD;
 
