@@ -40,7 +40,7 @@
 /* Global VLAN variables */
 
 /* Our listing of VLAN group(s) */
-struct hlist_head vlan_group_hash[VLAN_GRP_HASH_SIZE];
+static struct hlist_head vlan_group_hash[VLAN_GRP_HASH_SIZE];
 #define vlan_grp_hashfn(IDX)	((((IDX) >> VLAN_GRP_HASH_SHIFT) ^ (IDX)) & VLAN_GRP_HASH_MASK)
 
 static char vlan_fullname[] = "802.1Q VLAN Support";
@@ -52,7 +52,7 @@ static int vlan_device_event(struct notifier_block *, unsigned long, void *);
 static int vlan_ioctl_handler(void __user *);
 static int unregister_vlan_dev(struct net_device *, unsigned short );
 
-struct notifier_block vlan_notifier_block = {
+static struct notifier_block vlan_notifier_block = {
 	.notifier_call = vlan_device_event,
 };
 
@@ -60,9 +60,6 @@ struct notifier_block vlan_notifier_block = {
 
 /* Determines interface naming scheme. */
 unsigned short vlan_name_type = VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD;
-
-/* DO reorder the header by default */
-unsigned short vlan_default_dev_flags = 1;
 
 static struct packet_type vlan_packet_type = {
 	.type = __constant_htons(ETH_P_8021Q),
@@ -490,7 +487,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	VLAN_DEV_INFO(new_dev)->vlan_id = VLAN_ID; /* 1 through VLAN_VID_MASK */
 	VLAN_DEV_INFO(new_dev)->real_dev = real_dev;
 	VLAN_DEV_INFO(new_dev)->dent = NULL;
-	VLAN_DEV_INFO(new_dev)->flags = vlan_default_dev_flags;
+	VLAN_DEV_INFO(new_dev)->flags = 1;
 
 #ifdef VLAN_DEBUG
 	printk(VLAN_DBG "About to go find the group for idx: %i\n",
