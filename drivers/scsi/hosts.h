@@ -266,14 +266,6 @@ typedef struct	SHT
      */
     int (* bios_param)(Disk *, struct block_device *, int []);
 
-
-    /*
-     * Used to set the queue depth for a specific device.
-     *
-     * Once the slave_attach() function is in full use, this will go away.
-     */
-    void (*select_queue_depths)(struct Scsi_Host *, Scsi_Device *);
-
     /*
      * This determines if we will use a non-interrupt driven
      * or an interrupt driven scheme,  It is set to the maximum number

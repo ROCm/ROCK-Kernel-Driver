@@ -1530,7 +1530,7 @@ static inline int do_qcomm(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
       cpp->mess[1] = SCpnt->device->current_tag++;
       }
 
-   if (SCpnt->device->queue_depth > 2 && !SCpnt->device->simple_tags) {
+   if (SCpnt->device->new_queue_depth > 2 && !SCpnt->device->simple_tags) {
       HD(j)->cp_stat[i] = READY;
       flush_dev(SCpnt->device, SCpnt->request->sector, j, FALSE);
       return 0;
@@ -2040,7 +2040,7 @@ static inline void ihdlr(int irq, unsigned int j) {
 
    sync_dma(i, j);
 
-   if (linked_comm && SCpnt->device->queue_depth > 2
+   if (linked_comm && SCpnt->device->new_queue_depth > 2
                                      && TLDEV(SCpnt->device->type))
       flush_dev(SCpnt->device, SCpnt->request->sector, j, TRUE);
 

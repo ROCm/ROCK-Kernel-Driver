@@ -8432,7 +8432,7 @@ asc_prt_driver_conf(struct Scsi_Host *shp, char *cp, int cplen)
                 continue;
             }
             len = asc_prt_line(cp, leftlen, " %X:%d",
-                i, boardp->device[i]->queue_depth);
+                i, boardp->device[i]->current_queue_depth);
             ASC_PRT_NEXT();
         }
         len = asc_prt_line(cp, leftlen, "\n");
