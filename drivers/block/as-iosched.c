@@ -1728,7 +1728,7 @@ static void as_put_request(request_queue_t *q, struct request *rq)
 		return;
 	}
 
-	if (arq->state != AS_RQ_POSTSCHED) {
+	if (arq->state != AS_RQ_POSTSCHED && arq->state != AS_RQ_PRESCHED) {
 		printk("arq->state %d\n", arq->state);
 		WARN_ON(1);
 	}
