@@ -265,8 +265,9 @@ void iounmap(volatile void __iomem *addr)
 	unmap_vm_area(p);
 	if ((p->flags >> 20) &&
 		p->phys_addr + p->size - 1 < virt_to_phys(high_memory)) {
+		/* p->size includes the guard page, but cpa doesn't like that */
 		change_page_attr(virt_to_page(__va(p->phys_addr)),
-				 p->size >> PAGE_SHIFT,
+				 (p->size - PAGE_SIZE) >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 
 		global_flush_tlb();
 	} 
