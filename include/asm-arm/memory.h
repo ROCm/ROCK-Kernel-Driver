@@ -57,6 +57,16 @@
 #error Top of user space clashes with start of module space
 #endif
 
+/*
+ * The DMA mask corresponding to the maximum bus address allocatable
+ * using GFP_DMA.  The default here places no restriction on DMA
+ * allocations.  This must be the smallest DMA mask in the system,
+ * so a successful GFP_DMA allocation will always satisfy this.
+ */
+#ifndef ISA_DMA_THRESHOLD
+#define ISA_DMA_THRESHOLD	(0xffffffffULL)
+#endif
+
 #ifndef __ASSEMBLY__
 
 /*
