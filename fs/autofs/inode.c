@@ -61,7 +61,7 @@ static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid, pid
 
 	if ( !options ) return 1;
 	while ((this_char = strsep(&options,",")) != NULL) {
-		if (!*value)
+		if (!*this_char)
 			continue;
 		if ((value = strchr(this_char,'=')) != NULL)
 			*value++ = 0;
