@@ -24,6 +24,7 @@
 #include <linux/consolemap.h>
 #include <linux/selection.h>
 #include <linux/tiocl.h>
+#include <linux/console.h>
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -290,7 +291,10 @@ int paste_selection(struct tty_struct *tty)
 	int	pasted = 0, count;
 	DECLARE_WAITQUEUE(wait, current);
 
+	acquire_console_sem();
 	poke_blanked_console();
+	release_console_sem();
+
 	add_wait_queue(&vt->paste_wait, &wait);
 	while (sel_buffer && sel_buffer_lth > pasted) {
 		set_current_state(TASK_INTERRUPTIBLE);
