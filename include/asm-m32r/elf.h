@@ -1,16 +1,16 @@
 #ifndef _ASM_M32R__ELF_H
 #define _ASM_M32R__ELF_H
 
-/* $Id$ */
-
 /*
- * ELF register definitions..
+ * ELF-specific definitions.
+ *
+ * Copyright (C) 1999-2004, Renesas Technology Corp.
+ *      Hirokazu Takata <takata at linux-m32r.org>
  */
 
 #include <asm/ptrace.h>
 #include <asm/user.h>
-
-#include <linux/utsname.h>
+#include <asm/page.h>
 
 /* M32R relocation types  */
 #define	R_M32R_NONE		0
@@ -48,7 +48,7 @@
 #define R_M32R_HI16_SLO_RELA	R_M32R_HI16_SLO
 #define R_M32R_LO16_RELA	R_M32R_LO16
 #define R_M32R_SDA16_RELA	R_M32R_SDA16
-#else /* OLD_TYPE */
+#else /* not OLD_TYPE */
 #define	R_M32R_GNU_VTINHERIT	11
 #define	R_M32R_GNU_VTENTRY	12
 
@@ -92,14 +92,16 @@
 #define R_M32R_GOTPC_HI_ULO	59
 #define R_M32R_GOTPC_HI_SLO	60
 #define R_M32R_GOTPC_LO		61
-
-#endif /* OLD_TYPE */
+#endif /* not OLD_TYPE */
 
 #define R_M32R_NUM		256
 
-typedef unsigned long elf_greg_t;
-
+/*
+ * ELF register definitions..
+ */
 #define ELF_NGREG (sizeof (struct pt_regs) / sizeof(elf_greg_t))
+
+typedef unsigned long elf_greg_t;
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
 /* We have no FP mumumu.  */
@@ -125,28 +127,27 @@ typedef elf_fpreg_t elf_fpregset_t;
 #endif
 #define ELF_ARCH	EM_M32R
 
-/* SVR4/i386 ABI (pages 3-31, 3-32) says that when the program starts %edx
-   contains a pointer to a function which might be registered using `atexit'.
-   This provides a mean for the dynamic linker to call DT_FINI functions for
-   shared libraries that have been loaded before the code runs.
-
-   A value of 0 tells we have no such handler.
-
-   We might as well make sure everything else is cleared too (except for %esp),
-   just to make things more deterministic.
+/* r0 is set by ld.so to a pointer to a function which might be
+ * registered using 'atexit'.  This provides a mean for the dynamic
+ * linker to call DT_FINI functions for shared libraries that have
+ * been loaded before the code runs.
+ *
+ * So that we can use the same startup file with static executables,
+ * we start programs with a value of 0 to indicate that there is no
+ * such function.
  */
-#define ELF_PLAT_INIT(_r, load_addr)	do { \
-	_r->r0 = 0; \
-} while (0)
+#define ELF_PLAT_INIT(_r, load_addr)	(_r)->r0 = 0
 
 #define USE_ELF_CORE_DUMP
-#define ELF_EXEC_PAGESIZE	4096
+#define ELF_EXEC_PAGESIZE	PAGE_SIZE
 
-/* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
-   use of this is to invoke "./ld.so someprog" to test out a new version of
-   the loader.  We need to make sure that it is out of the way of the program
-   that it will "exec", and that there is sufficient room for the brk.  */
-
+/*
+ * This is the location that an ET_DYN program is loaded if exec'ed.
+ * Typical use of this is to invoke "./ld.so someprog" to test out a
+ * new version of the loader.  We need to make sure that it is out of
+ * the way of the program that it will "exec", and that there is
+ * sufficient room for the brk.
+ */
 #define ELF_ET_DYN_BASE         (TASK_SIZE / 3 * 2)
 
 /* regs is struct pt_regs, pr_reg is elf_gregset_t (which is
@@ -156,22 +157,16 @@ typedef elf_fpreg_t elf_fpregset_t;
 	memcpy((char *)&pr_reg, (char *)&regs, sizeof (struct pt_regs));
 
 /* This yields a mask that user programs can use to figure out what
-   instruction set this CPU supports.  This could be done in user space,
-   but it's not easy, and we've already done it here.  */
-
+   instruction set this CPU supports.  */
 #define ELF_HWCAP	(0)
 
 /* This yields a string that ld.so will use to load implementation
    specific libraries for optimization.  This is more specific in
-   intent than poking at uname or /proc/cpuinfo.
-
-   For the moment, we have only optimizations for the Intel generations,
-   but that could change... */
-
-#define ELF_PLATFORM  (NULL)
+   intent than poking at uname or /proc/cpuinfo.  */
+#define ELF_PLATFORM	(NULL)
 
 #ifdef __KERNEL__
-#define SET_PERSONALITY(ex, ibcs2) set_personality((ibcs2)?PER_SVR4:PER_LINUX)
+#define SET_PERSONALITY(ex, ibcs2) set_personality(PER_LINUX)
 #endif
 
 #endif  /* _ASM_M32R__ELF_H */
