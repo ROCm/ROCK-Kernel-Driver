@@ -161,8 +161,6 @@ static int hci_sock_release(struct socket *sock)
 	skb_queue_purge(&sk->write_queue);
 
 	sock_put(sk);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -591,8 +589,6 @@ static int hci_sock_create(struct socket *sock, int protocol)
 	sk->state   = BT_OPEN;
 
 	bt_sock_link(&hci_sk_list, sk);
-
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
