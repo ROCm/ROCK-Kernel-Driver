@@ -127,8 +127,7 @@ static int __devinit snd_card_dt019x_pnp(int dev, struct snd_card_dt019x *acard,
 	if (port[dev] != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[0], port[dev], 16);
 	if (dma8[dev] != SNDRV_AUTO_DMA)
-		pnp_resource_change(&cfg->dma_resource[0], dma8[dev],
-			1);
+		pnp_resource_change(&cfg->dma_resource[0], dma8[dev], 1);
 	if (irq[dev] != SNDRV_AUTO_IRQ)
 		pnp_resource_change(&cfg->irq_resource[0], irq[dev], 1);
 
@@ -158,18 +157,17 @@ static int __devinit snd_card_dt019x_pnp(int dev, struct snd_card_dt019x *acard,
 		if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
 			snd_printk(KERN_ERR PFX "DT-019X MPU401 the requested resources are invalid, using auto config\n");
 		err = pnp_activate_dev(pdev);
-		if (err < 0)
+		if (err < 0) {
+			pnp_release_card_device(pdev);
+			snd_printk(KERN_ERR PFX "DT-019X MPU401 pnp configure failure, skipping\n");
 			goto __mpu_error;
+		}
 		mpu_port[dev] = pnp_port_start(pdev, 0);
 		mpu_irq[dev] = pnp_irq(pdev, 0);
 		snd_printdd("dt019x: found MPU-401: port=0x%lx, irq=0x%lx\n",
 			 	mpu_port[dev],mpu_irq[dev]);
 	} else {
-		__mpu_error:
-		if (pdev) {
-			pnp_release_card_device(pdev);
-			snd_printk(KERN_ERR PFX "DT-019X MPU401 pnp configure failure, skipping\n");
-		}
+	__mpu_error:
 		acard->devmpu = NULL;
 		mpu_port[dev] = -1;
 	}
@@ -182,16 +180,15 @@ static int __devinit snd_card_dt019x_pnp(int dev, struct snd_card_dt019x *acard,
 		if ((pnp_manual_config_dev(pdev, cfg, 0)) < 0)
 			snd_printk(KERN_ERR PFX "DT-019X OPL3 the requested resources are invalid, using auto config\n");
 		err = pnp_activate_dev(pdev);
-		if (err < 0)
+		if (err < 0) {
+			pnp_release_card_device(pdev);
+			snd_printk(KERN_ERR PFX "DT-019X OPL3 pnp configure failure, skipping\n");
 			goto __fm_error;
+		}
 		fm_port[dev] = pnp_port_start(pdev, 0);
 		snd_printdd("dt019x: found OPL3 synth: port=0x%lx\n",fm_port[dev]);
 	} else {
-		__fm_error:
-		if (pdev) {
-			pnp_release_card_device(pdev);
-			snd_printk(KERN_ERR PFX "DT-019X OPL3 pnp configure failure, skipping\n");
-		}
+	__fm_error:
 		acard->devopl = NULL;
 		fm_port[dev] = -1;
 	}
