@@ -77,8 +77,8 @@ static struct tq_struct tq_recv_notify;
 static inline struct capi_ctr *
 capi_ctr_get(struct capi_ctr *card)
 {
-	if (card->driver->owner) {
-		if (try_inc_mod_count(card->driver->owner)) {
+	if (card->owner) {
+		if (try_inc_mod_count(card->owner)) {
 			DBG("MOD_COUNT INC");
 			return card;
 		} else
@@ -91,8 +91,8 @@ capi_ctr_get(struct capi_ctr *card)
 static inline void
 capi_ctr_put(struct capi_ctr *card)
 {
-	if (card->driver->owner)
-		__MOD_DEC_USE_COUNT(card->driver->owner);
+	if (card->owner)
+		__MOD_DEC_USE_COUNT(card->owner);
 	DBG("MOD_COUNT DEC");
 }
 
@@ -157,7 +157,7 @@ static void register_appl(struct capi_ctr *card, u16 applid, capi_register_param
 {
 	card = capi_ctr_get(card);
 
-	card->driver->register_appl(card, applid, rparam);
+	card->register_appl(card, applid, rparam);
 }
 
 
@@ -165,7 +165,7 @@ static void release_appl(struct capi_ctr *card, u16 applid)
 {
 	DBG("applid %#x", applid);
 	
-	card->driver->release_appl(card, applid);
+	card->release_appl(card, applid);
 	capi_ctr_put(card);
 }
 
@@ -471,7 +471,7 @@ attach_capi_ctr(struct capi_ctr *card)
 	if (card->procent) {
 	   card->procent->read_proc = 
 		(int (*)(char *,char **,off_t,int,int *,void *))
-			card->driver->ctr_read_proc;
+			card->ctr_read_proc;
 	   card->procent->data = card;
 	}
 
@@ -659,7 +659,7 @@ u16 capi20_put_message(struct capi20_appl *ap, struct sk_buff *skb)
 		}
 
 	}
-	return card->driver->send_message(card, skb);
+	return card->send_message(card, skb);
 }
 
 EXPORT_SYMBOL(capi20_put_message);
@@ -782,7 +782,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		card = capi_ctr_get(card);
 		if (!card)
 			return -ESRCH;
-		if (card->driver->load_firmware == 0) {
+		if (card->load_firmware == 0) {
 			printk(KERN_DEBUG "kcapi: load: driver \%s\" has no load function\n", card->driver->name);
 			return -ESRCH;
 		}
@@ -809,7 +809,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		}
 		card->cardstate = CARD_LOADING;
 
-		retval = card->driver->load_firmware(card, &ldata);
+		retval = card->load_firmware(card, &ldata);
 
 		if (retval) {
 			card->cardstate = CARD_DETECTED;
@@ -840,7 +840,7 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 		if (card->cardstate == CARD_DETECTED)
 			return 0;
 
-		card->driver->reset_ctr(card);
+		card->reset_ctr(card);
 
 		while (card->cardstate > CARD_DETECTED) {
 

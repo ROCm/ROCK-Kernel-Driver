@@ -345,6 +345,9 @@ static void t1isa_remove(struct pci_dev *pdev)
 
 /* ------------------------------------------------------------- */
 
+static u16 t1isa_send_message(struct capi_ctr *ctrl, struct sk_buff *skb);
+static char *t1isa_procinfo(struct capi_ctr *ctrl);
+
 static int __init t1isa_probe(struct pci_dev *pdev, int cardnr)
 {
 	avmctrl_info *cinfo;
@@ -400,9 +403,18 @@ static int __init t1isa_probe(struct pci_dev *pdev, int cardnr)
 	t1_disable_irq(card->port);
 	b1_reset(card->port);
 
-	cinfo->capi_ctrl.driver = &t1isa_driver;
-	cinfo->capi_ctrl.driverdata = cinfo;
+	cinfo->capi_ctrl.driver        = &t1isa_driver;
+	cinfo->capi_ctrl.driverdata    = cinfo;
+	cinfo->capi_ctrl.register_appl = b1_register_appl;
+	cinfo->capi_ctrl.release_appl  = b1_release_appl;
+	cinfo->capi_ctrl.send_message  = t1isa_send_message;
+	cinfo->capi_ctrl.load_firmware = t1isa_load_firmware;
+	cinfo->capi_ctrl.reset_ctr     = t1isa_reset_ctr;
+	cinfo->capi_ctrl.procinfo      = t1isa_procinfo;
+	cinfo->capi_ctrl.ctr_read_proc = b1ctl_read_proc;
 	strcpy(cinfo->capi_ctrl.name, card->name);
+	SET_MODULE_OWNER(&cinfo->capi_ctrl);
+
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {
 		printk(KERN_INFO "%s: attach controller failed.\n",
@@ -488,17 +500,8 @@ static char *t1isa_procinfo(struct capi_ctr *ctrl)
 /* ------------------------------------------------------------- */
 
 static struct capi_driver t1isa_driver = {
-	owner: THIS_MODULE,
 	name: "t1isa",
 	revision: "0.0",
-	load_firmware: t1isa_load_firmware,
-	reset_ctr: t1isa_reset_ctr,
-	register_appl: b1_register_appl,
-	release_appl: b1_release_appl,
-	send_message: t1isa_send_message,
-	
-	procinfo: t1isa_procinfo,
-	ctr_read_proc: b1ctl_read_proc,
 };
 
 #define MAX_CARDS 4

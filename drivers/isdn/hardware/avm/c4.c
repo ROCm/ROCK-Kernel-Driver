@@ -1163,9 +1163,18 @@ static int c4_add_card(struct capi_driver *driver,
 
 	for (i=0; i < nr_controllers ; i++) {
 		cinfo = &card->ctrlinfo[i];
-		cinfo->capi_ctrl.driver = driver;
-		cinfo->capi_ctrl.driverdata = cinfo;
+		cinfo->capi_ctrl.driver        = driver;
+		cinfo->capi_ctrl.driverdata    = cinfo;
+		cinfo->capi_ctrl.register_appl = c4_register_appl;
+		cinfo->capi_ctrl.release_appl  = c4_release_appl;
+		cinfo->capi_ctrl.send_message  = c4_send_message;
+		cinfo->capi_ctrl.load_firmware = c4_load_firmware;
+		cinfo->capi_ctrl.reset_ctr     = c4_reset_ctr;
+		cinfo->capi_ctrl.procinfo      = c4_procinfo;
+		cinfo->capi_ctrl.ctr_read_proc = c4_read_proc;
 		strcpy(cinfo->capi_ctrl.name, card->name);
+		SET_MODULE_OWNER(&cinfo->capi_ctrl);
+
 		retval = attach_capi_ctr(&cinfo->capi_ctrl);
 		if (retval) {
 			printk(KERN_ERR "%s: attach controller failed (%d).\n",
@@ -1203,31 +1212,13 @@ static int c4_add_card(struct capi_driver *driver,
 /* ------------------------------------------------------------- */
 
 static struct capi_driver c2_driver = {
-	owner: THIS_MODULE,
 	name: "c2",
 	revision: "0.0",
-	load_firmware: c4_load_firmware,
-	reset_ctr: c4_reset_ctr,
-	register_appl: c4_register_appl,
-	release_appl: c4_release_appl,
-	send_message: c4_send_message,
-
-	procinfo: c4_procinfo,
-	ctr_read_proc: c4_read_proc,
 };
 
 static struct capi_driver c4_driver = {
-	owner: THIS_MODULE,
 	name: "c4",
 	revision: "0.0",
-	load_firmware: c4_load_firmware,
-	reset_ctr: c4_reset_ctr,
-	register_appl: c4_register_appl,
-	release_appl: c4_release_appl,
-	send_message: c4_send_message,
-	
-	procinfo: c4_procinfo,
-	ctr_read_proc: c4_read_proc,
 };
 
 static int __devinit c4_probe(struct pci_dev *dev,

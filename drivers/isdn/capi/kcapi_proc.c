@@ -101,10 +101,10 @@ static int controller_show(struct seq_file *seq, void *v)
 		return 0;
 
 	seq_printf(seq, "%d %-10s %-8s %-16s %s\n",
-		   ctr->cnr, ctr->driver->name, 
+		   ctr->cnr, ctr->driver->name,
 		   cardstate2str(ctr->cardstate),
 		   ctr->name,
-		   ctr->driver->procinfo ?  ctr->driver->procinfo(ctr) : "");
+		   ctr->procinfo ?  ctr->procinfo(ctr) : "");
 
 	return 0;
 }

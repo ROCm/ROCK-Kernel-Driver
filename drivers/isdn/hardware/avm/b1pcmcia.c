@@ -51,6 +51,8 @@ static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 
 /* ------------------------------------------------------------- */
 
+static char *b1pcmcia_procinfo(struct capi_ctr *ctrl);
+
 static int b1pcmcia_add_card(struct capi_driver *driver,
 				unsigned int port,
 				unsigned irq,
@@ -95,9 +97,18 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	cinfo->capi_ctrl.driver = driver;
-	cinfo->capi_ctrl.driverdata = cinfo;
+	cinfo->capi_ctrl.driver        = driver;
+	cinfo->capi_ctrl.driverdata    = cinfo;
+	cinfo->capi_ctrl.register_appl = b1_register_appl;
+	cinfo->capi_ctrl.release_appl  = b1_release_appl;
+	cinfo->capi_ctrl.send_message  = b1_send_message;
+	cinfo->capi_ctrl.load_firmware = b1_load_firmware;
+	cinfo->capi_ctrl.reset_ctr     = b1_reset_ctr;
+	cinfo->capi_ctrl.procinfo      = b1pcmcia_procinfo;
+	cinfo->capi_ctrl.ctr_read_proc = b1ctl_read_proc;
 	strcpy(cinfo->capi_ctrl.name, card->name);
+	SET_MODULE_OWNER(&cinfo->capi_ctrl);
+
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
@@ -145,17 +156,8 @@ static char *b1pcmcia_procinfo(struct capi_ctr *ctrl)
 /* ------------------------------------------------------------- */
 
 static struct capi_driver b1pcmcia_driver = {
-	owner: THIS_MODULE,
 	name: "b1pcmcia",
 	revision: "0.0",
-	load_firmware: b1_load_firmware,
-	reset_ctr: b1_reset_ctr,
-	register_appl: b1_register_appl,
-	release_appl: b1_release_appl,
-	send_message: b1_send_message,
-	
-	procinfo: b1pcmcia_procinfo,
-	ctr_read_proc: b1ctl_read_proc,
 };
 
 /* ------------------------------------------------------------- */
