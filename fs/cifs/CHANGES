@@ -1,7 +1,11 @@
+Version 0.91
+------------
+Fix oops in reopen_files when invalid dentry. 
+
 Version 0.90
 ------------
-Fix scheduling while atomic error in getting inode info on newly created file. Fix truncate of existing files
-opened with O_CREAT set but O_TRUNC not set.
+Fix scheduling while atomic error in getting inode info on newly created file. 
+Fix truncate of existing files opened with O_CREAT but not O_TRUNC set.
 
 Version 0.89
 ------------
