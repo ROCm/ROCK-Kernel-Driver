@@ -600,7 +600,10 @@ static unsigned char in_sector_offset;	/* offset within physical sector,
 					 * expressed in units of 512 bytes */
 
 #ifndef fd_eject
-#define fd_eject(x) -EINVAL
+static inline int fd_eject(int drive)
+{
+	return -EINVAL;
+}
 #endif
 
 #ifdef DEBUGT
@@ -4556,7 +4559,7 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	int i;
+	int drive;
 		
 	unregister_sys_device(&device_floppy);
 	devfs_unregister (devfs_handle);
