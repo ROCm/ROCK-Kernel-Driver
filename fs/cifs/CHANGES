@@ -2,7 +2,8 @@ Version 1.13
 ------------
 Fix open of files in which O_CREATE can cause the mode to change in
 some cases. Fix case in which retry of write overlaps file close.
-Fix PPC64 build error.
+Fix PPC64 build error.  Reduce excessive stack usage in smb password
+hashing.
 
 Version 1.12
 ------------

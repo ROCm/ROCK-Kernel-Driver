@@ -6,7 +6,7 @@
    SMB authentication protocol
 
    Copyright (C) Andrew Tridgell 1998
-   Modified by Steve French (sfrench@us.ibm.com) 2002,2003
+   Modified by Steve French (sfrench@us.ibm.com) 2002,2004
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@
    should confirm it for yourself (and maybe let me know if you come
    up with a different answer to the one above)
 */
-
+#include <linux/slab.h>
 #define uchar unsigned char
 
 static uchar perm1[56] = { 57, 49, 41, 33, 25, 17, 9,
@@ -191,14 +191,23 @@ static void
 dohash(char *out, char *in, char *key, int forw)
 {
 	int i, j, k;
-	char pk1[56];
+	char *pk1;
 	char c[28];
 	char d[28];
-	char cd[56];
+	char *cd;
 	char ki[16][48];
-	char pd1[64];
+	char *pd1;
 	char l[32], r[32];
-	char rl[64];
+	char *rl;
+
+	/* Have to reduce stack usage */
+	pk1 = kmalloc(56+56+64+64,GFP_KERNEL);
+	if(pk1 == NULL)
+		return;
+
+	cd = pk1 + 56;
+	pd1= cd  + 56;
+	rl = pd1 + 64;
 
 	permute(pk1, key, perm1, 56);
 
@@ -223,12 +232,22 @@ dohash(char *out, char *in, char *key, int forw)
 	}
 
 	for (i = 0; i < 16; i++) {
-		char er[48];
-		char erk[48];
+		char *er;  /* er[48]  */
+		char *erk; /* erk[48] */
 		char b[8][6];
-		char cb[32];
-		char pcb[32];
-		char r2[32];
+		char *cb;  /* cb[32]  */
+		char *pcb; /* pcb[32] */
+		char *r2;  /* r2[32]  */
+
+		er = kmalloc(48+48+32+32+32, GFP_KERNEL);
+		if(er == NULL) {
+			kfree(pk1);
+			return;
+		}
+		erk = er+48;
+		cb  = erk+48;
+		pcb = cb+32;
+		r2  = pcb+32;
 
 		permute(er, r, perm4, 48);
 
@@ -262,11 +281,14 @@ dohash(char *out, char *in, char *key, int forw)
 
 		for (j = 0; j < 32; j++)
 			r[j] = r2[j];
+
+		kfree(er);
 	}
 
 	concat(rl, r, l, 32, 32);
 
 	permute(out, rl, perm6, 64);
+	kfree(pk1);
 }
 
 static void
@@ -291,10 +313,17 @@ static void
 smbhash(unsigned char *out, unsigned char *in, unsigned char *key, int forw)
 {
 	int i;
-	char outb[64];
-	char inb[64];
-	char keyb[64];
+	char *outb; /* outb[64] */
+	char *inb;  /* inb[64]  */
+	char *keyb; /* keyb[64] */
 	unsigned char key2[8];
+
+	outb = kmalloc(64 * 3,GFP_KERNEL);
+	if(outb == NULL)
+		return;
+
+	inb  = outb + 64;
+	keyb = inb +  64;
 
 	str_to_key(key, key2);
 
@@ -314,6 +343,7 @@ smbhash(unsigned char *out, unsigned char *in, unsigned char *key, int forw)
 		if (outb[i])
 			out[i / 8] |= (1 << (7 - (i % 8)));
 	}
+	kfree(outb);
 }
 
 void
