@@ -1045,10 +1045,10 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BOARD_VENDOR, "Intel"),
 			MATCH(DMI_BOARD_NAME, "C440GX+"),
 			NO_MATCH}},
-	{ need_local_apic, "HP Proliant DL380", {
-			MATCH(DMI_BOARD_VENDOR, "HP"),
-			MATCH(DMI_BOARD_NAME, "ProLiant DL380"),
-			NO_MATCH}},
+	
+
+
+
 
 	{ NULL, }
 };
