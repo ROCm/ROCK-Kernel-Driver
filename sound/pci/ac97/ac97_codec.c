@@ -100,6 +100,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x41445361, 0xffffffff, "AD1886",		patch_ad1886,	NULL },
 { 0x41445362, 0xffffffff, "AD1887",		patch_ad1881,	NULL },
 { 0x41445363, 0xffffffff, "AD1886A",		patch_ad1881,	NULL },
+{ 0x41445368, 0xffffffff, "AD1888",		patch_ad1888,	NULL },
 { 0x41445370, 0xffffffff, "AD1980",		patch_ad1980,	NULL },
 { 0x41445372, 0xffffffff, "AD1981A",		patch_ad1981a,	NULL },
 { 0x41445374, 0xffffffff, "AD1981B",		patch_ad1981b,	NULL },
