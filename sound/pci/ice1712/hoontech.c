@@ -218,6 +218,11 @@ struct snd_ice1712_card_info snd_ice1712_hoontech_cards[] __devinitdata = {
 		"Hoontech SoundTrack Audio DSP24",
 		snd_ice1712_hoontech_init,
 	},
+	{
+		ICE1712_SUBDEVICE_STDSP24_MEDIA7_1,
+		"Hoontech STA DSP24 Media 7.1",
+		snd_ice1712_hoontech_init,
+	},
 	{ } /* terminator */
 };
 

@@ -41,6 +41,7 @@
 #define MPU401_HW_CMIPCI		15	/* CMIPCI MPU-401 UART */
 #define MPU401_HW_ALS4000		16	/* Avance Logic ALS4000 */
 #define MPU401_HW_INTEL8X0		17	/* Intel8x0 driver */
+#define MPU401_HW_PC98II		18	/* Roland PC98II */
 
 #define MPU401_MODE_BIT_INPUT		0
 #define MPU401_MODE_BIT_OUTPUT		1
@@ -64,6 +65,7 @@ struct _snd_mpu401 {
 
 	unsigned short hardware;	/* MPU401_HW_XXXX */
 	unsigned long port;		/* base port of MPU-401 chip */
+	unsigned long cport;		/* port + 1 (usually) */
 	struct resource *res;		/* port resource */
 	int irq;			/* IRQ number of MPU-401 chip (-1 = poll) */
 	int irq_flags;
@@ -89,8 +91,8 @@ struct _snd_mpu401 {
 
 /* I/O ports */
 
-#define MPU401C(mpu) ((mpu)->port + 1)
-#define MPU401D(mpu) ((mpu)->port + 0)
+#define MPU401C(mpu) (mpu)->cport
+#define MPU401D(mpu) (mpu)->port
 
 /*
 

@@ -92,6 +92,7 @@ static snd_info_entry_t *info_entry = NULL;
 static int snd_seq_device_free(snd_seq_device_t *dev);
 static int snd_seq_device_dev_free(snd_device_t *device);
 static int snd_seq_device_dev_register(snd_device_t *device);
+static int snd_seq_device_dev_disconnect(snd_device_t *device);
 static int snd_seq_device_dev_unregister(snd_device_t *device);
 
 static int init_device(snd_seq_device_t *dev, ops_list_t *ops);
@@ -166,6 +167,7 @@ int snd_seq_device_new(snd_card_t *card, int device, char *id, int argsize,
 	static snd_device_ops_t dops = {
 		.dev_free = snd_seq_device_dev_free,
 		.dev_register = snd_seq_device_dev_register,
+		.dev_disconnect = snd_seq_device_dev_disconnect,
 		.dev_unregister = snd_seq_device_dev_unregister
 	};
 
@@ -263,6 +265,24 @@ static int snd_seq_device_dev_register(snd_device_t *device)
 	 */
 	if (ops->driver & DRIVER_LOADED)
 		init_device(dev, ops);
+
+	unlock_driver(ops);
+	return 0;
+}
+
+/*
+ * disconnect the device
+ */
+static int snd_seq_device_dev_disconnect(snd_device_t *device)
+{
+	snd_seq_device_t *dev = snd_magic_cast(snd_seq_device_t, device->device_data, return -ENXIO);
+	ops_list_t *ops;
+
+	ops = find_driver(dev->id, 0);
+	if (ops == NULL)
+		return -ENOENT;
+
+	free_device(dev, ops);
 
 	unlock_driver(ops);
 	return 0;

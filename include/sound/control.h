@@ -111,6 +111,8 @@ snd_kcontrol_t *snd_ctl_find_numid(snd_card_t * card, unsigned int numid);
 snd_kcontrol_t *snd_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id);
 
 int snd_ctl_register(snd_card_t *card);
+int snd_ctl_disconnect(snd_card_t *card);
+int snd_ctl_can_unregister(snd_card_t *card);
 int snd_ctl_unregister(snd_card_t *card);
 int snd_ctl_register_ioctl(snd_kctl_ioctl_func_t fcn);
 int snd_ctl_unregister_ioctl(snd_kctl_ioctl_func_t fcn);

@@ -985,7 +985,7 @@ static void snd_es1938_free_pcm(snd_pcm_t *pcm)
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
-static int __init snd_es1938_new_pcm(es1938_t *chip, int device, snd_pcm_t ** rpcm)
+static int __devinit snd_es1938_new_pcm(es1938_t *chip, int device, snd_pcm_t ** rpcm)
 {
 	snd_pcm_t *pcm;
 	int err;
@@ -1364,7 +1364,7 @@ static int snd_es1938_dev_free(snd_device_t *device)
 	return snd_es1938_free(chip);
 }
 
-static int __init snd_es1938_create(snd_card_t * card,
+static int __devinit snd_es1938_create(snd_card_t * card,
 				    struct pci_dev * pci,
 				    unsigned long dma1size,
 				    unsigned long dma2size,
@@ -1541,7 +1541,7 @@ static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 #define ES1938_DMA_SIZE 64
 
-static int __init snd_es1938_mixer(snd_pcm_t *pcm)
+static int __devinit snd_es1938_mixer(snd_pcm_t *pcm)
 {
 	snd_card_t *card;
 	es1938_t *chip;

@@ -305,7 +305,7 @@ snd_rme96_playback_pointer(snd_pcm_substream_t *substream);
 static snd_pcm_uframes_t
 snd_rme96_capture_pointer(snd_pcm_substream_t *substream);
 
-static void __init 
+static void __devinit 
 snd_rme96_proc_init(rme96_t *rme96);
 
 static void
@@ -1589,7 +1589,7 @@ snd_rme96_free_adat_pcm(snd_pcm_t *pcm)
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
-static int __init
+static int __devinit
 snd_rme96_create(rme96_t *rme96)
 {
 	struct pci_dev *pci = rme96->pci;
@@ -1838,7 +1838,7 @@ snd_rme96_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 	}
 }
 
-static void __init 
+static void __devinit 
 snd_rme96_proc_init(rme96_t *rme96)
 {
 	snd_info_entry_t *entry;

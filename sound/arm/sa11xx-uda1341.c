@@ -15,7 +15,7 @@
  * 2002-04-04   Tomas Kasparek  better rates handling (allow non-standard rates)
  */
 
-/* $Id: sa11xx-uda1341.c,v 1.5 2002/10/21 18:28:19 perex Exp $ */
+/* $Id: sa11xx-uda1341.c,v 1.6 2002/12/04 18:52:05 perex Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>

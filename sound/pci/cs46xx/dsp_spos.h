@@ -185,6 +185,25 @@ typedef enum  {
 #define SP_SPDOUT_CONTROL 0x804D
 #define SP_SPDOUT_CSUV    0x808E
 
+static inline u8 _wrap_all_bits (u8 val) {
+	u8 wrapped;
+	
+	/* wrap all 8 bits */
+	wrapped = 
+		((val & 0x1 ) << 7) |
+		((val & 0x2 ) << 5) |
+		((val & 0x4 ) << 3) |
+		((val & 0x8 ) << 1) |
+		((val & 0x10) >> 1) |
+		((val & 0x20) >> 3) |
+		((val & 0x40) >> 5) |
+		((val & 0x80) >> 7);
+
+	return wrapped;
+
+}
+
+
 static inline void cs46xx_dsp_spos_update_scb (cs46xx_t * chip,dsp_scb_descriptor_t * scb) 
 {
 	/* update nextSCB and subListPtr in SCB */
@@ -195,12 +214,11 @@ static inline void cs46xx_dsp_spos_update_scb (cs46xx_t * chip,dsp_scb_descripto
 }
 
 static inline void cs46xx_dsp_scb_set_volume (cs46xx_t * chip,dsp_scb_descriptor_t * scb,
-					      u16 right,u16 left) {
-	unsigned int val = ((0xffff - right) << 16 | (0xffff - left));	
+					      u16 left,u16 right) {
+	unsigned int val = ((0xffff - left) << 16 | (0xffff - right));
 
 	snd_cs46xx_poke(chip, (scb->address + SCBVolumeCtrl) << 2, val);
 	snd_cs46xx_poke(chip, (scb->address + SCBVolumeCtrl + 1) << 2, val);
 }
-
 #endif /* __DSP_SPOS_H__ */
 #endif /* CONFIG_SND_CS46XX_NEW_DSP  */
