@@ -33,7 +33,6 @@
 #include <linux/sysrq.h>
 #include <linux/serial_reg.h>
 #include <linux/circ_buf.h>
-#include <linux/serial.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 
@@ -386,9 +385,6 @@ static int serial_pxa_startup(struct uart_port *port)
 	if (retval)
 		return retval;
 
-	CKEN |= up->cken;
-	udelay(1);
-
 	/*
 	 * Clear the FIFO buffers and disable them.
 	 * (they will be reenabled in set_termios())
@@ -461,8 +457,6 @@ static void serial_pxa_shutdown(struct uart_port *port)
 				  UART_FCR_CLEAR_RCVR |
 				  UART_FCR_CLEAR_XMIT);
 	serial_out(up, UART_FCR, 0);
-
-	CKEN &= ~up->cken;
 }
 
 static void
@@ -576,10 +570,14 @@ static void
 serial_pxa_pm(struct uart_port *port, unsigned int state,
 	      unsigned int oldstate)
 {
+	struct uart_pxa_port *up = (struct uart_pxa_port *)port;
 	if (state) {
 		/* sleep */
+		CKEN &= ~up->cken;
 	} else {
 		/* wake */
+		CKEN |= up->cken;
+		udelay(1);
 	}
 }
 
@@ -760,13 +758,12 @@ static struct uart_pxa_port serial_pxa_ports[] = {
 	.cken	= CKEN6_FFUART,
 	.port	= {
 		.type		= PORT_PXA,
-		.iotype		= SERIAL_IO_MEM,
+		.iotype		= UPIO_MEM,
 		.membase	= (void *)&FFUART,
 		.mapbase	= __PREG(FFUART),
 		.irq		= IRQ_FFUART,
 		.uartclk	= 921600 * 16,
 		.fifosize	= 64,
-		.flags		= ASYNC_SKIP_TEST,
 		.ops		= &serial_pxa_pops,
 		.line		= 0,
 	},
@@ -775,13 +772,12 @@ static struct uart_pxa_port serial_pxa_ports[] = {
 	.cken	= CKEN7_BTUART,
 	.port	= {
 		.type		= PORT_PXA,
-		.iotype		= SERIAL_IO_MEM,
+		.iotype		= UPIO_MEM,
 		.membase	= (void *)&BTUART,
 		.mapbase	= __PREG(BTUART),
 		.irq		= IRQ_BTUART,
 		.uartclk	= 921600 * 16,
 		.fifosize	= 64,
-		.flags		= ASYNC_SKIP_TEST,
 		.ops		= &serial_pxa_pops,
 		.line		= 1,
 	},
@@ -790,13 +786,12 @@ static struct uart_pxa_port serial_pxa_ports[] = {
 	.cken	= CKEN5_STUART,
 	.port	= {
 		.type		= PORT_PXA,
-		.iotype		= SERIAL_IO_MEM,
+		.iotype		= UPIO_MEM,
 		.membase	= (void *)&STUART,
 		.mapbase	= __PREG(STUART),
 		.irq		= IRQ_STUART,
 		.uartclk	= 921600 * 16,
 		.fifosize	= 64,
-		.flags		= ASYNC_SKIP_TEST,
 		.ops		= &serial_pxa_pops,
 		.line		= 2,
 	},
@@ -830,6 +825,10 @@ static int __init serial_pxa_init(void)
 
 static void __exit serial_pxa_exit(void)
 {
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(serial_pxa_ports); i++)
+		uart_remove_one_port(&serial_pxa_reg, &serial_pxa_ports[i].port);
 	uart_unregister_driver(&serial_pxa_reg);
 }
 
