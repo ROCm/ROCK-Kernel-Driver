@@ -958,17 +958,6 @@ static struct device_driver sa1111_device_driver = {
 };
 
 /*
- *	Register the SA1111 driver with LDM.
- */
-static int sa1111_driver_init(void)
-{
-	driver_register(&sa1111_device_driver);
-	return 0;
-}
-
-arch_initcall(sa1111_driver_init);
-
-/*
  *	Get the parent device driver (us) structure
  *	from a child function device
  */
@@ -1180,13 +1169,6 @@ struct bus_type sa1111_bus_type = {
 	.resume		= sa1111_bus_resume,
 };
 
-static int sa1111_rab_bus_init(void)
-{
-	return bus_register(&sa1111_bus_type);
-}
-
-postcore_initcall(sa1111_rab_bus_init);
-
 int sa1111_driver_register(struct sa1111_driver *driver)
 {
 	driver->drv.probe = sa1111_bus_probe;
@@ -1199,6 +1181,26 @@ void sa1111_driver_unregister(struct sa1111_driver *driver)
 {
 	driver_unregister(&driver->drv);
 }
+
+static int __init sa1111_init(void)
+{
+	int ret = bus_register(&sa1111_bus_type);
+	if (ret == 0)
+		driver_register(&sa1111_device_driver);
+	return ret;
+}
+
+static void __exit sa1111_exit(void)
+{
+	driver_unregister(&sa1111_device_driver);
+	bus_unregister(&sa1111_bus_type);
+}
+
+module_init(sa1111_init);
+module_exit(sa1111_exit);
+
+MODULE_DESCRIPTION("Intel Corporation SA1111 core driver");
+MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(sa1111_check_dma_bug);
 EXPORT_SYMBOL(sa1111_select_audio_mode);
