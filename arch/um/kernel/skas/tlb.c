@@ -99,7 +99,6 @@ void flush_tlb_kernel_range_skas(unsigned long start, unsigned long end)
 				protect_memory(addr, PAGE_SIZE, 1, 1, 1, 1);
 			}
 			addr += PAGE_SIZE;
-
 		}
 		else {
 			if(pmd_newpage(*pmd)){

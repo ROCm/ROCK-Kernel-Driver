@@ -13,9 +13,9 @@ extern int gdb_config(char *str);
 extern int gdb_remove(char *unused);
 
 static struct mc_device gdb_mc = {
-	name:		"gdb",
-	config:		gdb_config,
-	remove:		gdb_remove,
+	.name		= "gdb",
+	.config		= gdb_config,
+	.remove		= gdb_remove,
 };
 
 int gdb_mc_init(void)

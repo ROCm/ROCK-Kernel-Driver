@@ -22,15 +22,15 @@ void slip_init(struct net_device *dev, void *data)
 	private = dev->priv;
 	spri = (struct slip_data *) private->user;
 	*spri = ((struct slip_data)
-		{ name :	{ '\0' },
-		  addr:		NULL,
-		  gate_addr :	init->gate_addr,
-		  slave : 	-1,
-		  ibuf : 	{ '\0' },
-		  obuf : 	{ '\0' },
-		  pos :		0,
-		  esc :		0,
-		  dev :		dev });
+		{ .name 	= { '\0' },
+		  .addr		= NULL,
+		  .gate_addr 	= init->gate_addr,
+		  .slave  	= -1,
+		  .ibuf  	= { '\0' },
+		  .obuf  	= { '\0' },
+		  .pos 		= 0,
+		  .esc 		= 0,
+		  .dev 		= dev });
 
 	dev->init = NULL;
 	dev->hard_header_len = 0;
@@ -61,10 +61,10 @@ static int slip_write(int fd, struct sk_buff **skb,
 }
 
 struct net_kern_info slip_kern_info = {
-	init:			slip_init,
-	protocol:		slip_protocol,
-	read:			slip_read,
-	write:			slip_write,
+	.init			= slip_init,
+	.protocol		= slip_protocol,
+	.read			= slip_read,
+	.write			= slip_write,
 };
 
 static int slip_setup(char *str, char **mac_out, void *data)
@@ -72,7 +72,7 @@ static int slip_setup(char *str, char **mac_out, void *data)
 	struct slip_init *init = data;
 
 	*init = ((struct slip_init)
-		{ gate_addr :		NULL });
+		{ .gate_addr 		= NULL });
 
 	if(str[0] != '\0') 
 		init->gate_addr = str;
@@ -80,13 +80,13 @@ static int slip_setup(char *str, char **mac_out, void *data)
 }
 
 static struct transport slip_transport = {
-	list :		LIST_HEAD_INIT(slip_transport.list),
-	name :		"slip",
-	setup : 	slip_setup,
-	user :		&slip_user_info,
-	kern :		&slip_kern_info,
-	private_size :	sizeof(struct slip_data),
-	setup_size :	sizeof(struct slip_init),
+	.list 		= LIST_HEAD_INIT(slip_transport.list),
+	.name 		= "slip",
+	.setup  	= slip_setup,
+	.user 		= &slip_user_info,
+	.kern 		= &slip_kern_info,
+	.private_size 	= sizeof(struct slip_data),
+	.setup_size 	= sizeof(struct slip_init),
 };
 
 static int register_slip(void)

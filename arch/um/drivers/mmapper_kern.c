@@ -106,13 +106,13 @@ mmapper_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations mmapper_fops = {
-	owner:		THIS_MODULE,
-	read:		mmapper_read,
-	write:		mmapper_write,
-	ioctl:		mmapper_ioctl,
-	mmap:		mmapper_mmap,
-	open:		mmapper_open,
-	release:	mmapper_release,
+	.owner		= THIS_MODULE,
+	.read		= mmapper_read,
+	.write		= mmapper_write,
+	.ioctl		= mmapper_ioctl,
+	.mmap		= mmapper_mmap,
+	.open		= mmapper_open,
+	.release	= mmapper_release,
 };
 
 static int __init mmapper_init(void)
