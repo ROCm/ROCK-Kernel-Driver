@@ -6,6 +6,7 @@
  *
  *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
  *  - flush_tlb_page(vma, vmaddr) flushes one page
+ *  - flush_tlb_page_nohash(vma, vmaddr) flushes one page if SW loaded TLB
  *  - flush_tlb_range(vma, start, end) flushes a range of pages
  *  - flush_tlb_kernel_range(start, end) flushes a range of kernel pages
  *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
@@ -39,6 +40,7 @@ static inline void flush_tlb_pending(void)
 
 #define flush_tlb_mm(mm)			flush_tlb_pending()
 #define flush_tlb_page(vma, addr)		flush_tlb_pending()
+#define flush_tlb_page_nohash(vma, addr)       	do { } while (0)
 #define flush_tlb_range(vma, start, end) \
 		do { (void)(start); flush_tlb_pending(); } while (0)
 #define flush_tlb_kernel_range(start, end)	flush_tlb_pending()
