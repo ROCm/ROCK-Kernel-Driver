@@ -48,7 +48,7 @@ enum {
 
 typedef	int (read_proc_t)(char *page, char **start, off_t off,
 			  int count, int *eof, void *data);
-typedef	int (write_proc_t)(struct file *file, const char *buffer,
+typedef	int (write_proc_t)(struct file *file, const char __user *buffer,
 			   unsigned long count, void *data);
 typedef int (get_info_t)(char *, char **, off_t, int);
 

@@ -2448,7 +2448,7 @@ struct seq_operations slabinfo_op = {
  * @count: data len
  * @data: unused
  */
-ssize_t slabinfo_write(struct file *file, const char *buffer,
+ssize_t slabinfo_write(struct file *file, const char __user *buffer,
 				size_t count, loff_t *ppos)
 {
 	char kbuf[MAX_SLABINFO_WRITE+1], *tmp;
