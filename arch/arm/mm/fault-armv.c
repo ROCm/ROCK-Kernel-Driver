@@ -14,6 +14,7 @@
 #include <linux/bitops.h>
 #include <linux/vmalloc.h>
 #include <linux/init.h>
+#include <linux/pagemap.h>
 
 #include <asm/cacheflush.h>
 #include <asm/pgtable.h>
@@ -78,7 +79,10 @@ void __flush_dcache_page(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
 	struct mm_struct *mm = current->active_mm;
-	struct list_head *l;
+	struct vm_area_struct *mpnt = NULL;
+	struct prio_tree_iter iter;
+	unsigned long offset;
+	pgoff_t pgoff;
 
 	__cpuc_flush_dcache_page(page_address(page));
 
@@ -89,26 +93,16 @@ void __flush_dcache_page(struct page *page)
 	 * With a VIVT cache, we need to also write back
 	 * and invalidate any user data.
 	 */
-	list_for_each(l, &mapping->i_mmap_shared) {
-		struct vm_area_struct *mpnt;
-		unsigned long off;
-
-		mpnt = list_entry(l, struct vm_area_struct, shared);
-
+	pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
+	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap_shared,
+					&iter, pgoff, pgoff)) != NULL) {
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
 		 */
 		if (mpnt->vm_mm != mm)
 			continue;
-
-		if (page->index < mpnt->vm_pgoff)
-			continue;
-
-		off = page->index - mpnt->vm_pgoff;
-		if (off >= (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT)
-			continue;
-
-		flush_cache_page(mpnt, mpnt->vm_start + (off << PAGE_SHIFT));
+		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
+		flush_cache_page(mpnt, mpnt->vm_start + offset);
 	}
 }
 
@@ -116,9 +110,11 @@ static void
 make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page, int dirty)
 {
 	struct address_space *mapping = page_mapping(page);
-	struct list_head *l;
 	struct mm_struct *mm = vma->vm_mm;
-	unsigned long pgoff;
+	struct vm_area_struct *mpnt = NULL;
+	struct prio_tree_iter iter;
+	unsigned long offset;
+	pgoff_t pgoff;
 	int aliases = 0;
 
 	if (!mapping)
@@ -131,12 +127,8 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 	 * space, then we need to handle them specially to maintain
 	 * cache coherency.
 	 */
-	list_for_each(l, &mapping->i_mmap_shared) {
-		struct vm_area_struct *mpnt;
-		unsigned long off;
-
-		mpnt = list_entry(l, struct vm_area_struct, shared);
-
+	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap_shared,
+					&iter, pgoff, pgoff)) != NULL) {
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
 		 * Note that we intentionally mask out the VMA
@@ -144,23 +136,8 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 		 */
 		if (mpnt->vm_mm != mm || mpnt == vma)
 			continue;
-
-		/*
-		 * If the page isn't in this VMA, we can also ignore it.
-		 */
-		if (pgoff < mpnt->vm_pgoff)
-			continue;
-
-		off = pgoff - mpnt->vm_pgoff;
-		if (off >= (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT)
-			continue;
-
-		off = mpnt->vm_start + (off << PAGE_SHIFT);
-
-		/*
-		 * Ok, it is within mpnt.  Fix it up.
-		 */
-		aliases += adjust_pte(mpnt, off);
+		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
+		aliases += adjust_pte(mpnt, mpnt->vm_start + offset);
 	}
 	if (aliases)
 		adjust_pte(vma, addr);
