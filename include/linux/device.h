@@ -54,7 +54,7 @@ enum {
 };
 
 struct device;
-
+struct device_driver;
 
 struct bus_type {
 	char			* name;
@@ -68,6 +68,8 @@ struct bus_type {
 	struct driver_dir_entry	dir;
 	struct driver_dir_entry	device_dir;
 	struct driver_dir_entry	driver_dir;
+
+	int	(*bind)		(struct device * dev, struct device_driver * drv);
 };
 
 
@@ -81,6 +83,11 @@ static inline struct bus_type * get_bus(struct bus_type * bus)
 }
 
 extern void put_bus(struct bus_type * bus);
+
+extern int bus_for_each_dev(struct bus_type * bus, void * data, 
+			    int (*callback)(struct device * dev, void * data));
+extern int bus_for_each_drv(struct bus_type * bus, void * data,
+			    int (*callback)(struct device_driver * drv, void * data));
 
 
 struct device_driver {
