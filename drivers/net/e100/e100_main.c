@@ -2687,13 +2687,12 @@ e100_sw_reset(struct e100_private *bdp, u32 reset_cmd)
 		udelay(20);
 	}
 
-	/* Mask off our interrupt line -- its unmasked after reset */
+	/* Mask off our interrupt line -- it is unmasked after reset */
 	e100_disable_clear_intr(bdp);
 #ifdef E100_CU_DEBUG	
 	bdp->last_cmd = 0;
 	bdp->last_sub_cmd = 0;
 #endif	
-
 }
 
 /**
