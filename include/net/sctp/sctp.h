@@ -323,7 +323,8 @@ static inline int sctp_ipv6_addr_type(const struct in6_addr *addr)
 	return ipv6_addr_type((struct in6_addr*) addr);
 }
 
-#define SCTP_SAT_LEN (sizeof(sctp_paramhdr_t) + 2 * sizeof(__u16))
+/* Size of Supported Address Parameter for 'x' address types. */
+#define SCTP_SAT_LEN(x) (sizeof(struct sctp_paramhdr) + (x) * sizeof(__u16))
 
 /* Note: These V6 macros are obsolescent.  */
 /* Use this macro to enclose code fragments which are V6-dependent. */

@@ -293,6 +293,7 @@ struct sctp_pf {
 			  const union sctp_addr *,
 			  struct sctp_opt *);
 	int  (*bind_verify) (struct sctp_opt *, union sctp_addr *);
+	int  (*supported_addrs)(const struct sctp_opt *, __u16 *);
 	struct sctp_af *af;
 };
 
@@ -396,8 +397,6 @@ typedef struct sctp_signed_cookie {
 	__u8 signature[SCTP_SECRET_SIZE];
 	sctp_cookie_t c;
 } sctp_signed_cookie_t;
-
-
 
 /* This is another convenience type to allocate memory for address
  * params for the maximum size and pass such structures around

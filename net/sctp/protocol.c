@@ -631,6 +631,16 @@ static int sctp_inet_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 	return sctp_v4_available(addr);
 }
 
+/* Fill in Supported Address Type information for INIT and INIT-ACK
+ * chunks.  Returns number of addresses supported.
+ */
+static int sctp_inet_supported_addrs(const struct sctp_opt *opt, 
+				     __u16 *types)
+{
+	types[0] = SCTP_PARAM_IPV4_ADDRESS;
+	return 1;
+}
+
 /* Wrapper routine that calls the ip transmit routine. */
 static inline int sctp_v4_xmit(struct sk_buff *skb,
 			       struct sctp_transport *transport, int ipfragok)
@@ -653,6 +663,7 @@ static struct sctp_pf sctp_pf_inet = {
 	.af_supported  = sctp_inet_af_supported,
 	.cmp_addr      = sctp_inet_cmp_addr,
 	.bind_verify   = sctp_inet_bind_verify,
+	.supported_addrs = sctp_inet_supported_addrs,
 	.af            = &sctp_ipv4_specific,
 };
 

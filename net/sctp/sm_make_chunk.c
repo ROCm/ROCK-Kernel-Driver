@@ -68,29 +68,6 @@
 
 /* RFC 2960 3.3.2 Initiation (INIT) (1)
  *
- * Note 4: This parameter, when present, specifies all the
- * address types the sending endpoint can support. The absence
- * of this parameter indicates that the sending endpoint can
- * support any address type.
- */
-static const sctp_supported_addrs_param_t sat_param = {
-	{
-		SCTP_PARAM_SUPPORTED_ADDRESS_TYPES,
-		__constant_htons(SCTP_SAT_LEN),
-	}
-};
-
-/* gcc 3.2 doesn't allow initialization of zero-length arrays. So the above
- * structure is split and the address types array is initialized using a
- * fixed length array.
- */
-static const __u16 sat_addr_types[2] = {
-	SCTP_PARAM_IPV4_ADDRESS,
-	SCTP_V6(SCTP_PARAM_IPV6_ADDRESS,)
-};
-
-/* RFC 2960 3.3.2 Initiation (INIT) (1)
- *
  * Note 2: The ECN capable field is reserved for future use of
  * Explicit Congestion Notification.
  */
@@ -174,7 +151,10 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 	union sctp_params addrs;
 	size_t chunksize;
 	sctp_chunk_t *retval = NULL;
-	int addrs_len = 0;
+	int num_types, addrs_len = 0;
+	struct sctp_opt *sp;
+	sctp_supported_addrs_param_t sat;
+	__u16 types[2];
 
 	/* RFC 2960 3.3.2 Initiation (INIT) (1)
 	 *
@@ -195,7 +175,11 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 	init.num_inbound_streams   = htons(asoc->c.sinit_max_instreams);
 	init.initial_tsn	   = htonl(asoc->c.initial_tsn);
 
-	chunksize = sizeof(init) + addrs_len + SCTP_SAT_LEN;
+	/* How many address types are needed? */
+	sp = sctp_sk(asoc->base.sk);
+	num_types = sp->pf->supported_addrs(sp, types);
+
+	chunksize = sizeof(init) + addrs_len + SCTP_SAT_LEN(num_types);
 	chunksize += sizeof(ecap_param);
 	chunksize += vparam_len;
 
@@ -220,8 +204,18 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 	retval->param_hdr.v =
 		sctp_addto_chunk(retval, addrs_len, addrs.v);
 
-	sctp_addto_chunk(retval, sizeof(sctp_paramhdr_t), &sat_param);
-	sctp_addto_chunk(retval, sizeof(sat_addr_types), sat_addr_types);
+	/* RFC 2960 3.3.2 Initiation (INIT) (1)
+	 *
+	 * Note 4: This parameter, when present, specifies all the
+	 * address types the sending endpoint can support. The absence
+	 * of this parameter indicates that the sending endpoint can
+	 * support any address type.
+	 */
+	sat.param_hdr.type = SCTP_PARAM_SUPPORTED_ADDRESS_TYPES;
+	sat.param_hdr.length = htons(SCTP_SAT_LEN(num_types));
+	sctp_addto_chunk(retval, sizeof(sat), &sat);
+	sctp_addto_chunk(retval, num_types * sizeof(__u16), &types);
+
 	sctp_addto_chunk(retval, sizeof(ecap_param), &ecap_param);
 nodata:
 	if (addrs.v)
