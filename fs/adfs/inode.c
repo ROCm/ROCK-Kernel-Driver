@@ -73,12 +73,12 @@ static int _adfs_bmap(struct address_space *mapping, long block)
 }
 
 static struct address_space_operations adfs_aops = {
-	readpage:	adfs_readpage,
-	writepage:	adfs_writepage,
-	sync_page:	block_sync_page,
-	prepare_write:	adfs_prepare_write,
-	commit_write:	generic_commit_write,
-	bmap:		_adfs_bmap
+	.readpage	= adfs_readpage,
+	.writepage	= adfs_writepage,
+	.sync_page	= block_sync_page,
+	.prepare_write	= adfs_prepare_write,
+	.commit_write	= generic_commit_write,
+	.bmap		= _adfs_bmap
 };
 
 static inline unsigned int
