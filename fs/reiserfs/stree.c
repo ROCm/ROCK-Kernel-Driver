@@ -714,14 +714,16 @@ int search_by_key (struct super_block * p_s_sb,
 	   to search is still in the tree rooted from the current buffer. If
 	   not then repeat search from the root. */
 	if ( fs_changed (fs_gen, p_s_sb) && 
-	     (!B_IS_IN_TREE (p_s_bh) || !key_in_buffer(p_s_search_path, p_s_key, p_s_sb)) ) {
+	    (!B_IS_IN_TREE (p_s_bh) || 
+	     B_LEVEL(p_s_bh) != expected_level || 
+	     !key_in_buffer(p_s_search_path, p_s_key, p_s_sb))) {
 	    PROC_INFO_INC( p_s_sb, search_by_key_fs_changed );
- 	    PROC_INFO_INC( p_s_sb, search_by_key_restarted );
+	    PROC_INFO_INC( p_s_sb, search_by_key_restarted );
 	    PROC_INFO_INC( p_s_sb, sbk_restarted[ expected_level - 1 ] );
 	    decrement_counters_in_path(p_s_search_path);
 	    
 	    /* Get the root block number so that we can repeat the search
-               starting from the root. */
+	       starting from the root. */
 	    n_block_number = SB_ROOT_BLOCK (p_s_sb);
 	    expected_level = -1;
 	    right_neighbor_of_leaf_node = 0;
