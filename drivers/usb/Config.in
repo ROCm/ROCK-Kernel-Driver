@@ -31,6 +31,7 @@ if [ "$CONFIG_USB" = "y" -o  "$CONFIG_USB" = "m" ]; then
 
    comment 'USB Device Class drivers'
    dep_tristate '  USB Audio support' CONFIG_USB_AUDIO $CONFIG_USB $CONFIG_SOUND
+   dep_tristate '    EMI 2|6 USB Audio interface support' CONFIG_USB_EMI26 $CONFIG_USB_AUDIO
    dep_tristate '  USB Bluetooth support (EXPERIMENTAL)' CONFIG_USB_BLUETOOTH $CONFIG_USB $CONFIG_EXPERIMENTAL
    if [ "$CONFIG_SCSI" = "n" ]; then
       comment '  SCSI support is needed for USB Storage'
