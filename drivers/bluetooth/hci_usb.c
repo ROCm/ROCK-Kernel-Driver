@@ -795,17 +795,15 @@ static void hci_usb_destruct(struct hci_dev *hdev)
 int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
-	struct usb_host_endpoint *bulk_out_ep[HCI_MAX_IFACE_NUM];
-	struct usb_host_endpoint *isoc_out_ep[HCI_MAX_IFACE_NUM];
-	struct usb_host_endpoint *bulk_in_ep[HCI_MAX_IFACE_NUM];
-	struct usb_host_endpoint *isoc_in_ep[HCI_MAX_IFACE_NUM];
-	struct usb_host_endpoint *intr_in_ep[HCI_MAX_IFACE_NUM];
+	struct usb_host_endpoint *bulk_out_ep = NULL;
+	struct usb_host_endpoint *bulk_in_ep = NULL;
+	struct usb_host_endpoint *intr_in_ep = NULL;
 	struct usb_host_endpoint  *ep;
 	struct usb_host_interface *uif;
-	struct usb_interface *iface, *isoc_iface;
+	struct usb_interface *isoc_iface;
 	struct hci_usb *husb;
 	struct hci_dev *hdev;
-	int i, a, e, size, ifn, isoc_ifnum, isoc_alts;
+	int i, e, size, isoc_ifnum, isoc_alts;
 
 	BT_DBG("udev %p intf %p", udev, intf);
 
@@ -816,83 +814,37 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 			id = match;
 	}
 
-	iface = udev->actconfig->interface[0];
-
 	if (id->driver_info & HCI_IGNORE)
 		return -ENODEV;
 
-	if (intf->altsetting->desc.bInterfaceNumber > 0)
+	if (intf->cur_altsetting->desc.bInterfaceNumber > 0)
 		return -ENODEV;
-
-	/* Check number of endpoints */
-	if (intf->altsetting[0].desc.bNumEndpoints < 3)
-		return -EIO;
-
-	memset(bulk_out_ep, 0, sizeof(bulk_out_ep));
-	memset(isoc_out_ep, 0, sizeof(isoc_out_ep));
-	memset(bulk_in_ep,  0, sizeof(bulk_in_ep));
-	memset(isoc_in_ep,  0, sizeof(isoc_in_ep));
-	memset(intr_in_ep,  0, sizeof(intr_in_ep));
-
-	size = 0; 
-	isoc_iface = NULL;
-	isoc_alts  = isoc_ifnum = 0;
 	
 	/* Find endpoints that we need */
 
-	ifn = min_t(unsigned int, udev->actconfig->desc.bNumInterfaces, HCI_MAX_IFACE_NUM);
-	for (i = 0; i < ifn; i++) {
-		iface = udev->actconfig->interface[i];
-		for (a = 0; a < iface->num_altsetting; a++) {
-			uif = &iface->altsetting[a];
-			for (e = 0; e < uif->desc.bNumEndpoints; e++) {
-				ep = &uif->endpoint[e];
+	uif = intf->cur_altsetting;
+	for (e = 0; e < uif->desc.bNumEndpoints; e++) {
+		ep = &uif->endpoint[e];
 
-				switch (ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
-				case USB_ENDPOINT_XFER_INT:
-					if (ep->desc.bEndpointAddress & USB_DIR_IN)
-						intr_in_ep[i] = ep;
-					break;
+		switch (ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
+		case USB_ENDPOINT_XFER_INT:
+			if (ep->desc.bEndpointAddress & USB_DIR_IN)
+				intr_in_ep = ep;
+			break;
 
-				case USB_ENDPOINT_XFER_BULK:
-					if (ep->desc.bEndpointAddress & USB_DIR_IN)
-						bulk_in_ep[i]  = ep;
-					else
-						bulk_out_ep[i] = ep;
-					break;
-
-#ifdef CONFIG_BT_HCIUSB_SCO
-				case USB_ENDPOINT_XFER_ISOC:
-					if (ep->desc.wMaxPacketSize < size || a > 2)
-						break;
-					size = ep->desc.wMaxPacketSize;
-
-					isoc_iface = iface;
-					isoc_alts  = a;
-					isoc_ifnum = i;
-
-					if (ep->desc.bEndpointAddress & USB_DIR_IN)
-						isoc_in_ep[i]  = ep;
-					else
-						isoc_out_ep[i] = ep;
-					break;
-#endif
-				}
-			}
+		case USB_ENDPOINT_XFER_BULK:
+			if (ep->desc.bEndpointAddress & USB_DIR_IN)
+				bulk_in_ep  = ep;
+			else
+				bulk_out_ep = ep;
+			break;
 		}
 	}
 
-	if (!bulk_in_ep[0] || !bulk_out_ep[0] || !intr_in_ep[0]) {
+	if (!bulk_in_ep || !bulk_out_ep || !intr_in_ep) {
 		BT_DBG("Bulk endpoints not found");
 		goto done;
 	}
-
-#ifdef CONFIG_BT_HCIUSB_SCO
-	if (!isoc_in_ep[1] || !isoc_out_ep[1]) {
-		BT_DBG("Isoc endpoints not found");
-		isoc_iface = NULL;
-	}
-#endif
 
 	if (!(husb = kmalloc(sizeof(struct hci_usb), GFP_KERNEL))) {
 		BT_ERR("Can't allocate: control structure");
@@ -902,26 +854,67 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	memset(husb, 0, sizeof(struct hci_usb));
 
 	husb->udev = udev;
-	husb->bulk_out_ep = bulk_out_ep[0];
-	husb->bulk_in_ep  = bulk_in_ep[0];
-	husb->intr_in_ep  = intr_in_ep[0];
+	husb->bulk_out_ep = bulk_out_ep;
+	husb->bulk_in_ep  = bulk_in_ep;
+	husb->intr_in_ep  = intr_in_ep;
 
 	if (id->driver_info & HCI_DIGIANSWER)
 		husb->ctrl_req = HCI_DIGI_REQ;
 	else
 		husb->ctrl_req = HCI_CTRL_REQ;
+	
+	/* Find isochronous endpoints that we can use */
+
+	size = 0; 
+	isoc_iface = NULL;
+	isoc_alts  = 0;
+	isoc_ifnum = 1;
 
 #ifdef CONFIG_BT_HCIUSB_SCO
+	isoc_iface = usb_ifnum_to_if(udev, isoc_ifnum);
 	if (isoc_iface) {
-		BT_DBG("isoc ifnum %d alts %d", isoc_ifnum, isoc_alts);
-		if (usb_set_interface(udev, isoc_ifnum, isoc_alts)) {
-			BT_ERR("Can't set isoc interface settings");
-			isoc_iface = NULL;
+		int a;
+		struct usb_host_endpoint *isoc_out_ep = NULL;
+		struct usb_host_endpoint *isoc_in_ep = NULL;
+
+		for (a = 0; a < isoc_iface->num_altsetting; a++) {
+			uif = &isoc_iface->altsetting[a];
+			for (e = 0; e < uif->desc.bNumEndpoints; e++) {
+				ep = &uif->endpoint[e];
+
+				switch (ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
+				case USB_ENDPOINT_XFER_ISOC:
+					if (ep->desc.wMaxPacketSize < size ||
+							uif->desc.bAlternateSetting > 2)
+						break;
+					size = ep->desc.wMaxPacketSize;
+
+					isoc_alts = uif->desc.bAlternateSetting;
+
+					if (ep->desc.bEndpointAddress & USB_DIR_IN)
+						isoc_in_ep  = ep;
+					else
+						isoc_out_ep = ep;
+					break;
+				}
+			}
 		}
-		usb_driver_claim_interface(&hci_usb_driver, isoc_iface, husb);
-		husb->isoc_iface  = isoc_iface;
-		husb->isoc_in_ep  = isoc_in_ep[isoc_ifnum];
-		husb->isoc_out_ep = isoc_out_ep[isoc_ifnum];
+
+		if (!isoc_in_ep || !isoc_out_ep)
+			BT_DBG("Isoc endpoints not found");
+		else {
+			BT_DBG("isoc ifnum %d alts %d", isoc_ifnum, isoc_alts);
+			if (usb_driver_claim_interface(&hci_usb_driver, isoc_iface, husb) != 0)
+				BT_ERR("Can't claim isoc interface");
+			else if (usb_set_interface(udev, isoc_ifnum, isoc_alts)) {
+				BT_ERR("Can't set isoc interface settings");
+				usb_driver_release_interface(&hci_usb_driver, isoc_iface);
+			} else {
+				husb->isoc_iface  = isoc_iface;
+				husb->isoc_in_ep  = isoc_in_ep;
+				husb->isoc_out_ep = isoc_out_ep;
+			}
+		}
 	}
 #endif
 	
@@ -967,6 +960,8 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	return 0;
 
 probe_error:
+	if (husb->isoc_iface)
+		usb_driver_release_interface(&hci_usb_driver, husb->isoc_iface);
 	kfree(husb);
 
 done:
@@ -976,11 +971,13 @@ done:
 static void hci_usb_disconnect(struct usb_interface *intf)
 {
 	struct hci_usb *husb = usb_get_intfdata(intf);
-	struct hci_dev *hdev = husb->hdev;
+	struct hci_dev *hdev;
 
-	if (!husb)
+	if (!husb || intf == husb->isoc_iface)
 		return;
+
 	usb_set_intfdata(intf, NULL);
+	hdev = husb->hdev;
 
 	BT_DBG("%s", hdev->name);
 
