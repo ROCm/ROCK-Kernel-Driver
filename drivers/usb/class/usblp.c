@@ -706,8 +706,6 @@ static ssize_t usblp_read(struct file *file, char __user *buffer, size_t count, 
 			goto done;
 		}
 
-		// FIXME:  only use urb->status inside completion
-		// callbacks; this way is racey...
 		add_wait_queue(&usblp->wait, &wait);
 		while (1==1) {
 			if (signal_pending(current)) {
