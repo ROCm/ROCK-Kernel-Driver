@@ -307,12 +307,17 @@ static void __init init_ide_data (void)
 		hwif = &ide_hwifs[index];
 		init_hwif_data(hwif, index);
 		init_hwif_default(hwif, index);
+		hwif->irq = hwif->hw.irq =
+			ide_init_default_irq(hwif->io_ports[IDE_DATA_OFFSET]);
 	}
 
+/* OBSOLETE: still needed on arm26 and arm */
+#ifdef CONFIG_ARM
 	/* Add default hw interfaces */
 	initializing = 1;
 	ide_init_default_hwifs();
 	initializing = 0;
+#endif
 }
 
 /*

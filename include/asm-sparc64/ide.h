@@ -53,8 +53,7 @@ static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_por
 	hw->io_ports[IDE_IRQ_OFFSET] = 0;
 }
 
-/* There are no standard ports. */
-static inline void ide_init_default_hwifs(void)	{ ; }
+#define ide_init_default_irq(base)	(0)
 
 #define __ide_insl(data_reg, buffer, wcount) \
 	__ide_insw(data_reg, buffer, (wcount)<<1)

@@ -42,8 +42,7 @@ static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	hw->io_ports[IDE_IRQ_OFFSET] = 0;
 }
 
-/* There are no standard ports. */
-static inline void ide_init_default_hwifs(void)	{ ; }
+#define ide_init_default_irq(base)	(0)
 
 #define ide_request_irq(irq,hand,flg,dev,id)	request_irq((irq),(hand),(flg),(dev),(id))
 #define ide_free_irq(irq,dev_id)		free_irq((irq), (dev_id))

@@ -68,19 +68,10 @@ static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	hw->io_ports[IDE_IRQ_OFFSET] = 0;
 }
 
-static inline void ide_init_default_hwifs(void)
-{
-#ifndef CONFIG_BLK_DEV_IDEPCI
-	hw_regs_t hw;
-	int index;
-
-	for(index = 0; index < MAX_HWIFS; index++) {
-		memset(&hw, 0, sizeof hw);
-		ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, NULL);
-		hw.irq = ide_default_irq(ide_default_io_base(index));
-		ide_register_hw(&hw, NULL);
-	}
-#endif /* CONFIG_BLK_DEV_IDEPCI */
-}
+#ifdef CONFIG_BLK_DEV_IDEPCI
+#define ide_init_default_irq(base)	(0)
+#else
+#define ide_init_default_irq(base)	ide_default_irq(base)
+#endif
 
 #endif /* __ASM_MACH_GENERIC_IDE_H */

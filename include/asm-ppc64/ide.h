@@ -45,9 +45,7 @@ static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	hw->io_ports[IDE_IRQ_OFFSET] = 0;
 }
 
-static __inline__ void ide_init_default_hwifs(void)
-{
-}
+#define ide_init_default_irq(base)	(0)
 
 #endif /* __KERNEL__ */
 

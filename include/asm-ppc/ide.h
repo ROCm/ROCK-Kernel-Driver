@@ -84,23 +84,11 @@ static __inline__ void ide_init_hwif_ports(hw_regs_t *hw,
 		ppc_ide_md.ide_init_hwif(hw, data_port, ctrl_port, irq);
 }
 
-static __inline__ void ide_init_default_hwifs(void)
-{
-#ifndef CONFIG_PCI
-	hw_regs_t hw;
-	int index;
-	unsigned long base;
-
-	for (index = 0; index < MAX_HWIFS; index++) {
-		base = ide_default_io_base(index);
-		if (base == 0)
-			continue;
-		ide_init_hwif_ports(&hw, base, 0, NULL);
-		hw.irq = ide_default_irq(base);
-		ide_register_hw(&hw, NULL);
-	}
+#ifdef CONFIG_PCI
+#define ide_init_default_irq(base)	(0)
+#else
+#define ide_init_default_irq(base)	ide_default_irq(base)
 #endif
-}
 
 #if (defined CONFIG_APUS || defined CONFIG_BLK_DEV_MPC8xx_IDE )
 #define IDE_ARCH_ACK_INTR  1
