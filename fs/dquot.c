@@ -326,7 +326,7 @@ restart:
 		if (!dquot_dirty(dquot))
 			continue;
 		spin_unlock(&dq_list_lock);
-		commit_dqblk(dquot);
+		sb->dq_op->sync_dquot(dquot);
 		goto restart;
 	}
 	spin_unlock(&dq_list_lock);
@@ -1072,8 +1072,15 @@ struct dquot_operations dquot_operations = {
 	.alloc_inode	= dquot_alloc_inode,
 	.free_space	= dquot_free_space,
 	.free_inode	= dquot_free_inode,
-	.transfer	= dquot_transfer
+	.transfer	= dquot_transfer,
+	.sync_dquot	= commit_dqblk
 };
+
+/* Function used by filesystems for initializing the dquot_operations structure */
+void init_dquot_operations(struct dquot_operations *fsdqops)
+{
+	memcpy(fsdqops, &dquot_operations, sizeof(dquot_operations));
+}
 
 static inline void set_enable_flags(struct quota_info *dqopt, int type)
 {
@@ -1432,3 +1439,4 @@ EXPORT_SYMBOL(unregister_quota_format);
 EXPORT_SYMBOL(dqstats);
 EXPORT_SYMBOL(dq_list_lock);
 EXPORT_SYMBOL(dq_data_lock);
+EXPORT_SYMBOL(init_dquot_operations);
