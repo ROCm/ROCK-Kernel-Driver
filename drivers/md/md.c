@@ -342,23 +342,6 @@ static unsigned int zoned_raid_size(mddev_t *mddev)
 	return 0;
 }
 
-static void remove_descriptor(mdp_disk_t *disk, mdp_super_t *sb)
-{
-	if (disk_active(disk)) {
-		sb->working_disks--;
-	} else {
-		if (disk_spare(disk)) {
-			sb->spare_disks--;
-			sb->working_disks--;
-		} else	{
-			sb->failed_disks--;
-		}
-	}
-	sb->nr_disks--;
-	disk->major = 0;
-	disk->minor = 0;
-	mark_disk_removed(disk);
-}
 
 #define BAD_MAGIC KERN_ERR \
 "md: invalid raid superblock magic on %s\n"
@@ -1091,8 +1074,8 @@ abort_free:
 static int analyze_sbs(mddev_t * mddev)
 {
 	int out_of_date = 0, i;
-	struct list_head *tmp, *tmp2;
-	mdk_rdev_t *rdev, *rdev2, *freshest;
+	struct list_head *tmp;
+	mdk_rdev_t *rdev, *freshest;
 	mdp_super_t *sb;
 
 	/*
@@ -1216,203 +1199,15 @@ static int analyze_sbs(mddev_t * mddev)
 			rdev->raid_disk = desc->raid_disk;
 			rdev->in_sync = rdev->faulty = 0;
 
-			if (desc->state & (1<<MD_DISK_FAULTY))
+			if (desc->state & (1<<MD_DISK_FAULTY)) {
 				rdev->faulty = 1;
-			else if (desc->state & (1<<MD_DISK_SYNC) &&
-				 rdev->raid_disk < mddev->sb-raid_disks)
+				kick_rdev_from_array(rdev);
+			} else if (desc->state & (1<<MD_DISK_SYNC) &&
+				 rdev->raid_disk < mddev->sb->raid_disks)
 				rdev->in_sync = 1;
 		}
 	}
-	/*
-	 * Fix up changed device names ... but only if this disk has a
-	 * recent update time. Use faulty checksum ones too.
-	 */
-	if (mddev->sb->level != LEVEL_MULTIPATH)
-	ITERATE_RDEV(mddev,rdev,tmp) {
-		__u64 ev1, ev2, ev3;
-		if (rdev->faulty || rdev->alias_device) {
-			MD_BUG();
-			goto abort;
-		}
-		ev1 = md_event(rdev->sb);
-		ev2 = md_event(sb);
-		ev3 = ev2;
-		--ev3;
-		if (!kdev_same(rdev->dev, rdev->old_dev) &&
-			((ev1 == ev2) || (ev1 == ev3))) {
-			mdp_disk_t *desc;
 
-			printk(KERN_WARNING "md: device name has changed from %s to %s since last import!\n",
-			       partition_name(rdev->old_dev), partition_name(rdev->dev));
-			if (rdev->desc_nr == -1) {
-				MD_BUG();
-				goto abort;
-			}
-			desc = &sb->disks[rdev->desc_nr];
-			if (!kdev_same( rdev->old_dev, mk_kdev(desc->major, desc->minor))) {
-				MD_BUG();
-				goto abort;
-			}
-			desc->major = major(rdev->dev);
-			desc->minor = minor(rdev->dev);
-			desc = &rdev->sb->this_disk;
-			desc->major = major(rdev->dev);
-			desc->minor = minor(rdev->dev);
-		}
-	}
-
-	/*
-	 * Remove unavailable and faulty devices ...
-	 *
-	 * note that if an array becomes completely unrunnable due to
-	 * missing devices, we do not write the superblock back, so the
-	 * administrator has a chance to fix things up. The removal thus
-	 * only happens if it's nonfatal to the contents of the array.
-	 */
-	for (i = 0; i < MD_SB_DISKS; i++) {
-		int found;
-		mdp_disk_t *desc;
-		kdev_t dev;
-
-		desc = sb->disks + i;
-		dev = mk_kdev(desc->major, desc->minor);
-
-		/*
-		 * We kick faulty devices/descriptors immediately.
-		 *
-		 * Note: multipath devices are a special case.  Since we
-		 * were able to read the superblock on the path, we don't
-		 * care if it was previously marked as faulty, it's up now
-		 * so enable it.
-		 */
-		if (disk_faulty(desc) && mddev->sb->level != LEVEL_MULTIPATH) {
-			found = 0;
-			ITERATE_RDEV(mddev,rdev,tmp) {
-				if (rdev->desc_nr != desc->number)
-					continue;
-				printk(KERN_WARNING "md%d: kicking faulty %s!\n",
-					mdidx(mddev),partition_name(rdev->dev));
-				kick_rdev_from_array(rdev);
-				found = 1;
-				break;
-			}
-			if (!found) {
-				if (kdev_none(dev))
-					continue;
-				printk(KERN_WARNING "md%d: removing former faulty %s!\n",
-					mdidx(mddev), partition_name(dev));
-			}
-			remove_descriptor(desc, sb);
-			continue;
-		} else if (disk_faulty(desc)) {
-			/*
-			 * multipath entry marked as faulty, unfaulty it
-			 */
-			rdev = find_rdev(mddev, dev);
-			if(rdev)
-				mark_disk_spare(desc);
-			else
-				remove_descriptor(desc, sb);
-		}
-
-		if (kdev_none(dev))
-			continue;
-		/*
-		 * Is this device present in the rdev ring?
-		 */
-		found = 0;
-		ITERATE_RDEV(mddev,rdev,tmp) {
-			/*
-			 * Multi-path IO special-case: since we have no
-			 * this_disk descriptor at auto-detect time,
-			 * we cannot check rdev->number.
-			 * We can check the device though.
-			 */
-			if ((sb->level == LEVEL_MULTIPATH) &&
-			    kdev_same(rdev->dev,
-				      mk_kdev(desc->major,desc->minor))) {
-				found = 1;
-				break;
-			}
-			if (rdev->desc_nr == desc->number) {
-				found = 1;
-				break;
-			}
-		}
-		if (found)
-			continue;
-
-		printk(KERN_WARNING "md%d: former device %s is unavailable, removing from array!\n",
-		       mdidx(mddev), partition_name(dev));
-		remove_descriptor(desc, sb);
-	}
-
-	/*
-	 * Double check wether all devices mentioned in the
-	 * superblock are in the rdev ring.
-	 */
-	for (i = 0; i < MD_SB_DISKS; i++) {
-		mdp_disk_t *desc;
-		kdev_t dev;
-
-		desc = sb->disks + i;
-		dev = mk_kdev(desc->major, desc->minor);
-
-		if (kdev_none(dev))
-			continue;
-
-		if (disk_faulty(desc)) {
-			MD_BUG();
-			goto abort;
-		}
-
-		rdev = find_rdev(mddev, dev);
-		if (!rdev) {
-			MD_BUG();
-			goto abort;
-		}
-	}
-
-	/*
-	 * Kick all rdevs that are not in the
-	 * descriptor array:
-	 */
-	ITERATE_RDEV(mddev,rdev,tmp) {
-		if (rdev->desc_nr == -1)
-			kick_rdev_from_array(rdev);
-	}
-
-	/*
-	 * Do a final reality check.
-	 */
-	if (mddev->sb->level != LEVEL_MULTIPATH) {
-		ITERATE_RDEV(mddev,rdev,tmp) {
-			if (rdev->desc_nr == -1) {
-				MD_BUG();
-				goto abort;
-			}
-			/*
-			 * is the desc_nr unique?
-			 */
-			ITERATE_RDEV(mddev,rdev2,tmp2) {
-				if ((rdev2 != rdev) &&
-						(rdev2->desc_nr == rdev->desc_nr)) {
-					MD_BUG();
-					goto abort;
-				}
-			}
-			/*
-			 * is the device unique?
-			 */
-			ITERATE_RDEV(mddev,rdev2,tmp2) {
-				if (rdev2 != rdev &&
-				    kdev_same(rdev2->dev, rdev->dev)) {
-					MD_BUG();
-					goto abort;
-				}
-			}
-		}
-	}
 
 	/*
 	 * Check if we can support this RAID array
@@ -2029,10 +1824,26 @@ static int get_version(void * arg)
 static int get_array_info(mddev_t * mddev, void * arg)
 {
 	mdu_array_info_t info;
+	int nr,working,active,failed,spare;
+	mdk_rdev_t *rdev;
+	struct list_head *tmp;
 
 	if (!mddev->sb) {
 		MD_BUG();
 		return -EINVAL;
+	}
+	nr=working=active=failed=spare=0;
+	ITERATE_RDEV(mddev,rdev,tmp) {
+		nr++;
+		if (rdev->faulty)
+			failed++;
+		else {
+			working++;
+			if (rdev->in_sync)
+				active++;	
+			else
+				spare++;
+		}
 	}
 
 	SET_FROM_SB(major_version);
@@ -2048,10 +1859,10 @@ static int get_array_info(mddev_t * mddev, void * arg)
 
 	SET_FROM_SB(utime);
 	SET_FROM_SB(state);
-	SET_FROM_SB(active_disks);
-	SET_FROM_SB(working_disks);
-	SET_FROM_SB(failed_disks);
-	SET_FROM_SB(spare_disks);
+	info.active_disks  = active;
+	info.working_disks = working;
+	info.failed_disks  = failed;
+	info.spare_disks   = spare;
 
 	SET_FROM_SB(layout);
 	SET_FROM_SB(chunk_size);
@@ -2063,11 +1874,12 @@ static int get_array_info(mddev_t * mddev, void * arg)
 }
 #undef SET_FROM_SB
 
-#define SET_FROM_SB(x) info.x = mddev->sb->disks[nr].x
+
 static int get_disk_info(mddev_t * mddev, void * arg)
 {
 	mdu_disk_info_t info;
 	unsigned int nr;
+	mdk_rdev_t *rdev;
 
 	if (!mddev->sb)
 		return -EINVAL;
@@ -2079,25 +1891,34 @@ static int get_disk_info(mddev_t * mddev, void * arg)
 	if (nr >= MD_SB_DISKS)
 		return -EINVAL;
 
-	SET_FROM_SB(major);
-	SET_FROM_SB(minor);
-	SET_FROM_SB(raid_disk);
-	SET_FROM_SB(state);
+	rdev = find_rdev_nr(mddev, nr);
+	if (rdev) {
+		info.major = major(rdev->dev);
+		info.minor = minor(rdev->dev);
+		info.raid_disk = rdev->raid_disk;
+		info.state = 0;
+		if (rdev->faulty)
+			info.state |= (1<<MD_DISK_FAULTY);
+		else if (rdev->in_sync) {
+			info.state |= (1<<MD_DISK_ACTIVE);
+			info.state |= (1<<MD_DISK_SYNC);
+		}
+	} else {
+		info.major = info.minor = 0;
+		info.raid_disk = 0;
+		info.state = (1<<MD_DISK_REMOVED);
+	}
 
 	if (copy_to_user(arg, &info, sizeof(info)))
 		return -EFAULT;
 
 	return 0;
 }
-#undef SET_FROM_SB
-
-#define SET_SB(x) mddev->sb->disks[nr].x = info->x
 
 static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 {
 	int size, persistent;
 	mdk_rdev_t *rdev;
-	unsigned int nr;
 	kdev_t dev;
 	dev = mk_kdev(info->major,info->minor);
 	if (!mddev->sb) {
@@ -2127,19 +1948,6 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 		return 0;
 	}
 
-	nr = info->number;
-	if (nr >= mddev->sb->nr_disks) {
-		MD_BUG();
-		return -EINVAL;
-	}
-
-
-	SET_SB(number);
-	SET_SB(major);
-	SET_SB(minor);
-	SET_SB(raid_disk);
-	SET_SB(state);
-
 	if (!(info->state & (1<<MD_DISK_FAULTY))) {
 		rdev = md_import_device (dev, 0);
 		if (IS_ERR(rdev)) {
@@ -2168,20 +1976,13 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 			mddev->sb->size = size;
 	}
 
-	/*
-	 * sync all other superblocks with the main superblock
-	 */
-	sync_sbs(mddev);
-
 	return 0;
 }
-#undef SET_SB
 
 static int hot_generate_error(mddev_t * mddev, kdev_t dev)
 {
 	struct request_queue *q;
 	mdk_rdev_t *rdev;
-	mdp_disk_t *disk;
 
 	if (!mddev->pers)
 		return -ENODEV;
@@ -2199,8 +2000,7 @@ static int hot_generate_error(mddev_t * mddev, kdev_t dev)
 		MD_BUG();
 		return -EINVAL;
 	}
-	disk = &mddev->sb->disks[rdev->desc_nr];
-	if (!disk_active(disk))
+	if (!rdev->in_sync)
 		return -ENODEV;
 
 	q = bdev_get_queue(rdev->bdev);
@@ -2218,7 +2018,6 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 {
 	int err;
 	mdk_rdev_t *rdev;
-	mdp_disk_t *disk;
 
 	if (!mddev->pers)
 		return -ENODEV;
@@ -2236,21 +2035,10 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 	if (!rdev)
 		return -ENXIO;
 
-	if (rdev->desc_nr == -1) {
-		MD_BUG();
-		return -EINVAL;
-	}
-	disk = &mddev->sb->disks[rdev->desc_nr];
-	if (disk_active(disk)) {
-		MD_BUG();
+	if (rdev->in_sync && ! rdev->faulty)
 		goto busy;
-	}
-	if (disk_removed(disk)) {
-		MD_BUG();
-		return -EINVAL;
-	}
 
-	err = mddev->pers->hot_remove_disk(mddev, disk->raid_disk);
+	err = mddev->pers->hot_remove_disk(mddev, rdev->raid_disk);
 	if (err == -EBUSY) {
 		MD_BUG();
 		goto busy;
@@ -2260,7 +2048,6 @@ static int hot_remove_disk(mddev_t * mddev, kdev_t dev)
 		return -EINVAL;
 	}
 
-	remove_descriptor(disk, mddev->sb);
 	kick_rdev_from_array(rdev);
 	md_update_sb(mddev);
 
@@ -2276,7 +2063,6 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	int i, err, persistent;
 	unsigned int size;
 	mdk_rdev_t *rdev;
-	mdp_disk_t *disk;
 
 	if (!mddev->pers)
 		return -ENODEV;
@@ -2289,10 +2075,6 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 		       mdidx(mddev));
 		return -EINVAL;
 	}
-
-	rdev = find_rdev(mddev, dev);
-	if (rdev)
-		return -EBUSY;
 
 	rdev = md_import_device (dev, 0);
 	if (IS_ERR(rdev)) {
@@ -2326,15 +2108,10 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 	rdev->size = size;
 	rdev->sb_offset = calc_dev_sboffset(rdev, mddev, persistent);
 
-	disk = mddev->sb->disks + mddev->sb->raid_disks;
-	for (i = mddev->sb->raid_disks; i < MD_SB_DISKS; i++) {
-		disk = mddev->sb->disks + i;
+	for (i = mddev->sb->raid_disks; i < MD_SB_DISKS; i++)
+		if (find_rdev_nr(mddev,i)==NULL)
+			break;
 
-		if (!disk->major && !disk->minor)
-			break;
-		if (disk_removed(disk))
-			break;
-	}
 	if (i == MD_SB_DISKS) {
 		printk(KERN_WARNING "md%d: can not hot-add to full array!\n",
 		       mdidx(mddev));
@@ -2342,33 +2119,14 @@ static int hot_add_disk(mddev_t * mddev, kdev_t dev)
 		goto abort_unbind_export;
 	}
 
-	if (disk_removed(disk)) {
-		/*
-		 * reuse slot
-		 */
-		if (disk->number != i) {
-			MD_BUG();
-			err = -EINVAL;
-			goto abort_unbind_export;
-		}
-	} else {
-		disk->number = i;
-	}
+	rdev->desc_nr = i;
+	rdev->raid_disk = i;
 
-	disk->raid_disk = disk->number;
-	disk->major = major(dev);
-	disk->minor = minor(dev);
-
-	if (mddev->pers->hot_add_disk(mddev, disk, rdev)) {
+	if (mddev->pers->hot_add_disk(mddev, rdev)) {
 		MD_BUG();
 		err = -EINVAL;
 		goto abort_unbind_export;
 	}
-
-	mark_disk_spare(disk);
-	mddev->sb->nr_disks++;
-	mddev->sb->spare_disks++;
-	mddev->sb->working_disks++;
 
 	md_update_sb(mddev);
 
@@ -2408,10 +2166,6 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 	SET_SB(not_persistent);
 
 	SET_SB(state);
-	SET_SB(active_disks);
-	SET_SB(working_disks);
-	SET_SB(failed_disks);
-	SET_SB(spare_disks);
 
 	SET_SB(layout);
 	SET_SB(chunk_size);
@@ -3076,28 +2830,18 @@ int unregister_md_personality(int pnum)
 	return 0;
 }
 
-mdp_disk_t *get_spare(mddev_t *mddev)
+static mdk_rdev_t *get_spare(mddev_t *mddev)
 {
-	mdp_super_t *sb = mddev->sb;
-	mdp_disk_t *disk;
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		if (rdev->faulty)
 			continue;
-		if (!rdev->sb) {
-			MD_BUG();
+		if (rdev->in_sync)
 			continue;
-		}
-		disk = &sb->disks[rdev->desc_nr];
-		if (disk_faulty(disk)) {
-			MD_BUG();
-			continue;
-		}
-		if (disk_active(disk))
-			continue;
-		return disk;
+
+		return rdev;
 	}
 	return NULL;
 }
@@ -3365,10 +3109,7 @@ void md_do_recovery(void *data)
 				/* success...*/
 				if (mddev->spare) {
 					mddev->pers->spare_active(mddev);
-					mark_disk_sync(mddev->spare);
-					mark_disk_active(mddev->spare);
-					sb->active_disks++;
-					sb->spare_disks--;
+					mddev->spare->in_sync = 1;
 					mddev->spare = NULL;
 				}
 			}
@@ -3390,7 +3131,7 @@ void md_do_recovery(void *data)
 				       "-- continuing in degraded mode\n", mdidx(mddev));
 			else
 				printk(KERN_INFO "md%d: resyncing spare disk %s to replace failed disk\n",
-				       mdidx(mddev), partition_name(mk_kdev(mddev->spare->major,mddev->spare->minor)));
+				       mdidx(mddev), partition_name(mddev->spare->dev));
 		}
 		if (!mddev->spare && mddev->in_sync) {
 			/* nothing we can do ... */
@@ -3749,10 +3490,6 @@ void __init md_setup_drive(void)
 			ainfo.not_persistent = 1;
 
 			ainfo.state = (1 << MD_SB_CLEAN);
-			ainfo.active_disks = 0;
-			ainfo.working_disks = 0;
-			ainfo.failed_disks = 0;
-			ainfo.spare_disks = 0;
 			ainfo.layout = 0;
 			ainfo.chunk_size = md_setup_args.chunk[minor];
 			err = set_array_info(mddev, &ainfo);
@@ -3765,10 +3502,7 @@ void __init md_setup_drive(void)
 				dinfo.state = (1<<MD_DISK_ACTIVE)|(1<<MD_DISK_SYNC);
 				dinfo.major = major(dev);
 				dinfo.minor = minor(dev);
-				mddev->sb->nr_disks++;
 				mddev->sb->raid_disks++;
-				mddev->sb->active_disks++;
-				mddev->sb->working_disks++;
 				err = add_new_disk (mddev, &dinfo);
 			}
 		} else {
@@ -3883,5 +3617,4 @@ EXPORT_SYMBOL(md_wakeup_thread);
 EXPORT_SYMBOL(md_print_devices);
 EXPORT_SYMBOL(find_rdev_nr);
 EXPORT_SYMBOL(md_interrupt_thread);
-EXPORT_SYMBOL(get_spare);
 MODULE_LICENSE("GPL");

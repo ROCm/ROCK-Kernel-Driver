@@ -442,7 +442,6 @@ static void raid5_build_block (struct stripe_head *sh, int i)
 static int error(mddev_t *mddev, struct block_device *bdev)
 {
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
-	mdp_super_t *sb = mddev->sb;
 	struct disk_info *disk;
 	int i;
 
@@ -453,12 +452,6 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 			continue;
 		if (disk->operational) {
 			disk->operational = 0;
-			mark_disk_faulty(sb->disks+disk->number);
-			mark_disk_nonsync(sb->disks+disk->number);
-			mark_disk_inactive(sb->disks+disk->number);
-			sb->active_disks--;
-			sb->working_disks--;
-			sb->failed_disks++;
 			mddev->sb_dirty = 1;
 			mddev->degraded++;
 			conf->working_disks--;
@@ -486,12 +479,6 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 			disk->operational = 0;
 			disk->write_only = 0;
 			conf->spare = NULL;
-			mark_disk_faulty(sb->disks+disk->number);
-			mark_disk_nonsync(sb->disks+disk->number);
-			mark_disk_inactive(sb->disks+disk->number);
-			sb->spare_disks--;
-			sb->working_disks--;
-			sb->failed_disks++;
 
 			mddev->sb_dirty = 1;
 
@@ -1376,9 +1363,8 @@ static void raid5d (void *data)
 static int run (mddev_t *mddev)
 {
 	raid5_conf_t *conf;
-	int i, j, raid_disk, memory;
+	int i, raid_disk, memory;
 	mdp_super_t *sb = mddev->sb;
-	mdp_disk_t *desc;
 	mdk_rdev_t *rdev;
 	struct disk_info *disk;
 	struct list_head *tmp;
@@ -1419,17 +1405,12 @@ static int run (mddev_t *mddev)
 		 * the disk only to get a pointer to the descriptor on
 		 * the main superblock, which might be more recent.
 		 */
-		desc = sb->disks + rdev->desc_nr;
-		raid_disk = desc->raid_disk;
+		raid_disk = rdev->raid_disk;
 		disk = conf->disks + raid_disk;
 
-		if (disk_faulty(desc)) {
+		if (rdev->faulty) {
 			printk(KERN_ERR "raid5: disabled device %s (errors detected)\n", bdev_partition_name(rdev->bdev));
-			if (!rdev->faulty) {
-				MD_BUG();
-				goto abort;
-			}
-			disk->number = desc->number;
+			disk->number = rdev->desc_nr;
 			disk->raid_disk = raid_disk;
 			disk->bdev = rdev->bdev;
 
@@ -1439,23 +1420,14 @@ static int run (mddev_t *mddev)
 			disk->used_slot = 1;
 			continue;
 		}
-		if (disk_active(desc)) {
-			if (!disk_sync(desc)) {
-				printk(KERN_ERR "raid5: disabled device %s (not in sync)\n", bdev_partition_name(rdev->bdev));
-				MD_BUG();
-				goto abort;
-			}
-			if (raid_disk > sb->raid_disks) {
-				printk(KERN_ERR "raid5: disabled device %s (inconsistent descriptor)\n", bdev_partition_name(rdev->bdev));
-				continue;
-			}
+		if (rdev->in_sync) {
 			if (disk->operational) {
 				printk(KERN_ERR "raid5: disabled device %s (device %d already operational)\n", bdev_partition_name(rdev->bdev), raid_disk);
 				continue;
 			}
 			printk(KERN_INFO "raid5: device %s operational as raid disk %d\n", bdev_partition_name(rdev->bdev), raid_disk);
 	
-			disk->number = desc->number;
+			disk->number = rdev->desc_nr;
 			disk->raid_disk = raid_disk;
 			disk->bdev = rdev->bdev;
 			disk->operational = 1;
@@ -1467,7 +1439,7 @@ static int run (mddev_t *mddev)
 			 * Must be a spare disk ..
 			 */
 			printk(KERN_INFO "raid5: spare disk %s\n", bdev_partition_name(rdev->bdev));
-			disk->number = desc->number;
+			disk->number = rdev->desc_nr;
 			disk->raid_disk = raid_disk;
 			disk->bdev = rdev->bdev;
 
@@ -1478,16 +1450,13 @@ static int run (mddev_t *mddev)
 		}
 	}
 
-	for (i = 0; i < MD_SB_DISKS; i++) {
-		desc = sb->disks + i;
-		raid_disk = desc->raid_disk;
-		disk = conf->disks + raid_disk;
+	for (i = 0; i < sb->raid_disks; i++) {
+		disk = conf->disks + i;
 
-		if (disk_faulty(desc) && (raid_disk < sb->raid_disks) &&
-			!conf->disks[raid_disk].used_slot) {
+		if (!disk->used_slot) {
 
-			disk->number = desc->number;
-			disk->raid_disk = raid_disk;
+			disk->number = i;
+			disk->raid_disk = i;
 			disk->bdev = NULL;
 
 			disk->operational = 0;
@@ -1555,22 +1524,7 @@ static int run (mddev_t *mddev)
 	} else
 		printk(KERN_INFO "raid5: allocated %dkB for md%d\n", memory, mdidx(mddev));
 
-	/*
-	 * Regenerate the "device is in sync with the raid set" bit for
-	 * each device.
-	 */
-	for (i = 0; i < MD_SB_DISKS ; i++) {
-		mark_disk_nonsync(sb->disks + i);
-		for (j = 0; j < sb->raid_disks; j++) {
-			if (!conf->disks[j].operational)
-				continue;
-			if (sb->disks[i].number == conf->disks[j].number)
-				mark_disk_sync(sb->disks + i);
-		}
-	}
-	sb->active_disks = conf->working_disks;
-
-	if (sb->active_disks == sb->raid_disks)
+	if (conf->working_disks == conf->raid_disks)
 		printk("raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev), sb->active_disks, sb->raid_disks, conf->algorithm);
 	else
 		printk(KERN_ALERT "raid5: raid level %d set md%d active with %d out of %d devices, algorithm %d\n", conf->level, mdidx(mddev), sb->active_disks, sb->raid_disks, conf->algorithm);
@@ -1693,8 +1647,6 @@ static int raid5_spare_active(mddev_t *mddev)
 	int i, failed_disk=-1, spare_disk=-1;
 	raid5_conf_t *conf = mddev->private;
 	struct disk_info *tmp, *sdisk, *fdisk;
-	mdp_super_t *sb = mddev->sb;
-	mdp_disk_t *failed_desc, *spare_desc;
 	mdk_rdev_t *spare_rdev, *failed_rdev;
 
 	print_raid5_conf(conf);
@@ -1726,17 +1678,6 @@ static int raid5_spare_active(mddev_t *mddev)
 	sdisk = conf->disks + spare_disk;
 	fdisk = conf->disks + failed_disk;
 
-	spare_desc = &sb->disks[sdisk->number];
-	failed_desc = &sb->disks[fdisk->number];
-
-	if ( spare_desc->raid_disk != sdisk->raid_disk ||
-	    sdisk->raid_disk != spare_disk || fdisk->raid_disk != failed_disk ||
-	    failed_desc->raid_disk != fdisk->raid_disk) {
-		MD_BUG();
-		err = 1;
-		goto abort;
-	}
-
 	/*
 	 * do the switch finally
 	 */
@@ -1746,15 +1687,13 @@ static int raid5_spare_active(mddev_t *mddev)
 	/* There must be a spare_rdev, but there may not be a
 	 * failed_rdev.  That slot might be empty...
 	 */
-	spare_rdev->desc_nr = failed_desc->number;
+	spare_rdev->desc_nr = failed_disk;
 	spare_rdev->raid_disk = failed_disk;
 	if (failed_rdev) {
-		failed_rdev->desc_nr = spare_desc->number;
+		failed_rdev->desc_nr = spare_disk;
 		failed_rdev->raid_disk = spare_disk;
 	}
-	spare_rdev->in_sync = 1;
 	
-	xchg_values(*spare_desc, *failed_desc);
 	xchg_values(*fdisk, *sdisk);
 
 	/*
@@ -1765,9 +1704,7 @@ static int raid5_spare_active(mddev_t *mddev)
 	 * disk. (this means we switch back these values)
 	 */
 
-	xchg_values(spare_desc->raid_disk, failed_desc->raid_disk);
 	xchg_values(sdisk->raid_disk, fdisk->raid_disk);
-	xchg_values(spare_desc->number, failed_desc->number);
 	xchg_values(sdisk->number, fdisk->number);
 
 	if (!sdisk->bdev)
@@ -1865,12 +1802,11 @@ abort:
 	return err;
 }
 
-static int raid5_add_disk(mddev_t *mddev, mdp_disk_t *added_desc,
-	mdk_rdev_t *rdev)
+static int raid5_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	raid5_conf_t *conf = mddev->private;
 	int err = 1;
-	int i;
+	struct disk_info *p = conf->disks + rdev->raid_disk;
 
 	print_raid5_conf(conf);
 	spin_lock_irq(&conf->device_lock);
@@ -1878,22 +1814,16 @@ static int raid5_add_disk(mddev_t *mddev, mdp_disk_t *added_desc,
 	 * find the disk ...
 	 */
 
-	for (i = conf->raid_disks; i < MD_SB_DISKS; i++) {
-		struct disk_info *p = conf->disks + i;
-		if (!p->used_slot) {
-			if (added_desc->number != i)
-				break;
-			p->number = added_desc->number;
-			p->raid_disk = added_desc->raid_disk;
-			/* it will be held open by rdev */
-			p->bdev = rdev->bdev;
-			p->operational = 0;
-			p->write_only = 0;
-			p->spare = 1;
-			p->used_slot = 1;
-			err = 0;
-			break;
-		}
+	if (!p->used_slot) {
+		p->number = rdev->desc_nr;
+		p->raid_disk = rdev->raid_disk;
+		/* it will be held open by rdev */
+		p->bdev = rdev->bdev;
+		p->operational = 0;
+		p->write_only = 0;
+		p->spare = 1;
+		p->used_slot = 1;
+		err = 0;
 	}
 	if (err)
 		MD_BUG();

@@ -190,7 +190,7 @@ struct mddev_s
 	int				in_sync;	/* know to not need resync */
 	struct semaphore		reconfig_sem;
 	atomic_t			active;
-	mdp_disk_t			*spare;
+	mdk_rdev_t			*spare;
 
 	int				degraded;	/* whether md should consider
 							 * adding a spare
@@ -212,7 +212,7 @@ struct mdk_personality_s
 	int (*stop)(mddev_t *mddev);
 	int (*status)(char *page, mddev_t *mddev);
 	int (*error_handler)(mddev_t *mddev, struct block_device *bdev);
-	int (*hot_add_disk) (mddev_t *mddev, mdp_disk_t *descriptor, mdk_rdev_t *rdev);
+	int (*hot_add_disk) (mddev_t *mddev, mdk_rdev_t *rdev);
 	int (*hot_remove_disk) (mddev_t *mddev, int number);
 	int (*spare_write) (mddev_t *mddev);
 	int (*spare_inactive) (mddev_t *mddev);
@@ -238,7 +238,7 @@ static inline kdev_t mddev_to_kdev(mddev_t * mddev)
 
 extern mdk_rdev_t * find_rdev(mddev_t * mddev, kdev_t dev);
 extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
-extern mdp_disk_t *get_spare(mddev_t *mddev);
+extern mdk_rdev_t *get_spare(mddev_t *mddev);
 
 /*
  * iterates through some rdev ringlist. It's safe to remove the

@@ -214,15 +214,8 @@ static void mark_disk_bad (mddev_t *mddev, int failed)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	struct multipath_info *multipath = conf->multipaths+failed;
-	mdp_super_t *sb = mddev->sb;
 
 	multipath->operational = 0;
-	mark_disk_faulty(sb->disks+multipath->number);
-	mark_disk_nonsync(sb->disks+multipath->number);
-	mark_disk_inactive(sb->disks+multipath->number);
-	sb->active_disks--;
-	sb->working_disks--;
-	sb->failed_disks++;
 	mddev->sb_dirty = 1;
 	conf->working_disks--;
 	printk (DISK_FAILED, bdev_partition_name (multipath->bdev),
@@ -296,30 +289,23 @@ static void print_multipath_conf (multipath_conf_t *conf)
 }
 
 
-static int multipath_add_disk(mddev_t *mddev, mdp_disk_t *added_desc,
-	mdk_rdev_t *rdev)
+static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	multipath_conf_t *conf = mddev->private;
 	int err = 1;
-	int i;
+	struct multipath_info *p = conf->multipaths + rdev->raid_disk;
 
 	print_multipath_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	for (i = 0; i < MD_SB_DISKS; i++) {
-		struct multipath_info *p = conf->multipaths + i;
-		if (!p->used_slot) {
-			if (added_desc->number != i)
-				break;
-			p->number = added_desc->number;
-			p->raid_disk = added_desc->raid_disk;
-			p->bdev = rdev->bdev;
-			p->operational = 1;
-			p->used_slot = 1;
-			conf->nr_disks++;
-			conf->working_disks++;
-			err = 0;
-			break;
-		}
+	if (!p->used_slot) {
+		p->number = rdev->desc_nr;
+		p->raid_disk = rdev->raid_disk;
+		p->bdev = rdev->bdev;
+		p->operational = 1;
+		p->used_slot = 1;
+		conf->nr_disks++;
+		conf->working_disks++;
+		err = 0;
 	}
 	if (err)
 		MD_BUG();
@@ -451,10 +437,9 @@ static void multipathd (void *data)
 static int multipath_run (mddev_t *mddev)
 {
 	multipath_conf_t *conf;
-	int i, j, disk_idx;
+	int disk_idx;
 	struct multipath_info *disk;
 	mdp_super_t *sb = mddev->sb;
-	mdp_disk_t *desc;
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 	int num_rdevs = 0;
@@ -498,32 +483,24 @@ static int multipath_run (mddev_t *mddev)
 			continue;
 		}
 
-		desc = &sb->disks[rdev->desc_nr];
-		disk_idx = desc->raid_disk;
+		disk_idx = rdev->raid_disk;
 		disk = conf->multipaths + disk_idx;
-
-		if (!disk_sync(desc))
-			printk(NOT_IN_SYNC, bdev_partition_name(rdev->bdev));
 
 		/*
 		 * Mark all disks as active to start with, there are no
 		 * spares.  multipath_read_balance deals with choose
 		 * the "best" operational device.
 		 */
-		disk->number = desc->number;
-		disk->raid_disk = desc->raid_disk;
+		disk->number = rdev->desc_nr;
+		disk->raid_disk = disk_idx;
 		disk->bdev = rdev->bdev;
 		disk->operational = 1;
 		disk->used_slot = 1;
-		mark_disk_sync(desc);
-		mark_disk_active(desc);
 		num_rdevs++;
 	}
 
-	conf->raid_disks = sb->raid_disks = sb->active_disks = num_rdevs;
-	conf->nr_disks = sb->nr_disks = sb->working_disks = num_rdevs;
-	sb->failed_disks = 0;
-	sb->spare_disks = 0;
+	conf->raid_disks = sb->raid_disks = num_rdevs;
+	conf->nr_disks = num_rdevs;
 	mddev->sb_dirty = 1;
 	conf->mddev = mddev;
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
@@ -548,18 +525,6 @@ static int multipath_run (mddev_t *mddev)
 		if (!conf->thread) {
 			printk(THREAD_ERROR, mdidx(mddev));
 			goto out_free_conf;
-		}
-	}
-
-	/*
-	 * Regenerate the "device is in sync with the raid set" bit for
-	 * each device.
-	 */
-	for (i = 0; i < MD_SB_DISKS; i++) {
-		mark_disk_nonsync(sb->disks+i);
-		for (j = 0; j < sb->raid_disks; j++) {
-			if (sb->disks[i].number == conf->multipaths[j].number)
-				mark_disk_sync(sb->disks+i);
 		}
 	}
 
