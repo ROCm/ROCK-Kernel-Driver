@@ -657,7 +657,7 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * calling usb_alloc_urb() and freed with a call to usb_free_urb().
  * Initialization may be done using various usb_fill_*_urb() functions.  URBs
  * are submitted using usb_submit_urb(), and pending requests may be canceled
- * using usb_unlink_urb().
+ * using usb_unlink_urb() or usb_kill_urb().
  *
  * Data Transfer Buffers:
  *
@@ -684,7 +684,9 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * All URBs submitted must initialize dev, pipe,
  * transfer_flags (may be zero), complete, timeout (may be zero).
  * The URB_ASYNC_UNLINK transfer flag affects later invocations of
- * the usb_unlink_urb() routine.
+ * the usb_unlink_urb() routine.  Note: Failure to set URB_ASYNC_UNLINK
+ * with usb_unlink_urb() is deprecated.  For synchronous unlinks use
+ * usb_kill_urb() instead.
  *
  * All URBs must also initialize 
  * transfer_buffer and transfer_buffer_length.  They may provide the
@@ -762,6 +764,8 @@ struct urb
 	void *hcpriv;			/* private data for host controller */
 	struct list_head urb_list;	/* list pointer to all active urbs */
 	int bandwidth;			/* bandwidth for INT/ISO request */
+	atomic_t use_count;		/* concurrent submissions counter */
+	u8 reject;			/* submissions will fail */
 
 	/* public, documented fields in the urb that can be used by drivers */
 	struct usb_device *dev; 	/* (in) pointer to associated device */
@@ -897,6 +901,7 @@ extern void usb_free_urb(struct urb *urb);
 extern struct urb *usb_get_urb(struct urb *urb);
 extern int usb_submit_urb(struct urb *urb, int mem_flags);
 extern int usb_unlink_urb(struct urb *urb);
+extern void usb_kill_urb(struct urb *urb);
 
 #define HAVE_USB_BUFFERS
 void *usb_buffer_alloc (struct usb_device *dev, size_t size,
