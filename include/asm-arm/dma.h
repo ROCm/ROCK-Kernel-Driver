@@ -74,6 +74,10 @@ extern void enable_dma(dmach_t channel);
  */
 extern void disable_dma(dmach_t channel);
 
+/* Test whether the specified channel has an active DMA transfer
+ */
+extern int dma_channel_active(dmach_t channel);
+
 /* Set the DMA scatter gather list for this channel
  *
  * This should not be called if a DMA channel is enabled,

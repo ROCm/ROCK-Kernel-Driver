@@ -33,10 +33,6 @@ typedef enum {
 	dma_size_32	= 4,
 	dma_size_128	= 16
 } dma_size_t;
-
-typedef struct {
-	dma_size_t	transfersize;
-} dma_t;
 #endif
 
 #define TRANSFER_SIZE	2
@@ -47,10 +43,6 @@ typedef struct {
 #define ENDB	(IOMD_IO0ENDB - IOMD_IO0CURA)
 #define CR	(IOMD_IO0CR - IOMD_IO0CURA)
 #define ST	(IOMD_IO0ST - IOMD_IO0CURA)
-
-#define state_prog_a	0
-#define state_wait_a	1
-#define state_wait_b	2
 
 static void iomd_get_next_sg(struct scatterlist *sg, dma_t *dma)
 {
@@ -91,76 +83,40 @@ static void iomd_get_next_sg(struct scatterlist *sg, dma_t *dma)
 	sg->length |= flags;
 }
 
-static inline void iomd_setup_dma_a(struct scatterlist *sg, dma_t *dma)
-{
-	iomd_writel(sg->dma_address, dma->dma_base + CURA);
-	iomd_writel(sg->length, dma->dma_base + ENDA);
-}
-
-static inline void iomd_setup_dma_b(struct scatterlist *sg, dma_t *dma)
-{
-	iomd_writel(sg->dma_address, dma->dma_base + CURB);
-	iomd_writel(sg->length, dma->dma_base + ENDB);
-}
-
 static void iomd_dma_handle(int irq, void *dev_id, struct pt_regs *regs)
 {
 	dma_t *dma = (dma_t *)dev_id;
-	unsigned int status = 0, no_buffer = dma->sg == NULL;
+	unsigned long base = dma->dma_base;
 
 	do {
-		switch (dma->state) {
-		case state_prog_a:
-			iomd_get_next_sg(&dma->cur_sg, dma);
-			iomd_setup_dma_a(&dma->cur_sg, dma);
-			dma->state = state_wait_a;
+		unsigned int status;
 
-		case state_wait_a:
-			status = iomd_readb(dma->dma_base + ST);
-			switch (status & (DMA_ST_OFL|DMA_ST_INT|DMA_ST_AB)) {
-			case DMA_ST_OFL|DMA_ST_INT:
-				iomd_get_next_sg(&dma->cur_sg, dma);
-				iomd_setup_dma_a(&dma->cur_sg, dma);
-				break;
+		status = iomd_readb(base + ST);
+		if (!(status & DMA_ST_INT))
+			return;
 
-			case DMA_ST_INT:
-				iomd_get_next_sg(&dma->cur_sg, dma);
-				iomd_setup_dma_b(&dma->cur_sg, dma);
-				dma->state = state_wait_b;
-				break;
-
-			case DMA_ST_OFL|DMA_ST_INT|DMA_ST_AB:
-				iomd_setup_dma_b(&dma->cur_sg, dma);
-				dma->state = state_wait_b;
-				break;
-			}
+		if (status & DMA_ST_OFL && !dma->sg)
 			break;
 
-		case state_wait_b:
-			status = iomd_readb(dma->dma_base + ST);
-			switch (status & (DMA_ST_OFL|DMA_ST_INT|DMA_ST_AB)) {
-			case DMA_ST_OFL|DMA_ST_INT|DMA_ST_AB:
-				iomd_get_next_sg(&dma->cur_sg, dma);
-				iomd_setup_dma_b(&dma->cur_sg, dma);
-				break;
+		iomd_get_next_sg(&dma->cur_sg, dma);
 
-			case DMA_ST_INT|DMA_ST_AB:
-				iomd_get_next_sg(&dma->cur_sg, dma);
-				iomd_setup_dma_a(&dma->cur_sg, dma);
-				dma->state = state_wait_a;
-				break;
+		switch (status & (DMA_ST_OFL | DMA_ST_AB)) {
+		case DMA_ST_OFL:			/* OIA */
+		case DMA_ST_AB:				/* .IB */
+			iomd_writel(dma->cur_sg.dma_address, base + CURA);
+			iomd_writel(dma->cur_sg.length, base + ENDA);
+			break;
 
-			case DMA_ST_OFL|DMA_ST_INT:
-				iomd_setup_dma_a(&dma->cur_sg, dma);
-				dma->state = state_wait_a;
-				break;
-			}
+		case DMA_ST_OFL | DMA_ST_AB:		/* OIB */
+		case 0:					/* .IA */
+			iomd_writel(dma->cur_sg.dma_address, base + CURB);
+			iomd_writel(dma->cur_sg.length, base + ENDB);
 			break;
 		}
-	} while (dma->sg && (status & DMA_ST_INT));
+	} while (1);
 
-	if (no_buffer)
-		disable_irq(irq);
+	iomd_writeb(0, dma->dma_base + CR);
+	disable_irq(irq);
 }
 
 static int iomd_request_dma(dmach_t channel, dma_t *dma)
@@ -194,7 +150,6 @@ static void iomd_enable_dma(dmach_t channel, dma_t *dma)
 		}
 
 		iomd_writeb(DMA_CR_C, dma_base + CR);
-		dma->state = state_prog_a;
 	}
 		
 	if (dma->dma_mode == DMA_MODE_READ)
@@ -207,11 +162,15 @@ static void iomd_enable_dma(dmach_t channel, dma_t *dma)
 static void iomd_disable_dma(dmach_t channel, dma_t *dma)
 {
 	unsigned long dma_base = dma->dma_base;
+	unsigned long flags;
 	unsigned int ctrl;
 
-	disable_irq(dma->dma_irq);
+	local_irq_save(flags);
 	ctrl = iomd_readb(dma_base + CR);
+	if (ctrl & DMA_CR_E)
+		disable_irq(dma->dma_irq);
 	iomd_writeb(ctrl & ~DMA_CR_E, dma_base + CR);
+	local_irq_restore(flags);
 }
 
 static int iomd_set_dma_speed(dmach_t channel, dma_t *dma, int cycle)
