@@ -1952,6 +1952,9 @@ long
 sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
 {
 	struct sigevent se;
+       mm_segment_t oldfs;
+       long err;
+
 	if (se32) { 
 		memset(&se, 0, sizeof(struct sigevent)); 
 		if (get_user(se.sigev_value.sival_int,  &se32->sigev_value) ||
@@ -1964,9 +1967,9 @@ sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
 	if (!access_ok(VERIFY_WRITE,timer_id,sizeof(timer_t)))
 		return -EFAULT;
 
-	mm_segment_t oldfs = get_fs();
+       oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	long err = sys_timer_create(clock, se32 ? &se : NULL, timer_id);
+       err = sys_timer_create(clock, se32 ? &se : NULL, timer_id);
 	set_fs(oldfs); 
 	
 	return err; 
