@@ -21,9 +21,6 @@
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
 
-DECLARE_MUTEX(device_sem);
-
-
 /*
  * sysfs bindings for devices.
  */
@@ -222,11 +219,11 @@ int device_add(struct device *dev)
 		goto register_done;
 
 	/* now take care of our own registration */
-	if (parent) {
-		down(&device_sem);
+
+	down_write(&devices_subsys.rwsem);
+	if (parent)
 		list_add_tail(&dev->node,&parent->children);
-		up(&device_sem);
-	}
+	up_write(&devices_subsys.rwsem);
 
 	bus_add_device(dev);
 
@@ -304,11 +301,10 @@ void device_del(struct device * dev)
 {
 	struct device * parent = dev->parent;
 
-	if (parent) {
-		down(&device_sem);
+	down_write(&devices_subsys.rwsem);
+	if (parent)
 		list_del_init(&dev->node);
-		up(&device_sem);
-	}
+	up_write(&devices_subsys.rwsem);
 
 	/* Notify the platform of the removal, in case they
 	 * need to do anything...
