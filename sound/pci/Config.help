@@ -7,6 +7,10 @@ CONFIG_SND_CS46XX
 
 CONFIG_SND_CS46XX_ACCEPT_VALID
   Say 'Y' to allow sample resolution for mmap() transfers.
+  Note: This can be also specified via module option snd_mmap_valid.
+
+CONFIG_SND_CS4281
+  Say 'Y' or 'M' to include support for Cirrus Logic CS4281.
 
 CONFIG_SND_EMU10K1
   Say 'Y' or 'M' to include support for Sound Blaster PCI 512, Live!,

@@ -96,6 +96,7 @@ typedef struct _snd_pcm_ops {
 		    void *buf, snd_pcm_uframes_t count);
 	int (*silence)(snd_pcm_substream_t *substream, int channel, 
 		       snd_pcm_uframes_t pos, snd_pcm_uframes_t count);
+	void *(*page)(snd_pcm_substream_t *substream, unsigned long offset);
 } snd_pcm_ops_t;
 
 /*
@@ -771,6 +772,9 @@ int snd_pcm_hw_constraint_step(snd_pcm_runtime_t *runtime,
 			       unsigned int cond,
 			       snd_pcm_hw_param_t var,
 			       unsigned long step);
+int snd_pcm_hw_constraint_pow2(snd_pcm_runtime_t *runtime,
+			       unsigned int cond,
+			       snd_pcm_hw_param_t var);
 int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime,
 			unsigned int cond,
 			int var,

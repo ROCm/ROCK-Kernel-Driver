@@ -32,6 +32,7 @@
 #include <linux/init.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
+#include <sound/pcm_sgbuf.h>
 
 #define chip_t emu10k1_t
 
@@ -358,13 +359,13 @@ static int snd_emu10k1_playback_hw_params(snd_pcm_substream_t * substream,
 
 	if ((err = snd_emu10k1_pcm_channel_alloc(epcm, params_channels(hw_params))) < 0)
 		return err;
-	if ((err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params))) < 0)
+	if ((err = snd_pcm_sgbuf_alloc(substream, params_buffer_bytes(hw_params))) < 0)
 		return err;
 	if (err > 0) {	/* change */
 		snd_util_memblk_t *memblk;
 		if (epcm->memblk != NULL)
 			snd_emu10k1_free_pages(emu, epcm->memblk);
-		memblk = snd_emu10k1_alloc_pages(emu, runtime->dma_addr, runtime->dma_bytes);
+		memblk = snd_emu10k1_alloc_pages(emu, (struct snd_sg_buf *)substream->dma_private);
 		if ((epcm->memblk = memblk) == NULL || ((emu10k1_memblk_t *)memblk)->mapped_page < 0) {
 			epcm->start_addr = 0;
 			return -ENOMEM;
@@ -400,7 +401,7 @@ static int snd_emu10k1_playback_hw_free(snd_pcm_substream_t * substream)
 		epcm->memblk = NULL;
 		epcm->start_addr = 0;
 	}
-	snd_pcm_lib_free_pages(substream);
+	snd_pcm_sgbuf_free(substream);
 	return 0;
 }
 
@@ -778,6 +779,10 @@ static int snd_emu10k1_playback_open(snd_pcm_substream_t * substream)
 	runtime->private_data = epcm;
 	runtime->private_free = snd_emu10k1_pcm_free_substream;
 	runtime->hw = snd_emu10k1_playback;
+	if ((err = snd_pcm_sgbuf_init(substream, emu->pci, 32)) < 0) {
+		snd_magic_kfree(epcm);
+		return err;
+	}
 	if ((err = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS)) < 0) {
 		snd_magic_kfree(epcm);
 		return err;
@@ -804,6 +809,7 @@ static int snd_emu10k1_playback_close(snd_pcm_substream_t * substream)
 	emu10k1_pcm_mixer_t *mix = &emu->pcm_mixer[substream->number];
 
 	mix->epcm = NULL;
+	snd_pcm_sgbuf_delete(substream);
 	snd_emu10k1_pcm_mixer_notify(emu->card, mix, 0);
 	return 0;
 }
@@ -942,6 +948,9 @@ static snd_pcm_ops_t snd_emu10k1_playback_ops = {
 	prepare:		snd_emu10k1_playback_prepare,
 	trigger:		snd_emu10k1_playback_trigger,
 	pointer:		snd_emu10k1_playback_pointer,
+	copy:			snd_pcm_sgbuf_ops_copy_playback,
+	silence:		snd_pcm_sgbuf_ops_silence,
+	page:			snd_pcm_sgbuf_ops_page,
 };
 
 static snd_pcm_ops_t snd_emu10k1_capture_ops = {
@@ -959,7 +968,6 @@ static void snd_emu10k1_pcm_free(snd_pcm_t *pcm)
 {
 	emu10k1_t *emu = snd_magic_cast(emu10k1_t, pcm->private_data, return);
 	emu->pcm = NULL;
-	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
 int __devinit snd_emu10k1_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
@@ -983,8 +991,6 @@ int __devinit snd_emu10k1_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
 	pcm->dev_subclass = SNDRV_PCM_SUBCLASS_GENERIC_MIX;
 	strcpy(pcm->name, "EMU10K1");
 	emu->pcm = pcm;
-
-	snd_pcm_lib_preallocate_pci_pages_for_all(emu->pci, pcm, 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;

@@ -960,6 +960,26 @@ int snd_pcm_hw_constraint_step(snd_pcm_runtime_t *runtime,
 				   var, -1);
 }
 
+static int snd_pcm_hw_rule_pow2(snd_pcm_hw_params_t *params, snd_pcm_hw_rule_t *rule)
+{
+	static int pow2_sizes[] = {
+		1<<0, 1<<1, 1<<2, 1<<3, 1<<4, 1<<5, 1<<6, 1<<7,
+		1<<8, 1<<9, 1<<10, 1<<11, 1<<12, 1<<13, 1<<14, 1<<15,
+		1<<16, 1<<17, 1<<18, 1<<19, 1<<20, 1<<21, 1<<22, 1<<23,
+		1<<24, 1<<25, 1<<26, 1<<27, 1<<28, 1<<29, 1<<30
+	};
+	return snd_interval_list(hw_param_interval(params, rule->var),
+				 sizeof(pow2_sizes)/sizeof(int), pow2_sizes, 0);
+}		
+
+int snd_pcm_hw_constraint_pow2(snd_pcm_runtime_t *runtime,
+			       unsigned int cond,
+			       snd_pcm_hw_param_t var)
+{
+	return snd_pcm_hw_rule_add(runtime, cond, var, 
+				   snd_pcm_hw_rule_pow2, NULL,
+				   var, -1);
+}
 
 /* To use the same code we have in alsa-lib */
 #define snd_pcm_t snd_pcm_substream_t
@@ -2364,6 +2384,7 @@ EXPORT_SYMBOL(snd_pcm_hw_constraint_ratdens);
 EXPORT_SYMBOL(snd_pcm_hw_constraint_msbits);
 EXPORT_SYMBOL(snd_pcm_hw_constraint_minmax);
 EXPORT_SYMBOL(snd_pcm_hw_constraint_integer);
+EXPORT_SYMBOL(snd_pcm_hw_constraint_pow2);
 EXPORT_SYMBOL(snd_pcm_hw_rule_add);
 EXPORT_SYMBOL(snd_pcm_set_ops);
 EXPORT_SYMBOL(snd_pcm_set_sync);

@@ -3,7 +3,8 @@
 # Copyright (c) 1999,2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o hwdep.o
+export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o hwdep.o \
+                pcm_sgbuf.o
 
 snd-objs     := sound.o init.o isadma.o memory.o info.o control.o misc.o \
                 device.o wrappers.o
@@ -12,7 +13,7 @@ snd-objs     += sound_oss.o info_oss.o
 endif
 
 snd-pcm-objs := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
-		pcm_memory.o
+		pcm_memory.o pcm_sgbuf.o
 
 snd-rawmidi-objs  := rawmidi.o
 snd-timer-objs    := timer.o

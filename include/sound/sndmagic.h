@@ -61,6 +61,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define snd_pcm_proc_private_t_magic		0xa15a0104
 #define snd_pcm_oss_file_t_magic		0xa15a0105
 #define snd_mixer_oss_t_magic			0xa15a0106
+#define snd_pcm_sgbuf_t_magic			0xa15a0107
 
 #define snd_info_private_data_t_magic		0xa15a0201
 #define snd_ctl_file_t_magic			0xa15a0301

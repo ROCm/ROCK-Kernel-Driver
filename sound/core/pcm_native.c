@@ -2631,6 +2631,7 @@ static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 	snd_pcm_runtime_t *runtime;
 	unsigned long offset;
 	struct page * page;
+	void *vaddr;
 	size_t dma_bytes;
 	
 	if (substream == NULL)
@@ -2646,7 +2647,13 @@ static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 	dma_bytes = PAGE_ALIGN(runtime->dma_bytes);
 	if (offset > dma_bytes - PAGE_SIZE)
 		return NOPAGE_SIGBUS;
-	page = virt_to_page(runtime->dma_area + offset);
+	if (substream->ops->page) {
+		vaddr = substream->ops->page(substream, offset);
+		if (! vaddr)
+			return NOPAGE_OOM;
+	} else
+		vaddr = runtime->dma_area + offset;
+	page = virt_to_page(vaddr);
 	get_page(page);
 #ifndef LINUX_2_2
 	return page;

@@ -482,7 +482,6 @@ static inline int hdsp_write_gain(hdsp_t *hdsp, unsigned int addr, unsigned shor
 	if (hdsp_fifo_wait(hdsp, 127, HDSP_LONG_WAIT)) {
 		return -1;
 	}
-	
 	hdsp_write (hdsp, HDSP_fifoData, ad);
 	hdsp->mixer_matrix[addr] = data;
 
@@ -854,10 +853,7 @@ static int snd_hdsp_midi_output_write (hdsp_midi_t *hmidi)
 		}
 
 		if (clear_timer && hmidi->istimer && --hmidi->istimer <= 0) {
-			printk ("removing timer because there is nothing to do\n");
-			if (del_timer(&hmidi->timer)) {
-				printk ("not removed\n");
-			}
+			del_timer(&hmidi->timer);
 		} 
 	}
 
@@ -956,16 +952,12 @@ static void snd_hdsp_midi_output_trigger(snd_rawmidi_substream_t * substream, in
 			hmidi->timer.function = snd_hdsp_midi_output_timer;
 			hmidi->timer.data = (unsigned long) hmidi;
 			hmidi->timer.expires = 1 + jiffies;
-			printk ("add timer from output trigger\n");
 			add_timer(&hmidi->timer);
 			hmidi->istimer++;
 		}
 	} else {
 		if (hmidi->istimer && --hmidi->istimer <= 0) {
-			printk ("remove timer in trigger off\n");
-			if (del_timer (&hmidi->timer)) {
-				printk ("not removed\n");
-			}
+			del_timer (&hmidi->timer);
 		}
 	}
 	spin_unlock_irqrestore (&hmidi->lock, flags);
@@ -2560,7 +2552,7 @@ static snd_pcm_hardware_t snd_hdsp_playback_subinfo =
 				 SNDRV_PCM_INFO_SYNC_START |
 				 SNDRV_PCM_INFO_DOUBLE),
 	formats:		SNDRV_PCM_FMTBIT_S32_LE,
-	rates:			(SNDRV_PCM_RATE_32000 | 
+	rates:			(SNDRV_PCM_RATE_32000 |
 				 SNDRV_PCM_RATE_44100 | 
 				 SNDRV_PCM_RATE_48000 | 
 				 SNDRV_PCM_RATE_64000 | 
@@ -2635,7 +2627,7 @@ static int snd_hdsp_hw_rule_channels_rate(snd_pcm_hw_params_t *params,
 			integer: 1,
 		};
 		return snd_interval_refine(c, &t);
-	} else if (r->max < 88200) {
+	} else if (r->max < 64000) {
 		snd_interval_t t = {
 			min: hdsp->ss_channels,
 			max: hdsp->ss_channels,
@@ -2654,14 +2646,14 @@ static int snd_hdsp_hw_rule_rate_channels(snd_pcm_hw_params_t *params,
 	snd_interval_t *r = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	if (c->min >= hdsp->ss_channels) {
 		snd_interval_t t = {
-			min: 44100,
+			min: 32000,
 			max: 48000,
 			integer: 1,
 		};
 		return snd_interval_refine(r, &t);
 	} else if (c->max <= hdsp->ds_channels) {
 		snd_interval_t t = {
-			min: 88200,
+			min: 64000,
 			max: 96000,
 			integer: 1,
 		};

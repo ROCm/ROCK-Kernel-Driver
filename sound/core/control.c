@@ -21,6 +21,7 @@
 
 #define __NO_VERSION__
 #include <sound/driver.h>
+#include <linux/threads.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
