@@ -688,11 +688,9 @@ static void autoconfig(struct uart_8250_port *up, unsigned int probeflags)
 		for (i = 0 ; i < PORT_RSA_MAX ; ++i) {
 			if (!probe_rsa[i] && !force_rsa[i])
 				break;
-			if (((probe_rsa[i] != up->port.iobase) ||
-			     check_region(up->port.iobase + UART_RSA_BASE, 16)) &&
-			    (force_rsa[i] != up->port.iobase))
-				continue;
-			if (__enable_rsa(up)) {
+			if ((probe_rsa[i] == up->port.iobase ||
+			     force_rsa[i] == up->port.iobase) &&
+			     __enable_rsa(up)) {
 				up->port.type = PORT_RSA;
 				break;
 			}
