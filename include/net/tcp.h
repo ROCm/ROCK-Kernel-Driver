@@ -637,7 +637,7 @@ DECLARE_SNMP_STAT(struct tcp_mib, tcp_statistics);
 #define TCP_INC_STATS_USER(field) 	SNMP_INC_STATS_USER(tcp_statistics, field)
 #define TCP_DEC_STATS(field)		SNMP_DEC_STATS(tcp_statistics, field)
 
-extern void			tcp_put_port(struct sock *sk);
+extern __inline__ void		tcp_put_port(struct sock *sk);
 extern void			tcp_inherit_port(struct sock *sk, struct sock *child);
 
 extern void			tcp_v4_err(struct sk_buff *skb, u32);
