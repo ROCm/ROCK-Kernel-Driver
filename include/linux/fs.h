@@ -368,6 +368,7 @@ struct inode {
 	unsigned long		i_blksize;
 	unsigned long		i_blocks;
 	unsigned long		i_version;
+	unsigned short          i_bytes;
 	struct semaphore	i_sem;
 	struct inode_operations	*i_op;
 	struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
@@ -424,6 +425,39 @@ struct fown_struct {
 	uid_t uid, euid;	/* uid/euid of process setting the owner */
 	int signum;		/* posix.1b rt signal to be delivered on IO */
 };
+
+static inline void inode_add_bytes(struct inode *inode, loff_t bytes)
+{
+	inode->i_blocks += bytes >> 9;
+	bytes &= 511;
+	inode->i_bytes += bytes;
+	if (inode->i_bytes >= 512) {
+		inode->i_blocks++;
+		inode->i_bytes -= 512;
+	}
+}
+
+static inline void inode_sub_bytes(struct inode *inode, loff_t bytes)
+{
+	inode->i_blocks -= bytes >> 9;
+	bytes &= 511;
+	if (inode->i_bytes < bytes) {
+		inode->i_blocks--;
+		inode->i_bytes += 512;
+	}
+	inode->i_bytes -= bytes;
+}
+
+static inline loff_t inode_get_bytes(struct inode *inode)
+{
+	return (((loff_t)inode->i_blocks) << 9) + inode->i_bytes;
+}
+
+static inline void inode_set_bytes(struct inode *inode, loff_t bytes)
+{
+	inode->i_blocks = bytes >> 9;
+	inode->i_bytes = bytes & 511;
+}
 
 /*
  * Track a single file's readahead state
@@ -581,20 +615,6 @@ struct nameidata {
 	struct vfsmount *old_mnt;
 };
 
-#define DQUOT_USR_ENABLED	0x01		/* User diskquotas enabled */
-#define DQUOT_GRP_ENABLED	0x02		/* Group diskquotas enabled */
-
-struct quota_mount_options
-{
-	unsigned int flags;			/* Flags for diskquotas on this device */
-	struct semaphore dqio_sem;		/* lock device while I/O in progress */
-	struct semaphore dqoff_sem;		/* serialize quota_off() and quota_on() on device */
-	struct file *files[MAXQUOTAS];		/* fp's to quotafiles */
-	time_t inode_expire[MAXQUOTAS];		/* expiretime for inode-quota */
-	time_t block_expire[MAXQUOTAS];		/* expiretime for block-quota */
-	char rsquash[MAXQUOTAS];		/* for quotas threat root as any other user */
-};
-
 /*
  *	Umount options
  */
@@ -624,6 +644,7 @@ struct super_block {
 	struct file_system_type	*s_type;
 	struct super_operations	*s_op;
 	struct dquot_operations	*dq_op;
+ 	struct quotactl_ops	*s_qcop;
 	struct export_operations *s_export_op;
 	unsigned long		s_flags;
 	unsigned long		s_magic;
@@ -642,7 +663,7 @@ struct super_block {
 
 	struct block_device	*s_bdev;
 	struct list_head	s_instances;
-	struct quota_mount_options s_dquot;	/* Diskquota specific options */
+	struct quota_info	s_dquot;	/* Diskquota specific options */
 
 	char s_id[32];				/* Informational name */
 
@@ -808,16 +829,6 @@ static inline void mark_inode_dirty_sync(struct inode *inode)
 {
 	__mark_inode_dirty(inode, I_DIRTY_SYNC);
 }
-
-struct dquot_operations {
-	void (*initialize) (struct inode *, short);
-	void (*drop) (struct inode *);
-	int (*alloc_block) (struct inode *, unsigned long, char);
-	int (*alloc_inode) (const struct inode *, unsigned long);
-	void (*free_block) (struct inode *, unsigned long);
-	void (*free_inode) (const struct inode *, unsigned long);
-	int (*transfer) (struct inode *, struct iattr *);
-};
 
 
 /**
