@@ -139,10 +139,6 @@ int srmmu_cache_pagetables;
 /* these will be initialized in srmmu_nocache_calcsize() */
 unsigned long srmmu_nocache_size;
 unsigned long srmmu_nocache_end;
-unsigned long pkmap_base;
-unsigned long pkmap_base_end;
-extern unsigned long fix_kmap_begin;
-extern unsigned long fix_kmap_end;
 
 /* 1 bit <=> 256 bytes of nocache <=> 64 PTEs */
 #define SRMMU_NOCACHE_BITMAP_SHIFT (PAGE_SHIFT - 4)
@@ -153,11 +149,6 @@ extern unsigned long fix_kmap_end;
 void *srmmu_nocache_pool;
 void *srmmu_nocache_bitmap;
 static struct bit_map srmmu_nocache_map;
-
-/* This makes sense. Honest it does - Anton */
-#define __nocache_pa(VADDR) (((unsigned long)VADDR) - SRMMU_NOCACHE_VADDR + __pa((unsigned long)srmmu_nocache_pool))
-#define __nocache_va(PADDR) (__va((unsigned long)PADDR) - (unsigned long)srmmu_nocache_pool + SRMMU_NOCACHE_VADDR)
-#define __nocache_fix(VADDR) __va(__nocache_pa(VADDR))
 
 static unsigned long srmmu_pte_pfn(pte_t pte)
 {
@@ -322,10 +313,7 @@ static unsigned long __srmmu_get_nocache(int size, int align)
 		printk("Size 0x%x unaligned int nocache request\n", size);
 		size += SRMMU_NOCACHE_BITMAP_SHIFT-1;
 	}
-	if (align > SRMMU_NOCACHE_ALIGN_MAX) {
-		BUG();
-		return 0;
-	}
+	BUG_ON(align > SRMMU_NOCACHE_ALIGN_MAX);
 
 	offset = bit_map_string_get(&srmmu_nocache_map,
 		       			size >> SRMMU_NOCACHE_BITMAP_SHIFT,
@@ -361,7 +349,7 @@ void srmmu_free_nocache(unsigned long vaddr, int size)
 		    vaddr, (unsigned long)SRMMU_NOCACHE_VADDR);
 		BUG();
 	}
-	if (vaddr >= srmmu_nocache_end) {
+	if (vaddr+size >= srmmu_nocache_end) {
 		printk("Vaddr %lx is bigger than nocache end 0x%lx\n",
 		    vaddr, srmmu_nocache_end);
 		BUG();
@@ -403,17 +391,15 @@ void srmmu_nocache_calcsize(void)
 
  /* P3 XXX The 4x overuse: corroborated by /proc/meminfo. */
 	// if (srmmu_nocache_npages < 256) srmmu_nocache_npages = 256;
-	if (srmmu_nocache_npages < 550) srmmu_nocache_npages = 550;
+	if (srmmu_nocache_npages < SRMMU_MIN_NOCACHE_PAGES)
+		srmmu_nocache_npages = SRMMU_MIN_NOCACHE_PAGES;
 
 	/* anything above 1280 blows up */
-	if (srmmu_nocache_npages > 1280) srmmu_nocache_npages = 1280;
+	if (srmmu_nocache_npages > SRMMU_MAX_NOCACHE_PAGES)
+		srmmu_nocache_npages = SRMMU_MAX_NOCACHE_PAGES;
 
 	srmmu_nocache_size = srmmu_nocache_npages * PAGE_SIZE;
 	srmmu_nocache_end = SRMMU_NOCACHE_VADDR + srmmu_nocache_size;
-	fix_kmap_begin = srmmu_nocache_end;
-	fix_kmap_end = fix_kmap_begin + (KM_TYPE_NR * NR_CPUS - 1) * PAGE_SIZE;
-	pkmap_base = SRMMU_NOCACHE_VADDR + srmmu_nocache_size + 0x40000;
-	pkmap_base_end = pkmap_base + LAST_PKMAP * PAGE_SIZE;
 }
 
 void srmmu_nocache_init(void)
@@ -453,7 +439,7 @@ void srmmu_nocache_init(void)
 		if (srmmu_cache_pagetables)
 			pteval |= SRMMU_CACHE;
 
-		srmmu_set_pte(__nocache_fix(pte), pteval);
+		srmmu_set_pte(__nocache_fix(pte), __pte(pteval));
 
 		vaddr += PAGE_SIZE;
 		paddr += PAGE_SIZE;
@@ -1083,6 +1069,8 @@ void __init srmmu_early_allocate_ptable_skeleton(unsigned long start, unsigned l
 			memset(__nocache_fix(ptep), 0, SRMMU_PTE_SZ_SOFT);
 			srmmu_pmd_set(__nocache_fix(pmdp), ptep);
 		}
+		if (start > (0xffffffffUL - SRMMU_PMD_SIZE_SOFT))
+			break;
 		start = (start + SRMMU_PMD_SIZE) & SRMMU_PMD_MASK;
 	}
 }
@@ -1111,6 +1099,8 @@ void __init srmmu_allocate_ptable_skeleton(unsigned long start, unsigned long en
 			memset(ptep, 0, SRMMU_PTE_SZ_SOFT);
 			srmmu_pmd_set(pmdp, ptep);
 		}
+		if (start > (0xffffffffUL - SRMMU_PMD_SIZE_SOFT))
+			break;
 		start = (start + SRMMU_PMD_SIZE) & SRMMU_PMD_MASK;
 	}
 }
@@ -1315,12 +1305,13 @@ void __init srmmu_paging_init(void)
 	srmmu_allocate_ptable_skeleton(DVMA_VADDR, DVMA_END);
 #endif
 
-	srmmu_allocate_ptable_skeleton(fix_kmap_begin, fix_kmap_end);
-	srmmu_allocate_ptable_skeleton(pkmap_base, pkmap_base_end);
+	srmmu_allocate_ptable_skeleton(
+		__fix_to_virt(__end_of_fixed_addresses - 1), FIXADDR_TOP);
+	srmmu_allocate_ptable_skeleton(PKMAP_BASE, PKMAP_END);
 
-	pgd = pgd_offset_k(pkmap_base);
-	pmd = srmmu_pmd_offset(pgd, pkmap_base);
-	pte = srmmu_pte_offset(pmd, pkmap_base);
+	pgd = pgd_offset_k(PKMAP_BASE);
+	pmd = srmmu_pmd_offset(pgd, PKMAP_BASE);
+	pte = srmmu_pte_offset(pmd, PKMAP_BASE);
 	pkmap_page_table = pte;
 
 	flush_cache_all();

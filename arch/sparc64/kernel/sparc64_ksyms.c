@@ -19,6 +19,7 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/fs_struct.h>
+#include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/socket.h>
 #include <linux/percpu.h>
@@ -96,6 +97,7 @@ extern int compat_sys_ioctl(unsigned int fd, unsigned int cmd, u32 arg);
 extern int (*handle_mathemu)(struct pt_regs *, struct fpustate *);
 extern long sparc32_open(const char * filename, int flags, int mode);
 extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset, unsigned long size, pgprot_t prot, int space);
+extern long sys_close(unsigned int);
                 
 extern int __ashrdi3(int, int);
 
@@ -324,6 +326,7 @@ EXPORT_SYMBOL(svr4_setcontext);
 EXPORT_SYMBOL(sys_ioctl);
 EXPORT_SYMBOL(compat_sys_ioctl);
 EXPORT_SYMBOL(sparc32_open);
+EXPORT_SYMBOL(sys_close);
 #endif
 
 /* Special internal versions of library functions. */
