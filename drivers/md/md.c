@@ -1500,6 +1500,7 @@ static int do_md_run(mddev_t * mddev)
 	mdk_rdev_t *rdev;
 	struct gendisk *disk;
 	char b[BDEVNAME_SIZE];
+	int unit;
 
 	if (list_empty(&mddev->disks)) {
 		MD_BUG();
@@ -1591,8 +1592,9 @@ static int do_md_run(mddev_t * mddev)
 		invalidate_bdev(rdev->bdev, 0);
 	}
 
-	md_probe(mdidx(mddev), NULL, NULL);
-	disk = disks[mdidx(mddev)];
+	unit = mdidx(mddev);
+	md_probe(0, &unit, NULL);
+	disk = disks[unit];
 	if (!disk)
 		return -ENOMEM;
 
