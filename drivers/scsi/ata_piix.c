@@ -67,6 +67,10 @@ static struct pci_device_id piix_pci_tbl[] = {
 	{ 0x8086, 0x25a2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_pata },
 #endif
 
+	/* NOTE: The following PCI ids must be kept in sync with the
+	 * list in drivers/pci/quirks.c.
+	 */
+
 	{ 0x8086, 0x24d1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
 	{ 0x8086, 0x24df, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
 	{ 0x8086, 0x25a3, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
