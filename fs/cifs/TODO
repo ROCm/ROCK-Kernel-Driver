@@ -65,14 +65,27 @@ but recognizes them
 3) create of new files to FAT partitions on Windows servers can
 succeed but still return access denied (appears to be Windows 
 not client problem).  NTFS partitions do not have this problem.
+4) debug connectathon special test case nfs_idem (which does
+some invalid symlink naming, or at least what Samba thinks
+is an invalid symlink target).
+5) debug connectation lock test case 10 which fails against
+Samba (may be unmappable due to POSIX to Windows lock model
+differences but worth investigating).  Also debug Samba to 
+see why lock test case 7 takes longer to complete to Samba
+than to Windows.
 
 Misc testing to do
 =================
 1) check out max path names and max path name components against various server
 types.
 
-2) Run dbench. Modify file portion of ltp so it can run against a mounted network
+2) Modify file portion of ltp so it can run against a mounted network
 share and run it against cifs vfs.
 
-3) Additional performance testing and optimization using iozone and similar tools.
+3) Additional performance testing and optimization using iozone and similar - 
+there are some easy changes that can be done to parallelize sequential writes,
+and when signing is disabled to request larger read sizes (larger than 
+negotiated size) and send larger write sizes to modern servers.
+
+4) More exhaustively test the recently added NT4 support
 
