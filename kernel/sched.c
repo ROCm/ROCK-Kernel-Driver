@@ -782,9 +782,7 @@ need_resched:
 	case TASK_RUNNING:
 		;
 	}
-#if CONFIG_SMP || CONFIG_PREEMPT
 pick_next_task:
-#endif
 	if (unlikely(!rq->nr_running)) {
 #if CONFIG_SMP
 		load_balance(rq, 1);
@@ -848,12 +846,14 @@ switch_tasks:
  */
 asmlinkage void preempt_schedule(void)
 {
-	if (unlikely(preempt_get_count()))
+	struct thread_info *ti = current_thread_info();
+
+	if (unlikely(ti->preempt_count))
 		return;
 
-	current_thread_info()->preempt_count += PREEMPT_ACTIVE;
+	ti->preempt_count = PREEMPT_ACTIVE;
 	schedule();
-	current_thread_info()->preempt_count -= PREEMPT_ACTIVE;
+	ti->preempt_count = 0;
 	barrier();
 }
 #endif /* CONFIG_PREEMPT */
