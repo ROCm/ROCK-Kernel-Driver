@@ -68,6 +68,7 @@ static int raw_open(struct inode *inode, struct file *filp)
 			}
 		}
 	}
+	filp->private_data = bdev;
 	up(&raw_mutex);
 	return err;
 }
@@ -92,22 +93,9 @@ static int
 raw_ioctl(struct inode *inode, struct file *filp,
 		  unsigned int command, unsigned long arg)
 {
-	const int minor = minor(inode->i_rdev);
-	int err;
-	struct block_device *bdev;
+	struct block_device *bdev = filp->private_data;
 
-	err = -ENODEV;
-	if (minor < 1 && minor > 255)
-		goto out;
-
-	bdev = raw_devices[minor].binding;
-	err = -EINVAL;
-	if (bdev == NULL)
-		goto out;
-	if (bdev->bd_inode && bdev->bd_op && bdev->bd_op->ioctl)
-		err = bdev->bd_op->ioctl(bdev->bd_inode, NULL, command, arg);
-out:
-	return err;
+	return blkdev_ioctl(bdev->bd_inode, NULL, command, arg);
 }
 
 /*

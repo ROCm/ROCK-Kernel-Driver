@@ -40,7 +40,7 @@ struct blk_probe {
 	unsigned long range;
 	struct module *owner;
 	struct gendisk *(*get)(dev_t dev, int *part, void *data);
-	void (*lock)(dev_t, void *);
+	int (*lock)(dev_t, void *);
 	void *data;
 } *probes[MAX_BLKDEV];
 
@@ -52,7 +52,7 @@ static inline int dev_to_index(dev_t dev)
 
 void blk_register_region(dev_t dev, unsigned long range, struct module *module,
 		    struct gendisk *(*probe)(dev_t, int *, void *),
-		    void (*lock)(dev_t, void *), void *data)
+		    int (*lock)(dev_t, void *), void *data)
 {
 	int index = dev_to_index(dev);
 	struct blk_probe *p = kmalloc(sizeof(struct blk_probe), GFP_KERNEL);
@@ -97,10 +97,12 @@ static struct gendisk *exact_match(dev_t dev, int *part, void *data)
 	return p;
 }
 
-static void exact_lock(dev_t dev, void *data)
+static int exact_lock(dev_t dev, void *data)
 {
 	struct gendisk *p = data;
-	get_disk(p);
+	if (!get_disk(p))
+		return -1;
+	return 0;
 }
 
 /**
@@ -167,8 +169,11 @@ retry:
 		probe = p->get;
 		best = p->range;
 		*part = dev - p->dev;
-		if (p->lock)
-			p->lock(dev, data);
+		if (p->lock && p->lock(dev, data) < 0) {
+			if (owner)
+				__MOD_DEC_USE_COUNT(owner);
+			continue;
+		}
 		read_unlock(&gendisk_lock);
 		disk = probe(dev, part, data);
 		/* Currently ->owner protects _only_ ->probe() itself. */
@@ -323,6 +328,12 @@ struct gendisk *alloc_disk(int minors)
 
 struct gendisk *get_disk(struct gendisk *disk)
 {
+	struct module *owner;
+	if (!disk->fops)
+		return NULL;
+	owner = disk->fops->owner;
+	if (owner && !try_inc_mod_count(owner))
+		return NULL;
 	atomic_inc(&disk->disk_dev.refcount);
 	return disk;
 }

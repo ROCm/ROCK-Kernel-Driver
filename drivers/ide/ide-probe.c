@@ -973,11 +973,10 @@ int init_irq (ide_hwif_t *hwif)
 
 EXPORT_SYMBOL(init_irq);
 
-static void ata_lock(dev_t dev, void *data)
+static int ata_lock(dev_t dev, void *data)
 {
-	ide_hwif_t *hwif = data;
-	int unit = MINOR(dev) >> PARTN_BITS;
-	get_disk(hwif->drives[unit].disk);
+	/* FIXME: we want to pin hwif down */
+	return 0;
 }
 
 struct gendisk *ata_probe(dev_t dev, int *part, void *data)
@@ -985,10 +984,8 @@ struct gendisk *ata_probe(dev_t dev, int *part, void *data)
 	ide_hwif_t *hwif = data;
 	int unit = MINOR(dev) >> PARTN_BITS;
 	ide_drive_t *drive = &hwif->drives[unit];
-	if (!drive->present) {
-		put_disk(drive->disk);
+	if (!drive->present)
 		return NULL;
-	}
 	if (!drive->driver) {
 		if (drive->media == ide_disk)
 			(void) request_module("ide-disk");
@@ -1001,11 +998,9 @@ struct gendisk *ata_probe(dev_t dev, int *part, void *data)
 		if (drive->media == ide_floppy)
 			(void) request_module("ide-floppy");
 	}
-	if (!drive->driver) {
-		put_disk(drive->disk);
+	if (!drive->driver)
 		return NULL;
-	}
-	return drive->disk;
+	return get_disk(drive->disk);
 }
 
 static int alloc_disks(ide_hwif_t *hwif)

@@ -306,8 +306,6 @@ struct block_device *bdget(dev_t dev)
 
 			atomic_set(&new_bdev->bd_count,1);
 			new_bdev->bd_dev = dev;
-			new_bdev->bd_op = NULL;
-			new_bdev->bd_queue = NULL;
 			new_bdev->bd_contains = NULL;
 			new_bdev->bd_inode = inode;
 			new_bdev->bd_part_count = 0;
@@ -434,10 +432,7 @@ void bd_release(struct block_device *bdev)
 	spin_unlock(&bdev_lock);
 }
 
-static struct {
-	const char *name;
-	struct block_device_operations *bdops;
-} blkdevs[MAX_BLKDEV];
+static const char *blkdevs[MAX_BLKDEV];
 
 int get_blkdev_list(char * p)
 {
@@ -446,33 +441,10 @@ int get_blkdev_list(char * p)
 
 	len = sprintf(p, "\nBlock devices:\n");
 	for (i = 0; i < MAX_BLKDEV ; i++) {
-		if (blkdevs[i].bdops) {
-			len += sprintf(p+len, "%3d %s\n", i, blkdevs[i].name);
-		}
+		if (blkdevs[i])
+			len += sprintf(p+len, "%3d %s\n", i, blkdevs[i]);
 	}
 	return len;
-}
-
-/*
-	Return the function table of a device.
-	Load the driver if needed.
-*/
-struct block_device_operations * get_blkfops(unsigned int major)
-{
-	struct block_device_operations *ret = NULL;
-
-	/* major 0 is used for non-device mounts */
-	if (major && major < MAX_BLKDEV) {
-#ifdef CONFIG_KMOD
-		if (!blkdevs[major].bdops) {
-			char name[20];
-			sprintf(name, "block-major-%d", major);
-			request_module(name);
-		}
-#endif
-		ret = blkdevs[major].bdops;
-	}
-	return ret;
 }
 
 int register_blkdev(unsigned int major, const char * name, struct block_device_operations *bdops)
@@ -481,9 +453,8 @@ int register_blkdev(unsigned int major, const char * name, struct block_device_o
 		return 0;
 	if (major == 0) {
 		for (major = MAX_BLKDEV-1; major > 0; major--) {
-			if (blkdevs[major].bdops == NULL) {
-				blkdevs[major].name = name;
-				blkdevs[major].bdops = bdops;
+			if (blkdevs[major] == NULL) {
+				blkdevs[major] = name;
 				return major;
 			}
 		}
@@ -491,10 +462,9 @@ int register_blkdev(unsigned int major, const char * name, struct block_device_o
 	}
 	if (major >= MAX_BLKDEV)
 		return -EINVAL;
-	if (blkdevs[major].bdops && blkdevs[major].bdops != bdops)
+	if (blkdevs[major])
 		return -EBUSY;
-	blkdevs[major].name = name;
-	blkdevs[major].bdops = bdops;
+	blkdevs[major] = name;
 	return 0;
 }
 
@@ -504,12 +474,11 @@ int unregister_blkdev(unsigned int major, const char * name)
 		return 0;
 	if (major >= MAX_BLKDEV)
 		return -EINVAL;
-	if (!blkdevs[major].bdops)
+	if (!blkdevs[major])
 		return -EINVAL;
-	if (strcmp(blkdevs[major].name, name))
+	if (strcmp(blkdevs[major], name))
 		return -EINVAL;
-	blkdevs[major].name = NULL;
-	blkdevs[major].bdops = NULL;
+	blkdevs[major] = NULL;
 	return 0;
 }
 
@@ -524,7 +493,8 @@ int unregister_blkdev(unsigned int major, const char * name)
  */
 int check_disk_change(struct block_device *bdev)
 {
-	struct block_device_operations * bdops = bdev->bd_op;
+	struct gendisk *disk = bdev->bd_disk;
+	struct block_device_operations * bdops = disk->fops;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	if (!bdops->media_changed)
@@ -587,117 +557,98 @@ static void bd_set_size(struct block_device *bdev, loff_t size)
 
 static int do_open(struct block_device *bdev, struct inode *inode, struct file *file)
 {
-	int ret = -ENXIO;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct module *owner = NULL;
-	struct block_device_operations *ops, *old;
 	struct gendisk *disk;
+	int ret = -ENXIO;
 	int part;
 
 	lock_kernel();
-	ops = get_blkfops(major(dev));
-	if (ops) {
-		owner = ops->owner;
-		if (owner)
-			__MOD_INC_USE_COUNT(owner);
-	}
 	disk = get_gendisk(bdev->bd_dev, &part);
 	if (!disk) {
-		if (owner)
-			__MOD_DEC_USE_COUNT(owner);
 		bdput(bdev);
 		return ret;
 	}
+	owner = disk->fops->owner;
 
 	down(&bdev->bd_sem);
-	old = bdev->bd_op;
-	if (!old) {
-		if (!ops)
-			goto out;
-		bdev->bd_op = ops;
-	} else {
-		if (owner)
-			__MOD_DEC_USE_COUNT(owner);
-	}
-	if (!bdev->bd_contains) {
+	if (!bdev->bd_openers) {
+		bdev->bd_disk = disk;
 		bdev->bd_contains = bdev;
-		if (part) {
+		if (!part) {
+			struct backing_dev_info *bdi;
+			if (disk->fops->open) {
+				ret = disk->fops->open(inode, file);
+				if (ret)
+					goto out_first;
+			}
+			bdev->bd_offset = 0;
+			if (!bdev->bd_openers) {
+				bd_set_size(bdev,(loff_t)get_capacity(disk)<<9);
+				bdi = blk_get_backing_dev_info(bdev);
+				if (bdi == NULL)
+					bdi = &default_backing_dev_info;
+				bdev->bd_inode->i_data.backing_dev_info = bdi;
+			}
+			if (bdev->bd_invalidated)
+				rescan_partitions(disk, bdev);
+		} else {
+			struct hd_struct *p;
 			struct block_device *whole;
 			whole = bdget(MKDEV(disk->major, disk->first_minor));
 			ret = -ENOMEM;
 			if (!whole)
-				goto out1;
+				goto out_first;
 			ret = blkdev_get(whole, file->f_mode, file->f_flags, BDEV_RAW);
 			if (ret)
-				goto out1;
+				goto out_first;
 			bdev->bd_contains = whole;
-		}
-	}
-	if (bdev->bd_contains == bdev) {
-		if (!bdev->bd_openers) {
-			bdev->bd_disk = disk;
-			bdev->bd_queue = disk->queue;
-		}
-		if (bdev->bd_op->open) {
-			ret = bdev->bd_op->open(inode, file);
-			if (ret)
-				goto out2;
-		}
-		if (!bdev->bd_openers) {
-			struct backing_dev_info *bdi;
-			bdev->bd_offset = 0;
-			bd_set_size(bdev, (loff_t)get_capacity(disk) << 9);
-			bdi = blk_get_backing_dev_info(bdev);
-			if (bdi == NULL)
-				bdi = &default_backing_dev_info;
-			bdev->bd_inode->i_data.backing_dev_info = bdi;
-		}
-		if (bdev->bd_invalidated)
-			rescan_partitions(disk, bdev);
-	} else {
-		down(&bdev->bd_contains->bd_sem);
-		bdev->bd_contains->bd_part_count++;
-		if (!bdev->bd_openers) {
-			struct hd_struct *p;
+			down(&whole->bd_sem);
+			whole->bd_part_count++;
 			p = disk->part + part - 1;
 			bdev->bd_inode->i_data.backing_dev_info =
-			   bdev->bd_contains->bd_inode->i_data.backing_dev_info;
+			   whole->bd_inode->i_data.backing_dev_info;
 			if (!(disk->flags & GENHD_FL_UP) || !p->nr_sects) {
-				bdev->bd_contains->bd_part_count--;
-				up(&bdev->bd_contains->bd_sem);
+				whole->bd_part_count--;
+				up(&whole->bd_sem);
 				ret = -ENXIO;
-				goto out2;
+				goto out_first;
 			}
-			bdev->bd_queue = bdev->bd_contains->bd_queue;
 			bdev->bd_offset = p->start_sect;
 			bd_set_size(bdev, (loff_t) p->nr_sects << 9);
-			bdev->bd_disk = disk;
+			up(&whole->bd_sem);
 		}
-		up(&bdev->bd_contains->bd_sem);
-	}
-	if (bdev->bd_openers++)
+	} else {
 		put_disk(disk);
+		if (owner)
+			__MOD_DEC_USE_COUNT(owner);
+		if (bdev->bd_contains == bdev) {
+			if (bdev->bd_disk->fops->open) {
+				ret = bdev->bd_disk->fops->open(inode, file);
+				if (ret)
+					goto out;
+			}
+			if (bdev->bd_invalidated)
+				rescan_partitions(bdev->bd_disk, bdev);
+		} else {
+			down(&bdev->bd_contains->bd_sem);
+			bdev->bd_contains->bd_part_count++;
+			up(&bdev->bd_contains->bd_sem);
+		}
+	}
+	bdev->bd_openers++;
 	up(&bdev->bd_sem);
 	unlock_kernel();
 	return 0;
 
-out2:
-	if (!bdev->bd_openers) {
-		bdev->bd_queue = NULL;
-		bdev->bd_disk = NULL;
-		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
-		if (bdev != bdev->bd_contains) {
-			blkdev_put(bdev->bd_contains, BDEV_RAW);
-			bdev->bd_contains = NULL;
-		}
-	}
-out1:
+out_first:
+	bdev->bd_disk = NULL;
+	bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
+	if (bdev != bdev->bd_contains)
+		blkdev_put(bdev->bd_contains, BDEV_RAW);
+	bdev->bd_contains = NULL;
 	put_disk(disk);
-	if (!old) {
-		bdev->bd_op = NULL;
-		if (owner)
-			__MOD_DEC_USE_COUNT(owner);
-	}
+	if (owner)
+		__MOD_DEC_USE_COUNT(owner);
 out:
 	up(&bdev->bd_sem);
 	unlock_kernel();
@@ -740,12 +691,13 @@ int blkdev_open(struct inode * inode, struct file * filp)
 	bdev = inode->i_bdev;
 
 	return do_open(bdev, inode, filp);
-}	
+}
 
 int blkdev_put(struct block_device *bdev, int kind)
 {
 	int ret = 0;
 	struct inode *bd_inode = bdev->bd_inode;
+	struct gendisk *disk = bdev->bd_disk;
 
 	down(&bdev->bd_sem);
 	lock_kernel();
@@ -758,26 +710,24 @@ int blkdev_put(struct block_device *bdev, int kind)
 	if (!--bdev->bd_openers)
 		kill_bdev(bdev);
 	if (bdev->bd_contains == bdev) {
-		if (bdev->bd_op->release)
-			ret = bdev->bd_op->release(bd_inode, NULL);
+		if (disk->fops->release)
+			ret = disk->fops->release(bd_inode, NULL);
 	} else {
 		down(&bdev->bd_contains->bd_sem);
 		bdev->bd_contains->bd_part_count--;
 		up(&bdev->bd_contains->bd_sem);
 	}
 	if (!bdev->bd_openers) {
-		struct gendisk *disk = bdev->bd_disk;
-		if (bdev->bd_op->owner)
-			__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
-		bdev->bd_op = NULL;
-		bdev->bd_queue = NULL;
+		struct module *owner = disk->fops->owner;
+		put_disk(disk);
+		if (owner)
+			__MOD_DEC_USE_COUNT(owner);
 		bdev->bd_disk = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains) {
 			blkdev_put(bdev->bd_contains, BDEV_RAW);
-			bdev->bd_contains = NULL;
 		}
-		put_disk(disk);
+		bdev->bd_contains = NULL;
 	}
 	unlock_kernel();
 	up(&bdev->bd_sem);
@@ -836,7 +786,7 @@ int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 const char *__bdevname(kdev_t dev)
 {
 	static char buffer[32];
-	const char * name = blkdevs[major(dev)].name;
+	const char * name = blkdevs[major(dev)];
 
 	if (!name)
 		name = "unknown-block";

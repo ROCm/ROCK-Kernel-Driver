@@ -312,7 +312,7 @@ extern void __blk_stop_queue(request_queue_t *q);
 
 static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {
-	return bdev->bd_queue;
+	return bdev->bd_disk->queue;
 }
 
 /*

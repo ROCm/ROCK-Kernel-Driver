@@ -14,6 +14,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/blk.h>
 #include <linux/kmod.h>
@@ -511,8 +512,8 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	bdev->bd_invalidated = 0;
 	for (p = 1; p < disk->minors; p++)
 		delete_partition(disk, p);
-	if (bdev->bd_op->revalidate_disk)
-		bdev->bd_op->revalidate_disk(disk);
+	if (disk->fops->revalidate_disk)
+		disk->fops->revalidate_disk(disk);
 	if (!get_capacity(disk) || !(state = check_partition(disk, bdev)))
 		return res;
 	for (p = 1; p < state->limit; p++) {
@@ -613,9 +614,12 @@ char *partition_name(dev_t dev)
 	 */
 	hd = get_gendisk(dev, &part);
 	dname->name = NULL;
-	if (hd)
+	if (hd) {
 		dname->name = disk_name(hd, part, dname->namebuf);
-	put_disk(hd);
+		if (hd->fops->owner)
+			__MOD_DEC_USE_COUNT(hd->fops->owner);
+		put_disk(hd);
+	}
 	if (!dname->name) {
 		sprintf(dname->namebuf, "[dev %s]", kdevname(to_kdev_t(dev)));
 		dname->name = dname->namebuf;

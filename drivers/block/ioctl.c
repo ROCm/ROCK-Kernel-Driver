@@ -122,6 +122,7 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			unsigned long arg)
 {
 	struct block_device *bdev = inode->i_bdev;
+	struct gendisk *disk = bdev->bd_disk;
 	struct backing_dev_info *bdi;
 	int holder;
 	int ret, n;
@@ -146,7 +147,7 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 	case BLKSSZGET: /* get block device hardware sector size */
 		return put_int(arg, bdev_hardsect_size(bdev));
 	case BLKSECTGET:
-		return put_ushort(arg, bdev->bd_queue->max_sectors);
+		return put_ushort(arg, bdev_get_queue(bdev)->max_sectors);
 	case BLKRASET:
 	case BLKFRASET:
 		if(!capable(CAP_SYS_ADMIN))
@@ -184,8 +185,8 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 	case BLKFLSBUF:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
-		if (bdev->bd_op->ioctl) {
-			ret = bdev->bd_op->ioctl(inode, file, cmd, arg);
+		if (disk->fops->ioctl) {
+			ret = disk->fops->ioctl(inode, file, cmd, arg);
 			if (ret != -EINVAL)
 				return ret;
 		}
@@ -193,8 +194,8 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 		invalidate_bdev(bdev, 0);
 		return 0;
 	case BLKROSET:
-		if (bdev->bd_op->ioctl) {
-			ret = bdev->bd_op->ioctl(inode, file, cmd, arg);
+		if (disk->fops->ioctl) {
+			ret = disk->fops->ioctl(inode, file, cmd, arg);
 			if (ret != -EINVAL)
 				return ret;
 		}
@@ -205,8 +206,8 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 		set_device_ro(bdev, n);
 		return 0;
 	default:
-		if (bdev->bd_op->ioctl) {
-			ret = bdev->bd_op->ioctl(inode, file, cmd, arg);
+		if (disk->fops->ioctl) {
+			ret = disk->fops->ioctl(inode, file, cmd, arg);
 			if (ret != -EINVAL)
 				return ret;
 		}

@@ -351,10 +351,9 @@ static int rd_open(struct inode * inode, struct file * filp)
 		rd_bdev[unit] = bdev;
 		bdev->bd_openers++;
 		bdev->bd_block_size = rd_blocksize;
+		bdev->bd_inode->i_size = get_capacity(rd_disks[unit])<<9;
 		inode->i_mapping->a_ops = &ramdisk_aops;
 		inode->i_mapping->backing_dev_info = &rd_backing_dev_info;
-		get_disk(bdev->bd_disk);
-		bdev->bd_inode->i_size = get_capacity(bdev->bd_disk) << 9;
 	}
 
 	return 0;

@@ -282,7 +282,7 @@ extern void put_disk(struct gendisk *disk);
 extern void blk_register_region(dev_t dev, unsigned long range,
 			struct module *module,
 			struct gendisk *(*probe)(dev_t, int *, void *),
-			void (*lock)(dev_t, void *),
+			int (*lock)(dev_t, void *),
 			void *data);
 extern void blk_unregister_region(dev_t dev, unsigned long range);
 
