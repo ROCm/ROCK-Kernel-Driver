@@ -208,6 +208,8 @@ endmenu
 mainmenu_option next_comment
 comment 'General options'
 
+source drivers/acpi/Config.in
+
 # Visual Workstation support is utterly broken.
 # If you want to see it working mail an VW540 to hch@infradead.org 8)
 #bool 'SGI Visual Workstation support' CONFIG_VISWS
@@ -265,14 +267,6 @@ tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 
 bool 'Power Management support' CONFIG_PM
-
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   dep_bool '  ACPI support' CONFIG_ACPI $CONFIG_PM
-   
-   if [ "$CONFIG_ACPI" != "n" ]; then
-      source drivers/acpi/Config.in
-   fi
-fi
 
 dep_tristate '  Advanced Power Management BIOS support' CONFIG_APM $CONFIG_PM
 if [ "$CONFIG_APM" != "n" ]; then
