@@ -28,9 +28,7 @@
 #include <asm/traps.h>
 #include <asm/io.h>
 #include <asm/setup.h>
-#include <asm/gpio.h>
 #include <asm/hardirq.h>
-#include <asm/regs306x.h>
 #include <asm/errno.h>
 
 /*
@@ -48,11 +46,16 @@ static irq_handler_t *irq_list[NR_IRQS];
 static int use_kmalloc;
 
 extern unsigned long *interrupt_redirect_table;
+extern const int h8300_saved_vectors[];
+extern const unsigned long h8300_trap_table[];
+int h8300_enable_irq_pin(unsigned int irq);
+void h8300_disable_irq_pin(unsigned int irq);
 
 #define CPU_VECTOR ((unsigned long *)0x000000)
 #define ADDR_MASK (0xffffff)
 
-static inline unsigned long *get_vector_address(void)
+#if defined(CONFIG_RAMKERNEL)
+static unsigned long __init *get_vector_address(void)
 {
 	unsigned long *rom_vector = CPU_VECTOR;
 	unsigned long base,tmp;
@@ -61,7 +64,7 @@ static inline unsigned long *get_vector_address(void)
 	base = rom_vector[EXT_IRQ0] & ADDR_MASK;
 	
 	/* check romvector format */
-	for (vec_no = EXT_IRQ1; vec_no <= EXT_IRQ5; vec_no++) {
+	for (vec_no = EXT_IRQ1; vec_no <= EXT_IRQ0+EXT_IRQS; vec_no++) {
 		if ((base+(vec_no - EXT_IRQ0)*4) != (rom_vector[vec_no] & ADDR_MASK))
 			return NULL;
 	}
@@ -76,19 +79,15 @@ static inline unsigned long *get_vector_address(void)
 		return NULL;
 	return (unsigned long *)base;
 }
+#endif
 
 void __init init_IRQ(void)
 {
 #if defined(CONFIG_RAMKERNEL)
 	int i;
 	unsigned long *ramvec,*ramvec_p;
-	unsigned long break_vec;
-
-#if defined(CONFIG_GDB_DEBUG)
-	break_vec = ramvec[TRAP3_VEC];
-#else
-	break_vec = VECTOR(trace_break);
-#endif
+	const unsigned long *trap_entry;
+	const int *saved_vector;
 
 	ramvec = get_vector_address();
 	if (ramvec == NULL)
@@ -96,14 +95,27 @@ void __init init_IRQ(void)
 	else
 		printk("virtual vector at 0x%08lx\n",(unsigned long)ramvec);
 
-	for (ramvec_p = ramvec, i = 0; i < NR_IRQS; i++)
-		*ramvec_p++ = REDIRECT(interrupt_entry);
-
-	ramvec[TRAP0_VEC] = VECTOR(system_call);
-	ramvec[TRAP3_VEC] = break_vec;
+	/* create redirect table */
+	ramvec_p = ramvec;
+	trap_entry = h8300_trap_table;
+	saved_vector = h8300_saved_vectors;
+	for ( i = 0; i < NR_IRQS; i++) {
+		if (i == *saved_vector) {
+			ramvec_p++;
+			saved_vector++;
+		} else {
+			if ( i < NR_TRAPS ) {
+				if (*trap_entry)
+					*ramvec_p = VECTOR(*trap_entry);
+				ramvec_p++;
+				trap_entry++;
+			} else
+				*ramvec_p++ = REDIRECT(interrupt_entry);
+		}
+	}
 	interrupt_redirect_table = ramvec;
 #ifdef DUMP_VECTOR
-	ramvec_p = interrupt_redirect_table;
+	ramvec_p = ramvec;
 	for (i = 0; i < NR_IRQS; i++) {
 		if ((i % 8) == 0)
 			printk("\n%p: ",ramvec_p);
@@ -124,18 +136,8 @@ int request_irq(unsigned int irq,
 		printk("Incorrect IRQ %d from %s\n", irq, devname);
 		return -EINVAL;
 	}
-	if (irq_list[irq])
+	if (irq_list[irq] || (h8300_enable_irq_pin(irq) == -EBUSY))
 		return -EBUSY;
-	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ3) {
-		if (H8300_GPIO_RESERVE(H8300_GPIO_P8, 1 << (irq - EXT_IRQ0)) == 0)
-			return -EBUSY;
-		H8300_GPIO_DDR(H8300_GPIO_P8, (irq - EXT_IRQ0), 0);
-	}
-	if (irq >= EXT_IRQ4 && irq <= EXT_IRQ5) {
-		if (H8300_GPIO_RESERVE(H8300_GPIO_P9, 1 << (irq - EXT_IRQ0)) == 0)
-			return -EBUSY;
-		H8300_GPIO_DDR(H8300_GPIO_P9, (irq - EXT_IRQ0), 0);
-	}
 
 	if (use_kmalloc)
 		irq_handle = (irq_handler_t *)kmalloc(sizeof(irq_handler_t), GFP_ATOMIC);
@@ -167,8 +169,7 @@ void free_irq(unsigned int irq, void *dev_id)
 	if (!irq_list[irq] || irq_list[irq]->dev_id != dev_id)
 		printk("Removing probably wrong IRQ %d from %s\n",
 		       irq, irq_list[irq]->devname);
-	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ5)
-		*(volatile unsigned char *)IER &= ~(1 << (irq - EXT_IRQ0));
+	h8300_disable_irq_pin(irq);
 	if (((unsigned long)irq_list[irq] & 0x80000000) == 0) {
 		kfree(irq_list[irq]);
 		irq_list[irq] = NULL;
@@ -196,30 +197,26 @@ EXPORT_SYMBOL(probe_irq_off);
 
 void enable_irq(unsigned int irq)
 {
-	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ5) {
-		*(volatile unsigned char *)IER |= (1 << (irq - EXT_IRQ0));
-		*(volatile unsigned char *)ISR &= ~(1 << (irq - EXT_IRQ0));
-	}
+	if (irq >= EXT_IRQ0 && irq <= (EXT_IRQ0 + EXT_IRQS))
+		IER_REGS |= 1 << (irq - EXT_IRQ0);
 }
 
 void disable_irq(unsigned int irq)
 {
-	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ5) {
-		*(volatile unsigned char *)IER &= ~(1 << (irq - EXT_IRQ0));
-	}
+	if (irq >= EXT_IRQ0 && irq <= (EXT_IRQ0 + EXT_IRQS))
+		IER_REGS &= ~(1 << (irq - EXT_IRQ0));
 }
 
-asmlinkage void process_int(int vec, struct pt_regs *fp)
+asmlinkage void process_int(int irq, struct pt_regs *fp)
 {
 	irq_enter();
-	if (vec >= EXT_IRQ0 && vec <= EXT_IRQ5)
-		*(volatile unsigned char *)ISR &= ~(1 << (vec - EXT_IRQ0));
-	if (vec < NR_IRQS) {
-		if (irq_list[vec]) {
-			irq_list[vec]->handler(vec, irq_list[vec]->dev_id, fp);
-			irq_list[vec]->count++;
-			if (irq_list[vec]->flags & SA_SAMPLE_RANDOM)
-				add_interrupt_randomness(vec);
+	h8300_clear_isr(irq);
+	if (irq >= NR_TRAPS && irq < NR_IRQS) {
+		if (irq_list[irq]) {
+			irq_list[irq]->handler(irq, irq_list[irq]->dev_id, fp);
+			irq_list[irq]->count++;
+			if (irq_list[irq]->flags & SA_SAMPLE_RANDOM)
+				add_interrupt_randomness(irq);
 		}
 	} else {
 		BUG();
