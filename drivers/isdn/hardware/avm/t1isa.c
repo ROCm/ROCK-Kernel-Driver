@@ -128,8 +128,9 @@ static int t1_detectandinit(unsigned int base, unsigned irq, int cardnr)
         return 0;
 }
 
-static void t1_handle_interrupt(avmcard * card)
+static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
+	avmcard *card = devptr;
 	avmctrl_info *cinfo = &card->ctrlinfo[0];
 	struct capi_ctr *ctrl = cinfo->capi_ctrl;
 	unsigned char b1cmd;
@@ -261,15 +262,6 @@ static void t1_handle_interrupt(avmcard * card)
 
 /* ------------------------------------------------------------- */
 
-static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
-{
-	avmcard *card = devptr;
-
-	t1_handle_interrupt(card);
-}
-
-/* ------------------------------------------------------------- */
-
 static int t1isa_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -342,8 +334,7 @@ static void t1isa_remove_ctr(struct capi_ctr *ctrl)
 	di->detach_ctr(ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
-	kfree(card->ctrlinfo);
-	kfree(card);
+	b1_free_card(card);
 
 	MOD_DEC_USE_COUNT;
 }
@@ -359,24 +350,14 @@ static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 
 	MOD_INC_USE_COUNT;
 
-	card = (avmcard *) kmalloc(sizeof(avmcard), GFP_ATOMIC);
-
+	card = b1_alloc_card(1);
 	if (!card) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto err;
 	}
-	memset(card, 0, sizeof(avmcard));
-        cinfo = (avmctrl_info *) kmalloc(sizeof(avmctrl_info), GFP_ATOMIC);
-	if (!cinfo) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
-	}
-	memset(cinfo, 0, sizeof(avmctrl_info));
-	card->ctrlinfo = cinfo;
-	cinfo->card = card;
+
+	cinfo = card->ctrlinfo;
 	sprintf(card->name, "t1isa-%x", p->port);
 	card->port = p->port;
 	card->irq = p->irq;
@@ -386,74 +367,53 @@ static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 	if (!(((card->port & 0x7) == 0) && ((card->port & 0x30) != 0x30))) {
 		printk(KERN_WARNING "%s: illegal port 0x%x.\n",
 				driver->name, card->port);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EINVAL;
+		retval = -EINVAL;
+		goto err_free;
         }
-
-	if (check_region(card->port, AVMB1_PORTLEN)) {
-		printk(KERN_WARNING
-		       "%s: ports 0x%03x-0x%03x in use.\n",
-		       driver->name, card->port, card->port + AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
-	}
 	if (hema_irq_table[card->irq & 0xf] == 0) {
 		printk(KERN_WARNING "%s: irq %d not valid.\n",
-				driver->name, card->irq);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EINVAL;
+		       driver->name, card->irq);
+		retval = -EINVAL;
+		goto err_free;
 	}
 	for (ctrl = driver->controller; ctrl; ctrl = ctrl->next) {
 	        avmcard *cardp = ((avmctrl_info *)(ctrl->driverdata))->card;
 		if (cardp->cardnr == card->cardnr) {
 			printk(KERN_WARNING "%s: card with number %d already installed at 0x%x.\n",
 					driver->name, card->cardnr, cardp->port);
-	                kfree(card->ctrlinfo);
-			kfree(card);
-	        	MOD_DEC_USE_COUNT;
-			return -EBUSY;
+			retval = -EINVAL;
+			goto err_free;
 		}
 	}
-        if ((retval = t1_detectandinit(card->port, card->irq, card->cardnr)) != 0) {
-		printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
-					driver->name, card->port, retval);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-		MOD_DEC_USE_COUNT;
-		return -EIO;
+	if (!request_region(card->port, AVMB1_PORTLEN, card->name)) {
+		printk(KERN_WARNING "%s: ports 0x%03x-0x%03x in use.\n",
+		       driver->name, card->port, card->port + AVMB1_PORTLEN);
+		retval = -EBUSY;
+		goto err_free;
 	}
-	t1_disable_irq(card->port);
-	b1_reset(card->port);
-
-	request_region(p->port, AVMB1_PORTLEN, card->name);
-
 	retval = request_irq(card->irq, t1isa_interrupt, 0, card->name, card);
 	if (retval) {
 		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
-				driver->name, card->irq);
-		release_region(card->port, AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-		MOD_DEC_USE_COUNT;
-		return -EBUSY;
+		       driver->name, card->irq);
+		retval = -EBUSY;
+		goto err_release_region;
 	}
+
+        if ((retval = t1_detectandinit(card->port, card->irq, card->cardnr)) != 0) {
+		printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
+		       driver->name, card->port, retval);
+		retval = -ENODEV;
+		goto err_free_irq;
+	}
+	t1_disable_irq(card->port);
+	b1_reset(card->port);
 
 	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "%s: attach controller failed.\n",
 				driver->name);
-		free_irq(card->irq, card);
-		release_region(card->port, AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-		kfree(card);
-		MOD_DEC_USE_COUNT;
-		return -EBUSY;
+		retval = -EBUSY;
+		goto err_free_irq;
 	}
 
 	printk(KERN_INFO
@@ -461,6 +421,16 @@ static int t1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 		driver->name, card->port, card->irq, card->cardnr);
 
 	return 0;
+
+ err_free_irq:
+	free_irq(card->irq, card);
+ err_release_region:
+	release_region(card->port, AVMB1_PORTLEN);
+ err_free:
+	b1_free_card(card);
+ err:
+	MOD_DEC_USE_COUNT;
+	return retval;
 }
 
 static void t1isa_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)

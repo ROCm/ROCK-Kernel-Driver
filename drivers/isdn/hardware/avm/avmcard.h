@@ -57,6 +57,20 @@ typedef struct avmcard_dmainfo {
 	struct pci_dev      *pcidev;
 } avmcard_dmainfo;
 
+typedef	struct avmctrl_info {
+	char cardname[32];
+	
+	int versionlen;
+	char versionbuf[1024];
+	char *version[AVM_MAXVERSION];
+	
+	char infobuf[128];	/* for function procinfo */
+	
+	struct avmcard  *card;
+	struct capi_ctr *capi_ctrl;
+	
+} avmctrl_info;
+
 typedef struct avmcard {
 	char name[32];
   
@@ -76,24 +90,10 @@ typedef struct avmcard {
 	volatile u32 csr;
 	avmcard_dmainfo *dma;
 
-	struct avmctrl_info {
-		char cardname[32];
-
-		int versionlen;
-		char versionbuf[1024];
-		char *version[AVM_MAXVERSION];
-
-		char infobuf[128];	/* for function procinfo */
-
-		struct avmcard  *card;
-		struct capi_ctr *capi_ctrl;
-
-	} *ctrlinfo;
+	struct avmctrl_info *ctrlinfo;
 
 	int nlogcontr;
 } avmcard;
-
-typedef struct avmctrl_info avmctrl_info;
 
 extern int b1_irq_table[16];
 
@@ -536,6 +536,8 @@ static inline void b1_setinterrupt(unsigned int base, unsigned irq,
 }
 
 /* b1.c */
+avmcard *b1_alloc_card(int nr_controllers);
+void b1_free_card(avmcard *card);
 int b1_detect(unsigned int base, enum avmcardtype cardtype);
 void b1_getrevision(avmcard *card);
 int b1_load_t4file(avmcard *card, capiloaddatapart * t4file);
