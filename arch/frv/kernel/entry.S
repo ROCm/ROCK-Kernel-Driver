@@ -1073,7 +1073,7 @@ __entry_work_resched:
 	andicc		gr4,#_TIF_NEED_RESCHED,gr0,icc0
 	bne		icc0,#1,__entry_work_resched
 
- __entry_work_notifysig:
+__entry_work_notifysig:
 	LEDS		0x6410
 	ori.p		gr4,#0,gr8
 	call		do_notify_resume
