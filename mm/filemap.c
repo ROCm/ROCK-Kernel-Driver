@@ -61,6 +61,10 @@
  *          ->mapping->page_lock
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
+ *  ->page_table_lock
+ *    ->swap_device_lock	(try_to_unmap_one)
+ *    ->private_lock		(try_to_unmap_one)
+ *    ->page_lock		(try_to_unmap_one)
  */
 
 /*
