@@ -353,7 +353,7 @@ void hci_conn_hash_flush(struct hci_dev *hdev)
 	}
 }
 
-int hci_get_conn_list(unsigned long arg)
+int hci_get_conn_list(void __user *arg)
 {
 	struct hci_conn_list_req req, *cl;
 	struct hci_conn_info *ci;
@@ -361,7 +361,7 @@ int hci_get_conn_list(unsigned long arg)
 	struct list_head *p;
 	int n = 0, size, err;
 
-	if (copy_from_user(&req, (void *) arg, sizeof(req)))
+	if (copy_from_user(&req, arg, sizeof(req)))
 		return -EFAULT;
 
 	if (!req.conn_num || req.conn_num > (PAGE_SIZE * 2) / sizeof(*ci))
@@ -401,20 +401,20 @@ int hci_get_conn_list(unsigned long arg)
 
 	hci_dev_put(hdev);
 
-	err = copy_to_user((void *) arg, cl, size);
+	err = copy_to_user(arg, cl, size);
 	kfree(cl);
 
 	return err ? -EFAULT : 0;
 }
 
-int hci_get_conn_info(struct hci_dev *hdev, unsigned long arg)
+int hci_get_conn_info(struct hci_dev *hdev, void __user *arg)
 {
 	struct hci_conn_info_req req;
 	struct hci_conn_info ci;
 	struct hci_conn *conn;
-	char *ptr = (void *) arg + sizeof(req);
+	char __user *ptr = arg + sizeof(req);
 
-	if (copy_from_user(&req, (void *) arg, sizeof(req)))
+	if (copy_from_user(&req, arg, sizeof(req)))
 		return -EFAULT;
 
 	hci_dev_lock_bh(hdev);

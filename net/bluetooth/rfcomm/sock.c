@@ -707,7 +707,7 @@ static int rfcomm_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned lon
 	lock_sock(sk);
 
 #ifdef CONFIG_BT_RFCOMM_TTY
-	err = rfcomm_dev_ioctl(sk, cmd, arg);
+	err = rfcomm_dev_ioctl(sk, cmd, (void __user *)arg);
 #else
 	err = -EOPNOTSUPP;
 #endif
