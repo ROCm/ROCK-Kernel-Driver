@@ -256,7 +256,7 @@ int jffs2_flash_writev(struct jffs2_sb_info *c, const struct iovec *invecs, unsi
 	if (!c->wbuf)
 		return jffs2_flash_direct_writev(c, invecs, count, to, retlen);
 	
-	/* If wbuf_ofs is not initialized, set it to target adress */
+	/* If wbuf_ofs is not initialized, set it to target address */
 	if (c->wbuf_ofs == 0xFFFFFFFF) {
 		c->wbuf_ofs = PAGE_DIV(to);
 		c->wbuf_len = PAGE_MOD(to);			

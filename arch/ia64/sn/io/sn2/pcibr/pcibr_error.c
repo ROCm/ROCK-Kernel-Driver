@@ -1874,7 +1874,7 @@ pcibr_dmard_error(
 			BRIDGE_ERRUPPR_ADDRMASK) << 32)));
 
     /*
-     * need to ensure that the xtalk adress in ioe
+     * need to ensure that the xtalk address in ioe
      * maps to PCI error address read from bridge.
      * How to convert PCI address back to Xtalk address ?
      * (better idea: convert XTalk address to PCI address

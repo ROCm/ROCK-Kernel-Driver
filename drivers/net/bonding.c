@@ -2547,7 +2547,7 @@ static int bond_xmit_roundrobin(struct sk_buff *skb, struct net_device *dev)
 
 /* 
  * in XOR mode, we determine the output device by performing xor on
- * the source and destination hw adresses.  If this device is not 
+ * the source and destination hw addresses.  If this device is not 
  * enabled, find the next slave following this xor slave. 
  */
 static int bond_xmit_xor(struct sk_buff *skb, struct net_device *dev)

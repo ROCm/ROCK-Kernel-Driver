@@ -1235,7 +1235,7 @@ restart_test:
  *  	s4:	scntl4 (see the manual)
  *
  *  current script command:
- *  	dsp:	script adress (relative to start of script).
+ *  	dsp:	script address (relative to start of script).
  *  	dbc:	first word of script command.
  *
  *  First 24 register of the chip:

@@ -491,7 +491,7 @@ static int configure_device (struct pci_func *func)
 				pci_bus_write_config_dword (ibmphp_pci_bus, devfn, address[count], func->pfmem[count]->start);
 
 				/*_______________This is for debugging purposes only______________________________*/				
-				debug ("b4 writing, start addres is %x\n", func->pfmem[count]->start);
+				debug ("b4 writing, start address is %x\n", func->pfmem[count]->start);
 				pci_bus_read_config_dword (ibmphp_pci_bus, devfn, address[count], &bar[count]);
 				debug ("after writing, start address is %x\n", bar[count]);
 				/*_________________________________________________________________________________*/

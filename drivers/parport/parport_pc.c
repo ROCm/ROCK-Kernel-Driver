@@ -1634,7 +1634,7 @@ static int __devinit get_superio_irq (struct parport *p)
 /*
  * Checks for port existence, all ports support SPP MODE
  * Returns: 
- *         0           :  No parallel port at this adress
+ *         0           :  No parallel port at this address
  *  PARPORT_MODE_PCSPP :  SPP port detected 
  *                        (if the user specified an ioport himself,
  *                         this shall always be the case!)

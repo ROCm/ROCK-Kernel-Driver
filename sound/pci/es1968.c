@@ -1414,7 +1414,7 @@ static snd_pcm_hardware_t snd_es1968_capture = {
    * DMA memory management *
    *************************/
 
-/* Because the Maestro can only take addresses relative to the PCM base adress
+/* Because the Maestro can only take addresses relative to the PCM base address
    register :( */
 
 static int calc_available_memory_size(es1968_t *chip)

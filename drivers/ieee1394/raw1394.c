@@ -238,7 +238,7 @@ static void remove_host(struct hpsb_host *host)
                 list_del(&hi->list);
                 host_count--;
                 /* 
-                   FIXME: adressranges should be removed 
+                   FIXME: addressranges should be removed 
                    and fileinfo states should be initialized
                    (including setting generation to 
                    internal-generation ...)

@@ -357,7 +357,7 @@ static void znet_set_multicast_list (struct net_device *dev)
 	znet->tx_cur += sizeof(struct i82593_conf_block)/2;
 	outb(OP0_CONFIGURE | CR0_CHNL, ioaddr);
 
-	/* XXX FIXME maz : Add multicast adresses here, so having a
+	/* XXX FIXME maz : Add multicast addresses here, so having a
 	 * multicast address configured isn't equal to IFF_ALLMULTI */
 }
 

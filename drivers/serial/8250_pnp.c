@@ -348,7 +348,7 @@ static int __devinit check_name(char *name)
  * Given a complete unknown PnP device, try to use some heuristics to
  * detect modems. Currently use such heuristic set:
  *     - dev->name or dev->bus->name must contain "modem" substring;
- *     - device must have only one IO region (8 byte long) with base adress
+ *     - device must have only one IO region (8 byte long) with base address
  *       0x2e8, 0x3e8, 0x2f8 or 0x3f8.
  *
  * Such detection looks very ugly, but can detect at least some of numerous

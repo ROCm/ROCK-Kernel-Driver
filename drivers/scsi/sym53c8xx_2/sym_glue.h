@@ -263,7 +263,7 @@ typedef Scsi_Cmnd *cam_scsiio_p;/* SCSI I/O */
 #endif
 
 /*
- *  If the CPU and the chip use same endian-ness adressing,
+ *  If the CPU and the chip use same endian-ness addressing,
  *  no byte reordering is needed for script patching.
  *  Macro cpu_to_scr() is to be used for script patching.
  *  Macro scr_to_cpu() is to be used for getting a DWORD 
@@ -297,7 +297,7 @@ typedef Scsi_Cmnd *cam_scsiio_p;/* SCSI I/O */
  *  would have been correctly designed for PCI, this 
  *  option would be useless.
  *
- *  If the CPU and the chip use same endian-ness adressing,
+ *  If the CPU and the chip use same endian-ness addressing,
  *  no byte reordering is needed for accessing chip io 
  *  registers. Functions suffixed by '_raw' are assumed 
  *  to access the chip over the PCI without doing byte 

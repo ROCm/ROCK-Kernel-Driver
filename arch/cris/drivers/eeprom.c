@@ -802,7 +802,7 @@ static int eeprom_address(unsigned long addr)
   return 1;
 }
 
-/* Reads from current adress. */
+/* Reads from current address. */
 
 static int read_from_eeprom(char * buf, int count)
 {
