@@ -6818,3 +6818,4 @@ MODULE_DESCRIPTION("Linux on zSeries OSA Express and HiperSockets support\n" \
 		                      "Copyright 2000,2003 IBM Corporation\n");
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("qeth_mod");
