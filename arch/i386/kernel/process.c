@@ -675,6 +675,14 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	tss->esp0 = next->esp0;
 
 	/*
+	 * Load the per-thread Thread-Local Storage descriptor.
+	 *
+	 * NOTE: it's faster to do the two stores unconditionally
+	 * than to branch away.
+	 */
+	load_TLS_desc(next, cpu);
+
+	/*
 	 * Save away %fs and %gs. No need to save %es and %ds, as
 	 * those are always kernel segments while inside the kernel.
 	 */
@@ -688,14 +696,6 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		loadsegment(fs, next->fs);
 		loadsegment(gs, next->gs);
 	}
-
-	/*
-	 * Load the per-thread Thread-Local Storage descriptor.
-	 *
-	 * NOTE: it's faster to do the two stores unconditionally
-	 * than to branch away.
-	 */
-	load_TLS_desc(next, cpu);
 
 	/*
 	 * Now maybe reload the debug registers
