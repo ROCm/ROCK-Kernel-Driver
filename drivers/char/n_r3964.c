@@ -150,22 +150,18 @@ static void r3964_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 static int  r3964_receive_room(struct tty_struct *tty);
 
 static struct tty_ldisc tty_ldisc_N_R3964 = {
-        TTY_LDISC_MAGIC,       /* magic */
-	"R3964",               /* name */
-        0,                     /* num */
-        0,                     /* flags */
-        r3964_open,            /* open */
-        r3964_close,           /* close */
-        0,                     /* flush_buffer */
-        0,                     /* chars_in_buffer */
-        r3964_read,            /* read */
-        r3964_write,           /* write */
-        r3964_ioctl,           /* ioctl */
-        r3964_set_termios,     /* set_termios */
-        r3964_poll,            /* poll */            
-        r3964_receive_buf,     /* receive_buf */
-        r3964_receive_room,    /* receive_room */
-        0                      /* write_wakeup */
+	.owner	 = THIS_MODULE,
+	.magic	= TTY_LDISC_MAGIC, 
+	.name	= "R3964",
+	.open	= r3964_open,
+	.close	= r3964_close,
+	.read	= r3964_read,
+	.write	= r3964_write,
+	.ioctl	= r3964_ioctl,
+	.set_termios = r3964_set_termios,
+	.poll	= r3964_poll,            
+	.receive_buf = r3964_receive_buf,
+	.receive_room = r3964_receive_room,
 };
 
 
@@ -1070,8 +1066,6 @@ static int r3964_open(struct tty_struct *tty)
 {
    struct r3964_info *pInfo;
    
-   MOD_INC_USE_COUNT;
-
    TRACE_L("open");
    TRACE_L("tty=%x, PID=%d, disc_data=%x", 
           (int)tty, current->pid, (int)tty->disc_data);
@@ -1188,8 +1182,6 @@ static void r3964_close(struct tty_struct *tty)
     TRACE_M("r3964_close - tx_buf kfree %x",(int)pInfo->tx_buf);
     kfree(pInfo);
     TRACE_M("r3964_close - info kfree %x",(int)pInfo);
-
-    MOD_DEC_USE_COUNT;
 }
 
 static ssize_t r3964_read(struct tty_struct *tty, struct file *file,
