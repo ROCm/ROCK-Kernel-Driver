@@ -38,6 +38,7 @@
 #include <net/llc_sap.h>
 #include <net/llc_pdu.h>
 #include <net/llc_conn.h>
+#include <net/llc_mac.h>
 #include <linux/llc.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
@@ -46,7 +47,6 @@
 /* remember: uninitialized global data is zeroed because its in .bss */
 static u16 llc_ui_sap_last_autoport = LLC_SAP_DYN_START;
 static u16 llc_ui_sap_link_no_max[256];
-static u8 llc_ui_addrany[IFHWADDRLEN];
 static struct sockaddr_llc llc_ui_addrnull;
 static struct proto_ops llc_ui_ops;
 static struct sock *llc_ui_sockets;
@@ -67,32 +67,6 @@ static int llc_ui_wait_for_data(struct sock *sk, int timeout);
 static __inline__ u16 llc_ui_next_link_no(int sap)
 {
 	return llc_ui_sap_link_no_max[sap]++;
-}
-
-/**
- *	llc_ui_mac_match - determines if two mac addresses are the same
- *	@mac1: First mac address to compare.
- *	@mac2: Second mac address to compare.
- *
- *	Determines if two given mac address are the same.  Returns 0 if there
- *	is not a complete match up to len, 1 if a complete match up to len is
- *	found.
- */
-static __inline__ u8 llc_ui_mac_match(u8 *mac1, u8 *mac2)
-{
-	return !memcmp(mac1, mac2, IFHWADDRLEN);
-}
-
-/**
- *	llc_ui_mac_null - determines if a address is a null mac address
- *	@mac: Mac address to test if null.
- *
- *	Determines if a given address is a null mac address.  Returns 0 if the
- *	address is not a null mac, 1 if the address is a null mac.
- */
-static __inline__ u8 llc_ui_mac_null(u8 *mac)
-{
-	return !memcmp(mac, llc_ui_addrany, IFHWADDRLEN);
 }
 
 /**
@@ -304,9 +278,9 @@ static struct sock *__llc_ui_find_sk_by_exact(struct llc_addr *laddr,
 
 		if (llc_ui->addr.sllc_ssap == laddr->lsap &&
 		    llc_ui->addr.sllc_dsap == daddr->lsap &&
-		    llc_ui_mac_null(llc_ui->addr.sllc_mmac) &&
-		    llc_ui_mac_match(llc_ui->addr.sllc_smac, laddr->mac) &&
-		    llc_ui_mac_match(llc_ui->addr.sllc_dmac, daddr->mac))
+		    llc_mac_null(llc_ui->addr.sllc_mmac) &&
+		    llc_mac_match(llc_ui->addr.sllc_smac, laddr->mac) &&
+		    llc_mac_match(llc_ui->addr.sllc_dmac, daddr->mac))
 			break;
 	}
 	return sk;
@@ -333,27 +307,27 @@ static struct sock *__llc_ui_find_sk_by_addr(struct llc_addr *laddr,
 
 		if (llc_ui->addr.sllc_ssap != laddr->lsap)
 			continue;
-		if (llc_ui_mac_null(llc_ui->addr.sllc_smac)) {
-			if (!llc_ui_mac_null(llc_ui->addr.sllc_mmac) &&
-			    !llc_ui_mac_match(llc_ui->addr.sllc_mmac,
+		if (llc_mac_null(llc_ui->addr.sllc_smac)) {
+			if (!llc_mac_null(llc_ui->addr.sllc_mmac) &&
+			    !llc_mac_match(llc_ui->addr.sllc_mmac,
 				    	      laddr->mac))
 				continue;
 			break;
 		}
-		if (dev && !llc_ui_mac_null(llc_ui->addr.sllc_mmac) &&
-		    llc_ui_mac_match(llc_ui->addr.sllc_mmac, laddr->mac) &&
-		    llc_ui_mac_match(llc_ui->addr.sllc_smac, dev->dev_addr))
+		if (dev && !llc_mac_null(llc_ui->addr.sllc_mmac) &&
+		    llc_mac_match(llc_ui->addr.sllc_mmac, laddr->mac) &&
+		    llc_mac_match(llc_ui->addr.sllc_smac, dev->dev_addr))
 			break;
 		if (dev->flags & IFF_LOOPBACK)
 			break;
-		if (!llc_ui_mac_match(llc_ui->addr.sllc_smac, laddr->mac))
+		if (!llc_mac_match(llc_ui->addr.sllc_smac, laddr->mac))
 			continue;
 		tmp_sk = __llc_ui_find_sk_by_exact(laddr, daddr);
 		if (tmp_sk) {
 			sk = tmp_sk;
 			break;
 		}
-		if (llc_ui_mac_null(llc_ui->addr.sllc_dmac))
+		if (llc_mac_null(llc_ui->addr.sllc_dmac))
 			break;
 	}
 	return sk;
@@ -597,7 +571,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 	if (!sk->zapped)
 		goto out;
 	/* bind to a specific mac, optional. */
-	if (!llc_ui_mac_null(addr->sllc_smac)) {
+	if (!llc_mac_null(addr->sllc_smac)) {
 		rtnl_lock();
 		dev = dev_getbyhwaddr(addr->sllc_arphrd, addr->sllc_smac);
 		rtnl_unlock();
@@ -625,11 +599,11 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 		struct sock *ask;
 
 		rc = -EUSERS; /* can't get exclusive use of sap */
-		if (!dev && llc_ui_mac_null(addr->sllc_mmac))
+		if (!dev && llc_mac_null(addr->sllc_mmac))
 			goto out;
 		memset(&laddr, 0, sizeof(laddr));
 		memset(&daddr, 0, sizeof(daddr));
-		if (!llc_ui_mac_null(addr->sllc_mmac)) {
+		if (!llc_mac_null(addr->sllc_mmac)) {
 			if (sk->type != SOCK_DGRAM) {
 				rc = -EOPNOTSUPP;
 				goto out;
@@ -1630,14 +1604,14 @@ static int llc_ui_get_info(char *buffer, char **start, off_t offset, int length)
 	for (s = llc_ui_sockets; s; s = s->next) {
 		struct llc_ui_opt *llc_ui = llc_ui_sk(s);
 		len += sprintf(buffer + len, "%p %02X  %02X ", s, s->type,
-			       !llc_ui_mac_null(llc_ui->addr.sllc_mmac));
+			       !llc_mac_null(llc_ui->addr.sllc_mmac));
 		if (llc_ui->sap) {
 			if (llc_ui->dev &&
-			    llc_ui_mac_null(llc_ui->addr.sllc_mmac))
+			    llc_mac_null(llc_ui->addr.sllc_mmac))
 				llc_ui_format_mac(buffer + len,
 						  llc_ui->dev->dev_addr);
 			else {
-				if (!llc_ui_mac_null(llc_ui->addr.sllc_mmac))
+				if (!llc_mac_null(llc_ui->addr.sllc_mmac))
 					llc_ui_format_mac(buffer + len,
 							llc_ui->addr.sllc_mmac);
 				else

@@ -33,6 +33,8 @@
 #define dprintk(args...)
 #endif
 
+u8 llc_mac_null_var[IFHWADDRLEN];
+
 static void fix_up_incoming_skb(struct sk_buff *skb);
 static void llc_station_rcv(struct sk_buff *skb);
 static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb);

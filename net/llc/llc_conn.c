@@ -430,8 +430,8 @@ struct sock *llc_lookup_established(struct llc_sap *sap, struct llc_addr *daddr,
 
 		if (llc->laddr.lsap == laddr->lsap &&
 		    llc->daddr.lsap == daddr->lsap &&
-		    !memcmp(llc->laddr.mac, laddr->mac, ETH_ALEN) &&
-		    !memcmp(llc->daddr.mac, daddr->mac, ETH_ALEN)) {
+		    llc_mac_match(llc->laddr.mac, laddr->mac) &&
+		    llc_mac_match(llc->daddr.mac, daddr->mac)) {
 			rc = llc->sk;
 			break;
 		}
