@@ -2822,7 +2822,7 @@ static void selinux_task_to_inode(struct task_struct *p,
 /* Returns error only if unable to parse addresses */
 static int selinux_parse_skb_ipv4(struct sk_buff *skb, struct avc_audit_data *ad)
 {
-	int offset, ihlen, ret;
+	int offset, ihlen, ret = -EINVAL;
 	struct iphdr _iph, *ih;
 
 	offset = skb->nh.raw - skb->data;
@@ -2836,6 +2836,7 @@ static int selinux_parse_skb_ipv4(struct sk_buff *skb, struct avc_audit_data *ad
 
 	ad->u.net.v4info.saddr = ih->saddr;
 	ad->u.net.v4info.daddr = ih->daddr;
+	ret = 0;
 
 	switch (ih->protocol) {
         case IPPROTO_TCP: {
@@ -2883,7 +2884,7 @@ out:
 static int selinux_parse_skb_ipv6(struct sk_buff *skb, struct avc_audit_data *ad)
 {
 	u8 nexthdr;
-	int ret, offset;
+	int ret = -EINVAL, offset;
 	struct ipv6hdr _ipv6h, *ip6;
 
 	offset = skb->nh.raw - skb->data;
@@ -2893,6 +2894,7 @@ static int selinux_parse_skb_ipv6(struct sk_buff *skb, struct avc_audit_data *ad
 
 	ipv6_addr_copy(&ad->u.net.v6info.saddr, &ip6->saddr);
 	ipv6_addr_copy(&ad->u.net.v6info.daddr, &ip6->daddr);
+	ret = 0;
 
 	nexthdr = ip6->nexthdr;
 	offset += sizeof(_ipv6h);
