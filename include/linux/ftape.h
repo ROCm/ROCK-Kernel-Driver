@@ -34,7 +34,7 @@
 #define KERNEL_VER(major,minor,sublvl) (((major)<<16)+((minor)<<8)+(sublvl))
 
 #ifdef __KERNEL__
-#include <linux/sched.h>
+#include <linux/interrupt.h>
 #include <linux/mm.h>
 #endif
 #include <linux/types.h>
