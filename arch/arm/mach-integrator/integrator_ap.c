@@ -256,7 +256,7 @@ static void __init ap_init(void)
 	unsigned long sc_dec;
 	int i;
 
-	platform_add_device(&cfi_flash_device);
+	platform_device_register(&cfi_flash_device);
 
 	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
 	for (i = 0; i < 4; i++) {
@@ -281,11 +281,17 @@ static void __init ap_init(void)
 	}
 }
 
+static void ap_time_init(void)
+{
+	integrator_time_init(1000000 * TICKS_PER_uSEC / HZ, 0);
+}
+
 MACHINE_START(INTEGRATOR, "ARM-Integrator")
 	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")
 	BOOT_MEM(0x00000000, 0x16000000, 0xf1600000)
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ap_map_io)
 	INITIRQ(ap_init_irq)
+	INITTIME(ap_time_init)
 	INIT_MACHINE(ap_init)
 MACHINE_END

@@ -148,11 +148,27 @@
 # endif
 #endif
 
+#ifndef __ASSEMBLY__
+
 #ifndef MULTI_CPU
 #include "asm/cpu-single.h"
 #else
 #include "asm/cpu-multi32.h"
 #endif
 
+#include <asm/memory.h>
+
+#define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
+
+#define cpu_get_pgd()	\
+	({						\
+		unsigned long pg;			\
+		__asm__("mrc	p15, 0, %0, c2, c0, 0"	\
+			 : "=r" (pg) : : "cc");		\
+		pg &= ~0x3fff;				\
+		(pgd_t *)phys_to_virt(pg);		\
+	})
+
+#endif /* __ASSEMBLY__ */
 #endif /* __KERNEL__ */
 #endif /* __ASM_PROCFNS_H */

@@ -31,10 +31,6 @@ typedef struct
 
 extern int smp_call_function_on(void (*func) (void *info), void *info,
 				int nonatomic, int wait, int cpu);
-
-extern cpumask_t cpu_online_map;
-extern cpumask_t cpu_possible_map;
-
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 
 /*
@@ -50,8 +46,6 @@ extern cpumask_t cpu_possible_map;
 #define PROC_CHANGE_PENALTY	20		/* Schedule penalty */
 
 #define smp_processor_id() (S390_lowcore.cpu_data.cpu_nr)
-
-#define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 
 extern __inline__ __u16 hard_smp_processor_id(void)
 {

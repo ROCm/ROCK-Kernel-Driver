@@ -75,9 +75,8 @@ static int br_initial_port_cost(struct net_device *dev)
 	return 100;	/* assume old 10Mbps */
 }
 
-static void destroy_nbp(void *arg)
+static void destroy_nbp(struct net_bridge_port *p)
 {
-	struct net_bridge_port *p = arg;
 	struct net_device *dev = p->dev;
 
 	dev->br_port = NULL;
@@ -86,6 +85,13 @@ static void destroy_nbp(void *arg)
 	dev_put(dev);
 
 	br_sysfs_freeif(p);
+}
+
+static void destroy_nbp_rcu(struct rcu_head *head)
+{
+	struct net_bridge_port *p =
+			container_of(head, struct net_bridge_port, rcu);
+	destroy_nbp(p);
 }
 
 /* called with RTNL */
@@ -108,7 +114,7 @@ static void del_nbp(struct net_bridge_port *p)
 	del_timer_sync(&p->forward_delay_timer);
 	del_timer_sync(&p->hold_timer);
 	
-	call_rcu(&p->rcu, destroy_nbp, p);
+	call_rcu(&p->rcu, destroy_nbp_rcu);
 }
 
 /* called with RTNL */

@@ -1,7 +1,5 @@
-/* 
- * $Id: pg-sh4.c,v 1.1.2.2 2002/11/17 17:56:18 lethal Exp $
- *
- *  arch/sh/mm/pg-sh4.c
+/*
+ * arch/sh/mm/pg-sh4.c
  *
  * Copyright (C) 1999, 2000, 2002  Niibe Yutaka
  * Copyright (C) 2002  Paul Mundt
@@ -101,3 +99,24 @@ void copy_user_page(void *to, void *from, unsigned long address,
 		up(&p3map_sem[(address & CACHE_ALIAS)>>12]);
 	}
 }
+
+/*
+ * For SH-4, we have our own implementation for ptep_get_and_clear
+ */
+inline pte_t ptep_get_and_clear(pte_t *ptep)
+{
+	pte_t pte = *ptep;
+
+	pte_clear(ptep);
+	if (!pte_not_present(pte)) {
+		unsigned long pfn = pte_pfn(pte);
+		if (pfn_valid(pfn)) {
+			struct page *page = pfn_to_page(pfn);
+			struct address_space *mapping = page_mapping(page);
+			if (!mapping || !mapping_writably_mapped(mapping))
+				__clear_bit(PG_mapped, &page->flags);
+		}
+	}
+	return pte;
+}
+

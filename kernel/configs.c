@@ -34,13 +34,26 @@
 /**************************************************/
 /* the actual current config file                 */
 
-/* This one is for extraction from the kernel binary file image. */
-#include "ikconfig.h"
+/*
+ * Define kernel_config_data and kernel_config_data_size, which contains the
+ * wrapped and compressed configuration file.  The file is first compressed
+ * with gzip and then bounded by two eight byte magic numbers to allow
+ * extraction from a binary kernel image:
+ *
+ *   IKCFG_ST
+ *   <image>
+ *   IKCFG_ED
+ */
+#define MAGIC_START	"IKCFG_ST"
+#define MAGIC_END	"IKCFG_ED"
+#include "config_data.h"
+
+
+#define MAGIC_SIZE (sizeof(MAGIC_START) - 1)
+#define kernel_config_data_size \
+	(sizeof(kernel_config_data) - 1 - MAGIC_SIZE * 2)
 
 #ifdef CONFIG_IKCONFIG_PROC
-
-/* This is the data that can be read from /proc/config.gz. */
-#include "config_data.h"
 
 /**************************************************/
 /* globals and useful constants                   */
@@ -58,7 +71,7 @@ ikconfig_read_current(struct file *file, char __user *buf,
 		return 0;
 
 	count = min(len, (size_t)(kernel_config_data_size - pos));
-	if(copy_to_user(buf, kernel_config_data + pos, count))
+	if (copy_to_user(buf, kernel_config_data + MAGIC_SIZE + pos, count))
 		return -EFAULT;
 
 	*offset += count;

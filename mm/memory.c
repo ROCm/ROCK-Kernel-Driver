@@ -407,7 +407,7 @@ static void zap_pte_range(struct mmu_gather *tlb,
 				set_pte(ptep, pgoff_to_pte(page->index));
 			if (pte_dirty(pte))
 				set_page_dirty(page);
-			if (pte_young(pte) && page_mapping(page))
+			if (pte_young(pte) && !PageAnon(page))
 				mark_page_accessed(page);
 			tlb->freed++;
 			page_remove_rmap(page);
@@ -718,19 +718,24 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			pte_t *pte;
 			if (write) /* user gate pages are read-only */
 				return i ? : -EFAULT;
-			pgd = pgd_offset_k(pg);
+			pgd = pgd_offset(mm, pg);
 			if (!pgd)
 				return i ? : -EFAULT;
 			pmd = pmd_offset(pgd, pg);
 			if (!pmd)
 				return i ? : -EFAULT;
-			pte = pte_offset_kernel(pmd, pg);
-			if (!pte || !pte_present(*pte))
+			pte = pte_offset_map(pmd, pg);
+			if (!pte)
 				return i ? : -EFAULT;
+			if (!pte_present(*pte)) {
+				pte_unmap(pte);
+				return i ? : -EFAULT;
+			}
 			if (pages) {
 				pages[i] = pte_page(*pte);
 				get_page(pages[i]);
 			}
+			pte_unmap(pte);
 			if (vmas)
 				vmas[i] = gate_vma;
 			i++;

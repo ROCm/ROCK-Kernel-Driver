@@ -158,9 +158,10 @@ void pte_free_now(struct page *ptepage)
 	pte_free(ptepage);
 }
 
-static void pte_free_rcu_callback(void *arg)
+static void pte_free_rcu_callback(struct rcu_head *head)
 {
-	struct pte_freelist_batch *batch = arg;
+	struct pte_freelist_batch *batch =
+		container_of(head, struct pte_freelist_batch, rcu);
 	unsigned int i;
 
 	for (i = 0; i < batch->index; i++)
@@ -171,7 +172,7 @@ static void pte_free_rcu_callback(void *arg)
 void pte_free_submit(struct pte_freelist_batch *batch)
 {
 	INIT_RCU_HEAD(&batch->rcu);
-	call_rcu(&batch->rcu, pte_free_rcu_callback, batch);
+	call_rcu(&batch->rcu, pte_free_rcu_callback);
 }
 
 void pte_free_finish(void)

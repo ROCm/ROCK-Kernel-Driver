@@ -72,9 +72,6 @@ choice
 	prompt "ARM system type"
 	default ARCH_RPC
 
-config ARCH_ADIFCC
-	bool "ADIFCC-based"
-
 config ARCH_CLPS7500
 	bool "Cirrus-CL-PS7500FE"
 
@@ -189,6 +186,11 @@ source "arch/arm/mach-lh7a40x/Kconfig"
 config ARCH_ACORN
 	bool
 	depends on ARCH_RPC
+	default y
+
+config TIMER_ACORN
+	bool
+	depends on ARCH_ACORN || ARCH_CLPS7500
 	default y
 
 #####################################################################

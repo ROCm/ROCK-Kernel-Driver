@@ -24,6 +24,7 @@
 #include <linux/socket.h>
 #include <linux/syscalls.h>
 #include <linux/percpu.h>
+#include <linux/init.h>
 #include <net/compat.h>
 
 #include <asm/oplib.h>
@@ -76,7 +77,6 @@ extern int __memcmp(const void *, const void *, __kernel_size_t);
 extern int __strncmp(const char *, const char *, __kernel_size_t);
 extern __kernel_size_t __strlen(const char *);
 extern __kernel_size_t strlen(const char *);
-extern char saved_command_line[];
 extern void linux_sparc_syscall(void);
 extern void rtrap(void);
 extern void show_regs(struct pt_regs *);

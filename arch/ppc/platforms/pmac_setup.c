@@ -103,8 +103,6 @@ int has_l2cache = 0;
 
 static int current_root_goodness = -1;
 
-extern char saved_command_line[];
-
 extern int pmac_newworld;
 
 #define DEFAULT_ROOT_DEVICE Root_SDA1	/* sda1 - slightly silly choice */

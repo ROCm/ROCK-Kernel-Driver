@@ -14,6 +14,7 @@
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
 #include <linux/parser.h>
+#include <linux/namei.h>
 
 #include "befs.h"
 #include "btree.h"
@@ -40,8 +41,8 @@ static struct inode *befs_alloc_inode(struct super_block *sb);
 static void befs_destroy_inode(struct inode *inode);
 static int befs_init_inodecache(void);
 static void befs_destroy_inodecache(void);
-static int befs_readlink(struct dentry *, char __user *, int);
-static int befs_follow_link(struct dentry *, struct nameidata *nd);
+static int befs_follow_link(struct dentry *, struct nameidata *);
+static void befs_put_link(struct dentry *, struct nameidata *);
 static int befs_utf2nls(struct super_block *sb, const char *in, int in_len,
 			char **out, int *out_len);
 static int befs_nls2utf(struct super_block *sb, const char *in, int in_len,
@@ -85,8 +86,9 @@ struct address_space_operations befs_aops = {
 };
 
 static struct inode_operations befs_symlink_inode_operations = {
-	.readlink	= befs_readlink,
+	.readlink	= generic_readlink,
 	.follow_link	= befs_follow_link,
+	.put_link	= befs_put_link,
 };
 
 /* 
@@ -462,71 +464,40 @@ befs_destroy_inodecache(void)
 static int
 befs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	struct super_block *sb = dentry->d_sb;
 	befs_inode_info *befs_ino = BEFS_I(dentry->d_inode);
 	char *link;
-	int res;
 
 	if (befs_ino->i_flags & BEFS_LONG_SYMLINK) {
+		struct super_block *sb = dentry->d_sb;
 		befs_data_stream *data = &befs_ino->i_data.ds;
-		befs_off_t linklen = data->size;
+		befs_off_t len = data->size;
 
 		befs_debug(sb, "Follow long symlink");
 
-		link = kmalloc(linklen, GFP_NOFS);
-		if (link == NULL)
-			return -ENOMEM;
-
-		if (befs_read_lsymlink(sb, data, link, linklen) != linklen) {
+		link = kmalloc(len, GFP_NOFS);
+		if (!link) {
+			link = ERR_PTR(-ENOMEM);
+		} else if (befs_read_lsymlink(sb, data, link, len) != len) {
 			kfree(link);
 			befs_error(sb, "Failed to read entire long symlink");
-			return -EIO;
+			link = ERR_PTR(-EIO);
 		}
-
-		res = vfs_follow_link(nd, link);
-
-		kfree(link);
 	} else {
 		link = befs_ino->i_data.symlink;
-		res = vfs_follow_link(nd, link);
 	}
 
-	return res;
+	nd_set_link(nd, link);
+	return 0;
 }
 
-static int
-befs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
+static void befs_put_link(struct dentry *dentry, struct nameidata *nd)
 {
-	struct super_block *sb = dentry->d_sb;
 	befs_inode_info *befs_ino = BEFS_I(dentry->d_inode);
-	char *link;
-	int res;
-
 	if (befs_ino->i_flags & BEFS_LONG_SYMLINK) {
-		befs_data_stream *data = &befs_ino->i_data.ds;
-		befs_off_t linklen = data->size;
-
-		befs_debug(sb, "Read long symlink");
-
-		link = kmalloc(linklen, GFP_NOFS);
-		if (link == NULL)
-			return -ENOMEM;
-
-		if (befs_read_lsymlink(sb, data, link, linklen) != linklen) {
-			kfree(link);
-			befs_error(sb, "Failed to read entire long symlink");
-			return -EIO;
-		}
-
-		res = vfs_readlink(dentry, buffer, buflen, link);
-
-		kfree(link);
-	} else {
-		link = befs_ino->i_data.symlink;
-		res = vfs_readlink(dentry, buffer, buflen, link);
+		char *p = nd_get_link(nd);
+		if (!IS_ERR(p))
+			kfree(p);
 	}
-
-	return res;
 }
 
 /*

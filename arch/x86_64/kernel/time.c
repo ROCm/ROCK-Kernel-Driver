@@ -689,7 +689,7 @@ int __init time_setup(char *str)
 }
 
 static struct irqaction irq0 = {
-	timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL
+	timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer", NULL, NULL
 };
 
 extern void __init config_acpi_tables(void);

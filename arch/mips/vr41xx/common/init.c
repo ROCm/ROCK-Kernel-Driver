@@ -18,16 +18,9 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include <linux/init.h>
-#include <linux/ioport.h>
 #include <linux/string.h>
 
 #include <asm/bootinfo.h>
-#include <asm/vr41xx/vr41xx.h>
-
-extern void vr41xx_bcu_init(void);
-extern void vr41xx_cmu_init(void);
-extern void vr41xx_pmu_init(void);
-extern void vr41xx_rtc_init(void);
 
 void __init prom_init(void)
 {
@@ -42,14 +35,6 @@ void __init prom_init(void)
 		if (i < (argc - 1))
 			strcat(arcs_cmdline, " ");
 	}
-
-	iomem_resource.start = IO_MEM_RESOURCE_START;
-	iomem_resource.end = IO_MEM_RESOURCE_END;
-
-	vr41xx_bcu_init();
-	vr41xx_cmu_init();
-	vr41xx_pmu_init();
-	vr41xx_rtc_init();
 }
 
 unsigned long __init prom_free_prom_memory (void)

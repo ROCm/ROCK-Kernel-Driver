@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -199,7 +199,14 @@ typedef enum {
 
 extern struct bhv_vfsops xfs_dmops;
 
-extern int dmapi_init(void);
-extern void dmapi_uninit(void);
+#ifdef CONFIG_XFS_DMAPI
+void xfs_dm_init(struct file_system_type *);
+void xfs_dm_exit(struct file_system_type *);
+#define XFS_DM_INIT(fstype)	xfs_dm_init(fstype)
+#define XFS_DM_EXIT(fstype)	xfs_dm_exit(fstype)
+#else
+#define XFS_DM_INIT(fstype)
+#define XFS_DM_EXIT(fstype)
+#endif
 
 #endif  /* __XFS_DMAPI_H__ */

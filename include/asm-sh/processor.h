@@ -37,8 +37,8 @@ enum cpu_type {
 	CPU_SH7604,
 
 	/* SH-3 types */
-	CPU_SH7707,  CPU_SH7708, CPU_SH7708S, CPU_SH7708R, CPU_SH7709,
-	CPU_SH7709A, CPU_SH7729, CPU_SH7300,
+	CPU_SH7705, CPU_SH7707,  CPU_SH7708, CPU_SH7708S, CPU_SH7708R,
+	CPU_SH7709, CPU_SH7709A, CPU_SH7729, CPU_SH7300,
 
 	/* SH-4 types */
 	CPU_SH7750, CPU_SH7750S, CPU_SH7750R, CPU_SH7751, CPU_SH7751R,
@@ -271,6 +271,7 @@ extern unsigned long get_wchan(struct task_struct *p);
 #define KSTK_EIP(tsk)  ((tsk)->thread.pc)
 #define KSTK_ESP(tsk)  ((tsk)->thread.sp)
 
-#define cpu_relax()	__asm__ __volatile__ ("sleep" : : : "memory")
+#define cpu_sleep()	__asm__ __volatile__ ("sleep" : : : "memory")
+#define cpu_relax()	do { } while (0)
 
 #endif /* __ASM_SH_PROCESSOR_H */

@@ -288,15 +288,15 @@ static __inline__ int ffs(int x)
 #define hweight16(x) generic_hweight16(x)
 #define hweight8(x) generic_hweight8(x)
 
-extern unsigned long find_next_zero_bit(unsigned long *addr, unsigned long size, unsigned long offset);
+extern unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size, unsigned long offset);
 #define find_first_zero_bit(addr, size) \
 	find_next_zero_bit((addr), (size), 0)
 
-extern unsigned long find_next_bit(unsigned long *addr, unsigned long size, unsigned long offset);
+extern unsigned long find_next_bit(const unsigned long *addr, unsigned long size, unsigned long offset);
 #define find_first_bit(addr, size) \
 	find_next_bit((addr), (size), 0)
 
-extern unsigned long find_next_zero_le_bit(unsigned long *addr, unsigned long size, unsigned long offset);
+extern unsigned long find_next_zero_le_bit(const unsigned long *addr, unsigned long size, unsigned long offset);
 #define find_first_zero_le_bit(addr, size) \
 	find_next_zero_le_bit((addr), (size), 0)
 

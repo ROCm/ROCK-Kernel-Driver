@@ -116,6 +116,7 @@ extern void enable_kernel_fp(void);
 extern void giveup_altivec(struct task_struct *);
 extern void disable_kernel_altivec(void);
 extern void enable_kernel_altivec(void);
+extern int emulate_altivec(struct pt_regs *);
 extern void cvt_fd(float *from, double *to, unsigned long *fpscr);
 extern void cvt_df(double *from, float *to, unsigned long *fpscr);
 
@@ -126,8 +127,6 @@ static inline void flush_altivec_to_thread(struct task_struct *t)
 {
 }
 #endif
-
-extern int abs(int);
 
 extern struct task_struct *__switch_to(struct task_struct *,
 				       struct task_struct *);

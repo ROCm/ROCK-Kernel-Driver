@@ -141,7 +141,7 @@ void sync_dquots(struct super_block *sb, int type)
 			sb->s_qcop->quota_sync(sb, type);
 	}
 	else {
-		while ((sb = get_super_to_sync(type))) {
+		while ((sb = get_super_to_sync(type)) != 0) {
 			if (sb->s_qcop->quota_sync)
 				sb->s_qcop->quota_sync(sb, type);
 			drop_super(sb);
@@ -150,7 +150,7 @@ void sync_dquots(struct super_block *sb, int type)
 }
 
 /* Copy parameters and call proper function */
-static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, caddr_t addr)
+static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, void __user *addr)
 {
 	int ret;
 
@@ -264,7 +264,7 @@ static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, cadd
  * calls. Maybe we need to add the process quotas etc. in the future,
  * but we probably should use rlimits for that.
  */
-asmlinkage long sys_quotactl(unsigned int cmd, const char __user *special, qid_t id, caddr_t addr)
+asmlinkage long sys_quotactl(unsigned int cmd, const char __user *special, qid_t id, void __user *addr)
 {
 	uint cmds, type;
 	struct super_block *sb = NULL;

@@ -1509,6 +1509,10 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		/* this workaround will cause lock-up after suspend/resume on Sony PCG-F305 */
 		chip->latitude_workaround = 0;
 	}
+	if (subsystem_vendor == 0x1028 && subsystem_device == 0x0080) {
+		/* this workaround will cause lock-up after suspend/resume on a Dell laptop */
+		chip->latitude_workaround = 0;
+	}
 
 	snd_nm256_init_chip(chip);
 

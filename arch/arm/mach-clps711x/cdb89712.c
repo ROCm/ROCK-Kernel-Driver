@@ -34,6 +34,7 @@
 
 extern void clps711x_init_irq(void);
 extern void clps711x_map_io(void);
+extern void clps711x-init_time(void);
 
 /*
  * Map the CS89712 Ethernet port.  That should be moved to the
@@ -55,6 +56,7 @@ MACHINE_START(CDB89712, "Cirrus-CDB89712")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(cdb89712_map_io)
 	INITIRQ(clps711x_init_irq)
+	INITTIME(clps711x_init_time)
 MACHINE_END
 
 static int cdb89712_hw_init(void)

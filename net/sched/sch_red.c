@@ -189,7 +189,7 @@ red_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 		int  shift;
 
 		PSCHED_GET_TIME(now);
-		us_idle = PSCHED_TDIFF_SAFE(now, q->qidlestart, q->Scell_max, 0);
+		us_idle = PSCHED_TDIFF_SAFE(now, q->qidlestart, q->Scell_max, (void)0);
 		PSCHED_SET_PASTPERFECT(q->qidlestart);
 
 /*

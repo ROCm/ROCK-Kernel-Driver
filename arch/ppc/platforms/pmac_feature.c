@@ -1282,6 +1282,25 @@ core99_firewire_cable_power(struct device_node* node, long param, long value)
 	return 0;
 }
 
+static long __pmac
+intrepid_aack_delay_enable(struct device_node* node, long param, long value)
+{
+	unsigned long flags;
+
+    	if (uninorth_rev < 0xd2)
+		return -ENODEV;
+
+	LOCK(flags);
+	if (param)
+		UN_BIS(UNI_N_AACK_DELAY, UNI_N_AACK_DELAY_ENABLE);
+	else
+		UN_BIC(UNI_N_AACK_DELAY, UNI_N_AACK_DELAY_ENABLE);
+	UNLOCK(flags);
+
+    	return 0;
+}
+
+
 #endif /* CONFIG_POWER4 */
 
 static long __pmac
@@ -1914,6 +1933,7 @@ static struct feature_table_entry intrepid_features[]  __pmacdata = {
 	{ PMAC_FTR_SLEEP_STATE,		core99_sleep_state },
 	{ PMAC_FTR_READ_GPIO,		core99_read_gpio },
 	{ PMAC_FTR_WRITE_GPIO,		core99_write_gpio },
+	{ PMAC_FTR_AACK_DELAY_ENABLE,	intrepid_aack_delay_enable },
 	{ 0, NULL }
 };
 
@@ -2116,6 +2136,14 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
 		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
 	},
+	{	"PowerBook5,4",			"PowerBook G4 15\"",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
+	},
+	{	"PowerBook5,5",			"PowerBook G4 17\"",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
+	},
 	{	"PowerBook6,1",			"PowerBook G4 12\"",
 		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
 		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
@@ -2125,6 +2153,10 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
 	},
 	{	"PowerBook6,3",			"iBook G4",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
+	},
+	{	"PowerBook6,4",			"PowerBook G4 12\"",
 		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
 		PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
 	},

@@ -1266,30 +1266,13 @@ static void isofs_read_inode(struct inode * inode)
 	}
 
 	/*
-	 * The ISO-9660 filesystem only stores 32 bits for file size.
-	 * mkisofs handles files up to 2GB-2 = 2147483646 = 0x7FFFFFFE bytes
-	 * in size. This is according to the large file summit paper from 1996.
-	 * WARNING: ISO-9660 filesystems > 1 GB and even > 2 GB are fully
-	 *	    legal. Do not prevent to use DVD's schilling@fokus.gmd.de
-	 */
-	if ((inode->i_size < 0 || inode->i_size > 0x7FFFFFFE) &&
-	    sbi->s_cruft == 'n') {
-		printk(KERN_WARNING "Warning: defective CD-ROM.  "
-		       "Enabling \"cruft\" mount option.\n");
-		sbi->s_cruft = 'y';
-	}
-
-	/*
 	 * Some dipshit decided to store some other bit of information
-	 * in the high byte of the file length.  Catch this and holler.
-	 * WARNING: this will make it impossible for a file to be > 16MB
-	 * on the CDROM.
+	 * in the high byte of the file length.  Truncate size in case
+	 * this CDROM was mounted with the cruft option.
 	 */
 
-	if (sbi->s_cruft == 'y' &&
-	    inode->i_size & 0xff000000) {
+	if (sbi->s_cruft == 'y')
 		inode->i_size &= 0x00ffffff;
-	}
 
 	if (de->interleave[0]) {
 		printk("Interleaved files not (yet) supported.\n");

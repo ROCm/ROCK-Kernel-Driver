@@ -1183,6 +1183,7 @@ endmenu
 
 source "lib/Kconfig"
 
+source "arch/ppc/oprofile/Kconfig"
 
 menu "Kernel hacking"
 

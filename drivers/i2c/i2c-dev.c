@@ -181,7 +181,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 	struct i2c_smbus_ioctl_data data_arg;
 	union i2c_smbus_data temp;
 	struct i2c_msg *rdwr_pa;
-	u8 **data_ptrs;
+	u8 __user **data_ptrs;
 	int i,datasize,res;
 	unsigned long funcs;
 
@@ -238,8 +238,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 			return -EFAULT;
 		}
 
-		data_ptrs = (u8 **) kmalloc(rdwr_arg.nmsgs * sizeof(u8 *),
-					    GFP_KERNEL);
+		data_ptrs = kmalloc(rdwr_arg.nmsgs * sizeof(u8 __user *), GFP_KERNEL);
 		if (data_ptrs == NULL) {
 			kfree(rdwr_pa);
 			return -ENOMEM;
@@ -252,7 +251,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 				res = -EINVAL;
 				break;
 			}
-			data_ptrs[i] = rdwr_pa[i].buf;
+			data_ptrs[i] = (u8 __user *)rdwr_pa[i].buf;
 			rdwr_pa[i].buf = kmalloc(rdwr_pa[i].len, GFP_KERNEL);
 			if(rdwr_pa[i].buf == NULL) {
 				res = -ENOMEM;

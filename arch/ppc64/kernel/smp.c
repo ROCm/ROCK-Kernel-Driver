@@ -241,7 +241,7 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
  */
 static int query_cpu_stopped(unsigned int pcpu)
 {
-	long cpu_status;
+	int cpu_status;
 	int status, qcss_tok;
 
 	qcss_tok = rtas_token("query-cpu-stopped-state");

@@ -165,7 +165,8 @@ static struct file_operations ulong_ro_fops = {
 
 
 static struct dentry * __oprofilefs_create_file(struct super_block * sb,
-	struct dentry * root, char const * name, struct file_operations * fops)
+	struct dentry * root, char const * name, struct file_operations * fops,
+	int perm)
 {
 	struct dentry * dentry;
 	struct inode * inode;
@@ -176,7 +177,7 @@ static struct dentry * __oprofilefs_create_file(struct super_block * sb,
 	dentry = d_alloc(root, &qname);
 	if (!dentry)
 		return 0;
-	inode = oprofilefs_get_inode(sb, S_IFREG | 0644);
+	inode = oprofilefs_get_inode(sb, S_IFREG | perm);
 	if (!inode) {
 		dput(dentry);
 		return 0;
@@ -190,7 +191,8 @@ static struct dentry * __oprofilefs_create_file(struct super_block * sb,
 int oprofilefs_create_ulong(struct super_block * sb, struct dentry * root,
 	char const * name, unsigned long * val)
 {
-	struct dentry * d = __oprofilefs_create_file(sb, root, name, &ulong_fops);
+	struct dentry * d = __oprofilefs_create_file(sb, root, name,
+						     &ulong_fops, 0644);
 	if (!d)
 		return -EFAULT;
 
@@ -202,7 +204,8 @@ int oprofilefs_create_ulong(struct super_block * sb, struct dentry * root,
 int oprofilefs_create_ro_ulong(struct super_block * sb, struct dentry * root,
 	char const * name, unsigned long * val)
 {
-	struct dentry * d = __oprofilefs_create_file(sb, root, name, &ulong_ro_fops);
+	struct dentry * d = __oprofilefs_create_file(sb, root, name,
+						     &ulong_ro_fops, 0444);
 	if (!d)
 		return -EFAULT;
 
@@ -227,7 +230,8 @@ static struct file_operations atomic_ro_fops = {
 int oprofilefs_create_ro_atomic(struct super_block * sb, struct dentry * root,
 	char const * name, atomic_t * val)
 {
-	struct dentry * d = __oprofilefs_create_file(sb, root, name, &atomic_ro_fops);
+	struct dentry * d = __oprofilefs_create_file(sb, root, name,
+						     &atomic_ro_fops, 0444);
 	if (!d)
 		return -EFAULT;
 
@@ -239,7 +243,16 @@ int oprofilefs_create_ro_atomic(struct super_block * sb, struct dentry * root,
 int oprofilefs_create_file(struct super_block * sb, struct dentry * root,
 	char const * name, struct file_operations * fops)
 {
-	if (!__oprofilefs_create_file(sb, root, name, fops))
+	if (!__oprofilefs_create_file(sb, root, name, fops, 0644))
+		return -EFAULT;
+	return 0;
+}
+
+
+int oprofilefs_create_file_perm(struct super_block * sb, struct dentry * root,
+	char const * name, struct file_operations * fops, int perm)
+{
+	if (!__oprofilefs_create_file(sb, root, name, fops, perm))
 		return -EFAULT;
 	return 0;
 }

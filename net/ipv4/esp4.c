@@ -11,8 +11,6 @@
 #include <net/icmp.h>
 #include <net/udp.h>
 
-#define MAX_SG_ONSTACK 4
-
 /* decapsulation data for use when post-processing */
 struct esp_decap_data {
 	xfrm_address_t	saddr;
@@ -185,17 +183,16 @@ int esp_output(struct sk_buff **pskb)
 		crypto_cipher_set_iv(tfm, esp->conf.ivec, crypto_tfm_alg_ivsize(tfm));
 
 	do {
-		struct scatterlist sgbuf[nfrags>MAX_SG_ONSTACK ? 0 : nfrags];
-		struct scatterlist *sg = sgbuf;
+		struct scatterlist *sg = &esp->sgbuf[0];
 
-		if (unlikely(nfrags > MAX_SG_ONSTACK)) {
+		if (unlikely(nfrags > ESP_NUM_FAST_SG)) {
 			sg = kmalloc(sizeof(struct scatterlist)*nfrags, GFP_ATOMIC);
 			if (!sg)
 				goto error;
 		}
 		skb_to_sgvec(*pskb, sg, esph->enc_data+esp->conf.ivlen-(*pskb)->data, clen);
 		crypto_cipher_encrypt(tfm, sg, sg, clen);
-		if (unlikely(sg != sgbuf))
+		if (unlikely(sg != &esp->sgbuf[0]))
 			kfree(sg);
 	} while (0);
 
@@ -283,19 +280,18 @@ int esp_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 
         {
 		u8 nexthdr[2];
-		struct scatterlist sgbuf[nfrags>MAX_SG_ONSTACK ? 0 : nfrags];
-		struct scatterlist *sg = sgbuf;
+		struct scatterlist *sg = &esp->sgbuf[0];
 		u8 workbuf[60];
 		int padlen;
 
-		if (unlikely(nfrags > MAX_SG_ONSTACK)) {
+		if (unlikely(nfrags > ESP_NUM_FAST_SG)) {
 			sg = kmalloc(sizeof(struct scatterlist)*nfrags, GFP_ATOMIC);
 			if (!sg)
 				goto out;
 		}
 		skb_to_sgvec(skb, sg, sizeof(struct ip_esp_hdr) + esp->conf.ivlen, elen);
 		crypto_cipher_decrypt(esp->conf.tfm, sg, sg, elen);
-		if (unlikely(sg != sgbuf))
+		if (unlikely(sg != &esp->sgbuf[0]))
 			kfree(sg);
 
 		if (skb_copy_bits(skb, skb->len-alen-2, nexthdr, 2))
@@ -599,7 +595,7 @@ static struct xfrm_type esp_type =
 	.output		= esp_output
 };
 
-static struct inet_protocol esp4_protocol = {
+static struct net_protocol esp4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	esp4_err,
 	.no_policy	=	1,

@@ -249,7 +249,7 @@ static struct clk cp_clcd_clk = {
 
 static struct clk cp_mmci_clk = {
 	.name	= "MCLK",
-	.rate	= 33000000,
+	.rate	= 14745600,
 };
 
 /*
@@ -351,7 +351,7 @@ static unsigned int mmc_status(struct device *dev)
 }
 
 static struct mmc_platform_data mmc_data = {
-	.mclk		= 33000000,
+	.mclk		= 14745600,
 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
 	.status		= mmc_status,
 };
@@ -419,11 +419,19 @@ static void __init intcp_init(void)
 	}
 }
 
+#define TIMER_CTRL_IE	(1 << 5)			/* Interrupt Enable */
+
+static void __init intcp_init_time(void)
+{
+	integrator_time_init(1000000 / HZ, TIMER_CTRL_IE);
+}
+
 MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
 	MAINTAINER("ARM Ltd/Deep Blue Solutions Ltd")
 	BOOT_MEM(0x00000000, 0x16000000, 0xf1600000)
 	BOOT_PARAMS(0x00000100)
 	MAPIO(intcp_map_io)
 	INITIRQ(intcp_init_irq)
+	INITTIME(intcp_init_time)
 	INIT_MACHINE(intcp_init)
 MACHINE_END

@@ -182,9 +182,9 @@ static ssize_t maxframe = 4096;
 /* TTY callbacks */
 
 static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
-			   __u8 *buf, size_t nr);
+			   __u8 __user *buf, size_t nr);
 static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
-			    const __u8 *buf, size_t nr);
+			    const __u8 __user *buf, size_t nr);
 static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			    unsigned int cmd, unsigned long arg);
 static unsigned int n_hdlc_tty_poll(struct tty_struct *tty, struct file *filp,
@@ -572,7 +572,7 @@ static void n_hdlc_tty_receive(struct tty_struct *tty, const __u8 *data,
  * Returns the number of bytes returned or error code.
  */
 static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
-			   __u8 *buf, size_t nr)
+			   __u8 __user *buf, size_t nr)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc(tty);
 	int error;
@@ -649,7 +649,7 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
  * Returns the number of bytes written (or error code).
  */
 static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
-			    const __u8 *data, size_t count)
+			    const __u8 __user *data, size_t count)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
 	int error = 0;
@@ -755,7 +755,7 @@ static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
 		else
 			count = 0;
 		spin_unlock_irqrestore(&n_hdlc->rx_buf_list.spinlock,flags);
-		error = put_user(count, (int *)arg);
+		error = put_user(count, (int __user *)arg);
 		break;
 
 	case TIOCOUTQ:
@@ -767,7 +767,7 @@ static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
 		if (n_hdlc->tx_buf_list.head)
 			count += n_hdlc->tx_buf_list.head->count;
 		spin_unlock_irqrestore(&n_hdlc->tx_buf_list.spinlock,flags);
-		error = put_user(count, (int*)arg);
+		error = put_user(count, (int __user *)arg);
 		break;
 
 	default:

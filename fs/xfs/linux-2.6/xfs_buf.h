@@ -347,27 +347,15 @@ extern void pagebuf_trace(
 #define XFS_BUF_ISSTALE(x)	((x)->pb_flags & XFS_B_STALE)
 #define XFS_BUF_SUPER_STALE(x)	do {				\
 					XFS_BUF_STALE(x);	\
-					xfs_buf_undelay(x);	\
+					pagebuf_delwri_dequeue(x);	\
 					XFS_BUF_DONE(x);	\
 				} while (0)
 
 #define XFS_BUF_MANAGE		PBF_FS_MANAGED
 #define XFS_BUF_UNMANAGE(x)	((x)->pb_flags &= ~PBF_FS_MANAGED)
 
-static inline void xfs_buf_undelay(xfs_buf_t *pb)
-{
-	if (pb->pb_flags & PBF_DELWRI) {
-		if (pb->pb_list.next != &pb->pb_list) {
-			pagebuf_delwri_dequeue(pb);
-			pagebuf_rele(pb);
-		} else {
-			pb->pb_flags &= ~PBF_DELWRI;
-		}
-	}
-}
-
 #define XFS_BUF_DELAYWRITE(x)	 ((x)->pb_flags |= PBF_DELWRI)
-#define XFS_BUF_UNDELAYWRITE(x)	 xfs_buf_undelay(x)
+#define XFS_BUF_UNDELAYWRITE(x)	 pagebuf_delwri_dequeue(x)
 #define XFS_BUF_ISDELAYWRITE(x)	 ((x)->pb_flags & PBF_DELWRI)
 
 #define XFS_BUF_ERROR(x,no)	 pagebuf_ioerror(x,no)
@@ -500,7 +488,7 @@ static inline int	xfs_bawrite(void *mp, xfs_buf_t *bp)
 {
 	bp->pb_fspriv3 = mp;
 	bp->pb_strat = xfs_bdstrat_cb;
-	xfs_buf_undelay(bp);
+	pagebuf_delwri_dequeue(bp);
 	return pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC | _PBF_RUN_QUEUES);
 }
 
@@ -540,7 +528,7 @@ static inline int	XFS_bwrite(xfs_buf_t *pb)
 	if (!iowait)
 		pb->pb_flags |= _PBF_RUN_QUEUES;
 
-	xfs_buf_undelay(pb);
+	pagebuf_delwri_dequeue(pb);
 	pagebuf_iostrategy(pb);
 	if (iowait) {
 		error = pagebuf_iowait(pb);

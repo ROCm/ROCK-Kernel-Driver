@@ -2360,7 +2360,7 @@ static const iw_handler		atmel_private_handler[] =
 
 typedef struct atmel_priv_ioctl {
 	char id[32];
-	unsigned char *data;		
+	unsigned char __user *data;		
 	unsigned short len;		
 } atmel_priv_ioctl;
 

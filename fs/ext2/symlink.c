@@ -19,23 +19,19 @@
 
 #include "ext2.h"
 #include "xattr.h"
-
-static int
-ext2_readlink(struct dentry *dentry, char __user *buffer, int buflen)
-{
-	struct ext2_inode_info *ei = EXT2_I(dentry->d_inode);
-	return vfs_readlink(dentry, buffer, buflen, (char *)ei->i_data);
-}
+#include <linux/namei.h>
 
 static int ext2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	struct ext2_inode_info *ei = EXT2_I(dentry->d_inode);
-	return vfs_follow_link(nd, (char *)ei->i_data);
+	nd_set_link(nd, (char *)ei->i_data);
+	return 0;
 }
 
 struct inode_operations ext2_symlink_inode_operations = {
-	.readlink	= page_readlink,
-	.follow_link	= page_follow_link,
+	.readlink	= generic_readlink,
+	.follow_link	= page_follow_link_light,
+	.put_link	= page_put_link,
 	.setxattr	= ext2_setxattr,
 	.getxattr	= ext2_getxattr,
 	.listxattr	= ext2_listxattr,
@@ -43,7 +39,7 @@ struct inode_operations ext2_symlink_inode_operations = {
 };
  
 struct inode_operations ext2_fast_symlink_inode_operations = {
-	.readlink	= ext2_readlink,
+	.readlink	= generic_readlink,
 	.follow_link	= ext2_follow_link,
 	.setxattr	= ext2_setxattr,
 	.getxattr	= ext2_getxattr,

@@ -275,7 +275,7 @@ int autofs4_wait_release(struct autofs_sb_info *sbi, autofs_wqt_t wait_queue_tok
 	struct autofs_wait_queue *wq, **wql;
 
 	down(&sbi->wq_sem);
-	for ( wql = &sbi->queues ; (wq = *wql) ; wql = &wq->next ) {
+	for ( wql = &sbi->queues ; (wq = *wql) != 0 ; wql = &wq->next ) {
 		if ( wq->wait_queue_token == wait_queue_token )
 			break;
 	}

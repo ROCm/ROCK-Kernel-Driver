@@ -2490,28 +2490,11 @@ static int devfs_mknod(struct inode *dir, struct dentry *dentry, int mode,
 	return 0;
 }				/*  End Function devfs_mknod  */
 
-static int devfs_readlink(struct dentry *dentry, char *buffer, int buflen)
-{
-	int err;
-	struct devfs_entry *de;
-
-	de = get_devfs_entry_from_vfs_inode(dentry->d_inode);
-	if (!de)
-		return -ENODEV;
-	err = vfs_readlink(dentry, buffer, buflen, de->u.symlink.linkname);
-	return err;
-}				/*  End Function devfs_readlink  */
-
 static int devfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	int err;
-	struct devfs_entry *de;
-
-	de = get_devfs_entry_from_vfs_inode(dentry->d_inode);
-	if (!de)
-		return -ENODEV;
-	err = vfs_follow_link(nd, de->u.symlink.linkname);
-	return err;
+	struct devfs_entry *p = get_devfs_entry_from_vfs_inode(dentry->d_inode);
+	nd_set_link(nd, p ? p->u.symlink.linkname : ERR_PTR(-ENODEV));
+	return 0;
 }				/*  End Function devfs_follow_link  */
 
 static struct inode_operations devfs_iops = {
@@ -2529,7 +2512,7 @@ static struct inode_operations devfs_dir_iops = {
 };
 
 static struct inode_operations devfs_symlink_iops = {
-	.readlink = devfs_readlink,
+	.readlink = generic_readlink,
 	.follow_link = devfs_follow_link,
 	.setattr = devfs_notify_change,
 };

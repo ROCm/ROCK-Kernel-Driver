@@ -40,6 +40,7 @@
 #include <linux/security.h>
 #include <linux/swapops.h>
 #include <linux/mempolicy.h>
+#include <linux/namei.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 #include <asm/pgtable.h>
@@ -1676,51 +1677,45 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 	return 0;
 }
 
-static int shmem_readlink_inline(struct dentry *dentry, char __user *buffer, int buflen)
-{
-	return vfs_readlink(dentry, buffer, buflen, (const char *)SHMEM_I(dentry->d_inode));
-}
-
 static int shmem_follow_link_inline(struct dentry *dentry, struct nameidata *nd)
 {
-	return vfs_follow_link(nd, (const char *)SHMEM_I(dentry->d_inode));
-}
-
-static int shmem_readlink(struct dentry *dentry, char __user *buffer, int buflen)
-{
-	struct page *page = NULL;
-	int res = shmem_getpage(dentry->d_inode, 0, &page, SGP_READ, NULL);
-	if (res)
-		return res;
-	res = vfs_readlink(dentry, buffer, buflen, kmap(page));
-	kunmap(page);
-	mark_page_accessed(page);
-	page_cache_release(page);
-	return res;
+	nd_set_link(nd, (char *)SHMEM_I(dentry->d_inode));
+	return 0;
 }
 
 static int shmem_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	struct page *page = NULL;
 	int res = shmem_getpage(dentry->d_inode, 0, &page, SGP_READ, NULL);
-	if (res)
-		return res;
-	res = vfs_follow_link(nd, kmap(page));
-	kunmap(page);
-	mark_page_accessed(page);
-	page_cache_release(page);
-	return res;
+	nd_set_link(nd, res ? ERR_PTR(res) : kmap(page));
+	return 0;
+}
+
+static void shmem_put_link(struct dentry *dentry, struct nameidata *nd)
+{
+	if (!IS_ERR(nd_get_link(nd))) {
+		struct page *page;
+
+		page = find_get_page(dentry->d_inode->i_mapping, 0);
+		if (!page)
+			BUG();
+		kunmap(page);
+		mark_page_accessed(page);
+		page_cache_release(page);
+		page_cache_release(page);
+	}
 }
 
 static struct inode_operations shmem_symlink_inline_operations = {
-	.readlink	= shmem_readlink_inline,
+	.readlink	= generic_readlink,
 	.follow_link	= shmem_follow_link_inline,
 };
 
 static struct inode_operations shmem_symlink_inode_operations = {
 	.truncate	= shmem_truncate,
-	.readlink	= shmem_readlink,
+	.readlink	= generic_readlink,
 	.follow_link	= shmem_follow_link,
+	.put_link	= shmem_put_link,
 };
 
 static int shmem_parse_options(char *options, int *mode, uid_t *uid, gid_t *gid, unsigned long *blocks, unsigned long *inodes)

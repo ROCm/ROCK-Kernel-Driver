@@ -703,6 +703,12 @@ M:	jrv@vanzandt.mv.com
 L:	blinux-list@redhat.com
 S:	Maintained
 
+DRIVER CORE, KOBJECTS, AND SYSFS
+P:	Greg Kroah-Hartman
+M:	greg@kroah.com
+L:	linux-kernel@vger.kernel.org
+S:	Supported
+
 DRM DRIVERS
 L:	dri-devel@lists.sourceforge.net
 S:	Supported
@@ -1271,6 +1277,13 @@ M:	mporter@kernel.crashing.org
 W:	http://www.penguinppc.org/
 L:	linuxppc-embedded@lists.linuxppc.org
 S:	Maintained
+
+LINUX FOR POWERPC EMBEDDED PPC85XX
+P:     Kumar Gala
+M:     kumar.gala@freescale.com
+W:     http://www.penguinppc.org/
+L:     linuxppc-embedded@lists.linuxppc.org
+S:     Maintained
 
 LLC (802.2)
 P:	Arnaldo Carvalho de Melo

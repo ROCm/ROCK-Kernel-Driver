@@ -32,8 +32,9 @@
 #include <linux/swap.h>
 #include <linux/bootmem.h>
 
-#define DCACHE_PARANOIA 1
 /* #define DCACHE_DEBUG 1 */
+
+int sysctl_vfs_cache_pressure = 100;
 
 spinlock_t dcache_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 seqlock_t rename_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
@@ -65,9 +66,9 @@ struct dentry_stat_t dentry_stat = {
 	.age_limit = 45,
 };
 
-static void d_callback(void *arg)
+static void d_callback(struct rcu_head *head)
 {
-	struct dentry * dentry = (struct dentry *)arg;
+	struct dentry * dentry = container_of(head, struct dentry, d_rcu);
 
 	if (dname_external(dentry))
 		kfree(dentry->d_name.name);
@@ -82,7 +83,7 @@ static void d_free(struct dentry *dentry)
 {
 	if (dentry->d_op && dentry->d_op->d_release)
 		dentry->d_op->d_release(dentry);
- 	call_rcu(&dentry->d_rcu, d_callback, dentry);
+ 	call_rcu(&dentry->d_rcu, d_callback);
 }
 
 /*
@@ -664,7 +665,7 @@ static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 			return -1;
 		prune_dcache(nr);
 	}
-	return dentry_stat.nr_unused;
+	return (dentry_stat.nr_unused / 100) * sysctl_vfs_cache_pressure;
 }
 
 /**

@@ -488,7 +488,7 @@ static int shrink_icache_memory(int nr, unsigned int gfp_mask)
 		if (gfp_mask & __GFP_FS)
 			prune_icache(nr);
 	}
-	return inodes_stat.nr_unused;
+	return (inodes_stat.nr_unused / 100) * sysctl_vfs_cache_pressure;
 }
 
 static void __wait_on_freeing_inode(struct inode *inode);

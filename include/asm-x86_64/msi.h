@@ -11,11 +11,6 @@
 #define LAST_DEVICE_VECTOR		232
 #define MSI_DEST_MODE			MSI_LOGICAL_MODE
 #define MSI_TARGET_CPU_SHIFT		12
-
-#ifdef CONFIG_SMP
-#define MSI_TARGET_CPU		logical_smp_processor_id()
-#else
-#define MSI_TARGET_CPU		TARGET_CPUS
-#endif
+#define MSI_TARGET_CPU			TARGET_CPUS
 
 #endif /* ASM_MSI_H */

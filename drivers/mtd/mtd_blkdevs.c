@@ -220,7 +220,7 @@ static int blktrans_ioctl(struct inode *inode, struct file *file,
 				return ret;
 
 			g.start = get_start_sect(inode->i_bdev);
-			if (copy_to_user((void *)arg, &g, sizeof(g)))
+			if (copy_to_user((void __user *)arg, &g, sizeof(g)))
 				return -EFAULT;
 			return 0;
 		} /* else */

@@ -101,6 +101,14 @@
 #define I2C_DRIVERID_UDA1342	53	/* UDA1342 audio codec		*/
 #define I2C_DRIVERID_ADV7170	54	/* video encoder		*/
 #define I2C_DRIVERID_RADEON	55	/* I2C bus on Radeon boards	*/
+#define I2C_DRIVERID_MAX1617	56	/* temp sensor			*/
+#define I2C_DRIVERID_SAA7191	57	/* video encoder		*/
+#define I2C_DRIVERID_INDYCAM	58	/* SGI IndyCam			*/
+#define I2C_DRIVERID_BT832	59	/* CMOS camera video processor	*/
+#define I2C_DRIVERID_TDA9887	60	/* TDA988x IF-PLL demodulator	*/
+#define I2C_DRIVERID_OVCAMCHIP	61	/* OmniVision CMOS image sens.	*/
+#define I2C_DRIVERID_TDA7313	62	/* TDA7313 audio processor	*/
+#define I2C_DRIVERID_MAX6900	63	/* MAX6900 real-time clock	*/
 
 
 #define I2C_DRIVERID_EXP0	0xF0	/* experimental use id's	*/
@@ -264,6 +272,10 @@
 #define I2C_HW_SMBUS_SCX200	0x0b
 #define I2C_HW_SMBUS_NFORCE2	0x0c
 #define I2C_HW_SMBUS_W9968CF	0x0d
+#define I2C_HW_SMBUS_OV511	0x0e	/* OV511(+) USB 1.1 webcam ICs	*/
+#define I2C_HW_SMBUS_OV518	0x0f	/* OV518(+) USB 1.1 webcam ICs	*/
+#define I2C_HW_SMBUS_OV519	0x10	/* OV519 USB 1.1 webcam IC	*/
+#define I2C_HW_SMBUS_OVFX2	0x11	/* Cypress/OmniVision FX2 webcam */
 
 /* --- ISA pseudo-adapter						*/
 #define I2C_HW_ISA 0x00

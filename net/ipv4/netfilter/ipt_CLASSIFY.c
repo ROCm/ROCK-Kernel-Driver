@@ -54,15 +54,17 @@ checkentry(const char *tablename,
 		return 0;
 	}
 	
-	if (hook_mask & ~(1 << NF_IP_POST_ROUTING)) {
-		printk(KERN_ERR "CLASSIFY: only valid in POST_ROUTING.\n");
+	if (hook_mask & ~((1 << NF_IP_LOCAL_OUT) | (1 << NF_IP_FORWARD) |
+	                  (1 << NF_IP_POST_ROUTING))) {
+		printk(KERN_ERR "CLASSIFY: only valid in LOCAL_OUT, FORWARD "
+		                "and POST_ROUTING.\n");
 		return 0;
 	}
 
 	if (strcmp(tablename, "mangle") != 0) {
-		printk(KERN_WARNING "CLASSIFY: can only be called from "
-		                    "\"mangle\" table, not \"%s\".\n",
-		                    tablename);
+		printk(KERN_ERR "CLASSIFY: can only be called from "
+		                "\"mangle\" table, not \"%s\".\n",
+		                tablename);
 		return 0;
 	}
 

@@ -20,8 +20,8 @@
 #include <asm/addrspace.h>
 #include <asm/bootinfo.h>
 #include <asm/pmon.h>
+#include <asm/gt64240.h>
 
-#include "gt64240.h"
 #include "ocelot_pld.h"
 
 struct callvectors* debug_vectors;
@@ -38,10 +38,8 @@ const char *get_system_type(void)
 	return "Momentum Ocelot";
 }
 
-/* [jsun@junsun.net] PMON passes arguments in C main() style */
 void __init prom_init(void)
 {
-	uint32_t tmp;
 	int argc = fw_arg0;
 	char **arg = (char **) fw_arg1;
 	char **env = (char **) fw_arg2;
@@ -78,10 +76,8 @@ void __init prom_init(void)
 			bus_clock = simple_strtol(*env + strlen("busclock="),
 							NULL, 10);
 		}
-		*env++;
+		env++;
 	}
-
-	debug_vectors->printf("Booting Linux kernel...\n");
 }
 
 unsigned long __init prom_free_prom_memory(void)

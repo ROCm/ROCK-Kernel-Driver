@@ -93,14 +93,12 @@ static struct mempolicy default_policy = {
 /* Check if all specified nodes are online */
 static int nodes_online(unsigned long *nodes)
 {
-	DECLARE_BITMAP(offline, MAX_NUMNODES);
+	DECLARE_BITMAP(online2, MAX_NUMNODES);
 
-	bitmap_copy(offline, node_online_map, MAX_NUMNODES);
-	if (bitmap_empty(offline, MAX_NUMNODES))
-		set_bit(0, offline);
-	bitmap_complement(offline, MAX_NUMNODES);
-	bitmap_and(offline, offline, nodes, MAX_NUMNODES);
-	if (!bitmap_empty(offline, MAX_NUMNODES))
+	bitmap_copy(online2, node_online_map, MAX_NUMNODES);
+	if (bitmap_empty(online2, MAX_NUMNODES))
+		set_bit(0, online2);
+	if (!bitmap_subset(nodes, online2, MAX_NUMNODES))
 		return -EINVAL;
 	return 0;
 }

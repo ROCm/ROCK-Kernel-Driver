@@ -45,12 +45,17 @@ extern unsigned long pgd_current[];
 #define ASID_INC	0x40
 #define ASID_MASK	0xfc0
 
+#elif defined(CONFIG_CPU_R8000)
+
+#define ASID_INC	0x10
+#define ASID_MASK	0xff0
+
 #elif defined(CONFIG_CPU_RM9000)
 
 #define ASID_INC	0x1
 #define ASID_MASK	0xfff
 
-#else /* FIXME: not correct for R6000, R8000 */
+#else /* FIXME: not correct for R6000 */
 
 #define ASID_INC	0x1
 #define ASID_MASK	0xff
@@ -78,9 +83,8 @@ get_new_mmu_context(struct mm_struct *mm, unsigned long cpu)
 	unsigned long asid = asid_cache(cpu);
 
 	if (! ((asid += ASID_INC) & ASID_MASK) ) {
-#ifdef CONFIG_VTAG_ICACHE
-		flush_icache_all();
-#endif
+		if (cpu_has_vtag_icache)
+			flush_icache_all();
 		local_flush_tlb_all();	/* start new asid cycle */
 		if (!asid)		/* fix version if needed */
 			asid = ASID_FIRST_VERSION;

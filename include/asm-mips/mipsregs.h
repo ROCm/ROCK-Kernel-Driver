@@ -632,7 +632,7 @@ do {									\
 } while (0)
 
 /*
- * On The RM7000 these are use to access cop0 set 1 registers
+ * On RM7000/RM9000 these are uses to access cop0 set 1 registers
  */
 #define __read_32bit_c0_ctrl_register(source)				\
 ({ int __res;								\

@@ -45,7 +45,11 @@
 
 /* Thanks to Doron Oz for this hack
 */
+#ifndef CONFIG_NET_CLS_ACT
+#ifdef CONFIG_NETFILTER
 static int nf_registered; 
+#endif
+#endif
 
 struct ingress_qdisc_data {
 	struct Qdisc		*q;
@@ -146,27 +150,52 @@ static int ingress_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 	 * Unlike normal "enqueue" functions, ingress_enqueue returns a
 	 * firewall FW_* code.
 	 */
-#ifdef CONFIG_NET_CLS_POLICE
+#ifdef CONFIG_NET_CLS_ACT
+	sch->stats.packets++;
+	sch->stats.bytes += skb->len;
 	switch (result) {
-		case TC_POLICE_SHOT:
-			result = NF_DROP;
+		case TC_ACT_SHOT:
+			result = TC_ACT_SHOT;
 			sch->stats.drops++;
 			break;
+		case TC_ACT_STOLEN:
+		case TC_ACT_QUEUED:
+			result = TC_ACT_STOLEN;
+			break;
+		case TC_ACT_RECLASSIFY: 
+		case TC_ACT_OK:
+		case TC_ACT_UNSPEC:
+		default:
+			skb->tc_index = TC_H_MIN(res.classid);
+			result = TC_ACT_OK;
+			break;
+	};
+/* backward compat */
+#else
+#ifdef	CONFIG_NET_CLS_POLICE  
+	switch (result) {
+		case TC_POLICE_SHOT:
+		result = NF_DROP;
+		sch->stats.drops++;
+		break;
 		case TC_POLICE_RECLASSIFY: /* DSCP remarking here ? */
 		case TC_POLICE_OK:
 		case TC_POLICE_UNSPEC:
 		default:
-			sch->stats.packets++;
-			sch->stats.bytes += skb->len;
-			result = NF_ACCEPT;
-			break;
+		sch->stats.packets++;
+		sch->stats.bytes += skb->len;
+		result = NF_ACCEPT;
+		break;
 	};
+
 #else
+	D2PRINTK("Overriding result to ACCEPT\n");
+	result = NF_ACCEPT;
 	sch->stats.packets++;
 	sch->stats.bytes += skb->len;
 #endif
+#endif
 
-	skb->tc_index = TC_H_MIN(res.classid);
 	return result;
 }
 
@@ -199,6 +228,8 @@ static unsigned int ingress_drop(struct Qdisc *sch)
 	return 0;
 }
 
+#ifndef CONFIG_NET_CLS_ACT
+#ifdef CONFIG_NETFILTER
 static unsigned int
 ing_hook(unsigned int hook, struct sk_buff **pskb,
                              const struct net_device *indev,
@@ -240,10 +271,29 @@ static struct nf_hook_ops ing_ops = {
 	.priority       = NF_IP_PRI_FILTER + 1,
 };
 
+#endif
+#endif
+
 int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 {
 	struct ingress_qdisc_data *p = PRIV(sch);
 
+/* Make sure either netfilter or preferably CLS_ACT is
+* compiled in */
+#ifndef CONFIG_NET_CLS_ACT
+#ifndef CONFIG_NETFILTER
+	printk("You MUST compile classifier actions into the kernel\n");
+	goto error;
+#else
+	printk("Ingress scheduler: Classifier actions prefered over netfilter\n");
+#endif
+#endif
+                                                                                
+	if (NULL == p)
+		goto error;
+
+#ifndef CONFIG_NET_CLS_ACT
+#ifdef CONFIG_NETFILTER
 	if (!nf_registered) {
 		if (nf_register_hook(&ing_ops) < 0) {
 			printk("ingress qdisc registration error \n");
@@ -251,6 +301,8 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 		}
 		nf_registered++;
 	}
+#endif
+#endif
 
 	DPRINTK("ingress_init(sch %p,[qdisc %p],opt %p)\n",sch,p,opt);
 	memset(p, 0, sizeof(*p));
@@ -364,8 +416,12 @@ static int __init ingress_module_init(void)
 static void __exit ingress_module_exit(void) 
 {
 	unregister_qdisc(&ingress_qdisc_ops);
+#ifndef CONFIG_NET_CLS_ACT
+#ifdef CONFIG_NETFILTER
 	if (nf_registered)
 		nf_unregister_hook(&ing_ops);
+#endif
+#endif
 }
 module_init(ingress_module_init)
 module_exit(ingress_module_exit)

@@ -153,7 +153,7 @@ static inline void
 send_CPI_allbutself(__u8 cpi)
 {
 	__u8 cpu = smp_processor_id();
-	__u32 mask = cpus_coerce(cpu_online_map) & ~(1 << cpu);
+	__u32 mask = cpus_addr(cpu_online_map)[0] & ~(1 << cpu);
 	send_CPI(mask, cpi);
 }
 
@@ -402,11 +402,11 @@ find_smp_config(void)
 	/* set up everything for just this CPU, we can alter
 	 * this as we start the other CPUs later */
 	/* now get the CPU disposition from the extended CMOS */
-	phys_cpu_present_map = cpus_promote(voyager_extended_cmos_read(VOYAGER_PROCESSOR_PRESENT_MASK));
-	cpus_coerce(phys_cpu_present_map) |= voyager_extended_cmos_read(VOYAGER_PROCESSOR_PRESENT_MASK + 1) << 8;
-	cpus_coerce(phys_cpu_present_map) |= voyager_extended_cmos_read(VOYAGER_PROCESSOR_PRESENT_MASK + 2) << 16;
-	cpus_coerce(phys_cpu_present_map) |= voyager_extended_cmos_read(VOYAGER_PROCESSOR_PRESENT_MASK + 3) << 24;
-	printk("VOYAGER SMP: phys_cpu_present_map = 0x%lx\n", cpus_coerce(phys_cpu_present_map));
+	cpus_addr(phys_cpu_present_map)[0] = voyager_extended_cmos_read(VOYAGER_PROCESSOR_PRESENT_MASK);
+	cpus_addr(phys_cpu_present_map)[0] |= voyager_extended_cmos_read(VOYAGER_PROCESSOR_PRESENT_MASK + 1) << 8;
+	cpus_addr(phys_cpu_present_map)[0] |= voyager_extended_cmos_read(VOYAGER_PROCESSOR_PRESENT_MASK + 2) << 16;
+	cpus_addr(phys_cpu_present_map)[0] |= voyager_extended_cmos_read(VOYAGER_PROCESSOR_PRESENT_MASK + 3) << 24;
+	printk("VOYAGER SMP: phys_cpu_present_map = 0x%lx\n", cpus_addr(phys_cpu_present_map)[0]);
 	/* Here we set up the VIC to enable SMP */
 	/* enable the CPIs by writing the base vector to their register */
 	outb(VIC_DEFAULT_CPI_BASE, VIC_CPI_BASE_REGISTER);
@@ -706,12 +706,12 @@ smp_boot_cpus(void)
 		/* now that the cat has probed the Voyager System Bus, sanity
 		 * check the cpu map */
 		if( ((voyager_quad_processors | voyager_extended_vic_processors)
-		     & cpus_coerce(phys_cpu_present_map)) != cpus_coerce(phys_cpu_present_map)) {
+		     & cpus_addr(phys_cpu_present_map)[0]) != cpus_addr(phys_cpu_present_map)[0]) {
 			/* should panic */
 			printk("\n\n***WARNING*** Sanity check of CPU present map FAILED\n");
 		}
 	} else if(voyager_level == 4)
-		voyager_extended_vic_processors = cpus_coerce(phys_cpu_present_map);
+		voyager_extended_vic_processors = cpus_addr(phys_cpu_present_map)[0];
 
 	/* this sets up the idle task to run on the current cpu */
 	voyager_extended_cpus = 1;
@@ -909,7 +909,7 @@ flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
 
 	if (!cpumask)
 		BUG();
-	if ((cpumask & cpus_coerce(cpu_online_map)) != cpumask)
+	if ((cpumask & cpus_addr(cpu_online_map)[0]) != cpumask)
 		BUG();
 	if (cpumask & (1 << smp_processor_id()))
 		BUG();
@@ -952,7 +952,7 @@ flush_tlb_current_task(void)
 
 	preempt_disable();
 
-	cpu_mask = cpus_coerce(mm->cpu_vm_mask) & ~(1 << smp_processor_id());
+	cpu_mask = cpus_addr(mm->cpu_vm_mask)[0] & ~(1 << smp_processor_id());
 	local_flush_tlb();
 	if (cpu_mask)
 		flush_tlb_others(cpu_mask, mm, FLUSH_ALL);
@@ -968,7 +968,7 @@ flush_tlb_mm (struct mm_struct * mm)
 
 	preempt_disable();
 
-	cpu_mask = cpus_coerce(mm->cpu_vm_mask) & ~(1 << smp_processor_id());
+	cpu_mask = cpus_addr(mm->cpu_vm_mask)[0] & ~(1 << smp_processor_id());
 
 	if (current->active_mm == mm) {
 		if (current->mm)
@@ -989,7 +989,7 @@ void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
 
 	preempt_disable();
 
-	cpu_mask = cpus_coerce(mm->cpu_vm_mask) & ~(1 << smp_processor_id());
+	cpu_mask = cpus_addr(mm->cpu_vm_mask)[0] & ~(1 << smp_processor_id());
 	if (current->active_mm == mm) {
 		if(current->mm)
 			__flush_tlb_one(va);
@@ -1098,7 +1098,7 @@ smp_call_function (void (*func) (void *info), void *info, int retry,
 		   int wait)
 {
 	struct call_data_struct data;
-	__u32 mask = cpus_coerce(cpu_online_map);
+	__u32 mask = cpus_addr(cpu_online_map)[0];
 
 	mask &= ~(1<<smp_processor_id());
 
@@ -1789,9 +1789,9 @@ set_vic_irq_affinity(unsigned int irq, cpumask_t mask)
 	unsigned long irq_mask = 1 << irq;
 	int cpu;
 
-	real_mask = cpus_coerce(mask) & voyager_extended_vic_processors;
+	real_mask = cpus_addr(mask)[0] & voyager_extended_vic_processors;
 	
-	if(cpus_coerce(mask) == 0)
+	if(cpus_addr(mask)[0] == 0)
 		/* can't have no cpu's to accept the interrupt -- extremely
 		 * bad things will happen */
 		return;

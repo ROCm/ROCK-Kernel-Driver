@@ -137,6 +137,8 @@ u8 shpchp_handle_switch_change(u8 hp_slot, void *inst_id)
 	p_slot = shpchp_find_slot(ctrl, hp_slot + ctrl->slot_device_offset);
 	p_slot->hpc_ops->get_adapter_status(p_slot, &(func->presence_save));
 	p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
+	dbg("%s: Card present %x Power status %x\n", __FUNCTION__,
+		func->presence_save, func->pwr_save);
 
 	if (getstatus) {
 		/*
@@ -145,6 +147,10 @@ u8 shpchp_handle_switch_change(u8 hp_slot, void *inst_id)
 		info("Latch open on Slot(%d)\n", ctrl->first_slot + hp_slot);
 		func->switch_save = 0;
 		taskInfo->event_type = INT_SWITCH_OPEN;
+		if (func->pwr_save && func->presence_save) {
+			taskInfo->event_type = INT_POWER_FAULT;
+			err("Surprise Removal of card\n");
+		}
 	} else {
 		/*
 		 *  Switch closed
@@ -1427,6 +1433,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 					rc = p_slot->hpc_ops->set_bus_speed_mode(p_slot, adapter_speed);
 					if (rc) {
 						err("%s: Issue of set bus speed mode command failed\n", __FUNCTION__);
+						up(&ctrl->crit_sect);
 						return WRONG_BUS_FREQUENCY;
 					}
 				
@@ -1438,6 +1445,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 						err("%s: Can't set bus speed/mode in the case of adapter & bus mismatch\n",
 								  __FUNCTION__);
 						err("%s: Error code (%d)\n", __FUNCTION__, rc);
+						up(&ctrl->crit_sect);
 						return WRONG_BUS_FREQUENCY;
 					}
 					/* Done with exclusive hardware access */
@@ -1589,8 +1597,9 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 		func->status = 0;
 		func->switch_save = 0x10;
 		func->is_a_board = 0x01;
+		func->pwr_save = 1;
 
-		/* next, we will instantiate the linux pci_dev structures 
+		/* Next, we will instantiate the linux pci_dev structures 
 		 * (with appropriate driver notification, if already present) 
 		 */
 		index = 0;
@@ -1781,6 +1790,7 @@ static u32 remove_board(struct pci_func *func, struct controller *ctrl)
 		func->function = 0;
 		func->configured = 0;
 		func->switch_save = 0x10;
+		func->pwr_save = 0;
 		func->is_a_board = 0;
 	}
 
@@ -1807,7 +1817,6 @@ static void shpchp_pushbutton_thread (unsigned long slot)
 {
 	struct slot *p_slot = (struct slot *) slot;
 	u8 getstatus;
-	int rc;
 	
 	pushbutton_pending = 0;
 
@@ -1821,23 +1830,7 @@ static void shpchp_pushbutton_thread (unsigned long slot)
 		p_slot->state = POWEROFF_STATE;
 		dbg("In power_down_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
 
-		if (shpchp_disable_slot(p_slot)) {
-			/* Wait for exclusive access to hardware */
-			down(&p_slot->ctrl->crit_sect);
-
-			/* Turn on the Attention LED */
-			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
-			if (rc) {
-				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
-				return;
-			}
-	
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-
-			/* Done with exclusive hardware access */
-			up(&p_slot->ctrl->crit_sect);
-		}
+		shpchp_disable_slot(p_slot);
 		p_slot->state = STATIC_STATE;
 	} else {
 		p_slot->state = POWERON_STATE;
@@ -1847,15 +1840,6 @@ static void shpchp_pushbutton_thread (unsigned long slot)
 			/* Wait for exclusive access to hardware */
 			down(&p_slot->ctrl->crit_sect);
 
-			/* Turn off the green LED */
-			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
-			if (rc) {
-				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
-				return;
-			}
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-			
 			p_slot->hpc_ops->green_led_off(p_slot);
 
 			/* Wait for the command to complete */
@@ -2096,7 +2080,7 @@ int shpchp_enable_slot (struct slot *p_slot)
 	func = shpchp_slot_find(p_slot->bus, p_slot->device, 0);
 	if (!func) {
 		dbg("%s: Error! slot NULL\n", __FUNCTION__);
-		return (1);
+		return 1;
 	}
 
 	/* Check to see if (latch closed, card present, power off) */
@@ -2105,19 +2089,19 @@ int shpchp_enable_slot (struct slot *p_slot)
 	if (rc || !getstatus) {
 		info("%s: no adapter on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 1;
 	}
 	rc = p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
 	if (rc || getstatus) {
 		info("%s: latch open on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 1;
 	}
 	rc = p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
 	if (rc || getstatus) {
 		info("%s: already enabled on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 1;
 	}
 	up(&p_slot->ctrl->crit_sect);
 
@@ -2125,7 +2109,7 @@ int shpchp_enable_slot (struct slot *p_slot)
 
 	func = shpchp_slot_create(p_slot->bus);
 	if (func == NULL)
-		return (1);
+		return 1;
 
 	func->bus = p_slot->bus;
 	func->device = p_slot->device;
@@ -2135,6 +2119,8 @@ int shpchp_enable_slot (struct slot *p_slot)
 
 	/* We have to save the presence info for these slots */
 	p_slot->hpc_ops->get_adapter_status(p_slot, &(func->presence_save));
+	p_slot->hpc_ops->get_power_status(p_slot, &(func->pwr_save));
+	dbg("%s: func->pwr_save %x\n", __FUNCTION__, func->pwr_save);
 	p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
 	func->switch_save = !getstatus? 0x10:0;
 
@@ -2181,7 +2167,7 @@ int shpchp_disable_slot (struct slot *p_slot)
 	struct pci_func *func;
 
 	if (!p_slot->ctrl)
-		return (1);
+		return 1;
 
 	/* Check to see if (latch closed, card present, power on) */
 	down(&p_slot->ctrl->crit_sect);
@@ -2190,19 +2176,19 @@ int shpchp_disable_slot (struct slot *p_slot)
 	if (ret || !getstatus) {
 		info("%s: no adapter on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 1;
 	}
 	ret = p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
 	if (ret || getstatus) {
 		info("%s: latch open on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 1;
 	}
 	ret = p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
 	if (ret || !getstatus) {
 		info("%s: already disabled slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 1;
 	}
 	up(&p_slot->ctrl->crit_sect);
 

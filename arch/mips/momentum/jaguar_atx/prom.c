@@ -245,20 +245,6 @@ void __init prom_fixup_mem_map(unsigned long start, unsigned long end)
 {
 }
 
-/*
- * SMP support
- */
-int prom_setup_smp(void)
-{
-	int	num_cpus = 2;
-
-	/*
-	 * We know that the RM9000 on the Jaguar ATX board has 2 cores.
-	 * Hence, this can be hardcoded for now.
-	 */
-	return num_cpus;
-}
-
 int prom_boot_secondary(int cpu, unsigned long sp, unsigned long gp)
 {
 	/* Clear the semaphore */

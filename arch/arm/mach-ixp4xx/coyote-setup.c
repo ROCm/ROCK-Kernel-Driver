@@ -84,6 +84,7 @@ MACHINE_START(ADI_COYOTE, "ADI Engineering IXP4XX Coyote Development Platform")
                 IXP4XX_PERIPHERAL_BASE_VIRT)
         MAPIO(coyote_map_io)
         INITIRQ(ixp4xx_init_irq)
+	INITTIME(ixp4xx_init_time)
         BOOT_PARAMS(0x0100)
 	INIT_MACHINE(coyote_init)
 MACHINE_END
