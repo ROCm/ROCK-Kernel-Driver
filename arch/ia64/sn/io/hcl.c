@@ -673,8 +673,7 @@ hwgraph_edge_get(devfs_handle_t from, char *name, devfs_handle_t *toptr)
 		 * Call devfs to get the devfs entry.
 		 */
 		namelen = (int) strlen(name);
-		target_handle = devfs_get_handle(from, name, 0, 0,
-					0, 1); /* Yes traverse symbolic links */
+		target_handle = devfs_get_handle(from, name, 1); /* Yes traverse symbolic links */
 		devfs_put(target_handle); /* Assume we're the owner */
 		if (target_handle == NULL)
 			return(-1);
@@ -955,9 +954,6 @@ hwgraph_path_lookup(	devfs_handle_t start_vertex_handle,
 {
 	*vertex_handle_ptr = devfs_get_handle(start_vertex_handle,	/* start dir */
 					lookup_path,		/* path */
-					0,			/* major */
-					0,			/* minor */
-					0,			/* char | block */
 					1);			/* traverse symlinks */
 	devfs_put(*vertex_handle_ptr); /* Assume we're the owner */
 	if (*vertex_handle_ptr == NULL)
@@ -979,9 +975,6 @@ hwgraph_traverse(devfs_handle_t dir, char *path, devfs_handle_t *found)
 
 	*found = devfs_get_handle(dir,	/* start dir */
 			    path,	/* path */
-			    0,		/* major */
-			    0,		/* minor */
-			    0,		/* char | block */
 			    1);		/* traverse symlinks */
 	devfs_put(*found); /* Assume we're the owner */
 	if (*found == NULL)
@@ -1001,9 +994,6 @@ hwgraph_path_to_vertex(char *path)
 
 	de = devfs_get_handle(NULL,	/* start dir */
 			path,		/* path */
-		    	0,		/* major */
-		    	0,		/* minor */
-		    	0,		/* char | block */
 		    	1);
 	devfs_put(de); /* Assume we're the owner */
 	return(de);
@@ -1033,9 +1023,6 @@ hwgraph_block_device_get(devfs_handle_t dir)
 
 	de = devfs_get_handle(dir,		/* start dir */
 			"block",		/* path */
-		    	0,			/* major */
-		    	0,			/* minor */
-		    	DEVFS_SPECIAL_BLK,	/* char | block */
 		    	1);			/* traverse symlinks */
 	devfs_put(de); /* Assume we're the owner */
 	return(de);
@@ -1052,9 +1039,6 @@ hwgraph_char_device_get(devfs_handle_t dir)
 
 	de = devfs_get_handle(dir,		/* start dir */
 			"char",			/* path */
-		    	0,			/* major */
-		    	0,			/* minor */
-		    	DEVFS_SPECIAL_CHR,	/* char | block */
 		    	1);			/* traverse symlinks */
 	devfs_put(de); /* Assume we're the owner */
 	return(de);

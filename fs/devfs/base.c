@@ -1277,79 +1277,11 @@ static devfs_handle_t _devfs_walk_path (struct devfs_entry *dir,
     return dir;
 }   /*  End Function _devfs_walk_path  */
 
-
-/**
- *	_devfs_find_by_dev - Find a devfs entry in a directory.
- *	@dir: The directory where to search
- *	@major: The major number to search for.
- *	@minor: The minor number to search for.
- *	@type: The type of special file to search for. This may be either
- *		%DEVFS_SPECIAL_CHR or %DEVFS_SPECIAL_BLK.
- *
- *	Returns the devfs_entry pointer on success, else %NULL. An implicit
- *	devfs_get() is performed.
- */
-
-static struct devfs_entry *_devfs_find_by_dev (struct devfs_entry *dir,
-					       unsigned int major,
-					       unsigned int minor, char type)
-{
-    struct devfs_entry *entry, *de;
-
-    devfs_get (dir);
-    if (dir == NULL) return NULL;
-    if ( !S_ISDIR (dir->mode) )
-    {
-	PRINTK ("(%p): not a directory\n", dir);
-	devfs_put (dir);
-	return NULL;
-    }
-    /*  First search files in this directory  */
-    read_lock (&dir->u.dir.lock);
-    for (entry = dir->u.dir.first; entry != NULL; entry = entry->next)
-    {
-	if ( !S_ISCHR (entry->mode) && !S_ISBLK (entry->mode) ) continue;
-	if ( S_ISCHR (entry->mode) && (type != DEVFS_SPECIAL_CHR) ) continue;
-	if ( S_ISBLK (entry->mode) && (type != DEVFS_SPECIAL_BLK) ) continue;
-	if ( (entry->u.fcb.u.device.major == major) &&
-	     (entry->u.fcb.u.device.minor == minor) )
-	{
-	    devfs_get (entry);
-	    read_unlock (&dir->u.dir.lock);
-	    devfs_put (dir);
-	    return entry;
-	}
-	/*  Not found: try the next one  */
-    }
-    /*  Now recursively search the subdirectories: this is a stack chomper  */
-    for (entry = dir->u.dir.first; entry != NULL; entry = entry->next)
-    {
-	if ( !S_ISDIR (entry->mode) ) continue;
-	de = _devfs_find_by_dev (entry, major, minor, type);
-	if (de)
-	{
-	    read_unlock (&dir->u.dir.lock);
-	    devfs_put (dir);
-	    return de;
-	}
-    }
-    read_unlock (&dir->u.dir.lock);
-    devfs_put (dir);
-    return NULL;
-}   /*  End Function _devfs_find_by_dev  */
-
-
 /**
  *	_devfs_find_entry - Find a devfs entry.
  *	@dir: The handle to the parent devfs directory entry. If this is %NULL the
  *		name is relative to the root of the devfs.
  *	@name: The name of the entry. This may be %NULL.
- *	@major: The major number. This is used if lookup by @name fails.
- *	@minor: The minor number. This is used if lookup by @name fails.
- *		NOTE: If @major and @minor are both 0, searching by major and minor
- *		numbers is disabled.
- *	@type: The type of special file to search for. This may be either
- *		%DEVFS_SPECIAL_CHR or %DEVFS_SPECIAL_BLK.
  *	@traverse_symlink: If %TRUE then symbolic links are traversed.
  *
  *	Returns the devfs_entry pointer on success, else %NULL. An implicit
@@ -1358,40 +1290,29 @@ static struct devfs_entry *_devfs_find_by_dev (struct devfs_entry *dir,
 
 static struct devfs_entry *_devfs_find_entry (devfs_handle_t dir,
 					      const char *name,
-					      unsigned int major,
-					      unsigned int minor,
-					      char type, int traverse_symlink)
+					      int traverse_symlink)
 {
-    struct devfs_entry *entry;
+    unsigned int namelen = strlen (name);
 
-    if (name != NULL)
+    if (name[0] == '/')
     {
-	unsigned int namelen = strlen (name);
-
-	if (name[0] == '/')
+	/*  Skip leading pathname component  */
+	if (namelen < 2)
 	{
-	    /*  Skip leading pathname component  */
-	    if (namelen < 2)
-	    {
-		PRINTK ("(%s): too short\n", name);
-		return NULL;
-	    }
-	    for (++name, --namelen; (*name != '/') && (namelen > 0);
-		 ++name, --namelen);
-	    if (namelen < 2)
-	    {
-		PRINTK ("(%s): too short\n", name);
-		return NULL;
-	    }
-	    ++name;
-	    --namelen;
+	    PRINTK ("(%s): too short\n", name);
+	    return NULL;
 	}
-	entry = _devfs_walk_path (dir, name, namelen, traverse_symlink);
-	if (entry != NULL) return entry;
+	for (++name, --namelen; (*name != '/') && (namelen > 0);
+	     ++name, --namelen);
+	if (namelen < 2)
+	{
+	    PRINTK ("(%s): too short\n", name);
+	    return NULL;
+	}
+	++name;
+	--namelen;
     }
-    /*  Have to search by major and minor: slow  */
-    if ( (major == 0) && (minor == 0) ) return NULL;
-    return _devfs_find_by_dev (root_entry, major, minor, type);
+    return _devfs_walk_path (dir, name, namelen, traverse_symlink);
 }   /*  End Function _devfs_find_entry  */
 
 static struct devfs_entry *get_devfs_entry_from_vfs_inode (struct inode *inode)
@@ -1883,22 +1804,12 @@ devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name, void *info)
  */
 
 devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
-				 unsigned int major, unsigned int minor,
-				 char type, int traverse_symlinks)
+				 int traverse_symlinks)
 {
-    if ( (name != NULL) && (name[0] == '\0') ) name = NULL;
-    return _devfs_find_entry (dir, name, major, minor, type,traverse_symlinks);
+    if (!name || !name[0])
+	return NULL;
+    return _devfs_find_entry (dir, name, traverse_symlinks);
 }   /*  End Function devfs_get_handle  */
-
-void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
-				unsigned int major, unsigned int minor,
-				char type, int traverse_symlinks)
-{
-    devfs_handle_t de = devfs_get_handle (dir, name, major, minor,
-					  type, traverse_symlinks);
-    devfs_unregister (de);
-    devfs_put (de);
-}   /*  End Function devfs_find_and_unregister  */
 
 void devfs_remove(const char *fmt, ...)
 {
@@ -1909,7 +1820,7 @@ void devfs_remove(const char *fmt, ...)
 	va_start(args, fmt);
 	n = vsnprintf(buf, 64, fmt, args);
 	if (n < 64) {
-		devfs_handle_t de = devfs_get_handle(NULL, buf, 0, 0, 0, 0);
+		devfs_handle_t de = devfs_get_handle(NULL, buf, 0);
 		devfs_unregister(de);
 		devfs_put(de);
 	}
@@ -1962,29 +1873,6 @@ int devfs_set_flags (devfs_handle_t de, unsigned int flags)
     }
     return 0;
 }   /*  End Function devfs_set_flags  */
-
-
-/**
- *	devfs_get_maj_min - Get the major and minor numbers for a devfs entry.
- *	@de: The handle to the device entry.
- *	@major: The major number is written here. This may be %NULL.
- *	@minor: The minor number is written here. This may be %NULL.
- *
- *	Returns 0 on success, else a negative error code.
- */
-
-int devfs_get_maj_min (devfs_handle_t de, unsigned int *major,
-		       unsigned int *minor)
-{
-    if (de == NULL) return -EINVAL;
-    VERIFY_ENTRY (de);
-    if ( S_ISDIR (de->mode) ) return -EISDIR;
-    if ( !S_ISCHR (de->mode) && !S_ISBLK (de->mode) ) return -EINVAL;
-    if (major != NULL) *major = de->u.fcb.u.device.major;
-    if (minor != NULL) *minor = de->u.fcb.u.device.minor;
-    return 0;
-}   /*  End Function devfs_get_maj_min  */
-
 
 /**
  *	devfs_get_handle_from_inode - Get the devfs handle for a VFS inode.
@@ -2287,11 +2175,9 @@ EXPORT_SYMBOL(devfs_unregister);
 EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_get_handle);
-EXPORT_SYMBOL(devfs_find_and_unregister);
 EXPORT_SYMBOL(devfs_remove);
 EXPORT_SYMBOL(devfs_get_flags);
 EXPORT_SYMBOL(devfs_set_flags);
-EXPORT_SYMBOL(devfs_get_maj_min);
 EXPORT_SYMBOL(devfs_get_handle_from_inode);
 EXPORT_SYMBOL(devfs_generate_path);
 EXPORT_SYMBOL(devfs_get_ops);

@@ -11,16 +11,6 @@
 
 #define DEVFS_SUPER_MAGIC                0x1373
 
-#define IS_DEVFS_INODE(inode) (DEVFS_SUPER_MAGIC == (inode)->i_sb->s_magic)
-
-#define DEVFS_MINOR(inode) \
-    ({unsigned int m; /* evil GCC trickery */ \
-      ((inode)->i_sb && \
-       ((inode)->i_sb->s_magic==DEVFS_SUPER_MAGIC) && \
-       (devfs_get_maj_min(devfs_get_handle_from_inode((inode)),NULL,&m)==0) \
-      ) ? m : MINOR((inode)->r_dev); })
-
-
 #define DEVFS_FL_NONE           0x000 /* This helps to make code more readable
 				       */
 #define DEVFS_FL_HIDE           0x001 /* Do not show entry in directory list */
@@ -67,15 +57,9 @@ extern int devfs_mk_symlink (devfs_handle_t dir, const char *name,
 extern devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name,
 				    void *info);
 extern devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
-					unsigned int major,unsigned int minor,
-					char type, int traverse_symlinks);
-extern void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
-				       unsigned int major, unsigned int minor,
-				       char type, int traverse_symlinks);
+					int traverse_symlinks);
 extern int devfs_get_flags (devfs_handle_t de, unsigned int *flags);
 extern int devfs_set_flags (devfs_handle_t de, unsigned int flags);
-extern int devfs_get_maj_min (devfs_handle_t de, 
-			      unsigned int *major, unsigned int *minor);
 extern devfs_handle_t devfs_get_handle_from_inode (struct inode *inode);
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
 extern void *devfs_get_ops (devfs_handle_t de);
@@ -145,19 +129,9 @@ static inline devfs_handle_t devfs_mk_dir (devfs_handle_t dir,
 }
 static inline devfs_handle_t devfs_get_handle (devfs_handle_t dir,
 					       const char *name,
-					       unsigned int major,
-					       unsigned int minor,
-					       char type,
 					       int traverse_symlinks)
 {
     return NULL;
-}
-static inline void devfs_find_and_unregister (devfs_handle_t dir,
-					      const char *name,
-					      unsigned int major,
-					      unsigned int minor,
-					      char type, int traverse_symlinks)
-{
 }
 static inline void devfs_remove(const char *fmt, ...)
 {
@@ -167,11 +141,6 @@ static inline int devfs_get_flags (devfs_handle_t de, unsigned int *flags)
     return 0;
 }
 static inline int devfs_set_flags (devfs_handle_t de, unsigned int flags)
-{
-    return 0;
-}
-static inline int devfs_get_maj_min (devfs_handle_t de, 
-				     unsigned int *major, unsigned int *minor)
 {
     return 0;
 }
