@@ -234,9 +234,23 @@ static void tg3_enable_ints(struct tg3 *tp)
 		tw32(GRC_LOCAL_CTRL,
 		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
 	}
-#if 0
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
-#endif
+}
+
+static inline void tg3_mask_ints(struct tg3 *tp)
+{
+	tw32(TG3PCI_MISC_HOST_CTRL,
+	     (tp->misc_host_ctrl | MISC_HOST_CTRL_MASK_PCI_INT));
+}
+
+static inline void tg3_unmask_ints(struct tg3 *tp)
+{
+	tw32(TG3PCI_MISC_HOST_CTRL,
+	     (tp->misc_host_ctrl & ~MISC_HOST_CTRL_MASK_PCI_INT));
+	if (tp->hw_status->status & SD_STATUS_UPDATED) {
+		tw32(GRC_LOCAL_CTRL,
+		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
+	}
 }
 
 static void tg3_switch_clocks(struct tg3 *tp)
@@ -2093,7 +2107,7 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 
 	if (done) {
 		netif_rx_complete(netdev);
-		tg3_enable_ints(tp);
+		tg3_unmask_ints(tp);
 	}
 
 	spin_unlock_irq(&tp->lock);
@@ -2120,11 +2134,10 @@ static __inline__ void tg3_interrupt_main_work(struct net_device *dev, struct tg
 		return;
 
 	if (netif_rx_schedule_prep(dev)) {
-		/* NOTE: This write is posted by the readback of
+		/* NOTE: These writes are posted by the readback of
 		 *       the mailbox register done by our caller.
 		 */
-		tw32(TG3PCI_MISC_HOST_CTRL,
-		     (tp->misc_host_ctrl | MISC_HOST_CTRL_MASK_PCI_INT));
+		tg3_mask_ints(tp);
 		__netif_rx_schedule(dev);
 	} else {
 		printk(KERN_ERR PFX "%s: Error, poll already scheduled\n",
