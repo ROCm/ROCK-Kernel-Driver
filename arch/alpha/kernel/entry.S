@@ -1119,3 +1119,27 @@ sys_call_table:
 	.quad sys_readahead
 	.quad sys_ni_syscall			/* 380, sys_security */
 	.quad sys_tkill
+	.quad sys_setxattr
+	.quad sys_lsetxattr
+	.quad sys_fsetxattr
+	.quad sys_getxattr
+	.quad sys_lgetxattr
+	.quad sys_fgetxattr
+	.quad sys_listxattr
+	.quad sys_llistxattr
+	.quad sys_flistxattr			/* 390 */
+	.quad sys_removexattr
+	.quad sys_lremovexattr
+	.quad sys_fremovexattr
+	.quad sys_futex
+	.quad sys_sched_setaffinity
+	.quad sys_sched_getaffinity
+	.quad sys_ni_syscall			/* 397, tux */
+	.quad sys_io_setup
+	.quad sys_io_destroy
+	.quad sys_io_getevents			/* 400 */
+	.quad sys_io_submit
+	.quad sys_io_cancel
+	.quad sys_ni_syscall			/* 403, sys_alloc_hugepages */
+	.quad sys_ni_syscall			/* 404, sys_free_hugepages */
+	.quad sys_exit_group

@@ -63,8 +63,7 @@
  * First was PCMCIA, like ISA; then CardBus, which is PCI.
  * Next comes "CardBay", using USB 2.0 signals.
  *
- * Contains additional contributions by: Brad Hards, Rory Bolt, ...
- *
+ * Contains additional contributions by Brad Hards, Rory Bolt, and others.
  * Special thanks to Intel and VIA for providing host controllers to
  * test this driver on, and Cypress (including In-System Design) for
  * providing early devices for those host controllers to talk to!
@@ -93,13 +92,19 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-Aug-28"
+#define DRIVER_VERSION "2002-Sep-23"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
+
+static const char	hcd_name [] = "ehci-hcd";
 
 
 // #define EHCI_VERBOSE_DEBUG
 // #define have_split_iso
+
+#ifdef DEBUG
+#define EHCI_STATS
+#endif
 
 #define INTR_AUTOMAGIC		/* to be removed later in 2.5 */
 
@@ -117,6 +122,12 @@
 static int log2_irq_thresh = 0;		// 0 to 6
 MODULE_PARM (log2_irq_thresh, "i");
 MODULE_PARM_DESC (log2_irq_thresh, "log2 IRQ latency, 1-64 microframes");
+
+/* allow irqs at least every N URB completions */
+static int max_completions = 16;
+MODULE_PARM (max_completions, "i");
+MODULE_PARM_DESC (max_completions,
+		"limit for urb completions called with irqs disenabled");
 
 #define	INTR_MASK (STS_IAA | STS_FATAL | STS_ERR | STS_INT)
 
@@ -426,11 +437,10 @@ done2:
         /* PCI Serial Bus Release Number is at 0x60 offset */
 	pci_read_config_byte (hcd->pdev, 0x60, &tempbyte);
 	temp = readw (&ehci->caps->hci_version);
-	info ("USB %x.%x support enabled, EHCI rev %x.%02x",
-	      ((tempbyte & 0xf0)>>4),
-	      (tempbyte & 0x0f),
-	       temp >> 8,
-	       temp & 0xff);
+	info ("USB %x.%x support enabled, EHCI rev %x.%02x, %s %s",
+	      ((tempbyte & 0xf0)>>4), (tempbyte & 0x0f),
+	       temp >> 8, temp & 0xff,
+	       hcd_name, DRIVER_VERSION);
 
 	/*
 	 * From here on, khubd concurrently accesses the root
@@ -441,11 +451,7 @@ done2:
 	 */
 	usb_connect (udev);
 	udev->speed = USB_SPEED_HIGH;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,32)
-	if (usb_new_device (udev) != 0) {
-#else
-	if (usb_register_root_hub (udev, &ehci->hcd.pdev->dev) != 0) {
-#endif
+	if (hcd_register_root (hcd) != 0) {
 		if (hcd->state == USB_STATE_RUNNING)
 			ehci_ready (ehci);
 		ehci_reset (ehci);
@@ -486,6 +492,13 @@ static void ehci_stop (struct usb_hcd *hcd)
 	tasklet_disable (&ehci->tasklet);
 	ehci_tasklet ((unsigned long) ehci);
 	ehci_mem_cleanup (ehci);
+
+#ifdef	EHCI_STATS
+	dbg ("irq normal %ld err %ld reclaim %ld",
+		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim);
+	dbg ("complete %ld unlink %ld qpatch %ld",
+		ehci->stats.complete, ehci->stats.unlink, ehci->stats.qpatch);
+#endif
 
 	dbg_status (ehci, "ehci_stop completed", readl (&ehci->regs->status));
 }
@@ -591,21 +604,16 @@ dbg ("%s: resume port %d", hcd_to_bus (hcd)->bus_name, i);
 static void ehci_tasklet (unsigned long param)
 {
 	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
-	unsigned long		flags;
 
-	// FIXME don't pass flags; on sparc they aren't really flags.
-	// qh_completions can just leave irqs blocked,
-	// then have scan_async() allow IRQs if it's very busy 
-
-	spin_lock_irqsave (&ehci->lock, flags);
+	spin_lock_irq (&ehci->lock);
 
 	if (ehci->reclaim_ready)
-		flags = end_unlink_async (ehci, flags);
-	flags = scan_async (ehci, flags);
+		end_unlink_async (ehci);
+	scan_async (ehci);
 	if (ehci->next_uframe != -1)
-		flags = scan_periodic (ehci, flags);
+		scan_periodic (ehci);
 
-	spin_unlock_irqrestore (&ehci->lock, flags);
+	spin_unlock_irq (&ehci->lock);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -639,11 +647,17 @@ static void ehci_irq (struct usb_hcd *hcd)
 	/* INT, ERR, and IAA interrupt rates can be throttled */
 
 	/* normal [4.15.1.2] or error [4.15.1.1] completion */
-	if (likely ((status & (STS_INT|STS_ERR)) != 0))
+	if (likely ((status & (STS_INT|STS_ERR)) != 0)) {
+		if (likely ((status & STS_ERR) == 0))
+			COUNT (ehci->stats.normal);
+		else
+			COUNT (ehci->stats.error);
 		bh = 1;
+	}
 
 	/* complete the unlinking of some qh [4.15.2.3] */
 	if (status & STS_IAA) {
+		COUNT (ehci->stats.reclaim);
 		ehci->reclaim_ready = 1;
 		bh = 1;
 	}
@@ -765,10 +779,10 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		spin_lock_irqsave (&ehci->lock, flags);
 		if (qh->qh_state == QH_STATE_LINKED) {
 			/* messy, can spin or block a microframe ... */
-			flags = intr_deschedule (ehci, qh, 1, flags);
+			intr_deschedule (ehci, qh, 1);
 			/* qh_state == IDLE */
 		}
-		flags = qh_completions (ehci, qh, flags);
+		qh_completions (ehci, qh);
 
 		/* reschedule QH iff another request is queued */
 		if (!list_empty (&qh->qtd_list)
@@ -880,8 +894,6 @@ idle:
 }
 
 /*-------------------------------------------------------------------------*/
-
-static const char	hcd_name [] = "ehci-hcd";
 
 static const struct hc_driver ehci_driver = {
 	.description =		hcd_name,

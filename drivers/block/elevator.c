@@ -157,13 +157,20 @@ inline int elv_try_last_merge(request_queue_t *q, struct request **req,
 	return ret;
 }
 
+static int bio_rq_before(struct bio *bio, struct request *rq)
+{
+	if (!kdev_same(to_kdev_t(bio->bi_bdev->bd_dev), rq->rq_dev))
+		return 0;
+	return bio->bi_sector < rq->sector;
+}
+
 /*
  * elevator_linux starts here
  */
 int elevator_linus_merge(request_queue_t *q, struct request **req,
 			 struct bio *bio)
 {
-	struct list_head *entry;
+	struct list_head *entry, *good;
 	struct request *__rq;
 	int ret;
 
@@ -171,6 +178,7 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 		return ret;
 
 	entry = &q->queue_head;
+	good = &q->queue_head;
 	ret = ELEVATOR_NO_MERGE;
 	while ((entry = entry->prev) != &q->queue_head) {
 		__rq = list_entry_rq(entry);
@@ -178,37 +186,31 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 		if (__rq->flags & (REQ_BARRIER | REQ_STARTED))
 			break;
 		if (!(__rq->flags & REQ_CMD))
-			continue;
-
-		if (elv_linus_sequence(__rq) < bio_sectors(bio))
 			break;
 
-		if (!*req && bio_rq_in_between(bio, __rq, &q->queue_head))
-			*req = __rq;
+		if (bio_data_dir(bio) != rq_data_dir(__rq)) {
+			if (bio_data_dir(bio) == WRITE)
+				break;
+			good = entry->prev;
+			continue;
+		}
 
-		if ((ret = elv_try_merge(__rq, bio))) {
-			if (ret == ELEVATOR_FRONT_MERGE)
-				elv_linus_sequence(__rq) -= bio_sectors(bio);
+		ret = elv_try_merge(__rq, bio);
+		if (ret) {
 			*req = __rq;
 			q->last_merge = &__rq->queuelist;
-			break;
+			return ret;
 		}
+
+		if (bio_rq_before(bio, __rq))
+			good = entry->prev;
+
 	}
 
-	/*
-	 * if *req, it's either a seek or merge in the middle of the queue
-	 */
-	if (*req) {
-		struct list_head *entry = &(*req)->queuelist;
-		int cost = ret ? 1 : ELV_LINUS_SEEK_COST;
+	if (good != &q->queue_head)
+		*req = list_entry_rq(good);
 
-		while ((entry = entry->next) != &q->queue_head) {
-			__rq = list_entry_rq(entry);
-			elv_linus_sequence(__rq) -= cost;
-		}
-	}
-
-	return ret;
+	return ELEVATOR_NO_MERGE;
 }
 
 void elevator_linus_merge_req(request_queue_t *q, struct request *req,

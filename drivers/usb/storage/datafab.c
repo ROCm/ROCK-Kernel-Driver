@@ -70,7 +70,7 @@ datafab_bulk_read(struct us_data *us, unsigned char *data, unsigned int len) {
 	unsigned int act_len;	/* ignored */
 
 	if (len == 0)
-		return USB_STOR_TRANSPORT_GOOD;
+		return USB_STOR_XFER_GOOD;
 
 	US_DEBUGP("datafab_bulk_read:  len = %d\n", len);
 	return usb_storage_raw_bulk(us, SCSI_DATA_READ, data, len, &act_len);
@@ -82,7 +82,7 @@ datafab_bulk_write(struct us_data *us, unsigned char *data, unsigned int len) {
 	unsigned int act_len;	/* ignored */
 
 	if (len == 0)
-		return USB_STOR_TRANSPORT_GOOD;
+		return USB_STOR_XFER_GOOD;
 
 	US_DEBUGP("datafab_bulk_write:  len = %d\n", len);
 	return usb_storage_raw_bulk(us, SCSI_DATA_WRITE, data, len, &act_len);
@@ -144,12 +144,12 @@ static int datafab_read_data(struct us_data *us,
 
 		// send the read command
 		result = datafab_bulk_write(us, command, sizeof(command));
-		if (result != USB_STOR_TRANSPORT_GOOD)
+		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
 		// read the result
 		result = datafab_bulk_read(us, ptr, len);
-		if (result != USB_STOR_TRANSPORT_GOOD)
+		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
 		sectors -= thistime;
@@ -171,7 +171,7 @@ static int datafab_read_data(struct us_data *us,
  leave:
 	if (use_sg)
 		kfree(buffer);
-	return result;
+	return USB_STOR_TRANSPORT_ERROR;
 }
 
 
@@ -243,17 +243,17 @@ static int datafab_write_data(struct us_data *us,
 
 		// send the command
 		result = datafab_bulk_write(us, command, sizeof(command));
-		if (result != USB_STOR_TRANSPORT_GOOD)
+		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
 		// send the data
 		result = datafab_bulk_write(us, ptr, len);
-		if (result != USB_STOR_TRANSPORT_GOOD)
+		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
 		// read the result
 		result = datafab_bulk_read(us, reply, sizeof(reply));
-		if (result != USB_STOR_TRANSPORT_GOOD)
+		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
 		if (reply[0] != 0x50 && reply[1] != 0) {
@@ -280,7 +280,7 @@ static int datafab_write_data(struct us_data *us,
  leave:
 	if (use_sg)
 		kfree(buffer);
-	return result;
+	return USB_STOR_TRANSPORT_ERROR;
 }
 
 
@@ -308,11 +308,11 @@ static int datafab_determine_lun(struct us_data *us,
 		command[5] = 0xa0;
 
 		rc = datafab_bulk_write(us, command, 8);
-		if (rc != USB_STOR_TRANSPORT_GOOD) 
-			return rc;
+		if (rc != USB_STOR_XFER_GOOD) 
+			return USB_STOR_TRANSPORT_ERROR;
 
 		rc = datafab_bulk_read(us, buf, sizeof(buf));
-		if (rc == USB_STOR_TRANSPORT_GOOD) {
+		if (rc == USB_STOR_XFER_GOOD) {
 			info->lun = 0;
 			return USB_STOR_TRANSPORT_GOOD;
 		}
@@ -320,11 +320,11 @@ static int datafab_determine_lun(struct us_data *us,
 		command[5] = 0xb0;
 
 		rc = datafab_bulk_write(us, command, 8);
-		if (rc != USB_STOR_TRANSPORT_GOOD) 
-			return rc;
+		if (rc != USB_STOR_XFER_GOOD) 
+			return USB_STOR_TRANSPORT_ERROR;
 
 		rc = datafab_bulk_read(us, buf, sizeof(buf));
-		if (rc == USB_STOR_TRANSPORT_GOOD) {
+		if (rc == USB_STOR_XFER_GOOD) {
 			info->lun = 1;
 			return USB_STOR_TRANSPORT_GOOD;
 		}
@@ -332,7 +332,7 @@ static int datafab_determine_lun(struct us_data *us,
 		wait_ms(20);
 	}
 
-	return USB_STOR_TRANSPORT_FAILED;
+	return USB_STOR_TRANSPORT_ERROR;
 }
 
 static int datafab_id_device(struct us_data *us,
@@ -358,22 +358,23 @@ static int datafab_id_device(struct us_data *us,
 	command[5] += (info->lun << 4);
 
 	rc = datafab_bulk_write(us, command, 8);
-	if (rc != USB_STOR_TRANSPORT_GOOD) 
-		return rc;
+	if (rc != USB_STOR_XFER_GOOD) 
+		return USB_STOR_TRANSPORT_ERROR;
 
 	// we'll go ahead and extract the media capacity while we're here...
 	//
 	rc = datafab_bulk_read(us, reply, sizeof(reply));
-	if (rc == USB_STOR_TRANSPORT_GOOD) {
+	if (rc == USB_STOR_XFER_GOOD) {
 		// capacity is at word offset 57-58
 		//
 		info->sectors = ((u32)(reply[117]) << 24) | 
 				((u32)(reply[116]) << 16) |
 				((u32)(reply[115]) <<  8) | 
 				((u32)(reply[114])      );
+		return USB_STOR_TRANSPORT_GOOD;
 	}
 		
-	return rc;
+	return USB_STOR_TRANSPORT_ERROR;
 }
 
 

@@ -48,10 +48,10 @@
 
 #define DRIVER_NAME		"radeon"
 #define DRIVER_DESC		"ATI Radeon"
-#define DRIVER_DATE		"20020611"
+#define DRIVER_DATE		"20020828"
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		5
+#define DRIVER_MINOR		6
 #define DRIVER_PATCHLEVEL	0
 
 /* Interface history:
@@ -68,6 +68,11 @@
  * 1.5 - Add r200 packets to cmdbuf ioctl
  *     - Add r200 function to init ioctl
  *     - Add 'scalar2' instruction to cmdbuf
+ * 1.6 - Add static agp memory manager
+ *       Add irq handler (won't be turned on unless X server knows to)
+ *       Add irq ioctls and irq_active getparam.
+ *       Add wait command for cmdbuf ioctl
+ *       Add agp offset query for getparam
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \
@@ -88,9 +93,18 @@
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_VERTEX2)]    = { radeon_cp_vertex2,  1, 0 }, \
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_CMDBUF)]     = { radeon_cp_cmdbuf,   1, 0 }, \
  [DRM_IOCTL_NR(DRM_IOCTL_RADEON_GETPARAM)]   = { radeon_cp_getparam, 1, 0 }, \
- [DRM_IOCTL_NR(DRM_IOCTL_RADEON_FLIP)]       = { radeon_cp_flip,     1, 0 }, 
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_FLIP)]       = { radeon_cp_flip,     1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_ALLOC)]      = { radeon_mem_alloc,   1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_FREE)]       = { radeon_mem_free,    1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_INIT_HEAP)]  = { radeon_mem_init_heap, 1, 1 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_IRQ_EMIT)]   = { radeon_irq_emit, 1, 0 }, \
+ [DRM_IOCTL_NR(DRM_IOCTL_RADEON_IRQ_WAIT)]   = { radeon_irq_wait, 1, 0 },
 
-/* Driver customization:
+/* When a client dies:
+ *    - Check for and clean up flipped page state
+ *    - Free any alloced agp memory.
+ *
+ * DRM infrastructure takes care of reclaiming dma buffers.
  */
 #define DRIVER_PRERELEASE() do {					\
 	if ( dev->dev_private ) {					\
@@ -98,22 +112,78 @@
 		if ( dev_priv->page_flipping ) {			\
 			radeon_do_cleanup_pageflip( dev );		\
 		}							\
+		radeon_mem_release( dev_priv->agp_heap );		\
 	}								\
 } while (0)
 
+/* On unloading the module:
+ *    - Free memory heap structure
+ *    - Remove mappings made at startup and free dev_private.
+ */
 #define DRIVER_PRETAKEDOWN() do {					\
-	if ( dev->dev_private ) radeon_do_cleanup_cp( dev );		\
+	if ( dev->dev_private ) {					\
+		drm_radeon_private_t *dev_priv = dev->dev_private;	\
+		radeon_mem_takedown( &(dev_priv->agp_heap) );		\
+		radeon_do_cleanup_cp( dev );				\
+	}								\
 } while (0)
 
 /* DMA customization:
  */
 #define __HAVE_DMA		1
 
+
+#define __HAVE_DMA_IRQ		1
+#define __HAVE_DMA_IRQ_BH	1 
+#define __HAVE_SHARED_IRQ       1
+
+#define DRIVER_PREINSTALL() do {				\
+	drm_radeon_private_t *dev_priv =			\
+		(drm_radeon_private_t *)dev->dev_private;	\
+	u32 tmp;						\
+								\
+	/* Clear bit if it's already high: */			\
+   	tmp = RADEON_READ( RADEON_GEN_INT_STATUS );		\
+   	tmp = tmp & RADEON_SW_INT_TEST_ACK;			\
+   	RADEON_WRITE( RADEON_GEN_INT_STATUS, tmp );		\
+								\
+ 	/* Disable *all* interrupts */				\
+      	RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );			\
+} while (0)
+
+#ifdef __linux__ 
+#define IWH(x) init_waitqueue_head(x) 
+#else 
+#define IWH(x) 
+#endif 
+
+#define DRIVER_POSTINSTALL() do {				\
+	drm_radeon_private_t *dev_priv =			\
+		(drm_radeon_private_t *)dev->dev_private;	\
+								\
+   	atomic_set(&dev_priv->irq_received, 0);			\
+   	atomic_set(&dev_priv->irq_emitted, 0);			\
+	IWH(&dev_priv->irq_queue);		\
+								\
+	/* Turn on SW_INT only */				\
+   	RADEON_WRITE( RADEON_GEN_INT_CNTL,			\
+		      RADEON_SW_INT_ENABLE );			\
+} while (0)
+
+#define DRIVER_UNINSTALL() do {					\
+	drm_radeon_private_t *dev_priv =			\
+		(drm_radeon_private_t *)dev->dev_private;	\
+	if ( dev_priv ) {					\
+		/* Disable *all* interrupts */			\
+		RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );		\
+	}							\
+} while (0)
+
 /* Buffer customization:
  */
 #define DRIVER_BUF_PRIV_T	drm_radeon_buf_priv_t
 
-#define DRIVER_AGP_BUFFERS_MAP( dev )					\
+#define DRIVER_AGP_BUFFERS_MAP( dev )				\
 	((drm_radeon_private_t *)((dev)->dev_private))->buffers
 
 #endif

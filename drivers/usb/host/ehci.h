@@ -21,6 +21,23 @@
 
 /* definitions used for the EHCI driver */
 
+/* statistics can be kept for for tuning/monitoring */
+struct ehci_stats {
+	/* irq usage */
+	unsigned long		normal;
+	unsigned long		error;
+	unsigned long		reclaim;
+
+	/* termination of urbs from core */
+	unsigned long		complete;
+	unsigned long		unlink;
+
+	/* qhs patched to recover from td queueing race
+	 * (can avoid by using 'dummy td', allowing fewer irqs)
+	 */
+	unsigned long		qpatch;
+};
+
 /* ehci_hcd->lock guards shared data against other CPUs:
  *   ehci_hcd:	async, reclaim, periodic (and shadow), ...
  *   hcd_dev:	ep[]
@@ -72,6 +89,13 @@ struct ehci_hcd {			/* one per controller */
 	struct pci_pool		*sitd_pool;	/* sitd per split iso urb */
 
 	struct timer_list	watchdog;
+
+#ifdef EHCI_STATS
+	struct ehci_stats	stats;
+#	define COUNT(x) do { (x)++; } while (0)
+#else
+#	define COUNT(x) do {} while (0)
+#endif
 };
 
 /* unwrap an HCD pointer to get an EHCI_HCD pointer */ 
@@ -400,10 +424,22 @@ struct ehci_fstn {
 #define SUBMIT_URB(urb,mem_flags) usb_submit_urb(urb)
 #define STUB_DEBUG_FILES
 
+static inline int hcd_register_root (struct usb_hcd *hcd)
+{
+	return usb_new_device (hcd_to_bus (hcd)->root_hub);
+}
+
 #else	/* LINUX_VERSION_CODE */
 
+// hcd_to_bus() eventually moves to hcd.h on 2.5 too
 static inline struct usb_bus *hcd_to_bus (struct usb_hcd *hcd)
 	{ return &hcd->self; }
+// ... as does hcd_register_root()
+static inline int hcd_register_root (struct usb_hcd *hcd)
+{
+	return usb_register_root_hub (
+		hcd_to_bus (hcd)->root_hub, &hcd->pdev->dev);
+}
 
 #define SUBMIT_URB(urb,mem_flags) usb_submit_urb(urb,mem_flags)
 

@@ -41,17 +41,13 @@ SPECIFIC DEVICES SUPPORTED
 ConnectTech WhiteHEAT 4 port converter
 
   ConnectTech has been very forthcoming with information about their
-  device, including providing a unit to test with. This driver will end up
-  being fully supported.
+  device, including providing a unit to test with.
 
-  Current status:
-    The device's firmware is downloaded on connection, the new firmware 
-    runs properly and all four ports are successfully recognized and connected.
-    Data can be sent and received through the device on all ports.
-    Hardware flow control needs to be implemented.
+  The driver is officially supported by Connect Tech Inc.
+  http://www.connecttech.com
 
-  For any questions or problems with this driver, please contact Greg
-  Kroah-Hartman at greg@kroah.com
+  For any questions or problems with this driver, please contact
+  Stuart MacDonald at stuartm@connecttech.com
 
 
 HandSpring Visor, Palm USB, and Clié USB driver

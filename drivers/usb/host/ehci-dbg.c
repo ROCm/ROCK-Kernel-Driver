@@ -79,7 +79,7 @@ static void dbg_hcc_params (struct ehci_hcd *ehci, char *label)
 
 	if (HCC_EXT_CAPS (params)) {
 		// EHCI 0.96 ... could interpret these (legacy?)
-		dbg ("%s extended capabilities at pci %d",
+		dbg ("%s extended capabilities at pci %2x",
 			label, HCC_EXT_CAPS (params));
 	}
 	if (HCC_ISOC_CACHE (params)) {
@@ -545,6 +545,18 @@ show_registers (struct device *dev, char *buf, size_t count, loff_t off)
 		size -= temp;
 		next += temp;
 	}
+
+#ifdef EHCI_STATS
+	temp = snprintf (next, size, "irq normal %ld err %ld reclaim %ld\n",
+		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim);
+	size -= temp;
+	next += temp;
+
+	temp = snprintf (next, size, "complete %ld unlink %ld qpatch %ld\n",
+		ehci->stats.complete, ehci->stats.unlink, ehci->stats.qpatch);
+	size -= temp;
+	next += temp;
+#endif
 
 	spin_unlock_irqrestore (&ehci->lock, flags);
 

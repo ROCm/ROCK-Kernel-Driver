@@ -237,7 +237,7 @@ int DRM(notifier)(void *priv)
 
 
 				/* Allow signal delivery if lock isn't held */
-	if (!_DRM_LOCK_IS_HELD(s->lock->lock)
+	if (!s->lock || !_DRM_LOCK_IS_HELD(s->lock->lock)
 	    || _DRM_LOCKING_CONTEXT(s->lock->lock) != s->context) return 1;
 
 				/* Otherwise, set flag to force call to
