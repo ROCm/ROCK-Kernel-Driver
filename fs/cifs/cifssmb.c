@@ -190,7 +190,7 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 		rc = -EIO;
 		return rc;
 	}
-	rc = smb_init(SMB_COM_NEGOTIATE, 0, 0 /* no tcon yet */ ,
+	rc = smb_init(SMB_COM_NEGOTIATE, 0, NULL /* no tcon yet */ ,
 		      (void **) &pSMB, (void **) &pSMBr);
 	if (rc)
 		return rc;
@@ -363,7 +363,7 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 		return -EBUSY;
 	}
 
-	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, 0 /* no tcon anymore */,
+	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, NULL /* no tcon anymore */,
 		 (void **) &pSMB, (void **) &smb_buffer_response);
 
 	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
@@ -2067,7 +2067,7 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 	if (ses == NULL)
 		return -ENODEV;
 getDFSRetry:
-	rc = smb_init(SMB_COM_TRANSACTION2, 15, 0, (void **) &pSMB,
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, NULL, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
 		return rc;

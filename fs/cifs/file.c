@@ -1105,7 +1105,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	struct cifsTconInfo *pTcon;
 	int bytes_read = 0;
 	unsigned int read_size,i;
-	char * smb_read_data = 0;
+	char * smb_read_data = NULL;
 	struct smb_com_read_rsp * pSMBr;
 	struct pagevec lru_pvec;
 	struct cifsFileInfo * open_file;
@@ -1170,7 +1170,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			if(rc== -EAGAIN) {
 				if(smb_read_data) {
 					cifs_buf_release(smb_read_data);
-					smb_read_data = 0;
+					smb_read_data = NULL;
 				}
 			}
 		}
@@ -1224,7 +1224,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		}
 		if(smb_read_data) {
 			cifs_buf_release(smb_read_data);
-			smb_read_data = 0;
+			smb_read_data = NULL;
 		}
 		bytes_read = 0;
 	}
@@ -1234,7 +1234,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 /* need to free smb_read_data buf before exit */
 	if(smb_read_data) {
 		cifs_buf_release(smb_read_data);
-		smb_read_data = 0;
+		smb_read_data = NULL;
 	} 
 
 	FreeXid(xid);

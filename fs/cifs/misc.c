@@ -150,7 +150,7 @@ tconInfoFree(struct cifsTconInfo *buf_to_free)
 struct smb_hdr *
 cifs_buf_get(void)
 {
-	struct smb_hdr *ret_buf = 0;
+	struct smb_hdr *ret_buf = NULL;
 
 /* We could use negotiated size instead of max_msgsize - 
    but it may be more efficient to always alloc same size 

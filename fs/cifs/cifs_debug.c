@@ -313,65 +313,65 @@ cifs_proc_init(void)
 
 	proc_fs_cifs->owner = THIS_MODULE;
 	create_proc_read_entry("DebugData", 0, proc_fs_cifs,
-				cifs_debug_data_read, 0);
+				cifs_debug_data_read, NULL);
 
 #ifdef CONFIG_CIFS_STATS
 	create_proc_read_entry("Stats", 0, proc_fs_cifs,
-				cifs_stats_read, 0);
+				cifs_stats_read, NULL);
 #endif
 	pde = create_proc_read_entry("cifsFYI", 0, proc_fs_cifs,
-				cifsFYI_read, 0);
+				cifsFYI_read, NULL);
 	if (pde)
 		pde->write_proc = cifsFYI_write;
 
 	pde =
 	    create_proc_read_entry("traceSMB", 0, proc_fs_cifs,
-				traceSMB_read, 0);
+				traceSMB_read, NULL);
 	if (pde)
 		pde->write_proc = traceSMB_write;
 
 	pde = create_proc_read_entry("OplockEnabled", 0, proc_fs_cifs,
-				oplockEnabled_read, 0);
+				oplockEnabled_read, NULL);
 	if (pde)
 		pde->write_proc = oplockEnabled_write;
 
 	pde = create_proc_read_entry("QuotaEnabled", 0, proc_fs_cifs,
-				quotaEnabled_read, 0);
+				quotaEnabled_read, NULL);
 	if (pde)
 		pde->write_proc = quotaEnabled_write;
 
 	pde = create_proc_read_entry("LinuxExtensionsEnabled", 0, proc_fs_cifs,
-				linuxExtensionsEnabled_read, 0);
+				linuxExtensionsEnabled_read, NULL);
 	if (pde)
 		pde->write_proc = linuxExtensionsEnabled_write;
 
 	pde =
 	    create_proc_read_entry("MultiuserMount", 0, proc_fs_cifs,
-				multiuser_mount_read, 0);
+				multiuser_mount_read, NULL);
 	if (pde)
 		pde->write_proc = multiuser_mount_write;
 
 	pde =
 	    create_proc_read_entry("ExtendedSecurity", 0, proc_fs_cifs,
-				extended_security_read, 0);
+				extended_security_read, NULL);
 	if (pde)
 		pde->write_proc = extended_security_write;
 
 	pde =
 	create_proc_read_entry("LookupCacheEnabled", 0, proc_fs_cifs,
-				lookupFlag_read, 0);
+				lookupFlag_read, NULL);
 	if (pde)
 		pde->write_proc = lookupFlag_write;
 
 	pde =
 	    create_proc_read_entry("NTLMV2Enabled", 0, proc_fs_cifs,
-				ntlmv2_enabled_read, 0);
+				ntlmv2_enabled_read, NULL);
 	if (pde)
 		pde->write_proc = ntlmv2_enabled_write;
 
 	pde =
 	    create_proc_read_entry("PacketSigningEnabled", 0, proc_fs_cifs,
-				packet_signing_enabled_read, 0);
+				packet_signing_enabled_read, NULL);
 	if (pde)
 		pde->write_proc = packet_signing_enabled_write;
 }
