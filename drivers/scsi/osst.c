@@ -606,7 +606,7 @@ static int osst_wait_ready(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, unsigned 
 {
 	unsigned char	cmd[MAX_COMMAND_SIZE];
 	Scsi_Request  * SRpnt;
-	long		startwait = jiffies;
+	unsigned long	startwait = jiffies;
 #if DEBUG
 	int		dbg  = debugging;
 	char          * name = tape_name(STp);
@@ -673,7 +673,7 @@ static int osst_wait_for_medium(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, unsi
 {
 	unsigned char	cmd[MAX_COMMAND_SIZE];
 	Scsi_Request  * SRpnt;
-	long		startwait = jiffies;
+	unsigned long	startwait = jiffies;
 #if DEBUG
 	int		dbg = debugging;
 	char          * name = tape_name(STp);
@@ -777,8 +777,8 @@ static int osst_flush_drive_buffer(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt)
 #define OSST_POLL_PER_SEC 10
 static int osst_wait_frame(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, int curr, int minlast, int to)
 {
-	long	startwait     = jiffies;
-	char  * name          = tape_name(STp);
+	unsigned long	startwait     = jiffies;
+	char	      * name          = tape_name(STp);
 #if DEBUG
 	char	notyetprinted = 1;
 #endif
@@ -1288,7 +1288,7 @@ static int osst_read_back_buffer_and_rewrite(OS_Scsi_Tape * STp, Scsi_Request **
 	int             logical_blk_num  = ntohl(STp->buffer->aux->logical_blk_num) 
 						- (nframes + pending - 1) * blks_per_frame;
 	char          * name             = tape_name(STp);
-	long		startwait        = jiffies;
+	unsigned long	startwait        = jiffies;
 #if DEBUG
 	int		dbg              = debugging;
 #endif
@@ -1477,7 +1477,7 @@ static int osst_reposition_and_retry(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt,
 	int		expected  = 0;
 	int		attempts  = 1000 / skip;
 	int		flag      = 1;
-	long		startwait = jiffies;
+	unsigned long	startwait = jiffies;
 #if DEBUG
 	int		dbg       = debugging;
 #endif

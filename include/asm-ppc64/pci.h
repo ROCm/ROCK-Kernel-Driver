@@ -124,4 +124,7 @@ int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
 	
 #endif	/* __KERNEL__ */
 
+/* generic pci stuff */
+#include <asm-generic/pci.h>
+
 #endif /* __PPC64_PCI_H */

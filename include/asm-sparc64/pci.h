@@ -207,4 +207,7 @@ extern int pcibios_prep_mwi(struct pci_dev *dev);
 
 #endif /* __KERNEL__ */
 
+/* generic pci stuff */
+#include <asm-generic/pci.h>
+
 #endif /* __SPARC64_PCI_H */

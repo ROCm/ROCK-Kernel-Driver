@@ -60,8 +60,8 @@ unsigned long	pci_slotmask = 0;
  *	really assign any resources we like to devices, as long as
  *	they do not clash with other PCI devices.
  */
-unsigned int	pci_iobase = PCIBIOS_MIN_IO;	/* Arbitary start address */
-unsigned int	pci_membase = PCIBIOS_MIN_MEM;	/* Arbitary start address */
+unsigned int	pci_iobase = PCIBIOS_MIN_IO;	/* Arbitrary start address */
+unsigned int	pci_membase = PCIBIOS_MIN_MEM;	/* Arbitrary start address */
 
 #define	PCI_MINIO	0x100			/* 256 byte minimum I/O */
 #define	PCI_MINMEM	0x00010000		/* 64k minimum chunk */

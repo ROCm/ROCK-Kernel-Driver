@@ -287,44 +287,20 @@ void __devinit pcibios_update_irq (struct pci_dev *dev, int irq)
 	pci_write_config_byte (dev, PCI_INTERRUPT_LINE, irq);
 }
 
-void __nomods_init
-pcibios_update_resource (struct pci_dev *dev, struct resource *root,
-			 struct resource *r, int resource)
+void __devinit
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			struct resource *res)
 {
-	u32 new, check;
-	int reg;
+	unsigned long offset = 0;
 
-	if (r->flags & IORESOURCE_IO)
-		new = (((r->start - MB_A_PCI_IO_ADDR)
-			& PCI_BASE_ADDRESS_IO_MASK)
-		       | PCI_BASE_ADDRESS_SPACE_IO);
-	else if (r->flags & IORESOURCE_MEM)
-		new = (((r->start - MB_A_PCI_MEM_ADDR)
-			& PCI_BASE_ADDRESS_MEM_MASK)
-		       | PCI_BASE_ADDRESS_MEM_TYPE_32
-		       | ((r->flags & IORESOURCE_PREFETCH)
-			  ? PCI_BASE_ADDRESS_MEM_PREFETCH
-			  : 0)
-		       | PCI_BASE_ADDRESS_SPACE_MEMORY);
-	else
-		panic ("pcibios_update_resource: unknown resource type");
-
-	if (resource < 6)
-		reg = PCI_BASE_ADDRESS_0 + 4*resource;
-	else if (resource == PCI_ROM_RESOURCE) {
-		r->flags |= PCI_ROM_ADDRESS_ENABLE;
-		new |= PCI_ROM_ADDRESS_ENABLE;
-		reg = dev->rom_base_reg;
-	} else
-		return;
-	
-	pci_write_config_dword(dev, reg, new);
-	pci_read_config_dword(dev, reg, &check);
-	if ((new ^ check) & ((new & PCI_BASE_ADDRESS_SPACE_IO) ? PCI_BASE_ADDRESS_IO_MASK : PCI_BASE_ADDRESS_MEM_MASK)) {
-		printk (KERN_ERR "PCI: Error while updating region "
-			"%s/%d (%08x != %08x)\n", dev->slot_name, resource,
-			new, check);
+	if (res->flags & IORESOURCE_IO) {
+		offset = MB_A_PCI_IO_ADDR;
+	} else if (res->flags & IORESOURCE_MEM) {
+		offset = MB_A_PCI_MEM_ADDR;
 	}
+
+	region->start = res->start - offset;
+	region->end = res->end - offset;
 }
 
 

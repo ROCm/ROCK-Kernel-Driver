@@ -611,6 +611,7 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	struct file_system_type *type = get_fs_type(fstype);
 	struct super_block *sb = ERR_PTR(-ENOMEM);
 	struct vfsmount *mnt;
+	int error;
 
 	if (!type)
 		return ERR_PTR(-ENODEV);
@@ -621,6 +622,9 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	sb = type->get_sb(type, flags, name, data);
 	if (IS_ERR(sb))
 		goto out_mnt;
+ 	error = security_sb_kern_mount(sb);
+ 	if (error) 
+ 		goto out_sb;
 	mnt->mnt_sb = sb;
 	mnt->mnt_root = dget(sb->s_root);
 	mnt->mnt_mountpoint = sb->s_root;
@@ -628,6 +632,10 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	up_write(&sb->s_umount);
 	put_filesystem(type);
 	return mnt;
+out_sb:
+	up_write(&sb->s_umount);
+	deactivate_super(sb);
+	sb = ERR_PTR(error);
 out_mnt:
 	free_vfsmnt(mnt);
 out:

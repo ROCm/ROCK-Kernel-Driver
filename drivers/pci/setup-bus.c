@@ -72,40 +72,29 @@ pbus_assign_resources_sorted(struct pci_bus *bus)
    requires that if there is no I/O ports or memory behind the
    bridge, corresponding range must be turned off by writing base
    value greater than limit to the bridge's base/limit registers.  */
-static void __devinit
-pci_setup_bridge(struct pci_bus *bus)
+static void __devinit pci_setup_bridge(struct pci_bus *bus)
 {
-	struct pbus_set_ranges_data ranges;
 	struct pci_dev *bridge = bus->self;
+	struct pci_bus_region region;
 	u32 l;
-
-	if (!bridge || (bridge->class >> 8) != PCI_CLASS_BRIDGE_PCI)
-		return;
-
-	ranges.io_start = bus->resource[0]->start;
-	ranges.io_end = bus->resource[0]->end;
-	ranges.mem_start = bus->resource[1]->start;
-	ranges.mem_end = bus->resource[1]->end;
-	ranges.prefetch_start = bus->resource[2]->start;
-	ranges.prefetch_end = bus->resource[2]->end;
-	pcibios_fixup_pbus_ranges(bus, &ranges);
 
 	DBGC((KERN_INFO "PCI: Bus %d, bridge: %s\n",
 			bus->number, bridge->dev.name));
 
 	/* Set up the top and bottom of the PCI I/O segment for this bus. */
+	pcibios_resource_to_bus(bridge, &region, bus->resource[0]);
 	if (bus->resource[0]->flags & IORESOURCE_IO) {
 		pci_read_config_dword(bridge, PCI_IO_BASE, &l);
 		l &= 0xffff0000;
-		l |= (ranges.io_start >> 8) & 0x00f0;
-		l |= ranges.io_end & 0xf000;
+		l |= (region.start >> 8) & 0x00f0;
+		l |= region.end & 0xf000;
 		/* Set up upper 16 bits of I/O base/limit. */
 		pci_write_config_word(bridge, PCI_IO_BASE_UPPER16,
-				      ranges.io_start >> 16);
+				      region.start >> 16);
 		pci_write_config_word(bridge, PCI_IO_LIMIT_UPPER16,
-				      ranges.io_end >> 16);
+				      region.end >> 16);
 		DBGC((KERN_INFO "  IO window: %04lx-%04lx\n",
-				ranges.io_start, ranges.io_end));
+				region.start, region.end));
 	}
 	else {
 		/* Clear upper 16 bits of I/O base/limit. */
@@ -117,11 +106,12 @@ pci_setup_bridge(struct pci_bus *bus)
 
 	/* Set up the top and bottom of the PCI Memory segment
 	   for this bus. */
+	pcibios_resource_to_bus(bridge, &region, bus->resource[1]);
 	if (bus->resource[1]->flags & IORESOURCE_MEM) {
-		l = (ranges.mem_start >> 16) & 0xfff0;
-		l |= ranges.mem_end & 0xfff00000;
+		l = (region.start >> 16) & 0xfff0;
+		l |= region.end & 0xfff00000;
 		DBGC((KERN_INFO "  MEM window: %08lx-%08lx\n",
-				ranges.mem_start, ranges.mem_end));
+				region.start, region.end));
 	}
 	else {
 		l = 0x0000fff0;
@@ -134,11 +124,12 @@ pci_setup_bridge(struct pci_bus *bus)
 	pci_write_config_dword(bridge, PCI_PREF_LIMIT_UPPER32, 0);
 
 	/* Set up PREF base/limit. */
+	pcibios_resource_to_bus(bridge, &region, bus->resource[2]);
 	if (bus->resource[2]->flags & IORESOURCE_PREFETCH) {
-		l = (ranges.prefetch_start >> 16) & 0xfff0;
-		l |= ranges.prefetch_end & 0xfff00000;
+		l = (region.start >> 16) & 0xfff0;
+		l |= region.end & 0xfff00000;
 		DBGC((KERN_INFO "  PREFETCH window: %08lx-%08lx\n",
-				ranges.prefetch_start, ranges.prefetch_end));
+				region.start, region.end));
 	}
 	else {
 		l = 0x0000fff0;
@@ -284,7 +275,7 @@ pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 				order = 0;
 			/* Exclude ranges with size > align from
 			   calculation of the alignment. */
-			if (size == align)
+			if (r_size == align)
 				aligns[order] += align;
 			if (order > max_order)
 				max_order = order;

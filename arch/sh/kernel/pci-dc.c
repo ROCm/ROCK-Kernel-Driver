@@ -113,10 +113,6 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 }
 
 
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *bus, struct pbus_set_ranges_data *ranges)
-{
-}                                                                                
-
 void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct list_head *ln;

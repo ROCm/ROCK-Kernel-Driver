@@ -377,10 +377,6 @@ config ROMFS_FS
 	  If you don't know whether you need it, then you don't need it:
 	  answer N.
 
-config HUGETLBFS
-	bool "HugeTLB file system support"
-	depends on HUGETLB_PAGE
-
 config QUOTA
 	bool "Quota support"
 	help
@@ -818,6 +814,10 @@ config TMPFS
 	  lost.
 
 	  See <file:Documentation/filesystems/tmpfs.txt> for details.
+
+config HUGETLBFS
+	bool "HugeTLB file system support"
+	depends on HUGETLB_PAGE
 
 config RAMFS
 	bool
