@@ -2122,7 +2122,10 @@ static int initialize_crq_queue(struct crq_queue *queue,
 	return 0;
 
       req_irq_failed:
-	plpar_hcall_norets(H_FREE_CRQ, adapter->dma_dev->unit_address);
+	do {
+		rc = plpar_hcall_norets(H_FREE_CRQ, adapter->dma_dev->unit_address);
+	} while ((rc == H_Busy) || (H_isLongBusy(rc)));
+	
       reg_crq_failed:
 	dma_unmap_single(adapter->dev, queue->msg_token,
 			 queue->size * sizeof(*queue->msgs), DMA_BIDIRECTIONAL);
@@ -2138,9 +2141,13 @@ static int initialize_crq_queue(struct crq_queue *queue,
 static void release_crq_queue(struct crq_queue *queue,
 			      struct server_adapter *adapter)
 {
+	int rc;
+
 	info("releasing crq\n");
 	free_irq(adapter->dma_dev->irq, adapter);
-	plpar_hcall_norets(H_FREE_CRQ, adapter->dma_dev->unit_address);
+	do {
+		rc = plpar_hcall_norets(H_FREE_CRQ, adapter->dma_dev->unit_address);
+	} while ((rc == H_Busy) || (H_isLongBusy(rc)));
 	dma_unmap_single(adapter->dev, queue->msg_token,
 			 queue->size * sizeof(*queue->msgs), DMA_BIDIRECTIONAL);
 	free_page((unsigned long)queue->msgs);

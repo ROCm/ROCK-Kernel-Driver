@@ -481,10 +481,19 @@ static int ibmvscsi_send_srp_event(struct srp_event_struct *evt_struct,
 	 */
 	if ((evt_struct->crq.format == VIOSRP_SRP_FORMAT) &&
 	    (atomic_dec_if_positive(&hostdata->request_limit) < 0)) {
-		printk("ibmvscsi: Warning, request_limit exceeded\n");
-		unmap_cmd_data(&evt_struct->evt->srp.cmd, hostdata->dev);
-		ibmvscsi_free_event_struct(&hostdata->pool, evt_struct);
-		return SCSI_MLQUEUE_HOST_BUSY;
+		/* See if the adapter is disabled */
+		if (atomic_read(&hostdata->request_limit) < 0) {
+			cmnd->result = DID_ERROR << 16;
+			evt_struct->cmnd_done(cmnd);
+			unmap_cmd_data(&evt_struct->evt->srp.cmd, hostdata->dev);
+			ibmvscsi_free_event_struct(&hostdata->pool, evt_struct);
+			return 0;
+		} else {
+			printk("ibmvscsi: Warning, request_limit exceeded\n");
+			unmap_cmd_data(&evt_struct->evt->srp.cmd, hostdata->dev);
+			ibmvscsi_free_event_struct(&hostdata->pool, evt_struct);
+			return SCSI_MLQUEUE_HOST_BUSY;
+		}
 	}
 
 	/* Add this to the sent list.  We need to do this 

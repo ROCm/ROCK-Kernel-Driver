@@ -75,7 +75,7 @@ void ibmvscsi_release_crq_queue(struct crq_queue *queue,
 	tasklet_kill(&hostdata->srp_task);
 	do {
 		rc = plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
-	} while (H_isLongBusy(rc));
+	} while ((rc == H_Busy) || (H_isLongBusy(rc)));
 	dma_unmap_single(hostdata->dev,
 			 queue->msg_token,
 			 queue->size * sizeof(*queue->msgs),
@@ -214,7 +214,9 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 	return 0;
 
       req_irq_failed:
-	plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
+	do {
+		rc = plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
+	} while ((rc == H_Busy) || (H_isLongBusy(rc)));
       reg_crq_failed:
 	dma_unmap_single(hostdata->dev,
 			 queue->msg_token,
