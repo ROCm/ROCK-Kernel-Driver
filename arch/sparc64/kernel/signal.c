@@ -545,6 +545,12 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	regs->u_regs[UREG_I0] = signo;
 	regs->u_regs[UREG_I1] = (unsigned long) &sf->info;
 
+	/* The sigcontext is passed in this way because of how it
+	 * is defined in GLIBC's /usr/include/bits/sigcontext.h
+	 * for sparc64.  It includes the 128 bytes of siginfo_t.
+	 */
+	regs->u_regs[UREG_I2] = (unsigned long) &sf->info;
+
 	/* 5. signal handler */
 	regs->tpc = (unsigned long) ka->sa.sa_handler;
 	regs->tnpc = (regs->tpc + 4);
