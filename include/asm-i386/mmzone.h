@@ -119,7 +119,7 @@ static inline struct pglist_data *pfn_to_pgdat(unsigned long pfn)
 
 #ifdef CONFIG_X86_NUMAQ
 #include <asm/numaq.h>
-#elif CONFIG_NUMA	/* summit or generic arch */
+#elif CONFIG_ACPI_SRAT
 #include <asm/srat.h>
 #elif CONFIG_X86_PC
 #define get_memcfg_numa get_memcfg_numa_flat
