@@ -98,27 +98,7 @@ struct upc_req {
 /*
  * Statistics
  */
-struct coda_upcallstats {
-	int	ncalls;			/* client requests */
-	int	nbadcalls;		/* upcall failures */
-	int	reqs[CODA_NCALLS];	/* count of each request */
-} ;
 
-extern struct coda_upcallstats coda_callstats;
 extern struct venus_comm coda_comms[];
-
-static inline void clstats(int opcode)
-{
-    coda_callstats.ncalls++;
-    if ( (0 <= opcode) && (opcode <= CODA_NCALLS) )
-	coda_callstats.reqs[opcode]++;
-    else
-	printk("clstats called with bad opcode %d\n", opcode); 
-}
-
-static inline void badclstats(void)
-{
-    coda_callstats.nbadcalls++;
-}
 
 #endif

@@ -171,10 +171,7 @@ int venus_store(struct super_block *sb, struct ViceFid *fid, int flags,
 	insize = SIZE(store);
 	UPARG(CODA_STORE);
 	
-	if ( cred ) {
-		memcpy(&(inp->ih.cred), cred, sizeof(*cred));
-	} else 
-		printk("CODA: store without valid file creds.\n");
+	memcpy(&(inp->ih.cred), cred, sizeof(*cred));
 	
         inp->coda_store.VFid = *fid;
         inp->coda_store.flags = flags;
@@ -213,10 +210,7 @@ int venus_close(struct super_block *sb, struct ViceFid *fid, int flags,
 	insize = SIZE(release);
 	UPARG(CODA_CLOSE);
 	
-	if ( cred ) {
-		memcpy(&(inp->ih.cred), cred, sizeof(*cred));
-	} else 
-		printk("CODA: close without valid file creds.\n");
+	memcpy(&(inp->ih.cred), cred, sizeof(*cred));
 	
         inp->coda_close.VFid = *fid;
         inp->coda_close.flags = flags;
@@ -620,16 +614,12 @@ int venus_statfs(struct super_block *sb, struct statfs *sfs)
  * 
  */
 
-static inline unsigned long coda_waitfor_upcall(struct upc_req *vmp,
-						struct venus_comm *vcommp)
+static inline void coda_waitfor_upcall(struct upc_req *vmp,
+				       struct venus_comm *vcommp)
 {
 	DECLARE_WAITQUEUE(wait, current);
- 	struct timeval begin = { 0, 0 }, end = { 0, 0 };
 
 	vmp->uc_posttime = jiffies;
-
-	if (coda_upcall_timestamping)
-		do_gettimeofday(&begin);
 
 	add_wait_queue(&vmp->uc_sleep, &wait);
 	for (;;) {
@@ -661,17 +651,7 @@ static inline unsigned long coda_waitfor_upcall(struct upc_req *vmp,
 	remove_wait_queue(&vmp->uc_sleep, &wait);
 	set_current_state(TASK_RUNNING);
 
-	if (coda_upcall_timestamping && begin.tv_sec != 0) {
-		do_gettimeofday(&end);
-
-		if (end.tv_usec < begin.tv_usec) {
-			end.tv_usec += 1000000; end.tv_sec--;
-		}
-		end.tv_sec  -= begin.tv_sec;
-		end.tv_usec -= begin.tv_usec;
-	}
-
-	return 	((end.tv_sec * 1000000) + end.tv_usec);
+	return;
 }
 
 
@@ -689,7 +669,6 @@ static int coda_upcall(struct coda_sb_info *sbi,
 		int inSize, int *outSize, 
 		union inputArgs *buffer) 
 {
-	unsigned long runtime; 
 	struct venus_comm *vcommp;
 	union outputArgs *out;
 	struct upc_req *req;
@@ -732,8 +711,7 @@ static int coda_upcall(struct coda_sb_info *sbi,
 	 * ENODEV.  */
 
 	/* Go to sleep.  Wake up on signals only after the timeout. */
-	runtime = coda_waitfor_upcall(req, vcommp);
-	coda_upcall_stats(((union inputArgs *)buffer)->ih.opcode, runtime);
+	coda_waitfor_upcall(req, vcommp);
 
 	if (vcommp->vc_inuse) {      /* i.e. Venus is still alive */
 	    /* Op went through, interrupt or not... */
@@ -794,8 +772,6 @@ static int coda_upcall(struct coda_sb_info *sbi,
 
  exit:
 	upc_free(req);
-	if (error) 
-	        badclstats();
 	return error;
 }
 
@@ -842,7 +818,6 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 	  switch (opcode) {
 
 	  case CODA_FLUSH : {
-	           clstats(CODA_FLUSH);
 		   coda_cache_clear_all(sb, NULL);
 		   shrink_dcache_sb(sb);
 		   coda_flag_inode(sb->s_root->d_inode, C_FLUSH);
@@ -855,7 +830,6 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 		           printk("PURGEUSER: null cred!\n");
 			   return 0;
 		   }
-		   clstats(CODA_PURGEUSER);
 		   coda_cache_clear_all(sb, cred);
 		   return(0);
 	  }
@@ -863,7 +837,6 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 	  case CODA_ZAPDIR : {
 	          struct inode *inode;
 		  ViceFid *fid = &out->coda_zapdir.CodaFid;
-		  clstats(CODA_ZAPDIR);
 
 		  inode = coda_fid_to_inode(fid, sb);
 		  if (inode) {
@@ -878,7 +851,6 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 	  case CODA_ZAPFILE : {
 	          struct inode *inode;
 		  struct ViceFid *fid = &out->coda_zapfile.CodaFid;
-		  clstats(CODA_ZAPFILE);
 		  inode = coda_fid_to_inode(fid, sb);
 		  if ( inode ) {
 	                  coda_flag_inode(inode, C_VATTR);
@@ -890,7 +862,6 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 	  case CODA_PURGEFID : {
 	          struct inode *inode;
 		  ViceFid *fid = &out->coda_purgefid.CodaFid;
-		  clstats(CODA_PURGEFID);
 		  inode = coda_fid_to_inode(fid, sb);
 		  if ( inode ) { 
 			coda_flag_inode_children(inode, C_PURGE);
@@ -908,7 +879,6 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 	          struct inode *inode;
 		  ViceFid *oldfid = &out->coda_replace.OldFid;
 		  ViceFid *newfid = &out->coda_replace.NewFid;
-		  clstats(CODA_REPLACE);
 		  inode = coda_fid_to_inode(oldfid, sb);
 		  if ( inode ) { 
 			  coda_replace_fid(inode, oldfid, newfid);

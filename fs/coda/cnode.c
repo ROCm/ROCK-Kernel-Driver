@@ -85,6 +85,7 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 		cii = ITOC(inode);
 		/* we still need to set i_ino for things like stat(2) */
 		inode->i_ino = hash;
+		cii->c_mapcount = 0;
 		list_add(&cii->c_cilist, &sbi->sbi_cihead);
 		unlock_new_inode(inode);
 	}
