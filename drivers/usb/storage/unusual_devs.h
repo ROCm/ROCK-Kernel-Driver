@@ -489,11 +489,6 @@ UNUSUAL_DEV(  0x07ab, 0xfc01, 0x0000, 0x9999,
 		"Freecom",
 		"USB-IDE",
 		US_SC_QIC, US_PR_FREECOM, freecom_init, 0),
-
-UNUSUAL_DEV(  0x07ab, 0xfc84, 0x0000, 0x9999,
-		"Freecom",
-		"FX-5/FX-50",
-		US_SC_QIC, US_PR_FREECOM, freecom_init, 0),
 #endif
 
 UNUSUAL_DEV(  0x07af, 0x0004, 0x0100, 0x0133, 
