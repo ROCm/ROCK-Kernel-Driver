@@ -121,8 +121,9 @@ nfs_delete_inode(struct inode * inode)
 {
 	dprintk("NFS: delete_inode(%s/%ld)\n", inode->i_sb->s_id, inode->i_ino);
 
+	nfs_wb_all(inode);
 	/*
-	 * The following can never actually happen...
+	 * The following should never happen...
 	 */
 	if (nfs_have_writebacks(inode)) {
 		printk(KERN_ERR "nfs_delete_inode: inode %ld has pending RPC requests\n", inode->i_ino);
@@ -139,10 +140,10 @@ static void
 nfs_clear_inode(struct inode *inode)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
-	struct rpc_cred *cred = nfsi->mm_cred;
+	struct rpc_cred *cred;
 
-	if (cred)
-		put_rpccred(cred);
+	nfs_wb_all(inode);
+	BUG_ON (!list_empty(&nfsi->open_files));
 	cred = nfsi->cache_access.cred;
 	if (cred)
 		put_rpccred(cred);
@@ -812,53 +813,114 @@ int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 	return err;
 }
 
+struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry, struct rpc_cred *cred)
+{
+	struct nfs_open_context *ctx;
+
+	ctx = (struct nfs_open_context *)kmalloc(sizeof(*ctx), GFP_KERNEL);
+	if (ctx != NULL) {
+		atomic_set(&ctx->count, 1);
+		ctx->dentry = dget(dentry);
+		ctx->cred = get_rpccred(cred);
+		ctx->state = NULL;
+		ctx->lockowner = current->files;
+		ctx->error = 0;
+		init_waitqueue_head(&ctx->waitq);
+	}
+	return ctx;
+}
+
+struct nfs_open_context *get_nfs_open_context(struct nfs_open_context *ctx)
+{
+	if (ctx != NULL)
+		atomic_inc(&ctx->count);
+	return ctx;
+}
+
+void put_nfs_open_context(struct nfs_open_context *ctx)
+{
+	if (atomic_dec_and_test(&ctx->count)) {
+		if (ctx->state != NULL)
+			nfs4_close_state(ctx->state, ctx->mode);
+		if (ctx->cred != NULL)
+			put_rpccred(ctx->cred);
+		dput(ctx->dentry);
+		kfree(ctx);
+	}
+}
+
 /*
  * Ensure that mmap has a recent RPC credential for use when writing out
  * shared pages
  */
-void
-nfs_set_mmcred(struct inode *inode, struct rpc_cred *cred)
+void nfs_file_set_open_context(struct file *filp, struct nfs_open_context *ctx)
 {
-	struct rpc_cred **p = &NFS_I(inode)->mm_cred,
-			*oldcred = *p;
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct nfs_inode *nfsi = NFS_I(inode);
 
-	*p = get_rpccred(cred);
-	if (oldcred)
-		put_rpccred(oldcred);
+	filp->private_data = get_nfs_open_context(ctx);
+	spin_lock(&inode->i_lock);
+	list_add(&ctx->list, &nfsi->open_files);
+	spin_unlock(&inode->i_lock);
+}
+
+struct nfs_open_context *nfs_find_open_context(struct inode *inode, int mode)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs_open_context *pos, *ctx = NULL;
+
+	spin_lock(&inode->i_lock);
+	list_for_each_entry(pos, &nfsi->open_files, list) {
+		if ((pos->mode & mode) == mode) {
+			ctx = get_nfs_open_context(pos);
+			break;
+		}
+	}
+	spin_unlock(&inode->i_lock);
+	return ctx;
+}
+
+void nfs_file_clear_open_context(struct file *filp)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct nfs_open_context *ctx = (struct nfs_open_context *)filp->private_data;
+
+	if (ctx) {
+		filp->private_data = NULL;
+		spin_lock(&inode->i_lock);
+		list_del(&ctx->list);
+		spin_unlock(&inode->i_lock);
+		put_nfs_open_context(ctx);
+	}
 }
 
 /*
- * These are probably going to contain hooks for
- * allocating and releasing RPC credentials for
- * the file. I'll have to think about Tronds patch
- * a bit more..
+ * These allocate and release file read/write context information.
  */
 int nfs_open(struct inode *inode, struct file *filp)
 {
-	struct rpc_auth *auth;
+	struct nfs_open_context *ctx;
 	struct rpc_cred *cred;
 
-	auth = NFS_CLIENT(inode)->cl_auth;
-	cred = rpcauth_lookupcred(auth, 0);
-	filp->private_data = cred;
-	if ((filp->f_mode & FMODE_WRITE) != 0) {
-		nfs_set_mmcred(inode, cred);
+	if ((cred = rpcauth_lookupcred(NFS_CLIENT(inode)->cl_auth, 0)) == NULL)
+		return -ENOMEM;
+	ctx = alloc_nfs_open_context(filp->f_dentry, cred);
+	put_rpccred(cred);
+	if (ctx == NULL)
+		return -ENOMEM;
+	ctx->mode = filp->f_mode;
+	nfs_file_set_open_context(filp, ctx);
+	put_nfs_open_context(ctx);
+	if ((filp->f_mode & FMODE_WRITE) != 0)
 		nfs_begin_data_update(inode);
-	}
 	return 0;
 }
 
 int nfs_release(struct inode *inode, struct file *filp)
 {
-	struct rpc_cred *cred;
-
-	lock_kernel();
 	if ((filp->f_mode & FMODE_WRITE) != 0)
 		nfs_end_data_update(inode);
-	cred = nfs_file_cred(filp);
-	if (cred)
-		put_rpccred(cred);
-	unlock_kernel();
+	nfs_file_clear_open_context(filp);
 	return 0;
 }
 
@@ -899,7 +961,7 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 
 	/* Protect against RPC races by saving the change attribute */
 	verifier = nfs_save_change_attribute(inode);
-	status = NFS_PROTO(inode)->getattr(inode, &fattr);
+	status = NFS_PROTO(inode)->getattr(server, NFS_FH(inode), &fattr);
 	if (status) {
 		dfprintk(PAGECACHE, "nfs_revalidate_inode: (%s/%Ld) getattr failed, error=%d\n",
 			 inode->i_sb->s_id,
@@ -1397,6 +1459,9 @@ static void nfs4_clear_inode(struct inode *inode)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 
+	/* First call standard NFS clear_inode() code */
+	nfs_clear_inode(inode);
+	/* Now clear out any remaining state */
 	while (!list_empty(&nfsi->open_states)) {
 		struct nfs4_state *state;
 		
@@ -1411,8 +1476,6 @@ static void nfs4_clear_inode(struct inode *inode)
 		BUG_ON(atomic_read(&state->count) != 1);
 		nfs4_close_state(state, state->state);
 	}
-	/* Now call standard NFS clear_inode() code */
-	nfs_clear_inode(inode);
 }
 
 
@@ -1510,8 +1573,13 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		memcpy(clp->cl_ipaddr, server->ip_addr, sizeof(clp->cl_ipaddr));
 		nfs_idmap_new(clp);
 	}
-	if (list_empty(&clp->cl_superblocks))
-		clear_bit(NFS4CLNT_OK, &clp->cl_state);
+	if (list_empty(&clp->cl_superblocks)) {
+		err = nfs4_init_client(clp);
+		if (err != 0) {
+			up_write(&clp->cl_sem);
+			goto out_fail;
+		}
+	}
 	list_add_tail(&server->nfs4_siblings, &clp->cl_superblocks);
 	clnt = rpc_clone_client(clp->cl_rpcclient);
 	if (!IS_ERR(clnt))
@@ -1712,7 +1780,6 @@ static struct inode *nfs_alloc_inode(struct super_block *sb)
 	if (!nfsi)
 		return NULL;
 	nfsi->flags = 0;
-	nfsi->mm_cred = NULL;
 	nfs4_zero_state(nfsi);
 	return &nfsi->vfs_inode;
 }
@@ -1732,6 +1799,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		spin_lock_init(&nfsi->req_lock);
 		INIT_LIST_HEAD(&nfsi->dirty);
 		INIT_LIST_HEAD(&nfsi->commit);
+		INIT_LIST_HEAD(&nfsi->open_files);
 		INIT_RADIX_TREE(&nfsi->nfs_page_tree, GFP_ATOMIC);
 		atomic_set(&nfsi->data_updates, 0);
 		nfsi->ndirty = 0;

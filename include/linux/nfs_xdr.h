@@ -235,8 +235,7 @@ struct nfs_lockres {
 
 struct nfs_readargs {
 	struct nfs_fh *		fh;
-	fl_owner_t		lockowner;
-	struct nfs4_state *	state;
+	struct nfs_open_context *context;
 	__u64			offset;
 	__u32			count;
 	unsigned int		pgbase;
@@ -259,8 +258,7 @@ struct nfs_readres {
 
 struct nfs_writeargs {
 	struct nfs_fh *		fh;
-	fl_owner_t		lockowner;
-	struct nfs4_state *	state;
+	struct nfs_open_context *context;
 	__u64			offset;
 	__u32			count;
 	enum nfs3_stable_how	stable;
@@ -597,13 +595,15 @@ struct nfs4_rename_res {
 };
 
 struct nfs4_setclientid {
-	nfs4_verifier			sc_verifier;      /* request */
-	char *				sc_name;	  /* request */
+	const nfs4_verifier *		sc_verifier;      /* request */
+	unsigned int			sc_name_len;
+	char				sc_name[32];	  /* request */
 	u32				sc_prog;          /* request */
+	unsigned int			sc_netid_len;
 	char				sc_netid[4];	  /* request */
+	unsigned int			sc_uaddr_len;
 	char				sc_uaddr[24];     /* request */
 	u32				sc_cb_ident;      /* request */
-	struct nfs4_client *		sc_state;	  /* response */
 };
 
 struct nfs4_statfs_arg {
@@ -669,16 +669,17 @@ struct nfs_rpc_ops {
 
 	int	(*getroot) (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsinfo *);
-	int	(*getattr) (struct inode *, struct nfs_fattr *);
+	int	(*getattr) (struct nfs_server *, struct nfs_fh *,
+			    struct nfs_fattr *);
 	int	(*setattr) (struct dentry *, struct nfs_fattr *,
 			    struct iattr *);
 	int	(*lookup)  (struct inode *, struct qstr *,
 			    struct nfs_fh *, struct nfs_fattr *);
 	int	(*access)  (struct inode *, struct nfs_access_entry *);
 	int	(*readlink)(struct inode *, struct page *);
-	int	(*read)    (struct nfs_read_data *, struct file *);
-	int	(*write)   (struct nfs_write_data *, struct file *);
-	int	(*commit)  (struct nfs_write_data *, struct file *);
+	int	(*read)    (struct nfs_read_data *);
+	int	(*write)   (struct nfs_write_data *);
+	int	(*commit)  (struct nfs_write_data *);
 	struct inode *	(*create)  (struct inode *, struct qstr *,
 			    struct iattr *, int);
 	int	(*remove)  (struct inode *, struct qstr *);
@@ -710,8 +711,6 @@ struct nfs_rpc_ops {
 	void	(*commit_setup) (struct nfs_write_data *, int how);
 	int	(*file_open)   (struct inode *, struct file *);
 	int	(*file_release) (struct inode *, struct file *);
-	void	(*request_init)(struct nfs_page *, struct file *);
-	int	(*request_compatible)(struct nfs_page *, struct file *, struct page *);
 	int	(*lock)(struct file *, int, struct file_lock *);
 };
 
