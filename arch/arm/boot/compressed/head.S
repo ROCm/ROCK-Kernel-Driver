@@ -19,6 +19,13 @@
  */
 #ifdef DEBUG
 #if defined(CONFIG_DEBUG_DC21285_PORT)
+		.macro	loadsp, rb
+		mov	\rb, #0x42000000
+		.endm
+		.macro	writeb, rb
+		str	\rb, [r3, #0x160]
+		.endm
+#elif defined(CONFIG_FOOTBRIDGE)
 		.macro	loadsp,	rb
 		mov	\rb, #0x7c000000
 		.endm
