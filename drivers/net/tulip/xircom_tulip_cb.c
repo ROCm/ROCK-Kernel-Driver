@@ -350,6 +350,7 @@ static struct net_device_stats *xircom_get_stats(struct net_device *dev);
 static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static void set_rx_mode(struct net_device *dev);
 static void check_duplex(struct net_device *dev);
+static struct ethtool_ops ops;
 
 
 /* The Xircom cards are picky about when certain bits in CSR6 can be
@@ -626,6 +627,7 @@ static int __devinit xircom_init_one(struct pci_dev *pdev, const struct pci_devi
 #endif
 	dev->tx_timeout = xircom_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+	SET_ETHTOOL_OPS(dev, &ops);
 
 	transceiver_voodoo(dev);
 
@@ -1368,18 +1370,10 @@ static struct net_device_stats *xircom_get_stats(struct net_device *dev)
 	return &tp->stats;
 }
 
-
-static int xircom_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static int xircom_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
-	struct ethtool_cmd ecmd;
 	struct xircom_private *tp = netdev_priv(dev);
-
-	if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-		return -EFAULT;
-
-	switch (ecmd.cmd) {
-	case ETHTOOL_GSET:
-		ecmd.supported =
+	ecmd->supported =
 			SUPPORTED_10baseT_Half |
 			SUPPORTED_10baseT_Full |
 			SUPPORTED_100baseT_Half |
@@ -1387,85 +1381,80 @@ static int xircom_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 			SUPPORTED_Autoneg |
 			SUPPORTED_MII;
 
-		ecmd.advertising = ADVERTISED_MII;
-		if (tp->advertising[0] & ADVERTISE_10HALF)
-			ecmd.advertising |= ADVERTISED_10baseT_Half;
-		if (tp->advertising[0] & ADVERTISE_10FULL)
-			ecmd.advertising |= ADVERTISED_10baseT_Full;
-		if (tp->advertising[0] & ADVERTISE_100HALF)
-			ecmd.advertising |= ADVERTISED_100baseT_Half;
-		if (tp->advertising[0] & ADVERTISE_100FULL)
-			ecmd.advertising |= ADVERTISED_100baseT_Full;
-		if (tp->autoneg) {
-			ecmd.advertising |= ADVERTISED_Autoneg;
-			ecmd.autoneg = AUTONEG_ENABLE;
-		} else
-			ecmd.autoneg = AUTONEG_DISABLE;
+	ecmd->advertising = ADVERTISED_MII;
+	if (tp->advertising[0] & ADVERTISE_10HALF)
+		ecmd->advertising |= ADVERTISED_10baseT_Half;
+	if (tp->advertising[0] & ADVERTISE_10FULL)
+		ecmd->advertising |= ADVERTISED_10baseT_Full;
+	if (tp->advertising[0] & ADVERTISE_100HALF)
+		ecmd->advertising |= ADVERTISED_100baseT_Half;
+	if (tp->advertising[0] & ADVERTISE_100FULL)
+		ecmd->advertising |= ADVERTISED_100baseT_Full;
+	if (tp->autoneg) {
+		ecmd->advertising |= ADVERTISED_Autoneg;
+		ecmd->autoneg = AUTONEG_ENABLE;
+	} else
+		ecmd->autoneg = AUTONEG_DISABLE;
 
-		ecmd.port = PORT_MII;
-		ecmd.transceiver = XCVR_INTERNAL;
-		ecmd.phy_address = tp->phys[0];
-		ecmd.speed = tp->speed100 ? SPEED_100 : SPEED_10;
-		ecmd.duplex = tp->full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
-		ecmd.maxtxpkt = TX_RING_SIZE / 2;
-		ecmd.maxrxpkt = 0;
-
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-
-	case ETHTOOL_SSET: {
-		u16 autoneg, speed100, full_duplex;
-
-		autoneg = (ecmd.autoneg == AUTONEG_ENABLE);
-		speed100 = (ecmd.speed == SPEED_100);
-		full_duplex = (ecmd.duplex == DUPLEX_FULL);
-
-		tp->autoneg = autoneg;
-		if (speed100 != tp->speed100 ||
-		    full_duplex != tp->full_duplex) {
-			tp->speed100 = speed100;
-			tp->full_duplex = full_duplex;
-			/* change advertising bits */
-			tp->advertising[0] &= ~(ADVERTISE_10HALF |
-					     ADVERTISE_10FULL |
-					     ADVERTISE_100HALF |
-					     ADVERTISE_100FULL |
-					     ADVERTISE_100BASE4);
-			if (speed100) {
-				if (full_duplex)
-					tp->advertising[0] |= ADVERTISE_100FULL;
-				else
-					tp->advertising[0] |= ADVERTISE_100HALF;
-			} else {
-				if (full_duplex)
-					tp->advertising[0] |= ADVERTISE_10FULL;
-				else
-					tp->advertising[0] |= ADVERTISE_10HALF;
-			}
-		}
-		check_duplex(dev);
-		return 0;
-	}
-
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info;
-		memset(&info, 0, sizeof(info));
-		info.cmd = ecmd.cmd;
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		*info.fw_version = 0;
-		strcpy(info.bus_info, pci_name(tp->pdev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-		       return -EFAULT;
-		return 0;
-	}
-
-	default:
-		return -EOPNOTSUPP;
-	}
+	ecmd->port = PORT_MII;
+	ecmd->transceiver = XCVR_INTERNAL;
+	ecmd->phy_address = tp->phys[0];
+	ecmd->speed = tp->speed100 ? SPEED_100 : SPEED_10;
+	ecmd->duplex = tp->full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
+	ecmd->maxtxpkt = TX_RING_SIZE / 2;
+	ecmd->maxrxpkt = 0;
+	return 0;
 }
 
+static int xircom_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct xircom_private *tp = netdev_priv(dev);
+	u16 autoneg, speed100, full_duplex;
+
+	autoneg = (ecmd->autoneg == AUTONEG_ENABLE);
+	speed100 = (ecmd->speed == SPEED_100);
+	full_duplex = (ecmd->duplex == DUPLEX_FULL);
+
+	tp->autoneg = autoneg;
+	if (speed100 != tp->speed100 ||
+	    full_duplex != tp->full_duplex) {
+		tp->speed100 = speed100;
+		tp->full_duplex = full_duplex;
+		/* change advertising bits */
+		tp->advertising[0] &= ~(ADVERTISE_10HALF |
+				     ADVERTISE_10FULL |
+				     ADVERTISE_100HALF |
+				     ADVERTISE_100FULL |
+				     ADVERTISE_100BASE4);
+		if (speed100) {
+			if (full_duplex)
+				tp->advertising[0] |= ADVERTISE_100FULL;
+			else
+				tp->advertising[0] |= ADVERTISE_100HALF;
+		} else {
+			if (full_duplex)
+				tp->advertising[0] |= ADVERTISE_10FULL;
+			else
+				tp->advertising[0] |= ADVERTISE_10HALF;
+		}
+	}
+	check_duplex(dev);
+	return 0;
+}
+
+static void xircom_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct xircom_private *tp = netdev_priv(dev);
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(tp->pdev));
+}
+
+static struct ethtool_ops ops = {
+	.get_settings = xircom_get_settings,
+	.set_settings = xircom_set_settings,
+	.get_drvinfo = xircom_get_drvinfo,
+};
 
 /* Provide ioctl() calls to examine the MII xcvr state. */
 static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
@@ -1476,9 +1465,6 @@ static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	unsigned long flags;
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return xircom_ethtool_ioctl(dev, rq->ifr_data);
-
 	/* Legacy mii-diag interface */
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		if (tp->mii_cnt)
