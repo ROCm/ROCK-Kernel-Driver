@@ -127,7 +127,7 @@ void multipath_end_request(struct bio *bio)
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	struct multipath_bh * mp_bh = (struct multipath_bh *)(bio->bi_private);
 	multipath_conf_t *conf;
-	struct block_device *bdev;
+	mdk_rdev_t *rdev;
 	if (uptodate) {
 		multipath_end_bh_io(mp_bh, uptodate);
 		return;
@@ -136,10 +136,10 @@ void multipath_end_request(struct bio *bio)
 	 * oops, IO error:
 	 */
 	conf = mddev_to_conf(mp_bh->mddev);
-	bdev = conf->multipaths[mp_bh->path].rdev->bdev;
-	md_error (mp_bh->mddev, bdev);
+	rdev = conf->multipaths[mp_bh->path].rdev;
+	md_error (mp_bh->mddev, rdev);
 	printk(KERN_ERR "multipath: %s: rescheduling sector %lu\n", 
-		 bdev_partition_name(bdev), bio->bi_sector);
+		 bdev_partition_name(rdev->bdev), bio->bi_sector);
 	multipath_reschedule_retry(mp_bh);
 	return;
 }
@@ -225,7 +225,7 @@ static void mark_disk_bad (mddev_t *mddev, int failed)
 /*
  * Careful, this can execute in IRQ contexts as well!
  */
-static int multipath_error (mddev_t *mddev, struct block_device *bdev)
+static int multipath_error (mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	struct multipath_info * multipaths = conf->multipaths;
@@ -240,7 +240,7 @@ static int multipath_error (mddev_t *mddev, struct block_device *bdev)
 		 * which has just failed.
 		 */
 		for (i = 0; i < disks; i++) {
-			if (multipaths[i].rdev->bdev == bdev && !multipaths[i].operational)
+			if (multipaths[i].rdev == rdev && !multipaths[i].operational)
 				return 0;
 		}
 		printk (LAST_DISK);
@@ -250,7 +250,7 @@ static int multipath_error (mddev_t *mddev, struct block_device *bdev)
 		 * Mark disk as unusable
 		 */
 		for (i = 0; i < disks; i++) {
-			if (multipaths[i].rdev->bdev == bdev && multipaths[i].operational) {
+			if (multipaths[i].rdev == rdev && multipaths[i].operational) {
 				mark_disk_bad(mddev, i);
 				break;
 			}

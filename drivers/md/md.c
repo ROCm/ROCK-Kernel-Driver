@@ -251,18 +251,6 @@ static mdk_rdev_t * find_rdev(mddev_t * mddev, dev_t dev)
 	return NULL;
 }
 
-static mdk_rdev_t * find_rdev_bdev(mddev_t * mddev, struct block_device *bdev)
-{
-	struct list_head *tmp;
-	mdk_rdev_t *rdev;
-
-	ITERATE_RDEV(mddev,rdev,tmp) {
-		if (rdev->bdev == bdev)
-			return rdev;
-	}
-	return NULL;
-}
-
 static LIST_HEAD(device_names);
 
 char * partition_name(kdev_t dev)
@@ -2213,7 +2201,7 @@ static int set_disk_faulty(mddev_t *mddev, dev_t dev)
 	if (!rdev)
 		return 0;
 
-	ret = md_error(mddev, rdev->bdev);
+	ret = md_error(mddev, rdev);
 	return ret;
 }
 
@@ -2629,9 +2617,8 @@ static void md_recover_arrays(void)
 }
 
 
-int md_error(mddev_t *mddev, struct block_device *bdev)
+int md_error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
-	mdk_rdev_t * rrdev;
 
 	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
 		MD_MAJOR,mdidx(mddev),MAJOR(bdev->bd_dev),MINOR(bdev->bd_dev),
@@ -2642,13 +2629,13 @@ int md_error(mddev_t *mddev, struct block_device *bdev)
 		MD_BUG();
 		return 0;
 	}
-	rrdev = find_rdev_bdev(mddev, bdev);
-	if (!rrdev || rrdev->faulty)
+
+	if (!rdev || rdev->faulty)
 		return 0;
 	if (!mddev->pers->error_handler
-			|| mddev->pers->error_handler(mddev,bdev) <= 0) {
-		rrdev->faulty = 1;
-		rrdev->in_sync = 0;
+			|| mddev->pers->error_handler(mddev,rdev) <= 0) {
+		rdev->faulty = 1;
+		rdev->in_sync = 0;
 	} else
 		return 1;
 	/*
@@ -2844,9 +2831,9 @@ static mdk_rdev_t *get_spare(mddev_t *mddev)
 }
 
 static unsigned int sync_io[DK_MAX_MAJOR][DK_MAX_DISK];
-void md_sync_acct(struct block_device *bdev, unsigned long nr_sectors)
+void md_sync_acct(mdk_rdev_t *rdev, unsigned long nr_sectors)
 {
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	kdev_t dev = to_kdev_t(rdev->bdev->bd_dev);
 	unsigned int major = major(dev);
 	unsigned int index;
 

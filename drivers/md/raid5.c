@@ -371,7 +371,7 @@ static void raid5_end_read_request (struct bio * bi)
 		set_bit(R5_UPTODATE, &sh->dev[i].flags);
 #endif		
 	} else {
-		md_error(conf->mddev, conf->disks[i].rdev->bdev);
+		md_error(conf->mddev, conf->disks[i].rdev);
 		clear_bit(R5_UPTODATE, &sh->dev[i].flags);
 	}
 #if 0
@@ -407,7 +407,7 @@ static void raid5_end_write_request (struct bio *bi)
 
 	spin_lock_irqsave(&conf->device_lock, flags);
 	if (!uptodate)
-		md_error(conf->mddev, conf->disks[i].rdev->bdev);
+		md_error(conf->mddev, conf->disks[i].rdev);
 	
 	clear_bit(R5_LOCKED, &sh->dev[i].flags);
 	set_bit(STRIPE_HANDLE, &sh->state);
@@ -437,7 +437,7 @@ static void raid5_build_block (struct stripe_head *sh, int i)
 		dev->sector = compute_blocknr(sh, i);
 }
 
-static int error(mddev_t *mddev, struct block_device *bdev)
+static int error(mddev_t *mddev, mdk_rdev_t *rdev)
 {
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 	struct disk_info *disk;
@@ -446,7 +446,7 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 	PRINTK("raid5: error called\n");
 
 	for (i = 0, disk = conf->disks; i < conf->raid_disks; i++, disk++) {
-		if (disk->rdev->bdev != bdev)
+		if (disk->rdev != rdev)
 			continue;
 		if (disk->operational) {
 			disk->operational = 0;
@@ -457,7 +457,7 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 			printk (KERN_ALERT
 				"raid5: Disk failure on %s, disabling device."
 				" Operation continuing on %d devices\n",
-				bdev_partition_name(bdev), conf->working_disks);
+				bdev_partition_name(rdev->bdev), conf->working_disks);
 		}
 		return 0;
 	}
@@ -466,10 +466,10 @@ static int error(mddev_t *mddev, struct block_device *bdev)
 	 */
 	if (conf->spare) {
 		disk = conf->spare;
-		if (disk->rdev->bdev == bdev) {
+		if (disk->rdev == rdev) {
 			printk (KERN_ALERT
 				"raid5: Disk failure on spare %s\n",
-				bdev_partition_name (bdev));
+				bdev_partition_name (rdev->bdev));
 			if (!conf->spare->operational) {
 				/* probably a SET_DISK_FAULTY ioctl */
 				return -EIO;
@@ -1001,7 +1001,7 @@ static void handle_stripe(struct stripe_head *sh)
 					locked++;
 					PRINTK("Reading block %d (sync=%d)\n", i, syncing);
 					if (syncing)
-						md_sync_acct(conf->disks[i].rdev->bdev, STRIPE_SECTORS);
+						md_sync_acct(conf->disks[i].rdev, STRIPE_SECTORS);
 				}
 			}
 		}
@@ -1140,9 +1140,9 @@ static void handle_stripe(struct stripe_head *sh)
 			locked++;
 			set_bit(STRIPE_INSYNC, &sh->state);
 			if (conf->disks[failed_num].operational)
-				md_sync_acct(conf->disks[failed_num].rdev->bdev, STRIPE_SECTORS);
+				md_sync_acct(conf->disks[failed_num].rdev, STRIPE_SECTORS);
 			else if ((spare=conf->spare))
-				md_sync_acct(spare->rdev->bdev, STRIPE_SECTORS);
+				md_sync_acct(spare->rdev, STRIPE_SECTORS);
 
 		}
 	}
