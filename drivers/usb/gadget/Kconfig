@@ -110,7 +110,7 @@ config USB_ZERO_SA1100
 
 config USB_ETH
 	tristate "Ethernet Gadget"
-	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA2XX || USB_SA1100)
+	depends on USB_GADGET && NET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA2XX || USB_SA1100)
 	help
 	  This driver implements Ethernet style communication, in either
 	  of two ways:
