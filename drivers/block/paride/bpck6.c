@@ -21,7 +21,7 @@
 
 
 /* PARAMETERS */
-int verbose=0; /* set this to 1 to see debugging messages and whatnot */
+static int verbose; /* set this to 1 to see debugging messages and whatnot */
 
 #define BACKPACK_VERSION "2.0.2"
 
