@@ -105,12 +105,7 @@ static void br_dev_set_multicast_list(struct net_device *dev)
 
 static int br_dev_stop(struct net_device *dev)
 {
-	struct net_bridge *br;
-
-	br = dev->priv;
-	write_lock(&br->lock);
-	br_stp_disable_bridge(br);
-	write_unlock(&br->lock);
+	br_stp_disable_bridge(dev->priv);
 
 	netif_stop_queue(dev);
 

@@ -64,11 +64,12 @@ void br_stp_enable_bridge(struct net_bridge *br)
 	br_timer_set(&br->gc_timer, jiffies);
 }
 
-/* called under bridge lock */
+/* NO locks held */
 void br_stp_disable_bridge(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
 
+	write_lock(&br->lock);
 	br->topology_change = 0;
 	br->topology_change_detected = 0;
 	br_timer_clear(&br->hello_timer);
@@ -84,6 +85,7 @@ void br_stp_disable_bridge(struct net_bridge *br)
 
 		p = p->next;
 	}
+	write_unlock(&br->lock);
 
 	del_timer_sync(&br->tick);
 }
