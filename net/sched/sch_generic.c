@@ -318,11 +318,11 @@ pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc* qdisc)
 	if (list->qlen < qdisc->dev->tx_queue_len) {
 		__skb_queue_tail(list, skb);
 		qdisc->q.qlen++;
-		qdisc->stats.bytes += skb->len;
-		qdisc->stats.packets++;
+		qdisc->bstats.bytes += skb->len;
+		qdisc->bstats.packets++;
 		return 0;
 	}
-	qdisc->stats.drops++;
+	qdisc->qstats.drops++;
 	kfree_skb(skb);
 	return NET_XMIT_DROP;
 }

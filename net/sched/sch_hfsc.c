@@ -1677,14 +1677,14 @@ hfsc_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 #ifdef CONFIG_NET_CLS_ACT
 	if (cl == NULL) {
 		if (NET_XMIT_DROP == ret) {
-			sch->stats.drops++;
+			sch->qstats.drops++;
 		}
 		return ret;
 	}
 #else
 	if (cl == NULL) {
 		kfree_skb(skb);
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return NET_XMIT_DROP;
 	}
 #endif
@@ -1692,7 +1692,7 @@ hfsc_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	err = cl->qdisc->enqueue(skb, cl->qdisc);
 	if (unlikely(err != NET_XMIT_SUCCESS)) {
 		cl->stats.drops++;
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return err;
 	}
 
@@ -1701,8 +1701,8 @@ hfsc_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 	cl->stats.packets++;
 	cl->stats.bytes += len;
-	sch->stats.packets++;
-	sch->stats.bytes += len;
+	sch->bstats.packets++;
+	sch->bstats.bytes += len;
 	sch->q.qlen++;
 
 	return NET_XMIT_SUCCESS;
@@ -1739,7 +1739,7 @@ hfsc_dequeue(struct Qdisc *sch)
 		 */
 		cl = vttree_get_minvt(&q->root, cur_time);
 		if (cl == NULL) {
-			sch->stats.overlimits++;
+			sch->qstats.overlimits++;
 			hfsc_schedule_watchdog(sch, cur_time);
 			return NULL;
 		}
@@ -1804,7 +1804,7 @@ hfsc_drop(struct Qdisc *sch)
 				list_move_tail(&cl->dlist, &q->droplist);
 			}
 			cl->stats.drops++;
-			sch->stats.drops++;
+			sch->qstats.drops++;
 			sch->q.qlen--;
 			return len;
 		}

@@ -227,7 +227,7 @@ static unsigned int sfq_drop(struct Qdisc *sch)
 		kfree_skb(skb);
 		sfq_dec(q, x);
 		sch->q.qlen--;
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return len;
 	}
 
@@ -243,7 +243,7 @@ static unsigned int sfq_drop(struct Qdisc *sch)
 		sfq_dec(q, d);
 		sch->q.qlen--;
 		q->ht[q->hash[d]] = SFQ_DEPTH;
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return len;
 	}
 
@@ -276,8 +276,8 @@ sfq_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 		}
 	}
 	if (++sch->q.qlen < q->limit-1) {
-		sch->stats.bytes += skb->len;
-		sch->stats.packets++;
+		sch->bstats.bytes += skb->len;
+		sch->bstats.packets++;
 		return 0;
 	}
 
@@ -313,7 +313,7 @@ sfq_requeue(struct sk_buff *skb, struct Qdisc* sch)
 	if (++sch->q.qlen < q->limit - 1)
 		return 0;
 
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	sfq_drop(sch);
 	return NET_XMIT_CN;
 }
