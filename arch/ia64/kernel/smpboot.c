@@ -429,30 +429,35 @@ smp_build_cpu_map (void)
 }
 
 #ifdef CONFIG_NUMA
+
 char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+
 /*
  * Build cpu to node mapping.
  */
 void __init
-build_cpu_to_node_map(void)
+build_cpu_to_node_map (void)
 {
 	int cpu, i;
 
-	for(cpu=0; cpu<NR_CPUS; cpu++) {
+	for(cpu = 0; cpu < NR_CPUS; ++cpu) {
 		/*
 		 * All Itanium NUMA platforms I know use ACPI, so maybe we
-		 * can drop this ifdef completely.                    [EF] 
+		 * can drop this ifdef completely.                    [EF]
 		 */
 #ifdef CONFIG_ACPI_NUMA
-		for(i=0; i<NR_CPUS; i++)
+		for (i = 0; i < NR_CPUS; ++i)
 			if (cpu_physical_id(cpu) == node_cpuid[i].phys_id) {
-				cpu_to_node_map[cpu]=node_cpuid[i].nid;
+				cpu_to_node_map[cpu] = node_cpuid[i].nid;
 				break;
 			}
+#else
+#		error Fixme: Dunno how to build CPU-to-node map.
 #endif
 	}
 }
-#endif
+
+#endif /* CONFIG_NUMA */
 
 /*
  * Cycle through the APs sending Wakeup IPIs to boot each.
