@@ -42,9 +42,10 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 
 	pcibios_resource_to_bus(dev, &region, res);
 
-	DBGC((KERN_ERR "  got res [%lx:%lx] bus [%lx:%lx] for "
-	      "resource %d of %s\n", res->start, res->end,
-	      region.start, region.end, resno, dev->dev.name));
+	DBGC((KERN_ERR "  got res [%lx:%lx] bus [%lx:%lx] flags %lx for "
+	      "BAR %d of %s\n", res->start, res->end,
+	      region.start, region.end, res->flags,
+	      resno, dev->dev.name));
 
 	new = region.start | (res->flags & PCI_REGION_FLAG_MASK);
 	if (res->flags & IORESOURCE_IO)
