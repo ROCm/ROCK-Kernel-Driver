@@ -612,12 +612,11 @@ static void snd_complete_sync_urb(struct urb *urb, struct pt_regs *regs)
 
 /*
  * unlink active urbs.
- * return the number of active urbs.
  */
 static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 {
 	unsigned int i;
-	int alive, async;
+	int async;
 
 	subs->running = 0;
 
@@ -629,10 +628,8 @@ static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 	if (! async && in_interrupt())
 		return 0;
 
-	alive = 0;
 	for (i = 0; i < subs->nurbs; i++) {
 		if (test_bit(i, &subs->active_mask)) {
-			alive++;
 			if (! test_and_set_bit(i, &subs->unlink_mask)) {
 				struct urb *u = subs->dataurb[i].urb;
 				if (async)
@@ -646,7 +643,6 @@ static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 	if (subs->syncpipe) {
 		for (i = 0; i < SYNC_URBS; i++) {
 			if (test_bit(i+16, &subs->active_mask)) {
-				alive++;
  				if (! test_and_set_bit(i+16, &subs->unlink_mask)) {
 					struct urb *u = subs->syncurb[i].urb;
 					if (async)
@@ -658,7 +654,7 @@ static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 			}
 		}
 	}
-	return async ? alive : 0;
+	return 0;
 }
 
 
@@ -803,8 +799,8 @@ static void release_substream_urbs(snd_usb_substream_t *subs, int force)
 	int i;
 
 	/* stop urbs (to be sure) */
-	if (deactivate_urbs(subs, force, 1) > 0)
-		wait_clear_urbs(subs);
+	deactivate_urbs(subs, force, 1);
+	wait_clear_urbs(subs);
 
 	for (i = 0; i < MAX_URBS; i++)
 		release_urb_ctx(&subs->dataurb[i]);
@@ -1277,8 +1273,8 @@ static int snd_usb_pcm_prepare(snd_pcm_substream_t *substream)
 	subs->phase = 0;
 
 	/* clear urbs (to be sure) */
-	if (deactivate_urbs(subs, 0, 0) > 0)
-		wait_clear_urbs(subs);
+	deactivate_urbs(subs, 0, 1);
+	wait_clear_urbs(subs);
 
 	return 0;
 }
