@@ -33,6 +33,7 @@
 #include <linux/usb.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/device.h>
 
 #include <linux/ticable.h>
 #include "tiglusb.h"
@@ -49,6 +50,7 @@
 
 static tiglusb_t tiglusb[MAXTIGL];
 static int timeout = TIMAXTIME;	/* timeout in tenth of seconds     */
+static struct class_simple *tiglusb_class;
 
 /*---------- misc functions ------------------------------------------- */
 
@@ -336,7 +338,7 @@ tiglusb_probe (struct usb_interface *intf,
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	int minor = -1;
-	int i;
+	int i, err = 0;
 	ptiglusb_t s;
 
 	dbg ("probing vendor id 0x%x, device id 0x%x",
@@ -347,18 +349,23 @@ tiglusb_probe (struct usb_interface *intf,
 	 * the TIGL hardware, there's only 1 configuration.
 	 */
 
-	if (dev->descriptor.bNumConfigurations != 1)
-		return -ENODEV;
+	if (dev->descriptor.bNumConfigurations != 1) {
+		err = -ENODEV;
+		goto out;
+	}
 
 	if ((dev->descriptor.idProduct != 0xe001)
-	    && (dev->descriptor.idVendor != 0x451))
-		return -ENODEV;
+	    && (dev->descriptor.idVendor != 0x451)) {
+		err = -ENODEV;
+		goto out;
+	}
 
 	// NOTE:  it's already in this config, this shouldn't be needed.
 	// is this working around some hardware bug?
 	if (usb_reset_configuration (dev) < 0) {
 		err ("tiglusb_probe: reset_configuration failed");
-		return -ENODEV;
+		err = -ENODEV;
+		goto out;
 	}
 
 	/*
@@ -372,8 +379,10 @@ tiglusb_probe (struct usb_interface *intf,
 		}
 	}
 
-	if (minor == -1)
-		return -ENODEV;
+	if (minor == -1) {
+		err = -ENODEV;
+		goto out;
+	}
 
 	s = &tiglusb[minor];
 
@@ -383,9 +392,14 @@ tiglusb_probe (struct usb_interface *intf,
 	up (&s->mutex);
 	dbg ("bound to interface");
 
-	devfs_mk_cdev(MKDEV(TIUSB_MAJOR, TIUSB_MINOR) + s->minor,
+	class_simple_device_add(tiglusb_class, MKDEV(TIUSB_MAJOR, TIUSB_MINOR + s->minor),
+			NULL, "usb%d", s->minor);
+	err = devfs_mk_cdev(MKDEV(TIUSB_MAJOR, TIUSB_MINOR) + s->minor,
 			S_IFCHR | S_IRUGO | S_IWUGO,
 			"ticables/usb/%d", s->minor);
+
+	if (err)
+		goto out_class;
 
 	/* Display firmware version */
 	info ("firmware revision %i.%02x",
@@ -393,7 +407,13 @@ tiglusb_probe (struct usb_interface *intf,
 		dev->descriptor.bcdDevice & 0xff);
 
 	usb_set_intfdata (intf, s);
-	return 0;
+	err = 0;
+	goto out;
+
+out_class:
+	class_simple_device_remove(MKDEV(TIUSB_MAJOR, TIUSB_MINOR + s->minor));
+out:
+	return err;
 }
 
 static void
@@ -423,6 +443,7 @@ tiglusb_disconnect (struct usb_interface *intf)
 	s->dev = NULL;
 	s->opened = 0;
 
+	class_simple_device_remove(MKDEV(TIUSB_MAJOR, TIUSB_MINOR + s->minor));
 	devfs_remove("ticables/usb/%d", s->minor);
 
 	info ("device %d removed", s->minor);
@@ -473,7 +494,7 @@ static int __init
 tiglusb_init (void)
 {
 	unsigned u;
-	int result;
+	int result, err = 0;
 
 	/* initialize struct */
 	for (u = 0; u < MAXTIGL; u++) {
@@ -490,28 +511,41 @@ tiglusb_init (void)
 	/* register device */
 	if (register_chrdev (TIUSB_MAJOR, "tiglusb", &tiglusb_fops)) {
 		err ("unable to get major %d", TIUSB_MAJOR);
-		return -EIO;
+		err = -EIO;
+		goto out;
 	}
 
 	/* Use devfs, tree: /dev/ticables/usb/[0..3] */
 	devfs_mk_dir ("ticables/usb");
 
+	tiglusb_class = class_simple_create(THIS_MODULE, "tiglusb");
+	if (IS_ERR(tiglusb_class)) {
+		err = PTR_ERR(tiglusb_class);
+		goto out_chrdev;
+	}
 	/* register USB module */
 	result = usb_register (&tiglusb_driver);
 	if (result < 0) {
-		unregister_chrdev (TIUSB_MAJOR, "tiglusb");
-		return -1;
+		err = -1;
+		goto out_chrdev;
 	}
 
 	info (DRIVER_DESC ", version " DRIVER_VERSION);
 
-	return 0;
+	err = 0;
+	goto out;
+
+out_chrdev:
+	unregister_chrdev (TIUSB_MAJOR, "tiglusb");
+out:
+	return err;
 }
 
 static void __exit
 tiglusb_cleanup (void)
 {
 	usb_deregister (&tiglusb_driver);
+	class_simple_destroy(tiglusb_class);
 	devfs_remove("ticables/usb");
 	unregister_chrdev (TIUSB_MAJOR, "tiglusb");
 }
