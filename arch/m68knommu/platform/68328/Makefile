@@ -1,0 +1,17 @@
+#
+# Makefile for arch/m68knommu/platform/68328.
+#
+
+obj-$(CONFIG_M68328)	+= entry.o ints.o config.o
+obj-$(CONFIG_M68EZ328)	+= entry.o ints.o
+obj-$(CONFIG_M68VZ328)	+= entry.o ints.o
+
+ifeq ($(CONFIG_M68328),y)
+EXTRA_TARGETS := $(BOARD)/bootlogo.rh $(BOARD/crt0_$(MODEL).o
+endif
+
+include $(TOPDIR)/Rules.make
+
+$(obj)/$(BOARD)/bootlogo.rh: $(src)/bootlogo.h
+	perl $(src)/bootlogo.pl < $(src)/bootlogo.h > $(obj)/$(BOARD)/bootlogo.rh
+
