@@ -800,7 +800,7 @@ int sctp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 		associd = sinfo->sinfo_assoc_id;
 	}
 
-	SCTP_DEBUG_PRINTK("msg_len: %d, sinfo_flags: 0x%x\n",
+	SCTP_DEBUG_PRINTK("msg_len: %Zd, sinfo_flags: 0x%x\n",
 			  msg_len, sinfo_flags);
 
 	/* If MSG_EOF|MSG_ABORT is set, no data can be sent.  Disallow

@@ -123,7 +123,7 @@ extern int sctp_copy_local_addr_list(sctp_protocol_t *, sctp_bind_addr_t *,
  */
 extern int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb);
 extern int sctp_inet_listen(struct socket *sock, int backlog);
-extern int sctp_get_port(struct sock *sk, unsigned short snum);
+extern long sctp_get_port(struct sock *sk, unsigned short snum);
 extern void sctp_write_space(struct sock *sk);
 extern unsigned int sctp_poll(struct file *file, struct socket *sock,
 		poll_table *wait);
