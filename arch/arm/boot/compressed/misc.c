@@ -270,8 +270,6 @@ void flush_window(void)
 
 static void error(char *x)
 {
-	int ptr;
-
 	puts("\n\n");
 	puts(x);
 	puts("\n\n -- System halted");
