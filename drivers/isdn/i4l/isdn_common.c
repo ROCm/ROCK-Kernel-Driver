@@ -75,7 +75,8 @@ struct isdn_driver {
 	struct fsm_inst    fi;
 } driver;
 
-struct isdn_driver *drivers[ISDN_MAX_DRIVERS];
+static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
+static struct isdn_driver *drivers[ISDN_MAX_DRIVERS];
 
 int
 isdn_drv_queue_empty(int di, int ch)
@@ -108,7 +109,78 @@ isdn_drv_hdrlen(int di)
 	return drivers[di]->interface->hl_hdrlen;
 }
 
-static int isdn_add_channels(struct isdn_driver *, int, int, int);
+static int  isdn_add_channels(struct isdn_driver *, int, int, int);
+static void isdn_receive_skb_callback(int di, int ch, struct sk_buff *skb);
+static int  isdn_status_callback(isdn_ctrl * c);
+static void set_global_features(void);
+
+/*
+ * Register a new ISDN interface
+ */
+
+int
+register_isdn(isdn_if *iif)
+{
+	struct isdn_driver *drv;
+	unsigned long flags;
+	int drvidx;
+
+	if (dev->drivers >= ISDN_MAX_DRIVERS) {
+		printk(KERN_WARNING "register_isdn: Max. %d drivers supported\n",
+		       ISDN_MAX_DRIVERS);
+		goto fail;
+	}
+
+	drv = kmalloc(sizeof(*drv), GFP_KERNEL);
+	if (!drv) {
+		printk(KERN_WARNING "register_isdn: out of mem\n");
+		goto fail;
+	}
+	memset(drv, 0, sizeof(*drv));
+
+	drv->maxbufsize = iif->maxbufsize;
+	drv->stavail = 0;
+	drv->flags = DRV_FLAG_LOADED;
+	drv->online = 0;
+	drv->interface = iif;
+	drv->channels = 0;
+
+	spin_lock_irqsave(&drivers_lock, flags);
+	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++)
+		if (!drivers[drvidx])
+			break;
+
+	if (!strlen(iif->id))
+		sprintf(iif->id, "line%d", drvidx);
+
+	strcpy(dev->drvid[drvidx], iif->id);
+
+	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++)
+		if (strcmp(iif->id, dev->drvid[drvidx]) == 0)
+			goto fail_unlock;
+
+	if (isdn_add_channels(drv, drvidx, iif->channels, 0))
+		goto fail_unlock;
+
+	drivers[drvidx] = drv;
+	spin_unlock_irqrestore(&drivers_lock, flags);
+
+	iif->channels = drvidx;
+	iif->rcvcallb_skb = isdn_receive_skb_callback;
+	iif->statcallb = isdn_status_callback;
+
+	isdn_info_update();
+	dev->drivers++;
+	set_global_features();
+
+	return 1;
+	
+ fail_unlock:
+	spin_unlock_irqrestore(&drivers_lock, flags);
+	kfree(drv);
+ fail:
+	return 0;
+}
 
 /* ====================================================================== */
 
@@ -120,7 +192,6 @@ static isdn_divert_if *divert_if; /* = NULL */
 
 spinlock_t stat_lock = SPIN_LOCK_UNLOCKED;
 
-static void set_global_features(void);
 static void isdn_register_devfs(int);
 static void isdn_unregister_devfs(int);
 static int isdn_wildmat(char *s, char *p);
@@ -1869,61 +1940,6 @@ EXPORT_SYMBOL(register_isdn);
 EXPORT_SYMBOL(isdn_ppp_register_compressor);
 EXPORT_SYMBOL(isdn_ppp_unregister_compressor);
 #endif
-
-int
-register_isdn(isdn_if * i)
-{
-	struct isdn_driver *d;
-	int j;
-	ulong flags;
-	int drvidx;
-
-	if (dev->drivers >= ISDN_MAX_DRIVERS) {
-		printk(KERN_WARNING "register_isdn: Max. %d drivers supported\n",
-		       ISDN_MAX_DRIVERS);
-		return 0;
-	}
-	if (!i->writebuf_skb) {
-		printk(KERN_WARNING "register_isdn: No write routine given.\n");
-		return 0;
-	}
-	if (!(d = kmalloc(sizeof(driver), GFP_KERNEL))) {
-		printk(KERN_WARNING "register_isdn: Could not alloc driver-struct\n");
-		return 0;
-	}
-	memset((char *) d, 0, sizeof(driver));
-
-	d->maxbufsize = i->maxbufsize;
-	d->stavail = 0;
-	d->flags = DRV_FLAG_LOADED;
-	d->online = 0;
-	d->interface = i;
-	d->channels = 0;
-	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++)
-		if (!drivers[drvidx])
-			break;
-	if (isdn_add_channels(d, drvidx, i->channels, 0)) {
-		kfree(d);
-		return 0;
-	}
-	i->channels = drvidx;
-	i->rcvcallb_skb = isdn_receive_skb_callback;
-	i->statcallb = isdn_status_callback;
-	if (!strlen(i->id))
-		sprintf(i->id, "line%d", drvidx);
-	save_flags(flags);
-	cli();
-	for (j = 0; j < drvidx; j++)
-		if (!strcmp(i->id, dev->drvid[j]))
-			sprintf(i->id, "line%d", drvidx);
-	drivers[drvidx] = d;
-	strcpy(dev->drvid[drvidx], i->id);
-	isdn_info_update();
-	dev->drivers++;
-	set_global_features();
-	restore_flags(flags);
-	return 1;
-}
 
 int
 isdn_slot_driver(int sl)
