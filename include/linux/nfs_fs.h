@@ -92,7 +92,6 @@ struct nfs_inode {
 	/*
 	 * The 64bit 'inode number'
 	 */
-	__u64 fsid;
 	__u64 fileid;
 
 	/*
@@ -130,6 +129,12 @@ struct nfs_inode {
 	unsigned long		attrtimeo_timestamp;
 
 	/*
+	 * Timestamp that dates the change made to read_cache_mtime.
+	 * This is of use for dentry revalidation
+	 */
+	unsigned long		cache_mtime_jiffies;
+
+	/*
 	 * This is the cookie verifier used for NFSv3 readdir
 	 * operations
 	 */
@@ -147,11 +152,6 @@ struct nfs_inode {
 				ndirty,
 				ncommit,
 				npages;
-
-	/* Flush daemon info */
-	struct inode		*hash_next,
-				*hash_prev;
-	unsigned long		nextscan;
 
 	/* Credentials for shared mmap */
 	struct rpc_cred		*mm_cred;
@@ -183,6 +183,7 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 #define NFS_CONGESTED(inode)		(RPC_CONGESTED(NFS_CLIENT(inode)))
 #define NFS_COOKIEVERF(inode)		(NFS_I(inode)->cookieverf)
 #define NFS_READTIME(inode)		(NFS_I(inode)->read_cache_jiffies)
+#define NFS_MTIME_UPDATE(inode)		(NFS_I(inode)->cache_mtime_jiffies)
 #define NFS_CACHE_CTIME(inode)		(NFS_I(inode)->read_cache_ctime)
 #define NFS_CACHE_MTIME(inode)		(NFS_I(inode)->read_cache_mtime)
 #define NFS_CACHE_ISIZE(inode)		(NFS_I(inode)->read_cache_isize)
@@ -206,7 +207,6 @@ do { \
 #define NFS_NEW(inode)			(NFS_FLAGS(inode) & NFS_INO_NEW)
 
 #define NFS_FILEID(inode)		(NFS_I(inode)->fileid)
-#define NFS_FSID(inode)			(NFS_I(inode)->fsid)
 
 /* Inode Flags */
 #define NFS_USE_READDIRPLUS(inode)	((NFS_FLAGS(inode) & NFS_INO_ADVISE_RDPLUS) ? 1 : 0)

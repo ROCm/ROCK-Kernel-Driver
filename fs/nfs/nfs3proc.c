@@ -80,7 +80,8 @@ nfs3_proc_lookup(struct inode *dir, struct qstr *name,
 		status = rpc_call(NFS_CLIENT(dir), NFS3PROC_GETATTR,
 			 fhandle, fattr, 0);
 	dprintk("NFS reply lookup: %d\n", status);
-	nfs_refresh_inode(dir, &dir_attr);
+	if (status >= 0)
+		status = nfs_refresh_inode(dir, &dir_attr);
 	return status;
 }
 
