@@ -358,7 +358,7 @@ static int audit_filter_rules(struct task_struct *tsk,
 		case AUDIT_INODE:
 			if (ctx) {
 				for (j = 0; j < ctx->name_count; j++) {
-					if (MINOR(ctx->names[j].ino)==value) {
+					if (ctx->names[j].ino == value) {
 						++result;
 						break;
 					}
