@@ -16,6 +16,7 @@
 #include <linux/if_arp.h>
 #include <linux/if_tr.h>
 #include <linux/netdevice.h>
+#include <linux/trdevice.h>
 #include <linux/skbuff.h>
 #include <net/llc.h>
 #include <net/llc_pdu.h>
