@@ -23,15 +23,14 @@ snd-rtctimer-objs := rtctimer.o
 snd-hwdep-objs    := hwdep.o
 
 obj-$(CONFIG_SND) += snd.o
-ifeq ($(subst m,y,$(CONFIG_RTC)),y)
-  obj-$(CONFIG_SND_RTCTIMER) += snd-timer.o
-  obj-$(CONFIG_SND_RTCTIMER) += snd-rtctimer.o
-endif
-obj-$(CONFIG_SND_HWDEP) += snd-hwdep.o
+obj-$(CONFIG_SND_HWDEP)		+= snd-hwdep.o
+obj-$(CONFIG_SND_TIMER)		+= snd-timer.o
+obj-$(CONFIG_SND_RTCTIMER)	+= snd-rtctimer.o
+obj-$(CONFIG_SND_PCM)		+= snd-pcm.o snd-page-alloc.o
+obj-$(CONFIG_SND_RAWMIDI)	+= snd-rawmidi.o
 
-obj-$(CONFIG_SND_MIXER_OSS) += oss/
-obj-$(CONFIG_SND_PCM_OSS) += snd-pcm.o snd-timer.o snd-page-alloc.o oss/
-obj-$(CONFIG_SND_SEQUENCER) += snd-timer.o seq/
+obj-$(CONFIG_SND_OSSEMUL)	+= oss/
+obj-$(CONFIG_SND_SEQUENCER)	+= seq/
 obj-$(CONFIG_SND_BIT32_EMUL) += ioctl32/
 
 # Toplevel Module Dependency
