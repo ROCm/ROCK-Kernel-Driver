@@ -37,8 +37,11 @@ ENTRY(exception_handling_table)
 	.long	exception_error	! address error load
 	.long	exception_error	! address error store	/* 100 */
 #endif
-
+#if defined(CONFIG_SH_FPU)
 	.long	do_fpu_error		/* 120 */
+#else
+	.long	exception_error		/* 120 */
+#endif
 	.long	exception_error		/* 140 */
 	.long	system_call	! Unconditional Trap	 /* 160 */
 	.long	exception_error	! reserved_instruction (filled by trap_init) /* 180 */
@@ -126,8 +129,13 @@ ENTRY(interrupt_table)
 	.long	exception_error			! 46
 	.long	exception_error			! 47
 #endif
+#if defined(CONFIG_SH_FPU)
 	.long	do_fpu_state_restore	! 48	/* 800 */
 	.long	do_fpu_state_restore	! 49	/* 820 */
+#else
+	.long	exception_error
+	.long	exception_error
+#endif
 #if defined(CONFIG_CPU_SUBTYPE_SH7751)
 	.long	exception_error			/* 840 */
 	.long	exception_error
@@ -217,6 +225,66 @@ ENTRY(interrupt_table)
 	.long	exception_error
 	.long	do_IRQ	! ADC	adi
 	.long	do_IRQ	! CMT	cmti	/* FA0 */
+#elif defined(CONFIG_CPU_SUBTYPE_SH73180)
+	.long	do_IRQ	!  50 0x840
+	.long	do_IRQ	!  51 0x860
+	.long	do_IRQ	!  52 0x880
+	.long	do_IRQ	!  53 0x8a0
+	.long	do_IRQ	!  54 0x8c0
+	.long	do_IRQ	!  55 0x8e0
+	.long	do_IRQ	!  56 0x900
+	.long	do_IRQ	!  57 0x920
+	.long	do_IRQ	!  58 0x940
+	.long	do_IRQ	!  59 0x960
+	.long	do_IRQ	!  60 0x980
+	.long	do_IRQ	!  61 0x9a0
+	.long	do_IRQ	!  62 0x9c0
+	.long	do_IRQ	!  63 0x9e0
+	.long	do_IRQ	!  64 0xa00
+	.long	do_IRQ	!  65 0xa20
+	.long	do_IRQ	!  66 0xa40
+	.long	do_IRQ	!  67 0xa60
+	.long	do_IRQ	!  68 0xa80
+	.long	do_IRQ	!  69 0xaa0
+	.long	do_IRQ	!  70 0xac0
+	.long	do_IRQ	!  71 0xae0
+	.long	do_IRQ	!  72 0xb00
+	.long	do_IRQ	!  73 0xb20
+	.long	do_IRQ	!  74 0xb40
+	.long	do_IRQ	!  75 0xb60
+	.long	do_IRQ	!  76 0xb80
+	.long	do_IRQ	!  77 0xba0
+	.long	do_IRQ	!  78 0xbc0
+	.long	do_IRQ	!  79 0xbe0
+	.long	do_IRQ	!  80 0xc00
+	.long	do_IRQ	!  81 0xc20
+	.long	do_IRQ	!  82 0xc40
+	.long	do_IRQ	!  83 0xc60
+	.long	do_IRQ	!  84 0xc80
+	.long	do_IRQ	!  85 0xca0
+	.long	do_IRQ	!  86 0xcc0
+	.long	do_IRQ	!  87 0xce0
+	.long	do_IRQ	!  88 0xd00
+	.long	do_IRQ	!  89 0xd20
+	.long	do_IRQ	!  90 0xd40
+	.long	do_IRQ	!  91 0xd60
+	.long	do_IRQ	!  92 0xd80
+	.long	do_IRQ	!  93 0xda0
+	.long	do_IRQ	!  94 0xdc0
+	.long	do_IRQ	!  95 0xde0
+	.long	do_IRQ	!  96 0xe00
+	.long	do_IRQ	!  97 0xe20
+	.long	do_IRQ	!  98 0xe40
+	.long	do_IRQ	!  99 0xe60
+	.long	do_IRQ	! 100 0xe80
+	.long	do_IRQ	! 101 0xea0
+	.long	do_IRQ	! 102 0xec0
+	.long	do_IRQ	! 103 0xee0
+	.long	do_IRQ	! 104 0xf00
+	.long	do_IRQ	! 105 0xf20
+	.long	do_IRQ	! 106 0xf40
+	.long	do_IRQ	! 107 0xf60
+	.long	do_IRQ	! 108 0xf80
 #elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
 	.long	exception_error			!  50 0x840
 	.long	exception_error			!  51 0x860

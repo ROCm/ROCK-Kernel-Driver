@@ -199,7 +199,7 @@ void exit_thread(void)
 
 void flush_thread(void)
 {
-#if defined(CONFIG_CPU_SH4)
+#if defined(CONFIG_SH_FPU)
 	struct task_struct *tsk = current;
 	struct pt_regs *regs = (struct pt_regs *)
 				((unsigned long)tsk->thread_info
@@ -222,7 +222,7 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 {
 	int fpvalid = 0;
 
-#if defined(CONFIG_CPU_SH4)
+#if defined(CONFIG_SH_FPU)
 	struct task_struct *tsk = current;
 
 	fpvalid = tsk->used_math;
@@ -259,7 +259,7 @@ dump_task_fpu (struct task_struct *tsk, elf_fpregset_t *fpu)
 {
 	int fpvalid = 0;
 
-#if defined(CONFIG_CPU_SH4)
+#if defined(CONFIG_SH_FPU)
 	fpvalid = tsk->used_math;
 	if (fpvalid) {
 		struct pt_regs *regs = (struct pt_regs *)
@@ -281,7 +281,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 		struct task_struct *p, struct pt_regs *regs)
 {
 	struct pt_regs *childregs;
-#if defined(CONFIG_CPU_SH4)
+#if defined(CONFIG_SH_FPU)
 	struct task_struct *tsk = current;
 
 	unlazy_fpu(tsk, regs);
@@ -363,7 +363,7 @@ ubc_set_tracing(int asid, unsigned long pc)
  */
 struct task_struct *__switch_to(struct task_struct *prev, struct task_struct *next)
 {
-#if defined(CONFIG_CPU_SH4)
+#if defined(CONFIG_SH_FPU)
 	struct pt_regs *regs = (struct pt_regs *)
 				((unsigned long)prev->thread_info
 				 + THREAD_SIZE - sizeof(struct pt_regs)
