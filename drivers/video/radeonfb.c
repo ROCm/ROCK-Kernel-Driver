@@ -361,8 +361,6 @@ struct radeonfb_info {
 	unsigned char *EDID;
 	unsigned char *bios_seg;
 
-	struct display disp; /* Will disappear */
-
 	u32 pseudo_palette[17];
 	struct { u8 red, green, blue, pad; } palette[256];
 
@@ -1289,7 +1287,7 @@ static int __devinit radeon_init_disp (struct radeonfb_info *rinfo)
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
 	var.activate = FB_ACTIVATE_NOW;
-	gen_set_var(&var, -1, info);
+	fb_set_var(&var, info);
         return 0;
 }
 
@@ -1508,7 +1506,7 @@ static int radeonfb_pan_display (struct fb_var_screeninfo *var,
 
 
 static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
-                           unsigned long arg, int con, struct fb_info *info)
+                           unsigned long arg, struct fb_info *info)
 {
         struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
 	unsigned int tmp;
@@ -1872,14 +1870,26 @@ static int radeonfb_set_par (struct fb_info *info)
 	newmode.crtc_pitch |= (newmode.crtc_pitch << 16);
 
 #if defined(__BIG_ENDIAN)
-	newmode.surface_cntl = SURF_TRANSLATION_DIS;
+	/*
+	 * It looks like recent chips have a problem with SURFACE_CNTL,
+	 * setting SURF_TRANSLATION_DIS completely disables the
+	 * swapper as well, so we leave it unset now.
+	 */
+	newmode.surface_cntl = 0;
+
+	/* Setup swapping on both apertures, though we currently
+	 * only use aperture 0, enabling swapper on aperture 1
+	 * won't harm
+	 */
 	switch (mode->bits_per_pixel) {
 		case 16:
 			newmode.surface_cntl |= NONSURF_AP0_SWP_16BPP;
+			newmode.surface_cntl |= NONSURF_AP1_SWP_16BPP;
 			break;
 		case 24:	
 		case 32:
 			newmode.surface_cntl |= NONSURF_AP0_SWP_32BPP;
+			newmode.surface_cntl |= NONSURF_AP1_SWP_32BPP;
 			break;
 	}
 #endif
@@ -1934,7 +1944,12 @@ static int radeonfb_set_par (struct fb_info *info)
 		newmode.ppll_div_3 = rinfo->fb_div | (post_div->bitvalue << 16);
 	}
 	newmode.vclk_ecp_cntl = rinfo->init_state.vclk_ecp_cntl;
-	
+
+#ifdef CONFIG_ALL_PPC
+	/* Gross hack for iBook with M7 until I find out a proper fix */
+	if (machine_is_compatible("PowerBook4,3") && rinfo->arch == RADEON_M7)
+		newmode.ppll_div_3 = 0x000600ad;
+#endif /* CONFIG_ALL_PPC */	
 
 	RTRACE("post div = 0x%x\n", rinfo->post_div);
 	RTRACE("fb_div = 0x%x\n", rinfo->fb_div);
@@ -2206,12 +2221,8 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 
 	info = &rinfo->info;
 
-	// XXX ???
-	strncpy (info->modename, rinfo->name, sizeof(info->modename));
-	
 	info->currcon = -1;
 	info->par = rinfo;
-	info->disp = &rinfo->disp;
 	info->pseudo_palette = rinfo->pseudo_palette;
         info->node = NODEV;
         info->flags = FBINFO_FLAG_DEFAULT;
@@ -2273,7 +2284,12 @@ static int radeon_set_backlight_enable(int on, int level, void *data)
 	unsigned int lvds_gen_cntl = INREG(LVDS_GEN_CNTL);
 	int* conv_table;
 
-	if (rinfo->arch == RADEON_M7)
+	/* Pardon me for that hack... maybe some day we can figure
+	 * out in what direction backlight should work on a given
+	 * panel ?
+	 */
+	if ((rinfo->arch == RADEON_M7 || rinfo->arch == RADEON_M9)
+		&& !machine_is_compatible("PowerBook4,3"))
 		conv_table = backlight_conv_m7;
 	else
 		conv_table = backlight_conv_m6;

@@ -246,41 +246,30 @@ static __inline__ int __get_order(unsigned long size)
 #endif
 
 /*
- *  We use our new error handling code if the kernel version is 2.5.1 or newer.
+ *  We use our new error handling code if the kernel version is 2.4.18 or newer.
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,18)
         #define MPT_SCSI_USE_NEW_EH
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
-#define mptscsih_lock(iocp, flags) \
-                spin_lock_irqsave(&iocp->FreeQlock, flags)
-#else
-#define mptscsih_lock(iocp, flags) \
-({	save_flags(flags); \
-	cli(); \
-})
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
-#define mptscsih_unlock(iocp, flags) \
-                spin_unlock_irqrestore(&iocp->FreeQlock, flags)
-#else
-#define mptscsih_unlock(iocp, flags)  restore_flags(flags);
-#endif
-
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
-#define mpt_work_struct work_struct 
+#define mpt_work_struct work_struct
 #define MPT_INIT_WORK(_task, _func, _data) INIT_WORK(_task, _func, _data)
 #else
-#define mpt_work_struct tq_struct 
+#define mpt_work_struct tq_struct
 #define MPT_INIT_WORK(_task, _func, _data) \
 ({	(_task)->sync = 0; \
 	(_task)->routine = (_func); \
 	(_task)->data = (void *) (_data); \
 })
 #endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
+#define mptscsih_sync_irq(_irq) synchronize_irq(_irq)
+#else
+#define mptscsih_sync_irq(_irq) synchronize_irq()
+#endif
+
 
 
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

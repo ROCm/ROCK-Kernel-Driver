@@ -8,6 +8,9 @@
 #include <linux/string.h>
 #include <asm/byteorder.h>
 
+struct statfs;
+
+
 #define SECTOR_SIZE	512		/* sector size (bytes) */
 #define SECTOR_BITS	9		/* log2(SECTOR_SIZE) */
 #define MSDOS_DPB	(MSDOS_DPS)	/* dir entries per block */

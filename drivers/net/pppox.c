@@ -40,25 +40,18 @@ static struct pppox_proto *proto[PX_MAX_PROTO+1];
 
 int register_pppox_proto(int proto_num, struct pppox_proto *pp)
 {
-	if (proto_num < 0 || proto_num > PX_MAX_PROTO) {
+	if (proto_num < 0 || proto_num > PX_MAX_PROTO)
 		return -EINVAL;
-	}
-
 	if (proto[proto_num])
 		return -EALREADY;
-
-	MOD_INC_USE_COUNT;
-
 	proto[proto_num] = pp;
 	return 0;
 }
 
 void unregister_pppox_proto(int proto_num)
 {
-	if (proto_num >= 0 && proto_num <= PX_MAX_PROTO) {
+	if (proto_num >= 0 && proto_num <= PX_MAX_PROTO)
 		proto[proto_num] = NULL;
-		MOD_DEC_USE_COUNT;
-	}
 }
 
 void pppox_unbind_sock(struct sock *sk)

@@ -17,6 +17,7 @@
 #include <linux/unistd.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
+#include <linux/vfs.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>

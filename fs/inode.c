@@ -1133,9 +1133,8 @@ void remove_dquot_ref(struct super_block *sb, int type)
 
 	if (!sb->dq_op)
 		return;	/* nothing to do */
-	/* We have to be protected against other CPUs */
-	lock_kernel();		/* This lock is for quota code */
 	spin_lock(&inode_lock);	/* This lock is for inodes code */
+	/* We don't have to lock against quota code - test IS_QUOTAINIT is just for speedup... */
  
 	list_for_each(act_head, &inode_in_use) {
 		inode = list_entry(act_head, struct inode, i_list);
@@ -1158,7 +1157,6 @@ void remove_dquot_ref(struct super_block *sb, int type)
 			remove_inode_dquot_ref(inode, type, &tofree_head);
 	}
 	spin_unlock(&inode_lock);
-	unlock_kernel();
 
 	put_dquot_list(&tofree_head);
 }

@@ -18,6 +18,7 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/buffer_head.h>
+#include <linux/vfs.h>
 
 #include <asm/bitops.h>
 #include <asm/uaccess.h>

@@ -20,6 +20,9 @@
 #include <linux/ext3_fs_i.h>
 #include <linux/ext3_fs_sb.h>
 
+
+struct statfs;
+
 /*
  * The second extended filesystem constants/structures
  */

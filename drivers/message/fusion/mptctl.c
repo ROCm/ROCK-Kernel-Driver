@@ -34,7 +34,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptctl.c,v 1.61 2002/10/17 20:15:57 pdelaney Exp $
+ *  $Id: mptctl.c,v 1.63 2002/12/03 21:26:33 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -2911,9 +2911,9 @@ int __init mptctl_init(void)
 #endif		/*} sparc */
 
 	/* Register this device */
-	if (misc_register(&mptctl_miscdev) == -1) {
+	err = misc_register(&mptctl_miscdev);
+	if (err < 0) {
 		printk(KERN_ERR MYNAM ": Can't register misc device [minor=%d].\n", MPT_MINOR);
-		err = -EBUSY;
 		goto out_fail;
 	}
 	printk(KERN_INFO MYNAM ": Registered with Fusion MPT base driver\n");

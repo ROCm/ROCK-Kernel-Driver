@@ -50,6 +50,7 @@
 #include <linux/file.h>
 #include <linux/tty.h>
 #include <linux/security.h>
+#include <linux/vfs.h>
 #include <asm/uaccess.h>
 
 /*

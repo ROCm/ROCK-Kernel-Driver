@@ -4,7 +4,7 @@
  */
 
 #include <linux/pagemap.h>
-#include <linux/smp_lock.h>
+#include <linux/vfs.h>
 
 int simple_getattr(struct vfsmount *mnt, struct dentry *dentry,
 		   struct kstat *stat)

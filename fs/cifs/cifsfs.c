@@ -31,6 +31,7 @@
 #include <linux/version.h>
 #include <linux/list.h>
 #include <linux/seq_file.h>
+#include <linux/vfs.h>
 #include "cifsfs.h"
 #include "cifspdu.h"
 #define DECLARE_GLOBALS_HERE

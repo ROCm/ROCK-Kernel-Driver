@@ -39,7 +39,7 @@ __END__;
    MSBit to LSBit = left to right.
  */
 
-#include "font.h"
+#include <linux/font.h>
 
 #define FONTDATAMAX 1536
 

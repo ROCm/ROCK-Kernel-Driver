@@ -1,7 +1,7 @@
 /*
- * linux/drivers/video/sti/stifb.c - 
- * Frame buffer driver for HP workstations with STI (standard text interface) 
- * video firmware.
+ * linux/drivers/video/stifb.c - 
+ * Low level Frame buffer driver for HP workstations with 
+ * STI (standard text interface) video firmware.
  *
  * Copyright (C) 2001-2002 Helge Deller <deller@gmx.de>
  * Portions Copyright (C) 2001 Thomas Bogendoerfer <tsbogend@alpha.franken.de>
@@ -40,10 +40,9 @@
 
 /* TODO:
  *	- remove the static fb_info to support multiple cards
- *	- remove the completely untested 1bpp mode
+ *	- 1bpp mode is completely untested
  *	- add support for h/w acceleration
  *	- add hardware cursor
- *	-
  */
 
 
@@ -59,30 +58,23 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/mm.h>
-#include <linux/tty.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
 #include <linux/init.h>
-#include <linux/selection.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
-
-#include <video/fbcon.h>
-#include <video/fbcon-cfb8.h>
-#include <video/fbcon-cfb32.h>
 
 #include <asm/grfioctl.h>	/* for HP-UX compatibility */
 
 #include "sticore.h"
 
+/* REGION_BASE(fb_info, index) returns the virtual address for region <index> */
 #ifdef __LP64__
-/* return virtual address */
-#define REGION_BASE(fb_info, index) \
+  #define REGION_BASE(fb_info, index) \
 	(fb_info->sti->glob_cfg->region_ptrs[index] | 0xffffffff00000000)
 #else
-/* return virtual address */
-#define REGION_BASE(fb_info, index) \
+  #define REGION_BASE(fb_info, index) \
 	fb_info->sti->glob_cfg->region_ptrs[index]
 #endif
 
@@ -117,7 +109,6 @@ struct stifb_info {
 	ngle_rom_t ngle_rom;
 	struct sti_struct *sti;
 	int deviceSpecificConfig;
-	struct display disp;
 };
 
 static int stifb_force_bpp[MAX_STI_ROMS] = {0, };
@@ -901,7 +892,11 @@ stifb_setcolreg(u_int regno, u_int red, u_int green,
 
 	if (regno >= 256)  /* no. of hw registers */
 		return 1;
-	
+
+	red   >>= 8;
+	green >>= 8;
+	blue  >>= 8;
+
 	START_IMAGE_COLORMAP_ACCESS(fb);
 	
 	if (fb->info.var.grayscale) {
@@ -935,53 +930,6 @@ stifb_setcolreg(u_int regno, u_int red, u_int green,
 
 	return 0;
 }
-
-#if 0
-static void
-stifb_loadcmap(struct stifb_info *fb)
-{
-	u32 color;
-	int i;
-
-	if (!fb->cmap_reload)
-		return;
-
-	START_IMAGE_COLORMAP_ACCESS(fb);
-	for (i = 0; i < 256; i++) {
-		if (fb->info.var.bits_per_pixel > 8) {
-			color = (i << 16) | (i << 8) | i;
-		} else {
-			if (fb->info.var.grayscale) {
-				/* gray = 0.30*R + 0.59*G + 0.11*B */
-				color = ((fb->palette[i].red * 77) +
-					 (fb->palette[i].green * 151) +
-					 (fb->palette[i].blue * 28)) >> 8;
-			} else {
-				color = ((fb->palette[i].red << 16) |
-					 (fb->palette[i].green << 8) |
-					 (fb->palette[i].blue));
-			}
-		}
-		WRITE_IMAGE_COLOR(fb, i, color);
-	}
-	if (fb->id == S9000_ID_HCRX) {
-		NgleLutBltCtl lutBltCtl;
-
-		lutBltCtl = setHyperLutBltCtl(fb,
-				0,	/* Offset w/i LUT */
-				256);	/* Load entire LUT */
-		NGLE_BINC_SET_SRCADDR(fb,
-				NGLE_LONG_FB_ADDRESS(0, 0x100, 0)); 
-				/* 0x100 is same as used in WRITE_IMAGE_COLOR() */
-		START_COLORMAPLOAD(fb, lutBltCtl.all);
-		SETUP_FB(fb);
-	} else {
-		/* cleanup colormap hardware */
-		FINISH_IMAGE_COLORMAP_ACCESS(fb);
-	}
-	fb->cmap_reload = 0;
-}
-#endif
 
 static int
 stifb_blank(int blank_mode, struct fb_info *info)
@@ -1075,32 +1023,24 @@ stifb_init_display(struct stifb_info *fb)
 
 static struct fb_ops stifb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= stifb_setcolreg,
-	/* .fb_pan_display = stifb_pan_display, */
 	.fb_blank	= stifb_blank,
-
-	/*
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
-	.fb_imageblit	= cfb_imageblit, 
-	*/
+	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor      = soft_cursor,
 };
 
 
-    /*
-     *  Initialization
-     */
+/*
+ *  Initialization
+ */
 
 int __init
 stifb_init_fb(struct sti_struct *sti, int force_bpp)
 {
 	struct fb_fix_screeninfo *fix;
 	struct fb_var_screeninfo *var;
-	struct display *disp;
-	struct display_switch *dispsw;
 	struct stifb_info *fb;
 	struct fb_info *info;
 	unsigned long sti_rom_address;
@@ -1119,8 +1059,6 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	memset(fb, 0, sizeof(*fb));
 	fix = &info->fix;
 	var = &info->var;
-	disp = &fb->disp;
-	info->disp = &fb->disp;
 
 	fb->sti = sti;
 	/* store upper 32bits of the graphics id */
@@ -1234,30 +1172,22 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	    case 1:
 		fix->type = FB_TYPE_PLANES;	/* well, sort of */
 		fix->visual = FB_VISUAL_MONO10;
-		dispsw = &fbcon_sti;
 		break;
-#ifdef FBCON_HAS_CFB8		
 	    case 8:
 		fix->type = FB_TYPE_PACKED_PIXELS;
 		fix->visual = FB_VISUAL_PSEUDOCOLOR;
-	 	dispsw = &fbcon_cfb8;
 		var->red.length = var->green.length = var->blue.length = 8;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB32
 	    case 32:
 		fix->type = FB_TYPE_PACKED_PIXELS;
 		fix->visual = FB_VISUAL_TRUECOLOR;
-		dispsw = &fbcon_cfb32;
 		var->red.length = var->green.length = var->blue.length = var->transp.length = 8;
 		var->blue.offset = 0;
 		var->green.offset = 8;
 		var->red.offset = 16;
 		var->transp.offset = 24;
 		break;
-#endif
 	    default:
-		dispsw = &fbcon_dummy;
 		break;
 	}
 	
@@ -1265,22 +1195,16 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	var->yres = var->yres_virtual = yres;
 	var->bits_per_pixel = bpp;
 
-	strcpy(info->modename, "stifb");
+	strcpy(fix->id, "stifb");
 	info->node = NODEV;
 	info->fbops = &stifb_ops;
 	info->screen_base = (void*) REGION_BASE(fb,1);
-	info->disp = disp;
-	info->changevar = NULL;
-	info->switch_con = gen_switch;
-	info->updatevar = &gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->currcon = -1;
 
 	/* This has to been done !!! */
 	fb_alloc_cmap(&info->cmap, 256, 0);
 	stifb_init_display(fb);
-	gen_set_disp(-1, info);
-	disp->dispsw = dispsw;
 
 	if (!request_mem_region(fix->smem_start, fix->smem_len, "stifb")) {
 		printk(KERN_ERR "stifb: cannot reserve fb region 0x%04lx-0x%04lx\n",
@@ -1297,13 +1221,15 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 	if (register_framebuffer(&fb->info) < 0)
 		goto out_err3;
 
+	sti->info = info; /* save for unregister_framebuffer() */
+
 	printk(KERN_INFO 
 	    "fb%d: %s %dx%d-%d frame buffer device, id: %04x, mmio: 0x%04lx\n",
 		minor(fb->info.node), 
-		fb->info.modename,
-		disp->var.xres, 
-		disp->var.yres,
-		disp->var.bits_per_pixel,
+		fix->id,
+		var->xres, 
+		var->yres,
+		var->bits_per_pixel,
 		fb->id, 
 		fix->mmio_start);
 
@@ -1315,6 +1241,7 @@ out_err3:
 out_err2:
 	release_mem_region(fix->smem_start, fix->smem_len);
 out_err1:
+	fb_dealloc_cmap(&info->cmap);
 	kfree(fb);
 	return -ENXIO;
 }
@@ -1324,7 +1251,6 @@ stifb_init(void)
 {
 	struct sti_struct *sti;
 	int i;
-	
 	
 	if (sti_init_roms() == NULL)
 		return -ENXIO; /* no STI cards available */
@@ -1346,7 +1272,17 @@ stifb_init(void)
 static void __exit
 stifb_cleanup(void)
 {
-	// unregister_framebuffer(); 
+	struct sti_struct *sti;
+	int i;
+	
+	for (i = 0; i < MAX_STI_ROMS; i++) {
+		sti = sti_get_rom(i);
+		if (!sti)
+			break;
+		if (sti->info)
+			unregister_framebuffer(sti->info);
+		sti->info = NULL;
+	}
 }
 
 int __init

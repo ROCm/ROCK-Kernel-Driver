@@ -29,6 +29,7 @@
 #include <linux/string.h>
 #include <asm/uaccess.h>
 #include <linux/vmalloc.h>
+#include <linux/vfs.h>
 
 #include <linux/coda.h>
 #include <linux/coda_linux.h>

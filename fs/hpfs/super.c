@@ -11,6 +11,7 @@
 #include "hpfs_fn.h"
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/vfs.h>
 
 /* Mark the filesystem dirty, so that chkdsk checks it when os/2 booted */
 

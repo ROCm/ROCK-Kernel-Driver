@@ -27,6 +27,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include <linux/vfs.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 

@@ -74,7 +74,7 @@ static char *mda_type_name;
 
 /* console information */
 
-static int	mda_first_vc = 13;
+static int	mda_first_vc = 1;
 static int	mda_last_vc  = 16;
 
 static struct vc_data	*mda_display_fg = NULL;
@@ -604,28 +604,22 @@ const struct consw mda_con = {
 	.con_invert_region =	mdacon_invert_region,
 };
 
-void __init mda_console_init(void)
+int __init mda_console_init(void)
 {
 	if (mda_first_vc > mda_last_vc)
-		return;
+		return 1;
 
 	take_over_console(&mda_con, mda_first_vc-1, mda_last_vc-1, 0);
-}
-
-#ifdef MODULE
-
-MODULE_LICENSE("GPL");
-
-int init_module(void)
-{
-	mda_console_init();
-
 	return 0;
 }
 
-void cleanup_module(void)
+void __exit mda_console_exit(void)
 {
 	give_up_console(&mda_con);
 }
 
-#endif
+module_init(mda_console_init);
+module_exit(mda_console_exit);
+
+MODULE_LICENSE("GPL");
+
