@@ -471,6 +471,7 @@ EXPORT_SYMBOL_GPL(idle_cpu);
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
 #endif
 EXPORT_SYMBOL(jiffies);
+EXPORT_SYMBOL(jiffies_64);
 EXPORT_SYMBOL(xtime);
 EXPORT_SYMBOL(do_gettimeofday);
 EXPORT_SYMBOL(do_settimeofday);

@@ -3,6 +3,7 @@ OUTPUT_FORMAT("elf64-sparc", "elf64-sparc", "elf64-sparc")
 OUTPUT_ARCH(sparc:v9a)
 ENTRY(_start)
 
+jiffies = jiffies_64;
 SECTIONS
 {
   swapper_pmd_dir = 0x0000000000402000;

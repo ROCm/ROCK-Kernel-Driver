@@ -3,6 +3,7 @@
 OUTPUT_FORMAT("elf64-alpha")
 ENTRY(__start)
 PHDRS { kernel PT_LOAD ; }
+jiffies = jiffies_64;
 SECTIONS
 {
 #ifdef CONFIG_ALPHA_LEGACY_START_ADDRESS

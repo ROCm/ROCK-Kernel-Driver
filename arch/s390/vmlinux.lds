@@ -4,6 +4,7 @@
 OUTPUT_FORMAT("elf32-s390", "elf32-s390", "elf32-s390")
 OUTPUT_ARCH(s390)
 ENTRY(_start)
+jiffies = jiffies_64 + 4;
 SECTIONS
 {
   . = 0x00000000;
