@@ -49,10 +49,6 @@ int ext3_sync_file(struct file * file, struct dentry *dentry, int datasync)
 
 	J_ASSERT(ext3_journal_current_handle() == 0);
 
-	smp_mb();		/* prepare for lockless i_state read */
-	if (!(inode->i_state & I_DIRTY))
-		goto out;
-
 	/*
 	 * data=writeback:
 	 *  The caller's filemap_fdatawrite()/wait will sync the data.
