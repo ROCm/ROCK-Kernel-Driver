@@ -87,6 +87,8 @@ typedef	struct {
 #define EFI_MEMORY_RUNTIME	0x8000000000000000	/* range requires runtime mapping */
 #define EFI_MEMORY_DESCRIPTOR_VERSION	1
 
+#define EFI_PAGE_SHIFT		12
+
 typedef struct {
 	u32 type;
 	u32 pad;
@@ -257,6 +259,7 @@ extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
 extern void efi_gettimeofday (struct timeval *tv);
 extern void efi_enter_virtual_mode (void);	/* switch EFI to virtual mode, if possible */
 extern u64  efi_get_iobase (void);
+extern u32  efi_mem_type (u64 phys_addr);
 
 /*
  * Variable Attributes

@@ -351,10 +351,18 @@ setup_arch (char **cmdline_p)
 	}
 
 #ifdef CONFIG_VT
-# if defined(CONFIG_VGA_CONSOLE)
-	conswitchp = &vga_con;
-# elif defined(CONFIG_DUMMY_CONSOLE)
+# if defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
+# endif
+# if defined(CONFIG_VGA_CONSOLE)
+	/*
+	 * Non-legacy systems may route legacy VGA MMIO range to system
+	 * memory.  vga_con probes the MMIO hole, so memory looks like
+	 * a VGA device to it.  The EFI memory map can tell us if it's
+	 * memory so we can avoid this problem.
+	 */
+	if (efi_mem_type(0xA0000) != EFI_CONVENTIONAL_MEMORY)
+		conswitchp = &vga_con;
 # endif
 #endif
 
