@@ -33,7 +33,7 @@ config VIDEO_PMS
 
 config VIDEO_PLANB
 	tristate "PlanB Video-In on PowerMac"
-	depends on PPC_PMAC && VIDEO_DEV
+	depends on PPC_PMAC && VIDEO_DEV && BROKEN
 	help
 	  PlanB is the V4L driver for the PowerMac 7x00/8x00 series video
 	  input hardware. If you want to experiment with this, say Y.
