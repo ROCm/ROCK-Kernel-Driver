@@ -41,27 +41,6 @@
 
 #define NFSD4_MAX_TAGLEN	128
 
-typedef struct {
-	u32		cl_boot;
-	u32		cl_id;
-} clientid_t;
-
-typedef u32 stateid_boot_t;        /* used to detect stale stateids */
-typedef u32 stateid_lockowner_t;   /* lockowner id - used in various places */
-typedef u32 stateid_file_t;        /* identifies a unique file per lockowner */
-typedef u32 stateid_generation_t;  /* used to update stateids */
-
-typedef struct {
-	stateid_boot_t		so_boot;
-	stateid_lockowner_t	so_lockowner;
-	stateid_file_t		so_file;
-} stateid_other_t;
-
-typedef struct {
-	stateid_generation_t	st_generation;
-	stateid_other_t		st_other;
-} stateid_t;
-
 typedef u32 delegation_zero_t;
 typedef u32 delegation_boot_t;
 typedef u64 delegation_id_t;
@@ -143,8 +122,7 @@ struct nfsd4_putfh {
 
 struct nfsd4_open {
 	u32		op_claim_type;      /* request */
-	u32		op_namelen;	    /* request - everything but CLAIM_PREV */
-	char *		op_name;	    /* request - everything but CLAIM_PREV */
+	struct xdr_netobj op_fname;	    /* request - everything but CLAIM_PREV */
 	u32		op_delegate_type;   /* request - CLAIM_PREV only */
 	delegation_stateid_t	op_delegate_stateid; /* request - CLAIM_DELEGATE_CUR only */
 	u32		op_create;     	    /* request */
@@ -155,8 +133,7 @@ struct nfsd4_open {
 		nfs4_verifier	verf;		                     /* EXCLUSIVE4 */
 	} u;
 	clientid_t	op_clientid;        /* request */
-	u32		op_ownerlen;        /* request */
-	char *		op_owner;           /* request */
+	struct xdr_netobj op_owner;           /* request */
 	u32		op_seqid;           /* request */
 	u32		op_share_access;    /* request */
 	u32		op_share_deny;      /* request */
@@ -343,6 +320,8 @@ int nfs4svc_encode_compoundres(struct svc_rqst *, u32 *, struct nfsd4_compoundre
 void nfsd4_encode_operation(struct nfsd4_compoundres *, struct nfsd4_op *);
 int nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		       struct dentry *dentry, u32 *buffer, int *countp, u32 *bmval);
+extern int nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid);
+extern int nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confirm *setclientid_confirm);
 
 #endif
 

@@ -50,6 +50,7 @@
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
 #include <linux/nfs4.h>
+#include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
@@ -80,14 +81,14 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 		 * Note: create modes (UNCHECKED,GUARDED...) are the same
 		 * in NFSv4 as in v3.
 		 */
-		status = nfsd_create_v3(rqstp, current_fh, open->op_name,
-					open->op_namelen, &open->op_iattr,
+		status = nfsd_create_v3(rqstp, current_fh, open->op_fname.data,
+					open->op_fname.len, &open->op_iattr,
 					&resfh, open->op_createmode,
 					(u32 *)open->op_verf, &open->op_truncate);
 	}
 	else {
 		status = nfsd_lookup(rqstp, current_fh,
-				     open->op_name, open->op_namelen, &resfh);
+				     open->op_fname.data, open->op_fname.len, &resfh);
 		fh_unlock(current_fh);
 	}
 

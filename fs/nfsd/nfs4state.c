@@ -43,8 +43,8 @@
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
 #include <linux/nfs4.h>
-#include <linux/nfsd/xdr4.h>
 #include <linux/nfsd/state.h>
+#include <linux/nfsd/xdr4.h>
 
 #define NFSDDBG_FACILITY                NFSDDBG_PROC
 
@@ -225,7 +225,7 @@ check_name(struct xdr_netobj name) {
 
 	if (name.len == 0) 
 		return 0;
-	if (name.len > NFSD4_CLIENT_MAXNAME) {
+	if (name.len > NFS4_OPAQUE_LIMIT) {
 		printk("NFSD: check_name: name too long(%d)!\n", name.len);
 		return 0;
 	}

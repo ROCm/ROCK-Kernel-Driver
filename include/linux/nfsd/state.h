@@ -39,9 +39,25 @@
 
 #include <linux/list.h>
 
-#define NFSD4_CLIENT_MAXNAME 1024
+#define NFS4_OPAQUE_LIMIT 1024
+typedef struct {
+	u32             cl_boot;
+	u32             cl_id;
+} clientid_t;
 
-extern int nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclid);
+typedef struct {
+	u32             so_boot;
+	u32             so_stateownerid;
+	u32             so_fileid;
+} stateid_opaque_t;
+
+typedef struct {
+	u32                     si_generation;
+	stateid_opaque_t        si_opaque;
+} stateid_t;
+#define si_boot           si_opaque.so_boot
+#define si_stateownerid   si_opaque.so_stateownerid
+#define si_fileid         si_opaque.so_fileid
 
 /*
  * struct nfs4_client - one per client.  Clientids live here.
