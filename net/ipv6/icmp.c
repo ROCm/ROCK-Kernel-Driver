@@ -355,8 +355,8 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
 
-	dst = ip6_dst_lookup(sk, &fl);
-	if (dst->error) goto out;
+	err = ip6_dst_lookup(sk, &dst, &fl);
+	if (err) goto out;
 
 	if (hlimit < 0) {
 		if (ipv6_addr_is_multicast(&fl.fl6_dst))
@@ -434,9 +434,9 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
 
-	dst = ip6_dst_lookup(sk, &fl);
+	err = ip6_dst_lookup(sk, &dst, &fl);
 
-	if (dst->error) goto out;
+	if (err) goto out;
 
 	if (hlimit < 0) {
 		if (ipv6_addr_is_multicast(&fl.fl6_dst))

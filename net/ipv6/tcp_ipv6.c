@@ -663,19 +663,12 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
-	dst = ip6_dst_lookup(sk, &fl);
+	err = ip6_dst_lookup(sk, &dst, &fl);
 
-	if ((err = dst->error) != 0) {
-		dst_release(dst);
+	if (err)
 		goto failure;
-	}
 
 	if (saddr == NULL) {
-		err = ipv6_get_saddr(dst, &np->daddr, &fl.fl6_src);
-		if (err) {
-			dst_release(dst);
-			goto failure;
-		}
 		saddr = &fl.fl6_src;
 		ipv6_addr_copy(&np->rcv_saddr, saddr);
 	}
@@ -790,13 +783,14 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			fl.fl_ip_dport = inet->dport;
 			fl.fl_ip_sport = inet->sport;
 
-			dst = ip6_dst_lookup(sk, &fl);
+			if ((err = ip6_dst_lookup(sk, &dst, &fl))) {
+				sk->sk_err_soft = -err;
+				goto out;
+			}
 		} else
 			dst_hold(dst);
 
-		if (dst->error) {
-			sk->sk_err_soft = -dst->error;
-		} else if (tp->pmtu_cookie > dst_pmtu(dst)) {
+		if (tp->pmtu_cookie > dst_pmtu(dst)) {
 			tcp_sync_mss(sk, dst_pmtu(dst));
 			tcp_simple_retransmit(sk);
 		} /* else let the usual retransmit timer handle it */
@@ -891,8 +885,8 @@ static int tcp_v6_send_synack(struct sock *sk, struct open_request *req,
 			ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 		}
 
-		dst = ip6_dst_lookup(sk, &fl);
-		if (dst->error)
+		err = ip6_dst_lookup(sk, &dst, &fl);
+		if (err)
 			goto done;
 	}
 
@@ -1020,9 +1014,7 @@ static void tcp_v6_send_reset(struct sk_buff *skb)
 	fl.fl_ip_sport = t1->source;
 
 	/* sk = NULL, but it is safe for now. RST socket required. */
-	buff->dst = ip6_dst_lookup(NULL, &fl);
-
-	if (buff->dst->error == 0) {
+	if (!ip6_dst_lookup(NULL, &buff->dst, &fl)) {
 		ip6_xmit(NULL, buff, &fl, NULL, 0);
 		TCP_INC_STATS_BH(TcpOutSegs);
 		TCP_INC_STATS_BH(TcpOutRsts);
@@ -1083,9 +1075,7 @@ static void tcp_v6_send_ack(struct sk_buff *skb, u32 seq, u32 ack, u32 win, u32 
 	fl.fl_ip_dport = t1->dest;
 	fl.fl_ip_sport = t1->source;
 
-	buff->dst = ip6_dst_lookup(NULL, &fl);
-
-	if (buff->dst->error == 0) {
+	if (!ip6_dst_lookup(NULL, &buff->dst, &fl)) {
 		ip6_xmit(NULL, buff, &fl, NULL, 0);
 		TCP_INC_STATS_BH(TcpOutSegs);
 		return;
@@ -1331,11 +1321,9 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		fl.fl_ip_dport = req->rmt_port;
 		fl.fl_ip_sport = inet_sk(sk)->sport;
 
-		dst = ip6_dst_lookup(sk, &fl);
-	}
-
-	if (dst->error)
-		goto out;
+		if (ip6_dst_lookup(sk, &dst, &fl))
+			goto out;
+	} 
 
 	newsk = tcp_create_openreq_child(sk, req, skb);
 	if (newsk == NULL)
@@ -1730,11 +1718,9 @@ static int tcp_v6_rebuild_header(struct sock *sk)
 			ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 		}
 
-		dst = ip6_dst_lookup(sk, &fl);
+		err = ip6_dst_lookup(sk, &dst, &fl);
 
-		if (dst->error) {
-			err = dst->error;
-			dst_release(dst);
+		if (err) {
 			sk->sk_route_caps = 0;
 			return err;
 		}
@@ -1774,12 +1760,11 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 	dst = __sk_dst_check(sk, np->dst_cookie);
 
 	if (dst == NULL) {
-		dst = ip6_dst_lookup(sk, &fl);
+		int err = ip6_dst_lookup(sk, &dst, &fl);
 
-		if (dst->error) {
-			sk->sk_err_soft = -dst->error;
-			dst_release(dst);
-			return -sk->sk_err_soft;
+		if (err) {
+			sk->sk_err_soft = -err;
+			return err;
 		}
 
 		ip6_dst_store(sk, dst, NULL);
