@@ -208,6 +208,9 @@ struct thread_struct {
 /* Free all resources held by a thread. */
 #define release_thread(thread) do { } while(0)
 
+/* Prepare to copy thread state - unlazy all lazy status */
+#define prepare_to_copy(tsk)	do { } while (0)
+
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
 /*

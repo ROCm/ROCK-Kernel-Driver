@@ -36,7 +36,7 @@ static inline void __save_init_fpu( struct task_struct *tsk )
 		asm volatile( "fnsave %0 ; fwait"
 			      : "=m" (tsk->thread.i387.fsave) );
 	}
-	tsk->thread_info->flags &= ~_TIF_USEDFPU;
+	tsk->thread_info->status &= ~TS_USEDFPU;
 }
 
 static inline void save_init_fpu( struct task_struct *tsk )
@@ -47,15 +47,15 @@ static inline void save_init_fpu( struct task_struct *tsk )
 
 
 #define unlazy_fpu( tsk ) do { \
-	if ((tsk)->thread_info->flags & _TIF_USEDFPU) \
+	if ((tsk)->thread_info->status & TS_USEDFPU) \
 		save_init_fpu( tsk ); \
 } while (0)
 
 #define clear_fpu( tsk )					\
 do {								\
-	if ((tsk)->thread_info->flags & _TIF_USEDFPU) {		\
+	if ((tsk)->thread_info->status & TS_USEDFPU) {		\
 		asm volatile("fwait");				\
-		(tsk)->thread_info->flags &= ~_TIF_USEDFPU;	\
+		(tsk)->thread_info->status &= ~TS_USEDFPU;	\
 		stts();						\
 	}							\
 } while (0)
