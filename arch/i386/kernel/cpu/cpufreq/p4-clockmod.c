@@ -236,6 +236,7 @@ static struct cpufreq_driver p4clockmod_driver = {
 	.init		= cpufreq_p4_cpu_init,
 	.exit		= cpufreq_p4_cpu_exit,
 	.name		= "p4-clockmod",
+	.owner		= THIS_MODULE,
 };
 
 

@@ -70,6 +70,8 @@ struct cpufreq_policy {
 	struct cpufreq_cpuinfo  cpuinfo;     /* see above */
 	struct device		* dev;
 	struct kobject		kobj;
+ 	struct semaphore	lock;   /* CPU ->setpolicy or ->target may
+					   only be called once a time */
 };
 
 #define CPUFREQ_ADJUST          (0)
@@ -132,18 +134,13 @@ struct cpufreq_governor {
 };
 
 /* pass a target to the cpufreq driver 
- * _l : (cpufreq_driver_sem is not held)
  */
 inline int cpufreq_driver_target(struct cpufreq_policy *policy,
 				 unsigned int target_freq,
 				 unsigned int relation);
 
-inline int cpufreq_driver_target_l(struct cpufreq_policy *policy,
-				   unsigned int target_freq,
-				   unsigned int relation);
-
 /* pass an event to the cpufreq governor */
-int cpufreq_governor_l(unsigned int cpu, unsigned int event);
+int cpufreq_governor(unsigned int cpu, unsigned int event);
 
 int cpufreq_register_governor(struct cpufreq_governor *governor);
 void cpufreq_unregister_governor(struct cpufreq_governor *governor);
@@ -165,6 +162,7 @@ struct cpufreq_driver {
 	int	(*target)	(struct cpufreq_policy *policy,
 				 unsigned int target_freq,
 				 unsigned int relation);
+	struct module           *owner;
 	/* optional, for the moment */
 	int	(*init)		(struct cpufreq_policy *policy);
 	int	(*exit)		(struct cpufreq_policy *policy);

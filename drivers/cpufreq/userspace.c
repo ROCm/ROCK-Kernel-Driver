@@ -113,7 +113,7 @@ int cpufreq_set(unsigned int freq, unsigned int cpu)
 	if (freq > cpu_max_freq[cpu])
 		freq = cpu_max_freq[cpu];
 
-	ret = cpufreq_driver_target_l(&current_policy[cpu], freq, 
+	ret = cpufreq_driver_target(&current_policy[cpu], freq, 
 	      CPUFREQ_RELATION_L);
 
  err:
