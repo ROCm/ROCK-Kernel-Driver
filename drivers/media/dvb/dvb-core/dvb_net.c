@@ -597,7 +597,7 @@ static int dvb_net_do_ioctl(struct inode *inode, struct file *file,
 	case NET_REMOVE_IF:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
-		return dvb_net_remove_if(dvbnet, (int) parg);
+		return dvb_net_remove_if(dvbnet, (int) (long) parg);
 	default:
 		return -EINVAL;
 	}
