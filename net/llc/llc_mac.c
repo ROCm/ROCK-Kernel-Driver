@@ -25,10 +25,8 @@
 #include <net/llc_evnt.h>
 #include <net/llc_c_ev.h>
 #include <net/llc_s_ev.h>
-#ifdef CONFIG_TR
-extern void tr_source_route(struct sk_buff *skb, struct trh_hdr *trh,
-			    struct net_device *dev);
-#endif
+#include <linux/trdevice.h>
+
 /* function prototypes */
 static void fix_up_incoming_skb(struct sk_buff *skb);
 
@@ -78,7 +76,7 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 		 struct packet_type *pt)
 {
 	struct llc_sap *sap;
-	llc_pdu_sn_t *pdu;
+	struct llc_pdu_sn *pdu;
 	u8 dest;
 
 	/* When the interface is in promisc. mode, drop all the crap that it
@@ -92,7 +90,7 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 	if (!skb)
 		goto out;
 	fix_up_incoming_skb(skb);
-	pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	pdu = (struct llc_pdu_sn *)skb->nh.raw;
 	if (!pdu->dsap) { /* NULL DSAP, refer to station */
 		llc_pdu_router(NULL, NULL, skb, 0);
 		goto out;
@@ -165,11 +163,12 @@ drop:
 static void fix_up_incoming_skb(struct sk_buff *skb)
 {
 	u8 llc_len = 2;
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->data;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->data;
 
 	if ((pdu->ctrl_1 & LLC_PDU_TYPE_MASK) == LLC_PDU_TYPE_U)
 		llc_len = 1;
 	llc_len += 2;
+	skb->h.raw += llc_len;
 	skb_pull(skb, llc_len);
 	if (skb->protocol == htons(ETH_P_802_2)) {
 		u16 pdulen = ((struct ethhdr *)skb->mac.raw)->h_proto,
@@ -197,7 +196,7 @@ static void fix_up_incoming_skb(struct sk_buff *skb)
 int llc_pdu_router(struct llc_sap *sap, struct sock* sk,
 		   struct sk_buff *skb, u8 type)
 {
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 	int rc = 0;
 
 	if (!pdu->dsap) {
@@ -246,17 +245,15 @@ int llc_pdu_router(struct llc_sap *sap, struct sock* sk,
  */
 u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da)
 {
-	u8 *saddr;
-	u8 *daddr;
 	u16 rc = 0;
 
 	switch (skb->dev->type) {
 #ifdef CONFIG_TR
 		case ARPHRD_IEEE802_TR: {
-			struct trh_hdr *trh = (struct trh_hdr *)
-						    skb_push(skb, sizeof(*trh));
+			struct trh_hdr *trh;
 			struct net_device *dev = skb->dev;
 
+			trh = (struct trh_hdr *)skb_push(skb, sizeof(*trh));
 			trh->ac = AC;
 			trh->fc = LLC_FRAME;
 			if (sa)
@@ -274,14 +271,13 @@ u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da)
 		case ARPHRD_ETHER:
 		case ARPHRD_LOOPBACK: {
 			unsigned short len = skb->len;
+			struct ethhdr *eth;
 
-			skb->mac.raw = skb_push(skb, sizeof(struct ethhdr));
-			memset(skb->mac.raw, 0, sizeof(struct ethhdr));
-			((struct ethhdr *)skb->mac.raw)->h_proto = htons(len);
-			daddr = ((struct ethhdr *)skb->mac.raw)->h_dest;
-			saddr = ((struct ethhdr *)skb->mac.raw)->h_source;
-			memcpy(daddr, da, ETH_ALEN);
-			memcpy(saddr, sa, ETH_ALEN);
+			skb->mac.raw = skb_push(skb, sizeof(*eth));
+			eth = (struct ethhdr *)skb->mac.raw;
+			eth->h_proto = htons(len);
+			memcpy(eth->h_dest, da, ETH_ALEN);
+			memcpy(eth->h_source, sa, ETH_ALEN);
 			break;
 		}
 		default:
