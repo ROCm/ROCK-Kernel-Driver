@@ -670,12 +670,10 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 		bit++;
 	} while (bit < __REQ_NR_BITS);
 
-	if (rq->flags & REQ_CMD)
-		printk("sector %llu, nr/cnr %lu/%u\n", (unsigned long long)rq->sector,
+	printk("sector %llu, nr/cnr %lu/%u\n", (unsigned long long)rq->sector,
 						       rq->nr_sectors,
 						       rq->current_nr_sectors);
-
-	printk("\n");
+	printk("bio %p, biotail %p\n", rq->bio, rq->biotail);
 }
 
 void blk_recount_segments(request_queue_t *q, struct bio *bio)
@@ -1927,7 +1925,7 @@ inline void blk_recalc_rq_segments(struct request *rq)
 
 inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
 {
-	if (rq->flags & REQ_CMD) {
+	if (rq->bio) {
 		rq->hard_sector += nsect;
 		rq->nr_sectors = rq->hard_nr_sectors -= nsect;
 		rq->sector = rq->hard_sector;
@@ -1968,20 +1966,28 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 
 	req->errors = 0;
 	if (!uptodate) {
-		printk("end_request: I/O error, dev %s, sector %llu\n",
-			kdevname(req->rq_dev), (unsigned long long)req->sector);
 		error = -EIO;
+		if (!(req->flags & REQ_QUIET))
+			printk("end_request: I/O error, dev %s, sector %llu\n",
+				kdevname(req->rq_dev),
+				(unsigned long long)req->sector);
 	}
 
 	while ((bio = req->bio)) {
-		const int nsect = bio_iovec(bio)->bv_len >> 9;
-		int new_bio = 0;
+		int new_bio = 0, nsect;
+
+		if (unlikely(bio->bi_idx >= bio->bi_vcnt)) {
+			printk("%s: bio idx %d >= vcnt %d\n", __FUNCTION__,
+						bio->bi_idx, bio->bi_vcnt);
+			break;
+		}
 
 		BIO_BUG_ON(bio_iovec(bio)->bv_len > bio->bi_size);
 
 		/*
 		 * not a complete bvec done
 		 */
+		nsect = bio_iovec(bio)->bv_len >> 9;
 		if (unlikely(nsect > nr_sectors)) {
 			int partial = nr_sectors << 9;
 
