@@ -575,7 +575,7 @@ error_exit:
     if (th->t_trans_id) {
         int err;
         // update any changes we made to blk count
-        reiserfs_update_sd(th, inode);
+        mark_inode_dirty(inode);
         err = journal_end(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1);
         if (err)
             res = err;
@@ -762,7 +762,8 @@ int reiserfs_submit_file_region_for_write(
 
 	if (th->t_trans_id) {
 	    reiserfs_write_lock(inode->i_sb);
-	    reiserfs_update_sd(th, inode); // And update on-disk metadata
+	    // this sets the proper flags for O_SYNC to trigger a commit
+	    mark_inode_dirty(inode);
 	    reiserfs_write_unlock(inode->i_sb);
 	} else
 	    inode->i_sb->s_op->dirty_inode(inode);
@@ -772,7 +773,7 @@ int reiserfs_submit_file_region_for_write(
     if (th->t_trans_id) {
 	reiserfs_write_lock(inode->i_sb);
 	if (!sd_update)
-	    reiserfs_update_sd(th, inode);
+	    mark_inode_dirty(inode);
 	status = journal_end(th, th->t_super, th->t_blocks_allocated);
         if (status)
             retval = status;
@@ -1214,7 +1215,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
                 return err;
             }
 	    reiserfs_update_inode_transaction(inode);
-	    reiserfs_update_sd(&th, inode);
+	    mark_inode_dirty(inode);
 	    err = journal_end(&th, inode->i_sb, 1);
             if (err) {
                 reiserfs_write_unlock (inode->i_sb);
