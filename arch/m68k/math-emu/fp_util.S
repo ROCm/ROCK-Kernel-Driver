@@ -49,7 +49,7 @@
  * is currently at that time unused, be careful if you want change
  * something here. %d0 and %d1 is always usable, sometimes %d2 (or
  * only the lower half) most function have to return the %a0
- * unmodified, so that the caller can immediatly reuse it.
+ * unmodified, so that the caller can immediately reuse it.
  */
 
 	.globl	fp_ill, fp_end

@@ -428,7 +428,7 @@ extern unsigned char scc_shadow[2][16];
  * for that purpose. They assume that a local variable 'port' is
  * declared and pointing to the port's scc_struct entry. The
  * variants with "_NB" appended should be used if no other SCC
- * accesses follow immediatly (within 0.5 usecs). They just skip the
+ * accesses follow immediately (within 0.5 usecs). They just skip the
  * final delay nops.
  * 
  * Please note that accesses to SCC registers should only take place

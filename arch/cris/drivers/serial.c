@@ -1766,7 +1766,7 @@ will look differently:
 
 B= Break character (0x00) with framing error.
 E= Error byte with parity error received after B characters.
-F= "Faked" valid byte received immediatly after B characters.
+F= "Faked" valid byte received immediately after B characters.
 V= Valid byte
 
 1.

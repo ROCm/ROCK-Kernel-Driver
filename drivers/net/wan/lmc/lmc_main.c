@@ -1024,7 +1024,7 @@ static struct net_device *lmc_probe1 (struct net_device *dev, unsigned long ioad
 }
 
 
-/* This is the entry point.  This is what is called immediatly. */
+/* This is the entry point.  This is what is called immediately. */
 /* This goes out and finds the card */
 
 int lmc_probe_fake(struct net_device *dev) /*fold00*/

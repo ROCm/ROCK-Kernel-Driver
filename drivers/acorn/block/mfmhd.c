@@ -406,7 +406,7 @@ static void issue_command(int command, unsigned char *cmdb, int len)
 
 	outw(command, MFM_COMMAND);
 	status = inw(MFM_STATUS);
-	DBG("issue_command: status immediatly after command issue: %02X:\n ", status >> 8);
+	DBG("issue_command: status immediately after command issue: %02X:\n ", status >> 8);
 }
 
 static void wait_for_completion(void)
