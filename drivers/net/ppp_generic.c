@@ -325,7 +325,6 @@ static int ppp_release(struct inode *inode, struct file *file)
 {
 	struct ppp_file *pf = (struct ppp_file *) file->private_data;
 
-	lock_kernel();
 	if (pf != 0) {
 		file->private_data = 0;
 		if (atomic_dec_and_test(&pf->refcnt)) {
@@ -339,7 +338,6 @@ static int ppp_release(struct inode *inode, struct file *file)
 			}
 		}
 	}
-	unlock_kernel();
 	return 0;
 }
 

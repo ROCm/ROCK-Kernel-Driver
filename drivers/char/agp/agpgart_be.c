@@ -1705,6 +1705,38 @@ static int intel_860_configure(void)
 	return 0;
 }
 
+static int intel_830mp_configure(void)
+{
+	u32 temp;
+	u16 temp2;
+	aper_size_info_8 *current_size;
+
+	current_size = A_SIZE_8(agp_bridge.current_size);
+
+	/* aperture size */
+	pci_write_config_byte(agp_bridge.dev, INTEL_APSIZE,
+			      current_size->size_value);
+
+	/* address to map to */
+	pci_read_config_dword(agp_bridge.dev, INTEL_APBASE, &temp);
+	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
+
+	/* attbase - aperture base */
+	pci_write_config_dword(agp_bridge.dev, INTEL_ATTBASE,
+			       agp_bridge.gatt_bus_addr);
+
+	/* agpctrl */
+	pci_write_config_dword(agp_bridge.dev, INTEL_AGPCTRL, 0x0000);
+
+	/* gmch */
+	pci_read_config_word(agp_bridge.dev, INTEL_NBXCFG, &temp2);
+	pci_write_config_word(agp_bridge.dev, INTEL_NBXCFG,
+			      temp2 | (1 << 9));
+	/* clear any possible AGP-related error conditions */
+	pci_write_config_word(agp_bridge.dev, INTEL_I830_ERRSTS, 0x1c);
+	return 0;
+}
+
 static unsigned long intel_mask_memory(unsigned long addr, int type)
 {
 	/* Memory type is ignored */
@@ -1743,6 +1775,14 @@ static aper_size_info_16 intel_generic_sizes[7] =
 	{16, 4096, 2, 60},
 	{8, 2048, 1, 62},
 	{4, 1024, 0, 63}
+};
+
+static aper_size_info_8 intel_830mp_sizes[4] = 
+{
+  {256, 65536, 6, 0},
+  {128, 32768, 5, 32},
+  {64, 16384, 4, 48},
+  {32, 8192, 3, 56}
 };
 
 static int __init intel_generic_setup (struct pci_dev *pdev)
@@ -1809,6 +1849,35 @@ static int __init intel_820_setup (struct pci_dev *pdev)
        (void) pdev; /* unused */
 }
 
+static int __init intel_830mp_setup (struct pci_dev *pdev)
+{
+       agp_bridge.masks = intel_generic_masks;
+       agp_bridge.num_of_masks = 1;
+       agp_bridge.aperture_sizes = (void *) intel_830mp_sizes;
+       agp_bridge.size_type = U8_APER_SIZE;
+       agp_bridge.num_aperture_sizes = 4;
+       agp_bridge.dev_private_data = NULL;
+       agp_bridge.needs_scratch_page = FALSE;
+       agp_bridge.configure = intel_830mp_configure;
+       agp_bridge.fetch_size = intel_8xx_fetch_size;
+       agp_bridge.cleanup = intel_8xx_cleanup;
+       agp_bridge.tlb_flush = intel_8xx_tlbflush;
+       agp_bridge.mask_memory = intel_mask_memory;
+       agp_bridge.agp_enable = agp_generic_agp_enable;
+       agp_bridge.cache_flush = global_cache_flush;
+       agp_bridge.create_gatt_table = agp_generic_create_gatt_table;
+       agp_bridge.free_gatt_table = agp_generic_free_gatt_table;
+       agp_bridge.insert_memory = agp_generic_insert_memory;
+       agp_bridge.remove_memory = agp_generic_remove_memory;
+       agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
+       agp_bridge.free_by_type = agp_generic_free_by_type;
+       agp_bridge.agp_alloc_page = agp_generic_alloc_page;
+       agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+
+       return 0;
+
+       (void) pdev; /* unused */
+}
 
 static int __init intel_840_setup (struct pci_dev *pdev)
 {
@@ -3557,7 +3626,7 @@ static struct {
 		INTEL_I830_M,
 		"Intel",
 		"i830M",
-		intel_generic_setup },
+		intel_830mp_setup },
 	{ PCI_DEVICE_ID_INTEL_840_0,
 		PCI_VENDOR_ID_INTEL,
 		INTEL_I840,
@@ -3879,18 +3948,17 @@ static int __init agp_find_supported_device(void)
 			i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
 									   PCI_DEVICE_ID_INTEL_830_M_1,
 									   NULL);
-			if(PCI_FUNC(i810_dev->devfn) != 0) {
+			if(i810_dev && PCI_FUNC(i810_dev->devfn) != 0) {
 				i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
 										   PCI_DEVICE_ID_INTEL_830_M_1,
 										   i810_dev);
 			}
 
 			if (i810_dev == NULL) {
-				printk(KERN_ERR PFX "Detected an "
-					   "Intel 830M, but could not find the"
-					   " secondary device.\n");
-				agp_bridge.type = NOT_SUPPORTED;
-				return -ENODEV;
+			        /* Intel 830MP with external graphic card */
+			        /* It will be initialized later */
+				agp_bridge.type = INTEL_I830_M;
+				break;
 			}
 			printk(KERN_INFO PFX "Detected an Intel "
 				   "830M Chipset.\n");

@@ -83,11 +83,6 @@ void initrd_init(void);
 
 static inline void blkdev_dequeue_request(struct request *req)
 {
-	if (req->bio)
-		bio_hash_remove(req->bio);
-	if (req->biotail)
-		bio_hash_remove(req->biotail);
-
 	list_del(&req->queuelist);
 }
 

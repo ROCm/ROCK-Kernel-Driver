@@ -31,7 +31,7 @@ extern int dn_request_irq(unsigned int irq, void (*handler)(int, void *, struct 
 extern void dn_free_irq(unsigned int irq, void *dev_id);
 extern void dn_enable_irq(unsigned int);
 extern void dn_disable_irq(unsigned int);
-extern int dn_get_irq_list(char *);
+extern int show_dn_interrupts(struct seq_file *, void *);
 extern unsigned long dn_gettimeoffset(void);
 extern void dn_gettod(int *, int *, int *, int *, int *, int *);
 extern int dn_dummy_hwclk(int, struct hwclk_time *);
@@ -173,7 +173,7 @@ void config_apollo(void) {
 	mach_free_irq        = dn_free_irq;
 	enable_irq      = dn_enable_irq;
 	disable_irq     = dn_disable_irq;
-	mach_get_irq_list    = dn_get_irq_list;
+	mach_get_irq_list    = show_dn_interrupts;
 	mach_gettimeoffset   = dn_gettimeoffset;
 	mach_gettod	     = dn_gettod; /* */
 	mach_max_dma_address = 0xffffffff;

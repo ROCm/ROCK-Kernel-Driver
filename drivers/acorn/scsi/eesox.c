@@ -577,7 +577,6 @@ static Scsi_Host_Template eesox_template = {
 	eh_bus_reset_handler:		fas216_eh_bus_reset,
 	eh_device_reset_handler:	fas216_eh_device_reset,
 	eh_abort_handler:		fas216_eh_abort,
-	use_new_eh_code:		1
 };
 
 static int __init eesox_init(void)

@@ -54,7 +54,6 @@ EXPORT_SYMBOL(scsi_need_isa_buffer);
 EXPORT_SYMBOL(scsi_release_command);
 EXPORT_SYMBOL(print_Scsi_Cmnd);
 EXPORT_SYMBOL(scsi_block_when_processing_errors);
-EXPORT_SYMBOL(scsi_mark_host_reset);
 EXPORT_SYMBOL(scsi_ioctl_send_command);
 #if defined(CONFIG_SCSI_LOGGING)	/* { */
 EXPORT_SYMBOL(scsi_logging_level);

@@ -109,7 +109,6 @@ int sym53c8xx_release(struct Scsi_Host *);
 	release:		sym53c8xx_release,			\
 	info:			sym53c8xx_info, 			\
 	queuecommand:		sym53c8xx_queue_command,		\
-	use_new_eh_code:	1,					\
 	eh_abort_handler:	sym53c8xx_eh_abort_handler,		\
 	eh_device_reset_handler:sym53c8xx_eh_device_reset_handler,	\
 	eh_bus_reset_handler:	sym53c8xx_eh_bus_reset_handler,		\

@@ -36,7 +36,7 @@
 static unsigned char days_in_mo[] =
 {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-static char rtc_status = 0;
+static atomic_t rtc_ready = ATOMIC_INIT(1);
 
 static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		     unsigned long arg)
@@ -130,18 +130,18 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static int rtc_open(struct inode *inode, struct file *file)
 {
-	if(rtc_status)
+	if( !atomic_dec_and_test(&rtc_ready) )
+	{
+		atomic_inc( &rtc_ready );
 		return -EBUSY;
+	}
 
-	rtc_status = 1;
 	return 0;
 }
 
 static int rtc_release(struct inode *inode, struct file *file)
 {
-	lock_kernel();
-	rtc_status = 0;
-	unlock_kernel();
+	atomic_inc( &rtc_ready );
 	return 0;
 }
 

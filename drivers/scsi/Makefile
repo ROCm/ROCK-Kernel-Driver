@@ -133,11 +133,9 @@ obj-$(CONFIG_BLK_DEV_SR)	+= sr_mod.o
 obj-$(CONFIG_CHR_DEV_SG)	+= sg.o
 
 list-multi	:= scsi_mod.o sd_mod.o sr_mod.o initio.o a100u2w.o cpqfc.o
-scsi_mod-objs	:= scsi.o hosts.o scsi_ioctl.o constants.o \
-			scsicam.o scsi_proc.o scsi_error.o \
-			scsi_obsolete.o scsi_queue.o scsi_lib.o \
-			scsi_merge.o scsi_dma.o scsi_scan.o \
-			scsi_syms.o
+scsi_mod-objs	:= scsi.o hosts.o scsi_ioctl.o constants.o scsicam.o \
+			scsi_proc.o scsi_error.o scsi_queue.o scsi_lib.o \
+			scsi_merge.o scsi_dma.o scsi_scan.o scsi_syms.o
 sd_mod-objs	:= sd.o
 sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o
 initio-objs	:= ini9100u.o i91uscsi.o

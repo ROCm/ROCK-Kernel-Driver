@@ -38,7 +38,6 @@ int sim710_release(struct Scsi_Host *);
 		      sg_tablesize:		128,		 	\
 		      cmd_per_lun:		1,		 	\
 		      use_clustering:		DISABLE_CLUSTERING,	\
-		      use_new_eh_code:		1}
 
 #ifndef HOSTS_C
 

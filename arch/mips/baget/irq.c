@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/delay.h>
+#include <linux/seq_file.h>
 
 #include <asm/bitops.h>
 #include <asm/bootinfo.h>
@@ -141,27 +142,27 @@ void enable_irq(unsigned int irq_nr)
  */
 static struct irqaction *irq_action[BAGET_IRQ_NR] = { NULL, };
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 	struct irqaction * action;
 
 	for (i = 0 ; i < BAGET_IRQ_NR ; i++) {
 		action = irq_action[i];
 		if (!action) 
 			continue;
-		len += sprintf(buf+len, "%2d: %8d %c %s",
+		seq_printf(p, "%2d: %8d %c %s",
 			i, kstat.irqs[0][i],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
-			len += sprintf(buf+len, ",%s %s",
+			seq_printf(p, ",%s %s",
 				(action->flags & SA_INTERRUPT) ? " +" : "",
 				action->name);
 		}
-		len += sprintf(buf+len, "\n");
+		seq_putc(p, '\n');
 	}
-	return len;
+	return 0;
 }
 
 

@@ -28,7 +28,6 @@ int mesh_reset(Scsi_Cmnd *, unsigned int);
 	sg_tablesize:	SG_ALL,				\
 	cmd_per_lun:	2,				\
 	use_clustering:	DISABLE_CLUSTERING,		\
-	use_new_eh_code: 1,				\
 }
 
 /*

@@ -20,7 +20,6 @@
  *
  * Jens:
  * - Rework again to work with bio instead of buffer_heads
- * - added merge by hash-lookup
  * - loose bi_dev comparisons, partition handling is right now
  * - completely modularize elevator setup and teardown
  *
@@ -106,84 +105,25 @@ inline int elv_rq_merge_ok(request_queue_t *q, struct request *rq,
 	return 0;
 }
 
-/*
- * find a struct request that has a bio linked that we can merge with
- */
-inline struct request *bio_get_hash_rq(kdev_t dev, sector_t sector, int vc)
-{
-	struct bio *bio = bio_hash_find(dev, sector, vc);
-	struct request *rq = NULL;
-
-	/*
-	 * bio is pinned until we bio_put it
-	 */
-	if (bio) {
-		rq = bio->bi_hash_desc;
-
-		BUG_ON(!rq);
-
-		bio_put(bio);
-	}
-
-	return rq;
-}
-
 int elevator_linus_merge(request_queue_t *q, struct request **req,
 			 struct list_head *head, struct bio *bio)
 {
 	unsigned int count = bio_sectors(bio);
-	struct elv_linus_data *edat = q->elevator.elevator_data;
-	unsigned int vc = q->hash_valid_counter;
-	struct list_head *entry;
+	struct list_head *entry = &q->queue_head;
+	int ret = ELEVATOR_NO_MERGE;
 	struct request *__rq;
 
-	/*
-	 * first try a back merge, then front, then give up and scan. this
-	 * will of course fail for different size bios on the same queue,
-	 * however that isn't really an issue
-	 */
-	if (likely(edat->flags & ELV_LINUS_BACK_MERGE)) {
-		__rq = bio_get_hash_rq(bio->bi_dev, bio->bi_sector - count, vc);
-		if (__rq) {
-			if (!elv_rq_merge_ok(q, __rq, bio))
-				goto front;
-
-			/*
-			 * looks ok to merge
-			 */
-			if (__rq->sector + __rq->nr_sectors == bio->bi_sector) {
-				*req = __rq;
-				return ELEVATOR_BACK_MERGE;
-			}
-		}
-	}
-
-front:
-	if (likely(edat->flags & ELV_LINUS_FRONT_MERGE)) {
-		__rq = bio_get_hash_rq(bio->bi_dev, bio->bi_sector + count, vc);
-		if (__rq) {
-			if (!elv_rq_merge_ok(q, __rq, bio))
-				goto scan;
-
-			/*
-			 * looks ok to merge
-			 */
-			if (__rq->sector - count == bio->bi_sector) {
-				*req = __rq;
-				return ELEVATOR_FRONT_MERGE;
-			}
-		}
-	}
-
-	/*
-	 * no merge possible, scan for insertion
-	 */
-scan:
 	entry = &q->queue_head;
 	while ((entry = entry->prev) != head) {
 		__rq = list_entry_rq(entry);
 
 		prefetch(list_entry_rq(entry->prev));
+
+		/*
+		 * simply "aging" of requests in queue
+		 */
+		if (__rq->elevator_sequence-- <= 0)
+			break;
 
 		if (unlikely(__rq->waiting || __rq->special))
 			continue;
@@ -191,17 +131,28 @@ scan:
 			break;
 		if (!*req && bio_rq_in_between(bio, __rq, &q->queue_head))
 			*req = __rq;
+		if (!elv_rq_merge_ok(q, __rq, bio))
+			continue;
+
+		if (__rq->elevator_sequence < count)
+			break;
 
 		/*
-		 * simple "aging" of requests in queue
+		 * we can merge and sequence is ok, check if it's possible
 		 */
-		if (__rq->elevator_sequence-- <= 0)
+		if (__rq->sector + __rq->nr_sectors == bio->bi_sector) {
+			ret = ELEVATOR_BACK_MERGE;
+			*req = __rq;
 			break;
-		else if (__rq->elevator_sequence < count)
+		} else if (__rq->sector - count == bio->bi_sector) {
+			ret = ELEVATOR_FRONT_MERGE;
+			__rq->elevator_sequence -= count;
+			*req = __rq;
 			break;
+		}
 	}
 
-	return ELEVATOR_NO_MERGE;
+	return ret;
 }
 
 void elevator_linus_merge_cleanup(request_queue_t *q, struct request *req, int count)
@@ -231,10 +182,6 @@ void elevator_linus_merge_req(struct request *req, struct request *next)
 void elv_add_request_fn(request_queue_t *q, struct request *rq,
 			       struct list_head *insert_here)
 {
-	/*
-	 * insert into queue pending list, merge hash, and possible latency
-	 * list
-	 */
 	list_add(&rq->queuelist, insert_here);
 }
 
@@ -248,78 +195,60 @@ struct request *elv_next_request_fn(request_queue_t *q)
 
 int elv_linus_init(request_queue_t *q, elevator_t *e)
 {
-	struct elv_linus_data *edata;
-
-	edata = kmalloc(sizeof(struct elv_linus_data), GFP_ATOMIC);
-	if (!edata)
-		return -ENOMEM;
-
-	/*
-	 * default to doing both front and back merges
-	 */
-	edata->flags = ELV_LINUS_BACK_MERGE | ELV_LINUS_FRONT_MERGE;
-	e->elevator_data = edata;
 	return 0;
 }
 
 void elv_linus_exit(request_queue_t *q, elevator_t *e)
 {
-	kfree(e->elevator_data);
 }
 
 /*
  * See if we can find a request that this buffer can be coalesced with.
  */
 int elevator_noop_merge(request_queue_t *q, struct request **req,
-			struct list_head * head, struct bio *bio)
+			struct list_head *head, struct bio *bio)
 {
+	unsigned int count = bio_sectors(bio);
+	struct list_head *entry = &q->queue_head;
 	struct request *__rq;
-	int count, ret;
-	unsigned int vc;
 
-	count = bio_sectors(bio);
-	ret = ELEVATOR_NO_MERGE;
-	vc = q->hash_valid_counter;
+	entry = &q->queue_head;
+	while ((entry = entry->prev) != head) {
+		__rq = list_entry_rq(entry);
 
-	__rq = bio_get_hash_rq(bio->bi_dev, bio->bi_sector - count, vc);
-	if (__rq) {
+		prefetch(list_entry_rq(entry->prev));
+
+		if (unlikely(__rq->waiting || __rq->special))
+			continue;
+		if (unlikely(!__rq->inactive))
+			break;
 		if (!elv_rq_merge_ok(q, __rq, bio))
-			goto front;
+			continue;
 
+		/*
+		 * we can merge and sequence is ok, check if it's possible
+		 */
 		if (__rq->sector + __rq->nr_sectors == bio->bi_sector) {
-			ret = ELEVATOR_BACK_MERGE;
 			*req = __rq;
-			goto out;
+			return ELEVATOR_BACK_MERGE;
+		} else if (__rq->sector - count == bio->bi_sector) {
+			*req = __rq;
+			return ELEVATOR_FRONT_MERGE;
 		}
 	}
 
-front:
-	__rq = bio_get_hash_rq(bio->bi_dev, bio->bi_sector + count, vc);
-	if (__rq) {
-		if (!elv_rq_merge_ok(q, __rq, bio))
-			goto out;
-
-		if (__rq->sector - count == bio->bi_sector) {
-			ret = ELEVATOR_FRONT_MERGE;
-			*req = __rq;
-			goto out;
-		}
-	}
-
-out:
-	return ret;
+	return ELEVATOR_NO_MERGE;
 }
 
 void elevator_noop_merge_cleanup(request_queue_t *q, struct request *req, int count) {}
 
 void elevator_noop_merge_req(struct request *req, struct request *next) {}
 
-int elevator_init(request_queue_t *q, elevator_t *e, elevator_t type,char *name)
+int elevator_init(request_queue_t *q, elevator_t *e, elevator_t type)
 {
 	*e = type;
 
 	INIT_LIST_HEAD(&q->queue_head);
-	strncpy(e->queue_name, name, 15);
 
 	if (e->elevator_init_fn)
 		return e->elevator_init_fn(q, e);

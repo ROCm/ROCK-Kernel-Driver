@@ -38,7 +38,6 @@ extern int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg);
  present:                0,                      \
  unchecked_isa_dma:      0,                      \
  use_clustering:         ENABLE_CLUSTERING,      \
- use_new_eh_code:        1			 \
 }
 
 #endif /* CPQFCTS_H */ 

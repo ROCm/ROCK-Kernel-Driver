@@ -175,7 +175,6 @@ int imm_biosparam(Disk *, kdev_t, int *);
                 eh_device_reset_handler:        NULL,                   \
                 eh_bus_reset_handler:           imm_reset,              \
                 eh_host_reset_handler:          imm_reset,              \
-		use_new_eh_code:		1,			\
 		bios_param:		        imm_biosparam,		\
 		this_id:			7,			\
 		sg_tablesize:			SG_ALL,			\

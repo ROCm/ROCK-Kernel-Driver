@@ -111,6 +111,7 @@ static int fasync_qp(int fd, struct file *filp, int on)
 
 static int qp_present;
 static int qp_count;
+static spinlock_t qp_count_lock = SPIN_LOCK_UNLOCKED;
 static int qp_data = QP_DATA;
 static int qp_status = QP_STATUS;
 
@@ -141,8 +142,8 @@ static int release_qp(struct inode * inode, struct file * file)
 {
 	unsigned char status;
 
-	lock_kernel();
 	fasync_qp(-1, file, 0);
+ 	spin_lock( &qp_count_lock );	
 	if (!--qp_count) {
 		if (!poll_qp_status())
 			printk(KERN_WARNING "Warning: Mouse device busy in release_qp()\n");
@@ -152,7 +153,7 @@ static int release_qp(struct inode * inode, struct file * file)
 			printk(KERN_WARNING "Warning: Mouse device busy in release_qp()\n");
 		free_irq(QP_IRQ, NULL);
 	}
-	unlock_kernel();
+	spin_unlock( &qp_count_lock );
 	return 0;
 }
 
@@ -168,8 +169,13 @@ static int open_qp(struct inode * inode, struct file * file)
 	if (!qp_present)
 		return -EINVAL;
 
+	spin_lock( &qp_count_lock );
 	if (qp_count++)
+	{
+		spin_unlock( &qp_count_lock );
 		return 0;
+	}
+	spin_unlock( &qp_count_lock );
 
 	if (request_irq(QP_IRQ, qp_interrupt, 0, "PS/2 Mouse", NULL)) {
 		qp_count--;

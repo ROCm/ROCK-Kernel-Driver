@@ -77,7 +77,6 @@ void advansys_setup(char *, int *);
     release:                    advansys_release, \
     info:                       advansys_info, \
     queuecommand:               advansys_queuecommand, \
-    use_new_eh_code:		1, \
     eh_bus_reset_handler:	advansys_reset, \
     bios_param:                 advansys_biosparam, \
     /* \

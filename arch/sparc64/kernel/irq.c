@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -104,9 +105,9 @@ static void register_irq_proc (unsigned int irq);
 #define put_smpaff_in_irqaction(action, smpaff)	(action)->mask = (smpaff)
 #define get_smpaff_in_irqaction(action) 	((action)->mask)
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 	struct irqaction *action;
 #ifdef CONFIG_SMP
 	int j;
@@ -115,23 +116,23 @@ int get_irq_list(char *buf)
 	for(i = 0; i < (NR_IRQS + 1); i++) {
 		if(!(action = *(i + irq_action)))
 			continue;
-		len += sprintf(buf + len, "%3d: ", i);
+		seq_print(p, "%3d: ", i);
 #ifndef CONFIG_SMP
-		len += sprintf(buf + len, "%10u ", kstat_irqs(i));
+		seq_print(p, "%10u ", kstat_irqs(i));
 #else
 		for (j = 0; j < smp_num_cpus; j++)
-			len += sprintf(buf + len, "%10u ",
+			seq_print(p, "%10u ",
 				       kstat.irqs[cpu_logical_map(j)][i]);
 #endif
-		len += sprintf(buf + len, " %s:%lx", action->name, \
+		seq_print(p, " %s:%lx", action->name,
 						get_ino_in_irqaction(action));
 		for(action = action->next; action; action = action->next) {
-			len += sprintf(buf+len, ", %s:%lx", action->name, \
+			seq_print(p, ", %s:%lx", action->name,
 						get_ino_in_irqaction(action));
 		}
-		len += sprintf(buf + len, "\n");
+		seq_putc(p, '\n');
 	}
-	return len;
+	return 0;
 }
 
 /* Now these are always passed a true fully specified sun4u INO. */

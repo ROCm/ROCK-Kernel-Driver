@@ -32,6 +32,7 @@
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 #include <linux/random.h>
+#include <linux/seq_file.h>
 
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -119,9 +120,9 @@ void enable_irq(unsigned int irq_nr)
 }
 
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 	int num = 0;
 	struct irqaction *action;
 
@@ -129,33 +130,33 @@ int get_irq_list(char *buf)
 		action = irq_action[i];
 		if (!action) 
 			continue;
-		len += sprintf(buf+len, "%2d: %8d %c %s",
+		seq_printf(p, "%2d: %8d %c %s",
 			num, kstat.irqs[0][num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
-			len += sprintf(buf+len, ",%s %s",
+			seq_printf(p, ",%s %s",
 				(action->flags & SA_INTERRUPT) ? " +" : "",
 				action->name);
 		}
-		len += sprintf(buf+len, " [on-chip]\n");
+		seq_puts(p, " [on-chip]\n");
 	}
 	for (i = 0; i < MALTAINT_END; i++, num++) {
 		action = hw0_irq_action[i];
 		if (!action) 
 			continue;
-		len += sprintf(buf+len, "%2d: %8d %c %s",
+		seq_printf(p, "%2d: %8d %c %s",
 			num, kstat.irqs[0][num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
-			len += sprintf(buf+len, ",%s %s",
+			seq_printf(p, ",%s %s",
 				(action->flags & SA_INTERRUPT) ? " +" : "",
 				action->name);
 		}
-		len += sprintf(buf+len, " [hw0]\n");
+		seq_puts(p, " [hw0]\n");
 	}
-	return len;
+	return 0;
 }
 
 int request_irq(unsigned int irq, 

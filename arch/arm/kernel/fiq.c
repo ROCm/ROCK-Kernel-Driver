@@ -40,6 +40,7 @@
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/fiq.h>
 #include <asm/io.h>
@@ -92,15 +93,12 @@ static struct fiq_handler default_owner = {
 
 static struct fiq_handler *current_fiq = &default_owner;
 
-int get_fiq_list(char *buf)
+int show_fiq_list(struct seq_file *p, void *v)
 {
-	char *p = buf;
-
 	if (current_fiq != &default_owner)
-		p += sprintf(p, "FIQ:              %s\n",
-			     current_fiq->name);
+		seq_printf(p, "FIQ:              %s\n", current_fiq->name);
 
-	return p - buf;
+	return 0;
 }
 
 void set_fiq_handler(void *start, unsigned int length)

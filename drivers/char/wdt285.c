@@ -94,10 +94,8 @@ static int watchdog_open(struct inode *inode, struct file *file)
 static int watchdog_release(struct inode *inode, struct file *file)
 {
 #ifdef ONLY_TESTING
-	lock_kernel();
 	free_irq(IRQ_TIMER4, NULL);
 	timer_alive = 0;
-	unlock_kernel();
 #else
 	/*
 	 *	It's irreversible!

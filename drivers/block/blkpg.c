@@ -285,10 +285,6 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 		case BLKELVSET:
 			return -ENOTTY;
 
-		case BLKHASHPROF:
-		case BLKHASHCLEAR:
-			return bio_ioctl(dev, cmd, arg);
-
 		case BLKBSZGET:
 			/* get the logical block size (cf. BLKSSZGET) */
 			intval = BLOCK_SIZE;

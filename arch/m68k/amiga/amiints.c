@@ -40,6 +40,7 @@
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -53,7 +54,7 @@ extern int cia_request_irq(struct ciabase *base,int irq,
                            unsigned long flags, const char *devname, void *dev_id);
 extern void cia_free_irq(struct ciabase *base, unsigned int irq, void *dev_id);
 extern void cia_init_IRQ(struct ciabase *base);
-extern int cia_get_irq_list(struct ciabase *base, char *buf);
+extern int cia_get_irq_list(struct ciabase *base, struct seq_file *p);
 
 /* irq node variables for amiga interrupt sources */
 static irq_node_t *ami_irq_list[AMI_STD_IRQS];
@@ -468,28 +469,28 @@ void (*amiga_default_handler[SYS_IRQS])(int, void *, struct pt_regs *) = {
 	ami_int4, ami_int5, ami_badint, ami_int7
 };
 
-int amiga_get_irq_list(char *buf)
+int show_amiga_interrupts(struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 	irq_node_t *node;
 
 	for (i = 0; i < AMI_STD_IRQS; i++) {
 		if (!(node = ami_irq_list[i]))
 			continue;
-		len += sprintf(buf+len, "ami  %2d: %10u ", i,
+		seq_printf(p, "ami  %2d: %10u ", i,
 		               kstat.irqs[0][SYS_IRQS + i]);
 		do {
 			if (node->flags & SA_INTERRUPT)
-				len += sprintf(buf+len, "F ");
+				seq_puts(p, "F ");
 			else
-				len += sprintf(buf+len, "  ");
-			len += sprintf(buf+len, "%s\n", node->devname);
+				seq_puts(p, "  ");
+			seq_printf(p, "%s\n", node->devname);
 			if ((node = node->next))
-				len += sprintf(buf+len, "                    ");
+				seq_puts(p, "                    ");
 		} while (node);
 	}
 
-	len += cia_get_irq_list(&ciaa_base, buf+len);
-	len += cia_get_irq_list(&ciab_base, buf+len);
-	return len;
+	cia_get_irq_list(&ciaa_base, p);
+	cia_get_irq_list(&ciab_base, p);
+	return 0;
 }

@@ -280,13 +280,6 @@ typedef struct	SHT
     unsigned use_clustering:1;
 
     /*
-     * True if this driver uses the new error handling code.  This flag is
-     * really only temporary until all of the other drivers get converted
-     * to use the new error handling code.
-     */
-    unsigned use_new_eh_code:1;
-
-    /*
      * True for emulated SCSI host adapters (e.g. ATAPI)
      */
     unsigned emulated:1;

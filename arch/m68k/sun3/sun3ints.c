@@ -15,6 +15,7 @@
 #include <asm/intersil.h>
 #include <asm/oplib.h>
 #include <asm/sun3ints.h>
+#include <linux/seq_file.h>
 
 extern void sun3_leds (unsigned char);
 
@@ -62,7 +63,7 @@ inline void sun3_do_irq(int irq, struct pt_regs *fp)
 	*sun3_intreg |=  (1<<irq);
 }
 
-int sun3_get_irq_list(char *buf)
+int show_sun3_interrupts(struct seq_file *p, void *v)
 {
 	return 0;
 }

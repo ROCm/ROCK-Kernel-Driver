@@ -100,7 +100,8 @@ static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
 #define WD_SRLY2                0x80	/* Software external relay triggered */
 
 static int current_readport, revision, temp_panic;
-static int is_open, initial_status, supports_temp, mode_debug;
+static atomic_t open_allowed = ATOMIC_INIT(1);
+static int initial_status, supports_temp, mode_debug;
 static spinlock_t io_lock;
 
 /*
@@ -402,9 +403,12 @@ static int pcwd_open(struct inode *ino, struct file *filep)
         switch (MINOR(ino->i_rdev))
         {
                 case WATCHDOG_MINOR:
-                    if (is_open)
+                    if ( !atomic_dec_and_test(&open_allowed) )
+		    {
+			atomic_inc( &open_allowed );
                         return -EBUSY;
-                    MOD_INC_USE_COUNT;
+                    }
+		    MOD_INC_USE_COUNT;
                     /*  Enable the port  */
                     if (revision == PCWD_REVISION_C)
                     {
@@ -412,7 +416,6 @@ static int pcwd_open(struct inode *ino, struct file *filep)
                     	outb_p(0x00, current_readport + 3);
                     	spin_unlock(&io_lock);
                     }
-                    is_open = 1;
                     return(0);
                 case TEMP_MINOR:
                     return(0);
@@ -452,8 +455,6 @@ static int pcwd_close(struct inode *ino, struct file *filep)
 {
 	if (MINOR(ino->i_rdev)==WATCHDOG_MINOR)
 	{
-		lock_kernel();
-	        is_open = 0;
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
 		/*  Disable the board  */
 		if (revision == PCWD_REVISION_C) {
@@ -462,8 +463,8 @@ static int pcwd_close(struct inode *ino, struct file *filep)
 			outb_p(0xA5, current_readport + 3);
 			spin_unlock(&io_lock);
 		}
+	        atomic_inc( &open_allowed );
 #endif
-		unlock_kernel();
 	}
 	return 0;
 }
@@ -574,7 +575,7 @@ static int __init pcwatchdog_init(void)
 	printk("pcwd: v%s Ken Hollis (kenji@bitgate.com)\n", WD_VER);
 
 	/* Initial variables */
-	is_open = 0;
+	set_bit( 0, &open_allowed );
 	supports_temp = 0;
 	mode_debug = 0;
 	temp_panic = 0;

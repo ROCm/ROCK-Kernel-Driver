@@ -90,6 +90,7 @@ static int __init psaux_init(void);
  
 static struct aux_queue *queue;	/* Mouse data buffer. */
 static int aux_count;
+static spinlock_t aux_count_lock = SPIN_LOCK_UNLOCKED;
 /* used when we send commands to the mouse that expect an ACK. */
 static unsigned char mouse_reply_expected;
 
@@ -405,8 +406,9 @@ int pckbd_pm_resume(struct pm_dev *dev, pm_request_t rqst, void *data)
 
        if (rqst == PM_RESUME) {
                if (queue) {                    /* Aux port detected */
-                       if (aux_count == 0) {   /* Mouse not in use */ 
-                               spin_lock_irqsave(&kbd_controller_lock, flags);
+		       spin_lock_irqsave( &aux_count_lock, flags);
+              	       if ( aux_count == 0) {   /* Mouse not in use */ 
+                               spin_lock(&kbd_controller_lock);
 			       /*
 				* Dell Lat. C600 A06 enables mouse after resume.
 				* When user touches the pad, it posts IRQ 12
@@ -418,8 +420,9 @@ int pckbd_pm_resume(struct pm_dev *dev, pm_request_t rqst, void *data)
 			       kbd_write_command(KBD_CCMD_WRITE_MODE);
 			       kb_wait();
 			       kbd_write_output(AUX_INTS_OFF);
-			       spin_unlock_irqrestore(&kbd_controller_lock, flags);
+			       spin_unlock(&kbd_controller_lock, flags);
 		       }
+		       spin_unlock_irqrestore( &aux_count_lock,flags );
 	       }
        }
 #endif
@@ -430,6 +433,7 @@ int pckbd_pm_resume(struct pm_dev *dev, pm_request_t rqst, void *data)
 static inline void handle_mouse_event(unsigned char scancode)
 {
 #ifdef CONFIG_PSMOUSE
+	int flags;
 	static unsigned char prev_code;
 	if (mouse_reply_expected) {
 		if (scancode == AUX_ACK) {
@@ -448,7 +452,8 @@ static inline void handle_mouse_event(unsigned char scancode)
 
 	prev_code = scancode;
 	add_mouse_randomness(scancode);
-	if (aux_count) {
+	spin_lock_irqsave( &aux_count_lock, flags);
+	if ( aux_count ) {
 		int head = queue->head;
 
 		queue->buf[head] = scancode;
@@ -459,6 +464,7 @@ static inline void handle_mouse_event(unsigned char scancode)
 			wake_up_interruptible(&queue->proc_list);
 		}
 	}
+	spin_unlock_irqrestore( &aux_count_lock, flags);
 #endif
 }
 
@@ -1046,16 +1052,17 @@ static int fasync_aux(int fd, struct file *filp, int on)
 
 static int release_aux(struct inode * inode, struct file * file)
 {
-	lock_kernel();
+	int flags;
 	fasync_aux(-1, file, 0);
-	if (--aux_count) {
-		unlock_kernel();
+	spin_lock_irqsave( &aux_count, flags );
+	if ( --aux_count ) {
+		spin_unlock_irqrestore( &aux_count_lock );
 		return 0;
 	}
+	spin_unlock_irqrestore( &aux_count_lock, flags );
 	kbd_write_cmd(AUX_INTS_OFF);			    /* Disable controller ints */
 	kbd_write_command_w(KBD_CCMD_MOUSE_DISABLE);
 	aux_free_irq(AUX_DEV);
-	unlock_kernel();
 	return 0;
 }
 
@@ -1066,12 +1073,16 @@ static int release_aux(struct inode * inode, struct file * file)
 
 static int open_aux(struct inode * inode, struct file * file)
 {
-	if (aux_count++) {
+	int flags;
+	spin_lock_irqsave( &aux_count_lock, flags );
+	if ( aux_count++ ) {
+		spin_unlock_irqrestore( &aux_count_lock );
 		return 0;
 	}
 	queue->head = queue->tail = 0;		/* Flush input queue */
 	if (aux_request_irq(keyboard_interrupt, AUX_DEV)) {
 		aux_count--;
+		spin_unlock_irqrestore( &aux_count_lock, flags );
 		return -EBUSY;
 	}
 	kbd_write_command_w(KBD_CCMD_MOUSE_ENABLE);	/* Enable the
@@ -1083,7 +1094,7 @@ static int open_aux(struct inode * inode, struct file * file)
 	mdelay(2);			/* Ensure we follow the kbc access delay rules.. */
 
 	send_data(KBD_CMD_ENABLE);	/* try to workaround toshiba4030cdt problem */
-
+	spin_unlock_irqrestore( &aux_count_lock, flags );
 	return 0;
 }
 

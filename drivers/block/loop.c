@@ -330,7 +330,10 @@ static void loop_put_buffer(struct bio *bio)
 	 * check bi_end_io, may just be a remapped bio
 	 */
 	if (bio && bio->bi_end_io == loop_end_io_transfer) {
-		__free_page(bio_page(bio));
+		int i;
+		for (i = 0; i < bio->bi_vcnt; i++)
+			__free_page(bio->bi_io_vec[i].bv_page);
+
 		bio_put(bio);
 	}
 }
@@ -398,7 +401,6 @@ static int loop_end_io_transfer(struct bio *bio, int nr_sectors)
 
 static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 {
-	struct page *page;
 	struct bio *bio;
 
 	/*
@@ -409,29 +411,7 @@ static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 		goto out_bh;
 	}
 
-	bio = bio_alloc(GFP_NOIO, 1);
-
-	/*
-	 * easy way out, although it does waste some memory for < PAGE_SIZE
-	 * blocks... if highmem bounce buffering can get away with it,
-	 * so can we :-)
-	 */
-	do {
-		page = alloc_page(GFP_NOIO);
-		if (page)
-			break;
-
-		run_task_queue(&tq_disk);
-		schedule_timeout(HZ);
-	} while (1);
-
-	bio->bi_io_vec->bvl_vec[0].bv_page = page;
-	bio->bi_io_vec->bvl_vec[0].bv_len = bio_size(rbh);
-	bio->bi_io_vec->bvl_vec[0].bv_offset = bio_offset(rbh);
-
-	bio->bi_io_vec->bvl_cnt = 1;
-	bio->bi_io_vec->bvl_idx = 1;
-	bio->bi_io_vec->bvl_size = bio_size(rbh);
+	bio = bio_copy(rbh, GFP_NOIO, rbh->bi_rw & WRITE);
 
 	bio->bi_end_io = loop_end_io_transfer;
 	bio->bi_private = rbh;

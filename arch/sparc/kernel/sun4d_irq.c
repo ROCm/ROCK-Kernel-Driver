@@ -20,6 +20,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
+#include <linux/seq_file.h>
 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -72,9 +73,9 @@ static int nsbi;
 spinlock_t sun4d_imsk_lock = SPIN_LOCK_UNLOCKED;
 #endif
 
-int sun4d_get_irq_list(char *buf)
+int show_sun4d_interrupts(struct seq_file *p, void *v)
 {
-	int i, j = 0, k = 0, len = 0, sbusl;
+	int i, j = 0, k = 0, sbusl;
 	struct irqaction * action;
 #ifdef CONFIG_SMP
 	int x;
@@ -94,21 +95,21 @@ int sun4d_get_irq_list(char *buf)
 			}
 			continue;
 		}
-found_it:	len += sprintf(buf+len, "%3d: ", i);
+found_it:	seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
-		len += sprintf(buf+len, "%10u ", kstat_irqs(i));
+		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
 		for (x = 0; x < smp_num_cpus; x++)
-			len += sprintf(buf+len, "%10u ",
+			seq_printf(p, "%10u ",
 				       kstat.irqs[cpu_logical_map(x)][i]);
 #endif
-		len += sprintf(buf+len, "%c %s",
+		seq_printf(p, "%c %s",
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		action = action->next;
 		for (;;) {
 			for (; action; action = action->next) {
-				len += sprintf(buf+len, ",%s %s",
+				seq_printf(p, ",%s %s",
 					(action->flags & SA_INTERRUPT) ? " +" : "",
 					action->name);
 			}
@@ -123,9 +124,9 @@ found_it:	len += sprintf(buf+len, "%3d: ", i);
 				action = sbus_actions [(j << 5) + (sbusl << 2)].action;
 			}
 		}
-		len += sprintf(buf+len, "\n");
+		seq_putc(p, '\n');
 	}
-	return len;
+	return 0;
 }
 
 void sun4d_free_irq(unsigned int irq, void *dev_id)

@@ -27,6 +27,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -84,31 +85,30 @@ struct hw_interrupt_type no_irq_type = {
  */
 
 #if defined(CONFIG_PROC_FS)
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
 	int i, j;
 	struct irqaction * action;
-	char *p = buf;
 
-	p += sprintf(p, "           ");
+	seq_puts(p, "           ");
 	for (j=0; j<smp_num_cpus; j++)
-		p += sprintf(p, "CPU%d       ",j);
-	*p++ = '\n';
+		seq_printf(p, "CPU%d       ",j);
+	seq_putc(p, '\n');
 
 	for (i = 0 ; i < ACTUAL_NR_IRQS ; i++) {
 		action = irq_desc[i].action;
 		if (!action) 
 			continue;
-		p += sprintf(p, "%3d: ",i);
-		p += sprintf(p, "%10u ", kstat_irqs(i));
-		p += sprintf(p, " %14s", irq_desc[i].handler->typename);
-		p += sprintf(p, "  %s", action->name);
+		seq_printf(p, "%3d: ",i);
+		seq_printf(p, "%10u ", kstat_irqs(i));
+		seq_printf(p, " %14s", irq_desc[i].handler->typename);
+		seq_printf(p, "  %s", action->name);
 
 		for (action=action->next; action; action = action->next)
-			p += sprintf(p, ", %s", action->name);
-		*p++ = '\n';
+			seq_printf(p, ", %s", action->name);
+		seq_putc(p, '\n');
 	}
-	return p - buf;
+	return 0;
 }
 #endif
 

@@ -166,7 +166,6 @@ static int aha1542_biosparam(Disk *, kdev_t, int*);
 		     sg_tablesize:		AHA1542_SCATTER, 	\
 		     cmd_per_lun:		AHA1542_CMDLUN, 	\
 		     unchecked_isa_dma:		1, 			\
-		     use_clustering:		ENABLE_CLUSTERING,	\
-		     use_new_eh_code:		1}
-
+		     use_clustering:		ENABLE_CLUSTERING	\
+}
 #endif

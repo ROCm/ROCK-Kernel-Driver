@@ -171,6 +171,7 @@ static int busmouse_release(struct inode *inode, struct file *file)
 	lock_kernel();
 	busmouse_fasync(-1, file, 0);
 
+	down(&mouse_sem); /* to protect mse->active */
 	if (--mse->active == 0) {
 		if (mse->ops->release)
 			ret = mse->ops->release(inode, file);
@@ -179,7 +180,8 @@ static int busmouse_release(struct inode *inode, struct file *file)
 		mse->ready = 0;
 	}
 	unlock_kernel();
-
+	up( &mouse_sem);
+	
 	return ret;
 }
 

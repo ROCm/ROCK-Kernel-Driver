@@ -5486,7 +5486,6 @@ static int idetape_chrdev_release (struct inode *inode, struct file *filp)
 	idetape_pc_t pc;
 	unsigned int minor=MINOR (inode->i_rdev);
 
-	lock_kernel();
 	tape = drive->driver_data;
 #if IDETAPE_DEBUG_LOG
 	if (tape->debug_level >= 3)
@@ -5517,7 +5516,6 @@ static int idetape_chrdev_release (struct inode *inode, struct file *filp)
 		MOD_DEC_USE_COUNT;
 	}
 	clear_bit (IDETAPE_BUSY, &tape->flags);
-	unlock_kernel();
 	return 0;
 }
 
@@ -6180,6 +6178,7 @@ static struct file_operations idetape_fops = {
 };
 
 MODULE_DESCRIPTION("ATAPI Streaming TAPE Driver");
+MODULE_LICENSE("GPL");
 
 static void __exit idetape_exit (void)
 {

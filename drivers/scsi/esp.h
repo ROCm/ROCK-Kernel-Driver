@@ -416,7 +416,6 @@ extern int esp_revoke(Scsi_Device* SDptr);
 		sg_tablesize:   SG_ALL,				\
 		cmd_per_lun:    1,				\
 		use_clustering: ENABLE_CLUSTERING,		\
-		use_new_eh_code: 0				\
 }
 
 /* For our interrupt engine. */

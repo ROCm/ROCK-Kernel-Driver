@@ -35,7 +35,6 @@ int fcal_proc_info (char *, char **, off_t, int, int, int);
 	sg_tablesize:		1,				\
 	cmd_per_lun:		1,				\
 	use_clustering:		ENABLE_CLUSTERING,		\
-	use_new_eh_code:	FCP_SCSI_USE_NEW_EH_CODE,	\
 	abort:			fcp_old_abort,			\
 	eh_abort_handler:	fcp_scsi_abort,			\
 	eh_device_reset_handler:fcp_scsi_dev_reset,		\

@@ -68,7 +68,8 @@ const ftape_info *zft_status;
 
 /*      Local vars.
  */
-static int busy_flag = 0;
+static int busy_flag;
+
 static sigset_t orig_sigmask;
 
 /*  the interface to the kernel vfs layer
@@ -113,14 +114,13 @@ static int zft_open(struct inode *ino, struct file *filep)
 	TRACE_FUN(ft_t_flow);
 
 	TRACE(ft_t_flow, "called for minor %d", MINOR(ino->i_rdev));
-	if (busy_flag) {
+	if ( test_and_set_bit(0,&busy_flag) )) {
 		TRACE_ABORT(-EBUSY, ft_t_warn, "failed: already busy");
 	}
-	busy_flag = 1;
 	if ((MINOR(ino->i_rdev) & ~(ZFT_MINOR_OP_MASK | FTAPE_NO_REWIND))
 	     > 
 	    FTAPE_SEL_D) {
-		busy_flag = 0;
+		clear_bit(0,&busy_flag);
 		TRACE_ABORT(-ENXIO, ft_t_err, "failed: illegal unit nr");
 	}
 	orig_sigmask = current->blocked;
@@ -128,7 +128,7 @@ static int zft_open(struct inode *ino, struct file *filep)
 	result = _zft_open(MINOR(ino->i_rdev), filep->f_flags & O_ACCMODE);
 	if (result < 0) {
 		current->blocked = orig_sigmask; /* restore mask */
-		busy_flag = 0;
+		clear_bit(0,&busy_flag);
 		TRACE_ABORT(result, ft_t_err, "_ftape_open failed");
 	} else {
 		/* Mask signals that will disturb proper operation of the
@@ -147,10 +147,8 @@ static int zft_close(struct inode *ino, struct file *filep)
 	int result;
 	TRACE_FUN(ft_t_flow);
 
-	lock_kernel();
-	if (!busy_flag || MINOR(ino->i_rdev) != zft_unit) {
+	if ( !test_bit(0,&busy_flag) || MINOR(ino->i_rdev) != zft_unit) {
 		TRACE(ft_t_err, "failed: not busy or wrong unit");
-		unlock_kernel();
 		TRACE_EXIT 0;
 	}
 	sigfillset(&current->blocked);
@@ -159,8 +157,7 @@ static int zft_close(struct inode *ino, struct file *filep)
 		TRACE(ft_t_err, "_zft_close failed");
 	}
 	current->blocked = orig_sigmask; /* restore before open state */
-	busy_flag = 0;
-	unlock_kernel();
+	clear_bit(0,&busy_flag);
 	TRACE_EXIT 0;
 }
 
@@ -173,7 +170,7 @@ static int zft_ioctl(struct inode *ino, struct file *filep,
 	sigset_t old_sigmask;
 	TRACE_FUN(ft_t_flow);
 
-	if (!busy_flag || MINOR(ino->i_rdev) != zft_unit || ft_failure) {
+	if ( !test_bit(0,&busy_flag) || MINOR(ino->i_rdev) != zft_unit || ft_failure) {
 		TRACE_ABORT(-EIO, ft_t_err,
 			    "failed: not busy, failure or wrong unit");
 	}
@@ -193,7 +190,7 @@ static int  zft_mmap(struct file *filep, struct vm_area_struct *vma)
 	sigset_t old_sigmask;
 	TRACE_FUN(ft_t_flow);
 
-	if (!busy_flag || 
+	if ( !test_bit(0,&busy_flag) || 
 	    MINOR(filep->f_dentry->d_inode->i_rdev) != zft_unit || 
 	    ft_failure)
 	{
@@ -202,14 +199,12 @@ static int  zft_mmap(struct file *filep, struct vm_area_struct *vma)
 	}
 	old_sigmask = current->blocked; /* save mask */
 	sigfillset(&current->blocked);
-	lock_kernel();
 	if ((result = ftape_mmap(vma)) >= 0) {
 #ifndef MSYNC_BUG_WAS_FIXED
 		static struct vm_operations_struct dummy = { NULL, };
 		vma->vm_ops = &dummy;
 #endif
 	}
-	unlock_kernel();
 	current->blocked = old_sigmask; /* restore mask */
 	TRACE_EXIT result;
 }
@@ -225,7 +220,7 @@ static ssize_t zft_read(struct file *fp, char *buff,
 	TRACE_FUN(ft_t_flow);
 
 	TRACE(ft_t_data_flow, "called with count: %ld", (unsigned long)req_len);
-	if (!busy_flag || MINOR(ino->i_rdev) != zft_unit || ft_failure) {
+	if (!test_bit(0,&busy_flag)  || MINOR(ino->i_rdev) != zft_unit || ft_failure) {
 		TRACE_ABORT(-EIO, ft_t_err,
 			    "failed: not busy, failure or wrong unit");
 	}
@@ -248,7 +243,7 @@ static ssize_t zft_write(struct file *fp, const char *buff,
 	TRACE_FUN(ft_t_flow);
 
 	TRACE(ft_t_flow, "called with count: %ld", (unsigned long)req_len);
-	if (!busy_flag || MINOR(ino->i_rdev) != zft_unit || ft_failure) {
+	if (!test_bit(0,&busy_flag) || MINOR(ino->i_rdev) != zft_unit || ft_failure) {
 		TRACE_ABORT(-EIO, ft_t_err,
 			    "failed: not busy, failure or wrong unit");
 	}
@@ -403,7 +398,7 @@ KERN_INFO
  */
 static int can_unload(void)
 {
-	return (GET_USE_COUNT(THIS_MODULE)||zft_dirty()||busy_flag)?-EBUSY:0;
+	return (GET_USE_COUNT(THIS_MODULE)||zft_dirty()||test_bit(0,&busy_flag))?-EBUSY:0;
 }
 /* Called by modules package when installing the driver
  */

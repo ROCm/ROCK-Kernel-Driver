@@ -115,7 +115,6 @@ extern int i91u_biosparam(Scsi_Disk *, kdev_t, int *);	/*for linux v2.0 */
 	present:	0, \
 	unchecked_isa_dma: 0, \
 	use_clustering:	ENABLE_CLUSTERING, \
- use_new_eh_code: 0 \
 }
 
 #define VIRT_TO_BUS(i)  (unsigned int) virt_to_bus((void *)(i))

@@ -467,7 +467,7 @@ int __init cpqarray_init(void)
 
 		q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
 		q->queuedata = hba[i];
-		blk_init_queue(q, do_ida_request, hba[i]->devname);
+		blk_init_queue(q, do_ida_request);
 		blk_queue_headactive(q, 0);
 		blk_queue_bounce_limit(q, hba[i]->pci_dev->dma_mask);
 		q->max_segments = SG_MAX;

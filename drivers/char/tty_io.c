@@ -2317,7 +2317,9 @@ void __init tty_init(void)
 	if (tty_register_driver(&dev_console_driver))
 		panic("Couldn't register /dev/tty0 driver\n");
 
+	vcs_init();
 	kbd_init();
+	console_map_init();
 #endif
 
 #ifdef CONFIG_ESPSERIAL  /* init ESP before rs, so rs doesn't see the port */
@@ -2363,9 +2365,6 @@ void __init tty_init(void)
 #ifdef CONFIG_MOXA_INTELLIO
 	moxa_init();
 #endif	
-#ifdef CONFIG_VT
-	vcs_init();
-#endif
 #ifdef CONFIG_TN3270
 	tub3270_init();
 #endif

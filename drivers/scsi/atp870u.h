@@ -65,7 +65,6 @@ extern int atp870u_proc_info(char *, char **, off_t, int, int, int);
 	present: 0,		/* number of 7xxx's present   */\
 	unchecked_isa_dma: 0,	/* no memory DMA restrictions */\
 	use_clustering: ENABLE_CLUSTERING,			\
-	use_new_eh_code: 0					\
 }
 
 #endif

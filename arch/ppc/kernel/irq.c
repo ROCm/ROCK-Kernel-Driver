@@ -47,6 +47,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 #include <linux/random.h>
+#include <linux/seq_file.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -371,58 +372,58 @@ void enable_irq(unsigned int irq)
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
 #ifdef CONFIG_APUS
-	return apus_get_irq_list (buf);
+	return show_apus_interrupts(p, v);
 #else
-	int i, len = 0, j;
+	int i, j;
 	struct irqaction * action;
 
-	len += sprintf(buf+len, "           ");
+	seq_puts(p, "           ");
 	for (j=0; j<smp_num_cpus; j++)
-		len += sprintf(buf+len, "CPU%d       ",j);
-	*(char *)(buf+len++) = '\n';
+		seq_printf(p, "CPU%d       ",j);
+	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
 		action = irq_desc[i].action;
 		if ( !action || !action->handler )
 			continue;
-		len += sprintf(buf+len, "%3d: ", i);		
+		seq_printf(p, "%3d: ", i);		
 #ifdef CONFIG_SMP
 		for (j = 0; j < smp_num_cpus; j++)
-			len += sprintf(buf+len, "%10u ",
+			seq_printf(p, "%10u ",
 				kstat.irqs[cpu_logical_map(j)][i]);
 #else		
-		len += sprintf(buf+len, "%10u ", kstat_irqs(i));
+		seq_printf(p, "%10u ", kstat_irqs(i));
 #endif /* CONFIG_SMP */
 		if ( irq_desc[i].handler )		
-			len += sprintf(buf+len, " %s ", irq_desc[i].handler->typename );
+			seq_printf(p, " %s ", irq_desc[i].handler->typename );
 		else
-			len += sprintf(buf+len, "  None      ");
-		len += sprintf(buf+len, "%s", (irq_desc[i].status & IRQ_LEVEL) ? "Level " : "Edge  ");
-		len += sprintf(buf+len, "    %s",action->name);
+			seq_puts(p, "  None      ");
+		seq_printf(p, "%s", (irq_desc[i].status & IRQ_LEVEL) ? "Level " : "Edge  ");
+		seq_printf(p, "    %s",action->name);
 		for (action=action->next; action; action = action->next) {
-			len += sprintf(buf+len, ", %s", action->name);
+			seq_printf(p, ", %s", action->name);
 		}
-		len += sprintf(buf+len, "\n");
+		seq_putc(p, '\n');
 	}
 #ifdef CONFIG_TAU_INT
 	if (tau_initialized){
-		len += sprintf(buf+len, "TAU: ");
+		seq_puts(p, "TAU: ");
 		for (j = 0; j < smp_num_cpus; j++)
-			len += sprintf(buf+len, "%10u ",
+			seq_printf(p, "%10u ",
 					tau_interrupts(j));
-		len += sprintf(buf+len, "  PowerPC             Thermal Assist (cpu temp)\n");
+		seq_puts(p, "  PowerPC             Thermal Assist (cpu temp)\n");
 	}
 #endif
 #ifdef CONFIG_SMP
 	/* should this be per processor send/receive? */
-	len += sprintf(buf+len, "IPI (recv/sent): %10u/%u\n",
+	seq_printf(p, "IPI (recv/sent): %10u/%u\n",
 		       atomic_read(&ipi_recv), atomic_read(&ipi_sent));
 #endif		
-	len += sprintf(buf+len, "BAD: %10u\n", ppc_spurious_interrupts);
-	return len;
+	seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
+	return 0;
 #endif /* CONFIG_APUS */
 }
 

@@ -100,12 +100,10 @@ static int softdog_release(struct inode *inode, struct file *file)
 	 *	Shut off the timer.
 	 * 	Lock it in if it's a module and we defined ...NOWAYOUT
 	 */
-	 lock_kernel();
 #ifndef CONFIG_WATCHDOG_NOWAYOUT	 
 	del_timer(&watchdog_ticktock);
 #endif	
 	timer_alive=0;
-	unlock_kernel();
 	return 0;
 }
 

@@ -127,9 +127,9 @@ struct request_queue
 	unsigned short		hardsect_size;
 	unsigned int		max_segment_size;
 
-	wait_queue_head_t	queue_wait;
+	unsigned long		seg_boundary_mask;
 
-	unsigned int		hash_valid_counter;
+	wait_queue_head_t	queue_wait;
 };
 
 #define RQ_INACTIVE		(-1)
@@ -140,6 +140,7 @@ struct request_queue
 
 #define QUEUE_FLAG_PLUGGED	0	/* queue is plugged */
 #define QUEUE_FLAG_NOSPLIT	1	/* can process bio over several goes */
+#define QUEUE_FLAG_CLUSTER	2	/* cluster several segments into 1 */
 
 #define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
 
@@ -166,11 +167,6 @@ extern inline struct request *elv_next_request(request_queue_t *q)
 	if (rq) {
 		rq->inactive = 0;
 		wmb();
-
-		if (rq->bio)
-			bio_hash_remove(rq->bio);
-		if (rq->biotail)
-			bio_hash_remove(rq->biotail);
 	}
 
 	return rq;
@@ -187,7 +183,7 @@ extern inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
 {
 	struct page *page = bio_page(*bio);
 
-	if (page - page->zone->zone_mem_map > q->bounce_pfn)
+	if ((page - page->zone->zone_mem_map) + (page->zone->zone_start_paddr >> PAGE_SHIFT) < q->bounce_pfn)
 		create_bounce(bio, q->bounce_gfp);
 }
 
@@ -235,7 +231,7 @@ extern void blk_attempt_remerge(request_queue_t *, struct request *);
 /*
  * Access functions for manipulating queue properties
  */
-extern int blk_init_queue(request_queue_t *, request_fn_proc *, char *);
+extern int blk_init_queue(request_queue_t *, request_fn_proc *);
 extern void blk_cleanup_queue(request_queue_t *);
 extern void blk_queue_make_request(request_queue_t *, make_request_fn *);
 extern void blk_queue_bounce_limit(request_queue_t *, unsigned long long);
@@ -243,6 +239,7 @@ extern void blk_queue_max_sectors(request_queue_t *q, unsigned short);
 extern void blk_queue_max_segments(request_queue_t *q, unsigned short);
 extern void blk_queue_max_segment_size(request_queue_t *q, unsigned int);
 extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
+extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void generic_unplug_device(void *);
 

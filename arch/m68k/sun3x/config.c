@@ -58,7 +58,7 @@ void __init config_sun3x(void)
 
 	sun3x_prom_init();
 
-	mach_get_irq_list	 = sun3_get_irq_list;
+	mach_get_irq_list	 = show_sun3_interrupts;
 	mach_max_dma_address = 0xffffffff; /* we can DMA anywhere, whee */
 
 	mach_keyb_init       = sun3x_keyb_init;

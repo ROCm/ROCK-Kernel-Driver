@@ -461,7 +461,6 @@ void tw_unmask_command_interrupt(TW_Device_Extension *tw_dev);
 	present : 0,					\
 	unchecked_isa_dma : 0,				\
 	use_clustering : ENABLE_CLUSTERING,		\
- 	use_new_eh_code : 1,				\
 	emulated : 1					\
 }
 #endif /* _3W_XXXX_H */

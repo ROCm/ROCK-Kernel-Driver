@@ -1,6 +1,8 @@
 #ifndef __ASM_MACINTOSH_H
 #define __ASM_MACINTOSH_H
 
+#include <linux/seq_file.h>
+
 /*
  *	Apple Macintoshisms
  */
@@ -15,7 +17,7 @@ extern void mac_free_irq(unsigned int, void *);
 extern void mac_enable_irq(unsigned int);
 extern void mac_disable_irq(unsigned int);
 extern int mac_irq_pending(unsigned int);
-extern int mac_get_irq_list(char *);
+extern int show_mac_interrupts(struct seq_file *, void *);
 #if 0
 extern void mac_default_handler(int irq);
 #endif

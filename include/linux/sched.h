@@ -21,7 +21,6 @@ extern unsigned long event;
 #include <asm/mmu.h>
 
 #include <linux/smp.h>
-#include <linux/tty.h>
 #include <linux/sem.h>
 #include <linux/signal.h>
 #include <linux/securebits.h>

@@ -50,7 +50,6 @@ int aha152x_proc_info(char *buffer, char **start, off_t offset, int length, int 
                   present:			0,			\
                   unchecked_isa_dma:		0,			\
                   use_clustering:		DISABLE_CLUSTERING,	\
-		  use_new_eh_code:		1 }
 #endif
 
 

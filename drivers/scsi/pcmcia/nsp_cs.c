@@ -149,7 +149,6 @@ static Scsi_Host_Template driver_template = {
 /*	present:		0,*/
 /*	unchecked_isa_dma:	0,*/
 	use_clustering:		DISABLE_CLUSTERING,
-	use_new_eh_code:	0,
 /*	emulated:		0,*/
 };
 

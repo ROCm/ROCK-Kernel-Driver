@@ -70,7 +70,7 @@ extern int atari_request_irq (unsigned int irq, void (*handler)(int, void *, str
 extern void atari_free_irq (unsigned int irq, void *dev_id);
 extern void atari_enable_irq (unsigned int);
 extern void atari_disable_irq (unsigned int);
-extern int atari_get_irq_list (char *buf);
+extern int show_atari_interrupts (struct seq_file *, void *);
 extern void atari_mksound( unsigned int count, unsigned int ticks );
 #ifdef CONFIG_HEARTBEAT
 static void atari_heartbeat( int on );
@@ -265,7 +265,7 @@ void __init config_atari(void)
     disable_irq          = atari_disable_irq;
     mach_get_model	 = atari_get_model;
     mach_get_hardware_list = atari_get_hardware_list;
-    mach_get_irq_list	 = atari_get_irq_list;
+    mach_get_irq_list	 = show_atari_interrupts;
     mach_gettimeoffset   = atari_gettimeoffset;
     mach_reset           = atari_reset;
 #ifdef CONFIG_ATARI_FLOPPY

@@ -458,7 +458,7 @@ static unsigned long bios32_service(unsigned long service)
 	unsigned long flags;
 
 	__save_flags(flags); __cli();
-	__asm__("lcall (%%edi); cld"
+	__asm__("lcall *(%%edi); cld"
 		: "=a" (return_code),
 		  "=b" (address),
 		  "=c" (length),
@@ -499,7 +499,7 @@ static int __devinit check_pcibios(void)
 
 		__save_flags(flags); __cli();
 		__asm__(
-			"lcall (%%edi); cld\n\t"
+			"lcall *(%%edi); cld\n\t"
 			"jc 1f\n\t"
 			"xor %%ah, %%ah\n"
 			"1:"
@@ -544,7 +544,7 @@ static int __devinit pci_bios_find_device (unsigned short vendor, unsigned short
 	unsigned short bx;
 	unsigned short ret;
 
-	__asm__("lcall (%%edi); cld\n\t"
+	__asm__("lcall *(%%edi); cld\n\t"
 		"jc 1f\n\t"
 		"xor %%ah, %%ah\n"
 		"1:"
@@ -573,7 +573,7 @@ static int pci_bios_read (int seg, int bus, int dev, int fn, int reg, int len, u
 
 	switch (len) {
 	case 1:
-		__asm__("lcall (%%esi); cld\n\t"
+		__asm__("lcall *(%%esi); cld\n\t"
 			"jc 1f\n\t"
 			"xor %%ah, %%ah\n"
 			"1:"
@@ -585,7 +585,7 @@ static int pci_bios_read (int seg, int bus, int dev, int fn, int reg, int len, u
 			  "S" (&pci_indirect));
 		break;
 	case 2:
-		__asm__("lcall (%%esi); cld\n\t"
+		__asm__("lcall *(%%esi); cld\n\t"
 			"jc 1f\n\t"
 			"xor %%ah, %%ah\n"
 			"1:"
@@ -597,7 +597,7 @@ static int pci_bios_read (int seg, int bus, int dev, int fn, int reg, int len, u
 			  "S" (&pci_indirect));
 		break;
 	case 4:
-		__asm__("lcall (%%esi); cld\n\t"
+		__asm__("lcall *(%%esi); cld\n\t"
 			"jc 1f\n\t"
 			"xor %%ah, %%ah\n"
 			"1:"
@@ -628,7 +628,7 @@ static int pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len, 
 
 	switch (len) {
 	case 1:
-		__asm__("lcall (%%esi); cld\n\t"
+		__asm__("lcall *(%%esi); cld\n\t"
 			"jc 1f\n\t"
 			"xor %%ah, %%ah\n"
 			"1:"
@@ -640,7 +640,7 @@ static int pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len, 
 			  "S" (&pci_indirect));
 		break;
 	case 2:
-		__asm__("lcall (%%esi); cld\n\t"
+		__asm__("lcall *(%%esi); cld\n\t"
 			"jc 1f\n\t"
 			"xor %%ah, %%ah\n"
 			"1:"
@@ -652,7 +652,7 @@ static int pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len, 
 			  "S" (&pci_indirect));
 		break;
 	case 4:
-		__asm__("lcall (%%esi); cld\n\t"
+		__asm__("lcall *(%%esi); cld\n\t"
 			"jc 1f\n\t"
 			"xor %%ah, %%ah\n"
 			"1:"
@@ -875,7 +875,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 	__asm__("push %%es\n\t"
 		"push %%ds\n\t"
 		"pop  %%es\n\t"
-		"lcall (%%esi); cld\n\t"
+		"lcall *(%%esi); cld\n\t"
 		"pop %%es\n\t"
 		"jc 1f\n\t"
 		"xor %%ah, %%ah\n"
@@ -908,7 +908,7 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq)
 {
 	int ret;
 
-	__asm__("lcall (%%esi); cld\n\t"
+	__asm__("lcall *(%%esi); cld\n\t"
 		"jc 1f\n\t"
 		"xor %%ah, %%ah\n"
 		"1:"

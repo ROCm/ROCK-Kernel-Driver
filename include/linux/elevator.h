@@ -33,13 +33,6 @@ struct elevator_s
 
 	elevator_init_fn *elevator_init_fn;
 	elevator_exit_fn *elevator_exit_fn;
-
-	/*
-	 * per-elevator private data
-	 */
-	void *elevator_data;
-
-	char queue_name[16];
 };
 
 int elevator_noop_merge(request_queue_t *, struct request **, struct list_head *, struct bio *);
@@ -66,7 +59,7 @@ typedef struct blkelv_ioctl_arg_s {
 #define BLKELVGET   _IOR(0x12,106,sizeof(blkelv_ioctl_arg_t))
 #define BLKELVSET   _IOW(0x12,107,sizeof(blkelv_ioctl_arg_t))
 
-extern int elevator_init(request_queue_t *, elevator_t *, elevator_t, char *);
+extern int elevator_init(request_queue_t *, elevator_t *, elevator_t);
 extern void elevator_exit(request_queue_t *, elevator_t *);
 
 /*

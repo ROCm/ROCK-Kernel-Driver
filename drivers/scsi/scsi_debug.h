@@ -37,6 +37,5 @@ int scsi_debug_proc_info(char *, char **, off_t, int, int, int);
 		    cmd_per_lun:       3,			\
 		    unchecked_isa_dma: 0,			\
 		    use_clustering:    ENABLE_CLUSTERING,	\
-		    use_new_eh_code:   1,			\
 }
 #endif

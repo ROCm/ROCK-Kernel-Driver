@@ -597,7 +597,6 @@ static int ds_release(struct inode *inode, struct file *file)
     DEBUG(0, "ds_release(socket %d)\n", i);
     if ((i >= sockets) || (sockets == 0))
 	return 0;
-    lock_kernel();
     s = &socket_table[i];
     user = file->private_data;
     if (CHECK_USER(user))
@@ -615,7 +614,6 @@ static int ds_release(struct inode *inode, struct file *file)
     user->user_magic = 0;
     kfree(user);
 out:
-    unlock_kernel();
     return 0;
 } /* ds_release */
 

@@ -501,7 +501,7 @@ static int __init nbd_init(void)
 #endif
 	blksize_size[MAJOR_NR] = nbd_blksizes;
 	blk_size[MAJOR_NR] = nbd_sizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request, "nbd");
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request);
 	blk_queue_headactive(BLK_DEFAULT_QUEUE(MAJOR_NR), 0);
 	for (i = 0; i < MAX_NBD; i++) {
 		nbd_dev[i].refcnt = 0;

@@ -29,6 +29,7 @@
 ulong if_used = 0;		/* number of interface users */
 static struct divert_info *divert_info_head = NULL;	/* head of queue */
 static struct divert_info *divert_info_tail = NULL;	/* pointer to last entry */
+static spinlock_t divert_info_lock = SPIN_LOCK_UNLOCKED;/* lock for queue */
 static wait_queue_head_t rd_queue;
 
 /*********************************/
@@ -50,8 +51,7 @@ put_info_buffer(char *cp)
 		 return;	/* no memory */
 	strcpy(ib->info_start, cp);	/* set output string */
 	ib->next = NULL;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave( &divert_info_lock, flags );
 	ib->usage_cnt = if_used;
 	if (!divert_info_head)
 		divert_info_head = ib;	/* new head */
@@ -70,6 +70,7 @@ put_info_buffer(char *cp)
 		} else
 			break;
 	}			/* divert_info_head->next */
+	spin_lock_irqrestore( &divert_info_lock, flags );
 	wake_up_interruptible(&(rd_queue));
 }				/* put_info_buffer */
 
@@ -135,17 +136,14 @@ isdn_divert_open(struct inode *ino, struct file *filep)
 {
 	unsigned long flags;
 
-	lock_kernel();
-	save_flags(flags);
-	cli();
-	if_used++;
+	spin_lock_irqsave( &divert_info_lock, flags );
+ 	if_used++;
 	if (divert_info_head)
 		(struct divert_info **) filep->private_data = &(divert_info_tail->next);
 	else
 		(struct divert_info **) filep->private_data = &divert_info_head;
-	restore_flags(flags);
+	spin_unlock_irqrestore( &divert_info_lock, flags );
 	/*  start_divert(); */
-	unlock_kernel();
 	return (0);
 }				/* isdn_divert_open */
 
@@ -158,9 +156,7 @@ isdn_divert_close(struct inode *ino, struct file *filep)
 	struct divert_info *inf;
 	unsigned long flags;
 
-	lock_kernel();
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave( &divert_info_lock, flags );
 	if_used--;
 	inf = *((struct divert_info **) filep->private_data);
 	while (inf) {
@@ -174,7 +170,7 @@ isdn_divert_close(struct inode *ino, struct file *filep)
 			divert_info_head = divert_info_head->next;
 			kfree(inf);
 		}
-	unlock_kernel();
+	spin_unlock_irq( &divert_info_lock, flags );
 	return (0);
 }				/* isdn_divert_close */
 

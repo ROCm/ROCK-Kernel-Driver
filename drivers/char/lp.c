@@ -494,11 +494,9 @@ static int lp_release(struct inode * inode, struct file * file)
 	parport_negotiate (lp_table[minor].dev->port, IEEE1284_MODE_COMPAT);
 	lp_table[minor].current_mode = IEEE1284_MODE_COMPAT;
 	lp_release_parport (&lp_table[minor]);
-	lock_kernel();
 	kfree(lp_table[minor].lp_buffer);
 	lp_table[minor].lp_buffer = NULL;
 	LP_F(minor) &= ~LP_BUSY;
-	unlock_kernel();
 	return 0;
 }
 

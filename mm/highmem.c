@@ -264,16 +264,17 @@ static __init int init_emergency_pool(void)
 
 __initcall(init_emergency_pool);
 
-static inline void bounce_end_io (struct bio *bio, int nr_sectors)
+static inline int bounce_end_io (struct bio *bio, int nr_sectors)
 {
 	struct bio *bio_orig = bio->bi_private;
 	struct page *page = bio_page(bio);
 	unsigned long flags;
+	int ret;
 
 	if (test_bit(BIO_UPTODATE, &bio->bi_flags))
-		set_bit(BIO_UPTODATE, bio_orig->bi_flags);
+		set_bit(BIO_UPTODATE, &bio_orig->bi_flags);
 
-	bio_orig->bi_end_io(bio_orig, nr_sectors);
+	ret = bio_orig->bi_end_io(bio_orig, nr_sectors);
 
 	spin_lock_irqsave(&emergency_lock, flags);
 	if (nr_emergency_pages >= POOL_SIZE) {
@@ -289,23 +290,23 @@ static inline void bounce_end_io (struct bio *bio, int nr_sectors)
 		spin_unlock_irqrestore(&emergency_lock, flags);
 	}
 
-	bio_hash_remove(bio);
 	bio_put(bio);
+	return ret;
 }
 
-static void bounce_end_io_write (struct bio *bio, int nr_sectors)
+static int bounce_end_io_write(struct bio *bio, int nr_sectors)
 {
-	bounce_end_io(bio, nr_sectors);
+	return bounce_end_io(bio, nr_sectors);
 }
 
-static void bounce_end_io_read (struct bio *bio, int nr_sectors)
+static int bounce_end_io_read (struct bio *bio, int nr_sectors)
 {
 	struct bio *bio_orig = bio->bi_private;
 
 	if (test_bit(BIO_UPTODATE, &bio->bi_flags))
 		copy_to_high_bio_irq(bio_orig, bio);
 
-	bounce_end_io(bio, nr_sectors);
+	return bounce_end_io(bio, nr_sectors);
 }
 
 struct page *alloc_bounce_page(int gfp_mask)
@@ -350,31 +351,42 @@ void create_bounce(struct bio **bio_orig, int gfp_mask)
 {
 	struct page *page;
 	struct bio *bio;
+	int i, rw = bio_data_dir(*bio_orig);
 
-	bio = bio_alloc(GFP_NOHIGHIO, 1);
+	BUG_ON((*bio_orig)->bi_idx);
 
-	/*
-	 * wasteful for 1kB fs, but machines with lots of ram are less likely
-	 * to have 1kB fs for anything that needs to go fast. so all things
-	 * considered, it should be ok.
-	 */
-	page = alloc_bounce_page(gfp_mask);
+	bio = bio_alloc(GFP_NOHIGHIO, (*bio_orig)->bi_vcnt);
 
 	bio->bi_dev = (*bio_orig)->bi_dev;
 	bio->bi_sector = (*bio_orig)->bi_sector;
 	bio->bi_rw = (*bio_orig)->bi_rw;
 
-	bio->bi_io_vec->bvl_vec[0].bv_page = page;
-	bio->bi_io_vec->bvl_vec[0].bv_len = bio_size(*bio_orig);
-	bio->bi_io_vec->bvl_vec[0].bv_offset = 0;
+	bio->bi_vcnt = (*bio_orig)->bi_vcnt;
+	bio->bi_idx = 0;
+	bio->bi_size = (*bio_orig)->bi_size;
 
-	bio->bi_private = *bio_orig;
-
-	if (bio_rw(bio) == WRITE) {
+	if (rw & WRITE)
 		bio->bi_end_io = bounce_end_io_write;
-		copy_from_high_bio(bio, *bio_orig);
-	} else
+	else
 		bio->bi_end_io = bounce_end_io_read;
 
+	for (i = 0; i < bio->bi_vcnt; i++) {
+		char *vto, *vfrom;
+
+		page = alloc_bounce_page(gfp_mask);
+
+		bio->bi_io_vec[i].bv_page = page;
+		bio->bi_io_vec[i].bv_len = (*bio_orig)->bi_io_vec[i].bv_len;
+		bio->bi_io_vec[i].bv_offset = 0;
+
+		if (rw & WRITE) {
+			vto = page_address(page);
+			vfrom = __bio_kmap(*bio_orig, i);
+			memcpy(vto, vfrom + __bio_offset(*bio_orig, i), bio->bi_io_vec[i].bv_len);
+			__bio_kunmap(bio, i);
+		}
+	}
+
+	bio->bi_private = *bio_orig;
 	*bio_orig = bio;
 }

@@ -178,7 +178,6 @@ static int adpt_detect(Scsi_Host_Template* sht)
 	adpt_hba* pHba;
 
 	adpt_init();
-	sht->use_new_eh_code = 1;
 
 	PINFO("Detecting Adaptec I2O RAID controllers...\n");
 

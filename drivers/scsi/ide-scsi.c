@@ -661,11 +661,12 @@ static inline struct bio *idescsi_kmalloc_bio (int count)
 
 	if ((first_bh = bhp = bh = bio_alloc(GFP_ATOMIC, 1)) == NULL)
 		goto abort;
-	memset (bh, 0, sizeof (struct bio));
+	bio_init(bh);
 	while (--count) {
 		if ((bh = bio_alloc(GFP_ATOMIC, 1)) == NULL)
 			goto abort;
-		memset (bh, 0, sizeof (struct bio));
+		bio_init(bh);
+		bh->bi_vcnt = 1;
 		bhp->bi_next = bh;
 		bhp = bh;
 		bh->bi_next = NULL;
@@ -707,10 +708,16 @@ static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
 		printk ("ide-scsi: %s: building DMA table, %d segments, %dkB total\n", drive->name, segments, pc->request_transfer >> 10);
 #endif /* IDESCSI_DEBUG_LOG */
 		while (segments--) {
-			bh->bi_io_vec.bv_page = sg->page;
-			bh->bi_io_vec.bv_len = sg->length;
-			bh->bi_io_vec.bv_offset = sg->offset;
+			bh->bi_io_vec[0].bv_page = sg->page;
+			bh->bi_io_vec[0].bv_len = sg->length;
+			bh->bi_io_vec[0].bv_offset = sg->offset;
+			bh->bi_size = sg->length;
 			bh = bh->bi_next;
+			/*
+			 * just until scsi_merge is fixed up...
+			 */
+			BUG_ON(PageHighMem(sg->page));
+			sg->address = page_address(sg->page) + sg->offset;
 			sg++;
 		}
 	} else {
@@ -719,9 +726,10 @@ static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
 #if IDESCSI_DEBUG_LOG
 		printk ("ide-scsi: %s: building DMA table for a single buffer (%dkB)\n", drive->name, pc->request_transfer >> 10);
 #endif /* IDESCSI_DEBUG_LOG */
-		bh->bi_io_vec.bv_page = virt_to_page(pc->scsi_cmd->request_buffer);
-		bh->bi_io_vec.bv_len = pc->request_transfer;
-		bh->bi_io_vec.bv_offset = (unsigned long) pc->scsi_cmd->request_buffer & ~PAGE_MASK;
+		bh->bi_io_vec[0].bv_page = virt_to_page(pc->scsi_cmd->request_buffer);
+		bh->bi_io_vec[0].bv_len = pc->request_transfer;
+		bh->bi_io_vec[0].bv_offset = (unsigned long) pc->scsi_cmd->request_buffer & ~PAGE_MASK;
+		bh->bi_size = pc->request_transfer;
 	}
 	return first_bh;
 }

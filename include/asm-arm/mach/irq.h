@@ -35,7 +35,7 @@ extern struct irqdesc irq_desc[];
 
 extern void (*init_arch_irq)(void);
 extern int setup_arm_irq(int, struct irqaction *);
-extern int get_fiq_list(char *);
+extern int show_fiq_list(struct seq_file *, void *);
 extern void init_FIQ(void);
 
 #endif

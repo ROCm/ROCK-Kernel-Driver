@@ -53,14 +53,7 @@ static int rtc_read_proc(char *page, char **start, off_t off,
 
 static void get_rtc_time(struct rtc_time *rtc_tm);
 
-/*
- *	Bits in rtc_status. (6 bits of room for future expansion)
- */
-
-#define RTC_IS_OPEN		0x01	/* means /dev/rtc is in use	*/
-#define RTC_TIMER_ON		0x02	/* missed irq timer active	*/
-
-static unsigned char rtc_status;	/* bitmapped status byte.	*/
+static atomic_t rtc_ready = ATOMIC_INIT(1);
 static unsigned long rtc_freq;	/* Current periodic IRQ rate	*/
 static struct m48t35_rtc *rtc;
 
@@ -166,23 +159,17 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static int rtc_open(struct inode *inode, struct file *file)
 {
-	if(rtc_status & RTC_IS_OPEN)
+	if( atomic_dec_and_test( &rtc_ready ) ) 
+	{
+		atomic_inc( &rtc_ready );
 		return -EBUSY;
-
-	rtc_status |= RTC_IS_OPEN;
+	}
 	return 0;
 }
 
 static int rtc_release(struct inode *inode, struct file *file)
 {
-	/*
-	 * Turn off all interrupts once the device is no longer
-	 * in use, and clear the data.
-	 */
-
-	lock_kernel();
-	rtc_status &= ~RTC_IS_OPEN;
-	unlock_kernel();
+	atomic_inc( &rtc_ready );
 	return 0;
 }
 

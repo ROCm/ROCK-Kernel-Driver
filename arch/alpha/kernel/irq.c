@@ -23,6 +23,7 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -514,64 +515,63 @@ free_irq(unsigned int irq, void *dev_id)
 }
 
 int
-get_irq_list(char *buf)
+show_interrupts(struct seq_file *p, void *v)
 {
 #ifdef CONFIG_SMP
 	int j;
 #endif
 	int i;
 	struct irqaction * action;
-	char *p = buf;
 
 #ifdef CONFIG_SMP
-	p += sprintf(p, "           ");
+	seq_puts(p, "           ");
 	for (i = 0; i < smp_num_cpus; i++)
-		p += sprintf(p, "CPU%d       ", i);
+		seq_printf(p, "CPU%d       ", i);
 #ifdef DO_BROADCAST_INTS
 	for (i = 0; i < smp_num_cpus; i++)
-		p += sprintf(p, "TRY%d       ", i);
+		seq_printf(p, "TRY%d       ", i);
 #endif
-	*p++ = '\n';
+	seq_putc(p, '\n');
 #endif
 
 	for (i = 0; i < NR_IRQS; i++) {
 		action = irq_desc[i].action;
 		if (!action) 
 			continue;
-		p += sprintf(p, "%3d: ",i);
+		seq_printf(p, "%3d: ",i);
 #ifndef CONFIG_SMP
-		p += sprintf(p, "%10u ", kstat_irqs(i));
+		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
 		for (j = 0; j < smp_num_cpus; j++)
-			p += sprintf(p, "%10u ",
+			seq_printf(p, "%10u ",
 				     kstat.irqs[cpu_logical_map(j)][i]);
 #ifdef DO_BROADCAST_INTS
 		for (j = 0; j < smp_num_cpus; j++)
-			p += sprintf(p, "%10lu ",
+			seq_printf(p, "%10lu ",
 				     irq_attempt(cpu_logical_map(j), i));
 #endif
 #endif
-		p += sprintf(p, " %14s", irq_desc[i].handler->typename);
-		p += sprintf(p, "  %c%s",
+		seq_printf(p, " %14s", irq_desc[i].handler->typename);
+		seq_printf(p, "  %c%s",
 			     (action->flags & SA_INTERRUPT)?'+':' ',
 			     action->name);
 
 		for (action=action->next; action; action = action->next) {
-			p += sprintf(p, ", %c%s",
+			seq_printf(p, ", %c%s",
 				     (action->flags & SA_INTERRUPT)?'+':' ',
 				     action->name);
 		}
-		*p++ = '\n';
+		seq_putc(p, '\n');
 	}
 #if CONFIG_SMP
-	p += sprintf(p, "IPI: ");
+	seq_puts(p, "IPI: ");
 	for (j = 0; j < smp_num_cpus; j++)
-		p += sprintf(p, "%10lu ",
+		seq_printf(p, "%10lu ",
 			     cpu_data[cpu_logical_map(j)].ipi_count);
-	p += sprintf(p, "\n");
+	seq_putc(p, '\n');
 #endif
-	p += sprintf(p, "ERR: %10lu\n", irq_err_count);
-	return p - buf;
+	seq_printf(p, "ERR: %10lu\n", irq_err_count);
+	return 0;
 }
 
 

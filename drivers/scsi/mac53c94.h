@@ -28,7 +28,6 @@ int mac53c94_reset(Scsi_Cmnd *, unsigned int);
 	sg_tablesize:	SG_ALL,				\
 	cmd_per_lun:	1,				\
 	use_clustering:	DISABLE_CLUSTERING,		\
-	use_new_eh_code: 1,				\
 }
 
 /*

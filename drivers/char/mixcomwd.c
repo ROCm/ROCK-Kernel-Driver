@@ -101,11 +101,9 @@ static int mixcomwd_open(struct inode *inode, struct file *file)
 static int mixcomwd_release(struct inode *inode, struct file *file)
 {
 
-	lock_kernel();
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
 	if(mixcomwd_timer_alive) {
 		printk(KERN_ERR "mixcomwd: release called while internal timer alive");
-		unlock_kernel();
 		return -EBUSY;
 	}
 	init_timer(&mixcomwd_timer);
@@ -117,7 +115,6 @@ static int mixcomwd_release(struct inode *inode, struct file *file)
 #endif
 
 	clear_bit(0,&mixcomwd_opened);
-	unlock_kernel();
 	return 0;
 }
 

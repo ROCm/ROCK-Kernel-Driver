@@ -1983,7 +1983,6 @@ static int pmu_release(struct inode *inode, struct file *file)
 	struct pmu_private *pp = file->private_data;
 	unsigned long flags;
 
-	lock_kernel();
 	if (pp != 0) {
 		file->private_data = 0;
 		spin_lock_irqsave(&all_pvt_lock, flags);
@@ -1991,7 +1990,6 @@ static int pmu_release(struct inode *inode, struct file *file)
 		spin_unlock_irqrestore(&all_pvt_lock, flags);
 		kfree(pp);
 	}
-	unlock_kernel();
 	return 0;
 }
 

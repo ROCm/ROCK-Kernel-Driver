@@ -214,7 +214,6 @@ static int fop_open(struct inode * inode, struct file * file)
 
 static int fop_close(struct inode * inode, struct file * file)
 {
-	lock_kernel();
 	if(MINOR(inode->i_rdev) == WATCHDOG_MINOR) 
 	{
 		if(wdt_expect_close)
@@ -225,7 +224,6 @@ static int fop_close(struct inode * inode, struct file * file)
 		}
 	}
 	wdt_is_open = 0;
-	unlock_kernel();
 	return 0;
 }
 

@@ -40,6 +40,7 @@
 #include <linux/ptrace.h>
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/system.h>
 #include <asm/traps.h>
@@ -609,37 +610,37 @@ void atari_unregister_vme_int(unsigned long irq)
 }
 
 
-int atari_get_irq_list(char *buf)
+int show_atari_interrupts(struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 
 	for (i = 0; i < NUM_INT_SOURCES; ++i) {
 		if (vectors[IRQ_SOURCE_TO_VECTOR(i)] == bad_interrupt)
 			continue;
 		if (i < STMFP_SOURCE_BASE)
-			len += sprintf(buf+len, "auto %2d: %10u ",
+			seq_printf(p,, "auto %2d: %10u ",
 				       i, kstat.irqs[0][i]);
 		else
-			len += sprintf(buf+len, "vec $%02x: %10u ",
+			seq_printf(p,, "vec $%02x: %10u ",
 				       IRQ_SOURCE_TO_VECTOR(i),
 				       kstat.irqs[0][i]);
 
 		if (irq_handler[i].handler != atari_call_irq_list) {
-			len += sprintf(buf+len, "%s\n", irq_param[i].devname);
+			seq_printf(p,, "%s\n", irq_param[i].devname);
 		}
 		else {
 			irq_node_t *p;
 			for( p = (irq_node_t *)irq_handler[i].dev_id; p; p = p->next ) {
-				len += sprintf(buf+len, "%s\n", p->devname);
+				seq_printf(p,, "%s\n", p->devname);
 				if (p->next)
-					len += sprintf( buf+len, "                    " );
+					seq_puts(p,, "                    " );
 			}
 		}
 	}
 	if (num_spurious)
-		len += sprintf(buf+len, "spurio.: %10u\n", num_spurious);
+		seq_printf(p, "spurio.: %10u\n", num_spurious);
 	
-	return len;
+	return 0;
 }
 
 

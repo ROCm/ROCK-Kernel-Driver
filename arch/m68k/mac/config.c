@@ -66,7 +66,7 @@ extern void mac_gettod (int *, int *, int *, int *, int *, int *);
 extern unsigned long mac_gettimeoffset (void);
 extern int mac_hwclk (int, struct hwclk_time *);
 extern int mac_set_clock_mmss (unsigned long);
-extern int mac_get_irq_list(char *);
+extern int show_mac_interrupts(struct seq_file *, void *);
 extern void iop_preinit(void);
 extern void iop_init(void);
 extern void via_init(void);
@@ -241,7 +241,7 @@ void __init config_mac(void)
 	disable_irq          = mac_disable_irq;
 	mach_get_model	 = mac_get_model;
 	mach_default_handler = &mac_handlers;
-	mach_get_irq_list    = mac_get_irq_list;
+	mach_get_irq_list    = show_mac_interrupts;
 	mach_gettimeoffset   = mac_gettimeoffset;
 	mach_gettod          = mac_gettod;
 	mach_hwclk           = mac_hwclk;

@@ -151,7 +151,6 @@ advwdt_open(struct inode *inode, struct file *file)
 static int
 advwdt_close(struct inode *inode, struct file *file)
 {
-	lock_kernel();
 	if (MINOR(inode->i_rdev) == WATCHDOG_MINOR) {
 		spin_lock(&advwdt_lock);
 #ifndef CONFIG_WATCHDOG_NOWAYOUT	
@@ -160,7 +159,6 @@ advwdt_close(struct inode *inode, struct file *file)
 		advwdt_is_open = 0;
 		spin_unlock(&advwdt_lock);
 	}
-	unlock_kernel();
 	return 0;
 }
 

@@ -271,6 +271,110 @@ struct file_system_type *get_fs_type(const char *name)
 	return fs;
 }
 
+/**
+ *	alloc_super	-	create new superblock
+ *
+ *	Allocates and initializes a new &struct super_block.  alloc_super()
+ *	returns a pointer new superblock or %NULL if allocation had failed.
+ */
+static struct super_block *alloc_super(void)
+{
+	struct super_block *s = kmalloc(sizeof(struct super_block),  GFP_USER);
+	if (s) {
+		memset(s, 0, sizeof(struct super_block));
+		INIT_LIST_HEAD(&s->s_dirty);
+		INIT_LIST_HEAD(&s->s_locked_inodes);
+		INIT_LIST_HEAD(&s->s_files);
+		INIT_LIST_HEAD(&s->s_instances);
+		init_rwsem(&s->s_umount);
+		sema_init(&s->s_lock, 1);
+		down_write(&s->s_umount);
+		s->s_count = S_BIAS;
+		atomic_set(&s->s_active, 1);
+		sema_init(&s->s_vfs_rename_sem,1);
+		sema_init(&s->s_nfsd_free_path_sem,1);
+		sema_init(&s->s_dquot.dqio_sem, 1);
+		sema_init(&s->s_dquot.dqoff_sem, 1);
+		s->s_maxbytes = MAX_NON_LFS;
+	}
+	return s;
+}
+
+/**
+ *	destroy_super	-	frees a superblock
+ *	@s: superblock to free
+ *
+ *	Frees a superblock.
+ */
+static inline void destroy_super(struct super_block *s)
+{
+	kfree(s);
+}
+
+/* Superblock refcounting  */
+
+/**
+ *	deactivate_super	-	turn an active reference into temporary
+ *	@s: superblock to deactivate
+ *
+ *	Turns an active reference into temporary one.  Returns 0 if there are
+ *	other active references, 1 if we had deactivated the last one.
+ */
+static inline int deactivate_super(struct super_block *s)
+{
+	if (!atomic_dec_and_lock(&s->s_active, &sb_lock))
+		return 0;
+	s->s_count -= S_BIAS-1;
+	spin_unlock(&sb_lock);
+	return 1;
+}
+
+/**
+ *	put_super	-	drop a temporary reference to superblock
+ *	@s: superblock in question
+ *
+ *	Drops a temporary reference, frees superblock if there's no
+ *	references left.
+ */
+static inline void put_super(struct super_block *s)
+{
+	spin_lock(&sb_lock);
+	if (!--s->s_count)
+		destroy_super(s);
+	spin_unlock(&sb_lock);
+}
+
+/**
+ *	grab_super	- acquire an active reference
+ *	@s	- reference we are trying to make active
+ *
+ *	Tries to acquire an active reference.  grab_super() is used when we
+ * 	had just found a superblock in super_blocks or fs_type->fs_supers
+ *	and want to turn it into a full-blown active reference.  grab_super()
+ *	is called with sb_lock held and drops it.  Returns 1 in case of
+ *	success, 0 if we had failed (superblock contents was already dead or
+ *	dying when grab_super() had been called).
+ */
+static int grab_super(struct super_block *s)
+{
+	s->s_count++;
+	spin_unlock(&sb_lock);
+	down_write(&s->s_umount);
+	if (s->s_root) {
+		spin_lock(&sb_lock);
+		if (s->s_count > S_BIAS) {
+			atomic_inc(&s->s_active);
+			s->s_count--;
+			spin_unlock(&sb_lock);
+			return 1;
+		}
+		spin_unlock(&sb_lock);
+	}
+	up_write(&s->s_umount);
+	put_super(s);
+	return 0;
+}
+
 struct vfsmount *alloc_vfsmnt(void);
 void free_vfsmnt(struct vfsmount *mnt);
 void set_devname(struct vfsmount *mnt, const char *name);
@@ -278,14 +382,6 @@ void set_devname(struct vfsmount *mnt, const char *name);
 /* Will go away */
 extern struct vfsmount *root_vfsmnt;
 extern int graft_tree(struct vfsmount *mnt, struct nameidata *nd);
-
-static inline void __put_super(struct super_block *sb)
-{
-	spin_lock(&sb_lock);
-	if (!--sb->s_count)
-		kfree(sb);
-	spin_unlock(&sb_lock);
-}
 
 static inline struct super_block * find_super(kdev_t dev)
 {
@@ -304,14 +400,7 @@ static inline struct super_block * find_super(kdev_t dev)
 void drop_super(struct super_block *sb)
 {
 	up_read(&sb->s_umount);
-	__put_super(sb);
-}
-
-static void put_super(struct super_block *sb)
-{
-	atomic_dec(&sb->s_active);
-	up_write(&sb->s_umount);
-	__put_super(sb);
+	put_super(sb);
 }
 
 static inline void write_super(struct super_block *sb)
@@ -322,7 +411,7 @@ static inline void write_super(struct super_block *sb)
 			sb->s_op->write_super(sb);
 	unlock_super(sb);
 }
- 
+
 /*
  * Note: check the dirty flag before waiting, so we don't
  * hold up the sync while mounting a device. (The newly
@@ -371,19 +460,19 @@ struct super_block * get_super(kdev_t dev)
 
 	if (!dev)
 		return NULL;
-restart:
-	spin_lock(&sb_lock);
-	s = find_super(dev);
-	if (s) {
+
+	while (1) {
+		spin_lock(&sb_lock);
+		s = find_super(dev);
 		spin_unlock(&sb_lock);
+		if (!s)
+			break;
 		down_read(&s->s_umount);
 		if (s->s_root)
-			return s;
+			break;
 		drop_super(s);
-		goto restart;
 	}
-	spin_unlock(&sb_lock);
-	return NULL;
+	return s;
 }
 
 asmlinkage long sys_ustat(dev_t dev, struct ustat * ubuf)
@@ -410,37 +499,6 @@ out:
 	return err;
 }
 
-/**
- *	get_empty_super	-	find empty superblocks
- *
- *	Find a superblock with no device assigned. A free superblock is 
- *	found and returned. If neccessary new superblocks are allocated.
- *	%NULL is returned if there are insufficient resources to complete
- *	the request.
- */
- 
-static struct super_block *alloc_super(void)
-{
-	struct super_block *s = kmalloc(sizeof(struct super_block),  GFP_USER);
-	if (s) {
-		memset(s, 0, sizeof(struct super_block));
-		INIT_LIST_HEAD(&s->s_dirty);
-		INIT_LIST_HEAD(&s->s_locked_inodes);
-		INIT_LIST_HEAD(&s->s_files);
-		INIT_LIST_HEAD(&s->s_instances);
-		init_rwsem(&s->s_umount);
-		sema_init(&s->s_lock, 1);
-		s->s_count = 1;
-		atomic_set(&s->s_active, 1);
-		sema_init(&s->s_vfs_rename_sem,1);
-		sema_init(&s->s_nfsd_free_path_sem,1);
-		sema_init(&s->s_dquot.dqio_sem, 1);
-		sema_init(&s->s_dquot.dqoff_sem, 1);
-		s->s_maxbytes = MAX_NON_LFS;
-	}
-	return s;
-}
-
 static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
 				       struct file_system_type *type, int flags,
 				       void *data)
@@ -456,9 +514,7 @@ static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
 	spin_lock(&sb_lock);
 	list_add (&s->s_list, super_blocks.prev);
 	list_add (&s->s_instances, &type->fs_supers);
-	s->s_count += S_BIAS;
 	spin_unlock(&sb_lock);
-	down_write(&s->s_umount);
 	lock_super(s);
 	if (!type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
 		goto out_fail;
@@ -475,11 +531,12 @@ out_fail:
 	s->s_bdev = 0;
 	s->s_type = NULL;
 	unlock_super(s);
+	deactivate_super(s);
 	spin_lock(&sb_lock);
 	list_del(&s->s_list);
 	list_del(&s->s_instances);
-	s->s_count -= S_BIAS;
 	spin_unlock(&sb_lock);
+	up_write(&s->s_umount);
 	put_super(s);
 	return NULL;
 }
@@ -510,25 +567,6 @@ void put_unnamed_dev(kdev_t dev)
 		return;
 	printk("VFS: put_unnamed_dev: freeing unused device %s\n",
 			kdevname(dev));
-}
-
-static int grab_super(struct super_block *sb)
-{
-	sb->s_count++;
-	atomic_inc(&sb->s_active);
-	spin_unlock(&sb_lock);
-	down_write(&sb->s_umount);
-	if (sb->s_root) {
-		spin_lock(&sb_lock);
-		if (sb->s_count > S_BIAS) {
-			sb->s_count--;
-			spin_unlock(&sb_lock);
-			return 1;
-		}
-		spin_unlock(&sb_lock);
-	}
-	put_super(sb);
-	return 0;
 }
 
 static struct super_block *get_sb_bdev(struct file_system_type *fs_type,
@@ -578,7 +616,6 @@ static struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	s = alloc_super();
 	if (!s)
 		goto out1;
-	down_write(&s->s_umount);
 
 	error = -EBUSY;
 restart:
@@ -591,12 +628,12 @@ restart:
 		if (old->s_type != fs_type ||
 		    ((flags ^ old->s_flags) & MS_RDONLY)) {
 			spin_unlock(&sb_lock);
-			put_super(s);
+			destroy_super(s);
 			goto out1;
 		}
 		if (!grab_super(old))
 			goto restart;
-		put_super(s);
+		destroy_super(s);
 		blkdev_put(bdev, BDEV_FS);
 		path_release(&nd);
 		return old;
@@ -607,8 +644,6 @@ restart:
 	s->s_type = fs_type;
 	list_add (&s->s_list, super_blocks.prev);
 	list_add (&s->s_instances, &fs_type->fs_supers);
-	s->s_count += S_BIAS;
-
 	spin_unlock(&sb_lock);
 
 	error = -EINVAL;
@@ -626,11 +661,12 @@ out_fail:
 	s->s_bdev = 0;
 	s->s_type = NULL;
 	unlock_super(s);
+	deactivate_super(s);
 	spin_lock(&sb_lock);
 	list_del(&s->s_list);
 	list_del(&s->s_instances);
-	s->s_count -= S_BIAS;
 	spin_unlock(&sb_lock);
+	up_write(&s->s_umount);
 	put_super(s);
 out1:
 	blkdev_put(bdev, BDEV_FS);
@@ -664,7 +700,6 @@ static struct super_block *get_sb_single(struct file_system_type *fs_type,
 	struct super_block * s = alloc_super();
 	if (!s)
 		return ERR_PTR(-ENOMEM);
-	down_write(&s->s_umount);
 	/*
 	 * Get the superblock of kernel-wide instance, but
 	 * keep the reference to fs_type.
@@ -677,14 +712,14 @@ retry:
 				s_instances);
 		if (!grab_super(old))
 			goto retry;
-		put_super(s);
+		destroy_super(s);
 		do_remount_sb(old, flags, data);
 		return old;
 	} else {
 		kdev_t dev = get_unnamed_dev();
 		if (!dev) {
 			spin_unlock(&sb_lock);
-			put_super(s);
+			destroy_super(s);
 			return ERR_PTR(-EMFILE);
 		}
 		s->s_dev = dev;
@@ -692,7 +727,6 @@ retry:
 		s->s_type = fs_type;
 		list_add (&s->s_list, super_blocks.prev);
 		list_add (&s->s_instances, &fs_type->fs_supers);
-		s->s_count += S_BIAS;
 		spin_unlock(&sb_lock);
 		lock_super(s);
 		if (!fs_type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
@@ -707,11 +741,12 @@ retry:
 		s->s_bdev = 0;
 		s->s_type = NULL;
 		unlock_super(s);
+		deactivate_super(s);
 		spin_lock(&sb_lock);
 		list_del(&s->s_list);
 		list_del(&s->s_instances);
-		s->s_count -= S_BIAS;
 		spin_unlock(&sb_lock);
+		up_write(&s->s_umount);
 		put_super(s);
 		put_unnamed_dev(dev);
 		return ERR_PTR(-EINVAL);
@@ -726,11 +761,8 @@ void kill_super(struct super_block *sb)
 	struct file_system_type *fs = sb->s_type;
 	struct super_operations *sop = sb->s_op;
 
-	if (!atomic_dec_and_lock(&sb->s_active, &sb_lock))
+	if (!deactivate_super(sb))
 		return;
-
-	sb->s_count -= S_BIAS;
-	spin_unlock(&sb_lock);
 
 	down_write(&sb->s_umount);
 	lock_kernel();
@@ -773,7 +805,7 @@ void kill_super(struct super_block *sb)
 	list_del(&sb->s_list);
 	list_del(&sb->s_instances);
 	spin_unlock(&sb_lock);
-	atomic_inc(&sb->s_active);
+	up_write(&sb->s_umount);
 	put_super(sb);
 }
 

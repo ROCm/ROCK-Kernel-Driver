@@ -89,6 +89,7 @@ static int crd_load(struct file *fp, struct file *outfp);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 static int initrd_users;
+static spinlock_t initrd_users_lock = SPIN_LOCK_UNLOCKED;
 #endif
 #endif
 
@@ -408,12 +409,15 @@ static int initrd_release(struct inode *inode,struct file *file)
 {
 	extern void free_initrd_mem(unsigned long, unsigned long);
 
-	lock_kernel();
+	spin_lock( &initrd_users_lock );
 	if (!--initrd_users) {
+		spin_unlock( &initrd_users_lock );
 		free_initrd_mem(initrd_start, initrd_end);
 		initrd_start = 0;
+	} else {
+		spin_unlock( &initrd_users_lock );
 	}
-	unlock_kernel();
+		
 	blkdev_put(inode->i_bdev, BDEV_FILE);
 	return 0;
 }
@@ -433,8 +437,10 @@ static int rd_open(struct inode * inode, struct file * filp)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (unit == INITRD_MINOR) {
-		if (!initrd_start) return -ENODEV;
+		spin_lock( &initrd_users_lock );
 		initrd_users++;
+		if (!initrd_start) return -ENODEV;
+		spin_unlock( &initrd_users_lock );
 		filp->f_op = &initrd_fops;
 		return 0;
 	}

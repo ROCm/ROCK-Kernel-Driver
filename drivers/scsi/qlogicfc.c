@@ -734,7 +734,6 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
  			scsi_set_pci_device(host, pdev);
 			host->max_id = QLOGICFC_MAX_ID + 1;
 			host->max_lun = QLOGICFC_MAX_LUN;
-			host->hostt->use_new_eh_code = 1;
 			hostdata = (struct isp2x00_hostdata *) host->hostdata;
 
 			memset(hostdata, 0, sizeof(struct isp2x00_hostdata));

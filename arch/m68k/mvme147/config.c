@@ -36,7 +36,7 @@
 extern void mvme147_process_int (int level, struct pt_regs *regs);
 extern void mvme147_init_IRQ (void);
 extern void mvme147_free_irq (unsigned int, void *);
-extern int  mvme147_get_irq_list (char *);
+extern int  show_mvme147_interrupts (struct seq_file *, void *);
 extern void mvme147_enable_irq (unsigned int);
 extern void mvme147_disable_irq (unsigned int);
 static void mvme147_get_model(char *model);
@@ -113,7 +113,7 @@ void __init config_mvme147(void)
 	mach_reset		= mvme147_reset;
 	mach_free_irq		= mvme147_free_irq;
 	mach_process_int	= mvme147_process_int;
-	mach_get_irq_list	= mvme147_get_irq_list;
+	mach_get_irq_list	= show_mvme147_interrupts;
 	mach_request_irq	= mvme147_request_irq;
 	enable_irq		= mvme147_enable_irq;
 	disable_irq		= mvme147_disable_irq;

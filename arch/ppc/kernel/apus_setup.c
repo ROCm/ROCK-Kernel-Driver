@@ -95,7 +95,7 @@ void (*mach_init_IRQ) (void) __initdata = NULL;
 void (*(*mach_default_handler)[]) (int, void *, struct pt_regs *) = NULL;
 void (*mach_get_model) (char *model) = NULL;
 int (*mach_get_hardware_list) (char *buffer) = NULL;
-int (*mach_get_irq_list) (char *) = NULL;
+int (*mach_get_irq_list) (struct seq_file *, void *) = NULL;
 void (*mach_process_int) (int, struct pt_regs *) = NULL;
 /* machine dependent timer functions */
 unsigned long (*mach_gettimeoffset) (void);
@@ -671,12 +671,12 @@ static unsigned int apus_irq_cannonicalize(unsigned int irq)
 	return irq;
 }
 
-int apus_get_irq_list(char *buf)
+int show_apus_interrupts(struct seq_file *p, void *v)
 {
 #ifdef CONFIG_APUS
-	extern int amiga_get_irq_list(char *buf);
+	extern int show_amiga_interrupts(struct seq_file *p, void *v)
 	
-	return amiga_get_irq_list (buf);
+	return show_amiga_interrupts(p, v);
 #else
 	return 0;
 #endif

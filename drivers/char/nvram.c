@@ -108,7 +108,10 @@
 #include <asm/system.h>
 
 static int nvram_open_cnt;	/* #times opened */
-static int nvram_open_mode;		/* special open modes */
+static int nvram_open_mode;	/* special open modes */
+static spinlock_t nvram_open_lock = SPIN_LOCK_UNLOCKED;
+                               /* guards nvram_open_cnt and
+                                         nvram_open_mode */
 #define	NVRAM_WRITE		1		/* opened for writing (exclusive) */
 #define	NVRAM_EXCL		2		/* opened with O_EXCL */
 
@@ -326,29 +329,33 @@ static int nvram_ioctl( struct inode *inode, struct file *file,
 
 static int nvram_open( struct inode *inode, struct file *file )
 {
+	spin_lock( &nvram_open_lock );
 	if ((nvram_open_cnt && (file->f_flags & O_EXCL)) ||
 		(nvram_open_mode & NVRAM_EXCL) ||
 		((file->f_mode & 2) && (nvram_open_mode & NVRAM_WRITE)))
+	{	
+		spin_unlock( &nvram_open_lock );
 		return( -EBUSY );
+	}
 
 	if (file->f_flags & O_EXCL)
 		nvram_open_mode |= NVRAM_EXCL;
 	if (file->f_mode & 2)
 		nvram_open_mode |= NVRAM_WRITE;
 	nvram_open_cnt++;
+	spin_unlock( &nvram_open_lock );
 	return( 0 );
 }
 
 static int nvram_release( struct inode *inode, struct file *file )
 {
-	lock_kernel();
+	spin_lock( &nvram_open_lock );
 	nvram_open_cnt--;
 	if (file->f_flags & O_EXCL)
 		nvram_open_mode &= ~NVRAM_EXCL;
 	if (file->f_mode & 2)
 		nvram_open_mode &= ~NVRAM_WRITE;
-	unlock_kernel();
-
+	spin_unlock( &nvram_open_lock );
 	return( 0 );
 }
 

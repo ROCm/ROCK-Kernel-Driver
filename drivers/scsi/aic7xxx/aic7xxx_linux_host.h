@@ -89,7 +89,6 @@ int		 ahc_linux_abort(Scsi_Cmnd *);
 	present: 0,		/* number of 7xxx's present   */\
 	unchecked_isa_dma: 0,	/* no memory DMA restrictions */\
 	use_clustering: ENABLE_CLUSTERING,			\
-	use_new_eh_code: 1,					\
 	highmem_io: 1						\
 }
 

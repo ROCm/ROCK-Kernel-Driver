@@ -242,22 +242,22 @@ asmlinkage void process_int(unsigned long vec, struct pt_regs *fp)
 	}
 }
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 
 	/* autovector interrupts */
 	if (mach_default_handler) {
 		for (i = 0; i < SYS_IRQS; i++) {
-			len += sprintf(buf+len, "auto %2d: %10u ", i,
+			seq_printf(p, "auto %2d: %10u ", i,
 			               i ? kstat.irqs[0][i] : num_spurious);
-				len += sprintf(buf+len, "  ");
-			len += sprintf(buf+len, "%s\n", irq_list[i].devname);
+			seq_puts(p, "  ");
+			seq_printf(p, "%s\n", irq_list[i].devname);
 		}
 	}
 
-	len += mach_get_irq_list(buf+len);
-	return len;
+	mach_get_irq_list(p, v);
+	return 0;
 }
 
 void init_irq_proc(void)

@@ -974,13 +974,11 @@ static int cosa_release(struct inode *inode, struct file *file)
 	struct cosa_data *cosa;
 	unsigned long flags;
 
-	lock_kernel();
 	cosa = channel->cosa;
 	spin_lock_irqsave(&cosa->lock, flags);
 	cosa->usage--;
 	channel->usage--;
 	spin_unlock_irqrestore(&cosa->lock, flags);
-	unlock_kernel();
 	return 0;
 }
 

@@ -36,7 +36,7 @@
 extern void bvme6000_process_int (int level, struct pt_regs *regs);
 extern void bvme6000_init_IRQ (void);
 extern void bvme6000_free_irq (unsigned int, void *);
-extern int  bvme6000_get_irq_list (char *);
+extern int  show_bvme6000_interrupts(struct seq_file *, void *);
 extern void bvme6000_enable_irq (unsigned int);
 extern void bvme6000_disable_irq (unsigned int);
 static void bvme6000_get_model(char *model);
@@ -145,7 +145,7 @@ void __init config_bvme6000(void)
     mach_reset		 = bvme6000_reset;
     mach_free_irq	 = bvme6000_free_irq;
     mach_process_int	 = bvme6000_process_int;
-    mach_get_irq_list	 = bvme6000_get_irq_list;
+    mach_get_irq_list	 = show_bvme6000_interrupts;
     mach_request_irq	 = bvme6000_request_irq;
     enable_irq		 = bvme6000_enable_irq;
     disable_irq          = bvme6000_disable_irq;

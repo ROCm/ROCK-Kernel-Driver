@@ -292,7 +292,7 @@ static int minix_statfs(struct super_block *sb, struct statfs *buf)
 	return 0;
 }
 
-static int minix_get_block(struct inode *inode, long block,
+static int minix_get_block(struct inode *inode, sector_t block,
 		    struct buffer_head *bh_result, int create)
 {
 	if (INODE_VERSION(inode) == MINIX_V1)

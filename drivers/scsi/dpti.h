@@ -95,7 +95,6 @@ static int adpt_device_reset(Scsi_Cmnd* cmd);
 	sg_tablesize: 0,		/* max scatter-gather cmds    */\
 	cmd_per_lun: 256,		/* cmds per lun (linked cmds) */\
 	use_clustering: ENABLE_CLUSTERING,				\
-	use_new_eh_code: 1,						\
 	proc_name: "dpt_i2o"	/* this is the name of our proc node*/	\
 }
 #endif

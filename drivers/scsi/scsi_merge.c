@@ -107,15 +107,6 @@ static void dma_exhausted(Scsi_Cmnd * SCpnt, int i)
 }
 
 /*
- * FIXME(eric) - the original disk code disabled clustering for MOD
- * devices.  I have no idea why we thought this was a good idea - my
- * guess is that it was an attempt to limit the size of requests to MOD
- * devices.
- */
-#define CLUSTERABLE_DEVICE(SH,SD) (SH->use_clustering && \
-				   SD->type != TYPE_MOD)
-
-/*
  * This entire source file deals with the new queueing code.
  */
 
@@ -126,7 +117,6 @@ static void dma_exhausted(Scsi_Cmnd * SCpnt, int i)
  *
  * Arguments:   q       - Queue for which we are merging request.
  *              req     - request into which we wish to merge.
- *              use_clustering - 1 if this host wishes to use clustering
  *              dma_host - 1 if this host has ISA DMA issues (bus doesn't
  *                      expose all of the address lines, so that DMA cannot
  *                      be done from an arbitrary address).
@@ -141,13 +131,14 @@ static void dma_exhausted(Scsi_Cmnd * SCpnt, int i)
  * Notes:       This is only used for diagnostic purposes.
  */
 __inline static int __count_segments(struct request *req,
-				     int use_clustering,
 				     int dma_host,
 				     int * remainder)
 {
 	int ret = 1;
 	int reqsize = 0;
-	struct bio *bio, *bionext;
+	int i;
+	struct bio *bio;
+	struct bio_vec *bvec;
 
 	if (remainder)
 		reqsize = *remainder;
@@ -161,54 +152,16 @@ __inline static int __count_segments(struct request *req,
 		ret++;
 #endif
 
-	for (bio = req->bio, bionext = bio->bi_next; 
-	     bionext != NULL; 
-	     bio = bionext, bionext = bio->bi_next) {
-		if (use_clustering) {
-			/* 
-			 * See if we can do this without creating another
-			 * scatter-gather segment.  In the event that this is a
-			 * DMA capable host, make sure that a segment doesn't span
-			 * the DMA threshold boundary.  
-			 */
-			if (dma_host && bio_to_phys(bionext) - 1 == ISA_DMA_THRESHOLD) {
-				ret++;
-				reqsize = bio_size(bionext);
-			} else if (BIO_CONTIG(bio, bionext)) {
-				/*
-				 * This one is OK.  Let it go.
-				 */ 
-#ifdef DMA_SEGMENT_SIZE_LIMITED
-				/* Note scsi_malloc is only able to hand out
-				 * chunks of memory in sizes of PAGE_SIZE or
-				 * less.  Thus we need to keep track of
-				 * the size of the piece that we have
-				 * seen so far, and if we have hit
-				 * the limit of PAGE_SIZE, then we are
-				 * kind of screwed and we need to start
-				 * another segment.
-				 */
-				if(dma_host && bio_to_phys(bionext) - 1 >= ISA_DMA_THRESHOLD
-				    && reqsize + bio_size(bionext) > PAGE_SIZE )
-				{
-					ret++;
-					reqsize = bio_size(bionext);
-					continue;
-				}
-#endif
-				reqsize += bio_size(bionext);
-				continue;
-			}
+	rq_for_each_bio(bio, req) {
+		bio_for_each_segment(bvec, bio, i)
 			ret++;
-			reqsize = bio_size(bionext);
-		} else {
-			ret++;
-			reqsize = bio_size(bionext);
-		}
+
+		reqsize += bio_size(bio);
 	}
-	if( remainder != NULL ) {
+
+	if (remainder)
 		*remainder = reqsize;
-	}
+
 	return ret;
 }
 
@@ -244,9 +197,7 @@ recount_segments(Scsi_Cmnd * SCpnt)
 	SHpnt = SCpnt->host;
 	SDpnt = SCpnt->device;
 
-	req->nr_segments = __count_segments(req, 
-					    CLUSTERABLE_DEVICE(SHpnt, SDpnt),
-					    SHpnt->unchecked_isa_dma, NULL);
+	req->nr_segments = __count_segments(req, SHpnt->unchecked_isa_dma,NULL);
 }
 
 #define MERGEABLE_BUFFERS(X,Y) \
@@ -317,7 +268,6 @@ static inline int scsi_new_segment(request_queue_t * q,
  * Arguments:   q       - Queue for which we are merging request.
  *              req     - request into which we wish to merge.
  *              bio     - Block which we may wish to merge into request
- *              use_clustering - 1 if this host wishes to use clustering
  *              dma_host - 1 if this host has ISA DMA issues (bus doesn't
  *                      expose all of the address lines, so that DMA cannot
  *                      be done from an arbitrary address).
@@ -335,9 +285,9 @@ static inline int scsi_new_segment(request_queue_t * q,
  *
  *              This function is not designed to be directly called.  Instead
  *              it should be referenced from other functions where the
- *              use_clustering and dma_host parameters should be integer
- *              constants.  The compiler should thus be able to properly
- *              optimize the code, eliminating stuff that is irrelevant.
+ *              dma_host parameter should be an integer constant. The
+ *              compiler should thus be able to properly optimize the code,
+ *              eliminating stuff that is irrelevant.
  *              It is more maintainable to do this way with a single function
  *              than to have 4 separate functions all doing roughly the
  *              same thing.
@@ -345,45 +295,15 @@ static inline int scsi_new_segment(request_queue_t * q,
 __inline static int __scsi_back_merge_fn(request_queue_t * q,
 					 struct request *req,
 					 struct bio *bio,
-					 int use_clustering,
 					 int dma_host)
 {
-	unsigned int count;
-	unsigned int segment_size = 0;
 	Scsi_Device *SDpnt = q->queuedata;
 
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors)
 		return 0;
-	else if (!BIO_PHYS_4G(req->biotail, bio))
+	else if (!BIO_SEG_BOUNDARY(q, req->biotail, bio))
 		return 0;
 
-	if (use_clustering) {
-		/* 
-		 * See if we can do this without creating another
-		 * scatter-gather segment.  In the event that this is a
-		 * DMA capable host, make sure that a segment doesn't span
-		 * the DMA threshold boundary.  
-		 */
-		if (dma_host && bio_to_phys(req->biotail) - 1 == ISA_DMA_THRESHOLD) {
-			goto new_end_segment;
-		}
-		if (BIO_CONTIG(req->biotail, bio)) {
-#ifdef DMA_SEGMENT_SIZE_LIMITED
-			if( dma_host && bio_to_phys(bio) - 1 >= ISA_DMA_THRESHOLD ) {
-				segment_size = 0;
-				count = __count_segments(req, use_clustering, dma_host, &segment_size);
-				if( segment_size + bio_size(bio) > PAGE_SIZE ) {
-					goto new_end_segment;
-				}
-			}
-#endif
-			/*
-			 * This one is OK.  Let it go.
-			 */
-			return 1;
-		}
-	}
- new_end_segment:
 #ifdef DMA_CHUNK_SIZE
 	if (MERGEABLE_BUFFERS(req->biotail, bio))
 		return scsi_new_mergeable(q, req, SDpnt->host);
@@ -394,45 +314,15 @@ __inline static int __scsi_back_merge_fn(request_queue_t * q,
 __inline static int __scsi_front_merge_fn(request_queue_t * q,
 					  struct request *req,
 					  struct bio *bio,
-					  int use_clustering,
 					  int dma_host)
 {
-	unsigned int count;
-	unsigned int segment_size = 0;
 	Scsi_Device *SDpnt = q->queuedata;
 
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors)
 		return 0;
-	else if (!BIO_PHYS_4G(bio, req->bio))
+	else if (!BIO_SEG_BOUNDARY(q, bio, req->bio))
 		return 0;
 
-	if (use_clustering) {
-		/* 
-		 * See if we can do this without creating another
-		 * scatter-gather segment.  In the event that this is a
-		 * DMA capable host, make sure that a segment doesn't span
-		 * the DMA threshold boundary. 
-		 */
-		if (dma_host && bio_to_phys(bio) - 1 == ISA_DMA_THRESHOLD) {
-			goto new_start_segment;
-		}
-		if (BIO_CONTIG(bio, req->bio)) {
-#ifdef DMA_SEGMENT_SIZE_LIMITED
-			if( dma_host && bio_to_phys(bio) - 1 >= ISA_DMA_THRESHOLD ) {
-				segment_size = bio_size(bio);
-				count = __count_segments(req, use_clustering, dma_host, &segment_size);
-				if( count != req->nr_segments ) {
-					goto new_start_segment;
-				}
-			}
-#endif
-			/*
-			 * This one is OK.  Let it go.
-			 */
-			return 1;
-		}
-	}
- new_start_segment:
 #ifdef DMA_CHUNK_SIZE
 	if (MERGEABLE_BUFFERS(bio, req->bio))
 		return scsi_new_mergeable(q, req, SDpnt->host);
@@ -457,7 +347,7 @@ __inline static int __scsi_front_merge_fn(request_queue_t * q,
  * Notes:       Optimized for different cases depending upon whether
  *              ISA DMA is in use and whether clustering should be used.
  */
-#define MERGEFCT(_FUNCTION, _BACK_FRONT, _CLUSTER, _DMA)		\
+#define MERGEFCT(_FUNCTION, _BACK_FRONT, _DMA)				\
 static int _FUNCTION(request_queue_t * q,				\
 		     struct request * req,				\
 		     struct bio *bio)					\
@@ -466,21 +356,15 @@ static int _FUNCTION(request_queue_t * q,				\
     ret =  __scsi_ ## _BACK_FRONT ## _merge_fn(q,			\
 					       req,			\
 					       bio,			\
-					       _CLUSTER,		\
 					       _DMA);			\
     return ret;								\
 }
 
-/* Version with use_clustering 0 and dma_host 1 is not necessary,
- * since the only use of dma_host above is protected by use_clustering.
- */
-MERGEFCT(scsi_back_merge_fn_, back, 0, 0)
-MERGEFCT(scsi_back_merge_fn_c, back, 1, 0)
-MERGEFCT(scsi_back_merge_fn_dc, back, 1, 1)
+MERGEFCT(scsi_back_merge_fn_, back, 0)
+MERGEFCT(scsi_back_merge_fn_d, back, 1)
 
-MERGEFCT(scsi_front_merge_fn_, front, 0, 0)
-MERGEFCT(scsi_front_merge_fn_c, front, 1, 0)
-MERGEFCT(scsi_front_merge_fn_dc, front, 1, 1)
+MERGEFCT(scsi_front_merge_fn_, front, 0)
+MERGEFCT(scsi_front_merge_fn_d, front, 1)
 
 /*
  * Function:    __scsi_merge_requests_fn()
@@ -490,7 +374,6 @@ MERGEFCT(scsi_front_merge_fn_dc, front, 1, 1)
  * Arguments:   q       - Queue for which we are merging request.
  *              req     - request into which we wish to merge.
  *              next    - 2nd request that we might want to combine with req
- *              use_clustering - 1 if this host wishes to use clustering
  *              dma_host - 1 if this host has ISA DMA issues (bus doesn't
  *                      expose all of the address lines, so that DMA cannot
  *                      be done from an arbitrary address).
@@ -505,20 +388,10 @@ MERGEFCT(scsi_front_merge_fn_dc, front, 1, 1)
  *              function is called from ll_rw_blk before it attempts to merge
  *              a new block into a request to make sure that the request will
  *              not become too large.
- *
- *              This function is not designed to be directly called.  Instead
- *              it should be referenced from other functions where the
- *              use_clustering and dma_host parameters should be integer
- *              constants.  The compiler should thus be able to properly
- *              optimize the code, eliminating stuff that is irrelevant.
- *              It is more maintainable to do this way with a single function
- *              than to have 4 separate functions all doing roughly the
- *              same thing.
  */
 __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 					     struct request *req,
 					     struct request *next,
-					     int use_clustering,
 					     int dma_host)
 {
 	Scsi_Device *SDpnt;
@@ -530,7 +403,7 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 	 */
 	if (req->special || next->special)
 		return 0;
-	else if (!BIO_PHYS_4G(req->biotail, next->bio))
+	else if (!BIO_SEG_BOUNDARY(q, req->biotail, next->bio))
 		return 0;
 
 	SDpnt = (Scsi_Device *) q->queuedata;
@@ -559,51 +432,6 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 	if ((req->nr_sectors + next->nr_sectors) > SHpnt->max_sectors)
 		return 0;
 
-	/*
-	 * The main question is whether the two segments at the boundaries
-	 * would be considered one or two.
-	 */
-	if (use_clustering) {
-		/* 
-		 * See if we can do this without creating another
-		 * scatter-gather segment.  In the event that this is a
-		 * DMA capable host, make sure that a segment doesn't span
-		 * the DMA threshold boundary.  
-		 */
-		if (dma_host && bio_to_phys(req->biotail) - 1 == ISA_DMA_THRESHOLD) {
-			goto dont_combine;
-		}
-#ifdef DMA_SEGMENT_SIZE_LIMITED
-		/*
-		 * We currently can only allocate scatter-gather bounce
-		 * buffers in chunks of PAGE_SIZE or less.
-		 */
-		if (dma_host
-		    && BIO_CONTIG(req->biotail, next->bio)
-		    && bio_to_phys(req->biotail) - 1 >= ISA_DMA_THRESHOLD )
-		{
-			int segment_size = 0;
-			int count = 0;
-
-			count = __count_segments(req, use_clustering, dma_host, &segment_size);
-			count += __count_segments(next, use_clustering, dma_host, &segment_size);
-			if( count != req->nr_segments + next->nr_segments ) {
-				goto dont_combine;
-			}
-		}
-#endif
-		if (BIO_CONTIG(req->biotail, next->bio)) {
-			/*
-			 * This one is OK.  Let it go.
-			 */
-			req->nr_segments += next->nr_segments - 1;
-#ifdef DMA_CHUNK_SIZE
-			req->nr_hw_segments += next->nr_hw_segments - 1;
-#endif
-			return 1;
-		}
-	}
-      dont_combine:
 #ifdef DMA_CHUNK_SIZE
 	if (req->nr_segments + next->nr_segments > q->max_segments)
 		return 0;
@@ -657,22 +485,18 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
  * Notes:       Optimized for different cases depending upon whether
  *              ISA DMA is in use and whether clustering should be used.
  */
-#define MERGEREQFCT(_FUNCTION, _CLUSTER, _DMA)		\
+#define MERGEREQFCT(_FUNCTION, _DMA)			\
 static int _FUNCTION(request_queue_t * q,		\
 		     struct request * req,		\
 		     struct request * next)		\
 {							\
     int ret;						\
-    ret =  __scsi_merge_requests_fn(q, req, next, _CLUSTER, _DMA); \
+    ret =  __scsi_merge_requests_fn(q, req, next, _DMA); \
     return ret;						\
 }
 
-/* Version with use_clustering 0 and dma_host 1 is not necessary,
- * since the only use of dma_host above is protected by use_clustering.
- */
-MERGEREQFCT(scsi_merge_requests_fn_, 0, 0)
-MERGEREQFCT(scsi_merge_requests_fn_c, 1, 0)
-MERGEREQFCT(scsi_merge_requests_fn_dc, 1, 1)
+MERGEREQFCT(scsi_merge_requests_fn_, 0)
+MERGEREQFCT(scsi_merge_requests_fn_d, 1)
 /*
  * Function:    __init_io()
  *
@@ -680,7 +504,6 @@ MERGEREQFCT(scsi_merge_requests_fn_dc, 1, 1)
  *
  * Arguments:   SCpnt   - Command descriptor we wish to initialize
  *              sg_count_valid  - 1 if the sg count in the req is valid.
- *              use_clustering - 1 if this host wishes to use clustering
  *              dma_host - 1 if this host has ISA DMA issues (bus doesn't
  *                      expose all of the address lines, so that DMA cannot
  *                      be done from an arbitrary address).
@@ -708,7 +531,6 @@ MERGEREQFCT(scsi_merge_requests_fn_dc, 1, 1)
  */
 __inline static int __init_io(Scsi_Cmnd * SCpnt,
 			      int sg_count_valid,
-			      int use_clustering,
 			      int dma_host)
 {
 	struct bio	   * bio;
@@ -722,18 +544,13 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 	int		     this_count;
 	void		   ** bbpnt;
 
-	/*
-	 * now working right now
-	 */
-	BUG_ON(dma_host);
-
 	req = &SCpnt->request;
 
 	/*
 	 * First we need to know how many scatter gather segments are needed.
 	 */
 	if (!sg_count_valid) {
-		count = __count_segments(req, use_clustering, dma_host, NULL);
+		count = __count_segments(req, dma_host, NULL);
 	} else {
 		count = req->nr_segments;
 	}
@@ -975,10 +792,10 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 	return 1;
 }
 
-#define INITIO(_FUNCTION, _VALID, _CLUSTER, _DMA)	\
-static int _FUNCTION(Scsi_Cmnd * SCpnt)			\
-{							\
-    return __init_io(SCpnt, _VALID, _CLUSTER, _DMA);	\
+#define INITIO(_FUNCTION, _VALID, _DMA)		\
+static int _FUNCTION(Scsi_Cmnd * SCpnt)		\
+{						\
+    return __init_io(SCpnt, _VALID, _DMA);	\
 }
 
 /*
@@ -987,10 +804,8 @@ static int _FUNCTION(Scsi_Cmnd * SCpnt)			\
  * We always force "_VALID" to 1.  Eventually clean this up
  * and get rid of the extra argument.
  */
-INITIO(scsi_init_io_v, 1, 0, 0)
-INITIO(scsi_init_io_vd, 1, 0, 1)
-INITIO(scsi_init_io_vc, 1, 1, 0)
-INITIO(scsi_init_io_vdc, 1, 1, 1)
+INITIO(scsi_init_io_v, 1, 0)
+INITIO(scsi_init_io_vd, 1, 1)
 
 /*
  * Function:    initialize_merge_fn()
@@ -1022,26 +837,16 @@ void initialize_merge_fn(Scsi_Device * SDpnt)
 	 * is simply easier to do it ourselves with our own functions
 	 * rather than rely upon the default behavior of ll_rw_blk.
 	 */
-	if (!CLUSTERABLE_DEVICE(SHpnt, SDpnt) && SHpnt->unchecked_isa_dma == 0) {
+	if (SHpnt->unchecked_isa_dma == 0) {
 		q->back_merge_fn = scsi_back_merge_fn_;
 		q->front_merge_fn = scsi_front_merge_fn_;
 		q->merge_requests_fn = scsi_merge_requests_fn_;
 		SDpnt->scsi_init_io_fn = scsi_init_io_v;
-	} else if (!CLUSTERABLE_DEVICE(SHpnt, SDpnt) && SHpnt->unchecked_isa_dma != 0) {
-		q->back_merge_fn = scsi_back_merge_fn_;
-		q->front_merge_fn = scsi_front_merge_fn_;
-		q->merge_requests_fn = scsi_merge_requests_fn_;
+	} else {
+		q->back_merge_fn = scsi_back_merge_fn_d;
+		q->front_merge_fn = scsi_front_merge_fn_d;
+		q->merge_requests_fn = scsi_merge_requests_fn_d;
 		SDpnt->scsi_init_io_fn = scsi_init_io_vd;
-	} else if (CLUSTERABLE_DEVICE(SHpnt, SDpnt) && SHpnt->unchecked_isa_dma == 0) {
-		q->back_merge_fn = scsi_back_merge_fn_c;
-		q->front_merge_fn = scsi_front_merge_fn_c;
-		q->merge_requests_fn = scsi_merge_requests_fn_c;
-		SDpnt->scsi_init_io_fn = scsi_init_io_vc;
-	} else if (CLUSTERABLE_DEVICE(SHpnt, SDpnt) && SHpnt->unchecked_isa_dma != 0) {
-		q->back_merge_fn = scsi_back_merge_fn_dc;
-		q->front_merge_fn = scsi_front_merge_fn_dc;
-		q->merge_requests_fn = scsi_merge_requests_fn_dc;
-		SDpnt->scsi_init_io_fn = scsi_init_io_vdc;
 	}
 
 	/*

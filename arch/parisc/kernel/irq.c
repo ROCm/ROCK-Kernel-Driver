@@ -39,6 +39,7 @@
 #include <linux/random.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/seq_file.h>
 
 #include <asm/cache.h>
 
@@ -160,19 +161,18 @@ void enable_irq(int irq)
 		BUG();
 }
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
 #ifdef CONFIG_PROC_FS
-	char *p = buf;
 	int i, j;
 	int regnr, irq_no;
 	struct irq_region *region;
 	struct irqaction *action, *mainaction;
 
-	p += sprintf(p, "           ");
+	seq_puts(p, "           ");
 	for (j=0; j<smp_num_cpus; j++)
-		p += sprintf(p, "CPU%d       ",j);
-	*p++ = '\n';
+		seq_printf(p, "CPU%d       ",j);
+	seq_putc(p, '\n');
 
 	for (regnr = 0; regnr < NR_IRQ_REGS; regnr++) {
 	    region = irq_region[regnr];
@@ -188,40 +188,34 @@ int get_irq_list(char *buf)
 		
 		irq_no = IRQ_FROM_REGION(regnr) + i;
 		
-		p += sprintf(p, "%3d: ", irq_no);
+		seq_printf(p, "%3d: ", irq_no);
 #ifndef CONFIG_SMP
-		p += sprintf(p, "%10u ", kstat_irqs(irq_no));
+		seq_printf(p, "%10u ", kstat_irqs(irq_no));
 #else
 		for (j = 0; j < smp_num_cpus; j++)
-		    p += sprintf(p, "%10u ",
+		    seq_printf(p, "%10u ",
 			    kstat.irqs[cpu_logical_map(j)][irq_no]);
 #endif
-		p += sprintf(p, " %14s", 
+		seq_printf(p, " %14s", 
 			    region->data.name ? region->data.name : "N/A");
-		p += sprintf(p, "  %s", action->name);
+		seq_printf(p, "  %s", action->name);
 
 		for (action=action->next; action; action = action->next)
-		    p += sprintf(p, ", %s", action->name);
-		*p++ = '\n';
+		    seq_printf(p, ", %s", action->name);
+		seq_putc(p, '\n');
 	    }	    	     
 	}  
 
-	p += sprintf(p, "\n");
+	seq_putc(p, '\n');
 #if CONFIG_SMP
-	p += sprintf(p, "LOC: ");
+	seq_puts(p, "LOC: ");
 	for (j = 0; j < smp_num_cpus; j++)
-		p += sprintf(p, "%10u ",
+		seq_printf(p, "%10u ",
 			apic_timer_irqs[cpu_logical_map(j)]);
-	p += sprintf(p, "\n");
+	seq_putc(p, '\n');
 #endif
-
-	return p - buf;
-
-#else	/* CONFIG_PROC_FS */
-
-	return 0;	
-
 #endif	/* CONFIG_PROC_FS */
+	return 0;
 }
 
 

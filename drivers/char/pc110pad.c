@@ -68,7 +68,9 @@ static struct pc110pad_params current_params;
 /* driver/filesystem interface management */
 static wait_queue_head_t queue;
 static struct fasync_struct *asyncptr;
-static int active;	/* number of concurrent open()s */
+static active_count = 0; 	/* number of concurrent open()s */
+static spinlock_t active_lock = SPIN_LOCK_UNLOCKED;
+/* this lock should be held when referencing active_count */
 static struct semaphore reader_lock;
 
 /**
@@ -584,11 +586,11 @@ static int fasync_pad(int fd, struct file *filp, int on)
  
 static int close_pad(struct inode * inode, struct file * file)
 {
-	lock_kernel();
 	fasync_pad(-1, file, 0);
-	if (!--active)
+	spin_lock( &active_lock );
+	if (!--active_count)
 		outb(0x30, current_params.io+2);  /* switch off digitiser */
-	unlock_kernel();
+	spin_unlock( &active_lock );	
 	return 0;
 }
 
@@ -608,8 +610,13 @@ static int open_pad(struct inode * inode, struct file * file)
 {
 	unsigned long flags;
 	
-	if (active++)
+	spin_lock( &active_lock );
+	if (active_count++)
+        {
+		spin_unlock( &active_lock );
 		return 0;
+	}
+	spin_unlock( &active_lock );
 
 	save_flags(flags);
 	cli();

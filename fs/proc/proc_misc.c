@@ -57,7 +57,6 @@ extern int get_device_list(char *);
 extern int get_partition_list(char *, char **, off_t, int);
 extern int get_filesystem_list(char *);
 extern int get_exec_domain_list(char *);
-extern int get_irq_list(char *);
 extern int get_dma_list(char *);
 extern int get_locks_status (char *, char **, off_t, int);
 extern int get_swaparea_info (char *);
@@ -139,24 +138,14 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
  * display in kilobytes.
  */
 #define K(x) ((x) << (PAGE_SHIFT - 10))
-#define B(x) ((unsigned long long)(x) << PAGE_SHIFT)
 	si_meminfo(&i);
 	si_swapinfo(&i);
 	pg_size = atomic_read(&page_cache_size) - i.bufferram ;
 
-	len = sprintf(page, "        total:    used:    free:  shared: buffers:  cached:\n"
-		"Mem:  %8Lu %8Lu %8Lu %8Lu %8Lu %8Lu\n"
-		"Swap: %8Lu %8Lu %8Lu\n",
-		B(i.totalram), B(i.totalram-i.freeram), B(i.freeram),
-		B(i.sharedram), B(i.bufferram),
-		B(pg_size), B(i.totalswap),
-		B(i.totalswap-i.freeswap), B(i.freeswap));
 	/*
 	 * Tagged format, for easy grepping and expansion.
-	 * The above will go away eventually, once the tools
-	 * have been updated.
 	 */
-	len += sprintf(page+len,
+	len = sprintf(page,
 		"MemTotal:     %8lu kB\n"
 		"MemFree:      %8lu kB\n"
 		"MemShared:    %8lu kB\n"
@@ -187,7 +176,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.freeswap));
 
 	return proc_calc_metrics(page, start, off, count, eof, len);
-#undef B
 #undef K
 }
 
@@ -328,14 +316,53 @@ static int partitions_read_proc(char *page, char **start, off_t off,
 	return len;
 }
 
-#if !defined(CONFIG_ARCH_S390)
-static int interrupts_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
+static void *single_start(struct seq_file *p, loff_t *pos)
 {
-	int len = get_irq_list(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
+	return (void *)(*pos == 0);
 }
-#endif
+static void *single_next(struct seq_file *p, void *v, loff_t *pos)
+{
+	++*pos;
+	return NULL;
+}
+static void single_stop(struct seq_file *p, void *v)
+{
+}
+extern int show_interrupts(struct seq_file *p, void *v);
+static struct seq_operations proc_interrupts_op = {
+	start:	single_start,
+	next:	single_next,
+	stop:	single_stop,
+	show:	show_interrupts,
+};
+static int interrupts_open(struct inode *inode, struct file *file)
+{
+	unsigned size = PAGE_SIZE;
+	/*
+	 * probably should depend on NR_CPUS, but that's only rough estimate;
+	 * if we'll need more it will be given,
+	 */
+	char *buf = kmalloc(size, GFP_KERNEL);
+	struct seq_file *m;
+	int res;
+
+	if (!buf)
+		return -ENOMEM;
+	res = seq_open(file, &proc_interrupts_op);
+	if (!res) {
+		m = file->private_data;
+		m->buf = buf;
+		m->size = size;
+	} else
+		kfree(buf);
+	return res;
+}
+static struct file_operations proc_interrupts_operations = {
+	open:		interrupts_open,
+	read:		seq_read,
+	llseek:		seq_lseek,
+	release:	seq_release,
+};
 
 static int filesystems_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
@@ -512,9 +539,6 @@ void __init proc_misc_init(void)
 		{"stat",	kstat_read_proc},
 		{"devices",	devices_read_proc},
 		{"partitions",	partitions_read_proc},
-#if !defined(CONFIG_ARCH_S390)
-		{"interrupts",	interrupts_read_proc},
-#endif
 		{"filesystems",	filesystems_read_proc},
 		{"dma",		dma_read_proc},
 		{"ioports",	ioports_read_proc},
@@ -537,6 +561,9 @@ void __init proc_misc_init(void)
 		entry->proc_fops = &proc_kmsg_operations;
 	create_seq_entry("mounts", 0, &proc_mounts_operations);
 	create_seq_entry("cpuinfo", 0, &proc_cpuinfo_operations);
+#if defined(CONFIG_ARCH_S390) || defined(CONFIG_X86) || defined(CONFIG_ARCH_MIPS)
+	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
+#endif
 #ifdef CONFIG_MODULES
 	create_seq_entry("ksyms", 0, &proc_ksyms_operations);
 #endif

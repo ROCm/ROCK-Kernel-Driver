@@ -374,7 +374,6 @@ static int wdt_open(struct inode *inode, struct file *file)
  
 static int wdt_release(struct inode *inode, struct file *file)
 {
-	lock_kernel();
 	if(MINOR(inode->i_rdev)==WATCHDOG_MINOR)
 	{
 #ifndef CONFIG_WATCHDOG_NOWAYOUT	
@@ -383,7 +382,6 @@ static int wdt_release(struct inode *inode, struct file *file)
 #endif		
 		wdt_is_open=0;
 	}
-	unlock_kernel();
 	return 0;
 }
 

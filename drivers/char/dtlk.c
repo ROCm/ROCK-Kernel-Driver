@@ -328,10 +328,8 @@ static int dtlk_release(struct inode *inode, struct file *file)
 		break;
 	}
 	TRACE_RET;
-
-	lock_kernel();
+	
 	del_timer(&dtlk_timer);
-	unlock_kernel();
 
 	return 0;
 }

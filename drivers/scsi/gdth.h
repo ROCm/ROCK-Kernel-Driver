@@ -1060,7 +1060,6 @@ int gdth_eh_host_reset(Scsi_Cmnd *scp);
                present:         0,                               \
                unchecked_isa_dma: 1,                             \
                use_clustering:  ENABLE_CLUSTERING,               \
-               use_new_eh_code: 1       /* use new error code */ }    
 
 #elif LINUX_VERSION_CODE >= 0x02015F
 int gdth_bios_param(Disk *,kdev_t,int *);
@@ -1092,7 +1091,6 @@ int gdth_eh_host_reset(Scsi_Cmnd *scp);
                present:         0,                               \
                unchecked_isa_dma: 1,                             \
                use_clustering:  ENABLE_CLUSTERING,               \
-               use_new_eh_code: 1       /* use new error code */ }    
 
 #elif LINUX_VERSION_CODE >= 0x010300
 int gdth_bios_param(Disk *,kdev_t,int *);

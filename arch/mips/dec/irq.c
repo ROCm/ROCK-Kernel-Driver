@@ -15,6 +15,7 @@
 #include <linux/timex.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/seq_file.h>
 
 #include <asm/bitops.h>
 #include <asm/bootinfo.h>
@@ -92,27 +93,27 @@ static struct irqaction *irq_action[32] =
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
-    int i, len = 0;
-    struct irqaction *action;
+	int i;
+	struct irqaction *action;
 
-    for (i = 0; i < 32; i++) {
-	action = irq_action[i];
-	if (!action)
-	    continue;
-	len += sprintf(buf + len, "%2d: %8d %c %s",
-		       i, kstat.irqs[0][i],
-		       (action->flags & SA_INTERRUPT) ? '+' : ' ',
-		       action->name);
-	for (action = action->next; action; action = action->next) {
-	    len += sprintf(buf + len, ",%s %s",
-			   (action->flags & SA_INTERRUPT) ? " +" : "",
-			   action->name);
+	for (i = 0; i < 32; i++) {
+		action = irq_action[i];
+		if (!action)
+			continue;
+		seq_printf(p, "%2d: %8d %c %s",
+				i, kstat.irqs[0][i],
+				(action->flags & SA_INTERRUPT) ? '+' : ' ',
+				action->name);
+		for (action = action->next; action; action = action->next) {
+			seq_printf(p, ",%s %s",
+				(action->flags & SA_INTERRUPT) ? " +" : "",
+				action->name);
+		}
+		seq_putc(p, '\n');
 	}
-	len += sprintf(buf + len, "\n");
-    }
-    return len;
+	return 0;
 }
 
 /*

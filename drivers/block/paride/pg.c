@@ -276,7 +276,7 @@ void pg_init_units( void )
 	pg_drive_count = 0;
 	for (unit=0;unit<PG_UNITS;unit++) {
 		PG.pi = & PG.pia;
-		PG.access = 0;
+		set_bit( 0, &PG.access );
 		PG.busy = 0;
 		PG.present = 0;
 		PG.bufptr = NULL;
@@ -573,10 +573,7 @@ static int pg_open (struct inode *inode, struct file *file)
 
 	if ((unit >= PG_UNITS) || (!PG.present)) return -ENODEV;
 
-	PG.access++;
-
-	if (PG.access > 1) {
-		PG.access--;
+	if ( test_and_set_bit(0, &PG.access) ) {
 		return -EBUSY;
 	}
 
@@ -590,7 +587,7 @@ static int pg_open (struct inode *inode, struct file *file)
 
 	PG.bufptr = kmalloc(PG_MAX_DATA,GFP_KERNEL);
 	if (PG.bufptr == NULL) {
-		PG.access--;
+		clear_bit( 0, &PG.access ) ;
 		printk("%s: buffer allocation failed\n",PG.name);
 		return -ENOMEM;
 	}
@@ -602,15 +599,13 @@ static int pg_release (struct inode *inode, struct file *file)
 {
 	int	unit = DEVICE_NR(inode->i_rdev);
 
-	if ((unit >= PG_UNITS) || (PG.access <= 0)) 
+	if ( unit >= PG_UNITS || !test_bit(0,&PG.access) )
 		return -EINVAL;
 
-	lock_kernel();
-	PG.access--;
+	clear_bit( 0, &PG.access);
 
 	kfree(PG.bufptr);
 	PG.bufptr = NULL;
-	unlock_kernel();
 
 	return 0;
 

@@ -193,7 +193,6 @@ static int hiddev_release(struct inode * inode, struct file * file)
 	struct hiddev_list *list = file->private_data;
 	struct hiddev_list **listptr;
 
-	lock_kernel();
 	listptr = &list->hiddev->list;
 	hiddev_fasync(-1, file, 0);
 
@@ -209,7 +208,6 @@ static int hiddev_release(struct inode * inode, struct file * file)
 	}
 
 	kfree(list);
-	unlock_kernel();
 
 	return 0;
 }

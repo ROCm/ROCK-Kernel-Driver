@@ -597,7 +597,8 @@ static void ide_init_queue(ide_drive_t *drive)
 	int max_sectors;
 
 	q->queuedata = HWGROUP(drive);
-	blk_init_queue(q, do_ide_request, drive->name);
+	blk_init_queue(q, do_ide_request);
+	blk_queue_segment_boundary(q, 0xffff);
 
 	/* IDE can do up to 128K per request, pdc4030 needs smaller limit */
 #ifdef CONFIG_BLK_DEV_PDC4030

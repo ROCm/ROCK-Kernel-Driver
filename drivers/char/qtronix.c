@@ -492,10 +492,8 @@ static int fasync_aux(int fd, struct file *filp, int on)
 
 static int release_aux(struct inode * inode, struct file * file)
 {
-	lock_kernel();
 	fasync_aux(-1, file, 0);
 	aux_count--;
-	unlock_kernel();
 	return 0;
 }
 

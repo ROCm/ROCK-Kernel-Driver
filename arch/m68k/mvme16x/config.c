@@ -40,7 +40,7 @@ static MK48T08ptr_t volatile rtc = (MK48T08ptr_t)MVME_RTC_BASE;
 extern void mvme16x_process_int (int level, struct pt_regs *regs);
 extern void mvme16x_init_IRQ (void);
 extern void mvme16x_free_irq (unsigned int, void *);
-extern int  mvme16x_get_irq_list (char *);
+extern int show_mvme16x_interrupts (struct seq_file *, void *);
 extern void mvme16x_enable_irq (unsigned int);
 extern void mvme16x_disable_irq (unsigned int);
 static void mvme16x_get_model(char *model);
@@ -156,7 +156,7 @@ void __init config_mvme16x(void)
     mach_reset		 = mvme16x_reset;
     mach_free_irq	 = mvme16x_free_irq;
     mach_process_int	 = mvme16x_process_int;
-    mach_get_irq_list	 = mvme16x_get_irq_list;
+    mach_get_irq_list	 = show_mvme16x_interrupts;
     mach_request_irq	 = mvme16x_request_irq;
     enable_irq           = mvme16x_enable_irq;
     disable_irq          = mvme16x_disable_irq;

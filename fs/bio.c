@@ -40,9 +40,6 @@ static struct bio *bio_pool;
 static DECLARE_WAIT_QUEUE_HEAD(bio_pool_wait);
 static DECLARE_WAIT_QUEUE_HEAD(biovec_pool_wait);
 
-struct bio_hash_bucket *bio_hash_table;
-unsigned int bio_hash_bits, bio_hash_mask;
-
 static unsigned int bio_pool_free;
 
 #define BIOVEC_NR_POOLS 6
@@ -63,268 +60,11 @@ static const int bvec_pool_sizes[BIOVEC_NR_POOLS] = { 1, 4, 16, 64, 128, 256 };
 
 #define BIO_MAX_PAGES	(bvec_pool_sizes[BIOVEC_NR_POOLS - 1])
 
-#ifdef BIO_HASH_PROFILING
-static struct bio_hash_stats bio_stats;
-#endif
-
-/*
- * optimized for 2^BIO_HASH_SCALE kB block size
- */
-#define BIO_HASH_SCALE	3
-#define BIO_HASH_BLOCK(sector)	((sector) >> BIO_HASH_SCALE)
-
-/*
- * pending further testing, grabbed from fs/buffer.c hash so far...
- */
-#define __bio_hash(dev,block)	\
-	(((((dev)<<(bio_hash_bits - 6)) ^ ((dev)<<(bio_hash_bits - 9))) ^ \
-	 (((block)<<(bio_hash_bits - 6)) ^ ((block) >> 13) ^ \
-	  ((block) << (bio_hash_bits - 12)))) & bio_hash_mask)
-
-#define bio_hash(dev, sector) &((bio_hash_table + __bio_hash(dev, BIO_HASH_BLOCK((sector))))->hash)
-
-#define bio_hash_bucket(dev, sector) (bio_hash_table + __bio_hash(dev, BIO_HASH_BLOCK((sector))))
-
-#define __BIO_HASH_RWLOCK(dev, sector)	\
-	&((bio_hash_table + __bio_hash((dev), BIO_HASH_BLOCK((sector))))->lock)
-#define BIO_HASH_RWLOCK(bio)		\
-	__BIO_HASH_RWLOCK((bio)->bi_dev, (bio)->bi_sector)
-
 /*
  * TODO: change this to use slab reservation scheme once that infrastructure
  * is in place...
  */
 #define BIO_POOL_SIZE		(256)
-
-void __init bio_hash_init(unsigned long mempages)
-{
-	unsigned long htable_size, order;
-	int i;
-
-	/*
-	 * need to experiment on size of hash
-	 */
-	mempages >>= 2;
-
-	htable_size = mempages * sizeof(struct bio_hash_bucket *);
-	for (order = 0; (PAGE_SIZE << order) < htable_size; order++)
-		;
-
-	do {
-		unsigned long tmp = (PAGE_SIZE << order) / sizeof(struct bio_hash_bucket);
-
-		bio_hash_bits = 0;
-		while ((tmp >>= 1UL) != 0UL)
-			bio_hash_bits++;
-
-		bio_hash_table = (struct bio_hash_bucket *) __get_free_pages(GFP_ATOMIC, order);
-	} while (bio_hash_table == NULL && --order > 0);
-
-	if (!bio_hash_table)
-		panic("Failed to allocate page hash table\n");
-
-	printk("Bio-cache hash table entries: %ld (order: %ld, %ld bytes)\n",
-	       BIO_HASH_SIZE, order, (PAGE_SIZE << order));
-
-	for (i = 0; i < BIO_HASH_SIZE; i++) {
-		struct bio_hash_bucket *hb = &bio_hash_table[i];
-
-		rwlock_init(&hb->lock);
-		hb->hash = NULL;
-	}
-
-	bio_hash_mask = BIO_HASH_SIZE - 1;
-}
-
-inline void __bio_hash_remove(struct bio *bio)
-{
-	bio_hash_t *entry = &bio->bi_hash;
-	bio_hash_t **pprev = entry->pprev_hash;
-
-	if (pprev) {
-		bio_hash_t *nxt = entry->next_hash;
-
-		if (nxt)
-			nxt->pprev_hash = pprev;
-
-		*pprev = nxt;
-#if 1
-		entry->next_hash = NULL;
-#endif
-		entry->pprev_hash = NULL;
-		entry->valid_counter = 0;
-		bio->bi_hash_desc = NULL;
-#ifdef BIO_HASH_PROFILING
-		atomic_dec(&bio_stats.nr_entries);
-#endif
-	}
-}
-
-inline void bio_hash_remove(struct bio *bio)
-{
-	rwlock_t *hash_lock = BIO_HASH_RWLOCK(bio);
-	unsigned long flags;
-
-	write_lock_irqsave(hash_lock, flags);
-	__bio_hash_remove(bio);
-	write_unlock_irqrestore(hash_lock, flags);
-}
-
-inline void __bio_hash_add(struct bio *bio, bio_hash_t **hash,
-			   void *hash_desc, unsigned int vc)
-{
-	bio_hash_t *entry = &bio->bi_hash;
-	bio_hash_t *nxt = *hash;
-
-	BUG_ON(entry->pprev_hash);
-
-	*hash = entry;
-	entry->next_hash = nxt;
-	entry->pprev_hash = hash;
-	entry->valid_counter = vc;
-
-	if (nxt)
-		nxt->pprev_hash = &entry->next_hash;
-
-	bio->bi_hash_desc = hash_desc;
-
-#ifdef BIO_HASH_PROFILING
-	atomic_inc(&bio_stats.nr_inserts);
-	atomic_inc(&bio_stats.nr_entries);
-	{
-		int entries = atomic_read(&bio_stats.nr_entries);
-		if (entries > atomic_read(&bio_stats.max_entries))
-			atomic_set(&bio_stats.max_entries, entries);
-	}
-#endif
-}
-
-inline void bio_hash_add(struct bio *bio, void *hash_desc, unsigned int vc)
-{
-	struct bio_hash_bucket *hb =bio_hash_bucket(bio->bi_dev,bio->bi_sector);
-	unsigned long flags;
-
-	write_lock_irqsave(&hb->lock, flags);
-	__bio_hash_add(bio, &hb->hash, hash_desc, vc);
-	write_unlock_irqrestore(&hb->lock, flags);
-}
-
-inline struct bio *__bio_hash_find(kdev_t dev, sector_t sector,
-				   bio_hash_t **hash, unsigned int vc)
-{
-	bio_hash_t *next = *hash, *entry;
-	struct bio *bio;
-	int nr = 0;
-
-#ifdef BIO_HASH_PROFILING
-	atomic_inc(&bio_stats.nr_lookups);
-#endif
-	while ((entry = next)) {
-		next = entry->next_hash;
-		prefetch(next);
-		bio = bio_hash_entry(entry);
-
-		if (entry->valid_counter == vc) {
-			if (bio->bi_sector == sector && bio->bi_dev == dev) {
-#ifdef BIO_HASH_PROFILING
-				if (nr > atomic_read(&bio_stats.max_bucket_size))
-					atomic_set(&bio_stats.max_bucket_size, nr);
-				if (nr <= MAX_PROFILE_BUCKETS)
-					atomic_inc(&bio_stats.bucket_size[nr]);
-				atomic_inc(&bio_stats.nr_hits);
-#endif
-				bio_get(bio);
-				return bio;
-			}
-		}
-		nr++;
-	}
-
-	return NULL;
-}
-
-inline struct bio *bio_hash_find(kdev_t dev, sector_t sector, unsigned int vc)
-{
-	struct bio_hash_bucket *hb = bio_hash_bucket(dev, sector);
-	unsigned long flags;
-	struct bio *bio;
-
-	read_lock_irqsave(&hb->lock, flags);
-	bio = __bio_hash_find(dev, sector, &hb->hash, vc);
-	read_unlock_irqrestore(&hb->lock, flags);
-
-	return bio;
-}
-
-inline int __bio_hash_add_unique(struct bio *bio, bio_hash_t **hash,
-				 void *hash_desc, unsigned int vc)
-{
-	struct bio *alias = __bio_hash_find(bio->bi_dev, bio->bi_sector, hash, vc);
-
-	if (!alias) {
-		__bio_hash_add(bio, hash, hash_desc, vc);
-		return 0;
-	}
-
-	/*
-	 * release reference to alias
-	 */
-	bio_put(alias);
-	return 1;
-}
-
-inline int bio_hash_add_unique(struct bio *bio, void *hash_desc, unsigned int vc)
-{
-	struct bio_hash_bucket *hb =bio_hash_bucket(bio->bi_dev,bio->bi_sector);
-	unsigned long flags;
-	int ret = 1;
-
-	if (!bio->bi_hash.pprev_hash) {
-		write_lock_irqsave(&hb->lock, flags);
-		ret = __bio_hash_add_unique(bio, &hb->hash, hash_desc, vc);
-		write_unlock_irqrestore(&hb->lock, flags);
-	}
-
-	return ret;
-}
-
-/*
- * increment validity counter on barrier inserts. if it wraps, we must
- * prune all existing entries for this device to be completely safe
- *
- * q->queue_lock must be held by caller
- */
-void bio_hash_invalidate(request_queue_t *q, kdev_t dev)
-{
-	bio_hash_t *hash;
-	struct bio *bio;
-	int i;
-
-	if (++q->hash_valid_counter)
-		return;
-
-	/*
-	 * it wrapped...
-	 */
-	for (i = 0; i < (1 << bio_hash_bits); i++) {
-		struct bio_hash_bucket *hb = &bio_hash_table[i];
-		unsigned long flags;
-
-		write_lock_irqsave(&hb->lock, flags);
-		while ((hash = hb->hash) != NULL) {
-			bio = bio_hash_entry(hash);
-			if (bio->bi_dev != dev)
-				__bio_hash_remove(bio);
-		}
-		write_unlock_irqrestore(&hb->lock, flags);
-	}
-
-	/*
-	 * entries pruned, reset validity counter
-	 */
-	q->hash_valid_counter = 1;
-}
-
 
 /*
  * if need be, add bio_pool_get_irq() to match...
@@ -384,38 +124,37 @@ static inline void bio_pool_put(struct bio *bio)
 #define BIO_CAN_WAIT(gfp_mask)	\
 	(((gfp_mask) & (__GFP_WAIT | __GFP_IO)) == (__GFP_WAIT | __GFP_IO))
 
-static inline struct bio_vec_list *bvec_alloc(int gfp_mask, int nr)
+static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, int *idx)
 {
-	struct bio_vec_list *bvl = NULL;
+	struct bio_vec *bvl = NULL;
 	struct biovec_pool *bp;
-	int idx;
 
 	/*
 	 * see comment near bvec_pool_sizes define!
 	 */
 	switch (nr) {
 		case 1:
-			idx = 0;
+			*idx = 0;
 			break;
 		case 2 ... 4:
-			idx = 1;
+			*idx = 1;
 			break;
 		case 5 ... 16:
-			idx = 2;
+			*idx = 2;
 			break;
 		case 17 ... 64:
-			idx = 3;
+			*idx = 3;
 			break;
 		case 65 ... 128:
-			idx = 4;
+			*idx = 4;
 			break;
 		case 129 ... 256:
-			idx = 5;
+			*idx = 5;
 			break;
 		default:
 			return NULL;
 	}
-	bp = &bvec_list[idx];
+	bp = &bvec_list[*idx];
 
 	/*
 	 * ok, so idx now points to the slab we want to allocate from
@@ -444,15 +183,9 @@ static inline struct bio_vec_list *bvec_alloc(int gfp_mask, int nr)
 		__set_current_state(TASK_RUNNING);
 	}
 
-	/*
-	 * we use bvl_max as index into bvec_pool_sizes, non-slab originated
-	 * bvecs may use it for something else if they use their own
-	 * destructor
-	 */
 	if (bvl) {
 out_gotit:
 		memset(bvl, 0, bp->bp_size);
-		bvl->bvl_max = idx;
 	}
 
 	return bvl;
@@ -463,9 +196,9 @@ out_gotit:
  */
 void bio_destructor(struct bio *bio)
 {
-	struct biovec_pool *bp = &bvec_list[bio->bi_io_vec->bvl_max];
+	struct biovec_pool *bp = &bvec_list[bio->bi_max];
 
-	BUG_ON(bio->bi_io_vec->bvl_max >= BIOVEC_NR_POOLS);
+	BUG_ON(bio->bi_max >= BIOVEC_NR_POOLS);
 
 	/*
 	 * cloned bio doesn't own the veclist
@@ -474,6 +207,15 @@ void bio_destructor(struct bio *bio)
 		kmem_cache_free(bp->bp_cachep, bio->bi_io_vec);
 
 	bio_pool_put(bio);
+}
+
+inline void bio_init(struct bio *bio)
+{
+	bio->bi_next = NULL;
+	atomic_set(&bio->bi_cnt, 1);
+	bio->bi_flags = 0;
+	bio->bi_rw = 0;
+	bio->bi_end_io = NULL;
 }
 
 static inline struct bio *__bio_alloc(int gfp_mask, bio_destructor_t *dest)
@@ -514,14 +256,8 @@ static inline struct bio *__bio_alloc(int gfp_mask, bio_destructor_t *dest)
 
 	if (bio) {
 gotit:
-		bio->bi_next = NULL;
-		bio->bi_hash.pprev_hash = NULL;
-		atomic_set(&bio->bi_cnt, 1);
+		bio_init(bio);
 		bio->bi_io_vec = NULL;
-		bio->bi_flags = 0;
-		bio->bi_rw = 0;
-		bio->bi_end_io = NULL;
-		bio->bi_hash_desc = NULL;
 		bio->bi_destructor = dest;
 	}
 
@@ -543,12 +279,12 @@ gotit:
 struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
 {
 	struct bio *bio = __bio_alloc(gfp_mask, bio_destructor);
-	struct bio_vec_list *bvl = NULL;
+	struct bio_vec *bvl = NULL;
 
 	if (unlikely(!bio))
 		return NULL;
 
-	if (!nr_iovecs || (bvl = bvec_alloc(gfp_mask, nr_iovecs))) {
+	if (!nr_iovecs || (bvl = bvec_alloc(gfp_mask,nr_iovecs,&bio->bi_max))) {
 		bio->bi_io_vec = bvl;
 		return bio;
 	}
@@ -562,8 +298,6 @@ struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
  */
 static inline void bio_free(struct bio *bio)
 {
-	BUG_ON(bio_is_hashed(bio));
-
 	bio->bi_destructor(bio);
 }
 
@@ -609,6 +343,11 @@ struct bio *bio_clone(struct bio *bio, int gfp_mask)
 		b->bi_dev = bio->bi_dev;
 		b->bi_flags |= 1 << BIO_CLONED;
 		b->bi_rw = bio->bi_rw;
+
+		b->bi_vcnt = bio->bi_vcnt;
+		b->bi_idx = bio->bi_idx;
+		b->bi_size = bio->bi_size;
+		b->bi_max = bio->bi_max;
 	}
 
 	return b;
@@ -618,14 +357,15 @@ struct bio *bio_clone(struct bio *bio, int gfp_mask)
  *	bio_copy	-	create copy of a bio
  *	@bio: bio to copy
  *	@gfp_mask: allocation priority
+ *	@copy: copy data to allocated bio
  *
  *	Create a copy of a &bio. Caller will own the returned bio and
  *	the actual data it points to. Reference count of returned
  * 	bio will be one.
  */
-struct bio *bio_copy(struct bio *bio, int gfp_mask)
+struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 {
-	struct bio *b = bio_alloc(gfp_mask, bio->bi_io_vec->bvl_cnt);
+	struct bio *b = bio_alloc(gfp_mask, bio->bi_vcnt);
 	unsigned long flags = 0; /* gcc silly */
 	int i;
 
@@ -636,33 +376,37 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask)
 		 * iterate iovec list and alloc pages + copy data
 		 */
 		bio_for_each_segment(bv, bio, i) {
-			struct bio_vec *bbv = &b->bi_io_vec->bvl_vec[i];
+			struct bio_vec *bbv = &b->bi_io_vec[i];
 			char *vfrom, *vto;
 
 			bbv->bv_page = alloc_page(gfp_mask);
 			if (bbv->bv_page == NULL)
 				goto oom;
 
+			if (!copy)
+				goto fill_in;
+
 			if (gfp_mask & __GFP_WAIT) {
 				vfrom = kmap(bv->bv_page);
-				vto = kmap(bv->bv_page);
+				vto = kmap(bbv->bv_page);
 			} else {
 				__save_flags(flags);
 				__cli();
 				vfrom = kmap_atomic(bv->bv_page, KM_BIO_IRQ);
-				vto = kmap_atomic(bv->bv_page, KM_BIO_IRQ);
+				vto = kmap_atomic(bbv->bv_page, KM_BIO_IRQ);
 			}
 
-			memcpy(vto + bv->bv_offset, vfrom + bv->bv_offset, bv->bv_len);
+			memcpy(vto + bbv->bv_offset, vfrom + bv->bv_offset, bv->bv_len);
 			if (gfp_mask & __GFP_WAIT) {
-				kunmap(vto);
-				kunmap(vfrom);
+				kunmap(bbv->bv_page);
+				kunmap(bv->bv_page);
 			} else {
 				kunmap_atomic(vto, KM_BIO_IRQ);
 				kunmap_atomic(vfrom, KM_BIO_IRQ);
 				__restore_flags(flags);
 			}
 
+fill_in:
 			bbv->bv_len = bv->bv_len;
 			bbv->bv_offset = bv->bv_offset;
 		}
@@ -671,15 +415,15 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask)
 		b->bi_dev = bio->bi_dev;
 		b->bi_rw = bio->bi_rw;
 
-		b->bi_io_vec->bvl_cnt = bio->bi_io_vec->bvl_cnt;
-		b->bi_io_vec->bvl_size = bio->bi_io_vec->bvl_size;
+		b->bi_vcnt = bio->bi_vcnt;
+		b->bi_size = bio->bi_size;
 	}
 
 	return b;
 
 oom:
 	while (i >= 0) {
-		__free_page(b->bi_io_vec->bvl_vec[i].bv_page);
+		__free_page(b->bi_io_vec[i].bv_page);
 		i--;
 	}
 
@@ -712,23 +456,20 @@ static int bio_end_io_page(struct bio *bio)
 static int bio_end_io_kio(struct bio *bio, int nr_sectors)
 {
 	struct kiobuf *kio = (struct kiobuf *) bio->bi_private;
-	struct bio_vec_list *bv = bio->bi_io_vec;
 	int uptodate, done;
-
-	BUG_ON(!bv);
 
 	done = 0;
 	uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	do {
-		int sectors = bv->bvl_vec[bv->bvl_idx].bv_len >> 9;
+		int sectors = bio->bi_io_vec[bio->bi_idx].bv_len >> 9;
 
 		nr_sectors -= sectors;
 
-		bv->bvl_idx++;
+		bio->bi_idx++;
 
 		done = !end_kio_request(kio, uptodate);
 
-		if (bv->bvl_idx == bv->bvl_cnt)
+		if (bio->bi_idx == bio->bi_vcnt)
 			done = 1;
 
 	} while (!done && nr_sectors > 0);
@@ -737,7 +478,6 @@ static int bio_end_io_kio(struct bio *bio, int nr_sectors)
 	 * all done
 	 */
 	if (done) {
-		bio_hash_remove(bio);
 		bio_put(bio);
 		return 0;
 	}
@@ -844,12 +584,12 @@ next_chunk:
 
 	bio->bi_sector = sector;
 	bio->bi_dev = dev;
-	bio->bi_io_vec->bvl_idx = 0;
+	bio->bi_idx = 0;
 	bio->bi_flags |= 1 << BIO_PREBUILT;
 	bio->bi_end_io = bio_end_io_kio;
 	bio->bi_private = kio;
 
-	bvec = &bio->bi_io_vec->bvl_vec[0];
+	bvec = bio->bi_io_vec;
 	for (i = 0; i < nr_pages; i++, bvec++, map_i++) {
 		int nbytes = PAGE_SIZE - offset;
 
@@ -858,11 +598,11 @@ next_chunk:
 
 		BUG_ON(kio->maplist[map_i] == NULL);
 
-		if (bio->bi_io_vec->bvl_size + nbytes > max_bytes)
+		if (bio->bi_size + nbytes > max_bytes)
 			goto queue_io;
 
-		bio->bi_io_vec->bvl_cnt++;
-		bio->bi_io_vec->bvl_size += nbytes;
+		bio->bi_vcnt++;
+		bio->bi_size += nbytes;
 
 		bvec->bv_page = kio->maplist[map_i];
 		bvec->bv_len = nbytes;
@@ -931,7 +671,6 @@ static void __init biovec_init_pool(void)
 		struct biovec_pool *bp = &bvec_list[i];
 
 		size = bvec_pool_sizes[i] * sizeof(struct bio_vec);
-		size += sizeof(struct bio_vec_list);
 
 		printk("biovec: init pool %d, %d entries, %d bytes\n", i,
 						bvec_pool_sizes[i], size);
@@ -962,29 +701,6 @@ static int __init init_bio(void)
 
 	biovec_init_pool();
 
-#ifdef BIO_HASH_PROFILING
-	memset(&bio_stats, 0, sizeof(bio_stats));
-#endif
-
-	return 0;
-}
-
-int bio_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
-{
-#ifdef BIO_HASH_PROFILING
-	switch (cmd) {
-		case BLKHASHPROF:
-			if (copy_to_user((struct bio_hash_stats *) arg, &bio_stats, sizeof(bio_stats)))
-				return -EFAULT;
-			break;
-		case BLKHASHCLEAR:
-			memset(&bio_stats, 0, sizeof(bio_stats));
-			break;
-		default:
-			return -ENOTTY;
-	}
-
-#endif
 	return 0;
 }
 
@@ -993,7 +709,7 @@ module_init(init_bio);
 EXPORT_SYMBOL(bio_alloc);
 EXPORT_SYMBOL(bio_put);
 EXPORT_SYMBOL(ll_rw_kio);
-EXPORT_SYMBOL(bio_hash_remove);
-EXPORT_SYMBOL(bio_hash_add);
-EXPORT_SYMBOL(bio_hash_add_unique);
 EXPORT_SYMBOL(bio_endio);
+EXPORT_SYMBOL(bio_init);
+EXPORT_SYMBOL(bio_copy);
+EXPORT_SYMBOL(bio_clone);

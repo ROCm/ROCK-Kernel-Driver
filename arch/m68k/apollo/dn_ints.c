@@ -104,7 +104,7 @@ void dn_disable_irq(unsigned int irq) {
 
 }
 
-int dn_get_irq_list(char *buf) {
+int show_dn_interrupts(struct seq_file *p, void *v) {
 
   printk("dn get irq list\n");
 

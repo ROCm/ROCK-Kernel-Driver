@@ -29,6 +29,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
+#include <linux/seq_file.h>
 
 #include <asm/irq.h>
 #include <asm/mips-boards/atlas.h>
@@ -93,9 +94,9 @@ static struct hw_interrupt_type atlas_irq_type = {
 	NULL
 };
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 	int num = 0;
 	struct irqaction *action;
 
@@ -103,18 +104,18 @@ int get_irq_list(char *buf)
 		action = irq_desc[i].action;
 		if (!action) 
 			continue;
-		len += sprintf(buf+len, "%2d: %8d %c %s",
+		seq_printf(p, "%2d: %8d %c %s",
 			num, kstat.irqs[0][num],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
-			len += sprintf(buf+len, ",%s %s",
+			seq_printf(p, ",%s %s",
 				(action->flags & SA_INTERRUPT) ? " +" : "",
 				action->name);
 		}
-		len += sprintf(buf+len, " [hw0]\n");
+		seq_printf(p, " [hw0]\n");
 	}
-	return len;
+	return 0;
 }
 
 int request_irq(unsigned int irq, 

@@ -121,8 +121,8 @@ static char slmmselect_cmd[6]  = { 0x15, 0, 0, 0, 0, 0 };
 static struct slm {
 	unsigned	target;			/* target number */
 	unsigned	lun;			/* LUN in target controller */
-	unsigned	wbusy : 1;		/* output part busy */
-	unsigned	rbusy : 1;		/* status part busy */
+	atomic_t	wr_ok; 			/* set to 0 if output part busy */
+	atomic_t	rd_ok;			/* set to 0 if status part busy */
 } slm_info[MAX_SLM];
 
 int N_SLM_Printers = 0;
@@ -778,15 +778,17 @@ static int slm_open( struct inode *inode, struct file *file )
 
 	if (file->f_mode & 2) {
 		/* open for writing is exclusive */
-		if (sip->wbusy)
+		if ( !atomic_dec_and_test(&sip->wr_ok) ) {
+			atomic_inc(&sip->wr_ok);	
 			return( -EBUSY );
-		sip->wbusy = 1;
+		}
 	}
 	if (file->f_mode & 1) {
-		/* open for writing is exclusive */
-		if (sip->rbusy)
-			return( -EBUSY );
-		sip->rbusy = 1;
+		/* open for reading is exclusive */
+                if ( !atomic_dec_and_test(&sip->rd_ok) ) {
+                        atomic_inc(&sip->rd_ok);
+                        return( -EBUSY );
+                }
 	}
 
 	return( 0 );
@@ -801,12 +803,10 @@ static int slm_release( struct inode *inode, struct file *file )
 	device = MINOR(inode->i_rdev);
 	sip = &slm_info[device];
 
-	lock_kernel();
 	if (file->f_mode & 2)
-		sip->wbusy = 0;
+		atomic_inc( &sip->wr_ok );
 	if (file->f_mode & 1)
-		sip->rbusy = 0;
-	unlock_kernel();
+		atomic_inc( &sip->rd_ok );
 	
 	return( 0 );
 }
@@ -983,8 +983,8 @@ int attach_slm( int target, int lun )
 
 	slm_info[N_SLM_Printers].target = target;
 	slm_info[N_SLM_Printers].lun    = lun;
-	slm_info[N_SLM_Printers].wbusy  = 0;
-	slm_info[N_SLM_Printers].rbusy  = 0;
+	atomic_set(&slm_info[N_SLM_Printers].wr_ok, 1 ); 
+	atomic_set(&slm_info[N_SLM_Printers].rd_ok, 1 );
 	
 	printk( KERN_INFO "  Printer: %s\n", SLMBuffer );
 	printk( KERN_INFO "Detected slm%d at id %d lun %d\n",

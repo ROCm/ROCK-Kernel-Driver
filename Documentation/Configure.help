@@ -2,10 +2,10 @@
 #	Eric S. Raymond <mailto:esr@thyrsus.com>
 #	Steven Cole <mailto:elenstev@mesatop.com>
 #
-# Merged version 2.49: Current with 2.4.15-pre1 and 2.4.13-ac8.
+# Merged version 2.61: current with 2.4.16/2.5.1-pre1.
 #
 # This version of the Linux kernel configuration help texts
-# corresponds to the kernel versions 2.4.x.
+# corresponds to kernel versions 2.4.x and 2.5.x.
 #
 # Translations of this file available on the WWW:
 #
@@ -14,11 +14,13 @@
 #   - Russian, by <mailto:kaf@linux.nevod.perm.su>, at
 #     <http://nevod.perm.su/service/linux/doc/kernel/Configure.help>
 #   - French, by Pierre Tane <mailto:tanep@bigfoot.com>, at
-#     <http://www.traduc.org/kernelfr>
+#     <http://www.traduc.org/kernelfr/>
 #   - Polish, by Dominik Mierzejewski <mailto:dmierzej@elka.pw.edu.pl>, at
 #     <http://home.elka.pw.edu.pl/~dmierzej/linux/kernel/>
-#   - German, by SuSE, at <http://www.suse.de/~ke/kernel>. This patch
+#   - German, by SuSE, at <http://www.suse.de/~ke/kernel/>. This patch
 #     also includes infrastructure to support different languages.
+#   - Catalan, by Antoni Bella <mailto:bella5@teleline.es>, at
+#     <http://www.terra.es/personal7/bella5/traduccions.htm>
 #
 # To access a document on the WWW, you need to have a direct Internet
 # connection and a browser program such as netscape or lynx. If you
@@ -133,8 +135,8 @@ CONFIG_SMP
 
   See also the <file:Documentation/smp.tex>,
   <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
-  <file:Documentation/nmi_watchdog.txt> and the SMP-FAQ on the WWW at
-  <http://www.irisa.fr/prive/mentre/smp-faq/>.
+  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
+  <http://www.linuxdoc.org/docs.html#howto>.
 
   If you don't know what to do here, say N.
 
@@ -577,7 +579,7 @@ CONFIG_BLK_DEV_IDE
 
   To fine-tune ATA/IDE drive/interface parameters for improved
   performance, look for the hdparm package at
-  <http://www.ibiblio.org/pub/Linux/system/hardware>.
+  <ftp://ibiblio.org/pub/Linux/system/hardware/>.
 
   If you want to compile this driver as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
@@ -666,12 +668,9 @@ CONFIG_BLK_DEV_IDECD
   CD-ROM drive, you can say N to all other CD-ROM options, but be sure
   to say Y or M to "ISO 9660 CD-ROM file system support".
 
-  Read the CD-ROM-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto> and
-  <file:Documentation/cdrom/ide-cd>. Note that older versions of lilo
-  (the Linux boot loader) cannot properly deal with IDE/ATAPI CD-ROMs,
-  so install lilo-16 or higher, available from
-  <ftp://metalab.unc.edu/pub/Linux/system/boot/lilo>.
+  Note that older versions of LILO (LInux LOader) cannot properly deal
+  with IDE/ATAPI CD-ROMs, so install LILO 16 or higher, available from
+  <ftp://brun.dyndns.org/pub/linux/lilo/>.
 
   If you want to compile the driver as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
@@ -820,7 +819,7 @@ CONFIG_BLK_DEV_IDEDMA_PCI
   for these drives, but you can change that by saying Y to the
   following question "Use DMA by default when available". You can get
   the latest version of the hdparm utility from
-  <ftp://metalab.unc.edu/pub/Linux/system/hardware/>.
+  <ftp://ibiblio.org/pub/Linux/system/hardware/>.
 
   Read the comments at the beginning of <file:drivers/ide/ide-dma.c>
   and the file <file:Documentation/ide.txt> for more information.
@@ -899,7 +898,7 @@ CONFIG_IDEDMA_IVB
 
   It is normally safe to answer Y; however, the default is N.
 
-ATA Work(s) In Progress (EXPERIMENTAL)‹
+ATA Work(s) In Progress (EXPERIMENTAL)
 CONFIG_IDEDMA_PCI_WIP
   If you enable this you will be able to use and test highly
   developmental projects. If you say N, the configurator will
@@ -914,7 +913,7 @@ CONFIG_BLK_DEV_ADMA
 
 Pacific Digital A-DMA support (EXPERIMENTAL)
 CONFIG_BLK_DEV_PDC_ADMA
-  Please read the comments at the top of <file:drivers/ide/pdcadma.c>.
+  Please read the comments at the top of <file:drivers/ide/ide-pci.c>.
 
 3ware Hardware ATA-RAID support
 CONFIG_BLK_DEV_3W_XXXX_RAID
@@ -1118,11 +1117,13 @@ CONFIG_BLK_DEV_PDC202XX
 
 Special UDMA Feature
 CONFIG_PDC202XX_BURST
-  For PDC20246, PDC20262, PDC20265 and PDC20267 Ultra DMA chipsets.
-  Designed originally for PDC20246/Ultra33 that has BIOS setup
-  failures when using 3 or more cards.
+  This option causes the pdc202xx driver to enable UDMA modes on the
+  PDC202xx even when the PDC202xx BIOS has not done so.
 
-  Unknown for PDC20265/PDC20267 Ultra DMA 100.
+  It was originally designed for the PDC20246/Ultra33, whose BIOS will
+  only setup UDMA on the first two PDC20246 cards.  It has also been
+  used succesfully on a PDC20265/Ultra100, allowing use of UDMA modes
+  when the PDC20265 BIOS has been disabled (for faster boot up).
 
   Please read the comments at the top of
   <file:drivers/ide/pdc202xx.c>.
@@ -1251,15 +1252,6 @@ CONFIG_BLK_DEV_PDC4030
   <file:Documentation/ide.txt> and <file:drivers/ide/pdc4030.c> files
   for more info.
 
-# This is for Linus's tree.
-QDI QD6580 support
-CONFIG_BLK_DEV_QD6580
-  This driver is enabled at runtime using the "ide0=qd6580" kernel
-  boot parameter.  It permits faster I/O speeds to be set.  See the
-  <file:Documentation/ide.txt> and <file:drivers/ide/qd6580.c> for
-  more info.
-
-# This is for Alan's tree.  Note the name difference.
 QDI QD65XX support
 CONFIG_BLK_DEV_QD65XX
   This driver is enabled at runtime using the "ide0=qd65xx" kernel
@@ -1488,7 +1480,7 @@ Parallel port generic ATAPI devices
 CONFIG_PARIDE_PG
   This option enables a special high-level driver for generic ATAPI
   devices connected through a parallel port. The driver allows user
-  programs, such as cdrecord, to send ATAPI commands directly to a
+  programs, such as cdrtools, to send ATAPI commands directly to a
   device.
 
   If you chose to build PARIDE support into your kernel, you may
@@ -1502,7 +1494,7 @@ CONFIG_PARIDE_PG
   This driver implements an API loosely related to the generic SCSI
   driver. See <file:include/linux/pg.h>. for details.
 
-  You can obtain the most recent version of cdrecord from
+  You can obtain the most recent version of cdrtools from
   <ftp://ftp.fokus.gmd.de/pub/unix/cdrecord/>. Versions 1.6.1a3 and
   later fully support this driver.
 
@@ -1716,9 +1708,9 @@ CONFIG_BLK_DEV_MD
   controller, you do not need to say Y here.
 
   More information about Software RAID on Linux is contained in the
-  Software-RAID mini-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>. There you will also
-  learn where to get the supporting user space utilities raidtools.
+  Software RAID mini-HOWTO, available from
+  <http://www.linuxdoc.org/docs.html#howto>. There you will also learn
+  where to get the supporting user space utilities raidtools.
 
   If unsure, say N.
 
@@ -1811,7 +1803,6 @@ CONFIG_MD_MULTIPATH
 
   If unsure, say N.
 
-# AC tree only
 Support for IDE Raid controllers
 CONFIG_BLK_DEV_ATARAID
   Say Y or M if you have an IDE Raid controller and want linux
@@ -1824,7 +1815,6 @@ CONFIG_BLK_DEV_ATARAID
   has its own Raid drivers, which you should use if you need better
   performance.
 
-# AC tree only
 Support Promise software RAID (Fasttrak(tm))
 CONFIG_BLK_DEV_ATARAID_PDC
   Say Y or M if you have a Promise Fasttrak (tm) Raid controller
@@ -1835,7 +1825,6 @@ CONFIG_BLK_DEV_ATARAID_PDC
   If you choose to compile this as a module, the module will be called
   pdcraid.o.
 
-# AC tree only
 Highpoint 370 software RAID
 CONFIG_BLK_DEV_ATARAID_HPT
   Say Y or M if you have a Highpoint HPT 370 Raid controller
@@ -1851,19 +1840,19 @@ CONFIG_ACER_PICA_61
   This is a machine with a R4400 133/150 MHz CPU. To compile a Linux
   kernel that runs on these, say Y here. For details about Linux on
   the MIPS architecture, check out the Linux/MIPS FAQ on the WWW at
-  <http://oss.sgi.com/mips>.
+  <http://oss.sgi.com/mips/>.
 
 Support for Algorithmics P4032 (EXPERIMENTAL)
 CONFIG_ALGOR_P4032
   This is an evaluation board of the British company Algorithmics.
   The board uses the R4300 and a R5230 CPUs.  For more information
-  about this board see <http://www.algor.co.uk>.
+  about this board see <http://www.algor.co.uk/>.
 
 Support for BAGET MIPS series
 CONFIG_BAGET_MIPS
   This enables support for the Baget, a Russian embedded system.  For
   more details about the Baget see the Linux/MIPS FAQ on
-  <http://oss.sgi.com/mips>.
+  <http://oss.sgi.com/mips/>.
 
 Baget AMD LANCE support
 CONFIG_BAGETLANCE
@@ -1874,8 +1863,8 @@ CONFIG_BAGETLANCE
 Support for DECstations
 CONFIG_DECSTATION
   This enables support for DEC's MIPS based workstations.  For details
-  see the Linux/MIPS FAQ on <http://oss.sgi.com/mips> and the
-  DECstation porting pages on <http://decstation.unix-ag.org>.
+  see the Linux/MIPS FAQ on <http://oss.sgi.com/mips/> and the
+  DECstation porting pages on <http://decstation.unix-ag.org/>.
 
   If you have one of the following DECstation Models you definitely
   want to choose R4xx0 for the CPU Type:
@@ -1904,7 +1893,7 @@ CONFIG_COBALT_28
 Support for the Momentum Computer Ocelot SBC
 CONFIG_MOMENCO_OCELOT
   The Ocelot is a MIPS-based Single Board Computer (SBC) made by
-  Momentum Computer <http://www.momenco.com>.
+  Momentum Computer <http://www.momenco.com/>.
 
 Support for NEC DDB Vrc-5074
 CONFIG_DDB5074
@@ -1917,7 +1906,7 @@ CONFIG_DDB5476
   evaluation board.
 
   Features : kernel debugging, serial terminal, NFS root fs, on-board
-  ether port (Need an additional patch at <http://linux.junsun.net>),
+  ether port (Need an additional patch at <http://linux.junsun.net/>),
   USB, AC97, PCI, PCI VGA card & framebuffer console, IDE controller,
   PS2 keyboard, PS2 mouse, etc.
 
@@ -1927,7 +1916,7 @@ CONFIG_DDB5477
   evaluation board.
 
   Features : kernel debugging, serial terminal, NFS root fs, on-board
-  ether port (Need an additional patch at <http://linux.junsun.net>),
+  ether port (Need an additional patch at <http://linux.junsun.net/>),
   USB, AC97, PCI, etc.
 
 Support for MIPS Atlas board
@@ -1953,7 +1942,7 @@ CONFIG_MIPS_MAGNUM_4000
   This is a machine with a R4000 100 MHz CPU. To compile a Linux
   kernel that runs on these, say Y here. For details about Linux on
   the MIPS architecture, check out the Linux/MIPS FAQ on the WWW at
-  <http://oss.sgi.com/mips>.
+  <http://oss.sgi.com/mips/>.
 
 Enable Qtronix 990P Keyboard Support
 CONFIG_QTRONIX_KEYBOARD
@@ -1965,7 +1954,7 @@ CONFIG_OLIVETTI_M700
   This is a machine with a R4000 100 MHz CPU. To compile a Linux
   kernel that runs on these, say Y here. For details about Linux on
   the MIPS architecture, check out the Linux/MIPS FAQ on the WWW at
-  <http://oss.sgi.com/mips>.
+  <http://oss.sgi.com/mips/>.
 
 Support for SNI RM200 PCI
 CONFIG_SNI_RM200_PCI
@@ -2072,7 +2061,7 @@ NinjaSCSI-3 / NinjaSCSI-32Bi (16bit) PCMCIA support
 CONFIG_PCMCIA_NINJA_SCSI
   If you intend to attach this type of PCMCIA SCSI host adapter to
   your computer, say Y here and read
-  <file:Documentation/README.nsp_cs>.
+  <file:Documentation/README.nsp_cs.eng>.
 
   This driver is also available as a module called nsp_cs.o ( =
   code which can be inserted in and removed from the running kernel
@@ -2263,7 +2252,7 @@ CONFIG_NET
   of which are given in <file:Documentation/Changes>.
 
   For a general introduction to Linux networking, it is highly
-  recommended to read the NET-3-HOWTO, available from
+  recommended to read the NET-HOWTO, available from
   <http://www.linuxdoc.org/docs.html#howto>.
 
 Socket filtering
@@ -2658,6 +2647,23 @@ CONFIG_IP6_NF_MATCH_MARK
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+Multiple port match support
+CONFIG_IP6_NF_MATCH_MULTIPORT
+  Multiport matching allows you to match TCP or UDP packets based on
+  a series of source or destination ports: normally a rule can only
+  match a single range of ports.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+Owner match support
+CONFIG_IP6_NF_MATCH_OWNER
+  Packet owner matching allows you to match locally-generated packets
+  based on who created them: the user, group, process or session.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 Packet filtering
 CONFIG_IP6_NF_FILTER
   Packet filtering defines a table `filter', which has a series of
@@ -2724,6 +2730,14 @@ CONFIG_IP6_NF_MATCH_LIMIT
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+LOG target support
+CONFIG_IP6_NF_TARGET_LOG
+  This option adds a `LOG' target, which allows you to create rules in
+  any iptables table which records the packet header to the syslog.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 SYN flood protection
 CONFIG_SYN_COOKIES
   Normal TCP/IP networking is open to an attack known as "SYN
@@ -2776,7 +2790,7 @@ CONFIG_ALPHA_GENERIC
 
   To find out what type of Alpha system you have, you may want to
   check out the Linux/Alpha FAQ, accessible on the WWW from
-  <http://www.alphalinux.org>. In summary:
+  <http://www.alphalinux.org/>. In summary:
 
   Alcor/Alpha-XLT     AS 600
   Alpha-XL            XL-233, XL-266
@@ -2961,7 +2975,7 @@ CONFIG_ALPHA_SRM
   which is command line driven, and ARC, which uses menus and arrow
   keys. Details about the Linux/Alpha booting process are contained in
   the Linux/Alpha FAQ, accessible on the WWW from
-  <http://www.alphalinux.org>.
+  <http://www.alphalinux.org/>.
 
   The usual way to load Linux on an Alpha machine is to use MILO
   (a bootloader that lets you pass command line parameters to the
@@ -3130,7 +3144,7 @@ CONFIG_MWAVE
 
   The user level application needed to use this driver can be found at
   the IBM Linux Technology Center (LTC) web site:
-  http://www.ibm.com/linux/ltc/
+  <http://www.ibm.com/linux/ltc/>.
 
   If you own one of the above IBM Thinkpads which has the Mwave chipset
   in it, say Y.
@@ -3505,7 +3519,7 @@ CONFIG_HOTPLUG
   example, used on modern desktops as well as laptops, is USB.
 
   Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
-  software (at <http://linux-hotplug.sourceforge.net>) and install it.
+  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
   Then your kernel will automatically call out to a user mode "policy
   agent" (/sbin/hotplug) to load modules and set up software needed
   to use devices as you hotplug them.
@@ -3546,6 +3560,12 @@ CONFIG_CARDBUS
   for location).
 
   If unsure, say Y.
+
+i82092 compatible bridge support
+CONFIG_I82092
+  This provides support for the Intel I82092AA PCI-to-PCMCIA bridge device,
+  found in some older laptops and more commonly in evaluation boards for the
+  chip.
 
 i82365 compatible host bridge support
 CONFIG_I82365
@@ -3821,7 +3841,7 @@ CONFIG_VGA_CONSOLE
 
   The program SVGATextMode can be used to utilize SVGA video cards to
   their full potential in text mode. Download it from
-  <ftp://metalab.unc.edu/pub/Linux/utils/console>.
+  <ftp://ibiblio.org/pub/Linux/utils/console/>.
 
   Say Y.
 
@@ -4053,21 +4073,18 @@ CONFIG_FB_ATY128
   module will be called aty128fb.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-# AC tree only
 Maxine (Personal DECstation) onboard framebuffer support
 CONFIG_FB_MAXINE
   Say Y here to directly support the on-board framebuffer in the
   Maxine (5000/20, /25, /33) version of the DECstation.  There is a
   page dedicated to Linux on DECstations at <http://decstation.unix-ag.org/>.
 
-# AC tree only
 PMAG-BA TURBOchannel framebuffer support
 CONFIG_FB_PMAG_BA
   Say Y here to directly support the on-board PMAG-BA framebuffer in
   the 5000/1xx versions of the DECstation.  There is a page dedicated
   to Linux on DECstations at <http://decstation.unix-ag.org/>.
 
-# AC tree only
 PMAGB-B TURBOchannel framebuffer support
 CONFIG_FB_PMAGB_B
   Say Y here to directly support the on-board PMAGB-B framebuffer in
@@ -4079,10 +4096,32 @@ CONFIG_ARCH_FTVPCI
   Say Y here if you intend to run this kernel on a FutureTV (nee Nexus
   Electronics) StrongARM PCI card.
 
-P720T
-CONFIG_ARCH_P720T
-  Say Y here if you intend to run this kernel on the ARM Prospector
-  720T.
+ANAKIN Vehicle Telematics Platform
+CONFIG_ARCH_ANAKIN
+  The Anakin is a StrongArm based SA110 - 2 DIN Vehicle Telematics Platform.
+  64MB SDRAM - 4 Mb Flash - Compact Flash Interface - 1 MB VRAM
+
+  On board peripherals:
+        * Front display: 400x234 16 bit TFT touchscreen
+        * External independent second screen interface
+        * CAN controller SJA1000
+        * USB host controller
+        * 6 channel video codec with hardware overlay
+        * Smartcard reader
+        * IrDa
+
+  Modules interfaced over the Multi Media Extension slots:
+        * A communication card
+                Wavecom GPRS modem
+                uBlock GPS
+                Bosch DAB module
+        * An audio card ( 4 * 40W, AC97 Codec, I2S)
+
+Altera Excalibur XA10 Dev Board
+ARCH_CAMELOT
+  This enables support for Altera's Excalibur XA10 development board.
+  If you would like to build your kernel to run on one of these boards
+  then you must say 'Y' here. Otherwise say 'N'
 
 Link-Up Systems LCD support
 CONFIG_FB_L7200
@@ -4306,10 +4345,8 @@ CONFIG_FB_MATROX
   a module, say M here and read <file:Documentation/modules.txt>.
 
   You can pass several parameters to the driver at boot time or at
-  module load time. The parameters look like "video=matrox:XXX", where
-  the meaning of XXX can be found at the end of the main source file
-  (<file:drivers/video/matroxfb.c>). Please see
-  <file:Documentation/fb/matroxfb.txt>.
+  module load time. The parameters look like "video=matrox:XXX", and
+  are described in <file:Documentation/fb/matroxfb.txt>.
 
 Matrox Millennium I/II support
 CONFIG_FB_MATROX_MILLENIUM
@@ -4372,7 +4409,7 @@ CONFIG_FB_MATROX_MAVEN
 
   The driver starts in monitor mode and you must use the matroxset
   tool (available at
-  <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest>) to switch it to
+  <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to switch it to
   PAL or NTSC or to swap primary and secondary head outputs.
   Secondary head driver also always start in 640x480 resolution, you
   must use fbset to change it.
@@ -4394,7 +4431,7 @@ CONFIG_FB_MATROX_G450
 
   The driver starts in monitor mode and currently does not support
   output in TV modes.  You must use the matroxset tool (available
-  at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest>) to swap
+  at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to swap
   primary and secondary head outputs.  Secondary head driver always
   start in 640x480 resolution and you must use fbset to change it.
 
@@ -4509,14 +4546,12 @@ CONFIG_FB_SIS
   This is the frame buffer device driver for the SiS 630 and 640 Super
   Socket 7 UMA cards.  Specs available at <http://www.sis.com.tw/>.
 
-# AC tree only
 SIS 630/540/730 support
 CONFIG_FB_SIS_300
   This is the frame buffer device driver for the SiS 630 and related
   Super Socket 7 UMA cards.  Specs available at
   <http://www.sis.com.tw/>.
 
-# AC tree only
 SIS 315H/315 support
 CONFIG_FB_SIS_315
   This is the frame buffer device driver for the SiS 315 graphics
@@ -4570,7 +4605,6 @@ CONFIG_FB_ATY_GX
   is at
   <http://support.ati.com/products/pc/mach64/graphics_xpression.html>.
 
-# AC tree only
 ATI Radeon display support
 CONFIG_FB_RADEON
   Choose this option if you want to use an ATI Radeon graphics card as
@@ -4697,7 +4731,8 @@ CONFIG_PARPORT
   drive, PLIP link (Parallel Line Internet Protocol is mainly used to
   create a mini network by connecting the parallel ports of two local
   machines) etc., then you need to say Y here; please read
-  <file:Documentation/parport.txt> and drivers/parport/BUGS-parport.
+  <file:Documentation/parport.txt> and
+  <file:drivers/parport/BUGS-parport>.
 
   For extensive information about drivers for many devices attaching
   to the parallel port see <http://www.torque.net/linux-pp.html> on
@@ -5186,7 +5221,7 @@ CONFIG_IPX
   used for local networks of Windows machines.  You need it if you
   want to access Novell NetWare file or print servers using the Linux
   Novell client ncpfs (available from
-  <ftp://metalab.unc.edu/pub/Linux/system/filesystems/>) or from
+  <ftp://platan.vc.cvut.cz/pub/linux/ncpfs/>) or from
   within the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO,
   available from <http://www.linuxdoc.org/docs.html#howto>).  In order
   to do the former, you'll also have to say Y to "NCP file system
@@ -5198,8 +5233,8 @@ CONFIG_IPX
 
   To turn your Linux box into a fully featured NetWare file server and
   IPX router, say Y here and fetch either lwared from
-  <ftp://metalab.unc.edu/pub/Linux/system/network/daemons/> or
-  mars_nwe from <ftp://ftp.gwdg.de/pub/linux/misc/ncpfs>. For more
+  <ftp://ibiblio.org/pub/Linux/system/network/daemons/> or
+  mars_nwe from <ftp://www.compu-art.de/mars_nwe/>. For more
   information, read the IPX-HOWTO available from
   <http://www.linuxdoc.org/docs.html#howto>.
 
@@ -5235,7 +5270,7 @@ CONFIG_IPX_INTERN
   'special' sockets to sockets listening on the primary network is
   disabled. This might break existing applications, especially RIP/SAP
   daemons. A RIP/SAP daemon that works well with the full internal net
-  can be found on <ftp://ftp.gwdg.de/pub/linux/misc/ncpfs>.
+  can be found on <ftp://ftp.gwdg.de/pub/linux/misc/ncpfs/>.
 
   If you don't know what you are doing, say N.
 
@@ -5303,7 +5338,7 @@ CONFIG_DECNET_ROUTER
   network link driver", "Routing messages" and "Network packet
   filtering".  The first two are required to allow configuration via
   rtnetlink (currently you need Alexey Kuznetsov's iproute2 package
-  from <ftp://ftp.inr.ac.ru>). The "Network packet filtering" option
+  from <ftp://ftp.inr.ac.ru/>). The "Network packet filtering" option
   will be required for the forthcoming routing daemon to work.
 
   See <file:Documentation/networking/decnet.txt> for more information.
@@ -5424,9 +5459,8 @@ CONFIG_COPS_TANGENT
 Amateur Radio support
 CONFIG_HAMRADIO
   If you want to connect your Linux box to an amateur radio, answer Y
-  here. You want to read <http://www.tapr.org/tapr/html/pkthome.html>
-  and the HAM-HOWTO and the AX25-HOWTO, both available from
-  <http://www.linuxdoc.org/docs.html#howto>.
+  here. You want to read <http://www.tapr.org/tapr/html/pkthome.html> and
+  the AX25-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>.
 
   Note that the answer to this question won't directly affect the
   kernel: saying N will just cause the configurator to skip all
@@ -5633,7 +5667,7 @@ CONFIG_BAYCOM_PAR
   connect to a parallel interface. The driver supports the picpar and
   par96 designs. To configure the driver, use the sethdlc utility
   available in the standard ax25 utilities package. For information on
-  the modems, see <http://www.baycom.de> and the file
+  the modems, see <http://www.baycom.de/> and the file
   <file:Documentation/networking/baycom.txt>.
 
   If you want to compile this driver as a module ( = code which can be
@@ -5647,7 +5681,7 @@ CONFIG_BAYCOM_EPP
   connect to a parallel interface. The driver supports the EPP
   designs. To configure the driver, use the sethdlc utility available
   in the standard ax25 utilities package. For information on the
-  modems, see <http://www.baycom.de> and the file
+  modems, see <http://www.baycom.de/> and the file
   <file:Documentation/networking/baycom.txt>.
 
   If you want to compile this driver as a module ( = code which can be
@@ -5666,7 +5700,7 @@ CONFIG_BAYCOM_SER_FDX
   driver and still provided in case this driver does not work with
   your serial interface chip. To configure the driver, use the sethdlc
   utility available in the standard ax25 utilities package. For
-  information on the modems, see <http://www.baycom.de> and
+  information on the modems, see <http://www.baycom.de/> and
   <file:Documentation/networking/baycom.txt>.
 
   If you want to compile this driver as a module ( = code which can be
@@ -5683,7 +5717,7 @@ CONFIG_BAYCOM_SER_HDX
   the full-duplex driver. This driver is depreciated.  To configure
   the driver, use the sethdlc utility available in the standard ax25
   utilities package. For information on the modems, see
-  <http://www.baycom.de> and
+  <http://www.baycom.de/> and
   <file:Documentation/networking/baycom.txt>.
 
   If you want to compile this driver as a module ( = code which can be
@@ -5860,7 +5894,7 @@ CONFIG_NET_DIVERT
    - etc...
 
   For more informations, please refer to:
-    <http://www.freshmeat.net/projects/etherdivert>
+    <http://diverter.sourceforge.net/>
     <http://perso.wanadoo.fr/magpie/EtherDivert.html>
 
   If unsure, say N.
@@ -5921,8 +5955,7 @@ CONFIG_NETLINK
   user processes.  It does so by creating a new socket family,
   PF_NETLINK.  Over this socket, the kernel can send and receive
   datagrams carrying information.  It is documented on many systems in
-  netlink(7), a HOWTO is provided as well, for example on
-  <http://snafu.freedom.org/linux2.2/docs/netlink-HOWTO.html>.
+  netlink(7).
 
   So far, the kernel uses this feature to publish some network related
   information if you say Y to "Routing messages", below. You also need
@@ -5938,7 +5971,7 @@ Routing messages
 CONFIG_RTNETLINK
   If you say Y here, user space programs can receive some network
   related routing information over the netlink. 'rtmon', supplied
-  with the iproute2 package (<ftp://ftp.inr.ac.ru>), can read and
+  with the iproute2 package (<ftp://ftp.inr.ac.ru/>), can read and
   interpret this data.  Information sent to the kernel over this link
   is ignored.
 
@@ -6225,7 +6258,7 @@ CONFIG_ATM_IA
   control memory (128K-1KVC, 512K-4KVC), the size of the packet
   memory (128K, 512K, 1M), and the PHY type (Single/Multi mode OC3,
   UTP155, UTP25, DS3 and E3). Go to:
-  	www.iphase.com/products/ClassSheet.cfm?ClassID=ATM
+  	<http://www.iphase.com/products/ClassSheet.cfm?ClassID=ATM>
   for more info about the cards. Say Y (or M to compile as a module
   named iphase.o) here if you have one of these cards.
 
@@ -6238,7 +6271,7 @@ CONFIG_ATM_IA_DEBUG
   messages is controlled by a bitmap. This may be specified as a
   module argument (kernel command line argument as well?), changed
   dynamically using an ioctl (Get the debug utility, iadbg, from
-  <ftp://ftp.iphase.com/pub/atm/pci>).
+  <ftp://ftp.iphase.com/pub/atm/pci/>).
 
   See the file <file:drivers/atm/iphase.h> for the meanings of the
   bits in the mask.
@@ -6490,12 +6523,6 @@ CONFIG_SCSI
   You also need to say Y here if you want support for the parallel
   port version of the 100 MB IOMEGA ZIP drive.
 
-  Please read the SCSI-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>. The
-  SCSI-Programming-HOWTO contains information about how to add or
-  remove an SCSI device from a running Linux machine without
-  rebooting.
-
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called scsi_mod.o.  If you want to compile it as
@@ -6573,7 +6600,7 @@ CONFIG_CHR_DEV_OSST
   tape drives (ADR-x0) that supports the standard SCSI-2 commands for
   tapes (QIC-157) and can be driven by the standard driver st.
   For more information, you may have a look at the SCSI-HOWTO
-  <ftp://metalab.unc.edu/pub/Linux/docs/HOWTO>  and
+  <http://www.linuxdoc.org/docs.html#howto>  and
   <file:drivers/scsi/README.osst>  in the kernel source.
   More info on the OnStream driver may be found on
   <http://linux1.onstream.nl/test/>
@@ -6628,12 +6655,12 @@ CONFIG_CHR_DEV_SG
   directly, so you need some additional software which knows how to
   talk to these devices using the SCSI protocol:
 
-  For scanners, look at SANE (<http://www.mostang.com/sane>). For CD
-  writer software look at cdrecord
+  For scanners, look at SANE (<http://www.mostang.com/sane/>). For CD
+  writer software look at Cdrtools
   (<http://www.fokus.gmd.de/research/cc/glone/employees/joerg.schilling/private/cdrecord.html>)
-  and for burning a "disk at once": cdrdao
-  (<http://www.ping.de/sites/daneb/cdrdao.html>). Cdparanoia is a high
-  quality digital reader of audio CDs (<http://www.xiph.org/paranoia>).
+  and for burning a "disk at once": CDRDAO
+  (<http://cdrdao.sourceforge.net/>). Cdparanoia is a high
+  quality digital reader of audio CDs (<http://www.xiph.org/paranoia/>).
   For other devices, it's possible that you'll have to write the
   driver software yourself. Please read the file
   <file:Documentation/scsi-generic.txt> for more information.
@@ -6930,10 +6957,10 @@ CONFIG_SCSI_BUSLOGIC
   This is support for BusLogic MultiMaster and FlashPoint SCSI Host
   Adapters. Consult the SCSI-HOWTO, available from
   <http://www.linuxdoc.org/docs.html#howto>, and the files
-  README.BusLogic and README.FlashPoint in drivers/scsi for more
-  information. If this driver does not work correctly without
-  modification, please contact the author, Leonard N. Zubkoff, by
-  email to lnz@dandelion.com.
+  <file:drivers/scsi/README.BusLogic> and
+  <file:drivers/scsi/README.FlashPoint> for more information. If this
+  driver does not work correctly without modification, please contact
+  the author, Leonard N. Zubkoff, by email to lnz@dandelion.com.
 
   You can also build this driver as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
@@ -7175,7 +7202,7 @@ CONFIG_SCSI_SYM53C8XX_2
   If your system has problems using this new major version of the
   SYM53C8XX driver, you may switch back to driver version 1.
 
-  Please read drivers/scsi/sym53c8xx_2/Documentation.txt for more
+  Please read <file:drivers/scsi/sym53c8xx_2/Documentation.txt> for more
   information.
 
 PCI DMA addressing mode
@@ -7716,7 +7743,7 @@ CONFIG_SCSI_EATA_MAX_TAGS
 NCR53c406a SCSI support
 CONFIG_SCSI_NCR53C406A
   This is support for the NCR53c406a SCSI host adapter.  For user
-  configurable parameters, check out <file:drivers/scsi/NCR53c406.c>
+  configurable parameters, check out <file:drivers/scsi/NCR53c406a.c>
   in the kernel source.  Also read the SCSI-HOWTO, available from
   <http://www.linuxdoc.org/docs.html#howto>.
 
@@ -7828,7 +7855,8 @@ CONFIG_SCSI_GDTH
  
   This is a driver for RAID/SCSI Disk Array Controllers (EISA/ISA/PCI) 
   manufactured by Intel/ICP vortex (an Intel Company). It is documented
-  in the kernel source in drivers/scsi/gdth.c and drivers/scsi/gdth.h. 
+  in the kernel source in <file:drivers/scsi/gdth.c> and
+  <file:drivers/scsi/gdth.h.>
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -8241,8 +8269,8 @@ CONFIG_SLIP
 
   Normally, your access provider has to support SLIP in order for you
   to be able to use it, but there is now a SLIP emulator called SLiRP
-  around (available via FTP (user: anonymous) from
-  <ftp://metalab.unc.edu/pub/Linux/system/network/serial/>) which
+  around (available from
+  <ftp://ibiblio.org/pub/Linux/system/network/serial/>) which
   allows you to use SLIP over a regular dial up shell connection. If
   you plan to use SLiRP, make sure to say Y to CSLIP, below. The
   NET-3-HOWTO, available from
@@ -8267,7 +8295,7 @@ CONFIG_SLIP_COMPRESSED
   on both ends. Ask your access provider if you are not sure and
   answer Y, just in case. You will still be able to use plain SLIP. If
   you plan to use SLiRP, the SLIP emulator (available from
-  <ftp://metalab.unc.edu/pub/Linux/system/network/serial/>) which
+  <ftp://ibiblio.org/pub/Linux/system/network/serial/>) which
   allows you to use SLIP over a regular dial up shell connection, you
   definitely want to say Y here. The NET-3-HOWTO, available from
   <http://www.linuxdoc.org/docs.html#howto>, explains how to configure
@@ -8404,7 +8432,7 @@ CONFIG_PPPOE
 
   This driver requires a specially patched pppd daemon.  The patch to
   pppd, along with binaries of a patched pppd package can be found at:
-  <http://www.shoshin.uwaterloo.ca/~mostrows>.
+  <http://www.shoshin.uwaterloo.ca/~mostrows/>.
 
 Wireless LAN (non-hamradio)
 CONFIG_NET_RADIO
@@ -8426,7 +8454,7 @@ CONFIG_NET_RADIO
 
   Some user-level drivers for scarab devices which don't require
   special kernel support are available from
-  <ftp://shadow.cabi.net/pub/Linux>.
+  <ftp://shadow.cabi.net/pub/Linux/>.
 
 STRIP (Metricom Starmode radio IP)
 CONFIG_STRIP
@@ -8772,12 +8800,6 @@ CONFIG_HERMES
   configure your card and that /etc/pcmcia/wireless.opts works :
   <http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html>
 
-Apple Airport support (built-in)
-CONFIG_APPLE_AIRPORT
-  Enable support for the Apple Airport card (which is essentially a
-  Lucent Orinoco card with a non-standard interface) built into some
-  newer Apple Macintosh machines.
-
 Hermes 802.11b in PLX9052 based PCI adaptor support
 CONFIG_PLX_HERMES
   Enable support for PCMCIA cards supported by the "Hermes" (aka
@@ -8859,7 +8881,8 @@ Apple Airport support (built-in)
 CONFIG_APPLE_AIRPORT
   Say Y here to support the Airport 802.11b wireless Ethernet hardware
   built into the Macintosh iBook and other recent PowerPC-based
-  Macintosh machines.
+  Macintosh machines. This is essentially a Lucent Orinoco card with 
+  a non-standard interface
 
 Xircom Netwave AirSurfer wireless support
 CONFIG_PCMCIA_NETWAVE
@@ -9107,7 +9130,7 @@ CONFIG_WAN_ROUTER
   the price of an external router.  If you have one of those cards and
   wish to use your Linux box as a WAN router, say Y here and also to
   the WAN driver for your card, below.  You will then need the
-  wan-tools package which is available from <ftp://ftp.sangoma.com>.
+  wan-tools package which is available from <ftp://ftp.sangoma.com/>.
   Read <file:Documentation/networking/wan-router.txt> for more
   information.
 
@@ -9489,7 +9512,7 @@ CONFIG_COSA
   up. Look at the <http://www.fi.muni.cz/~kas/cosa/> for more
   information about the cards (including the pointer to the user-space
   utilities). You can also read the comment at the top of the
-  <file:drivers/net/cosa.c> for details about the cards and the driver
+  <file:drivers/net/wan/cosa.c> for details about the cards and the driver
   itself.
 
   The driver will be compiled as a module ( = code which can be
@@ -9501,7 +9524,7 @@ Etinc PCISYNC serial board support
 CONFIG_DSCC4
   This is a driver for Etinc PCISYNC boards based on the Infineon
   (ex. Siemens) DSCC4 chipset. It is supposed to work with the four
-  ports card. Take a look at <http://www.cogenit.fr/dscc4>
+  ports card. Take a look at <http://www.cogenit.fr/dscc4/>
   for further informations about the driver and his configuration.
 
   The driver will be compiled as a module ( = code which can be
@@ -9528,7 +9551,7 @@ CONFIG_LANMEDIA
   additional external hardware.
 
   To change setting such as syncPPP vs cisco HDLC or clock source you
-  will need lmcctl.  It is available at <ftp://ftp.lanmedia.com>.
+  will need lmcctl.  It is available at <ftp://ftp.lanmedia.com/>.
 
   This code is also available as a module called lmc.o ( = code
   which can be inserted in and removed from the running kernel
@@ -9573,7 +9596,7 @@ CONFIG_SBNI
   module will be called sbni.o).
 
   You can find more information and last versions of drivers and
-  utilities at <http://www.granch.ru>. If you have any question you
+  utilities at <http://www.granch.ru/>. If you have any question you
   can send email to sbni@granch.ru.
 
   Say N if unsure.
@@ -9596,7 +9619,7 @@ CONFIG_WAN_ROUTER_DRIVERS
   Router".
 
   You will need the wan-tools package which is available from
-  <ftp://ftp.sangoma.com>. Read
+  <ftp://ftp.sangoma.com/>. Read
   <file:Documentation/networking/wan-router.txt> for more information.
 
   Note that the answer to this question won't directly affect the
@@ -9605,7 +9628,7 @@ CONFIG_WAN_ROUTER_DRIVERS
 
 Sangoma WANPIPE(tm) multiprotocol cards
 CONFIG_VENDOR_SANGOMA
-  WANPIPE from Sangoma Technologies Inc. (<http://www.sangoma.com>)
+  WANPIPE from Sangoma Technologies Inc. (<http://www.sangoma.com/>)
   is a family of intelligent multiprotocol WAN adapters with data
   transfer rates up to 4Mbps. They are also known as Synchronous
   Data Link Adapters (SDLA) and are designated as S514-PCI or
@@ -9693,7 +9716,7 @@ CONFIG_COMX
 
   Read <file:Documentation/networking/comx.txt> for help on
   configuring and using COMX interfaces.  Further info on these cards
-  can be found at <http://www.itc.hu> or <info@itc.hu>.
+  can be found at <http://www.itc.hu/> or <info@itc.hu>.
 
   You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
   use this driver.
@@ -9787,8 +9810,8 @@ CONFIG_COMX_PROTO_FR
 
 Cyclom 2X(tm) multiprotocol cards
 CONFIG_CYCLADES_SYNC
-  Cyclom 2X from Cyclades Corporation (<http://www.cyclades.com> and
-  <http://www.cyclades.com.br)> is an intelligent multiprotocol WAN
+  Cyclom 2X from Cyclades Corporation (<http://www.cyclades.com/> and
+  <http://www.cyclades.com.br/>) is an intelligent multiprotocol WAN
   adapter with data transfer rates up to 512 Kbps. These cards support
   the X.25 and SNA related protocols. If you have one or more of these
   cards, say Y to this option. The next questions will ask you about
@@ -9797,10 +9820,10 @@ CONFIG_CYCLADES_SYNC
 
   While no documentation is available at this time please grab the
   wanconfig tarball in
-  <http://www.conectiva.com.br/~acme/cycsyn-devel> (with minor changes
+  <http://www.conectiva.com.br/~acme/cycsyn-devel/> (with minor changes
   to make it compile with the current wanrouter include files; efforts
   are being made to use the original package available at
-  <ftp://ftp.sangoma.com>).
+  <ftp://ftp.sangoma.com/>).
 
   Feel free to contact me or the cycsyn-devel mailing list at
   acme@conectiva.com.br and cycsyn-devel@bazar.conectiva.com.br for
@@ -10277,15 +10300,7 @@ CONFIG_STNIC
   is a 10Mbit/sec Ethernet controller.  Product overview and specs at
   <http://www.national.com/pf/DP/DP83902A.html>.
 
-CompactFlash Connection Area
-CONFIG_CF_AREA5
-  If your board has "Directly Connected" CompactFlash, You should
-  select the area where your CF is connected to.
-
-  - "Area5" if CompactFlash is connected to Area 5 (0x14000000)
-  - "Area6" if it is connected to Area 6 (0x18000000)
-
-  "Area6" will work for most boards. For ADX, select "Area5".
+  If unsure, say N.
 
 3COM cards
 CONFIG_NET_VENDOR_3COM
@@ -10632,7 +10647,7 @@ CONFIG_FMV18X
   module, say M here and read <file:Documentation/modules.txt> as well
   as <file:Documentation/networking/net-modules.txt>.
 
-EtherExpressPro support/EtherExpress 10 (i82595) support
+EtherExpressPro and EtherExpress 10 (i82595) support
 CONFIG_EEXPRESS_PRO
   If you have a network (Ethernet) card of this type, say Y. This
   driver supports intel i82595{FX,TX} based boards. Note however
@@ -10776,10 +10791,7 @@ CONFIG_IBMLANA
   driver and as a module ( = code which can be inserted in and removed
   from the running kernel whenever you want).  If you want to compile
   it as a module, say M here and read <file:Documentation/modules.txt>
-  as well as <file:Documentation/networking/net-modules.txt>.
-  If you plan to use more than one network card under linux, read the
-  Multiple-Ethernet-mini-HOWTO, available from
-  <ftp://sunsite.unc.edu:/pub/Linux/docs/HOWTO/mini>.  The only
+  as well as <file:Documentation/networking/net-modules.txt>. The only
   currently supported card is the IBM LAN Adapter/A for Ethernet.  It
   will both support 16K and 32K memory windows, however a 32K window
   gives a better security against packet losses.  Usage of multiple
@@ -10946,7 +10958,7 @@ Myson MTD-8xx PCI Ethernet support
 CONFIG_FEALNX
   Say Y here to support the Mysom MTD-800 family of PCI-based Ethernet
   cards. Specifications and data at
-  <http:www.myson.com.hk/mtd/datasheet>.
+  <http://www.myson.com.hk/mtd/datasheet/>.
 
 ICL EtherTeam 16i/32 support
 CONFIG_ETH16I
@@ -10993,7 +11005,7 @@ CONFIG_VIA_RHINE
 Davicom DM910x/DM980x support
 CONFIG_DM9102
   This driver is for DM9102(A)/DM9132/DM9801 compatible PCI cards from
-  Davicom (<http://www.davicom.com.tw>).  If you have such a network
+  Davicom (<http://www.davicom.com.tw/>).  If you have such a network
   (Ethernet) card, say Y.  Some information is contained in the file
   <file:Documentation/networking/dmfe.txt>.
 
@@ -11178,8 +11190,7 @@ CONFIG_IBMOL
   Wake On Lan, and PCI 100/16/4 adapters.
 
   If you have such an adapter, say Y and read the Token-Ring
-  mini-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>.
+  mini-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -11188,15 +11199,14 @@ CONFIG_IBMOL
 
   Also read <file:Documentation/networking/olympic.txt> or check the
   Linux Token Ring Project site for the latest information at
-  <http://www.linuxtr.net>.
+  <http://www.linuxtr.net/>.
 
 IBM Lanstreamer chipset PCI adapter support
 CONFIG_IBMLS
   This is support for IBM Lanstreamer PCI Token Ring Cards.
 
   If you have such an adapter, say Y and read the Token-Ring
-  mini-HOWTO available via FTP (user:anonymous) from
-  <ftp://metalab.unc/edu/pub/Linux/docs/HOWTO>.
+  mini-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>.
 
   This driver is also available as a modules ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -11347,7 +11357,7 @@ CONFIG_SHAPER
   say Y to "QoS and/or fair queueing" above.
 
   To set up and configure shaper devices, you need the shapecfg
-  program, available from <ftp://shadow.cabi.net/pub/Linux> in the
+  program, available from <ftp://shadow.cabi.net/pub/Linux/> in the
   shaper package.
 
   This driver is also available as a module ( = code which can be
@@ -11608,7 +11618,7 @@ CONFIG_SBPCD2
   Say Y here only if you have two CD-ROM controller cards of this type
   (usually only if you have more than four drives).  You should enter
   the parameters for the second, third and fourth interface card into
-  <file:include/linux/sbpcd.h> before compiling the new kernel.  Read
+  <file:drivers/cdrom/sbpcd.h> before compiling the new kernel.  Read
   the file <file:Documentation/cdrom/sbpcd>.
 
 Matsushita/Panasonic, ... third CD-ROM controller support
@@ -12383,6 +12393,100 @@ CONFIG_MTD_OCELOT
   NVRAM on the Momenco Ocelot board.  If you have one of these boards
   and would like access to either of these, say 'Y'.
 
+Support for absent chips in bus mapping
+CONFIG_MTD_ABSENT
+  This option enables support for a dummy probing driver used to
+  allocated placeholder MTD devices on systems that have socketed
+  or removable media.  Use of this driver as a fallback chip probe
+  preserves the expected registration order of MTD device nodes on
+  the system regardless of media presence.  Device nodes created
+  with this driver will return -ENODEV upon access.
+
+MTD Emulation using block device
+CONFIG_MTD_BLKMTD
+  This driver allows a block device to appear as an MTD. It would
+  generally be used in the following cases:
+
+    Using Compact Flash as an MTD, these usually present themselves to
+    the system as an ATA drive.
+    Testing MTD users (eg JFFS2) on large media and media that might
+    be removed during a write (using the floppy drive).
+
+Cirrus CDB89712 evaluation board mappings
+CONFIG_MTD_CDB89712
+  This enables access to the flash or ROM chips on the CDB89712 board.
+  If you have such a board, say 'Y'.
+
+Detect non-CFI AMD/JEDEC-compatible flash chips
+CONFIG_MTD_JEDECPROBE
+  This option enables JEDEC-style probing of flash chips which are not
+  compatible with the Common Flash Interface, but will use the common
+  CFI-targetted flash drivers for any chips which are identified which
+  are in fact compatible in all but the probe method. This actually
+  covers most AMD/Fujitsu-compatible chips, and will shortly cover also
+  non-CFI Intel chips (that code is in MTD CVS and should shortly be sent
+  for inclusion in Linus' tree)
+
+BIOS flash chip on Intel L440GX boards
+CONFIG_MTD_L440GX
+  Support for treating the BIOS flash chip on Intel L440GX motherboards
+  as an MTD device - with this you can reprogram your BIOS.
+
+  BE VERY CAREFUL.
+
+28F160xx flash driver for LART
+CONFIG_MTD_LART
+  This enables the flash driver for LART. Please note that you do
+  not need any mapping/chip driver for LART. This one does it all
+  for you, so go disable all of those if you enabled some of them (:
+
+Older (theoretically obsoleted now) drivers for non-CFI chips
+CONFIG_MTD_OBSOLETE_CHIPS
+  This option does not enable any code directly, but will allow you to
+  select some other chip drivers which are now considered obsolete,
+  because the generic CONFIG_JEDEC_PROBE code above should now detect
+  the chips which are supported by these drivers, and allow the generic
+  CFI-compatible drivers to drive the chips. Say 'N' here unless you have
+  already tried the CONFIG_JEDEC_PROBE method and reported its failure
+  to the MTD mailing list at <linux-mtd@lists.infradead.org>
+
+CFI Flash device mapped on Hitachi SolutionEngine
+CONFIG_MTD_SOLUTIONENGINE
+  This enables access to the flash chips on the Hitachi SolutionEngine and
+  similar boards. Say 'Y' if you are building a kernel for such a board.
+
+Flash chip mapping on TQM8xxL PPC board
+CONFIG_MTD_TQM8XXL
+  The TQM8xxL PowerPC board has up to two banks of CFI-compliant
+  chips, currently uses AMD one. This 'mapping' driver supports
+  that arrangement, allowing the CFI probe and command set driver
+  code to communicate with the chips on the TQM8xxL board. More at
+  <http://www.denx.de/embedded-ppc-en.html>.
+
+Darkness
+CONFIG_MEMORY_SET
+  This is an option about which you will never be asked a question.
+  Therefore, I conclude that you do not exist - go away.
+
+  There is a grue here.
+
+Physical memory size
+CONFIG_MEMORY_SIZE
+  This sets the default memory size assumed by your SH kernel. It can
+  be overridden as normal by the 'mem=' argument on the kernel command
+  line. If unsure, consult your board specifications or just leave it
+  as 0x00400000 which was the default value before this became
+  configurable.
+
+Cache and PCI noncoherent
+CONFIG_SH_PCIDMA_NONCOHERENT
+  Enable this option if your platform does not have a CPU cache which
+  remains coherent with PCI DMA. It is safest to say 'Y', although you
+  will see better performance if you can say 'N', because the PCI DMA
+  code will not have to flush the CPU's caches. If you have a PCI host
+  bridge integrated with your SH CPU, refer carefully to the chip specs
+  to see if you can say 'N' here. Otherwise, leave it as 'Y'.
+
 USB (Universal Serial Bus) support
 CONFIG_USB
   Universal Serial Bus (USB) is a specification for a serial bus
@@ -12568,7 +12672,7 @@ CONFIG_USB_AIPTEK
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called aiptek.o. If you want to compile it as a
-  module, say M here and read Documentation/modules.txt.
+  module, say M here and read <file:Documentation/modules.txt>.
 
 Use input layer for ADB devices
 CONFIG_INPUT_ADBHID
@@ -12729,12 +12833,23 @@ USB Handspring Visor Driver
 CONFIG_USB_SERIAL_VISOR
   Say Y here if you want to connect to your HandSpring Visor, Palm
   m500 or m505 through its USB docking station. See
-  <http://usbvisor.sourceforge.net> for more information on using this
+  <http://usbvisor.sourceforge.net/> for more information on using this
   driver.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called visor.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+USB IR Dongle Serial Driver
+CONFIG_USB_SERIAL_IR
+  Say Y here if you want to enable simple serial support for USB IrDA
+  devices.  This is useful if you do not want to use the full IrDA
+  stack.
+  
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ir-usb.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
 USB IR Dongle Serial Driver
@@ -12765,7 +12880,7 @@ CONFIG_USB_SERIAL_FTDI_SIO
   converter device. The implementation I have is called the USC-1000.
   This driver has also be tested with the 245 and 232 devices.
 
-  See  http://ftdi-usb-sio.sourceforge.net for more
+  See <http://ftdi-usb-sio.sourceforge.net/> for more
   information on this driver and the device.
 
   This code is also available as a module ( = code which can be
@@ -13002,7 +13117,7 @@ CONFIG_USB_CDCETHER
   This driver supports devices conforming to the Communication Device
   Class Ethernet Control Model.  This is used in some cable modems.
   For more details on the specification, get the Communication Device
-  Class specification from <http://www.usb.org>.
+  Class specification from <http://www.usb.org/>.
 
   This driver should work with the following devices:
         * Ericsson PipeRider (all variants)
@@ -13129,7 +13244,7 @@ CONFIG_USB_DC2XX
   Say Y here if you want to connect this type of still camera to your
   computer's USB port.  See <file:Documentation/usb/dc2xx.txt> for
   more information; some non-Kodak cameras may also work with this
-  driver, given application support (such as <http://www.gPhoto.org>).
+  driver, given application support (such as <http://www.gphoto.org/>).
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -13140,7 +13255,7 @@ USB Mustek MDC800 Digital Camera support
 CONFIG_USB_MDC800
   Say Y here if you want to connect this type of still camera to
   your computer's USB port. This driver can be used with gphoto 0.4.3
-  and higher (look at <http://www.gphoto.org>).
+  and higher (look at <http://www.gphoto.org/>).
   To use it create a device node with "mknod /dev/mustek c 180 32" and
   configure it in your software.
 
@@ -13244,7 +13359,7 @@ CONFIG_USB_BANDWIDTH
 DABUSB driver
 CONFIG_USB_DABUSB
   A Digital Audio Broadcasting (DAB) Receiver for USB and Linux
-  brought to you by the DAB-Team (<http://dab.in.tum.de>).  This
+  brought to you by the DAB-Team (<http://dab.in.tum.de/>).  This
   driver can be taken as an example for URB-based bulk, control, and
   isochronous transactions. URB's are explained in
   <file:Documentation/usb/URB.txt>.
@@ -13482,7 +13597,7 @@ CONFIG_UML_NET_ETHERTAP
   running UML to exchange packets with its host over one of the
   host's Ethertap devices, such as /dev/tap0.  Additional running
   UMLs can use additional Ethertap devices, one per running UML.
-  While the UML believes its on a (multi-device, broadcast) virtual
+  While the UML believes it's on a (multi-device, broadcast) virtual
   Ethernet network, it's in fact communicating over a point-to-point
   link with the host.
 
@@ -13577,7 +13692,7 @@ USB Bluetooth support
 CONFIG_USB_BLUETOOTH
   Say Y here if you want to connect a USB Bluetooth device to your
   computer's USB port. You will need the Bluetooth stack (available
-  at <http://developer.axis.com/software/index.shtml)> to fully use
+  at <http://developer.axis.com/software/index.shtml>) to fully use
   the device.
 
   This code is also available as a module ( = code which can be
@@ -13613,7 +13728,7 @@ CONFIG_REISERFS_FS
 
   In general, ReiserFS is as fast as ext2, but is very efficient with
   large directories and small files.  Additional patches are needed
-  for NFS and quotas, please see <http://www.reiserfs.org> for links.
+  for NFS and quotas, please see <http://www.reiserfs.org/> for links.
 
   It is more easily extended to have features currently found in
   database and keyword search systems than block allocation based file
@@ -13621,7 +13736,7 @@ CONFIG_REISERFS_FS
   plugins consistent with our motto ``It takes more than a license to
   make source code open.''
 
-  Read <http://www.reiserfs.org> to learn more about reiserfs.
+  Read <http://www.reiserfs.org/> to learn more about reiserfs.
 
   Sponsored by Threshold Networks, Emusic.com, and Bigstorage.com.
 
@@ -13648,15 +13763,6 @@ CONFIG_REISERFS_PROC_INFO
   increases amount of kernel memory required for each mount.  Almost
   everyone but ReiserFS developers and people fine-tuning reiserfs or
   tracing problems should say N.
-
-Publish some reiserfs-specific info under /proc/fs/reiserfs
-CONFIG_REISERFS_PROC_INFO
-  Create under /proc/fs/reiserfs hierarchy of files, displaying
-  various ReiserFS statistics and internal data on the expense of
-  making your kernel or module slightly larger (+8K). This also increases 
-  amount of kernel memory required for each mount. Almost everyone
-  but ReiserFS developers and people fine-tuning reiserfs or tracing
-  problems should say NO.
 
 Second extended fs support
 CONFIG_EXT2_FS
@@ -13687,10 +13793,10 @@ CONFIG_EXT2_FS
   directories on ext2 file systems, use chattr ("man chattr").
 
   Ext2fs partitions can be read from within DOS using the ext2tool
-  command line tool package (available via FTP (user: anonymous) from
-  <ftp://metalab.unc.edu/pub/Linux/system/filesystems/ext2>) and from
+  command line tool package (available from
+  <ftp://ibiblio.org/pub/Linux/system/filesystems/ext2/>) and from
   within Windows NT using the ext2nt command line tool package from
-  <ftp://metalab.unc.edu/pub/Linux/utils/dos>.  Explore2fs is a
+  <ftp://ibiblio.org/pub/Linux/utils/dos/>.  Explore2fs is a
   graphical explorer for ext2fs partitions which runs on Windows 95
   and Windows NT and includes experimental write support; it is
   available from
@@ -13890,7 +13996,7 @@ CONFIG_JOLIET
   which allows for long filenames in unicode format (unicode is the
   new 16 bit character code, successor to ASCII, which encodes the
   characters of almost all languages of the world; see
-  <http://www.unicode.org> for more information).  Say Y here if you
+  <http://www.unicode.org/> for more information).  Say Y here if you
   want to be able to read Joliet CD-ROMs under Linux.
 
 Transparent decompression extension
@@ -13975,7 +14081,7 @@ CONFIG_MSDOS_FS
   Linux, you can either use the DOS emulator DOSEMU, described in the
   DOSEMU-HOWTO, available from
   <http://www.linuxdoc.org/docs.html#howto>, or try dmsdosfs in
-  <ftp://metalab.unc.edu/pub/Linux/system/filesystems/dosfs>. If you
+  <ftp://ibiblio.org/pub/Linux/system/filesystems/dosfs/>. If you
   intend to use dosemu with a non-compressed MSDOS partition, say Y
   here) and MSDOS floppies. This means that file access becomes
   transparent, i.e. the MSDOS files look and behave just like all
@@ -14150,8 +14256,9 @@ CONFIG_NFS_FS
   level IP autoconfiguration" above and to "Root file system on NFS"
   below. You cannot compile this driver as a module in this case.
   There are two packages designed for booting diskless machines over
-  the net: netboot and etherboot, both available via FTP from
-  <ftp://metalab.unc.edu/pub/Linux/system/boot/Ethernet/>.
+  the net: netboot, available from
+  <http://ftp1.sourceforge.net/netboot/>, and Etherboot,
+  available from <http://ftp1.sourceforge.net/etherboot/>.
 
   If you don't know what all this is about, say N.
 
@@ -14274,7 +14381,7 @@ CONFIG_SYSV_FS
   a set of kernel modules that lets you run SCO, Xenix, Wyse,
   UnixWare, Dell Unix and System V programs under Linux.  It is
   available via FTP (user: ftp) from
-  <ftp://ftp.openlinux.org/pub/people/hch/linux-abi>).
+  <ftp://ftp.openlinux.org/pub/people/hch/linux-abi/>).
   NOTE: that will work only for binaries from Intel-based systems;
   PDP ones will have to wait until somebody ports Linux to -11 ;-)
 
@@ -14403,7 +14510,7 @@ CONFIG_AUTOFS4_FS
   automounter (amd), which is a pure user space daemon.
 
   To use the automounter you need the user-space tools from
-  <ftp://ftp.kernel.org/pub/linux/daemons/autofs/testing-v4>; you also
+  <ftp://ftp.kernel.org/pub/linux/daemons/autofs/testing-v4/>; you also
   want to answer Y to "NFS file system support", below.
 
   If you want to compile this as a module ( = code which can be
@@ -14466,6 +14573,11 @@ CONFIG_JFFS2_FS_DEBUG
 
   If reporting bugs, please try to have available a full dump of the
   messages at debug level 1 while the misbehaviour was occurring.
+
+JFFS stats available in /proc filesystem
+CONFIG_JFFS_PROC_FS
+  Enabling this option will cause statistics from mounted JFFS file systems
+  to be made available to the user in the /proc/fs/jffs/ directory.
 
 UFS file system support (read-only)
 CONFIG_UFS_FS
@@ -14567,7 +14679,7 @@ CONFIG_LDM_PARTITION
   XP.
 
   Technical documentation to accompany this driver is available from:
-  <http://linux-ntfs.sf.net/ldm>.
+  <http://linux-ntfs.sf.net/ldm/>.
 
   If unsure, say N.
 
@@ -14695,7 +14807,6 @@ CONFIG_DEVPTS_FS
   Note that the experimental "/dev file system support"
   (CONFIG_DEVFS_FS)  is a more general facility.
 
-# This is for Linus's tree
 FreeVxFS file system support (VERITAS VxFS(TM) compatible)
 CONFIG_VXFS_FS
   FreeVxFS is a file system driver that support the VERITAS VxFS(TM)
@@ -14713,25 +14824,6 @@ CONFIG_VXFS_FS
   The module is called freevxfs.o.  If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.  If
   unsure, say N. 
-
-# This is for Alan's tree.  Note the name difference.
-FreeVxFS file system support (VERITAS VxFS(TM) compatible)
-CONFIG_FREEVXFS_FS
-  FreeVxFS is a file system driver that support the VERITAS VxFS(TM)
-  file system format.  VERITAS VxFS(TM) is the standard file system
-  of SCO UnixWare (and possibly others) and optionally available
-  for Sunsoft Solaris, HP-UX and many other operating systems.
-  Currently only readonly access is supported.
-
-  NOTE: the file system type as used by mount(1), mount(2) and
-        fstab(5) is 'vxfs' as it describes the filesystem format, not
-        the actual driver.
-
-  This file system is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module is called freevxfs.o.  If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.  If
-  unsure, say N.
 
 UnixWare slices support
 CONFIG_UNIXWARE_DISKLABEL
@@ -14766,8 +14858,8 @@ CONFIG_SMB_FS
   Note: if you just want your box to act as an SMB *server* and make
   files and printing services available to Windows clients (which need
   to have a TCP/IP stack), you don't need to say Y here; you can use
-  the program samba (available via FTP (user: anonymous) in
-  <ftp://metalab.unc.edu/pub/Linux/system/network/samba>) for that.
+  the program SAMBA (available from <ftp://ftp.samba.org/pub/samba/>)
+  for that.
 
   General information about how to connect Linux, Windows machines and
   Macs is on the WWW at <http://www.eats.com/linux_mac_win.html>.
@@ -14816,7 +14908,7 @@ CONFIG_CODA_FS
   client and server.  Servers are currently user level, i.e. they need
   no kernel support.  Please read
   <file:Documentation/filesystems/coda.txt> and check out the Coda
-  home page <http://www.coda.cs.cmu.edu>.
+  home page <http://www.coda.cs.cmu.edu/>.
 
   If you want to compile the coda client support as a module ( = code
   which can be inserted in and removed from the running kernel
@@ -14832,7 +14924,7 @@ CONFIG_INTERMEZZO_FS
 
   If you say Y or M your kernel or module will provide InterMezzo
   support.  You will also need a file server daemon, which you can get
-  from <http://www.inter-mezzo.org>.
+  from <http://www.inter-mezzo.org/>.
 
 NCP file system support (to mount NetWare volumes)
 CONFIG_NCP_FS
@@ -15484,7 +15576,7 @@ Include IOP (IIfx/Quadra 9x0) ADB driver
 CONFIG_ADB_IOP
   The I/O Processor (IOP) is an Apple custom IC designed to provide
   intelligent support for I/O controllers.  It is described at
-  <http://www.angelfire.com/ca2/dev68k/iopdesc.html;> to enable direct
+  <http://www.angelfire.com/ca2/dev68k/iopdesc.html> to enable direct
   support for it, say 'Y' here.
 
 Mac II style Apple Desktop Bus support
@@ -16193,9 +16285,7 @@ CONFIG_BUSMOUSE
   Say Y here if your machine has a bus mouse as opposed to a serial
   mouse. Most people have a regular serial MouseSystem or
   Microsoft mouse (made by Logitech) that plugs into a COM port
-  (rectangular with 9 or 25 pins). These people say N here. If you
-  have something else, read the Busmouse-HOWTO, available from
-  <http://www.linuxdoc.org/docs.html#howto>, and say Y here.
+  (rectangular with 9 or 25 pins). These people say N here. 
 
   If you have a laptop, you either have to check the documentation or
   experiment a bit to find out whether the trackball is a serial mouse
@@ -16260,8 +16350,8 @@ CONFIG_PSMOUSE
   When using a PS/2 mouse, you can get problems if you want to use the
   mouse both on the Linux console and under X. Using the "-R" option
   of the Linux mouse managing program gpm (available from
-  <ftp://metalab.unc.edu/pub/Linux/system/mouse>) solves this
-  problem, or you can get the "mconv2" utility from the same location.
+  <ftp://gnu.systemy.it/pub/gpm/>) solves this problem, or you can get
+  the "mconv2" utility from <ftp://ibiblio.org/pub/Linux/system/mouse/>.
 
 C&T 82C710 mouse port support (as on TI Travelmate)
 CONFIG_82C710_MOUSE
@@ -16380,7 +16470,7 @@ CONFIG_FTAPE
   Note that the Ftape-HOWTO is out of date (sorry) and documents the
   older version 2.08 of this software but still contains useful
   information.  There is a web page with more recent documentation at
-  <http://www.math1.rwth-aachen.de/~heine/ftape/>.  This page
+  <http://www.instmath.rwth-aachen.de/~heine/ftape/>.  This page
   always contains the latest release of the ftape driver and useful
   information (backup software, ftape related patches and
   documentation, FAQ).  Note that the file system interface has
@@ -16416,7 +16506,7 @@ CONFIG_ZFTAPE
   file <file:Documentation/ftape.txt> contains a short description of
   the most important changes in the file system interface compared to
   previous versions of ftape.  The ftape home page
-  <http://www-math.math.rwth-aachen.de/~LBFM/claus/ftape/> contains
+  <http://www.instmath.rwth-aachen.de/~heine/ftape/> contains
   further information.
 
   IMPORTANT NOTE: zftape can read archives created by previous
@@ -16659,7 +16749,7 @@ CONFIG_DRM
   introduced in XFree86 4.0. If you say Y here, you need to select
   the module that's right for your graphics card from the list below.
   These modules provide support for synchronization, security, and
-  DMA transfers. Please see <http://dri.sourceforge.net> for more
+  DMA transfers. Please see <http://dri.sourceforge.net/> for more
   details.  You should also select and configure AGP
   (/dev/agpgart) support.
 
@@ -17125,9 +17215,9 @@ CONFIG_WATCHDOG
   in the kernel source.
 
   The watchdog is usually used together with the watchdog daemon
-  which is available via FTP (user: anonymous) from
-  <ftp://tsx-11.mit.edu/pub/linux/sources/sbin/>. This daemon can also
-  monitor NFS connections and can reboot the machine when the process
+  which is available from
+  <ftp://ibiblio.org/pub/Linux/system/daemons/watchdog/>. This daemon can
+  also monitor NFS connections and can reboot the machine when the process
   table is full.
 
   If unsure, say N.
@@ -17201,7 +17291,7 @@ CONFIG_PCWATCHDOG
   and if it does, it reboots your computer after a certain amount of
   time. This driver is like the WDT501 driver but for different
   hardware. Please read <file:Documentation/pcwd-watchdog.txt>. The PC
-  watchdog cards can be ordered from <http://www.berkprod.com>.
+  watchdog cards can be ordered from <http://www.berkprod.com/>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17435,7 +17525,6 @@ CONFIG_NVRAM
   The module will be called nvram.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-# Linus tree only
 Joystick support
 CONFIG_JOYSTICK
   If you have a joystick, 6dof controller, gamepad, steering wheel,
@@ -17443,18 +17532,17 @@ CONFIG_JOYSTICK
   enable generic support for these controllers. You will also need to
   say Y or M to at least one of the hardware specific drivers. This
   will make the controllers available as /dev/input/jsX devices.
-  Please read the file <file:Documentation/joystick.txt> which
+  Please read the file <file:Documentation/input/joystick.txt> which
   contains more information and the location of the joystick package
   that you'll need.
 
-# AC tree only
 Game port support
 CONFIG_INPUT_GAMEPORT
   Gameport support is for the standard 15-pin PC gameport.  If you
   have a joystick, gamepad, gameport card, a soundcard with a gameport
   or anything else that uses the gameport, say Y or M here and also to
   at least one of the hardware specific drivers.
-  Please read the file <file:Documentation/joystick.txt> which
+  Please read the file <file:Documentation/input/joystick.txt> which
   contains more information and the location of the joystick package
   that you'll need if you use the gameport with a joystick.
 
@@ -17467,7 +17555,7 @@ Classic ISA/PnP gameports
 CONFIG_INPUT_NS558
   Say Y here if you have an ISA or PnP gameport.
   For more information on how to use the driver please read
-  <file:Documentation/joystick.txt>.
+  <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17478,7 +17566,7 @@ PDPI Lightning 4 gamecard
 CONFIG_INPUT_LIGHTNING
   Say Y here if you have a PDPI Lightning 4 gamecard. For more
   information on how to use the driver please read
-  <file:Documentation/joystick.txt>.
+  <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17500,7 +17588,7 @@ Aureal Vortex and Trident 4DWave gameports
 CONFIG_INPUT_PCIGAME
   Say Y here if you have a Trident 4DWave DX/NX or Aureal Vortex 1/2
   card. For more information on how to use the driver please read
-  <file:Documentation/joystick.txt>.
+  <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17511,7 +17599,7 @@ SoundBlaster Live! gameports
 CONFIG_INPUT_EMU10K1
   Say Y here if you have a SoundBlaster Live! card and want to use
   its gameport.  For more information on how to use the driver
-  please read <file:Documentation/joystick.txt>.
+  please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17526,7 +17614,7 @@ CONFIG_INPUT_ANALOG
   additional hats and buttons compatible with CH Flightstick Pro,
   ThrustMaster FCS, 6 and 8 button gamepads, or Saitek Cyborg
   joysticks.  For more information on how to use the driver please
-  read <file:Documentation/joystick.txt>.
+  read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17537,7 +17625,7 @@ Assassin 3D and MadCatz Panther devices
 CONFIG_INPUT_A3D
   Say Y here if you have an FPGaming or MadCatz controller using the
   A3D protocol over the PC gameport.  For more information on how to
-  use the driver please read <file:Documentation/joystick.txt>.
+  use the driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17548,7 +17636,7 @@ Logitech ADI digital joysticks and gamepads
 CONFIG_INPUT_ADI
   Say Y here if you have a Logitech controller using the ADI
   protocol over the PC gameport. For more information on how to use
-  the driver please read <file:Documentation/joystick.txt>.
+  the driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17559,7 +17647,7 @@ Creative Labs Blaster Cobra gamepad
 CONFIG_INPUT_COBRA
   Say Y here if you have a Creative Labs Blaster Cobra gamepad.
   For more information on how to use the driver please read
-  <file:Documentation/joystick.txt>.
+  <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17570,7 +17658,7 @@ Genius Flight2000 Digital joysticks and gamepads
 CONFIG_INPUT_GF2K
   Say Y here if you have a Genius Flight2000 or MaxFighter digitally
   communicating joystick or gamepad.  For more information on how to
-  use the driver please read <file:Documentation/joystick.txt>.
+  use the driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17581,7 +17669,7 @@ Gravis GrIP joysticks and gamepads
 CONFIG_INPUT_GRIP
   Say Y here if you have a Gravis controller using the GrIP protocol
   over the PC gameport.  For more information on how to use the driver
-  please read <file:Documentation/joystick.txt>.
+  please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17592,7 +17680,7 @@ InterAct digital joysticks and gamepads
 CONFIG_INPUT_INTERACT
   Say Y hereif you have an InterAct gameport or joystick
   communicating digitally over the gameport.  For more information on
-  how to use the driver please read <file:Documentation/joystick.txt>.
+  how to use the driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17604,7 +17692,7 @@ CONFIG_INPUT_TMDC
   Say Y here if you have a ThrustMaster controller using the
   DirectConnect (BSP) protocol over the PC gameport.  For more
   information on how to use the driver please read
-  <file:Documentation/joystick.txt>.
+  <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17615,7 +17703,7 @@ Microsoft SideWinder digital joysticks and gamepads
 CONFIG_INPUT_SIDEWINDER
   Say Y here if you have a Microsoft controller using the Digital
   Overdrive protocol over PC gameport.  For more information on how to
-  use the driver please read <file:Documentation/joystick.txt>.
+  use the driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17627,7 +17715,7 @@ CONFIG_INPUT_SERIO
   Say Y here and to the Serial port input line discipline option if
   you plan to use a joystick that communicates over the serial (COM)
   port.  For more information on how to use the driver please read
-  <file:Documentation/joystick.txt>.
+  <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17638,7 +17726,7 @@ Serial port input line discipline
 CONFIG_INPUT_SERPORT
   Say Y here if you plan to use a joystick that communicates over the
   serial (COM) port.  For more information on how to use the driver
-  please read <file:Documentation/joystick.txt>.
+  please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17649,7 +17737,7 @@ Logitech WingMan Warrior joystick
 CONFIG_INPUT_WARRIOR
   Say Y here if you have a Logitech WingMan Warrior joystick connected
   to your computer's serial port.  For more information on how to use
-  the driver please read <file:Documentation/joystick.txt>.
+  the driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17660,7 +17748,7 @@ LogiCad3d Magellan/SpaceMouse 6dof controller
 CONFIG_INPUT_MAGELLAN
   Say Y here if you have a Magellan or Space Mouse 6DOF controller
   connected to your computer's serial port.  For more information on
-  how to use the driver please read <file:Documentation/joystick.txt>.
+  how to use the driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17672,7 +17760,7 @@ CONFIG_INPUT_SPACEORB
   Say Y here if you have a SpaceOrb 360 or SpaceBall Avenger 6DOF
   controller connected to your computer's serial port.  For more
   information on how to use the driver please read
-  <file:Documentation/joystick.txt>.
+  <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17683,7 +17771,7 @@ SpaceTec SpaceBall 4000 FLX 6dof controller
 CONFIG_INPUT_SPACEBALL
   Say Y here if you have a SpaceTec SpaceBall 4000 FLX controller
   connected to your computer's serial port.  For more information on
-  how to use the driver please read <file:Documentation/joystick.txt>.
+  how to use the driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17694,7 +17782,7 @@ Gravis Stinger gamepad
 CONFIG_INPUT_STINGER
   Say Y here if you have a Gravis Stinger connected to one of your
   serial ports.  For more information on how to use the driver please
-  read <file:Documentation/joystick.txt>.
+  read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17705,7 +17793,7 @@ I-Force joysticks/wheels
 CONFIG_INPUT_IFORCE_232
   Say Y here if you have an I-Force joystick or steering wheel
   connected to your serial (COM) port.  For more information on how
-  to use the driver please read <file:Documentation/joystick.txt>.
+  to use the driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17716,7 +17804,7 @@ I-Force joysticks/wheels
 CONFIG_INPUT_IFORCE_USB
   Say Y here if you have an I-Force joystick or steering wheel
   connected to your USB port.  For more information on how to use the
-  driver please read <file:Documentation/joystick.txt>.
+  driver please read <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17729,8 +17817,8 @@ CONFIG_INPUT_DB9
   gamepad, Sega Saturn gamepad, or a Multisystem -- Atari, Amiga,
   Commodore, Amstrad CPC joystick connected to your parallel port.
   For more information on how to use the driver please read
-  <file:Documentation/joystick.txt> and
-  <file:Documentation/joystick-parport.txt>.
+  <file:Documentation/input/joystick.txt> and
+  <file:Documentation/input/joystick-parport.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17744,8 +17832,8 @@ CONFIG_INPUT_GAMECON
   Sony PlayStation gamepad or a Multisystem -- Atari, Amiga,
   Commodore, Amstrad CPC joystick connected to your parallel port.
   For more information on how to use the driver please read
-  <file:Documentation/joystick.txt> and
-  <file:Documentation/joystick-parport.txt>.
+  <file:Documentation/input/joystick.txt> and
+  <file:Documentation/input/joystick-parport.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17757,8 +17845,8 @@ CONFIG_INPUT_TURBOGRAFX
   Say Y here if you have the TurboGraFX interface by Steffen Schwenke,
   and want to use it with Multisystem -- Atari, Amiga, Commodore,
   Amstrad CPC joystick.  For more information on how to use the driver
-  please read <file:Documentation/joystick.txt> and
-  <file:Documentation/joystick-parport.txt>.
+  please read <file:Documentation/input/joystick.txt> and
+  <file:Documentation/input/joystick-parport.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -17769,7 +17857,7 @@ Amiga joysticks
 CONFIG_INPUT_AMIJOY
   Say Y here if you have an Amiga with a digital joystick connected
   to it.  For more information on how to use the driver please read
-  <file:Documentation/joystick.txt>.
+  <file:Documentation/input/joystick.txt>.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -18342,7 +18430,7 @@ CONFIG_SOUND_AEDSP16
   questions.
 
   Read the <file:Documentation/sound/README.OSS> file and the head of
-  <file:drivers/sound/lowlevel/aedsp16.c> as well as
+  <file:drivers/sound/aedsp16.c> as well as
   <file:Documentation/sound/AudioExcelDSP16> to get more information
   about this driver and its configuration.
 
@@ -18401,11 +18489,19 @@ CONFIG_SOUND_CMPCI
   or the CMI8378 chipset.  Data on these chips are available at
   <http://www.cmedia.com.tw/>.
 
+  A userspace utility to control some internal registers of these
+  chips is available at
+  <http://member.nifty.ne.jp/Breeze/softwares/unix/cmictl-e.html>.
+
 Support CMI8738 based audio cards
 CONFIG_SOUND_CMPCI_CM8738
   Say Y or M if you have a PCI sound card using the CMI8338
   or the CMI8378 chipset.  Data on this chip is available at
   <http://www.cmedia.com.tw/doc8738.htm>.
+
+  A userspace utility to control some internal registers of these
+  chips is available at
+  <http://member.nifty.ne.jp/Breeze/softwares/unix/cmictl-e.html>.
 
 Enable joystick
 CONFIG_SOUND_CMPCI_JOYSTICK
@@ -18424,13 +18520,19 @@ CONFIG_SOUND_CMPCI_SPDIFLOOP
   "The 8738 Audio SPDIF In/Out Technical Data" on the technical
   support page at <http://www.cmedia.com.tw/>.
 
+  A userspace utility to control even more internal registers of these
+  chips is available at
+  <http://member.nifty.ne.jp/Breeze/softwares/unix/cmictl-e.html>.
+  This package will among other things help you enable SPDIF 
+  out/in/loop/monitor.
+
 Creative SBLive! (EMU10K1) based PCI sound cards
 CONFIG_SOUND_EMU10K1
   Say Y or M if you have a PCI sound card using the EMU10K1 chipset,
   such as the Creative SBLive!, SB PCI512 or Emu-APS.
 
   For more information on this driver and the degree of support for the
-  different card models please check <http://opensource.creative.com>.
+  different card models please check <http://opensource.creative.com/>.
 
   It is now possible to load dsp microcode patches into the EMU10K1
   chip.  These patches are used to implement real time sound
@@ -18663,7 +18765,7 @@ CONFIG_MIPS_EV96100
 
 Support for ITE 8172G board
 CONFIG_MIPS_ITE8172
-  Ths is an evaluation board made by ITE (http://www.ite.com.tw/)
+  Ths is an evaluation board made by ITE <http://www.ite.com.tw/>
   with ATX form factor that utilizes a MIPS R5000 to work with its
   ITE8172G companion internet appliance chip. The MIPS core can be
   either a NEC Vr5432 or QED RM5231. Say Y here if you wish to build
@@ -19177,7 +19279,7 @@ CONFIG_ISDN_DRV_SC
   can be inserted in and removed from the running kernel whenever you
   want, details in <file:Documentation/modules.txt>); the module will
   be called sc.o.  See <file:Documentation/isdn/README.sc> and
-  <http://www.spellcast.com> for more information.
+  <http://www.spellcast.com/> for more information.
 
 Eicon active card support
 CONFIG_ISDN_DRV_EICON
@@ -19319,7 +19421,7 @@ CONFIG_ISDN_DRV_TPAM
   This enables support for the Auvertech TurboPAM ISDN-card.
   For running this card, additional firmware is necessary, which has
   to be downloaded into the card using a utility which is distributed
-  separately from the Auvertech's web site: <http://www.auvertech.fr>.
+  separately from the Auvertech's web site: <http://www.auvertech.fr/>.
 
   Please redirect all support questions to support@auvertech.fr.
 
@@ -19514,7 +19616,7 @@ CONFIG_BLUEZ
   It was designed as a replacement for cables and other short-range
   technologies like IrDA.  Bluetooth operates in personal area range
   that typically extends up to 10 meters.  More information about
-  Bluetooth can be found at <http://www.bluetooth.com>.
+  Bluetooth can be found at <http://www.bluetooth.com/>.
 
   Linux Bluetooth subsystem consist of several layers:
                HCI Core (device and connection manager, scheduler)
@@ -19527,7 +19629,7 @@ CONFIG_BLUEZ
   To use Linux Bluetooth subsystem, you will need several user-space
   utilities like hciconfig and hcid.  These utilities and updates to
   Bluetooth kernel modules are provided in the BlueZ package.
-  For more information, see <http://bluez.sf.net>.
+  For more information, see <http://bluez.sourceforge.net/>.
 
   If you want to compile HCI Core as module (hci.o) say M here.
 
@@ -19569,62 +19671,6 @@ CONFIG_BLUEZ_HCIVHCI
 # The following options are for Linux when running on the Hitachi
 # SuperH family of RISC microprocessors.
 
-CPU Selection
-CONFIG_CPU_SUBTYPE_SH7707
-  This is the type of your Hitachi SuperH processor. This information is
-  used for optimizing and configuration purposes.
-
-  - "SH7707" for SH7707
-  - "SH7708" for SH7708, SH7708S, SH7708R
-  - "SH7709" for SH7707, SH7709, SH7709A, and SH7729.
-  - "SH7750" for SH7750, SH7750S
-  - "SH7751" for SH7751
-  - "ST40STB1" for ST40STB1
-
-Target machine selection
-CONFIG_SH_GENERIC
-  This is machine type of your target.
-
-  - "Generic" for Generic kernel which might support all of them
-  - "SolutionEngine" for Hitachi SolutionEngine (7709A, 7750, 7750S)
-  - "SolutionEngine7751" for Hitachi SolutionEngine (7751)
-  - "STB1_Harp" for STMicroelectronics HARP
-  - "STB1_Overdrive" for STMicroelectronics Overdrive
-  - "HP620" for HP 'Jornada' 620
-  - "HP680" for HP 'Jornada' 680
-  - "HP690" for HP 'Jornada' 690
-  - "CqREEK" for CQ Publishing CqREEK SH-4
-  - "DMIDA" for DMIDA, industrial data assistant
-  - "EC3104" for Compaq Aero 8000
-  - "Dreamcast" for SEGA Dreamcast
-  - "CAT68701" for CAT 68701 Evaluation Board (SH7708)
-  - "BigSur" for Big Sur Evaluation Board
-  - "SH2000" for SH2000 Evaluation Board (SH7709A)
-  - "ADX" for A&D ADX
-  - "BareCPU" for Bare CPU board such as CqREEK SH-3
-
-  If unsure, select "BareCPU".
-
-Physical memory start address
-CONFIG_MEMORY_START
-  Computers built with Hitachi SuperH processors always
-  map the ROM starting at address zero.  But the processor
-  does not specify the range that RAM takes.  RAM is usually
-  mapped starting at 0c000000, but it may be elsewhere.
-
-  You should set this value to the address of the lowest
-  RAM location.
-
-  A value of 0c000000 will work for most boards.
-
-Directly Connected Compact Flash support
-CONFIG_CF_ENABLER
-  If your board has "Directly Connected" CompactFlash at area 5 or 6, 
-  you may want to enable this option.  Then, you can use CF as
-  primary IDE drive (only tested for SanDisk).
-
-  If in doubt, press "n".
-
 SuperH RTC support
 CONFIG_SH_RTC
   Selecting this option will allow the Linux kernel to emulate
@@ -19639,38 +19685,7 @@ CONFIG_SH_DMA
 
   If unsure, say N.
 
-SuperH SCI (serial) support
-CONFIG_SH_SCI
-  Selecting this option will allow the Linux kernel to transfer
-  data over SCI (Serial Communication Interface) and/or SCIF
-  which are built into the Hitachi SuperH processor.
-
-  If unsure, say N.
-
-Use LinuxSH standard BIOS
-CONFIG_SH_STANDARD_BIOS
-  Say Y here if your target has the gdb-sh-stub package from
-  www.m17n.org (or any conforming standard LinuxSH BIOS) in FLASH
-  or EPROM.  The kernel will use standard BIOS calls during boot
-  for various housekeeping tasks.  Note this does not work with
-  WindowsCE machines.  If unsure, say N.
-
-Early printk support
-CONFIG_SH_EARLY_PRINTK
-  If you say Y here, the kernel printk routine will begin output to
-  the console much earlier in the boot process, before the serial
-  console is initialised, instead of buffering output.  Standard
-  LinuxSH BIOS calls are used for the output.  This helps when
-  debugging fatal problems early in the boot sequence.  This is only
-  useful for kernel hackers.  If unsure, say N.
-  
-National Semiconductor DP83902AV 'ST-NIC' support
-CONFIG_STNIC
-  If you have a network adaptor with National Semiconductor DP83902AV, 
-  say Y or M (for module).
-
-  If unsure, say N.
-
+# Choice: cf_area
 CompactFlash Connection Area
 CONFIG_CF_AREA5
   If your board has "Directly Connected" CompactFlash, You should
@@ -20472,7 +20487,7 @@ CONFIG_ALL_PPC
   <http://www.synergymicro.com/PressRel/97_10_15.html>.
 
   Select APUS if configuring for a PowerUP Amiga.  More information is
-  available at: <http://linux-apus.sourceforge.net>.
+  available at: <http://linux-apus.sourceforge.net/>.
 
 Synergy-Gemini
 CONFIG_GEMINI
@@ -20484,122 +20499,7 @@ Amiga-Apus
 CONFIG_APUS
   Select APUS if configuring for a PowerUP Amiga.
   More information is available at:
-  <http://linux-apus.sourceforge.net>.
-
-Embedded 8xx Board Type
-CONFIG_RPXLITE
-  RPX-Lite:
-    Embedded Planet RPX Lite
-
-  RPX-Classic:
-    Embedded Planet RPX Classic Low-fat.
-
-  BSE-IP: 
-    Bright Star Engineering ip-Engine.
-
-  TQM823L:
-  TQM850L:
-  TQM855L:
-  TQM860L:
-    MPC8xx based family of mini modules, half credit card size,
-    up to 64 MB of RAM, 8 MB Flash, (Fast) Ethernet, 2 x serial ports,
-    2 x CAN bus interface, ...
-      Manufacturer: TQ Components, www.tq-group.de
-      Date of Release: October (?) 1999
-      End of Life: not yet :-)
-      URL:
-      - module: http://www.denx.de/PDF/TQM8xxLHWM201.pdf
-      - starter kit: http://www.denx.de/PDF/STK8xxLHWM201.pdf
-      - images: http://www.denx.de/embedded-ppc-en.html
-
-  FPS850L:
-    FingerPrint Sensor System (based on TQM850L)
-      Manufacturer: IKENDI AG, http://www.ikendi.com/
-      Date of Release: November 1999
-      End of life: end 2000 ?
-      URL: see TQM850L
-
-  SPD823TS:
-    MPC823 based board used in the "Tele Server" product
-    Manufacturer: Speech Design, http://www.speech-design.de/
-    Date of Release: Mid 2000 (?)
-    End of life: -
-    URL: http://www.speech-design.de/
-         select "English", then "Teleteam Solutions", then "TeleServer"
-
-  IVMS8:
-    MPC860 based board used in the "Integrated Voice Mail System",
-    Small Version (8 voice channels)
-    Manufacturer: Speech Design, http://www.speech-design.de/
-    Date of Release: December 2000 (?)
-    End of life: -
-    URL: http://www.speech-design.de/
-
-  IVML24:
-    MPC860 based board used in the "Integrated Voice Mail System", 
-    Large Version (24 voice channels)
-    Manufacturer: Speech Design, http://www.speech-design.de/
-    Date of Release: March 2001  (?)
-    End of life: -
-    URL: http://www.speech-design.de/
-
-  SM850:
-    Service Module (based on TQM850L)
-    Manufacturer: Dependable Computer Systems, http://www.decomsys.com/
-    Date of Release: end 2000 (?)
-    End of life: mid 2001 (?)
-    URL: http://www.tz-mikroelektronik.de/ServiceModule/index.html
-
-  HERMES:
-    Hermes-Pro ISDN/LAN router with integrated 8 x hub
-    Manufacturer: Multidata Gesellschaft für Datentechnik und Informatik
-      http://www.multidata.de/
-    Date of Release: 2000 (?)
-    End of life: -
-    URL: http://www.multidata.de/english/products/hpro.htm
-
-  IP860:	
-    VMEBus IP (Industry Pack) carrier board with MPC860
-    Manufacturer: MicroSys GmbH, http://www.microsys.de/
-    Date of Release: ?
-    End of life: -
-    URL: http://www.microsys.de/html/ip860.html
-
-  PCU_E:
-    PCU = Peripheral Controller Unit, Extended
-    Manufacturer: Siemens AG, ICN (Information and Communication Networks)
-    	http://www.siemens.de/page/1,3771,224315-1-999_2_226207-0,00.html
-    Date of Release: April 2001
-    End of life: August 2001
-    URL: n. a.
-
-Embedded 82xx Board Type
-CONFIG_EST8260
-  EST8260: Wind River System, Inc. EST SBC8260
-
-  TQM8260:
-    MPC8260 based module, little larger than credit card,
-    up to 128 MB global + 64 MB local RAM, 32 MB Flash,
-    32 kB EEPROM, 256 kB L@ Cache, 10baseT + 100baseT Ethernet,
-    2 x serial ports, ...
-      Manufacturer: TQ Components, www.tq-group.de
-      Date of Release: June 2001
-      End of Life: not yet :-)
-      URL: http://www.denx.de/PDF/TQM82xx_SPEC_Rev005.pdf
-
-  PM826:
-    Modular system with MPC8260 CPU
-    Manufacturer: MicroSys GmbH, http://www.microsys.de/
-    Date of Release: mid 2001
-    End of life: -
-    URL: http://www.microsys.de/html/pm826.html
-
-  CU824:
-    VMEBus Board with PCI extension with MPC8240 CPU
-    Manufacturer: MicroSys GmbH, http://www.microsys.de/
-    Date of Release: early 2001 (?)
-    End of life: -
-    URL: http://www.microsys.de/html/cu824.html
+  <http://linux-apus.sourceforge.net/>.
 
 AltiVec Kernel Support
 CONFIG_ALTIVEC
@@ -20673,26 +20573,97 @@ CONFIG_PMAC_BACKLIGHT
   change the screen brightness.
 
 # Choice: ppc8xxtype
-RPX-Lite
+Embedded 8xx Board Type
 CONFIG_RPXLITE
   Single-board computers based around the PowerPC MPC8xx chips and
   intended for embedded applications.  The following types are
   supported:
 
-    RPX-Lite    -- PC104 form-factor SBC based on the MPC823
-    RPX-Classic -- Credit-card-size SBC based on the MPC 860
-    BSE-IP      -- Bright Star Engineering BSE-IP SBC
-    TQM823L     -- TQM823L SBC from TQ Components
-    TQM850L     -- TQM850L SBC from TQ Components
-    TQM855L     -- TQM855L SBC from TQ Components
-    TQM860L     -- TQM860L SBC from TQ Components
-    FPS850L	-- FingerPrint Sensor from TQ Components
-    TQM860      -- TQM860 SBC from IKENDI AG
-    SPD823TS	-- Speech Design TeleServer from Speech Design
-    IVMS8	-- Integrated VoiceMail SBC from Speech Design
-    SM850       -- Service Module 850 from Dependable Computer Systems
-    MBX         -- MBX821 and MBX860 SBCs
-    Wincept     -- Wincept SBCs for thin-client machines
+  RPX-Lite:
+    Embedded Planet RPX Lite. PC104 form-factor SBC based on the MPC823.
+
+  RPX-Classic:
+    Embedded Planet RPX Classic Low-fat. Credit-card-size SBC based on 
+    the MPC 860
+
+  BSE-IP: 
+    Bright Star Engineering ip-Engine.
+
+  TQM823L:
+  TQM850L:
+  TQM855L:
+  TQM860L:
+    MPC8xx based family of mini modules, half credit card size,
+    up to 64 MB of RAM, 8 MB Flash, (Fast) Ethernet, 2 x serial ports,
+    2 x CAN bus interface, ...
+      Manufacturer: TQ Components, www.tq-group.de
+      Date of Release: October (?) 1999
+      End of Life: not yet :-)
+      URL:
+      - module: <http://www.denx.de/PDF/TQM8xxLHWM201.pdf>
+      - starter kit: <http://www.denx.de/PDF/STK8xxLHWM201.pdf>
+      - images: <http://www.denx.de/embedded-ppc-en.html>
+
+  FPS850L:
+    FingerPrint Sensor System (based on TQM850L)
+      Manufacturer: IKENDI AG, <http://www.ikendi.com/>
+      Date of Release: November 1999
+      End of life: end 2000 ?
+      URL: see TQM850L
+
+  SPD823TS:
+    MPC823 based board used in the "Tele Server" product
+    Manufacturer: Speech Design, <http://www.speech-design.de/>
+    Date of Release: Mid 2000 (?)
+    End of life: -
+    URL: <http://www.speech-design.de/>
+         select "English", then "Teleteam Solutions", then "TeleServer"
+
+  IVMS8:
+    MPC860 based board used in the "Integrated Voice Mail System",
+    Small Version (8 voice channels)
+    Manufacturer: Speech Design, <http://www.speech-design.de/>
+    Date of Release: December 2000 (?)
+    End of life: -
+    URL: <http://www.speech-design.de/>
+
+  IVML24:
+    MPC860 based board used in the "Integrated Voice Mail System", 
+    Large Version (24 voice channels)
+    Manufacturer: Speech Design, <http://www.speech-design.de/>
+    Date of Release: March 2001  (?)
+    End of life: -
+    URL: <http://www.speech-design.de/>
+
+  SM850:
+    Service Module (based on TQM850L)
+    Manufacturer: Dependable Computer Systems, <http://www.decomsys.com/>
+    Date of Release: end 2000 (?)
+    End of life: mid 2001 (?)
+    URL: <http://www.tz-mikroelektronik.de/ServiceModule/index.html>
+
+  HERMES:
+    Hermes-Pro ISDN/LAN router with integrated 8 x hub
+    Manufacturer: Multidata Gesellschaft für Datentechnik und Informatik
+      <http://www.multidata.de/>
+    Date of Release: 2000 (?)
+    End of life: -
+    URL: <http://www.multidata.de/english/products/hpro.htm>
+
+  IP860:	
+    VMEBus IP (Industry Pack) carrier board with MPC860
+    Manufacturer: MicroSys GmbH, <http://www.microsys.de/>
+    Date of Release: ?
+    End of life: -
+    URL: <http://www.microsys.de/html/ip860.html>
+
+  PCU_E:
+    PCU = Peripheral Controller Unit, Extended
+    Manufacturer: Siemens AG, ICN (Information and Communication Networks)
+    	<http://www.siemens.de/page/1,3771,224315-1-999_2_226207-0,00.html>
+    Date of Release: April 2001
+    End of life: August 2001
+    URL: n. a.
 
 RPX-Classic
 CONFIG_RPXCLASSIC
@@ -20820,7 +20791,7 @@ CONFIG_WINCEPT
 #         Manufacturer: MicroSys GmbH, <http://www.microsys.de/>
 #         Date of Release: early 2001 (?)
 #         End of life: -
-#         URL: <http://www.microsys.de/html/cu824.html
+#         URL: <http://www.microsys.de/html/cu824.html>
 #
 # PM826:
 #         Modular system with MPC8260 CPU
@@ -20839,13 +20810,39 @@ CONFIG_WINCEPT
 #         End of life: -
 #         URL: n. a.o
 
-Support for EST8260
+# Choice: ppc82xxtype
+Embedded 82xx Board Type
 CONFIG_EST8260
-  The EST8260 is a single-board computer manufactured by Wind River
-  Systems, Inc. (formerly Embedded Support Tools Corp.) and based on
-  the MPC8260.  Wind River Systems has a website at
-  <http://www.windriver.com/>, but the EST8260 cannot be found on it
-  and has probably been discontinued or rebadged.
+  EST8260:
+    The EST8260 is a single-board computer manufactured by Wind River
+    Systems, Inc. (formerly Embedded Support Tools Corp.) and based on
+    the MPC8260.  Wind River Systems has a website at
+    <http://www.windriver.com/>, but the EST8260 cannot be found on it
+    and has probably been discontinued or rebadged.
+
+  TQM8260:
+    MPC8260 based module, little larger than credit card,
+    up to 128 MB global + 64 MB local RAM, 32 MB Flash,
+    32 kB EEPROM, 256 kB L@ Cache, 10baseT + 100baseT Ethernet,
+    2 x serial ports, ...
+      Manufacturer: TQ Components, www.tq-group.de
+      Date of Release: June 2001
+      End of Life: not yet :-)
+      URL: <http://www.denx.de/PDF/TQM82xx_SPEC_Rev005.pdf>
+
+  PM826:
+    Modular system with MPC8260 CPU
+    Manufacturer: MicroSys GmbH, <http://www.microsys.de/>
+    Date of Release: mid 2001
+    End of life: -
+    URL: <http://www.microsys.de/html/pm826.html>
+
+  CU824:
+    VMEBus Board with PCI extension with MPC8240 CPU
+    Manufacturer: MicroSys GmbH, http://www.microsys.de/
+    Date of Release: early 2001 (?)
+    End of life: -
+    URL: <http://www.microsys.de/html/cu824.html>
 
 ADB raw keycode support
 CONFIG_MAC_ADBKEYCODES
@@ -20858,6 +20855,13 @@ CONFIG_MAC_ADBKEYCODES
   argument.
 
   If unsure, say Y here.
+
+I2C/SPI Microcode Patch
+UCODE_PATCH
+  Motorola releases microcode updates for their 8xx CPM modules.  The
+  microcode update file has updates for IIC, SMC and USB.  Currently only
+  the USB update is available by default, if the MPC8xx USB option is
+  enabled.  If in doubt, say 'N' here.
 
 Mouse button 2+3 emulation support
 CONFIG_MAC_EMUMOUSEBTN
@@ -21002,7 +21006,7 @@ CONFIG_VIDEO_DEV
   Support for audio/video capture and overlay devices and FM radio
   cards. The exact capabilities of each device vary. User tools for
   this are available from
-  <ftp://ftp.uk.linux.org/pub/linux/video4linux>.
+  <ftp://ftp.uk.linux.org/pub/linux/video4linux/>.
 
   If you are interested in writing a driver for such an audio/video
   device or user software interacting with such a driver, please read
@@ -21388,7 +21392,7 @@ CONFIG_VIDEO_ZORAN
   Miro DC10 and DC30 video capture cards).
 
 Include support for Iomega Buz
-CONFIG_VIDEO_BUZ
+CONFIG_VIDEO_ZORAN_BUZ
   Say Y here to include support for the Iomega Buz video card.  There
   is a Buz/Linux homepage at <http://www.lysator.liu.se/~gz/buz/>.
 
@@ -21441,8 +21445,8 @@ CONFIG_VIDEO_W9966
   otherwise say N.
   This driver is also available as a module (w9966.o).
 
-  Check out <file:Documentation/video4linux/w9966.txt> and
-  <file:Documentation/video4linux/w9966.c> for more information.
+  Check out <file:Documentation/video4linux/w9966.txt> for more
+  information.
 
 CPiA Video For Linux
 CONFIG_VIDEO_CPIA
@@ -21566,25 +21570,23 @@ CONFIG_IPLABLE
   CONFIG_IPLABE.
 
 Support for 3215 line mode terminal
-CONFIG_3215
-  Include support for IBM 3215 line-mode terminals.  Can't be used
-  if 3270 console support is chosen.
+CONFIG_TN3215
+  Include support for IBM 3215 line-mode terminals.
 
 Support for console on 3215 line mode terminal
-CONFIG_3215_CONSOLE
-  Include support for using an IBM 3215 line-mode terminal as the
-  Linux system console.  Can't be used if 3270 console support is
-  chosen.
+CONFIG_TN3215_CONSOLE
+  Include support for using an IBM 3215 line-mode terminal as a
+  Linux system console.
 
 Support for 3270 line mode terminal
-CONFIG_3270
+CONFIG_TN3270
   Include support for IBM 3270 line-mode terminals.
 
 Support for console on 3270 line mode terminal
-CONFIG_3270_CONSOLE
-  Include support for using an IBM 3270 line-mode terminal as the
-  Linux system console.  Excludes using 3215s.  Available only if 3270
-  support is compiled in statically.
+CONFIG_TN3270_CONSOLE
+  Include support for using an IBM 3270 line-mode terminal as a Linux
+  system console.  Available only if 3270 support is compiled in
+  statically.
 
 Support for HWC line mode terminal
 CONFIG_HWC
@@ -21835,7 +21837,7 @@ CONFIG_ARCH_PERSONAL_SERVER
   There are no product plans beyond the current research
   prototypes at this time.  Information is available at:
 
-  <http://crl.research.compaq.com/projects/personalserver>
+  <http://crl.research.compaq.com/projects/personalserver/>
 
   If you have any questions or comments about the  Compaq Personal
   Server, send e-mail to skiff@crl.dec.com.
@@ -21885,6 +21887,12 @@ CONFIG_SA1100_CERF
 
   Say Y if configuring for an Intrinsyc CerfBoard.
   Say N otherwise.
+
+FlexaNet
+CONFIG_SA1100_FLEXANET
+  Say Y here if you intend to run this kernel on the FlexaNet
+  handheld instruments. Information about this machine can be
+  found at: <http://www.flexanet.com/>.
 
 nanoEngine
 CONFIG_SA1100_NANOENGINE
@@ -23530,7 +23538,7 @@ CONFIG_IA32_SUPPORT
   this.  If in doubt, say Y.
 
 /proc/efi/vars support
-CONFIG_IA64_EFIVARS
+CONFIG_EFI_VARS
   If you say Y here, you are able to get EFI (Extensible Firmware
   Interface) variable information in /proc/efi/vars.  You may read,
   write, create, and destroy EFI variables through this interface.
@@ -23687,7 +23695,7 @@ CONFIG_SH_GENERIC
   each of the machines below is described by a machine vector.
 
   Select SolutionEngine if configuring for a Hitachi SH7709
-  or SH7750 evalutation board.
+  or SH7750/7750S evalutation board.
 
   Select Overdrive if configuring for a ST407750 Overdrive board.
   More information at
@@ -23695,33 +23703,42 @@ CONFIG_SH_GENERIC
 
   Select HP620 if configuring for a HP Jornada HP620.
   More information (hardware only) at
-  <http://www.hp.com/jornada>.
+  <http://www.hp.com/jornada/>.
 
   Select HP680 if configuring for a HP Jornada HP680.
   More information (hardware only) at
-  <http://www.hp.com/jornada/products/680>.
+  <http://www.hp.com/jornada/products/680/>.
 
   Select HP690 if configuring for a HP Jornada HP690.
   More information (hardware only) at
-  <http://www.hp.com/jornada/products/680>.
+  <http://www.hp.com/jornada/products/680/>.
 
   Select CqREEK if configuring for a CqREEK SH7708 or SH7750.
   More information at
   <http://sources.redhat.com/ecos/hardware.html#SuperH>.
 
   Select DMIDA if configuring for a DataMyte 4000 Industrial
-  Digital Assistant. More information at <http://www.dmida.com>.
+  Digital Assistant. More information at <http://www.dmida.com/>.
 
   Select EC3104 if configuring for a system with an Eclipse
-  International EC3104 chip, e.g. the Harris AD2000.
+  International EC3104 chip, e.g. the Harris AD2000 or Compaq Aero 8000.
 
   Select Dreamcast if configuring for a SEGA Dreamcast.
   More information at
-  <http://www.m17n.org/linux-sh/dreamcast>.  There is a
+  <http://www.m17n.org/linux-sh/dreamcast/>.  There is a
   Dreamcast project is at <http://linuxdc.sourceforge.net/>.
 
   Select BareCPU if you know what this means, and it applies
   to your system.
+
+# These may have to be merged in when we go to CML2:
+#  - "SolutionEngine7751" for Hitachi SolutionEngine (7751)
+#  - "STB1_Harp" for STMicroelectronics HARP
+#  - "CqREEK" for CQ Publishing CqREEK SH-4
+#  - "CAT68701" for CAT 68701 Evaluation Board (SH7708)
+#  - "BigSur" for Big Sur Evaluation Board
+#  - "SH2000" for SH2000 Evaluation Board (SH7709A)
+#  - "ADX" for A&D ADX
 
 SolutionEngine
 CONFIG_SH_SOLUTION_ENGINE
@@ -23743,19 +23760,19 @@ HP620
 CONFIG_SH_HP620
   Select HP620 if configuring for a HP jornada HP620.
   More information (hardware only) at
-  <http://www.hp.com/jornada>.
+  <http://www.hp.com/jornada/>.
 
 HP680
 CONFIG_SH_HP680
   Select HP680 if configuring for a HP Jornada HP680.
   More information (hardware only) at
-  <http://www.hp.com/jornada/products/680>.
+  <http://www.hp.com/jornada/products/680/>.
 
 HP690
 CONFIG_SH_HP690
   Select HP690 if configuring for a HP Jornada HP690.
   More information (hardware only)
-  at <http://www.hp.com/jornada/products/680>.
+  at <http://www.hp.com/jornada/products/680/>.
 
 CqREEK
 CONFIG_SH_CQREEK
@@ -23766,7 +23783,7 @@ CONFIG_SH_CQREEK
 DMIDA
 CONFIG_SH_DMIDA
   Select DMIDA if configuring for a DataMyte 4000 Industrial
-  Digital Assistant. More information at <http://www.dmida.com>.
+  Digital Assistant. More information at <http://www.dmida.com/>.
 
 EC3104
 CONFIG_SH_EC3104
@@ -23777,7 +23794,7 @@ Dreamcast
 CONFIG_SH_DREAMCAST
   Select Dreamcast if configuring for a SEGA Dreamcast.
   More information at
-  <http://www.m17n.org/linux-sh/dreamcast>.  There is a
+  <http://www.m17n.org/linux-sh/dreamcast/>.  There is a
   Dreamcast project is at <http://linuxdc.sourceforge.net/>.
 
 BareCPU
@@ -23794,7 +23811,8 @@ CONFIG_SH_UNKNOWN
 # Choice: superhtype
 SH7707
 CONFIG_CPU_SUBTYPE_SH7707
-  Select the type of SuperH processor you have.
+  Select the type of SuperH processor you have. This information is
+  used for optimizing and configuration purposes.
 
   Select SH7707 if you have a  60 Mhz SH-3 HD6417707 CPU.
 
@@ -23804,6 +23822,10 @@ CONFIG_CPU_SUBTYPE_SH7707
   Select SH7709 if you have a  80 Mhz SH-3 HD6417709 CPU.
 
   Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
+
+  Select SH7751 if you have a SH7751
+
+  Select ST40STB1 if you have a ST40STB1
 
 SH7708
 CONFIG_CPU_SUBTYPE_SH7708
@@ -23820,7 +23842,11 @@ CONFIG_CPU_SUBTYPE_SH7750
 
 Physical memory start address
 CONFIG_MEMORY_START
-  The physical memory start address will be automatically
+  Computers built with Hitachi SuperH processors always
+  map the ROM starting at address zero.  But the processor
+  does not specify the range that RAM takes.  
+
+  The physical memory (RAM) start address will be automatically
   set to 08000000, unless you selected one of the following
   processor types: SolutionEngine, Overdrive, HP620, HP680, HP690,
   in which case the start address will be set to 0c000000.
@@ -23878,15 +23904,15 @@ CONFIG_HD64465_IOBASE
   The default setting of the HD64465 IO base address is 0xb0000000.
 
   Do not change this unless you know what you are doing.
-
+  
 Early printk support
 CONFIG_SH_EARLY_PRINTK
-  Say Y here to redirect kernel messages to the serial port
+  Say Y here to redirect kernel printk messages to the serial port
   used by the SH-IPL bootloader, starting very early in the boot
   process and ending when the kernel's serial console is initialised.
   This option is only useful porting the kernel to a new machine,
   when the kernel may crash or hang before the serial console is
-  initialised.
+  initialised. If unsure, say N.
 
 SuperH SCI (serial) support
 CONFIG_SH_SCI
@@ -23940,7 +23966,7 @@ CONFIG_GDB_CONSOLE
 #
 # This is used by Emacs' spell checker ispell.el:
 #
-# LocalWords:  CONFIG coprocessor DX Pentium SX lilo loadlin HOWTO ftp metalab
+# LocalWords:  CONFIG coprocessor DX Pentium SX lilo loadlin HOWTO ftp ibiblio
 # LocalWords:  unc edu docs emu README kB BLK DEV FD Thinkpad fd MFM RLL IDE gz
 # LocalWords:  cdrom diskless netboot nfs xzvf ATAPI MB ide pavia rubini pl pd
 # LocalWords:  HD CD-ROMs IDECD NEC MITSUMI filesystem XT XD PCI BIOS cezar ATEN
@@ -23986,7 +24012,7 @@ CONFIG_GDB_CONSOLE
 # LocalWords:  bsd comp SPARCstation le SunOS ie Gracilis PackeTwin PT pt LU FX
 # LocalWords:  FX TEAC CR LCS mS ramdisk IDETAPE cmd fperllo encis tcfs unisa
 # LocalWords:  Vertos Genoa Funai hsfs NCP NetWare tgz APM apm ioctls UltraLite
-# LocalWords:  TravelMate CDT LCD backlight VC RPC Mips AXP barlow cdrecord pg
+# LocalWords:  TravelMate CDT LCD backlight VC RPC Mips AXP barlow cdrtools pg
 # LocalWords:  PMAX MILO Alphas Multia Tseng linuxelf endian mipsel mips drv HT
 # LocalWords:  kerneld callouts AdvanSys advansys Admin WDT DataStor EP verden
 # LocalWords:  wdt hdb hdc bugfix SiS vlb Acculogic CSA DTC dtc Holtek ht QDI

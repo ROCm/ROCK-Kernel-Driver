@@ -2395,7 +2395,6 @@ static int qic02_tape_release(struct inode *inode, struct file *filp)
 {
 	kdev_t dev = inode->i_rdev;
 
-	lock_kernel();
 	if (TP_DIAGS(dev)) {
 		printk("qic02_tape_release: dev=%s\n", kdevname(dev));
 	}
@@ -2419,7 +2418,6 @@ static int qic02_tape_release(struct inode *inode, struct file *filp)
 			(void) do_qic_cmd(QCMD_REWIND, TIM_R);
 		}
 	}
-	unlock_kernel();
 	return 0;
 }				/* qic02_tape_release */
 

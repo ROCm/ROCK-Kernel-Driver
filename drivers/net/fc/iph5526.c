@@ -3802,7 +3802,6 @@ struct pci_dev *pdev = NULL;
 		fi->host = host;
 		//host->max_id = MAX_SCSI_TARGETS;
 		host->max_id = 5;
-		host->hostt->use_new_eh_code = 1;
 		host->this_id = tmpt->this_id;
 
 		pci_maddr = pci_resource_start(pdev, 0);

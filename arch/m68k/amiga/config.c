@@ -86,7 +86,7 @@ extern void amiga_enable_irq (unsigned int);
 extern void amiga_disable_irq (unsigned int);
 static void amiga_get_model(char *model);
 static int amiga_get_hardware_list(char *buffer);
-extern int amiga_get_irq_list (char *);
+extern int show_amiga_interrupts (struct seq_file *, void *);
 /* amiga specific timer functions */
 static unsigned long amiga_gettimeoffset (void);
 static void a3000_gettod (int *, int *, int *, int *, int *, int *);
@@ -403,7 +403,7 @@ void __init config_amiga(void)
   disable_irq          = amiga_disable_irq;
   mach_get_model       = amiga_get_model;
   mach_get_hardware_list = amiga_get_hardware_list;
-  mach_get_irq_list    = amiga_get_irq_list;
+  mach_get_irq_list    = show_amiga_interrupts;
   mach_gettimeoffset   = amiga_gettimeoffset;
   if (AMIGAHW_PRESENT(A3000_CLK)){
     mach_gettod  = a3000_gettod;

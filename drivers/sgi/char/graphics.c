@@ -196,7 +196,6 @@ sgi_graphics_close (struct inode *inode, struct file *file)
 	int board = GRAPHICS_CARD (inode->i_rdev);
 
 	/* Tell the rendering manager that one client is going away */
-	lock_kernel();
 	rrm_close (inode, file);
 
 	/* Was this file handle from the board owner?, clear it */
@@ -206,7 +205,6 @@ sgi_graphics_close (struct inode *inode, struct file *file)
 			(*cards [board].g_reset_console)();
 		enable_gconsole ();
 	}
-	unlock_kernel();
 	return 0;
 }
 

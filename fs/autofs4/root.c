@@ -202,8 +202,6 @@ static void autofs4_dentry_release(struct dentry *de)
 {
 	struct autofs_info *inf;
 
-	lock_kernel();
-
 	DPRINTK(("autofs4_dentry_release: releasing %p\n", de));
 
 	inf = autofs4_dentry_ino(de);
@@ -215,8 +213,6 @@ static void autofs4_dentry_release(struct dentry *de)
 
 		autofs4_free_ino(inf);
 	}
-
-	unlock_kernel();
 }
 
 /* For dentries of directories in the root dir */

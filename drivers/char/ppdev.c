@@ -646,7 +646,6 @@ static int pp_release (struct inode * inode, struct file * file)
 	struct pp_struct *pp = file->private_data;
 	int compat_negot;
 
-	lock_kernel();
 	compat_negot = 0;
 	if (!(pp->flags & PP_CLAIMED) && pp->pdev &&
 	    (pp->state.mode != IEEE1284_MODE_COMPAT)) {
@@ -695,7 +694,6 @@ static int pp_release (struct inode * inode, struct file * file)
 		printk (KERN_DEBUG CHRDEV "%x: unregistered pardevice\n",
 			minor);
 	}
-	unlock_kernel();
 
 	kfree (pp);
 

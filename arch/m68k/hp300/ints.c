@@ -148,7 +148,7 @@ void hp300_free_irq(unsigned int irq, void *dev_id)
 	spin_unlock_irqrestore(&irqlist_lock, flags);
 }
 
-int hp300_get_irq_list(char *buf)
+int show_hp300_interrupts(struct seq_file *p, void *v)
 {
 	return 0;
 }

@@ -64,7 +64,6 @@ extern int DC390_proc_info(char *buffer, char **start, off_t offset, int length,
    this_id:        7,					\
    sg_tablesize:   SG_ALL,				\
    cmd_per_lun:    16,					\
-   NEW_EH						\
    unchecked_isa_dma: 0,				\
    use_clustering: DISABLE_CLUSTERING			\
    }

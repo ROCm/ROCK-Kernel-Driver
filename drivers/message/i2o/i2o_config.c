@@ -847,7 +847,6 @@ static int cfg_release(struct inode *inode, struct file *file)
 	struct i2o_cfg_info *p1, *p2;
 	unsigned long flags;
 
-	lock_kernel();
 	p1 = p2 = NULL;
 
 	spin_lock_irqsave(&i2o_config_lock, flags);
@@ -870,7 +869,6 @@ static int cfg_release(struct inode *inode, struct file *file)
 		p1 = p1->next;
 	}
 	spin_unlock_irqrestore(&i2o_config_lock, flags);
-	unlock_kernel();
 
 	return 0;
 }

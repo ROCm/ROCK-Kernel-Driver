@@ -353,16 +353,16 @@ static int wdtpci_open(struct inode *inode, struct file *file)
 	switch(MINOR(inode->i_rdev))
 	{
 		case WATCHDOG_MINOR:
-			if(wdt_is_open)
+			if( test_and_set_bit(0,&wdt_is_open) ) 
+			{
 				return -EBUSY;
+			}
 #ifdef CONFIG_WATCHDOG_NOWAYOUT	
 			MOD_INC_USE_COUNT;
 #endif
 			/*
 			 *	Activate 
 			 */
-	 
-			wdt_is_open=1;
 
 			inb_p(WDT_DC);		/* Disable */
 
@@ -412,13 +412,11 @@ static int wdtpci_release(struct inode *inode, struct file *file)
 {
 	if(MINOR(inode->i_rdev)==WATCHDOG_MINOR)
 	{
-		lock_kernel();
 #ifndef CONFIG_WATCHDOG_NOWAYOUT	
 		inb_p(WDT_DC);		/* Disable counters */
 		wdtpci_ctr_load(2,0);	/* 0 length reset pulses now */
 #endif		
-		wdt_is_open=0;
-		unlock_kernel();
+		clear_bit(0, &wdt_is_open );
 	}
 	return 0;
 }

@@ -30,6 +30,12 @@
  * Aki Laukkanen	: added power management support
  * Arnaldo C. de Melo	: added missing restore_flags in ad1848_resume
  * Miguel Freitas       : added ISA PnP support
+ * Alan Cox		: Added CS4236->4239 identification
+ * Daniel T. Cobra	: Alernate config/mixer for later chips
+ * Alan Cox		: Merged chip idents and config code
+ *
+ * TODO
+ *		APM save restore assist code on IBM thinkpad
  *
  * Status:
  *		Tested. Believed fully functional.
@@ -57,7 +63,7 @@ typedef struct
 	int             dual_dma;	/* 1, when two DMA channels allocated */
 	int 		subtype;
 	unsigned char   MCE_bit;
-	unsigned char   saved_regs[32];
+	unsigned char   saved_regs[64];	/* Includes extended register space */
 	int             debug_flag;
 
 	int             audio_flags;
@@ -78,6 +84,9 @@ typedef struct
 #define MD_IWAVE	7
 #define MD_4235         8 /* Crystal Audio CS4235  */
 #define MD_1845_SSCAPE  9 /* Ensoniq Soundscape PNP*/
+#define MD_4236		10 /* 4236 and higher */
+#define MD_42xB		11 /* CS 42xB */
+#define MD_4239		12 /* CS4239 */
 
 	/* Mixer parameters */
 	int             recmask;
@@ -202,9 +211,22 @@ static int ad_read(ad1848_info * devc, int reg)
 
 	save_flags(flags);
 	cli();
-	outb(((unsigned char) (reg & 0xff) | devc->MCE_bit), io_Index_Addr(devc));
-	x = inb(io_Indexed_Data(devc));
-/* printk("(%02x<-%02x) ", reg|devc->MCE_bit, x); */
+	
+	if(reg < 32)
+	{
+		outb(((unsigned char) (reg & 0xff) | devc->MCE_bit), io_Index_Addr(devc));
+		x = inb(io_Indexed_Data(devc));
+	}
+	else
+	{
+		int xreg, xra;
+
+		xreg = (reg & 0xff) - 32;
+		xra = (((xreg & 0x0f) << 4) & 0xf0) | 0x08 | ((xreg & 0x10) >> 2);
+		outb(((unsigned char) (23 & 0xff) | devc->MCE_bit), io_Index_Addr(devc));
+		outb(((unsigned char) (xra & 0xff)), io_Indexed_Data(devc));
+		x = inb(io_Indexed_Data(devc));
+	}
 	restore_flags(flags);
 
 	return x;
@@ -220,9 +242,22 @@ static void ad_write(ad1848_info * devc, int reg, int data)
 
 	save_flags(flags);
 	cli();
-	outb(((unsigned char) (reg & 0xff) | devc->MCE_bit), io_Index_Addr(devc));
-	outb(((unsigned char) (data & 0xff)), io_Indexed_Data(devc));
-	/* printk("(%02x->%02x) ", reg|devc->MCE_bit, data); */
+	
+	if(reg < 32)
+	{
+		outb(((unsigned char) (reg & 0xff) | devc->MCE_bit), io_Index_Addr(devc));
+		outb(((unsigned char) (data & 0xff)), io_Indexed_Data(devc));
+	}
+	else
+	{
+		int xreg, xra;
+		
+		xreg = (reg & 0xff) - 32;
+		xra = (((xreg & 0x0f) << 4) & 0xf0) | 0x08 | ((xreg & 0x10) >> 2);
+		outb(((unsigned char) (23 & 0xff) | devc->MCE_bit), io_Index_Addr(devc));
+		outb(((unsigned char) (xra & 0xff)), io_Indexed_Data(devc));
+		outb((unsigned char) (data & 0xff), io_Indexed_Data(devc));
+	}
 	restore_flags(flags);
 }
 
@@ -591,7 +626,13 @@ static void ad1848_mixer_reset(ad1848_info * devc)
 			devc->mix_devices = &(iwave_mix_devices[0]);
 			break;
 
+		case MD_42xB:
+		case MD_4239:
+			devc->mix_devices = &(cs42xb_mix_devices[0]);
+			devc->supported_devices = MODE3_MIXER_DEVICES;
+			break;
 		case MD_4232:
+		case MD_4236:
 			devc->supported_devices = MODE3_MIXER_DEVICES;
 			break;
 
@@ -1118,7 +1159,7 @@ static int ad1848_prepare_for_output(int dev, int bsize, int bcount)
 	}
 	old_fs = ad_read(devc, 8);
 
-	if (devc->model == MD_4232)
+	if (devc->model == MD_4232 || devc->model >= MD_4236)
 	{
 		tmp = ad_read(devc, 16);
 		ad_write(devc, 16, tmp | 0x30);
@@ -1139,7 +1180,7 @@ static int ad1848_prepare_for_output(int dev, int bsize, int bcount)
 	while (timeout < 10000 && inb(devc->base) == 0x80)
 		timeout++;
 
-	if (devc->model == MD_4232)
+	if (devc->model >= MD_4232)
 		ad_write(devc, 16, tmp & ~0x30);
 
 	ad_leave_MCE(devc);	/*
@@ -1403,11 +1444,12 @@ static void ad1848_trigger(int dev, int state)
 static void ad1848_init_hw(ad1848_info * devc)
 {
 	int i;
+	int *init_values;
 
 	/*
 	 * Initial values for the indirect registers of CS4248/AD1848.
 	 */
-	static int      init_values[] =
+	static int      init_values_a[] =
 	{
 		0xa8, 0xa8, 0x08, 0x08, 0x08, 0x08, 0x00, 0x00,
 		0x00, 0x0c, 0x02, 0x00, 0x8a, 0x01, 0x00, 0x00,
@@ -1417,6 +1459,31 @@ static void ad1848_init_hw(ad1848_info * devc)
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
 
+	static int      init_values_b[] =
+	{
+		/* 
+		   Values for the newer chips
+		   Some of the register initialization values were changed. In
+		   order to get rid of the click that preceded PCM playback,
+		   calibration was disabled on the 10th byte. On that same byte,
+		   dual DMA was enabled; on the 11th byte, ADC dithering was
+		   enabled, since that is theoretically desirable; on the 13th
+		   byte, Mode 3 was selected, to enable access to extended
+		   registers.
+		 */
+		0xa8, 0xa8, 0x08, 0x08, 0x08, 0x08, 0x00, 0x00,
+		0x00, 0x00, 0x06, 0x00, 0xe0, 0x01, 0x00, 0x00,
+ 		0x80, 0x00, 0x10, 0x10, 0x00, 0x00, 0x1f, 0x40,
+ 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+	};
+
+	/*
+	 *	Select initialisation data
+	 */
+	 
+	init_values = init_values_a;
+	if(devc->model >= MD_4236)
+		init_values = init_values_b;
 
 	for (i = 0; i < 16; i++)
 		ad_write(devc, i, init_values[i]);
@@ -1768,19 +1835,49 @@ int ad1848_detect(int io_base, int *ad_flags, int *osp)
 				else
 				{
 					switch (id & 0x1f) {
-					case 3: /* CS4236/CS4235 */
+					case 3: /* CS4236/CS4235/CS42xB/CS4239 */
 						{
 							int xid;
 							ad_write(devc, 12, ad_read(devc, 12) | 0x60); /* switch to mode 3 */
 							ad_write(devc, 23, 0x9c); /* select extended register 25 */
 							xid = inb(io_Indexed_Data(devc));
 							ad_write(devc, 12, ad_read(devc, 12) & ~0x60); /* back to mode 0 */
-							if ((xid & 0x1f) == 0x1d) {
-								devc->chip_name = "CS4235";
-								devc->model = MD_4235;
-							} else {
-								devc->chip_name = "CS4236";
-								devc->model = MD_4232;
+							switch (xid & 0x1f)
+							{
+								case 0x00:
+									devc->chip_name = "CS4237B(B)";
+									devc->model = MD_42xB;
+									break;
+								case 0x08:
+									/* Seems to be a 4238 ?? */
+									devc->chip_name = "CS4238";
+									devc->model = MD_42xB;
+									break;
+								case 0x09:
+									devc->chip_name = "CS4238B";
+									devc->model = MD_42xB;
+									break;
+								case 0x0b:
+									devc->chip_name = "CS4236B";
+									devc->model = MD_4236;
+									break;
+								case 0x10:
+									devc->chip_name = "CS4237B";
+									devc->model = MD_42xB;
+									break;
+								case 0x1d:
+									devc->chip_name = "CS4235";
+									devc->model = MD_4235;
+									break;
+								case 0x1e:
+									devc->chip_name = "CS4239";
+									devc->model = MD_4239;
+									break;
+								default:
+									printk("Chip ident is %X.\n", xid&0x1F);
+									devc->chip_name = "CS42xx";
+									devc->model = MD_4232;
+									break;
 							}
 						}
 						break;
@@ -2747,6 +2844,10 @@ static int ad1848_resume(ad1848_info *devc)
 
 	save_flags(flags);
 	cli();
+	
+	/* Thinkpad is a bit more of PITA than normal. The BIOS tends to
+	   restore it in a different config to the one we use.  Need to
+	   fix this somehow */
 
 	/* store old mixer levels */
 	memcpy(mixer_levels, devc->levels, sizeof (mixer_levels));  

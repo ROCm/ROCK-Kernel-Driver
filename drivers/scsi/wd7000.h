@@ -57,6 +57,5 @@ int wd7000_biosparam (Disk *, kdev_t, int *);
 	cmd_per_lun:		1,				\
 	unchecked_isa_dma:	1,				\
 	use_clustering:		ENABLE_CLUSTERING,		\
-	use_new_eh_code:	0				\
 }
 #endif

@@ -2,7 +2,11 @@
 #define _LINUX_SEQ_FILE_H
 #ifdef __KERNEL__
 
+#include <linux/types.h>
+
 struct seq_operations;
+struct file;
+struct inode;
 
 struct seq_file {
 	char *buf;
@@ -12,6 +16,7 @@ struct seq_file {
 	loff_t index;
 	struct semaphore sem;
 	struct seq_operations *op;
+	void *private;
 };
 
 struct seq_operations {

@@ -221,9 +221,7 @@ sgi_mouse_open (struct inode *inode, struct file *file)
 static int
 sgi_mouse_close (struct inode *inode, struct file *filp)
 {
-	lock_kernel();
 	mouse_opened = 0;
-	unlock_kernel();
 	return 0;
 }
 

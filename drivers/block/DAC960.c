@@ -1946,7 +1946,7 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
     Initialize the I/O Request Queue.
   */
   RequestQueue = BLK_DEFAULT_QUEUE(MajorNumber);
-  blk_init_queue(RequestQueue, DAC960_RequestFunction, "dac960");
+  blk_init_queue(RequestQueue, DAC960_RequestFunction);
   blk_queue_headactive(RequestQueue, 0);
   RequestQueue->queuedata = Controller;
   RequestQueue->max_segments = Controller->DriverScatterGatherLimit;

@@ -25,7 +25,7 @@
 
 extern void hp300_reset(void);
 extern void (*hp300_default_handler[])(int, void *, struct pt_regs *);
-extern int hp300_get_irq_list(char *buf);
+extern int show_hp300_interrupts(struct seq_file *, void *);
 
 #ifdef CONFIG_VT
 extern int hp300_keyb_init(void);
@@ -70,7 +70,7 @@ void __init config_hp300(void)
   mach_request_irq     = hp300_request_irq;
   mach_free_irq        = hp300_free_irq;
   mach_get_model       = hp300_get_model;
-  mach_get_irq_list    = hp300_get_irq_list;
+  mach_get_irq_list    = show_hp300_interrupts;
   mach_gettimeoffset   = hp300_gettimeoffset;
   mach_default_handler = &hp300_default_handler;
 #if 0

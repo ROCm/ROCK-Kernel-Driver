@@ -243,6 +243,16 @@ void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
 	q->hardsect_size = size;
 }
 
+/**
+ * blk_queue_segment_boundary - set boundary rules for segment merging
+ * @q:  the request queue for the device
+ * @mask:  the memory boundary mask
+ **/
+void blk_queue_segment_boundary(request_queue_t *q, unsigned long mask)
+{
+	q->seg_boundary_mask = mask;
+}
+
 /*
  * can we merge the two segments, or do we need to start a new one?
  */
@@ -256,10 +266,10 @@ inline int blk_same_segment(request_queue_t *q, struct bio *bio,
 		return 0;
 
 	/*
-	 * bio and nxt are contigous, if they don't span a 4GB mem boundary
-	 * return ok
+	 * bio and nxt are contigous in memory, check if the queue allows
+	 * these two to be merged into one
 	 */
-	if (BIO_PHYS_4G(bio, nxt))
+	if (BIO_SEG_BOUNDARY(q, bio, nxt))
 		return 1;
 
 	return 0;
@@ -274,11 +284,12 @@ int blk_rq_map_sg(request_queue_t *q, struct request *rq, struct scatterlist *sg
 	unsigned long long lastend;
 	struct bio_vec *bvec;
 	struct bio *bio;
-	int nsegs, i;
+	int nsegs, i, cluster;
 
 	nsegs = 0;
 	bio = rq->bio;
 	lastend = ~0ULL;
+	cluster = q->queue_flags & (1 << QUEUE_FLAG_CLUSTER);
 
 	/*
 	 * for each bio in rq
@@ -290,22 +301,22 @@ int blk_rq_map_sg(request_queue_t *q, struct request *rq, struct scatterlist *sg
 		bio_for_each_segment(bvec, bio, i) {
 			int nbytes = bvec->bv_len;
 
-			BIO_BUG_ON(i > bio->bi_io_vec->bvl_cnt);
+			BIO_BUG_ON(i > bio->bi_vcnt);
+
+			if (!cluster)
+				goto new_segment;
 
 			if (bvec_to_phys(bvec) == lastend) {
-				if (sg[nsegs - 1].length + nbytes > q->max_segment_size) {
-					printk("blk_rq_map_sg: %d segment size exceeded\n", q->max_segment_size);
+				if (sg[nsegs - 1].length + nbytes > q->max_segment_size)
 					goto new_segment;
-				}
 
 				/*
-				 * make sure to not map a 4GB boundary into
-				 * same sg entry
+				 * make sure to not map a segment across a
+				 * boundary that the queue doesn't want
 				 */
-				if (!__BIO_PHYS_4G(lastend, lastend + nbytes)) {
-					printk("blk_rq_map_sg: 4GB cross\n");
+				if (!__BIO_SEG_BOUNDARY(lastend, lastend + nbytes, q->seg_boundary_mask))
 					lastend = ~0ULL;
-				} else
+				else
 					lastend += nbytes;
 
 				sg[nsegs - 1].length += nbytes;
@@ -549,14 +560,14 @@ static int __make_request(request_queue_t *, struct bio *);
  *    blk_init_queue() must be paired with a blk_cleanup_queue() call
  *    when the block device is deactivated (such as at module unload).
  **/
-int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, char *name)
+int blk_init_queue(request_queue_t *q, request_fn_proc *rfn)
 {
 	int ret;
 
 	if (blk_init_free_list(q))
 		return -ENOMEM;
 
-	if ((ret = elevator_init(q, &q->elevator, ELEVATOR_LINUS, name))) {
+	if ((ret = elevator_init(q, &q->elevator, ELEVATOR_LINUS))) {
 		blk_cleanup_queue(q);
 		return ret;
 	}
@@ -568,12 +579,14 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, char *name)
 	q->plug_tq.sync		= 0;
 	q->plug_tq.routine	= &generic_unplug_device;
 	q->plug_tq.data		= q;
-	q->queue_flags		= 0;
-
+	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
+	
 	/*
 	 * by default assume old behaviour and bounce for any highmem page
 	 */
 	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
+
+	blk_queue_segment_boundary(q, 0xffffffff);
 
 	blk_queue_make_request(q, __make_request);
 	blk_queue_max_segment_size(q, MAX_SEGMENT_SIZE);
@@ -709,17 +722,6 @@ void blkdev_release_request(struct request *req)
 	req->q = NULL;
 
 	/*
-	 * should only happen on freereq logic in __make_request, in which
-	 * case we don't want to prune these entries from the hash
-	 */
-#if 1
-	if (req->bio)
-		bio_hash_remove(req->bio);
-	if (req->biotail)
-		bio_hash_remove(req->biotail);
-#endif
-
-	/*
 	 * Request may not have originated from ll_rw_blk. if not,
 	 * assume it has free buffers and check waiters
 	 */
@@ -756,19 +758,12 @@ static void attempt_merge(request_queue_t *q, struct request *req)
 	if (q->merge_requests_fn(q, req, next)) {
 		q->elevator.elevator_merge_req_fn(req, next);
 
-		bio_hash_remove(req->biotail);
-
-		/*
-		 * will handle dangling hash too
-		 */
 		blkdev_dequeue_request(next);
 
 		req->biotail->bi_next = next->bio;
 		req->biotail = next->biotail;
 
 		next->bio = next->biotail = NULL;
-
-		bio_hash_add_unique(req->biotail, req, q->hash_valid_counter);
 
 		req->nr_sectors = req->hard_nr_sectors += next->hard_nr_sectors;
 
@@ -857,10 +852,8 @@ again:
 	 * the back of the queue and invalidate the entire existing merge hash
 	 * for this device
 	 */
-	if (barrier && !freereq) {
+	if (barrier && !freereq)
 		latency = 0;
-		bio_hash_invalidate(q, bio->bi_dev);
-	}
 
 	insert_here = head->prev;
 	if (blk_queue_empty(q) || barrier) {
@@ -887,8 +880,6 @@ again:
 				break;
 			elevator->elevator_merge_cleanup_fn(q, req, nr_sectors);
 
-			bio_hash_remove(req->biotail);
-
 			req->biotail->bi_next = bio;
 			req->biotail = bio;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
@@ -902,8 +893,6 @@ again:
 			if (!q->front_merge_fn(q, req, bio))
 				break;
 			elevator->elevator_merge_cleanup_fn(q, req, nr_sectors);
-
-			bio_hash_remove(req->bio);
 
 			bio->bi_next = req->bio;
 			req->bio = bio;
@@ -973,7 +962,7 @@ get_rq:
 	req->hard_sector = req->sector = sector;
 	req->hard_nr_sectors = req->nr_sectors = nr_sectors;
 	req->current_nr_sectors = req->hard_cur_sectors = cur_nr_sectors;
-	req->nr_segments = bio->bi_io_vec->bvl_cnt;
+	req->nr_segments = bio->bi_vcnt;
 	req->nr_hw_segments = req->nr_segments;
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
@@ -987,7 +976,6 @@ out:
 	}
 
 	spin_unlock_irq(&q->queue_lock);
-	bio_hash_add_unique(bio, req, q->hash_valid_counter);
 	return 0;
 
 end_io:
@@ -1035,13 +1023,13 @@ static inline void blk_partition_remap(struct bio *bio)
  *
  * The caller of generic_make_request must make sure that bi_io_vec
  * are set to describe the memory buffer, and that bi_dev and bi_sector are
- & set to describe the device address, and the
+ * set to describe the device address, and the
  * bi_end_io and optionally bi_private are set to describe how
  * completion notification should be signaled.
  *
  * generic_make_request and the drivers it calls may use bi_next if this
  * bio happens to be merged with someone else, and may change bi_dev and
- * bi_rsector for remaps as it sees fit.  So the values of these fields
+ * bi_sector for remaps as it sees fit.  So the values of these fields
  * should NOT be depended on after the call to generic_make_request.
  *
  * */
@@ -1121,11 +1109,6 @@ static int end_bio_bh_io_sync(struct bio *bio, int nr_sectors)
 
 	BIO_BUG_ON(nr_sectors != (bh->b_size >> 9));
 
-	/*
-	 * I/O is complete -- remove from hash, end buffer_head, put bio
-	 */
-	bio_hash_remove(bio);
-
 	bh->b_end_io(bh, test_bit(BIO_UPTODATE, &bio->bi_flags));
 	bio_put(bio);
 
@@ -1194,13 +1177,13 @@ int submit_bh(int rw, struct buffer_head * bh)
 	bio->bi_private = bh;
 	bio->bi_end_io = end_bio_bh_io_sync;
 
-	bio->bi_io_vec->bvl_vec[0].bv_page = bh->b_page;
-	bio->bi_io_vec->bvl_vec[0].bv_len = bh->b_size;
-	bio->bi_io_vec->bvl_vec[0].bv_offset = bh_offset(bh);
+	bio->bi_io_vec[0].bv_page = bh->b_page;
+	bio->bi_io_vec[0].bv_len = bh->b_size;
+	bio->bi_io_vec[0].bv_offset = bh_offset(bh);
 
-	bio->bi_io_vec->bvl_cnt = 1;
-	bio->bi_io_vec->bvl_idx = 0;
-	bio->bi_io_vec->bvl_size = bh->b_size;
+	bio->bi_vcnt = 1;
+	bio->bi_idx = 0;
+	bio->bi_size = bh->b_size;
 
 	return submit_bio(rw, bio);
 }
@@ -1317,9 +1300,9 @@ extern int stram_device_init (void);
 
 /**
  * end_that_request_first - end I/O on one buffer.
- * &q:        queue that finished request
  * @req:      the request being processed
  * @uptodate: 0 for I/O error
+ * @nr_sectors: number of sectors to end I/O on
  *
  * Description:
  *     Ends I/O on the first buffer attached to @req, and sets it up
@@ -1354,7 +1337,6 @@ next_chunk:
 			bio->bi_next = nxt;
 
 		if ((bio = req->bio) != NULL) {
-			bio_hash_add_unique(bio,req,req->q->hash_valid_counter);
 			req->hard_sector += nsect;
 			req->hard_nr_sectors -= nsect;
 			req->sector = req->hard_sector;

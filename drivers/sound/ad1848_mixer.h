@@ -57,14 +57,14 @@
 				 SOUND_MASK_OGAIN)
 
 struct mixer_def {
-	unsigned int regno:5;		/* register number for volume */
+	unsigned int regno:6;		/* register number for volume */
 	unsigned int polarity:1;	/* volume polarity: 0=normal, 1=reversed */
 	unsigned int bitpos:3;		/* position of bits in register for volume */
 	unsigned int nbits:3;		/* number of bits in register for volume */
-	unsigned int mutereg:5;		/* register number for mute bit */
+	unsigned int mutereg:6;		/* register number for mute bit */
 	unsigned int mutepol:1;		/* mute polarity: 0=normal, 1=reversed */
 	unsigned int mutepos:4;		/* position of mute bit in register */
-	unsigned int recreg:5;		/* register number for recording bit */
+	unsigned int recreg:6;		/* register number for recording bit */
 	unsigned int recpol:1;		/* recording polarity: 0=normal, 1=reversed */
 	unsigned int recpos:4;		/* position of recording bit in register */
 };
@@ -104,43 +104,69 @@ typedef mixer_ent mixer_ents[2];
 		    rec_reg_r, rec_pola_r, rec_pos_r}}
 
 static mixer_ents ad1848_mix_devices[32] = {
-MIX_ENT(SOUND_MIXER_VOLUME,	27, 1, 0, 4,	29, 1, 0, 4,  8),
-MIX_ENT(SOUND_MIXER_BASS,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_TREBLE,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_SYNTH,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_PCM,	 6, 1, 0, 6,	 7, 1, 0, 6,  7),
-MIX_ENT(SOUND_MIXER_SPEAKER,	26, 1, 0, 4,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_LINE,	18, 1, 0, 5,	19, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_MIC,	 0, 0, 5, 1,	 1, 0, 5, 1,  8),
-MIX_ENT(SOUND_MIXER_CD,		 2, 1, 0, 5,	 3, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_IMIX,	13, 1, 2, 6,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_ALTPCM,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_RECLEV,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_IGAIN,	 0, 0, 0, 4,	 1, 0, 0, 4,  8),
-MIX_ENT(SOUND_MIXER_OGAIN,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_LINE1,	 2, 1, 0, 5,	 3, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_LINE2,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_LINE3,	18, 1, 0, 5,	19, 1, 0, 5,  7)
+	MIX_ENT(SOUND_MIXER_VOLUME,	27, 1, 0, 4,	29, 1, 0, 4,  8),
+	MIX_ENT(SOUND_MIXER_BASS,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_TREBLE,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_SYNTH,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_PCM,	 6, 1, 0, 6,	 7, 1, 0, 6,  7),
+	MIX_ENT(SOUND_MIXER_SPEAKER,	26, 1, 0, 4,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_LINE,	18, 1, 0, 5,	19, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_MIC,	 0, 0, 5, 1,	 1, 0, 5, 1,  8),
+	MIX_ENT(SOUND_MIXER_CD,		 2, 1, 0, 5,	 3, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_IMIX,	13, 1, 2, 6,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_ALTPCM,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_RECLEV,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_IGAIN,	 0, 0, 0, 4,	 1, 0, 0, 4,  8),
+	MIX_ENT(SOUND_MIXER_OGAIN,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_LINE1,	 2, 1, 0, 5,	 3, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_LINE2,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_LINE3,	18, 1, 0, 5,	19, 1, 0, 5,  7)
 };
 
 static mixer_ents iwave_mix_devices[32] = {
-MIX_ENT(SOUND_MIXER_VOLUME,	25, 1, 0, 5,	27, 1, 0, 5,  8),
-MIX_ENT(SOUND_MIXER_BASS,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_TREBLE,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_SYNTH,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_PCM,	 6, 1, 0, 6,	 7, 1, 0, 6,  7),
-MIX_ENT(SOUND_MIXER_SPEAKER,	26, 1, 0, 4,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_LINE,	18, 1, 0, 5,	19, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_MIC,	 0, 0, 5, 1,	 1, 0, 5, 1,  8),
-MIX_ENT(SOUND_MIXER_CD,		 2, 1, 0, 5,	 3, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_IMIX,	16, 1, 0, 5,	17, 1, 0, 5,  8),
-MIX_ENT(SOUND_MIXER_ALTPCM,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_RECLEV,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_IGAIN,	 0, 0, 0, 4,	 1, 0, 0, 4,  8),
-MIX_ENT(SOUND_MIXER_OGAIN,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_LINE1,	 2, 1, 0, 5,	 3, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_LINE2,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_LINE3,	18, 1, 0, 5,	19, 1, 0, 5,  7)
+	MIX_ENT(SOUND_MIXER_VOLUME,	25, 1, 0, 5,	27, 1, 0, 5,  8),
+	MIX_ENT(SOUND_MIXER_BASS,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_TREBLE,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_SYNTH,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_PCM,	 6, 1, 0, 6,	 7, 1, 0, 6,  7),
+	MIX_ENT(SOUND_MIXER_SPEAKER,	26, 1, 0, 4,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_LINE,	18, 1, 0, 5,	19, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_MIC,	 0, 0, 5, 1,	 1, 0, 5, 1,  8),
+	MIX_ENT(SOUND_MIXER_CD,		 2, 1, 0, 5,	 3, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_IMIX,	16, 1, 0, 5,	17, 1, 0, 5,  8),
+	MIX_ENT(SOUND_MIXER_ALTPCM,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_RECLEV,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_IGAIN,	 0, 0, 0, 4,	 1, 0, 0, 4,  8),
+	MIX_ENT(SOUND_MIXER_OGAIN,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_LINE1,	 2, 1, 0, 5,	 3, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_LINE2,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_LINE3,	18, 1, 0, 5,	19, 1, 0, 5,  7)
+};
+
+static mixer_ents cs42xb_mix_devices[32] = {
+	/* Digital master volume actually has seven bits, but we only use
+	   six to avoid the discontinuity when the analog gain kicks in. */
+	MIX_ENT(SOUND_MIXER_VOLUME,	46, 1, 0, 6,	47, 1, 0, 6,  7),
+	MIX_ENT(SOUND_MIXER_BASS,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_TREBLE,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_SYNTH,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_PCM,	 6, 1, 0, 6,	 7, 1, 0, 6,  7),
+	MIX_ENT(SOUND_MIXER_SPEAKER,	26, 1, 0, 4,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_LINE,	18, 1, 0, 5,	19, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_MIC,	34, 1, 0, 5,	35, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_CD,		 2, 1, 0, 5,	 3, 1, 0, 5,  7),
+	/* For the IMIX entry, it was not possible to use the MIX_ENT macro
+	   because the mute bit is in different positions for the two
+	   channels and requires reverse polarity. */
+	[SOUND_MIXER_IMIX] = {{13, 1, 2, 6, 13, 1, 0, 0, 0, 8},
+		      {42, 1, 0, 6, 42, 1, 7, 0, 0, 8}},
+	MIX_ENT(SOUND_MIXER_ALTPCM,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_RECLEV,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_IGAIN,	 0, 0, 0, 4,	 1, 0, 0, 4,  8),
+	MIX_ENT(SOUND_MIXER_OGAIN,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_LINE1,	 2, 1, 0, 5,	 3, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_LINE2,	 4, 1, 0, 5,	 5, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_LINE3,	38, 1, 0, 6,	39, 1, 0, 6,  7)
 };
 
 /* OPTi 82C930 has somewhat different port addresses.
@@ -149,68 +175,68 @@ MIX_ENT(SOUND_MIXER_LINE3,	18, 1, 0, 5,	19, 1, 0, 5,  7)
  * MIC is level of mic monitoring direct to output. Same for CD, LINE, etc.
  */
 static mixer_ents c930_mix_devices[32] = {
-MIX_ENT(SOUND_MIXER_VOLUME,	22, 1, 1, 5,	23, 1, 1, 5,  7),
-MIX_ENT(SOUND_MIXER_BASS,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_TREBLE,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_SYNTH,	 4, 1, 1, 4,	 5, 1, 1, 4,  7),
-MIX_ENT(SOUND_MIXER_PCM,	 6, 1, 0, 5,	 7, 1, 0, 5,  7),
-MIX_ENT(SOUND_MIXER_SPEAKER,	22, 1, 1, 5,	23, 1, 1, 5,  7),
-MIX_ENT(SOUND_MIXER_LINE,	18, 1, 1, 4,	19, 1, 1, 4,  7),
-MIX_ENT(SOUND_MIXER_MIC,	20, 1, 1, 4,	21, 1, 1, 4,  7),
-MIX_ENT(SOUND_MIXER_CD,		 2, 1, 1, 4,	 3, 1, 1, 4,  7),
-MIX_ENT(SOUND_MIXER_IMIX,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_ALTPCM,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_RECLEV,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_IGAIN,	 0, 0, 0, 4,	 1, 0, 0, 4,  8),
-MIX_ENT(SOUND_MIXER_OGAIN,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
-MIX_ENT(SOUND_MIXER_LINE1,	 2, 1, 1, 4,	 3, 1, 1, 4,  7),
-MIX_ENT(SOUND_MIXER_LINE2,	 4, 1, 1, 4,	 5, 1, 1, 4,  7),
-MIX_ENT(SOUND_MIXER_LINE3,	18, 1, 1, 4,	19, 1, 1, 4,  7)
+	MIX_ENT(SOUND_MIXER_VOLUME,	22, 1, 1, 5,	23, 1, 1, 5,  7),
+	MIX_ENT(SOUND_MIXER_BASS,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_TREBLE,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_SYNTH,	 4, 1, 1, 4,	 5, 1, 1, 4,  7),
+	MIX_ENT(SOUND_MIXER_PCM,	 6, 1, 0, 5,	 7, 1, 0, 5,  7),
+	MIX_ENT(SOUND_MIXER_SPEAKER,	22, 1, 1, 5,	23, 1, 1, 5,  7),
+	MIX_ENT(SOUND_MIXER_LINE,	18, 1, 1, 4,	19, 1, 1, 4,  7),
+	MIX_ENT(SOUND_MIXER_MIC,	20, 1, 1, 4,	21, 1, 1, 4,  7),
+	MIX_ENT(SOUND_MIXER_CD,		 2, 1, 1, 4,	 3, 1, 1, 4,  7),
+	MIX_ENT(SOUND_MIXER_IMIX,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_ALTPCM,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_RECLEV,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_IGAIN,	 0, 0, 0, 4,	 1, 0, 0, 4,  8),
+	MIX_ENT(SOUND_MIXER_OGAIN,	 0, 0, 0, 0,	 0, 0, 0, 0,  8),
+	MIX_ENT(SOUND_MIXER_LINE1,	 2, 1, 1, 4,	 3, 1, 1, 4,  7),
+	MIX_ENT(SOUND_MIXER_LINE2,	 4, 1, 1, 4,	 5, 1, 1, 4,  7),
+	MIX_ENT(SOUND_MIXER_LINE3,	18, 1, 1, 4,	19, 1, 1, 4,  7)
 };
 
 static mixer_ents spro_mix_devices[32] = {
-MIX_ENT (SOUND_MIXER_VOLUME,	19, 0, 4, 4,			 19, 0, 0, 4,  8),
-MIX_ENT (SOUND_MIXER_BASS,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
-MIX_ENT (SOUND_MIXER_TREBLE,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
-MIX_ENT2(SOUND_MIXER_SYNTH,	 4, 1, 1, 4, 23, 0, 3,  0, 0, 8,
-	 			 5, 1, 1, 4, 23, 0, 3, 0, 0, 8),
-MIX_ENT (SOUND_MIXER_PCM,	 6, 1, 1, 4,			  7, 1, 1, 4,  8),
-MIX_ENT (SOUND_MIXER_SPEAKER,	18, 0, 3, 2,			  0, 0, 0, 0,  8),
-MIX_ENT2(SOUND_MIXER_LINE,	20, 0, 4, 4, 17, 1, 4, 16, 0, 2,
-	 			20, 0, 0, 4, 17, 1, 3, 16, 0, 1),
-MIX_ENT2(SOUND_MIXER_MIC,	18, 0, 0, 3, 17, 1, 0, 16, 0, 0,
-	 			 0, 0, 0, 0,  0, 0, 0,  0, 0, 0),
-MIX_ENT2(SOUND_MIXER_CD,	21, 0, 4, 4, 17, 1, 2, 16, 0, 4,
-				21, 0, 0, 4, 17, 1, 1, 16, 0, 3),
-MIX_ENT (SOUND_MIXER_IMIX,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
-MIX_ENT (SOUND_MIXER_ALTPCM,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
-MIX_ENT (SOUND_MIXER_RECLEV,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
-MIX_ENT (SOUND_MIXER_IGAIN,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
-MIX_ENT (SOUND_MIXER_OGAIN,	17, 1, 6, 1,			  0, 0, 0, 0,  8),
-/* This is external wavetable */
-MIX_ENT2(SOUND_MIXER_LINE1,	22, 0, 4, 4, 23, 1, 1, 23, 0, 4,
-	 			22, 0, 0, 4, 23, 1, 0, 23, 0, 5),
+	MIX_ENT (SOUND_MIXER_VOLUME,	19, 0, 4, 4,			 19, 0, 0, 4,  8),
+	MIX_ENT (SOUND_MIXER_BASS,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
+	MIX_ENT (SOUND_MIXER_TREBLE,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
+	MIX_ENT2(SOUND_MIXER_SYNTH,	 4, 1, 1, 4, 23, 0, 3,  0, 0, 8,
+		 			 5, 1, 1, 4, 23, 0, 3, 0, 0, 8),
+	MIX_ENT (SOUND_MIXER_PCM,	 6, 1, 1, 4,			  7, 1, 1, 4,  8),
+	MIX_ENT (SOUND_MIXER_SPEAKER,	18, 0, 3, 2,			  0, 0, 0, 0,  8),
+	MIX_ENT2(SOUND_MIXER_LINE,	20, 0, 4, 4, 17, 1, 4, 16, 0, 2,
+		 			20, 0, 0, 4, 17, 1, 3, 16, 0, 1),
+	MIX_ENT2(SOUND_MIXER_MIC,	18, 0, 0, 3, 17, 1, 0, 16, 0, 0,
+		 			 0, 0, 0, 0,  0, 0, 0,  0, 0, 0),
+	MIX_ENT2(SOUND_MIXER_CD,	21, 0, 4, 4, 17, 1, 2, 16, 0, 4,
+					21, 0, 0, 4, 17, 1, 1, 16, 0, 3),
+	MIX_ENT (SOUND_MIXER_IMIX,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
+	MIX_ENT (SOUND_MIXER_ALTPCM,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
+	MIX_ENT (SOUND_MIXER_RECLEV,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
+	MIX_ENT (SOUND_MIXER_IGAIN,	 0, 0, 0, 0,			  0, 0, 0, 0,  8),
+	MIX_ENT (SOUND_MIXER_OGAIN,	17, 1, 6, 1,			  0, 0, 0, 0,  8),
+	/* This is external wavetable */
+	MIX_ENT2(SOUND_MIXER_LINE1,	22, 0, 4, 4, 23, 1, 1, 23, 0, 4,
+		 			22, 0, 0, 4, 23, 1, 0, 23, 0, 5),
 };
 
 static int default_mixer_levels[32] =
 {
-  0x3232,			/* Master Volume */
-  0x3232,			/* Bass */
-  0x3232,			/* Treble */
-  0x4b4b,			/* FM */
-  0x3232,			/* PCM */
-  0x1515,			/* PC Speaker */
-  0x2020,			/* Ext Line */
-  0x1010,			/* Mic */
-  0x4b4b,			/* CD */
-  0x0000,			/* Recording monitor */
-  0x4b4b,			/* Second PCM */
-  0x4b4b,			/* Recording level */
-  0x4b4b,			/* Input gain */
-  0x4b4b,			/* Output gain */
-  0x2020,			/* Line1 */
-  0x2020,			/* Line2 */
-  0x1515			/* Line3 (usually line in)*/
+	0x3232,			/* Master Volume */
+	0x3232,			/* Bass */
+	0x3232,			/* Treble */
+	0x4b4b,			/* FM */
+	0x3232,			/* PCM */
+	0x1515,			/* PC Speaker */
+	0x2020,			/* Ext Line */
+	0x1010,			/* Mic */
+	0x4b4b,			/* CD */
+	0x0000,			/* Recording monitor */
+	0x4b4b,			/* Second PCM */
+	0x4b4b,			/* Recording level */
+	0x4b4b,			/* Input gain */
+	0x4b4b,			/* Output gain */
+	0x2020,			/* Line1 */
+	0x2020,			/* Line2 */
+	0x1515			/* Line3 (usually line in)*/
 };
 
 #define LEFT_CHN	0

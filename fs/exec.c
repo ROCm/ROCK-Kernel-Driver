@@ -586,7 +586,7 @@ mmap_failed:
 flush_failed:
 	spin_lock_irq(&current->sigmask_lock);
 	if (current->sig != oldsig) {
-		kfree(current->sig);
+		kmem_cache_free(sigact_cachep, current->sig);
 		current->sig = oldsig;
 	}
 	spin_unlock_irq(&current->sigmask_lock);

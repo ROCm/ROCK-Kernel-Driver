@@ -244,7 +244,7 @@ struct pt_unit {
 	int flags;        	  /* various state flags */
 	int last_sense;		  /* result of last request sense */
 	int drive;		  /* drive */
-	int access;               /* count of active opens ... */
+	atomic_t available;       /* 1 if access is available 0 otherwise */
 	int bs;			  /* block size */
 	int capacity;             /* Size of tape in KB */
 	int present;		  /* device present ? */
@@ -279,7 +279,7 @@ void pt_init_units( void )
         pt_drive_count = 0;
         for (unit=0;unit<PT_UNITS;unit++) {
                 PT.pi = & PT.pia;
-                PT.access = 0;
+                atomic_set( &PT.available, 1 );
                 PT.flags = 0;
 		PT.last_sense = 0;
                 PT.present = 0;
@@ -696,22 +696,20 @@ static int pt_open (struct inode *inode, struct file *file)
 
         if ((unit >= PT_UNITS) || (!PT.present)) return -ENODEV;
 
-        PT.access++;
-
-	if (PT.access > 1) {
-		PT.access--;
+	if ( !atomic_dec_and_test(&PT.available) ) {
+		atomic_inc( &PT.available );
 		return -EBUSY;
 	}
 
 	pt_identify(unit);
 
 	if (!PT.flags & PT_MEDIA) {
-		PT.access--;
+		atomic_inc( &PT.available );
 		return -ENODEV;
 		}
 
 	if ((!PT.flags & PT_WRITE_OK) && (file ->f_mode & 2)) {
-		PT.access--;
+		atomic_inc( &PT.available );
 		return -EROFS;
 		}
 
@@ -720,7 +718,7 @@ static int pt_open (struct inode *inode, struct file *file)
 
 	PT.bufptr = kmalloc(PT_BUFSIZE,GFP_KERNEL);
 	if (PT.bufptr == NULL) {
-		PT.access--;
+		atomic_inc( &PT.available );
 		printk("%s: buffer allocation failed\n",PT.name);
 		return -ENOMEM;
 	}
@@ -775,20 +773,18 @@ static int pt_release (struct inode *inode, struct file *file)
 {
         int	unit = DEVICE_NR(inode->i_rdev);
 
-        if ((unit >= PT_UNITS) || (PT.access <= 0)) 
+        if ((unit >= PT_UNITS) || (atomic_read(&PT.available) > 1)) 
                 return -EINVAL;
 
-	lock_kernel();
 	if (PT.flags & PT_WRITING) pt_write_fm(unit);
 
 	if (PT.flags & PT_REWIND) pt_rewind(unit);	
 
-	PT.access--;
-
 	kfree(PT.bufptr);
 	PT.bufptr = NULL;
-	unlock_kernel();
 
+	atomic_inc( &PT.available );
+	
 	return 0;
 
 }

@@ -92,7 +92,6 @@ static int wdt977_release(struct inode *inode, struct file *file)
 	 * 	Lock it in if it's a module and we defined ...NOWAYOUT
 	 */
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
-	lock_kernel();
 
 	// unlock the SuperIO chip
 	outb(0x87,0x370); 
@@ -124,7 +123,6 @@ static int wdt977_release(struct inode *inode, struct file *file)
 	outb(0xAA,0x370);
 
 	timer_alive=0;
-	unlock_kernel();
 
 	printk(KERN_INFO "Watchdog: shutdown.\n");
 #endif

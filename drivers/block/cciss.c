@@ -1866,7 +1866,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
         q->queuedata = hba[i];
-        blk_init_queue(q, do_cciss_request, hba[i]->devname);
+        blk_init_queue(q, do_cciss_request);
         blk_queue_headactive(q, 0);		
 	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
 	q->max_segments = MAXSGENTRIES;

@@ -388,7 +388,6 @@ Scsi_Host_Template usb_stor_host_template = {
 	present:		0,
 	unchecked_isa_dma:	FALSE,
 	use_clustering:		TRUE,
-	use_new_eh_code:	TRUE,
 	emulated:		TRUE
 };
 

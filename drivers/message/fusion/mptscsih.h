@@ -198,7 +198,6 @@ extern	void		 x_scsi_taskmgmt_bh(void *);
 	cmd_per_lun:			MPT_SCSI_CMD_PER_LUN,	\
 	unchecked_isa_dma:		0,			\
 	use_clustering:			ENABLE_CLUSTERING,	\
-	use_new_eh_code:		1			\
 }
 
 #else

@@ -2834,8 +2834,6 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 		case BLKELVSET:
 		case BLKBSZGET:
 		case BLKBSZSET:
-		case BLKHASHPROF:
-		case BLKHASHCLEAR:
 			return blk_ioctl(inode->i_rdev, cmd, arg);
 
 		case HDIO_GET_BUSSTATE:

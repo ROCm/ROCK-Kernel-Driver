@@ -16,6 +16,7 @@
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
+#include <linux/seq_file.h>
 #include <asm/segment.h>
 #include <asm/intersil.h>
 #include <asm/oplib.h>
@@ -32,7 +33,7 @@ extern void (*sun3_inthandler[]) (int, void *, struct pt_regs *);
 extern void sun3_free_irq (unsigned int irq, void *dev_id);
 extern void sun3_enable_interrupts (void);
 extern void sun3_disable_interrupts (void);
-extern int sun3_get_irq_list(char *buf);
+extern int show_sun3_interrupts(struct seq_file *, void *);
 extern void sun3_process_int(int, struct pt_regs *);
 extern volatile unsigned char* sun3_intreg;
 

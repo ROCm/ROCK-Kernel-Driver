@@ -27,6 +27,7 @@
 #include <linux/delay.h>
 #include <linux/threads.h>
 #include <linux/spinlock.h>
+#include <linux/seq_file.h>
 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -97,42 +98,42 @@ struct irqaction *irq_action[NR_IRQS+1] = {
 	  NULL, NULL, NULL, NULL, NULL, NULL , NULL, NULL
 };
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 	struct irqaction * action;
 #ifdef CONFIG_SMP
 	int j;
 #endif
 
 	if (sparc_cpu_model == sun4d) {
-		extern int sun4d_get_irq_list(char *);
+		extern int show_sun4d_interrupts(struct seq_file *, void *);
 		
-		return sun4d_get_irq_list(buf);
+		return show_sun4d_interrupts(p, v);
 	}
 	for (i = 0 ; i < (NR_IRQS+1) ; i++) {
 	        action = *(i + irq_action);
 		if (!action) 
 		        continue;
-		len += sprintf(buf+len, "%3d: ", i);
+		seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
-		len += sprintf(buf+len, "%10u ", kstat_irqs(i));
+		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
 		for (j = 0; j < smp_num_cpus; j++)
-			len += sprintf(buf+len, "%10u ",
+			seq_printf(p, "%10u ",
 				kstat.irqs[cpu_logical_map(j)][i]);
 #endif
-		len += sprintf(buf+len, " %c %s",
+		seq_printf(p, " %c %s",
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
-			len += sprintf(buf+len, ",%s %s",
+			seq_printf(p, ",%s %s",
 				(action->flags & SA_INTERRUPT) ? " +" : "",
 				action->name);
 		}
-		len += sprintf(buf+len, "\n");
+		seq_putc(p, '\n');
 	}
-	return len;
+	return 0;
 }
 
 void free_irq(unsigned int irq, void *dev_id)

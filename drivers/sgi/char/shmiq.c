@@ -79,11 +79,13 @@ static struct {
 
 /* /dev/qcntlN attached memory regions, location and size of the event queue */
 static struct {
-	int    opened;		/* if this device has been opened */
-	void   *shmiq_vaddr;	/* mapping in kernel-land */
-	int    tail;		/* our copy of the shmiq->tail */
-	int    events;
-	int    mapped;
+	int		opened;
+	void 	 	*shmiq_vaddr;		/* mapping in kernel-land */
+	spinlock_t	shmiq_lock:SPIN_LOCK_UNLOCKED;
+					 	/* protects vaddr and opened */
+	int   		tail;			/* our copy of the shmiq->tail */
+	int    		events;
+	int    		mapped;
 	
 	wait_queue_head_t    proc_list;
 	struct fasync_struct *fasync;
@@ -328,10 +330,10 @@ shmiq_qcntl_mmap (struct file *file, struct vm_area_struct *vma)
 
 	size  = vma->vm_end - vma->vm_start;
 	start = vma->vm_start; 
-	lock_kernel();
+	spin_lock( &shmiqs [minor].shmiq_lock );
 	mem = (unsigned long) shmiqs [minor].shmiq_vaddr =  vmalloc_uncached (size);
 	if (!mem) {
-		unlock_kernel();
+		spin_unlock( &shmiqs [minor].shmiq_lock );
 		return -EINVAL;
 	}
 
@@ -347,8 +349,7 @@ shmiq_qcntl_mmap (struct file *file, struct vm_area_struct *vma)
 	shmiqs [minor].tail = 0;
 	/* Init the shared memory input queue */
 	memset (shmiqs [minor].shmiq_vaddr, 0, size);
-	unlock_kernel();
-	
+	spin_unlock( &shmiqs [minor].shmiq_lock );
 	return error;
 }
 
@@ -393,13 +394,16 @@ shmiq_qcntl_open (struct inode *inode, struct file *filp)
 	minor--;
 	if (minor > MAX_SHMI_QUEUES)
 		return -EINVAL;
+	spin_lock( &shmiqs [minor].shmiq_lock );
 	if (shmiqs [minor].opened)
+	{
+		spin_unlock( &shmiqs [minor].shmiq_lock );
 		return -EBUSY;
+	}
 
-	lock_kernel ();
 	shmiqs [minor].opened      = 1;
 	shmiqs [minor].shmiq_vaddr = 0;
-	unlock_kernel ();
+	spin_unlock( &shmiqs [minor].shmiq_lock );
 
 	return 0;
 }
@@ -429,18 +433,19 @@ shmiq_qcntl_close (struct inode *inode, struct file *filp)
 
 	if (minor > MAX_SHMI_QUEUES)
 		return -EINVAL;
+
+	spin_lock( &shmiqs [minor].shmiq_lock );
 	if (shmiqs [minor].opened == 0)
 		return -EINVAL;
 
-	lock_kernel ();
 	shmiq_qcntl_fasync (-1, filp, 0);
-	shmiqs [minor].opened      = 0;
+	shmiqs [minor].opened 	   = 0;
 	shmiqs [minor].mapped      = 0;
 	shmiqs [minor].events      = 0;
 	shmiqs [minor].fasync      = 0;
 	vfree (shmiqs [minor].shmiq_vaddr);
 	shmiqs [minor].shmiq_vaddr = 0;
-	unlock_kernel ();
+	spin_unlock( &shmiqs [minor].shmiq_lock );
 
 	return 0;
 }

@@ -218,7 +218,6 @@ int Pci2000_BiosParam		(Disk *disk, kdev_t dev, int geom[]);
 	present:	0,						\
 	unchecked_isa_dma:0,						\
 	use_clustering:	DISABLE_CLUSTERING,				\
-	use_new_eh_code:0						\
 }
 
 #endif

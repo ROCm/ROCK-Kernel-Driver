@@ -17,6 +17,7 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/sched.h>
+#include <linux/seq_file.h>
 
 #include <asm/rtc.h>
 #include <asm/ptrace.h>
@@ -431,21 +432,20 @@ void q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
 	  }
 }
 
-int q40_get_irq_list (char *buf)
+int show_q40_interrupts (struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 
-	for (i = 0; i <= Q40_IRQ_MAX; i++) 
-	  {
+	for (i = 0; i <= Q40_IRQ_MAX; i++) {
 		if (irq_tab[i].count)
-	      len += sprintf (buf+len, "%sIRQ %02d: %8d  %s%s\n",
+		      seq_printf(p, "%sIRQ %02d: %8d  %s%s\n",
 			      (i<=15) ? "ISA-" : "    " ,		
 			    i, irq_tab[i].count,
 			    irq_tab[i].devname[0] ? irq_tab[i].devname : "?",
 			    irq_tab[i].handler == q40_defhand ? 
 					" (now unassigned)" : "");
 	}
-	return len;
+	return 0;
 }
 
 

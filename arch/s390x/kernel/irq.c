@@ -28,6 +28,7 @@
 #include <linux/threads.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -59,19 +60,17 @@ BUILD_SMP_INTERRUPT(mtrr_interrupt)
 BUILD_SMP_INTERRUPT(spurious_interrupt)
 #endif
 
-#if 0
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
 	int i, j;
 	struct irqaction * action;
-	char *p = buf;
 
-	p += sprintf(p, "           ");
+	seq_puts(p, "           ");
 
 	for (j=0; j<smp_num_cpus; j++)
-		p += sprintf(p, "CPU%d       ",j);
+		seq_printf(p, "CPU%d       ",j);
 
-	*p++ = '\n';
+	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++)
 	{
@@ -83,35 +82,34 @@ int get_irq_list(char *buf)
   		if (!action)
 			continue;
 
-		p += sprintf(p, "%3d: ",i);
+		seq_printf(p, "%3d: ",i);
 #ifndef CONFIG_SMP
-		p += sprintf(p, "%10u ", kstat_irqs(i));
+		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
 		for (j=0; j<smp_num_cpus; j++)
-			p += sprintf( p, "%10u ",
+			seq_printf( p, "%10u ",
 			              kstat.irqs[cpu_logical_map(j)][i]);
 #endif
-		p += sprintf(p, " %14s", ioinfo[i]->irq_desc.handler->typename);
-		p += sprintf(p, "  %s", action->name);
+		seq_printf(p, " %14s", ioinfo[i]->irq_desc.handler->typename);
+		seq_printf(p, "  %s", action->name);
 
 		for (action=action->next; action; action = action->next)
 		{
-			p += sprintf(p, ", %s", action->name);
+			seq_printf(p, ", %s", action->name);
 
 		} /* endfor */
 
-		*p++ = '\n';
+		seq_putc(p, '\n');
 	
 	} /* endfor */
 
-	p += sprintf(p, "NMI: %10u\n", nmi_counter);
+	seq_printf(p, "NMI: %10u\n", nmi_counter);
 #ifdef CONFIG_SMP
-	p += sprintf(p, "IPI: %10u\n", atomic_read(&ipi_count));
+	seq_printf(p, "IPI: %10u\n", atomic_read(&ipi_count));
 #endif
 
-	return p - buf;
+	return 0;
 }
-#endif
 
 /*
  * Global interrupt locks for SMP. Allow interrupts to come in on any

@@ -169,8 +169,7 @@ static int mousedev_release(struct inode * inode, struct file * file)
 {
 	struct mousedev_list *list = file->private_data;
 	struct mousedev_list **listptr;
-
-	lock_kernel();
+	
 	listptr = &list->mousedev->list;
 	mousedev_fasync(-1, file, 0);
 
@@ -208,7 +207,6 @@ static int mousedev_release(struct inode * inode, struct file * file)
 	}
 	
 	kfree(list);
-	unlock_kernel();
 
 	return 0;
 }

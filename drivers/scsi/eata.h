@@ -30,7 +30,6 @@ int eata2x_biosparam(Disk *, kdev_t, int *);
                 this_id:                 7,                                  \
                 unchecked_isa_dma:       1,                                  \
                 use_clustering:          ENABLE_CLUSTERING,                  \
-                use_new_eh_code:         1    /* Enable new error code */    \
              }
 
 #endif

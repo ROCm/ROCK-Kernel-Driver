@@ -14,9 +14,9 @@
 #include <linux/module.h>
 #include <linux/tty.h>
 #include <linux/fb.h>
-#include <linux/console_struct.h>
 #include <linux/sched.h>
 
+#include <video/fbcon.h>
 
 #undef DEBUG
 
@@ -256,29 +256,6 @@ static int __init my_atoi(const char *name)
 	}
     }
 }
-
-static int PROC_CONSOLE(const struct fb_info *info)
-{
-	int fgc;
-	
-	if (info->display_fg != NULL)
-		fgc = info->display_fg->vc_num;
-	else
-		return -1;
-		
-	if (!current->tty)
-		return fgc;
-
-	if (current->tty->driver.type != TTY_DRIVER_TYPE_CONSOLE)
-		/* XXX Should report error here? */
-		return fgc;
-
-	if (MINOR(current->tty->device) < 1)
-		return fgc;
-
-	return MINOR(current->tty->device) - 1;
-}
-
 
 /**
  *	__fb_try_mode - test a video mode

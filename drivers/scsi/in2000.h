@@ -423,7 +423,6 @@ int in2000_reset(Scsi_Cmnd *, unsigned int);
                   sg_tablesize:    IN2000_SG,           /* scatter-gather table size */ \
                   cmd_per_lun:     IN2000_CPL,          /* commands per lun */ \
                   use_clustering:  DISABLE_CLUSTERING,  /* ENABLE_CLUSTERING may speed things up */ \
-                  use_new_eh_code: 0                    /* new error code - not using it yet */ \
                 }
 
 #endif /* IN2000_H */

@@ -267,7 +267,6 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	tpnt->sg_tablesize = NCR_700_SG_SEGMENTS;
 	tpnt->cmd_per_lun = NCR_700_MAX_TAGS;
 	tpnt->use_clustering = DISABLE_CLUSTERING;
-	tpnt->use_new_eh_code = 1;
 	tpnt->proc_info = NCR_700_proc_directory_info;
 	
 	if(tpnt->name == NULL)

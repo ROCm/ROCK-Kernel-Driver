@@ -336,9 +336,7 @@ static int sg_release(struct inode * inode, struct file * filp)
     Sg_device * sdp;
     Sg_fd * sfp;
 
-    lock_kernel();
     if ((! (sfp = (Sg_fd *)filp->private_data)) || (! (sdp = sfp->parentdp))) {
-	unlock_kernel();
         return -ENXIO;
     }
     SCSI_LOG_TIMEOUT(3, printk("sg_release: dev=%d\n", MINOR(sdp->i_rdev)));
@@ -352,7 +350,6 @@ static int sg_release(struct inode * inode, struct file * filp)
 	sdp->exclude = 0;
 	wake_up_interruptible(&sdp->o_excl_wait);
     }
-    unlock_kernel();
     return 0;
 }
 

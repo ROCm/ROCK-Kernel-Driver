@@ -120,6 +120,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h> /* for intr_count */
 #include <linux/delay.h>
+#include <linux/seq_file.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -576,9 +577,9 @@ void mac_free_irq(unsigned int irq, void *dev_id)
  *		  displayed for us as autovector irq 0.
  */
 
-int mac_get_irq_list (char *buf)
+int show_mac_interrupts(struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 	irq_node_t *node;
 	char *base;
 
@@ -618,25 +619,24 @@ int mac_get_irq_list (char *buf)
 			case 8: base = "bbn";
 				break;
 		}
-		len += sprintf(buf+len, "%4s %2d: %10u ",
-				base, i, kstat.irqs[0][i]);
+		seq_printf(p, "%4s %2d: %10u ", base, i, kstat.irqs[0][i]);
 
 		do {
 			if (node->flags & IRQ_FLG_FAST) {
-				len += sprintf(buf+len, "F ");
+				seq_puts(p, "F ");
 			} else if (node->flags & IRQ_FLG_SLOW) {
-				len += sprintf(buf+len, "S ");
+				seq_puts(p, "S ");
 			} else {
-				len += sprintf(buf+len, "  ");
+				seq_puts(p, "  ");
 			}
-			len += sprintf(buf+len, "%s\n", node->devname);
+			seq_printf(p, "%s\n", node->devname);
 			if ((node = node->next)) {
-				len += sprintf(buf+len, "                    ");
+				seq_puts(p, "                    ");
 			}
 		} while(node);
 
 	}
-	return len;
+	return 0;
 }
 
 void mac_default_handler(int irq, void *dev_id, struct pt_regs *regs)

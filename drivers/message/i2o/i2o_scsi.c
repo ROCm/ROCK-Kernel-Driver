@@ -151,10 +151,9 @@ static void flush_pending(void)
 static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, struct i2o_message *msg)
 {
 	Scsi_Cmnd *current_command;
+	spinlock_t *lock;
 	u32 *m = (u32 *)msg;
 	u8 as,ds,st;
-
-	spin_lock_prefetch(&io_request_lock);		
 
 	if(m[0] & (1<<13))
 	{
@@ -190,12 +189,13 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 		{
 			/* Create a scsi error for this */
 			current_command = (Scsi_Cmnd *)m[3];
+			lock = &current_command->host->host_lock;
 			printk("Aborted %ld\n", current_command->serial_number);
 
-			spin_lock_irq(&io_request_lock);			
+			spin_lock_irq(lock);
 			current_command->result = DID_ERROR << 16;
 			current_command->scsi_done(current_command);
-			spin_unlock_irq(&io_request_lock);			
+			spin_unlock_irq(lock);
 			
 			/* Now flush the message by making it a NOP */
 			m[0]&=0x00FFFFFF;
@@ -284,9 +284,10 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 		 *	It worked maybe ?
 		 */		
 		current_command->result = DID_OK << 16 | ds;
-	spin_lock(&io_request_lock);
+	lock = &current_command->host->host_lock;
+	spin_lock(lock);
 	current_command->scsi_done(current_command);
-	spin_unlock(&io_request_lock);
+	spin_unlock(lock);
 	return;
 }
 

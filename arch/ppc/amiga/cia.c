@@ -19,6 +19,7 @@
 #include <linux/errno.h>
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/irq.h>
 #include <asm/amigahw.h>
@@ -222,16 +223,16 @@ void __init cia_init_IRQ(struct ciabase *base)
 	custom.intena = IF_SETCLR | base->int_mask;
 }
 
-int cia_get_irq_list(struct ciabase *base, char *buf)
+int cia_get_irq_list(struct ciabase *base, struct seq_file *p)
 {
-	int i, j, len = 0;
+	int i, j;
 
 	j = base->cia_irq;
 	for (i = 0; i < CIA_IRQS; i++) {
-		len += sprintf(buf+len, "cia  %2d: %10d ", j + i,
+		seq_printf(p, "cia  %2d: %10d ", j + i,
 			       kstat.irqs[0][SYS_IRQS + j + i]);
-			len += sprintf(buf+len, "  ");
-		len += sprintf(buf+len, "%s\n", base->irq_list[i].devname);
+		seq_puts(p, "  ");
+		seq_printf(p, "%s\n", base->irq_list[i].devname);
 	}
-	return len;
+	return 0;
 }

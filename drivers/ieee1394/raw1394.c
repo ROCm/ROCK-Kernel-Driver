@@ -949,7 +949,6 @@ static int raw1394_release(struct inode *inode, struct file *file)
         struct pending_request *req;
         int done = 0, i;
 
-        lock_kernel();
         for (i = 0; i < 64; i++) {
                 if (fi->listen_channels & (1ULL << i)) {
                         hpsb_unlisten_channel(hl_handle, fi->host, i);
@@ -990,7 +989,6 @@ static int raw1394_release(struct inode *inode, struct file *file)
         kfree(fi);
 
         V22_COMPAT_MOD_DEC_USE_COUNT;
-        unlock_kernel();
         return 0;
 }
 

@@ -151,14 +151,6 @@ extern void scsi_times_out(Scsi_Cmnd * SCpnt);
 void scsi_build_commandblocks(Scsi_Device * SDpnt);
 
 /*
- * These are the interface to the old error handling code.  It should go away
- * someday soon.
- */
-extern void scsi_old_done(Scsi_Cmnd * SCpnt);
-extern void scsi_old_times_out(Scsi_Cmnd * SCpnt);
-
-
-/*
  * Function:    scsi_initialize_queue()
  *
  * Purpose:     Selects queue handler function for a device.
@@ -188,12 +180,9 @@ extern void scsi_old_times_out(Scsi_Cmnd * SCpnt);
  */
 void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 {
-	char name[16];
-
 	request_queue_t *q = &SDpnt->request_queue;
 
-	sprintf(name, "scsi%d%d%d", SDpnt->id, SDpnt->lun, SDpnt->channel);
-	blk_init_queue(q, scsi_request_fn, name);
+	blk_init_queue(q, scsi_request_fn);
 	blk_queue_headactive(q, 0);
 	q->queuedata = (void *) SDpnt;
 #ifdef DMA_CHUNK_SIZE
@@ -202,6 +191,9 @@ void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 	blk_queue_max_segments(q, SHpnt->sg_tablesize);
 #endif
 	blk_queue_max_sectors(q, SHpnt->max_sectors);
+
+	if (!SHpnt->use_clustering)
+		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
 }
 
 #ifdef MODULE
@@ -670,12 +662,8 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 			mdelay(1 + 999 / HZ);
 		host->resetting = 0;
 	}
-	if (host->hostt->use_new_eh_code) {
-		scsi_add_timer(SCpnt, SCpnt->timeout_per_command, scsi_times_out);
-	} else {
-		scsi_add_timer(SCpnt, SCpnt->timeout_per_command,
-			       scsi_old_times_out);
-	}
+
+	scsi_add_timer(SCpnt, SCpnt->timeout_per_command, scsi_times_out);
 
 	/*
 	 * We will use a queued command if possible, otherwise we will emulate the
@@ -692,50 +680,27 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 		SCSI_LOG_MLQUEUE(3, printk("queuecommand : routine at %p\n",
 					   host->hostt->queuecommand));
 		/*
-		 * Use the old error handling code if we haven't converted the driver
-		 * to use the new one yet.  Note - only the new queuecommand variant
-		 * passes a meaningful return value.
+		 * Before we queue this command, check if the command
+		 * length exceeds what the host adapter can handle.
 		 */
-		if (host->hostt->use_new_eh_code) {
-			/*
-			 * Before we queue this command, check if the command
-			 * length exceeds what the host adapter can handle.
-			 */
-			if (CDB_SIZE(SCpnt) <= SCpnt->host->max_cmd_len) {
-				spin_lock_irqsave(&host->host_lock, flags);
-				rtn = host->hostt->queuecommand(SCpnt, scsi_done);
-				spin_unlock_irqrestore(&host->host_lock, flags);
-				if (rtn != 0) {
-					scsi_delete_timer(SCpnt);
-					scsi_mlqueue_insert(SCpnt, SCSI_MLQUEUE_HOST_BUSY);
-					SCSI_LOG_MLQUEUE(3, printk("queuecommand : request rejected\n"));                                
-				}
-			} else {
-				SCSI_LOG_MLQUEUE(3, printk("queuecommand : command too long.\n"));
-				SCpnt->result = (DID_ABORT << 16);
-				spin_lock_irqsave(&host->host_lock, flags);
-				scsi_done(SCpnt);
-				spin_unlock_irqrestore(&host->host_lock, flags);
-				rtn = 1;
-
+		if (CDB_SIZE(SCpnt) <= SCpnt->host->max_cmd_len) {
+			spin_lock_irqsave(&host->host_lock, flags);
+			rtn = host->hostt->queuecommand(SCpnt, scsi_done);
+			spin_unlock_irqrestore(&host->host_lock, flags);
+			if (rtn != 0) {
+				scsi_delete_timer(SCpnt);
+				scsi_mlqueue_insert(SCpnt, SCSI_MLQUEUE_HOST_BUSY);
+				SCSI_LOG_MLQUEUE(3,
+				   printk("queuecommand : request rejected\n"));                                
 			}
 		} else {
-			/*
-			 * Before we queue this command, check if the command
-			 * length exceeds what the host adapter can handle.
-			 */
-			if (CDB_SIZE(SCpnt) <= SCpnt->host->max_cmd_len) {
-				spin_lock_irqsave(&host->host_lock, flags);
-				host->hostt->queuecommand(SCpnt, scsi_old_done);
-				spin_unlock_irqrestore(&host->host_lock, flags);
-			} else {
-				SCSI_LOG_MLQUEUE(3, printk("queuecommand : command too long.\n"));
-				SCpnt->result = (DID_ABORT << 16);
-				spin_lock_irqsave(&host->host_lock, flags);
-				scsi_old_done(SCpnt);
-				spin_unlock_irqrestore(&host->host_lock, flags);
-				rtn = 1;
-			}
+			SCSI_LOG_MLQUEUE(3,
+				printk("queuecommand : command too long.\n"));
+			SCpnt->result = (DID_ABORT << 16);
+			spin_lock_irqsave(&host->host_lock, flags);
+			scsi_done(SCpnt);
+			spin_unlock_irqrestore(&host->host_lock, flags);
+			rtn = 1;
 		}
 	} else {
 		int temp;
@@ -755,11 +720,7 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 		       host->host_no, temp, host->hostt->command);
                 spin_lock_irqsave(&host->host_lock, flags);
 #endif
-		if (host->hostt->use_new_eh_code) {
-			scsi_done(SCpnt);
-		} else {
-			scsi_old_done(SCpnt);
-		}
+		scsi_done(SCpnt);
                 spin_unlock_irqrestore(&host->host_lock, flags);
 	}
 	SCSI_LOG_MLQUEUE(3, printk("leaving scsi_dispatch_cmnd()\n"));
@@ -1886,19 +1847,12 @@ static int scsi_register_host(Scsi_Host_Template * tpnt)
 
 	/* The detect routine must carefully spinunlock/spinlock if 
 	   it enables interrupts, since all interrupt handlers do 
-	   spinlock as well.
-	   All lame drivers are going to fail due to the following 
-	   spinlock. For the time beeing let's use it only for drivers 
-	   using the new scsi code. NOTE: the detect routine could
-	   redefine the value tpnt->use_new_eh_code. (DB, 13 May 1998) */
+	   spinlock as well.  */
 
 	/*
 	 * detect should do its own locking
 	 */
-	if (tpnt->use_new_eh_code) {
-		tpnt->present = tpnt->detect(tpnt);
-	} else
-		tpnt->present = tpnt->detect(tpnt);
+	tpnt->present = tpnt->detect(tpnt);
 
 	if (tpnt->present) {
 		if (pcount == next_scsi_host) {
@@ -1932,7 +1886,7 @@ static int scsi_register_host(Scsi_Host_Template * tpnt)
 		 * handle error correction.
 		 */
 		for (shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next) {
-			if (shpnt->hostt == tpnt && shpnt->hostt->use_new_eh_code) {
+			if (shpnt->hostt == tpnt) {
 				DECLARE_MUTEX_LOCKED(sem);
 
 				shpnt->eh_notify = &sem;
@@ -2140,7 +2094,6 @@ static int scsi_unregister_host(Scsi_Host_Template * tpnt)
 	 */
 	for (shpnt = scsi_hostlist; shpnt; shpnt = shpnt->next) {
 		if (shpnt->hostt == tpnt
-		    && shpnt->hostt->use_new_eh_code
 		    && shpnt->ehandler != NULL) {
 			DECLARE_MUTEX_LOCKED(sem);
 

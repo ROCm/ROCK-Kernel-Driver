@@ -236,7 +236,7 @@ die:	jne	die			# %es must be at 64kB boundary
 rp_read:
 #ifdef __BIG_KERNEL__			# look in setup.S for bootsect_kludge
 	bootsect_kludge = 0x220		# 0x200 + 0x20 which is the size of the
-	lcall	bootsect_kludge		# bootsector + bootsect_kludge offset
+	lcall	*bootsect_kludge	# bootsector + bootsect_kludge offset
 #else
 	movw	%es, %ax
 	subw	$SYSSEG, %ax

@@ -46,6 +46,7 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/serial_reg.h>
+#include <linux/seq_file.h>
 
 #include <asm/bitops.h>
 #include <asm/bootinfo.h>
@@ -217,34 +218,34 @@ static struct hw_interrupt_type it8172_irq_type = {
 };
 
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
-        int i, len = 0, j;
+        int i, j;
         struct irqaction * action;
 
-        len += sprintf(buf+len, "           ");
+        seq_printf(p, "           ");
         for (j=0; j<smp_num_cpus; j++)
-                len += sprintf(buf+len, "CPU%d       ",j);
-        *(char *)(buf+len++) = '\n';
+		seq_printf(p, "CPU%d       ",j);
+	seq_putc(p, '\n');
 
         for (i = 0 ; i < NR_IRQS ; i++) {
                 action = irq_desc[i].action;
                 if ( !action || !action->handler )
                         continue;
-                len += sprintf(buf+len, "%3d: ", i);		
-                len += sprintf(buf+len, "%10u ", kstat_irqs(i));
+                seq_printf(p, "%3d: ", i);		
+                seq_printf(p, "%10u ", kstat_irqs(i));
                 if ( irq_desc[i].handler )		
-                        len += sprintf(buf+len, " %s ", irq_desc[i].handler->typename );
+                        seq_printf(p, " %s ", irq_desc[i].handler->typename );
                 else
-                        len += sprintf(buf+len, "  None      ");
-                len += sprintf(buf+len, "    %s",action->name);
+                        seq_puts(p, "  None      ");
+                seq_printf(p, "    %s",action->name);
                 for (action=action->next; action; action = action->next) {
-                        len += sprintf(buf+len, ", %s", action->name);
+                        seq_printf(p, ", %s", action->name);
                 }
-                len += sprintf(buf+len, "\n");
+                seq_putc(p, '\n');
         }
-        len += sprintf(buf+len, "BAD: %10lu\n", spurious_count);
-        return len;
+        seq_printf(p, "BAD: %10lu\n", spurious_count);
+        return 0;
 }
 
 asmlinkage void do_IRQ(int irq, struct pt_regs *regs)

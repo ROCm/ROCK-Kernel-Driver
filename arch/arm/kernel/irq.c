@@ -28,6 +28,7 @@
 #include <linux/random.h>
 #include <linux/smp.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/irq.h>
 #include <asm/system.h>
@@ -95,29 +96,28 @@ void enable_irq(unsigned int irq)
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
 	int i;
 	struct irqaction * action;
-	char *p = buf;
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
 	    	action = irq_desc[i].action;
 		if (!action)
 			continue;
-		p += sprintf(p, "%3d: %10u ", i, kstat_irqs(i));
-		p += sprintf(p, "  %s", action->name);
+		seq_printf(p, "%3d: %10u ", i, kstat_irqs(i));
+		seq_printf(p, "  %s", action->name);
 		for (action = action->next; action; action = action->next) {
-			p += sprintf(p, ", %s", action->name);
+			seq_printf(p, ", %s", action->name);
 		}
-		*p++ = '\n';
+		seq_putc(p, '\n');
 	}
 
 #ifdef CONFIG_ARCH_ACORN
-	p += get_fiq_list(p);
+	show_fiq_list(p);
 #endif
-	p += sprintf(p, "Err: %10lu\n", irq_err_count);
-	return p - buf;
+	seq_printf(p, "Err: %10lu\n", irq_err_count);
+	return 0;
 }
 
 /*

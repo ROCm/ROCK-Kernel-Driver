@@ -14,6 +14,7 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
+#include <linux/seq_file.h>
 
 #include <asm/system.h>
 #include <asm/ptrace.h>
@@ -114,17 +115,17 @@ void mvme16x_process_int (unsigned long vec, struct pt_regs *fp)
 	}
 }
 
-int mvme16x_get_irq_list (char *buf)
+int show_mvme16x_interrupts (struct seq_file *p, void *v)
 {
-	int i, len = 0;
+	int i;
 
 	for (i = 0; i < 192; i++) {
 		if (irq_tab[i].count)
-			len += sprintf (buf+len, "Vec 0x%02x: %8d  %s\n",
+			seq_printf(p, "Vec 0x%02x: %8d  %s\n",
 			    i+64, irq_tab[i].count,
 			    irq_tab[i].devname ? irq_tab[i].devname : "free");
 	}
-	return len;
+	return 0;
 }
 
 

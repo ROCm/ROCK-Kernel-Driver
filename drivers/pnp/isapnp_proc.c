@@ -170,12 +170,10 @@ static int isapnp_info_entry_open(struct inode *inode, struct file *file)
 		kfree(buffer);
 		return -ENOMEM;
 	}
-	lock_kernel();
 	buffer->curr = buffer->buffer;
 	file->private_data = buffer;
 	if (mode == O_RDONLY)
 		isapnp_info_read(buffer);
-	unlock_kernel();
 	return 0;
 }
 
@@ -187,12 +185,10 @@ static int isapnp_info_entry_release(struct inode *inode, struct file *file)
 	if ((buffer = (isapnp_info_buffer_t *) file->private_data) == NULL)
 		return -EINVAL;
 	mode = file->f_flags & O_ACCMODE;
-	lock_kernel();
 	if (mode == O_WRONLY)
 		isapnp_info_write(buffer);
 	vfree(buffer->buffer);
 	kfree(buffer);
-	unlock_kernel();
 	return 0;
 }
 

@@ -1055,7 +1055,6 @@ capi_release(struct inode *inode, struct file *file)
 {
 	struct capidev *cdev = (struct capidev *)file->private_data;
 
-	lock_kernel();
 	capincci_free(cdev, 0xffffffff);
 	capidev_free(cdev);
 	file->private_data = NULL;
@@ -1064,7 +1063,6 @@ capi_release(struct inode *inode, struct file *file)
 #ifdef _DEBUG_REFCOUNT
 	printk(KERN_DEBUG "capi_release %d\n", GET_USE_COUNT(THIS_MODULE));
 #endif
-	unlock_kernel();
 	return 0;
 }
 
@@ -1243,13 +1241,11 @@ capinc_raw_release(struct inode *inode, struct file *file)
 	struct capiminor *mp = (struct capiminor *)file->private_data;
 
 	if (mp) {
-		lock_kernel();
 		mp->file = 0;
 		if (mp->nccip == 0) {
 			capiminor_free(mp);
 			file->private_data = NULL;
 		}
-		unlock_kernel();
 	}
 
 #ifdef _DEBUG_REFCOUNT
