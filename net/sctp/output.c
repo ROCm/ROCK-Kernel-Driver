@@ -97,6 +97,7 @@ struct sctp_packet *sctp_packet_init(struct sctp_packet *packet,
 	packet->source_port = sport;
 	packet->destination_port = dport;
 	skb_queue_head_init(&packet->chunks);
+	packet->size = SCTP_IP_OVERHEAD;
 	packet->vtag = 0;
 	packet->ecn_capable = 0;
 	packet->get_prepend_chunk = NULL;
@@ -219,9 +220,8 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 		/* Both control chunks and data chunks with TSNs are
 		 * non-fragmentable.
 		 */
-		if (packet_empty) {
-
-			/* We no longer do refragmentation at all.
+		if (packet_empty || !sctp_chunk_is_data(chunk)) {
+			/* We no longer do re-fragmentation.
 			 * Just fragment at the IP layer, if we
 			 * actually hit this condition
 			 */
@@ -229,7 +229,7 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 			packet->ipfragok = 1;
 			goto append;
 
-		} else { /* !packet_empty */
+		} else {
 			retval = SCTP_XMIT_PMTU_FULL;
 			goto finish;
 		}
@@ -283,20 +283,18 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	__u8 has_data = 0;
 	struct dst_entry *dst;
 
-	/* Do NOT generate a chunkless packet... */
-	if (skb_queue_empty(&packet->chunks))
+	/* Do NOT generate a chunkless packet. */
+	chunk = (struct sctp_chunk *)skb_peek(&packet->chunks);
+	if (unlikely(!chunk))
 		return err;
 
 	/* Set up convenience variables... */
-	chunk = (struct sctp_chunk *) (packet->chunks.next);
 	sk = chunk->skb->sk;
 
 	/* Allocate the new skb.  */
 	nskb = dev_alloc_skb(packet->size);
-	if (!nskb) {
-		err = -ENOMEM;
-		goto out;
-	}
+	if (!nskb)
+		goto nomem;
 
 	/* Make sure the outbound skb has enough header room reserved. */
 	skb_reserve(nskb, SCTP_IP_OVERHEAD);
@@ -468,9 +466,11 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 	if (!nskb->dst)
 		goto no_route;
 
-	SCTP_DEBUG_PRINTK("***sctp_transmit_packet*** skb length %d\n",
+	SCTP_DEBUG_PRINTK("***sctp_transmit_packet*** skb len %d\n",
 			  nskb->len);
+
 	(*tp->af_specific->sctp_xmit)(nskb, tp, packet->ipfragok);
+
 out:
 	packet->size = SCTP_IP_OVERHEAD;
 	return err;
@@ -486,7 +486,20 @@ no_route:
 	 * required.
 	 */
 	 /* err = -EHOSTUNREACH; */
+err:
+	/* Control chunks are unreliable so just drop them.  DATA chunks
+	 * will get resent or dropped later.
+	 */
+
+	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks))) {
+		if (!sctp_chunk_is_data(chunk))
+    			sctp_chunk_free(chunk);
+	}
 	goto out;
+nomem:
+	err = -ENOMEM;
+	printk("%s alloc_skb failed.\n", __FUNCTION__);
+	goto err;
 }
 
 /********************************************************************
