@@ -62,7 +62,6 @@
 
 #include <linux/fs.h>
 #include <linux/locks.h>
-#include <linux/slab.h>
 #include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>

@@ -104,7 +104,6 @@
  */
 
 #include <linux/fs.h>
-#include <linux/slab.h>
 #include <linux/locks.h>
 #include "jfs_incore.h"
 #include "jfs_superblock.h"
