@@ -37,7 +37,6 @@ struct device;
 
 struct driver_file_entry {
 	struct driver_dir_entry * parent;
-	struct list_head	node;
 	char			* name;
 	mode_t			mode;
 	struct dentry		* dentry;

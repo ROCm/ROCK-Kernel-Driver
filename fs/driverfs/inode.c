@@ -658,7 +658,6 @@ driverfs_create_file(struct driver_file_entry * entry,
 			dentry->d_inode->u.generic_ip = (void *)entry;
 			entry->dentry = dentry;
 			entry->parent = parent;
-			list_add_tail(&entry->node,&parent->files);
 		}
 	} else
 		error = PTR_ERR(dentry);
@@ -704,7 +703,6 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 			dentry->d_inode->u.generic_ip = (void *)entry;
 			entry->dentry = dentry;
 			entry->parent = parent;
-			list_add_tail(&entry->node,&parent->files);
 		}
 	} else
 		error = PTR_ERR(dentry);
@@ -742,7 +740,6 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 		/* make sure dentry is really there */
 		if (dentry->d_inode && 
 		    (dentry->d_parent->d_inode == dir->dentry->d_inode)) {
-			list_del_init(&entry->node);
 			driverfs_unlink(dir->dentry->d_inode,dentry);
 			dput(dir->dentry);
 			put_mount();
@@ -777,7 +774,6 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 
 		node = node->next;
 
-		list_del_init(&entry->node);
 		driverfs_unlink(dentry->d_inode,d);
 		dput(dentry);
 		put_mount();
