@@ -7,6 +7,7 @@
  */
 
 #ifndef __ASSEMBLY__
+#include <linux/threads.h>
 #include <asm/processor.h>		/* For TASK_SIZE */
 #include <asm/mmu.h>
 #include <asm/page.h>
@@ -93,13 +94,15 @@
 #define _PAGE_WRITETHRU	0x040UL	/* W: cache write-through */
 #define _PAGE_DIRTY	0x080UL	/* C: page changed */
 #define _PAGE_ACCESSED	0x100UL	/* R: page referenced */
+#if 0
 #define _PAGE_HPTENOIX	0x200UL /* software: pte HPTE slot unknown */
+#endif
 #define _PAGE_HASHPTE	0x400UL	/* software: pte has an associated HPTE */
 #define _PAGE_EXEC	0x800UL	/* software: i-cache coherence required */
 #define _PAGE_SECONDARY 0x8000UL /* software: HPTE is in secondary group */
 #define _PAGE_GROUP_IX  0x7000UL /* software: HPTE index within group */
 /* Bits 0x7000 identify the index within an HPT Group */
-#define _PAGE_HPTEFLAGS (_PAGE_HASHPTE | _PAGE_HPTENOIX | _PAGE_SECONDARY | _PAGE_GROUP_IX)
+#define _PAGE_HPTEFLAGS (_PAGE_HASHPTE | _PAGE_SECONDARY | _PAGE_GROUP_IX)
 /* PAGE_MASK gives the right answer below, but only by accident */
 /* It should be preserving the high 48 bits and then specifically */
 /* preserving _PAGE_SECONDARY | _PAGE_GROUP_IX */
@@ -397,6 +400,7 @@ extern void paging_init(void);
  * as entries are faulted into the hash table by the low-level
  * data/instruction access exception handlers.
  */
+#if 0
 /*
  * We won't be able to use update_mmu_cache to update the 
  * hardware page table because we need to update the pte
@@ -404,9 +408,29 @@ extern void paging_init(void);
  * its value.
  */
 #define update_mmu_cache(vma, addr, pte)	do { } while (0)
+#else
+/*
+ * This gets called at the end of handling a page fault, when
+ * the kernel has put a new PTE into the page table for the process.
+ * We use it to put a corresponding HPTE into the hash table
+ * ahead of time, instead of waiting for the inevitable extra
+ * hash-table miss exception.
+ */
+extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
+#endif
 
 extern void flush_hash_segments(unsigned low_vsid, unsigned high_vsid);
-extern void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte);
+extern void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte,
+			    int local);
+void flush_hash_range(unsigned long context, unsigned long number, int local);
+
+/* TLB flush batching */
+#define MAX_BATCH_FLUSH 128
+struct tlb_batch_data {
+	pte_t pte;
+	unsigned long addr;
+};
+extern struct tlb_batch_data tlb_batch_array[NR_CPUS][MAX_BATCH_FLUSH];
 
 /* Encode and de-code a swap entry */
 #define SWP_TYPE(entry)			(((entry).val >> 1) & 0x3f)
