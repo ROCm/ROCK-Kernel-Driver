@@ -228,6 +228,7 @@ static void e100_set_bool_option(struct e100_private *bdp, int, u32, int,
 				 char *);
 unsigned char e100_wait_exec_cmplx(struct e100_private *, u32, u8, u8);
 void e100_exec_cmplx(struct e100_private *, u32, u8);
+static unsigned char e100_asf_enabled(struct e100_private *bdp);
 
 /**
  * e100_get_rx_struct - retrieve cell to hold skb buff from the pool
@@ -4135,7 +4136,7 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 	e100_do_wol(pcid, bdp);
 	
 	/* If wol is enabled */
-	if (bdp->wolopts) {
+	if (bdp->wolopts || e100_asf_enabled(bdp)) {
 		pci_enable_wake(pcid, 3, 1);	/* Enable PME for power state D3 */
 		pci_set_power_state(pcid, 3);	/* Set power state to D3.        */
 	} else {
@@ -4162,6 +4163,31 @@ e100_resume(struct pci_dev *pcid)
 	return 0;
 }
 #endif /* CONFIG_PM */
+
+/**
+ * e100_asf_enabled - checks if ASF is configured on the current adaper
+ *                    by reading registers 0xD and 0x90 in the EEPROM 
+ * @bdp: atapter's private data struct
+ *
+ * Returns: true if ASF is enabled
+ */
+static unsigned char
+e100_asf_enabled(struct e100_private *bdp)
+{
+	u16 asf_reg;
+	u16 smbus_addr_reg;
+	if ((bdp->pdev->device >= 0x1050) && (bdp->pdev->device <= 0x1055)) {
+		asf_reg = e100_eeprom_read(bdp, EEPROM_CONFIG_ASF);
+		if ((asf_reg & EEPROM_FLAG_ASF)
+		    && !(asf_reg & EEPROM_FLAG_GCL)) {
+			smbus_addr_reg = 
+				e100_eeprom_read(bdp, EEPROM_SMBUS_ADDR);
+			if ((smbus_addr_reg & 0xFF) != 0xFE) 
+				return true;
+		}
+	}
+	return false;
+}
 
 #ifdef E100_CU_DEBUG
 unsigned char

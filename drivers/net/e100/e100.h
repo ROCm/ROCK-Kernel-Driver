@@ -303,6 +303,9 @@ struct driver_stats {
 
 /* EEPROM bit definitions */
 /*- EEPROM control register bits */
+#define EEPROM_FLAG_ASF  0x8000
+#define EEPROM_FLAG_GCL  0x4000
+
 #define EN_TRNF          0x10	/* Enable turnoff */
 #define EEDO             0x08	/* EEPROM data out */
 #define EEDI             0x04	/* EEPROM data in (set for writing data) */
@@ -321,6 +324,8 @@ struct driver_stats {
 #define EEPROM_COMPATIBILITY_WORD       3
 #define EEPROM_PWA_NO                   8
 #define EEPROM_ID_WORD			0x0A
+#define EEPROM_CONFIG_ASF		0x0D
+#define EEPROM_SMBUS_ADDR		0x90
 
 #define EEPROM_SUM                      0xbaba
 
