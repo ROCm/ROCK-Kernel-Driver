@@ -25,6 +25,8 @@
 		pci_unmap_sg(alpha_gendev_to_pci(dev), sg, nents, dir)
 #define dma_supported(dev, mask)			\
 		pci_dma_supported(alpha_gendev_to_pci(dev), mask)
+#define dma_mapping_error(addr)				\
+		pci_dma_mapping_error(addr)
 
 #else	/* no PCI - no IOMMU. */
 
@@ -42,6 +44,8 @@ int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 #define dma_unmap_single(dev, addr, size, dir)	do { } while (0)
 #define dma_unmap_page(dev, addr, size, dir)	do { } while (0)
 #define dma_unmap_sg(dev, sg, nents, dir)	do { } while (0)
+
+#define dma_mapping_error(addr)  (0)
 
 #endif	/* !CONFIG_PCI */
 
