@@ -717,5 +717,5 @@ static void __exit input_exit(void)
 	devclass_unregister(&input_devclass);
 }
 
-module_init(input_init);
+subsys_initcall(input_init);
 module_exit(input_exit);

@@ -336,7 +336,7 @@ void scsi_setup_cmd_retry(struct scsi_cmnd *cmd)
 static void scsi_single_lun_run(struct scsi_device *current_sdev)
 {
 	struct scsi_device *sdev;
-	unsigned int flags, flags2;
+	unsigned long flags, flags2;
 
 	spin_lock_irqsave(current_sdev->host->host_lock, flags);
 	WARN_ON(!current_sdev->sdev_target->starget_sdev_user);
@@ -1155,7 +1155,7 @@ static void scsi_request_fn(request_queue_t *q)
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_cmnd *cmd;
 	struct request *req;
-	unsigned int flags;
+	unsigned long flags;
 
 	/*
 	 * To start with, we keep looping until the queue is empty, or until

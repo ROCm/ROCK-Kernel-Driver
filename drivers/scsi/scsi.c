@@ -815,7 +815,7 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
 	struct Scsi_Host *host;
 	Scsi_Device *device;
 	Scsi_Request * SRpnt;
-	unsigned int flags;
+	unsigned long flags;
 
 	host = SCpnt->device->host;
 	device = SCpnt->device;
