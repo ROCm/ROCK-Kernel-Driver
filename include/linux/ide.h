@@ -51,9 +51,6 @@
 #ifndef SUPPORT_VLB_SYNC		/* 1 to support weird 32-bit chips */
 #define SUPPORT_VLB_SYNC	1	/* 0 to reduce kernel size */
 #endif
-#ifndef DISK_RECOVERY_TIME		/* off=0; on=access_delay_time */
-#define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
-#endif
 #ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
 #define OK_TO_RESET_CONTROLLER	1	/* 0 for use with AH2372A/B interface */
 #endif
@@ -999,10 +996,6 @@ typedef struct hwif_s {
 	unsigned	dma_extra;	/* extra addr for dma ports */
 	unsigned long	config_data;	/* for use by chipset-specific code */
 	unsigned long	select_data;	/* for use by chipset-specific code */
-#if (DISK_RECOVERY_TIME > 0)
-	unsigned long	last_time;	/* time when previous rq was done */
-#endif
-
 
 	unsigned	noprobe    : 1;	/* don't probe for this interface */
 	unsigned	present    : 1;	/* this interface exists */
