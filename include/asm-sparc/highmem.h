@@ -38,10 +38,12 @@ extern void kmap_init(void) __init;
 /*
  * Right now we initialize only a single pte table. It can be extended
  * easily, subsequent pte tables have to be allocated in one physical
- * chunk of RAM.
+ * chunk of RAM.  Currently the simplest way to do this is to align the
+ * pkmap region on a pagetable boundary (4MB).
  */
-#define PKMAP_BASE (SRMMU_NOCACHE_VADDR + (SRMMU_MAX_NOCACHE_PAGES << PAGE_SHIFT))
 #define LAST_PKMAP 1024
+#define PKMAP_SIZE (LAST_PKMAP << PAGE_SHIFT)
+#define PKMAP_BASE SRMMU_PMD_ALIGN_SOFT(SRMMU_NOCACHE_VADDR + (SRMMU_MAX_NOCACHE_PAGES << PAGE_SHIFT))
 
 #define LAST_PKMAP_MASK (LAST_PKMAP - 1)
 #define PKMAP_NR(virt)  ((virt - PKMAP_BASE) >> PAGE_SHIFT)
