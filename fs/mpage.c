@@ -460,6 +460,9 @@ page_is_mapped:
 			clear_buffer_dirty(bh);
 			bh = bh->b_this_page;
 		} while (bh != head);
+
+		if (buffer_heads_over_limit)
+			try_to_free_buffers(page);
 	}
 
 	bvec = &bio->bi_io_vec[bio->bi_idx++];

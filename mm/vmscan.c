@@ -433,9 +433,16 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 		list_move(&page->lru, &zone->inactive_list);
 		if (!pagevec_add(&pvec, page)) {
 			spin_unlock_irq(&zone->lru_lock);
+			if (buffer_heads_over_limit)
+				pagevec_strip(&pvec);
 			__pagevec_release(&pvec);
 			spin_lock_irq(&zone->lru_lock);
 		}
+	}
+	if (buffer_heads_over_limit) {
+		spin_unlock_irq(&zone->lru_lock);
+		pagevec_strip(&pvec);
+		spin_lock_irq(&zone->lru_lock);
 	}
 	while (!list_empty(&l_active)) {
 		page = list_entry(l_active.prev, struct page, lru);
