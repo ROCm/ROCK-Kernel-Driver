@@ -59,7 +59,6 @@ static int max_interrupt_work = 20;
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/isapnp.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
