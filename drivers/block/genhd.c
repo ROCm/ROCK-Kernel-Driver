@@ -525,9 +525,21 @@ static struct kobj_type ktype_block = {
 	.default_attrs	= default_attrs,
 };
 
+extern struct kobj_type ktype_part;
+
+static int block_hotplug_filter(struct kset *kset, struct kobject *kobj)
+{
+	struct kobj_type *ktype = get_ktype(kobj);
+
+	return ((ktype == &ktype_block) || (ktype == &ktype_part));
+}
+
+static struct kset_hotplug_ops block_hotplug_ops = {
+	.filter	= block_hotplug_filter,
+};
 
 /* declare block_subsys. */
-static decl_subsys(block,&ktype_block);
+static decl_subsys(block, &ktype_block, &block_hotplug_ops);
 
 
 struct gendisk *alloc_disk(int minors)

@@ -108,19 +108,19 @@ void highlevel_host_reset(struct hpsb_host *host);
    later case, no response will be sent and the driver, that handled the request
    will send the response itself.
 */
-int highlevel_read(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
+int highlevel_read(struct hpsb_host *host, int nodeid, void *data,
                    u64 addr, unsigned int length, u16 flags);
 int highlevel_write(struct hpsb_host *host, int nodeid, int destid,
-		    quadlet_t *data, u64 addr, unsigned int length, u16 flags);
+		    void *data, u64 addr, unsigned int length, u16 flags);
 int highlevel_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
                    u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode, u16 flags);
 int highlevel_lock64(struct hpsb_host *host, int nodeid, octlet_t *store,
                      u64 addr, octlet_t data, octlet_t arg, int ext_tcode, u16 flags);
 
-void highlevel_iso_receive(struct hpsb_host *host, quadlet_t *data,
+void highlevel_iso_receive(struct hpsb_host *host, void *data,
                            unsigned int length);
 void highlevel_fcp_request(struct hpsb_host *host, int nodeid, int direction,
-                           u8 *data, unsigned int length);
+                           void *data, unsigned int length);
 
 
 /*

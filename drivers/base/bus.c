@@ -132,7 +132,7 @@ static struct kobj_type ktype_bus = {
 
 };
 
-decl_subsys(bus,&ktype_bus);
+decl_subsys(bus,&ktype_bus,NULL);
 
 /**
  *	bus_for_each_dev - device iterator.

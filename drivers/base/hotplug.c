@@ -2,8 +2,8 @@
  * drivers/base/hotplug.c - hotplug call code
  * 
  * Copyright (c) 2000-2001 David Brownell
- * Copyright (c) 2002 Greg Kroah-Hartman
- * Copyright (c) 2002 IBM Corp.
+ * Copyright (c) 2002-2003 Greg Kroah-Hartman
+ * Copyright (c) 2002-2003 IBM Corp.
  *
  * Based off of drivers/usb/core/usb.c:call_agent(), which was 
  * written by David Brownell.
@@ -52,17 +52,6 @@ static int do_hotplug (struct device *dev, char *argv1, const char *action,
 
 	if (!hotplug_path [0])
 		return -ENODEV;
-
-	if (in_interrupt ()) {
-		pr_debug ("%s - in_interrupt, not allowed!", __FUNCTION__);
-		return -EIO;
-	}
-
-	if (!current->fs->root) {
-		/* don't try to do anything unless we have a root partition */
-		pr_debug ("%s - %s -- no FS yet\n", __FUNCTION__, action);
-		return -EIO;
-	}
 
 	envp = (char **) kmalloc (NUM_ENVP * sizeof (char *), GFP_KERNEL);
 	if (!envp)
@@ -127,23 +116,6 @@ exit:
 	kfree (envp);
 	return retval;
 }
-
-
-/*
- * dev_hotplug - called when any device is added or removed from a bus
- */
-int dev_hotplug (struct device *dev, const char *action)
-{
-	pr_debug ("%s\n", __FUNCTION__);
-	if (!dev)
-		return -ENODEV;
-
-	if (!dev->bus)
-		return -ENODEV;
-
-	return do_hotplug (dev, dev->bus->name, action, dev->bus->hotplug);
-}
-
 
 /*
  * class_hotplug - called when a class is added or removed from a device

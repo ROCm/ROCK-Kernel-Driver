@@ -146,10 +146,10 @@ int hpsb_get_tlabel(struct hpsb_packet *packet, int wait)
 
 	spin_lock_irqsave(&tp->lock, flags);
 	
-	packet->tlabel = find_next_zero_bit(&tp->pool, 64, tp->next);
+	packet->tlabel = find_next_zero_bit(tp->pool, 64, tp->next);
 	tp->next = (packet->tlabel + 1) % 64;
 	/* Should _never_ happen */
-	BUG_ON(test_and_set_bit(packet->tlabel, &tp->pool));
+	BUG_ON(test_and_set_bit(packet->tlabel, tp->pool));
 	tp->allocations++;
 	spin_unlock_irqrestore(&tp->lock, flags);
 
@@ -177,7 +177,7 @@ void hpsb_free_tlabel(struct hpsb_packet *packet)
 	BUG_ON(packet->tlabel > 63 || packet->tlabel < 0);
 
         spin_lock_irqsave(&tp->lock, flags);
-	BUG_ON(!test_and_clear_bit(packet->tlabel, &tp->pool));
+	BUG_ON(!test_and_clear_bit(packet->tlabel, tp->pool));
         spin_unlock_irqrestore(&tp->lock, flags);
 
 	up(&tp->count);

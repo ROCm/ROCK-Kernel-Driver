@@ -80,6 +80,10 @@
  * Manfred Weihs <weihs@ict.tuwien.ac.at>
  *  . Reworked code for initiating bus resets
  *    (long, short, with or without hold-off)
+ *
+ * Nandu Santhi <contactnandu@users.sourceforge.net>
+ *  . Added support for nVidia nForce2 onboard Firewire chipset
+ *
  */
 
 #include <linux/config.h>
@@ -90,6 +94,7 @@
 #include <linux/wait.h>
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
@@ -145,7 +150,7 @@ printk(KERN_INFO "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 #define OHCI_DMA_FREE(fmt, args...) \
 	HPSB_ERR("%s(%s)free(%d): "fmt, OHCI1394_DRIVER_NAME, __FUNCTION__, \
 		--global_outstanding_dmas, ## args)
-u32 global_outstanding_dmas = 0;
+static int global_outstanding_dmas = 0;
 #else
 #define OHCI_DMA_ALLOC(fmt, args...)
 #define OHCI_DMA_FREE(fmt, args...)
@@ -160,12 +165,12 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 801 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 858 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
-MODULE_PARM(phys_dma,"i");
-MODULE_PARM_DESC(phys_dma, "Enable physical dma (default = 1).");
 static int phys_dma = 1;
+module_param(phys_dma, int, 0644);
+MODULE_PARM_DESC(phys_dma, "Enable physical dma (default = 1).");
 
 static void dma_trm_tasklet(unsigned long data);
 static void dma_trm_reset(struct dma_trm_ctx *d);
@@ -354,10 +359,10 @@ static void handle_selfid(struct ti_ohci *ohci, struct hpsb_host *host,
 static void ohci_soft_reset(struct ti_ohci *ohci) {
 	int i;
 
-	reg_write(ohci, OHCI1394_HCControlSet, 0x00010000);
+	reg_write(ohci, OHCI1394_HCControlSet, OHCI1394_HCControl_softReset);
   
 	for (i = 0; i < OHCI_LOOP_COUNT; i++) {
-		if (reg_read(ohci, OHCI1394_HCControlSet) & 0x00010000)
+		if (!reg_read(ohci, OHCI1394_HCControlSet) & OHCI1394_HCControl_softReset)
 			break;
 		mdelay(1);
 	}
@@ -514,7 +519,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	reg_write(ohci, OHCI1394_NodeID, 0x0000ffc0);
 
 	/* Enable posted writes */
-	reg_write(ohci, OHCI1394_HCControlSet, 0x00040000);
+	reg_write(ohci, OHCI1394_HCControlSet, OHCI1394_HCControl_postedWriteEnable);
 
 	/* Clear link control register */
 	reg_write(ohci, OHCI1394_LinkControlClear, 0xffffffff);
@@ -577,7 +582,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 		  (OHCI1394_MAX_PHYS_RESP_RETRIES<<8));
 
 	/* We don't want hardware swapping */
-	reg_write(ohci, OHCI1394_HCControlClear, 0x40000000);
+	reg_write(ohci, OHCI1394_HCControlClear, OHCI1394_HCControl_noByteSwap);
 
 	/* Enable interrupts */
 	reg_write(ohci, OHCI1394_IntMaskSet,
@@ -594,7 +599,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 		  OHCI1394_cycleInconsistent);
 
 	/* Enable link */
-	reg_write(ohci, OHCI1394_HCControlSet, 0x00020000);
+	reg_write(ohci, OHCI1394_HCControlSet, OHCI1394_HCControl_linkEnable);
 
 	buf = reg_read(ohci, OHCI1394_Version);
 	PRINT(KERN_INFO, ohci->id, "OHCI-1394 %d.%d (PCI): IRQ=[%d]  "
@@ -1190,10 +1195,11 @@ static int ohci_iso_recv_init(struct hpsb_iso *iso)
 		/* iso->irq_interval is in packets - translate that to blocks */
 		/* (err, sort of... 1 is always the safest value) */
 		recv->block_irq_interval = iso->irq_interval / recv->nblocks;
+		if(recv->block_irq_interval*4 > recv->nblocks)
+			recv->block_irq_interval = recv->nblocks/4;
 		if(recv->block_irq_interval < 1)
 			recv->block_irq_interval = 1;
-		else if(recv->block_irq_interval*4 > recv->nblocks)
-			recv->block_irq_interval = recv->nblocks/4;
+
 	} else {
 		int max_packet_size;
 
@@ -2291,17 +2297,35 @@ static void ohci_irq_handler(int irq, void *dev_id,
 		 * selfID phase, so we disable busReset interrupts, to
 		 * avoid burying the cpu in interrupt requests. */
 		spin_lock_irqsave(&ohci->event_lock, flags);
-  		reg_write(ohci, OHCI1394_IntMaskClear, OHCI1394_busReset);
-		if (ohci->dev->vendor == PCI_VENDOR_ID_APPLE && 
-		    ohci->dev->device == PCI_DEVICE_ID_APPLE_UNI_N_FW) {
-  			udelay(10);
-  			while(reg_read(ohci, OHCI1394_IntEventSet) & OHCI1394_busReset) {
-  				reg_write(ohci, OHCI1394_IntEventClear, OHCI1394_busReset);
+		reg_write(ohci, OHCI1394_IntMaskClear, OHCI1394_busReset);
+
+		if (ohci->check_busreset) {
+			int loop_count = 0;
+
+			udelay(10);
+
+			while (reg_read(ohci, OHCI1394_IntEventSet) & OHCI1394_busReset) {
+				reg_write(ohci, OHCI1394_IntEventClear, OHCI1394_busReset);
+
 				spin_unlock_irqrestore(&ohci->event_lock, flags);
-	  			udelay(10);
+				udelay(10);
 				spin_lock_irqsave(&ohci->event_lock, flags);
-  			}
-  		}
+
+				/* The loop counter check is to prevent the driver
+				 * from remaining in this state forever. For the
+				 * initial bus reset, the loop continues for ever
+				 * and the system hangs, until some device is plugged-in
+				 * or out manually into a port! The forced reset seems
+				 * to solve this problem. This mainly effects nForce2. */
+				if (loop_count > 10000) {
+					hpsb_reset_bus(host, 1);
+					DBGMSG(ohci->id, "Detected bus-reset loop. Forced a bus reset!");
+					loop_count = 0;
+				}
+
+				loop_count++;
+			}
+		}
 		spin_unlock_irqrestore(&ohci->event_lock, flags);
 		if (!host->in_bus_reset) {
 			DBGMSG(ohci->id, "irq_handler: Bus reset requested");
@@ -2438,6 +2462,8 @@ selfid_not_valid:
 	if (event)
 		PRINT(KERN_ERR, ohci->id, "Unhandled interrupt(s) 0x%08x",
 		      event);
+
+	return;
 }
 
 /* Put the buffer back into the dma context */
@@ -3277,6 +3303,18 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 		ohci->selfid_swap = 1;
 #endif
 
+#ifndef PCI_DEVICE_ID_NVIDIA_NFORCE2_FW
+#define PCI_DEVICE_ID_NVIDIA_NFORCE2_FW 0x006e
+#endif
+
+	/* These chipsets require a bit of extra care when checking after
+	 * a busreset.  */
+	if ((dev->vendor == PCI_VENDOR_ID_APPLE &&
+	     dev->device == PCI_DEVICE_ID_APPLE_UNI_N_FW) ||
+	    (dev->vendor ==  PCI_VENDOR_ID_NVIDIA &&
+	     dev->device == PCI_DEVICE_ID_NVIDIA_NFORCE2_FW))
+		ohci->check_busreset = 1;
+
 	/* We hardwire the MMIO length, since some CardBus adaptors
 	 * fail to report the right length.  Anyway, the ohci spec
 	 * clearly says it's 2kb, so this shouldn't be a problem. */ 
@@ -3363,7 +3401,7 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	 * accessing registers in the SClk domain without LPS enabled
 	 * will lock up the machine.  Wait 50msec to make sure we have
 	 * full link enabled.  */
-	reg_write(ohci, OHCI1394_HCControlSet, 0x00080000);
+	reg_write(ohci, OHCI1394_HCControlSet, OHCI1394_HCControl_LPS);
 	mdelay(50);
 
 	/* Determine the number of available IR and IT contexts. */
@@ -3489,7 +3527,7 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 static struct pci_device_id ohci1394_pci_tbl[] __devinitdata = {
 	{
 		.class = 	PCI_CLASS_FIREWIRE_OHCI,
-		.class_mask = 	~0,
+		.class_mask = 	PCI_ANY_ID,
 		.vendor =	PCI_ANY_ID,
 		.device =	PCI_ANY_ID,
 		.subvendor =	PCI_ANY_ID,

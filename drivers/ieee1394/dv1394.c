@@ -2919,11 +2919,7 @@ static int __init dv1394_init_module(void)
 	}
 
 #ifdef CONFIG_DEVFS_FS
-	if (!devfs_mk_dir("ieee1394/dv")) {
-		printk(KERN_ERR "dv1394: unable to create /dev/ieee1394/dv\n");
-		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
-		return -ENOMEM;
-	}
+	devfs_mk_dir("ieee1394/dv");
 #endif
 
 #ifdef CONFIG_PROC_FS

@@ -6,7 +6,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-static decl_subsys(firmware,NULL);
+static decl_subsys(firmware,NULL,NULL);
 
 int firmware_register(struct subsystem * s)
 {

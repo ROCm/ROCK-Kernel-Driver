@@ -233,6 +233,9 @@ struct ti_ohci {
 	unsigned int selfid_swap:1;
 	/* Some Apple chipset seem to swap incoming headers for us */
 	unsigned int no_swap_incoming:1;
+
+	/* Force extra paranoia checking on bus-reset handling */
+	unsigned int check_busreset:1;
 };
 
 static inline int cross_bound(unsigned long addr, unsigned int size)
@@ -288,6 +291,13 @@ static inline u32 reg_read(const struct ti_ohci *ohci, int offset)
 #define OHCI1394_VendorID                     0x040
 #define OHCI1394_HCControlSet                 0x050
 #define OHCI1394_HCControlClear               0x054
+#define  OHCI1394_HCControl_noByteSwap		0x40000000
+#define  OHCI1394_HCControl_programPhyEnable	0x00800000
+#define  OHCI1394_HCControl_aPhyEnhanceEnable	0x00400000
+#define  OHCI1394_HCControl_LPS			0x00080000
+#define  OHCI1394_HCControl_postedWriteEnable	0x00040000
+#define  OHCI1394_HCControl_linkEnable		0x00020000
+#define  OHCI1394_HCControl_softReset		0x00010000
 #define OHCI1394_SelfIDBuffer                 0x064
 #define OHCI1394_SelfIDCount                  0x068
 #define OHCI1394_IRMultiChanMaskHiSet         0x070
