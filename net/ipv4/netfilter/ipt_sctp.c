@@ -42,7 +42,7 @@ match_packet(const struct sk_buff *skb,
 {
 	int offset;
 	u_int32_t chunkmapcopy[256 / sizeof (u_int32_t)];
-	sctp_chunkhdr_t sch;
+	sctp_chunkhdr_t _sch, *sch;
 
 #ifdef DEBUG_SCTP
 	int i = 0;
@@ -54,38 +54,39 @@ match_packet(const struct sk_buff *skb,
 
 	offset = skb->nh.iph->ihl * 4 + sizeof (sctp_sctphdr_t);
 	do {
-		if (skb_copy_bits(skb, offset, &sch, sizeof(sch)) < 0) {
+		sch = skb_header_pointer(skb, offset, sizeof(_sch), &_sch);
+		if (sch == NULL) {
 			duprintf("Dropping invalid SCTP packet.\n");
 			*hotdrop = 1;
 			return 0;
         	}
 
 		duprintf("Chunk num: %d\toffset: %d\ttype: %d\tlength: %d\tflags: %x\n", 
-				++i, offset, sch.type, htons(sch.length), sch.flags);
+				++i, offset, sch->type, htons(sch->length), sch->flags);
 
-		offset += (htons(sch.length) + 3) & ~3;
+		offset += (htons(sch->length) + 3) & ~3;
 
 		duprintf("skb->len: %d\toffset: %d\n", skb->len, offset);
 
-		if (SCTP_CHUNKMAP_IS_SET(chunkmap, sch.type)) {
+		if (SCTP_CHUNKMAP_IS_SET(chunkmap, sch->type)) {
 			switch (chunk_match_type) {
 			case SCTP_CHUNK_MATCH_ANY:
 				if (match_flags(flag_info, flag_count, 
-					sch.type, sch.flags)) {
+					sch->type, sch->flags)) {
 					return 1;
 				}
 				break;
 
 			case SCTP_CHUNK_MATCH_ALL:
 				if (match_flags(flag_info, flag_count, 
-					sch.type, sch.flags)) {
-					SCTP_CHUNKMAP_CLEAR(chunkmapcopy, sch.type);
+					sch->type, sch->flags)) {
+					SCTP_CHUNKMAP_CLEAR(chunkmapcopy, sch->type);
 				}
 				break;
 
 			case SCTP_CHUNK_MATCH_ONLY:
 				if (!match_flags(flag_info, flag_count, 
-					sch.type, sch.flags)) {
+					sch->type, sch->flags)) {
 					return 0;
 				}
 				break;
@@ -120,7 +121,7 @@ match(const struct sk_buff *skb,
       int *hotdrop)
 {
 	const struct ipt_sctp_info *info;
-	sctp_sctphdr_t sh;
+	sctp_sctphdr_t _sh, *sh;
 
 	info = (const struct ipt_sctp_info *)matchinfo;
 
@@ -129,18 +130,19 @@ match(const struct sk_buff *skb,
 		return 0;
 	}
 	
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &sh, sizeof(sh)) < 0) {
+	sh = skb_header_pointer(skb, skb->nh.iph->ihl*4, sizeof(_sh), &_sh);
+	if (sh == NULL) {
 		duprintf("Dropping evil TCP offset=0 tinygram.\n");
 		*hotdrop = 1;
 		return 0;
        	}
-	duprintf("spt: %d\tdpt: %d\n", ntohs(sh.source), ntohs(sh.dest));
+	duprintf("spt: %d\tdpt: %d\n", ntohs(sh->source), ntohs(sh->dest));
 
-	return  SCCHECK(((ntohs(sh.source) >= info->spts[0]) 
-			&& (ntohs(sh.source) <= info->spts[1])), 
+	return  SCCHECK(((ntohs(sh->source) >= info->spts[0]) 
+			&& (ntohs(sh->source) <= info->spts[1])), 
 		   	IPT_SCTP_SRC_PORTS, info->flags, info->invflags)
-		&& SCCHECK(((ntohs(sh.dest) >= info->dpts[0]) 
-			&& (ntohs(sh.dest) <= info->dpts[1])), 
+		&& SCCHECK(((ntohs(sh->dest) >= info->dpts[0]) 
+			&& (ntohs(sh->dest) <= info->dpts[1])), 
 			IPT_SCTP_DEST_PORTS, info->flags, info->invflags)
 		&& SCCHECK(match_packet(skb, info->chunkmap, info->chunk_match_type,
  					info->flag_info, info->flag_count, 
