@@ -75,7 +75,7 @@ MODULE_DEVICE_TABLE(pci, isicom_pci_tbl);
 
 static int prev_card = 3;	/*	start servicing isi_card[0]	*/
 static struct isi_board * irq_to_board[16];
-static struct tty_driver isicom_normal;
+static struct tty_driver *isicom_normal;
 
 static struct isi_board isi_card[BOARD_COUNT];
 static struct isi_port  isi_ports[PORT_COUNT];
@@ -1640,44 +1640,49 @@ static void unregister_ioregion(void)
 		}
 }
 
+static struct tty_operations isicom_ops = {
+	.open	= isicom_open,
+	.close	= isicom_close,
+	.write	= isicom_write,
+	.put_char	= isicom_put_char,
+	.flush_chars	= isicom_flush_chars,
+	.write_room	= isicom_write_room,
+	.chars_in_buffer	= isicom_chars_in_buffer,
+	.ioctl	= isicom_ioctl,
+	.set_termios	= isicom_set_termios,
+	.throttle	= isicom_throttle,
+	.unthrottle	= isicom_unthrottle,
+	.stop	= isicom_stop,
+	.start	= isicom_start,
+	.hangup	= isicom_hangup,
+	.flush_buffer	= isicom_flush_buffer,
+};
+
 static int register_drivers(void)
 {
 	int error;
 
 	/* tty driver structure initialization */
-	memset(&isicom_normal, 0, sizeof(struct tty_driver));
-	isicom_normal.magic	= TTY_DRIVER_MAGIC;
-	isicom_normal.owner	= THIS_MODULE;
-	isicom_normal.name 	= "ttyM";
-	isicom_normal.major	= ISICOM_NMAJOR;
-	isicom_normal.minor_start	= 0;
-	isicom_normal.num	= PORT_COUNT;
-	isicom_normal.type	= TTY_DRIVER_TYPE_SERIAL;
-	isicom_normal.subtype	= SERIAL_TYPE_NORMAL;
-	isicom_normal.init_termios	= tty_std_termios;
-	isicom_normal.init_termios.c_cflag	= 
+	isicom_normal = alloc_tty_driver(PORT_COUNT);
+	if (!isicom_normal)
+		return -ENOMEM;
+
+	isicom_normal->owner	= THIS_MODULE;
+	isicom_normal->name 	= "ttyM";
+	isicom_normal->major	= ISICOM_NMAJOR;
+	isicom_normal->minor_start	= 0;
+	isicom_normal->type	= TTY_DRIVER_TYPE_SERIAL;
+	isicom_normal->subtype	= SERIAL_TYPE_NORMAL;
+	isicom_normal->init_termios	= tty_std_termios;
+	isicom_normal->init_termios.c_cflag	= 
 				B9600 | CS8 | CREAD | HUPCL |CLOCAL;
-	isicom_normal.flags	= TTY_DRIVER_REAL_RAW;
+	isicom_normal->flags	= TTY_DRIVER_REAL_RAW;
+	tty_set_operations(isicom_normal, &isicom_ops);
 	
-	isicom_normal.open	= isicom_open;
-	isicom_normal.close	= isicom_close;
-	isicom_normal.write	= isicom_write;
-	isicom_normal.put_char	= isicom_put_char;
-	isicom_normal.flush_chars	= isicom_flush_chars;
-	isicom_normal.write_room	= isicom_write_room;
-	isicom_normal.chars_in_buffer	= isicom_chars_in_buffer;
-	isicom_normal.ioctl	= isicom_ioctl;
-	isicom_normal.set_termios	= isicom_set_termios;
-	isicom_normal.throttle	= isicom_throttle;
-	isicom_normal.unthrottle	= isicom_unthrottle;
-	isicom_normal.stop	= isicom_stop;
-	isicom_normal.start	= isicom_start;
-	isicom_normal.hangup	= isicom_hangup;
-	isicom_normal.flush_buffer	= isicom_flush_buffer;
-	
-	if ((error=tty_register_driver(&isicom_normal))!=0) {
+	if ((error=tty_register_driver(isicom_normal))!=0) {
 		printk(KERN_DEBUG "ISICOM: Couldn't register the dialin driver, error=%d\n",
 			error);
+		put_tty_driver(isicom_normal);
 		return error;
 	}
 	return 0;
@@ -1686,8 +1691,9 @@ static int register_drivers(void)
 static void unregister_drivers(void)
 {
 	int error;
-	if (tty_unregister_driver(&isicom_normal))
+	if (tty_unregister_driver(isicom_normal))
 		printk(KERN_DEBUG "ISICOM: couldn't unregister normal driver error=%d.\n",error);
+	put_tty_driver(isicom_normal);
 }
 
 static int register_isr(void)
