@@ -2040,6 +2040,17 @@ struct module *module_text_address(unsigned long addr)
 	return NULL;
 }
 
+/* Don't grab lock, we're oopsing. */
+void print_modules(void)
+{
+	struct module *mod;
+
+	printk("Modules linked in:");
+	list_for_each_entry(mod, &modules, list)
+		printk(" %s", mod->name);
+	printk("\n");
+}
+
 #ifdef CONFIG_MODVERSIONS
 /* Generate the signature for struct module here, too, for modversions. */
 void struct_module(struct module *mod) { return; }

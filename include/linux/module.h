@@ -24,7 +24,6 @@
 
 /* Not Yet Implemented */
 #define MODULE_SUPPORTED_DEVICE(name)
-#define print_modules()
 
 /* v850 toolchain uses a `_' prefix for all user symbols */
 #ifndef MODULE_SYMBOL_PREFIX
@@ -425,6 +424,7 @@ const struct exception_table_entry *search_module_extables(unsigned long addr);
 int register_module_notifier(struct notifier_block * nb);
 int unregister_module_notifier(struct notifier_block * nb);
 
+extern void print_modules(void);
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
@@ -505,6 +505,9 @@ static inline int unregister_module_notifier(struct notifier_block * nb)
 
 #define module_put_and_exit(code) do_exit(code)
 
+static inline void print_modules(void)
+{
+}
 #endif /* CONFIG_MODULES */
 
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
