@@ -17,7 +17,7 @@
  * will stop our MCLK signal (which provides the clock for the glue
  * logic, and therefore the timer interrupt).
  *
- * Instead, we spin, waiting for either hlt_counter or need_resched
+ * Instead, we spin, waiting for either hlt_counter or need_resched()
  * to be set.  If we have been spinning for 2cs, then we drop the
  * core clock down to the memory clock.
  */
@@ -28,13 +28,13 @@ static void arch_idle(void)
 	start_idle = jiffies;
 
 	do {
-		if (current->need_resched || hlt_counter)
+		if (need_resched() || hlt_counter)
 			goto slow_out;
 	} while (time_before(jiffies, start_idle + HZ/50));
 
 	cpu_do_idle(IDLE_CLOCK_SLOW);
 
-	while (!current->need_resched && !hlt_counter) {
+	while (!need_resched() && !hlt_counter) {
 		/* do nothing slowly */
 	}
 

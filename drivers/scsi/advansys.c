@@ -1,4 +1,4 @@
-#define ASC_VERSION "3.3G"    /* AdvanSys Driver Version */
+#define ASC_VERSION "3.3GG"    /* AdvanSys Driver Version */
 
 /*
  * advansys.c - Linux Host Driver for AdvanSys SCSI Adapters
@@ -669,6 +669,9 @@
      3.3G (2/16/01):
          1. Return an error from narrow boards if passed a 16 byte
             CDB. The wide board can already handle 16 byte CDBs.
+
+     3.3GG (01/02/02):
+	 1. hacks for lk 2.5 series (D. Gilbert)
 
   I. Known Problems/Fix List (XXX)
 
@@ -3610,6 +3613,23 @@ typedef struct {
 #define ASC_MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif /* CONFIG_PROC_FS */
 
+/*
+ * XXX - Release and acquire the io_request_lock. These macros are needed
+ * because the 2.4 kernel SCSI mid-level driver holds the 'io_request_lock'
+ * on entry to SCSI low-level drivers.
+ *
+ * These definitions and all code that uses code should be removed when the
+ * SCSI mid-level driver no longer holds the 'io_request_lock' on entry to
+ * SCSI low-level driver detect, queuecommand, and reset entrypoints.
+ *
+ * The interrupt flags values doesn't matter in the macros because the
+ * SCSI mid-level will save and restore the flags values before and after
+ * calling advansys_detect, advansys_queuecommand, and advansys_reset where
+ * these macros are used. We do want interrupts enabled after the lock is
+ * released so an explicit sti() is done. The driver only needs interrupts
+ * disabled when it acquires the per board lock.
+ */
+
 /* Asc Library return codes */
 #define ASC_TRUE        1
 #define ASC_FALSE       0
@@ -4054,6 +4074,7 @@ typedef struct asc_board {
         ADVEEP_38C1600_CONFIG adv_38C1600_eep;  /* 38C1600 EEPROM config. */
     } eep_config;
     ulong                last_reset;            /* Saved last reset time */
+    spinlock_t lock;                            /* Board spinlock */
 #ifdef CONFIG_PROC_FS
     /* /proc/scsi/advansys/[0...] */
     char                 *prtbuf;               /* /proc print buffer */
@@ -4206,7 +4227,7 @@ STATIC PortAddr     _asc_def_iop_base[];
 STATIC void       advansys_interrupt(int, void *, struct pt_regs *);
 STATIC void       advansys_select_queue_depths(struct Scsi_Host *,
                                                Scsi_Device *);
-STATIC void       asc_scsi_done_list(Scsi_Cmnd *);
+STATIC void       asc_scsi_done_list(Scsi_Cmnd *, int from_isr);
 STATIC int        asc_execute_scsi_cmnd(Scsi_Cmnd *);
 STATIC int        asc_build_req(asc_board_t *, Scsi_Cmnd *);
 STATIC int        adv_build_req(asc_board_t *, Scsi_Cmnd *, ADV_SCSI_REQ_Q **);
@@ -4798,6 +4819,9 @@ advansys_detect(Scsi_Host_Template *tpnt)
             boardp = ASC_BOARDP(shp);
             memset(boardp, 0, sizeof(asc_board_t));
             boardp->id = asc_board_count - 1;
+
+            /* Initialize spinlock. */
+            boardp->lock = SPIN_LOCK_UNLOCKED; /* replaced by host_lock dpg */
 
             /*
              * Handle both narrow and wide boards.
@@ -5511,7 +5535,7 @@ advansys_detect(Scsi_Host_Template *tpnt)
                 }
             } else {
                 ADV_CARR_T      *carrp;
-                int             req_cnt;
+                int             req_cnt = 0;
                 adv_req_t       *reqp = NULL;
                 int             sg_cnt = 0;
 
@@ -5845,7 +5869,9 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
     boardp = ASC_BOARDP(shp);
     ASC_STATS(shp, queuecommand);
 
-    spin_lock_irqsave(&shp->host_lock, flags);
+    /* host_lock taken by mid-level prior to call but need to protect */
+    /* against own ISR */
+    spin_lock_irqsave(&boardp->lock, flags);
 
     /*
      * Block new commands while handling a reset or abort request.
@@ -5862,7 +5888,7 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
          * handling.
          */
         asc_enqueue(&boardp->done, scp, ASC_BACK);
-        spin_unlock_irqrestore(&shp->host_lock, flags);
+	spin_unlock_irqrestore(&boardp->lock, flags);
         return 0;
     }
 
@@ -5902,11 +5928,11 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
     default:
         done_scp = asc_dequeue_list(&boardp->done, NULL, ASC_TID_ALL);
         /* Interrupts could be enabled here. */
-        asc_scsi_done_list(done_scp);
+        asc_scsi_done_list(done_scp, 0);
         break;
     }
+    spin_unlock_irqrestore(&boardp->lock, flags);
 
-    spin_unlock_irqrestore(&shp->host_lock, flags);
     return 0;
 }
 
@@ -5952,13 +5978,13 @@ advansys_reset(Scsi_Cmnd *scp)
     /*
      * Check for re-entrancy.
      */
-    spin_lock_irqsave(&shp->host_lock, flags);
+    spin_lock_irqsave(&boardp->lock, flags);
     if (boardp->flags & ASC_HOST_IN_RESET) {
-        spin_unlock_irqrestore(&shp->host_lock, flags);
+	spin_unlock_irqrestore(&boardp->lock, flags);
         return FAILED;
     }
     boardp->flags |= ASC_HOST_IN_RESET;
-    spin_unlock_irqrestore(&shp->host_lock, flags);
+    spin_unlock_irqrestore(&boardp->lock, flags);
 
     if (ASC_NARROW_BOARD(boardp)) {
         /*
@@ -5989,11 +6015,7 @@ advansys_reset(Scsi_Cmnd *scp)
         }
 
         ASC_DBG(1, "advansys_reset: after AscInitAsc1000Driver()\n");
-
-        /*
-         * Acquire the board lock.
-         */
-        spin_lock_irqsave(&shp->host_lock, flags);
+	spin_lock_irqsave(&boardp->lock, flags);
 
     } else {
         /*
@@ -6020,14 +6042,9 @@ advansys_reset(Scsi_Cmnd *scp)
             ret = FAILED;
             break;
         }
-        /*
-         * Acquire the board lock and ensure all requests completed by the
-         * microcode have been processed by calling AdvISR().
-         */
-        spin_lock_irqsave(&shp->host_lock, flags);
+	spin_lock_irqsave(&boardp->lock, flags);
         (void) AdvISR(adv_dvc_varp);
     }
-
     /* Board lock is held. */
 
     /*
@@ -6088,15 +6105,13 @@ advansys_reset(Scsi_Cmnd *scp)
 
     /* Clear reset flag. */
     boardp->flags &= ~ASC_HOST_IN_RESET;
-
-    /* Release the board. */
-    spin_unlock_irqrestore(&shp->host_lock, flags);
+    spin_unlock_irqrestore(&boardp->lock, flags);
 
     /*
      * Complete all the 'done_scp' requests.
      */
     if (done_scp != NULL) {
-        asc_scsi_done_list(done_scp);
+        asc_scsi_done_list(done_scp, 0);
     }
 
     ASC_DBG1(1, "advansys_reset: ret %d\n", ret);
@@ -6259,6 +6274,7 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     asc_board_t     *boardp;
     Scsi_Cmnd       *done_scp = NULL, *last_scp = NULL;
     Scsi_Cmnd       *new_last_scp;
+    struct Scsi_Host *shp;
 
     ASC_DBG(1, "advansys_interrupt: begin\n");
 
@@ -6267,17 +6283,17 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
      * AscISR() will call asc_isr_callback().
      */
     for (i = 0; i < asc_board_count; i++) {
-	struct Scsi_Host *shp = asc_host[i];
+	shp = asc_host[i];
         boardp = ASC_BOARDP(shp);
         ASC_DBG2(2, "advansys_interrupt: i %d, boardp 0x%lx\n",
             i, (ulong) boardp);
-        spin_lock_irqsave(&shp->host_lock, flags);
+        spin_lock_irqsave(&boardp->lock, flags);
         if (ASC_NARROW_BOARD(boardp)) {
             /*
              * Narrow Board
              */
-            if (AscIsIntPending(asc_host[i]->io_port)) {
-                ASC_STATS(asc_host[i], interrupt);
+            if (AscIsIntPending(shp->io_port)) {
+                ASC_STATS(shp, interrupt);
                 ASC_DBG(1, "advansys_interrupt: before AscISR()\n");
                 AscISR(&boardp->dvc_var.asc_dvc_var);
             }
@@ -6287,7 +6303,7 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
              */
             ASC_DBG(1, "advansys_interrupt: before AdvISR()\n");
             if (AdvISR(&boardp->dvc_var.adv_dvc_var)) {
-                ASC_STATS(asc_host[i], interrupt);
+                ASC_STATS(shp, interrupt);
             }
         }
 
@@ -6327,7 +6343,7 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                 }
             }
         }
-        spin_unlock_irqrestore(&shp->host_lock, flags);
+        spin_unlock_irqrestore(&boardp->lock, flags);
     }
 
     /*
@@ -6336,7 +6352,8 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
      *
      * Complete all requests on the done list.
      */
-    asc_scsi_done_list(done_scp);
+
+    asc_scsi_done_list(done_scp, 1);
 
     ASC_DBG(1, "advansys_interrupt: end\n");
     return;
@@ -6383,9 +6400,10 @@ advansys_select_queue_depths(struct Scsi_Host *shp, Scsi_Device *devicelist)
  * Interrupts can be enabled on entry.
  */
 STATIC void
-asc_scsi_done_list(Scsi_Cmnd *scp)
+asc_scsi_done_list(Scsi_Cmnd *scp, int from_isr)
 {
     Scsi_Cmnd    *tscp;
+    ulong	  flags = 0;
 
     ASC_DBG(2, "asc_scsi_done_list: begin\n");
     while (scp != NULL) {
@@ -6394,7 +6412,11 @@ asc_scsi_done_list(Scsi_Cmnd *scp)
         REQPNEXT(scp) = NULL;
         ASC_STATS(scp->host, done);
         ASC_ASSERT(scp->scsi_done != NULL);
+	if (from_isr)
+	    spin_lock_irqsave(&scp->host->host_lock, flags);
         scp->scsi_done(scp);
+	if (from_isr)
+	    spin_unlock_irqrestore(&scp->host->host_lock, flags);
         scp = tscp;
     }
     ASC_DBG(2, "asc_scsi_done_list: done\n");
@@ -6728,7 +6750,9 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
         slp = (struct scatterlist *) scp->request_buffer;
         for (sgcnt = 0; sgcnt < scp->use_sg; sgcnt++, slp++) {
             asc_sg_head.sg_list[sgcnt].addr =
-                cpu_to_le32(virt_to_bus(slp->address));
+                cpu_to_le32(virt_to_bus(slp->address ? 
+		(unsigned char *)slp->address :
+		(unsigned char *)page_address(slp->page) + slp->offset));
             asc_sg_head.sg_list[sgcnt].bytes = cpu_to_le32(slp->length);
             ASC_STATS_ADD(scp->host, sg_xfer, ASC_CEILING(slp->length, 512));
         }
@@ -6986,7 +7010,9 @@ adv_get_sglist(asc_board_t *boardp, adv_req_t *reqp, Scsi_Cmnd *scp)
         for (i = 0; i < NO_OF_SG_PER_BLOCK; i++)
         {
             sg_block->sg_list[i].sg_addr =
-                cpu_to_le32(virt_to_bus(slp->address));
+                cpu_to_le32(virt_to_bus(slp->address ? 
+		(unsigned char *)slp->address :
+                (unsigned char *)page_address(slp->page) + slp->offset));
             sg_block->sg_list[i].sg_count = cpu_to_le32(slp->length);
             ASC_STATS_ADD(scp->host, sg_xfer, ASC_CEILING(slp->length, 512));
 

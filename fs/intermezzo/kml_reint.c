@@ -17,7 +17,6 @@
 #include <linux/mm.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
-#include <asm/mmu_context.h>
 #include <linux/intermezzo_fs.h>
 #include <linux/intermezzo_kml.h>
 #include <linux/intermezzo_psdev.h>

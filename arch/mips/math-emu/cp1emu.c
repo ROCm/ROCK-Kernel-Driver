@@ -1674,8 +1674,7 @@ int fpu_emulator_cop1Handler(struct pt_regs *xcp)
 
 	oldepc = xcp->cp0_epc;
 	do {
-		if (current->need_resched)
-			schedule();
+		cond_resched();
 
 		prevepc = xcp->cp0_epc;
 		insn = mips_get_word(xcp, REG_TO_VA(xcp->cp0_epc), &err);

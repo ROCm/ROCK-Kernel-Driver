@@ -127,11 +127,7 @@ struct saa5249_device
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
-#define RESCHED \
-        do { \
-          if (current->need_resched) \
-            schedule(); \
-        } while (0)
+#define RESCHED do { cond_resched(); } while(0)
 
 static struct video_device saa_template;	/* Declared near bottom */
 

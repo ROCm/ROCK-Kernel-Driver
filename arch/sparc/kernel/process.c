@@ -106,7 +106,7 @@ int cpu_idle(void)
 {
 	/* endless idle loop with no priority at all */
 	while(1) {
-		if(current->need_resched) {
+		if(need_resched()) {
 			schedule();
 			check_pgt_cache();
 		}

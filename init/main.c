@@ -38,33 +38,8 @@
 #include <asm/ccwcache.h>
 #endif
 
-#ifdef CONFIG_PCI
-#include <linux/pci.h>
-#endif
-
-#ifdef CONFIG_DIO
-#include <linux/dio.h>
-#endif
-
-#ifdef CONFIG_ZORRO
-#include <linux/zorro.h>
-#endif
-
 #ifdef CONFIG_MTRR
 #  include <asm/mtrr.h>
-#endif
-
-#ifdef CONFIG_NUBUS
-#include <linux/nubus.h>
-#endif
-
-#ifdef CONFIG_ISAPNP
-#include <linux/isapnp.h>
-#endif
-
-#ifdef CONFIG_IRDA
-extern int irda_proto_init(void);
-extern int irda_device_init(void);
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -92,18 +67,14 @@ extern void sock_init(void);
 extern void fork_init(unsigned long);
 extern void mca_init(void);
 extern void sbus_init(void);
-extern void ppc_init(void);
 extern void sysctl_init(void);
 extern void signals_init(void);
-extern int init_pcmcia_ds(void);
 
 extern void free_initmem(void);
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
 #endif
-
-extern void ecard_init(void);
 
 #if defined(CONFIG_SYSVIPC)
 extern void ipc_init(void);
@@ -490,50 +461,11 @@ static void __init do_basic_setup(void)
 	/* bring up the device tree */
 	device_driver_init();
 
-#ifdef CONFIG_PCI
-	pci_init();
-#endif
-#ifdef CONFIG_SBUS
-	sbus_init();
-#endif
-#if defined(CONFIG_PPC)
-	ppc_init();
-#endif
-#ifdef CONFIG_MCA
-	mca_init();
-#endif
-#ifdef CONFIG_ARCH_ACORN
-	ecard_init();
-#endif
-#ifdef CONFIG_ZORRO
-	zorro_init();
-#endif
-#ifdef CONFIG_DIO
-	dio_init();
-#endif
-#ifdef CONFIG_NUBUS
-	nubus_init();
-#endif
-#ifdef CONFIG_ISAPNP
-	isapnp_init();
-#endif
-#ifdef CONFIG_TC
-	tc_init();
-#endif
-
 	/* Networking initialization needs a process context */ 
 	sock_init();
 
 	start_context_thread();
 	do_initcalls();
-
-#ifdef CONFIG_IRDA
-	irda_proto_init();
-	irda_device_init(); /* Must be done after protocol initialization */
-#endif
-#ifdef CONFIG_PCMCIA
-	init_pcmcia_ds();		/* Do this last */
-#endif
 }
 
 extern void prepare_namespace(void);

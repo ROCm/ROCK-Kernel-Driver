@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/isdn.h>
+#include <linux/smp_lock.h>
 #include <linux/poll.h>
 #include <linux/ppp-comp.h>
 
@@ -269,13 +270,11 @@ isdn_ppp_get_slot(void)
  */
 
 int
-isdn_ppp_open(int min, struct file *file)
+isdn_ppp_open(struct inode *ino, struct file *file)
 {
+	uint minor = minor(ino->i_rdev) - ISDN_MINOR_PPP;
 	int slot;
 	struct ippp_struct *is;
-
-	if (min < 0 || min > ISDN_MAX_CHANNELS)
-		return -ENODEV;
 
 	slot = isdn_ppp_get_slot();
 	if (slot < 0) {
@@ -283,7 +282,7 @@ isdn_ppp_open(int min, struct file *file)
 	}
 	is = file->private_data = ippp_table[slot];
 
-		printk(KERN_DEBUG "ippp, open, slot: %d, minor: %d, state: %04x\n", slot, min, is->state);
+		printk(KERN_DEBUG "ippp, open, slot: %d, minor: %d, state: %04x\n", slot, minor, is->state);
 
 	/* compression stuff */
 	is->link_compressor   = is->compressor = NULL;
@@ -306,7 +305,7 @@ isdn_ppp_open(int min, struct file *file)
 	init_waitqueue_head(&is->wq);
 	is->first = is->rq + NUM_RCV_BUFFS - 1;	/* receive queue */
 	is->last = is->rq;
-	is->minor = min;
+	is->minor = minor;
 #ifdef CONFIG_ISDN_PPP_VJ
 	/*
 	 * VJ header compression init
@@ -315,6 +314,7 @@ isdn_ppp_open(int min, struct file *file)
 #endif
 
 	is->state = IPPP_OPEN;
+	isdn_lock_drivers();
 
 	return 0;
 }
@@ -322,18 +322,19 @@ isdn_ppp_open(int min, struct file *file)
 /*
  * release ippp device
  */
-void
-isdn_ppp_release(int min, struct file *file)
+int
+isdn_ppp_release(struct inode *ino, struct file *file)
 {
+	uint minor = minor(ino->i_rdev) - ISDN_MINOR_PPP;
 	int i;
 	struct ippp_struct *is;
 
-	if (min < 0 || min >= ISDN_MAX_CHANNELS)
-		return;
+	lock_kernel();
+
 	is = file->private_data;
 
 	if (is->debug & 0x1)
-		printk(KERN_DEBUG "ippp: release, minor: %d %lx\n", min, (long) is->lp);
+		printk(KERN_DEBUG "ippp: release, minor: %d %lx\n", minor, (long) is->lp);
 
 	if (is->lp) {           /* a lp address says: this link is still up */
 		isdn_net_dev *p = is->lp->netdev;
@@ -381,6 +382,11 @@ isdn_ppp_release(int min, struct file *file)
 
 	/* this slot is ready for new connections */
 	is->state = 0;
+
+	isdn_unlock_drivers();
+	
+	unlock_kernel();
+	return 0;
 }
 
 /*
@@ -413,7 +419,7 @@ set_arg(void *b, void *val,int len)
  * ippp device ioctl
  */
 int
-isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
+isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	unsigned long val;
 	int r,i,j;
@@ -425,7 +431,7 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 	lp = is->lp;
 
 	if (is->debug & 0x1)
-		printk(KERN_DEBUG "isdn_ppp_ioctl: minor: %d cmd: %x state: %x\n", min, cmd, is->state);
+		printk(KERN_DEBUG "isdn_ppp_ioctl: minor: %d cmd: %x state: %x\n", is->minor, cmd, is->state);
 
 	if (!(is->state & IPPP_OPEN))
 		return -EINVAL;
@@ -438,7 +444,7 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 			if ((r = get_arg((void *) arg, &val, sizeof(val) )))
 				return r;
 			printk(KERN_DEBUG "iPPP-bundle: minor: %d, slave unit: %d, master unit: %d\n",
-			       (int) min, (int) is->unit, (int) val);
+			       (int) is->minor, (int) is->unit, (int) val);
 			return isdn_ppp_bundle(is, val);
 #else
 			return -1;
@@ -582,6 +588,7 @@ isdn_ppp_poll(struct file *file, poll_table * wait)
 	unsigned long flags;
 	struct ippp_struct *is;
 
+	lock_kernel();
 	is = file->private_data;
 
 	if (is->debug & 0x2)
@@ -592,10 +599,13 @@ isdn_ppp_poll(struct file *file, poll_table * wait)
 	poll_wait(file, &is->wq, wait);
 
 	if (!(is->state & IPPP_OPEN)) {
-		if(is->state == IPPP_CLOSEWAIT)
-			return POLLHUP;
+		if(is->state == IPPP_CLOSEWAIT) {
+			mask = POLLHUP;
+			goto out;
+		}
 		printk(KERN_DEBUG "isdn_ppp: device not open\n");
-		return POLLERR;
+		mask = POLLERR;
+		goto out;
 	}
 	/* we're always ready to send .. */
 	mask = POLLOUT | POLLWRNORM;
@@ -612,6 +622,9 @@ isdn_ppp_poll(struct file *file, poll_table * wait)
 		mask |= POLLIN | POLLRDNORM;
 	}
 	restore_flags(flags);
+
+ out:
+	unlock_kernel();
 	return mask;
 }
 
@@ -678,21 +691,28 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
  */
 
 int
-isdn_ppp_read(int min, struct file *file, char *buf, int count)
+isdn_ppp_read(struct file *file, char *buf, int count, loff_t *off)
 {
 	struct ippp_struct *is;
 	struct ippp_buf_queue *b;
-	int r;
 	unsigned long flags;
 	unsigned char *save_buf;
+	int retval;
+
+	if (off != &file->f_pos)
+		return -ESPIPE;
+	
+	lock_kernel();
 
 	is = file->private_data;
 
-	if (!(is->state & IPPP_OPEN))
-		return 0;
-
-	if ((r = verify_area(VERIFY_WRITE, (void *) buf, count)))
-		return r;
+	if (!(is->state & IPPP_OPEN)) {
+		retval = 0;
+		goto out;
+	}
+	retval = verify_area(VERIFY_WRITE, (void *) buf, count);
+	if (retval)
+		goto out;
 
 	save_flags(flags);
 	cli();
@@ -701,7 +721,8 @@ isdn_ppp_read(int min, struct file *file, char *buf, int count)
 	save_buf = b->buf;
 	if (!save_buf) {
 		restore_flags(flags);
-		return -EAGAIN;
+		retval = -EAGAIN;
+		goto out;
 	}
 	if (b->len < count)
 		count = b->len;
@@ -713,7 +734,11 @@ isdn_ppp_read(int min, struct file *file, char *buf, int count)
 	copy_to_user(buf, save_buf, count);
 	kfree(save_buf);
 
-	return count;
+	retval = count;
+
+ out:
+	unlock_kernel();
+	return retval;
 }
 
 /*
@@ -721,17 +746,25 @@ isdn_ppp_read(int min, struct file *file, char *buf, int count)
  */
 
 int
-isdn_ppp_write(int min, struct file *file, const char *buf, int count)
+isdn_ppp_write(struct file *file, const char *buf, int count, loff_t *off)
 {
 	isdn_net_local *lp;
 	struct ippp_struct *is;
 	int proto;
 	unsigned char protobuf[4];
+	int retval;
+
+	if (off != &file->f_pos)
+		return -ESPIPE;
+
+	lock_kernel();
 
 	is = file->private_data;
 
-	if (!(is->state & IPPP_CONNECT))
-		return 0;
+	if (!(is->state & IPPP_CONNECT)) {
+		retval = 0;
+		goto out;
+	}
 
 	lp = is->lp;
 
@@ -744,15 +777,18 @@ isdn_ppp_write(int min, struct file *file, const char *buf, int count)
 		 * Don't reset huptimer for
 		 * LCP packets. (Echo requests).
 		 */
-		if (copy_from_user(protobuf, buf, 4))
-			return -EFAULT;
+		if (copy_from_user(protobuf, buf, 4)) {
+			retval = -EFAULT;
+			goto out;
+		}
 		proto = PPP_PROTOCOL(protobuf);
 		if (proto != PPP_LCP)
 			lp->huptimer = 0;
 
-		if (lp->isdn_device < 0 || lp->isdn_channel < 0)
-			return 0;
-
+		if (lp->isdn_device < 0 || lp->isdn_channel < 0) {
+			retval = 0;
+			goto out;
+		}
 		if ((dev->drv[lp->isdn_device]->flags & DRV_FLAG_RUNNING) &&
 			lp->dialstate == 0 &&
 		    (lp->flags & ISDN_NET_CONNECTED)) {
@@ -767,13 +803,15 @@ isdn_ppp_write(int min, struct file *file, const char *buf, int count)
 			skb = alloc_skb(hl+count, GFP_ATOMIC);
 			if (!skb) {
 				printk(KERN_WARNING "isdn_ppp_write: out of memory!\n");
-				return count;
+				retval = count;
+				goto out;
 			}
 			skb_reserve(skb, hl);
 			if (copy_from_user(skb_put(skb, count), buf, count))
 			{
 				kfree_skb(skb);
-				return -EFAULT;
+				retval = -EFAULT;
+				goto out;
 			}
 			if (is->debug & 0x40) {
 				printk(KERN_DEBUG "ppp xmit: len %d\n", (int) skb->len);
@@ -785,7 +823,11 @@ isdn_ppp_write(int min, struct file *file, const char *buf, int count)
 			isdn_net_write_super(lp, skb);
 		}
 	}
-	return count;
+	retval = count;
+	
+ out:
+	unlock_kernel();
+	return retval;
 }
 
 /*

@@ -557,6 +557,10 @@ static int usb_hub_port_wait_reset(struct usb_device *hub, int port,
 		dbg("port %d, portstatus %x, change %x, %s", port + 1,
 			portstatus, portchange, portspeed (portstatus));
 
+		/* Device went away? */
+		if (!(portstatus & USB_PORT_STAT_CONNECTION))
+			return 1;
+
 		/* bomb out completely if something weird happened */
 		if ((portchange & USB_PORT_STAT_C_CONNECTION))
 			return -1;

@@ -82,11 +82,12 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	for (i = 0; i < ports; i++) {
 		temp = readl (&ehci->regs->port_status [i]);
 		if (temp & PORT_OWNER) {
-			// get disconnected ports back if no companion driver
-			if (temp & PORT_CONNECT)
-				continue;
-			temp &= ~(PORT_OWNER|PORT_CSC);
-			writel (temp, &ehci->regs->port_status [i]);
+			/* don't report this in GetPortStatus */
+			if (temp & PORT_CSC) {
+				temp &= ~PORT_CSC;
+				writel (temp, &ehci->regs->port_status [i]);
+			}
+			continue;
 		}
 		if (!(temp & PORT_CONNECT))
 			ehci->reset_done [i] = 0;

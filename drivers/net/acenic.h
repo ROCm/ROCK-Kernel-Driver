@@ -585,7 +585,7 @@ struct ace_info {
 
 struct ring_info {
 	struct sk_buff		*skb;
-	dma_addr_t		mapping;
+	DECLARE_PCI_UNMAP_ADDR(mapping)
 };
 
 
@@ -596,8 +596,8 @@ struct ring_info {
  */
 struct tx_ring_info {
 	struct sk_buff		*skb;
-	dma_addr_t		mapping;
-	int			maplen;
+	DECLARE_PCI_UNMAP_ADDR(mapping)
+	DECLARE_PCI_UNMAP_LEN(maplen)
 };
 
 

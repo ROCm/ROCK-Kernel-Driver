@@ -1,6 +1,6 @@
 /* Driver for USB Mass Storage compliant devices
  *
- * $Id: protocol.c,v 1.10 2001/07/30 00:27:59 mdharm Exp $
+ * $Id: protocol.c,v 1.11 2002/01/13 06:40:25 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -76,7 +76,7 @@ void fix_inquiry_data(Scsi_Cmnd *srb)
 		data_ptr = (unsigned char *)srb->request_buffer;
 
 	/* Change the SCSI revision number */
-	data_ptr[2] |= 0x2;
+	data_ptr[2] = (data_ptr[2] & ~7) | 2;
 }
 
 /***********************************************************************

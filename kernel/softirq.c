@@ -387,8 +387,7 @@ static int ksoftirqd(void * __bind_cpu)
 
 		while (softirq_pending(cpu)) {
 			do_softirq();
-			if (current->need_resched)
-				schedule();
+			cond_resched();
 		}
 
 		__set_current_state(TASK_INTERRUPTIBLE);

@@ -1266,10 +1266,15 @@ struct super_block *vfat_read_super(struct super_block *sb,void *data,
 	struct super_block *res;
   
 	MSDOS_SB(sb)->options.isvfat = 1;
-
 	res = fat_read_super(sb, data, silent, &vfat_dir_inode_operations);
-	if (res == NULL)
+	if (IS_ERR(res))
 		return NULL;
+	if (res == NULL) {
+		if (!silent)
+			printk(KERN_INFO "VFS: Can't find a valid"
+			       " VFAT filesystem on dev %s.\n", sb->s_id);
+		return NULL;
+	}
 
 	if (parse_options((char *) data, &(MSDOS_SB(sb)->options))) {
 		MSDOS_SB(sb)->options.dotsOK = 0;

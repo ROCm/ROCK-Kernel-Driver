@@ -20,10 +20,7 @@
 #include <linux/interrupt.h>
 #include <asm/mmu_context.h>
 
-#define BITMAP_SIZE ((MAX_PRIO+7)/8)
-#define PRIO_INTERACTIVE	(MAX_RT_PRIO + (MAX_PRIO - MAX_RT_PRIO) / 3)
-#define TASK_INTERACTIVE(p)	((p)->prio >= MAX_RT_PRIO && (p)->prio <= PRIO_INTERACTIVE)
-#define JSLEEP_TO_PRIO(t)	(((t) * 20) / HZ)
+#define BITMAP_SIZE ((((MAX_PRIO+7)/8)+sizeof(long)-1)/sizeof(long))
 
 typedef struct runqueue runqueue_t;
 
@@ -31,7 +28,7 @@ struct prio_array {
 	int nr_active;
 	spinlock_t *lock;
 	runqueue_t *rq;
-	char bitmap[BITMAP_SIZE];
+	unsigned long bitmap[BITMAP_SIZE];
 	list_t queue[MAX_PRIO];
 };
 
@@ -40,33 +37,36 @@ struct prio_array {
  *
  * Locking rule: those places that want to lock multiple runqueues
  * (such as the load balancing or the process migration code), lock
- * acquire operations must be ordered by rq->cpu.
+ * acquire operations must be ordered by the runqueue's cpu id.
  *
  * The RT event id is used to avoid calling into the the RT scheduler
  * if there is a RT task active in an SMP system but there is no
  * RT scheduling activity otherwise.
  */
-static struct runqueue {
-	int cpu;
+struct runqueue {
 	spinlock_t lock;
 	unsigned long nr_running, nr_switches;
 	task_t *curr, *idle;
 	prio_array_t *active, *expired, arrays[2];
-	char __pad [SMP_CACHE_BYTES];
-} runqueues [NR_CPUS] __cacheline_aligned;
+	int prev_nr_running[NR_CPUS];
+} ____cacheline_aligned;
 
-#define this_rq()		(runqueues + smp_processor_id())
-#define task_rq(p)		(runqueues + (p)->cpu)
+static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
+
 #define cpu_rq(cpu)		(runqueues + (cpu))
-#define cpu_curr(cpu)		(runqueues[(cpu)].curr)
+#define this_rq()		cpu_rq(smp_processor_id())
+#define task_rq(p)		cpu_rq((p)->cpu)
+#define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
+#define rq_cpu(rq)		((rq) - runqueues)
 #define rt_task(p)		((p)->policy != SCHED_OTHER)
+
 
 #define lock_task_rq(rq,p,flags)				\
 do {								\
 repeat_lock_task:						\
 	rq = task_rq(p);					\
 	spin_lock_irqsave(&rq->lock, flags);			\
-	if (unlikely((rq)->cpu != (p)->cpu)) {			\
+	if (unlikely(rq_cpu(rq) != (p)->cpu)) {			\
 		spin_unlock_irqrestore(&rq->lock, flags);	\
 		goto repeat_lock_task;				\
 	}							\
@@ -94,18 +94,56 @@ static inline void enqueue_task(struct task_struct *p, prio_array_t *array)
 	p->array = array;
 }
 
+/*
+ * A task is 'heavily interactive' if it has reached the
+ * bottom 25% of the SCHED_OTHER priority range - in this
+ * case we favor it by reinserting it on the active array,
+ * even after it expired its current timeslice.
+ *
+ * A task can get a priority bonus by being 'somewhat
+ * interactive' - and it will get a priority penalty for
+ * being a CPU hog.
+ *
+ * CPU-hog penalties cannot go more than 5 above the default
+ * priority level. Priority bonus cannot go below the minimum
+ * priority level.
+ */
+#define PRIO_INTERACTIVE (MAX_RT_PRIO + MAX_USER_PRIO/3)
+#define TASK_INTERACTIVE(p) ((p)->prio <= PRIO_INTERACTIVE)
+
+static inline int effective_prio(task_t *p)
+{
+	int bonus, prio;
+
+	/*
+	 * Here we scale the actual sleep average [0 .... MAX_SLEEP_AVG]
+	 * into the 20 ... -20 bonus/penalty range.
+	 */
+	bonus = MAX_USER_PRIO * p->sleep_avg / MAX_SLEEP_AVG - MAX_USER_PRIO/2;
+	prio = NICE_TO_PRIO(p->__nice) - bonus;
+	if (prio < MAX_RT_PRIO)
+		prio = MAX_RT_PRIO;
+	if (prio > MAX_PRIO-1)
+		prio = MAX_PRIO-1;
+	return prio;
+}
+
 static inline void activate_task(task_t *p, runqueue_t *rq)
 {
 	prio_array_t *array = rq->active;
 
 	if (!rt_task(p)) {
-		unsigned long prio_bonus = JSLEEP_TO_PRIO(jiffies - p->sleep_jtime);
-
-		if (prio_bonus > MAX_PRIO)
-			prio_bonus = MAX_PRIO;
-		p->prio -= prio_bonus;
-		if (p->prio < MAX_RT_PRIO)
-			p->prio = MAX_RT_PRIO;
+		/*
+		 * This code gives a bonus to interactive tasks. We update
+		 * an 'average sleep time' value here, based on
+		 * sleep_timestamp. The more time a task spends sleeping,
+		 * the higher the average gets - and the higher the priority
+		 * boost gets as well.
+		 */
+		p->sleep_avg += jiffies - p->sleep_timestamp;
+		if (p->sleep_avg > MAX_SLEEP_AVG)
+			p->sleep_avg = MAX_SLEEP_AVG;
+		p->prio = effective_prio(p);
 	}
 	enqueue_task(p, array);
 	rq->nr_running++;
@@ -116,7 +154,7 @@ static inline void deactivate_task(struct task_struct *p, runqueue_t *rq)
 	rq->nr_running--;
 	dequeue_task(p, p->array);
 	p->array = NULL;
-	p->sleep_jtime = jiffies;
+	p->sleep_timestamp = jiffies;
 }
 
 static inline void resched_task(task_t *p)
@@ -206,13 +244,13 @@ void wake_up_forked_process(task_t * p)
 {
 	runqueue_t *rq = this_rq();
 
-	spin_lock_irq(&rq->lock);
 	p->state = TASK_RUNNING;
 	if (!rt_task(p)) {
 		p->prio += MAX_USER_PRIO/10;
 		if (p->prio > MAX_PRIO-1)
 			p->prio = MAX_PRIO-1;
 	}
+	spin_lock_irq(&rq->lock);
 	activate_task(p, rq);
 	spin_unlock_irq(&rq->lock);
 }
@@ -287,59 +325,98 @@ static inline unsigned long max_rq_len(void)
 }
 
 /*
- * Current runqueue is empty, try to find work on
- * other runqueues.
+ * Current runqueue is empty, or rebalance tick: if there is an
+ * inbalance (current runqueue is too short) then pull from
+ * busiest runqueue(s).
  *
  * We call this with the current runqueue locked,
  * irqs disabled.
  */
-static void load_balance(runqueue_t *this_rq)
+static void load_balance(runqueue_t *this_rq, int idle)
 {
-	int nr_tasks, load, prev_max_load, max_load, idx, i;
+	int imbalance, nr_running, load, prev_max_load,
+		max_load, idx, i, this_cpu = smp_processor_id();
 	task_t *next = this_rq->idle, *tmp;
-	runqueue_t *busiest, *rq_tmp;
+	runqueue_t *busiest, *rq_src;
 	prio_array_t *array;
 	list_t *head, *curr;
 
-	prev_max_load = max_rq_len();
-	nr_tasks = prev_max_load - this_rq->nr_running;
-	/*
-	 * It needs an at least ~10% imbalance to trigger balancing:
-	 */
-	if (nr_tasks <= 1 + prev_max_load/8)
-		return;
-	prev_max_load++;
-
-repeat_search:
 	/*
 	 * We search all runqueues to find the most busy one.
 	 * We do this lockless to reduce cache-bouncing overhead,
-	 * we re-check the source CPU with the lock held.
+	 * we re-check the 'best' source CPU later on again, with
+	 * the lock held.
+	 *
+	 * We fend off statistical fluctuations in runqueue lengths by
+	 * saving the runqueue length during the previous load-balancing
+	 * operation and using the smaller one the current and saved lengths.
+	 * If a runqueue is long enough for a longer amount of time then
+	 * we recognize it and pull tasks from it.
+	 *
+	 * The 'current runqueue length' is a statistical maximum variable,
+	 * for that one we take the longer one - to avoid fluctuations in
+	 * the other direction. So for a load-balance to happen it needs
+	 * stable long runqueue on the target CPU and stable short runqueue
+	 * on the local runqueue.
+	 *
+	 * We make an exception if this CPU is about to become idle - in
+	 * that case we are less picky about moving a task across CPUs and
+	 * take what can be taken.
 	 */
+	if (idle || (this_rq->nr_running > this_rq->prev_nr_running[this_cpu]))
+		nr_running = this_rq->nr_running;
+	else
+		nr_running = this_rq->prev_nr_running[this_cpu];
+	prev_max_load = 1000000000;
+
 	busiest = NULL;
 	max_load = 0;
 	for (i = 0; i < smp_num_cpus; i++) {
-		rq_tmp = cpu_rq(i);
-		load = rq_tmp->nr_running;
+		rq_src = cpu_rq(i);
+		if (idle || (rq_src->nr_running < this_rq->prev_nr_running[i]))
+			load = rq_src->nr_running;
+		else
+			load = this_rq->prev_nr_running[i];
+		this_rq->prev_nr_running[i] = rq_src->nr_running;
+
 		if ((load > max_load) && (load < prev_max_load) &&
-						(rq_tmp != this_rq)) {
-			busiest = rq_tmp;
+						(rq_src != this_rq)) {
+			busiest = rq_src;
 			max_load = load;
 		}
 	}
 
 	if (likely(!busiest))
 		return;
-	if (max_load <= this_rq->nr_running)
+
+	imbalance = (max_load - nr_running) / 2;
+
+	/*
+	 * It needs an at least ~25% imbalance to trigger balancing.
+	 *
+	 * prev_max_load makes sure that we do not try to balance
+	 * ad infinitum - certain tasks might be impossible to be
+	 * pulled into this runqueue.
+	 */
+	if (!idle && (imbalance < (max_load + 3)/4))
 		return;
 	prev_max_load = max_load;
-	if (busiest->cpu < this_rq->cpu) {
+
+	/*
+	 * Ok, lets do some actual balancing:
+	 */
+
+	if (rq_cpu(busiest) < this_cpu) {
 		spin_unlock(&this_rq->lock);
 		spin_lock(&busiest->lock);
 		spin_lock(&this_rq->lock);
 	} else
 		spin_lock(&busiest->lock);
-	if (busiest->nr_running <= this_rq->nr_running + 1)
+	/*
+	 * Make sure nothing changed since we checked the
+	 * runqueue length.
+	 */
+	if (busiest->nr_running <= nr_running + 1)
 		goto out_unlock;
 
 	/*
@@ -365,15 +442,14 @@ skip_bitmap:
 			array = busiest->active;
 			goto new_array;
 		}
-		spin_unlock(&busiest->lock);
-		goto repeat_search;
+		goto out_unlock;
 	}
 
 	head = array->queue + idx;
 	curr = head->next;
 skip_queue:
 	tmp = list_entry(curr, task_t, run_list);
-	if ((tmp == busiest->curr) || !(tmp->cpus_allowed & (1 << smp_processor_id()))) {
+	if ((tmp == busiest->curr) || !(tmp->cpus_allowed & (1 << this_cpu))) {
 		curr = curr->next;
 		if (curr != head)
 			goto skip_queue;
@@ -387,64 +463,96 @@ skip_queue:
 	 */
 	dequeue_task(next, array);
 	busiest->nr_running--;
-	next->cpu = smp_processor_id();
+	next->cpu = this_cpu;
 	this_rq->nr_running++;
 	enqueue_task(next, this_rq->active);
 	if (next->prio < current->prio)
 		current->need_resched = 1;
-	if (--nr_tasks) {
+	if (!idle && --imbalance) {
 		if (array == busiest->expired) {
 			array = busiest->active;
 			goto new_array;
 		}
-		spin_unlock(&busiest->lock);
-		goto repeat_search;
 	}
 out_unlock:
 	spin_unlock(&busiest->lock);
 }
 
-/* Rebalance every 250 msecs */
-#define REBALANCE_TICK (HZ/4)
+/*
+ * One of the idle_cpu_tick() or the busy_cpu_tick() function will
+ * gets called every timer tick, on every CPU. Our balancing action
+ * frequency and balancing agressivity depends on whether the CPU is
+ * idle or not.
+ *
+ * busy-rebalance every 250 msecs. idle-rebalance every 1 msec. (or on
+ * systems with HZ=100, every 10 msecs.)
+ */
+#define BUSY_REBALANCE_TICK (HZ/4 ?: 1)
+#define IDLE_REBALANCE_TICK (HZ/1000 ?: 1)
 
-void idle_tick(void)
+static inline void idle_tick(void)
 {
-	unsigned long flags;
-
-	if (!(jiffies % REBALANCE_TICK) && likely(this_rq()->curr != NULL)) {
-		spin_lock_irqsave(&this_rq()->lock, flags);
-		load_balance(this_rq());
-		spin_unlock_irqrestore(&this_rq()->lock, flags);
-	}
+	if ((jiffies % IDLE_REBALANCE_TICK) ||
+			likely(this_rq()->curr == NULL))
+		return;
+	spin_lock(&this_rq()->lock);
+	load_balance(this_rq(), 1);
+	spin_unlock(&this_rq()->lock);
 }
 
-void expire_task(task_t *p)
+/*
+ * This function gets called by the timer code, with HZ frequency.
+ * We call it with interrupts disabled.
+ */
+void scheduler_tick(task_t *p)
 {
+	unsigned long now = jiffies;
 	runqueue_t *rq = this_rq();
-	unsigned long flags;
 
+	if (p == rq->idle || !rq->idle)
+		return idle_tick();
+	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
 		p->need_resched = 1;
 		return;
 	}
-	/*
-	 * The task cannot change CPUs because it's the current task.
-	 */
-	spin_lock_irqsave(&rq->lock, flags);
-	if ((p->policy != SCHED_FIFO) && !--p->time_slice) {
-		prio_array_t *array = rq->active;
-		p->need_resched = 1;
-		dequeue_task(p, rq->active);
-		if (!rt_task(p)) {
-			if (++p->prio >= MAX_PRIO)
-				p->prio = MAX_PRIO - 1;
-			if (!TASK_INTERACTIVE(p))
-				array = rq->expired;
+	spin_lock(&rq->lock);
+	if (unlikely(rt_task(p))) {
+		/*
+		 * RR tasks need a special form of timeslice management.
+		 * FIFO tasks have no timeslices.
+		 */
+		if ((p->policy == SCHED_RR) && !--p->time_slice) {
+			p->time_slice = NICE_TO_TIMESLICE(p->__nice);
+			p->need_resched = 1;
+
+			/* put it at the end of the queue: */
+			dequeue_task(p, rq->active);
+			enqueue_task(p, rq->active);
 		}
-		enqueue_task(p, array);
-		p->time_slice = NICE_TO_TIMESLICE(p->__nice);
+		goto out;
 	}
-	spin_unlock_irqrestore(&rq->lock, flags);
+	/*
+	 * The task was running during this tick - update the
+	 * time slice counter and the sleep average. Note: we
+	 * do not update a process's priority until it either
+	 * goes to sleep or uses up its timeslice. This makes
+	 * it possible for interactive tasks to use up their
+	 * timeslices at their high priority levels.
+	 */
+	if (p->sleep_avg)
+		p->sleep_avg--;
+	if (!--p->time_slice) {
+		dequeue_task(p, rq->active);
+		p->need_resched = 1;
+		p->prio = effective_prio(p);
+		p->time_slice = NICE_TO_TIMESLICE(p->__nice);
+		enqueue_task(p, TASK_INTERACTIVE(p) ? rq->active : rq->expired);
+	}
+out:
+	if (!(now % BUSY_REBALANCE_TICK))
+		load_balance(rq, 0);
+	spin_unlock(&rq->lock);
 }
 
 void scheduling_functions_start_here(void) { }
@@ -469,18 +577,18 @@ need_resched_back:
 	spin_lock_irq(&rq->lock);
 
 	switch (prev->state) {
-	case TASK_INTERRUPTIBLE:
-		if (unlikely(signal_pending(prev))) {
-			prev->state = TASK_RUNNING;
-			break;
-		}
-	default:
-		deactivate_task(prev, rq);
-	case TASK_RUNNING:
+		case TASK_INTERRUPTIBLE:
+			if (unlikely(signal_pending(prev))) {
+				prev->state = TASK_RUNNING;
+				break;
+			}
+		default:
+			deactivate_task(prev, rq);
+		case TASK_RUNNING:
 	}
 pick_next_task:
 	if (unlikely(!rq->nr_running)) {
-		load_balance(rq);
+		load_balance(rq, 1);
 		if (rq->nr_running)
 			goto pick_next_task;
 		next = rq->idle;
@@ -520,7 +628,7 @@ switch_tasks:
 	spin_unlock_irq(&rq->lock);
 
 	reacquire_kernel_lock(current);
-	if (unlikely(current->need_resched))
+	if (need_resched())
 		goto need_resched_back;
 	return;
 }
@@ -1015,7 +1123,7 @@ asmlinkage long sys_sched_rr_get_interval(pid_t pid, struct timespec *interval)
 	p = find_process_by_pid(pid);
 	if (p)
 		jiffies_to_timespec(p->policy & SCHED_FIFO ?
-					 0 : NICE_TO_TIMESLICE(p->__nice), &t);
+					 0 : NICE_TO_TIMESLICE(p->prio), &t);
 	read_unlock(&tasklist_lock);
 	if (p)
 		retval = copy_to_user(interval, &t, sizeof(t)) ? -EFAULT : 0;
@@ -1123,7 +1231,7 @@ static inline void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
 	if (rq1 == rq2)
 		spin_lock(&rq1->lock);
 	else {
-		if (rq1->cpu < rq2->cpu) {
+		if (rq_cpu(rq1) < rq_cpu(rq2)) {
 			spin_lock(&rq1->lock);
 			spin_lock(&rq2->lock);
 		} else {
@@ -1152,7 +1260,7 @@ void __init init_idle(void)
 	this_rq->curr = this_rq->idle = current;
 	deactivate_task(current, rq);
 	current->array = NULL;
-	current->prio = MAX_PRIO;
+	current->prio = MAX_PRIO-1;
 	current->state = TASK_RUNNING;
 	clear_bit(smp_processor_id(), &wait_init_idle);
 	double_rq_unlock(this_rq, rq);
@@ -1181,17 +1289,17 @@ void __init sched_init(void)
 		rq->active = rq->arrays + 0;
 		rq->expired = rq->arrays + 1;
 		spin_lock_init(&rq->lock);
-		rq->cpu = i;
 
 		for (j = 0; j < 2; j++) {
 			array = rq->arrays + j;
 			array->rq = rq;
 			array->lock = &rq->lock;
-			for (k = 0; k < MAX_PRIO; k++)
+			for (k = 0; k < MAX_PRIO; k++) {
 				INIT_LIST_HEAD(array->queue + k);
-			memset(array->bitmap, 0xff, BITMAP_SIZE);
+				__set_bit(k, array->bitmap);
+			}
 			// zero delimiter for bitsearch
-			clear_bit(MAX_PRIO, array->bitmap);
+			__clear_bit(MAX_PRIO, array->bitmap);
 		}
 	}
 	/*
@@ -1202,9 +1310,6 @@ void __init sched_init(void)
 	rq->curr = current;
 	rq->idle = NULL;
 	wake_up_process(current);
-
-	for (i = 0; i < PIDHASH_SZ; i++)
-		pidhash[i] = NULL;
 
 	init_timervecs();
 	init_bh(TIMER_BH, timer_bh);

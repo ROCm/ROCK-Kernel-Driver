@@ -90,9 +90,9 @@ extern inline struct request *elv_next_request(request_queue_t *q)
 
 #define _elv_add_request(q, rq, back, p) do {				      \
 	if ((back))							      \
-		_elv_add_request_core((q), (rq), (q)->queue_head.prev, (p)); \
+		_elv_add_request_core((q), (rq), (q)->queue_head.prev, (p));  \
 	else								      \
-		_elv_add_request_core((q), (rq), &(q)->queue_head, 0);	      \
+		_elv_add_request_core((q), (rq), &(q)->queue_head, (p));      \
 } while (0)
 
 #define elv_add_request(q, rq, back) _elv_add_request((q), (rq), (back), 1)

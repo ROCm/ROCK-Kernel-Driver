@@ -2147,8 +2147,7 @@ static void fetch_frame(void *data)
 			/* loop until image ready */
 			do_command(cam, CPIA_COMMAND_GetCameraStatus,0,0,0,0);
 			while (cam->params.status.streamState != STREAM_READY) {
-				if (current->need_resched)
-					schedule();
+				cond_resched();
 
 				current->state = TASK_INTERRUPTIBLE;
 
@@ -2163,8 +2162,7 @@ static void fetch_frame(void *data)
 		}
 
 		/* grab image from camera */
-		if (current->need_resched)
-			schedule();
+		cond_resched();
 
 		oldjif = jiffies;
 		image_size = cam->ops->streamRead(cam->lowlevel_data,
@@ -2189,8 +2187,7 @@ static void fetch_frame(void *data)
 		/* decompress and convert image to by copying it from
 		 * raw_image to decompressed_frame
 		 */
-		if (current->need_resched)
-			schedule();
+		cond_resched();
 
 		cam->image_size = parse_picture(cam, image_size);
 		if (cam->image_size <= 0)

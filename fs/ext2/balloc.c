@@ -42,19 +42,20 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 	unsigned long group_desc;
 	unsigned long desc;
 	struct ext2_group_desc * gdp;
+	struct ext2_sb_info *sbi = &sb->u.ext2_sb;
 
-	if (block_group >= sb->u.ext2_sb.s_groups_count) {
+	if (block_group >= sbi->s_groups_count) {
 		ext2_error (sb, "ext2_get_group_desc",
 			    "block_group >= groups_count - "
 			    "block_group = %d, groups_count = %lu",
-			    block_group, sb->u.ext2_sb.s_groups_count);
+			    block_group, sbi->s_groups_count);
 
 		return NULL;
 	}
 	
 	group_desc = block_group / EXT2_DESC_PER_BLOCK(sb);
 	desc = block_group % EXT2_DESC_PER_BLOCK(sb);
-	if (!sb->u.ext2_sb.s_group_desc[group_desc]) {
+	if (!sbi->s_group_desc[group_desc]) {
 		ext2_error (sb, "ext2_get_group_desc",
 			    "Group descriptor not loaded - "
 			    "block_group = %d, group_desc = %lu, desc = %lu",
@@ -62,10 +63,9 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 		return NULL;
 	}
 	
-	gdp = (struct ext2_group_desc *) 
-	      sb->u.ext2_sb.s_group_desc[group_desc]->b_data;
+	gdp = (struct ext2_group_desc *) sbi->s_group_desc[group_desc]->b_data;
 	if (bh)
-		*bh = sb->u.ext2_sb.s_group_desc[group_desc];
+		*bh = sbi->s_group_desc[group_desc];
 	return gdp + desc;
 }
 
@@ -73,37 +73,26 @@ struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
  * Read the bitmap for a given block_group, reading into the specified 
  * slot in the superblock's bitmap cache.
  *
- * Return >=0 on success or a -ve error code.
+ * Return buffer_head on success or NULL in case of failure.
  */
 
-static int read_block_bitmap (struct super_block * sb,
-			       unsigned int block_group,
-			       unsigned long bitmap_nr)
+static struct buffer_head *read_block_bitmap(struct super_block *sb,
+						unsigned int block_group)
 {
 	struct ext2_group_desc * gdp;
 	struct buffer_head * bh = NULL;
-	int retval = -EIO;
 	
 	gdp = ext2_get_group_desc (sb, block_group, NULL);
 	if (!gdp)
 		goto error_out;
-	retval = 0;
 	bh = sb_bread(sb, le32_to_cpu(gdp->bg_block_bitmap));
-	if (!bh) {
+	if (!bh)
 		ext2_error (sb, "read_block_bitmap",
 			    "Cannot read block bitmap - "
 			    "block_group = %d, block_bitmap = %lu",
 			    block_group, (unsigned long) gdp->bg_block_bitmap);
-		retval = -EIO;
-	}
-	/*
-	 * On IO error, just leave a zero in the superblock's block pointer for
-	 * this group.  The IO will be retried next time.
-	 */
 error_out:
-	sb->u.ext2_sb.s_block_bitmap_number[bitmap_nr] = block_group;
-	sb->u.ext2_sb.s_block_bitmap[bitmap_nr] = bh;
-	return retval;
+	return bh;
 }
 
 /*
@@ -117,134 +106,65 @@ error_out:
  * 2/ If the file system contains less than EXT2_MAX_GROUP_LOADED groups,
  *    this function reads the bitmap without maintaining a LRU cache.
  * 
- * Return the slot used to store the bitmap, or a -ve error code.
+ * Return the buffer_head of the bitmap or ERR_PTR(-ve).
  */
-static int __load_block_bitmap (struct super_block * sb,
-			        unsigned int block_group)
+static struct buffer_head *load_block_bitmap(struct super_block * sb,
+						unsigned int block_group)
 {
-	int i, j, retval = 0;
-	unsigned long block_bitmap_number;
-	struct buffer_head * block_bitmap;
+	struct ext2_sb_info *sbi = &sb->u.ext2_sb;
+	int i, slot = 0;
+	struct buffer_head *bh = sbi->s_block_bitmap[0];
 
-	if (block_group >= sb->u.ext2_sb.s_groups_count)
+	if (block_group >= sbi->s_groups_count)
 		ext2_panic (sb, "load_block_bitmap",
 			    "block_group >= groups_count - "
 			    "block_group = %d, groups_count = %lu",
-			    block_group, sb->u.ext2_sb.s_groups_count);
-
-	if (sb->u.ext2_sb.s_groups_count <= EXT2_MAX_GROUP_LOADED) {
-		if (sb->u.ext2_sb.s_block_bitmap[block_group]) {
-			if (sb->u.ext2_sb.s_block_bitmap_number[block_group] ==
-			    block_group)
-				return block_group;
-			ext2_error (sb, "__load_block_bitmap",
-				    "block_group != block_bitmap_number");
-		}
-		retval = read_block_bitmap (sb, block_group, block_group);
-		if (retval < 0)
-			return retval;
-		return block_group;
-	}
-
-	for (i = 0; i < sb->u.ext2_sb.s_loaded_block_bitmaps &&
-		    sb->u.ext2_sb.s_block_bitmap_number[i] != block_group; i++)
-		;
-	if (i < sb->u.ext2_sb.s_loaded_block_bitmaps &&
-  	    sb->u.ext2_sb.s_block_bitmap_number[i] == block_group) {
-		block_bitmap_number = sb->u.ext2_sb.s_block_bitmap_number[i];
-		block_bitmap = sb->u.ext2_sb.s_block_bitmap[i];
-		for (j = i; j > 0; j--) {
-			sb->u.ext2_sb.s_block_bitmap_number[j] =
-				sb->u.ext2_sb.s_block_bitmap_number[j - 1];
-			sb->u.ext2_sb.s_block_bitmap[j] =
-				sb->u.ext2_sb.s_block_bitmap[j - 1];
-		}
-		sb->u.ext2_sb.s_block_bitmap_number[0] = block_bitmap_number;
-		sb->u.ext2_sb.s_block_bitmap[0] = block_bitmap;
-
-		/*
-		 * There's still one special case here --- if block_bitmap == 0
-		 * then our last attempt to read the bitmap failed and we have
-		 * just ended up caching that failure.  Try again to read it.
-		 */
-		if (!block_bitmap)
-			retval = read_block_bitmap (sb, block_group, 0);
-	} else {
-		if (sb->u.ext2_sb.s_loaded_block_bitmaps < EXT2_MAX_GROUP_LOADED)
-			sb->u.ext2_sb.s_loaded_block_bitmaps++;
-		else
-			brelse (sb->u.ext2_sb.s_block_bitmap[EXT2_MAX_GROUP_LOADED - 1]);
-		for (j = sb->u.ext2_sb.s_loaded_block_bitmaps - 1; j > 0; j--) {
-			sb->u.ext2_sb.s_block_bitmap_number[j] =
-				sb->u.ext2_sb.s_block_bitmap_number[j - 1];
-			sb->u.ext2_sb.s_block_bitmap[j] =
-				sb->u.ext2_sb.s_block_bitmap[j - 1];
-		}
-		retval = read_block_bitmap (sb, block_group, 0);
-	}
-	return retval;
-}
-
-/*
- * Load the block bitmap for a given block group.  First of all do a couple
- * of fast lookups for common cases and then pass the request onto the guts
- * of the bitmap loader.
- *
- * Return the slot number of the group in the superblock bitmap cache's on
- * success, or a -ve error code.
- *
- * There is still one inconsistency here --- if the number of groups in this
- * filesystems is <= EXT2_MAX_GROUP_LOADED, then we have no way of 
- * differentiating between a group for which we have never performed a bitmap
- * IO request, and a group for which the last bitmap read request failed.
- */
-static inline int load_block_bitmap (struct super_block * sb,
-				     unsigned int block_group)
-{
-	int slot;
+			    block_group, sbi->s_groups_count);
 	
 	/*
 	 * Do the lookup for the slot.  First of all, check if we're asking
 	 * for the same slot as last time, and did we succeed that last time?
 	 */
-	if (sb->u.ext2_sb.s_loaded_block_bitmaps > 0 &&
-	    sb->u.ext2_sb.s_block_bitmap_number[0] == block_group &&
-	    sb->u.ext2_sb.s_block_bitmap[0]) {
-		return 0;
-	}
-	/*
-	 * Or can we do a fast lookup based on a loaded group on a filesystem
-	 * small enough to be mapped directly into the superblock?
-	 */
-	else if (sb->u.ext2_sb.s_groups_count <= EXT2_MAX_GROUP_LOADED && 
-		 sb->u.ext2_sb.s_block_bitmap_number[block_group] == block_group &&
-		 sb->u.ext2_sb.s_block_bitmap[block_group]) {
+	if (sbi->s_loaded_block_bitmaps > 0 &&
+	    sbi->s_block_bitmap_number[0] == block_group && bh)
+		goto found;
+
+	if (sbi->s_groups_count <= EXT2_MAX_GROUP_LOADED) {
 		slot = block_group;
-	}
-	/*
-	 * If not, then do a full lookup for this block group.
-	 */
-	else {
-		slot = __load_block_bitmap (sb, block_group);
+		bh = sbi->s_block_bitmap[slot];
+		if (!bh)
+			goto read_it;
+		if (sbi->s_block_bitmap_number[slot] == slot)
+			goto found;
+		ext2_panic (sb, "__load_block_bitmap",
+			    "block_group != block_bitmap_number");
 	}
 
-	/*
-	 * <0 means we just got an error
-	 */
-	if (slot < 0)
-		return slot;
-	
-	/*
-	 * If it's a valid slot, we may still have cached a previous IO error,
-	 * in which case the bh in the superblock cache will be zero.
-	 */
-	if (!sb->u.ext2_sb.s_block_bitmap[slot])
-		return -EIO;
-	
-	/*
-	 * Must have been read in OK to get this far.
-	 */
-	return slot;
+	bh = NULL;
+	for (i = 0; i < sbi->s_loaded_block_bitmaps &&
+		    sbi->s_block_bitmap_number[i] != block_group; i++)
+		;
+	if (i < sbi->s_loaded_block_bitmaps)
+		bh = sbi->s_block_bitmap[i];
+	else if (sbi->s_loaded_block_bitmaps < EXT2_MAX_GROUP_LOADED)
+		sbi->s_loaded_block_bitmaps++;
+	else
+		brelse (sbi->s_block_bitmap[--i]);
+
+	while (i--) {
+		sbi->s_block_bitmap_number[i+1] = sbi->s_block_bitmap_number[i];
+		sbi->s_block_bitmap[i+1] = sbi->s_block_bitmap[i];
+	}
+
+read_it:
+	if (!bh)
+		bh = read_block_bitmap(sb, block_group);
+	sbi->s_block_bitmap_number[slot] = block_group;
+	sbi->s_block_bitmap[slot] = bh;
+	if (!bh)
+		return ERR_PTR(-EIO);
+found:
+	return bh;
 }
 
 /* Free given blocks, update quota and i_blocks field */
@@ -256,7 +176,6 @@ void ext2_free_blocks (struct inode * inode, unsigned long block,
 	unsigned long block_group;
 	unsigned long bit;
 	unsigned long i;
-	int bitmap_nr;
 	unsigned long overflow;
 	struct super_block * sb;
 	struct ext2_group_desc * gdp;
@@ -293,11 +212,10 @@ do_more:
 		overflow = bit + count - EXT2_BLOCKS_PER_GROUP(sb);
 		count -= overflow;
 	}
-	bitmap_nr = load_block_bitmap (sb, block_group);
-	if (bitmap_nr < 0)
+	bh = load_block_bitmap (sb, block_group);
+	if (IS_ERR(bh))
 		goto error_return;
 	
-	bh = sb->u.ext2_sb.s_block_bitmap[bitmap_nr];
 	gdp = ext2_get_group_desc (sb, block_group, &bh2);
 	if (!gdp)
 		goto error_return;
@@ -361,7 +279,6 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 	struct buffer_head * bh2;
 	char * p, * r;
 	int i, j, k, tmp;
-	int bitmap_nr;
 	struct super_block * sb;
 	struct ext2_group_desc * gdp;
 	struct ext2_super_block * es;
@@ -404,12 +321,10 @@ repeat:
 		if (j)
 			goal_attempts++;
 #endif
-		bitmap_nr = load_block_bitmap (sb, i);
-		if (bitmap_nr < 0)
+		bh = load_block_bitmap (sb, i);
+		if (IS_ERR(bh))
 			goto io_error;
 		
-		bh = sb->u.ext2_sb.s_block_bitmap[bitmap_nr];
-
 		ext2_debug ("goal is at %d:%d.\n", i, j);
 
 		if (!ext2_test_bit(j, bh->b_data)) {
@@ -477,11 +392,10 @@ repeat:
 	}
 	if (k >= sb->u.ext2_sb.s_groups_count)
 		goto out;
-	bitmap_nr = load_block_bitmap (sb, i);
-	if (bitmap_nr < 0)
+	bh = load_block_bitmap (sb, i);
+	if (IS_ERR(bh))
 		goto io_error;
 	
-	bh = sb->u.ext2_sb.s_block_bitmap[bitmap_nr];
 	r = memscan(bh->b_data, 0, EXT2_BLOCKS_PER_GROUP(sb) >> 3);
 	j = (r - bh->b_data) << 3;
 	if (j < EXT2_BLOCKS_PER_GROUP(sb))
@@ -619,7 +533,6 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 #ifdef EXT2FS_DEBUG
 	struct ext2_super_block * es;
 	unsigned long desc_count, bitmap_count, x;
-	int bitmap_nr;
 	struct ext2_group_desc * gdp;
 	int i;
 	
@@ -629,16 +542,16 @@ unsigned long ext2_count_free_blocks (struct super_block * sb)
 	bitmap_count = 0;
 	gdp = NULL;
 	for (i = 0; i < sb->u.ext2_sb.s_groups_count; i++) {
+		struct buffer_head *bh;
 		gdp = ext2_get_group_desc (sb, i, NULL);
 		if (!gdp)
 			continue;
 		desc_count += le16_to_cpu(gdp->bg_free_blocks_count);
-		bitmap_nr = load_block_bitmap (sb, i);
-		if (bitmap_nr < 0)
+		bh = load_block_bitmap (sb, i);
+		if (IS_ERR(bh))
 			continue;
 		
-		x = ext2_count_free (sb->u.ext2_sb.s_block_bitmap[bitmap_nr],
-				     sb->s_blocksize);
+		x = ext2_count_free (bh, sb->s_blocksize);
 		printk ("group %d: stored = %d, counted = %lu\n",
 			i, le16_to_cpu(gdp->bg_free_blocks_count), x);
 		bitmap_count += x;
@@ -720,7 +633,6 @@ void ext2_check_blocks_bitmap (struct super_block * sb)
 	struct ext2_super_block * es;
 	unsigned long desc_count, bitmap_count, x, j;
 	unsigned long desc_blocks;
-	int bitmap_nr;
 	struct ext2_group_desc * gdp;
 	int i;
 
@@ -733,11 +645,9 @@ void ext2_check_blocks_bitmap (struct super_block * sb)
 		if (!gdp)
 			continue;
 		desc_count += le16_to_cpu(gdp->bg_free_blocks_count);
-		bitmap_nr = load_block_bitmap (sb, i);
-		if (bitmap_nr < 0)
+		bh = load_block_bitmap (sb, i);
+		if (IS_ERR(bh))
 			continue;
-
-		bh = EXT2_SB(sb)->s_block_bitmap[bitmap_nr];
 
 		if (ext2_bg_has_super(sb, i) && !ext2_test_bit(0, bh->b_data))
 			ext2_error(sb, __FUNCTION__,

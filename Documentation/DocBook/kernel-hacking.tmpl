@@ -371,8 +371,7 @@ if (signal_pending())
   </para>
 
   <programlisting>
-if (current-&gt;need_resched)
-        schedule(); /* Will sleep */ 
+cond_resched(); /* Will sleep */ 
   </programlisting>
 
   <para>

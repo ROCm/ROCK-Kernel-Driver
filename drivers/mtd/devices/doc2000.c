@@ -97,7 +97,7 @@ static int _DoC_WaitReady(struct DiskOnChip *doc)
 			DEBUG(MTD_DEBUG_LEVEL2, "_DoC_WaitReady timed out.\n");
 			return -EIO;
 		}
-		if (current->need_resched) {
+		if (need_resched()) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(1);
 		}

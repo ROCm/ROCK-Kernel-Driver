@@ -3458,8 +3458,7 @@ recheck:
 		 * about not overloading the IO subsystem. (things like an
 		 * e2fsck being done on the RAID array should execute fast)
 		 */
-		if (current->need_resched)
-			schedule();
+		cond_resched();
 
 		currspeed = (j-mddev->resync_mark_cnt)/2/((jiffies-mddev->resync_mark)/HZ +1) +1;
 

@@ -123,12 +123,10 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
  */
 static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
 {
-	if (rq_data_dir(rq) == READ)
-		goto good_command;
-	if (rq_data_dir(rq) == WRITE)
+	if (rq->flags & REQ_CMD)
 		goto good_command;
 
-	printk(KERN_ERR "%s: bad command: %lx\n", drive->name, rq->flags);
+	blk_dump_rq_flags(rq, "do_rw_disk, bad command");
 	ide_end_request(0, HWGROUP(drive));
 	return ide_stopped;
 
@@ -179,8 +177,10 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 	struct hd_drive_task_hdr	taskfile;
 	struct hd_drive_hob_hdr		hobfile;
 	ide_task_t			args;
+	int				sectors;
 
 	task_ioreg_t command	= get_command(drive, rq_data_dir(rq));
+
 	unsigned int track	= (block / drive->sect);
 	unsigned int sect	= (block % drive->sect) + 1;
 	unsigned int head	= (track % drive->head);
@@ -189,7 +189,16 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 	memset(&taskfile, 0, sizeof(task_struct_t));
 	memset(&hobfile, 0, sizeof(hob_struct_t));
 
-	taskfile.sector_count	= (rq->nr_sectors==256)?0x00:rq->nr_sectors;
+	sectors = rq->nr_sectors;
+	if (sectors == 256)
+		sectors = 0;
+	if (command == WIN_MULTWRITE_EXT || command == WIN_MULTWRITE) {
+		sectors = drive->mult_count;
+		if (sectors > rq->current_nr_sectors)
+			sectors = rq->current_nr_sectors;
+	}
+
+	taskfile.sector_count	= sectors;
 	taskfile.sector_number	= sect;
 	taskfile.low_cylinder	= cyl;
 	taskfile.high_cylinder	= (cyl>>8);
@@ -225,13 +234,23 @@ static ide_startstop_t lba_28_rw_disk (ide_drive_t *drive, struct request *rq, u
 	struct hd_drive_task_hdr	taskfile;
 	struct hd_drive_hob_hdr		hobfile;
 	ide_task_t			args;
+	int				sectors;
 
 	task_ioreg_t command	= get_command(drive, rq_data_dir(rq));
+
+	sectors = rq->nr_sectors;
+	if (sectors == 256)
+		sectors = 0;
+	if (command == WIN_MULTWRITE_EXT || command == WIN_MULTWRITE) {
+		sectors = drive->mult_count;
+		if (sectors > rq->current_nr_sectors)
+			sectors = rq->current_nr_sectors;
+	}
 
 	memset(&taskfile, 0, sizeof(task_struct_t));
 	memset(&hobfile, 0, sizeof(hob_struct_t));
 
-	taskfile.sector_count	= (rq->nr_sectors==256)?0x00:rq->nr_sectors;
+	taskfile.sector_count	= sectors;
 	taskfile.sector_number	= block;
 	taskfile.low_cylinder	= (block>>=8);
 	taskfile.high_cylinder	= (block>>=8);
@@ -273,14 +292,24 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 	struct hd_drive_task_hdr	taskfile;
 	struct hd_drive_hob_hdr		hobfile;
 	ide_task_t			args;
+	int				sectors;
 
 	task_ioreg_t command	= get_command(drive, rq_data_dir(rq));
 
 	memset(&taskfile, 0, sizeof(task_struct_t));
 	memset(&hobfile, 0, sizeof(hob_struct_t));
 
-	taskfile.sector_count	= rq->nr_sectors;
-	hobfile.sector_count	= (rq->nr_sectors>>8);
+	sectors = rq->nr_sectors;
+	if (sectors == 256)
+		sectors = 0;
+	if (command == WIN_MULTWRITE_EXT || command == WIN_MULTWRITE) {
+		sectors = drive->mult_count;
+		if (sectors > rq->current_nr_sectors)
+			sectors = rq->current_nr_sectors;
+	}
+
+	taskfile.sector_count	= sectors;
+	hobfile.sector_count	= sectors >> 8;
 
 	if (rq->nr_sectors == 65536) {
 		taskfile.sector_count	= 0x00;
@@ -652,7 +681,7 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 			memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
 			taskfile.sector_count	= drive->mult_req;
 			taskfile.command	= WIN_SETMULT;
-			do_taskfile(drive, &taskfile, &hobfile, ide_handler_parser(&taskfile, &hobfile));
+			do_taskfile(drive, &taskfile, &hobfile, &set_multmode_intr);
 		}
 	} else if (s->all) {
 		int special = s->all;
@@ -789,23 +818,12 @@ static ide_proc_entry_t idedisk_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
+/*
+ * This is tightly woven into the driver->do_special can not touch.
+ * DON'T do it again until a total personality rewrite is committed.
+ */
 static int set_multcount(ide_drive_t *drive, int arg)
 {
-#if 1
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
-
-	if (drive->special.b.set_multmode)
-		return -EBUSY;
-
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-	taskfile.sector_count	= drive->mult_req;
-	taskfile.command	= WIN_SETMULT;
-	drive->mult_req		= arg;
-	drive->special.b.set_multmode = 1;
-	ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
-#else
 	struct request rq;
 
 	if (drive->special.b.set_multmode)
@@ -814,7 +832,6 @@ static int set_multcount(ide_drive_t *drive, int arg)
 	drive->mult_req = arg;
 	drive->special.b.set_multmode = 1;
 	(void) ide_do_drive_cmd (drive, &rq, ide_wait);
-#endif
 	return (drive->mult_count == arg) ? 0 : -EIO;
 }
 

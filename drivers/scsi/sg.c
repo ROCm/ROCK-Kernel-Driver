@@ -19,9 +19,9 @@
  */
 #include <linux/config.h>
 #ifdef CONFIG_PROC_FS
- static char sg_version_str[] = "Version: 3.1.20 (20010814)";
+ static char sg_version_str[] = "Version: 3.5.23 (20020103)";
 #endif
- static int sg_version_num = 30120; /* 2 digits for each component */
+ static int sg_version_num = 30523; /* 2 digits for each component */
 /*
  *  D. P. Gilbert (dgilbert@interlog.com, dougg@triode.net.au), notes:
  *      - scsi logging is available via SCSI_LOG_TIMEOUT macros. First
@@ -76,11 +76,17 @@ static void sg_proc_cleanup(void);
 #include <linux/version.h>
 #endif /* LINUX_VERSION_CODE */
 
+#define SG_STILL_HAVE_ADDRESS_IN_SCATTERLIST
+
 #define SG_ALLOW_DIO_DEF 0
 #define SG_ALLOW_DIO_CODE	/* compile out be commenting this define */
 #ifdef SG_ALLOW_DIO_CODE
 #include <linux/iobuf.h>
 #endif
+
+#define SG_NEW_KIOVEC 0	/* use alloc_kiovec(), not alloc_kiovec_sz() */
+
+#define SG_MAX_DEVS_MASK ((1U << KDEV_MINOR_BITS) - 1)
 
 int sg_big_buff = SG_DEF_RESERVED_SIZE;
 /* N.B. This variable is readable and writeable via
@@ -95,14 +101,8 @@ static int sg_allow_dio = SG_ALLOW_DIO_DEF;
 #define SG_SECTOR_SZ 512
 #define SG_SECTOR_MSK (SG_SECTOR_SZ - 1)
 
-#define SG_LOW_POOL_THRESHHOLD 30
-#define SG_MAX_POOL_SECTORS 320  /* Max. number of pool sectors to take */
-
-static int sg_pool_secs_avail = SG_MAX_POOL_SECTORS;
-
 #define SG_HEAP_PAGE 1  /* heap from kernel via get_free_pages() */
 #define SG_HEAP_KMAL 2  /* heap from kernel via kmalloc() */
-#define SG_HEAP_POOL 3  /* heap from scsi dma pool (mid-level) */
 #define SG_USER_MEM 4   /* memory belongs to user space */
 
 #define SG_DEV_ARR_LUMP 6 /* amount to over allocate sg_dev_arr by */
@@ -136,10 +136,10 @@ static struct Scsi_Device_Template sg_template =
 typedef struct sg_scatter_hold  /* holding area for scsi scatter gather info */
 {
     unsigned short k_use_sg;    /* Count of kernel scatter-gather pieces */
-    unsigned short sglist_len;  /* size of malloc'd scatter-gather list */
+    unsigned short sglist_len;  /* size of malloc'd scatter-gather list ++ */
     unsigned bufflen;           /* Size of (aggregate) data buffer */
     unsigned b_malloc_len;      /* actual len malloc'ed in buffer */
-    void * buffer;              /* Data buffer or scatter list,12 bytes each*/
+    void * buffer;              /* Data buffer or scatter list + mem_src_arr */
     struct kiobuf * kiobp;      /* for direct IO information */
     char mapped;                /* indicates kiobp has locked pages */
     char buffer_mem_src;        /* heap whereabouts of 'buffer' */
@@ -182,6 +182,7 @@ typedef struct sg_fd /* holds the state of a file descriptor */
     char cmd_q;         /* 1 -> allow command queuing, 0 -> don't */
     char next_cmd_len;  /* 0 -> automatic (def), >0 -> use on next write() */
     char keep_orphan;   /* 0 -> drop orphan (def), 1 -> keep for read() */
+    char mmap_called;   /* 0 -> mmap() never called on this fd */
 } Sg_fd; /* 2760 bytes long on i386 */
 
 typedef struct sg_device /* holds the state of each scsi generic device */
@@ -203,7 +204,8 @@ static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt);
 static int sg_start_req(Sg_request * srp);
 static void sg_finish_rem_req(Sg_request * srp);
 static int sg_build_indi(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size);
-static int sg_build_sgat(Sg_scatter_hold * schp, const Sg_fd * sfp);
+static int sg_build_sgat(Sg_scatter_hold * schp, const Sg_fd * sfp,
+			 int tablesize);
 static ssize_t sg_new_read(Sg_fd * sfp, char * buf, size_t count,
 			   Sg_request * srp);
 static ssize_t sg_new_write(Sg_fd * sfp, const char * buf, size_t count,
@@ -233,13 +235,15 @@ static Sg_request * sg_get_rq_mark(Sg_fd * sfp, int pack_id);
 static Sg_request * sg_add_request(Sg_fd * sfp);
 static int sg_remove_request(Sg_fd * sfp, Sg_request * srp);
 static int sg_res_in_use(Sg_fd * sfp);
-static void sg_clr_srpnt(Scsi_Request * SRpnt);
 static int sg_ms_to_jif(unsigned int msecs);
-static unsigned sg_jif_to_ms(int jifs);
+static inline unsigned sg_jif_to_ms(int jifs);
 static int sg_allow_access(unsigned char opcode, char dev_type);
 static int sg_build_dir(Sg_request * srp, Sg_fd * sfp, int dxfer_len);
 static void sg_unmap_and(Sg_scatter_hold * schp, int free_also);
 static Sg_device * sg_get_dev(int dev);
+static inline int sg_alloc_kiovec(int nr, struct kiobuf **bufp, int *szp);
+static inline void sg_free_kiovec(int nr, struct kiobuf **bufp, int *szp);
+static inline unsigned char * sg_scatg2virt(const struct scatterlist * sclp);
 #ifdef CONFIG_PROC_FS
 static int sg_last_dev(void);
 #endif
@@ -337,9 +341,8 @@ static int sg_release(struct inode * inode, struct file * filp)
     Sg_device * sdp;
     Sg_fd * sfp;
 
-    if ((! (sfp = (Sg_fd *)filp->private_data)) || (! (sdp = sfp->parentdp))) {
+    if ((! (sfp = (Sg_fd *)filp->private_data)) || (! (sdp = sfp->parentdp)))
         return -ENXIO;
-    }
     SCSI_LOG_TIMEOUT(3, printk("sg_release: dev=%d\n", minor(sdp->i_rdev)));
     sg_fasync(-1, filp, 0);   /* remove filp from async notification list */
     if (0 == sg_remove_sfp(sdp, sfp)) { /* Returns 1 when sdp gone */
@@ -615,6 +618,20 @@ static ssize_t sg_new_write(Sg_fd * sfp, const char * buf, size_t count,
 	sg_remove_request(sfp, srp);
 	return -ENOSYS;
     }
+    if (hp->flags & SG_FLAG_MMAP_IO) {
+    	if (hp->dxfer_len > sfp->reserve.bufflen) {
+	    sg_remove_request(sfp, srp);
+	    return -ENOMEM;	/* MMAP_IO size must fit in reserve buffer */
+	}
+	if (hp->flags & SG_FLAG_DIRECT_IO) {
+	    sg_remove_request(sfp, srp);
+	    return -EINVAL;	/* either MMAP_IO or DIRECT_IO (not both) */
+	}
+	if (sg_res_in_use(sfp)) {
+	    sg_remove_request(sfp, srp);
+	    return -EBUSY;	/* reserve buffer already being used */
+	}
+    }
     timeout = sg_ms_to_jif(srp->header.timeout);
     if ((! hp->cmdp) || (hp->cmd_len < 6) || (hp->cmd_len > sizeof(cmnd))) {
 	sg_remove_request(sfp, srp);
@@ -681,7 +698,6 @@ static int sg_common_write(Sg_fd * sfp, Sg_request * srp,
     srp->my_cmdp = SRpnt;
     q = &SRpnt->sr_device->request_queue;
     SRpnt->sr_request.rq_dev = sdp->i_rdev;
-    SRpnt->sr_request.rq_status = RQ_ACTIVE;
     SRpnt->sr_sense_buffer[0] = 0;
     SRpnt->sr_cmd_len = hp->cmd_len;
     if (! (hp->flags & SG_FLAG_LUN_INHIBIT)) {
@@ -849,7 +865,7 @@ static int sg_ioctl(struct inode * inode, struct file * filp,
         result = get_user(val, (int *)arg);
         if (result) return result;
         if (val != sfp->reserve.bufflen) {
-            if (sg_res_in_use(sfp))
+            if (sg_res_in_use(sfp) || sfp->mmap_called)
                 return -EBUSY;
             sg_remove_scat(&sfp->reserve);
             sg_build_reserve(sfp, val);
@@ -1030,6 +1046,146 @@ static int sg_fasync(int fd, struct file * filp, int mode)
     return (retval < 0) ? retval : 0;
 }
 
+static inline unsigned char * sg_scatg2virt(const struct scatterlist * sclp)
+{
+    return (sclp && sclp->page) ? 
+    		(unsigned char *)page_address(sclp->page) + sclp->offset :
+		NULL;
+}
+
+static void sg_rb_correct4mmap(Sg_scatter_hold * rsv_schp, int startFinish)
+{
+    void * page_ptr;
+    struct page * page;
+    int k, m;
+
+    SCSI_LOG_TIMEOUT(3, printk("sg_rb_correct4mmap: startFinish=%d, "
+			   "scatg=%d\n", startFinish, rsv_schp->k_use_sg)); 
+    /* N.B. correction _not_ applied to base page of aech allocation */
+    if (rsv_schp->k_use_sg) { /* reserve buffer is a scatter gather list */
+        struct scatterlist * sclp = rsv_schp->buffer;
+
+        for (k = 0; k < rsv_schp->k_use_sg; ++k, ++sclp) {
+	    for (m = PAGE_SIZE; m < sclp->length; m += PAGE_SIZE) {
+		page_ptr = sg_scatg2virt(sclp) + m;
+		page = virt_to_page(page_ptr);
+		if (startFinish)
+		    get_page(page);	/* increment page count */
+		else {
+		    if (page_count(page) > 0)
+			put_page_testzero(page); /* decrement page count */
+		}
+	    }
+        }
+    }
+    else { /* reserve buffer is just a single allocation */
+	for (m = PAGE_SIZE; m < rsv_schp->bufflen; m += PAGE_SIZE) {
+	    page_ptr = (unsigned char *)rsv_schp->buffer + m;
+	    page = virt_to_page(page_ptr);
+	    if (startFinish)
+		get_page(page);	/* increment page count */
+	    else {
+		if (page_count(page) > 0)
+		    put_page_testzero(page); /* decrement page count */
+	    }
+	}
+    }
+}
+
+static struct page * sg_vma_nopage(struct vm_area_struct *vma, 
+				   unsigned long addr, int unused)
+{
+    Sg_fd * sfp;
+    struct page * page = NOPAGE_SIGBUS;
+    void * page_ptr = NULL;
+    unsigned long offset;
+    Sg_scatter_hold * rsv_schp;
+
+    if ((NULL == vma) || (! (sfp = (Sg_fd *)vma->vm_private_data)))
+	return page;
+    rsv_schp = &sfp->reserve;
+    offset = addr - vma->vm_start;
+    if (offset >= rsv_schp->bufflen)
+	return page;
+    SCSI_LOG_TIMEOUT(3, printk("sg_vma_nopage: offset=%lu, scatg=%d\n", 
+			       offset, rsv_schp->k_use_sg));
+    if (rsv_schp->k_use_sg) { /* reserve buffer is a scatter gather list */
+        int k;
+        unsigned long sa = vma->vm_start;
+        unsigned long len;
+        struct scatterlist * sclp = rsv_schp->buffer;
+
+        for (k = 0; (k < rsv_schp->k_use_sg) && (sa < vma->vm_end);
+             ++k, ++sclp) {
+            len = vma->vm_end - sa;
+            len = (len < sclp->length) ? len : sclp->length;
+	    if (offset < len) {
+		page_ptr = sg_scatg2virt(sclp) + offset;
+		page = virt_to_page(page_ptr);
+		get_page(page);	/* increment page count */
+		break;
+	    }
+            sa += len;
+	    offset -= len;
+        }
+    }
+    else { /* reserve buffer is just a single allocation */
+        page_ptr = (unsigned char *)rsv_schp->buffer + offset;
+	page = virt_to_page(page_ptr);
+	get_page(page);	/* increment page count */
+    }
+    return page;
+}
+
+static struct vm_operations_struct sg_mmap_vm_ops = {
+    nopage : sg_vma_nopage,
+};
+
+static int sg_mmap(struct file * filp, struct vm_area_struct *vma)
+{
+    Sg_fd * sfp;
+    unsigned long req_sz = vma->vm_end - vma->vm_start;
+    Sg_scatter_hold * rsv_schp;
+
+    if ((! filp) || (! vma) || (! (sfp = (Sg_fd *)filp->private_data)))
+        return -ENXIO;
+    SCSI_LOG_TIMEOUT(3, printk("sg_mmap starting, vm_start=%p, len=%d\n", 
+			       (void *)vma->vm_start, (int)req_sz));
+    if (vma->vm_pgoff)
+    	return -EINVAL;		/* want no offset */
+    rsv_schp = &sfp->reserve;
+    if (req_sz > rsv_schp->bufflen)
+    	return -ENOMEM;		/* cannot map more than reserved buffer */
+
+    if (rsv_schp->k_use_sg) { /* reserve buffer is a scatter gather list */
+    	int k;
+	unsigned long sa = vma->vm_start;
+	unsigned long len;
+	struct scatterlist * sclp = rsv_schp->buffer;
+
+	for (k = 0; (k < rsv_schp->k_use_sg) && (sa < vma->vm_end); 
+	     ++k, ++sclp) {
+	    if (0 != sclp->offset)
+	    	return -EFAULT;     /* non page aligned memory ?? */
+	    len = vma->vm_end - sa;
+	    len = (len < sclp->length) ? len : sclp->length;
+	    sa += len;
+	}
+    }
+    else { /* reserve buffer is just a single allocation */
+    	if ((unsigned long)rsv_schp->buffer & (PAGE_SIZE - 1))
+	    return -EFAULT;	/* non page aligned memory ?? */
+    }
+    if (0 == sfp->mmap_called) {
+    	sg_rb_correct4mmap(rsv_schp, 1);  /* do only once per fd lifetime */
+	sfp->mmap_called = 1;
+    }
+    vma->vm_flags |= (VM_RESERVED | VM_IO);
+    vma->vm_private_data = sfp;
+    vma->vm_ops = &sg_mmap_vm_ops;
+    return 0;
+}
+
 /* This function is a "bottom half" handler that is called by the
  * mid level when a command is completed (or has failed). */
 static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt)
@@ -1076,7 +1232,14 @@ static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt)
     srp->data.sglist_len = SRpnt->sr_sglist_len;
     srp->data.bufflen = SRpnt->sr_bufflen;
     srp->data.buffer = SRpnt->sr_buffer;
-    sg_clr_srpnt(SRpnt);
+    /* now clear out request structure */
+    SRpnt->sr_use_sg = 0;
+    SRpnt->sr_sglist_len = 0;
+    SRpnt->sr_bufflen = 0;
+    SRpnt->sr_buffer = NULL;
+    SRpnt->sr_underflow = 0;
+    SRpnt->sr_request.rq_dev = mk_kdev(0, 0);  /* "sg" _disowns_ request blk */
+
     srp->my_cmdp = NULL;
     srp->done = 1;
     read_unlock(&sg_dev_arr_lock);
@@ -1121,14 +1284,15 @@ static void sg_cmd_done_bh(Scsi_Cmnd * SCpnt)
 	if (NULL == sfp->headrp) {
             SCSI_LOG_TIMEOUT(1,
 		printk("sg...bh: already closed, final cleanup\n"));
-            sg_remove_sfp(sdp, sfp);
+            if (0 == sg_remove_sfp(sdp, sfp)) { /* device still present */
+		sdp->device->access_count--;
+		if (sdp->device->host->hostt->module)
+		    __MOD_DEC_USE_COUNT(sdp->device->host->hostt->module);
+	    }
+	    if (sg_template.module)
+		    __MOD_DEC_USE_COUNT(sg_template.module);
 	    sfp = NULL;
         }
-	sdp->device->access_count--;
-	if (sg_template.module)
-		__MOD_DEC_USE_COUNT(sg_template.module);
-	if (sdp->device->host->hostt->module)
-	    __MOD_DEC_USE_COUNT(sdp->device->host->hostt->module);
     }
     else if (srp && srp->orphan) {
 	if (sfp->keep_orphan)
@@ -1152,6 +1316,7 @@ static struct file_operations sg_fops = {
 	poll:		sg_poll,
 	ioctl:		sg_ioctl,
 	open:		sg_open,
+	mmap:		sg_mmap,
 	release:	sg_release,
 	fasync:		sg_fasync,
 };
@@ -1176,7 +1341,7 @@ static int sg_init()
     if(!sg_registered) {
 	if (devfs_register_chrdev(SCSI_GENERIC_MAJOR,"sg",&sg_fops))
         {
-            printk("Unable to get major %d for generic SCSI device\n",
+            printk(KERN_ERR "Unable to get major %d for generic SCSI device\n",
                    SCSI_GENERIC_MAJOR);
 	    write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
             return 1;
@@ -1189,7 +1354,7 @@ static int sg_init()
     sg_dev_arr = (Sg_device **)kmalloc(sg_template.dev_max * 
     					sizeof(Sg_device *), GFP_ATOMIC);
     if (NULL == sg_dev_arr) {
-        printk("sg_init: no space for sg_dev_arr\n");
+        printk(KERN_ERR "sg_init: no space for sg_dev_arr\n");
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
         return 1;
     }
@@ -1212,8 +1377,8 @@ static int __init sg_def_reserved_size_setup(char *str)
 	    sg_big_buff = tmp;
 	return 1;
     } else {
-	printk("sg_def_reserved_size : usage sg_def_reserved_size=n "
-	       "(n could be 65536, 131072 or 262144)\n");
+	printk(KERN_WARNING "sg_def_reserved_size : usage "
+	    "sg_def_reserved_size=n (n could be 65536, 131072 or 262144)\n");
 	return 0;
     }
 }
@@ -1238,7 +1403,7 @@ static int sg_attach(Scsi_Device * scsidp)
 	if (NULL == tmp_da) {
 	    scsidp->attached--;
 	    write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
-	    printk("sg_attach: device array cannot be resized\n");
+	    printk(KERN_ERR "sg_attach: device array cannot be resized\n");
 	    return 1;
 	}
 	memset(tmp_da, 0, tmp_dev_max * sizeof(Sg_device *));
@@ -1250,13 +1415,13 @@ static int sg_attach(Scsi_Device * scsidp)
 
     for(k = 0; k < sg_template.dev_max; k++)
         if(! sg_dev_arr[k]) break;
-    if (k > MINORMASK) {
+    if (k > SG_MAX_DEVS_MASK) {
 	scsidp->attached--;
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
-	printk("Unable to attach sg device <%d, %d, %d, %d>"
+	printk(KERN_WARNING "Unable to attach sg device <%d, %d, %d, %d>"
 	       " type=%d, minor number exceed %d\n", scsidp->host->host_no, 
 	       scsidp->channel, scsidp->id, scsidp->lun, scsidp->type,
-	       MINORMASK);
+	       SG_MAX_DEVS_MASK);
 	return 1;
     }
     if(k < sg_template.dev_max)
@@ -1266,7 +1431,7 @@ static int sg_attach(Scsi_Device * scsidp)
     if (NULL == sdp) {
 	scsidp->attached--;
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
-	printk("sg_attach: Sg_device cannot be allocated\n");
+	printk(KERN_ERR "sg_attach: Sg_device cannot be allocated\n");
 	return 1;
     }
 
@@ -1293,8 +1458,8 @@ static int sg_attach(Scsi_Device * scsidp)
 	case TYPE_WORM:
 	case TYPE_TAPE: break;
 	default:
-	    printk("Attached scsi generic sg%d at scsi%d, channel %d, id %d,"
-		   " lun %d,  type %d\n", k, scsidp->host->host_no, 
+	    printk(KERN_NOTICE "Attached scsi generic sg%d at scsi%d, channel"
+	    	   " %d, id %d, lun %d,  type %d\n", k, scsidp->host->host_no, 
 		   scsidp->channel, scsidp->id, scsidp->lun, scsidp->type);
     }
     return 0;
@@ -1371,7 +1536,10 @@ static void sg_detach(Scsi_Device * scsidp)
 
 MODULE_AUTHOR("Douglas Gilbert");
 MODULE_DESCRIPTION("SCSI generic (sg) driver");
+
+#ifdef MODULE_LICENSE
 MODULE_LICENSE("GPL");
+#endif
 
 MODULE_PARM(def_reserved_size, "i");
 MODULE_PARM_DESC(def_reserved_size, "size of buffer reserved for each fd");
@@ -1417,9 +1585,8 @@ static int sg_start_req(Sg_request * srp)
 	if (res <= 0)   /* -ve -> error, 0 -> done, 1 -> try indirect */
 	    return res;
     }
-    if ((! sg_res_in_use(sfp)) && (dxfer_len <= rsv_schp->bufflen)) {
+    if ((! sg_res_in_use(sfp)) && (dxfer_len <= rsv_schp->bufflen))
 	sg_link_reserve(sfp, srp, dxfer_len);
-    }
     else {
 	res = sg_build_indi(req_schp, sfp, dxfer_len);
         if (res) {
@@ -1445,23 +1612,24 @@ static void sg_finish_rem_req(Sg_request * srp)
     sg_remove_request(sfp, srp);
 }
 
-static int sg_build_sgat(Sg_scatter_hold * schp, const Sg_fd * sfp)
+static int sg_build_sgat(Sg_scatter_hold * schp, const Sg_fd * sfp,
+			 int tablesize)
 {
     int mem_src, ret_sz;
-    int sg_bufflen = PAGE_SIZE;
     int elem_sz = sizeof(struct scatterlist) + sizeof(char);
-    int mx_sc_elems = (sg_bufflen / elem_sz) - 1;
+    /* scatter gather array, followed by mem_src_arr (array of chars) */
+    int sg_bufflen = tablesize * elem_sz;
+    int mx_sc_elems = tablesize;
 
     mem_src = SG_HEAP_KMAL;
-    schp->buffer = (struct scatterlist *)sg_malloc(sfp, sg_bufflen,
-						   &ret_sz, &mem_src);
-    schp->buffer_mem_src = (char)mem_src;
+    schp->buffer = sg_malloc(sfp, sg_bufflen, &ret_sz, &mem_src);
     if (! schp->buffer)
 	return -ENOMEM;
     else if (ret_sz != sg_bufflen) {
 	sg_bufflen = ret_sz;
-	mx_sc_elems = (sg_bufflen / elem_sz) - 1;
+	mx_sc_elems = sg_bufflen / elem_sz;
     }
+    schp->buffer_mem_src = (char)mem_src;
     schp->sglist_len = sg_bufflen;
     memset(schp->buffer, 0, sg_bufflen);
     return mx_sc_elems; /* number of scat_gath elements allocated */
@@ -1470,13 +1638,15 @@ static int sg_build_sgat(Sg_scatter_hold * schp, const Sg_fd * sfp)
 static void sg_unmap_and(Sg_scatter_hold * schp, int free_also)
 {
 #ifdef SG_ALLOW_DIO_CODE
+    int nbhs = 0;
+
     if (schp && schp->kiobp) {
 	if (schp->mapped) {
 	    unmap_kiobuf(schp->kiobp);
 	    schp->mapped = 0;
 	}
 	if (free_also) {
-	    free_kiovec(1, &schp->kiobp);
+	    sg_free_kiovec(1, &schp->kiobp, &nbhs);
 	    schp->kiobp = NULL;
 	}
     }
@@ -1494,10 +1664,12 @@ static int sg_build_dir(Sg_request * srp, Sg_fd * sfp, int dxfer_len)
     sg_io_hdr_t * hp = &srp->header;
     Sg_scatter_hold * schp = &srp->data;
     int sg_tablesize = sfp->parentdp->sg_tablesize;
+    int nbhs = 0;
 
-    res = alloc_kiovec(1, &schp->kiobp);
+    res = sg_alloc_kiovec(1, &schp->kiobp, &nbhs);
     if (0 != res) {
-	SCSI_LOG_TIMEOUT(5, printk("sg_build_dir: alloc_kiovec res=%d\n", res));
+	SCSI_LOG_TIMEOUT(5, printk("sg_build_dir: sg_alloc_kiovec res=%d\n", 
+			 res));
 	return 1;
     }
     res = map_user_kiobuf((SG_DXFER_TO_DEV == hp->dxfer_direction) ? 1 : 0,
@@ -1527,7 +1699,7 @@ static int sg_build_dir(Sg_request * srp, Sg_fd * sfp, int dxfer_len)
 	hp->info |= SG_INFO_DIRECT_IO;
 	return 0;
     }
-    mx_sc_elems = sg_build_sgat(schp, sfp);
+    mx_sc_elems = sg_build_sgat(schp, sfp, sg_tablesize);
     if (mx_sc_elems <= 1) {
 	sg_unmap_and(schp, 1);
 	sg_remove_scat(schp);
@@ -1535,19 +1707,22 @@ static int sg_build_dir(Sg_request * srp, Sg_fd * sfp, int dxfer_len)
     }
     mem_src_arr = schp->buffer + (mx_sc_elems * sizeof(struct scatterlist));
     for (k = 0, sclp = schp->buffer, rem_sz = dxfer_len;
-	 (k < sg_tablesize) && (rem_sz > 0) && (k < mx_sc_elems);
+	 (rem_sz > 0) && (k < mx_sc_elems);
 	 ++k, ++sclp) {
 	offset = (0 == k) ? kp->offset : 0;
 	num = (rem_sz > (PAGE_SIZE - offset)) ? (PAGE_SIZE - offset) :
 						rem_sz;
+	sclp->page = kp->maplist[k];
+	sclp->offset = offset;
+#ifdef SG_STILL_HAVE_ADDRESS_IN_SCATTERLIST
 	sclp->address = page_address(kp->maplist[k]) + offset;
-	sclp->page = NULL;
+#endif
 	sclp->length = num;
 	mem_src_arr[k] = SG_USER_MEM;
 	rem_sz -= num;
 	SCSI_LOG_TIMEOUT(5,
 	    printk("sg_build_dir: k=%d, a=0x%p, len=%d, ms=%d\n",
-	    k, sclp->address, num, mem_src_arr[k]));
+	    k, sg_scatg2virt(sclp), num, mem_src_arr[k]));
     }
     schp->k_use_sg = k;
     SCSI_LOG_TIMEOUT(5,
@@ -1569,7 +1744,7 @@ static int sg_build_indi(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size)
 {
     int ret_sz, mem_src;
     int blk_size = buff_size;
-    char * p = NULL;
+    unsigned char * p = NULL;
 
     if ((blk_size < 0) || (! sfp))
         return -EFAULT;
@@ -1609,14 +1784,14 @@ static int sg_build_indi(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size)
 	char * mem_src_arr;
 
         /* N.B. ret_sz and mem_src carried into this block ... */
-	mx_sc_elems = sg_build_sgat(schp, sfp);
+	mx_sc_elems = sg_build_sgat(schp, sfp, sg_tablesize);
 	if (mx_sc_elems < 0)
 	    return mx_sc_elems; /* most likely -ENOMEM */
 	mem_src_arr = schp->buffer +
 		      (mx_sc_elems * sizeof(struct scatterlist));
 
 	for (k = 0, sclp = schp->buffer, rem_sz = blk_size;
-	     (k < sg_tablesize) && (rem_sz > 0) && (k < mx_sc_elems);
+	     (rem_sz > 0) && (k < mx_sc_elems);
              ++k, rem_sz -= ret_sz, ++sclp) {
 	    if (first)
                 first = 0;
@@ -1627,14 +1802,17 @@ static int sg_build_indi(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size)
                 if (! p)
                     break;
             }
+            sclp->page = virt_to_page(p);
+            sclp->offset = (unsigned long)p & ~PAGE_MASK;
+#ifdef SG_STILL_HAVE_ADDRESS_IN_SCATTERLIST
             sclp->address = p;
-	    sclp->page = NULL;
+#endif
             sclp->length = ret_sz;
 	    mem_src_arr[k] = mem_src;
 
 	    SCSI_LOG_TIMEOUT(5,
 		printk("sg_build_build: k=%d, a=0x%p, len=%d, ms=%d\n",
-                k, sclp->address, ret_sz, mem_src));
+                k, sg_scatg2virt(sclp), ret_sz, mem_src));
         } /* end of for loop */
 	schp->k_use_sg = k;
 	SCSI_LOG_TIMEOUT(5,
@@ -1664,7 +1842,8 @@ static int sg_write_xfer(Sg_request * srp)
 	if (schp->bufflen < num_xfer)
 	    num_xfer = schp->bufflen;
     }
-    if ((num_xfer <= 0) || (new_interface && (SG_FLAG_NO_DXFER & hp->flags)))
+    if ((num_xfer <= 0) || 
+    	(new_interface && ((SG_FLAG_NO_DXFER | SG_FLAG_MMAP_IO) & hp->flags)))
 	return 0;
 
     SCSI_LOG_TIMEOUT(4,
@@ -1698,14 +1877,15 @@ static int sg_write_xfer(Sg_request * srp)
 	struct scatterlist * sclp = (struct scatterlist *)schp->buffer;
 	char * mem_src_arr = sg_get_sgat_msa(schp);
 	ksglen = (int)sclp->length;
-	p = sclp->address;
+	p = sg_scatg2virt(sclp);
 
 	for (j = 0, k = 0; j < onum; ++j) {
 	    res = sg_u_iovec(hp, iovec_count, j, 1, &usglen, &up);
 	    if (res) return res;
 
 	    for (; (k < schp->k_use_sg) && p;
-		 ++k, ++sclp, ksglen = (int)sclp->length, p = sclp->address) {
+		 ++k, ++sclp, ksglen = (int)sclp->length, 
+		 	p = sg_scatg2virt(sclp)) {
 		ok = (SG_USER_MEM != mem_src_arr[k]);
 		if (usglen <= 0)
 		    break;
@@ -1766,7 +1946,7 @@ static int sg_u_iovec(sg_io_hdr_t * hp, int sg_num, int ind,
 static char * sg_get_sgat_msa(Sg_scatter_hold * schp)
 {
     int elem_sz = sizeof(struct scatterlist) + sizeof(char);
-    int mx_sc_elems = (schp->sglist_len / elem_sz) - 1;
+    int mx_sc_elems = schp->sglist_len / elem_sz;
     return schp->buffer + (sizeof(struct scatterlist) * mx_sc_elems);
 }
 
@@ -1779,14 +1959,17 @@ static void sg_remove_scat(Sg_scatter_hold * schp)
         struct scatterlist * sclp = (struct scatterlist *)schp->buffer;
 	char * mem_src_arr = sg_get_sgat_msa(schp);
 
-	for (k = 0; (k < schp->k_use_sg) && sclp->address; ++k, ++sclp) {
+	for (k = 0; (k < schp->k_use_sg) && sg_scatg2virt(sclp); ++k, ++sclp) {
 	    mem_src = mem_src_arr[k];
 	    SCSI_LOG_TIMEOUT(5,
 		printk("sg_remove_scat: k=%d, a=0x%p, len=%d, ms=%d\n",
-                       k, sclp->address, sclp->length, mem_src));
-            sg_free(sclp->address, sclp->length, mem_src);
-            sclp->address = NULL;
+                       k, sg_scatg2virt(sclp), sclp->length, mem_src));
+            sg_free(sg_scatg2virt(sclp), sclp->length, mem_src);
 	    sclp->page = NULL;
+            sclp->offset = 0;
+#ifdef SG_STILL_HAVE_ADDRESS_IN_SCATTERLIST
+	    sclp->address = 0;
+#endif
             sclp->length = 0;
         }
 	sg_free(schp->buffer, schp->sglist_len, schp->buffer_mem_src);
@@ -1814,7 +1997,8 @@ static int sg_read_xfer(Sg_request * srp)
 	if (schp->bufflen < num_xfer)
 	    num_xfer = schp->bufflen;
     }
-    if ((num_xfer <= 0) || (new_interface && (SG_FLAG_NO_DXFER & hp->flags)))
+    if ((num_xfer <= 0) || 
+    	(new_interface && ((SG_FLAG_NO_DXFER | SG_FLAG_MMAP_IO) & hp->flags)))
 	return 0;
 
     SCSI_LOG_TIMEOUT(4,
@@ -1848,14 +2032,15 @@ static int sg_read_xfer(Sg_request * srp)
 	struct scatterlist * sclp = (struct scatterlist *)schp->buffer;
 	char * mem_src_arr = sg_get_sgat_msa(schp);
 	ksglen = (int)sclp->length;
-	p = sclp->address;
+	p = sg_scatg2virt(sclp);
 
 	for (j = 0, k = 0; j < onum; ++j) {
 	    res = sg_u_iovec(hp, iovec_count, j, 0, &usglen, &up);
 	    if (res) return res;
 
 	    for (; (k < schp->k_use_sg) && p;
-		 ++k, ++sclp, ksglen = (int)sclp->length, p = sclp->address) {
+		 ++k, ++sclp, ksglen = (int)sclp->length, 
+		 	p = sg_scatg2virt(sclp)) {
 		ok = (SG_USER_MEM != mem_src_arr[k]);
 		if (usglen <= 0)
 		    break;
@@ -1896,14 +2081,14 @@ static void sg_read_oxfer(Sg_request * srp, char * outp, int num_read_xfer)
         int k, num;
         struct scatterlist * sclp = (struct scatterlist *)schp->buffer;
 
-	for (k = 0; (k < schp->k_use_sg) && sclp->address; ++k, ++sclp) {
+	for (k = 0; (k < schp->k_use_sg) && sg_scatg2virt(sclp); ++k, ++sclp) {
             num = (int)sclp->length;
             if (num > num_read_xfer) {
-                __copy_to_user(outp, sclp->address, num_read_xfer);
+                __copy_to_user(outp, sg_scatg2virt(sclp), num_read_xfer);
                 break;
             }
             else {
-                __copy_to_user(outp, sclp->address, num);
+                __copy_to_user(outp, sg_scatg2virt(sclp), num);
                 num_read_xfer -= num;
                 if (num_read_xfer <= 0)
                     break;
@@ -1949,7 +2134,7 @@ static void sg_link_reserve(Sg_fd * sfp, Sg_request * srp, int size)
             if (rem <= num) {
 		if (0 == k) {
 		    req_schp->k_use_sg = 0;
-		    req_schp->buffer = sclp->address;
+		    req_schp->buffer = sg_scatg2virt(sclp);
 		}
 		else {
     		    sfp->save_scat_len = num;
@@ -2189,6 +2374,8 @@ static void __sg_remove_sfp(Sg_device * sdp, Sg_fd * sfp)
     if (sfp->reserve.bufflen > 0) {
     SCSI_LOG_TIMEOUT(6, printk("__sg_remove_sfp:    bufflen=%d, k_use_sg=%d\n",
 	     (int)sfp->reserve.bufflen, (int)sfp->reserve.k_use_sg));
+	if (sfp->mmap_called)
+	    sg_rb_correct4mmap(&sfp->reserve, 0); /* undo correction */
 	sg_remove_scat(&sfp->reserve);
     }
     sfp->parentdp = NULL;
@@ -2237,7 +2424,7 @@ static int sg_remove_sfp(Sg_device * sdp, Sg_fd * sfp)
 	/* MOD_INC's to inhibit unloading sg and associated adapter driver */
 	if (sg_template.module)
 	    __MOD_INC_USE_COUNT(sg_template.module);
-	 if (sdp->device->host->hostt->module)
+	if (sdp->device->host->hostt->module)
 	    __MOD_INC_USE_COUNT(sdp->device->host->hostt->module);
         SCSI_LOG_TIMEOUT(1, printk(
           "sg_remove_sfp: worrisome, %d writes pending\n", dirty));
@@ -2270,30 +2457,6 @@ static char * sg_low_malloc(int rqSz, int lowDma, int mem_src, int * retSzp)
         if (resp && retSzp) *retSzp = rqSz;
         return resp;
     }
-    if (SG_HEAP_POOL == mem_src) {
-        int num_sect = rqSz / SG_SECTOR_SZ;
-
-        if (0 != (rqSz & SG_SECTOR_MSK)) {
-            if (! retSzp)
-                return resp;
-            ++num_sect;
-            rqSz = num_sect * SG_SECTOR_SZ;
-        }
-        while (num_sect > 0) {
-            if ((num_sect <= sg_pool_secs_avail)) {
-                resp = kmalloc(rqSz, page_mask);
-                if (resp) {
-                    if (retSzp) *retSzp = rqSz;
-                    sg_pool_secs_avail -= num_sect;
-                    return resp;
-                }
-            }
-            if (! retSzp)
-                return resp;
-            num_sect /= 2;      /* try half as many */
-            rqSz = num_sect * SG_SECTOR_SZ;
-        }
-    }
     else if (SG_HEAP_PAGE == mem_src) {
         int order, a_size;
         int resSz = rqSz;
@@ -2311,7 +2474,8 @@ static char * sg_low_malloc(int rqSz, int lowDma, int mem_src, int * retSzp)
         if (retSzp) *retSzp = resSz;
     }
     else
-        printk("sg_low_malloc: bad mem_src=%d, rqSz=%df\n", mem_src, rqSz);
+        printk(KERN_ERR "sg_low_malloc: bad mem_src=%d, rqSz=%df\n", 
+	       mem_src, rqSz);
     return resp;
 }
 
@@ -2330,29 +2494,20 @@ static char * sg_malloc(const Sg_fd * sfp, int size, int * retSzp,
 	switch (*mem_srcp)
         {
         case SG_HEAP_PAGE:
-            l_ms = (size < PAGE_SIZE) ? SG_HEAP_POOL : SG_HEAP_PAGE;
+            l_ms = (size < PAGE_SIZE) ? SG_HEAP_KMAL : SG_HEAP_PAGE;
             resp = sg_low_malloc(size, low_dma, l_ms, 0);
             if (resp)
                 break;
             resp = sg_low_malloc(size, low_dma, l_ms, &size);
             if (! resp) {
-                l_ms = (SG_HEAP_POOL == l_ms) ? SG_HEAP_PAGE : SG_HEAP_POOL;
+                l_ms = (SG_HEAP_KMAL == l_ms) ? SG_HEAP_PAGE : SG_HEAP_KMAL;
                 resp = sg_low_malloc(size, low_dma, l_ms, &size);
-                if (! resp) {
-                    l_ms = SG_HEAP_KMAL;
-                    resp = sg_low_malloc(size, low_dma, l_ms, &size);
-                }
             }
             if (resp && retSzp) *retSzp = size;
             break;
         case SG_HEAP_KMAL:
-            l_ms = SG_HEAP_PAGE;
+            l_ms = SG_HEAP_KMAL; /* was SG_HEAP_PAGE */
             resp = sg_low_malloc(size, low_dma, l_ms, 0);
-            if (resp)
-                break;
-            l_ms = SG_HEAP_POOL;
-            resp = sg_low_malloc(size, low_dma, l_ms, &size);
-            if (resp && retSzp) *retSzp = size;
             break;
         default:
             SCSI_LOG_TIMEOUT(1, printk("sg_malloc: bad ms=%d\n", *mem_srcp));
@@ -2365,18 +2520,19 @@ static char * sg_malloc(const Sg_fd * sfp, int size, int * retSzp,
     return resp;
 }
 
+static inline int sg_alloc_kiovec(int nr, struct kiobuf **bufp, int *szp)
+{
+#if SG_NEW_KIOVEC
+    return alloc_kiovec_sz(nr, bufp, szp);
+#else
+    return alloc_kiovec(nr, bufp);
+#endif
+}
+
 static void sg_low_free(char * buff, int size, int mem_src)
 {
     if (! buff) return;
     switch (mem_src) {
-    case SG_HEAP_POOL:
-	{
-	    int num_sect = size / SG_SECTOR_SZ;
-
-	    kfree(buff);
-	    sg_pool_secs_avail += num_sect;
-	}
-	break;
     case SG_HEAP_KMAL:
 	kfree(buff);    /* size not used */
 	break;
@@ -2392,7 +2548,7 @@ static void sg_low_free(char * buff, int size, int mem_src)
     case SG_USER_MEM:
 	break; /* nothing to do */
     default:
-	printk("sg_low_free: bad mem_src=%d, buff=0x%p, rqSz=%d\n",
+	printk(KERN_ERR "sg_low_free: bad mem_src=%d, buff=0x%p, rqSz=%d\n",
                mem_src, buff, size);
 	break;
     }
@@ -2408,14 +2564,13 @@ static void sg_free(char * buff, int size, int mem_src)
         sg_low_free(buff, size, mem_src);
 }
 
-static void sg_clr_srpnt(Scsi_Request * SRpnt)
+static inline void sg_free_kiovec(int nr, struct kiobuf **bufp, int *szp)
 {
-    SRpnt->sr_use_sg = 0;
-    SRpnt->sr_sglist_len = 0;
-    SRpnt->sr_bufflen = 0;
-    SRpnt->sr_buffer = NULL;
-    SRpnt->sr_underflow = 0;
-    SRpnt->sr_request.rq_dev = mk_kdev(0, 0);  /* "sg" _disowns_ command blk */
+#if SG_NEW_KIOVEC
+    free_kiovec_sz(nr, bufp, szp);
+#else
+    free_kiovec(nr, bufp);
+#endif
 }
 
 static int sg_ms_to_jif(unsigned int msecs)
@@ -2427,7 +2582,7 @@ static int sg_ms_to_jif(unsigned int msecs)
 					       : (((int)msecs / 1000) * HZ);
 }
 
-static unsigned sg_jif_to_ms(int jifs)
+static inline unsigned sg_jif_to_ms(int jifs)
 {
     if (jifs <= 0)
 	return 0U;
@@ -2477,8 +2632,8 @@ static Sg_device * sg_get_dev(int dev)
     if (sg_dev_arr && (dev >= 0))
     {
 	read_lock_irqsave(&sg_dev_arr_lock, iflags);
-    if (dev < sg_template.dev_max)
-    	sdp = sg_dev_arr[dev];
+	if (dev < sg_template.dev_max)
+	    sdp = sg_dev_arr[dev];
 	read_unlock_irqrestore(&sg_dev_arr_lock, iflags);
     }
     return sdp;
@@ -2671,7 +2826,7 @@ static int sg_proc_debug_info(char * buffer, int * len, off_t * begin,
 {
     Sg_device * sdp;
     const sg_io_hdr_t * hp;
-    int j, max_dev;
+    int j, max_dev, new_interface;
 
     if (NULL == sg_dev_arr) {
 	PRINT_PROC("sg_dev_arr NULL, driver not initialized\n");
@@ -2680,8 +2835,7 @@ static int sg_proc_debug_info(char * buffer, int * len, off_t * begin,
     max_dev = sg_last_dev();
     PRINT_PROC("dev_max(currently)=%d max_active_device=%d (origin 1)\n",
 	       sg_template.dev_max, max_dev);
-    PRINT_PROC(" sg_pool_secs_aval=%d def_reserved_size=%d\n",
-	       sg_pool_secs_avail, sg_big_buff);
+    PRINT_PROC(" def_reserved_size=%d\n", sg_big_buff);
     for (j = 0; j < max_dev; ++j) {
 	if ((sdp = sg_get_dev(j))) {
 	    Sg_fd * fp;
@@ -2717,8 +2871,10 @@ static int sg_proc_debug_info(char * buffer, int * len, off_t * begin,
 			   (int)fp->keep_orphan, (int)fp->closed);
 		for (m = 0; (srp = sg_get_nth_request(fp, m)); ++m) {
 		    hp = &srp->header;
+		    new_interface = (hp->interface_id == '\0') ? 0 : 1;
 /* stop indenting so far ... */
-	PRINT_PROC(srp->res_used ? "     rb>> " :
+	PRINT_PROC(srp->res_used ? ((new_interface && 
+	    (SG_FLAG_MMAP_IO & hp->flags)) ? "     mmap>> " : "     rb>> ") :
 	    ((SG_INFO_DIRECT_IO_MASK & hp->info) ? "     dio>> " : "     "));
 	blen = srp->my_cmdp ? srp->my_cmdp->sr_bufflen : srp->data.bufflen;
 	usg = srp->my_cmdp ? srp->my_cmdp->sr_use_sg : srp->data.k_use_sg;
@@ -2728,8 +2884,8 @@ static int sg_proc_debug_info(char * buffer, int * len, off_t * begin,
 	if (srp->done)
 	    PRINT_PROC(" dur=%d", hp->duration);
 	else
-	    PRINT_PROC(" t_o/elap=%d/%d", ((hp->interface_id == '\0') ?
-			sg_jif_to_ms(fp->timeout) : hp->timeout),
+	    PRINT_PROC(" t_o/elap=%d/%d", new_interface ? hp->timeout :
+			sg_jif_to_ms(fp->timeout),
 		  sg_jif_to_ms(hp->duration ? (jiffies - hp->duration) : 0));
 	PRINT_PROC("ms sgat=%d op=0x%02x\n", usg, (int)srp->data.cmd_opcode);
 /* reset indenting */

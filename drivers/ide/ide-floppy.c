@@ -688,7 +688,7 @@ static void idefloppy_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 	/* Why does this happen? */
 	if (!rq)
 		return;
-	if (rq->flags & IDEFLOPPY_RQ) {
+	if (!(rq->flags & IDEFLOPPY_RQ)) {
 		ide_end_request (uptodate, hwgroup);
 		return;
 	}

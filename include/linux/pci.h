@@ -525,7 +525,6 @@ int pcibios_find_device (unsigned short vendor, unsigned short dev_id,
 
 /* Generic PCI functions used internally */
 
-void pci_init(void);
 int pci_bus_exists(const struct list_head *list, int nr);
 struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
 struct pci_bus *pci_alloc_primary_bus(int bus);

@@ -766,14 +766,14 @@ static void apm_cpu_idle(void)
 
 	start_idle = jiffies;
 	while (1) {
-		if (!current->need_resched) {
+		if (!need_resched()) {
 			if (jiffies - start_idle < HARD_IDLE_TIMEOUT) {
 				if (!current_cpu_data.hlt_works_ok)
 					continue;
 				if (hlt_counter)
 					continue;
 				__cli();
-				if (!current->need_resched)
+				if (!need_resched())
 					safe_halt();
 				else
 					__sti();

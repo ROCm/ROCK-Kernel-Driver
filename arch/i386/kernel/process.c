@@ -42,7 +42,6 @@
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/desc.h>
-#include <asm/mmu_context.h>
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
 #endif
@@ -81,7 +80,7 @@ static void default_idle(void)
 {
 	if (current_cpu_data.hlt_works_ok && !hlt_counter) {
 		__cli();
-		if (!current->need_resched)
+		if (!need_resched())
 			safe_halt();
 		else
 			__sti();
@@ -127,7 +126,7 @@ void cpu_idle (void)
 		void (*idle)(void) = pm_idle;
 		if (!idle)
 			idle = default_idle;
-		while (!current->need_resched)
+		while (!need_resched())
 			idle();
 		schedule();
 		check_pgt_cache();

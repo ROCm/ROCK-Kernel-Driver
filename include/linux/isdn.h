@@ -178,8 +178,6 @@ typedef struct {
  * the correspondent code in isdn.c
  */
 
-#define ISDN_MINOR_B        0
-#define ISDN_MINOR_BMAX     (ISDN_MAX_CHANNELS-1)
 #define ISDN_MINOR_CTRL     64
 #define ISDN_MINOR_CTRLMAX  (64 + (ISDN_MAX_CHANNELS-1))
 #define ISDN_MINOR_PPP      128

@@ -339,7 +339,7 @@ static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 		goto loop;
 	if (current->total_link_count >= 40)
 		goto loop;
-	if (current->need_resched) {
+	if (need_resched()) {
 		current->state = TASK_RUNNING;
 		schedule();
 	}

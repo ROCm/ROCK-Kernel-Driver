@@ -524,7 +524,7 @@ void release_console_sem(void)
  */
 void console_conditional_schedule(void)
 {
-	if (console_may_schedule && current->need_resched) {
+	if (console_may_schedule && need_resched()) {
 		set_current_state(TASK_RUNNING);
 		schedule();
 	}

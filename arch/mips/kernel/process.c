@@ -39,7 +39,7 @@ void cpu_idle(void)
 	init_idle();
 
 	while (1) {
-		while (!current->need_resched)
+		while (!need_resched())
 			if (cpu_wait)
 				(*cpu_wait)();
 		schedule();

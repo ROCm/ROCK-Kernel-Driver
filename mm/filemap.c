@@ -290,7 +290,7 @@ static int truncate_list_pages(struct list_head *head, unsigned long start, unsi
 
 			page_cache_release(page);
 
-			if (current->need_resched) {
+			if (need_resched()) {
 				__set_current_state(TASK_RUNNING);
 				schedule();
 			}
@@ -400,7 +400,7 @@ static int invalidate_list_pages2(struct list_head *head)
 		}
 
 		page_cache_release(page);
-		if (current->need_resched) {
+		if (need_resched()) {
 			__set_current_state(TASK_RUNNING);
 			schedule();
 		}

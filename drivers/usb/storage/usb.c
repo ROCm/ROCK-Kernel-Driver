@@ -1,6 +1,6 @@
 /* Driver for USB Mass Storage compliant devices
  *
- * $Id: usb.c,v 1.69 2001/11/11 03:33:03 mdharm Exp $
+ * $Id: usb.c,v 1.70 2002/01/06 07:14:12 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -315,6 +315,13 @@ static int usb_stor_control_thread(void * __us)
 	 * so get rid of all our resources..
 	 */
 	daemonize();
+
+	/* avoid getting signals */
+	spin_lock_irq(&current->sigmask_lock);
+	flush_signals(current);
+	sigfillset(&current->blocked);
+	recalc_sigpending(current);
+	spin_unlock_irq(&current->sigmask_lock);
 
 	/* set our name for identification purposes */
 	sprintf(current->comm, "usb-storage-%d", us->host_number);

@@ -300,7 +300,7 @@ static int swap_out(unsigned int priority, unsigned int gfp_mask, zone_t * class
 
 	counter = mmlist_nr;
 	do {
-		if (unlikely(current->need_resched)) {
+		if (need_resched()) {
 			__set_current_state(TASK_RUNNING);
 			schedule();
 		}
@@ -345,7 +345,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 	while (--max_scan >= 0 && (entry = inactive_list.prev) != &inactive_list) {
 		struct page * page;
 
-		if (unlikely(current->need_resched)) {
+		if (need_resched()) {
 			spin_unlock(&pagemap_lru_lock);
 			__set_current_state(TASK_RUNNING);
 			schedule();
@@ -625,8 +625,7 @@ static int kswapd_balance_pgdat(pg_data_t * pgdat)
 
 	for (i = pgdat->nr_zones-1; i >= 0; i--) {
 		zone = pgdat->node_zones + i;
-		if (unlikely(current->need_resched))
-			schedule();
+		cond_resched();
 		if (!zone->need_balance)
 			continue;
 		if (!try_to_free_pages(zone, GFP_KSWAPD, 0)) {

@@ -272,7 +272,7 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 	if (!srb->bufflen) {
 		usb_callback = simple_command_callback;
 	} else {
-        	if (srb->use_sg) {
+        	if (likely(srb->use_sg)) {
 			usb_callback = scatter_gather_callback;
 			hpusbscsi->fragment = 0;
 		} else {
@@ -288,10 +288,6 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 
 
 	TRACE_STATE;
-	if (hpusbscsi->state != HP_STATE_FREE) {
-		printk(KERN_CRIT"hpusbscsi - Ouch: queueing violation!\n");
-		return 1; /* This must not happen */
-	}
 
         /* We zero the sense buffer to avoid confusing user space */
         memset(srb->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
@@ -313,10 +309,10 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 	hpusbscsi->srb = srb;
 
 	res = usb_submit_urb(&hpusbscsi->dataurb);
-	if (res) {
+	if (unlikely(res)) {
 		hpusbscsi->state = HP_STATE_FREE;
 		TRACE_STATE;
-		if (callback) {
+		if (likely(callback != NULL)) {
 			srb->result = DID_ERROR;
 			callback(srb);
 		}
@@ -355,7 +351,7 @@ static int hpusbscsi_scsi_abort (Scsi_Cmnd *srb)
 
 static void handle_usb_error (struct hpusbscsi *hpusbscsi)
 {
-	if (hpusbscsi->scallback != NULL) {
+	if (likely(hpusbscsi->scallback != NULL)) {
 		hpusbscsi->srb->result = DID_ERROR;
 		hpusbscsi->scallback(hpusbscsi->srb);
 	}
@@ -367,8 +363,8 @@ static void  control_interrupt_callback (struct urb *u)
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
 
 DEBUG("Getting status byte %d \n",hpusbscsi->scsi_state_byte);
-	if(u->status < 0) {
-                if (hpusbscsi->state != HP_STATE_FREE)
+	if(unlikely(u->status < 0)) {
+                if (likely(hpusbscsi->state != HP_STATE_FREE))
                         handle_usb_error(hpusbscsi);
 		return;
 	}
@@ -402,7 +398,7 @@ DEBUG("Getting status byte %d \n",hpusbscsi->scsi_state_byte);
 static void simple_command_callback(struct urb *u)
 {
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
-	if (u->status<0) {
+	if (unlikely(u->status<0)) {
 		handle_usb_error(hpusbscsi);
 		return;
         }
@@ -411,7 +407,7 @@ static void simple_command_callback(struct urb *u)
 	        TRACE_STATE;
 		hpusbscsi->state = HP_STATE_WAIT;
 	} else {
-		if (hpusbscsi->scallback != NULL)
+		if (likely(hpusbscsi->scallback != NULL))
 			hpusbscsi->scallback(hpusbscsi->srb);
 		hpusbscsi->state = HP_STATE_FREE;
 	TRACE_STATE;
@@ -426,7 +422,7 @@ static void scatter_gather_callback(struct urb *u)
         int res;
 
         DEBUG("Going through scatter/gather\n");
-        if (u->status < 0) {
+        if (unlikely(u->status < 0)) {
                 handle_usb_error(hpusbscsi);
                 return;
         }
@@ -452,7 +448,7 @@ static void scatter_gather_callback(struct urb *u)
         );
 
         res = usb_submit_urb(u);
-        if (res)
+        if (unlikely(res))
                 hpusbscsi->state = HP_STATE_ERROR;
 	TRACE_STATE;
 }
@@ -461,20 +457,20 @@ static void simple_done (struct urb *u)
 {
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
 
-        if (u->status < 0) {
+        if (unlikely(u->status < 0)) {
                 handle_usb_error(hpusbscsi);
                 return;
         }
         DEBUG("Data transfer done\n");
 	TRACE_STATE;
 	if (hpusbscsi->state != HP_STATE_PREMATURE) {
-		if (u->status < 0)
+		if (unlikely(u->status < 0))
 			hpusbscsi->state = HP_STATE_ERROR;
 		else
 			hpusbscsi->state = HP_STATE_WAIT;
 		TRACE_STATE;
 	} else {
-		if (hpusbscsi->scallback != NULL)
+		if (likely(hpusbscsi->scallback != NULL))
 			hpusbscsi->scallback(hpusbscsi->srb);
 		hpusbscsi->state = HP_STATE_FREE;
 	}
@@ -485,7 +481,7 @@ static void simple_payload_callback (struct urb *u)
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
 	int res;
 
-	if (u->status<0) {
+	if (unlikely(u->status<0)) {
                 handle_usb_error(hpusbscsi);
 		return;
         }
@@ -501,7 +497,7 @@ static void simple_payload_callback (struct urb *u)
 	);
 
 	res = usb_submit_urb(u);
-	if (res) {
+	if (unlikely(res)) {
                 handle_usb_error(hpusbscsi);
 		return;
         }
@@ -510,10 +506,11 @@ static void simple_payload_callback (struct urb *u)
 		hpusbscsi->state = HP_STATE_WORKING;
 	TRACE_STATE;
 	} else {
-		if (hpusbscsi->scallback != NULL)
+		if (likely(hpusbscsi->scallback != NULL))
 			hpusbscsi->scallback(hpusbscsi->srb);
 		hpusbscsi->state = HP_STATE_FREE;
 	TRACE_STATE;
 	}
 }
+
 

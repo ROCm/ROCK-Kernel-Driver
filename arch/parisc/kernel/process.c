@@ -73,8 +73,8 @@ void cpu_idle(void)
 	current->nice = 20;
 
 	while (1) {
-		while (!current->need_resched) {
-		}
+		while (!need_resched())
+			barrier();
 		schedule();
 		check_pgt_cache();
 	}

@@ -60,7 +60,7 @@ int cpu_idle(void *unused)
 	wait_psw.mask = _WAIT_PSW_MASK;
 	wait_psw.addr = (unsigned long) &&idle_wakeup;
 	while(1) {
-                if (current->need_resched) {
+                if (need_resched()) {
                         schedule();
                         check_pgt_cache();
                         continue;

@@ -101,8 +101,7 @@ int jffs2_reserve_space(struct jffs2_sb_info *c, __u32 minsize, __u32 *ofs, __u3
 			if (ret)
 				return ret;
 
-			if (current->need_resched)
-				schedule();
+			cond_resched();
 
 			if (signal_pending(current))
 				return -EINTR;

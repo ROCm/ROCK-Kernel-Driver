@@ -320,11 +320,6 @@ static inline void mts_debug_dump(struct mts_desc* dummy)
 
 #endif
 
-
-/* static inline int mts_is_aborting(struct mts_desc* desc) {
-	return (atomic_read(&desc->context.do_abort));
-}  */
-
 static inline void mts_urb_abort(struct mts_desc* desc) {
 	MTS_DEBUG_GOT_HERE();
 	mts_debug_dump(desc);
@@ -504,7 +499,7 @@ void mts_int_submit_urb (struct urb* transfer,
 	transfer->status = 0;
 
 	res = usb_submit_urb( transfer );
-	if ( res ) {
+	if ( unlikely(res) ) {
 		MTS_INT_ERROR( "could not submit URB! Error was %d\n",(int)res );
 		context->srb->result = DID_ERROR << 16;
 		mts_transfer_cleanup(transfer);
@@ -518,7 +513,7 @@ static void mts_transfer_cleanup( struct urb *transfer )
 {
 	MTS_INT_INIT();
 
-	if ( context->final_callback )
+	if ( likely(context->final_callback != NULL) )
 		context->final_callback(context->srb);
 
 }
@@ -556,7 +551,7 @@ static void mts_data_done( struct urb* transfer )
 
 	if ( context->data_length != transfer->actual_length ) {
 		context->srb->resid = context->data_length - transfer->actual_length;
-	} else if ( transfer->status ) {
+	} else if ( unlikely(transfer->status) ) {
 		context->srb->result = (transfer->status == -ENOENT ? DID_ABORT : DID_ERROR)<<16;
 	}
 
@@ -571,7 +566,7 @@ static void mts_command_done( struct urb *transfer )
 {
 	MTS_INT_INIT();
 
-	if ( transfer->status ) {
+	if ( unlikely(transfer->status) ) {
 	        if (transfer->status == -ENOENT) {
 		        /* We are being killed */
 			MTS_DEBUG_GOT_HERE();
@@ -605,7 +600,7 @@ static void mts_do_sg (struct urb* transfer)
 	
 	MTS_DEBUG("Processing fragment %d of %d\n", context->fragment,context->srb->use_sg);
 
-	if (transfer->status) {
+	if (unlikely(transfer->status)) {
                 context->srb->result = (transfer->status == -ENOENT ? DID_ABORT : DID_ERROR)<<16;
 		mts_transfer_cleanup(transfer);
         }
@@ -703,7 +698,7 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 
 		srb->result = DID_BAD_TARGET << 16;
 
-		if(callback)
+		if(likely(callback != NULL))
 			callback(srb);
 
 		goto out;
@@ -725,11 +720,11 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 	
 	res=usb_submit_urb(&desc->urb);
 
-	if(res){
+	if(unlikely(res)){
 		MTS_ERROR("error %d submitting URB\n",(int)res);
 		srb->result = DID_ERROR << 16;
 
-		if(callback)
+		if(likely(callback != NULL))
 			callback(srb);
 
 	}
@@ -1061,4 +1056,5 @@ module_exit(microtek_drv_exit);
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
+
 

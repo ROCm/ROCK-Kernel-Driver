@@ -35,7 +35,7 @@ asmlinkage int cpu_idle(void)
 	init_idle();
 	current->nice = 20;
 	while (1) {
-		while (!current->need_resched)
+		while (!need_resched())
 			if (wait_available)
 				__asm__("wait");
 		schedule();

@@ -559,9 +559,9 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	int logical_sector_size, fat_clusters;
+	int logical_sector_size, fat_clusters, debug, cp;
 	unsigned int total_sectors, rootdir_sectors;
-	int debug, cp;
+	long error = -EIO;
 	char buf[50];
 	int i;
 	char cvf_format[21];
@@ -786,9 +786,8 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	return sb;
 
 out_invalid:
-	if (!silent)
-		printk("VFS: Can't find a valid FAT filesystem on dev %s.\n",
-			sb->s_id);
+	error = 0;
+
 out_fail:
 	if (sbi->nls_io)
 		unload_nls(sbi->nls_io);
@@ -799,8 +798,8 @@ out_fail:
 	if (sbi->private_data)
 		kfree(sbi->private_data);
 	sbi->private_data = NULL;
- 
-	return NULL;
+
+	return ERR_PTR(error);
 }
 
 int fat_statfs(struct super_block *sb,struct statfs *buf)

@@ -1133,28 +1133,23 @@ static int c4_add_card(struct capi_driver *driver,
 
 	MOD_INC_USE_COUNT;
 
-	card = (avmcard *) kmalloc(sizeof(avmcard), GFP_ATOMIC);
-
+	retval = -ENOMEM;
+	card = kmalloc(sizeof(avmcard), GFP_ATOMIC);
 	if (!card) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
+		goto err;
 	}
 	memset(card, 0, sizeof(avmcard));
+
         card->dma = avmcard_dma_alloc(driver->name, dev, 2048+128, 2048+128);
 	if (!card->dma) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
+		goto err_kfree;
 	}
         cinfo = (avmctrl_info *) kmalloc(sizeof(avmctrl_info)*4, GFP_ATOMIC);
 	if (!cinfo) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-                avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
+		goto err_dma_free;
 	}
 	memset(cinfo, 0, sizeof(avmctrl_info)*4);
 	card->ctrlinfo = cinfo;
@@ -1168,53 +1163,37 @@ static int c4_add_card(struct capi_driver *driver,
 	card->membase = p->membase;
 	card->cardtype = nr == 4 ? avm_c4 : avm_c2;
 
-	if (check_region(card->port, AVMB1_PORTLEN)) {
+	if (!request_region(card->port, AVMB1_PORTLEN, card->name)) {
 		printk(KERN_WARNING
 		       "%s: ports 0x%03x-0x%03x in use.\n",
 		       driver->name, card->port, card->port + AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-                avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
+		retval = -EBUSY;
+		goto err_kfree_ctrlinfo;
 	}
 
 	card->mbase = ioremap_nocache(card->membase, 128);
 	if (card->mbase == 0) {
 		printk(KERN_NOTICE "%s: can't remap memory at 0x%lx\n",
 					driver->name, card->membase);
-	        kfree(card->ctrlinfo);
-                avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EIO;
+		retval = -EIO;
+		goto err_release_region;
 	}
 
-	if ((retval = c4_detect(card)) != 0) {
+	retval = c4_detect(card);
+	if (retval != 0) {
 		printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
 					driver->name, card->port, retval);
-                iounmap(card->mbase);
-	        kfree(card->ctrlinfo);
-                avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EIO;
+		retval = -EIO;
+		goto err_unmap;
 	}
 	c4_reset(card);
-
-	request_region(p->port, AVMB1_PORTLEN, card->name);
 
 	retval = request_irq(card->irq, c4_interrupt, SA_SHIRQ, card->name, card);
 	if (retval) {
 		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
 				driver->name, card->irq);
-                iounmap(card->mbase);
-		release_region(card->port, AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-                avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
+		retval = -EBUSY;
+		goto err_unmap;
 	}
 
 	for (i=0; i < nr ; i++) {
@@ -1228,14 +1207,7 @@ static int c4_add_card(struct capi_driver *driver,
 				cinfo = &card->ctrlinfo[i];
 				di->detach_ctr(cinfo->capi_ctrl);
 			}
-                	iounmap(card->mbase);
-			free_irq(card->irq, card);
-			release_region(card->port, AVMB1_PORTLEN);
-                        avmcard_dma_free(card->dma);
-	        	kfree(card->ctrlinfo);
-			kfree(card);
-	        	MOD_DEC_USE_COUNT;
-			return -EBUSY;
+			goto err_free_irq;
 		}
 		if (i == 0)
 			card->cardnr = cinfo->capi_ctrl->cnr;
@@ -1246,6 +1218,22 @@ static int c4_add_card(struct capi_driver *driver,
 		driver->name, nr, card->port, card->irq, card->membase);
 
 	return 0;
+
+ err_free_irq:
+	free_irq(card->irq, card);
+ err_unmap:
+	iounmap(card->mbase);
+ err_release_region:
+	release_region(card->port, AVMB1_PORTLEN);
+ err_kfree_ctrlinfo:
+	kfree(card->ctrlinfo);
+ err_dma_free:
+	avmcard_dma_free(card->dma);
+ err_kfree:
+	kfree(card);
+ err:
+	MOD_DEC_USE_COUNT;
+	return retval;
 }
 
 /* ------------------------------------------------------------- */

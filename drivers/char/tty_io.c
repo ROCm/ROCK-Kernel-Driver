@@ -712,8 +712,7 @@ static inline ssize_t do_tty_write(
 			ret = -ERESTARTSYS;
 			if (signal_pending(current))
 				break;
-			if (current->need_resched)
-				schedule();
+			cond_resched();
 		}
 	}
 	if (written) {

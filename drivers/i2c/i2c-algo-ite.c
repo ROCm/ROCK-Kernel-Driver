@@ -67,7 +67,7 @@
 /* might not like this, as they have an internal timeout of some mils	*/
 /*
 #define SLO_IO      jif=jiffies;while(jiffies<=jif+i2c_table[minor].veryslow)\
-                        if (need_resched) schedule();
+                        cond_resched();
 */
 
 

@@ -1081,20 +1081,20 @@ static int hcd_unlink_urb (struct urb *urb)
 	if (!urb)
 		return -EINVAL;
 
-	// FIXME:  add some explicit records to flag the
-	// state where the URB is "in periodic completion".
-	// Workaround is for driver to set the urb status
-	// to "-EINPROGRESS", so it can get through here
-	// and unlink from the completion handler.
-
 	/*
 	 * we contend for urb->status with the hcd core,
 	 * which changes it while returning the urb.
+	 *
+	 * Caller guaranteed that the urb pointer hasn't been freed, and
+	 * that it was submitted.  But as a rule it can't know whether or
+	 * not it's already been unlinked ... so we respect the reversed
+	 * lock sequence needed for the usb_hcd_giveback_urb() code paths
+	 * (urb lock, then hcd_data_lock) in case some other CPU is now
+	 * unlinking it.
 	 */
 	spin_lock_irqsave (&urb->lock, flags);
-	if (!urb->hcpriv
-			|| urb->status != -EINPROGRESS
-			|| urb->transfer_flags & USB_TIMEOUT_KILLED) {
+	spin_lock (&hcd_data_lock);
+	if (!urb->hcpriv || urb->transfer_flags & USB_TIMEOUT_KILLED) {
 		retval = -EINVAL;
 		goto done;
 	}
@@ -1103,11 +1103,34 @@ static int hcd_unlink_urb (struct urb *urb)
 		retval = -ENODEV;
 		goto done;
 	}
+
+	/* giveback clears dev; non-null means it's linked at this level */
 	dev = urb->dev->hcpriv;
 	hcd = urb->dev->bus->hcpriv;
 	if (!dev || !hcd) {
 		retval = -ENODEV;
 		goto done;
+	}
+
+	/* For non-periodic transfers, any status except -EINPROGRESS means
+	 * the HCD has already started to unlink this URB from the hardware.
+	 * In that case, there's no more work to do.
+	 *
+	 * For periodic transfers, this is the only way to trigger unlinking
+	 * from the hardware.  Since we (currently) overload urb->status to
+	 * tell the driver to unlink, error status might get clobbered ...
+	 * unless that transfer hasn't yet restarted.  One such case is when
+	 * the URB gets unlinked from its completion handler.
+	 *
+	 * FIXME use an URB_UNLINKED flag to match URB_TIMEOUT_KILLED
+	 */
+	switch (usb_pipetype (urb->pipe)) {
+	case PIPE_CONTROL:
+	case PIPE_BULK:
+		if (urb->status != -EINPROGRESS) {
+			retval = 0;
+			goto done;
+		}
 	}
 
 	/* maybe set up to block on completion notification */
@@ -1130,6 +1153,7 @@ static int hcd_unlink_urb (struct urb *urb)
 		/* asynchronous unlink */
 		urb->status = -ECONNRESET;
 	}
+	spin_unlock (&hcd_data_lock);
 	spin_unlock_irqrestore (&urb->lock, flags);
 
 	if (urb == (struct urb *) hcd->rh_timer.data) {
@@ -1154,6 +1178,7 @@ if (retval && urb->status == -ENOENT) err ("whoa! retval %d", retval);
 	}
 	goto bye;
 done:
+	spin_unlock (&hcd_data_lock);
 	spin_unlock_irqrestore (&urb->lock, flags);
 bye:
 	if (retval)

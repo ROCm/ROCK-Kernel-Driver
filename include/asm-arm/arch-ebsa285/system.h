@@ -20,14 +20,14 @@ static void arch_idle(void)
 	start_idle = jiffies;
 
 	do {
-		if (current->need_resched || hlt_counter)
+		if (need_resched() || hlt_counter)
 			goto slow_out;
 		cpu_do_idle(IDLE_WAIT_FAST);
 	} while (time_before(jiffies, start_idle + HZ/50));
 
 	cpu_do_idle(IDLE_CLOCK_SLOW);
 
-	while (!current->need_resched && !hlt_counter) {
+	while (!need_resched() && !hlt_counter) {
 		cpu_do_idle(IDLE_WAIT_SLOW);
 	}
 

@@ -25,6 +25,7 @@ extern unsigned long event;
 #include <linux/signal.h>
 #include <linux/securebits.h>
 #include <linux/fs_struct.h>
+#include <linux/compiler.h>
 
 struct exec_domain;
 
@@ -136,6 +137,8 @@ struct completion;
 extern rwlock_t tasklist_lock;
 extern spinlock_t mmlist_lock;
 
+typedef struct task_struct task_t;
+
 extern void sched_init(void);
 extern void init_idle(void);
 extern void show_state(void);
@@ -144,8 +147,7 @@ extern void trap_init(void);
 extern void update_process_times(int user);
 extern void update_one_process(struct task_struct *p, unsigned long user,
 			       unsigned long system, int cpu);
-extern void expire_task(struct task_struct *p);
-extern void idle_tick(void);
+extern void scheduler_tick(struct task_struct *p);
 
 #define	MAX_SCHEDULE_TIMEOUT	LONG_MAX
 extern signed long FASTCALL(schedule_timeout(signed long timeout));
@@ -221,7 +223,6 @@ struct user_struct {
 extern struct user_struct root_user;
 #define INIT_USER (&root_user)
 
-typedef struct task_struct task_t;
 typedef struct prio_array prio_array_t;
 
 struct task_struct {
@@ -251,7 +252,10 @@ struct task_struct {
 	prio_array_t *array;
 
 	unsigned int time_slice;
-	unsigned long sleep_jtime;
+
+	#define MAX_SLEEP_AVG (2*HZ)
+	unsigned long sleep_avg;
+	unsigned long sleep_timestamp;
 
 	unsigned long policy;
 	unsigned long cpus_allowed;
@@ -390,30 +394,47 @@ struct task_struct {
  * them out at 128 to make it easier to search the
  * scheduler bitmap.
  */
-#define MAX_RT_PRIO	128
+#define MAX_RT_PRIO		128
 /*
  * The lower the priority of a process, the more likely it is
  * to run. Priority of a process goes from 0 to 167. The 0-99
  * priority range is allocated to RT tasks, the 128-167 range
  * is for SCHED_OTHER tasks.
  */
-#define MAX_PRIO	(MAX_RT_PRIO+40)
-#define DEF_USER_NICE	0
+#define MAX_PRIO		(MAX_RT_PRIO + 40)
 
 /*
- * Default timeslice is 80 msecs, maximum is 160 msecs.
+ * Scales user-nice values [ -20 ... 0 ... 19 ]
+ * to static priority [ 128 ... 167 (MAX_PRIO-1) ]
+ *
+ * User-nice value of -20 == static priority 128, and
+ * user-nice value 19 == static priority 167. The lower
+ * the priority value, the higher the task's priority.
+ */
+#define NICE_TO_PRIO(n)		(MAX_RT_PRIO + (n) + 20)
+#define DEF_USER_NICE		0
+
+/*
+ * Default timeslice is 90 msecs, maximum is 180 msecs.
  * Minimum timeslice is 10 msecs.
  */
-#define MIN_TIMESLICE	(10 * HZ / 1000)
-#define MAX_TIMESLICE	(160 * HZ / 1000)
+#define MIN_TIMESLICE		( 10 * HZ / 1000)
+#define MAX_TIMESLICE		(180 * HZ / 1000)
 
-#define USER_PRIO(p) ((p)-MAX_RT_PRIO)
-#define MAX_USER_PRIO (USER_PRIO(MAX_PRIO))
-#define DEF_PRIO	(MAX_RT_PRIO + MAX_USER_PRIO / 3)
-#define NICE_TO_PRIO(n) (MAX_PRIO-1 + (n) - 19)
+#define USER_PRIO(p)		((p)-MAX_RT_PRIO)
+#define MAX_USER_PRIO		(USER_PRIO(MAX_PRIO))
 
-#define NICE_TO_TIMESLICE(n)   (MIN_TIMESLICE + \
-	((MAX_TIMESLICE - MIN_TIMESLICE) * (19 - (n))) / 39)
+/*
+ * NICE_TO_TIMESLICE scales nice values [ -20 ... 19 ]
+ * to time slice values.
+ *
+ * The higher a process's priority, the bigger timeslices
+ * it gets during one round of execution. But even the lowest
+ * priority process gets MIN_TIMESLICE worth of execution time.
+ */
+
+#define NICE_TO_TIMESLICE(n) (MIN_TIMESLICE + \
+	((MAX_TIMESLICE - MIN_TIMESLICE) * (19-(n))) / 39)
 
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
 extern void set_user_nice(task_t *p, long nice);
@@ -541,6 +562,17 @@ extern int do_sigaltstack(const stack_t *, stack_t *, unsigned long);
 static inline int signal_pending(struct task_struct *p)
 {
 	return (p->sigpending != 0);
+}
+  
+static inline int need_resched(void)
+{
+	return unlikely(current->need_resched != 0);
+}
+
+static inline void cond_resched(void)
+{
+	if (need_resched())
+		schedule();
 }
 
 /*

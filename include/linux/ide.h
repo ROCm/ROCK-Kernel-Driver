@@ -884,6 +884,9 @@ typedef enum {
  */
 #define ide_rq_offset(rq) (((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
 
+#define task_rq_offset(rq) \
+	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
+
 extern inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
 {
 	return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
@@ -892,6 +895,24 @@ extern inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
 extern inline void ide_unmap_buffer(char *buffer, unsigned long *flags)
 {
 	bio_kunmap_irq(buffer, flags);
+}
+
+/*
+ * for now, taskfile requests are special :/
+ */
+extern inline char *ide_map_rq(struct request *rq, unsigned long *flags)
+{
+	if (rq->bio)
+		return ide_map_buffer(rq, flags);
+	else
+		return rq->buffer + task_rq_offset(rq);
+}
+
+extern inline void ide_unmap_rq(struct request *rq, char *buf,
+				unsigned long *flags)
+{
+	if (rq->bio)
+		ide_unmap_buffer(buf, flags);
 }
 
 /*

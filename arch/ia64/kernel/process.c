@@ -117,10 +117,10 @@ cpu_idle (void *unused)
 
 	while (1) {
 #ifdef CONFIG_SMP
-		if (!current->need_resched)
+		if (!need_resched())
 			min_xtp();
 #endif
-		while (!current->need_resched)
+		while (!need_resched())
 			continue;
 #ifdef CONFIG_SMP
 		normal_xtp();

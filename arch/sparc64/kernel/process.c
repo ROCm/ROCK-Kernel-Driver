@@ -61,7 +61,7 @@ int cpu_idle(void)
 		 * But this requires writing back the contents of the
 		 * L2 cache etc. so implement this later. -DaveM
 		 */
-		while (!current->need_resched)
+		while (!need_resched())
 			barrier();
 
 		schedule();
@@ -80,7 +80,7 @@ int cpu_idle(void)
 int cpu_idle(void)
 {
 	while(1) {
-		if (current->need_resched != 0) {
+		if (need_resched()) {
 			unidle_me();
 			schedule();
 			check_pgt_cache();

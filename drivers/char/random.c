@@ -1313,7 +1313,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 		/*
 		 * Check if we need to break out or reschedule....
 		 */
-		if ((flags & EXTRACT_ENTROPY_USER) && current->need_resched) {
+		if ((flags & EXTRACT_ENTROPY_USER) && need_resched()) {
 			if (signal_pending(current)) {
 				if (ret == 0)
 					ret = -ERESTARTSYS;

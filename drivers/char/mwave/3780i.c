@@ -68,11 +68,9 @@ static unsigned long flags;
 
 static void PaceMsaAccess(unsigned short usDspBaseIO)
 {
-	if(current->need_resched)
-		schedule();
+	cond_resched();
 	udelay(100);
-	if(current->need_resched)
-		schedule();
+	cond_resched();
 }
 
 unsigned short dsp3780I_ReadMsaCfg(unsigned short usDspBaseIO,

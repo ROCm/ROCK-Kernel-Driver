@@ -88,6 +88,7 @@ const short	channel_bands[] = { 0x30, 0x58, 0x64, 0x7A, 0x80, 0xA8,
  */
 const int	fixed_bands[] = { 915e6, 2.425e8, 2.46e8, 2.484e8, 2.4305e8 };
 
+
 /*************************** PC INTERFACE ****************************/
 
 /* WaveLAN host interface definitions */
@@ -316,6 +317,7 @@ struct mmw_t
 /* Calculate offset of a field in the above structure */
 #define	mmwoff(p,f) 	(unsigned short)((void *)(&((mmw_t *)((void *)0 + (p)))->f) - (void *)0)
 
+
 /*
  * Modem Management Controller (MMC) read structure.
  */
@@ -372,6 +374,7 @@ struct mmr_t
 
 /* Calculate offset of a field in the above structure */
 #define	mmroff(p,f) 	(unsigned short)((void *)(&((mmr_t *)((void *)0 + (p)))->f) - (void *)0)
+
 
 /* Make the two above structures one */
 typedef union mm_t

@@ -1995,7 +1995,7 @@ handle_one_block:
 	/* just to be a nice neighbor */
 	/* Thomas Sailer:
 	 * But also to ourselves, release semaphore if we do so */
-	if (current->need_resched) {
+	if (need_resched()) {
 		up(&card->syscall_sem);
 		schedule ();
 		ret = via_syscall_down (card, nonblock);
@@ -2171,7 +2171,7 @@ handle_one_block:
 	/* just to be a nice neighbor */
 	/* Thomas Sailer:
 	 * But also to ourselves, release semaphore if we do so */
-	if (current->need_resched) {
+	if (need_resched()) {
 		up(&card->syscall_sem);
 		schedule ();
 		ret = via_syscall_down (card, nonblock);

@@ -128,7 +128,7 @@ int parport_poll_peripheral(struct parport *port,
 			return 0;
 		if (signal_pending (current))
 			return -EINTR;
-		if (current->need_resched)
+		if (need_resched())
 			break;
 		if (i >= 2)
 			udelay (5);

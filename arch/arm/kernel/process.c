@@ -91,7 +91,7 @@ void cpu_idle(void)
 		if (!idle)
 			idle = arch_idle;
 		leds_event(led_idle_start);
-		while (!current->need_resched)
+		while (!need_resched())
 			idle();
 		leds_event(led_idle_end);
 		schedule();

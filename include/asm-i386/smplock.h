@@ -19,8 +19,8 @@ extern spinlock_t kernel_flag;
 do {						\
 	if (unlikely(task->lock_depth >= 0)) {	\
 		spin_unlock(&kernel_flag);	\
-		release_irqlock(cpu);		\
-		__sti();			\
+		if (global_irq_holder == (cpu))	\
+			BUG();			\
 	}					\
 } while (0)
 

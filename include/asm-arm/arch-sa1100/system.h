@@ -10,7 +10,7 @@ static inline void arch_idle(void)
 	if (!hlt_counter) {
 		int flags;
 		local_irq_save(flags);
-		if (!current->need_resched)
+		if (!need_resched())
 			cpu_do_idle(0);
 		local_irq_restore(flags);
 	}

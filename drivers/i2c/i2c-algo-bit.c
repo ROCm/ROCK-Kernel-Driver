@@ -50,7 +50,7 @@
 /* might not like this, as they have an internal timeout of some mils	*/
 /*
 #define SLO_IO      jif=jiffies;while(jiffies<=jif+i2c_table[minor].veryslow)\
-                        if (need_resched) schedule();
+                        cond_resched();
 */
 
 
@@ -120,8 +120,7 @@ static inline int sclhi(struct i2c_algo_bit_data *adap)
 		if (start+adap->timeout <= jiffies) {
 			return -ETIMEDOUT;
 		}
-		if (current->need_resched)
-			schedule();
+		cond_resched();
 	}
 	DEBSTAT(printk("needed %ld jiffies\n", jiffies-start));
 #ifdef SLO_IO

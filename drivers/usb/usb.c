@@ -2252,6 +2252,14 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 		return -EINVAL;
 	}
 
+	/* 9.4.10 says devices don't need this, if the interface
+	   only has one alternate setting */
+	if (iface->num_altsetting == 1) {
+		warn("ignoring set_interface for dev %d, iface %d, alt %d",
+			dev->devnum, interface, alternate);
+		return 0;
+	}
+
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 	    USB_REQ_SET_INTERFACE, USB_RECIP_INTERFACE, alternate,
 	    interface, NULL, 0, HZ * 5)) < 0)

@@ -10,7 +10,7 @@
 
 static void arch_idle(void)
 {
-	while (!current->need_resched && !hlt_counter);
+	while (!need_resched() && !hlt_counter);
 }
 
 static inline void arch_reset(char mode)

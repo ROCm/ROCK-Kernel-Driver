@@ -331,7 +331,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 
 	SCSI_LOG_HLQUEUE(2, printk("sr%d : %s %d/%ld 512 byte blocks.\n",
                                    devm,
-		   (SCpnt->request.cmd == WRITE) ? "writing" : "reading",
+		   (rq_data_dir(&SCpnt->request) == WRITE) ? "writing" : "reading",
 				 this_count, SCpnt->request.nr_sectors));
 
 	SCpnt->cmnd[1] = (SCpnt->device->scsi_level <= SCSI_2) ?

@@ -883,11 +883,10 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		/* can't get here without STS_ASS set */
 		if (ehci->hcd.state != USB_STATE_HALT) {
 			if (cmd & CMD_PSE)
-				writel (cmd & __constant_cpu_to_le32 (~CMD_ASE),
-					&ehci->regs->command);
+				writel (cmd & ~CMD_ASE, &ehci->regs->command);
 			else {
 				ehci_ready (ehci);
-				while (!(readl (&ehci->regs->status) & STS_ASS))
+				while (readl (&ehci->regs->status) & STS_ASS)
 					udelay (100);
 			}
 		}

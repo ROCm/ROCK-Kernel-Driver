@@ -186,7 +186,8 @@ void blk_queue_bounce_limit(request_queue_t *q, u64 dma_addr)
 	 * full 4GB zone, so we have to resort to low memory for any bounces.
 	 * ISA has its own < 16MB zone.
 	 */
-	if (dma_addr == BLK_BOUNCE_ISA) {
+	if (bounce_pfn < blk_max_low_pfn) {
+		BUG_ON(dma_addr < BLK_BOUNCE_ISA);
 		init_emergency_isa_pool();
 		q->bounce_gfp = GFP_NOIO | GFP_DMA;
 	} else
@@ -302,8 +303,8 @@ void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
 static char *rq_flags[] = { "REQ_RW", "REQ_RW_AHEAD", "REQ_BARRIER",
 			   "REQ_CMD", "REQ_NOMERGE", "REQ_STARTED",
 			   "REQ_DONTPREP", "REQ_DRIVE_CMD", "REQ_DRIVE_TASK",
-			   "REQ_PC", "REQ_BLOCK_PC", "REQ_SENSE",
-			   "REQ_SPECIAL" };
+			   "REQ_DRIVE_ACB", "REQ_PC", "REQ_BLOCK_PC",
+			   "REQ_SENSE", "REQ_SPECIAL" };
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
 {
@@ -1708,7 +1709,11 @@ int __init blk_dev_init(void)
 	printk("block: %d slots per queue, batch=%d\n", queue_nr_requests, batch_requests);
 
 	blk_max_low_pfn = max_low_pfn;
+#ifdef CONFIG_HIGHMEM
 	blk_max_pfn = max_pfn;
+#else
+	blk_max_pfn = max_low_pfn;
+#endif
 
 #if defined(CONFIG_IDE) && defined(CONFIG_BLK_DEV_IDE)
 	ide_init();		/* this MUST precede hd_init */

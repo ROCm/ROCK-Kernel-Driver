@@ -1458,14 +1458,11 @@ void ide_dma_timeout_retry(ide_drive_t *drive)
 	HWGROUP(drive)->rq = NULL;
 
 	rq->errors = 0;
-	rq->sector = rq->bio->bi_sector;
-	rq->current_nr_sectors = bio_sectors(rq->bio);
-
-	/*
-	 * just to make sure...
-	 */
-	if (rq->bio)
+	if (rq->bio) {
+		rq->sector = rq->bio->bi_sector;
+		rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
 		rq->buffer = NULL;
+	}
 }
 
 /*

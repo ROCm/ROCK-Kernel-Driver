@@ -178,15 +178,7 @@ struct keyspan_port_private {
 /* Functions used by new usb-serial code. */
 static int __init keyspan_init (void)
 {
-	usb_serial_register (&keyspan_usa18x_pre_device);
-	usb_serial_register (&keyspan_usa19_pre_device);
-	usb_serial_register (&keyspan_usa19w_pre_device);
-	usb_serial_register (&keyspan_usa28_pre_device);
-	usb_serial_register (&keyspan_usa28x_pre_device);
-	usb_serial_register (&keyspan_usa28xa_pre_device);
-	usb_serial_register (&keyspan_usa28xb_pre_device);
-	usb_serial_register (&keyspan_usa49w_pre_device);
-
+	usb_serial_register (&keyspan_pre_device);
 	usb_serial_register (&keyspan_usa18x_device);
 	usb_serial_register (&keyspan_usa19_device);
 	usb_serial_register (&keyspan_usa19w_device);
@@ -203,15 +195,7 @@ static int __init keyspan_init (void)
 
 static void __exit keyspan_exit (void)
 {
-	usb_serial_deregister (&keyspan_usa18x_pre_device);
-	usb_serial_deregister (&keyspan_usa19_pre_device);
-	usb_serial_deregister (&keyspan_usa19w_pre_device);
-	usb_serial_deregister (&keyspan_usa28_pre_device);
-	usb_serial_deregister (&keyspan_usa28x_pre_device);
-	usb_serial_deregister (&keyspan_usa28xa_pre_device);
-	usb_serial_deregister (&keyspan_usa28xb_pre_device);
-	usb_serial_deregister (&keyspan_usa49w_pre_device);
-
+	usb_serial_deregister (&keyspan_pre_device);
 	usb_serial_deregister (&keyspan_usa18x_device);
 	usb_serial_deregister (&keyspan_usa19_device);
 	usb_serial_deregister (&keyspan_usa19w_device);

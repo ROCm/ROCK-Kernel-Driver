@@ -170,9 +170,7 @@ static ssize_t pp_read (struct file * file, char * buf, size_t count,
 			break;
 		}
 
-		if (current->need_resched) {
-			schedule ();
-		}
+		cond_resched();
 	}
 
 	kfree (kbuffer);
@@ -242,9 +240,7 @@ static ssize_t pp_write (struct file * file, const char * buf, size_t count,
 			break;
 		}
 
-		if (current->need_resched) {
-			schedule ();
-		}
+		cond_resched();
 	}
 
 	kfree (kbuffer);

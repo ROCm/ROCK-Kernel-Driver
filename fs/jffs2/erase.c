@@ -131,8 +131,7 @@ void jffs2_erase_pending_blocks(struct jffs2_sb_info *c)
 		
 		jffs2_erase_block(c, jeb);
 		/* Be nice */
-		if (current->need_resched)
-			schedule();
+		cond_resched();
 		spin_lock_bh(&c->erase_completion_lock);
 	}
 	spin_unlock_bh(&c->erase_completion_lock);

@@ -27,6 +27,8 @@
 /* Prototypes */
 extern void isdn_MOD_INC_USE_COUNT(void);
 extern void isdn_MOD_DEC_USE_COUNT(void);
+extern void isdn_lock_drivers(void);
+extern void isdn_unlock_drivers(void);
 extern void isdn_free_channel(int di, int ch, int usage);
 extern void isdn_all_eaz(int di, int ch);
 extern int isdn_command(isdn_ctrl *);

@@ -127,8 +127,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 			schedule();
 		}
                 
-		if (current->need_resched)
-			schedule();
+		cond_resched();
 
                 /* Put_super will send a SIGKILL and then wait on the sem. 
                  */

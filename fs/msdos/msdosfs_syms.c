@@ -23,7 +23,6 @@ EXPORT_SYMBOL(msdos_mkdir);
 EXPORT_SYMBOL(msdos_rename);
 EXPORT_SYMBOL(msdos_rmdir);
 EXPORT_SYMBOL(msdos_unlink);
-EXPORT_SYMBOL(msdos_read_super);
 EXPORT_SYMBOL(msdos_put_super);
 
 static DECLARE_FSTYPE_DEV(msdos_fs_type, "msdos", msdos_read_super);

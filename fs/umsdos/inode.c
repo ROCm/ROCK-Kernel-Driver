@@ -363,10 +363,17 @@ struct super_block *UMSDOS_read_super (struct super_block *sb, void *data,
 	 * Call msdos-fs to mount the disk.
 	 * Note: this returns res == sb or NULL
 	 */
-	res = msdos_read_super (sb, data, silent);
+	MSDOS_SB(sb)->options.isvfat = 0;
+	res = fat_read_super(sb, data, silent, &umsdos_rdir_inode_operations);
 
-	if (!res)
-		goto out_fail;
+	if (IS_ERR(res))
+		return NULL;
+	if (res == NULL) {
+		if (!silent)
+			printk(KERN_INFO "VFS: Can't find a valid "
+			       "UMSDOS filesystem on dev %s.\n", sb->s_id);
+		return NULL;
+	}
 
 	printk (KERN_INFO "UMSDOS 0.86k "
 		"(compatibility level %d.%d, fast msdos)\n", 
@@ -394,10 +401,6 @@ struct super_block *UMSDOS_read_super (struct super_block *sb, void *data,
 		dget (sb->s_root); sb->s_root = dget(new_root);
 	}
 	return sb;
-
-out_fail:
-	printk(KERN_INFO "UMSDOS: msdos_read_super failed, mount aborted.\n");
-	return NULL;
 }
 
 /*

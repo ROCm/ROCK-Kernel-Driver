@@ -589,7 +589,15 @@ struct super_block *msdos_read_super(struct super_block *sb,void *data, int sile
 
 	MSDOS_SB(sb)->options.isvfat = 0;
 	res = fat_read_super(sb, data, silent, &msdos_dir_inode_operations);
-	if (res)
-		sb->s_root->d_op = &msdos_dentry_operations;
+	if (IS_ERR(res))
+		return NULL;
+	if (res == NULL) {
+		if (!silent)
+			printk(KERN_INFO "VFS: Can't find a valid"
+			       " MSDOS filesystem on dev %s.\n", sb->s_id);
+		return NULL;
+	}
+
+	sb->s_root->d_op = &msdos_dentry_operations;
 	return res;
 }

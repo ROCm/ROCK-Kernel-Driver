@@ -16,7 +16,7 @@
 
 static void arch_idle(void)
 {
-	while (!current->need_resched && !hlt_counter)
+	while (!need_resched() && !hlt_counter)
 		cpu_do_idle(IDLE_WAIT_SLOW);
 }
 

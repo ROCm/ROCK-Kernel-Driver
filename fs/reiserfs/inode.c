@@ -101,9 +101,9 @@ inline void make_le_item_head (struct item_head * ih, const struct cpu_key * key
 }
 
 static void add_to_flushlist(struct inode *inode, struct buffer_head *bh) {
-    struct inode *jinode = &(SB_JOURNAL(inode->i_sb)->j_dummy_inode) ;
+    struct list_head *list = &(SB_JOURNAL(inode->i_sb)->j_dirty_buffers) ;
 
-    buffer_insert_inode_queue(bh, jinode) ;
+    buffer_insert_list(bh, list) ;
 }
 
 //
@@ -808,8 +808,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	/* inserting indirect pointers for a hole can take a 
 	** long time.  reschedule if needed
 	*/
-	if (current->need_resched)
-	    schedule() ;
+	cond_resched();
 
 	retval = search_for_position_by_key (inode->i_sb, &key, &path);
 	if (retval == IO_ERROR) {

@@ -70,9 +70,15 @@
  *	Brad Hards
  *	Rory Bolt
  *	...
+ *
+ * HISTORY:
+ * 2002-01-14	Minor cleanup; version synch.
+ * 2002-01-08	Fix roothub handoff of FS/LS to companion controllers.
+ * 2002-01-04	Control/Bulk queuing behaves.
+ * 2001-12-12	Initial patch version for Linux 2.5.1 kernel.
  */
 
-#define DRIVER_VERSION "$Revision: 0.25 $"
+#define DRIVER_VERSION "$Revision: 0.26 $"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -97,9 +103,6 @@
 static int log2_irq_thresh = 0;		// 0 to 6
 MODULE_PARM (log2_irq_thresh, "i");
 MODULE_PARM_DESC (log2_irq_thresh, "log2 IRQ latency, 1-64 microframes");
-
-/* Some A steppings of the NEC controller need soft retries */
-//#define	EHCI_SOFT_RETRIES	5	/* after CERR-induced fault */
 
 #define	INTR_MASK (STS_IAA | STS_FATAL | STS_ERR | STS_INT)
 

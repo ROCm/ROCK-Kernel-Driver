@@ -5,12 +5,9 @@
 #ifndef __LINUX_FILE_H
 #define __LINUX_FILE_H
 
-#ifndef _LINUX_POSIX_TYPES_H	/* __FD_CLR */
+#include <asm/atomic.h>
 #include <linux/posix_types.h>
-#endif
-#ifndef __LINUX_COMPILER_H	/* unlikely */
 #include <linux/compiler.h>
-#endif
 
 /*
  * The default fd array needs to be at least BITS_PER_LONG,

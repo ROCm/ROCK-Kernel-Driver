@@ -368,7 +368,7 @@ static inline __u8 cfi_read_query(struct map_info *map, __u32 addr)
 static inline void cfi_udelay(int us)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-	if (current->need_resched) {
+	if (need_resched()) {
 		unsigned long t = us * HZ / 1000000;
 		if (t < 1)
 			t = 1;

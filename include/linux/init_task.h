@@ -1,9 +1,7 @@
 #ifndef _LINUX__INIT_TASK_H
 #define _LINUX__INIT_TASK_H
 
-#ifndef __LINUX_FILE_H
 #include <linux/file.h>
-#endif
 
 #define INIT_FILES \
 { 							\

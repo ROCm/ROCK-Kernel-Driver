@@ -367,7 +367,7 @@ static ssize_t lp_write(struct file * file, const char * buf,
 			  = lp_negotiate (port, 
 					  lp_table[minor].best_mode);
 
-		} else if (current->need_resched)
+		} else if (need_resched())
 			schedule ();
 
 		if (count) {

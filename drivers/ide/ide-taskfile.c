@@ -706,8 +706,8 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 	ide__sti();	/* local CPU only */
 
 	if (!OK_STAT(stat, READY_STAT, BAD_STAT))
-		return ide_error(drive, "task_no_data_intr", stat); /* calls ide_end_drive_cmd */
-
+		return ide_error(drive, "task_no_data_intr", stat);
+		/* calls ide_end_drive_cmd */
 	if (args)
 		ide_end_drive_cmd (drive, stat, GET_ERR());
 
@@ -723,6 +723,7 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= HWGROUP(drive)->rq;
 	char *pBuf		= NULL;
+	unsigned long flags;
 
 	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
@@ -735,17 +736,21 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 		}
 	}
 	DTF("stat: %02x\n", stat);
-	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
+	pBuf = ide_map_rq(rq, &flags);
 	DTF("Read: %p, rq->current_nr_sectors: %d\n", pBuf, (int) rq->current_nr_sectors);
 
 	drive->io_32bit = 0;
 	taskfile_input_data(drive, pBuf, SECTOR_WORDS);
+	ide_unmap_rq(rq, pBuf, &flags);
 	drive->io_32bit = io_32bit;
 
 	if (--rq->current_nr_sectors <= 0) {
 		/* (hs): swapped next 2 lines */
 		DTF("Request Ended stat: %02x\n", GET_STAT());
-		ide_end_request(1, HWGROUP(drive));
+		if (ide_end_request(1, HWGROUP(drive))) {
+			ide_set_handler(drive, &task_in_intr,  WAIT_CMD, NULL);
+			return ide_started;
+		}
 	} else {
 		ide_set_handler(drive, &task_in_intr,  WAIT_CMD, NULL);
 		return ide_started;
@@ -809,13 +814,14 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= HWGROUP(drive)->rq;
 	char *pBuf		= NULL;
+	unsigned long flags;
 
 	if (!OK_STAT(stat,DATA_READY,BAD_R_STAT)) {
 		if (stat & (ERR_STAT|DRQ_STAT)) {
 			return ide_error(drive, "task_mulin_intr", stat);
 		}
 		/* no data yet, so wait for another interrupt */
-		ide_set_handler(drive, &task_mulin_intr, WAIT_CMD, NULL);
+		ide_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
 		return ide_started;
 	}
 
@@ -834,10 +840,11 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 		 */
 		nsect = 1;
 		while (rq->current_nr_sectors) {
-			pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
+			pBuf = ide_map_rq(rq, &flags);
 			DTF("Multiread: %p, nsect: %d, rq->current_nr_sectors: %ld\n", pBuf, nsect, rq->current_nr_sectors);
 			drive->io_32bit = 0;
 			taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
+			ide_unmap_rq(rq, pBuf, &flags);
 			drive->io_32bit = io_32bit;
 			rq->errors = 0;
 			rq->current_nr_sectors -= nsect;
@@ -848,22 +855,34 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 	}
 #endif /* ALTSTAT_SCREW_UP */
 
-	nsect = (rq->current_nr_sectors > msect) ? msect : rq->current_nr_sectors;
-	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
+	do {
+		nsect = rq->current_nr_sectors;
+		if (nsect > msect)
+			nsect = msect;
 
-	DTF("Multiread: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
-		pBuf, nsect, rq->current_nr_sectors);
-	drive->io_32bit = 0;
-	taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
-	drive->io_32bit = io_32bit;
-	rq->errors = 0;
-	rq->current_nr_sectors -= nsect;
-	if (rq->current_nr_sectors != 0) {
-		ide_set_handler(drive, &task_mulin_intr, WAIT_CMD, NULL);
-		return ide_started;
-	}
-	ide_end_request(1, HWGROUP(drive));
-	return ide_stopped;
+		pBuf = ide_map_rq(rq, &flags);
+
+		DTF("Multiread: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
+			pBuf, nsect, rq->current_nr_sectors);
+		drive->io_32bit = 0;
+		taskfile_input_data(drive, pBuf, nsect * SECTOR_WORDS);
+		ide_unmap_rq(rq, pBuf, &flags);
+		drive->io_32bit = io_32bit;
+		rq->errors = 0;
+		rq->current_nr_sectors -= nsect;
+		msect -= nsect;
+		if (!rq->current_nr_sectors) {
+			if (!ide_end_request(1, HWGROUP(drive)))
+				return ide_stopped;
+		}
+	} while (msect);
+
+
+	/*
+	 * more data left
+	 */
+	ide_set_handler(drive, task_mulin_intr, WAIT_CMD, NULL);
+	return ide_started;
 }
 
 ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
@@ -879,10 +898,12 @@ ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 	/* (ks/hs): Fixed Multi Write */
 	if ((args->tfRegister[IDE_COMMAND_OFFSET] != WIN_MULTWRITE) &&
 	    (args->tfRegister[IDE_COMMAND_OFFSET] != WIN_MULTWRITE_EXT)) {
+		unsigned long flags;
+		char *buf = ide_map_rq(rq, &flags);
 		/* For Write_sectors we need to stuff the first sector */
-		taskfile_output_data(drive, rq->buffer, SECTOR_WORDS);
+		taskfile_output_data(drive, buf, SECTOR_WORDS);
 		rq->current_nr_sectors--;
-		return ide_started;
+		ide_unmap_rq(rq, buf, &flags);
 	} else {
 		/*
 		 * (ks/hs): Stuff the first sector(s)
@@ -913,8 +934,10 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= HWGROUP(drive)->rq;
 	char *pBuf		= NULL;
+	unsigned long flags;
 
 	if (!rq->current_nr_sectors) { 
+		printk("task_out_intr: should not trigger\n");
 		ide_end_request(1, HWGROUP(drive));
 		return ide_stopped;
 	}
@@ -922,19 +945,24 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 	if (!OK_STAT(stat,DRIVE_READY,drive->bad_wstat)) {
 		return ide_error(drive, "task_out_intr", stat);
 	}
+
 	if ((rq->current_nr_sectors==1) ^ (stat & DRQ_STAT)) {
 		rq = HWGROUP(drive)->rq;
-		pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
+		pBuf = ide_map_rq(rq, &flags);
 		DTF("write: %p, rq->current_nr_sectors: %d\n", pBuf, (int) rq->current_nr_sectors);
 		drive->io_32bit = 0;
 		taskfile_output_data(drive, pBuf, SECTOR_WORDS);
+		ide_unmap_rq(rq, pBuf, &flags);
 		drive->io_32bit = io_32bit;
 		rq->errors = 0;
 		rq->current_nr_sectors--;
 	}
 
 	if (rq->current_nr_sectors <= 0) {
-		ide_end_request(1, HWGROUP(drive));
+		if (ide_end_request(1, HWGROUP(drive))) {
+			ide_set_handler(drive, &task_out_intr, WAIT_CMD, NULL);
+			return ide_started;
+		}
 	} else {
 		ide_set_handler(drive, &task_out_intr, WAIT_CMD, NULL);
 		return ide_started;
@@ -961,14 +989,20 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	struct request *rq	= HWGROUP(drive)->rq;
 	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
 	char *pBuf		= NULL;
+	unsigned long flags;
 
 	/*
 	 * (ks/hs): Handle last IRQ on multi-sector transfer,
-	 * occurs after all data was sent
+	 * occurs after all data was sent in this chunk
 	 */
 	if (rq->current_nr_sectors == 0) {
 		if (stat & (ERR_STAT|DRQ_STAT))
 			return ide_error(drive, "task_mulout_intr", stat);
+
+		/*
+		 * there may be more, ide_do_request will restart it if
+		 * necessary
+		 */
 		ide_end_request(1, HWGROUP(drive));
 		return ide_stopped;
 	}
@@ -994,10 +1028,11 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	if (!msect) {
 		nsect = 1;
 		while (rq->current_nr_sectors) {
-			pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
+			pBuf = ide_map_rq(rq, &flags);
 			DTF("Multiwrite: %p, nsect: %d, rq->current_nr_sectors: %ld\n", pBuf, nsect, rq->current_nr_sectors);
 			drive->io_32bit = 0;
 			taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
+			ide_unmap_rq(pBuf, &flags);
 			drive->io_32bit = io_32bit;
 			rq->errors = 0;
 			rq->current_nr_sectors -= nsect;
@@ -1008,12 +1043,16 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 	}
 #endif /* ALTSTAT_SCREW_UP */
 
-	nsect = (rq->current_nr_sectors > msect) ? msect : rq->current_nr_sectors;
-	pBuf = rq->buffer + ((rq->nr_sectors - rq->current_nr_sectors) * SECTOR_SIZE);
+	nsect = rq->current_nr_sectors;
+	if (nsect > msect)
+		nsect = msect;
+
+	pBuf = ide_map_rq(rq, &flags);
 	DTF("Multiwrite: %p, nsect: %d , rq->current_nr_sectors: %ld\n",
 		pBuf, nsect, rq->current_nr_sectors);
 	drive->io_32bit = 0;
 	taskfile_output_data(drive, pBuf, nsect * SECTOR_WORDS);
+	ide_unmap_rq(rq, pBuf, &flags);
 	drive->io_32bit = io_32bit;
 	rq->errors = 0;
 	rq->current_nr_sectors -= nsect;

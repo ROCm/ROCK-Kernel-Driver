@@ -224,14 +224,13 @@ write_out_data_locked:
 		}
 	} while (jh != last_jh);
 
-	if (bufs || current->need_resched) {
+	if (bufs || need_resched()) {
 		jbd_debug(2, "submit %d writes\n", bufs);
 		spin_unlock(&journal_datalist_lock);
 		unlock_journal(journal);
 		if (bufs)
 			ll_rw_block(WRITE, bufs, wbuf);
-		if (current->need_resched)
-			schedule();
+		cond_resched();
 		journal_brelse_array(wbuf, bufs);
 		lock_journal(journal);
 		spin_lock(&journal_datalist_lock);
@@ -458,8 +457,7 @@ start_journal_io:
 				bh->b_end_io = journal_end_buffer_io_sync;
 				submit_bh(WRITE, bh);
 			}
-			if (current->need_resched)
-				schedule();
+			cond_resched();
 			lock_journal(journal);
 
 			/* Force a new descriptor to be generated next

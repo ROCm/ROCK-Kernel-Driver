@@ -1,3 +1,23 @@
+2001-12-07  Tim Waugh  <twaugh@redhat.com>
+
+	* ieee1284_ops.c (parport_ieee1284_epp_write_addr,
+	parport_ieee1284_epp_read_addr): Actually do something useful.
+
+2001-12-07  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (dmaval): Don't use DMA by default.  It seems to be
+	too buggy at the moment.  Use 'dma=auto' to restore the previous
+	behaviour.
+
+2001-12-03  Rich Liu  <Rich.Liu@ite.com.tw>
+
+	* parport_pc.c (sio_ite_8872_probe): ITE8873 is a single-port
+	serial board, not a serial+parallel.
+
+2001-11-30  Niels Kristian Bech Jensen  <nkbj@image.dk>
+
+	* parport_pc.c: Fix compiler warning.
+
 2001-12-06  Tim Waugh  <twaugh@redhat.com>
 
 	* ieee1284_ops.c (parport_ieee1284_ecp_read_data): Mask off

@@ -270,8 +270,10 @@ check_for_redirect(struct sk_buff *skb)
 	if (redir) {
 		DEBUGP("Doing tcp redirect again.\n");
 		do_tcp_redir(skb, redir);
-		if (del_timer(&redir->destroyme))
-			add_timer(&redir->destroyme, jiffies + REDIR_TIMEOUT);
+		if (del_timer(&redir->destroyme)) {
+			redir->destroyme.expires = jiffies + REDIR_TIMEOUT;
+			add_timer(&redir->destroyme);
+		}
 	}
 	UNLOCK_BH(&redir_lock);
 }
@@ -296,8 +298,10 @@ check_for_unredirect(struct sk_buff *skb)
 	if (redir) {
 		DEBUGP("Doing tcp unredirect.\n");
 		do_tcp_unredir(skb, redir);
-		if (del_timer(&redir->destroyme))
-			add_timer(&redir->destroyme, jiffies + REDIR_TIMEOUT);
+		if (del_timer(&redir->destroyme)) {
+			redir->destroyme.expires = jiffies + REDIR_TIMEOUT;
+			add_timer(&redir->destroyme);
+		}
 	}
 	UNLOCK_BH(&redir_lock);
 }

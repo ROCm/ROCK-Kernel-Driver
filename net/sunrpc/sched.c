@@ -721,7 +721,7 @@ __rpc_schedule(void)
 
 		__rpc_execute(task);
 
-		if (++count >= 200 || current->need_resched) {
+		if (++count >= 200 || need_resched()) {
 			count = 0;
 			schedule();
 		}

@@ -392,7 +392,7 @@ static int cpia_pp_streamRead(void *privdata, u8 *buffer, int noblock)
 	endseen = 0;
 	block_size = PARPORT_CHUNK_SIZE;
 	while( !cam->image_complete ) {
-		if(current->need_resched)  schedule();
+		cond_resched();
 		
 		new_bytes = cpia_pp_read(cam->port, buffer, block_size );
 		if( new_bytes <= 0 ) {

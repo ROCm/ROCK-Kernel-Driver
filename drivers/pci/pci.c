@@ -1929,7 +1929,7 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 }
 
 
-void __devinit  pci_init(void)
+static int __devinit pci_init(void)
 {
 	struct pci_dev *dev;
 
@@ -1942,6 +1942,7 @@ void __devinit  pci_init(void)
 #ifdef CONFIG_PM
 	pm_register(PM_PCI_DEV, 0, pci_pm_callback);
 #endif
+	return 0;
 }
 
 static int __devinit  pci_setup(char *str)
@@ -1958,6 +1959,8 @@ static int __devinit  pci_setup(char *str)
 	}
 	return 1;
 }
+
+subsys_initcall(pci_init);
 
 __setup("pci=", pci_setup);
 

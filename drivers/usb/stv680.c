@@ -43,6 +43,13 @@
  * 			   Took out sharpen function, ran code through
  * 			   Lindent, and did other minor tweaks to get
  * 			   things to work properly with 2.5.1
+ *
+ * ver 0.24 Jan, 2002 (kjs) 
+ *                         Fixed the problem with webcam crashing after
+ *                         two pictures. Changed the way pic is halved to 
+ *                         improve quality. Got rid of green line around 
+ *                         frame. Fix brightness reset when changing size 
+ *                         bug. Adjusted gamma filters slightly.
  */
 
 #include <linux/config.h>
@@ -65,7 +72,8 @@
 #include "stv680.h"
 
 static int video_nr = -1;
-static int swapRGB = 0;
+static int swapRGB = 0;   /* default for auto sleect */
+static int swapRGB_on = 0; /* default to allow auto select; -1=swap never, +1= swap always */
 
 static unsigned int debug = 0;
 
@@ -79,7 +87,7 @@ static unsigned int debug = 0;
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.23"
+#define DRIVER_VERSION "v0.24"
 #define DRIVER_AUTHOR "Kevin Sisson <kjsisson@bellsouth.net>"
 #define DRIVER_DESC "STV0680 USB Camera Driver"
 
@@ -88,8 +96,8 @@ MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE ("GPL");
 MODULE_PARM (debug, "i");
 MODULE_PARM_DESC (debug, "Debug enabled or not");
-MODULE_PARM (swapRGB, "i");
-MODULE_PARM_DESC (swapRGB, "Swap red and blue, e.g., for xawtv");
+MODULE_PARM (swapRGB_on, "i");
+MODULE_PARM_DESC (swapRGB_on, "Red/blue swap: 1=always, 0=auto, -1=never");
 MODULE_PARM (video_nr, "i");
 EXPORT_NO_SYMBOLS;
 
@@ -521,8 +529,15 @@ exit:
 	stv680->palette = STV_VIDEO_PALETTE;
 	stv680->depth = 24;	/* rgb24 bits */
 	swapRGB = 0;
-	PDEBUG (1, "STV(i): swapRGB is OFF");
-
+	if ((swapRGB_on == 0) && (swapRGB == 0))
+		PDEBUG (1, "STV(i): swapRGB is (auto) OFF");
+	else if ((swapRGB_on == 1) && (swapRGB == 1))
+		PDEBUG (1, "STV(i): swapRGB is (auto) ON");
+	else if (swapRGB_on == 1)
+		PDEBUG (1, "STV(i): swapRGB is (forced) ON");
+	else if (swapRGB_on == -1)
+		PDEBUG (1, "STV(i): swapRGB is (forced) OFF");
+	
 	if (stv_set_video_mode (stv680) < 0) {
 		PDEBUG (0, "STV(e): Could not set video mode in stv_init");
 		return -1;
@@ -543,6 +558,7 @@ static struct proc_dir_entry *stv680_proc_entry = NULL;
 extern struct proc_dir_entry *video_proc_entry;
 
 #define YES_NO(x) ((x) ? "yes" : "no")
+#define ON_OFF(x) ((x) ? "(auto) on" : "(auto) off")
 
 static int stv680_read_proc (char *page, char **start, off_t off, int count, int *eof, void *data)
 {
@@ -559,7 +575,13 @@ static int stv680_read_proc (char *page, char **start, off_t off, int count, int
 	out += sprintf (out, "num_frames      : %d\n", STV680_NUMFRAMES);
 
 	out += sprintf (out, "Current size    : %ix%i\n", stv680->vwidth, stv680->vheight);
-	out += sprintf (out, "swapRGB         : %s\n", YES_NO (swapRGB));
+	if (swapRGB_on == 0)
+		out += sprintf (out, "swapRGB         : %s\n", ON_OFF (swapRGB));
+	else if (swapRGB_on == 1)
+		out += sprintf (out, "swapRGB         : (forced) on\n");
+	else if (swapRGB_on == -1)
+		out += sprintf (out, "swapRGB         : (forced) off\n");
+
 	out += sprintf (out, "Palette         : %i", stv680->palette);
 
 	out += sprintf (out, "\n");
@@ -671,9 +693,7 @@ static int stv680_set_pict (struct usb_stv *stv680, struct video_picture *p)
 	if (stv680->brightness != p->brightness) {
 		stv680->chgbright = 1;
 		stv680->brightness = p->brightness;
-	} else {
-		stv680->chgbright = 0;
-	}
+	} 
 
 	stv680->whiteness = p->whiteness;	/* greyscale */
 	stv680->colour = p->colour;
@@ -888,7 +908,7 @@ static void bayer_unshuffle (struct usb_stv *stv680, struct stv680_scratch *buff
 {
 	int x, y, i;
 	int w = stv680->cwidth;
-	int vw = stv680->cwidth, vh = stv680->cheight, vstep = 1;
+	int vw = stv680->cwidth, vh = stv680->cheight;
 	unsigned int p = 0;
 	int colour = 0, bayer = 0;
 	unsigned char *raw = buffer->data;
@@ -908,46 +928,23 @@ static void bayer_unshuffle (struct usb_stv *stv680, struct stv680_scratch *buff
 		return;
 	}
 
-	if ((stv680->vwidth == 322) || (stv680->vwidth == 320)) {
+	if ((stv680->vwidth == 320) || (stv680->vwidth == 160)) {
 		vw = 320;
 		vh = 240;
-		vstep = 1;
 	}
-	if ((stv680->vwidth == 352)) {
+	if ((stv680->vwidth == 352) || (stv680->vwidth == 176)) {
 		vw = 352;
 		vh = 288;
-		vstep = 1;
 	}
-	if ((stv680->vwidth == 160)) {
-		vw = 160;
-		vh = 120;
-		vstep = 2;
-	}
-	if ((stv680->vwidth == 176)) {
-		vw = 176;
-		vh = 144;
-		vstep = 2;
-	}
-	memset (output, 0, 3 * vw * vh);	/* clear output matrix. Maybe not necessary. */
+
+	memset (output, 0, 3 * vw * vh);	/* clear output matrix. */
 
 	for (y = 0; y < vh; y++) {
 		for (x = 0; x < vw; x++) {
-
-			switch (vstep) {
-			case 1:
-				if (x & 1)
-					p = *(raw + y * w + (x >> 1));
-				else
-					p = *(raw + y * w + (x >> 1) + (w >> 1));
-				break;
-
-			case 2:
-				if (x & 1)
-					p = *(raw + ((y * w) << 1) + x);
-				else
-					p = *(raw + ((y * w) << 1) + x + (w >> 1));
-				break;
-			}
+			if (x & 1)
+				p = *(raw + y * w + (x >> 1));
+			else
+				p = *(raw + y * w + (x >> 1) + (w >> 1));
 
 			if (y & 1)
 				bayer = 2;
@@ -968,9 +965,10 @@ static void bayer_unshuffle (struct usb_stv *stv680, struct stv680_scratch *buff
 				colour = 2;
 				break;
 			}
-			i = (y * vw + x) * 3;	/* output already zeroed out with memset */
+			i = (y * vw + x) * 3;	
 			*(output + i + colour) = (unsigned char) p;
 		}		/* for x */
+
 	}			/* for y */
 
 	/****** gamma correction plus hardcoded white balance */
@@ -979,6 +977,7 @@ static void bayer_unshuffle (struct usb_stv *stv680, struct stv680_scratch *buff
 	   (pow(i/256.0, GAMMA)*255.0)*white balanceRGB where GAMMA=0.55, 1<i<255. 
 	   White balance (RGB)= 1.0, 1.17, 1.48. Values are calculated as double float and 
 	   converted to unsigned char. Values are in stv680.h  */
+
 	for (y = 0; y < vh; y++) {
 		for (x = 0; x < vw; x++) {
 			i = (y * vw + x) * 3;
@@ -1022,8 +1021,47 @@ static void bayer_unshuffle (struct usb_stv *stv680, struct stv680_scratch *buff
 		}		/* for x */
 	}			/* for y  - end demosaic  */
 
+	/* fix top and bottom row, left and right side */
+	i = vw * 3;
+	memcpy (output, (output + i), i);
+	memcpy ((output + (vh * i)), (output + ((vh - 1) * i)), i);
+	for (y = 0; y < vh; y++) {
+		i = y * vw * 3;
+		memcpy ((output + i), (output + i + 3), 3);
+		memcpy ((output + i + (vw * 3)), (output + i + (vw - 1) * 3), 3);
+	}
+
+	/*  process all raw data, then trim to size if necessary */
+	if ((stv680->vwidth == 160) || (stv680->vwidth == 176))  {
+		i = 0;
+		for (y = 0; y < vh; y++) {
+			if (!(y & 1)) {
+				for (x = 0; x < vw; x++) {
+					p = (y * vw + x) * 3;
+					if (!(x & 1)) {
+						*(output + i) = *(output + p);
+						*(output + i + 1) = *(output + p + 1);
+						*(output + i + 2) = *(output + p + 2);
+						i += 3;
+					}
+				}  /* for x */
+			}
+		}  /* for y */
+	}
+	/* reset to proper width */
+	if ((stv680->vwidth == 160)) {
+		vw = 160;
+		vh = 120;
+	}
+	if ((stv680->vwidth == 176)) {
+		vw = 176;
+		vh = 144;
+	}
+
 	/* output is RGB; some programs want BGR  */
-	if (swapRGB == 1) {
+	/* swapRGB_on=0 -> program decides;  swapRGB_on=1, always swap */
+	/* swapRGB_on=-1, never swap */
+	if (((swapRGB == 1) && (swapRGB_on != -1)) || (swapRGB_on == 1)) {
 		for (y = 0; y < vh; y++) {
 			for (x = 0; x < vw; x++) {
 				i = (y * vw + x) * 3;
@@ -1242,7 +1280,7 @@ static int stv680_ioctl (struct video_device *vdev, unsigned int cmd, void *arg)
 				return -EFAULT;
 			}
 			copy_from_user (&p, arg, sizeof (p));
-			PDEBUG (2, "STV(i): palette set to RGB in VIDIOSPICT");
+			PDEBUG (2, "STV(i): palette set to %i in VIDIOSPICT", p.palette);
 
 			if (stv680_set_pict (stv680, &p))
 				return -EINVAL;
@@ -1309,8 +1347,8 @@ static int stv680_ioctl (struct video_device *vdev, unsigned int cmd, void *arg)
 			if (vm.format != STV_VIDEO_PALETTE) {
 				PDEBUG (2, "STV(i): VIDIOCMCAPTURE vm.format (%i) != VIDEO_PALETTE (%i)",
 					vm.format, STV_VIDEO_PALETTE);
-				if (vm.format == 3) {
-					PDEBUG (2, "STV(i): VIDIOCMCAPTURE swapRGB is ON");
+				if ((vm.format == 3) && (swapRGB_on == 0))  {
+					PDEBUG (2, "STV(i): VIDIOCMCAPTURE swapRGB is (auto) ON");
 					/* this may fix those apps (e.g., xawtv) that want BGR */
 					swapRGB = 1;
 				}
@@ -1320,8 +1358,10 @@ static int stv680_ioctl (struct video_device *vdev, unsigned int cmd, void *arg)
 				PDEBUG (2, "STV(e): VIDIOCMCAPTURE vm.frame > NUMFRAMES");
 				return -EINVAL;
 			}
-			if (stv680->frame[vm.frame].grabstate != FRAME_UNUSED) {
-				PDEBUG (2, "STV(e): VIDIOCMCAPTURE grabstate != FRAME_UNUSED");
+			if ((stv680->frame[vm.frame].grabstate == FRAME_ERROR)
+			    || (stv680->frame[vm.frame].grabstate == FRAME_GRABBING)) {
+				PDEBUG (2, "STV(e): VIDIOCMCAPTURE grabstate (%i) error",
+					stv680->frame[vm.frame].grabstate);
 				return -EBUSY;
 			}
 			/* Is this according to the v4l spec??? */

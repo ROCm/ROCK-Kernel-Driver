@@ -372,42 +372,15 @@ MODULE_DEVICE_TABLE(usb, keyspan_ids_combined);
    ID pattern.  But, for now, it looks like we need slightly different
    behavior for each match. */
 
-static __devinitdata struct usb_device_id keyspan_usa18x_pre_ids[] = {
+/* usb_device_id table for the pre-firmware download keyspan devices */
+static __devinitdata struct usb_device_id keyspan_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa18x_pre_product_id) },
-	{ }	/* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id keyspan_usa19_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19_pre_product_id) },
-	{ } /* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id keyspan_usa19w_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19w_pre_product_id) },
-	{ } /* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id keyspan_usa28_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28_pre_product_id) },
-	{ } /* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id keyspan_usa28x_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28x_pre_product_id) },
-	{ } /* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id keyspan_usa28xa_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28xa_pre_product_id) },
-	{ } /* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id keyspan_usa28xb_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28xb_pre_product_id) },
-	{ } /* Terminating entry */
-};
-
-static __devinitdata struct usb_device_id keyspan_usa49w_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa49w_pre_product_id) },
 	{ } /* Terminating entry */
 };
@@ -448,10 +421,10 @@ static __devinitdata struct usb_device_id keyspan_usa49w_ids[] = {
 };
 
     /* Structs for the devices, pre and post renumeration. */
-static struct usb_serial_device_type keyspan_usa18x_pre_device = {
+static struct usb_serial_device_type keyspan_pre_device = {
 	owner:			THIS_MODULE,
-	name:			"Keyspan USA18X - (without firmware)",
-	id_table:		keyspan_usa18x_pre_ids,
+	name:			"Keyspan - (without firmware)",
+	id_table:		keyspan_pre_ids,
 	num_interrupt_in:	NUM_DONT_CARE,
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
@@ -459,84 +432,6 @@ static struct usb_serial_device_type keyspan_usa18x_pre_device = {
 	startup:		keyspan_fake_startup	
 };
 
-static struct usb_serial_device_type keyspan_usa19_pre_device = {
-	owner:			THIS_MODULE,
-	name:			"Keyspan USA19 - (without firmware)",
-	id_table:		keyspan_usa19_pre_ids,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		1,
-	startup:		keyspan_fake_startup	
-};
-
-
-static struct usb_serial_device_type keyspan_usa19w_pre_device = {
-	owner:			THIS_MODULE,
-	name:			"Keyspan USA19W - (without firmware)",
-	id_table:		keyspan_usa19w_pre_ids,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		1,
-	startup:		keyspan_fake_startup	
-};
-
-
-static struct usb_serial_device_type keyspan_usa28_pre_device = {
-	owner:			THIS_MODULE,
-	name:			"Keyspan USA28 - (without firmware)",
-	id_table:		keyspan_usa28_pre_ids,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		2,
-	startup:		keyspan_fake_startup	
-};
-
-static struct usb_serial_device_type keyspan_usa28x_pre_device = {
-	owner:			THIS_MODULE,
-	name:			"Keyspan USA28X - (without firmware)",
-	id_table:		keyspan_usa28x_pre_ids,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		2,
-	startup:		keyspan_fake_startup	
-};
-
-static struct usb_serial_device_type keyspan_usa28xa_pre_device = {
-	owner:			THIS_MODULE,
-	name:			"Keyspan USA28XA - (without firmware)",
-	id_table:		keyspan_usa28xa_pre_ids,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		2,
-	startup:		keyspan_fake_startup	
-};
-
-static struct usb_serial_device_type keyspan_usa28xb_pre_device = {
-	owner:			THIS_MODULE,
-	name:			"Keyspan USA28XB - (without firmware)",
-	id_table:		keyspan_usa28xb_pre_ids,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		2,
-	startup:		keyspan_fake_startup	
-};
-
-static struct usb_serial_device_type keyspan_usa49w_pre_device = {
-	owner:			THIS_MODULE,
-	name:			"Keyspan USA49W - (without firmware)",
-	id_table:		keyspan_usa49w_pre_ids,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		4,
-	startup:		keyspan_fake_startup	
-};
 
 static struct usb_serial_device_type keyspan_usa18x_device = {
 	owner:			THIS_MODULE,
@@ -550,8 +445,6 @@ static struct usb_serial_device_type keyspan_usa18x_device = {
 	close:			keyspan_close,
 	write:			keyspan_write,
 	write_room:		keyspan_write_room,
-	//write_bulk_callback: 	Not used - we define our own herbs
-	//read_int_callback:	keyspan_usa26_read_int_callback,
 	chars_in_buffer:	keyspan_chars_in_buffer,
 	throttle:		keyspan_rx_throttle,
 	unthrottle:		keyspan_rx_unthrottle,
@@ -574,8 +467,6 @@ static struct usb_serial_device_type keyspan_usa19_device = {
 	close:			keyspan_close,
 	write:			keyspan_write,
 	write_room:		keyspan_write_room,
-//	write_bulk_callback: 	keyspan_write_bulk_callback,
-//	read_int_callback:	keyspan_usa28_read_int_callback,
 	chars_in_buffer:	keyspan_chars_in_buffer,
 	throttle:		keyspan_rx_throttle,
 	unthrottle:		keyspan_rx_unthrottle,
@@ -599,8 +490,6 @@ static struct usb_serial_device_type keyspan_usa19w_device = {
 	close:			keyspan_close,
 	write:			keyspan_write,
 	write_room:		keyspan_write_room,
-	//write_bulk_callback: 	Not used - we define our own herbs
-	//read_int_callback:	keyspan_usa26_read_int_callback,
 	chars_in_buffer:	keyspan_chars_in_buffer,
 	throttle:		keyspan_rx_throttle,
 	unthrottle:		keyspan_rx_unthrottle,
@@ -640,8 +529,6 @@ static struct usb_serial_device_type keyspan_usa28x_device = {
 	close:			keyspan_close,
 	write:			keyspan_write,
 	write_room:		keyspan_write_room,
-//	write_bulk_callback: 	keyspan_write_bulk_callback,
-//	read_int_callback:	keyspan_usa26_read_int_callback,
 	chars_in_buffer:	keyspan_chars_in_buffer,
 	throttle:		keyspan_rx_throttle,
 	unthrottle:		keyspan_rx_unthrottle,
@@ -665,8 +552,6 @@ static struct usb_serial_device_type keyspan_usa28xa_device = {
 	close:			keyspan_close,
 	write:			keyspan_write,
 	write_room:		keyspan_write_room,
-//	write_bulk_callback: 	keyspan_write_bulk_callback,
-//	read_int_callback:	keyspan_usa26_read_int_callback,
 	chars_in_buffer:	keyspan_chars_in_buffer,
 	throttle:		keyspan_rx_throttle,
 	unthrottle:		keyspan_rx_unthrottle,
@@ -690,8 +575,6 @@ static struct usb_serial_device_type keyspan_usa49w_device = {
 	close:			keyspan_close,
 	write:			keyspan_write,
 	write_room:		keyspan_write_room,
-	//write_bulk_callback: 	Not used - we define our own herbs
-	//read_int_callback:	keyspan_usa26_read_int_callback,
 	chars_in_buffer:	keyspan_chars_in_buffer,
 	throttle:		keyspan_rx_throttle,
 	unthrottle:		keyspan_rx_unthrottle,

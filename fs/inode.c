@@ -75,13 +75,53 @@ struct inodes_stat_t inodes_stat;
 
 static kmem_cache_t * inode_cachep;
 
-#define alloc_inode() \
-	 ((struct inode *) kmem_cache_alloc(inode_cachep, SLAB_KERNEL))
+static struct inode *alloc_inode(struct super_block *sb)
+{
+	static struct address_space_operations empty_aops;
+	static struct inode_operations empty_iops;
+	static struct file_operations empty_fops;
+	struct inode *inode;
+
+	if (sb->s_op->alloc_inode)
+		inode = sb->s_op->alloc_inode(sb);
+	else
+		inode = (struct inode *) kmem_cache_alloc(inode_cachep, SLAB_KERNEL);
+
+	if (inode) {
+		inode->i_sb = sb;
+		inode->i_dev = sb->s_dev;
+		inode->i_blkbits = sb->s_blocksize_bits;
+		inode->i_flags = 0;
+		atomic_set(&inode->i_count, 1);
+		inode->i_sock = 0;
+		inode->i_op = &empty_iops;
+		inode->i_fop = &empty_fops;
+		inode->i_nlink = 1;
+		atomic_set(&inode->i_writecount, 0);
+		inode->i_size = 0;
+		inode->i_blocks = 0;
+		inode->i_generation = 0;
+		memset(&inode->i_dquot, 0, sizeof(inode->i_dquot));
+		inode->i_pipe = NULL;
+		inode->i_bdev = NULL;
+		inode->i_cdev = NULL;
+		inode->i_data.a_ops = &empty_aops;
+		inode->i_data.host = inode;
+		inode->i_data.gfp_mask = GFP_HIGHUSER;
+		inode->i_mapping = &inode->i_data;
+		memset(&inode->u, 0, sizeof(inode->u));
+	}
+	return inode;
+}
+
 static void destroy_inode(struct inode *inode) 
 {
 	if (inode_has_buffers(inode))
 		BUG();
-	kmem_cache_free(inode_cachep, (inode));
+	if (inode->i_sb->s_op->destroy_inode)
+		inode->i_sb->s_op->destroy_inode(inode);
+	else
+		kmem_cache_free(inode_cachep, (inode));
 }
 
 
@@ -90,27 +130,30 @@ static void destroy_inode(struct inode *inode)
  * once, because the fields are idempotent across use
  * of the inode, so let the slab aware of that.
  */
+void inode_init_once(struct inode *inode)
+{
+	memset(inode, 0, sizeof(*inode));
+	init_waitqueue_head(&inode->i_wait);
+	INIT_LIST_HEAD(&inode->i_hash);
+	INIT_LIST_HEAD(&inode->i_data.clean_pages);
+	INIT_LIST_HEAD(&inode->i_data.dirty_pages);
+	INIT_LIST_HEAD(&inode->i_data.locked_pages);
+	INIT_LIST_HEAD(&inode->i_dentry);
+	INIT_LIST_HEAD(&inode->i_dirty_buffers);
+	INIT_LIST_HEAD(&inode->i_dirty_data_buffers);
+	INIT_LIST_HEAD(&inode->i_devices);
+	sema_init(&inode->i_sem, 1);
+	sema_init(&inode->i_zombie, 1);
+	spin_lock_init(&inode->i_data.i_shared_lock);
+}
+
 static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 {
 	struct inode * inode = (struct inode *) foo;
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR)
-	{
-		memset(inode, 0, sizeof(*inode));
-		init_waitqueue_head(&inode->i_wait);
-		INIT_LIST_HEAD(&inode->i_hash);
-		INIT_LIST_HEAD(&inode->i_data.clean_pages);
-		INIT_LIST_HEAD(&inode->i_data.dirty_pages);
-		INIT_LIST_HEAD(&inode->i_data.locked_pages);
-		INIT_LIST_HEAD(&inode->i_dentry);
-		INIT_LIST_HEAD(&inode->i_dirty_buffers);
-		INIT_LIST_HEAD(&inode->i_dirty_data_buffers);
-		INIT_LIST_HEAD(&inode->i_devices);
-		sema_init(&inode->i_sem, 1);
-		sema_init(&inode->i_zombie, 1);
-		spin_lock_init(&inode->i_data.i_shared_lock);
-	}
+		inode_init_once(inode);
 }
 
 /*
@@ -768,72 +811,28 @@ static struct inode * find_inode(struct super_block * sb, unsigned long ino, str
 	return inode;
 }
 
-/*
- * This just initializes the inode fields
- * to known values before returning the inode..
- *
- * i_sb, i_ino, i_count, i_state and the lists have
- * been initialized elsewhere..
- */
-static void clean_inode(struct inode *inode)
-{
-	static struct address_space_operations empty_aops;
-	static struct inode_operations empty_iops;
-	static struct file_operations empty_fops;
-	memset(&inode->u, 0, sizeof(inode->u));
-	inode->i_sock = 0;
-	inode->i_op = &empty_iops;
-	inode->i_fop = &empty_fops;
-	inode->i_nlink = 1;
-	atomic_set(&inode->i_writecount, 0);
-	inode->i_size = 0;
-	inode->i_blocks = 0;
-	inode->i_generation = 0;
-	memset(&inode->i_dquot, 0, sizeof(inode->i_dquot));
-	inode->i_pipe = NULL;
-	inode->i_bdev = NULL;
-	inode->i_cdev = NULL;
-	inode->i_data.a_ops = &empty_aops;
-	inode->i_data.host = inode;
-	inode->i_data.gfp_mask = GFP_HIGHUSER;
-	inode->i_mapping = &inode->i_data;
-}
-
 /**
- * get_empty_inode 	- obtain an inode
+ *	new_inode 	- obtain an inode
+ *	@sb: superblock
  *
- * This is called by things like the networking layer
- * etc that want to get an inode without any inode
- * number, or filesystems that allocate new inodes with
- * no pre-existing information.
- *
- * On a successful return the inode pointer is returned. On a failure
- * a %NULL pointer is returned. The returned inode is not on any superblock
- * lists.
+ *	Allocates a new inode for given superblock.
  */
  
-struct inode * get_empty_inode(void)
+struct inode *new_inode(struct super_block *sb)
 {
 	static unsigned long last_ino;
 	struct inode * inode;
 
 	spin_lock_prefetch(&inode_lock);
 	
-	inode = alloc_inode();
-	if (inode)
-	{
+	inode = alloc_inode(sb);
+	if (inode) {
 		spin_lock(&inode_lock);
 		inodes_stat.nr_inodes++;
 		list_add(&inode->i_list, &inode_in_use);
-		inode->i_sb = NULL;
-		inode->i_dev = NODEV;
-		inode->i_blkbits = 0;
 		inode->i_ino = ++last_ino;
-		inode->i_flags = 0;
-		atomic_set(&inode->i_count, 1);
 		inode->i_state = 0;
 		spin_unlock(&inode_lock);
-		clean_inode(inode);
 	}
 	return inode;
 }
@@ -848,7 +847,7 @@ static struct inode * get_new_inode(struct super_block *sb, unsigned long ino, s
 {
 	struct inode * inode;
 
-	inode = alloc_inode();
+	inode = alloc_inode(sb);
 	if (inode) {
 		struct inode * old;
 
@@ -859,16 +858,9 @@ static struct inode * get_new_inode(struct super_block *sb, unsigned long ino, s
 			inodes_stat.nr_inodes++;
 			list_add(&inode->i_list, &inode_in_use);
 			list_add(&inode->i_hash, head);
-			inode->i_sb = sb;
-			inode->i_dev = sb->s_dev;
-			inode->i_blkbits = sb->s_blocksize_bits;
 			inode->i_ino = ino;
-			inode->i_flags = 0;
-			atomic_set(&inode->i_count, 1);
 			inode->i_state = I_LOCK;
 			spin_unlock(&inode_lock);
-
-			clean_inode(inode);
 
 			/* reiserfs specific hack right here.  We don't
 			** want this to last, and are looking for VFS changes

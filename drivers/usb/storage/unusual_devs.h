@@ -1,7 +1,7 @@
 /* Driver for USB Mass Storage compliant devices
  * Ununsual Devices File
  *
- * $Id: unusual_devs.h,v 1.24 2001/12/29 03:12:45 mdharm Exp $
+ * $Id: unusual_devs.h,v 1.25 2002/01/13 06:39:17 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -458,6 +458,14 @@ UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
                 US_SC_ISD200, US_PR_BULK, isd200_Initialization,
                 0 ),
 #endif
+
+/* Submitted by Brian Hall <brihall@bigfoot.com>
+ * Needed for START_STOP flag */
+UNUSUAL_DEV(  0x0c76, 0x0003, 0x0100, 0x0100,
+		"JMTek",
+		"USBDrive",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_START_STOP ),
 
 /* Reported by Dan Pilone <pilone@slac.com>
  * The device needs the flags only.

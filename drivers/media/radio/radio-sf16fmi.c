@@ -94,8 +94,7 @@ static inline int fmi_setfreq(struct fmi_device *dev)
 	for(i=0; i< 100; i++)
 	{
 		udelay(1400);
-		if(current->need_resched)
-			schedule();
+		cond_resched();
 	}
 /* If this becomes allowed use it ... 	
 	current->state = TASK_UNINTERRUPTIBLE;
@@ -121,8 +120,7 @@ static inline int fmi_getsigstr(struct fmi_device *dev)
 	for(i=0; i< 100; i++)
 	{
 		udelay(1400);
-		if(current->need_resched)
-			schedule();
+		cond_resched();
 	}
 /* If this becomes allowed use it ... 	
 	current->state = TASK_UNINTERRUPTIBLE;

@@ -404,6 +404,10 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start, void *
 		result = pci_hp_register (new_slot->hotplug_slot);
 		if (result) {
 			err ("pci_hp_register failed with error %d\n", result);
+			kfree (new_slot->hotplug_slot->info);
+			kfree (new_slot->hotplug_slot->name);
+			kfree (new_slot->hotplug_slot);
+			kfree (new_slot);
 			return result;
 		}
 		
@@ -429,6 +433,8 @@ static int ctrl_slot_cleanup (struct controller * ctrl)
 	while (old_slot) {
 		next_slot = old_slot->next;
 		pci_hp_deregister (old_slot->hotplug_slot);
+		kfree(old_slot->hotplug_slot->info);
+		kfree(old_slot->hotplug_slot->name);
 		kfree(old_slot->hotplug_slot);
 		kfree(old_slot);
 		old_slot = next_slot;

@@ -56,7 +56,7 @@ asmlinkage void ret_from_fork(void);
 static void default_idle(void)
 {
 	while(1) {
-		if (!current->need_resched)
+		if (!need_resched())
 #if defined(MACH_ATARI_ONLY) && !defined(CONFIG_HADES)
 			/* block out HSYNC on the atari (falcon) */
 			__asm__("stop #0x2200" : : : "cc");

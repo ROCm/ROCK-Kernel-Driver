@@ -585,17 +585,16 @@ void update_process_times(int user_tick)
 
 	update_one_process(p, user_tick, system, cpu);
 	if (p->pid) {
-		expire_task(p);
 		if (p->__nice > 0)
 			kstat.per_cpu_nice[cpu] += user_tick;
 		else
 			kstat.per_cpu_user[cpu] += user_tick;
 		kstat.per_cpu_system[cpu] += system;
 	} else {
-		idle_tick();
 		if (local_bh_count(cpu) || local_irq_count(cpu) > 1)
 			kstat.per_cpu_system[cpu] += system;
 	}
+	scheduler_tick(p);
 }
 
 /*

@@ -889,7 +889,7 @@ retry:
 
 	times_left = 500000;
 	while (times_left-- && flash_is_busy(map, adr, private->interleave)) { 
-		if (current->need_resched) {
+		if (need_resched()) {
 			spin_unlock_bh(chip->mutex);
 			schedule();
 			spin_lock_bh(chip->mutex);
@@ -1126,7 +1126,7 @@ retry:
 		/* Latency issues. Drop the lock, wait a while and retry */
 		spin_unlock_bh(chip->mutex);
 
-		if (current->need_resched)
+		if (need_resched())
 			schedule();
 		else
 			udelay(1);

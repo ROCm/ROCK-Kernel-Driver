@@ -66,15 +66,15 @@ int idled(void)
 			int oldval = xchg(&current->need_resched, -1);
 
 			if (!oldval) {
-				while(current->need_resched == -1)
-					; /* Do Nothing */
+				while (need_resched())
+					barrier(); /* Do Nothing */
 			}
 		}
 #endif
-		if (do_power_save && !current->need_resched)
+		if (do_power_save && !need_resched())
 			power_save();
 
-		if (current->need_resched) {
+		if (need_resched()) {
 			schedule();
 			check_pgt_cache();
 		}
@@ -150,7 +150,7 @@ void zero_paged(void)
 
 	if ( atomic_read(&zero_cache_sz) >= zero_cache_water[0] )
 		return;
-	while ( (atomic_read(&zero_cache_sz) < zero_cache_water[1]) && (!current->need_resched) )
+	while ( (atomic_read(&zero_cache_sz) < zero_cache_water[1]) && !need_resched() )
 	{
 		/*
 		 * Mark a page as reserved so we can mess with it
@@ -161,8 +161,7 @@ void zero_paged(void)
 		if ( !pageptr )
 			return;
 		
-		if ( current->need_resched )
-			schedule();
+		cond_resched();
 		
 		/*
 		 * Make the page no cache so we don't blow our cache with 0's
@@ -181,8 +180,7 @@ void zero_paged(void)
 		 */
 		for ( bytecount = 0; bytecount < PAGE_SIZE ; bytecount += 4 )
 		{
-			if ( current->need_resched )
-				schedule();
+			cond_resched();
 			*(unsigned long *)(bytecount + pageptr) = 0;
 		}
 		
@@ -243,7 +241,7 @@ void power_save(void)
 	 *  -- Cort
 	 */
 	_nmask_and_or_msr(MSR_EE, 0);
-	if (!current->need_resched)
+	if (!need_resched())
 	{
 		asm("mfspr %0,1008" : "=r" (hid0) :);
 		hid0 &= ~(HID0_NAP | HID0_SLEEP | HID0_DOZE);

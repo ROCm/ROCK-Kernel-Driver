@@ -704,8 +704,9 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 		 * runqueue lock is not a problem.
 		 */
 		current->time_slice = 1;
-		expire_task(current);
+		scheduler_tick(current);
 	}
+	p->sleep_timestamp = jiffies;
 	__restore_flags(flags);
 
 	if (p->policy == SCHED_OTHER)

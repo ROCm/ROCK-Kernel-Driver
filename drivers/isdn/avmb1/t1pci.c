@@ -49,6 +49,114 @@ static struct capi_driver_interface *di;
 
 /* ------------------------------------------------------------- */
 
+static int t1pci_add_card(struct capi_driver *driver,
+                          struct capicardparams *p,
+	                  struct pci_dev *dev)
+{
+	avmcard *card;
+	avmctrl_info *cinfo;
+	int retval;
+
+	MOD_INC_USE_COUNT;
+
+	retval = -ENOMEM;
+	card = kmalloc(sizeof(avmcard), GFP_KERNEL);
+	if (!card) {
+		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		goto err;
+	}
+	memset(card, 0, sizeof(avmcard));
+        card->dma = avmcard_dma_alloc(driver->name, dev, 2048+128, 2048+128);
+	if (!card->dma) {
+		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		goto err_kfree;
+	}
+        cinfo = kmalloc(sizeof(avmctrl_info), GFP_KERNEL);
+	if (!cinfo) {
+		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		goto err_dma_free;
+	}
+	memset(cinfo, 0, sizeof(avmctrl_info));
+	card->ctrlinfo = cinfo;
+	cinfo->card = card;
+	sprintf(card->name, "t1pci-%x", p->port);
+	card->port = p->port;
+	card->irq = p->irq;
+	card->membase = p->membase;
+	card->cardtype = avm_t1pci;
+
+	if (!request_region(card->port, AVMB1_PORTLEN, card->name)) {
+		printk(KERN_WARNING
+		       "%s: ports 0x%03x-0x%03x in use.\n",
+		       driver->name, card->port, card->port + AVMB1_PORTLEN);
+		retval = -EBUSY;
+		goto err_kfree_ctrlinfo;
+	}
+
+	card->mbase = ioremap_nocache(card->membase, 64);
+	if (!card->mbase) {
+		printk(KERN_NOTICE "%s: can't remap memory at 0x%lx\n",
+					driver->name, card->membase);
+		retval = -EIO;
+		goto err_release_region;
+	}
+
+	b1dma_reset(card);
+
+	retval = t1pci_detect(card);
+	if (retval != 0) {
+		if (retval < 6)
+			printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
+					driver->name, card->port, retval);
+		else
+			printk(KERN_NOTICE "%s: card at 0x%x, but cabel not connected or T1 has no power (%d)\n",
+					driver->name, card->port, retval);
+		retval = -EIO;
+		goto err_unmap;
+	}
+	b1dma_reset(card);
+
+	retval = request_irq(card->irq, b1dma_interrupt, SA_SHIRQ, card->name, card);
+	if (retval) {
+		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
+				driver->name, card->irq);
+		retval = -EBUSY;
+		goto err_unmap;
+	}
+
+	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
+	if (!cinfo->capi_ctrl) {
+		printk(KERN_ERR "%s: attach controller failed.\n", driver->name);
+		retval = -EBUSY;
+		goto err_free_irq;
+	}
+	card->cardnr = cinfo->capi_ctrl->cnr;
+
+	printk(KERN_INFO
+		"%s: AVM T1 PCI at i/o %#x, irq %d, mem %#lx\n",
+		driver->name, card->port, card->irq, card->membase);
+
+	return 0;
+
+ err_free_irq:
+	free_irq(card->irq, card);
+ err_unmap:
+	iounmap(card->mbase);
+ err_release_region:
+	release_region(card->port, AVMB1_PORTLEN);
+ err_kfree_ctrlinfo:
+	kfree(card->ctrlinfo);
+ err_dma_free:
+	avmcard_dma_free(card->dma);
+ err_kfree:
+	kfree(card);
+ err:
+	MOD_DEC_USE_COUNT;
+	return retval;
+}
+
+/* ------------------------------------------------------------- */
+
 static void t1pci_remove_ctr(struct capi_ctr *ctrl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -66,126 +174,6 @@ static void t1pci_remove_ctr(struct capi_ctr *ctrl)
 	kfree(card);
 
 	MOD_DEC_USE_COUNT;
-}
-
-/* ------------------------------------------------------------- */
-
-static int t1pci_add_card(struct capi_driver *driver,
-                          struct capicardparams *p,
-	                  struct pci_dev *dev)
-{
-	avmcard *card;
-	avmctrl_info *cinfo;
-	int retval;
-
-	MOD_INC_USE_COUNT;
-
-	card = (avmcard *) kmalloc(sizeof(avmcard), GFP_ATOMIC);
-
-	if (!card) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
-	}
-	memset(card, 0, sizeof(avmcard));
-        card->dma = avmcard_dma_alloc(driver->name, dev, 2048+128, 2048+128);
-	if (!card->dma) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
-	}
-        cinfo = (avmctrl_info *) kmalloc(sizeof(avmctrl_info), GFP_ATOMIC);
-	if (!cinfo) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
-		avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -ENOMEM;
-	}
-	memset(cinfo, 0, sizeof(avmctrl_info));
-	card->ctrlinfo = cinfo;
-	cinfo->card = card;
-	sprintf(card->name, "t1pci-%x", p->port);
-	card->port = p->port;
-	card->irq = p->irq;
-	card->membase = p->membase;
-	card->cardtype = avm_t1pci;
-
-	if (check_region(card->port, AVMB1_PORTLEN)) {
-		printk(KERN_WARNING
-		       "%s: ports 0x%03x-0x%03x in use.\n",
-		       driver->name, card->port, card->port + AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-		avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
-	}
-
-	card->mbase = ioremap_nocache(card->membase, 64);
-	if (!card->mbase) {
-		printk(KERN_NOTICE "%s: can't remap memory at 0x%lx\n",
-					driver->name, card->membase);
-	        kfree(card->ctrlinfo);
-		avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EIO;
-	}
-
-	b1dma_reset(card);
-
-	if ((retval = t1pci_detect(card)) != 0) {
-		if (retval < 6)
-			printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
-					driver->name, card->port, retval);
-		else
-			printk(KERN_NOTICE "%s: card at 0x%x, but cabel not connected or T1 has no power (%d)\n",
-					driver->name, card->port, retval);
-                iounmap(card->mbase);
-	        kfree(card->ctrlinfo);
-		avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EIO;
-	}
-	b1dma_reset(card);
-
-	request_region(p->port, AVMB1_PORTLEN, card->name);
-
-	retval = request_irq(card->irq, b1dma_interrupt, SA_SHIRQ, card->name, card);
-	if (retval) {
-		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
-				driver->name, card->irq);
-                iounmap(card->mbase);
-		release_region(card->port, AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-		avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
-	}
-
-	cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
-	if (!cinfo->capi_ctrl) {
-		printk(KERN_ERR "%s: attach controller failed.\n", driver->name);
-                iounmap(card->mbase);
-		free_irq(card->irq, card);
-		release_region(card->port, AVMB1_PORTLEN);
-	        kfree(card->ctrlinfo);
-		avmcard_dma_free(card->dma);
-		kfree(card);
-	        MOD_DEC_USE_COUNT;
-		return -EBUSY;
-	}
-	card->cardnr = cinfo->capi_ctrl->cnr;
-
-	printk(KERN_INFO
-		"%s: AVM T1 PCI at i/o %#x, irq %d, mem %#lx\n",
-		driver->name, card->port, card->irq, card->membase);
-
-	return 0;
 }
 
 /* ------------------------------------------------------------- */

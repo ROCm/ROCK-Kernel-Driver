@@ -367,12 +367,6 @@ void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig)
 		if (pfn >= blk_max_pfn)
 			return;
 
-#ifndef CONFIG_HIGHMEM
-		/*
-		 * should not hit for non-highmem case
-		 */
-		BUG();
-#endif
 		bio_gfp = GFP_NOHIGHIO;
 		pool = page_pool;
 	} else {

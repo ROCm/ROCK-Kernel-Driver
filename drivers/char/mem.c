@@ -381,8 +381,7 @@ static inline size_t read_zero_pagealigned(char * buf, size_t size)
 		unsigned long unwritten = clear_user(buf, PAGE_SIZE);
 		if (unwritten)
 			return size + unwritten - PAGE_SIZE;
-		if (current->need_resched)
-			schedule();
+		cond_resched();
 		buf += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	} while (size);
