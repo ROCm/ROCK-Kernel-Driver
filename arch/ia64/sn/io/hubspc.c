@@ -52,7 +52,7 @@ typedef struct cpuprom_info {
 }cpuprom_info_t;
 
 static cpuprom_info_t	*cpuprom_head;
-spinlock_t	cpuprom_spinlock;
+static spinlock_t	cpuprom_spinlock;
 #define	PROM_LOCK()	mutex_spinlock(&cpuprom_spinlock)
 #define	PROM_UNLOCK(s)	mutex_spinunlock(&cpuprom_spinlock, (s))
 
@@ -161,69 +161,8 @@ cpuprom_detailed_inventory_info_add(devfs_handle_t prom_dev,devfs_handle_t node)
 				sizeof(invent_miscinfo_t));
 }
 
-#define FPROM_CONFIG_ADDR	MD_JUNK_BUS_TIMING
-#define FPROM_ENABLE_MASK	MJT_FPROM_ENABLE_MASK
-#define FPROM_ENABLE_SHFT	MJT_FPROM_ENABLE_SHFT
-#define FPROM_SETUP_MASK	MJT_FPROM_SETUP_MASK
-#define FPROM_SETUP_SHFT	MJT_FPROM_SETUP_SHFT
+#endif  /* CONFIG_IA64_SGI_SN1 */
 
-/*ARGSUSED*/
-int
-cpuprom_map(devfs_handle_t dev, vhandl_t *vt, off_t addr, size_t len)
-{
-        int 		errcode = 0;
-	caddr_t 	kvaddr;
-	devfs_handle_t		node;
-	cnodeid_t 	cnode;
-
-	node = prominfo_nodeget(dev);
-
-	if (!node)
-		return EIO;
-        
-
-	kvaddr = hubdev_prombase_get(node);
-	cnode  = hubdev_cnodeid_get(node);
-#ifdef	HUBSPC_DEBUG
-	printk("cpuprom_map: hubnode %d kvaddr 0x%x\n", node, kvaddr);
-#endif
-
-	if (len > RBOOT_SIZE)
-		len = RBOOT_SIZE;
-        /*
-         * Map in the prom space
-         */
-	errcode = v_mapphys(vt, kvaddr, len);
-
-	if (errcode == 0 ){
-		/*
-		 * Set the MD configuration registers suitably.
-		 */
-		nasid_t		nasid;
-		uint64_t	value;
-		volatile hubreg_t	*regaddr;
-
-		nasid = COMPACT_TO_NASID_NODEID(cnode);
-		regaddr = REMOTE_HUB_ADDR(nasid, FPROM_CONFIG_ADDR);
-		value = HUB_L(regaddr);
-		value &= ~(FPROM_SETUP_MASK | FPROM_ENABLE_MASK);
-		{
-			value |= (((long)CONFIG_FPROM_SETUP << FPROM_SETUP_SHFT) | 
-				  ((long)CONFIG_FPROM_ENABLE << FPROM_ENABLE_SHFT));
-		}
-		HUB_S(regaddr, value);
-
-	}
-        return (errcode);
-}
-#endif	/* CONFIG_IA64_SGI_SN1 */
-
-/*ARGSUSED*/
-int
-cpuprom_unmap(devfs_handle_t dev, vhandl_t *vt)
-{
-        return 0;
-}
 
 /***********************************************************************/
 /* Base Hub Space Driver                                               */
@@ -245,15 +184,14 @@ hubspc_init(void)
         hubdev_register(mem_refcnt_attach);
 #endif
 
-#if defined(CONFIG_SERIAL_SGI_L1_PROTOCOL)
+#ifdef CONFIG_IA64_SGI_SN1
 	/* L1 system controller link */
 	if ( !IS_RUNNING_ON_SIMULATOR() ) {
 		/* initialize the L1 link */
 		extern void l1_init(void);
 		l1_init();
 	}
-#endif
-
+#endif	/* CONFIG_IA64_SGI_SN1 */
 #ifdef	HUBSPC_DEBUG
 	printk("hubspc_init: Completed\n");
 #endif	/* HUBSPC_DEBUG */
@@ -285,7 +223,7 @@ hubspc_map(devfs_handle_t dev, vhandl_t *vt, off_t off, size_t len, uint prot)
 
 	/* check validity of request */
 	if( len == 0 ) {
-		return ENXIO;
+		return -ENXIO;
         }
 
 	return errcode;

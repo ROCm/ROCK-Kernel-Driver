@@ -77,7 +77,7 @@ ia64_sal_strerror (long status)
 	return str;
 }
 
-static void __init
+void __init
 ia64_sal_handler_init (void *entry_point, void *gpval)
 {
 	/* fill in the SAL procedure descriptor and point ia64_sal to it: */

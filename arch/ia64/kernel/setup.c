@@ -469,9 +469,18 @@ show_cpuinfo (struct seq_file *m, void *v)
 #	define lpj	loops_per_jiffy
 #	define cpunum	0
 #endif
-	char family[32], features[128], *cp;
+	static struct {
+		unsigned long mask;
+		const char *feature_name;
+	} feature_bits[] = {
+		{ 1UL << 0, "branchlong" },
+		{ 1UL << 1, "spontaneous deferral"},
+		{ 1UL << 2, "16-byte atomic ops" }
+	};
+	char family[32], features[128], *cp, sep;
 	struct cpuinfo_ia64 *c = v;
 	unsigned long mask;
+	int i;
 
 	mask = c->features;
 
@@ -484,13 +493,23 @@ show_cpuinfo (struct seq_file *m, void *v)
 	/* build the feature string: */
 	memcpy(features, " standard", 10);
 	cp = features;
-	if (mask & 1) {
-		strcpy(cp, " branchlong");
-		cp = strchr(cp, '\0');
-		mask &= ~1UL;
+	sep = 0;
+	for (i = 0; i < sizeof(feature_bits)/sizeof(feature_bits[0]); ++i) {
+		if (mask & feature_bits[i].mask) {
+			if (sep)
+				*cp++ = sep;
+			sep = ',';
+			*cp++ = ' ';
+			strcpy(cp, feature_bits[i].feature_name);
+			mask &= ~feature_bits[i].mask;
+		}
 	}
-	if (mask)
+	if (mask) {
+		/* print unknown features as a hex value: */
+		if (sep)
+			*cp++ = sep;
 		sprintf(cp, " 0x%lx", mask);
+	}
 
 	seq_printf(m,
 		   "processor  : %d\n"
@@ -630,9 +649,8 @@ cpu_init (void)
 	 * "NR_CPUS" pages for all CPUs to avoid that AP calls get_zeroed_page().
 	 */
 	if (smp_processor_id() == 0) {
-		cpu_data = (unsigned long) __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
-							   PERCPU_PAGE_SIZE,
-							   __pa(MAX_DMA_ADDRESS));
+		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS, PERCPU_PAGE_SIZE,
+					   __pa(MAX_DMA_ADDRESS));
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;

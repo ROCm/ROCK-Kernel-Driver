@@ -8,20 +8,31 @@
 # Copyright (C) 1998 by David Mosberger-Tang <davidm@hpl.hp.com>
 #
 
-LINKFLAGS = -static -T $(src)/bootloader.lds
+EXTRA_TARGETS := vmlinux.bin vmlinux.gz
 
-OBJS	= $(obj)/bootloader.o
+targets-$(CONFIG_IA64_HP_SIM)  += bootloader
+targets-$(CONFIG_IA64_GENERIC) += bootloader
+EXTRA_TARGETS += $(sort $(targets-y))
 
-targets-$(CONFIG_IA64_HP_SIM)	+= bootloader
-targets-$(CONFIG_IA64_GENERIC)	+= bootloader
+quiet_cmd_cptotop = LN      $@
+      cmd_cptotop = ln $< $@
 
-CFLAGS	:= $(CFLAGS) $(CFLAGS_KERNEL)
+vmlinux.gz: $(obj)/vmlinux.gz $(targets-y)
+	$(call cmd,cptotop)
+	@echo '  Kernel: $@ is ready'
 
-all:	$(targets-y)
+bootloader: $(obj)/bootloader
+	$(call cmd,cptotop)
 
-bootloader: $(OBJS)
-	$(LD) $(LINKFLAGS) $(OBJS) $(TOPDIR)/lib/lib.a $(TOPDIR)/arch/$(ARCH)/lib/lib.a \
-	-o bootloader
+$(obj)/vmlinux.gz: $(obj)/vmlinux.bin FORCE
+	$(call if_changed,gzip)
 
-clean:
-	rm -f $(TARGETS)
+$(obj)/vmlinux.bin: vmlinux FORCE
+	$(call if_changed,objcopy)
+
+
+LDFLAGS_bootloader = -static -T
+
+$(obj)/bootloader: $(src)/bootloader.lds $(obj)/bootloader.o \
+                   lib/lib.a arch/ia64/lib/lib.a FORCE
+	$(call if_changed,ld)

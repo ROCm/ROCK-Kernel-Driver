@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2000-2001 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (C) 2000-2002 Silicon Graphics, Inc.  All rights reserved.
  */
 
 #include <linux/config.h>
@@ -71,7 +71,8 @@ typedef struct node_memmap_s
 } node_memmap_t ;
 
 #define SN2_BANK_SIZE_SHIFT		(MBSHIFT+6)     /* 64 MB */
-#define BankSizeBytes(bsize)            (1UL<<((bsize)+SN2_BANK_SIZE_SHIFT))
+#define BankPresent(bsize)		(bsize<6)
+#define BankSizeBytes(bsize)            (BankPresent(bsize) ? 1UL<<((bsize)+SN2_BANK_SIZE_SHIFT) : 0)
 #endif
 
 typedef struct sn_memmap_s

@@ -38,7 +38,6 @@
 #include <linux/smb_mount.h>
 #include <linux/ncp_fs.h>
 #include <linux/quota.h>
-#include <linux/module.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
@@ -194,9 +193,12 @@ putstat (struct stat32 *ubuf, struct kstat *stat)
 	err |= __put_user(high2lowgid(stat->gid), &ubuf->st_gid);
 	err |= __put_user(stat->rdev, &ubuf->st_rdev);
 	err |= __put_user(stat->size, &ubuf->st_size);
-	err |= __put_user(stat->atime, &ubuf->st_atime);
-	err |= __put_user(stat->mtime, &ubuf->st_mtime);
-	err |= __put_user(stat->ctime, &ubuf->st_ctime);
+	err |= __put_user(stat->atime.tv_sec, &ubuf->st_atime);
+	err |= __put_user(stat->atime.tv_nsec, &ubuf->st_atime_nsec);
+	err |= __put_user(stat->mtime.tv_sec, &ubuf->st_mtime);
+	err |= __put_user(stat->mtime.tv_nsec, &ubuf->st_mtime_nsec);
+	err |= __put_user(stat->ctime.tv_sec, &ubuf->st_ctime);
+	err |= __put_user(stat->ctime.tv_nsec, &ubuf->st_ctime_nsec);
 	err |= __put_user(stat->blksize, &ubuf->st_blksize);
 	err |= __put_user(stat->blocks, &ubuf->st_blocks);
 	return err;
@@ -2898,57 +2900,152 @@ get_fpreg (int regno, struct _fpreg_ia32 *reg, struct pt_regs *ptp, struct switc
 }
 
 static int
-save_ia32_fpstate (struct task_struct *tsk, struct _fpstate_ia32 *save)
+save_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save)
 {
 	struct switch_stack *swp;
 	struct pt_regs *ptp;
 	int i, tos;
 
 	if (!access_ok(VERIFY_WRITE, save, sizeof(*save)))
-		return -EIO;
-	__put_user(tsk->thread.fcr, &save->cw);
-	__put_user(tsk->thread.fsr, &save->sw);
-	__put_user(tsk->thread.fsr >> 32, &save->tag);
-	__put_user(tsk->thread.fir, &save->ipoff);
-	__put_user(__USER_CS, &save->cssel);
-	__put_user(tsk->thread.fdr, &save->dataoff);
-	__put_user(__USER_DS, &save->datasel);
+		return -EFAULT;
+
+	__put_user(tsk->thread.fcr & 0xffff, &save->cwd);
+	__put_user(tsk->thread.fsr & 0xffff, &save->swd);
+	__put_user((tsk->thread.fsr>>16) & 0xffff, &save->twd);
+	__put_user(tsk->thread.fir, &save->fip);
+	__put_user((tsk->thread.fir>>32) & 0xffff, &save->fcs);
+	__put_user(tsk->thread.fdr, &save->foo);
+	__put_user((tsk->thread.fdr>>32) & 0xffff, &save->fos);
+
 	/*
 	 *  Stack frames start with 16-bytes of temp space
 	 */
 	swp = (struct switch_stack *)(tsk->thread.ksp + 16);
 	ptp = ia64_task_regs(tsk);
-	tos = (tsk->thread.fsr >> 11) & 3;
+	tos = (tsk->thread.fsr >> 11) & 7;
 	for (i = 0; i < 8; i++)
-		put_fpreg(i, &save->_st[i], ptp, swp, tos);
+		put_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
 	return 0;
 }
 
 static int
-restore_ia32_fpstate (struct task_struct *tsk, struct _fpstate_ia32 *save)
+restore_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save)
 {
 	struct switch_stack *swp;
 	struct pt_regs *ptp;
-	int i, tos, ret;
-	int fsrlo, fsrhi;
+	int i, tos;
+	unsigned int fsrlo, fsrhi, num32;
 
 	if (!access_ok(VERIFY_READ, save, sizeof(*save)))
-		return(-EIO);
-	ret = __get_user(tsk->thread.fcr, (unsigned int *)&save->cw);
-	ret |= __get_user(fsrlo, (unsigned int *)&save->sw);
-	ret |= __get_user(fsrhi, (unsigned int *)&save->tag);
-	tsk->thread.fsr = ((long)fsrhi << 32) | (long)fsrlo;
-	ret |= __get_user(tsk->thread.fir, (unsigned int *)&save->ipoff);
-	ret |= __get_user(tsk->thread.fdr, (unsigned int *)&save->dataoff);
+		return(-EFAULT);
+
+	__get_user(num32, (unsigned int *)&save->cwd);
+	tsk->thread.fcr = (tsk->thread.fcr & (~0x1f3f)) | (num32 & 0x1f3f);
+	__get_user(fsrlo, (unsigned int *)&save->swd);
+	__get_user(fsrhi, (unsigned int *)&save->twd);
+	num32 = (fsrhi << 16) | fsrlo;
+	tsk->thread.fsr = (tsk->thread.fsr & (~0xffffffff)) | num32;
+	__get_user(num32, (unsigned int *)&save->fip);
+	tsk->thread.fir = (tsk->thread.fir & (~0xffffffff)) | num32;
+	__get_user(num32, (unsigned int *)&save->foo);
+	tsk->thread.fdr = (tsk->thread.fdr & (~0xffffffff)) | num32;
+
 	/*
 	 *  Stack frames start with 16-bytes of temp space
 	 */
 	swp = (struct switch_stack *)(tsk->thread.ksp + 16);
 	ptp = ia64_task_regs(tsk);
-	tos = (tsk->thread.fsr >> 11) & 3;
+	tos = (tsk->thread.fsr >> 11) & 7;
 	for (i = 0; i < 8; i++)
-		get_fpreg(i, &save->_st[i], ptp, swp, tos);
-	return ret ? -EFAULT : 0;
+		get_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+	return 0;
+}
+
+static int
+save_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *save)
+{
+	struct switch_stack *swp;
+	struct pt_regs *ptp;
+	int i, tos;
+	unsigned long mxcsr=0;
+	unsigned long num128[2];
+
+	if (!access_ok(VERIFY_WRITE, save, sizeof(*save)))
+		return -EFAULT;
+
+	__put_user(tsk->thread.fcr & 0xffff, &save->cwd);
+	__put_user(tsk->thread.fsr & 0xffff, &save->swd);
+	__put_user((tsk->thread.fsr>>16) & 0xffff, &save->twd);
+	__put_user(tsk->thread.fir, &save->fip);
+	__put_user((tsk->thread.fir>>32) & 0xffff, &save->fcs);
+	__put_user(tsk->thread.fdr, &save->foo);
+	__put_user((tsk->thread.fdr>>32) & 0xffff, &save->fos);
+
+        /*
+         *  Stack frames start with 16-bytes of temp space
+         */
+        swp = (struct switch_stack *)(tsk->thread.ksp + 16);
+        ptp = ia64_task_regs(tsk);
+	tos = (tsk->thread.fsr >> 11) & 7;
+        for (i = 0; i < 8; i++)
+		put_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+
+	mxcsr = ((tsk->thread.fcr>>32) & 0xff80) | ((tsk->thread.fsr>>32) & 0x3f);
+	__put_user(mxcsr & 0xffff, &save->mxcsr);
+	for (i = 0; i < 8; i++) {
+		memcpy(&(num128[0]), &(swp->f16) + i*2, sizeof(unsigned long));
+		memcpy(&(num128[1]), &(swp->f17) + i*2, sizeof(unsigned long));
+		copy_to_user(&save->xmm_space[0] + 4*i, num128, sizeof(struct _xmmreg_ia32));
+	}
+	return 0;
+}
+
+static int
+restore_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *save)
+{
+	struct switch_stack *swp;
+	struct pt_regs *ptp;
+	int i, tos;
+	unsigned int fsrlo, fsrhi, num32;
+	int mxcsr;
+	unsigned long num64;
+	unsigned long num128[2];
+
+	if (!access_ok(VERIFY_READ, save, sizeof(*save)))
+		return(-EFAULT);
+
+	__get_user(num32, (unsigned int *)&save->cwd);
+	tsk->thread.fcr = (tsk->thread.fcr & (~0x1f3f)) | (num32 & 0x1f3f);
+	__get_user(fsrlo, (unsigned int *)&save->swd);
+	__get_user(fsrhi, (unsigned int *)&save->twd);
+	num32 = (fsrhi << 16) | fsrlo;
+	tsk->thread.fsr = (tsk->thread.fsr & (~0xffffffff)) | num32;
+	__get_user(num32, (unsigned int *)&save->fip);
+	tsk->thread.fir = (tsk->thread.fir & (~0xffffffff)) | num32;
+	__get_user(num32, (unsigned int *)&save->foo);
+	tsk->thread.fdr = (tsk->thread.fdr & (~0xffffffff)) | num32;
+
+	/*
+	 *  Stack frames start with 16-bytes of temp space
+	 */
+	swp = (struct switch_stack *)(tsk->thread.ksp + 16);
+	ptp = ia64_task_regs(tsk);
+	tos = (tsk->thread.fsr >> 11) & 7;
+	for (i = 0; i < 8; i++)
+	get_fpreg(i, (struct _fpreg_ia32 *)&save->st_space[4*i], ptp, swp, tos);
+
+	__get_user(mxcsr, (unsigned int *)&save->mxcsr);
+	num64 = mxcsr & 0xff10;
+	tsk->thread.fcr = (tsk->thread.fcr & (~0xff1000000000)) | (num64<<32);
+	num64 = mxcsr & 0x3f;
+	tsk->thread.fsr = (tsk->thread.fsr & (~0x3f00000000)) | (num64<<32);
+
+	for (i = 0; i < 8; i++) {
+		copy_from_user(num128, &save->xmm_space[0] + 4*i, sizeof(struct _xmmreg_ia32));
+		memcpy(&(swp->f16) + i*2, &(num128[0]), sizeof(unsigned long));
+		memcpy(&(swp->f17) + i*2, &(num128[1]), sizeof(unsigned long));
+	}
+	return 0;
 }
 
 extern asmlinkage long sys_ptrace (long, pid_t, unsigned long, unsigned long, long, long, long,
@@ -3060,11 +3157,19 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 		break;
 
 	      case IA32_PTRACE_GETFPREGS:
-		ret = save_ia32_fpstate(child, (struct _fpstate_ia32 *) A(data));
+		ret = save_ia32_fpstate(child, (struct ia32_user_i387_struct *) A(data));
+		break;
+
+	      case IA32_PTRACE_GETFPXREGS:
+		ret = save_ia32_fpxstate(child, (struct ia32_user_fxsr_struct *) A(data));
 		break;
 
 	      case IA32_PTRACE_SETFPREGS:
-		ret = restore_ia32_fpstate(child, (struct _fpstate_ia32 *) A(data));
+		ret = restore_ia32_fpstate(child, (struct ia32_user_i387_struct *) A(data));
+		break;
+
+	      case IA32_PTRACE_SETFPXREGS:
+		ret = restore_ia32_fpxstate(child, (struct ia32_user_fxsr_struct *) A(data));
 		break;
 
 	      case PTRACE_SYSCALL:	/* continue, stop after next syscall */
@@ -3534,9 +3639,12 @@ putstat64 (struct stat64 *ubuf, struct kstat *kbuf)
 	err |= __put_user(kbuf->rdev, &ubuf->st_rdev);
 	err |= __put_user(kbuf->size, &ubuf->st_size_lo);
 	err |= __put_user((kbuf->size >> 32), &ubuf->st_size_hi);
-	err |= __put_user(kbuf->atime, &ubuf->st_atime);
-	err |= __put_user(kbuf->mtime, &ubuf->st_mtime);
-	err |= __put_user(kbuf->ctime, &ubuf->st_ctime);
+	err |= __put_user(kbuf->atime.tv_sec, &ubuf->st_atime);
+	err |= __put_user(kbuf->atime.tv_nsec, &ubuf->st_atime_nsec);
+	err |= __put_user(kbuf->mtime.tv_sec, &ubuf->st_mtime);
+	err |= __put_user(kbuf->mtime.tv_nsec, &ubuf->st_mtime_nsec);
+	err |= __put_user(kbuf->ctime.tv_sec, &ubuf->st_ctime);
+	err |= __put_user(kbuf->ctime.tv_nsec, &ubuf->st_ctime_nsec);
 	err |= __put_user(kbuf->blksize, &ubuf->st_blksize);
 	err |= __put_user(kbuf->blocks, &ubuf->st_blocks);
 	return err;
@@ -3698,6 +3806,37 @@ sys32_brk (unsigned int brk)
 	if (ret < obrk)
 		clear_user((void *) ret, PAGE_ALIGN(ret) - ret);
 	return ret;
+}
+
+/*
+ * Exactly like fs/open.c:sys_open(), except that it doesn't set the O_LARGEFILE flag.
+ */
+asmlinkage long
+sys32_open (const char * filename, int flags, int mode)
+{
+	char * tmp;
+	int fd, error;
+
+	tmp = getname(filename);
+	fd = PTR_ERR(tmp);
+	if (!IS_ERR(tmp)) {
+		fd = get_unused_fd();
+		if (fd >= 0) {
+			struct file *f = filp_open(tmp, flags, mode);
+			error = PTR_ERR(f);
+			if (IS_ERR(f))
+				goto out_error;
+			fd_install(fd, f);
+		}
+out:
+		putname(tmp);
+	}
+	return fd;
+
+out_error:
+	put_unused_fd(fd);
+	fd = error;
+	goto out;
 }
 
 #ifdef	NOTYET  /* UNTESTED FOR IA64 FROM HERE DOWN */

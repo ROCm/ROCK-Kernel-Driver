@@ -192,9 +192,9 @@ struct alenlist_s {
 #define AL_FIXED_SIZE	0x1	/* List is pre-allocated, and of fixed size */
 
 
-zone_t *alenlist_zone = NULL;
-zone_t *alenlist_chunk_zone = NULL;
-zone_t *alenlist_cursor_zone = NULL;
+struct zone *alenlist_zone = NULL;
+struct zone *alenlist_chunk_zone = NULL;
+struct zone *alenlist_cursor_zone = NULL;
 
 #if DEBUG
 int alenlist_count=0;		/* Currently allocated Lists */

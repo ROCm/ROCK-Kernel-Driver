@@ -11,6 +11,8 @@
 #ifndef _ASM_IA64_SN_HACK_H
 #define _ASM_IA64_SN_HACK_H
 
+#include <linux/mmzone.h>
+#include <asm/sn/arch.h>
 #include <asm/sn/types.h>
 #include <asm/uaccess.h>		/* for copy_??_user */
 
@@ -21,9 +23,6 @@
 typedef int cred_t;	/* This is for compilation reasons */
 struct cred { int x; };
 
-
-#define mrlock(_s, _t, _u)
-#define mrunlock(_s)
 
 /*
  * Hardware Graph routines that are currently stubbed!
@@ -60,9 +59,9 @@ typedef int (*splfunc_t)(void);
 extern void * snia_kmem_alloc_node(register size_t, register int, cnodeid_t);
 extern void * snia_kmem_zalloc(size_t, int);
 extern void * snia_kmem_zalloc_node(register size_t, register int, cnodeid_t );
-extern void * snia_kmem_zone_alloc(register zone_t *, int);
-extern zone_t * snia_kmem_zone_init(register int , char *);
-extern void snia_kmem_zone_free(register zone_t *, void *);
+extern void * snia_kmem_zone_alloc(register struct zone *, int);
+extern struct zone * snia_kmem_zone_init(register int , char *);
+extern void snia_kmem_zone_free(register struct zone *, void *);
 extern int is_specified(char *);
 extern int cap_able(uint64_t);
 extern int compare_and_swap_ptr(void **, void *, void *);

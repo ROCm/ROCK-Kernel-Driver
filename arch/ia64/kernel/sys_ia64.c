@@ -317,22 +317,26 @@ sys_free_hugepages (unsigned long  addr)
 
 #endif /* !CONFIG_HUGETLB_PAGE */
 
-asmlinkage long
-sys_vm86 (long arg0, long arg1, long arg2, long arg3)
-{
-	printk(KERN_ERR "sys_vm86(%lx, %lx, %lx, %lx)!\n", arg0, arg1, arg2, arg3);
-	return -ENOSYS;
-}
-
 asmlinkage unsigned long
-ia64_create_module (const char *name_user, size_t size)
+ia64_mremap (unsigned long addr, unsigned long old_len, unsigned long new_len, unsigned long flags,
+	     unsigned long new_addr)
 {
-	extern unsigned long sys_create_module (const char *, size_t);
-	unsigned long   addr;
+	extern unsigned long do_mremap (unsigned long addr,
+					unsigned long old_len,
+					unsigned long new_len,
+					unsigned long flags,
+					unsigned long new_addr);
 
-	addr = sys_create_module (name_user, size);
-	if (!IS_ERR((void *) addr))
-		force_successful_syscall_return();
+	down_write(&current->mm->mmap_sem);
+	{
+		addr = do_mremap(addr, old_len, new_len, flags, new_addr);
+	}
+	up_write(&current->mm->mmap_sem);
+
+	if (IS_ERR((void *) addr))
+		return addr;
+
+	force_successful_syscall_return();
 	return addr;
 }
 

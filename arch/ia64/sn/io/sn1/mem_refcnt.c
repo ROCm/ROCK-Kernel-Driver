@@ -1,4 +1,4 @@
-/* $Id$
+/* $Id: mem_refcnt.c,v 1.1 2002/02/28 17:31:25 marcelo Exp $
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -7,7 +7,6 @@
  * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/config.h>
 #include <linux/types.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/sgi.h>
@@ -43,7 +42,7 @@
 int
 mem_refcnt_attach(devfs_handle_t hub)
 {
-#ifndef CONFIG_IA64_SGI_SN
+#if 0
         devfs_handle_t refcnt_dev;
         
         hwgraph_char_device_add(hub,

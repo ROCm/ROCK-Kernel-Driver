@@ -1,4 +1,4 @@
-/* $Id$
+/* $Id: ml_SN_intr.c,v 1.1 2002/02/28 17:31:25 marcelo Exp $
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -13,7 +13,7 @@
  *	handle interrupts on an IP27 board.
  */
 
-#ident  "$Revision: 1.167 $"
+#ident  "$Revision: 1.1 $"
 
 #include <linux/types.h>
 #include <linux/config.h>
@@ -987,13 +987,12 @@ intr_reserve_hardwired(cnodeid_t cnode)
 	char subnode_done[NUM_SUBNODES];
 
 	// cpu = cnodetocpu(cnode);
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu)) continue;
+	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
 		if (cpuid_to_cnodeid(cpu) == cnode) {
 			break;
 		}
 	}
-	if (cpu == NR_CPUS) cpu = CPU_NONE;
+	if (cpu == smp_num_cpus) cpu = CPU_NONE;
 	if (cpu == CPU_NONE) {
 		printk("Node %d has no CPUs", cnode);
 		return;
@@ -1002,7 +1001,7 @@ intr_reserve_hardwired(cnodeid_t cnode)
 	for (i=0; i<NUM_SUBNODES; i++)
 		subnode_done[i] = 0;
 
-	for (; cpu<NR_CPUS && cpu_enabled(cpu) && cpuid_to_cnodeid(cpu) == cnode; cpu++) {
+	for (; cpu<smp_num_cpus && cpu_enabled(cpu) && cpuid_to_cnodeid(cpu) == cnode; cpu++) {
 		int which_subnode = cpuid_to_subnode(cpu);
 		if (subnode_done[which_subnode])
 			continue;
