@@ -242,6 +242,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->backing_dev_info.state = 0;
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
+	blk_queue_dma_alignment(q, 511);
 
 	/*
 	 * by default assume old behaviour and bounce for any highmem page
@@ -406,6 +407,21 @@ void blk_queue_segment_boundary(request_queue_t *q, unsigned long mask)
 	}
 
 	q->seg_boundary_mask = mask;
+}
+
+/**
+ * blk_queue_dma_alignment - set dma length and memory alignment
+ * @q:  the request queue for the device
+ * @dma_mask:  alignment mask
+ *
+ * description:
+ *    set required memory and length aligment for direct dma transactions.
+ *    this is used when buiding direct io requests for the queue.
+ *
+ **/
+void blk_queue_dma_alignment(request_queue_t *q, int mask)
+{
+	q->dma_alignment = mask;
 }
 
 void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
@@ -639,7 +655,7 @@ void blk_queue_invalidate_tags(request_queue_t *q)
 			blk_queue_end_tag(q, rq);
 
 		rq->flags &= ~REQ_STARTED;
-		elv_add_request(q, rq, 0);
+		__elv_add_request(q, rq, 0, 0);
 	}
 }
 
@@ -655,14 +671,19 @@ static char *rq_flags[] = {
 	"REQ_PC",
 	"REQ_BLOCK_PC",
 	"REQ_SENSE",
+	"REQ_FAILED",
+	"REQ_QUIET",
 	"REQ_SPECIAL"
+	"REQ_DRIVE_CMD",
+	"REQ_DRIVE_TASK",
+	"REQ_DRIVE_TASKFILE",
 };
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
 {
 	int bit;
 
-	printk("%s: dev %02x:%02x: ", msg, major(rq->rq_dev), minor(rq->rq_dev));
+	printk("%s: dev %02x:%02x: flags = ", msg, major(rq->rq_dev), minor(rq->rq_dev));
 	bit = 0;
 	do {
 		if (rq->flags & (1 << bit))
@@ -670,10 +691,17 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 		bit++;
 	} while (bit < __REQ_NR_BITS);
 
-	printk("sector %llu, nr/cnr %lu/%u\n", (unsigned long long)rq->sector,
+	printk("\nsector %llu, nr/cnr %lu/%u\n", (unsigned long long)rq->sector,
 						       rq->nr_sectors,
 						       rq->current_nr_sectors);
-	printk("bio %p, biotail %p\n", rq->bio, rq->biotail);
+	printk("bio %p, biotail %p, buffer %p, data %p, len %u\n", rq->bio, rq->biotail, rq->buffer, rq->data, rq->data_len);
+
+	if (rq->flags & (REQ_BLOCK_PC | REQ_PC)) {
+		printk("cdb: ");
+		for (bit = 0; bit < sizeof(rq->cmd); bit++)
+			printk("%02x ", rq->cmd[bit]);
+		printk("\n");
+	}
 }
 
 void blk_recount_segments(request_queue_t *q, struct bio *bio)
@@ -1466,7 +1494,7 @@ static inline void add_request(request_queue_t * q, struct request * req,
 	 * elevator indicated where it wants this request to be
 	 * inserted at elevator_merge time
 	 */
-	__elv_add_request(q, req, insert_here);
+	__elv_add_request_pos(q, req, insert_here);
 }
 
 /*
@@ -1480,11 +1508,6 @@ void blk_put_request(struct request *req)
 	req->rq_status = RQ_INACTIVE;
 	req->q = NULL;
 	req->rl = NULL;
-
-	if (q) {
-		if (q->last_merge == &req->queuelist)
-			q->last_merge = NULL;
-	}
 
 	/*
 	 * Request may not have originated from ll_rw_blk. if not,
@@ -2112,6 +2135,7 @@ EXPORT_SYMBOL(blk_queue_max_hw_segments);
 EXPORT_SYMBOL(blk_queue_max_segment_size);
 EXPORT_SYMBOL(blk_queue_hardsect_size);
 EXPORT_SYMBOL(blk_queue_segment_boundary);
+EXPORT_SYMBOL(blk_queue_dma_alignment);
 EXPORT_SYMBOL(blk_rq_map_sg);
 EXPORT_SYMBOL(blk_nohighio);
 EXPORT_SYMBOL(blk_dump_rq_flags);

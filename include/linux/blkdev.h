@@ -215,6 +215,7 @@ struct request_queue
 	unsigned int		max_segment_size;
 
 	unsigned long		seg_boundary_mask;
+	unsigned int		dma_alignment;
 
 	wait_queue_head_t	queue_wait;
 
@@ -254,6 +255,13 @@ struct request_queue
  */
 #define blk_queue_headactive(q, head_active)
 
+/*
+ * q->prep_rq_fn return values
+ */
+#define BLKPREP_OK		0	/* serve it */
+#define BLKPREP_KILL		1	/* fatal error, kill */
+#define BLKPREP_DEFER		2	/* leave on queue */
+
 extern unsigned long blk_max_low_pfn, blk_max_pfn;
 
 /*
@@ -268,7 +276,7 @@ extern unsigned long blk_max_low_pfn, blk_max_pfn;
 #define BLK_BOUNCE_ISA		(ISA_DMA_THRESHOLD)
 
 extern int init_emergency_isa_pool(void);
-void blk_queue_bounce(request_queue_t *q, struct bio **bio);
+inline void blk_queue_bounce(request_queue_t *q, struct bio **bio);
 
 #define rq_for_each_bio(bio, rq)	\
 	if ((rq->bio))			\
@@ -339,6 +347,7 @@ extern void blk_queue_segment_boundary(request_queue_t *, unsigned long);
 extern void blk_queue_assign_lock(request_queue_t *, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *, prep_rq_fn *pfn);
 extern void blk_queue_merge_bvec(request_queue_t *, merge_bvec_fn *);
+extern void blk_queue_dma_alignment(request_queue_t *, int);
 extern struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
@@ -383,6 +392,21 @@ static inline int queue_hardsect_size(request_queue_t *q)
 static inline int bdev_hardsect_size(struct block_device *bdev)
 {
 	return queue_hardsect_size(bdev_get_queue(bdev));
+}
+
+static inline int queue_dma_alignment(request_queue_t *q)
+{
+	int retval = 511;
+
+	if (q && q->dma_alignment)
+		retval = q->dma_alignment;
+
+	return retval;
+}
+
+static inline int bdev_dma_aligment(struct block_device *bdev)
+{
+	return queue_dma_alignment(bdev_get_queue(bdev));
 }
 
 #define blk_finished_io(nsects)	do { } while (0)
