@@ -202,7 +202,7 @@ static int alloc_targets(struct dm_table *t, unsigned int num)
 	return 0;
 }
 
-int dm_table_create(struct dm_table **result, int mode)
+int dm_table_create(struct dm_table **result, int mode, unsigned num_targets)
 {
 	struct dm_table *t = kmalloc(sizeof(*t), GFP_NOIO);
 
@@ -213,8 +213,12 @@ int dm_table_create(struct dm_table **result, int mode)
 	INIT_LIST_HEAD(&t->devices);
 	atomic_set(&t->holders, 1);
 
-	/* allocate a single nodes worth of targets to begin with */
-	if (alloc_targets(t, KEYS_PER_NODE)) {
+	if (!num_targets)
+		num_targets = KEYS_PER_NODE;
+
+	num_targets = dm_round_up(num_targets, KEYS_PER_NODE);
+
+	if (alloc_targets(t, num_targets)) {
 		kfree(t);
 		t = NULL;
 		return -ENOMEM;
