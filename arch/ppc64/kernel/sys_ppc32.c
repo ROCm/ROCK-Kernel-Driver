@@ -446,7 +446,6 @@ struct old_linux_dirent32 {
 	u32		d_ino;
 	u32		d_offset;
 	unsigned short	d_namlen;
-  /* unsigned char	d_type; */
 	char		d_name[1];
 };
 
@@ -497,22 +496,12 @@ out:
 	return error;
 }
 
-#if 0
 struct linux_dirent32 {
 	u32		d_ino;
 	u32		d_off;
 	unsigned short	d_reclen;
 	char		d_name[1];
 };
-#else
-struct linux_dirent32 {
-	u32		d_ino;
-	u32		d_off;
-	unsigned short	d_reclen;
-  /* unsigned char	d_type; */
-	char		d_name[256];
-};
-#endif
 
 struct getdents_callback32 {
 	struct linux_dirent32 * current_dir;
@@ -539,7 +528,6 @@ filldir(void * __buf, const char * name, int namlen, off_t offset, ino_t ino,
 	buf->previous = dirent;
 	put_user(ino, &dirent->d_ino);
 	put_user(reclen, &dirent->d_reclen);
-	/* put_user(d_type, &dirent->d_type); */
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
 	((char *) dirent) += reclen;
