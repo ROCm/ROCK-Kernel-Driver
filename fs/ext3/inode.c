@@ -464,7 +464,7 @@ static int ext3_find_goal(struct inode *inode, long block, Indirect chain[4],
 {
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	/* Writer: ->i_next_alloc* */
-	if (block == ei->i_next_alloc_block + 1) {
+	if ((block == ei->i_next_alloc_block + 1)&& ei->i_next_alloc_goal) {
 		ei->i_next_alloc_block++;
 		ei->i_next_alloc_goal++;
 	}
