@@ -54,8 +54,8 @@ MODULE_LICENSE("GPL");
 
 static spinlock_t riowd_lock = SPIN_LOCK_UNLOCKED;
 
-static void *bbc_regs;
-static void *riowd_regs;
+static void __iomem *bbc_regs;
+static void __iomem *riowd_regs;
 #define WDTO_INDEX	0x05
 
 static int riowd_timeout = 1;		/* in minutes */

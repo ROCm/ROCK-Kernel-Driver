@@ -569,7 +569,7 @@ static void snd_cs4231_mce_down(cs4231_t *chip)
 #endif
 #ifdef CONFIG_SND_DEBUG
 	if (__cs4231_readb(chip, CS4231P(chip, REGSEL)) & CS4231_INIT)
-		snd_printk("mce_down [0x%lx] - auto calibration time out (0)\n", CS4231P(chip, REGSEL));
+		snd_printk("mce_down [%p] - auto calibration time out (0)\n", CS4231P(chip, REGSEL));
 #endif
 	chip->mce_bit &= ~CS4231_MCE;
 	timeout = __cs4231_readb(chip, CS4231P(chip, REGSEL));
@@ -1347,7 +1347,7 @@ static int snd_cs4231_probe(cs4231_t *chip)
 				break;	/* this is valid value */
 		}
 	}
-	snd_printdd("cs4231: port = 0x%lx, id = 0x%x\n", chip->port, id);
+	snd_printdd("cs4231: port = %p, id = 0x%x\n", chip->port, id);
 	if (id != 0x0a)
 		return -ENODEV;	/* no valid device found */
 
