@@ -9,17 +9,11 @@
 
 #include "sysfs.h"
 
-static struct inode_operations sysfs_symlink_inode_operations = {
+struct inode_operations sysfs_symlink_inode_operations = {
 	.readlink = generic_readlink,
 	.follow_link = sysfs_follow_link,
 	.put_link = sysfs_put_link,
 };
-
-static int init_symlink(struct inode * inode)
-{
-	inode->i_op = &sysfs_symlink_inode_operations;
-	return 0;
-}
 
 static int object_depth(struct kobject * kobj)
 {
@@ -55,9 +49,9 @@ static void fill_object_path(struct kobject * kobj, char * buffer, int length)
 	}
 }
 
-static int sysfs_add_link(struct dentry * dentry, char * name, struct kobject * target)
+static int sysfs_add_link(struct dentry * parent, char * name, struct kobject * target)
 {
-	struct sysfs_dirent * parent_sd = dentry->d_parent->d_fsdata;
+	struct sysfs_dirent * parent_sd = parent->d_fsdata;
 	struct sysfs_symlink * sl;
 	int error = 0;
 
@@ -73,7 +67,7 @@ static int sysfs_add_link(struct dentry * dentry, char * name, struct kobject * 
 	strcpy(sl->link_name, name);
 	sl->target_kobj = kobject_get(target);
 
-	error = sysfs_make_dirent(parent_sd, dentry, sl, S_IFLNK|S_IRWXUGO,
+	error = sysfs_make_dirent(parent_sd, NULL, sl, S_IFLNK|S_IRWXUGO,
 				SYSFS_KOBJ_LINK);
 	if (!error)
 		return 0;
@@ -94,22 +88,12 @@ exit1:
 int sysfs_create_link(struct kobject * kobj, struct kobject * target, char * name)
 {
 	struct dentry * dentry = kobj->dentry;
-	struct dentry * d;
 	int error = 0;
 
 	BUG_ON(!kobj || !kobj->dentry || !name);
 
 	down(&dentry->d_inode->i_sem);
-	d = sysfs_get_dentry(dentry,name);
-	if (!IS_ERR(d)) {
-		error = sysfs_create(d, S_IFLNK|S_IRWXUGO, init_symlink);
-		if (!error)
-			error = sysfs_add_link(d, name, target);
-		if (error)
-			d_drop(d);
-		dput(d);
-	} else 
-		error = PTR_ERR(d);
+	error = sysfs_add_link(dentry, name, target);
 	up(&dentry->d_inode->i_sem);
 	return error;
 }

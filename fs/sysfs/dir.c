@@ -61,15 +61,17 @@ int sysfs_make_dirent(struct sysfs_dirent * parent_sd, struct dentry * dentry,
 	sd->s_mode = mode;
 	sd->s_type = type;
 	sd->s_dentry = dentry;
-	dentry->d_fsdata = sysfs_get(sd);
-	dentry->d_op = &sysfs_dentry_ops;
+	if (dentry) {
+		dentry->d_fsdata = sysfs_get(sd);
+		dentry->d_op = &sysfs_dentry_ops;
+	}
 
 	return 0;
 }
 
 static int init_dir(struct inode * inode)
 {
-	inode->i_op = &simple_dir_inode_operations;
+	inode->i_op = &sysfs_dir_inode_operations;
 	inode->i_fop = &sysfs_dir_operations;
 
 	/* directory inodes start off with i_nlink == 2 (for "." entry) */
@@ -77,6 +79,18 @@ static int init_dir(struct inode * inode)
 	return 0;
 }
 
+static int init_file(struct inode * inode)
+{
+	inode->i_size = PAGE_SIZE;
+	inode->i_fop = &sysfs_file_operations;
+	return 0;
+}
+
+static int init_symlink(struct inode * inode)
+{
+	inode->i_op = &sysfs_symlink_inode_operations;
+	return 0;
+}
 
 static int create_dir(struct kobject * k, struct dentry * p,
 		      const char * n, struct dentry ** d)
@@ -91,8 +105,11 @@ static int create_dir(struct kobject * k, struct dentry * p,
 		if (!error) {
 			error = sysfs_make_dirent(p->d_fsdata, *d, k, mode,
 						SYSFS_DIR);
-			if (!error)
+			if (!error) {
 				p->d_inode->i_nlink++;
+				(*d)->d_op = &sysfs_dentry_ops;
+				d_rehash(*d);
+			}
 		}
 		if (error)
 			d_drop(*d);
@@ -136,6 +153,82 @@ int sysfs_create_dir(struct kobject * kobj)
 	return error;
 }
 
+/* attaches attribute's sysfs_dirent to the dentry corresponding to the
+ * attribute file
+ */
+static int sysfs_attach_attr(struct sysfs_dirent * sd, struct dentry * dentry)
+{
+	struct attribute * attr = NULL;
+	struct bin_attribute * bin_attr = NULL;
+	int (* init) (struct inode *) = NULL;
+	int error = 0;
+
+        if (sd->s_type & SYSFS_KOBJ_BIN_ATTR) {
+                bin_attr = sd->s_element;
+                attr = &bin_attr->attr;
+        } else {
+                attr = sd->s_element;
+                init = init_file;
+        }
+
+	error = sysfs_create(dentry, (attr->mode & S_IALLUGO) | S_IFREG, init);
+	if (error)
+		return error;
+
+        if (bin_attr) {
+		dentry->d_inode->i_size = bin_attr->size;
+		dentry->d_inode->i_fop = &bin_fops;
+	}
+	dentry->d_op = &sysfs_dentry_ops;
+	dentry->d_fsdata = sysfs_get(sd);
+	sd->s_dentry = dentry;
+	d_rehash(dentry);
+
+	return 0;
+}
+
+static int sysfs_attach_link(struct sysfs_dirent * sd, struct dentry * dentry)
+{
+	int err = 0;
+
+	err = sysfs_create(dentry, S_IFLNK|S_IRWXUGO, init_symlink);
+	if (!err) {
+		dentry->d_op = &sysfs_dentry_ops;
+		dentry->d_fsdata = sysfs_get(sd);
+		sd->s_dentry = dentry;
+		d_rehash(dentry);
+	}
+	return err;
+}
+
+struct dentry * sysfs_lookup(struct inode *dir, struct dentry *dentry,
+				struct nameidata *nd)
+{
+	struct sysfs_dirent * parent_sd = dentry->d_parent->d_fsdata;
+	struct sysfs_dirent * sd;
+	int err = 0;
+
+	list_for_each_entry(sd, &parent_sd->s_children, s_sibling) {
+		if (sd->s_type & SYSFS_NOT_PINNED) {
+			const unsigned char * name = sysfs_get_name(sd);
+
+			if (strcmp(name, dentry->d_name.name))
+				continue;
+
+			if (sd->s_type & SYSFS_KOBJ_LINK)
+				err = sysfs_attach_link(sd, dentry);
+			else
+				err = sysfs_attach_attr(sd, dentry);
+			break;
+		}
+	}
+
+	return ERR_PTR(err);
+}
+
+struct inode_operations sysfs_dir_inode_operations = {
+	.lookup		= sysfs_lookup,
+};
 
 static void remove_dir(struct dentry * d)
 {
@@ -219,8 +312,10 @@ int sysfs_rename_dir(struct kobject * kobj, const char *new_name)
 	if (!IS_ERR(new_dentry)) {
   		if (!new_dentry->d_inode) {
 			error = kobject_set_name(kobj, "%s", new_name);
-			if (!error)
+			if (!error) {
+				d_add(new_dentry, NULL);
 				d_move(kobj->dentry, new_dentry);
+			}
 			else
 				d_drop(new_dentry);
 		} else
@@ -254,7 +349,6 @@ static int sysfs_dir_close(struct inode *inode, struct file *file)
 	down(&dentry->d_inode->i_sem);
 	list_del_init(&cursor->s_sibling);
 	up(&dentry->d_inode->i_sem);
-	sysfs_put(file->private_data);
 
 	return 0;
 }

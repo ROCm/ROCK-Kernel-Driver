@@ -9,15 +9,6 @@
 
 #include "sysfs.h"
 
-static struct file_operations sysfs_file_operations;
-
-static int init_file(struct inode * inode)
-{
-	inode->i_size = PAGE_SIZE;
-	inode->i_fop = &sysfs_file_operations;
-	return 0;
-}
-
 #define to_subsys(k) container_of(k,struct subsystem,kset.kobj)
 #define to_sattr(a) container_of(a,struct subsys_attribute,attr)
 
@@ -337,7 +328,7 @@ static int sysfs_release(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-static struct file_operations sysfs_file_operations = {
+struct file_operations sysfs_file_operations = {
 	.read		= sysfs_read_file,
 	.write		= sysfs_write_file,
 	.llseek		= generic_file_llseek,
@@ -348,24 +339,14 @@ static struct file_operations sysfs_file_operations = {
 
 int sysfs_add_file(struct dentry * dir, const struct attribute * attr, int type)
 {
-	struct dentry * dentry;
 	struct sysfs_dirent * parent_sd = dir->d_fsdata;
 	umode_t mode = (attr->mode & S_IALLUGO) | S_IFREG;
 	int error = 0;
 
 	down(&dir->d_inode->i_sem);
-	dentry = sysfs_get_dentry(dir,attr->name);
-	if (!IS_ERR(dentry)) {
-		error = sysfs_create(dentry, mode, init_file);
-		if (!error)
-			error = sysfs_make_dirent(parent_sd, dentry,
-						(void *) attr, mode, type);
-		if (error)
-			d_drop(dentry);
-		dput(dentry);
-	} else
-		error = PTR_ERR(dentry);
+	error = sysfs_make_dirent(parent_sd, NULL, (void *) attr, mode, type);
 	up(&dir->d_inode->i_sem);
+
 	return error;
 }
 
