@@ -213,6 +213,9 @@ int arp_mc_map(u32 addr, u8 *haddr, struct net_device *dev, int dir)
 	case ARPHRD_IEEE802_TR:
 		ip_tr_mc_map(addr, haddr);
 		return 0;
+	case ARPHRD_INFINIBAND:
+		ip_ib_mc_map(addr, haddr);
+		return 0;
 	default:
 		if (dir) {
 			memcpy(haddr, dev->broadcast, dev->addr_len);
