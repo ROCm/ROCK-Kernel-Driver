@@ -190,12 +190,14 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 /* list all files open on tree connection */
 	read_lock(&GlobalSMBSeslock);
 	list_for_each_safe(tmp, tmp1, &pTcon->openFileList) {            
-		open_file = list_entry(tmp,struct cifsFileInfo, flist);
+		open_file = list_entry(tmp,struct cifsFileInfo, tlist);
 		if(open_file) {
 			if(open_file->search_resume_name) {
 				kfree(open_file->search_resume_name);
 			}
 			file = open_file->pfile;
+			list_del(&open_file->flist);
+			list_del(&open_file->tlist);
 			kfree(open_file);
 			if(file) {                
 				file->private_data = NULL;
@@ -232,8 +234,7 @@ cifs_close(struct inode *inode, struct file *file)
 	pTcon = cifs_sb->tcon;
 	if (pSMBFile) {
 		write_lock(&file->f_owner.lock);
-		if(pSMBFile->flist.next)
-			list_del(&pSMBFile->flist);
+		list_del(&pSMBFile->flist);
 		list_del(&pSMBFile->tlist);
 		write_unlock(&file->f_owner.lock);
 		rc = CIFSSMBClose(xid, pTcon, pSMBFile->netfid);

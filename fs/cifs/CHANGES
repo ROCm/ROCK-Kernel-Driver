@@ -1,6 +1,7 @@
 Version 0.85
 ------------
-Fix oops in mkdir when server fails to return inode info.
+Fix oops in mkdir when server fails to return inode info. Fix oops in reopen_files
+during auto reconnection to server after server recovered from failure.
 
 Version 0.84
 ------------
