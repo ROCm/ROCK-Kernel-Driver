@@ -126,6 +126,9 @@ extern void xor_vis_4(unsigned long, unsigned long *, unsigned long *,
 extern void xor_vis_5(unsigned long, unsigned long *, unsigned long *,
 		      unsigned long *, unsigned long *, unsigned long *);
 
+/* Per-CPU information table */
+EXPORT_PER_CPU_SYMBOL(__cpu_data);
+
 /* used by various drivers */
 #ifdef CONFIG_SMP
 #ifndef CONFIG_DEBUG_SPINLOCK
@@ -143,9 +146,6 @@ EXPORT_SYMBOL(synchronize_irq);
 extern void mcount(void);
 EXPORT_SYMBOL_NOVERS(mcount);
 #endif
-
-/* Per-CPU information table */
-EXPORT_PER_CPU_SYMBOL(__cpu_data);
 
 /* CPU online map and active count.  */
 EXPORT_SYMBOL(cpu_online_map);

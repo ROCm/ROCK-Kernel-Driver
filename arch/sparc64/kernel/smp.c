@@ -42,8 +42,6 @@
 extern int linux_num_cpus;
 extern void calibrate_delay(void);
 
-DEFINE_PER_CPU(cpuinfo_sparc, __cpu_data) = { 0 };
-
 /* Please don't make this stuff initdata!!!  --DaveM */
 static unsigned char boot_cpu_id;
 

@@ -12,6 +12,9 @@
 #include <asm/asi.h>
 #include <asm/system.h>
 #include <asm/fpumacro.h>
+#include <asm/cpudata.h>
+
+DEFINE_PER_CPU(cpuinfo_sparc, __cpu_data) = { 0 };
 
 struct cpu_iu_info {
   short manuf;
