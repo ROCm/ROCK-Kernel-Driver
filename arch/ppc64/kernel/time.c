@@ -58,10 +58,10 @@
 #include <asm/iSeries/HvCallXm.h>
 #endif
 #include <asm/uaccess.h>
-
 #include <asm/time.h>
 #include <asm/ppcdebug.h>
 #include <asm/prom.h>
+#include <asm/sections.h>
 
 void smp_local_timer_interrupt(struct pt_regs *);
 
@@ -108,7 +108,6 @@ static inline void ppc64_do_profile(struct pt_regs *regs)
 {
 	unsigned long nip;
 	extern unsigned long prof_cpu_mask;
-	extern char _stext;
 
 	profile_hook(regs);
 
@@ -127,7 +126,7 @@ static inline void ppc64_do_profile(struct pt_regs *regs)
 	if (!((1<<smp_processor_id()) & prof_cpu_mask))
 		return;
 
-	nip -= (unsigned long) &_stext;
+	nip -= (unsigned long)_stext;
 	nip >>= prof_shift;
 	/*
 	 * Don't ignore out-of-bounds EIP values silently,
