@@ -61,6 +61,7 @@
 #include <asm/semaphore.h>
 
 #include <net/scm.h>
+#include <net/sock.h>
 #include <linux/elf.h>
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
