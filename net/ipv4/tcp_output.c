@@ -99,10 +99,10 @@ static __u16 tcp_advertise_mss(struct sock *sk)
 
 /* RFC2861. Reset CWND after idle period longer RTO to "restart window".
  * This is the first part of cwnd validation mechanism. */
-static void tcp_cwnd_restart(struct tcp_opt *tp)
+static void tcp_cwnd_restart(struct tcp_opt *tp, struct dst_entry *dst)
 {
 	s32 delta = tcp_time_stamp - tp->lsndtime;
-	u32 restart_cwnd = tcp_init_cwnd(tp);
+	u32 restart_cwnd = tcp_init_cwnd(tp, dst);
 	u32 cwnd = tp->snd_cwnd;
 
 	tp->snd_ssthresh = tcp_current_ssthresh(tp);
@@ -115,12 +115,12 @@ static void tcp_cwnd_restart(struct tcp_opt *tp)
 	tp->snd_cwnd_used = 0;
 }
 
-static __inline__ void tcp_event_data_sent(struct tcp_opt *tp, struct sk_buff *skb)
+static __inline__ void tcp_event_data_sent(struct tcp_opt *tp, struct sk_buff *skb, struct sock *sk)
 {
 	u32 now = tcp_time_stamp;
 
 	if (!tp->packets_out && (s32)(now - tp->lsndtime) > tp->rto)
-		tcp_cwnd_restart(tp);
+		tcp_cwnd_restart(tp, __sk_dst_get(sk));
 
 	tp->lsndtime = now;
 
@@ -272,7 +272,7 @@ int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 			tcp_event_ack_sent(sk);
 
 		if (skb->len != tcp_header_size)
-			tcp_event_data_sent(tp, skb);
+			tcp_event_data_sent(tp, skb, sk);
 
 		TCP_INC_STATS(TcpOutSegs);
 

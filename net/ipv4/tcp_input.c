@@ -598,25 +598,17 @@ void tcp_update_metrics(struct sock *sk)
 	}
 }
 
-/* Increase initial CWND conservatively: if estimated
- * RTT is low enough (<20msec) or if we have some preset ssthresh.
- *
- * Numbers are taken from RFC2414.
- */
-__u32 tcp_init_cwnd(struct tcp_opt *tp)
+/* Numbers are taken from RFC2414.  */
+__u32 tcp_init_cwnd(struct tcp_opt *tp, struct dst_entry *dst)
 {
-	__u32 cwnd;
+	__u32 cwnd = dst_metric(dst, RTAX_INITCWND);
 
-	if (tp->mss_cache > 1460)
-		return 2;
-
-	cwnd = (tp->mss_cache > 1095) ? 3 : 4;
-
-	if (!tp->srtt || (tp->snd_ssthresh >= 0xFFFF && tp->srtt > ((HZ/50)<<3)))
-		cwnd = 2;
-	else if (cwnd > tp->snd_ssthresh)
-		cwnd = tp->snd_ssthresh;
-
+	if (!cwnd) {
+		if (tp->mss_cache > 1460)
+			cwnd = 2;
+		else
+			cwnd = (tp->mss_cache > 1095) ? 3 : 4;
+	}
 	return min_t(__u32, cwnd, tp->snd_cwnd_clamp);
 }
 
@@ -675,7 +667,7 @@ static void tcp_init_metrics(struct sock *sk)
 	tcp_bound_rto(tp);
 	if (tp->rto < TCP_TIMEOUT_INIT && !tp->saw_tstamp)
 		goto reset;
-	tp->snd_cwnd = tcp_init_cwnd(tp);
+	tp->snd_cwnd = tcp_init_cwnd(tp, dst);
 	tp->snd_cwnd_stamp = tcp_time_stamp;
 	return;
 
