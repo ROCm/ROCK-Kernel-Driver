@@ -777,6 +777,10 @@ config DEVFS_FS
 	  the material in <file:Documentation/filesystems/devfs/>, especially
 	  the file README there.
 
+	  Note that devfs no longer manages /dev/pts!  If you are using UNIX98
+	  ptys, you will also need to enable (and mount) the /dev/pts
+	  filesystem (CONFIG_DEVPTS_FS).
+
 	  If unsure, say N.
 
 config DEVFS_MOUNT
@@ -823,9 +827,6 @@ config DEVPTS_FS
 	  mode of operation; you also need client programs that use the Unix98
 	  API. Please read <file:Documentation/Changes> for more information
 	  about the Unix98 pty devices.
-
-	  Note that the experimental "/dev file system support"
-	  (CONFIG_DEVFS_FS)  is a more general facility.
 
 config DEVPTS_FS_XATTR
 	bool "/dev/pts Extended Attributes"
