@@ -126,7 +126,7 @@ static int i2o_block_remove(struct device *dev)
  */
 static int i2o_block_device_flush(struct i2o_device *dev)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 
 	m = i2o_msg_get_wait(dev->iop, &msg, I2O_TIMEOUT_MESSAGE_GET);
@@ -154,7 +154,7 @@ static int i2o_block_device_flush(struct i2o_device *dev)
  */
 static int i2o_block_device_mount(struct i2o_device *dev, u32 media_id)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 
 	m = i2o_msg_get_wait(dev->iop, &msg, I2O_TIMEOUT_MESSAGE_GET);
@@ -183,7 +183,7 @@ static int i2o_block_device_mount(struct i2o_device *dev, u32 media_id)
  */
 static int i2o_block_device_lock(struct i2o_device *dev, u32 media_id)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 
 	m = i2o_msg_get_wait(dev->iop, &msg, I2O_TIMEOUT_MESSAGE_GET);
@@ -211,7 +211,7 @@ static int i2o_block_device_lock(struct i2o_device *dev, u32 media_id)
  */
 static int i2o_block_device_unlock(struct i2o_device *dev, u32 media_id)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 
 	m = i2o_msg_get_wait(dev->iop, &msg, I2O_TIMEOUT_MESSAGE_GET);
@@ -240,7 +240,7 @@ static int i2o_block_device_power(struct i2o_block_device *dev, u8 op)
 {
 	struct i2o_device *i2o_dev = dev->i2o_dev;
 	struct i2o_controller *c = i2o_dev->iop;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	int rc;
 
@@ -777,8 +777,8 @@ static int i2o_block_transfer(struct request *req)
 	struct i2o_block_device *dev = req->rq_disk->private_data;
 	struct i2o_controller *c = dev->i2o_dev->iop;
 	int tid = dev->i2o_dev->lct_data.tid;
-	struct i2o_message *msg;
-	void *mptr;
+	struct i2o_message __iomem *msg;
+	void __iomem *mptr;
 	struct i2o_block_request *ireq = req->special;
 	struct scatterlist *sg;
 	int sgnum;

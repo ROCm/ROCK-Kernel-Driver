@@ -269,11 +269,11 @@ end
 
 # Set kernel parameters
 define set_kernel_parameters
-  set $param = (void*)0x08002000
+  set $param = (void*)0x08001000
   # INITRD_START
 # set *(unsigned long *)($param + 0x0010) = 0x082a0000
   # INITRD_SIZE
-  set *(unsigned long *)($param + 0x0014) = 0x00000000
+#  set *(unsigned long *)($param + 0x0014) = 0x00000000
   # M32R_CPUCLK
   set *(unsigned long *)($param + 0x0018) = 0d160000000
 #  set *(unsigned long *)($param + 0x0018) = 0d80000000
@@ -284,14 +284,14 @@ define set_kernel_parameters
   # M32R_TIMER_DIVIDE
   set *(unsigned long *)($param + 0x0020) = 0d128
 
-  set {char[0x200]}($param + 0x100) = "console=tty1 console=ttyD0,115200n8x root=/dev/nfsroot nfsroot=192.168.0.1:/project/m32r-linux/export/root.x nfsaddrs=192.168.0.101:192.168.0.1:192.168.0.1:255.255.255.0:mappi001 \0"
+  set {char[0x200]}($param + 0x100) = "console=tty1 console=ttyS0,115200n8x root=/dev/nfsroot nfsroot=192.168.0.1:/project/m32r-linux/export/root.x nfsaddrs=192.168.0.101:192.168.0.1:192.168.0.1:255.255.255.0:mappi001 \0"
 #  set {char[0x200]}($param + 0x100) = "console=tty1 root=/dev/nfsroot nfsroot=192.168.0.1:/project/m32r-linux/export/root.x nfsaddrs=192.168.0.101:192.168.0.1:192.168.0.1:255.255.255.0:mappi001 \0"
 end
 
 # Boot
 define boot
   set_kernel_parameters
-  set $pc=0x08001000
+  set $pc=0x08002000
   set *(unsigned char *)0x08001003=0x03
   si
   c
@@ -309,7 +309,7 @@ define boot_mp
   set *(unsigned long *)0x00eff2f8 = 0x2
   x 0x00eff2f8
 
-  set $pc=0x08001000
+  set $pc=0x08002000
   si
   c
 end
@@ -320,7 +320,7 @@ end
 ## Boot UP
 define boot_up
   set_kernel_parameters
-  set $pc=0x08001000
+  set $pc=0x08002000
   si
   c
 end

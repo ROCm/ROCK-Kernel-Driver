@@ -3169,7 +3169,7 @@ deinit_card(struct idt77252_dev *card)
 	}
 
 	if (card->membase)
-		iounmap((void *) card->membase);
+		iounmap(card->membase);
 
 	clear_bit(IDT77252_BIT_INIT, &card->flags);
 	DIPRINTK("%s: Card deinitialized.\n", card->name);
@@ -3685,9 +3685,9 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	int i, err;
 
 
-	if (pci_enable_device(pcidev)) {
+	if ((err = pci_enable_device(pcidev))) {
 		printk("idt77252: can't enable PCI device at %s\n", pci_name(pcidev));
-		return -ENODEV;
+		return err;
 	}
 
 	if (pci_read_config_word(pcidev, PCI_REVISION_ID, &revision)) {
@@ -3803,7 +3803,7 @@ err_out_deinit_card:
 	deinit_card(card);
 
 err_out_iounmap:
-	iounmap((void *) card->membase);
+	iounmap(card->membase);
 
 err_out_free_card:
 	kfree(card);
@@ -3873,10 +3873,10 @@ module_exit(idt77252_exit);
 
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(vpibits, "i");
+module_param(vpibits, uint, 0);
 MODULE_PARM_DESC(vpibits, "number of VPI bits supported (0, 1, or 2)");
 #ifdef CONFIG_ATM_IDT77252_DEBUG
-MODULE_PARM(debug, "i");
+module_param(debug, ulong, 0644);
 MODULE_PARM_DESC(debug,   "debug bitmap, see drivers/atm/idt77252.h");
 #endif
 

@@ -164,6 +164,15 @@ config MD_MULTIPATH
 
 	  If unsure, say N.
 
+config MD_FAULTY
+	tristate "Faulty test module for MD"
+	depends on BLK_DEV_MD
+	help
+	  The "faulty" module allows for a block device that occasionally returns
+	  read or write errors.  It is useful for testing.
+
+	  In unsure, say N.
+
 config BLK_DEV_DM
 	tristate "Device mapper support"
 	depends on MD

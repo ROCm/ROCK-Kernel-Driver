@@ -2204,8 +2204,6 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 		goto err_out_disable_pdev;
 	}
 
-	pci_set_master(pdev);
-
 	if((err = pci_set_dma_mask(pdev, 0xFFFFFFFFULL))) {
 		DPRINTK(PROBE, ERR, "No usable DMA configuration, aborting.\n");
 		goto err_out_free_res;
@@ -2226,8 +2224,17 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 	else
 		nic->flags &= ~ich;
 
+	e100_get_defaults(nic);
+
 	spin_lock_init(&nic->cb_lock);
 	spin_lock_init(&nic->cmd_lock);
+
+	/* Reset the device before pci_set_master() in case device is in some
+	 * funky state and has an interrupt pending - hint: we don't have the
+	 * interrupt handler registered yet. */
+	e100_hw_reset(nic);
+
+	pci_set_master(pdev);
 
 	init_timer(&nic->watchdog);
 	nic->watchdog.function = e100_watchdog;
@@ -2241,8 +2248,6 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 		goto err_out_iounmap;
 	}
 
-	e100_get_defaults(nic);
-	e100_hw_reset(nic);
 	e100_phy_init(nic);
 
 	if((err = e100_eeprom_load(nic)))

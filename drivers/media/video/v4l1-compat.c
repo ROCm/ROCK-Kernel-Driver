@@ -44,7 +44,7 @@
 #endif
 
 static unsigned int debug  = 0;
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug,"enable debug messages");
 MODULE_AUTHOR("Bill Dirks");
 MODULE_DESCRIPTION("v4l(1) compatibility layer for v4l2 drivers.");

@@ -441,3 +441,5 @@ acpi_pci_irq_enable (
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_pci_irq_enable);
+

@@ -232,6 +232,8 @@ static u8 sonypi_call3(u8 dev, u8 fn, u8 v)
 	return v1;
 }
 
+#if 0
+/* Get brightness, hue etc. Unreliable... */
 static u8 sonypi_read(u8 fn)
 {
 	u8 v1, v2;
@@ -245,6 +247,7 @@ static u8 sonypi_read(u8 fn)
 	}
 	return 0xff;
 }
+#endif
 
 /* Set brightness, hue etc */
 static void sonypi_set(u8 fn, u8 v)
@@ -435,80 +438,48 @@ found:
 }
 
 /* External camera command (exported to the motion eye v4l driver) */
-u8 sonypi_camera_command(int command, u8 value)
+int sonypi_camera_command(int command, u8 value)
 {
-	u8 ret = 0;
-
 	if (!camera)
-		return 0;
+		return -EIO;
 
 	down(&sonypi_device.lock);
 
 	switch (command) {
-	case SONYPI_COMMAND_GETCAMERA:
-		ret = sonypi_camera_ready();
-		break;
 	case SONYPI_COMMAND_SETCAMERA:
 		if (value)
 			sonypi_camera_on();
 		else
 			sonypi_camera_off();
 		break;
-	case SONYPI_COMMAND_GETCAMERABRIGHTNESS:
-		ret = sonypi_read(SONYPI_CAMERA_BRIGHTNESS);
-		break;
 	case SONYPI_COMMAND_SETCAMERABRIGHTNESS:
 		sonypi_set(SONYPI_CAMERA_BRIGHTNESS, value);
-		break;
-	case SONYPI_COMMAND_GETCAMERACONTRAST:
-		ret = sonypi_read(SONYPI_CAMERA_CONTRAST);
 		break;
 	case SONYPI_COMMAND_SETCAMERACONTRAST:
 		sonypi_set(SONYPI_CAMERA_CONTRAST, value);
 		break;
-	case SONYPI_COMMAND_GETCAMERAHUE:
-		ret = sonypi_read(SONYPI_CAMERA_HUE);
-		break;
 	case SONYPI_COMMAND_SETCAMERAHUE:
 		sonypi_set(SONYPI_CAMERA_HUE, value);
-		break;
-	case SONYPI_COMMAND_GETCAMERACOLOR:
-		ret = sonypi_read(SONYPI_CAMERA_COLOR);
 		break;
 	case SONYPI_COMMAND_SETCAMERACOLOR:
 		sonypi_set(SONYPI_CAMERA_COLOR, value);
 		break;
-	case SONYPI_COMMAND_GETCAMERASHARPNESS:
-		ret = sonypi_read(SONYPI_CAMERA_SHARPNESS);
-		break;
 	case SONYPI_COMMAND_SETCAMERASHARPNESS:
 		sonypi_set(SONYPI_CAMERA_SHARPNESS, value);
-		break;
-	case SONYPI_COMMAND_GETCAMERAPICTURE:
-		ret = sonypi_read(SONYPI_CAMERA_PICTURE);
 		break;
 	case SONYPI_COMMAND_SETCAMERAPICTURE:
 		sonypi_set(SONYPI_CAMERA_PICTURE, value);
 		break;
-	case SONYPI_COMMAND_GETCAMERAAGC:
-		ret = sonypi_read(SONYPI_CAMERA_AGC);
-		break;
 	case SONYPI_COMMAND_SETCAMERAAGC:
 		sonypi_set(SONYPI_CAMERA_AGC, value);
 		break;
-	case SONYPI_COMMAND_GETCAMERADIRECTION:
-		ret = sonypi_read(SONYPI_CAMERA_STATUS);
-		ret &= SONYPI_DIRECTION_BACKWARDS;
-		break;
-	case SONYPI_COMMAND_GETCAMERAROMVERSION:
-		ret = sonypi_read(SONYPI_CAMERA_ROMVERSION);
-		break;
-	case SONYPI_COMMAND_GETCAMERAREVISION:
-		ret = sonypi_read(SONYPI_CAMERA_REVISION);
+	default:
+		printk(KERN_ERR "sonypi: sonypi_camera_command invalid: %d\n",
+		       command);
 		break;
 	}
 	up(&sonypi_device.lock);
-	return ret;
+	return 0;
 }
 
 EXPORT_SYMBOL(sonypi_camera_command);

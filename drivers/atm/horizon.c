@@ -2896,11 +2896,11 @@ static void __init hrz_check_args (void) {
 MODULE_AUTHOR(maintainer_string);
 MODULE_DESCRIPTION(description_string);
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug, "h");
-MODULE_PARM(vpi_bits, "h");
-MODULE_PARM(max_tx_size, "i");
-MODULE_PARM(max_rx_size, "i");
-MODULE_PARM(pci_lat, "b");
+module_param(debug, ushort, 0644);
+module_param(vpi_bits, ushort, 0);
+module_param(max_tx_size, int, 0);
+module_param(max_rx_size, int, 0);
+module_param(pci_lat, byte, 0);
 MODULE_PARM_DESC(debug, "debug bitmap, see .h file");
 MODULE_PARM_DESC(vpi_bits, "number of bits (0..4) to allocate to VPIs");
 MODULE_PARM_DESC(max_tx_size, "maximum size of TX AAL5 frames");

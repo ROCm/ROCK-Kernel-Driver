@@ -1085,7 +1085,7 @@ G2Q_QUIN:		/* k=binID#,       */
 
 }
 
-void is870(struct Scsi_Host *host, unsigned int wkport)
+static void is870(struct Scsi_Host *host, unsigned int wkport)
 {
 	unsigned int tmport;
 	unsigned char i, j, k, rmb, n;

@@ -786,6 +786,11 @@ static inline void hci_encrypt_change_evt(struct hci_dev *hdev, struct sk_buff *
 	hci_dev_unlock(hdev);
 }
 
+/* Change Connection Link Key Complete */
+static inline void hci_change_conn_link_key_complete_evt(struct hci_dev *hdev, struct sk_buff *skb)
+{
+}
+
 /* Pin Code Request*/
 static inline void hci_pin_code_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
@@ -851,6 +856,10 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 
 	case HCI_EV_ENCRYPT_CHANGE:
 		hci_encrypt_change_evt(hdev, skb);
+		break;
+
+	case HCI_EV_CHANGE_CONN_LINK_KEY_COMPLETE:
+		hci_change_conn_link_key_complete_evt(hdev, skb);
 		break;
 
 	case HCI_EV_PIN_CODE_REQ:

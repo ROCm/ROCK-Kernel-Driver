@@ -637,7 +637,7 @@ static void set_dac2_rate(struct es1371_state *s, unsigned rate)
 
 /* --------------------------------------------------------------------- */
 
-static void __init src_init(struct es1371_state *s)
+static void __devinit src_init(struct es1371_state *s)
 {
         unsigned int i;
 
@@ -2758,7 +2758,7 @@ MODULE_LICENSE("GPL");
 static struct initvol {
 	int mixch;
 	int vol;
-} initvol[] __initdata = {
+} initvol[] __devinitdata = {
 	{ SOUND_MIXER_WRITE_LINE, 0x4040 },
 	{ SOUND_MIXER_WRITE_CD, 0x4040 },
 	{ MIXER_WRITE(SOUND_MIXER_VIDEO), 0x4040 },

@@ -2,6 +2,7 @@
  *
  *  Broadcom Blutonium firmware driver
  *
+ *  Copyright (C) 2003  Maxim Krasnyansky <maxk@qualcomm.com>
  *  Copyright (C) 2003  Marcel Holtmann <marcel@holtmann.org>
  *
  *
@@ -264,7 +265,7 @@ static void bcm203x_disconnect(struct usb_interface *intf)
 
 	BT_DBG("intf %p", intf);
 
-	usb_unlink_urb(data->urb);
+	usb_kill_urb(data->urb);
 
 	usb_set_intfdata(intf, NULL);
 

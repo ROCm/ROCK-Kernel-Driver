@@ -118,9 +118,9 @@
  * Interrupt numbers and addresses, & info obtained from the device tree.
  */
 static int awacs_irq, awacs_tx_irq, awacs_rx_irq;
-static volatile struct awacs_regs *awacs;
-static volatile u32 *i2s;
-static volatile struct dbdma_regs *awacs_txdma, *awacs_rxdma;
+static volatile struct awacs_regs __iomem *awacs;
+static volatile u32 __iomem *i2s;
+static volatile struct dbdma_regs __iomem *awacs_txdma, *awacs_rxdma;
 static int awacs_rate_index;
 static int awacs_subframe;
 static struct device_node* awacs_node;
@@ -146,8 +146,8 @@ static int has_ziva;
 /* for earlier powerbooks which need fiddling with mac-io to enable
  * cd etc.
 */
-static unsigned char *latch_base;
-static unsigned char *macio_base;
+static unsigned char __iomem *latch_base;
+static unsigned char __iomem *macio_base;
 
 /*
  * Space for the DBDMA command blocks.
@@ -661,11 +661,11 @@ static void PMacIrqCleanup(void)
 	free_irq(awacs_rx_irq, NULL);
 	
 	if (awacs)
-		iounmap((void *)awacs);
+		iounmap(awacs);
 	if (i2s)
-		iounmap((void *)i2s);
-	iounmap((void *)awacs_txdma);
-	iounmap((void *)awacs_rxdma);
+		iounmap(i2s);
+	iounmap(awacs_txdma);
+	iounmap(awacs_rxdma);
 
 	release_OF_resource(awacs_node, 0);
 	release_OF_resource(awacs_node, 1);
@@ -2915,14 +2915,11 @@ printk("dmasound_pmac: couldn't find a Codec we can handle\n");
 
 	/* all OF versions I've seen use this value */
 	if (i2s_node)
-		i2s = (u32 *)ioremap(io->addrs[0].address, 0x1000);
+		i2s = ioremap(io->addrs[0].address, 0x1000);
 	else
-		awacs = (volatile struct awacs_regs *)
-			ioremap(io->addrs[0].address, 0x1000);
-	awacs_txdma = (volatile struct dbdma_regs *)
-		ioremap(io->addrs[1].address, 0x100);
-	awacs_rxdma = (volatile struct dbdma_regs *)
-		ioremap(io->addrs[2].address, 0x100);
+		awacs = ioremap(io->addrs[0].address, 0x1000);
+	awacs_txdma = ioremap(io->addrs[1].address, 0x100);
+	awacs_rxdma = ioremap(io->addrs[2].address, 0x100);
 
 	/* first of all make sure that the chip is powered up....*/
 	pmac_call_feature(PMAC_FTR_SOUND_CHIP_ENABLE, io, 0, 1);
@@ -3075,7 +3072,7 @@ printk("dmasound_pmac: Awacs/Screamer Codec Mfct: %d Rev %d\n", mfg, rev);
 		 * sound input.  The 0x100 enables the SCSI bus
 		 * terminator power.
 		 */
-		latch_base = (unsigned char *) ioremap (0xf301a000, 0x1000);
+		latch_base = ioremap (0xf301a000, 0x1000);
 		in_8(latch_base + 0x190);
 
 	} else if (is_pbook_g3) {
@@ -3084,8 +3081,7 @@ printk("dmasound_pmac: Awacs/Screamer Codec Mfct: %d Rev %d\n", mfg, rev);
 		for (mio = io->parent; mio; mio = mio->parent) {
 			if (strcmp(mio->name, "mac-io") == 0
 			    && mio->n_addrs > 0) {
-				macio_base = (unsigned char *) ioremap
-					(mio->addrs[0].address, 0x40);
+				macio_base = ioremap(mio->addrs[0].address, 0x40);
 				break;
 			}
 		}

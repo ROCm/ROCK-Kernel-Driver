@@ -38,6 +38,8 @@ LIST_HEAD(i2o_controllers);
  */
 static struct i2o_dma i2o_systab;
 
+static int i2o_hrt_get(struct i2o_controller *c);
+
 /* Module internal functions from other sources */
 extern struct i2o_driver i2o_exec_driver;
 extern int i2o_exec_lct_get(struct i2o_controller *);
@@ -63,7 +65,7 @@ extern void i2o_device_exit(void);
  */
 void i2o_msg_nop(struct i2o_controller *c, u32 m)
 {
-	struct i2o_message *msg = c->in_queue.virt + m;
+	struct i2o_message __iomem *msg = c->in_queue.virt + m;
 
 	writel(THREE_WORD_MSG_SIZE | SGL_OFFSET_0, &msg->u.head[0]);
 	writel(I2O_CMD_UTIL_NOP << 24 | HOST_TID << 12 | ADAPTER_TID,
@@ -87,7 +89,7 @@ void i2o_msg_nop(struct i2o_controller *c, u32 m)
  *	address from the read port (see the i2o spec). If no message is
  *	available returns I2O_QUEUE_EMPTY and msg is leaved untouched.
  */
-u32 i2o_msg_get_wait(struct i2o_controller *c, struct i2o_message **msg,
+u32 i2o_msg_get_wait(struct i2o_controller *c, struct i2o_message __iomem **msg,
 		     int wait)
 {
 	unsigned long timeout = jiffies + wait * HZ;
@@ -304,7 +306,7 @@ struct i2o_device *i2o_iop_find_device(struct i2o_controller *c, u16 tid)
  */
 static int i2o_iop_quiesce(struct i2o_controller *c)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	i2o_status_block *sb = c->status_block.virt;
 	int rc;
@@ -346,7 +348,7 @@ static int i2o_iop_quiesce(struct i2o_controller *c)
  */
 static int i2o_iop_enable(struct i2o_controller *c)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	i2o_status_block *sb = c->status_block.virt;
 	int rc;
@@ -418,7 +420,7 @@ static inline void i2o_iop_enable_all(void)
  */
 static int i2o_iop_clear(struct i2o_controller *c)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	int rc;
 
@@ -459,7 +461,7 @@ static int i2o_iop_clear(struct i2o_controller *c)
 static int i2o_iop_reset(struct i2o_controller *c)
 {
 	u8 *status = c->status.virt;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned long timeout;
 	i2o_status_block *sb = c->status_block.virt;
@@ -564,11 +566,11 @@ static int i2o_iop_reset(struct i2o_controller *c)
  *
  *	Returns 0 on success or a negative errno code on failure.
  */
-int i2o_iop_init_outbound_queue(struct i2o_controller *c)
+static int i2o_iop_init_outbound_queue(struct i2o_controller *c)
 {
 	u8 *status = c->status.virt;
 	u32 m;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	ulong timeout;
 	int i;
 
@@ -629,7 +631,7 @@ int i2o_iop_init_outbound_queue(struct i2o_controller *c)
  */
 static int i2o_iop_send_nop(struct i2o_controller *c)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m = i2o_msg_get_wait(c, &msg, HZ);
 	if (m == I2O_QUEUE_EMPTY)
 		return -ETIMEDOUT;
@@ -732,7 +734,7 @@ static int i2o_iop_activate(struct i2o_controller *c)
  */
 static int i2o_iop_systab_set(struct i2o_controller *c)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	i2o_status_block *sb = c->status_block.virt;
 	struct device *dev = &c->pdev->dev;
@@ -995,7 +997,7 @@ static int i2o_parse_hrt(struct i2o_controller *c)
  */
 int i2o_status_get(struct i2o_controller *c)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	u8 *status_block;
 	unsigned long timeout;
@@ -1050,7 +1052,7 @@ int i2o_status_get(struct i2o_controller *c)
  *
  *	Returns 0 on success or negativer error code on failure.
  */
-int i2o_hrt_get(struct i2o_controller *c)
+static int i2o_hrt_get(struct i2o_controller *c)
 {
 	int rc;
 	int i;
@@ -1059,7 +1061,7 @@ int i2o_hrt_get(struct i2o_controller *c)
 	struct device *dev = &c->pdev->dev;
 
 	for (i = 0; i < I2O_HRT_GET_TRIES; i++) {
-		struct i2o_message *msg;
+		struct i2o_message __iomem *msg;
 		u32 m;
 
 		m = i2o_msg_get_wait(c, &msg, I2O_TIMEOUT_MESSAGE_GET);
@@ -1119,13 +1121,13 @@ struct i2o_controller *i2o_iop_alloc(void)
 	memset(c, 0, sizeof(*c));
 
 	INIT_LIST_HEAD(&c->devices);
-	c->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&c->lock);
 	init_MUTEX(&c->lct_lock);
 	c->unit = unit++;
 	sprintf(c->name, "iop%d", c->unit);
 
 #if BITS_PER_LONG == 64
-	c->context_list_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&c->context_list_lock);
 	atomic_set(&c->context_list_counter, 0);
 	INIT_LIST_HEAD(&c->context_list);
 #endif
@@ -1214,7 +1216,7 @@ int i2o_event_register(struct i2o_device *dev, struct i2o_driver *drv,
 		       int tcntxt, u32 evt_mask)
 {
 	struct i2o_controller *c = dev->iop;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 
 	m = i2o_msg_get_wait(c, &msg, I2O_TIMEOUT_MESSAGE_GET);
@@ -1310,5 +1312,4 @@ EXPORT_SYMBOL(i2o_find_iop);
 EXPORT_SYMBOL(i2o_iop_find_device);
 EXPORT_SYMBOL(i2o_event_register);
 EXPORT_SYMBOL(i2o_status_get);
-EXPORT_SYMBOL(i2o_hrt_get);
 EXPORT_SYMBOL(i2o_controllers);

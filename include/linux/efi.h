@@ -306,7 +306,7 @@ extern int __init efi_set_rtc_mmss(unsigned long nowtime);
 extern struct efi_memory_map memmap;
 
 #ifdef CONFIG_EFI_PCDP
-extern void __init efi_setup_pcdp_console(char *);
+extern int __init efi_setup_pcdp_console(char *);
 #endif
 
 /*

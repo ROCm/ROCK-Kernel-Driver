@@ -45,7 +45,7 @@
 #endif
 
 #define MB_FCR32(bay, r)	((bay)->base + ((r) >> 2))
-#define MB_FCR8(bay, r)		(((volatile u8*)((bay)->base)) + (r))
+#define MB_FCR8(bay, r)		(((volatile u8 __iomem *)((bay)->base)) + (r))
 
 #define MB_IN32(bay,r)		(in_le32(MB_FCR32(bay,r)))
 #define MB_OUT32(bay,r,v)	(out_le32(MB_FCR32(bay,r), (v)))
@@ -67,7 +67,7 @@ struct mb_ops {
 };
 
 struct media_bay_info {
-	volatile u32*			base;
+	u32 __iomem			*base;
 	int				content_id;
 	int				state;
 	int				last_value;
@@ -80,7 +80,7 @@ struct media_bay_info {
 	int				sleeping;
 	struct semaphore		lock;
 #ifdef CONFIG_BLK_DEV_IDE
-	unsigned long			cd_base;
+	void __iomem			*cd_base;
 	int 				cd_index;
 	int				cd_irq;
 	int				cd_retry;
@@ -443,7 +443,7 @@ int __pmac check_media_bay_by_base(unsigned long base, int what)
 	int	i;
 
 	for (i=0; i<media_bay_count; i++)
-		if (media_bays[i].mdev && base == media_bays[i].cd_base) {
+		if (media_bays[i].mdev && base == (unsigned long) media_bays[i].cd_base) {
 			if ((what == media_bays[i].content_id) && media_bays[i].state == mb_up)
 				return 0;
 			media_bays[i].cd_index = -1;
@@ -468,7 +468,7 @@ int __pmac media_bay_set_ide_infos(struct device_node* which_bay, unsigned long 
 			
 			down(&bay->lock);
 
- 			bay->cd_base	= base;
+ 			bay->cd_base	= (void __iomem *) base;
 			bay->cd_irq	= irq;
 
 			if ((MB_CD != bay->content_id) || bay->state != mb_up) {
@@ -553,7 +553,7 @@ static void __pmac media_bay_step(int i)
 	    	break;
 	    
 	case mb_ide_waiting:
-		if (bay->cd_base == 0) {
+		if (bay->cd_base == NULL) {
 			bay->timer = 0;
 			bay->state = mb_up;
 			MBDBG("mediabay%d: up before IDE init\n", i);
@@ -651,7 +651,7 @@ static int __pmac media_bay_task(void *x)
 static int __devinit media_bay_attach(struct macio_dev *mdev, const struct of_match *match)
 {
 	struct media_bay_info* bay;
-	volatile u32 *regbase;
+	u32 __iomem *regbase;
 	struct device_node *ofnode;
 	int i;
 
@@ -664,7 +664,8 @@ static int __devinit media_bay_attach(struct macio_dev *mdev, const struct of_ma
 	/* Media bay registers are located at the beginning of the
          * mac-io chip, we get the parent address for now (hrm...)
          */
-	regbase = (volatile u32 *)ioremap(ofnode->parent->addrs[0].address, 0x100);
+	regbase = (u32 __iomem *)
+		ioremap(ofnode->parent->addrs[0].address, 0x100);
 	if (regbase == NULL) {
 		macio_release_resources(mdev);
 		return -ENOMEM;
@@ -713,13 +714,13 @@ static int __pmac media_bay_suspend(struct macio_dev *mdev, u32 state)
 {
 	struct media_bay_info	*bay = macio_get_drvdata(mdev);
 
-	if (state != mdev->ofdev.dev.power_state && state >= 2) {
+	if (state != mdev->ofdev.dev.power.power_state && state == PM_SUSPEND_MEM) {
 		down(&bay->lock);
 		bay->sleeping = 1;
 		set_mb_power(bay, 0);
 		up(&bay->lock);
 		msleep(MB_POLL_DELAY);
-		mdev->ofdev.dev.power_state = state;
+		mdev->ofdev.dev.power.power_state = state;
 	}
 	return 0;
 }
@@ -728,8 +729,8 @@ static int __pmac media_bay_resume(struct macio_dev *mdev)
 {
 	struct media_bay_info	*bay = macio_get_drvdata(mdev);
 
-	if (mdev->ofdev.dev.power_state != 0) {
-		mdev->ofdev.dev.power_state = 0;
+	if (mdev->ofdev.dev.power.power_state != 0) {
+		mdev->ofdev.dev.power.power_state = 0;
 
 	       	/* We re-enable the bay using it's previous content
 	       	   only if it did not change. Note those bozo timings,

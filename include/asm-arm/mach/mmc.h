@@ -7,7 +7,6 @@
 #include <linux/mmc/protocol.h>
 
 struct mmc_platform_data {
-	unsigned int mclk;			/* mmc base clock rate */
 	unsigned int ocr_mask;			/* available voltages */
 	u32 (*translate_vdd)(struct device *, unsigned int);
 	unsigned int (*status)(struct device *);

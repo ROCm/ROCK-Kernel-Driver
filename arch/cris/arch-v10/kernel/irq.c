@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.1 2002/12/11 15:42:02 starvik Exp $
+/* $Id: irq.c,v 1.2 2004/06/09 05:30:27 starvik Exp $
  *
  *	linux/arch/cris/kernel/irq.c
  *
@@ -23,12 +23,8 @@ irqvectptr irq_shortcuts[NR_IRQS]; /* vector of shortcut jumps after the irq pro
  */
 
 void
-set_int_vector(int n, irqvectptr addr, irqvectptr saddr)
+set_int_vector(int n, irqvectptr addr)
 {
-	/* remember the shortcut entry point, after the prologue */
-
-	irq_shortcuts[n] = saddr;
-
 	etrax_irv->v[n + 0x20] = (irqvectptr)addr;
 }
 
@@ -106,17 +102,6 @@ static void (*interrupt[NR_IRQS])(void) = {
 	IRQ31_interrupt
 };
 
-static void (*sinterrupt[NR_IRQS])(void) = {
-	NULL, NULL, sIRQ2_interrupt, sIRQ3_interrupt,
-	sIRQ4_interrupt, sIRQ5_interrupt, sIRQ6_interrupt, sIRQ7_interrupt,
-	sIRQ8_interrupt, sIRQ9_interrupt, sIRQ10_interrupt, sIRQ11_interrupt,
-	sIRQ12_interrupt, sIRQ13_interrupt, NULL, NULL,	
-	sIRQ16_interrupt, sIRQ17_interrupt, sIRQ18_interrupt, sIRQ19_interrupt,	
-	sIRQ20_interrupt, sIRQ21_interrupt, sIRQ22_interrupt, sIRQ23_interrupt,	
-	sIRQ24_interrupt, sIRQ25_interrupt, NULL, NULL, NULL, NULL, NULL,
-	sIRQ31_interrupt
-};
-
 static void (*bad_interrupt[NR_IRQS])(void) = {
         NULL, NULL,
 	NULL, bad_IRQ3_interrupt,
@@ -137,12 +122,12 @@ static void (*bad_interrupt[NR_IRQS])(void) = {
 
 void arch_setup_irq(int irq)
 {
-  set_int_vector(irq, interrupt[irq], sinterrupt[irq]);
+  set_int_vector(irq, interrupt[irq]);
 }
 
 void arch_free_irq(int irq)
 {
-  set_int_vector(irq, bad_interrupt[irq], 0);
+  set_int_vector(irq, bad_interrupt[irq]);
 }
 
 void weird_irq(void);
@@ -187,20 +172,20 @@ init_IRQ(void)
         
 	/* set all etrax irq's to the bad handlers */
 	for (i = 2; i < NR_IRQS; i++)
-		set_int_vector(i, bad_interrupt[i], 0);
+		set_int_vector(i, bad_interrupt[i]);
         
 	/* except IRQ 15 which is the multiple-IRQ handler on Etrax100 */
 
-	set_int_vector(15, multiple_interrupt, 0);
+	set_int_vector(15, multiple_interrupt);
 	
 	/* 0 and 1 which are special breakpoint/NMI traps */
 
-	set_int_vector(0, hwbreakpoint, 0);
-	set_int_vector(1, IRQ1_interrupt, 0);
+	set_int_vector(0, hwbreakpoint);
+	set_int_vector(1, IRQ1_interrupt);
 
 	/* and irq 14 which is the mmu bus fault handler */
 
-	set_int_vector(14, mmu_bus_fault, 0);
+	set_int_vector(14, mmu_bus_fault);
 
 	/* setup the system-call trap, which is reached by BREAK 13 */
 

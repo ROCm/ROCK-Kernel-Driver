@@ -90,6 +90,7 @@ int acpi_pci_register_driver(struct acpi_pci_driver *driver)
 
 	return n;
 }
+EXPORT_SYMBOL(acpi_pci_register_driver);
 
 void acpi_pci_unregister_driver(struct acpi_pci_driver *driver)
 {
@@ -112,6 +113,7 @@ void acpi_pci_unregister_driver(struct acpi_pci_driver *driver)
 		driver->remove(root->handle);
 	}
 }
+EXPORT_SYMBOL(acpi_pci_unregister_driver);
 
 static acpi_status
 get_root_bridge_busnr_callback (struct acpi_resource *resource, void *data)

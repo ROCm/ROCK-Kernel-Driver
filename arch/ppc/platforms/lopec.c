@@ -189,7 +189,7 @@ static unsigned long lopec_idedma_regbase;
 static void
 lopec_ide_probe(void)
 {
-	struct pci_dev *dev = pci_find_device(PCI_VENDOR_ID_WINBOND,
+	struct pci_dev *dev = pci_get_device(PCI_VENDOR_ID_WINBOND,
 					      PCI_DEVICE_ID_WINBOND_82C105,
 					      NULL);
 	lopec_ide_ports_known = 1;
@@ -200,6 +200,7 @@ lopec_ide_probe(void)
 		lopec_ide_ctl_regbase[0] = dev->resource[1].start;
 		lopec_ide_ctl_regbase[1] = dev->resource[3].start;
 		lopec_idedma_regbase = dev->resource[4].start;
+		pci_dev_put(dev);
 	}
 }
 

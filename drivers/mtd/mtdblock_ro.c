@@ -1,5 +1,5 @@
 /*
- * $Id: mtdblock_ro.c,v 1.18 2003/06/23 12:00:08 dwmw2 Exp $
+ * $Id: mtdblock_ro.c,v 1.19 2004/11/16 18:28:59 dwmw2 Exp $
  *
  * (C) 2003 David Woodhouse <dwmw2@infradead.org>
  *
@@ -58,7 +58,7 @@ static void mtdblock_remove_dev(struct mtd_blktrans_dev *dev)
 	kfree(dev);
 }
 
-struct mtd_blktrans_ops mtdblock_tr = {
+static struct mtd_blktrans_ops mtdblock_tr = {
 	.name		= "mtdblock",
 	.major		= 31,
 	.part_bits	= 0,

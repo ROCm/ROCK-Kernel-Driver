@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.18 2004/05/11 12:28:25 starvik Exp $
+/* $Id: entry.S,v 1.23 2004/10/19 13:07:37 starvik Exp $
  *
  *  linux/arch/cris/entry.S
  *
@@ -7,6 +7,23 @@
  *  Authors:	Bjorn Wesen (bjornw@axis.com)
  *
  *  $Log: entry.S,v $
+ *  Revision 1.23  2004/10/19 13:07:37  starvik
+ *  Merge of Linux 2.6.9
+ *
+ *  Revision 1.22  2004/06/21 10:29:55  starvik
+ *  Merge of Linux 2.6.7
+ *
+ *  Revision 1.21  2004/06/09 05:30:27  starvik
+ *  Clean up multiple interrupt handling.
+ *    Prevent interrupts from interrupting each other.
+ *    Handle all active interrupts.
+ *
+ *  Revision 1.20  2004/06/08 08:55:32  starvik
+ *  Removed unused code
+ *
+ *  Revision 1.19  2004/06/04 11:56:15  starvik
+ *  Implemented page table lookup for refills in assembler for improved performance.
+ *
  *  Revision 1.18  2004/05/11 12:28:25  starvik
  *  Merge of Linux 2.6.6
  *
@@ -238,7 +255,9 @@
 #include <asm/errno.h>
 #include <asm/thread_info.h>
 #include <asm/arch/offset.h>
-		
+#include <asm/page.h>
+#include <asm/pgtable.h>
+
 	;; functions exported from this file
 	
 	.globl system_call
@@ -539,11 +558,63 @@ resume:
 	;; It needs to stack the CPU status and overall is different
 	;; from the other interrupt handlers.
 
-mmu_bus_fault:	
-	sbfs	[$sp=$sp-16]	; push the internal CPU status
+mmu_bus_fault:
+	;; For refills we try to do a quick page table lookup. If it is
+	;; a real fault we let the mm subsystem handle it.
+
 	;; the first longword in the sbfs frame was the interrupted PC
 	;; which fits nicely with the "IRP" slot in pt_regs normally used to
-	;; contain the return address. used by Oops to print kernel errors..
+	;; contain the return address. used by Oops to print kernel errors.
+	sbfs	[$sp=$sp-16]	; push the internal CPU status
+	push	$dccr
+	di
+	subq	2*4, $sp
+	movem	$r1, [$sp]
+	move.d  [R_MMU_CAUSE], $r1
+	;; ETRAX 100LX TR89 bugfix: if the second half of an unaligned
+	;; write causes a MMU-fault, it will not be restarted correctly.
+	;; This could happen if a write crosses a page-boundary and the
+	;; second page is not yet COW'ed or even loaded. The workaround
+	;; is to clear the unaligned bit in the CPU status record, so
+	;; that the CPU will rerun both the first and second halves of
+	;; the instruction. This will not have any sideeffects unless
+	;; the first half goes to any device or memory that can't be
+	;; written twice, and which is mapped through the MMU.
+	;;
+	;; We only need to do this for writes.
+	btstq	8, $r1		   ; Write access?
+	bpl	1f
+	nop
+	move.d	[$sp+16], $r0	   ; Clear unaligned bit in csrinstr
+	and.d	~(1<<5), $r0
+	move.d	$r0, [$sp+16]
+1:	btstq	12, $r1		   ; Refill?
+	bpl	2f
+	lsrq	PMD_SHIFT, $r1     ; Get PMD index into PGD (bit 24-31)
+	move.d  [current_pgd], $r0 ; PGD for the current process
+	move.d	[$r0+$r1.d], $r0   ; Get PMD
+	beq	2f
+	nop
+	and.w	PAGE_MASK, $r0	   ; Remove PMD flags
+	move.d  [R_MMU_CAUSE], $r1
+	lsrq	PAGE_SHIFT, $r1
+	and.d	0x7ff, $r1         ; Get PTE index into PMD (bit 13-24)
+	move.d	[$r0+$r1.d], $r1   ; Get PTE
+	beq	2f
+	nop
+	;; Store in TLB
+	move.d  $r1, [R_TLB_LO]
+	;; Return
+	movem	[$sp+], $r1
+	pop	$dccr
+	rbf	[$sp+]		; return by popping the CPU status
+
+2:	; PMD or PTE missing, let the mm subsystem fix it up.
+	movem	[$sp+], $r1
+	pop	$dccr
+
+	; Ok, not that easy, pass it on to the mm subsystem
+	; The MMU status record is now on the stack
 	push	$srp		; make a stackframe similar to pt_regs
 	push	$dccr
 	push	$mof
@@ -556,7 +627,7 @@ mmu_bus_fault:
 
 	move.d	$sp, $r10	; pt_regs argument to handle_mmu_bus_fault
 		
-	jsr	handle_mmu_bus_fault  ; in arch/cris/mm/fault.c
+	jsr	handle_mmu_bus_fault  ; in arch/cris/arch-v10/mm/fault.c
 
 	;; now we need to return through the normal path, we cannot just
 	;; do the RBFexit since we might have killed off the running
@@ -569,48 +640,20 @@ mmu_bus_fault:
 	nop
 		
 	;; special handlers for breakpoint and NMI
-#if 0			
 hwbreakpoint:
 	push	$dccr
 	di
-	push	$r10
-	push	$r11
-	push	$r12
-	push	$r13
-	clearf	b
-	move	$brp,$r11
-	move.d	[hw_bp_msg],$r10
-	jsr	printk
-	setf	b
-	pop	$r13
-	pop	$r12
-	pop	$r11
-	pop	$r10
-	pop	$dccr
-	retb
-	nop
-#else
-hwbreakpoint:
-	push	$dccr
-	di
-#if 1
 	push	$r10
 	push	$r11
 	move.d	[hw_bp_trig_ptr],$r10
-	move.d	[$r10],$r11
-	cmp.d	42,$r11
-	beq	1f
-	nop
 	move	$brp,$r11
 	move.d	$r11,[$r10+]
 	move.d	$r10,[hw_bp_trig_ptr]
 1:	pop	$r11
 	pop	$r10
-#endif
 	pop	$dccr
 	retb
 	nop
-#endif
 	
 IRQ1_interrupt:
 
@@ -719,29 +762,23 @@ multiple_interrupt:
 	push	$r10		; push orig_r10
 	clear.d [$sp=$sp-4]	; frametype == 0, normal frame
 	
-	move.d	irq_shortcuts + 8, $r1
 	moveq	2, $r2		; first bit we care about is the timer0 irq
 	move.d	[R_VECT_MASK_RD], $r0; read the irq bits that triggered the multiple irq
+	move.d	$r0, [R_VECT_MASK_CLR] ; Block all active IRQs
 1:	
 	btst	$r2, $r0	; check for the irq given by bit r2
-	bmi	_do_shortcut	; actually do the shortcut
-	nop
+	bpl	2f
+	move.d  $r2, $r10	; First argument to do_IRQ
+	move.d  $sp, $r11	; second argument to do_IRQ
+	jsr	do_IRQ
+2:
 	addq	1, $r2		; next vector bit
-	addq	4, $r1		; next vector
 	cmp.b	32, $r2
 	bne	1b	; process all irq's up to and including number 31
-	nop
+	moveq	0, $r9  ; make ret_from_intr realise we came from an ir
 	
-	;; strange, we didn't get any set vector bits.. oh well, just return
-	
-	ba	_Rexit
-	nop
-
-_do_shortcut:
-	test.d	[$r1]
-	beq	_Rexit
-	nop
-	jump	[$r1]		; jump to the irq handlers shortcut
+	move.d	$r0, [R_VECT_MASK_SET] ;  Unblock all the IRQs
+	jump    ret_from_intr
 
 do_sigtrap:
 	;; 
@@ -1079,7 +1116,9 @@ sys_call_table:
 	.long sys_mq_timedreceive	/* 280 */
 	.long sys_mq_notify
 	.long sys_mq_getsetattr
-		
+	.long sys_ni_syscall		/* reserved for kexec */
+	.long sys_waitid
+
         /*
          * NOTE!! This doesn't have to be exact - we just have
          * to make sure we have _enough_ of the "sys_ni_syscall"

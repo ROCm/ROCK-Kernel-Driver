@@ -488,7 +488,7 @@ error_exit:
  * DESCRIPTION: Convert string to uppercase
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 char *
 acpi_ut_strupr (
 	char                            *src_string)
@@ -508,6 +508,7 @@ acpi_ut_strupr (
 
 	return (src_string);
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************

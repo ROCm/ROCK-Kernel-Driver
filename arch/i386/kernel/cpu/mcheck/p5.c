@@ -17,7 +17,7 @@
 #include "mce.h"
 
 /* Machine check handler for Pentium class Intel */
-static asmlinkage void pentium_machine_check(struct pt_regs * regs, long error_code)
+static fastcall void pentium_machine_check(struct pt_regs * regs, long error_code)
 {
 	u32 loaddr, hi, lotype;
 	rdmsr(MSR_IA32_P5_MC_ADDR, loaddr, hi);

@@ -441,7 +441,7 @@ static unsigned long __init interpret_isa_props(struct device_node *np,
 	if (rp != 0 && l >= sizeof(struct isa_reg_property)) {
 		i = 0;
 		adr = (struct address_range *) mem_start;
-		while ((l -= sizeof(struct reg_property)) >= 0) {
+		while ((l -= sizeof(struct isa_reg_property)) >= 0) {
 			if (!measure_only) {
 				adr[i].space = rp[i].space;
 				adr[i].address = rp[i].address;
@@ -823,7 +823,7 @@ void __init unflatten_device_tree(void)
 			strlcpy(cmd_line, p, min(l, COMMAND_LINE_SIZE));
 	}
 #ifdef CONFIG_CMDLINE
-	if (l == 0) /* dbl check */
+	if (l == 0 || (l == 1 && (*p) == 0))
 		strlcpy(cmd_line, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
 #endif /* CONFIG_CMDLINE */
 
@@ -853,10 +853,19 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 		}
 	}
 
-	/* Check if it's the boot-cpu, set it's hw index in paca now */
-	if (get_flat_dt_prop(node, "linux,boot-cpu", NULL) != NULL) {
-		u32 *prop = get_flat_dt_prop(node, "reg", NULL);
-		paca[0].hw_cpu_id = prop == NULL ? 0 : *prop;
+	if (initial_boot_params && initial_boot_params->version >= 2) {
+		/* version 2 of the kexec param format adds the phys cpuid
+		 * of booted proc.
+		 */
+		boot_cpuid_phys = initial_boot_params->boot_cpuid_phys;
+		boot_cpuid = 0;
+	} else {
+		/* Check if it's the boot-cpu, set it's hw index in paca now */
+		if (get_flat_dt_prop(node, "linux,boot-cpu", NULL) != NULL) {
+			u32 *prop = get_flat_dt_prop(node, "reg", NULL);
+			set_hard_smp_processor_id(0, prop == NULL ? 0 : *prop);
+			boot_cpuid_phys = get_hard_smp_processor_id(0);
+		}
 	}
 
 	return 0;
@@ -1023,6 +1032,7 @@ void __init early_init_devtree(void *params)
 	scan_flat_dt(early_init_dt_scan_memory, NULL);
 	lmb_analyze();
 	systemcfg->physicalMemorySize = lmb_phys_mem_size();
+	lmb_reserve(0, __pa(klimit));
 
 	DBG("Phys. mem: %lx\n", systemcfg->physicalMemorySize);
 

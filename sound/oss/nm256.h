@@ -60,7 +60,7 @@ struct nm256_info
 	/* Physical address of the port. */
 	u32 physaddr;
 	/* Our mapped-in pointer. */
-	char *ptr;
+	char __iomem *ptr;
 	/* PTR's offset within the physical port.  */
 	u32 start_offset;
 	/* And the offset of the end of the buffer.  */
@@ -233,14 +233,14 @@ extern int nm256_debug;
 static inline int nm256_writePort##X (struct nm256_info *card,\
 				      int port, int offset, int value)\
 {\
-    u##X *addr;\
+    u##X __iomem *addr;\
 \
     if (nm256_debug > 1)\
         printk (KERN_DEBUG "Writing 0x%x to %d:0x%x\n", value, port, offset);\
 \
     NM_FIX_PORT;\
 \
-    addr = (u##X *)(card->port[port - 1].ptr + offset);\
+    addr = (u##X __iomem *)(card->port[port - 1].ptr + offset);\
     func (value, addr);\
     return 0;\
 }
@@ -253,11 +253,11 @@ DEFwritePortX (32, writel)
 static inline u##X nm256_readPort##X (struct nm256_info *card,\
 					int port, int offset)\
 {\
-    u##X *addr;\
+    u##X __iomem *addr;\
 \
     NM_FIX_PORT\
 \
-    addr = (u##X *)(card->port[port - 1].ptr + offset);\
+    addr = (u##X __iomem *)(card->port[port - 1].ptr + offset);\
     return func(addr);\
 }
 

@@ -279,14 +279,18 @@ struct dentry * dget_locked(struct dentry *dentry)
 /**
  * d_find_alias - grab a hashed alias of inode
  * @inode: inode in question
+ * @want_discon:  flag, used by d_splice_alias, to request
+ *          that only a DISCONNECTED alias be returned.
  *
- * If inode has a hashed alias - acquire the reference to alias and
- * return it. Otherwise return NULL. Notice that if inode is a directory
- * there can be only one alias and it can be unhashed only if it has
- * no children.
+ * If inode has a hashed alias, or is a directory and has any alias,
+ * acquire the reference to alias and return it. Otherwise return NULL.
+ * Notice that if inode is a directory there can be only one alias and
+ * it can be unhashed only if it has no children, or if it is the root
+ * of a filesystem.
  *
  * If the inode has a DCACHE_DISCONNECTED alias, then prefer
- * any other hashed alias over that one.
+ * any other hashed alias over that one unless @want_discon is set,
+ * in which case only return a DCACHE_DISCONNECTED alias.
  */
 
 static struct dentry * __d_find_alias(struct inode *inode, int want_discon)
@@ -301,7 +305,7 @@ static struct dentry * __d_find_alias(struct inode *inode, int want_discon)
 		next = tmp->next;
 		prefetch(next);
 		alias = list_entry(tmp, struct dentry, d_alias);
- 		if (!d_unhashed(alias)) {
+ 		if (S_ISDIR(inode->i_mode) || !d_unhashed(alias)) {
 			if (alias->d_flags & DCACHE_DISCONNECTED)
 				discon_alias = alias;
 			else if (!want_discon) {

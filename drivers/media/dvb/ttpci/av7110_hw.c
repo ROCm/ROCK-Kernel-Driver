@@ -952,11 +952,11 @@ int av7110_osd_cmd(struct av7110 *av7110, osd_cmd_t *dc)
 	case OSD_SetPalette:
 	{
 		if (FW_VERSION(av7110->arm_app) >= 0x2618) {
-			ret = OSDSetPalette(av7110, (u32 *)dc->data, dc->color, dc->x0);
+			ret = OSDSetPalette(av7110, dc->data, dc->color, dc->x0);
 			goto out;
 		} else {
 			int i, len = dc->x0-dc->color+1;
-			u8 *colors = (u8 *)dc->data;
+			u8 __user *colors = dc->data;
 			u8 r, g, b, blend;
 
 			for (i = 0; i<len; i++) {

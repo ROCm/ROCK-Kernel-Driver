@@ -1,4 +1,4 @@
-/* $Id: gpio.c,v 1.11 2004/05/14 07:58:03 starvik Exp $
+/* $Id: gpio.c,v 1.12 2004/08/24 07:19:59 starvik Exp $
  *
  * Etrax general port I/O device
  *
@@ -9,6 +9,9 @@
  *             Johan Adolfsson  (read/set directions, write, port G)
  *
  * $Log: gpio.c,v $
+ * Revision 1.12  2004/08/24 07:19:59  starvik
+ * Whitespace cleanup
+ *
  * Revision 1.11  2004/05/14 07:58:03  starvik
  * Merge of changes from 2.4
  *

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: gc.c,v 1.137 2004/07/20 13:44:55 dwmw2 Exp $
+ * $Id: gc.c,v 1.140 2004/11/13 10:59:22 dedekind Exp $
  *
  */
 
@@ -628,6 +628,7 @@ static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c,
 			jffs2_free_raw_node_ref(nraw);
 		}
 
+		jffs2_free_raw_node_ref(nraw);
 		if (!ret)
 			ret = -EIO;
 		goto out_node;
@@ -637,10 +638,12 @@ static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c,
 
 	/* Link into per-inode list. This is safe because of the ic
 	   state being INO_STATE_GC. Note that if we're doing this
-	   for an inode which is in-code, the 'nraw' pointer is then
+	   for an inode which is in-core, the 'nraw' pointer is then
 	   going to be fetched from ic->nodes by our caller. */
+	spin_lock(&c->erase_completion_lock);
         nraw->next_in_ino = ic->nodes;
         ic->nodes = nraw;
+	spin_unlock(&c->erase_completion_lock);
 
 	jffs2_mark_node_obsolete(c, raw);
 	D1(printk(KERN_DEBUG "WHEEE! GC REF_PRISTINE node at 0x%08x succeeded\n", ref_offset(raw)));
@@ -828,7 +831,7 @@ static int jffs2_garbage_collect_deletion_dirent(struct jffs2_sb_info *c, struct
 				continue;
 			}
 			if (retlen != rawlen) {
-				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%zd not %zd) reading header from obsolete node at %08x\n",
+				printk(KERN_WARNING "jffs2_g_c_deletion_dirent(): Short read (%zd not %u) reading header from obsolete node at %08x\n",
 				       retlen, rawlen, ref_offset(raw));
 				continue;
 			}

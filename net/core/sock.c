@@ -179,7 +179,7 @@ static void sock_disable_timestamp(struct sock *sk)
 {	
 	if (sock_flag(sk, SOCK_TIMESTAMP)) { 
 		sock_reset_flag(sk, SOCK_TIMESTAMP);
-		atomic_dec(&netstamp_needed);
+		net_disable_timestamp();
 	}
 }
 
@@ -913,7 +913,7 @@ struct sk_buff *sock_alloc_send_skb(struct sock *sk, unsigned long size,
 	return sock_alloc_send_pskb(sk, size, 0, noblock, errcode);
 }
 
-void __lock_sock(struct sock *sk)
+static void __lock_sock(struct sock *sk)
 {
 	DEFINE_WAIT(wait);
 
@@ -929,7 +929,7 @@ void __lock_sock(struct sock *sk)
 	finish_wait(&sk->sk_lock.wq, &wait);
 }
 
-void __release_sock(struct sock *sk)
+static void __release_sock(struct sock *sk)
 {
 	struct sk_buff *skb = sk->sk_backlog.head;
 
@@ -1175,8 +1175,8 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	} else
 		sk->sk_sleep	=	NULL;
 
-	sk->sk_dst_lock		=	RW_LOCK_UNLOCKED;
-	sk->sk_callback_lock	=	RW_LOCK_UNLOCKED;
+	rwlock_init(&sk->sk_dst_lock);
+	rwlock_init(&sk->sk_callback_lock);
 
 	sk->sk_state_change	=	sock_def_wakeup;
 	sk->sk_data_ready	=	sock_def_readable;
@@ -1226,9 +1226,6 @@ void fastcall release_sock(struct sock *sk)
 }
 EXPORT_SYMBOL(release_sock);
 
-/* When > 0 there are consumers of rx skb time stamps */
-atomic_t netstamp_needed = ATOMIC_INIT(0); 
-
 int sock_get_timestamp(struct sock *sk, struct timeval __user *userstamp)
 { 
 	if (!sock_flag(sk, SOCK_TIMESTAMP))
@@ -1246,7 +1243,7 @@ void sock_enable_timestamp(struct sock *sk)
 {	
 	if (!sock_flag(sk, SOCK_TIMESTAMP)) { 
 		sock_set_flag(sk, SOCK_TIMESTAMP);
-		atomic_inc(&netstamp_needed);
+		net_enable_timestamp();
 	}
 }
 EXPORT_SYMBOL(sock_enable_timestamp); 
@@ -1359,8 +1356,6 @@ void sk_free_slab(struct proto *prot)
 
 EXPORT_SYMBOL(sk_free_slab);
 
-EXPORT_SYMBOL(__lock_sock);
-EXPORT_SYMBOL(__release_sock);
 EXPORT_SYMBOL(sk_alloc);
 EXPORT_SYMBOL(sk_free);
 EXPORT_SYMBOL(sk_send_sigurg);

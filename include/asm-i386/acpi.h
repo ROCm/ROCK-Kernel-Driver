@@ -138,6 +138,8 @@ extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
 extern int skip_ioapic_setup;
 extern int acpi_skip_timer_override;
 
+extern void check_acpi_pci(void);
+
 static inline void disable_ioapic_setup(void)
 {
 	skip_ioapic_setup = 1;
@@ -149,8 +151,8 @@ static inline int ioapic_setup_disabled(void)
 }
 
 #else
-static inline void disable_ioapic_setup(void)
-{ }
+static inline void disable_ioapic_setup(void) { }
+static inline void check_acpi_pci(void) { }
 
 #endif
 

@@ -1,7 +1,7 @@
 
 /* Common Flash Interface structures 
  * See http://support.intel.com/design/flash/technote/index.htm
- * $Id: cfi.h,v 1.48 2004/10/20 23:08:05 dwmw2 Exp $
+ * $Id: cfi.h,v 1.49 2004/11/15 20:56:32 nico Exp $
  */
 
 #ifndef __MTD_CFI_H__
@@ -145,6 +145,24 @@ struct cfi_pri_intelext {
 	uint16_t ProtRegAddr;
 	uint8_t  FactProtRegSize;
 	uint8_t  UserProtRegSize;
+	uint8_t  extra[0];
+} __attribute__((packed));
+
+struct cfi_intelext_blockinfo {
+	uint16_t NumIdentBlocks;
+	uint16_t BlockSize;
+	uint16_t MinBlockEraseCycles;
+	uint8_t  BitsPerCell;
+	uint8_t  BlockCap;
+} __attribute__((packed));
+
+struct cfi_intelext_regioninfo {
+	uint16_t NumIdentPartitions;
+	uint8_t  NumOpAllowed;
+	uint8_t  NumOpAllowedSimProgMode;
+	uint8_t  NumOpAllowedSimEraMode;
+	uint8_t  NumBlockTypes;
+	struct cfi_intelext_blockinfo BlockTypes[1];
 } __attribute__((packed));
 
 /* Vendor-Specific PRI for AMD/Fujitsu Extended Command Set (0x0002) */

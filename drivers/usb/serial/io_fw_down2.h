@@ -13,9 +13,9 @@
 #if !defined(DEFINED_EDGE_FIRMWARE_IMAGE_RECORD)
 	#define DEFINED_EDGE_FIRMWARE_IMAGE_RECORD
 	struct edge_firmware_image_record {
-		unsigned short ExtAddr;
-		unsigned short Addr;
-		unsigned short Len;
+		__le16 ExtAddr;
+		__le16 Addr;
+		__le16 Len;
 		unsigned char  Data[0];
 	} __attribute__ ((packed));
 

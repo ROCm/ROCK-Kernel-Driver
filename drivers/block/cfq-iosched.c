@@ -1398,10 +1398,7 @@ static void cfq_put_request(request_queue_t *q, struct request *rq)
 		if (crq->io_context)
 			put_io_context(crq->io_context->ioc);
 
-		if (!cfqq->allocated[crq->is_write]) {
-			WARN_ON(1);
-			cfqq->allocated[crq->is_write] = 1;
-		}
+		BUG_ON(!cfqq->allocated[crq->is_write]);
 		cfqq->allocated[crq->is_write]--;
 
 		mempool_free(crq, cfqd->crq_pool);
@@ -1421,7 +1418,7 @@ static int cfq_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct cfq_io_context *cic;
 	const int rw = rq_data_dir(rq);
-	struct cfq_queue *cfqq;
+	struct cfq_queue *cfqq, *saved_cfqq;
 	struct cfq_rq *crq;
 	unsigned long flags;
 
@@ -1439,19 +1436,29 @@ static int cfq_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 #endif
 	}
 
+repeat:
 	if (cfqq->allocated[rw] >= cfqd->max_queued)
 		goto out_lock;
 
+	cfqq->allocated[rw]++;
 	spin_unlock_irqrestore(q->queue_lock, flags);
 
 	/*
-	 * if hashing type has changed, the cfq_queue might change here. we
-	 * don't bother rechecking ->allocated since it should be a rare
-	 * event
+	 * if hashing type has changed, the cfq_queue might change here.
 	 */
+	saved_cfqq = cfqq;
 	cic = cfq_get_io_context(&cfqq, gfp_mask);
 	if (!cic)
 		goto err;
+
+	/*
+	 * repeat allocation checks on queue change
+	 */
+	if (unlikely(saved_cfqq != cfqq)) {
+		spin_lock_irqsave(q->queue_lock, flags);
+		saved_cfqq->allocated[rw]--;
+		goto repeat;
+	}
 
 	crq = mempool_alloc(cfqd->crq_pool, gfp_mask);
 	if (crq) {
@@ -1465,7 +1472,6 @@ static int cfq_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 		crq->in_flight = crq->accounted = crq->is_sync = 0;
 		crq->is_write = rw;
 		rq->elevator_private = crq;
-		cfqq->allocated[rw]++;
 		cfqq->alloc_limit[rw] = 0;
 		return 0;
 	}
@@ -1473,6 +1479,7 @@ static int cfq_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 	put_io_context(cic->ioc);
 err:
 	spin_lock_irqsave(q->queue_lock, flags);
+	cfqq->allocated[rw]--;
 	cfq_put_queue(cfqq);
 out_lock:
 	spin_unlock_irqrestore(q->queue_lock, flags);
@@ -1920,7 +1927,7 @@ int cfq_init(void)
 	return ret;
 }
 
-void cfq_exit(void)
+static void __exit cfq_exit(void)
 {
 	cfq_slab_kill();
 	elv_unregister(&iosched_cfq);

@@ -1,5 +1,5 @@
 /*
-    $Id: cx88-i2c.c,v 1.17 2004/10/11 13:45:51 kraxel Exp $
+    $Id: cx88-i2c.c,v 1.18 2004/10/13 10:39:00 kraxel Exp $
 
     cx88-i2c.c  --  all the i2c code is here
 
@@ -21,7 +21,7 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-    
+
 */
 
 #include <linux/module.h>
@@ -72,7 +72,7 @@ static int cx8800_bit_getscl(void *data)
 {
 	struct cx88_core *core = data;
 	u32 state;
-	
+
 	state = cx_read(MO_I2C);
 	return state & 0x02 ? 1 : 0;
 }

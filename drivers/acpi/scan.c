@@ -614,6 +614,7 @@ acpi_bus_register_driver (
 
 	return_VALUE(count);
 }
+EXPORT_SYMBOL(acpi_bus_register_driver);
 
 
 /**
@@ -642,6 +643,7 @@ acpi_bus_unregister_driver (
 		error = -EINVAL;
 	return_VALUE(error);
 }
+EXPORT_SYMBOL(acpi_bus_unregister_driver);
 
 /**
  * acpi_bus_find_driver 
@@ -1114,7 +1116,7 @@ end:
 
 	return_VALUE(result);
 }
-
+EXPORT_SYMBOL(acpi_bus_add);
 
 
 int acpi_bus_scan (struct acpi_device	*start)
@@ -1218,6 +1220,7 @@ int acpi_bus_scan (struct acpi_device	*start)
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_bus_scan);
 
 
 int

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.4 2003/07/04 12:57:13 tobiasa Exp $
+# $Id: Makefile,v 1.5 2004/06/02 08:24:38 starvik Exp $
 #
 # Makefile for the linux kernel.
 #
@@ -11,6 +11,7 @@ obj-y   := entry.o traps.o shadows.o debugport.o irq.o \
 
 obj-$(CONFIG_ETRAX_KGDB) += kgdb.o
 obj-$(CONFIG_ETRAX_FAST_TIMER) += fasttimer.o
+obj-$(CONFIG_MODULES)    += crisksyms.o
 
 clean:
 

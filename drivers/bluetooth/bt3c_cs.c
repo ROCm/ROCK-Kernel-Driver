@@ -96,14 +96,14 @@ typedef struct bt3c_info_t {
 } bt3c_info_t;
 
 
-void bt3c_config(dev_link_t *link);
-void bt3c_release(dev_link_t *link);
-int bt3c_event(event_t event, int priority, event_callback_args_t *args);
+static void bt3c_config(dev_link_t *link);
+static void bt3c_release(dev_link_t *link);
+static int bt3c_event(event_t event, int priority, event_callback_args_t *args);
 
 static dev_info_t dev_info = "bt3c_cs";
 
-dev_link_t *bt3c_attach(void);
-void bt3c_detach(dev_link_t *);
+static dev_link_t *bt3c_attach(void);
+static void bt3c_detach(dev_link_t *);
 
 static dev_link_t *dev_list = NULL;
 
@@ -132,28 +132,28 @@ static dev_link_t *dev_list = NULL;
 #define CONTROL  4
 
 
-inline void bt3c_address(unsigned int iobase, unsigned short addr)
+static inline void bt3c_address(unsigned int iobase, unsigned short addr)
 {
 	outb(addr & 0xff, iobase + ADDR_L);
 	outb((addr >> 8) & 0xff, iobase + ADDR_H);
 }
 
 
-inline void bt3c_put(unsigned int iobase, unsigned short value)
+static inline void bt3c_put(unsigned int iobase, unsigned short value)
 {
 	outb(value & 0xff, iobase + DATA_L);
 	outb((value >> 8) & 0xff, iobase + DATA_H);
 }
 
 
-inline void bt3c_io_write(unsigned int iobase, unsigned short addr, unsigned short value)
+static inline void bt3c_io_write(unsigned int iobase, unsigned short addr, unsigned short value)
 {
 	bt3c_address(iobase, addr);
 	bt3c_put(iobase, value);
 }
 
 
-inline unsigned short bt3c_get(unsigned int iobase)
+static inline unsigned short bt3c_get(unsigned int iobase)
 {
 	unsigned short value = inb(iobase + DATA_L);
 
@@ -163,7 +163,7 @@ inline unsigned short bt3c_get(unsigned int iobase)
 }
 
 
-inline unsigned short bt3c_read(unsigned int iobase, unsigned short addr)
+static inline unsigned short bt3c_read(unsigned int iobase, unsigned short addr)
 {
 	bt3c_address(iobase, addr);
 
@@ -584,7 +584,7 @@ error:
 }
 
 
-int bt3c_open(bt3c_info_t *info)
+static int bt3c_open(bt3c_info_t *info)
 {
 	const struct firmware *firmware;
 	struct hci_dev *hdev;
@@ -654,7 +654,7 @@ error:
 }
 
 
-int bt3c_close(bt3c_info_t *info)
+static int bt3c_close(bt3c_info_t *info)
 {
 	struct hci_dev *hdev = info->hdev;
 
@@ -671,7 +671,7 @@ int bt3c_close(bt3c_info_t *info)
 	return 0;
 }
 
-dev_link_t *bt3c_attach(void)
+static dev_link_t *bt3c_attach(void)
 {
 	bt3c_info_t *info;
 	client_reg_t client_reg;
@@ -729,7 +729,7 @@ dev_link_t *bt3c_attach(void)
 }
 
 
-void bt3c_detach(dev_link_t *link)
+static void bt3c_detach(dev_link_t *link)
 {
 	bt3c_info_t *info = link->priv;
 	dev_link_t **linkp;
@@ -783,7 +783,7 @@ static int next_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 	return get_tuple(handle, tuple, parse);
 }
 
-void bt3c_config(dev_link_t *link)
+static void bt3c_config(dev_link_t *link)
 {
 	static ioaddr_t base[5] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, 0x0 };
 	client_handle_t handle = link->handle;
@@ -896,7 +896,7 @@ failed:
 }
 
 
-void bt3c_release(dev_link_t *link)
+static void bt3c_release(dev_link_t *link)
 {
 	bt3c_info_t *info = link->priv;
 
@@ -913,7 +913,7 @@ void bt3c_release(dev_link_t *link)
 }
 
 
-int bt3c_event(event_t event, int priority, event_callback_args_t *args)
+static int bt3c_event(event_t event, int priority, event_callback_args_t *args)
 {
 	dev_link_t *link = args->client_data;
 	bt3c_info_t *info = link->priv;

@@ -26,7 +26,7 @@ void ptrace_disable(struct task_struct *child)
 	child->thread.singlestep_syscall = 0;
 }
 
-int sys_ptrace(long request, long pid, long addr, long data)
+long sys_ptrace(long request, long pid, long addr, long data)
 {
 	struct task_struct *child;
 	int i, ret;

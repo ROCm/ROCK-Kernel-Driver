@@ -12,18 +12,18 @@
  */
 #endif
 /* list of timers, ordered by preference, NULL terminated */
-static struct timer_opts* timers[] = {
+static struct init_timer_opts* __initdata timers[] = {
 #ifdef CONFIG_X86_CYCLONE_TIMER
-	&timer_cyclone,
+	&timer_cyclone_init,
 #endif
 #ifdef CONFIG_HPET_TIMER
-	&timer_hpet,
+	&timer_hpet_init,
 #endif
 #ifdef CONFIG_X86_PM_TIMER
-	&timer_pmtmr,
+	&timer_pmtmr_init,
 #endif
-	&timer_tsc,
-	&timer_pit,
+	&timer_tsc_init,
+	&timer_pit_init,
 	NULL,
 };
 
@@ -49,7 +49,7 @@ void clock_fallback(void)
 /* iterates through the list of timers, returning the first 
  * one that initializes successfully.
  */
-struct timer_opts* select_timer(void)
+struct timer_opts* __init select_timer(void)
 {
 	int i = 0;
 	
@@ -57,7 +57,7 @@ struct timer_opts* select_timer(void)
 	while (timers[i]) {
 		if (timers[i]->init)
 			if (timers[i]->init(clock_override) == 0)
-				return timers[i];
+				return timers[i]->opts;
 		++i;
 	}
 		

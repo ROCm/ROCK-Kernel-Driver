@@ -936,7 +936,7 @@ static struct elevator_type iosched_deadline = {
 	.elevator_owner = THIS_MODULE,
 };
 
-int deadline_init(void)
+static int __init deadline_init(void)
 {
 	int ret;
 
@@ -953,7 +953,7 @@ int deadline_init(void)
 	return ret;
 }
 
-void deadline_exit(void)
+static void __exit deadline_exit(void)
 {
 	kmem_cache_destroy(drq_pool);
 	elv_unregister(&iosched_deadline);

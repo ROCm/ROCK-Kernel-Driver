@@ -41,6 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/actables.h>
@@ -51,6 +52,7 @@
 
 
 u8 acpi_fadt_is_v1;
+EXPORT_SYMBOL(acpi_fadt_is_v1);
 
 /*******************************************************************************
  *

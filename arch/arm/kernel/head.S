@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/head-armv.S
+ *  linux/arch/arm/kernel/head.S
  *
  *  Copyright (C) 1994-2002 Russell King
  *
@@ -19,17 +19,16 @@
 #include <asm/ptrace.h>
 #include <asm/constants.h>
 
+#ifndef CONFIG_XIP_KERNEL
 /*
  * We place the page tables 16K below TEXTADDR.  Therefore, we must make sure
  * that TEXTADDR is correctly set.  Currently, we expect the least significant
  * 16 bits to be 0x8000, but we could probably relax this restriction to
- * TEXTADDR > PAGE_OFFSET + 0x4000
+ * TEXTADDR >= PAGE_OFFSET + 0x4000
  *
  * Note that swapper_pg_dir is the virtual address of the page tables, and
  * pgtbl gives us a position-independent reference to these tables.  We can
  * do this because stext == TEXTADDR
- *
- * swapper_pg_dir, pgtbl and krnladr are all closely related.
  */
 #if (TEXTADDR & 0xffff) != 0x8000
 #error TEXTADDR must start at 0xXXXX8000
@@ -38,19 +37,35 @@
 	.globl	swapper_pg_dir
 	.equ	swapper_pg_dir, TEXTADDR - 0x4000
 
-	.macro	pgtbl, reg
-	adr	\reg, stext
-	sub	\reg, \reg, #0x4000
+	.macro	pgtbl, rd, phys
+	adr	\rd, stext
+	sub	\rd, \rd, #0x4000
 	.endm
-
+#else
 /*
- * Since the page table is closely related to the kernel start address, we
- * can convert the page table base address to the base address of the section
- * containing both.
+ * XIP Kernel:
+ *
+ * We place the page tables 16K below DATAADDR.  Therefore, we must make sure
+ * that DATAADDR is correctly set.  Currently, we expect the least significant
+ * 16 bits to be 0x8000, but we could probably relax this restriction to
+ * DATAADDR >= PAGE_OFFSET + 0x4000
+ *
+ * Note that pgtbl is meant to return the physical address of swapper_pg_dir.
+ * We can't make it relative to the kernel position in this case since
+ * the kernel can physically be anywhere.
  */
-	.macro	krnladr, rd, pgtable
-	bic	\rd, \pgtable, #0x000ff000
+#if (DATAADDR & 0xffff) != 0x8000
+#error DATAADDR must start at 0xXXXX8000
+#endif
+
+	.globl	swapper_pg_dir
+	.equ	swapper_pg_dir, DATAADDR - 0x4000
+
+	.macro	pgtbl, rd, phys
+	ldr	\rd, =((DATAADDR - 0x4000) - VIRT_OFFSET)
+	add	\rd, \rd, \phys
 	.endm
+#endif
 
 /*
  * Kernel startup entry point.
@@ -99,6 +114,8 @@ ENTRY(stext)
 	.type	__switch_data, %object
 __switch_data:
 	.long	__mmap_switched
+	.long	__data_loc			@ r2
+	.long	__data_start			@ r3
 	.long	__bss_start			@ r4
 	.long	_end				@ r5
 	.long	processor_id			@ r6
@@ -136,12 +153,20 @@ __turn_mmu_on:
  */
 	.align	5
 __mmap_switched:
-	adr	r3, __switch_data + 4
-	ldmia	r3, {r4, r5, r6, r7, r8, sp}
+	adr	r2, __switch_data + 4
+	ldmia	r2, {r2, r3, r4, r5, r6, r7, r8, sp}
+
+	cmp	r2, r3				@ Copy data segment if needed
+1:	cmpne	r3, r4
+	ldrne	fp, [r2], #4
+	strne	fp, [r3], #4
+	bne	1b
+
 	mov	fp, #0				@ Clear BSS (and zero fp)
 1:	cmp	r4, r5
 	strcc	fp, [r4],#4
 	bcc	1b
+
 	str	r9, [r6]			@ Save processor ID
 	str	r1, [r7]			@ Save machine type
 	bic	r2, r0, #2			@ Clear 'A' bit
@@ -156,16 +181,13 @@ __mmap_switched:
  * amount which are required to get the kernel running, which
  * generally means mapping in the kernel code.
  *
- * We only map in 4MB of RAM, which should be sufficient in
- * all cases.
- *
  * r5 = physical address of start of RAM
  * r6 = physical IO address
  * r7 = byte offset into page tables for IO
  * r8 = page table flags
  */
 __create_page_tables:
-	pgtbl	r4				@ page table address
+	pgtbl	r4, r5				@ page table address
 
 	/*
 	 * Clear the 16K level 1 swapper page table
@@ -183,28 +205,50 @@ __create_page_tables:
 	/*
 	 * Create identity mapping for first MB of kernel to
 	 * cater for the MMU enable.  This identity mapping
-	 * will be removed by paging_init()
+	 * will be removed by paging_init().  We use our current program
+	 * counter to determine corresponding section base address.
 	 */
-	krnladr	r2, r4				@ start of kernel
-	add	r3, r8, r2			@ flags + kernel base
-	str	r3, [r4, r2, lsr #18]		@ identity mapping
+	mov	r2, pc, lsr #20			@ start of kernel section
+	add	r3, r8, r2, lsl #20		@ flags + kernel base
+	str	r3, [r4, r2, lsl #2]		@ identity mapping
 
 	/*
 	 * Now setup the pagetables for our kernel direct
 	 * mapped region.  We round TEXTADDR down to the
-	 * nearest megabyte boundary.
+	 * nearest megabyte boundary.  It is assumed that
+	 * the kernel fits within 4 contigous 1MB sections.
 	 */
-	add	r0, r4, #(TEXTADDR & 0xff000000) >> 18 @ start of kernel
-	bic	r2, r3, #0x00f00000
-	str	r2, [r0]			@ PAGE_OFFSET + 0MB
-	add	r0, r0, #(TEXTADDR & 0x00f00000) >> 18
-	str	r3, [r0], #4			@ KERNEL + 0MB
+	add	r0, r4,  #(TEXTADDR & 0xff000000) >> 18	@ start of kernel
+	str	r3, [r0, #(TEXTADDR & 0x00f00000) >> 18]!
 	add	r3, r3, #1 << 20
-	str	r3, [r0], #4			@ KERNEL + 1MB
+	str	r3, [r0, #4]!			@ KERNEL + 1MB
 	add	r3, r3, #1 << 20
-	str	r3, [r0], #4			@ KERNEL + 2MB
+	str	r3, [r0, #4]!			@ KERNEL + 2MB
 	add	r3, r3, #1 << 20
-	str	r3, [r0], #4			@ KERNEL + 3MB
+	str	r3, [r0, #4]			@ KERNEL + 3MB
+
+	/*
+	 * Then map first 1MB of ram in case it contains our boot params.
+	 */
+	add	r0, r4, #VIRT_OFFSET >> 18
+	add	r2, r5, r8
+	str	r2, [r0]
+
+#ifdef CONFIG_XIP_KERNEL
+	/*
+	 * Map some ram to cover our .data and .bss areas.
+	 * Mapping 3MB should be plenty.
+	 */
+	sub	r3, r4, r5
+	mov	r3, r3, lsr #20
+	add	r0, r0, r3, lsl #2
+	add	r2, r2, r3, lsl #20
+	str	r2, [r0], #4
+	add	r2, r2, #(1 << 20)
+	str	r2, [r0], #4
+	add	r2, r2, #(1 << 20)
+	str	r2, [r0]
+#endif
 
 	bic	r8, r8, #0x0c			@ turn off cacheable
 						@ and bufferable bits
@@ -255,6 +299,7 @@ __create_page_tables:
 	str	r3, [r0]
 #endif
 	mov	pc, lr
+	.ltorg
 
 
 

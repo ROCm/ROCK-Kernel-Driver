@@ -183,7 +183,7 @@ static void cy82c693_dma_enable (ide_drive_t *drive, int mode, int single)
 /* 
  * used to set DMA mode for CY82C693 (single and multi modes)
  */
-int cy82c693_ide_dma_on (ide_drive_t *drive)
+static int cy82c693_ide_dma_on (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
 

@@ -30,7 +30,7 @@ static inline void pci_exp_set_dev_base(int bus, int devfn)
 	u32 dev_base = pci_mmcfg_base_addr | (bus << 20) | (devfn << 12);
 	if (dev_base != mmcfg_last_accessed_device) {
 		mmcfg_last_accessed_device = dev_base;
-		set_fixmap(FIX_PCIE_MCFG, dev_base);
+		set_fixmap_nocache(FIX_PCIE_MCFG, dev_base);
 	}
 }
 
@@ -84,9 +84,6 @@ static int pci_mmcfg_write(int seg, int bus, int devfn, int reg, int len, u32 va
 		writel(value, mmcfg_virt_addr + reg);
 		break;
 	}
-
-	/* Dummy read to flush PCI write */
-	readl(mmcfg_virt_addr);
 
 	spin_unlock_irqrestore(&pci_config_lock, flags);
 

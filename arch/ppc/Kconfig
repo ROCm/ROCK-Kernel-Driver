@@ -189,18 +189,6 @@ config MATH_EMULATION
 	  here.  Saying Y here will not hurt performance (on any machine) but
 	  will increase the size of the kernel.
 
-config CPU_FREQ
-	bool "CPU Frequency scaling"
-	help
-	  Clock scaling allows you to change the clock speed of CPUs on the
-	  fly. This is a nice method to save battery power on notebooks,
-	  because the lower the clock speed, the less power the CPU consumes.
-
-	  For more information, take a look at <file:Documentation/cpu-freq> or
-	  at <http://www.brodo.de/cpufreq/>
-
-	  If in doubt, say N.
-
 source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_PMAC
@@ -756,11 +744,6 @@ config SPRUCE_BAUD_33M
 config PC_KEYBOARD
 	bool "PC PS/2 style Keyboard"
 	depends on 4xx || CPM2
-
-config SERIAL_CONSOLE_BAUD
-	int
-	depends on EV64260
-	default "115200"
 
 config PPCBUG_NVRAM
 	bool "Enable reading PPCBUG NVRAM during boot" if PPLUS || LOPEC

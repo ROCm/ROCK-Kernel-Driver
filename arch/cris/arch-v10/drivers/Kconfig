@@ -549,44 +549,17 @@ config ETRAX_RS485_DISABLE_RECEIVER
 
 config ETRAX_IDE
 	bool "ATA/IDE support"
+	select IDE
+	select BLK_DEV_IDE
+	select BLK_DEV_IDEDISK
+	select BLK_DEV_IDECD
+	select BLK_DEV_IDEDMA
+	select DMA_NONPCI
 	help
 	  Enable this to get support for ATA/IDE.
 	  You can't use parallell ports or SCSI ports
 	  at the same time.
 
-# here we should add the CONFIG_'s necessary to enable the basic
-# general ide drivers so the common case does not need to go
-# into that config submenu. enable disk and CD support. others
-# need to go fiddle in the submenu..
-config IDE
-	tristate
-	depends on ETRAX_IDE
-	default y
-
-config BLK_DEV_IDE
-	tristate
-	depends on ETRAX_IDE
-	default y
-
-config BLK_DEV_IDEDISK
-	tristate
-	depends on ETRAX_IDE
-	default y
-
-config BLK_DEV_IDECD
-	tristate
-	depends on ETRAX_IDE
-	default y
-
-config BLK_DEV_IDEDMA
-	bool
-	depends on ETRAX_IDE
-	default y
-
-config DMA_NONPCI
-	bool
-	depends on ETRAX_IDE
-	default y
 
 config ETRAX_IDE_DELAY
 	int "Delay for drives to regain consciousness"

@@ -148,12 +148,12 @@ static u8 read_prom_byte(struct he_dev *he_dev, int addr);
 /* globals */
 
 struct he_dev *he_devs = NULL;
-static short disable64 = -1;
+static int disable64 = 0;
 static short nvpibits = -1;
 static short nvcibits = -1;
 static short rx_skb_reserve = 16;
-static short irq_coalesce = 1;
-static short sdh = 0;
+static int irq_coalesce = 1;
+static int sdh = 0;
 
 static struct atmdev_ops he_ops =
 {
@@ -1701,7 +1701,7 @@ he_stop(struct he_dev *he_dev)
 	}
 	
 	if (he_dev->membase)
-		iounmap((void *) he_dev->membase);
+		iounmap(he_dev->membase);
 }
 
 static struct he_tpd *
@@ -3032,17 +3032,17 @@ read_prom_byte(struct he_dev *he_dev, int addr)
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("chas williams <chas@cmf.nrl.navy.mil>");
 MODULE_DESCRIPTION("ForeRunnerHE ATM Adapter driver");
-MODULE_PARM(disable64, "h");
+module_param(disable64, bool, 0);
 MODULE_PARM_DESC(disable64, "disable 64-bit pci bus transfers");
-MODULE_PARM(nvpibits, "i");
+module_param(nvpibits, short, 0);
 MODULE_PARM_DESC(nvpibits, "numbers of bits for vpi (default 0)");
-MODULE_PARM(nvcibits, "i");
+module_param(nvcibits, short, 0);
 MODULE_PARM_DESC(nvcibits, "numbers of bits for vci (default 12)");
-MODULE_PARM(rx_skb_reserve, "i");
+module_param(rx_skb_reserve, short, 0);
 MODULE_PARM_DESC(rx_skb_reserve, "padding for receive skb (default 16)");
-MODULE_PARM(irq_coalesce, "i");
+module_param(irq_coalesce, bool, 0);
 MODULE_PARM_DESC(irq_coalesce, "use interrupt coalescing (default 1)");
-MODULE_PARM(sdh, "i");
+module_param(sdh, bool, 0);
 MODULE_PARM_DESC(sdh, "use SDH framing (default 0)");
 
 static struct pci_device_id he_pci_tbl[] = {

@@ -47,6 +47,7 @@ static int match_one(char *s, char *p, substring_t args[])
 		else if (*p == '%') {
 			if (*s++ != '%')
 				return 0;
+			p++;
 			continue;
 		}
 

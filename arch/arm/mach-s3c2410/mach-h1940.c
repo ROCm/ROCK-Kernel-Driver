@@ -19,6 +19,7 @@
  *     21-Aug-2004 BJD  Added struct s3c2410_board
  *     04-Sep-2004 BJD  Changed uart init, renamed ipaq_ -> h1940_
  *     18-Oct-2004 BJD  Updated new board structure name
+ *     04-Nov-2004 BJD  Change for new serial clock
 */
 
 #include <linux/kernel.h>
@@ -41,6 +42,8 @@
 //#include <asm/debug-ll.h>
 #include <asm/arch/regs-serial.h>
 
+#include <linux/serial_core.h>
+
 #include "s3c2410.h"
 #include "clock.h"
 #include "devs.h"
@@ -58,7 +61,6 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[0] = {
 		.hwport	     = 0,
 		.flags	     = 0,
-		.clock	     = &s3c24xx_pclk,
 		.ucon	     = 0x3c5,
 		.ulcon	     = 0x03,
 		.ufcon	     = 0x51,
@@ -66,7 +68,6 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[1] = {
 		.hwport	     = 1,
 		.flags	     = 0,
-		.clock	     = &s3c24xx_pclk,
 		.ucon	     = 0x245,
 		.ulcon	     = 0x03,
 		.ufcon	     = 0x00,
@@ -75,7 +76,7 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[2] = {
 		.hwport	     = 2,
 		.flags	     = 0,
-		.clock	     = &s3c24xx_pclk,
+		.uart_flags  = UPF_CONS_FLOW,
 		.ucon	     = 0x3c5,
 		.ulcon	     = 0x43,
 		.ufcon	     = 0x51,

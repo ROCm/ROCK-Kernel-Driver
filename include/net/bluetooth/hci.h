@@ -170,6 +170,8 @@ enum {
 #define HCI_LM_AUTH	0x0002
 #define HCI_LM_ENCRYPT	0x0004
 #define HCI_LM_TRUSTED	0x0008
+#define HCI_LM_RELIABLE	0x0010
+#define HCI_LM_SECURE	0x0020
 
 /* -----  HCI Commands ---- */
 /* OGF & OCF values */
@@ -366,6 +368,11 @@ struct hci_cp_set_conn_encrypt {
 	__u8     encrypt;
 } __attribute__ ((packed));
 
+#define OCF_CHANGE_CONN_LINK_KEY 0x0015
+struct hci_cp_change_conn_link_key {
+	__u16    handle;
+} __attribute__ ((packed));
+
 #define OCF_READ_REMOTE_FEATURES 0x001B
 struct hci_cp_read_rmt_features {
 	__u16    handle;
@@ -482,6 +489,12 @@ struct hci_ev_encrypt_change {
 	__u8     encrypt;
 } __attribute__ ((packed));
 
+#define HCI_EV_CHANGE_CONN_LINK_KEY_COMPLETE	0x09
+struct hci_ev_change_conn_link_key_complete {
+	__u8     status;
+	__u16    handle;
+} __attribute__ ((packed));
+
 #define HCI_EV_QOS_SETUP_COMPLETE	0x0D
 struct hci_qos {
 	__u8     service_type;
@@ -520,6 +533,14 @@ struct hci_ev_role_change {
 	__u8     status;
 	bdaddr_t bdaddr;
 	__u8     role;
+} __attribute__ ((packed));
+
+#define HCI_EV_MODE_CHANGE	0x14
+struct hci_ev_mode_change {
+	__u8     status;
+	__u16    handle;
+	__u8     mode;
+	__u16    interval;
 } __attribute__ ((packed));
 
 #define HCI_EV_PIN_CODE_REQ	0x16

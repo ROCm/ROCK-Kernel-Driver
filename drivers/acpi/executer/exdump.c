@@ -438,6 +438,8 @@ acpi_ex_dump_operands (
 }
 
 
+#ifdef ACPI_FUTURE_USAGE
+
 /*****************************************************************************
  *
  * FUNCTION:    acpi_ex_out*
@@ -785,6 +787,8 @@ acpi_ex_dump_object_descriptor (
 
 	return_VOID;
 }
+
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 #endif
 

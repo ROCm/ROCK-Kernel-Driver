@@ -267,8 +267,8 @@ static struct mpoa_client *alloc_mpc(void)
 	if (mpc == NULL)
 		return NULL;
 	memset(mpc, 0, sizeof(struct mpoa_client));
-	mpc->ingress_lock = RW_LOCK_UNLOCKED;
-	mpc->egress_lock  = RW_LOCK_UNLOCKED;
+	rwlock_init(&mpc->ingress_lock);
+	rwlock_init(&mpc->egress_lock);
 	mpc->next = mpcs;
 	atm_mpoa_init_cache(mpc);
 
@@ -755,13 +755,18 @@ int atm_mpoa_mpoad_attach (struct atm_vcc *vcc, int arg)
 {
 	struct mpoa_client *mpc;
 	struct lec_priv *priv;
+	int err;
 	
 	if (mpcs == NULL) {
 		init_timer(&mpc_timer);
 		mpc_timer_refresh();
 
 		/* This lets us now how our LECs are doing */
-		register_netdevice_notifier(&mpoa_notifier);
+		err = register_netdevice_notifier(&mpoa_notifier);
+		if (err < 0) {
+			del_timer(&mpc_timer);
+			return err;
+		}
 	}
 	
 	mpc = find_mpc_by_itfnum(arg);

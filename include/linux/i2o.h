@@ -162,9 +162,9 @@ struct i2o_controller {
 	struct notifier_block *event_notifer;	/* Events */
 	atomic_t users;
 	struct list_head list;	/* Controller list */
-	void *post_port;	/* Inbout port address */
-	void *reply_port;	/* Outbound port address */
-	void *irq_mask;		/* Interrupt register address */
+	void __iomem *post_port;	/* Inbout port address */
+	void __iomem *reply_port;	/* Outbound port address */
+	void __iomem *irq_mask;		/* Interrupt register address */
 
 	/* Dynamic LCT related data */
 
@@ -241,8 +241,8 @@ struct i2o_sys_tbl {
 extern struct list_head i2o_controllers;
 
 /* Message functions */
-static inline u32 i2o_msg_get(struct i2o_controller *, struct i2o_message **);
-extern u32 i2o_msg_get_wait(struct i2o_controller *, struct i2o_message **,
+static inline u32 i2o_msg_get(struct i2o_controller *, struct i2o_message __iomem **);
+extern u32 i2o_msg_get_wait(struct i2o_controller *, struct i2o_message __iomem **,
 			    int);
 static inline void i2o_msg_post(struct i2o_controller *, u32);
 static inline int i2o_msg_post_wait(struct i2o_controller *, u32,
@@ -263,7 +263,6 @@ static inline void i2o_dma_unmap(struct device *, struct i2o_dma *);
 
 /* IOP functions */
 extern int i2o_status_get(struct i2o_controller *);
-extern int i2o_hrt_get(struct i2o_controller *);
 
 extern int i2o_event_register(struct i2o_device *, struct i2o_driver *, int,
 			      u32);
@@ -385,7 +384,6 @@ extern int i2o_device_claim_release(struct i2o_device *);
 
 /* Exec OSM functions */
 extern int i2o_exec_lct_get(struct i2o_controller *);
-extern int i2o_exec_lct_notify(struct i2o_controller *, u32);
 
 /* device to i2o_device and driver to i2o_driver convertion functions */
 #define to_i2o_driver(drv) container_of(drv,struct i2o_driver, driver)
@@ -445,7 +443,7 @@ static inline void I2O_IRQ_WRITE32(struct i2o_controller *c, u32 val)
  *	available returns I2O_QUEUE_EMPTY and msg is leaved untouched.
  */
 static inline u32 i2o_msg_get(struct i2o_controller *c,
-			      struct i2o_message **msg)
+			      struct i2o_message __iomem **msg)
 {
 	u32 m;
 
@@ -515,10 +513,8 @@ static inline void i2o_flush_reply(struct i2o_controller *c, u32 m)
 static inline struct i2o_message *i2o_msg_out_to_virt(struct i2o_controller *c,
 						      u32 m)
 {
-	if (unlikely
-	    (m < c->out_queue.phys
-	     || m >= c->out_queue.phys + c->out_queue.len))
-		BUG();
+	BUG_ON(m < c->out_queue.phys
+	       || m >= c->out_queue.phys + c->out_queue.len);
 
 	return c->out_queue.virt + (m - c->out_queue.phys);
 };
@@ -534,7 +530,7 @@ static inline struct i2o_message *i2o_msg_out_to_virt(struct i2o_controller *c,
  *	work for receive side messages as they are kmalloc objects
  *	in a different pool.
  */
-static inline struct i2o_message *i2o_msg_in_to_virt(struct i2o_controller *c,
+static inline struct i2o_message __iomem *i2o_msg_in_to_virt(struct i2o_controller *c,
 						     u32 m)
 {
 	return c->in_queue.virt + m;
@@ -633,7 +629,6 @@ static inline void i2o_dma_unmap(struct device *dev, struct i2o_dma *addr)
 #define i2o_raw_writel(val, mem)	__raw_writel(cpu_to_le32(val), mem)
 
 extern int i2o_parm_field_get(struct i2o_device *, int, int, void *, int);
-extern int i2o_parm_field_set(struct i2o_device *, int, int, void *, int);
 extern int i2o_parm_table_get(struct i2o_device *, int, int, int, void *, int,
 			      void *, int);
 /* FIXME: remove

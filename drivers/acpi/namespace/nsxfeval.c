@@ -42,6 +42,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
@@ -72,7 +73,7 @@
  *              be valid (non-null)
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_evaluate_object_typed (
 	acpi_handle                     handle,
@@ -143,6 +144,7 @@ acpi_evaluate_object_typed (
 	return_buffer->length = 0;
 	return_ACPI_STATUS (AE_TYPE);
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************
@@ -354,6 +356,7 @@ acpi_evaluate_object (
 
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_evaluate_object);
 
 
 /*******************************************************************************
@@ -426,6 +429,7 @@ acpi_walk_namespace (
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_walk_namespace);
 
 
 /*******************************************************************************
@@ -599,6 +603,7 @@ acpi_get_devices (
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_devices);
 
 
 /*******************************************************************************

@@ -384,11 +384,11 @@ static int gbefb_blank(int blank, struct fb_info *info)
 {
 	/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
 	switch (blank) {
-	case 0:		/* unblank */
+	case FB_BLANK_UNBLANK:		/* unblank */
 		gbe_turn_on();
 		break;
 
-	case 1:		/* blank */
+	case FB_BLANK_NORMAL:		/* blank */
 		gbe_turn_off();
 		break;
 
@@ -1084,9 +1084,9 @@ int __init gbefb_init(void)
 	int i, ret = 0;
 
 #ifndef MODULE
-	char *option = NULL;
+	char *options = NULL;
 
-	if (fb_get_options("gbefb", &option))
+	if (fb_get_options("gbefb", &options))
 		return -ENODEV;
 	gbefb_setup(options);
 #endif

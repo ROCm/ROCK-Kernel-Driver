@@ -278,7 +278,7 @@ int ip_mc_output(struct sk_buff *skb)
 				newskb->dev, ip_dev_loopback_xmit);
 	}
 
-	if (skb->len > dst_pmtu(&rt->u.dst) || skb_shinfo(skb)->frag_list)
+	if (skb->len > dst_pmtu(&rt->u.dst))
 		return ip_fragment(skb, ip_finish_output);
 	else
 		return ip_finish_output(skb);
@@ -288,8 +288,7 @@ int ip_output(struct sk_buff *skb)
 {
 	IP_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
 
-	if ((skb->len > dst_pmtu(skb->dst) || skb_shinfo(skb)->frag_list) &&
-	    !skb_shinfo(skb)->tso_size)
+	if (skb->len > dst_pmtu(skb->dst) && !skb_shinfo(skb)->tso_size)
 		return ip_fragment(skb, ip_finish_output);
 	else
 		return ip_finish_output(skb);

@@ -120,7 +120,7 @@ static struct usb_device_id blacklist_ids[] = {
 	{ }	/* Terminating entry */
 };
 
-struct _urb *_urb_alloc(int isoc, int gfp)
+static struct _urb *_urb_alloc(int isoc, int gfp)
 {
 	struct _urb *_urb = kmalloc(sizeof(struct _urb) +
 				sizeof(struct usb_iso_packet_descriptor) * isoc, gfp);
@@ -131,7 +131,7 @@ struct _urb *_urb_alloc(int isoc, int gfp)
 	return _urb;
 }
 
-struct _urb *_urb_dequeue(struct _urb_queue *q)
+static struct _urb *_urb_dequeue(struct _urb_queue *q)
 {
 	struct _urb *_urb = NULL;
 	unsigned long flags;
@@ -805,7 +805,7 @@ static void hci_usb_notify(struct hci_dev *hdev, unsigned int evt)
 	BT_DBG("%s evt %d", hdev->name, evt);
 }
 
-int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
+static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct usb_host_endpoint *bulk_out_ep = NULL;
@@ -933,7 +933,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	}
 #endif
 
-	husb->completion_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&husb->completion_lock);
 
 	for (i = 0; i < 4; i++) {
 		skb_queue_head_init(&husb->transmit_q[i]);

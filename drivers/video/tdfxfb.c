@@ -837,23 +837,23 @@ static int tdfxfb_blank(int blank, struct fb_info *info)
 	dacmode = tdfx_inl(par, DACMODE);
 
 	switch (blank) {
-		case 0: /* Screen: On; HSync: On, VSync: On */    
+		case FB_BLANK_UNBLANK: /* Screen: On; HSync: On, VSync: On */
 			state    = 0;
 			vgablank = 0;
 			break;
-		case 1: /* Screen: Off; HSync: On, VSync: On */
+		case FB_BLANK_NORMAL: /* Screen: Off; HSync: On, VSync: On */
 			state    = 0;
 			vgablank = 1;
 			break;
-		case 2: /* Screen: Off; HSync: On, VSync: Off */
+		case FB_BLANK_VSYNC_SUSPEND: /* Screen: Off; HSync: On, VSync: Off */
 			state    = BIT(3);
 			vgablank = 1;
 			break;
-		case 3: /* Screen: Off; HSync: Off, VSync: On */
+		case FB_BLANK_HSYNC_SUSPEND: /* Screen: Off; HSync: Off, VSync: On */
 			state    = BIT(1);
 			vgablank = 1;
 			break;
-		case 4: /* Screen: Off; HSync: Off, VSync: Off */
+		case FB_BLANK_POWERDOWN: /* Screen: Off; HSync: Off, VSync: Off */
 			state    = BIT(1) | BIT(3);
 			vgablank = 1;
 			break;

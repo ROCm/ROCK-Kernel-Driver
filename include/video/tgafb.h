@@ -176,9 +176,9 @@ struct tga_par {
 	struct pci_dev *pdev;
 
 	/* Device dependent information.  */
-	void *tga_mem_base;
-	void *tga_fb_base;
-	void *tga_regs_base;
+	void __iomem *tga_mem_base;
+	void __iomem *tga_fb_base;
+	void __iomem *tga_regs_base;
 	u8 tga_type;				/* TGA_TYPE_XXX */
 	u8 tga_chip_rev;			/* dc21030 revision */
 

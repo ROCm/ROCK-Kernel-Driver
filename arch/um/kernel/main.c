@@ -26,6 +26,7 @@
 #include "uml-config.h"
 #include "irq_user.h"
 #include "time_user.h"
+#include "os.h"
 
 /* Set in set_stklim, which is called from main and __wrap_malloc.
  * __wrap_malloc only calls it if main hasn't started.
@@ -175,7 +176,7 @@ int main(int argc, char **argv, char **envp)
 }
 
 #define CAN_KMALLOC() \
-	(kmalloc_ok && CHOOSE_MODE((getpid() != tracing_pid), 1))
+	(kmalloc_ok && CHOOSE_MODE((os_getpid() != tracing_pid), 1))
 
 extern void *__real_malloc(int);
 

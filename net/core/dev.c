@@ -520,35 +520,6 @@ struct net_device *dev_get_by_name(const char *name)
 	return dev;
 }
 
-/*
-   Return value is changed to int to prevent illegal usage in future.
-   It is still legal to use to check for device existence.
-
-   User should understand, that the result returned by this function
-   is meaningless, if it was not issued under rtnl semaphore.
- */
-
-/**
- *	dev_get	-	test if a device exists
- *	@name:	name to test for
- *
- *	Test if a name exists. Returns true if the name is found. In order
- *	to be sure the name is not allocated or removed during the test the
- *	caller must hold the rtnl semaphore.
- *
- *	This function exists only for back compatibility with older
- *	drivers.
- */
-int __dev_get(const char *name)
-{
-	struct net_device *dev;
-
-	read_lock(&dev_base_lock);
-	dev = __dev_get_by_name(name);
-	read_unlock(&dev_base_lock);
-	return dev != NULL;
-}
-
 /**
  *	__dev_get_by_index - find a device by its ifindex
  *	@ifindex: index of device
@@ -623,26 +594,17 @@ struct net_device *dev_getbyhwaddr(unsigned short type, char *ha)
 	return dev;
 }
 
-struct net_device *__dev_getfirstbyhwtype(unsigned short type)
-{
-	struct net_device *dev;
-
-	for (dev = dev_base; dev; dev = dev->next)
-		if (dev->type == type)
-			break;
-	return dev;
-}
-
-EXPORT_SYMBOL(__dev_getfirstbyhwtype);
-
 struct net_device *dev_getfirstbyhwtype(unsigned short type)
 {
 	struct net_device *dev;
 
 	rtnl_lock();
-	dev = __dev_getfirstbyhwtype(type);
-	if (dev)
-		dev_hold(dev);
+	for (dev = dev_base; dev; dev = dev->next) {
+		if (dev->type == type) {
+			dev_hold(dev);
+			break;
+		}
+	}
 	rtnl_unlock();
 	return dev;
 }
@@ -665,32 +627,14 @@ struct net_device * dev_get_by_flags(unsigned short if_flags, unsigned short mas
 	struct net_device *dev;
 
 	read_lock(&dev_base_lock);
-	dev = __dev_get_by_flags(if_flags, mask);
-	if (dev)
-		dev_hold(dev);
+	for (dev = dev_base; dev != NULL; dev = dev->next) {
+		if (((dev->flags ^ if_flags) & mask) == 0) {
+			dev_hold(dev);
+			break;
+		}
+	}
 	read_unlock(&dev_base_lock);
 	return dev;
-}
-
-/**
- *	__dev_get_by_flags - find any device with given flags
- *	@if_flags: IFF_* values
- *	@mask: bitmask of bits in if_flags to check
- *
- *	Search for any interface with the given flags. Returns NULL if a device
- *	is not found or a pointer to the device. The caller must hold either
- *	the RTNL semaphore or @dev_base_lock.
- */
-
-struct net_device *__dev_get_by_flags(unsigned short if_flags, unsigned short mask)
-{
-	struct net_device *dev;
-
-	for (dev = dev_base; dev != NULL; dev = dev->next) {
-		if (((dev->flags ^ if_flags) & mask) == 0)
-			return dev;
-	}
-	return NULL;
 }
 
 /**
@@ -1055,6 +999,29 @@ int unregister_netdevice_notifier(struct notifier_block *nb)
 int call_netdevice_notifiers(unsigned long val, void *v)
 {
 	return notifier_call_chain(&netdev_chain, val, v);
+}
+
+/* When > 0 there are consumers of rx skb time stamps */
+static atomic_t netstamp_needed = ATOMIC_INIT(0);
+
+void net_enable_timestamp(void)
+{
+	atomic_inc(&netstamp_needed);
+}
+
+void net_disable_timestamp(void)
+{
+	atomic_dec(&netstamp_needed);
+}
+
+static inline void net_timestamp(struct timeval *stamp)
+{
+	if (atomic_read(&netstamp_needed))
+		do_gettimeofday(stamp);
+	else {
+		stamp->tv_sec = 0;
+		stamp->tv_usec = 0;
+	}
 }
 
 /*
@@ -2700,7 +2667,7 @@ int dev_ioctl(unsigned int cmd, void __user *arg)
  *	number.  The caller must hold the rtnl semaphore or the
  *	dev_base_lock to be sure it remains unique.
  */
-int dev_new_index(void)
+static int dev_new_index(void)
 {
 	static int ifindex;
 	for (;;) {
@@ -3240,8 +3207,6 @@ out:
 
 subsys_initcall(net_dev_init);
 
-EXPORT_SYMBOL(__dev_get);
-EXPORT_SYMBOL(__dev_get_by_flags);
 EXPORT_SYMBOL(__dev_get_by_index);
 EXPORT_SYMBOL(__dev_get_by_name);
 EXPORT_SYMBOL(__dev_remove_pack);
@@ -3252,17 +3217,13 @@ EXPORT_SYMBOL(dev_close);
 EXPORT_SYMBOL(dev_get_by_flags);
 EXPORT_SYMBOL(dev_get_by_index);
 EXPORT_SYMBOL(dev_get_by_name);
-EXPORT_SYMBOL(dev_getbyhwaddr);
 EXPORT_SYMBOL(dev_ioctl);
-EXPORT_SYMBOL(dev_new_index);
 EXPORT_SYMBOL(dev_open);
 EXPORT_SYMBOL(dev_queue_xmit);
-EXPORT_SYMBOL(dev_queue_xmit_nit);
 EXPORT_SYMBOL(dev_remove_pack);
 EXPORT_SYMBOL(dev_set_allmulti);
 EXPORT_SYMBOL(dev_set_promiscuity);
 EXPORT_SYMBOL(dev_change_flags);
-EXPORT_SYMBOL(dev_change_name);
 EXPORT_SYMBOL(dev_set_mtu);
 EXPORT_SYMBOL(free_netdev);
 EXPORT_SYMBOL(netdev_boot_setup_check);
@@ -3277,6 +3238,8 @@ EXPORT_SYMBOL(skb_checksum_help);
 EXPORT_SYMBOL(synchronize_net);
 EXPORT_SYMBOL(unregister_netdevice);
 EXPORT_SYMBOL(unregister_netdevice_notifier);
+EXPORT_SYMBOL(net_enable_timestamp);
+EXPORT_SYMBOL(net_disable_timestamp);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);

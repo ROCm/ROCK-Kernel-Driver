@@ -1262,19 +1262,19 @@ sys32_fadvise64_64_wrapper:
 sys32_clock_settime_wrapper:
 	lgfr	%r2,%r2			# clockid_t (int)
 	llgtr	%r3,%r3			# struct compat_timespec *
-	jg	compat_clock_settime
+	jg	compat_sys_clock_settime
 
 	.globl	sys32_clock_gettime_wrapper
 sys32_clock_gettime_wrapper:
 	lgfr	%r2,%r2			# clockid_t (int)
 	llgtr	%r3,%r3			# struct compat_timespec *
-	jg	compat_clock_gettime
+	jg	compat_sys_clock_gettime
 
 	.globl	sys32_clock_getres_wrapper
 sys32_clock_getres_wrapper:
 	lgfr	%r2,%r2			# clockid_t (int)
 	llgtr	%r3,%r3			# struct compat_timespec *
-	jg	compat_clock_getres
+	jg	compat_sys_clock_getres
 
 	.globl	sys32_clock_nanosleep_wrapper
 sys32_clock_nanosleep_wrapper:
@@ -1282,7 +1282,7 @@ sys32_clock_nanosleep_wrapper:
 	lgfr	%r3,%r3			# int
 	llgtr	%r4,%r4			# struct compat_timespec *
 	llgtr	%r5,%r5			# struct compat_timespec *
-	jg	compat_clock_nanosleep
+	jg	compat_sys_clock_nanosleep
 
 	.globl	sys32_timer_create_wrapper
 sys32_timer_create_wrapper:
@@ -1297,13 +1297,13 @@ sys32_timer_settime_wrapper:
 	lgfr	%r3,%r3			# int
 	llgtr	%r4,%r4			# struct compat_itimerspec *
 	llgtr	%r5,%r5			# struct compat_itimerspec *
-	jg	compat_timer_settime
+	jg	compat_sys_timer_settime
 
 	.globl	sys32_timer_gettime_wrapper
 sys32_timer_gettime_wrapper:
 	lgfr	%r2,%r2			# timer_t (int)
 	llgtr	%r3,%r3			# struct compat_itimerspec *
-	jg	compat_timer_gettime
+	jg	compat_sys_timer_gettime
 
 	.globl	sys32_timer_getoverrun_wrapper
 sys32_timer_getoverrun_wrapper:
@@ -1354,14 +1354,14 @@ compat_sys_statfs64_wrapper:
 	llgtr	%r2,%r2			# const char *
 	llgfr	%r3,%r3			# compat_size_t
 	llgtr	%r4,%r4			# struct compat_statfs64 *
-	jg	compat_statfs64
+	jg	compat_sys_statfs64
 
 	.globl compat_sys_fstatfs64_wrapper
 compat_sys_fstatfs64_wrapper:
 	llgfr	%r2,%r2			# unsigned int fd
 	llgfr	%r3,%r3			# compat_size_t
 	llgtr	%r4,%r4			# struct compat_statfs64 *
-	jg	compat_fstatfs64
+	jg	compat_sys_fstatfs64
 
 	.globl	compat_sys_mq_open_wrapper
 compat_sys_mq_open_wrapper:

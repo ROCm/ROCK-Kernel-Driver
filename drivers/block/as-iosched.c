@@ -2096,7 +2096,7 @@ static struct elevator_type iosched_as = {
 	.elevator_owner = THIS_MODULE,
 };
 
-int as_init(void)
+static int __init as_init(void)
 {
 	int ret;
 
@@ -2120,7 +2120,7 @@ int as_init(void)
 	return ret;
 }
 
-void as_exit(void)
+static void __exit as_exit(void)
 {
 	kmem_cache_destroy(arq_pool);
 	elv_unregister(&iosched_as);

@@ -48,15 +48,10 @@ static int ohci_restart (struct ohci_hcd *ohci);
 static int ohci_hub_suspend (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-	struct usb_device	*root = hcd_to_bus (&ohci->hcd)->root_hub;
 	int			status = 0;
+	unsigned long		flags;
 
-	if (root->dev.power.power_state != 0)
-		return 0;
-	if (time_before (jiffies, ohci->next_statechange))
-		return -EAGAIN;
-
-	spin_lock_irq (&ohci->lock);
+	spin_lock_irqsave (&ohci->lock, flags);
 
 	ohci->hc_control = ohci_readl (ohci, &ohci->regs->control);
 	switch (ohci->hc_control & OHCI_CTRL_HCFS) {
@@ -72,8 +67,8 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 		ohci_dbg (ohci, "needs reinit!\n");
 		goto done;
 	case OHCI_USB_SUSPEND:
-		ohci_dbg (ohci, "already suspended?\n");
-		goto succeed;
+		ohci_dbg (ohci, "already suspended\n");
+		goto done;
 	}
 	ohci_dbg (ohci, "suspend root hub\n");
 
@@ -122,14 +117,10 @@ static int ohci_hub_suspend (struct usb_hcd *hcd)
 	/* no resumes until devices finish suspending */
 	ohci->next_statechange = jiffies + msecs_to_jiffies (5);
 
-succeed:
-	/* it's not HCD_STATE_SUSPENDED unless access to this
-	 * hub from the non-usb side (PCI, SOC, etc) stopped 
-	 */
-	root->dev.power.power_state = 3;
-	usb_set_device_state (root, USB_STATE_SUSPENDED);
 done:
-	spin_unlock_irq (&ohci->lock);
+	if (status == 0)
+		ohci->hcd.state = HCD_STATE_SUSPENDED;
+	spin_unlock_irqrestore (&ohci->lock, flags);
 	return status;
 }
 
@@ -145,22 +136,26 @@ static inline struct ed *find_head (struct ed *ed)
 static int ohci_hub_resume (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-	struct usb_device	*root = hcd_to_bus (&ohci->hcd)->root_hub;
 	u32			temp, enables;
 	int			status = -EINPROGRESS;
 
-	if (!root->dev.power.power_state)
-		return 0;
 	if (time_before (jiffies, ohci->next_statechange))
-		return -EAGAIN;
+		msleep(5);
 
 	spin_lock_irq (&ohci->lock);
 	ohci->hc_control = ohci_readl (ohci, &ohci->regs->control);
+
 	if (ohci->hc_control & (OHCI_CTRL_IR | OHCI_SCHED_ENABLES)) {
 		/* this can happen after suspend-to-disk */
-		ohci_dbg (ohci, "BIOS/SMM active, control %03x\n",
-				ohci->hc_control);
-		status = -EBUSY;
+		if (hcd->state == USB_STATE_RESUMING) {
+			ohci_dbg (ohci, "BIOS/SMM active, control %03x\n",
+					ohci->hc_control);
+			status = -EBUSY;
+		/* this happens when pmcore resumes HC then root */
+		} else {
+			ohci_dbg (ohci, "duplicate resume\n");
+			status = 0;
+		}
 	} else switch (ohci->hc_control & OHCI_CTRL_HCFS) {
 	case OHCI_USB_SUSPEND:
 		ohci->hc_control &= ~(OHCI_CTRL_HCFS|OHCI_SCHED_ENABLES);
@@ -175,7 +170,6 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 		break;
 	case OHCI_USB_OPER:
 		ohci_dbg (ohci, "odd resume\n");
-		root->dev.power.power_state = 0;
 		status = 0;
 		break;
 	default:		/* RESET, we lost power */
@@ -245,8 +239,6 @@ static int ohci_hub_resume (struct usb_hcd *hcd)
 
 	/* TRSMRCY */
 	msleep (10);
-	root->dev.power.power_state = 0;
-	usb_set_device_state (root, USB_STATE_CONFIGURED);
 
 	/* keep it alive for ~5x suspend + resume costs */
 	ohci->next_statechange = jiffies + msecs_to_jiffies (250);
@@ -315,10 +307,12 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	int		ports, i, changed = 0, length = 1;
 	int		can_suspend = 1;
 
+	/* if !USB_SUSPEND, root hub timers won't get shut down ... */
+	if (!HCD_IS_RUNNING(ohci->hcd.state))
+		return 0;
+
 	ports = roothub_a (ohci) & RH_A_NDP; 
 	if (ports > MAX_ROOT_PORTS) {
-		if (!HCD_IS_RUNNING(ohci->hcd.state))
-			return -ESHUTDOWN;
 		ohci_err (ohci, "bogus NDP=%d, rereads as NDP=%d\n", ports,
 			  ohci_readl (ohci, &ohci->regs->roothub.a) & RH_A_NDP);
 		/* retry later; "should not happen" */
@@ -362,6 +356,7 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 #ifdef CONFIG_PM
 	/* save power by suspending idle root hubs;
 	 * INTR_RD wakes us when there's work
+	 * NOTE: if we can do this, we don't need a root hub timer!
 	 */
 	if (can_suspend
 			&& !changed
@@ -369,6 +364,7 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 			&& ((OHCI_CTRL_HCFS | OHCI_SCHED_ENABLES)
 					& ohci->hc_control)
 				== OHCI_USB_OPER
+			&& time_after (jiffies, ohci->next_statechange)
 			&& usb_trylock_device (hcd->self.root_hub)
 			) {
 		ohci_vdbg (ohci, "autosuspend\n");
@@ -409,7 +405,7 @@ ohci_hub_descriptor (
 	    temp |= 0x0010;
 	else if (rh & RH_A_OCPM)	/* per-port overcurrent reporting? */
 	    temp |= 0x0008;
-	desc->wHubCharacteristics = cpu_to_hc16 (ohci, temp);
+	desc->wHubCharacteristics = (__force __u16)cpu_to_hc16(ohci, temp);
 
 	/* two bitmaps:  ports removable, and usb 1.0 legacy PortPwrCtrlMask */
 	rh = roothub_b (ohci);
@@ -475,7 +471,7 @@ static void start_hnp(struct ohci_hcd *ohci);
 /* called from some task, normally khubd */
 static inline void root_port_reset (struct ohci_hcd *ohci, unsigned port)
 {
-	u32 __iomem *portstat = &ohci->regs->roothub.portstatus [port];
+	__hc32 __iomem *portstat = &ohci->regs->roothub.portstatus [port];
 	u32	temp;
 	u16	now = ohci_readl(ohci, &ohci->regs->fmnumber);
 	u16	reset_done = now + PORT_RESET_MSEC;

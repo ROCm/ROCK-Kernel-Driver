@@ -95,14 +95,14 @@ typedef struct dtl1_info_t {
 } dtl1_info_t;
 
 
-void dtl1_config(dev_link_t *link);
-void dtl1_release(dev_link_t *link);
-int dtl1_event(event_t event, int priority, event_callback_args_t *args);
+static void dtl1_config(dev_link_t *link);
+static void dtl1_release(dev_link_t *link);
+static int dtl1_event(event_t event, int priority, event_callback_args_t *args);
 
 static dev_info_t dev_info = "dtl1_cs";
 
-dev_link_t *dtl1_attach(void);
-void dtl1_detach(dev_link_t *);
+static dev_link_t *dtl1_attach(void);
+static void dtl1_detach(dev_link_t *);
 
 static dev_link_t *dev_list = NULL;
 
@@ -469,7 +469,7 @@ static int dtl1_hci_ioctl(struct hci_dev *hdev, unsigned int cmd,  unsigned long
 /* ======================== Card services HCI interaction ======================== */
 
 
-int dtl1_open(dtl1_info_t *info)
+static int dtl1_open(dtl1_info_t *info)
 {
 	unsigned long flags;
 	unsigned int iobase = info->link.io.BasePort1;
@@ -540,7 +540,7 @@ int dtl1_open(dtl1_info_t *info)
 }
 
 
-int dtl1_close(dtl1_info_t *info)
+static int dtl1_close(dtl1_info_t *info)
 {
 	unsigned long flags;
 	unsigned int iobase = info->link.io.BasePort1;
@@ -569,7 +569,7 @@ int dtl1_close(dtl1_info_t *info)
 	return 0;
 }
 
-dev_link_t *dtl1_attach(void)
+static dev_link_t *dtl1_attach(void)
 {
 	dtl1_info_t *info;
 	client_reg_t client_reg;
@@ -627,7 +627,7 @@ dev_link_t *dtl1_attach(void)
 }
 
 
-void dtl1_detach(dev_link_t *link)
+static void dtl1_detach(dev_link_t *link)
 {
 	dtl1_info_t *info = link->priv;
 	dev_link_t **linkp;
@@ -681,7 +681,7 @@ static int next_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 	return get_tuple(handle, tuple, parse);
 }
 
-void dtl1_config(dev_link_t *link)
+static void dtl1_config(dev_link_t *link)
 {
 	client_handle_t handle = link->handle;
 	dtl1_info_t *info = link->priv;
@@ -768,7 +768,7 @@ failed:
 }
 
 
-void dtl1_release(dev_link_t *link)
+static void dtl1_release(dev_link_t *link)
 {
 	dtl1_info_t *info = link->priv;
 
@@ -785,7 +785,7 @@ void dtl1_release(dev_link_t *link)
 }
 
 
-int dtl1_event(event_t event, int priority, event_callback_args_t *args)
+static int dtl1_event(event_t event, int priority, event_callback_args_t *args)
 {
 	dev_link_t *link = args->client_data;
 	dtl1_info_t *info = link->priv;

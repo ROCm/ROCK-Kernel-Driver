@@ -53,9 +53,9 @@ struct  fbtype {
 struct  fbcmap {
         int             index;          /* first element (0 origin) */
         int             count;
-        unsigned char   *red;
-        unsigned char   *green;
-        unsigned char   *blue;
+        unsigned char   __user *red;
+        unsigned char   __user *green;
+        unsigned char   __user *blue;
 };
 
 #ifdef __KERNEL__

@@ -70,7 +70,7 @@ struct edd_attribute {
 static int edd_dev_is_type(struct edd_device *edev, const char *type);
 static struct pci_dev *edd_get_pci_dev(struct edd_device *edev);
 
-static struct edd_device *edd_devices[EDDMAXNR];
+static struct edd_device *edd_devices[EDD_MBR_SIG_MAX];
 
 #define EDD_DEVICE_ATTR(_name,_mode,_show,_test) \
 struct edd_attribute edd_attr_##_name = { 	\
@@ -728,9 +728,9 @@ edd_device_register(struct edd_device *edev, int i)
 
 static inline int edd_num_devices(void)
 {
-	return min_t(unsigned char,
-		     max_t(unsigned char, edd.edd_info_nr, edd.mbr_signature_nr),
-		     max_t(unsigned char, EDD_MBR_SIG_MAX, EDDMAXNR));
+	return max_t(unsigned char,
+		     min_t(unsigned char, EDD_MBR_SIG_MAX, edd.mbr_signature_nr),
+		     min_t(unsigned char, EDDMAXNR, edd.edd_info_nr));
 }
 
 /**

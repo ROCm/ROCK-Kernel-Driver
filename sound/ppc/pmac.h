@@ -61,7 +61,7 @@ typedef struct snd_pmac_dbdma pmac_dbdma_t;
  */
 struct snd_pmac_dbdma {
 	unsigned long addr;
-	struct dbdma_cmd *cmds;
+	struct dbdma_cmd __iomem *cmds;
 	void *space;
 	int size;
 };
@@ -80,7 +80,7 @@ struct snd_pmac_stream {
 	int nperiods, cur_period;
 
 	pmac_dbdma_t cmd;
-	volatile struct dbdma_regs *dma;
+	volatile struct dbdma_regs __iomem *dma;
 
 	snd_pcm_substream_t *substream;
 
@@ -130,12 +130,12 @@ struct snd_pmac {
 	int format;			/* current format */
 
 	spinlock_t reg_lock;
-	volatile struct awacs_regs *awacs;
+	volatile struct awacs_regs __iomem *awacs;
 	int awacs_reg[8]; /* register cache */
 	unsigned int hp_stat_mask;
 
-	unsigned char *latch_base;
-	unsigned char *macio_base;
+	unsigned char __iomem *latch_base;
+	unsigned char __iomem *macio_base;
 
 	pmac_stream_t playback;
 	pmac_stream_t capture;
@@ -199,8 +199,6 @@ typedef struct snd_pmac_keywest {
 
 int snd_pmac_keywest_init(pmac_keywest_t *i2c);
 void snd_pmac_keywest_cleanup(pmac_keywest_t *i2c);
-#define snd_pmac_keywest_write(i2c,cmd,len,data) i2c_smbus_write_block_data((i2c)->client, cmd, len, data)
-#define snd_pmac_keywest_write_byte(i2c,cmd,data) i2c_smbus_write_byte_data((i2c)->client, cmd, data)
 
 /* misc */
 int snd_pmac_boolean_stereo_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo);

@@ -89,13 +89,13 @@ struct fb_par_valkyrie {
 struct fb_info_valkyrie {
 	struct fb_info		info;
 	struct fb_par_valkyrie	par;
-	struct cmap_regs	*cmap_regs;
+	struct cmap_regs	__iomem *cmap_regs;
 	unsigned long		cmap_regs_phys;
 	
-	struct valkyrie_regs	*valkyrie_regs;
+	struct valkyrie_regs	__iomem *valkyrie_regs;
 	unsigned long		valkyrie_regs_phys;
 	
-	__u8			*frame_buffer;
+	__u8			__iomem *frame_buffer;
 	unsigned long		frame_buffer_phys;
 	
 	int			sense;
@@ -142,7 +142,7 @@ static struct fb_ops valkyriefb_ops = {
 static int valkyriefb_set_par(struct fb_info *info)
 {
 	struct fb_info_valkyrie *p = (struct fb_info_valkyrie *) info;
-	volatile struct valkyrie_regs *valkyrie_regs = p->valkyrie_regs;
+	volatile struct valkyrie_regs __iomem *valkyrie_regs = p->valkyrie_regs;
 	struct fb_par_valkyrie *par = info->par;
 	struct valkyrie_regvals	*init;
 	int err;
@@ -207,13 +207,13 @@ static int valkyriefb_blank(int blank_mode, struct fb_info *info)
 		return 1;
 
 	switch (blank_mode) {
-	case 0:			/* unblank */
+	case FB_BLANK_UNBLANK:			/* unblank */
 		out_8(&p->valkyrie_regs->mode.r, init->mode);
 		break;
-	case 1:
+	case FB_BLANK_NORMAL:
 		return 1;	/* get caller to set CLUT to all black */
-	case VESA_VSYNC_SUSPEND+1:
-	case VESA_HSYNC_SUSPEND+1:
+	case FB_BLANK_VSYNC_SUSPEND:
+	case FB_BLANK_HSYNC_SUSPEND:
 		/*
 		 * [kps] Value extracted from MacOS. I don't know
 		 * whether this bit disables hsync or vsync, or
@@ -221,7 +221,7 @@ static int valkyriefb_blank(int blank_mode, struct fb_info *info)
 		 */
 		out_8(&p->valkyrie_regs->mode.r, init->mode | 0x40);
 		break;
-	case VESA_POWERDOWN+1:
+	case FB_BLANK_POWERDOWN:
 		out_8(&p->valkyrie_regs->mode.r, 0x66);
 		break;
 	}
@@ -232,7 +232,7 @@ static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			     u_int transp, struct fb_info *info)
 {
 	struct fb_info_valkyrie *p = (struct fb_info_valkyrie *) info;
-	volatile struct cmap_regs *cmap_regs = p->cmap_regs;
+	volatile struct cmap_regs __iomem *cmap_regs = p->cmap_regs;
 	struct fb_par_valkyrie *par = info->par;
 
 	if (regno > 255)
@@ -341,21 +341,23 @@ int __init valkyriefb_init(void)
 	cmap_regs_phys = 0x50f24000;
 	flags = IOMAP_NOCACHE_SER; /* IOMAP_WRITETHROUGH?? */
 #else /* ppc (!CONFIG_MAC) */
-	struct device_node *dp;
+	{
+		struct device_node *dp;
 
-	dp = find_devices("valkyrie");
-	if (dp == 0)
-		return 0;
+		dp = find_devices("valkyrie");
+		if (dp == 0)
+			return 0;
 
-	if (dp->n_addrs != 1) {
-		printk(KERN_ERR "expecting 1 address for valkyrie (got %d)\n",
-		       dp->n_addrs);
-		return 0;
+		if (dp->n_addrs != 1) {
+			printk(KERN_ERR "expecting 1 address for valkyrie (got %d)\n",
+			       dp->n_addrs);
+			return 0;
+		}
+
+		frame_buffer_phys = dp->addrs[0].address;
+		cmap_regs_phys = dp->addrs[0].address+0x304000;
+		flags = _PAGE_WRITETHRU;
 	}
-
-	frame_buffer_phys = dp->addrs[0].address;
-	cmap_regs_phys = dp->addrs[0].address+0x304000;
-	flags = _PAGE_WRITETHRU;
 #endif /* ppc (!CONFIG_MAC) */
 
 	p = kmalloc(sizeof(*p), GFP_ATOMIC);
@@ -544,7 +546,7 @@ static void valkyrie_par_to_fix(struct fb_par_valkyrie *par,
 static void __init valkyrie_init_info(struct fb_info *info, struct fb_info_valkyrie *p)
 {
 	info->fbops = &valkyriefb_ops;
-	info->screen_base = (char *) p->frame_buffer + 0x1000;
+	info->screen_base = p->frame_buffer + 0x1000;
 	info->flags = FBINFO_DEFAULT;
 	info->pseudo_palette = p->pseudo_palette;
 	fb_alloc_cmap(&info->cmap, 256, 0);

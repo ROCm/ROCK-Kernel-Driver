@@ -438,7 +438,7 @@ MODULE_AUTHOR("Maintainer: Justin T. Gibbs <gibbs@scsiguy.com>");
 MODULE_DESCRIPTION("Adaptec Aic77XX/78XX SCSI Host Bus Adapter driver");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_VERSION(AIC7XXX_DRIVER_VERSION);
-MODULE_PARM(aic7xxx, "s");
+module_param(aic7xxx, charp, 0444);
 MODULE_PARM_DESC(aic7xxx,
 "period delimited, options string.\n"
 "	verbose			Enable verbose/diagnostic logging\n"
@@ -845,7 +845,6 @@ ahc_linux_detect(Scsi_Host_Template *template)
 		return (0);
 	}
 	ahc_linux_size_nseg();
-#ifdef MODULE
 	/*
 	 * If we've been passed any parameters, process them now.
 	 */
@@ -857,7 +856,6 @@ ahc_linux_detect(Scsi_Host_Template *template)
 "aic7xxx: to see the proper way to specify options to the aic7xxx module\n"
 "aic7xxx: Specifically, don't use any commas when passing arguments to\n"
 "aic7xxx: insmod or else it might trash certain memory areas.\n");
-#endif
 
 	template->proc_name = "aic7xxx";
 

@@ -382,11 +382,10 @@ void __init smp_init_pSeries(void)
 		vpa_init(boot_cpuid);
 
 	/* Non-lpar has additional take/give timebase */
-	if (systemcfg->platform == PLATFORM_PSERIES) {
+	if (rtas_token("freeze-time-base") != RTAS_UNKNOWN_SERVICE) {
 		smp_ops->give_timebase = pSeries_give_timebase;
 		smp_ops->take_timebase = pSeries_take_timebase;
 	}
-
 
 	DBG(" <- smp_init_pSeries()\n");
 }

@@ -1,7 +1,7 @@
 /*
  * Common code to handle map devices which are simple RAM
  * (C) 2000 Red Hat. GPL'd.
- * $Id: map_ram.c,v 1.20 2004/08/09 13:19:43 dwmw2 Exp $
+ * $Id: map_ram.c,v 1.21 2004/11/16 18:29:00 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -124,7 +124,7 @@ static void mapram_nop(struct mtd_info *mtd)
 	/* Nothing to see here */
 }
 
-int __init map_ram_init(void)
+static int __init map_ram_init(void)
 {
 	register_mtd_chip_driver(&mapram_chipdrv);
 	return 0;
