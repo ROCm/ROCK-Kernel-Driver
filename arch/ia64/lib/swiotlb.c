@@ -243,7 +243,7 @@ unmap_single (struct device *hwdev, char *dma_addr, size_t size, int dir)
 	/*
 	 * First, sync the memory before unmapping the entry
 	 */
-	if ((dir == DMA_FROM_DEVICE) || (dir == DMA_BIDIRECTIONAL))
+	if (buffer && ((dir == DMA_FROM_DEVICE) || (dir == DMA_BIDIRECTIONAL)))
 		/*
 		 * bounce... copy the data back into the original buffer * and delete the
 		 * bounce buffer.
@@ -300,13 +300,27 @@ swiotlb_alloc_coherent (struct device *hwdev, size_t size, dma_addr_t *dma_handl
 {
 	unsigned long dev_addr;
 	void *ret;
+	int order = get_order(size);
 
 	/* XXX fix me: the DMA API should pass us an explicit DMA mask instead: */
 	flags |= GFP_DMA;
 
-	ret = (void *)__get_free_pages(flags, get_order(size));
+	ret = (void *)__get_free_pages(flags, order);
+	if (ret && address_needs_mapping(hwdev, virt_to_phys(ret))) {
+		/*
+		 * The allocated memory isn't reachable by the device.
+		 * Fall back on swiotlb_map_single().
+		 */
+		free_pages((unsigned long) ret, order);
+		ret = NULL;
+	}
 	if (!ret) {
-		 /* DMA_FROM_DEVICE is to avoid the memcpy in map_single */
+		/*
+		 * We are either out of memory or the device can't DMA
+		 * to GFP_DMA memory; fall back on
+		 * swiotlb_map_single(), which will grab memory from
+		 * the lowest available address range.
+		 */
 		dma_addr_t handle;
 		handle = swiotlb_map_single(NULL, NULL, size, DMA_FROM_DEVICE);
 		if (dma_mapping_error(handle))
@@ -586,7 +600,7 @@ swiotlb_dma_mapping_error (dma_addr_t dma_addr)
 int
 swiotlb_dma_supported (struct device *hwdev, u64 mask)
 {
-	return 1;
+	return (virt_to_phys (io_tlb_end) - 1) <= mask;
 }
 
 EXPORT_SYMBOL(swiotlb_init);
