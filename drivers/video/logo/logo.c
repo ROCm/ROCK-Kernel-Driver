@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/linux_logo.h>
+#include <linux/stddef.h>
 
 #ifdef CONFIG_M68K
 #include <asm/setup.h>
