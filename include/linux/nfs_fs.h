@@ -630,6 +630,7 @@ struct nfs4_lock_state {
 /* bits for nfs4_state->flags */
 enum {
 	LK_STATE_IN_USE,
+	NFS_DELEGATED_STATE,
 };
 
 struct nfs4_state {

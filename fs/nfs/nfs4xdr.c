@@ -180,16 +180,14 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_open_confirm_sz        (compound_decode_hdr_maxsz + \
                                         decode_putfh_maxsz + \
                                         op_decode_hdr_maxsz + 4)
-#define NFS4_enc_open_reclaim_sz	(compound_encode_hdr_maxsz + \
+#define NFS4_enc_open_noattr_sz	(compound_encode_hdr_maxsz + \
 					encode_putfh_maxsz + \
 					op_encode_hdr_maxsz + \
-					11 + \
-					encode_getattr_maxsz)
-#define NFS4_dec_open_reclaim_sz	(compound_decode_hdr_maxsz + \
+					11)
+#define NFS4_dec_open_noattr_sz	(compound_decode_hdr_maxsz + \
 					decode_putfh_maxsz + \
 					op_decode_hdr_maxsz + \
-					4 + 5 + 2 + 3 + \
-					decode_getattr_maxsz)
+					4 + 5 + 2 + 3)
 #define NFS4_enc_open_downgrade_sz \
 				(compound_encode_hdr_maxsz + \
                                 encode_putfh_maxsz + \
@@ -1425,13 +1423,13 @@ out:
 }
 
 /*
- * Encode an OPEN request
+ * Encode an OPEN request with no attributes.
  */
-static int nfs4_xdr_enc_open_reclaim(struct rpc_rqst *req, uint32_t *p, struct nfs_openargs *args)
+static int nfs4_xdr_enc_open_noattr(struct rpc_rqst *req, uint32_t *p, struct nfs_openargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
-		.nops   = 3,
+		.nops   = 2,
 	};
 	int status;
 
@@ -1441,9 +1439,6 @@ static int nfs4_xdr_enc_open_reclaim(struct rpc_rqst *req, uint32_t *p, struct n
 	if (status)
 		goto out;
 	status = encode_open(&xdr, args);
-	if (status)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
 out:
 	return status;
 }
@@ -3491,9 +3486,9 @@ out:
 }
 
 /*
- * Decode OPEN_RECLAIM response
+ * Decode OPEN response
  */
-static int nfs4_xdr_dec_open_reclaim(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
+static int nfs4_xdr_dec_open_noattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -3507,11 +3502,6 @@ static int nfs4_xdr_dec_open_reclaim(struct rpc_rqst *rqstp, uint32_t *p, struct
         if (status)
                 goto out;
         status = decode_open(&xdr, res);
-        if (status)
-                goto out;
-	status = decode_getfattr(&xdr, res->f_attr, res->server);
-	if (status == NFS4ERR_DELAY)
-		status = 0;
 out:
         return status;
 }
@@ -3993,7 +3983,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(COMMIT,		enc_commit,	dec_commit),
   PROC(OPEN,		enc_open,	dec_open),
   PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm),
-  PROC(OPEN_RECLAIM,	enc_open_reclaim,	dec_open_reclaim),
+  PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr),
   PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade),
   PROC(CLOSE,		enc_close,	dec_close),
   PROC(SETATTR,		enc_setattr,	dec_setattr),

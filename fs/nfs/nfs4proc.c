@@ -196,9 +196,6 @@ static int _nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *st
 {
 	struct inode *inode = state->inode;
 	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs_fattr fattr = {
-		.valid = 0,
-	};
 	struct nfs_openargs o_arg = {
 		.fh = NFS_FH(inode),
 		.seqid = sp->so_seqid,
@@ -209,11 +206,10 @@ static int _nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *st
 		.bitmask = server->attr_bitmask,
 	};
 	struct nfs_openres o_res = {
-		.f_attr = &fattr,
 		.server = server,	/* Grrr */
 	};
 	struct rpc_message msg = {
-		.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN_RECLAIM],
+		.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN_NOATTR],
 		.rpc_argp       = &o_arg,
 		.rpc_resp	= &o_res,
 		.rpc_cred	= sp->so_cred,
@@ -222,10 +218,17 @@ static int _nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *st
 
 	status = rpc_call_sync(server->client, &msg, 0);
 	nfs4_increment_seqid(status, sp);
-	if (status == 0)
+	if (status == 0) {
 		memcpy(&state->stateid, &o_res.stateid, sizeof(state->stateid));
-	/* Update the inode attributes */
-	nfs_refresh_inode(inode, &fattr);
+		if (o_res.delegation_type != 0) {
+			nfs_inode_set_delegation(inode, sp->so_cred, &o_res);
+			/* Did the server issue an immediate delegation recall? */
+			if (o_res.do_recall)
+				nfs_async_inode_return_delegation(inode, &o_res.stateid);
+		}
+	}
+	/* Ensure we update the inode attributes */
+	NFS_CACHEINV(inode);
 	return status;
 }
 
@@ -248,7 +251,76 @@ int nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *state)
 	return err;
 }
 
-static int _nfs4_proc_open_confirm(struct rpc_clnt *clnt, const struct nfs_fhandle *fh, struct nfs4_state_owner *sp, nfs4_stateid *stateid)
+static int _nfs4_open_delegation_recall(struct dentry *dentry, struct nfs4_state *state)
+{
+	struct nfs4_state_owner  *sp  = state->owner;
+	struct inode *inode = dentry->d_inode;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct dentry *parent = dget_parent(dentry);
+	struct nfs_openargs arg = {
+		.fh = NFS_FH(parent->d_inode),
+		.clientid = server->nfs4_state->cl_clientid,
+		.name = &dentry->d_name,
+		.id = sp->so_id,
+		.server = server,
+		.bitmask = server->attr_bitmask,
+		.claim = NFS4_OPEN_CLAIM_DELEGATE_CUR,
+	};
+	struct nfs_openres res = {
+		.server = server,
+	};
+	struct 	rpc_message msg = {
+		.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN_NOATTR],
+		.rpc_argp       = &arg,
+		.rpc_resp       = &res,
+		.rpc_cred	= sp->so_cred,
+	};
+	int status = 0;
+
+	down(&sp->so_sema);
+	if (!test_bit(NFS_DELEGATED_STATE, &state->flags))
+		goto out;
+	if (state->state == 0)
+		goto out;
+	arg.seqid = sp->so_seqid;
+	arg.open_flags = state->state;
+	memcpy(arg.u.delegation.data, state->stateid.data, sizeof(arg.u.delegation.data));
+	status = rpc_call_sync(server->client, &msg, 0);
+	nfs4_increment_seqid(status, sp);
+	if (status >= 0) {
+		memcpy(state->stateid.data, res.stateid.data,
+				sizeof(state->stateid.data));
+		clear_bit(NFS_DELEGATED_STATE, &state->flags);
+	}
+out:
+	up(&sp->so_sema);
+	dput(parent);
+	return status;
+}
+
+int nfs4_open_delegation_recall(struct dentry *dentry, struct nfs4_state *state)
+{
+	struct nfs4_exception exception = { };
+	struct nfs_server *server = NFS_SERVER(dentry->d_inode);
+	int err;
+	do {
+		err = _nfs4_open_delegation_recall(dentry, state);
+		switch (err) {
+			case 0:
+				return err;
+			case -NFS4ERR_STALE_CLIENTID:
+			case -NFS4ERR_STALE_STATEID:
+			case -NFS4ERR_EXPIRED:
+				/* Don't recall a delegation if it was lost */
+				nfs4_schedule_state_recovery(server->nfs4_state);
+				return err;
+		}
+		err = nfs4_handle_exception(server, err, &exception);
+	} while (exception.retry);
+	return err;
+}
+
+static int _nfs4_proc_open_confirm(struct rpc_clnt *clnt, const struct nfs_fh *fh, struct nfs4_state_owner *sp, nfs4_stateid *stateid)
 {
 	struct nfs_open_confirmargs arg = {
 		.fh             = fh,
