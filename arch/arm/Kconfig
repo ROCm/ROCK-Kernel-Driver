@@ -631,6 +631,8 @@ source "drivers/misc/Kconfig"
 
 source "drivers/usb/Kconfig"
 
+source "drivers/mmc/Kconfig"
+
 
 menu "Kernel hacking"
 
