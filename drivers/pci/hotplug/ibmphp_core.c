@@ -51,7 +51,7 @@
 int ibmphp_debug;
 
 static int debug;
-MODULE_PARM (debug, "i");
+module_param(debug, bool, 0644);
 MODULE_PARM_DESC (debug, "Debugging mode enabled or not");
 MODULE_LICENSE ("GPL");
 MODULE_DESCRIPTION (DRIVER_DESC);

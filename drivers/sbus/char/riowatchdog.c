@@ -59,7 +59,7 @@ static void *riowd_regs;
 #define WDTO_INDEX	0x05
 
 static int riowd_timeout = 1;		/* in minutes */
-MODULE_PARM(riowd_timeout,"i");
+module_param(riowd_timeout, int, 0);
 MODULE_PARM_DESC(riowd_timeout, "Watchdog timeout in minutes");
 
 #if 0 /* Currently unused. */

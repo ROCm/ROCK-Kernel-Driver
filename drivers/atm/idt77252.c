@@ -3873,10 +3873,10 @@ module_exit(idt77252_exit);
 
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(vpibits, "i");
+module_param(vpibits, uint, 0);
 MODULE_PARM_DESC(vpibits, "number of VPI bits supported (0, 1, or 2)");
 #ifdef CONFIG_ATM_IDT77252_DEBUG
-MODULE_PARM(debug, "i");
+module_param(debug, ulong, 0644);
 MODULE_PARM_DESC(debug,   "debug bitmap, see drivers/atm/idt77252.h");
 #endif
 

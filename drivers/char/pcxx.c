@@ -112,13 +112,13 @@ static int numports[]     = {0, 0, 0, 0};
 MODULE_AUTHOR("Bernhard Kaindl");
 MODULE_DESCRIPTION("Digiboard PC/X{i,e,eve} driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(verbose,     "i");
-MODULE_PARM(debug,       "i");
-MODULE_PARM(io,          "1-4i");
-MODULE_PARM(membase,     "1-4i");
-MODULE_PARM(memsize,     "1-4i");
-MODULE_PARM(altpin,      "1-4i");
-MODULE_PARM(numports,    "1-4i");
+module_param(verbose,     bool, 0644);
+module_param(debug,       bool, 0644);
+module_param_array(io,          int, NULL, 0);
+module_param_array(membase,     int, NULL, 0);
+module_param_array(memsize,     int, NULL, 0);
+module_param_array(altpin,      int, NULL, 0);
+module_param_array(numports,    int, NULL, 0);
 
 #endif /* MODULE */
 
@@ -148,7 +148,7 @@ static void pcxx_error(int, char *);
 static void pcxe_close(struct tty_struct *, struct file *);
 static int pcxe_ioctl(struct tty_struct *, struct file *, unsigned int, unsigned long);
 static void pcxe_set_termios(struct tty_struct *, struct termios *);
-static int pcxe_write(struct tty_struct *, int, const unsigned char *, int);
+static int pcxe_write(struct tty_struct *, const unsigned char *, int);
 static int pcxe_write_room(struct tty_struct *);
 static int pcxe_chars_in_buffer(struct tty_struct *);
 static void pcxe_flush_buffer(struct tty_struct *);
@@ -637,7 +637,7 @@ static int pcxe_write(struct tty_struct * tty, const unsigned char *buf, int cou
 
 static void pcxe_put_char(struct tty_struct *tty, unsigned char c)
 {
-	pcxe_write(tty, 0, &c, 1);
+	pcxe_write(tty, &c, 1);
 	return;
 }
 
