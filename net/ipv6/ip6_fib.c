@@ -515,7 +515,7 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nlmsghdr *nlh, 
 	int err = -ENOMEM;
 
 	fn = fib6_add_1(root, &rt->rt6i_dst.addr, sizeof(struct in6_addr),
-			rt->rt6i_dst.plen, (u8*) &rt->rt6i_dst - (u8*) rt);
+			rt->rt6i_dst.plen, offsetof(struct rt6_info, rt6i_dst));
 
 	if (fn == NULL)
 		goto out;
@@ -551,7 +551,7 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nlmsghdr *nlh, 
 
 			sn = fib6_add_1(sfn, &rt->rt6i_src.addr,
 					sizeof(struct in6_addr), rt->rt6i_src.plen,
-					(u8*) &rt->rt6i_src - (u8*) rt);
+					offsetof(struct rt6_info, rt6i_src));
 
 			if (sn == NULL) {
 				/* If it is failed, discard just allocated
@@ -572,7 +572,7 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt, struct nlmsghdr *nlh, 
 		} else {
 			sn = fib6_add_1(fn->subtree, &rt->rt6i_src.addr,
 					sizeof(struct in6_addr), rt->rt6i_src.plen,
-					(u8*) &rt->rt6i_src - (u8*) rt);
+					offsetof(struct rt6_info, rt6i_src));
 
 			if (sn == NULL)
 				goto st_failure;
@@ -681,14 +681,13 @@ struct fib6_node * fib6_lookup(struct fib6_node *root, struct in6_addr *daddr,
 			       struct in6_addr *saddr)
 {
 	struct lookup_args args[2];
-	struct rt6_info *rt = NULL;
 	struct fib6_node *fn;
 
-	args[0].offset = (u8*) &rt->rt6i_dst - (u8*) rt;
+	args[0].offset = offsetof(struct rt6_info, rt6i_dst);
 	args[0].addr = daddr;
 
 #ifdef CONFIG_IPV6_SUBTREES
-	args[1].offset = (u8*) &rt->rt6i_src - (u8*) rt;
+	args[1].offset = offsetof(struct rt6_info, rt6i_src);
 	args[1].addr = saddr;
 #endif
 
@@ -740,11 +739,10 @@ struct fib6_node * fib6_locate(struct fib6_node *root,
 			       struct in6_addr *daddr, int dst_len,
 			       struct in6_addr *saddr, int src_len)
 {
-	struct rt6_info *rt = NULL;
 	struct fib6_node *fn;
 
 	fn = fib6_locate_1(root, daddr, dst_len,
-			   (u8*) &rt->rt6i_dst - (u8*) rt);
+			   offsetof(struct rt6_info, rt6i_dst));
 
 #ifdef CONFIG_IPV6_SUBTREES
 	if (src_len) {
@@ -753,7 +751,7 @@ struct fib6_node * fib6_locate(struct fib6_node *root,
 			fn = fn->subtree;
 		if (fn)
 			fn = fib6_locate_1(fn, saddr, src_len,
-					   (u8*) &rt->rt6i_src - (u8*) rt);
+					   offsetof(struct rt6_info, rt6i_src));
 	}
 #endif
 
