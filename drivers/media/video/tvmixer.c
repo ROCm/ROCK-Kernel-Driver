@@ -217,8 +217,9 @@ static struct i2c_driver driver = {
 	.owner           = THIS_MODULE,
 	.name            = "tv card mixer driver",
         .id              = I2C_DRIVERID_TVMIXER,
-	.flags           = I2C_DF_DUMMY,
+	.flags           = I2C_DF_NOTIFY,
         .attach_adapter  = tvmixer_adapters,
+        .detach_adapter  = tvmixer_adapters,
         .detach_client   = tvmixer_clients,
 };
 
@@ -234,14 +235,15 @@ static struct file_operations tvmixer_fops = {
 
 static int tvmixer_adapters(struct i2c_adapter *adap)
 {
-	int i;
+	struct list_head  *item;
+	struct i2c_client *client;
 
 	if (debug)
 		printk("tvmixer: adapter %s\n",adap->dev.name);
-	for (i=0; i<I2C_CLIENT_MAX; i++) {
-		if (!adap->clients[i])
-			continue;
-		tvmixer_clients(adap->clients[i]);
+
+	list_for_each(item,&adap->clients) {
+		client = list_entry(item, struct i2c_client, list);
+		tvmixer_clients(client);
 	}
 	return 0;
 }
@@ -264,7 +266,8 @@ static int tvmixer_clients(struct i2c_client *client)
 			       client->adapter->dev.name);
 		return -1;
 	}
-	printk("tvmixer: debug: %s\n",client->dev.name);
+	if (debug)
+		printk("tvmixer: debug: %s\n",client->dev.name);
 
 	/* unregister ?? */
 	for (i = 0; i < DEV_MAX; i++) {

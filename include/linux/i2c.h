@@ -39,12 +39,6 @@
 
 /* --- General options ------------------------------------------------	*/
 
-#define I2C_ALGO_MAX	4		/* control memory consumption	*/
-#define I2C_ADAP_MAX	16
-#define I2C_DRIVER_MAX	16
-#define I2C_CLIENT_MAX	32
-#define I2C_DUMMY_MAX 4
-
 struct i2c_msg;
 struct i2c_algorithm;
 struct i2c_adapter;
@@ -131,6 +125,7 @@ struct i2c_driver {
 	 * i2c_attach_client.
 	 */
 	int (*attach_adapter)(struct i2c_adapter *);
+	int (*detach_adapter)(struct i2c_adapter *);
 
 	/* tells the driver that a client is about to be deleted & gives it 
 	 * the chance to remove its private data. Also, if the client struct
@@ -145,6 +140,7 @@ struct i2c_driver {
 	int (*command)(struct i2c_client *client,unsigned int cmd, void *arg);
 
 	struct device_driver driver;
+	struct list_head list;
 };
 #define to_i2c_driver(d) container_of(d, struct i2c_driver, driver)
 
@@ -169,6 +165,7 @@ struct i2c_client {
 	int usage_count;		/* How many accesses currently  */
 					/* to the client		*/
 	struct device dev;		/* the device structure		*/
+	struct list_head list;
 };
 #define to_i2c_client(d) container_of(d, struct i2c_client, dev)
 
@@ -236,11 +233,9 @@ struct i2c_adapter {
 	int (*client_unregister)(struct i2c_client *);
 
 	/* data fields that are valid for all devices	*/
-	struct semaphore bus;
-	struct semaphore list;  
+	struct semaphore bus_lock;
+	struct semaphore clist_lock;
 	unsigned int flags;/* flags specifying div. data		*/
-
-	struct i2c_client *clients[I2C_CLIENT_MAX];
 
 	int timeout;
 	int retries;
@@ -250,6 +245,10 @@ struct i2c_adapter {
 	/* No need to set this when you initialize the adapter          */
 	int inode;
 #endif /* def CONFIG_PROC_FS */
+
+	int nr;
+	struct list_head clients;
+	struct list_head list;
 };
 #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
 
@@ -265,7 +264,11 @@ static inline void i2c_set_adapdata (struct i2c_adapter *dev, void *data)
 
 /*flags for the driver struct: */
 #define I2C_DF_NOTIFY	0x01		/* notify on bus (de/a)ttaches 	*/
-#define I2C_DF_DUMMY	0x02		/* do not connect any clients */
+#if 0
+/* this flag is gone -- there is a (optional) driver->detach_adapter
+ * callback now which can be used instead */
+# define I2C_DF_DUMMY	0x02
+#endif
 
 /*flags for the client struct: */
 #define I2C_CLIENT_ALLOW_USE		0x01	/* Client allows access */
@@ -352,7 +355,8 @@ extern int i2c_control(struct i2c_client *,unsigned int, unsigned long);
  * or -1 if the adapter was not registered. 
  */
 extern int i2c_adapter_id(struct i2c_adapter *adap);
-
+extern struct i2c_adapter* i2c_get_adapter(int id);
+extern void i2c_put_adapter(struct i2c_adapter *adap);
 
 
 /* Return the functionality mask */
