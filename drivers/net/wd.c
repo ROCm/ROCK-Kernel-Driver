@@ -450,10 +450,11 @@ MODULE_PARM(io, "1-" __MODULE_STRING(MAX_WD_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_WD_CARDS) "i");
 MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_WD_CARDS) "i");
 MODULE_PARM(mem_end, "1-" __MODULE_STRING(MAX_WD_CARDS) "i");
-MODULE_PARM_DESC(io, "WD80x3 I/O base address(es)");
-MODULE_PARM_DESC(irq, "WD80x3 IRQ number(s) (ignored for PureData boards)");
-MODULE_PARM_DESC(mem, "WD80x3 memory base address(es)(ignored for PureData boards)");
-MODULE_PARM_DESC(mem_end, "WD80x3 memory end address(es)");
+MODULE_PARM_DESC(io, "I/O base address(es)");
+MODULE_PARM_DESC(irq, "IRQ number(s) (ignored for PureData boards)");
+MODULE_PARM_DESC(mem, "memory base address(es)(ignored for PureData boards)");
+MODULE_PARM_DESC(mem_end, "memory end address(es)");
+MODULE_DESCRIPTION("ISA Western Digital wd8003/wd8013 ; SMC Elite, Elite16 ethernet driver");
 MODULE_LICENSE("GPL");
 
 /* This is set up so that only a single autoprobe takes place per call.

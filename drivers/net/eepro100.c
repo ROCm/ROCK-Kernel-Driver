@@ -130,17 +130,17 @@ MODULE_PARM(rxdmacount, "i");
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(multicast_filter_limit, "i");
-MODULE_PARM_DESC(debug, "eepro100 debug level (0-6)");
-MODULE_PARM_DESC(options, "eepro100: Bits 0-3: tranceiver type, bit 4: full duplex, bit 5: 100Mbps");
-MODULE_PARM_DESC(full_duplex, "eepro100 full duplex setting(s) (1)");
-MODULE_PARM_DESC(congenb, "eepro100  Enable congestion control (1)");
-MODULE_PARM_DESC(txfifo, "eepro100 Tx FIFO threshold in 4 byte units, (0-15)");
-MODULE_PARM_DESC(rxfifo, "eepro100 Rx FIFO threshold in 4 byte units, (0-15)");
-MODULE_PARM_DESC(txdmaccount, "eepro100 Tx DMA burst length; 128 - disable (0-128)");
-MODULE_PARM_DESC(rxdmaccount, "eepro100 Rx DMA burst length; 128 - disable (0-128)");
-MODULE_PARM_DESC(rx_copybreak, "eepro100 copy breakpoint for copy-only-tiny-frames");
-MODULE_PARM_DESC(max_interrupt_work, "eepro100 maximum events handled per interrupt");
-MODULE_PARM_DESC(multicast_filter_limit, "eepro100 maximum number of filtered multicast addresses");
+MODULE_PARM_DESC(debug, "debug level (0-6)");
+MODULE_PARM_DESC(options, "Bits 0-3: tranceiver type, bit 4: full duplex, bit 5: 100Mbps");
+MODULE_PARM_DESC(full_duplex, "full duplex setting(s) (1)");
+MODULE_PARM_DESC(congenb, "Enable congestion control (1)");
+MODULE_PARM_DESC(txfifo, "Tx FIFO threshold in 4 byte units, (0-15)");
+MODULE_PARM_DESC(rxfifo, "Rx FIFO threshold in 4 byte units, (0-15)");
+MODULE_PARM_DESC(txdmaccount, "Tx DMA burst length; 128 - disable (0-128)");
+MODULE_PARM_DESC(rxdmaccount, "Rx DMA burst length; 128 - disable (0-128)");
+MODULE_PARM_DESC(rx_copybreak, "copy breakpoint for copy-only-tiny-frames");
+MODULE_PARM_DESC(max_interrupt_work, "maximum events handled per interrupt");
+MODULE_PARM_DESC(multicast_filter_limit, "maximum number of filtered multicast addresses");
 
 #define RUN_AT(x) (jiffies + (x))
 
