@@ -123,8 +123,8 @@ static struct usb_midi_device usb_midi_devices[] = {
 /* for Hot-Plugging */
 
 static struct usb_device_id usb_midi_ids [] = {
-	{ match_flags: (USB_DEVICE_ID_MATCH_INT_CLASS | USB_DEVICE_ID_MATCH_INT_SUBCLASS),
-	  bInterfaceClass: USB_CLASS_AUDIO, bInterfaceSubClass: USB_SUBCLASS_MIDISTREAMING},
+	{ .match_flags = (USB_DEVICE_ID_MATCH_INT_CLASS | USB_DEVICE_ID_MATCH_INT_SUBCLASS),
+	  .bInterfaceClass = USB_CLASS_AUDIO, .bInterfaceSubClass = USB_SUBCLASS_MIDISTREAMING},
 	{ USB_DEVICE( USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_UM1    ) },
 	{ USB_DEVICE( USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_UM2    ) },
 	{ USB_DEVICE( USB_VENDOR_ID_ROLAND, USBMIDI_ROLAND_UA100G ) },
