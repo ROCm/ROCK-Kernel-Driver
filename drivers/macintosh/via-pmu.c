@@ -568,7 +568,7 @@ init_pmu(void)
 	return 1;
 }
 
-int __pmac
+int
 pmu_get_model(void)
 {
 	return pmu_kind;
@@ -1193,7 +1193,7 @@ pmu_poll_adb(void)
 	if (disable_poll)
 		return;
 	/* Kicks ADB read when PMU is suspended */
-		adb_int_pending = 1;
+	adb_int_pending = 1;
 	do {
 		via_pmu_interrupt(0, 0, 0);
 	} while (pmu_suspended && (adb_int_pending || pmu_state != idle
@@ -1366,7 +1366,7 @@ next:
 #endif /* CONFIG_ADB */		
 		}
 	}
-		/* Sound/brightness button pressed */
+	/* Sound/brightness button pressed */
 	else if ((1 << pirq) & PMU_INT_SNDBRT) {
 #ifdef CONFIG_PMAC_BACKLIGHT
 		if (len == 3)
@@ -1375,7 +1375,7 @@ next:
 #endif /* CONFIG_INPUT_ADBHID */
 				set_backlight_level(data[1] >> 4);
 #endif /* CONFIG_PMAC_BACKLIGHT */
-		}
+	}
 	/* Tick interrupt */
 	else if ((1 << pirq) & PMU_INT_TICK) {
 #ifdef CONFIG_PMAC_PBOOK
@@ -1390,7 +1390,7 @@ next:
 	else if ((1 << pirq) & PMU_INT_ENVIRONMENT) {
 		if (pmu_battery_count)
 			query_battery_state();
-			pmu_pass_intr(data, len);
+		pmu_pass_intr(data, len);
 	} else
 	       pmu_pass_intr(data, len);
 
@@ -1522,7 +1522,7 @@ pmu_sr_intr(struct pt_regs *regs)
 			if (req->data[0] == PMU_SLEEP || req->data[0] == PMU_CPU_SPEED)
 				pmu_state = locked;
 			else
-			pmu_state = idle;
+				pmu_state = idle;
 			return req;
 		}
 		break;
@@ -1771,6 +1771,258 @@ int
 pmu_present(void)
 {
 	return via != 0;
+}
+
+struct pmu_i2c_hdr {
+	u8	bus;
+	u8	mode;
+	u8	bus2;
+	u8	address;
+	u8	sub_addr;
+	u8	comb_addr;
+	u8	count;
+};
+
+int
+pmu_i2c_combined_read(int bus, int addr, int subaddr,  u8* data, int len)
+{
+	struct adb_request	req;
+	struct pmu_i2c_hdr	*hdr = (struct pmu_i2c_hdr *)&req.data[1];
+	int retry;
+	int rc;
+
+	for (retry=0; retry<16; retry++) {
+		memset(&req, 0, sizeof(req));
+
+		hdr->bus = bus;
+		hdr->address = addr & 0xfe;
+		hdr->mode = PMU_I2C_MODE_COMBINED;
+		hdr->bus2 = 0;
+		hdr->sub_addr = subaddr;
+		hdr->comb_addr = addr | 1;
+		hdr->count = len;
+		
+		req.nbytes = sizeof(struct pmu_i2c_hdr) + 1;
+		req.reply_expected = 0;
+		req.reply_len = 0;
+		req.data[0] = PMU_I2C_CMD;
+		req.reply[0] = 0xff;
+		rc = pmu_queue_request(&req);
+		if (rc)
+			return rc;
+		while(!req.complete)
+			pmu_poll();
+		if (req.reply[0] == PMU_I2C_STATUS_OK)
+			break;
+		mdelay(15);
+	}
+	if (req.reply[0] != PMU_I2C_STATUS_OK)
+		return -1;
+
+	for (retry=0; retry<16; retry++) {
+		memset(&req, 0, sizeof(req));
+
+		mdelay(15);
+
+		hdr->bus = PMU_I2C_BUS_STATUS;
+		req.reply[0] = 0xff;
+		
+		req.nbytes = 2;
+		req.reply_expected = 0;
+		req.reply_len = 0;
+		req.data[0] = PMU_I2C_CMD;
+		rc = pmu_queue_request(&req);
+		if (rc)
+			return rc;
+		while(!req.complete)
+			pmu_poll();
+		if (req.reply[0] == PMU_I2C_STATUS_DATAREAD) {
+			memcpy(data, &req.reply[1], req.reply_len - 1);
+			return req.reply_len - 1;
+		}
+	}
+	return -1;
+}
+
+int
+pmu_i2c_stdsub_write(int bus, int addr, int subaddr,  u8* data, int len)
+{
+	struct adb_request	req;
+	struct pmu_i2c_hdr	*hdr = (struct pmu_i2c_hdr *)&req.data[1];
+	int retry;
+	int rc;
+
+	for (retry=0; retry<16; retry++) {
+		memset(&req, 0, sizeof(req));
+
+		hdr->bus = bus;
+		hdr->address = addr & 0xfe;
+		hdr->mode = PMU_I2C_MODE_STDSUB;
+		hdr->bus2 = 0;
+		hdr->sub_addr = subaddr;
+		hdr->comb_addr = addr & 0xfe;
+		hdr->count = len;
+
+		req.data[0] = PMU_I2C_CMD;
+		memcpy(&req.data[sizeof(struct pmu_i2c_hdr) + 1], data, len);
+		req.nbytes = sizeof(struct pmu_i2c_hdr) + len + 1;
+		req.reply_expected = 0;
+		req.reply_len = 0;
+		req.reply[0] = 0xff;
+		rc = pmu_queue_request(&req);
+		if (rc)
+			return rc;
+		while(!req.complete)
+			pmu_poll();
+		if (req.reply[0] == PMU_I2C_STATUS_OK)
+			break;
+		mdelay(15);
+	}
+	if (req.reply[0] != PMU_I2C_STATUS_OK)
+		return -1;
+
+	for (retry=0; retry<16; retry++) {
+		memset(&req, 0, sizeof(req));
+
+		mdelay(15);
+
+		hdr->bus = PMU_I2C_BUS_STATUS;
+		req.reply[0] = 0xff;
+		
+		req.nbytes = 2;
+		req.reply_expected = 0;
+		req.reply_len = 0;
+		req.data[0] = PMU_I2C_CMD;
+		rc = pmu_queue_request(&req);
+		if (rc)
+			return rc;
+		while(!req.complete)
+			pmu_poll();
+		if (req.reply[0] == PMU_I2C_STATUS_OK)
+			return len;
+	}
+	return -1;
+}
+
+int
+pmu_i2c_simple_read(int bus, int addr,  u8* data, int len)
+{
+	struct adb_request	req;
+	struct pmu_i2c_hdr	*hdr = (struct pmu_i2c_hdr *)&req.data[1];
+	int retry;
+	int rc;
+
+	for (retry=0; retry<16; retry++) {
+		memset(&req, 0, sizeof(req));
+
+		hdr->bus = bus;
+		hdr->address = addr | 1;
+		hdr->mode = PMU_I2C_MODE_SIMPLE;
+		hdr->bus2 = 0;
+		hdr->sub_addr = 0;
+		hdr->comb_addr = 0;
+		hdr->count = len;
+
+		req.data[0] = PMU_I2C_CMD;
+		req.nbytes = sizeof(struct pmu_i2c_hdr) + 1;
+		req.reply_expected = 0;
+		req.reply_len = 0;
+		req.reply[0] = 0xff;
+		rc = pmu_queue_request(&req);
+		if (rc)
+			return rc;
+		while(!req.complete)
+			pmu_poll();
+		if (req.reply[0] == PMU_I2C_STATUS_OK)
+			break;
+		mdelay(15);
+	}
+	if (req.reply[0] != PMU_I2C_STATUS_OK)
+		return -1;
+
+	for (retry=0; retry<16; retry++) {
+		memset(&req, 0, sizeof(req));
+
+		mdelay(15);
+
+		hdr->bus = PMU_I2C_BUS_STATUS;
+		req.reply[0] = 0xff;
+		
+		req.nbytes = 2;
+		req.reply_expected = 0;
+		req.reply_len = 0;
+		req.data[0] = PMU_I2C_CMD;
+		rc = pmu_queue_request(&req);
+		if (rc)
+			return rc;
+		while(!req.complete)
+			pmu_poll();
+		if (req.reply[0] == PMU_I2C_STATUS_DATAREAD) {
+			memcpy(data, &req.reply[1], req.reply_len - 1);
+			return req.reply_len - 1;
+		}
+	}
+	return -1;
+}
+
+int
+pmu_i2c_simple_write(int bus, int addr,  u8* data, int len)
+{
+	struct adb_request	req;
+	struct pmu_i2c_hdr	*hdr = (struct pmu_i2c_hdr *)&req.data[1];
+	int retry;
+	int rc;
+
+	for (retry=0; retry<16; retry++) {
+		memset(&req, 0, sizeof(req));
+
+		hdr->bus = bus;
+		hdr->address = addr & 0xfe;
+		hdr->mode = PMU_I2C_MODE_SIMPLE;
+		hdr->bus2 = 0;
+		hdr->sub_addr = 0;
+		hdr->comb_addr = 0;
+		hdr->count = len;
+
+		req.data[0] = PMU_I2C_CMD;
+		memcpy(&req.data[sizeof(struct pmu_i2c_hdr) + 1], data, len);
+		req.nbytes = sizeof(struct pmu_i2c_hdr) + len + 1;
+		req.reply_expected = 0;
+		req.reply_len = 0;
+		req.reply[0] = 0xff;
+		rc = pmu_queue_request(&req);
+		if (rc)
+			return rc;
+		while(!req.complete)
+			pmu_poll();
+		if (req.reply[0] == PMU_I2C_STATUS_OK)
+			break;
+		mdelay(15);
+	}
+	if (req.reply[0] != PMU_I2C_STATUS_OK)
+		return -1;
+
+	for (retry=0; retry<16; retry++) {
+		memset(&req, 0, sizeof(req));
+
+		mdelay(15);
+
+		hdr->bus = PMU_I2C_BUS_STATUS;
+		req.reply[0] = 0xff;
+		
+		req.nbytes = 2;
+		req.reply_expected = 0;
+		req.reply_len = 0;
+		req.data[0] = PMU_I2C_CMD;
+		rc = pmu_queue_request(&req);
+		if (rc)
+			return rc;
+		while(!req.complete)
+			pmu_poll();
+		if (req.reply[0] == PMU_I2C_STATUS_OK)
+			return len;
+	}
+	return -1;
 }
 
 #ifdef CONFIG_PMAC_PBOOK
@@ -2043,9 +2295,9 @@ static int __pmac
 pmac_suspend_devices(void)
 {
 	int ret;
-
+	
 	pm_prepare_console();
-
+	
 	/* Notify old-style device drivers & userland */
 	ret = broadcast_sleep(PBOOK_SLEEP_REQUEST, PBOOK_SLEEP_REJECT);
 	if (ret != PBOOK_SLEEP_OK) {
@@ -2075,14 +2327,14 @@ pmac_suspend_devices(void)
 		broadcast_wake();
 		return -EBUSY;
 	}
-
+	
 	/* Make sure the decrementer won't interrupt us */
 	asm volatile("mtdec %0" : : "r" (0x7fffffff));
 	/* Make sure any pending DEC interrupt occurring while we did
 	 * the above didn't re-enable the DEC */
 	mb();
 	asm volatile("mtdec %0" : : "r" (0x7fffffff));
-	
+
 	/* We can now disable MSR_EE. This code of course works properly only
 	 * on UP machines... For SMP, if we ever implement sleep, we'll have to
 	 * stop the "other" CPUs way before we do all that stuff.
@@ -2192,8 +2444,8 @@ powerbook_sleep_grackle(void)
 		_set_L2CR(save_l2cr & 0x7fffffff);
 
 	if (!__fake_sleep) {
-	/* Ask the PMU to put us to sleep */
-	pmu_request(&req, NULL, 5, PMU_SLEEP, 'M', 'A', 'T', 'T');
+		/* Ask the PMU to put us to sleep */
+		pmu_request(&req, NULL, 5, PMU_SLEEP, 'M', 'A', 'T', 'T');
 		pmu_wait_complete(&req);
 	}
 
@@ -2212,7 +2464,7 @@ powerbook_sleep_grackle(void)
 	if (__fake_sleep)
 		mdelay(5000);
 	else
-	low_sleep_handler();
+		low_sleep_handler();
 
 	/* We're awake again, stop grackle PM */
 	pci_read_config_word(grackle, 0x70, &pmcr1);
@@ -2264,7 +2516,7 @@ powerbook_sleep_Core99(void)
 		printk(KERN_ERR "Sleep rejected by devices\n");
 		return ret;
 	}
-
+	
 	/* Tell PMU what events will wake us up */
 	pmu_request(&req, NULL, 4, PMU_POWER_EVENTS, PMU_PWR_CLR_WAKEUP_EVENTS,
 		0xff, 0xff);
@@ -2778,6 +3030,10 @@ EXPORT_SYMBOL(pmu_wait_complete);
 EXPORT_SYMBOL(pmu_suspend);
 EXPORT_SYMBOL(pmu_resume);
 EXPORT_SYMBOL(pmu_unlock);
+EXPORT_SYMBOL(pmu_i2c_combined_read);
+EXPORT_SYMBOL(pmu_i2c_stdsub_write);
+EXPORT_SYMBOL(pmu_i2c_simple_read);
+EXPORT_SYMBOL(pmu_i2c_simple_write);
 #ifdef CONFIG_PMAC_PBOOK
 EXPORT_SYMBOL(pmu_register_sleep_notifier);
 EXPORT_SYMBOL(pmu_unregister_sleep_notifier);
