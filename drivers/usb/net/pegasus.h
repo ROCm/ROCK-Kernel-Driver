@@ -76,6 +76,7 @@ enum pegasus_registers {
 	EthTxStat0 = 0x2b,
 	EthTxStat1 = 0x2c,
 	EthRxStat = 0x2d,
+	WakeupControl = 0x78,
 	Reg7b = 0x7b,
 	Gpio0 = 0x7e,
 	Gpio1 = 0x7f,
@@ -90,6 +91,8 @@ typedef struct pegasus {
 	struct mii_if_info	mii;
 	unsigned		flags;
 	unsigned		features;
+	u32			msg_level;
+	u32			wolopts;
 	int			dev_index;
 	int			intr_interval;
 	struct tasklet_struct	rx_tl;

@@ -200,10 +200,9 @@ void inode_init_once(struct inode *inode)
 	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
 	rwlock_init(&inode->i_data.tree_lock);
 	spin_lock_init(&inode->i_data.i_mmap_lock);
-	atomic_set(&inode->i_data.truncate_count, 0);
 	INIT_LIST_HEAD(&inode->i_data.private_list);
 	spin_lock_init(&inode->i_data.private_lock);
-	INIT_PRIO_TREE_ROOT(&inode->i_data.i_mmap);
+	INIT_RAW_PRIO_TREE_ROOT(&inode->i_data.i_mmap);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap_nonlinear);
 	spin_lock_init(&inode->i_lock);
 	i_size_ordered_init(inode);
@@ -308,6 +307,14 @@ static int invalidate_list(struct list_head *head, struct list_head *dispose)
 	for (;;) {
 		struct list_head * tmp = next;
 		struct inode * inode;
+
+		/*
+		 * We can reschedule here without worrying about the list's
+		 * consistency because the per-sb list of inodes must not
+		 * change during umount anymore, and because iprune_sem keeps
+		 * shrink_icache_memory() away.
+		 */
+		cond_resched_lock(&inode_lock);
 
 		next = next->next;
 		if (tmp == head)
@@ -1136,19 +1143,6 @@ sector_t bmap(struct inode * inode, sector_t block)
 
 EXPORT_SYMBOL(bmap);
 
-/*
- * Return true if the filesystem which backs this inode considers the two
- * passed timespecs to be sufficiently different to warrant flushing the
- * altered time out to disk.
- */
-static int inode_times_differ(struct inode *inode,
-			struct timespec *old, struct timespec *new)
-{
-	if (IS_ONE_SECOND(inode))
-		return old->tv_sec != new->tv_sec;
-	return !timespec_equal(old, new);
-}
-
 /**
  *	update_atime	-	update the access time
  *	@inode: inode accessed
@@ -1168,8 +1162,8 @@ void update_atime(struct inode *inode)
 	if (IS_RDONLY(inode))
 		return;
 
-	now = current_kernel_time();
-	if (inode_times_differ(inode, &inode->i_atime, &now)) {
+	now = current_fs_time(inode->i_sb);
+	if (!timespec_equal(&inode->i_atime, &now)) {
 		inode->i_atime = now;
 		mark_inode_dirty_sync(inode);
 	} else {
@@ -1199,14 +1193,13 @@ void inode_update_time(struct inode *inode, int ctime_too)
 	if (IS_RDONLY(inode))
 		return;
 
-	now = current_kernel_time();
-
-	if (inode_times_differ(inode, &inode->i_mtime, &now))
+	now = current_fs_time(inode->i_sb);
+	if (!timespec_equal(&inode->i_mtime, &now))
 		sync_it = 1;
 	inode->i_mtime = now;
 
 	if (ctime_too) {
-		if (inode_times_differ(inode, &inode->i_ctime, &now))
+		if (!timespec_equal(&inode->i_ctime, &now))
 			sync_it = 1;
 		inode->i_ctime = now;
 	}
@@ -1322,14 +1315,21 @@ void __init inode_init_early(void)
 {
 	int loop;
 
+	/* If hashes are distributed across NUMA nodes, defer
+	 * hash allocation until vmalloc space is available.
+	 */
+	if (hashdist)
+		return;
+
 	inode_hashtable =
 		alloc_large_system_hash("Inode-cache",
 					sizeof(struct hlist_head),
 					ihash_entries,
 					14,
-					0,
+					HASH_EARLY,
 					&i_hash_shift,
-					&i_hash_mask);
+					&i_hash_mask,
+					0);
 
 	for (loop = 0; loop < (1 << i_hash_shift); loop++)
 		INIT_HLIST_HEAD(&inode_hashtable[loop]);
@@ -1337,10 +1337,29 @@ void __init inode_init_early(void)
 
 void __init inode_init(unsigned long mempages)
 {
+	int loop;
+
 	/* inode slab cache */
 	inode_cachep = kmem_cache_create("inode_cache", sizeof(struct inode),
 				0, SLAB_PANIC, init_once, NULL);
 	set_shrinker(DEFAULT_SEEKS, shrink_icache_memory);
+
+	/* Hash may have been set up in inode_init_early */
+	if (!hashdist)
+		return;
+
+	inode_hashtable =
+		alloc_large_system_hash("Inode-cache",
+					sizeof(struct hlist_head),
+					ihash_entries,
+					14,
+					0,
+					&i_hash_shift,
+					&i_hash_mask,
+					0);
+
+	for (loop = 0; loop < (1 << i_hash_shift); loop++)
+		INIT_HLIST_HEAD(&inode_hashtable[loop]);
 }
 
 void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)

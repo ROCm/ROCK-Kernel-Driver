@@ -655,11 +655,11 @@ asmlinkage void do_cpu(struct pt_regs *regs)
 		preempt_disable();
 
 		own_fpu();
-		if (used_math()) {	/* Using the FPU again.  */
+		if (current->used_math) {	/* Using the FPU again.  */
 			restore_fp(current);
 		} else {			/* First time FPU user.  */
 			init_fpu();
-			set_used_math();
+			current->used_math = 1;
 		}
 
 		if (!cpu_has_fpu) {

@@ -77,7 +77,7 @@ config CRYPTO_WP512
 	  Whirlpool will be part of the ISO/IEC 10118-3:2003(E) standard
 
 	  See also:
-	  http://planeta.terra.com.br/informatica/paulobarreto/WhirlpoolPage.html
+	  <http://planeta.terra.com.br/informatica/paulobarreto/WhirlpoolPage.html>
 
 config CRYPTO_DES
 	tristate "DES and Triple DES EDE cipher algorithms"
@@ -102,7 +102,7 @@ config CRYPTO_BLOWFISH
 	  designed for use on "large microprocessors".
 	  
 	  See also:
-	  http://www.schneier.com/blowfish.html
+	  <http://www.schneier.com/blowfish.html>
 
 config CRYPTO_TWOFISH
 	tristate "Twofish cipher algorithm"
@@ -116,7 +116,7 @@ config CRYPTO_TWOFISH
 	  bits.
 	  
 	  See also:
-	  http://www.schneier.com/twofish.html
+	  <http://www.schneier.com/twofish.html>
 
 config CRYPTO_SERPENT
 	tristate "Serpent cipher algorithm"
@@ -129,7 +129,7 @@ config CRYPTO_SERPENT
 	  variant of Serpent for compatibility with old kerneli code.
 
 	  See also:
-	  http://www.cl.cam.ac.uk/~rja14/serpent.html
+	  <http://www.cl.cam.ac.uk/~rja14/serpent.html>
 
 config CRYPTO_AES
 	tristate "AES cipher algorithms"
@@ -149,7 +149,7 @@ config CRYPTO_AES
 
 	  The AES specifies three key sizes: 128, 192 and 256 bits	  
 
-	  See http://csrc.nist.gov/CryptoToolkit/aes/ for more information.
+	  See <http://csrc.nist.gov/CryptoToolkit/aes/> for more information.
 
 config CRYPTO_AES_586
 	tristate "AES cipher algorithms (i586)"
@@ -169,7 +169,7 @@ config CRYPTO_AES_586
 
 	  The AES specifies three key sizes: 128, 192 and 256 bits	  
 
-	  See http://csrc.nist.gov/encryption/aes/ for more information.
+	  See <http://csrc.nist.gov/encryption/aes/> for more information.
 
 config CRYPTO_CAST5
 	tristate "CAST5 (CAST-128) cipher algorithm"
@@ -221,7 +221,7 @@ config CRYPTO_KHAZAD
 	  on 32-bit processors.  Khazad uses an 128 bit key size.
 
 	  See also:
-	  http://planeta.terra.com.br/informatica/paulobarreto/KhazadPage.html
+	  <http://planeta.terra.com.br/informatica/paulobarreto/KhazadPage.html>
 
 config CRYPTO_ANUBIS
 	tristate "Anubis cipher algorithm"
@@ -234,8 +234,8 @@ config CRYPTO_ANUBIS
 	  in the NESSIE competition.
 	  
 	  See also:
-	  https://www.cosic.esat.kuleuven.ac.be/nessie/reports/
-	  http://planeta.terra.com.br/informatica/paulobarreto/AnubisPage.html
+	  <https://www.cosic.esat.kuleuven.ac.be/nessie/reports/>
+	  <http://planeta.terra.com.br/informatica/paulobarreto/AnubisPage.html>
 
 
 config CRYPTO_DEFLATE

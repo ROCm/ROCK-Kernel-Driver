@@ -40,7 +40,7 @@ serial_init_chip(struct parisc_device *dev)
 		 * what we have here is a missing parent device, so tell
 		 * the user what they're missing.
 		 */
-		if (dev->parent->id.hw_type != HPHW_IOA) {
+		if (parisc_parent(dev)->id.hw_type != HPHW_IOA) {
 			printk(KERN_INFO "Serial: device 0x%lx not configured.\n"
 				"Enable support for Wax, Lasi, Asp or Dino.\n", dev->hpa);
 		}
@@ -65,7 +65,7 @@ serial_init_chip(struct parisc_device *dev)
 		printk(KERN_WARNING "serial8250_register_port returned error %d\n", err);
 		return err;
 	}
-
+        
 	return 0;
 }
 
@@ -99,13 +99,13 @@ static struct parisc_device_id lasi_tbl[] = {
 MODULE_DEVICE_TABLE(parisc, serial_tbl);
 
 static struct parisc_driver lasi_driver = {
-	.name		= "Lasi RS232",
+	.name		= "serial_1",
 	.id_table	= lasi_tbl,
 	.probe		= serial_init_chip,
 };
 
 static struct parisc_driver serial_driver = {
-	.name		= "Serial RS232",
+	.name		= "serial",
 	.id_table	= serial_tbl,
 	.probe		= serial_init_chip,
 };

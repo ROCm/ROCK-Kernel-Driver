@@ -43,6 +43,7 @@
   Paul Gortmaker	: Separate out Tx timeout code from Tx path.
   Paul Gortmaker	: Remove old unused single Tx buffer code.
   Hayato Fujiwara	: Add m32r support.
+  Paul Gortmaker	: use skb_padto() instead of stack scratch area
 
   Sources:
   The National Semiconductor LAN Databook, and the 3Com 3c503 databook.
@@ -272,11 +273,15 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	long e8390_base = dev->base_addr;
 	struct ei_device *ei_local = (struct ei_device *) netdev_priv(dev);
-	int length, send_length, output_page;
+	int send_length = skb->len, output_page;
 	unsigned long flags;
-	char scratch[ETH_ZLEN];
 
-	length = skb->len;
+	if (skb->len < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+		send_length = ETH_ZLEN;
+	}
 
 	/* Mask interrupts from the ethercard. 
 	   SMP: We have to grab the lock here otherwise the IRQ handler
@@ -298,8 +303,6 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	
 	ei_local->irqlock = 1;
 
-	send_length = ETH_ZLEN < length ? length : ETH_ZLEN;
-    
 	/*
 	 * We have two Tx slots available for use. Find the first free
 	 * slot, and then perform some sanity checks. With two Tx bufs,
@@ -344,13 +347,7 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * trigger the send later, upon receiving a Tx done interrupt.
 	 */
 	 
-	if (length == send_length)
-		ei_block_output(dev, length, skb->data, output_page);
-	else {
-		memset(scratch, 0, ETH_ZLEN);
-		memcpy(scratch, skb->data, skb->len);
-		ei_block_output(dev, ETH_ZLEN, scratch, output_page);
-	}
+	ei_block_output(dev, send_length, skb->data, output_page);
 		
 	if (! ei_local->txing) 
 	{
@@ -1114,7 +1111,6 @@ EXPORT_SYMBOL(ei_interrupt);
 #ifdef CONFIG_NET_POLL_CONTROLLER
 EXPORT_SYMBOL(ei_poll);
 #endif
-EXPORT_SYMBOL(ei_tx_timeout);
 EXPORT_SYMBOL(NS8390_init);
 EXPORT_SYMBOL(__alloc_ei_netdev);
 

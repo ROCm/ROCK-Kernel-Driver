@@ -36,7 +36,7 @@ struct ehci_stats {
 
 /* ehci_hcd->lock guards shared data against other CPUs:
  *   ehci_hcd:	async, reclaim, periodic (and shadow), ...
- *   hcd_dev:	ep[]
+ *   usb_host_endpoint: hcpriv
  *   ehci_qh:	qh_next, qtd_list
  *   ehci_qtd:	qtd_list
  *
@@ -47,13 +47,6 @@ struct ehci_stats {
 #define	EHCI_MAX_ROOT_PORTS	15		/* see HCS_N_PORTS */
 
 struct ehci_hcd {			/* one per controller */
-
-	/* glue to PCI and HCD framework */
-	struct usb_hcd		hcd;		/* must come first! */
-	struct ehci_caps __iomem *caps;
-	struct ehci_regs __iomem *regs;
-	__u32			hcs_params;	/* cached register copy */
-
 	spinlock_t		lock;
 
 	/* async schedule support */
@@ -91,6 +84,11 @@ struct ehci_hcd {			/* one per controller */
 
 	unsigned		is_arc_rh_tt:1;	/* ARC roothub with TT */
 
+	/* glue to PCI and HCD framework */
+	struct ehci_caps __iomem *caps;
+	struct ehci_regs __iomem *regs;
+	__u32			hcs_params;	/* cached register copy */
+
 	/* irq statistics */
 #ifdef EHCI_STATS
 	struct ehci_stats	stats;
@@ -100,8 +98,15 @@ struct ehci_hcd {			/* one per controller */
 #endif
 };
 
-/* unwrap an HCD pointer to get an EHCI_HCD pointer */ 
-#define hcd_to_ehci(hcd_ptr) container_of(hcd_ptr, struct ehci_hcd, hcd)
+/* convert between an HCD pointer and the corresponding EHCI_HCD */ 
+static inline struct ehci_hcd *hcd_to_ehci (struct usb_hcd *hcd)
+{
+	return (struct ehci_hcd *) (hcd->hcd_priv);
+}
+static inline struct usb_hcd *ehci_to_hcd (struct ehci_hcd *ehci)
+{
+	return container_of ((void *) ehci, struct usb_hcd, hcd_priv);
+}
 
 
 enum ehci_timer_action {
@@ -259,6 +264,30 @@ struct ehci_regs {
 #define PORT_CONNECT	(1<<0)		/* device connected */
 } __attribute__ ((packed));
 
+/* Appendix C, Debug port ... intended for use with special "debug devices"
+ * that can help if there's no serial console.  (nonstandard enumeration.)
+ */
+struct ehci_dbg_port {
+	u32	control;
+#define DBGP_OWNER	(1<<30)
+#define DBGP_ENABLED	(1<<28)
+#define DBGP_DONE	(1<<16)
+#define DBGP_INUSE	(1<<10)
+#define DBGP_ERRCODE(x)	(((x)>>7)&0x0f)
+#	define DBGP_ERR_BAD	1
+#	define DBGP_ERR_SIGNAL	2
+#define DBGP_ERROR	(1<<6)
+#define DBGP_GO		(1<<5)
+#define DBGP_OUT	(1<<4)
+#define DBGP_LEN(x)	(((x)>>0)&0x0f)
+	u32	pids;
+#define DBGP_PID_GET(x)		(((x)>>16)&0xff)
+#define DBGP_PID_SET(data,tok)	(((data)<<8)|(tok));
+	u32	data03;
+	u32	data47;
+	u32	address;
+#define DBGP_EPADDR(dev,ep)	(((dev)<<8)|(ep));
+} __attribute__ ((packed));
 
 /*-------------------------------------------------------------------------*/
 
@@ -430,6 +459,7 @@ struct ehci_iso_stream {
 	struct list_head	td_list;	/* queued itds/sitds */
 	struct list_head	free_list;	/* list of unused itds/sitds */
 	struct usb_device	*udev;
+ 	struct usb_host_endpoint *ep;
 
 	/* output of (re)scheduling */
 	unsigned long		start;		/* jiffies */

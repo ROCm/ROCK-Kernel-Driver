@@ -35,9 +35,9 @@
 
 
 /* List of all pfkey sockets. */
-HLIST_HEAD(pfkey_table);
+static HLIST_HEAD(pfkey_table);
 static DECLARE_WAIT_QUEUE_HEAD(pfkey_table_wait);
-static rwlock_t pfkey_table_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(pfkey_table_lock);
 static atomic_t pfkey_table_users = ATOMIC_INIT(0);
 
 static atomic_t pfkey_socks_nr = ATOMIC_INIT(0);
@@ -2344,7 +2344,7 @@ static u32 get_acqseq(void)
 {
 	u32 res;
 	static u32 acqseq;
-	static spinlock_t acqseq_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(acqseq_lock);
 
 	spin_lock_bh(&acqseq_lock);
 	res = (++acqseq ? : ++acqseq);

@@ -31,6 +31,7 @@
 #include <asm/rtas.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
+#include <asm/systemcfg.h>
 
 #undef DEBUG_NVRAM
 

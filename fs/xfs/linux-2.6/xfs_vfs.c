@@ -250,7 +250,7 @@ vfs_allocate( void )
 	vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
 	bhv_head_init(VFS_BHVHEAD(vfsp), "vfs");
 	INIT_LIST_HEAD(&vfsp->vfs_sync_list);
-	vfsp->vfs_sync_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&vfsp->vfs_sync_lock);
 	init_waitqueue_head(&vfsp->vfs_wait_sync_task);
 	init_waitqueue_head(&vfsp->vfs_wait_single_sync_task);
 	return vfsp;

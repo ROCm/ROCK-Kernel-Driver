@@ -18,29 +18,10 @@
  */
 
 #include <linux/config.h>
-#include <linux/errno.h>
-#include <linux/types.h>
-#include <linux/socket.h>
-#include <linux/in.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/timer.h>
-#include <linux/string.h>
-#include <linux/sockios.h>
-#include <linux/net.h>
-#include <linux/stat.h>
-#include <linux/inet.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
-#include <asm/system.h>
-#include <asm/uaccess.h>
-#include <linux/fcntl.h>
-#include <linux/termios.h>	/* For TIOCINQ/OUTQ */
-#include <linux/mm.h>
-#include <linux/interrupt.h>
-#include <linux/notifier.h>
-#include <linux/proc_fs.h>
 #include <linux/if_arp.h>
 #include <net/x25.h>
 
@@ -140,29 +121,6 @@ drop:
 	kfree_skb(skb);
 out:
 	return 0;
-}
-
-int x25_llc_receive_frame(struct sk_buff *skb, struct net_device *dev,
-			  struct packet_type *ptype)
-{
-	struct x25_neigh *nb;
-	int rc = 0;
-
-	skb->sk = NULL;
-
-	/*
-	 * Packet received from unrecognised device, throw it away.
-	 */
-	nb = x25_get_neigh(dev);
-	if (!nb) {
-		printk(KERN_DEBUG "X.25: unknown_neighbour - %s\n", dev->name);
-		kfree_skb(skb);
-	} else {
-		rc = x25_receive_data(skb, nb);
-		x25_neigh_put(nb);
-	}
-
-	return rc;
 }
 
 void x25_establish_link(struct x25_neigh *nb)

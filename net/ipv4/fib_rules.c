@@ -99,7 +99,7 @@ static struct fib_rule local_rule = {
 };
 
 static struct fib_rule *fib_rules = &local_rule;
-static rwlock_t fib_rules_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(fib_rules_lock);
 
 int inet_rtm_delrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg)
 {
@@ -119,7 +119,7 @@ int inet_rtm_delrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg)
 #endif
 		    (!rtm->rtm_type || rtm->rtm_type == r->r_action) &&
 		    (!rta[RTA_PRIORITY-1] || memcmp(RTA_DATA(rta[RTA_PRIORITY-1]), &r->r_preference, 4) == 0) &&
-		    (!rta[RTA_IIF-1] || strcmp(RTA_DATA(rta[RTA_IIF-1]), r->r_ifname) == 0) &&
+		    (!rta[RTA_IIF-1] || rtattr_strcmp(rta[RTA_IIF-1], r->r_ifname) == 0) &&
 		    (!rtm->rtm_table || (r && rtm->rtm_table == r->r_table))) {
 			err = -EPERM;
 			if (r == &local_rule)
@@ -209,8 +209,7 @@ int inet_rtm_newrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg)
 	new_r->r_table = table_id;
 	if (rta[RTA_IIF-1]) {
 		struct net_device *dev;
-		memcpy(new_r->r_ifname, RTA_DATA(rta[RTA_IIF-1]), IFNAMSIZ);
-		new_r->r_ifname[IFNAMSIZ-1] = 0;
+		rtattr_strlcpy(new_r->r_ifname, rta[RTA_IIF-1], IFNAMSIZ);
 		new_r->r_ifindex = -1;
 		dev = __dev_get_by_name(new_r->r_ifname);
 		if (dev)
@@ -243,12 +242,6 @@ int inet_rtm_newrule(struct sk_buff *skb, struct nlmsghdr* nlh, void *arg)
 	*rp = new_r;
 	write_unlock_bh(&fib_rules_lock);
 	return 0;
-}
-
-u32 fib_rules_map_destination(u32 daddr, struct fib_result *res)
-{
-	u32 mask = inet_make_mask(res->prefixlen);
-	return (daddr&~mask)|res->fi->fib_nh->nh_gw;
 }
 
 #ifdef CONFIG_NET_CLS_ROUTE
@@ -368,7 +361,7 @@ static int fib_rules_event(struct notifier_block *this, unsigned long event, voi
 }
 
 
-struct notifier_block fib_rules_notifier = {
+static struct notifier_block fib_rules_notifier = {
 	.notifier_call =fib_rules_event,
 };
 

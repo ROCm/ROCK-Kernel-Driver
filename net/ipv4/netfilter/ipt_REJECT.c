@@ -223,7 +223,6 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 static void send_unreach(struct sk_buff *skb_in, int code)
 {
 	struct iphdr *iph;
-	struct udphdr *udph;
 	struct icmphdr *icmph;
 	struct sk_buff *nskb;
 	u32 saddr;
@@ -257,26 +256,13 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 	if (skb_in->len < skb_in->nh.iph->ihl*4 + 8)
 		return;
 
-	/* if UDP checksum is set, verify it's correct */
-	if (iph->protocol == IPPROTO_UDP
-	    && skb_in->tail-(u8*)iph >= sizeof(struct udphdr)) {
-		int datalen = skb_in->len - (iph->ihl<<2);
-		udph = (struct udphdr *)((char *)iph + (iph->ihl<<2));
-		if (udph->check
-		    && csum_tcpudp_magic(iph->saddr, iph->daddr,
-		                         datalen, IPPROTO_UDP,
-		                         csum_partial((char *)udph, datalen,
-		                                      0)) != 0)
-			return;
-	}
-
 	/* If we send an ICMP error to an ICMP error a mess would result.. */
-	if (iph->protocol == IPPROTO_ICMP
-	    && skb_in->tail-(u8*)iph >= sizeof(struct icmphdr)) {
-		icmph = (struct icmphdr *)((char *)iph + (iph->ihl<<2));
+	if (iph->protocol == IPPROTO_ICMP) {
+		struct icmphdr ihdr;
 
-		if (skb_copy_bits(skb_in, skb_in->nh.iph->ihl*4,
-				  icmph, sizeof(*icmph)) < 0)
+		icmph = skb_header_pointer(skb_in, skb_in->nh.iph->ihl*4,
+					   sizeof(ihdr), &ihdr);
+		if (!icmph)
 			return;
 
 		/* Between echo-reply (0) and timestamp (13),

@@ -887,7 +887,7 @@ static int udf_rmdir(struct inode * dir, struct dentry * dentry)
 	inode->i_size = 0;
 	mark_inode_dirty(inode);
 	dir->i_nlink --;
-	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	inode->i_ctime = dir->i_ctime = dir->i_mtime = current_fs_time(dir->i_sb);
 	mark_inode_dirty(dir);
 
 end_rmdir:
@@ -928,7 +928,7 @@ static int udf_unlink(struct inode * dir, struct dentry * dentry)
 	retval = udf_delete_entry(dir, fi, &fibh, &cfi);
 	if (retval)
 		goto end_unlink;
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	dir->i_ctime = dir->i_mtime = current_fs_time(dir->i_sb);
 	mark_inode_dirty(dir);
 	inode->i_nlink--;
 	mark_inode_dirty(inode);
@@ -1158,7 +1158,7 @@ static int udf_link(struct dentry * old_dentry, struct inode * dir,
 		udf_release_data(fibh.ebh);
 	udf_release_data(fibh.sbh);
 	inode->i_nlink ++;
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = current_fs_time(inode->i_sb);
 	mark_inode_dirty(inode);
 	atomic_inc(&inode->i_count);
 	d_instantiate(dentry, inode);
@@ -1251,7 +1251,7 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 	 * Like most other Unix systems, set the ctime for inodes on a
 	 * rename.
 	 */
-	old_inode->i_ctime = CURRENT_TIME;
+	old_inode->i_ctime = current_fs_time(old_inode->i_sb);
 	mark_inode_dirty(old_inode);
 
 	/*
@@ -1269,10 +1269,10 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 	if (new_inode)
 	{
 		new_inode->i_nlink--;
-		new_inode->i_ctime = CURRENT_TIME;
+		new_inode->i_ctime = current_fs_time(new_inode->i_sb);
 		mark_inode_dirty(new_inode);
 	}
-	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
+	old_dir->i_ctime = old_dir->i_mtime = current_fs_time(old_dir->i_sb);
 	mark_inode_dirty(old_dir);
 
 	if (dir_fi)

@@ -16,7 +16,7 @@
 #include <asm/naca.h>
 #include <asm/abs_addr.h>
 #include <asm/iSeries/ItLpNaca.h>
-#include <asm/iSeries/ItLpPaca.h>
+#include <asm/lppaca.h>
 #include <asm/iSeries/ItLpRegSave.h>
 #include <asm/paca.h>
 #include <asm/iSeries/HvReleaseData.h>
@@ -41,86 +41,91 @@ struct ItLpQueue xItLpQueue __attribute__((__section__(".data")));
  */
 
 struct HvReleaseData hvReleaseData = {
-	0xc8a5d9c4,	/* desc = "HvRD" ebcdic */
-	sizeof(struct HvReleaseData),
-	offsetof(struct naca_struct, xItVpdAreas),
-	(struct naca_struct *)(NACA_VIRT_ADDR), /* 64-bit Naca address */
-	0x6000,		/* offset of LparMap within loadarea (see head.S) */
-	0,
-	1,		/* tags inactive       */
-	0,		/* 64 bit              */
-	0,		/* shared processors   */
-	0,		/* HMT allowed         */
-	6,		/* TEMP: This allows non-GA driver */
-	4,		/* We are v5r2m0               */
-	3,		/* Min supported PLIC = v5r1m0 */
-	3,		/* Min usable PLIC   = v5r1m0 */
-	{ 0xd3, 0x89, 0x95, 0xa4, /* "Linux 2.4   "*/
-	  0xa7, 0x40, 0xf2, 0x4b,
-	  0xf4, 0x4b, 0xf6, 0xf4 },
-	{0}  
+	.xDesc = 0xc8a5d9c4,	/* "HvRD" ebcdic */
+	.xSize = sizeof(struct HvReleaseData),
+	.xVpdAreasPtrOffset = offsetof(struct naca_struct, xItVpdAreas),
+	.xSlicNacaAddr = &naca,		/* 64-bit Naca address */
+	.xMsNucDataOffset = 0x6000,	/* offset of LparMap within loadarea (see head.S) */
+	.xTagsMode = 1,			/* tags inactive       */
+	.xAddressSize = 0,		/* 64 bit              */
+	.xNoSharedProcs = 0,		/* shared processors   */
+	.xNoHMT = 0,			/* HMT allowed         */
+	.xRsvd2 = 6,			/* TEMP: This allows non-GA driver */
+	.xVrmIndex = 4,			/* We are v5r2m0               */
+	.xMinSupportedPlicVrmIndex = 3,		/* v5r1m0 */
+	.xMinCompatablePlicVrmIndex = 3,	/* v5r1m0 */
+	.xVrmName = { 0xd3, 0x89, 0x95, 0xa4,	/* "Linux 2.4.64" ebcdic */
+		0xa7, 0x40, 0xf2, 0x4b,
+		0xf4, 0x4b, 0xf6, 0xf4 },
 };
 
-extern void SystemReset_Iseries(void);
-extern void MachineCheck_Iseries(void);
-extern void DataAccess_Iseries(void);
-extern void InstructionAccess_Iseries(void);
-extern void HardwareInterrupt_Iseries(void);
-extern void Alignment_Iseries(void);
-extern void ProgramCheck_Iseries(void);
-extern void FPUnavailable_Iseries(void);
-extern void Decrementer_Iseries(void);
-extern void Trap_0a_Iseries(void);
-extern void Trap_0b_Iseries(void);
-extern void SystemCall_Iseries(void);
-extern void SingleStep_Iseries(void);
-extern void Trap_0e_Iseries(void);
-extern void PerformanceMonitor_Iseries(void);
-extern void DataAccessSLB_Iseries(void);
-extern void InstructionAccessSLB_Iseries(void);
+extern void system_reset_iSeries(void);
+extern void machine_check_iSeries(void);
+extern void data_access_iSeries(void);
+extern void instruction_access_iSeries(void);
+extern void hardware_interrupt_iSeries(void);
+extern void alignment_iSeries(void);
+extern void program_check_iSeries(void);
+extern void fp_unavailable_iSeries(void);
+extern void decrementer_iSeries(void);
+extern void trap_0a_iSeries(void);
+extern void trap_0b_iSeries(void);
+extern void system_call_iSeries(void);
+extern void single_step_iSeries(void);
+extern void trap_0e_iSeries(void);
+extern void performance_monitor_iSeries(void);
+extern void data_access_slb_iSeries(void);
+extern void instruction_access_slb_iSeries(void);
 	
 struct ItLpNaca itLpNaca = {
-	0xd397d581,	/* desc = "LpNa" ebcdic */
-	0x0400,		/* size of ItLpNaca     */
-	0x0300, 19,	/* offset to int array, # ents */
-	0, 0, 0,	/* Part # of primary, serv, me */
-	0, 0x100,	/* # of LP queues, offset */
-	0, 0, 0,	/* Piranha stuff */
-	{ 0,0,0,0,0 },	/* reserved */
-	0,0,0,0,0,0,0,	/* stuff    */
-	{ 0,0,0,0,0 },	/* reserved */
-	0,		/* reserved */
-	0,		/* VRM index of PLIC */
-	0, 0,		/* min supported, compat SLIC */
-	0,		/* 64-bit addr of load area   */
-	0,		/* chunks for load area  */
-	0, 0,		/* PASE mask, seg table  */
-	{ 0 },		/* 64 reserved bytes  */
-	{ 0 }, 		/* 128 reserved bytes */
-	{ 0 }, 		/* Old LP Queue       */
-	{ 0 }, 		/* 384 reserved bytes */
-	{
-		(u64)SystemReset_Iseries,	/* 0x100 System Reset */
-		(u64)MachineCheck_Iseries,	/* 0x200 Machine Check */
-		(u64)DataAccess_Iseries,	/* 0x300 Data Access */
-		(u64)InstructionAccess_Iseries,	/* 0x400 Instruction Access */
-		(u64)HardwareInterrupt_Iseries,	/* 0x500 External */
-		(u64)Alignment_Iseries,		/* 0x600 Alignment */
-		(u64)ProgramCheck_Iseries,	/* 0x700 Program Check */
-		(u64)FPUnavailable_Iseries,	/* 0x800 FP Unavailable */
-		(u64)Decrementer_Iseries,	/* 0x900 Decrementer */
-		(u64)Trap_0a_Iseries,		/* 0xa00 Trap 0A */
-		(u64)Trap_0b_Iseries,		/* 0xb00 Trap 0B */
-		(u64)SystemCall_Iseries,	/* 0xc00 System Call */
-		(u64)SingleStep_Iseries,	/* 0xd00 Single Step */
-		(u64)Trap_0e_Iseries,		/* 0xe00 Trap 0E */
-		(u64)PerformanceMonitor_Iseries,/* 0xf00 Performance Monitor */
+	.xDesc = 0xd397d581,		/* "LpNa" ebcdic */
+	.xSize = 0x0400,		/* size of ItLpNaca */
+	.xIntHdlrOffset = 0x0300,	/* offset to int array */
+	.xMaxIntHdlrEntries = 19,	/* # ents */
+	.xPrimaryLpIndex = 0,		/* Part # of primary */
+	.xServiceLpIndex = 0,		/* Part # of serv */
+	.xLpIndex = 0,			/* Part # of me */
+	.xMaxLpQueues = 0,		/* # of LP queues */
+	.xLpQueueOffset = 0x100,	/* offset of start of LP queues */
+	.xPirEnvironMode = 0,		/* Piranha stuff */
+	.xPirConsoleMode = 0,
+	.xPirDasdMode = 0,
+	.xLparInstalled = 0,
+	.xSysPartitioned = 0,
+	.xHwSyncedTBs = 0,
+	.xIntProcUtilHmt = 0,
+	.xSpVpdFormat = 0,
+	.xIntProcRatio = 0,
+	.xPlicVrmIndex = 0,		/* VRM index of PLIC */
+	.xMinSupportedSlicVrmInd = 0,	/* min supported SLIC */
+	.xMinCompatableSlicVrmInd = 0,	/* min compat SLIC */
+	.xLoadAreaAddr = 0,		/* 64-bit addr of load area */
+	.xLoadAreaChunks = 0,		/* chunks for load area */
+	.xPaseSysCallCRMask = 0,	/* PASE mask */
+	.xSlicSegmentTablePtr = 0,	/* seg table */
+	.xOldLpQueue = { 0 }, 		/* Old LP Queue */
+	.xInterruptHdlr = {
+		(u64)system_reset_iSeries,	/* 0x100 System Reset */
+		(u64)machine_check_iSeries,	/* 0x200 Machine Check */
+		(u64)data_access_iSeries,	/* 0x300 Data Access */
+		(u64)instruction_access_iSeries, /* 0x400 Instruction Access */
+		(u64)hardware_interrupt_iSeries, /* 0x500 External */
+		(u64)alignment_iSeries,		/* 0x600 Alignment */
+		(u64)program_check_iSeries,	/* 0x700 Program Check */
+		(u64)fp_unavailable_iSeries,	/* 0x800 FP Unavailable */
+		(u64)decrementer_iSeries,	/* 0x900 Decrementer */
+		(u64)trap_0a_iSeries,		/* 0xa00 Trap 0A */
+		(u64)trap_0b_iSeries,		/* 0xb00 Trap 0B */
+		(u64)system_call_iSeries,	/* 0xc00 System Call */
+		(u64)single_step_iSeries,	/* 0xd00 Single Step */
+		(u64)trap_0e_iSeries,		/* 0xe00 Trap 0E */
+		(u64)performance_monitor_iSeries,/* 0xf00 Performance Monitor */
 		0,				/* int 0x1000 */
 		0,				/* int 0x1010 */
 		0,				/* int 0x1020 CPU ctls */
-		(u64)HardwareInterrupt_Iseries, /* SC Ret Hdlr */
-		(u64)DataAccessSLB_Iseries,	/* 0x380 D-SLB */
-		(u64)InstructionAccessSLB_Iseries /* 0x480 I-SLB */
+		(u64)hardware_interrupt_iSeries, /* SC Ret Hdlr */
+		(u64)data_access_slb_iSeries,	/* 0x380 D-SLB */
+		(u64)instruction_access_slb_iSeries /* 0x480 I-SLB */
 	}
 };
 EXPORT_SYMBOL(itLpNaca);
@@ -153,10 +158,8 @@ u64    xMsVpd[3400] __attribute__((__section__(".data")));
 u64    xRecoveryLogBuffer[32] __attribute__((__section__(".data")));
 
 struct SpCommArea xSpCommArea = {
-	0xE2D7C3C2,
-	1,
-	{0},
-	0, 0, 0, 0, {0}
+	.xDesc = 0xE2D7C3C2,
+	.xFormat = 1,
 };
 
 /* The LparMap data is now located at offset 0x6000 in head.S
@@ -168,22 +171,21 @@ struct SpCommArea xSpCommArea = {
  * offset into the Naca of the pointer to the ItVpdAreas.
  */
 struct ItVpdAreas itVpdAreas = {
-	0xc9a3e5c1,	/* "ItVA" */
-	sizeof( struct ItVpdAreas ),
-	0, 0,
-	26,		/* # VPD array entries */
-	10,		/* # DMA array entries */
-	NR_CPUS*2, maxPhysicalProcessors,	/* Max logical, physical procs */
-	offsetof(struct ItVpdAreas,xPlicDmaToks),/* offset to DMA toks */
-	offsetof(struct ItVpdAreas,xSlicVpdAdrs),/* offset to VPD addrs */
-	offsetof(struct ItVpdAreas,xPlicDmaLens),/* offset to DMA lens */
-	offsetof(struct ItVpdAreas,xSlicVpdLens),/* offset to VPD lens */
-	0,		/* max slot labels */
-	1,		/* max LP queues */
-	{0}, {0},	/* reserved */
-	{0},		/* DMA lengths */
-	{0},		/* DMA tokens */
-	{		/* VPD lengths */
+	.xSlicDesc = 0xc9a3e5c1,		/* "ItVA" */
+	.xSlicSize = sizeof(struct ItVpdAreas),
+	.xSlicVpdEntries = ItVpdMaxEntries,	/* # VPD array entries */
+	.xSlicDmaEntries = ItDmaMaxEntries,	/* # DMA array entries */
+	.xSlicMaxLogicalProcs = NR_CPUS * 2,	/* Max logical procs */
+	.xSlicMaxPhysicalProcs = maxPhysicalProcessors,	/* Max physical procs */
+	.xSlicDmaToksOffset = offsetof(struct ItVpdAreas, xPlicDmaToks),
+	.xSlicVpdAdrsOffset = offsetof(struct ItVpdAreas, xSlicVpdAdrs),
+	.xSlicDmaLensOffset = offsetof(struct ItVpdAreas, xPlicDmaLens),
+	.xSlicVpdLensOffset = offsetof(struct ItVpdAreas, xSlicVpdLens),
+	.xSlicMaxSlotLabels = 0,		/* max slot labels */
+	.xSlicMaxLpQueues = 1,			/* max LP queues */
+	.xPlicDmaLens = { 0 },			/* DMA lengths */
+	.xPlicDmaToks = { 0 },			/* DMA tokens */
+	.xSlicVpdLens = {			/* VPD lengths */
 	        0,0,0,		        /*  0 - 2 */
 		sizeof(xItExtVpdPanel), /*       3 Extended VPD   */
 		sizeof(struct paca_struct),	/*       4 length of Paca  */
@@ -201,7 +203,7 @@ struct ItVpdAreas itVpdAreas = {
 		sizeof(struct ItLpQueue),/*     23 length of Lp Queue */
 		0,0			/* 24 - 25 */
 		},
-	{			/* VPD addresses */
+	.xSlicVpdAdrs = {			/* VPD addresses */
 		0,0,0,  		/*	 0 -  2 */
 		&xItExtVpdPanel,        /*       3 Extended VPD */
 		&paca[0],		/*       4 first Paca */

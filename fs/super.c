@@ -85,6 +85,7 @@ static struct super_block *alloc_super(void)
 		s->dq_op = sb_dquot_ops;
 		s->s_qcop = sb_quotactl_ops;
 		s->s_op = &default_op;
+		s->s_time_gran = 1000000000;
 	}
 out:
 	return s;
@@ -233,10 +234,10 @@ void generic_shutdown_super(struct super_block *sb)
 		dput(root);
 		fsync_super(sb);
 		lock_super(sb);
-		lock_kernel();
 		sb->s_flags &= ~MS_ACTIVE;
 		/* bad name - it should be evict_inodes() */
 		invalidate_inodes(sb);
+		lock_kernel();
 
 		if (sop->write_super && sb->s_dirt)
 			sop->write_super(sb);

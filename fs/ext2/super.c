@@ -203,6 +203,11 @@ static void ext2_clear_inode(struct inode *inode)
 }
 
 
+#ifdef CONFIG_QUOTA
+static ssize_t ext2_quota_read(struct super_block *sb, int type, char *data, size_t len, loff_t off);
+static ssize_t ext2_quota_write(struct super_block *sb, int type, const char *data, size_t len, loff_t off);
+#endif
+
 static struct super_operations ext2_sops = {
 	.alloc_inode	= ext2_alloc_inode,
 	.destroy_inode	= ext2_destroy_inode,
@@ -214,6 +219,10 @@ static struct super_operations ext2_sops = {
 	.statfs		= ext2_statfs,
 	.remount_fs	= ext2_remount,
 	.clear_inode	= ext2_clear_inode,
+#ifdef CONFIG_QUOTA
+	.quota_read	= ext2_quota_read,
+	.quota_write	= ext2_quota_write,
+#endif
 };
 
 /* Yes, most of these are left as NULL!!
@@ -595,7 +604,6 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	es = (struct ext2_super_block *) (((char *)bh->b_data) + offset);
 	sbi->s_es = es;
 	sb->s_magic = le16_to_cpu(es->s_magic);
-	sb->s_flags |= MS_ONE_SECOND;
 
 	if (sb->s_magic != EXT2_SUPER_MAGIC)
 		goto cantfind_ext2;
@@ -1003,6 +1011,111 @@ static struct super_block *ext2_get_sb(struct file_system_type *fs_type,
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, ext2_fill_super);
 }
+
+#ifdef CONFIG_QUOTA
+
+/* Read data from quotafile - avoid pagecache and such because we cannot afford
+ * acquiring the locks... As quota files are never truncated and quota code
+ * itself serializes the operations (and noone else should touch the files)
+ * we don't have to be afraid of races */
+static ssize_t ext2_quota_read(struct super_block *sb, int type, char *data,
+			       size_t len, loff_t off)
+{
+	struct inode *inode = sb_dqopt(sb)->files[type];
+	sector_t blk = off >> EXT2_BLOCK_SIZE_BITS(sb);
+	int err = 0;
+	int offset = off & (sb->s_blocksize - 1);
+	int tocopy;
+	size_t toread;
+	struct buffer_head tmp_bh;
+	struct buffer_head *bh;
+	loff_t i_size = i_size_read(inode);
+
+	if (off > i_size)
+		return 0;
+	if (off+len > i_size)
+		len = i_size-off;
+	toread = len;
+	while (toread > 0) {
+		tocopy = sb->s_blocksize - offset < toread ?
+				sb->s_blocksize - offset : toread;
+
+		tmp_bh.b_state = 0;
+		err = ext2_get_block(inode, blk, &tmp_bh, 0);
+		if (err)
+			return err;
+		if (!buffer_mapped(&tmp_bh))	/* A hole? */
+			memset(data, 0, tocopy);
+		else {
+			bh = sb_bread(sb, tmp_bh.b_blocknr);
+			if (!bh)
+				return -EIO;
+			memcpy(data, bh->b_data+offset, tocopy);
+			brelse(bh);
+		}
+		offset = 0;
+		toread -= tocopy;
+		data += tocopy;
+		blk++;
+	}
+	return len;
+}
+
+/* Write to quotafile */
+static ssize_t ext2_quota_write(struct super_block *sb, int type,
+				const char *data, size_t len, loff_t off)
+{
+	struct inode *inode = sb_dqopt(sb)->files[type];
+	sector_t blk = off >> EXT2_BLOCK_SIZE_BITS(sb);
+	int err = 0;
+	int offset = off & (sb->s_blocksize - 1);
+	int tocopy;
+	size_t towrite = len;
+	struct buffer_head tmp_bh;
+	struct buffer_head *bh;
+
+	down(&inode->i_sem);
+	while (towrite > 0) {
+		tocopy = sb->s_blocksize - offset < towrite ?
+				sb->s_blocksize - offset : towrite;
+
+		tmp_bh.b_state = 0;
+		err = ext2_get_block(inode, blk, &tmp_bh, 1);
+		if (err)
+			goto out;
+		if (offset || tocopy != EXT2_BLOCK_SIZE(sb))
+			bh = sb_bread(sb, tmp_bh.b_blocknr);
+		else
+			bh = sb_getblk(sb, tmp_bh.b_blocknr);
+		if (!bh) {
+			err = -EIO;
+			goto out;
+		}
+		lock_buffer(bh);
+		memcpy(bh->b_data+offset, data, tocopy);
+		flush_dcache_page(bh->b_page);
+		set_buffer_uptodate(bh);
+		mark_buffer_dirty(bh);
+		unlock_buffer(bh);
+		brelse(bh);
+		offset = 0;
+		towrite -= tocopy;
+		data += tocopy;
+		blk++;
+	}
+out:
+	if (len == towrite)
+		return err;
+	if (inode->i_size < off+len-towrite)
+		i_size_write(inode, off+len-towrite);
+	inode->i_version++;
+	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	mark_inode_dirty(inode);
+	up(&inode->i_sem);
+	return len - towrite;
+}
+
+#endif
 
 static struct file_system_type ext2_fs_type = {
 	.owner		= THIS_MODULE,

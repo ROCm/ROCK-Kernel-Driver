@@ -15,7 +15,6 @@
 #include <linux/user.h>
 #include <linux/security.h>
 #include <linux/audit.h>
-#include <linux/proc_mm.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -42,6 +41,12 @@
  * Offset of eflags on child stack..
  */
 #define EFL_OFFSET ((EFL-2)*4-sizeof(struct pt_regs))
+
+static inline struct pt_regs *get_child_regs(struct task_struct *task)
+{
+	void *stack_top = (void *)task->thread.esp0;
+	return stack_top - sizeof(struct pt_regs);
+}
 
 /*
  * this routine will get a word off of the processes privileged stack. 
@@ -139,24 +144,119 @@ static unsigned long getreg(struct task_struct *child,
 	return retval;
 }
 
+#define LDT_SEGMENT 4
+
+static unsigned long convert_eip_to_linear(struct task_struct *child, struct pt_regs *regs)
+{
+	unsigned long addr, seg;
+
+	addr = regs->eip;
+	seg = regs->xcs & 0xffff;
+	if (regs->eflags & VM_MASK) {
+		addr = (addr & 0xffff) + (seg << 4);
+		return addr;
+	}
+
+	/*
+	 * We'll assume that the code segments in the GDT
+	 * are all zero-based. That is largely true: the
+	 * TLS segments are used for data, and the PNPBIOS
+	 * and APM bios ones we just ignore here.
+	 */
+	if (seg & LDT_SEGMENT) {
+		u32 *desc;
+		unsigned long base;
+
+		down(&child->mm->context.sem);
+		desc = child->mm->context.ldt + (seg & ~7);
+		base = (desc[0] >> 16) | ((desc[1] & 0xff) << 16) | (desc[1] & 0xff000000);
+
+		/* 16-bit code segment? */
+		if (!((desc[1] >> 22) & 1))
+			addr &= 0xffff;
+		addr += base;
+		up(&child->mm->context.sem);
+	}
+	return addr;
+}
+
+static inline int is_at_popf(struct task_struct *child, struct pt_regs *regs)
+{
+	int i, copied;
+	unsigned char opcode[16];
+	unsigned long addr = convert_eip_to_linear(child, regs);
+
+	copied = access_process_vm(child, addr, opcode, sizeof(opcode), 0);
+	for (i = 0; i < copied; i++) {
+		switch (opcode[i]) {
+		/* popf */
+		case 0x9d:
+			return 1;
+		/* opcode and address size prefixes */
+		case 0x66: case 0x67:
+			continue;
+		/* irrelevant prefixes (segment overrides and repeats) */
+		case 0x26: case 0x2e:
+		case 0x36: case 0x3e:
+		case 0x64: case 0x65:
+		case 0xf0: case 0xf2: case 0xf3:
+			continue;
+
+		/*
+		 * pushf: NOTE! We should probably not let
+		 * the user see the TF bit being set. But
+		 * it's more pain than it's worth to avoid
+		 * it, and a debugger could emulate this
+		 * all in user space if it _really_ cares.
+		 */
+		case 0x9c:
+		default:
+			return 0;
+		}
+	}
+	return 0;
+}
+
 static void set_singlestep(struct task_struct *child)
 {
-	long eflags;
+	struct pt_regs *regs = get_child_regs(child);
 
+	/*
+	 * Always set TIF_SINGLESTEP - this guarantees that 
+	 * we single-step system calls etc..  This will also
+	 * cause us to set TF when returning to user mode.
+	 */
 	set_tsk_thread_flag(child, TIF_SINGLESTEP);
-	eflags = get_stack_long(child, EFL_OFFSET);
-	put_stack_long(child, EFL_OFFSET, eflags | TRAP_FLAG);
+
+	/*
+	 * If TF was already set, don't do anything else
+	 */
+	if (regs->eflags & TRAP_FLAG)
+		return;
+
+	/* Set TF on the kernel stack.. */
+	regs->eflags |= TRAP_FLAG;
+
+	/*
+	 * ..but if TF is changed by the instruction we will trace,
+	 * don't mark it as being "us" that set it, so that we
+	 * won't clear it by hand later.
+	 */
+	if (is_at_popf(child, regs))
+		return;
+	
 	child->ptrace |= PT_DTRACE;
 }
 
 static void clear_singlestep(struct task_struct *child)
 {
-	if (child->ptrace & PT_DTRACE) {
-		long eflags;
+	/* Always clear TIF_SINGLESTEP... */
+	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 
-		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
-		eflags = get_stack_long(child, EFL_OFFSET);
-		put_stack_long(child, EFL_OFFSET, eflags & ~TRAP_FLAG);
+	/* But touch TF only if it was set by us.. */
+	if (child->ptrace & PT_DTRACE) {
+		struct pt_regs *regs = get_child_regs(child);
+		regs->eflags &= ~TRAP_FLAG;
 		child->ptrace &= ~PT_DTRACE;
 	}
 }
@@ -407,27 +507,15 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		  }
 		  break;
 
-	case PTRACE_SYSEMU:	/* continue and stop at next syscall, which will not be executed */
 	case PTRACE_SYSCALL:	/* continue and stop at next (return from) syscall */
 	case PTRACE_CONT:	/* restart after signal. */
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		/* If we came here with PTRACE_SYSEMU and now continue with
-		 * PTRACE_SYSCALL, entry.S used to intercept the syscall return.
-		 * But it shouldn't!
-		 * So we don't clear TIF_SYSCALL_EMU, which is always unused in
-		 * this special case, to remember, we came from SYSEMU. That
-		 * flag will be cleared by do_syscall_trace().
-		 */
-		if (request == PTRACE_SYSEMU) {
-			set_tsk_thread_flag(child, TIF_SYSCALL_EMU);
-		} else if (request == PTRACE_CONT) {
-			clear_tsk_thread_flag(child, TIF_SYSCALL_EMU);
-		}
 		if (request == PTRACE_SYSCALL) {
 			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
-		} else {
+		}
+		else {
 			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		}
 		child->exit_code = data;
@@ -456,8 +544,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		/*See do_syscall_trace to know why we don't clear
-		 * TIF_SYSCALL_EMU.*/
 		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		set_singlestep(child);
 		child->exit_code = data;
@@ -506,7 +592,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		}
 		ret = 0;
-		if (!tsk_used_math(child))
+		if (!child->used_math)
 			init_fpu(child);
 		get_fpregs((struct user_i387_struct __user *)data, child);
 		break;
@@ -518,7 +604,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		set_stopped_child_used_math(child);
+		child->used_math = 1;
 		set_fpregs(child, (struct user_i387_struct __user *)data);
 		ret = 0;
 		break;
@@ -530,7 +616,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		if (!tsk_used_math(child))
+		if (!child->used_math)
 			init_fpu(child);
 		ret = get_fpxregs((struct user_fxsr_struct __user *)data, child);
 		break;
@@ -542,7 +628,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			break;
 		}
-		set_stopped_child_used_math(child);
+		child->used_math = 1;
 		ret = set_fpxregs(child, (struct user_fxsr_struct __user *)data);
 		break;
 	}
@@ -557,56 +643,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 					(struct user_desc __user *) data);
 		break;
 
-#ifdef CONFIG_PROC_MM
-	case PTRACE_FAULTINFO: {
-		struct ptrace_faultinfo fault;
-
-		fault = ((struct ptrace_faultinfo)
-			{ .is_write	= child->thread.error_code,
-			  .addr		= child->thread.cr2 });
-		ret = copy_to_user((unsigned long *) data, &fault,
-				   sizeof(fault));
-		if(ret)
-			break;
-		break;
-	}
-
-	case PTRACE_SIGPENDING:
-		ret = copy_to_user((unsigned long *) data,
-				   &child->pending.signal,
-				   sizeof(child->pending.signal));
-		break;
-
-	case PTRACE_LDT: {
-		struct ptrace_ldt ldt;
-
-		if(copy_from_user(&ldt, (unsigned long *) data,
-				  sizeof(ldt))){
-			ret = -EIO;
-			break;
-		}
-		ret = modify_ldt(child->mm, ldt.func, ldt.ptr, ldt.bytecount);
-		break;
-	}
-
-	case PTRACE_SWITCH_MM: {
-		struct mm_struct *old = child->mm;
-		struct mm_struct *new = proc_mm_get_mm(data);
-
-		if(IS_ERR(new)){
-			ret = PTR_ERR(new);
-			break;
-		}
-
-		atomic_inc(&new->mm_users);
-		child->mm = new;
-		child->active_mm = new;
-		mmput(old);
-		ret = 0;
-		break;
-	}
-#endif
-
 	default:
 		ret = ptrace_request(child, request, addr, data);
 		break;
@@ -618,13 +654,30 @@ out:
 	return ret;
 }
 
+void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code)
+{
+	struct siginfo info;
+
+	tsk->thread.trap_no = 1;
+	tsk->thread.error_code = error_code;
+
+	memset(&info, 0, sizeof(info));
+	info.si_signo = SIGTRAP;
+	info.si_code = TRAP_BRKPT;
+
+	/* User-mode eip? */
+	info.si_addr = user_mode(regs) ? (void __user *) regs->eip : NULL;
+
+	/* Send us the fakey SIGTRAP */
+	force_sig_info(SIGTRAP, &info, tsk);
+}
+
 /* notification of system call entry/exit
  * - triggered by current->work.syscall_trace
  */
 __attribute__((regparm(3)))
-int do_syscall_trace(struct pt_regs *regs, int entryexit)
+void do_syscall_trace(struct pt_regs *regs, int entryexit)
 {
-	int is_sysemu, is_systrace, is_singlestep;
 	if (unlikely(current->audit_context)) {
 		if (!entryexit)
 			audit_syscall_entry(current, regs->orig_eax,
@@ -633,27 +686,20 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 		else
 			audit_syscall_exit(current, regs->eax);
 	}
-	is_sysemu = test_thread_flag(TIF_SYSCALL_EMU);
-	is_systrace = test_thread_flag(TIF_SYSCALL_TRACE);
-	is_singlestep = test_thread_flag(TIF_SINGLESTEP);
 
-	if (!is_systrace && !is_singlestep && !is_sysemu)
-		return 0;
-	/* We can detect the case of coming from PTRACE_SYSEMU and now running
-	 * with PTRACE_SYSCALL or PTRACE_SINGLESTEP, by TIF_SYSCALL_EMU being
-	 * set additionally.
-	 * If so let's reset the flag and return without action.
-	 */
-	if (is_sysemu && (is_systrace || is_singlestep)) {
-		clear_thread_flag(TIF_SYSCALL_EMU);
-		return 0;
-	}
 	if (!(current->ptrace & PT_PTRACED))
-		return 0;
+		return;
+
+	/* Fake a debug trap */
+	if (test_thread_flag(TIF_SINGLESTEP))
+		send_sigtrap(current, regs, 0);
+
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) &&
-				 !is_singlestep ? 0x80 : 0));
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) ? 0x80 : 0));
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
@@ -664,6 +710,4 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 		send_sig(current->exit_code, current, 1);
 		current->exit_code = 0;
 	}
-	/* != 0 if nullifying the syscall, 0 if running it normally */
-	return is_sysemu;
 }

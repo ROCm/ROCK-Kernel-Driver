@@ -91,4 +91,6 @@ tlb_is_full_mm(struct mmu_gather *tlb)
 #define pte_free_tlb(tlb,ptep)		pte_free(ptep)
 #define pmd_free_tlb(tlb,pmdp)		pmd_free(pmdp)
 
+#define tlb_migrate_finish(mm)		do { } while (0)
+
 #endif

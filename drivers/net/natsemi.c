@@ -251,12 +251,12 @@ MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("National Semiconductor DP8381x series PCI Ethernet driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(max_interrupt_work, "i");
-MODULE_PARM(mtu, "i");
-MODULE_PARM(debug, "i");
-MODULE_PARM(rx_copybreak, "i");
-MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
+module_param(max_interrupt_work, int, 0);
+module_param(mtu, int, 0);
+module_param(debug, int, 0);
+module_param(rx_copybreak, int, 0);
+module_param_array(options, int, NULL, 0);
+module_param_array(full_duplex, int, NULL, 0);
 MODULE_PARM_DESC(max_interrupt_work, 
 	"DP8381x maximum events handled per interrupt");
 MODULE_PARM_DESC(mtu, "DP8381x MTU (all boards)");

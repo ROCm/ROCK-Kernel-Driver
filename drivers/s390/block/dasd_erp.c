@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.12 $
+ * $Revision: 1.13 $
  */
 
 #include <linux/config.h>
@@ -36,10 +36,6 @@ dasd_alloc_erp_request(char *magic, int cplength, int datasize,
 	if ( magic == NULL || datasize > PAGE_SIZE ||
 	     (cplength*sizeof(struct ccw1)) > PAGE_SIZE)
 		BUG();
-	debug_text_event ( dasd_debug_area, 1, "ALLC");
-	debug_text_event ( dasd_debug_area, 1, magic);
-	debug_int_event ( dasd_debug_area, 1, cplength);
-	debug_int_event ( dasd_debug_area, 1, datasize);
 
 	size = (sizeof(struct dasd_ccw_req) + 7L) & -8L;
 	if (cplength > 0)
@@ -77,8 +73,6 @@ dasd_free_erp_request(struct dasd_ccw_req * cqr, struct dasd_device * device)
 {
 	unsigned long flags;
 
-	debug_text_event(dasd_debug_area, 1, "FREE");
-	debug_int_event(dasd_debug_area, 1, (long) cqr);
 	spin_lock_irqsave(&device->mem_lock, flags);
 	dasd_free_chunk(&device->erp_chunks, cqr);
 	spin_unlock_irqrestore(&device->mem_lock, flags);
@@ -105,7 +99,6 @@ dasd_default_erp_action(struct dasd_ccw_req * cqr)
         } else {
                 DEV_MESSAGE (KERN_WARNING, device, "%s",
 			     "default ERP called (NO retry left)");
-		
 		cqr->status = DASD_CQR_FAILED;
 		cqr->stopclk = get_clock ();
         }

@@ -64,19 +64,6 @@ static void nfs_umount_begin(struct super_block *);
 static int  nfs_statfs(struct super_block *, struct kstatfs *);
 static int  nfs_show_options(struct seq_file *, struct vfsmount *);
 
-#ifdef CONFIG_NFS_ACL
-static void nfs_forget_cached_acls(struct inode *);
-static void __nfs_forget_cached_acls(struct nfs_inode *nfsi);
-#else
-static inline void nfs_forget_cached_acls(struct inode *inode)
-{
-}
-
-static inline void __nfs_forget_cached_acls(struct inode *inode)
-{
-}
-#endif
-
 static struct super_operations nfs_sops = { 
 	.alloc_inode	= nfs_alloc_inode,
 	.destroy_inode	= nfs_destroy_inode,
@@ -116,21 +103,6 @@ struct rpc_program		nfs_program = {
 	.stats			= &nfs_rpcstat,
 	.pipe_dir_name		= "/nfs",
 };
-
-#ifdef CONFIG_NFS_ACL
-static struct rpc_stat		nfsacl_rpcstat = { &nfsacl_program };
-static struct rpc_version *	nfsacl_version[] = {
-	[3]			= &nfsacl_version3,
-};
-
-struct rpc_program		nfsacl_program = {
-	.name =			"nfsacl",
-	.number =		NFS3_ACL_PROGRAM,
-	.nrvers =		sizeof(nfsacl_version) / sizeof(nfsacl_version[0]),
-	.version =		nfsacl_version,
-	.stats =		&nfsacl_rpcstat,
-};
-#endif  /* CONFIG_NFS_ACL */
 
 static inline unsigned long
 nfs_fattr_to_ino_t(struct nfs_fattr *fattr)
@@ -193,11 +165,6 @@ nfs_umount_begin(struct super_block *sb)
 	/* -EIO all pending I/O */
 	if ((rpc = server->client) != NULL)
 		rpc_killall_tasks(rpc);
-#ifdef CONFIG_NFS_ACL
-	/* FIXME: Is this really necessary? */
-	if ((rpc = server->client_acl) != NULL)
-		rpc_killall_tasks(rpc);
-#endif  /* CONFIG_NFS_ACL */
 }
 
 
@@ -486,24 +453,11 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 		atomic_inc(&server->client->cl_count);
 		server->client_sys = server->client;
 	}
-#ifdef CONFIG_NFS_ACL
-	if (server->flags & NFS_MOUNT_VER3) {
-		struct rpc_clnt *clnt = rpc_clone_client(server->client);
 
-		if (IS_ERR(clnt)) {
-			rpc_release_client(server->client_sys);
-			server->client_sys = NULL;
-			return PTR_ERR(clnt);
-		}
-		rpc_change_program(clnt, &nfsacl_program, 3);
-		server->client_acl = clnt;
-		/* Initially assume the nfsacl program is supported */
-		server->flags |= NFSACL;
-	}
-#endif
 	if (server->flags & NFS_MOUNT_VER3) {
 		if (server->namelen == 0 || server->namelen > NFS3_MAXNAMLEN)
 			server->namelen = NFS3_MAXNAMLEN;
+		sb->s_time_gran = 1;
 	} else {
 		if (server->namelen == 0 || server->namelen > NFS2_MAXNAMLEN)
 			server->namelen = NFS2_MAXNAMLEN;
@@ -627,10 +581,9 @@ nfs_zap_caches(struct inode *inode)
 
 	memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
 	if (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode))
-		nfsi->flags |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA;
+		nfsi->flags |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA|NFS_INO_INVALID_ACCESS;
 	else
-		nfsi->flags |= NFS_INO_INVALID_ATTR;
-	nfs_forget_cached_acls(inode);
+		nfsi->flags |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_ACCESS;
 }
 
 /*
@@ -668,7 +621,7 @@ nfs_find_actor(struct inode *inode, void *opaque)
 		return 0;
 	if (nfs_compare_fh(NFS_FH(inode), fh))
 		return 0;
-	if (is_bad_inode(inode))
+	if (is_bad_inode(inode) || NFS_STALE(inode))
 		return 0;
 	return 1;
 }
@@ -686,20 +639,6 @@ nfs_init_locked(struct inode *inode, void *opaque)
 
 /* Don't use READDIRPLUS on directories that we believe are too large */
 #define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
-
-#ifdef CONFIG_NFS_ACL
-static struct inode_operations nfs_special_inode_operations[] = {{
-	.permission =	nfs_permission,
-	.getattr =	nfs_getattr,
-	.setattr =	nfs_setattr,
-	.listxattr =	nfs_listxattr,
-	.getxattr =	nfs_getxattr,
-	.setxattr =	nfs_setxattr,
-	.removexattr =	nfs_removexattr,
-}};
-#else
-#define nfs_special_inode_operations NULL
-#endif  /* CONFIG_NFS_ACL */
 
 /*
  * This is our front-end to iget that looks up inodes by file handle
@@ -754,10 +693,8 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 				NFS_FLAGS(inode) |= NFS_INO_ADVISE_RDPLUS;
 		} else if (S_ISLNK(inode->i_mode))
 			inode->i_op = &nfs_symlink_inode_operations;
-		else {
-			inode->i_op = nfs_special_inode_operations;
+		else
 			init_special_inode(inode, inode->i_mode, fattr->rdev);
-		}
 
 		nfsi->read_cache_jiffies = fattr->timestamp;
 		inode->i_atime = fattr->atime;
@@ -798,16 +735,6 @@ out:
 out_no_inode:
 	printk("nfs_fhget: iget failed\n");
 	goto out;
-}
-
-void
-nfs_invalidate_access_cache(struct inode *inode)
-{
-	struct rpc_cred **cred = &NFS_I(inode)->cache_access.cred;
-	if (*cred) {
-		put_rpccred(*cred);
-		*cred = NULL;
-	}
 }
 
 #define NFS_VALID_ATTRS (ATTR_MODE|ATTR_UID|ATTR_GID|ATTR_SIZE|ATTR_ATIME|ATTR_ATIME_SET|ATTR_MTIME|ATTR_MTIME_SET)
@@ -856,7 +783,7 @@ nfs_setattr(struct dentry *dentry, struct iattr *attr)
 		}
 	}
 	if ((attr->ia_valid & (ATTR_MODE|ATTR_UID|ATTR_GID)) != 0)
-		nfs_invalidate_access_cache(inode);
+		NFS_FLAGS(inode) |= NFS_INO_INVALID_ACCESS;
 	nfs_end_data_update(inode);
 	unlock_kernel();
 	return error;
@@ -1033,14 +960,14 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 	lock_kernel();
 	if (!inode || is_bad_inode(inode))
  		goto out_nowait;
-	if (NFS_STALE(inode) && inode != inode->i_sb->s_root->d_inode)
+	if (NFS_STALE(inode))
  		goto out_nowait;
 
 	while (NFS_REVALIDATING(inode)) {
 		status = nfs_wait_on_inode(inode, NFS_INO_REVALIDATING);
 		if (status < 0)
 			goto out_nowait;
-		if (NFS_SERVER(inode)->flags & NFS_MOUNT_NOAC)
+		if (NFS_ATTRTIMEO(inode) == 0)
 			continue;
 		if (NFS_FLAGS(inode) & (NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA|NFS_INO_INVALID_ATIME))
 			continue;
@@ -1052,14 +979,14 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 	/* Protect against RPC races by saving the change attribute */
 	verifier = nfs_save_change_attribute(inode);
 	status = NFS_PROTO(inode)->getattr(server, NFS_FH(inode), &fattr);
-	if (status) {
+	if (status != 0) {
 		dfprintk(PAGECACHE, "nfs_revalidate_inode: (%s/%Ld) getattr failed, error=%d\n",
 			 inode->i_sb->s_id,
 			 (long long)NFS_FILEID(inode), status);
 		if (status == -ESTALE) {
-			NFS_FLAGS(inode) |= NFS_INO_STALE;
-			if (inode != inode->i_sb->s_root->d_inode)
-				remove_inode_hash(inode);
+			nfs_zap_caches(inode);
+			if (!S_ISDIR(inode->i_mode))
+				NFS_FLAGS(inode) |= NFS_INO_STALE;
 		}
 		goto out;
 	}
@@ -1098,7 +1025,6 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode));
 
-	NFS_FLAGS(inode) &= ~NFS_INO_STALE;
 out:
 	NFS_FLAGS(inode) &= ~NFS_INO_REVALIDATING;
 	wake_up(&nfsi->nfs_i_wait);
@@ -1184,81 +1110,6 @@ void nfs_end_data_update_defer(struct inode *inode)
 	}
 }
 
-#ifdef CONFIG_NFS_ACL
-static void __nfs_forget_cached_acls(struct nfs_inode *nfsi)
-{
-	if (nfsi->acl_access != ERR_PTR(-EAGAIN)) {
-		posix_acl_release(nfsi->acl_access);
-		nfsi->acl_access = ERR_PTR(-EAGAIN);
-	}
-	if (nfsi->acl_default != ERR_PTR(-EAGAIN)) {
-		posix_acl_release(nfsi->acl_default);
-		nfsi->acl_default = ERR_PTR(-EAGAIN);
-	}
-}
-#endif  /* CONFIG_NFS_ACL */
-
-#ifdef CONFIG_NFS_ACL
-static void nfs_forget_cached_acls(struct inode *inode)
-{
-	dprintk("NFS: nfs_forget_cached_acls(%s/%ld)\n", inode->i_sb->s_id,
-		inode->i_ino);
-	spin_lock(&inode->i_lock);
-	__nfs_forget_cached_acls(NFS_I(inode));
-	spin_unlock(&inode->i_lock);
-}
-#endif
-
-#ifdef CONFIG_NFS_ACL
-struct posix_acl *nfs_get_cached_acl(struct inode *inode, int type)
-{
-	struct nfs_inode *nfsi = NFS_I(inode);
-	struct posix_acl *acl = ERR_PTR(-EAGAIN);
-
-	spin_lock(&inode->i_lock);
-	if (time_after(jiffies, nfsi->acl_timestamp + nfsi->attrtimeo)) {
-		__nfs_forget_cached_acls(nfsi);
-		nfsi->acl_timestamp = jiffies;
-	} else switch(type) {
-		case ACL_TYPE_ACCESS:
-			acl = nfsi->acl_access;
-			break;
-
-		case ACL_TYPE_DEFAULT:
-			acl = nfsi->acl_default;
-			break;
-
-		default:
-			return ERR_PTR(-EINVAL);
-	}
-	if (acl == ERR_PTR(-EAGAIN))
-		acl = ERR_PTR(-EAGAIN);
-	else
-		acl = posix_acl_dup(acl);
-	spin_unlock(&inode->i_lock);
-	dprintk("NFS: nfs_get_cached_acl(%s/%ld, %d) = %p\n", inode->i_sb->s_id,
-		inode->i_ino, type, acl);
-	return acl;
-}
-#endif  /* CONFIG_NFS_ACL */
-
-#ifdef CONFIG_NFS_ACL
-void nfs_cache_acls(struct inode *inode, struct posix_acl *acl,
-		    struct posix_acl *dfacl)
-{
-	struct nfs_inode *nfsi = NFS_I(inode);
-
-	dprintk("nfs_cache_acls(%s/%ld, %p, %p)\n", inode->i_sb->s_id,
-		inode->i_ino, acl, dfacl);
-	spin_lock(&inode->i_lock);
-	__nfs_forget_cached_acls(NFS_I(inode));
-	nfsi->acl_access = posix_acl_dup(acl);
-	nfsi->acl_default = posix_acl_dup(dfacl);
-	nfsi->acl_timestamp = jiffies;
-	spin_unlock(&inode->i_lock);
-}
-#endif  /* CONFIG_NFS_ACL */
-
 /**
  * nfs_refresh_inode - verify consistency of the inode attribute cache
  * @inode - pointer to inode
@@ -1319,10 +1170,8 @@ int nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	/* Have any file permissions changed? */
 	if ((inode->i_mode & S_IALLUGO) != (fattr->mode & S_IALLUGO)
 			|| inode->i_uid != fattr->uid
-			|| inode->i_gid != fattr->gid) {
-		nfs_forget_cached_acls(inode);
-		nfsi->flags |= NFS_INO_INVALID_ATTR;
-	}
+			|| inode->i_gid != fattr->gid)
+		nfsi->flags |= NFS_INO_INVALID_ATTR | NFS_INO_INVALID_ACCESS;
 
 	/* Has the link count changed? */
 	if (inode->i_nlink != fattr->nlink)
@@ -1431,7 +1280,7 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 #endif
 		nfsi->change_attr = fattr->change_attr;
 		if (!data_unstable)
-			invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA;
+			invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA|NFS_INO_INVALID_ACCESS;
 	}
 
 	memcpy(&inode->i_ctime, &fattr->ctime, sizeof(inode->i_ctime));
@@ -1439,11 +1288,8 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 
 	if ((inode->i_mode & S_IALLUGO) != (fattr->mode & S_IALLUGO) ||
 	    inode->i_uid != fattr->uid ||
-	    inode->i_gid != fattr->gid) {
-		nfs_invalidate_access_cache(inode);
-		nfs_forget_cached_acls(inode);
-		invalid |= NFS_INO_INVALID_ATTR;
-	}
+	    inode->i_gid != fattr->gid)
+		invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_ACCESS;
 
 	inode->i_mode = fattr->mode;
 	inode->i_nlink = fattr->nlink;
@@ -1493,7 +1339,8 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 	 */
 	nfs_invalidate_inode(inode);
  out_err:
-	return -EIO;
+	NFS_FLAGS(inode) |= NFS_INO_STALE;
+	return -ESTALE;
 }
 
 /*
@@ -1599,8 +1446,6 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 		return ERR_PTR(error);
 	}
 	s->s_flags |= MS_ACTIVE;
-	/* The nfs client applies the umask itself when needed. */
-	s->s_flags |= MS_POSIXACL;
 	return s;
 }
 
@@ -1610,23 +1455,15 @@ static void nfs_kill_super(struct super_block *s)
 
 	kill_anon_super(s);
 
-	nfs4_renewd_prepare_shutdown(server);
-
 	if (server->client != NULL && !IS_ERR(server->client))
 		rpc_shutdown_client(server->client);
 	if (server->client_sys != NULL && !IS_ERR(server->client_sys))
 		rpc_shutdown_client(server->client_sys);
-#ifdef CONFIG_NFS_ACL
-	if (server->client_acl != NULL && !IS_ERR(server->client_acl))
-		rpc_shutdown_client(server->client_acl);
-#endif
 
 	if (!(server->flags & NFS_MOUNT_NONLM))
 		lockd_down();	/* release rpc.lockd */
 
 	rpciod_down();		/* release rpciod */
-
-	destroy_nfsv4_state(server);
 
 	if (server->hostname != NULL)
 		kfree(server->hostname);
@@ -1707,9 +1544,6 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	if (data->wsize != 0)
 		server->wsize = nfs_block_size(data->wsize, NULL);
 	server->flags = data->flags & NFS_MOUNT_FLAGMASK;
-
-	/* NFSv4 doesn't use NLM locking */
-	server->flags |= NFS_MOUNT_NONLM;
 
 	server->acregmin = data->acregmin*HZ;
 	server->acregmax = data->acregmax*HZ;
@@ -1817,6 +1651,8 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 			return -ENOMEM;
 		}
 	}
+
+	sb->s_time_gran = 1;
 
 	sb->s_op = &nfs4_sops;
 	err = nfs_sb_init(sb, authflavour);
@@ -1955,8 +1791,22 @@ out_free:
 
 static void nfs4_kill_super(struct super_block *sb)
 {
+	struct nfs_server *server = NFS_SB(sb);
+
 	nfs_return_all_delegations(sb);
-	nfs_kill_super(sb);
+	kill_anon_super(sb);
+
+	nfs4_renewd_prepare_shutdown(server);
+
+	if (server->client != NULL && !IS_ERR(server->client))
+		rpc_shutdown_client(server->client);
+	rpciod_down();		/* release rpciod */
+
+	destroy_nfsv4_state(server);
+
+	if (server->hostname != NULL)
+		kfree(server->hostname);
+	kfree(server);
 }
 
 static struct file_system_type nfs4_fs_type = {
@@ -1986,9 +1836,13 @@ static struct file_system_type nfs4_fs_type = {
 extern int nfs_init_nfspagecache(void);
 extern void nfs_destroy_nfspagecache(void);
 extern int nfs_init_readpagecache(void);
-extern int nfs_destroy_readpagecache(void);
+extern void nfs_destroy_readpagecache(void);
 extern int nfs_init_writepagecache(void);
-extern int nfs_destroy_writepagecache(void);
+extern void nfs_destroy_writepagecache(void);
+#ifdef CONFIG_NFS_DIRECTIO
+extern int nfs_init_directcache(void);
+extern void nfs_destroy_directcache(void);
+#endif
 
 static kmem_cache_t * nfs_inode_cachep;
 
@@ -2004,7 +1858,6 @@ static struct inode *nfs_alloc_inode(struct super_block *sb)
 
 static void nfs_destroy_inode(struct inode *inode)
 {
-	__nfs_forget_cached_acls(NFS_I(inode));
 	kmem_cache_free(nfs_inode_cachep, NFS_I(inode));
 }
 
@@ -2025,10 +1878,6 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		nfsi->ncommit = 0;
 		nfsi->npages = 0;
 		init_waitqueue_head(&nfsi->nfs_i_wait);
-#ifdef CONFIG_NFS_ACL
-		nfsi->acl_access = ERR_PTR(-EAGAIN);
-		nfsi->acl_default = ERR_PTR(-EAGAIN);
-#endif
 		nfs4_init_once(nfsi);
 	}
 }
@@ -2074,6 +1923,12 @@ static int __init init_nfs_fs(void)
 	if (err)
 		goto out1;
 
+#ifdef CONFIG_NFS_DIRECTIO
+	err = nfs_init_directcache();
+	if (err)
+		goto out0;
+#endif
+
 #ifdef CONFIG_PROC_FS
 	rpc_proc_register(&nfs_rpcstat);
 #endif
@@ -2084,8 +1939,14 @@ static int __init init_nfs_fs(void)
 		goto out;
 	return 0;
 out:
+#ifdef CONFIG_PROC_FS
 	rpc_proc_unregister("nfs");
+#endif
 	nfs_destroy_writepagecache();
+#ifdef CONFIG_NFS_DIRECTIO
+out0:
+	nfs_destroy_directcache();
+#endif
 out1:
 	nfs_destroy_readpagecache();
 out2:
@@ -2098,6 +1959,9 @@ out4:
 
 static void __exit exit_nfs_fs(void)
 {
+#ifdef CONFIG_NFS_DIRECTIO
+	nfs_destroy_directcache();
+#endif
 	nfs_destroy_writepagecache();
 	nfs_destroy_readpagecache();
 	nfs_destroy_inodecache();

@@ -753,27 +753,10 @@ static int config_drive_for_dma (ide_drive_t *drive)
  */
 static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
 {
-	int i, dma_stat;
-	byte stat;
-
 	LED_DISK_READ(0);
 	LED_DISK_WRITE(0);
 
-	dma_stat = HWIF(drive)->ide_dma_end(drive);
-	stat = HWIF(drive)->INB(IDE_STATUS_REG);		/* get drive status */
-	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
-		if (!dma_stat) {
-			struct request *rq;
-			rq = HWGROUP(drive)->rq;
-			for (i = rq->nr_sectors; i > 0;) {
-				i -= rq->current_nr_sectors;
-				DRIVER(drive)->end_request(drive, 1, rq->nr_sectors);
-			}
-			return ide_stopped;
-		}
-		printk("%s: bad DMA status\n", drive->name);
-	}
-	return DRIVER(drive)->error(drive, "dma_intr", stat);
+	return ide_dma_intr(drive);
 }
 
 /*

@@ -463,11 +463,11 @@ struct depca_private {
         } depca_bus;	        /* type of bus */
 	struct depca_init init_block;	/* Shadow Initialization block            */
 /* CPU address space fields */
-	struct depca_rx_desc *rx_ring;	/* Pointer to start of RX descriptor ring */
-	struct depca_tx_desc *tx_ring;	/* Pointer to start of TX descriptor ring */
-	void *rx_buff[NUM_RX_DESC];	/* CPU virt address of sh'd memory buffs  */
-	void *tx_buff[NUM_TX_DESC];	/* CPU virt address of sh'd memory buffs  */
-	void *sh_mem;		/* CPU mapped virt address of device RAM  */
+	struct depca_rx_desc __iomem *rx_ring;	/* Pointer to start of RX descriptor ring */
+	struct depca_tx_desc __iomem *tx_ring;	/* Pointer to start of TX descriptor ring */
+	void __iomem *rx_buff[NUM_RX_DESC];	/* CPU virt address of sh'd memory buffs  */
+	void __iomem *tx_buff[NUM_TX_DESC];	/* CPU virt address of sh'd memory buffs  */
+	void __iomem *sh_mem;	/* CPU mapped virt address of device RAM  */
 	u_long mem_start;	/* Bus address of device RAM (before remap) */
 	u_long mem_len;		/* device memory size */
 /* Device address space fields */
@@ -693,11 +693,11 @@ static int __init depca_hw_init (struct net_device *dev, struct device *device)
 
 	/* Tx & Rx descriptors (aligned to a quadword boundary) */
 	offset = (offset + DEPCA_ALIGN) & ~DEPCA_ALIGN;
-	lp->rx_ring = (struct depca_rx_desc *) (lp->sh_mem + offset);
+	lp->rx_ring = (struct depca_rx_desc __iomem *) (lp->sh_mem + offset);
 	lp->rx_ring_offset = offset;
 
 	offset += (sizeof(struct depca_rx_desc) * NUM_RX_DESC);
-	lp->tx_ring = (struct depca_tx_desc *) (lp->sh_mem + offset);
+	lp->tx_ring = (struct depca_tx_desc __iomem *) (lp->sh_mem + offset);
 	lp->tx_ring_offset = offset;
 
 	offset += (sizeof(struct depca_tx_desc) * NUM_TX_DESC);
@@ -1649,7 +1649,7 @@ static int __devexit depca_device_remove (struct device *device)
 static int __init DepcaSignature(char *name, u_long base_addr)
 {
 	u_int i, j, k;
-	void *ptr;
+	void __iomem *ptr;
 	char tmpstr[16];
 	u_long prom_addr = base_addr + 0xc000;
 	u_long mem_addr = base_addr + 0x8000; /* 32KB */
@@ -1876,17 +1876,17 @@ static void depca_dbg_open(struct net_device *dev)
 		printk("Descriptor addresses (CPU):\nRX: ");
 		for (i = 0; i < lp->rxRingMask; i++) {
 			if (i < 3) {
-				printk("0x%8.8lx ", (long) &lp->rx_ring[i].base);
+				printk("%p ", &lp->rx_ring[i].base);
 			}
 		}
-		printk("...0x%8.8lx\n", (long) &lp->rx_ring[i].base);
+		printk("...%p\n", &lp->rx_ring[i].base);
 		printk("TX: ");
 		for (i = 0; i < lp->txRingMask; i++) {
 			if (i < 3) {
-				printk("0x%8.8lx ", (long) &lp->tx_ring[i].base);
+				printk("%p ", &lp->tx_ring[i].base);
 			}
 		}
-		printk("...0x%8.8lx\n", (long) &lp->tx_ring[i].base);
+		printk("...%p\n", &lp->tx_ring[i].base);
 		printk("\nDescriptor buffers (Device):\nRX: ");
 		for (i = 0; i < lp->rxRingMask; i++) {
 			if (i < 3) {

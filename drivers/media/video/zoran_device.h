@@ -79,7 +79,6 @@ extern void zoran_set_pci_master(struct zoran *zr,
 				 int set_master);
 extern void zoran_init_hardware(struct zoran *zr);
 extern void zr36057_restart(struct zoran *zr);
-extern void zr36057_init_vfe(struct zoran *zr);
 
 /* i2c */
 extern int decoder_command(struct zoran *zr,

@@ -69,7 +69,7 @@ struct fib6_cleaner_t
 	void *arg;
 };
 
-rwlock_t fib6_walker_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(fib6_walker_lock);
 
 
 #ifdef CONFIG_IPV6_SUBTREES
@@ -1205,7 +1205,7 @@ static int fib6_age(struct rt6_info *rt, void *arg)
 	return 0;
 }
 
-static spinlock_t fib6_gc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(fib6_gc_lock);
 
 void fib6_run_gc(unsigned long dummy)
 {

@@ -315,4 +315,26 @@ struct ac97_driver {
 extern int ac97_register_driver(struct ac97_driver *driver);
 extern void ac97_unregister_driver(struct ac97_driver *driver);
 
+/* quirk types */
+enum {
+	AC97_TUNE_DEFAULT = -1, /* use default from quirk list (not valid in list) */
+	AC97_TUNE_NONE = 0,     /* nothing extra to do */
+	AC97_TUNE_HP_ONLY,      /* headphone (true line-out) control as master only */
+	AC97_TUNE_SWAP_HP,      /* swap headphone and master controls */
+	AC97_TUNE_SWAP_SURROUND, /* swap master and surround controls */
+	AC97_TUNE_AD_SHARING,   /* for AD1985, turn on OMS bit and use headphone */
+	AC97_TUNE_ALC_JACK,     /* for Realtek, enable JACK detection */
+};
+
+struct ac97_quirk {
+	unsigned short vendor;  /* PCI vendor id */
+	unsigned short device;  /* PCI device id */
+	unsigned short mask;    /* device id bit mask, 0 = accept all */
+	const char *name;       /* name shown as info */
+	int type;               /* quirk type above */
+};
+
+struct pci_dev;
+extern int ac97_tune_hardware(struct pci_dev *pdev, struct ac97_quirk *quirk, int override);
+
 #endif /* _AC97_CODEC_H_ */

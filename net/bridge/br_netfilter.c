@@ -845,19 +845,6 @@ static unsigned int ip_sabotage_out(unsigned int hook, struct sk_buff **pskb,
 {
 	struct sk_buff *skb = *pskb;
 
-#ifdef CONFIG_SYSCTL
-	if (!skb->nf_bridge) {
-		struct vlan_ethhdr *hdr = vlan_eth_hdr(skb);
-
-		if (skb->protocol == __constant_htons(ETH_P_IP) ||
-		    IS_VLAN_IP) {
-			if (!brnf_call_iptables)
-				return NF_ACCEPT;
-		} else if (!brnf_call_ip6tables)
-			return NF_ACCEPT;
-	}
-#endif
-
 	if ((out->hard_start_xmit == br_dev_xmit &&
 	    okfn != br_nf_forward_finish &&
 	    okfn != br_nf_local_out_finish &&
@@ -869,8 +856,24 @@ static unsigned int ip_sabotage_out(unsigned int hook, struct sk_buff **pskb,
 	    ) {
 		struct nf_bridge_info *nf_bridge;
 
-		if (!skb->nf_bridge && !nf_bridge_alloc(skb))
-			return NF_DROP;
+		if (!skb->nf_bridge) {
+#ifdef CONFIG_SYSCTL
+			/* This code is executed while in the IP(v6) stack,
+			   the version should be 4 or 6. We can't use
+			   skb->protocol because that isn't set on
+			   PF_INET(6)/LOCAL_OUT. */
+			struct iphdr *ip = skb->nh.iph;
+
+			if (ip->version == 4 && !brnf_call_iptables)
+				return NF_ACCEPT;
+			else if (ip->version == 6 && !brnf_call_ip6tables)
+				return NF_ACCEPT;
+#endif
+			if (hook == NF_IP_POST_ROUTING)
+				return NF_ACCEPT;
+			if (!nf_bridge_alloc(skb))
+				return NF_DROP;
+		}
 
 		nf_bridge = skb->nf_bridge;
 

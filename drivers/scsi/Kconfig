@@ -221,6 +221,14 @@ config SCSI_FC_ATTRS
 	  each attached FiberChannel device to sysfs, say Y.
 	  Otherwise, say N.
 
+config SCSI_ISCSI_ATTRS
+	tristate "iSCSI Transport Attributes"
+	depends on SCSI
+	help
+	  If you wish to export transport-specific information about
+	  each attached iSCSI device to sysfs, say Y.
+	  Otherwise, say N.
+
 endmenu
 
 menu "SCSI low-level drivers"
@@ -801,7 +809,7 @@ config SCSI_IPS
 	  See <http://www.developer.ibm.com/welcome/netfinity/serveraid.html>
 	  for more information.  If this driver does not work correctly
 	  without modification please contact the author by email at
-	  ipslinux@adaptec.com.
+	  <ipslinux@adaptec.com>.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ips.
@@ -1511,7 +1519,7 @@ config SCSI_DEBUG
 	  host adapter with one dummy SCSI disk. Each dummy disk uses kernel
 	  RAM as storage (i.e. it is a ramdisk). To save space when multiple
 	  dummy disks are simulated, they share the same kernel RAM for 
-	  their storage. See http://www.torque.net/sg/sdebug.html for more
+	  their storage. See <http://www.torque.net/sg/sdebug.html> for more
 	  information. This driver is primarily of use to those testing the
 	  SCSI and block subsystems. If unsure, say N.
 
@@ -1802,7 +1810,7 @@ config ZFCP
 
           This driver is also available as a module. This module will be
           called zfcp. If you want to compile it as a module, say M here
-          and read Documentation/modules.txt.
+          and read <file:Documentation/modules.txt>.
 
 endmenu
 

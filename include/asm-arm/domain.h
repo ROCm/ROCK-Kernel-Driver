@@ -14,12 +14,12 @@
  * Domain numbers
  *
  *  DOMAIN_IO     - domain 2 includes all IO only
- *  DOMAIN_KERNEL - domain 1 includes all kernel memory only
- *  DOMAIN_USER   - domain 0 includes all user memory only
+ *  DOMAIN_USER   - domain 1 includes all user memory only
+ *  DOMAIN_KERNEL - domain 0 includes all kernel memory only
  */
-#define DOMAIN_USER	0
-#define DOMAIN_KERNEL	1
-#define DOMAIN_TABLE	1
+#define DOMAIN_KERNEL	0
+#define DOMAIN_TABLE	0
+#define DOMAIN_USER	1
 #define DOMAIN_IO	2
 
 /*
@@ -29,8 +29,9 @@
 #define DOMAIN_CLIENT	1
 #define DOMAIN_MANAGER	3
 
-#define domain_val(dom,type)	((type) << 2*(dom))
+#define domain_val(dom,type)	((type) << (2*(dom)))
 
+#ifndef __ASSEMBLY__
 #define set_domain(x)					\
 	do {						\
 	__asm__ __volatile__(				\
@@ -48,3 +49,4 @@
 	} while (0)
 
 #endif
+#endif /* !__ASSEMBLY__ */

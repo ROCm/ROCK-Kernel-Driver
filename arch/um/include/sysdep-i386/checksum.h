@@ -31,10 +31,10 @@ unsigned int csum_partial(const unsigned char * buff, int len,
  * better 64-bit) boundary
  */
 
-unsigned int csum_partial_copy_to(const char *src, char *dst, int len, 
-				  int sum, int *err_ptr);
-unsigned int csum_partial_copy_from(const char *src, char *dst, int len, 
-				    int sum, int *err_ptr);
+unsigned int csum_partial_copy_to(const unsigned char *src, unsigned char *dst,
+				  int len, int sum, int *err_ptr);
+unsigned int csum_partial_copy_from(const unsigned char *src, unsigned char *dst,
+				    int len, int sum, int *err_ptr);
 
 /*
  *	Note: when you get a NULL pointer exception here this means someone
@@ -45,7 +45,7 @@ unsigned int csum_partial_copy_from(const char *src, char *dst, int len,
  */
 
 static __inline__
-unsigned int csum_partial_copy_nocheck(const char *src, char *dst,
+unsigned int csum_partial_copy_nocheck(const unsigned char *src, unsigned char *dst,
 				       int len, int sum)
 {
 	memcpy(dst, src, len);
@@ -53,7 +53,7 @@ unsigned int csum_partial_copy_nocheck(const char *src, char *dst,
 }
 
 static __inline__
-unsigned int csum_partial_copy_from_user(const char *src, char *dst,
+unsigned int csum_partial_copy_from_user(const unsigned char *src, unsigned char *dst,
 					 int len, int sum, int *err_ptr)
 {
 	return csum_partial_copy_from(src, dst, len, sum, err_ptr);
@@ -67,7 +67,7 @@ unsigned int csum_partial_copy_from_user(const char *src, char *dst,
  */
 
 #define csum_partial_copy_fromuser csum_partial_copy_from_user
-unsigned int csum_partial_copy( const char *src, char *dst, int len, int sum);
+unsigned int csum_partial_copy(const unsigned char *src, unsigned char *dst, int len, int sum);
 
 /*
  *	This is a version of ip_compute_csum() optimized for IP headers,
@@ -192,9 +192,9 @@ static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
  *	Copy and checksum to user
  */
 #define HAVE_CSUM_COPY_USER
-static __inline__ unsigned int csum_and_copy_to_user(const char *src, 
-						     char *dst, int len,
-						     int sum, int *err_ptr)
+static __inline__ unsigned int csum_and_copy_to_user(const unsigned char *src,
+						     unsigned char *dst,
+						     int len, int sum, int *err_ptr)
 {
 	if (access_ok(VERIFY_WRITE, dst, len))
 		return(csum_partial_copy_to(src, dst, len, sum, err_ptr));

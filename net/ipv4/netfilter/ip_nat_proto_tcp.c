@@ -91,8 +91,8 @@ tcp_manip_pkt(struct sk_buff **pskb,
 	struct iphdr *iph = (struct iphdr *)((*pskb)->data + iphdroff);
 	struct tcphdr *hdr;
 	unsigned int hdroff = iphdroff + iph->ihl*4;
-	u_int32_t oldip;
-	u_int16_t *portptr, oldport;
+	u32 oldip, oldsrc = iph->saddr, olddst = iph->daddr;
+	u16 *portptr, oldport;
 	int hdrsize = 8; /* TCP connection tracking guarantees this much */
 
 	/* this could be a inner header returned in icmp packet; in such
@@ -108,11 +108,11 @@ tcp_manip_pkt(struct sk_buff **pskb,
 
 	if (maniptype == IP_NAT_MANIP_SRC) {
 		/* Get rid of src ip and src pt */
-		oldip = iph->saddr;
+		oldip = oldsrc;
 		portptr = &hdr->source;
 	} else {
 		/* Get rid of dst ip and dst pt */
-		oldip = iph->daddr;
+		oldip = olddst;
 		portptr = &hdr->dest;
 	}
 

@@ -78,7 +78,8 @@ smb_readpage_sync(struct dentry *dentry, struct page *page)
 		count -= result;
 		offset += result;
 		buffer += result;
-		dentry->d_inode->i_atime = CURRENT_TIME;
+		dentry->d_inode->i_atime =
+			current_fs_time(dentry->d_inode->i_sb);
 		if (result < rsize)
 			break;
 	} while (count);
@@ -152,7 +153,7 @@ smb_writepage_sync(struct inode *inode, struct page *page,
 		/*
 		 * Update the inode now rather than waiting for a refresh.
 		 */
-		inode->i_mtime = inode->i_atime = CURRENT_TIME;
+		inode->i_mtime = inode->i_atime = current_fs_time(inode->i_sb);
 		SMB_I(inode)->flags |= SMB_F_LOCALWRITE;
 		if (offset > inode->i_size)
 			inode->i_size = offset;
@@ -362,7 +363,7 @@ smb_file_open(struct inode *inode, struct file * file)
 	SMB_I(inode)->openers++;
 out:
 	unlock_kernel();
-	return 0;
+	return result;
 }
 
 static int

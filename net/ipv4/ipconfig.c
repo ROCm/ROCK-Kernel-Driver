@@ -109,7 +109,7 @@
  */
 int ic_set_manually __initdata = 0;		/* IPconfig parameters set manually */
 
-int ic_enable __initdata = 0;			/* IP config enabled? */
+static int ic_enable __initdata = 0;		/* IP config enabled? */
 
 /* Protocol choice */
 int ic_proto_enabled __initdata = 0
@@ -124,10 +124,10 @@ int ic_proto_enabled __initdata = 0
 #endif
 			;
 
-int ic_host_name_set __initdata = 0;		/* Host name set by us? */
+static int ic_host_name_set __initdata = 0;	/* Host name set by us? */
 
 u32 ic_myaddr = INADDR_NONE;		/* My IP address */
-u32 ic_netmask = INADDR_NONE;	/* Netmask for local subnet */
+static u32 ic_netmask = INADDR_NONE;	/* Netmask for local subnet */
 u32 ic_gateway = INADDR_NONE;	/* Gateway IP address */
 
 u32 ic_servaddr = INADDR_NONE;	/* Boot server IP address */
@@ -137,9 +137,9 @@ u8 root_server_path[256] = { 0, };	/* Path to mount as root */
 
 /* Persistent data: */
 
-int ic_proto_used;			/* Protocol used, if any */
-u32 ic_nameservers[CONF_NAMESERVERS_MAX]; /* DNS Server IP addresses */
-u8 ic_domain[64];		/* DNS (not NIS) domain name */
+static int ic_proto_used;			/* Protocol used, if any */
+static u32 ic_nameservers[CONF_NAMESERVERS_MAX]; /* DNS Server IP addresses */
+static u8 ic_domain[64];		/* DNS (not NIS) domain name */
 
 /*
  * Private state.
@@ -152,7 +152,7 @@ static char user_dev_name[IFNAMSIZ] __initdata = { 0, };
 static int ic_proto_have_if __initdata = 0;
 
 #ifdef IPCONFIG_DYNAMIC
-static spinlock_t ic_recv_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ic_recv_lock);
 static volatile int ic_got_reply __initdata = 0;    /* Proto(s) that replied */
 #endif
 #ifdef IPCONFIG_DHCP

@@ -312,10 +312,10 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 {
 	struct inode * inode = dentry->d_inode;
 	struct super_block * sb;
-	int ret;
+	int ret, err;
 
 	/* sync the inode to buffers */
-	write_inode_now(inode, 0);
+	ret = write_inode_now(inode, 0);
 
 	/* sync the superblock to buffers */
 	sb = inode->i_sb;
@@ -325,7 +325,9 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 	unlock_super(sb);
 
 	/* .. finally sync the buffers to disk */
-	ret = sync_blockdev(sb->s_bdev);
+	err = sync_blockdev(sb->s_bdev);
+	if (!ret)
+		ret = err;
 	return ret;
 }
 
@@ -348,18 +350,22 @@ asmlinkage long sys_fsync(unsigned int fd)
 		goto out_putf;
 	}
 
-	/* We need to protect against concurrent writers.. */
-	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(mapping);
+
+	/*
+	 * We need to protect against concurrent writers,
+	 * which could cause livelocks in fsync_buffers_list
+	 */
+	down(&mapping->host->i_sem);
 	err = file->f_op->fsync(file, file->f_dentry, 0);
 	if (!ret)
 		ret = err;
+	up(&mapping->host->i_sem);
 	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);
@@ -384,17 +390,17 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 
 	mapping = file->f_mapping;
 
-	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(mapping);
+	down(&mapping->host->i_sem);
 	err = file->f_op->fsync(file, file->f_dentry, 1);
 	if (!ret)
 		ret = err;
+	up(&mapping->host->i_sem);
 	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);
@@ -445,10 +451,11 @@ __find_get_block_slow(struct block_device *bdev, sector_t block, int unused)
 			all_mapped = 0;
 		bh = bh->b_this_page;
 	} while (bh != head);
-	/* we might be here because some of the buffers on this page are 
+
+	/* we might be here because some of the buffers on this page are
 	 * not mapped.  This is due to various races between
 	 * file io on the block device and getblk.  It gets dealt with
-	 * elsewhere, don't warn if we had some unmapped buffers
+	 * elsewhere, don't buffer_error if we had some unmapped buffers
 	 */
 	if (all_mapped) {
 		printk("__find_get_block_slow() failed. "

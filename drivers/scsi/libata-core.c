@@ -28,6 +28,7 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/mm.h>
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
 #include <linux/blkdev.h>
@@ -2421,7 +2422,6 @@ static void atapi_request_sense(struct ata_port *ap, struct ata_device *dev,
 	DECLARE_COMPLETION(wait);
 	struct ata_queued_cmd *qc;
 	unsigned long flags;
-	int using_pio = dev->flags & ATA_DFLAG_PIO;
 	int rc;
 
 	DPRINTK("ATAPI request sense\n");
@@ -2442,16 +2442,10 @@ static void atapi_request_sense(struct ata_port *ap, struct ata_device *dev,
 	qc->tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
 	qc->tf.command = ATA_CMD_PACKET;
 
-	if (using_pio) {
-		qc->tf.protocol = ATA_PROT_ATAPI;
-		qc->tf.lbam = (8 * 1024) & 0xff;
-		qc->tf.lbah = (8 * 1024) >> 8;
-
-		qc->nbytes = SCSI_SENSE_BUFFERSIZE;
-	} else {
-		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
-		qc->tf.feature |= ATAPI_PKT_DMA;
-	}
+	qc->tf.protocol = ATA_PROT_ATAPI;
+	qc->tf.lbam = (8 * 1024) & 0xff;
+	qc->tf.lbah = (8 * 1024) >> 8;
+	qc->nbytes = SCSI_SENSE_BUFFERSIZE;
 
 	qc->waiting = &wait;
 	qc->complete_fn = ata_qc_complete_noop;

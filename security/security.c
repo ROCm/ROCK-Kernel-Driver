@@ -38,8 +38,8 @@ static inline int verify(struct security_operations *ops)
 static void __init do_security_initcalls(void)
 {
 	initcall_t *call;
-	call = &__security_initcall_start;
-	while (call < &__security_initcall_end) {
+	call = __security_initcall_start;
+	while (call < __security_initcall_end) {
 		(*call) ();
 		call++;
 	}

@@ -83,7 +83,7 @@ void __init profile_init(void)
 #ifdef CONFIG_PROFILING
  
 static DECLARE_RWSEM(profile_rwsem);
-static rwlock_t handoff_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(handoff_lock);
 static struct notifier_block * task_exit_notifier;
 static struct notifier_block * task_free_notifier;
 static struct notifier_block * munmap_notifier;
@@ -326,17 +326,15 @@ static int __devinit profile_cpu_callback(struct notifier_block *info,
 		node = cpu_to_node(cpu);
 		per_cpu(cpu_profile_flip, cpu) = 0;
 		if (!per_cpu(cpu_profile_hits, cpu)[1]) {
-			page = alloc_pages_node(node, GFP_KERNEL, 0);
+			page = alloc_pages_node(node, GFP_KERNEL | __GFP_ZERO, 0);
 			if (!page)
 				return NOTIFY_BAD;
-			clear_highpage(page);
 			per_cpu(cpu_profile_hits, cpu)[1] = page_address(page);
 		}
 		if (!per_cpu(cpu_profile_hits, cpu)[0]) {
-			page = alloc_pages_node(node, GFP_KERNEL, 0);
+			page = alloc_pages_node(node, GFP_KERNEL | __GFP_ZERO, 0);
 			if (!page)
 				goto out_free;
-			clear_highpage(page);
 			per_cpu(cpu_profile_hits, cpu)[0] = page_address(page);
 		}
 		break;
@@ -510,16 +508,14 @@ static int __init create_hash_tables(void)
 		int node = cpu_to_node(cpu);
 		struct page *page;
 
-		page = alloc_pages_node(node, GFP_KERNEL, 0);
+		page = alloc_pages_node(node, GFP_KERNEL | __GFP_ZERO, 0);
 		if (!page)
 			goto out_cleanup;
-		clear_highpage(page);
 		per_cpu(cpu_profile_hits, cpu)[1]
 				= (struct profile_hit *)page_address(page);
-		page = alloc_pages_node(node, GFP_KERNEL, 0);
+		page = alloc_pages_node(node, GFP_KERNEL | __GFP_ZERO, 0);
 		if (!page)
 			goto out_cleanup;
-		clear_highpage(page);
 		per_cpu(cpu_profile_hits, cpu)[0]
 				= (struct profile_hit *)page_address(page);
 	}

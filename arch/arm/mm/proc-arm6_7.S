@@ -253,9 +253,6 @@ ENTRY(cpu_arm7_reset)
 __arm6_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c0		@ flush caches on v3
 		mcr	p15, 0, r0, c5, c0		@ flush TLBs on v3
-		mcr	p15, 0, r4, c2, c0		@ load page table pointer
-		mov	r0, #0x1f			@ Domains 0, 1 = client
-		mcr	p15, 0, r0, c3, c0		@ load domain access register
 		mov	r0, #0x3d			@ . ..RS BLDP WCAM
 		orr	r0, r0, #0x100			@ . ..01 0011 1101
 		mov	pc, lr
@@ -265,8 +262,6 @@ __arm6_setup:	mov	r0, #0
 __arm7_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c0		@ flush caches on v3
 		mcr	p15, 0, r0, c5, c0		@ flush TLBs on v3
-		mcr	p15, 0, r4, c2, c0		@ load page table pointer
-		mov	r0, #0x1f			@ Domains 0, 1 = client
 		mcr	p15, 0, r0, c3, c0		@ load domain access register
 		mov	r0, #0x7d			@ . ..RS BLDP WCAM
 		orr	r0, r0, #0x100			@ . ..01 0111 1101
@@ -391,7 +386,12 @@ __arm7_proc_info:
 __arm710_proc_info:
 		.long	0x41007100
 		.long	0xfff8ff00
-		.long	0x00000c1e
+		.long   PMD_TYPE_SECT | \
+			PMD_SECT_BUFFERABLE | \
+			PMD_SECT_CACHEABLE | \
+			PMD_BIT4 | \
+			PMD_SECT_AP_WRITE | \
+			PMD_SECT_AP_READ
 		b	__arm7_setup
 		.long	cpu_arch_name
 		.long	cpu_elf_name

@@ -17,51 +17,13 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
-#include <linux/ctype.h>
 #include <linux/cpufreq.h>
-#include <linux/sysctl.h>
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/sysfs.h>
 
 #include <asm/uaccess.h>
 
-#define CTL_CPU_VARS_SPEED_MAX(cpunr) { \
-                .ctl_name	= CPU_NR_FREQ_MAX, \
-                .data		= &cpu_max_freq[cpunr], \
-                .procname	= "speed-max", \
-                .maxlen		= sizeof(cpu_max_freq[cpunr]),\
-                .mode		= 0444, \
-                .proc_handler	= proc_dointvec, }
-
-#define CTL_CPU_VARS_SPEED_MIN(cpunr) { \
-                .ctl_name	= CPU_NR_FREQ_MIN, \
-                .data		= &cpu_min_freq[cpunr], \
-                .procname	= "speed-min", \
-                .maxlen		= sizeof(cpu_min_freq[cpunr]),\
-                .mode		= 0444, \
-                .proc_handler	= proc_dointvec, }
-
-#define CTL_CPU_VARS_SPEED(cpunr) { \
-                .ctl_name	= CPU_NR_FREQ, \
-                .procname	= "speed", \
-                .mode		= 0644, \
-                .proc_handler	= cpufreq_procctl, \
-                .strategy	= cpufreq_sysctl, \
-                .extra1		= (void*) (cpunr), }
-
-#define CTL_TABLE_CPU_VARS(cpunr) static ctl_table ctl_cpu_vars_##cpunr[] = {\
-                CTL_CPU_VARS_SPEED_MAX(cpunr), \
-                CTL_CPU_VARS_SPEED_MIN(cpunr), \
-                CTL_CPU_VARS_SPEED(cpunr),  \
-                { .ctl_name = 0, }, }
-
-/* the ctl_table entry for each CPU */
-#define CPU_ENUM(s) { \
-                .ctl_name	= (CPU_NR + s), \
-                .procname	= #s, \
-                .mode		= 0555, \
-                .child		= ctl_cpu_vars_##s }
 
 /**
  * A few values needed by the userspace governor
@@ -96,17 +58,17 @@ static struct notifier_block userspace_cpufreq_notifier_block = {
 
 
 /** 
- * _cpufreq_set - set the CPU frequency
+ * cpufreq_set - set the CPU frequency
  * @freq: target frequency in kHz
  * @cpu: CPU for which the frequency is to be set
  *
  * Sets the CPU frequency to freq.
  */
-static int _cpufreq_set(unsigned int freq, unsigned int cpu)
+static int cpufreq_set(unsigned int freq, unsigned int cpu)
 {
 	int ret = -EINVAL;
 
-	dprintk("_cpufreq_set for cpu %u, freq %u kHz\n", cpu, freq);
+	dprintk("cpufreq_set for cpu %u, freq %u kHz\n", cpu, freq);
 
 	down(&userspace_sem);
 	if (!cpu_is_managed[cpu])
@@ -135,358 +97,6 @@ static int _cpufreq_set(unsigned int freq, unsigned int cpu)
 }
 
 
-#ifdef CONFIG_CPU_FREQ_24_API
-
-#warning The /proc/sys/cpu/ and sysctl interface to cpufreq will be removed from the 2.6. kernel series soon after 2005-01-01
-
-static unsigned int warning_print = 0;
-
-int __deprecated cpufreq_set(unsigned int freq, unsigned int cpu)
-{
-	return _cpufreq_set(freq, cpu);
-}
-EXPORT_SYMBOL_GPL(cpufreq_set);
-
-
-/** 
- * cpufreq_setmax - set the CPU to the maximum frequency
- * @cpu - affected cpu;
- *
- * Sets the CPU frequency to the maximum frequency supported by
- * this CPU.
- */
-int __deprecated cpufreq_setmax(unsigned int cpu)
-{
-	if (!cpu_is_managed[cpu] || !cpu_online(cpu))
-		return -EINVAL;
-	return _cpufreq_set(cpu_max_freq[cpu], cpu);
-}
-EXPORT_SYMBOL_GPL(cpufreq_setmax);
-
-/*********************** cpufreq_sysctl interface ********************/
-static int
-cpufreq_procctl(ctl_table *ctl, int write, struct file *filp,
-		void __user *buffer, size_t *lenp, loff_t *ppos)
-{
-	char buf[16], *p;
-	int cpu = (long) ctl->extra1;
-	unsigned int len, left = *lenp;
-
-	if (!left || (*ppos && !write) || !cpu_online(cpu)) {
-		*lenp = 0;
-		return 0;
-	}
-
-	if (!warning_print) {
-		warning_print++;
-		printk(KERN_INFO "Access to /proc/sys/cpu/ is deprecated and "
-			"will be removed from (new) 2.6. kernels soon "
-			"after 2005-01-01\n");
-	}
-
-	if (write) {
-		unsigned int freq;
-
-		len = left;
-		if (left > sizeof(buf))
-			left = sizeof(buf);
-		if (copy_from_user(buf, buffer, left))
-			return -EFAULT;
-		buf[sizeof(buf) - 1] = '\0';
-
-		freq = simple_strtoul(buf, &p, 0);
-		_cpufreq_set(freq, cpu);
-	} else {
-		len = sprintf(buf, "%d\n", cpufreq_get(cpu));
-		if (len > left)
-			len = left;
-		if (copy_to_user(buffer, buf, len))
-			return -EFAULT;
-	}
-
-	*lenp = len;
-	*ppos += len;
-	return 0;
-}
-
-static int
-cpufreq_sysctl(ctl_table *table, int __user *name, int nlen,
-	       void __user *oldval, size_t __user *oldlenp,
-	       void __user *newval, size_t newlen, void **context)
-{
-	int cpu = (long) table->extra1;
-
-	if (!cpu_online(cpu))
-		return -EINVAL;
-
-	if (!warning_print) {
-		warning_print++;
-		printk(KERN_INFO "Access to /proc/sys/cpu/ is deprecated and "
-			"will be removed from (new) 2.6. kernels soon "
-			"after 2005-01-01\n");
-	}
-
-	if (oldval && oldlenp) {
-		size_t oldlen;
-
-		if (get_user(oldlen, oldlenp))
-			return -EFAULT;
-
-		if (oldlen != sizeof(unsigned int))
-			return -EINVAL;
-
-		if (put_user(cpufreq_get(cpu), (unsigned int __user *)oldval) ||
-		    put_user(sizeof(unsigned int), oldlenp))
-			return -EFAULT;
-	}
-	if (newval && newlen) {
-		unsigned int freq;
-
-		if (newlen != sizeof(unsigned int))
-			return -EINVAL;
-
-		if (get_user(freq, (unsigned int __user *)newval))
-			return -EFAULT;
-
-		_cpufreq_set(freq, cpu);
-	}
-	return 1;
-}
-
-/* ctl_table ctl_cpu_vars_{0,1,...,(NR_CPUS-1)} */
-/* due to NR_CPUS tweaking, a lot of if/endifs are required, sorry */
-        CTL_TABLE_CPU_VARS(0);
-#if NR_CPUS > 1
-	CTL_TABLE_CPU_VARS(1);
-#endif
-#if NR_CPUS > 2
-	CTL_TABLE_CPU_VARS(2);
-#endif
-#if NR_CPUS > 3
-	CTL_TABLE_CPU_VARS(3);
-#endif
-#if NR_CPUS > 4
-	CTL_TABLE_CPU_VARS(4);
-#endif
-#if NR_CPUS > 5
-	CTL_TABLE_CPU_VARS(5);
-#endif
-#if NR_CPUS > 6
-	CTL_TABLE_CPU_VARS(6);
-#endif
-#if NR_CPUS > 7
-	CTL_TABLE_CPU_VARS(7);
-#endif
-#if NR_CPUS > 8
-	CTL_TABLE_CPU_VARS(8);
-#endif
-#if NR_CPUS > 9
-	CTL_TABLE_CPU_VARS(9);
-#endif
-#if NR_CPUS > 10
-	CTL_TABLE_CPU_VARS(10);
-#endif
-#if NR_CPUS > 11
-	CTL_TABLE_CPU_VARS(11);
-#endif
-#if NR_CPUS > 12
-	CTL_TABLE_CPU_VARS(12);
-#endif
-#if NR_CPUS > 13
-	CTL_TABLE_CPU_VARS(13);
-#endif
-#if NR_CPUS > 14
-	CTL_TABLE_CPU_VARS(14);
-#endif
-#if NR_CPUS > 15
-	CTL_TABLE_CPU_VARS(15);
-#endif
-#if NR_CPUS > 16
-	CTL_TABLE_CPU_VARS(16);
-#endif
-#if NR_CPUS > 17
-	CTL_TABLE_CPU_VARS(17);
-#endif
-#if NR_CPUS > 18
-	CTL_TABLE_CPU_VARS(18);
-#endif
-#if NR_CPUS > 19
-	CTL_TABLE_CPU_VARS(19);
-#endif
-#if NR_CPUS > 20
-	CTL_TABLE_CPU_VARS(20);
-#endif
-#if NR_CPUS > 21
-	CTL_TABLE_CPU_VARS(21);
-#endif
-#if NR_CPUS > 22
-	CTL_TABLE_CPU_VARS(22);
-#endif
-#if NR_CPUS > 23
-	CTL_TABLE_CPU_VARS(23);
-#endif
-#if NR_CPUS > 24
-	CTL_TABLE_CPU_VARS(24);
-#endif
-#if NR_CPUS > 25
-	CTL_TABLE_CPU_VARS(25);
-#endif
-#if NR_CPUS > 26
-	CTL_TABLE_CPU_VARS(26);
-#endif
-#if NR_CPUS > 27
-	CTL_TABLE_CPU_VARS(27);
-#endif
-#if NR_CPUS > 28
-	CTL_TABLE_CPU_VARS(28);
-#endif
-#if NR_CPUS > 29
-	CTL_TABLE_CPU_VARS(29);
-#endif
-#if NR_CPUS > 30
-	CTL_TABLE_CPU_VARS(30);
-#endif
-#if NR_CPUS > 31
-	CTL_TABLE_CPU_VARS(31);
-#endif
-#if NR_CPUS > 32
-#error please extend CPU enumeration
-#endif
-
-/* due to NR_CPUS tweaking, a lot of if/endifs are required, sorry */
-static ctl_table ctl_cpu_table[NR_CPUS + 1] = {
-	CPU_ENUM(0),
-#if NR_CPUS > 1
-	CPU_ENUM(1),
-#endif
-#if NR_CPUS > 2
-	CPU_ENUM(2),
-#endif
-#if NR_CPUS > 3
-	CPU_ENUM(3),
-#endif
-#if NR_CPUS > 4
-	CPU_ENUM(4),
-#endif
-#if NR_CPUS > 5
-	CPU_ENUM(5),
-#endif
-#if NR_CPUS > 6
-	CPU_ENUM(6),
-#endif
-#if NR_CPUS > 7
-	CPU_ENUM(7),
-#endif
-#if NR_CPUS > 8
-	CPU_ENUM(8),
-#endif
-#if NR_CPUS > 9
-	CPU_ENUM(9),
-#endif
-#if NR_CPUS > 10
-	CPU_ENUM(10),
-#endif
-#if NR_CPUS > 11
-	CPU_ENUM(11),
-#endif
-#if NR_CPUS > 12
-	CPU_ENUM(12),
-#endif
-#if NR_CPUS > 13
-	CPU_ENUM(13),
-#endif
-#if NR_CPUS > 14
-	CPU_ENUM(14),
-#endif
-#if NR_CPUS > 15
-	CPU_ENUM(15),
-#endif
-#if NR_CPUS > 16
-	CPU_ENUM(16),
-#endif
-#if NR_CPUS > 17
-	CPU_ENUM(17),
-#endif
-#if NR_CPUS > 18
-	CPU_ENUM(18),
-#endif
-#if NR_CPUS > 19
-	CPU_ENUM(19),
-#endif
-#if NR_CPUS > 20
-	CPU_ENUM(20),
-#endif
-#if NR_CPUS > 21
-	CPU_ENUM(21),
-#endif
-#if NR_CPUS > 22
-	CPU_ENUM(22),
-#endif
-#if NR_CPUS > 23
-	CPU_ENUM(23),
-#endif
-#if NR_CPUS > 24
-	CPU_ENUM(24),
-#endif
-#if NR_CPUS > 25
-	CPU_ENUM(25),
-#endif
-#if NR_CPUS > 26
-	CPU_ENUM(26),
-#endif
-#if NR_CPUS > 27
-	CPU_ENUM(27),
-#endif
-#if NR_CPUS > 28
-	CPU_ENUM(28),
-#endif
-#if NR_CPUS > 29
-	CPU_ENUM(29),
-#endif
-#if NR_CPUS > 30
-	CPU_ENUM(30),
-#endif
-#if NR_CPUS > 31
-	CPU_ENUM(31),
-#endif
-#if NR_CPUS > 32
-#error please extend CPU enumeration
-#endif
-	{
-		.ctl_name	= 0,
-	}
-};
-
-static ctl_table ctl_cpu[2] = {
-	{
-		.ctl_name	= CTL_CPU,
-		.procname	= "cpu",
-		.mode		= 0555,
-		.child		= ctl_cpu_table,
-	},
-	{
-		.ctl_name	= 0,
-	}
-};
-
-static struct ctl_table_header *cpufreq_sysctl_table;
-
-static inline void cpufreq_sysctl_init(void)
-{
-	cpufreq_sysctl_table = register_sysctl_table(ctl_cpu, 0);
-}
-
-static inline void cpufreq_sysctl_exit(void)
-{
-	unregister_sysctl_table(cpufreq_sysctl_table);
-}
-
-#else
-#define cpufreq_sysctl_init() do {} while(0)
-#define cpufreq_sysctl_exit() do {} while(0)
-#endif /* CONFIG_CPU_FREQ_24API */
-
-
 /************************** sysfs interface ************************/
 static ssize_t show_speed (struct cpufreq_policy *policy, char *buf)
 {
@@ -503,7 +113,7 @@ store_speed (struct cpufreq_policy *policy, const char *buf, size_t count)
 	if (ret != 1)
 		return -EINVAL;
 
-	_cpufreq_set(freq, policy->cpu);
+	cpufreq_set(freq, policy->cpu);
 
 	return count;
 }
@@ -577,7 +187,6 @@ EXPORT_SYMBOL(cpufreq_gov_userspace);
 
 static int __init cpufreq_gov_userspace_init(void)
 {
-	cpufreq_sysctl_init();
 	cpufreq_register_notifier(&userspace_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
 	return cpufreq_register_governor(&cpufreq_gov_userspace);
 }
@@ -587,7 +196,6 @@ static void __exit cpufreq_gov_userspace_exit(void)
 {
 	cpufreq_unregister_governor(&cpufreq_gov_userspace);
         cpufreq_unregister_notifier(&userspace_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
-	cpufreq_sysctl_exit();
 }
 
 

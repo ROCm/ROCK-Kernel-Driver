@@ -527,10 +527,9 @@ static int is_good_config (char *buf, int len)
 		return 0;
 	}
 
-	le16_to_cpus (&config->wTotalLength);
-	if (config->wTotalLength == len)		/* read it all */
+	if (le16_to_cpu(config->wTotalLength) == len)		/* read it all */
 		return 1;
-	if (config->wTotalLength >= TBUF_SIZE)		/* max partial read */
+	if (le16_to_cpu(config->wTotalLength) >= TBUF_SIZE)		/* max partial read */
 		return 1;
 	dbg ("bogus config descriptor read size");
 	return 0;
@@ -636,7 +635,7 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 	}
 
 	/* and sometimes [9.2.6.6] speed dependent descriptors */
-	if (udev->descriptor.bcdUSB == 0x0200) {	/* pre-swapped */
+	if (le16_to_cpu(udev->descriptor.bcdUSB) == 0x0200) {
 		struct usb_qualifier_descriptor		*d = NULL;
 
 		/* device qualifier [9.6.2] */
@@ -954,13 +953,13 @@ test_ctrl_queue (struct usbtest_dev *dev, struct usbtest_param *param)
 		case 13:	// short read, resembling case 10
 			req.wValue = cpu_to_le16 ((USB_DT_CONFIG << 8) | 0);
 			// last data packet "should" be DATA1, not DATA0
-			len = 1024 - udev->epmaxpacketin [0];
+			len = 1024 - udev->descriptor.bMaxPacketSize0;
 			expected = -EREMOTEIO;
 			break;
 		case 14:	// short read; try to fill the last packet
 			req.wValue = cpu_to_le16 ((USB_DT_DEVICE << 8) | 0);
 			// device descriptor size == 18 bytes 
-			len = udev->epmaxpacketin [0];
+			len = udev->descriptor.bMaxPacketSize0;
 			switch (len) {
 			case 8:		len = 24; break;
 			case 16:	len = 32; break;
@@ -1205,7 +1204,7 @@ static int halt_simple (struct usbtest_dev *dev)
 	struct urb	*urb;
 
 	urb = simple_alloc_urb (testdev_to_usbdev (dev), 0, 512);
-	if (urb == 0)
+	if (urb == NULL)
 		return -ENOMEM;
 
 	if (dev->in_pipe) {
@@ -1372,8 +1371,8 @@ static struct urb *iso_alloc_urb (
 
 	if (bytes < 0 || !desc)
 		return NULL;
-	maxp = 0x7ff & desc->wMaxPacketSize;
-	maxp *= 1 + (0x3 & (desc->wMaxPacketSize >> 11));
+	maxp = 0x7ff & le16_to_cpu(desc->wMaxPacketSize);
+	maxp *= 1 + (0x3 & (le16_to_cpu(desc->wMaxPacketSize) >> 11));
 	packets = (bytes + maxp - 1) / maxp;
 
 	urb = usb_alloc_urb (packets, SLAB_KERNEL);
@@ -1433,7 +1432,7 @@ test_iso_queue (struct usbtest_dev *dev, struct usbtest_param *param,
 		"... iso period %d %sframes, wMaxPacket %04x\n",
 		1 << (desc->bInterval - 1),
 		(udev->speed == USB_SPEED_HIGH) ? "micro" : "",
-		desc->wMaxPacketSize);
+		le16_to_cpu(desc->wMaxPacketSize));
 
 	for (i = 0; i < param->sglen; i++) {
 		urbs [i] = iso_alloc_urb (udev, pipe, desc,
@@ -1842,13 +1841,13 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 	/* specify devices by module parameters? */
 	if (id->match_flags == 0) {
 		/* vendor match required, product match optional */
-		if (!vendor || udev->descriptor.idVendor != (u16)vendor)
+		if (!vendor || le16_to_cpu(udev->descriptor.idVendor) != (u16)vendor)
 			return -ENODEV;
-		if (product && udev->descriptor.idProduct != (u16)product)
+		if (product && le16_to_cpu(udev->descriptor.idProduct) != (u16)product)
 			return -ENODEV;
 		dbg ("matched module params, vend=0x%04x prod=0x%04x",
-				udev->descriptor.idVendor,
-				udev->descriptor.idProduct);
+				le16_to_cpu(udev->descriptor.idVendor),
+				le16_to_cpu(udev->descriptor.idProduct));
 	}
 #endif
 
@@ -1863,7 +1862,7 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 	dev->intf = intf;
 
 	/* cacheline-aligned scratch for i/o */
-	if ((dev->buf = kmalloc (TBUF_SIZE, SLAB_KERNEL)) == 0) {
+	if ((dev->buf = kmalloc (TBUF_SIZE, SLAB_KERNEL)) == NULL) {
 		kfree (dev);
 		return -ENOMEM;
 	}

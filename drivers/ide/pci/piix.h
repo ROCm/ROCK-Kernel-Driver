@@ -5,7 +5,7 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-static void init_setup_piix(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_piix(struct pci_dev *, ide_pci_device_t *);
 static unsigned int __devinit init_chipset_piix(struct pci_dev *, const char *);
 static void init_hwif_piix(ide_hwif_t *);
 
@@ -59,6 +59,7 @@ static ide_pci_device_t piix_pci_info[] __devinitdata = {
 	/* 19 */ DECLARE_PIIX_DEV("ICH5"),
 	/* 20 */ DECLARE_PIIX_DEV("ICH6"),
 	/* 21 */ DECLARE_PIIX_DEV("ICH7"),
+	/* 22 */ DECLARE_PIIX_DEV("ICH4"),
 };
 
 #endif /* PIIX_H */

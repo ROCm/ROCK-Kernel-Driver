@@ -59,19 +59,19 @@ struct rt_sigframe_ia32
        int sig;
        int pinfo;
        int puc;
-       siginfo_t32 info;
+       compat_siginfo_t info;
        struct ucontext_ia32 uc;
        struct _fpstate_ia32 fpstate;
        char retcode[8];
 };
 
 int
-copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 __user *from)
+copy_siginfo_from_user32 (siginfo_t *to, compat_siginfo_t __user *from)
 {
 	unsigned long tmp;
 	int err;
 
-	if (!access_ok(VERIFY_READ, from, sizeof(siginfo_t32)))
+	if (!access_ok(VERIFY_READ, from, sizeof(compat_siginfo_t)))
 		return -EFAULT;
 
 	err = __get_user(to->si_signo, &from->si_signo);
@@ -110,12 +110,12 @@ copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 __user *from)
 }
 
 int
-copy_siginfo_to_user32 (siginfo_t32 __user *to, siginfo_t *from)
+copy_siginfo_to_user32 (compat_siginfo_t __user *to, siginfo_t *from)
 {
 	unsigned int addr;
 	int err;
 
-	if (!access_ok(VERIFY_WRITE, to, sizeof(siginfo_t32)))
+	if (!access_ok(VERIFY_WRITE, to, sizeof(compat_siginfo_t)))
 		return -EFAULT;
 
 	/* If you change siginfo_t structure, please be sure
@@ -589,34 +589,7 @@ sys32_rt_sigprocmask (int how, compat_sigset_t __user *set, compat_sigset_t __us
 }
 
 asmlinkage long
-sys32_rt_sigtimedwait (compat_sigset_t __user *uthese, siginfo_t32 __user *uinfo,
-		       struct compat_timespec __user *uts, unsigned int sigsetsize)
-{
-	mm_segment_t old_fs = get_fs();
-	struct timespec t;
-	siginfo_t info;
-	sigset_t s;
-	int ret;
-
-	if (copy_from_user(&s.sig, uthese, sizeof(compat_sigset_t)))
-		return -EFAULT;
-	if (uts && get_compat_timespec(&t, uts))
-		return -EFAULT;
-	set_fs(KERNEL_DS);
-	ret = sys_rt_sigtimedwait((sigset_t __user *) &s,
-				  uinfo ? (siginfo_t __user *) &info : NULL,
-				  uts ? (struct timespec __user *) &t : NULL,
-				  sigsetsize);
-	set_fs(old_fs);
-	if (ret >= 0 && uinfo) {
-		if (copy_siginfo_to_user32(uinfo, &info))
-			return -EFAULT;
-	}
-	return ret;
-}
-
-asmlinkage long
-sys32_rt_sigqueueinfo (int pid, int sig, siginfo_t32 __user *uinfo)
+sys32_rt_sigqueueinfo (int pid, int sig, compat_siginfo_t __user *uinfo)
 {
 	mm_segment_t old_fs = get_fs();
 	siginfo_t info;

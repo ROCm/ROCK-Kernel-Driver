@@ -144,7 +144,7 @@ static struct net_proto_family *net_families[NPROTO];
 
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 static atomic_t net_family_lockct = ATOMIC_INIT(0);
-static spinlock_t net_family_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(net_family_lock);
 
 /* The strategy is: modifications net_family vector are short, do not
    sleep and veeery rare, but read access should be free of any exclusive
@@ -736,8 +736,9 @@ ssize_t sock_sendpage(struct file *file, struct page *page,
 	return sock->ops->sendpage(sock, page, offset, size, flags);
 }
 
-int sock_readv_writev(int type, struct inode * inode, struct file * file,
-		      const struct iovec * iov, long count, size_t size)
+static int sock_readv_writev(int type, struct inode * inode,
+			     struct file * file, const struct iovec * iov,
+			     long count, size_t size)
 {
 	struct msghdr msg;
 	struct socket *sock;
@@ -1073,7 +1074,6 @@ int sock_wake_async(struct socket *sock, int how, int band)
 
 static int __sock_create(int family, int type, int protocol, struct socket **res, int kern)
 {
-	int i;
 	int err;
 	struct socket *sock;
 
@@ -1118,7 +1118,7 @@ static int __sock_create(int family, int type, int protocol, struct socket **res
 
 	net_family_read_lock();
 	if (net_families[family] == NULL) {
-		i = -EAFNOSUPPORT;
+		err = -EAFNOSUPPORT;
 		goto out;
 	}
 
@@ -1128,10 +1128,9 @@ static int __sock_create(int family, int type, int protocol, struct socket **res
  *	default.
  */
 
-	if (!(sock = sock_alloc())) 
-	{
+	if (!(sock = sock_alloc())) {
 		printk(KERN_WARNING "socket: no more sockets\n");
-		i = -ENFILE;		/* Not exactly a match, but its the
+		err = -ENFILE;		/* Not exactly a match, but its the
 					   closest posix thing */
 		goto out;
 	}
@@ -1142,11 +1141,11 @@ static int __sock_create(int family, int type, int protocol, struct socket **res
 	 * We will call the ->create function, that possibly is in a loadable
 	 * module, so we have to bump that loadable module refcnt first.
 	 */
-	i = -EAFNOSUPPORT;
+	err = -EAFNOSUPPORT;
 	if (!try_module_get(net_families[family]->owner))
 		goto out_release;
 
-	if ((i = net_families[family]->create(sock, protocol)) < 0)
+	if ((err = net_families[family]->create(sock, protocol)) < 0)
 		goto out_module_put;
 	/*
 	 * Now to bump the refcnt of the [loadable] module that owns this
@@ -1166,7 +1165,7 @@ static int __sock_create(int family, int type, int protocol, struct socket **res
 
 out:
 	net_family_read_unlock();
-	return i;
+	return err;
 out_module_put:
 	module_put(net_families[family]->owner);
 out_release:

@@ -87,7 +87,7 @@ static int usb_parse_endpoint(struct device *ddev, int cfgno, int inum,
 	++ifp->desc.bNumEndpoints;
 
 	memcpy(&endpoint->desc, d, n);
-	le16_to_cpus(&endpoint->desc.wMaxPacketSize);
+	INIT_LIST_HEAD(&endpoint->urb_list);
 
 	/* Skip over any Class Specific or Vendor Specific descriptors;
 	 * find the next endpoint or interface descriptor */
@@ -319,7 +319,7 @@ int usb_parse_configuration(struct device *ddev, int cfgidx,
 
 	}	/* for ((buffer2 = buffer, size2 = size); ...) */
 	size = buffer2 - buffer;
-	config->desc.wTotalLength = buffer2 - buffer0;
+	config->desc.wTotalLength = cpu_to_le16(buffer2 - buffer0);
 
 	if (n != nintf)
 		dev_warn(ddev, "config %d has %d interface%s, different from "

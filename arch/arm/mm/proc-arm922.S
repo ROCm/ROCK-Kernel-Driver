@@ -386,32 +386,26 @@ __arm922_setup:
 	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches on v4
 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer on v4
 	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs on v4
-	mcr	p15, 0, r4, c2, c0		@ load page table pointer
-	mov	r0, #0x1f			@ Domains 0, 1 = client
-	mcr	p15, 0, r0, c3, c0		@ load domain access register
 	mrc	p15, 0, r0, c1, c0		@ get control register v4
-/*
- * Clear out 'unwanted' bits (then put them in if we need them)
- */
-						@   VI ZFRS BLDP WCAM
-	bic	r0, r0, #0x0e00
-	bic	r0, r0, #0x0002
-	bic	r0, r0, #0x000c
-	bic	r0, r0, #0x1000			@ ...0 000. .... 000.
-/*
- * Turn on what we want
- */
-	orr	r0, r0, #0x0031
-	orr	r0, r0, #0x2100			@ ..1. ...1 ..11 ...1
-
-#ifndef CONFIG_CPU_DCACHE_DISABLE
-	orr	r0, r0, #0x0004			@ .... .... .... .1..
-#endif
-#ifndef CONFIG_CPU_ICACHE_DISABLE
-	orr	r0, r0, #0x1000			@ ...1 .... .... ....
-#endif
+	ldr	r5, arm922_cr1_clear
+	bic	r0, r0, r5
+	ldr	r5, arm922_cr1_set
+	orr	r0, r0, r5
 	mov	pc, lr
 	.size	__arm922_setup, . - __arm922_setup
+
+	/*
+	 *  R
+	 * .RVI ZFRS BLDP WCAM
+	 * ..11 0001 ..11 0101
+	 * 
+	 */
+	.type	arm922_cr1_clear, #object
+	.type	arm922_cr1_set, #object
+arm922_cr1_clear:
+	.word	0x3f3f
+arm922_cr1_set:
+	.word	0x3135
 
 	__INITDATA
 
@@ -468,7 +462,12 @@ cpu_arm922_name:
 __arm922_proc_info:
 	.long	0x41009220
 	.long	0xff00fff0
-	.long	0x00000c1e			@ mmuflags
+	.long   PMD_TYPE_SECT | \
+		PMD_SECT_BUFFERABLE | \
+		PMD_SECT_CACHEABLE | \
+		PMD_BIT4 | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__arm922_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name

@@ -211,7 +211,7 @@ static __inline__ int opt_unrec(struct sk_buff *skb, __u32 offset)
 	return (*op & 0xC0) == 0x80;
 }
 
-int icmpv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct icmp6hdr *thdr, int len)
+static int icmpv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct icmp6hdr *thdr, int len)
 {
 	struct sk_buff *skb;
 	struct icmp6hdr *icmp6h;

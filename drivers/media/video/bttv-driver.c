@@ -315,12 +315,12 @@ const struct bttv_tvnorm bttv_tvnorms[] = {
 		.sram           = -1,
 	}
 };
-const unsigned int BTTV_TVNORMS = ARRAY_SIZE(bttv_tvnorms);
+static const unsigned int BTTV_TVNORMS = ARRAY_SIZE(bttv_tvnorms);
 
 /* ----------------------------------------------------------------------- */
 /* bttv format list
    packed pixel formats must come first */
-const struct bttv_format bttv_formats[] = {
+static const struct bttv_format bttv_formats[] = {
 	{
 		.name     = "8 bpp, gray",
 		.palette  = VIDEO_PALETTE_GREY,
@@ -472,7 +472,7 @@ const struct bttv_format bttv_formats[] = {
 		.flags    = FORMAT_FLAGS_RAW,
 	}
 };
-const unsigned int BTTV_FORMATS = ARRAY_SIZE(bttv_formats);
+static const unsigned int BTTV_FORMATS = ARRAY_SIZE(bttv_formats);
 
 /* ----------------------------------------------------------------------- */
 
@@ -621,7 +621,7 @@ static const struct v4l2_queryctrl bttv_ctls[] = {
 	}
 
 };
-const int BTTV_CTLS = ARRAY_SIZE(bttv_ctls);
+static const int BTTV_CTLS = ARRAY_SIZE(bttv_ctls);
 
 /* ----------------------------------------------------------------------- */
 /* resource management                                                     */
@@ -757,7 +757,7 @@ static void set_pll(struct bttv *btv)
 }
 
 /* used to switch between the bt848's analog/digital video capture modes */
-void bt848A_set_timing(struct bttv *btv)
+static void bt848A_set_timing(struct bttv *btv)
 {
 	int i, len;
 	int table_idx = bttv_tvnorms[btv->tvnorm].sram;
@@ -3037,7 +3037,7 @@ static struct video_device bttv_video_template =
 	.minor    = -1,
 };
 
-struct video_device bttv_vbi_template =
+static struct video_device bttv_vbi_template =
 {
 	.name     = "bt848/878 vbi",
 	.type     = VID_TYPE_TUNER|VID_TYPE_TELETEXT,
@@ -3949,7 +3949,7 @@ static int bttv_suspend(struct pci_dev *pci_dev, u32 state)
 
 	/* save pci state */
 	pci_save_state(pci_dev);
-	if (0 != pci_set_power_state(pci_dev, state)) {
+	if (0 != pci_set_power_state(pci_dev, pci_choose_state(pci_dev, state))) {
 		pci_disable_device(pci_dev);
 		btv->state.disabled = 1;
 	}
@@ -3968,7 +3968,7 @@ static int bttv_resume(struct pci_dev *pci_dev)
 		pci_enable_device(pci_dev);
 		btv->state.disabled = 0;
 	}
-	pci_set_power_state(pci_dev, 0);
+	pci_set_power_state(pci_dev, PCI_D0);
 	pci_restore_state(pci_dev);
 
 	/* restore bt878 state */

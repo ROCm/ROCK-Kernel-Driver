@@ -58,7 +58,6 @@
 #define Dprintk(x...)
 #endif
 
-extern int cpu_idle(void);
 extern cpumask_t cpu_initialized;
 
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
@@ -248,7 +247,7 @@ static void __init init_ipi_lock(void)
 	int ipi;
 
 	for (ipi = 0 ; ipi < NR_IPIS ; ipi++)
-		ipi_lock[ipi] = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&ipi_lock[ipi]);
 }
 
 /*==========================================================================*
@@ -443,7 +442,8 @@ int __init start_secondary(void *unused)
 	 */
 	local_flush_tlb_all();
 
-	return cpu_idle();
+	cpu_idle();
+	return 0;
 }
 
 /*==========================================================================*

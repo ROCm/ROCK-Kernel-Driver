@@ -47,7 +47,7 @@
 
 static struct proto_ops econet_ops;
 static struct hlist_head econet_sklist;
-static rwlock_t econet_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(econet_lock);
 
 /* Since there are only 256 possible network numbers (or fewer, depends
    how you count) it makes sense to use a simple lookup table. */

@@ -340,6 +340,8 @@ static struct pci_driver agp_sis_pci_driver = {
 
 static int __init agp_sis_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_sis_pci_driver);
 }
 
@@ -351,8 +353,8 @@ static void __exit agp_sis_cleanup(void)
 module_init(agp_sis_init);
 module_exit(agp_sis_cleanup);
 
-MODULE_PARM(agp_sis_force_delay,"i");
+module_param(agp_sis_force_delay, bool, 0);
 MODULE_PARM_DESC(agp_sis_force_delay,"forces sis delay hack");
-MODULE_PARM(agp_sis_agp_spec,"i");
+module_param(agp_sis_agp_spec, int, 0);
 MODULE_PARM_DESC(agp_sis_agp_spec,"0=force sis init, 1=force generic agp3 init, default: autodetect");
 MODULE_LICENSE("GPL and additional rights");

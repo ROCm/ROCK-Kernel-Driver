@@ -9,7 +9,7 @@
  *
  * /proc interface for the dasd driver.
  *
- * $Revision: 1.27 $
+ * $Revision: 1.30 $
  */
 
 #include <linux/config.h>
@@ -248,7 +248,9 @@ dasd_statistics_write(struct file *file, const char __user *user_buf,
 	if (user_len > 65536)
 		user_len = 65536;
 	buffer = dasd_get_user_string(user_buf, user_len);
-	MESSAGE(KERN_INFO, "/proc/dasd/statictics: '%s'", buffer);
+	if (IS_ERR(buffer))
+		return PTR_ERR(buffer);
+	MESSAGE_LOG(KERN_INFO, "/proc/dasd/statictics: '%s'", buffer);
 
 	/* check for valid verbs */
 	for (str = buffer; isspace(*str); str++);
@@ -258,20 +260,20 @@ dasd_statistics_write(struct file *file, const char __user *user_buf,
 		if (strcmp(str, "on") == 0) {
 			/* switch on statistics profiling */
 			dasd_profile_level = DASD_PROFILE_ON;
-			MESSAGE(KERN_INFO, "%s", "Statictics switched on");
+			MESSAGE(KERN_INFO, "%s", "Statistics switched on");
 		} else if (strcmp(str, "off") == 0) {
 			/* switch off and reset statistics profiling */
 			memset(&dasd_global_profile,
 			       0, sizeof (struct dasd_profile_info_t));
 			dasd_profile_level = DASD_PROFILE_OFF;
-			MESSAGE(KERN_INFO, "%s", "Statictics switched off");
+			MESSAGE(KERN_INFO, "%s", "Statistics switched off");
 		} else
 			goto out_error;
 	} else if (strncmp(str, "reset", 5) == 0) {
 		/* reset the statistics */
 		memset(&dasd_global_profile, 0,
 		       sizeof (struct dasd_profile_info_t));
-		MESSAGE(KERN_INFO, "%s", "Statictics reset");
+		MESSAGE(KERN_INFO, "%s", "Statistics reset");
 	} else
 		goto out_error;
 	kfree(buffer);

@@ -40,7 +40,4 @@
  */
 #define MCA_NUMADAPTERS (MCA_MAX_SLOT_NR+3)
 
-/* lock to protect access to the MCA registers */
-extern spinlock_t mca_lock;
-
 #endif

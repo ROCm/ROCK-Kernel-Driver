@@ -182,20 +182,19 @@ static char *open_min_error[] = {
 
 static int ringspeed[STREAMER_MAX_ADAPTERS] = { 0, };
 
-MODULE_PARM(ringspeed, "1-" __MODULE_STRING(STREAMER_MAX_ADAPTERS) "i");
+module_param_array(ringspeed, int, NULL, 0);
 
 /* Packet buffer size */
 
 static int pkt_buf_sz[STREAMER_MAX_ADAPTERS] = { 0, };
 
-MODULE_PARM(pkt_buf_sz, "1-" __MODULE_STRING(STREAMER_MAX_ADAPTERS) "i");
+module_param_array(pkt_buf_sz, int, NULL, 0);
 
 /* Message Level */
 
 static int message_level[STREAMER_MAX_ADAPTERS] = { 1, };
 
-MODULE_PARM(message_level,
-	    "1-" __MODULE_STRING(STREAMER_MAX_ADAPTERS) "i");
+module_param_array(message_level, int, NULL, 0);
 
 #if STREAMER_IOCTL
 static int streamer_ioctl(struct net_device *, struct ifreq *, int);
@@ -443,7 +442,7 @@ static void __devexit streamer_remove_one(struct pci_dev *pdev)
 static int streamer_reset(struct net_device *dev)
 {
 	struct streamer_private *streamer_priv;
-	__u8 *streamer_mmio;
+	__u8 __iomem *streamer_mmio;
 	unsigned long t;
 	unsigned int uaa_addr;
 	struct sk_buff *skb = NULL;
@@ -591,7 +590,7 @@ static int streamer_reset(struct net_device *dev)
 static int streamer_open(struct net_device *dev)
 {
 	struct streamer_private *streamer_priv = (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 	unsigned long flags;
 	char open_error[255];
 	int i, open_finished = 1;
@@ -908,7 +907,7 @@ static void streamer_rx(struct net_device *dev)
 {
 	struct streamer_private *streamer_priv =
 	    (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 	struct streamer_rx_desc *rx_desc;
 	int rx_ring_last_received, length, frame_length, buffer_cnt = 0;
 	struct sk_buff *skb, *skb2;
@@ -1035,7 +1034,7 @@ static irqreturn_t streamer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct streamer_private *streamer_priv =
 	    (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 	__u16 sisr;
 	__u16 misr;
 	u8 max_intr = MAX_INTR;
@@ -1158,7 +1157,7 @@ static int streamer_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct streamer_private *streamer_priv =
 	    (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 	unsigned long flags ;
 
 	spin_lock_irqsave(&streamer_priv->streamer_lock, flags);
@@ -1209,7 +1208,7 @@ static int streamer_close(struct net_device *dev)
 {
 	struct streamer_private *streamer_priv =
 	    (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 	unsigned long flags;
 	int i;
 
@@ -1275,7 +1274,7 @@ static void streamer_set_rx_mode(struct net_device *dev)
 {
 	struct streamer_private *streamer_priv =
 	    (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 	__u8 options = 0;
 	struct dev_mc_list *dmi;
 	unsigned char dev_mc_address[5];
@@ -1334,7 +1333,7 @@ static void streamer_set_rx_mode(struct net_device *dev)
 static void streamer_srb_bh(struct net_device *dev)
 {
 	struct streamer_private *streamer_priv = (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 	__u16 srb_word;
 
 	writew(streamer_priv->srb, streamer_mmio + LAPA);
@@ -1531,7 +1530,7 @@ static void streamer_arb_cmd(struct net_device *dev)
 {
 	struct streamer_private *streamer_priv =
 	    (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 	__u8 header_len;
 	__u16 frame_len, buffer_len;
 	struct sk_buff *mac_frame;
@@ -1747,7 +1746,7 @@ static void streamer_asb_bh(struct net_device *dev)
 {
 	struct streamer_private *streamer_priv =
 	    (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 
 	if (streamer_priv->asb_queued == 1) 
 	{
@@ -1855,7 +1854,7 @@ static int sprintf_info(char *buffer, struct net_device *dev)
 {
 	struct streamer_private *streamer_priv =
 	    (struct streamer_private *) dev->priv;
-	__u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	__u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 	struct streamer_adapter_addr_table sat;
 	struct streamer_parameters_table spt;
 	int size = 0;
@@ -1939,7 +1938,7 @@ static int streamer_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
         int i;
 	struct streamer_private *streamer_priv = (struct streamer_private *) dev->priv;
-	u8 *streamer_mmio = streamer_priv->streamer_mmio;
+	u8 __iomem *streamer_mmio = streamer_priv->streamer_mmio;
 
 	switch(cmd) {
 	case IOCTL_SISR_MASK:

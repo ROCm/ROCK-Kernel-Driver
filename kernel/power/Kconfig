@@ -48,7 +48,7 @@ config SOFTWARE_SUSPEND
 	  involved in suspending. Also in this case there is a risk that buffers
 	  on disk won't match with saved ones.
 
-	  For more information take a look at Documentation/power/swsusp.txt.
+	  For more information take a look at <file:Documentation/power/swsusp.txt>.
 
 config PM_STD_PARTITION
 	string "Default resume partition"

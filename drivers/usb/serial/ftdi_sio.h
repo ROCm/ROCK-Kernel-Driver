@@ -240,6 +240,12 @@
 #define FTDI_RM_VID		0x0403	/* Vendor  Id */
 #define FTDI_RMCANVIEW_PID	0xfd60	/* Product Id */
 
+/*
+ * EVER Eco Pro UPS (http://www.ever.com.pl/)
+ */
+
+#define	EVER_ECO_PRO_CDS	0xe520	/* RS-232 converter */
+
 /* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */
@@ -249,6 +255,8 @@
 #define FTDI_SIO_GET_MODEM_STATUS	5 /* Retrieve current value of modern status register */
 #define FTDI_SIO_SET_EVENT_CHAR	6 /* Set the event character */
 #define FTDI_SIO_SET_ERROR_CHAR	7 /* Set the error character */
+#define FTDI_SIO_SET_LATENCY_TIMER	9 /* Set the latency timer */
+#define FTDI_SIO_GET_LATENCY_TIMER	10 /* Get the latency timer */
 
 /* Port interface code for FT2232C */
 #define INTERFACE_A		1
@@ -502,6 +510,55 @@ typedef enum {
  * and the lValue field contains the XON character.
  */  
  
+/*
+ * FTDI_SIO_GET_LATENCY_TIMER
+ *
+ * Set the timeout interval. The FTDI collects data from the slave
+ * device, transmitting it to the host when either A) 62 bytes are
+ * received, or B) the timeout interval has elapsed and the buffer
+ * contains at least 1 byte.  Setting this value to a small number
+ * can dramatically improve performance for applications which send
+ * small packets, since the default value is 16ms.
+ */
+#define  FTDI_SIO_GET_LATENCY_TIMER_REQUEST FTDI_SIO_GET_LATENCY_TIMER
+#define  FTDI_SIO_GET_LATENCY_TIMER_REQUEST_TYPE 0xC0
+
+/* 
+ *  BmRequestType:   1100 0000b
+ *  bRequest:        FTDI_SIO_GET_LATENCY_TIMER
+ *  wValue:          0
+ *  wIndex:          Port
+ *  wLength:         0
+ *  Data:            latency (on return)
+ */
+
+/* 
+ * FTDI_SIO_SET_LATENCY_TIMER
+ *
+ * Set the timeout interval. The FTDI collects data from the slave
+ * device, transmitting it to the host when either A) 62 bytes are
+ * received, or B) the timeout interval has elapsed and the buffer
+ * contains at least 1 byte.  Setting this value to a small number
+ * can dramatically improve performance for applications which send
+ * small packets, since the default value is 16ms.
+ */
+#define  FTDI_SIO_SET_LATENCY_TIMER_REQUEST FTDI_SIO_SET_LATENCY_TIMER
+#define  FTDI_SIO_SET_LATENCY_TIMER_REQUEST_TYPE 0x40
+
+/* 
+ *  BmRequestType:   0100 0000b
+ *  bRequest:        FTDI_SIO_SET_LATENCY_TIMER
+ *  wValue:          Latency (milliseconds)
+ *  wIndex:          Port
+ *  wLength:         0
+ *  Data:            None
+ *
+ * wValue:
+ *   B0..7   Latency timer
+ *   B8..15  0
+ *
+ */
+
 /*
  * FTDI_SIO_SET_EVENT_CHAR 
  *

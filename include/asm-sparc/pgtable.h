@@ -9,6 +9,8 @@
  *  Copyright (C) 1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
  */
 
+#include <asm-generic/4level-fixup.h>
+
 #include <linux/config.h>
 #include <linux/spinlock.h>
 #include <linux/swap.h>

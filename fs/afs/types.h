@@ -26,8 +26,6 @@ typedef enum {
 	AFSVL_BACKVOL,			/* backup volume */
 } __attribute__((packed)) afs_voltype_t;
 
-extern const char *afs_voltypes[];
-
 typedef enum {
 	AFS_FTYPE_INVALID	= 0,
 	AFS_FTYPE_FILE		= 1,

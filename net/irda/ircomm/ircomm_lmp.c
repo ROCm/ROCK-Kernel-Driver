@@ -41,44 +41,6 @@
 #include <net/irda/ircomm_event.h>
 #include <net/irda/ircomm_lmp.h>
 
-/*
- * Function ircomm_open_lsap (self)
- *
- *    Open LSAP. This function will only be used when using "raw" services
- *
- */
-int ircomm_open_lsap(struct ircomm_cb *self)
-{
-	notify_t notify;
-	
-	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
-	
-        /* Register callbacks */
-        irda_notify_init(&notify);
-	notify.data_indication       = ircomm_lmp_data_indication;
-	notify.connect_confirm       = ircomm_lmp_connect_confirm;
-        notify.connect_indication    = ircomm_lmp_connect_indication;
-	notify.disconnect_indication = ircomm_lmp_disconnect_indication;
-	notify.instance = self;
-	strlcpy(notify.name, "IrCOMM", sizeof(notify.name));
-
-	self->lsap = irlmp_open_lsap(LSAP_ANY, &notify, 0);
-	if (!self->lsap) {
-		IRDA_DEBUG(0,"%sfailed to allocate tsap\n", __FUNCTION__ );
-		return -1;
-	}
-	self->slsap_sel = self->lsap->slsap_sel;
-
-	/*
-	 *  Initialize the call-table for issuing commands
-	 */
-	self->issue.data_request       = ircomm_lmp_data_request;
-	self->issue.connect_request    = ircomm_lmp_connect_request;
-	self->issue.connect_response   = ircomm_lmp_connect_response;
-	self->issue.disconnect_request = ircomm_lmp_disconnect_request;
-
-	return 0;
-}
 
 /*
  * Function ircomm_lmp_connect_request (self, userdata)
@@ -86,9 +48,9 @@ int ircomm_open_lsap(struct ircomm_cb *self)
  *    
  *
  */
-int ircomm_lmp_connect_request(struct ircomm_cb *self, 
-			       struct sk_buff *userdata, 
-			       struct ircomm_info *info)
+static int ircomm_lmp_connect_request(struct ircomm_cb *self, 
+				      struct sk_buff *userdata, 
+				      struct ircomm_info *info)
 {
 	int ret = 0;
 
@@ -109,7 +71,8 @@ int ircomm_lmp_connect_request(struct ircomm_cb *self,
  *    
  *
  */
-int ircomm_lmp_connect_response(struct ircomm_cb *self, struct sk_buff *userdata)
+static int ircomm_lmp_connect_response(struct ircomm_cb *self,
+				       struct sk_buff *userdata)
 {
 	struct sk_buff *tx_skb;
 	int ret;
@@ -141,9 +104,9 @@ int ircomm_lmp_connect_response(struct ircomm_cb *self, struct sk_buff *userdata
 	return 0;
 }
 
-int ircomm_lmp_disconnect_request(struct ircomm_cb *self, 
-				  struct sk_buff *userdata, 
-				  struct ircomm_info *info)
+static int ircomm_lmp_disconnect_request(struct ircomm_cb *self, 
+					 struct sk_buff *userdata, 
+					 struct ircomm_info *info)
 {
         struct sk_buff *tx_skb;
 	int ret;
@@ -175,7 +138,7 @@ int ircomm_lmp_disconnect_request(struct ircomm_cb *self,
  *    been deallocated. We do this to make sure we don't flood IrLAP with 
  *    frames, since we are not using the IrTTP flow control mechanism
  */
-void ircomm_lmp_flow_control(struct sk_buff *skb)
+static void ircomm_lmp_flow_control(struct sk_buff *skb)
 {
 	struct irda_skb_cb *cb;
 	struct ircomm_cb *self;
@@ -215,8 +178,9 @@ void ircomm_lmp_flow_control(struct sk_buff *skb)
  *    Send data frame to peer device
  *
  */
-int ircomm_lmp_data_request(struct ircomm_cb *self, struct sk_buff *skb, 
-			    int not_used)
+static int ircomm_lmp_data_request(struct ircomm_cb *self,
+				   struct sk_buff *skb, 
+				   int not_used)
 {
 	struct irda_skb_cb *cb;
 	int ret;
@@ -256,8 +220,8 @@ int ircomm_lmp_data_request(struct ircomm_cb *self, struct sk_buff *skb,
  *    Incoming data which we must deliver to the state machine, to check
  *    we are still connected.
  */
-int ircomm_lmp_data_indication(void *instance, void *sap,
-			       struct sk_buff *skb)
+static int ircomm_lmp_data_indication(void *instance, void *sap,
+				      struct sk_buff *skb)
 {
 	struct ircomm_cb *self = (struct ircomm_cb *) instance;
 
@@ -282,11 +246,11 @@ int ircomm_lmp_data_indication(void *instance, void *sap,
  *    Connection has been confirmed by peer device
  *
  */
-void ircomm_lmp_connect_confirm(void *instance, void *sap,
-				struct qos_info *qos, 
-				__u32 max_seg_size, 
-				__u8 max_header_size,
-				struct sk_buff *skb)
+static void ircomm_lmp_connect_confirm(void *instance, void *sap,
+				       struct qos_info *qos, 
+				       __u32 max_seg_size, 
+				       __u8 max_header_size,
+				       struct sk_buff *skb)
 {
 	struct ircomm_cb *self = (struct ircomm_cb *) instance;
 	struct ircomm_info info;
@@ -315,11 +279,11 @@ void ircomm_lmp_connect_confirm(void *instance, void *sap,
  *    Peer device wants to make a connection with us
  *
  */
-void ircomm_lmp_connect_indication(void *instance, void *sap,
-				   struct qos_info *qos,
-				   __u32 max_seg_size,
-				   __u8 max_header_size,
-				   struct sk_buff *skb)
+static void ircomm_lmp_connect_indication(void *instance, void *sap,
+					  struct qos_info *qos,
+					  __u32 max_seg_size,
+					  __u8 max_header_size,
+					  struct sk_buff *skb)
 {
 	struct ircomm_cb *self = (struct ircomm_cb *)instance;
 	struct ircomm_info info;
@@ -347,9 +311,9 @@ void ircomm_lmp_connect_indication(void *instance, void *sap,
  *    Peer device has closed the connection, or the link went down for some
  *    other reason
  */
-void ircomm_lmp_disconnect_indication(void *instance, void *sap, 
-				      LM_REASON reason,
-				      struct sk_buff *skb)
+static void ircomm_lmp_disconnect_indication(void *instance, void *sap, 
+					     LM_REASON reason,
+					     struct sk_buff *skb)
 {
 	struct ircomm_cb *self = (struct ircomm_cb *) instance;
 	struct ircomm_info info;
@@ -366,4 +330,42 @@ void ircomm_lmp_disconnect_indication(void *instance, void *sap,
 	/* Drop reference count - see ircomm_tty_disconnect_indication(). */
 	if(skb)
 		dev_kfree_skb(skb);
+}
+/*
+ * Function ircomm_open_lsap (self)
+ *
+ *    Open LSAP. This function will only be used when using "raw" services
+ *
+ */
+int ircomm_open_lsap(struct ircomm_cb *self)
+{
+	notify_t notify;
+
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
+
+	/* Register callbacks */
+	irda_notify_init(&notify);
+	notify.data_indication       = ircomm_lmp_data_indication;
+	notify.connect_confirm       = ircomm_lmp_connect_confirm;
+	notify.connect_indication    = ircomm_lmp_connect_indication;
+	notify.disconnect_indication = ircomm_lmp_disconnect_indication;
+	notify.instance = self;
+	strlcpy(notify.name, "IrCOMM", sizeof(notify.name));
+
+	self->lsap = irlmp_open_lsap(LSAP_ANY, &notify, 0);
+	if (!self->lsap) {
+		IRDA_DEBUG(0,"%sfailed to allocate tsap\n", __FUNCTION__ );
+		return -1;
+	}
+	self->slsap_sel = self->lsap->slsap_sel;
+
+	/*
+	 *  Initialize the call-table for issuing commands
+	 */
+	self->issue.data_request       = ircomm_lmp_data_request;
+	self->issue.connect_request    = ircomm_lmp_connect_request;
+	self->issue.connect_response   = ircomm_lmp_connect_response;
+	self->issue.disconnect_request = ircomm_lmp_disconnect_request;
+
+	return 0;
 }

@@ -19,6 +19,9 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default n
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
 
 # Turn off some random 386 crap that can affect device config
 config ISA

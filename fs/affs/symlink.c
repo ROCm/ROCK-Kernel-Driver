@@ -8,14 +8,7 @@
  *  affs symlink handling code
  */
 
-#include <linux/errno.h>
-#include <linux/fs.h>
-#include <linux/stat.h>
-#include <linux/affs_fs.h>
-#include <linux/amigaffs.h>
-#include <linux/pagemap.h>
-#include <linux/smp_lock.h>
-#include <linux/buffer_head.h>
+#include "affs.h"
 
 static int affs_symlink_readpage(struct file *file, struct page *page)
 {

@@ -76,7 +76,7 @@ void start_thread(struct pt_regs * regs, unsigned long pc, unsigned long sp)
 #endif
 	status |= KU_USER;
 	regs->cp0_status = status;
-	clear_used_math();
+	current->used_math = 0;
 	lose_fpu();
 	regs->cp0_epc = pc;
 	regs->regs[29] = sp;

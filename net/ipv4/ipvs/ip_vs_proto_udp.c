@@ -277,7 +277,7 @@ udp_csum_check(struct sk_buff *skb, struct ip_vs_protocol *pp)
 #define	UDP_APP_TAB_MASK	(UDP_APP_TAB_SIZE - 1)
 
 static struct list_head udp_apps[UDP_APP_TAB_SIZE];
-static spinlock_t udp_app_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(udp_app_lock);
 
 static inline __u16 udp_app_hashkey(__u16 port)
 {

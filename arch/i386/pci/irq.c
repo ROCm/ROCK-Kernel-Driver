@@ -29,6 +29,8 @@ static int acer_tm360_irqrouting;
 
 static struct irq_routing_table *pirq_table;
 
+static int pirq_enable_irq(struct pci_dev *dev);
+
 /*
  * Never use: 0, 1, 2 (timer, keyboard, and cascade)
  * Avoid using: 13, 14 and 15 (FP error and IDE).
@@ -735,7 +737,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	if (!pirq_table)
 		return 0;
 	
-	DBG("IRQ for %s:%d", pci_name(dev), pin);
+	DBG("IRQ for %s[%c]", pci_name(dev), 'A' + pin);
 	info = pirq_get_info(dev);
 	if (!info) {
 		DBG(" -> not found in routing table\n");
@@ -892,16 +894,16 @@ static void __init pcibios_fixup_irqs(void)
 					irq = IO_APIC_get_PCI_irq_vector(bridge->bus->number, 
 							PCI_SLOT(bridge->devfn), pin);
 					if (irq >= 0)
-						printk(KERN_WARNING "PCI: using PPB(B%d,I%d,P%d) to get irq %d\n", 
-							bridge->bus->number, PCI_SLOT(bridge->devfn), pin, irq);
+						printk(KERN_WARNING "PCI: using PPB %s[%c] to get irq %d\n",
+							pci_name(bridge), 'A' + pin, irq);
 				}
 				if (irq >= 0) {
 					if (use_pci_vector() &&
 						!platform_legacy_irq(irq))
 						irq = IO_APIC_VECTOR(irq);
 
-					printk(KERN_INFO "PCI->APIC IRQ transform: (B%d,I%d,P%d) -> %d\n",
-						dev->bus->number, PCI_SLOT(dev->devfn), pin, irq);
+					printk(KERN_INFO "PCI->APIC IRQ transform: %s[%c] -> IRQ %d\n",
+						pci_name(dev), 'A' + pin, irq);
 					dev->irq = irq;
 				}
 			}
@@ -1021,10 +1023,10 @@ void pcibios_penalize_isa_irq(int irq)
 		pirq_penalize_isa_irq(irq);
 }
 
-int pirq_enable_irq(struct pci_dev *dev)
+static int pirq_enable_irq(struct pci_dev *dev)
 {
 	u8 pin;
-	extern int interrupt_line_quirk;
+	extern int via_interrupt_line_quirk;
 	struct pci_dev *temp_dev;
 
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
@@ -1051,8 +1053,8 @@ int pirq_enable_irq(struct pci_dev *dev)
 					irq = IO_APIC_get_PCI_irq_vector(bridge->bus->number, 
 							PCI_SLOT(bridge->devfn), pin);
 					if (irq >= 0)
-						printk(KERN_WARNING "PCI: using PPB(B%d,I%d,P%d) to get irq %d\n", 
-							bridge->bus->number, PCI_SLOT(bridge->devfn), pin, irq);
+						printk(KERN_WARNING "PCI: using PPB %s[%c] to get irq %d\n",
+							pci_name(bridge), 'A' + pin, irq);
 					dev = bridge;
 				}
 				dev = temp_dev;
@@ -1061,8 +1063,8 @@ int pirq_enable_irq(struct pci_dev *dev)
 					if (!platform_legacy_irq(irq))
 						irq = IO_APIC_VECTOR(irq);
 #endif
-					printk(KERN_INFO "PCI->APIC IRQ transform: (B%d,I%d,P%d) -> %d\n",
-						dev->bus->number, PCI_SLOT(dev->devfn), pin, irq);
+					printk(KERN_INFO "PCI->APIC IRQ transform: %s[%c] -> IRQ %d\n",
+						pci_name(dev), 'A' + pin, irq);
 					dev->irq = irq;
 					return 0;
 				} else
@@ -1082,7 +1084,7 @@ int pirq_enable_irq(struct pci_dev *dev)
 	}
 	/* VIA bridges use interrupt line for apic/pci steering across
 	   the V-Link */
-	else if (interrupt_line_quirk)
+	else if (via_interrupt_line_quirk)
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq & 15);
 	return 0;
 }

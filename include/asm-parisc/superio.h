@@ -56,7 +56,6 @@ struct superio_device {
 	u32 pp_base;
 	u32 acpi_base;
 	int suckyio_irq_enabled;
-	struct irq_region *irq_region;
 	struct pci_dev *lio_pdev;       /* pci device for legacy IO (fn 1) */
 	struct pci_dev *usb_pdev;       /* pci device for USB (fn 2) */
 };
@@ -81,11 +80,6 @@ struct superio_device {
 	|| ((x)->device == PCI_DEVICE_ID_NS_87560_LIO) \
 	|| ((x)->device == PCI_DEVICE_ID_NS_87560_USB) ) )
 
-struct hwif_s;
-
-extern void superio_inform_irq(int irq);
-extern void superio_serial_init(void);		/* called by rs_init() */
 extern int superio_fixup_irq(struct pci_dev *pcidev); /* called by iosapic */
-extern void superio_fixup_pci(struct pci_dev *pdev);
 
 #endif /* _PARISC_SUPERIO_H */

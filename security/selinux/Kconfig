@@ -34,7 +34,7 @@ config SECURITY_SELINUX_BOOTPARAM_VALUE
 	  'selinux', which allows SELinux to be disabled at boot.  If this
 	  option is set to 0 (zero), the SELinux kernel parameter will
 	  default to 0, disabling SELinux at bootup.  If this option is
-	  set to 1 (one), the SELinux kernel paramater will default to 1,
+	  set to 1 (one), the SELinux kernel parameter will default to 1,
 	  enabling SELinux at bootup.
 
 	  If you are unsure how to answer this question, answer 1.
@@ -66,6 +66,15 @@ config SECURITY_SELINUX_DEVELOP
 	  unless you specify enforcing=1 on the kernel command line.  You
 	  can interactively toggle the kernel between enforcing mode and
 	  permissive mode (if permitted by the policy) via /selinux/enforce.
+
+config SECURITY_SELINUX_AVC_STATS
+	bool "NSA SELinux AVC Statistics"
+	depends on SECURITY_SELINUX
+	default y
+	help
+	  This option collects access vector cache statistics to
+	  /selinux/avc/cache_stats, which may be monitored via
+	  tools such as avcstat.
 
 config SECURITY_SELINUX_MLS
 	bool "NSA SELinux MLS policy (EXPERIMENTAL)"

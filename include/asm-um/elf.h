@@ -1,6 +1,7 @@
 #ifndef __UM_ELF_H
 #define __UM_ELF_H
 
+#include "linux/config.h"
 #include "asm/archparam.h"
 
 extern long elf_aux_hwcap;
@@ -12,7 +13,11 @@ extern long elf_aux_hwcap;
 
 #define elf_check_arch(x) (1)
 
+#ifdef CONFIG_64_BIT
+#define ELF_CLASS ELFCLASS64
+#else
 #define ELF_CLASS ELFCLASS32
+#endif
 
 #define USE_ELF_CORE_DUMP
 

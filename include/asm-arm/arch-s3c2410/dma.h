@@ -285,6 +285,14 @@ extern int s3c2410_dma_config(dmach_t channel, int xferunit, int dcon);
 extern int s3c2410_dma_devconfig(int channel, s3c2410_dmasrc_t source,
 				 int hwcfg, unsigned long devaddr);
 
+/* s3c2410_dma_getposition
+ *
+ * get the position that the dma transfer is currently at
+*/
+
+extern int s3c2410_dma_getposition(dmach_t channel,
+				   dma_addr_t *src, dma_addr_t *dest);
+
 extern int s3c2410_dma_set_opfn(dmach_t, s3c2410_dma_opfn_t rtn);
 extern int s3c2410_dma_set_buffdone_fn(dmach_t, s3c2410_dma_cbfn_t rtn);
 

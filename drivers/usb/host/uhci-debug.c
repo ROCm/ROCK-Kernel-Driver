@@ -11,7 +11,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/proc_fs.h>
+#include <linux/debugfs.h>
 #include <linux/smp_lock.h>
 #include <asm/io.h>
 
@@ -95,24 +95,25 @@ static int uhci_show_qh(struct uhci_qh *qh, char *buf, int len, int space)
 	struct list_head *head, *tmp;
 	struct uhci_td *td;
 	int i = 0, checked = 0, prevactive = 0;
+	__le32 element = qh_element(qh);
 
 	/* Try to make sure there's enough memory */
 	if (len < 80 * 6)
 		return 0;
 
 	out += sprintf(out, "%*s[%p] link (%08x) element (%08x)\n", space, "",
-			qh, le32_to_cpu(qh->link), le32_to_cpu(qh->element));
+			qh, le32_to_cpu(qh->link), le32_to_cpu(element));
 
-	if (qh->element & UHCI_PTR_QH)
+	if (element & UHCI_PTR_QH)
 		out += sprintf(out, "%*s  Element points to QH (bug?)\n", space, "");
 
-	if (qh->element & UHCI_PTR_DEPTH)
+	if (element & UHCI_PTR_DEPTH)
 		out += sprintf(out, "%*s  Depth traverse\n", space, "");
 
-	if (qh->element & cpu_to_le32(8))
+	if (element & cpu_to_le32(8))
 		out += sprintf(out, "%*s  Bit 3 set (bug?)\n", space, "");
 
-	if (!(qh->element & ~(UHCI_PTR_QH | UHCI_PTR_DEPTH)))
+	if (!(element & ~(UHCI_PTR_QH | UHCI_PTR_DEPTH)))
 		out += sprintf(out, "%*s  Element is NULL (bug?)\n", space, "");
 
 	if (!qh->urbp) {
@@ -127,7 +128,7 @@ static int uhci_show_qh(struct uhci_qh *qh, char *buf, int len, int space)
 
 	td = list_entry(tmp, struct uhci_td, list);
 
-	if (cpu_to_le32(td->dma_handle) != (qh->element & ~UHCI_PTR_BITS))
+	if (cpu_to_le32(td->dma_handle) != (element & ~UHCI_PTR_BITS))
 		out += sprintf(out, "%*s Element != First TD\n", space, "");
 
 	while (tmp != head) {
@@ -447,7 +448,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 			if (qh->link != UHCI_PTR_TERM)
 				out += sprintf(out, "    bandwidth reclamation on!\n");
 
-			if (qh->element != cpu_to_le32(uhci->term_td->dma_handle))
+			if (qh_element(qh) != cpu_to_le32(uhci->term_td->dma_handle))
 				out += sprintf(out, "    skel_term_qh element is not set to term_td!\n");
 
 			continue;
@@ -496,19 +497,18 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 
 #define MAX_OUTPUT	(64 * 1024)
 
-static struct proc_dir_entry *uhci_proc_root = NULL;
+static struct dentry *uhci_debugfs_root = NULL;
 
-struct uhci_proc {
+struct uhci_debug {
 	int size;
 	char *data;
 	struct uhci_hcd *uhci;
 };
 
-static int uhci_proc_open(struct inode *inode, struct file *file)
+static int uhci_debug_open(struct inode *inode, struct file *file)
 {
-	const struct proc_dir_entry *dp = PDE(inode);
-	struct uhci_hcd *uhci = dp->data;
-	struct uhci_proc *up;
+	struct uhci_hcd *uhci = inode->u.generic_ip;
+	struct uhci_debug *up;
 	int ret = -ENOMEM;
 
 	lock_kernel();
@@ -532,9 +532,9 @@ out:
 	return ret;
 }
 
-static loff_t uhci_proc_lseek(struct file *file, loff_t off, int whence)
+static loff_t uhci_debug_lseek(struct file *file, loff_t off, int whence)
 {
-	struct uhci_proc *up;
+	struct uhci_debug *up;
 	loff_t new = -1;
 
 	lock_kernel();
@@ -556,16 +556,16 @@ static loff_t uhci_proc_lseek(struct file *file, loff_t off, int whence)
 	return (file->f_pos = new);
 }
 
-static ssize_t uhci_proc_read(struct file *file, char __user *buf,
+static ssize_t uhci_debug_read(struct file *file, char __user *buf,
 				size_t nbytes, loff_t *ppos)
 {
-	struct uhci_proc *up = file->private_data;
+	struct uhci_debug *up = file->private_data;
 	return simple_read_from_buffer(buf, nbytes, ppos, up->data, up->size);
 }
 
-static int uhci_proc_release(struct inode *inode, struct file *file)
+static int uhci_debug_release(struct inode *inode, struct file *file)
 {
-	struct uhci_proc *up = file->private_data;
+	struct uhci_debug *up = file->private_data;
 
 	kfree(up->data);
 	kfree(up);
@@ -573,11 +573,10 @@ static int uhci_proc_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static struct file_operations uhci_proc_operations = {
-	.open =		uhci_proc_open,
-	.llseek =	uhci_proc_lseek,
-	.read =		uhci_proc_read,
-//	write:		uhci_proc_write,
-	.release =	uhci_proc_release,
+static struct file_operations uhci_debug_operations = {
+	.open =		uhci_debug_open,
+	.llseek =	uhci_debug_lseek,
+	.read =		uhci_debug_read,
+	.release =	uhci_debug_release,
 };
 #endif

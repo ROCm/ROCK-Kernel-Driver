@@ -1400,6 +1400,7 @@ static int __init init_i82365(void)
     for (i = 0; i < sockets; i++) {
 	    socket[i].socket.dev.dev = &i82365_device.dev;
 	    socket[i].socket.ops = &pcic_operations;
+	    socket[i].socket.resource_ops = &pccard_nonstatic_ops;
 	    socket[i].socket.owner = THIS_MODULE;
 	    socket[i].number = i;
 	    ret = pcmcia_register_socket(&socket[i].socket);	    

@@ -413,35 +413,28 @@ __arm1020e_setup:
 	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches on v4
 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer on v4
 	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs on v4
-	mcr	p15, 0, r4, c2, c0		@ load page table pointer
-	mov	r0, #0x1f			@ Domains 0, 1 = client
-	mcr	p15, 0, r0, c3, c0		@ load domain access register
 	mrc	p15, 0, r0, c1, c0		@ get control register v4
-/*
- * Clear out 'unwanted' bits (then put them in if we need them)
- */
-	bic	r0, r0, #0x1e00 		@ i...??r.........
-	bic	r0, r0, #0x000e 		@ ............wca.
-/*
- * Turn on what we want
- */
-	orr	r0, r0, #0x0031 		@ ..........DP...M
-	orr	r0, r0, #0x0100 		@ .......S........
-
+	ldr	r5, arm1020e_cr1_clear
+	bic	r0, r0, r5
+	ldr	r5, arm1020e_cr1_set
+	orr	r0, r0, r5
 #ifdef CONFIG_CPU_CACHE_ROUND_ROBIN
-	orr	r0, r0, #0x4000 		@ .R..............
-#endif
-#ifndef CONFIG_CPU_BPREDICT_DISABLE
-	orr	r0, r0, #0x0800 		@ ....Z...........
-#endif
-#ifndef CONFIG_CPU_DCACHE_DISABLE
-	orr	r0, r0, #0x0004 		@ Enable D cache
-#endif
-#ifndef CONFIG_CPU_ICACHE_DISABLE
-	orr	r0, r0, #0x1000 		@ I Cache on
+	orr	r0, r0, #0x4000 		@ .R.. .... .... ....
 #endif
 	mov	pc, lr
 	.size	__arm1020e_setup, . - __arm1020e_setup
+
+	/*
+	 *  R
+	 * .RVI ZFRS BLDP WCAM
+	 * .0.1 1001 ..11 0101	/* FIXME: why no V bit? */
+	 */
+	.type	arm1020e_cr1_clear, #object
+	.type	arm1020e_cr1_set, #object
+arm1020e_cr1_clear:
+	.word	0x5f3f
+arm1020e_cr1_set:
+	.word	0x1935
 
 	__INITDATA
 
@@ -504,7 +497,10 @@ cpu_arm1020e_name:
 __arm1020e_proc_info:
 	.long	0x4105a200			@ ARM 1020TE (Architecture v5TE)
 	.long	0xff0ffff0
-	.long	0x00000c12			@ mmuflags
+	.long   PMD_TYPE_SECT | \
+		PMD_BIT4 | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__arm1020e_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name

@@ -382,12 +382,6 @@ void __init maple_pcibios_fixup(void)
 	/* Do the mapping of the IO space */
 	phbs_remap_io();
 
-	/* Fixup the pci_bus sysdata pointers */
-	pci_fix_bus_sysdata();
-
-	/* Setup the iommu */
-	iommu_setup_u3();
-
 	DBG(" <- maple_pcibios_fixup\n");
 }
 

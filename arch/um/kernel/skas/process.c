@@ -28,6 +28,7 @@
 #include "skas_ptrace.h"
 #include "chan_user.h"
 #include "signal_user.h"
+#include "registers.h"
 
 int is_skas_winch(int pid, int fd, void *data)
 {
@@ -37,13 +38,6 @@ int is_skas_winch(int pid, int fd, void *data)
 	register_winch_irq(-1, fd, -1, data);
 	return(1);
 }
-
-/* These are set once at boot time and not changed thereafter */
-
-unsigned long exec_regs[FRAME_SIZE];
-unsigned long exec_fp_regs[HOST_FP_SIZE];
-unsigned long exec_fpx_regs[HOST_XFP_SIZE];
-int have_fpx_regs = 1;
 
 static void handle_segv(int pid)
 {
@@ -55,17 +49,6 @@ static void handle_segv(int pid)
 		panic("handle_segv - PTRACE_FAULTINFO failed, errno = %d\n",
 		      errno);
 
-	if (!(fault.is_write & 4)) {
-		/*
-		    kernel fault -- likely that was general
- 		    protection fault (trap_no = 13), not a
-		    page fault (trap_no = 14).  But we don't
-		    know for sure as PTRACE_FAULTINFO doesn't
-		    tell us :-/
-		*/
-		bad_segv(fault.addr, 0, fault.is_write);
-		return;
-	}
 	segv(fault.addr, 0, FAULT_WRITE(fault.is_write), 1, NULL);
 }
 
@@ -90,7 +73,8 @@ static void handle_trap(int pid, union uml_pt_regs *regs, int local_using_sysemu
 			      "errno = %d\n", errno);
 
 		CATCH_EINTR(err = waitpid(pid, &status, WUNTRACED));
-		if((err < 0) || !WIFSTOPPED(status) || (WSTOPSIG(status) != (SIGTRAP + 0x80)))
+		if((err < 0) || !WIFSTOPPED(status) ||
+		   (WSTOPSIG(status) != SIGTRAP + 0x80))
 			panic("handle_trap - failed to wait at end of syscall, "
 			      "errno = %d, status = %d\n", errno, status);
 	}
@@ -108,6 +92,7 @@ static int userspace_tramp(void *arg)
 }
 
 /* Each element set once, and only accessed by a single processor anyway */
+#undef NR_CPUS
 #define NR_CPUS 1
 int userspace_pid[NR_CPUS];
 
@@ -154,7 +139,7 @@ void userspace(union uml_pt_regs *regs)
 	int err, status, op, pid = userspace_pid[0];
 	int local_using_sysemu; /*To prevent races if using_sysemu changes under us.*/
 
-	restore_registers(regs);
+	restore_registers(pid, regs);
 		
 	local_using_sysemu = get_using_sysemu();
 
@@ -171,7 +156,7 @@ void userspace(union uml_pt_regs *regs)
 			      errno);
 
 		regs->skas.is_user = 1;
-		save_registers(regs);
+		save_registers(pid, regs);
 		UPT_SYSCALL_NR(regs) = -1; /* Assume: It's not a syscall */
 
 		if(WIFSTOPPED(status)){
@@ -203,7 +188,7 @@ void userspace(union uml_pt_regs *regs)
 			PT_SYSCALL_NR(regs->skas.regs) = -1;
 		}
 
-		restore_registers(regs);
+		restore_registers(pid, regs);
 
 		/*Now we ended the syscall, so re-read local_using_sysemu.*/
 		local_using_sysemu = get_using_sysemu();
@@ -252,58 +237,6 @@ void thread_wait(void *sw, void *fb)
 	fork_buf = fb;
 	if(sigsetjmp(buf, 1) == 0)
 		siglongjmp(*fork_buf, 1);
-}
-
-static int move_registers(int pid, int int_op, int fp_op,
-			  union uml_pt_regs *regs, unsigned long *fp_regs)
-{
-	if(ptrace(int_op, pid, 0, regs->skas.regs) < 0)
-		return(-errno);
-	if(ptrace(fp_op, pid, 0, fp_regs) < 0)
-		return(-errno);
-	return(0);
-}
-
-void save_registers(union uml_pt_regs *regs)
-{
-	unsigned long *fp_regs;
-	int err, fp_op;
-
-	if(have_fpx_regs){
-		fp_op = PTRACE_GETFPXREGS;
-		fp_regs = regs->skas.xfp;
-	}
-	else {
-		fp_op = PTRACE_GETFPREGS;
-		fp_regs = regs->skas.fp;
-	}
-
-	err = move_registers(userspace_pid[0], PTRACE_GETREGS, fp_op, regs,
-			     fp_regs);
-	if(err)
-		panic("save_registers - saving registers failed, errno = %d\n",
-		      -err);
-}
-
-void restore_registers(union uml_pt_regs *regs)
-{
-	unsigned long *fp_regs;
-	int err, fp_op;
-
-	if(have_fpx_regs){
-		fp_op = PTRACE_SETFPXREGS;
-		fp_regs = regs->skas.xfp;
-	}
-	else {
-		fp_op = PTRACE_SETFPREGS;
-		fp_regs = regs->skas.fp;
-	}
-
-	err = move_registers(userspace_pid[0], PTRACE_SETREGS, fp_op, regs,
-			     fp_regs);
-	if(err)
-		panic("restore_registers - saving registers failed, "
-		      "errno = %d\n", -err);
 }
 
 void switch_threads(void *me, void *next)
@@ -403,29 +336,6 @@ void kill_off_processes_skas(void)
 {
 #warning need to loop over userspace_pids in kill_off_processes_skas
 	os_kill_ptraced_process(userspace_pid[0], 1);
-}
-
-void init_registers(int pid)
-{
-	int err;
-
-	if(ptrace(PTRACE_GETREGS, pid, 0, exec_regs) < 0)
-		panic("check_ptrace : PTRACE_GETREGS failed, errno = %d", 
-		      errno);
-
-	err = ptrace(PTRACE_GETFPXREGS, pid, 0, exec_fpx_regs);
-	if(!err)
-		return;
-
-	have_fpx_regs = 0;
-	if(errno != EIO)
-		panic("check_ptrace : PTRACE_GETFPXREGS failed, errno = %d", 
-		      errno);
-
-	err = ptrace(PTRACE_GETFPREGS, pid, 0, exec_fp_regs);
-	if(err)
-		panic("check_ptrace : PTRACE_GETFPREGS failed, errno = %d", 
-		      errno);
 }
 
 /*

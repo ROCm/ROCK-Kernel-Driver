@@ -17,7 +17,8 @@
  *
  *  Revision history:
  *   22nd Aug 2003 Initial version.
- *
+ *   20th Dec 2004 Added ssp_config for changing port config without
+ *                 closing the port.
  */
 
 #include <linux/module.h>
@@ -33,6 +34,11 @@
 #include <asm/hardware.h>
 #include <asm/arch/ssp.h>
 #include <asm/arch/pxa-regs.h>
+
+#define PXA_SSP_PORTS 	3
+
+static DECLARE_MUTEX(sem);
+static int use_count[PXA_SSP_PORTS] = {0, 0, 0};
 
 static irqreturn_t ssp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -171,6 +177,30 @@ void ssp_restore_state(struct ssp_dev *dev, struct ssp_state *ssp)
 }
 
 /**
+ * ssp_config - configure SSP port settings
+ * @mode: port operating mode
+ * @flags: port config flags
+ * @psp_flags: port PSP config flags
+ * @speed: port speed
+ *
+ * Port MUST be disabled by ssp_disable before making any config changes.
+ */
+int ssp_config(struct ssp_dev *dev, u32 mode, u32 flags, u32 psp_flags, u32 speed)
+{
+	dev->mode = mode;
+	dev->flags = flags;
+	dev->psp_flags = psp_flags;
+	dev->speed = speed;
+
+	/* set up port type, speed, port settings */
+	SSCR0_P(dev->port) = (dev->speed | dev->mode);
+	SSCR1_P(dev->port) = dev->flags;
+	SSPSP_P(dev->port) = dev->psp_flags;
+
+	return 0;
+}
+
+/**
  * ssp_init - setup the SSP port
  *
  * initialise and claim resources for the SSP port.
@@ -180,12 +210,23 @@ void ssp_restore_state(struct ssp_dev *dev, struct ssp_state *ssp)
  *   %-EBUSY	if the resources are already in use
  *   %0		on success
  */
-int ssp_init(struct ssp_dev *dev, u32 port, u32 mode, u32 flags, u32 psp_flags,
-						u32 speed)
+int ssp_init(struct ssp_dev *dev, u32 port)
 {
 	int ret, irq;
 
+	if (port > PXA_SSP_PORTS || port == 0)
+		return -ENODEV;
+
+	down(&sem);
+	if (use_count[port - 1]) {
+		up(&sem);
+		return -EBUSY;
+	}
+	use_count[port - 1]++;
+
 	if (!request_mem_region(__PREG(SSCR0_P(port)), 0x2c, "SSP")) {
+		use_count[port - 1]--;
+		up(&sem);
 		return -EBUSY;
 	}
 
@@ -213,15 +254,6 @@ int ssp_init(struct ssp_dev *dev, u32 port, u32 mode, u32 flags, u32 psp_flags,
 	}
 
 	dev->port = port;
-	dev->mode = mode;
-	dev->flags = flags;
-	dev->psp_flags = psp_flags;
-	dev->speed = speed;
-
-	/* set up port type, speed, port settings */
-	SSCR0_P(dev->port) = (dev->speed | dev->mode);
-	SSCR1_P(dev->port) = dev->flags;
-	SSPSP_P(dev->port) = dev->psp_flags;
 
 	ret = request_irq(irq, ssp_interrupt, 0, "SSP", dev);
 	if (ret)
@@ -252,10 +284,13 @@ int ssp_init(struct ssp_dev *dev, u32 port, u32 mode, u32 flags, u32 psp_flags,
 #endif
 	}
 
+	up(&sem);
 	return 0;
 
 out_region:
-	release_mem_region(__PREG(SSCR0_P(dev->port)), 0x2c);
+	release_mem_region(__PREG(SSCR0_P(port)), 0x2c);
+	use_count[port - 1]--;
+	up(&sem);
 	return ret;
 }
 
@@ -268,6 +303,7 @@ void ssp_exit(struct ssp_dev *dev)
 {
 	int irq;
 
+	down(&sem);
 	SSCR0_P(dev->port) &= ~SSCR0_SSE;
 
 	/* find irq, save power and turn off SSP port clock */
@@ -306,6 +342,8 @@ void ssp_exit(struct ssp_dev *dev)
 
 	free_irq(irq, dev);
 	release_mem_region(__PREG(SSCR0_P(dev->port)), 0x2c);
+	use_count[dev->port - 1]--;
+	up(&sem);
 }
 
 EXPORT_SYMBOL(ssp_write_word);
@@ -317,3 +355,9 @@ EXPORT_SYMBOL(ssp_save_state);
 EXPORT_SYMBOL(ssp_restore_state);
 EXPORT_SYMBOL(ssp_init);
 EXPORT_SYMBOL(ssp_exit);
+EXPORT_SYMBOL(ssp_config);
+
+MODULE_DESCRIPTION("PXA SSP driver");
+MODULE_AUTHOR("Liam Girdwood");
+MODULE_LICENSE("GPL");
+

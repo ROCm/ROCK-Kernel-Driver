@@ -48,7 +48,7 @@ MODULE_LICENSE("GPL");
 extern atomic_t ip_conntrack_count;
 DECLARE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
 
-static int kill_proto(const struct ip_conntrack *i, void *data)
+static int kill_proto(struct ip_conntrack *i, void *data)
 {
 	return (i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum == 
 			*((u_int8_t *) data));
@@ -791,7 +791,8 @@ static int init_or_cleanup(int init)
 	ip_ct_sysctl_header = register_sysctl_table(ip_ct_net_table, 0);
 	if (ip_ct_sysctl_header == NULL) {
 		printk("ip_conntrack: can't register to sysctl.\n");
-		goto cleanup;
+		ret = -ENOMEM;
+		goto cleanup_localinops;
 	}
 #endif
 
@@ -800,6 +801,7 @@ static int init_or_cleanup(int init)
  cleanup:
 #ifdef CONFIG_SYSCTL
  	unregister_sysctl_table(ip_ct_sysctl_header);
+ cleanup_localinops:
 #endif
 	nf_unregister_hook(&ip_conntrack_local_in_ops);
  cleanup_inoutandlocalops:
@@ -821,7 +823,7 @@ static int init_or_cleanup(int init)
  cleanup_proc_stat:
 #ifdef CONFIG_PROC_FS
 	remove_proc_entry("ip_conntrack", proc_net_stat);
-cleanup_proc_exp:
+ cleanup_proc_exp:
 	proc_net_remove("ip_conntrack_expect");
  cleanup_proc:
 	proc_net_remove("ip_conntrack");
@@ -859,7 +861,7 @@ void ip_conntrack_protocol_unregister(struct ip_conntrack_protocol *proto)
 	synchronize_net();
 
 	/* Remove all contrack entries for this protocol */
-	ip_ct_selective_cleanup(kill_proto, &proto->proto);
+	ip_ct_iterate_cleanup(kill_proto, &proto->proto);
 }
 
 static int __init init(void)
@@ -883,13 +885,14 @@ void need_ip_conntrack(void)
 
 EXPORT_SYMBOL(ip_conntrack_protocol_register);
 EXPORT_SYMBOL(ip_conntrack_protocol_unregister);
+EXPORT_SYMBOL(ip_ct_get_tuple);
 EXPORT_SYMBOL(invert_tuplepr);
 EXPORT_SYMBOL(ip_conntrack_alter_reply);
 EXPORT_SYMBOL(ip_conntrack_destroyed);
 EXPORT_SYMBOL(need_ip_conntrack);
 EXPORT_SYMBOL(ip_conntrack_helper_register);
 EXPORT_SYMBOL(ip_conntrack_helper_unregister);
-EXPORT_SYMBOL(ip_ct_selective_cleanup);
+EXPORT_SYMBOL(ip_ct_iterate_cleanup);
 EXPORT_SYMBOL(ip_ct_refresh_acct);
 EXPORT_SYMBOL(ip_ct_protos);
 EXPORT_SYMBOL(ip_ct_find_proto);

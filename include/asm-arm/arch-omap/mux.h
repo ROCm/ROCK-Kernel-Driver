@@ -310,6 +310,12 @@ typedef enum {
 	/* Power management */
 	T20_1610_LOW_PWR,
 
+	/* MCLK Settings */
+	V5_1710_MCLK_ON,
+	V5_1710_MCLK_OFF,
+	R10_1610_MCLK_ON,
+	R10_1610_MCLK_OFF,
+
 } reg_cfg_t;
 
 #if defined(__MUX_C__) && defined(CONFIG_OMAP_MUX)
@@ -516,6 +522,12 @@ MUX_CFG("N19_1610_KBR5",	 6,  12,     1,	  1,   2,   1,	  1,	 1,  0)
 
 /* Power management */
 MUX_CFG("T20_1610_LOW_PWR",	 7,   12,    1,	  NA,   0,   0,   NA,	 0,  0)
+
+/* MCLK Settings */
+MUX_CFG("V5_1710_MCLK_ON",	 B,   15,    0,	  NA,   0,   0,   NA,	 0,  0)
+MUX_CFG("V5_1710_MCLK_OFF",	 B,   15,    6,	  NA,   0,   0,   NA,	 0,  0)
+MUX_CFG("R10_1610_MCLK_ON",	 B,   18,    0,	  NA,  22,   0,	  NA,	 1,  0)
+MUX_CFG("R10_1610_MCLK_OFF",	 B,   18,    6,	  2,   22,   1,	  2,	 1,  1)
 };
 
 #endif	/* __MUX_C__ */

@@ -59,7 +59,7 @@ config VT_CONSOLE
 
 config HW_CONSOLE
 	bool
-	depends on VT && !S390
+	depends on VT && !S390 && !USERMODE
 	default y
 
 config ECC
@@ -206,7 +206,7 @@ config MOXA_SMARTIO
 
 config ISI
 	tristate "Multi-Tech multiport card support (EXPERIMENTAL)"
-	depends on SERIAL_NONSTANDARD && PCI && EXPERIMENTAL && BROKEN_ON_SMP && m
+	depends on SERIAL_NONSTANDARD
 	help
 	  This is a driver for the Multi-Tech cards which provide several
 	  serial ports.  The driver is experimental and can currently only be
@@ -355,7 +355,7 @@ config SERIAL_TX3912
 	bool "TX3912/PR31700 serial port support"
 	depends on SERIAL_NONSTANDARD && MIPS && BROKEN_ON_SMP
 	help
-	  The TX3912 is a Toshiba RISC processor based o the MIPS 3900 core;
+	  The TX3912 is a Toshiba RISC processor based on the MIPS 3900 core;
 	  see <http://www.toshiba.com/taec/components/Generic/risc/tx3912.htm>.
 	  Say Y here to enable kernel support for the on-board serial port.
 
@@ -363,7 +363,7 @@ config SERIAL_TX3912_CONSOLE
 	bool "Console on TX3912/PR31700 serial port"
 	depends on SERIAL_TX3912
 	help
-	  The TX3912 is a Toshiba RISC processor based o the MIPS 3900 core;
+	  The TX3912 is a Toshiba RISC processor based on the MIPS 3900 core;
 	  see <http://www.toshiba.com/taec/components/Generic/risc/tx3912.htm>.
 	  Say Y here to direct console I/O to the on-board serial port.
 

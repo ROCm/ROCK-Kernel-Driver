@@ -138,17 +138,8 @@ op_axp_create_files(struct super_block * sb, struct dentry * root)
 	return 0;
 }
 
-static struct oprofile_operations oprof_axp_ops = {
-	.create_files	= op_axp_create_files,
-	.setup		= op_axp_setup,
-	.shutdown	= op_axp_shutdown,
-	.start		= op_axp_start,
-	.stop		= op_axp_stop,
-	.cpu_type	= NULL		/* To be filled in below.  */
-};
-
-int __init
-oprofile_arch_init(struct oprofile_operations **ops)
+void __init
+oprofile_arch_init(struct oprofile_operations *ops)
 {
 	struct op_axp_model *lmodel = NULL;
 
@@ -175,16 +166,18 @@ oprofile_arch_init(struct oprofile_operations **ops)
 	}
 
 	if (!lmodel)
-		return -ENODEV;
+		return;
 	model = lmodel;
 
-	oprof_axp_ops.cpu_type = lmodel->cpu_type;
-	*ops = &oprof_axp_ops;
+	ops->create_files = op_axp_create_files;
+	ops->setup = op_axp_setup;
+	ops->shutdown = op_axp_shutdown;
+	ops->start = op_axp_start;
+	ops->stop = op_axp_stop;
+	ops->cpu_type = lmodel->cpu_type;
 
 	printk(KERN_INFO "oprofile: using %s performance monitoring.\n",
 	       lmodel->cpu_type);
-
-	return 0;
 }
 
 

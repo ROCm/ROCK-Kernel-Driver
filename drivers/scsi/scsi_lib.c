@@ -233,7 +233,8 @@ void scsi_do_req(struct scsi_request *sreq, const void *cmnd,
 	 */
 	scsi_insert_special_req(sreq, 1);
 }
- 
+EXPORT_SYMBOL(scsi_do_req);
+
 static void scsi_wait_done(struct scsi_cmnd *cmd)
 {
 	struct request *req = cmd->request;
@@ -267,6 +268,7 @@ void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 
 	__scsi_release_request(sreq);
 }
+EXPORT_SYMBOL(scsi_wait_req);
 
 /*
  * Function:    scsi_init_cmd_errh()
@@ -718,7 +720,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			clear_errors = 0;
 			if (scsi_command_normalize_sense(cmd, &sshdr)) {
 				/*
-				 * SG_IO wants to know about deferred errors
+				 * SG_IO wants current and deferred errors
 				 */
 				int len = 8 + cmd->sense_buffer[7];
 
@@ -844,9 +846,10 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			cmd = scsi_end_request(cmd, 0, this_count, 1);
 			return;
 		case VOLUME_OVERFLOW:
-			printk("scsi%d: ERROR on channel %d, id %d, lun %d, CDB: ",
-			       cmd->device->host->host_no, (int) cmd->device->channel,
-			       (int) cmd->device->id, (int) cmd->device->lun);
+			printk(KERN_INFO "Volume overflow <%d %d %d %d> CDB: ",
+			       cmd->device->host->host_no,
+			       (int)cmd->device->channel,
+			       (int)cmd->device->id, (int)cmd->device->lun);
 			__scsi_print_command(cmd->data_cmnd);
 			scsi_print_sense("", cmd);
 			cmd = scsi_end_request(cmd, 0, block_bytes, 1);
@@ -865,8 +868,8 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		return;
 	}
 	if (result) {
-		printk("SCSI error : <%d %d %d %d> return code = 0x%x\n",
-		       cmd->device->host->host_no,
+		printk(KERN_INFO "SCSI error : <%d %d %d %d> return code "
+		       "= 0x%x\n", cmd->device->host->host_no,
 		       cmd->device->channel,
 		       cmd->device->id,
 		       cmd->device->lun, result);
@@ -884,6 +887,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		cmd = scsi_end_request(cmd, 0, block_bytes, 1);
 	}
 }
+EXPORT_SYMBOL(scsi_io_completion);
 
 /*
  * Function:    scsi_init_io()
@@ -1344,6 +1348,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
 
 	return bounce_limit;
 }
+EXPORT_SYMBOL(scsi_calculate_bounce_limit);
 
 struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 {
@@ -1393,6 +1398,7 @@ void scsi_block_requests(struct Scsi_Host *shost)
 {
 	shost->host_self_blocked = 1;
 }
+EXPORT_SYMBOL(scsi_block_requests);
 
 /*
  * Function:    scsi_unblock_requests()
@@ -1419,6 +1425,7 @@ void scsi_unblock_requests(struct Scsi_Host *shost)
 	shost->host_self_blocked = 0;
 	scsi_run_host_queues(shost);
 }
+EXPORT_SYMBOL(scsi_unblock_requests);
 
 int __init scsi_init_queue(void)
 {
@@ -1553,6 +1560,7 @@ __scsi_mode_sense(struct scsi_request *sreq, int dbd, int modepage,
 
 	return sreq->sr_result;
 }
+EXPORT_SYMBOL(__scsi_mode_sense);
 
 /**
  *	scsi_mode_sense - issue a mode sense, falling back from 10 to 
@@ -1587,6 +1595,7 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 
 	return ret;
 }
+EXPORT_SYMBOL(scsi_mode_sense);
 
 int
 scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries)
@@ -1604,12 +1613,15 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries)
 	sreq->sr_data_direction = DMA_NONE;
 	scsi_wait_req(sreq, cmd, NULL, 0, timeout, retries);
 
-	if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) &&
-	    ((sreq->sr_sense_buffer[2] & 0x0f) == UNIT_ATTENTION ||
-	     (sreq->sr_sense_buffer[2] & 0x0f) == NOT_READY) &&
-	    sdev->removable) {
-		sdev->changed = 1;
-		sreq->sr_result = 0;
+	if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) && sdev->removable) {
+		struct scsi_sense_hdr sshdr;
+
+		if ((scsi_request_normalize_sense(sreq, &sshdr)) &&
+		    ((sshdr.sense_key == UNIT_ATTENTION) ||
+		     (sshdr.sense_key == NOT_READY))) {
+			sdev->changed = 1;
+			sreq->sr_result = 0;
+		}
 	}
 	result = sreq->sr_result;
 	scsi_release_request(sreq);
@@ -1668,6 +1680,7 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 		case SDEV_CREATED:
 		case SDEV_RUNNING:
 		case SDEV_QUIESCE:
+		case SDEV_BLOCK:
 			break;
 		default:
 			goto illegal;
@@ -1710,11 +1723,12 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 	return 0;
 
  illegal:
-	dev_printk(KERN_ERR, &sdev->sdev_gendev,
-		   "Illegal state transition %s->%s\n",
-		   scsi_device_state_name(oldstate),
-		   scsi_device_state_name(state));
-	WARN_ON(1);
+	SCSI_LOG_ERROR_RECOVERY(1, 
+				dev_printk(KERN_ERR, &sdev->sdev_gendev,
+					   "Illegal state transition %s->%s\n",
+					   scsi_device_state_name(oldstate),
+					   scsi_device_state_name(state))
+				);
 	return -EINVAL;
 }
 EXPORT_SYMBOL(scsi_device_set_state);
@@ -1768,31 +1782,29 @@ scsi_device_resume(struct scsi_device *sdev)
 }
 EXPORT_SYMBOL(scsi_device_resume);
 
-static int
-device_quiesce_fn(struct device *dev, void *data)
+static void
+device_quiesce_fn(struct scsi_device *sdev, void *data)
 {
-	scsi_device_quiesce(to_scsi_device(dev));
-	return 0;
+	scsi_device_quiesce(sdev);
 }
 
 void
 scsi_target_quiesce(struct scsi_target *starget)
 {
-	device_for_each_child(&starget->dev, NULL, device_quiesce_fn);
+	starget_for_each_device(starget, NULL, device_quiesce_fn);
 }
 EXPORT_SYMBOL(scsi_target_quiesce);
 
-static int
-device_resume_fn(struct device *dev, void *data)
+static void
+device_resume_fn(struct scsi_device *sdev, void *data)
 {
-	scsi_device_resume(to_scsi_device(dev));
-	return 0;
+	scsi_device_resume(sdev);
 }
 
 void
 scsi_target_resume(struct scsi_target *starget)
 {
-	device_for_each_child(&starget->dev, NULL, device_resume_fn);
+	starget_for_each_device(starget, NULL, device_resume_fn);
 }
 EXPORT_SYMBOL(scsi_target_resume);
 

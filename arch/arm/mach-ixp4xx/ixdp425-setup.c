@@ -8,6 +8,7 @@
  * Author: Deepak Saxena <dsaxena@plexity.net>
  */
 
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/serial.h>
@@ -108,10 +109,30 @@ static struct platform_device *ixdp425_devices[] __initdata = {
 
 static void __init ixdp425_init(void)
 {
-	platform_add_devices(&ixdp425_devices, ARRAY_SIZE(ixdp425_devices));
+	ixp4xx_sys_init();
+
+	/*
+	 * IXP465 has 32MB window
+	 */
+	if (machine_is_ixdp465()) {
+		ixdp425_flash_resource.end += IXDP425_FLASH_SIZE;
+	}
+
+	platform_add_devices(ixdp425_devices, ARRAY_SIZE(ixdp425_devices));
 }
 
 MACHINE_START(IXDP425, "Intel IXDP425 Development Platform")
+	MAINTAINER("MontaVista Software, Inc.")
+	BOOT_MEM(PHYS_OFFSET, IXP4XX_PERIPHERAL_BASE_PHYS,
+		IXP4XX_PERIPHERAL_BASE_VIRT)
+	MAPIO(ixdp425_map_io)
+	INITIRQ(ixp4xx_init_irq)
+	.timer		= &ixp4xx_timer,
+	BOOT_PARAMS(0x0100)
+	INIT_MACHINE(ixdp425_init)
+MACHINE_END
+
+MACHINE_START(IXDP465, "Intel IXDP465 Development Platform")
 	MAINTAINER("MontaVista Software, Inc.")
 	BOOT_MEM(PHYS_OFFSET, IXP4XX_PERIPHERAL_BASE_PHYS,
 		IXP4XX_PERIPHERAL_BASE_VIRT)

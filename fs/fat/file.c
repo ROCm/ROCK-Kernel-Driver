@@ -77,7 +77,7 @@ static ssize_t fat_file_write(struct file *filp, const char __user *buf,
 
 	retval = generic_file_write(filp, buf, count, ppos);
 	if (retval > 0) {
-		inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+		inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
 		MSDOS_I(inode)->i_attrs |= ATTR_ARCH;
 		mark_inode_dirty(inode);
 	}
@@ -103,6 +103,6 @@ void fat_truncate(struct inode *inode)
 	fat_free(inode, nr_clusters);
 	MSDOS_I(inode)->i_attrs |= ATTR_ARCH;
 	unlock_kernel();
-	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
+	inode->i_ctime = inode->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 }

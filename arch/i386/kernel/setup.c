@@ -33,6 +33,7 @@
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/console.h>
+#include <linux/mca.h>
 #include <linux/root_dev.h>
 #include <linux/highmem.h>
 #include <linux/module.h>
@@ -87,7 +88,6 @@ int __initdata acpi_force = 0;
 extern acpi_interrupt_flags	acpi_sci_flags;
 #endif
 
-int MCA_bus;
 /* for MCA, but anyone else can use it if they want */
 unsigned int machine_id;
 unsigned int machine_submodel_id;
@@ -96,6 +96,9 @@ unsigned int mca_pentium_flag;
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
+
+/* Boot loader ID as an integer, for the benefit of proc_dointvec */
+int bootloader_type;
 
 /* user-defined highmem size */
 static unsigned int highmem_pages = -1;
@@ -737,6 +740,10 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			}
 		}
 
+		else if (!memcmp(from, "noexec=", 7))
+			noexec_setup(from + 7);
+
+
 #ifdef  CONFIG_X86_SMP
 		/*
 		 * If the BIOS enumerates physical processors before logical,
@@ -1288,6 +1295,15 @@ __setup("noreplacement", noreplacement_setup);
 
 static char * __init machine_specific_memory_setup(void);
 
+#ifdef CONFIG_MCA
+static void set_mca_bus(int x)
+{
+	MCA_bus = x;
+}
+#else
+static void set_mca_bus(int x) { }
+#endif
+
 /*
  * Determine if we were loaded by an EFI loader.  If so, then we have also been
  * passed the efi memmap, systab, etc., so we should use these data structures
@@ -1323,12 +1339,13 @@ void __init setup_arch(char **cmdline_p)
 	ist_info = IST_INFO;
 	saved_videomode = VIDEO_MODE;
 	if( SYS_DESC_TABLE.length != 0 ) {
-		MCA_bus = SYS_DESC_TABLE.table[3] &0x2;
+		set_mca_bus(SYS_DESC_TABLE.table[3] & 0x2);
 		machine_id = SYS_DESC_TABLE.table[0];
 		machine_submodel_id = SYS_DESC_TABLE.table[1];
 		BIOS_revision = SYS_DESC_TABLE.table[2];
 	}
 	aux_device_present = AUX_DEVICE_INFO;
+	bootloader_type = LOADER_TYPE;
 
 #ifdef CONFIG_BLK_DEV_RAM
 	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
@@ -1404,6 +1421,7 @@ void __init setup_arch(char **cmdline_p)
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
+	acpi_boot_table_init();
 	acpi_boot_init();
 
 #ifdef CONFIG_X86_LOCAL_APIC

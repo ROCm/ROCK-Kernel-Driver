@@ -37,10 +37,6 @@
 #include <linux/mca.h>
 #endif
 
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
-
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -61,9 +57,6 @@
 #include "mach_traps.h"
 
 asmlinkage int system_call(void);
-#ifdef	CONFIG_KDB
-asmlinkage int kdb_call(void);
-#endif	/* CONFIG_KDB */
 
 struct desc_struct default_ldt[] = { { 0, 0 }, { 0, 0 }, { 0, 0 },
 		{ 0, 0 }, { 0, 0 } };
@@ -92,9 +85,6 @@ asmlinkage void segment_not_present(void);
 asmlinkage void stack_segment(void);
 asmlinkage void general_protection(void);
 asmlinkage void page_fault(void);
-#ifdef	CONFIG_KDB
-asmlinkage void page_fault_mca(void);
-#endif	/* CONFIG_KDB */
 asmlinkage void coprocessor_error(void);
 asmlinkage void simd_coprocessor_error(void);
 asmlinkage void alignment_check(void);
@@ -316,7 +306,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	};
 	static int die_counter;
 
-	if (die.lock_owner != smp_processor_id()) {
+	if (die.lock_owner != _smp_processor_id()) {
 		console_verbose();
 		spin_lock_irq(&die.lock);
 		die.lock_owner = smp_processor_id();
@@ -350,10 +340,6 @@ void die(const char * str, struct pt_regs * regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
-#ifdef	CONFIG_KDB
-	kdb_diemsg = str;
-	kdb(KDB_REASON_OOPS, err, regs);
-#endif	/* CONFIG_KDB */
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
@@ -455,7 +441,7 @@ fastcall void do_##name(struct pt_regs * regs, long error_code) \
 }
 
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip)
-#if	!defined(CONFIG_KPROBES) && !defined(CONFIG_KDB)
+#ifndef CONFIG_KPROBES
 DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
 #endif
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
@@ -551,9 +537,6 @@ static void io_check_error(unsigned char reason, struct pt_regs * regs)
 
 static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 {
-#ifdef	CONFIG_KDB
-	(void)kdb(KDB_REASON_NMI, reason, regs);
-#endif	/* CONFIG_KDB */
 #ifdef CONFIG_MCA
 	/* Might actually be able to figure out what the guilty party
 	* is. */
@@ -583,9 +566,6 @@ void die_nmi (struct pt_regs *regs, const char *msg)
 		smp_processor_id(), regs->eip);
 	show_registers(regs);
 	printk("console shuts up ...\n");
-#ifdef	CONFIG_KDB
-	kdb(KDB_REASON_NMI, 0, regs);
-#endif	/* CONFIG_KDB */
 	console_silent();
 	spin_unlock(&nmi_print_lock);
 	bust_spinlocks(0);
@@ -599,17 +579,7 @@ static void default_do_nmi(struct pt_regs * regs)
 	/* Only the BSP gets external NMIs from the system.  */
 	if (!smp_processor_id())
 		reason = get_nmi_reason();
-
-#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
-	/*
-	 * Call the kernel debugger to see if this NMI is due
-	 * to an KDB requested IPI.  If so, kdb will handle it.
-	 */
-	if (kdb_ipi(regs, NULL)) {
-		return;
-	}
-#endif	/* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
-
+ 
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT)
 							== NOTIFY_STOP)
@@ -712,14 +682,8 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 {
 	unsigned int condition;
 	struct task_struct *tsk = current;
-	siginfo_t info;
 
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
-
-#ifdef	CONFIG_KDB
-	if (kdb(KDB_REASON_DEBUG, error_code, regs))
-		return;
-#endif	/* CONFIG_KDB */
 
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
 					SIGTRAP) == NOTIFY_STOP)
@@ -740,36 +704,29 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	/* Save debug status register where ptrace can see it */
 	tsk->thread.debugreg[6] = condition;
 
-	/* Mask out spurious TF errors due to lazy TF clearing */
+	/*
+	 * Single-stepping through TF: make sure we ignore any events in
+	 * kernel space (but re-enable TF when returning to user mode).
+	 * And if the event was due to a debugger (PT_DTRACE), clear the
+	 * TF flag so that register information is correct.
+	 */
 	if (condition & DR_STEP) {
 		/*
-		 * The TF error should be masked out only if the current
-		 * process is not traced and if the TRAP flag has been set
-		 * previously by a tracing process (condition detected by
-		 * the PT_DTRACE flag); remember that the i386 TRAP flag
-		 * can be modified by the process itself in user mode,
-		 * allowing programs to debug themselves without the ptrace()
-		 * interface.
+		 * We already checked v86 mode above, so we can
+		 * check for kernel mode by just checking the CPL
+		 * of CS.
 		 */
 		if ((regs->xcs & 3) == 0)
 			goto clear_TF_reenable;
-		if ((tsk->ptrace & (PT_DTRACE|PT_PTRACED)) == PT_DTRACE)
-			goto clear_TF;
+
+		if (likely(tsk->ptrace & PT_DTRACE)) {
+			tsk->ptrace &= ~PT_DTRACE;
+			regs->eflags &= ~TF_MASK;
+		}
 	}
 
 	/* Ok, finally something we can handle */
-	tsk->thread.trap_no = 1;
-	tsk->thread.error_code = error_code;
-	info.si_signo = SIGTRAP;
-	info.si_errno = 0;
-	info.si_code = TRAP_BRKPT;
-	
-	/* If this is a kernel mode trap, save the user PC on entry to 
-	 * the kernel, that's what the debugger can make sense of.
-	 */
-	info.si_addr = ((regs->xcs & 3) == 0) ? (void __user *)tsk->thread.eip
-	                                      : (void __user *)regs->eip;
-	force_sig_info(SIGTRAP, &info, tsk);
+	send_sigtrap(tsk, regs, error_code);
 
 	/* Disable additional traps. They'll be re-enabled when
 	 * the signal is delivered.
@@ -786,20 +743,9 @@ debug_vm86:
 
 clear_TF_reenable:
 	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
-clear_TF:
 	regs->eflags &= ~TF_MASK;
 	return;
 }
-
-#ifdef	CONFIG_KDB
-fastcall void do_int3(struct pt_regs * regs, long error_code)
-{
-	if (kdb(KDB_REASON_BREAK, error_code, regs))
-		return;
-	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
-}
-#endif	/* CONFIG_KDB */
-
 
 /*
  * Note that we play around with the 'TS' bit in an attempt to get
@@ -965,7 +911,7 @@ asmlinkage void math_state_restore(struct pt_regs regs)
 	struct task_struct *tsk = thread->task;
 
 	clts();		/* Allow maths ops (or we recurse) */
-	if (!tsk_used_math(tsk))
+	if (!tsk->used_math)
 		init_fpu(tsk);
 	restore_fpu(tsk);
 	thread->status |= TS_USEDFPU;	/* So we fnsave on switch_to() */
@@ -1049,9 +995,11 @@ static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
 void __init trap_init(void)
 {
 #ifdef CONFIG_EISA
-	if (isa_readl(0x0FFFD9) == 'E'+('I'<<8)+('S'<<16)+('A'<<24)) {
+	void __iomem *p = ioremap(0x0FFFD9, 4);
+	if (readl(p) == 'E'+('I'<<8)+('S'<<16)+('A'<<24)) {
 		EISA_bus = 1;
 	}
+	iounmap(p);
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -1072,17 +1020,7 @@ void __init trap_init(void)
 	set_trap_gate(11,&segment_not_present);
 	set_trap_gate(12,&stack_segment);
 	set_trap_gate(13,&general_protection);
-#ifdef	CONFIG_KDB
-	if (test_bit(X86_FEATURE_MCE, boot_cpu_data.x86_capability) &&
-	    test_bit(X86_FEATURE_MCA, boot_cpu_data.x86_capability)) {
-		set_intr_gate(14,&page_fault_mca);
-	}
-	else {
-		set_intr_gate(14,&page_fault);
-	}
-#else	/* !CONFIG_KDB */
 	set_intr_gate(14,&page_fault);
-#endif	/* CONFIG_KDB */
 	set_trap_gate(15,&spurious_interrupt_bug);
 	set_trap_gate(16,&coprocessor_error);
 	set_trap_gate(17,&alignment_check);
@@ -1092,14 +1030,6 @@ void __init trap_init(void)
 	set_trap_gate(19,&simd_coprocessor_error);
 
 	set_system_gate(SYSCALL_VECTOR,&system_call);
-#ifdef	CONFIG_KDB
-	kdb_enablehwfault();
-	/*
-	 * A trap gate, used by the kernel to enter the 
-	 * debugger, preserving all registers.
-	 */
-	set_trap_gate(KDBENTER_VECTOR, &kdb_call);
-#endif	/* CONFIG_KDB */
 
 	/*
 	 * Should be a barrier for any external CPU state.

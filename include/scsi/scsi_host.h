@@ -216,13 +216,35 @@ struct scsi_host_template {
 	void (* slave_destroy)(struct scsi_device *);
 
 	/*
+	 * fill in this function to allow the queue depth of this host
+	 * to be changeable (on a per device basis).  returns either
+	 * the current queue depth setting (may be different from what
+	 * was passed in) or an error.  An error should only be
+	 * returned if the requested depth is legal but the driver was
+	 * unable to set it.  If the requested depth is illegal, the
+	 * driver should set and return the closest legal queue depth.
+	 *
+	 */
+	int (* change_queue_depth)(struct scsi_device *, int);
+
+	/*
+	 * fill in this function to allow the changing of tag types
+	 * (this also allows the enabling/disabling of tag command
+	 * queueing).  An error should only be returned if something
+	 * went wrong in the driver while trying to set the tag type.
+	 * If the driver doesn't support the requested tag type, then
+	 * it should set the closest type it does support without
+	 * returning an error.  Returns the actual tag type set.
+	 */
+	int (* change_queue_type)(struct scsi_device *, int);
+
+	/*
 	 * This function determines the bios parameters for a given
 	 * harddisk.  These tend to be numbers that are made up by
 	 * the host adapter.  Parameters:
 	 * size, device, list (heads, sectors, cylinders)
 	 *
-	 * Status: OPTIONAL
-	 */
+	 * Status: OPTIONAL */
 	int (* bios_param)(struct scsi_device *, struct block_device *,
 			sector_t, int []);
 
@@ -527,6 +549,9 @@ struct Scsi_Host {
 extern struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *, int);
 extern int __must_check scsi_add_host(struct Scsi_Host *, struct device *);
 extern void scsi_scan_host(struct Scsi_Host *);
+extern void scsi_scan_single_target(struct Scsi_Host *, unsigned int,
+	unsigned int);
+extern void scsi_rescan_device(struct device *);
 extern void scsi_remove_host(struct Scsi_Host *);
 extern struct Scsi_Host *scsi_host_get(struct Scsi_Host *);
 extern void scsi_host_put(struct Scsi_Host *t);

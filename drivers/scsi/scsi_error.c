@@ -125,6 +125,7 @@ void scsi_add_timer(struct scsi_cmnd *scmd, int timeout,
 
 	add_timer(&scmd->eh_timeout);
 }
+EXPORT_SYMBOL(scsi_add_timer);
 
 /**
  * scsi_delete_timer - Delete/cancel timer for a given function.
@@ -152,6 +153,7 @@ int scsi_delete_timer(struct scsi_cmnd *scmd)
 
 	return rtn;
 }
+EXPORT_SYMBOL(scsi_delete_timer);
 
 /**
  * scsi_times_out - Timeout function for normal scsi commands.
@@ -214,6 +216,7 @@ int scsi_block_when_processing_errors(struct scsi_device *sdev)
 
 	return online;
 }
+EXPORT_SYMBOL(scsi_block_when_processing_errors);
 
 #ifdef CONFIG_SCSI_LOGGING
 /**
@@ -268,16 +271,42 @@ static inline void scsi_eh_prt_fail_stats(struct Scsi_Host *shost,
  *
  * Return value:
  * 	SUCCESS or FAILED or NEEDS_RETRY
+ *
+ * Notes:
+ *	When a deferred error is detected the current command has
+ *	not been executed and needs retrying.
  **/
 static int scsi_check_sense(struct scsi_cmnd *scmd)
 {
-	if (!SCSI_SENSE_VALID(scmd))
-		return FAILED;
+	struct scsi_sense_hdr sshdr;
 
-	if (scmd->sense_buffer[2] & 0xe0)
-		return SUCCESS;
+	if (! scsi_command_normalize_sense(scmd, &sshdr))
+		return FAILED;	/* no valid sense data */
 
-	switch (scmd->sense_buffer[2] & 0xf) {
+	if (scsi_sense_is_deferred(&sshdr))
+		return NEEDS_RETRY;
+
+	/*
+	 * Previous logic looked for FILEMARK, EOM or ILI which are
+	 * mainly associated with tapes and returned SUCCESS.
+	 */
+	if (sshdr.response_code == 0x70) {
+		/* fixed format */
+		if (scmd->sense_buffer[2] & 0xe0)
+			return SUCCESS;
+	} else {
+		/*
+		 * descriptor format: look for "stream commands sense data
+		 * descriptor" (see SSC-3). Assume single sense data
+		 * descriptor. Ignore ILI from SBC-2 READ LONG and WRITE LONG.
+		 */
+		if ((sshdr.additional_length > 3) &&
+		    (scmd->sense_buffer[8] == 0x4) &&
+		    (scmd->sense_buffer[11] & 0xe0))
+			return SUCCESS;
+	}
+
+	switch (sshdr.sense_key) {
 	case NO_SENSE:
 		return SUCCESS;
 	case RECOVERED_ERROR:
@@ -301,19 +330,15 @@ static int scsi_check_sense(struct scsi_cmnd *scmd)
 		 * if the device is in the process of becoming ready, we 
 		 * should retry.
 		 */
-		if ((scmd->sense_buffer[12] == 0x04) &&
-			(scmd->sense_buffer[13] == 0x01)) {
+		if ((sshdr.asc == 0x04) && (sshdr.ascq == 0x01))
 			return NEEDS_RETRY;
-		}
 		/*
 		 * if the device is not started, we need to wake
 		 * the error handler to start the motor
 		 */
 		if (scmd->device->allow_restart &&
-		    (scmd->sense_buffer[12] == 0x04) &&
-		    (scmd->sense_buffer[13] == 0x02)) {
+		    (sshdr.asc == 0x04) && (sshdr.ascq == 0x02))
 			return FAILED;
-		}
 		return SUCCESS;
 
 		/* these three are not supported */
@@ -1358,7 +1383,8 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		return SUCCESS;
 
 	case RESERVATION_CONFLICT:
-		printk("scsi%d (%d,%d,%d) : reservation conflict\n",
+		printk(KERN_INFO "scsi: reservation conflict: host"
+                                " %d channel %d id %d lun %d\n",
 		       scmd->device->host->host_no, scmd->device->channel,
 		       scmd->device->id, scmd->device->lun);
 		return SUCCESS; /* causes immediate i/o error */
@@ -1729,6 +1755,7 @@ void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
 		}
 	}
 }
+EXPORT_SYMBOL(scsi_report_bus_reset);
 
 /*
  * Function:    scsi_report_device_reset()
@@ -1764,6 +1791,7 @@ void scsi_report_device_reset(struct Scsi_Host *shost, int channel, int target)
 		}
 	}
 }
+EXPORT_SYMBOL(scsi_report_device_reset);
 
 static void
 scsi_reset_provider_done_command(struct scsi_cmnd *scmd)
@@ -1843,6 +1871,7 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
 	scsi_next_command(scmd);
 	return rtn;
 }
+EXPORT_SYMBOL(scsi_reset_provider);
 
 /**
  * scsi_normalize_sense - normalize main elements from either fixed or

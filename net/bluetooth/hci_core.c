@@ -59,15 +59,15 @@ static void hci_rx_task(unsigned long arg);
 static void hci_tx_task(unsigned long arg);
 static void hci_notify(struct hci_dev *hdev, int event);
 
-rwlock_t hci_task_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(hci_task_lock);
 
 /* HCI device list */
 LIST_HEAD(hci_dev_list);
-rwlock_t hci_dev_list_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(hci_dev_list_lock);
 
 /* HCI callback list */
 LIST_HEAD(hci_cb_list);
-rwlock_t hci_cb_list_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(hci_cb_list_lock);
 
 /* HCI protocols */
 #define HCI_MAX_PROTO	2
@@ -106,7 +106,7 @@ void hci_req_complete(struct hci_dev *hdev, int result)
 	}
 }
 
-void hci_req_cancel(struct hci_dev *hdev, int err)
+static void hci_req_cancel(struct hci_dev *hdev, int err)
 {
 	BT_DBG("%s err 0x%2.2x", hdev->name, err);
 

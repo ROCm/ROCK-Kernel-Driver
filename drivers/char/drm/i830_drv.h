@@ -32,6 +32,36 @@
 #ifndef _I830_DRV_H_
 #define _I830_DRV_H_
 
+/* General customization:
+ */
+
+#define DRIVER_AUTHOR		"VA Linux Systems Inc."
+
+#define DRIVER_NAME		"i830"
+#define DRIVER_DESC		"Intel 830M"
+#define DRIVER_DATE		"20021108"
+
+/* Interface history:
+ *
+ * 1.1: Original.
+ * 1.2: ?
+ * 1.3: New irq emit/wait ioctls.
+ *      New pageflip ioctl.
+ *      New getparam ioctl.
+ *      State for texunits 3&4 in sarea.
+ *      New (alternative) layout for texture state.
+ */
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		3
+#define DRIVER_PATCHLEVEL	2
+
+/* Driver will work either way: IRQ's save cpu time when waiting for
+ * the card, but are subject to subtle interactions between bios,
+ * hardware and the driver.
+ */
+/* XXX: Add vblank support? */
+#define USE_IRQS 0
+
 typedef struct drm_i830_buf_priv {
    	u32 *in_use;
    	int my_use_idx;
@@ -99,7 +129,7 @@ extern int  i830_dma_init(struct inode *inode, struct file *filp,
 extern int  i830_dma_cleanup(drm_device_t *dev);
 extern int  i830_flush_ioctl(struct inode *inode, struct file *filp,
 			     unsigned int cmd, unsigned long arg);
-extern void i830_reclaim_buffers(struct file *filp);
+extern void i830_reclaim_buffers(drm_device_t *dev, struct file *filp);
 extern int  i830_getage(struct inode *inode, struct file *filp, unsigned int cmd,
 			unsigned long arg);
 extern int i830_mmap_buffers(struct file *filp, struct vm_area_struct *vma);
@@ -140,6 +170,9 @@ extern irqreturn_t i830_driver_irq_handler( DRM_IRQ_ARGS );
 extern void i830_driver_irq_preinstall( drm_device_t *dev );
 extern void i830_driver_irq_postinstall( drm_device_t *dev );
 extern void i830_driver_irq_uninstall( drm_device_t *dev );
+extern void i830_driver_pretakedown(drm_device_t *dev);
+extern void i830_driver_release(drm_device_t *dev, struct file *filp);
+extern int i830_driver_dma_quiescent(drm_device_t *dev);
 
 #define I830_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)

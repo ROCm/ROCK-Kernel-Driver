@@ -15,7 +15,6 @@
 #ifndef _ARCH_IXP4XX_IRQS_H_
 #define _ARCH_IXP4XX_IRQS_H_
 
-#define NR_IRQS			32
 
 #define IRQ_IXP4XX_NPEA		0
 #define IRQ_IXP4XX_NPEB		1
@@ -49,6 +48,25 @@
 #define IRQ_IXP4XX_GPIO12	29
 #define IRQ_IXP4XX_SW_INT1	30
 #define IRQ_IXP4XX_SW_INT2	31
+#define IRQ_IXP4XX_USB_HOST	32
+#define IRQ_IXP4XX_I2C		33
+#define IRQ_IXP4XX_SSP		34
+#define IRQ_IXP4XX_TSYNC	35
+#define IRQ_IXP4XX_EAU_DONE	36
+#define IRQ_IXP4XX_SHA_DONE	37
+#define IRQ_IXP4XX_SWCP_PE	58
+#define IRQ_IXP4XX_QM_PE	60
+#define IRQ_IXP4XX_MCU_ECC	61
+#define IRQ_IXP4XX_EXP_PE	62
+
+/*
+ * Only first 32 sources are valid if running on IXP42x systems
+ */
+#ifndef	CONFIG_CPU_IXP46X
+#define NR_IRQS			32
+#else
+#define NR_IRQS			64
+#endif
 
 #define	XSCALE_PMU_IRQ		(IRQ_IXP4XX_XSCALE_PMU)
 

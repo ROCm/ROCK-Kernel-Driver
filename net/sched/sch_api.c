@@ -131,7 +131,7 @@ static int tclass_notify(struct sk_buff *oskb, struct nlmsghdr *n,
  */
 
 /* Protects list of registered TC modules. It is pure SMP lock. */
-static rwlock_t qdisc_mod_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(qdisc_mod_lock);
 
 
 /************************************************
@@ -207,7 +207,7 @@ struct Qdisc *qdisc_lookup(struct net_device *dev, u32 handle)
 	return NULL;
 }
 
-struct Qdisc *qdisc_leaf(struct Qdisc *p, u32 classid)
+static struct Qdisc *qdisc_leaf(struct Qdisc *p, u32 classid)
 {
 	unsigned long cl;
 	struct Qdisc *leaf;
@@ -226,7 +226,7 @@ struct Qdisc *qdisc_leaf(struct Qdisc *p, u32 classid)
 
 /* Find queueing discipline by name */
 
-struct Qdisc_ops *qdisc_lookup_ops(struct rtattr *kind)
+static struct Qdisc_ops *qdisc_lookup_ops(struct rtattr *kind)
 {
 	struct Qdisc_ops *q = NULL;
 
@@ -290,7 +290,7 @@ void qdisc_put_rtab(struct qdisc_rate_table *tab)
 
 /* Allocate an unique handle from space managed by kernel */
 
-u32 qdisc_alloc_handle(struct net_device *dev)
+static u32 qdisc_alloc_handle(struct net_device *dev)
 {
 	int i = 0x10000;
 	static u32 autohandle = TC_H_MAKE(0x80000000U, 0);
@@ -356,8 +356,9 @@ dev_graft_qdisc(struct net_device *dev, struct Qdisc *qdisc)
    Old qdisc is not destroyed but returned in *old.
  */
 
-int qdisc_graft(struct net_device *dev, struct Qdisc *parent, u32 classid,
-		struct Qdisc *new, struct Qdisc **old)
+static int qdisc_graft(struct net_device *dev, struct Qdisc *parent,
+		       u32 classid,
+		       struct Qdisc *new, struct Qdisc **old)
 {
 	int err = 0;
 	struct Qdisc *q = *old;
@@ -406,8 +407,9 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	ops = qdisc_lookup_ops(kind);
 #ifdef CONFIG_KMOD
 	if (ops==NULL && tca[TCA_KIND-1] != NULL) {
-		if (RTA_PAYLOAD(kind) <= IFNAMSIZ) {
-			request_module("sch_%s", (char*)RTA_DATA(kind));
+		char name[IFNAMSIZ];
+		if (rtattr_strlcpy(name, kind, IFNAMSIZ) < IFNAMSIZ) {
+			request_module("sch_%s", name);
 			ops = qdisc_lookup_ops(kind);
 		}
 	}

@@ -1,6 +1,8 @@
 #ifndef _ALPHA_PGTABLE_H
 #define _ALPHA_PGTABLE_H
 
+#include <asm-generic/4level-fixup.h>
+
 /*
  * This file contains the functions and defines necessary to modify and use
  * the Alpha page table tree.

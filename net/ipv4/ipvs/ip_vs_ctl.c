@@ -45,24 +45,24 @@
 static DECLARE_MUTEX(__ip_vs_mutex);
 
 /* lock for service table */
-static rwlock_t __ip_vs_svc_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(__ip_vs_svc_lock);
 
 /* lock for table with the real services */
-static rwlock_t __ip_vs_rs_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(__ip_vs_rs_lock);
 
 /* lock for state and timeout tables */
-static rwlock_t __ip_vs_securetcp_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(__ip_vs_securetcp_lock);
 
 /* lock for drop entry handling */
-static spinlock_t __ip_vs_dropentry_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(__ip_vs_dropentry_lock);
 
 /* lock for drop packet handling */
-static spinlock_t __ip_vs_droppacket_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(__ip_vs_droppacket_lock);
 
 /* 1/rate drop and drop-entry variables */
 int ip_vs_drop_rate = 0;
 int ip_vs_drop_counter = 0;
-atomic_t ip_vs_dropentry = ATOMIC_INIT(0);
+static atomic_t ip_vs_dropentry = ATOMIC_INIT(0);
 
 /* number of virtual services */
 static int ip_vs_num_services = 0;

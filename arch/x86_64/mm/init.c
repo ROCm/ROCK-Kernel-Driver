@@ -68,8 +68,8 @@ void show_mem(void)
 
 	for_each_pgdat(pgdat) {
                for (i = 0; i < pgdat->node_spanned_pages; ++i) {
-                       page = pgdat->node_mem_map + i;
-		total++;
+			page = pfn_to_page(pgdat->node_start_pfn + i);
+			total++;
                        if (PageReserved(page))
 			reserved++;
                        else if (PageSwapCache(page))
@@ -108,28 +108,28 @@ static void *spp_getpage(void)
 static void set_pte_phys(unsigned long vaddr,
 			 unsigned long phys, pgprot_t prot)
 {
-	pml4_t *level4;
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte, new_pte;
 
 	Dprintk("set_pte_phys %lx to %lx\n", vaddr, phys);
 
-	level4 = pml4_offset_k(vaddr);
-	if (pml4_none(*level4)) {
-		printk("PML4 FIXMAP MISSING, it should be setup in head.S!\n");
+	pgd = pgd_offset_k(vaddr);
+	if (pgd_none(*pgd)) {
+		printk("PGD FIXMAP MISSING, it should be setup in head.S!\n");
 		return;
 	}
-	pgd = level3_offset_k(level4, vaddr);
-	if (pgd_none(*pgd)) {
+	pud = pud_offset(pgd, vaddr);
+	if (pud_none(*pud)) {
 		pmd = (pmd_t *) spp_getpage(); 
-		set_pgd(pgd, __pgd(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
-		if (pmd != pmd_offset(pgd, 0)) {
-			printk("PAGETABLE BUG #01! %p <-> %p\n", pmd, pmd_offset(pgd,0));
+		set_pud(pud, __pud(__pa(pmd) | _KERNPG_TABLE | _PAGE_USER));
+		if (pmd != pmd_offset(pud, 0)) {
+			printk("PAGETABLE BUG #01! %p <-> %p\n", pmd, pmd_offset(pud,0));
 			return;
 		}
 	}
-	pmd = pmd_offset(pgd, vaddr);
+	pmd = pmd_offset(pud, vaddr);
 	if (pmd_none(*pmd)) {
 		pte = (pte_t *) spp_getpage();
 		set_pmd(pmd, __pmd(__pa(pte) | _KERNPG_TABLE | _PAGE_USER));
@@ -210,31 +210,31 @@ static __init void unmap_low_page(int i)
 	ti->allocated = 0; 
 } 
 
-static void __init phys_pgd_init(pgd_t *pgd, unsigned long address, unsigned long end)
+static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned long end)
 { 
 	long i, j; 
 
-	i = pgd_index(address);
-	pgd = pgd + i;
-	for (; i < PTRS_PER_PGD; pgd++, i++) {
+	i = pud_index(address);
+	pud = pud + i;
+	for (; i < PTRS_PER_PUD; pud++, i++) {
 		int map; 
 		unsigned long paddr, pmd_phys;
 		pmd_t *pmd;
 
-		paddr = (address & PML4_MASK) + i*PGDIR_SIZE;
+		paddr = address + i*PUD_SIZE;
 		if (paddr >= end) { 
-			for (; i < PTRS_PER_PGD; i++, pgd++) 
-				set_pgd(pgd, __pgd(0)); 
+			for (; i < PTRS_PER_PUD; i++, pud++) 
+				set_pud(pud, __pud(0)); 
 			break;
 		} 
 
-		if (!e820_mapped(paddr, paddr+PGDIR_SIZE, 0)) { 
-			set_pgd(pgd, __pgd(0)); 
+		if (!e820_mapped(paddr, paddr+PUD_SIZE, 0)) { 
+			set_pud(pud, __pud(0)); 
 			continue;
 		} 
 
 		pmd = alloc_low_page(&map, &pmd_phys);
-		set_pgd(pgd, __pgd(pmd_phys | _KERNPG_TABLE));
+		set_pud(pud, __pud(pmd_phys | _KERNPG_TABLE));
 		for (j = 0; j < PTRS_PER_PMD; pmd++, j++, paddr += PMD_SIZE) {
 			unsigned long pe;
 
@@ -252,19 +252,31 @@ static void __init phys_pgd_init(pgd_t *pgd, unsigned long address, unsigned lon
 	__flush_tlb();
 } 
 
+static void __init find_early_table_space(unsigned long end)
+{
+	unsigned long puds, pmds, tables;
+
+	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
+	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
+	tables = round_up(puds * sizeof(pud_t), PAGE_SIZE) +
+		 round_up(pmds * sizeof(pmd_t), PAGE_SIZE);
+
+	table_start = find_e820_area(0x8000, __pa_symbol(&_text), tables);
+	if (table_start == -1UL)
+		panic("Cannot find space for the kernel page tables");
+
+	table_start >>= PAGE_SHIFT;
+	table_end = table_start;
+}
+
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
    This runs before bootmem is initialized and gets pages directly from the 
    physical memory. To access them they are temporarily mapped. */
-void __init init_memory_mapping(void) 
+void __init init_memory_mapping(unsigned long start, unsigned long end)
 { 
-	unsigned long adr;	       
-	unsigned long end;
 	unsigned long next; 
-	unsigned long pgds, pmds, tables; 
 
 	Dprintk("init_memory_mapping\n");
-
-	end = end_pfn_map << PAGE_SHIFT;
 
 	/* 
 	 * Find space for the kernel direct mapping tables.
@@ -272,31 +284,23 @@ void __init init_memory_mapping(void)
 	 * mapped.  Unfortunately this is done currently before the nodes are 
 	 * discovered.
 	 */
+	find_early_table_space(end);
 
-	pgds = (end + PGDIR_SIZE - 1) >> PGDIR_SHIFT;
-	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT; 
-	tables = round_up(pgds*8, PAGE_SIZE) + round_up(pmds * 8, PAGE_SIZE); 
+	start = (unsigned long)__va(start);
+	end = (unsigned long)__va(end);
 
-	table_start = find_e820_area(0x8000, __pa_symbol(&_text), tables); 
-	if (table_start == -1UL) 
-		panic("Cannot find space for the kernel page tables"); 
-
-	table_start >>= PAGE_SHIFT; 
-	table_end = table_start;
-       
-	end += __PAGE_OFFSET; /* turn virtual */  	
-
-	for (adr = PAGE_OFFSET; adr < end; adr = next) { 
+	for (; start < end; start = next) {
 		int map;
-		unsigned long pgd_phys; 
-		pgd_t *pgd = alloc_low_page(&map, &pgd_phys);
-		next = adr + PML4_SIZE;
+		unsigned long pud_phys; 
+		pud_t *pud = alloc_low_page(&map, &pud_phys);
+		next = start + PGDIR_SIZE;
 		if (next > end) 
 			next = end; 
-		phys_pgd_init(pgd, adr-PAGE_OFFSET, next-PAGE_OFFSET); 
-		set_pml4(init_level4_pgt + pml4_index(adr), mk_kernel_pml4(pgd_phys));
+		phys_pud_init(pud, __pa(start), __pa(next));
+		set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
 		unmap_low_page(map);   
 	} 
+
 	asm volatile("movq %%cr4,%0" : "=r" (mmu_cr4_features));
 	__flush_tlb_all();
 	early_printk("kernel direct mapping tables upto %lx @ %lx-%lx\n", end, 
@@ -306,25 +310,12 @@ void __init init_memory_mapping(void)
 
 extern struct x8664_pda cpu_pda[NR_CPUS];
 
-static unsigned long low_pml4[NR_CPUS];
-
-void swap_low_mappings(void)
-{
-	int i;
-	for (i = 0; i < NR_CPUS; i++) {
-	        unsigned long t;
-		if (!cpu_pda[i].level4_pgt) 
-			continue;
-		t = cpu_pda[i].level4_pgt[0];
-		cpu_pda[i].level4_pgt[0] = low_pml4[i];
-		low_pml4[i] = t;
-	}
-	flush_tlb_all();
-}
-
+/* Assumes all CPUs still execute in init_mm */
 void zap_low_mappings(void)
 {
-	swap_low_mappings();
+	pgd_t *pgd = pgd_offset_k(0UL);
+	pgd_clear(pgd);
+	flush_tlb_all();
 }
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -361,10 +352,14 @@ void __init clear_kernel_mapping(unsigned long address, unsigned long size)
 	
 	for (; address < end; address += LARGE_PAGE_SIZE) { 
 		pgd_t *pgd = pgd_offset_k(address);
-               pmd_t *pmd;
-		if (!pgd || pgd_none(*pgd))
+		pud_t *pud;
+		pmd_t *pmd;
+		if (pgd_none(*pgd))
+			continue;
+		pud = pud_offset(pgd, address);
+		if (pud_none(*pud))
 			continue; 
-               pmd = pmd_offset(pgd, address);
+		pmd = pmd_offset(pud, address);
 		if (!pmd || pmd_none(*pmd))
 			continue; 
 		if (0 == (pmd_val(*pmd) & _PAGE_PSE)) { 
@@ -446,7 +441,7 @@ void __init mem_init(void)
 		/*
 		 * Only count reserved RAM pages
 		 */
-		if (page_is_ram(tmp) && PageReserved(mem_map+tmp))
+		if (page_is_ram(tmp) && PageReserved(pfn_to_page(tmp)))
 			reservedpages++;
 #endif
 
@@ -531,29 +526,29 @@ void __init reserve_bootmem_generic(unsigned long phys, unsigned len)
 int kern_addr_valid(unsigned long addr) 
 { 
 	unsigned long above = ((long)addr) >> __VIRTUAL_MASK_SHIFT;
-       pml4_t *pml4;
        pgd_t *pgd;
+       pud_t *pud;
        pmd_t *pmd;
        pte_t *pte;
 
 	if (above != 0 && above != -1UL)
 		return 0; 
 	
-       pml4 = pml4_offset_k(addr);
-	if (pml4_none(*pml4))
+	pgd = pgd_offset_k(addr);
+	if (pgd_none(*pgd))
 		return 0;
 
-       pgd = pgd_offset_k(addr);
-	if (pgd_none(*pgd))
+	pud = pud_offset(pgd, addr);
+	if (pud_none(*pud))
 		return 0; 
 
-       pmd = pmd_offset(pgd, addr);
+	pmd = pmd_offset(pud, addr);
 	if (pmd_none(*pmd))
 		return 0;
 	if (pmd_large(*pmd))
 		return pfn_valid(pmd_pfn(*pmd));
 
-       pte = pte_offset_kernel(pmd, addr);
+	pte = pte_offset_kernel(pmd, addr);
 	if (pte_none(*pte))
 		return 0;
 	return pfn_valid(pte_pfn(*pte));
@@ -610,7 +605,7 @@ struct vm_area_struct *get_gate_vma(struct task_struct *tsk)
 	if (test_tsk_thread_flag(tsk, TIF_IA32)) {
 		/* lookup code assumes the pages are present. set them up
 		   now */
-		if (__map_syscall32(tsk->mm, 0xfffe000) < 0)
+		if (__map_syscall32(tsk->mm, VSYSCALL32_BASE) < 0)
 			return NULL;
 		return &gate32_vma;
 	}
@@ -622,4 +617,14 @@ int in_gate_area(struct task_struct *task, unsigned long addr)
 {
 	struct vm_area_struct *vma = get_gate_vma(task);
 	return (addr >= vma->vm_start) && (addr < vma->vm_end);
+}
+
+/* Use this when you have no reliable task/vma, typically from interrupt
+ * context.  It is less reliable than using the task's vma and may give
+ * false positives.
+ */
+int in_gate_area_no_task(unsigned long addr)
+{
+	return (((addr >= VSYSCALL_START) && (addr < VSYSCALL_END)) ||
+		((addr >= VSYSCALL32_BASE) && (addr < VSYSCALL32_END)));
 }

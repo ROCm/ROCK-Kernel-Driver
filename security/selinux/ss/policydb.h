@@ -246,6 +246,8 @@ struct policydb {
 	struct ebitmap trustedwriters;
 	struct ebitmap trustedobjects;
 #endif
+
+	unsigned int policyvers;
 };
 
 extern int policydb_init(struct policydb *p);
@@ -271,17 +273,15 @@ struct policy_file {
 	size_t len;
 };
 
-static inline void *next_entry(struct policy_file *fp, size_t bytes)
+static inline int next_entry(void *buf, struct policy_file *fp, size_t bytes)
 {
-	void *buf;
-
 	if (bytes > fp->len)
-		return NULL;
+		return -EINVAL;
 
-	buf = fp->data;
+	memcpy(buf, fp->data, bytes);
 	fp->data += bytes;
 	fp->len -= bytes;
-	return buf;
+	return 0;
 }
 
 #endif	/* _SS_POLICYDB_H_ */

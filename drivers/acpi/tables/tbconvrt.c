@@ -190,7 +190,7 @@ acpi_tb_init_generic_address (
 	new_gas_struct->address_space_id = ACPI_ADR_SPACE_SYSTEM_IO;
 	new_gas_struct->register_bit_width = register_bit_width;
 	new_gas_struct->register_bit_offset = 0;
-	new_gas_struct->reserved        = 0;
+	new_gas_struct->access_width    = 0;
 }
 
 
@@ -510,7 +510,7 @@ acpi_tb_convert_table_fadt (void)
  *
  * FUNCTION:    acpi_tb_convert_table_facs
  *
- * PARAMETERS:  table_info      - Info for currently installad FACS
+ * PARAMETERS:  table_info      - Info for currently installed FACS
  *
  * RETURN:      Status
  *

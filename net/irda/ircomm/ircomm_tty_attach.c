@@ -52,8 +52,9 @@ static void ircomm_tty_discovery_indication(discinfo_t *discovery,
 					    void *priv);
 static void ircomm_tty_getvalue_confirm(int result, __u16 obj_id, 
 					struct ias_value *value, void *priv);
-void ircomm_tty_start_watchdog_timer(struct ircomm_tty_cb *self, int timeout);
-void ircomm_tty_watchdog_timer_expired(void *data);
+static void ircomm_tty_start_watchdog_timer(struct ircomm_tty_cb *self,
+					    int timeout);
+static void ircomm_tty_watchdog_timer_expired(void *data);
 
 static int ircomm_tty_state_idle(struct ircomm_tty_cb *self, 
 				 IRCOMM_TTY_EVENT event, 
@@ -90,7 +91,8 @@ char *ircomm_tty_state[] = {
 	"*** ERROR *** ",
 };
 
-char *ircomm_tty_event[] = {
+#ifdef CONFIG_IRDA_DEBUG
+static char *ircomm_tty_event[] = {
 	"IRCOMM_TTY_ATTACH_CABLE",
 	"IRCOMM_TTY_DETACH_CABLE",
 	"IRCOMM_TTY_DATA_REQUEST",
@@ -106,6 +108,7 @@ char *ircomm_tty_event[] = {
 	"IRCOMM_TTY_GOT_LSAPSEL",
 	"*** ERROR ****",
 };
+#endif /* CONFIG_IRDA_DEBUG */
 
 static int (*state[])(struct ircomm_tty_cb *self, IRCOMM_TTY_EVENT event,
 		      struct sk_buff *skb, struct ircomm_tty_info *info) = 
@@ -594,7 +597,8 @@ void ircomm_tty_link_established(struct ircomm_tty_cb *self)
  *    connection attempt is successful, and if not, we will retry after 
  *    the timeout
  */
-void ircomm_tty_start_watchdog_timer(struct ircomm_tty_cb *self, int timeout)
+static void ircomm_tty_start_watchdog_timer(struct ircomm_tty_cb *self,
+					    int timeout)
 {
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
@@ -609,7 +613,7 @@ void ircomm_tty_start_watchdog_timer(struct ircomm_tty_cb *self, int timeout)
  *    Called when the connect procedure have taken to much time.
  *
  */
-void ircomm_tty_watchdog_timer_expired(void *data)
+static void ircomm_tty_watchdog_timer_expired(void *data)
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) data;
 	

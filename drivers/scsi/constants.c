@@ -4,6 +4,7 @@
  * Additions for SCSI 2 and Linux 2.2.x by D. Gilbert (990422)
  * Additions for SCSI 3+ (SPC-3 T10/1416-D Rev 07 3 May 2002)
  *   by D. Gilbert and aeb (20020609)
+ * Additions for SPC-3 T10/1416-D Rev 21 22 Sept 2004, D. Gilbert 20041025
  */
 
 #include <linux/config.h>
@@ -15,96 +16,78 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_request.h>
+#include <scsi/scsi_eh.h>
 
 
-#define CONST_COMMAND   0x01
-#define CONST_STATUS    0x02
-#define CONST_SENSE     0x04
-#define CONST_XSENSE    0x08
-#define CONST_CMND      0x10
-#define CONST_MSG       0x20
-#define CONST_HOST	0x40
-#define CONST_DRIVER	0x80
 
-static const char unknown[] = "UNKNOWN";
+/* Commands with service actions that change the command name */
+#define MAINTENANCE_IN 0xa3
+#define MAINTENANCE_OUT 0xa4
+#define SERVICE_ACTION_IN_12 0xab
+#define SERVICE_ACTION_OUT_12 0xa9
+#define SERVICE_ACTION_IN_16 0x9e
+#define SERVICE_ACTION_OUT_16 0x9f
+#define VARIABLE_LENGTH_CMD 0x7f
+
+
 
 #ifdef CONFIG_SCSI_CONSTANTS
-#ifdef CONSTANTS
-#undef CONSTANTS
-#endif
-#define CONSTANTS (CONST_COMMAND | CONST_STATUS | CONST_SENSE | CONST_XSENSE \
-		   | CONST_CMND | CONST_MSG | CONST_HOST | CONST_DRIVER)
-#else
-#define CONSTANTS 0
-#endif
-
-#if (CONSTANTS & CONST_COMMAND)
-static const char * group_0_commands[] = {
-/* 00-03 */ "Test Unit Ready", "Rezero Unit", unknown, "Request Sense",
-/* 04-07 */ "Format Unit", "Read Block Limits", unknown, "Reasssign Blocks",
-/* 08-0d */ "Read (6)", unknown, "Write (6)", "Seek (6)", unknown, unknown,
-/* 0e-12 */ unknown, "Read Reverse", "Write Filemarks", "Space", "Inquiry",  
-/* 13-16 */ "Verify", "Recover Buffered Data", "Mode Select", "Reserve",
-/* 17-1b */ "Release", "Copy", "Erase", "Mode Sense", "Start/Stop Unit",
-/* 1c-1d */ "Receive Diagnostic", "Send Diagnostic", 
-/* 1e-1f */ "Prevent/Allow Medium Removal", unknown,
-};
-
-
-static const char *group_1_commands[] = {
-/* 20-22 */  unknown, unknown, unknown,
-/* 23-28 */ unknown, "Define window parameters", "Read Capacity", 
-            unknown, unknown, "Read (10)", 
-/* 29-2d */ "Read Generation", "Write (10)", "Seek (10)", "Erase", 
+static const char * cdb_byte0_names[] = {
+/* 00-03 */ "Test Unit Ready", "Rezero Unit/Rewind", NULL, "Request Sense",
+/* 04-07 */ "Format Unit/Medium", "Read Block Limits", NULL,
+	    "Reasssign Blocks",
+/* 08-0d */ "Read (6)", NULL, "Write (6)", "Seek (6)", NULL, NULL,
+/* 0e-12 */ NULL, "Read Reverse", "Write Filemarks", "Space", "Inquiry",  
+/* 13-16 */ "Verify (6)", "Recover Buffered Data", "Mode Select (6)",
+	    "Reserve (6)",
+/* 17-1a */ "Release (6)", "Copy", "Erase", "Mode Sense (6)", 
+/* 1b-1d */ "Start/Stop Unit", "Receive Diagnostic", "Send Diagnostic", 
+/* 1e-1f */ "Prevent/Allow Medium Removal", NULL,
+/* 20-22 */  NULL, NULL, NULL,
+/* 23-28 */ "Read Format Capacities", "Set Window",
+	    "Read Capacity (10)", NULL, NULL, "Read (10)", 
+/* 29-2d */ "Read Generation", "Write (10)", "Seek (10)", "Erase (10)", 
             "Read updated block", 
-/* 2e-31 */ "Write Verify","Verify", "Search High", "Search Equal", 
-/* 32-34 */ "Search Low", "Set Limits", "Prefetch or Read Position", 
-/* 35-37 */ "Synchronize Cache","Lock/Unlock Cache", "Read Defect Data", 
+/* 2e-31 */ "Write Verify (10)", "Verify (10)", "Search High", "Search Equal", 
+/* 32-34 */ "Search Low", "Set Limits", "Prefetch/Read Position", 
+/* 35-37 */ "Synchronize Cache (10)", "Lock/Unlock Cache (10)",
+	    "Read Defect Data(10)", 
 /* 38-3c */ "Medium Scan", "Compare", "Copy Verify", "Write Buffer", 
             "Read Buffer", 
-/* 3d-3f */ "Update Block", "Read Long",  "Write Long",
-};
-
-
-static const char *group_2_commands[] = {
-/* 40-41 */ "Change Definition", "Write Same",
-/* 42-48 */ "Read sub-channel", "Read TOC", "Read header",
+/* 3d-3f */ "Update Block", "Read Long (10)",  "Write Long (10)",
+/* 40-41 */ "Change Definition", "Write Same (10)",
+/* 42-48 */ "Read sub-channel", "Read TOC/PMA/ATIP", "Read density support",
             "Play audio (10)", "Get configuration", "Play audio msf",
             "Play audio track/index",
 /* 49-4f */ "Play track relative (10)", "Get event status notification",
             "Pause/resume", "Log Select", "Log Sense", "Stop play/scan",
-            unknown,
+            NULL,
 /* 50-55 */ "Xdwrite", "Xpwrite, Read disk info", "Xdread, Read track info",
-            "Reserve track", "Send OPC onfo", "Mode Select (10)",
+            "Reserve track", "Send OPC info", "Mode Select (10)",
 /* 56-5b */ "Reserve (10)", "Release (10)", "Repair track", "Read master cue",
             "Mode Sense (10)", "Close track/session",
 /* 5c-5f */ "Read buffer capacity", "Send cue sheet", "Persistent reserve in",
             "Persistent reserve out",
-};
-
-
-/* The following are 16 byte commands in group 4 */
-static const char *group_4_commands[] = {
+/* 60-67 */ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/* 68-6f */ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/* 70-77 */ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/* 78-7f */ NULL, NULL, NULL, NULL, NULL, NULL, NULL, "Variable length",
 /* 80-84 */ "Xdwrite (16)", "Rebuild (16)", "Regenerate (16)", "Extended copy",
             "Receive copy results",
 /* 85-89 */ "Memory Export In (16)", "Access control in", "Access control out",
             "Read (16)", "Memory Export Out (16)",
-/* 8a-8f */ "Write (16)", unknown, "Read attributes", "Write attributes",
+/* 8a-8f */ "Write (16)", NULL, "Read attributes", "Write attributes",
             "Write and verify (16)", "Verify (16)",
 /* 90-94 */ "Pre-fetch (16)", "Synchronize cache (16)",
-            "Lock/unlock cache (16)", "Write same (16)", unknown,
-/* 95-99 */ unknown, unknown, unknown, unknown, unknown,
-/* 9a-9f */ unknown, unknown, unknown, unknown, "Service action in",
-            "Service action out",
-};
-
-/* The following are 12 byte commands in group 5 */
-static const char *group_5_commands[] = {
-/* a0-a5 */ "Report luns", "Blank", "Send event", "Maintenance (in)",
-            "Maintenance (out)", "Move medium/play audio(12)",
+            "Lock/unlock cache (16)", "Write same (16)", NULL,
+/* 95-99 */ NULL, NULL, NULL, NULL, NULL,
+/* 9a-9f */ NULL, NULL, NULL, NULL, "Service action in (16)",
+            "Service action out (16)",
+/* a0-a5 */ "Report luns", "Blank", "Send event", "Maintenance in",
+            "Maintenance out", "Move medium/play audio(12)",
 /* a6-a9 */ "Exchange medium", "Move medium attached", "Read(12)",
             "Play track relative(12)",
-/* aa-ae */ "Write(12)", unknown, "Erase(12), Get Performance",
+/* aa-ae */ "Write(12)", NULL, "Erase(12), Get Performance",
             "Read DVD structure", "Write and verify(12)",
 /* af-b1 */ "Verify(12)", "Search data high(12)", "Search data equal(12)",
 /* b2-b4 */ "Search data low(12)", "Set limits(12)",
@@ -112,57 +95,279 @@ static const char *group_5_commands[] = {
 /* b5-b6 */ "Request volume element address", "Send volume tag, set streaming",
 /* b7-b9 */ "Read defect data(12)", "Read element status", "Read CD msf",
 /* ba-bc */ "Redundancy group (in), Scan",
-            "Redundancy group (out), Set cd-rom speed", "Spare (in), Play cd",
-/* bd-bf */ "Spare (out), Mechanism status", "Volume set (in), Read cd",
-            "Volume set (out), Send DVD structure",
+            "Redundancy group (out), Set cd-rom speed", "Spare in, Play cd",
+/* bd-bf */ "Spare out, Mechanism status", "Volume set in, Read cd",
+            "Volume set out, Send DVD structure",
 };
 
-
-
-#define group(opcode) (((opcode) >> 5) & 7)
-
-#define RESERVED_GROUP  0
-#define VENDOR_GROUP    1
-
-static const char **commands[] = {
-    group_0_commands, group_1_commands, group_2_commands, 
-    (const char **) RESERVED_GROUP, group_4_commands, 
-    group_5_commands, (const char **) VENDOR_GROUP, 
-    (const char **) VENDOR_GROUP
+struct value_name_pair {
+	int value;
+	const char * name;
 };
 
-static const char reserved[] = "RESERVED";
-static const char vendor[] = "VENDOR SPECIFIC";
+static const struct value_name_pair maint_in_arr[] = {
+	{0x5, "Report device identifier"},
+	{0xa, "Report target port groups"},
+	{0xb, "Report aliases"},
+	{0xc, "Report supported operation codes"},
+	{0xd, "Report supported task management functions"},
+	{0xe, "Report priority"},
+};
+#define MAINT_IN_SZ \
+        (int)(sizeof(maint_in_arr) / sizeof(maint_in_arr[0]))
 
-static void print_opcode(int opcode) {
-    const char **table = commands[ group(opcode) ];
-    switch ((unsigned long) table) {
-    case RESERVED_GROUP:
-	printk("%s(0x%02x) ", reserved, opcode); 
-	break;
-    case VENDOR_GROUP:
-	printk("%s(0x%02x) ", vendor, opcode); 
-	break;
-    default:
-	if (table[opcode & 0x1f] != unknown)
-	    printk("%s ",table[opcode & 0x1f]);
-	else
-	    printk("%s(0x%02x) ", unknown, opcode);
-	break;
-    }
+static const struct value_name_pair maint_out_arr[] = {
+	{0x6, "Set device identifier"},
+	{0xa, "Set target port groups"},
+	{0xb, "Change aliases"},
+	{0xe, "Set priority"},
+};
+#define MAINT_OUT_SZ \
+        (int)(sizeof(maint_out_arr) / sizeof(maint_out_arr[0]))
+
+static const struct value_name_pair serv_in12_arr[] = {
+	{0x1, "Read media serial number"},
+};
+#define SERV_IN12_SZ  \
+        (int)(sizeof(serv_in12_arr) / sizeof(serv_in12_arr[0]))
+
+static const struct value_name_pair serv_out12_arr[] = {
+	{-1, "dummy entry"},
+};
+#define SERV_OUT12_SZ \
+        (int)(sizeof(serv_out12_arr) / sizeof(serv_in12_arr[0]))
+
+static const struct value_name_pair serv_in16_arr[] = {
+	{0x10, "Read capacity(16)"},
+	{0x11, "Read long(16)"},
+};
+#define SERV_IN16_SZ  \
+        (int)(sizeof(serv_in16_arr) / sizeof(serv_in16_arr[0]))
+
+static const struct value_name_pair serv_out16_arr[] = {
+	{0x11, "Write long(16)"},
+	{0x1f, "Notify data transfer device(16)"},
+};
+#define SERV_OUT16_SZ \
+        (int)(sizeof(serv_out16_arr) / sizeof(serv_in16_arr[0]))
+
+static const struct value_name_pair variable_length_arr[] = {
+	{0x1, "Rebuild(32)"},
+	{0x2, "Regenerate(32)"},
+	{0x3, "Xdread(32)"},
+	{0x4, "Xdwrite(32)"},
+	{0x5, "Xdwrite extended(32)"},
+	{0x6, "Xpwrite(32)"},
+	{0x7, "Xdwriteread(32)"},
+	{0x8, "Xdwrite extended(64)"},
+	{0x9, "Read(32)"},
+	{0xa, "Verify(32)"},
+	{0xb, "Write(32)"},
+	{0xc, "Write an verify(32)"},
+	{0xd, "Write same(32)"},
+	{0x8801, "Format OSD"},
+	{0x8802, "Create (osd)"},
+	{0x8803, "List (osd)"},
+	{0x8805, "Read (osd)"},
+	{0x8806, "Write (osd)"},
+	{0x8807, "Append (osd)"},
+	{0x8808, "Flush (osd)"},
+	{0x880a, "Remove (osd)"},
+	{0x880b, "Create partition (osd)"},
+	{0x880c, "Remove partition (osd)"},
+	{0x880e, "Get attributes (osd)"},
+	{0x880f, "Set attributes (osd)"},
+	{0x8812, "Create and write (osd)"},
+	{0x8815, "Create collection (osd)"},
+	{0x8816, "Remove collection (osd)"},
+	{0x8817, "List collection (osd)"},
+	{0x8818, "Set key (osd)"},
+	{0x8819, "Set master key (osd)"},
+	{0x881a, "Flush collection (osd)"},
+	{0x881b, "Flush partition (osd)"},
+	{0x881c, "Flush OSD"},
+	{0x8f7e, "Perform SCSI command (osd)"},
+	{0x8f7f, "Perform task management function (osd)"},
+};
+#define VARIABLE_LENGTH_SZ \
+        (int)(sizeof(variable_length_arr) / sizeof(variable_length_arr[0]))
+
+static const char * get_sa_name(const struct value_name_pair * arr,
+			        int arr_sz, int service_action)
+{
+	int k;
+
+	for (k = 0; k < arr_sz; ++k, ++arr) {
+		if (service_action == arr->value)
+			break;
+	}
+	return (k < arr_sz) ? arr->name : NULL;
 }
-#else /* CONST & CONST_COMMAND */
-static void print_opcode(int opcode) {
-    printk("0x%02x ", opcode);
+
+/* attempt to guess cdb length if cdb_len==0 . No trailing linefeed. */
+static void print_opcode_name(unsigned char * cdbp, int cdb_len,
+			      int start_of_line)
+{
+	int sa, len, cdb0;
+	const char * name;
+	const char * leadin = start_of_line ? KERN_INFO : "";
+
+	cdb0 = cdbp[0];
+	switch(cdb0) {
+	case VARIABLE_LENGTH_CMD:
+		len = cdbp[7] + 8;
+		if (len < 10) {
+			printk("%sshort variable length command, "
+			       "len=%d ext_len=%d", leadin, len, cdb_len);
+			break;
+		}
+		sa = (cdbp[8] << 8) + cdbp[9];
+		name = get_sa_name(maint_in_arr, MAINT_IN_SZ, sa);
+		if (name) {
+			printk("%s%s", leadin, name);
+			if ((cdb_len > 0) && (len != cdb_len))
+				printk(", in_cdb_len=%d, ext_len=%d",
+				       len, cdb_len);
+		} else {
+			printk("%scdb[0]=0x%x, sa=0x%x", leadin, cdb0, sa);
+			if ((cdb_len > 0) && (len != cdb_len))
+				printk(", in_cdb_len=%d, ext_len=%d",
+				       len, cdb_len);
+		}
+		break;
+	case MAINTENANCE_IN:
+		sa = cdbp[1] & 0x1f;
+		name = get_sa_name(maint_in_arr, MAINT_IN_SZ, sa);
+		if (name)
+			printk("%s%s", leadin, name);
+		else
+			printk("%scdb[0]=0x%x, sa=0x%x", leadin, cdb0, sa);
+		break;
+	case MAINTENANCE_OUT:
+		sa = cdbp[1] & 0x1f;
+		name = get_sa_name(maint_out_arr, MAINT_OUT_SZ, sa);
+		if (name)
+			printk("%s%s", leadin, name);
+		else
+			printk("%scdb[0]=0x%x, sa=0x%x", leadin, cdb0, sa);
+		break;
+	case SERVICE_ACTION_IN_12:
+		sa = cdbp[1] & 0x1f;
+		name = get_sa_name(serv_in12_arr, SERV_IN12_SZ, sa);
+		if (name)
+			printk("%s%s", leadin, name);
+		else
+			printk("%scdb[0]=0x%x, sa=0x%x", leadin, cdb0, sa);
+		break;
+	case SERVICE_ACTION_OUT_12:
+		sa = cdbp[1] & 0x1f;
+		name = get_sa_name(serv_out12_arr, SERV_OUT12_SZ, sa);
+		if (name)
+			printk("%s%s", leadin, name);
+		else
+			printk("%scdb[0]=0x%x, sa=0x%x", leadin, cdb0, sa);
+		break;
+	case SERVICE_ACTION_IN_16:
+		sa = cdbp[1] & 0x1f;
+		name = get_sa_name(serv_in16_arr, SERV_IN16_SZ, sa);
+		if (name)
+			printk("%s%s", leadin, name);
+		else
+			printk("%scdb[0]=0x%x, sa=0x%x", leadin, cdb0, sa);
+		break;
+	case SERVICE_ACTION_OUT_16:
+		sa = cdbp[1] & 0x1f;
+		name = get_sa_name(serv_out16_arr, SERV_OUT16_SZ, sa);
+		if (name)
+			printk("%s%s", leadin, name);
+		else
+			printk("%scdb[0]=0x%x, sa=0x%x", leadin, cdb0, sa);
+		break;
+	default:
+		if (cdb0 < 0xc0) {
+			name = cdb_byte0_names[cdb0];
+			if (name)
+				printk("%s%s", leadin, name);
+			else
+				printk("%scdb[0]=0x%x (reserved)",
+				       leadin, cdb0);
+		} else
+			printk("%scdb[0]=0x%x (vendor)", leadin, cdb0);
+		break;
+	}
+}
+
+#else /* ifndef CONFIG_SCSI_CONSTANTS */
+
+static void print_opcode_name(unsigned char * cdbp, int cdb_len,
+			      int start_of_line)
+{
+	int sa, len, cdb0;
+	const char * leadin = start_of_line ? KERN_INFO : "";
+
+	cdb0 = cdbp[0];
+	switch(cdb0) {
+	case VARIABLE_LENGTH_CMD:
+		len = cdbp[7] + 8;
+		if (len < 10) {
+			printk("%sshort opcode=0x%x command, len=%d "
+			       "ext_len=%d", leadin, cdb0, len, cdb_len);
+			break;
+		}
+		sa = (cdbp[8] << 8) + cdbp[9];
+		printk("%scdb[0]=0x%x, sa=0x%x", leadin, cdb0, sa);
+		if (len != cdb_len)
+			printk(", in_cdb_len=%d, ext_len=%d", len, cdb_len);
+		break;
+	case MAINTENANCE_IN:
+	case MAINTENANCE_OUT:
+	case SERVICE_ACTION_IN_12:
+	case SERVICE_ACTION_OUT_12:
+	case SERVICE_ACTION_IN_16:
+	case SERVICE_ACTION_OUT_16:
+		sa = cdbp[1] & 0x1f;
+		printk("%scdb[0]=0x%x, sa=0x%x", leadin, cdb0, sa);
+		break;
+	default:
+		if (cdb0 < 0xc0)
+			printk("%scdb[0]=0x%x", leadin, cdb0);
+		else
+			printk("%scdb[0]=0x%x (vendor)", leadin, cdb0);
+		break;
+	}
 }
 #endif  
 
-void __scsi_print_command (unsigned char *command) {
-    int i,s;
-    print_opcode(command[0]);
-    for ( i = 1, s = COMMAND_SIZE(command[0]); i < s; ++i) 
-	printk("%02x ", command[i]);
-    printk("\n");
+void __scsi_print_command(unsigned char *command)
+{
+	int k, len;
+
+	print_opcode_name(command, 0, 1);
+	if (VARIABLE_LENGTH_CMD == command[0])
+		len = command[7] + 8;
+	else
+		len = COMMAND_SIZE(command[0]);
+	/* print out all bytes in cdb */
+	for (k = 0; k < len; ++k) 
+		printk(" %02x", command[k]);
+	printk("\n");
+}
+EXPORT_SYMBOL(__scsi_print_command);
+
+/* This function (perhaps with the addition of peripheral device type)
+ * is more approriate than __scsi_print_command(). Perhaps that static
+ * can be dropped later if it replaces the __scsi_print_command version.
+ */
+static void scsi_print_cdb(unsigned char *cdb, int cdb_len, int start_of_line)
+{
+	int k;
+
+	print_opcode_name(cdb, cdb_len, start_of_line);
+	/* print out all bytes in cdb */
+	printk(":");
+	for (k = 0; k < cdb_len; ++k) 
+		printk(" %02x", cdb[k]);
+	printk("\n");
 }
 
 /**
@@ -177,7 +382,7 @@ void __scsi_print_command (unsigned char *command) {
  **/
 void
 scsi_print_status(unsigned char scsi_status) {
-#if (CONSTANTS & CONST_STATUS)
+#ifdef CONFIG_SCSI_CONSTANTS
 	const char * ccp;
 
 	switch (scsi_status) {
@@ -194,13 +399,14 @@ scsi_print_status(unsigned char scsi_status) {
 	case 0x40: ccp = "Task Aborted"; break;
 	default:   ccp = "Unknown status";
 	}
-	printk("%s", ccp);
+	printk(KERN_INFO "%s", ccp);
 #else
-	printk("0x%0x", scsi_status);
+	printk(KERN_INFO "0x%0x", scsi_status);
 #endif
 }
+EXPORT_SYMBOL(scsi_print_status);
 
-#if (CONSTANTS & CONST_XSENSE)
+#ifdef CONFIG_SCSI_CONSTANTS
 
 struct error_info {
 	unsigned short code12;	/* 0x0302 looks better than 0x03,0x02 */
@@ -253,6 +459,8 @@ static struct error_info additional[] =
 	{0x040C, "Logical unit not accessible, target port in unavailable "
 	 "state"},
 	{0x0410, "Logical unit not ready, auxiliary memory not accessible"},
+	{0x0411, "Logical unit not ready, notify (enable spinup) required"},
+	{0x0412, "Logical unit not ready, offline"},
 
 	{0x0500, "Logical unit does not respond to selection"},
 
@@ -300,7 +508,14 @@ static struct error_info additional[] =
 	{0x0D04, "Copy target device data underrun"},
 	{0x0D05, "Copy target device data overrun"},
 
+	{0x0E00, "Invalid information unit"},
+	{0x0E01, "Information unit too short"},
+	{0x0E02, "Information unit too long"},
+
 	{0x1000, "Id CRC or ECC error"},
+	{0x1001, "Data block guard check failed"},
+	{0x1002, "Data block application tag check failed"},
+	{0x1003, "Data block reference tag check failed"},
 
 	{0x1100, "Unrecovered read error"},
 	{0x1101, "Read retries exhausted"},
@@ -407,8 +622,10 @@ static struct error_info additional[] =
 
 	{0x2400, "Invalid field in cdb"},
 	{0x2401, "CDB decryption error"},
-	{0x2402, "Obsolete"},
-	{0x2403, "Obsolete"},
+	{0x2404, "Security audit value frozen"},
+	{0x2405, "Security working key frozen"},
+	{0x2406, "Nonce not unique"},
+	{0x2407, "Nonce timestamp out of range"},
 
 	{0x2500, "Logical unit not supported"},
 
@@ -426,6 +643,8 @@ static struct error_info additional[] =
 	{0x260B, "Inline data length exceeded"},
 	{0x260C, "Invalid operation for copy source or destination"},
 	{0x260D, "Copy segment granularity violation"},
+	{0x260E, "Invalid parameter while port is enabled"},
+	{0x260F, "Invalid data-out buffer integrity"},
 
 	{0x2700, "Write protected"},
 	{0x2701, "Hardware write protected"},
@@ -455,6 +674,8 @@ static struct error_info additional[] =
 	{0x2A05, "Registrations preempted"},
 	{0x2A06, "Asymmetric access state changed"},
 	{0x2A07, "Implicit asymmetric access state transition failed"},
+	{0x2A08, "Priority changed"},
+	{0x2A09, "Capacity data has changed"},
 
 	{0x2B00, "Copy cannot execute since host cannot disconnect"},
 
@@ -468,6 +689,8 @@ static struct error_info additional[] =
 	{0x2C07, "Previous busy status"},
 	{0x2C08, "Previous task set full status"},
 	{0x2C09, "Previous reservation conflict status"},
+	{0x2C0A, "Partition or collection contains user objects"},
+	{0x2C0B, "Not reserved"},
 
 	{0x2D00, "Overwrite error on update in place"},
 
@@ -485,6 +708,8 @@ static struct error_info additional[] =
 	{0x3007, "Cleaning failure"},
 	{0x3008, "Cannot write - application code mismatch"},
 	{0x3009, "Current session not fixated for append"},
+	{0x300A, "Cleaning request rejected"},
+	{0x300C, "WORM medium, overwrite attempted"},
 	{0x3010, "Medium not formatted"},
 
 	{0x3100, "Medium format corrupted"},
@@ -503,6 +728,7 @@ static struct error_info additional[] =
 	{0x3502, "Enclosure services unavailable"},
 	{0x3503, "Enclosure services transfer failure"},
 	{0x3504, "Enclosure services transfer refused"},
+	{0x3505, "Enclosure services checksum error"},
 
 	{0x3600, "Ribbon, ink, or toner failure"},
 
@@ -543,6 +769,7 @@ static struct error_info additional[] =
 	{0x3B14, "Medium magazine locked"},
 	{0x3B15, "Medium magazine unlocked"},
 	{0x3B16, "Mechanical positioning or changer error"},
+	{0x3B17, "Read past end of user object"},
 
 	{0x3D00, "Invalid bits in identify message"},
 
@@ -570,14 +797,12 @@ static struct error_info additional[] =
 	{0x3F0F, "Echo buffer overwritten"},
 	{0x3F10, "Medium loadable"},
 	{0x3F11, "Medium auxiliary memory accessible"},
-
-#if 0
-	{0x40NN, "Ram failure"},
-	{0x40NN, "Diagnostic failure on component nn"},
-	{0x41NN, "Data path failure"},
-	{0x42NN, "Power-on or self-test failure"},
-#endif
-
+/*
+ *	{0x40NN, "Ram failure"},
+ *	{0x40NN, "Diagnostic failure on component nn"},
+ *	{0x41NN, "Data path failure"},
+ *	{0x42NN, "Power-on or self-test failure"},
+ */
 	{0x4300, "Message error"},
 
 	{0x4400, "Internal target failure"},
@@ -592,6 +817,7 @@ static struct error_info additional[] =
 	{0x4703, "Information unit CRC error detected"},
 	{0x4704, "Asynchronous information protection error detected"},
 	{0x4705, "Protocol service CRC error"},
+	{0x477f, "Some commands cleared by iSCSI Protocol event"},
 
 	{0x4800, "Initiator detected error message received"},
 
@@ -600,13 +826,17 @@ static struct error_info additional[] =
 	{0x4A00, "Command phase error"},
 
 	{0x4B00, "Data phase error"},
+	{0x4B01, "Invalid target port transfer tag received"},
+	{0x4B02, "Too much write data"},
+	{0x4B03, "Ack/nak timeout"},
+	{0x4B04, "Nak received"},
+	{0x4B05, "Data offset error"},
+	{0x4B06, "Initiator response timeout"},
 
 	{0x4C00, "Logical unit failed self-configuration"},
-
-#if 0
-	{0x4DNN, "Tagged overlapped commands (nn = queue tag)"},
-#endif
-
+/*
+ *	{0x4DNN, "Tagged overlapped commands (nn = queue tag)"},
+ */
 	{0x4E00, "Overlapped commands attempted"},
 
 	{0x5000, "Write append error"},
@@ -631,6 +861,7 @@ static struct error_info additional[] =
 	{0x5504, "Insufficient registration resources"},
 	{0x5505, "Insufficient access control resources"},
 	{0x5506, "Auxiliary memory out of space"},
+	{0x5507, "Quota error"},
 
 	{0x5700, "Unable to recover table-of-contents"},
 
@@ -806,11 +1037,9 @@ static struct error_info additional[] =
 	{0x6F03, "Read of scrambled sector without authentication"},
 	{0x6F04, "Media region code is mismatched to logical unit region"},
 	{0x6F05, "Drive region must be permanent/region reset count error"},
-
-#if 0
-	{0x70NN, "Decompression exception short algorithm id of nn"},
-#endif
-
+/*
+ *	{0x70NN, "Decompression exception short algorithm id of nn"},
+ */
 	{0x7100, "Decompression exception long algorithm id"},
 
 	{0x7200, "Session fixation error"},
@@ -845,9 +1074,7 @@ static struct error_info2 additional2[] =
 	{0x70,0x00,0xff,"Decompression exception short algorithm id of %x"},
 	{0, 0, 0, NULL}
 };
-#endif
 
-#if (CONSTANTS & CONST_SENSE)
 /* description of the sense key values */
 static const char *snstext[] = {
 	"No Sense",	    /* 0: There is no sense information */
@@ -858,11 +1085,11 @@ static const char *snstext[] = {
 	"Hardware Error",   /* 4: Controller or device failure */
 	"Illegal Request",  /* 5: Error in request */
 	"Unit Attention",   /* 6: Removable medium was changed, or
-				  the target has been reset */
+				  the target has been reset, or ... */
 	"Data Protect",	    /* 7: Access to the data is blocked */
 	"Blank Check",	    /* 8: Reached unexpected written or unwritten
 				  region of the medium */
-	"Vendor Specific",  /* 9: Vendor specific */
+	"Vendor Specific(9)",
 	"Copy Aborted",	    /* A: COPY or COMPARE was aborted */
 	"Aborted Command",  /* B: The target aborted the command */
 	"Equal",	    /* C: A SEARCH DATA command found data equal */
@@ -875,20 +1102,21 @@ static const char *snstext[] = {
 /* Get sense key string or NULL if not available */
 const char *
 scsi_sense_key_string(unsigned char key) {
-#if (CONSTANTS & CONST_SENSE)
+#ifdef CONFIG_SCSI_CONSTANTS
 	if (key <= 0xE)
 		return snstext[key];
 #endif
 	return NULL;
 }
+EXPORT_SYMBOL(scsi_sense_key_string);
 
 /*
- * Get extended sense key string or NULL if not available.
- * This string may contain a %x and must be printed with ascq as arg.
+ * Get additional sense code string or NULL if not available.
+ * This string may contain a "%x" and should be printed with ascq as arg.
  */
 const char *
 scsi_extd_sense_format(unsigned char asc, unsigned char ascq) {
-#if (CONSTANTS & CONST_XSENSE)
+#ifdef CONFIG_SCSI_CONSTANTS
 	int i;
 	unsigned short code = ((asc << 8) | ascq);
 
@@ -903,131 +1131,149 @@ scsi_extd_sense_format(unsigned char asc, unsigned char ascq) {
 #endif
 	return NULL;
 }
+EXPORT_SYMBOL(scsi_extd_sense_format);
 
-/* Print extended sense information */
+/* Print extended sense information; no leadin, no linefeed */
 static void
-scsi_show_extd_sense(unsigned char asc, unsigned char ascq) {
+scsi_show_extd_sense(unsigned char asc, unsigned char ascq)
+{
 	const char *extd_sense_fmt = scsi_extd_sense_format(asc, ascq);
 
 	if (extd_sense_fmt) {
-		printk("Additional sense: ");
-		printk(extd_sense_fmt, ascq);
-		printk("\n");
+		if (strstr(extd_sense_fmt, "%x")) {
+			printk("Additional sense: ");
+			printk(extd_sense_fmt, ascq);
+		} else
+			printk("Additional sense: %s", extd_sense_fmt);
 	} else {
-		printk("ASC=%2x ASCQ=%2x\n", asc, ascq);
+		if (asc >= 0x80)
+			printk("<<vendor>> ASC=0x%x ASCQ=0x%x", asc, ascq);
+		if (ascq >= 0x80)
+			printk("ASC=0x%x <<vendor>> ASCQ=0x%x", asc, ascq);
+		else
+			printk("ASC=0x%x ASCQ=0x%x", asc, ascq);
 	}
 }
 
 /* Print sense information */
-static void
-print_sense_internal(const char *devclass, 
-		     const unsigned char *sense_buffer,
-		     struct request *req)
+void
+__scsi_print_sense(const char *name, const unsigned char *sense_buffer,
+		   int sense_len)
 {
-	int s, sense_class, valid, code, info;
-	const char *error = NULL;
-	unsigned char asc, ascq;
+	int k, num, res;
+	unsigned int info;
+	const char *error;
 	const char *sense_txt;
-	const char *name = req->rq_disk ? req->rq_disk->disk_name : devclass;
+	struct scsi_sense_hdr ssh;
     
-	sense_class = (sense_buffer[0] >> 4) & 0x07;
-	code = sense_buffer[0] & 0xf;
-	valid = sense_buffer[0] & 0x80;
-    
-	if (sense_class == 7) {	/* extended sense data */
-		s = sense_buffer[7] + 8;
-		if (s > SCSI_SENSE_BUFFERSIZE)
-			s = SCSI_SENSE_BUFFERSIZE;
-	
+	res = scsi_normalize_sense(sense_buffer, sense_len, &ssh);
+	if (0 == res) {
+		/* this may be SCSI-1 sense data */
+		num = (sense_len < 32) ? sense_len : 32;
+		printk(KERN_INFO "Unrecognized sense data (in hex):");
+		for (k = 0; k < num; ++k) {
+			if (0 == (k % 16)) {
+				printk("\n");
+				printk(KERN_INFO "        ");
+			}
+			printk("%02x ", sense_buffer[k]);
+		}
+		printk("\n");
+		return;
+	}
+
+	/* An example of deferred is when an earlier write to disk cache
+	 * succeeded, but now the disk discovers that it cannot write the
+	 * data to the magnetic media.
+	 */
+	error = scsi_sense_is_deferred(&ssh) ? 
+			"<<DEFERRED>>" : "Current";
+	printk(KERN_INFO "%s: %s", name, error);
+	if (ssh.response_code >= 0x72)
+		printk(" [descriptor]");
+
+	sense_txt = scsi_sense_key_string(ssh.sense_key);
+	if (sense_txt)
+		printk(": sense key: %s\n", sense_txt);
+	else
+		printk(": sense key=0x%x\n", ssh.sense_key);
+	printk(KERN_INFO "    ");
+	scsi_show_extd_sense(ssh.asc, ssh.ascq);
+	printk("\n");
+
+	if (ssh.response_code < 0x72) {
+		/* only decode extras for "fixed" format now */
+		char buff[80];
+		int blen, fixed_valid;
+
+		fixed_valid = sense_buffer[0] & 0x80;
 		info = ((sense_buffer[3] << 24) | (sense_buffer[4] << 16) |
 			(sense_buffer[5] << 8) | sense_buffer[6]);
-		if (info || valid) {
-			printk("Info fld=0x%x", info);
-			if (!valid)	/* info data not according to standard */
-				printk(" (nonstd)");
-			printk(", ");
+		res = 0;
+		memset(buff, 0, sizeof(buff));
+		blen = sizeof(buff) - 1;
+		if (fixed_valid)
+			res += snprintf(buff + res, blen - res,
+					"Info fld=0x%x", info);
+		if (sense_buffer[2] & 0x80) {
+			/* current command has read a filemark */
+			if (res > 0)
+				res += snprintf(buff + res, blen - res, ", ");
+			res += snprintf(buff + res, blen - res, "FMK");
 		}
-		if (sense_buffer[2] & 0x80)
-			printk( "FMK ");	/* current command has read a filemark */
-		if (sense_buffer[2] & 0x40)
-			printk( "EOM ");	/* end-of-medium condition exists */
-		if (sense_buffer[2] & 0x20)
-			printk( "ILI ");	/* incorrect block length requested */
-	
-		switch (code) {
-		case 0x0:
-			error = "Current";	/* error concerns current command */
-			break;
-		case 0x1:
-			error = "Deferred";	/* error concerns some earlier command */
-			/* e.g., an earlier write to disk cache succeeded, but
-			   now the disk discovers that it cannot write the data */
-			break;
-		default:
-			error = "Invalid";
+		if (sense_buffer[2] & 0x40) {
+			/* end-of-medium condition exists */
+			if (res > 0)
+				res += snprintf(buff + res, blen - res, ", ");
+			res += snprintf(buff + res, blen - res, "EOM");
 		}
-
-		printk("%s ", error);
-
-		sense_txt = scsi_sense_key_string(sense_buffer[2]);
-		if (sense_txt)
-			printk("%s: sense key %s\n", name, sense_txt);
-		else
-			printk("%s: sense = %2x %2x\n", name,
-			       sense_buffer[0], sense_buffer[2]);
-
-		asc = ascq = 0;
-		if (sense_buffer[7] + 7 >= 13) {
-			asc = sense_buffer[12];
-			ascq = sense_buffer[13];
+		if (sense_buffer[2] & 0x20) {
+			/* incorrect block length requested */
+			if (res > 0)
+				res += snprintf(buff + res, blen - res, ", ");
+			res += snprintf(buff + res, blen - res, "ILI");
 		}
-		if (asc || ascq)
-			scsi_show_extd_sense(asc, ascq);
-
-	} else {	/* non-extended sense data */
-
-		/*
-		 * Standard says:
-		 *    sense_buffer[0] & 0200 : address valid
-		 *    sense_buffer[0] & 0177 : vendor-specific error code
-		 *    sense_buffer[1] & 0340 : vendor-specific
-		 *    sense_buffer[1..3] : 21-bit logical block address
-		 */
-
-		sense_txt = scsi_sense_key_string(sense_buffer[0]);
-		if (sense_txt)
-			printk("%s: old sense key %s\n", name, sense_txt);
-		else
-			printk("%s: sense = %2x %2x\n", name,
-			       sense_buffer[0], sense_buffer[2]);
-
-		printk("Non-extended sense class %d code 0x%0x\n",
-		       sense_class, code);
-		s = 4;
+		if (res > 0)
+			printk(KERN_INFO "%s\n", buff);
+	} else if (ssh.additional_length > 0) {
+		/* descriptor format with sense descriptors */
+		num = 8 + ssh.additional_length;
+		num = (sense_len < num) ? sense_len : num;
+		printk(KERN_INFO "Descriptor sense data with sense "
+		       "descriptors (in hex):");
+		for (k = 0; k < num; ++k) {
+			if (0 == (k % 16)) {
+				printk("\n");
+				printk(KERN_INFO "        ");
+			}
+			printk("%02x ", sense_buffer[k]);
+		}
+		printk("\n");
 	}
-    
-#if !(CONSTANTS & CONST_SENSE)
-	{
-		int i;
-	printk("Raw sense data:");
-	for (i = 0; i < s; ++i) 
-		printk("0x%02x ", sense_buffer[i]);
-	printk("\n");
-	}
-#endif
 }
+EXPORT_SYMBOL(__scsi_print_sense);
 
 void scsi_print_sense(const char *devclass, struct scsi_cmnd *cmd)
 {
-	print_sense_internal(devclass, cmd->sense_buffer, cmd->request);
+	const char *name = devclass;
+
+	if (cmd->request->rq_disk)
+		name = cmd->request->rq_disk->disk_name;
+	__scsi_print_sense(name, cmd->sense_buffer, SCSI_SENSE_BUFFERSIZE);
 }
+EXPORT_SYMBOL(scsi_print_sense);
 
 void scsi_print_req_sense(const char *devclass, struct scsi_request *sreq)
 {
-	print_sense_internal(devclass, sreq->sr_sense_buffer, sreq->sr_request);
-}
+	const char *name = devclass;
 
-#if (CONSTANTS & CONST_MSG) 
+	if (sreq->sr_request->rq_disk)
+		name = sreq->sr_request->rq_disk->disk_name;
+	__scsi_print_sense(name, sreq->sr_sense_buffer, SCSI_SENSE_BUFFERSIZE);
+}
+EXPORT_SYMBOL(scsi_print_req_sense);
+
+#ifdef CONFIG_SCSI_CONSTANTS
 static const char *one_byte_msgs[] = {
 /* 0x00 */ "Command Complete", NULL, "Save Pointers",
 /* 0x03 */ "Restore Pointers", "Disconnect", "Initiator Error", 
@@ -1036,161 +1282,167 @@ static const char *one_byte_msgs[] = {
 /* 0x0c */ "Bus device reset", "Abort Tag", "Clear Queue", 
 /* 0x0f */ "Initiate Recovery", "Release Recovery"
 };
-
 #define NO_ONE_BYTE_MSGS (sizeof(one_byte_msgs)  / sizeof (const char *))
 
 static const char *two_byte_msgs[] = {
 /* 0x20 */ "Simple Queue Tag", "Head of Queue Tag", "Ordered Queue Tag"
 /* 0x23 */ "Ignore Wide Residue"
 };
-
 #define NO_TWO_BYTE_MSGS (sizeof(two_byte_msgs)  / sizeof (const char *))
 
 static const char *extended_msgs[] = {
 /* 0x00 */ "Modify Data Pointer", "Synchronous Data Transfer Request",
 /* 0x02 */ "SCSI-I Extended Identify", "Wide Data Transfer Request"
 };
-
 #define NO_EXTENDED_MSGS (sizeof(two_byte_msgs)  / sizeof (const char *))
-#endif /* (CONSTANTS & CONST_MSG) */
 
-int scsi_print_msg (const unsigned char *msg) {
-    int len = 0, i;
-    if (msg[0] == EXTENDED_MESSAGE) {
-	len = 3 + msg[1];
-#if (CONSTANTS & CONST_MSG)
-	if (msg[2] < NO_EXTENDED_MSGS)
-	    printk ("%s ", extended_msgs[msg[2]]); 
-	else 
-	    printk ("Extended Message, reserved code (0x%02x) ", (int) msg[2]);
-	switch (msg[2]) {
-	case EXTENDED_MODIFY_DATA_POINTER:
-	    printk("pointer = %d", (int) (msg[3] << 24) | (msg[4] << 16) | 
-		   (msg[5] << 8) | msg[6]);
-	    break;
-	case EXTENDED_SDTR:
-	    printk("period = %d ns, offset = %d", (int) msg[3] * 4, (int) 
-		   msg[4]);
-	    break;
-	case EXTENDED_WDTR:
-	    printk("width = 2^%d bytes", msg[3]);
-	    break;
-	default:
-	    for (i = 2; i < len; ++i) 
-		printk("%02x ", msg[i]);
-	}
-#else
-	for (i = 0; i < len; ++i)
-	    printk("%02x ", msg[i]);
-#endif
+
+int scsi_print_msg (const unsigned char *msg)
+{
+	int len = 0, i;
+	if (msg[0] == EXTENDED_MESSAGE) {
+		len = 3 + msg[1];
+		if (msg[2] < NO_EXTENDED_MSGS)
+			printk ("%s ", extended_msgs[msg[2]]); 
+		else 
+			printk ("Extended Message, reserved code (0x%02x) ",
+				(int) msg[2]);
+		switch (msg[2]) {
+		case EXTENDED_MODIFY_DATA_POINTER:
+			printk("pointer = %d", (int) (msg[3] << 24) |
+				(msg[4] << 16) | (msg[5] << 8) | msg[6]);
+			break;
+		case EXTENDED_SDTR:
+			printk("period = %d ns, offset = %d",
+				(int) msg[3] * 4, (int) msg[4]);
+			break;
+		case EXTENDED_WDTR:
+			printk("width = 2^%d bytes", msg[3]);
+			break;
+		default:
+		for (i = 2; i < len; ++i) 
+			printk("%02x ", msg[i]);
+		}
 	/* Identify */
-    } else if (msg[0] & 0x80) {
-#if (CONSTANTS & CONST_MSG)
-	printk("Identify disconnect %sallowed %s %d ",
-	       (msg[0] & 0x40) ? "" : "not ",
-	       (msg[0] & 0x20) ? "target routine" : "lun",
-	       msg[0] & 0x7);
-#else
-	printk("%02x ", msg[0]);
-#endif
-	len = 1;
+	} else if (msg[0] & 0x80) {
+		printk("Identify disconnect %sallowed %s %d ",
+			(msg[0] & 0x40) ? "" : "not ",
+			(msg[0] & 0x20) ? "target routine" : "lun",
+			msg[0] & 0x7);
+		len = 1;
 	/* Normal One byte */
-    } else if (msg[0] < 0x1f) {
-#if (CONSTANTS & CONST_MSG)
-	if (msg[0] < NO_ONE_BYTE_MSGS)
-	    printk(one_byte_msgs[msg[0]]);
-	else
-	    printk("reserved (%02x) ", msg[0]);
-#else
-	printk("%02x ", msg[0]);
-#endif
-	len = 1;
+	} else if (msg[0] < 0x1f) {
+		if (msg[0] < NO_ONE_BYTE_MSGS)
+			printk(one_byte_msgs[msg[0]]);
+		else
+			printk("reserved (%02x) ", msg[0]);
+		len = 1;
 	/* Two byte */
-    } else if (msg[0] <= 0x2f) {
-#if (CONSTANTS & CONST_MSG)
-	if ((msg[0] - 0x20) < NO_TWO_BYTE_MSGS)
-	    printk("%s %02x ", two_byte_msgs[msg[0] - 0x20], 
-		   msg[1]);
-	else 
-	    printk("reserved two byte (%02x %02x) ", 
-		   msg[0], msg[1]);
-#else
-	printk("%02x %02x", msg[0], msg[1]);
-#endif
-	len = 2;
-    } else 
-#if (CONSTANTS & CONST_MSG)
-	printk(reserved);
-#else
-    printk("%02x ", msg[0]);
-#endif
-    return len;
+	} else if (msg[0] <= 0x2f) {
+		if ((msg[0] - 0x20) < NO_TWO_BYTE_MSGS)
+			printk("%s %02x ", two_byte_msgs[msg[0] - 0x20], 
+				msg[1]);
+		else 
+			printk("reserved two byte (%02x %02x) ", 
+				msg[0], msg[1]);
+		len = 2;
+	} else 
+		printk("reserved");
+	return len;
 }
+EXPORT_SYMBOL(scsi_print_msg);
 
-void scsi_print_command(struct scsi_cmnd *cmd) {
-    printk("scsi%d : destination target %d, lun %d\n", 
-	   cmd->device->host->host_no, 
-	   cmd->device->id, 
-	   cmd->device->lun);
-    printk("        command = ");
-    __scsi_print_command(cmd->cmnd);
+#else  /* ifndef CONFIG_SCSI_CONSTANTS */
+
+int scsi_print_msg (const unsigned char *msg)
+{
+	int len = 0, i;
+
+	if (msg[0] == EXTENDED_MESSAGE) {
+		len = 3 + msg[1];
+		for (i = 0; i < len; ++i)
+			printk("%02x ", msg[i]);
+	/* Identify */
+	} else if (msg[0] & 0x80) {
+		printk("%02x ", msg[0]);
+		len = 1;
+	/* Normal One byte */
+	} else if (msg[0] < 0x1f) {
+		printk("%02x ", msg[0]);
+		len = 1;
+	/* Two byte */
+	} else if (msg[0] <= 0x2f) {
+		printk("%02x %02x", msg[0], msg[1]);
+		len = 2;
+	} else 
+		printk("%02x ", msg[0]);
+	return len;
 }
+EXPORT_SYMBOL(scsi_print_msg);
+#endif /* ! CONFIG_SCSI_CONSTANTS */
 
-#if (CONSTANTS & CONST_HOST)
+void scsi_print_command(struct scsi_cmnd *cmd)
+{
+	/* Assume appended output (i.e. not at start of line) */
+	printk("scsi%d : destination target %d, lun %d\n", 
+		cmd->device->host->host_no, 
+		cmd->device->id, 
+		cmd->device->lun);
+	printk(KERN_INFO "        command: ");
+	scsi_print_cdb(cmd->cmnd, cmd->cmd_len, 0);
+}
+EXPORT_SYMBOL(scsi_print_command);
+
+#ifdef CONFIG_SCSI_CONSTANTS
+
 static const char * hostbyte_table[]={
 "DID_OK", "DID_NO_CONNECT", "DID_BUS_BUSY", "DID_TIME_OUT", "DID_BAD_TARGET", 
 "DID_ABORT", "DID_PARITY", "DID_ERROR", "DID_RESET", "DID_BAD_INTR",
-"DID_PASSTHROUGH", "DID_SOFT_ERROR", "DID_IMM_RETRY", NULL};
+"DID_PASSTHROUGH", "DID_SOFT_ERROR", "DID_IMM_RETRY"};
+#define NUM_HOSTBYTE_STRS (sizeof(hostbyte_table) / sizeof(const char *))
 
 void scsi_print_hostbyte(int scsiresult)
-{   static int maxcode=0;
-    int i;
-   
-    if(!maxcode) {
-	for(i=0;hostbyte_table[i];i++) ;
-	maxcode=i-1;
-    }
-    printk("Hostbyte=0x%02x",host_byte(scsiresult));
-    if(host_byte(scsiresult)>maxcode) {
-	printk("is invalid "); 
-	return;
-    }
-    printk("(%s) ",hostbyte_table[host_byte(scsiresult)]);
+{
+	int hb = host_byte(scsiresult);
+
+	printk("Hostbyte=0x%02x", hb);
+	if (hb < NUM_HOSTBYTE_STRS)
+		printk("(%s) ", hostbyte_table[hb]);
+	else
+		printk("is invalid "); 
 }
 #else
 void scsi_print_hostbyte(int scsiresult)
-{   printk("Hostbyte=0x%02x ",host_byte(scsiresult));
+{
+	printk("Hostbyte=0x%02x ", host_byte(scsiresult));
 }
 #endif
 
-#if (CONSTANTS & CONST_DRIVER)
+#ifdef CONFIG_SCSI_CONSTANTS
+
 static const char * driverbyte_table[]={
 "DRIVER_OK", "DRIVER_BUSY", "DRIVER_SOFT",  "DRIVER_MEDIA", "DRIVER_ERROR", 
-"DRIVER_INVALID", "DRIVER_TIMEOUT", "DRIVER_HARD",NULL };
+"DRIVER_INVALID", "DRIVER_TIMEOUT", "DRIVER_HARD", "DRIVER_SENSE"};
+#define NUM_DRIVERBYTE_STRS (sizeof(driverbyte_table) / sizeof(const char *))
 
 static const char * driversuggest_table[]={"SUGGEST_OK",
 "SUGGEST_RETRY", "SUGGEST_ABORT", "SUGGEST_REMAP", "SUGGEST_DIE",
-unknown,unknown,unknown, "SUGGEST_SENSE",NULL};
-
+"SUGGEST_5", "SUGGEST_6", "SUGGEST_7", "SUGGEST_SENSE"};
+#define NUM_SUGGEST_STRS (sizeof(driversuggest_table) / sizeof(const char *))
 
 void scsi_print_driverbyte(int scsiresult)
-{   static int driver_max=0,suggest_max=0;
-    int i,dr=driver_byte(scsiresult)&DRIVER_MASK, 
-	su=(driver_byte(scsiresult)&SUGGEST_MASK)>>4;
+{
+	int dr = (driver_byte(scsiresult) & DRIVER_MASK);
+	int su = ((driver_byte(scsiresult) & SUGGEST_MASK) >> 4);
 
-    if(!driver_max) {
-        for(i=0;driverbyte_table[i];i++) ;
-        driver_max=i;
-	for(i=0;driversuggest_table[i];i++) ;
-	suggest_max=i;
-    }
-    printk("Driverbyte=0x%02x",driver_byte(scsiresult));
-    printk("(%s,%s) ",
-	dr<driver_max  ? driverbyte_table[dr]:"invalid",
-	su<suggest_max ? driversuggest_table[su]:"invalid");
+	printk("Driverbyte=0x%02x ", driver_byte(scsiresult));
+	printk("(%s,%s) ",
+	       (dr < NUM_DRIVERBYTE_STRS ? driverbyte_table[dr] : "invalid"),
+	       (su < NUM_SUGGEST_STRS ? driversuggest_table[su] : "invalid"));
 }
 #else
 void scsi_print_driverbyte(int scsiresult)
-{   printk("Driverbyte=0x%02x ",driver_byte(scsiresult));
+{
+	printk("Driverbyte=0x%02x ", driver_byte(scsiresult));
 }
 #endif

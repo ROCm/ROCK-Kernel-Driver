@@ -353,58 +353,58 @@ MODULE_LICENSE("GPL");
 
 #if !defined(PCMCIA)
 #if defined(MODULE)
-MODULE_PARM(io, "1-2i");
-MODULE_PARM_DESC(io,"base io address of controller");
 static int io[] = {0, 0};
+module_param_array(io, int, NULL, 0);
+MODULE_PARM_DESC(io,"base io address of controller");
 
-MODULE_PARM(irq, "1-2i");
-MODULE_PARM_DESC(irq,"interrupt for controller");
 static int irq[] = {0, 0};
+module_param_array(irq, int, NULL, 0);
+MODULE_PARM_DESC(irq,"interrupt for controller");
 
-MODULE_PARM(scsiid, "1-2i");
-MODULE_PARM_DESC(scsiid,"scsi id of controller");
 static int scsiid[] = {7, 7};
+module_param_array(scsiid, int, NULL, 0);
+MODULE_PARM_DESC(scsiid,"scsi id of controller");
 
-MODULE_PARM(reconnect, "1-2i");
-MODULE_PARM_DESC(reconnect,"allow targets to disconnect");
 static int reconnect[] = {1, 1};
+module_param_array(reconnect, int, NULL, 0);
+MODULE_PARM_DESC(reconnect,"allow targets to disconnect");
 
-MODULE_PARM(parity, "1-2i");
-MODULE_PARM_DESC(parity,"use scsi parity");
 static int parity[] = {1, 1};
+module_param_array(parity, int, NULL, 0);
+MODULE_PARM_DESC(parity,"use scsi parity");
 
-MODULE_PARM(sync, "1-2i");
-MODULE_PARM_DESC(sync,"use synchronous transfers");
 static int sync[] = {1, 1};
+module_param_array(sync, int, NULL, 0);
+MODULE_PARM_DESC(sync,"use synchronous transfers");
 
-MODULE_PARM(delay, "1-2i");
-MODULE_PARM_DESC(delay,"scsi reset delay");
 static int delay[] = {DELAY_DEFAULT, DELAY_DEFAULT};
+module_param_array(delay, int, NULL, 0);
+MODULE_PARM_DESC(delay,"scsi reset delay");
 
-MODULE_PARM(exttrans, "1-2i");
-MODULE_PARM_DESC(exttrans,"use extended translation");
 static int exttrans[] = {0, 0};
+module_param_array(exttrans, int, NULL, 0);
+MODULE_PARM_DESC(exttrans,"use extended translation");
 
 #if !defined(AHA152X_DEBUG)
-MODULE_PARM(aha152x, "1-8i");
-MODULE_PARM_DESC(aha152x, "parameters for first controller");
 static int aha152x[] = {0, 11, 7, 1, 1, 0, DELAY_DEFAULT, 0};
-
-MODULE_PARM(aha152x1, "1-8i");
-MODULE_PARM_DESC(aha152x1, "parameters for second controller");
-static int aha152x1[] = {0, 11, 7, 1, 1, 0, DELAY_DEFAULT, 0};
-#else
-MODULE_PARM(debug, "1-2i");
-MODULE_PARM_DESC(debug, "flags for driver debugging");
-static int debug[] = {DEBUG_DEFAULT, DEBUG_DEFAULT};
-
-MODULE_PARM(aha152x, "1-9i");
+module_param_array(aha152x, int, NULL, 0);
 MODULE_PARM_DESC(aha152x, "parameters for first controller");
-static int aha152x[]   = {0, 11, 7, 1, 1, 1, DELAY_DEFAULT, 0, DEBUG_DEFAULT};
 
-MODULE_PARM(aha152x1, "1-9i");
+static int aha152x1[] = {0, 11, 7, 1, 1, 0, DELAY_DEFAULT, 0};
+module_param_array(aha152x1, int, NULL, 0);
 MODULE_PARM_DESC(aha152x1, "parameters for second controller");
+#else
+static int debug[] = {DEBUG_DEFAULT, DEBUG_DEFAULT};
+module_param_array(debug, int, NULL, 0);
+MODULE_PARM_DESC(debug, "flags for driver debugging");
+
+static int aha152x[]   = {0, 11, 7, 1, 1, 1, DELAY_DEFAULT, 0, DEBUG_DEFAULT};
+module_param_array(aha152x, int, NULL, 0);
+MODULE_PARM_DESC(aha152x, "parameters for first controller");
+
 static int aha152x1[]  = {0, 11, 7, 1, 1, 1, DELAY_DEFAULT, 0, DEBUG_DEFAULT};
+module_param_array(aha152x1, int, NULL, 0);
+MODULE_PARM_DESC(aha152x1, "parameters for second controller");
 #endif /* !defined(AHA152X_DEBUG) */
 #endif /* MODULE */
 

@@ -78,6 +78,9 @@ extern int gsi_to_irq (unsigned int gsi);
 extern void iosapic_enable_intr (unsigned int vector);
 extern int iosapic_register_intr (unsigned int gsi, unsigned long polarity,
 				  unsigned long trigger);
+#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
+extern void iosapic_unregister_intr (unsigned int irq);
+#endif
 extern void __init iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 				      unsigned long polarity,
 				      unsigned long trigger);
@@ -97,6 +100,7 @@ extern void __init map_iosapic_to_node (unsigned int, int);
 #define iosapic_system_init(pcat_compat)			do { } while (0)
 #define iosapic_init(address,gsi_base)				do { } while (0)
 #define iosapic_register_intr(gsi,polarity,trigger)		(gsi)
+#define iosapic_unregister_intr(irq)				do { } while (0)
 #define iosapic_override_isa_irq(isa_irq,gsi,polarity,trigger)	do { } while (0)
 #define iosapic_register_platform_intr(type,gsi,pmi,eid,id, \
 	polarity,trigger)					(gsi)

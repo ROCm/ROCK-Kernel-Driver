@@ -24,14 +24,6 @@ static int pmu_setup(void);
 static void pmu_stop(void);
 static int pmu_create_files(struct super_block *, struct dentry *);
 
-static struct oprofile_operations pmu_ops = {
-	.create_files	= pmu_create_files,
-	.setup		= pmu_setup,
-	.shutdown	= pmu_stop,
-	.start		= pmu_start,
-	.stop		= pmu_stop,
-};
-
 #ifdef CONFIG_PM
 static struct sys_device device_oprofile = {
 	.id		= 0,
@@ -113,19 +105,22 @@ static void pmu_stop(void)
 	up(&pmu_sem);
 }
 
-int __init pmu_init(struct oprofile_operations **ops, struct op_arm_model_spec *spec)
+void __init pmu_init(struct oprofile_operations *ops, struct op_arm_model_spec *spec)
 {
 	init_MUTEX(&pmu_sem);
 
 	if (spec->init() < 0)
-		return -ENODEV;
+		return;
 
 	pmu_model = spec;
 	init_driverfs();
-	*ops = &pmu_ops;
-	pmu_ops.cpu_type = pmu_model->name;
+	ops->create_files = pmu_create_files;
+	ops->setup = pmu_setup;
+	ops->shutdown = pmu_stop;
+	ops->start = pmu_start;
+	ops->stop = pmu_stop;
+	ops->cpu_type = pmu_model->name;
 	printk(KERN_INFO "oprofile: using %s PMU\n", spec->name);
-	return 0;
 }
 
 void pmu_exit(void)

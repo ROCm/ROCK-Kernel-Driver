@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.39 $
+ * $Revision: 1.42 $
  */
 
 #include <linux/config.h>
@@ -138,7 +138,7 @@ dasd_start_diag(struct dasd_ccw_req * cqr)
 
 	rc = dia250(&private->iob, RW_BIO);
 	if (rc > 8) {
-		MESSAGE(KERN_WARNING, "dia250 returned CC %d", rc);
+		DEV_MESSAGE(KERN_WARNING, device, "dia250 returned CC %d", rc);
 		cqr->status = DASD_CQR_ERROR;
 	} else if (rc == 0) {
 		cqr->status = DASD_CQR_DONE;
@@ -201,8 +201,9 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 				if (dasd_start_diag(next) == 0)
 					expires = next->expires;
 				else
-					MESSAGE(KERN_WARNING, "%s",
-						"Interrupt fastpath failed!");
+					DEV_MESSAGE(KERN_WARNING, device, "%s",
+						    "Interrupt fastpath "
+						    "failed!");
 			}
 		}
 	} else 
@@ -231,7 +232,7 @@ dasd_diag_check_device(struct dasd_device *device)
 	if (private == NULL) {
 		private = kmalloc(sizeof(struct dasd_diag_private),GFP_KERNEL);
 		if (private == NULL) {
-			MESSAGE(KERN_WARNING, "%s",
+			DEV_MESSAGE(KERN_WARNING, device, "%s",
 				"memory allocation failed for private data");
 			return -ENOMEM;
 		}
@@ -258,11 +259,11 @@ dasd_diag_check_device(struct dasd_device *device)
 		return -ENOTSUPP;
 	}
 
-	DBF_EVENT(DBF_INFO,
-		  "%04X: %04X on real %04X/%02X",
-		  rdc_data->dev_nr,
-		  rdc_data->vdev_type,
-		  rdc_data->rdev_type, rdc_data->rdev_model);
+	DBF_DEV_EVENT(DBF_INFO, device,
+		      "%04X: %04X on real %04X/%02X",
+		      rdc_data->dev_nr,
+		      rdc_data->vdev_type,
+		      rdc_data->rdev_type, rdc_data->rdev_model);
 
 	/* terminate all outstanding operations */
 	mdsk_term_io(device);
@@ -270,10 +271,11 @@ dasd_diag_check_device(struct dasd_device *device)
 	/* figure out blocksize of device */
 	label = (long *) get_zeroed_page(GFP_KERNEL);
 	if (label == NULL)  {
-		MESSAGE(KERN_WARNING, "%s",
-			"No memory to allocate initialization request");
+		DEV_MESSAGE(KERN_WARNING, device, "%s",
+			    "No memory to allocate initialization request");
 		return -ENOMEM;
 	}
+	/* try all sizes - needed for ECKD devices */
 	for (bsize = 512; bsize <= PAGE_SIZE; bsize <<= 1) {
 		mdsk_init_io(device, bsize, 0, 64);
 		memset(&bio, 0, sizeof (struct dasd_diag_bio));
@@ -291,8 +293,9 @@ dasd_diag_check_device(struct dasd_device *device)
 			break;
 		mdsk_term_io(device);
 	}
-	if (bsize <= PAGE_SIZE && label[3] == bsize &&
-	    label[0] == 0xc3d4e2f1) {
+	if (bsize <= PAGE_SIZE && label[0] == 0xc3d4e2f1) {
+		/* get formatted blocksize from label block */
+		bsize = (int) label[3];
 		device->blocks = label[7];
 		device->bp_block = bsize;
 		device->s2b_shift = 0;	/* bits to shift 512 to get a block */
@@ -305,8 +308,12 @@ dasd_diag_check_device(struct dasd_device *device)
 			    (device->blocks << device->s2b_shift) >> 1);
 		rc = 0;
 	} else {
-		DEV_MESSAGE(KERN_WARNING, device, "%s",
-			    "volume has incompatible disk layout");
+		if (bsize > PAGE_SIZE)
+			DEV_MESSAGE(KERN_WARNING, device, "%s",
+				    "DIAG access failed");
+		else
+			DEV_MESSAGE(KERN_WARNING, device, "%s",
+				    "volume is not CMS formatted");
 		rc = -EMEDIUMTYPE;
 	}
 	free_page((long) label);
@@ -445,20 +452,8 @@ static void
 dasd_diag_dump_sense(struct dasd_device *device, struct dasd_ccw_req * req,
 		     struct irb *stat)
 {
-	char *page;
-
-	page = (char *) get_zeroed_page(GFP_KERNEL);
-	if (page == NULL) {
-		MESSAGE(KERN_ERR, "%s", "No memory to dump sense data");
-		return;
-	}
-	sprintf(page, KERN_WARNING PRINTK_HEADER
-		"device %s: I/O status report:\n",
-		device->cdev->dev.bus_id);
-
-	MESSAGE(KERN_ERR, "Sense data:\n%s", page);
-
-	free_page((unsigned long) page);
+	DEV_MESSAGE(KERN_ERR, device, "%s",
+		    "dump sense not available for DIAG data");
 }
 
 /*
@@ -494,9 +489,10 @@ static int __init
 dasd_diag_init(void)
 {
 	if (!MACHINE_IS_VM) {
-		MESSAGE(KERN_INFO,
-			"Machine is not VM: %s discipline not initializing",
-			dasd_diag_discipline.name);
+		MESSAGE_LOG(KERN_INFO,
+			    "Machine is not VM: %s "
+			    "discipline not initializing",
+			    dasd_diag_discipline.name);
 		return -EINVAL;
 	}
 	ASCEBC(dasd_diag_discipline.ebcname, 4);
@@ -511,9 +507,10 @@ static void __exit
 dasd_diag_cleanup(void)
 {
 	if (!MACHINE_IS_VM) {
-		MESSAGE(KERN_INFO,
-			"Machine is not VM: %s discipline not initializing",
-			dasd_diag_discipline.name);
+		MESSAGE_LOG(KERN_INFO,
+			    "Machine is not VM: %s "
+			    "discipline not cleaned",
+			    dasd_diag_discipline.name);
 		return;
 	}
 	unregister_external_interrupt(0x2603, dasd_ext_handler);

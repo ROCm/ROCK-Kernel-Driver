@@ -276,8 +276,6 @@ struct svc_program {
 	struct svc_stat *	pg_stats;	/* rpc statistics */
 	/* Override authentication. NULL means use default */
 	int			(*pg_authenticate)(struct svc_rqst *, u32 *);
-	/* Simpler */
-	int			(*pg_need_auth)(struct svc_rqst *);
 };
 
 /*

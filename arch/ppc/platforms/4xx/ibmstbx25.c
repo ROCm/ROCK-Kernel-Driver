@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <asm/ocp.h>
 #include <platforms/4xx/ibmstbx25.h>
+#include <asm/ppc4xx_pic.h>
 
 static struct ocp_func_iic_data ibmstbx25_iic0_def = {
 	.fast_mode	= 0,		/* Use standad mode (100Khz) */
@@ -55,5 +56,13 @@ struct ocp_def core_ocp[] __initdata = {
 	  .pm		= IBM_CPM_GPIO0,
 	},
 	{ .vendor	= OCP_VENDOR_INVALID
+	}
+};
+
+/* Polarity and triggering settings for internal interrupt sources */
+struct ppc4xx_uic_settings ppc4xx_core_uic_cfg[] __initdata = {
+	{ .polarity 	= 0xffff8f80,
+	  .triggering	= 0x00000000,
+	  .ext_irq_mask	= 0x0000707f,	/* IRQ7 - IRQ9, IRQ0 - IRQ6 */
 	}
 };

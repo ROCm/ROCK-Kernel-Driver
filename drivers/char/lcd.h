@@ -37,6 +37,8 @@ struct lcd_display {
 
 #define LCD_DRIVER	"Cobalt LCD Driver v2.10"
 
+#define LCD		"lcd: "
+
 #define kLCD_IR		0x0F000000
 #define kLCD_DR		0x0F000010
 #define kGPI		0x0D000000

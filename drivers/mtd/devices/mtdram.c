@@ -1,6 +1,6 @@
 /*
  * mtdram - a test mtd device
- * $Id: mtdram.c,v 1.34 2004/11/16 18:29:01 dwmw2 Exp $
+ * $Id: mtdram.c,v 1.35 2005/01/05 18:05:12 dwmw2 Exp $
  * Author: Alexander Larsson <alex@cendio.se>
  *
  * Copyright (c) 1999 Alexander Larsson <alex@cendio.se>
@@ -29,9 +29,9 @@
 #ifdef MODULE
 static unsigned long total_size = CONFIG_MTDRAM_TOTAL_SIZE;
 static unsigned long erase_size = CONFIG_MTDRAM_ERASE_SIZE;
-MODULE_PARM(total_size,"l");
+module_param(total_size,ulong,0);
 MODULE_PARM_DESC(total_size, "Total device size in KiB");
-MODULE_PARM(erase_size,"l");
+module_param(erase_size,ulong,0);
 MODULE_PARM_DESC(erase_size, "Device erase block size in KiB");
 #define MTDRAM_TOTAL_SIZE (total_size * 1024)
 #define MTDRAM_ERASE_SIZE (erase_size * 1024)
@@ -158,7 +158,7 @@ static int __init init_mtdram(void)
   void *addr;
   int err;
   /* Allocate some memory */
-   mtd_info = (struct mtd_info *)kmalloc(sizeof(struct mtd_info), GFP_KERNEL);
+   mtd_info = kmalloc(sizeof(struct mtd_info), GFP_KERNEL);
    if (!mtd_info)
      return -ENOMEM;
    
@@ -191,7 +191,7 @@ static int __init init_mtdram(void)
   void *addr;
   int err;
   /* Allocate some memory */
-   mtd_info = (struct mtd_info *)kmalloc(sizeof(struct mtd_info), GFP_KERNEL);
+   mtd_info = kmalloc(sizeof(struct mtd_info), GFP_KERNEL);
    if (!mtd_info)
      return -ENOMEM;
 

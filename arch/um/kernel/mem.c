@@ -25,7 +25,7 @@ extern char __binary_start;
 /* Changed during early boot */
 unsigned long *empty_zero_page = NULL;
 unsigned long *empty_bad_page = NULL;
-pgd_t swapper_pg_dir[1024];
+pgd_t swapper_pg_dir[PTRS_PER_PGD];
 unsigned long highmem;
 int kmalloc_ok = 0;
 
@@ -49,8 +49,6 @@ static void setup_highmem(unsigned long highmem_start,
 	unsigned long highmem_pfn;
 	int i;
 
-	highmem_start_page = virt_to_page(highmem_start);
-
 	highmem_pfn = __pa(highmem_start) >> PAGE_SHIFT;
 	for(i = 0; i < highmem_len >> PAGE_SHIFT; i++){
 		page = &mem_map[highmem_pfn + i];
@@ -67,9 +65,6 @@ void mem_init(void)
 	unsigned long start;
 
 	max_low_pfn = (high_physmem - uml_physmem) >> PAGE_SHIFT;
-#ifdef CONFIG_HIGHMEM
-	highmem_start_page = phys_page(__pa(high_physmem));
-#endif
 
         /* clear the zero-page */
         memset((void *) empty_zero_page, 0, PAGE_SIZE);
@@ -135,12 +130,13 @@ static void __init fixrange_init(unsigned long start, unsigned long end,
 	}
 }
 
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
 #define kmap_get_fixmap_pte(vaddr)					\
-	pte_offset(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
+	pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(vaddr), (vaddr)),\
+ 			  (vaddr)), (vaddr))
 
 void __init kmap_init(void)
 {
@@ -177,6 +173,7 @@ static void init_highmem(void)
 
 static void __init fixaddr_user_init( void)
 {
+#if FIXADDR_USER_START != 0
 	long size = FIXADDR_USER_END - FIXADDR_USER_START;
 	pgd_t *pgd;
 	pmd_t *pmd;
@@ -196,6 +193,7 @@ static void __init fixaddr_user_init( void)
 		pte = pte_offset_kernel(pmd, vaddr);
 		pte_set_val( (*pte), paddr, PAGE_READONLY);
 	}
+#endif
 }
 
 void paging_init(void)
@@ -237,7 +235,7 @@ struct page *arch_validate(struct page *page, int mask, int order)
 	addr = (unsigned long) page_address(page);
 	for(i = 0; i < (1 << order); i++){
 		current->thread.fault_addr = (void *) addr;
-		if(__do_copy_to_user((void *) addr, &zero,
+		if(__do_copy_to_user((void __user *) addr, &zero,
 				     sizeof(zero),
 				     &current->thread.fault_addr,
 				     &current->thread.fault_catcher)){
@@ -246,6 +244,7 @@ struct page *arch_validate(struct page *page, int mask, int order)
 		}
 		addr += PAGE_SIZE;
 	}
+
 	if(i == (1 << order)) return(page);
 	page = alloc_pages(mask, order);
 	goto again;
@@ -332,9 +331,7 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
 	pte_t *pte;
 
-	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
-	if (pte)
-		clear_page(pte);
+	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 	return pte;
 }
 
@@ -342,9 +339,7 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	struct page *pte;
    
-	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
-	if (pte)
-		clear_highpage(pte);
+	pte = alloc_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 	return pte;
 }
 

@@ -374,7 +374,7 @@ static int keyspan_write(struct usb_serial_port *port,
 		flip = p_priv->out_flip;
 	
 		/* Check we have a valid urb/endpoint before we use it... */
-		if ((this_urb = p_priv->out_urbs[flip]) == 0) {
+		if ((this_urb = p_priv->out_urbs[flip]) == NULL) {
 			/* no bulk out, so return 0 bytes written */
 			dbg("%s - no output urb :(", __FUNCTION__);
 			return count;
@@ -1020,11 +1020,11 @@ static int keyspan_write_room (struct usb_serial_port *port)
 	flip = p_priv->out_flip;
 
 	/* Check both endpoints to see if any are available. */
-	if ((this_urb = p_priv->out_urbs[flip]) != 0) {
+	if ((this_urb = p_priv->out_urbs[flip]) != NULL) {
 		if (this_urb->status != -EINPROGRESS)
 			return (data_len);
 		flip = (flip + 1) & d_details->outdat_endp_flip;        
-		if ((this_urb = p_priv->out_urbs[flip]) != 0) 
+		if ((this_urb = p_priv->out_urbs[flip]) != NULL) 
 			if (this_urb->status != -EINPROGRESS)
 				return (data_len);
 	}
@@ -1174,16 +1174,16 @@ static int keyspan_fake_startup (struct usb_serial *serial)
 	char				*fw_name;
 
 	dbg("Keyspan startup version %04x product %04x",
-	    serial->dev->descriptor.bcdDevice,
-	    serial->dev->descriptor.idProduct); 
+	    le16_to_cpu(serial->dev->descriptor.bcdDevice),
+	    le16_to_cpu(serial->dev->descriptor.idProduct));
 	
-	if ((serial->dev->descriptor.bcdDevice & 0x8000) != 0x8000) {
+	if ((le16_to_cpu(serial->dev->descriptor.bcdDevice) & 0x8000) != 0x8000) {
 		dbg("Firmware already loaded.  Quitting.");
 		return(1);
 	}
 
 		/* Select firmware image on the basis of idProduct */
-	switch (serial->dev->descriptor.idProduct) {
+	switch (le16_to_cpu(serial->dev->descriptor.idProduct)) {
 	case keyspan_usa28_pre_product_id:
 		record = &keyspan_usa28_firmware[0];
 		fw_name = "USA28";
@@ -2248,10 +2248,10 @@ static int keyspan_startup (struct usb_serial *serial)
 	dbg("%s", __FUNCTION__);
 
 	for (i = 0; (d_details = keyspan_devices[i]) != NULL; ++i)
-		if (d_details->product_id == serial->dev->descriptor.idProduct)
+		if (d_details->product_id == le16_to_cpu(serial->dev->descriptor.idProduct))
 			break;
 	if (d_details == NULL) {
-		dev_err(&serial->dev->dev, "%s - unknown product id %x\n", __FUNCTION__, serial->dev->descriptor.idProduct);
+		dev_err(&serial->dev->dev, "%s - unknown product id %x\n", __FUNCTION__, le16_to_cpu(serial->dev->descriptor.idProduct));
 		return 1;
 	}
 

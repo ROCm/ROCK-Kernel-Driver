@@ -136,7 +136,8 @@ psa_read(struct net_device *	dev,
 	 u_char *	b,	/* buffer to fill */
 	 int		n)	/* size to read */
 {
-  u_char *	ptr = ((u_char *)dev->mem_start) + PSA_ADDR + (o << 1);
+  net_local *lp = netdev_priv(dev);
+  u_char __iomem *ptr = lp->mem + PSA_ADDR + (o << 1);
 
   while(n-- > 0)
     {
@@ -160,12 +161,13 @@ psa_write(struct net_device *	dev,
 	  u_char *	b,	/* Buffer in memory */
 	  int		n)	/* Length of buffer */
 {
-  u_char *	ptr = ((u_char *) dev->mem_start) + PSA_ADDR + (o << 1);
+  net_local *lp = netdev_priv(dev);
+  u_char __iomem *ptr = lp->mem + PSA_ADDR + (o << 1);
   int		count = 0;
   ioaddr_t	base = dev->base_addr;
   /* As there seem to have no flag PSA_BUSY as in the ISA model, we are
    * oblige to verify this address to know when the PSA is ready... */
-  volatile u_char *	verify = ((u_char *) dev->mem_start) + PSA_ADDR +
+  volatile u_char __iomem *verify = lp->mem + PSA_ADDR +
     (psaoff(0, psa_comp_number) << 1);
 
   /* Authorize writting to PSA */
@@ -950,7 +952,7 @@ wv_diag(struct net_device *	dev)
 		  OP0_DIAGNOSE, SR0_DIAGNOSE_PASSED))
     ret = TRUE;
 
-#ifdef DEBUG_CONFIG_ERROR
+#ifdef DEBUG_CONFIG_ERRORS
   printk(KERN_INFO "wavelan_cs: i82593 Self Test failed!\n");
 #endif
   return(ret);
@@ -3463,7 +3465,7 @@ wv_ru_stop(struct net_device *	dev)
   /* If there was a problem */
   if(spin <= 0)
     {
-#ifdef DEBUG_CONFIG_ERROR
+#ifdef DEBUG_CONFIG_ERRORS
       printk(KERN_INFO "%s: wv_ru_stop(): The chip doesn't want to stop...\n",
 	     dev->name);
 #endif
@@ -3948,17 +3950,16 @@ wv_hw_reset(struct net_device *	dev)
 static inline int
 wv_pcmcia_config(dev_link_t *	link)
 {
-  client_handle_t	handle;
+  client_handle_t	handle = link->handle;
   tuple_t		tuple;
   cisparse_t		parse;
-  struct net_device *	dev;
+  struct net_device *	dev = (struct net_device *) link->priv;
   int			i;
   u_char		buf[64];
   win_req_t		req;
   memreq_t		mem;
+  net_local *		lp = netdev_priv(dev);
 
-  handle = link->handle;
-  dev = (struct net_device *) link->priv;
 
 #ifdef DEBUG_CONFIG_TRACE
   printk(KERN_DEBUG "->wv_pcmcia_config(0x%p)\n", link);
@@ -4045,7 +4046,8 @@ wv_pcmcia_config(dev_link_t *	link)
 	  break;
 	}
 
-      dev->mem_start = (u_long)ioremap(req.Base, req.Size);
+      lp->mem = ioremap(req.Base, req.Size);
+      dev->mem_start = (u_long)lp->mem;
       dev->mem_end = dev->mem_start + req.Size;
 
       mem.CardOffset = 0; mem.Page = 0;
@@ -4062,10 +4064,11 @@ wv_pcmcia_config(dev_link_t *	link)
       netif_start_queue(dev);
 
 #ifdef DEBUG_CONFIG_INFO
-      printk(KERN_DEBUG "wv_pcmcia_config: MEMSTART 0x%x IRQ %d IOPORT 0x%x\n",
-	     (u_int) dev->mem_start, dev->irq, (u_int) dev->base_addr);
+      printk(KERN_DEBUG "wv_pcmcia_config: MEMSTART %p IRQ %d IOPORT 0x%x\n",
+	     lp->mem, dev->irq, (u_int) dev->base_addr);
 #endif
 
+      SET_NETDEV_DEV(dev, &handle_to_dev(handle));
       i = register_netdev(dev);
       if(i != 0)
 	{
@@ -4104,13 +4107,14 @@ static void
 wv_pcmcia_release(dev_link_t *link)
 {
   struct net_device *	dev = (struct net_device *) link->priv;
+  net_local *		lp = netdev_priv(dev);
 
 #ifdef DEBUG_CONFIG_TRACE
   printk(KERN_DEBUG "%s: -> wv_pcmcia_release(0x%p)\n", dev->name, link);
 #endif
 
   /* Don't bother checking to see if these succeed or not */
-  iounmap((u_char *)dev->mem_start);
+  iounmap(lp->mem);
   pcmcia_release_window(link->win);
   pcmcia_release_configuration(link->handle);
   pcmcia_release_io(link->handle, &link->io);
@@ -4597,7 +4601,7 @@ wavelan_attach(void)
   dev_link_t *	link;		/* Info for cardmgr */
   struct net_device *	dev;		/* Interface generic data */
   net_local *	lp;		/* Interface specific data */
-  int		i, ret;
+  int		ret;
 
 #ifdef DEBUG_CALLBACK_TRACE
   printk(KERN_DEBUG "-> wavelan_attach()\n");
@@ -4615,12 +4619,7 @@ wavelan_attach(void)
 
   /* Interrupt setup */
   link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-  link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-  if (irq_list[0] == -1)
-    link->irq.IRQInfo2 = irq_mask;
-  else
-    for (i = 0; i < 4; i++)
-      link->irq.IRQInfo2 |= 1 << irq_list[i];
+  link->irq.IRQInfo1 = IRQ_LEVEL_ID;
   link->irq.Handler = wavelan_interrupt;
 
   /* General socket configuration */
@@ -4685,7 +4684,6 @@ wavelan_attach(void)
 
   /* Register with Card Services */
   client_reg.dev_info = &dev_info;
-  client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
   client_reg.EventMask = 
     CS_EVENT_REGISTRATION_COMPLETE |
     CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |

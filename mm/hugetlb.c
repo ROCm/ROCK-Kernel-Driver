@@ -10,6 +10,7 @@
 #include <linux/hugetlb.h>
 #include <linux/sysctl.h>
 #include <linux/highmem.h>
+#include <linux/nodemask.h>
 
 const unsigned long hugetlb_zero = 0, hugetlb_infinity = ~0UL;
 static unsigned long nr_huge_pages, free_huge_pages;
@@ -17,7 +18,7 @@ unsigned long max_huge_pages;
 static struct list_head hugepage_freelists[MAX_NUMNODES];
 static unsigned int nr_huge_pages_node[MAX_NUMNODES];
 static unsigned int free_huge_pages_node[MAX_NUMNODES];
-static spinlock_t hugetlb_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hugetlb_lock);
 
 static void enqueue_huge_page(struct page *page)
 {
@@ -54,10 +55,10 @@ static struct page *alloc_fresh_huge_page(void)
 	struct page *page;
 	page = alloc_pages_node(nid, GFP_HIGHUSER|__GFP_COMP|__GFP_NOWARN,
 					HUGETLB_PAGE_ORDER);
-	nid = (nid + 1) % numnodes;
+	nid = (nid + 1) % num_online_nodes();
 	if (page) {
 		nr_huge_pages++;
-		nr_huge_pages_node[page_zone(page)->zone_pgdat->node_id]++;
+		nr_huge_pages_node[page_to_nid(page)]++;
 	}
 	return page;
 }
@@ -218,23 +219,6 @@ int hugetlb_report_node_meminfo(int nid, char *buf)
 		nid, nr_huge_pages_node[nid],
 		nid, free_huge_pages_node[nid]);
 }
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-/* Like hugetlb_report_meminfo() but using kdb_printf() */
-void
-kdb_hugetlb_report_meminfo(void)
-{
-	kdb_printf(
-		"HugePages_Total: %5lu\n"
-		"HugePages_Free:  %5lu\n"
-		"Hugepagesize:    %5lu kB\n",
-		nr_huge_pages,
-		free_huge_pages,
-		HPAGE_SIZE/1024);
-}
-#endif	/* CONFIG_KDB */
 
 int is_hugepage_mem_enough(size_t size)
 {

@@ -41,6 +41,12 @@ void __init clustered_apic_check(void)
 	u8 id;
 	u8 cluster_cnt[NUM_APIC_CLUSTERS];
 
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
+		/* AMD always uses flat mode right now */
+		genapic = &apic_flat;
+		goto print;
+	}
+
 	memset(cluster_cnt, 0, sizeof(cluster_cnt));
 
 	for (i = 0; i < NR_CPUS; i++) {
@@ -71,6 +77,7 @@ void __init clustered_apic_check(void)
 	else
 		genapic = &apic_cluster;
 
+print:
 	printk(KERN_INFO "Setting APIC routing to %s\n", genapic->name);
 }
 

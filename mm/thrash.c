@@ -13,7 +13,7 @@
 #include <linux/sched.h>
 #include <linux/swap.h>
 
-static spinlock_t swap_token_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(swap_token_lock);
 static unsigned long swap_token_timeout;
 unsigned long swap_token_check;
 struct mm_struct * swap_token_mm = &init_mm;

@@ -745,7 +745,7 @@ static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->out = usb_sndbulkpipe(dev->udev, 2);
 
 	// allocate irq urb
-	if ((data->int_urb = usb_alloc_urb (0, GFP_KERNEL)) == 0) {
+	if ((data->int_urb = usb_alloc_urb (0, GFP_KERNEL)) == NULL) {
 		dbg ("%s: cannot allocate interrupt URB",
 			dev->net->name);
 		return -ENOMEM;
@@ -1298,7 +1298,7 @@ struct gl_header {
 	struct gl_packet	packets;
 };
 
-#ifdef	GENLINK_ACK
+#ifdef	GENELINK_ACK
 
 // FIXME:  this code is incomplete, not debugged; it doesn't
 // handle interrupts correctly.  interrupts should be generic
@@ -2265,14 +2265,34 @@ static const struct driver_info	zaurus_sl5x00_info = {
 	.unbind =	cdc_unbind,
 	.tx_fixup = 	zaurus_tx_fixup,
 };
+#define	ZAURUS_STRONGARM_INFO	((unsigned long)&zaurus_sl5x00_info)
+
 static const struct driver_info	zaurus_pxa_info = {
 	.description =	"Sharp Zaurus, PXA-2xx based",
 	.flags =	FLAG_FRAMING_Z,
 	.check_connect = always_connected,
+	.bind =		generic_cdc_bind,
+	.unbind =	cdc_unbind,
 	.tx_fixup = 	zaurus_tx_fixup,
-
-	.in = 1, .out = 2,
 };
+#define	ZAURUS_PXA_INFO		((unsigned long)&zaurus_pxa_info)
+
+static const struct driver_info	olympus_mxl_info = {
+	.description =	"Olympus R1000",
+	.flags =	FLAG_FRAMING_Z,
+	.check_connect = always_connected,
+	.bind =		generic_cdc_bind,
+	.unbind =	cdc_unbind,
+	.tx_fixup = 	zaurus_tx_fixup,
+};
+#define	OLYMPUS_MXL_INFO	((unsigned long)&olympus_mxl_info)
+
+#else
+
+/* blacklist all those devices */
+#define	ZAURUS_STRONGARM_INFO	0
+#define	ZAURUS_PXA_INFO		0
+#define	OLYMPUS_MXL_INFO	0
 
 #endif
 
@@ -2384,7 +2404,7 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 #endif
 		size = (sizeof (struct ethhdr) + dev->net->mtu);
 
-	if ((skb = alloc_skb (size, flags)) == 0) {
+	if ((skb = alloc_skb (size, flags)) == NULL) {
 		devdbg (dev, "no rx skb");
 		defer_kevent (dev, EVENT_RX_MEMORY);
 		usb_free_urb (urb);
@@ -2741,7 +2761,7 @@ kevent (void *data)
 	if (test_bit (EVENT_TX_HALT, &dev->flags)) {
 		unlink_urbs (dev, &dev->txq);
 		status = usb_clear_halt (dev->udev, dev->out);
-		if (status < 0)
+		if (status < 0 && status != -EPIPE)
 			deverr (dev, "can't clear tx halt, status %d",
 				status);
 		else {
@@ -2752,7 +2772,7 @@ kevent (void *data)
 	if (test_bit (EVENT_RX_HALT, &dev->flags)) {
 		unlink_urbs (dev, &dev->rxq);
 		status = usb_clear_halt (dev->udev, dev->in);
-		if (status < 0)
+		if (status < 0 && status != -EPIPE)
 			deverr (dev, "can't clear rx halt, status %d",
 				status);
 		else {
@@ -2769,7 +2789,7 @@ kevent (void *data)
 			urb = usb_alloc_urb (0, GFP_KERNEL);
 		else
 			clear_bit (EVENT_RX_MEMORY, &dev->flags);
-		if (urb != 0) {
+		if (urb != NULL) {
 			clear_bit (EVENT_RX_MEMORY, &dev->flags);
 			rx_submit (dev, urb, GFP_KERNEL);
 			tasklet_schedule (&dev->bh);
@@ -2996,7 +3016,8 @@ static void usbnet_bh (unsigned long param)
 
 			// don't refill the queue all at once
 			for (i = 0; i < 10 && dev->rxq.qlen < qlen; i++) {
-				if ((urb = usb_alloc_urb (0, GFP_ATOMIC)) != 0)
+				urb = usb_alloc_urb (0, GFP_ATOMIC);
+				if (urb != NULL)
 					rx_submit (dev, urb, GFP_ATOMIC);
 			}
 			if (temp != dev->rxq.qlen)
@@ -3358,12 +3379,15 @@ static const struct usb_device_id	products [] = {
 }, 
 #endif
 
-#ifdef	CONFIG_USB_ZAURUS
+#if	defined(CONFIG_USB_ZAURUS) || defined(CONFIG_USB_CDCETHER)
 /*
  * SA-1100 based Sharp Zaurus ("collie"), or compatible.
  * Same idea as above, but different framing.
  *
  * PXA-2xx based models are also lying-about-cdc.
+ *
+ * NOTE:  These entries do double-duty, serving as blacklist entries
+ * whenever Zaurus support isn't enabled, but CDC Ethernet is.
  */
 {
 	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
@@ -3374,82 +3398,79 @@ static const struct usb_device_id	products [] = {
 	.bInterfaceClass	= USB_CLASS_COMM,
 	.bInterfaceSubClass	= 6 /* Ethernet model */,
 	.bInterfaceProtocol	= 0,
-	.driver_info =  (unsigned long) &zaurus_sl5x00_info,
+	.driver_info = ZAURUS_STRONGARM_INFO,
 }, {
 	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
 			  | USB_DEVICE_ID_MATCH_DEVICE, 
 	.idVendor		= 0x04DD,
 	.idProduct		= 0x8005,	/* A-300 */
-	.bInterfaceClass	= 0x02,
-	.bInterfaceSubClass	= 0x0a,
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
 	.bInterfaceProtocol	= 0x00,
-	.driver_info =  (unsigned long) &zaurus_pxa_info,
+	.driver_info = ZAURUS_PXA_INFO,
 }, {
 	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
 			  | USB_DEVICE_ID_MATCH_DEVICE, 
 	.idVendor		= 0x04DD,
 	.idProduct		= 0x8006,	/* B-500/SL-5600 */
-	.bInterfaceClass	= 0x02,
-	.bInterfaceSubClass	= 0x0a,
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
 	.bInterfaceProtocol	= 0x00,
-	.driver_info =  (unsigned long) &zaurus_pxa_info,
+	.driver_info = ZAURUS_PXA_INFO,
 }, {
 	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
 	          | USB_DEVICE_ID_MATCH_DEVICE,
 	.idVendor		= 0x04DD,
 	.idProduct		= 0x8007,	/* C-700 */
-	.bInterfaceClass    = 0x02,
-	.bInterfaceSubClass = 0x0a,
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
 	.bInterfaceProtocol = 0x00,
-	.driver_info =  (unsigned long) &zaurus_pxa_info,
+	.driver_info = ZAURUS_PXA_INFO,
 }, {
 	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
 		 | USB_DEVICE_ID_MATCH_DEVICE,
 	.idVendor               = 0x04DD,
 	.idProduct              = 0x9031,	/* C-750 C-760 */
-	.bInterfaceClass        = 0x02,
-	.bInterfaceSubClass     = 0x0a,
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
 	.bInterfaceProtocol     = 0x00,
-	.driver_info =  (unsigned long) &zaurus_pxa_info,
+	.driver_info = ZAURUS_PXA_INFO,
 }, {
 	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
 		 | USB_DEVICE_ID_MATCH_DEVICE,
 	.idVendor               = 0x04DD,
 	.idProduct              = 0x9032,	/* SL-6000 */
-	.bInterfaceClass        = 0x02,
-	.bInterfaceSubClass     = 0x0a,
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
 	.bInterfaceProtocol     = 0x00,
-	.driver_info =  (unsigned long) &zaurus_pxa_info,
+	.driver_info = ZAURUS_PXA_INFO,
 }, {
 	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
 		 | USB_DEVICE_ID_MATCH_DEVICE,
 	.idVendor               = 0x04DD,
 	.idProduct              = 0x9050,	/* C-860 */
-	.bInterfaceClass        = 0x02,
-	.bInterfaceSubClass     = 0x0a,
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
 	.bInterfaceProtocol     = 0x00,
-	.driver_info =  (unsigned long) &zaurus_pxa_info,
+	.driver_info = ZAURUS_PXA_INFO,
+},
+
+/* Olympus has some models with a Zaurus-compatible option.
+ * R-1000 uses a FreeScale i.MXL cpu (ARMv4T)
+ */
+{
+	.match_flags    =   USB_DEVICE_ID_MATCH_INT_INFO
+		 | USB_DEVICE_ID_MATCH_DEVICE,
+	.idVendor               = 0x07B4,
+	.idProduct              = 0x0F02,	/* R-1000 */
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
+	.bInterfaceProtocol     = 0x00,
+	.driver_info = OLYMPUS_MXL_INFO,
 },
 #endif
 
 #ifdef	CONFIG_USB_CDCETHER
-
-#ifndef	CONFIG_USB_ZAURUS
-	/* if we couldn't whitelist Zaurus, we must blacklist it */
-{
-	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
-			  | USB_DEVICE_ID_MATCH_DEVICE, 
-	.idVendor		= 0x04DD,
-	.idProduct		= 0x8004,
-	/* match the master interface */
-	.bInterfaceClass	= USB_CLASS_COMM,
-	.bInterfaceSubClass	= 6 /* Ethernet model */,
-	.bInterfaceProtocol	= 0,
-	.driver_info 		= 0, /* BLACKLIST */
-},
-	// FIXME blacklist the other Zaurus models too, sigh
-#endif
-
 {
 	/* CDC Ether uses two interfaces, not necessarily consecutive.
 	 * We match the main interface, ignoring the optional device

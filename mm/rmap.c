@@ -51,6 +51,7 @@
 #include <linux/swapops.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/acct.h>
 #include <linux/rmap.h>
 #include <linux/rcupdate.h>
 
@@ -120,14 +121,7 @@ int anon_vma_prepare(struct vm_area_struct *vma)
 
 void __anon_vma_merge(struct vm_area_struct *vma, struct vm_area_struct *next)
 {
-	if (!vma->anon_vma) {
-		BUG_ON(!next->anon_vma);
-		vma->anon_vma = next->anon_vma;
-		list_add(&vma->anon_vma_node, &next->anon_vma_node);
-	} else {
-		/* if they're both non-null they must be the same */
-		BUG_ON(vma->anon_vma != next->anon_vma);
-	}
+	BUG_ON(vma->anon_vma != next->anon_vma);
 	list_del(&next->anon_vma_node);
 }
 
@@ -259,6 +253,7 @@ static int page_referenced_one(struct page *page,
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long address;
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	int referenced = 0;
@@ -275,7 +270,11 @@ static int page_referenced_one(struct page *page,
 	if (!pgd_present(*pgd))
 		goto out_unlock;
 
-	pmd = pmd_offset(pgd, address);
+	pud = pud_offset(pgd, address);
+	if (!pud_present(*pud))
+		goto out_unlock;
+
+	pmd = pmd_offset(pud, address);
 	if (!pmd_present(*pmd))
 		goto out_unlock;
 
@@ -505,6 +504,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long address;
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	pte_t pteval;
@@ -526,7 +526,11 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 	if (!pgd_present(*pgd))
 		goto out_unlock;
 
-	pmd = pmd_offset(pgd, address);
+	pud = pud_offset(pgd, address);
+	if (!pud_present(*pud))
+		goto out_unlock;
+
+	pmd = pmd_offset(pud, address);
 	if (!pmd_present(*pmd))
 		goto out_unlock;
 
@@ -596,6 +600,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 	}
 
 	mm->rss--;
+	acct_update_integrals();
 	page_remove_rmap(page);
 	page_cache_release(page);
 
@@ -634,6 +639,7 @@ static void try_to_unmap_cluster(unsigned long cursor,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	pte_t pteval;
@@ -659,7 +665,11 @@ static void try_to_unmap_cluster(unsigned long cursor,
 	if (!pgd_present(*pgd))
 		goto out_unlock;
 
-	pmd = pmd_offset(pgd, address);
+	pud = pud_offset(pgd, address);
+	if (!pud_present(*pud))
+		goto out_unlock;
+
+	pmd = pmd_offset(pud, address);
 	if (!pmd_present(*pmd))
 		goto out_unlock;
 
@@ -695,6 +705,7 @@ static void try_to_unmap_cluster(unsigned long cursor,
 
 		page_remove_rmap(page);
 		page_cache_release(page);
+		acct_update_integrals();
 		mm->rss--;
 		(*mapcount)--;
 	}

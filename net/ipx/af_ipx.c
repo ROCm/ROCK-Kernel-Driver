@@ -78,7 +78,7 @@ static struct datalink_proto *pSNAP_datalink;
 static struct proto_ops ipx_dgram_ops;
 
 LIST_HEAD(ipx_interfaces);
-spinlock_t ipx_interfaces_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(ipx_interfaces_lock);
 
 struct ipx_interface *ipx_primary_net;
 struct ipx_interface *ipx_internal_net;
@@ -291,7 +291,7 @@ found:
 }
 #endif
 
-void __ipxitf_down(struct ipx_interface *intrfc)
+static void __ipxitf_down(struct ipx_interface *intrfc)
 {
 	struct sock *s;
 	struct hlist_node *node, *t;
@@ -333,6 +333,12 @@ void ipxitf_down(struct ipx_interface *intrfc)
 	spin_lock_bh(&ipx_interfaces_lock);
 	__ipxitf_down(intrfc);
 	spin_unlock_bh(&ipx_interfaces_lock);
+}
+
+static __inline__ void __ipxitf_put(struct ipx_interface *intrfc)
+{
+	if (atomic_dec_and_test(&intrfc->refcnt))
+		__ipxitf_down(intrfc);
 }
 
 static int ipxitf_device_event(struct notifier_block *notifier,
@@ -1629,7 +1635,7 @@ out:
 	return rc;
 }
 
-int ipx_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
+static int ipx_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
 	/* NULL here for pt means the packet was looped back */
 	struct ipx_interface *intrfc;

@@ -512,27 +512,28 @@ struct hamachi_private {
 	u32 rx_int_var, tx_int_var;	/* interrupt control variables */
 	u32 option;							/* Hold on to a copy of the options */
 	struct pci_dev *pci_dev;
+	void __iomem *base;
 };
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>, Eric Kasten <kasten@nscl.msu.edu>, Keith Underwood <keithu@parl.clemson.edu>");
 MODULE_DESCRIPTION("Packet Engines 'Hamachi' GNIC-II Gigabit Ethernet driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(max_interrupt_work, "i");
-MODULE_PARM(mtu, "i");
-MODULE_PARM(debug, "i");
-MODULE_PARM(min_rx_pkt, "i");
-MODULE_PARM(max_rx_gap, "i");
-MODULE_PARM(max_rx_latency, "i");
-MODULE_PARM(min_tx_pkt, "i");
-MODULE_PARM(max_tx_gap, "i");
-MODULE_PARM(max_tx_latency, "i");
-MODULE_PARM(rx_copybreak, "i");
-MODULE_PARM(rx_params, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(tx_params, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(force32, "i");
+module_param(max_interrupt_work, int, 0);
+module_param(mtu, int, 0);
+module_param(debug, int, 0);
+module_param(min_rx_pkt, int, 0);
+module_param(max_rx_gap, int, 0);
+module_param(max_rx_latency, int, 0);
+module_param(min_tx_pkt, int, 0);
+module_param(max_tx_gap, int, 0);
+module_param(max_tx_latency, int, 0);
+module_param(rx_copybreak, int, 0);
+module_param_array(rx_params, int, NULL, 0);
+module_param_array(tx_params, int, NULL, 0);
+module_param_array(options, int, NULL, 0);
+module_param_array(full_duplex, int, NULL, 0);
+module_param(force32, int, 0);
 MODULE_PARM_DESC(max_interrupt_work, "GNIC-II maximum events handled per interrupt");
 MODULE_PARM_DESC(mtu, "GNIC-II MTU (all boards)");
 MODULE_PARM_DESC(debug, "GNIC-II debug level (0-7)");
@@ -549,7 +550,7 @@ MODULE_PARM_DESC(options, "GNIC-II Bits 0-3: media type, bits 4-6: as force32, b
 MODULE_PARM_DESC(full_duplex, "GNIC-II full duplex setting(s) (1)");
 MODULE_PARM_DESC(force32, "GNIC-II: Bit 0: 32 bit PCI, bit 1: disable parity, bit 2: 64 bit PCI (all boards)");
                                                                         
-static int read_eeprom(long ioaddr, int location);
+static int read_eeprom(void __iomem *ioaddr, int location);
 static int mdio_read(struct net_device *dev, int phy_id, int location);
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value);
 static int hamachi_open(struct net_device *dev);
@@ -575,7 +576,8 @@ static int __devinit hamachi_init_one (struct pci_dev *pdev,
 	int option, i, rx_int_var, tx_int_var, boguscnt;
 	int chip_id = ent->driver_data;
 	int irq;
-	long ioaddr;
+	void __iomem *ioaddr;
+	unsigned long base;
 	static int card_idx;
 	struct net_device *dev;
 	void *ring_space;
@@ -594,9 +596,9 @@ static int __devinit hamachi_init_one (struct pci_dev *pdev,
 		goto err_out;
 	}
 
-	ioaddr = pci_resource_start(pdev, 0);
+	base = pci_resource_start(pdev, 0);
 #ifdef __alpha__				/* Really "64 bit addrs" */
-	ioaddr |= (pci_resource_start(pdev, 1) << 32);
+	base |= (pci_resource_start(pdev, 1) << 32);
 #endif
 
 	pci_set_master(pdev);
@@ -605,7 +607,7 @@ static int __devinit hamachi_init_one (struct pci_dev *pdev,
 	if (i) return i;
 
 	irq = pdev->irq;
-	ioaddr = (long) ioremap(ioaddr, 0x400);
+	ioaddr = ioremap(base, 0x400);
 	if (!ioaddr)
 		goto err_out_release;
 
@@ -678,7 +680,8 @@ static int __devinit hamachi_init_one (struct pci_dev *pdev,
 		i = readb(ioaddr + PCIClkMeas);	
 	}
 
-	dev->base_addr = ioaddr;
+	hmp->base = ioaddr;
+	dev->base_addr = (unsigned long)ioaddr;
 	dev->irq = irq;
 	pci_set_drvdata(pdev, dev);
 
@@ -741,7 +744,7 @@ static int __devinit hamachi_init_one (struct pci_dev *pdev,
 		goto err_out_unmap_rx;
 	}
 
-	printk(KERN_INFO "%s: %s type %x at 0x%lx, ",
+	printk(KERN_INFO "%s: %s type %x at %p, ",
 		   dev->name, chip_tbl[chip_id].name, readl(ioaddr + ChipRev),
 		   ioaddr);
 	for (i = 0; i < 5; i++)
@@ -790,14 +793,14 @@ err_out_unmap_tx:
 err_out_cleardev:
 	free_netdev (dev);
 err_out_iounmap:
-	iounmap((char *)ioaddr);
+	iounmap(ioaddr);
 err_out_release:
 	pci_release_regions(pdev);
 err_out:
 	return ret;
 }
 
-static int __devinit read_eeprom(long ioaddr, int location)
+static int __devinit read_eeprom(void __iomem *ioaddr, int location)
 {
 	int bogus_cnt = 1000;
 
@@ -819,7 +822,8 @@ static int __devinit read_eeprom(long ioaddr, int location)
 
 static int mdio_read(struct net_device *dev, int phy_id, int location)
 {
-	long ioaddr = dev->base_addr;
+	struct hamachi_private *hmp = netdev_priv(dev);
+	void __iomem *ioaddr = hmp->base;
 	int i;
 
 	/* We should check busy first - per docs -KDU */
@@ -836,7 +840,8 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value)
 {
-	long ioaddr = dev->base_addr;
+	struct hamachi_private *hmp = netdev_priv(dev);
+	void __iomem *ioaddr = hmp->base;
 	int i;
 
 	/* We should check busy first - per docs -KDU */
@@ -857,7 +862,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 static int hamachi_open(struct net_device *dev)
 {
 	struct hamachi_private *hmp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = hmp->base;
 	int i;
 	u32 rx_int_var, tx_int_var;
 	u16 fifo_info;
@@ -987,7 +992,7 @@ static int hamachi_open(struct net_device *dev)
 	writew(0x001D, ioaddr + RxDMACtrl);
 	writew(0x001D, ioaddr + TxDMACtrl);
 #endif
-	writew(0x0001, dev->base_addr + RxCmd);
+	writew(0x0001, ioaddr + RxCmd);
 
 	if (hamachi_debug > 2) {
 		printk(KERN_DEBUG "%s: Done hamachi_open(), status: Rx %x Tx %x.\n",
@@ -1038,7 +1043,7 @@ static void hamachi_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct hamachi_private *hmp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = hmp->base;
 	int next_tick = 10*HZ;
 
 	if (hamachi_debug > 2) {
@@ -1063,7 +1068,7 @@ static void hamachi_tx_timeout(struct net_device *dev)
 {
 	int i;
 	struct hamachi_private *hmp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = hmp->base;
 
 	printk(KERN_WARNING "%s: Hamachi transmit timed out, status %8.8x,"
 		   " resetting...\n", dev->name, (int)readw(ioaddr + TxStatus));
@@ -1115,7 +1120,7 @@ static void hamachi_tx_timeout(struct net_device *dev)
 	}
 
 	udelay(60); /* Sleep 60 us just for safety sake */
-	writew(0x0002, dev->base_addr + RxCmd); /* STOP Rx */
+	writew(0x0002, ioaddr + RxCmd); /* STOP Rx */
 		
 	writeb(0x01, ioaddr + ChipReset);  /* Reinit the hardware */ 
 
@@ -1157,9 +1162,9 @@ static void hamachi_tx_timeout(struct net_device *dev)
 	hmp->stats.tx_errors++;
 
 	/* Restart the chip's Tx/Rx processes . */
-	writew(0x0002, dev->base_addr + TxCmd); /* STOP Tx */
-	writew(0x0001, dev->base_addr + TxCmd); /* START Tx */
-	writew(0x0001, dev->base_addr + RxCmd); /* START Rx */
+	writew(0x0002, ioaddr + TxCmd); /* STOP Tx */
+	writew(0x0001, ioaddr + TxCmd); /* START Tx */
+	writew(0x0001, ioaddr + RxCmd); /* START Rx */
 
 	netif_wake_queue(dev);
 }
@@ -1275,9 +1280,9 @@ static int hamachi_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 		/* Wake the potentially-idle transmit channel. */
 		/* If we don't need to read status, DON'T -KDU */
-		status=readw(dev->base_addr + TxStatus);
+		status=readw(hmp->base + TxStatus);
 		if( !(status & 0x0001) || (status & 0x0002))
-			writew(0x0001, dev->base_addr + TxCmd);
+			writew(0x0001, hmp->base + TxCmd);
 		return 1;
 	} 
 
@@ -1343,9 +1348,9 @@ static int hamachi_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	/* Wake the potentially-idle transmit channel. */
 	/* If we don't need to read status, DON'T -KDU */
-	status=readw(dev->base_addr + TxStatus);
+	status=readw(hmp->base + TxStatus);
 	if( !(status & 0x0001) || (status & 0x0002))
-		writew(0x0001, dev->base_addr + TxCmd);
+		writew(0x0001, hmp->base + TxCmd);
 
 	/* Immediately before returning, let's clear as many entries as we can. */
 	hamachi_tx(dev);
@@ -1376,8 +1381,9 @@ static int hamachi_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static irqreturn_t hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = dev_instance;
-	struct hamachi_private *hmp;
-	long ioaddr, boguscnt = max_interrupt_work;
+	struct hamachi_private *hmp = netdev_priv(dev);
+	void __iomem *ioaddr = hmp->base;
+	long boguscnt = max_interrupt_work;
 	int handled = 0;
 
 #ifndef final_version			/* Can never occur. */
@@ -1387,8 +1393,6 @@ static irqreturn_t hamachi_interrupt(int irq, void *dev_instance, struct pt_regs
 	}
 #endif
 
-	ioaddr = dev->base_addr;
-	hmp = netdev_priv(dev);
 	spin_lock(&hmp->lock);
 
 	do {
@@ -1687,8 +1691,8 @@ static int hamachi_rx(struct net_device *dev)
 
 	/* Restart Rx engine if stopped. */
 	/* If we don't need to check status, don't. -KDU */
-	if (readw(dev->base_addr + RxStatus) & 0x0002)
-		writew(0x0001, dev->base_addr + RxCmd);
+	if (readw(hmp->base + RxStatus) & 0x0002)
+		writew(0x0001, hmp->base + RxCmd);
 
 	return 0;
 }
@@ -1697,8 +1701,8 @@ static int hamachi_rx(struct net_device *dev)
    than just errors. */
 static void hamachi_error(struct net_device *dev, int intr_status)
 {
-	long ioaddr = dev->base_addr;
 	struct hamachi_private *hmp = netdev_priv(dev);
+	void __iomem *ioaddr = hmp->base;
 
 	if (intr_status & (LinkChange|NegotiationChange)) {
 		if (hamachi_debug > 1)
@@ -1731,8 +1735,8 @@ static void hamachi_error(struct net_device *dev, int intr_status)
 
 static int hamachi_close(struct net_device *dev)
 {
-	long ioaddr = dev->base_addr;
 	struct hamachi_private *hmp = netdev_priv(dev);
+	void __iomem *ioaddr = hmp->base;
 	struct sk_buff *skb;
 	int i;
 
@@ -1817,8 +1821,8 @@ static int hamachi_close(struct net_device *dev)
 
 static struct net_device_stats *hamachi_get_stats(struct net_device *dev)
 {
-	long ioaddr = dev->base_addr;
 	struct hamachi_private *hmp = netdev_priv(dev);
+	void __iomem *ioaddr = hmp->base;
 
 	/* We should lock this segment of code for SMP eventually, although
 	   the vulnerability window is very small and statistics are
@@ -1845,7 +1849,8 @@ static struct net_device_stats *hamachi_get_stats(struct net_device *dev)
 
 static void set_rx_mode(struct net_device *dev)
 {
-	long ioaddr = dev->base_addr;
+	struct hamachi_private *hmp = netdev_priv(dev);
+	void __iomem *ioaddr = hmp->base;
 
 	if (dev->flags & IFF_PROMISC) {			/* Set promiscuous. */
 		/* Unconditionally log net taps. */
@@ -1950,11 +1955,11 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		writel(d[0], dev->base_addr + TxIntrCtrl);
-		writel(d[1], dev->base_addr + RxIntrCtrl);
+		writel(d[0], np->base + TxIntrCtrl);
+		writel(d[1], np->base + RxIntrCtrl);
 		printk(KERN_NOTICE "%s: tx %08x, rx %08x intr\n", dev->name,
-		  (u32) readl(dev->base_addr + TxIntrCtrl),
-		  (u32) readl(dev->base_addr + RxIntrCtrl));
+		  (u32) readl(np->base + TxIntrCtrl),
+		  (u32) readl(np->base + RxIntrCtrl));
 		rc = 0;
 	}
 
@@ -1980,7 +1985,7 @@ static void __devexit hamachi_remove_one (struct pci_dev *pdev)
 		pci_free_consistent(pdev, TX_TOTAL_SIZE, hmp->tx_ring, 
 			hmp->tx_ring_dma);
 		unregister_netdev(dev);
-		iounmap((char *)dev->base_addr);
+		iounmap(hmp->base);
 		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_set_drvdata(pdev, NULL);

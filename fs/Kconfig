@@ -252,7 +252,7 @@ config JFS_FS
 	select NLS
 	help
 	  This is a port of IBM's Journaled Filesystem .  More information is
-	  available in the file Documentation/filesystems/jfs.txt.
+	  available in the file <file:Documentation/filesystems/jfs.txt>.
 
 	  If you do not intend to use the JFS filesystem, say N.
 
@@ -267,6 +267,18 @@ config JFS_POSIX_ACL
 	  Linux website <http://acl.bestbits.at/>.
 
 	  If you don't know what Access Control Lists are, say N
+
+config JFS_SECURITY
+	bool "JFS Security Labels"
+	depends on JFS_FS
+	help
+	  Security labels support alternative access control models
+	  implemented by security modules like SELinux.  This option
+	  enables an extended attribute handler for file security
+	  labels in the jfs filesystem.
+
+	  If you are not using a security module that requires using
+	  extended attributes for file security labels, say N.
 
 config JFS_DEBUG
 	bool "JFS debugging"
@@ -575,9 +587,8 @@ config FAT_FS
 	tristate
 	select NLS
 	help
-	  If you want to use one of the FAT-based file systems (the MS-DOS,
-	  VFAT (Windows 95) and UMSDOS (used to run Linux on top of an
-	  ordinary DOS partition) file systems), then you must say Y or M here
+	  If you want to use one of the FAT-based file systems (the MS-DOS and
+	  VFAT (Windows 95) file systems), then you must say Y or M here
 	  to include FAT support. You will then be able to mount partitions or
 	  diskettes with FAT-based file systems and transparently access the
 	  files on them, i.e. MSDOS files will look and behave just like all
@@ -609,9 +620,6 @@ config FAT_FS
 	  fat.  Note that if you compile the FAT support as a module, you
 	  cannot compile any of the FAT-based file systems into the kernel
 	  -- they will have to be modules as well.
-	  The file system of your root partition (the one containing the
-	  directory /) cannot be a module, so don't say M here if you intend
-	  to use UMSDOS as your root file system.
 
 config MSDOS_FS
 	tristate "MSDOS fs support"
@@ -627,10 +635,6 @@ config MSDOS_FS
 	  here) and MSDOS floppies. This means that file access becomes
 	  transparent, i.e. the MSDOS files look and behave just like all
 	  other Unix files.
-
-	  If you want to use UMSDOS, the Unix-like file system on top of a
-	  DOS file system, which allows you to run Linux from within a DOS
-	  partition without repartitioning, you'll have to say Y or M here.
 
 	  If you have Windows 95 or Windows NT installed on your MSDOS
 	  partitions, you should use the VFAT file system (say Y to "VFAT fs
@@ -650,11 +654,6 @@ config VFAT_FS
 	  long filenames.  That includes non-compressed FAT-based file systems
 	  used by Windows 95, Windows 98, Windows NT 4.0, and the Unix
 	  programs from the mtools package.
-
-	  You cannot use the VFAT file system for your Linux root partition
-	  (the one containing the directory /); use UMSDOS instead if you
-	  want to run Linux from within a DOS partition (i.e. say Y to
-	  "Unix like fs on top of std MSDOS fs", below).
 
 	  The VFAT support enlarges your kernel by about 10 KB and it only
 	  works if you said Y to the "DOS FAT fs support" above.  Please read
@@ -685,35 +684,6 @@ config FAT_DEFAULT_IOCHARSET
 	  Note that "utf8" is not recommended for FAT filesystems.
 	  If unsure, you shouldn't set "utf8" here.
 	  See <file:Documentation/filesystems/vfat.txt> for more information.
-
-config UMSDOS_FS
-#dep_tristate '    UMSDOS: Unix-like file system on top of standard MSDOS fs' CONFIG_UMSDOS_FS $CONFIG_MSDOS_FS
-# UMSDOS is temprory broken
-	bool
-	help
-	  Say Y here if you want to run Linux from within an existing DOS
-	  partition of your hard drive. The advantage of this is that you can
-	  get away without repartitioning your hard drive (which often implies
-	  backing everything up and restoring afterwards) and hence you're
-	  able to quickly try out Linux or show it to your friends; the
-	  disadvantage is that Linux becomes susceptible to DOS viruses and
-	  that UMSDOS is somewhat slower than ext2fs.  Another use of UMSDOS
-	  is to write files with long unix filenames to MSDOS floppies; it
-	  also allows Unix-style soft-links and owner/permissions of files on
-	  MSDOS floppies.  You will need a program called umssync in order to
-	  make use of UMSDOS; read
-	  <file:Documentation/filesystems/umsdos.txt>.
-
-	  To get utilities for initializing/checking UMSDOS file system, or
-	  latest patches and/or information, visit the UMSDOS home page at
-	  <http://www.voyager.hr/~mnalis/umsdos/>.
-
-	  This option enlarges your kernel by about 28 KB and it only works if
-	  you said Y to both "DOS FAT fs support" and "MSDOS fs support"
-	  above.  To compile this as a module, choose M here: the module will be
-	  called umsdos.  Note that the file system of your root partition
-	  (the one containing the directory /) cannot be a module, so saying M
-	  could be dangerous.  If unsure, say N.
 
 config NTFS_FS
 	tristate "NTFS file system support"
@@ -1066,10 +1036,10 @@ config BEFS_FS
 	help
 	  The BeOS File System (BeFS) is the native file system of Be, Inc's
 	  BeOS. Notable features include support for arbitrary attributes
-	  on files and directories, and database-like indices on selected
+	  on files and directories, and database-like indeces on selected
 	  attributes. (Also note that this driver doesn't make those features
 	  available at this time). It is a 64 bit filesystem, so it supports
-	  extreemly large volumes and files.
+	  extremly large volumes and files.
 
 	  If you use this filesystem, you should also say Y to at least one
 	  of the NLS (native language support) options below.
@@ -1188,6 +1158,15 @@ config JFFS2_FS_NAND
 
 	  Say 'N' unless you have NAND flash.
 
+config JFFS2_FS_NOR_ECC
+        bool "JFFS2 support for ECC'd NOR flash (EXPERIMENTAL)"
+        depends on JFFS2_FS && EXPERIMENTAL
+        default n
+        help
+          This enables the experimental support for NOR flash with transparent
+          ECC for JFFS2. This type of flash chip is not common, however it is
+          available from ST Microelectronics.
+
 config JFFS2_COMPRESSION_OPTIONS
 	bool "Advanced compression options for JFFS2"
 	depends on JFFS2_FS
@@ -1210,7 +1189,7 @@ config JFFS2_ZLIB
         help
           Zlib is designed to be a free, general-purpose, legally unencumbered,
           lossless data-compression library for use on virtually any computer 
-          hardware and operating system. See http://www.gzip.org/zlib/ for
+          hardware and operating system. See <http://www.gzip.org/zlib/> for
           further information.
           
           Say 'Y' if unsure.
@@ -1235,7 +1214,7 @@ choice
         depends on JFFS2_FS
         help
           You can set here the default compression mode of JFFS2 from 
-          the avaiable compression modes. Don't touch if unsure.
+          the available compression modes. Don't touch if unsure.
 
 config JFFS2_CMODE_NONE
         bool "no compression"
@@ -1326,7 +1305,7 @@ config QNX4FS_FS
 
 config QNX4FS_RW
 	bool "QNX4FS write support (DANGEROUS)"
-	depends on QNX4FS_FS && EXPERIMENTAL
+	depends on QNX4FS_FS && EXPERIMENTAL && BROKEN
 	help
 	  Say Y if you want to test write support for QNX4 file systems.
 
@@ -1422,7 +1401,6 @@ config NFS_FS
 	depends on INET
 	select LOCKD
 	select SUNRPC
-	select NFS_ACL_SUPPORT if NFS_ACL
 	help
 	  If you are connected to some other (usually local) Unix computer
 	  (using SLIP, PLIP, PPP or Ethernet) and want to mount files residing
@@ -1464,17 +1442,6 @@ config NFS_V3
 	  3 of the NFS protocol.
 
 	  If unsure, say Y.
-
-config NFS_ACL
-	bool "NFS_ACL protocol extension"
-	depends on NFS_V3
-	select QSORT
-	help
-	  Implement the NFS_ACL protocol extension for manipulating POSIX
-	  Access Control Lists.  The server must also implement the NFS_ACL
-	  protocol extension; see the CONFIG_NFSD_ACL option.
-
-	  If unsure, say N.
 
 config NFS_V4
 	bool "Provide NFSv4 client support (EXPERIMENTAL)"
@@ -1842,7 +1809,7 @@ config AFS_FS
 	  If you say Y here, you will get an experimental Andrew File System
 	  driver. It currently only supports unsecured read-only AFS access.
 
-	  See Documentation/filesystems/afs.txt for more intormation.
+	  See <file:Documentation/filesystems/afs.txt> for more intormation.
 
 	  If unsure, say N.
 

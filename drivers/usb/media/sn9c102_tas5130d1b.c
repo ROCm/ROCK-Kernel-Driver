@@ -2,7 +2,7 @@
  * Plug-in for TAS5130D1B image sensor connected to the SN9C10x PC Camera  *
  * Controllers                                                             *
  *                                                                         *
- * Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>       *
+ * Copyright (C) 2004-2005 by Luca Risolia <luca.risolia@studio.unibo.it>  *
  *                                                                         *
  * This program is free software; you can redistribute it and/or modify    *
  * it under the terms of the GNU General Public License as published by    *
@@ -98,7 +98,21 @@ static int tas5130d1b_set_crop(struct sn9c102_device* cam,
 	/* Do NOT change! */
 	err += sn9c102_write_reg(cam, 0x1f, 0x1a);
 	err += sn9c102_write_reg(cam, 0x1a, 0x1b);
-	err += sn9c102_write_reg(cam, 0xf3, 0x19);
+	err += sn9c102_write_reg(cam, sn9c102_pread_reg(cam, 0x19), 0x19);
+
+	return err;
+}
+
+
+static int tas5130d1b_set_pix_format(struct sn9c102_device* cam, 
+                                     const struct v4l2_pix_format* pix)
+{
+	int err = 0;
+
+	if (pix->pixelformat == V4L2_PIX_FMT_SN9C10X)
+		err += sn9c102_write_reg(cam, 0x63, 0x19);
+	else
+		err += sn9c102_write_reg(cam, 0xf3, 0x19);
 
 	return err;
 }
@@ -107,10 +121,9 @@ static int tas5130d1b_set_crop(struct sn9c102_device* cam,
 static struct sn9c102_sensor tas5130d1b = {
 	.name = "TAS5130D1B",
 	.maintainer = "Luca Risolia <luca.risolia@studio.unibo.it>",
+	.sysfs_ops = SN9C102_I2C_WRITE,
 	.frequency = SN9C102_I2C_100KHZ,
 	.interface = SN9C102_I2C_3WIRES,
-	.slave_read_id = SN9C102_I2C_SLAVEID_UNAVAILABLE,
-	.slave_write_id = SN9C102_I2C_SLAVEID_FICTITIOUS,
 	.init = &tas5130d1b_init,
 	.qctrl = {
 		{
@@ -156,7 +169,8 @@ static struct sn9c102_sensor tas5130d1b = {
 		.height = 480,
 		.pixelformat = V4L2_PIX_FMT_SBGGR8,
 		.priv = 8,
-	}
+	},
+	.set_pix_format = &tas5130d1b_set_pix_format
 };
 
 
@@ -166,8 +180,8 @@ int sn9c102_probe_tas5130d1b(struct sn9c102_device* cam)
 	sn9c102_attach_sensor(cam, &tas5130d1b);
 
 	/* Sensor detection is based on USB pid/vid */
-	if (tas5130d1b.usbdev->descriptor.idProduct != 0x6025 &&
-	    tas5130d1b.usbdev->descriptor.idProduct != 0x60aa)
+	if (le16_to_cpu(tas5130d1b.usbdev->descriptor.idProduct) != 0x6025 &&
+	    le16_to_cpu(tas5130d1b.usbdev->descriptor.idProduct) != 0x60aa)
 		return -ENODEV;
 
 	return 0;

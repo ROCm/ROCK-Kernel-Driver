@@ -36,7 +36,7 @@ check(const char *tablename,
       unsigned int targinfosize,
       unsigned int hook_mask)
 {
-	const struct ip_nat_multi_range *mr = targinfo;
+	const struct ip_nat_multi_range_compat *mr = targinfo;
 
 	if (strcmp(tablename, "nat") != 0) {
 		DEBUGP(MODULENAME":check: bad table `%s'.\n", tablename);
@@ -72,8 +72,8 @@ target(struct sk_buff **pskb,
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
 	u_int32_t new_ip, netmask;
-	const struct ip_nat_multi_range *mr = targinfo;
-	struct ip_nat_multi_range newrange;
+	const struct ip_nat_multi_range_compat *mr = targinfo;
+	struct ip_nat_range newrange;
 
 	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING
 		     || hooknum == NF_IP_POST_ROUTING);
@@ -87,10 +87,10 @@ target(struct sk_buff **pskb,
 		new_ip = (*pskb)->nh.iph->saddr & ~netmask;
 	new_ip |= mr->range[0].min_ip & netmask;
 
-	newrange = ((struct ip_nat_multi_range)
-	{ 1, { { mr->range[0].flags | IP_NAT_RANGE_MAP_IPS,
-		 new_ip, new_ip,
-		 mr->range[0].min, mr->range[0].max } } });
+	newrange = ((struct ip_nat_range)
+		{ mr->range[0].flags | IP_NAT_RANGE_MAP_IPS,
+		  new_ip, new_ip,
+		  mr->range[0].min, mr->range[0].max });
 
 	/* Hand modified range to generic setup. */
 	return ip_nat_setup_info(ct, &newrange, hooknum);

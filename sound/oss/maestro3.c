@@ -378,7 +378,7 @@ static int m3_notifier(struct notifier_block *nb, unsigned long event, void *buf
 static int m3_suspend(struct pci_dev *pci_dev, u32 state);
 static void check_suspend(struct m3_card *card);
 
-struct notifier_block m3_reboot_nb = {
+static struct notifier_block m3_reboot_nb = {
 	.notifier_call = m3_notifier,
 };
 
@@ -1024,8 +1024,8 @@ static void set_dmac(struct m3_state *s, unsigned int addr, unsigned int count)
     DPRINTK(DPINT,"set_dmac??\n");
 }
 
-u32 get_dma_pos(struct m3_card *card,
-        int instance_addr)
+static u32 get_dma_pos(struct m3_card *card,
+		       int instance_addr)
 {
     u16 hi = 0, lo = 0;
     int retry = 10;
@@ -1047,7 +1047,7 @@ u32 get_dma_pos(struct m3_card *card,
     return lo | (hi<<16);
 }
 
-u32 get_dmaa(struct m3_state *s)
+static u32 get_dmaa(struct m3_state *s)
 {
     u32 offset;
 
@@ -1059,7 +1059,7 @@ u32 get_dmaa(struct m3_state *s)
     return offset;
 }
 
-u32 get_dmac(struct m3_state *s)
+static u32 get_dmac(struct m3_state *s)
 {
     u32 offset;
 
@@ -2102,7 +2102,7 @@ static int m3_ac97_wait(struct m3_card *card)
     return i == 0;
 }
 
-u16 m3_ac97_read(struct ac97_codec *codec, u8 reg)
+static u16 m3_ac97_read(struct ac97_codec *codec, u8 reg)
 {
     u16 ret = 0;
     struct m3_card *card = codec->private_data;
@@ -2129,7 +2129,7 @@ out:
     return ret;
 }
 
-void m3_ac97_write(struct ac97_codec *codec, u8 reg, u16 val)
+static void m3_ac97_write(struct ac97_codec *codec, u8 reg, u16 val)
 {
     struct m3_card *card = codec->private_data;
 
@@ -2187,7 +2187,7 @@ static struct file_operations m3_mixer_fops = {
 	.release = m3_release_mixdev,
 };
 
-void remote_codec_config(int io, int isremote)
+static void remote_codec_config(int io, int isremote)
 {
     isremote = isremote ? 1 : 0;
 
@@ -2571,7 +2571,7 @@ static struct file_operations m3_audio_fops = {
 };
 
 #ifdef CONFIG_PM
-int alloc_dsp_suspendmem(struct m3_card *card)
+static int alloc_dsp_suspendmem(struct m3_card *card)
 {
     int len = sizeof(u16) * (REV_B_CODE_MEMORY_LENGTH + REV_B_DATA_MEMORY_LENGTH);
 
@@ -2580,7 +2580,7 @@ int alloc_dsp_suspendmem(struct m3_card *card)
 
     return 0;
 }
-void free_dsp_suspendmem(struct m3_card *card)
+static void free_dsp_suspendmem(struct m3_card *card)
 {
    if(card->suspend_mem)
        vfree(card->suspend_mem);
@@ -2919,10 +2919,10 @@ MODULE_DESCRIPTION("ESS Maestro3/Allegro Driver");
 MODULE_LICENSE("GPL");
 
 #ifdef M_DEBUG
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0);
 #endif
-MODULE_PARM(external_amp,"i");
-MODULE_PARM(gpio_pin, "i");
+module_param(external_amp, int, 0);
+module_param(gpio_pin, int, 0);
 
 static struct pci_driver m3_pci_driver = {
 	.name	  = "ess_m3_audio",

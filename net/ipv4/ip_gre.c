@@ -152,7 +152,7 @@ static struct ip_tunnel *tunnels[4][HASH_SIZE];
 #define tunnels_l	(tunnels[1])
 #define tunnels_wc	(tunnels[0])
 
-static rwlock_t ipgre_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ipgre_lock);
 
 /* Given src, dst and key, find appropriate for input tunnel. */
 
@@ -304,7 +304,7 @@ static void ipgre_tunnel_uninit(struct net_device *dev)
 }
 
 
-void ipgre_err(struct sk_buff *skb, u32 info)
+static void ipgre_err(struct sk_buff *skb, u32 info)
 {
 #ifndef I_WISH_WORLD_WERE_PERFECT
 
@@ -552,7 +552,7 @@ ipgre_ecn_encapsulate(u8 tos, struct iphdr *old_iph, struct sk_buff *skb)
 	return INET_ECN_encapsulate(tos, inner);
 }
 
-int ipgre_rcv(struct sk_buff *skb)
+static int ipgre_rcv(struct sk_buff *skb)
 {
 	struct iphdr *iph;
 	u8     *h;
@@ -1279,7 +1279,7 @@ err1:
 	goto out;
 }
 
-void ipgre_fini(void)
+static void ipgre_fini(void)
 {
 	if (inet_del_protocol(&ipgre_protocol, IPPROTO_GRE) < 0)
 		printk(KERN_INFO "ipgre close: can't remove protocol\n");

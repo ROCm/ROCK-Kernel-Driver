@@ -26,7 +26,7 @@ config ARCH_PERSONAL_SERVER
 	  <http://www.crl.hpl.hp.com/projects/personalserver/>
 
 	  If you have any questions or comments about the  Compaq Personal
-	  Server, send e-mail to skiff@crl.dec.com.
+	  Server, send e-mail to <skiff@crl.dec.com>.
 
 config ARCH_EBSA285_ADDIN
 	bool "EBSA285 (addin mode)"

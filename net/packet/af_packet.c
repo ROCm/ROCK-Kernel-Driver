@@ -145,10 +145,10 @@ dev->hard_header == NULL (ll header is added by device, we cannot control it)
  */
 
 /* List of all packet sockets. */
-HLIST_HEAD(packet_sklist);
-static rwlock_t packet_sklist_lock = RW_LOCK_UNLOCKED;
+static HLIST_HEAD(packet_sklist);
+static DEFINE_RWLOCK(packet_sklist_lock);
 
-atomic_t packet_socks_nr;
+static atomic_t packet_socks_nr;
 
 
 /* Private packet socket structures. */
@@ -215,7 +215,7 @@ static inline char *packet_lookup_frame(struct packet_opt *po, unsigned int posi
 
 #define pkt_sk(__sk) ((struct packet_opt *)(__sk)->sk_protinfo)
 
-void packet_sock_destruct(struct sock *sk)
+static void packet_sock_destruct(struct sock *sk)
 {
 	BUG_TRAP(!atomic_read(&sk->sk_rmem_alloc));
 	BUG_TRAP(!atomic_read(&sk->sk_wmem_alloc));
@@ -234,10 +234,10 @@ void packet_sock_destruct(struct sock *sk)
 }
 
 
-extern struct proto_ops packet_ops;
+static struct proto_ops packet_ops;
 
 #ifdef CONFIG_SOCK_PACKET
-extern struct proto_ops packet_ops_spkt;
+static struct proto_ops packet_ops_spkt;
 
 static int packet_rcv_spkt(struct sk_buff *skb, struct net_device *dev,  struct packet_type *pt)
 {
@@ -1350,8 +1350,8 @@ packet_setsockopt(struct socket *sock, int level, int optname, char __user *optv
 	}
 }
 
-int packet_getsockopt(struct socket *sock, int level, int optname,
-		      char __user *optval, int __user *optlen)
+static int packet_getsockopt(struct socket *sock, int level, int optname,
+			     char __user *optval, int __user *optlen)
 {
 	int len;
 	struct sock *sk = sock->sk;
@@ -1500,7 +1500,8 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 #define packet_poll datagram_poll
 #else
 
-unsigned int packet_poll(struct file * file, struct socket *sock, poll_table *wait)
+static unsigned int packet_poll(struct file * file, struct socket *sock,
+				poll_table *wait)
 {
 	struct sock *sk = sock->sk;
 	struct packet_opt *po = pkt_sk(sk);
@@ -1747,7 +1748,7 @@ out:
 
 
 #ifdef CONFIG_SOCK_PACKET
-struct proto_ops packet_ops_spkt = {
+static struct proto_ops packet_ops_spkt = {
 	.family =	PF_PACKET,
 	.owner =	THIS_MODULE,
 	.release =	packet_release,
@@ -1769,7 +1770,7 @@ struct proto_ops packet_ops_spkt = {
 };
 #endif
 
-struct proto_ops packet_ops = {
+static struct proto_ops packet_ops = {
 	.family =	PF_PACKET,
 	.owner =	THIS_MODULE,
 	.release =	packet_release,

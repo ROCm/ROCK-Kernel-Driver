@@ -2,7 +2,7 @@
  * linux/arch/m32r/kernel/ptrace.c
  *
  * Copyright (C) 2002  Hirokazu Takata, Takeo Takahashi
- * Copyright (C) 2004  Hirokazu Takata <takata at linux-m32r.org>
+ * Copyright (C) 2004  Hirokazu Takata, Kei Sakamoto
  *
  * Original x86 implementation:
  *	By Ross Biro 1/23/92
@@ -130,7 +130,7 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
 #ifndef NO_FPU
 		else if (off >= (long)(&dummy->fpu >> 2) &&
 			 off < (long)(&dummy->u_fpvalid >> 2)) {
-			if (!tsk_used_math(tsk)) {
+			if (!tsk->used_math) {
 				if (off == (long)(&dummy->fpu.fpscr >> 2))
 					tmp = FPSCR_INIT;
 				else
@@ -139,7 +139,7 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
 				tmp = ((long *)(&tsk->thread.fpu >> 2))
 					[off - (long)&dummy->fpu];
 		} else if (off == (long)(&dummy->u_fpvalid >> 2))
-			tmp = !!tsk_used_math(tsk);
+			tmp = tsk->used_math;
 #endif /* not NO_FPU */
 		else
 			tmp = 0;
@@ -187,12 +187,12 @@ static int ptrace_write_user(struct task_struct *tsk, unsigned long off,
 #ifndef NO_FPU
 		else if (off >= (long)(&dummy->fpu >> 2) &&
 			 off < (long)(&dummy->u_fpvalid >> 2)) {
-			set_stopped_child_used_math(tsk);
+			tsk->used_math = 1;
 			((long *)&tsk->thread.fpu)
 				[off - (long)&dummy->fpu] = data;
 			ret = 0;
 		} else if (off == (long)(&dummy->u_fpvalid >> 2)) {
-			conditional_stopped_child_used_math(data, tsk);
+			tsk->used_math = data ? 1 : 0;
 			ret = 0;
 		}
 #endif /* not NO_FPU */
@@ -450,13 +450,13 @@ register_debug_trap(struct task_struct *child, unsigned long next_pc,
 	struct debug_trap *p = &child->thread.debug_trap;
 	unsigned long addr = next_pc & ~3;
 
-	if (p->nr_trap != 0) {
+	if (p->nr_trap == MAX_TRAPS) {
 		printk("kernel BUG at %s %d: p->nr_trap = %d\n",
 					__FILE__, __LINE__, p->nr_trap);
 		return -1;
 	}
-	p->addr = addr;
-	p->insn = next_insn;
+	p->addr[p->nr_trap] = addr;
+	p->insn[p->nr_trap] = next_insn;
 	p->nr_trap++;
 	if (next_pc & 3) {
 		*code = (next_insn & 0xffff0000) | 0x10f1;
@@ -473,35 +473,34 @@ register_debug_trap(struct task_struct *child, unsigned long next_pc,
 	return 0;
 }
 
-int withdraw_debug_trap_for_signal(struct task_struct *child)
-{
-	struct debug_trap *p = &child->thread.debug_trap;
-	int nr_trap = p->nr_trap;
-
-	if (nr_trap) {
-		access_process_vm(child, p->addr, &p->insn, sizeof(p->insn), 1);
-		p->nr_trap = 0;
-		p->addr = 0;
-		p->insn = 0;
-	}
-	return nr_trap;
-}
-
 static int
 unregister_debug_trap(struct task_struct *child, unsigned long addr,
 		      unsigned long *code)
 {
 	struct debug_trap *p = &child->thread.debug_trap;
+        int i;
 
-	if (p->nr_trap != 1 || p->addr != addr) {
+	/* Search debug trap entry. */
+	for (i = 0; i < p->nr_trap; i++) {
+		if (p->addr[i] == addr)
+			break;
+	}
+	if (i >= p->nr_trap) {
 		/* The trap may be requested from debugger.
 		 * ptrace should do nothing in this case.
 		 */
 		return 0;
 	}
-	*code = p->insn;
-	p->insn = 0;
-	p->addr = 0;
+
+	/* Recover orignal instruction code. */
+	*code = p->insn[i];
+
+	/* Shift debug trap entries. */
+	while (i < p->nr_trap - 1) {
+		p->insn[i] = p->insn[i + 1];
+		p->addr[i] = p->addr[i + 1];
+		i++;
+	}
 	p->nr_trap--;
 	return 1;
 }
@@ -510,13 +509,11 @@ static void
 unregister_all_debug_traps(struct task_struct *child)
 {
 	struct debug_trap *p = &child->thread.debug_trap;
+	int i;
 
-	if (p->nr_trap) {
-		access_process_vm(child, p->addr, &p->insn, sizeof(p->insn), 1);
-		p->addr = 0;
-		p->insn = 0;
-		p->nr_trap = 0;
-	}
+	for (i = 0; i < p->nr_trap; i++)
+		access_process_vm(child, p->addr[i], &p->insn[i], sizeof(p->insn[i]), 1);
+	p->nr_trap = 0;
 }
 
 static inline void
@@ -576,34 +573,6 @@ embed_debug_trap(struct task_struct *child, unsigned long next_pc)
 }
 
 void
-embed_debug_trap_for_signal(struct task_struct *child)
-{
-	unsigned long next_pc;
-	unsigned long pc, insn;
-	int ret;
-
-	pc = get_stack_long(child, PT_BPC);
-	ret = access_process_vm(child, pc&~3, &insn, sizeof(insn), 0);
-	if (ret != sizeof(insn)) {
-		printk("kernel BUG at %s %d: access_process_vm returns %d\n",
-		       __FILE__, __LINE__, ret);
-		return;
-	}
-	compute_next_pc(insn, pc, &next_pc, child);
-	if (next_pc & 0x80000000) {
-		printk("kernel BUG at %s %d: next_pc = 0x%08x\n",
-		       __FILE__, __LINE__, (int)next_pc);
-		return;
-	}
-	if (embed_debug_trap(child, next_pc)) {
-		printk("kernel BUG at %s %d: embed_debug_trap error\n",
-		       __FILE__, __LINE__);
-		return;
-	}
-	invalidate_cache();
-}
-
-void
 withdraw_debug_trap(struct pt_regs *regs)
 {
 	unsigned long addr;
@@ -621,9 +590,12 @@ static void
 init_debug_traps(struct task_struct *child)
 {
 	struct debug_trap *p = &child->thread.debug_trap;
+	int i;
 	p->nr_trap = 0;
-	p->addr = 0;
-	p->insn = 0;
+	for (i = 0; i < MAX_TRAPS; i++) {
+		p->addr[i] = 0;
+		p->insn[i] = 0;
+	}
 }
 
 
@@ -855,4 +827,3 @@ void do_syscall_trace(void)
 		current->exit_code = 0;
 	}
 }
-

@@ -1546,8 +1546,8 @@ static int __devinit add_card(struct pci_dev *dev,
         host->pdev = dev;
         pci_set_drvdata(dev, lynx);
 
-        lynx->lock = SPIN_LOCK_UNLOCKED;
-        lynx->phy_reg_lock = SPIN_LOCK_UNLOCKED;
+        spin_lock_init(&lynx->lock);
+        spin_lock_init(&lynx->phy_reg_lock);
 
 #ifndef CONFIG_IEEE1394_PCILYNX_LOCALRAM
         lynx->pcl_mem = pci_alloc_consistent(dev, LOCALRAM_SIZE,
@@ -1659,11 +1659,11 @@ static int __devinit add_card(struct pci_dev *dev,
 	tasklet_init(&lynx->iso_rcv.tq, (void (*)(unsigned long))iso_rcv_bh,
 		     (unsigned long)lynx);
 
-        lynx->iso_rcv.lock = SPIN_LOCK_UNLOCKED;
+        spin_lock_init(&lynx->iso_rcv.lock);
 
-        lynx->async.queue_lock = SPIN_LOCK_UNLOCKED;
+        spin_lock_init(&lynx->async.queue_lock);
         lynx->async.channel = CHANNEL_ASYNC_SEND;
-        lynx->iso_send.queue_lock = SPIN_LOCK_UNLOCKED;
+        spin_lock_init(&lynx->iso_send.queue_lock);
         lynx->iso_send.channel = CHANNEL_ISO_SEND;
 
         PRINT(KERN_INFO, lynx->id, "remapped memory spaces reg 0x%p, rom 0x%p, "

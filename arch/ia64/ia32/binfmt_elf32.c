@@ -35,7 +35,7 @@ extern void ia64_elf32_init (struct pt_regs *regs);
 
 static void elf32_set_personality (void);
 
-#define setup_arg_pages(bprm,exec)		ia32_setup_arg_pages(bprm,exec)
+#define setup_arg_pages(bprm,tos,exec)		ia32_setup_arg_pages(bprm,exec)
 #define elf_map				elf32_map
 
 #undef SET_PERSONALITY

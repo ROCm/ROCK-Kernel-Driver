@@ -43,7 +43,7 @@
 #include <net/arp.h>
 #include <linux/init.h>
 
-int nr_ndevs = 4;
+static int nr_ndevs = 4;
 
 int sysctl_netrom_default_path_quality            = NR_DEFAULT_QUAL;
 int sysctl_netrom_obsolescence_count_initialiser  = NR_DEFAULT_OBS;
@@ -60,7 +60,7 @@ int sysctl_netrom_link_fails_count                = NR_DEFAULT_FAILS;
 static unsigned short circuit = 0x101;
 
 static HLIST_HEAD(nr_list);
-static spinlock_t nr_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nr_list_lock);
 
 static struct proto_ops nr_proto_ops;
 void nr_init_timers(struct sock *sk);

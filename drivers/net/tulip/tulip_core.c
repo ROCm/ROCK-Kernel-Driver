@@ -88,9 +88,9 @@ static int rx_copybreak = 100;
 	ToDo: Non-Intel setting could be better.
 */
 
-#if defined(__alpha__) || defined(__ia64__) || defined(__x86_64__)
+#if defined(__alpha__) || defined(__ia64__)
 static int csr0 = 0x01A00000 | 0xE000;
-#elif defined(__i386__) || defined(__powerpc__)
+#elif defined(__i386__) || defined(__powerpc__) || defined(__x86_64__)
 static int csr0 = 0x01A00000 | 0x8000;
 #elif defined(__sparc__) || defined(__hppa__)
 /* The UltraSparc PCI controllers will disconnect at every 64-byte
@@ -115,12 +115,13 @@ static int csr0 = 0x00A00000 | 0x4800;
 MODULE_AUTHOR("The Linux Kernel Team");
 MODULE_DESCRIPTION("Digital 21*4* Tulip ethernet driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(tulip_debug, "i");
-MODULE_PARM(max_interrupt_work, "i");
-MODULE_PARM(rx_copybreak, "i");
-MODULE_PARM(csr0, "i");
-MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
+MODULE_VERSION(DRV_VERSION);
+module_param(tulip_debug, int, 0);
+module_param(max_interrupt_work, int, 0);
+module_param(rx_copybreak, int, 0);
+module_param(csr0, int, 0);
+module_param_array(options, int, NULL, 0);
+module_param_array(full_duplex, int, NULL, 0);
 
 #define PFX DRV_NAME ": "
 
@@ -197,6 +198,10 @@ struct tulip_chip_table tulip_tbl[] = {
   /* RS7112 */
   { "Conexant LANfinity", 256, 0x0001ebef,
 	HAS_MII | HAS_ACPI, tulip_timer },
+
+   /* ULi526X */
+   { "ULi M5261/M5263", 128, 0x0001ebef,
+        HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM | HAS_ACPI, tulip_timer },
 };
 
 
@@ -228,12 +233,14 @@ static struct pci_device_id tulip_pci_tbl[] = {
 	{ 0x1113, 0x9511, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1186, 0x1541, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1186, 0x1561, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
+	{ 0x1186, 0x1591, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x14f1, 0x1803, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CONEXANT },
 	{ 0x1626, 0x8410, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1737, 0xAB09, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1737, 0xAB08, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x17B3, 0xAB08, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
- 	{ 0x10b9, 0x5261, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DM910X },	/* ALi 1563 integrated ethernet */
+ 	{ 0x10b9, 0x5261, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ULI526X },	/* ALi 1563 integrated ethernet */
+ 	{ 0x10b9, 0x5263, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ULI526X },	/* ALi 1563 integrated ethernet */
 	{ 0x10b7, 0x9300, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET }, /* 3Com 3CSOHO100B-TX */
 	{ } /* terminate list */
 };
@@ -514,7 +521,7 @@ static void tulip_tx_timeout(struct net_device *dev)
 				   dev->name);
 	} else if (tp->chip_id == DC21140 || tp->chip_id == DC21142
 			   || tp->chip_id == MX98713 || tp->chip_id == COMPEX9881
-			   || tp->chip_id == DM910X) {
+			   || tp->chip_id == DM910X || tp->chip_id == ULI526X) {
 		printk(KERN_WARNING "%s: 21140 transmit timed out, status %8.8x, "
 			   "SIA %8.8x %8.8x %8.8x %8.8x, resetting...\n",
 			   dev->name, ioread32(ioaddr + CSR5), ioread32(ioaddr + CSR12),
@@ -1044,7 +1051,7 @@ static void set_rx_mode(struct net_device *dev)
 				else
 					filterbit = ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26;
 				filterbit &= 0x3f;
-				mc_filter[filterbit >> 5] |= cpu_to_le32(1 << (filterbit & 31));
+				mc_filter[filterbit >> 5] |= 1 << (filterbit & 31);
 				if (tulip_debug > 2) {
 					printk(KERN_INFO "%s: Added filter for %2.2x:%2.2x:%2.2x:"
 						   "%2.2x:%2.2x:%2.2x  %8.8x bit %d.\n", dev->name,
@@ -1215,6 +1222,22 @@ out:
 }
 #endif
 
+/*
+ *	Chips that have the MRM/reserved bit quirk and the burst quirk. That
+ *	is the DM910X and the on chip ULi devices
+ */
+ 
+static int tulip_uli_dm_quirk(struct pci_dev *pdev)
+{
+	if (pdev->vendor == 0x1282 && pdev->device == 0x9102)
+		return 1;
+	if (pdev->vendor == 0x10b9 && pdev->device == 0x5261)
+		return 1;
+	if (pdev->vendor == 0x10b9 && pdev->device == 0x5263)
+		return 1;
+	return 0;
+}
+
 static int __devinit tulip_init_one (struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
 {
@@ -1303,17 +1326,12 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		csr0 &= ~0xfff10000; /* zero reserved bits 31:20, 16 */
 
 	/* DM9102A has troubles with MRM & clear reserved bits 24:22, 20, 16, 7:1 */
-	if ((pdev->vendor == 0x1282 && pdev->device == 0x9102)
-		|| (pdev->vendor == 0x10b9 && pdev->device == 0x5261))
+	if (tulip_uli_dm_quirk(pdev)) {
 		csr0 &= ~0x01f100ff;
-
 #if defined(__sparc__)
-        /* DM9102A needs 32-dword alignment/burst length on sparc - chip bug? */
-	if ((pdev->vendor == 0x1282 && pdev->device == 0x9102)
-		|| (pdev->vendor == 0x10b9 && pdev->device == 0x5261))
                 csr0 = (csr0 & ~0xff00) | 0xe000;
 #endif
-
+	}
 	/*
 	 *	And back to business
 	 */
@@ -1658,6 +1676,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	switch (chip_idx) {
 	case DC21140:
 	case DM910X:
+	case ULI526X:
 	default:
 		if (tp->mtable)
 			iowrite32(tp->mtable->csr12dir | 0x100, ioaddr + CSR12);

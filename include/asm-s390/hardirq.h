@@ -16,6 +16,7 @@
 #include <linux/threads.h>
 #include <linux/sched.h>
 #include <linux/cache.h>
+#include <linux/interrupt.h>
 #include <asm/lowcore.h>
 
 /* irq_cpustat_t is unused currently, but could be converted
@@ -37,24 +38,10 @@ softirq_pending(unsigned int cpu)
 }
 
 #define __ARCH_IRQ_STAT
+#define __ARCH_HAS_DO_SOFTIRQ
 
 #define HARDIRQ_BITS	8
 
 extern void account_ticks(struct pt_regs *);
-
-#define __ARCH_HAS_DO_SOFTIRQ
-
-#define irq_enter()							\
-do {									\
-	(preempt_count() += HARDIRQ_OFFSET);				\
-} while(0)
-#define irq_exit()							\
-do {									\
-	preempt_count() -= IRQ_EXIT_OFFSET;				\
-	if (!in_interrupt() && local_softirq_pending())			\
-		/* Use the async. stack for softirq */			\
-		do_softirq();						\
-	preempt_enable_no_resched();					\
-} while (0)
 
 #endif /* __ASM_HARDIRQ_H */

@@ -225,7 +225,6 @@ ENTRY(init_level4_pgt)
 	.quad	0x0000000000103007		/* -> level3_kernel_pgt */
 
 .org 0x2000
-/* Kernel does not "know" about 4-th level of page tables. */
 ENTRY(level3_ident_pgt)
 	.quad	0x0000000000104007
 	.fill	511,8,0
@@ -356,7 +355,7 @@ ENTRY(cpu_gdt_table)
 	.quad	0x008f9a000000ffff	/* __KERNEL_COMPAT32_CS */	
 	.quad	0x00af9a000000ffff	/* __KERNEL_CS */
 	.quad	0x00cf92000000ffff	/* __KERNEL_DS */
-	.quad	0x00cffe000000ffff	/* __USER32_CS */
+	.quad	0x00cffa000000ffff	/* __USER32_CS */
 	.quad	0x00cff2000000ffff	/* __USER_DS, __USER32_DS  */		
 	.quad	0x00affa000000ffff	/* __USER_CS */
 	.quad	0x00cf9a000000ffff	/* __KERNEL32_CS */

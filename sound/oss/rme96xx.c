@@ -68,7 +68,7 @@ TODO:
 #define NR_DEVICE 2
 
 static int devices = 1;
-MODULE_PARM(devices, "1-" __MODULE_STRING(NR_DEVICE) "i");
+module_param(devices, int, 0);
 MODULE_PARM_DESC(devices, "number of dsp devices allocated by the driver");
 
 
@@ -339,7 +339,7 @@ typedef struct _rme96xx_info {
 
 /* fiddling with the card (first level hardware control) */
 
-inline void rme96xx_set_ctrl(rme96xx_info* s,int mask)
+static inline void rme96xx_set_ctrl(rme96xx_info* s,int mask)
 {
 
 	s->control_register|=mask;
@@ -347,7 +347,7 @@ inline void rme96xx_set_ctrl(rme96xx_info* s,int mask)
 
 }
 
-inline void rme96xx_unset_ctrl(rme96xx_info* s,int mask)
+static inline void rme96xx_unset_ctrl(rme96xx_info* s,int mask)
 {
 
 	s->control_register&=(~mask);
@@ -355,7 +355,7 @@ inline void rme96xx_unset_ctrl(rme96xx_info* s,int mask)
 
 }
 
-inline int rme96xx_get_sample_rate_status(rme96xx_info* s)
+static inline int rme96xx_get_sample_rate_status(rme96xx_info* s)
 {
 	int val;
 	u32 status;
@@ -366,7 +366,7 @@ inline int rme96xx_get_sample_rate_status(rme96xx_info* s)
 	return val;
 }
 
-inline int rme96xx_get_sample_rate_ctrl(rme96xx_info* s)
+static inline int rme96xx_get_sample_rate_ctrl(rme96xx_info* s)
 {
 	int val;
 	val = (s->control_register & RME96xx_freq) ? 48000 : 44100;
@@ -539,7 +539,7 @@ static inline int rme96xx_spdif_sample_rate (rme96xx_info *s, int *spdifrate)
 /* the function returns the hardware pointer in bytes */
 #define RME96xx_BURSTBYTES -64  /* bytes by which hwptr could be off */
 
-inline int rme96xx_gethwptr(rme96xx_info* s,int exact)
+static inline int rme96xx_gethwptr(rme96xx_info* s,int exact)
 {
 	unsigned long flags;
 	if (exact) {
@@ -557,7 +557,7 @@ inline int rme96xx_gethwptr(rme96xx_info* s,int exact)
 	return (s->hwbufid ? s->fragsize : 0);
 }
 
-inline void rme96xx_setlatency(rme96xx_info* s,int l)
+static inline void rme96xx_setlatency(rme96xx_info* s,int l)
 {
 	s->latency = l;
 	s->fragsize = 1<<(8+l);
@@ -626,7 +626,7 @@ static int rme96xx_startcard(rme96xx_info *s,int stop)
 }
 
 
-inline int rme96xx_getospace(struct dmabuf * dma, unsigned int hwp)
+static inline int rme96xx_getospace(struct dmabuf * dma, unsigned int hwp)
 {
 	int cnt;
 	int  swptr;
@@ -643,7 +643,7 @@ inline int rme96xx_getospace(struct dmabuf * dma, unsigned int hwp)
 	return cnt;
 }
 
-inline int rme96xx_getispace(struct dmabuf * dma, unsigned int hwp)
+static inline int rme96xx_getispace(struct dmabuf * dma, unsigned int hwp)
 {
 	int cnt;
 	int  swptr;
@@ -661,7 +661,7 @@ inline int rme96xx_getispace(struct dmabuf * dma, unsigned int hwp)
 }
 
 
-inline int rme96xx_copyfromuser(struct dmabuf* dma,const char __user * buffer,int count,int hop)
+static inline int rme96xx_copyfromuser(struct dmabuf* dma,const char __user * buffer,int count,int hop)
 {
 	int swptr = dma->writeptr;
 	switch (dma->format) {
@@ -710,7 +710,7 @@ inline int rme96xx_copyfromuser(struct dmabuf* dma,const char __user * buffer,in
 }
 
 /* The count argument is the number of bytes */
-inline int rme96xx_copytouser(struct dmabuf* dma,const char __user* buffer,int count,int hop)
+static inline int rme96xx_copytouser(struct dmabuf* dma,const char __user* buffer,int count,int hop)
 {
 	int swptr = dma->readptr;
 	switch (dma->format) {
@@ -793,7 +793,7 @@ static irqreturn_t rme96xx_interrupt(int irq, void *dev_id, struct pt_regs *regs
  PCI detection and module initialization stuff 
  ----------------------------------------------------------------------------*/
 
-void* busmaster_malloc(int size) {
+static void* busmaster_malloc(int size) {
      int pg; /* 2 s exponent of memory size */
         char *buf;
 
@@ -819,7 +819,7 @@ void* busmaster_malloc(int size) {
 	return NULL;
 }
 
-void busmaster_free(void* ptr,int size) {
+static void busmaster_free(void* ptr,int size) {
         int pg;
 	struct page* page, *last_page;
 
@@ -866,7 +866,7 @@ static int rme96xx_dmabuf_init(rme96xx_info * s,struct dmabuf* dma,int ioffset,i
 }
 
 
-int rme96xx_init(rme96xx_info* s)
+static int rme96xx_init(rme96xx_info* s)
 {
 	int i;
 	int status;

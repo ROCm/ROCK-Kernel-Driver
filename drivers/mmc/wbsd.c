@@ -16,13 +16,13 @@
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/blkdev.h>
-
+#include <linux/highmem.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/protocol.h>
 
 #include <asm/io.h>
 #include <asm/dma.h>
+#include <asm/scatterlist.h>
 
 #include "wbsd.h"
 
@@ -33,7 +33,7 @@
 #define DBG(x...) \
 	printk(KERN_DEBUG DRIVER_NAME ": " x)
 #define DBGF(f, x...) \
-	printk(KERN_DEBUG DRIVER_NAME " [%s()]: " f, __func__, ##x)
+	printk(KERN_DEBUG DRIVER_NAME " [%s()]: " f, __func__ , ##x)
 #else
 #define DBG(x...)	do { } while (0)
 #define DBGF(x...)	do { } while (0)
@@ -205,8 +205,6 @@ static void wbsd_request_end(struct wbsd_host* host, struct mmc_request* mrq)
 
 static inline void wbsd_init_sg(struct wbsd_host* host, struct mmc_data* data)
 {
-	struct request* req = data->req;
-	
 	/*
 	 * Get info. about SG list from data structure.
 	 */

@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-rc3
-# Wed Dec 15 16:43:39 2004
+# Linux kernel version: 2.6.10
+# Thu Jan  6 10:44:16 2005
 #
 CONFIG_ARM=y
 CONFIG_MMU=y
@@ -33,7 +33,6 @@ CONFIG_KOBJECT_UEVENT=y
 # CONFIG_IKCONFIG is not set
 # CONFIG_EMBEDDED is not set
 CONFIG_KALLSYMS=y
-# CONFIG_KALLSYMS_ALL is not set
 # CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
@@ -91,12 +90,14 @@ CONFIG_ARCH_IOP3XX=y
 # CONFIG_ARCH_IQ80321 is not set
 # CONFIG_ARCH_IQ31244 is not set
 CONFIG_ARCH_IQ80331=y
+# CONFIG_MACH_IQ80332 is not set
 # CONFIG_ARCH_EP80219 is not set
 CONFIG_ARCH_IOP331=y
 
 #
 # IOP3xx Chipset Features
 #
+CONFIG_IOP331_STEPD=y
 
 #
 # Processor Type
@@ -119,7 +120,6 @@ CONFIG_XSCALE_PMU=y
 # General setup
 #
 CONFIG_PCI=y
-# CONFIG_ZBOOT_ROM is not set
 CONFIG_ZBOOT_ROM_TEXT=0x0
 CONFIG_ZBOOT_ROM_BSS=0x0
 # CONFIG_XIP_KERNEL is not set
@@ -141,11 +141,10 @@ CONFIG_BINFMT_AOUT=y
 #
 CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
-# CONFIG_DEBUG_DRIVER is not set
 # CONFIG_PM is not set
 # CONFIG_PREEMPT is not set
 # CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="ip=boot root=nfs console=ttyS0,115200 mem=128M@0x00000000"
+CONFIG_CMDLINE="ip=boot root=nfs console=ttyS0,115200"
 CONFIG_ALIGNMENT_TRAP=y
 
 #
@@ -511,7 +510,7 @@ CONFIG_INPUT=y
 # Userland interfaces
 #
 CONFIG_INPUT_MOUSEDEV=y
-CONFIG_INPUT_MOUSEDEV_PSAUX=y
+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
 CONFIG_INPUT_MOUSEDEV_SCREEN_X=1024
 CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
 # CONFIG_INPUT_JOYDEV is not set
@@ -584,7 +583,84 @@ CONFIG_LEGACY_PTY_COUNT=256
 #
 # I2C support
 #
-# CONFIG_I2C is not set
+CONFIG_I2C=y
+CONFIG_I2C_CHARDEV=y
+
+#
+# I2C Algorithms
+#
+# CONFIG_I2C_ALGOBIT is not set
+# CONFIG_I2C_ALGOPCF is not set
+# CONFIG_I2C_ALGOPCA is not set
+
+#
+# I2C Hardware Bus support
+#
+# CONFIG_I2C_ALI1535 is not set
+# CONFIG_I2C_ALI1563 is not set
+# CONFIG_I2C_ALI15X3 is not set
+# CONFIG_I2C_AMD756 is not set
+# CONFIG_I2C_AMD8111 is not set
+# CONFIG_I2C_I801 is not set
+# CONFIG_I2C_I810 is not set
+CONFIG_I2C_IOP3XX=y
+# CONFIG_I2C_ISA is not set
+# CONFIG_I2C_NFORCE2 is not set
+# CONFIG_I2C_PARPORT_LIGHT is not set
+# CONFIG_I2C_PIIX4 is not set
+# CONFIG_I2C_PROSAVAGE is not set
+# CONFIG_I2C_SAVAGE4 is not set
+# CONFIG_SCx200_ACB is not set
+# CONFIG_I2C_SIS5595 is not set
+# CONFIG_I2C_SIS630 is not set
+# CONFIG_I2C_SIS96X is not set
+# CONFIG_I2C_STUB is not set
+# CONFIG_I2C_VIA is not set
+# CONFIG_I2C_VIAPRO is not set
+# CONFIG_I2C_VOODOO3 is not set
+# CONFIG_I2C_PCA_ISA is not set
+
+#
+# Hardware Sensors Chip support
+#
+# CONFIG_I2C_SENSOR is not set
+# CONFIG_SENSORS_ADM1021 is not set
+# CONFIG_SENSORS_ADM1025 is not set
+# CONFIG_SENSORS_ADM1026 is not set
+# CONFIG_SENSORS_ADM1031 is not set
+# CONFIG_SENSORS_ASB100 is not set
+# CONFIG_SENSORS_DS1621 is not set
+# CONFIG_SENSORS_FSCHER is not set
+# CONFIG_SENSORS_GL518SM is not set
+# CONFIG_SENSORS_IT87 is not set
+# CONFIG_SENSORS_LM63 is not set
+# CONFIG_SENSORS_LM75 is not set
+# CONFIG_SENSORS_LM77 is not set
+# CONFIG_SENSORS_LM78 is not set
+# CONFIG_SENSORS_LM80 is not set
+# CONFIG_SENSORS_LM83 is not set
+# CONFIG_SENSORS_LM85 is not set
+# CONFIG_SENSORS_LM87 is not set
+# CONFIG_SENSORS_LM90 is not set
+# CONFIG_SENSORS_MAX1619 is not set
+# CONFIG_SENSORS_PC87360 is not set
+# CONFIG_SENSORS_SMSC47M1 is not set
+# CONFIG_SENSORS_VIA686A is not set
+# CONFIG_SENSORS_W83781D is not set
+# CONFIG_SENSORS_W83L785TS is not set
+# CONFIG_SENSORS_W83627HF is not set
+
+#
+# Other I2C Chip support
+#
+# CONFIG_SENSORS_EEPROM is not set
+# CONFIG_SENSORS_PCF8574 is not set
+# CONFIG_SENSORS_PCF8591 is not set
+# CONFIG_SENSORS_RTC8564 is not set
+# CONFIG_I2C_DEBUG_CORE is not set
+# CONFIG_I2C_DEBUG_ALGO is not set
+# CONFIG_I2C_DEBUG_BUS is not set
+# CONFIG_I2C_DEBUG_CHIP is not set
 
 #
 # Multimedia devices
@@ -764,19 +840,10 @@ CONFIG_USB_ARCH_HAS_OHCI=y
 #
 # Kernel hacking
 #
-CONFIG_DEBUG_KERNEL=y
-# CONFIG_MAGIC_SYSRQ is not set
-# CONFIG_SCHEDSTATS is not set
-# CONFIG_DEBUG_SLAB is not set
-# CONFIG_DEBUG_SPINLOCK is not set
-# CONFIG_DEBUG_KOBJECT is not set
-CONFIG_DEBUG_BUGVERBOSE=y
+# CONFIG_DEBUG_KERNEL is not set
 # CONFIG_DEBUG_INFO is not set
 CONFIG_FRAME_POINTER=y
 CONFIG_DEBUG_USER=y
-# CONFIG_DEBUG_WAITQ is not set
-CONFIG_DEBUG_ERRORS=y
-# CONFIG_DEBUG_LL is not set
 
 #
 # Security options
@@ -793,5 +860,5 @@ CONFIG_DEBUG_ERRORS=y
 # Library routines
 #
 # CONFIG_CRC_CCITT is not set
-CONFIG_CRC32=y
+# CONFIG_CRC32 is not set
 # CONFIG_LIBCRC32C is not set

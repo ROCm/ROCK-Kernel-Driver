@@ -65,7 +65,7 @@ struct proc_dir_entry	*proc_net_sctp;
 DEFINE_SNMP_STAT(struct sctp_mib, sctp_statistics);
 
 struct idr sctp_assocs_id;
-spinlock_t sctp_assocs_id_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(sctp_assocs_id_lock);
 
 /* This is the global socket data structure used for responding to
  * the Out-of-the-blue (OOTB) packets.  A control sock will be created
@@ -95,7 +95,7 @@ struct sock *sctp_get_ctl_sock(void)
 }
 
 /* Set up the proc fs entry for the SCTP protocol. */
-__init int sctp_proc_init(void)
+static __init int sctp_proc_init(void)
 {
 	if (!proc_net_sctp) {
 		struct proc_dir_entry *ent;
@@ -124,7 +124,7 @@ out_nomem:
  * Note: Do not make this __exit as it is used in the init error
  * path.
  */
-void sctp_proc_exit(void)
+static void sctp_proc_exit(void)
 {
 	sctp_snmp_proc_exit();
 	sctp_eps_proc_exit();
@@ -428,9 +428,9 @@ static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
  * addresses. If an association is passed, trys to get a dst entry with a
  * source address that matches an address in the bind address list.
  */
-struct dst_entry *sctp_v4_get_dst(struct sctp_association *asoc,
-				  union sctp_addr *daddr,
-				  union sctp_addr *saddr)
+static struct dst_entry *sctp_v4_get_dst(struct sctp_association *asoc,
+					 union sctp_addr *daddr,
+					 union sctp_addr *saddr)
 {
 	struct rtable *rt;
 	struct flowi fl;
@@ -520,10 +520,10 @@ out:
 /* For v4, the source address is cached in the route entry(dst). So no need
  * to cache it separately and hence this is an empty routine.
  */
-void sctp_v4_get_saddr(struct sctp_association *asoc,
-		       struct dst_entry *dst,
-		       union sctp_addr *daddr,
-		       union sctp_addr *saddr)
+static void sctp_v4_get_saddr(struct sctp_association *asoc,
+			      struct dst_entry *dst,
+			      union sctp_addr *daddr,
+			      union sctp_addr *saddr)
 {
 	struct rtable *rt = (struct rtable *)dst;
 
@@ -547,12 +547,12 @@ static int sctp_v4_is_ce(const struct sk_buff *skb)
 }
 
 /* Create and initialize a new sk for the socket returned by accept(). */
-struct sock *sctp_v4_create_accept_sk(struct sock *sk,
-				      struct sctp_association *asoc)
+static struct sock *sctp_v4_create_accept_sk(struct sock *sk,
+					     struct sctp_association *asoc)
 {
 	struct sock *newsk;
-	struct inet_opt *inet = inet_sk(sk);
-	struct inet_opt *newinet;
+	struct inet_sock *inet = inet_sk(sk);
+	struct inet_sock *newinet;
 
 	newsk = sk_alloc(PF_INET, GFP_KERNEL, sk->sk_prot->slab_obj_size,
 			 sk->sk_prot->slab);
@@ -639,7 +639,7 @@ int sctp_inetaddr_event(struct notifier_block *this, unsigned long ev,
  * Initialize the control inode/socket with a control endpoint data
  * structure.  This endpoint is reserved exclusively for the OOTB processing.
  */
-int sctp_ctl_sock_init(void)
+static int sctp_ctl_sock_init(void)
 {
 	int err;
 	sa_family_t family;
@@ -808,7 +808,7 @@ static inline int sctp_v4_xmit(struct sk_buff *skb,
 	return ip_queue_xmit(skb, ipfragok);
 }
 
-struct sctp_af sctp_ipv4_specific;
+static struct sctp_af sctp_ipv4_specific;
 
 static struct sctp_pf sctp_pf_inet = {
 	.event_msgname = sctp_inet_event_msgname,
@@ -829,7 +829,7 @@ static struct notifier_block sctp_inetaddr_notifier = {
 };
 
 /* Socket operations.  */
-struct proto_ops inet_seqpacket_ops = {
+static struct proto_ops inet_seqpacket_ops = {
 	.family      = PF_INET,
 	.owner       = THIS_MODULE,
 	.release     = inet_release,       /* Needs to be wrapped... */
@@ -878,7 +878,7 @@ static struct net_protocol sctp_protocol = {
 };
 
 /* IPv4 address related functions.  */
-struct sctp_af sctp_ipv4_specific = {
+static struct sctp_af sctp_ipv4_specific = {
 	.sctp_xmit      = sctp_v4_xmit,
 	.setsockopt     = ip_setsockopt,
 	.getsockopt     = ip_getsockopt,
@@ -959,7 +959,7 @@ static void cleanup_sctp_mibs(void)
 }
 
 /* Initialize the universe into something sensible.  */
-__init int sctp_init(void)
+SCTP_STATIC __init int sctp_init(void)
 {
 	int i;
 	int status = -EINVAL;
@@ -1196,7 +1196,7 @@ err_bucket_cachep:
 }
 
 /* Exit handler for the SCTP protocol.  */
-__exit void sctp_exit(void)
+SCTP_STATIC __exit void sctp_exit(void)
 {
 	/* BUG.  This should probably do something useful like clean
 	 * up all the remaining associations and all that memory.

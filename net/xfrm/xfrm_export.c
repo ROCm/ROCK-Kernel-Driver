@@ -53,7 +53,6 @@ EXPORT_SYMBOL_GPL(xfrm_count_auth_supported);
 EXPORT_SYMBOL_GPL(xfrm_count_enc_supported);
 EXPORT_SYMBOL_GPL(xfrm_aalg_get_byidx);
 EXPORT_SYMBOL_GPL(xfrm_ealg_get_byidx);
-EXPORT_SYMBOL_GPL(xfrm_calg_get_byidx);
 EXPORT_SYMBOL_GPL(xfrm_aalg_get_byid);
 EXPORT_SYMBOL_GPL(xfrm_ealg_get_byid);
 EXPORT_SYMBOL_GPL(xfrm_calg_get_byid);

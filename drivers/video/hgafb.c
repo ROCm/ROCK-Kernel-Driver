@@ -618,7 +618,7 @@ MODULE_AUTHOR("Ferenc Bakonyi (fero@drama.obuda.kando.hu)");
 MODULE_DESCRIPTION("FBDev driver for Hercules Graphics Adaptor");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(nologo, "i");
+module_param(nologo, bool, 0);
 MODULE_PARM_DESC(nologo, "Disables startup logo if != 0 (default=0)");
 module_init(hgafb_init);
 

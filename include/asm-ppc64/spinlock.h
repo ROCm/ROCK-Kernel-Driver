@@ -23,10 +23,16 @@
 
 typedef struct {
 	volatile unsigned int lock;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } spinlock_t;
 
 typedef struct {
 	volatile signed int lock;
+#ifdef CONFIG_PREEMPT
+	unsigned int break_lock;
+#endif
 } rwlock_t;
 
 #ifdef __KERNEL__
@@ -57,7 +63,7 @@ static __inline__ void _raw_spin_unlock(spinlock_t *lock)
 
 #if defined(CONFIG_PPC_SPLPAR) || defined(CONFIG_PPC_ISERIES)
 /* We only yield to the hypervisor if we are in shared processor mode */
-#define SHARED_PROCESSOR (get_paca()->lppaca.xSharedProc)
+#define SHARED_PROCESSOR (get_paca()->lppaca.shared_proc)
 extern void __spin_yield(spinlock_t *lock);
 extern void __rw_yield(rwlock_t *lock);
 #else /* SPLPAR || ISERIES */

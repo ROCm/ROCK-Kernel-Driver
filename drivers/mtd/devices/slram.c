@@ -1,6 +1,6 @@
 /*======================================================================
 
-  $Id: slram.c,v 1.32 2004/11/16 18:29:01 dwmw2 Exp $
+  $Id: slram.c,v 1.33 2005/01/05 18:05:13 dwmw2 Exp $
 
   This driver provides a method to access memory not used by the kernel
   itself (i.e. if the kernel commandline mem=xxx is used). To actually
@@ -66,12 +66,12 @@ typedef struct slram_mtd_list {
 
 #ifdef MODULE
 static char *map[SLRAM_MAX_DEVICES_PARAMS];
+
+module_param_array(map, charp, NULL, 0);
+MODULE_PARM_DESC(map, "List of memory regions to map. \"map=<name>, <start>, <length / end>\"");
 #else
 static char *map;
 #endif
-
-MODULE_PARM(map, "3-" __MODULE_STRING(SLRAM_MAX_DEVICES_PARAMS) "s");
-MODULE_PARM_DESC(map, "List of memory regions to map. \"map=<name>, <start>, <length / end>\"");
 
 static slram_mtd_list_t *slram_mtdlist = NULL;
 
@@ -106,7 +106,7 @@ static int slram_erase(struct mtd_info *mtd, struct erase_info *instr)
 static int slram_point(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char **mtdbuf)
 {
-	slram_priv_t *priv = (slram_priv_t *)mtd->priv;
+	slram_priv_t *priv = mtd->priv;
 
 	*mtdbuf = priv->start + from;
 	*retlen = len;
@@ -120,7 +120,7 @@ static void slram_unpoint(struct mtd_info *mtd, u_char *addr, loff_t from, size_
 static int slram_read(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char *buf)
 {
-	slram_priv_t *priv = (slram_priv_t *)mtd->priv;
+	slram_priv_t *priv = mtd->priv;
 	
 	memcpy(buf, priv->start + from, len);
 
@@ -131,7 +131,7 @@ static int slram_read(struct mtd_info *mtd, loff_t from, size_t len,
 static int slram_write(struct mtd_info *mtd, loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
-	slram_priv_t *priv = (slram_priv_t *)mtd->priv;
+	slram_priv_t *priv = mtd->priv;
 
 	memcpy(priv->start + to, buf, len);
 
@@ -161,7 +161,7 @@ static int register_device(char *name, unsigned long start, unsigned long length
 	if ((*curmtd)->mtdinfo)	{
 		memset((char *)(*curmtd)->mtdinfo, 0, sizeof(struct mtd_info));
 		(*curmtd)->mtdinfo->priv =
-			(void *)kmalloc(sizeof(slram_priv_t), GFP_KERNEL);
+			kmalloc(sizeof(slram_priv_t), GFP_KERNEL);
 		
 		if (!(*curmtd)->mtdinfo->priv) {
 			kfree((*curmtd)->mtdinfo);

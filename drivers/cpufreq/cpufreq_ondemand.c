@@ -229,10 +229,14 @@ static void dbs_check_cpu(int cpu)
 	static int down_skip[NR_CPUS];
 	struct cpu_dbs_info_s *this_dbs_info;
 
+	struct cpufreq_policy *policy;
+	unsigned int j;
+
 	this_dbs_info = &per_cpu(cpu_dbs_info, cpu);
 	if (!this_dbs_info->enable)
 		return;
 
+	policy = this_dbs_info->cur_policy;
 	/* 
 	 * The default safe range is 20% to 80% 
 	 * Every sampling_rate, we check
@@ -246,12 +250,33 @@ static void dbs_check_cpu(int cpu)
 	 * Frequency reduction happens at minimum steps of 
 	 * 5% of max_frequency 
 	 */
+
 	/* Check for frequency increase */
 	total_idle_ticks = kstat_cpu(cpu).cpustat.idle +
 		kstat_cpu(cpu).cpustat.iowait;
 	idle_ticks = total_idle_ticks -
 		this_dbs_info->prev_cpu_idle_up;
 	this_dbs_info->prev_cpu_idle_up = total_idle_ticks;
+	
+
+	for_each_cpu_mask(j, policy->cpus) {
+		unsigned int tmp_idle_ticks;
+		struct cpu_dbs_info_s *j_dbs_info;
+
+		if (j == cpu)
+			continue;
+
+		j_dbs_info = &per_cpu(cpu_dbs_info, j);
+		/* Check for frequency increase */
+		total_idle_ticks = kstat_cpu(j).cpustat.idle +
+			kstat_cpu(j).cpustat.iowait;
+		tmp_idle_ticks = total_idle_ticks -
+			j_dbs_info->prev_cpu_idle_up;
+		j_dbs_info->prev_cpu_idle_up = total_idle_ticks;
+
+		if (tmp_idle_ticks < idle_ticks)
+			idle_ticks = tmp_idle_ticks;
+	}
 
 	/* Scale idle ticks by 100 and compare with up and down ticks */
 	idle_ticks *= 100;
@@ -259,8 +284,7 @@ static void dbs_check_cpu(int cpu)
 			sampling_rate_in_HZ(dbs_tuners_ins.sampling_rate);
 
 	if (idle_ticks < up_idle_ticks) {
-		__cpufreq_driver_target(this_dbs_info->cur_policy,
-			this_dbs_info->cur_policy->max, 
+		__cpufreq_driver_target(policy, policy->max, 
 			CPUFREQ_RELATION_H);
 		down_skip[cpu] = 0;
 		this_dbs_info->prev_cpu_idle_down = total_idle_ticks;
@@ -272,12 +296,34 @@ static void dbs_check_cpu(int cpu)
 	if (down_skip[cpu] < dbs_tuners_ins.sampling_down_factor)
 		return;
 
+	total_idle_ticks = kstat_cpu(cpu).cpustat.idle +
+		kstat_cpu(cpu).cpustat.iowait;
 	idle_ticks = total_idle_ticks -
 		this_dbs_info->prev_cpu_idle_down;
+	this_dbs_info->prev_cpu_idle_down = total_idle_ticks;
+
+	for_each_cpu_mask(j, policy->cpus) {
+		unsigned int tmp_idle_ticks;
+		struct cpu_dbs_info_s *j_dbs_info;
+
+		if (j == cpu)
+			continue;
+
+		j_dbs_info = &per_cpu(cpu_dbs_info, j);
+		/* Check for frequency increase */
+		total_idle_ticks = kstat_cpu(j).cpustat.idle +
+			kstat_cpu(j).cpustat.iowait;
+		tmp_idle_ticks = total_idle_ticks -
+			j_dbs_info->prev_cpu_idle_down;
+		j_dbs_info->prev_cpu_idle_down = total_idle_ticks;
+
+		if (tmp_idle_ticks < idle_ticks)
+			idle_ticks = tmp_idle_ticks;
+	}
+
 	/* Scale idle ticks by 100 and compare with up and down ticks */
 	idle_ticks *= 100;
 	down_skip[cpu] = 0;
-	this_dbs_info->prev_cpu_idle_down = total_idle_ticks;
 
 	freq_down_sampling_rate = dbs_tuners_ins.sampling_rate *
 		dbs_tuners_ins.sampling_down_factor;
@@ -285,14 +331,14 @@ static void dbs_check_cpu(int cpu)
 			sampling_rate_in_HZ(freq_down_sampling_rate);
 
 	if (idle_ticks > down_idle_ticks ) {
-		freq_down_step = (5 * this_dbs_info->cur_policy->max) / 100;
+		freq_down_step = (5 * policy->max) / 100;
 
 		/* max freq cannot be less than 100. But who knows.... */
 		if (unlikely(freq_down_step == 0))
 			freq_down_step = 5;
 
-		__cpufreq_driver_target(this_dbs_info->cur_policy,
-			this_dbs_info->cur_policy->cur - freq_down_step, 
+		__cpufreq_driver_target(policy,
+			policy->cur - freq_down_step, 
 			CPUFREQ_RELATION_H);
 		return;
 	}
@@ -313,7 +359,8 @@ static void do_dbs_timer(void *data)
 static inline void dbs_timer_init(void)
 {
 	INIT_WORK(&dbs_work, do_dbs_timer, NULL);
-	schedule_work(&dbs_work);
+	schedule_delayed_work(&dbs_work,
+			sampling_rate_in_HZ(dbs_tuners_ins.sampling_rate));
 	return;
 }
 
@@ -328,6 +375,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 {
 	unsigned int cpu = policy->cpu;
 	struct cpu_dbs_info_s *this_dbs_info;
+	unsigned int j;
 
 	this_dbs_info = &per_cpu(cpu_dbs_info, cpu);
 
@@ -344,14 +392,18 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			break;
 		 
 		down(&dbs_sem);
-		this_dbs_info->cur_policy = policy;
+		for_each_cpu_mask(j, policy->cpus) {
+			struct cpu_dbs_info_s *j_dbs_info;
+			j_dbs_info = &per_cpu(cpu_dbs_info, j);
+			j_dbs_info->cur_policy = policy;
 		
-		this_dbs_info->prev_cpu_idle_up = 
-				kstat_cpu(cpu).cpustat.idle +
-				kstat_cpu(cpu).cpustat.iowait;
-		this_dbs_info->prev_cpu_idle_down = 
-				kstat_cpu(cpu).cpustat.idle +
-				kstat_cpu(cpu).cpustat.iowait;
+			j_dbs_info->prev_cpu_idle_up = 
+				kstat_cpu(j).cpustat.idle +
+				kstat_cpu(j).cpustat.iowait;
+			j_dbs_info->prev_cpu_idle_down = 
+				kstat_cpu(j).cpustat.idle +
+				kstat_cpu(j).cpustat.iowait;
+		}
 		this_dbs_info->enable = 1;
 		sysfs_create_group(&policy->kobj, &dbs_attr_group);
 		dbs_enable++;

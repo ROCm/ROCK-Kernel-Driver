@@ -212,7 +212,6 @@ void emu10k1_set_volume_gpr(struct emu10k1_card *, int, s32, int);
 #define TIMEOUT 		    16384
 
 u32 srToPitch(u32);
-u8 sumVolumeToAttenuation(u32);
 
 extern struct list_head emu10k1_devs;
 
@@ -232,7 +231,6 @@ u32 sblive_readptr(struct emu10k1_card *, u32 , u32 );
 
 void emu10k1_irq_enable(struct emu10k1_card *, u32);
 void emu10k1_irq_disable(struct emu10k1_card *, u32);
-void emu10k1_set_stop_on_loop(struct emu10k1_card *, u32);
 void emu10k1_clear_stop_on_loop(struct emu10k1_card *, u32);
 
 /* AC97 Codec register access function */

@@ -14,6 +14,7 @@
 #include <linux/smp_lock.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/buffer_head.h>
 
 /* Check validity of quotactl */
 static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t id)
@@ -135,16 +136,54 @@ restart:
 	return NULL;
 }
 
+static void quota_sync_sb(struct super_block *sb, int type)
+{
+	int cnt;
+	struct inode *discard[MAXQUOTAS];
+
+	sb->s_qcop->quota_sync(sb, type);
+	/* This is not very clever (and fast) but currently I don't know about
+	 * any other simple way of getting quota data to disk and we must get
+	 * them there for userspace to be visible... */
+	if (sb->s_op->sync_fs)
+		sb->s_op->sync_fs(sb, 1);
+	sync_blockdev(sb->s_bdev);
+
+	/* Now when everything is written we can discard the pagecache so
+	 * that userspace sees the changes. We need i_sem and so we could
+	 * not do it inside dqonoff_sem. Moreover we need to be carefull
+	 * about races with quotaoff() (that is the reason why we have own
+	 * reference to inode). */
+	down(&sb_dqopt(sb)->dqonoff_sem);
+	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
+		discard[cnt] = NULL;
+		if (type != -1 && cnt != type)
+			continue;
+		if (!sb_has_quota_enabled(sb, cnt))
+			continue;
+		discard[cnt] = igrab(sb_dqopt(sb)->files[cnt]);
+	}
+	up(&sb_dqopt(sb)->dqonoff_sem);
+	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
+		if (discard[cnt]) {
+			down(&discard[cnt]->i_sem);
+			truncate_inode_pages(&discard[cnt]->i_data, 0);
+			up(&discard[cnt]->i_sem);
+			iput(discard[cnt]);
+		}
+	}
+}
+
 void sync_dquots(struct super_block *sb, int type)
 {
 	if (sb) {
 		if (sb->s_qcop->quota_sync)
-			sb->s_qcop->quota_sync(sb, type);
+			quota_sync_sb(sb, type);
 	}
 	else {
-		while ((sb = get_super_to_sync(type)) != 0) {
+		while ((sb = get_super_to_sync(type)) != NULL) {
 			if (sb->s_qcop->quota_sync)
-				sb->s_qcop->quota_sync(sb, type);
+				quota_sync_sb(sb, type);
 			drop_super(sb);
 		}
 	}

@@ -375,7 +375,7 @@ static int __devinit agp_efficeon_probe(struct pci_dev *pdev,
 	if (!r->start && r->end) {
 		if(pci_assign_resource(pdev, 0)) {
 			printk(KERN_ERR PFX "could not assign resource 0\n");
-			return (-ENODEV);
+			return -ENODEV;
 		}
 	}
 
@@ -386,7 +386,7 @@ static int __devinit agp_efficeon_probe(struct pci_dev *pdev,
 	*/
 	if (pci_enable_device(pdev)) {
 		printk(KERN_ERR PFX "Unable to Enable PCI device\n");
-		return (-ENODEV);
+		return -ENODEV;
 	}
 
 	/* Fill in the mode register */
@@ -440,6 +440,9 @@ static struct pci_driver agp_efficeon_pci_driver = {
 static int __init agp_efficeon_init(void)
 {
 	static int agp_initialised=0;
+
+	if (agp_off)
+		return -EINVAL;
 
 	if (agp_initialised == 1)
 		return 0;

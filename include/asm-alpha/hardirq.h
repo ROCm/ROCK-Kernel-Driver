@@ -9,9 +9,6 @@
 /* entry.S is sensitive to the offsets of these fields */
 typedef struct {
 	unsigned long __softirq_pending;
-	unsigned int __syscall_count;
-	unsigned long idle_timestamp;
-	struct task_struct * __ksoftirqd_task;
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
@@ -28,15 +25,5 @@ typedef struct {
 #if (1 << HARDIRQ_BITS) < 16
 #error HARDIRQ_BITS is too low!
 #endif
-
-#define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
-#define irq_exit()						\
-do {								\
-		preempt_count() -= IRQ_EXIT_OFFSET;		\
-		if (!in_interrupt() &&				\
-		    softirq_pending(smp_processor_id()))	\
-			do_softirq();				\
-		preempt_enable_no_resched();			\
-} while (0)
 
 #endif /* _ALPHA_HARDIRQ_H */

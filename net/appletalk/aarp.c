@@ -77,7 +77,7 @@ static struct aarp_entry *proxies[AARP_HASH_SIZE];
 static int unresolved_count;
 
 /* One lock protects it all. */
-static rwlock_t aarp_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(aarp_lock);
 
 /* Used to walk the list and purge/kick entries.  */
 static struct timer_list aarp_timer;
@@ -199,7 +199,7 @@ static void aarp_send_reply(struct net_device *dev, struct atalk_addr *us,
  *	aarp_proxy_probe_network.
  */
 
-void aarp_send_probe(struct net_device *dev, struct atalk_addr *us)
+static void aarp_send_probe(struct net_device *dev, struct atalk_addr *us)
 {
 	struct elapaarp *eah;
 	int len = dev->hard_header_len + sizeof(*eah) + aarp_dl->header_length;
@@ -429,7 +429,7 @@ static struct atalk_addr *__aarp_proxy_find(struct net_device *dev,
  * Probe a Phase 1 device or a device that requires its Net:Node to
  * be set via an ioctl.
  */
-void aarp_send_probe_phase1(struct atalk_iface *iface)
+static void aarp_send_probe_phase1(struct atalk_iface *iface)
 {
 	struct ifreq atreq;
 	struct sockaddr_at *sa = (struct sockaddr_at *)&atreq.ifr_addr;

@@ -6,7 +6,7 @@
  *   
  *  Copyright (C) 2004 Thomas Gleixner (tglx@linutronix.de)
  *
- * $Id: nand_bbt.c,v 1.26 2004/10/05 13:50:20 gleixner Exp $
+ * $Id: nand_bbt.c,v 1.28 2004/11/13 10:19:09 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1001,25 +1001,27 @@ int nand_default_bbt (struct mtd_info *mtd)
 		return nand_scan_bbt (mtd, &agand_flashbased);
 	}
 	
+	
 	/* Is a flash based bad block table requested ? */
 	if (this->options & NAND_USE_FLASH_BBT) {
 		/* Use the default pattern descriptors */	
 		if (!this->bbt_td) {	
 			this->bbt_td = &bbt_main_descr;
 			this->bbt_md = &bbt_mirror_descr;
-		}	
-		if (mtd->oobblock > 512)
-			return nand_scan_bbt (mtd, &largepage_flashbased);
-		else	
-			return nand_scan_bbt (mtd, &smallpage_flashbased);			
+		}
+		if (!this->badblock_pattern) {
+			this->badblock_pattern = (mtd->oobblock > 512) ?
+				&largepage_flashbased : &smallpage_flashbased;
+		}
 	} else {
 		this->bbt_td = NULL;
 		this->bbt_md = NULL;
-		if (mtd->oobblock > 512)
-			return nand_scan_bbt (mtd, &largepage_memorybased);
-		else
-			return nand_scan_bbt (mtd, &smallpage_memorybased);
+		if (!this->badblock_pattern) {
+			this->badblock_pattern = (mtd->oobblock > 512) ?
+				&largepage_memorybased : &smallpage_memorybased;
+		}
 	}
+	return nand_scan_bbt (mtd, this->badblock_pattern);
 }
 
 /**

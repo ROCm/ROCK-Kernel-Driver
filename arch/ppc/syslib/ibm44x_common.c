@@ -19,6 +19,7 @@
 #include <linux/time.h>
 #include <linux/types.h>
 #include <linux/serial.h>
+#include <linux/module.h>
 
 #include <asm/ibm44x.h>
 #include <asm/mmu.h>
@@ -47,6 +48,7 @@ phys_addr_t fixup_bigphys_addr(phys_addr_t addr, phys_addr_t size)
 
 	return (page_4gb | addr);
 };
+EXPORT_SYMBOL(fixup_bigphys_addr);
 
 void __init ibm44x_calibrate_decr(unsigned int freq)
 {
@@ -142,19 +144,9 @@ static unsigned long __init ibm44x_find_end_of_memory(void)
 	return mem_size;
 }
 
-static void __init ibm44x_init_irq(void)
-{
-	int i;
-
-	ppc4xx_pic_init();
-
-	for (i = 0; i < NR_IRQS; i++)
-		irq_desc[i].handler = ppc4xx_pic;
-}
-
 void __init ibm44x_platform_init(void)
 {
-	ppc_md.init_IRQ = ibm44x_init_irq;
+	ppc_md.init_IRQ = ppc4xx_pic_init;
 	ppc_md.find_end_of_memory = ibm44x_find_end_of_memory;
 	ppc_md.restart = ibm44x_restart;
 	ppc_md.power_off = ibm44x_power_off;

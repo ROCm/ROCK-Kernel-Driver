@@ -361,14 +361,6 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 	return 1;
 }
 
-static int
-nfsd_rqst_needs_auth(struct svc_rqst *rqstp)
-{
-	if (rqstp->rq_proc == 0)
-		return 0;
-	return 1;
-}
-
 extern struct svc_version nfsd_version2, nfsd_version3, nfsd_version4;
 
 static struct svc_version *	nfsd_version[] = {
@@ -410,6 +402,4 @@ struct svc_program		nfsd_program = {
 	.pg_name		= "nfsd",		/* program name */
 	.pg_class		= "nfsd",		/* authentication class */
 	.pg_stats		= &nfsd_svcstats,	/* version table */
-
-	.pg_need_auth		= nfsd_rqst_needs_auth,
 };

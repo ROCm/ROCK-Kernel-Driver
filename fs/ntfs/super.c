@@ -2392,6 +2392,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 */
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
 
+	sb->s_time_gran = 100;
+
 	/*
 	 * Now load the metadata required for the page cache and our address
 	 * space operations to function. We do this by setting up a specialised

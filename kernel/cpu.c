@@ -48,7 +48,9 @@ static inline void check_for_tasks(int cpu)
 
 	write_lock_irq(&tasklist_lock);
 	for_each_process(p) {
-		if (task_cpu(p) == cpu && (p->utime != 0 || p->stime != 0))
+		if (task_cpu(p) == cpu &&
+		    (!cputime_eq(p->utime, cputime_zero) ||
+		     !cputime_eq(p->stime, cputime_zero)))
 			printk(KERN_WARNING "Task %s (pid = %d) is on cpu %d\
 				(state = %ld, flags = %lx) \n",
 				 p->comm, p->pid, cpu, p->state, p->flags);
@@ -132,7 +134,8 @@ int cpu_down(unsigned int cpu)
 	__cpu_die(cpu);
 
 	/* Move it here so it can run. */
-	kthread_bind(p, smp_processor_id());
+	kthread_bind(p, get_cpu());
+	put_cpu();
 
 	/* CPU is completely dead: tell everyone.  Too late to complain. */
 	if (notifier_call_chain(&cpu_chain, CPU_DEAD, (void *)(long)cpu)

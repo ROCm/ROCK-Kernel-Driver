@@ -96,11 +96,10 @@ void __devinit cpu_init (void)
          * Force FPU initialization:
          */
         clear_thread_flag(TIF_USEDFPU);
-        clear_used_math();
+        current->used_math = 0;
 
-        /* Setup active_mm for idle_task  */
-        atomic_inc(&init_mm.mm_count);
-        current->active_mm = &init_mm;
+	atomic_inc(&init_mm.mm_count);
+	current->active_mm = &init_mm;
         if (current->mm)
                 BUG();
         enter_lazy_tlb(&init_mm, current);

@@ -1,6 +1,6 @@
 /* Derived from Applicom driver ac.c for SCO Unix                            */
 /* Ported by David Woodhouse, Axiom (Cambridge) Ltd.                         */
-/* dwmw2@redhat.com  30/8/98                                                 */
+/* dwmw2@infradead.org 30/8/98                                               */
 /* $Id: ac.c,v 1.30 2000/03/22 16:03:57 dwmw2 Exp $			     */
 /* This module is for Linux 2.1 and 2.2 series kernels.                      */
 /*****************************************************************************/
@@ -79,10 +79,6 @@ MODULE_DEVICE_TABLE(pci, applicom_pci_tbl);
 MODULE_AUTHOR("David Woodhouse & Applicom International");
 MODULE_DESCRIPTION("Driver for Applicom Profibus card");
 MODULE_LICENSE("GPL");
-MODULE_PARM(irq, "i");
-MODULE_PARM_DESC(irq, "IRQ of the Applicom board");
-MODULE_PARM(mem, "i");
-MODULE_PARM_DESC(mem, "Shared Memory Address of Applicom board");
 
 MODULE_SUPPORTED_DEVICE("ac");
 
@@ -97,6 +93,11 @@ static struct applicom_board {
 
 static unsigned int irq = 0;	/* interrupt number IRQ       */
 static unsigned long mem = 0;	/* physical segment of board  */
+
+module_param(irq, uint, 0);
+MODULE_PARM_DESC(irq, "IRQ of the Applicom board");
+module_param(mem, ulong, 0);
+MODULE_PARM_DESC(mem, "Shared Memory Address of Applicom board");
 
 static unsigned int numboards;	/* number of installed boards */
 static volatile unsigned char Dummy;

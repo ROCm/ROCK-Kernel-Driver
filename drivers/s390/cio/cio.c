@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.128 $
+ *   $Revision: 1.130 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -813,9 +813,10 @@ __clear_subchannel_easy(unsigned int schid)
 }
 
 extern void do_reipl(unsigned long devno);
-/* Make sure all subchannels are quiet before we re-ipl an lpar. */
+
+/* Clear all subchannels. */
 void
-reipl(unsigned long devno)
+clear_all_subchannels(void)
 {
 	unsigned int schid;
 
@@ -823,7 +824,7 @@ reipl(unsigned long devno)
 	for (schid=0;schid<=highest_subchannel;schid++) {
 		struct schib schib;
 		if (stsch(schid, &schib))
-			goto out;
+			break; /* break out of the loop */
 		if (!schib.pmcw.ena)
 			continue;
 		switch(__disable_subchannel_easy(schid, &schib)) {
@@ -832,11 +833,17 @@ reipl(unsigned long devno)
 			break;
 		default: /* -EBUSY */
 			if (__clear_subchannel_easy(schid))
-				break; /* give up... */
+				break; /* give up... jump out of switch */
 			stsch(schid, &schib);
 			__disable_subchannel_easy(schid, &schib);
 		}
 	}
-out:
+}
+
+/* Make sure all subchannels are quiet before we re-ipl an lpar. */
+void
+reipl(unsigned long devno)
+{
+	clear_all_subchannels();
 	do_reipl(devno);
 }

@@ -64,6 +64,7 @@
 #define ACPI_THERMAL_PATH_POWEROFF	"/sbin/poweroff"
 
 #define ACPI_THERMAL_MAX_ACTIVE	10
+#define ACPI_THERMAL_MAX_LIMIT_STR_LEN 65
 
 #define KELVIN_TO_CELSIUS(t)    (long)(((long)t-2732>=0) ? ((long)t-2732+5)/10 : ((long)t-2732-5)/10)
 #define CELSIUS_TO_KELVIN(t)	((t+273)*10)
@@ -899,21 +900,33 @@ acpi_thermal_write_trip_points (
 	struct seq_file		*m = (struct seq_file *)file->private_data;
 	struct acpi_thermal	*tz = (struct acpi_thermal *)m->private;
 
-	char			limit_string[65] = {'\0'};
+	char			*limit_string; 
 	int			num, critical, hot, passive;
-	int			active[ACPI_THERMAL_MAX_ACTIVE];
+	int			*active; 
 	int			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_thermal_write_trip_points");
 
-	if (!tz || (count > sizeof(limit_string) - 1)) {
+	limit_string = kmalloc(ACPI_THERMAL_MAX_LIMIT_STR_LEN, GFP_KERNEL);
+	if(!limit_string)
+		return_VALUE(-ENOMEM);
+
+	memset(limit_string, 0, ACPI_THERMAL_MAX_LIMIT_STR_LEN);
+
+	active = kmalloc(ACPI_THERMAL_MAX_ACTIVE *sizeof(int), GFP_KERNEL);
+	if(!active)
+		return_VALUE(-ENOMEM);
+
+	if (!tz || (count > ACPI_THERMAL_MAX_LIMIT_STR_LEN - 1)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid argument\n"));
-		return_VALUE(-EINVAL);
+		count = -EINVAL;
+		goto end;
 	}
 	
 	if (copy_from_user(limit_string, buffer, count)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid data\n"));
-		return_VALUE(-EFAULT);
+		count = -EFAULT;
+		goto end;
 	}
 	
 	limit_string[count] = '\0';
@@ -924,7 +937,8 @@ acpi_thermal_write_trip_points (
 				&active[5], &active[6], &active[7], &active[8], &active[9]);
 	if(!(num >=5 && num < (ACPI_THERMAL_MAX_ACTIVE + 3))) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid data format\n"));
-		return_VALUE(-EINVAL);
+		count = -EINVAL;
+		goto end;
 	}
 
 	tz->trips.critical.temperature = CELSIUS_TO_KELVIN(critical);
@@ -936,6 +950,9 @@ acpi_thermal_write_trip_points (
 		tz->trips.active[i].temperature = CELSIUS_TO_KELVIN(active[i]);
 	}
 	
+end:
+	kfree(active);
+	kfree(limit_string);
 	return_VALUE(count);
 }
 

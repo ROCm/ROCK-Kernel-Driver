@@ -262,11 +262,11 @@ MODULE_DESCRIPTION("ESS Maestro Driver");
 MODULE_LICENSE("GPL");
 
 #ifdef M_DEBUG
-MODULE_PARM(debug,"i");
+module_param(debug, bool, 0644);
 #endif
-MODULE_PARM(dsps_order,"i");
-MODULE_PARM(use_pm,"i");
-MODULE_PARM(clocking, "i");
+module_param(dsps_order, int, 0);
+module_param(use_pm, int, 0);
+module_param(clocking, int, 0);
 
 /* --------------------------------------------------------------------- */
 #define DRIVER_VERSION "0.15"
@@ -344,7 +344,7 @@ enum {
 
 /* these masks indicate which units we care about at
 	which states */
-u16 acpi_state_mask[] = {
+static u16 acpi_state_mask[] = {
 	[ACPI_D0] = ACPI_ALL,
 	[ACPI_D1] = ACPI_SLEEP,
 	[ACPI_D2] = ACPI_SLEEP,
@@ -610,7 +610,7 @@ static u16 maestro_ac97_get(struct ess_card *card, u8 cmd)
 	be sure to fill it in if you add oss mixers
 	to anyone's supported mixer defines */
 
- unsigned int mixer_defaults[SOUND_MIXER_NRDEVICES] = {
+static unsigned int mixer_defaults[SOUND_MIXER_NRDEVICES] = {
 	[SOUND_MIXER_VOLUME] =          0x3232,
 	[SOUND_MIXER_BASS] =            0x3232,
 	[SOUND_MIXER_TREBLE] =          0x3232,
@@ -3363,7 +3363,7 @@ maestro_config(struct ess_card *card)
 /* this guy tries to find the pci power management
  * register bank.  this should really be in core
  * code somewhere.  1 on success. */
-int
+static int
 parse_power(struct ess_card *card, struct pci_dev *pcidev)
 {
 	u32 n;
@@ -3629,7 +3629,7 @@ static struct pci_driver maestro_pci_driver = {
 	.remove	  = maestro_remove,
 };
 
-int __init init_maestro(void)
+static int __init init_maestro(void)
 {
 	int rc;
 
@@ -3666,7 +3666,7 @@ static int maestro_notifier(struct notifier_block *nb, unsigned long event, void
 /* --------------------------------------------------------------------- */
 
 
-void cleanup_maestro(void) {
+static void cleanup_maestro(void) {
 	M_printk("maestro: unloading\n");
 	pci_unregister_driver(&maestro_pci_driver);
 	pm_unregister_all(maestro_pm_callback);

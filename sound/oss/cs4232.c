@@ -54,7 +54,6 @@
 
 #include "sound_config.h"
 
-#include "cs4232.h"
 #include "ad1848.h"
 #include "mpu401.h"
 
@@ -78,7 +77,7 @@ static int mpu_base, mpu_irq;
 static int synth_base, synth_irq;
 static int mpu_detected;
 
-int probe_cs4232_mpu(struct address_info *hw_config)
+static int probe_cs4232_mpu(struct address_info *hw_config)
 {
 	/*
 	 *	Just write down the config values.
@@ -363,25 +362,25 @@ MODULE_DESCRIPTION("CS4232 based soundcard driver");
 MODULE_AUTHOR("Hannu Savolainen, Paul Barton-Davis"); 
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io,"i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io,"base I/O port for AD1848");
-MODULE_PARM(irq,"i");
+module_param(irq, int, 0);
 MODULE_PARM_DESC(irq,"IRQ for AD1848 chip");
-MODULE_PARM(dma,"i");
+module_param(dma, int, 0);
 MODULE_PARM_DESC(dma,"8 bit DMA for AD1848 chip");
-MODULE_PARM(dma2,"i");
+module_param(dma2, int, 0);
 MODULE_PARM_DESC(dma2,"16 bit DMA for AD1848 chip");
-MODULE_PARM(mpuio,"i");
+module_param(mpuio, int, 0);
 MODULE_PARM_DESC(mpuio,"MPU 401 base address");
-MODULE_PARM(mpuirq,"i");
+module_param(mpuirq, int, 0);
 MODULE_PARM_DESC(mpuirq,"MPU 401 IRQ");
-MODULE_PARM(synthio,"i");
+module_param(synthio, int, 0);
 MODULE_PARM_DESC(synthio,"Maui WaveTable base I/O port");
-MODULE_PARM(synthirq,"i");
+module_param(synthirq, int, 0);
 MODULE_PARM_DESC(synthirq,"Maui WaveTable IRQ");
-MODULE_PARM(isapnp,"i");
+module_param(isapnp, bool, 0);
 MODULE_PARM_DESC(isapnp,"Enable ISAPnP probing (default 1)");
-MODULE_PARM(bss,"i");
+module_param(bss, bool, 0);
 MODULE_PARM_DESC(bss,"Enable Bose Sound System Support (default 0)");
 
 /*

@@ -193,6 +193,7 @@ static int change_mode(struct parport *p, int m)
 
 #ifdef CONFIG_PARPORT_1284
 /* Find FIFO lossage; FIFO is reset */
+#if 0
 static int get_fifo_residue (struct parport *p)
 {
 	int residue;
@@ -233,6 +234,7 @@ static int get_fifo_residue (struct parport *p)
 	DPRINTK (KERN_DEBUG "*** get_fifo_residue: done residue collecting (ecr = 0x%2.2x)\n", inb (ECONTROL (p)));
 	return residue;
 }
+#endif  /*  0 */
 #endif /* IEEE 1284 support */
 #endif /* FIFO support */
 
@@ -273,7 +275,7 @@ static irqreturn_t parport_pc_interrupt(int irq, void *dev_id, struct pt_regs *r
 	return IRQ_HANDLED;
 }
 
-void parport_pc_init_state(struct pardevice *dev, struct parport_state *s)
+static void parport_pc_init_state(struct pardevice *dev, struct parport_state *s)
 {
 	s->u.pc.ctr = 0xc;
 	if (dev->irq_func &&
@@ -285,7 +287,7 @@ void parport_pc_init_state(struct pardevice *dev, struct parport_state *s)
 			     * D.Gruszka VScom */
 }
 
-void parport_pc_save_state(struct parport *p, struct parport_state *s)
+static void parport_pc_save_state(struct parport *p, struct parport_state *s)
 {
 	const struct parport_pc_private *priv = p->physport->private_data;
 	s->u.pc.ctr = priv->ctr;
@@ -293,7 +295,7 @@ void parport_pc_save_state(struct parport *p, struct parport_state *s)
 		s->u.pc.ecr = inb (ECONTROL (p));
 }
 
-void parport_pc_restore_state(struct parport *p, struct parport_state *s)
+static void parport_pc_restore_state(struct parport *p, struct parport_state *s)
 {
 	struct parport_pc_private *priv = p->physport->private_data;
 	register unsigned char c = s->u.pc.ctr & priv->ctr_writable;
@@ -732,9 +734,9 @@ dump_parport_state ("leave fifo_write_block_dma", port);
 }
 
 /* Parallel Port FIFO mode (ECP chipsets) */
-size_t parport_pc_compat_write_block_pio (struct parport *port,
-					  const void *buf, size_t length,
-					  int flags)
+static size_t parport_pc_compat_write_block_pio (struct parport *port,
+						 const void *buf, size_t length,
+						 int flags)
 {
 	size_t written;
 	int r;
@@ -809,9 +811,9 @@ size_t parport_pc_compat_write_block_pio (struct parport *port,
 
 /* ECP */
 #ifdef CONFIG_PARPORT_1284
-size_t parport_pc_ecp_write_block_pio (struct parport *port,
-				       const void *buf, size_t length,
-				       int flags)
+static size_t parport_pc_ecp_write_block_pio (struct parport *port,
+					      const void *buf, size_t length,
+					      int flags)
 {
 	size_t written;
 	int r;
@@ -924,8 +926,10 @@ size_t parport_pc_ecp_write_block_pio (struct parport *port,
 	return written;
 }
 
-size_t parport_pc_ecp_read_block_pio (struct parport *port,
-				      void *buf, size_t length, int flags)
+#if 0
+static size_t parport_pc_ecp_read_block_pio (struct parport *port,
+					     void *buf, size_t length,
+					     int flags)
 {
 	size_t left = length;
 	size_t fifofull;
@@ -1143,7 +1147,7 @@ out_no_data:
 dump_parport_state ("fwd idle", port);
 	return length - left;
 }
-
+#endif  /*  0  */
 #endif /* IEEE 1284 support */
 #endif /* Allowed to use FIFO/DMA */
 
@@ -1156,7 +1160,7 @@ dump_parport_state ("fwd idle", port);
 
 /* GCC is not inlining extern inline function later overwriten to non-inline,
    so we use outlined_ variants here.  */
-struct parport_operations parport_pc_ops = 
+static struct parport_operations parport_pc_ops =
 {
 	.write_data	= parport_pc_write_data,
 	.read_data	= parport_pc_read_data,
@@ -3176,7 +3180,6 @@ static int __init parport_init_mode_setup(char *str)
 #ifdef MODULE
 static const char *irq[PARPORT_PC_MAX_PORTS];
 static const char *dma[PARPORT_PC_MAX_PORTS];
-static char *init_mode;
 
 MODULE_PARM_DESC(io, "Base I/O address (SPP regs)");
 module_param_array(io, int, NULL, 0);
@@ -3192,8 +3195,9 @@ MODULE_PARM_DESC(verbose_probing, "Log chit-chat during initialisation");
 module_param(verbose_probing, int, 0644);
 #endif
 #ifdef CONFIG_PCI
+static char *init_mode;
 MODULE_PARM_DESC(init_mode, "Initialise mode for VIA VT8231 port (spp, ps2, epp, ecp or ecpepp)");
-MODULE_PARM(init_mode, "s");
+module_param(init_mode, charp, 0);
 #endif
 
 static int __init parse_parport_params(void)

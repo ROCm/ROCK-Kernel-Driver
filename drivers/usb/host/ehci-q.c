@@ -200,7 +200,7 @@ static void qtd_copy_status (
 					|| QTD_CERR(token) == 0)
 				&& (!ehci_is_ARC(ehci)
                 	                || urb->dev->tt->hub !=
-						ehci->hcd.self.root_hub)) {
+					   ehci_to_hcd(ehci)->self.root_hub)) {
 #ifdef DEBUG
 			struct usb_device *tt = urb->dev->tt->hub;
 			dev_dbg (&tt->dev,
@@ -218,14 +218,14 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 __releases(ehci->lock)
 __acquires(ehci->lock)
 {
-	if (likely (urb->hcpriv != 0)) {
+	if (likely (urb->hcpriv != NULL)) {
 		struct ehci_qh	*qh = (struct ehci_qh *) urb->hcpriv;
 
 		/* S-mask in a QH means it's an interrupt urb */
 		if ((qh->hw_info2 & __constant_cpu_to_le32 (0x00ff)) != 0) {
 
 			/* ... update hc-wide periodic stats (for usbfs) */
-			hcd_to_bus (&ehci->hcd)->bandwidth_int_reqs--;
+			ehci_to_hcd(ehci)->self.bandwidth_int_reqs--;
 		}
 		qh_put (qh);
 	}
@@ -262,14 +262,13 @@ __acquires(ehci->lock)
 
 	/* complete() can reenter this HCD */
 	spin_unlock (&ehci->lock);
-	usb_hcd_giveback_urb (&ehci->hcd, urb, regs);
+	usb_hcd_giveback_urb (ehci_to_hcd(ehci), urb, regs);
 	spin_lock (&ehci->lock);
 }
 
 static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh);
 
-static void intr_deschedule (struct ehci_hcd *ehci,
-				struct ehci_qh *qh, int wait);
+static void intr_deschedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
 static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh);
 
 /*
@@ -348,13 +347,13 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 
 		/* stop scanning when we reach qtds the hc is using */
 		} else if (likely (!stopped
-				&& HCD_IS_RUNNING (ehci->hcd.state))) {
+				&& HCD_IS_RUNNING (ehci_to_hcd(ehci)->state))) {
 			break;
 
 		} else {
 			stopped = 1;
 
-			if (unlikely (!HCD_IS_RUNNING (ehci->hcd.state)))
+			if (unlikely (!HCD_IS_RUNNING (ehci_to_hcd(ehci)->state)))
 				urb->status = -ESHUTDOWN;
 
 			/* ignore active urbs unless some previous qtd
@@ -405,7 +404,7 @@ halt:
 	}
 
 	/* last urb's completion might still need calling */
-	if (likely (last != 0)) {
+	if (likely (last != NULL)) {
 		ehci_urb_done (ehci, last->urb, regs);
 		count++;
 		ehci_qtd_free (ehci, last);
@@ -428,7 +427,7 @@ halt:
 			 * except maybe high bandwidth ...
 			 */
 			if (qh->period) {
-				intr_deschedule (ehci, qh, 1);
+				intr_deschedule (ehci, qh);
 				(void) qh_schedule (ehci, qh);
 			} else
 				start_unlink_async (ehci, qh);
@@ -664,9 +663,12 @@ qh_make (
 			qh->c_usecs = 0;
 			qh->gap_uf = 0;
 
-			/* FIXME handle HS periods of less than 1 frame. */
 			qh->period = urb->interval >> 3;
-			if (qh->period < 1) {
+			if (qh->period == 0 && urb->interval != 1) {
+				/* NOTE interval 2 or 4 uframes could work.
+				 * But interval 1 scheduling is simpler, and
+				 * includes high bandwidth.
+				 */
 				dbg ("intr period %d uframes, NYET!",
 						urb->interval);
 				goto done;
@@ -715,7 +717,8 @@ qh_make (
 		 * root hub tt, leave it zeroed.
 		 */
 		if (!ehci_is_ARC(ehci)
-				|| urb->dev->tt->hub != ehci->hcd.self.root_hub)
+				|| urb->dev->tt->hub !=
+					ehci_to_hcd(ehci)->self.root_hub)
 			info2 |= urb->dev->tt->hub->devnum << 16;
 
 		/* NOTE:  if (PIPE_INTERRUPT) { scheduler sets c-mask } */
@@ -776,7 +779,7 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 			(void) handshake (&ehci->regs->status, STS_ASS, 0, 150);
 			cmd |= CMD_ASE | CMD_RUN;
 			writel (cmd, &ehci->regs->command);
-			ehci->hcd.state = USB_STATE_RUNNING;
+			ehci_to_hcd(ehci)->state = USB_STATE_RUNNING;
 			/* posted write need not be known to HC yet ... */
 		}
 	}
@@ -832,26 +835,8 @@ static struct ehci_qh *qh_append_tds (
 			qtd = list_entry (qtd_list->next, struct ehci_qtd,
 					qtd_list);
 
-		/* control qh may need patching after enumeration */
+		/* control qh may need patching ... */
 		if (unlikely (epnum == 0)) {
-			/* set_address changes the address */
-			if ((qh->hw_info1 & QH_ADDR_MASK) == 0)
-				qh->hw_info1 |= cpu_to_le32 (
-						usb_pipedevice (urb->pipe));
-
-			/* for full speed, ep0 maxpacket can grow */
-			else if (!(qh->hw_info1
-					& __constant_cpu_to_le32 (0x3 << 12))) {
-				u32	info, max;
-
-				info = le32_to_cpu (qh->hw_info1);
-				max = urb->dev->descriptor.bMaxPacketSize0;
-				if (max > (0x07ff & (info >> 16))) {
-					info &= ~(0x07ff << 16);
-					info |= max << 16;
-					qh->hw_info1 = cpu_to_le32 (info);
-				}
-			}
 
                         /* usb_reset_device() briefly reverts to address 0 */
                         if (usb_pipedevice (urb->pipe) == 0)
@@ -861,7 +846,7 @@ static struct ehci_qh *qh_append_tds (
 		/* just one way to queue requests: swap with the dummy qtd.
 		 * only hc or qh_refresh() ever modify the overlay.
 		 */
-		if (likely (qtd != 0)) {
+		if (likely (qtd != NULL)) {
 			struct ehci_qtd		*dummy;
 			dma_addr_t		dma;
 			__le32			token;
@@ -908,43 +893,40 @@ static struct ehci_qh *qh_append_tds (
 static int
 submit_async (
 	struct ehci_hcd		*ehci,
+	struct usb_host_endpoint *ep,
 	struct urb		*urb,
 	struct list_head	*qtd_list,
 	int			mem_flags
 ) {
 	struct ehci_qtd		*qtd;
-	struct hcd_dev		*dev;
 	int			epnum;
 	unsigned long		flags;
 	struct ehci_qh		*qh = NULL;
 
 	qtd = list_entry (qtd_list->next, struct ehci_qtd, qtd_list);
-	dev = (struct hcd_dev *)urb->dev->hcpriv;
-	epnum = usb_pipeendpoint (urb->pipe);
-	if (usb_pipein (urb->pipe) && !usb_pipecontrol (urb->pipe))
-		epnum |= 0x10;
+	epnum = ep->desc.bEndpointAddress;
 
 #ifdef EHCI_URB_TRACE
 	ehci_dbg (ehci,
 		"%s %s urb %p ep%d%s len %d, qtd %p [qh %p]\n",
 		__FUNCTION__, urb->dev->devpath, urb,
-		epnum & 0x0f, usb_pipein (urb->pipe) ? "in" : "out",
+		epnum & 0x0f, (epnum & USB_DIR_IN) ? "in" : "out",
 		urb->transfer_buffer_length,
-		qtd, dev ? dev->ep [epnum] : (void *)~0);
+		qtd, ep->hcpriv);
 #endif
 
 	spin_lock_irqsave (&ehci->lock, flags);
-	qh = qh_append_tds (ehci, urb, qtd_list, epnum, &dev->ep [epnum]);
+	qh = qh_append_tds (ehci, urb, qtd_list, epnum, &ep->hcpriv);
 
 	/* Control/bulk operations through TTs don't need scheduling,
 	 * the HC and TT handle it when the TT has a buffer ready.
 	 */
-	if (likely (qh != 0)) {
+	if (likely (qh != NULL)) {
 		if (likely (qh->qh_state == QH_STATE_IDLE))
 			qh_link_async (ehci, qh_get (qh));
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
-	if (unlikely (qh == 0)) {
+	if (unlikely (qh == NULL)) {
 		qtd_list_free (ehci, urb, qtd_list);
 		return -ENOMEM;
 	}
@@ -976,7 +958,7 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 	qh_completions (ehci, qh, regs);
 
 	if (!list_empty (&qh->qtd_list)
-			&& HCD_IS_RUNNING (ehci->hcd.state))
+			&& HCD_IS_RUNNING (ehci_to_hcd(ehci)->state))
 		qh_link_async (ehci, qh);
 	else {
 		qh_put (qh);		// refcount from async list
@@ -984,8 +966,8 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 		/* it's not free to turn the async schedule on/off; leave it
 		 * active but idle for a while once it empties.
 		 */
-		if (HCD_IS_RUNNING (ehci->hcd.state)
-				&& ehci->async->qh_next.qh == 0)
+		if (HCD_IS_RUNNING (ehci_to_hcd(ehci)->state)
+				&& ehci->async->qh_next.qh == NULL)
 			timer_action (ehci, TIMER_ASYNC_OFF);
 	}
 
@@ -1018,7 +1000,7 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	/* stop async schedule right now? */
 	if (unlikely (qh == ehci->async)) {
 		/* can't get here without STS_ASS set */
-		if (ehci->hcd.state != USB_STATE_HALT) {
+		if (ehci_to_hcd(ehci)->state != USB_STATE_HALT) {
 			writel (cmd & ~CMD_ASE, &ehci->regs->command);
 			wmb ();
 			// handshake later, if we need to
@@ -1038,7 +1020,7 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	prev->qh_next = qh->qh_next;
 	wmb ();
 
-	if (unlikely (ehci->hcd.state == USB_STATE_HALT)) {
+	if (unlikely (ehci_to_hcd(ehci)->state == USB_STATE_HALT)) {
 		/* if (unlikely (qh->reclaim != 0))
 		 * 	this will recurse, probably not much
 		 */
@@ -1066,7 +1048,7 @@ scan_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 	timer_action_done (ehci, TIMER_ASYNC_SHRINK);
 rescan:
 	qh = ehci->async->qh_next.qh;
-	if (likely (qh != 0)) {
+	if (likely (qh != NULL)) {
 		do {
 			/* clean any finished work for this qh */
 			if (!list_empty (&qh->qtd_list)

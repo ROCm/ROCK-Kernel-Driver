@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/mach-bast.c
  *
- * Copyright (c) 2003,2004 Simtec Electronics
+ * Copyright (c) 2003-2005 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.simtec.co.uk/products/EB2410ITX/
@@ -20,6 +20,9 @@
  *     18-Jan-2003 BJD  Added serial port configuration
  *     05-Oct-2004 BJD  Power management code
  *     04-Nov-2004 BJD  Updated serial port clocks
+ *     04-Jan-2005 BJD  New uart init call
+ *     10-Jan-2005 BJD  Removed include of s3c2410.h
+ *     14-Jan-2005 BJD  Add support for muitlple NAND devices
 */
 
 #include <linux/kernel.h>
@@ -46,15 +49,20 @@
 #include <asm/arch/regs-serial.h>
 #include <asm/arch/regs-gpio.h>
 #include <asm/arch/regs-mem.h>
+#include <asm/arch/nand.h>
 
-#include "s3c2410.h"
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/nand.h>
+#include <linux/mtd/nand_ecc.h>
+#include <linux/mtd/partitions.h>
+
 #include "clock.h"
 #include "devs.h"
 #include "cpu.h"
 #include "usb-simtec.h"
 #include "pm.h"
 
-#define COPYRIGHT ", (c) 2004 Simtec Electronics"
+#define COPYRIGHT ", (c) 2004-2005 Simtec Electronics"
 
 /* macros for virtual address mods for the io space entries */
 #define VA_C5(item) ((item) + BAST_VAM_CS5)
@@ -219,6 +227,100 @@ static struct platform_device bast_device_nor = {
 	.resource	= bast_nor_resource,
 };
 
+/* NAND Flash on BAST board */
+
+
+static int smartmedia_map[] = { 0 };
+static int chip0_map[] = { 1 };
+static int chip1_map[] = { 2 };
+static int chip2_map[] = { 3 };
+
+struct mtd_partition bast_default_nand_part[] = {
+	[0] = {
+		.name	= "Boot Agent",
+		.size	= SZ_16K,
+		.offset	= 0
+	},
+	[1] = {
+		.name	= "/boot",
+		.size	= SZ_4M - SZ_16K,
+		.offset	= SZ_16K,
+	},
+	[2] = {
+		.name	= "user",
+		.offset	= SZ_4M,
+		.size	= MTDPART_SIZ_FULL,
+	}
+};
+
+/* the bast has 4 selectable slots for nand-flash, the three
+ * on-board chip areas, as well as the external SmartMedia
+ * slot.
+ *
+ * Note, there is no current hot-plug support for the SmartMedia
+ * socket.
+*/
+
+static struct s3c2410_nand_set bast_nand_sets[] = {
+	[0] = {
+		.name		= "SmartMedia",
+		.nr_chips	= 1,
+		.nr_map		= smartmedia_map,
+		.nr_partitions	= ARRAY_SIZE(bast_default_nand_part),
+		.partitions	= bast_default_nand_part
+	},
+	[1] = {
+		.name		= "chip0",
+		.nr_chips	= 1,
+		.nr_map		= chip0_map,
+		.nr_partitions	= ARRAY_SIZE(bast_default_nand_part),
+		.partitions	= bast_default_nand_part
+	},
+	[2] = {
+		.name		= "chip1",
+		.nr_chips	= 1,
+		.nr_map		= chip1_map,
+		.nr_partitions	= ARRAY_SIZE(bast_default_nand_part),
+		.partitions	= bast_default_nand_part
+	},
+	[3] = {
+		.name		= "chip2",
+		.nr_chips	= 1,
+		.nr_map		= chip2_map,
+		.nr_partitions	= ARRAY_SIZE(bast_default_nand_part),
+		.partitions	= bast_default_nand_part
+	}
+};
+
+static void bast_nand_select(struct s3c2410_nand_set *set, int slot)
+{
+	unsigned int tmp;
+
+	slot = set->nr_map[slot] & 3;
+
+	pr_debug("bast_nand: selecting slot %d (set %p,%p)\n",
+		 slot, set, set->nr_map);
+
+	tmp = __raw_readb(BAST_VA_CTRL2);
+	tmp &= BAST_CPLD_CTLR2_IDERST;
+	tmp |= slot;
+	tmp |= BAST_CPLD_CTRL2_WNAND;
+
+	pr_debug("bast_nand: ctrl2 now %02x\n", tmp);
+
+	__raw_writeb(tmp, BAST_VA_CTRL2);
+}
+
+static struct s3c2410_platform_nand bast_nand_info = {
+	.tacls		= 80,
+	.twrph0		= 80,
+	.twrph1		= 80,
+	.nr_sets	= ARRAY_SIZE(bast_nand_sets),
+	.sets		= bast_nand_sets,
+	.select_chip	= bast_nand_select,
+};
+
+
 /* Standard BAST devices */
 
 static struct platform_device *bast_devices[] __initdata = {
@@ -228,6 +330,7 @@ static struct platform_device *bast_devices[] __initdata = {
 	&s3c_device_i2c,
 	&s3c_device_iis,
  	&s3c_device_rtc,
+	&s3c_device_nand,
 	&bast_device_nor
 };
 
@@ -261,15 +364,18 @@ void __init bast_map_io(void)
 
 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
 
+	s3c_device_nand.dev.platform_data = &bast_nand_info;
+
 	s3c24xx_init_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
-	s3c2410_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
+	s3c24xx_init_clocks(0);
+	s3c24xx_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
 	s3c24xx_set_board(&bast_board);
 	usb_simtec_init();
 }
 
 void __init bast_init_irq(void)
 {
-	s3c2410_init_irq();
+	s3c24xx_init_irq();
 }
 
 #ifdef CONFIG_PM
@@ -306,5 +412,5 @@ MACHINE_START(BAST, "Simtec-BAST")
      MAPIO(bast_map_io)
      INITIRQ(bast_init_irq)
 	.init_machine	= bast_init_machine,
-     .timer		= &s3c2410_timer,
+	.timer		= &s3c24xx_timer,
 MACHINE_END

@@ -88,7 +88,7 @@ static UCHAR ct36[] = { 2, BTH,     0x24,0                   }; // SETERRMODE
 //static UCHAR ct37[]={ 5, BYP|VIP, 0x25,0,0,0,0             }; // FLOW PACKET
 
 // Back to normal
-static UCHAR ct38[] = {11, BTH|VAR, 0x26,0,0,0,0,0,0,0,0,0,0 }; // DEF KEY SEQ
+//static UCHAR ct38[] = {11, BTH|VAR, 0x26,0,0,0,0,0,0,0,0,0,0 }; // DEF KEY SEQ
 //static UCHAR ct39[]={ 3, BTH|END, 0x27,0,0                 }; // OPOSTON
 //static UCHAR ct40[]={ 1, BTH|END, 0x28                     }; // OPOSTOFF
 static UCHAR ct41[] = { 1, BYP,     0x29                     }; // RESUME
@@ -103,7 +103,7 @@ static UCHAR ct47[] = { 7, BTH,     0x2F,0,0,0,0,0,0         }; // UNIX FLAGS
 //static UCHAR ct50[]={ 1, BTH,     0x32                     }; // DTRFLOWENAB
 //static UCHAR ct51[]={ 1, BTH,     0x33                     }; // DTRFLOWDSAB
 //static UCHAR ct52[]={ 1, BTH,     0x34                     }; // BAUDTABRESET
-static UCHAR ct53[] = { 3, BTH,     0x35,0,0                 }; // BAUDREMAP
+//static UCHAR ct53[] = { 3, BTH,     0x35,0,0                 }; // BAUDREMAP
 static UCHAR ct54[] = { 3, BTH,     0x36,0,0                 }; // CUSTOMBAUD1
 static UCHAR ct55[] = { 3, BTH,     0x37,0,0                 }; // CUSTOMBAUD2
 static UCHAR ct56[] = { 2, BTH|END, 0x38,0                   }; // PAUSE
@@ -152,40 +152,6 @@ static UCHAR ct89[]={ 1, BYP,     0x59                     }; // DSS_NOW
 //********
 
 //******************************************************************************
-// Function:   i2cmdSetSeq(type, size, string)
-// Parameters: type   - sequence number
-//             size   - length of sequence
-//             string - substitution string
-//
-// Returns:    Pointer to command structure
-//
-// Description:
-//
-// This routine sets the parameters of command 38 Define Hot Key sequence (alias
-// "special receive sequence"). Returns a pointer to the structure. Endeavours
-// to be bullet-proof in that the sequence number is forced in range, and any
-// out-of-range sizes are forced to zero.
-//******************************************************************************
-cmdSyntaxPtr
-i2cmdSetSeq(unsigned char type, unsigned char size, unsigned char *string)
-{
-	cmdSyntaxPtr pCM = (cmdSyntaxPtr) ct38;
-	unsigned char *pc;
-
-	pCM->cmd[1] = ((type > 0xf) ? 0xf : type);   // Sequence number
-	size = ((size > 0x8) ? 0 : size);            // size
-	pCM->cmd[2] = size;
-	pCM->length = 3 + size;                      // UPDATES THE LENGTH!
-
-	pc = &(pCM->cmd[3]);
-
-	while(size--) {
-		*pc++ = *string++;
-	}
-	return pCM;
-}
-
-//******************************************************************************
 // Function:   i2cmdUnixFlags(iflag, cflag, lflag)
 // Parameters: Unix tty flags
 //
@@ -207,27 +173,6 @@ i2cmdUnixFlags(unsigned short iflag,unsigned short cflag,unsigned short lflag)
 	pCM->cmd[4] = (unsigned char) (cflag >> 8);
 	pCM->cmd[5] = (unsigned char)  lflag;
 	pCM->cmd[6] = (unsigned char) (lflag >> 8);
-	return pCM;
-}
-
-//******************************************************************************
-// Function:   i2cmdBaudRemap(dest,src)
-// Parameters: ?
-//
-// Returns:    Pointer to command structure
-//
-// Description:
-//
-// This routine sets the parameters of command 53 and returns a pointer to the
-// appropriate structure.
-//******************************************************************************
-cmdSyntaxPtr
-i2cmdBaudRemap(unsigned char dest, unsigned char src)
-{
-	cmdSyntaxPtr pCM = (cmdSyntaxPtr) ct53;
-
-	pCM->cmd[1] = dest;
-	pCM->cmd[2] = src;
 	return pCM;
 }
 

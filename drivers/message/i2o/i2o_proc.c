@@ -27,6 +27,10 @@
  *			Changes for new I2O API
  */
 
+#define OSM_NAME	"proc-osm"
+#define OSM_VERSION	"$Rev$"
+#define OSM_DESCRIPTION	"I2O ProcFS OSM"
+
 #define I2O_MAX_MODULES 4
 // FIXME!
 #define FMT_U64_HEX "0x%08x%08x"
@@ -60,7 +64,7 @@ static struct proc_dir_entry *i2o_proc_dir_root;
 
 /* proc OSM driver struct */
 static struct i2o_driver i2o_proc_driver = {
-	.name = "proc-osm",
+	.name = OSM_NAME,
 };
 
 static int print_serial_number(struct seq_file *seq, u8 * serialno, int max_len)
@@ -1938,11 +1942,11 @@ static void i2o_proc_device_add(struct proc_dir_entry *dir,
 
 	sprintf(buff, "%03x", dev->lct_data.tid);
 
-	pr_debug("Adding device /proc/i2o/iop%d/%s\n", dev->iop->unit, buff);
+	osm_debug("adding device /proc/i2o/%s/%s\n", dev->iop->name, buff);
 
 	devdir = proc_mkdir(buff, dir);
 	if (!devdir) {
-		printk(KERN_WARNING "i2o: Could not allocate procdir!\n");
+		osm_warn("Could not allocate procdir!\n");
 		return;
 	}
 
@@ -1978,13 +1982,10 @@ static int i2o_proc_iop_add(struct proc_dir_entry *dir,
 {
 	struct proc_dir_entry *iopdir;
 	struct i2o_device *dev;
-	char buff[10];
 
-	snprintf(buff, 10, "iop%d", c->unit);
+	osm_debug("adding IOP /proc/i2o/%s\n", c->name);
 
-	pr_debug("Adding IOP /proc/i2o/%s\n", buff);
-
-	iopdir = proc_mkdir(buff, dir);
+	iopdir = proc_mkdir(c->name, dir);
 	if (!iopdir)
 		return -1;
 
@@ -2018,7 +2019,7 @@ static void i2o_proc_iop_remove(struct proc_dir_entry *dir,
 			i2o_proc_subdir_remove(pe);
 			remove_proc_entry(pe->name, dir);
 		}
-		pr_debug("Removing IOP /proc/i2o/iop%d\n", c->unit);
+		osm_debug("removing IOP /proc/i2o/%s\n", c->name);
 		pe = tmp;
 	}
 }
@@ -2076,6 +2077,8 @@ static int __init i2o_proc_init(void)
 {
 	int rc;
 
+	printk(KERN_INFO OSM_DESCRIPTION " v" OSM_VERSION "\n");
+
 	rc = i2o_driver_register(&i2o_proc_driver);
 	if (rc)
 		return rc;
@@ -2101,8 +2104,9 @@ static void __exit i2o_proc_exit(void)
 };
 
 MODULE_AUTHOR("Deepak Saxena");
-MODULE_DESCRIPTION("I2O procfs Handler");
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION(OSM_DESCRIPTION);
+MODULE_VERSION(OSM_VERSION);
 
 module_init(i2o_proc_init);
 module_exit(i2o_proc_exit);

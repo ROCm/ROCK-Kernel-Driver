@@ -4,8 +4,6 @@
 
 #include <asm-generic/sections.h>
 
-extern char _end[];
-
 #define __pmac __attribute__ ((__section__ (".pmac.text")))
 #define __pmacdata __attribute__ ((__section__ (".pmac.data")))
 #define __pmacfunc(__argpmac) \

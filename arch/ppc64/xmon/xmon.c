@@ -26,12 +26,12 @@
 #include <asm/pgtable.h>
 #include <asm/mmu.h>
 #include <asm/mmu_context.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
 #include <asm/rtas.h>
 #include <asm/sstep.h>
+#include <asm/bug.h>
 
 #include "nonstdio.h"
 #include "privinst.h"
@@ -50,6 +50,7 @@ static unsigned long in_xmon = 0;
 
 static unsigned long adrs;
 static int size = 1;
+#define MAX_DUMP (128 * 1024)
 static unsigned long ndump = 64;
 static unsigned long nidump = 16;
 static unsigned long ncsum = 4096;
@@ -146,8 +147,6 @@ extern int setjmp(long *);
 extern void longjmp(long *, int);
 extern unsigned long _ASR;
 
-pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
-
 #define GETWORD(v)	(((v)[0] << 24) + ((v)[1] << 16) + ((v)[2] << 8) + (v)[3])
 
 #define isxdigit(c)	(('0' <= (c) && (c) <= '9') \
@@ -227,17 +226,6 @@ extern inline void sync(void)
  Note that the LR (ret addr) may not be saved in the current frame if
  no functions have been called from the current function.
  */
-
-/*
- * We don't allow single-stepping an mtmsrd that would clear
- * MSR_RI, since that would make the exception unrecoverable.
- * Since we need to single-step to proceed from a breakpoint,
- * we don't allow putting a breakpoint on an mtmsrd instruction.
- * Similarly we don't allow breakpoints on rfid instructions.
- * These macros tell us if an instruction is a mtmsrd or rfid.
- */
-#define IS_MTMSRD(instr)	(((instr) & 0xfc0007fe) == 0x7c000164)
-#define IS_RFID(instr)		(((instr) & 0xfc0007fe) == 0x4c000024)
 
 /*
  * Disable surveillance (the service processor watchdog function)
@@ -1332,6 +1320,26 @@ static void backtrace(struct pt_regs *excp)
 	scannl();
 }
 
+static void print_bug_trap(struct pt_regs *regs)
+{
+	struct bug_entry *bug;
+	unsigned long addr;
+
+	if (regs->msr & MSR_PR)
+		return;		/* not in kernel */
+	addr = regs->nip;	/* address of trap instruction */
+	if (addr < PAGE_OFFSET)
+		return;
+	bug = find_bug(regs->nip);
+	if (bug == NULL)
+		return;
+	if (bug->line & BUG_WARNING_TRAP)
+		return;
+
+	printf("kernel BUG in %s at %s:%d!\n",
+	       bug->function, bug->file, (unsigned int)bug->line);
+}
+
 void excprint(struct pt_regs *fp)
 {
 	unsigned long trap;
@@ -1363,6 +1371,9 @@ void excprint(struct pt_regs *fp)
 		printf("    pid   = %ld, comm = %s\n",
 		       current->pid, current->comm);
 	}
+
+	if (trap == 0x700)
+		print_bug_trap(fp);
 }
 
 void prregs(struct pt_regs *fp)
@@ -1455,7 +1466,17 @@ read_spr(int n)
 	store_inst(instrs+1);
 	code = (unsigned long (*)(void)) opd;
 
-	ret = code();
+	if (setjmp(bus_error_jmp) == 0) {
+		catch_memory_errors = 1;
+		sync();
+
+		ret = code();
+
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
+		n = size;
+	}
 
 	return ret;
 }
@@ -1476,7 +1497,17 @@ write_spr(int n, unsigned long val)
 	store_inst(instrs+1);
 	code = (unsigned long (*)(unsigned long)) opd;
 
-	code(val);
+	if (setjmp(bus_error_jmp) == 0) {
+		catch_memory_errors = 1;
+		sync();
+
+		code(val);
+
+		sync();
+		/* wait a little while to see if we get a machine check */
+		__delay(200);
+		n = size;
+	}
 }
 
 static unsigned long regno;
@@ -1490,7 +1521,7 @@ super_regs(void)
 	unsigned long val;
 #ifdef CONFIG_PPC_ISERIES
 	struct paca_struct *ptrPaca = NULL;
-	struct ItLpPaca *ptrLpPaca = NULL;
+	struct lppaca *ptrLpPaca = NULL;
 	struct ItLpRegSave *ptrLpRegSave = NULL;
 #endif
 
@@ -1514,10 +1545,10 @@ super_regs(void)
 		printf("  Local Processor Control Area (LpPaca): \n");
 		ptrLpPaca = ptrPaca->lppaca_ptr;
 		printf("    Saved Srr0=%.16lx  Saved Srr1=%.16lx \n",
-		       ptrLpPaca->xSavedSrr0, ptrLpPaca->xSavedSrr1);
+		       ptrLpPaca->saved_srr0, ptrLpPaca->saved_srr1);
 		printf("    Saved Gpr3=%.16lx  Saved Gpr4=%.16lx \n",
-		       ptrLpPaca->xSavedGpr3, ptrLpPaca->xSavedGpr4);
-		printf("    Saved Gpr5=%.16lx \n", ptrLpPaca->xSavedGpr5);
+		       ptrLpPaca->saved_gpr3, ptrLpPaca->saved_gpr4);
+		printf("    Saved Gpr5=%.16lx \n", ptrLpPaca->saved_gpr5);
     
 		printf("  Local Processor Register Save Area (LpRegSave): \n");
 		ptrLpRegSave = ptrPaca->reg_save_ptr;
@@ -1895,18 +1926,22 @@ dump(void)
 	if ((isxdigit(c) && c != 'f' && c != 'd') || c == '\n')
 		termch = c;
 	scanhex((void *)&adrs);
-	if( termch != '\n')
+	if (termch != '\n')
 		termch = 0;
-	if( c == 'i' ){
+	if (c == 'i') {
 		scanhex(&nidump);
-		if( nidump == 0 )
+		if (nidump == 0)
 			nidump = 16;
+		else if (nidump > MAX_DUMP)
+			nidump = MAX_DUMP;
 		adrs += ppc_inst_dump(adrs, nidump, 1);
 		last_cmd = "di\n";
 	} else {
 		scanhex(&ndump);
-		if( ndump == 0 )
+		if (ndump == 0)
 			ndump = 64;
+		else if (ndump > MAX_DUMP)
+			ndump = MAX_DUMP;
 		prdump(adrs, ndump);
 		adrs += ndump;
 		last_cmd = "d\n";
@@ -2360,9 +2395,9 @@ static void debug_trace(void)
 	if (cmd == '\n') {
 		/* show current state */
 		unsigned long i;
-		printf("naca->debug_switch = 0x%lx\n", naca->debug_switch);
+		printf("ppc64_debug_switch = 0x%lx\n", ppc64_debug_switch);
 		for (i = 0; i < PPCDBG_NUM_FLAGS ;i++) {
-			on = PPCDBG_BITVAL(i) & naca->debug_switch;
+			on = PPCDBG_BITVAL(i) & ppc64_debug_switch;
 			printf("%02x %s %12s   ", i, on ? "on " : "off",  trace_names[i] ? trace_names[i] : "");
 			if (((i+1) % 3) == 0)
 				printf("\n");
@@ -2376,7 +2411,7 @@ static void debug_trace(void)
 			on = (cmd == '+');
 			cmd = inchar();
 			if (cmd == ' ' || cmd == '\n') {  /* Turn on or off based on + or - */
-				naca->debug_switch = on ? PPCDBG_ALL:PPCDBG_NONE;
+				ppc64_debug_switch = on ? PPCDBG_ALL:PPCDBG_NONE;
 				printf("Setting all values to %s...\n", on ? "on" : "off");
 				if (cmd == '\n') return;
 				else cmd = skipbl(); 
@@ -2391,10 +2426,10 @@ static void debug_trace(void)
 			return;
 		}
 		if (on) {
-			naca->debug_switch |= PPCDBG_BITVAL(val);
+			ppc64_debug_switch |= PPCDBG_BITVAL(val);
 			printf("enable debug %x %s\n", val, trace_names[val] ? trace_names[val] : "");
 		} else {
-			naca->debug_switch &= ~PPCDBG_BITVAL(val);
+			ppc64_debug_switch &= ~PPCDBG_BITVAL(val);
 			printf("disable debug %x %s\n", val, trace_names[val] ? trace_names[val] : "");
 		}
 		cmd = skipbl();

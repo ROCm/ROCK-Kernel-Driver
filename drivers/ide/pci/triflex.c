@@ -158,9 +158,7 @@ static ide_pci_device_t triflex_device __devinitdata = {
 static int __devinit triflex_init_one(struct pci_dev *dev, 
 		const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &triflex_device);
-
-	return 0;
+	return ide_setup_pci_device(dev, &triflex_device);
 }
 
 static struct pci_device_id triflex_pci_tbl[] = {

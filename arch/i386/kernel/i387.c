@@ -60,8 +60,7 @@ void init_fpu(struct task_struct *tsk)
 		tsk->thread.i387.fsave.twd = 0xffffffffu;
 		tsk->thread.i387.fsave.fos = 0xffff0000u;
 	}
-	/* only the device not available exception or ptrace can call init_fpu */
-	set_stopped_child_used_math(tsk);
+	tsk->used_math = 1;
 }
 
 /*
@@ -112,16 +111,17 @@ static inline unsigned short twd_i387_to_fxsr( unsigned short twd )
 static inline unsigned long twd_fxsr_to_i387( struct i387_fxsave_struct *fxsave )
 {
 	struct _fpxreg *st = NULL;
+	unsigned long tos = (fxsave->swd >> 11) & 7;
 	unsigned long twd = (unsigned long) fxsave->twd;
 	unsigned long tag;
 	unsigned long ret = 0xffff0000u;
 	int i;
 
-#define FPREG_ADDR(f, n)	((char *)&(f)->st_space + (n) * 16);
+#define FPREG_ADDR(f, n)	((void *)&(f)->st_space + (n) * 16);
 
 	for ( i = 0 ; i < 8 ; i++ ) {
 		if ( twd & 0x1 ) {
-			st = (struct _fpxreg *) FPREG_ADDR( fxsave, i );
+			st = FPREG_ADDR( fxsave, (i - tos) & 7 );
 
 			switch ( st->exponent & 0x7fff ) {
 			case 0x7fff:
@@ -331,13 +331,13 @@ static int save_i387_fxsave( struct _fpstate __user *buf )
 
 int save_i387( struct _fpstate __user *buf )
 {
-	if ( !used_math() )
+	if ( !current->used_math )
 		return 0;
 
 	/* This will cause a "finit" to be triggered by the next
 	 * attempted FPU operation by the 'current' process.
 	 */
-	clear_used_math();
+	current->used_math = 0;
 
 	if ( HAVE_HWFP ) {
 		if ( cpu_has_fxsr ) {
@@ -383,7 +383,7 @@ int restore_i387( struct _fpstate __user *buf )
 	} else {
 		err = restore_i387_soft( &current->thread.i387.soft, buf );
 	}
-	set_used_math();
+	current->used_math = 1;
 	return err;
 }
 
@@ -507,7 +507,7 @@ int dump_fpu( struct pt_regs *regs, struct user_i387_struct *fpu )
 	int fpvalid;
 	struct task_struct *tsk = current;
 
-	fpvalid = !!used_math();
+	fpvalid = tsk->used_math;
 	if ( fpvalid ) {
 		unlazy_fpu( tsk );
 		if ( cpu_has_fxsr ) {
@@ -522,7 +522,7 @@ int dump_fpu( struct pt_regs *regs, struct user_i387_struct *fpu )
 
 int dump_task_fpu(struct task_struct *tsk, struct user_i387_struct *fpu)
 {
-	int fpvalid = !!tsk_used_math(tsk);
+	int fpvalid = tsk->used_math;
 
 	if (fpvalid) {
 		if (tsk == current)
@@ -537,7 +537,7 @@ int dump_task_fpu(struct task_struct *tsk, struct user_i387_struct *fpu)
 
 int dump_task_extended_fpu(struct task_struct *tsk, struct user_fxsr_struct *fpu)
 {
-	int fpvalid = tsk_used_math(tsk) && cpu_has_fxsr;
+	int fpvalid = tsk->used_math && cpu_has_fxsr;
 
 	if (fpvalid) {
 		if (tsk == current)

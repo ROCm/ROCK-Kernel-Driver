@@ -44,9 +44,6 @@
 #include <linux/smp_lock.h>
 #include <linux/irq.h>
 #include <linux/bootmem.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 #include <linux/delay.h>
 #include <linux/mc146818rtc.h>
@@ -64,6 +61,7 @@ static int __initdata smp_b_stepping;
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
 int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
+EXPORT_SYMBOL(phys_proc_id);
 
 /* bitmap of online cpus */
 cpumask_t cpu_online_map;
@@ -405,11 +403,6 @@ void __init smp_callin(void)
 	 */
 	cpu_set(cpuid, cpu_callin_map);
 
-#ifdef	CONFIG_KDB
-	/* Activate any preset global breakpoints on this cpu */
-	kdb(KDB_REASON_SILENT, 0, 0);
-#endif	/* CONFIG_KDB */
-
 	/*
 	 *      Synchronize the TSC with the BP
 	 */
@@ -419,12 +412,10 @@ void __init smp_callin(void)
 
 int cpucount;
 
-extern int cpu_idle(void);
-
 /*
  * Activate a secondary processor.
  */
-int __init start_secondary(void *unused)
+static void __init start_secondary(void *unused)
 {
 	/*
 	 * Dont put anything before smp_callin(), SMP
@@ -449,7 +440,7 @@ int __init start_secondary(void *unused)
 	local_flush_tlb();
 	cpu_set(smp_processor_id(), cpu_online_map);
 	wmb();
-	return cpu_idle();
+	cpu_idle();
 }
 
 /*

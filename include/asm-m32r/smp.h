@@ -92,7 +92,6 @@ static __inline__ unsigned int num_booting_cpus(void)
 }
 
 extern void smp_send_timer(void);
-extern void calibrate_delay(void);
 extern unsigned long send_IPI_mask_phys(cpumask_t, int, int);
 
 #endif	/* not __ASSEMBLY__ */

@@ -51,9 +51,6 @@
 */
 #define SIS96x_VERSION "1.0.0"
 
-/* SiS96x SMBus PCI device ID */
-#define PCI_DEVICE_ID_SI_SMBUS 0x16
-
 /* base address register in PCI config space */
 #define SIS96x_BAR 0x04
 
@@ -267,14 +264,7 @@ static struct i2c_adapter sis96x_adapter = {
 };
 
 static struct pci_device_id sis96x_ids[] = {
-
-	{
-		.vendor	=	PCI_VENDOR_ID_SI,
-		.device =	PCI_DEVICE_ID_SI_SMBUS,
-		.subvendor =	PCI_ANY_ID,
-		.subdevice =	PCI_ANY_ID,
-	},
-
+	{ PCI_DEVICE(PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_SMBUS) },
 	{ 0, }
 };
 

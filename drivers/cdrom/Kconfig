@@ -18,7 +18,7 @@ config CD_NO_IDESCSI
 	  have, say Y and find out whether you have one of the following
 	  drives.
 
-	  For each of these drivers, a file Documentation/cdrom/{driver_name}
+	  For each of these drivers, a <file:Documentation/cdrom/{driver_name}>
 	  exists. Especially in cases where you do not know exactly which kind
 	  of drive you have you should read there. Most of these drivers use a
 	  file drivers/cdrom/{driver_name}.h where you can define your

@@ -5,7 +5,7 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-static void init_setup_opti621(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_opti621(struct pci_dev *, ide_pci_device_t *);
 static void init_hwif_opti621(ide_hwif_t *);
 
 static ide_pci_device_t opti621_chipsets[] __devinitdata = {

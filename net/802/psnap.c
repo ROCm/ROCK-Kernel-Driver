@@ -22,7 +22,7 @@
 #include <linux/init.h>
 
 static LIST_HEAD(snap_list);
-static spinlock_t snap_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(snap_lock);
 static struct llc_sap *snap_sap;
 
 /*

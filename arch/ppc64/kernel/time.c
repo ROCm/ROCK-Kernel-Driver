@@ -66,8 +66,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/prom.h>
 #include <asm/sections.h>
-
-void smp_local_timer_interrupt(struct pt_regs *);
+#include <asm/systemcfg.h>
 
 u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
 
@@ -143,16 +142,54 @@ static __inline__ void timer_check_rtc(void)
         }
 }
 
+/*
+ * This version of gettimeofday has microsecond resolution.
+ */
+static inline void __do_gettimeofday(struct timeval *tv, unsigned long tb_val)
+{
+	unsigned long sec, usec, tb_ticks;
+	unsigned long xsec, tb_xsec;
+	struct gettimeofday_vars * temp_varp;
+	unsigned long temp_tb_to_xs, temp_stamp_xsec;
+
+	/*
+	 * These calculations are faster (gets rid of divides)
+	 * if done in units of 1/2^20 rather than microseconds.
+	 * The conversion to microseconds at the end is done
+	 * without a divide (and in fact, without a multiply)
+	 */
+	tb_ticks = tb_val - do_gtod.tb_orig_stamp;
+	temp_varp = do_gtod.varp;
+	temp_tb_to_xs = temp_varp->tb_to_xs;
+	temp_stamp_xsec = temp_varp->stamp_xsec;
+	tb_xsec = mulhdu( tb_ticks, temp_tb_to_xs );
+	xsec = temp_stamp_xsec + tb_xsec;
+	sec = xsec / XSEC_PER_SEC;
+	xsec -= sec * XSEC_PER_SEC;
+	usec = (xsec * USEC_PER_SEC)/XSEC_PER_SEC;
+
+	tv->tv_sec = sec;
+	tv->tv_usec = usec;
+}
+
+void do_gettimeofday(struct timeval *tv)
+{
+	__do_gettimeofday(tv, get_tb());
+}
+
+EXPORT_SYMBOL(do_gettimeofday);
+
 /* Synchronize xtime with do_gettimeofday */ 
 
-static __inline__ void timer_sync_xtime( unsigned long cur_tb )
+static inline void timer_sync_xtime(unsigned long cur_tb)
 {
 	struct timeval my_tv;
 
-	if ( cur_tb > next_xtime_sync_tb ) {
+	if (cur_tb > next_xtime_sync_tb) {
 		next_xtime_sync_tb = cur_tb + xtime_sync_interval;
-		do_gettimeofday( &my_tv );
-		if ( xtime.tv_sec <= my_tv.tv_sec ) {
+		__do_gettimeofday(&my_tv, cur_tb);
+
+		if (xtime.tv_sec <= my_tv.tv_sec) {
 			xtime.tv_sec = my_tv.tv_sec;
 			xtime.tv_nsec = my_tv.tv_usec * 1000;
 		}
@@ -229,7 +266,7 @@ static void iSeries_tb_recal(void)
 /*
  * For iSeries shared processors, we have to let the hypervisor
  * set the hardware decrementer.  We set a virtual decrementer
- * in the ItLpPaca and call the hypervisor if the virtual
+ * in the lppaca and call the hypervisor if the virtual
  * decrementer is less than the current value in the hardware
  * decrementer. (almost always the new decrementer value will
  * be greater than the current hardware decementer so the hypervisor
@@ -255,11 +292,9 @@ int timer_interrupt(struct pt_regs * regs)
 	profile_tick(CPU_PROFILING, regs);
 #endif
 
-	lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;
+	lpaca->lppaca.int_dword.fields.decr_int = 0;
 
 	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
-
-#ifdef CONFIG_SMP
 		/*
 		 * We cannot disable the decrementer, so in the period
 		 * between this cpu's being marked offline in cpu_online_map
@@ -268,8 +303,7 @@ int timer_interrupt(struct pt_regs * regs)
 		 * is the case.
 		 */
 		if (!cpu_is_offline(cpu))
-			smp_local_timer_interrupt(regs);
-#endif
+			update_process_times(user_mode(regs));
 		/*
 		 * No need to check whether cpu is offline here; boot_cpuid
 		 * should have been fixed up by now.
@@ -278,10 +312,7 @@ int timer_interrupt(struct pt_regs * regs)
 			write_seqlock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;
 			do_timer(regs);
-#ifndef CONFIG_SMP
-			update_process_times(user_mode(regs));
-#endif
-			timer_sync_xtime( cur_tb );
+			timer_sync_xtime(lpaca->next_jiffy_update_tb);
 			timer_check_rtc();
 			write_sequnlock(&xtime_lock);
 			if ( adjusting_time && (time_adjust == 0) )
@@ -319,36 +350,6 @@ unsigned long long sched_clock(void)
 {
 	return mulhdu(get_tb(), tb_to_ns_scale) << tb_to_ns_shift;
 }
-
-/*
- * This version of gettimeofday has microsecond resolution.
- */
-void do_gettimeofday(struct timeval *tv)
-{
-        unsigned long sec, usec, tb_ticks;
-	unsigned long xsec, tb_xsec;
-	struct gettimeofday_vars * temp_varp;
-	unsigned long temp_tb_to_xs, temp_stamp_xsec;
-
-	/* These calculations are faster (gets rid of divides)
-	 * if done in units of 1/2^20 rather than microseconds.
-	 * The conversion to microseconds at the end is done
-	 * without a divide (and in fact, without a multiply) */
-	tb_ticks = get_tb() - do_gtod.tb_orig_stamp;
-	temp_varp = do_gtod.varp;
-	temp_tb_to_xs = temp_varp->tb_to_xs;
-	temp_stamp_xsec = temp_varp->stamp_xsec;
-	tb_xsec = mulhdu( tb_ticks, temp_tb_to_xs );
-	xsec = temp_stamp_xsec + tb_xsec;
-	sec = xsec / XSEC_PER_SEC;
-	xsec -= sec * XSEC_PER_SEC;
-	usec = (xsec * USEC_PER_SEC)/XSEC_PER_SEC;
-
-        tv->tv_sec = sec;
-        tv->tv_usec = usec;
-}
-
-EXPORT_SYMBOL(do_gettimeofday);
 
 int do_settimeofday(struct timespec *tv)
 {
@@ -424,60 +425,6 @@ int do_settimeofday(struct timespec *tv)
 }
 
 EXPORT_SYMBOL(do_settimeofday);
-
-/*
- * This function is a copy of the architecture independent function
- * but which calls do_settimeofday rather than setting the xtime
- * fields itself.  This way, the fields which are used for 
- * do_settimeofday get updated too.
- */
-long ppc64_sys32_stime(int __user * tptr)
-{
-	int value;
-	struct timespec myTimeval;
-	int err;
-
-	if (get_user(value, tptr))
-		return -EFAULT;
-
-	myTimeval.tv_sec = value;
-	myTimeval.tv_nsec = 0;
-
-	err = security_settime(&myTimeval, NULL);
-	if (err)
-		return err;
-
-	do_settimeofday(&myTimeval);
-
-	return 0;
-}
-
-/*
- * This function is a copy of the architecture independent function
- * but which calls do_settimeofday rather than setting the xtime
- * fields itself.  This way, the fields which are used for 
- * do_settimeofday get updated too.
- */
-long ppc64_sys_stime(long __user * tptr)
-{
-	long value;
-	struct timespec myTimeval;
-	int err;
-
-	if (get_user(value, tptr))
-		return -EFAULT;
-
-	myTimeval.tv_sec = value;
-	myTimeval.tv_nsec = 0;
-
-	err = security_settime(&myTimeval, NULL);
-	if (err)
-		return err;
-
-	do_settimeofday(&myTimeval);
-
-	return 0;
-}
 
 void __init time_init(void)
 {

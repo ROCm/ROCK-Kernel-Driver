@@ -152,7 +152,6 @@ extern int zft_volume_table_changed;
 /* exported functions */
 extern void  zft_init_vtbl             (void);
 extern void  zft_free_vtbl             (void);
-extern void  zft_new_vtbl_entry        (void);
 extern int   zft_extract_volume_headers(__u8 *buffer);
 extern int   zft_update_volume_table   (unsigned int segment);
 extern int   zft_open_volume           (zft_position *pos,

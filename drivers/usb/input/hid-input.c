@@ -564,9 +564,9 @@ int hidinput_connect(struct hid_device *hid)
 				hidinput->input.phys = hid->phys;
 				hidinput->input.uniq = hid->uniq;
 				hidinput->input.id.bustype = BUS_USB;
-				hidinput->input.id.vendor = dev->descriptor.idVendor;
-				hidinput->input.id.product = dev->descriptor.idProduct;
-				hidinput->input.id.version = dev->descriptor.bcdDevice;
+				hidinput->input.id.vendor = le16_to_cpu(dev->descriptor.idVendor);
+				hidinput->input.id.product = le16_to_cpu(dev->descriptor.idProduct);
+				hidinput->input.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 				hidinput->input.dev = &hid->intf->dev;
 			}
 

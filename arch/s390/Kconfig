@@ -14,6 +14,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 config GENERIC_BUST_SPINLOCK
 	bool
 
@@ -81,7 +85,8 @@ config NR_CPUS
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
-	depends on SMP && HOTPLUG && EXPERIMENTAL
+	depends on SMP && EXPERIMENTAL
+	select HOTPLUG
 	default n
 	help
 	  Say Y here to experiment with turning CPUs off and on.  CPUs
@@ -361,6 +366,13 @@ config VIRT_TIMER
 	help
 	  This provides a kernel interface for virtual CPU timers.
 	  Default is disabled.
+
+config VIRT_CPU_ACCOUNTING
+	bool "Base user process accounting on virtual cpu timer"
+	depends on VIRT_TIMER
+	help
+	  Select this option to use CPU timer deltas to do user
+	  process accounting.
 
 config APPLDATA_BASE
 	bool "Linux - VM Monitor Stream, base infrastructure"

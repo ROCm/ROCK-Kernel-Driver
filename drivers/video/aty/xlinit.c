@@ -105,19 +105,6 @@ static const lcd_tbl_t lcd_tbl[] = {
 	{ 0x37,	0x00000000 }
 };
 
-static inline u32 aty_ld_lcd(u8 lcd_reg, struct atyfb_par *par)
-{
-	aty_st_8(LCD_INDEX, lcd_reg, par);
-	return aty_ld_le32(LCD_DATA, par);
-}
-
-static inline void aty_st_lcd(u8 lcd_reg, u32 val,
-			      struct atyfb_par *par)
-{
-	aty_st_8(LCD_INDEX, lcd_reg, par);
-	aty_st_le32(LCD_DATA, val, par);
-}
-
 static void reset_gui(struct atyfb_par *par)
 {
 	aty_st_8(GEN_TEST_CNTL+1, 0x01, par);
@@ -205,7 +192,7 @@ int atyfb_xl_init(struct fb_info *info)
 		// the MCLK, XCLK are 120MHz on victoria card
 		par->mclk_per = 1000000/120;
 		par->xclk_per = 1000000/120;
-		par->features &= ~M64F_MFB_TIMES_4;
+		par->features &= ~M64F_MFB_FORCE_4;
 	}
 	
 	/*

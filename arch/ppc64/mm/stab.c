@@ -17,7 +17,6 @@
 #include <asm/mmu.h>
 #include <asm/mmu_context.h>
 #include <asm/paca.h>
-#include <asm/naca.h>
 #include <asm/cputable.h>
 
 /* Both the segment table and SLB code uses the following cache */

@@ -48,6 +48,5 @@ static int cs46xx_resume_tbl(struct pci_dev *pcidev);
 #define CS46XX_SUSPEND_TBL cs46xx_null
 #define CS46XX_RESUME_TBL cs46xx_null
 #endif
-int cs46xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data);
 
 #endif

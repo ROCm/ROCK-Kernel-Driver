@@ -202,7 +202,7 @@ restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t __user *fpu)
 		regs->psr &= ~PSR_EF;
 	}
 #endif
-	set_used_math();
+	current->used_math = 1;
 	clear_tsk_thread_flag(current, TIF_USEDFPU);
 
 	if (verify_area(VERIFY_READ, fpu, sizeof(*fpu)))
@@ -584,7 +584,7 @@ save_fpu_state(struct pt_regs *regs, __siginfo_fpu_t __user *fpu)
 				      &current->thread.fpqueue[0],
 				      ((sizeof(unsigned long) +
 				      (sizeof(unsigned long *)))*16));
-	clear_used_math();
+	current->used_math = 0;
 	return err;
 }
 
@@ -599,7 +599,7 @@ new_setup_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	synchronize_user_stack();
 
 	sigframe_size = NF_ALIGNEDSZ;
-	if (!used_math())
+	if (!current->used_math)
 		sigframe_size -= sizeof(__siginfo_fpu_t);
 
 	sf = (struct new_signal_frame __user *)
@@ -616,7 +616,7 @@ new_setup_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	
 	err |= __put_user(0, &sf->extra_size);
 
-	if (used_math()) {
+	if (current->used_math) {
 		err |= save_fpu_state(regs, &sf->fpu_state);
 		err |= __put_user(&sf->fpu_state, &sf->fpu_save);
 	} else {
@@ -677,7 +677,7 @@ new_setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 
 	synchronize_user_stack();
 	sigframe_size = RT_ALIGNEDSZ;
-	if (!used_math())
+	if (!current->used_math)
 		sigframe_size -= sizeof(__siginfo_fpu_t);
 	sf = (struct rt_signal_frame __user *)
 		get_sigframe(&ka->sa, regs, sigframe_size);
@@ -690,7 +690,7 @@ new_setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	err |= __put_user(regs->npc, &sf->regs.npc);
 	err |= __put_user(regs->y, &sf->regs.y);
 	psr = regs->psr;
-	if (used_math())
+	if (current->used_math)
 		psr |= PSR_EF;
 	err |= __put_user(psr, &sf->regs.psr);
 	err |= __copy_to_user(&sf->regs.u_regs, regs->u_regs, sizeof(regs->u_regs));
@@ -1016,6 +1016,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 
 sigsegv_and_return:
 	force_sig(SIGSEGV, current);
+	return -EFAULT;
 }
 
 static inline void

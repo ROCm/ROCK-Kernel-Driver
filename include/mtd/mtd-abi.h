@@ -1,5 +1,5 @@
 /*
- * $Id: mtd-abi.h,v 1.6 2004/08/09 13:38:30 dwmw2 Exp $
+ * $Id: mtd-abi.h,v 1.7 2004/11/23 15:37:32 gleixner Exp $
  *
  * Portions of MTD ABI definition which are shared by kernel and user space 
  */
@@ -40,6 +40,7 @@ struct mtd_oob_buf {
 #define MTD_XIP			32	// eXecute-In-Place possible
 #define MTD_OOB			64	// Out-of-band data (NAND flash)
 #define MTD_ECC			128	// Device capable of automatic ECC
+#define MTD_NO_VIRTBLOCKS	256	// Virtual blocks not allowed
 
 // Some common devices / combinations of capabilities
 #define MTD_CAP_ROM		0

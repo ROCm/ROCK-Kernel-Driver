@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.93 $"
+#define VERSION_QDIO_C "$Revision: 1.98 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -2043,6 +2043,7 @@ tiqdio_check_chsc_availability(void)
 				"installed.\n");
 		return -ENOENT;
 	}
+
 	/* Check for bits 107 and 108. */
 	if (!css_chsc_characteristics.scssc ||
 	    !css_chsc_characteristics.scsscf) {
@@ -2132,7 +2133,11 @@ tiqdio_set_subchannel_ind(struct qdio_irq *irq_ptr, int reset_to_zero)
 	/* enables the time delay disablement facility. Don't care
 	 * whether it is really there (i.e. we haven't checked for
 	 * it) */
-	scssc_area->word_with_d_bit = 0x10000000;
+	if (css_general_characteristics.aif_tdd)
+		scssc_area->word_with_d_bit = 0x10000000;
+	else
+		QDIO_PRINT_WARN("Time delay disablement facility " \
+				"not available\n");
 
 
 
@@ -2319,6 +2324,15 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 	}
 	if (rc == -ENODEV) {
 		/* No need to wait for device no longer present. */
+		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_INACTIVE);
+		spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
+	} else if (((void *)cdev->handler != (void *)qdio_handler) && rc == 0) {
+		/*
+		 * Whoever put another handler there, has to cope with the
+		 * interrupt theirself. Might happen if qdio_shutdown was
+		 * called on already shutdown queues, but this shouldn't have
+		 * bad side effects.
+		 */
 		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_INACTIVE);
 		spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
 	} else if (rc == 0) {

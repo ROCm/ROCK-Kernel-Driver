@@ -39,7 +39,7 @@
 #define LOCKD_BUFSIZE		(1024 + NLMSVC_XDRSIZE)
 #define ALLOWED_SIGS		(sigmask(SIGKILL))
 
-extern struct svc_program	nlmsvc_program;
+static struct svc_program	nlmsvc_program;
 extern struct svc_program	nsmsvc_program;
 
 struct nlmsvc_binding *		nlmsvc_ops;
@@ -217,32 +217,6 @@ lockd(struct svc_rqst *rqstp)
 	unlock_kernel();
 	module_put_and_exit(0);
 }
-
-static int
-lockd_rqst_needs_auth(struct svc_rqst *rqstp)
-{
-	u32 proc = rqstp->rq_proc;
-
-	if (proc == 0
-	 || proc == NLMPROC_GRANTED
-	 || proc == NLMPROC_TEST_RES
-	 || proc == NLMPROC_LOCK_RES
-	 || proc == NLMPROC_CANCEL_RES
-	 || proc == NLMPROC_UNLOCK_RES
-	 || proc == NLMPROC_GRANTED_MSG
-	 || proc == NLMPROC_NSM_NOTIFY)
-		return 0;
-	return 1;
-}
-
-#ifdef CONFIG_STATD
-static int
-statd_rqst_needs_auth(struct svc_rqst *rqstp)
-{
-	/* statd is unauthenticated */
-	return 0;
-}
-#endif
 
 /*
  * Bring up the lockd process if it's not already up.
@@ -534,15 +508,13 @@ static struct svc_version *	nlmsvc_version[] = {
 static struct svc_stat		nlmsvc_stats;
 
 #define NLM_NRVERS	(sizeof(nlmsvc_version)/sizeof(nlmsvc_version[0]))
-struct svc_program	nlmsvc_program = {
-	.pg_prog	= NLM_PROGRAM,		/* program number */
-	.pg_nvers	= NLM_NRVERS,		/* number of entries in nlmsvc_version */
-	.pg_vers	= nlmsvc_version,	/* version table */
-	.pg_name	= "lockd",		/* service name */
-	.pg_class	= "nfsd",		/* share authentication with nfsd */
-	.pg_stats	= &nlmsvc_stats,	/* stats table */
-
- 	.pg_need_auth	= lockd_rqst_needs_auth,
+static struct svc_program	nlmsvc_program = {
+	.pg_prog		= NLM_PROGRAM,		/* program number */
+	.pg_nvers		= NLM_NRVERS,		/* number of entries in nlmsvc_version */
+	.pg_vers		= nlmsvc_version,	/* version table */
+	.pg_name		= "lockd",		/* service name */
+	.pg_class		= "nfsd",		/* share authentication with nfsd */
+	.pg_stats		= &nlmsvc_stats,	/* stats table */
 };
 
 #ifdef CONFIG_STATD
@@ -570,8 +542,6 @@ struct svc_program	nsmsvc_program = {
 	.pg_name	= "statd",		/* service name */
 	.pg_class	= "nfsd",		/* share authentication with nfsd */
 	.pg_stats	= &nsmsvc_stats,	/* stats table */
-
-	.pg_need_auth	= statd_rqst_needs_auth,
 };
 #endif
 

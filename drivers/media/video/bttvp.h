@@ -90,7 +90,6 @@ struct bttv_tvnorm {
 	int   sram;
 };
 extern const struct bttv_tvnorm bttv_tvnorms[];
-extern const unsigned int BTTV_TVNORMS;
 
 struct bttv_format {
 	char *name;
@@ -102,8 +101,6 @@ struct bttv_format {
 	int  flags;
 	int  hshift,vshift;   /* for planar modes   */
 };
-extern const struct bttv_format bttv_formats[];
-extern const unsigned int BTTV_FORMATS;
 
 /* ---------------------------------------------------------- */
 
@@ -174,22 +171,6 @@ int bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 		     struct scatterlist *sglist,
 		     unsigned int offset, unsigned int bpl,
 		     unsigned int pitch, unsigned int lines);
-int bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
-		     struct scatterlist *sglist,
-		     unsigned int yoffset,  unsigned int ybpl,
-		     unsigned int ypadding, unsigned int ylines,
-		     unsigned int uoffset,  unsigned int voffset,
-		     unsigned int hshift,   unsigned int vshift,
-		     unsigned int cpadding);
-int bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
-		      const struct bttv_format *fmt,
-		      struct bttv_overlay *ov,
-		      int skip_top, int skip_bottom);
-
-/* calculate / apply geometry settings */
-void bttv_calc_geo(struct bttv *btv, struct bttv_geometry *geo,
-		   int width, int height, int interleaved, int norm);
-void bttv_apply_geo(struct bttv *btv, struct bttv_geometry *geo, int top);
 
 /* control dma register + risc main loop */
 void bttv_set_dma(struct bttv *btv, int override);

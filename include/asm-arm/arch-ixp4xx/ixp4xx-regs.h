@@ -43,6 +43,10 @@
  * 0xC8000000	0x0000C000	0xffbf2000	On-Chip Peripherals
  */
 
+/*
+ * Queue Manager
+ */
+#define IXP4XX_QMGR_BASE_PHYS		(0x60000000)
 
 /*
  * Expansion BUS Configuration registers
@@ -107,7 +111,9 @@
 #define IXP4XX_INTC_BASE_PHYS	(IXP4XX_PERIPHERAL_BASE_PHYS + 0x3000)
 #define IXP4XX_GPIO_BASE_PHYS	(IXP4XX_PERIPHERAL_BASE_PHYS + 0x4000)
 #define IXP4XX_TIMER_BASE_PHYS	(IXP4XX_PERIPHERAL_BASE_PHYS + 0x5000)
-#define IXP4XX_USB_BASE_PHYS	(IXP4XX_PERIPHERAL_BASE_PHYS + 0x5000)
+#define IXP4XX_EthA_BASE_PHYS	(IXP4XX_PERIPHERAL_BASE_PHYS + 0x9000)
+#define IXP4XX_EthB_BASE_PHYS	(IXP4XX_PERIPHERAL_BASE_PHYS + 0xA000)
+#define IXP4XX_USB_BASE_PHYS	(IXP4XX_PERIPHERAL_BASE_PHYS + 0xB000)
 
 #define IXP4XX_UART1_BASE_VIRT	(IXP4XX_PERIPHERAL_BASE_VIRT + 0x0000)
 #define IXP4XX_UART2_BASE_VIRT	(IXP4XX_PERIPHERAL_BASE_VIRT + 0x1000)
@@ -115,7 +121,9 @@
 #define IXP4XX_INTC_BASE_VIRT	(IXP4XX_PERIPHERAL_BASE_VIRT + 0x3000)
 #define IXP4XX_GPIO_BASE_VIRT	(IXP4XX_PERIPHERAL_BASE_VIRT + 0x4000)
 #define IXP4XX_TIMER_BASE_VIRT	(IXP4XX_PERIPHERAL_BASE_VIRT + 0x5000)
-#define IXP4XX_USB_BASE_VIRT	(IXP4XX_PERIPHERAL_BASE_VIRT + 0x5000)
+#define IXP4XX_EthA_BASE_VIRT	(IXP4XX_PERIPHERAL_BASE_VIRT + 0x9000)
+#define IXP4XX_EthB_BASE_VIRT	(IXP4XX_PERIPHERAL_BASE_VIRT + 0xA000)
+#define IXP4XX_USB_BASE_VIRT	(IXP4XX_PERIPHERAL_BASE_VIRT + 0xB000)
 
 /*
  * Constants to make it easy to access  Interrupt Controller registers
@@ -128,6 +136,17 @@
 #define IXP4XX_ICHR_OFFSET	0x14 /* Interrupt Priority */
 #define IXP4XX_ICIH_OFFSET	0x18 /* IRQ Highest Pri Int */
 #define IXP4XX_ICFH_OFFSET	0x1C /* FIQ Highest Pri Int */
+
+/*
+ * IXP465-only
+ */
+#define	IXP4XX_ICPR2_OFFSET	0x20 /* Interrupt Status 2 */
+#define	IXP4XX_ICMR2_OFFSET	0x24 /* Interrupt Enable 2 */
+#define	IXP4XX_ICLR2_OFFSET	0x28 /* Interrupt IRQ/FIQ Select 2 */
+#define IXP4XX_ICIP2_OFFSET     0x2C /* IRQ Status */
+#define IXP4XX_ICFP2_OFFSET	0x30 /* FIQ Status */
+#define IXP4XX_ICEEN_OFFSET	0x34 /* Error High Pri Enable */
+
 
 /*
  * Interrupt Controller Register Definitions.
@@ -143,6 +162,12 @@
 #define IXP4XX_ICHR     IXP4XX_INTC_REG(IXP4XX_ICHR_OFFSET)
 #define IXP4XX_ICIH     IXP4XX_INTC_REG(IXP4XX_ICIH_OFFSET) 
 #define IXP4XX_ICFH     IXP4XX_INTC_REG(IXP4XX_ICFH_OFFSET)
+#define IXP4XX_ICPR2	IXP4XX_INTC_REG(IXP4XX_ICPR2_OFFSET)
+#define IXP4XX_ICMR2    IXP4XX_INTC_REG(IXP4XX_ICMR2_OFFSET)
+#define IXP4XX_ICLR2    IXP4XX_INTC_REG(IXP4XX_ICLR2_OFFSET)
+#define IXP4XX_ICIP2    IXP4XX_INTC_REG(IXP4XX_ICIP2_OFFSET)
+#define IXP4XX_ICFP2    IXP4XX_INTC_REG(IXP4XX_ICFP2_OFFSET)
+#define IXP4XX_ICEEN    IXP4XX_INTC_REG(IXP4XX_ICEEN_OFFSET)
                                                                                 
 /*
  * Constants to make it easy to access GPIO registers
@@ -547,5 +572,20 @@
 #define USIR1_IR15	(1 << 7)	/* Interrup request ep 15 */
 
 #define DCMD_LENGTH	0x01fff		/* length mask (max = 8K - 1) */
+
+#ifndef __ASSEMBLY__
+static inline int cpu_is_ixp46x(void)
+{
+#ifdef CONFIG_CPU_IXP46X
+	unsigned int processor_id;
+
+	asm("mrc p15, 0, %0, cr0, cr0, 0;" : "=r"(processor_id) :);
+
+	if ((processor_id & 0xffffff00) == 0x69054200)
+		return 1;
+#endif
+	return 0;
+}
+#endif
 
 #endif

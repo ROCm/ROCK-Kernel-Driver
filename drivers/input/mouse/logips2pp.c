@@ -245,8 +245,7 @@ static struct ps2pp_info *get_model_info(unsigned char model)
  * Set up input device's properties based on the detected mouse model.
  */
 
-static void ps2pp_set_model_properties(struct psmouse *psmouse, struct ps2pp_info *model_info,
-				       int using_ps2pp)
+static void ps2pp_set_model_properties(struct psmouse *psmouse, struct ps2pp_info *model_info)
 {
 	if (model_info->features & PS2PP_SIDE_BTN)
 		set_bit(BTN_SIDE, psmouse->dev.keybit);
@@ -279,16 +278,6 @@ static void ps2pp_set_model_properties(struct psmouse *psmouse, struct ps2pp_inf
 
 		case PS2PP_KIND_TP3:
 			psmouse->name = "TouchPad 3";
-			break;
-
-		default:
-			/*
-			 * Set name to "Mouse" only when using PS2++,
-			 * otherwise let other protocols define suitable
-			 * name
-			 */
-			if (using_ps2pp)
-				psmouse->name = "Mouse";
 			break;
 	}
 }
@@ -382,7 +371,7 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 			clear_bit(BTN_RIGHT, psmouse->dev.keybit);
 
 		if (model_info)
-			ps2pp_set_model_properties(psmouse, model_info, use_ps2pp);
+			ps2pp_set_model_properties(psmouse, model_info);
 	}
 
 	return use_ps2pp ? 0 : -1;

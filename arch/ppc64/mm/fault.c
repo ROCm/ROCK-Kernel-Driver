@@ -36,6 +36,7 @@
 #include <asm/mmu_context.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/kdebug.h>
 
 /*
  * Check whether the instruction at regs->nip is a store using
@@ -95,6 +96,10 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 
 	BUG_ON((trap == 0x380) || (trap == 0x480));
 
+	if (notify_die(DIE_PAGE_FAULT, "page_fault", regs, error_code,
+				11, SIGSEGV) == NOTIFY_STOP)
+		return 0;
+
 	if (trap == 0x300) {
 		if (debugger_fault_handler(regs))
 			return 0;
@@ -105,6 +110,9 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 		return SIGSEGV;
 
 	if (error_code & 0x00400000) {
+		if (notify_die(DIE_DABR_MATCH, "dabr_match", regs, error_code,
+					11, SIGSEGV) == NOTIFY_STOP)
+			return 0;
 		if (debugger_dabr_match(regs))
 			return 0;
 	}

@@ -80,7 +80,7 @@ static struct rpc_credops gss_credops;
 /* dump the buffer in `emacs-hexl' style */
 #define isprint(c)      ((c > 0x1f) && (c < 0x7f))
 
-static rwlock_t gss_ctx_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(gss_ctx_lock);
 
 struct gss_auth {
 	struct rpc_auth rpc_auth;
@@ -480,12 +480,14 @@ gss_pipe_downcall(struct file *filp, const char __user *src, size_t mlen)
 	if (!cred)
 		goto err;
 	if (gss_err)
-		cred->cr_flags |= RPCAUTH_CRED_DEAD;
+		cred->cr_flags &= ~RPCAUTH_CRED_UPTODATE;
 	else
 		gss_cred_set_ctx(cred, ctx);
 	spin_lock(&gss_auth->lock);
 	gss_msg = __gss_find_upcall(gss_auth, acred.uid);
 	if (gss_msg) {
+		if (gss_err)
+			gss_msg->msg.errno = -EACCES;
 		__gss_unhash_msg(gss_msg);
 		spin_unlock(&gss_auth->lock);
 		gss_release_msg(gss_msg);
@@ -532,7 +534,7 @@ gss_pipe_release(struct inode *inode)
 	spin_unlock(&gss_auth->lock);
 }
 
-void
+static void
 gss_pipe_destroy_msg(struct rpc_pipe_msg *msg)
 {
 	struct gss_upcall_msg *gss_msg = container_of(msg, struct gss_upcall_msg, msg);
@@ -591,9 +593,11 @@ gss_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 			gss_auth->mech->gm_name);
 	gss_auth->dentry = rpc_mkpipe(gss_auth->path, clnt, &gss_upcall_ops, RPC_PIPE_WAIT_FOR_OPEN);
 	if (IS_ERR(gss_auth->dentry))
-		goto err_free;
+		goto err_put_mech;
 
 	return auth;
+err_put_mech:
+	gss_mech_put(gss_auth->mech);
 err_free:
 	kfree(gss_auth);
 out_dec:
@@ -610,6 +614,7 @@ gss_destroy(struct rpc_auth *auth)
 
 	gss_auth = container_of(auth, struct gss_auth, rpc_auth);
 	rpc_unlink(gss_auth->path);
+	gss_mech_put(gss_auth->mech);
 
 	rpcauth_free_credcache(auth);
 }
@@ -740,7 +745,9 @@ gss_marshal(struct rpc_task *task, u32 *p, int ruid)
 	maj_stat = gss_get_mic(ctx->gc_gss_ctx,
 			       GSS_C_QOP_DEFAULT, 
 			       &verf_buf, &mic);
-	if(maj_stat != 0){
+	if (maj_stat == GSS_S_CONTEXT_EXPIRED) {
+		cred->cr_flags &= ~RPCAUTH_CRED_UPTODATE;
+	} else if (maj_stat != 0) {
 		printk("gss_marshal: gss_get_mic FAILED (%d)\n", maj_stat);
 		goto out_put_ctx;
 	}
@@ -779,6 +786,7 @@ gss_validate(struct rpc_task *task, u32 *p)
 	struct xdr_netobj mic;
 	u32		flav,len;
 	u32		service;
+	u32		maj_stat;
 
 	dprintk("RPC: %4u gss_validate\n", task->tk_pid);
 
@@ -794,8 +802,11 @@ gss_validate(struct rpc_task *task, u32 *p)
 	mic.data = (u8 *)p;
 	mic.len = len;
 
-	if (gss_verify_mic(ctx->gc_gss_ctx, &verf_buf, &mic, &qop_state))
-               goto out_bad;
+	maj_stat = gss_verify_mic(ctx->gc_gss_ctx, &verf_buf, &mic, &qop_state);
+	if (maj_stat == GSS_S_CONTEXT_EXPIRED)
+		cred->cr_flags &= ~RPCAUTH_CRED_UPTODATE;
+	if (maj_stat)
+		goto out_bad;
        service = gss_pseudoflavor_to_service(ctx->gc_gss_ctx->mech_type,
 					gss_cred->gc_flavor);
        switch (service) {
@@ -821,11 +832,10 @@ out_bad:
 }
 
 static inline int
-gss_wrap_req_integ(struct gss_cl_ctx *ctx,
-			kxdrproc_t encode, void *rqstp, u32 *p, void *obj)
+gss_wrap_req_integ(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
+		kxdrproc_t encode, struct rpc_rqst *rqstp, u32 *p, void *obj)
 {
-	struct rpc_rqst	*req = (struct rpc_rqst *)rqstp;
-	struct xdr_buf	*snd_buf = &req->rq_snd_buf;
+	struct xdr_buf	*snd_buf = &rqstp->rq_snd_buf;
 	struct xdr_buf	integ_buf;
 	u32             *integ_len = NULL;
 	struct xdr_netobj mic;
@@ -836,7 +846,7 @@ gss_wrap_req_integ(struct gss_cl_ctx *ctx,
 
 	integ_len = p++;
 	offset = (u8 *)p - (u8 *)snd_buf->head[0].iov_base;
-	*p++ = htonl(req->rq_seqno);
+	*p++ = htonl(rqstp->rq_seqno);
 
 	status = encode(rqstp, p, obj);
 	if (status)
@@ -858,7 +868,9 @@ gss_wrap_req_integ(struct gss_cl_ctx *ctx,
 	maj_stat = gss_get_mic(ctx->gc_gss_ctx,
 			GSS_C_QOP_DEFAULT, &integ_buf, &mic);
 	status = -EIO; /* XXX? */
-	if (maj_stat)
+	if (maj_stat == GSS_S_CONTEXT_EXPIRED)
+		cred->cr_flags &= ~RPCAUTH_CRED_UPTODATE;
+	else if (maj_stat)
 		return status;
 	q = xdr_encode_opaque(p, NULL, mic.len);
 
@@ -894,7 +906,8 @@ gss_wrap_req(struct rpc_task *task,
 			status = encode(rqstp, p, obj);
 			goto out;
 		case RPC_GSS_SVC_INTEGRITY:
-			status = gss_wrap_req_integ(ctx, encode, rqstp, p, obj);
+			status = gss_wrap_req_integ(cred, ctx, encode,
+								rqstp, p, obj);
 			goto out;
 		case RPC_GSS_SVC_PRIVACY:
 		default:
@@ -907,11 +920,10 @@ out:
 }
 
 static inline int
-gss_unwrap_resp_integ(struct gss_cl_ctx *ctx,
-		kxdrproc_t decode, void *rqstp, u32 **p, void *obj)
+gss_unwrap_resp_integ(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
+		struct rpc_rqst *rqstp, u32 **p)
 {
-	struct rpc_rqst *req = (struct rpc_rqst *)rqstp;
-	struct xdr_buf	*rcv_buf = &req->rq_rcv_buf;
+	struct xdr_buf	*rcv_buf = &rqstp->rq_rcv_buf;
 	struct xdr_buf integ_buf;
 	struct xdr_netobj mic;
 	u32 data_offset, mic_offset;
@@ -926,7 +938,7 @@ gss_unwrap_resp_integ(struct gss_cl_ctx *ctx,
 	mic_offset = integ_len + data_offset;
 	if (mic_offset > rcv_buf->len)
 		return status;
-	if (ntohl(*(*p)++) != req->rq_seqno)
+	if (ntohl(*(*p)++) != rqstp->rq_seqno)
 		return status;
 
 	if (xdr_buf_subsegment(rcv_buf, &integ_buf, data_offset,
@@ -938,6 +950,8 @@ gss_unwrap_resp_integ(struct gss_cl_ctx *ctx,
 
 	maj_stat = gss_verify_mic(ctx->gc_gss_ctx, &integ_buf,
 			&mic, NULL);
+	if (maj_stat == GSS_S_CONTEXT_EXPIRED)
+		cred->cr_flags &= ~RPCAUTH_CRED_UPTODATE;
 	if (maj_stat != GSS_S_COMPLETE)
 		return status;
 	return 0;
@@ -962,8 +976,7 @@ gss_unwrap_resp(struct rpc_task *task,
 		case RPC_GSS_SVC_NONE:
 			goto out_decode;
 		case RPC_GSS_SVC_INTEGRITY:
-			status = gss_unwrap_resp_integ(ctx, decode, 
-							rqstp, &p, obj);
+			status = gss_unwrap_resp_integ(cred, ctx, rqstp, &p);
 			if (status)
 				goto out;
 			break;

@@ -16,12 +16,16 @@
 
 static inline pte_t *lookup_address(unsigned long address) 
 { 
-	pgd_t *pgd = pgd_offset_k(address); 
+	pgd_t *pgd = pgd_offset_k(address);
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
-	if (!pgd || !pgd_present(*pgd))
+	if (pgd_none(*pgd))
+		return NULL;
+	pud = pud_offset(pgd, address);
+	if (!pud_present(*pud))
 		return NULL; 
-	pmd = pmd_offset(pgd, address); 	       
+	pmd = pmd_offset(pud, address);
 	if (!pmd_present(*pmd))
 		return NULL; 
 	if (pmd_large(*pmd))
@@ -98,54 +102,65 @@ static inline void save_page(unsigned long address, struct page *fpage)
  */
 static void revert_page(unsigned long address, pgprot_t ref_prot)
 {
-       pgd_t *pgd;
-       pmd_t *pmd; 
-       pte_t large_pte; 
-       
-       pgd = pgd_offset_k(address); 
-       pmd = pmd_offset(pgd, address);
-       BUG_ON(pmd_val(*pmd) & _PAGE_PSE); 
-       pgprot_val(ref_prot) |= _PAGE_PSE;
-       large_pte = mk_pte_phys(__pa(address) & LARGE_PAGE_MASK, ref_prot);
-       set_pte((pte_t *)pmd, large_pte);
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t large_pte;
+
+	pgd = pgd_offset_k(address);
+	BUG_ON(pgd_none(*pgd));
+	pud = pud_offset(pgd,address);
+	BUG_ON(pud_none(*pud));
+	pmd = pmd_offset(pud, address);
+	BUG_ON(pmd_val(*pmd) & _PAGE_PSE);
+	pgprot_val(ref_prot) |= _PAGE_PSE;
+	large_pte = mk_pte_phys(__pa(address) & LARGE_PAGE_MASK, ref_prot);
+	set_pte((pte_t *)pmd, large_pte);
 }      
 
 static int
-__change_page_attr(unsigned long address, struct page *page, pgprot_t prot, 
-		   pgprot_t ref_prot)
+__change_page_attr(unsigned long address, unsigned long pfn, pgprot_t prot,
+				   pgprot_t ref_prot)
 { 
 	pte_t *kpte; 
 	struct page *kpte_page;
 	unsigned kpte_flags;
-
 	kpte = lookup_address(address);
 	if (!kpte) return 0;
 	kpte_page = virt_to_page(((unsigned long)kpte) & PAGE_MASK);
 	kpte_flags = pte_val(*kpte); 
 	if (pgprot_val(prot) != pgprot_val(ref_prot)) { 
 		if ((kpte_flags & _PAGE_PSE) == 0) { 
-			pte_t old = *kpte;
-			pte_t standard = mk_pte(page, ref_prot); 
-
-			set_pte(kpte, mk_pte(page, prot)); 
-			if (pte_same(old,standard))
-				get_page(kpte_page);
+			set_pte(kpte, pfn_pte(pfn, prot));
 		} else {
+ 			/*
+ 			 * split_large_page will take the reference for this change_page_attr
+ 			 * on the split page.
+ 			 */
 			struct page *split = split_large_page(address, prot, ref_prot); 
 			if (!split)
 				return -ENOMEM;
-			get_page(kpte_page);
 			set_pte(kpte,mk_pte(split, ref_prot));
+			kpte_page = split;
 		}	
+		get_page(kpte_page);
 	} else if ((kpte_flags & _PAGE_PSE) == 0) { 
-		set_pte(kpte, mk_pte(page, ref_prot));
+		set_pte(kpte, pfn_pte(pfn, ref_prot));
 		__put_page(kpte_page);
-	}
+	} else
+		BUG();
 
-	if (page_count(kpte_page) == 1) {
+	/* on x86-64 the direct mapping set at boot is not using 4k pages */
+ 	BUG_ON(PageReserved(kpte_page));
+
+	switch (page_count(kpte_page)) {
+ 	case 1:
 		save_page(address, kpte_page); 		     
 		revert_page(address, ref_prot);
-	} 
+		break;
+ 	case 0:
+ 		BUG(); /* memleak and failed 2M page regeneration */
+ 	}
 	return 0;
 } 
 
@@ -162,29 +177,37 @@ __change_page_attr(unsigned long address, struct page *page, pgprot_t prot,
  * 
  * Caller must call global_flush_tlb() after this.
  */
-int change_page_attr(struct page *page, int numpages, pgprot_t prot)
+int change_page_attr_addr(unsigned long address, int numpages, pgprot_t prot)
 {
 	int err = 0; 
 	int i; 
 
 	down_write(&init_mm.mmap_sem);
-	for (i = 0; i < numpages; !err && i++, page++) { 
-		unsigned long address = (unsigned long)page_address(page); 
-		err = __change_page_attr(address, page, prot, PAGE_KERNEL); 
+	for (i = 0; i < numpages; i++, address += PAGE_SIZE) {
+		unsigned long pfn = __pa(address) >> PAGE_SHIFT;
+
+		err = __change_page_attr(address, pfn, prot, PAGE_KERNEL);
 		if (err) 
 			break; 
 		/* Handle kernel mapping too which aliases part of the
 		 * lowmem */
-		/* Disabled right now. Fixme */ 
-		if (0 && page_to_phys(page) < KERNEL_TEXT_SIZE) {		
+		if (__pa(address) < KERNEL_TEXT_SIZE) {
 			unsigned long addr2;
-			addr2 = __START_KERNEL_map + page_to_phys(page);
-			err = __change_page_attr(addr2, page, prot, 
-						 PAGE_KERNEL_EXEC);
+			pgprot_t prot2 = prot;
+			addr2 = __START_KERNEL_map + __pa(address);
+ 			pgprot_val(prot2) &= ~_PAGE_NX;
+			err = __change_page_attr(addr2, pfn, prot2, PAGE_KERNEL_EXEC);
 		} 
 	} 	
 	up_write(&init_mm.mmap_sem); 
 	return err;
+}
+
+/* Don't call this for MMIO areas that may not have a mem_map entry */
+int change_page_attr(struct page *page, int numpages, pgprot_t prot)
+{
+	unsigned long addr = (unsigned long)page_address(page);
+	return change_page_attr_addr(addr, numpages, prot);
 }
 
 void global_flush_tlb(void)

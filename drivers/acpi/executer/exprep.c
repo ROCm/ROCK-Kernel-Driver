@@ -339,6 +339,8 @@ acpi_ex_prep_common_field_object (
 	obj_desc->common_field.access_byte_width = (u8)
 			ACPI_DIV_8 (access_bit_width); /* 1, 2, 4,  8 */
 
+	obj_desc->common_field.access_bit_width = (u8) access_bit_width;
+
 	/*
 	 * base_byte_offset is the address of the start of the field within the
 	 * region.  It is the byte address of the first *datum* (field-width data
@@ -360,28 +362,6 @@ acpi_ex_prep_common_field_object (
 	 */
 	obj_desc->common_field.start_field_bit_offset = (u8)
 		(field_bit_position - ACPI_MUL_8 (obj_desc->common_field.base_byte_offset));
-
-	/*
-	 * Valid bits -- the number of bits that compose a partial datum,
-	 * 1) At the end of the field within the region (arbitrary starting bit
-	 *    offset)
-	 * 2) At the end of a buffer used to contain the field (starting offset
-	 *    always zero)
-	 */
-	obj_desc->common_field.end_field_valid_bits = (u8)
-		((obj_desc->common_field.start_field_bit_offset + field_bit_length) %
-				  access_bit_width);
-	/* start_buffer_bit_offset always = 0 */
-
-	obj_desc->common_field.end_buffer_valid_bits = (u8)
-		(field_bit_length % access_bit_width);
-
-	/*
-	 * datum_valid_bits is the number of valid field bits in the first
-	 * field datum.
-	 */
-	obj_desc->common_field.datum_valid_bits  = (u8)
-		(access_bit_width - obj_desc->common_field.start_field_bit_offset);
 
 	/*
 	 * Does the entire field fit within a single field access element? (datum)

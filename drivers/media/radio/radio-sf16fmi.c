@@ -312,9 +312,9 @@ MODULE_AUTHOR("Petr Vandrovec, vandrove@vc.cvut.cz and M. Kirkwood");
 MODULE_DESCRIPTION("A driver for the SF16MI radio.");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "I/O address of the SF16MI card (0x284 or 0x384)");
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 static void __exit fmi_cleanup_module(void)
 {

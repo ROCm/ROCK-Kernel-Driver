@@ -46,6 +46,11 @@
 #define NVIDIA_X86_64_1_APBASE2		0xd8
 #define NVIDIA_X86_64_1_APLIMIT2	0xdc
 
+/* ULi K8 registers */
+#define ULI_X86_64_BASE_ADDR		0x10
+#define ULI_X86_64_HTT_FEA_REG		0x50
+#define ULI_X86_64_ENU_SCR_REG		0x54
+
 static int nr_garts;
 static struct pci_dev * hammers[MAX_HAMMER_GARTS];
 
@@ -109,6 +114,7 @@ static int amd64_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 		pte |= GPTE_VALID | GPTE_COHERENT;
 
 		writel(pte, agp_bridge->gatt_table+j);
+		readl(agp_bridge->gatt_table+j);	/* PCI Posting. */
 	}
 	amd64_tlbflush(mem);
 	return 0;
@@ -355,7 +361,7 @@ static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 	int i = 0;
 
 	/* cache pci_devs of northbridges. */
-	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev))
+	while ((loop_dev = pci_get_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev))
 			!= NULL) {
 		if (i == MAX_HAMMER_GARTS) {
 			printk(KERN_ERR PFX "Too many northbridges for AGP\n");
@@ -404,6 +410,61 @@ static void __devinit amd8151_init(struct pci_dev *pdev, struct agp_bridge_data 
 		bridge->minor_version = 0;
 	}
 }
+
+
+static struct aper_size_info_32 uli_sizes[7] =
+{
+	{256, 65536, 6, 10},
+	{128, 32768, 5, 9},
+	{64, 16384, 4, 8},
+	{32, 8192, 3, 7},
+	{16, 4096, 2, 6},
+	{8, 2048, 1, 4},
+	{4, 1024, 0, 3}
+};
+static int __devinit uli_agp_init(struct pci_dev *pdev)
+{
+	u32 httfea,baseaddr,enuscr;
+	struct pci_dev *dev1;
+	int i;
+	unsigned size = amd64_fetch_size();
+	printk(KERN_INFO "Setting up ULi AGP. \n");
+	dev1 = pci_find_slot ((unsigned int)pdev->bus->number,PCI_DEVFN(0,0));
+	if (dev1 == NULL) {
+		printk(KERN_INFO PFX "Detected a ULi chipset, "
+			"but could not fine the secondary device.\n");
+		return -ENODEV;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(uli_sizes); i++)
+		if (uli_sizes[i].size == size)
+			break;
+
+	if (i == ARRAY_SIZE(uli_sizes)) {
+		printk(KERN_INFO PFX "No ULi size found for %d\n", size);
+		return -ENODEV;
+	}
+
+	/* shadow x86-64 registers into ULi registers */
+	pci_read_config_dword (hammers[0], AMD64_GARTAPERTUREBASE, &httfea);
+
+	/* if x86-64 aperture base is beyond 4G, exit here */
+	if ((httfea & 0x7fff) >> (32 - 25))
+		return -ENODEV;
+
+	httfea = (httfea& 0x7fff) << 25;
+
+	pci_read_config_dword(pdev, ULI_X86_64_BASE_ADDR, &baseaddr);
+	baseaddr&= ~PCI_BASE_ADDRESS_MEM_MASK;
+	baseaddr|= httfea;
+	pci_write_config_dword(pdev, ULI_X86_64_BASE_ADDR, baseaddr);
+
+	enuscr= httfea+ (size * 1024 * 1024) - 1;
+	pci_write_config_dword(dev1, ULI_X86_64_HTT_FEA_REG, httfea);
+	pci_write_config_dword(dev1, ULI_X86_64_ENU_SCR_REG, enuscr);
+	return 0;
+}
+
 
 static struct aper_size_info_32 nforce3_sizes[5] =
 {
@@ -513,6 +574,14 @@ static int __devinit agp_amd64_probe(struct pci_dev *pdev,
 		}
 	}
 
+	if (pdev->vendor == PCI_VENDOR_ID_AL) {
+		int ret = uli_agp_init(pdev);
+		if (ret) {
+			agp_put_bridge(bridge);
+			return ret;
+		}
+	}
+
 	pci_set_drvdata(pdev, bridge);
 	return agp_add_bridge(bridge);
 }
@@ -533,6 +602,15 @@ static struct pci_device_id agp_amd64_pci_table[] = {
 	.class_mask	= ~0,
 	.vendor		= PCI_VENDOR_ID_AMD,
 	.device		= PCI_DEVICE_ID_AMD_8151_0,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	/* ULi M1689 */
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_AL,
+	.device		= PCI_DEVICE_ID_AL_M1689,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
@@ -581,7 +659,6 @@ static struct pci_device_id agp_amd64_pci_table[] = {
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
-
 	/* NForce3 */
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -625,6 +702,11 @@ static struct pci_driver agp_amd64_pci_driver = {
 int __init agp_amd64_init(void)
 {
 	int err = 0;
+	static struct pci_device_id amd64nb[] = {
+		{ PCI_DEVICE(PCI_VENDOR_ID_AMD, 0x1103) },
+		{ },
+	};
+
 	if (agp_off)
 		return -EINVAL;
 	if (pci_module_init(&agp_amd64_pci_driver) > 0) {
@@ -640,13 +722,13 @@ int __init agp_amd64_init(void)
 		}
 
 		/* First check that we have at least one AMD64 NB */
-		if (!pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, NULL))
+		if (!pci_dev_present(amd64nb))
 			return -ENODEV;
 
 		/* Look for any AGP bridge */
 		dev = NULL;
 		err = -ENODEV;
-		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev))) {
+		for_each_pci_dev(dev) {
 			if (!pci_find_capability(dev, PCI_CAP_ID_AGP))
 				continue;
 			/* Only one bridge supported right now */
@@ -674,5 +756,5 @@ module_exit(agp_amd64_cleanup);
 #endif
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>, Andi Kleen");
-MODULE_PARM(agp_try_unsupported, "1i");
+module_param(agp_try_unsupported, bool, 0);
 MODULE_LICENSE("GPL");

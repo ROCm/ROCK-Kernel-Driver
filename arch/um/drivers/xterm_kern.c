@@ -46,6 +46,8 @@ int xterm_fd(int socket, int *pid_out)
 		printk(KERN_ERR "xterm_fd : failed to allocate xterm_wait\n");
 		return(-ENOMEM);
 	}
+
+	/* This is a locked semaphore... */
 	*data = ((struct xterm_wait) 
 		{ .sem  	= __SEMAPHORE_INITIALIZER(data->sem, 0),
 		  .fd 		= socket,
@@ -55,12 +57,17 @@ int xterm_fd(int socket, int *pid_out)
 	err = um_request_irq(XTERM_IRQ, socket, IRQ_READ, xterm_interrupt, 
 			     SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 
 			     "xterm", data);
-	if(err){
+	if (err){
 		printk(KERN_ERR "xterm_fd : failed to get IRQ for xterm, "
 		       "err = %d\n",  err);
 		ret = err;
 		goto out;
 	}
+
+	/* ... so here we wait for an xterm interrupt.
+	 *
+	 * XXX Note, if the xterm doesn't work for some reason (eg. DISPLAY
+	 * isn't set) this will hang... */
 	down(&data->sem);
 
 	free_irq_by_irq_and_dev(XTERM_IRQ, data);

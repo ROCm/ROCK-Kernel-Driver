@@ -238,6 +238,10 @@ extern void omap_set_dma_dest_burst_mode(int lch,
 extern void omap_dma_link_lch (int lch_head, int lch_queue);
 extern void omap_dma_unlink_lch (int lch_head, int lch_queue);
 
+extern dma_addr_t omap_get_dma_src_pos(int lch);
+extern dma_addr_t omap_get_dma_dst_pos(int lch);
+extern void omap_clear_dma(int lch);
+
 /* Returns 1 if the DMA module is in OMAP1510-compatible mode, 0 otherwise */
 extern int omap_dma_in_1510_mode(void);
 

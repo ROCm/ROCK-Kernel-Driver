@@ -1,6 +1,8 @@
 #ifndef _I386_PGTABLE_3LEVEL_H
 #define _I386_PGTABLE_3LEVEL_H
 
+#include <asm-generic/pgtable-nopud.h>
+
 /*
  * Intel Physical Address Extension (PAE) Mode - three-level page
  * tables on PPro+ CPUs.
@@ -15,9 +17,9 @@
 #define pgd_ERROR(e) \
 	printk("%s:%d: bad pgd %p(%016Lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
 
-static inline int pgd_none(pgd_t pgd)		{ return 0; }
-static inline int pgd_bad(pgd_t pgd)		{ return 0; }
-static inline int pgd_present(pgd_t pgd)	{ return 1; }
+#define pud_none(pud)				0
+#define pud_bad(pud)				0
+#define pud_present(pud)			1
 
 /*
  * Is the pte executable?
@@ -59,8 +61,8 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 		set_64bit((unsigned long long *)(pteptr),pte_val(pteval))
 #define set_pmd(pmdptr,pmdval) \
 		set_64bit((unsigned long long *)(pmdptr),pmd_val(pmdval))
-#define set_pgd(pgdptr,pgdval) \
-		set_64bit((unsigned long long *)(pgdptr),pgd_val(pgdval))
+#define set_pud(pudptr,pudval) \
+		set_64bit((unsigned long long *)(pudptr),pud_val(pudval))
 
 /*
  * Pentium-II erratum A13: in PAE mode we explicitly have to flush
@@ -68,13 +70,22 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
  * We do not let the generic code free and clear pgd entries due to
  * this erratum.
  */
-static inline void pgd_clear (pgd_t * pgd) { }
+static inline void pud_clear (pud_t * pud) { }
 
-#define pgd_page(pgd) \
-((unsigned long) __va(pgd_val(pgd) & PAGE_MASK))
+#define pmd_page(pmd) (pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
+
+#define pmd_page_kernel(pmd) \
+((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+
+#define pud_page(pud) \
+((struct page *) __va(pud_val(pud) & PAGE_MASK))
+
+#define pud_page_kernel(pud) \
+((unsigned long) __va(pud_val(pud) & PAGE_MASK))
+
 
 /* Find an entry in the second-level page table.. */
-#define pmd_offset(dir, address) ((pmd_t *) pgd_page(*(dir)) + \
+#define pmd_offset(pud, address) ((pmd_t *) pud_page(*(pud)) + \
 			pmd_index(address))
 
 static inline pte_t ptep_get_and_clear(pte_t *ptep)
@@ -141,5 +152,7 @@ static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 #define __swp_entry(type, offset)	((swp_entry_t){(type) | (offset) << 5})
 #define __pte_to_swp_entry(pte)		((swp_entry_t){ (pte).pte_high })
 #define __swp_entry_to_pte(x)		((pte_t){ 0, (x).val })
+
+#define __pmd_free_tlb(tlb, x)		do { } while (0)
 
 #endif /* _I386_PGTABLE_3LEVEL_H */

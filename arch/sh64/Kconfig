@@ -25,6 +25,10 @@ config RWSEM_GENERIC_SPINLOCK
 	bool
 	default y
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 config LOG_BUF_SHIFT
 	int
 	default 14

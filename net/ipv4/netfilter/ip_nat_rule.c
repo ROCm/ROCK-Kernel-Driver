@@ -35,32 +35,13 @@
 
 #define NAT_VALID_HOOKS ((1<<NF_IP_PRE_ROUTING) | (1<<NF_IP_POST_ROUTING) | (1<<NF_IP_LOCAL_OUT))
 
-/* Standard entry. */
-struct ipt_standard
-{
-	struct ipt_entry entry;
-	struct ipt_standard_target target;
-};
-
-struct ipt_error_target
-{
-	struct ipt_entry_target target;
-	char errorname[IPT_FUNCTION_MAXNAMELEN];
-};
-
-struct ipt_error
-{
-	struct ipt_entry entry;
-	struct ipt_error_target target;
-};
-
 static struct
 {
 	struct ipt_replace repl;
 	struct ipt_standard entries[3];
 	struct ipt_error term;
-} nat_initial_table = {
-    { "nat", NAT_VALID_HOOKS, 4,
+} nat_initial_table __initdata
+= { { "nat", NAT_VALID_HOOKS, 4,
       sizeof(struct ipt_standard) * 3 + sizeof(struct ipt_error),
       { [NF_IP_PRE_ROUTING] = 0,
 	[NF_IP_POST_ROUTING] = sizeof(struct ipt_standard),
@@ -110,7 +91,6 @@ static struct
 
 static struct ipt_table nat_table = {
 	.name		= "nat",
-	.table		= &nat_initial_table.repl,
 	.valid_hooks	= NAT_VALID_HOOKS,
 	.lock		= RW_LOCK_UNLOCKED,
 	.me		= THIS_MODULE,
@@ -126,6 +106,7 @@ static unsigned int ipt_snat_target(struct sk_buff **pskb,
 {
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
+	const struct ip_nat_multi_range_compat *mr = targinfo;
 
 	IP_NF_ASSERT(hooknum == NF_IP_POST_ROUTING);
 
@@ -136,7 +117,7 @@ static unsigned int ipt_snat_target(struct sk_buff **pskb,
 	                    || ctinfo == IP_CT_RELATED + IP_CT_IS_REPLY));
 	IP_NF_ASSERT(out);
 
-	return ip_nat_setup_info(ct, targinfo, hooknum);
+	return ip_nat_setup_info(ct, &mr->range[0], hooknum);
 }
 
 static unsigned int ipt_dnat_target(struct sk_buff **pskb,
@@ -148,20 +129,17 @@ static unsigned int ipt_dnat_target(struct sk_buff **pskb,
 {
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
+	const struct ip_nat_multi_range_compat *mr = targinfo;
 
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING
 		     || hooknum == NF_IP_LOCAL_OUT);
-#else
-	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING);
-#endif
 
 	ct = ip_conntrack_get(*pskb, &ctinfo);
 
 	/* Connection must be valid and new. */
 	IP_NF_ASSERT(ct && (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED));
 
-	return ip_nat_setup_info(ct, targinfo, hooknum);
+	return ip_nat_setup_info(ct, &mr->range[0], hooknum);
 }
 
 static int ipt_snat_checkentry(const char *tablename,
@@ -170,17 +148,15 @@ static int ipt_snat_checkentry(const char *tablename,
 			       unsigned int targinfosize,
 			       unsigned int hook_mask)
 {
-	struct ip_nat_multi_range *mr = targinfo;
+	struct ip_nat_multi_range_compat *mr = targinfo;
 
 	/* Must be a valid range */
-	if (targinfosize < sizeof(struct ip_nat_multi_range)) {
-		DEBUGP("SNAT: Target size %u too small\n", targinfosize);
+	if (mr->rangesize != 1) {
+		printk("SNAT: multiple ranges no longer supported\n");
 		return 0;
 	}
 
-	if (targinfosize != IPT_ALIGN((sizeof(struct ip_nat_multi_range)
-				       + (sizeof(struct ip_nat_range)
-					  * (mr->rangesize - 1))))) {
+	if (targinfosize != sizeof(struct ip_nat_multi_range_compat)) {
 		DEBUGP("SNAT: Target size %u wrong for %u ranges\n",
 		       targinfosize, mr->rangesize);
 		return 0;
@@ -205,17 +181,15 @@ static int ipt_dnat_checkentry(const char *tablename,
 			       unsigned int targinfosize,
 			       unsigned int hook_mask)
 {
-	struct ip_nat_multi_range *mr = targinfo;
+	struct ip_nat_multi_range_compat *mr = targinfo;
 
 	/* Must be a valid range */
-	if (targinfosize < sizeof(struct ip_nat_multi_range)) {
-		DEBUGP("DNAT: Target size %u too small\n", targinfosize);
+	if (mr->rangesize != 1) {
+		printk("DNAT: multiple ranges no longer supported\n");
 		return 0;
 	}
 
-	if (targinfosize != IPT_ALIGN((sizeof(struct ip_nat_multi_range)
-				       + (sizeof(struct ip_nat_range)
-					  * (mr->rangesize - 1))))) {
+	if (targinfosize != sizeof(struct ip_nat_multi_range_compat)) {
 		DEBUGP("DNAT: Target size %u wrong for %u ranges\n",
 		       targinfosize, mr->rangesize);
 		return 0;
@@ -232,13 +206,6 @@ static int ipt_dnat_checkentry(const char *tablename,
 		return 0;
 	}
 	
-#ifndef CONFIG_IP_NF_NAT_LOCAL
-	if (hook_mask & (1 << NF_IP_LOCAL_OUT)) {
-		DEBUGP("DNAT: CONFIG_IP_NF_NAT_LOCAL not enabled\n");
-		return 0;
-	}
-#endif
-
 	return 1;
 }
 
@@ -255,12 +222,12 @@ alloc_null_binding(struct ip_conntrack *conntrack,
 		= (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC
 		   ? conntrack->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip
 		   : conntrack->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip);
-	struct ip_nat_multi_range mr
-		= { 1, { { IP_NAT_RANGE_MAP_IPS, ip, ip, { 0 }, { 0 } } } };
+	struct ip_nat_range range
+		= { IP_NAT_RANGE_MAP_IPS, ip, ip, { 0 }, { 0 } };
 
 	DEBUGP("Allocating NULL binding for %p (%u.%u.%u.%u)\n", conntrack,
 	       NIPQUAD(ip));
-	return ip_nat_setup_info(conntrack, &mr, hooknum);
+	return ip_nat_setup_info(conntrack, &range, hooknum);
 }
 
 int ip_nat_rule_find(struct sk_buff **pskb,
@@ -298,7 +265,7 @@ int __init ip_nat_rule_init(void)
 {
 	int ret;
 
-	ret = ipt_register_table(&nat_table);
+	ret = ipt_register_table(&nat_table, &nat_initial_table.repl);
 	if (ret != 0)
 		return ret;
 	ret = ipt_register_target(&ipt_snat_reg);

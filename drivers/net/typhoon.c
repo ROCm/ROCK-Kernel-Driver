@@ -1687,8 +1687,7 @@ typhoon_rx(struct typhoon *tp, struct basic_ring *rxRing, volatile u32 * ready,
 		skb = rxb->skb;
 		dma_addr = rxb->dma_addr;
 
-		rxaddr += sizeof(struct rx_desc);
-		rxaddr %= RX_ENTRIES * sizeof(struct rx_desc);
+		typhoon_inc_rx_index(&rxaddr, 1);
 
 		if(rx->flags & TYPHOON_RX_ERROR) {
 			typhoon_recycle_rx_skb(tp, idx);
@@ -1890,7 +1889,7 @@ typhoon_sleep(struct typhoon *tp, int state, u16 events)
 
 	pci_enable_wake(tp->pdev, state, 1);
 	pci_disable_device(pdev);
-	return pci_set_power_state(pdev, state);
+	return pci_set_power_state(pdev, pci_choose_state(pdev, state));
 }
 
 static int
@@ -1899,7 +1898,7 @@ typhoon_wakeup(struct typhoon *tp, int wait_type)
 	struct pci_dev *pdev = tp->pdev;
 	void __iomem *ioaddr = tp->ioaddr;
 
-	pci_set_power_state(pdev, 0);
+	pci_set_power_state(pdev, PCI_D0);
 	pci_restore_state(pdev);
 
 	/* Post 2.x.x versions of the Sleep Image require a reset before
@@ -2553,7 +2552,7 @@ typhoon_remove_one(struct pci_dev *pdev)
 	struct typhoon *tp = netdev_priv(dev);
 
 	unregister_netdev(dev);
-	pci_set_power_state(pdev, 0);
+	pci_set_power_state(pdev, PCI_D0);
 	pci_restore_state(pdev);
 	typhoon_reset(tp->ioaddr, NoWait);
 	iounmap(tp->ioaddr);

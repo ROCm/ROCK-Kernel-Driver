@@ -98,6 +98,7 @@ static struct sysrq_key_op sysrq_unraw_op = {
 static void sysrq_handle_reboot(int key, struct pt_regs *pt_regs,
 				struct tty_struct *tty) 
 {
+	local_irq_enable();
 	machine_restart(NULL);
 }
 
@@ -228,7 +229,7 @@ static struct sysrq_key_op sysrq_unrt_op = {
 };
 
 /* Key Operations table and lock */
-static spinlock_t sysrq_key_table_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sysrq_key_table_lock);
 #define SYSRQ_KEY_TABLE_LENGTH 36
 static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 /* 0 */	&sysrq_loglevel_op,

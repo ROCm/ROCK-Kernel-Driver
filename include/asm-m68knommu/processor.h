@@ -55,11 +55,6 @@ extern inline void wrusp(unsigned long usp)
  */
 #define TASK_UNMAPPED_BASE	0
 
-/*
- * Bus types
- */
-#define MCA_bus 0
-
 /* 
  * if you change this structure, you must change the code and offsets
  * in m68k/machasm.S
@@ -126,7 +121,7 @@ unsigned long get_wchan(struct task_struct *p);
     ({			\
 	unsigned long eip = 0;	 \
 	if ((tsk)->thread.esp0 > PAGE_SIZE && \
-	    MAP_NR((tsk)->thread.esp0) < max_mapnr) \
+	    (virt_addr_valid((tsk)->thread.esp0))) \
 	      eip = ((struct pt_regs *) (tsk)->thread.esp0)->pc; \
 	eip; })
 #define	KSTK_ESP(tsk)	((tsk) == current ? rdusp() : (tsk)->thread.usp)

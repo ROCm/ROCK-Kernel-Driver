@@ -57,7 +57,7 @@
 #include "remote.h"
 
 
-static int __init ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
+static int __devinit ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	int err, result = -ENOMEM;
 	struct service_processor *sp;
@@ -107,7 +107,7 @@ static int __init ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_
 		goto error_remote_queue;
 	}
 
-	sp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&sp->lock);
 	INIT_LIST_HEAD(&sp->command_queue);
 
 	result = request_irq(sp->irq, ibmasm_interrupt_handler, SA_SHIRQ, sp->devname, (void*)sp);
@@ -161,7 +161,7 @@ error_kmalloc:
 	return result;
 }
 
-static void __exit ibmasm_remove_one(struct pci_dev *pdev)
+static void __devexit ibmasm_remove_one(struct pci_dev *pdev)
 {
 	struct service_processor *sp = (struct service_processor *)pci_get_drvdata(pdev);
 

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/csumipv6.S
+ *  linux/arch/arm26/lib/csumipv6.S
  *
  *  Copyright (C) 1995-1998 Russell King
  *

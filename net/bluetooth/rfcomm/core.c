@@ -50,7 +50,7 @@
 #include <net/bluetooth/l2cap.h>
 #include <net/bluetooth/rfcomm.h>
 
-#define VERSION "1.3"
+#define VERSION "1.4"
 
 #ifndef CONFIG_BT_RFCOMM_DEBUG
 #undef  BT_DBG
@@ -61,8 +61,12 @@
 struct proc_dir_entry *proc_bt_rfcomm;
 #endif
 
-struct task_struct *rfcomm_thread;
-DECLARE_MUTEX(rfcomm_sem);
+static struct task_struct *rfcomm_thread;
+
+static DECLARE_MUTEX(rfcomm_sem);
+#define rfcomm_lock()	down(&rfcomm_sem);
+#define rfcomm_unlock()	up(&rfcomm_sem);
+
 unsigned long rfcomm_event;
 
 static LIST_HEAD(session_list);
@@ -80,6 +84,10 @@ static int rfcomm_send_credits(struct rfcomm_session *s, u8 addr, u8 credits);
 static void rfcomm_make_uih(struct sk_buff *skb, u8 addr);
 
 static void rfcomm_process_connect(struct rfcomm_session *s);
+
+static struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst, int *err);
+static struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst);
+static void rfcomm_session_del(struct rfcomm_session *s);
 
 /* ---- RFCOMM frame parsing macros ---- */
 #define __get_dlci(b)     ((b & 0xfc) >> 2)
@@ -110,6 +118,21 @@ static void rfcomm_process_connect(struct rfcomm_session *s);
 #define __get_rpn_data_bits(line) ((line) & 0x3)
 #define __get_rpn_stop_bits(line) (((line) >> 2) & 0x1)
 #define __get_rpn_parity(line)    (((line) >> 3) & 0x3)
+
+static inline void rfcomm_schedule(uint event)
+{
+	if (!rfcomm_thread)
+		return;
+	//set_bit(event, &rfcomm_event);
+	set_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event);
+	wake_up_process(rfcomm_thread);
+}
+
+static inline void rfcomm_session_put(struct rfcomm_session *s)
+{
+	if (atomic_dec_and_test(&s->refcnt))
+		rfcomm_session_del(s);
+}
 
 /* ---- RFCOMM FCS computation ---- */
 
@@ -458,7 +481,7 @@ int rfcomm_dlc_get_modem_status(struct rfcomm_dlc *d, u8 *v24_sig)
 }
 
 /* ---- RFCOMM sessions ---- */
-struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state)
+static struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state)
 {
 	struct rfcomm_session *s = kmalloc(sizeof(*s), GFP_KERNEL);
 	if (!s)
@@ -487,7 +510,7 @@ struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state)
 	return s;
 }
 
-void rfcomm_session_del(struct rfcomm_session *s)
+static void rfcomm_session_del(struct rfcomm_session *s)
 {
 	int state = s->state;
 
@@ -505,7 +528,7 @@ void rfcomm_session_del(struct rfcomm_session *s)
 		module_put(THIS_MODULE);
 }
 
-struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst)
+static struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst)
 {
 	struct rfcomm_session *s;
 	struct list_head *p, *n;
@@ -521,7 +544,7 @@ struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst)
 	return NULL;
 }
 
-void rfcomm_session_close(struct rfcomm_session *s, int err)
+static void rfcomm_session_close(struct rfcomm_session *s, int err)
 {
 	struct rfcomm_dlc *d;
 	struct list_head *p, *n;
@@ -542,7 +565,7 @@ void rfcomm_session_close(struct rfcomm_session *s, int err)
 	rfcomm_session_put(s);
 }
 
-struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst, int *err)
+static struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst, int *err)
 {
 	struct rfcomm_session *s = NULL;
 	struct sockaddr_l2 addr;

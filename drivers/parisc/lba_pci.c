@@ -41,11 +41,9 @@
 #include <linux/smp_lock.h>
 
 #include <asm/byteorder.h>
-#include <asm/irq.h>		/* for struct irq_region support */
 #include <asm/pdc.h>
 #include <asm/pdcpat.h>
 #include <asm/page.h>
-#include <asm/segment.h>
 #include <asm/system.h>
 
 #include <asm/hardware.h>	/* for register_parisc_driver() stuff */

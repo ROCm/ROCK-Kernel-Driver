@@ -87,7 +87,7 @@ int ext3_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		ei->i_flags = flags;
 
 		ext3_set_inode_flags(inode);
-		inode->i_ctime = CURRENT_TIME;
+		inode->i_ctime = CURRENT_TIME_SEC;
 
 		err = ext3_mark_iloc_dirty(handle, inode, &iloc);
 flags_err:
@@ -121,7 +121,7 @@ flags_err:
 			return PTR_ERR(handle);
 		err = ext3_reserve_inode_write(handle, inode, &iloc);
 		if (err == 0) {
-			inode->i_ctime = CURRENT_TIME;
+			inode->i_ctime = CURRENT_TIME_SEC;
 			inode->i_generation = generation;
 			err = ext3_mark_iloc_dirty(handle, inode, &iloc);
 		}

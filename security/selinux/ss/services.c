@@ -40,7 +40,7 @@
 #include "mls.h"
 
 extern void selnl_notify_policyload(u32 seqno);
-extern int policydb_loaded_version;
+unsigned int policydb_loaded_version;
 
 static rwlock_t policy_rwlock = RW_LOCK_UNLOCKED;
 #define POLICY_RDLOCK read_lock(&policy_rwlock)
@@ -275,7 +275,7 @@ static int context_struct_compute_av(struct context *scontext,
 	 * pair.
 	 */
 	if (tclass == SECCLASS_PROCESS &&
-	    (avd->allowed & PROCESS__TRANSITION) &&
+	    (avd->allowed & (PROCESS__TRANSITION | PROCESS__DYNTRANSITION)) &&
 	    scontext->role != tcontext->role) {
 		for (ra = policydb.role_allow; ra; ra = ra->next) {
 			if (scontext->role == ra->role &&
@@ -283,7 +283,8 @@ static int context_struct_compute_av(struct context *scontext,
 				break;
 		}
 		if (!ra)
-			avd->allowed = (avd->allowed) & ~(PROCESS__TRANSITION);
+			avd->allowed = (avd->allowed) & ~(PROCESS__TRANSITION |
+			                                PROCESS__DYNTRANSITION);
 	}
 
 	return 0;
@@ -1046,6 +1047,7 @@ int security_load_policy(void *data, size_t len)
 			avtab_cache_destroy();
 			return -EINVAL;
 		}
+		policydb_loaded_version = policydb.policyvers;
 		ss_initialized = 1;
 
 		LOAD_UNLOCK;
@@ -1094,7 +1096,7 @@ int security_load_policy(void *data, size_t len)
 	memcpy(&policydb, &newpolicydb, sizeof policydb);
 	sidtab_set(&sidtab, &newsidtab);
 	seqno = ++latest_granting;
-
+	policydb_loaded_version = policydb.policyvers;
 	POLICY_WRUNLOCK;
 	LOAD_UNLOCK;
 

@@ -34,10 +34,18 @@ int HvLpEvent_registerHandler( HvLpEvent_Type eventType, LpEventHandler handler 
 int HvLpEvent_unregisterHandler( HvLpEvent_Type eventType )
 {
 	int rc = 1;
+
+	might_sleep();
+
 	if ( eventType < HvLpEvent_Type_NumTypes ) {
 		if ( !lpEventHandlerPaths[eventType] ) {
 			lpEventHandler[eventType] = NULL;
 			rc = 0;
+
+			/* We now sleep until all other CPUs have scheduled. This ensures that
+			 * the deletion is seen by all other CPUs, and that the deleted handler
+			 * isn't still running on another CPU when we return. */
+			synchronize_kernel();
 		}
 	}
 	return rc;

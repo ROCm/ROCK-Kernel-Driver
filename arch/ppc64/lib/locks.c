@@ -34,7 +34,7 @@ void __spin_yield(spinlock_t *lock)
 	holder_cpu = lock_value & 0xffff;
 	BUG_ON(holder_cpu >= NR_CPUS);
 	holder_paca = &paca[holder_cpu];
-	yield_count = holder_paca->lppaca.xYieldCount;
+	yield_count = holder_paca->lppaca.yield_count;
 	if ((yield_count & 1) == 0)
 		return;		/* virtual cpu is currently running */
 	rmb();
@@ -66,7 +66,7 @@ void __rw_yield(rwlock_t *rw)
 	holder_cpu = lock_value & 0xffff;
 	BUG_ON(holder_cpu >= NR_CPUS);
 	holder_paca = &paca[holder_cpu];
-	yield_count = holder_paca->lppaca.xYieldCount;
+	yield_count = holder_paca->lppaca.yield_count;
 	if ((yield_count & 1) == 0)
 		return;		/* virtual cpu is currently running */
 	rmb();

@@ -81,7 +81,7 @@ static int tosh_fan = 0;
 
 static int tosh_fn = 0;
 
-MODULE_PARM(tosh_fn, "i");
+module_param(tosh_fn, int, 0);
 
 
 static int tosh_ioctl(struct inode *, struct file *, unsigned int,
@@ -407,7 +407,7 @@ static int tosh_get_machine_id(void)
  *   laptop, otherwise zero and determines the Machine ID, BIOS version and
  *   date, and SCI version.
  */
-int tosh_probe(void)
+static int tosh_probe(void)
 {
 	int i,major,minor,day,year,month,flag;
 	unsigned char signature[7] = { 0x54,0x4f,0x53,0x48,0x49,0x42,0x41 };

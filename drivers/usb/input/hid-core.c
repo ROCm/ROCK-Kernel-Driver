@@ -676,7 +676,7 @@ static struct hid_device *hid_parse_report(__u8 *start, unsigned size)
 	parser->device = device;
 
 	end = start + size;
-	while ((start = fetch_item(start, end, &item)) != 0) {
+	while ((start = fetch_item(start, end, &item)) != NULL) {
 
 		if (item.format != HID_ITEM_FORMAT_SHORT) {
 			dbg("unexpected long global item");
@@ -1478,9 +1478,6 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_VENDOR_ID_DELORME		0x1163
 #define USB_DEVICE_ID_DELORME_EARTHMATE 0x0100
 
-#define USB_VENDOR_ID_DELORME		0x1163
-#define USB_DEVICE_ID_DELORME_EARTHMATE 0x0100
-
 static struct hid_blacklist {
 	__u16 idVendor;
 	__u16 idProduct;
@@ -1613,8 +1610,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	int n;
 
 	for (n = 0; hid_blacklist[n].idVendor; n++)
-		if ((hid_blacklist[n].idVendor == dev->descriptor.idVendor) &&
-			(hid_blacklist[n].idProduct == dev->descriptor.idProduct))
+		if ((hid_blacklist[n].idVendor == le16_to_cpu(dev->descriptor.idVendor)) &&
+			(hid_blacklist[n].idProduct == le16_to_cpu(dev->descriptor.idProduct)))
 				quirks = hid_blacklist[n].quirks;
 
 	if (quirks & HID_QUIRK_IGNORE)
@@ -1733,7 +1730,9 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	} else if (usb_string(dev, dev->descriptor.iProduct, buf, 128) > 0) {
 			snprintf(hid->name, 128, "%s", buf);
 	} else
-		snprintf(hid->name, 128, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
+		snprintf(hid->name, 128, "%04x:%04x", 
+			 le16_to_cpu(dev->descriptor.idVendor),
+			 le16_to_cpu(dev->descriptor.idProduct));
 
 	usb_make_path(dev, buf, 64);
 	snprintf(hid->phys, 64, "%s/input%d", buf,

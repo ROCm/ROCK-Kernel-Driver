@@ -29,10 +29,17 @@ int bit_map_string_get(struct bit_map *t, int len, int align)
 	int offset, count;	/* siamese twins */
 	int off_new;
 	int align1;
-	int i;
+	int i, color;
 
-	if (align == 0)
-		align = 1;
+	if (t->num_colors) {
+		/* align is overloaded to be the page color */
+		color = align;
+		align = t->num_colors;
+	} else {
+		color = 0;
+		if (align == 0)
+			align = 1;
+	}
 	align1 = align - 1;
 	if ((align & align1) != 0)
 		BUG();
@@ -40,6 +47,7 @@ int bit_map_string_get(struct bit_map *t, int len, int align)
 		BUG();
 	if (len <= 0 || len > t->size)
 		BUG();
+	color &= align1;
 
 	spin_lock(&t->lock);
 	if (len < t->last_size)
@@ -49,7 +57,7 @@ int bit_map_string_get(struct bit_map *t, int len, int align)
 	count = 0;
 	for (;;) {
 		off_new = find_next_zero_bit(t->map, t->size, offset);
-		off_new = (off_new + align1) & ~align1;
+		off_new = ((off_new + align1) & ~align1) + color;
 		count += off_new - offset;
 		offset = off_new;
 		if (offset >= t->size)
@@ -121,6 +129,4 @@ void bit_map_init(struct bit_map *t, unsigned long *map, int size)
 	spin_lock_init(&t->lock);
 	t->map = map;
 	t->size = size;
-	t->last_size = 0;
-	t->first_free = 0;
 }

@@ -66,7 +66,7 @@ struct rif_cache_s {
  
 static struct rif_cache_s *rif_table[RIF_TABLE_SIZE];
 
-static spinlock_t rif_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rif_lock);
 
 
 /*

@@ -109,7 +109,7 @@ bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 	return 0;
 }
 
-int
+static int
 bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 		 struct scatterlist *sglist,
 		 unsigned int yoffset,  unsigned int ybpl,
@@ -227,7 +227,7 @@ bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 	return 0;
 }
 
-int
+static int
 bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 		  const struct bttv_format *fmt, struct bttv_overlay *ov,
 		  int skip_even, int skip_odd)
@@ -315,7 +315,7 @@ bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 
 /* ---------------------------------------------------------- */
 
-void
+static void
 bttv_calc_geo(struct bttv *btv, struct bttv_geometry *geo,
 	      int width, int height, int interleaved, int norm)
 {
@@ -363,7 +363,7 @@ bttv_calc_geo(struct bttv *btv, struct bttv_geometry *geo,
         }
 }
 
-void
+static void
 bttv_apply_geo(struct bttv *btv, struct bttv_geometry *geo, int odd)
 {
         int off = odd ? 0x80 : 0x00;

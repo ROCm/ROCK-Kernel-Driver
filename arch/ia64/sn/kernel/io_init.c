@@ -7,6 +7,7 @@
  */
 
 #include <linux/bootmem.h>
+#include <linux/nodemask.h>
 #include <asm/sn/types.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/addrs.h>
@@ -201,7 +202,7 @@ static void sn_pci_fixup_slot(struct pci_dev *dev)
 	struct pci_dev *host_pci_dev;
 	int status = 0;
 
-	SN_PCIDEV_INFO(dev) = kmalloc(sizeof(struct pcidev_info), GFP_KERNEL);
+	dev->sysdata = kmalloc(sizeof(struct pcidev_info), GFP_KERNEL);
 	if (SN_PCIDEV_INFO(dev) <= 0)
 		BUG();		/* Cannot afford to run out of memory */
 	memset(SN_PCIDEV_INFO(dev), 0, sizeof(struct pcidev_info));
@@ -309,8 +310,8 @@ static void sn_pci_controller_fixup(int segment, int busnum)
 	 * after this point.
 	 */
 
-	PCI_CONTROLLER(bus) = controller;
-	SN_PCIBUS_BUSSOFT(bus) = provider_soft;
+	bus->sysdata = controller;
+	PCI_CONTROLLER(bus)->platform_data = provider_soft;
 
 	nasid = NASID_GET(SN_PCIBUS_BUSSOFT(bus)->bs_base);
 	cnode = nasid_to_cnodeid(nasid);
@@ -382,7 +383,7 @@ void hubdev_init_node(nodepda_t * npda, cnodeid_t node)
 
 	struct hubdev_info *hubdev_info;
 
-	if (node >= numnodes)	/* Headless/memless IO nodes */
+	if (node >= num_online_nodes())	/* Headless/memless IO nodes */
 		hubdev_info =
 		    (struct hubdev_info *)alloc_bootmem_node(NODE_DATA(0),
 							     sizeof(struct

@@ -172,8 +172,6 @@ extern struct pci_controller ddb5477_io_controller;
 
 static int  ddb5477_setup(void)
 {
-	extern int panic_timeout;
-
 	/* initialize board - we don't trust the loader */
         ddb5477_board_init();
 

@@ -61,9 +61,13 @@ extern char wakeup_start, wakeup_end;
 
 extern unsigned long FASTCALL(acpi_copy_wakeup_routine(unsigned long));
 
+static pgd_t low_ptr;
+
 static void init_low_mapping(void)
 {
-	cpu_pda[0].level4_pgt[0] = cpu_pda[0].level4_pgt[pml4_index(PAGE_OFFSET)];
+	pgd_t *slot0 = pgd_offset(current->mm, 0UL);
+	low_ptr = *slot0;
+	set_pgd(slot0, *pgd_offset(current->mm, PAGE_OFFSET));
 	flush_tlb_all();
 }
 
@@ -97,7 +101,7 @@ int acpi_save_state_disk (void)
  */
 void acpi_restore_state_mem (void)
 {
-	cpu_pda[0].level4_pgt[0] = 0;
+	set_pgd(pgd_offset(current->mm, 0UL), low_ptr);
 	flush_tlb_all();
 }
 

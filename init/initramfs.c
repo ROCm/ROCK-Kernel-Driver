@@ -241,10 +241,9 @@ static __initdata int wfd;
 static int __init do_name(void)
 {
 	state = SkipIt;
-	next_state = Start;
+	next_state = Reset;
 	if (strcmp(collected, "TRAILER!!!") == 0) {
 		free_hash();
-		next_state = Reset;
 		return 0;
 	}
 	if (dry_run)
@@ -295,7 +294,7 @@ static int __init do_symlink(void)
 	sys_symlink(collected + N_ALIGN(name_len), collected);
 	sys_lchown(collected, uid, gid);
 	state = SkipIt;
-	next_state = Start;
+	next_state = Reset;
 	return 0;
 }
 
@@ -331,6 +330,10 @@ static void __init flush_buffer(char *buf, unsigned len)
 			buf += written;
 			len -= written;
 			state = Start;
+		} else if (c == 0) {
+			buf += written;
+			len -= written;
+			state = Reset;
 		} else
 			error("junk in compressed archive");
 	}
@@ -410,7 +413,7 @@ static void __init flush_window(void)
 	outcnt = 0;
 }
 
-char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
+static char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
 {
 	int written;
 	dry_run = check_only;
@@ -460,15 +463,15 @@ char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
 	return message;
 }
 
-extern char __initramfs_start, __initramfs_end;
+extern char __initramfs_start[], __initramfs_end[];
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/initrd.h>
 #endif
 
 void __init populate_rootfs(void)
 {
-	char *err = unpack_to_rootfs(&__initramfs_start,
-			 &__initramfs_end - &__initramfs_start, 0);
+	char *err = unpack_to_rootfs(__initramfs_start,
+			 __initramfs_end - __initramfs_start, 0);
 	if (err)
 		panic(err);
 #ifdef CONFIG_BLK_DEV_INITRD

@@ -51,7 +51,7 @@
 #endif
 
 static LIST_HEAD(registered_mechs);
-static spinlock_t registered_mechs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(registered_mechs_lock);
 
 static void
 gss_mech_free(struct gss_api_mech *gm)
@@ -150,9 +150,8 @@ gss_mech_get_by_name(char *name)
 	spin_lock(&registered_mechs_lock);
 	list_for_each_entry(pos, &registered_mechs, gm_list) {
 		if (0 == strcmp(name, pos->gm_name)) {
-			if (!try_module_get(pos->gm_owner))
-				continue;
-			gm = pos;
+			if (try_module_get(pos->gm_owner))
+				gm = pos;
 			break;
 		}
 	}
@@ -182,13 +181,12 @@ gss_mech_get_by_pseudoflavor(u32 pseudoflavor)
 
 	spin_lock(&registered_mechs_lock);
 	list_for_each_entry(pos, &registered_mechs, gm_list) {
-		if (!try_module_get(pos->gm_owner))
-			continue;
 		if (!mech_supports_pseudoflavor(pos, pseudoflavor)) {
 			module_put(pos->gm_owner);
 			continue;
 		}
-		gm = pos;
+		if (try_module_get(pos->gm_owner))
+			gm = pos;
 		break;
 	}
 	spin_unlock(&registered_mechs_lock);

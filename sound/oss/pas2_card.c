@@ -240,8 +240,6 @@ static int __init config_pas_hw(struct address_info *hw_config)
 	mix_write(0x80 | 5, 0x078B);
 	mix_write(5, 0x078B);
 
-#if !defined(DISABLE_SB_EMULATION)
-
 	{
 		struct address_info *sb_config;
 
@@ -279,9 +277,6 @@ static int __init config_pas_hw(struct address_info *hw_config)
 		else
 			pas_write(0x00, 0xF788);
 	}
-#else
-	pas_write(0x00, 0xF788);
-#endif
 
 	if (!ok)
 		printk(KERN_WARNING "PAS16: Driver not enabled\n");
@@ -349,11 +344,6 @@ static void __init attach_pas_card(struct address_info *hw_config)
 		if (config_pas_hw(hw_config))
 		{
 			pas_pcm_init(hw_config);
-
-#if !defined(MODULE) && !defined(DISABLE_SB_EMULATION)
-			sb_dsp_disable_midi(pas_sb_base);	/* No MIDI capability */
-#endif
-
 			pas_midi_init();
 			pas_init_mixer();
 		}
@@ -393,19 +383,19 @@ static int __initdata sb_irq	= -1;
 static int __initdata sb_dma	= -1;
 static int __initdata sb_dma16	= -1;
 
-MODULE_PARM(io,"i");
-MODULE_PARM(irq,"i");
-MODULE_PARM(dma,"i");
-MODULE_PARM(dma16,"i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(dma, int, 0);
+module_param(dma16, int, 0);
 
-MODULE_PARM(sb_io,"i");
-MODULE_PARM(sb_irq,"i");
-MODULE_PARM(sb_dma,"i");
-MODULE_PARM(sb_dma16,"i");
+module_param(sb_io, int, 0);
+module_param(sb_irq, int, 0);
+module_param(sb_dma, int, 0);
+module_param(sb_dma16, int, 0);
 
-MODULE_PARM(joystick,"i");
-MODULE_PARM(symphony,"i");
-MODULE_PARM(broken_bus_clock,"i");
+module_param(joystick, bool, 0);
+module_param(symphony, bool, 0);
+module_param(broken_bus_clock, bool, 0);
 
 MODULE_LICENSE("GPL");
 

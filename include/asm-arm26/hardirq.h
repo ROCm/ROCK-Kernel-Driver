@@ -7,10 +7,6 @@
 
 typedef struct {
 	unsigned int __softirq_pending;
-	unsigned int __local_irq_count;
-	unsigned int __local_bh_count;
-	unsigned int __syscall_count;
-	struct task_struct * __ksoftirqd_task; /* waitqueue is too large */
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
@@ -29,14 +25,17 @@ typedef struct {
 #define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
 
 #ifndef CONFIG_SMP
-#define irq_exit()							\
-	do {								\
-		preempt_count() -= HARDIRQ_OFFSET;			\
-		if (!in_interrupt() && softirq_pending(smp_processor_id())) \
-			__asm__("bl%? __do_softirq": : : "lr");/* out of line */\
-		preempt_enable_no_resched();				\
-	} while (0)
 
+extern asmlinkage void __do_softirq(void);
+
+#define irq_exit()                                                      \
+        do {                                                            \
+                preempt_count() -= IRQ_EXIT_OFFSET;                     \
+                if (!in_interrupt() && local_softirq_pending())         \
+                        __do_softirq();                                 \
+                preempt_enable_no_resched();                            \
+        } while (0)
 #endif
+
 
 #endif /* __ASM_HARDIRQ_H */

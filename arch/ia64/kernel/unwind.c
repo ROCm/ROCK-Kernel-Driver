@@ -59,16 +59,9 @@
 
 #ifdef UNW_DEBUG
   static unsigned int unw_debug_level = UNW_DEBUG;
-#  ifdef CONFIG_KDB
-#    include <linux/kdb.h>
-#    define UNW_DEBUG_ON(n)	(unw_debug_level >= n && !KDB_IS_RUNNING())
-#    define UNW_DPRINT(n, ...)	if (UNW_DEBUG_ON(n)) kdb_printf(__VA_ARGS__)
-#  else	/* !CONFIG_KDB */
-#    define UNW_DEBUG_ON(n)	unw_debug_level >= n
-     /* Do not code a printk level, not all debug lines end in newline */
-#    define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
-#  endif /* CONFIG_KDB */
-#  undef inline
+#  define UNW_DEBUG_ON(n)	unw_debug_level >= n
+   /* Do not code a printk level, not all debug lines end in newline */
+#  define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
 #  define inline
 #else /* !UNW_DEBUG */
 #  define UNW_DEBUG_ON(n)  0
@@ -2058,6 +2051,8 @@ unw_init_frame_info (struct unw_frame_info *info, struct task_struct *t, struct 
 	find_save_locs(info);
 }
 
+EXPORT_SYMBOL(unw_init_frame_info);
+
 void
 unw_init_from_blocked_task (struct unw_frame_info *info, struct task_struct *t)
 {
@@ -2261,7 +2256,7 @@ unw_init (void)
 		if (i > 0)
 			unw.cache[i].lru_chain = (i - 1);
 		unw.cache[i].coll_chain = -1;
-		unw.cache[i].lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&unw.cache[i].lock);
 	}
 	unw.lru_head = UNW_CACHE_SIZE - 1;
 	unw.lru_tail = 0;

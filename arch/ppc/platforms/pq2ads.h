@@ -40,6 +40,8 @@
 #define BCSR1_FETH_RST		((uint)0x04000000)	/* 0 == reset */
 #define BCSR1_RS232_EN1		((uint)0x02000000)	/* 0 == enable */
 #define BCSR1_RS232_EN2		((uint)0x01000000)	/* 0 == enable */
+#define BCSR3_FETHIEN2		((uint)0x10000000)	/* 0 == enable */
+#define BCSR3_FETH2_RST 	((uint)0x80000000)	/* 0 == reset */
 
 #define PHY_INTERRUPT	SIU_INT_IRQ7
 

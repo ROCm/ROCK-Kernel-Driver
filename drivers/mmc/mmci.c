@@ -14,14 +14,15 @@
 #include <linux/ioport.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
-#include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/err.h>
+#include <linux/highmem.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/protocol.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/scatterlist.h>
 #include <asm/hardware/amba.h>
 #include <asm/hardware/clock.h>
 #include <asm/mach/mmc.h>

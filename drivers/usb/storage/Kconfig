@@ -47,7 +47,7 @@ config USB_STORAGE_RW_DETECT
 
 	  Saying Y here allows these commands to be sent to a USB device.
 	  If you find a device this doesn't work for, switch to N and let
-	  us know at usb-storage@lists.one-eyed-alien.net
+	  us know at <usb-storage@lists.one-eyed-alien.net>
 
 	  If you say N here, the kernel will assume that all disk-like USB
 	  devices are write-enabled.

@@ -309,8 +309,8 @@ static void emu10k1_unregister_devices(struct emu10k1_card *card)
 	unregister_sound_dsp(card->audio_dev);
 }
 
-int emu10k1_info_proc (char *page, char **start, off_t off,
-		    int count, int *eof, void *data)
+static int emu10k1_info_proc (char *page, char **start, off_t off,
+			      int count, int *eof, void *data)
 {
 	struct emu10k1_card *card = data;
 	int len = 0;
@@ -524,7 +524,7 @@ static void __devinit timer_init(struct emu10k1_card *card)
 {
 	INIT_LIST_HEAD(&card->timers);
 	card->timer_delay = TIMER_STOPPED;
-	card->timer_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&card->timer_lock);
 }
 
 static void __devinit addxmgr_init(struct emu10k1_card *card)
@@ -873,7 +873,7 @@ static int __devinit fx_init(struct emu10k1_card *card)
 		sblive_writeptr(card, DBG, 0, 0);
 	}
 
-	mgr->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&mgr->lock);
 
 	// Set up Volume controls, try to keep this the same for both Audigy and Live
 

@@ -210,32 +210,17 @@ unsigned long ffb_get_unmapped_area(struct file *filp,
 	return addr;
 }
 
-#include "drm_core.h"
-
-/* This functions must be here since it references DRM(numdevs)
- * which drm_drv.h declares.
- */
 static int ffb_presetup(drm_device_t *dev)
 {
 	ffb_dev_priv_t	*ffb_priv;
-	drm_device_t *temp_dev;
 	int ret = 0;
-	int i;
+	int i = 0;
 
 	/* Check for the case where no device was found. */
 	if (ffb_position == NULL)
 		return -ENODEV;
 
-	/* Find our instance number by finding our device in dev structure */
-	for (i = 0; i < DRM(numdevs); i++) {
-		temp_dev = &(DRM(device)[i]);
-		if(temp_dev == dev)
-			break;
-	}
-
-	if (i == DRM(numdevs))
-		return -ENODEV;
-
+	/* code used to use numdevs no numdevs anymore */
 	ffb_priv = kmalloc(sizeof(ffb_dev_priv_t), GFP_KERNEL);
 	if (!ffb_priv)
 		return -ENOMEM;
@@ -307,16 +292,74 @@ static unsigned long ffb_driver_get_reg_ofs(drm_device_t *dev)
        return 0;
 }
 
-void ffb_driver_register_fns(drm_device_t *dev)
+static int postinit( struct drm_device *dev, unsigned long flags ) 
 {
-	ffb_set_context_ioctls();
-	DRM(fops).get_unmapped_area = ffb_get_unmapped_area;
-	dev->fn_tbl.release = ffb_driver_release;
-	dev->fn_tbl.presetup = ffb_presetup;
-	dev->fn_tbl.pretakedown = ffb_driver_pretakedown;
-	dev->fn_tbl.postcleanup = ffb_driver_postcleanup;
-	dev->fn_tbl.kernel_context_switch = ffb_context_switch;
-	dev->fn_tbl.kernel_context_switch_unlock = ffb_driver_kernel_context_switch_unlock;
-	dev->fn_tbl.get_map_ofs = ffb_driver_get_map_ofs;
-	dev->fn_tbl.get_reg_ofs = ffb_driver_get_reg_ofs;
+	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d\n",
+		DRIVER_NAME,
+		DRIVER_MAJOR,
+		DRIVER_MINOR,
+		DRIVER_PATCHLEVEL,
+		DRIVER_DATE,
+		dev->minor
+		);
+	return 0;
 }
+
+static int version( drm_version_t *version )
+{
+	int len;
+
+	version->version_major = DRIVER_MAJOR;
+	version->version_minor = DRIVER_MINOR;
+	version->version_patchlevel = DRIVER_PATCHLEVEL;
+	DRM_COPY( version->name, DRIVER_NAME );
+	DRM_COPY( version->date, DRIVER_DATE );
+	DRM_COPY( version->desc, DRIVER_DESC );
+	return 0;
+}
+
+static drm_ioctl_desc_t ioctls[] = {
+	
+};
+
+static struct drm_driver driver = {
+	.driver_features = 0,
+	.dev_priv_size = sizeof(u32),
+	.release = ffb_driver_release,
+	.presetup = ffb_presetup,
+	.pretakedown = ffb_driver_pretakedown,
+	.postcleanup = ffb_driver_postcleanup,
+	.kernel_context_switch = ffb_driver_context_switch,
+	.kernel_context_switch_unlock = ffb_driver_kernel_context_switch_unlock,
+	.get_map_ofs = ffb_driver_get_map_ofs,
+	.get_reg_ofs = ffb_driver_get_reg_ofs,
+	.postinit = postinit,
+	.version = version,
+	.ioctls = ioctls,
+	.num_ioctls = DRM_ARRAY_SIZE(ioctls),
+	.fops = {
+		.owner = THIS_MODULE,
+		.open = drm_open,
+		.release = drm_release,
+		.ioctl = drm_ioctl,
+		.mmap = drm_mmap,
+		.poll = drm_poll,
+		.fasync = drm_fasync,
+	},
+};
+
+static int __init ffb_init(void)
+{
+	return -ENODEV;
+}
+
+static void __exit ffb_exit(void)
+{
+}
+
+module_init(ffb_init);
+module_exit(ffb_exit);
+
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL and additional rights");

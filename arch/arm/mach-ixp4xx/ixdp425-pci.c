@@ -14,6 +14,7 @@
  *
  */
 
+#include <linux/kernel.h>
 #include <linux/config.h>
 #include <linux/pci.h>
 #include <linux/init.h>
@@ -73,9 +74,8 @@ struct hw_pci ixdp425_pci __initdata = {
 
 int __init ixdp425_pci_init(void)
 {
-	if (machine_is_ixdp425() || 
-		machine_is_ixcdp1100() || 
-		machine_is_avila())
+	if (machine_is_ixdp425() || machine_is_ixcdp1100() ||
+			machine_is_avila() || machine_is_ixdp465())
 		pci_common_init(&ixdp425_pci);
 	return 0;
 }

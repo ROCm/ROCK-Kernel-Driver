@@ -315,7 +315,7 @@ ia32_sys_call_table:
 	.quad sys_unlink		/* 10 */
 	.quad stub32_execve
 	.quad sys_chdir
-	.quad sys32_time
+	.quad compat_sys_time
 	.quad sys_mknod
 	.quad sys_chmod		/* 15 */
 	.quad sys_lchown16
@@ -327,7 +327,7 @@ ia32_sys_call_table:
 	.quad sys_oldumount	/* old_umount  */
 	.quad sys_setuid16
 	.quad sys_getuid16
-	.quad sys_stime		/* stime */		/* 25 */
+	.quad compat_sys_stime	/* stime */		/* 25 */
 	.quad sys32_ptrace	/* ptrace */
 	.quad sys_alarm
 	.quad sys_fstat	/* (old)fstat */
@@ -388,7 +388,11 @@ ia32_sys_call_table:
 	.quad sys_symlink
 	.quad sys_lstat
 	.quad sys_readlink		/* 85 */
+#ifdef CONFIG_IA32_AOUT
 	.quad sys_uselib
+#else
+	.quad quiet_ni_syscall
+#endif
 	.quad sys_swapon
 	.quad sys_reboot
 	.quad compat_sys_old_readdir
@@ -479,7 +483,7 @@ ia32_sys_call_table:
 	.quad sys32_rt_sigaction
 	.quad sys32_rt_sigprocmask	/* 175 */
 	.quad sys32_rt_sigpending
-	.quad sys32_rt_sigtimedwait
+	.quad compat_sys_rt_sigtimedwait
 	.quad sys32_rt_sigqueueinfo
 	.quad stub32_rt_sigsuspend
 	.quad sys32_pread		/* 180 */
@@ -587,6 +591,10 @@ ia32_sys_call_table:
 	.quad compat_sys_mq_getsetattr
 	.quad quiet_ni_syscall		/* reserved for kexec */
 	.quad sys32_waitid
+	.quad quiet_ni_syscall		/* sys_altroot */
+	.quad sys_add_key
+	.quad sys_request_key
+	.quad sys_keyctl
 	/* don't forget to change IA32_NR_syscalls */
 ia32_syscall_end:		
 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8

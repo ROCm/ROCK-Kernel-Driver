@@ -46,6 +46,8 @@
 
 #define VERSION "1.0"
 
+static int ignore = 0;
+
 static struct usb_device_id bcm203x_table[] = {
 	/* Broadcom Blutonium (BCM2033) */
 	{ USB_DEVICE(0x0a5c, 0x2033) },
@@ -54,7 +56,6 @@ static struct usb_device_id bcm203x_table[] = {
 };
 
 MODULE_DEVICE_TABLE(usb, bcm203x_table);
-
 
 #define BCM203X_ERROR		0
 #define BCM203X_RESET		1
@@ -175,7 +176,7 @@ static int bcm203x_probe(struct usb_interface *intf, const struct usb_device_id 
 
 	BT_DBG("intf %p id %p", intf, id);
 
-	if (intf->cur_altsetting->desc.bInterfaceNumber != 0)
+	if (ignore || (intf->cur_altsetting->desc.bInterfaceNumber != 0))
 		return -ENODEV;
 
 	data = kmalloc(sizeof(*data), GFP_KERNEL);
@@ -303,6 +304,9 @@ static void __exit bcm203x_exit(void)
 
 module_init(bcm203x_init);
 module_exit(bcm203x_exit);
+
+module_param(ignore, bool, 0644);
+MODULE_PARM_DESC(ignore, "Ignore devices from the matching table");
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Broadcom Blutonium firmware driver ver " VERSION);

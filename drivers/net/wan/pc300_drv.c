@@ -1776,7 +1776,7 @@ void cpc_tx_timeout(struct net_device *dev)
 	pc300_t *card = (pc300_t *) chan->card;
 	struct net_device_stats *stats = hdlc_stats(dev);
 	int ch = chan->channel;
-	uclong flags;
+	unsigned long flags;
 	ucchar ilar;
 
 	stats->tx_errors++;
@@ -1804,7 +1804,7 @@ int cpc_queue_xmit(struct sk_buff *skb, struct net_device *dev)
 	pc300_t *card = (pc300_t *) chan->card;
 	struct net_device_stats *stats = hdlc_stats(dev);
 	int ch = chan->channel;
-	uclong flags;
+	unsigned long flags;
 #ifdef PC300_DEBUG_TX
 	int i;
 #endif
@@ -2407,7 +2407,7 @@ void cpc_sca_status(pc300_t * card, int ch)
 {
 	ucchar ilar;
 	void __iomem *scabase = card->hw.scabase;
-	uclong flags;
+	unsigned long flags;
 
 	tx_dma_buf_check(card, ch);
 	rx_dma_buf_check(card, ch);
@@ -2499,7 +2499,7 @@ void cpc_falc_status(pc300_t * card, int ch)
 {
 	pc300ch_t *chan = &card->chan[ch];
 	falc_t *pfalc = (falc_t *) & chan->falc;
-	uclong flags;
+	unsigned long flags;
 
 	CPC_LOCK(card, flags);
 	printk("CH%d:   %s %s  %d channels\n",
@@ -3179,7 +3179,7 @@ int cpc_close(struct net_device *dev)
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	uclong flags;
+	unsigned long flags;
 
 #ifdef	PC300_DEBUG_OTHER
 	printk("pc300: cpc_close");

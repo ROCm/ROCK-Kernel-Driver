@@ -28,7 +28,7 @@
 
 char x86_boot_params[2048] __initdata = {0,};
 
-unsigned long cpu_initialized __initdata = 0;
+cpumask_t cpu_initialized __initdata = CPU_MASK_NONE;
 
 struct x8664_pda cpu_pda[NR_CPUS] __cacheline_aligned; 
 
@@ -50,7 +50,7 @@ Control non executable mappings for 64bit processes.
 on	Enable(default)
 off	Disable
 */ 
-static int __init nonx_setup(char *str)
+void __init nonx_setup(const char *str)
 {
 	if (!strcmp(str, "on")) {
                 __supported_pte_mask |= _PAGE_NX; 
@@ -59,14 +59,11 @@ static int __init nonx_setup(char *str)
 		do_not_nx = 1;
 		__supported_pte_mask &= ~_PAGE_NX;
         } 
-        return 1;
 } 
-
-__setup("noexec=", nonx_setup); 
 
 /*
  * Great future plan:
- * Declare PDA itself and support (irqstack,tss,pml4) as per cpu data.
+ * Declare PDA itself and support (irqstack,tss,pgd) as per cpu data.
  * Always point %gs to its beginning
  */
 void __init setup_per_cpu_areas(void)
@@ -83,13 +80,13 @@ void __init setup_per_cpu_areas(void)
 
 	for (i = 0; i < NR_CPUS; i++) { 
 		unsigned char *ptr;
-		/* If possible allocate on the node of the CPU.
-		   In case it doesn't exist round-robin nodes. */
-		if (!NODE_DATA(i % numnodes)) { 
-			printk("cpu with no node %d, numnodes %d\n", i, numnodes);
+
+		if (!NODE_DATA(cpu_to_node(i))) {
+			printk("cpu with no node %d, num_online_nodes %d\n",
+			       i, num_online_nodes());
 			ptr = alloc_bootmem(size);
 		} else { 
-			ptr = alloc_bootmem_node(NODE_DATA(i % numnodes), size);
+			ptr = alloc_bootmem_node(NODE_DATA(cpu_to_node(i)), size);
 		}
 		if (!ptr)
 			panic("Cannot allocate cpu data for CPU %d\n", i);
@@ -100,7 +97,6 @@ void __init setup_per_cpu_areas(void)
 
 void pda_init(int cpu)
 { 
-        pml4_t *level4;
 	struct x8664_pda *pda = &cpu_pda[cpu];
 
 	/* Setup up data that may be needed in __get_free_pages early */
@@ -119,22 +115,14 @@ void pda_init(int cpu)
 		/* others are initialized in smpboot.c */
 		pda->pcurrent = &init_task;
 		pda->irqstackptr = boot_cpu_stack; 
-		level4 = init_level4_pgt; 
 	} else {
-		level4 = (pml4_t *)__get_free_pages(GFP_ATOMIC, 0); 
-		if (!level4) 
-			panic("Cannot allocate top level page for cpu %d", cpu); 
 		pda->irqstackptr = (char *)
 			__get_free_pages(GFP_ATOMIC, IRQSTACK_ORDER);
 		if (!pda->irqstackptr)
 			panic("cannot allocate irqstack for cpu %d", cpu); 
 	}
 
-	pda->level4_pgt = (unsigned long *)level4; 
-	if (level4 != init_level4_pgt)
-		memcpy(level4, &init_level4_pgt, PAGE_SIZE); 
-	set_pml4(level4 + 510, mk_kernel_pml4(__pa_symbol(boot_vmalloc_pgt)));
-	asm volatile("movq %0,%%cr3" :: "r" (__pa(level4))); 
+	asm volatile("movq %0,%%cr3" :: "r" (__pa_symbol(&init_level4_pgt)));
 
 	pda->irqstackptr += IRQSTACKSIZE-64;
 } 
@@ -199,7 +187,7 @@ void __init cpu_init (void)
 
 	me = current;
 
-	if (test_and_set_bit(cpu, &cpu_initialized))
+	if (cpu_test_and_set(cpu, cpu_initialized))
 		panic("CPU#%d already initialized!\n", cpu);
 
 	printk("Initializing CPU#%d\n", cpu);
@@ -226,9 +214,6 @@ void __init cpu_init (void)
 	 */
 
 	asm volatile("pushfq ; popq %%rax ; btr $14,%%rax ; pushq %%rax ; popfq" ::: "eax");
-
-	if (cpu == 0) 
-		early_identify_cpu(&boot_cpu_data);
 
 	syscall_init();
 
@@ -283,8 +268,4 @@ void __init cpu_init (void)
 	set_debug(0UL, 7);
 
 	fpu_init(); 
-
-#ifdef CONFIG_NUMA
-	numa_add_cpu(cpu);
-#endif
 }

@@ -29,9 +29,7 @@
 #define DPRINTK(fmt, args...)
 #endif
 
-
-const char *global_mode_option = NULL;
-
+const char *global_mode_option;
 
     /*
      *  Standard video mode definitions (taken from XFree86)

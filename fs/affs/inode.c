@@ -10,26 +10,7 @@
  *  (C) 1991  Linus Torvalds - minix filesystem
  */
 
-#include <asm/div64.h>
-#include <linux/errno.h>
-#include <linux/fs.h>
-#include <linux/slab.h>
-#include <linux/stat.h>
-#include <linux/time.h>
-#include <linux/affs_fs.h>
-#include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/string.h>
-#include <linux/genhd.h>
-#include <linux/amigaffs.h>
-#include <linux/major.h>
-#include <linux/blkdev.h>
-#include <linux/init.h>
-#include <linux/smp_lock.h>
-#include <linux/buffer_head.h>
-#include <asm/system.h>
-#include <asm/uaccess.h>
-#include <linux/module.h>
+#include "affs.h"
 
 extern struct inode_operations affs_symlink_inode_operations;
 extern struct timezone sys_tz;
@@ -322,7 +303,7 @@ affs_new_inode(struct inode *dir)
 	inode->i_gid     = current->fsgid;
 	inode->i_ino     = block;
 	inode->i_nlink   = 1;
-	inode->i_mtime   = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime   = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;
 	AFFS_I(inode)->i_opencnt = 0;
 	AFFS_I(inode)->i_blkcnt = 0;
 	AFFS_I(inode)->i_lc = NULL;
@@ -428,4 +409,3 @@ err:
 	affs_unlock_link(inode);
 	goto done;
 }
-MODULE_LICENSE("GPL");

@@ -119,11 +119,11 @@ struct ip_vs_sync_buff {
 
 /* the sync_buff list head and the lock */
 static LIST_HEAD(ip_vs_sync_queue);
-static spinlock_t ip_vs_sync_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ip_vs_sync_lock);
 
 /* current sync_buff for accepting new conn entries */
 static struct ip_vs_sync_buff   *curr_sb = NULL;
-static spinlock_t curr_sb_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(curr_sb_lock);
 
 /* ipvs sync daemon state */
 volatile int ip_vs_sync_state = IP_VS_STATE_NONE;
@@ -343,7 +343,7 @@ static void ip_vs_process_message(const char *buffer, const size_t buflen)
  */
 static void set_mcast_loop(struct sock *sk, u_char loop)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	/* setsockopt(sock, SOL_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop)); */
 	lock_sock(sk);
@@ -356,7 +356,7 @@ static void set_mcast_loop(struct sock *sk, u_char loop)
  */
 static void set_mcast_ttl(struct sock *sk, u_char ttl)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	/* setsockopt(sock, SOL_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)); */
 	lock_sock(sk);
@@ -370,7 +370,7 @@ static void set_mcast_ttl(struct sock *sk, u_char ttl)
 static int set_mcast_if(struct sock *sk, char *ifname)
 {
 	struct net_device *dev;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 
 	if ((dev = __dev_get_by_name(ifname)) == NULL)
 		return -ENODEV;

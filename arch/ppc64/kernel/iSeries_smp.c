@@ -37,7 +37,6 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 #include <asm/smp.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/iSeries/HvCall.h>
@@ -91,7 +90,7 @@ static int smp_iSeries_numProcs(void)
 
 	np = 0;
         for (i=0; i < NR_CPUS; ++i) {
-                if (paca[i].lppaca.xDynProcStatus < 2) {
+                if (paca[i].lppaca.dyn_proc_status < 2) {
 			cpu_set(i, cpu_possible_map);
 			cpu_set(i, cpu_present_map);
 			cpu_set(i, cpu_sibling_map[i]);
@@ -107,7 +106,7 @@ static int smp_iSeries_probe(void)
 	unsigned np = 0;
 
 	for (i=0; i < NR_CPUS; ++i) {
-		if (paca[i].lppaca.xDynProcStatus < 2) {
+		if (paca[i].lppaca.dyn_proc_status < 2) {
 			/*paca[i].active = 1;*/
 			++np;
 		}
@@ -121,7 +120,7 @@ static void smp_iSeries_kick_cpu(int nr)
 	BUG_ON(nr < 0 || nr >= NR_CPUS);
 
 	/* Verify that our partition has a processor nr */
-	if (paca[nr].lppaca.xDynProcStatus >= 2)
+	if (paca[nr].lppaca.dyn_proc_status >= 2)
 		return;
 
 	/* The processor is currently spinning, waiting

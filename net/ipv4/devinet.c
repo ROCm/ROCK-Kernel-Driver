@@ -380,7 +380,7 @@ struct in_ifaddr *inet_ifa_byprefix(struct in_device *in_dev, u32 prefix,
 	return NULL;
 }
 
-int inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
+static int inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 {
 	struct rtattr **rta = arg;
 	struct in_device *in_dev;
@@ -399,7 +399,7 @@ int inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		     memcmp(RTA_DATA(rta[IFA_LOCAL - 1]),
 			    &ifa->ifa_local, 4)) ||
 		    (rta[IFA_LABEL - 1] &&
-		     strcmp(RTA_DATA(rta[IFA_LABEL - 1]), ifa->ifa_label)) ||
+		     rtattr_strcmp(rta[IFA_LABEL - 1], ifa->ifa_label)) ||
 		    (rta[IFA_ADDRESS - 1] &&
 		     (ifm->ifa_prefixlen != ifa->ifa_prefixlen ||
 		      !inet_ifa_match(*(u32*)RTA_DATA(rta[IFA_ADDRESS - 1]),
@@ -412,7 +412,7 @@ out:
 	return -EADDRNOTAVAIL;
 }
 
-int inet_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
+static int inet_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 {
 	struct rtattr **rta = arg;
 	struct net_device *dev;
@@ -456,7 +456,7 @@ int inet_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	in_dev_hold(in_dev);
 	ifa->ifa_dev   = in_dev;
 	if (rta[IFA_LABEL - 1])
-		memcpy(ifa->ifa_label, RTA_DATA(rta[IFA_LABEL - 1]), IFNAMSIZ);
+		rtattr_strlcpy(ifa->ifa_label, rta[IFA_LABEL - 1], IFNAMSIZ);
 	else
 		memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);
 

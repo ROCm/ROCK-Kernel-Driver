@@ -65,8 +65,6 @@ extern void memcons_setup (void);
 
 void EARLY_INIT_SECTION_ATTR mach_early_init (void)
 {
-	extern int panic_timeout;
-
 	/* The sim85e2 simulator tracks `undefined' values, so to make
 	   debugging easier, we begin by zeroing out all otherwise
 	   undefined registers.  This is not strictly necessary.

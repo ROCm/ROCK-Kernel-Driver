@@ -98,14 +98,10 @@ static struct netlink_table *nl_table;
 static DECLARE_WAIT_QUEUE_HEAD(nl_table_wait);
 static unsigned int nl_nonroot[MAX_LINKS];
 
-#ifdef NL_EMULATE_DEV
-static struct socket *netlink_kernel[MAX_LINKS];
-#endif
-
 static int netlink_dump(struct sock *sk);
 static void netlink_destroy_callback(struct netlink_callback *cb);
 
-static rwlock_t nl_table_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(nl_table_lock);
 static atomic_t nl_table_users = ATOMIC_INIT(0);
 
 static struct notifier_block *netlink_chain;
@@ -546,7 +542,7 @@ static void netlink_overrun(struct sock *sk)
 	}
 }
 
-struct sock *netlink_getsockbypid(struct sock *ssk, u32 pid)
+static struct sock *netlink_getsockbypid(struct sock *ssk, u32 pid)
 {
 	int protocol = ssk->sk_protocol;
 	struct sock *sock;
@@ -1202,61 +1198,6 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 }
 
 
-#ifdef NL_EMULATE_DEV
-
-static rwlock_t nl_emu_lock = RW_LOCK_UNLOCKED;
-
-/*
- *	Backward compatibility.
- */	
- 
-int netlink_attach(int unit, int (*function)(int, struct sk_buff *skb))
-{
-	struct sock *sk = netlink_kernel_create(unit, NULL);
-	if (sk == NULL)
-		return -ENOBUFS;
-	nlk_sk(sk)->handler = function;
-	write_lock_bh(&nl_emu_lock);
-	netlink_kernel[unit] = sk->sk_socket;
-	write_unlock_bh(&nl_emu_lock);
-	return 0;
-}
-
-void netlink_detach(int unit)
-{
-	struct socket *sock;
-
-	write_lock_bh(&nl_emu_lock);
-	sock = netlink_kernel[unit];
-	netlink_kernel[unit] = NULL;
-	write_unlock_bh(&nl_emu_lock);
-
-	sock_release(sock);
-}
-
-int netlink_post(int unit, struct sk_buff *skb)
-{
-	struct socket *sock;
-
-	read_lock(&nl_emu_lock);
-	sock = netlink_kernel[unit];
-	if (sock) {
-		struct sock *sk = sock->sk;
-		memset(skb->cb, 0, sizeof(skb->cb));
-		sock_hold(sk);
-		read_unlock(&nl_emu_lock);
-
-		netlink_broadcast(sk, skb, 0, ~0, GFP_ATOMIC);
-
-		sock_put(sk);
-		return 0;
-	}
-	read_unlock(&nl_emu_lock);
-	return -EUNATCH;
-}
-
-#endif
-
 #ifdef CONFIG_PROC_FS
 struct nl_seq_iter {
 	int link;
@@ -1521,8 +1462,3 @@ EXPORT_SYMBOL(netlink_set_nonroot);
 EXPORT_SYMBOL(netlink_unicast);
 EXPORT_SYMBOL(netlink_unregister_notifier);
 
-#if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
-EXPORT_SYMBOL(netlink_attach);
-EXPORT_SYMBOL(netlink_detach);
-EXPORT_SYMBOL(netlink_post);
-#endif

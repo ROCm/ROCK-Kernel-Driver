@@ -27,6 +27,8 @@
 /* cache for request structures */
 static kmem_cache_t *req_cachep;
 
+static int smb_request_send_req(struct smb_request *req);
+
 /*
   /proc/slabinfo:
   name, active, num, objsize, active_slabs, num_slaps, #pages
@@ -133,7 +135,7 @@ static void smb_free_request(struct smb_request *req)
  * What prevents a rget to race with a rput? The count must never drop to zero
  * while it is in use. Only rput if it is ok that it is free'd.
  */
-void smb_rget(struct smb_request *req)
+static void smb_rget(struct smb_request *req)
 {
 	atomic_inc(&req->rq_count);
 }
@@ -380,7 +382,7 @@ int smb_add_request(struct smb_request *req)
  * Send a request and place it on the recvq if successfully sent.
  * Must be called with the server lock held.
  */
-int smb_request_send_req(struct smb_request *req)
+static int smb_request_send_req(struct smb_request *req)
 {
 	struct smb_sb_info *server = req->rq_server;
 	int result;
@@ -592,13 +594,13 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 		if (unlikely(data_offset < hdrlen))
 			goto out_bad_data;
 		else
-	data_offset -= hdrlen;
+			data_offset -= hdrlen;
 	}
 	if (parm_count || parm_offset) {
 		if (unlikely(parm_offset < hdrlen))
 			goto out_bad_parm;
 		else
-	parm_offset -= hdrlen;
+			parm_offset -= hdrlen;
 	}
 
 	if (parm_count == parm_tot && data_count == data_tot) {
@@ -682,10 +684,9 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 	return 1;
 
 out_too_long:
-	printk(KERN_ERR "smb_trans2: data/param too long, data=%d, parm=%d\n",
+	printk(KERN_ERR "smb_trans2: data/param too long, data=%u, parm=%u\n",
 		data_tot, parm_tot);
-	req->rq_errno = -EIO;
-	goto out;
+	goto out_EIO;
 out_no_mem:
 	printk(KERN_ERR "smb_trans2: couldn't allocate data area of %d bytes\n",
 	       req->rq_trans2bufsize);

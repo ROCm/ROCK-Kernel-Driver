@@ -34,7 +34,7 @@ prom_adjust_regs(struct linux_prom_registers *regp, int nregs,
 	}
 }
 
-static void
+void
 prom_adjust_ranges(struct linux_prom_ranges *ranges1, int nranges1,
 		   struct linux_prom_ranges *ranges2, int nranges2)
 {

@@ -959,7 +959,7 @@ MODULE_PARM_DESC(regshifts, "The amount to shift the data read from the."
 #define IPMI_MEM_ADDR_SPACE 1
 #define IPMI_IO_ADDR_SPACE  2
 
-#if defined(CONFIG_ACPI_INTERPETER) || defined(CONFIG_X86) || defined(CONFIG_PCI)
+#if defined(CONFIG_ACPI_INTERPRETER) || defined(CONFIG_X86) || defined(CONFIG_PCI)
 static int is_new_interface(int intf, u8 addr_space, unsigned long base_addr)
 {
 	int i;
@@ -1331,7 +1331,7 @@ static int try_init_mem(int intf_num, struct smi_info **new_info)
 static int acpi_failure = 0;
 
 /* For GPE-type interrupts. */
-u32 ipmi_acpi_gpe(void *context)
+static u32 ipmi_acpi_gpe(void *context)
 {
 	struct smi_info *smi_info = context;
 	unsigned long   flags;
@@ -2253,7 +2253,7 @@ static __init int init_ipmi_si(void)
 }
 module_init(init_ipmi_si);
 
-void __exit cleanup_one_si(struct smi_info *to_clean)
+static void __exit cleanup_one_si(struct smi_info *to_clean)
 {
 	int           rv;
 	unsigned long flags;

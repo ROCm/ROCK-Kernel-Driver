@@ -65,7 +65,7 @@ static inline void ip_vs_app_put(struct ip_vs_app *app)
 /*
  *	Allocate/initialize app incarnation and register it in proto apps.
  */
-int
+static int
 ip_vs_app_inc_new(struct ip_vs_app *app, __u16 proto, __u16 port)
 {
 	struct ip_vs_protocol *pp;

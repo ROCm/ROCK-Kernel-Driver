@@ -15,7 +15,7 @@ extern void pda_init(int);
 extern void early_idt_handler(void);
 
 extern void mcheck_init(struct cpuinfo_x86 *c);
-extern void init_memory_mapping(void);
+extern void init_memory_mapping(unsigned long start, unsigned long end);
 
 extern void system_call(void); 
 extern int kernel_syscall(void);
@@ -25,8 +25,6 @@ extern void ia32_syscall(void);
 extern void ia32_cstar_target(void); 
 extern void ia32_sysenter_target(void); 
 
-extern void calibrate_delay(void);
-extern void cpu_idle(void);
 extern void config_acpi_tables(void);
 extern void ia32_syscall(void);
 extern void iommu_hole_init(void);
@@ -54,7 +52,7 @@ extern void load_gs_index(unsigned gs);
 
 extern unsigned long end_pfn_map; 
 
-extern unsigned long cpu_initialized;
+extern cpumask_t cpu_initialized;
 
 extern void show_trace(unsigned long * rsp);
 extern void show_registers(struct pt_regs *regs);
@@ -107,6 +105,8 @@ extern int iommu_aperture_disabled;
 extern int iommu_aperture_allowed;
 extern int fix_aperture;
 extern int force_iommu;
+
+extern int reboot_force;
 
 extern void smp_local_timer_interrupt(struct pt_regs * regs);
 

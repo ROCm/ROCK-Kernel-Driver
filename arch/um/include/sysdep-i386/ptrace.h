@@ -9,11 +9,52 @@
 #include "uml-config.h"
 
 #ifdef UML_CONFIG_MODE_TT
-#include "ptrace-tt.h"
+#include "sysdep/sc.h"
 #endif
 
 #ifdef UML_CONFIG_MODE_SKAS
-#include "ptrace-skas.h"
+
+/* syscall emulation path in ptrace */
+
+#ifndef PTRACE_SYSEMU
+#define PTRACE_SYSEMU 31
+#endif
+
+void set_using_sysemu(int value);
+int get_using_sysemu(void);
+extern int sysemu_supported;
+
+#include "skas_ptregs.h"
+
+#define HOST_FRAME_SIZE 17
+
+#define REGS_IP(r) ((r)[HOST_IP])
+#define REGS_SP(r) ((r)[HOST_SP])
+#define REGS_EFLAGS(r) ((r)[HOST_EFLAGS])
+#define REGS_EAX(r) ((r)[HOST_EAX])
+#define REGS_EBX(r) ((r)[HOST_EBX])
+#define REGS_ECX(r) ((r)[HOST_ECX])
+#define REGS_EDX(r) ((r)[HOST_EDX])
+#define REGS_ESI(r) ((r)[HOST_ESI])
+#define REGS_EDI(r) ((r)[HOST_EDI])
+#define REGS_EBP(r) ((r)[HOST_EBP])
+#define REGS_CS(r) ((r)[HOST_CS])
+#define REGS_SS(r) ((r)[HOST_SS])
+#define REGS_DS(r) ((r)[HOST_DS])
+#define REGS_ES(r) ((r)[HOST_ES])
+#define REGS_FS(r) ((r)[HOST_FS])
+#define REGS_GS(r) ((r)[HOST_GS])
+
+#define REGS_SET_SYSCALL_RETURN(r, res) REGS_EAX(r) = (res)
+
+#define REGS_RESTART_SYSCALL(r) IP_RESTART_SYSCALL(REGS_IP(r))
+
+#define REGS_SEGV_IS_FIXABLE(r) SEGV_IS_FIXABLE((r)->trap_type)
+
+#define REGS_FAULT_ADDR(r) ((r)->fault_addr)
+
+#define REGS_FAULT_WRITE(r) FAULT_WRITE((r)->fault_type)
+
 #endif
 #ifndef PTRACE_SYSEMU_SINGLESTEP
 #define PTRACE_SYSEMU_SINGLESTEP 32

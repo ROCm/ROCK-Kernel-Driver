@@ -55,8 +55,8 @@ static struct sock *tcpnl;
 static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 			int ext, u32 pid, u32 seq, u16 nlmsg_flags)
 {
-	struct inet_opt *inet = inet_sk(sk);
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcpdiagmsg *r;
 	struct nlmsghdr  *nlh;
 	struct tcp_info  *info = NULL;
@@ -427,7 +427,7 @@ static int tcpdiag_dump_sock(struct sk_buff *skb, struct sock *sk,
 	if (cb->nlh->nlmsg_len > 4 + NLMSG_SPACE(sizeof(*r))) {
 		struct tcpdiag_entry entry;
 		struct rtattr *bc = (struct rtattr *)(r + 1);
-		struct inet_opt *inet = inet_sk(sk);
+		struct inet_sock *inet = inet_sk(sk);
 
 		entry.family = sk->sk_family;
 #ifdef CONFIG_IP_TCPDIAG_IPV6
@@ -458,7 +458,7 @@ static int tcpdiag_fill_req(struct sk_buff *skb, struct sock *sk,
 			    struct open_request *req,
 			    u32 pid, u32 seq)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	unsigned char *b = skb->tail;
 	struct tcpdiagmsg *r;
 	struct nlmsghdr *nlh;
@@ -512,10 +512,10 @@ static int tcpdiag_dump_reqs(struct sk_buff *skb, struct sock *sk,
 {
 	struct tcpdiag_entry entry;
 	struct tcpdiagreq *r = NLMSG_DATA(cb->nlh);
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_listen_opt *lopt;
 	struct rtattr *bc = NULL;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	int j, s_j;
 	int reqnum, s_reqnum;
 	int err = 0;
@@ -609,7 +609,7 @@ static int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 
 			num = 0;
 			sk_for_each(sk, node, &tcp_listening_hash[i]) {
-				struct inet_opt *inet = inet_sk(sk);
+				struct inet_sock *inet = inet_sk(sk);
 
 				if (num < s_num) {
 					num++;
@@ -670,7 +670,7 @@ skip_listen_ht:
 
 		num = 0;
 		sk_for_each(sk, node, &head->chain) {
-			struct inet_opt *inet = inet_sk(sk);
+			struct inet_sock *inet = inet_sk(sk);
 
 			if (num < s_num)
 				goto next_normal;
@@ -692,7 +692,7 @@ next_normal:
 		if (r->tcpdiag_states&TCPF_TIME_WAIT) {
 			sk_for_each(sk, node,
 				    &tcp_ehash[i + tcp_ehash_size].chain) {
-				struct inet_opt *inet = inet_sk(sk);
+				struct inet_sock *inet = inet_sk(sk);
 
 				if (num < s_num)
 					goto next_dying;

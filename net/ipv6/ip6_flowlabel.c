@@ -54,11 +54,11 @@ static struct timer_list ip6_fl_gc_timer = TIMER_INITIALIZER(ip6_fl_gc, 0, 0);
 
 /* FL hash table lock: it protects only of GC */
 
-static rwlock_t ip6_fl_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ip6_fl_lock);
 
 /* Big socket sock */
 
-static rwlock_t ip6_sk_fl_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ip6_sk_fl_lock);
 
 
 static __inline__ struct ip6_flowlabel * __fl_lookup(u32 label)

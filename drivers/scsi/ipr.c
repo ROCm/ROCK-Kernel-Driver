@@ -312,6 +312,8 @@ struct ipr_error_table_t ipr_error_table[] = {
 	"9041: Array protection temporarily suspended"},
 	{0x066B0200, 0, 1,
 	"9030: Array no longer protected due to missing or failed disk unit"},
+	{0x066B8200, 0, 1,
+	"9042: Corrupt array parity detected on specified device"},
 	{0x07270000, 0, 0,
 	"Failure due to other device"},
 	{0x07278000, 0, 1,
@@ -542,7 +544,7 @@ static int ipr_save_pcix_cmd_reg(struct ipr_ioa_cfg *ioa_cfg)
 		return -EIO;
 	}
 
-	if (pci_read_config_word(ioa_cfg->pdev, pcix_cmd_reg,
+	if (pci_read_config_word(ioa_cfg->pdev, pcix_cmd_reg + PCI_X_CMD,
 				 &ioa_cfg->saved_pcix_cmd_reg) != PCIBIOS_SUCCESSFUL) {
 		dev_err(&ioa_cfg->pdev->dev, "Failed to save PCI-X command register\n");
 		return -EIO;
@@ -564,7 +566,7 @@ static int ipr_set_pcix_cmd_reg(struct ipr_ioa_cfg *ioa_cfg)
 	int pcix_cmd_reg = pci_find_capability(ioa_cfg->pdev, PCI_CAP_ID_PCIX);
 
 	if (pcix_cmd_reg) {
-		if (pci_write_config_word(ioa_cfg->pdev, pcix_cmd_reg,
+		if (pci_write_config_word(ioa_cfg->pdev, pcix_cmd_reg + PCI_X_CMD,
 					  ioa_cfg->saved_pcix_cmd_reg) != PCIBIOS_SUCCESSFUL) {
 			dev_err(&ioa_cfg->pdev->dev, "Failed to setup PCI-X command register\n");
 			return -EIO;
@@ -2608,23 +2610,19 @@ static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg) { return 0; };
 #endif
 
 /**
- * ipr_store_queue_depth - Change the device's queue depth
- * @dev:	device struct
- * @buf:	buffer
+ * ipr_change_queue_depth - Change the device's queue depth
+ * @sdev:	scsi device struct
+ * @qdepth:	depth to set
  *
  * Return value:
- * 	number of bytes printed to buffer
+ * 	actual depth set
  **/
-static ssize_t ipr_store_queue_depth(struct device *dev,
-				    const char *buf, size_t count)
+static int ipr_change_queue_depth(struct scsi_device *sdev, int qdepth)
 {
-	struct scsi_device *sdev = to_scsi_device(dev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)sdev->host->hostdata;
 	struct ipr_resource_entry *res;
-	int qdepth = simple_strtoul(buf, NULL, 10);
 	int tagged = 0;
 	unsigned long lock_flags = 0;
-	ssize_t len = -ENXIO;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 	res = (struct ipr_resource_entry *)sdev->hostdata;
@@ -2633,22 +2631,12 @@ static ssize_t ipr_store_queue_depth(struct device *dev,
 
 		if (ipr_is_gscsi(res) && res->tcq_active)
 			tagged = MSG_ORDERED_TAG;
-
-		len = strlen(buf);
 	}
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 	scsi_adjust_queue_depth(sdev, tagged, qdepth);
-	return len;
+	return qdepth;
 }
-
-static struct device_attribute ipr_queue_depth_attr = {
-	.attr = {
-		.name = 	"queue_depth",
-		.mode =		S_IRUSR | S_IWUSR,
-	},
-	.store = ipr_store_queue_depth
-};
 
 /**
  * ipr_show_tcq_enable - Show if the device is enabled for tcqing
@@ -2758,7 +2746,6 @@ static struct device_attribute ipr_adapter_handle_attr = {
 };
 
 static struct device_attribute *ipr_dev_attrs[] = {
-	&ipr_queue_depth_attr,
 	&ipr_tcqing_attr,
 	&ipr_adapter_handle_attr,
 	NULL,
@@ -3904,7 +3891,8 @@ static int ipr_queuecommand(struct scsi_cmnd *scsi_cmd,
 		ioarcb->cmd_pkt.flags_lo |= ipr_get_task_attributes(scsi_cmd);
 	}
 
-	if (!ipr_is_gscsi(res) && scsi_cmd->cmnd[0] >= 0xC0)
+	if (scsi_cmd->cmnd[0] >= 0xC0 &&
+	    (!ipr_is_gscsi(res) || scsi_cmd->cmnd[0] == IPR_QUERY_RSRC_STATE))
 		ioarcb->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
 
 	if (ipr_is_ioa_resource(res) && scsi_cmd->cmnd[0] == MODE_SELECT)
@@ -3958,6 +3946,7 @@ static struct scsi_host_template driver_template = {
 	.slave_alloc = ipr_slave_alloc,
 	.slave_configure = ipr_slave_configure,
 	.slave_destroy = ipr_slave_destroy,
+	.change_queue_depth = ipr_change_queue_depth,
 	.bios_param = ipr_biosparam,
 	.can_queue = IPR_MAX_COMMANDS,
 	.this_id = -1,

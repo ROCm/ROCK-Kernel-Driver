@@ -84,8 +84,8 @@ static struct notifier_block sctp_inet6addr_notifier = {
 };
 
 /* ICMP error handler. */
-void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
-		 int type, int code, int offset, __u32 info)
+SCTP_STATIC void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
+			     int type, int code, int offset, __u32 info)
 {
 	struct inet6_dev *idev;
 	struct ipv6hdr *iph = (struct ipv6hdr *)skb->data;
@@ -122,6 +122,12 @@ void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	case ICMPV6_PKT_TOOBIG:
 		sctp_icmp_frag_needed(sk, asoc, transport, ntohl(info));
 		goto out_unlock;
+	case ICMPV6_PARAMPROB:
+		if (ICMPV6_UNK_NEXTHDR == code) {
+			sctp_icmp_proto_unreachable(sk, ep, asoc, transport);
+			goto out_unlock;
+		}
+		break;
 	default:
 		break;
 	}
@@ -188,9 +194,9 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 /* Returns the dst cache entry for the given source and destination ip
  * addresses.
  */
-struct dst_entry *sctp_v6_get_dst(struct sctp_association *asoc,
-				  union sctp_addr *daddr,
-				  union sctp_addr *saddr)
+static struct dst_entry *sctp_v6_get_dst(struct sctp_association *asoc,
+					 union sctp_addr *daddr,
+					 union sctp_addr *saddr)
 {
 	struct dst_entry *dst;
 	struct flowi fl;
@@ -251,8 +257,10 @@ static inline int sctp_v6_addr_match_len(union sctp_addr *s1,
 /* Fills in the source address(saddr) based on the destination address(daddr)
  * and asoc's bind address list.
  */
-void sctp_v6_get_saddr(struct sctp_association *asoc, struct dst_entry *dst,
-		       union sctp_addr *daddr, union sctp_addr *saddr)
+static void sctp_v6_get_saddr(struct sctp_association *asoc,
+			      struct dst_entry *dst,
+			      union sctp_addr *daddr,
+			      union sctp_addr *saddr)
 {
 	struct sctp_bind_addr *bp;
 	rwlock_t *addr_lock;
@@ -577,12 +585,12 @@ static sctp_scope_t sctp_v6_scope(union sctp_addr *addr)
 }
 
 /* Create and initialize a new sk for the socket to be returned by accept(). */
-struct sock *sctp_v6_create_accept_sk(struct sock *sk,
-				      struct sctp_association *asoc)
+static struct sock *sctp_v6_create_accept_sk(struct sock *sk,
+					     struct sctp_association *asoc)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct sock *newsk;
-	struct inet_opt *newinet;
+	struct inet_sock *newinet;
 	struct ipv6_pinfo *newnp, *np = inet6_sk(sk);
 	struct sctp6_sock *newsctp6sk;
 
@@ -608,7 +616,7 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 	newsk->sk_shutdown = sk->sk_shutdown;
 
 	newsctp6sk = (struct sctp6_sock *)newsk;
-	newsctp6sk->pinet6 = &newsctp6sk->inet6;
+	newsctp6sk->inet.pinet6 = &newsctp6sk->inet6;
 
 	newinet = inet_sk(newsk);
 	newnp = inet6_sk(newsk);

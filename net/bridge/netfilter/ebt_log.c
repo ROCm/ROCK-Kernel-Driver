@@ -15,7 +15,7 @@
 #include <linux/if_arp.h>
 #include <linux/spinlock.h>
 
-static spinlock_t ebt_log_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ebt_log_lock);
 
 static int ebt_log_check(const char *tablename, unsigned int hookmask,
    const struct ebt_entry *e, void *data, unsigned int datalen)
@@ -55,8 +55,9 @@ static void print_MAC(unsigned char *p)
 }
 
 #define myNIPQUAD(a) a[0], a[1], a[2], a[3]
-static void ebt_log(const struct sk_buff *skb, const struct net_device *in,
-   const struct net_device *out, const void *data, unsigned int datalen)
+static void ebt_log(const struct sk_buff *skb, unsigned int hooknr,
+   const struct net_device *in, const struct net_device *out,
+   const void *data, unsigned int datalen)
 {
 	struct ebt_log_info *info = (struct ebt_log_info *)data;
 	char level_string[4] = "< >";

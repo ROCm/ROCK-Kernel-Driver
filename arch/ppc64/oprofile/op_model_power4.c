@@ -97,7 +97,7 @@ static void power4_cpu_setup(void *unused)
 	mtspr(SPRN_MMCR0, mmcr0);
 
 	mmcr0 |= MMCR0_FCM1|MMCR0_PMXE|MMCR0_FCECE;
-	mmcr0 |= MMCR0_PMC1INTCONTROL|MMCR0_PMCNINTCONTROL;
+	mmcr0 |= MMCR0_PMC1CE|MMCR0_PMCjCE;
 	mtspr(SPRN_MMCR0, mmcr0);
 
 	mtspr(SPRN_MMCR1, mmcr1_val);
@@ -264,7 +264,6 @@ static void power4_handle_interrupt(struct pt_regs *regs,
 	int is_kernel;
 	int val;
 	int i;
-	unsigned int cpu = smp_processor_id();
 	unsigned int mmcr0;
 
 	pc = get_pc(regs);
@@ -277,7 +276,7 @@ static void power4_handle_interrupt(struct pt_regs *regs,
 		val = ctr_read(i);
 		if (val < 0) {
 			if (oprofile_running && ctr[i].enabled) {
-				oprofile_add_sample(pc, is_kernel, i, cpu);
+				oprofile_add_pc(pc, is_kernel, i);
 				ctr_write(i, reset_value[i]);
 			} else {
 				ctr_write(i, 0);

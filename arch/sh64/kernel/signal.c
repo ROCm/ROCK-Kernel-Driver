@@ -186,7 +186,7 @@ restore_sigcontext_fpu(struct pt_regs *regs, struct sigcontext __user *sc)
 	int fpvalid;
 
 	err |= __get_user (fpvalid, &sc->sc_fpvalid);
-	conditional_used_math(fpvalid);
+	current->used_math = fpvalid;
 	if (! fpvalid)
 		return err;
 
@@ -207,7 +207,7 @@ setup_sigcontext_fpu(struct pt_regs *regs, struct sigcontext __user *sc)
 	int err = 0;
 	int fpvalid;
 
-	fpvalid = !!used_math();
+	fpvalid = current->used_math;
 	err |= __put_user(fpvalid, &sc->sc_fpvalid);
 	if (! fpvalid)
 		return err;
@@ -222,7 +222,7 @@ setup_sigcontext_fpu(struct pt_regs *regs, struct sigcontext __user *sc)
 
 	err |= __copy_to_user(&sc->sc_fpregs[0], &current->thread.fpu.hard,
 			      (sizeof(long long) * 32) + (sizeof(int) * 1));
-	clear_used_math();
+	current->used_math = 0;
 
 	return err;
 }
@@ -701,10 +701,8 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 	if (!user_mode(regs))
 		return 1;
 
-	if (current->flags & PF_FREEZE) {
-		refrigerator(0);
+	if (try_to_freeze(0))
 		goto no_signal;
-		}
 
 	if (!oldset)
 		oldset = &current->blocked;

@@ -655,19 +655,9 @@ int av7110_diseqc_send(struct av7110 *av7110, int len, u8 *msg, unsigned long bu
 
 #ifdef CONFIG_DVB_AV7110_OSD
 
-static inline int ResetBlend(struct av7110 *av7110, u8 windownr)
-{
-	return av7110_fw_cmd(av7110, COMTYPE_OSD, SetNonBlend, 1, windownr);
-}
-
 static inline int SetColorBlend(struct av7110 *av7110, u8 windownr)
 {
 	return av7110_fw_cmd(av7110, COMTYPE_OSD, SetCBlend, 1, windownr);
-}
-
-static inline int SetWindowBlend(struct av7110 *av7110, u8 windownr, u8 blending)
-{
-	return av7110_fw_cmd(av7110, COMTYPE_OSD, SetWBlend, 2, windownr, blending);
 }
 
 static inline int SetBlend_(struct av7110 *av7110, u8 windownr,
@@ -682,11 +672,6 @@ static inline int SetColor_(struct av7110 *av7110, u8 windownr,
 {
 	return av7110_fw_cmd(av7110, COMTYPE_OSD, SetColor, 5,
 			     windownr, colordepth, index, colorhi, colorlo);
-}
-
-static inline int BringToTop(struct av7110 *av7110, u8 windownr)
-{
-	return av7110_fw_cmd(av7110, COMTYPE_OSD, WTop, 1, windownr);
 }
 
 static inline int SetFont(struct av7110 *av7110, u8 windownr, u8 fontsize,
@@ -1034,7 +1019,7 @@ int av7110_osd_cmd(struct av7110 *av7110, osd_cmd_t *dc)
 			goto out;
 		} else {
 			int i, len = dc->x0-dc->color+1;
-			u8 __user *colors = (u8 *)dc->data;
+			u8 __user *colors = (u8 __user *)dc->data;
 			u8 r, g, b, blend;
 
 			for (i = 0; i<len; i++) {

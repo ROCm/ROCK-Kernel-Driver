@@ -405,7 +405,7 @@ void reiserfs_free_block (struct reiserfs_transaction_handle *th,
 }
 
 /* preallocated blocks don't need to be run through journal_mark_freed */
-void reiserfs_free_prealloc_block (struct reiserfs_transaction_handle *th, 
+static void reiserfs_free_prealloc_block (struct reiserfs_transaction_handle *th,
 			  struct inode *inode, b_blocknr_t block) {
     RFALSE(!th->t_super, "vs-4060: trying to free block on nonexistent device");
     RFALSE(is_reusable (th->t_super, block, 1) == 0, "vs-4070: can not free such block");
@@ -956,14 +956,14 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
     if (!hint->formatted_node) {
         int quota_ret;
 #ifdef REISERQUOTA_DEBUG
-	reiserfs_debug (s, "reiserquota: allocating %d blocks id=%u", amount_needed, hint->inode->i_uid);
+	reiserfs_debug (s, REISERFS_DEBUG_CODE, "reiserquota: allocating %d blocks id=%u", amount_needed, hint->inode->i_uid);
 #endif
 	quota_ret = DQUOT_ALLOC_BLOCK_NODIRTY(hint->inode, amount_needed);
 	if (quota_ret)    /* Quota exceeded? */
 	    return QUOTA_EXCEEDED;
 	if (hint->preallocate && hint->prealloc_size ) {
 #ifdef REISERQUOTA_DEBUG
-	    reiserfs_debug (s, "reiserquota: allocating (prealloc) %d blocks id=%u", hint->prealloc_size, hint->inode->i_uid);
+	    reiserfs_debug (s, REISERFS_DEBUG_CODE, "reiserquota: allocating (prealloc) %d blocks id=%u", hint->prealloc_size, hint->inode->i_uid);
 #endif
 	    quota_ret = DQUOT_PREALLOC_BLOCK_NODIRTY(hint->inode, hint->prealloc_size);
 	    if (quota_ret)
@@ -1009,7 +1009,7 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 	    /* Free the blocks */
 	    if (!hint->formatted_node) {
 #ifdef REISERQUOTA_DEBUG
-		reiserfs_debug (s, "reiserquota: freeing (nospace) %d blocks id=%u", amount_needed + hint->prealloc_size - nr_allocated, hint->inode->i_uid);
+		reiserfs_debug (s, REISERFS_DEBUG_CODE, "reiserquota: freeing (nospace) %d blocks id=%u", amount_needed + hint->prealloc_size - nr_allocated, hint->inode->i_uid);
 #endif
 		DQUOT_FREE_BLOCK_NODIRTY(hint->inode, amount_needed + hint->prealloc_size - nr_allocated);     /* Free not allocated blocks */
 	    }
@@ -1029,7 +1029,7 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 	 nr_allocated + REISERFS_I(hint->inode)->i_prealloc_count) {
     /* Some of preallocation blocks were not allocated */
 #ifdef REISERQUOTA_DEBUG
-	reiserfs_debug (s, "reiserquota: freeing (failed prealloc) %d blocks id=%u", amount_needed + hint->prealloc_size - nr_allocated - INODE_INFO(hint->inode)->i_prealloc_count, hint->inode->i_uid);
+	reiserfs_debug (s, REISERFS_DEBUG_CODE, "reiserquota: freeing (failed prealloc) %d blocks id=%u", amount_needed + hint->prealloc_size - nr_allocated - REISERFS_I(hint->inode)->i_prealloc_count, hint->inode->i_uid);
 #endif
 	DQUOT_FREE_BLOCK_NODIRTY(hint->inode, amount_needed +
 	                         hint->prealloc_size - nr_allocated -

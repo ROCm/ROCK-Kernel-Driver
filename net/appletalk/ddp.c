@@ -9,6 +9,7 @@
  *		Wesley Craig <netatalk@umich.edu>
  *
  *	Fixes:
+ *		Neil Horman		:	Added missing device ioctls
  *		Michael Callahan	:	Made routing work
  *		Wesley Craig		:	Fix probing to listen to a
  *						passed node id.
@@ -71,7 +72,7 @@ static struct proto_ops atalk_dgram_ops;
 \**************************************************************************/
 
 HLIST_HEAD(atalk_sockets);
-rwlock_t atalk_sockets_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(atalk_sockets_lock);
 
 static inline void __atalk_insert_socket(struct sock *sk)
 {
@@ -193,10 +194,10 @@ static inline void atalk_destroy_socket(struct sock *sk)
 
 /* Anti-deadlock ordering is atalk_routes_lock --> iface_lock -DaveM */
 struct atalk_route *atalk_routes;
-rwlock_t atalk_routes_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(atalk_routes_lock);
 
 struct atalk_iface *atalk_interfaces;
-rwlock_t atalk_interfaces_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(atalk_interfaces_lock);
 
 /* For probing devices or in a routerless network */
 struct atalk_route atrtr_default;
@@ -612,7 +613,7 @@ out:
  * Called when a device is downed. Just throw away any routes
  * via it.
  */
-void atrtr_device_down(struct net_device *dev)
+static void atrtr_device_down(struct net_device *dev)
 {
 	struct atalk_route **r = &atalk_routes;
 	struct atalk_route *tmp;
@@ -1806,6 +1807,8 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCSIFHWADDR:
 		case SIOCGIFFLAGS:
 		case SIOCSIFFLAGS:
+		case SIOCGIFTXQLEN:
+		case SIOCSIFTXQLEN:
 		case SIOCGIFMTU:
 		case SIOCGIFCONF:
 		case SIOCADDMULTI:
@@ -1854,12 +1857,12 @@ static struct notifier_block ddp_notifier = {
 	.notifier_call	= ddp_device_event,
 };
 
-struct packet_type ltalk_packet_type = {
+static struct packet_type ltalk_packet_type = {
 	.type		= __constant_htons(ETH_P_LOCALTALK),
 	.func		= ltalk_rcv,
 };
 
-struct packet_type ppptalk_packet_type = {
+static struct packet_type ppptalk_packet_type = {
 	.type		= __constant_htons(ETH_P_PPPTALK),
 	.func		= atalk_rcv,
 };

@@ -28,9 +28,10 @@ struct smp_ops_t {
 	int   (*probe)(void);
 	void  (*kick_cpu)(int nr);
 	void  (*setup_cpu)(int nr);
-	void  (*late_setup_cpu)(int nr);
 	void  (*take_timebase)(void);
 	void  (*give_timebase)(void);
+	int   (*cpu_disable)(void);
+	void  (*cpu_die)(unsigned int nr);
 };
 #endif
 
@@ -70,6 +71,8 @@ struct machdep_calls {
 				    long index,
 				    long npages);
 	void		(*tce_flush)(struct iommu_table *tbl);
+	void		(*iommu_dev_setup)(struct pci_dev *dev);
+	void		(*iommu_bus_setup)(struct pci_bus *bus);
 
 	int		(*probe)(int platform);
 	void		(*setup_arch)(void);
@@ -109,6 +112,10 @@ struct machdep_calls {
 	ssize_t		(*nvram_read)(char *buf, size_t count, loff_t *index);	
 	ssize_t		(*nvram_size)(void);		
 	int		(*nvram_sync)(void);
+
+	/* Exception handlers */
+	void		(*system_reset_exception)(struct pt_regs *regs);
+	int 		(*machine_check_exception)(struct pt_regs *regs);
 
 	/* Motherboard/chipset features. This is a kind of general purpose
 	 * hook used to control some machine specific features (like reset

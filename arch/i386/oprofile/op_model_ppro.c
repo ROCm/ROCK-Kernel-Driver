@@ -85,19 +85,16 @@ static void ppro_setup_ctrs(struct op_msrs const * const msrs)
 }
 
  
-static int ppro_check_ctrs(unsigned int const cpu, 
-			    struct op_msrs const * const msrs,
-			    struct pt_regs * const regs)
+static int ppro_check_ctrs(struct pt_regs * const regs,
+			   struct op_msrs const * const msrs)
 {
 	unsigned int low, high;
 	int i;
-	unsigned long eip = profile_pc(regs);
-	int is_kernel = !user_mode(regs);
  
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
 		CTR_READ(low, high, msrs, i);
 		if (CTR_OVERFLOWED(low)) {
-			oprofile_add_sample(eip, is_kernel, i, cpu);
+			oprofile_add_sample(regs, i);
 			CTR_WRITE(reset_value[i], msrs, i);
 		}
 	}

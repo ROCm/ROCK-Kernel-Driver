@@ -628,12 +628,12 @@ s3c_irq_demux_uart2(unsigned int irq,
 	s3c_irq_demux_uart(IRQ_S3CUART_RX2, regs);
 }
 
-/* s3c2410_init_irq
+/* s3c24xx_init_irq
  *
  * Initialise S3C2410 IRQ system
 */
 
-void __init s3c2410_init_irq(void)
+void __init s3c24xx_init_irq(void)
 {
 	unsigned long pend;
 	unsigned long last;

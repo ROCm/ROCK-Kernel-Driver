@@ -237,7 +237,7 @@ struct php_ctlr_state_s {
 static spinlock_t hpc_event_lock;
 
 DEFINE_DBG_BUFFER		/* Debug string buffer for entire HPC defined here */
-static struct php_ctlr_state_s *php_ctlr_list_head = 0;	/* HPC state linked list */
+static struct php_ctlr_state_s *php_ctlr_list_head; /* HPC state linked list */
 static int ctlr_seq_num = 0;	/* Controller sequence # */
 static spinlock_t list_lock;
 
@@ -1249,7 +1249,7 @@ static struct hpc_ops pciehp_hpc_ops = {
 };
 
 int pcie_init(struct controller * ctrl,
-	struct pci_dev *pdev,
+	struct pcie_device *dev,
 	php_intr_callback_t attention_button_callback,
 	php_intr_callback_t switch_change_callback,
 	php_intr_callback_t presence_change_callback,
@@ -1265,6 +1265,7 @@ int pcie_init(struct controller * ctrl,
 	u32 slot_cap;
 	int cap_base, saved_cap_base;
 	u16 slot_status, slot_ctrl;
+	struct pci_dev *pdev;
 
 	DBG_ENTER_ROUTINE
 	
@@ -1277,7 +1278,8 @@ int pcie_init(struct controller * ctrl,
 	}
 
 	memset(php_ctlr, 0, sizeof(struct php_ctlr_state_s));
-
+	
+	pdev = dev->port;
 	php_ctlr->pci_dev = pdev;	/* save pci_dev in context */
 
 	dbg("%s: pdev->vendor %x pdev->device %x\n", __FUNCTION__,
@@ -1338,7 +1340,7 @@ int pcie_init(struct controller * ctrl,
 	}
 
 	dbg("pdev = %p: b:d:f:irq=0x%x:%x:%x:%x\n", pdev, pdev->bus->number, 
-		PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn), pdev->irq);
+		PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn), dev->irq);
 	for ( rc = 0; rc < DEVICE_COUNT_RESOURCE; rc++)
 		if (pci_resource_len(pdev, rc) > 0)
 			dbg("pci resource[%d] start=0x%lx(len=0x%lx)\n", rc,
@@ -1355,7 +1357,7 @@ int pcie_init(struct controller * ctrl,
 	init_waitqueue_head(&ctrl->queue);
 
 	/* find the IRQ */
-	php_ctlr->irq = pdev->irq;
+	php_ctlr->irq = dev->irq;
 	dbg("HPC interrupt = %d\n", php_ctlr->irq);
 
 	/* Save interrupt callback info */
@@ -1407,17 +1409,6 @@ int pcie_init(struct controller * ctrl,
 		start_int_poll_timer( php_ctlr, 10 );   /* start with 10 second delay */
 	} else {
 		/* Installs the interrupt handler */
-		dbg("%s: pcie_mch_quirk = %x\n", __FUNCTION__, pcie_mch_quirk);
-		if (!pcie_mch_quirk) {
-			rc = pci_enable_msi(pdev);
-			if (rc) {
-				info("Can't get msi for the hotplug controller\n");
-				info("Use INTx for the hotplug controller\n");
-				dbg("%s: rc = %x\n", __FUNCTION__, rc);
-			} else 
-				php_ctlr->irq = pdev->irq;
-		}
-
 		rc = request_irq(php_ctlr->irq, pcie_isr, SA_SHIRQ, MY_NAME, (void *) ctrl);
 		dbg("%s: request_irq %d for hpc%d (returns %d)\n", __FUNCTION__, php_ctlr->irq, ctlr_seq_num, rc);
 		if (rc) {

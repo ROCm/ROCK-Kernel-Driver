@@ -292,6 +292,8 @@ prism54_resume(struct pci_dev *pdev)
 	islpci_private *priv = ndev ? netdev_priv(ndev) : NULL;
 	BUG_ON(!priv);
 
+	pci_enable_device(pdev);
+
 	printk(KERN_NOTICE "%s: got resume request\n", ndev->name);
 
 	pci_restore_state(pdev);

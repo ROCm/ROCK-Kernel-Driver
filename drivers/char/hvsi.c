@@ -1331,7 +1331,7 @@ static int __init hvsi_console_init(void)
 		INIT_WORK(&hp->handshaker, hvsi_handshaker, hp);
 		init_waitqueue_head(&hp->emptyq);
 		init_waitqueue_head(&hp->stateq);
-		hp->lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&hp->lock);
 		hp->index = hvsi_count;
 		hp->inbuf_end = hp->inbuf;
 		hp->state = HVSI_CLOSED;

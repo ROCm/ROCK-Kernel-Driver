@@ -114,7 +114,8 @@ ibm_partition(struct parsed_partitions *state, struct block_device *bdev)
 		}
 		put_partition(state, 1, offset*(blocksize >> 9),
 				 size-offset*(blocksize >> 9));
-	} else if (strncmp(type, "VOL1", 4) == 0) {
+	} else if ((strncmp(type, "VOL1", 4) == 0) &&
+		(!info->FBA_layout) && (!strcmp(info->type, "ECKD"))) {
 		/*
 		 * New style VOL1 labeled disk
 		 */

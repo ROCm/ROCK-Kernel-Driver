@@ -41,7 +41,7 @@ extern unsigned long s3c24xx_fclk;
  * Please DO NOT use these outside of arch/arm/mach-s3c2410
 */
 
-extern int s3c2410_clkcon_enable(struct clk *clk, int enable);
-extern int s3c2410_register_clock(struct clk *clk);
-extern int s3c2410_init_clocks(void);
+extern int s3c24xx_clkcon_enable(struct clk *clk, int enable);
+extern int s3c24xx_register_clock(struct clk *clk);
 
+extern int s3c24xx_setup_clocks(void);

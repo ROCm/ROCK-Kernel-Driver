@@ -23,7 +23,7 @@
 #include <net/x25.h>
 
 struct list_head x25_route_list = LIST_HEAD_INIT(x25_route_list);
-rwlock_t x25_route_list_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(x25_route_list_lock);
 
 /*
  *	Add a new route.

@@ -447,14 +447,9 @@ iounmap (volatile void __iomem *addr)
 /*
  * String version of IO memory access ops:
  */
-extern void __ia64_memcpy_fromio (void *, volatile void __iomem *, long);
-extern void __ia64_memcpy_toio (volatile void __iomem *, void *, long);
-extern void __ia64_memset_c_io (volatile void __iomem *, unsigned long, long);
-
-#define memcpy_fromio(to,from,len)	__ia64_memcpy_fromio((to), (from),(len))
-#define memcpy_toio(to,from,len)	__ia64_memcpy_toio((to),(from),(len))
-#define memset_io(addr,c,len)		__ia64_memset_c_io((addr), 0x0101010101010101UL*(u8)(c), \
-							   (len))
+extern void memcpy_fromio(void *dst, const volatile void __iomem *src, long n);
+extern void memcpy_toio(volatile void __iomem *dst, const void *src, long n);
+extern void memset_io(volatile void __iomem *s, int c, long n);
 
 #define dma_cache_inv(_start,_size)             do { } while (0)
 #define dma_cache_wback(_start,_size)           do { } while (0)

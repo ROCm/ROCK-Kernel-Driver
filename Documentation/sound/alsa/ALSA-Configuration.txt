@@ -184,6 +184,8 @@ Module parameters
     Module for ATI IXP 150/200/250 AC97 controllers.
 
     ac97_clock		- AC'97 clock (defalut = 48000)
+    ac97_quirk		- AC'97 workaround for strange hardware
+			  See the description of intel8x0 module for details.
     spdif_aclink	- S/PDIF transfer over AC-link (default = 1)
 
     This module supports up to 8 cards and autoprobe.
@@ -252,8 +254,17 @@ Module parameters
     Module for video cards based on Bt87x chips.
 
     digital_rate - Override the default digital rate (Hz)
+    load_all	- Load the driver even if the card model isn't known
 
     Module supports up to 8 cards.
+
+  Module snd-ca0106
+  -----------------
+
+    Module for Creative Audigy LS and SB Live 24bit
+
+    Module supports up to 8 cards.
+
 
   Module snd-cmi8330
   ------------------
@@ -426,6 +437,13 @@ Module parameters
 	* Creative Card 5.1 (c) 2003			[0x3fc3/0x7cff]
         * Creative Card all ins and outs		[0x3fff/0x7fff]
     
+  Module snd-emu10k1x
+  -------------------
+
+    Module for Creative Emu10k1X (SB Live Dell OEM version)
+
+    Module supports up to 8 cards.
+
   Module snd-ens1370
   ------------------
 
@@ -595,8 +613,11 @@ Module parameters
 
     Module supports up to 8 cards.
 
-    Note: you need to load the firmware via hdsploader utility included
-          in alsa-tools and alsa-firmware packages.
+    Note: The firmware data can be automatically loaded via hotplug
+          when CONFIG_FW_LOADER is set.  Otherwise, you need to load
+          the firmware via hdsploader utility included in alsa-tools
+          package.
+          The firmware data is found in alsa-firmware package.
 
     Note: snd-page-alloc module does the job which snd-hammerfall-mem
           module did formerly.  It will allocate the buffers in advance
@@ -661,16 +682,21 @@ Module parameters
 			* ALi m5455
 
     ac97_clock	  - AC'97 codec clock base (0 = auto-detect)
-    ac97_quirk    - AC'97 workaround for strange hardware (-1 = default)
-                    -1 = default, don't override
-                     0 = disable
-                     1 = use headphone control as master
-                     2 = swap headphone and master controls
-                     3 = for AD1985, turn on OMS bit and use headphone
-                     4 = for ALC65x, turn on the jack sense mode
-                     5 = inverted EAPD implementation
-    buggy_irq      - Enable workaround for buggy interrupts on some
-                     motherboards (default off)
+    ac97_quirk    - AC'97 workaround for strange hardware
+                    The following strings are accepted:
+                      default = don't override the default setting
+                      disable = disable the quirk
+                      hp_only = use headphone control as master
+                      swap_hp = swap headphone and master controls
+                      swap_surround = swap master and surround controls
+                      ad_shring = for AD1985, turn on OMS bit and use headphone
+                      alc_jack = for ALC65x, turn on the jack sense mode
+                      inv_eapd = inverted EAPD implementation
+                      mute_led = bind EAPD bit for turning on/off mute LED
+                    For backward compatibility, the corresponding integer
+                    value -1, 0, ... are accepted, too.
+    buggy_irq     - Enable workaround for buggy interrupts on some
+                    motherboards (default off)
 
     Module supports autoprobe and multiple bus-master chips (max 8).
 
@@ -773,6 +799,12 @@ Module parameters
     Module supports multiple cards.
     Note: One miXart8 board will be represented as 4 alsa cards.
           See MIXART.txt for details.
+
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via mixartloader utility in alsa-tools package.
 
   Module snd-mpu401
   -----------------
@@ -1182,6 +1214,15 @@ Module parameters
     Note: for the MPU401 on VIA823x, use snd-mpu401 driver
 	  additonally.  The mpu_port option is for VIA686 chips only.
 
+  Module snd-via82xx-modem
+  ------------------------
+
+    Module for VIA82xx AC97 modem
+
+    ac97_clock	- AC'97 codec clock base (default 48000Hz)
+
+    Module supports up to 8 cards.
+
   Module snd-virmidi
   ------------------
 
@@ -1203,9 +1244,12 @@ Module parameters
 
     Module supports up to 8 cards.
 
-    For loading the firmware, use vxloader utility in alsa-tools
-    and alsa-firmware packages.  You can load the firmware automatically
-    by adding the following to /etc/modprobe.conf
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via vxloader utility in alsa-tools package.  To invoke
+    vxloader automatically, add the following to /etc/modprobe.conf
 
 	install snd-vx222 /sbin/modprobe --first-time -i snd-vx222 && /usr/bin/vxloader
 
@@ -1234,8 +1278,11 @@ Module parameters
     To activate the driver via the card manager, you'll need to set
     up /etc/pcmcia/vxpocket.conf.  See the sound/pcmcia/vx/vxpocket.c.
 
-    For loading the firmware, use vxloader utility in alsa-tools
-    and alsa-firmware packages.
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via vxloader utility in alsa-tools package.
 
     The irq_mask and irq_list are provided to avoid allocation of
     specific IRQs.  Usually you don't need to specify them.
@@ -1260,8 +1307,11 @@ Module parameters
     To activate the driver via the card manager, you'll need to set
     up /etc/pcmcia/vxp440.conf.  See the sound/pcmcia/vx/vxp440.c.
 
-    For loading the firmware, use vxloader utility in alsa-tools
-    and alsa-firmware packages.
+    When the driver is compiled as a module and the hotplug firmware
+    is supported, the firmware data is loaded via hotplug automatically.
+    Install the necessary firmware files in alsa-firmware package.
+    When no hotplug fw loader is available, you need to load the
+    firmware via vxloader utility in alsa-tools package.
 
     The irq_mask and irq_list are provided to avoid allocation of
     specific IRQs.  Usually you don't need to specify them.
@@ -1359,18 +1409,21 @@ In this example, the interwave card is always loaded as the first card
 ALSA PCM devices to OSS devices mapping
 =======================================
 
-/dev/snd/pcmC0D0  -> /dev/audio0 (/dev/audio) -> minor 4
-/dev/snd/pcmC0D0  -> /dev/dsp0 (/dev/dsp)     -> minor 3
-/dev/snd/pcmC0D1  -> /dev/adsp0 (/dev/adsp)   -> minor 12
-/dev/snd/pcmC1D0  -> /dev/audio1              -> minor 4+16 = 20
-/dev/snd/pcmC1D0  -> /dev/dsp1                -> minor 3+16 = 19
-/dev/snd/pcmC1D1  -> /dev/adsp1               -> minor 12+16 = 28
-/dev/snd/pcmC2D0  -> /dev/audio2              -> minor 4+32 = 36
-/dev/snd/pcmC2D0  -> /dev/dsp2                -> minor 3+32 = 39
-/dev/snd/pcmC2D1  -> /dev/adsp2               -> minor 12+32 = 44
+/dev/snd/pcmC0D0[c|p]  -> /dev/audio0 (/dev/audio) -> minor 4
+/dev/snd/pcmC0D0[c|p]  -> /dev/dsp0 (/dev/dsp)     -> minor 3
+/dev/snd/pcmC0D1[c|p]  -> /dev/adsp0 (/dev/adsp)   -> minor 12
+/dev/snd/pcmC1D0[c|p]  -> /dev/audio1              -> minor 4+16 = 20
+/dev/snd/pcmC1D0[c|p]  -> /dev/dsp1                -> minor 3+16 = 19
+/dev/snd/pcmC1D1[c|p]  -> /dev/adsp1               -> minor 12+16 = 28
+/dev/snd/pcmC2D0[c|p]  -> /dev/audio2              -> minor 4+32 = 36
+/dev/snd/pcmC2D0[c|p]  -> /dev/dsp2                -> minor 3+32 = 39
+/dev/snd/pcmC2D1[c|p]  -> /dev/adsp2               -> minor 12+32 = 44
 
-The first number from /dev/snd/pcmC{X}D{Y} expression means soundcard number
-and second means device number.
+The first number from /dev/snd/pcmC{X}D{Y}[c|p] expression means
+soundcard number and second means device number.  The ALSA devices
+have either 'c' or 'p' suffix indicating the direction, capture and
+playback, respectively.
+
 Please note that the device mapping above may be varied via the module
 options of snd-pcm-oss module.
 

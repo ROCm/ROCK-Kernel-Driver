@@ -52,26 +52,20 @@ int alloc_divert_blk(struct net_device *dev)
 {
 	int alloc_size = (sizeof(struct divert_blk) + 3) & ~3;
 
+	dev->divert = NULL;
 	if (dev->type == ARPHRD_ETHER) {
-		printk(KERN_DEBUG "divert: allocating divert_blk for %s\n",
-		       dev->name);
-
 		dev->divert = (struct divert_blk *)
 			kmalloc(alloc_size, GFP_KERNEL);
 		if (dev->divert == NULL) {
-			printk(KERN_DEBUG "divert: unable to allocate divert_blk for %s\n",
+			printk(KERN_INFO "divert: unable to allocate divert_blk for %s\n",
 			       dev->name);
 			return -ENOMEM;
-		} else {
-			memset(dev->divert, 0, sizeof(struct divert_blk));
 		}
-		dev_hold(dev);
-	} else {
-		printk(KERN_DEBUG "divert: not allocating divert_blk for non-ethernet device %s\n",
-		       dev->name);
 
-		dev->divert = NULL;
+		memset(dev->divert, 0, sizeof(struct divert_blk));
+		dev_hold(dev);
 	}
+
 	return 0;
 } 
 
@@ -85,11 +79,6 @@ void free_divert_blk(struct net_device *dev)
 		kfree(dev->divert);
 		dev->divert=NULL;
 		dev_put(dev);
-		printk(KERN_DEBUG "divert: freeing divert_blk for %s\n",
-		       dev->name);
-	} else {
-		printk(KERN_DEBUG "divert: no divert_blk to free, %s not ethernet\n",
-		       dev->name);
 	}
 }
 
@@ -192,8 +181,12 @@ out:
 /*
  * control function of the diverter
  */
+#if 0
 #define	DVDBG(a)	\
 	printk(KERN_DEBUG "divert_ioctl() line %d %s\n", __LINE__, (a))
+#else
+#define	DVDBG(a)
+#endif
 
 int divert_ioctl(unsigned int cmd, struct divert_cf __user *arg)
 {

@@ -21,9 +21,6 @@
 #define PTRUNRELOC(x)   ((typeof(x))((unsigned long)(x) + offset))
 #define RELOC(x)        (*PTRRELOC(&(x)))
 
-#define LONG_LSW(X) (((unsigned long)X) & 0xffffffff)
-#define LONG_MSW(X) (((unsigned long)X) >> 32)
-
 /* Definitions used by the flattened device tree */
 #define OF_DT_HEADER		0xd00dfeed	/* 4: version, 4: total size */
 #define OF_DT_BEGIN_NODE	0x1		/* Start node: full name */
@@ -64,8 +61,6 @@ struct boot_param_header
 
 typedef u32 phandle;
 typedef u32 ihandle;
-typedef u32 phandle32;
-typedef u32 ihandle32;
 
 struct address_range {
 	unsigned long space;
@@ -95,13 +90,6 @@ struct isa_range {
 	unsigned int size;
 };
 
-struct of_tce_table {
-	phandle node;
-	unsigned long base;
-	unsigned long size;
-};
-extern struct of_tce_table of_tce_table[];
-
 struct reg_property {
 	unsigned long address;
 	unsigned long size;
@@ -115,19 +103,6 @@ struct reg_property32 {
 struct reg_property64 {
 	unsigned long address;
 	unsigned long size;
-};
-
-struct reg_property_pmac {
-	unsigned int address_hi;
-	unsigned int address_lo;
-	unsigned int size;
-};
-
-struct translation_property {
-	unsigned long virt;
-	unsigned long size;
-	unsigned long phys;
-	unsigned int flags;
 };
 
 struct property {
@@ -160,8 +135,6 @@ struct device_node {
 	int	busno;			/* for pci devices */
 	int	bussubno;		/* for pci devices */
 	int	devfn;			/* for pci devices */
-#define DN_STATUS_BIST_FAILED (1<<0)
-	int	status;			/* Current device status (non-zero is bad) */
 	int	eeh_mode;		/* See eeh.h for possible EEH_MODEs */
 	int	eeh_config_addr;
 	struct  pci_controller *phb;	/* for pci devices */
@@ -244,7 +217,6 @@ extern int of_remove_node(struct device_node *np);
 /* Other Prototypes */
 extern unsigned long prom_init(unsigned long, unsigned long, unsigned long,
 	unsigned long, unsigned long);
-extern void relocate_nodes(void);
 extern void finish_device_tree(void);
 extern int device_is_compatible(struct device_node *device, const char *);
 extern int machine_is_compatible(const char *compat);

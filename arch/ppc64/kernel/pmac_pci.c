@@ -666,10 +666,6 @@ void __init pmac_pcibios_fixup(void)
 
 	for_each_pci_dev(dev)
  		pmac_pci_read_irq_line(dev);
-
-	pci_fix_bus_sysdata();
-
-	iommu_setup_u3();
 }
 
 static void __init pmac_fixup_phb_resources(void)

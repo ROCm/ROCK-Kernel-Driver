@@ -162,7 +162,6 @@ extern int  x25_addr_ntoa(unsigned char *, struct x25_address *,
 			  struct x25_address *);
 extern int  x25_addr_aton(unsigned char *, struct x25_address *,
 			  struct x25_address *);
-extern unsigned int x25_new_lci(struct x25_neigh *);
 extern struct sock *x25_find_socket(unsigned int, struct x25_neigh *);
 extern void x25_destroy_socket(struct sock *);
 extern int  x25_rx_call_request(struct sk_buff *, struct x25_neigh *, unsigned int);
@@ -171,7 +170,6 @@ extern void x25_kill_by_neigh(struct x25_neigh *);
 /* x25_dev.c */
 extern void x25_send_frame(struct sk_buff *, struct x25_neigh *);
 extern int  x25_lapb_receive_frame(struct sk_buff *, struct net_device *, struct packet_type *);
-extern int  x25_llc_receive_frame(struct sk_buff *, struct net_device *, struct packet_type *);
 extern void x25_establish_link(struct x25_neigh *);
 extern void x25_terminate_link(struct x25_neigh *);
 
@@ -191,9 +189,6 @@ extern void x25_link_device_up(struct net_device *);
 extern void x25_link_device_down(struct net_device *);
 extern void x25_link_established(struct x25_neigh *);
 extern void x25_link_terminated(struct x25_neigh *);
-extern void x25_transmit_restart_request(struct x25_neigh *);
-extern void x25_transmit_restart_confirmation(struct x25_neigh *);
-extern void x25_transmit_diagnostic(struct x25_neigh *, unsigned char);
 extern void x25_transmit_clear_request(struct x25_neigh *, unsigned int, unsigned char);
 extern void x25_transmit_link(struct sk_buff *, struct x25_neigh *);
 extern int  x25_subscr_ioctl(unsigned int, void __user *);
@@ -243,6 +238,7 @@ extern int  x25_validate_nr(struct sock *, unsigned short);
 extern void x25_write_internal(struct sock *, int);
 extern int  x25_decode(struct sock *, struct sk_buff *, int *, int *, int *, int *, int *);
 extern void x25_disconnect(struct sock *, int, unsigned char, unsigned char);
+extern int x25_check_calluserdata(struct x25_calluserdata *,struct x25_calluserdata *);
 
 /* x25_timer.c */
 extern void x25_start_heartbeat(struct sock *);

@@ -20,7 +20,7 @@
 #include <asm/tlbflush.h>
 
 
-rwlock_t vmlist_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(vmlist_lock);
 struct vm_struct *vmlist;
 
 static void unmap_area_pte(pmd_t *pmd, unsigned long address,
@@ -56,31 +56,58 @@ static void unmap_area_pte(pmd_t *pmd, unsigned long address,
 	} while (address < end);
 }
 
-static void unmap_area_pmd(pgd_t *dir, unsigned long address,
+static void unmap_area_pmd(pud_t *pud, unsigned long address,
 				  unsigned long size)
 {
 	unsigned long end;
 	pmd_t *pmd;
 
-	if (pgd_none(*dir))
+	if (pud_none(*pud))
 		return;
-	if (pgd_bad(*dir)) {
-		pgd_ERROR(*dir);
-		pgd_clear(dir);
+	if (pud_bad(*pud)) {
+		pud_ERROR(*pud);
+		pud_clear(pud);
 		return;
 	}
 
-	pmd = pmd_offset(dir, address);
-	address &= ~PGDIR_MASK;
+	pmd = pmd_offset(pud, address);
+	address &= ~PUD_MASK;
 	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
+	if (end > PUD_SIZE)
+		end = PUD_SIZE;
 
 	do {
 		unmap_area_pte(pmd, address, end - address);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address < end);
+}
+
+static void unmap_area_pud(pgd_t *pgd, unsigned long address,
+			   unsigned long size)
+{
+	pud_t *pud;
+	unsigned long end;
+
+	if (pgd_none(*pgd))
+		return;
+	if (pgd_bad(*pgd)) {
+		pgd_ERROR(*pgd);
+		pgd_clear(pgd);
+		return;
+	}
+
+	pud = pud_offset(pgd, address);
+	address &= ~PGDIR_MASK;
+	end = address + size;
+	if (end > PGDIR_SIZE)
+		end = PGDIR_SIZE;
+
+	do {
+		unmap_area_pmd(pud, address, end - address);
+		address = (address + PUD_SIZE) & PUD_MASK;
+		pud++;
+	} while (address && (address < end));
 }
 
 static int map_area_pte(pte_t *pte, unsigned long address,
@@ -96,7 +123,6 @@ static int map_area_pte(pte_t *pte, unsigned long address,
 
 	do {
 		struct page *page = **pages;
-
 		WARN_ON(!pte_none(*pte));
 		if (!page)
 			return -ENOMEM;
@@ -115,11 +141,11 @@ static int map_area_pmd(pmd_t *pmd, unsigned long address,
 {
 	unsigned long base, end;
 
-	base = address & PGDIR_MASK;
-	address &= ~PGDIR_MASK;
+	base = address & PUD_MASK;
+	address &= ~PUD_MASK;
 	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
+	if (end > PUD_SIZE)
+		end = PUD_SIZE;
 
 	do {
 		pte_t * pte = pte_alloc_kernel(&init_mm, pmd, base + address);
@@ -134,19 +160,41 @@ static int map_area_pmd(pmd_t *pmd, unsigned long address,
 	return 0;
 }
 
+static int map_area_pud(pud_t *pud, unsigned long address,
+			       unsigned long end, pgprot_t prot,
+			       struct page ***pages)
+{
+	do {
+		pmd_t *pmd = pmd_alloc(&init_mm, pud, address);
+		if (!pmd)
+			return -ENOMEM;
+		if (map_area_pmd(pmd, address, end - address, prot, pages))
+			return -ENOMEM;
+		address = (address + PUD_SIZE) & PUD_MASK;
+		pud++;
+	} while (address && address < end);
+
+	return 0;
+}
+
 void unmap_vm_area(struct vm_struct *area)
 {
 	unsigned long address = (unsigned long) area->addr;
 	unsigned long end = (address + area->size);
-	pgd_t *dir;
+	unsigned long next;
+	pgd_t *pgd;
+	int i;
 
-	dir = pgd_offset_k(address);
+	pgd = pgd_offset_k(address);
 	flush_cache_vunmap(address, end);
-	do {
-		unmap_area_pmd(dir, address, end - address);
-		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		dir++;
-	} while (address && (address < end));
+	for (i = pgd_index(address); i <= pgd_index(end-1); i++) {
+		next = (address + PGDIR_SIZE) & PGDIR_MASK;
+		if (next <= address || next > end)
+			next = end;
+		unmap_area_pud(pgd, address, next - address);
+		address = next;
+	        pgd++;
+	}
 	flush_tlb_kernel_range((unsigned long) area->addr, end);
 }
 
@@ -154,25 +202,30 @@ int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
 {
 	unsigned long address = (unsigned long) area->addr;
 	unsigned long end = address + (area->size-PAGE_SIZE);
-	pgd_t *dir;
+	unsigned long next;
+	pgd_t *pgd;
 	int err = 0;
+	int i;
 
-	dir = pgd_offset_k(address);
+	pgd = pgd_offset_k(address);
 	spin_lock(&init_mm.page_table_lock);
-	do {
-		pmd_t *pmd = pmd_alloc(&init_mm, dir, address);
-		if (!pmd) {
+	for (i = pgd_index(address); i <= pgd_index(end-1); i++) {
+		pud_t *pud = pud_alloc(&init_mm, pgd, address);
+		if (!pud) {
 			err = -ENOMEM;
 			break;
 		}
-		if (map_area_pmd(pmd, address, end - address, prot, pages)) {
+		next = (address + PGDIR_SIZE) & PGDIR_MASK;
+		if (next < address || next > end)
+			next = end;
+		if (map_area_pud(pud, address, next, prot, pages)) {
 			err = -ENOMEM;
 			break;
 		}
 
-		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		dir++;
-	} while (address && (address < end));
+		address = next;
+		pgd++;
+	}
 
 	spin_unlock(&init_mm.page_table_lock);
 	flush_cache_vmap((unsigned long) area->addr, end);

@@ -72,7 +72,7 @@
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
 "ibmtr_cs.c 1.10   1996/01/06 05:19:00 (Steve Kipisz)\n"
@@ -86,10 +86,6 @@ static char *version =
 
 /* Parameters that can be set with 'insmod' */
 
-/* Bit map of interrupts to choose from */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
 /* MMIO base address */
 static u_long mmiobase = 0xce000;
 
@@ -102,12 +98,10 @@ static u_long sramsize = 64;
 /* Ringspeed 4,16 */
 static int ringspeed = 16;
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(mmiobase, "i");
-MODULE_PARM(srambase, "i");
-MODULE_PARM(sramsize, "i");
-MODULE_PARM(ringspeed, "i");
+module_param(mmiobase, ulong, 0);
+module_param(srambase, ulong, 0);
+module_param(sramsize, ulong, 0);
+module_param(ringspeed, int, 0);
 MODULE_LICENSE("GPL");
 
 /*====================================================================*/
@@ -162,7 +156,7 @@ static dev_link_t *ibmtr_attach(void)
     dev_link_t *link;
     struct net_device *dev;
     client_reg_t client_reg;
-    int i, ret;
+    int ret;
     
     DEBUG(0, "ibmtr_attach()\n");
 
@@ -184,12 +178,7 @@ static dev_link_t *ibmtr_attach(void)
     link->io.NumPorts1 = 4;
     link->io.IOAddrLines = 16;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->irq.Handler = &tok_interrupt;
     link->conf.Attributes = CONF_ENABLE_IRQ;
     link->conf.Vcc = 50;
@@ -204,7 +193,6 @@ static dev_link_t *ibmtr_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
         CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
         CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -366,6 +354,7 @@ static void ibmtr_config(dev_link_t *link)
 
     link->dev = &info->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     i = ibmtr_probe_card(dev);
     if (i != 0) {
@@ -538,8 +527,7 @@ static int __init init_ibmtr_cs(void)
 static void __exit exit_ibmtr_cs(void)
 {
 	pcmcia_unregister_driver(&ibmtr_cs_driver);
-	while (dev_list != NULL)
-		ibmtr_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_ibmtr_cs);

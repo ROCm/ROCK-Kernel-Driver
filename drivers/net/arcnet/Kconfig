@@ -59,6 +59,25 @@ config ARCNET_RAW
 	  to work unless talking to a copy of the same Linux arcnet driver,
 	  but perhaps marginally faster in that case.
 
+config ARCNET_CAP
+	tristate "Enable CAP mode packet interface"
+	depends on ARCNET
+	help
+	  ARCnet "cap mode" packet encapsulation. Used to get the hardware
+          acknowledge back to userspace. After the initial protocol byte every
+          packet is stuffed with an extra 4 byte "cookie" which doesn't
+          actually appear on the network. After transmit the driver will send
+          back a packet with protocol byte 0 containing the status of the
+          transmition:
+             0=no hardware acknowledge
+             1=excessive nak
+             2=transmition accepted by the reciever hardware
+
+          Received packets are also stuffed with the extra 4 bytes but it will
+          be random data.
+
+          Cap only listens to protocol 1-8.
+
 config ARCNET_COM90xx
 	tristate "ARCnet COM90xx (normal) chipset driver"
 	depends on ARCNET
@@ -91,7 +110,7 @@ config ARCNET_RIM_I
 	  This is yet another chipset driver for the COM90xx cards, but this
 	  time only using memory-mapped mode, and no IO ports at all. This
 	  driver is completely untested, so if you have one of these cards,
-	  please mail dwmw2@infradead.org, especially if it works!
+	  please mail <dwmw2@infradead.org>, especially if it works!
 
 	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/networking/net-modules.txt>.  The module will

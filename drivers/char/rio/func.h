@@ -47,7 +47,6 @@ int RIOBootCodeHOST(struct rio_info *, register struct DownLoad *);
 int RIOBootCodeUNKNOWN(struct rio_info *, struct DownLoad *);
 void msec_timeout(struct Host *);
 int RIOBootRup(struct rio_info *, uint, struct Host *, struct PKT *);
-int RIOBootComplete(struct rio_info *, struct Host *, uint, struct PktCmd *);
 int RIOBootOk(struct rio_info *,struct Host *, ulong);
 int RIORtaBound(struct rio_info *, uint); 
 void FillSlot(int, int, uint, struct Host *);
@@ -61,15 +60,10 @@ int RIOIdentifyRta(struct rio_info *, caddr_t);
 int RIOKillNeighbour(struct rio_info *, caddr_t);
 int RIOSuspendBootRta(struct Host *, int, int);
 int RIOFoadWakeup(struct rio_info *);
-int RIOCommandRup(struct rio_info *, uint, struct Host *, struct PKT *);
 struct CmdBlk * RIOGetCmdBlk(void);
 void RIOFreeCmdBlk(struct CmdBlk *);
 int RIOQueueCmdBlk(struct Host *, uint, struct CmdBlk *);
 void RIOPollHostCommands(struct rio_info *, struct Host *);
-int RIOStrlen(register char *);
-int RIOStrCmp(register char *, register char *);
-int RIOStrnCmp(register char *, register char *, int);
-void  RIOStrNCpy(char *, char *, int);
 int RIOWFlushMark(int, struct CmdBlk *);
 int RIORFlushEnable(int, struct CmdBlk *);
 int RIOUnUse(int, struct CmdBlk *);
@@ -77,7 +71,6 @@ void ShowPacket(uint, struct PKT *);
 
 /* rioctrl.c */
 int copyin(int, caddr_t, int);
-int copyout(caddr_t, int, int);
 int riocontrol(struct rio_info *, dev_t,int,caddr_t,int); 
 int RIOPreemptiveCmd(struct rio_info *,struct Port *,uchar);
 
@@ -89,24 +82,17 @@ int RIODoAT(struct rio_info *, int, int);
 caddr_t RIOCheckForATCard(int);
 int RIOAssignAT(struct rio_info *, int, caddr_t, int);
 int RIOBoardTest(paddr_t, caddr_t, uchar, int);
-int RIOScrub(int, BYTE *, int);
-void RIOAllocateInterrupts(struct rio_info *);
-void RIOStopInterrupts(struct rio_info *, int, int);
 void RIOAllocDataStructs(struct rio_info *);
 void RIOSetupDataStructs(struct rio_info *);
 int RIODefaultName(struct rio_info *, struct Host *, uint);
-int RIOReport(struct rio_info *);
 struct rioVersion * RIOVersid(void);
 int RIOMapin(paddr_t, int, caddr_t *);
 void RIOMapout(paddr_t, long, caddr_t);
 void RIOHostReset(uint, volatile struct DpRam *, uint);
 
 /* riointr.c */
-void riopoll(struct rio_info *);
-void riointr(struct rio_info *);
 void RIOTxEnable(char *);
 void RIOServiceHost(struct rio_info *, struct Host *, int);
-void RIOReceive(struct rio_info *, struct Port *);
 int riotproc(struct rio_info *, register struct ttystatics *, int, int);
 
 /* rioparam.c */
@@ -123,22 +109,15 @@ void remove_receive(struct Port *);
 /* rioroute.c */
 int RIORouteRup(struct rio_info *, uint, struct Host *, struct PKT *);
 void RIOFixPhbs(struct rio_info *, struct Host *, uint); 
-int RIOCheckIsolated(struct rio_info *, struct Host *, uint);
-int RIOIsolate(struct rio_info *, struct Host *, uint);
-int RIOCheck(struct Host *, uint);
 uint GetUnitType(uint);
 int RIOSetChange(struct rio_info *);
-void RIOConCon(struct rio_info *, struct Host *, uint, uint, uint, uint, int);
 int RIOFindFreeID(struct rio_info *, struct Host *, uint *, uint *);
-int RIOFreeDisconnected(struct rio_info *, struct Host *, int );
-int RIORemoveFromSavedTable(struct rio_info *, struct Map *);
 
 
 /* riotty.c */
 
 int riotopen(struct tty_struct * tty, struct file * filp);
 int riotclose(void  *ptr);
-int RIOCookMode(struct ttystatics *);
 int riotioctl(struct rio_info *, struct tty_struct *, register int, register caddr_t); 
 void ttyseth(struct Port *, struct ttystatics *, struct old_sgttyb *sg);
 

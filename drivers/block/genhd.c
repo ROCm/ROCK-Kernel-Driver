@@ -19,10 +19,11 @@
 
 static struct subsystem block_subsys;
 
+static DECLARE_MUTEX(block_subsys_sem);
+
 /*
  * Can be deleted altogether. Later.
  *
- * Modified under both block_subsys.rwsem and major_names_lock.
  */
 static struct blk_major_name {
 	struct blk_major_name *next;
@@ -30,14 +31,13 @@ static struct blk_major_name {
 	char name[16];
 } *major_names[MAX_PROBE_HASH];
 
-static spinlock_t major_names_lock = SPIN_LOCK_UNLOCKED;
-
 /* index in the above - for now: assume no multimajor ranges */
 static inline int major_to_index(int major)
 {
 	return major % MAX_PROBE_HASH;
 }
 
+#ifdef CONFIG_PROC_FS
 /* get block device names in somewhat random order */
 int get_blkdev_list(char *p)
 {
@@ -46,24 +46,24 @@ int get_blkdev_list(char *p)
 
 	len = sprintf(p, "\nBlock devices:\n");
 
-	down_read(&block_subsys.rwsem);
+	down(&block_subsys_sem);
 	for (i = 0; i < ARRAY_SIZE(major_names); i++) {
 		for (n = major_names[i]; n; n = n->next)
 			len += sprintf(p+len, "%3d %s\n",
 				       n->major, n->name);
 	}
-	up_read(&block_subsys.rwsem);
+	up(&block_subsys_sem);
 
 	return len;
 }
+#endif
 
 int register_blkdev(unsigned int major, const char *name)
 {
 	struct blk_major_name **n, *p;
 	int index, ret = 0;
-	unsigned long flags;
 
-	down_write(&block_subsys.rwsem);
+	down(&block_subsys_sem);
 
 	/* temporary */
 	if (major == 0) {
@@ -93,7 +93,6 @@ int register_blkdev(unsigned int major, const char *name)
 	p->next = NULL;
 	index = major_to_index(major);
 
-	spin_lock_irqsave(&major_names_lock, flags);
 	for (n = &major_names[index]; *n; n = &(*n)->next) {
 		if ((*n)->major == major)
 			break;
@@ -102,7 +101,6 @@ int register_blkdev(unsigned int major, const char *name)
 		*n = p;
 	else
 		ret = -EBUSY;
-	spin_unlock_irqrestore(&major_names_lock, flags);
 
 	if (ret < 0) {
 		printk("register_blkdev: cannot get major %d for %s\n",
@@ -110,7 +108,7 @@ int register_blkdev(unsigned int major, const char *name)
 		kfree(p);
 	}
 out:
-	up_write(&block_subsys.rwsem);
+	up(&block_subsys_sem);
 	return ret;
 }
 
@@ -122,11 +120,9 @@ int unregister_blkdev(unsigned int major, const char *name)
 	struct blk_major_name **n;
 	struct blk_major_name *p = NULL;
 	int index = major_to_index(major);
-	unsigned long flags;
 	int ret = 0;
 
-	down_write(&block_subsys.rwsem);
-	spin_lock_irqsave(&major_names_lock, flags);
+	down(&block_subsys_sem);
 	for (n = &major_names[index]; *n; n = &(*n)->next)
 		if ((*n)->major == major)
 			break;
@@ -136,8 +132,7 @@ int unregister_blkdev(unsigned int major, const char *name)
 		p = *n;
 		*n = p->next;
 	}
-	spin_unlock_irqrestore(&major_names_lock, flags);
-	up_write(&block_subsys.rwsem);
+	up(&block_subsys_sem);
 	kfree(p);
 
 	return ret;
@@ -231,7 +226,7 @@ static void *part_start(struct seq_file *part, loff_t *pos)
 	struct list_head *p;
 	loff_t l = *pos;
 
-	down_read(&block_subsys.rwsem);
+	down(&block_subsys_sem);
 	list_for_each(p, &block_subsys.kset.list)
 		if (!l--)
 			return list_entry(p, struct gendisk, kobj.entry);
@@ -248,7 +243,7 @@ static void *part_next(struct seq_file *part, void *v, loff_t *pos)
 
 static void part_stop(struct seq_file *part, void *v)
 {
-	up_read(&block_subsys.rwsem);
+	up(&block_subsys_sem);
 }
 
 static int show_partition(struct seq_file *part, void *v)
@@ -320,12 +315,6 @@ subsys_initcall(device_init);
 /*
  * kobject & sysfs bindings for block devices
  */
-
-struct disk_attribute {
-	struct attribute attr;
-	ssize_t (*show)(struct gendisk *, char *);
-};
-
 static ssize_t disk_attr_show(struct kobject *kobj, struct attribute *attr,
 			      char *page)
 {
@@ -506,7 +495,7 @@ static void *diskstats_start(struct seq_file *part, loff_t *pos)
 	loff_t k = *pos;
 	struct list_head *p;
 
-	down_read(&block_subsys.rwsem);
+	down(&block_subsys_sem);
 	list_for_each(p, &block_subsys.kset.list)
 		if (!k--)
 			return list_entry(p, struct gendisk, kobj.entry);
@@ -523,7 +512,7 @@ static void *diskstats_next(struct seq_file *part, void *v, loff_t *pos)
 
 static void diskstats_stop(struct seq_file *part, void *v)
 {
-	up_read(&block_subsys.rwsem);
+	up(&block_subsys_sem);
 }
 
 static int diskstats_show(struct seq_file *s, void *v)

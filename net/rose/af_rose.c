@@ -59,7 +59,7 @@ int sysctl_rose_maximum_vcs             = ROSE_DEFAULT_MAXVC;
 int sysctl_rose_window_size             = ROSE_DEFAULT_WINDOW_SIZE;
 
 static HLIST_HEAD(rose_list);
-spinlock_t rose_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rose_list_lock);
 
 static struct proto_ops rose_proto_ops;
 

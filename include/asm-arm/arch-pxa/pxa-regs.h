@@ -272,11 +272,6 @@
 #define DCMD_WIDTH4	(3 << 14)	/* 4 byte width (Word) */
 #define DCMD_LENGTH	0x01fff		/* length mask (max = 8K - 1) */
 
-/* default combinations */
-#define DCMD_RXPCDR	(DCMD_INCTRGADDR|DCMD_FLOWSRC|DCMD_BURST32|DCMD_WIDTH4)
-#define DCMD_RXMCDR	(DCMD_INCTRGADDR|DCMD_FLOWSRC|DCMD_BURST32|DCMD_WIDTH4)
-#define DCMD_TXPCDR	(DCMD_INCSRCADDR|DCMD_FLOWTRG|DCMD_BURST32|DCMD_WIDTH4)
-
 
 /*
  * UARTs
@@ -1215,6 +1210,7 @@
 #define GPIO30_SDATA_OUT	30	/* AC97/I2S Sdata_out */
 #define GPIO31_SYNC		31	/* AC97/I2S sync */
 #define GPIO32_SDATA_IN1	32	/* AC97 Sdata_in1 */
+#define GPIO32_SYSCLK		32	/* I2S System Clock */
 #define GPIO32_MMCCLK		32	/* MMC Clock (PXA270) */
 #define GPIO33_nCS_5		33	/* chip select 5 */
 #define GPIO34_FFRXD		34	/* FFUART receive */
@@ -1332,14 +1328,16 @@
 #define GPIO26_SRXD_MD		(26 | GPIO_ALT_FN_1_IN)
 #define GPIO27_SEXTCLK_MD	(27 | GPIO_ALT_FN_1_IN)
 #define GPIO28_BITCLK_AC97_MD	(28 | GPIO_ALT_FN_1_IN)
-#define GPIO28_BITCLK_I2S_MD	(28 | GPIO_ALT_FN_2_IN)
+#define GPIO28_BITCLK_IN_I2S_MD	(28 | GPIO_ALT_FN_2_IN)
+#define GPIO28_BITCLK_OUT_I2S_MD	(28 | GPIO_ALT_FN_1_OUT)
 #define GPIO29_SDATA_IN_AC97_MD	(29 | GPIO_ALT_FN_1_IN)
 #define GPIO29_SDATA_IN_I2S_MD	(29 | GPIO_ALT_FN_2_IN)
 #define GPIO30_SDATA_OUT_AC97_MD	(30 | GPIO_ALT_FN_2_OUT)
 #define GPIO30_SDATA_OUT_I2S_MD	(30 | GPIO_ALT_FN_1_OUT)
-#define GPIO31_SYNC_AC97_MD	(31 | GPIO_ALT_FN_2_OUT)
 #define GPIO31_SYNC_I2S_MD	(31 | GPIO_ALT_FN_1_OUT)
+#define GPIO31_SYNC_AC97_MD	(31 | GPIO_ALT_FN_2_OUT)
 #define GPIO32_SDATA_IN1_AC97_MD	(32 | GPIO_ALT_FN_1_IN)
+#define GPIO32_SYSCLK_I2S_MD	(32 | GPIO_ALT_FN_1_OUT)
 #define GPIO32_MMCCLK_MD		( 32 | GPIO_ALT_FN_2_OUT)
 #define GPIO33_nCS_5_MD		(33 | GPIO_ALT_FN_2_OUT)
 #define GPIO34_FFRXD_MD		(34 | GPIO_ALT_FN_1_IN)
@@ -1580,6 +1578,7 @@
 #define SSCR0_EDSS		(1 << 20)	/* Extended Data Size Select */
 
 /* extra bits in PXA255, PXA26x and PXA27x SSP ports */
+#define SSCR0_PSP		(3 << 4)	/* PSP - Programmable Serial Protocol */
 #define SSCR1_TTELP		(1 << 31)	/* TXD Tristate Enable Last Phase */
 #define SSCR1_TTE		(1 << 30)	/* TXD Tristate Enable */
 #define SSCR1_EBCEI		(1 << 29)	/* Enable Bit Count Error interrupt */

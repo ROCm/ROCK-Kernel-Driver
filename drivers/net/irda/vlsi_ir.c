@@ -83,9 +83,9 @@ MODULE_DEVICE_TABLE(pci, vlsi_irda_table);
  *		3: external 40MHz XCLK (HP OB-800)
  */
 
-MODULE_PARM(clksrc, "i");
-MODULE_PARM_DESC(clksrc, "clock input source selection");
 static int clksrc = 0;			/* default is 0(auto) */
+module_param(clksrc, int, 0);
+MODULE_PARM_DESC(clksrc, "clock input source selection");
 
 /*	ringsize: size of the tx and rx descriptor rings
  *		independent for tx and rx
@@ -95,9 +95,9 @@ static int clksrc = 0;			/* default is 0(auto) */
  *		there should be no gain when using rings larger than 8
  */
 
-MODULE_PARM(ringsize, "1-2i");
-MODULE_PARM_DESC(ringsize, "TX, RX ring descriptor size");
 static int ringsize[] = {8,8};		/* default is tx=8 / rx=8 */
+module_param_array(ringsize, int, NULL, 0);
+MODULE_PARM_DESC(ringsize, "TX, RX ring descriptor size");
 
 /*	sirpulse: tuning of the SIR pulse width within IrPHY 1.3 limits
  *		0: very short, 1.5us (exception: 6us at 2.4 kbaud)
@@ -108,9 +108,9 @@ static int ringsize[] = {8,8};		/* default is tx=8 / rx=8 */
  *		pulse width saves more than 90% of the transmitted IR power.
  */
 
-MODULE_PARM(sirpulse, "i");
-MODULE_PARM_DESC(sirpulse, "SIR pulse width tuning");
 static int sirpulse = 1;		/* default is 3/16 bittime */
+module_param(sirpulse, int, 0);
+MODULE_PARM_DESC(sirpulse, "SIR pulse width tuning");
 
 /*	qos_mtt_bits: encoded min-turn-time value we require the peer device
  *		 to use before transmitting to us. "Type 1" (per-station)
@@ -119,9 +119,9 @@ static int sirpulse = 1;		/* default is 3/16 bittime */
  *		 pretty common HP HDLS-1100 requires 1 msec - so lets use this.
  */
 
-MODULE_PARM(qos_mtt_bits, "i");
-MODULE_PARM_DESC(qos_mtt_bits, "IrLAP bitfield representing min-turn-time");
 static int qos_mtt_bits = 0x07;		/* default is 1 ms or more */
+module_param(qos_mtt_bits, int, 0);
+MODULE_PARM_DESC(qos_mtt_bits, "IrLAP bitfield representing min-turn-time");
 
 /********************************************************/
 

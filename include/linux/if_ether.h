@@ -69,7 +69,7 @@
 #define ETH_P_ATMFATE	0x8884		/* Frame-based ATM Transport
 					 * over Ethernet
 					 */
-#define ETH_P_EDP2	0x88A2		/* Coraid EDP2			*/
+#define ETH_P_AOE	0x88A2		/* ATA over Ethernet		*/
 
 /*
  *	Non DIX types. Won't clash for 1500 types.
@@ -91,6 +91,7 @@
 #define ETH_P_IRDA	0x0017		/* Linux-IrDA			*/
 #define ETH_P_ECONET	0x0018		/* Acorn Econet			*/
 #define ETH_P_HDLC	0x0019		/* HDLC frames			*/
+#define ETH_P_ARCNET	0x001A		/* 1A for ArcNet :-)            */
 
 /*
  *	This is an Ethernet frame header.

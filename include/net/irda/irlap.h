@@ -253,10 +253,8 @@ int irlap_validate_ns_received(struct irlap_cb *, int ns);
 int  irlap_generate_rand_time_slot(int S, int s);
 void irlap_initiate_connection_state(struct irlap_cb *);
 void irlap_flush_all_queues(struct irlap_cb *);
-void irlap_change_speed(struct irlap_cb *self, __u32 speed, int now);
 void irlap_wait_min_turn_around(struct irlap_cb *, struct qos_info *);
 
-void irlap_init_qos_capabilities(struct irlap_cb *, struct qos_info *);
 void irlap_apply_default_connection_parameters(struct irlap_cb *self);
 void irlap_apply_connection_parameters(struct irlap_cb *self, int now);
 

@@ -260,7 +260,7 @@
 #define __NR_fstatfs64		253
 #define __NR_fadvise64_64	254
 #define __NR_rtas		255
-/* Number 256 is reserved for sys_debug_setcontext */
+#define __NR_sys_debug_setcontext 256
 /* Number 257 is reserved for vserver */
 /* Number 258 is reserved for new sys_remap_file_pages */
 /* Number 259 is reserved for new sys_mbind */

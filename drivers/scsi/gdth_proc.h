@@ -14,14 +14,10 @@ static int gdth_get_info(char *buffer,char **start,off_t offset,int length,
 static void gdth_do_req(Scsi_Request *srp, gdth_cmd_str *cmd, 
                         char *cmnd, int timeout);
 static int gdth_set_asc_info(char *buffer,int length,int hanum,Scsi_Request *scp);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+#else
 static void gdth_do_cmd(Scsi_Cmnd *scp, gdth_cmd_str *cmd, 
                         char *cmnd, int timeout);
 static int gdth_set_asc_info(char *buffer,int length,int hanum,Scsi_Cmnd *scp);
-#else 
-static void gdth_do_cmd(Scsi_Cmnd *scp, gdth_cmd_str *cmd, 
-                        char *cmnd, int timeout);
-static int gdth_set_asc_info(char *buffer,int length,int hanum,Scsi_Cmnd scp);
 #endif
 
 static char *gdth_ioctl_alloc(int hanum, int size, int scratch,

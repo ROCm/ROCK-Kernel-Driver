@@ -1,30 +1,15 @@
 /*
- * mem_op.h 1.13 2000/06/12 21:55:40
+ * mem_op.h
  *
- * The contents of this file are subject to the Mozilla Public License
- * Version 1.1 (the "License"); you may not use this file except in
- * compliance with the License. You may obtain a copy of the License
- * at http://www.mozilla.org/MPL/
- *
- * Software distributed under the License is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
- * the License for the specific language governing rights and
- * limitations under the License. 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * The initial developer of the original code is David A. Hinds
  * <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
  * are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
  *
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License version 2 (the "GPL"), in which
- * case the provisions of the GPL are applicable instead of the
- * above.  If you wish to allow the use of your version of this file
- * only under the terms of the GPL and not to allow others to use
- * your version of this file under the MPL, indicate your decision by
- * deleting the provisions above and replace them with the notice and
- * other provisions required by the GPL.  If you do not delete the
- * provisions above, a recipient may use your version of this file
- * under either the MPL or the GPL.
+ * (C) 1999             David A. Hinds
  */
 
 #ifndef _LINUX_MEM_OP_H
@@ -76,67 +61,54 @@ static inline void copy_user_to_pc(void *to, const void *from, size_t n)
 
 #else /* UNSAFE_MEMCPY */
 
-static inline void copy_from_pc(void *to, const void *from, size_t n)
+static inline void copy_from_pc(void *to, void __iomem *from, size_t n)
 {
-    size_t odd = (n & 1);
-    n -= odd;
-    while (n) {
-	u_short *t = to;
-
-	*t = __raw_readw(from);
-	to = (void *)((long)to + 2);
-	from = (const void *)((long)from + 2);
-	n -= 2;
-    }
-    if (odd)
-	*(u_char *)to = readb(from);
+	__u16 *t = to;
+	__u16 __iomem *f = from;
+	size_t odd = (n & 1);
+	for (n >>= 1; n; n--)
+		*t++ = __raw_readw(f++);
+	if (odd)
+		*(__u8 *)t = readb(f);
 }
 
-static inline void copy_to_pc(void *to, const void *from, size_t n)
+static inline void copy_to_pc(void __iomem *to, const void *from, size_t n)
 {
-    size_t odd = (n & 1);
-    n -= odd;
-    while (n) {
-	__raw_writew(*(u_short *)from, to);
-	to = (void *)((long)to + 2);
-	from = (const void *)((long)from + 2);
-	n -= 2;
-    }
-    if (odd)
-	writeb(*(u_char *)from, to);
+	__u16 __iomem *t = to;
+	const __u16 *f = from;
+	size_t odd = (n & 1);
+	for (n >>= 1; n ; n--)
+		__raw_writew(*f++, t++);
+	if (odd)
+		writeb(*(__u8 *)f, t);
 }
 
-static inline void copy_pc_to_user(void *to, const void *from, size_t n)
+static inline void copy_pc_to_user(void __user *to, void __iomem *from, size_t n)
 {
-    size_t odd = (n & 1);
-    n -= odd;
-    while (n) {
-	put_user(__raw_readw(from), (short *)to);
-	to = (void *)((long)to + 2);
-	from = (const void *)((long)from + 2);
-	n -= 2;
-    }
-    if (odd)
-	put_user(readb(from), (char *)to);
+	__u16 __user *t = to;
+	__u16 __iomem *f = from;
+	size_t odd = (n & 1);
+	for (n >>= 1; n ; n--)
+		put_user(__raw_readw(f++), t++);
+	if (odd)
+		put_user(readb(f), (char __user *)t);
 }
 
-static inline void copy_user_to_pc(void *to, const void *from, size_t n)
+static inline void copy_user_to_pc(void __iomem *to, void __user *from, size_t n)
 {
-    short s;
-    char c;
-    size_t odd = (n & 1);
-    n -= odd;
-    while (n) {
-	get_user(s, (short *)from);
-	__raw_writew(s, to);
-	to = (void *)((long)to + 2);
-	from = (const void *)((long)from + 2);
-	n -= 2;
-    }
-    if (odd) {
-	get_user(c, (char *)from);
-	writeb(c, to);
-    }
+	__u16 __user *f = from;
+	__u16 __iomem *t = to;
+	short s;
+	char c;
+	size_t odd = (n & 1);
+	for (n >>= 1; n; n--) {
+		get_user(s, f++);
+		__raw_writew(s, t++);
+	}
+	if (odd) {
+		get_user(c, (char __user *)f);
+		writeb(c, t);
+	}
 }
 
 #endif /* UNSAFE_MEMCPY */

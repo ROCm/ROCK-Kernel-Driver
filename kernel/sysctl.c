@@ -44,10 +44,6 @@
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-static int proc_do_kdb(ctl_table *table, int write, struct file *filp, void *buffer, size_t *lenp, loff_t *ppos);
-#endif	/* CONFIG_KDB */
 
 #ifdef CONFIG_ROOT_NFS
 #include <linux/nfs_fs.h>
@@ -56,7 +52,6 @@ static int proc_do_kdb(ctl_table *table, int write, struct file *filp, void *buf
 #if defined(CONFIG_SYSCTL)
 
 /* External variables not in a header file. */
-extern int panic_timeout;
 extern int C_A_D;
 extern int sysctl_overcommit_memory;
 extern int sysctl_overcommit_ratio;
@@ -66,6 +61,7 @@ extern int core_uses_pid;
 extern char core_pattern[];
 extern int cad_pid;
 extern int pid_max;
+extern int sysctl_lower_zone_protection;
 extern int min_free_kbytes;
 extern int printk_ratelimit_jiffies;
 extern int printk_ratelimit_burst;
@@ -494,16 +490,6 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
-#ifdef	CONFIG_KDB
-	{
-		.ctl_name	= KERN_KDB,
-		.procname	= "kdb",
-		.data		= &kdb_on,
-		.maxlen		= sizeof(kdb_on),
-		.mode		= 0644,
-		.proc_handler	= &proc_do_kdb,
-	},
-#endif	/* CONFIG_KDB */
 	{
 		.ctl_name	= KERN_CADPID,
 		.procname	= "cad_pid",
@@ -643,6 +629,16 @@ static ctl_table kern_table[] = {
 		.proc_handler   = &proc_unknown_nmi_panic,
 	},
 #endif
+#if defined(CONFIG_X86)
+	{
+		.ctl_name	= KERN_BOOTLOADER_TYPE,
+		.procname	= "bootloader_type",
+		.data		= &bootloader_type,
+		.maxlen		= sizeof (int),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
 	{ .ctl_name = 0 }
 };
 
@@ -755,13 +751,14 @@ static ctl_table vm_table[] = {
 	 },
 #endif
 	{
-		.ctl_name	= VM_LOWMEM_RESERVE_RATIO,
-		.procname	= "lowmem_reserve_ratio",
-		.data		= &sysctl_lowmem_reserve_ratio,
-		.maxlen		= sizeof(sysctl_lowmem_reserve_ratio),
+		.ctl_name	= VM_LOWER_ZONE_PROTECTION,
+		.procname	= "lower_zone_protection",
+		.data		= &sysctl_lower_zone_protection,
+		.maxlen		= sizeof(sysctl_lower_zone_protection),
 		.mode		= 0644,
-		.proc_handler	= &lowmem_reserve_ratio_sysctl_handler,
+		.proc_handler	= &lower_zone_protection_sysctl_handler,
 		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
 	},
 	{
 		.ctl_name	= VM_MIN_FREE_KBYTES,
@@ -773,6 +770,7 @@ static ctl_table vm_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &zero,
 	},
+#ifdef CONFIG_MMU
 	{
 		.ctl_name	= VM_MAX_MAP_COUNT,
 		.procname	= "max_map_count",
@@ -781,6 +779,7 @@ static ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},
+#endif
 	{
 		.ctl_name	= VM_LAPTOP_MODE,
 		.procname	= "laptop_mode",
@@ -922,6 +921,7 @@ static ctl_table fs_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
+#ifdef CONFIG_MMU
 	{
 		.ctl_name	= FS_LEASE_TIME,
 		.procname	= "lease-break-time",
@@ -946,6 +946,7 @@ static ctl_table fs_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#endif
 	{ .ctl_name = 0 }
 };
 
@@ -2217,22 +2218,6 @@ void unregister_sysctl_table(struct ctl_table_header * table)
 }
 
 #endif /* CONFIG_SYSCTL */
-
-#ifdef	CONFIG_KDB
-static int proc_do_kdb(ctl_table *table, int write, struct file *filp,
-		       void *buffer, size_t *lenp, loff_t *ppos)
-{
-#ifdef	CONFIG_SYSCTL
-	if (KDB_FLAG(NO_CONSOLE) && write) {
-		printk(KERN_ERR "kdb has no working console and has switched itself off\n");
-		return -EINVAL;
-	}
-	return proc_dointvec(table, write, filp, buffer, lenp, ppos);
-#else	/* !CONFIG_SYSCTL */
-	return -ENOSYS;
-#endif	/* CONFIG_SYSCTL */
-}
-#endif	/* CONFIG_KDB */
 
 /*
  * No sense putting this after each symbol definition, twice,

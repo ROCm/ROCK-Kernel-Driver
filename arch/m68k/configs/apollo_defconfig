@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-rc3-m68k
-# Sun Dec  5 14:21:29 2004
+# Linux kernel version: 2.6.10-m68k
+# Sun Dec 26 11:22:58 2004
 #
 CONFIG_M68K=y
 CONFIG_MMU=y
@@ -302,7 +302,6 @@ CONFIG_IP_NF_TARGET_MASQUERADE=m
 CONFIG_IP_NF_TARGET_REDIRECT=m
 CONFIG_IP_NF_TARGET_NETMAP=m
 CONFIG_IP_NF_TARGET_SAME=m
-CONFIG_IP_NF_NAT_LOCAL=y
 CONFIG_IP_NF_NAT_SNMP_BASIC=m
 CONFIG_IP_NF_NAT_IRC=m
 CONFIG_IP_NF_NAT_FTP=m
@@ -589,6 +588,11 @@ CONFIG_DUMMY_CONSOLE=y
 # USB Gadget Support
 #
 # CONFIG_USB_GADGET is not set
+
+#
+# MMC/SD Card support
+#
+# CONFIG_MMC is not set
 
 #
 # Character devices

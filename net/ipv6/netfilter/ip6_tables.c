@@ -234,7 +234,7 @@ ip6_packet_match(const struct sk_buff *skb,
 			 * we will change the return 0 to 1*/
 			if ((currenthdr == IPPROTO_NONE) || 
 				(currenthdr == IPPROTO_ESP))
-				return 0;
+				break;
 
 			hp = skb_header_pointer(skb, ptr, sizeof(_hdr), &_hdr);
 			BUG_ON(hp == NULL);
@@ -365,10 +365,6 @@ ip6t_do_table(struct sk_buff **pskb,
 	const char *indev, *outdev;
 	void *table_base;
 	struct ip6t_entry *e, *back;
-
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
 
 	/* Initialization */
 	indev = in ? in->name : nulldevname;
@@ -1222,11 +1218,12 @@ do_replace(void __user *user, unsigned int len)
 	IP6T_ENTRY_ITERATE(oldinfo->entries, oldinfo->size, cleanup_entry,NULL);
 	vfree(oldinfo);
 	/* Silent error: too late now. */
-	copy_to_user(tmp.counters, counters,
-		     sizeof(struct ip6t_counters) * tmp.num_counters);
+	if (copy_to_user(tmp.counters, counters,
+			 sizeof(struct ip6t_counters) * tmp.num_counters) != 0)
+		ret = -EFAULT;
 	vfree(counters);
 	up(&ip6t_mutex);
-	return 0;
+	return ret;
 
  put_module:
 	module_put(t->me);
@@ -1372,7 +1369,7 @@ do_ip6t_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 			       sizeof(info.underflow));
 			info.num_entries = t->private->number;
 			info.size = t->private->size;
-			strcpy(info.name, name);
+			memcpy(info.name, name, sizeof(info.name));
 
 			if (copy_to_user(user, &info, *len) != 0)
 				ret = -EFAULT;
@@ -1463,7 +1460,8 @@ ip6t_unregister_match(struct ip6t_match *match)
 	up(&ip6t_mutex);
 }
 
-int ip6t_register_table(struct ip6t_table *table)
+int ip6t_register_table(struct ip6t_table *table,
+			const struct ip6t_replace *repl)
 {
 	int ret;
 	struct ip6t_table_info *newinfo;
@@ -1471,17 +1469,17 @@ int ip6t_register_table(struct ip6t_table *table)
 		= { 0, 0, 0, { 0 }, { 0 }, { } };
 
 	newinfo = vmalloc(sizeof(struct ip6t_table_info)
-			  + SMP_ALIGN(table->table->size) * NR_CPUS);
+			  + SMP_ALIGN(repl->size) * NR_CPUS);
 	if (!newinfo)
 		return -ENOMEM;
 
-	memcpy(newinfo->entries, table->table->entries, table->table->size);
+	memcpy(newinfo->entries, repl->entries, repl->size);
 
 	ret = translate_table(table->name, table->valid_hooks,
-			      newinfo, table->table->size,
-			      table->table->num_entries,
-			      table->table->hook_entry,
-			      table->table->underflow);
+			      newinfo, repl->size,
+			      repl->num_entries,
+			      repl->hook_entry,
+			      repl->underflow);
 	if (ret != 0) {
 		vfree(newinfo);
 		return ret;

@@ -44,7 +44,6 @@
 #include <asm/system.h>
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
-#include <asm/naca.h>
 #include <asm/pci.h>
 #include <asm/iommu.h>
 #include <asm/bootinfo.h>
@@ -557,7 +556,7 @@ void __init finish_device_tree(void)
 
 	DBG(" -> finish_device_tree\n");
 
-	if (naca->interrupt_controller == IC_INVALID) {
+	if (ppc64_interrupt_controller == IC_INVALID) {
 		DBG("failed to configure interrupt controller type\n");
 		panic("failed to configure interrupt controller type\n");
 	}
@@ -844,12 +843,12 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 
 	/* On LPAR, look for the first ibm,pft-size property for the  hash table size
 	 */
-	if (systemcfg->platform == PLATFORM_PSERIES_LPAR && naca->pftSize == 0) {
+	if (systemcfg->platform == PLATFORM_PSERIES_LPAR && ppc64_pft_size == 0) {
 		u32 *pft_size;
 		pft_size = (u32 *)get_flat_dt_prop(node, "ibm,pft-size", NULL);
 		if (pft_size != NULL) {
 			/* pft_size[0] is the NUMA CEC cookie */
-			naca->pftSize = pft_size[1];
+			ppc64_pft_size = pft_size[1];
 		}
 	}
 
@@ -1018,7 +1017,7 @@ void __init early_init_devtree(void *params)
 	initial_boot_params = params;
 
 	/* By default, hash size is not set */
-	naca->pftSize = 0;
+	ppc64_pft_size = 0;
 
 	/* Retreive various informations from the /chosen node of the
 	 * device-tree, including the platform type, initrd location and
@@ -1047,7 +1046,7 @@ void __init early_init_devtree(void *params)
 	/* If hash size wasn't obtained above, we calculate it now based on
 	 * the total RAM size
 	 */
-	if (naca->pftSize == 0) {
+	if (ppc64_pft_size == 0) {
 		unsigned long rnd_mem_size, pteg_count;
 
 		/* round mem_size up to next power of 2 */
@@ -1058,10 +1057,10 @@ void __init early_init_devtree(void *params)
 		/* # pages / 2 */
 		pteg_count = (rnd_mem_size >> (12 + 1));
 
-		naca->pftSize = __ilog2(pteg_count << 7);
+		ppc64_pft_size = __ilog2(pteg_count << 7);
 	}
 
-	DBG("Hash pftSize: %x\n", (int)naca->pftSize);
+	DBG("Hash pftSize: %x\n", (int)ppc64_pft_size);
 	DBG(" <- early_init_devtree()\n");
 }
 
@@ -1743,17 +1742,6 @@ static int of_finish_dynamic_node(struct device_node *node)
 		node->busno = (regs[0] >> 16) & 0xff;
 		node->devfn = (regs[0] >> 8) & 0xff;
 	}
-
-	/* fixing up iommu_table */
-
-#ifdef CONFIG_PPC_PSERIES
-	if (strcmp(node->name, "pci") == 0 &&
-	    get_property(node, "ibm,dma-window", NULL)) {
-		node->bussubno = node->busno;
-		iommu_devnode_init_pSeries(node);
-	} else
-		node->iommu_table = parent->iommu_table;
-#endif /* CONFIG_PPC_PSERIES */
 
 out:
 	of_node_put(parent);

@@ -122,3 +122,6 @@ EXPORT_SYMBOL(ia64_spinlock_contention);
 #  endif
 # endif
 #endif
+
+extern char ia64_ivt[];
+EXPORT_SYMBOL(ia64_ivt);

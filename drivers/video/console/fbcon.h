@@ -66,6 +66,7 @@ struct fbcon_ops {
         int    currcon;	                /* Current VC. */
 	int    cursor_flash;
 	int    cursor_reset;
+	int    blank_state;
 	char  *cursor_data;
 };
     /*
@@ -161,4 +162,7 @@ extern void fbcon_set_tileops(struct vc_data *vc, struct fb_info *info,
 			      struct display *p, struct fbcon_ops *ops);
 #endif
 extern void fbcon_set_bitops(struct fbcon_ops *ops);
+
+extern const struct consw fb_con;
+
 #endif /* _VIDEO_FBCON_H */

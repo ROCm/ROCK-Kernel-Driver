@@ -195,7 +195,7 @@ struct ext3_group_desc
  */
 #define EXT3_STATE_JDATA		0x00000001 /* journaled data exists */
 #define EXT3_STATE_NEW			0x00000002 /* inode is newly created */
-
+#define EXT3_STATE_XATTR		0x00000004 /* has in-inode xattrs */
 
 /* Used to pass group descriptor data when online resize is done */
 struct ext3_new_group_input {
@@ -293,6 +293,8 @@ struct ext3_inode {
 			__u32	m_i_reserved2[2];
 		} masix2;
 	} osd2;				/* OS dependent 2 */
+	__le16	i_extra_isize;
+	__le16	i_pad1;
 };
 
 #define i_size_high	i_dir_acl
@@ -758,12 +760,12 @@ extern struct buffer_head * ext3_bread (handle_t *, struct inode *, int, int, in
 extern void ext3_read_inode (struct inode *);
 extern int  ext3_write_inode (struct inode *, int);
 extern int  ext3_setattr (struct dentry *, struct iattr *);
-extern void ext3_put_inode (struct inode *);
 extern void ext3_delete_inode (struct inode *);
 extern int  ext3_sync_inode (handle_t *, struct inode *);
 extern void ext3_discard_reservation (struct inode *);
 extern void ext3_dirty_inode(struct inode *);
 extern int ext3_change_inode_journal_flag(struct inode *, int);
+extern int ext3_get_inode_loc(struct inode *, struct ext3_iloc *);
 extern void ext3_truncate (struct inode *);
 extern void ext3_set_inode_flags(struct inode *);
 extern void ext3_set_aops(struct inode *inode);
@@ -791,25 +793,15 @@ extern void ext3_error (struct super_block *, const char *, const char *, ...)
 extern void __ext3_std_error (struct super_block *, const char *, int);
 extern void ext3_abort (struct super_block *, const char *, const char *, ...)
 	__attribute__ ((format (printf, 3, 4)));
-extern NORET_TYPE void ext3_panic (struct super_block *, const char *,
-				   const char *, ...)
-	__attribute__ ((NORET_AND format (printf, 3, 4)));
 extern void ext3_warning (struct super_block *, const char *, const char *, ...)
 	__attribute__ ((format (printf, 3, 4)));
 extern void ext3_update_dynamic_rev (struct super_block *sb);
-extern void ext3_put_super (struct super_block *);
-extern void ext3_write_super (struct super_block *);
-extern void ext3_write_super_lockfs (struct super_block *);
-extern void ext3_unlockfs (struct super_block *);
-extern int ext3_remount (struct super_block *, int *, char *);
-extern int ext3_statfs (struct super_block *, struct kstatfs *);
 
 #define ext3_std_error(sb, errno)				\
 do {								\
 	if ((errno))						\
 		__ext3_std_error((sb), __FUNCTION__, (errno));	\
 } while (0)
-extern const char *ext3_decode_error(struct super_block *sb, int errno, char nbuf[16]);
 
 /*
  * Inodes and files operations

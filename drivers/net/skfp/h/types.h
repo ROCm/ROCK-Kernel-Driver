@@ -29,20 +29,11 @@
 #define _far
 #endif
 
-#ifndef MEM_MAPPED_IO // "normal" IO
-#define inp(p)  inb(p)
-#define inpw(p)	inw(p)
-#define inpd(p) inl(p)
-#define outp(p,c)  outb(c,p)
-#define outpw(p,s) outw(s,p)
-#define outpd(p,l) outl(l,p)
-#else // memory mapped io
-#define inp(a)		readb(a)
-#define inpw(a)		readw(a)
-#define inpd(a)		readl(a)
-#define outp(a,v)	writeb(v, a)	
-#define outpw(a,v)	writew(v, a)	
-#define outpd(a,v)	writel(v, a)	
-#endif
+#define inp(p)  ioread8(p)
+#define inpw(p)	ioread16(p)
+#define inpd(p) ioread32(p)
+#define outp(p,c)  iowrite8(c,p)
+#define outpw(p,s) iowrite16(s,p)
+#define outpd(p,l) iowrite32(l,p)
 
 #endif	/* _TYPES_ */

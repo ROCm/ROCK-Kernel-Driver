@@ -39,7 +39,7 @@ struct errormsg {
 	struct sockaddr_in		icmp_src;	/* ICMP packet source address */
 };
 
-static spinlock_t rxrpc_transports_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rxrpc_transports_lock);
 static struct list_head rxrpc_transports = LIST_HEAD_INIT(rxrpc_transports);
 
 __RXACCT_DECL(atomic_t rxrpc_transport_count);
@@ -147,16 +147,6 @@ int rxrpc_create_transport(unsigned short port,
 	_leave(" = %d", ret);
 	return ret;
 } /* end rxrpc_create_transport() */
-
-/*****************************************************************************/
-/*
- * clear the connections on a transport endpoint
- */
-void rxrpc_clear_transport(struct rxrpc_transport *trans)
-{
-	//struct rxrpc_connection *conn;
-
-} /* end rxrpc_clear_transport() */
 
 /*****************************************************************************/
 /*

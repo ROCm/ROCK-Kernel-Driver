@@ -1,8 +1,9 @@
 #ifndef _ASM_M32R_PGTABLE_H
 #define _ASM_M32R_PGTABLE_H
 
-/* $Id$ */
+#include <asm-generic/4level-fixup.h>
 
+#ifdef __KERNEL__
 /*
  * The Linux memory management assumes a three-level page table setup. On
  * the M32R, we use that, but "fold" the mid level into the top-level page
@@ -38,11 +39,6 @@ extern unsigned long empty_zero_page[1024];
 
 #endif /* !__ASSEMBLY__ */
 
-/*
- * The Linux x86 paging architecture is 'compile-time dual-mode', it
- * implements both the traditional 2-level x86 page tables and the
- * newer 3-level PAE-mode page tables.
- */
 #ifndef __ASSEMBLY__
 #include <asm/pgtable-2level.h>
 #endif
@@ -69,14 +65,6 @@ extern unsigned long empty_zero_page[1024];
 #define VMALLOC_END		KSEG3
 
 /*
- * The 4MB page is guessing..  Detailed in the infamous "Chapter H"
- * of the Pentium details, but assuming intel did the straightforward
- * thing, this bit set in the page directory entry just means that
- * the page directory entry points directly to a 4MB-aligned block of
- * memory.
- */
-
-/*
  *     M32R TLB format
  *
  *     [0]    [1:19]           [20:23]       [24:31]
@@ -89,47 +77,34 @@ extern unsigned long empty_zero_page[1024];
  *                                     RWX
  */
 
-#define _PAGE_BIT_DIRTY		0	/* software */
+#define _PAGE_BIT_DIRTY		0	/* software: page changed */
 #define _PAGE_BIT_FILE		0	/* when !present: nonlinear file
 					   mapping */
-#define _PAGE_BIT_PRESENT	1	/* Valid */
+#define _PAGE_BIT_PRESENT	1	/* Valid: page is valid */
 #define _PAGE_BIT_GLOBAL	2	/* Global */
 #define _PAGE_BIT_LARGE		3	/* Large */
 #define _PAGE_BIT_EXEC		4	/* Execute */
 #define _PAGE_BIT_WRITE		5	/* Write */
 #define _PAGE_BIT_READ		6	/* Read */
 #define _PAGE_BIT_NONCACHABLE	7	/* Non cachable */
-#define _PAGE_BIT_USER		8	/* software */
-#define _PAGE_BIT_ACCESSED	9	/* software */
+#define _PAGE_BIT_ACCESSED	8	/* software: page referenced */
+#define _PAGE_BIT_PROTNONE	9	/* software: if not present */
 
-#define _PAGE_DIRTY	\
-	(1UL << _PAGE_BIT_DIRTY)	/* software : page changed */
-#define _PAGE_FILE	\
-	(1UL << _PAGE_BIT_FILE)		/* when !present: nonlinear file
-					   mapping */
-#define _PAGE_PRESENT	\
-	(1UL << _PAGE_BIT_PRESENT)	/* Valid : Page is Valid */
-#define _PAGE_GLOBAL	\
-	(1UL << _PAGE_BIT_GLOBAL)	/* Global */
-#define _PAGE_LARGE	\
-	(1UL << _PAGE_BIT_LARGE)	/* Large */
-#define _PAGE_EXEC	\
-	(1UL << _PAGE_BIT_EXEC)		/* Execute */
-#define _PAGE_WRITE	\
-	(1UL << _PAGE_BIT_WRITE)	/* Write */
-#define _PAGE_READ	\
-	(1UL << _PAGE_BIT_READ)		/* Read */
-#define _PAGE_NONCACHABLE	\
-	(1UL<<_PAGE_BIT_NONCACHABLE)	/* Non cachable */
-#define _PAGE_USER	\
-	(1UL << _PAGE_BIT_USER)		/* software : user space access
-					   allowed */
-#define _PAGE_ACCESSED	\
-	(1UL << _PAGE_BIT_ACCESSED)	/* software : page referenced */
+#define _PAGE_DIRTY		(1UL << _PAGE_BIT_DIRTY)
+#define _PAGE_FILE		(1UL << _PAGE_BIT_FILE)
+#define _PAGE_PRESENT		(1UL << _PAGE_BIT_PRESENT)
+#define _PAGE_GLOBAL		(1UL << _PAGE_BIT_GLOBAL)
+#define _PAGE_LARGE		(1UL << _PAGE_BIT_LARGE)
+#define _PAGE_EXEC		(1UL << _PAGE_BIT_EXEC)
+#define _PAGE_WRITE		(1UL << _PAGE_BIT_WRITE)
+#define _PAGE_READ		(1UL << _PAGE_BIT_READ)
+#define _PAGE_NONCACHABLE	(1UL << _PAGE_BIT_NONCACHABLE)
+#define _PAGE_ACCESSED		(1UL << _PAGE_BIT_ACCESSED)
+#define _PAGE_PROTNONE		(1UL << _PAGE_BIT_PROTNONE)
 
 #define _PAGE_TABLE	\
-	( _PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_USER \
-	| _PAGE_ACCESSED | _PAGE_DIRTY )
+	( _PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_ACCESSED \
+	| _PAGE_DIRTY )
 #define _KERNPG_TABLE	\
 	( _PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_ACCESSED \
 	| _PAGE_DIRTY )
@@ -138,24 +113,20 @@ extern unsigned long empty_zero_page[1024];
 
 #ifdef CONFIG_MMU
 #define PAGE_NONE	\
-	__pgprot(_PAGE_PRESENT | _PAGE_ACCESSED)
+	__pgprot(_PAGE_PROTNONE | _PAGE_ACCESSED)
 #define PAGE_SHARED	\
-	__pgprot(_PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_USER \
-		| _PAGE_ACCESSED)
-#define PAGE_SHARED_X	\
+	__pgprot(_PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_ACCESSED)
+#define PAGE_SHARED_EXEC \
 	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_WRITE | _PAGE_READ \
-		| _PAGE_USER | _PAGE_ACCESSED)
+		| _PAGE_ACCESSED)
 #define PAGE_COPY	\
-	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_USER \
-		| _PAGE_ACCESSED)
-#define PAGE_COPY_X	\
-	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_USER \
-		| _PAGE_ACCESSED)
+	__pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_ACCESSED)
+#define PAGE_COPY_EXEC	\
+	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_ACCESSED)
 #define PAGE_READONLY	\
-	__pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_USER | _PAGE_ACCESSED)
-#define PAGE_READONLY_X	\
-	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_USER \
-		| _PAGE_ACCESSED)
+	__pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_ACCESSED)
+#define PAGE_READONLY_EXEC \
+	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_ACCESSED)
 
 #define __PAGE_KERNEL	\
 	( _PAGE_PRESENT | _PAGE_EXEC | _PAGE_WRITE | _PAGE_READ | _PAGE_DIRTY \
@@ -170,53 +141,47 @@ extern unsigned long empty_zero_page[1024];
 #define PAGE_KERNEL_NOCACHE	MAKE_GLOBAL(__PAGE_KERNEL_NOCACHE)
 
 #else
-#define PAGE_NONE               __pgprot(0)
-#define PAGE_SHARED             __pgprot(0)
-#define PAGE_SHARED_X           __pgprot(0)
-#define PAGE_COPY               __pgprot(0)
-#define PAGE_COPY_X             __pgprot(0)
-#define PAGE_READONLY           __pgprot(0)
-#define PAGE_READONLY_X         __pgprot(0)
+#define PAGE_NONE		__pgprot(0)
+#define PAGE_SHARED		__pgprot(0)
+#define PAGE_SHARED_EXEC	__pgprot(0)
+#define PAGE_COPY		__pgprot(0)
+#define PAGE_COPY_EXEC		__pgprot(0)
+#define PAGE_READONLY		__pgprot(0)
+#define PAGE_READONLY_EXEC	__pgprot(0)
 
-#define PAGE_KERNEL             __pgprot(0)
-#define PAGE_KERNEL_RO          __pgprot(0)
-#define PAGE_KERNEL_NOCACHE     __pgprot(0)
+#define PAGE_KERNEL		__pgprot(0)
+#define PAGE_KERNEL_RO		__pgprot(0)
+#define PAGE_KERNEL_NOCACHE	__pgprot(0)
 #endif /* CONFIG_MMU */
 
-/*
- * The i386 can't do page protection for execute, and considers that
- * the same are read. Also, write permissions imply read permissions.
- * This is the closest we can get..
- */
-	/* rwx */
+	/* xwr */
 #define __P000	PAGE_NONE
-#define __P001	PAGE_READONLY_X
-#define __P010	PAGE_COPY_X
-#define __P011	PAGE_COPY_X
-#define __P100	PAGE_READONLY
-#define __P101	PAGE_READONLY_X
-#define __P110	PAGE_COPY_X
-#define __P111	PAGE_COPY_X
+#define __P001	PAGE_READONLY
+#define __P010	PAGE_COPY
+#define __P011	PAGE_COPY
+#define __P100	PAGE_READONLY_EXEC
+#define __P101	PAGE_READONLY_EXEC
+#define __P110	PAGE_COPY_EXEC
+#define __P111	PAGE_COPY_EXEC
 
 #define __S000	PAGE_NONE
-#define __S001	PAGE_READONLY_X
+#define __S001	PAGE_READONLY
 #define __S010	PAGE_SHARED
-#define __S011	PAGE_SHARED_X
-#define __S100	PAGE_READONLY
-#define __S101	PAGE_READONLY_X
-#define __S110	PAGE_SHARED
-#define __S111	PAGE_SHARED_X
+#define __S011	PAGE_SHARED
+#define __S100	PAGE_READONLY_EXEC
+#define __S101	PAGE_READONLY_EXEC
+#define __S110	PAGE_SHARED_EXEC
+#define __S111	PAGE_SHARED_EXEC
 
 /* page table for 0-4MB for everybody */
 
-#define pte_present(x)	(pte_val(x) & _PAGE_PRESENT)
+#define pte_present(x)	(pte_val(x) & (_PAGE_PRESENT | _PAGE_PROTNONE))
 #define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
 
 #define pmd_none(x)	(!pmd_val(x))
 #define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
-#define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) \
-	!= _KERNPG_TABLE)
+#define	pmd_bad(x)	((pmd_val(x) & ~PAGE_MASK) != _KERNPG_TABLE)
 
 #define pages_to_mb(x)	((x) >> (20 - PAGE_SHIFT))
 
@@ -224,32 +189,27 @@ extern unsigned long empty_zero_page[1024];
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
-static __inline__ int pte_user(pte_t pte)
-{
-	return pte_val(pte) & _PAGE_USER;
-}
-
-static __inline__ int pte_read(pte_t pte)
+static inline int pte_read(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_READ;
 }
 
-static __inline__ int pte_exec(pte_t pte)
+static inline int pte_exec(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_EXEC;
 }
 
-static __inline__ int pte_dirty(pte_t pte)
+static inline int pte_dirty(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_DIRTY;
 }
 
-static __inline__ int pte_young(pte_t pte)
+static inline int pte_young(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_ACCESSED;
 }
 
-static __inline__ int pte_write(pte_t pte)
+static inline int pte_write(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_WRITE;
 }
@@ -257,88 +217,103 @@ static __inline__ int pte_write(pte_t pte)
 /*
  * The following only works if pte_present() is not true.
  */
-static __inline__ int pte_file(pte_t pte)
+static inline int pte_file(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_FILE;
 }
 
-static __inline__ pte_t pte_rdprotect(pte_t pte)
+static inline pte_t pte_rdprotect(pte_t pte)
 {
 	pte_val(pte) &= ~_PAGE_READ;
 	return pte;
 }
 
-static __inline__ pte_t pte_exprotect(pte_t pte)
+static inline pte_t pte_exprotect(pte_t pte)
 {
 	pte_val(pte) &= ~_PAGE_EXEC;
 	return pte;
 }
 
-static __inline__ pte_t pte_mkclean(pte_t pte)
+static inline pte_t pte_mkclean(pte_t pte)
 {
 	pte_val(pte) &= ~_PAGE_DIRTY;
 	return pte;
 }
 
-static __inline__ pte_t pte_mkold(pte_t pte)
+static inline pte_t pte_mkold(pte_t pte)
 {
-	pte_val(pte) &= ~_PAGE_ACCESSED;return pte;}
+	pte_val(pte) &= ~_PAGE_ACCESSED;
+	return pte;
+}
 
-static __inline__ pte_t pte_wrprotect(pte_t pte)
+static inline pte_t pte_wrprotect(pte_t pte)
 {
 	pte_val(pte) &= ~_PAGE_WRITE;
 	return pte;
 }
 
-static __inline__ pte_t pte_mkread(pte_t pte)
+static inline pte_t pte_mkread(pte_t pte)
 {
 	pte_val(pte) |= _PAGE_READ;
 	return pte;
 }
 
-static __inline__ pte_t pte_mkexec(pte_t pte)
+static inline pte_t pte_mkexec(pte_t pte)
 {
 	pte_val(pte) |= _PAGE_EXEC;
 	return pte;
 }
 
-static __inline__ pte_t pte_mkdirty(pte_t pte)
+static inline pte_t pte_mkdirty(pte_t pte)
 {
 	pte_val(pte) |= _PAGE_DIRTY;
 	return pte;
 }
 
-static __inline__ pte_t pte_mkyoung(pte_t pte)
+static inline pte_t pte_mkyoung(pte_t pte)
 {
 	pte_val(pte) |= _PAGE_ACCESSED;
 	return pte;
 }
 
-static __inline__ pte_t pte_mkwrite(pte_t pte)
+static inline pte_t pte_mkwrite(pte_t pte)
 {
 	pte_val(pte) |= _PAGE_WRITE;
 	return pte;
 }
 
-static __inline__  int ptep_test_and_clear_dirty(pte_t *ptep)
+static inline  int ptep_test_and_clear_dirty(pte_t *ptep)
 {
 	return test_and_clear_bit(_PAGE_BIT_DIRTY, ptep);
 }
 
-static __inline__  int ptep_test_and_clear_young(pte_t *ptep)
+static inline  int ptep_test_and_clear_young(pte_t *ptep)
 {
 	return test_and_clear_bit(_PAGE_BIT_ACCESSED, ptep);
 }
 
-static __inline__ void ptep_set_wrprotect(pte_t *ptep)
+static inline void ptep_set_wrprotect(pte_t *ptep)
 {
 	clear_bit(_PAGE_BIT_WRITE, ptep);
 }
 
-static __inline__ void ptep_mkdirty(pte_t *ptep)
+static inline void ptep_mkdirty(pte_t *ptep)
 {
 	set_bit(_PAGE_BIT_DIRTY, ptep);
 }
+
+/*
+ * Macro and implementation to make a page protection as uncachable.
+ */
+static inline pgprot_t pgprot_noncached(pgprot_t _prot)
+{
+	unsigned long prot = pgprot_val(_prot);
+
+	prot |= _PAGE_NONCACHABLE;
+	return __pgprot(prot);
+}
+
+#define pgprot_writecombine(prot) pgprot_noncached(prot)
 
 /*
  * Conversion functions: convert a page and protection to a page entry,
@@ -346,7 +321,7 @@ static __inline__ void ptep_mkdirty(pte_t *ptep)
  */
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), pgprot)
 
-static __inline__ pte_t pte_modify(pte_t pte, pgprot_t newprot)
+static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
 	set_pte(&pte, __pte((pte_val(pte) & _PAGE_CHG_MASK) \
 		| pgprot_val(newprot)));
@@ -361,7 +336,7 @@ static __inline__ pte_t pte_modify(pte_t pte, pgprot_t newprot)
  * and a page entry and page directory to the page they refer to.
  */
 
-static __inline__ void pmd_set(pmd_t * pmdp, pte_t * ptep)
+static inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
 {
 	pmd_val(*pmdp) = (((unsigned long) ptep) & PAGE_MASK);
 }
@@ -396,10 +371,10 @@ static __inline__ void pmd_set(pmd_t * pmdp, pte_t * ptep)
 #define pte_unmap_nested(pte)	do { } while (0)
 
 /* Encode and de-code a swap entry */
-#define __swp_type(x)			(((x).val >> 1) & 0x3f)
-#define __swp_offset(x)			((x).val >> 8)
+#define __swp_type(x)			(((x).val >> 2) & 0x3f)
+#define __swp_offset(x)			((x).val >> 10)
 #define __swp_entry(type, offset)	\
-	((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
+	((swp_entry_t) { ((type) << 2) | ((offset) << 10) })
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
@@ -408,8 +383,8 @@ static __inline__ void pmd_set(pmd_t * pmdp, pte_t * ptep)
 /* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
 #define kern_addr_valid(addr)	(1)
 
-#define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
-		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
+#define io_remap_page_range(vma, vaddr, paddr, size, prot)	\
+	remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
 
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
@@ -419,5 +394,6 @@ static __inline__ void pmd_set(pmd_t * pmdp, pte_t * ptep)
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
 
-#endif /* _ASM_M32R_PGTABLE_H */
+#endif /* __KERNEL__ */
 
+#endif /* _ASM_M32R_PGTABLE_H */

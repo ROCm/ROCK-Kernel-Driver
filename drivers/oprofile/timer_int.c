@@ -14,13 +14,12 @@
 #include <linux/profile.h>
 #include <linux/init.h>
 #include <asm/ptrace.h>
- 
+
+#include "oprof.h"
+
 static int timer_notify(struct pt_regs *regs)
 {
-	int cpu = smp_processor_id();
-	unsigned long eip = profile_pc(regs);
- 
-	oprofile_add_sample(eip, !user_mode(regs), 0, cpu);
+ 	oprofile_add_sample(regs, 0);
 	return 0;
 }
 
@@ -36,15 +35,12 @@ static void timer_stop(void)
 }
 
 
-static struct oprofile_operations timer_ops = {
-	.start	= timer_start,
-	.stop	= timer_stop,
-	.cpu_type = "timer"
-};
-
- 
-void __init timer_init(struct oprofile_operations ** ops)
+void __init oprofile_timer_init(struct oprofile_operations * ops)
 {
-	*ops = &timer_ops;
-	printk(KERN_INFO "oprofile: using timer interrupt.\n");
+	ops->create_files = NULL;
+	ops->setup = NULL;
+	ops->shutdown = NULL;
+	ops->start = timer_start;
+	ops->stop = timer_stop;
+	ops->cpu_type = "timer";
 }

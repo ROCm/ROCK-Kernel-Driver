@@ -748,6 +748,7 @@ struct tcamsg
 
 #include <linux/config.h>
 
+extern size_t rtattr_strlcpy(char *dest, const struct rtattr *rta, size_t size);
 static __inline__ int rtattr_strcmp(const struct rtattr *rta, const char *str)
 {
 	int len = strlen(str) + 1;
@@ -755,6 +756,9 @@ static __inline__ int rtattr_strcmp(const struct rtattr *rta, const char *str)
 }
 
 extern int rtattr_parse(struct rtattr *tb[], int maxattr, struct rtattr *rta, int len);
+
+#define rtattr_parse_nested(tb, max, rta) \
+	rtattr_parse((tb), (max), RTA_DATA((rta)), RTA_PAYLOAD((rta)))
 
 extern struct sock *rtnl;
 
@@ -765,7 +769,6 @@ struct rtnetlink_link
 };
 
 extern struct rtnetlink_link * rtnetlink_links[NPROTO];
-extern int rtnetlink_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb);
 extern int rtnetlink_send(struct sk_buff *skb, u32 pid, u32 group, int echo);
 extern int rtnetlink_put_metrics(struct sk_buff *skb, u32 *metrics);
 
@@ -806,6 +809,7 @@ extern struct semaphore rtnl_sem;
 		        } while(0)
 
 extern void rtnl_lock(void);
+extern int rtnl_lock_interruptible(void);
 extern void rtnl_unlock(void);
 extern void rtnetlink_init(void);
 

@@ -327,8 +327,8 @@ static void icmp_out_count(int type)
  *	Checksum each fragment, and on the first include the headers and final
  *	checksum.
  */
-int icmp_glue_bits(void *from, char *to, int offset, int len, int odd,
-		   struct sk_buff *skb)
+static int icmp_glue_bits(void *from, char *to, int offset, int len, int odd,
+			  struct sk_buff *skb)
 {
 	struct icmp_bxm *icmp_param = (struct icmp_bxm *)from;
 	unsigned int csum;
@@ -377,7 +377,7 @@ static void icmp_push_reply(struct icmp_bxm *icmp_param,
 static void icmp_reply(struct icmp_bxm *icmp_param, struct sk_buff *skb)
 {
 	struct sock *sk = icmp_socket->sk;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipcm_cookie ipc;
 	struct rtable *rt = (struct rtable *)skb->dst;
 	u32 daddr;
@@ -1097,7 +1097,7 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES + 1] = {
 
 void __init icmp_init(struct net_proto_family *ops)
 {
-	struct inet_opt *inet;
+	struct inet_sock *inet;
 	int i;
 
 	for (i = 0; i < NR_CPUS; i++) {

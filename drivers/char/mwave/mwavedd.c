@@ -76,11 +76,11 @@ int mwave_3780i_irq = 0;
 int mwave_3780i_io = 0;
 int mwave_uart_irq = 0;
 int mwave_uart_io = 0;
-MODULE_PARM(mwave_debug, "i");
-MODULE_PARM(mwave_3780i_irq, "i");
-MODULE_PARM(mwave_3780i_io, "i");
-MODULE_PARM(mwave_uart_irq, "i");
-MODULE_PARM(mwave_uart_io, "i");
+module_param(mwave_debug, int, 0);
+module_param(mwave_3780i_irq, int, 0);
+module_param(mwave_3780i_io, int, 0);
+module_param(mwave_uart_irq, int, 0);
+module_param(mwave_uart_io, int, 0);
 
 static int mwave_open(struct inode *inode, struct file *file);
 static int mwave_close(struct inode *inode, struct file *file);

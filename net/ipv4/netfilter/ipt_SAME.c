@@ -149,8 +149,8 @@ same_target(struct sk_buff **pskb,
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
 	u_int32_t tmpip, aindex, new_ip;
-	const struct ipt_same_info *mr = targinfo;
-	struct ip_nat_multi_range newrange;
+	const struct ipt_same_info *same = targinfo;
+	struct ip_nat_range newrange;
 	const struct ip_conntrack_tuple *t;
 
 	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING ||
@@ -161,17 +161,17 @@ same_target(struct sk_buff **pskb,
 
 	/* Base new source on real src ip and optionally dst ip,
 	   giving some hope for consistency across reboots.
-	   Here we calculate the index in mr->iparray which
+	   Here we calculate the index in same->iparray which
 	   holds the ipaddress we should use */
 	
 	tmpip = ntohl(t->src.ip);
 
-	if (!(mr->info & IPT_SAME_NODST))
+	if (!(same->info & IPT_SAME_NODST))
 		tmpip += ntohl(t->dst.ip);
 	
-	aindex = tmpip % mr->ipnum;
-		
-	new_ip = htonl(mr->iparray[aindex]);
+	aindex = tmpip % same->ipnum;
+
+	new_ip = htonl(same->iparray[aindex]);
 
 	DEBUGP("ipt_SAME: src=%u.%u.%u.%u dst=%u.%u.%u.%u, "
 			"new src=%u.%u.%u.%u\n",
@@ -179,10 +179,10 @@ same_target(struct sk_buff **pskb,
 			NIPQUAD(new_ip));
 
 	/* Transfer from original range. */
-	newrange = ((struct ip_nat_multi_range)
-		{ 1, { { mr->range[0].flags | IP_NAT_RANGE_MAP_IPS,
-			 new_ip, new_ip,
-			 mr->range[0].min, mr->range[0].max } } });
+	newrange = ((struct ip_nat_range)
+		{ same->range[0].flags, new_ip, new_ip,
+		  /* FIXME: Use ports from correct range! */
+		  same->range[0].min, same->range[0].max });
 
 	/* Hand modified range to generic setup. */
 	return ip_nat_setup_info(ct, &newrange, hooknum);

@@ -182,12 +182,47 @@ struct mdc800_data
 /* Specification of the Endpoints */
 static struct usb_endpoint_descriptor mdc800_ed [4] =
 {
-	{ 0,0, 0x01, 0x02,  8, 0,0,0 },
-	{ 0,0, 0x82, 0x03,  8, 0,0,0 },
-	{ 0,0, 0x03, 0x02, 64, 0,0,0 },
-	{ 0,0, 0x84, 0x02, 64, 0,0,0 }
+	{ 
+		.bLength = 		0,
+		.bDescriptorType =	0,
+		.bEndpointAddress =	0x01,
+		.bmAttributes = 	0x02,
+		.wMaxPacketSize =	__constant_cpu_to_le16(8),
+		.bInterval = 		0,
+		.bRefresh = 		0,
+		.bSynchAddress = 	0,
+	},
+	{
+		.bLength = 		0,
+		.bDescriptorType = 	0,
+		.bEndpointAddress = 	0x82,
+		.bmAttributes = 	0x03,
+		.wMaxPacketSize = 	__constant_cpu_to_le16(8),
+		.bInterval = 		0,
+		.bRefresh = 		0,
+		.bSynchAddress = 	0,
+	},
+	{
+		.bLength = 		0,
+		.bDescriptorType = 	0,
+		.bEndpointAddress = 	0x03,
+		.bmAttributes = 	0x02,
+		.wMaxPacketSize = 	__constant_cpu_to_le16(64),
+		.bInterval = 		0,
+		.bRefresh = 		0,
+		.bSynchAddress = 	0,
+	},
+	{
+		.bLength = 		0,
+		.bDescriptorType = 	0,
+		.bEndpointAddress = 	0x84,
+		.bmAttributes = 	0x02,
+		.wMaxPacketSize = 	__constant_cpu_to_le16(64),
+		.bInterval = 		0,
+		.bRefresh = 		0,
+		.bSynchAddress = 	0,
+	},
 };
-
 
 /* The Variable used by the driver */
 static struct mdc800_data* mdc800;
@@ -421,7 +456,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 	dbg ("(mdc800_usb_probe) called.");
 
 
-	if (mdc800->dev != 0)
+	if (mdc800->dev != NULL)
 	{
 		warn ("only one Mustek MDC800 is supported.");
 		return -ENODEV;
@@ -1010,7 +1045,7 @@ static int __init usb_mdc800_init (void)
 
 cleanup_on_fail:
 
-	if (mdc800 != 0)
+	if (mdc800 != NULL)
 	{
 		err ("can't alloc memory!");
 

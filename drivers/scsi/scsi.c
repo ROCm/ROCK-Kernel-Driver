@@ -98,6 +98,9 @@ static unsigned long serial_number;
  * After the system is up, you may enable logging via the /proc interface.
  */
 unsigned int scsi_logging_level;
+#if defined(CONFIG_SCSI_LOGGING)
+EXPORT_SYMBOL(scsi_logging_level);
+#endif
 
 const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] = {
 	"Direct-Access    ",
@@ -115,6 +118,7 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] = {
 	"RAID             ",
 	"Enclosure        ",
 };
+EXPORT_SYMBOL(scsi_device_types);
 
 /*
  * Function:    scsi_allocate_request
@@ -147,6 +151,7 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev,
 
 	return sreq;
 }
+EXPORT_SYMBOL(scsi_allocate_request);
 
 void __scsi_release_request(struct scsi_request *sreq)
 {
@@ -187,6 +192,7 @@ void scsi_release_request(struct scsi_request *sreq)
 	__scsi_release_request(sreq);
 	kfree(sreq);
 }
+EXPORT_SYMBOL(scsi_release_request);
 
 struct scsi_host_cmd_pool {
 	kmem_cache_t	*slab;
@@ -269,6 +275,7 @@ struct scsi_cmnd *scsi_get_command(struct scsi_device *dev, int gfp_mask)
 
 	return cmd;
 }				
+EXPORT_SYMBOL(scsi_get_command);
 
 /*
  * Function:	scsi_put_command()
@@ -305,6 +312,7 @@ void scsi_put_command(struct scsi_cmnd *cmd)
 
 	put_device(&sdev->sdev_gendev);
 }
+EXPORT_SYMBOL(scsi_put_command);
 
 /*
  * Function:	scsi_setup_command_freelist()
@@ -606,9 +614,7 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 				printk("queuecommand : command too long.\n"));
 		cmd->result = (DID_ABORT << 16);
 
-		spin_lock_irqsave(host->host_lock, flags);
 		scsi_done(cmd);
-		spin_unlock_irqrestore(host->host_lock, flags);
 		goto out;
 	}
 
@@ -961,6 +967,7 @@ void scsi_adjust_queue_depth(struct scsi_device *sdev, int tagged, int tags)
 	spin_unlock(sdev->request_queue->queue_lock);
 	spin_unlock_irqrestore(&device_request_lock, flags);
 }
+EXPORT_SYMBOL(scsi_adjust_queue_depth);
 
 /*
  * Function:	scsi_track_queue_full()
@@ -1011,6 +1018,7 @@ int scsi_track_queue_full(struct scsi_device *sdev, int depth)
 		scsi_adjust_queue_depth(sdev, MSG_SIMPLE_TAG, depth);
 	return depth;
 }
+EXPORT_SYMBOL(scsi_track_queue_full);
 
 /**
  * scsi_device_get  -  get an addition reference to a scsi_device
@@ -1073,6 +1081,28 @@ struct scsi_device *__scsi_iterate_devices(struct Scsi_Host *shost,
 	return next;
 }
 EXPORT_SYMBOL(__scsi_iterate_devices);
+
+/**
+ * starget_for_each_device  -  helper to walk all devices of a target
+ * @starget:	target whose devices we want to iterate over.
+ *
+ * This traverses over each devices of @shost.  The devices have
+ * a reference that must be released by scsi_host_put when breaking
+ * out of the loop.
+ */
+void starget_for_each_device(struct scsi_target *starget, void * data,
+		     void (*fn)(struct scsi_device *, void *))
+{
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	struct scsi_device *sdev;
+
+	shost_for_each_device(sdev, shost) {
+		if ((sdev->channel == starget->channel) &&
+		    (sdev->id == starget->id))
+			fn(sdev, data);
+	}
+}
+EXPORT_SYMBOL(starget_for_each_device);
 
 /**
  * scsi_device_lookup - find a device given the host (UNLOCKED)
@@ -1177,6 +1207,7 @@ int scsi_device_cancel(struct scsi_device *sdev, int recovery)
 
 	return 0;
 }
+EXPORT_SYMBOL(scsi_device_cancel);
 
 #ifdef CONFIG_HOTPLUG_CPU
 static int scsi_cpu_notify(struct notifier_block *self,

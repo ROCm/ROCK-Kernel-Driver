@@ -1198,9 +1198,10 @@ void * ccio_get_iommu(const struct parisc_device *dev)
  * to/from certain pages.  To avoid this happening, we mark these pages
  * as `used', and ensure that nothing will try to allocate from them.
  */
-void ccio_cujo20_fixup(struct parisc_device *dev, u32 iovp)
+void ccio_cujo20_fixup(struct parisc_device *cujo, u32 iovp)
 {
 	unsigned int idx;
+	struct parisc_device *dev = parisc_parent(cujo);
 	struct ioc *ioc = ccio_get_iommu(dev);
 	u8 *res_ptr;
 
@@ -1556,9 +1557,12 @@ static int ccio_probe(struct parisc_device *dev)
 		create_proc_read_entry(MODULE_NAME"-bitmap", S_IRWXU,
 				       proc_runway_root, ccio_resource_map, NULL);
 	}
+
+	ioc_count++;
+
 	parisc_vmerge_boundary = IOVP_SIZE;
 	parisc_vmerge_max_size = BITS_PER_LONG * IOVP_SIZE;
-	ioc_count++;
+	parisc_has_iommu();
 	return 0;
 }
 

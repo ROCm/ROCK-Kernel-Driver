@@ -3,10 +3,10 @@
  * Assembled from chunks of code in arch/arm
  *
  * Copyright (C) 2003 Ian Molton
+ * Based on the work of RMK.
  *
  */
 
-#include <linux/config.h> /* for CONFIG_ARCH_xxxx */
 #include <linux/linkage.h>
 
 #include <asm/assembler.h>
@@ -35,8 +35,6 @@
 #define BAD_IRQ		3
 #define BAD_UNDEFINSTR	4
 
-#define PT_TRACESYS	0x00000002
-
 @ OS version number used in SWIs
 @  RISC OS is 0
 @  RISC iX is 8
@@ -46,10 +44,12 @@
 
 @
 @ Stack format (ensured by USER_* and SVC_*)
+@ PSR and PC are comined on arm26
 @
-#define S_FRAME_SIZE	72   @ FIXME: Really?
+
+#define S_OFF		8
+
 #define S_OLD_R0	64
-#define S_PSR		60
 #define S_PC		60
 #define S_LR		56
 #define S_SP		52
@@ -66,19 +66,18 @@
 #define S_R2		8
 #define S_R1		4
 #define S_R0		0
-#define S_OFF		8
 
 	.macro	save_user_regs
-	str	r0, [sp, #-4]!
-	str	lr, [sp, #-4]!
+	str	r0, [sp, #-4]!   @ Store SVC r0
+	str	lr, [sp, #-4]!   @ Store user mode PC
 	sub	sp, sp, #15*4
-	stmia	sp, {r0 - lr}^
+	stmia	sp, {r0 - lr}^   @ Store the other user-mode regs
 	mov	r0, r0
 	.endm
 
 	.macro	slow_restore_user_regs
-	ldmia	sp, {r0 - lr}^   @ restore the user regs
-	mov	r0, r0           @ no-op
+	ldmia	sp, {r0 - lr}^   @ restore the user regs not including PC
+	mov	r0, r0
 	ldr	lr, [sp, #15*4]  @ get user PC
 	add	sp, sp, #15*4+8  @ free stack
 	movs	pc, lr           @ return
@@ -91,6 +90,32 @@
 	ldr	lr, [sp, #15*4]
 	add	sp, sp, #15*4+8
 	movs	pc, lr
+	.endm
+
+	.macro	save_svc_regs
+	str     sp, [sp, #-16]!
+	str     lr, [sp, #8]
+	str     lr, [sp, #4]
+	stmfd   sp!, {r0 - r12}
+	mov     r0, #-1
+	str     r0, [sp, #S_OLD_R0]
+	zero_fp
+	.endm
+
+	.macro	save_svc_regs_irq
+	str     sp, [sp, #-16]!
+	str     lr, [sp, #4]
+	ldr     lr, .LCirq
+	ldr     lr, [lr]
+	str     lr, [sp, #8]
+	stmfd   sp!, {r0 - r12}
+	mov     r0, #-1
+	str     r0, [sp, #S_OLD_R0]
+	zero_fp
+	.endm
+
+	.macro	restore_svc_regs
+                ldmfd   sp, {r0 - pc}^
 	.endm
 
 	.macro	mask_pc, rd, rm
@@ -117,20 +142,9 @@
 	mov	\rd, \rd, lsl #13
 	.endm
 
-	/*
-	 * Like adr, but force SVC mode (if required)
-	 */
-	.macro	adrsvc, cond, reg, label
-	adr\cond	\reg, \label
-	orr\cond	\reg, \reg, #PSR_I_BIT | MODE_SVC26
-	.endm
-
-
 /*
  * These are the registers used in the syscall handler, and allow us to
  * have in theory up to 7 arguments to a function - r0 to r6.
- *
- * r7 is reserved for the system call number for thumb mode.
  *
  * Note that tbl == why is intentional.
  *
@@ -159,17 +173,6 @@ tsk	.req	r9		@ current thread_info
 #if S_R0 != 0
 #error "Please fix"
 #endif
-
-/*
- * Our do_softirq out of line code.  See include/asm-arm26/hardirq.h for
- * the calling assembly.
- */
-ENTRY(__do_softirq)
-	stmfd	sp!, {r0 - r3, ip, lr}
-	bl	do_softirq
-	ldmfd	sp!, {r0 - r3, ip, pc}
-
-	.align	5
 
 /*
  * This is the fast syscall return path.  We do as little as
@@ -228,7 +231,8 @@ ENTRY(ret_from_fork)
 	bl	syscall_trace
 	b	ret_slow_syscall
 	
-#include <asm/calls.h>
+// FIXME - is this strictly necessary?
+#include "calls.S"
 
 /*=============================================================================
  * SWI handler
@@ -258,7 +262,8 @@ ENTRY(vector_swi)
 	tst	ip, #_TIF_SYSCALL_TRACE		@ are we tracing syscalls?
 	bne	__sys_trace
 
-	adrsvc	al, lr, ret_fast_syscall	@ return address
+	adral	lr, ret_fast_syscall            @ set return address
+        orral	lr, lr, #PSR_I_BIT | MODE_SVC26 @ Force SVC mode on return
 	cmp	scno, #NR_syscalls		@ check upper syscall limit
 	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
 
@@ -278,7 +283,8 @@ __sys_trace:
 	mov	r0, #0				@ trace entry [IP = 0]
 	bl	syscall_trace
 
-	adrsvc	al, lr, __sys_trace_return	@ return address
+	adral   lr, __sys_trace_return          @ set return address
+        orral   lr, lr, #PSR_I_BIT | MODE_SVC26 @ Force SVC mode on return
 	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
 	cmp	scno, #NR_syscalls		@ check upper syscall limit
 	ldmccia	r1, {r0 - r3}			@ have to reload r0 - r3
@@ -301,7 +307,7 @@ __cr_alignment:
 
 	.type	sys_call_table, #object
 ENTRY(sys_call_table)
-#include <asm/calls.h>
+#include "calls.S"
 
 /*============================================================================
  * Special system call wrappers
@@ -387,27 +393,22 @@ sys_mmap2:
 
 		.text
 
-		.equ	ioc_base_high, IOC_BASE & 0xff000000
-		.equ	ioc_base_low, IOC_BASE & 0x00ff0000
-		.macro	disable_fiq
-		mov	r12, #ioc_base_high
-		.if	ioc_base_low
-		orr	r12, r12, #ioc_base_low
-		.endif
-		strb	r12, [r12, #0x38]	@ Disable FIQ register
+		.macro handle_irq
+1:		mov     r4, #IOC_BASE
+		ldrb    r6, [r4, #0x24]            @ get high priority first
+		adr     r5, irq_prio_h
+		teq     r6, #0
+		ldreqb  r6, [r4, #0x14]            @ get low priority
+		adreq   r5, irq_prio_l
+
+                teq     r6, #0                     @ If an IRQ happened...
+                ldrneb  r0, [r5, r6]               @ get IRQ number
+                movne   r1, sp                     @ get struct pt_regs
+                adrne   lr, 1b                     @ Set return address to 1b
+                orrne   lr, lr, #PSR_I_BIT | MODE_SVC26  @ (and force SVC mode)
+                bne     asm_do_IRQ                 @ process IRQ (if asserted)
 		.endm
 
-		.macro	get_irqnr_and_base, irqnr, base
-		mov	r4, #ioc_base_high		@ point at IOC
-		.if	ioc_base_low
-		orr	r4, r4, #ioc_base_low
-		.endif
-		ldrb	\irqnr, [r4, #0x24]		@ get high priority first
-		adr	\base, irq_prio_h
-		teq	\irqnr, #0
-		ldreqb	\irqnr, [r4, #0x14]		@ get low priority
-		adreq	\base, irq_prio_l
-		.endm
 
 /*
  * Interrupt table (incorporates priority)
@@ -448,9 +449,9 @@ irq_prio_h:	.byte	 0, 8, 9, 8,10,10,10,10,11,11,11,11,10,10,10,10
 		.endm
 
 #if 1
-/* FIXME (well, ok, dont - but its easy to grep for :) */
 /*
  * Uncomment these if you wish to get more debugging into about data aborts.
+ * FIXME - I bet we can find a way to encode these and keep performance.
  */
 #define FAULT_CODE_LDRSTRPOST	0x80
 #define FAULT_CODE_LDRSTRPRE	0x40
@@ -462,29 +463,6 @@ irq_prio_h:	.byte	 0, 8, 9, 8,10,10,10,10,11,11,11,11,10,10,10,10
 #define FAULT_CODE_WRITE	0x02
 #define FAULT_CODE_FORCECOW	0x01
 
-#define SVC_SAVE_ALL				\
-		str	sp, [sp, #-16]!		;\
-		str	lr, [sp, #8]		;\
-		str	lr, [sp, #4]		;\
-		stmfd	sp!, {r0 - r12}		;\
-		mov	r0, #-1			;\
-		str	r0, [sp, #S_OLD_R0]	;\
-		zero_fp
-
-#define SVC_IRQ_SAVE_ALL			\
-		str	sp, [sp, #-16]!		;\
-		str	lr, [sp, #4]		;\
-		ldr	lr, .LCirq		;\
-		ldr	lr, [lr]		;\
-		str	lr, [sp, #8]		;\
-		stmfd	sp!, {r0 - r12}		;\
-		mov	r0, #-1			;\
-		str	r0, [sp, #S_OLD_R0]	;\
-		zero_fp
-
-#define SVC_RESTORE_ALL				\
-		ldmfd	sp, {r0 - pc}^
-		
 /*=============================================================================
  * Undefined FIQs
  *-----------------------------------------------------------------------------
@@ -526,13 +504,13 @@ vector_undefinstr:
 /* FIXME - should we trap for a null pointer here? */
 
 /* The SVC mode case */
-__und_svc:      SVC_SAVE_ALL                            @ Non-user mode
+__und_svc:	save_svc_regs                           @ Non-user mode
                 mask_pc r0, lr
                 and     r2, lr, #3
                 sub     r0, r0, #4
                 mov     r1, sp
                 bl      do_undefinstr
-                SVC_RESTORE_ALL
+                restore_svc_regs
 
 /* We get here if the FP emulator doesnt handle the undef instr.
  * If the insn WAS handled, the emulator jumps to ret_from_exception by itself/
@@ -614,7 +592,7 @@ vector_prefetch:
 		ldr	lr, [sp,#S_PC]		@ FIXME program to test this on.  I think its
 		b	.Lbug_undef		@ broken at the moment though!)
 
-__pabt_invalid:	SVC_SAVE_ALL
+__pabt_invalid:	save_svc_regs
 		mov	r0, sp			@ Prefetch aborts are definitely *not*
 		mov	r1, #BAD_PREFETCH	@ allowed in non-user modes.  We cant
 		and	r2, lr, #3		@ recover from this problem.
@@ -648,7 +626,7 @@ vector_addrexcptn:
 		b	ret_from_exception
 
 Laddrexcptn_not_user:
-		SVC_SAVE_ALL
+		save_svc_regs
 		and	r2, lr, #3
 		teq	r2, #3
 		bne	Laddrexcptn_illegal_mode
@@ -686,56 +664,50 @@ Laddrexcptn_illegal_mode:
 /*=============================================================================
  * Interrupt (IRQ) handler
  *-----------------------------------------------------------------------------
- * Note: if in user mode, then *no* kernel routine is running, so do not have
- *       to save svc lr
- * (r13 points to irq temp save area)
+ * Note: if the IRQ was taken whilst in user mode, then *no* kernel routine
+ * is running, so do not have to save svc lr.
+ *
+ * Entered in IRQ mode.
  */
 
-vector_IRQ:	ldr	r13, .LCirq			@ I will leave this one in just in case...
-		sub	lr, lr, #4
-		str	lr, [r13]
-		tst	lr, #3
-		bne	__irq_svc
-		teqp	pc, #PSR_I_BIT | MODE_SVC26
+vector_IRQ:	ldr     sp, .LCirq         @ Setup some temporary stack
+                sub     lr, lr, #4
+                str     lr, [sp]           @ push return address
+
+		tst     lr, #3
+		bne	__irq_non_usr
+
+__irq_usr:	teqp	pc, #PSR_I_BIT | MODE_SVC26     @ Enter SVC mode
 		mov	r0, r0
+
 		ldr	lr, .LCirq
-		ldr	lr, [lr]
+		ldr	lr, [lr]           @ Restore lr for jump back to USR
+
 		save_user_regs
 
-1:		get_irqnr_and_base r6, r5
-		teq	r6, #0
-		ldrneb	r0, [r5, r6]			@ get IRQ number
-		movne	r1, sp
-		@
-		@ routine called with r0 = irq number, r1 = struct pt_regs *
-		@
-		adr	lr, 1b
-		orr	lr, lr, #PSR_I_BIT | MODE_SVC26		@ Force SVC
-		bne	asm_do_IRQ
+		handle_irq
 
 		mov	why, #0
-		get_thread_info tsk        @ FIXME - was r5, but seemed wrong.
+		get_thread_info tsk
 		b	ret_to_user
+
+@ Place the IRQ priority table here so that the handle_irq macros above
+@ and below here can access it.
 
 		irq_prio_table
 
-__irq_svc:	teqp	pc, #PSR_I_BIT | MODE_SVC26
+__irq_non_usr:	teqp	pc, #PSR_I_BIT | MODE_SVC26     @ Enter SVC mode
 		mov	r0, r0
-		SVC_IRQ_SAVE_ALL
+
+		save_svc_regs_irq
+
                 and	r2, lr, #3
 		teq	r2, #3
-		bne	__irq_invalid
-1:		get_irqnr_and_base r6, r5
-		teq	r6, #0
-		ldrneb	r0, [r5, r6]			@ get IRQ number
-		movne	r1, sp
-		@
-		@ routine called with r0 = irq number, r1 = struct pt_regs *
-		@
-		adr	lr, 1b
-		orr	lr, lr, #PSR_I_BIT | MODE_SVC26		@ Force SVC
-		bne	asm_do_IRQ			@ Returns to 1b
-		SVC_RESTORE_ALL
+		bne	__irq_invalid                @ IRQ not from SVC mode
+
+		handle_irq
+
+		restore_svc_regs
 
 __irq_invalid:	mov	r0, sp
 		mov	r1, #BAD_IRQ
@@ -762,7 +734,7 @@ vector_data:	sub	lr, lr, #8		@ Correct lr
 		b	ret_from_exception
 
 Ldata_not_user:
-		SVC_SAVE_ALL
+		save_svc_regs
 		and	r2, lr, #3
 		teq	r2, #3
 		bne	Ldata_illegal_mode
@@ -770,7 +742,7 @@ Ldata_not_user:
 		teqeqp	pc, #MODE_SVC26
 		mask_pc	r0, lr
 		bl	Ldata_do
-		SVC_RESTORE_ALL
+		restore_svc_regs
 
 Ldata_illegal_mode:
 		mov	r0, sp

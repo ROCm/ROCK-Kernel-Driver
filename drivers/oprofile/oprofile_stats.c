@@ -59,6 +59,8 @@ void oprofile_create_stats_files(struct super_block * sb, struct dentry * root)
 			&cpu_buf->sample_received);
 		oprofilefs_create_ro_ulong(sb, cpudir, "sample_lost_overflow",
 			&cpu_buf->sample_lost_overflow);
+		oprofilefs_create_ro_ulong(sb, cpudir, "backtrace_aborted",
+			&cpu_buf->backtrace_aborted);
 	}
  
 	oprofilefs_create_ro_atomic(sb, dir, "sample_lost_no_mm",
@@ -67,4 +69,6 @@ void oprofile_create_stats_files(struct super_block * sb, struct dentry * root)
 		&oprofile_stats.sample_lost_no_mapping);
 	oprofilefs_create_ro_atomic(sb, dir, "event_lost_overflow",
 		&oprofile_stats.event_lost_overflow);
+	oprofilefs_create_ro_atomic(sb, dir, "bt_lost_no_mapping",
+		&oprofile_stats.bt_lost_no_mapping);
 }

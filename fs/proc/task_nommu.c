@@ -1,7 +1,9 @@
 
 #include <linux/mm.h>
 #include <linux/file.h>
+#include <linux/mount.h>
 #include <linux/seq_file.h>
+#include "internal.h"
 
 /*
  * Logic: we've got two memory sums for each process, "shared", and
@@ -11,23 +13,25 @@
  */
 char *task_mem(struct mm_struct *mm, char *buffer)
 {
+	struct vm_list_struct *vml;
 	unsigned long bytes = 0, sbytes = 0, slack = 0;
-	struct mm_tblock_struct *tblock;
         
 	down_read(&mm->mmap_sem);
-	for (tblock = &mm->context.tblock; tblock; tblock = tblock->next) {
-		if (!tblock->rblock)
+	for (vml = mm->context.vmlist; vml; vml = vml->next) {
+		if (!vml->vma)
 			continue;
-		bytes += kobjsize(tblock);
+
+		bytes += kobjsize(vml);
 		if (atomic_read(&mm->mm_count) > 1 ||
-		    tblock->rblock->refcount > 1) {
-			sbytes += kobjsize(tblock->rblock->kblock);
-			sbytes += kobjsize(tblock->rblock);
+		    atomic_read(&vml->vma->vm_usage) > 1
+		    ) {
+			sbytes += kobjsize((void *) vml->vma->vm_start);
+			sbytes += kobjsize(vml->vma);
 		} else {
-			bytes += kobjsize(tblock->rblock->kblock);
-			bytes += kobjsize(tblock->rblock);
-			slack += kobjsize(tblock->rblock->kblock) -
-					tblock->rblock->size;
+			bytes += kobjsize((void *) vml->vma->vm_start);
+			bytes += kobjsize(vml->vma);
+			slack += kobjsize((void *) vml->vma->vm_start) -
+				(vml->vma->vm_end - vml->vma->vm_start);
 		}
 	}
 
@@ -65,13 +69,13 @@ char *task_mem(struct mm_struct *mm, char *buffer)
 
 unsigned long task_vsize(struct mm_struct *mm)
 {
-	struct mm_tblock_struct *tbp;
+	struct vm_list_struct *tbp;
 	unsigned long vsize = 0;
 
 	down_read(&mm->mmap_sem);
-	for (tbp = &mm->context.tblock; tbp; tbp = tbp->next) {
-		if (tbp->rblock)
-			vsize += kobjsize(tbp->rblock->kblock);
+	for (tbp = mm->context.vmlist; tbp; tbp = tbp->next) {
+		if (tbp->vma)
+			vsize += kobjsize((void *) tbp->vma->vm_start);
 	}
 	up_read(&mm->mmap_sem);
 	return vsize;
@@ -80,16 +84,15 @@ unsigned long task_vsize(struct mm_struct *mm)
 int task_statm(struct mm_struct *mm, int *shared, int *text,
 	       int *data, int *resident)
 {
-	struct mm_tblock_struct *tbp;
+	struct vm_list_struct *tbp;
 	int size = kobjsize(mm);
 
 	down_read(&mm->mmap_sem);
-	for (tbp = &mm->context.tblock; tbp; tbp = tbp->next) {
-		if (tbp->next)
-			size += kobjsize(tbp->next);
-		if (tbp->rblock) {
-			size += kobjsize(tbp->rblock);
-			size += kobjsize(tbp->rblock->kblock);
+	for (tbp = mm->context.vmlist; tbp; tbp = tbp->next) {
+		size += kobjsize(tbp);
+		if (tbp->vma) {
+			size += kobjsize(tbp->vma);
+			size += kobjsize((void *) tbp->vma->vm_start);
 		}
 	}
 
@@ -98,6 +101,40 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 	up_read(&mm->mmap_sem);
 	*resident = size;
 	return size;
+}
+
+int proc_exe_link(struct inode *inode, struct dentry **dentry, struct vfsmount **mnt)
+{
+	struct vm_list_struct *vml;
+	struct vm_area_struct *vma;
+	struct task_struct *task = proc_task(inode);
+	struct mm_struct *mm = get_task_mm(task);
+	int result = -ENOENT;
+
+	if (!mm)
+		goto out;
+	down_read(&mm->mmap_sem);
+
+	vml = mm->context.vmlist;
+	vma = NULL;
+	while (vml) {
+		if ((vml->vma->vm_flags & VM_EXECUTABLE) && vml->vma->vm_file) {
+			vma = vml->vma;
+			break;
+		}
+		vml = vml->next;
+	}
+
+	if (vma) {
+		*mnt = mntget(vma->vm_file->f_vfsmnt);
+		*dentry = dget(vma->vm_file->f_dentry);
+		result = 0;
+	}
+
+	up_read(&mm->mmap_sem);
+	mmput(mm);
+out:
+	return result;
 }
 
 /*

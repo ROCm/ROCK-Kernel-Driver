@@ -394,35 +394,29 @@ __arm1022_setup:
 	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches on v4
 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer on v4
 	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs on v4
-	mcr	p15, 0, r4, c2, c0		@ load page table pointer
-	mov	r0, #0x1f			@ Domains 0, 1 = client
-	mcr	p15, 0, r0, c3, c0		@ load domain access register
 	mrc	p15, 0, r0, c1, c0		@ get control register v4
-/*
- * Clear out 'unwanted' bits (then put them in if we need them)
- */
-	bic	r0, r0, #0x1e00 		@ ...i??r.........
-	bic	r0, r0, #0x000e 		@ ............wca.
-/*
- * Turn on what we want
- */
-	orr	r0, r0, #0x0031 		@ ..........DP...M
-	orr	r0, r0, #0x2100 		@ ..V....S........
-
+	ldr	r5, arm1022_cr1_clear
+	bic	r0, r0, r5
+	ldr	r5, arm1022_cr1_set
+	orr	r0, r0, r5
 #ifdef CONFIG_CPU_CACHE_ROUND_ROBIN
 	orr	r0, r0, #0x4000 		@ .R..............
 #endif
-#ifndef CONFIG_CPU_BPREDICT_DISABLE
-	orr	r0, r0, #0x0800 		@ ....Z...........
-#endif
-#ifndef CONFIG_CPU_DCACHE_DISABLE
-	orr	r0, r0, #0x0004 		@ .............C..
-#endif
-#ifndef CONFIG_CPU_ICACHE_DISABLE
-	orr	r0, r0, #0x1000 		@ ...I............
-#endif
 	mov	pc, lr
 	.size	__arm1022_setup, . - __arm1022_setup
+
+	/*
+	 *  R
+	 * .RVI ZFRS BLDP WCAM
+	 * .011 1001 ..11 0101
+	 * 
+	 */
+	.type	arm1022_cr1_clear, #object
+	.type	arm1022_cr1_set, #object
+arm1022_cr1_clear:
+	.word	0x7f3f
+arm1022_cr1_set:
+	.word	0x3935
 
 	__INITDATA
 
@@ -485,7 +479,10 @@ cpu_arm1022_name:
 __arm1022_proc_info:
 	.long	0x4105a220			@ ARM 1022E (v5TE)
 	.long	0xff0ffff0
-	.long	0x00000c12			@ mmuflags
+	.long   PMD_TYPE_SECT | \
+		PMD_BIT4 | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__arm1022_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name

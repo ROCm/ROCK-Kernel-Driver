@@ -68,8 +68,6 @@ extern int dir_notify_enable;
 #endif
 
 #define NR_FILE  8192	/* this can well be larger on a larger system */
-#define NR_RESERVED_FILES 10 /* reserved for root */
-#define NR_SUPER 256
 
 #define MAY_EXEC 1
 #define MAY_WRITE 2
@@ -123,7 +121,6 @@ extern int dir_notify_enable;
 #define MS_REC		16384
 #define MS_VERBOSE	32768
 #define MS_POSIXACL	(1<<16)	/* VFS does not apply the umask */
-#define MS_ONE_SECOND	(1<<17)	/* fs has 1 sec a/m/ctime resolution */
 #define MS_ACTIVE	(1<<30)
 #define MS_NOUSER	(1<<31)
 
@@ -179,7 +176,6 @@ extern int dir_notify_enable;
 #define IS_NOATIME(inode)	(__IS_FLG(inode, MS_NOATIME) || ((inode)->i_flags & S_NOATIME))
 #define IS_NODIRATIME(inode)	__IS_FLG(inode, MS_NODIRATIME)
 #define IS_POSIXACL(inode)	__IS_FLG(inode, MS_POSIXACL)
-#define IS_ONE_SECOND(inode)	__IS_FLG(inode, MS_ONE_SECOND)
 
 #define IS_DEADDIR(inode)	((inode)->i_flags & S_DEAD)
 #define IS_NOCMTIME(inode)	((inode)->i_flags & S_NOCMTIME)
@@ -343,7 +339,7 @@ struct address_space {
 	struct prio_tree_root	i_mmap;		/* tree of private and shared mappings */
 	struct list_head	i_mmap_nonlinear;/*list VM_NONLINEAR mappings */
 	spinlock_t		i_mmap_lock;	/* protect tree, count, list */
-	atomic_t		truncate_count;	/* Cover race condition with truncate */
+	unsigned int		truncate_count;	/* Cover race condition with truncate */
 	unsigned long		nrpages;	/* number of total pages */
 	pgoff_t			writeback_index;/* writeback starts here */
 	struct address_space_operations *a_ops;	/* methods */
@@ -565,16 +561,17 @@ struct fown_struct {
 struct file_ra_state {
 	unsigned long start;		/* Current window */
 	unsigned long size;
-	unsigned long next_size;	/* Next window size */
+	unsigned long flags;		/* ra flags RA_FLAG_xxx*/
+	unsigned long cache_hit;	/* cache hit count*/
 	unsigned long prev_page;	/* Cache last read() position */
 	unsigned long ahead_start;	/* Ahead window */
 	unsigned long ahead_size;
-	unsigned long currnt_wnd_hit;	/* locality in the current window */
-	unsigned long average;		/* size of next current window */
 	unsigned long ra_pages;		/* Maximum readahead window */
 	unsigned long mmap_hit;		/* Cache hit stat for mmap accesses */
 	unsigned long mmap_miss;	/* Cache miss stat for mmap accesses */
 };
+#define RA_FLAG_MISS 0x01	/* a cache miss occured against this file */
+#define RA_FLAG_INCACHE 0x02	/* file is already in cache */
 
 struct file {
 	struct list_head	f_list;
@@ -800,7 +797,13 @@ struct super_block {
 	 * even looking at it. You had been warned.
 	 */
 	struct semaphore s_vfs_rename_sem;	/* Kludge */
+
+	/* Granuality of c/m/atime in ns.
+	   Cannot be worse than a second */
+	u32		   s_time_gran;
 };
+
+extern struct timespec current_fs_time(struct super_block *sb);
 
 /*
  * Snapshotting support.
@@ -903,10 +906,16 @@ typedef struct {
 
 typedef int (*read_actor_t)(read_descriptor_t *, struct page *, unsigned long, unsigned long);
 
+/* These macros are for out of kernel modules to test that
+ * the kernel supports the unlocked_ioctl and compat_ioctl
+ * fields in struct file_operations. */
+#define HAVE_COMPAT_IOCTL 1
+#define HAVE_UNLOCKED_IOCTL 1
+
 /*
  * NOTE:
- * read, write, poll, fsync, readv, writev can be called
- *   without the big kernel lock held in all filesystems.
+ * read, write, poll, fsync, readv, writev, unlocked_ioctl and compat_ioctl
+ * can be called without the big kernel lock held in all filesystems.
  */
 struct file_operations {
 	struct module *owner;
@@ -918,6 +927,8 @@ struct file_operations {
 	int (*readdir) (struct file *, void *, filldir_t);
 	unsigned int (*poll) (struct file *, struct poll_table_struct *);
 	int (*ioctl) (struct inode *, struct file *, unsigned int, unsigned long);
+	long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+	long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
 	int (*mmap) (struct file *, struct vm_area_struct *);
 	int (*open) (struct inode *, struct file *);
 	int (*flush) (struct file *);
@@ -997,6 +1008,9 @@ struct super_operations {
 	void (*sync_inodes) (struct super_block *sb,
 				struct writeback_control *wbc);
 	int (*show_options)(struct seq_file *, struct vfsmount *);
+
+	ssize_t (*quota_read)(struct super_block *, int, char *, size_t, loff_t);
+	ssize_t (*quota_write)(struct super_block *, int, const char *, size_t, loff_t);
 };
 
 /* Inode state bits.  Protected by inode_lock. */
@@ -1190,11 +1204,6 @@ extern long do_mount(char *, char *, char *, unsigned long, void *);
 
 extern int vfs_statfs(struct super_block *, struct kstatfs *);
 
-/* Return value for VFS lock functions - tells locks.c to lock conventionally
- * REALLY kosha for root NFS and nfs_lock
- */ 
-#define LOCK_USE_CLNT 1
-
 #define FLOCK_VERIFY_READ  1
 #define FLOCK_VERIFY_WRITE 2
 
@@ -1345,8 +1354,8 @@ static inline void invalidate_remote_inode(struct inode *inode)
 	    S_ISLNK(inode->i_mode))
 		invalidate_inode_pages(inode->i_mapping);
 }
-extern void invalidate_inode_pages2(struct address_space *mapping);
-extern void write_inode_now(struct inode *, int);
+extern int invalidate_inode_pages2(struct address_space *mapping);
+extern int write_inode_now(struct inode *, int);
 extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_flush(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);

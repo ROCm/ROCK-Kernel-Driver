@@ -10,16 +10,13 @@
 #define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
 
-static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
-{
-	set_pmd(pmd, __pmd(_PAGE_TABLE +
-		((unsigned long long)page_to_pfn(pte) <<
-			(unsigned long long) PAGE_SHIFT)));
-}
+#define pmd_populate(mm, pmd, pte) 				\
+	set_pmd(pmd, __pmd(_PAGE_TABLE +			\
+		((unsigned long long)page_to_pfn(pte) <<	\
+			(unsigned long long) PAGE_SHIFT)))
 /*
  * Allocate and free page tables.
  */
-
 extern pgd_t *pgd_alloc(struct mm_struct *);
 extern void pgd_free(pgd_t *pgd);
 
@@ -39,16 +36,15 @@ static inline void pte_free(struct page *pte)
 
 #define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 
+#ifdef CONFIG_X86_PAE
 /*
- * allocating and freeing a pmd is trivial: the 1-entry pmd is
- * inside the pgd, so has no extra memory associated with it.
- * (In the PAE case we free the pmds as part of the pgd.)
+ * In the PAE case we free the pmds as part of the pgd.
  */
-
 #define pmd_alloc_one(mm, addr)		({ BUG(); ((pmd_t *)2); })
 #define pmd_free(x)			do { } while (0)
 #define __pmd_free_tlb(tlb,x)		do { } while (0)
-#define pgd_populate(mm, pmd, pte)	BUG()
+#define pud_populate(mm, pmd, pte)	BUG()
+#endif
 
 #define check_pgt_cache()	do { } while (0)
 

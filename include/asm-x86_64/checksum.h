@@ -133,17 +133,17 @@ extern unsigned int csum_partial(const unsigned char *buff, unsigned len, unsign
 
 
 /* Do not call this directly. Use the wrappers below */
-extern unsigned long csum_partial_copy_generic(const char *src, const char *dst, 
+extern unsigned long csum_partial_copy_generic(const unsigned char *src, const unsigned char *dst,
 					       unsigned len,
 					       unsigned sum, 
 					       int *src_err_ptr, int *dst_err_ptr);
 
 
-extern unsigned int csum_partial_copy_from_user(const char __user *src, char *dst, 
+extern unsigned int csum_partial_copy_from_user(const unsigned char __user *src, unsigned char *dst,
 				       int len, unsigned int isum, int *errp);
-extern unsigned int csum_partial_copy_to_user(const char *src, char __user *dst, 
+extern unsigned int csum_partial_copy_to_user(const unsigned char *src, unsigned char __user *dst,
 				      int len, unsigned int isum, int *errp);
-extern unsigned int csum_partial_copy_nocheck(const char *src, char *dst, int len, 
+extern unsigned int csum_partial_copy_nocheck(const unsigned char *src, unsigned char *dst, int len,
 					      unsigned int sum);
 
 /* Old names. To be removed. */

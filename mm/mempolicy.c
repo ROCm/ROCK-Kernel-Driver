@@ -234,18 +234,29 @@ static struct mempolicy *mpol_new(int mode, unsigned long *nodes)
 
 /* Ensure all existing pages follow the policy. */
 static int
-verify_pages(unsigned long addr, unsigned long end, unsigned long *nodes)
+verify_pages(struct mm_struct *mm,
+	     unsigned long addr, unsigned long end, unsigned long *nodes)
 {
 	while (addr < end) {
 		struct page *p;
 		pte_t *pte;
 		pmd_t *pmd;
-		pgd_t *pgd = pgd_offset_k(addr);
+		pud_t *pud;
+		pgd_t *pgd;
+		pgd = pgd_offset(mm, addr);
 		if (pgd_none(*pgd)) {
-			addr = (addr + PGDIR_SIZE) & PGDIR_MASK;
+			unsigned long next = (addr + PGDIR_SIZE) & PGDIR_MASK;
+			if (next > addr)
+				break;
+			addr = next;
 			continue;
 		}
-		pmd = pmd_offset(pgd, addr);
+		pud = pud_offset(pgd, addr);
+		if (pud_none(*pud)) {
+			addr = (addr + PUD_SIZE) & PUD_MASK;
+			continue;
+		}
+		pmd = pmd_offset(pud, addr);
 		if (pmd_none(*pmd)) {
 			addr = (addr + PMD_SIZE) & PMD_MASK;
 			continue;
@@ -283,7 +294,8 @@ check_range(struct mm_struct *mm, unsigned long start, unsigned long end,
 		if (prev && prev->vm_end < vma->vm_start)
 			return ERR_PTR(-EFAULT);
 		if ((flags & MPOL_MF_STRICT) && !is_vm_hugetlb_page(vma)) {
-			err = verify_pages(vma->vm_start, vma->vm_end, nodes);
+			err = verify_pages(vma->vm_mm,
+					   vma->vm_start, vma->vm_end, nodes);
 			if (err) {
 				first = ERR_PTR(err);
 				break;
@@ -477,7 +489,7 @@ asmlinkage long sys_get_mempolicy(int __user *policy,
 
 	if (flags & ~(unsigned long)(MPOL_F_NODE|MPOL_F_ADDR))
 		return -EINVAL;
-	if (nmask != NULL && maxnode < numnodes)
+	if (nmask != NULL && maxnode < MAX_NUMNODES)
 		return -EINVAL;
 	if (flags & MPOL_F_ADDR) {
 		down_read(&mm->mmap_sem);
@@ -1016,12 +1028,10 @@ restart:
 						return -ENOMEM;
 					goto restart;
 				}
-				n->end = end;
+				n->end = start;
 				sp_insert(sp, new2);
-				new2 = NULL;
-			}
-			/* Old crossing beginning, but not end (easy) */
-			if (n->start < start && n->end > start)
+				break;
+			} else
 				n->end = start;
 		}
 		if (!next)
@@ -1074,11 +1084,11 @@ void mpol_free_shared_policy(struct shared_policy *p)
 	while (next) {
 		n = rb_entry(next, struct sp_node, nd);
 		next = rb_next(&n->nd);
-		rb_erase(&n->nd, &p->root);
 		mpol_free(n->policy);
 		kmem_cache_free(sn_cache, n);
 	}
 	spin_unlock(&p->lock);
+	p->root = RB_ROOT;
 }
 
 /* assumes fs == KERNEL_DS */

@@ -38,6 +38,26 @@
 #include "cardmi.h"
 #include "irqmgr.h"
 
+
+static int emu10k1_mpuin_callback(struct emu10k1_mpuin *card_mpuin, u32 msg, unsigned long data, u32 bytesvalid);
+
+static int sblive_miStateInit(struct emu10k1_mpuin *);
+static int sblive_miStateEntry(struct emu10k1_mpuin *, u8);
+static int sblive_miStateParse(struct emu10k1_mpuin *, u8);
+static int sblive_miState3Byte(struct emu10k1_mpuin *, u8);
+static int sblive_miState3ByteKey(struct emu10k1_mpuin *, u8);
+static int sblive_miState3ByteVel(struct emu10k1_mpuin *, u8);
+static int sblive_miState2Byte(struct emu10k1_mpuin *, u8);
+static int sblive_miState2ByteKey(struct emu10k1_mpuin *, u8);
+static int sblive_miStateSysCommon2(struct emu10k1_mpuin *, u8);
+static int sblive_miStateSysCommon2Key(struct emu10k1_mpuin *, u8);
+static int sblive_miStateSysCommon3(struct emu10k1_mpuin *, u8);
+static int sblive_miStateSysCommon3Key(struct emu10k1_mpuin *, u8);
+static int sblive_miStateSysCommon3Vel(struct emu10k1_mpuin *, u8);
+static int sblive_miStateSysExNorm(struct emu10k1_mpuin *, u8);
+static int sblive_miStateSysReal(struct emu10k1_mpuin *, u8);
+
+
 static struct {
 	int (*Fn) (struct emu10k1_mpuin *, u8);
 } midistatefn[] = {
@@ -68,6 +88,7 @@ static struct {
 	{
 	sblive_miStateSysReal}	/* 0xF4 - 0xF6 ,0xF8 - 0xFF     */
 };
+
 
 /* Installs the IRQ handler for the MPU in port                 */
 
@@ -269,7 +290,7 @@ int emu10k1_mpuin_reset(struct emu10k1_card *card)
 /* Passes the message with the data back to the client          */
 
 /* via IRQ & DPC callbacks to Ring 3                            */
-int emu10k1_mpuin_callback(struct emu10k1_mpuin *card_mpuin, u32 msg, unsigned long data, u32 bytesvalid)
+static int emu10k1_mpuin_callback(struct emu10k1_mpuin *card_mpuin, u32 msg, unsigned long data, u32 bytesvalid)
 {
 	unsigned long timein;
 	struct midi_queue *midiq;
@@ -374,7 +395,7 @@ int emu10k1_mpuin_irqhandler(struct emu10k1_card *card)
 /*****************************************************************************/
 
 /* FIXME: This should be a macro */
-int sblive_miStateInit(struct emu10k1_mpuin *card_mpuin)
+static int sblive_miStateInit(struct emu10k1_mpuin *card_mpuin)
 {
 	card_mpuin->status = 0;	/* For MIDI running status */
 	card_mpuin->fstatus = 0;	/* For 0xFn status only */
@@ -388,12 +409,12 @@ int sblive_miStateInit(struct emu10k1_mpuin *card_mpuin)
 }
 
 /* FIXME: This should be a macro */
-int sblive_miStateEntry(struct emu10k1_mpuin *card_mpuin, u8 data)
+static int sblive_miStateEntry(struct emu10k1_mpuin *card_mpuin, u8 data)
 {
 	return midistatefn[card_mpuin->curstate].Fn(card_mpuin, data);
 }
 
-int sblive_miStateParse(struct emu10k1_mpuin *card_mpuin, u8 data)
+static int sblive_miStateParse(struct emu10k1_mpuin *card_mpuin, u8 data)
 {
 	switch (data & 0xf0) {
 	case 0x80:
@@ -457,7 +478,7 @@ int sblive_miStateParse(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return midistatefn[card_mpuin->curstate].Fn(card_mpuin, data);
 }
 
-int sblive_miState3Byte(struct emu10k1_mpuin *card_mpuin, u8 data)
+static int sblive_miState3Byte(struct emu10k1_mpuin *card_mpuin, u8 data)
 {
 	u8 temp = data & 0xf0;
 
@@ -473,8 +494,7 @@ int sblive_miState3Byte(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return midistatefn[STIN_PARSE].Fn(card_mpuin, data);
 }
 
-int sblive_miState3ByteKey(struct emu10k1_mpuin *card_mpuin, u8 data)
-
+static int sblive_miState3ByteKey(struct emu10k1_mpuin *card_mpuin, u8 data)
 /* byte 1 */
 {
 	unsigned long tmp;
@@ -502,8 +522,7 @@ int sblive_miState3ByteKey(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return CTSTATUS_NEXT_BYTE;
 }
 
-int sblive_miState3ByteVel(struct emu10k1_mpuin *card_mpuin, u8 data)
-
+static int sblive_miState3ByteVel(struct emu10k1_mpuin *card_mpuin, u8 data)
 /* byte 2 */
 {
 	unsigned long tmp;
@@ -539,7 +558,7 @@ int sblive_miState3ByteVel(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return 0;
 }
 
-int sblive_miState2Byte(struct emu10k1_mpuin *card_mpuin, u8 data)
+static int sblive_miState2Byte(struct emu10k1_mpuin *card_mpuin, u8 data)
 {
 	u8 temp = data & 0xf0;
 
@@ -556,8 +575,7 @@ int sblive_miState2Byte(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return midistatefn[STIN_PARSE].Fn(card_mpuin, data);
 }
 
-int sblive_miState2ByteKey(struct emu10k1_mpuin *card_mpuin, u8 data)
-
+static int sblive_miState2ByteKey(struct emu10k1_mpuin *card_mpuin, u8 data)
 /* byte 1 */
 {
 	unsigned long tmp;
@@ -590,7 +608,7 @@ int sblive_miState2ByteKey(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return 0;
 }
 
-int sblive_miStateSysCommon2(struct emu10k1_mpuin *card_mpuin, u8 data)
+static int sblive_miStateSysCommon2(struct emu10k1_mpuin *card_mpuin, u8 data)
 {
 	card_mpuin->fstatus = data;
 	card_mpuin->curstate = STIN_SYS_COMMON_2_KEY;
@@ -598,8 +616,7 @@ int sblive_miStateSysCommon2(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return CTSTATUS_NEXT_BYTE;
 }
 
-int sblive_miStateSysCommon2Key(struct emu10k1_mpuin *card_mpuin, u8 data)
-
+static int sblive_miStateSysCommon2Key(struct emu10k1_mpuin *card_mpuin, u8 data)
 /* byte 1 */
 {
 	unsigned long tmp;
@@ -632,7 +649,7 @@ int sblive_miStateSysCommon2Key(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return 0;
 }
 
-int sblive_miStateSysCommon3(struct emu10k1_mpuin *card_mpuin, u8 data)
+static int sblive_miStateSysCommon3(struct emu10k1_mpuin *card_mpuin, u8 data)
 {
 	card_mpuin->fstatus = data;
 	card_mpuin->curstate = STIN_SYS_COMMON_3_KEY;
@@ -640,8 +657,7 @@ int sblive_miStateSysCommon3(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return CTSTATUS_NEXT_BYTE;
 }
 
-int sblive_miStateSysCommon3Key(struct emu10k1_mpuin *card_mpuin, u8 data)
-
+static int sblive_miStateSysCommon3Key(struct emu10k1_mpuin *card_mpuin, u8 data)
 /* byte 1 */
 {
 	unsigned long tmp;
@@ -670,8 +686,7 @@ int sblive_miStateSysCommon3Key(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return CTSTATUS_NEXT_BYTE;
 }
 
-int sblive_miStateSysCommon3Vel(struct emu10k1_mpuin *card_mpuin, u8 data)
-
+static int sblive_miStateSysCommon3Vel(struct emu10k1_mpuin *card_mpuin, u8 data)
 /* byte 2 */
 {
 	unsigned long tmp;
@@ -708,7 +723,7 @@ int sblive_miStateSysCommon3Vel(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return 0;
 }
 
-int sblive_miStateSysExNorm(struct emu10k1_mpuin *card_mpuin, u8 data)
+static int sblive_miStateSysExNorm(struct emu10k1_mpuin *card_mpuin, u8 data)
 {
 	unsigned long flags;
 
@@ -809,7 +824,7 @@ int sblive_miStateSysExNorm(struct emu10k1_mpuin *card_mpuin, u8 data)
 	return CTSTATUS_NEXT_BYTE;
 }
 
-int sblive_miStateSysReal(struct emu10k1_mpuin *card_mpuin, u8 data)
+static int sblive_miStateSysReal(struct emu10k1_mpuin *card_mpuin, u8 data)
 {
 	emu10k1_mpuin_callback(card_mpuin, ICARDMIDI_INDATA, data, 1);
 

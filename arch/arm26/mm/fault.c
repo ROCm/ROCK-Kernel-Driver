@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mm/fault-common.c
+ *  linux/arch/arm26/mm/fault.c
  *
  *  Copyright (C) 1995  Linus Torvalds
  *  Modifications for ARM processor (c) 1995-2001 Russell King
@@ -212,7 +212,6 @@ int do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	tsk = current;
 	mm  = tsk->mm;
 
-	printk("do_page_fault: pid: %d      %08x\n", tsk->pid, addr);
 	/*
 	 * If we're in an interrupt or have no user
 	 * context, we must not take the fault..

@@ -15,10 +15,6 @@
 MODULE_DESCRIPTION("ISDN4Linux: Driver for Spellcaster card");
 MODULE_AUTHOR("Spellcaster Telecommunications Inc.");
 MODULE_LICENSE("GPL");
-MODULE_PARM( io, "1-" __MODULE_STRING(MAX_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_CARDS) "i");
-MODULE_PARM(ram, "1-" __MODULE_STRING(MAX_CARDS) "i");
-MODULE_PARM(do_reset, "i");
 
 board *sc_adapter[MAX_CARDS];
 int cinst;
@@ -33,6 +29,11 @@ static unsigned int io[] = {0,0,0,0};
 static unsigned char irq[] = {0,0,0,0};
 static unsigned long ram[] = {0,0,0,0};
 static int do_reset = 0;
+
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(ram, int, NULL, 0);
+module_param(do_reset, bool, 0);
 
 static int sup_irq[] = { 11, 10, 9, 5, 12, 14, 7, 3, 4, 6 };
 #define MAX_IRQS	10

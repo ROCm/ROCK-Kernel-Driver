@@ -41,7 +41,7 @@ bootmem_data_t node0_bdata;
  * numa interface - we expect the numa architecture specfic code to have
  *                  populated the following initialisation.
  *
- * 1) numnodes         - the total number of nodes configured in the system
+ * 1) node_online_map  - the map of all nodes configured (online) in the system
  * 2) physnode_map     - the mapping between a pfn and owning node
  * 3) node_start_pfn   - the starting page frame number for a node
  * 3) node_end_pfn     - the ending page fram number for a node
@@ -93,12 +93,12 @@ int __init get_memcfg_numa_flat(void)
 
 	/* Run the memory configuration and find the top of memory. */
 	find_max_pfn();
-	node_start_pfn[0]  = 0;
-	node_end_pfn[0]	  = max_pfn;
+	node_start_pfn[0] = 0;
+	node_end_pfn[0] = max_pfn;
 
         /* Indicate there is one node available. */
+	nodes_clear(node_online_map);
 	node_set_online(0);
-	numnodes = 1;
 	return 1;
 }
 
@@ -183,7 +183,9 @@ void __init remap_numa_kva(void)
 	unsigned long pfn;
 	int node;
 
-	for (node = 1; node < numnodes; ++node) {
+	for_each_online_node(node) {
+		if (node == 0)
+			continue;
 		for (pfn=0; pfn < node_remap_size[node]; pfn += PTRS_PER_PTE) {
 			vaddr = node_remap_start_vaddr[node]+(pfn<<PAGE_SHIFT);
 			set_pmd_pfn((ulong) vaddr, 
@@ -198,7 +200,9 @@ static unsigned long calculate_numa_remap_pages(void)
 	int nid;
 	unsigned long size, reserve_pages = 0;
 
-	for (nid = 1; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
+		if (nid == 0)
+			continue;
 		/* calculate the size of the mem_map needed in bytes */
 		size = (node_end_pfn[nid] - node_start_pfn[nid] + 1) 
 			* sizeof(struct page) + sizeof(pg_data_t);
@@ -248,7 +252,7 @@ unsigned long __init setup_memory(void)
 	get_memcfg_numa();
 
 	/* Fill in the physnode_map */
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
 		printk("Node: %d, start_pfn: %ld, end_pfn: %ld\n",
 				nid, node_start_pfn[nid], node_end_pfn[nid]);
 		printk("  Setting physnode_map array to node %d for pfns:\n  ",
@@ -285,7 +289,7 @@ unsigned long __init setup_memory(void)
 
 	printk("Low memory ends at vaddr %08lx\n",
 			(ulong) pfn_to_kaddr(max_low_pfn));
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
 		node_remap_start_vaddr[nid] = pfn_to_kaddr(
 			(highstart_pfn + reserve_pages) - node_remap_offset[nid]);
 		allocate_pgdat(nid);
@@ -297,7 +301,7 @@ unsigned long __init setup_memory(void)
 	printk("High memory starts at vaddr %08lx\n",
 			(ulong) pfn_to_kaddr(highstart_pfn));
 	vmalloc_earlyreserve = reserve_pages * PAGE_SIZE;
-	for (nid = 0; nid < numnodes; nid++)
+	for_each_online_node(nid)
 		find_max_pfn_node(nid);
 
 	NODE_DATA(0)->bdata = &node0_bdata;
@@ -375,14 +379,16 @@ void __init zone_sizes_init(void)
 	 * Clobber node 0's links and NULL out pgdat_list before starting.
 	 */
 	pgdat_list = NULL;
-	for (nid = numnodes - 1; nid >= 0; nid--) {       
+	for (nid = MAX_NUMNODES - 1; nid >= 0; nid--) {
+		if (!node_online(nid))
+			continue;
 		if (nid)
 			memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
 		NODE_DATA(nid)->pgdat_next = pgdat_list;
 		pgdat_list = NODE_DATA(nid);
 	}
 
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
 		unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
 		unsigned long *zholes_size;
 		unsigned int max_dma;
@@ -464,11 +470,6 @@ void __init set_highmem_pages_init(int bad_ppro)
 void __init set_max_mapnr_init(void)
 {
 #ifdef CONFIG_HIGHMEM
-	struct zone *high0 = &NODE_DATA(0)->node_zones[ZONE_HIGHMEM];
-	if (high0->spanned_pages > 0)
-	      	highmem_start_page = high0->zone_mem_map;
-	else
-		highmem_start_page = pfn_to_page(max_low_pfn - 1) + 1;
 	num_physpages = highend_pfn;
 #else
 	num_physpages = max_low_pfn;

@@ -71,7 +71,7 @@
 
 #define HTB_HSIZE 16	/* classid hash size */
 #define HTB_EWMAC 2	/* rate average over HTB_EWMAC*HTB_HSIZE sec */
-#define HTB_DEBUG 1	/* compile debugging support (activated by tc tool) */
+#undef HTB_DEBUG	/* compile debugging support (activated by tc tool) */
 #define HTB_RATECM 1    /* whether to use rate computer */
 #define HTB_HYSTERESIS 1/* whether to use mode hysteresis for speedup */
 #define HTB_QLOCK(S) spin_lock_bh(&(S)->dev->queue_lock)
@@ -1267,7 +1267,7 @@ static int htb_init(struct Qdisc *sch, struct rtattr *opt)
 	printk(KERN_INFO "HTB init, kernel part version %d.%d\n",
 			  HTB_VER >> 16,HTB_VER & 0xffff);
 #endif
-	if (!opt || rtattr_parse(tb, TCA_HTB_INIT, RTA_DATA(opt), RTA_PAYLOAD(opt)) ||
+	if (!opt || rtattr_parse_nested(tb, TCA_HTB_INIT, opt) ||
 			tb[TCA_HTB_INIT-1] == NULL ||
 			RTA_PAYLOAD(tb[TCA_HTB_INIT-1]) < sizeof(*gopt)) {
 		printk(KERN_ERR "HTB: hey probably you have bad tc tool ?\n");
@@ -1559,7 +1559,7 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 	struct tc_htb_opt *hopt;
 
 	/* extract all subattrs from opt attr */
-	if (!opt || rtattr_parse(tb, TCA_HTB_RTAB, RTA_DATA(opt), RTA_PAYLOAD(opt)) ||
+	if (!opt || rtattr_parse_nested(tb, TCA_HTB_RTAB, opt) ||
 			tb[TCA_HTB_PARMS-1] == NULL ||
 			RTA_PAYLOAD(tb[TCA_HTB_PARMS-1]) < sizeof(*hopt))
 		goto failure;

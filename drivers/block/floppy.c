@@ -155,7 +155,6 @@ static int print_unex = 1;
 #include <linux/kernel.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
-#include <linux/version.h>
 #define FDPATCHES
 #include <linux/fdreg.h>
 
@@ -3317,11 +3316,6 @@ static int invalidate_drive(struct block_device *bdev)
 	process_fd_request();
 	check_disk_change(bdev);
 	return 0;
-}
-
-static inline void clear_write_error(int drive)
-{
-	CLEARSTRUCT(UDRWE);
 }
 
 static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,

@@ -8,22 +8,9 @@
  *  (C) 1991  Linus Torvalds - minix filesystem
  */
 
-#include <linux/time.h>
-#include <linux/affs_fs.h>
-#include <linux/kernel.h>
-#include <linux/string.h>
-#include <linux/stat.h>
-#include <linux/fcntl.h>
-#include <linux/amigaffs.h>
-#include <linux/smp_lock.h>
-#include <linux/buffer_head.h>
-#include <asm/uaccess.h>
-
-#include <linux/errno.h>
+#include "affs.h"
 
 typedef int (*toupper_t)(int);
-
-extern struct inode_operations affs_symlink_inode_operations;
 
 static int	 affs_toupper(int ch);
 static int	 affs_hash_dentry(struct dentry *, struct qstr *);

@@ -154,7 +154,6 @@ typedef struct siginfo {
 #define SI_FROMUSER(siptr)	((siptr)->si_code <= 0)
 #define SI_FROMKERNEL(siptr)	((siptr)->si_code > 0)
 
-#ifndef HAVE_ARCH_SI_CODES
 /*
  * SIGILL si_codes
  */
@@ -225,8 +224,6 @@ typedef struct siginfo {
 #define POLL_HUP	(__SI_POLL|6)	/* device disconnected */
 #define NSIGPOLL	6
 
-#endif
-
 /*
  * sigevent definitions
  * 
@@ -245,8 +242,6 @@ typedef struct siginfo {
 #define SIGEV_PAD_SIZE	((SIGEV_MAX_SIZE/sizeof(int)) - 3)
 #endif
 
-#ifndef HAVE_ARCH_SIGEVENT_T
-
 typedef struct sigevent {
 	sigval_t sigev_value;
 	int sigev_signo;
@@ -261,8 +256,6 @@ typedef struct sigevent {
 		} _sigev_thread;
 	} _sigev_un;
 } sigevent_t;
-
-#endif
 
 #define sigev_notify_function	_sigev_un._sigev_thread._function
 #define sigev_notify_attributes	_sigev_un._sigev_thread._attribute

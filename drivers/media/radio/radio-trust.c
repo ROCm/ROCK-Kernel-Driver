@@ -306,9 +306,9 @@ MODULE_AUTHOR("Eric Lammerts, Russell Kroll, Quay Lu, Donald Song, Jason Lewis, 
 MODULE_DESCRIPTION("A driver for the Trust FM Radio card.");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "I/O address of the Trust FM Radio card (0x350 or 0x358)");
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 static void __exit cleanup_trust_module(void)
 {

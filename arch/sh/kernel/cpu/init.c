@@ -194,7 +194,7 @@ asmlinkage void __init sh_cpu_init(void)
 	/* FPU initialization */
 	if ((cpu_data->flags & CPU_HAS_FPU)) {
 		clear_thread_flag(TIF_USEDFPU);
-		clear_used_math();
+		current->used_math = 0;
 	}
 
 #ifdef CONFIG_SH_DSP

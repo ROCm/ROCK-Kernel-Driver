@@ -200,8 +200,8 @@ static __u32 __init search_agp_bridge(u32 *order, int *valid_agp)
 void __init iommu_hole_init(void) 
 { 
 	int fix, num; 
-	u32 aper_size, aper_alloc = 0, aper_order;
-	u64 aper_base; 
+	u32 aper_size, aper_alloc = 0, aper_order, last_aper_order = 0;
+	u64 aper_base, last_aper_base = 0;
 	int valid_agp = 0;
 
 	if (iommu_aperture_disabled || !fix_aperture)
@@ -230,7 +230,15 @@ void __init iommu_hole_init(void)
 		if (!aperture_valid(name, aper_base, aper_size)) { 
 			fix = 1; 
 			break; 
-		} 
+		}
+
+		if ((last_aper_order && aper_order != last_aper_order) ||
+		    (last_aper_base && aper_base != last_aper_base)) {
+			fix = 1;
+			break;
+		}
+		last_aper_order = aper_order;
+		last_aper_base = aper_base;
 	} 
 
 	if (!fix && !fallback_aper_force) 

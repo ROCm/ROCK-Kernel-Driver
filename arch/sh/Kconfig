@@ -25,6 +25,10 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 source "init/Kconfig"
 
 menu "System type"
@@ -37,25 +41,25 @@ config SH_SOLUTION_ENGINE
 	bool "SolutionEngine"
 	help
 	  Select SolutionEngine if configuring for a Hitachi SH7709
-	  or SH7750 evalutation board.
+	  or SH7750 evaluation board.
 
 config SH_7751_SOLUTION_ENGINE
 	bool "SolutionEngine7751"
 	help
 	  Select 7751 SolutionEngine if configuring for a Hitachi SH7751
-	  evalutation board.
+	  evaluation board.
 
 config SH_7300_SOLUTION_ENGINE
 	bool "SolutionEngine7300"
 	help
 	  Select 7300 SolutionEngine if configuring for a Hitachi SH7300(SH-Mobile V)
-	  evalutation board.
+	  evaluation board.
 
 config SH_73180_SOLUTION_ENGINE
        bool "SolutionEngine73180"
        help
          Select 73180 SolutionEngine if configuring for a Hitachi SH73180(SH-Mobile 3)
-         evalutation board.
+         evaluation board.
 
 config SH_7751_SYSTEMH
 	bool "SystemH7751R"

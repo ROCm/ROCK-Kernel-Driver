@@ -523,6 +523,8 @@ static struct pci_driver agp_via_pci_driver = {
 
 static int __init agp_via_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_via_pci_driver);
 }
 

@@ -47,6 +47,10 @@ typedef enum {
 } mode_type;
 
 #if 0
+static void ftape_put_bad_sector_entry(int segment_id, SectorMap new_map);
+#endif
+
+#if 0
 /*  fix_tape converts a normal QIC-80 tape into a 'wide' tape.
  *  For testing purposes only !
  */
@@ -375,7 +379,8 @@ static int backwards_seek_entry(int segment_id,
 	}
 }
 
-void ftape_put_bad_sector_entry(int segment_id, SectorMap new_map)
+#if 0
+static void ftape_put_bad_sector_entry(int segment_id, SectorMap new_map)
 {
 	SectorCount *ptr = (SectorCount *)bad_sector_map;
 	int count;
@@ -438,6 +443,7 @@ void ftape_put_bad_sector_entry(int segment_id, SectorMap new_map)
 	}
 	TRACE_EXIT;
 }
+#endif  /*  0  */
 
 SectorMap ftape_get_bad_sector_entry(int segment_id)
 {

@@ -25,7 +25,7 @@ static struct rpc_authops *	auth_flavors[RPC_AUTH_MAXFLAVOR] = {
 	NULL,			/* others can be loadable modules */
 };
 
-u32
+static u32
 pseudoflavor_to_flavor(u32 flavor) {
 	if (flavor >= RPC_AUTH_MAXFLAVOR)
 		return RPC_AUTH_GSS;
@@ -89,7 +89,7 @@ rpcauth_destroy(struct rpc_auth *auth)
 	kfree(auth);
 }
 
-static spinlock_t rpc_credcache_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rpc_credcache_lock);
 
 /*
  * Initialize RPC credential cache
@@ -214,8 +214,6 @@ retry:
 	list_for_each_safe(pos, next, &auth->au_credcache[nr]) {
 		struct rpc_cred *entry;
 	       	entry = list_entry(pos, struct rpc_cred, cr_hash);
-		if (entry->cr_flags & RPCAUTH_CRED_DEAD)
-			continue;
 		if (rpcauth_prune_expired(entry, &free))
 			continue;
 		if (entry->cr_ops->crmatch(acred, entry, taskflags)) {
@@ -306,9 +304,6 @@ put_rpccred(struct rpc_cred *cred)
 {
 	if (!atomic_dec_and_lock(&cred->cr_count, &rpc_credcache_lock))
 		return;
-
-	if ((cred->cr_flags & RPCAUTH_CRED_DEAD) && !list_empty(&cred->cr_hash))
-		list_del_init(&cred->cr_hash);
 
 	if (list_empty(&cred->cr_hash)) {
 		spin_unlock(&rpc_credcache_lock);
@@ -412,11 +407,4 @@ rpcauth_uptodatecred(struct rpc_task *task)
 {
 	return !(task->tk_msg.rpc_cred) ||
 		(task->tk_msg.rpc_cred->cr_flags & RPCAUTH_CRED_UPTODATE);
-}
-
-int
-rpcauth_deadcred(struct rpc_task *task)
-{
-	return !(task->tk_msg.rpc_cred) ||
-		(task->tk_msg.rpc_cred->cr_flags & RPCAUTH_CRED_DEAD);
 }

@@ -54,12 +54,32 @@
 #include <scsi/scsi_transport.h>
 #include <scsi/scsi_transport_spi.h>
 
-#include "lasi700.h"
 #include "53c700.h"
 
 MODULE_AUTHOR("James Bottomley");
 MODULE_DESCRIPTION("lasi700 SCSI Driver");
 MODULE_LICENSE("GPL");
+
+#define LASI_700_SVERSION 0x00071
+#define LASI_710_SVERSION 0x00082
+
+#define LASI700_ID_TABLE {			\
+	.hw_type	= HPHW_FIO,		\
+	.sversion	= LASI_700_SVERSION,	\
+	.hversion	= HVERSION_ANY_ID,	\
+	.hversion_rev	= HVERSION_REV_ANY_ID,	\
+}
+
+#define LASI710_ID_TABLE {			\
+	.hw_type	= HPHW_FIO,		\
+	.sversion	= LASI_710_SVERSION,	\
+	.hversion	= HVERSION_ANY_ID,	\
+	.hversion_rev	= HVERSION_REV_ANY_ID,	\
+}
+
+#define LASI700_CLOCK	25
+#define LASI710_CLOCK	40
+#define LASI_SCSI_CORE_OFFSET 0x100
 
 static struct parisc_device_id lasi700_ids[] = {
 	LASI700_ID_TABLE,

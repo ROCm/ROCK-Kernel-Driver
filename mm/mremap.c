@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/highmem.h>
 #include <linux/security.h>
+#include <linux/acct.h>
 #include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
@@ -25,19 +26,24 @@
 static pte_t *get_one_pte_map_nested(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte = NULL;
 
 	pgd = pgd_offset(mm, addr);
 	if (pgd_none(*pgd))
 		goto end;
-	if (pgd_bad(*pgd)) {
-		pgd_ERROR(*pgd);
-		pgd_clear(pgd);
+
+	pud = pud_offset(pgd, addr);
+	if (pud_none(*pud))
+		goto end;
+	if (pud_bad(*pud)) {
+		pud_ERROR(*pud);
+		pud_clear(pud);
 		goto end;
 	}
 
-	pmd = pmd_offset(pgd, addr);
+	pmd = pmd_offset(pud, addr);
 	if (pmd_none(*pmd))
 		goto end;
 	if (pmd_bad(*pmd)) {
@@ -58,12 +64,17 @@ end:
 static pte_t *get_one_pte_map(struct mm_struct *mm, unsigned long addr)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 
 	pgd = pgd_offset(mm, addr);
 	if (pgd_none(*pgd))
 		return NULL;
-	pmd = pmd_offset(pgd, addr);
+
+	pud = pud_offset(pgd, addr);
+	if (pud_none(*pud))
+		return NULL;
+	pmd = pmd_offset(pud, addr);
 	if (!pmd_present(*pmd))
 		return NULL;
 	return pte_offset_map(pmd, addr);
@@ -71,10 +82,17 @@ static pte_t *get_one_pte_map(struct mm_struct *mm, unsigned long addr)
 
 static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 {
+	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte = NULL;
 
-	pmd = pmd_alloc(mm, pgd_offset(mm, addr), addr);
+	pgd = pgd_offset(mm, addr);
+
+	pud = pud_alloc(mm, pgd, addr);
+	if (!pud)
+		return NULL;
+	pmd = pmd_alloc(mm, pud, addr);
 	if (pmd)
 		pte = pte_alloc_map(mm, pmd, addr);
 	return pte;
@@ -82,7 +100,7 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 
 static int
 move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
-		unsigned long new_addr)
+		struct vm_area_struct *new_vma, unsigned long new_addr)
 {
 	struct address_space *mapping = NULL;
 	struct mm_struct *mm = vma->vm_mm;
@@ -98,6 +116,9 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		 */
 		mapping = vma->vm_file->f_mapping;
 		spin_lock(&mapping->i_mmap_lock);
+		if (new_vma->vm_truncate_count &&
+		    new_vma->vm_truncate_count != vma->vm_truncate_count)
+			new_vma->vm_truncate_count = 0;
 	}
 	spin_lock(&mm->page_table_lock);
 
@@ -144,8 +165,8 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 }
 
 static unsigned long move_page_tables(struct vm_area_struct *vma,
-		unsigned long new_addr, unsigned long old_addr,
-		unsigned long len)
+		unsigned long old_addr, struct vm_area_struct *new_vma,
+		unsigned long new_addr, unsigned long len)
 {
 	unsigned long offset;
 
@@ -157,7 +178,8 @@ static unsigned long move_page_tables(struct vm_area_struct *vma,
 	 * only a few pages.. This also makes error recovery easier.
 	 */
 	for (offset = 0; offset < len; offset += PAGE_SIZE) {
-		if (move_one_page(vma, old_addr+offset, new_addr+offset) < 0)
+		if (move_one_page(vma, old_addr + offset,
+				new_vma, new_addr + offset) < 0)
 			break;
 		cond_resched();
 	}
@@ -188,14 +210,14 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	if (!new_vma)
 		return -ENOMEM;
 
-	moved_len = move_page_tables(vma, new_addr, old_addr, old_len);
+	moved_len = move_page_tables(vma, old_addr, new_vma, new_addr, old_len);
 	if (moved_len < old_len) {
 		/*
 		 * On error, move entries back from new area to old,
 		 * which will succeed since page tables still there,
 		 * and then proceed to unmap new area instead of old.
 		 */
-		move_page_tables(new_vma, old_addr, new_addr, moved_len);
+		move_page_tables(new_vma, new_addr, vma, old_addr, moved_len);
 		vma = new_vma;
 		old_len = new_len;
 		old_addr = new_addr;
@@ -232,6 +254,9 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 			make_pages_present(new_addr + old_len,
 					   new_addr + new_len);
 	}
+
+	acct_update_integrals();
+	update_mem_hiwater();
 
 	return new_addr;
 }
@@ -369,6 +394,8 @@ unsigned long do_mremap(unsigned long addr,
 				make_pages_present(addr + old_len,
 						   addr + new_len);
 			}
+			acct_update_integrals();
+			update_mem_hiwater();
 			ret = addr;
 			goto out;
 		}

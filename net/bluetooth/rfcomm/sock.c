@@ -51,6 +51,8 @@
 #include <asm/uaccess.h>
 
 #include <net/bluetooth/bluetooth.h>
+#include <net/bluetooth/hci_core.h>
+#include <net/bluetooth/l2cap.h>
 #include <net/bluetooth/rfcomm.h>
 
 #ifndef CONFIG_BT_RFCOMM_DEBUG
@@ -261,10 +263,18 @@ static void rfcomm_sock_close(struct sock *sk)
 
 static void rfcomm_sock_init(struct sock *sk, struct sock *parent)
 {
+	struct rfcomm_pinfo *pi = rfcomm_pi(sk);
+
 	BT_DBG("sk %p", sk);
 
-	if (parent) 
+	if (parent) {
 		sk->sk_type = parent->sk_type;
+		pi->link_mode = rfcomm_pi(parent)->link_mode;
+	} else {
+		pi->link_mode = 0;
+	}
+
+	pi->dlc->link_mode = pi->link_mode;
 }
 
 static struct sock *rfcomm_sock_alloc(struct socket *sock, int proto, int prio)
@@ -393,7 +403,7 @@ static int rfcomm_sock_connect(struct socket *sock, struct sockaddr *addr, int a
 	return err;
 }
 
-int rfcomm_sock_listen(struct socket *sock, int backlog)
+static int rfcomm_sock_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
@@ -437,7 +447,7 @@ done:
 	return err;
 }
 
-int rfcomm_sock_accept(struct socket *sock, struct socket *newsock, int flags)
+static int rfcomm_sock_accept(struct socket *sock, struct socket *newsock, int flags)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	struct sock *sk = sock->sk, *nsk;
@@ -671,12 +681,22 @@ static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, c
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
+	u32 opt;
 
 	BT_DBG("sk %p", sk);
 
 	lock_sock(sk);
 
 	switch (optname) {
+	case RFCOMM_LM:
+		if (get_user(opt, (u32 __user *) optval)) {
+			err = -EFAULT;
+			break;
+		}
+
+		rfcomm_pi(sk)->link_mode = opt;
+		break;
+
 	default:
 		err = -ENOPROTOOPT;
 		break;
@@ -689,7 +709,9 @@ static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, c
 static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
-	int len, err = 0; 
+	struct sock *l2cap_sk;
+	struct rfcomm_conninfo cinfo;
+	int len, err = 0;
 
 	BT_DBG("sk %p", sk);
 
@@ -699,10 +721,32 @@ static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, c
 	lock_sock(sk);
 
 	switch (optname) {
+	case RFCOMM_LM:
+		if (put_user(rfcomm_pi(sk)->link_mode, (u32 __user *) optval))
+			err = -EFAULT;
+		break;
+
+	case RFCOMM_CONNINFO:
+		if (sk->sk_state != BT_CONNECTED) {
+			err = -ENOTCONN;
+			break;
+		}
+
+		l2cap_sk = rfcomm_pi(sk)->dlc->session->sock->sk;
+
+		cinfo.hci_handle = l2cap_pi(l2cap_sk)->conn->hcon->handle;
+		memcpy(cinfo.dev_class, l2cap_pi(l2cap_sk)->conn->hcon->dev_class, 3);
+
+		len = min_t(unsigned int, len, sizeof(cinfo));
+		if (copy_to_user(optval, (char *) &cinfo, len))
+			err = -EFAULT;
+
+		break;
+
 	default:
 		err = -ENOPROTOOPT;
 		break;
-	};
+	}
 
 	release_sock(sk);
 	return err;

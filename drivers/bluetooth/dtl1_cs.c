@@ -59,13 +59,6 @@
 /* ======================== Module parameters ======================== */
 
 
-/* Bit map of interrupts to choose from */
-static unsigned int irq_mask = 0xffff;
-static int irq_list[4] = { -1 };
-
-module_param(irq_mask, uint, 0);
-module_param_array(irq_list, int, NULL, 0);
-
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth driver for Nokia Connectivity Card DTL-1");
 MODULE_LICENSE("GPL");
@@ -574,7 +567,7 @@ static dev_link_t *dtl1_attach(void)
 	dtl1_info_t *info;
 	client_reg_t client_reg;
 	dev_link_t *link;
-	int i, ret;
+	int ret;
 
 	/* Create new info device */
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
@@ -588,13 +581,7 @@ static dev_link_t *dtl1_attach(void)
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
 	link->io.NumPorts1 = 8;
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-
-	if (irq_list[0] == -1)
-		link->irq.IRQInfo2 = irq_mask;
-	else
-		for (i = 0; i < 4; i++)
-			link->irq.IRQInfo2 |= 1 << irq_list[i];
+	link->irq.IRQInfo1 = IRQ_LEVEL_ID;
 
 	link->irq.Handler = dtl1_interrupt;
 	link->irq.Instance = info;
@@ -607,7 +594,6 @@ static dev_link_t *dtl1_attach(void)
 	link->next = dev_list;
 	dev_list = link;
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -839,10 +825,7 @@ static int __init init_dtl1_cs(void)
 static void __exit exit_dtl1_cs(void)
 {
 	pcmcia_unregister_driver(&dtl1_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		dtl1_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_dtl1_cs);

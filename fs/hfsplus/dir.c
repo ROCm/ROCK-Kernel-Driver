@@ -294,7 +294,7 @@ int hfsplus_link(struct dentry *src_dentry, struct inode *dst_dir, struct dentry
 	inode->i_nlink++;
 	hfsplus_instantiate(dst_dentry, inode, cnid);
 	atomic_inc(&inode->i_count);
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	HFSPLUS_SB(sb).file_count++;
 	sb->s_dirt = 1;
@@ -340,7 +340,7 @@ int hfsplus_unlink(struct inode *dir, struct dentry *dentry)
 		} else
 			inode->i_flags |= S_DEAD;
 	}
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 
 	return res;
@@ -379,7 +379,7 @@ int hfsplus_rmdir(struct inode *dir, struct dentry *dentry)
 	if (res)
 		return res;
 	inode->i_nlink = 0;
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	hfsplus_delete_inode(inode);
 	mark_inode_dirty(inode);
 	return 0;

@@ -980,11 +980,15 @@ static int lmLogSync(struct jfs_log * log, int nosyncwait)
 		 * actually make it to disk
 		 */
 		list_for_each_entry(sbi, &log->sb_list, log_list) {
+			if (sbi->flag & JFS_NOINTEGRITY)
+				continue;
 			filemap_fdatawrite(sbi->ipbmap->i_mapping);
 			filemap_fdatawrite(sbi->ipimap->i_mapping);
 			filemap_fdatawrite(sbi->sb->s_bdev->bd_inode->i_mapping);
 		}
 		list_for_each_entry(sbi, &log->sb_list, log_list) {
+			if (sbi->flag & JFS_NOINTEGRITY)
+				continue;
 			filemap_fdatawait(sbi->ipbmap->i_mapping);
 			filemap_fdatawait(sbi->ipimap->i_mapping);
 			filemap_fdatawait(sbi->sb->s_bdev->bd_inode->i_mapping);

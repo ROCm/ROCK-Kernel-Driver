@@ -2022,6 +2022,7 @@ gadgetfs_fill_super (struct super_block *sb, void *opts, int silent)
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = GADGETFS_MAGIC;
 	sb->s_op = &gadget_fs_operations;
+	sb->s_time_gran = 1;
 
 	/* root inode */
 	inode = gadgetfs_make_inode (sb,

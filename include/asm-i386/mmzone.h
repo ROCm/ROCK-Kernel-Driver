@@ -48,12 +48,6 @@ static inline int pfn_to_nid(unsigned long pfn)
 #endif
 }
 
-static inline struct pglist_data *pfn_to_pgdat(unsigned long pfn)
-{
-	return(NODE_DATA(pfn_to_nid(pfn)));
-}
-
-
 /*
  * Following are macros that are specific to this numa platform.
  */
@@ -116,7 +110,6 @@ static inline struct pglist_data *pfn_to_pgdat(unsigned long pfn)
 	(unsigned long)(__page - __zone->zone_mem_map)			\
 		+ __zone->zone_start_pfn;				\
 })
-#define pmd_page(pmd)		(pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
 
 #ifdef CONFIG_X86_NUMAQ            /* we have contiguous memory on NUMA-Q */
 #define pfn_valid(pfn)          ((pfn) < num_physpages)

@@ -9,17 +9,18 @@
 #include <linux/config.h>
 #include <linux/linkage.h>
 
+#ifdef CONFIG_DEBUG_PREEMPT
+  extern void fastcall add_preempt_count(int val);
+  extern void fastcall sub_preempt_count(int val);
+#else
+# define add_preempt_count(val)	do { preempt_count() += (val); } while (0)
+# define sub_preempt_count(val)	do { preempt_count() -= (val); } while (0)
+#endif
+
+#define inc_preempt_count() add_preempt_count(1)
+#define dec_preempt_count() sub_preempt_count(1)
+
 #define preempt_count()	(current_thread_info()->preempt_count)
-
-#define inc_preempt_count() \
-do { \
-	preempt_count()++; \
-} while (0)
-
-#define dec_preempt_count() \
-do { \
-	preempt_count()--; \
-} while (0)
 
 #ifdef CONFIG_PREEMPT
 

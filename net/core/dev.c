@@ -154,7 +154,7 @@
  *		86DD	IPv6
  */
 
-static spinlock_t ptype_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ptype_lock);
 static struct list_head ptype_base[16];	/* 16 way hashed list */
 static struct list_head ptype_all;		/* Taps */
 
@@ -183,8 +183,8 @@ static struct timer_list samp_timer = TIMER_INITIALIZER(sample_queue, 0, 0);
  * semaphore held.
  */
 struct net_device *dev_base;
-struct net_device **dev_tail = &dev_base;
-rwlock_t dev_base_lock = RW_LOCK_UNLOCKED;
+static struct net_device **dev_tail = &dev_base;
+DEFINE_RWLOCK(dev_base_lock);
 
 EXPORT_SYMBOL(dev_base);
 EXPORT_SYMBOL(dev_base_lock);
@@ -361,7 +361,7 @@ static struct netdev_boot_setup dev_boot_setup[NETDEV_BOOT_SETUP_MAX];
  *	returns 0 on error and 1 on success.  This is a generic routine to
  *	all netdevices.
  */
-int netdev_boot_setup_add(char *name, struct ifmap *map)
+static int netdev_boot_setup_add(char *name, struct ifmap *map)
 {
 	struct netdev_boot_setup *s;
 	int i;
@@ -644,7 +644,7 @@ struct net_device * dev_get_by_flags(unsigned short if_flags, unsigned short mas
  *	Network device names need to be valid file names to
  *	to allow sysfs to work
  */
-int dev_valid_name(const char *name)
+static int dev_valid_name(const char *name)
 {
 	return !(*name == '\0' 
 		 || !strcmp(name, ".")
@@ -1119,7 +1119,7 @@ static inline int illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 		return 0;
 
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
-		if (skb_shinfo(skb)->frags[i].page >= highmem_start_page)
+		if (PageHighMem(skb_shinfo(skb)->frags[i].page))
 			return 1;
 
 	return 0;
@@ -1486,7 +1486,7 @@ int netif_rx_ni(struct sk_buff *skb)
 
 	preempt_disable();
 	err = netif_rx(skb);
-	if (softirq_pending(smp_processor_id()))
+	if (local_softirq_pending())
 		do_softirq();
 	preempt_enable();
 
@@ -1590,7 +1590,7 @@ static __inline__ int handle_bridge(struct sk_buff **pskb,
  * the ingress scheduler, you just cant add policies on ingress.
  *
  */
-int ing_filter(struct sk_buff *skb) 
+static int ing_filter(struct sk_buff *skb) 
 {
 	struct Qdisc *q;
 	struct net_device *dev = skb->dev;
@@ -2674,7 +2674,7 @@ static int dev_new_index(void)
 static int dev_boot_phase = 1;
 
 /* Delayed registration/unregisteration */
-static spinlock_t net_todo_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(net_todo_list_lock);
 static struct list_head net_todo_list = LIST_HEAD_INIT(net_todo_list);
 
 static inline void net_set_todo(struct net_device *dev)
@@ -2693,8 +2693,7 @@ static inline void net_set_todo(struct net_device *dev)
  *	chain. 0 is returned on success. A negative errno code is returned
  *	on a failure to set up the device, or if the name is a duplicate.
  *
- *	Callers must hold the rtnl semaphore.  See the comment at the
- *	end of Space.c for details about the locking.  You may want
+ *	Callers must hold the rtnl semaphore. You may want
  *	register_netdev() instead of this.
  *
  *	BUGS:
@@ -2814,6 +2813,51 @@ out_err:
 	free_divert_blk(dev);
 	goto out;
 }
+
+/**
+ *	register_netdev	- register a network device
+ *	@dev: device to register
+ *
+ *	Take a completed network device structure and add it to the kernel
+ *	interfaces. A %NETDEV_REGISTER message is sent to the netdev notifier
+ *	chain. 0 is returned on success. A negative errno code is returned
+ *	on a failure to set up the device, or if the name is a duplicate.
+ *
+ *	This is a wrapper around register_netdev that takes the rtnl semaphore
+ *	and expands the device name if you passed a format string to
+ *	alloc_netdev.
+ */
+int register_netdev(struct net_device *dev)
+{
+	int err;
+
+	rtnl_lock();
+
+	/*
+	 * If the name is a format string the caller wants us to do a
+	 * name allocation.
+	 */
+	if (strchr(dev->name, '%')) {
+		err = dev_alloc_name(dev, dev->name);
+		if (err < 0)
+			goto out;
+	}
+	
+	/*
+	 * Back compatibility hook. Kill this one in 2.5
+	 */
+	if (dev->name[0] == 0 || dev->name[0] == ' ') {
+		err = dev_alloc_name(dev, "eth%d");
+		if (err < 0)
+			goto out;
+	}
+
+	err = register_netdevice(dev);
+out:
+	rtnl_unlock();
+	return err;
+}
+EXPORT_SYMBOL(register_netdev);
 
 /*
  * netdev_wait_allrefs - wait until all references are gone.
@@ -2958,6 +3002,46 @@ out:
 }
 
 /**
+ *	alloc_netdev - allocate network device
+ *	@sizeof_priv:	size of private data to allocate space for
+ *	@name:		device name format string
+ *	@setup:		callback to initialize device
+ *
+ *	Allocates a struct net_device with private data area for driver use
+ *	and performs basic initialization.
+ */
+struct net_device *alloc_netdev(int sizeof_priv, const char *name,
+		void (*setup)(struct net_device *))
+{
+	void *p;
+	struct net_device *dev;
+	int alloc_size;
+
+	/* ensure 32-byte alignment of both the device and private area */
+	alloc_size = (sizeof(*dev) + NETDEV_ALIGN_CONST) & ~NETDEV_ALIGN_CONST;
+	alloc_size += sizeof_priv + NETDEV_ALIGN_CONST;
+
+	p = kmalloc(alloc_size, GFP_KERNEL);
+	if (!p) {
+		printk(KERN_ERR "alloc_dev: Unable to allocate device.\n");
+		return NULL;
+	}
+	memset(p, 0, alloc_size);
+
+	dev = (struct net_device *)
+		(((long)p + NETDEV_ALIGN_CONST) & ~NETDEV_ALIGN_CONST);
+	dev->padded = (char *)dev - (char *)p;
+
+	if (sizeof_priv)
+		dev->priv = netdev_priv(dev);
+
+	setup(dev);
+	strcpy(dev->name, name);
+	return dev;
+}
+EXPORT_SYMBOL(alloc_netdev);
+
+/**
  *	free_netdev - free network device
  *	@dev: device
  *
@@ -2999,8 +3083,7 @@ void synchronize_net(void)
  *	from the kernel tables. On success 0 is returned, on a failure
  *	a negative errno code is returned.
  *
- *	Callers must hold the rtnl semaphore.  See the comment at the
- *	end of Space.c for details about the locking.  You may want
+ *	Callers must hold the rtnl semaphore.  You may want
  *	unregister_netdev() instead of this.
  */
 
@@ -3077,6 +3160,27 @@ int unregister_netdevice(struct net_device *dev)
 	dev_put(dev);
 	return 0;
 }
+
+/**
+ *	unregister_netdev - remove device from the kernel
+ *	@dev: device
+ *
+ *	This function shuts down a device interface and removes it
+ *	from the kernel tables. On success 0 is returned, on a failure
+ *	a negative errno code is returned.
+ *
+ *	This is just a wrapper for unregister_netdevice that takes
+ *	the rtnl semaphore.  In general you want to use this and not
+ *	unregister_netdevice.
+ */
+void unregister_netdev(struct net_device *dev)
+{
+	rtnl_lock();
+	unregister_netdevice(dev);
+	rtnl_unlock();
+}
+
+EXPORT_SYMBOL(unregister_netdev);
 
 #ifdef CONFIG_HOTPLUG_CPU
 static int dev_cpu_callback(struct notifier_block *nfb,
@@ -3241,10 +3345,5 @@ EXPORT_SYMBOL(br_handle_frame_hook);
 #ifdef CONFIG_KMOD
 EXPORT_SYMBOL(dev_load);
 #endif
-
-#ifdef CONFIG_NET_CLS_ACT
-EXPORT_SYMBOL(ing_filter);
-#endif
-
 
 EXPORT_PER_CPU_SYMBOL(softnet_data);

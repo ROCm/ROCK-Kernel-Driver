@@ -54,15 +54,18 @@ static int noinline do_test_wp_bit(void);
  */
 static pmd_t * __init one_md_table_init(pgd_t *pgd)
 {
+	pud_t *pud;
 	pmd_t *pmd_table;
 		
 #ifdef CONFIG_X86_PAE
 	pmd_table = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE);
 	set_pgd(pgd, __pgd(__pa(pmd_table) | _PAGE_PRESENT));
-	if (pmd_table != pmd_offset(pgd, 0)) 
+	pud = pud_offset(pgd, 0);
+	if (pmd_table != pmd_offset(pud, 0)) 
 		BUG();
 #else
-	pmd_table = pmd_offset(pgd, 0);
+	pud = pud_offset(pgd, 0);
+	pmd_table = pmd_offset(pud, 0);
 #endif
 
 	return pmd_table;
@@ -100,6 +103,7 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
 static void __init page_table_range_init (unsigned long start, unsigned long end, pgd_t *pgd_base)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	int pgd_idx, pmd_idx;
 	unsigned long vaddr;
@@ -112,8 +116,8 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 	for ( ; (pgd_idx < PTRS_PER_PGD) && (vaddr != end); pgd++, pgd_idx++) {
 		if (pgd_none(*pgd)) 
 			one_md_table_init(pgd);
-
-		pmd = pmd_offset(pgd, vaddr);
+		pud = pud_offset(pgd, vaddr);
+		pmd = pmd_offset(pud, vaddr);
 		for (; (pmd_idx < PTRS_PER_PMD) && (vaddr != end); pmd++, pmd_idx++) {
 			if (pmd_none(*pmd)) 
 				one_page_table_init(pmd);
@@ -126,7 +130,7 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 
 static inline int is_kernel_text(unsigned long addr)
 {
-	if (addr >= (unsigned long)_stext && addr <= (unsigned long)__init_end)
+	if (addr >= PAGE_OFFSET && addr <= (unsigned long)__init_end)
 		return 1;
 	return 0;
 }
@@ -233,7 +237,7 @@ EXPORT_SYMBOL(kmap_prot);
 EXPORT_SYMBOL(kmap_pte);
 
 #define kmap_get_fixmap_pte(vaddr)					\
-	pte_offset_kernel(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
+	pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(vaddr), vaddr), (vaddr)), (vaddr))
 
 void __init kmap_init(void)
 {
@@ -249,6 +253,7 @@ void __init kmap_init(void)
 void __init permanent_kmaps_init(pgd_t *pgd_base)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned long vaddr;
@@ -257,7 +262,8 @@ void __init permanent_kmaps_init(pgd_t *pgd_base)
 	page_table_range_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, pgd_base);
 
 	pgd = swapper_pg_dir + pgd_index(vaddr);
-	pmd = pmd_offset(pgd, vaddr);
+	pud = pud_offset(pgd, vaddr);
+	pmd = pmd_offset(pud, vaddr);
 	pte = pte_offset_kernel(pmd, vaddr);
 	pkmap_page_table = pte;	
 }
@@ -424,7 +430,7 @@ u64 __supported_pte_mask = ~_PAGE_NX;
  * on      Enable
  * off     Disable
  */
-static int __init noexec_setup(char *str)
+void __init noexec_setup(const char *str)
 {
 	if (!strncmp(str, "on",2) && cpu_has_nx) {
 		__supported_pte_mask |= _PAGE_NX;
@@ -433,10 +439,7 @@ static int __init noexec_setup(char *str)
 		disable_nx = 1;
 		__supported_pte_mask &= ~_PAGE_NX;
 	}
-	return 1;
 }
-
-__setup("noexec=", noexec_setup);
 
 int nx_enabled = 0;
 #ifdef CONFIG_X86_PAE
@@ -549,7 +552,6 @@ void __init test_wp_bit(void)
 static void __init set_max_mapnr_init(void)
 {
 #ifdef CONFIG_HIGHMEM
-	highmem_start_page = pfn_to_page(highstart_pfn);
 	max_mapnr = num_physpages = highend_pfn;
 #else
 	max_mapnr = num_physpages = max_low_pfn;

@@ -20,6 +20,7 @@
 struct super_block;
 struct dentry;
 struct file_operations;
+struct pt_regs;
  
 /* Operations structure to be filled in */
 struct oprofile_operations {
@@ -34,6 +35,8 @@ struct oprofile_operations {
 	int (*start)(void);
 	/* Stop delivering interrupts. */
 	void (*stop)(void);
+	/* Initiate a stack backtrace. Optional. */
+	void (*backtrace)(struct pt_regs * const regs, unsigned int depth);
 	/* CPU identification string. */
 	char * cpu_type;
 };
@@ -41,11 +44,11 @@ struct oprofile_operations {
 /**
  * One-time initialisation. *ops must be set to a filled-in
  * operations structure. This is called even in timer interrupt
- * mode.
+ * mode so an arch can set a backtrace callback.
  *
- * Return 0 on success.
+ * If an error occurs, the fields should be left untouched.
  */
-int oprofile_arch_init(struct oprofile_operations ** ops);
+void oprofile_arch_init(struct oprofile_operations * ops);
  
 /**
  * One-time exit/cleanup for the arch.
@@ -56,8 +59,15 @@ void oprofile_arch_exit(void);
  * Add a sample. This may be called from any context. Pass
  * smp_processor_id() as cpu.
  */
-extern void oprofile_add_sample(unsigned long eip, unsigned int is_kernel, 
-	unsigned long event, int cpu);
+void oprofile_add_sample(struct pt_regs * const regs, unsigned long event);
+
+/* Use this instead when the PC value is not from the regs. Doesn't
+ * backtrace. */
+void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event);
+
+/* add a backtrace entry, to be called from the ->backtrace callback */
+void oprofile_add_trace(unsigned long eip);
+
 
 /**
  * Create a file of the given name as a child of the given root, with

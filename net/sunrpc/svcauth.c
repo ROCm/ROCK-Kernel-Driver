@@ -28,7 +28,7 @@
 extern struct auth_ops svcauth_null;
 extern struct auth_ops svcauth_unix;
 
-static spinlock_t authtab_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(authtab_lock);
 static struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR] = {
 	[0] = &svcauth_null,
 	[1] = &svcauth_unix,
@@ -128,7 +128,8 @@ EXPORT_SYMBOL(svc_auth_unregister);
 #define	DN_HASHMASK	(DN_HASHMAX-1)
 
 static struct cache_head	*auth_domain_table[DN_HASHMAX];
-void auth_domain_drop(struct cache_head *item, struct cache_detail *cd)
+
+static void auth_domain_drop(struct cache_head *item, struct cache_detail *cd)
 {
 	struct auth_domain *dom = container_of(item, struct auth_domain, h);
 	if (cache_put(item,cd))

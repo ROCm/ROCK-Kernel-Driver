@@ -457,13 +457,12 @@ setup_trampoline(void)
 }
 
 /* Routine initially called when a non-boot CPU is brought online */
-int __init
+static void __init
 start_secondary(void *unused)
 {
 	__u8 cpuid = hard_smp_processor_id();
 	/* external functions not defined in the headers */
 	extern void calibrate_delay(void);
-	extern int cpu_idle(void);
 
 	cpu_init();
 
@@ -520,7 +519,7 @@ start_secondary(void *unused)
 
 	cpu_set(cpuid, cpu_online_map);
 	wmb();
-	return cpu_idle();
+	cpu_idle();
 }
 
 

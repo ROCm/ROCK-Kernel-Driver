@@ -51,6 +51,7 @@ restrictions referred to are that the relevant option is valid if:
 	MOUSE	Appropriate mouse support is enabled.
 	MTD	MTD support is enabled.
 	NET	Appropriate network support is enabled.
+	NUMA	NUMA support is enabled.
 	NFS	Appropriate NFS support is enabled.
 	OSS	OSS sound support is enabled.
 	PARIDE	The ParIDE subsystem is enabled.
@@ -150,6 +151,8 @@ running once the system is up.
 			1: enable, 0: disable. It is useful for boot time
 			debugging. After system has booted up, it can be set
 			via /proc/acpi/debug_level.
+
+	acpi_fake_ecdt	[HW,ACPI] Workaround failure due to BIOS lacking ECDT
 
 	ad1816=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma2>
@@ -479,6 +482,10 @@ running once the system is up.
  
 	gvp11=		[HW,SCSI]
 
+	hashdist=	[KNL,NUMA] Large hashes allocated during boot
+			are distributed across NUMA nodes.  Defaults on
+			for IA-64, off otherwise.
+
 	hcl=		[IA-64] SGI's Hardware Graph compatibility layer
 
 	hd=		[EIDE] (E)IDE hard drive subsystem geometry
@@ -508,9 +515,6 @@ running once the system is up.
 	i8042.noaux	[HW] Don't check for auxiliary (== mouse) port
 	i8042.nomux	[HW] Don't check presence of an active multiplexing
 			     controller
-	i8042.panicblink=
-			[HW] Frequency with which keyboard LEDs should blink
-			     when kernel panics (default is 0.5 sec)
 	i8042.reset	[HW] Reset the controller during init and cleanup
 	i8042.unlock	[HW] Unlock (ignore) the keylock
 
@@ -583,11 +587,13 @@ running once the system is up.
 			Format: <RDP>, <reset>, <pci_scan>, <verbosity>
 
 	isolcpus=	[KNL,SMP] Isolate CPUs from the general scheduler.
-			Format: <cpu number>, ..., <cpu number>
+			Format: <cpu number>,...,<cpu number>
 			This option can be used to specify one or more CPUs
 			to isolate from the general SMP balancing and scheduling
 			algorithms. The only way to move a process onto or off
 			an "isolated" CPU is via the CPU affinity syscalls.
+			<cpu number> begins at 0 and the maximum value is
+			"number of CPUs in system - 1".
 
 			This option is the preferred way to isolate CPUs. The
 			alternative - manually setting the CPU mask of all tasks
@@ -667,7 +673,11 @@ running once the system is up.
 
 	mac53c9x=	[HW,SCSI]
 			Format: <num_esps>,<disconnect>,<nosync>,<can_queue>,<cmd_per_lun>,<sg_tablesize>,<hostid>,<use_tags>
-	
+
+	machvec=	[IA64]
+			Force the use of a particular machine-vector (machvec) in a generic
+			kernel.  Example: machvec=hpzx1_swiotlb
+
 	mad16=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma16>,<mpu_io>,<mpu_irq>,<joystick>
 
@@ -1336,8 +1346,12 @@ running once the system is up.
 	thash_entries=	[KNL,NET]
 			Set number of hash buckets for TCP connection
 
-	tipar=		[HW]
-			See header of drivers/char/tipar.c.
+	tipar.timeout=	[HW,PPT]
+			Set communications timeout in tenths of a second
+			(default 15).
+
+	tipar.delay=	[HW,PPT]
+			Set inter-bit delay in microseconds (default 10).
 
 	tiusb=		[HW,USB] Texas Instruments' USB GraphLink (aka SilverLink)
 			Format: <timeout>

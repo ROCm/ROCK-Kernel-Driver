@@ -159,11 +159,10 @@ void default_idle(void)
 #endif /* CONFIG_ARCH_S390X */
 }
 
-int cpu_idle(void)
+void cpu_idle(void)
 {
 	for (;;)
 		default_idle();
-	return 0;
 }
 
 void show_regs(struct pt_regs *regs)
@@ -216,7 +215,8 @@ void exit_thread(void)
 
 void flush_thread(void)
 {
-	clear_used_math();
+
+        current->used_math = 0;
 	clear_tsk_thread_flag(current, TIF_USEDFPU);
 }
 

@@ -277,7 +277,6 @@ static inline struct hci_conn *hci_conn_hash_lookup_ba(struct hci_dev *hdev,
 	return NULL;
 }
 
-void hci_acl_connect(struct hci_conn *conn);
 void hci_acl_disconn(struct hci_conn *conn, __u8 reason);
 void hci_add_sco(struct hci_conn *conn, __u16 handle);
 
@@ -589,6 +588,5 @@ struct hci_sec_filter {
 #define hci_req_unlock(d)	up(&d->req_lock)
 
 void hci_req_complete(struct hci_dev *hdev, int result);
-void hci_req_cancel(struct hci_dev *hdev, int err);
 
 #endif /* __HCI_CORE_H */

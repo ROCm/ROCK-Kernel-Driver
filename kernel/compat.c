@@ -20,6 +20,7 @@
 #include <linux/futex.h>	/* for FUTEX_WAIT */
 #include <linux/syscalls.h>
 #include <linux/unistd.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 
@@ -162,15 +163,15 @@ asmlinkage long compat_sys_times(struct compat_tms __user *tbuf)
 		struct compat_tms tmp;
 		struct task_struct *tsk = current;
 		struct task_struct *t;
-		unsigned long utime, stime, cutime, cstime;
+		cputime_t utime, stime, cutime, cstime;
 
 		read_lock(&tasklist_lock);
 		utime = tsk->signal->utime;
 		stime = tsk->signal->stime;
 		t = tsk;
 		do {
-			utime += t->utime;
-			stime += t->stime;
+			utime = cputime_add(utime, t->utime);
+			stime = cputime_add(stime, t->stime);
 			t = next_thread(t);
 		} while (t != tsk);
 
@@ -189,10 +190,10 @@ asmlinkage long compat_sys_times(struct compat_tms __user *tbuf)
 		spin_unlock_irq(&tsk->sighand->siglock);
 		read_unlock(&tasklist_lock);
 
-		tmp.tms_utime = compat_jiffies_to_clock_t(utime);
-		tmp.tms_stime = compat_jiffies_to_clock_t(stime);
-		tmp.tms_cutime = compat_jiffies_to_clock_t(cutime);
-		tmp.tms_cstime = compat_jiffies_to_clock_t(cstime);
+		tmp.tms_utime = compat_jiffies_to_clock_t(cputime_to_jiffies(utime));
+		tmp.tms_stime = compat_jiffies_to_clock_t(cputime_to_jiffies(stime));
+		tmp.tms_cutime = compat_jiffies_to_clock_t(cputime_to_jiffies(cutime));
+		tmp.tms_cstime = compat_jiffies_to_clock_t(cputime_to_jiffies(cstime));
 		if (copy_to_user(tbuf, &tmp, sizeof(tmp)))
 			return -EFAULT;
 	}
@@ -680,3 +681,128 @@ long compat_put_bitmap(compat_ulong_t __user *umask, unsigned long *mask,
 
 	return 0;
 }
+
+void
+sigset_from_compat (sigset_t *set, compat_sigset_t *compat)
+{
+	switch (_NSIG_WORDS) {
+#if defined (__COMPAT_ENDIAN_SWAP__)
+	case 4: set->sig[3] = compat->sig[7] | (((long)compat->sig[6]) << 32 );
+	case 3: set->sig[2] = compat->sig[5] | (((long)compat->sig[4]) << 32 );
+	case 2: set->sig[1] = compat->sig[3] | (((long)compat->sig[2]) << 32 );
+	case 1: set->sig[0] = compat->sig[1] | (((long)compat->sig[0]) << 32 );
+#else
+	case 4: set->sig[3] = compat->sig[6] | (((long)compat->sig[7]) << 32 );
+	case 3: set->sig[2] = compat->sig[4] | (((long)compat->sig[5]) << 32 );
+	case 2: set->sig[1] = compat->sig[2] | (((long)compat->sig[3]) << 32 );
+	case 1: set->sig[0] = compat->sig[0] | (((long)compat->sig[1]) << 32 );
+#endif
+	}
+}
+
+asmlinkage long
+compat_sys_rt_sigtimedwait (compat_sigset_t __user *uthese,
+		struct compat_siginfo __user *uinfo,
+		struct compat_timespec __user *uts, compat_size_t sigsetsize)
+{
+	compat_sigset_t s32;
+	sigset_t s;
+	int sig;
+	struct timespec t;
+	siginfo_t info;
+	long ret, timeout = 0;
+
+	if (sigsetsize != sizeof(sigset_t))
+		return -EINVAL;
+
+	if (copy_from_user(&s32, uthese, sizeof(compat_sigset_t)))
+		return -EFAULT;
+	sigset_from_compat(&s, &s32);
+	sigdelsetmask(&s,sigmask(SIGKILL)|sigmask(SIGSTOP));
+	signotset(&s);
+
+	if (uts) {
+		if (get_compat_timespec (&t, uts))
+			return -EFAULT;
+		if (t.tv_nsec >= 1000000000L || t.tv_nsec < 0
+				|| t.tv_sec < 0)
+			return -EINVAL;
+	}
+
+	spin_lock_irq(&current->sighand->siglock);
+	sig = dequeue_signal(current, &s, &info);
+	if (!sig) {
+		timeout = MAX_SCHEDULE_TIMEOUT;
+		if (uts)
+			timeout = timespec_to_jiffies(&t)
+				+(t.tv_sec || t.tv_nsec);
+		if (timeout) {
+			current->real_blocked = current->blocked;
+			sigandsets(&current->blocked, &current->blocked, &s);
+
+			recalc_sigpending();
+			spin_unlock_irq(&current->sighand->siglock);
+
+			current->state = TASK_INTERRUPTIBLE;
+			timeout = schedule_timeout(timeout);
+
+			spin_lock_irq(&current->sighand->siglock);
+			sig = dequeue_signal(current, &s, &info);
+			current->blocked = current->real_blocked;
+			siginitset(&current->real_blocked, 0);
+			recalc_sigpending();
+		}
+	}
+	spin_unlock_irq(&current->sighand->siglock);
+
+	if (sig) {
+		ret = sig;
+		if (uinfo) {
+			if (copy_siginfo_to_user32(uinfo, &info))
+				ret = -EFAULT;
+		}
+	}else {
+		ret = timeout?-EINTR:-EAGAIN;
+	}
+	return ret;
+
+}
+
+#ifdef __ARCH_WANT_COMPAT_SYS_TIME
+
+/* compat_time_t is a 32 bit "long" and needs to get converted. */
+
+asmlinkage long compat_sys_time(compat_time_t __user * tloc)
+{
+	compat_time_t i;
+	struct timeval tv;
+
+	do_gettimeofday(&tv);
+	i = tv.tv_sec;
+
+	if (tloc) {
+		if (put_user(i,tloc))
+			i = -EFAULT;
+	}
+	return i;
+}
+
+asmlinkage long compat_sys_stime(compat_time_t __user *tptr)
+{
+	struct timespec tv;
+	int err;
+
+	if (get_user(tv.tv_sec, tptr))
+		return -EFAULT;
+
+	tv.tv_nsec = 0;
+
+	err = security_settime(&tv, NULL);
+	if (err)
+		return err;
+
+	do_settimeofday(&tv);
+	return 0;
+}
+
+#endif /* __ARCH_WANT_COMPAT_SYS_TIME */

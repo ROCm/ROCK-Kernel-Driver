@@ -49,7 +49,9 @@ static void set_brk(unsigned long start, unsigned long end)
 	end = PAGE_ALIGN(end);
 	if (end <= start)
 		return;
+	down_write(&current->mm->mmap_sem);
 	do_brk(start, end - start);
+	up_write(&current->mm->mmap_sem);
 }
 
 /*
@@ -95,7 +97,7 @@ static int aout32_core_dump(long signr, struct pt_regs *regs, struct file *file)
 	set_fs(KERNEL_DS);
 	has_dumped = 1;
 	current->flags |= PF_DUMPCORE;
-       	strncpy(dump.u_comm, current->comm, sizeof(current->comm));
+       	strncpy(dump.u_comm, current->comm, sizeof(dump.u_comm));
 	dump.signal = signr;
 	dump_thread(regs, &dump);
 
@@ -246,10 +248,14 @@ static int load_aout32_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	if (N_MAGIC(ex) == NMAGIC) {
 		loff_t pos = fd_offset;
 		/* Fuck me plenty... */
+		down_write(&current->mm->mmap_sem);	
 		error = do_brk(N_TXTADDR(ex), ex.a_text);
+		up_write(&current->mm->mmap_sem);
 		bprm->file->f_op->read(bprm->file, (char __user *)N_TXTADDR(ex),
 			  ex.a_text, &pos);
+		down_write(&current->mm->mmap_sem);
 		error = do_brk(N_DATADDR(ex), ex.a_data);
+		up_write(&current->mm->mmap_sem);
 		bprm->file->f_op->read(bprm->file, (char __user *)N_DATADDR(ex),
 			  ex.a_data, &pos);
 		goto beyond_if;
@@ -257,8 +263,10 @@ static int load_aout32_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 	if (N_MAGIC(ex) == OMAGIC) {
 		loff_t pos = fd_offset;
+		down_write(&current->mm->mmap_sem);
 		do_brk(N_TXTADDR(ex) & PAGE_MASK,
 			ex.a_text+ex.a_data + PAGE_SIZE - 1);
+		up_write(&current->mm->mmap_sem);
 		bprm->file->f_op->read(bprm->file, (char __user *)N_TXTADDR(ex),
 			  ex.a_text+ex.a_data, &pos);
 	} else {
@@ -272,7 +280,9 @@ static int load_aout32_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 		if (!bprm->file->f_op->mmap) {
 			loff_t pos = fd_offset;
+			down_write(&current->mm->mmap_sem);
 			do_brk(0, ex.a_text+ex.a_data);
+			up_write(&current->mm->mmap_sem);
 			bprm->file->f_op->read(bprm->file,
 				  (char __user *)N_TXTADDR(ex),
 				  ex.a_text+ex.a_data, &pos);
@@ -311,7 +321,7 @@ beyond_if:
 	orig_thr_flags = current_thread_info()->flags;
 	current_thread_info()->flags |= _TIF_32BIT;
 
-	retval = setup_arg_pages(bprm, EXSTACK_DEFAULT);
+	retval = setup_arg_pages(bprm, STACK_TOP, EXSTACK_DEFAULT);
 	if (retval < 0) { 
 		current_thread_info()->flags = orig_thr_flags;
 
@@ -389,7 +399,9 @@ static int load_aout32_library(struct file *file)
 	len = PAGE_ALIGN(ex.a_text + ex.a_data);
 	bss = ex.a_text + ex.a_data + ex.a_bss;
 	if (bss > len) {
+		down_write(&current->mm->mmap_sem);
 		error = do_brk(start_addr + len, bss - len);
+		up_write(&current->mm->mmap_sem);
 		retval = error;
 		if (error != start_addr + len)
 			goto out;

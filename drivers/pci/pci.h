@@ -59,12 +59,14 @@ struct pci_visit {
 extern int pci_visit_dev(struct pci_visit *fn,
 			 struct pci_dev_wrapped *wrapped_dev,
 			 struct pci_bus_wrapped *wrapped_parent);
+extern void pci_remove_legacy_files(struct pci_bus *bus);
 
 /* Lock for read/write access to pci device and bus lists */
 extern spinlock_t pci_bus_lock;
 
 extern int pcie_mch_quirk;
 extern struct device_attribute pci_dev_attrs[];
+extern struct class_device_attribute class_device_attr_cpuaffinity;
 
 /**
  * pci_match_one_device - Tell if a PCI device structure has a matching

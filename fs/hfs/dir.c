@@ -248,7 +248,7 @@ int hfs_unlink(struct inode *dir, struct dentry *dentry)
 
 	inode->i_nlink--;
 	hfs_delete_inode(inode);
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 
 	return res;
@@ -274,7 +274,7 @@ int hfs_rmdir(struct inode *dir, struct dentry *dentry)
 	if (res)
 		return res;
 	inode->i_nlink = 0;
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	hfs_delete_inode(inode);
 	mark_inode_dirty(inode);
 	return 0;

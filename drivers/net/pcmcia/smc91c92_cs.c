@@ -66,7 +66,7 @@ static char *if_names[] = { "auto", "10baseT", "10base2"};
 MODULE_DESCRIPTION("SMC 91c92 series PCMCIA ethernet driver");
 MODULE_LICENSE("GPL");
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0)
 
 /*
   Transceiver/media type.
@@ -75,11 +75,6 @@ MODULE_LICENSE("GPL");
    2 = AUI/10base2,
 */
 INT_MODULE_PARM(if_port, 0);
-
-/* Bit map of interrupts to choose from. */
-INT_MODULE_PARM(irq_mask, 0xdeb8);
-static int irq_list[4] = { -1 };
-MODULE_PARM(irq_list, "1-4i");
 
 #ifdef PCMCIA_DEBUG
 INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
@@ -120,7 +115,7 @@ struct smc_private {
     dev_node_t			node;
     struct sk_buff		*saved_skb;
     int				packets_waiting;
-    caddr_t			base;
+    void			__iomem *base;
     u_short			cfg;
     struct timer_list		media;
     int				watchdog, tx_err;
@@ -320,7 +315,7 @@ static dev_link_t *smc91c92_attach(void)
     struct smc_private *smc;
     dev_link_t *link;
     struct net_device *dev;
-    int i, ret;
+    int ret;
 
     DEBUG(0, "smc91c92_attach()\n");
 
@@ -337,12 +332,7 @@ static dev_link_t *smc91c92_attach(void)
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
     link->io.IOAddrLines = 4;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->irq.Handler = &smc_interrupt;
     link->irq.Instance = dev;
     link->conf.Attributes = CONF_ENABLE_IRQ;
@@ -374,7 +364,6 @@ static dev_link_t *smc91c92_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask = CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
 	CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
@@ -1024,6 +1013,7 @@ static void smc91c92_config(dev_link_t *link)
 
     link->dev = &smc->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     if (register_netdev(dev) != 0) {
 	printk(KERN_ERR "smc91c92_cs: register_netdev() failed\n");
@@ -2263,8 +2253,7 @@ static int __init init_smc91c92_cs(void)
 static void __exit exit_smc91c92_cs(void)
 {
 	pcmcia_unregister_driver(&smc91c92_cs_driver);
-	while (dev_list != NULL)
-		smc91c92_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_smc91c92_cs);

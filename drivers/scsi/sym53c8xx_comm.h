@@ -505,8 +505,6 @@ static int __map_scsi_sg_data(struct device *dev, struct scsi_cmnd *cmd)
 #define unmap_scsi_data(np, cmd)	__unmap_scsi_data(np->dev, cmd)
 #define map_scsi_single_data(np, cmd)	__map_scsi_single_data(np->dev, cmd)
 #define map_scsi_sg_data(np, cmd)	__map_scsi_sg_data(np->dev, cmd)
-#define sync_scsi_data_for_cpu(np, cmd)	__sync_scsi_data_for_cpu(np->dev, cmd)
-#define sync_scsi_data_for_device(np, cmd) __sync_scsi_data_for_device(np->dev, cmd)
 
 /*==========================================================
 **

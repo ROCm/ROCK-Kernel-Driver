@@ -91,19 +91,14 @@ static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, unsigned long *id
 /*
  * default destructor for a bio allocated with bio_alloc()
  */
-void bio_destructor(struct bio *bio)
+static void bio_destructor(struct bio *bio)
 {
 	const int pool_idx = BIO_POOL_IDX(bio);
 	struct biovec_pool *bp = bvec_array + pool_idx;
 
 	BIO_BUG_ON(pool_idx >= BIOVEC_NR_POOLS);
 
-	/*
-	 * cloned bio doesn't own the veclist
-	 */
-	if (!bio_flagged(bio, BIO_CLONED))
-		mempool_free(bio->bi_io_vec, bp->pool);
-
+	mempool_free(bio->bi_io_vec, bp->pool);
 	mempool_free(bio, bio_pool);
 }
 
@@ -210,7 +205,9 @@ inline int bio_hw_segments(request_queue_t *q, struct bio *bio)
  */
 inline void __bio_clone(struct bio *bio, struct bio *bio_src)
 {
-	bio->bi_io_vec = bio_src->bi_io_vec;
+	request_queue_t *q = bdev_get_queue(bio_src->bi_bdev);
+
+	memcpy(bio->bi_io_vec, bio_src->bi_io_vec, bio_src->bi_max_vecs * sizeof(struct bio_vec));
 
 	bio->bi_sector = bio_src->bi_sector;
 	bio->bi_bdev = bio_src->bi_bdev;
@@ -222,21 +219,9 @@ inline void __bio_clone(struct bio *bio, struct bio *bio_src)
 	 * for the clone
 	 */
 	bio->bi_vcnt = bio_src->bi_vcnt;
-	bio->bi_idx = bio_src->bi_idx;
-	if (bio_flagged(bio, BIO_SEG_VALID)) {
-		bio->bi_phys_segments = bio_src->bi_phys_segments;
-		bio->bi_hw_segments = bio_src->bi_hw_segments;
-		bio->bi_flags |= (1 << BIO_SEG_VALID);
-	}
 	bio->bi_size = bio_src->bi_size;
-
-	/*
-	 * cloned bio does not own the bio_vec, so users cannot fiddle with
-	 * it. clear bi_max_vecs and clear the BIO_POOL_BITS to make this
-	 * apparent
-	 */
-	bio->bi_max_vecs = 0;
-	bio->bi_flags &= (BIO_POOL_MASK - 1);
+	bio_phys_segments(q, bio);
+	bio_hw_segments(q, bio);
 }
 
 /**
@@ -248,7 +233,7 @@ inline void __bio_clone(struct bio *bio, struct bio *bio_src)
  */
 struct bio *bio_clone(struct bio *bio, int gfp_mask)
 {
-	struct bio *b = bio_alloc(gfp_mask, 0);
+	struct bio *b = bio_alloc(gfp_mask, bio->bi_max_vecs);
 
 	if (b)
 		__bio_clone(b, bio);

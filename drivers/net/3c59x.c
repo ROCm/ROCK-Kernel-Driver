@@ -277,37 +277,8 @@ MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("3Com 3c59x/3c9xx ethernet driver "
 					DRV_VERSION " " DRV_RELDATE);
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_VERSION);
 
-MODULE_PARM(debug, "i");
-MODULE_PARM(global_options, "i");
-MODULE_PARM(options, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(global_full_duplex, "i");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(hw_checksums, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(flow_ctrl, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(global_enable_wol, "i");
-MODULE_PARM(enable_wol, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(rx_copybreak, "i");
-MODULE_PARM(max_interrupt_work, "i");
-MODULE_PARM(compaq_ioaddr, "i");
-MODULE_PARM(compaq_irq, "i");
-MODULE_PARM(compaq_device_id, "i");
-MODULE_PARM(watchdog, "i");
-MODULE_PARM_DESC(debug, "3c59x debug level (0-6)");
-MODULE_PARM_DESC(options, "3c59x: Bits 0-3: media type, bit 4: bus mastering, bit 9: full duplex");
-MODULE_PARM_DESC(global_options, "3c59x: same as options, but applies to all NICs if options is unset");
-MODULE_PARM_DESC(full_duplex, "3c59x full duplex setting(s) (1)");
-MODULE_PARM_DESC(global_full_duplex, "3c59x: same as full_duplex, but applies to all NICs if options is unset");
-MODULE_PARM_DESC(hw_checksums, "3c59x Hardware checksum checking by adapter(s) (0-1)");
-MODULE_PARM_DESC(flow_ctrl, "3c59x 802.3x flow control usage (PAUSE only) (0-1)");
-MODULE_PARM_DESC(enable_wol, "3c59x: Turn on Wake-on-LAN for adapter(s) (0-1)");
-MODULE_PARM_DESC(global_enable_wol, "3c59x: same as enable_wol, but applies to all NICs if options is unset");
-MODULE_PARM_DESC(rx_copybreak, "3c59x copy breakpoint for copy-only-tiny-frames");
-MODULE_PARM_DESC(max_interrupt_work, "3c59x maximum events handled per interrupt");
-MODULE_PARM_DESC(compaq_ioaddr, "3c59x PCI I/O base address (Compaq BIOS problem workaround)");
-MODULE_PARM_DESC(compaq_irq, "3c59x PCI IRQ number (Compaq BIOS problem workaround)");
-MODULE_PARM_DESC(compaq_device_id, "3c59x PCI device ID (Compaq BIOS problem workaround)");
-MODULE_PARM_DESC(watchdog, "3c59x transmit timeout in milliseconds");
 
 /* Operational parameter that usually are not changed. */
 
@@ -416,7 +387,7 @@ enum {	IS_VORTEX=1, IS_BOOMERANG=2, IS_CYCLONE=4, IS_TORNADO=8,
 	HAS_PWR_CTRL=0x20, HAS_MII=0x40, HAS_NWAY=0x80, HAS_CB_FNS=0x100,
 	INVERT_MII_PWR=0x200, INVERT_LED_PWR=0x400, MAX_COLLISION_RESET=0x800,
 	EEPROM_OFFSET=0x1000, HAS_HWCKSM=0x2000, WNO_XCVR_PWR=0x4000,
-	EXTRA_PREAMBLE=0x8000, };
+	EXTRA_PREAMBLE=0x8000, EEPROM_RESET=0x10000, };
 
 enum vortex_chips {
 	CH_3C590 = 0,
@@ -491,9 +462,9 @@ static struct vortex_chip_info {
 	{"3c595 Vortex 100base-MII",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
 	{"3c900 Boomerang 10baseT",
-	 PCI_USES_IO|PCI_USES_MASTER, IS_BOOMERANG, 64, },
+	 PCI_USES_IO|PCI_USES_MASTER, IS_BOOMERANG|EEPROM_RESET, 64, },
 	{"3c900 Boomerang 10Mbps Combo",
-	 PCI_USES_IO|PCI_USES_MASTER, IS_BOOMERANG, 64, },
+	 PCI_USES_IO|PCI_USES_MASTER, IS_BOOMERANG|EEPROM_RESET, 64, },
 	{"3c900 Cyclone 10Mbps TPO",						/* AKPM: from Don's 0.99M */
 	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE|HAS_HWCKSM, 128, },
 	{"3c900 Cyclone 10Mbps Combo",
@@ -504,9 +475,9 @@ static struct vortex_chip_info {
 	{"3c900B-FL Cyclone 10base-FL",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE|HAS_HWCKSM, 128, },
 	{"3c905 Boomerang 100baseTx",
-	 PCI_USES_IO|PCI_USES_MASTER, IS_BOOMERANG|HAS_MII, 64, },
+	 PCI_USES_IO|PCI_USES_MASTER, IS_BOOMERANG|HAS_MII|EEPROM_RESET, 64, },
 	{"3c905 Boomerang 100baseT4",
-	 PCI_USES_IO|PCI_USES_MASTER, IS_BOOMERANG|HAS_MII, 64, },
+	 PCI_USES_IO|PCI_USES_MASTER, IS_BOOMERANG|HAS_MII|EEPROM_RESET, 64, },
 	{"3c905B Cyclone 100baseTx",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_CYCLONE|HAS_NWAY|HAS_HWCKSM|EXTRA_PREAMBLE, 128, },
 
@@ -833,7 +804,7 @@ struct vortex_private {
 										 * bale from the ISR */
 	u16 io_size;						/* Size of PCI region (for release_region) */
 	spinlock_t lock;					/* Serialise access to device & its vortex_private */
-	spinlock_t mdio_lock;				/* Serialise access to mdio hardware */
+	struct mii_if_info mii;				/* MII lib hooks/info */
 };
 
 #ifdef CONFIG_PCI
@@ -879,6 +850,22 @@ static struct media_table {
   { "MII-External",	 0,		0x41, XCVR_10baseT, 3*HZ },
   { "Default",	 0,			0xFF, XCVR_10baseT, 10000},
 };
+
+static struct {
+	const char str[ETH_GSTRING_LEN];
+} ethtool_stats_keys[] = {
+	{ "rx_packets" },
+	{ "tx_packets" },
+	{ "rx_bytes" },
+	{ "tx_bytes" },
+	{ "collisions" },
+	{ "tx_carrier_errors" },
+	{ "tx_heartbeat_errors" },
+	{ "tx_window_errors" },
+};
+
+/* number of ETHTOOL_GSTATS u64's */
+#define VORTEX_NUM_STATS      8
 
 static int vortex_probe1(struct device *gendev, long ioaddr, int irq,
 				   int chip_idx, int card_idx);
@@ -930,10 +917,41 @@ static struct net_device *compaq_net_device;
 
 static int vortex_cards_found;
 
+module_param(debug, int, 0);
+module_param(global_options, int, 0);
+module_param_array(options, int, NULL, 0);
+module_param(global_full_duplex, int, 0);
+module_param_array(full_duplex, int, NULL, 0);
+module_param_array(hw_checksums, int, NULL, 0);
+module_param_array(flow_ctrl, int, NULL, 0);
+module_param(global_enable_wol, int, 0);
+module_param_array(enable_wol, int, NULL, 0);
+module_param(rx_copybreak, int, 0);
+module_param(max_interrupt_work, int, 0);
+module_param(compaq_ioaddr, int, 0);
+module_param(compaq_irq, int, 0);
+module_param(compaq_device_id, int, 0);
+module_param(watchdog, int, 0);
+MODULE_PARM_DESC(debug, "3c59x debug level (0-6)");
+MODULE_PARM_DESC(options, "3c59x: Bits 0-3: media type, bit 4: bus mastering, bit 9: full duplex");
+MODULE_PARM_DESC(global_options, "3c59x: same as options, but applies to all NICs if options is unset");
+MODULE_PARM_DESC(full_duplex, "3c59x full duplex setting(s) (1)");
+MODULE_PARM_DESC(global_full_duplex, "3c59x: same as full_duplex, but applies to all NICs if options is unset");
+MODULE_PARM_DESC(hw_checksums, "3c59x Hardware checksum checking by adapter(s) (0-1)");
+MODULE_PARM_DESC(flow_ctrl, "3c59x 802.3x flow control usage (PAUSE only) (0-1)");
+MODULE_PARM_DESC(enable_wol, "3c59x: Turn on Wake-on-LAN for adapter(s) (0-1)");
+MODULE_PARM_DESC(global_enable_wol, "3c59x: same as enable_wol, but applies to all NICs if options is unset");
+MODULE_PARM_DESC(rx_copybreak, "3c59x copy breakpoint for copy-only-tiny-frames");
+MODULE_PARM_DESC(max_interrupt_work, "3c59x maximum events handled per interrupt");
+MODULE_PARM_DESC(compaq_ioaddr, "3c59x PCI I/O base address (Compaq BIOS problem workaround)");
+MODULE_PARM_DESC(compaq_irq, "3c59x PCI IRQ number (Compaq BIOS problem workaround)");
+MODULE_PARM_DESC(compaq_device_id, "3c59x PCI device ID (Compaq BIOS problem workaround)");
+MODULE_PARM_DESC(watchdog, "3c59x transmit timeout in milliseconds");
+
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void poll_vortex(struct net_device *dev)
 {
-	struct vortex_private *vp = (struct vortex_private *)dev->priv;
+	struct vortex_private *vp = netdev_priv(dev);
 	unsigned long flags;
 	local_save_flags(flags);
 	local_irq_disable();
@@ -1074,14 +1092,20 @@ static int __devinit vortex_init_one (struct pci_dev *pdev,
 	int rc;
 
 	/* wake up and enable device */		
-	if (pci_enable_device (pdev)) {
-		rc = -EIO;
-	} else {
-		rc = vortex_probe1 (&pdev->dev, pci_resource_start (pdev, 0),
-							pdev->irq, ent->driver_data, vortex_cards_found);
-		if (rc == 0)
-			vortex_cards_found++;
+	rc = pci_enable_device (pdev);
+	if (rc < 0)
+		goto out;
+
+	rc = vortex_probe1 (&pdev->dev, pci_resource_start (pdev, 0),
+						pdev->irq, ent->driver_data, vortex_cards_found);
+	if (rc < 0) {
+		pci_disable_device (pdev);
+		goto out;
 	}
+
+	vortex_cards_found++;
+
+out:
 	return rc;
 }
 
@@ -1210,8 +1234,12 @@ static int __devinit vortex_probe1(struct device *gendev,
 	}
 
 	spin_lock_init(&vp->lock);
-	spin_lock_init(&vp->mdio_lock);
 	vp->gendev = gendev;
+	vp->mii.dev = dev;
+	vp->mii.mdio_read = mdio_read;
+	vp->mii.mdio_write = mdio_write;
+	vp->mii.phy_id_mask = 0x1f;
+	vp->mii.reg_num_mask = 0x1f;
 
 	/* Makes sure rings are at least 16 byte aligned. */
 	vp->rx_ring = pci_alloc_consistent(pdev, sizeof(struct boom_rx_desc) * RX_RING_SIZE
@@ -1446,6 +1474,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 				mdio_write(dev, vp->phys[0], 4, vp->advertising);
 			}
 		}
+		vp->mii.phy_id = vp->phys[0];
 	}
 
 	if (vp->capabilities & CapBusMaster) {
@@ -1491,7 +1520,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	dev->poll_controller = poll_vortex; 
 #endif
-	if (pdev && vp->enable_wol) {
+	if (pdev) {
 		vp->pm_state_valid = 1;
  		pci_save_state(VORTEX_PCI(vp));
  		acpi_set_WOL(dev);
@@ -1548,9 +1577,10 @@ vortex_up(struct net_device *dev)
 	unsigned int config;
 	int i;
 
-	if (VORTEX_PCI(vp) && vp->enable_wol) {
-		pci_set_power_state(VORTEX_PCI(vp), 0);	/* Go active */
+	if (VORTEX_PCI(vp)) {
+		pci_set_power_state(VORTEX_PCI(vp), PCI_D0);	/* Go active */
 		pci_restore_state(VORTEX_PCI(vp));
+		pci_enable_device(VORTEX_PCI(vp));
 	}
 
 	/* Before initializing select the active media port. */
@@ -1838,6 +1868,7 @@ vortex_timer(unsigned long data)
 		break;
 	case XCVR_MII: case XCVR_NWAY:
 		{
+			spin_lock_bh(&vp->lock);
 			mii_status = mdio_read(dev, vp->phys[0], 1);
 			ok = 1;
 			if (vortex_debug > 2)
@@ -1871,6 +1902,7 @@ vortex_timer(unsigned long data)
 			} else {
 				netif_carrier_off(dev);
 			}
+			spin_unlock_bh(&vp->lock);
 		}
 		break;
 	  default:					/* Other media types handled by Tx timeouts. */
@@ -2706,7 +2738,7 @@ vortex_down(struct net_device *dev, int final_down)
 	if (vp->full_bus_master_tx)
 		outl(0, ioaddr + DownListPtr);
 
-	if (final_down && VORTEX_PCI(vp) && vp->enable_wol) {
+	if (final_down && VORTEX_PCI(vp)) {
 		pci_save_state(VORTEX_PCI(vp));
 		acpi_set_WOL(dev);
 	}
@@ -2867,6 +2899,109 @@ static void update_stats(long ioaddr, struct net_device *dev)
 	return;
 }
 
+static int vortex_nway_reset(struct net_device *dev)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	EL3WINDOW(4);
+	rc = mii_nway_restart(&vp->mii);
+	spin_unlock_irqrestore(&vp->lock, flags);
+	return rc;
+}
+
+static u32 vortex_get_link(struct net_device *dev)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	EL3WINDOW(4);
+	rc = mii_link_ok(&vp->mii);
+	spin_unlock_irqrestore(&vp->lock, flags);
+	return rc;
+}
+
+static int vortex_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	EL3WINDOW(4);
+	rc = mii_ethtool_gset(&vp->mii, cmd);
+	spin_unlock_irqrestore(&vp->lock, flags);
+	return rc;
+}
+
+static int vortex_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	EL3WINDOW(4);
+	rc = mii_ethtool_sset(&vp->mii, cmd);
+	spin_unlock_irqrestore(&vp->lock, flags);
+	return rc;
+}
+
+static u32 vortex_get_msglevel(struct net_device *dev)
+{
+	return vortex_debug;
+}
+
+static void vortex_set_msglevel(struct net_device *dev, u32 dbg)
+{
+	vortex_debug = dbg;
+}
+
+static int vortex_get_stats_count(struct net_device *dev)
+{
+	return VORTEX_NUM_STATS;
+}
+
+static void vortex_get_ethtool_stats(struct net_device *dev,
+	struct ethtool_stats *stats, u64 *data)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	unsigned long flags;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	update_stats(dev->base_addr, dev);
+	spin_unlock_irqrestore(&vp->lock, flags);
+
+	data[0] = vp->stats.rx_packets;
+	data[1] = vp->stats.tx_packets;
+	data[2] = vp->stats.rx_bytes;
+	data[3] = vp->stats.tx_bytes;
+	data[4] = vp->stats.collisions;
+	data[5] = vp->stats.tx_carrier_errors;
+	data[6] = vp->stats.tx_heartbeat_errors;
+	data[7] = vp->stats.tx_window_errors;
+}
+
+
+static void vortex_get_strings(struct net_device *dev, u32 stringset, u8 *data)
+{
+	switch (stringset) {
+	case ETH_SS_STATS:
+		memcpy(data, &ethtool_stats_keys, sizeof(ethtool_stats_keys));
+		break;
+	default:
+		WARN_ON(1);
+		break;
+	}
+}
 
 static void vortex_get_drvinfo(struct net_device *dev,
 					struct ethtool_drvinfo *info)
@@ -2888,44 +3023,18 @@ static void vortex_get_drvinfo(struct net_device *dev,
 
 static struct ethtool_ops vortex_ethtool_ops = {
 	.get_drvinfo		= vortex_get_drvinfo,
+	.get_strings            = vortex_get_strings,
+	.get_msglevel           = vortex_get_msglevel,
+	.set_msglevel           = vortex_set_msglevel,
+	.get_ethtool_stats      = vortex_get_ethtool_stats,
+	.get_stats_count        = vortex_get_stats_count,
+	.get_settings           = vortex_get_settings,
+	.set_settings           = vortex_set_settings,
+	.get_link               = vortex_get_link,
+	.nway_reset             = vortex_nway_reset,
 };
 
 #ifdef CONFIG_PCI
-static int vortex_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
-{
-	struct vortex_private *vp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
-	struct mii_ioctl_data *data = if_mii(rq);
-	int phy = vp->phys[0] & 0x1f;
-	int retval;
-
-	switch(cmd) {
-	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-		data->phy_id = phy;
-
-	case SIOCGMIIREG:		/* Read MII PHY register. */
-		EL3WINDOW(4);
-		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
-		retval = 0;
-		break;
-
-	case SIOCSMIIREG:		/* Write MII PHY register. */
-		if (!capable(CAP_NET_ADMIN)) {
-			retval = -EPERM;
-		} else {
-			EL3WINDOW(4);
-			mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
-			retval = 0;
-		}
-		break;
-	default:
-		retval = -EOPNOTSUPP;
-		break;
-	}
-
-	return retval;
-}
-
 /*
  *	Must power the device up to do MDIO operations
  */
@@ -2933,6 +3042,8 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	int err;
 	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
 	int state = 0;
 
 	if(VORTEX_PCI(vp))
@@ -2941,8 +3052,11 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	/* The kernel core really should have pci_get_power_state() */
 
 	if(state != 0)
-		pci_set_power_state(VORTEX_PCI(vp), 0);
-	err = vortex_do_ioctl(dev, rq, cmd);
+		pci_set_power_state(VORTEX_PCI(vp), PCI_D0);
+	spin_lock_irqsave(&vp->lock, flags);
+	EL3WINDOW(4);
+	err = generic_mii_ioctl(&vp->mii, if_mii(rq), cmd, NULL);
+	spin_unlock_irqrestore(&vp->lock, flags);
 	if(state != 0)
 		pci_set_power_state(VORTEX_PCI(vp), state);
 
@@ -2981,7 +3095,7 @@ static void set_rx_mode(struct net_device *dev)
 
 static void set_8021q_mode(struct net_device *dev, int enable)
 {
-	struct vortex_private *vp = (struct vortex_private *)dev->priv;
+	struct vortex_private *vp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int old_window = inw(ioaddr + EL3_CMD);
 	int mac_ctrl;
@@ -3060,14 +3174,11 @@ static void mdio_sync(long ioaddr, int bits)
 
 static int mdio_read(struct net_device *dev, int phy_id, int location)
 {
-	struct vortex_private *vp = netdev_priv(dev);
 	int i;
 	long ioaddr = dev->base_addr;
 	int read_cmd = (0xf6 << 10) | (phy_id << 5) | location;
 	unsigned int retval = 0;
 	long mdio_addr = ioaddr + Wn4_PhysicalMgmt;
-
-	spin_lock_bh(&vp->mdio_lock);
 
 	if (mii_preamble_required)
 		mdio_sync(ioaddr, 32);
@@ -3088,19 +3199,15 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 		outw(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
-	spin_unlock_bh(&vp->mdio_lock);
 	return retval & 0x20000 ? 0xffff : retval>>1 & 0xffff;
 }
 
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value)
 {
-	struct vortex_private *vp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int write_cmd = 0x50020000 | (phy_id << 23) | (location << 18) | value;
 	long mdio_addr = ioaddr + Wn4_PhysicalMgmt;
 	int i;
-
-	spin_lock_bh(&vp->mdio_lock);
 
 	if (mii_preamble_required)
 		mdio_sync(ioaddr, 32);
@@ -3120,7 +3227,6 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 		outw(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
-	spin_unlock_bh(&vp->mdio_lock);
 	return;
 }
 
@@ -3131,16 +3237,18 @@ static void acpi_set_WOL(struct net_device *dev)
 	struct vortex_private *vp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
-	/* Power up on: 1==Downloaded Filter, 2==Magic Packets, 4==Link Status. */
-	EL3WINDOW(7);
-	outw(2, ioaddr + 0x0c);
-	/* The RxFilter must accept the WOL frames. */
-	outw(SetRxFilter|RxStation|RxMulticast|RxBroadcast, ioaddr + EL3_CMD);
-	outw(RxEnable, ioaddr + EL3_CMD);
+	if (vp->enable_wol) {
+		/* Power up on: 1==Downloaded Filter, 2==Magic Packets, 4==Link Status. */
+		EL3WINDOW(7);
+		outw(2, ioaddr + 0x0c);
+		/* The RxFilter must accept the WOL frames. */
+		outw(SetRxFilter|RxStation|RxMulticast|RxBroadcast, ioaddr + EL3_CMD);
+		outw(RxEnable, ioaddr + EL3_CMD);
 
+		pci_enable_wake(VORTEX_PCI(vp), 0, 1);
+	}
 	/* Change the power state to D3; RxEnable doesn't take effect. */
-	pci_enable_wake(VORTEX_PCI(vp), 0, 1);
-	pci_set_power_state(VORTEX_PCI(vp), 3);
+	pci_set_power_state(VORTEX_PCI(vp), PCI_D3hot);
 }
 
 
@@ -3162,13 +3270,15 @@ static void __devexit vortex_remove_one (struct pci_dev *pdev)
 	 */
 	unregister_netdev(dev);
 
-	if (VORTEX_PCI(vp) && vp->enable_wol) {
-		pci_set_power_state(VORTEX_PCI(vp), 0);	/* Go active */
+	if (VORTEX_PCI(vp)) {
+		pci_set_power_state(VORTEX_PCI(vp), PCI_D0);	/* Go active */
 		if (vp->pm_state_valid)
 			pci_restore_state(VORTEX_PCI(vp));
+		pci_disable_device(VORTEX_PCI(vp));
 	}
 	/* Should really use issue_and_wait() here */
-	outw(TotalReset|0x14, dev->base_addr + EL3_CMD);
+	outw(TotalReset | ((vp->drv_flags & EEPROM_RESET) ? 0x04 : 0x14),
+	     dev->base_addr + EL3_CMD);
 
 	pci_free_consistent(pdev,
 						sizeof(struct boom_rx_desc) * RX_RING_SIZE

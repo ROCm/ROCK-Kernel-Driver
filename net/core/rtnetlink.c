@@ -57,6 +57,11 @@ void rtnl_lock(void)
 {
 	rtnl_shlock();
 }
+
+int rtnl_lock_interruptible(void)
+{
+	return down_interruptible(&rtnl_sem);
+}
  
 void rtnl_unlock(void)
 {
@@ -117,6 +122,21 @@ void __rta_fill(struct sk_buff *skb, int attrtype, int attrlen, const void *data
 	rta->rta_type = attrtype;
 	rta->rta_len = size;
 	memcpy(RTA_DATA(rta), data, attrlen);
+}
+
+size_t rtattr_strlcpy(char *dest, const struct rtattr *rta, size_t size)
+{
+	size_t ret = RTA_PAYLOAD(rta);
+	char *src = RTA_DATA(rta);
+
+	if (ret > 0 && src[ret - 1] == '\0')
+		ret--;
+	if (size > 0) {
+		size_t len = (ret >= size) ? size - 1 : ret;
+		memset(dest, 0, size);
+		memcpy(dest, src, len);
+	}
+	return ret;
 }
 
 int rtnetlink_send(struct sk_buff *skb, u32 pid, unsigned group, int echo)
@@ -241,7 +261,7 @@ rtattr_failure:
 	return -1;
 }
 
-int rtnetlink_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
+static int rtnetlink_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 {
 	int idx;
 	int s_idx = cb->args[0];
@@ -267,7 +287,18 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	struct net_device *dev;
 	int err, send_addr_notify = 0;
 
-	dev = dev_get_by_index(ifm->ifi_index);
+	if (ifm->ifi_index >= 0)
+		dev = dev_get_by_index(ifm->ifi_index);
+	else if (ida[IFLA_IFNAME - 1]) {
+		char ifname[IFNAMSIZ];
+
+		if (rtattr_strlcpy(ifname, ida[IFLA_IFNAME - 1],
+		                   IFNAMSIZ) >= IFNAMSIZ)
+			return -EINVAL;
+		dev = dev_get_by_name(ifname);
+	} else
+		return -EINVAL;
+
 	if (!dev)
 		return -ENODEV;
 
@@ -358,19 +389,13 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		dev->weight = *((u32 *) RTA_DATA(ida[IFLA_WEIGHT - 1]));
 	}
 
-	if (ida[IFLA_IFNAME - 1]) {
+	if (ifm->ifi_index >= 0 && ida[IFLA_IFNAME - 1]) {
 		char ifname[IFNAMSIZ];
 
-		if (ida[IFLA_IFNAME - 1]->rta_len > RTA_LENGTH(sizeof(ifname)))
+		if (rtattr_strlcpy(ifname, ida[IFLA_IFNAME - 1],
+		                   IFNAMSIZ) >= IFNAMSIZ)
 			goto out;
-
-		memset(ifname, 0, sizeof(ifname));
-		memcpy(ifname, RTA_DATA(ida[IFLA_IFNAME - 1]),
-			RTA_PAYLOAD(ida[IFLA_IFNAME - 1]));
-		ifname[IFNAMSIZ - 1] = '\0';
-
 		err = dev_change_name(dev, ifname);
-
 		if (err)
 			goto out;
 	}
@@ -675,11 +700,12 @@ void __init rtnetlink_init(void)
 }
 
 EXPORT_SYMBOL(__rta_fill);
+EXPORT_SYMBOL(rtattr_strlcpy);
 EXPORT_SYMBOL(rtattr_parse);
-EXPORT_SYMBOL(rtnetlink_dump_ifinfo);
 EXPORT_SYMBOL(rtnetlink_links);
 EXPORT_SYMBOL(rtnetlink_put_metrics);
 EXPORT_SYMBOL(rtnl);
 EXPORT_SYMBOL(rtnl_lock);
+EXPORT_SYMBOL(rtnl_lock_interruptible);
 EXPORT_SYMBOL(rtnl_sem);
 EXPORT_SYMBOL(rtnl_unlock);

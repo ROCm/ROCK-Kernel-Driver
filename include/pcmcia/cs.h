@@ -1,30 +1,15 @@
 /*
- * cs.h 1.71 2000/08/29 00:54:20
+ * cs.h
  *
- * The contents of this file are subject to the Mozilla Public License
- * Version 1.1 (the "License"); you may not use this file except in
- * compliance with the License. You may obtain a copy of the License
- * at http://www.mozilla.org/MPL/
- *
- * Software distributed under the License is distributed on an "AS IS"
- * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
- * the License for the specific language governing rights and
- * limitations under the License. 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * The initial developer of the original code is David A. Hinds
  * <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
  * are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
  *
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License version 2 (the "GPL"), in which
- * case the provisions of the GPL are applicable instead of the
- * above.  If you wish to allow the use of your version of this file
- * only under the terms of the GPL and not to allow others to use
- * your version of this file under the MPL, indicate your decision by
- * deleting the provisions above and replace them with the notice and
- * other provisions required by the GPL.  If you do not delete the
- * provisions above, a recipient may use your version of this file
- * under either the MPL or the GPL.
+ * (C) 1999             David A. Hinds
  */
 
 #ifndef _LINUX_CS_H
@@ -139,7 +124,7 @@ typedef struct client_req_t {
 /* For RegisterClient */
 typedef struct client_reg_t {
     dev_info_t	*dev_info;
-    u_int	Attributes;
+    u_int	Attributes;  /* UNUSED */
     u_int	EventMask;
     int		(*event_handler)(event_t event, int priority,
 				 event_callback_args_t *);
@@ -206,7 +191,7 @@ typedef struct io_req_t {
 typedef struct irq_req_t {
     u_int	Attributes;
     u_int	AssignedIRQ;
-    u_int	IRQInfo1, IRQInfo2;
+    u_int	IRQInfo1, IRQInfo2; /* IRQInfo2 is ignored */
     void	*Handler;
     void	*Instance;
 } irq_req_t;
@@ -294,7 +279,7 @@ typedef struct win_req_t {
 #define WIN_BAR_MASK		0xe000
 #define WIN_BAR_SHIFT		13
 
-/* Attributes for RegisterClient */
+/* Attributes for RegisterClient -- UNUSED -- */
 #define INFO_MASTER_CLIENT	0x01
 #define INFO_IO_CLIENT		0x02
 #define INFO_MTD_CLIENT		0x04
@@ -315,22 +300,8 @@ typedef struct error_info_t {
     int		retcode;
 } error_info_t;
 
-/* Special stuff for binding drivers to sockets */
-typedef struct bind_req_t {
-    struct pcmcia_socket	*Socket;
-    u_char	Function;
-    dev_info_t	*dev_info;
-} bind_req_t;
-
 /* Flag to bind to all functions */
 #define BIND_FN_ALL	0xff
-
-typedef struct mtd_bind_t {
-    struct pcmcia_socket	*Socket;
-    u_int	Attributes;
-    u_int	CardOffset;
-    dev_info_t	*dev_info;
-} mtd_bind_t;
 
 /* Events */
 #define CS_EVENT_PRI_LOW		0
@@ -420,6 +391,8 @@ enum service {
     GetFirstWindow, GetNextWindow, GetMemPage
 };
 
+struct pcmcia_socket;
+
 int pcmcia_access_configuration_register(client_handle_t handle, conf_reg_t *reg);
 int pcmcia_deregister_client(client_handle_t handle);
 int pcmcia_get_configuration_info(client_handle_t handle, config_info_t *config);
@@ -446,12 +419,8 @@ int pcmcia_eject_card(struct pcmcia_socket *skt);
 int pcmcia_insert_card(struct pcmcia_socket *skt);
 int pcmcia_report_error(client_handle_t handle, error_info_t *err);
 
-#ifdef CONFIG_PCMCIA_OBSOLETE
-int pcmcia_get_first_client(client_handle_t *handle, client_req_t *req);
-int pcmcia_get_next_client(client_handle_t *handle, client_req_t *req);
-int pcmcia_modify_window(window_handle_t win, modwin_t *req);
-int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask);
-#endif
+struct pcmcia_socket * pcmcia_get_socket(struct pcmcia_socket *skt);
+void pcmcia_put_socket(struct pcmcia_socket *skt);
 
 #endif /* __KERNEL__ */
 

@@ -645,6 +645,7 @@ struct net_local
   int			cell_search;		/* Searching for new cell? */
   struct timer_list	cell_timer;		/* Garbage collection */
 #endif	/* WAVELAN_ROAMING */
+  void __iomem *mem;
 };
 
 /**************************** PROTOTYPES ****************************/
@@ -794,23 +795,16 @@ static dev_link_t *dev_list = NULL;	/* Linked list of devices */
  * The exact syntax is 'insmod wavelan_cs.o <var>=<value>'
  */
 
-/* Bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4 and 3 */
-static int	irq_mask = 0xdeb8;
-static int 	irq_list[4] = { -1 };
-
 /* Shared memory speed, in ns */
 static int	mem_speed = 0;
 
 /* New module interface */
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(mem_speed, "i");
+module_param(mem_speed, int, 0);
 
 #ifdef WAVELAN_ROAMING		/* Conditional compile, see above in options */
 /* Enable roaming mode ? No ! Please keep this to 0 */
 static int	do_roaming = 0;
-MODULE_PARM(do_roaming, "i");
+module_param(do_roaming, bool, 0);
 #endif	/* WAVELAN_ROAMING */
 
 MODULE_LICENSE("GPL");

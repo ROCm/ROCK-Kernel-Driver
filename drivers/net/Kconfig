@@ -84,6 +84,7 @@ config EQUALIZER
 config TUN
 	tristate "Universal TUN/TAP device driver support"
 	depends on NETDEVICES
+	select CRC32
 	---help---
 	  TUN/TAP provides packet reception and transmission for user space
 	  programs.  It can be viewed as a simple Point-to-Point or Ethernet
@@ -691,6 +692,7 @@ config ELMC_II
 config VORTEX
 	tristate "3c590/3c900 series (592/595/597) \"Vortex/Boomerang\" support"
 	depends on NET_VENDOR_3COM && (PCI || EISA)
+	select MII
 	---help---
 	  This option enables driver support for a large number of 10mbps and
 	  10/100mbps EISA, PCI and PCMCIA 3Com network cards:
@@ -1179,37 +1181,38 @@ config IBMVETH
 	  be called ibmveth.
 
 config IBM_EMAC
-       tristate "IBM PPC4xx EMAC driver support"
-       depends on 4xx
-       ---help---
-       This driver supports the IBM PPC4xx EMAC family of on-chip
-       Ethernet controllers.
+	tristate "IBM PPC4xx EMAC driver support"
+	depends on 4xx
+	select CRC32
+	---help---
+	  This driver supports the IBM PPC4xx EMAC family of on-chip
+	  Ethernet controllers.
 
 config IBM_EMAC_ERRMSG
-       bool "Verbose error messages"
-       depends on IBM_EMAC
+	bool "Verbose error messages"
+	depends on IBM_EMAC
 
 config IBM_EMAC_RXB
-       int "Number of receive buffers"
-       depends on IBM_EMAC
-       default "128" if IBM_EMAC4
-       default "64"
+	int "Number of receive buffers"
+	depends on IBM_EMAC
+	default "128" if IBM_EMAC4
+	default "64"
 
 config IBM_EMAC_TXB
-       int "Number of transmit buffers"
-       depends on IBM_EMAC
-       default "128" if IBM_EMAC4
-       default "8"
+	int "Number of transmit buffers"
+	depends on IBM_EMAC
+	default "128" if IBM_EMAC4
+	default "8"
 
 config IBM_EMAC_FGAP
-       int "Frame gap"
-       depends on IBM_EMAC
-       default "8"
+	int "Frame gap"
+	depends on IBM_EMAC
+	default "8"
 
 config IBM_EMAC_SKBRES
-       int "Skb reserve amount"
-       depends on IBM_EMAC
-       default "0"
+	int "Skb reserve amount"
+	depends on IBM_EMAC
+	default "0"
 
 config NET_PCI
 	bool "EISA, VLB, PCI and on board controllers"
@@ -1398,16 +1401,6 @@ config EEPRO100
 	  will be called eepro100.
 
 
-config EEPRO100_PIO
-	bool "Use PIO instead of MMIO" if !X86_VISWS
-	depends on EEPRO100
-	default y if X86_VISWS
-	help
-	  This instructs the driver to use programmed I/O ports (PIO) instead
-	  of PCI shared memory (MMIO).  This can possibly solve some problems
-	  in case your mainboard has memory consistency issues.  If unsure,
-	  say N.
-
 config E100
 	tristate "Intel(R) PRO/100+ support"
 	depends on NET_PCI && PCI
@@ -1420,13 +1413,13 @@ config E100
 
 	  Use the above information and the Adapter & Driver ID Guide at:
 
-	  http://support.intel.com/support/network/adapter/pro100/21397.htm
+	  <http://support.intel.com/support/network/adapter/pro100/21397.htm>
 
           to identify the adapter.
 
 	  For the latest Intel PRO/100 network driver for Linux, see:
 
-	  http://appsr.intel.com/scripts-df/support_intel.asp
+	  <http://appsr.intel.com/scripts-df/support_intel.asp>
 
 	  More specific information on configuring the driver is in 
 	  <file:Documentation/networking/e100.txt>.
@@ -1667,7 +1660,7 @@ config TLAN
 	  <file:Documentation/networking/net-modules.txt>. The module
 	  will be called tlan.
 
-	  Please email feedback to  torben.mathiasen@compaq.com.
+	  Please email feedback to <torben.mathiasen@compaq.com>.
 
 config VIA_RHINE
 	tristate "VIA Rhine support"
@@ -1979,6 +1972,14 @@ config R8169_NAPI
 
 	  If in doubt, say N.
 
+config R8169_VLAN
+	bool "VLAN support"
+	depends on R8169 && VLAN_8021Q
+	---help---
+	  Say Y here for the r8169 driver to support the functions required
+	  by the kernel 802.1Q code.
+	  
+	  If in doubt, say Y.
 
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
@@ -2001,57 +2002,29 @@ config SK98LIN
 	    - DGE-530T Gigabit Ethernet Adapter
 	    - EG1032 v2 Instant Gigabit Network Adapter
 	    - EG1064 v2 Instant Gigabit Network Adapter
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Abit)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Albatron)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Asus)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Chaintech)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (ECS)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Epox)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Foxconn)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Gigabyte)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Iwill)
-	    - Marvell 88E8035 Fast Ethernet Controller (LGE)
-	    - Marvell 88E8035 Fast Ethernet Controller (Toshiba)
-	    - Marvell 88E8036 Fast Ethernet Controller (LGE)
-	    - Marvell 88E8036 Fast Ethernet Controller (Toshiba)
-	    - Marvell 88E8050 Gigabit Ethernet Controller (Intel)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (ASRock)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (Asus)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (Gigabyte)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (MSI)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (ASRock)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Albatron)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Aopen)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Asus)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Chaintech)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Clevo)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (DFI)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Epox)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Gigabyte)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (LGE)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (MSI)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (SOYO)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Toshiba)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Trigem)
-	    - Marvell RDK-8001 
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Abit)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Albatron)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Asus)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (ECS)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Epox)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Foxconn)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Gigabyte)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Iwill)
+	    - Marvell 88E8050 Gigabit LOM Ethernet Adapter (Intel)
 	    - Marvell RDK-8001 Adapter
 	    - Marvell RDK-8002 Adapter
-	    - Marvell RDK-8003 
 	    - Marvell RDK-8003 Adapter
 	    - Marvell RDK-8004 Adapter
 	    - Marvell RDK-8006 Adapter
 	    - Marvell RDK-8007 Adapter
 	    - Marvell RDK-8008 Adapter
 	    - Marvell RDK-8009 Adapter
-	    - Marvell RDK-8010 
+	    - Marvell RDK-8010 Adapter
 	    - Marvell RDK-8011 Adapter
 	    - Marvell RDK-8012 Adapter
-	    - Marvell RDK-8035 
-	    - Marvell RDK-8036 
-	    - Marvell RDK-8052 
-	    - Marvell RDK-8053 
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Controller (32 bit)
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Controller (64 bit)
+	    - Marvell RDK-8052 Adapter
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (32 bit)
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (64 bit)
 	    - N-Way PCI-Bus Giga-Card 1000/100/10Mbps(L)
 	    - SK-9521 10/100/1000Base-T Adapter
 	    - SK-9521 V2.0 10/100/1000Base-T Adapter
@@ -2077,23 +2050,15 @@ config SK98LIN
 	  The dual link adapters support link-failover and dual port features.
 	  Both Marvell Yukon and SysKonnect SK-98xx/SK-95xx adapters support 
 	  the scatter-gather functionality with sendfile(). Please refer to 
-	  Documentation/networking/sk98lin.txt for more information about
+	  <file:Documentation/networking/sk98lin.txt> for more information about
 	  optional driver parameters.
 	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
+	      <linux@syskonnect.de>
 	  
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read Documentation/modules.txt. This is recommended.
-	  The module will be called sk98lin.
-
-config SK98LIN_NAPI
-	bool "Use Rx polling (NAPI)"
-	depends on SK98LIN
-	help
-	  NAPI is a new driver API designed to reduce CPU and interrupt load
-	  when the driver is receiving lots of packets from the card.
-
+	  say M here and read <file:Documentation/kbuild/modules.txt>. The module will
+	  be called sk98lin. This is recommended.
 
 config VIA_VELOCITY
 	tristate "VIA Velocity support"
@@ -2228,6 +2193,17 @@ config S2IO_NAPI
 
 	  If in doubt, say N.
 
+config 2BUFF_MODE
+	bool "Use 2 Buffer Mode on Rx side."
+	depends on S2IO
+	---help---
+	On enabling the 2 buffer mode, the received frame will be
+	split into 2 parts before being DMA'ed to the hosts memory.
+	The parts are the ethernet header and ethernet payload. 
+	This is useful on systems where DMA'ing to to unaligned 
+	physical memory loactions comes with a heavy price.
+	If not sure please say N.
+
 endmenu
 
 source "drivers/net/tokenring/Kconfig"
@@ -2290,7 +2266,7 @@ config SKFP
 	  the driver.
 
 	  Questions concerning this driver can be addressed to:
-	  linux@syskonnect.de
+	  <linux@syskonnect.de>
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called skfp.  This is recommended.
@@ -2486,7 +2462,7 @@ config PPPOE
 
 	  This driver requires the latest version of pppd from the CVS
 	  repository at cvs.samba.org.  Alternatively, see the 
-	  RoaringPenguin package (http://www.roaringpenguin.com/pppoe)
+	  RoaringPenguin package (<http://www.roaringpenguin.com/pppoe>)
 	  which contains instruction on how to use this driver (under 
 	  the heading "Kernel mode PPPoE").
 
@@ -2614,5 +2590,5 @@ config NETCONSOLE
 	depends on NETDEVICES && EXPERIMENTAL
 	---help---
 	If you want to log kernel messages over the network, enable this.
-	See Documentation/networking/netconsole.txt for details.
+	See <file:Documentation/networking/netconsole.txt> for details.
 

@@ -510,7 +510,7 @@ tcp_state_transition(struct ip_vs_conn *cp, int direction,
 #define	TCP_APP_TAB_MASK	(TCP_APP_TAB_SIZE - 1)
 
 static struct list_head tcp_apps[TCP_APP_TAB_SIZE];
-static spinlock_t tcp_app_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(tcp_app_lock);
 
 static inline __u16 tcp_app_hashkey(__u16 port)
 {

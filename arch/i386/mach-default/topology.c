@@ -32,6 +32,37 @@
 
 struct i386_cpu cpu_devices[NR_CPUS];
 
+int arch_register_cpu(int num){
+	struct node *parent = NULL;
+	
+#ifdef CONFIG_NUMA
+	int node = cpu_to_node(num);
+	if (node_online(node))
+		parent = &node_devices[node].node;
+#endif /* CONFIG_NUMA */
+
+	return register_cpu(&cpu_devices[num].cpu, num, parent);
+}
+
+#ifdef CONFIG_HOTPLUG_CPU
+
+void arch_unregister_cpu(int num) {
+	struct node *parent = NULL;
+
+#ifdef CONFIG_NUMA
+	int node = cpu_to_node(num);
+	if (node_online(node))
+		parent = &node_devices[node].node;
+#endif /* CONFIG_NUMA */
+
+	return unregister_cpu(&cpu_devices[num].cpu, parent);
+}
+EXPORT_SYMBOL(arch_register_cpu);
+EXPORT_SYMBOL(arch_unregister_cpu);
+#endif /*CONFIG_HOTPLUG_CPU*/
+
+
+
 #ifdef CONFIG_NUMA
 #include <linux/mmzone.h>
 #include <asm/node.h>

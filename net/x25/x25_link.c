@@ -21,32 +21,22 @@
  *	2000-09-04	Henner Eisen	  dev_hold() / dev_put() for x25_neigh.
  */
 
-#include <linux/errno.h>
-#include <linux/types.h>
-#include <linux/socket.h>
-#include <linux/in.h>
 #include <linux/kernel.h>
 #include <linux/jiffies.h>
 #include <linux/timer.h>
-#include <linux/string.h>
-#include <linux/sockios.h>
-#include <linux/net.h>
-#include <linux/inet.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
-#include <net/sock.h>
-#include <asm/system.h>
 #include <asm/uaccess.h>
-#include <linux/fcntl.h>
-#include <linux/mm.h>
-#include <linux/interrupt.h>
 #include <linux/init.h>
 #include <net/x25.h>
 
 static struct list_head x25_neigh_list = LIST_HEAD_INIT(x25_neigh_list);
-static rwlock_t x25_neigh_list_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(x25_neigh_list_lock);
 
 static void x25_t20timer_expiry(unsigned long);
+
+static void x25_transmit_restart_confirmation(struct x25_neigh *nb);
+static void x25_transmit_restart_request(struct x25_neigh *nb);
 
 /*
  *	Linux set/reset timer routines
@@ -119,7 +109,7 @@ void x25_link_control(struct sk_buff *skb, struct x25_neigh *nb,
 /*
  *	This routine is called when a Restart Request is needed
  */
-void x25_transmit_restart_request(struct x25_neigh *nb)
+static void x25_transmit_restart_request(struct x25_neigh *nb)
 {
 	unsigned char *dptr;
 	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 2;
@@ -146,7 +136,7 @@ void x25_transmit_restart_request(struct x25_neigh *nb)
 /*
  * This routine is called when a Restart Confirmation is needed
  */
-void x25_transmit_restart_confirmation(struct x25_neigh *nb)
+static void x25_transmit_restart_confirmation(struct x25_neigh *nb)
 {
 	unsigned char *dptr;
 	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN;
@@ -162,32 +152,6 @@ void x25_transmit_restart_confirmation(struct x25_neigh *nb)
 	*dptr++ = nb->extended ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
 	*dptr++ = 0x00;
 	*dptr++ = X25_RESTART_CONFIRMATION;
-
-	skb->sk = NULL;
-
-	x25_send_frame(skb, nb);
-}
-
-/*
- * This routine is called when a Diagnostic is required.
- */
-void x25_transmit_diagnostic(struct x25_neigh *nb, unsigned char diag)
-{
-	unsigned char *dptr;
-	int len = X25_MAX_L2_LEN + X25_STD_MIN_LEN + 1;
-	struct sk_buff *skb = alloc_skb(len, GFP_ATOMIC);
-
-	if (!skb)
-		return;
-
-	skb_reserve(skb, X25_MAX_L2_LEN);
-
-	dptr = skb_put(skb, X25_STD_MIN_LEN + 1);
-
-	*dptr++ = nb->extended ? X25_GFI_EXTSEQ : X25_GFI_STDSEQ;
-	*dptr++ = 0x00;
-	*dptr++ = X25_DIAGNOSTIC;
-	*dptr++ = diag;
 
 	skb->sk = NULL;
 

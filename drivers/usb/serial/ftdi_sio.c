@@ -372,6 +372,7 @@ static struct usb_device_id id_table_8U232AM [] = {
 	{ USB_DEVICE_VER(BANDB_VID, BANDB_USOTL4_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(BANDB_VID, BANDB_USTL4_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(BANDB_VID, BANDB_USO9ML2_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, EVER_ECO_PRO_CDS, 0, 0x3ff) },
 	{ }						/* Terminating entry */
 };
 
@@ -486,6 +487,7 @@ static struct usb_device_id id_table_FT232BM [] = {
 	{ USB_DEVICE_VER(BANDB_VID, BANDB_USOTL4_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(BANDB_VID, BANDB_USTL4_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(BANDB_VID, BANDB_USO9ML2_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, EVER_ECO_PRO_CDS, 0x400, 0xffff) },
 	{ }						/* Terminating entry */
 };
 
@@ -608,6 +610,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(BANDB_VID, BANDB_USOTL4_PID) },
 	{ USB_DEVICE(BANDB_VID, BANDB_USTL4_PID) },
 	{ USB_DEVICE(BANDB_VID, BANDB_USO9ML2_PID) },
+	{ USB_DEVICE(FTDI_VID, EVER_ECO_PRO_CDS) },
 	{ }						/* Terminating entry */
 };
 
@@ -1174,6 +1177,135 @@ check_and_exit:
 
 } /* set_serial_info */
 
+
+/*
+ * ***************************************************************************
+ * Sysfs Attribute
+ * ***************************************************************************
+ */
+
+ssize_t show_latency_timer(struct device *dev, char *buf)
+{
+	struct usb_serial_port *port = to_usb_serial_port(dev);
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
+	struct usb_device *udev;
+	unsigned short latency = 0;
+	int rv = 0;
+	
+	udev = to_usb_device(dev);
+	
+	dbg("%s",__FUNCTION__);
+	
+	rv = usb_control_msg(udev,
+			     usb_rcvctrlpipe(udev, 0),
+			     FTDI_SIO_GET_LATENCY_TIMER_REQUEST,
+			     FTDI_SIO_GET_LATENCY_TIMER_REQUEST_TYPE,
+			     0, priv->interface, 
+			     (char*) &latency, 1, WDR_TIMEOUT);
+	
+	if (rv < 0) {
+		dev_err(dev, "Unable to read latency timer: %i", rv);
+		return -EIO;
+	}
+	return sprintf(buf, "%i\n", latency);
+}
+
+/* Write a new value of the latency timer, in units of milliseconds. */
+ssize_t store_latency_timer(struct device *dev, const char *valbuf, size_t count)
+{
+	struct usb_serial_port *port = to_usb_serial_port(dev);
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
+	struct usb_device *udev;
+	char buf[1];
+	int v = simple_strtoul(valbuf, NULL, 10);
+	int rv = 0;
+	
+	udev = to_usb_device(dev);
+	
+	dbg("%s: setting latency timer = %i", __FUNCTION__, v);
+	
+	rv = usb_control_msg(udev,
+			     usb_sndctrlpipe(udev, 0),
+			     FTDI_SIO_SET_LATENCY_TIMER_REQUEST,
+			     FTDI_SIO_SET_LATENCY_TIMER_REQUEST_TYPE,
+			     v, priv->interface, 
+			     buf, 0, WDR_TIMEOUT);
+	
+	if (rv < 0) {
+		dev_err(dev, "Unable to write latency timer: %i", rv);
+		return -EIO;
+	}
+	
+	return count;
+}
+
+/* Write an event character directly to the FTDI register.  The ASCII
+   value is in the low 8 bits, with the enable bit in the 9th bit. */
+ssize_t store_event_char(struct device *dev, const char *valbuf, size_t count)
+{
+	struct usb_serial_port *port = to_usb_serial_port(dev);
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
+	struct usb_device *udev;
+	char buf[1];
+	int v = simple_strtoul(valbuf, NULL, 10);
+	int rv = 0;
+	
+	udev = to_usb_device(dev);
+	
+	dbg("%s: setting event char = %i", __FUNCTION__, v);
+	
+	rv = usb_control_msg(udev,
+			     usb_sndctrlpipe(udev, 0),
+			     FTDI_SIO_SET_EVENT_CHAR_REQUEST,
+			     FTDI_SIO_SET_EVENT_CHAR_REQUEST_TYPE,
+			     v, priv->interface, 
+			     buf, 0, WDR_TIMEOUT);
+	
+	if (rv < 0) {
+		dbg("Unable to write event character: %i", rv);
+		return -EIO;
+	}
+	
+	return count;
+}
+
+static DEVICE_ATTR(latency_timer, S_IWUGO | S_IRUGO, show_latency_timer, store_latency_timer);
+static DEVICE_ATTR(event_char, S_IWUGO, NULL, store_event_char);
+
+void create_sysfs_attrs(struct usb_serial *serial)
+{	
+	struct ftdi_private *priv;
+	struct usb_device *udev;
+
+	dbg("%s",__FUNCTION__);
+	
+	priv = usb_get_serial_port_data(serial->port[0]);
+	udev = serial->dev;
+	
+	if (priv->chip_type == FT232BM) {
+		dbg("sysfs attributes for FT232BM");
+		device_create_file(&udev->dev, &dev_attr_event_char);
+		device_create_file(&udev->dev, &dev_attr_latency_timer);
+	}
+}
+
+void remove_sysfs_attrs(struct usb_serial *serial)
+{
+	struct ftdi_private *priv;
+	struct usb_device *udev;
+
+	dbg("%s",__FUNCTION__);	
+
+	priv = usb_get_serial_port_data(serial->port[0]);
+	udev = serial->dev;
+	
+	if (priv->chip_type == FT232BM) {
+		device_remove_file(&udev->dev, &dev_attr_event_char);
+		device_remove_file(&udev->dev, &dev_attr_latency_timer);
+	}
+	
+}
+
 /*
  * ***************************************************************************
  * FTDI driver specific functions
@@ -1291,6 +1423,8 @@ static int ftdi_FT232BM_startup (struct usb_serial *serial)
 	priv->chip_type = FT232BM;
 	priv->baud_base = 48000000 / 2; /* Would be / 16, but FT232BM supports multiple of 0.125 divisor fractions! */
 	
+	create_sysfs_attrs(serial);
+
 	return (0);
 } /* ftdi_FT232BM_startup */
 
@@ -1384,6 +1518,8 @@ static void ftdi_shutdown (struct usb_serial *serial)
 
 	dbg("%s", __FUNCTION__);
 
+	remove_sysfs_attrs(serial);
+	
 	/* all open ports are closed at this point 
          *    (by usbserial.c:__serial_close, which calls ftdi_close)  
 	 */
@@ -1518,7 +1654,7 @@ static int ftdi_write (struct usb_serial_port *port,
 	dbg("%s port %d, %d bytes", __FUNCTION__, port->number, count);
 
 	if (count == 0) {
-		err("write request of 0 bytes");
+		dbg("write request of 0 bytes");
 		return 0;
 	}
 	

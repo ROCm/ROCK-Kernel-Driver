@@ -604,20 +604,6 @@ int synaptics_detect(struct psmouse *psmouse, int set_properties)
 	return 0;
 }
 
-#if defined(__i386__)
-#include <linux/dmi.h>
-static struct dmi_system_id toshiba_dmi_table[] = {
-	{
-		.ident = "Toshiba Satellite",
-		.matches = {
-			DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
-			DMI_MATCH(DMI_PRODUCT_NAME , "Satellite"),
-		},
-	},
-	{ }
-};
-#endif
-
 int synaptics_init(struct psmouse *psmouse)
 {
 	struct synaptics_data *priv;
@@ -650,18 +636,6 @@ int synaptics_init(struct psmouse *psmouse)
 	psmouse->disconnect = synaptics_disconnect;
 	psmouse->reconnect = synaptics_reconnect;
 	psmouse->pktsize = 6;
-
-#if defined(__i386__)
-	/*
-	 * Toshiba's KBC seems to have trouble handling data from
-	 * Synaptics as full rate, switch to lower rate which is roughly
-	 * thye same as rate of standard PS/2 mouse.
-	 */
-	if (psmouse->rate >= 80 && dmi_check_system(toshiba_dmi_table)) {
-		printk(KERN_INFO "synaptics: Toshiba Satellite detected, limiting rate to 40pps.\n");
-		psmouse->rate = 40;
-	}
-#endif
 
 	return 0;
 

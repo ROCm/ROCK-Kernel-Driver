@@ -355,14 +355,6 @@ static int dn_phase3_output(struct sk_buff *skb)
  * basically does a neigh_lookup(), but without comparing the device
  * field. This is required for the On-Ethernet cache
  */
-/*
- * Any traffic on a pointopoint link causes the timer to be reset
- * for the entry in the neighbour table.
- */
-void dn_neigh_pointopoint_notify(struct sk_buff *skb)
-{
-	return;
-}
 
 /*
  * Pointopoint link receives a hello message

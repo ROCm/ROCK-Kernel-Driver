@@ -18,7 +18,7 @@
 #include <linux/netdevice.h>
 #include <linux/spinlock.h>
 
-static spinlock_t limit_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(limit_lock);
 
 #define MAX_CPJ (0xFFFFFFFF / (HZ*60*60*24))
 

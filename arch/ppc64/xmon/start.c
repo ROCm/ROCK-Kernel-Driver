@@ -40,7 +40,7 @@ static struct sysrq_key_op sysrq_xmon_op =
 
 static int __init setup_xmon_sysrq(void)
 {
-	__sysrq_put_key_op('x', &sysrq_xmon_op);
+	register_sysrq_key('x', &sysrq_xmon_op);
 	return 0;
 }
 __initcall(setup_xmon_sysrq);

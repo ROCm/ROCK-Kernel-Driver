@@ -47,7 +47,7 @@ static inline struct thread_info *current_thread_info(void)
 	struct thread_info *ti;
 	unsigned long mask = PAGE_SIZE *
 		(1 << CONFIG_KERNEL_STACK_ORDER) - 1;
-	__asm__("andl %%esp,%0; ":"=r" (ti) : "0" (~mask));
+        ti = (struct thread_info *) (((unsigned long) &ti) & ~mask);
 	return ti;
 }
 
@@ -71,7 +71,6 @@ static inline struct thread_info *current_thread_info(void)
 					 * TIF_NEED_RESCHED 
 					 */
 #define TIF_RESTART_BLOCK 	4
-#define TIF_MEMDIE	 	5
 
 #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
 #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)

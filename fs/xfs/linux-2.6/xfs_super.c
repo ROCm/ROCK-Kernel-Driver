@@ -71,7 +71,6 @@
 #include <linux/namei.h>
 #include <linux/init.h>
 #include <linux/mount.h>
-#include <linux/suspend.h>
 #include <linux/writeback.h>
 
 STATIC struct quotactl_ops linvfs_qops;
@@ -489,8 +488,7 @@ xfssyncd(
 		set_current_state(TASK_INTERRUPTIBLE);
 		timeleft = schedule_timeout(timeleft);
 		/* swsusp */
-		if (current->flags & PF_FREEZE)
-			refrigerator(PF_FREEZE);
+		try_to_freeze(PF_FREEZE);
 		if (vfsp->vfs_flag & VFS_UMOUNT)
 			break;
 
@@ -829,6 +827,7 @@ linvfs_fill_super(
 	sb->s_blocksize = statvfs.f_bsize;
 	sb->s_blocksize_bits = ffs(statvfs.f_bsize) - 1;
 	sb->s_maxbytes = xfs_max_file_offset(sb->s_blocksize_bits);
+	sb->s_time_gran = 1;
 	set_posix_acl_flag(sb);
 
 	VFS_ROOT(vfsp, &rootvp, error);

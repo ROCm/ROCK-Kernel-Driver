@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.c,v 1.87 2004/11/14 17:07:07 dedekind Exp $
+ * $Id: nodelist.c,v 1.90 2004/12/08 17:59:20 dwmw2 Exp $
  *
  */
 
@@ -92,6 +92,17 @@ static void jffs2_free_full_dirent_list(struct jffs2_full_dirent *fd)
 	}
 }
 
+/* Returns first valid node after 'ref'. May return 'ref' */
+static struct jffs2_raw_node_ref *jffs2_first_valid_node(struct jffs2_raw_node_ref *ref)
+{
+	while (ref && ref->next_in_ino) {
+		if (!ref_obsolete(ref))
+			return ref;
+		D1(printk(KERN_DEBUG "node at 0x%08x is obsoleted. Ignoring.\n", ref_offset(ref)));
+		ref = ref->next_in_ino;
+	}
+	return NULL;
+}
 
 /* Get tmp_dnode_info and full_dirent for all non-obsolete nodes associated
    with this ino, returning the former in order of version */
@@ -101,7 +112,7 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			  uint32_t *highest_version, uint32_t *latest_mctime,
 			  uint32_t *mctime_ver)
 {
-	struct jffs2_raw_node_ref *ref = f->inocache->nodes;
+	struct jffs2_raw_node_ref *ref, *valid_ref;
 	struct jffs2_tmp_dnode_info *tn, *ret_tn = NULL;
 	struct jffs2_full_dirent *fd, *ret_fd = NULL;
 	union jffs2_node_union node;
@@ -111,22 +122,23 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 	*mctime_ver = 0;
 	
 	D1(printk(KERN_DEBUG "jffs2_get_inode_nodes(): ino #%u\n", f->inocache->ino));
-	if (!f->inocache->nodes) {
-		printk(KERN_WARNING "Eep. no nodes for ino #%u\n", f->inocache->ino);
-	}
 
 	spin_lock(&c->erase_completion_lock);
 
-	for (ref = f->inocache->nodes; ref && ref->next_in_ino; ref = ref->next_in_ino) {
-		/* Work out whether it's a data node or a dirent node */
-		if (ref_obsolete(ref)) {
-			/* FIXME: On NAND flash we may need to read these */
-			D1(printk(KERN_DEBUG "node at 0x%08x is obsoleted. Ignoring.\n", ref_offset(ref)));
-			continue;
-		}
+	valid_ref = jffs2_first_valid_node(f->inocache->nodes);
+
+	if (!valid_ref)
+		printk(KERN_WARNING "Eep. No valid nodes for ino #%u\n", f->inocache->ino);
+
+	while (valid_ref) {
 		/* We can hold a pointer to a non-obsolete node without the spinlock,
 		   but _obsolete_ nodes may disappear at any time, if the block
-		   they're in gets erased */
+		   they're in gets erased. So if we mark 'ref' obsolete while we're
+		   not holding the lock, it can go away immediately. For that reason,
+		   we find the next valid node first, before processing 'ref'.
+		*/
+		ref = valid_ref;
+		valid_ref = jffs2_first_valid_node(ref->next_in_ino);
 		spin_unlock(&c->erase_completion_lock);
 
 		cond_resched();
@@ -182,7 +194,6 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 				err = -ENOMEM;
 				goto free_out;
 			}
-			memset(fd,0,sizeof(struct jffs2_full_dirent) + node.d.nsize+1);
 			fd->raw = ref;
 			fd->version = je32_to_cpu(node.d.version);
 			fd->ino = je32_to_cpu(node.d.ino);
@@ -220,6 +231,7 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			}
 			fd->nhash = full_name_hash(fd->name, node.d.nsize);
 			fd->next = NULL;
+			fd->name[node.d.nsize] = '\0';
 				/* Wheee. We now have a complete jffs2_full_dirent structure, with
 				   the name in it and everything. Link it into the list 
 				*/

@@ -33,6 +33,9 @@
 
 #define	 RPCDBG_FACILITY RPCDBG_CACHE
 
+static void cache_defer_req(struct cache_req *req, struct cache_head *item);
+static void cache_revisit_request(struct cache_head *item);
+
 void cache_init(struct cache_head *h)
 {
 	time_t now = get_seconds();
@@ -158,7 +161,7 @@ void cache_fresh(struct cache_detail *detail,
  */
 
 static LIST_HEAD(cache_list);
-static spinlock_t cache_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cache_list_lock);
 static struct cache_detail *current_detail;
 static int current_index;
 
@@ -256,39 +259,13 @@ int cache_unregister(struct cache_detail *cd)
 	return 0;
 }
 
-struct cache_detail *cache_find(char *name)
-{
-	struct list_head *l;
-
-	spin_lock(&cache_list_lock);
-	list_for_each(l, &cache_list) {
-		struct cache_detail *cd = list_entry(l, struct cache_detail, others);
-		
-		if (strcmp(cd->name, name)==0) {
-			atomic_inc(&cd->inuse);
-			spin_unlock(&cache_list_lock);
-			return cd;
-		}
-	}
-	spin_unlock(&cache_list_lock);
-	return NULL;
-}
-
-/* cache_drop must be called on any cache returned by
- * cache_find, after it has been used
- */
-void cache_drop(struct cache_detail *detail)
-{
-	atomic_dec(&detail->inuse);
-}
-
 /* clean cache tries to find something to clean
  * and cleans it.
  * It returns 1 if it cleaned something,
  *            0 if it didn't find anything this time
  *           -1 if it fell off the end of the list.
  */
-int cache_clean(void)
+static int cache_clean(void)
 {
 	int rv = 0;
 	struct list_head *next;
@@ -428,12 +405,12 @@ void cache_purge(struct cache_detail *detail)
 
 #define	DFR_MAX	300	/* ??? */
 
-spinlock_t cache_defer_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cache_defer_lock);
 static LIST_HEAD(cache_defer_list);
 static struct list_head cache_defer_hash[DFR_HASHSIZE];
 static int cache_defer_cnt;
 
-void cache_defer_req(struct cache_req *req, struct cache_head *item)
+static void cache_defer_req(struct cache_req *req, struct cache_head *item)
 {
 	struct cache_deferred_req *dreq;
 	int hash = DFR_HASH(item);
@@ -483,7 +460,7 @@ void cache_defer_req(struct cache_req *req, struct cache_head *item)
 	}
 }
 
-void cache_revisit_request(struct cache_head *item)
+static void cache_revisit_request(struct cache_head *item)
 {
 	struct cache_deferred_req *dreq;
 	struct list_head pending;
@@ -556,7 +533,7 @@ void cache_clean_deferred(void *owner)
  *
  */
 
-static spinlock_t queue_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(queue_lock);
 static DECLARE_MUTEX(queue_io_sem);
 
 struct cache_queue {
@@ -902,7 +879,7 @@ void qword_addhex(char **bpp, int *lp, char *buf, int blen)
 	*lp = len;
 }
 
-void warn_no_listener(struct cache_detail *detail)
+static void warn_no_listener(struct cache_detail *detail)
 {
 	if (detail->last_warn != detail->last_close) {
 		detail->last_warn = detail->last_close;
@@ -1119,7 +1096,7 @@ static int c_show(struct seq_file *m, void *p)
 	return cd->cache_show(m, cd, cp);
 }
 
-struct seq_operations cache_content_op = {
+static struct seq_operations cache_content_op = {
 	.start	= c_start,
 	.next	= c_next,
 	.stop	= c_stop,

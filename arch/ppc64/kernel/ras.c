@@ -55,6 +55,13 @@
 static unsigned char ras_log_buf[RTAS_ERROR_LOG_MAX];
 static spinlock_t ras_log_buf_lock = SPIN_LOCK_UNLOCKED;
 
+char mce_data_buf[RTAS_ERROR_LOG_MAX]
+;
+/* This is true if we are using the firmware NMI handler (typically LPAR) */
+extern int fwnmi_active;
+
+extern void _exception(int signr, struct pt_regs *regs, int code, unsigned long addr);
+
 static int ras_get_sensor_state_token;
 static int ras_check_exception_token;
 
@@ -233,4 +240,117 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	spin_unlock(&ras_log_buf_lock);
 	return IRQ_HANDLED;
+}
+
+/* Get the error information for errors coming through the
+ * FWNMI vectors.  The pt_regs' r3 will be updated to reflect
+ * the actual r3 if possible, and a ptr to the error log entry
+ * will be returned if found.
+ *
+ * The mce_data_buf does not have any locks or protection around it,
+ * if a second machine check comes in, or a system reset is done
+ * before we have logged the error, then we will get corruption in the
+ * error log.  This is preferable over holding off on calling
+ * ibm,nmi-interlock which would result in us checkstopping if a
+ * second machine check did come in.
+ */
+static struct rtas_error_log *fwnmi_get_errinfo(struct pt_regs *regs)
+{
+	unsigned long errdata = regs->gpr[3];
+	struct rtas_error_log *errhdr = NULL;
+	unsigned long *savep;
+
+	if ((errdata >= 0x7000 && errdata < 0x7fff0) ||
+	    (errdata >= rtas.base && errdata < rtas.base + rtas.size - 16)) {
+		savep = __va(errdata);
+		regs->gpr[3] = savep[0];	/* restore original r3 */
+		memset(mce_data_buf, 0, RTAS_ERROR_LOG_MAX);
+		memcpy(mce_data_buf, (char *)(savep + 1), RTAS_ERROR_LOG_MAX);
+		errhdr = (struct rtas_error_log *)mce_data_buf;
+	} else {
+		printk("FWNMI: corrupt r3\n");
+	}
+	return errhdr;
+}
+
+/* Call this when done with the data returned by FWNMI_get_errinfo.
+ * It will release the saved data area for other CPUs in the
+ * partition to receive FWNMI errors.
+ */
+static void fwnmi_release_errinfo(void)
+{
+	int ret = rtas_call(rtas_token("ibm,nmi-interlock"), 0, 1, NULL);
+	if (ret != 0)
+		printk("FWNMI: nmi-interlock failed: %d\n", ret);
+}
+
+void pSeries_system_reset_exception(struct pt_regs *regs)
+{
+	if (fwnmi_active) {
+		struct rtas_error_log *errhdr = fwnmi_get_errinfo(regs);
+		if (errhdr) {
+			/* XXX Should look at FWNMI information */
+		}
+		fwnmi_release_errinfo();
+	}
+}
+
+/*
+ * See if we can recover from a machine check exception.
+ * This is only called on power4 (or above) and only via
+ * the Firmware Non-Maskable Interrupts (fwnmi) handler
+ * which provides the error analysis for us.
+ *
+ * Return 1 if corrected (or delivered a signal).
+ * Return 0 if there is nothing we can do.
+ */
+static int recover_mce(struct pt_regs *regs, struct rtas_error_log * err)
+{
+	int nonfatal = 0;
+
+	if (err->disposition == RTAS_DISP_FULLY_RECOVERED) {
+		/* Platform corrected itself */
+		nonfatal = 1;
+	} else if ((regs->msr & MSR_RI) &&
+		   user_mode(regs) &&
+		   err->severity == RTAS_SEVERITY_ERROR_SYNC &&
+		   err->disposition == RTAS_DISP_NOT_RECOVERED &&
+		   err->target == RTAS_TARGET_MEMORY &&
+		   err->type == RTAS_TYPE_ECC_UNCORR &&
+		   !(current->pid == 0 || current->pid == 1)) {
+		/* Kill off a user process with an ECC error */
+		printk(KERN_ERR "MCE: uncorrectable ecc error for pid %d\n",
+		       current->pid);
+		/* XXX something better for ECC error? */
+		_exception(SIGBUS, regs, BUS_ADRERR, regs->nip);
+		nonfatal = 1;
+	}
+
+ 	log_error((char *)err, ERR_TYPE_RTAS_LOG, !nonfatal);
+
+	return nonfatal;
+}
+
+/*
+ * Handle a machine check.
+ *
+ * Note that on Power 4 and beyond Firmware Non-Maskable Interrupts (fwnmi)
+ * should be present.  If so the handler which called us tells us if the
+ * error was recovered (never true if RI=0).
+ *
+ * On hardware prior to Power 4 these exceptions were asynchronous which
+ * means we can't tell exactly where it occurred and so we can't recover.
+ */
+int pSeries_machine_check_exception(struct pt_regs *regs)
+{
+	struct rtas_error_log *errp;
+
+	if (fwnmi_active) {
+		errp = fwnmi_get_errinfo(regs);
+		fwnmi_release_errinfo();
+		if (errp && recover_mce(regs, errp))
+			return 1;
+	}
+
+	return 0;
 }

@@ -9,15 +9,15 @@
 
 #define kernel_locked()		(current->lock_depth >= 0)
 
-extern int __lockfunc get_kernel_lock(void);
-extern void __lockfunc put_kernel_lock(void);
+extern int __lockfunc __reacquire_kernel_lock(void);
+extern void __lockfunc __release_kernel_lock(void);
 
 /*
  * Release/re-acquire global kernel lock for the scheduler
  */
 #define release_kernel_lock(tsk) do { 		\
 	if (unlikely((tsk)->lock_depth >= 0))	\
-		put_kernel_lock();		\
+		__release_kernel_lock();	\
 } while (0)
 
 /*
@@ -26,16 +26,16 @@ extern void __lockfunc put_kernel_lock(void);
  * reacquire_kernel_lock() so that the compiler can see
  * it at compile-time.
  */
-#ifdef CONFIG_SMP
-#define return_value_on_smp return
+#if defined(CONFIG_SMP) && !defined(CONFIG_PREEMPT_BKL)
+# define return_value_on_smp return
 #else
-#define return_value_on_smp
+# define return_value_on_smp
 #endif
 
 static inline int reacquire_kernel_lock(struct task_struct *task)
 {
 	if (unlikely(task->lock_depth >= 0))
-		return_value_on_smp get_kernel_lock();
+		return_value_on_smp __reacquire_kernel_lock();
 	return 0;
 }
 

@@ -66,6 +66,27 @@ STACK_SIZE  = 1 << STACK_SHIFT
  *    R15 - kernel stack pointer
  */
 
+	.macro  STORE_TIMER lc_offset
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	stpt	\lc_offset
+#endif
+	.endm
+
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	.macro  UPDATE_VTIME lc_from,lc_to,lc_sum
+	lm	%r10,%r11,\lc_from
+	sl	%r10,\lc_to
+	sl	%r11,\lc_to+4
+	bc	3,BASED(0f)
+	sl	%r10,BASED(.Lc_1)
+0:	al	%r10,\lc_sum
+	al	%r11,\lc_sum+4
+	bc	12,BASED(1f)
+	al	%r10,BASED(.Lc_1)
+1:	stm	%r10,%r11,\lc_sum
+	.endm
+#endif
+
 	.macro	SAVE_ALL_BASE savearea
 	stm	%r12,%r15,\savearea
 	l	%r13,__LC_SVC_NEW_PSW+4	# load &system_call to %r13
@@ -118,6 +139,7 @@ STACK_SIZE  = 1 << STACK_SHIFT
 	ni	__LC_RETURN_PSW+1,0xfd	# clear wait state bit
 	.endif
 	lm	%r0,%r15,SP_R0(%r15)	# load gprs 0-15 of user
+	STORE_TIMER __LC_EXIT_TIMER
 	lpsw	__LC_RETURN_PSW		# back to caller
 	.endm
 
@@ -159,9 +181,21 @@ __critical_start:
 
 	.globl  system_call
 system_call:
+	STORE_TIMER __LC_SYNC_ENTER_TIMER
+sysc_saveall:
 	SAVE_ALL_BASE __LC_SAVE_AREA
         SAVE_ALL __LC_SVC_OLD_PSW,__LC_SAVE_AREA,1
 	lh	%r7,0x8a	  # get svc number from lowcore
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+sysc_vtime:
+	tm	SP_PSW+1(%r15),0x01	# interrupting from user ?
+	bz	BASED(sysc_do_svc)
+	UPDATE_VTIME __LC_EXIT_TIMER,__LC_SYNC_ENTER_TIMER,__LC_USER_TIMER
+sysc_stime:
+	UPDATE_VTIME __LC_LAST_UPDATE_TIMER,__LC_EXIT_TIMER,__LC_SYSTEM_TIMER
+sysc_update:
+	mvc	__LC_LAST_UPDATE_TIMER(8),__LC_SYNC_ENTER_TIMER
+#endif
 sysc_do_svc:
 	l	%r9,__LC_THREAD_INFO	# load pointer to thread_info struct
 	sla	%r7,2             # *4 and test for svc 0
@@ -391,10 +425,19 @@ pgm_check_handler:
  * we just ignore the PER event (FIXME: is there anything we have to do
  * for LPSW?).
  */
+	STORE_TIMER __LC_SYNC_ENTER_TIMER
 	SAVE_ALL_BASE __LC_SAVE_AREA
         tm      __LC_PGM_INT_CODE+1,0x80 # check whether we got a per exception
         bnz     BASED(pgm_per)           # got per exception -> special case
 	SAVE_ALL __LC_PGM_OLD_PSW,__LC_SAVE_AREA,1
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	tm	SP_PSW+1(%r15),0x01	# interrupting from user ?
+	bz	BASED(pgm_no_vtime)
+	UPDATE_VTIME __LC_EXIT_TIMER,__LC_SYNC_ENTER_TIMER,__LC_USER_TIMER
+	UPDATE_VTIME __LC_LAST_UPDATE_TIMER,__LC_EXIT_TIMER,__LC_SYSTEM_TIMER
+	mvc	__LC_LAST_UPDATE_TIMER(8),__LC_SYNC_ENTER_TIMER
+pgm_no_vtime:
+#endif
 	l	%r9,__LC_THREAD_INFO	# load pointer to thread_info struct
         l       %r3,__LC_PGM_ILC         # load program interruption code
 	la	%r8,0x7f
@@ -425,6 +468,14 @@ pgm_per:
 #
 pgm_per_std:
 	SAVE_ALL __LC_PGM_OLD_PSW,__LC_SAVE_AREA,1
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	tm	SP_PSW+1(%r15),0x01	# interrupting from user ?
+	bz	BASED(pgm_no_vtime2)
+	UPDATE_VTIME __LC_EXIT_TIMER,__LC_SYNC_ENTER_TIMER,__LC_USER_TIMER
+	UPDATE_VTIME __LC_LAST_UPDATE_TIMER,__LC_EXIT_TIMER,__LC_SYSTEM_TIMER
+	mvc	__LC_LAST_UPDATE_TIMER(8),__LC_SYNC_ENTER_TIMER
+pgm_no_vtime2:
+#endif
 	l	%r9,__LC_THREAD_INFO	# load pointer to thread_info struct
 	l	%r1,__TI_task(%r9)
 	mvc	__THREAD_per+__PER_atmid(2,%r1),__LC_PER_ATMID
@@ -442,6 +493,14 @@ pgm_per_std:
 #
 pgm_svcper:
 	SAVE_ALL __LC_SVC_OLD_PSW,__LC_SAVE_AREA,1
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	tm	SP_PSW+1(%r15),0x01	# interrupting from user ?
+	bz	BASED(pgm_no_vtime3)
+	UPDATE_VTIME __LC_EXIT_TIMER,__LC_SYNC_ENTER_TIMER,__LC_USER_TIMER
+	UPDATE_VTIME __LC_LAST_UPDATE_TIMER,__LC_EXIT_TIMER,__LC_SYSTEM_TIMER
+	mvc	__LC_LAST_UPDATE_TIMER(8),__LC_SYNC_ENTER_TIMER
+pgm_no_vtime3:
+#endif
 	lh	%r7,0x8a		# get svc number from lowcore
 	l	%r9,__LC_THREAD_INFO	# load pointer to thread_info struct
 	l	%r1,__TI_task(%r9)
@@ -458,9 +517,18 @@ pgm_svcper:
 
         .globl io_int_handler
 io_int_handler:
+	STORE_TIMER __LC_ASYNC_ENTER_TIMER
 	stck	__LC_INT_CLOCK
 	SAVE_ALL_BASE __LC_SAVE_AREA+16
         SAVE_ALL __LC_IO_OLD_PSW,__LC_SAVE_AREA+16,0
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	tm	SP_PSW+1(%r15),0x01	# interrupting from user ?
+	bz	BASED(io_no_vtime)
+	UPDATE_VTIME __LC_EXIT_TIMER,__LC_ASYNC_ENTER_TIMER,__LC_USER_TIMER
+	UPDATE_VTIME __LC_LAST_UPDATE_TIMER,__LC_EXIT_TIMER,__LC_SYSTEM_TIMER
+	mvc	__LC_LAST_UPDATE_TIMER(8),__LC_ASYNC_ENTER_TIMER
+io_no_vtime:
+#endif
 	l	%r9,__LC_THREAD_INFO	# load pointer to thread_info struct
         l       %r1,BASED(.Ldo_IRQ)        # load address of do_IRQ
         la      %r2,SP_PTREGS(%r15) # address of register-save area
@@ -549,9 +617,18 @@ io_sigpending:
 
         .globl  ext_int_handler
 ext_int_handler:
+	STORE_TIMER __LC_ASYNC_ENTER_TIMER
 	stck	__LC_INT_CLOCK
 	SAVE_ALL_BASE __LC_SAVE_AREA+16
         SAVE_ALL __LC_EXT_OLD_PSW,__LC_SAVE_AREA+16,0
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	tm	SP_PSW+1(%r15),0x01	# interrupting from user ?
+	bz	BASED(ext_no_vtime)
+	UPDATE_VTIME __LC_EXIT_TIMER,__LC_ASYNC_ENTER_TIMER,__LC_USER_TIMER
+	UPDATE_VTIME __LC_LAST_UPDATE_TIMER,__LC_EXIT_TIMER,__LC_SYSTEM_TIMER
+	mvc	__LC_LAST_UPDATE_TIMER(8),__LC_ASYNC_ENTER_TIMER
+ext_no_vtime:
+#endif
 	l	%r9,__LC_THREAD_INFO	# load pointer to thread_info struct
 	la	%r2,SP_PTREGS(%r15)    # address of register-save area
 	lh	%r3,__LC_EXT_INT_CODE  # get interruption code
@@ -565,8 +642,17 @@ ext_int_handler:
 
         .globl mcck_int_handler
 mcck_int_handler:
+	STORE_TIMER __LC_ASYNC_ENTER_TIMER
 	SAVE_ALL_BASE __LC_SAVE_AREA+32
         SAVE_ALL __LC_MCK_OLD_PSW,__LC_SAVE_AREA+32,0
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	tm	SP_PSW+1(%r15),0x01	# interrupting from user ?
+	bz	BASED(mcck_no_vtime)
+	UPDATE_VTIME __LC_EXIT_TIMER,__LC_ASYNC_ENTER_TIMER,__LC_USER_TIMER
+	UPDATE_VTIME __LC_LAST_UPDATE_TIMER,__LC_EXIT_TIMER,__LC_SYSTEM_TIMER
+	mvc	__LC_LAST_UPDATE_TIMER(8),__LC_ASYNC_ENTER_TIMER
+mcck_no_vtime:
+#endif
 	l       %r1,BASED(.Ls390_mcck)
 	basr    %r14,%r1	  # call machine check handler
 mcck_return:
@@ -661,17 +747,47 @@ cleanup_critical:
 	br	%r14
 
 cleanup_system_call:
-	mvc	__LC_RETURN_PSW(4),0(%r12)
-	clc	4(4,%r12),BASED(cleanup_table_system_call)
-	bne	BASED(0f)
+	mvc	__LC_RETURN_PSW(8),0(%r12)
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	clc	__LC_RETURN_PSW+4(4),BASED(cleanup_system_call_insn+4)
+	bh	BASED(0f)
+	mvc	__LC_SYNC_ENTER_TIMER(8),__LC_ASYNC_ENTER_TIMER
+0:	clc	__LC_RETURN_PSW+4(4),BASED(cleanup_system_call_insn+8)
+	bhe	BASED(cleanup_vtime)
+#endif
+	clc	__LC_RETURN_PSW+4(4),BASED(cleanup_system_call_insn)
+	bh	BASED(0f)
 	mvc	__LC_SAVE_AREA(16),__LC_SAVE_AREA+16
 0:	st	%r13,__LC_SAVE_AREA+20
 	SAVE_ALL __LC_SVC_OLD_PSW,__LC_SAVE_AREA,1
 	st	%r15,__LC_SAVE_AREA+28
 	lh	%r7,0x8a
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+cleanup_vtime:
+	clc	__LC_RETURN_PSW+4(4),BASED(cleanup_system_call_insn+12)
+	bhe	BASED(cleanup_stime)
+	tm	SP_PSW+1(%r15),0x01	# interrupting from user ?
+	bz	BASED(cleanup_novtime)
+	UPDATE_VTIME __LC_EXIT_TIMER,__LC_SYNC_ENTER_TIMER,__LC_USER_TIMER
+cleanup_stime:
+	clc	__LC_RETURN_PSW+4(4),BASED(cleanup_system_call_insn+16)
+	bh	BASED(cleanup_update)
+	UPDATE_VTIME __LC_LAST_UPDATE_TIMER,__LC_EXIT_TIMER,__LC_SYSTEM_TIMER
+cleanup_update:
+	mvc	__LC_LAST_UPDATE_TIMER(8),__LC_SYNC_ENTER_TIMER
+cleanup_novtime:
+#endif
 	mvc	__LC_RETURN_PSW+4(4),BASED(cleanup_table_system_call+4)
 	la	%r12,__LC_RETURN_PSW
 	br	%r14
+cleanup_system_call_insn:
+	.long	sysc_saveall + 0x80000000
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	.long   system_call + 0x80000000
+	.long   sysc_vtime + 0x80000000
+	.long   sysc_stime + 0x80000000
+	.long   sysc_update + 0x80000000
+#endif
 
 cleanup_sysc_return:
 	mvc	__LC_RETURN_PSW(4),0(%r12)
@@ -680,15 +796,23 @@ cleanup_sysc_return:
 	br	%r14
 
 cleanup_sysc_leave:
-	clc	4(4,%r12),BASED(cleanup_sysc_leave_lpsw)
+	clc	4(4,%r12),BASED(cleanup_sysc_leave_insn)
 	be	BASED(0f)
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	mvc	__LC_EXIT_TIMER(8),__LC_ASYNC_ENTER_TIMER
+	clc	4(4,%r12),BASED(cleanup_sysc_leave_insn+4)
+	be	BASED(0f)
+#endif
 	mvc	__LC_RETURN_PSW(8),SP_PSW(%r15)
 	mvc	__LC_SAVE_AREA+16(16),SP_R12(%r15)
 	lm	%r0,%r11,SP_R0(%r15)
 	l	%r15,SP_R15(%r15)
 0:	la	%r12,__LC_RETURN_PSW
 	br	%r14
-cleanup_sysc_leave_lpsw:
+cleanup_sysc_leave_insn:
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+	.long	sysc_leave + 14 + 0x80000000
+#endif
 	.long	sysc_leave + 10 + 0x80000000
 
 /*
@@ -704,6 +828,7 @@ cleanup_sysc_leave_lpsw:
 .L0x028:       .short 0x028
 .L0x030:       .short 0x030
 .L0x038:       .short 0x038
+.Lc_1:         .long  1
 
 /*
  * Symbol constants

@@ -378,6 +378,11 @@ do_more:
 		}
 		jbd_lock_bh_state(bitmap_bh);
 #endif
+		if (need_resched()) {
+			jbd_unlock_bh_state(bitmap_bh);
+			cond_resched();
+			jbd_lock_bh_state(bitmap_bh);
+		}
 		/* @@@ This prevents newly-allocated data from being
 		 * freed and then reallocated within the same
 		 * transaction. 
@@ -1446,7 +1451,7 @@ static inline int test_root(int a, int b)
 	}
 }
 
-int ext3_group_sparse(int group)
+static int ext3_group_sparse(int group)
 {
 	return (test_root(group, 3) || test_root(group, 5) ||
 		test_root(group, 7));

@@ -140,8 +140,6 @@ static inline int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 #include <linux/binfmts.h>
 #include <linux/compat.h>
 
-int setup_arg_pages32(struct linux_binprm *bprm, int executable_stack);
-
 #define elf_prstatus elf_prstatus32
 struct elf_prstatus32
 {
@@ -191,7 +189,6 @@ struct elf_prpsinfo32
 
 #undef start_thread
 #define start_thread                    start_thread31 
-#define setup_arg_pages(bprm, exec)     setup_arg_pages32(bprm, exec)
 
 MODULE_DESCRIPTION("Binary format loader for compatibility with 32bit Linux for S390 binaries,"
                    " Copyright 2000 IBM Corporation"); 
@@ -200,12 +197,13 @@ MODULE_AUTHOR("Gerhard Tonn <ton@de.ibm.com>");
 #undef MODULE_DESCRIPTION
 #undef MODULE_AUTHOR
 
-#define jiffies_to_timeval jiffies_to_compat_timeval
+#undef cputime_to_timeval
+#define cputime_to_timeval cputime_to_compat_timeval
 static __inline__ void
-jiffies_to_compat_timeval(unsigned long jiffies, struct compat_timeval *value)
+cputime_to_compat_timeval(const cputime_t cputime, struct compat_timeval *value)
 {
-	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
-	value->tv_sec = jiffies / HZ;
+	value->tv_usec = cputime % 1000000;
+	value->tv_sec = cputime / 1000000;
 }
 
 #include "../../../fs/binfmt_elf.c"

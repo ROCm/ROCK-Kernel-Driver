@@ -70,10 +70,12 @@ typedef struct {
 	unsigned long seg;
 } mm_segment_t;
 
+#define MAX_TRAPS 10
+
 struct debug_trap {
 	int nr_trap;
-	unsigned long	addr;
-	unsigned long	insn;
+	unsigned long	addr[MAX_TRAPS];
+	unsigned long	insn[MAX_TRAPS];
 };
 
 struct thread_struct {

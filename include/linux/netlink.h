@@ -116,9 +116,6 @@ struct netlink_skb_parms
 #define NETLINK_CREDS(skb)	(&NETLINK_CB((skb)).creds)
 
 
-extern int netlink_attach(int unit, int (*function)(int,struct sk_buff *skb));
-extern void netlink_detach(int unit);
-extern int netlink_post(int unit, struct sk_buff *skb);
 extern struct sock *netlink_kernel_create(int unit, void (*input)(struct sock *sk, int len));
 extern void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err);
 extern int netlink_unicast(struct sock *ssk, struct sk_buff *skb, __u32 pid, int nonblock);
@@ -129,7 +126,6 @@ extern int netlink_register_notifier(struct notifier_block *nb);
 extern int netlink_unregister_notifier(struct notifier_block *nb);
 
 /* finegrained unicast helpers: */
-struct sock *netlink_getsockbypid(struct sock *ssk, u32 pid);
 struct sock *netlink_getsockbyfilp(struct file *filp);
 int netlink_attachskb(struct sock *sk, struct sk_buff *skb, int nonblock, long timeo);
 void netlink_detachskb(struct sock *sk, struct sk_buff *skb);

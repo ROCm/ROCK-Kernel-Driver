@@ -2,8 +2,8 @@
  *
  * Name:	skvpd.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 2.3 $
- * Date:	$Date: 2004/02/27 13:24:38 $
+ * Version:	$Revision: 1.37 $
+ * Date:	$Date: 2003/01/13 10:42:45 $
  * Purpose:	Shared software to read and write VPD data
  *
  ******************************************************************************/
@@ -25,7 +25,7 @@
 	Please refer skvpd.txt for infomation how to include this module
  */
 static const char SysKonnectFileId[] =
-	"@(#)$Id: skvpd.c,v 2.3 2004/02/27 13:24:38 malthoff Exp $ (C) SK";
+	"@(#)$Id: skvpd.c,v 1.37 2003/01/13 10:42:45 rschmidt Exp $ (C) SK";
 
 #include "h/skdrv1st.h"
 #include "h/sktypes.h"
@@ -374,8 +374,7 @@ int		dir)	/* transfer direction may be VPD_READ or VPD_WRITE */
 	return(Rtv);
 }
 
-#if defined (SKDIAG) || defined (SK_ASF)
-//#ifdef SKDIAG
+#ifdef SKDIAG
 
 /*
  *	Read 'len' bytes of VPD data, starting at 'addr'.
@@ -408,24 +407,16 @@ int		len)	/* number of bytes to write */
 }
 #endif	/* SKDIAG */
 
-/******************************************************************************
+/*
+ * (re)initialize the VPD buffer
  *
- *	VpdInit() - (re)initialize the VPD buffer
+ * Reads the VPD data from the EEPROM into the VPD buffer.
+ * Get the remaining read only and read / write space.
  *
- * Description:
- *	Reads the VPD data from the EEPROM into the VPD buffer.
- *	Get the remaining read only and read / write space.
- *
- * Note:
- *	This is a local function and should be used locally only.
- *	However, the ASF module needs to use this function also.
- *	Therfore it has been published.
- *
- * Returns:
- *	0:	success
- *	1:	fatal VPD error
+ * return	0:	success
+ *		1:	fatal VPD error
  */
-int VpdInit(
+static int VpdInit(
 SK_AC	*pAC,	/* Adapters context */
 SK_IOC	IoC)	/* IO Context */
 {
@@ -476,6 +467,17 @@ SK_IOC	IoC)	/* IO Context */
 	}
 	
 	pAC->vpd.vpd_size = vpd_size;
+
+	/* Asus K8V Se Deluxe bugfix. Correct VPD content */
+	/* MBo April 2004 */
+	if (((unsigned char)pAC->vpd.vpd_buf[0x3f] == 0x38) &&
+	    ((unsigned char)pAC->vpd.vpd_buf[0x40] == 0x3c) &&
+	    ((unsigned char)pAC->vpd.vpd_buf[0x41] == 0x45)) {
+		printk("sk98lin: Asus mainboard with buggy VPD? "
+				"Correcting data.\n");
+		pAC->vpd.vpd_buf[0x40] = 0x38;
+	}
+
 
 	/* find the end tag of the RO area */
 	if (!(r = vpd_find_para(pAC, VPD_RV, &rp))) {
@@ -554,7 +556,7 @@ SK_VPD_PARA *p)		/* parameter description struct */
 	if (*v != (char)RES_ID) {
 		SK_DBG_MSG(pAC, SK_DBGMOD_VPD, SK_DBGCAT_ERR | SK_DBGCAT_FATAL,
 			("Error: 0x%x missing\n", RES_ID));
-		return(0);
+		return NULL;
 	}
 
 	if (strcmp(key, VPD_NAME) == 0) {
@@ -598,7 +600,7 @@ SK_VPD_PARA *p)		/* parameter description struct */
 			("Key/Len Encoding error\n"));
 	}
 #endif /* DEBUG */
-	return(0);
+	return NULL;
 }
 
 /*
@@ -749,7 +751,7 @@ int		op)			/* operation to do: ADD_KEY or OWR_KEY */
 	vpd_size = pAC->vpd.vpd_size;
 
 	rtv = 0;
-	ip = 0;
+	ip = NULL;
 	if (type == VPD_RW_KEY) {
 		/* end tag is "RW" */
 		free = pAC->vpd.v.vpd_free_rw;

@@ -150,17 +150,17 @@ MODULE_DESCRIPTION("Olympic PCI/Cardbus Chipset Driver") ;
  */
 
 static int ringspeed[OLYMPIC_MAX_ADAPTERS] = {0,} ;
-MODULE_PARM(ringspeed, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i");
+module_param_array(ringspeed, int, NULL, 0);
 
 /* Packet buffer size */
 
 static int pkt_buf_sz[OLYMPIC_MAX_ADAPTERS] = {0,} ;
-MODULE_PARM(pkt_buf_sz, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i") ; 
+module_param_array(pkt_buf_sz, int, NULL, 0) ;
 
 /* Message Level */
 
 static int message_level[OLYMPIC_MAX_ADAPTERS] = {0,} ; 
-MODULE_PARM(message_level, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i") ; 
+module_param_array(message_level, int, NULL, 0) ;
 
 /* Change network_monitor to receive mac frames through the arb channel.
  * Will also create a /proc/net/olympic_tr%d entry, where %d is the tr
@@ -169,7 +169,7 @@ MODULE_PARM(message_level, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i") ;
  * i.e. it will give you the source address of beaconers on the ring 
  */
 static int network_monitor[OLYMPIC_MAX_ADAPTERS] = {0,};
-MODULE_PARM(network_monitor, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i");
+module_param_array(network_monitor, int, NULL, 0);
 
 static struct pci_device_id olympic_pci_tbl[] = {
 	{PCI_VENDOR_ID_IBM,PCI_DEVICE_ID_IBM_TR_WAKE,PCI_ANY_ID,PCI_ANY_ID,},
@@ -438,8 +438,8 @@ static int olympic_open(struct net_device *dev)
 	struct olympic_private *olympic_priv=(struct olympic_private *)dev->priv;
 	u8 __iomem *olympic_mmio=olympic_priv->olympic_mmio,*init_srb;
 	unsigned long flags, t;
-	char open_error[255] ; 
 	int i, open_finished = 1 ;
+	u8 resp, err;
 
 	DECLARE_WAITQUEUE(wait,current) ; 
 
@@ -540,52 +540,48 @@ static int olympic_open(struct net_device *dev)
                  * timed out.
 		 */
 
-		if(readb(init_srb+2)== OLYMPIC_CLEAR_RET_CODE) {
+		switch (resp = readb(init_srb+2)) {
+		case OLYMPIC_CLEAR_RET_CODE:
 			printk(KERN_WARNING "%s: Adapter Open time out or error.\n", dev->name) ; 
-			return -EIO ; 
-		}	
+			goto out;
+		case 0:
+			open_finished = 1;
+			break;
+		case 0x07:
+			if (!olympic_priv->olympic_ring_speed && open_finished) { /* Autosense , first time around */
+				printk(KERN_WARNING "%s: Retrying at different ring speed \n", dev->name); 
+				open_finished = 0 ;  
+				continue;
+			}
 
-		if(readb(init_srb+2)!=0) {
-			if (readb(init_srb+2) == 0x07) {  
-				if (!olympic_priv->olympic_ring_speed && open_finished) { /* Autosense , first time around */
-					printk(KERN_WARNING "%s: Retrying at different ring speed \n", dev->name); 
-					open_finished = 0 ;  
-				} else {
+			err = readb(init_srb+7);
 
-					strcpy(open_error, open_maj_error[(readb(init_srb+7) & 0xf0) >> 4]) ; 
-					strcat(open_error," - ") ; 
-					strcat(open_error, open_min_error[(readb(init_srb+7) & 0x0f)]) ;
+			if (!olympic_priv->olympic_ring_speed && ((err & 0x0f) == 0x0d)) { 
+				printk(KERN_WARNING "%s: Tried to autosense ring speed with no monitors present\n",dev->name);
+				printk(KERN_WARNING "%s: Please try again with a specified ring speed \n",dev->name);
+			} else {
+				printk(KERN_WARNING "%s: %s - %s\n", dev->name,
+					open_maj_error[(err & 0xf0) >> 4],
+					open_min_error[(err & 0x0f)]);
+			}
+			goto out;
 
-					if (!olympic_priv->olympic_ring_speed && ((readb(init_srb+7) & 0x0f) == 0x0d)) { 
-						printk(KERN_WARNING "%s: Tried to autosense ring speed with no monitors present\n",dev->name);
-						printk(KERN_WARNING "%s: Please try again with a specified ring speed \n",dev->name);
-						free_irq(dev->irq, dev);
-						return -EIO ;
-					}
+		case 0x32:
+			printk(KERN_WARNING "%s: Invalid LAA: %02x:%02x:%02x:%02x:%02x:%02x\n",
+				dev->name, 
+				olympic_priv->olympic_laa[0],
+				olympic_priv->olympic_laa[1],
+				olympic_priv->olympic_laa[2],
+				olympic_priv->olympic_laa[3],
+				olympic_priv->olympic_laa[4],
+				olympic_priv->olympic_laa[5]) ; 
+			goto out;
 
-					printk(KERN_WARNING "%s: %s\n",dev->name,open_error);
-					free_irq(dev->irq,dev) ; 
-					return -EIO ; 
- 
-				}	/* if autosense && open_finished */
-			} else if (init_srb[2] == 0x32) {
-				printk(KERN_WARNING "%s: Invalid LAA: %02x:%02x:%02x:%02x:%02x:%02x\n",
-					dev->name, 
-					olympic_priv->olympic_laa[0],
-					olympic_priv->olympic_laa[1],
-					olympic_priv->olympic_laa[2],
-					olympic_priv->olympic_laa[3],
-					olympic_priv->olympic_laa[4],
-					olympic_priv->olympic_laa[5]) ; 
-				free_irq(dev->irq,dev) ; 
-				return -EIO ; 
-			} else {  
-				printk(KERN_WARNING "%s: Bad OPEN response: %x\n", dev->name,init_srb[2]);
-				free_irq(dev->irq, dev);
-				return -EIO;
-			} 
-		} else 
-			open_finished = 1 ; 
+		default:
+			printk(KERN_WARNING "%s: Bad OPEN response: %x\n", dev->name, resp);
+			goto out;
+
+		}
 	} while (!(open_finished)) ; /* Will only loop if ring speed mismatch re-open attempted && autosense is on */	
 
 	if (readb(init_srb+18) & (1<<3)) 
@@ -634,8 +630,7 @@ static int olympic_open(struct net_device *dev)
 
 	if (i==0) {
 		printk(KERN_WARNING "%s: Not enough memory to allocate rx buffers. Adapter disabled\n",dev->name);
-		free_irq(dev->irq, dev);
-		return -EIO;
+		goto out;
 	}
 
 	olympic_priv->rx_ring_dma_addr = pci_map_single(olympic_priv->pdev,olympic_priv->olympic_rx_ring, 
@@ -737,7 +732,10 @@ static int olympic_open(struct net_device *dev)
 	
 	netif_start_queue(dev);
 	return 0;
-	
+
+out:
+	free_irq(dev->irq, dev);
+	return -EIO;
 }	
 
 /*

@@ -115,12 +115,6 @@ acpi_ex_convert_to_integer (
 	 */
 	result = 0;
 
-	/* Transfer no more than an integer's worth of data */
-
-	if (count > acpi_gbl_integer_byte_width) {
-		count = acpi_gbl_integer_byte_width;
-	}
-
 	/*
 	 * String conversion is different than Buffer conversion
 	 */
@@ -141,6 +135,12 @@ acpi_ex_convert_to_integer (
 
 
 	case ACPI_TYPE_BUFFER:
+
+		/* Transfer no more than an integer's worth of data */
+
+		if (count > acpi_gbl_integer_byte_width) {
+			count = acpi_gbl_integer_byte_width;
+		}
 
 		/*
 		 * Convert buffer to an integer - we simply grab enough raw data
@@ -173,6 +173,7 @@ acpi_ex_convert_to_integer (
 	/* Save the Result */
 
 	return_desc->integer.value = result;
+	acpi_ex_truncate_for32bit_table (return_desc);
 	*result_desc = return_desc;
 	return_ACPI_STATUS (AE_OK);
 }
@@ -398,9 +399,9 @@ acpi_ex_convert_to_string (
 {
 	union acpi_operand_object       *return_desc;
 	u8                              *new_buf;
+	u32                             i;
 	u32                             string_length = 0;
 	u16                             base = 16;
-	u32                             i;
 	u8                              separator = ',';
 
 
@@ -460,6 +461,8 @@ acpi_ex_convert_to_string (
 
 	case ACPI_TYPE_BUFFER:
 
+		/* Setup string length, base, and separator */
+
 		switch (type) {
 		case ACPI_EXPLICIT_CONVERT_DECIMAL: /* Used by to_decimal_string operator */
 			/*
@@ -467,9 +470,23 @@ acpi_ex_convert_to_string (
 			 * decimal values separated by commas."
 			 */
 			base = 10;
-			string_length = obj_desc->buffer.length; /* 4 chars for each decimal */
 
-			/*lint -fallthrough */
+			/*
+			 * Calculate the final string length.  Individual string values
+			 * are variable length (include separator for each)
+			 */
+			for (i = 0; i < obj_desc->buffer.length; i++) {
+				if (obj_desc->buffer.pointer[i] >= 100) {
+					string_length += 4;
+				}
+				else if (obj_desc->buffer.pointer[i] >= 10) {
+					string_length += 3;
+				}
+				else {
+					string_length += 2;
+				}
+			}
+			break;
 
 		case ACPI_IMPLICIT_CONVERT_HEX:
 			/*
@@ -477,55 +494,56 @@ acpi_ex_convert_to_string (
 			 *"The entire contents of the buffer are converted to a string of
 			 * two-character hexadecimal numbers, each separated by a space."
 			 */
-			if (type == ACPI_IMPLICIT_CONVERT_HEX) {
-				separator = ' ';
-			}
-
-			/*lint -fallthrough */
+			separator = ' ';
+			string_length = (obj_desc->buffer.length * 3);
+			break;
 
 		case ACPI_EXPLICIT_CONVERT_HEX:     /* Used by to_hex_string operator */
 			/*
 			 * From ACPI: "If Data is a buffer, it is converted to a string of
 			 * hexadecimal values separated by commas."
 			 */
-			string_length += (obj_desc->buffer.length * 3);
-			if (string_length > ACPI_MAX_STRING_CONVERSION) /* ACPI limit */ {
-				return_ACPI_STATUS (AE_AML_STRING_LIMIT);
-			}
-
-			/* Create a new string object and string buffer */
-
-			return_desc = acpi_ut_create_string_object ((acpi_size) string_length -1);
-			if (!return_desc) {
-				return_ACPI_STATUS (AE_NO_MEMORY);
-			}
-
-			new_buf = return_desc->buffer.pointer;
-
-			/*
-			 * Convert buffer bytes to hex or decimal values
-			 * (separated by commas)
-			 */
-			for (i = 0; i < obj_desc->buffer.length; i++) {
-				new_buf += acpi_ex_convert_to_ascii (
-						 (acpi_integer) obj_desc->buffer.pointer[i], base,
-						 new_buf, 1);
-				*new_buf++ = separator; /* each separated by a comma or space */
-			}
-
-			/* Null terminate the string (overwrites final comma from above) */
-
-			new_buf--;
-			*new_buf = 0;
-
-			/* Recalculate length */
-
-			return_desc->string.length = ACPI_STRLEN (return_desc->string.pointer);
+			string_length = (obj_desc->buffer.length * 3);
 			break;
 
 		default:
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
+
+		/*
+		 * Perform the conversion.
+		 * (-1 because of extra separator included in string_length from above)
+		 */
+		string_length--;
+		if (string_length > ACPI_MAX_STRING_CONVERSION) /* ACPI limit */ {
+			return_ACPI_STATUS (AE_AML_STRING_LIMIT);
+		}
+
+		/*
+		 * Create a new string object and string buffer
+		 */
+		return_desc = acpi_ut_create_string_object ((acpi_size) string_length);
+		if (!return_desc) {
+			return_ACPI_STATUS (AE_NO_MEMORY);
+		}
+
+		new_buf = return_desc->buffer.pointer;
+
+		/*
+		 * Convert buffer bytes to hex or decimal values
+		 * (separated by commas or spaces)
+		 */
+		for (i = 0; i < obj_desc->buffer.length; i++) {
+			new_buf += acpi_ex_convert_to_ascii (
+					 (acpi_integer) obj_desc->buffer.pointer[i], base,
+					 new_buf, 1);
+			*new_buf++ = separator; /* each separated by a comma or space */
+		}
+
+		/* Null terminate the string (overwrites final comma/space from above) */
+
+		new_buf--;
+		*new_buf = 0;
 		break;
 
 	default:

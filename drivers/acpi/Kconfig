@@ -20,7 +20,7 @@ config ACPI
 	  kernel by about 70K.
 
 	  Linux ACPI provides a robust functional replacement for several 
-	  legacy configuration and power management intefaces, including 
+	  legacy configuration and power management interfaces, including
 	  the Plug-and-Play BIOS specification (PnP BIOS), the 
 	  MultiProcessor Specification (MPS), and the Advanced Power 
 	  Management (APM) specification.  If both ACPI and APM support 
@@ -144,6 +144,15 @@ config ACPI_PROCESSOR
 	  ACPI C2 and C3 processor states to save power, on systems that
 	  support it.
 
+config ACPI_HOTPLUG_CPU
+	bool "Processor Hotplug (EXPERIMENTAL)"
+	depends on ACPI_PROCESSOR && HOTPLUG_CPU && EXPERIMENTAL
+	depends on !IA64_SGI_SN
+	select ACPI_CONTAINER
+	default n
+	 ---help---
+	 Select this option if your platform support physical CPU hotplug.
+
 config ACPI_THERMAL
 	tristate "Thermal Zone"
 	depends on ACPI_PROCESSOR
@@ -158,7 +167,7 @@ config ACPI_NUMA
 	bool "NUMA support"
 	depends on ACPI_INTERPRETER
 	depends on NUMA
-	depends on IA64
+	depends on (IA64 || X86_64)
 	default y if IA64_GENERIC || IA64_SGI_SN2
 
 config ACPI_ASUS
@@ -200,8 +209,8 @@ config ACPI_IBM
 	  This is a Linux ACPI driver for the IBM ThinkPad laptops. It adds
 	  support for Fn-Fx key combinations, Bluetooth control, video
 	  output switching, ThinkLight control, UltraBay eject and more.
-	  For more information about this driver see Documentation/ibm-acpi.txt
-	  and http://ibm-acpi.sf.net/ .
+	  For more information about this driver see <file:Documentation/ibm-acpi.txt>
+	  and <http://ibm-acpi.sf.net/> .
 
 	  If you have an IBM ThinkPad laptop, say Y or M here.
 
@@ -325,6 +334,14 @@ config X86_PM_TIMER
 	  kernel logs, and/or you are using this on a notebook which
 	  does not yet have an HPET, you should say "Y" here.
 
+config ACPI_CONTAINER
+	tristate "ACPI0004,PNP0A05 and PNP0A06 Container Driver (EXPERIMENTAL)"
+	depends on ACPI && EXPERIMENTAL
+	default (ACPI_HOTPLUG_MEMORY || ACPI_HOTPLUG_CPU || ACPI_HOTPLUG_IO)
+	 ---help---
+	 	This is the ACPI generic container driver which supports
+		ACPI0004, PNP0A05 and PNP0A06 devices
+
 config ACPI_INITRD
 	bool "Read DSDT from initrd"
 	depends on ACPI && BLK_DEV_INITRD && !ACPI_CUSTOM_DSDT
@@ -340,4 +357,3 @@ config ACPI_INITRD
 	  DSDT later. It is save to say yes here
 
 endmenu
-

@@ -19,6 +19,7 @@
 #endif
 #include <asm/ptrace.h>
 #include <asm/types.h>
+#include <asm/systemcfg.h>
 
 /* Machine State Register (MSR) Fields */
 #define MSR_SF_LG	63              /* Enable 64 bit mode */
@@ -44,6 +45,7 @@
 #define MSR_DR_LG	4 		/* Data Relocate */
 #define MSR_PE_LG	3		/* Protection Enable */
 #define MSR_PX_LG	2		/* Protection Exclusive Mode */
+#define MSR_PMM_LG	2		/* Performance monitor */
 #define MSR_RI_LG	1		/* Recoverable Exception */
 #define MSR_LE_LG	0 		/* Little Endian */
 
@@ -76,6 +78,7 @@
 #define MSR_DR		__MASK(MSR_DR_LG)	/* Data Relocate */
 #define MSR_PE		__MASK(MSR_PE_LG)	/* Protection Enable */
 #define MSR_PX		__MASK(MSR_PX_LG)	/* Protection Exclusive Mode */
+#define MSR_PMM		__MASK(MSR_PMM_LG)	/* Performance monitor */
 #define MSR_RI		__MASK(MSR_RI_LG)	/* Recoverable Exception */
 #define MSR_LE		__MASK(MSR_LE_LG)	/* Little Endian */
 
@@ -305,6 +308,9 @@
 #define SPRN_SIAR	780
 #define SPRN_SDAR	781
 #define SPRN_MMCRA	786
+#define   MMCRA_SIHV	0x10000000UL /* state of MSR HV when SIAR set */
+#define   MMCRA_SIPR	0x08000000UL /* state of MSR PR when SIAR set */
+#define   MMCRA_SAMPLE_ENABLE 0x00000001UL /* enable sampling */
 #define SPRN_PMC1	787
 #define SPRN_PMC2	788
 #define SPRN_PMC3	789
@@ -314,6 +320,26 @@
 #define SPRN_PMC7	793
 #define SPRN_PMC8	794
 #define SPRN_MMCR0	795
+#define   MMCR0_FC	0x80000000UL /* freeze counters. set to 1 on a perfmon exception */
+#define   MMCR0_FCS	0x40000000UL /* freeze in supervisor state */
+#define   MMCR0_KERNEL_DISABLE MMCR0_FCS
+#define   MMCR0_FCP	0x20000000UL /* freeze in problem state */
+#define   MMCR0_PROBLEM_DISABLE MMCR0_FCP
+#define   MMCR0_FCM1	0x10000000UL /* freeze counters while MSR mark = 1 */
+#define   MMCR0_FCM0	0x08000000UL /* freeze counters while MSR mark = 0 */
+#define   MMCR0_PMXE	0x04000000UL /* performance monitor exception enable */
+#define   MMCR0_FCECE	0x02000000UL /* freeze counters on enabled condition or event */
+/* time base exception enable */
+#define   MMCR0_TBEE	0x00400000UL /* time base exception enable */
+#define   MMCR0_PMC1CE	0x00008000UL /* PMC1 count enable*/
+#define   MMCR0_PMCjCE	0x00004000UL /* PMCj count enable*/
+#define   MMCR0_TRIGGER	0x00002000UL /* TRIGGER enable */
+#define   MMCR0_PMAO	0x00000080UL /* performance monitor alert has occurred, set to 0 after handling exception */
+#define   MMCR0_SHRFC	0x00000040UL /* SHRre freeze conditions between threads */
+#define   MMCR0_FCTI	0x00000008UL /* freeze counters in tags inactive mode */
+#define   MMCR0_FCTA	0x00000004UL /* freeze counters in tags active mode */
+#define   MMCR0_FCWAIT	0x00000002UL /* freeze counter in WAIT state */
+#define   MMCR0_FCHV	0x00000001UL /* freeze conditions in hypervisor mode */
 #define SPRN_MMCR1	798
 
 /* Short-hand versions for a number of the above SPRNs */
@@ -483,6 +509,7 @@ static inline void set_tb(unsigned int upper, unsigned int lower)
 #ifdef __KERNEL__
 
 extern int have_of;
+extern u64 ppc64_interrupt_controller;
 
 struct task_struct;
 void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp);
@@ -493,12 +520,6 @@ extern void prepare_to_copy(struct task_struct *tsk);
 
 /* Create a new kernel thread. */
 extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
-
-/*
- * Bus types
- */
-#define MCA_bus 0
-#define MCA_bus__is_a_macro /* for versions in ksyms.c */
 
 /* Lazy FPU handling on uni-processor */
 extern struct task_struct *last_task_used_math;
@@ -515,6 +536,10 @@ extern struct task_struct *last_task_used_altivec;
 
 #define TASK_SIZE (test_thread_flag(TIF_32BIT) ? \
 		TASK_SIZE_USER32 : TASK_SIZE_USER64)
+
+/* We can't actually tell the TASK_SIZE given just the mm, but default
+ * to the 64-bit case to make sure that enough gets cleaned up. */
+#define MM_VM_SIZE(mm)	TASK_SIZE_USER64
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.

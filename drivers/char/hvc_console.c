@@ -94,7 +94,7 @@ static struct list_head hvc_structs = LIST_HEAD_INIT(hvc_structs);
  * Protect the list of hvc_struct instances from inserts and removals during
  * list traversal.
  */
-static spinlock_t hvc_structs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hvc_structs_lock);
 
 /*
  * Initial console vtermnos for console API usage prior to full console
@@ -629,7 +629,7 @@ static int __devinit hvc_probe(
 	kobject_init(&hp->kobj);
 	hp->kobj.ktype = &hvc_kobj_type;
 
-	hp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&hp->lock);
 	spin_lock(&hvc_structs_lock);
 	hp->index = ++hvc_count;
 	list_add_tail(&(hp->next), &hvc_structs);

@@ -168,7 +168,7 @@ static int hugetlbfs_commit_write(struct file *file,
 	return -EINVAL;
 }
 
-void huge_pagevec_release(struct pagevec *pvec)
+static void huge_pagevec_release(struct pagevec *pvec)
 {
 	int i;
 
@@ -178,7 +178,7 @@ void huge_pagevec_release(struct pagevec *pvec)
 	pagevec_reinit(pvec);
 }
 
-void truncate_huge_page(struct page *page)
+static void truncate_huge_page(struct page *page)
 {
 	clear_page_dirty(page);
 	ClearPageUptodate(page);
@@ -186,7 +186,7 @@ void truncate_huge_page(struct page *page)
 	put_page(page);
 }
 
-void truncate_hugepages(struct address_space *mapping, loff_t lstart)
+static void truncate_hugepages(struct address_space *mapping, loff_t lstart)
 {
 	const pgoff_t start = lstart >> HPAGE_SHIFT;
 	struct pagevec pvec;
@@ -495,7 +495,7 @@ static int hugetlbfs_symlink(struct inode *dir,
 /*
  * For direct-IO reads into hugetlb pages
  */
-int hugetlbfs_set_page_dirty(struct page *page)
+static int hugetlbfs_set_page_dirty(struct page *page)
 {
 	return 0;
 }
@@ -672,6 +672,7 @@ hugetlbfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_blocksize_bits = HPAGE_SHIFT;
 	sb->s_magic = HUGETLBFS_MAGIC;
 	sb->s_op = &hugetlbfs_ops;
+	sb->s_time_gran = 1;
 	inode = hugetlbfs_get_inode(sb, config.uid, config.gid,
 					S_IFDIR | config.mode, 0);
 	if (!inode)

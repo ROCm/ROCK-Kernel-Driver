@@ -948,12 +948,12 @@ static int do_replace(void __user *user, unsigned int len)
 	/* Decrease module usage counts and free resource */
 	ARPT_ENTRY_ITERATE(oldinfo->entries, oldinfo->size, cleanup_entry,NULL);
 	vfree(oldinfo);
-	/* Silent error: too late now. */
-	copy_to_user(tmp.counters, counters,
-		     sizeof(struct arpt_counters) * tmp.num_counters);
+	if (copy_to_user(tmp.counters, counters,
+			 sizeof(struct arpt_counters) * tmp.num_counters) != 0)
+		ret = -EFAULT;
 	vfree(counters);
 	up(&arpt_mutex);
-	return 0;
+	return ret;
 
  put_module:
 	module_put(t->me);
@@ -1150,7 +1150,8 @@ void arpt_unregister_target(struct arpt_target *target)
 	up(&arpt_mutex);
 }
 
-int arpt_register_table(struct arpt_table *table)
+int arpt_register_table(struct arpt_table *table,
+			const struct arpt_replace *repl)
 {
 	int ret;
 	struct arpt_table_info *newinfo;
@@ -1158,18 +1159,18 @@ int arpt_register_table(struct arpt_table *table)
 		= { 0, 0, 0, { 0 }, { 0 }, { } };
 
 	newinfo = vmalloc(sizeof(struct arpt_table_info)
-			  + SMP_ALIGN(table->table->size) * NR_CPUS);
+			  + SMP_ALIGN(repl->size) * NR_CPUS);
 	if (!newinfo) {
 		ret = -ENOMEM;
 		return ret;
 	}
-	memcpy(newinfo->entries, table->table->entries, table->table->size);
+	memcpy(newinfo->entries, repl->entries, repl->size);
 
 	ret = translate_table(table->name, table->valid_hooks,
-			      newinfo, table->table->size,
-			      table->table->num_entries,
-			      table->table->hook_entry,
-			      table->table->underflow);
+			      newinfo, repl->size,
+			      repl->num_entries,
+			      repl->hook_entry,
+			      repl->underflow);
 	duprintf("arpt_register_table: translate table gives %d\n", ret);
 	if (ret != 0) {
 		vfree(newinfo);

@@ -83,7 +83,6 @@ __build: $(if $(KBUILD_BUILTIN),$(builtin-target) $(lib-target) $(extra-y)) \
 
 # Linus' kernel sanity checking tool
 ifneq ($(KBUILD_CHECKSRC),0)
-  CHECKFLAGS += -I$(shell $(CC) -print-file-name=include)
   ifeq ($(KBUILD_CHECKSRC),2)
     quiet_cmd_force_checksrc = CHECK   $<
           cmd_force_checksrc = $(CHECK) $(CHECKFLAGS) $(c_flags) $< ;

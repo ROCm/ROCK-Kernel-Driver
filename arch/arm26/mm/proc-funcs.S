@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mm/proc-arm2,3.S
+ *  linux/arch/arm26/mm/proc-arm2,3.S
  *
  *  Copyright (C) 1997-1999 Russell King
  *

@@ -292,6 +292,8 @@ struct sk_buff {
 
 extern void	       __kfree_skb(struct sk_buff *skb);
 extern struct sk_buff *alloc_skb(unsigned int size, int priority);
+extern struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
+					    unsigned int size, int priority);
 extern void	       kfree_skbmem(struct sk_buff *skb);
 extern struct sk_buff *skb_clone(struct sk_buff *skb, int priority);
 extern struct sk_buff *skb_copy(const struct sk_buff *skb, int priority);
@@ -935,6 +937,7 @@ static inline void __skb_queue_purge(struct sk_buff_head *list)
  *
  *	%NULL is returned in there is no free memory.
  */
+#ifndef CONFIG_HAVE_ARCH_DEV_ALLOC_SKB
 static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 					      int gfp_mask)
 {
@@ -943,6 +946,9 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 		skb_reserve(skb, 16);
 	return skb;
 }
+#else
+extern struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask);
+#endif
 
 /**
  *	dev_alloc_skb - allocate an skbuff for sending
@@ -1071,23 +1077,18 @@ static inline void kunmap_skb_frag(void *vaddr)
 }
 
 #define skb_queue_walk(queue, skb) \
-		for (skb = (queue)->next, prefetch(skb->next);	\
-		     (skb != (struct sk_buff *)(queue));	\
-		     skb = skb->next, prefetch(skb->next))
+		for (skb = (queue)->next;					\
+		     prefetch(skb->next), (skb != (struct sk_buff *)(queue));	\
+		     skb = skb->next)
 
 
 extern struct sk_buff *skb_recv_datagram(struct sock *sk, unsigned flags,
 					 int noblock, int *err);
 extern unsigned int    datagram_poll(struct file *file, struct socket *sock,
 				     struct poll_table_struct *wait);
-extern int	       skb_copy_datagram(const struct sk_buff *from,
-					 int offset, char __user *to, int size);
 extern int	       skb_copy_datagram_iovec(const struct sk_buff *from,
 					       int offset, struct iovec *to,
 					       int size);
-extern int	       skb_copy_and_csum_datagram(const struct sk_buff *skb,
-						  int offset, u8 __user *to,
-						  int len, unsigned int *csump);
 extern int	       skb_copy_and_csum_datagram_iovec(const
 							struct sk_buff *skb,
 							int hlen,

@@ -14,10 +14,6 @@
 #include <linux/swap.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-#endif	/* CONFIG_KDB */
 #include <linux/namei.h>
 #include <linux/shm.h>
 #include <linux/blkdev.h>
@@ -28,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/rmap.h>
 #include <linux/security.h>
+#include <linux/acct.h>
 #include <linux/backing-dev.h>
 #include <linux/syscalls.h>
 
@@ -35,7 +32,7 @@
 #include <asm/tlbflush.h>
 #include <linux/swapops.h>
 
-spinlock_t swaplock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(swaplock);
 unsigned int nr_swapfiles;
 long total_swap_pages;
 static int swap_overflow;
@@ -440,15 +437,16 @@ unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
 	page_add_anon_rmap(page, vma, address);
 	swap_free(entry);
+	acct_update_integrals();
+	update_mem_hiwater();
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
-	unsigned long address, unsigned long size, unsigned long offset,
+static unsigned long unuse_pmd(struct vm_area_struct *vma, pmd_t *dir,
+	unsigned long address, unsigned long end,
 	swp_entry_t entry, struct page *page)
 {
-	pte_t * pte;
-	unsigned long end;
+	pte_t *pte;
 	pte_t swp_pte = swp_entry_to_pte(entry);
 
 	if (pmd_none(*dir))
@@ -459,18 +457,13 @@ static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		return 0;
 	}
 	pte = pte_offset_map(dir, address);
-	offset += address & PMD_MASK;
-	address &= ~PMD_MASK;
-	end = address + size;
-	if (end > PMD_SIZE)
-		end = PMD_SIZE;
 	do {
 		/*
 		 * swapoff spends a _lot_ of time in this loop!
 		 * Test inline before going to call unuse_pte.
 		 */
 		if (unlikely(pte_same(*pte, swp_pte))) {
-			unuse_pte(vma, offset + address, pte, entry, page);
+			unuse_pte(vma, address, pte, entry, page);
 			pte_unmap(pte);
 
 			/*
@@ -480,77 +473,104 @@ static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 			activate_page(page);
 
 			/* add 1 since address may be 0 */
-			return 1 + offset + address;
+			return 1 + address;
 		}
 		address += PAGE_SIZE;
 		pte++;
-	} while (address && (address < end));
+	} while (address < end);
 	pte_unmap(pte - 1);
 	return 0;
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static unsigned long unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
-	unsigned long address, unsigned long size,
+static unsigned long unuse_pud(struct vm_area_struct *vma, pud_t *pud,
+        unsigned long address, unsigned long end,
 	swp_entry_t entry, struct page *page)
 {
-	pmd_t * pmd;
-	unsigned long offset, end;
+	pmd_t *pmd;
+	unsigned long next;
 	unsigned long foundaddr;
 
-	if (pgd_none(*dir))
+	if (pud_none(*pud))
 		return 0;
-	if (pgd_bad(*dir)) {
-		pgd_ERROR(*dir);
-		pgd_clear(dir);
+	if (pud_bad(*pud)) {
+		pud_ERROR(*pud);
+		pud_clear(pud);
 		return 0;
 	}
-	pmd = pmd_offset(dir, address);
-	offset = address & PGDIR_MASK;
-	address &= ~PGDIR_MASK;
-	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
-	if (address >= end)
-		BUG();
+	pmd = pmd_offset(pud, address);
 	do {
-		foundaddr = unuse_pmd(vma, pmd, address, end - address,
-						offset, entry, page);
+		next = (address + PMD_SIZE) & PMD_MASK;
+		if (next > end || !next)
+			next = end;
+		foundaddr = unuse_pmd(vma, pmd, address, next, entry, page);
 		if (foundaddr)
 			return foundaddr;
-		address = (address + PMD_SIZE) & PMD_MASK;
+		address = next;
 		pmd++;
-	} while (address && (address < end));
+	} while (address < end);
 	return 0;
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static unsigned long unuse_vma(struct vm_area_struct * vma,
+static unsigned long unuse_pgd(struct vm_area_struct *vma, pgd_t *pgd,
+	unsigned long address, unsigned long end,
 	swp_entry_t entry, struct page *page)
 {
-	pgd_t *pgdir;
-	unsigned long start, end;
+	pud_t *pud;
+	unsigned long next;
+	unsigned long foundaddr;
+
+	if (pgd_none(*pgd))
+		return 0;
+	if (pgd_bad(*pgd)) {
+		pgd_ERROR(*pgd);
+		pgd_clear(pgd);
+		return 0;
+	}
+	pud = pud_offset(pgd, address);
+	do {
+		next = (address + PUD_SIZE) & PUD_MASK;
+		if (next > end || !next)
+			next = end;
+		foundaddr = unuse_pud(vma, pud, address, next, entry, page);
+		if (foundaddr)
+			return foundaddr;
+		address = next;
+		pud++;
+	} while (address < end);
+	return 0;
+}
+
+/* vma->vm_mm->page_table_lock is held */
+static unsigned long unuse_vma(struct vm_area_struct *vma,
+	swp_entry_t entry, struct page *page)
+{
+	pgd_t *pgd;
+	unsigned long address, next, end;
 	unsigned long foundaddr;
 
 	if (page->mapping) {
-		start = page_address_in_vma(page, vma);
-		if (start == -EFAULT)
+		address = page_address_in_vma(page, vma);
+		if (address == -EFAULT)
 			return 0;
 		else
-			end = start + PAGE_SIZE;
+			end = address + PAGE_SIZE;
 	} else {
-		start = vma->vm_start;
+		address = vma->vm_start;
 		end = vma->vm_end;
 	}
-	pgdir = pgd_offset(vma->vm_mm, start);
+	pgd = pgd_offset(vma->vm_mm, address);
 	do {
-		foundaddr = unuse_pgd(vma, pgdir, start, end - start,
-						entry, page);
+		next = (address + PGDIR_SIZE) & PGDIR_MASK;
+		if (next > end || !next)
+			next = end;
+		foundaddr = unuse_pgd(vma, pgd, address, next, entry, page);
 		if (foundaddr)
 			return foundaddr;
-		start = (start + PGDIR_SIZE) & PGDIR_MASK;
-		pgdir++;
-	} while (start && (start < end));
+		address = next;
+		pgd++;
+	} while (address < end);
 	return 0;
 }
 
@@ -1596,8 +1616,7 @@ bad_swap_2:
 		++least_priority;
 	swap_list_unlock();
 	destroy_swap_extents(p);
-	if (swap_map)
-		vfree(swap_map);
+	vfree(swap_map);
 	if (swap_file)
 		filp_close(swap_file, NULL);
 out:
@@ -1631,24 +1650,6 @@ void si_swapinfo(struct sysinfo *val)
 	val->totalswap = total_swap_pages + nr_to_be_unused;
 	swap_list_unlock();
 }
-
-#ifdef	CONFIG_KDB
-/* Like si_swapinfo() but without the locks */
-void kdb_si_swapinfo(struct sysinfo *val)
-{
-	unsigned int i;
-	unsigned long nr_to_be_unused = 0;
-
-	for (i = 0; i < nr_swapfiles; i++) {
-		if (!(swap_info[i].flags & SWP_USED) ||
-		     (swap_info[i].flags & SWP_WRITEOK))
-			continue;
-		nr_to_be_unused += swap_info[i].inuse_pages;
-	}
-	val->freeswap = nr_swap_pages + nr_to_be_unused;
-	val->totalswap = total_swap_pages + nr_to_be_unused;
-}
-#endif	/* CONFIG_KDB */
 
 /*
  * Verify that a swap entry is valid and increment its swap map count.

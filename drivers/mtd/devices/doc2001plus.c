@@ -6,7 +6,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001plus.c,v 1.11 2004/11/16 18:29:01 dwmw2 Exp $
+ * $Id: doc2001plus.c,v 1.13 2005/01/05 18:05:12 dwmw2 Exp $
  *
  * Released under GPL
  */
@@ -190,7 +190,7 @@ static int DoC_SelectFloor(void __iomem * docptr, int floor)
    may not want it */
 static unsigned int DoC_GetDataOffset(struct mtd_info *mtd, loff_t *from)
 {
-	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 
 	if (this->interleave) {
 		unsigned int ofs = *from & 0x3ff;
@@ -458,24 +458,24 @@ static const char im_name[] = "DoCMilPlus_init";
  */
 static void DoCMilPlus_init(struct mtd_info *mtd)
 {
-	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	struct DiskOnChip *old = NULL;
 
 	/* We must avoid being called twice for the same device. */
 	if (docmilpluslist)
-		old = (struct DiskOnChip *)docmilpluslist->priv;
+		old = docmilpluslist->priv;
 
 	while (old) {
 		if (DoCMilPlus_is_alias(this, old)) {
 			printk(KERN_NOTICE "Ignoring DiskOnChip Millennium "
 				"Plus at 0x%lX - already configured\n",
 				this->physadr);
-			iounmap((void *)this->virtadr);
+			iounmap(this->virtadr);
 			kfree(mtd);
 			return;
 		}
 		if (old->nextdoc)
-			old = (struct DiskOnChip *)old->nextdoc->priv;
+			old = old->nextdoc->priv;
 		else
 			old = NULL;
 	}
@@ -514,7 +514,7 @@ static void DoCMilPlus_init(struct mtd_info *mtd)
 
 	if (!this->totlen) {
 		kfree(mtd);
-		iounmap((void *)this->virtadr);
+		iounmap(this->virtadr);
 	} else {
 		this->nextdoc = docmilpluslist;
 		docmilpluslist = mtd;
@@ -530,7 +530,7 @@ static int doc_dumpblk(struct mtd_info *mtd, loff_t from)
 {
 	int i;
 	loff_t fofs;
-	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	void __iomem * docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[from >> (this->chipshift)];
 	unsigned char *bp, buf[1056];
@@ -615,7 +615,7 @@ static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
 	volatile char dummy;
 	loff_t fofs;
 	unsigned char syndrome[6];
-	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	void __iomem * docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[from >> (this->chipshift)];
 
@@ -754,7 +754,7 @@ static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 	int i, before, ret = 0;
 	loff_t fto;
 	volatile char dummy;
-	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	void __iomem * docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[to >> (this->chipshift)];
 
@@ -880,7 +880,7 @@ static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 			size_t *retlen, u_char *buf)
 {
 	loff_t fofs, base;
-	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	void __iomem * docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[ofs >> this->chipshift];
 	size_t i, size, got, want;
@@ -958,7 +958,7 @@ static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 {
 	volatile char dummy;
 	loff_t fofs, base;
-	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	void __iomem * docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[ofs >> this->chipshift];
 	size_t i, size, got, want;
@@ -1058,7 +1058,7 @@ static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	volatile char dummy;
-	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
+	struct DiskOnChip *this = mtd->priv;
 	__u32 ofs = instr->addr;
 	__u32 len = instr->len;
 	void __iomem * docptr = this->virtadr;
@@ -1134,12 +1134,12 @@ static void __exit cleanup_doc2001plus(void)
 	struct DiskOnChip *this;
 
 	while ((mtd=docmilpluslist)) {
-		this = (struct DiskOnChip *)mtd->priv;
+		this = mtd->priv;
 		docmilpluslist = this->nextdoc;
 			
 		del_mtd_device(mtd);
 			
-		iounmap((void *)this->virtadr);
+		iounmap(this->virtadr);
 		kfree(this->chips);
 		kfree(mtd);
 	}

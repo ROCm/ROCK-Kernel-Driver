@@ -47,7 +47,7 @@ static DECLARE_MUTEX(nf_sockopt_mutex);
 
 struct list_head nf_hooks[NPROTO][NF_MAX_HOOKS];
 static LIST_HEAD(nf_sockopts);
-static spinlock_t nf_hook_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nf_hook_lock);
 
 /* 
  * A queue handler may be registered for each protocol.  Each is protected by
@@ -58,7 +58,7 @@ static struct nf_queue_handler_t {
 	nf_queue_outfn_t outfn;
 	void *data;
 } queue_handler[NPROTO];
-static rwlock_t queue_handler_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(queue_handler_lock);
 
 int nf_register_hook(struct nf_hook_ops *reg)
 {
@@ -173,7 +173,7 @@ static void debug_print_hooks_ip(unsigned int nf_debug)
 	printk("\n");
 }
 
-void nf_dump_skb(int pf, struct sk_buff *skb)
+static void nf_dump_skb(int pf, struct sk_buff *skb)
 {
 	printk("skb: pf=%i %s dev=%s len=%u\n", 
 	       pf,
@@ -744,7 +744,7 @@ EXPORT_SYMBOL(skb_ip_make_writable);
 
 static nf_logfn *nf_logging[NPROTO]; /* = NULL */
 static int reported = 0;
-static spinlock_t nf_log_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(nf_log_lock);
 
 int nf_log_register(int pf, nf_logfn *logfn)
 {

@@ -45,6 +45,7 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
 static void
 truncate_complete_page(struct address_space *mapping, struct page *page)
 {
+	BUG_ON(page_mapped(page));
 	if (page->mapping != mapping)
 		return;
 
@@ -64,6 +65,8 @@ truncate_complete_page(struct address_space *mapping, struct page *page)
  * be marked dirty at any time too.  So we re-check the dirtiness inside
  * ->tree_lock.  That provides exclusion against the __set_page_dirty
  * functions.
+ *
+ * Returns non-zero if the page was successfully invalidated.
  */
 static int
 invalidate_complete_page(struct address_space *mapping, struct page *page)
@@ -88,10 +91,6 @@ invalidate_complete_page(struct address_space *mapping, struct page *page)
 	}
 
 	BUG_ON(PagePrivate(page));
-	if (page_count(page) != 2) {
-		write_unlock_irq(&mapping->tree_lock);
-		return 0;
-	}
 	__remove_from_page_cache(page);
 	write_unlock_irq(&mapping->tree_lock);
 	ClearPageUptodate(page);
@@ -280,50 +279,67 @@ unsigned long invalidate_inode_pages(struct address_space *mapping)
 EXPORT_SYMBOL(invalidate_inode_pages);
 
 /**
- * invalidate_inode_pages2 - remove all unmapped pages from an address_space
+ * invalidate_inode_pages2 - remove all pages from an address_space
  * @mapping - the address_space
  *
- * invalidate_inode_pages2() is like truncate_inode_pages(), except for the case
- * where the page is seen to be mapped into process pagetables.  In that case,
- * the page is marked clean but is left attached to its address_space.
+ * Any pages which are found to be mapped into pagetables are unmapped prior to
+ * invalidation.
  *
- * The page is also marked not uptodate so that a subsequent pagefault will
- * perform I/O to bringthe page's contents back into sync with its backing
- * store.
- *
- * FIXME: invalidate_inode_pages2() is probably trivially livelockable.
+ * Returns -EIO if any pages could not be invalidated.
  */
-void invalidate_inode_pages2(struct address_space *mapping)
+int invalidate_inode_pages2(struct address_space *mapping)
 {
 	struct pagevec pvec;
 	pgoff_t next = 0;
 	int i;
+	int ret = 0;
+	int did_full_unmap = 0;
 
 	pagevec_init(&pvec, 0);
-	while (pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
-		for (i = 0; i < pagevec_count(&pvec); i++) {
+	while (!ret && pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
+		for (i = 0; !ret && i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
+			int was_dirty;
 
 			lock_page(page);
-			if (page->mapping == mapping) {	/* truncate race? */
-				wait_on_page_writeback(page);
-				next = page->index + 1;
-				if (page_mapped(page)) {
-					clear_page_dirty(page);
-					ClearPageUptodate(page);
+			if (page->mapping != mapping) {	/* truncate race? */
+				unlock_page(page);
+				continue;
+			}
+			wait_on_page_writeback(page);
+			next = page->index + 1;
+			while (page_mapped(page)) {
+				if (!did_full_unmap) {
+					/*
+					 * Zap the rest of the file in one hit.
+					 * FIXME: invalidate_inode_pages2()
+					 * should take start/end offsets.
+					 */
+					unmap_mapping_range(mapping,
+						page->index << PAGE_CACHE_SHIFT,
+					  	-1, 0);
+					did_full_unmap = 1;
 				} else {
-					if (!invalidate_complete_page(mapping,
-								      page)) {
-						clear_page_dirty(page);
-						ClearPageUptodate(page);
-					}
+					/*
+					 * Just zap this page
+					 */
+					unmap_mapping_range(mapping,
+					  page->index << PAGE_CACHE_SHIFT,
+					  (page->index << PAGE_CACHE_SHIFT)+1,
+					  0);
 				}
+			}
+			was_dirty = test_clear_page_dirty(page);
+			if (!invalidate_complete_page(mapping, page)) {
+				if (was_dirty)
+					set_page_dirty(page);
+				ret = -EIO;
 			}
 			unlock_page(page);
 		}
 		pagevec_release(&pvec);
 		cond_resched();
 	}
+	return ret;
 }
-
 EXPORT_SYMBOL_GPL(invalidate_inode_pages2);

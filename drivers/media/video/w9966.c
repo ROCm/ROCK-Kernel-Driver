@@ -127,18 +127,18 @@ static const char* pardev[] = {[0 ... W9966_MAXCAMS] = ""};
 #else
 static const char* pardev[] = {[0 ... W9966_MAXCAMS] = "aggressive"};
 #endif
-MODULE_PARM(pardev, "1-" __MODULE_STRING(W9966_MAXCAMS) "s");
+module_param_array(pardev, charp, NULL, 0);
 MODULE_PARM_DESC(pardev, "pardev: where to search for\n\
 \teach camera. 'aggressive' means brute-force search.\n\
 \tEg: >pardev=parport3,aggressive,parport2,parport1< would assign\n\
 \tcam 1 to parport3 and search every parport for cam 2 etc...");
 
 static int parmode = 0;
-MODULE_PARM(parmode, "i");
+module_param(parmode, int, 0);
 MODULE_PARM_DESC(parmode, "parmode: transfer mode (0=auto, 1=ecp, 2=epp");
 
 static int video_nr = -1;
-MODULE_PARM(video_nr, "i");
+module_param(video_nr, int, 0);
 
 /*
  *	Private data

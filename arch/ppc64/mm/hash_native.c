@@ -52,7 +52,7 @@ long native_hpte_insert(unsigned long hpte_group, unsigned long va,
 			unsigned long hpteflags, int bolted, int large)
 {
 	unsigned long arpn = physRpn_to_absRpn(prpn);
-	HPTE *hptep = htab_data.htab + hpte_group;
+	HPTE *hptep = htab_address + hpte_group;
 	Hpte_dword0 dw0;
 	HPTE lhpte;
 	int i;
@@ -117,7 +117,7 @@ static long native_hpte_remove(unsigned long hpte_group)
 	slot_offset = mftb() & 0x7;
 
 	for (i = 0; i < HPTES_PER_GROUP; i++) {
-		hptep = htab_data.htab + hpte_group + slot_offset;
+		hptep = htab_address + hpte_group + slot_offset;
 		dw0 = hptep->dw0.dw0;
 
 		if (dw0.v && !dw0.bolted) {
@@ -172,9 +172,9 @@ static long native_hpte_find(unsigned long vpn)
 	hash = hpt_hash(vpn, 0);
 
 	for (j = 0; j < 2; j++) {
-		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
+		slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
 		for (i = 0; i < HPTES_PER_GROUP; i++) {
-			hptep = htab_data.htab + slot;
+			hptep = htab_address + slot;
 			dw0 = hptep->dw0.dw0;
 
 			if ((dw0.avpn == (vpn >> 11)) && dw0.v &&
@@ -195,7 +195,7 @@ static long native_hpte_find(unsigned long vpn)
 static long native_hpte_updatepp(unsigned long slot, unsigned long newpp,
 				 unsigned long va, int large, int local)
 {
-	HPTE *hptep = htab_data.htab + slot;
+	HPTE *hptep = htab_address + slot;
 	Hpte_dword0 dw0;
 	unsigned long avpn = va >> 23;
 	int ret = 0;
@@ -242,7 +242,7 @@ static long native_hpte_updatepp(unsigned long slot, unsigned long newpp,
  */
 static void native_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 {
-	unsigned long vsid, va, vpn, flags;
+	unsigned long vsid, va, vpn, flags = 0;
 	long slot;
 	HPTE *hptep;
 	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
@@ -254,7 +254,7 @@ static void native_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 	slot = native_hpte_find(vpn);
 	if (slot == -1)
 		panic("could not find page to bolt\n");
-	hptep = htab_data.htab + slot;
+	hptep = htab_address + slot;
 
 	set_pp_bit(newpp, hptep);
 
@@ -269,7 +269,7 @@ static void native_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 static void native_hpte_invalidate(unsigned long slot, unsigned long va,
 				    int large, int local)
 {
-	HPTE *hptep = htab_data.htab + slot;
+	HPTE *hptep = htab_address + slot;
 	Hpte_dword0 dw0;
 	unsigned long avpn = va >> 23;
 	unsigned long flags;
@@ -336,10 +336,10 @@ static void native_flush_hash_range(unsigned long context,
 		secondary = (pte_val(batch->pte[i]) & _PAGE_SECONDARY) >> 15;
 		if (secondary)
 			hash = ~hash;
-		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
+		slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
 		slot += (pte_val(batch->pte[i]) & _PAGE_GROUP_IX) >> 12;
 
-		hptep = htab_data.htab + slot;
+		hptep = htab_address + slot;
 
 		avpn = va >> 23;
 		if (large)

@@ -40,30 +40,22 @@ struct udphdr {
 #include <net/sock.h>
 #include <linux/ip.h>
 
-struct udp_opt {
-	int		pending;	/* Any pending frames ? */
-	unsigned int	corkflag;	/* Cork is required */
-  	__u16		encap_type;	/* Is this an Encapsulation socket? */
+struct udp_sock {
+	/* inet_sock has to be the first member */
+	struct inet_sock inet;
+	int		 pending;	/* Any pending frames ? */
+	unsigned int	 corkflag;	/* Cork is required */
+  	__u16		 encap_type;	/* Is this an Encapsulation socket? */
 	/*
 	 * Following member retains the infomation to create a UDP header
 	 * when the socket is uncorked.
 	 */
-	__u16		len;		/* total length of pending frames */
+	__u16		 len;		/* total length of pending frames */
 };
 
-/* WARNING: don't change the layout of the members in udp_sock! */
-struct udp_sock {
-	struct sock	  sk;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-	struct ipv6_pinfo *pinet6;
-#endif
-	struct inet_opt	  inet;
-	struct udp_opt	  udp;
-};
-
-static inline struct udp_opt * udp_sk(const struct sock *__sk)
+static inline struct udp_sock *udp_sk(const struct sock *sk)
 {
-	return &((struct udp_sock *)__sk)->udp;
+	return (struct udp_sock *)sk;
 }
 
 #endif

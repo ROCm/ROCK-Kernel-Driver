@@ -22,7 +22,7 @@
 
 int ip4_datagram_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct sockaddr_in *usin = (struct sockaddr_in *) uaddr;
 	struct rtable *rt;
 	u32 saddr;

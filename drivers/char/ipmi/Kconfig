@@ -12,7 +12,7 @@ config IPMI_HANDLER
          IPMI is a standard for managing sensors (temperature,
          voltage, etc.) in a system.
 
-         See Documentation/IPMI.txt for more details on the driver.
+         See <file:Documentation/IPMI.txt> for more details on the driver.
 
 	 If unsure, say N.
 

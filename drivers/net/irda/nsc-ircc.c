@@ -2206,15 +2206,15 @@ MODULE_DESCRIPTION("NSC IrDA Device Driver");
 MODULE_LICENSE("GPL");
 
 
-MODULE_PARM(qos_mtt_bits, "i");
+module_param(qos_mtt_bits, int, 0);
 MODULE_PARM_DESC(qos_mtt_bits, "Minimum Turn Time");
-MODULE_PARM(io,  "1-4i");
+module_param_array(io, int, NULL, 0);
 MODULE_PARM_DESC(io, "Base I/O addresses");
-MODULE_PARM(irq, "1-4i");
+module_param_array(irq, int, NULL, 0);
 MODULE_PARM_DESC(irq, "IRQ lines");
-MODULE_PARM(dma, "1-4i");
+module_param_array(dma, int, NULL, 0);
 MODULE_PARM_DESC(dma, "DMA channels");
-MODULE_PARM(dongle_id, "i");
+module_param(dongle_id, int, 0);
 MODULE_PARM_DESC(dongle_id, "Type-id of used dongle");
 
 module_init(nsc_ircc_init);

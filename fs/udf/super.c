@@ -162,9 +162,7 @@ static void destroy_inodecache(void)
 static struct super_operations udf_sb_ops = {
 	.alloc_inode		= udf_alloc_inode,
 	.destroy_inode		= udf_destroy_inode,
-	.read_inode		= udf_read_inode,
 	.write_inode		= udf_write_inode,
-	.put_inode		= udf_put_inode,
 	.delete_inode		= udf_delete_inode,
 	.clear_inode		= udf_clear_inode,
 	.put_super		= udf_put_super,
@@ -1567,6 +1565,7 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 	sb->dq_op = NULL;
 	sb->s_dirt = 0;
 	sb->s_magic = UDF_SUPER_MAGIC;
+	sb->s_time_gran = 1000;
 
 	if (udf_load_partition(sb, &fileset))
 	{

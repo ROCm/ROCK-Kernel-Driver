@@ -181,7 +181,7 @@ static void irlap_poll_timer_expired(void *data)
  * Make sure that state is XMIT_P/XMIT_S when calling this function
  * (and that nobody messed up with the state). - Jean II
  */
-void irlap_start_poll_timer(struct irlap_cb *self, int timeout)
+static void irlap_start_poll_timer(struct irlap_cb *self, int timeout)
 {
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LAP_MAGIC, return;);

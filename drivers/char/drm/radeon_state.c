@@ -27,7 +27,6 @@
  *    Kevin E. Martin <martin@valinux.com>
  */
 
-#include "radeon.h"
 #include "drmP.h"
 #include "drm.h"
 #include "drm_sarea.h"
@@ -1440,7 +1439,8 @@ static int radeon_cp_dispatch_texture( DRMFILE filp,
 		}
 		if ( !buf ) {
 			DRM_DEBUG("radeon_cp_dispatch_texture: EAGAIN\n");
-			DRM_COPY_TO_USER( tex->image, image, sizeof(*image) );
+			if (DRM_COPY_TO_USER( tex->image, image, sizeof(*image) ))
+				return DRM_ERR(EFAULT);
 			return DRM_ERR(EAGAIN);
 		}
 
@@ -1596,7 +1596,7 @@ static int radeon_do_init_pageflip( drm_device_t *dev )
 	return 0;
 }
 
-/* Called whenever a client dies, from DRM(release).
+/* Called whenever a client dies, from drm_release.
  * NOTE:  Lock isn't necessarily held when this is called!
  */
 int radeon_do_cleanup_pageflip( drm_device_t *dev )
@@ -2553,7 +2553,7 @@ int radeon_cp_setparam( DRM_IOCTL_ARGS ) {
  *
  * DRM infrastructure takes care of reclaiming dma buffers.
  */
-static void radeon_driver_prerelease(drm_device_t *dev, DRMFILE filp)
+void radeon_driver_prerelease(drm_device_t *dev, DRMFILE filp)
 {
 	if ( dev->dev_private ) {				
 		drm_radeon_private_t *dev_priv = dev->dev_private; 
@@ -2565,17 +2565,17 @@ static void radeon_driver_prerelease(drm_device_t *dev, DRMFILE filp)
 	}				
 }
 
-static void radeon_driver_pretakedown(drm_device_t *dev)
+void radeon_driver_pretakedown(drm_device_t *dev)
 {
 	radeon_do_release(dev);
 }
 
-static int radeon_driver_open_helper(drm_device_t *dev, drm_file_t *filp_priv)
+int radeon_driver_open_helper(drm_device_t *dev, drm_file_t *filp_priv)
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	struct drm_radeon_driver_file_fields *radeon_priv;
 	
-	radeon_priv = (struct drm_radeon_driver_file_fields *)DRM(alloc)(sizeof(*radeon_priv), DRM_MEM_FILES);
+	radeon_priv = (struct drm_radeon_driver_file_fields *)drm_alloc(sizeof(*radeon_priv), DRM_MEM_FILES);
 	
 	if (!radeon_priv)
 		return -ENOMEM;
@@ -2589,24 +2589,9 @@ static int radeon_driver_open_helper(drm_device_t *dev, drm_file_t *filp_priv)
 }
 
 
-static void radeon_driver_free_filp_priv(drm_device_t *dev, drm_file_t *filp_priv)
+void radeon_driver_free_filp_priv(drm_device_t *dev, drm_file_t *filp_priv)
 {
 	 struct drm_radeon_driver_file_fields *radeon_priv = filp_priv->driver_priv;
 	 
-	 DRM(free)(radeon_priv, sizeof(*radeon_priv), DRM_MEM_FILES);
-}
-
-void radeon_driver_register_fns(struct drm_device *dev)
-{	
-	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG | DRIVER_HAVE_IRQ | DRIVER_HAVE_DMA | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL;
-	dev->dev_priv_size = sizeof(drm_radeon_buf_priv_t);
-	dev->fn_tbl.prerelease = radeon_driver_prerelease;
-	dev->fn_tbl.pretakedown = radeon_driver_pretakedown;
-	dev->fn_tbl.open_helper = radeon_driver_open_helper;
-	dev->fn_tbl.free_filp_priv = radeon_driver_free_filp_priv;
-	dev->fn_tbl.vblank_wait = radeon_driver_vblank_wait;
- 	dev->fn_tbl.irq_preinstall = radeon_driver_irq_preinstall;
- 	dev->fn_tbl.irq_postinstall = radeon_driver_irq_postinstall;
- 	dev->fn_tbl.irq_uninstall = radeon_driver_irq_uninstall;
- 	dev->fn_tbl.irq_handler = radeon_driver_irq_handler;
+	 drm_free(radeon_priv, sizeof(*radeon_priv), DRM_MEM_FILES);
 }

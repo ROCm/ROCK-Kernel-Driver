@@ -22,7 +22,7 @@
 
 struct free_area {
 	struct list_head	free_list;
-	unsigned long		*map;
+	unsigned long		nr_free;
 };
 
 struct pglist_data;
@@ -112,14 +112,18 @@ struct zone {
 	unsigned long		free_pages;
 	unsigned long		pages_min, pages_low, pages_high;
 	/*
-	 * We don't know if the memory that we're going to allocate will be freeable
-	 * or/and it will be released eventually, so to avoid totally wasting several
-	 * GB of ram we must reserve some of the lower zone memory (otherwise we risk
-	 * to run OOM on the lower zones despite there's tons of freeable ram
-	 * on the higher zones). This array is recalculated at runtime if the
-	 * sysctl_lowmem_reserve_ratio sysctl changes.
+	 * protection[] is a pre-calculated number of extra pages that must be
+	 * available in a zone in order for __alloc_pages() to allocate memory
+	 * from the zone. i.e., for a GFP_KERNEL alloc of "order" there must
+	 * be "(1<<order) + protection[ZONE_NORMAL]" free pages in the zone
+	 * for us to choose to allocate the page from that zone.
+	 *
+	 * It uses both min_free_kbytes and sysctl_lower_zone_protection.
+	 * The protection values are recalculated if either of these values
+	 * change.  The array elements are in zonelist order:
+	 *	[0] == GFP_DMA, [1] == GFP_KERNEL, [2] == GFP_HIGHMEM.
 	 */
-	unsigned long		lowmem_reserve[MAX_NR_ZONES];
+	unsigned long		protection[MAX_NR_ZONES];
 
 	struct per_cpu_pageset	pageset[NR_CPUS];
 
@@ -259,14 +263,14 @@ typedef struct pglist_data {
 					     range, including holes */
 	int node_id;
 	struct pglist_data *pgdat_next;
-	wait_queue_head_t       kswapd_wait;
+	wait_queue_head_t kswapd_wait;
 	struct task_struct *kswapd;
+	int kswapd_max_order;
 } pg_data_t;
 
 #define node_present_pages(nid)	(NODE_DATA(nid)->node_present_pages)
 #define node_spanned_pages(nid)	(NODE_DATA(nid)->node_spanned_pages)
 
-extern int numnodes;
 extern struct pglist_data *pgdat_list;
 
 void __get_zone_counts(unsigned long *active, unsigned long *inactive,
@@ -274,7 +278,9 @@ void __get_zone_counts(unsigned long *active, unsigned long *inactive,
 void get_zone_counts(unsigned long *active, unsigned long *inactive,
 			unsigned long *free);
 void build_all_zonelists(void);
-void wakeup_kswapd(struct zone *zone);
+void wakeup_kswapd(struct zone *zone, int order);
+int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
+		int alloc_type, int can_try_harder, int gfp_high);
 
 /*
  * zone_idx() returns 0 for the ZONE_DMA zone, 1 for the ZONE_NORMAL zone, etc.
@@ -362,13 +368,12 @@ struct ctl_table;
 struct file;
 int min_free_kbytes_sysctl_handler(struct ctl_table *, int, struct file *, 
 					void __user *, size_t *, loff_t *);
-extern int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES-1];
-int lowmem_reserve_ratio_sysctl_handler(struct ctl_table *, int, struct file *,
+int lower_zone_protection_sysctl_handler(struct ctl_table *, int, struct file *,
 					void __user *, size_t *, loff_t *);
 
 #include <linux/topology.h>
 /* Returns the number of the current Node. */
-#define numa_node_id()		(cpu_to_node(smp_processor_id()))
+#define numa_node_id()		(cpu_to_node(_smp_processor_id()))
 
 #ifndef CONFIG_DISCONTIGMEM
 

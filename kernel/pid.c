@@ -60,7 +60,7 @@ typedef struct pidmap {
 static pidmap_t pidmap_array[PIDMAP_ENTRIES] =
 	 { [ 0 ... PIDMAP_ENTRIES-1 ] = { ATOMIC_INIT(BITS_PER_PAGE), NULL } };
 
-static spinlock_t pidmap_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(pidmap_lock);
 
 fastcall void free_pidmap(int pid)
 {

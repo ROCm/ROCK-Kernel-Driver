@@ -1233,7 +1233,7 @@ static int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	old_ip->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(old_ip);
 
-	new_dir->i_ctime = new_dir->i_mtime = CURRENT_TIME;
+	new_dir->i_ctime = new_dir->i_mtime = current_fs_time(new_dir->i_sb);
 	mark_inode_dirty(new_dir);
 
 	/* Build list of inodes modified by this transaction */

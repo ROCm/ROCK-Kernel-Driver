@@ -17,7 +17,6 @@ struct tcf_walker
 
 extern int register_tcf_proto_ops(struct tcf_proto_ops *ops);
 extern int unregister_tcf_proto_ops(struct tcf_proto_ops *ops);
-extern int ing_filter(struct sk_buff *skb);
 
 static inline unsigned long
 __cls_set_class(unsigned long *clp, unsigned long cl)
@@ -62,114 +61,99 @@ tcf_unbind_filter(struct tcf_proto *tp, struct tcf_result *r)
 		tp->q->ops->cl_ops->unbind_tcf(tp->q, cl);
 }
 
+struct tcf_exts
+{
 #ifdef CONFIG_NET_CLS_ACT
-static inline int
-tcf_change_act_police(struct tcf_proto *tp, struct tc_action **action,
-	struct rtattr *act_police_tlv, struct rtattr *rate_tlv)
+	struct tc_action *action;
+#elif defined CONFIG_NET_CLS_POLICE
+	struct tcf_police *police;
+#endif
+};
+
+/* Map to export classifier specific extension TLV types to the
+ * generic extensions API. Unsupported extensions must be set to 0.
+ */
+struct tcf_ext_map
 {
-	int ret;
-	struct tc_action *act;
+	int action;
+	int police;
+};
 
-	act = kmalloc(sizeof(*act), GFP_KERNEL);
-	if (NULL == act)
-		return -ENOMEM;
-	memset(act, 0, sizeof(*act));
-	
-	ret = tcf_action_init_1(act_police_tlv, rate_tlv, act, "police",
-		TCA_ACT_NOREPLACE, TCA_ACT_BIND);
-	if (ret < 0) {
-		tcf_action_destroy(act, TCA_ACT_UNBIND);
-		return ret;
-	}
+/**
+ * tcf_exts_is_predicative - check if a predicative extension is present
+ * @exts: tc filter extensions handle
+ *
+ * Returns 1 if a predicative extension is present, i.e. an extension which
+ * might cause further actions and thus overrule the regular tcf_result.
+ */
+static inline int
+tcf_exts_is_predicative(struct tcf_exts *exts)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	return !!exts->action;
+#elif defined CONFIG_NET_CLS_POLICE
+	return !!exts->police;
+#else
+	return 0;
+#endif
+}
 
-	act->type = TCA_OLD_COMPAT;
+/**
+ * tcf_exts_is_available - check if at least one extension is present
+ * @exts: tc filter extensions handle
+ *
+ * Returns 1 if at least one extension is present.
+ */
+static inline int
+tcf_exts_is_available(struct tcf_exts *exts)
+{
+	/* All non-predicative extensions must be added here. */
+	return tcf_exts_is_predicative(exts);
+}
 
-	if (*action) {
-		tcf_tree_lock(tp);
-		act = xchg(action, act);
-		tcf_tree_unlock(tp);
-
-		tcf_action_destroy(act, TCA_ACT_UNBIND);
-	} else
-		*action = act;
+/**
+ * tcf_exts_exec - execute tc filter extensions
+ * @skb: socket buffer
+ * @exts: tc filter extensions handle
+ * @res: desired result
+ *
+ * Executes all configured extensions. Returns 0 on a normal execution,
+ * a negative number if the filter must be considered unmatched or
+ * a positive action code (TC_ACT_*) which must be returned to the
+ * underlying layer.
+ */
+static inline int
+tcf_exts_exec(struct sk_buff *skb, struct tcf_exts *exts,
+	       struct tcf_result *res)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	if (exts->action)
+		return tcf_action_exec(skb, exts->action, res);
+#elif defined CONFIG_NET_CLS_POLICE
+	if (exts->police)
+		return tcf_police(skb, exts->police);
+#endif
 
 	return 0;
 }
 
-static inline int
-tcf_change_act(struct tcf_proto *tp, struct tc_action **action,
-	struct rtattr *act_tlv, struct rtattr *rate_tlv)
-{
-	int ret;
-	struct tc_action *act;
-
-	act = kmalloc(sizeof(*act), GFP_KERNEL);
-	if (NULL == act)
-		return -ENOMEM;
-	memset(act, 0, sizeof(*act));
-
-	ret = tcf_action_init(act_tlv, rate_tlv, act, NULL,
-		TCA_ACT_NOREPLACE, TCA_ACT_BIND);
-	if (ret < 0) {
-		tcf_action_destroy(act, TCA_ACT_UNBIND);
-		return ret;
-	}
-
-	if (*action) {
-		tcf_tree_lock(tp);
-		act = xchg(action, act);
-		tcf_tree_unlock(tp);
-
-		tcf_action_destroy(act, TCA_ACT_UNBIND);
-	} else
-		*action = act;
-
-	return 0;
-}
-
-static inline int
-tcf_dump_act(struct sk_buff *skb, struct tc_action *action,
-	int act_type, int compat_type)
-{
-	/*
-	 * again for backward compatible mode - we want
-	 * to work with both old and new modes of entering
-	 * tc data even if iproute2  was newer - jhs
-	 */
-	if (action) {
-		struct rtattr * p_rta = (struct rtattr*) skb->tail;
-
-		if (action->type != TCA_OLD_COMPAT) {
-			RTA_PUT(skb, act_type, 0, NULL);
-			if (tcf_action_dump(skb, action, 0, 0) < 0)
-				goto rtattr_failure;
-		} else {
-			RTA_PUT(skb, compat_type, 0, NULL);
-			if (tcf_action_dump_old(skb, action, 0, 0) < 0)
-				goto rtattr_failure;
-		}
-		
-		p_rta->rta_len = skb->tail - (u8*)p_rta;
-	}
-	return 0;
-
-rtattr_failure:
-	return -1;
-}
-#endif /* CONFIG_NET_CLS_ACT */
+extern int tcf_exts_validate(struct tcf_proto *tp, struct rtattr **tb,
+	                     struct rtattr *rate_tlv, struct tcf_exts *exts,
+	                     struct tcf_ext_map *map);
+extern void tcf_exts_destroy(struct tcf_proto *tp, struct tcf_exts *exts);
+extern void tcf_exts_change(struct tcf_proto *tp, struct tcf_exts *dst,
+	                     struct tcf_exts *src);
+extern int tcf_exts_dump(struct sk_buff *skb, struct tcf_exts *exts,
+	                 struct tcf_ext_map *map);
+extern int tcf_exts_dump_stats(struct sk_buff *skb, struct tcf_exts *exts,
+	                       struct tcf_ext_map *map);
 
 #ifdef CONFIG_NET_CLS_IND
 static inline int
 tcf_change_indev(struct tcf_proto *tp, char *indev, struct rtattr *indev_tlv)
 {
-	if (RTA_PAYLOAD(indev_tlv) >= IFNAMSIZ) {
-		printk("cls: bad indev name %s\n", (char *) RTA_DATA(indev_tlv));
+	if (rtattr_strlcpy(indev, indev_tlv, IFNAMSIZ) >= IFNAMSIZ)
 		return -EINVAL;
-	}
-
-	memset(indev, 0, IFNAMSIZ);
-	sprintf(indev, "%s", (char *) RTA_DATA(indev_tlv));
-
 	return 0;
 }
 
@@ -186,45 +170,5 @@ tcf_match_indev(struct sk_buff *skb, char *indev)
 	return 1;
 }
 #endif /* CONFIG_NET_CLS_IND */
-
-#ifdef CONFIG_NET_CLS_POLICE
-static inline int
-tcf_change_police(struct tcf_proto *tp, struct tcf_police **police,
-	struct rtattr *police_tlv, struct rtattr *rate_tlv)
-{
-	struct tcf_police *p = tcf_police_locate(police_tlv, rate_tlv);
-
-	if (*police) {
-		tcf_tree_lock(tp);
-		p = xchg(police, p);
-		tcf_tree_unlock(tp);
-
-		tcf_police_release(p, TCA_ACT_UNBIND);
-	} else
-		*police = p;
-
-	return 0;
-}
-
-static inline int
-tcf_dump_police(struct sk_buff *skb, struct tcf_police *police,
-	int police_type)
-{
-	if (police) {
-		struct rtattr * p_rta = (struct rtattr*) skb->tail;
-
-		RTA_PUT(skb, police_type, 0, NULL);
-
-		if (tcf_police_dump(skb, police) < 0)
-			goto rtattr_failure;
-
-		p_rta->rta_len = skb->tail - (u8*)p_rta;
-	}
-	return 0;
-
-rtattr_failure:
-	return -1;
-}
-#endif /* CONFIG_NET_CLS_POLICE */
 
 #endif

@@ -78,7 +78,7 @@ struct stat64 {
 	unsigned long long	st_ino;
 } __attribute__((packed));
 
-typedef struct siginfo32 {
+typedef struct compat_siginfo{
 	int si_signo;
 	int si_errno;
 	int si_code;
@@ -128,7 +128,7 @@ typedef struct siginfo32 {
 			int _fd;
 		} _sigpoll;
 	} _sifields;
-} siginfo_t32;
+} compat_siginfo_t;
 
 struct sigframe32
 {
@@ -145,7 +145,7 @@ struct rt_sigframe32
         int sig;
         u32 pinfo;
         u32 puc;
-        struct siginfo32 info;
+        compat_siginfo_t info;
         struct ucontext_ia32 uc;
         struct _fpstate_ia32 fpstate;
 };
@@ -165,8 +165,6 @@ struct siginfo_t;
 int do_get_thread_area(struct thread_struct *t, struct user_desc __user *info);
 int do_set_thread_area(struct thread_struct *t, struct user_desc __user *info);
 int ia32_child_tls(struct task_struct *p, struct pt_regs *childregs);
-int ia32_copy_siginfo_from_user(siginfo_t *to, siginfo_t32 __user *from);
-int ia32_copy_siginfo_to_user(siginfo_t32 __user *to, siginfo_t *from);
 #endif
 
 #endif /* !CONFIG_IA32_SUPPORT */

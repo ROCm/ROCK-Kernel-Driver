@@ -103,7 +103,6 @@
 #include <asm/uaccess.h>
 #include <linux/blkdev.h>
 
-#define mcd_port mcd		/* for compatible parameter passing with "insmod" */
 #include "mcd.h"
 
 /* I added A flag to drop to 1x speed if too many errors 0 = 1X ; 1 = 2X */
@@ -157,7 +156,6 @@ int mitsumi_bug_93_wait;
 
 static short mcd_port = CONFIG_MCD_BASE;	/* used as "mcd" by "insmod" */
 static int mcd_irq = CONFIG_MCD_IRQ;	/* must directly follow mcd_port */
-MODULE_PARM(mcd, "1-2i");
 
 static int McdTimeout, McdTries;
 static DECLARE_WAIT_QUEUE_HEAD(mcd_waitq);
@@ -246,7 +244,6 @@ static struct block_device_operations mcd_bdops =
 
 static struct gendisk *mcd_gendisk;
 
-#ifndef MODULE
 static int __init mcd_setup(char *str)
 {
 	int ints[9];
@@ -265,7 +262,14 @@ static int __init mcd_setup(char *str)
 
 __setup("mcd=", mcd_setup);
 
-#endif				/* MODULE */
+#ifdef MODULE
+static int __init param_set_mcd(const char *val, struct kernel_param *kp)
+{
+	mcd_setup(val);
+	return 0;
+}
+module_param_call(mcd, param_set_mcd, NULL, NULL, 0);
+#endif
 
 static int mcd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
 {

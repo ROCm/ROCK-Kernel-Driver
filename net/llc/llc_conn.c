@@ -503,7 +503,8 @@ found:
  *	local mac, and local sap. Returns pointer for parent socket found,
  *	%NULL otherwise.
  */
-struct sock *llc_lookup_listener(struct llc_sap *sap, struct llc_addr *laddr)
+static struct sock *llc_lookup_listener(struct llc_sap *sap,
+					struct llc_addr *laddr)
 {
 	struct sock *rc;
 	struct hlist_node *node;
@@ -546,7 +547,7 @@ u8 llc_data_accept_state(u8 state)
  *	Finds offset of next category of transitions in transition table.
  *	Returns the start index of next category.
  */
-u16 find_next_offset(struct llc_conn_state *state, u16 offset)
+static u16 find_next_offset(struct llc_conn_state *state, u16 offset)
 {
 	u16 cnt = 0;
 	struct llc_conn_state_trans **next_trans;
@@ -785,7 +786,7 @@ out_kfree_skb:
  *
  *     Initializes a socket with default llc values.
  */
-int llc_sk_init(struct sock* sk)
+static int llc_sk_init(struct sock* sk)
 {
 	struct llc_opt *llc = kmalloc(sizeof(*llc), GFP_ATOMIC);
 	int rc = -ENOMEM;

@@ -4,6 +4,7 @@
  *  Replacement code for mm functions to support CPU's that don't
  *  have any form of memory management unit (thus no virtual memory).
  *
+ *  Copyright (c) 2004      David Howells <dhowells@redhat.com>
  *  Copyright (c) 2000-2003 David McCullough <davidm@snapgear.com>
  *  Copyright (c) 2000-2001 D Jeff Dionne <jeff@uClinux.org>
  *  Copyright (c) 2002      Greg Ungerer <gerg@snapgear.com>
@@ -12,13 +13,17 @@
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
-#include <linux/smp_lock.h>
+#include <linux/file.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/ptrace.h>
 #include <linux/blkdev.h>
 #include <linux/backing-dev.h>
+#include <linux/mount.h>
+#include <linux/personality.h>
+#include <linux/security.h>
 #include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
@@ -34,9 +39,17 @@ atomic_t vm_committed_space = ATOMIC_INIT(0);
 int sysctl_overcommit_memory = OVERCOMMIT_GUESS; /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50; /* default is 50% */
 int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
+int heap_stack_gap = 0;
 
 EXPORT_SYMBOL(sysctl_max_map_count);
 EXPORT_SYMBOL(mem_map);
+
+/* list of shareable VMAs */
+struct rb_root nommu_vma_tree = RB_ROOT;
+DECLARE_RWSEM(nommu_vma_sem);
+
+struct vm_operations_struct generic_file_vm_ops = {
+};
 
 /*
  * Handle all mappings that got truncated by a "truncate()"
@@ -123,7 +136,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 	return(i);
 }
 
-rwlock_t vmlist_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(vmlist_lock);
 struct vm_struct *vmlist;
 
 void vfree(void *addr)
@@ -161,7 +174,7 @@ long vwrite(char *buf, char *addr, unsigned long count)
 	/* Don't allow overflow */
 	if ((unsigned long) addr + count < count)
 		count = -(unsigned long) addr;
-	
+
 	memcpy(addr, buf, count);
 	return(count);
 }
@@ -217,7 +230,7 @@ asmlinkage unsigned long sys_brk(unsigned long brk)
 {
 	struct mm_struct *mm = current->mm;
 
-	if (brk < mm->end_code || brk < mm->start_brk || brk > mm->context.end_brk)
+	if (brk < mm->start_brk || brk > mm->context.end_brk)
 		return mm->brk;
 
 	if (mm->brk == brk)
@@ -263,49 +276,127 @@ static inline unsigned long calc_vm_flags(unsigned long prot, unsigned long flag
 #ifdef DEBUG
 static void show_process_blocks(void)
 {
-	struct mm_tblock_struct *tblock;
+	struct vm_list_struct *vml;
 
 	printk("Process blocks %d:", current->pid);
 
-	for (tblock = &current->mm->context.tblock; tblock; tblock = tblock->next) {
-		printk(" %p: %p", tblock, tblock->rblock);
-		if (tblock->rblock)
-			printk(" (%d @%p #%d)", kobjsize(tblock->rblock->kblock), tblock->rblock->kblock, tblock->rblock->refcount);
-		printk(tblock->next ? " ->" : ".\n");
+	for (vml = &current->mm->context.vmlist; vml; vml = vml->next) {
+		printk(" %p: %p", vml, vml->vma);
+		if (vml->vma)
+			printk(" (%d @%lx #%d)",
+			       kobjsize((void *) vml->vma->vm_start),
+			       vml->vma->vm_start,
+			       atomic_read(&vml->vma->vm_usage));
+		printk(vml->next ? " ->" : ".\n");
 	}
 }
 #endif /* DEBUG */
 
-unsigned long do_mmap_pgoff(
-	struct file * file,
-	unsigned long addr,
-	unsigned long len,
-	unsigned long prot,
-	unsigned long flags,
-	unsigned long pgoff)
+static inline struct vm_area_struct *find_nommu_vma(unsigned long start)
 {
-	void * result;
-	struct mm_tblock_struct * tblock;
-	unsigned int vm_flags;
+	struct vm_area_struct *vma;
+	struct rb_node *n = nommu_vma_tree.rb_node;
 
-	/*
-	 * Get the !CONFIG_MMU specific checks done first
-	 */
-	if ((flags & MAP_SHARED) && (prot & PROT_WRITE) && (file)) {
-		printk("MAP_SHARED not supported (cannot write mappings to disk)\n");
+	while (n) {
+		vma = rb_entry(n, struct vm_area_struct, vm_rb);
+
+		if (start < vma->vm_start)
+			n = n->rb_left;
+		else if (start > vma->vm_start)
+			n = n->rb_right;
+		else
+			return vma;
+	}
+
+	return NULL;
+}
+
+static void add_nommu_vma(struct vm_area_struct *vma)
+{
+	struct vm_area_struct *pvma;
+	struct address_space *mapping;
+	struct rb_node **p = &nommu_vma_tree.rb_node;
+	struct rb_node *parent = NULL;
+
+	/* add the VMA to the mapping */
+	if (vma->vm_file) {
+		mapping = vma->vm_file->f_mapping;
+
+		flush_dcache_mmap_lock(mapping);
+		vma_prio_tree_insert(vma, &mapping->i_mmap);
+		flush_dcache_mmap_unlock(mapping);
+	}
+
+	/* add the VMA to the master list */
+	while (*p) {
+		parent = *p;
+		pvma = rb_entry(parent, struct vm_area_struct, vm_rb);
+
+		if (vma->vm_start < pvma->vm_start) {
+			p = &(*p)->rb_left;
+		}
+		else if (vma->vm_start > pvma->vm_start) {
+			p = &(*p)->rb_right;
+		}
+		else {
+			/* mappings are at the same address - this can only
+			 * happen for shared-mem chardevs and shared file
+			 * mappings backed by ramfs/tmpfs */
+			BUG_ON(!(pvma->vm_flags & VM_SHARED));
+
+			if (vma < pvma)
+				p = &(*p)->rb_left;
+			else if (vma > pvma)
+				p = &(*p)->rb_right;
+			else
+				BUG();
+		}
+	}
+
+	rb_link_node(&vma->vm_rb, parent, p);
+	rb_insert_color(&vma->vm_rb, &nommu_vma_tree);
+}
+
+static void delete_nommu_vma(struct vm_area_struct *vma)
+{
+	struct address_space *mapping;
+
+	/* remove the VMA from the mapping */
+	if (vma->vm_file) {
+		mapping = vma->vm_file->f_mapping;
+
+		flush_dcache_mmap_lock(mapping);
+		vma_prio_tree_remove(vma, &mapping->i_mmap);
+		flush_dcache_mmap_unlock(mapping);
+	}
+
+	/* remove from the master list */
+	rb_erase(&vma->vm_rb, &nommu_vma_tree);
+}
+
+/*
+ * handle mapping creation for uClinux
+ */
+unsigned long do_mmap_pgoff(struct file *file,
+			    unsigned long addr,
+			    unsigned long len,
+			    unsigned long prot,
+			    unsigned long flags,
+			    unsigned long pgoff)
+{
+	struct vm_list_struct *vml = NULL;
+	struct vm_area_struct *vma = NULL;
+	struct rb_node *rb;
+	unsigned int vm_flags;
+	void *result;
+	int ret, membacked;
+
+	/* do the simple checks first */
+	if (flags & MAP_FIXED || addr) {
+		printk(KERN_DEBUG "%d: Can't do fixed-address/overlay mmap of RAM\n",
+		       current->pid);
 		return -EINVAL;
 	}
-	
-	if ((prot & PROT_WRITE) && (flags & MAP_PRIVATE)) {
-		printk("Private writable mappings not supported\n");
-		return -EINVAL;
-	}
-	
-	/*
-	 *	now all the standard checks
-	 */
-	if (file && (!file->f_op || !file->f_op->mmap))
-		return -ENODEV;
 
 	if (PAGE_ALIGN(len) == 0)
 		return addr;
@@ -317,148 +408,377 @@ unsigned long do_mmap_pgoff(
 	if ((pgoff + (len >> PAGE_SHIFT)) < pgoff)
 		return -EINVAL;
 
-	/* Do simple checking here so the lower-level routines won't have
+	/* validate file mapping requests */
+	membacked = 0;
+	if (file) {
+		/* files must support mmap */
+		if (!file->f_op || !file->f_op->mmap)
+			return -ENODEV;
+
+		if ((prot & PROT_EXEC) &&
+		    (file->f_vfsmnt->mnt_flags & MNT_NOEXEC))
+			return -EPERM;
+
+		/* work out if what we've got could possibly be shared
+		 * - we support chardevs that provide their own "memory"
+		 * - we support files/blockdevs that are memory backed
+		 */
+		if (S_ISCHR(file->f_dentry->d_inode->i_mode)) {
+			membacked = 1;
+		}
+		else {
+			struct address_space *mapping = file->f_mapping;
+			if (!mapping)
+				mapping = file->f_dentry->d_inode->i_mapping;
+			if (mapping && mapping->backing_dev_info)
+				membacked = mapping->backing_dev_info->memory_backed;
+		}
+
+		if (flags & MAP_SHARED) {
+			/* do checks for writing, appending and locking */
+			if ((prot & PROT_WRITE) && !(file->f_mode & FMODE_WRITE))
+				return -EACCES;
+
+			if (IS_APPEND(file->f_dentry->d_inode) &&
+			    (file->f_mode & FMODE_WRITE))
+				return -EACCES;
+
+			if (locks_verify_locked(file->f_dentry->d_inode))
+				return -EAGAIN;
+
+			if (!membacked) {
+				printk("MAP_SHARED not completely supported on !MMU\n");
+				return -EINVAL;
+			}
+
+			/* we require greater support from the driver or
+			 * filesystem - we ask it to tell us what memory to
+			 * use */
+			if (!file->f_op->get_unmapped_area)
+				return -ENODEV;
+		}
+		else {
+			/* we read private files into memory we allocate */
+			if (!file->f_op->read)
+				return -ENODEV;
+		}
+	}
+
+	/* handle PROT_EXEC implication by PROT_READ */
+	if ((prot & PROT_READ) && (current->personality & READ_IMPLIES_EXEC))
+		if (!(file && (file->f_vfsmnt->mnt_flags & MNT_NOEXEC)))
+			prot |= PROT_EXEC;
+
+	/* do simple checking here so the lower-level routines won't have
 	 * to. we assume access permissions have been handled by the open
 	 * of the memory object, so we don't do any here.
 	 */
-	vm_flags = calc_vm_flags(prot,flags) /* | mm->def_flags */ | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
+	vm_flags = calc_vm_flags(prot,flags) /* | mm->def_flags */
+		| VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
 
-	/*
-	 * determine the object being mapped and call the appropriate
-	 * specific mapper. 
+	if (!membacked) {
+		/* share any file segment that's mapped read-only */
+		if (((flags & MAP_PRIVATE) && !(prot & PROT_WRITE) && file) ||
+		    ((flags & MAP_SHARED) && !(prot & PROT_WRITE) && file))
+			vm_flags |= VM_MAYSHARE;
+
+		/* refuse to let anyone share files with this process if it's being traced -
+		 * otherwise breakpoints set in it may interfere with another untraced process
+		 */
+		if (current->ptrace & PT_PTRACED)
+			vm_flags &= ~(VM_SHARED | VM_MAYSHARE);
+	}
+	else {
+		/* permit sharing of character devices and ramfs files at any time for
+		 * anything other than a privately writable mapping
+		 */
+		if (!(flags & MAP_PRIVATE) || !(prot & PROT_WRITE)) {
+			vm_flags |= VM_MAYSHARE;
+			if (flags & MAP_SHARED)
+				vm_flags |= VM_SHARED;
+		}
+	}
+
+	/* allow the security API to have its say */
+	ret = security_file_mmap(file, prot, flags);
+	if (ret)
+		return ret;
+
+	/* we're going to need to record the mapping if it works */
+	vml = kmalloc(sizeof(struct vm_list_struct), GFP_KERNEL);
+	if (!vml)
+		goto error_getting_vml;
+	memset(vml, 0, sizeof(*vml));
+
+	down_write(&nommu_vma_sem);
+
+	/* if we want to share, we need to search for VMAs created by another
+	 * mmap() call that overlap with our proposed mapping
+	 * - we can only share with an exact match on most regular files
+	 * - shared mappings on character devices and memory backed files are
+	 *   permitted to overlap inexactly as far as we are concerned for in
+	 *   these cases, sharing is handled in the driver or filesystem rather
+	 *   than here
+	 */
+	if (vm_flags & VM_MAYSHARE) {
+		unsigned long pglen = (len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		unsigned long vmpglen;
+
+		for (rb = rb_first(&nommu_vma_tree); rb; rb = rb_next(rb)) {
+			vma = rb_entry(rb, struct vm_area_struct, vm_rb);
+
+			if (!(vma->vm_flags & VM_MAYSHARE))
+				continue;
+
+			/* search for overlapping mappings on the same file */
+			if (vma->vm_file->f_dentry->d_inode != file->f_dentry->d_inode)
+				continue;
+
+			if (vma->vm_pgoff >= pgoff + pglen)
+				continue;
+
+			vmpglen = (vma->vm_end - vma->vm_start + PAGE_SIZE - 1) >> PAGE_SHIFT;
+			if (pgoff >= vma->vm_pgoff + vmpglen)
+				continue;
+
+			/* handle inexact matches between mappings */
+			if (vmpglen != pglen || vma->vm_pgoff != pgoff) {
+				if (!membacked)
+					goto sharing_violation;
+				continue;
+			}
+
+			/* we've found a VMA we can share */
+			atomic_inc(&vma->vm_usage);
+
+			vml->vma = vma;
+			result = (void *) vma->vm_start;
+			goto shared;
+		}
+	}
+
+	vma = NULL;
+
+	/* obtain the address to map to. we verify (or select) it and ensure
+	 * that it represents a valid section of the address space
+	 * - this is the hook for quasi-memory character devices
+	 */
+	if (file && file->f_op->get_unmapped_area)
+		addr = file->f_op->get_unmapped_area(file, addr, len, pgoff, flags);
+
+	if (IS_ERR((void *) addr)) {
+		ret = addr;
+		goto error;
+	}
+
+	/* we're going to need a VMA struct as well */
+	vma = kmalloc(sizeof(struct vm_area_struct), GFP_KERNEL);
+	if (!vma)
+		goto error_getting_vma;
+
+	memset(vma, 0, sizeof(*vma));
+	INIT_LIST_HEAD(&vma->anon_vma_node);
+	atomic_set(&vma->vm_usage, 1);
+	if (file)
+		get_file(file);
+	vma->vm_file	= file;
+	vma->vm_flags	= vm_flags;
+	vma->vm_start	= addr;
+	vma->vm_end	= addr + len;
+	vma->vm_pgoff	= pgoff;
+
+	vml->vma = vma;
+
+	/* determine the object being mapped and call the appropriate specific
+	 * mapper.
 	 */
 	if (file) {
-		struct vm_area_struct vma;
-		int error;
-
-		if (!file->f_op)
-			return -ENODEV;
-
-		vma.vm_start = addr;
-		vma.vm_end = addr + len;
-		vma.vm_flags = vm_flags;
-		vma.vm_pgoff = pgoff;
-
 #ifdef MAGIC_ROM_PTR
 		/* First, try simpler routine designed to give us a ROM pointer. */
-
 		if (file->f_op->romptr && !(prot & PROT_WRITE)) {
-			error = file->f_op->romptr(file, &vma);
+			ret = file->f_op->romptr(file, vma);
 #ifdef DEBUG
-			printk("romptr mmap returned %d, start 0x%.8x\n", error,
-					vma.vm_start);
+			printk("romptr mmap returned %d (st=%lx)\n",
+			       ret, vma->vm_start);
 #endif
-			if (!error)
-				return vma.vm_start;
-			else if (error != -ENOSYS)
-				return error;
+			result = (void *) vma->vm_start;
+			if (!ret)
+				goto done;
+			else if (ret != -ENOSYS)
+				goto error;
 		} else
 #endif /* MAGIC_ROM_PTR */
-		/* Then try full mmap routine, which might return a RAM pointer,
-		   or do something truly complicated. */
-		   
+		/* Then try full mmap routine, which might return a RAM
+		 * pointer, or do something truly complicated
+		 */
 		if (file->f_op->mmap) {
-			error = file->f_op->mmap(file, &vma);
-				   
+			ret = file->f_op->mmap(file, vma);
+
 #ifdef DEBUG
-			printk("f_op->mmap() returned %d/%lx\n", error, vma.vm_start);
+			printk("f_op->mmap() returned %d (st=%lx)\n",
+			       ret, vma->vm_start);
 #endif
-			if (!error)
-				return vma.vm_start;
-			else if (error != -ENOSYS)
-				return error;
-		} else
-			return -ENODEV; /* No mapping operations defined */
+			result = (void *) vma->vm_start;
+			if (!ret)
+				goto done;
+			else if (ret != -ENOSYS)
+				goto error;
+		} else {
+			ret = -ENODEV; /* No mapping operations defined */
+			goto error;
+		}
 
-		/* An ENOSYS error indicates that mmap isn't possible (as opposed to
-		   tried but failed) so we'll fall through to the copy. */
+		/* An ENOSYS error indicates that mmap isn't possible (as
+		 * opposed to tried but failed) so we'll fall through to the
+		 * copy. */
 	}
 
-	tblock = (struct mm_tblock_struct *)
-                        kmalloc(sizeof(struct mm_tblock_struct), GFP_KERNEL);
-	if (!tblock) {
-		printk("Allocation of tblock for %lu byte allocation from process %d failed\n", len, current->pid);
-		show_free_areas();
-		return -ENOMEM;
-	}
-
-	tblock->rblock = (struct mm_rblock_struct *)
-			kmalloc(sizeof(struct mm_rblock_struct), GFP_KERNEL);
-
-	if (!tblock->rblock) {
-		printk("Allocation of rblock for %lu byte allocation from process %d failed\n", len, current->pid);
-		show_free_areas();
-		kfree(tblock);
-		return -ENOMEM;
-	}
-
+	/* allocate some memory to hold the mapping
+	 * - note that this may not return a page-aligned address if the object
+	 *   we're allocating is smaller than a page
+	 */
+	ret = -ENOMEM;
 	result = kmalloc(len, GFP_KERNEL);
 	if (!result) {
-		printk("Allocation of length %lu from process %d failed\n", len,
-				current->pid);
+		printk("Allocation of length %lu from process %d failed\n",
+		       len, current->pid);
 		show_free_areas();
-		kfree(tblock->rblock);
-		kfree(tblock);
-		return -ENOMEM;
+		goto error;
 	}
 
-	tblock->rblock->refcount = 1;
-	tblock->rblock->kblock = result;
-	tblock->rblock->size = len;
-	
-	realalloc += kobjsize(result);
-	askedalloc += len;
+	vma->vm_start = (unsigned long) result;
+	vma->vm_end = vma->vm_start + len;
 
-#ifdef WARN_ON_SLACK	
-	if ((len+WARN_ON_SLACK) <= kobjsize(result))
-		printk("Allocation of %lu bytes from process %d has %lu bytes of slack\n", len, current->pid, kobjsize(result)-len);
+#ifdef WARN_ON_SLACK
+	if (len + WARN_ON_SLACK <= kobjsize(result))
+		printk("Allocation of %lu bytes from process %d has %lu bytes of slack\n",
+		       len, current->pid, kobjsize(result) - len);
 #endif
-	
+
 	if (file) {
-		int error;
 		mm_segment_t old_fs = get_fs();
+		loff_t fpos;
+
+		fpos = pgoff;
+		fpos <<= PAGE_SHIFT;
+
 		set_fs(KERNEL_DS);
-		error = file->f_op->read(file, (char *) result, len, &file->f_pos);
+		ret = file->f_op->read(file, (char *) result, len, &fpos);
 		set_fs(old_fs);
-		if (error < 0) {
-			kfree(result);
-			kfree(tblock->rblock);
-			kfree(tblock);
-			return error;
-		}
-		if (error < len)
-			memset(result+error, '\0', len-error);
+
+		if (ret < 0)
+			goto error2;
+		if (ret < len)
+			memset(result + ret, 0, len - ret);
 	} else {
-		memset(result, '\0', len);
+		memset(result, 0, len);
 	}
 
-	realalloc += kobjsize(tblock);
-	askedalloc += sizeof(struct mm_tblock_struct);
+	if (prot & PROT_EXEC)
+		flush_icache_range((unsigned long) result, (unsigned long) result + len);
 
-	realalloc += kobjsize(tblock->rblock);
-	askedalloc += sizeof(struct mm_rblock_struct);
+ done:
+	if (!(vma->vm_flags & VM_SHARED)) {
+		realalloc += kobjsize(result);
+		askedalloc += len;
+	}
 
-	tblock->next = current->mm->context.tblock.next;
-	current->mm->context.tblock.next = tblock;
+	realalloc += kobjsize(vma);
+	askedalloc += sizeof(*vma);
+
 	current->mm->total_vm += len >> PAGE_SHIFT;
+
+	add_nommu_vma(vma);
+ shared:
+	realalloc += kobjsize(vml);
+	askedalloc += sizeof(*vml);
+
+	vml->next = current->mm->context.vmlist;
+	current->mm->context.vmlist = vml;
+
+	up_write(&nommu_vma_sem);
 
 #ifdef DEBUG
 	printk("do_mmap:\n");
 	show_process_blocks();
-#endif	  
+#endif
 
-	return (unsigned long)result;
+	return (unsigned long) result;
+
+ error2:
+	kfree(result);
+ error:
+	up_write(&nommu_vma_sem);
+	kfree(vml);
+	if (vma) {
+		fput(vma->vm_file);
+		kfree(vma);
+	}
+	return ret;
+
+ sharing_violation:
+	up_write(&nommu_vma_sem);
+	printk("Attempt to share mismatched mappings\n");
+	kfree(vml);
+	return -EINVAL;
+
+ error_getting_vma:
+	up_write(&nommu_vma_sem);
+	kfree(vml);
+	printk("Allocation of vml for %lu byte allocation from process %d failed\n",
+	       len, current->pid);
+	show_free_areas();
+	return -ENOMEM;
+
+ error_getting_vml:
+	printk("Allocation of vml for %lu byte allocation from process %d failed\n",
+	       len, current->pid);
+	show_free_areas();
+	return -ENOMEM;
 }
 
-int do_munmap(struct mm_struct * mm, unsigned long addr, size_t len)
+/*
+ * handle mapping disposal for uClinux
+ */
+static void put_vma(struct vm_area_struct *vma)
 {
-	struct mm_tblock_struct * tblock, *tmp;
+	if (vma) {
+		down_write(&nommu_vma_sem);
+
+		if (atomic_dec_and_test(&vma->vm_usage)) {
+			delete_nommu_vma(vma);
+
+			if (vma->vm_ops && vma->vm_ops->close)
+				vma->vm_ops->close(vma);
+
+			/* IO memory and memory shared directly out of the pagecache from
+			 * ramfs/tmpfs mustn't be released here */
+			if (!(vma->vm_flags & (VM_IO | VM_SHARED)) && vma->vm_start) {
+				realalloc -= kobjsize((void *) vma->vm_start);
+				askedalloc -= vma->vm_end - vma->vm_start;
+				kfree((void *) vma->vm_start);
+			}
+
+			realalloc -= kobjsize(vma);
+			askedalloc -= sizeof(*vma);
+
+			if (vma->vm_file)
+				fput(vma->vm_file);
+			kfree(vma);
+		}
+
+		up_write(&nommu_vma_sem);
+	}
+}
+
+int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
+{
+	struct vm_list_struct *vml, **parent;
+	unsigned long end = addr + len;
 
 #ifdef MAGIC_ROM_PTR
-	/*
-	 * For efficiency's sake, if the pointer is obviously in ROM,
-	 * don't bother walking the lists to free it.
-	 */
+	/* For efficiency's sake, if the pointer is obviously in ROM,
+	   don't bother walking the lists to free it */
 	if (is_in_rom(addr))
 		return 0;
 #endif
@@ -467,38 +787,29 @@ int do_munmap(struct mm_struct * mm, unsigned long addr, size_t len)
 	printk("do_munmap:\n");
 #endif
 
-	tmp = &mm->context.tblock; /* dummy head */
-	while ((tblock=tmp->next) && tblock->rblock &&
-			tblock->rblock->kblock != (void*)addr) 
-		tmp = tblock;
-		
-	if (!tblock) {
-		printk("munmap of non-mmaped memory by process %d (%s): %p\n",
-				current->pid, current->comm, (void*)addr);
-		return -EINVAL;
-	}
-	if (tblock->rblock) {
-		if (!--tblock->rblock->refcount) {
-			if (tblock->rblock->kblock) {
-				realalloc -= kobjsize(tblock->rblock->kblock);
-				askedalloc -= tblock->rblock->size;
-				kfree(tblock->rblock->kblock);
-			}
-			
-			realalloc -= kobjsize(tblock->rblock);
-			askedalloc -= sizeof(struct mm_rblock_struct);
-			kfree(tblock->rblock);
-		}
-	}
-	tmp->next = tblock->next;
-	realalloc -= kobjsize(tblock);
-	askedalloc -= sizeof(struct mm_tblock_struct);
-	kfree(tblock);
+	for (parent = &mm->context.vmlist; *parent; parent = &(*parent)->next)
+		if ((*parent)->vma->vm_start == addr &&
+		    (*parent)->vma->vm_end == end)
+			goto found;
+
+	printk("munmap of non-mmaped memory by process %d (%s): %p\n",
+	       current->pid, current->comm, (void *) addr);
+	return -EINVAL;
+
+ found:
+	vml = *parent;
+
+	put_vma(vml->vma);
+
+	*parent = vml->next;
+	realalloc -= kobjsize(vml);
+	askedalloc -= sizeof(*vml);
+	kfree(vml);
 	mm->total_vm -= len >> PAGE_SHIFT;
 
 #ifdef DEBUG
 	show_process_blocks();
-#endif	  
+#endif
 
 	return 0;
 }
@@ -506,39 +817,28 @@ int do_munmap(struct mm_struct * mm, unsigned long addr, size_t len)
 /* Release all mmaps. */
 void exit_mmap(struct mm_struct * mm)
 {
-	struct mm_tblock_struct *tmp;
-	mm->total_vm = 0;
+	struct vm_list_struct *tmp;
 
-	if (!mm)
-		return;
-
+	if (mm) {
 #ifdef DEBUG
-	printk("Exit_mmap:\n");
+		printk("Exit_mmap:\n");
 #endif
 
-	while((tmp = mm->context.tblock.next)) {
-		if (tmp->rblock) {
-			if (!--tmp->rblock->refcount) {
-				if (tmp->rblock->kblock) {
-					realalloc -= kobjsize(tmp->rblock->kblock);
-					askedalloc -= tmp->rblock->size;
-					kfree(tmp->rblock->kblock);
-				}
-				realalloc -= kobjsize(tmp->rblock);
-				askedalloc -= sizeof(struct mm_rblock_struct);
-				kfree(tmp->rblock);
-			}
-			tmp->rblock = 0;
+		mm->total_vm = 0;
+
+		while ((tmp = mm->context.vmlist)) {
+			mm->context.vmlist = tmp->next;
+			put_vma(tmp->vma);
+
+			realalloc -= kobjsize(tmp);
+			askedalloc -= sizeof(*tmp);
+			kfree(tmp);
 		}
-		mm->context.tblock.next = tmp->next;
-		realalloc -= kobjsize(tmp);
-		askedalloc -= sizeof(struct mm_tblock_struct);
-		kfree(tmp);
-	}
 
 #ifdef DEBUG
-	show_process_blocks();
-#endif	  
+		show_process_blocks();
+#endif
+	}
 }
 
 asmlinkage long sys_munmap(unsigned long addr, size_t len)
@@ -557,10 +857,69 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	return -ENOMEM;
 }
 
-struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr)
+/*
+ * Expand (or shrink) an existing mapping, potentially moving it at the
+ * same time (controlled by the MREMAP_MAYMOVE flag and available VM space)
+ *
+ * MREMAP_FIXED option added 5-Dec-1999 by Benjamin LaHaise
+ * This option implies MREMAP_MAYMOVE.
+ *
+ * on uClinux, we only permit changing a mapping's size, and only as long as it stays within the
+ * hole allocated by the kmalloc() call in do_mmap_pgoff() and the block is not shareable
+ */
+unsigned long do_mremap(unsigned long addr,
+			unsigned long old_len, unsigned long new_len,
+			unsigned long flags, unsigned long new_addr)
 {
+	struct vm_list_struct *vml = NULL;
+
+	/* insanity checks first */
+	if (new_len == 0)
+		return (unsigned long) -EINVAL;
+
+	if (flags & MREMAP_FIXED && new_addr != addr)
+		return (unsigned long) -EINVAL;
+
+	for (vml = current->mm->context.vmlist; vml; vml = vml->next)
+		if (vml->vma->vm_start == addr)
+			goto found;
+
+	return (unsigned long) -EINVAL;
+
+ found:
+	if (vml->vma->vm_end != vml->vma->vm_start + old_len)
+		return (unsigned long) -EFAULT;
+
+	if (vml->vma->vm_flags & VM_MAYSHARE)
+		return (unsigned long) -EPERM;
+
+	if (new_len > kobjsize((void *) addr))
+		return (unsigned long) -ENOMEM;
+
+	/* all checks complete - do it */
+	vml->vma->vm_end = vml->vma->vm_start + new_len;
+
+	askedalloc -= old_len;
+	askedalloc += new_len;
+
+	return vml->vma->vm_start;
+}
+
+/*
+ * Look up the first VMA which satisfies  addr < vm_end,  NULL if none
+ */
+struct vm_area_struct *find_vma(struct mm_struct *mm, unsigned long addr)
+{
+	struct vm_list_struct *vml;
+
+	for (vml = mm->context.vmlist; vml; vml = vml->next)
+		if (addr >= vml->vma->vm_start && addr < vml->vma->vm_end)
+			return vml->vma;
+
 	return NULL;
 }
+
+EXPORT_SYMBOL(find_vma);
 
 struct page * follow_page(struct mm_struct *mm, unsigned long addr, int write)
 {
@@ -578,12 +937,6 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long from,
 	return -EPERM;
 }
 
-unsigned long get_unmapped_area(struct file *file, unsigned long addr,
-	unsigned long len, unsigned long pgoff, unsigned long flags)
-{
-	return -ENOMEM;
-}
-
 void swap_unplug_io_fn(struct backing_dev_info *bdi, struct page *page)
 {
 }
@@ -598,3 +951,20 @@ void arch_unmap_area(struct vm_area_struct *area)
 {
 }
 
+void update_mem_hiwater(void)
+{
+	struct task_struct *tsk = current;
+
+	if (likely(tsk->mm)) {
+		if (tsk->mm->hiwater_rss < tsk->mm->rss)
+			tsk->mm->hiwater_rss = tsk->mm->rss;
+		if (tsk->mm->hiwater_vm < tsk->mm->total_vm)
+			tsk->mm->hiwater_vm = tsk->mm->total_vm;
+	}
+}
+
+void unmap_mapping_range(struct address_space *mapping,
+			 loff_t const holebegin, loff_t const holelen,
+			 int even_cows)
+{
+}

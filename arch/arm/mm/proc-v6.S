@@ -105,6 +105,7 @@ ENTRY(cpu_v6_dcache_clean_area)
 ENTRY(cpu_v6_switch_mm)
 	mov	r2, #0
 	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
+	mcr     p15, 0, r2, c7, c5, 6           @ flush BTAC/BTB
 	mcr	p15, 0, r2, c7, c10, 4		@ drain write buffer
 	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
 	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
@@ -189,27 +190,24 @@ cpu_v6_name:
  *	- cache type register is implemented
  */
 __v6_setup:
-	mov	r10, #0
-	mcr	p15, 0, r10, c7, c14, 0		@ clean+invalidate D cache
-	mcr	p15, 0, r10, c7, c5, 0		@ invalidate I cache
-	mcr	p15, 0, r10, c7, c15, 0		@ clean+invalidate cache
-	mcr	p15, 0, r10, c7, c10, 4		@ drain write buffer
-	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs
-	mcr	p15, 0, r10, c2, c0, 2		@ TTB control register
-	mcr	p15, 0, r4, c2, c0, 0		@ load TTB0
+	mov	r0, #0
+	mcr	p15, 0, r0, c7, c14, 0		@ clean+invalidate D cache
+	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
+	mcr	p15, 0, r0, c7, c15, 0		@ clean+invalidate cache
+	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
+	mcr	p15, 0, r0, c8, c7, 0		@ invalidate I + D TLBs
+	mcr	p15, 0, r0, c2, c0, 2		@ TTB control register
 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
-	mov	r10, #0x1f			@ domains 0, 1 = manager
-	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
-	mrc	p15, 0, r0, c1, c0, 0		@ read control register
 #ifdef CONFIG_VFP
-	mrc	p15, 0, r10, c1, c0, 2
-	orr	r10, r10, #(3 << 20)
-	mcr	p15, 0, r10, c1, c0, 2		@ Enable full access to VFP
+	mrc	p15, 0, r0, c1, c0, 2
+	orr	r0, r0, #(3 << 20)
+	mcr	p15, 0, r0, c1, c0, 2		@ Enable full access to VFP
 #endif
-	ldr	r10, cr1_clear			@ get mask for bits to clear
-	bic	r0, r0, r10			@ clear bits them
-	ldr	r10, cr1_set			@ get mask for bits to set
-	orr	r0, r0, r10			@ set them
+	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+	ldr	r5, v6_cr1_clear		@ get mask for bits to clear
+	bic	r0, r0, r5			@ clear bits them
+	ldr	r5, v6_cr1_set			@ get mask for bits to set
+	orr	r0, r0, r5			@ set them
 	mov	pc, lr				@ return to head.S:__ret
 
 	/*
@@ -218,11 +216,11 @@ __v6_setup:
 	 * rrrr rrrx xxx0 0101 xxxx xxxx x111 xxxx < forced
 	 *         0 110       0011 1.00 .111 1101 < we want
 	 */
-	.type	cr1_clear, #object
-	.type	cr1_set, #object
-cr1_clear:
-	.word	0x0120c302
-cr1_set:
+	.type	v6_cr1_clear, #object
+	.type	v6_cr1_set, #object
+v6_cr1_clear:
+	.word	0x01e0fb7f
+v6_cr1_set:
 	.word	0x00c0387d
 
 	.type	v6_processor_functions, #object
@@ -257,7 +255,11 @@ cpu_elf_name:
 __v6_proc_info:
 	.long	0x0007b000
 	.long	0x0007f000
-	.long	0x00000c0e
+	.long   PMD_TYPE_SECT | \
+		PMD_SECT_BUFFERABLE | \
+		PMD_SECT_CACHEABLE | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__v6_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name

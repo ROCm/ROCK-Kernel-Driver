@@ -557,12 +557,12 @@ static void __init init_dma_svwks (ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
-static void __init init_setup_svwks (struct pci_dev *dev, ide_pci_device_t *d)
+static int __init init_setup_svwks (struct pci_dev *dev, ide_pci_device_t *d)
 {
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
-static void __init init_setup_csb6 (struct pci_dev *dev, ide_pci_device_t *d)
+static int __init init_setup_csb6 (struct pci_dev *dev, ide_pci_device_t *d)
 {
 	if (!(PCI_FUNC(dev->devfn) & 1)) {
 		d->bootable = NEVER_BOARD;
@@ -579,7 +579,7 @@ static void __init init_setup_csb6 (struct pci_dev *dev, ide_pci_device_t *d)
 			dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB6IDE2) &&
 		       (!(PCI_FUNC(dev->devfn) & 1))) ? 1 : 2;
 
-	ide_setup_pci_device(dev, d);
+	return ide_setup_pci_device(dev, d);
 }
 
 
@@ -596,8 +596,7 @@ static int __devinit svwks_init_one(struct pci_dev *dev, const struct pci_device
 {
 	ide_pci_device_t *d = &serverworks_chipsets[id->driver_data];
 
-	d->init_setup(dev, d);
-	return 0;
+	return d->init_setup(dev, d);
 }
 
 static struct pci_device_id svwks_pci_tbl[] = {

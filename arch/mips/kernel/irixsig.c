@@ -13,7 +13,6 @@
 #include <linux/smp_lock.h>
 #include <linux/time.h>
 #include <linux/ptrace.h>
-#include <linux/suspend.h>
 
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
@@ -100,7 +99,7 @@ static void setup_irix_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	__put_user((u64) regs->hi, &ctx->hi);
 	__put_user((u64) regs->lo, &ctx->lo);
 	__put_user((u64) regs->cp0_epc, &ctx->pc);
-	__put_user(!!used_math(), &ctx->usedfp);
+	__put_user(current->used_math, &ctx->usedfp);
 	__put_user((u64) regs->cp0_cause, &ctx->cp0_cause);
 	__put_user((u64) regs->cp0_badvaddr, &ctx->cp0_badvaddr);
 
@@ -179,10 +178,8 @@ asmlinkage int do_irix_signal(sigset_t *oldset, struct pt_regs *regs)
 	if (!user_mode(regs))
 		return 1;
 
-	if (current->flags & PF_FREEZE) {
-		refrigerator(0);
+	if (try_to_freeze(0))
 		goto no_signal;
-	}
 
 	if (!oldset)
 		oldset = &current->blocked;
@@ -583,7 +580,7 @@ asmlinkage int irix_waitsys(int type, int pid, struct irix5_siginfo *info,
 		retval = -EINVAL;
 		goto out;
 	}
-	add_wait_queue(&current->wait_chldexit, &wait);
+	add_wait_queue(&current->signal->wait_chldexit, &wait);
 repeat:
 	flag = 0;
 	current->state = TASK_INTERRUPTIBLE;
@@ -672,7 +669,7 @@ repeat:
 	retval = -ECHILD;
 end_waitsys:
 	current->state = TASK_RUNNING;
-	remove_wait_queue(&current->wait_chldexit, &wait);
+	remove_wait_queue(&current->signal->wait_chldexit, &wait);
 
 out:
 	return retval;
@@ -728,7 +725,7 @@ asmlinkage int irix_getcontext(struct pt_regs *regs)
 	__put_user(regs->cp0_epc, &ctx->regs[35]);
 
 	flags = 0x0f;
-	if(!used_math()) {
+	if(!current->used_math) {
 		flags &= ~(0x08);
 	} else {
 		/* XXX wheee... */

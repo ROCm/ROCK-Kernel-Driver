@@ -1,7 +1,7 @@
 /* 
  * Direct MTD block device access
  *
- * $Id: mtdblock.c,v 1.65 2004/11/16 18:28:59 dwmw2 Exp $
+ * $Id: mtdblock.c,v 1.66 2004/11/25 13:52:52 joern Exp $
  *
  * (C) 2000-2003 Nicolas Pitre <nico@cam.org>
  * (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>
@@ -248,7 +248,7 @@ static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
 			      unsigned long block, char *buf)
 {
 	struct mtdblk_dev *mtdblk = mtdblks[dev->devnum];
-	if (unlikely(!mtdblk->cache_data)) {
+	if (unlikely(!mtdblk->cache_data && mtdblk->cache_size)) {
 		mtdblk->cache_data = vmalloc(mtdblk->mtd->erasesize);
 		if (!mtdblk->cache_data)
 			return -EINTR;

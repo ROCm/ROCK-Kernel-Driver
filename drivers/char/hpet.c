@@ -52,9 +52,9 @@
 static u32 hpet_ntimer, hpet_nhpet, hpet_max_freq = HPET_USER_FREQ;
 
 /* A lock for concurrent access by app and isr hpet activity. */
-static spinlock_t hpet_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hpet_lock);
 /* A lock for concurrent intermodule access to hpet and isr hpet activity. */
-static spinlock_t hpet_task_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hpet_task_lock);
 
 #define	HPET_DEV_NAME	(7)
 

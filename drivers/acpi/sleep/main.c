@@ -159,7 +159,7 @@ static int acpi_pm_finish(suspend_state_t pm_state)
 
 int acpi_suspend(u32 acpi_state)
 {
-	u32 states[] = {
+	suspend_state_t states[] = {
 		[1]	= PM_SUSPEND_STANDBY,
 		[3]	= PM_SUSPEND_MEM,
 		[4]	= PM_SUSPEND_DISK,

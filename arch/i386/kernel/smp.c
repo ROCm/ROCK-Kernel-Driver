@@ -24,11 +24,6 @@
 #include <asm/tlbflush.h>
 #include <mach_apic.h>
 
-#include <linux/config.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
-
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *
@@ -147,15 +142,6 @@ void __send_IPI_shortcut(unsigned int shortcut, int vector)
 	 */
 	cfg = __prepare_ICR(shortcut, vector);
 
-#ifdef	CONFIG_KDB
-	if (vector == KDB_VECTOR) {
-		/*
-		 * Setup KDB IPI to be delivered as an NMI
-		 */
-		cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
-	}
-#endif	/* CONFIG_KDB */
-
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.
 	 */
@@ -233,15 +219,6 @@ inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 			 * program the ICR 
 			 */
 			cfg = __prepare_ICR(0, vector);
-
-#ifdef	CONFIG_KDB
-			if (vector == KDB_VECTOR) {
-				/*
-				 * Setup KDB IPI to be delivered as an NMI
-				 */
-				cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
-			}
-#endif	/* CONFIG_KDB */
 			
 			/*
 			 * Send the IPI. The write to APIC_ICR fires this off.
@@ -489,15 +466,6 @@ void flush_tlb_all(void)
 {
 	on_each_cpu(do_flush_tlb_all, NULL, 1, 1);
 }
-
-#ifdef	CONFIG_KDB
-void
-smp_kdb_stop(void)
-{
-	if (!KDB_FLAG(NOIPI))
-		send_IPI_allbutself(KDB_VECTOR);
-}
-#endif	/* CONFIG_KDB */
 
 /*
  * this function sends a 'reschedule' IPI to another CPU.

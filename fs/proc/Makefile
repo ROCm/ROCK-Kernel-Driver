@@ -4,8 +4,8 @@
 
 obj-$(CONFIG_PROC_FS) += proc.o
 
-proc-y			:= task_nommu.o
-proc-$(CONFIG_MMU)	:= task_mmu.o
+proc-y			:= nommu.o task_nommu.o
+proc-$(CONFIG_MMU)	:= mmu.o task_mmu.o
 
 proc-y       += inode.o root.o base.o generic.o array.o \
 		kmsg.o proc_tty.o proc_misc.o

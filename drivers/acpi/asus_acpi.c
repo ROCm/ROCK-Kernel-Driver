@@ -78,9 +78,9 @@ MODULE_LICENSE("GPL");
 
 static uid_t asus_uid;
 static gid_t asus_gid;
-MODULE_PARM(asus_uid, "i");
+module_param(asus_uid, uint, 0);
 MODULE_PARM_DESC(uid, "UID for entries in /proc/acpi/asus.\n");
-MODULE_PARM(asus_gid, "i");
+module_param(asus_gid, uint, 0);
 MODULE_PARM_DESC(gid, "GID for entries in /proc/acpi/asus.\n");
 
 
@@ -866,7 +866,7 @@ static int __init asus_hotk_add_fs(struct acpi_device *device)
 
 	acpi_device_dir(device) = asus_proc_dir;
 	if (!acpi_device_dir(device))
-		return(-ENODEV);
+		return -ENODEV;
 
 	proc = create_proc_entry(PROC_INFO, mode, acpi_device_dir(device));
 	if (proc) {
@@ -1098,16 +1098,16 @@ static int __init asus_hotk_check(void)
 
 	result = acpi_bus_get_status(hotk->device);
 	if (result)
-		return(result);
+		return result;
 
 	if (hotk->device->status.present) {
 		result = asus_hotk_get_info();
 	} else {
 		printk(KERN_ERR "  Hotkey device not present, aborting\n");
-		return(-EINVAL);
+		return -EINVAL;
 	}
 
-	return(result);
+	return result;
 }
 
 
@@ -1117,7 +1117,7 @@ static int __init asus_hotk_add(struct acpi_device *device)
 	int result;
 
 	if (!device)
-		return(-EINVAL);
+		return -EINVAL;
 
 	printk(KERN_NOTICE "Asus Laptop ACPI Extras version %s\n",
 	       ASUS_ACPI_VERSION);
@@ -1125,7 +1125,7 @@ static int __init asus_hotk_add(struct acpi_device *device)
 	hotk =
 	    (struct asus_hotk *) kmalloc(sizeof(struct asus_hotk), GFP_KERNEL);
 	if (!hotk)
-		return(-ENOMEM);
+		return -ENOMEM;
 	memset(hotk, 0, sizeof(struct asus_hotk));
 
 	hotk->handle = device->handle;
@@ -1173,7 +1173,7 @@ static int __init asus_hotk_add(struct acpi_device *device)
 		kfree(hotk);
 	}
 
-	return(result);
+	return result;
 }
 
 
@@ -1182,7 +1182,7 @@ static int asus_hotk_remove(struct acpi_device *device, int type)
 	acpi_status status = 0;
 
 	if (!device || !acpi_driver_data(device))
-		return(-EINVAL);
+		return -EINVAL;
 
 	status = acpi_remove_notify_handler(hotk->handle, ACPI_SYSTEM_NOTIFY,
 					    asus_hotk_notify);
@@ -1193,7 +1193,7 @@ static int asus_hotk_remove(struct acpi_device *device, int type)
 
 	kfree(hotk);
 
-	return(0);
+	return 0;
 }
 
 

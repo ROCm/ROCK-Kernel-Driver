@@ -249,6 +249,17 @@ UNUSUAL_DEV(  0x04e6, 0x0101, 0x0200, 0x0200,
 		"CD-RW Device",
 		US_SC_8020, US_PR_CB, NULL, 0),
 
+/* Entry and supporting patch by Theodore Kilgore <kilgota@auburn.edu>.
+ * Device uses standards-violating 32-byte Bulk Command Block Wrappers and
+ * reports itself as "Proprietary SCSI Bulk." Cf. device entry 0x084d:0x0011.
+ */
+
+UNUSUAL_DEV(  0x04fc, 0x80c2, 0x0100, 0x0100,
+		"Kobian Mercury",
+		"Binocam DCB-132",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_BULK32),
+
 /* Reported by Bob Sass <rls@vectordb.com> -- only rev 1.33 tested */
 UNUSUAL_DEV(  0x050d, 0x0115, 0x0133, 0x0133,
 		"Belkin",
@@ -310,14 +321,14 @@ UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450,
 		"Sony",
 		"DSC-S30/S70/S75/505V/F505/F707/F717/P8", 
 		US_SC_SCSI, US_PR_DEVICE, NULL,
-		US_FL_SINGLE_LUN | US_FL_MODE_XLATE ),
+		US_FL_SINGLE_LUN ),
 
 /* This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0500, 0x0500, 
                "Sony",
                "DSC-T1", 
                US_SC_8070, US_PR_DEVICE, NULL,
-               US_FL_SINGLE_LUN | US_FL_MODE_XLATE ),
+               US_FL_SINGLE_LUN ),
 
 
 /* Reported by wim@geeks.nl */
@@ -346,14 +357,14 @@ UNUSUAL_DEV(  0x054c, 0x002e, 0x0106, 0x0310,
 		"Sony",
 		"Handycam",
 		US_SC_SCSI, US_PR_DEVICE, NULL,
-		US_FL_SINGLE_LUN | US_FL_MODE_XLATE),
+		US_FL_SINGLE_LUN ),
 
 /* Submitted by Rajesh Kumble Nayak <nayak@obs-nice.fr> */
 UNUSUAL_DEV(  0x054c, 0x002e, 0x0500, 0x0500, 
 		"Sony",
 		"Handycam HC-85",
 		US_SC_UFI, US_PR_DEVICE, NULL,
-		US_FL_SINGLE_LUN | US_FL_MODE_XLATE),
+		US_FL_SINGLE_LUN ),
 
 UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		"Sony",
@@ -483,7 +494,7 @@ UNUSUAL_DEV(  0x05dc, 0x0001, 0x0000, 0x0001,
 		"Lexar",
 		"Jumpshot USB CF Reader",
 		US_SC_SCSI, US_PR_JUMPSHOT, NULL,
-		US_FL_NEED_OVERRIDE | US_FL_MODE_XLATE ),
+		US_FL_NEED_OVERRIDE ),
 #endif
 
 /* Reported by Blake Matheny <bmatheny@purdue.edu> */
@@ -499,7 +510,7 @@ UNUSUAL_DEV(  0x0636, 0x0003, 0x0000, 0x9999,
 		"Vivitar",
 		"Vivicam 35Xx",
 		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_FIX_INQUIRY | US_FL_MODE_XLATE),
+		US_FL_FIX_INQUIRY ),
 
 UNUSUAL_DEV(  0x0644, 0x0000, 0x0100, 0x0100, 
 		"TEAC",
@@ -518,6 +529,20 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 UNUSUAL_DEV( 0x066f, 0x8000, 0x0001, 0x0001,
 		"SigmaTel",
 		"USBMSC Audio Player",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
+/* Reported by Alex Butcher <alex.butcher@assursys.co.uk> */
+UNUSUAL_DEV( 0x067b, 0x3507, 0x0001, 0x0001,
+		"Prolific Technology Inc.",
+		"ATAPI-6 Bridge Controller",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
+/* Reported by Alex Butcher <alex.butcher@assursys.co.uk> */
+UNUSUAL_DEV( 0x067b, 0x3507, 0x0001, 0x0001,
+		"Prolific Technology Inc.",
+		"ATAPI-6 Bridge Controller",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
 
@@ -609,48 +634,48 @@ UNUSUAL_DEV(  0x07c4, 0xa000, 0x0000, 0x0015,
 		"Datafab",
 		"MDCFE-B USB CF Reader",
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
-		US_FL_MODE_XLATE ),
+		0 ),
 
-	/*
-	 * The following Datafab-based devices may or may not work
-	 * using the current driver...the 0xffff is arbitrary since I
-	 * don't know what device versions exist for these guys.
-	 *
-	 * The 0xa003 and 0xa004 devices in particular I'm curious about.
-	 * I'm told they exist but so far nobody has come forward to say that
-	 * they work with this driver.  Given the success we've had getting
-	 * other Datafab-based cards operational with this driver, I've decided
-	 * to leave these two devices in the list.
-	 */
+/*
+ * The following Datafab-based devices may or may not work
+ * using the current driver...the 0xffff is arbitrary since I
+ * don't know what device versions exist for these guys.
+ *
+ * The 0xa003 and 0xa004 devices in particular I'm curious about.
+ * I'm told they exist but so far nobody has come forward to say that
+ * they work with this driver.  Given the success we've had getting
+ * other Datafab-based cards operational with this driver, I've decided
+ * to leave these two devices in the list.
+ */
 UNUSUAL_DEV( 0x07c4, 0xa001, 0x0000, 0xffff,
 		"SIIG/Datafab",
 		"SIIG/Datafab Memory Stick+CF Reader/Writer",
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
-		US_FL_MODE_XLATE ),
+		0 ),
 
 UNUSUAL_DEV( 0x07c4, 0xa003, 0x0000, 0xffff,
 		"Datafab/Unknown",
 		"Datafab-based Reader",
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
-		US_FL_MODE_XLATE ),
+		0 ),
 
 UNUSUAL_DEV( 0x07c4, 0xa004, 0x0000, 0xffff,
 		"Datafab/Unknown",
 		"Datafab-based Reader",
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
-		US_FL_MODE_XLATE ),
+		0 ),
 
 UNUSUAL_DEV( 0x07c4, 0xa005, 0x0000, 0xffff,
 		"PNY/Datafab",
 		"PNY/Datafab CF+SM Reader",
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
-		US_FL_MODE_XLATE ),
+		0 ),
 
 UNUSUAL_DEV( 0x07c4, 0xa006, 0x0000, 0xffff,
 		"Simple Tech/Datafab",
 		"Simple Tech/Datafab CF+SM Reader",
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
-		US_FL_MODE_XLATE ),
+		0 ),
 #endif
 		
 #ifdef CONFIG_USB_STORAGE_SDDR55
@@ -668,7 +693,7 @@ UNUSUAL_DEV(  0x07c4, 0xa109, 0x0000, 0xffff,
 		"Datafab Systems, Inc.",
 		"USB to CF + SM Combo (LC1)",
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
-		US_FL_MODE_XLATE ),
+		0 ),
 #endif
 #ifdef CONFIG_USB_STORAGE_SDDR55
 /* SM part - aeb <Andries.Brouwer@cwi.nl> */
@@ -715,14 +740,18 @@ UNUSUAL_DEV( 0x0839, 0x000a, 0x0001, 0x0001,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY),
 
-/* Aiptek PocketCAM 3Mega
- * Nicolas DUPEUX <nicolas@dupeux.net> 
+/* Entry and supporting patch by Theodore Kilgore <kilgota@auburn.edu>.
+ * Flag will support Bulk devices which use a standards-violating 32-byte
+ * Command Block Wrapper. Here, the "DC2MEGA" cameras (several brands) with
+ * Grandtech GT892x chip, which request "Proprietary SCSI Bulk" support.
  */
-UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
-		"AIPTEK",
-		"PocketCAM 3Mega",
+
+UNUSUAL_DEV(  0x084d, 0x0011, 0x0110, 0x0110,
+		"Grandtech",
+		"DC2MEGA",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_MODE_XLATE ),
+		US_FL_BULK32),
+
 
 /* Entry needed for flags. Moreover, all devices with this ID use
  * bulk-only transport, but _some_ falsely report Control/Bulk instead.
@@ -733,14 +762,14 @@ UNUSUAL_DEV(  0x090a, 0x1001, 0x0100, 0x0100,
 		"Trumpion",
 		"t33520 USB Flash Card Controller",
 		US_SC_DEVICE, US_PR_BULK, NULL,
-		US_FL_NEED_OVERRIDE | US_FL_MODE_XLATE),
+		US_FL_NEED_OVERRIDE ),
 
 /* Trumpion Microelectronics MP3 player (felipe_alfaro@linuxmail.org) */
 UNUSUAL_DEV( 0x090a, 0x1200, 0x0000, 0x9999,
 		"Trumpion",
 		"MP3 player",
 		US_SC_RBC, US_PR_BULK, NULL,
-		US_FL_MODE_XLATE),
+		0 ),
 
 /* aeb */
 UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
@@ -748,12 +777,6 @@ UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
 		"5-in-1 Card Reader",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
-
-UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
-		"Minds@Work",
-		"Digital Wallet",
- 		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_MODE_XLATE ),
 
 /* This Pentax still camera is not conformant
  * to the USB storage specification: -
@@ -842,6 +865,14 @@ UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Submitted by Daniel Drake <dsd@gentoo.org>
+ * Reported by dayul on the Gentoo Forums */
+UNUSUAL_DEV(  0x0ea0, 0x2168, 0x0110, 0x0110,
+		"Ours Technology",
+		"Flash Disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Reported by Rastislav Stanik <rs_kernel@yahoo.com> */
 UNUSUAL_DEV(  0x0ea0, 0x6828, 0x0110, 0x0110,
 		"USB",
@@ -858,17 +889,6 @@ UNUSUAL_DEV(  0x1019, 0x0c55, 0x0000, 0x9999,
 		"UCR-61S2B",
 		US_SC_DEVICE, US_PR_DEVICE, usb_stor_ucr61s2b_init,
 		0 ),
-
-/* Reported by Dan Pilone <pilone@slac.com>
- * The device needs the flags only.
- * Also reported by Brian Hall <brihall@pcisys.net>, again for flags.
- * I also suspect this device may have a broken serial number.
- */
-UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x9999,
-		"CCYU TECHNOLOGY",
-		"EasyDisk Portable Device",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_MODE_XLATE ),
 
 /* Reported by Kotrla Vitezslav <kotrla@ceb.cz> */
 UNUSUAL_DEV(  0x1370, 0x6828, 0x0110, 0x0110,

@@ -72,6 +72,7 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
  * Powermanagement idle function, if any..
  */
 void (*pm_idle)(void);
+static cpumask_t cpu_idle_map;
 
 void disable_hlt(void)
 {
@@ -93,7 +94,7 @@ EXPORT_SYMBOL(enable_hlt);
  */
 void default_idle(void)
 {
-	if (!hlt_counter && current_cpu_data.hlt_works_ok) {
+	if (!hlt_counter && boot_cpu_data.hlt_works_ok) {
 		local_irq_disable();
 		if (!need_resched())
 			safe_halt();
@@ -144,28 +145,43 @@ static void poll_idle (void)
  */
 void cpu_idle (void)
 {
+	int cpu = _smp_processor_id();
+
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
 			void (*idle)(void);
-			/*
-			 * Mark this as an RCU critical section so that
-			 * synchronize_kernel() in the unload path waits
-			 * for our completion.
-			 */
-			rcu_read_lock();
+
+			if (cpu_isset(cpu, cpu_idle_map))
+				cpu_clear(cpu, cpu_idle_map);
+			rmb();
 			idle = pm_idle;
 
 			if (!idle)
 				idle = default_idle;
 
-			irq_stat[smp_processor_id()].idle_timestamp = jiffies;
+			irq_stat[cpu].idle_timestamp = jiffies;
 			idle();
-			rcu_read_unlock();
 		}
 		schedule();
 	}
 }
+
+void cpu_idle_wait(void)
+{
+	int cpu;
+	cpumask_t map;
+
+	for_each_online_cpu(cpu)
+		cpu_set(cpu, cpu_idle_map);
+
+	wmb();
+	do {
+		ssleep(1);
+		cpus_and(map, cpu_idle_map, cpu_online_map);
+	} while (!cpus_empty(map));
+}
+EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 /*
  * This uses new MONITOR/MWAIT instructions on P4 processors with PNI,
@@ -335,7 +351,7 @@ void flush_thread(void)
 	 * Forget coprocessor state..
 	 */
 	clear_fpu(tsk);
-	clear_used_math();
+	tsk->used_math = 0;
 }
 
 void release_thread(struct task_struct *dead_task)

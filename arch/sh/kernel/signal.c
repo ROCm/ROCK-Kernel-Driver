@@ -24,7 +24,6 @@
 #include <linux/tty.h>
 #include <linux/personality.h>
 #include <linux/binfmts.h>
-#include <linux/suspend.h>
 
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
@@ -163,7 +162,7 @@ static inline int restore_sigcontext_fpu(struct sigcontext __user *sc)
 	if (!(cpu_data->flags & CPU_HAS_FPU))
 		return 0;
 
-	set_used_math();
+	tsk->used_math = 1;
 	return __copy_from_user(&tsk->thread.fpu.hard, &sc->sc_fpregs[0],
 				sizeof(long)*(16*2+2));
 }
@@ -176,7 +175,7 @@ static inline int save_sigcontext_fpu(struct sigcontext __user *sc,
 	if (!(cpu_data->flags & CPU_HAS_FPU))
 		return 0;
 
-	if (!used_math()) {
+	if (!tsk->used_math) {
 		__put_user(0, &sc->sc_ownedfp);
 		return 0;
 	}
@@ -186,7 +185,7 @@ static inline int save_sigcontext_fpu(struct sigcontext __user *sc,
 	/* This will cause a "finit" to be triggered by the next
 	   attempted FPU operation by the 'current' process.
 	   */
-	clear_used_math();
+	tsk->used_math = 0;
 
 	unlazy_fpu(tsk, regs);
 	return __copy_to_user(&sc->sc_fpregs[0], &tsk->thread.fpu.hard,
@@ -220,7 +219,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, int *r0_p
 
 		regs->sr |= SR_FD; /* Release FPU */
 		clear_fpu(tsk, regs);
-		clear_used_math();
+		tsk->used_math = 0;
 		__get_user (owned_fp, &sc->sc_ownedfp);
 		if (owned_fp)
 			err |= restore_sigcontext_fpu(sc);
@@ -579,10 +578,8 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 	if (!user_mode(regs))
 		return 1;
 
-	if (current->flags & PF_FREEZE) {
-		refrigerator(0);
+	if (try_to_freeze(0))
 		goto no_signal;
-	}
 
 	if (!oldset)
 		oldset = &current->blocked;

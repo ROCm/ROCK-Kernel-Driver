@@ -56,7 +56,7 @@
 #include <linux/seq_file.h>
 
 struct hlist_head raw_v6_htable[RAWV6_HTABLE_SIZE];
-rwlock_t raw_v6_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(raw_v6_lock);
 
 static void raw_v6_hash(struct sock *sk)
 {
@@ -178,7 +178,7 @@ out:
 /* This cleans up af_inet6 a bit. -DaveM */
 static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *) uaddr;
 	__u32 v4addr = 0;
@@ -253,7 +253,7 @@ void rawv6_err(struct sock *sk, struct sk_buff *skb,
 	       struct inet6_skb_parm *opt,
 	       int type, int code, int offset, u32 info)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	int err;
 	int harderr;
@@ -314,7 +314,7 @@ static inline int rawv6_rcv_skb(struct sock * sk, struct sk_buff * skb)
  */
 int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct raw6_opt *raw_opt = raw6_sk(sk);
 
         if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb)) {
@@ -505,7 +505,7 @@ static int rawv6_send_hdrinc(struct sock *sk, void *from, int length,
 			struct flowi *fl, struct rt6_info *rt, 
 			unsigned int flags)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6hdr *iph;
 	struct sk_buff *skb;
 	unsigned int hh_len;
@@ -607,7 +607,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 	struct ipv6_txoptions opt_space;
 	struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *) msg->msg_name;
 	struct in6_addr *daddr, *final_p = NULL, final;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct raw6_opt *raw_opt = raw6_sk(sk);
 	struct ipv6_txoptions *opt = NULL;

@@ -101,8 +101,6 @@ struct synaptics_data {
 	unsigned long int ext_cap; 		/* Extended Capabilities */
 	unsigned long int identity;		/* Identification */
 
-	/* Data for normal processing */
-	int old_w;				/* Previous w value */
 	unsigned char pkt_type;			/* packet type - old, new, etc */
 	unsigned char mode;			/* current mode byte */
 };

@@ -334,6 +334,18 @@ config NET_CLS_IND
 	  Requires a new iproute2
 	  You MUST NOT turn this on if you dont have an update iproute2.
 
+config CLS_U32_MARK
+	bool "Use nfmark as a key in U32 classifier"
+	depends on NET_CLS_U32 && NETFILTER
+	help
+	  This allows you to match mark in a u32 filter.
+	  Example:
+	  tc filter add dev eth0 protocol ip parent 1:0 prio 5 u32 \
+		match mark 0x0090 0xffff \
+		match ip dst 4.4.4.4 \
+		flowid 1:90
+	  You must use a new iproute2 to use this feature.
+
 config NET_CLS_RSVP
 	tristate "Special RSVP classifier"
 	depends on NET_CLS && NET_QOS
@@ -369,7 +381,6 @@ config NET_CLS_ACT
 	---help---
 	This option requires you have a new iproute2. It enables
 	tc extensions which can be used with tc classifiers.
-	Only the u32 and fw classifiers are supported at the moment.
 	  You MUST NOT turn this on if you dont have an update iproute2.
 
 config NET_ACT_POLICE
@@ -379,13 +390,6 @@ config NET_ACT_POLICE
         If you are using a newer iproute2 select this one, otherwise use one
 	below to select a policer.
 	  You MUST NOT turn this on if you dont have an update iproute2.
-
-config NET_CLS_POLICE
-	bool "Traffic policing (needed for in/egress)"
-	depends on NET_CLS && NET_QOS && NET_ACT_POLICE!=y && NET_ACT_POLICE!=m
-	help
-	  Say Y to support traffic policing (bandwidth limits).  Needed for
-	  ingress and egress rate limiting.
 
 config NET_ACT_GACT
         tristate "generic Actions"
@@ -420,3 +424,11 @@ config NET_ACT_PEDIT
         ---help---
         requires new iproute2
         This allows for packets to be generically edited
+
+config NET_CLS_POLICE
+	bool "Traffic policing (needed for in/egress)"
+	depends on NET_CLS && NET_QOS && NET_CLS_ACT!=y
+	help
+	  Say Y to support traffic policing (bandwidth limits).  Needed for
+	  ingress and egress rate limiting.
+

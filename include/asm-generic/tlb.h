@@ -141,6 +141,14 @@ static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
 		__pte_free_tlb(tlb, ptep);			\
 	} while (0)
 
+#ifndef __ARCH_HAS_4LEVEL_HACK
+#define pud_free_tlb(tlb, pudp)					\
+	do {							\
+		tlb->need_flush = 1;				\
+		__pud_free_tlb(tlb, pudp);			\
+	} while (0)
+#endif
+
 #define pmd_free_tlb(tlb, pmdp)					\
 	do {							\
 		tlb->need_flush = 1;				\

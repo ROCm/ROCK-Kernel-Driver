@@ -27,6 +27,7 @@
 #include <linux/bootmem.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/initrd.h>
 
@@ -85,8 +86,6 @@ int swarm_be_handler(struct pt_regs *regs, int is_fixup)
 
 static int __init swarm_setup(void)
 {
-	extern int panic_timeout;
-
 	sb1250_setup();
 
 	panic_timeout = 5;  /* For debug.  */

@@ -8,14 +8,7 @@
  *  Please send bug reports to: hjw@zvw.de
  */
 
-#include <stdarg.h>
-#include <linux/stat.h>
-#include <linux/time.h>
-#include <linux/affs_fs.h>
-#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/amigaffs.h>
-#include <linux/buffer_head.h>
+#include "affs.h"
 
 extern struct timezone sys_tz;
 
@@ -68,7 +61,7 @@ affs_insert_hash(struct inode *dir, struct buffer_head *bh)
 	mark_buffer_dirty_inode(dir_bh, dir);
 	affs_brelse(dir_bh);
 
-	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
 	dir->i_version++;
 	mark_inode_dirty(dir);
 
@@ -121,7 +114,7 @@ affs_remove_hash(struct inode *dir, struct buffer_head *rem_bh)
 
 	affs_brelse(bh);
 
-	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
 	dir->i_version++;
 	mark_inode_dirty(dir);
 
@@ -319,7 +312,7 @@ affs_remove_header(struct dentry *dentry)
 	else
 		inode->i_nlink = 0;
 	affs_unlock_link(inode);
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 
 done:

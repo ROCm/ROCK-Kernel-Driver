@@ -231,7 +231,6 @@ extern void ax25_send_to_raw(ax25_address *, struct sk_buff *, int);
 extern void ax25_destroy_socket(ax25_cb *);
 extern ax25_cb *ax25_create_cb(void);
 extern void ax25_fillin_cb(ax25_cb *, ax25_dev *);
-extern int  ax25_create(struct socket *, int);
 extern struct sock *ax25_make_new(struct sock *, struct ax25_dev *);
 
 /* ax25_addr.c */
@@ -268,7 +267,6 @@ extern int  ax25_ds_frame_in(ax25_cb *, struct sk_buff *, int);
 extern void ax25_ds_nr_error_recovery(ax25_cb *);
 extern void ax25_ds_enquiry_response(ax25_cb *);
 extern void ax25_ds_establish_data_link(ax25_cb *);
-extern void ax25_dev_dama_on(ax25_dev *);
 extern void ax25_dev_dama_off(ax25_dev *);
 extern void ax25_dama_on(ax25_cb *);
 extern void ax25_dama_off(ax25_cb *);

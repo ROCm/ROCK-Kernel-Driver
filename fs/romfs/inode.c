@@ -161,8 +161,7 @@ static int romfs_fill_super(struct super_block *s, void *data, int silent)
 	if (!root)
 		goto out;
 
-	s->s_root = d_alloc_root(iget(s, sz));
-
+	s->s_root = d_alloc_root(root);
 	if (!s->s_root)
 		goto outiput;
 

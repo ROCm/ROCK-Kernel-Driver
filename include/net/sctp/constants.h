@@ -105,9 +105,10 @@ typedef enum {
 
 typedef enum {
 	SCTP_EVENT_NO_PENDING_TSN = 0,
+	SCTP_EVENT_ICMP_PROTO_UNREACH,
 } sctp_event_other_t;
 
-#define SCTP_EVENT_OTHER_MAX		SCTP_EVENT_NO_PENDING_TSN
+#define SCTP_EVENT_OTHER_MAX		SCTP_EVENT_ICMP_PROTO_UNREACH
 #define SCTP_NUM_OTHER_TYPES		(SCTP_EVENT_OTHER_MAX + 1)
 
 /* These are primitive requests from the ULP.  */
@@ -155,10 +156,6 @@ SCTP_SUBTYPE_CONSTRUCTOR(PRIMITIVE,	sctp_event_primitive_t,	primitive)
 		       		- (unsigned long)(c->chunk_hdr)\
 				- sizeof(sctp_data_chunk_t)))
 
-/* This is a table of printable names of sctp_param_t's.  */
-extern const char *sctp_param_tbl[];
-
-
 #define SCTP_MAX_ERROR_CAUSE  SCTP_ERROR_NONEXIST_IP
 #define SCTP_NUM_ERROR_CAUSE  10
 
@@ -179,6 +176,7 @@ typedef enum {
 	SCTP_IERROR_IGNORE_TSN,
 	SCTP_IERROR_NO_DATA,
 	SCTP_IERROR_BAD_STREAM,
+	SCTP_IERROR_BAD_PORTS,
 
 } sctp_ierror_t;
 

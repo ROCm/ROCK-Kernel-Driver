@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-rc3-m68k
-# Sun Dec  5 14:21:41 2004
+# Linux kernel version: 2.6.10-m68k
+# Sun Dec 26 11:23:36 2004
 #
 CONFIG_M68K=y
 CONFIG_MMU=y
@@ -460,6 +460,11 @@ CONFIG_DUMMY_CONSOLE=y
 # USB Gadget Support
 #
 # CONFIG_USB_GADGET is not set
+
+#
+# MMC/SD Card support
+#
+# CONFIG_MMC is not set
 
 #
 # Character devices

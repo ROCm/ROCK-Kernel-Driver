@@ -448,7 +448,7 @@ static struct cache_detail rsc_cache = {
 
 static DefineSimpleCacheLookup(rsc, 0);
 
-struct rsc *
+static struct rsc *
 gss_svc_searchbyctx(struct xdr_netobj *handle)
 {
 	struct rsc rsci;
@@ -958,7 +958,7 @@ svcauth_gss_release(struct svc_rqst *rqstp)
 	if (gc->gc_proc != RPC_GSS_PROC_DATA)
 		goto out;
 	/* Release can be called twice, but we only wrap once. */
-	if (gsd->body_start == 0)
+	if (gsd->body_start == NULL)
 		goto out;
 	/* normally not set till svc_send, but we need it here: */
 	resbuf->len = resbuf->head[0].iov_len
@@ -1045,7 +1045,7 @@ svcauth_gss_domain_release(struct auth_domain *dom)
 	kfree(gd);
 }
 
-struct auth_ops svcauthops_gss = {
+static struct auth_ops svcauthops_gss = {
 	.name		= "rpcsec_gss",
 	.owner		= THIS_MODULE,
 	.flavour	= RPC_AUTH_GSS,

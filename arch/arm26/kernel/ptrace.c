@@ -540,7 +540,7 @@ static int ptrace_getfpregs(struct task_struct *tsk, void *ufp)
  */
 static int ptrace_setfpregs(struct task_struct *tsk, void *ufp)
 {
-	set_stopped_child_used_math(tsk);
+	tsk->used_math = 1;
 	return copy_from_user(&tsk->thread_info->fpstate, ufp,
 			      sizeof(struct user_fp)) ? -EFAULT : 0;
 }

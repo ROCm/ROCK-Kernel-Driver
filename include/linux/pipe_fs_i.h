@@ -2,10 +2,27 @@
 #define _LINUX_PIPE_FS_I_H
 
 #define PIPEFS_MAGIC 0x50495045
+
+#define PIPE_BUFFERS (16)
+
+struct pipe_buffer {
+	struct page *page;
+	unsigned int offset, len;
+	struct pipe_buf_operations *ops;
+};
+
+struct pipe_buf_operations {
+	int can_merge;
+	void * (*map)(struct file *, struct pipe_inode_info *, struct pipe_buffer *);
+	void (*unmap)(struct pipe_inode_info *, struct pipe_buffer *);
+	void (*release)(struct pipe_inode_info *, struct pipe_buffer *);
+};
+
 struct pipe_inode_info {
 	wait_queue_head_t wait;
-	char *base;
-	unsigned int len;
+	unsigned int nrbufs, curbuf;
+	struct pipe_buffer bufs[PIPE_BUFFERS];
+	struct page *tmp_page;
 	unsigned int start;
 	unsigned int readers;
 	unsigned int writers;
@@ -33,16 +50,10 @@ struct pipe_inode_info {
 #define PIPE_FASYNC_READERS(inode)     (&((inode).i_pipe->fasync_readers))
 #define PIPE_FASYNC_WRITERS(inode)     (&((inode).i_pipe->fasync_writers))
 
-#define PIPE_EMPTY(inode)	(PIPE_LEN(inode) == 0)
-#define PIPE_FULL(inode)	(PIPE_LEN(inode) == PIPE_SIZE)
-#define PIPE_FREE(inode)	(PIPE_SIZE - PIPE_LEN(inode))
-#define PIPE_END(inode)	((PIPE_START(inode) + PIPE_LEN(inode)) & (PIPE_SIZE-1))
-#define PIPE_MAX_RCHUNK(inode)	(PIPE_SIZE - PIPE_START(inode))
-#define PIPE_MAX_WCHUNK(inode)	(PIPE_SIZE - PIPE_END(inode))
-
 /* Drop the inode semaphore and wait for a pipe event, atomically */
 void pipe_wait(struct inode * inode);
 
 struct inode* pipe_new(struct inode* inode);
+void free_pipe_info(struct inode* inode);
 
 #endif

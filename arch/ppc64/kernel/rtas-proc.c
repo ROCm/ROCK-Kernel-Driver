@@ -31,6 +31,7 @@
 #include <asm/rtas.h>
 #include <asm/machdep.h> /* for ppc_md */
 #include <asm/time.h>
+#include <asm/systemcfg.h>
 
 /* Token for Sensors */
 #define KEY_SWITCH		0x0001
@@ -51,7 +52,6 @@
 #define IBM_VOLTAGE		0x232a /* 9002 */
 #define IBM_DRCONNECTOR		0x232b /* 9003 */
 #define IBM_POWERSUPPLY		0x232c /* 9004 */
-#define IBM_INTQUEUE		0x232d /* 9005 */
 
 /* Status return values */
 #define SENSOR_CRITICAL_HIGH	13
@@ -106,7 +106,6 @@
 #define DR_ACTION		0x2329 /* 9001 */
 #define DR_INDICATOR		0x232a /* 9002 */
 /* 9003 - 9004: Vendor specific */
-#define GLOBAL_INTERRUPT_QUEUE	0x232d /* 9005 */
 /* 9006 - 9999: Vendor specific */
 
 /* other */
@@ -552,7 +551,6 @@ static void ppc_rtas_process_sensor(struct seq_file *m,
 						"No current flow" };
 	const char * ibm_drconnector[]     = { "Empty", "Present", "Unusable", 
 						"Exchange" };
-	const char * ibm_intqueue[]        = { "Disabled", "Enabled" };
 
 	int have_strings = 0;
 	int num_states = 0;
@@ -663,15 +661,6 @@ static void ppc_rtas_process_sensor(struct seq_file *m,
 			break;
 		case IBM_POWERSUPPLY:
 			seq_printf(m, "Powersupply:\t");
-			break;
-		case IBM_INTQUEUE:
-			seq_printf(m, "Interrupt queue:\t");
-			num_states = sizeof(ibm_intqueue) / sizeof(char *);
-			if (state < num_states) {
-				seq_printf(m, "%s\t", 
-						ibm_intqueue[state]);
-				have_strings = 1;
-			}
 			break;
 		default:
 			seq_printf(m,  "Unknown sensor (type %d), ignoring it\n",

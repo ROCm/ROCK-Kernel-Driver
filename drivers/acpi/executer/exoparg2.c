@@ -410,7 +410,7 @@ acpi_ex_opcode_2A_1T_1R (
 		index = (u32) operand[1]->integer.value;
 
 		/*
-		 * At this point, the Source operand is either a Package or a Buffer
+		 * At this point, the Source operand is a Package, Buffer, or String
 		 */
 		if (ACPI_GET_OBJECT_TYPE (operand[0]) == ACPI_TYPE_PACKAGE) {
 			/* Object to be indexed is a Package */
@@ -428,7 +428,7 @@ acpi_ex_opcode_2A_1T_1R (
 			return_desc->reference.where     = &operand[0]->package.elements [index];
 		}
 		else {
-			/* Object to be indexed is a Buffer */
+			/* Object to be indexed is a Buffer/String */
 
 			if (index >= operand[0]->buffer.length) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,

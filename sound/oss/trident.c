@@ -4014,7 +4014,8 @@ ali_free_other_states_resources(struct trident_state *state)
 	}
 }
 
-struct proc_dir_entry *res;
+static struct proc_dir_entry *res;
+
 static int
 ali_write_proc(struct file *file, const char __user *buffer, unsigned long count, void *data)
 {

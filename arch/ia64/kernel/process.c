@@ -25,6 +25,7 @@
 #include <linux/unistd.h>
 #include <linux/efi.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #include <asm/cpu.h>
 #include <asm/delay.h>
@@ -46,6 +47,7 @@
 #include "sigframe.h"
 
 void (*ia64_mark_idle)(int);
+static cpumask_t cpu_idle_map;
 
 unsigned long boot_option_idle_override = 0;
 EXPORT_SYMBOL(boot_option_idle_override);
@@ -225,10 +227,28 @@ static inline void play_dead(void)
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
+
+void cpu_idle_wait(void)
+{
+        int cpu;
+        cpumask_t map;
+
+        for_each_online_cpu(cpu)
+                cpu_set(cpu, cpu_idle_map);
+
+        wmb();
+        do {
+                ssleep(1);
+                cpus_and(map, cpu_idle_map, cpu_online_map);
+        } while (!cpus_empty(map));
+}
+EXPORT_SYMBOL_GPL(cpu_idle_wait);
+
 void __attribute__((noreturn))
-cpu_idle (void *unused)
+cpu_idle (void)
 {
 	void (*mark_idle)(int) = ia64_mark_idle;
+	int cpu = smp_processor_id();
 
 	/* endless idle loop with no priority at all */
 	while (1) {
@@ -241,17 +261,14 @@ cpu_idle (void *unused)
 
 			if (mark_idle)
 				(*mark_idle)(1);
-			/*
-			 * Mark this as an RCU critical section so that
-			 * synchronize_kernel() in the unload path waits
-			 * for our completion.
-			 */
-			rcu_read_lock();
+
+			if (cpu_isset(cpu, cpu_idle_map))
+				cpu_clear(cpu, cpu_idle_map);
+			rmb();
 			idle = pm_idle;
 			if (!idle)
 				idle = default_idle;
 			(*idle)();
-			rcu_read_unlock();
 		}
 
 		if (mark_idle)

@@ -32,34 +32,7 @@
 #define IRCOMM_LMP_H
 
 #include <net/irda/ircomm_core.h>
-#include <net/irda/ircomm_event.h>
 
 int ircomm_open_lsap(struct ircomm_cb *self);
-int  ircomm_lmp_connect_request(struct ircomm_cb *self, 
-				struct sk_buff *userdata, 
-				struct ircomm_info *info);
-int  ircomm_lmp_connect_response(struct ircomm_cb *self, struct sk_buff *skb);
-int  ircomm_lmp_disconnect_request(struct ircomm_cb *self, 
-				   struct sk_buff *userdata, 
-				   struct ircomm_info *info);
-int  ircomm_lmp_data_request(struct ircomm_cb *self, struct sk_buff *skb, 
-			     int clen);
-int  ircomm_lmp_control_request(struct ircomm_cb *self, 
-			       struct sk_buff *userdata);
-int  ircomm_lmp_data_indication(void *instance, void *sap,
-				struct sk_buff *skb);
-void ircomm_lmp_connect_confirm(void *instance, void *sap,
-				struct qos_info *qos, 
-				__u32 max_sdu_size, 
-				__u8 max_header_size,
-				struct sk_buff *skb);
-void ircomm_lmp_connect_indication(void *instance, void *sap,
-				   struct qos_info *qos,
-				   __u32 max_sdu_size,
-				   __u8 max_header_size,
-				   struct sk_buff *skb);
-void ircomm_lmp_disconnect_indication(void *instance, void *sap, 
-				      LM_REASON reason,
-				      struct sk_buff *skb);
 
 #endif

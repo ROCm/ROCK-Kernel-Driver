@@ -27,9 +27,6 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/config.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/smp_lock.h>
 #include <linux/mc146818rtc.h>
 #include <linux/compiler.h>
@@ -576,6 +573,7 @@ static int balanced_irq(void *unused)
 	for ( ; ; ) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		time_remaining = schedule_timeout(time_remaining);
+		try_to_freeze(PF_FREEZE);
 		if (time_after(jiffies,
 				prev_balance_time+balanced_irq_interval)) {
 			do_irq_balance();
@@ -1140,10 +1138,6 @@ next:
 	current_vector += 8;
 	if (current_vector == SYSCALL_VECTOR)
 		goto next;
-#ifdef	CONFIG_KDB
-	if (current_vector == KDBENTER_VECTOR)
-		goto next;
-#endif	/* CONFIG_KDB */
 
 	if (current_vector >= FIRST_SYSTEM_VECTOR) {
 		offset++;

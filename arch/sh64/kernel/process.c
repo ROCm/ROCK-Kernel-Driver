@@ -338,7 +338,7 @@ void default_idle(void)
 	}
 }
 
-void cpu_idle(void *unused)
+void cpu_idle(void)
 {
 	default_idle();
 }
@@ -688,7 +688,7 @@ void flush_thread(void)
 		last_task_used_math = NULL;
 	}
 	/* Force FPU state to be reinitialised after exec */
-	clear_used_math();
+	current->used_math = 0;
 #endif
 
 	/* if we are a kernel thread, about to change to user thread,
@@ -713,7 +713,7 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 	int fpvalid;
 	struct task_struct *tsk = current;
 
-	fpvalid = !!tsk_used_math(tsk);
+	fpvalid = tsk->used_math;
 	if (fpvalid) {
 		if (current == last_task_used_math) {
 			grab_fpu();

@@ -275,7 +275,7 @@ struct rsq_info {
 	struct rsq_entry	*next;
 	struct rsq_entry	*last;
 	dma_addr_t		paddr;
-} rsq_info;
+};
 
 
 /*****************************************************************************/

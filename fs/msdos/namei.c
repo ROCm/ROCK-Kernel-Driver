@@ -243,7 +243,7 @@ static int msdos_add_entry(struct inode *dir, const unsigned char *name,
 	/*
 	 * XXX all times should be set by caller upon successful completion.
 	 */
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(dir);
 
 	memcpy((*de)->name, name, MSDOS_NAME);
@@ -296,7 +296,7 @@ static int msdos_create(struct inode *dir, struct dentry *dentry, int mode,
 		unlock_kernel();
 		return res;
 	}
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	d_instantiate(dentry, inode);
 	unlock_kernel();
@@ -330,7 +330,7 @@ static int msdos_rmdir(struct inode *dir, struct dentry *dentry)
 	mark_buffer_dirty(bh);
 	fat_detach(inode);
 	inode->i_nlink = 0;
-	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
 	dir->i_nlink--;
 	mark_inode_dirty(inode);
 	mark_inode_dirty(dir);
@@ -392,7 +392,7 @@ out_unlock:
 
 mkdir_error:
 	inode->i_nlink = 0;
-	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
 	dir->i_nlink--;
 	mark_inode_dirty(inode);
 	mark_inode_dirty(dir);
@@ -430,7 +430,7 @@ static int msdos_unlink(struct inode *dir, struct dentry *dentry)
 	fat_detach(inode);
 	brelse(bh);
 	inode->i_nlink = 0;
-	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	mark_inode_dirty(dir);
 	res = 0;
@@ -493,11 +493,11 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 		MSDOS_I(old_inode)->i_attrs &= ~ATTR_HIDDEN;
 	mark_inode_dirty(old_inode);
 	old_dir->i_version++;
-	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
+	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(old_dir);
 	if (new_inode) {
 		new_inode->i_nlink--;
-		new_inode->i_ctime = CURRENT_TIME;
+		new_inode->i_ctime = CURRENT_TIME_SEC;
 		mark_inode_dirty(new_inode);
 	}
 	if (dotdot_bh) {
@@ -530,7 +530,7 @@ degenerate_case:
 		MSDOS_I(old_inode)->i_attrs &= ~ATTR_HIDDEN;
 	mark_inode_dirty(old_inode);
 	old_dir->i_version++;
-	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
+	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME_SEC;
 	mark_inode_dirty(old_dir);
 	return 0;
 }

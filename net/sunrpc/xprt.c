@@ -90,6 +90,8 @@ static struct socket *xprt_create_socket(struct rpc_xprt *, int, int);
 static void	xprt_bind_socket(struct rpc_xprt *, struct socket *);
 static int      __xprt_get_cong(struct rpc_xprt *, struct rpc_task *);
 
+static int	xprt_clear_backlog(struct rpc_xprt *xprt);
+
 #ifdef RPC_DEBUG_DATA
 /*
  * Print the buffer contents (first 128 bytes only--just enough for
@@ -893,7 +895,8 @@ tcp_read_xid(struct rpc_xprt *xprt, skb_reader_t *desc)
 	xprt->tcp_flags &= ~XPRT_COPY_XID;
 	xprt->tcp_flags |= XPRT_COPY_DATA;
 	xprt->tcp_copied = 4;
-	dprintk("RPC:      reading reply for XID %08x\n", xprt->tcp_xid);
+	dprintk("RPC:      reading reply for XID %08x\n",
+						ntohl(xprt->tcp_xid));
 	tcp_check_recm(xprt);
 }
 
@@ -914,7 +917,7 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 	if (!req) {
 		xprt->tcp_flags &= ~XPRT_COPY_DATA;
 		dprintk("RPC:      XID %08x request not found!\n",
-				xprt->tcp_xid);
+				ntohl(xprt->tcp_xid));
 		spin_unlock(&xprt->sock_lock);
 		return;
 	}
@@ -1119,7 +1122,7 @@ xprt_write_space(struct sock *sk)
 		goto out;
 
 	spin_lock_bh(&xprt->sock_lock);
-	if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->pending)
+	if (xprt->snd_task)
 		rpc_wake_up_task(xprt->snd_task);
 	spin_unlock_bh(&xprt->sock_lock);
 out:
@@ -1378,7 +1381,7 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 	req->rq_xprt    = xprt;
 	req->rq_xid     = xprt_alloc_xid(xprt);
 	dprintk("RPC: %4d reserved req %p xid %08x\n", task->tk_pid,
-			req, req->rq_xid);
+			req, ntohl(req->rq_xid));
 }
 
 /*
@@ -1415,7 +1418,7 @@ xprt_release(struct rpc_task *task)
 /*
  * Set default timeout parameters
  */
-void
+static void
 xprt_default_timeout(struct rpc_timeout *to, int proto)
 {
 	if (proto == IPPROTO_UDP)
@@ -1563,8 +1566,7 @@ xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 		sk->sk_no_check = UDP_CSUM_NORCV;
 		xprt_set_connected(xprt);
 	} else {
-		struct tcp_opt *tp = tcp_sk(sk);
-		tp->nonagle = 1;	/* disable Nagle's algorithm */
+		tcp_sk(sk)->nonagle = 1;	/* disable Nagle's algorithm */
 		sk->sk_data_ready = tcp_data_ready;
 		sk->sk_state_change = tcp_state_change;
 		xprt_clear_connected(xprt);
@@ -1651,7 +1653,7 @@ xprt_create_proto(int proto, struct sockaddr_in *sap, struct rpc_timeout *to)
 /*
  * Prepare for transport shutdown.
  */
-void
+static void
 xprt_shutdown(struct rpc_xprt *xprt)
 {
 	xprt->shutdown = 1;
@@ -1666,7 +1668,7 @@ xprt_shutdown(struct rpc_xprt *xprt)
 /*
  * Clear the xprt backlog queue
  */
-int
+static int
 xprt_clear_backlog(struct rpc_xprt *xprt) {
 	rpc_wake_up_next(&xprt->backlog);
 	wake_up(&xprt->cong_wait);

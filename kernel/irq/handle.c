@@ -73,17 +73,6 @@ irqreturn_t no_action(int cpl, void *dev_id, struct pt_regs *regs)
 }
 
 /*
- * Exit an interrupt context. Process softirqs if needed and possible:
- */
-void irq_exit(void)
-{
-	preempt_count() -= IRQ_EXIT_OFFSET;
-	if (!in_interrupt() && local_softirq_pending())
-		do_softirq();
-	preempt_enable_no_resched();
-}
-
-/*
  * Have got an event to handle:
  */
 fastcall int handle_IRQ_event(unsigned int irq, struct pt_regs *regs,

@@ -1,6 +1,6 @@
 /* linux/include/asm-arm/arch-s3c2410/vr1000-map.h
  *
- * (c) 2003,2004 Simtec Electronics
+ * (c) 2003-2005 Simtec Electronics
  *  Ben Dooks <ben@simtec.co.uk>
  *
  * Machine VR1000 - Memory map definitions
@@ -13,6 +13,7 @@
  *  06-Jan-2003 BJD  Linux 2.6.0 version, split specifics from arch/map.h
  *  12-Mar-2004 BJD  Fixed header include protection
  *  19-Mar-2004 BJD  Copied to VR1000 machine headers.
+ *  19-Jan-2005 BJD  Updated map definitions
 */
 
 /* needs arch/map.h including with this */
@@ -94,7 +95,6 @@
 #define VR1000_VA_DM9000	   (VR1000_VA_MULTISPACE + 0x02500000)
 #define VR1000_VA_SUPERIO	   (VR1000_VA_MULTISPACE + 0x02600000)
 
-
 /* physical offset addresses for the peripherals */
 
 #define VR1000_PA_IDEPRI	   (0x02000000)
@@ -104,6 +104,10 @@
 #define VR1000_PA_DM9000	   (0x05000000)
 
 #define VR1000_PA_SERIAL	   (0x11800000)
+#define VR1000_VA_SERIAL	   (VR1000_IOADDR(0x00700000))
+
+/* VR1000 ram is in CS1, with A26..A24 = 2_101 */
+#define VR1000_PA_SRAM		   (S3C2410_CS1 | 0x05000000)
 
 /* some configurations for the peripherals */
 

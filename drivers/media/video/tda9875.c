@@ -34,10 +34,10 @@
 #include <media/audiochip.h>
 #include <media/id.h>
 
-MODULE_PARM(debug,"i");
+static int debug; /* insmod parameter */
+module_param(debug, int, S_IRUGO | S_IWUSR);
 MODULE_LICENSE("GPL");
 
-static int debug = 0;	/* insmod parameter */
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] =  {

@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: scan.c,v 1.112 2004/09/12 09:56:13 gleixner Exp $
+ * $Id: scan.c,v 1.115 2004/11/17 12:59:08 dedekind Exp $
  *
  */
 #include <linux/kernel.h>
@@ -68,7 +68,7 @@ static int jffs2_scan_dirent_node(struct jffs2_sb_info *c, struct jffs2_eraseblo
 static inline int min_free(struct jffs2_sb_info *c)
 {
 	uint32_t min = 2 * sizeof(struct jffs2_raw_inode);
-#ifdef CONFIG_JFFS2_FS_NAND
+#if defined CONFIG_JFFS2_FS_NAND || defined CONFIG_JFFS2_FS_NOR_ECC
 	if (!jffs2_can_mark_obsolete(c) && min < c->wbuf_pagesize)
 		return c->wbuf_pagesize;
 #endif
@@ -160,11 +160,8 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 
 		case BLK_STATE_PARTDIRTY:
                         /* Some data, but not full. Dirty list. */
-                        /* Except that we want to remember the block with most free space,
-                           and stick it in the 'nextblock' position to start writing to it.
-                           Later when we do snapshots, this must be the most recent block,
-                           not the one with most free space.
-                        */
+                        /* We want to remember the block with most free space
+                           and stick it in the 'nextblock' position to start writing to it. */
                         if (jeb->free_size > min_free(c) && 
 			    (!c->nextblock || c->nextblock->free_size < jeb->free_size)) {
                                 /* Better candidate for the next writes to go to */
@@ -223,7 +220,7 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 		c->dirty_size -= c->nextblock->dirty_size;
 		c->nextblock->dirty_size = 0;
 	}
-#ifdef CONFIG_JFFS2_FS_NAND
+#if defined CONFIG_JFFS2_FS_NAND || defined CONFIG_JFFS2_FS_NOR_ECC
 	if (!jffs2_can_mark_obsolete(c) && c->nextblock && (c->nextblock->free_size & (c->wbuf_pagesize-1))) {
 		/* If we're going to start writing into a block which already 
 		   contains data, and the end of the data isn't page-aligned,

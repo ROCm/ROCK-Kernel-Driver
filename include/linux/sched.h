@@ -13,12 +13,14 @@
 #include <linux/rbtree.h>
 #include <linux/thread_info.h>
 #include <linux/cpumask.h>
+#include <linux/errno.h>
 
 #include <asm/system.h>
 #include <asm/semaphore.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
 #include <asm/mmu.h>
+#include <asm/cputime.h>
 
 #include <linux/smp.h>
 #include <linux/sem.h>
@@ -85,9 +87,7 @@ extern unsigned long avenrun[];		/* Load averages */
 	load += n*(FIXED_1-exp); \
 	load >>= FSHIFT;
 
-#define CT_TO_SECS(x)	((x) / HZ)
-#define CT_TO_USECS(x)	(((x) % HZ) * 1000000/HZ)
-
+extern unsigned long total_forks;
 extern int nr_threads;
 extern int last_pid;
 DECLARE_PER_CPU(unsigned long, process_counts);
@@ -120,6 +120,9 @@ extern unsigned long nr_iowait(void);
 	do { current->state = (state_value); } while (0)
 #define set_current_state(state_value)		\
 	set_mb(current->state, (state_value))
+
+/* Task command name length */
+#define TASK_COMM_LEN 16
 
 /*
  * Scheduling policies
@@ -169,7 +172,7 @@ long io_schedule_timeout(long timeout);
 extern void cpu_init (void);
 extern void trap_init(void);
 extern void update_process_times(int user);
-extern void scheduler_tick(int user_tick, int system);
+extern void scheduler_tick(void);
 extern unsigned long cache_decay_ticks;
 
 /* Attach to any functions which should be ignored in wchan output. */
@@ -250,6 +253,9 @@ struct mm_struct {
 	struct kioctx		*ioctx_list;
 
 	struct kioctx		default_kioctx;
+
+	unsigned long hiwater_rss;	/* High-water RSS usage */
+	unsigned long hiwater_vm;	/* High-water virtual memory usage */
 };
 
 struct sighand_struct {
@@ -269,6 +275,8 @@ struct signal_struct {
 	atomic_t		count;
 	atomic_t		live;
 
+	wait_queue_head_t	wait_chldexit;	/* for wait4() */
+
 	/* current thread group signal load-balancing target: */
 	task_t			*curr_target;
 
@@ -276,7 +284,6 @@ struct signal_struct {
 	struct sigpending	shared_pending;
 
 	/* thread group exit support */
-	int			group_exit;
 	int			group_exit_code;
 	/* overloaded:
 	 * - notify group_exit_task when ->count is equal to notify_count
@@ -288,8 +295,7 @@ struct signal_struct {
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
-	/* 1 if group stopped since last SIGCONT, -1 if SIGCONT since report */
-  	int			stop_state;
+	unsigned int		flags; /* see SIGNAL_* flags below */
 
 	/* POSIX.1b Interval Timers */
 	struct list_head posix_timers;
@@ -309,7 +315,7 @@ struct signal_struct {
 	 * Live threads maintain their own counters and add to these
 	 * in __exit_signal, except for the group leader.
 	 */
-	unsigned long utime, stime, cutime, cstime;
+	cputime_t utime, stime, cutime, cstime;
 	unsigned long nvcsw, nivcsw, cnvcsw, cnivcsw;
 	unsigned long min_flt, maj_flt, cmin_flt, cmaj_flt;
 
@@ -324,6 +330,15 @@ struct signal_struct {
 	 */
 	struct rlimit rlim[RLIM_NLIMITS];
 };
+
+/*
+ * Bits in flags field of signal_struct.
+ */
+#define SIGNAL_STOP_STOPPED	0x00000001 /* job control stop in effect */
+#define SIGNAL_STOP_DEQUEUED	0x00000002 /* stop signal dequeued */
+#define SIGNAL_STOP_CONTINUED	0x00000004 /* SIGCONT since WCONTINUED reap */
+#define SIGNAL_GROUP_EXIT	0x00000008 /* group exit in progress */
+
 
 /*
  * Priority of a process goes from 0..MAX_PRIO-1, valid RT
@@ -524,7 +539,6 @@ struct task_struct {
 	prio_array_t *array;
 
 	unsigned long sleep_avg;
-	long interactive_credit;
 	unsigned long long timestamp, last_ran;
 	int activated;
 
@@ -574,16 +588,16 @@ struct task_struct {
 	/* PID/PID hash table linkage. */
 	struct pid pids[PIDTYPE_MAX];
 
-	wait_queue_head_t wait_chldexit;	/* for wait4() */
 	struct completion *vfork_done;		/* for vfork() */
 	int __user *set_child_tid;		/* CLONE_CHILD_SETTID */
 	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
 
 	unsigned long rt_priority;
-	unsigned long it_real_value, it_prof_value, it_virt_value;
-	unsigned long it_real_incr, it_prof_incr, it_virt_incr;
+	unsigned long it_real_value, it_real_incr;
+	cputime_t it_virt_value, it_virt_incr;
+	cputime_t it_prof_value, it_prof_incr;
 	struct timer_list real_timer;
-	unsigned long utime, stime;
+	cputime_t utime, stime;
 	unsigned long nvcsw, nivcsw; /* context switch counts */
 	struct timespec start_time;
 /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
@@ -600,8 +614,20 @@ struct task_struct {
 	struct key *process_keyring;	/* keyring private to this process (CLONE_THREAD) */
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
-	int oomkilladj; /* OOM kill score adjustment (bit shift). */
-	char comm[16];
+/*
+ * Must be changed atomically so it shouldn't be
+ * be a shareable bitflag.
+ */
+	unsigned char used_math;
+/*
+ * OOM kill score adjustment (bit shift).
+ * Cannot live together with used_math since
+ * used_math and oomkilladj can be changed at the
+ * same time, so they would race if they're in the
+ * same atomic block.
+ */
+	short oomkilladj;
+	char comm[TASK_COMM_LEN];
 /* file system info */
 	int link_count, total_link_count;
 /* ipc stuff */
@@ -660,9 +686,16 @@ struct task_struct {
  * to a stack based synchronous wait) if its doing sync IO.
  */
 	wait_queue_t *io_wait;
+/* i/o counters(bytes read/written, #syscalls */
+	u64 rchar, wchar, syscr, syscw;
+#if defined(CONFIG_BSD_PROCESS_ACCT)
+	u64 acct_rss_mem1;	/* accumulated rss usage */
+	u64 acct_vm_mem1;	/* accumulated virtual memory usage */
+	clock_t acct_stimexpd;	/* clock_t-converted stime since last update */
+#endif
 #ifdef CONFIG_NUMA
   	struct mempolicy *mempolicy;
-  	short il_next;
+  	short il_next;		/* could be shared with used_math */
 #endif
 
 /* TASK_UNMAPPED_BASE */
@@ -715,9 +748,10 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_DUMPCORE	0x00000200	/* dumped core */
 #define PF_SIGNALED	0x00000400	/* killed by a signal */
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
-#define PF_FLUSHER	0x00001000	/* responsible for disk writeback */
-#define PF_USED_MATH	0x00002000	/* if unset the fpu must be initialized before use */
-#define PF_FREEZE	0x00004000	/* this task should be frozen for suspend */
+#define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
+#define PF_FLUSHER	0x00002000	/* responsible for disk writeback */
+
+#define PF_FREEZE	0x00004000	/* this task is being frozen for suspend now */
 #define PF_NOFREEZE	0x00008000	/* this thread should not be frozen */
 #define PF_FROZEN	0x00010000	/* frozen for system suspend */
 #define PF_FSTRANS	0x00020000	/* inside a filesystem transaction */
@@ -727,36 +761,13 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
 #define PF_BORROWED_MM	0x00400000	/* I am a kthread doing use_mm */
 
-/*
- * Only the _current_ task can read/write to tsk->flags, but other
- * tasks can access tsk->flags in readonly mode for example
- * with tsk_used_math (like during threaded core dumping).
- * There is however an exception to this rule during ptrace
- * or during fork: the ptracer task is allowed to write to the
- * child->flags of its traced child (same goes for fork, the parent
- * can write to the child->flags), because we're guaranteed the
- * child is not running and in turn not changing child->flags
- * at the same time the parent does it.
- */
-#define clear_stopped_child_used_math(child) do { (child)->flags &= ~PF_USED_MATH; } while (0)
-#define set_stopped_child_used_math(child) do { (child)->flags |= PF_USED_MATH; } while (0)
-#define clear_used_math() clear_stopped_child_used_math(current)
-#define set_used_math() set_stopped_child_used_math(current)
-#define conditional_stopped_child_used_math(condition, child) \
-	do { (child)->flags &= ~PF_USED_MATH, (child)->flags |= (condition) ? PF_USED_MATH : 0; } while (0)
-#define conditional_used_math(condition) \
-	conditional_stopped_child_used_math(condition, current)
-#define copy_to_stopped_child_used_math(child) \
-	do { (child)->flags &= ~PF_USED_MATH, (child)->flags |= current->flags & PF_USED_MATH; } while (0)
-/* NOTE: this will return 0 or PF_USED_MATH, it will never return 1 */
-#define tsk_used_math(p) ((p)->flags & PF_USED_MATH)
-#define used_math() tsk_used_math(current)
-
 #ifdef CONFIG_SMP
 extern int set_cpus_allowed(task_t *p, cpumask_t new_mask);
 #else
 static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 {
+	if (!cpus_intersects(new_mask, cpu_online_map))
+		return -EINVAL;
 	return 0;
 }
 #endif
@@ -770,12 +781,19 @@ extern void sched_exec(void);
 #define sched_exec()   {}
 #endif
 
+#ifdef CONFIG_HOTPLUG_CPU
+extern void idle_task_exit(void);
+#else
+static inline void idle_task_exit(void) {}
+#endif
+
 extern void sched_idle_next(void);
 extern void set_user_nice(task_t *p, long nice);
 extern int task_prio(const task_t *p);
 extern int task_nice(const task_t *p);
 extern int task_curr(const task_t *p);
 extern int idle_cpu(int cpu);
+extern int sched_setscheduler(struct task_struct *, int, struct sched_param *);
 
 void yield(void);
 
@@ -1078,29 +1096,36 @@ static inline int need_resched(void)
 	return unlikely(test_thread_flag(TIF_NEED_RESCHED));
 }
 
-extern void __cond_resched(void);
-static inline void cond_resched(void)
-{
-	if (need_resched())
-		__cond_resched();
-}
+/*
+ * cond_resched() and cond_resched_lock(): latency reduction via
+ * explicit rescheduling in places that are safe. The return
+ * value indicates whether a reschedule was done in fact.
+ * cond_resched_lock() will drop the spinlock before scheduling,
+ * cond_resched_softirq() will enable bhs before scheduling.
+ */
+extern int cond_resched(void);
+extern int cond_resched_lock(spinlock_t * lock);
+extern int cond_resched_softirq(void);
 
 /*
- * cond_resched_lock() - if a reschedule is pending, drop the given lock,
- * call schedule, and on return reacquire the lock.
- *
- * This works OK both with and without CONFIG_PREEMPT.  We do strange low-level
- * operations here to prevent schedule() from being called twice (once via
- * spin_unlock(), once by hand).
+ * Does a critical section need to be broken due to another
+ * task waiting?:
  */
-static inline void cond_resched_lock(spinlock_t * lock)
+#if defined(CONFIG_PREEMPT) && defined(CONFIG_SMP)
+# define need_lockbreak(lock) ((lock)->break_lock)
+#else
+# define need_lockbreak(lock) 0
+#endif
+
+/*
+ * Does a critical section need to be broken due to another
+ * task waiting or preemption being signalled:
+ */
+static inline int lock_need_resched(spinlock_t *lock)
 {
-	if (need_resched()) {
-		_raw_spin_unlock(lock);
-		preempt_enable_no_resched();
-		__cond_resched();
-		spin_lock(lock);
-	}
+	if (need_lockbreak(lock) || need_resched())
+		return 1;
+	return 0;
 }
 
 /* Reevaluate whether the task has signals pending delivery.
@@ -1160,6 +1185,34 @@ extern void normalize_rt_tasks(void);
 
 #endif
 
+/* try_to_freeze
+ *
+ * Checks whether we need to enter the refrigerator
+ * and returns 1 if we did so.
+ */
+#ifdef CONFIG_PM
+extern void refrigerator(unsigned long);
+extern int freeze_processes(void);
+extern void thaw_processes(void);
+
+static inline int try_to_freeze(unsigned long refrigerator_flags)
+{
+	if (unlikely(current->flags & PF_FREEZE)) {
+		refrigerator(refrigerator_flags);
+		return 1;
+	} else
+		return 0;
+}
+#else
+static inline void refrigerator(unsigned long flag) {}
+static inline int freeze_processes(void) { BUG(); return 0; }
+static inline void thaw_processes(void) {}
+
+static inline int try_to_freeze(unsigned long refrigerator_flags)
+{
+	return 0;
+}
+#endif /* CONFIG_PM */
 #endif /* __KERNEL__ */
 
 #endif

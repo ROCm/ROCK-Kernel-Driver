@@ -83,13 +83,13 @@ struct pll_ct {
 	u8 pll_gen_cntl;
 	u8 mclk_fb_div;
 	u8 mclk_fb_mult; /* 2 ro 4 */
-/*	u8 sclk_fb_div;*/
+	u8 sclk_fb_div;
 	u8 pll_vclk_cntl;
 	u8 vclk_post_div;
 	u8 vclk_fb_div;
 	u8 pll_ext_cntl;
-/*	u8 ext_vpll_cntl;
-	u8 spll_cntl2;*/
+	u8 ext_vpll_cntl;
+	u8 spll_cntl2;
 	u32 dsp_config; /* Mach64 GTB DSP */
 	u32 dsp_on_off; /* Mach64 GTB DSP */
 	u32 dsp_loop_latency;
@@ -215,7 +215,6 @@ struct atyfb_par {
 #define M64F_XL_DLL		0x00080000
 #define M64F_MFB_FORCE_4	0x00100000
 #define M64F_HW_TRIPLE		0x00200000
-
     /*
      *  Register access
      */
@@ -241,6 +240,19 @@ static inline void aty_st_le32(int regindex, u32 val, const struct atyfb_par *pa
 
 #ifdef CONFIG_ATARI
 	out_le32((volatile u32 *)(par->ati_regbase + regindex), val);
+#else
+	writel(val, par->ati_regbase + regindex);
+#endif
+}
+
+static inline void aty_st_le16(int regindex, u16 val,
+			       const struct atyfb_par *par)
+{
+	/* Hack for bloc 1, should be cleanly optimized by compiler */
+	if (regindex >= 0x400)
+		regindex -= 0x800;
+#ifdef CONFIG_ATARI
+	out_le16((volatile u16 *)(par->ati_regbase + regindex), val);
 #else
 	writel(val, par->ati_regbase + regindex);
 #endif
@@ -343,4 +355,6 @@ static inline void wait_for_idle(struct atyfb_par *par)
 
 extern void aty_reset_engine(const struct atyfb_par *par);
 extern void aty_init_engine(struct atyfb_par *par, struct fb_info *info);
-
+extern int  atyfb_xl_init(struct fb_info *info);
+extern void aty_st_pll_ct(int offset, u8 val, const struct atyfb_par *par);
+extern u8   aty_ld_pll_ct(int offset, const struct atyfb_par *par);

@@ -199,20 +199,9 @@ config HOTPLUG
 	bool "Support for hot-pluggable devices" if !ARCH_S390
 	default ARCH_S390
 	help
-	  Say Y here if you want to plug devices into your computer while
-	  the system is running, and be able to use them quickly.  In many
-	  cases, the devices can likewise be unplugged at any time too.
-
-	  One well known example of this is PCMCIA- or PC-cards, credit-card
-	  size devices such as network cards, modems or hard drives which are
-	  plugged into slots found on all modern laptop computers.  Another
-	  example, used on modern desktops as well as laptops, is USB.
-
-	  Enable HOTPLUG and KMOD, and build a modular kernel.  Get agent
-	  software (at <http://linux-hotplug.sourceforge.net/>) and install it.
-	  Then your kernel will automatically call out to a user mode "policy
-	  agent" (/sbin/hotplug) to load modules and set up software needed
-	  to use devices as you hotplug them.
+	  This option is provided for the case where no in-kernel-tree
+	  modules require HOTPLUG functionality, but a module built
+	  outside the kernel tree does. Such modules require Y here.
 
 config KOBJECT_UEVENT
 	bool "Kernel Userspace Events"
@@ -320,8 +309,9 @@ config CC_OPTIMIZE_FOR_SIZE
 	  If unsure, say N.
 
 config SHMEM
+	bool "Use full shmem filesystem" if EMBEDDED
 	default y
-	bool "Use full shmem filesystem" if EMBEDDED && MMU
+	depends on MMU
 	help
 	  The shmem is an internal filesystem used to manage shared memory.
 	  It is backed by swap and manages resource limits. It is also exported

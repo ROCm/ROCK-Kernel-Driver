@@ -31,6 +31,19 @@
 #ifndef __RADEON_DRV_H__
 #define __RADEON_DRV_H__
 
+/* General customization:
+ */
+
+#define DRIVER_AUTHOR		"Gareth Hughes, Keith Whitwell, others."
+
+#define DRIVER_NAME		"radeon"
+#define DRIVER_DESC		"ATI Radeon"
+#define DRIVER_DATE		"20020828"
+
+#define DRIVER_MAJOR		1
+#define DRIVER_MINOR		11
+#define DRIVER_PATCHLEVEL	0
+
 #define GET_RING_HEAD(dev_priv)		DRM_READ32(  (dev_priv)->ring_rptr, 0 )
 #define SET_RING_HEAD(dev_priv,val)	DRM_WRITE32( (dev_priv)->ring_rptr, 0, (val) )
 
@@ -210,6 +223,14 @@ extern irqreturn_t radeon_driver_irq_handler( DRM_IRQ_ARGS );
 extern void radeon_driver_irq_preinstall( drm_device_t *dev );
 extern void radeon_driver_irq_postinstall( drm_device_t *dev );
 extern void radeon_driver_irq_uninstall( drm_device_t *dev );
+extern void radeon_driver_prerelease(drm_device_t *dev, DRMFILE filp);
+extern void radeon_driver_pretakedown(drm_device_t *dev);
+extern int radeon_driver_open_helper(drm_device_t *dev, drm_file_t *filp_priv);
+extern void radeon_driver_free_filp_priv(drm_device_t *dev, drm_file_t *filp_priv);
+
+extern int radeon_preinit( struct drm_device *dev, unsigned long flags );
+extern int radeon_postinit( struct drm_device *dev, unsigned long flags );
+extern int radeon_postcleanup( struct drm_device *dev );
 
 /* Flags for stats.boxes
  */

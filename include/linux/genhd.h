@@ -128,6 +128,12 @@ struct gendisk {
 #endif
 };
 
+/* Structure for sysfs attributes on block devices */
+struct disk_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct gendisk *, char *);
+};
+
 /* 
  * Macros to operate on percpu disk statistics:
  *
@@ -218,6 +224,7 @@ static inline void free_disk_stats(struct gendisk *disk)
 extern void disk_round_stats(struct gendisk *disk);
 
 /* drivers/block/genhd.c */
+extern int get_blkdev_list(char *);
 extern void add_disk(struct gendisk *disk);
 extern void del_gendisk(struct gendisk *gp);
 extern void unlink_gendisk(struct gendisk *gp);

@@ -58,6 +58,7 @@
 int smp_num_siblings = 1;
 /* Package ID of each logical CPU */
 u8 phys_proc_id[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
+EXPORT_SYMBOL(phys_proc_id);
 
 /* Bitmask of currently online CPUs */
 cpumask_t cpu_online_map;

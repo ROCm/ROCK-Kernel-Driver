@@ -57,8 +57,8 @@ struct pci_controller {
 	unsigned long pci_mem_offset;
 
 	struct pci_ops *ops;
-	volatile unsigned int *cfg_addr;
-	volatile unsigned char *cfg_data;
+	volatile unsigned int __iomem *cfg_addr;
+	volatile void __iomem *cfg_data;
 	/*
 	 * If set, indirect method will set the cfg_type bit as
 	 * needed to generate type 1 configuration transactions.
@@ -95,7 +95,7 @@ int early_write_config_dword(struct pci_controller *hose, int bus, int dev_fn,
 			     int where, u32 val);
 
 extern void setup_indirect_pci_nomap(struct pci_controller* hose,
-			       u32 cfg_addr, u32 cfg_data);
+			       void __iomem *cfg_addr, void __iomem *cfg_data);
 extern void setup_indirect_pci(struct pci_controller* hose,
 			       u32 cfg_addr, u32 cfg_data);
 extern void setup_grackle(struct pci_controller *hose);

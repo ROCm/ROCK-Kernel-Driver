@@ -63,9 +63,9 @@ static const char *pdc_quirk_drives[] = {
 #define	MC1		0x02	/* DMA"C" timing */
 #define	MC0		0x01	/* DMA"C" timing */
 
-static void init_setup_pdc202ata4(struct pci_dev *dev, ide_pci_device_t *d);
-static void init_setup_pdc20265(struct pci_dev *, ide_pci_device_t *);
-static void init_setup_pdc202xx(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_pdc202ata4(struct pci_dev *dev, ide_pci_device_t *d);
+static int init_setup_pdc20265(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_pdc202xx(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_pdc202xx(struct pci_dev *, const char *);
 static void init_hwif_pdc202xx(ide_hwif_t *);
 static void init_dma_pdc202xx(ide_hwif_t *, unsigned long);

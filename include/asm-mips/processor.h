@@ -33,12 +33,6 @@ extern void (*cpu_wait)(void);
 
 extern unsigned int vced_count, vcei_count;
 
-/*
- * Bus types (default is ISA, but people can check others with these..)
- */
-#define MCA_bus 0
-#define MCA_bus__is_a_macro /* for versions in ksyms.c */
-
 #ifdef CONFIG_MIPS32
 /*
  * User space process size: 2GB. This is hardcoded into a few places,

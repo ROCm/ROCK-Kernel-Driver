@@ -252,49 +252,6 @@ static inline void mono_src_copy_imm_blit(int dwidth, int dheight, int dpitch,
 	end_iring(par);
 }
 
-/**
- * mono_src_copy_blit - color expand from video memory to framebuffer
- * @dwidth: width of destination
- * @dheight: height of destination
- * @dpitch: pixels per line of the buffer
- * @qsize: size of bitmap in quad words
- * @dest: address of first byte of pixel;
- * @rop: raster operation
- * @blit_bpp: pixelformat to use which can be different from the 
- *            framebuffer's pixelformat
- * @src: address of image data
- * @bg: backgound color
- * @fg: forground color
- * @par: pointer to i810fb_par structure
- *
- * DESCRIPTION:
- * A color expand operation where the  source data is in video memory. 
- * Useful for drawing text. 
- *
- * REQUIREMENT:
- * The end of a scanline must be padded to the next word.
- */
-static inline void mono_src_copy_blit(int dwidth, int dheight, int dpitch, 
-				      int qsize, int blit_bpp, int rop, 
-				      int dest, int src, int bg,
-				      int fg, struct fb_info *info)
-{
-	struct i810fb_par *par = (struct i810fb_par *) info->par;
-
-	if (begin_iring(info, 32 + IRING_PAD)) return;
-
-	PUT_RING(BLIT | MONO_SOURCE_COPY_BLIT | 6);
-	PUT_RING(DYN_COLOR_EN | blit_bpp | rop << 16 | dpitch | 1 << 27);
-	PUT_RING(dheight << 16 | dwidth);
-	PUT_RING(dest);
-	PUT_RING(qsize - 1);
-	PUT_RING(src);
-	PUT_RING(bg);
-	PUT_RING(fg);
-
-	end_iring(par);
-}
-
 static inline void load_front(int offset, struct fb_info *info)
 {
 	struct i810fb_par *par = (struct i810fb_par *) info->par;

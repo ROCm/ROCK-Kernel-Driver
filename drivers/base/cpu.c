@@ -48,10 +48,23 @@ static ssize_t store_online(struct sys_device *dev, const char *buf,
 }
 static SYSDEV_ATTR(online, 0600, show_online, store_online);
 
-static void __init register_cpu_control(struct cpu *cpu)
+static void __devinit register_cpu_control(struct cpu *cpu)
 {
 	sysdev_create_file(&cpu->sysdev, &attr_online);
 }
+void unregister_cpu(struct cpu *cpu, struct node *root)
+{
+
+	if (root)
+		sysfs_remove_link(&root->sysdev.kobj,
+				  kobject_name(&cpu->sysdev.kobj));
+	sysdev_remove_file(&cpu->sysdev, &attr_online);
+
+	sysdev_unregister(&cpu->sysdev);
+
+	return;
+}
+EXPORT_SYMBOL(unregister_cpu);
 #else /* ... !CONFIG_HOTPLUG_CPU */
 static inline void register_cpu_control(struct cpu *cpu)
 {
@@ -66,7 +79,7 @@ static inline void register_cpu_control(struct cpu *cpu)
  *
  * Initialize and register the CPU device.
  */
-int __init register_cpu(struct cpu *cpu, int num, struct node *root)
+int __devinit register_cpu(struct cpu *cpu, int num, struct node *root)
 {
 	int error;
 
@@ -83,6 +96,9 @@ int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 		register_cpu_control(cpu);
 	return error;
 }
+#ifdef CONFIG_HOTPLUG_CPU
+EXPORT_SYMBOL(register_cpu);
+#endif
 
 
 

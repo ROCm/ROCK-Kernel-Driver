@@ -25,7 +25,7 @@ config PCI_LEGACY_PROC
 
 	  lspci can provide the same data, as well as much more. lspci is a part of
 	  the pci-utils package, which should be installed by your distribution. 
-	  See Documentation/Changes for information on where to get the latest 
+	  See <file:Documentation/Changes> for information on where to get the latest
 	  version. 
 
 	  When in doubt, say N.

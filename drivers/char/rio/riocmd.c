@@ -397,7 +397,7 @@ struct rio_info *	p;
 /*
 ** Incoming command on the COMMAND_RUP to be processed.
 */
-int
+static int
 RIOCommandRup(p, Rup, HostP, PacketP)
 struct rio_info *	p;
 uint Rup;
@@ -915,62 +915,6 @@ struct Host *		HostP;
 		}
 		spin_unlock_irqrestore(&UnixRupP->RupLock, flags);
 	} while ( Rup );
-}
-
-
-/*
-** Return the length of the named string
-*/
-int
-RIOStrlen(Str)
-register char *Str;
-{
-	register int len = 0;
-
-	while ( *Str++ )
-		len++;
-	return len;
-}
-
-/*
-** compares s1 to s2 and return 0 if they match.
-*/
-int
-RIOStrCmp(s1, s2)
-register char *s1;
-register char *s2;
-{
-	while ( *s1 && *s2 && *s1==*s2 )
-		s1++, s2++;
-	return *s1-*s2;
-}
-
-/*
-** compares s1 to s2 for upto n bytes and return 0 if they match.
-*/
-int
-RIOStrnCmp(s1, s2, n)
-register char *s1;
-register char *s2;
-int n;
-{
-	while ( n && *s1 && *s2 && *s1==*s2 )
-		n--, s1++, s2++;
-	return n ? *s1!=*s2 : 0;
-}
-
-/*
-** copy up to 'len' bytes from 'from' to 'to'.
-*/
-void
-RIOStrNCpy(to, from, len)
-char *to;
-char *from;
-int len; 
-{
-	while ( len-- && (*to++ = *from++) )
-		;
-	to[-1]='\0';
 }
 
 int

@@ -92,7 +92,7 @@ static void ip_cmsg_recv_opts(struct msghdr *msg, struct sk_buff *skb)
 }
 
 
-void ip_cmsg_recv_retopts(struct msghdr *msg, struct sk_buff *skb)
+static void ip_cmsg_recv_retopts(struct msghdr *msg, struct sk_buff *skb)
 {
 	unsigned char optbuf[sizeof(struct ip_options) + 40];
 	struct ip_options * opt = (struct ip_options*)optbuf;
@@ -112,7 +112,7 @@ void ip_cmsg_recv_retopts(struct msghdr *msg, struct sk_buff *skb)
 
 void ip_cmsg_recv(struct msghdr *msg, struct sk_buff *skb)
 {
-	struct inet_opt *inet = inet_sk(skb->sk);
+	struct inet_sock *inet = inet_sk(skb->sk);
 	unsigned flags = inet->cmsg_flags;
 
 	/* Ordered by supposed usage frequency */
@@ -186,7 +186,7 @@ int ip_cmsg_send(struct msghdr *msg, struct ipcm_cookie *ipc)
    sent to multicast group to reach destination designated router.
  */
 struct ip_ra_chain *ip_ra_chain;
-rwlock_t ip_ra_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(ip_ra_lock);
 
 int ip_ra_control(struct sock *sk, unsigned char on, void (*destructor)(struct sock *))
 {
@@ -234,7 +234,7 @@ int ip_ra_control(struct sock *sk, unsigned char on, void (*destructor)(struct s
 void ip_icmp_error(struct sock *sk, struct sk_buff *skb, int err, 
 		   u16 port, u32 info, u8 *payload)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct sock_exterr_skb *serr;
 
 	if (!inet->recverr)
@@ -263,7 +263,7 @@ void ip_icmp_error(struct sock *sk, struct sk_buff *skb, int err,
 
 void ip_local_error(struct sock *sk, int err, u32 daddr, u16 port, u32 info)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct sock_exterr_skb *serr;
 	struct iphdr *iph;
 	struct sk_buff *skb;
@@ -342,7 +342,7 @@ int ip_recv_error(struct sock *sk, struct msghdr *msg, int len)
 	sin = &errhdr.offender;
 	sin->sin_family = AF_UNSPEC;
 	if (serr->ee.ee_origin == SO_EE_ORIGIN_ICMP) {
-		struct inet_opt *inet = inet_sk(sk);
+		struct inet_sock *inet = inet_sk(sk);
 
 		sin->sin_family = AF_INET;
 		sin->sin_addr.s_addr = skb->nh.iph->saddr;
@@ -383,7 +383,7 @@ out:
 
 int ip_setsockopt(struct sock *sk, int level, int optname, char __user *optval, int optlen)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	int val=0,err;
 
 	if (level != SOL_IP)
@@ -429,7 +429,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char __user *optval, 
 			if (err)
 				break;
 			if (sk->sk_type == SOCK_STREAM) {
-				struct tcp_opt *tp = tcp_sk(sk);
+				struct tcp_sock *tp = tcp_sk(sk);
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 				if (sk->sk_family == PF_INET ||
 				    (!((1 << sk->sk_state) &
@@ -875,7 +875,7 @@ e_inval:
 
 int ip_getsockopt(struct sock *sk, int level, int optname, char __user *optval, int __user *optlen)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	int val;
 	int len;
 	

@@ -232,7 +232,7 @@ typedef union sigval32 {
 
 #define SIGEV_PAD_SIZE32 ((SIGEV_MAX_SIZE/sizeof(int)) - 3)
 
-typedef struct siginfo32 {
+typedef struct compat_siginfo {
 	int si_signo;
 	int si_errno;
 	int si_code;
@@ -282,7 +282,7 @@ typedef struct siginfo32 {
 			int _fd;
 		} _sigpoll;
 	} _sifields;
-} siginfo_t32;
+} compat_siginfo_t;
 
 typedef struct sigevent32 {
 	sigval_t32 sigev_value;
@@ -558,10 +558,6 @@ struct user_regs_struct32 {
 /* Prototypes for use in elfcore32.h */
 extern int save_ia32_fpstate (struct task_struct *, struct ia32_user_i387_struct __user *);
 extern int save_ia32_fpxstate (struct task_struct *, struct ia32_user_fxsr_struct __user *);
-
-/* Prototypes for use in sys_ia32.c */
-int copy_siginfo_to_user32 (siginfo_t32 __user *to, siginfo_t *from);
-int copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 __user *from);
 
 #endif /* !CONFIG_IA32_SUPPORT */
 

@@ -35,7 +35,6 @@
 
 /* zftape-init.c */
 EXPORT_SYMBOL(zft_cmpr_register);
-EXPORT_SYMBOL(zft_cmpr_unregister);
 /* zftape-read.c */
 EXPORT_SYMBOL(zft_fetch_segment_fraction);
 /* zftape-buffers.c */

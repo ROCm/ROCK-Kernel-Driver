@@ -147,18 +147,6 @@ ENTRY(ret_from_fork)
 	popl %eax
 	jmp syscall_exit
 
-#if defined(CONFIG_KDB)
-ENTRY(kdb_call)
-	pushl %eax              # save orig EAX
-	SAVE_ALL
-	pushl %esp              # struct pt_regs
-	pushl $0                # error_code
-	pushl $7                # KDB_REASON_ENTRY
-	call  kdb
-	addl  $12,%esp          # remove args
-	jmp restore_all
-#endif
-
 /*
  * Return to user mode is not as complex as all this looks,
  * but we want the default path for a system call return to
@@ -196,9 +184,8 @@ need_resched:
 	jz restore_all
 	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (exception path) ?
 	jz restore_all
-	movl $PREEMPT_ACTIVE,TI_preempt_count(%ebp)
 	sti
-	call schedule
+	call preempt_schedule
 	cli
 	movl $0,TI_preempt_count(%ebp)
 	jmp need_resched
@@ -234,7 +221,7 @@ sysenter_past_esp:
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
 
-	testb $(_TIF_SYSCALL_EMU|_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
 	jnz syscall_trace_entry
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
@@ -257,8 +244,8 @@ ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
-					# system call tracing in operation / emulation
-	testb $(_TIF_SYSCALL_EMU|_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
+					# system call tracing in operation
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
 	jnz syscall_trace_entry
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
@@ -319,9 +306,6 @@ syscall_trace_entry:
 	movl %esp, %eax
 	xorl %edx,%edx
 	call do_syscall_trace
-	cmpl $0, %eax
-	jne syscall_exit		# ret != 0 -> running under PTRACE_SYSEMU,
-					# so must skip actual syscall
 	movl ORIG_EAX(%esp), %eax
 	cmpl $(nr_syscalls), %eax
 	jnae syscall_call
@@ -572,22 +556,6 @@ ENTRY(general_protection)
 ENTRY(alignment_check)
 	pushl $do_alignment_check
 	jmp error_code
-
-#if defined(CONFIG_KDB)
-ENTRY(page_fault_mca)
-	pushl %ecx
-	pushl %edx
-	pushl %eax
-	movl  $473,%ecx
-	rdmsr
-	andl  $0xfffffffe,%eax		/* Disable last branch recording */
-	wrmsr
-	popl  %eax
-	popl  %edx
-	popl  %ecx
-	pushl $do_page_fault
-	jmp error_code
-#endif
 
 ENTRY(page_fault)
 	pushl $do_page_fault
