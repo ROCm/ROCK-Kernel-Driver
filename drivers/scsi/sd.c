@@ -92,7 +92,6 @@ static int sd_revalidate(struct gendisk *);
 static void sd_init_onedisk(Scsi_Disk * sdkp, struct gendisk *disk);
 
 static int sd_init(void);
-static void sd_finish(void);
 static int sd_attach(Scsi_Device *);
 static int sd_detect(Scsi_Device *);
 static void sd_detach(Scsi_Device *);
@@ -103,23 +102,19 @@ static int sd_notifier(struct notifier_block *, unsigned long, void *);
 static struct notifier_block sd_notifier_block = {sd_notifier, NULL, 0}; 
 
 static struct Scsi_Device_Template sd_template = {
-	module:THIS_MODULE,
-	name:"disk",
-	tag:"sd",
-	scsi_type:TYPE_DISK,
-	major:SCSI_DISK0_MAJOR,
-        /*
-         * Secondary range of majors that this driver handles.
-         */
-	min_major:SCSI_DISK1_MAJOR,
-	max_major:SCSI_DISK7_MAJOR,
-	blk:1,
-	detect:sd_detect,
-	init:sd_init,
-	finish:sd_finish,
-	attach:sd_attach,
-	detach:sd_detach,
-	init_command:sd_init_command,
+	.module		= THIS_MODULE,
+	.name		= "disk",
+	.tag		= "sd",
+	.scsi_type	= TYPE_DISK,
+	.major		= SCSI_DISK0_MAJOR,
+	.min_major	= SCSI_DISK1_MAJOR,
+	.max_major	= SCSI_DISK7_MAJOR,
+	.blk		= 1,
+	.detect		= sd_detect,
+	.init		= sd_init,
+	.attach		= sd_attach,
+	.detach		= sd_detach,
+	.init_command	= sd_init_command,
 };
 
 static void sd_rw_intr(Scsi_Cmnd * SCpnt);
@@ -1291,38 +1286,6 @@ cleanup_mem:
 }
 
 /**
- *	sd_finish - called during driver initialization, after all
- *	the sd_attach() calls are finished.
- *
- *	Note: this function is invoked from the scsi mid-level.
- *	This function is not called after driver initialization has completed.
- *	Specifically later device attachments invoke sd_attach() but not
- *	this function.
- **/
-static void sd_finish()
-{
-	int k;
-	Scsi_Disk * sdkp;
-
-	SCSI_LOG_HLQUEUE(3, printk("sd_finish: \n"));
-
-	for (k = 0; k < sd_template.dev_max; ++k) {
-		sdkp = sd_get_sdisk(k);
-		if (sdkp && (0 == sdkp->capacity) && sdkp->device) {
-			sd_init_onedisk(sdkp, sd_disks[k]);
-			if (sdkp->has_been_registered)
-				continue;
-			set_capacity(sd_disks[k], sdkp->capacity);
-			sd_disks[k]->private_data = sdkp;
-			sd_disks[k]->queue = &sdkp->device->request_queue;
-			add_disk(sd_disks[k]);
-			sdkp->has_been_registered = 1;
-		}
-	}
-	return;
-}
-
-/**
  *	sd_detect - called at the start of driver initialization, once 
  *	for each scsi device (not just disks) present.
  *
@@ -1358,13 +1321,12 @@ static int sd_detect(Scsi_Device * sdp)
  **/
 static int sd_attach(Scsi_Device * sdp)
 {
-	Scsi_Disk *sdkp;
+	Scsi_Disk *sdkp = NULL;	/* shut up lame gcc warning */
 	int dsk_nr;
 	unsigned long iflags;
 	struct gendisk *gd;
 
-	if ((NULL == sdp) ||
-	    ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD)))
+	if ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD))
 		return 0;
 
 	gd = alloc_disk(16);
@@ -1373,15 +1335,16 @@ static int sd_attach(Scsi_Device * sdp)
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
+
 	if (sd_template.nr_dev >= sd_template.dev_max) {
-		sdp->attached--;
 		printk(KERN_ERR "sd_init: no more room for device\n");
-		put_disk(gd);
-		return 1;
+		goto out;
 	}
 
-/* Assume sd_attach is not re-entrant (for time being) */
-/* Also think about sd_attach() and sd_detach() running coincidentally. */
+	/*
+	 * Assume sd_attach is not re-entrant (for time being)
+	 * Also think about sd_attach() and sd_detach() running coincidentally.
+	 */
 	write_lock_irqsave(&sd_dsk_arr_lock, iflags);
 	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; dsk_nr++) {
 		sdkp = sd_dsk_arr[dsk_nr];
@@ -1393,15 +1356,15 @@ static int sd_attach(Scsi_Device * sdp)
 	}
 	write_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
 
-	if (dsk_nr >= sd_template.dev_max) {
-		/* panic("scsi_devices corrupt (sd)");  overkill */
+	if (!sdkp || dsk_nr >= sd_template.dev_max) {
 		printk(KERN_ERR "sd_init: sd_dsk_arr corrupted\n");
-		put_disk(gd);
-		return 1;
+		goto out;
 	}
 
+	sd_init_onedisk(sdkp, gd);
 	sd_template.nr_dev++;
-        gd->de = sdp->de;
+
+	gd->de = sdp->de;
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
 	gd->fops = &sd_fops;
@@ -1409,14 +1372,26 @@ static int sd_attach(Scsi_Device * sdp)
 		sprintf(gd->disk_name, "sd%c%c",'a'+dsk_nr/26-1,'a'+dsk_nr%26);
 	else
 		sprintf(gd->disk_name, "sd%c",'a'+dsk_nr%26);
-        gd->flags = sdp->removable ? GENHD_FL_REMOVABLE : 0;
-        gd->driverfs_dev = &sdp->sdev_driverfs_dev;
-        gd->flags |= GENHD_FL_DRIVERFS | GENHD_FL_DEVFS;
+	gd->flags = sdp->removable ? GENHD_FL_REMOVABLE : 0;
+	gd->driverfs_dev = &sdp->sdev_driverfs_dev;
+	gd->flags |= GENHD_FL_DRIVERFS | GENHD_FL_DEVFS;
+	gd->private_data = sdkp;
+	gd->queue = &sdkp->device->request_queue;
+
+	set_capacity(gd, sdkp->capacity);
+	add_disk(gd);
+
 	sd_disks[dsk_nr] = gd;
+
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "
 	       "id %d, lun %d\n", sdp->removable ? "removable " : "",
 	       gd->disk_name, sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);
 	return 0;
+
+out:
+	sdp->attached--;
+	put_disk(gd);
+	return 1;
 }
 
 static int sd_revalidate(struct gendisk *disk)
@@ -1472,10 +1447,7 @@ static void sd_detach(Scsi_Device * sdp)
 	sdkp->capacity = 0;
 	/* sdkp->detaching = 1; */
 
-	if (sdkp->has_been_registered) {
-		sdkp->has_been_registered = 0;
-		del_gendisk(sd_disks[dsk_nr]);
-	}
+	del_gendisk(sd_disks[dsk_nr]);
 	sdp->attached--;
 	sd_template.dev_noticed--;
 	sd_template.nr_dev--;

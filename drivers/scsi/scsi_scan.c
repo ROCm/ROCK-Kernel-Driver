@@ -2012,11 +2012,6 @@ static void scsi_scan_selected_lun(struct Scsi_Host *shost, uint channel,
 						       __FUNCTION__);
 				}
 			}
-
-		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-			if (sdt->finish && sdt->nr_dev)
-				(*sdt->finish) ();
-
 	}
 }
 

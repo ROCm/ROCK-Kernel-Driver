@@ -2034,18 +2034,14 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 		}
 	}
 
-	/*
-	 * This does any final handling that is required.
-	 */
-	if (tpnt->finish && tpnt->nr_dev)
-		(*tpnt->finish) ();
 	MOD_INC_USE_COUNT;
 
 	if (out_of_space) {
 		scsi_unregister_device(tpnt);	/* easiest way to clean up?? */
 		return 1;
-	} else
-		return 0;
+	}
+
+	return 0;
 }
 
 int scsi_unregister_device(struct Scsi_Device_Template *tpnt)

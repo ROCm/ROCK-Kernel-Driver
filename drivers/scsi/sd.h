@@ -25,7 +25,6 @@ typedef struct scsi_disk {
 	Scsi_Device *device;
 	unsigned char media_present;
 	unsigned char write_prot;
-	unsigned has_been_registered:1;
 	unsigned WCE:1;         /* state of disk WCE bit */
 	unsigned RCD:1;         /* state of disk RCD bit */
 } Scsi_Disk;

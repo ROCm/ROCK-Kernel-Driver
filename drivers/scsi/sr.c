@@ -63,27 +63,24 @@ MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
 #define SR_TIMEOUT	(30 * HZ)
 
 static int sr_init(void);
-static void sr_finish(void);
 static int sr_attach(Scsi_Device *);
 static int sr_detect(Scsi_Device *);
 static void sr_detach(Scsi_Device *);
 
 static int sr_init_command(Scsi_Cmnd *);
 
-static struct Scsi_Device_Template sr_template =
-{
-	module:THIS_MODULE,
-	name:"cdrom",
-	tag:"sr",
-	scsi_type:TYPE_ROM,
-	major:SCSI_CDROM_MAJOR,
-	blk:1,
-	detect:sr_detect,
-	init:sr_init,
-	finish:sr_finish,
-	attach:sr_attach,
-	detach:sr_detach,
-	init_command:sr_init_command
+static struct Scsi_Device_Template sr_template = {
+	.module		= THIS_MODULE,
+	.name		= "cdrom",
+	.tag		= "sr",
+	.scsi_type	= TYPE_ROM,
+	.major		= SCSI_CDROM_MAJOR,
+	.blk		= 1,
+	.detect		= sr_detect,
+	.init		= sr_init,
+	.attach		= sr_attach,
+	.detach		= sr_detach,
+	.init_command	= sr_init_command
 };
 
 static Scsi_CD *scsi_CDs;
@@ -91,6 +88,7 @@ static Scsi_CD *scsi_CDs;
 static int sr_open(struct cdrom_device_info *, int);
 static void get_sectorsize(Scsi_CD *);
 static void get_capabilities(Scsi_CD *);
+static int sr_init_one(Scsi_CD *, int);
 
 static int sr_media_change(struct cdrom_device_info *, int);
 static int sr_packet(struct cdrom_device_info *, struct cdrom_generic_command *);
@@ -473,10 +471,9 @@ static int sr_attach(Scsi_Device * SDp)
 	if (SDp->type != TYPE_ROM && SDp->type != TYPE_WORM)
 		return 1;
 
-	if (sr_template.nr_dev >= sr_template.dev_max) {
-		SDp->attached--;
-		return 1;
-	}
+	if (sr_template.nr_dev >= sr_template.dev_max)
+		goto fail;
+
 	for (cpnt = scsi_CDs, i = 0; i < sr_template.dev_max; i++, cpnt++)
 		if (!cpnt->device)
 			break;
@@ -484,6 +481,8 @@ static int sr_attach(Scsi_Device * SDp)
 	if (i >= sr_template.dev_max)
 		panic("scsi_devices corrupt (sr)");
 
+	if (sr_init_one(cpnt, i))
+		goto fail;
 
 	scsi_CDs[i].device = SDp;
 
@@ -494,6 +493,10 @@ static int sr_attach(Scsi_Device * SDp)
 	printk("Attached scsi CD-ROM %s at scsi%d, channel %d, id %d, lun %d\n",
 	       scsi_CDs[i].cdi.name, SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
 	return 0;
+
+fail:
+	SDp->attached--;
+	return 1;
 }
 
 
@@ -744,64 +747,56 @@ cleanup_dev:
 	return 1;
 }
 
-void sr_finish()
+static int sr_init_one(Scsi_CD *cd, int first_minor)
 {
-	int i;
+	struct gendisk *disk;
 
-	for (i = 0; i < sr_template.nr_dev; ++i) {
-		struct gendisk *disk;
-		Scsi_CD *cd = &scsi_CDs[i];
-		/* If we have already seen this, then skip it.  Comes up
-		 * with loadable modules. */
-		if (cd->disk)
-			continue;
-		disk = alloc_disk(1);
-		if (!disk)
-			continue;
-		if (cd->disk) {
-			put_disk(disk);
-			continue;
-		}
-		disk->major = MAJOR_NR;
-		disk->first_minor = i;
-		strcpy(disk->disk_name, cd->cdi.name);
-		disk->fops = &sr_bdops;
-		disk->flags = GENHD_FL_CD;
-		cd->disk = disk;
-		cd->capacity = 0x1fffff;
-		cd->device->sector_size = 2048;/* A guess, just in case */
-		cd->needs_sector_size = 1;
-		cd->device->changed = 1;	/* force recheck CD type */
+	disk = alloc_disk(1);
+	if (!disk)
+		return -ENOMEM;
+
+	disk->major = MAJOR_NR;
+	disk->first_minor = first_minor;
+	strcpy(disk->disk_name, cd->cdi.name);
+	disk->fops = &sr_bdops;
+	disk->flags = GENHD_FL_CD;
+	cd->disk = disk;
+	cd->capacity = 0x1fffff;
+	cd->device->sector_size = 2048;/* A guess, just in case */
+	cd->needs_sector_size = 1;
+	cd->device->changed = 1;	/* force recheck CD type */
 #if 0
-		/* seems better to leave this for later */
-		get_sectorsize(cd);
-		printk("Scd sectorsize = %d bytes.\n", cd->sector_size);
+	/* seems better to leave this for later */
+	get_sectorsize(cd);
+	printk("Scd sectorsize = %d bytes.\n", cd->sector_size);
 #endif
-		cd->use = 1;
+	cd->use = 1;
 
-		cd->device->ten = 1;
-		cd->device->remap = 1;
-		cd->readcd_known = 0;
-		cd->readcd_cdda = 0;
+	cd->device->ten = 1;
+	cd->device->remap = 1;
+	cd->readcd_known = 0;
+	cd->readcd_cdda = 0;
 
-		cd->cdi.ops = &sr_dops;
-		cd->cdi.handle = cd;
-		cd->cdi.mask = 0;
-		cd->cdi.capacity = 1;
-		/*
-		 *	FIXME: someone needs to handle a get_capabilities
-		 *	failure properly ??
-		 */
-		get_capabilities(cd);
-		sr_vendor_init(cd);
-		disk->de = cd->device->de;
-		disk->driverfs_dev = &cd->device->sdev_driverfs_dev;
-		register_cdrom(&cd->cdi);
-		set_capacity(disk, cd->capacity);
-		disk->private_data = cd;
-		disk->queue = &cd->device->request_queue;
-		add_disk(disk);
-	}
+	cd->cdi.ops = &sr_dops;
+	cd->cdi.handle = cd;
+	cd->cdi.mask = 0;
+	cd->cdi.capacity = 1;
+
+	/*
+	 *	FIXME: someone needs to handle a get_capabilities
+	 *	failure properly ??
+	 */
+	get_capabilities(cd);
+	sr_vendor_init(cd);
+	disk->de = cd->device->de;
+	disk->driverfs_dev = &cd->device->sdev_driverfs_dev;
+	register_cdrom(&cd->cdi);
+	set_capacity(disk, cd->capacity);
+	disk->private_data = cd;
+	disk->queue = &cd->device->request_queue;
+	add_disk(disk);
+
+	return 0;
 }
 
 static void sr_detach(Scsi_Device * SDp)

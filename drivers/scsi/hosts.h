@@ -549,7 +549,6 @@ struct Scsi_Device_Template
     int (*detect)(Scsi_Device *); /* Returns 1 if we can attach this device */
     int (*init)(void);		  /* Sizes arrays based upon number of devices
 		   *  detected */
-    void (*finish)(void);	  /* Perform initialization after attachment */
     int (*attach)(Scsi_Device *); /* Attach devices to arrays */
     void (*detach)(Scsi_Device *);
     int (*init_command)(Scsi_Cmnd *);     /* Used by new queueing code. 

@@ -573,14 +573,6 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 					}
 				}
 		}
-
-		/* This does any final handling that is required. */
-		for (sdev_tp = scsi_devicelist; sdev_tp;
-		     sdev_tp = sdev_tp->next) {
-			if (sdev_tp->finish && sdev_tp->nr_dev) {
-				(*sdev_tp->finish) ();
-			}
-		}
 	}
 
 	return 0;
