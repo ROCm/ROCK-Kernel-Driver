@@ -631,7 +631,7 @@ static int __devinit hamachi_init_one (struct pci_dev *pdev,
 				   read_eeprom(ioaddr, i), i % 16 != 15 ? " " : "\n");
 #endif
 
-	hmp = dev->priv;
+	hmp = netdev_priv(dev);
 	spin_lock_init(&hmp->lock);
 
 	hmp->mii_if.dev = dev;
@@ -851,7 +851,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 
 static int hamachi_open(struct net_device *dev)
 {
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i;
 	u32 rx_int_var, tx_int_var;
@@ -1000,7 +1000,7 @@ static int hamachi_open(struct net_device *dev)
 
 static inline int hamachi_tx(struct net_device *dev)
 {
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 
 	/* Update the dirty pointer until we find an entry that is
 		still owned by the card */
@@ -1032,7 +1032,7 @@ static inline int hamachi_tx(struct net_device *dev)
 static void hamachi_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int next_tick = 10*HZ;
 
@@ -1057,7 +1057,7 @@ static void hamachi_timer(unsigned long data)
 static void hamachi_tx_timeout(struct net_device *dev)
 {
 	int i;
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	printk(KERN_WARNING "%s: Hamachi transmit timed out, status %8.8x,"
@@ -1163,7 +1163,7 @@ static void hamachi_tx_timeout(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void hamachi_init_ring(struct net_device *dev)
 {
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 	int i;
 
 	hmp->tx_full = 0;
@@ -1255,7 +1255,7 @@ do { \
 
 static int hamachi_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 	unsigned entry;
 	u16 status;
 
@@ -1383,7 +1383,7 @@ static irqreturn_t hamachi_interrupt(int irq, void *dev_instance, struct pt_regs
 #endif
 
 	ioaddr = dev->base_addr;
-	hmp = dev->priv;
+	hmp = netdev_priv(dev);
 	spin_lock(&hmp->lock);
 
 	do {
@@ -1477,7 +1477,7 @@ static irqreturn_t hamachi_interrupt(int irq, void *dev_instance, struct pt_regs
    for clarity and better register allocation. */
 static int hamachi_rx(struct net_device *dev)
 {
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 	int entry = hmp->cur_rx % RX_RING_SIZE;
 	int boguscnt = (hmp->dirty_rx + RX_RING_SIZE) - hmp->cur_rx;
 
@@ -1693,7 +1693,7 @@ static int hamachi_rx(struct net_device *dev)
 static void hamachi_error(struct net_device *dev, int intr_status)
 {
 	long ioaddr = dev->base_addr;
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 
 	if (intr_status & (LinkChange|NegotiationChange)) {
 		if (hamachi_debug > 1)
@@ -1727,7 +1727,7 @@ static void hamachi_error(struct net_device *dev, int intr_status)
 static int hamachi_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 	struct sk_buff *skb;
 	int i;
 
@@ -1813,7 +1813,7 @@ static int hamachi_close(struct net_device *dev)
 static struct net_device_stats *hamachi_get_stats(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct hamachi_private *hmp = dev->priv;
+	struct hamachi_private *hmp = netdev_priv(dev);
 
 	/* We should lock this segment of code for SMP eventually, although
 	   the vulnerability window is very small and statistics are
@@ -1869,7 +1869,7 @@ static void set_rx_mode(struct net_device *dev)
 
 static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
-	struct hamachi_private *np = dev->priv;
+	struct hamachi_private *np = netdev_priv(dev);
 	u32 ethcmd;
 		
 	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
@@ -1934,7 +1934,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct hamachi_private *np = dev->priv;
+	struct hamachi_private *np = netdev_priv(dev);
 	struct mii_ioctl_data *data = if_mii(rq);
 	int rc;
 
@@ -1976,7 +1976,7 @@ static void __devexit hamachi_remove_one (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	if (dev) {
-		struct hamachi_private *hmp = dev->priv;
+		struct hamachi_private *hmp = netdev_priv(dev);
 
 		pci_free_consistent(pdev, RX_TOTAL_SIZE, hmp->rx_ring, 
 			hmp->rx_ring_dma);
