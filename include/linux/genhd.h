@@ -78,10 +78,10 @@ struct gendisk {
 					   get real minor */
 
 	struct hd_struct *part;		/* [indexed by minor] */
-	struct gendisk *next;
 	struct block_device_operations *fops;
 	sector_t capacity;
 	struct list_head list;
+	struct list_head full_list;
 
 	int flags;
 	int number;			/* devfs crap */
