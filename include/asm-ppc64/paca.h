@@ -63,7 +63,7 @@ struct paca_struct {
 	u16 xPacaIndex;			/* Logical processor number		0x18 */
 	u16 active;			/* Is this cpu active?			0x1a */
 	u32 default_decr;		/* Default decrementer value		0x1c */	
-	u64 xHrdIntStack;		/* Stack for hardware interrupts	0x20 */
+	u64 unused1;
 	u64 xKsave;			/* Saved Kernel stack addr or zero	0x28 */
 	u64 pvr;			/* Processor version register		0x30 */
 	u8 *exception_sp;		/*					0x38 */
@@ -73,7 +73,7 @@ struct paca_struct {
 	STAB xStab_data;		/* Segment table information		0x50,0x58,0x60 */
 	u8 xSegments[STAB_CACHE_SIZE];	/* Cache of used stab entries		0x68,0x70 */
 	u8 xProcEnabled;		/* 1=soft enabled			0x78 */
-	u8 xHrdIntCount;		/* Count of active hardware interrupts  0x79  */
+	u8 unused2;
 	u8 prof_enabled;		/* 1=iSeries profiling enabled          0x7A */
 	u8 stab_cache_pointer;	
 	u8 resv1[4];			/*					0x7B-0x7F */
