@@ -66,7 +66,7 @@ EXPORT_SYMBOL(ip_conntrack_count);
 
 void (*ip_conntrack_destroyed)(struct ip_conntrack *conntrack) = NULL;
 LIST_HEAD(ip_conntrack_expect_list);
-LIST_HEAD(protocol_list);
+struct ip_conntrack_protocol *ip_ct_protos[MAX_IP_CT_PROTO];
 static LIST_HEAD(helpers);
 unsigned int ip_conntrack_htable_size = 0;
 int ip_conntrack_max;
@@ -76,37 +76,6 @@ static kmem_cache_t *ip_conntrack_expect_cachep;
 struct ip_conntrack ip_conntrack_untracked;
 
 DEFINE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
-
-extern struct ip_conntrack_protocol ip_conntrack_generic_protocol;
-
-static inline int proto_cmpfn(const struct ip_conntrack_protocol *curr,
-			      u_int8_t protocol)
-{
-	return protocol == curr->proto;
-}
-
-struct ip_conntrack_protocol *__ip_ct_find_proto(u_int8_t protocol)
-{
-	struct ip_conntrack_protocol *p;
-
-	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	p = LIST_FIND(&protocol_list, proto_cmpfn,
-		      struct ip_conntrack_protocol *, protocol);
-	if (!p)
-		p = &ip_conntrack_generic_protocol;
-
-	return p;
-}
-
-struct ip_conntrack_protocol *ip_ct_find_proto(u_int8_t protocol)
-{
-	struct ip_conntrack_protocol *p;
-
-	READ_LOCK(&ip_conntrack_lock);
-	p = __ip_ct_find_proto(protocol);
-	READ_UNLOCK(&ip_conntrack_lock);
-	return p;
-}
 
 inline void 
 ip_conntrack_put(struct ip_conntrack *ct)
@@ -1397,10 +1366,12 @@ int __init ip_conntrack_init(void)
 
 	/* Don't NEED lock here, but good form anyway. */
 	WRITE_LOCK(&ip_conntrack_lock);
+	for (i = 0; i < MAX_IP_CT_PROTO; i++)
+		ip_ct_protos[i] = &ip_conntrack_generic_protocol;
 	/* Sew in builtin protocols. */
-	list_append(&protocol_list, &ip_conntrack_protocol_tcp);
-	list_append(&protocol_list, &ip_conntrack_protocol_udp);
-	list_append(&protocol_list, &ip_conntrack_protocol_icmp);
+	ip_ct_protos[IPPROTO_TCP] = &ip_conntrack_protocol_tcp;
+	ip_ct_protos[IPPROTO_UDP] = &ip_conntrack_protocol_udp;
+	ip_ct_protos[IPPROTO_ICMP] = &ip_conntrack_protocol_icmp;
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
 	for (i = 0; i < ip_conntrack_htable_size; i++)

@@ -496,7 +496,6 @@ static int sctp_exp_matches_pkt(struct ip_conntrack_expect *exp,
 }
 
 struct ip_conntrack_protocol ip_conntrack_protocol_sctp = { 
-	.list 		 = { NULL, NULL }, 
 	.proto 		 = IPPROTO_SCTP, 
 	.name 		 = "sctp",
 	.pkt_to_tuple 	 = sctp_pkt_to_tuple, 

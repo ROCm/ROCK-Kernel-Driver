@@ -283,18 +283,13 @@ static struct nf_hook_ops ip_nat_local_in_ops = {
 int ip_nat_protocol_register(struct ip_nat_protocol *proto)
 {
 	int ret = 0;
-	struct list_head *i;
 
 	WRITE_LOCK(&ip_nat_lock);
-	list_for_each(i, &protos) {
-		if (((struct ip_nat_protocol *)i)->protonum
-		    == proto->protonum) {
-			ret = -EBUSY;
-			goto out;
-		}
+	if (ip_nat_protos[proto->protonum] != &ip_nat_unknown_protocol) {
+		ret = -EBUSY;
+		goto out;
 	}
-
-	list_prepend(&protos, proto);
+	ip_nat_protos[proto->protonum] = proto;
  out:
 	WRITE_UNLOCK(&ip_nat_lock);
 	return ret;
@@ -304,7 +299,7 @@ int ip_nat_protocol_register(struct ip_nat_protocol *proto)
 void ip_nat_protocol_unregister(struct ip_nat_protocol *proto)
 {
 	WRITE_LOCK(&ip_nat_lock);
-	LIST_DELETE(&protos, proto);
+	ip_nat_protos[proto->protonum] = &ip_nat_unknown_protocol;
 	WRITE_UNLOCK(&ip_nat_lock);
 
 	/* Someone could be still looking at the proto in a bh. */

@@ -104,7 +104,7 @@ icmp_print_range(char *buffer, const struct ip_nat_range *range)
 }
 
 struct ip_nat_protocol ip_nat_protocol_icmp
-= { { NULL, NULL }, "ICMP", IPPROTO_ICMP,
+= { "ICMP", IPPROTO_ICMP,
     icmp_manip_pkt,
     icmp_in_range,
     icmp_unique_tuple,

@@ -48,9 +48,8 @@ static unsigned int ip_nat_htable_size;
 
 static struct list_head *bysource;
 static struct list_head *byipsproto;
-LIST_HEAD(protos);
+struct ip_nat_protocol *ip_nat_protos[MAX_IP_NAT_PROTO];
 
-extern struct ip_nat_protocol unknown_nat_protocol;
 
 /* We keep extra hashes for each conntrack, for fast searching. */
 static inline size_t
@@ -103,23 +102,6 @@ ip_nat_cheat_check(u_int32_t oldvalinv, u_int32_t newval, u_int16_t oldcheck)
 				      oldcheck^0xFFFF));
 }
 
-static inline int cmp_proto(const struct ip_nat_protocol *i, int proto)
-{
-	return i->protonum == proto;
-}
-
-struct ip_nat_protocol *
-find_nat_proto(u_int16_t protonum)
-{
-	struct ip_nat_protocol *i;
-
-	MUST_BE_READ_LOCKED(&ip_nat_lock);
-	i = LIST_FIND(&protos, cmp_proto, struct ip_nat_protocol *, protonum);
-	if (!i)
-		i = &unknown_nat_protocol;
-	return i;
-}
-
 /* Is this tuple already taken? (not by us) */
 int
 ip_nat_used_tuple(const struct ip_conntrack_tuple *tuple,
@@ -142,7 +124,7 @@ in_range(const struct ip_conntrack_tuple *tuple,
 	 const struct ip_conntrack_manip *manip,
 	 const struct ip_nat_multi_range *mr)
 {
-	struct ip_nat_protocol *proto = find_nat_proto(tuple->dst.protonum);
+	struct ip_nat_protocol *proto = ip_nat_find_proto(tuple->dst.protonum);
 	unsigned int i;
 	struct ip_conntrack_tuple newtuple = { *manip, tuple->dst };
 
@@ -394,7 +376,7 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 		 unsigned int hooknum)
 {
 	struct ip_nat_protocol *proto
-		= find_nat_proto(orig_tuple->dst.protonum);
+		= ip_nat_find_proto(orig_tuple->dst.protonum);
 	struct ip_nat_range *rptr;
 	unsigned int i;
 	int ret;
@@ -705,9 +687,8 @@ manip_pkt(u_int16_t proto,
 	iph = (void *)(*pskb)->data + iphdroff;
 
 	/* Manipulate protcol part. */
-	if (!find_nat_proto(proto)->manip_pkt(pskb,
-					      iphdroff + iph->ihl*4,
-					      manip, maniptype))
+	if (!ip_nat_find_proto(proto)->manip_pkt(pskb, iphdroff + iph->ihl*4,
+	                                         manip, maniptype))
 		return 0;
 
 	iph = (void *)(*pskb)->data + iphdroff;
@@ -731,7 +712,7 @@ static inline int exp_for_packet(struct ip_conntrack_expect *exp,
 	int ret = 1;
 
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
-	proto = __ip_ct_find_proto(skb->nh.iph->protocol);
+	proto = ip_ct_find_proto(skb->nh.iph->protocol);
 	if (proto->exp_matches_pkt)
 		ret = proto->exp_matches_pkt(exp, skb);
 
@@ -976,9 +957,11 @@ int __init ip_nat_init(void)
 
 	/* Sew in builtin protocols. */
 	WRITE_LOCK(&ip_nat_lock);
-	list_append(&protos, &ip_nat_protocol_tcp);
-	list_append(&protos, &ip_nat_protocol_udp);
-	list_append(&protos, &ip_nat_protocol_icmp);
+	for (i = 0; i < MAX_IP_NAT_PROTO; i++)
+		ip_nat_protos[i] = &ip_nat_unknown_protocol;
+	ip_nat_protos[IPPROTO_TCP] = &ip_nat_protocol_tcp;
+	ip_nat_protos[IPPROTO_UDP] = &ip_nat_protocol_udp;
+	ip_nat_protos[IPPROTO_ICMP] = &ip_nat_protocol_icmp;
 	WRITE_UNLOCK(&ip_nat_lock);
 
 	for (i = 0; i < ip_nat_htable_size; i++) {

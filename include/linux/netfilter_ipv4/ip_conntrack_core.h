@@ -16,10 +16,6 @@ extern int ip_conntrack_init(void);
 extern void ip_conntrack_cleanup(void);
 
 struct ip_conntrack_protocol;
-extern struct ip_conntrack_protocol *ip_ct_find_proto(u_int8_t protocol);
-/* Like above, but you already have conntrack read lock. */
-extern struct ip_conntrack_protocol *__ip_ct_find_proto(u_int8_t protocol);
-extern struct list_head protocol_list;
 
 extern int
 ip_ct_get_tuple(const struct iphdr *iph,
