@@ -2429,6 +2429,11 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 	if ((offset & 3) || (length & 3))
 		return -EIO;
 
+	if (offset >= sizeof(struct ip_rt_acct) * 256) {
+		*eof = 1;
+		return 0;
+	}
+
 	if (offset + length >= sizeof(struct ip_rt_acct) * 256) {
 		length = sizeof(struct ip_rt_acct) * 256 - offset;
 		*eof = 1;
