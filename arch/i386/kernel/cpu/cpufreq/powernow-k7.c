@@ -372,7 +372,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 	printk (KERN_INFO PFX "Minimum speed %d MHz. Maximum speed %d MHz.\n",
 				minimum_speed, maximum_speed);
 
-	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
+	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.transition_latency = latency;
 	policy->cur = maximum_speed;
 

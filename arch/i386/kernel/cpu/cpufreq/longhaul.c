@@ -584,7 +584,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 	if (ret != 0)
 		return ret;
 
- 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
+ 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
  	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
 	policy->cur = (unsigned int) (longhaul_get_cpu_fsb() * longhaul_get_cpu_mult() * 100);
