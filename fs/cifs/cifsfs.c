@@ -48,11 +48,13 @@ int cifsFYI = 0;
 int cifsERROR = 1;
 int traceSMB = 0;
 unsigned int oplockEnabled = 0;
+unsigned int lookupCacheEnabled = 1;
 unsigned int multiuser_mount = 0;
 unsigned int extended_security = 0;
 unsigned int ntlmv2_support = 0;
 unsigned int sign_CIFS_PDUs = 0;
 unsigned int CIFSMaximumBufferSize = CIFS_MAX_MSGSIZE;
+struct task_struct * oplockThread = NULL;
 
 extern int cifs_mount(struct super_block *, struct cifs_sb_info *, char *,
 			char *);
@@ -175,6 +177,7 @@ static int cifs_permission(struct inode * inode, int mask)
 static kmem_cache_t *cifs_inode_cachep;
 kmem_cache_t *cifs_req_cachep;
 kmem_cache_t *cifs_mid_cachep;
+kmem_cache_t *cifs_oplock_cachep;
 
 static struct inode *
 cifs_alloc_inode(struct super_block *sb)
@@ -390,10 +393,17 @@ int
 cifs_init_mids(void)
 {
 	cifs_mid_cachep = kmem_cache_create("cifs_mpx_ids",
-					    sizeof (struct mid_q_entry), 0,
-					    SLAB_HWCACHE_ALIGN, NULL, NULL);
+				sizeof (struct mid_q_entry), 0,
+				SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (cifs_mid_cachep == NULL)
 		return -ENOMEM;
+	cifs_oplock_cachep = kmem_cache_create("cifs_oplock_structs",
+				sizeof (struct oplock_q_entry), 0,
+				SLAB_HWCACHE_ALIGN, NULL, NULL);
+	if (cifs_oplock_cachep == NULL) {
+		kmem_cache_destroy(cifs_mid_cachep);
+		return -ENOMEM;
+	}
 
 	return 0;
 }
@@ -404,6 +414,49 @@ cifs_destroy_mids(void)
 	if (kmem_cache_destroy(cifs_mid_cachep))
 		printk(KERN_WARNING
 		       "cifs_destroy_mids: error not all structures were freed\n");
+	if (kmem_cache_destroy(cifs_oplock_cachep))
+		printk(KERN_WARNING
+		       "error not all oplock structures were freed\n");}
+
+static int cifs_oplock_thread(void * dummyarg)
+{
+	struct list_head * tmp;
+	struct oplock_q_entry * oplock_item;
+	struct file * pfile;
+	struct cifsTconInfo *pTcon;
+	int rc;
+
+	daemonize("cifsoplockd");
+	allow_signal(SIGKILL);
+
+	oplockThread = current;
+	while (1) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(100*HZ);
+		/* BB add missing code */
+		cFYI(1,("oplock thread woken up - flush inode")); /* BB remove */
+		write_lock(&GlobalMid_Lock); 
+		list_for_each(tmp, &GlobalOplock_Q) {
+			oplock_item = list_entry(tmp, struct
+							       oplock_q_entry,
+							       qhead);
+			if(oplock_item) {
+				pTcon = oplock_item->tcon;
+				pfile = oplock_item->file_to_flush;
+				cFYI(1,("process item on queue"));/* BB remove */
+				DeleteOplockQEntry(oplock_item);
+				write_unlock(&GlobalMid_Lock);
+				rc = filemap_fdatawrite(pfile->f_dentry->d_inode->i_mapping);
+				cFYI(1,("Oplock flush file %p rc %d",pfile,rc));
+				/* send oplock break */
+				write_lock(&GlobalMid_Lock);
+			} else
+				break;
+			cFYI(1,("next time through list")); /* BB remove */
+		}
+		write_unlock(&GlobalMid_Lock);
+		cFYI(1,("next time through while loop")); /* BB remove */
+	}
 }
 
 static int __init
@@ -416,7 +469,7 @@ init_cifs(void)
 	INIT_LIST_HEAD(&GlobalServerList);	/* BB not implemented yet */
 	INIT_LIST_HEAD(&GlobalSMBSessionList);
 	INIT_LIST_HEAD(&GlobalTreeConnectionList);
-
+	INIT_LIST_HEAD(&GlobalOplock_Q);
 /*
  *  Initialize Global counters
  */
@@ -437,9 +490,11 @@ init_cifs(void)
 			rc = cifs_init_request_bufs();
 			if (!rc) {
 				rc = register_filesystem(&cifs_fs_type);
-				if (!rc)
-					return rc;	/* Success */
-				else
+				if (!rc) {                
+					kernel_thread(cifs_oplock_thread, NULL, 
+						CLONE_FS | CLONE_FILES | CLONE_VM);
+					return rc; /* Success */
+				} else
 					cifs_destroy_request_bufs();
 			}
 			cifs_destroy_mids();
@@ -459,10 +514,12 @@ exit_cifs(void)
 #if CONFIG_PROC_FS
 	cifs_proc_clean();
 #endif
-    	unregister_filesystem(&cifs_fs_type);
+	unregister_filesystem(&cifs_fs_type);
 	cifs_destroy_inodecache();
 	cifs_destroy_mids();
 	cifs_destroy_request_bufs();
+	if(oplockThread)
+		send_sig(SIGKILL, oplockThread, 1);
 }
 
 MODULE_AUTHOR("Steve French <sfrench@us.ibm.com>");

@@ -207,6 +207,9 @@ struct cifsFileInfo {
     struct file * pfile; /* needed for writepage */
 	int endOfSearch:1;	/* we have reached end of search */
 	int closePend:1;	/* file is marked to close */
+    char * search_resume_name;
+    unsigned int resume_name_length;
+    __u32 resume_key;
 };
 
 /*
@@ -221,7 +224,8 @@ struct cifsInodeInfo {
 	atomic_t inUse;	 /* num concurrent users (local openers cifs) of file*/
 	unsigned long time;	/* jiffies of last update/check of inode */
 	int clientCanCacheRead:1; /* read oplock */
-    int clientCanCacheAll:1;  /* read and writebehind oplock */
+	int clientCanCacheAll:1;  /* read and writebehind oplock */
+	int oplockPending:1;
 	struct inode vfs_inode;
 };
 
@@ -251,14 +255,20 @@ struct mid_q_entry {
 	int midState;	/* wish this were enum but can not pass to wait_event */
 };
 
+struct oplock_q_entry {
+	struct list_head qhead;
+	struct file * file_to_flush;
+	struct cifsTconInfo * tcon; 
+};
+
 #define   MID_FREE 0
 #define   MID_REQUEST_ALLOCATED 1
 #define   MID_REQUEST_SUBMITTED 2
 #define   MID_RESPONSE_RECEIVED 4
 
-struct servers_not_supported {	/* @z4a */
-	struct servers_not_supported *next1;	/* @z4a */
-	char server_Name[SERVER_NAME_LEN_WITH_NULL];	/* @z4a */
+struct servers_not_supported { /* @z4a */
+	struct servers_not_supported *next1;  /* @z4a */
+	char server_Name[SERVER_NAME_LEN_WITH_NULL]; /* @z4a */
 	/* Server Names in SMB protocol are 15 chars + X'20'  */
 	/*   in 16th byte...                      @z4a        */
 };
@@ -301,6 +311,8 @@ GLOBAL_EXTERN struct list_head GlobalSMBSessionList;
 GLOBAL_EXTERN struct list_head GlobalTreeConnectionList;
 GLOBAL_EXTERN rwlock_t GlobalSMBSeslock;  /* protects list inserts on 3 above */
 
+GLOBAL_EXTERN struct list_head GlobalOplock_Q;
+
 /*
  * Global transaction id (XID) information
  */
@@ -327,6 +339,7 @@ GLOBAL_EXTERN unsigned int multiuser_mount;	/* if enabled allows new sessions
 				have the uid/password or Kerberos credential 
 				or equivalent for current user */
 GLOBAL_EXTERN unsigned int oplockEnabled;
+GLOBAL_EXTERN unsigned int lookupCacheEnabled;
 GLOBAL_EXTERN unsigned int extended_security;	/* if on, session setup sent 
 				with more secure ntlmssp2 challenge/resp */
 GLOBAL_EXTERN unsigned int ntlmv2_support;  /* better optional password hash */

@@ -1449,7 +1449,7 @@ CIFSFindFirst(const int xid, struct cifsTconInfo *tcon,
 	    cpu_to_le16(ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM |
 			ATTR_DIRECTORY);
 	pSMB->SearchCount = cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_DIRECTORY_INFO));	/* should this be shrunk even more ? */
-	pSMB->SearchFlags = cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END);
+	pSMB->SearchFlags = cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
 
 	/* test for Unix extensions */
 	if (tcon->ses->capabilities & CAP_UNIX) {
@@ -1496,9 +1496,9 @@ CIFSFindFirst(const int xid, struct cifsTconInfo *tcon,
 
 int
 CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
-	     FILE_DIRECTORY_INFO * findData,
-	     T2_FNEXT_RSP_PARMS * findParms, const __u16 searchHandle,
-	     __u32 resumeKey, int *pUnicodeFlag, int *pUnixFlag)
+		FILE_DIRECTORY_INFO * findData, T2_FNEXT_RSP_PARMS * findParms,
+		const __u16 searchHandle, char * resume_file_name, int name_len,
+		__u32 resume_key, int *pUnicodeFlag, int *pUnixFlag)
 {
 /* level 257 SMB_ */
 	TRANSACTION2_FNEXT_REQ *pSMB = NULL;
@@ -1508,6 +1508,9 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	int bytes_returned;
 
 	cFYI(1, ("In FindNext"));
+	if(resume_file_name == NULL) {
+		return -EIO;
+	}
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1530,9 +1533,6 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_FIND_NEXT);
-	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
-	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
-	pSMB->ParameterCount = pSMB->TotalParameterCount;
 	pSMB->SearchHandle = searchHandle;	/* always kept as le */
 	findParms->SearchCount = 0;	/* set to zero in case of error */
 	pSMB->SearchCount =
@@ -1546,10 +1546,19 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 		    cpu_to_le16(SMB_FIND_FILE_DIRECTORY_INFO);
 		*pUnixFlag = FALSE;
 	}
-	pSMB->ResumeKey = resumeKey;	/* always kept as le */
+	pSMB->ResumeKey = resume_key;
 	pSMB->SearchFlags =
-	    cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END |
-			CIFS_SEARCH_CONTINUE_FROM_LAST);
+	    cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
+	/* BB add check to make sure we do not cross end of smb */
+	if(name_len < CIFS_MAX_MSGSIZE) {
+		memcpy(pSMB->ResumeFileName, resume_file_name, name_len);
+		pSMB->ByteCount += name_len;
+	}
+	pSMB->TotalParameterCount += name_len;
+	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
+	pSMB->ParameterCount = pSMB->TotalParameterCount;
+	/* BB improve error handling here */
 	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
 	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
 
@@ -1582,6 +1591,33 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	}
 	if (pSMB)
 		buf_release(pSMB);
+	return rc;
+}
+
+int
+CIFSFindClose(const int xid, struct cifsTconInfo *tcon, const __u16 searchHandle)
+{
+	int rc = 0;
+	FINDCLOSE_REQ *pSMB = NULL;
+	CLOSE_RSP *pSMBr = NULL;
+	int bytes_returned;
+	cFYI(1, ("In CIFSSMBFindClose"));
+
+	rc = smb_init(SMB_COM_FIND_CLOSE2, 1, tcon, (void **) &pSMB,
+		      (void **) &pSMBr);
+	if (rc)
+		return rc;
+
+	pSMB->FileID = searchHandle;
+	pSMB->ByteCount = 0;
+	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
+			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+	if (rc) {
+		cERROR(1, ("Send error in FindClose = %d", rc));
+	}
+	if (pSMB)
+		buf_release(pSMB);
+
 	return rc;
 }
 
