@@ -971,8 +971,8 @@ config HPET
 	default n
 	depends on ACPI
 	help
-	  If you say Y here, you will have a device named "/dev/hpet/XX" for
-	  each timer supported by the HPET.  The timers are
+	  If you say Y here, you will have a miscdevice named "/dev/hpet/".  Each
+	  open selects one of the timers supported by the HPET.  The timers are
 	  non-periodioc and/or periodic.
 
 config HPET_RTC_IRQ
