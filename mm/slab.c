@@ -965,9 +965,10 @@ static void dump_line(char *data, int offset, int limit)
 }
 #endif
 
+#if DEBUG
+
 static void print_objinfo(kmem_cache_t *cachep, void *objp, int lines)
 {
-#if DEBUG
 	int i, size;
 	char *realobj;
 
@@ -978,8 +979,10 @@ static void print_objinfo(kmem_cache_t *cachep, void *objp, int lines)
 	}
 
 	if (cachep->flags & SLAB_STORE_USER) {
-		printk(KERN_ERR "Last user: [<%p>]", *dbg_userword(cachep, objp));
-		print_symbol("(%s)", (unsigned long)*dbg_userword(cachep, objp));
+		printk(KERN_ERR "Last user: [<%p>]",
+				*dbg_userword(cachep, objp));
+		print_symbol("(%s)",
+				(unsigned long)*dbg_userword(cachep, objp));
 		printk("\n");
 	}
 	realobj = (char*)objp+obj_dbghead(cachep);
@@ -991,10 +994,7 @@ static void print_objinfo(kmem_cache_t *cachep, void *objp, int lines)
 			limit = size-i;
 		dump_line(realobj, i, limit);
 	}
-#endif
 }
-
-#if DEBUG
 
 static void check_poison_obj(kmem_cache_t *cachep, void *objp)
 {
@@ -3024,73 +3024,4 @@ unsigned int ksize(const void *objp)
 	}
 
 	return size;
-}
-
-void ptrinfo(unsigned long addr)
-{
-	struct page *page;
-
-	printk("Dumping data about address %p.\n", (void*)addr);
-	if (!virt_addr_valid((void*)addr)) {
-		printk("virt addr invalid.\n");
-		return;
-	}
-#ifdef CONFIG_MMU
-	do {
-		pgd_t *pgd = pgd_offset_k(addr);
-		pmd_t *pmd;
-		if (pgd_none(*pgd)) {
-			printk("No pgd.\n");
-			break;
-		}
-		pmd = pmd_offset(pgd, addr);
-		if (pmd_none(*pmd)) {
-			printk("No pmd.\n");
-			break;
-		}
-#ifdef CONFIG_X86
-		if (pmd_large(*pmd)) {
-			printk("Large page.\n");
-			break;
-		}
-#endif
-		printk("normal page, pte_val 0x%llx\n",
-		  (unsigned long long)pte_val(*pte_offset_kernel(pmd, addr)));
-	} while(0);
-#endif
-
-	page = virt_to_page((void*)addr);
-	printk("struct page at %p, flags %08lx\n",
-			page, (unsigned long)page->flags);
-	if (PageSlab(page)) {
-		kmem_cache_t *c;
-		struct slab *s;
-		unsigned long flags;
-		int objnr;
-		void *objp;
-
-		c = GET_PAGE_CACHE(page);
-		printk("belongs to cache %s.\n",c->name);
-
-		spin_lock_irqsave(&c->spinlock, flags);
-		s = GET_PAGE_SLAB(page);
-		printk("slabp %p with %d inuse objects (from %d).\n",
-			s, s->inuse, c->num);
-		check_slabp(c,s);
-
-		objnr = (addr-(unsigned long)s->s_mem)/c->objsize;
-		objp = s->s_mem+c->objsize*objnr;
-		printk("points into object no %d, starting at %p, len %d.\n",
-			objnr, objp, c->objsize);
-		if (objnr >= c->num) {
-			printk("Bad obj number.\n");
-		} else {
-			kernel_map_pages(virt_to_page(objp),
-					c->objsize/PAGE_SIZE, 1);
-
-			print_objinfo(c, objp, 2);
-		}
-		spin_unlock_irqrestore(&c->spinlock, flags);
-
-	}
 }
