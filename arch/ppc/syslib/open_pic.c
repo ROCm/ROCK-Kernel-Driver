@@ -261,6 +261,9 @@ static void openpic_safe_writefield_IPI(volatile u_int *addr, u_int mask, u_int 
 #endif /* CONFIG_SMP */
 
 #ifdef CONFIG_EPIC_SERIAL_MODE
+/* On platforms that may use EPIC serial mode, the default is enabled. */
+int epic_serial_mode = 1;
+
 static void __init openpic_eicr_set_clk(u_int clkval)
 {
 	openpic_writefield(&OpenPIC->Global.Global_Configuration1,
@@ -415,8 +418,10 @@ void __init openpic_init(int offset)
 	openpic_set_spurious(OPENPIC_VEC_SPURIOUS);
 	openpic_disable_8259_pass_through();
 #ifdef CONFIG_EPIC_SERIAL_MODE
-	openpic_eicr_set_clk(7);	/* Slowest value until we know better */
-	openpic_enable_sie();
+	if (epic_serial_mode) {
+		openpic_eicr_set_clk(7);	/* Slowest value until we know better */
+		openpic_enable_sie();
+	}
 #endif
 	openpic_set_priority(0);
 
