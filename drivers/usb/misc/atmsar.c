@@ -119,7 +119,6 @@
  */
 #define CRC32_REMAINDER CBF43926
 #define CRC32_INITIAL 0xffffffff
-#define CRC32(c,crc) (crc32tab[((size_t)(crc>>24) ^ (c)) & 0xff] ^ (((crc) << 8)))
 unsigned long crc32tab[256] = {
 	0x00000000L, 0x04C11DB7L, 0x09823B6EL, 0x0D4326D9L,
 	0x130476DCL, 0x17C56B6BL, 0x1A864DB2L, 0x1E475005L,
@@ -213,8 +212,6 @@ unsigned long calc_crc (char *mem, int len, unsigned initial)
 	return (crc);
 }
 #endif
-
-#define crc32( crc, mem, len) calc_crc(mem, len, crc);
 
 /* initialization routines. not used at the moment
  * I will avoid these as long as possible !!

@@ -50,6 +50,11 @@
 #define ATMSAR_DEF_MTU_AAL34         0	/* not supported */
 #define ATMSAR_DEF_MTU_AAL5      65535	/* max mtu ..    */
 
+#define CRC32(c,crc) (crc32tab[((size_t)(crc>>24) ^ (c)) & 0xff] ^ (((crc) << 8)))
+#define crc32( crc, mem, len) calc_crc(mem, len, crc);
+
+extern unsigned long crc32tab[256];
+
 struct atmsar_vcc_data {
 	struct atmsar_vcc_data *next;
 
@@ -91,5 +96,7 @@ struct sk_buff *atmsar_decode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff 
 struct sk_buff *atmsar_alloc_tx (struct atmsar_vcc_data *vcc, unsigned int size);
 
 unsigned int atmsar_encode (struct atmsar_vcc_data *ctx, char *source, char *target, unsigned int pdu_length);
+
+unsigned long calc_crc (char *mem, int len, unsigned initial);
 
 #endif				/* _ATMSAR_H_ */
