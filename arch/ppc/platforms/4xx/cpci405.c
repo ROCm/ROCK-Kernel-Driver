@@ -22,6 +22,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/todc.h>
+#include <asm/ocp.h>
 
 void *cpci405_nvram;
 
@@ -53,6 +54,9 @@ void __init
 cpci405_setup_arch(void)
 {
 	ppc4xx_setup_arch();
+
+	ibm_ocp_set_emac(0, 0);
+
 	TODC_INIT(TODC_TYPE_MK48T35, cpci405_nvram, cpci405_nvram, cpci405_nvram, 8);
 }
 

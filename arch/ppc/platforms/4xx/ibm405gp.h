@@ -51,9 +51,6 @@
 #define PPC4xx_ONB_IO_VADDR	PPC4xx_ONB_IO_PADDR
 #define PPC4xx_ONB_IO_SIZE	((uint)4*1024)
 
-#define OPB_BASE_START	0x40000000
-#define EBIU_BASE_START	0xF0100000
-
 /* serial port defines */
 #define RS_TABLE_SIZE	2
 
@@ -63,24 +60,8 @@
 #define PCIL0_BASE	0xEF400000
 #define UART0_IO_BASE	0xEF600300
 #define UART1_IO_BASE	0xEF600400
-#define IIC0_BASE	0xEF600500
-#define OPB0_BASE	0xEF600600
-#define GPIO0_BASE	0xEF600700
 #define EMAC0_BASE	0xEF600800
-#define BL_MAC_WOL	9	/* WOL */
-#define BL_MAL_SERR	10	/* MAL SERR */
-#define BL_MAL_TXDE	13	/* MAL TXDE */
-#define BL_MAL_RXDE	14	/* MAL RXDE */
-#define BL_MAL_TXEOB	11	/* MAL TX EOB */
-#define BL_MAL_RXEOB	12	/* MAL RX EOB */
-#define BL_MAC_ETH0	15	/* MAC */
 
-#define EMAC_NUMS	1
-#define IIC0_IRQ	2
-#define IIC1_IRQ	0
-
-#define IIC_OWN		0x55
-#define IIC_CLOCK	50
 #define BD_EMAC_ADDR(e,i) bi_enetaddr[i]
 
 #define STD_UART_OP(num)					\

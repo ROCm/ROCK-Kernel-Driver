@@ -14,7 +14,6 @@
 #define __ASM_IBMSTB4_H__
 
 #include <linux/config.h>
-#include <platforms/4xx/ibm_ocp.h>
 
 /* serial port defines */
 #define STB04xxx_IO_BASE	((uint)0xe0000000)
