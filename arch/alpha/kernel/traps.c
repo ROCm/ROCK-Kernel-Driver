@@ -29,12 +29,15 @@
 */
 static int opDEC_testing = 0;
 static int opDEC_fix = 0;
+static int opDEC_checked = 0;
 static unsigned long opDEC_test_pc = 0;
 
 static void
 opDEC_check(void)
 {
 	unsigned long test_pc;
+
+	if (opDEC_checked) return;
 
 	lock_kernel();
 	opDEC_testing = 1;
@@ -48,6 +51,7 @@ opDEC_check(void)
 		: );
 
 	opDEC_testing = 0;
+	opDEC_checked = 1;
 	unlock_kernel();
 }
 
