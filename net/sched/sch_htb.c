@@ -814,7 +814,10 @@ static void htb_charge_class(struct htb_sched *q,struct htb_class *cl,
 		if (diff > cl->mbuffer || diff < 0 || PSCHED_TLESS(q->now, cl->t_c)) {
 			if (net_ratelimit())
 				printk(KERN_ERR "HTB: bad diff in charge, cl=%X diff=%lX now=%Lu then=%Lu j=%lu\n",
-						cl->classid,diff,q->now,cl->t_c,jiffies);
+				       cl->classid, diff,
+				       (unsigned long long) q->now,
+				       (unsigned long long) cl->t_c,
+				       jiffies);
 			diff = 1000;
 		}
 #endif
@@ -881,7 +884,10 @@ static long htb_do_events(struct htb_sched *q,int level)
 		if (diff > cl->mbuffer || diff < 0 || PSCHED_TLESS(q->now, cl->t_c)) {
 			if (net_ratelimit())
 				printk(KERN_ERR "HTB: bad diff in events, cl=%X diff=%lX now=%Lu then=%Lu j=%lu\n",
-						cl->classid,diff,q->now,cl->t_c,jiffies);
+				       cl->classid, diff,
+				       (unsigned long long) q->now,
+				       (unsigned long long) cl->t_c,
+				       jiffies);
 			diff = 1000;
 		}
 #endif
@@ -1098,7 +1104,7 @@ static void htb_reset(struct Qdisc* sch)
 {
 	struct htb_sched *q = (struct htb_sched *)sch->data;
 	int i;
-	HTB_DBG(0,1,"htb_reset sch=%X, handle=%X\n",(int)sch,sch->handle);
+	HTB_DBG(0,1,"htb_reset sch=%p, handle=%X\n",sch,sch->handle);
 
 	for (i = 0; i < HTB_HSIZE; i++) {
 		struct list_head *p;
