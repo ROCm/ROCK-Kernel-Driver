@@ -256,21 +256,18 @@ isdn_net_bind(isdn_net_dev *idev, isdn_net_ioctl_cfg *cfg)
 		goto out;
 	}
 	if (idev->exclusive >= 0) {
-		isdn_unexclusive_channel(idev->pre_device, idev->pre_channel);
-		isdn_free_channel(idev->pre_device, idev->pre_channel, ISDN_USAGE_NET);
+		isdn_slot_free(idev->exclusive);
 		idev->exclusive = -1;
 	}
 	if (cfg->exclusive) {
 		/* If binding is exclusive, try to grab the channel */
-		idev->exclusive = isdn_get_free_slot(ISDN_USAGE_NET, mlp->l2_proto, 
-						     mlp->l3_proto, drvidx, chidx, cfg->eaz);
+		idev->exclusive = isdn_get_free_slot(ISDN_USAGE_NET | ISDN_USAGE_EXCLUSIVE, 
+						     mlp->l2_proto, mlp->l3_proto, drvidx, chidx, cfg->eaz);
 		if (idev->exclusive < 0) {
 			/* Grab failed, because desired channel is in use */
 			retval = -EBUSY;
 			goto out;
 		}
-		/* All went ok, so update isdninfo */
-		isdn_slot_set_usage(idev->exclusive, ISDN_USAGE_EXCLUSIVE);
 	}
 	idev->pre_device = drvidx;
 	idev->pre_channel = chidx;
@@ -449,7 +446,7 @@ isdn_net_dev_delete(isdn_net_dev *idev)
 	isdn_net_rmallphone(idev);
 
 	if (idev->exclusive >= 0)
-		isdn_unexclusive_channel(idev->pre_device, idev->pre_channel);
+		isdn_free_slot(idev->exclusive);
 
 	list_del(&idev->slaves);
 	
@@ -1209,7 +1206,7 @@ isdn_net_unbind_channel(isdn_net_dev *idev)
 	fsm_change_state(&idev->fi, ST_NULL);
 
 	isdn_slot_set_idev(idev->isdn_slot, NULL);
-	isdn_slot_free(idev->isdn_slot, ISDN_USAGE_NET);
+	isdn_slot_free(idev->isdn_slot);
 
 	idev->isdn_slot = -1;
 
@@ -1234,8 +1231,6 @@ isdn_net_dial(isdn_net_dev *idev)
 	if (slot < 0)
 		goto err;
 
-	isdn_slot_set_usage(slot, isdn_slot_usage(slot) | ISDN_USAGE_OUTGOING);
-
 	if (isdn_net_bind_channel(idev, slot) < 0)
 		goto err;
 	
@@ -1257,8 +1252,6 @@ accept_icall(struct fsm_inst *fi, int pr, void *arg)
 	int slot = (int) arg;
 
 	// FIXME this really should be done in generic code
-//	strcpy(isdn_slot_num(slot), nr);
-	isdn_slot_set_usage(slot, (isdn_slot_usage(slot) & ISDN_USAGE_EXCLUSIVE) | ISDN_USAGE_NET);
 	
 	isdn_net_bind_channel(idev, slot);
 	
@@ -1299,8 +1292,6 @@ do_callback(struct fsm_inst *fi, int pr, void *arg)
 				  idev->pre_device, idev->pre_channel, mlp->msn);
 	if (slot < 0)
 		goto err;
-
-	isdn_slot_set_usage(slot, isdn_slot_usage(slot) | ISDN_USAGE_OUTGOING);
 
 	if (isdn_net_bind_channel(idev, slot) < 0)
 		goto err;

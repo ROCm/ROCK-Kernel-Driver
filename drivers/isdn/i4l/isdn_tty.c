@@ -745,7 +745,7 @@ isdn_tty_modem_hup(modem_info * info, int local)
 
 	isdn_slot_all_eaz(slot);
 	info->emu.mdmreg[REG_RINGCNT] = 0;
-	isdn_slot_free(slot, 0);
+	isdn_slot_free(slot);
 	isdn_slot_set_m_idx(slot, -1);
 	info->isdn_slot = -1;
 }

@@ -503,11 +503,14 @@ isdn_status_callback(isdn_ctrl * c)
 						retval = 2;
 					}
 					break;
-				case 1:
+				case 1: /* incoming call accepted by net interface */
 					list_for_each(l, &isdn_net_devs) {
 						isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 						if (p->isdn_slot == i) {
 							strcpy(cmd.parm.setup.eazmsn, p->mlp->msn);
+							isdn_slot_set_usage(i, (isdn_slot_usage(i) & ISDN_USAGE_EXCLUSIVE) | ISDN_USAGE_NET);
+							strcpy(isdn_slot_num(i), c->parm.setup.phone);
+
 							isdn_slot_command(i, ISDN_CMD_ACCEPTD, &cmd);
 							retval = 1;
 							break;
@@ -1535,26 +1538,20 @@ isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
 		if (USG_NONE(slot[i].usage) &&
 		    (slot[i].di != -1)) {
 			int d = slot[i].di;
-			if ((slot[i].usage & ISDN_USAGE_EXCLUSIVE) &&
-			((pre_dev != d) || (pre_chan != slot[i].ch)))
-				continue;
 			if (!strcmp(isdn_map_eaz2msn(msn, d), "-"))
 				continue;
 			if (slot[i].usage & ISDN_USAGE_DISABLED)
 			        continue; /* usage not allowed */
-			if (dev->drv[d]->flags & DRV_FLAG_RUNNING) {
-				if (((dev->drv[d]->interface->features & features) == features) ||
-				    (((dev->drv[d]->interface->features & vfeatures) == vfeatures) &&
-				     (dev->drv[d]->interface->features & ISDN_FEATURE_L2_TRANS))) {
-					if ((pre_dev < 0) || (pre_chan < 0)) {
-						isdn_slot_set_usage(i, (isdn_slot_usage(i) & ISDN_USAGE_EXCLUSIVE) | usage);
-						restore_flags(flags);
-						return i;
-					} else if ((pre_dev == d) && (pre_chan == slot[i].ch)) {
-						isdn_slot_set_usage(i, (isdn_slot_usage(i) & ISDN_USAGE_EXCLUSIVE) | usage);
-						restore_flags(flags);
-						return i;
-					}
+			if (!dev->drv[d]->flags & DRV_FLAG_RUNNING)
+				continue;
+			if (((dev->drv[d]->interface->features & features) == features) ||
+			    (((dev->drv[d]->interface->features & vfeatures) == vfeatures) &&
+			     (dev->drv[d]->interface->features & ISDN_FEATURE_L2_TRANS))) {
+				if (pre_dev < 0 || pre_chan < 0 ||
+				    (pre_dev == d && pre_chan == slot[i].ch)) {
+					isdn_slot_set_usage(i, usage);
+					restore_flags(flags);
+					return i;
 				}
 			}
 		}
@@ -1571,50 +1568,27 @@ isdn_free_channel(int di, int ch, int usage)
 	int sl;
 
 	sl = isdn_dc2minor(di, ch);
-	isdn_slot_free(sl, usage);
+	isdn_slot_free(sl);
 }
 
 void
-isdn_slot_free(int sl, int usage)
+isdn_slot_free(int sl)
 {
 	unsigned long flags;
 
 	save_flags(flags);
 	cli();
-	if (!usage || (slot[sl].usage & ISDN_USAGE_MASK) == usage) {
-		strcpy(isdn_slot_num(sl), "???");
-		slot[sl].ibytes = 0;
-		slot[sl].obytes = 0;
+	strcpy(isdn_slot_num(sl), "???");
+	slot[sl].ibytes = 0;
+	slot[sl].obytes = 0;
 // 20.10.99 JIM, try to reinitialize v110 !
-		slot[sl].iv110.v110emu = 0;
-		atomic_set(&slot[sl].iv110.v110use, 0);
-		isdn_v110_close(slot[sl].iv110.v110);
-		slot[sl].iv110.v110 = NULL;
+	slot[sl].iv110.v110emu = 0;
+	atomic_set(&slot[sl].iv110.v110use, 0);
+	isdn_v110_close(slot[sl].iv110.v110);
+	slot[sl].iv110.v110 = NULL;
 // 20.10.99 JIM, try to reinitialize v110 !
-		isdn_slot_set_usage(sl, isdn_slot_usage(sl) & (ISDN_USAGE_NONE | ISDN_USAGE_EXCLUSIVE));
-		skb_queue_purge(&dev->drv[isdn_slot_driver(sl)]->rpqueue[isdn_slot_channel(sl)]);
-	}
-	restore_flags(flags);
-}
-
-/*
- * Cancel Exclusive-Flag for ISDN-channel
- */
-void
-isdn_unexclusive_channel(int di, int ch)
-{
-	int i;
-	ulong flags;
-
-	save_flags(flags);
-	cli();
-	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-		if ((slot[i].di == di) &&
-		    (slot[i].ch == ch)) {
-			isdn_slot_set_usage(i, isdn_slot_usage(i) & ~ISDN_USAGE_EXCLUSIVE);
-			restore_flags(flags);
-			return;
-		}
+	isdn_slot_set_usage(sl, ISDN_USAGE_NONE);
+	skb_queue_purge(&dev->drv[isdn_slot_driver(sl)]->rpqueue[isdn_slot_channel(sl)]);
 	restore_flags(flags);
 }
 
@@ -1959,6 +1933,7 @@ isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 	case ISDN_CMD_DIAL:
 		if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 			return -EBUSY;
+
 		/* fall through */
 	default:
 		ctrl->arg = isdn_slot_channel(sl);
