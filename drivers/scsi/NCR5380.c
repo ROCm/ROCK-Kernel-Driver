@@ -1477,8 +1477,8 @@ static int NCR5380_select(struct Scsi_Host *instance, Scsi_Cmnd * cmd, int tag)
 	int len;
 	unsigned long timeout;
 	unsigned char value;
-	NCR5380_setup(instance);
 	int err;
+	NCR5380_setup(instance);
 
 	if (hostdata->selecting) {
 		if(instance->irq != IRQ_NONE)
