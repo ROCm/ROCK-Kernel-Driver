@@ -188,7 +188,6 @@ int noautodma = 1;
 #endif
 
 EXPORT_SYMBOL(noautodma);
-EXPORT_SYMBOL(ide_bus_type);
 
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
@@ -554,8 +553,6 @@ control_region_busy:
 	return -EBUSY;
 }
 
-EXPORT_SYMBOL(ide_hwif_request_regions);
-
 /**
  *	ide_hwif_release_regions - free IDE resources
  *
@@ -583,8 +580,6 @@ void ide_hwif_release_regions(ide_hwif_t *hwif)
 		if (hwif->io_ports[i])
 			release_region(hwif->io_ports[i], 1);
 }
-
-EXPORT_SYMBOL(ide_hwif_release_regions);
 
 /* restore hwif to a sane state */
 static void ide_hwif_restore(ide_hwif_t *hwif, ide_hwif_t *tmp_hwif)
@@ -936,8 +931,6 @@ void ide_setup_ports (	hw_regs_t *hw,
  */
 }
 
-EXPORT_SYMBOL(ide_setup_ports);
-
 /*
  * Register an IDE interface, specifying exactly the registers etc
  * Set init=1 iff calling before probes have taken place.
@@ -998,7 +991,6 @@ EXPORT_SYMBOL(ide_register_hw);
  */
 
 DECLARE_MUTEX(ide_setting_sem);
-EXPORT_SYMBOL(ide_setting_sem);
 
 /**
  *	ide_add_setting	-	add an ide setting option
@@ -1272,8 +1264,6 @@ int ide_write_setting (ide_drive_t *drive, ide_settings_t *setting, int val)
 	return 0;
 }
 
-EXPORT_SYMBOL(ide_write_setting);
-
 static int set_io_32bit(ide_drive_t *drive, int arg)
 {
 	drive->io_32bit = arg;
@@ -1401,8 +1391,6 @@ abort:
 	return 1;
 }
 
-EXPORT_SYMBOL(ide_replace_subdriver);
-
 int ata_attach(ide_drive_t *drive)
 {
 	struct list_head *p;
@@ -1426,8 +1414,6 @@ int ata_attach(ide_drive_t *drive)
 		panic("ide: default attach failed");
 	return 1;
 }
-
-EXPORT_SYMBOL(ata_attach);
 
 static int generic_ide_suspend(struct device *dev, u32 state)
 {

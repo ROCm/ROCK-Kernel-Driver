@@ -1116,7 +1116,6 @@ extern struct proc_dir_entry *proc_ide_root;
 
 extern void proc_ide_create(void);
 extern void proc_ide_destroy(void);
-extern void destroy_proc_ide_device(ide_hwif_t *, ide_drive_t *);
 extern void destroy_proc_ide_drives(ide_hwif_t *);
 extern void create_proc_ide_interfaces(void);
 extern void ide_add_proc_entries(struct proc_dir_entry *, ide_proc_entry_t *, void *);
