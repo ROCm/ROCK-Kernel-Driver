@@ -635,11 +635,11 @@ pmac_ide_tuneproc(ide_drive_t *drive, u8 pio)
 		}
 	case controller_kl_ata4:
 		/* 66Mhz cell */
-	recTime = d.cycle_time - ide_pio_timings[pio].active_time
-			- ide_pio_timings[pio].setup_time;
-	recTime = max(recTime, 150U);
-	accessTime = ide_pio_timings[pio].active_time;
-	accessTime = max(accessTime, 150U);
+		recTime = d.cycle_time - ide_pio_timings[pio].active_time
+				- ide_pio_timings[pio].setup_time;
+		recTime = max(recTime, 150U);
+		accessTime = ide_pio_timings[pio].active_time;
+		accessTime = max(accessTime, 150U);
 		accessTicks = SYSCLK_TICKS_66(accessTime);
 		accessTicks = min(accessTicks, 0x1fU);
 		recTicks = SYSCLK_TICKS_66(recTime);
@@ -765,23 +765,23 @@ set_timings_mdma(ide_drive_t *drive, int intf_type, u32 *timings, u32 *timings2,
 			break;
 	}
 	if (tm != NULL) {
-	/* Lookup matching access & recovery times */
-	i = -1;
-	for (;;) {
-		if (tm[i+1].cycleTime < cycleTime)
-			break;
-		i++;
-	}
-	if (i < 0)
+		/* Lookup matching access & recovery times */
+		i = -1;
+		for (;;) {
+			if (tm[i+1].cycleTime < cycleTime)
+				break;
+			i++;
+		}
+		if (i < 0)
 			return 1;
-	cycleTime = tm[i].cycleTime;
-	accessTime = tm[i].accessTime;
-	recTime = tm[i].recoveryTime;
+		cycleTime = tm[i].cycleTime;
+		accessTime = tm[i].accessTime;
+		recTime = tm[i].recoveryTime;
 
 #ifdef IDE_PMAC_DEBUG
 		printk(KERN_ERR "%s: MDMA, cycleTime: %d, accessTime: %d, recTime: %d\n",
 			drive->name, cycleTime, accessTime, recTime);
-#endif	
+#endif
 	}
 	switch(intf_type) {
 	case controller_un_ata6: {
@@ -844,7 +844,7 @@ set_timings_mdma(ide_drive_t *drive, int intf_type, u32 *timings, u32 *timings2,
 				(recTicks << TR_33_MDMA_RECOVERY_SHIFT);
 		if (halfTick)
 			*timings |= TR_33_MDMA_HALFTICK;
-	}
+		}
 	}
 #ifdef IDE_PMAC_DEBUG
 	printk(KERN_ERR "%s: Set MDMA timing for mode %d, reg: 0x%08x\n",
@@ -864,10 +864,10 @@ pmac_ide_tune_chipset (ide_drive_t *drive, byte speed)
 	int ret = 0;
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
 	u32 *timings, *timings2;
-	
+
 	if (pmif == NULL)
 		return 1;
-
+		
 	timings = &pmif->timings[unit];
 	timings2 = &pmif->timings[unit+2];
 	
@@ -1008,16 +1008,16 @@ static int
 pmac_ide_do_suspend(ide_hwif_t *hwif)
 {
 	pmac_ide_hwif_t *pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
-
+	
 	/* We clear the timings */
 	pmif->timings[0] = 0;
 	pmif->timings[1] = 0;
-
+	
 #ifdef CONFIG_BLK_DEV_IDE_PMAC_BLINK
 	/* Note: This code will be called for every hwif, thus we'll
 	 * try several time to stop the LED blinker timer,  but that
 	 * should be harmless
-		 */
+	 */
 	if (pmu_ide_blink_enabled) {
 		unsigned long flags;
 
@@ -1027,13 +1027,13 @@ pmac_ide_do_suspend(ide_hwif_t *hwif)
 			del_timer(&pmu_blink_timer);
 		pmu_blink_ledstate = 0;
 		spin_unlock_irqrestore(&pmu_blink_lock, flags);
-		}
+	}
 #endif /* CONFIG_BLK_DEV_IDE_PMAC_BLINK */
 
 	/* The media bay will handle itself just fine */
 	if (pmif->mediabay)
 		return 0;
-
+	
 	/* Disable the bus */
 	ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, pmif->node, pmif->aapl_bus_id, 0);
 
@@ -1042,12 +1042,12 @@ pmac_ide_do_suspend(ide_hwif_t *hwif)
 
 /* Resume call back, should be called before the child devices
  * are resumed
-		 */
+ */
 static int
 pmac_ide_do_resume(ide_hwif_t *hwif)
 {
 	pmac_ide_hwif_t *pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
-
+	
 	/* Hard reset & re-enable controller (do we really need to reset ? -BenH) */
 	if (!pmif->mediabay) {
 		ppc_md.feature_call(PMAC_FTR_IDE_RESET, pmif->node, pmif->aapl_bus_id, 1);
@@ -1055,7 +1055,7 @@ pmac_ide_do_resume(ide_hwif_t *hwif)
 		mdelay(10);
 		ppc_md.feature_call(PMAC_FTR_IDE_RESET, pmif->node, pmif->aapl_bus_id, 0);
 		mdelay(100);
-		}
+	}
 
 	/* Sanitize drive timings */
 	sanitize_timings(pmif);
@@ -1074,76 +1074,76 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	if (device_is_compatible(np, "kauai-ata"))
 		pmif->kind = controller_un_ata6;
 	else if (device_is_compatible(np, "keylargo-ata")) {
-			if (strcmp(np->name, "ata-4") == 0)
-				pmif->kind = controller_kl_ata4;
-			else
-				pmif->kind = controller_kl_ata3;
-		} else if (device_is_compatible(np, "heathrow-ata"))
-			pmif->kind = controller_heathrow;
+		if (strcmp(np->name, "ata-4") == 0)
+			pmif->kind = controller_kl_ata4;
+		else
+			pmif->kind = controller_kl_ata3;
+	} else if (device_is_compatible(np, "heathrow-ata"))
+		pmif->kind = controller_heathrow;
 	else {
-			pmif->kind = controller_ohare;
+		pmif->kind = controller_ohare;
 		pmif->broken_dma = 1;
 	}
 
-		bidp = (int *)get_property(np, "AAPL,bus-id", NULL);
-		pmif->aapl_bus_id =  bidp ? *bidp : 0;
+	bidp = (int *)get_property(np, "AAPL,bus-id", NULL);
+	pmif->aapl_bus_id =  bidp ? *bidp : 0;
 
 	/* Get cable type from device-tree */
 	if (pmif->kind == controller_kl_ata4 || pmif->kind == controller_un_ata6) {
-			char* cable = get_property(np, "cable-type", NULL);
-			if (cable && !strncmp(cable, "80-", 3))
+		char* cable = get_property(np, "cable-type", NULL);
+		if (cable && !strncmp(cable, "80-", 3))
 			pmif->cable_80 = 1;
-		}
+	}
 
 	pmif->mediabay = 0;
 	
-		/* Make sure we have sane timings */
-		sanitize_timings(pmif);
+	/* Make sure we have sane timings */
+	sanitize_timings(pmif);
 
 	/* XXX FIXME: Media bay stuff need re-organizing */
-		if (np->parent && np->parent->name
-		    && strcasecmp(np->parent->name, "media-bay") == 0) {
+	if (np->parent && np->parent->name
+	    && strcasecmp(np->parent->name, "media-bay") == 0) {
 #ifdef CONFIG_PMAC_PBOOK
 		media_bay_set_ide_infos(np->parent, pmif->regbase, pmif->irq, hwif->index);
 #endif /* CONFIG_PMAC_PBOOK */
 		pmif->mediabay = 1;
-			if (!bidp)
-				pmif->aapl_bus_id = 1;
-		} else if (pmif->kind == controller_ohare) {
-			/* The code below is having trouble on some ohare machines
-			 * (timing related ?). Until I can put my hand on one of these
-			 * units, I keep the old way
-			 */
-			ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, 0, 1);
-		} else {
- 			/* This is necessary to enable IDE when net-booting */
-			ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 1);
-			ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, pmif->aapl_bus_id, 1);
-			mdelay(10);
-			ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 0);
+		if (!bidp)
+			pmif->aapl_bus_id = 1;
+	} else if (pmif->kind == controller_ohare) {
+		/* The code below is having trouble on some ohare machines
+		 * (timing related ?). Until I can put my hand on one of these
+		 * units, I keep the old way
+		 */
+		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, 0, 1);
+	} else {
+ 		/* This is necessary to enable IDE when net-booting */
+		ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 1);
+		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, pmif->aapl_bus_id, 1);
+		mdelay(10);
+		ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 0);
 		mdelay(100);
-		}
+	}
 
-		/* Setup MMIO ops */
-		default_hwif_mmiops(hwif);
+	/* Setup MMIO ops */
+	default_hwif_mmiops(hwif);
 
-		/* Tell common code _not_ to mess with resources */
-		hwif->mmio = 2;
-		hwif->hwif_data = pmif;
+	/* Tell common code _not_ to mess with resources */
+	hwif->mmio = 2;
+	hwif->hwif_data = pmif;
 	pmac_ide_init_hwif_ports(&hwif->hw, pmif->regbase, 0, &hwif->irq);
-		memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
-		hwif->chipset = ide_pmac;
+	memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
+	hwif->chipset = ide_pmac;
 	hwif->noprobe = !hwif->io_ports[IDE_DATA_OFFSET] || pmif->mediabay;
 	hwif->hold = pmif->mediabay;
 	hwif->udma_four = pmif->cable_80;
-		hwif->drives[0].unmask = 1;
-		hwif->drives[1].unmask = 1;
-		hwif->tuneproc = pmac_ide_tuneproc;
+	hwif->drives[0].unmask = 1;
+	hwif->drives[1].unmask = 1;
+	hwif->tuneproc = pmac_ide_tuneproc;
 	if (pmif->kind == controller_un_ata6)
 		hwif->selectproc = pmac_ide_kauai_selectproc;
 	else
 		hwif->selectproc = pmac_ide_selectproc;
-		hwif->speedproc = pmac_ide_tune_chipset;
+	hwif->speedproc = pmac_ide_tune_chipset;
 
 #ifdef CONFIG_BLK_DEV_IDE_PMAC_BLINK
 	pmu_ide_blink_enabled = pmu_hd_blink_init();
@@ -1158,11 +1158,11 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 			
 #ifdef CONFIG_PMAC_PBOOK
 	if (pmif->mediabay && check_media_bay_by_base(pmif->regbase, MB_CD) == 0)
-			hwif->noprobe = 0;
+		hwif->noprobe = 0;
 #endif /* CONFIG_PMAC_PBOOK */
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
-			/* has a DBDMA controller channel */
+	/* has a DBDMA controller channel */
 	if (pmif->dma_regs)
 		pmac_ide_setup_dma(pmif, hwif);
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
@@ -1180,6 +1180,7 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 		for (i = IDE_DATA_OFFSET; i <= IDE_CONTROL_OFFSET; ++i)
 			hwif->io_ports[i] = 0;
 		hwif->chipset = ide_unknown;
+		hwif->noprobe = 1;
 		return -ENODEV;
 	}
 
@@ -1194,7 +1195,7 @@ pmac_ide_macio_attach(struct macio_dev *mdev, const struct of_match *match)
 	ide_hwif_t *hwif;
 	pmac_ide_hwif_t *pmif;
 	int i, rc;
-		
+
 	i = 0;
 	while (i < MAX_HWIFS && (ide_hwifs[i].io_ports[IDE_DATA_OFFSET] != 0
 	    || pmac_ide[i].node != NULL))
@@ -1204,7 +1205,7 @@ pmac_ide_macio_attach(struct macio_dev *mdev, const struct of_match *match)
 		printk(KERN_ERR "          %s\n", mdev->ofdev.node->full_name);
 		return -ENODEV;
 	}
-		
+
 	pmif = &pmac_ide[i];
 	hwif = &ide_hwifs[i];
 
@@ -1693,7 +1694,7 @@ pmac_ide_udma_enable(ide_drive_t *drive, u16 mode)
 	u32 *timings, *timings2;
 	u32 timing_local[2];
 	int ret;
-
+		
 	/* which drive is it ? */
 	timings = &pmif->timings[drive->select.b.unit & 0x01];
 	timings2 = &pmif->timings[(drive->select.b.unit & 0x01) + 2];
@@ -2044,25 +2045,25 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 #endif
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-	
+
 	hwif->atapi_dma = 1;
 	switch(pmif->kind) {
 		case controller_un_ata6:
 			hwif->ultra_mask = pmif->cable_80 ? 0x3f : 0x07;
 			hwif->mwdma_mask = 0x07;
 			hwif->swdma_mask = 0x00;
-		break;
+			break;
 		case controller_kl_ata4:
 			hwif->ultra_mask = pmif->cable_80 ? 0x1f : 0x07;
 			hwif->mwdma_mask = 0x07;
 			hwif->swdma_mask = 0x00;
-		break;
+			break;
 		default:
 			hwif->ultra_mask = 0x00;
 			hwif->mwdma_mask = 0x07;
 			hwif->swdma_mask = 0x00;
-		break;
-	}
+			break;
+	}	
 }
 
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
