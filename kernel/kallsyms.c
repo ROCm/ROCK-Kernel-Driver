@@ -88,13 +88,19 @@ const char *kallsyms_lookup(unsigned long addr,
 			name += strlen(name) + 1;
 		}
 
-		/* Base symbol size on next symbol. */
-		if (best + 1 < kallsyms_num_syms)
-			symbol_end = kallsyms_addresses[best + 1];
-		else if (is_kernel_inittext(addr))
+		/* At worst, symbol ends at end of section. */
+		if (is_kernel_inittext(addr))
 			symbol_end = (unsigned long)_einittext;
 		else
 			symbol_end = (unsigned long)_etext;
+
+		/* Search for next non-aliased symbol */
+		for (i = best+1; i < kallsyms_num_syms; i++) {
+			if (kallsyms_addresses[i] > kallsyms_addresses[best]) {
+				symbol_end = kallsyms_addresses[i];
+				break;
+			}
+		}
 
 		*symbolsize = symbol_end - kallsyms_addresses[best];
 		*modname = NULL;

@@ -93,7 +93,6 @@ read_map(FILE *in)
 static void
 write_src(void)
 {
-	unsigned long long last_addr;
 	int i, valid = 0;
 	char *prev;
 
@@ -111,16 +110,12 @@ write_src(void)
 	printf(".globl kallsyms_addresses\n");
 	printf("\tALGN\n");
 	printf("kallsyms_addresses:\n");
-	for (i = 0, last_addr = 0; i < cnt; i++) {
+	for (i = 0; i < cnt; i++) {
 		if (!symbol_valid(&table[i]))
-			continue;
-		
-		if (table[i].addr == last_addr)
 			continue;
 
 		printf("\tPTR\t%#llx\n", table[i].addr);
 		valid++;
-		last_addr = table[i].addr;
 	}
 	printf("\n");
 
@@ -134,20 +129,16 @@ write_src(void)
 	printf("\tALGN\n");
 	printf("kallsyms_names:\n");
 	prev = ""; 
-	for (i = 0, last_addr = 0; i < cnt; i++) {
+	for (i = 0; i < cnt; i++) {
 		int k;
 
 		if (!symbol_valid(&table[i]))
-			continue;
-		
-		if (table[i].addr == last_addr)
 			continue;
 
 		for (k = 0; table[i].sym[k] && table[i].sym[k] == prev[k]; ++k)
 			; 
 
 		printf("\t.byte 0x%02x\n\t.asciz\t\"%s\"\n", k, table[i].sym + k);
-		last_addr = table[i].addr;
 		prev = table[i].sym;
 	}
 	printf("\n");
