@@ -307,6 +307,7 @@ __ncp_lookup_validate(struct dentry * dentry, int flags)
 		if (!res)
 			res = ncp_obtain_info(server, dir, __name, &(finfo.i));
 	}
+	finfo.volume = finfo.i.volNumber;
 	DDPRINTK("ncp_lookup_validate: looked for %s/%s, res=%d\n",
 		dentry->d_parent->d_name.name, __name, res);
 	/*
@@ -670,6 +671,7 @@ ncp_read_volume_list(struct file *filp, void *dirent, filldir_t filldir,
 				info.volume_name);
 			continue;
 		}
+		entry.volume = entry.i.volNumber;
 		if (!ncp_fill_cache(filp, dirent, filldir, ctl, &entry))
 			return;
 	}
@@ -704,6 +706,7 @@ ncp_do_readdir(struct file *filp, void *dirent, filldir_t filldir,
 			DPRINTK("ncp_do_readdir: search failed, err=%d\n", err);
 			return;
 		}
+		entry.volume = entry.i.volNumber;
 		if (!ncp_fill_cache(filp, dirent, filldir, ctl, &entry))
 			return;
 	}
@@ -788,6 +791,7 @@ static struct dentry *ncp_lookup(struct inode *dir, struct dentry *dentry)
 	 */
 	finfo.opened = 0;
 	finfo.ino = iunique(dir->i_sb, 2);
+	finfo.volume = finfo.i.volNumber;
 	error = -EACCES;
 	inode = ncp_iget(dir->i_sb, &finfo);
 

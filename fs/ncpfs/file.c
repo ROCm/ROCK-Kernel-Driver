@@ -51,12 +51,10 @@ int ncp_make_open(struct inode *inode, int right)
 		struct ncp_entry_info finfo;
 		int result;
 
-		finfo.i.dirEntNum = NCP_FINFO(inode)->dirEntNum;
-		finfo.i.volNumber = NCP_FINFO(inode)->volNumber;
 		/* tries max. rights */
 		finfo.access = O_RDWR;
 		result = ncp_open_create_file_or_subdir(NCP_SERVER(inode),
-					NULL, NULL, OC_MODE_OPEN,
+					inode, NULL, OC_MODE_OPEN,
 					0, AR_READ | AR_WRITE, &finfo);
 		if (!result)
 			goto update;
@@ -65,13 +63,13 @@ int ncp_make_open(struct inode *inode, int right)
 			case O_RDONLY:
 				finfo.access = O_RDONLY;
 				result = ncp_open_create_file_or_subdir(NCP_SERVER(inode),
-					NULL, NULL, OC_MODE_OPEN,
+					inode, NULL, OC_MODE_OPEN,
 					0, AR_READ, &finfo);
 				break;
 			case O_WRONLY:
 				finfo.access = O_WRONLY;
 				result = ncp_open_create_file_or_subdir(NCP_SERVER(inode),
-					NULL, NULL, OC_MODE_OPEN,
+					inode, NULL, OC_MODE_OPEN,
 					0, AR_WRITE, &finfo);
 				break;
 		}

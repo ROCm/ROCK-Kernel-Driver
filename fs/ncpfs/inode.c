@@ -103,13 +103,9 @@ void ncp_update_inode(struct inode *inode, struct ncp_entry_info *nwinfo)
 {
 	NCP_FINFO(inode)->DosDirNum = nwinfo->i.DosDirNum;
 	NCP_FINFO(inode)->dirEntNum = nwinfo->i.dirEntNum;
-	NCP_FINFO(inode)->volNumber = nwinfo->i.volNumber;
+	NCP_FINFO(inode)->volNumber = nwinfo->volume;
 
-#ifdef CONFIG_NCPFS_STRONG
 	NCP_FINFO(inode)->nwattr = nwinfo->i.attributes;
-#else
-	NCP_FINFO(inode)->nwattr = nwinfo->i.attributes;
-#endif
 	NCP_FINFO(inode)->access = nwinfo->access;
 	memcpy(NCP_FINFO(inode)->file_handle, nwinfo->file_handle,
 			sizeof(nwinfo->file_handle));
@@ -478,7 +474,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 #ifdef CONFIG_NCPFS_SMALLDOS
 	finfo.i.NSCreator	= NW_NS_DOS;
 #endif
-	finfo.i.volNumber	= NCP_NUMBER_OF_VOLUMES + 1;	/* illegal volnum */
+	finfo.volume		= NCP_NUMBER_OF_VOLUMES;
 	/* set dates of mountpoint to Jan 1, 1986; 00:00 */
 	finfo.i.creationTime	= finfo.i.modifyTime
 				= cpu_to_le16(0x0000);
@@ -491,7 +487,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	finfo.opened		= 0;
 	finfo.ino		= 2;	/* tradition */
 
-	server->name_space[finfo.i.volNumber] = NW_NS_DOS;
+	server->name_space[finfo.volume] = NW_NS_DOS;
 
 	error = -ENOMEM;
         root_inode = ncp_iget(sb, &finfo);

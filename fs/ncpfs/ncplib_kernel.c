@@ -640,15 +640,12 @@ int ncp_open_create_file_or_subdir(struct ncp_server *server,
 				   struct ncp_entry_info *target)
 {
 	__u16 search_attribs = ntohs(0x0600);
-	__u8  volnum = target->i.volNumber;
-	__u32 dirent = target->i.dirEntNum;
+	__u8  volnum;
+	__u32 dirent;
 	int result;
 
-	if (dir)
-	{
-		volnum = NCP_FINFO(dir)->volNumber;
-		dirent = NCP_FINFO(dir)->dirEntNum;
-	}
+	volnum = NCP_FINFO(dir)->volNumber;
+	dirent = NCP_FINFO(dir)->dirEntNum;
 
 	if ((create_attributes & aDIR) != 0) {
 		search_attribs |= ntohs(0x0080);
@@ -672,6 +669,7 @@ int ncp_open_create_file_or_subdir(struct ncp_server *server,
 
 	/* in target there's a new finfo to fill */
 	ncp_extract_file_info(ncp_reply_data(server, 6), &(target->i));
+	target->volume = target->i.volNumber;
 	ConvertToNWfromDWORD(ncp_reply_dword(server, 0), target->file_handle);
 
 out:

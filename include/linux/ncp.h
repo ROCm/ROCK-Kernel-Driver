@@ -44,7 +44,7 @@ struct ncp_reply_header {
 };
 
 #define NCP_VOLNAME_LEN (16)
-#define NCP_NUMBER_OF_VOLUMES (64)
+#define NCP_NUMBER_OF_VOLUMES (256)
 struct ncp_volume_info {
 	__u32 total_blocks;
 	__u32 free_blocks;

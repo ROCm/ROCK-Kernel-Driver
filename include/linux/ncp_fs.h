@@ -182,6 +182,7 @@ struct ncp_entry_info {
 	ino_t			ino;
 	int			opened;
 	int			access;
+	unsigned int		volume;
 	__u8			file_handle[6];
 };
 
