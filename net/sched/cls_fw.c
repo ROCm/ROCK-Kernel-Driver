@@ -395,11 +395,9 @@ static int fw_dump(struct tcf_proto *tp, unsigned long fh,
 	}
 #else /* CONFIG_NET_CLS_ACT */
 #ifdef CONFIG_NET_CLS_POLICE
-	if (f->police) {
-		if (qdisc_copy_stats(skb, &f->police->stats,
-			f->police->stats_lock))
+	if (f->police)
+		if (tcf_police_dump_stats(skb, f->police) < 0)
 			goto rtattr_failure;
-	}
 #endif /* CONFIG_NET_CLS_POLICE */
 #endif /* CONFIG_NET_CLS_ACT */
 	return skb->len;

@@ -775,11 +775,9 @@ static int u32_dump(struct tcf_proto *tp, unsigned long fh,
 	}
 #else
 #ifdef CONFIG_NET_CLS_POLICE
-	if (TC_U32_KEY(n->handle) && n->police) {
-		if (qdisc_copy_stats(skb, &n->police->stats,
-				     n->police->stats_lock))
+	if (TC_U32_KEY(n->handle) && n->police)
+		if (tcf_police_dump_stats(skb, n->police) < 0)
 			goto rtattr_failure;
-	}
 #endif
 #endif
 	return skb->len;
