@@ -329,6 +329,9 @@ struct usb_device {
 
 	int maxchild;			/* Number of ports if hub */
 	struct usb_device *children[USB_MAXCHILDREN];
+	char *static_vendor;
+	char *static_product;
+	char *static_serial;
 };
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 

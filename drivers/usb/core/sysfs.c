@@ -72,7 +72,9 @@ static ssize_t  show_##name(struct device *dev, char *buf)		\
 	int len;							\
 									\
 	udev = to_usb_device (dev);					\
-	len = usb_string(udev, udev->descriptor.field, buf, PAGE_SIZE);	\
+	if (!udev->field)						\
+		return 0;						\
+	len = snprintf(buf, 256, "%s", udev->field);			\
 	if (len < 0)							\
 		return 0;						\
 	buf[len] = '\n';						\
@@ -81,9 +83,9 @@ static ssize_t  show_##name(struct device *dev, char *buf)		\
 }									\
 static DEVICE_ATTR(name, S_IRUGO, show_##name, NULL);
 
-usb_string_attr(product, iProduct);
-usb_string_attr(manufacturer, iManufacturer);
-usb_string_attr(serial, iSerialNumber);
+usb_string_attr(product, static_product);     /* iProduct */
+usb_string_attr(manufacturer, static_vendor); /* iManufacturer */
+usb_string_attr(serial, static_serial);       /* iSerialNumber */
 
 static ssize_t
 show_speed (struct device *dev, char *buf)
