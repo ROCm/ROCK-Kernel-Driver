@@ -907,22 +907,23 @@ static int vgacon_adjust_height(struct vc_data *vc, unsigned fontheight)
 	return 0;
 }
 
-static int vgacon_font_set(struct vc_data *c, struct console_font_op *op)
+static int vgacon_font_set(struct vc_data *c, struct console_font *font, unsigned flags)
 {
+	unsigned charcount = font->charcount;
 	int rc;
 
 	if (vga_video_type < VIDEO_TYPE_EGAM)
 		return -EINVAL;
 
-	if (op->width != 8 || (op->charcount != 256 && op->charcount != 512))
+	if (font->width != 8 || (charcount != 256 && charcount != 512))
 		return -EINVAL;
 
-	rc = vgacon_do_font_op(&state, op->data, 1, op->charcount == 512);
+	rc = vgacon_do_font_op(&state, font->data, 1, charcount == 512);
 	if (rc)
 		return rc;
 
-	if (!(op->flags & KD_FONT_FLAG_DONT_RECALC))
-		rc = vgacon_adjust_height(c, op->height);
+	if (!(flags & KD_FONT_FLAG_DONT_RECALC))
+		rc = vgacon_adjust_height(c, font->height);
 	return rc;
 }
 

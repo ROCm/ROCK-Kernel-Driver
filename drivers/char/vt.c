@@ -3081,14 +3081,12 @@ out:
 
 int con_font_set(int currcons, struct console_font_op *op)
 {
-	struct console_font_op old_op;
+	struct console_font font;
 	int rc = -EINVAL;
 	int size;
-	u8 *temp;
 
 	if (vt_cons[currcons]->vc_mode != KD_TEXT)
 		return -EINVAL;
-	memcpy(&old_op, op, sizeof(old_op));
 	if (!op->data)
 		return -EINVAL;
 	if (op->charcount > 512)
@@ -3113,28 +3111,28 @@ int con_font_set(int currcons, struct console_font_op *op)
 	nonzero:
 		op->height = h;
 	}
-	if (op->width > 32 || op->height > 32)
+	if (op->width <= 0 || op->width > 32 || op->height > 32)
 		return -EINVAL;
 	size = (op->width+7)/8 * 32 * op->charcount;
 	if (size > max_font_size)
 		return -ENOSPC;
-	temp = kmalloc(size, GFP_KERNEL);
-	if (!temp)
+	font.charcount = op->charcount;
+	font.height = op->height;
+	font.width = op->width;
+	font.data = kmalloc(size, GFP_KERNEL);
+	if (!font.data)
 		return -ENOMEM;
-	if (copy_from_user(temp, op->data, size)) {
-		rc = -EFAULT;
-		goto out;
+	if (copy_from_user(font.data, op->data, size)) {
+		kfree(font.data);
+		return -EFAULT;
 	}
-	op->data = temp;
 	acquire_console_sem();
 	if (sw->con_font_set)
-		rc = sw->con_font_set(vc_cons[currcons].d, op);
+		rc = sw->con_font_set(vc_cons[currcons].d, &font, op->flags);
 	else
 		rc = -ENOSYS;
 	release_console_sem();
-	op->data = old_op.data;
-out:
-	kfree(temp);
+	kfree(font.data);
 	return rc;
 }
 

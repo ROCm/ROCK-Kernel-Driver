@@ -2180,16 +2180,25 @@ static int fbcon_copy_font(struct vc_data *vc, int con)
 	return fbcon_do_set_font(vc, &crap, od->fontdata, od->userfont);
 }
 
-static int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
+/*
+ *  User asked to set font; we are guaranteed that
+ *	a) width and height are in range 1..32
+ *	b) charcount does not exceed 512
+ */
+
+static int fbcon_set_font(struct vc_data *vc, struct console_font *font, unsigned flags)
 {
-	int w = op->width;
-	int h = op->height;
+	unsigned charcount = font->charcount;
+	int w = font->width;
+	int h = font->height;
 	int size = h;
 	int i, k;
-	u8 *new_data, *data = op->data, *p;
+	u8 *new_data, *data = font->data, *p;
+	struct console_font_op crap = {.width = font->width,
+				       .height = font->height, 
+				       .op = KD_FONT_OP_SET};
 
-	if ((w <= 0) || (w > 32)
-	    || (op->charcount != 256 && op->charcount != 512))
+	if (charcount != 256 && charcount != 512)
 		return -EINVAL;
 
 	if (w > 8) {
@@ -2198,32 +2207,33 @@ static int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 		else
 			size *= 4;
 	}
-	size *= op->charcount;
+	size *= charcount;
 
-	if (!
-	    (new_data =
-	     kmalloc(FONT_EXTRA_WORDS * sizeof(int) + size, GFP_USER)))
+	new_data = kmalloc(FONT_EXTRA_WORDS * sizeof(int) + size, GFP_USER);
+
+	if (!new_data)
 		return -ENOMEM;
+
 	new_data += FONT_EXTRA_WORDS * sizeof(int);
 	FNTSIZE(new_data) = size;
-	FNTCHARCNT(new_data) = op->charcount;
+	FNTCHARCNT(new_data) = charcount;
 	REFCOUNT(new_data) = 0;	/* usage counter */
 	p = new_data;
 	if (w <= 8) {
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < charcount; i++) {
 			memcpy(p, data, h);
 			data += 32;
 			p += h;
 		}
 	} else if (w <= 16) {
 		h *= 2;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < charcount; i++) {
 			memcpy(p, data, h);
 			data += 64;
 			p += h;
 		}
 	} else if (w <= 24) {
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < charcount; i++) {
 			int j;
 			for (j = 0; j < h; j++) {
 				memcpy(p, data, 3);
@@ -2235,7 +2245,7 @@ static int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 		}
 	} else {
 		h *= 4;
-		for (i = 0; i < op->charcount; i++) {
+		for (i = 0; i < charcount; i++) {
 			memcpy(p, data, h);
 			data += 128;
 			p += h;
@@ -2265,7 +2275,7 @@ static int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 			break;
 		}
 	}
-	return fbcon_do_set_font(vc, op, new_data, 1);
+	return fbcon_do_set_font(vc, &crap, new_data, 1);
 }
 
 static int fbcon_set_def_font(struct vc_data *vc, struct console_font *font, char *name)

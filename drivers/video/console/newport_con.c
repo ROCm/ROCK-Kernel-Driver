@@ -477,7 +477,7 @@ static int newport_blank(struct vc_data *c, int blank)
 	return 1;
 }
 
-static int newport_set_font(int unit, struct console_font_op *op)
+static int newport_set_font(int unit, struct console_font *op)
 {
 	int w = op->width;
 	int h = op->height;
@@ -548,9 +548,9 @@ static int newport_font_default(struct vc_data *vc, struct console_font *op, cha
 	return newport_set_def_font(vc->vc_num, op);
 }
 
-static int newport_font_set(struct vc_data *vc, struct console_font_op *op)
+static int newport_font_set(struct vc_data *vc, struct console_font *font, unsigned flags)
 {
-	return newport_set_font(vc->vc_num, op);
+	return newport_set_font(vc->vc_num, font);
 }
 
 static int newport_set_palette(struct vc_data *vc, unsigned char *table)
