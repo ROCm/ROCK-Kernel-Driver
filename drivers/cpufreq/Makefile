@@ -1,3 +1,6 @@
+# CPUfreq core
+obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o
+
 # CPUfreq governors 
 obj-$(CONFIG_CPU_FREQ_GOV_USERSPACE)	+= userspace.o
 
