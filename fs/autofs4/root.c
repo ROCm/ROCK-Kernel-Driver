@@ -673,6 +673,23 @@ static inline int autofs4_get_protosubver(struct autofs_sb_info *sbi, int *p)
 	return put_user(sbi->sub_version, p);
 }
 
+/*
+* Tells the daemon whether it can umount the autofs mount.
+*/
+static inline int autofs4_ask_umount(struct vfsmount *mnt, int *p)
+{
+	int status = 0;
+
+	if (may_umount(mnt) == 0)
+		status = 1;
+
+	DPRINTK(("autofs_ask_umount: returning %d\n", status));
+
+	status = put_user(status, p);
+
+	return status;
+}
+
 /* Identify autofs4_dentries - this is so we can tell if there's
    an extra dentry refcount or not.  We only hold a refcount on the
    dentry if its non-negative (ie, d_inode != NULL)
@@ -718,6 +735,9 @@ static int autofs4_root_ioctl(struct inode *inode, struct file *filp,
 		return autofs4_get_protosubver(sbi, (int *)arg);
 	case AUTOFS_IOC_SETTIMEOUT:
 		return autofs4_get_set_timeout(sbi,(unsigned long *)arg);
+
+	case AUTOFS_IOC_ASKUMOUNT:
+		return autofs4_ask_umount(filp->f_vfsmnt, (int *) arg);
 
 	/* return a single thing to expire */
 	case AUTOFS_IOC_EXPIRE:
