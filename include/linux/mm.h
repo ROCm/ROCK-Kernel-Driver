@@ -466,20 +466,7 @@ static inline int is_page_cache_freeable(struct page * page)
 	return page_count(page) - !!page->buffers == 1;
 }
 
-/*
- * Work out if there are any other processes sharing this
- * swap cache page. Never mind the buffers.
- */
-static inline int exclusive_swap_page(struct page *page)
-{
-	if (!PageLocked(page))
-		BUG();
-	if (!PageSwapCache(page))
-		return 0;
-	if (page_count(page) - !!page->buffers != 2)	/* 2: us + cache */
-		return 0;
-	return swap_count(page) == 1;			/* 1: just cache */
-}
+extern int remove_exclusive_swap_page(struct page *);
 
 extern void __free_pte(pte_t);
 

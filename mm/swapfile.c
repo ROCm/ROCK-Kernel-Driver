@@ -224,6 +224,50 @@ void swap_free(swp_entry_t entry)
 }
 
 /*
+ * Work out if there are any other processes sharing this
+ * swap cache page. Free it if you can. Return success.
+ */
+int remove_exclusive_swap_page(struct page *page)
+{
+	int retval;
+	struct swap_info_struct * p;
+	swp_entry_t entry;
+
+	if (!PageLocked(page))
+		BUG();
+	if (!PageSwapCache(page))
+		return 0;
+	if (page_count(page) - !!page->buffers != 2)	/* 2: us + cache */
+		return 0;
+
+	entry.val = page->index;
+	p = swap_info_get(entry);
+	if (!p)
+		return 0;
+
+	/* Is the only swap cache user the cache itself? */
+	retval = 0;
+	if (p->swap_map[SWP_OFFSET(entry)] == 1) {
+		/* Recheck the page count with the pagecache lock held.. */
+		spin_lock(&pagecache_lock);
+		if (page_count(page) - !!page->buffers == 2) {
+			__delete_from_swap_cache(page);
+			retval = 1;
+		}
+		spin_unlock(&pagecache_lock);
+	}
+	swap_info_put(p);
+
+	if (retval) {
+		block_flushpage(page, 0);
+		swap_free(entry);
+		page_cache_release(page);
+	}
+
+	return retval;
+}
+
+/*
  * Free the swap entry like above, but also try to
  * free the page cache entry if it is the last user.
  */
@@ -242,7 +286,7 @@ void free_swap_and_cache(swp_entry_t entry)
 		page_cache_get(page);
 		delete_from_swap_cache(page);
 		UnlockPage(page);
-		free_lru_page(page);
+		page_cache_release(page);
 	}
 }
 
@@ -582,7 +626,7 @@ static int try_to_unuse(unsigned int type)
 		 */
 		SetPageDirty(page);
 		UnlockPage(page);
-		free_lru_page(page);
+		page_cache_release(page);
 
 		/*
 		 * Make sure that we aren't completely killing

@@ -137,11 +137,10 @@ void free_page_and_swap_cache(struct page *page)
 	 * 					- Marcelo
 	 */
 	if (PageSwapCache(page) && !TryLockPage(page)) {
-		if (exclusive_swap_page(page))
-			delete_from_swap_cache(page);
+		remove_exclusive_swap_page(page);
 		UnlockPage(page);
 	}
-	free_lru_page(page);
+	page_cache_release(page);
 }
 
 /*

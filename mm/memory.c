@@ -939,9 +939,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		if (TryLockPage(old_page))
 			break;
 		/* Recheck swapcachedness once the page is locked */
-		can_reuse = exclusive_swap_page(old_page);
-		if (can_reuse)
-			delete_from_swap_cache(old_page);
+		can_reuse = remove_exclusive_swap_page(old_page);
 		UnlockPage(old_page);
 		if (!can_reuse)
 			break;
@@ -965,7 +963,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (!new_page)
 		goto no_mem;
 	copy_cow_page(old_page,new_page,address);
-	free_lru_page(old_page);
+	page_cache_release(old_page);
 
 	/*
 	 * Re-check the pte - we dropped the lock
@@ -981,7 +979,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		new_page = old_page;
 	}
 	spin_unlock(&mm->page_table_lock);
-	free_lru_page(new_page);
+	page_cache_release(new_page);
 	return 1;	/* Minor fault */
 
 bad_wp_page:
@@ -989,7 +987,7 @@ bad_wp_page:
 	printk("do_wp_page: bogus page at address %08lx (page 0x%lx)\n",address,(unsigned long)old_page);
 	return -1;
 no_mem:
-	free_lru_page(old_page);
+	page_cache_release(old_page);
 	return -1;
 }
 
@@ -1150,7 +1148,6 @@ static int do_swap_page(struct mm_struct * mm,
 	 */
 	spin_lock(&mm->page_table_lock);
 	if (!pte_same(*page_table, orig_pte)) {
-		UnlockPage(page);
 		page_cache_release(page);
 		spin_unlock(&mm->page_table_lock);
 		return 1;
@@ -1283,7 +1280,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		set_pte(page_table, entry);
 	} else {
 		/* One of our sibling threads was faster, back out. */
-		free_lru_page(new_page);
+		page_cache_release(new_page);
 		spin_unlock(&mm->page_table_lock);
 		return 1;
 	}
