@@ -51,7 +51,7 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int external_amp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int thinkpad[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int mmap_valid[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int mmap_valid[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for the CS46xx soundcard.");
@@ -70,7 +70,7 @@ MODULE_PARM_DESC(thinkpad, "Force to enable Thinkpad's CLKRUN control.");
 MODULE_PARM_SYNTAX(thinkpad, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 MODULE_PARM(mmap_valid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(mmap_valid, "Support OSS mmap.");
-MODULE_PARM_SYNTAX(mmap_valid, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM_SYNTAX(mmap_valid, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 
 static struct pci_device_id snd_cs46xx_ids[] = {
         { 0x1013, 0x6001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* CS4280 */
@@ -219,7 +219,7 @@ module_exit(alsa_card_cs46xx_exit)
 
 #ifndef MODULE
 
-/* format is: snd-cs46xx=enable,index,id */
+/* format is: snd-cs46xx=enable,index,id,mmap_valid,external_amp,thinkpad */
 
 static int __init alsa_card_cs46xx_setup(char *str)
 {
@@ -229,7 +229,10 @@ static int __init alsa_card_cs46xx_setup(char *str)
 		return 0;
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2);
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&mmap_valid[nr_dev]) == 2 &&
+	       get_option(&str,&external_amp[nr_dev]) == 2 &&
+	       get_option(&str,&thinkpad[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

@@ -11,13 +11,14 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#ifndef _VIO_H
-#define _VIO_H
+#ifndef _ASM_VIO_H
+#define _ASM_VIO_H
 
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/device.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 #include <asm/scatterlist.h>
@@ -137,4 +138,9 @@ static inline struct vio_dev *to_vio_dev(struct device *dev)
 	return container_of(dev, struct vio_dev, dev);
 }
 
-#endif /* _PHYP_H */
+static inline int vio_dma_mapping_error(dma_addr_t dma_addr)
+{
+	return dma_mapping_error(dma_addr);
+}
+
+#endif /* _ASM_VIO_H */

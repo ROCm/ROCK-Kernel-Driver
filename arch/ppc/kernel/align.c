@@ -325,14 +325,18 @@ fix_alignment(struct pt_regs *regs)
 	 * the kernel with -msoft-float so it doesn't use the
 	 * fp regs for copying 8-byte objects. */
 	case LD+F+S:
+		preempt_disable();
 		enable_kernel_fp();
 		cvt_fd(&data.f, &current->thread.fpr[reg], &current->thread.fpscr);
 		/* current->thread.fpr[reg] = data.f; */
+		preempt_enable();
 		break;
 	case ST+F+S:
+		preempt_disable();
 		enable_kernel_fp();
 		cvt_df(&current->thread.fpr[reg], &data.f, &current->thread.fpscr);
 		/* data.f = current->thread.fpr[reg]; */
+		preempt_enable();
 		break;
 	default:
 		printk("align: can't handle flags=%x\n", flags);

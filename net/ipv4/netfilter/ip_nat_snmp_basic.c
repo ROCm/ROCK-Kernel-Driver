@@ -899,10 +899,10 @@ static unsigned char snmp_trap_decode(struct asn1_ctx *ctx,
 		goto err_addr_free;
 		
 	if (cls != ASN1_UNI || con != ASN1_PRI || tag != ASN1_INT)
-		goto err_addr_free;;
+		goto err_addr_free;
 		
 	if (!asn1_uint_decode(ctx, end, &trap->general))
-		goto err_addr_free;;
+		goto err_addr_free;
 		
 	if (!asn1_header_decode(ctx, &end, &cls, &con, &tag))
 		goto err_addr_free;

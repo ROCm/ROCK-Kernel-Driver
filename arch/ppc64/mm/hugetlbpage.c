@@ -190,6 +190,9 @@ static hugepte_t *hugepte_offset(struct mm_struct *mm, unsigned long addr)
 	BUG_ON(!in_hugepage_area(mm->context, addr));
 
 	pgd = pgd_offset(mm, addr);
+	if (pgd_none(*pgd))
+		return NULL;
+
 	pmd = pmd_offset(pgd, addr);
 
 	/* We shouldn't find a (normal) PTE page pointer here */
@@ -250,8 +253,11 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 	/* Check no VMAs are in the region */
 	vma = find_vma(mm, TASK_HPAGE_BASE_32);
 
-	if (vma && (vma->vm_start < TASK_HPAGE_END_32))
+	if (vma && (vma->vm_start < TASK_HPAGE_END_32)) {
+		printk(KERN_DEBUG "Low HTLB region busy: PID=%d  vma @ %lx-%lx\n",
+		       current->pid, vma->vm_start, vma->vm_end);
 		return -EBUSY;
+	}
 
 	/* Clean up any leftover PTE pages in the region */
 	spin_lock(&mm->page_table_lock);
@@ -290,6 +296,16 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 	on_each_cpu(do_slbia, NULL, 0, 1);
 
 	return 0;
+}
+
+int prepare_hugepage_range(unsigned long addr, unsigned long len)
+{
+	if (is_hugepage_high_range(addr, len))
+		return 0;
+	else if (is_hugepage_low_range(addr, len))
+		return open_32bit_htlbpage_range(current->mm);
+
+	return -EINVAL;
 }
 
 int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
@@ -910,6 +926,12 @@ int hugetlb_report_meminfo(char *buf)
 int is_hugepage_mem_enough(size_t size)
 {
 	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= htlbpage_free;
+}
+
+/* Return the number pages of memory we physically have, in PAGE_SIZE units. */
+unsigned long hugetlb_total_pages(void)
+{
+	return htlbpage_total * (HPAGE_SIZE / PAGE_SIZE);
 }
 
 /*

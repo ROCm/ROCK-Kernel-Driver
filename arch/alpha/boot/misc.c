@@ -25,7 +25,7 @@
 #define memzero(s,n)	memset ((s),0,(n))
 #define puts		srm_printk
 extern long srm_printk(const char *, ...)
-     __attribute__ ((format (printf, 1, 2)));;
+     __attribute__ ((format (printf, 1, 2)));
 
 /*
  * gzip delarations

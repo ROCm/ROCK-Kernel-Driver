@@ -1320,7 +1320,7 @@ static int rme96xx_ioctl(struct inode *in, struct file *file, unsigned int cmd, 
 		count = rme96xx_getispace(dma,val);
 
 		abinfo.fragsize = (s->fragsize*dma->inchannels)>>dma->formatshift;
-                abinfo.bytes = (count*dma->inchannels)>>dma->formatshift;;
+                abinfo.bytes = (count*dma->inchannels)>>dma->formatshift;
                 abinfo.fragstotal = 2;
                 abinfo.fragments = count > s->fragsize; 
 		return copy_to_user((void *)arg, &abinfo, sizeof(abinfo)) ? -EFAULT : 0;
@@ -1348,7 +1348,7 @@ static int rme96xx_ioctl(struct inode *in, struct file *file, unsigned int cmd, 
 			return -EINVAL;
 		val = rme96xx_gethwptr(dma->s,0);
 		spin_lock_irqsave(&s->lock,flags);
-                cinfo.bytes = s->fragsize<<1;;
+                cinfo.bytes = s->fragsize<<1;
 		count = val - dma->readptr;
 		if (count < 0)
 			count += s->fragsize<<1;
@@ -1368,7 +1368,7 @@ static int rme96xx_ioctl(struct inode *in, struct file *file, unsigned int cmd, 
 			return -EINVAL;
 		val = rme96xx_gethwptr(dma->s,0);
 		spin_lock_irqsave(&s->lock,flags);
-                cinfo.bytes = s->fragsize<<1;;
+                cinfo.bytes = s->fragsize<<1;
 		count = val - dma->writeptr;
 		if (count < 0)
 			count += s->fragsize<<1;

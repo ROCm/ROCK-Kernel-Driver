@@ -281,7 +281,7 @@ static void i810_load_vgax(struct i810fb_par *par)
 static void i810_load_2d(struct i810fb_par *par)
 {
 	u32 tmp;
-	u8 tmp8, *mmio = par->mmio_start_virtual;;
+	u8 tmp8, *mmio = par->mmio_start_virtual;
 
   	i810_writel(FW_BLC, mmio, par->watermark); 
 	tmp = i810_readl(PIXCONF, mmio);

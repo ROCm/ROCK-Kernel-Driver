@@ -1128,9 +1128,9 @@ do_sys_sigstack(struct sigstack __user *ssptr, struct sigstack __user *ossptr,
 
 	/* Now see if we want to update the new state. */
 	if (ssptr) {
-		void *ss_sp;
+		char *ss_sp;
 
-		if (get_user((long)ss_sp, &ssptr->the_stack))
+		if (get_user(ss_sp, &ssptr->the_stack))
 			goto out;
 		/* If the current stack was set with sigaltstack, don't
 		   swap stacks while we are on it.  */

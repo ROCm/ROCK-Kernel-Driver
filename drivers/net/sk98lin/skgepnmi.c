@@ -7684,7 +7684,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
 			 to the low-power state.
 			 A miniport driver must always return NDIS_STATUS_SUCCESS
 			 to a query of OID_PNP_QUERY_POWER. */
-			*pLen = sizeof(SK_DEVICE_POWER_STATE);;
+			*pLen = sizeof(SK_DEVICE_POWER_STATE);
             RetCode = SK_PNMI_ERR_OK;
 			break;
 

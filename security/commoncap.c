@@ -22,6 +22,7 @@
 #include <linux/netlink.h>
 #include <linux/ptrace.h>
 #include <linux/xattr.h>
+#include <linux/hugetlb.h>
 
 int cap_capable (struct task_struct *tsk, int cap)
 {
@@ -358,7 +359,8 @@ int cap_vm_enough_memory(long pages)
 		return -ENOMEM;
 	}
 
-	allowed = totalram_pages * sysctl_overcommit_ratio / 100;
+	allowed = (totalram_pages - hugetlb_total_pages())
+	       	* sysctl_overcommit_ratio / 100;
 	allowed += total_swap_pages;
 
 	if (atomic_read(&vm_committed_space) < allowed)

@@ -428,7 +428,7 @@ struct _snd_pcm_str {
 	snd_info_entry_t *proc_root;
 	snd_info_entry_t *proc_info_entry;
 #ifdef CONFIG_SND_DEBUG
-	unsigned int xrun_debug: 1;
+	unsigned int xrun_debug;	/* 0 = disabled, 1 = verbose, 2 = stacktrace */
 	snd_info_entry_t *proc_xrun_debug_entry;
 #endif
 };

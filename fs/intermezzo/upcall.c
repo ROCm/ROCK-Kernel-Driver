@@ -142,7 +142,10 @@ int izo_upc_kml(int minor, __u64 offset, __u32 first_recno, __u64 length, __u32 
 
         CDEBUG(D_UPCALL, "KML: fileset %s, offset %Lu, length %Lu, "
                "first %u, last %d; minor %d\n",
-               fsetname, hdr->u_offset, hdr->u_length, hdr->u_first_recno,
+               fsetname,
+               (unsigned long long) hdr->u_offset,
+               (unsigned long long) hdr->u_length,
+               hdr->u_first_recno,
                hdr->u_last_recno, minor);
 
         error = izo_upc_upcall(minor, &size, hdr, ASYNCHRONOUS);
@@ -174,7 +177,9 @@ int izo_upc_kml_truncate(int minor, __u64 length, __u32 last_recno, char *fsetna
 
         CDEBUG(D_UPCALL, "KML TRUNCATE: fileset %s, length %Lu, "
                "last recno %d, minor %d\n",
-               fsetname, hdr->u_length, hdr->u_last_recno, minor);
+               fsetname,
+               (unsigned long long) hdr->u_length,
+               hdr->u_last_recno, minor);
 
         error = izo_upc_upcall(minor, &size, hdr, ASYNCHRONOUS);
 

@@ -1342,7 +1342,7 @@ static int one_time_init(void)
 	cpqhp_rom_start = ioremap(ROM_PHY_ADDR, ROM_PHY_LEN);
 	if (!cpqhp_rom_start) {
 		err ("Could not ioremap memory region for ROM\n");
-		retval = -EIO;;
+		retval = -EIO;
 		goto error;
 	}
 	
@@ -1353,14 +1353,14 @@ static int one_time_init(void)
 	smbios_table = detect_SMBIOS_pointer(cpqhp_rom_start, cpqhp_rom_start + ROM_PHY_LEN);
 	if (!smbios_table) {
 		err ("Could not find the SMBIOS pointer in memory\n");
-		retval = -EIO;;
+		retval = -EIO;
 		goto error;
 	}
 
 	smbios_start = ioremap(readl(smbios_table + ST_ADDRESS), readw(smbios_table + ST_LENGTH));
 	if (!smbios_start) {
 		err ("Could not ioremap memory region taken from SMBIOS values\n");
-		retval = -EIO;;
+		retval = -EIO;
 		goto error;
 	}
 

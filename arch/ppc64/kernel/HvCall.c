@@ -19,7 +19,7 @@ void HvCall_writeLogBuffer(const void *buffer, u64 len)
 {
 	struct HvLpBufferList hv_buf;
 	u64 left_this_page;
-	u64 cur = virt_to_absolute((unsigned long)buffer);
+	u64 cur = virt_to_abs(buffer);
 
 	while (len) {
 		hv_buf.addr = cur;
@@ -29,7 +29,7 @@ void HvCall_writeLogBuffer(const void *buffer, u64 len)
 		hv_buf.len = left_this_page;
 		len -= left_this_page;
 		HvCall2(HvCallBaseWriteLogBuffer,
-				virt_to_absolute((unsigned long)&hv_buf),
+				virt_to_abs(&hv_buf),
 				left_this_page);
 		cur = (cur & PAGE_MASK) + PAGE_SIZE;
 	}

@@ -37,7 +37,7 @@ void snd_seq_oss_synth_setup_midi(seq_oss_devinfo_t *dp);
 void snd_seq_oss_synth_cleanup(seq_oss_devinfo_t *dp);
 
 void snd_seq_oss_synth_reset(seq_oss_devinfo_t *dp, int dev);
-int snd_seq_oss_synth_load_patch(seq_oss_devinfo_t *dp, int dev, int fmt, const char *buf, int p, int c);
+int snd_seq_oss_synth_load_patch(seq_oss_devinfo_t *dp, int dev, int fmt, const char __user *buf, int p, int c);
 int snd_seq_oss_synth_is_valid(seq_oss_devinfo_t *dp, int dev);
 int snd_seq_oss_synth_sysex(seq_oss_devinfo_t *dp, int dev, unsigned char *buf, snd_seq_event_t *ev);
 int snd_seq_oss_synth_addr(seq_oss_devinfo_t *dp, int dev, snd_seq_event_t *ev);

@@ -162,7 +162,8 @@ static int reint_close(struct kml_rec *rec, struct file *file,
                          */
                         if (error == ENOENT) {
                                 CDEBUG(D_KML, "manually updating remote offset uuid %s"
-                                       "recno %d offset %Lu\n", info.uuid, info.recno, info.kml_offset);
+                                       "recno %d offset %Lu\n", info.uuid, info.recno,
+                                       (unsigned long long) info.kml_offset);
                                 error = izo_rcvd_upd_remote(fset, info.uuid, info.recno, info.kml_offset);
                                 if(error)
                                         CERROR("izo_rcvd_upd_remote error %d\n", error);
@@ -528,7 +529,7 @@ int kml_reint_rec(struct file *dir, struct izo_ioctl_data *data)
 
         if (rec.suffix->recno != lr_rec.lr_remote_recno + 1) {
                 CERROR("KML record number %Lu expected, not %d\n",
-                       lr_rec.lr_remote_recno + 1,
+                       (unsigned long long) (lr_rec.lr_remote_recno + 1),
                        rec.suffix->recno);
 
 #if 0
@@ -631,8 +632,9 @@ int izo_get_fileid(struct file *dir, struct izo_ioctl_data *data)
         data->ioc_generation = file->f_dentry->d_inode->i_generation; 
         filp_close(file, 0); 
 
-        CDEBUG(D_FILE, "%s ino %Lx, gen %Lx\n", rec.path, 
-               data->ioc_ino, data->ioc_generation);
+        CDEBUG(D_FILE, "%s ino %Lx, gen %Lx\n", rec.path,
+               (unsigned long long) data->ioc_ino,
+               (unsigned long long) data->ioc_generation);
 
  out:
         if (buf) 

@@ -59,6 +59,7 @@
 #include <net/af_unix.h>	/* for Unix socket types */
 #include <linux/parser.h>
 #include <linux/nfs_mount.h>
+#include <linux/hugetlb.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -1453,7 +1454,7 @@ static int selinux_quotactl(int cmds, int type, int id, struct super_block *sb)
 
 static int selinux_quota_on(struct file *f)
 {
-	return file_has_perm(current, f, FILE__QUOTAON);;
+	return file_has_perm(current, f, FILE__QUOTAON);
 }
 
 static int selinux_syslog(int type)
@@ -1544,7 +1545,8 @@ static int selinux_vm_enough_memory(long pages)
 		return -ENOMEM;
 	}
 
-	allowed = totalram_pages * sysctl_overcommit_ratio / 100;
+	allowed = (totalram_pages - hugetlb_total_pages())
+		* sysctl_overcommit_ratio / 100;
 	allowed += total_swap_pages;
 
 	if (atomic_read(&vm_committed_space) < allowed)

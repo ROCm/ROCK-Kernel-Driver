@@ -98,7 +98,7 @@ void mvme16x_free_irq(unsigned int irq, void *dev_id)
 		printk("%s: Removing probably wrong IRQ %d from %s\n",
 		       __FUNCTION__, irq, irq_tab[irq-64].devname);
 
-	irq_tab[irq-64].handler = mvme16x_defhand;;
+	irq_tab[irq-64].handler = mvme16x_defhand;
 	irq_tab[irq-64].flags   = IRQ_FLG_STD;
 	irq_tab[irq-64].dev_id  = NULL;
 	irq_tab[irq-64].devname = NULL;

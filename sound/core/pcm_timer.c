@@ -32,9 +32,9 @@
  */
 
 /* Greatest common divisor */
-static int gcd(int a, int b)
+static unsigned long gcd(unsigned long a, unsigned long b)
 {
-	int r;
+	unsigned long r;
 	if (a < b) {
 		r = a;
 		a = b;
@@ -49,7 +49,7 @@ static int gcd(int a, int b)
 
 void snd_pcm_timer_resolution_change(snd_pcm_substream_t *substream)
 {
-	unsigned int rate, mult, fsize, l;
+	unsigned long rate, mult, fsize, l;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	
         mult = 1000000000;
@@ -67,7 +67,11 @@ void snd_pcm_timer_resolution_change(snd_pcm_substream_t *substream)
 		mult /= 2;
 		rate /= 2;
 	}
-	snd_assert(rate != 0, return);
+	if (rate == 0) {
+		snd_printk(KERN_ERR "pcm timer resolution out of range (rate = %u, period_size = %lu)\n", runtime->rate, runtime->period_size);
+		runtime->timer_resolution = -1;
+		return;
+	}
 	runtime->timer_resolution = mult * fsize / rate;
 }
 

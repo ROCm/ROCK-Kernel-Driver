@@ -170,7 +170,7 @@ __set_personality(u_long personality)
 		fsp = copy_fs_struct(current->fs);
 		if (fsp == NULL) {
 			module_put(ep->module);
-			return -ENOMEM;;
+			return -ENOMEM;
 		}
 
 		task_lock(current);
@@ -213,7 +213,7 @@ get_exec_domain_list(char *page)
 asmlinkage long
 sys_personality(u_long personality)
 {
-	u_long old = current->personality;;
+	u_long old = current->personality;
 
 	if (personality != 0xffffffff) {
 		set_personality(personality);

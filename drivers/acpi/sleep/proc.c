@@ -99,7 +99,7 @@ static int acpi_system_alarm_seq_show(struct seq_file *seq, void *offset)
 	if (acpi_gbl_FADT->mon_alrm)
 		mo = CMOS_READ(acpi_gbl_FADT->mon_alrm);
 	else
-		mo = CMOS_READ(RTC_MONTH);;
+		mo = CMOS_READ(RTC_MONTH);
 	if (acpi_gbl_FADT->century)
 		yr = CMOS_READ(acpi_gbl_FADT->century) * 100 + CMOS_READ(RTC_YEAR);
 	else

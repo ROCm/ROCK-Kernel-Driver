@@ -701,7 +701,7 @@ ULONG *p_dst_len;
           /* been postponed for lack of bytes.                                */
           if (literals>0)
             {
-             register UBYTE *r=p_ziv-literals;;
+             register UBYTE *r=p_ziv-literals;
              hash[HASH(r)]=r;
              if (literals==2)
                 {r++; hash[HASH(r)]=r;}

@@ -536,6 +536,10 @@ linvfs_setattr(
 
 	if (ia_valid & (ATTR_MTIME_SET | ATTR_ATIME_SET))
 		flags = ATTR_UTIME;
+#ifdef ATTR_NO_BLOCK
+	if ((ia_valid & ATTR_NO_BLOCK))
+		flags |= ATTR_NONBLOCK;
+#endif
 
 	VOP_SETATTR(vp, &vattr, flags, NULL, error);
 	if (error)

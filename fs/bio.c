@@ -701,10 +701,11 @@ static int bio_pair_end_1(struct bio * bi, unsigned int done, int err)
 {
 	struct bio_pair *bp = container_of(bi, struct bio_pair, bio1);
 
-	if (bi->bi_size)
-		return 1;
 	if (err)
 		bp->error = err;
+
+	if (bi->bi_size)
+		return 1;
 
 	bio_pair_release(bp);
 	return 0;
@@ -714,10 +715,11 @@ static int bio_pair_end_2(struct bio * bi, unsigned int done, int err)
 {
 	struct bio_pair *bp = container_of(bi, struct bio_pair, bio2);
 
-	if (bi->bi_size)
-		return 1;
 	if (err)
 		bp->error = err;
+
+	if (bi->bi_size)
+		return 1;
 
 	bio_pair_release(bp);
 	return 0;

@@ -88,6 +88,7 @@ static inline void mrdemote(mrlock_t *mrp)
 	downgrade_write(&mrp->mr_lock);
 }
 
+#ifdef DEBUG
 /*
  * Debug-only routine, without some platform-specific asm code, we can
  * now only answer requests regarding whether we hold the lock for write
@@ -96,9 +97,10 @@ static inline void mrdemote(mrlock_t *mrp)
  */
 static inline int ismrlocked(mrlock_t *mrp, int type)
 {
-	if (type == MR_UPDATE)
+	if (mrp && type == MR_UPDATE)
 		return mrp->mr_writer;
 	return 1;
 }
+#endif
 
 #endif /* __XFS_SUPPORT_MRLOCK_H__ */

@@ -206,7 +206,7 @@ static void kbd_int_handler(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned char int_status;
 
 	cir = (struct cir_port *)dev_id;
-	int_status = get_int_status(cir);;
+	int_status = get_int_status(cir);
 	if (int_status & 0x4) {
 		clear_fifo(cir);
 		return;

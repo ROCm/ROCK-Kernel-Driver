@@ -2706,7 +2706,7 @@ zfcp_erp_adapter_strategy_open_fsf_xconfig(struct zfcp_erp_action *erp_action)
 		ZFCP_LOG_INFO("error: Exchange of configuration data between "
 			      "the adapter %s and the device driver failed.\n",
 			      zfcp_get_busid_by_adapter(adapter));
-		retval = ZFCP_ERP_FAILED;;
+		retval = ZFCP_ERP_FAILED;
 	}
 
 	return retval;

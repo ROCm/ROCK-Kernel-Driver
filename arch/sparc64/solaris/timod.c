@@ -296,7 +296,7 @@ static int timod_optmgmt(unsigned int fd, int flag, char *opt_buf, int opt_len, 
 		SOLD("calling GETSOCKOPT");
 		set_fs(KERNEL_DS);
 		error = sys_socketcall(SYS_GETSOCKOPT, args);
-		set_fs(old_fs);;
+		set_fs(old_fs);
 		if (error) {
 			failed = TBADOPT;
 			break;

@@ -61,7 +61,7 @@ static void tce_build_pSeries(struct iommu_table *tbl, long index,
 
 	while (npages--) {
 		/* can't move this out since we might cross LMB boundary */
-		t.te_rpn = (virt_to_absolute(uaddr)) >> PAGE_SHIFT;
+		t.te_rpn = (virt_to_abs(uaddr)) >> PAGE_SHIFT;
 	
 		tp->te_word = t.te_word;
 

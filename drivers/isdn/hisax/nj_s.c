@@ -80,7 +80,7 @@ netjet_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			printk(KERN_WARNING "nj LOCK_ATOMIC s0val %x->%x\n",
 				cs->hw.njet.last_is0, s0val);
 			spin_unlock_irqrestore(&cs->lock, flags);
-			return IRQ_HANDLED;;
+			return IRQ_HANDLED;
 		}
 		cs->hw.njet.irqstat0 = s0val;
 		if ((cs->hw.njet.irqstat0 & NETJET_IRQM0_READ) != 

@@ -96,7 +96,7 @@ MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:0");
 MODULE_PARM(ac97_quirk, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
-MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",allows:{{-1,3}},dialog:list,default:-1");
+MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",allows:{{-1,4}},dialog:list,default:-1");
 #ifdef SUPPORT_JOYSTICK
 MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(joystick, "Enable joystick for Intel i8x0 soundcard.");
@@ -824,19 +824,16 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 	spin_lock(&chip->reg_lock);
 	status = igetdword(chip, chip->int_sta_reg);
 	if ((status & chip->int_sta_mask) == 0) {
-		static int err_count = 10;
 		if (status) {
 			/* ack */
 			iputdword(chip, chip->int_sta_reg, status);
+			/* some Nforce[2] boards have problems when
+			   IRQ_NONE is returned here.
+			*/
 			if (chip->device_type != DEVICE_NFORCE)
-				status ^= igetdword(chip, chip->int_sta_reg);
+				status = 0;
 		}
 		spin_unlock(&chip->reg_lock);
-		if (chip->device_type != DEVICE_NFORCE && status && err_count) {
-			err_count--;
-			snd_printd("intel8x0: unknown IRQ bits 0x%x (sta_mask=0x%x)\n",
-				   status, chip->int_sta_mask);
-		}
 		return IRQ_RETVAL(status);
 	}
 
@@ -1689,6 +1686,12 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 };
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
+	{
+		.vendor = 0x0e11,
+		.device = 0x00b8,
+		.name = "Compaq Evo D510C",
+		.type = AC97_TUNE_HP_ONLY
+	},
 	{
 		.vendor = 0x1014,
 		.device = 0x1f00,
@@ -2739,6 +2742,7 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 
 	pci_read_config_word(pci, 0xe6, &val);
 #ifdef SUPPORT_JOYSTICK
+	val &= ~0x100;
 	if (joystick[dev]) {
 		if (! request_region(ich_gameport.io, 8, "ICH gameport")) {
 			printk(KERN_WARNING "intel8x0: cannot grab gameport 0x%x\n",  ich_gameport.io);
@@ -2751,6 +2755,7 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 	}
 #endif
 #ifdef SUPPORT_MIDI
+	val &= ~0x20;
 	if (mpu_port[dev] > 0) {
 		if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330) {
 			u8 b;

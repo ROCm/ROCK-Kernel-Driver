@@ -5120,7 +5120,7 @@ static int sbp_data(struct request *req)
 			for ( ; try!=0;try--)
 			{
 				j=inb(CDi_status);
-				if (!(j&s_not_data_ready)) break;;
+				if (!(j&s_not_data_ready)) break;
 				if (!(j&s_not_result_ready)) break;
 				if (fam0LV_drive) if (j&s_attention) break;
 			}

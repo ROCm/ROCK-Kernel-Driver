@@ -350,7 +350,7 @@ smb_receive(struct smb_sb_info *server, struct smb_request *req)
 	fs = get_fs();
 	set_fs(get_ds());
 
-	flags = MSG_DONTWAIT | MSG_NOSIGNAL;;
+	flags = MSG_DONTWAIT | MSG_NOSIGNAL;
 	msg.msg_flags = flags;
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;

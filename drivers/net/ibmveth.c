@@ -40,6 +40,7 @@
 #include <linux/errno.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -59,9 +60,6 @@
 #include <linux/seq_file.h>
 
 #include "ibmveth.h"
-
-#warning remove NO_TCE usage from ibmveth.c
-#define NO_TCE PCI_DMA_ERROR_CODE
 
 #define DEBUG 1
 
@@ -407,27 +405,27 @@ static inline void ibmveth_rxq_harvest_buffer(struct ibmveth_adapter *adapter)
 static void ibmveth_cleanup(struct ibmveth_adapter *adapter)
 {
 	if(adapter->buffer_list_addr != NULL) {
-		if(adapter->buffer_list_dma != NO_TCE) {
+		if(!vio_dma_mapping_error(adapter->buffer_list_dma)) {
 			vio_unmap_single(adapter->vdev, adapter->buffer_list_dma, 4096, PCI_DMA_BIDIRECTIONAL);
-			adapter->buffer_list_dma = NO_TCE;
+			adapter->buffer_list_dma = DMA_ERROR_CODE;
 		}
 		free_page((unsigned long)adapter->buffer_list_addr);
 		adapter->buffer_list_addr = NULL;
 	} 
 
 	if(adapter->filter_list_addr != NULL) {
-		if(adapter->filter_list_dma != NO_TCE) {
+		if(!vio_dma_mapping_error(adapter->filter_list_dma)) {
 			vio_unmap_single(adapter->vdev, adapter->filter_list_dma, 4096, PCI_DMA_BIDIRECTIONAL);
-			adapter->filter_list_dma = NO_TCE;
+			adapter->filter_list_dma = DMA_ERROR_CODE;
 		}
 		free_page((unsigned long)adapter->filter_list_addr);
 		adapter->filter_list_addr = NULL;
 	}
 
 	if(adapter->rx_queue.queue_addr != NULL) {
-		if(adapter->rx_queue.queue_dma != NO_TCE) {
+		if(!vio_dma_mapping_error(adapter->rx_queue.queue_dma)) {
 			vio_unmap_single(adapter->vdev, adapter->rx_queue.queue_dma, adapter->rx_queue.queue_len, PCI_DMA_BIDIRECTIONAL);
-			adapter->rx_queue.queue_dma = NO_TCE;
+			adapter->rx_queue.queue_dma = DMA_ERROR_CODE;
 		}
 		kfree(adapter->rx_queue.queue_addr);
 		adapter->rx_queue.queue_addr = NULL;
@@ -476,9 +474,9 @@ static int ibmveth_open(struct net_device *netdev)
 	adapter->filter_list_dma = vio_map_single(adapter->vdev, adapter->filter_list_addr, 4096, PCI_DMA_BIDIRECTIONAL);
 	adapter->rx_queue.queue_dma = vio_map_single(adapter->vdev, adapter->rx_queue.queue_addr, adapter->rx_queue.queue_len, PCI_DMA_BIDIRECTIONAL);
 
-	if((adapter->buffer_list_dma == NO_TCE) || 
-	   (adapter->filter_list_dma == NO_TCE) || 
-	   (adapter->rx_queue.queue_dma == NO_TCE)) {
+	if((vio_dma_mapping_error(adapter->buffer_list_dma) ) ||
+	   (vio_dma_mapping_error(adapter->filter_list_dma)) ||
+	   (vio_dma_mapping_error(adapter->rx_queue.queue_dma))) {
 		ibmveth_error_printk("unable to map filter or buffer list pages\n");
 		ibmveth_cleanup(adapter);
 		return -ENOMEM;
@@ -647,7 +645,7 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	desc[0].fields.address = vio_map_single(adapter->vdev, skb->data, desc[0].fields.length, PCI_DMA_TODEVICE);
 	desc[0].fields.valid   = 1;
 
-	if(desc[0].fields.address == NO_TCE) {
+	if(vio_dma_mapping_error(desc[0].fields.address)) {
 		ibmveth_error_printk("tx: unable to map initial fragment\n");
 		adapter->tx_map_failed++;
 		adapter->stats.tx_dropped++;
@@ -666,7 +664,7 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 		desc[curfrag+1].fields.length = frag->size;
 		desc[curfrag+1].fields.valid  = 1;
 
-		if(desc[curfrag+1].fields.address == NO_TCE) {
+		if(vio_dma_mapping_error(desc[curfrag+1].fields.address)) {
 			ibmveth_error_printk("tx: unable to map fragment %d\n", curfrag);
 			adapter->tx_map_failed++;
 			adapter->stats.tx_dropped++;
@@ -947,9 +945,9 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 
 	INIT_WORK(&adapter->replenish_task, (void*)ibmveth_replenish_task, (void*)adapter);
 
-	adapter->buffer_list_dma = NO_TCE;
-	adapter->filter_list_dma = NO_TCE;
-	adapter->rx_queue.queue_dma = NO_TCE;
+	adapter->buffer_list_dma = DMA_ERROR_CODE;
+	adapter->filter_list_dma = DMA_ERROR_CODE;
+	adapter->rx_queue.queue_dma = DMA_ERROR_CODE;
 
 	atomic_set(&adapter->not_replenishing, 1);
 
