@@ -96,6 +96,7 @@ struct xfrm_state
 		u8		replay_window;
 		u8		aalgo, ealgo, calgo;
 		u16		reqid;
+		u16		family;
 		xfrm_address_t	saddr;
 		int		header_len;
 		int		trailer_len;
@@ -201,6 +202,7 @@ struct xfrm_policy
 	struct xfrm_lifetime_cfg lft;
 	struct xfrm_lifetime_cur curlft;
 	struct dst_entry       *bundles;
+	__u16			family;
 	__u8			action;
 	__u8			flags;
 	__u8			dead;

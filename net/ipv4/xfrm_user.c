@@ -146,6 +146,7 @@ static void copy_from_user_state(struct xfrm_state *x, struct xfrm_usersa_info *
 	x->props.mode = p->mode;
 	x->props.replay_window = p->replay_window;
 	x->props.reqid = p->reqid;
+	x->props.family = p->family;
 	x->props.saddr = x->sel.saddr;
 }
 
@@ -242,6 +243,7 @@ static void copy_to_user_state(struct xfrm_state *x, struct xfrm_usersa_info *p)
 	p->mode = x->props.mode;
 	p->replay_window = x->props.replay_window;
 	p->reqid = x->props.reqid;
+	p->family = x->props.family;
 	p->seq = x->km.seq;
 }
 
@@ -508,7 +510,7 @@ static void copy_from_user_policy(struct xfrm_policy *xp, struct xfrm_userpolicy
 	memcpy(&xp->lft, &p->lft, sizeof(xp->lft));
 	xp->action = p->action;
 	xp->flags = p->flags;
-	/* XXX xp->family = p->family; */
+	xp->family = p->family;
 	/* XXX xp->share = p->share; */
 }
 
@@ -519,7 +521,7 @@ static void copy_to_user_policy(struct xfrm_policy *xp, struct xfrm_userpolicy_i
 	memcpy(&p->curlft, &xp->curlft, sizeof(p->curlft));
 	p->priority = xp->priority;
 	p->index = xp->index;
-	p->family = AF_INET; /* XXX xp->family */
+	p->family = xp->family;
 	p->dir = dir;
 	p->action = xp->action;
 	p->flags = xp->flags;
