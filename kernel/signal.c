@@ -500,7 +500,6 @@ inline void signal_wake_up(struct task_struct *t)
 {
 	set_tsk_thread_flag(t,TIF_SIGPENDING);
 
-#ifdef CONFIG_SMP
 	/*
 	 * If the task is running on a different CPU 
 	 * force a reschedule on the other CPU to make
@@ -511,9 +510,8 @@ inline void signal_wake_up(struct task_struct *t)
 	 * process of changing - but no harm is done by that
 	 * other than doing an extra (lightweight) IPI interrupt.
 	 */
-	if ((t->state == TASK_RUNNING) && (t->thread_info->cpu != smp_processor_id()))
+	if (t->state == TASK_RUNNING)
 		kick_if_running(t);
-#endif
 	if (t->state & TASK_INTERRUPTIBLE) {
 		wake_up_process(t);
 		return;

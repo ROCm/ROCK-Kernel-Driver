@@ -190,16 +190,19 @@ int request_module(const char * module_name)
 	pid_t pid;
 	int waitpid_result;
 	sigset_t tmpsig;
-	int i;
+	int i, ret;
 	static atomic_t kmod_concurrent = ATOMIC_INIT(0);
 #define MAX_KMOD_CONCURRENT 50	/* Completely arbitrary value - KAO */
 	static int kmod_loop_msg;
+	unsigned long saved_policy = current->policy;
 
+	current->policy = SCHED_NORMAL;
 	/* Don't allow request_module() before the root fs is mounted!  */
 	if ( ! current->fs->root ) {
 		printk(KERN_ERR "request_module[%s]: Root fs not mounted\n",
 			module_name);
-		return -EPERM;
+		ret = -EPERM;
+		goto out;
 	}
 
 	/* If modprobe needs a service that is in a module, we get a recursive
@@ -220,14 +223,16 @@ int request_module(const char * module_name)
 			printk(KERN_ERR
 			       "kmod: runaway modprobe loop assumed and stopped\n");
 		atomic_dec(&kmod_concurrent);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out;
 	}
 
 	pid = kernel_thread(exec_modprobe, (void*) module_name, 0);
 	if (pid < 0) {
 		printk(KERN_ERR "request_module[%s]: fork failed, errno %d\n", module_name, -pid);
 		atomic_dec(&kmod_concurrent);
-		return pid;
+		ret = pid;
+		goto out;
 	}
 
 	/* Block everything but SIGKILL/SIGSTOP */
@@ -250,7 +255,10 @@ int request_module(const char * module_name)
 		printk(KERN_ERR "request_module[%s]: waitpid(%d,...) failed, errno %d\n",
 		       module_name, pid, -waitpid_result);
 	}
-	return 0;
+	ret = 0;
+out:
+	current->policy = saved_policy;
+	return ret;
 }
 #endif /* CONFIG_KMOD */
 

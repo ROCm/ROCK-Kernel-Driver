@@ -888,7 +888,7 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 
 
 	if (t.tv_sec == 0 && t.tv_nsec <= 2000000L &&
-	    current->policy != SCHED_OTHER)
+	    current->policy != SCHED_NORMAL)
 	{
 		/*
 		 * Short delay requests up to 2 ms will be handled with

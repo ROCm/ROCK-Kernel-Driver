@@ -13,11 +13,6 @@
 #define LOCK_PREFIX ""
 #endif
 
-#define prepare_arch_schedule(prev)            do { } while(0)
-#define finish_arch_schedule(prev)             do { } while(0)
-#define prepare_arch_switch(rq)                        do { } while(0)
-#define finish_arch_switch(rq)                 spin_unlock_irq(&(rq)->lock)
-
 #define __STR(x) #x
 #define STR(x) __STR(x)
 

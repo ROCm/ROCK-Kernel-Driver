@@ -184,7 +184,7 @@ void reparent_to_init(void)
 	current->exit_signal = SIGCHLD;
 
 	current->ptrace = 0;
-	if ((current->policy == SCHED_OTHER) && (task_nice(current) < 0))
+	if ((current->policy == SCHED_NORMAL) && (task_nice(current) < 0))
 		set_user_nice(current, 0);
 	/* cpus_allowed? */
 	/* rt_priority? */

@@ -18,11 +18,6 @@
 #endif
 #include <linux/kernel.h>
 
-#define prepare_arch_schedule(prev)		do { } while (0)
-#define finish_arch_schedule(prev)		do { } while (0)
-#define prepare_arch_switch(rq)			do { } while (0)
-#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
-
 #define switch_to(prev,next,last) do {					     \
 	if (prev == next)						     \
 		break;							     \

@@ -47,7 +47,7 @@
     lock_depth:		-1,						\
     prio:		MAX_PRIO-20,					\
     static_prio:	MAX_PRIO-20,					\
-    policy:		SCHED_OTHER,					\
+    policy:		SCHED_NORMAL,					\
     cpus_allowed:	-1,						\
     mm:			NULL,						\
     active_mm:		&init_mm,					\
@@ -78,6 +78,7 @@
     pending:		{ NULL, &tsk.pending.head, {{0}}},		\
     blocked:		{{0}},						\
     alloc_lock:		SPIN_LOCK_UNLOCKED,				\
+    switch_lock:	SPIN_LOCK_UNLOCKED,				\
     journal_info:	NULL,						\
 }
 
