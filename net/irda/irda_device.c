@@ -83,12 +83,6 @@ static const char *task_state[] = {
 
 static void irda_task_timer_expired(void *data);
 
-#ifdef CONFIG_PROC_FS
-int irda_device_proc_read(char *buf, char **start, off_t offset, int len,
-			  int unused);
-
-#endif /* CONFIG_PROC_FS */
-
 int __init irda_device_init( void)
 {
 	dongles = hashbin_new(HB_LOCK);
