@@ -489,6 +489,7 @@ error:
 static struct xfrm_type esp6_type =
 {
 	.description	= "ESP6",
+	.owner	     	= THIS_MODULE,
 	.proto	     	= IPPROTO_ESP,
 	.init_state	= esp6_init_state,
 	.destructor	= esp6_destroy,
@@ -505,7 +506,6 @@ static struct inet6_protocol esp6_protocol = {
 
 int __init esp6_init(void)
 {
-	SET_MODULE_OWNER(&esp6_type);
 	if (xfrm_register_type(&esp6_type, AF_INET6) < 0) {
 		printk(KERN_INFO "ipv6 esp init: can't add xfrm type\n");
 		return -EAGAIN;

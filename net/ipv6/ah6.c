@@ -319,6 +319,7 @@ static void ah6_destroy(struct xfrm_state *x)
 static struct xfrm_type ah6_type =
 {
 	.description	= "AH6",
+	.owner		= THIS_MODULE,
 	.proto	     	= IPPROTO_AH,
 	.init_state	= ah6_init_state,
 	.destructor	= ah6_destroy,
@@ -334,8 +335,6 @@ static struct inet6_protocol ah6_protocol = {
 
 int __init ah6_init(void)
 {
-	SET_MODULE_OWNER(&ah6_type);
-
 	if (xfrm_register_type(&ah6_type, AF_INET6) < 0) {
 		printk(KERN_INFO "ipv6 ah init: can't add xfrm type\n");
 		return -EAGAIN;

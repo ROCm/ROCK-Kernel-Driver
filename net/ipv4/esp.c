@@ -553,6 +553,7 @@ error:
 static struct xfrm_type esp_type =
 {
 	.description	= "ESP4",
+	.owner		= THIS_MODULE,
 	.proto	     	= IPPROTO_ESP,
 	.init_state	= esp_init_state,
 	.destructor	= esp_destroy,

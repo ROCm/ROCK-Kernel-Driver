@@ -321,6 +321,7 @@ static void ah_destroy(struct xfrm_state *x)
 static struct xfrm_type ah_type =
 {
 	.description	= "AH4",
+	.owner		= THIS_MODULE,
 	.proto	     	= IPPROTO_AH,
 	.init_state	= ah_init_state,
 	.destructor	= ah_destroy,
@@ -336,7 +337,6 @@ static struct inet_protocol ah4_protocol = {
 
 static int __init ah4_init(void)
 {
-	SET_MODULE_OWNER(&ah_type);
 	if (xfrm_register_type(&ah_type, AF_INET) < 0) {
 		printk(KERN_INFO "ip ah init: can't add xfrm type\n");
 		return -EAGAIN;
