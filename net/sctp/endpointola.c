@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2002 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -237,7 +237,7 @@ void sctp_endpoint_put(sctp_endpoint_t *ep)
 
 /* Is this the endpoint we are looking for?  */
 sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *ep,
-					const sockaddr_storage_t *laddr)
+					const union sctp_addr *laddr)
 {
 	sctp_endpoint_t *retval;
 
@@ -262,7 +262,7 @@ out:
  */
 sctp_association_t *__sctp_endpoint_lookup_assoc(
 	const sctp_endpoint_t *endpoint,
-	const sockaddr_storage_t *paddr,
+	const union sctp_addr *paddr,
 	sctp_transport_t **transport)
 {
 	int rport;
@@ -289,7 +289,7 @@ sctp_association_t *__sctp_endpoint_lookup_assoc(
 
 /* Lookup association on an endpoint based on a peer address.  BH-safe.  */
 sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
-					       const sockaddr_storage_t *paddr,
+					       const union sctp_addr *paddr,
 					       sctp_transport_t **transport)
 {
 	sctp_association_t *asoc;
@@ -299,6 +299,30 @@ sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
 	sctp_local_bh_enable();
 
 	return asoc;
+}
+
+/* Look for any peeled off association from the endpoint that matches the
+ * given peer address.
+ */
+int sctp_endpoint_is_peeled_off(sctp_endpoint_t *ep,
+				const union sctp_addr *paddr)
+{
+	struct list_head *pos;
+	struct sockaddr_storage_list *addr;
+	sctp_bind_addr_t *bp;
+
+	sctp_read_lock(&ep->base.addr_lock);
+	bp = &ep->base.bind_addr;
+	list_for_each(pos, &bp->address_list) {
+		addr = list_entry(pos, struct sockaddr_storage_list, list);
+		if (sctp_has_association(&addr->a, paddr)) {
+			sctp_read_unlock(&ep->base.addr_lock);
+			return 1;
+		}
+	}
+	sctp_read_unlock(&ep->base.addr_lock);
+
+	return 0;
 }
 
 /* Do delayed input processing.  This is scheduled by sctp_rcv().
@@ -316,13 +340,13 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 	int error = 0;
 
 	if (ep->base.dead)
-		goto out;
+		return;
 
 	asoc = NULL;
 	inqueue = &ep->base.inqueue;
 	sk = ep->base.sk;
 
-	while (NULL != (chunk = sctp_pop_inqueue(inqueue))) {
+	while (NULL != (chunk = sctp_pop_inqueue(inqueue))) {		
 		subtype.chunk = chunk->chunk_hdr->type;
 
 		/* We might have grown an association since last we
@@ -350,25 +374,16 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 		if (chunk->transport)
 			chunk->transport->last_time_heard = jiffies;
 
-		/* FIX ME We really would rather NOT have to use
-		 * GFP_ATOMIC.
-		 */
 		error = sctp_do_sm(SCTP_EVENT_T_CHUNK, subtype, state,
                                    ep, asoc, chunk, GFP_ATOMIC);
 
-		if (error != 0)
-			goto err_out;
+		if (error && chunk)
+			chunk->pdiscard = 1;
 
 		/* Check to see if the endpoint is freed in response to
 		 * the incoming chunk. If so, get out of the while loop.
 		 */
 		if (!sctp_sk(sk)->ep)
-			goto out;
+			break;
 	}
-
-err_out:
-	/* Is this the right way to pass errors up to the ULP?  */
-	if (error)
-		ep->base.sk->err = -error;
-out:
 }

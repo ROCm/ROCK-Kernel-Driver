@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines Corp.
+ * Copyright (c) 2001-2002 International Business Machines Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 La Monte H.P. Yarroll
  * 
@@ -363,7 +363,7 @@ static void sctp_association_destroy(sctp_association_t *asoc)
 
 /* Add a transport address to an association.  */
 sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
-				      const sockaddr_storage_t *addr,
+				      const union sctp_addr *addr,
 				      int priority)
 {
 	sctp_transport_t *peer;
@@ -423,7 +423,7 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 	asoc->frag_point = asoc->pmtu -
 		(SCTP_IP_OVERHEAD + sizeof(sctp_data_chunk_t));
 
-	/* The asoc->peer.port might not be meaningful as of now, but
+	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.
 	 */
 	(asoc->outqueue.init_output)(&peer->packet,
@@ -460,6 +460,9 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 		min(asoc->overall_error_threshold + peer->error_threshold,
 		    asoc->max_retrans);
 
+	/* By default, enable heartbeat for peer address. */
+	peer->hb_allowed = 1;
+
 	/* Initialize the peer's heartbeat interval based on the
 	 * sock configured value.
 	 */
@@ -474,7 +477,7 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 		asoc->peer.primary_path = peer;
 		/* Set a default msg_name for events. */
 		memcpy(&asoc->peer.primary_addr, &peer->ipaddr,
-		       sizeof(sockaddr_storage_t));
+		       sizeof(union sctp_addr));
 		asoc->peer.active_path = peer;
 		asoc->peer.retran_path = peer;
 	}
@@ -487,7 +490,7 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 
 /* Lookup a transport by address. */
 sctp_transport_t *sctp_assoc_lookup_paddr(const sctp_association_t *asoc,
-					  const sockaddr_storage_t *address)
+					  const union sctp_addr *address)
 {
 	sctp_transport_t *t;
 	struct list_head *pos;
@@ -522,12 +525,12 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	/* Record the transition on the transport.  */
 	switch (command) {
 	case SCTP_TRANSPORT_UP:
-		transport->state.active = 1;
+		transport->active = 1;
 		spc_state = ADDRESS_AVAILABLE;
 		break;
 
 	case SCTP_TRANSPORT_DOWN:
-		transport->state.active = 0;
+		transport->active = 0;
 		spc_state = ADDRESS_UNREACHABLE;
 		break;
 
@@ -557,7 +560,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	list_for_each(pos, &asoc->peer.transport_addr_list) {
 		t = list_entry(pos, sctp_transport_t, transports);
 
-		if (!t->state.active)
+		if (!t->active)
 			continue;
 		if (!first || t->last_time_heard > first->last_time_heard) {
 			second = first;
@@ -577,7 +580,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	 * [If the primary is active but not most recent, bump the most
 	 * recently used transport.]
 	 */
-	if (asoc->peer.primary_path->state.active &&
+	if (asoc->peer.primary_path->active &&
 	    first != asoc->peer.primary_path) {
 		second = first;
 		first = asoc->peer.primary_path;
@@ -650,7 +653,7 @@ __u16 __sctp_association_get_next_ssn(sctp_association_t *asoc, __u16 sid)
  *
  * FIXME: We do not match address scopes correctly.
  */
-int sctp_cmp_addr(const sockaddr_storage_t *ss1, const sockaddr_storage_t *ss2)
+int sctp_cmp_addr(const union sctp_addr *ss1, const union sctp_addr *ss2)
 {
 	int len;
 	const void *base1;
@@ -706,8 +709,8 @@ match:
  *
  * FIXME: We do not match address scopes correctly.
  */
-int sctp_cmp_addr_exact(const sockaddr_storage_t *ss1,
-			const sockaddr_storage_t *ss2)
+int sctp_cmp_addr_exact(const union sctp_addr *ss1,
+			const union sctp_addr *ss2)
 {
 	int len;
 	const void *base1;
@@ -842,8 +845,8 @@ out:
 
 /* Is this the association we are looking for? */
 sctp_transport_t *sctp_assoc_is_match(sctp_association_t *asoc,
-				      const sockaddr_storage_t *laddr,
-				      const sockaddr_storage_t *paddr)
+				      const union sctp_addr *laddr,
+				      const union sctp_addr *paddr)
 {
 	sctp_transport_t *transport;
 
@@ -902,17 +905,13 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 		 * the incoming chunk.  If so, get out of the while loop.
 		 */
 		if (!sctp_id2assoc(sk, associd))
-			goto out;
+			break;
 
-		if (error != 0)
-			goto err_out;
+		/* If there is an error on chunk, discard this packet. */
+		if (error && chunk)
+			chunk->pdiscard = 1;
 	}
 
-err_out:
-	/* Is this the right way to pass errors up to the ULP?  */
-	if (error)
-		sk->err = -error;
-out:
 }
 
 /* This routine moves an association from its old sk to a new sk.  */
@@ -1017,7 +1016,7 @@ sctp_transport_t *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
 
 		/* Try to find an active transport. */
 
-		if (t->state.active) {
+		if (t->active) {
 			break;
 		} else {
 			/* Keep track of the next transport in case

@@ -9,7 +9,7 @@
  *
  * This module provides the abstraction for an SCTP tranport representing
  * a remote transport address.  For local transport addresses, we just use
- * sockaddr_storage_t.
+ * union sctp_addr.
  *
  * The SCTP reference implementation is free software;
  * you can redistribute it and/or modify it under the terms of
@@ -53,7 +53,7 @@
 /* 1st Level Abstractions.  */
 
 /* Allocate and initialize a new transport.  */
-sctp_transport_t *sctp_transport_new(const sockaddr_storage_t *addr, int priority)
+sctp_transport_t *sctp_transport_new(const union sctp_addr *addr, int priority)
 {
         sctp_transport_t *transport;
 
@@ -78,14 +78,14 @@ fail:
 
 /* Intialize a new transport from provided memory.  */
 sctp_transport_t *sctp_transport_init(sctp_transport_t *peer,
-				      const sockaddr_storage_t *addr,
+				      const union sctp_addr *addr,
 				      int priority)
 {
 	sctp_protocol_t *proto = sctp_get_protocol();
 
 	/* Copy in the address.  */
 	peer->ipaddr = *addr;
-	peer->af_specific = sctp_get_af_specific(addr);
+	peer->af_specific = sctp_get_af_specific(addr->sa.sa_family);
 	peer->asoc = NULL;
 
 	/* From 6.3.1 RTO Calculation:
@@ -104,8 +104,8 @@ sctp_transport_t *sctp_transport_init(sctp_transport_t *peer,
 	peer->last_time_used = jiffies;
 	peer->last_time_ecne_reduced = jiffies;
 
-	peer->state.active = 1;
-	peer->state.hb_allowed = 0;
+	peer->active = 1;
+	peer->hb_allowed = 0;
 
 	/* Initialize the default path max_retrans.  */
 	peer->max_retrans = proto->max_retrans_path;
@@ -204,11 +204,11 @@ void sctp_transport_set_owner(sctp_transport_t *transport,
  * souce address.
  */ 
 void sctp_transport_route(sctp_transport_t *transport,
-			  sockaddr_storage_t *saddr)
+			  union sctp_addr *saddr)
 {
 	sctp_association_t *asoc = transport->asoc;
 	sctp_func_t *af = transport->af_specific;
-	sockaddr_storage_t *daddr = &transport->ipaddr;
+	union sctp_addr *daddr = &transport->ipaddr;
 	sctp_bind_addr_t *bp;
 	rwlock_t *addr_lock;
 	struct sockaddr_storage_list *laddr;

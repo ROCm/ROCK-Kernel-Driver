@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) Cisco 1999,2000
  * Copyright (c) Motorola 1999,2000,2001
- * Copyright (c) International Business Machines Corp., 2001
+ * Copyright (c) International Business Machines Corp., 2001,2002
  * Copyright (c) La Monte H.P. Yarroll 2001
  *
  * This file is part of the SCTP kernel reference implementation.
@@ -52,7 +52,7 @@
 #include <net/sctp/sm.h>
 
 /* Forward declarations for internal helpers. */
-static int sctp_copy_one_addr(sctp_bind_addr_t *, sockaddr_storage_t *,
+static int sctp_copy_one_addr(sctp_bind_addr_t *, union sctp_addr *,
 			      sctp_scope_t scope, int priority, int flags);
 static void sctp_bind_addr_clean(sctp_bind_addr_t *);
 
@@ -143,7 +143,7 @@ void sctp_bind_addr_free(sctp_bind_addr_t *bp)
 }
 
 /* Add an address to the bind address list in the SCTP_bind_addr structure. */
-int sctp_add_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *new,
+int sctp_add_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *new,
 		       int priority)
 {
 	struct sockaddr_storage_list *addr;
@@ -171,7 +171,7 @@ int sctp_add_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *new,
 /* Delete an address from the bind address list in the SCTP_bind_addr
  * structure.
  */
-int sctp_del_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *del_addr)
+int sctp_del_bind_addr(sctp_bind_addr_t *bp, union sctp_addr *del_addr)
 {
 	struct list_head *pos, *temp;
 	struct sockaddr_storage_list *addr;
@@ -196,18 +196,16 @@ int sctp_del_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *del_addr)
  *
  * The second argument is the return value for the length.
  */
-sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, int *addrs_len,
-				   int priority)
+union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
+					 int *addrs_len, int priority)
 {
-	sctpParam_t addrparms;
-	sctpParam_t retval;
+	union sctp_params addrparms;
+	union sctp_params retval;
 	int addrparms_len;
 	sctp_addr_param_t rawaddr;
 	int len;
 	struct sockaddr_storage_list *addr;
 	struct list_head *pos;
-
-	retval.v = NULL;
 	addrparms_len = 0;
 	len = 0;
 
@@ -216,11 +214,11 @@ sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, int *addrs_len,
 		len += sizeof(sctp_addr_param_t);
 	}
 
-	addrparms.v = kmalloc(len, priority);
-	if (!addrparms.v)
+	retval.v = kmalloc(len, priority);
+	if (!retval.v)
 		goto end_raw;
 
-	retval = addrparms;
+	addrparms = retval;
 
 	list_for_each(pos, &bp->address_list) {
 		addr = list_entry(pos, struct sockaddr_storage_list, list);
@@ -244,7 +242,7 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
 {
 	sctp_addr_param_t *rawaddr;
 	sctp_paramhdr_t *param;
-	sockaddr_storage_t addr;
+	union sctp_addr addr;
 	int retval = 0;
 	int len;
 
@@ -254,7 +252,7 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
 		rawaddr = (sctp_addr_param_t *)raw_addr_list;
 
 		switch (param->type) {
-		case SCTP_PARAM_IPV4_ADDRESS:			
+		case SCTP_PARAM_IPV4_ADDRESS:
 		case SCTP_PARAM_IPV6_ADDRESS:
 			sctp_param2sockaddr(&addr, rawaddr, port);
 			retval = sctp_add_bind_addr(bp, &addr, priority);
@@ -285,7 +283,7 @@ int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
  ********************************************************************/
 
 /* Does this contain a specified address? */
-int sctp_bind_addr_has_addr(sctp_bind_addr_t *bp, const sockaddr_storage_t *addr)
+int sctp_bind_addr_has_addr(sctp_bind_addr_t *bp, const union sctp_addr *addr)
 {
 	struct sockaddr_storage_list *laddr;
 	struct list_head *pos;
@@ -300,7 +298,7 @@ int sctp_bind_addr_has_addr(sctp_bind_addr_t *bp, const sockaddr_storage_t *addr
 }
 
 /* Copy out addresses from the global local address list. */
-static int sctp_copy_one_addr(sctp_bind_addr_t *dest, sockaddr_storage_t *addr,
+static int sctp_copy_one_addr(sctp_bind_addr_t *dest, union sctp_addr *addr,
 			      sctp_scope_t scope, int priority, int flags)
 {
 	sctp_protocol_t *proto = sctp_get_protocol();
@@ -326,7 +324,7 @@ static int sctp_copy_one_addr(sctp_bind_addr_t *dest, sockaddr_storage_t *addr,
 }
 
 /* Is addr one of the wildcards?  */
-int sctp_is_any(const sockaddr_storage_t *addr)
+int sctp_is_any(const union sctp_addr *addr)
 {
 	int retval = 0;
 
@@ -352,7 +350,7 @@ int sctp_is_any(const sockaddr_storage_t *addr)
 }
 
 /* Is 'addr' valid for 'scope'?  */
-int sctp_in_scope(const sockaddr_storage_t *addr, sctp_scope_t scope)
+int sctp_in_scope(const union sctp_addr *addr, sctp_scope_t scope)
 {
 	sctp_scope_t addr_scope = sctp_scope(addr);
 
@@ -422,112 +420,13 @@ int sctp_in_scope(const sockaddr_storage_t *addr, sctp_scope_t scope)
  ********************************************************************/
 
 /* What is the scope of 'addr'?  */
-sctp_scope_t sctp_scope(const sockaddr_storage_t *addr)
+sctp_scope_t sctp_scope(const union sctp_addr *addr)
 {
-	sctp_scope_t retval = SCTP_SCOPE_GLOBAL;
+	struct sctp_func *af;
 
-	switch (addr->sa.sa_family) {
-	case AF_INET:
-		/* We are checking the loopback, private and other address
-		 * scopes as defined in RFC 1918.
-		 * The IPv4 scoping is based on the draft for SCTP IPv4
-		 * scoping <draft-stewart-tsvwg-sctp-ipv4-00.txt>.
-		 * The set of SCTP address scope hopefully can cover both
-		 * types of addresses.
-		 */
+	af = sctp_get_af_specific(addr->sa.sa_family);
+	if (!af)
+		return SCTP_SCOPE_UNUSABLE;
 
-		/* Should IPv4 scoping be a sysctl configurable option
-		 * so users can turn it off (default on) for certain
-		 * unconventional networking environments?
-		 */
-
-		/* Check for unusable SCTP addresses. */
-		if (IS_IPV4_UNUSABLE_ADDRESS(&addr->v4.sin_addr.s_addr)) {
-			retval =  SCTP_SCOPE_UNUSABLE;
-		} else if (LOOPBACK(addr->v4.sin_addr.s_addr)) {
-			retval = SCTP_SCOPE_LOOPBACK;
-		} else if (IS_IPV4_LINK_ADDRESS(&addr->v4.sin_addr.s_addr)) {
-			retval = SCTP_SCOPE_LINK;
-		} else if (IS_IPV4_PRIVATE_ADDRESS(&addr->v4.sin_addr.s_addr)) {
-			retval = SCTP_SCOPE_PRIVATE;
-		} else {
-			retval = SCTP_SCOPE_GLOBAL;
-		}
-		break;
-
-	case AF_INET6:
-		{
-			SCTP_V6(
-				int v6scope;
-				v6scope = ipv6_addr_scope((struct in6_addr *)
-						 &addr->v6.sin6_addr);
-				/* The IPv6 scope is really a set of bit
-				 * fields. See IFA_* in <net/if_inet6.h>.
-				 * Mapping them to the generic SCTP scope
-				 * set is an attempt to have code
-				 * consistencies with the IPv4 scoping.
-				 */
-				switch (v6scope) {
-				case IFA_HOST:
-					retval = SCTP_SCOPE_LOOPBACK;
-					break;
-
-				case IFA_LINK:
-					retval = SCTP_SCOPE_LINK;
-					break;
-
-				case IFA_SITE:
-					retval = SCTP_SCOPE_PRIVATE;
-					break;
-
-				default:
-					retval = SCTP_SCOPE_GLOBAL;
-					break;
-				};
-			);
-			break;
-		}
-
-	default:
-		retval = SCTP_SCOPE_GLOBAL;
-		break;
-	};
-
-	return retval;
-}
-
-/* This function checks if the address is a valid address to be used for
- * SCTP.
- *
- * Output:
- * Return 0 - If the address is a non-unicast or an illegal address.
- * Return 1 - If the address is a unicast.
- */
-int sctp_addr_is_valid(const sockaddr_storage_t *addr)
-{
-	unsigned short sa_family = addr->sa.sa_family;
-
-	switch (sa_family) {
-	case AF_INET:
-		/* Is this a non-unicast address or a unusable SCTP address? */
-		if (IS_IPV4_UNUSABLE_ADDRESS(&addr->v4.sin_addr.s_addr))
-			return 0;
-		break;
-
-	case AF_INET6:
-		SCTP_V6(
-		{
-			int ret = sctp_ipv6_addr_type(&addr->v6.sin6_addr);
-
-			/* Is this a non-unicast address */
-			if (!(ret & IPV6_ADDR_UNICAST))
-				return 0;
-			break;
-		});
-
-	default:
-		return 0;
-	};
-
-	return 1;
+	return af->scope((union sctp_addr *)addr);
 }
