@@ -189,8 +189,7 @@ per_cpu_init (void)
 	if (smp_processor_id() == 0) {
 		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
 					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
-		mca_data = __alloc_bootmem(PERCPU_MCA_SIZE * NR_CPUS,
-					   PERCPU_MCA_SIZE, __pa(MAX_DMA_ADDRESS));
+		mca_data = alloc_bootmem(PERCPU_MCA_SIZE * NR_CPUS);
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
