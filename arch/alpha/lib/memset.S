@@ -17,6 +17,7 @@
 	.set noat
 	.set noreorder
 .text
+	.globl memset
 	.globl __memset
 	.globl __memsetw
 	.globl __constant_c_memset
