@@ -714,10 +714,8 @@ struct thread_struct {
 /*
  * Return saved PC of a blocked thread. For now, this is the "user" PC
  */
-static inline unsigned long thread_saved_pc(struct thread_struct *t)
-{
-	return (t->regs) ? t->regs->nip : 0;
-}
+#define thread_saved_pc(tsk)	\
+	((tsk)->thread.regs? (tsk)->thread.regs->nip: 0)
 
 #define copy_segments(tsk, mm)		do { } while (0)
 #define release_segments(mm)		do { } while (0)
