@@ -302,7 +302,7 @@ sba_dump_pdir_entry(struct ioc *ioc, char *msg, uint pide)
 		printk(KERN_DEBUG "%s %2d %p %016Lx\n",
 		       (rcnt == (pide & (BITS_PER_LONG - 1)))
 		       ? "    -->" : "       ",
-		       rcnt, ptr, *ptr );
+		       rcnt, ptr, (unsigned long long) *ptr );
 		rcnt++;
 		ptr++;
 	}
@@ -1451,9 +1451,9 @@ ioc_iova_init(struct ioc *ioc)
 	iov_order = get_order(ioc->iov_size >> (IOVP_SHIFT - PAGE_SHIFT));
 	ioc->pdir_size = (ioc->iov_size / IOVP_SIZE) * sizeof(u64);
 
-	DBG_INIT("%s() hpa 0x%lx IOV %dMB (%d bits) PDIR size 0x%0x\n",
-		__FUNCTION__, ioc->ioc_hpa, ioc->iov_size >> 20,
-		iov_order + PAGE_SHIFT, ioc->pdir_size);
+	DBG_INIT("%s() hpa %p IOV %dMB (%d bits) PDIR size 0x%0x\n",
+		 __FUNCTION__, ioc->ioc_hpa, ioc->iov_size >> 20,
+		 iov_order + PAGE_SHIFT, ioc->pdir_size);
 
 	/* FIXME : DMA HINTs not used */
 	ioc->hint_shift_pdir = iov_order + PAGE_SHIFT;
@@ -1552,7 +1552,7 @@ ioc_iova_init(struct ioc *ioc)
 		if (!addr)
 			panic(PFX "Couldn't allocate PDIR spill page\n");
 
-		poison_addr = (u64) addr;
+		poison_addr = addr;
 		for ( ; (u64) poison_addr < addr + IOVP_SIZE; poison_addr += poison_size)
 			memcpy(poison_addr, spill_poison, poison_size);
 
@@ -1824,7 +1824,6 @@ sba_proc_init(void)
 		create_proc_info_entry(ioc_list->name, 0, proc_mckinley_root, sba_proc_info);
 		create_proc_info_entry("bitmap", 0, proc_mckinley_root, sba_resource_map);
 	}
-	return 0;
 }
 #endif
 
@@ -1919,7 +1918,7 @@ sba_init(void)
 	return 0;
 }
 
-device_initcall(sba_init);
+subsys_initcall(sba_init); /* must be initialized after ACPI etc., but before any drivers... */
 
 static int __init
 nosbagart(char *str)
