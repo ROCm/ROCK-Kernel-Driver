@@ -183,6 +183,7 @@ struct tty_struct *devpts_get_tty(int number)
 			dentry->d_inode->u.generic_ip;
 
 	up(&devpts_root->d_inode->i_sem);
+	dput(dentry);
 
 	return tty;
 }
