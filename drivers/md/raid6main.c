@@ -1878,6 +1878,7 @@ static int stop (mddev_t *mddev)
 	mddev->thread = NULL;
 	shrink_stripes(conf);
 	free_pages((unsigned long) conf->stripe_hashtbl, HASH_PAGES_ORDER);
+	blk_sync_queue(mddev->queue); /* the unplug fn references 'conf'*/
 	kfree(conf);
 	mddev->private = NULL;
 	return 0;

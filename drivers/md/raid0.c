@@ -385,6 +385,7 @@ static int raid0_stop (mddev_t *mddev)
 {
 	raid0_conf_t *conf = mddev_to_conf(mddev);
 
+	blk_sync_queue(mddev->queue); /* the unplug fn references 'conf'*/
 	kfree (conf->hash_table);
 	conf->hash_table = NULL;
 	kfree (conf->strip_zone);
