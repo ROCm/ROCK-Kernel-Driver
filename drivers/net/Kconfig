@@ -8,32 +8,18 @@ config NETDEVICES
 	bool "Network device support"
 	---help---
 	  You can say N here if you don't intend to connect your Linux box to
-	  any other computer at all or if all your connections will be over a
-	  telephone line with a modem either via UUCP (UUCP is a protocol to
-	  forward mail and news between unix hosts over telephone lines; read
-	  the UUCP-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>) or dialing up a shell
-	  account or a BBS, even using term (term is a program which gives you
-	  almost full Internet connectivity if you have a regular dial up
-	  shell account on some Internet connected Unix computer. Read
-	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+	  any other computer at all.
 
 	  You'll have to say Y if your computer contains a network card that
-	  you want to use under Linux (make sure you know its name because you
-	  will be asked for it and read the Ethernet-HOWTO (especially if you
-	  plan to use more than one network card under Linux)) or if you want
-	  to use SLIP (Serial Line Internet Protocol is the protocol used to
-	  send Internet traffic over telephone lines or null modem cables) or
-	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
-	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
-	  Protocol is mainly used to create a mini network by connecting the
-	  parallel ports of two local machines) or AX.25/KISS (protocol for
-	  sending Internet traffic over amateur radio links).
+	  you want to use under Linux. If you are going to run SLIP or PPP over
+	  telephone line or null modem cable you need say Y here. Connecting
+	  two machines with parallel ports using PLIP needs this, as well as
+	  AX.25/KISS for sending Internet traffic over amateur radio links.
 
-	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
-	  Olaf Kirch's excellent and free book "Network Administrator's
-	  Guide", to be found in <http://www.tldp.org/docs.html#guide>. If
-	  unsure, say Y.
+	  See also "The Linux Network Administrator's Guide" by Olaf Kirch and
+	  Terry Dawson. Available at <http://www.tldp.org/guides.html>.
+
+	  If unsure, say Y.
 
 if NETDEVICES
 	source "drivers/net/arcnet/Kconfig"
