@@ -1344,14 +1344,14 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 	for (tmp=0; tmp <= 0x01; tmp += 1)
 		snd_azf3328_dbgmisc("0x%02x: opl 0x%04x, mpu300 0x%04x, mpu310 0x%04x, mpu320 0x%04x, mpu330 0x%04x\n", tmp, inb(0x388 + tmp), inb(0x300 + tmp), inb(0x310 + tmp), inb(0x320 + tmp), inb(0x330 + tmp));
 
-	/* create mixer interface & switches */
-	if ((err = snd_azf3328_mixer_new(chip)) < 0)
-		return err;
-
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_azf3328_free(chip);
 		return err;
 	}
+
+	/* create mixer interface & switches */
+	if ((err = snd_azf3328_mixer_new(chip)) < 0)
+		return err;
 
 #if 0
 	/* set very low bitrate to reduce noise and power consumption? */

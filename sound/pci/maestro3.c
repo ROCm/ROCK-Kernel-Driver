@@ -2564,26 +2564,7 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 
 	snd_m3_assp_init(chip);
 	snd_m3_amp_enable(chip, 1);
-    
-	if ((err = snd_m3_mixer(chip)) < 0) {
-		snd_m3_free(chip);
-		return err;
-	}
 
-	for (i = 0; i < chip->num_substreams; i++) {
-		m3_dma_t *s = &chip->substreams[i];
-		s->chip = chip;
-		if ((err = snd_m3_assp_client_init(chip, s, i)) < 0) {
-			snd_m3_free(chip);
-			return err;
-		}
-	}
-    
-	if ((err = snd_m3_pcm(chip, 0)) < 0) {
-		snd_m3_free(chip);
-		return err;
-	}
-    
 	if (request_irq(pci->irq, snd_m3_interrupt, SA_INTERRUPT|SA_SHIRQ,
 			card->driver, (void *)chip)) {
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
@@ -2605,6 +2586,19 @@ snd_m3_create(snd_card_t *card, struct pci_dev *pci,
 		return err;
 	}
 
+	if ((err = snd_m3_mixer(chip)) < 0)
+		return err;
+
+	for (i = 0; i < chip->num_substreams; i++) {
+		m3_dma_t *s = &chip->substreams[i];
+		s->chip = chip;
+		if ((err = snd_m3_assp_client_init(chip, s, i)) < 0)
+			return err;
+	}
+
+	if ((err = snd_m3_pcm(chip, 0)) < 0)
+		return err;
+    
 	snd_m3_enable_ints(chip);
 	snd_m3_assp_continue(chip);
 

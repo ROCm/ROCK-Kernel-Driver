@@ -3614,10 +3614,13 @@ int __devinit snd_trident_create(snd_card_t * card,
 		return err;
 	}
 
-	if ((err = snd_trident_mixer(trident, pcm_spdif_device)) < 0) {
+	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, trident, &ops)) < 0) {
 		snd_trident_free(trident);
 		return err;
 	}
+
+	if ((err = snd_trident_mixer(trident, pcm_spdif_device)) < 0)
+		return err;
 	
 	/* initialise synth voices */
 	for (i = 0; i < 64; i++) {
@@ -3638,12 +3641,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 
 	
 	snd_card_set_pm_callback(card, snd_trident_suspend, snd_trident_resume, trident);
-
 	snd_trident_proc_init(trident);
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, trident, &ops)) < 0) {
-		snd_trident_free(trident);
-		return err;
-	}
 	snd_card_set_dev(card, &pci->dev);
 	*rtrident = trident;
 	return 0;
@@ -3653,7 +3651,7 @@ int __devinit snd_trident_create(snd_card_t * card,
    snd_trident_free
   
    Description: This routine will free the device specific class for
-            q    the 4DWave card. 
+                the 4DWave card. 
                 
    Paramters:   trident  - device specific private data for 4DWave card
 

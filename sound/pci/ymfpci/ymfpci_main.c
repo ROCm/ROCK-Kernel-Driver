@@ -2266,12 +2266,12 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	snd_card_set_pm_callback(card, snd_ymfpci_suspend, snd_ymfpci_resume, chip);
 #endif
 
-	snd_ymfpci_proc_init(card, chip);
-
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_ymfpci_free(chip);
 		return err;
 	}
+
+	snd_ymfpci_proc_init(card, chip);
 
 	snd_card_set_dev(card, &pci->dev);
 

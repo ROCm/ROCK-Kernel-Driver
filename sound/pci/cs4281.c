@@ -1439,14 +1439,14 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 		return tmp;
 	}
 
-	snd_cs4281_proc_init(chip);
-
-	snd_card_set_pm_callback(card, cs4281_suspend, cs4281_resume, chip);
-
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_cs4281_free(chip);
 		return err;
 	}
+
+	snd_cs4281_proc_init(chip);
+
+	snd_card_set_pm_callback(card, cs4281_suspend, cs4281_resume, chip);
 
 	snd_card_set_dev(card, &pci->dev);
 

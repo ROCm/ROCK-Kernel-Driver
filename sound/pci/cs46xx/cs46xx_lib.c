@@ -3909,15 +3909,15 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 		return err;
 	}
 
-	snd_cs46xx_proc_init(card, chip);
-
-	snd_card_set_pm_callback(card, snd_cs46xx_suspend, snd_cs46xx_resume, chip);
-
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_cs46xx_free(chip);
 		return err;
 	}
 	
+	snd_cs46xx_proc_init(card, chip);
+
+	snd_card_set_pm_callback(card, snd_cs46xx_suspend, snd_cs46xx_resume, chip);
+
 	chip->active_ctrl(chip, -1); /* disable CLKRUN */
 
 	snd_card_set_dev(card, &pci->dev);
