@@ -156,12 +156,6 @@ static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
  * task_rq_lock - lock the runqueue a given task resides on and disable
  * interrupts.  Note the ordering: we can safely lookup the task_rq without
  * explicitly disabling preemption.
- *
- * WARNING: to squeeze out a few more cycles we do not disable preemption
- * explicitly (or implicitly), we just keep interrupts disabled. This means
- * that within task_rq_lock/unlock sections you must be careful
- * about locking/unlocking spinlocks, since they could cause an unexpected
- * preemption.
  */
 static inline runqueue_t *task_rq_lock(task_t *p, unsigned long *flags)
 {
@@ -170,9 +164,9 @@ static inline runqueue_t *task_rq_lock(task_t *p, unsigned long *flags)
 repeat_lock_task:
 	local_irq_save(*flags);
 	rq = task_rq(p);
-	_raw_spin_lock(&rq->lock);
+	spin_lock(&rq->lock);
 	if (unlikely(rq != task_rq(p))) {
-		_raw_spin_unlock_irqrestore(&rq->lock, *flags);
+		spin_unlock_irqrestore(&rq->lock, *flags);
 		goto repeat_lock_task;
 	}
 	return rq;
@@ -180,8 +174,7 @@ repeat_lock_task:
 
 static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
 {
-	_raw_spin_unlock_irqrestore(&rq->lock, *flags);
-	preempt_check_resched();
+	spin_unlock_irqrestore(&rq->lock, *flags);
 }
 
 /*
@@ -289,15 +282,8 @@ static inline void resched_task(task_t *p)
 	nrpolling |= test_tsk_thread_flag(p,TIF_POLLING_NRFLAG);
 
 	if (!need_resched && !nrpolling && (p->thread_info->cpu != smp_processor_id()))
-		/*
-		 * NOTE: smp_send_reschedule() can be called from
-		 * spinlocked sections which do not have an elevated
-		 * preemption count. So the code either has to avoid
-	 	 * spinlocks, or has to put preempt_disable() and
-		 * preempt_enable_no_resched() around the code.
-		 */
 		smp_send_reschedule(p->thread_info->cpu);
-	preempt_enable_no_resched();
+	preempt_enable();
 #else
 	set_tsk_need_resched(p);
 #endif
@@ -348,10 +334,8 @@ repeat:
  */
 void kick_if_running(task_t * p)
 {
-	if (p == task_rq(p)->curr) {
+	if (p == task_rq(p)->curr)
 		resched_task(p);
-		preempt_check_resched();
-	}
 }
 #endif
 
@@ -451,18 +435,17 @@ void sched_exit(task_t * p)
 }
 
 #if CONFIG_SMP || CONFIG_PREEMPT
-asmlinkage void schedule_tail(void)
+asmlinkage void schedule_tail(task_t *prev)
 {
-	spin_unlock_irq(&this_rq()->lock);
+	finish_arch_switch(this_rq());
+	finish_arch_schedule(prev);
 }
 #endif
 
-static inline void context_switch(task_t *prev, task_t *next)
+static inline task_t * context_switch(task_t *prev, task_t *next)
 {
 	struct mm_struct *mm = next->mm;
 	struct mm_struct *oldmm = prev->active_mm;
-
-	prepare_to_switch();
 
 	if (unlikely(!mm)) {
 		next->active_mm = oldmm;
@@ -477,7 +460,9 @@ static inline void context_switch(task_t *prev, task_t *next)
 	}
 
 	/* Here we just switch the register state and the stack. */
-	switch_to(prev, next);
+	switch_to(prev, next, prev);
+
+	return prev;
 }
 
 unsigned long nr_running(void)
@@ -823,6 +808,7 @@ need_resched:
 	rq = this_rq();
 
 	release_kernel_lock(prev, smp_processor_id());
+	prepare_arch_schedule(prev);
 	prev->sleep_timestamp = jiffies;
 	spin_lock_irq(&rq->lock);
 
@@ -878,23 +864,20 @@ switch_tasks:
 	if (likely(prev != next)) {
 		rq->nr_switches++;
 		rq->curr = next;
-		context_switch(prev, next);
-
-		/*
-		 * The runqueue pointer might be from another CPU
-		 * if the new task was last running on a different
-		 * CPU - thus re-load it.
-		 */
-		mb();
+	
+		prepare_arch_switch(rq);
+		prev = context_switch(prev, next);
+		barrier();
 		rq = this_rq();
-	}
-	spin_unlock_irq(&rq->lock);
+		finish_arch_switch(rq);
+	} else
+		spin_unlock_irq(&rq->lock);
+	finish_arch_schedule(prev);
 
 	reacquire_kernel_lock(current);
 	preempt_enable_no_resched();
 	if (test_thread_flag(TIF_NEED_RESCHED))
 		goto need_resched;
-	return;
 }
 
 #ifdef CONFIG_PREEMPT

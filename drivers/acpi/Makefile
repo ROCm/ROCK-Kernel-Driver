@@ -12,7 +12,7 @@ endif
 
 EXTRA_CFLAGS	+= $(ACPI_CFLAGS)
 
-export-objs 	:= acpi_ksyms.o
+export-objs 	:= acpi_ksyms.o processor.o
 
 obj-y		:= acpi_ksyms.o 
 

@@ -50,12 +50,12 @@ if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
    fi
    bool '  HiSax debugging' CONFIG_HISAX_DEBUG
 
-   dep_tristate 'Sedlbauer PCMCIA cards'                              CONFIG_HISAX_SEDLBAUER_CS  $CONFIG_DRV_ISDN_HISAX $CONFIG_PCMCIA
-   dep_tristate 'ELSA PCMCIA MicroLink cards'                         CONFIG_HISAX_ELSA_CS       $CONFIG_DRV_ISDN_HISAX $CONFIG_PCMCIA
-   dep_tristate 'ST5481 USB ISDN modem (EXPERIMENTAL)'                CONFIG_HISAX_ST5481        $CONFIG_DRV_ISDN_HISAX $CONFIG_USB $CONFIG_EXPERIMENTAL
-   dep_tristate 'AVM Fritz!Card PCI/PCIv2/PnP support (EXPERIMENTAL)' CONFIG_HISAX_FRITZ_PCIPNP  $CONFIG_DRV_ISDN_HISAX $CONFIG_EXPERIMENTAL
-   dep_tristate 'AVM Fritz!Card classic support (EXPERIMENTAL)'       CONFIG_HISAX_FRITZ_CLASSIC $CONFIG_DRV_ISDN_HISAX  $CONFIG_EXPERIMENTAL
-   dep_tristate 'HFC PCI support (EXPERIMENTAL)'                      CONFIG_HISAX_HFCPCI        $CONFIG_DRV_ISDN_HISAX $CONFIG_EXPERIMENTAL
+   dep_tristate 'Sedlbauer PCMCIA cards'                              CONFIG_HISAX_SEDLBAUER_CS  $CONFIG_ISDN_DRV_HISAX $CONFIG_PCMCIA
+   dep_tristate 'ELSA PCMCIA MicroLink cards'                         CONFIG_HISAX_ELSA_CS       $CONFIG_ISDN_DRV_HISAX $CONFIG_PCMCIA
+   dep_tristate 'ST5481 USB ISDN modem (EXPERIMENTAL)'                CONFIG_HISAX_ST5481        $CONFIG_ISDN_DRV_HISAX $CONFIG_USB $CONFIG_EXPERIMENTAL
+   dep_tristate 'AVM Fritz!Card PCI/PCIv2/PnP support (EXPERIMENTAL)' CONFIG_HISAX_FRITZ_PCIPNP  $CONFIG_ISDN_DRV_HISAX $CONFIG_EXPERIMENTAL
+   dep_tristate 'AVM Fritz!Card classic support (EXPERIMENTAL)'       CONFIG_HISAX_FRITZ_CLASSIC $CONFIG_ISDN_DRV_HISAX  $CONFIG_EXPERIMENTAL
+   dep_tristate 'HFC PCI support (EXPERIMENTAL)'                      CONFIG_HISAX_HFCPCI        $CONFIG_ISDN_DRV_HISAX $CONFIG_EXPERIMENTAL
 fi
 endmenu
 

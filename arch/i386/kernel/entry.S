@@ -193,6 +193,7 @@ ENTRY(lcall27)
 
 ENTRY(ret_from_fork)
 #if CONFIG_SMP || CONFIG_PREEMPT
+	# NOTE: this function takes a parameter but it's unused on x86.
 	call schedule_tail
 #endif
 	GET_THREAD_INFO(%ebx)

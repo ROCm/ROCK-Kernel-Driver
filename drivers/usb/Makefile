@@ -3,7 +3,6 @@
 #
 
 # Object files in subdirectories
-mod-subdirs	:= serial
 
 obj-$(CONFIG_USB)		+= core/
 

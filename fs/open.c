@@ -304,7 +304,8 @@ asmlinkage long sys_utimes(char * filename, struct timeval * utimes)
 		newattrs.ia_mtime = times[1].tv_sec;
 		newattrs.ia_valid |= ATTR_ATIME_SET | ATTR_MTIME_SET;
 	} else {
-		if ((error = permission(inode,MAY_WRITE)) != 0)
+		if (current->fsuid != inode->i_uid &&
+		    (error = permission(inode,MAY_WRITE)) != 0)
 			goto dput_and_out;
 	}
 	down(&inode->i_sem);

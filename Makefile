@@ -122,7 +122,9 @@ export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
-		    clean mrproper distclean
+		    clean mrproper distclean \
+		    tags TAGS sgmldocs psdocs pdfdocs htmldocs \
+		    checkconfig checkhelp checkincludes
 
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
@@ -431,44 +433,9 @@ modules modules_install: FORCE
 
 endif # CONFIG_MODULES
 
-# Scripts to check various things for consistency
-# ---------------------------------------------------------------------------
-
-checkconfig:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
-
-checkhelp:
-	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
-
-checkincludes:
-	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
-
-# Generate tags for editors
-# ---------------------------------------------------------------------------
-
-TAGS: FORCE
-	{ find include/asm-${ARCH} -name '*.h' -print ; \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
-	find $(SUBDIRS) init arch/${ARCH} -name '*.[chS]' ; } | grep -v SCCS | etags -
-
-# 	Exuberant ctags works better with -I
-tags: FORCE
-	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
-	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
-	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
-
-# Assorted miscellaneous targets
-# ---------------------------------------------------------------------------
-
-# Documentation targets
-
-sgmldocs psdocs pdfdocs htmldocs:
-	@$(MAKE) -C Documentation/DocBook $@
-
-
 # RPM target
-#
+# ---------------------------------------------------------------------------
+
 #	If you do a make spec before packing the tarball you can rpm -ta it
 
 spec:
@@ -650,7 +617,41 @@ distclean: mrproper
 	 	-o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -type f \
 		-print | xargs rm -f
 
+# Generate tags for editors
+# ---------------------------------------------------------------------------
+
+TAGS: FORCE
+	{ find include/asm-${ARCH} -name '*.h' -print ; \
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
+	find $(SUBDIRS) init arch/${ARCH} -name '*.[chS]' ; } | grep -v SCCS | etags -
+
+# 	Exuberant ctags works better with -I
+tags: FORCE
+	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
+	ctags $$CTAGSF `find include/asm-$(ARCH) -name '*.h'` && \
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs ctags $$CTAGSF -a && \
+	find $(SUBDIRS) init -name '*.[ch]' | xargs ctags $$CTAGSF -a
+
+# Documentation targets
+# ---------------------------------------------------------------------------
+
+sgmldocs psdocs pdfdocs htmldocs:
+	@$(MAKE) -C Documentation/DocBook $@
+
+
 endif # ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
+
+# Scripts to check various things for consistency
+# ---------------------------------------------------------------------------
+
+checkconfig:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkconfig.pl
+
+checkhelp:
+	find * -name [cC]onfig.in -print | sort | xargs $(PERL) -w scripts/checkhelp.pl
+
+checkincludes:
+	find * -name '*.[hcS]' -type f -print | sort | xargs $(PERL) -w scripts/checkincludes.pl
 
 # FIXME Should go into a make.lib or something 
 # ===========================================================================

@@ -291,7 +291,7 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 
 	TCQ_PRINTK("%s: stat %x, feat %x\n", __FUNCTION__, stat, feat);
 
-	rq = blk_queue_tag_request(&drive->queue, tag);
+	rq = blk_queue_find_tag(&drive->queue, tag);
 	if (!rq) {
 		printk(KERN_ERR"%s: missing request for tag %d\n", __FUNCTION__, tag);
 		return ide_stopped;

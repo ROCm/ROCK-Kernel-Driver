@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 162 $
+ *              $Revision: 163 $
  *
  *****************************************************************************/
 
@@ -427,40 +427,6 @@ acpi_ut_get_event_name (
 }
 
 
-#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
-
-/*
- * Strings and procedures used for debug only
- *
- */
-
-
-/*****************************************************************************
- *
- * FUNCTION:    Acpi_ut_get_mutex_name
- *
- * PARAMETERS:  None.
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Translate a mutex ID into a name string (Debug only)
- *
- ****************************************************************************/
-
-NATIVE_CHAR *
-acpi_ut_get_mutex_name (
-	u32                     mutex_id)
-{
-
-	if (mutex_id > MAX_MTX)
-	{
-		return ("Invalid Mutex ID");
-	}
-
-	return (acpi_gbl_mutex_names[mutex_id]);
-}
-
-
 /*****************************************************************************
  *
  * FUNCTION:    Acpi_ut_get_type_name
@@ -552,6 +518,40 @@ acpi_ut_get_object_type_name (
 	}
 
 	return (acpi_ut_get_type_name (ACPI_GET_OBJECT_TYPE (obj_desc)));
+}
+
+
+#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
+
+/*
+ * Strings and procedures used for debug only
+ *
+ */
+
+
+/*****************************************************************************
+ *
+ * FUNCTION:    Acpi_ut_get_mutex_name
+ *
+ * PARAMETERS:  None.
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Translate a mutex ID into a name string (Debug only)
+ *
+ ****************************************************************************/
+
+NATIVE_CHAR *
+acpi_ut_get_mutex_name (
+	u32                     mutex_id)
+{
+
+	if (mutex_id > MAX_MTX)
+	{
+		return ("Invalid Mutex ID");
+	}
+
+	return (acpi_gbl_mutex_names[mutex_id]);
 }
 
 

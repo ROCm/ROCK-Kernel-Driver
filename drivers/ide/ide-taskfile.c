@@ -176,6 +176,9 @@ int drive_is_ready(struct ata_device *drive)
 	return 1;	/* drive ready: *might* be interrupting */
 }
 
+/*
+ * FIXME: Channel lock should be held on entry.
+ */
 ide_startstop_t ata_taskfile(struct ata_device *drive,
 		struct ata_taskfile *ar, struct request *rq)
 {

@@ -85,6 +85,10 @@ real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m
 # Only build module versions for files which are selected to be built
 export-objs := $(filter $(export-objs),$(real-objs-y) $(real-objs-m))
 
+# The temporary file to save gcc -MD generated dependencies must not
+# contain a comma
+depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
+
 # We're called for one of three purposes:
 # o fastdep: build module version files (.ver) for $(export-objs) in
 #   the current directory
@@ -131,7 +135,7 @@ $(MODVERDIR)/$(real-objs-y:.o=.ver): modkern_cflags := $(CFLAGS_KERNEL)
 $(MODVERDIR)/$(real-objs-m:.o=.ver): modkern_cflags := $(CFLAGS_MODULE)
 $(MODVERDIR)/$(export-objs:.o=.ver): export_flags   := -D__GENKSYMS__
 
-c_flags = -Wp,-MD,$(@D)/.$(@F).d $(CFLAGS) $(NOSTDINC_FLAGS) \
+c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
 	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
 	  $(export_flags) 
@@ -216,7 +220,7 @@ $(export-objs:.o=.i)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.s)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.lst): export_flags   := $(EXPORT_FLAGS)
 
-c_flags = -Wp,-MD,$(@D)/.$(@F).d $(CFLAGS) $(NOSTDINC_FLAGS) \
+c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
 	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
 	  $(export_flags) 
@@ -253,7 +257,7 @@ modkern_aflags := $(AFLAGS_KERNEL)
 $(real-objs-m)      : modkern_aflags := $(AFLAGS_MODULE)
 $(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
 
-a_flags = -Wp,-MD,$(@D)/.$(@F).d $(AFLAGS) $(NOSTDINC_FLAGS) \
+a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS) \
 	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
 quiet_cmd_as_s_S = CPP    $(RELDIR)/$@
@@ -333,7 +337,8 @@ host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
 
 quiet_cmd_host_cc__c  = HOSTCC $(RELDIR)/$@
 cmd_host_cc__c        = $(HOSTCC) -Wp,-MD,.$(subst /,_,$@).d \
-			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) -o $@ $<
+			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) \
+			$(HOST_LOADLIBES) -o $@ $<
 
 $(host-progs-single): %: %.c FORCE
 	$(call if_changed_dep,host_cc__c)
@@ -447,8 +452,8 @@ if_changed_dep = $(if $(strip $? \
 	@set -e; \
 	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
 	$(cmd_$(1)); \
-	$(TOPDIR)/scripts/fixdep $(@D)/.$(@F).d $@ $(TOPDIR) '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
-	rm -f $(@D)/.$(@F).d; \
+	$(TOPDIR)/scripts/fixdep $(depfile) $@ $(TOPDIR) '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
+	rm -f $(depfile); \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 
 # If quiet is set, only print short version of command

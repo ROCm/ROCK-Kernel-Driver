@@ -514,8 +514,8 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 			inode->i_mapping->a_ops = &ext3_writeback_aops;
 		else
 			inode->i_mapping->a_ops = &ext3_aops;
-		ext3_mark_inode_dirty(handle, inode);
 		err = ext3_add_nondir(handle, dentry, inode);
+		ext3_mark_inode_dirty(handle, inode);
 	}
 	ext3_journal_stop(handle, dir);
 	unlock_kernel();
@@ -543,8 +543,8 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 	err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
 		init_special_inode(inode, mode, rdev);
-		ext3_mark_inode_dirty(handle, inode);
 		err = ext3_add_nondir(handle, dentry, inode);
+		ext3_mark_inode_dirty(handle, inode);
 	}
 	ext3_journal_stop(handle, dir);
 	unlock_kernel();
@@ -1006,8 +1006,8 @@ static int ext3_symlink (struct inode * dir,
 		inode->i_size = l-1;
 	}
 	EXT3_I(inode)->i_disksize = inode->i_size;
-	ext3_mark_inode_dirty(handle, inode);
 	err = ext3_add_nondir(handle, dentry, inode);
+	ext3_mark_inode_dirty(handle, inode);
 out_stop:
 	ext3_journal_stop(handle, dir);
 	unlock_kernel();
@@ -1046,8 +1046,8 @@ static int ext3_link (struct dentry * old_dentry,
 	ext3_inc_count(handle, inode);
 	atomic_inc(&inode->i_count);
 
-	ext3_mark_inode_dirty(handle, inode);
 	err = ext3_add_nondir(handle, dentry, inode);
+	ext3_mark_inode_dirty(handle, inode);
 	ext3_journal_stop(handle, dir);
 	unlock_kernel();
 	return err;

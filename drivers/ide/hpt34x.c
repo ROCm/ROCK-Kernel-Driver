@@ -5,19 +5,7 @@
  * Copyright (C) 1998-2000	Andre Hedrick <andre@linux-ide.org>
  * May be copied or modified under the terms of the GNU General Public License
  *
- *
- * 00:12.0 Unknown mass storage controller:
- * Triones Technologies, Inc.
- * Unknown device 0003 (rev 01)
- *
- * hde: UDMA 2 (0x0000 0x0002) (0x0000 0x0010)
- * hdf: UDMA 2 (0x0002 0x0012) (0x0010 0x0030)
- * hde: DMA 2  (0x0000 0x0002) (0x0000 0x0010)
- * hdf: DMA 2  (0x0002 0x0012) (0x0010 0x0030)
- * hdg: DMA 1  (0x0012 0x0052) (0x0030 0x0070)
- * hdh: DMA 1  (0x0052 0x0252) (0x0070 0x00f0)
- *
- * ide-pci.c reference
+ * ide-pci.c reference:
  *
  * Since there are two cards that report almost identically,
  * the only discernable difference is the values reported in pcicmd.
@@ -45,53 +33,34 @@
 #include "ata-timing.h"
 #include "pcihost.h"
 
-#ifndef SPLIT_BYTE
-# define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
-#endif
-
 #define HPT343_DEBUG_DRIVE_INFO		0
 
-static void hpt34x_clear_chipset(struct ata_device *drive)
+static int hpt34x_tune_chipset(struct ata_device *drive, u8 speed)
 {
-	unsigned int reg1	= 0, tmp1 = 0;
-	unsigned int reg2	= 0, tmp2 = 0;
+	struct pci_dev *dev = drive->channel->pci_dev;
+	u8 udma = 0, pio = 0;
+	u32 reg1, reg2, tmp1, tmp2;
 
-	pci_read_config_dword(drive->channel->pci_dev, 0x44, &reg1);
-	pci_read_config_dword(drive->channel->pci_dev, 0x48, &reg2);
-	tmp1 = ((0x00 << (3 * drive->dn)) | (reg1 & ~(7 << (3 * drive->dn))));
-	tmp2 = (reg2 & ~(0x11 << drive->dn));
-	pci_write_config_dword(drive->channel->pci_dev, 0x44, tmp1);
-	pci_write_config_dword(drive->channel->pci_dev, 0x48, tmp2);
-}
+	if (speed >= XFER_UDMA_0)
+		udma = 0x01;
+	else if (speed >= XFER_SW_DMA_0)
+		udma = 0x10;
+	else
+		pio = speed & 7;
 
-static int hpt34x_tune_chipset(struct ata_device *drive, byte speed)
-{
-	byte			hi_speed, lo_speed;
-	unsigned int reg1	= 0, tmp1 = 0;
-	unsigned int reg2	= 0, tmp2 = 0;
-
-	SPLIT_BYTE(speed, hi_speed, lo_speed);
-
-	if (hi_speed & 7) {
-		hi_speed = (hi_speed & 4) ? 0x01 : 0x10;
-	} else {
-		lo_speed <<= 5;
-		lo_speed >>= 5;
-	}
-
-	pci_read_config_dword(drive->channel->pci_dev, 0x44, &reg1);
-	pci_read_config_dword(drive->channel->pci_dev, 0x48, &reg2);
-	tmp1 = ((lo_speed << (3*drive->dn)) | (reg1 & ~(7 << (3*drive->dn))));
-	tmp2 = ((hi_speed << drive->dn) | reg2);
-	pci_write_config_dword(drive->channel->pci_dev, 0x44, tmp1);
-	pci_write_config_dword(drive->channel->pci_dev, 0x48, tmp2);
+	pci_read_config_dword(dev, 0x44, &reg1);
+	pci_read_config_dword(dev, 0x48, &reg2);
+	tmp1 = (pio << (3*drive->dn)) | (reg1 & ~(7 << (3*drive->dn)));
+	tmp2 = (udma << drive->dn) | (reg2 & ~(0x11 << drive->dn));
+	pci_write_config_dword(dev, 0x44, tmp1);
+	pci_write_config_dword(dev, 0x48, tmp2);
 
 #if HPT343_DEBUG_DRIVE_INFO
 	printk("%s: %02x drive%d (0x%04x 0x%04x) (0x%04x 0x%04x)" \
 		" (0x%02x 0x%02x) 0x%04x\n",
 		drive->name, speed,
 		drive->dn, reg1, tmp1, reg2, tmp2,
-		hi_speed, lo_speed, err);
+		udma, pio, err);
 #endif
 
 	drive->current_speed = speed;
@@ -103,7 +72,7 @@ static void config_chipset_for_pio(struct ata_device *drive)
 	unsigned short eide_pio_timing[6] = {960, 480, 240, 180, 120, 90};
 	unsigned short xfer_pio = drive->id->eide_pio_modes;
 
-	byte	timing, speed, pio;
+	u8 timing, speed, pio;
 
 	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
@@ -135,19 +104,9 @@ static void config_chipset_for_pio(struct ata_device *drive)
 	(void) hpt34x_tune_chipset(drive, speed);
 }
 
-static void hpt34x_tune_drive(struct ata_device *drive, byte pio)
+static void hpt34x_tune_drive(struct ata_device *drive, u8 pio)
 {
-	byte speed;
-
-	switch(pio) {
-		case 4:		speed = XFER_PIO_4;break;
-		case 3:		speed = XFER_PIO_3;break;
-		case 2:		speed = XFER_PIO_2;break;
-		case 1:		speed = XFER_PIO_1;break;
-		default:	speed = XFER_PIO_0;break;
-	}
-	hpt34x_clear_chipset(drive);
-	(void) hpt34x_tune_chipset(drive, speed);
+	(void) hpt34x_tune_chipset(drive, XFER_PIO_0 + min_t(u8, pio, 4));
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -168,7 +127,6 @@ static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 	if (mode < XFER_SW_DMA_0)
 		return 0;
 
-	hpt34x_clear_chipset(drive);
 	return !hpt34x_tune_chipset(drive, mode);
 }
 

@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-mod-subdirs  := opl3 mpu401
-
 snd-dummy-objs := dummy.o
 snd-mtpav-objs := mtpav.o
 snd-serial-u16550-objs := serial-u16550.o

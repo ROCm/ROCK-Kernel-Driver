@@ -148,7 +148,7 @@ static dev_link_t *avmcs_attach(void)
     /* Initialize the dev_link_t structure */
     link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
     if (!link)
-	return NULL;
+        goto err;
     memset(link, 0, sizeof(struct dev_link_t));
     link->release.function = &avmcs_release;
     link->release.data = (u_long)link;
@@ -181,7 +181,7 @@ static dev_link_t *avmcs_attach(void)
     /* Allocate space for private device-specific data */
     local = kmalloc(sizeof(local_info_t), GFP_KERNEL);
     if (!local)
-	return NULL;
+        goto err_kfree;
     memset(local, 0, sizeof(local_info_t));
     link->priv = local;
     
@@ -201,10 +201,14 @@ static dev_link_t *avmcs_attach(void)
     if (ret != 0) {
 	cs_error(link->handle, RegisterClient, ret);
 	avmcs_detach(link);
-	return NULL;
+	goto err;
     }
-
     return link;
+
+ err_kfree:
+    kfree(link);
+ err:
+    return NULL;
 } /* avmcs_attach */
 
 /*======================================================================

@@ -4,9 +4,6 @@
 #
 # $Id: Makefile,v 1.63 2001/06/13 09:43:07 dwmw2 Exp $
 
-
-mod-subdirs	:= chips maps devices nand
-
 export-objs	:= mtdcore.o mtdpart.o redboot.o bootldr.o afs.o
 
 obj-y           += chips/ maps/	devices/ nand/

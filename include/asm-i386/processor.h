@@ -267,6 +267,7 @@ extern unsigned int mca_pentium_flag;
  * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
  */
 #define IO_BITMAP_SIZE	32
+#define IO_BITMAP_BYTES	(IO_BITMAP_SIZE * 4)
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 
@@ -370,8 +371,7 @@ struct thread_struct {
 	unsigned long		screen_bitmap;
 	unsigned long		v86flags, v86mask, v86mode, saved_esp0;
 /* IO permissions */
-	int		ioperm;
-	unsigned long	io_bitmap[IO_BITMAP_SIZE+1];
+	unsigned long	*ts_io_bitmap;
 };
 
 #define INIT_THREAD  {						\
@@ -381,7 +381,7 @@ struct thread_struct {
 	0, 0, 0,						\
 	{ { 0, }, },		/* 387 state */			\
 	0,0,0,0,0,0,						\
-	0,{~0,}			/* io permissions */		\
+	NULL,			/* io permissions */		\
 }
 
 #define INIT_TSS  {						\

@@ -385,7 +385,7 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 /* v */	NULL,
 /* w */	NULL,
 /* x */	NULL,
-/* w */	NULL,
+/* y */	NULL,
 /* z */	NULL
 };
 

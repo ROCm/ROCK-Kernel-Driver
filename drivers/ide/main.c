@@ -325,7 +325,6 @@ void ide_driver_module(void)
 	int i;
 
 	/* Don't reinit the probe if there is already one channel detected. */
-
 	for (i = 0; i < MAX_HWIFS; ++i) {
 		if (ide_hwifs[i].present)
 			goto revalidate;
@@ -565,31 +564,10 @@ static int subdriver_match(struct ata_channel *channel, struct ata_operations *o
 		if (drive->present && !drive->driver) {
 			(*ops->attach)(drive);
 			if (drive->driver != NULL)
-				count++;
+				++count;
 		}
 	}
 	return count;
-}
-
-static struct ata_operations * subdriver_iterator(struct ata_operations *prev)
-{
-	struct ata_operations *tmp;
-	unsigned long flags;
-
-	spin_lock_irqsave(&ata_drivers_lock, flags);
-
-	/* Restart from beginning if current ata_operations was deallocated,
-	   or if prev is NULL. */
-	for(tmp = ata_drivers; tmp != prev && tmp; tmp = tmp->next);
-	if (!tmp)
-		tmp = ata_drivers;
-	else
-		tmp = tmp->next;
-
-	spin_unlock_irqrestore(&ata_drivers_lock, flags);
-
-	return tmp;
-
 }
 
 /*
@@ -601,7 +579,6 @@ int ide_register_hw(hw_regs_t *hw)
 	int h;
 	int retry = 1;
 	struct ata_channel *ch;
-	struct ata_operations *subdriver;
 
 	do {
 		for (h = 0; h < MAX_HWIFS; ++h) {
@@ -639,12 +616,20 @@ found:
 	}
 
 	/* Look up whatever there is a subdriver, which will serve this
-	 * device.
+	 * device and execute the attach method it is providing.
 	 */
-	subdriver = NULL;
-	while ((subdriver = subdriver_iterator(subdriver))) {
-		if (subdriver_match(ch, subdriver) > 0)
-			break;
+	{
+		struct ata_operations *tmp;
+		unsigned long flags;
+
+		struct ata_operations *sd = NULL;
+
+		spin_lock_irqsave(&ata_drivers_lock, flags);
+		for(tmp = ata_drivers; tmp; tmp = tmp->next) {
+			if (subdriver_match(ch, tmp) > 0)
+				break;
+		}
+		spin_unlock_irqrestore(&ata_drivers_lock, flags);
 	}
 
 	return (initializing || ch->present) ? h : -1;
