@@ -25,7 +25,6 @@
 
 #include "op_impl.h"
 
-extern struct op_ppc32_model op_model_fsl_booke;
 static struct op_ppc32_model *model;
 
 static struct op_counter_config ctr[OP_MAX_COUNTER];

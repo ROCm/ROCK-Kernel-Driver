@@ -32,15 +32,7 @@
 #include <asm/io.h>
 #include <asm/reg.h>
 #include <asm/xmon.h>
-
-void init_pmc_stop(int ctr);
-void set_pmc_event(int ctr, int event);
-void set_pmc_user_kernel(int ctr, int user, int kernel);
-void set_pmc_marked(int ctr, int mark0, int mark1);
-void pmc_start_ctr(int ctr, int enable);
-void pmc_start_ctrs(int enable);
-void pmc_stop_ctrs(void);
-void dump_pmcs(void);
+#include <asm/perfmon.h>
 
 static inline u32 get_pmlca(int ctr);
 static inline void set_pmlca(int ctr, u32 pmlca);
