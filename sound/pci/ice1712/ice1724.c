@@ -382,11 +382,6 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 		return;
 	}
 
-	if (rate == ice->cur_rate) {
-		spin_unlock_irqrestore(&ice->reg_lock, flags);
-		return;
-	}
-
 	switch (rate) {
 	case 8000: val = 6; break;
 	case 9600: val = 3; break;
@@ -409,6 +404,11 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 		break;
 	}
 	outb(val, ICEMT1724(ice, RATE));
+	if (rate == ice->cur_rate) {
+		spin_unlock_irqrestore(&ice->reg_lock, flags);
+		return;
+	}
+
 	ice->cur_rate = rate;
 
 	/* check MT02 */
