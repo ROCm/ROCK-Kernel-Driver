@@ -28,9 +28,9 @@ typedef struct ray_dev_t {
     dev_node_t  node;
     window_handle_t amem_handle;   /* handle to window for attribute memory  */
     window_handle_t rmem_handle;   /* handle to window for rx buffer on card */
-    UCHAR *sram;                   /* pointer to beginning of shared RAM     */
-    UCHAR *amem;                   /* pointer to attribute mem window        */
-    UCHAR *rmem;                   /* pointer to receive buffer window       */
+    void __iomem *sram;            /* pointer to beginning of shared RAM     */
+    void __iomem *amem;            /* pointer to attribute mem window        */
+    void __iomem *rmem;            /* pointer to receive buffer window       */
     dev_link_t *finder;            /* pointer back to dev_link_t for card    */
     struct timer_list timer;
     long tx_ccs_lock;
