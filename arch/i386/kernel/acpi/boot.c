@@ -28,6 +28,7 @@
 #include <linux/acpi.h>
 #include <linux/efi.h>
 #include <linux/irq.h>
+#include <linux/module.h>
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
 #include <asm/apic.h>
@@ -449,10 +450,12 @@ unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
 		static u16 irq_mask;
 		extern void eisa_set_level_irq(unsigned int irq);
 
-		if ((gsi < 16) && !((1 << gsi) & irq_mask)) {
-			Dprintk(KERN_DEBUG PREFIX "Setting GSI %u as level-triggered\n", gsi);
-			irq_mask |= (1 << gsi);
-			eisa_set_level_irq(gsi);
+		if (edge_level == ACPI_LEVEL_SENSITIVE) {
+			if ((gsi < 16) && !((1 << gsi) & irq_mask)) {
+				Dprintk(KERN_DEBUG PREFIX "Setting GSI %u as level-triggered\n", gsi);
+				irq_mask |= (1 << gsi);
+				eisa_set_level_irq(gsi);
+			}
 		}
 	}
 #endif
@@ -465,6 +468,7 @@ unsigned int acpi_register_gsi(u32 gsi, int edge_level, int active_high_low)
 	acpi_gsi_to_irq(gsi, &irq);
 	return irq;
 }
+EXPORT_SYMBOL(acpi_register_gsi);
 
 static unsigned long __init
 acpi_scan_rsdp (
