@@ -1298,6 +1298,16 @@ config SCSI_QLOGIC_1280
 	  The module will be called qla1280. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
+config SCSI_QLOGIC_1280_PIO
+	bool "Use PIO instead of MMIO" if !X86_VISWS
+	depends on SCSI_QLOGIC_1280
+	default y if X86_VISWS
+	help
+	  This instructs the driver to use programmed I/O ports (PIO) instead
+	  of PCI shared memory (MMIO).  This can possibly solve some problems
+	  in case your mainboard has memory consistency issues.  If unsure,
+	  say N.
+
 config SCSI_QLOGICPTI
 	tristate "PTI Qlogic, ISP Driver"
 	depends on SBUS && SCSI
