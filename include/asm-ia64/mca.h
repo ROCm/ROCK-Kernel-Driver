@@ -20,22 +20,7 @@
 #include <asm/processor.h>
 #include <asm/mca_asm.h>
 
-/* These are the return codes from all the IA64_MCA specific interfaces */
-typedef	int ia64_mca_return_code_t;
-
-enum {
-	IA64_MCA_SUCCESS	=	0,
-	IA64_MCA_FAILURE	=	1
-};
-
 #define IA64_MCA_RENDEZ_TIMEOUT		(20 * 1000)	/* value in milliseconds - 20 seconds */
-
-#define IA64_CMC_INT_DISABLE		0
-#define IA64_CMC_INT_ENABLE		1
-
-
-typedef u32 int_vector_t;
-typedef u64 millisec_t;
 
 typedef union cmcv_reg_u {
 	u64	cmcv_regval;
@@ -52,10 +37,6 @@ typedef union cmcv_reg_u {
 
 #define cmcv_mask		cmcv_reg_s.cmcr_mask
 #define cmcv_vector		cmcv_reg_s.cmcr_vector
-
-
-#define IA64_MCA_UCMC_HANDLER_SIZE	0x10
-#define IA64_INIT_HANDLER_SIZE		0x10
 
 enum {
 	IA64_MCA_RENDEZ_CHECKIN_NOTDONE	=	0x0,
@@ -84,16 +65,6 @@ typedef struct ia64_mc_info_s {
 	u8		imi_rendez_checkin[NR_CPUS];
 
 } ia64_mc_info_t;
-
-/* Possible rendez states passed from SAL to OS during MCA
- * handoff
- */
-enum {
-	IA64_MCA_RENDEZ_NOT_RQD		=	0x0,
-	IA64_MCA_RENDEZ_DONE_WITHOUT_INIT	=	0x1,
-	IA64_MCA_RENDEZ_DONE_WITH_INIT		=	0x2,
-	IA64_MCA_RENDEZ_FAILURE			=	-1
-};
 
 typedef struct ia64_mca_sal_to_os_state_s {
 	u64		imsto_os_gp;		/* GP of the os registered with the SAL */
@@ -144,10 +115,6 @@ extern void ia64_monarch_init_handler(void);
 extern void ia64_slave_init_handler(void);
 extern void ia64_mca_cmc_vector_setup(void);
 extern int  ia64_mca_check_errors(void);
-
-#undef	MCA_TEST
-
-#undef IA64_MCA_DEBUG_INFO
 
 #if defined(IA64_MCA_DEBUG_INFO)
 # define IA64_MCA_DEBUG(fmt...)	printk(fmt)

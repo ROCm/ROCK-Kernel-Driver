@@ -45,6 +45,7 @@
  *            Avoid deadlock when using printk() for MCA and INIT records.
  *            Delete all record printing code, moved to salinfo_decode in user space.
  *            Mark variables and functions static where possible.
+ *            Delete dead variables and functions.
  */
 #include <linux/config.h>
 #include <linux/types.h>
@@ -73,14 +74,12 @@
 #include <asm/irq.h>
 #include <asm/hw_irq.h>
 
-#undef MCA_PRT_XTRA_DATA
-
 typedef struct ia64_fptr {
 	unsigned long fp;
 	unsigned long gp;
 } ia64_fptr_t;
 
-static ia64_mc_info_t		ia64_mc_info;
+/* Used by mca_asm.S */
 ia64_mca_sal_to_os_state_t	ia64_sal_to_os_handoff_state;
 ia64_mca_os_to_sal_state_t	ia64_os_to_sal_handoff_state;
 u64				ia64_mca_proc_state_dump[512];
@@ -88,8 +87,19 @@ u64				ia64_mca_stack[1024] __attribute__((aligned(16)));
 u64				ia64_mca_stackframe[32];
 u64				ia64_mca_bspstore[1024];
 u64				ia64_init_stack[KERNEL_STACK_SIZE/8] __attribute__((aligned(16)));
-u64				ia64_os_mca_recovery_successful;
 u64				ia64_mca_serialize;
+
+/* In mca_asm.S */
+extern void			ia64_monarch_init_handler (void);
+extern void			ia64_slave_init_handler (void);
+
+static ia64_mc_info_t		ia64_mc_info;
+
+extern struct hw_interrupt_type	irq_type_iosapic_level;
+
+struct ia64_mca_tlb_info ia64_mca_tlb_list[NR_CPUS];
+
+/* Forward declarations, the code is not in a nice order */
 static void			ia64_mca_wakeup_ipi_wait(void);
 static void			ia64_mca_wakeup(int cpu);
 static void			ia64_mca_wakeup_all(void);
@@ -100,12 +110,7 @@ static irqreturn_t		ia64_mca_cmc_int_handler(int,void *,struct pt_regs *);
 static irqreturn_t		ia64_mca_cpe_int_handler(int, void *, struct pt_regs *);
 static irqreturn_t		ia64_mca_cmc_int_caller(int,void *,struct pt_regs *);
 static irqreturn_t		ia64_mca_cpe_int_caller(int,void *,struct pt_regs *);
-extern void			ia64_monarch_init_handler (void);
-extern void			ia64_slave_init_handler (void);
 static u64			ia64_log_get(int sal_info_type, u8 **buffer);
-extern struct hw_interrupt_type	irq_type_iosapic_level;
-
-struct ia64_mca_tlb_info ia64_mca_tlb_list[NR_CPUS];
 
 static struct irqaction cmci_irqaction = {
 	.handler =	ia64_mca_cmc_int_handler,
@@ -206,11 +211,6 @@ ia64_mca_log_sal_error_record(int sal_info_type, int called_from_init)
  * platform dependent error handling
  */
 #ifndef PLATFORM_MCA_HANDLERS
-static void
-mca_handler_platform (void)
-{
-
-}
 
 static irqreturn_t
 ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
@@ -412,23 +412,6 @@ init_handler_platform (pal_min_state_area_t *ms,
 }
 
 /*
- * ia64_mca_init_platform
- *
- *  External entry for platform specific MCA initialization.
- *
- *  Inputs
- *      None
- *
- *  Outputs
- *      None
- */
-static void
-ia64_mca_init_platform (void)
-{
-
-}
-
-/*
  *  ia64_mca_check_errors
  *
  *  External entry to check for error records which may have been posted by SAL
@@ -627,9 +610,6 @@ ia64_mca_init(void)
 
 	IA64_MCA_DEBUG("ia64_mca_init: begin\n");
 
-	/* initialize recovery success indicator */
-	ia64_os_mca_recovery_successful = 0;
-
 	/* Clear the Rendez checkin flag for all cpus */
 	for(i = 0 ; i < NR_CPUS; i++)
 		ia64_mc_info.imi_rendez_checkin[i] = IA64_MCA_RENDEZ_CHECKIN_NOTDONE;
@@ -697,7 +677,7 @@ ia64_mca_init(void)
 
 	/*
 	 * XXX - disable SAL checksum by setting size to 0, should be
-	 * IA64_INIT_HANDLER_SIZE
+	 * size of the actual init handler in mca_asm.S.
 	 */
 	ia64_mc_info.imi_monarch_init_handler		= ia64_tpa(mon_init_ptr->fp);
 	ia64_mc_info.imi_monarch_init_handler_size	= 0;
@@ -766,17 +746,7 @@ ia64_mca_init(void)
 	ia64_log_init(SAL_INFO_TYPE_CMC);
 	ia64_log_init(SAL_INFO_TYPE_CPE);
 
-#if defined(MCA_TEST)
-	mca_test();
-#endif /* #if defined(MCA_TEST) */
-
 	printk(KERN_INFO "Mca related initialization done\n");
-
-	/* commented out because this is done elsewhere */
-#if 0
-	/* Do post-failure MCA error logging */
-	ia64_mca_check_errors();
-#endif
 }
 
 /*
