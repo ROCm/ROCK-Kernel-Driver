@@ -1102,8 +1102,7 @@ static ide_pci_device_t siimage_chipsets[] __devinitdata = {
  
 static int __devinit siimage_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &siimage_chipsets[id->driver_data]);
-	return 0;
+	return ide_setup_pci_device(dev, &siimage_chipsets[id->driver_data]);
 }
 
 static struct pci_device_id siimage_pci_tbl[] = {

@@ -414,9 +414,9 @@ static struct chipset_bus_clock_list_entry sixty_six_base_hpt374[] = {
 #define F_LOW_PCI_50      0x2d
 #define F_LOW_PCI_66      0x42
 
-static void init_setup_hpt366(struct pci_dev *, ide_pci_device_t *);
-static void init_setup_hpt37x(struct pci_dev *, ide_pci_device_t *);
-static void init_setup_hpt374(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_hpt366(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_hpt37x(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_hpt374(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_hpt366(struct pci_dev *, const char *);
 static void init_hwif_hpt366(ide_hwif_t *);
 static void init_dma_hpt366(ide_hwif_t *, unsigned long);

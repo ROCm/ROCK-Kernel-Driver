@@ -493,9 +493,12 @@ static int __devinit amd74xx_probe(struct pci_dev *dev, const struct pci_device_
 {
 	amd_chipset = amd74xx_chipsets + id->driver_data;
 	amd_config = amd_ide_chips + id->driver_data;
-	if (dev->device != amd_config->id) BUG();
-	ide_setup_pci_device(dev, amd_chipset);
-	return 0;
+	if (dev->device != amd_config->id) {
+		printk(KERN_ERR "%s: assertion 0x%02x == 0x%02x failed !\n",
+		       pci_name(dev), dev->device, amd_config->id);
+		return -ENODEV;
+	}
+	return ide_setup_pci_device(dev, amd_chipset);
 }
 
 static struct pci_device_id amd74xx_pci_tbl[] = {

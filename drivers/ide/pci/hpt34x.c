@@ -251,8 +251,7 @@ static int __devinit hpt34x_init_one(struct pci_dev *dev, const struct pci_devic
 	d->name = chipset_names[(pcicmd & PCI_COMMAND_MEMORY) ? 1 : 0];
 	d->bootable = (pcicmd & PCI_COMMAND_MEMORY) ? OFF_BOARD : NEVER_BOARD;
 
-	ide_setup_pci_device(dev, d);
-	return 0;
+	return ide_setup_pci_device(dev, d);
 }
 
 static struct pci_device_id hpt34x_pci_tbl[] = {

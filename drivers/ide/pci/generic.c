@@ -96,25 +96,26 @@ static int __devinit generic_init_one(struct pci_dev *dev, const struct pci_devi
 {
 	ide_pci_device_t *d = &generic_chipsets[id->driver_data];
 	u16 command;
+	int ret = -ENODEV;
 
 	if (dev->vendor == PCI_VENDOR_ID_UMC &&
 	    dev->device == PCI_DEVICE_ID_UMC_UM8886A &&
 	    (!(PCI_FUNC(dev->devfn) & 1)))
-		return 1; /* UM8886A/BF pair */
+		goto out; /* UM8886A/BF pair */
 
 	if (dev->vendor == PCI_VENDOR_ID_OPTI &&
 	    dev->device == PCI_DEVICE_ID_OPTI_82C558 &&
 	    (!(PCI_FUNC(dev->devfn) & 1)))
-		return 1;
+		goto out;
 
 	pci_read_config_word(dev, PCI_COMMAND, &command);
-	if(!(command & PCI_COMMAND_IO))
-	{
+	if (!(command & PCI_COMMAND_IO)) {
 		printk(KERN_INFO "Skipping disabled %s IDE controller.\n", d->name);
-		return 1; 
+		goto out;
 	}
-	ide_setup_pci_device(dev, d);
-	return 0;
+	ret = ide_setup_pci_device(dev, d);
+out:
+	return ret;
 }
 
 static struct pci_device_id generic_pci_tbl[] = {

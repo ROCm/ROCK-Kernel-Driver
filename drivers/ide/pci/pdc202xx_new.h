@@ -43,9 +43,9 @@ const static char *pdc_quirk_drives[] = {
 		set_2regs(0x13,(c));			\
 	} while(0)
 
-static void init_setup_pdcnew(struct pci_dev *, ide_pci_device_t *);
-static void init_setup_pdc20270(struct pci_dev *, ide_pci_device_t *);
-static void init_setup_pdc20276(struct pci_dev *dev, ide_pci_device_t *d);
+static int init_setup_pdcnew(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_pdc20270(struct pci_dev *, ide_pci_device_t *);
+static int init_setup_pdc20276(struct pci_dev *dev, ide_pci_device_t *d);
 static unsigned int init_chipset_pdcnew(struct pci_dev *, const char *);
 static void init_hwif_pdc202new(ide_hwif_t *);
 

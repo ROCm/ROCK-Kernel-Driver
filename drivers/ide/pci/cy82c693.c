@@ -426,15 +426,16 @@ static int __devinit cy82c693_init_one(struct pci_dev *dev, const struct pci_dev
 {
 	ide_pci_device_t *d = &cy82c693_chipsets[id->driver_data];
 	struct pci_dev *dev2;
+	int ret = -ENODEV;
 
 	/* CY82C693 is more than only a IDE controller.
 	   Function 1 is primary IDE channel, function 2 - secondary. */
         if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE &&
 	    PCI_FUNC(dev->devfn) == 1) {
 		dev2 = pci_find_slot(dev->bus->number, dev->devfn + 1);
-		ide_setup_pci_devices(dev, dev2, d);
+		ret = ide_setup_pci_devices(dev, dev2, d);
 	}
-	return 0;
+	return ret;
 }
 
 static struct pci_device_id cy82c693_pci_tbl[] = {
