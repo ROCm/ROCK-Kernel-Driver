@@ -956,7 +956,7 @@ static void visor_set_termios (struct usb_serial_port *port, struct termios *old
 
 static int __init visor_init (void)
 {
-	int i;
+	int i, retval;
 	/* Only if parameters were passed to us */
 	if ((vendor>0) && (product>0)) {
 		struct usb_device_id usb_dev_temp[]=
@@ -983,12 +983,24 @@ static int __init visor_init (void)
 		info("Adding Palm OS protocol 4.x support for unknown device: 0x%x/0x%x",
 			vendor, product);
 	}
-	usb_serial_register (&handspring_device);
-	usb_serial_register (&clie_3_5_device);
-	usb_register (&visor_driver);
+	retval = usb_serial_register(&handspring_device);
+	if (retval)
+		goto failed_handspring_register;
+	retval = usb_serial_register(&clie_3_5_device);
+	if (retval)
+		goto failed_clie_3_5_register;
+	retval = usb_register(&visor_driver);
+	if (retval) 
+		goto failed_usb_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&clie_3_5_device);
+failed_clie_3_5_register:
+	usb_serial_deregister(&handspring_device);
+failed_handspring_register:
+	return retval;
 }
 
 
