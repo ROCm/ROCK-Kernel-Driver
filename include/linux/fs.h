@@ -623,12 +623,15 @@ extern spinlock_t files_lock;
 typedef struct files_struct *fl_owner_t;
 
 struct file_lock_operations {
+	void (*fl_insert)(struct file_lock *);	/* lock insertion callback */
+	void (*fl_remove)(struct file_lock *);	/* lock removal callback */
 	void (*fl_copy_lock)(struct file_lock *, struct file_lock *);
 	void (*fl_release_private)(struct file_lock *);
 };
 
 struct lock_manager_operations {
 	int (*fl_compare_owner)(struct file_lock *, struct file_lock *);
+	void (*fl_notify)(struct file_lock *);	/* unblock callback */
 };
 
 /* that will die - we need it for nfs_lock_info */
@@ -646,10 +649,6 @@ struct file_lock {
 	unsigned char fl_type;
 	loff_t fl_start;
 	loff_t fl_end;
-
-	void (*fl_notify)(struct file_lock *);	/* unblock callback */
-	void (*fl_insert)(struct file_lock *);	/* lock insertion callback */
-	void (*fl_remove)(struct file_lock *);	/* lock removal callback */
 
 	struct fasync_struct *	fl_fasync; /* for lease break notifications */
 	unsigned long fl_break_time;	/* for nonblocking lease breaks */

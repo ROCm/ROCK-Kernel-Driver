@@ -190,9 +190,6 @@ void locks_init_lock(struct file_lock *fl)
 	fl->fl_flags = 0;
 	fl->fl_type = 0;
 	fl->fl_start = fl->fl_end = 0;
-	fl->fl_notify = NULL;
-	fl->fl_insert = NULL;
-	fl->fl_remove = NULL;
 	fl->fl_ops = NULL;
 	fl->fl_lmops = NULL;
 }
@@ -226,9 +223,6 @@ void locks_copy_lock(struct file_lock *new, struct file_lock *fl)
 	new->fl_type = fl->fl_type;
 	new->fl_start = fl->fl_start;
 	new->fl_end = fl->fl_end;
-	new->fl_notify = fl->fl_notify;
-	new->fl_insert = fl->fl_insert;
-	new->fl_remove = fl->fl_remove;
 	new->fl_ops = fl->fl_ops;
 	new->fl_lmops = fl->fl_lmops;
 	if (fl->fl_ops && fl->fl_ops->fl_copy_lock)
@@ -333,9 +327,6 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 	fl->fl_pid = current->tgid;
 	fl->fl_file = filp;
 	fl->fl_flags = FL_POSIX;
-	fl->fl_notify = NULL;
-	fl->fl_insert = NULL;
-	fl->fl_remove = NULL;
 	fl->fl_ops = NULL;
 	fl->fl_lmops = NULL;
 
@@ -375,9 +366,6 @@ static int flock64_to_posix_lock(struct file *filp, struct file_lock *fl,
 	fl->fl_pid = current->tgid;
 	fl->fl_file = filp;
 	fl->fl_flags = FL_POSIX;
-	fl->fl_notify = NULL;
-	fl->fl_insert = NULL;
-	fl->fl_remove = NULL;
 	fl->fl_ops = NULL;
 	fl->fl_lmops = NULL;
 
@@ -413,9 +401,6 @@ static int lease_alloc(struct file *filp, int type, struct file_lock **flp)
 	}
 	fl->fl_start = 0;
 	fl->fl_end = OFFSET_MAX;
-	fl->fl_notify = NULL;
-	fl->fl_insert = NULL;
-	fl->fl_remove = NULL;
 	fl->fl_ops = NULL;
 	fl->fl_lmops = NULL;
 
@@ -491,8 +476,8 @@ static void locks_wake_up_blocks(struct file_lock *blocker)
 		struct file_lock *waiter = list_entry(blocker->fl_block.next,
 				struct file_lock, fl_block);
 		__locks_delete_block(waiter);
-		if (waiter->fl_notify)
-			waiter->fl_notify(waiter);
+		if (waiter->fl_lmops && waiter->fl_lmops->fl_notify)
+			waiter->fl_lmops->fl_notify(waiter);
 		else
 			wake_up(&waiter->fl_wait);
 	}
@@ -509,8 +494,8 @@ static void locks_insert_lock(struct file_lock **pos, struct file_lock *fl)
 	fl->fl_next = *pos;
 	*pos = fl;
 
-	if (fl->fl_insert)
-		fl->fl_insert(fl);
+	if (fl->fl_ops && fl->fl_ops->fl_insert)
+		fl->fl_ops->fl_insert(fl);
 }
 
 /*
@@ -533,8 +518,8 @@ static void locks_delete_lock(struct file_lock **thisfl_p)
 		fl->fl_fasync = NULL;
 	}
 
-	if (fl->fl_remove)
-		fl->fl_remove(fl);
+	if (fl->fl_ops && fl->fl_ops->fl_remove)
+		fl->fl_ops->fl_remove(fl);
 
 	locks_wake_up_blocks(fl);
 	locks_free_lock(fl);
