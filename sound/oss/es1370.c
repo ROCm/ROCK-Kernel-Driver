@@ -151,7 +151,6 @@
 #include <linux/soundcard.h>
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
-#include <linux/wrapper.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/spinlock.h>

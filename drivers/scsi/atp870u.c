@@ -86,7 +86,8 @@ static struct Scsi_Host *atp_host[MAX_ATP];
 
 static void send_s870(struct Scsi_Host *);
 
-static void atp870u_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t atp870u_intr_handle(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	unsigned long flags;
 	unsigned short int tmpcip, id;
@@ -108,7 +109,7 @@ static void atp870u_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		j = inb(tmport);
 		if ((j & 0x80) == 0) {
 			dev->in_int = 0;
-			return;
+			return IRQ_NONE;
 		}
 
 		tmpcip = dev->pciport;
@@ -175,13 +176,13 @@ stop_dma:
 			 *      Done
 			 */
 			dev->in_int = 0;
-			return;
+			goto out;
 		}
 
 		if (i == 0x40) {
 			dev->last_cmd |= 0x40;
 			dev->in_int = 0;
-			return;
+			goto out;
 		}
 
 		if (i == 0x21) {
@@ -202,7 +203,7 @@ stop_dma:
 			tmport += 0x08;
 			outb(0x08, tmport);
 			dev->in_int = 0;
-			return;
+			goto out;
 		}
 		if ((i == 0x80) || (i == 0x8f)) {
 			lun = 0;
@@ -228,7 +229,7 @@ stop_dma:
 					tmport += 0x04;
 					outb(0x08, tmport);
 					dev->in_int = 0;
-					return;
+					goto out;
 				} else {
 					outb(0x46, tmport);
 					dev->id[target_id].dirctu = 0x00;
@@ -239,7 +240,7 @@ stop_dma:
 					tmport += 0x03;
 					outb(0x08, tmport);
 					dev->in_int = 0;
-					return;
+					goto out;
 				}
 			}
 			if (dev->last_cmd != 0xff) {
@@ -313,7 +314,7 @@ stop_dma:
 				tmport = workportu + 0x18;
 				outb(0x08, tmport);
 				dev->in_int = 0;
-				return;
+				goto out;
 			}
 			prd = dev->id[target_id].prd_posu;
 			while (adrcntu != 0) {
@@ -352,12 +353,12 @@ stop_dma:
 				outb(0x08, tmport);
 				outb(0x01, tmpcip);
 				dev->in_int = 0;
-				return;
+				goto out;
 			}
 			outb(0x08, tmport);
 			outb(0x09, tmpcip);
 			dev->in_int = 0;
-			return;
+			goto out;
 		}
 
 		/*
@@ -417,7 +418,7 @@ go_42:
 				send_s870(host);
 			}
 			dev->in_int = 0;
-			return;
+			goto out;
 		}
 		if ((dev->last_cmd & 0xf0) != 0x40) {
 			dev->last_cmd = 0xff;
@@ -440,7 +441,7 @@ go_42:
 			outb(0x08, tmport);
 			outb(0x09, tmpcip);
 			dev->in_int = 0;
-			return;
+			goto out;
 		}
 		if (i == 0x08) {
 			tmpcip = tmpcip + 4;
@@ -458,7 +459,7 @@ go_42:
 			outb(0x08, tmport);
 			outb(0x01, tmpcip);
 			dev->in_int = 0;
-			return;
+			goto out;
 		}
 		tmport -= 0x07;
 		if (i == 0x0a) {
@@ -474,14 +475,15 @@ go_42:
 		tmport += 0x03;
 		outb(0x08, tmport);
 		dev->in_int = 0;
-		return;
+		goto out;
 	} else {
 //              tmport = workportu + 0x17;
 //              inb(tmport);
 //              dev->working = 0;
 		dev->in_int = 0;
-		return;
 	}
+out:
+	return IRQ_HANDLED;
 }
 
 static int atp870u_queuecommand(Scsi_Cmnd * req_p, void (*done) (Scsi_Cmnd *))

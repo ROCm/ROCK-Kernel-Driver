@@ -292,7 +292,6 @@ int __init tx3912fb_init(void)
 	if ((tx3912fb_fix.line_length * tx3912fb_var.yres_virtual) > tx3912fb_fix.smem_len)
 		return -ENOMEM;
 
-	fb_info.node = NODEV;
 	fb_info.fbops = &tx3912fb_ops;
 	fb_info.var = tx3912fb_var;
 	fb_info.fix = tx3912fb_fix;
@@ -309,7 +308,7 @@ int __init tx3912fb_init(void)
 		return -1;
 
 	printk(KERN_INFO "fb%d: TX3912 frame buffer using %uKB.\n",
-	       minor(fb_info.node), (u_int) (fb_info.fix.smem_len >> 10));
+	       fb_info.node, (u_int) (fb_info.fix.smem_len >> 10));
 	return 0;
 }
 

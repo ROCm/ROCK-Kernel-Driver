@@ -62,7 +62,8 @@ vbi_buffer_risc(struct bttv *btv, struct bttv_buffer *buf, int lines)
 	return 0;
 }
 
-static int vbi_buffer_setup(struct file *file, int *count, int *size)
+static int vbi_buffer_setup(struct file *file,
+			unsigned int *count, unsigned int *size)
 {
 	struct bttv_fh *fh = file->private_data;
 	struct bttv *btv = fh->btv;

@@ -1985,7 +1985,7 @@ static void listentimerfunc(unsigned long x)
 static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 {
 	capidrv_contr *card;
-	long flags;
+	unsigned long flags;
 	isdn_ctrl cmd;
 	char id[20];
 	int i;

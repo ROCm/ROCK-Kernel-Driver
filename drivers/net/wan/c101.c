@@ -155,11 +155,12 @@ static int c101_open(struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	port_t *port = hdlc_to_port(hdlc);
+	int result;
 
 	if (!try_module_get(THIS_MODULE))
 		return -EFAULT;	/* rmmod in progress */
 
-	int result = hdlc_open(hdlc);
+	result = hdlc_open(hdlc);
 	if (result) {
 		return result;
 		module_put(THIS_MODULE);

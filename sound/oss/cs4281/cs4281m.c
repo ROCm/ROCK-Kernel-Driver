@@ -71,7 +71,6 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/poll.h>
-#include <linux/wrapper.h>
 #include <linux/fs.h>
 #include <linux/wait.h>
 

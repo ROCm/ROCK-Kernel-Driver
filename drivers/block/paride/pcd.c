@@ -761,7 +761,7 @@ static void do_pcd_request(request_queue_t * q)
 
 static inline void next_request(int success)
 {
-	long saved_flags;
+	unsigned long saved_flags;
 
 	spin_lock_irqsave(&pcd_lock, saved_flags);
 	end_request(pcd_req, success);

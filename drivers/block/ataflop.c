@@ -364,7 +364,7 @@ static __inline__ void set_head_settle_flag( void );
 static __inline__ int get_head_settle_flag( void );
 static void floppy_irq (int irq, void *dummy, struct pt_regs *fp);
 static void fd_error( void );
-static int do_format(kdev_t drive, struct atari_format_descr *desc);
+static int do_format(int drive, int type, struct atari_format_descr *desc);
 static void do_fd_action( int drive );
 static void fd_calibrate( void );
 static void fd_calibrate_done( int status );
@@ -656,12 +656,11 @@ static void fd_error( void )
 	p += n;			\
     } while(0)
 
-static int do_format(kdev_t device, struct atari_format_descr *desc)
+static int do_format(int drive, int type, struct atari_format_descr *desc)
 {
 	unsigned char	*p;
 	int sect, nsect;
 	unsigned long	flags;
-	int type, drive = minor(device) & 3;
 
 	DPRINT(("do_format( dr=%d tr=%d he=%d offs=%d )\n",
 		drive, desc->track, desc->head, desc->sect_offset ));
@@ -673,7 +672,6 @@ static int do_format(kdev_t device, struct atari_format_descr *desc)
 	atari_turnon_irq( IRQ_MFP_FDC ); /* should be already, just to be sure */
 	local_irq_restore(flags);
 
-	type = minor(device) >> 2;
 	if (type) {
 		if (--type >= NUM_DISK_MINORS ||
 		    minor2disktype[type].drive_types > DriveType) {
@@ -1690,7 +1688,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 			return -EBUSY;
 		if (copy_from_user(&fmt_desc, (void *) param, sizeof(fmt_desc)))
 			return -EFAULT;
-		return do_format(device, &fmt_desc);
+		return do_format(drive, type, &fmt_desc);
 	case FDCLRPRM:
 		UDT = NULL;
 		/* MSch: invalidate default_params */
@@ -1863,9 +1861,6 @@ static int floppy_open( struct inode *inode, struct file *filp )
 		fd_ref[drive]++;
 
 	fd_device[drive] = type;
-
-	if (old_dev && old_dev != type)
-		invalidate_buffers(mk_kdev(FLOPPY_MAJOR, drive + (type<<2)));
 
 	if (filp->f_flags & O_NDELAY)
 		return 0;

@@ -17,11 +17,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/pci.h>
-#include <asm/io.h>
-#include <asm/irq.h>
 
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
@@ -29,6 +24,11 @@
 	#undef DEBUG
 #endif
 
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/pci.h>
+#include <asm/io.h>
+#include <asm/irq.h>
 #include <linux/usb.h>
 #include "hcd.h"
 
@@ -214,7 +214,7 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	hub = hcd->self.root_hub;
 	hcd->state = USB_STATE_QUIESCING;
 
-	dev_dbg (*hcd->controller, "roothub graceful disconnect\n");
+	dev_dbg (hcd->controller, "roothub graceful disconnect\n");
 	usb_disconnect (&hub);
 
 	hcd->driver->stop (hcd);
@@ -326,7 +326,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 
 	retval = -EBUSY;
 	if (hcd->state != USB_STATE_SUSPENDED) {
-		dev_dbg (*hcd->controller, "can't resume, not suspended!\n");
+		dev_dbg (hcd->controller, "can't resume, not suspended!\n");
 		goto done;
 	}
 	hcd->state = USB_STATE_RESUMING;
@@ -336,7 +336,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 
 	retval = hcd->driver->resume (hcd);
 	if (!HCD_IS_RUNNING (hcd->state)) {
-		dev_dbg (*hcd->controller, "resume fail, retval %d\n", retval);
+		dev_dbg (hcd->controller, "resume fail, retval %d\n", retval);
 		usb_hc_died (hcd);
 // FIXME:  recover, reset etc.
 	} else {

@@ -283,12 +283,6 @@ static inline void fallback_on_nodma_alloc(char **addr, size_t l)
 static unsigned long fake_change;
 static int initialising=1;
 
-static inline int TYPE(kdev_t x) {
-	return  (minor(x)>>2) & 0x1f;
-}
-static inline int DRIVE(kdev_t x) {
-	return (minor(x)&0x03) | ((minor(x)&0x80) >> 5);
-}
 #define ITYPE(x) (((x)>>2) & 0x1f)
 #define TOMINOR(x) ((x & 3) | ((x & 4) << 5))
 #define UNIT(x) ((x) & 0x03)		/* drive on fdc */
@@ -415,6 +409,8 @@ static struct floppy_drive_struct drive_state[N_DRIVE];
 static struct floppy_write_errors write_errors[N_DRIVE];
 static struct timer_list motor_off_timer[N_DRIVE];
 static struct gendisk *disks[N_DRIVE];
+static struct block_device *opened_bdev[N_DRIVE];
+static DECLARE_MUTEX(open_lock);
 static struct floppy_raw_cmd *raw_cmd, default_raw_cmd;
 
 /*
@@ -3332,25 +3328,21 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 	if (type){
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
+		down(&open_lock);
 		LOCK_FDC(drive,1);
-		for (cnt = 0; cnt < N_DRIVE; cnt++){
-			if (ITYPE(drive_state[cnt].fd_device) == type &&
-			    drive_state[cnt].fd_ref)
-				set_bit(drive, &fake_change);
-		}
 		floppy_type[type] = *g;
 		floppy_type[type].name="user format";
 		for (cnt = type << 2; cnt < (type << 2) + 4; cnt++)
 			floppy_sizes[cnt]= floppy_sizes[cnt+0x80]=
 				floppy_type[type].size+1;
 		process_fd_request();
-		for (cnt = 0; cnt < N_DRIVE; cnt++){
-			if (ITYPE(drive_state[cnt].fd_device) == type &&
-			    drive_state[cnt].fd_ref)
-				__check_disk_change(
-					MKDEV(FLOPPY_MAJOR,
-					      drive_state[cnt].fd_device));
+		for (cnt = 0; cnt < N_DRIVE; cnt++) {
+			struct block_device *bdev = opened_bdev[cnt];
+			if (!bdev || ITYPE(drive_state[cnt].fd_device) != type)
+				continue;
+			__invalidate_device(bdev, 0);
 		}
+		up(&open_lock);
 	} else {
 		LOCK_FDC(drive,1);
 		if (cmd != FDDEFPRM)
@@ -3448,8 +3440,8 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 #define OUT(c,x) case c: outparam = (const char *) (x); break
 #define IN(c,x,tag) case c: *(x) = inparam. tag ; return 0
 
-	int i,drive,type;
-	kdev_t device;
+	int drive = (long)inode->i_bdev->bd_disk->private_data;
+	int i, type = ITYPE(UDRS->fd_device);
 	int ret;
 	int size;
 	union inparam {
@@ -3460,9 +3452,6 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 	} inparam; /* parameters coming from user space */
 	const char *outparam; /* parameters passed back to user space */
 
-	device = inode->i_rdev;
-	type = TYPE(device);
-	drive = DRIVE(device);
 
 	/* convert compatibility eject ioctls into floppy eject ioctl.
 	 * We do this in order to provide a means to eject floppy disks before
@@ -3675,15 +3664,19 @@ static void __init config_types(void)
 
 static int floppy_release(struct inode * inode, struct file * filp)
 {
-	int drive = DRIVE(inode->i_rdev);
+	int drive = (long)inode->i_bdev->bd_disk->private_data;
 
+	down(&open_lock);
 	if (UDRS->fd_ref < 0)
 		UDRS->fd_ref=0;
 	else if (!UDRS->fd_ref--) {
 		DPRINT("floppy_release with fd_ref == 0");
 		UDRS->fd_ref = 0;
 	}
+	if (!UDRS->fd_ref)
+		opened_bdev[drive] = NULL;
 	floppy_release_irq_and_dma();
+	up(&open_lock);
 	return 0;
 }
 
@@ -3692,28 +3685,19 @@ static int floppy_release(struct inode * inode, struct file * filp)
  * /dev/PS0 etc), and disallows simultaneous access to the same
  * drive with different device numbers.
  */
-#define RETERR(x) do{floppy_release(inode,filp); return -(x);}while(0)
-
 static int floppy_open(struct inode * inode, struct file * filp)
 {
-	int drive;
+	int drive = (long)inode->i_bdev->bd_disk->private_data;
 	int old_dev;
 	int try;
+	int res = -EBUSY;
 	char *tmp;
 
 	filp->private_data = (void*) 0;
-
-	drive = DRIVE(inode->i_rdev);
-	if (drive >= N_DRIVE ||
-	    !(allowed_drive_mask & (1 << drive)) ||
-	    fdc_state[FDC(drive)].version == FDC_NONE)
-		return -ENXIO;
-
-	if (TYPE(inode->i_rdev) >= NUMBER(floppy_type))
-		return -ENXIO;
+	down(&open_lock);
 	old_dev = UDRS->fd_device;
-	if (UDRS->fd_ref && old_dev != minor(inode->i_rdev))
-		return -EBUSY;
+	if (opened_bdev[drive] && opened_bdev[drive] != inode->i_bdev)
+		goto out2;
 
 	if (!UDRS->fd_ref && (UDP->flags & FD_BROKEN_DCL)){
 		USETF(FD_DISK_CHANGED);
@@ -3722,15 +3706,19 @@ static int floppy_open(struct inode * inode, struct file * filp)
 
 	if (UDRS->fd_ref == -1 ||
 	   (UDRS->fd_ref && (filp->f_flags & O_EXCL)))
-		return -EBUSY;
+		goto out2;
 
 	if (floppy_grab_irq_and_dma())
-		return -EBUSY;
+		goto out2;
 
 	if (filp->f_flags & O_EXCL)
 		UDRS->fd_ref = -1;
 	else
 		UDRS->fd_ref++;
+
+	opened_bdev[drive] = inode->i_bdev;
+
+	res = -ENXIO;
 
 	if (!floppy_track_buffer){
 		/* if opening an ED drive, reserve a big buffer,
@@ -3751,7 +3739,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
 		}
 		if (!tmp && !floppy_track_buffer) {
 			DPRINT("Unable to allocate DMA memory\n");
-			RETERR(ENXIO);
+			goto out;
 		}
 		if (floppy_track_buffer) {
 			if (tmp)
@@ -3768,8 +3756,6 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	if (old_dev != -1 && old_dev != minor(inode->i_rdev)) {
 		if (buffer_drive == drive)
 			buffer_track = -1;
-		/* umm, invalidate_buffers() in ->open??  --hch */
-		invalidate_buffers(mk_kdev(FLOPPY_MAJOR,old_dev));
 	}
 
 	/* Allow ioctls if we have write-permissions even if read-only open.
@@ -3782,18 +3768,30 @@ static int floppy_open(struct inode * inode, struct file * filp)
 	if (UFDCS->rawcmd == 1)
 		UFDCS->rawcmd = 2;
 
-	if (filp->f_flags & O_NDELAY)
-		return 0;
-	if (filp->f_mode & 3) {
-		UDRS->last_checked = 0;
-		check_disk_change(inode->i_bdev);
-		if (UTESTF(FD_DISK_CHANGED))
-			RETERR(ENXIO);
+	if (!filp->f_flags & O_NDELAY) {
+		if (filp->f_mode & 3) {
+			UDRS->last_checked = 0;
+			check_disk_change(inode->i_bdev);
+			if (UTESTF(FD_DISK_CHANGED))
+				goto out;
+		}
+		res = -EROFS;
+		if ((filp->f_mode & 2) && !(UTESTF(FD_DISK_WRITABLE)))
+			goto out;
 	}
-	if ((filp->f_mode & 2) && !(UTESTF(FD_DISK_WRITABLE)))
-		RETERR(EROFS);
+	up(&open_lock);
 	return 0;
-#undef RETERR
+out:
+	if (UDRS->fd_ref < 0)
+		UDRS->fd_ref=0;
+	else
+		UDRS->fd_ref--;
+	if (!UDRS->fd_ref)
+		opened_bdev[drive] = NULL;
+	floppy_release_irq_and_dma();
+out2:
+	up(&open_lock);
+	return res;
 }
 
 /*
@@ -4215,6 +4213,8 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 	if (drive >= N_DRIVE ||
 	    !(allowed_drive_mask & (1 << drive)) ||
 	    fdc_state[FDC(drive)].version == FDC_NONE)
+		return NULL;
+	if (((*part >> 2) & 0x1f) >= NUMBER(floppy_type))
 		return NULL;
 	*part = 0;
 	return get_disk(disks[drive]);

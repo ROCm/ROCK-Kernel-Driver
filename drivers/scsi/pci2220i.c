@@ -1586,7 +1586,7 @@ reconTimerExpiry:;
  *	Returns:		TRUE if drive is not ready in time.
  *
  ****************************************************************/
-static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	{
 	struct Scsi_Host   *shost = NULL;	// Pointer to host data block
 	PADAPTER2220I		padapter;		// Pointer to adapter control structure
@@ -1600,6 +1600,7 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	int					z;
 	ULONG				zl;
     unsigned long		flags;
+    int handled = 0;
 
 //	DEB (printk ("\npci2220i received interrupt\n"));
 
@@ -1621,6 +1622,7 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 		goto out;
 		}
 
+	handled = 1;
 	spin_lock_irqsave(shost->host_lock, flags);
 	padapter = HOSTDATA(shost);
 	pdev = padapter->pdev;
@@ -2025,8 +2027,10 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	OpDone (padapter, zl);
 irq_return:
     spin_unlock_irqrestore(shost->host_lock, flags);
-out:;
-	}
+out:
+	return IRQ_RETVAL(handled);
+}
+
 /****************************************************************
  *	Name:	Pci2220i_QueueCommand
  *

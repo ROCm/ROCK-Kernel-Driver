@@ -576,7 +576,7 @@ static void snd_via82xx_channel_reset(via82xx_t *chip, viadev_t *viadev)
 
 static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	via82xx_t *chip = snd_magic_cast(via82xx_t, dev_id, return);
+	via82xx_t *chip = snd_magic_cast(via82xx_t, dev_id, return IRQ_NONE);
 	unsigned int status;
 	unsigned int i;
 

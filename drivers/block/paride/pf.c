@@ -812,7 +812,7 @@ repeat:
 
 static int pf_next_buf(void)
 {
-	long saved_flags;
+	unsigned long saved_flags;
 
 	pf_count--;
 	pf_run--;
@@ -832,7 +832,8 @@ static int pf_next_buf(void)
 
 static inline void next_request(int success)
 {
-	long saved_flags;
+	unsigned long saved_flags;
+
 	spin_lock_irqsave(&pf_spin_lock, saved_flags);
 	end_request(pf_req, success);
 	pf_busy = 0;

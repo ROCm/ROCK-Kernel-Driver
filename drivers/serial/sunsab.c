@@ -863,11 +863,6 @@ static void sunsab_console_write(struct console *con, const char *s, unsigned n)
 	sunsab_tec_wait(up);
 }
 
-static kdev_t sunsab_console_device(struct console *con)
-{
-	return mk_kdev(sunsab_reg.major, sunsab_reg.minor + con->index);
-}
-
 static int sunsab_console_setup(struct console *con, char *options)
 {
 	struct uart_sunsab_port *up = &sunsab_ports[con->index];
@@ -928,10 +923,11 @@ static int sunsab_console_setup(struct console *con, char *options)
 static struct console sunsab_console = {
 	.name	=	"ttyS",
 	.write	=	sunsab_console_write,
-	.device	=	sunsab_console_device,
+	.device	=	uart_console_device,
 	.setup	=	sunsab_console_setup,
 	.flags	=	CON_PRINTBUFFER,
 	.index	=	-1,
+	.data	=	&sunsab_reg,
 };
 
 static void __init sunsab_console_init(void)

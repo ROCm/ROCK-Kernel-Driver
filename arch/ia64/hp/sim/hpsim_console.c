@@ -27,7 +27,7 @@
 
 static int simcons_init (struct console *, char *);
 static void simcons_write (struct console *, const char *, unsigned);
-static kdev_t simcons_console_device (struct console *);
+static struct tty_driver *simcons_console_device (struct console *, int *);
 
 struct console hpsim_cons = {
 	.name =		"simcons",
@@ -57,8 +57,9 @@ simcons_write (struct console *cons, const char *buf, unsigned count)
 	}
 }
 
-static kdev_t
-simcons_console_device (struct console *c)
+static struct tty_driver *simcons_console_device (struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
+	extern struct tty_driver hp_serial_driver;
+	*index = c->index;
+	return &hp_serial_driver;
 }

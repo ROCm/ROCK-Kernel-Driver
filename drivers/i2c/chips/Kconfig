@@ -22,6 +22,16 @@ config SENSORS_ADM1021
 	  in the lm_sensors package, which you can download at 
 	  http://www.lm-sensors.nu
 
+config SENSORS_IT87
+	tristate "  National Semiconductors IT87 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	help
+	  The module will be called it87.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+
 config SENSORS_LM75
 	tristate "  National Semiconductors LM75 and compatibles"
 	depends on I2C && EXPERIMENTAL
@@ -66,8 +76,8 @@ config SENSORS_W83781D
 
 config I2C_SENSOR
 	tristate
-	default y if SENSORS_ADM1021=y || SENSORS_LM75=y || SENSORS_VIA686A=y || SENSORS_W83781D=y
-	default m if SENSORS_ADM1021=m || SENSORS_LM75=m || SENSORS_VIA686A=m || SENSORS_W83781D=m
+	default y if SENSORS_ADM1021=y || SENSORS_IT87=y || SENSORS_LM75=y || SENSORS_VIA686A=y || SENSORS_W83781D=y
+	default m if SENSORS_ADM1021=m || SENSORS_IT87=m || SENSORS_LM75=m || SENSORS_VIA686A=m || SENSORS_W83781D=m
 	default n
 
 endmenu

@@ -2011,7 +2011,7 @@ static void es1968_update_hw_volume(unsigned long private_data)
  */
 static irqreturn_t snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es1968_t *chip = snd_magic_cast(es1968_t, dev_id, return);
+	es1968_t *chip = snd_magic_cast(es1968_t, dev_id, return IRQ_NONE);
 	u32 event;
 
 	if (!(event = inb(chip->io_port + 0x1A)))

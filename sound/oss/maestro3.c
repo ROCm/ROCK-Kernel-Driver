@@ -149,11 +149,6 @@
 #include <asm/dma.h>
 #include <asm/uaccess.h>
 
- /*
-  * for crizappy mmap()
-  */
-#include <linux/wrapper.h>
-
 #include "maestro3.h"
 
 #define M_DEBUG 1

@@ -1828,7 +1828,6 @@ static int __init i810fb_init_pci (struct pci_dev *dev,
 	i810_init_device(par);        
 
 	info->screen_base = par->fb.virtual;
-	info->node = NODEV;
 	info->fbops = &par->i810fb_ops;
 	info->pseudo_palette = par->pseudo_palette;
 	info->flags = FBINFO_FLAG_DEFAULT;
@@ -1861,7 +1860,7 @@ static int __init i810fb_init_pci (struct pci_dev *dev,
       	       "I810FB: Video RAM   : %dK\n" 
 	       "I810FB: Monitor     : H: %d-%d KHz V: %d-%d Hz\n"
 	       "I810FB: Mode        : %dx%d-%dbpp@%dHz\n",
-	       minor(info->node),
+	       info->node,
 	       i810_pci_list[entry->driver_data],
 	       VERSION_MAJOR, VERSION_MINOR, VERSION_TEENIE, BRANCH_VERSION,
 	       (int) par->fb.size>>10, info->monspecs.hfmin/1000,

@@ -265,5 +265,5 @@ static inline void nsp32_fifo_write(unsigned int   base,
 	nsp32_multi_write4(base, FIFO_DATA_LOW, buf, count);
 }
 
-#endif _NSP32_IO_H
+#endif	/* _NSP32_IO_H */
 /* end */

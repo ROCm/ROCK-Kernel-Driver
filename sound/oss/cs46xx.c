@@ -89,7 +89,6 @@
 #include <linux/bitops.h>
 #include <linux/init.h>
 #include <linux/poll.h>
-#include <linux/wrapper.h>
 #include <linux/ac97_codec.h>
 
 #include <asm/io.h>

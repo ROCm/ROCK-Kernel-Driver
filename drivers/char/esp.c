@@ -653,7 +653,8 @@ static _INLINE_ void check_modem_status(struct esp_struct *info)
 /*
  * This is the serial driver's interrupt routine
  */
-static void rs_interrupt_single(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t rs_interrupt_single(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	struct esp_struct * info;
 	unsigned err_status;
@@ -670,7 +671,7 @@ static void rs_interrupt_single(int irq, void *dev_id, struct pt_regs * regs)
 	
 	if (!info->tty) {
 		sti();
-		return;
+		return IRQ_NONE;
 	}
 
 	if (scratch & 0x04) { /* error */
@@ -753,6 +754,7 @@ static void rs_interrupt_single(int irq, void *dev_id, struct pt_regs * regs)
 	printk("end.\n");
 #endif
 	sti();
+	return IRQ_HANDLED;
 }
 
 /*

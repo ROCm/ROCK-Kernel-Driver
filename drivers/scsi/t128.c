@@ -248,14 +248,14 @@ int __init t128_detect(Scsi_Host_Template * tpnt){
 	else 
 	    instance->irq = NCR5380_probe_irq(instance, T128_IRQS);
 
-	if (instance->irq != IRQ_NONE) 
+	if (instance->irq != SCSI_IRQ_NONE) 
 	    if (request_irq(instance->irq, t128_intr, SA_INTERRUPT, "t128", instance)) {
 		printk("scsi%d : IRQ%d not free, interrupts disabled\n", 
 		    instance->host_no, instance->irq);
-		instance->irq = IRQ_NONE;
+		instance->irq = SCSI_IRQ_NONE;
 	    } 
 
-	if (instance->irq == IRQ_NONE) {
+	if (instance->irq == SCSI_IRQ_NONE) {
 	    printk("scsi%d : interrupts not enabled. for better interactive performance,\n", instance->host_no);
 	    printk("scsi%d : please jumper the board for a free IRQ.\n", instance->host_no);
 	}
@@ -265,7 +265,7 @@ int __init t128_detect(Scsi_Host_Template * tpnt){
 #endif
 
 	printk("scsi%d : at 0x%08lx", instance->host_no, instance->base);
-	if (instance->irq == IRQ_NONE)
+	if (instance->irq == SCSI_IRQ_NONE)
 	    printk (" interrupts disabled");
 	else 
 	    printk (" irq %d", instance->irq);

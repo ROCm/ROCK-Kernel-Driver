@@ -2056,7 +2056,7 @@ static void showMbox (mega_scb * pScb)
 /*--------------------------------------------------------------------
  * Interrupt service routine
  *--------------------------------------------------------------------*/
-static void megaraid_isr (int irq, void *devp, struct pt_regs *regs)
+static irqreturn_t megaraid_isr (int irq, void *devp, struct pt_regs *regs)
 {
 	IO_LOCK_T;
 	mega_host_config * megaCfg;
@@ -2067,11 +2067,13 @@ static void megaraid_isr (int irq, void *devp, struct pt_regs *regs)
 	u_char qCnt, qStatus;
 	u_char completed[MAX_FIRMWARE_STATUS];
 	Scsi_Cmnd *SCpnt;
+	int handled = 0;
 
 	megaCfg = (mega_host_config *) devp;
 	mbox = (mega_mailbox *) tmpBox;
 
 	if (megaCfg->host->irq == irq) {
+		handled = 1;
 		if (megaCfg->flag & IN_ISR) {
 			TRACE (("ISR called reentrantly!!\n"));
 			printk ("ISR called reentrantly!!\n");
@@ -2088,14 +2090,14 @@ static void megaraid_isr (int irq, void *devp, struct pt_regs *regs)
 			if (dword != 0x10001234) {
 				/* Spurious interrupt */
 				megaCfg->flag &= ~IN_ISR;
-				return;
+				goto out;
 			}
 		} else {
 			byte = READ_PORT (megaCfg->host->io_port, INTR_PORT);
 			if ((byte & VALID_INTR_BYTE) == 0) {
 				/* Spurious interrupt */
 				megaCfg->flag &= ~IN_ISR;
-				return;
+				goto out;
 			}
 			WRITE_PORT (megaCfg->host->io_port, INTR_PORT, byte);
 		}
@@ -2225,7 +2227,8 @@ static void megaraid_isr (int irq, void *devp, struct pt_regs *regs)
 		IO_UNLOCK(megaCfg->host);
 
 	}
-
+out:
+	return IRQ_RETVAL(handled);
 }
 
 /*==================================================*/

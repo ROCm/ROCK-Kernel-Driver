@@ -509,22 +509,23 @@ diva_xdi_read(void *adapter, void *os_handle, void *dst,
 }
 
 
-void diva_os_irq_wrapper(int irq, void *context, struct pt_regs *regs)
+irqreturn_t diva_os_irq_wrapper(int irq, void *context, struct pt_regs *regs)
 {
 	diva_os_xdi_adapter_t *a = (diva_os_xdi_adapter_t *) context;
 	diva_xdi_clear_interrupts_proc_t clear_int_proc;
 
 	if (!a || !a->xdi_adapter.diva_isr_handler) {
-		return;
+		return IRQ_NONE;
 	}
 
 	if ((clear_int_proc = a->clear_interrupts_proc)) {
 		(*clear_int_proc) (a);
 		a->clear_interrupts_proc = 0;
-		return;
+		return IRQ_HANDLED;
 	}
 
 	(*(a->xdi_adapter.diva_isr_handler)) (&a->xdi_adapter);
+	return IRQ_HANDLED;
 }
 
 static void diva_init_request_array(void)

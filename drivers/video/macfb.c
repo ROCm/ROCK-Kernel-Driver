@@ -943,7 +943,6 @@ void __init macfb_init(void)
 			break;
 		}
 
-	fb_info.node		= NODEV;
 	fb_info.fbops		= &macfb_ops;
 	fb_info.var		= macfb_defined;
 	fb_info.fix		= macfb_fix;
@@ -956,7 +955,7 @@ void __init macfb_init(void)
 		return;
 
 	printk("fb%d: %s frame buffer device\n",
-	       minor(fb_info.node), fb_info.fix.id);
+	       fb_info.node, fb_info.fix.id);
 }
 
 MODULE_LICENSE("GPL");

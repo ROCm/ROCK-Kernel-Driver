@@ -1219,7 +1219,7 @@ static int snd_cs46xx_capture_prepare(snd_pcm_substream_t * substream)
 
 static irqreturn_t snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, dev_id, return);
+	cs46xx_t *chip = snd_magic_cast(cs46xx_t, dev_id, return IRQ_NONE);
 	u32 status1;
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
