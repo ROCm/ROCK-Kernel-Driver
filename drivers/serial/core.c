@@ -2003,7 +2003,6 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 	state->port = port;
 
 	spin_lock_init(&port->lock);
-	port->type = PORT_UNKNOWN;
 	port->cons = drv->cons;
 	port->info = state->info;
 
@@ -2020,8 +2019,10 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 	flags = UART_CONFIG_TYPE;
 	if (port->flags & UPF_AUTO_IRQ)
 		flags |= UART_CONFIG_IRQ;
-	if (port->flags & UPF_BOOT_AUTOCONF)
+	if (port->flags & UPF_BOOT_AUTOCONF) {
+		port->type = PORT_UNKNOWN;
 		port->ops->config_port(port, flags);
+	}
 
 	/*
 	 * Register the port whether it's detected or not.  This allows
