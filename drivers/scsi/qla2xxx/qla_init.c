@@ -37,6 +37,7 @@ static int qla2x00_pci_config(scsi_qla_host_t *);
 static int qla2x00_isp_firmware(scsi_qla_host_t *);
 static void qla2x00_reset_chip(scsi_qla_host_t *);
 static int qla2x00_chip_diag(scsi_qla_host_t *);
+static void qla2x00_resize_request_q(scsi_qla_host_t *);
 static int qla2x00_setup_chip(scsi_qla_host_t *);
 static void qla2x00_init_response_q_entries(scsi_qla_host_t *);
 static int qla2x00_init_rings(scsi_qla_host_t *);
@@ -660,6 +661,58 @@ chip_diag_failed:
 }
 
 /**
+ * qla2x00_resize_request_q() - Resize request queue given available ISP memory.
+ * @ha: HA context
+ *
+ * Returns 0 on success.
+ */
+static void
+qla2x00_resize_request_q(scsi_qla_host_t *ha)
+{
+	int rval;
+	uint16_t fw_iocb_cnt = 0;
+	uint16_t request_q_length = REQUEST_ENTRY_CNT_2XXX_EXT_MEM;
+	dma_addr_t request_dma;
+	request_t *request_ring;
+
+	/* Valid only on recent ISPs. */
+	if (IS_QLA2100(ha) || IS_QLA2200(ha))
+		return;
+
+	/* Retrieve IOCB counts available to the firmware. */
+	rval = qla2x00_get_resource_cnts(ha, NULL, NULL, NULL, &fw_iocb_cnt);
+	if (rval)
+		return;
+	/* No point in continuing if current settings are sufficient. */
+	if (fw_iocb_cnt < 1024)
+		return;
+	if (ha->request_q_length >= request_q_length)
+		return;
+
+	/* Attempt to claim larger area for request queue. */
+	request_ring = pci_alloc_consistent(ha->pdev,
+	    (request_q_length + 1) * sizeof(request_t), &request_dma);
+	if (request_ring == NULL)
+		return;
+
+	/* Resize successful, report extensions. */
+	qla_printk(KERN_INFO, ha, "Extended memory detected (%d KB)...\n",
+	    (ha->fw_memory_size + 1) / 1024);
+	qla_printk(KERN_INFO, ha, "Resizing request queue depth "
+	    "(%d -> %d)...\n", ha->request_q_length, request_q_length);
+
+	/* Clear old allocations. */
+	pci_free_consistent(ha->pdev,
+	    (ha->request_q_length + 1) * sizeof(request_t), ha->request_ring,
+	    ha->request_dma);
+
+	/* Begin using larger queue. */
+	ha->request_q_length = request_q_length;
+	ha->request_ring = request_ring;
+	ha->request_dma = request_dma;
+}
+
+/**
  * qla2x00_setup_chip() - Load and start RISC firmware.
  * @ha: HA context
  *
@@ -756,9 +809,9 @@ qla2x00_setup_chip(scsi_qla_host_t *ha)
 				    &ha->fw_minor_version,
 				    &ha->fw_subminor_version,
 				    &ha->fw_attributes, &ha->fw_memory_size);
+				qla2x00_resize_request_q(ha);
 			}
-		}
-		else {
+		} else {
 			DEBUG2(printk(KERN_INFO
 			    "scsi(%ld): ISP Firmware failed checksum.\n",
 			    ha->host_no));
@@ -877,6 +930,16 @@ qla2x00_init_rings(scsi_qla_host_t *ha)
 	ha->req_q_cnt         = ha->request_q_length;
 	ha->response_ring_ptr = ha->response_ring;
 	ha->rsp_ring_index    = 0;
+
+	/* Setup ring parameters in initialization control block. */
+	ha->init_cb->request_q_outpointer = __constant_cpu_to_le16(0);
+	ha->init_cb->response_q_inpointer = __constant_cpu_to_le16(0);
+	ha->init_cb->request_q_length = cpu_to_le16(ha->request_q_length);
+	ha->init_cb->response_q_length = cpu_to_le16(ha->response_q_length);
+	ha->init_cb->request_q_address[0] = cpu_to_le32(LSD(ha->request_dma));
+	ha->init_cb->request_q_address[1] = cpu_to_le32(MSD(ha->request_dma));
+	ha->init_cb->response_q_address[0] = cpu_to_le32(LSD(ha->response_dma));
+	ha->init_cb->response_q_address[1] = cpu_to_le32(MSD(ha->response_dma));
 
 	/* Initialize response queue entries */
 	qla2x00_init_response_q_entries(ha);
@@ -1423,18 +1486,6 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 
 		ha->binding_type = BIND_BY_PORT_NAME;
 	}
-
-	/*
-	 * Setup ring parameters in initialization control block
-	 */
-	icb->request_q_outpointer = __constant_cpu_to_le16(0);
-	icb->response_q_inpointer = __constant_cpu_to_le16(0);
-	icb->request_q_length = cpu_to_le16(ha->request_q_length);
-	icb->response_q_length = cpu_to_le16(ha->response_q_length);
-	icb->request_q_address[0] = cpu_to_le32(LSD(ha->request_dma));
-	icb->request_q_address[1] = cpu_to_le32(MSD(ha->request_dma));
-	icb->response_q_address[0] = cpu_to_le32(LSD(ha->response_dma));
-	icb->response_q_address[1] = cpu_to_le32(MSD(ha->response_dma));
 
 	icb->lun_enables = __constant_cpu_to_le16(0);
 	icb->command_resource_count = 0;
