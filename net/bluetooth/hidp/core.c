@@ -36,6 +36,7 @@
 #include <linux/ioctl.h>
 #include <linux/file.h>
 #include <linux/init.h>
+#include <linux/wait.h>
 #include <net/sock.h>
 
 #include <linux/input.h>
@@ -73,6 +74,8 @@ static unsigned char hidp_keycode[256] = {
 	 29, 42, 56,125, 97, 54,100,126,164,166,165,163,161,115,114,113,
 	150,158,159,128,136,177,178,176,142,152,173,140
 };
+
+static unsigned char hidp_mkeyspat[] = { 0x01, 0x01, 0x01, 0x01, 0x01, 0x01 };
 
 static struct hidp_session *__hidp_get_session(bdaddr_t *bdaddr)
 {
@@ -174,6 +177,11 @@ static void hidp_input_report(struct hidp_session *session, struct sk_buff *skb)
 	case 0x01:	/* Keyboard report */
 		for (i = 0; i < 8; i++)
 			input_report_key(dev, hidp_keycode[i + 224], (udata[0] >> i) & 1);
+
+		/* If all the key codes have been set to 0x01, it means
+		 * too many keys were pressed at the same time. */
+		if (!memcmp(udata + 2, hidp_mkeyspat, 6))
+			break;
 
 		for (i = 2; i < 8; i++) {
 			if (keys[i] > 3 && memscan(udata + 2, keys[i], 6) == udata + 8) {
@@ -459,7 +467,6 @@ static int hidp_session(void *arg)
 	struct sk_buff *skb;
 	int vendor = 0x0000, product = 0x0000;
 	wait_queue_t ctrl_wait, intr_wait;
-	unsigned long timeo = HZ;
 
 	BT_DBG("session %p", session);
 
@@ -504,28 +511,12 @@ static int hidp_session(void *arg)
 
 	hidp_del_timer(session);
 
-	if (intr_sk->sk_state != BT_CONNECTED) {
-		init_waitqueue_entry(&ctrl_wait, current);
-		add_wait_queue(ctrl_sk->sk_sleep, &ctrl_wait);
-		while (timeo && ctrl_sk->sk_state != BT_CLOSED) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			timeo = schedule_timeout(timeo);
-		}
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(ctrl_sk->sk_sleep, &ctrl_wait);
-		timeo = HZ;
-	}
+	if (intr_sk->sk_state != BT_CONNECTED)
+		wait_event_timeout(*(ctrl_sk->sk_sleep), (ctrl_sk->sk_state == BT_CLOSED), HZ);
 
 	fput(session->ctrl_sock->file);
 
-	init_waitqueue_entry(&intr_wait, current);
-	add_wait_queue(intr_sk->sk_sleep, &intr_wait);
-	while (timeo && intr_sk->sk_state != BT_CLOSED) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		timeo = schedule_timeout(timeo);
-	}
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(intr_sk->sk_sleep, &intr_wait);
+	wait_event_timeout(*(intr_sk->sk_sleep), (intr_sk->sk_state == BT_CLOSED), HZ);
 
 	fput(session->intr_sock->file);
 
