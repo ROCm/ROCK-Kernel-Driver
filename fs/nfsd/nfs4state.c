@@ -213,12 +213,19 @@ free_client(struct nfs4_client *clp)
 	kfree(clp);
 }
 
+void
+put_nfs4_client(struct nfs4_client *clp)
+{
+	if (atomic_dec_and_test(&clp->cl_count))
+		free_client(clp);
+}
+
 static void
 expire_client(struct nfs4_client *clp)
 {
 	struct nfs4_stateowner *sop;
 
-	dprintk("NFSD: expire_client\n");
+	dprintk("NFSD: expire_client cl_count %d\n",atomic_read(&clp->cl_count));
 	list_del(&clp->cl_idhash);
 	list_del(&clp->cl_strhash);
 	list_del(&clp->cl_lru);
@@ -226,7 +233,7 @@ expire_client(struct nfs4_client *clp)
 		sop = list_entry(clp->cl_perclient.next, struct nfs4_stateowner, so_perclient);
 		release_stateowner(sop);
 	}
-	free_client(clp);
+	put_nfs4_client(clp);
 }
 
 static struct nfs4_client *
@@ -235,6 +242,9 @@ create_client(struct xdr_netobj name) {
 
 	if (!(clp = alloc_client(name)))
 		goto out;
+	atomic_set(&clp->cl_count, 1);
+	atomic_set(&clp->cl_callback.cb_set, 0);
+	clp->cl_callback.cb_parsed = 0;
 	INIT_LIST_HEAD(&clp->cl_idhash);
 	INIT_LIST_HEAD(&clp->cl_strhash);
 	INIT_LIST_HEAD(&clp->cl_perclient);
