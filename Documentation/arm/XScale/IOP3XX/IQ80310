@@ -49,61 +49,14 @@ Preparing the Hardware
 -----------------------------
 
 This document assumes you're using a Rev D or newer board running
-Redboot as the bootloader.
+Redboot as the bootloader.  Note that the version of RedBoot provided
+with the boards has a major issue and you need to replace it with the
+latest RedBoot. You can grab the source from the ECOS CVS or you can
+get a prebuilt image and burn it in using FRU at:
 
-The as-supplied RedBoot image appears to leave the first page of RAM
-in a corrupt state such that certain words in that page are unwritable
-and contain random data.  The value of the data, and the location within
-the first page changes with each boot, but is generally in the range
-0xa0000150 to 0xa0000fff.
+   ftp://source.mvista.com/pub/xscale/iq80310/redboot.bin
 
-You can grab the source from the ECOS CVS or you can get a prebuilt image
-from:
-
-   ftp://source.mvista.com/pub/xscale/iop310/IQ80310/redboot.bin
-
-which is:
-
-    # strings redboot.bin | grep bootstrap
-    RedBoot(tm) bootstrap and debug environment, version UNKNOWN - built 14:58:21, Aug 15 2001
-
-md5sum of this version:
-
-    bcb96edbc6f8e55b16c165930b6e4439  redboot.bin
-
-You have two options to program it:
-
-1. Using the FRU program (see the instructions in the user manual).
-
-2. Using a Linux host, with MTD support built into the host kernel:
-   - ensure that the RedBoot image is not locked (issue the following
-     command under the existing RedBoot image):
-    RedBoot> fis unlock -f 0 -l 0x40000
-   - switch S3-1 and S3-2 on.
-   - reboot the host
-   - login as root
-   - identify the 80310 card:
-    # lspci
-    ...
-    00:0c.1 Memory controller: Intel Corporation 80310 IOP [IO Processor] (rev 01)
-   - in this example, bus 0, slot 0c, function 1.
-   - insert the MTD modules, and the PCI map module:
-    # insmod drivers/mtd/maps/pci.o
-   - locate the MTD device (using the bus, slot, function)
-    # cat /proc/mtd
-    dev:    size   erasesize  name
-    mtd0: 00800000 00020000 "00:0c.1"
-   - in this example, it is mtd device 0.  Yours will be different.
-     Check carefully.
-   - program the flash
-    # cat redboot.bin > /dev/mtdblock0
-   - check the kernel message log for errors (some cat commands don't
-     error on failure)   
-    # dmesg
-   - switch S3-1 and S3-2 off
-   - reboot host
-
-In any case, make sure you do an 'fis init' command once you boot with the new
+Make sure you do an 'fis init' command once you boot with the new
 RedBoot image.
 
 
@@ -235,7 +188,7 @@ JFFS RedBoot partition mapped into the MTD partition scheme.
 
 You can grab a pre-built JFFS image to use as a root file system at:
 
-   ftp://source.mvista.com/pub/xscale/iop310/IQ80310/jffs.img
+   ftp://source.mvista.com/pub/xscale/iq80310/jffs.img
 
 For detailed info on using MTD and creating a JFFS image go to:
 

@@ -1,0 +1,64 @@
+
+Intel's XScale Microarchitecture provides support for locking of TLB
+entries in both the instruction and data TLBs.  This  file provides
+an overview of the API that has been developed to take advantage of this
+feature from kernel space. Note that there is NO support for user space.
+
+In general, this feature should be used in conjunction with locking
+data or instructions into the appropriate caches.  See the file
+cache-lock.txt in this directory.
+
+If you have any questions, comments, patches, etc, please contact me.
+
+Deepak Saxena <dsaxena@mvista.com>
+
+
+API DESCRIPTION
+
+I. Header file
+
+   #include <asm/xscale-lock.h>
+
+II. Locking an entry into the TLB
+
+    SYNOPSIS
+
+    xscale_tlb_lock(u8 tlb_type, u32 addr);
+
+    /*
+     * TLB types
+     */
+    #define ITLB	0x0
+    #define DTLB	0x1
+
+    DESCRIPTION
+
+    This function locks the virtual to physical mapping for virtual
+    address addr into the requested TLB.
+
+    RETURN VALUE
+
+    If the entry is properly locked into the TLB, a 0 is returned.
+    In case of an error, an appropriate error is returned.
+
+       -ENOSPC No more entries left in the TLB
+       -EIO    Unknown error
+
+III. Unlocking an entry from a TLB
+
+     SYNOPSIS
+
+     xscale_tlb_unlock(u8 tlb_type, u32 addr);
+
+     DESCRIPTION
+
+     This function unlocks the entry for virtual address addr from the
+     specified cache.
+
+     RETURN VALUE
+
+     If the TLB entry is properly unlocked, a 0 is returned.
+     In case of an error, an appropriate error is returned.
+
+        -ENOENT  No entry for given address in specified TLB
+

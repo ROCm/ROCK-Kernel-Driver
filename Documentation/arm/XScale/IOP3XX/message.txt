@@ -1,0 +1,110 @@
+Support functions for the Intel 80310 MU
+===========================================
+
+Dave Jiang <dave.jiang@intel.com>
+Last updated: 10/11/2001
+
+The messaging unit of the IOP310 contains 4 components and is utilized for
+passing messages between the PCI agents on the primary bus and the Intel(R)
+80200 CPU. The four components are:
+Messaging Component
+Doorbell Component
+Circular Queues Component
+Index Registers Component
+
+Messaging Component:
+Contains 4 32bit registers, 2 in and 2 out. Writing to the registers assert
+interrupt on the PCI bus or to the 80200 depend on incoming or outgoing.
+
+int mu_msg_request(u32 *mu_context);
+Request the usage of Messaging Component. mu_context is written back by the
+API. The MU context is passed to other Messaging calls as a parameter.
+
+int mu_msg_set_callback(u32 mu_context, u8 reg, mu_msg_cb_t func);
+Setup the callback function for incoming messages. Callback can be setup for
+outbound 0, 1, or both outbound registers.
+
+int mu_msg_post(u32 mu_context, u32 val, u8 reg);
+Posting a message in the val parameter. The reg parameter denotes whether
+to use register 0, 1.
+
+int mu_msg_free(u32 mu_context, u8 mode);
+Free the usage of messaging component. mode can be specified soft or hard. In
+hardmode all resources are unallocated.
+
+Doorbell Component:
+The doorbell registers contains 1 inbound and 1 outbound. Depending on the bits
+being set different interrupts are asserted.
+
+int mu_db_request(u32 *mu_context);
+Request the usage of the doorbell register.
+
+int mu_db_set_callback(u32 mu_context, mu_db_cb_t func);
+Setting up the inbound callback.
+
+void mu_db_ring(u32 mu_context, u32 mask);
+Write to the outbound db register with mask.
+
+int mu_db_free(u32 mu_context);
+Free the usage of doorbell component.
+
+Circular Queues Component:
+The circular queue component has 4 circular queues. Inbound post, inbound free,
+outbound post, outbound free. These queues are used to pass messages.
+
+int mu_cq_request(u32 *mu_context, u32 q_size);
+Request the usage of the queue. See code comment header for q_size. It tells
+the API how big of queues to setup.
+
+int mu_cq_inbound_init(u32 mu_context, mfa_list_t *list, u32 size,
+                       mu_cq_cb_t func);
+Init inbound queues. The user must provide a list of free message frames to
+be put in inbound free queue and the callback function to handle the inbound
+messages.
+
+int mu_cq_enable(u32 mu_context);
+Enables the circular queues mechanism. Called once all the setup functions
+are called.
+
+u32 mu_cq_get_frame(u32 mu_context);
+Obtain the address of an outbound free frame for the user.
+
+int mu_cq_post_frame(u32 mu_context, u32 mfa);
+The user can post the frame once getting the frame and put information in the
+frame.
+
+int mu_cq_free(u32 mu_context);
+Free the usage of circular queues mechanism.
+
+Index Registers Component:
+The index register provides the mechanism to receive inbound messages.
+
+int mu_ir_request(u32 *mu_context);
+Request of Index Register component usage.
+
+int mu_ir_set_callback(u32 mu_context, mu_ir_cb_t callback);
+Setting up callback for inbound messages. The callback will receive the
+value of the register that IAR offsets to.
+
+int mu_ir_free(u32 mu_context);
+Free the usage of Index Registers component.
+
+void mu_set_irq_threshold(u32 mu_context, int thresh);
+Setup the IRQ threshold before relinquish processing in IRQ space. Default
+is set at 10 loops.
+
+
+*NOTE: Example of host driver that utilize the MU can be found in the Linux I2O
+driver. Specifically i2o_pci and some functions of i2o_core. The I2O driver
+only utilize the circular queues mechanism. The other 3 components are simple
+enough that they can be easily setup. The MU API provides no flow control for
+the messaging mechanism. Flow control of the messaging needs to be established
+by a higher layer of software on the IOP or the host driver.
+
+All Disclaimers apply. Use this at your own discretion. Neither Intel nor I
+will be responsible if anything goes wrong. =)
+
+
+TODO
+____
+

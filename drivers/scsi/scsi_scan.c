@@ -1338,7 +1338,7 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	scsi_release_request(sreq);
  out_free_sdev:
 	if (res == SCSI_SCAN_LUN_PRESENT) {
-		if (*sdevp)
+		if (sdevp)
 			*sdevp = sdev;
 	} else {
 		if (q) {

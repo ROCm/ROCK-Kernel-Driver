@@ -217,6 +217,21 @@ struct agp_bridge_data {
 /* This one is for I830MP w. an external graphic card */
 #define INTEL_I830_ERRSTS	0x92
 
+/* Intel 855GM/852GM registers */
+#define I855_GMCH_GMS_STOLEN_0M		0x0
+#define I855_GMCH_GMS_STOLEN_1M		(0x1 << 4)
+#define I855_GMCH_GMS_STOLEN_4M		(0x2 << 4)
+#define I855_GMCH_GMS_STOLEN_8M		(0x3 << 4)
+#define I855_GMCH_GMS_STOLEN_16M	(0x4 << 4)
+#define I855_GMCH_GMS_STOLEN_32M	(0x5 << 4)
+#define I85X_CAPID			0x44
+#define I85X_VARIANT_MASK		0x7
+#define I85X_VARIANT_SHIFT		5
+#define I855_GME			0x0
+#define I855_GM				0x4
+#define I852_GME			0x2
+#define I852_GM				0x5
+
 /* intel 815 register */
 #define INTEL_815_APCONT	0x51
 #define INTEL_815_ATTBASE_MASK	~0x1FFFFFFF

@@ -3,7 +3,7 @@
  *
  * (C) Copyright 1999 Roman Weissgaerber <weissg@vienna.at>
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
- * (C) Hewlett-Packard Company
+ * (C) Copyright 2002 Hewlett-Packard Company
  * 
  * SA1111 Bus Glue
  *
@@ -24,14 +24,6 @@
 #endif
 
 extern int usb_disabled(void);
-
-/*-------------------------------------------------------------------------*/
-
-struct ohci_hcd *dev_to_ohci(struct device *dev) {
-	struct usb_hcd *hcd = dev->driver_data;
-
-	return hcd_to_ohci(hcd);
-}
 
 /*-------------------------------------------------------------------------*/
 

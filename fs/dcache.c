@@ -1056,7 +1056,7 @@ int d_validate(struct dentry *dentry, struct dentry *dparent)
 		 * as it is parsed under dcache_lock
 		 */
 		if (dentry == list_entry(lhp, struct dentry, d_hash)) {
-			dget(dentry);
+			__dget_locked(dentry);
 			spin_unlock(&dcache_lock);
 			return 1;
 		}

@@ -27,6 +27,7 @@
 #include <linux/mm.h>
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
+#include <linux/module.h>
 #include <asm/numaq.h>
 
 /* These are needed before the pgdat's are created */
@@ -82,19 +83,7 @@ static void __init smp_dump_qct(void)
  * physnode_map[8- ] = -1;
  */
 int physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
-
-#define PFN_TO_ELEMENT(pfn) (pfn / PAGES_PER_ELEMENT)
-#define PA_TO_ELEMENT(pa) (PFN_TO_ELEMENT(pa >> PAGE_SHIFT))
-
-int pfn_to_nid(unsigned long pfn)
-{
-	int nid = physnode_map[PFN_TO_ELEMENT(pfn)];
-
-	if (nid == -1)
-		BUG(); /* address is not present */
-
-	return nid;
-}
+EXPORT_SYMBOL(physnode_map);
 
 /*
  * for each node mark the regions

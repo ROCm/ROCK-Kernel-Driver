@@ -67,8 +67,8 @@ acpi_status
 acpi_hw_clear_acpi_status (void)
 {
 	acpi_native_uint                i;
-	acpi_native_uint                gpe_block;
 	acpi_status                     status;
+	struct acpi_gpe_block_info      *gpe_block;
 
 
 	ACPI_FUNCTION_TRACE ("hw_clear_acpi_status");
@@ -100,16 +100,19 @@ acpi_hw_clear_acpi_status (void)
 		}
 	}
 
-	/* Clear the GPE Bits */
+	/* Clear the GPE Bits in all GPE registers in all GPE blocks */
 
-	for (gpe_block = 0; gpe_block < ACPI_MAX_GPE_BLOCKS; gpe_block++) {
-		for (i = 0; i < acpi_gbl_gpe_block_info[gpe_block].register_count; i++) {
+	gpe_block = acpi_gbl_gpe_block_list_head;
+	while (gpe_block) {
+		for (i = 0; i < gpe_block->register_count; i++) {
 			status = acpi_hw_low_level_write (8, 0xFF,
-					 acpi_gbl_gpe_block_info[gpe_block].block_address, (u32) i);
+					 &gpe_block->register_info[i].status_address, (u32) i);
 			if (ACPI_FAILURE (status)) {
 				goto unlock_and_exit;
 			}
 		}
+
+		gpe_block = gpe_block->next;
 	}
 
 unlock_and_exit:

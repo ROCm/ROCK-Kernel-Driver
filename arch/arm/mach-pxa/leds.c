@@ -27,4 +27,4 @@ pxa_leds_init(void)
 	return 0;
 }
 
-__initcall(pxa_leds_init);
+core_initcall(pxa_leds_init);

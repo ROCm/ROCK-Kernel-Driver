@@ -313,6 +313,19 @@ config SC520_WDT
 	  You can compile this driver directly into the kernel, or use
 	  it as a module.  The module will be called sc520_wdt.
 
+config AMD7XX_TCO
+	tristate "AMD 766/768 TCO Timer/Watchdog"
+	depends on WATCHDOG
+	help
+	  This is the driver for the hardware watchdog built in to the
+	  AMD 766/768 chipsets.
+	  This watchdog simply watches your kernel to make sure it doesn't
+	  freeze, and if it does, it reboots your computer after a certain
+	  amount of time.
+	
+	  You can compile this driver directly into the kernel, or use
+	  it as a module.  The module will be called amd7xx_tco.
+
 config ALIM7101_WDT
 	tristate "ALi M7101 PMU Computer Watchdog"
 	depends on WATCHDOG
