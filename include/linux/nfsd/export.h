@@ -48,12 +48,10 @@
 struct svc_client {
 	struct svc_client *	cl_next;
 	char			cl_ident[NFSCLNT_IDMAX];
-	struct list_head	cl_list;
 };
 
 struct svc_export {
 	struct list_head	ex_hash;
-	struct list_head	ex_list;
 	struct svc_client *	ex_client;
 	int			ex_flags;
 	struct vfsmount *	ex_mnt;
