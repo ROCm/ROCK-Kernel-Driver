@@ -1021,7 +1021,6 @@ s32 i2c_smbus_write_word_data(struct i2c_client *client, u8 command, u16 value)
 	                      I2C_SMBUS_WORD_DATA,&data);
 }
 
-/* Returns the number of bytes transferred */
 s32 i2c_smbus_write_block_data(struct i2c_client *client, u8 command,
 			       u8 length, u8 *values)
 {
