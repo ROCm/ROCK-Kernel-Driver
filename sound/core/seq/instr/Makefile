@@ -19,5 +19,5 @@ sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_
 # Toplevel Module Dependency
 obj-$(call sequencer,$(CONFIG_SND_OPL3_LIB)) += snd-ainstr-fm.o
 obj-$(call sequencer,$(CONFIG_SND_OPL4_LIB)) += snd-ainstr-fm.o
-obj-$(call sequencer,$(CONFIG_SND_GUS_SYNTH)) += snd-ainstr-gf1.o snd-ainstr-simple.o
+obj-$(call sequencer,$(CONFIG_SND_GUS_SYNTH)) += snd-ainstr-gf1.o snd-ainstr-simple.o snd-ainstr-iw.o
 obj-$(call sequencer,$(CONFIG_SND_TRIDENT)) += snd-ainstr-simple.o
