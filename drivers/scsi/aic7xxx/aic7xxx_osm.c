@@ -404,9 +404,6 @@ static int aic7xxx_pci_parity = 0;
  * would result in never finding any devices :)
  */
 #ifndef CONFIG_AIC7XXX_PROBE_EISA_VL
-#define CONFIG_AIC7XXX_PROBE_EISA_VL n
-#endif
-#if CONFIG_AIC7XXX_PROBE_EISA_VL == n
 static int aic7xxx_no_probe = 1;
 #else
 static int aic7xxx_no_probe;
