@@ -1018,8 +1018,8 @@ W:	http://www.kernelconcepts.de/
 S:	Maintained
 
 IA64 (Itanium) PLATFORM
-P:	David Mosberger-Tang
-M:	davidm@hpl.hp.com
+P:	Tony Luck
+M:	tony.luck@intel.com
 L:	linux-ia64@vger.kernel.org
 W:	http://www.ia64-linux.org/
 S:	Maintained
