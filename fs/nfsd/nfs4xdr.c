@@ -2179,6 +2179,8 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	    readdir->common.err == nfserr_toosmall &&
 	    readdir->buffer == page) 
 		nfserr = nfserr_toosmall;
+	if (nfserr == nfserr_symlink)
+		nfserr = nfserr_notdir;
 	if (nfserr)
 		goto err_no_verf;
 

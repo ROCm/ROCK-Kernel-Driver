@@ -448,6 +448,9 @@ out:
 static inline int
 nfsd4_readdir(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_readdir *readdir)
 {
+	u64 cookie = readdir->rd_cookie;
+	static const nfs4_verifier zeroverf;
+
 	/* no need to check permission - this will be done in nfsd_readdir() */
 
 	if (readdir->rd_bmval[1] & NFSD_WRITEONLY_ATTRS_WORD1)
@@ -456,7 +459,8 @@ nfsd4_readdir(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_re
 	readdir->rd_bmval[0] &= NFSD_SUPPORTED_ATTRS_WORD0;
 	readdir->rd_bmval[1] &= NFSD_SUPPORTED_ATTRS_WORD1;
 
-	if (readdir->rd_cookie > ~(u32)0)
+	if ((cookie > ~(u32)0) || (cookie == 1) || (cookie == 2) ||
+	    (cookie == 0 && memcmp(readdir->rd_verf.data, zeroverf.data, NFS4_VERIFIER_SIZE)))
 		return nfserr_bad_cookie;
 
 	readdir->rd_rqstp = rqstp;
