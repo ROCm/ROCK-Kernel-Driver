@@ -3448,10 +3448,11 @@ out:
 }
 
 /* tp->lock is held. */
-static void tg3_chip_reset(struct tg3 *tp)
+static int tg3_chip_reset(struct tg3 *tp)
 {
 	u32 val;
 	u32 flags_save;
+	int i;
 
 	if (!(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
 		/* Force NVRAM to settle.
@@ -3519,6 +3520,8 @@ static void tg3_chip_reset(struct tg3 *tp)
 
 	tw32(MEMARB_MODE, MEMARB_MODE_ENABLE);
 
+	tw32(GRC_MODE, tp->grc_mode);
+
 	if ((tp->nic_sram_data_cfg & NIC_SRAM_DATA_CFG_MINI_PCI) != 0 &&
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
 		tp->pci_clock_ctrl |=
@@ -3526,7 +3529,45 @@ static void tg3_chip_reset(struct tg3 *tp)
 		tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl);
 	}
 
-	tw32(TG3PCI_MISC_HOST_CTRL, tp->misc_host_ctrl);
+	/* Prevent PXE from restarting.  */
+	tg3_write_mem(tp,
+		      NIC_SRAM_FIRMWARE_MBOX,
+		      NIC_SRAM_FIRMWARE_MBOX_MAGIC1);
+
+	if (tp->phy_id == PHY_ID_SERDES) {
+		tp->mac_mode = MAC_MODE_PORT_MODE_TBI;
+		tw32_f(MAC_MODE, tp->mac_mode);
+	} else
+		tw32_f(MAC_MODE, 0);
+	udelay(40);
+
+	/* Wait for firmware initialization to complete. */
+	for (i = 0; i < 100000; i++) {
+		tg3_read_mem(tp, NIC_SRAM_FIRMWARE_MBOX, &val);
+		if (val == ~NIC_SRAM_FIRMWARE_MBOX_MAGIC1)
+			break;
+		udelay(10);
+	}
+	if (i >= 100000 &&
+	    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
+		printk(KERN_ERR PFX "tg3_reset_hw timed out for %s, "
+		       "firmware will not restart magic=%08x\n",
+		       tp->dev->name, val);
+		return -ENODEV;
+	}
+
+	/* Reprobe ASF enable state.  */
+	tp->tg3_flags &= ~TG3_FLAG_ENABLE_ASF;
+	tg3_read_mem(tp, NIC_SRAM_DATA_SIG, &val);
+	if (val == NIC_SRAM_DATA_SIG_MAGIC) {
+		u32 nic_cfg;
+
+		tg3_read_mem(tp, NIC_SRAM_DATA_CFG, &nic_cfg);
+		if (nic_cfg & NIC_SRAM_DATA_CFG_ASF_ENABLE)
+			tp->tg3_flags |= TG3_FLAG_ENABLE_ASF;
+	}
+
+	return 0;
 }
 
 /* tp->lock is held. */
@@ -3553,40 +3594,17 @@ static void tg3_stop_fw(struct tg3 *tp)
 /* tp->lock is held. */
 static int tg3_halt(struct tg3 *tp)
 {
-	u32 val;
-	int i;
+	int err;
 
 	tg3_stop_fw(tp);
 	tg3_abort_hw(tp);
-	tg3_chip_reset(tp);
-	tg3_write_mem(tp,
-		      NIC_SRAM_FIRMWARE_MBOX,
-		      NIC_SRAM_FIRMWARE_MBOX_MAGIC1);
-	for (i = 0; i < 100000; i++) {
-		tg3_read_mem(tp, NIC_SRAM_FIRMWARE_MBOX, &val);
-		if (val == ~NIC_SRAM_FIRMWARE_MBOX_MAGIC1)
-			break;
-		udelay(10);
-	}
+	err = tg3_chip_reset(tp);
+	if (err)
+		return err;
 
-	if (i >= 100000 &&
-	    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
-		printk(KERN_ERR PFX "tg3_halt timed out for %s, "
-		       "firmware will not restart magic=%08x\n",
-		       tp->dev->name, val);
-		return -ENODEV;
-	}
-
-	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) {
-		if (tp->tg3_flags & TG3_FLAG_WOL_ENABLE)
-			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
-				      DRV_STATE_WOL);
-		else
-			tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
-				      DRV_STATE_UNLOAD);
-	} else
+	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF)
 		tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
-			      DRV_STATE_SUSPEND);
+			      DRV_STATE_UNLOAD);
 
 	return 0;
 }
@@ -4550,36 +4568,9 @@ static int tg3_reset_hw(struct tg3 *tp)
 			return err;
 	}
 
-	tg3_chip_reset(tp);
-
-	val = tr32(GRC_MODE);
-	val &= GRC_MODE_HOST_STACKUP;
-	tw32(GRC_MODE, val | tp->grc_mode);
-
-	tg3_write_mem(tp,
-		      NIC_SRAM_FIRMWARE_MBOX,
-		      NIC_SRAM_FIRMWARE_MBOX_MAGIC1);
-	if (tp->phy_id == PHY_ID_SERDES) {
-		tp->mac_mode = MAC_MODE_PORT_MODE_TBI;
-		tw32_f(MAC_MODE, tp->mac_mode);
-	} else
-		tw32_f(MAC_MODE, 0);
-	udelay(40);
-
-	/* Wait for firmware initialization to complete. */
-	for (i = 0; i < 100000; i++) {
-		tg3_read_mem(tp, NIC_SRAM_FIRMWARE_MBOX, &val);
-		if (val == ~NIC_SRAM_FIRMWARE_MBOX_MAGIC1)
-			break;
-		udelay(10);
-	}
-	if (i >= 100000 &&
-	    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
-		printk(KERN_ERR PFX "tg3_reset_hw timed out for %s, "
-		       "firmware will not restart magic=%08x\n",
-		       tp->dev->name, val);
-		return -ENODEV;
-	}
+	err = tg3_chip_reset(tp);
+	if (err)
+		return err;
 
 	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF)
 		tg3_write_mem(tp, NIC_SRAM_FW_DRV_STATE_MBOX,
