@@ -30,16 +30,7 @@ acpi_device_register (
 	struct acpi_device	*device,
 	struct acpi_device	*parent)
 {
-	int			result = 0;
-
-	ACPI_FUNCTION_TRACE("acpi_device_register");
-
-	if (device)
-		result = acpi_create_dir(device);
-	else 
-		result = -EINVAL;
-
-	return_VALUE(result);
+	return acpi_create_dir(device);
 }
 
 
@@ -47,10 +38,8 @@ static int
 acpi_device_unregister (
 	struct acpi_device	*device)
 {
-	ACPI_FUNCTION_TRACE("acpi_device_unregister");
-
 	acpi_remove_dir(device);
-	return_VALUE(0);
+	return 0;
 }
 
 void
@@ -75,9 +64,6 @@ acpi_bus_get_power_flags (
 	u32                     i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_get_power_flags");
-
-	if (!device)
-		return -ENODEV;
 
 	/*
 	 * Power Management Flags
@@ -129,21 +115,6 @@ acpi_bus_get_power_flags (
 	device->power.states[ACPI_STATE_D3].flags.valid = 1;
 	device->power.states[ACPI_STATE_D3].power = 0;
 
-	/*
-	 * System Power States
-	 * -------------------
-	 */
-	/* TBD: S1-S4 power state support and resource requirements. */
-	/*
-	for (i=ACPI_STATE_S1; i<ACPI_STATE_S5; i++) {
-		char name[5] = {'_','S',('0'+i),'D','\0'};
-		status = acpi_evaluate_integer(device->handle, name, NULL,
-			&state);
-		if (ACPI_FAILURE(status))
-			continue;
-	}
-	*/
-
 	/* TBD: System wake support and resource requirements. */
 
 	device->power.state = ACPI_STATE_UNKNOWN;
@@ -160,13 +131,7 @@ static int
 acpi_bus_get_perf_flags (
 	struct acpi_device	*device)
 {
-	ACPI_FUNCTION_TRACE("acpi_bus_get_perf_flags");
-
-	if (!device)
-		return -ENODEV;
-
 	device->performance.state = ACPI_STATE_UNKNOWN;
-
 	return 0;
 }
 
@@ -189,22 +154,17 @@ acpi_bus_match (
 	struct acpi_device	*device,
 	struct acpi_driver	*driver)
 {
+	int error = 0;
+	acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 
-	if (!device || !driver)
-		return -EINVAL;
-
-	if (device->flags.hardware_id) {
+	if (device->flags.hardware_id)
 		if (strstr(driver->ids, device->pnp.hardware_id))
-			return 0;
-	}
+			goto Done;
 
 	if (device->flags.compatible_ids) {
 		acpi_status	status = AE_OK;
-		acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 		acpi_object	*object = NULL;
-		char		cid[256];
-
-		memset(cid, 0, sizeof(cid));
+		char		cid[256] = {};
 
 		status = acpi_evaluate_object(device->handle, "_CID", NULL, 
 			&buffer);
@@ -226,20 +186,15 @@ acpi_bus_match (
 			break;
 		}
 
-		if (!cid[0]) {
-			acpi_os_free(buffer.pointer);
-			return -ENOENT;
-		}
-
-		if (strstr(driver->ids, cid)) {
-			acpi_os_free(buffer.pointer);
-			return 0;
-		}
-
-		acpi_os_free(buffer.pointer);
+		if (strlen(cid) && strstr(driver->ids,cid))
+			goto Done;
+		error = -ENOENT;
 	}
 
-	return -ENOENT;
+ Done:
+	if (buffer.pointer)
+		acpi_os_free(buffer.pointer);
+	return error;
 }
 
 
@@ -493,51 +448,16 @@ acpi_bus_remove (
 	struct acpi_device	*device, 
 	int			type)
 {
-	ACPI_FUNCTION_TRACE("acpi_bus_remove");
-
-	if (!device)
-		return_VALUE(-ENODEV);
-
 	acpi_device_unregister(device);
-
 	kfree(device);
-
-	return_VALUE(0);
+	return 0;
 }
 
-static int 
-acpi_bus_add (
-	struct acpi_device	**child,
-	struct acpi_device	*parent,
-	acpi_handle		handle,
-	int			type)
+static void acpi_device_get_busid(struct acpi_device * device, acpi_handle handle, int type)
 {
-	int			result = 0;
-	acpi_status		status = AE_OK;
-	struct acpi_device	*device = NULL;
 	char			bus_id[5] = {'?',0};
 	acpi_buffer		buffer = {sizeof(bus_id), bus_id};
-	acpi_device_info	info;
-	char			*hid = NULL;
-	char			*uid = NULL;
 	int			i = 0;
-
-	ACPI_FUNCTION_TRACE("acpi_bus_add");
-
-	if (!child)
-		return_VALUE(-EINVAL);
-
-	device = kmalloc(sizeof(struct acpi_device), GFP_KERNEL);
-	if (!device) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Memory allocation error\n"));
-		return_VALUE(-ENOMEM);
-	}
-	memset(device, 0, sizeof(struct acpi_device));
-
-	device->handle = handle;
-	device->parent = parent;
-
-	memset(&info, 0, sizeof(acpi_device_info));
 
 	/*
 	 * Bus ID
@@ -567,61 +487,22 @@ acpi_bus_add (
 		sprintf(device->pnp.bus_id, "%s", bus_id);
 		break;
 	}
+}
 
-	/*
-	 * Flags
-	 * -----
-	 * Get prior to calling acpi_bus_get_status() so we know whether
-	 * or not _STA is present.  Note that we only look for object
-	 * handles -- cannot evaluate objects until we know the device is
-	 * present and properly initialized.
-	 */
-	result = acpi_bus_get_flags(device);
-	if (result)
-		goto end;
+static void acpi_device_set_id(struct acpi_device * device, struct acpi_device * parent,
+			       acpi_handle handle, int type)
+{
+	acpi_device_info	info;
+	char			*hid = NULL;
+	char			*uid = NULL;
+	acpi_status		status;
 
-	/*
-	 * Status
-	 * ------
-	 * See if the device is present.  We always assume that non-Device()
-	 * objects (e.g. thermal zones, power resources, processors, etc.) are
-	 * present, functioning, etc. (at least when parent object is present).
-	 * Note that _STA has a different meaning for some objects (e.g.
-	 * power resources) so we need to be careful how we use it.
-	 */
-	switch (type) {
-	case ACPI_BUS_TYPE_DEVICE:
-		result = acpi_bus_get_status(device);
-		if (result)
-			goto end;
-		break;
-	default:
-		STRUCT_TO_INT(device->status) = 0x0F;
-		break;
-	}
-	if (!device->status.present) {
-		result = -ENOENT;
-		goto end;
-	}
-
-	/*
-	 * Initialize Device
-	 * -----------------
-	 * TBD: Synch with Core's enumeration/initialization process.
-	 */
-
-	/*
-	 * Hardware ID, Unique ID, & Bus Address
-	 * -------------------------------------
-	 */
 	switch (type) {
 	case ACPI_BUS_TYPE_DEVICE:
 		status = acpi_get_object_info(handle, &info);
 		if (ACPI_FAILURE(status)) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-				"Error reading device info\n"));
-			result = -ENODEV;
-			goto end;
+			printk("%s: Error reading device info\n",__FUNCTION__);
+			return;
 		}
 		/* Clean up info strings (not NULL terminated) */
 		info.hardware_id[sizeof(info.hardware_id)-1] = '\0';
@@ -674,6 +555,166 @@ acpi_bus_add (
 		sprintf(device->pnp.unique_id, "%s", uid);
 		device->flags.unique_id = 1;
 	}
+}
+
+int acpi_device_set_context(struct acpi_device * device, int type)
+{
+	acpi_status status = AE_OK;
+	int result = 0;
+	/*
+	 * Context
+	 * -------
+	 * Attach this 'struct acpi_device' to the ACPI object.  This makes
+	 * resolutions from handle->device very efficient.  Note that we need
+	 * to be careful with fixed-feature devices as they all attach to the
+	 * root object.
+	 */
+	if (type != ACPI_BUS_TYPE_POWER_BUTTON && 
+	    type != ACPI_BUS_TYPE_SLEEP_BUTTON) {
+		status = acpi_attach_data(device->handle,
+			acpi_bus_data_handler, device);
+
+		if (ACPI_FAILURE(status)) {
+			printk("Error attaching device data\n");
+			result = -ENODEV;
+		}
+	}
+	return result;
+}
+
+void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle, int type)
+{
+	char		*type_string = NULL;
+	char		name[80] = {'?','\0'};
+	acpi_buffer	buffer = {sizeof(name), name};
+
+#ifdef CONFIG_ACPI_DEBUG
+	acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
+
+	switch (type) {
+	case ACPI_BUS_TYPE_DEVICE:
+		type_string = "Device";
+		break;
+	case ACPI_BUS_TYPE_POWER:
+		type_string = "Power Resource";
+		break;
+	case ACPI_BUS_TYPE_PROCESSOR:
+		type_string = "Processor";
+		break;
+	case ACPI_BUS_TYPE_SYSTEM:
+		type_string = "System";
+		break;
+	case ACPI_BUS_TYPE_THERMAL:
+		type_string = "Thermal Zone";
+		break;
+	case ACPI_BUS_TYPE_POWER_BUTTON:
+		type_string = "Power Button";
+		sprintf(name, "PWRB");
+		break;
+	case ACPI_BUS_TYPE_SLEEP_BUTTON:
+		type_string = "Sleep Button";
+		sprintf(name, "SLPB");
+		break;
+	}
+
+	pr_debug("Found %s %s [%p]\n", type_string, name, handle);
+#endif /*CONFIG_ACPI_DEBUG*/
+}
+
+static void acpi_device_attach(struct acpi_device * device, struct acpi_device * parent)
+{
+	/*
+	 * Linkage
+	 * -------
+	 * Link this device to its parent and siblings.
+	 */
+	INIT_LIST_HEAD(&device->children);
+	INIT_LIST_HEAD(&device->node);
+	INIT_LIST_HEAD(&device->g_list);
+
+	spin_lock(&acpi_device_lock);
+	if (device->parent) {
+		list_add_tail(&device->node, &device->parent->children);
+		list_add_tail(&device->g_list,&device->parent->g_list);
+	} else
+		list_add_tail(&device->g_list,&acpi_device_list);
+	spin_unlock(&acpi_device_lock);
+
+	acpi_device_register(device, parent);
+}
+
+static int 
+acpi_bus_add (
+	struct acpi_device	**child,
+	struct acpi_device	*parent,
+	acpi_handle		handle,
+	int			type)
+{
+	int			result = 0;
+	struct acpi_device	*device = NULL;
+
+	ACPI_FUNCTION_TRACE("acpi_bus_add");
+
+	if (!child)
+		return_VALUE(-EINVAL);
+
+	device = kmalloc(sizeof(struct acpi_device), GFP_KERNEL);
+	if (!device) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Memory allocation error\n"));
+		return_VALUE(-ENOMEM);
+	}
+	memset(device, 0, sizeof(struct acpi_device));
+
+	device->handle = handle;
+	device->parent = parent;
+
+	acpi_device_get_busid(device,handle,type);
+
+	/*
+	 * Flags
+	 * -----
+	 * Get prior to calling acpi_bus_get_status() so we know whether
+	 * or not _STA is present.  Note that we only look for object
+	 * handles -- cannot evaluate objects until we know the device is
+	 * present and properly initialized.
+	 */
+	result = acpi_bus_get_flags(device);
+	if (result)
+		goto end;
+
+	/*
+	 * Status
+	 * ------
+	 * See if the device is present.  We always assume that non-Device()
+	 * objects (e.g. thermal zones, power resources, processors, etc.) are
+	 * present, functioning, etc. (at least when parent object is present).
+	 * Note that _STA has a different meaning for some objects (e.g.
+	 * power resources) so we need to be careful how we use it.
+	 */
+	switch (type) {
+	case ACPI_BUS_TYPE_DEVICE:
+		result = acpi_bus_get_status(device);
+		if (!result)
+			break;
+		if (!device->status.present) 
+			result = -ENOENT;
+		goto end;
+	default:
+		STRUCT_TO_INT(device->status) = 0x0F;
+		break;
+	}
+
+	/*
+	 * Initialize Device
+	 * -----------------
+	 * TBD: Synch with Core's enumeration/initialization process.
+	 */
+
+	/*
+	 * Hardware ID, Unique ID, & Bus Address
+	 * -------------------------------------
+	 */
+	acpi_device_set_id(device,parent,handle,type);
 
 	/*
 	 * Power Management
@@ -695,92 +736,12 @@ acpi_bus_add (
 			goto end;
 	}
 
-	/*
-	 * Context
-	 * -------
-	 * Attach this 'struct acpi_device' to the ACPI object.  This makes
-	 * resolutions from handle->device very efficient.  Note that we need
-	 * to be careful with fixed-feature devices as they all attach to the
-	 * root object.
-	 */
-	switch (type) {
-	case ACPI_BUS_TYPE_POWER_BUTTON:
-	case ACPI_BUS_TYPE_SLEEP_BUTTON:
-		break;
-	default:
-		status = acpi_attach_data(device->handle,
-			acpi_bus_data_handler, device);
-		break;
-	}
-	if (ACPI_FAILURE(status)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Error attaching device data\n"));
-		result = -ENODEV;
+	if ((result = acpi_device_set_context(device,type)))
 		goto end;
-	}
 
-	/*
-	 * Linkage
-	 * -------
-	 * Link this device to its parent and siblings.
-	 */
-	INIT_LIST_HEAD(&device->children);
-	INIT_LIST_HEAD(&device->node);
-	INIT_LIST_HEAD(&device->g_list);
+	acpi_device_get_debug_info(device,handle,type);
 
-	spin_lock(&acpi_device_lock);
-	if (device->parent) {
-		list_add_tail(&device->node, &device->parent->children);
-		list_add_tail(&device->g_list,&device->parent->g_list);
-	} else
-		list_add_tail(&device->g_list,&acpi_device_list);
-	spin_unlock(&acpi_device_lock);
-
-#ifdef CONFIG_ACPI_DEBUG
-	{
-		char		*type_string = NULL;
-		char		name[80] = {'?','\0'};
-		acpi_buffer	buffer = {sizeof(name), name};
-
-		acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
-
-		switch (type) {
-		case ACPI_BUS_TYPE_DEVICE:
-			type_string = "Device";
-			break;
-		case ACPI_BUS_TYPE_POWER:
-			type_string = "Power Resource";
-			break;
-		case ACPI_BUS_TYPE_PROCESSOR:
-			type_string = "Processor";
-			break;
-		case ACPI_BUS_TYPE_SYSTEM:
-			type_string = "System";
-			break;
-		case ACPI_BUS_TYPE_THERMAL:
-			type_string = "Thermal Zone";
-			break;
-		case ACPI_BUS_TYPE_POWER_BUTTON:
-			type_string = "Power Button";
-			sprintf(name, "PWRB");
-			break;
-		case ACPI_BUS_TYPE_SLEEP_BUTTON:
-			type_string = "Sleep Button";
-			sprintf(name, "SLPB");
-			break;
-		}
-
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %s %s [%p]\n", 
-			type_string, name, handle));
-	}
-#endif /*CONFIG_ACPI_DEBUG*/
-
-	/*
-	 * Global Device Hierarchy:
-	 * ------------------------
-	 * Register this device with the global device hierarchy.
-	 */
-	acpi_device_register(device, parent);
+	acpi_device_attach(device,parent);
 
 	/*
 	 * Bind _ADR-Based Devices
@@ -803,17 +764,14 @@ acpi_bus_add (
 	 *
 	 * TBD: Assumes LDM provides driver hot-plug capability.
 	 */
-		acpi_bus_find_driver(device);
+	acpi_bus_find_driver(device);
 
 end:
-	if (result) {
+	if (!result)
+		*child = device;
+	else
 		kfree(device);
-		return_VALUE(result);
-	}
-
-	*child = device;
-
-	return_VALUE(0);
+	return_VALUE(result);
 }
 
 
