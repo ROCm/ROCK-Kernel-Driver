@@ -268,20 +268,17 @@ struct auth_domain *auth_unix_lookup(struct in_addr addr)
 
 	if (!ipm)
 		return NULL;
+	if (cache_check(&ip_map_cache, &ipm->h, NULL))
+		return NULL;
 
-	if (test_bit(CACHE_VALID, &ipm->h.flags) &&
-	    (ipm->m_client->addr_changes - ipm->m_add_change) >0)
+	if ((ipm->m_client->addr_changes - ipm->m_add_change) >0) {
 		set_bit(CACHE_NEGATIVE, &ipm->h.flags);
-
-	if (!test_bit(CACHE_VALID, &ipm->h.flags))
 		rv = NULL;
-	else if (test_bit(CACHE_NEGATIVE, &ipm->h.flags))
-		rv = NULL;
-	else {
+	} else {
 		rv = &ipm->m_client->h;
 		cache_get(&rv->h);
 	}
-	if (ipm) ip_map_put(&ipm->h, &ip_map_cache);
+	ip_map_put(&ipm->h, &ip_map_cache);
 	return rv;
 }
 
