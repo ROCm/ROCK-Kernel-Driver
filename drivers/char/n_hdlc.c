@@ -182,9 +182,9 @@ static ssize_t maxframe = 4096;
 
 /* TTY callbacks */
 
-static int n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
+static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 			   __u8 *buf, size_t nr);
-static int n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
+static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
 			    const __u8 *buf, size_t nr);
 static int n_hdlc_tty_ioctl(struct tty_struct *tty, struct file *file,
 			    unsigned int cmd, unsigned long arg);
@@ -572,7 +572,7 @@ static void n_hdlc_tty_receive(struct tty_struct *tty, const __u8 *data,
  * 	
  * Returns the number of bytes returned or error code.
  */
-static int n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
+static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 			   __u8 *buf, size_t nr)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc(tty);
@@ -649,7 +649,7 @@ static int n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
  * 		
  * Returns the number of bytes written (or error code).
  */
-static int n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
+static ssize_t n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
 			    const __u8 *data, size_t count)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
@@ -658,7 +658,7 @@ static int n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
 	struct n_hdlc_buf *tbuf;
 
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
-		printk("%s(%d)n_hdlc_tty_write() called count=%d\n",
+		printk("%s(%d)n_hdlc_tty_write() called count=%Zd\n",
 			__FILE__,__LINE__,count);
 		
 	/* Verify pointers */
@@ -673,7 +673,7 @@ static int n_hdlc_tty_write(struct tty_struct *tty, struct file *file,
 		if (debuglevel & DEBUG_LEVEL_INFO)
 			printk (KERN_WARNING
 				"n_hdlc_tty_write: truncating user packet "
-				"from %lu to %d\n", (unsigned long) count,
+				"from %lu to %Zd\n", (unsigned long) count,
 				maxframe );
 		count = maxframe;
 	}
