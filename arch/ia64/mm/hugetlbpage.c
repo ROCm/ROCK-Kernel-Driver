@@ -117,7 +117,7 @@ int is_aligned_hugepage_range(unsigned long addr, unsigned long len)
 /* This function checks if the address and address+len falls out of HugeTLB region.  It
  * return -EINVAL if any part of address range falls in HugeTLB region.
  */
-int  is_invalid_hugepage_range(unsigned long addr, unsigned long len)
+int  check_valid_hugepage_range(unsigned long addr, unsigned long len)
 {
 	if (REGION_NUMBER(addr) == REGION_HPAGE)
 		return -EINVAL;
