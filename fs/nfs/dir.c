@@ -557,7 +557,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, struct nameidata *nd)
 	/* Force a full look up iff the parent directory has changed */
 	if (nfs_check_verifier(dir, dentry)) {
 		if (nfs_lookup_verify_inode(inode, isopen))
-			goto out_bad;
+			goto out_zap_parent;
 		goto out_valid;
 	}
 
@@ -566,7 +566,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, struct nameidata *nd)
 		if (memcmp(NFS_FH(inode), &fhandle, sizeof(struct nfs_fh))!= 0)
 			goto out_bad;
 		if (nfs_lookup_verify_inode(inode, isopen))
-			goto out_bad;
+			goto out_zap_parent;
 		goto out_valid_renew;
 	}
 
@@ -587,6 +587,8 @@ static int nfs_lookup_revalidate(struct dentry * dentry, struct nameidata *nd)
 	unlock_kernel();
 	dput(parent);
 	return 1;
+out_zap_parent:
+	nfs_zap_caches(dir);
  out_bad:
 	NFS_CACHEINV(dir);
 	if (inode && S_ISDIR(inode->i_mode)) {

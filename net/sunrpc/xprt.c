@@ -138,15 +138,22 @@ xprt_from_sock(struct sock *sk)
 static int
 __xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
 {
+	struct rpc_rqst *req = task->tk_rqstp;
+
 	if (!xprt->snd_task) {
-		if (xprt->nocong || __xprt_get_cong(xprt, task))
+		if (xprt->nocong || __xprt_get_cong(xprt, task)) {
 			xprt->snd_task = task;
+			if (req) {
+				req->rq_bytes_sent = 0;
+				req->rq_ntrans++;
+			}
+		}
 	}
 	if (xprt->snd_task != task) {
 		dprintk("RPC: %4d TCP write queue full\n", task->tk_pid);
 		task->tk_timeout = 0;
 		task->tk_status = -EAGAIN;
-		if (task->tk_rqstp && task->tk_rqstp->rq_nresend)
+		if (req && req->rq_ntrans)
 			rpc_sleep_on(&xprt->resend, task, NULL, NULL);
 		else
 			rpc_sleep_on(&xprt->sending, task, NULL, NULL);
@@ -181,8 +188,14 @@ __xprt_lock_write_next(struct rpc_xprt *xprt)
 		if (!task)
 			return;
 	}
-	if (xprt->nocong || __xprt_get_cong(xprt, task))
+	if (xprt->nocong || __xprt_get_cong(xprt, task)) {
+		struct rpc_rqst *req = task->tk_rqstp;
 		xprt->snd_task = task;
+		if (req) {
+			req->rq_bytes_sent = 0;
+			req->rq_ntrans++;
+		}
+	}
 }
 
 /*
@@ -422,6 +435,9 @@ xprt_connect(struct rpc_task *task)
 	if (xprt_connected(xprt))
 		goto out_write;
 
+	if (task->tk_rqstp)
+		task->tk_rqstp->rq_bytes_sent = 0;
+
 	/*
 	 * We're here because the xprt was marked disconnected.
 	 * Start by resetting any existing state.
@@ -566,14 +582,13 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 	if (!xprt->nocong) {
 		xprt_adjust_cwnd(xprt, copied);
 		__xprt_put_cong(xprt, req);
-	       	if (!req->rq_nresend) {
+	       	if (req->rq_ntrans == 1) {
 			unsigned timer =
 				task->tk_msg.rpc_proc->p_timer;
 			if (timer)
 				rpc_update_rtt(&clnt->cl_rtt, timer,
 						(long)jiffies - req->rq_xtime);
 		}
-		rpc_clear_timeo(&clnt->cl_rtt);
 	}
 
 #ifdef RPC_PROFILE
@@ -714,11 +729,11 @@ udp_data_ready(struct sock *sk, int len)
 
 	dprintk("RPC: %4d received reply\n", task->tk_pid);
 
-	if ((copied = rovr->rq_rlen) > repsize)
+	if ((copied = rovr->rq_private_buf.len) > repsize)
 		copied = repsize;
 
 	/* Suck it into the iovec, verify checksum if not done by hw. */
-	if (csum_partial_copy_to_xdr(&rovr->rq_rcv_buf, skb))
+	if (csum_partial_copy_to_xdr(&rovr->rq_private_buf, skb))
 		goto out_unlock;
 
 	/* Something worked... */
@@ -841,7 +856,7 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 		return;
 	}
 
-	rcvbuf = &req->rq_rcv_buf;
+	rcvbuf = &req->rq_private_buf;
 	len = desc->count;
 	if (len > xprt->tcp_reclen - xprt->tcp_offset) {
 		skb_reader_t my_desc;
@@ -859,7 +874,7 @@ tcp_read_request(struct rpc_xprt *xprt, skb_reader_t *desc)
 	xprt->tcp_copied += len;
 	xprt->tcp_offset += len;
 
-	if (xprt->tcp_copied == req->rq_rlen)
+	if (xprt->tcp_copied == req->rq_private_buf.len)
 		xprt->tcp_flags &= ~XPRT_COPY_DATA;
 	else if (xprt->tcp_offset == xprt->tcp_reclen) {
 		if (xprt->tcp_flags & XPRT_LAST_FRAG)
@@ -1040,21 +1055,6 @@ out:
 }
 
 /*
- * Exponential backoff for UDP retries
- */
-static inline int
-xprt_expbackoff(struct rpc_task *task, struct rpc_rqst *req)
-{
-	int backoff;
-
-	req->rq_ntimeo++;
-	backoff = min(rpc_ntimeo(&task->tk_client->cl_rtt), XPRT_MAX_BACKOFF);
-	if (req->rq_ntimeo < (1 << backoff))
-		return 1;
-	return 0;
-}
-
-/*
  * RPC receive timeout handler.
  */
 static void
@@ -1067,15 +1067,8 @@ xprt_timer(struct rpc_task *task)
 	if (req->rq_received)
 		goto out;
 
-	if (!xprt->nocong) {
-		if (xprt_expbackoff(task, req)) {
-			rpc_add_timer(task, xprt_timer);
-			goto out_unlock;
-		}
-		rpc_inc_timeo(&task->tk_client->cl_rtt);
-		xprt_adjust_cwnd(req->rq_xprt, -ETIMEDOUT);
-	}
-	req->rq_nresend++;
+	xprt_adjust_cwnd(req->rq_xprt, -ETIMEDOUT);
+	__xprt_put_cong(xprt, req);
 
 	dprintk("RPC: %4d xprt_timer (%s request)\n",
 		task->tk_pid, req ? "pending" : "backlogged");
@@ -1084,7 +1077,6 @@ xprt_timer(struct rpc_task *task)
 out:
 	task->tk_timeout = 0;
 	rpc_wake_up_task(task);
-out_unlock:
 	spin_unlock(&xprt->sock_lock);
 }
 
@@ -1104,10 +1096,11 @@ xprt_prepare_transmit(struct rpc_task *task)
 	if (xprt->shutdown)
 		return -EIO;
 
-	if (task->tk_rpcwait)
-		rpc_remove_wait_queue(task);
-
 	spin_lock_bh(&xprt->sock_lock);
+	if (req->rq_received && !req->rq_bytes_sent) {
+		err = req->rq_received;
+		goto out_unlock;
+	}
 	if (!__xprt_lock_write(xprt, task)) {
 		err = -EAGAIN;
 		goto out_unlock;
@@ -1116,11 +1109,6 @@ xprt_prepare_transmit(struct rpc_task *task)
 	if (!xprt_connected(xprt)) {
 		err = -ENOTCONN;
 		goto out_unlock;
-	}
-
-	if (list_empty(&req->rq_list)) {
-		list_add_tail(&req->rq_list, &xprt->recv);
-		req->rq_received = 0;
 	}
 out_unlock:
 	spin_unlock_bh(&xprt->sock_lock);
@@ -1146,6 +1134,20 @@ xprt_transmit(struct rpc_task *task)
 		*marker = htonl(0x80000000|(req->rq_slen-sizeof(*marker)));
 	}
 
+	smp_rmb();
+	if (!req->rq_received) {
+		if (list_empty(&req->rq_list)) {
+			spin_lock_bh(&xprt->sock_lock);
+			/* Update the softirq receive buffer */
+			memcpy(&req->rq_private_buf, &req->rq_rcv_buf,
+					sizeof(req->rq_private_buf));
+			/* Add request to the receive list */
+			list_add_tail(&req->rq_list, &xprt->recv);
+			spin_unlock_bh(&xprt->sock_lock);
+		}
+	} else if (!req->rq_bytes_sent)
+		return;
+
 	/* Continue transmitting the packet/record. We must be careful
 	 * to cope with writespace callbacks arriving _after_ we have
 	 * called xprt_sendmsg().
@@ -1160,8 +1162,12 @@ xprt_transmit(struct rpc_task *task)
 		if (xprt->stream) {
 			req->rq_bytes_sent += status;
 
-			if (req->rq_bytes_sent >= req->rq_slen)
+			/* If we've sent the entire packet, immediately
+			 * reset the count of bytes sent. */
+			if (req->rq_bytes_sent >= req->rq_slen) {
+				req->rq_bytes_sent = 0;
 				goto out_receive;
+			}
 		} else {
 			if (status >= req->rq_slen)
 				goto out_receive;
@@ -1182,9 +1188,6 @@ xprt_transmit(struct rpc_task *task)
 	 *	 hence there is no danger of the waking up task being put on
 	 *	 schedq, and being picked up by a parallel run of rpciod().
 	 */
-	if (req->rq_received)
-		goto out_release;
-
 	task->tk_status = status;
 
 	switch (status) {
@@ -1214,22 +1217,21 @@ xprt_transmit(struct rpc_task *task)
 		if (xprt->stream)
 			xprt_disconnect(xprt);
 	}
- out_release:
 	xprt_release_write(xprt, task);
-	req->rq_bytes_sent = 0;
 	return;
  out_receive:
 	dprintk("RPC: %4d xmit complete\n", task->tk_pid);
 	/* Set the task's receive timeout value */
+	spin_lock_bh(&xprt->sock_lock);
 	if (!xprt->nocong) {
 		task->tk_timeout = rpc_calc_rto(&clnt->cl_rtt,
 				task->tk_msg.rpc_proc->p_timer);
-		req->rq_ntimeo = 0;
+		task->tk_timeout <<= clnt->cl_timeout.to_retries
+			- req->rq_timeout.to_retries;
 		if (task->tk_timeout > req->rq_timeout.to_maxval)
 			task->tk_timeout = req->rq_timeout.to_maxval;
 	} else
 		task->tk_timeout = req->rq_timeout.to_current;
-	spin_lock_bh(&xprt->sock_lock);
 	/* Don't race with disconnect */
 	if (!xprt_connected(xprt))
 		task->tk_status = -ENOTCONN;
@@ -1237,7 +1239,6 @@ xprt_transmit(struct rpc_task *task)
 		rpc_sleep_on(&xprt->pending, task, NULL, xprt_timer);
 	__xprt_release_write(xprt, task);
 	spin_unlock_bh(&xprt->sock_lock);
-	req->rq_bytes_sent = 0;
 }
 
 /*
