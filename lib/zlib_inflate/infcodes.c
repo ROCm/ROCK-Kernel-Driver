@@ -149,15 +149,9 @@ int zlib_inflate_codes(
       DUMPBITS(j)
       c->mode = COPY;
     case COPY:          /* o: copying bytes in window, waiting for space */
-#ifndef __TURBOC__ /* Turbo C bug for following expression */
-      f = (uInt)(q - s->window) < c->sub.copy.dist ?
-          s->end - (c->sub.copy.dist - (q - s->window)) :
-          q - c->sub.copy.dist;
-#else
       f = q - c->sub.copy.dist;
-      if ((uInt)(q - s->window) < c->sub.copy.dist)
-        f = s->end - (c->sub.copy.dist - (uInt)(q - s->window));
-#endif
+      while (f < s->window)             /* modulo window size-"while" instead */
+        f += s->end - s->window;        /* of "if" handles invalid distances */
       while (c->len)
       {
         NEEDOUT
