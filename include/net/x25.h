@@ -101,16 +101,25 @@ enum {
 #define	X25_MAX_FAC_LEN		20		/* Plenty to spare */
 #define	X25_MAX_CUD_LEN		128
 
+/**
+ *	struct x25_route - x25 routing entry
+ *	@node - entry in x25_list_lock
+ *	@address - Start of address range
+ *	@sigdigits - Number of sig digits
+ *	@dev - More than one for MLP
+ *	@refcnt - reference counter
+ */
 struct x25_route {
-	struct x25_route	*next;
-	struct x25_address	address;	/* Start of address range */
-	unsigned int		sigdigits;	/* Number of sig digits */
-	struct net_device	*dev;		/* More than one for MLP */
+	struct list_head	node;		
+	struct x25_address	address;
+	unsigned int		sigdigits;
+	struct net_device	*dev;
+	atomic_t		refcnt;
 };
 
 struct x25_neigh {
 	struct x25_neigh	*next;
-	struct net_device		*dev;
+	struct net_device	*dev;
 	unsigned int		state;
 	unsigned int		extended;
 	struct sk_buff_head	queue;
@@ -119,7 +128,7 @@ struct x25_neigh {
 	unsigned long		global_facil_mask;
 };
 
-typedef struct {
+struct x25_opt {
 	struct x25_address	source_addr, dest_addr;
 	struct x25_neigh	*neighbour;
 	unsigned int		lci;
@@ -137,9 +146,9 @@ typedef struct {
 	struct x25_facilities	facilities;
 	struct x25_calluserdata	calluserdata;
 	unsigned long 		vc_facil_mask;	/* inc_call facilities mask */
-} x25_cb;
+};
 
-#define x25_sk(__sk) ((x25_cb *)(__sk)->protinfo)
+#define x25_sk(__sk) ((struct x25_opt *)(__sk)->protinfo)
 
 /* af_x25.c */
 extern int  sysctl_x25_restart_request_timeout;
@@ -196,12 +205,23 @@ extern void x25_kick(struct sock *);
 extern void x25_enquiry_response(struct sock *);
 
 /* x25_route.c */
-extern struct net_device *x25_get_route(struct x25_address *);
+extern struct x25_route *x25_get_route(struct x25_address *addr);
 extern struct net_device *x25_dev_get(char *);
 extern void x25_route_device_down(struct net_device *);
 extern int  x25_route_ioctl(unsigned int, void *);
 extern int  x25_routes_get_info(char *, char **, off_t, int);
 extern void x25_route_free(void);
+
+static __inline__ void x25_route_hold(struct x25_route *rt)
+{
+	atomic_inc(&rt->refcnt);
+}
+
+static __inline__ void x25_route_put(struct x25_route *rt)
+{
+	if (atomic_dec_and_test(&rt->refcnt))
+		kfree(rt);
+}
 
 /* x25_subr.c */
 extern void x25_clear_queues(struct sock *);

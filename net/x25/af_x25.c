@@ -421,7 +421,7 @@ static int x25_listen(struct socket *sock, int backlog)
 static struct sock *x25_alloc_socket(void)
 {
 	struct sock *sk;
-	x25_cb *x25;
+	struct x25_opt *x25;
 
 	MOD_INC_USE_COUNT;
 
@@ -455,7 +455,7 @@ decmod:
 static int x25_create(struct socket *sock, int protocol)
 {
 	struct sock *sk;
-	x25_cb *x25;
+	struct x25_opt *x25;
 	int rc = -ESOCKTNOSUPPORT;
 
 	if (sock->type != SOCK_SEQPACKET || protocol)
@@ -495,7 +495,7 @@ out:
 static struct sock *x25_make_new(struct sock *osk)
 {
 	struct sock *sk = NULL;
-	x25_cb *x25, *ox25;
+	struct x25_opt *x25, *ox25;
 
 	if (osk->type != SOCK_SEQPACKET)
 		goto out;
@@ -533,7 +533,7 @@ out:
 static int x25_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
-	x25_cb *x25;
+	struct x25_opt *x25;
 
 	if (!sk)
 		goto out;
@@ -590,9 +590,9 @@ static int x25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len, int flags)
 {
 	struct sock *sk = sock->sk;
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	struct sockaddr_x25 *addr = (struct sockaddr_x25 *)uaddr;
-	struct net_device *dev;
+	struct x25_route *rt;
 	int rc = 0;
 
 	if (sk->state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
@@ -619,23 +619,23 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 		goto out;
 
 	rc = -ENETUNREACH;
-	dev = x25_get_route(&addr->sx25_addr);
-	if (!dev)
+	rt = x25_get_route(&addr->sx25_addr);
+	if (!rt)
 		goto out;
 
-	x25->neighbour = x25_get_neigh(dev);
+	x25->neighbour = x25_get_neigh(rt->dev);
 	if (!x25->neighbour)
-		goto out;
+		goto out_put_route;
 
 	x25_limit_facilities(&x25->facilities, x25->neighbour);
 
 	x25->lci = x25_new_lci(x25->neighbour);
 	if (!x25->lci)
-		goto out;
+		goto out_put_route;
 
 	rc = -EINVAL;
 	if (sk->zapped)		/* Must bind first - autobinding does not work */
-		goto out;
+		goto out_put_route;
 
 	if (!strcmp(x25->source_addr.x25_addr, null_x25_address.x25_addr))
 		memset(&x25->source_addr, '\0', X25_ADDR_LEN);
@@ -656,7 +656,7 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	/* Now the loop */
 	rc = -EINPROGRESS;
 	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
-		goto out;
+		goto out_put_route;
 
 	cli();	/* To avoid races on the sleep */
 
@@ -681,6 +681,8 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len
 	rc = 0;
 out_unlock:
 	sti();
+out_put_route:
+	x25_route_put(rt);
 out:
 	return rc;
 }
@@ -741,7 +743,7 @@ static int x25_getname(struct socket *sock, struct sockaddr *uaddr, int *uaddr_l
 {
 	struct sockaddr_x25 *sx25 = (struct sockaddr_x25 *)uaddr;
 	struct sock *sk = sock->sk;
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 
 	if (peer) {
 		if (sk->state != TCP_ESTABLISHED)
@@ -760,7 +762,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *neigh, unsigned i
 {
 	struct sock *sk;
 	struct sock *make;
-	x25_cb *makex25;
+	struct x25_opt *makex25;
 	struct x25_address source_addr, dest_addr;
 	struct x25_facilities facilities;
 	int len, rc;
@@ -858,7 +860,7 @@ out_clear_request:
 static int x25_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	struct sockaddr_x25 *usx25 = (struct sockaddr_x25 *)msg->msg_name;
 	struct sockaddr_x25 sx25;
 	struct sk_buff *skb;
@@ -1033,7 +1035,7 @@ static int x25_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 		       int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	struct sockaddr_x25 *sx25 = (struct sockaddr_x25 *)msg->msg_name;
 	int copied, qbit;
 	struct sk_buff *skb;
@@ -1119,7 +1121,7 @@ out:
 static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
-	x25_cb *x25 = x25_sk(sk);
+	struct x25_opt *x25 = x25_sk(sk);
 	int rc;
 
 	switch (cmd) {
@@ -1266,7 +1268,7 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 			      "t  t2 t21 t22 t23 Snd-Q Rcv-Q inode\n");
 
 	for (s = x25_list; s; s = s->next) {
-		x25_cb *x25 = x25_sk(s);
+		struct x25_opt *x25 = x25_sk(s);
 
 		if (!x25->neighbour || (dev = x25->neighbour->dev) == NULL)
 			devname = "???";
