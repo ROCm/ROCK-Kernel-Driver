@@ -423,6 +423,13 @@ static int associate_dev(struct us_data *us, struct usb_interface *intf)
 	us->pusb_dev = interface_to_usbdev(intf);
 	us->pusb_intf = intf;
 	us->ifnum = intf->cur_altsetting->desc.bInterfaceNumber;
+	US_DEBUGP("Vendor: 0x%04x, Product: 0x%04x, Revision: 0x%04x\n",
+			us->pusb_dev->descriptor.idVendor,
+			us->pusb_dev->descriptor.idProduct,
+			us->pusb_dev->descriptor.bcdDevice);
+	US_DEBUGP("Interface Subclass: 0x%02x, Protocol: 0x%02x\n",
+			intf->cur_altsetting->desc.bInterfaceSubClass,
+			intf->cur_altsetting->desc.bInterfaceProtocol);
 
 	/* Store our private data in the interface */
 	usb_set_intfdata(intf, us);
@@ -452,11 +459,6 @@ static void get_device_info(struct us_data *us, int id_index)
 		&us->pusb_intf->cur_altsetting->desc;
 	struct us_unusual_dev *unusual_dev = &us_unusual_dev_list[id_index];
 	struct usb_device_id *id = &storage_usb_ids[id_index];
-
-	if (unusual_dev->vendorName)
-		US_DEBUGP("Vendor: %s\n", unusual_dev->vendorName);
-	if (unusual_dev->productName)
-		US_DEBUGP("Product: %s\n", unusual_dev->productName);
 
 	/* Store the entries */
 	us->unusual_dev = unusual_dev;
@@ -528,6 +530,8 @@ static void get_device_info(struct us_data *us, int id_index)
 	}
 	if (strlen(us->serial) == 0)
 		strcpy(us->serial, "None");
+
+	US_DEBUGP("Vendor: %s,  Product: %s\n", us->vendor, us->product);
 }
 
 /* Get the transport settings */
@@ -715,8 +719,6 @@ static int get_pipes(struct us_data *us)
 			ep_int = ep;
 		}
 	}
-	US_DEBUGP("Endpoints: In: 0x%p Out: 0x%p Int: 0x%p (Period %d)\n",
-		  ep_in, ep_out, ep_int, ep_int ? ep_int->bInterval : 0);
 
 	if (!ep_in || !ep_out || (us->protocol == US_PR_CBI && !ep_int)) {
 		US_DEBUGP("Endpoint sanity check failed! Rejecting dev.\n");
@@ -880,9 +882,6 @@ static int storage_probe(struct usb_interface *intf,
 	int result;
 
 	US_DEBUGP("USB Mass Storage device detected\n");
-	US_DEBUGP("altsetting is %d, id_index is %d\n",
-			intf->cur_altsetting->desc.bAlternateSetting,
-			id_index);
 
 	/* Allocate the us_data structure and initialize the mutexes */
 	us = (struct us_data *) kmalloc(sizeof(*us), GFP_KERNEL);
