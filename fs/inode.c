@@ -1333,9 +1333,10 @@ void __init inode_init_early(void)
 					sizeof(struct hlist_head),
 					ihash_entries,
 					14,
-					0,
+					HASH_EARLY,
 					&i_hash_shift,
-					&i_hash_mask);
+					&i_hash_mask,
+					0);
 
 	for (loop = 0; loop < (1 << i_hash_shift); loop++)
 		INIT_HLIST_HEAD(&inode_hashtable[loop]);

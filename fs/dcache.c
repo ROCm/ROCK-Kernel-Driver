@@ -1579,9 +1579,10 @@ static void __init dcache_init_early(void)
 					sizeof(struct hlist_head),
 					dhash_entries,
 					13,
-					0,
+					HASH_EARLY,
 					&d_hash_shift,
-					&d_hash_mask);
+					&d_hash_mask,
+					0);
 
 	for (loop = 0; loop < (1 << d_hash_shift); loop++)
 		INIT_HLIST_HEAD(&dentry_hashtable[loop]);
