@@ -10,24 +10,37 @@
 #	Merged 'chrp' and 'pmac' into 'openfirmware', and cleaned up the
 #	rules.
 
+EXTRA_TARGETS := start.o misc.o crt0.o coffcrt0.o coffmain.o chrpmain.o \
+		newworldmain.o common.o
+
+boot: zImage
+
+include $(TOPDIR)/Rules.make
+
+boot := arch/ppc/boot
+common := $(boot)/common
+utils := $(boot)/utils
+bootlib := $(boot)/lib
+of1275 := $(boot)/of1275
+images := $(boot)/images
+
 OBJCOPY_ARGS = -O aixcoff-rs6000 -R .stab -R .stabstr -R .comment
-COFF_LD_ARGS = -T ../ld.script -e _start -Ttext 0x00500000 -Bstatic
-CHRP_LD_ARGS = -T ../ld.script -e _start -Ttext 0x00400000
-NEWWORLD_LD_ARGS = -T ../ld.script -e _start -Ttext 0x01000000
+COFF_LD_ARGS = -T $(boot)/ld.script -e _start -Ttext 0x00700000 -Bstatic
+CHRP_LD_ARGS = -T $(boot)/ld.script -e _start -Ttext 0x00800000
+NEWWORLD_LD_ARGS = -T $(boot)/ld.script -e _start -Ttext 0x01000000
 
-COMMONOBJS = start.o misc.o ../common/string.o common.o
-COFFOBJS = ../common/coffcrt0.o $(COMMONOBJS) coffmain.o
-CHRPOBJS = ../common/crt0.o $(COMMONOBJS) chrpmain.o
-NEWWORLDOBJS = ../common/crt0.o $(COMMONOBJS) newworldmain.o
+COMMONOBJS = $(obj)/start.o $(obj)/misc.o $(obj)/common.o
+COFFOBJS = $(obj)/coffcrt0.o $(COMMONOBJS) $(obj)/coffmain.o
+CHRPOBJS = $(obj)/crt0.o $(COMMONOBJS) $(obj)/chrpmain.o
+NEWWORLDOBJS = $(obj)/crt0.o $(COMMONOBJS) $(obj)/newworldmain.o
 
-EXTRA_TARGETS	:= $(COFFOBJS) $(CHRPOBJS) $(NEWWORLDOBJS)
-LIBS = $(TOPDIR)/lib/lib.a ../lib/lib.a ../of1275/of1275.a
+LIBS = lib/lib.a $(bootlib)/lib.a $(of1275)/lib.a $(common)/lib.a
 
-ADDNOTE := ../utils/addnote
-MKNOTE := ../utils/mknote
-SIZE := ../utils/size
-OFFSET := ../utils/offset
-HACKCOFF := ../utils/hack-coff
+ADDNOTE := $(utils)/addnote
+MKNOTE := $(utils)/mknote
+SIZE := $(utils)/size
+OFFSET := $(utils)/offset
+HACKCOFF := $(utils)/hack-coff
 
 ifdef CONFIG_SMP
 END := .smp
@@ -38,12 +51,12 @@ endif
 
 TFTPIMAGE=/tftpboot/zImage.
 
-../common/coffcrt0.o:
-	$(MAKE) -C ../common coffcrt0.o
+$(obj)/dummy.o: $(common)/dummy.c
+	$(CC) -c -o $@ $(common)/dummy.c
 
-image.o: ../images/vmlinux.gz ../common/dummy.o
-	$(OBJCOPY) ../common/dummy.o $@ -R .comment \
-		--add-section=.image=../images/vmlinux.gz \
+$(obj)/image.o: $(images)/vmlinux.gz $(obj)/dummy.o
+	$(OBJCOPY) $(obj)/dummy.o $@ -R .comment \
+		--add-section=.image=$(images)/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data
 ifdef CONFIG_XMON
 	$(OBJCOPY) $@ $@ \
@@ -52,86 +65,93 @@ ifdef CONFIG_XMON
 endif
 
 # Place the ramdisk in the initrd image.
-image-initrd.o: image.o ../images/ramdisk.image.gz
-	$(OBJCOPY) image.o $@ \
-		--add-section=.ramdisk=../images/ramdisk.image.gz \
+$(obj)/image-initrd.o: $(obj)/image.o $(images)/ramdisk.image.gz
+	$(OBJCOPY) $(obj)/image.o $@ \
+		--add-section=.ramdisk=$(images)/ramdisk.image.gz \
 		--set-section-flags=.ramdisk=contents,alloc,load,readonly,data
 
 # Create the note section for New-World PowerMacs.
-note: $(MKNOTE)
-	$(MKNOTE) > note
+$(obj)/note: $(MKNOTE)
+	$(MKNOTE) > $(obj)/note
 
-znetboot: vmlinux.coff vmlinux.elf-pmac zImage
-	cp ../images/vmlinux.coff $(TFTPIMAGE).pmac$(END)
-	cp ../images/vmlinux.elf-pmac $(TFTPIMAGE).pmac$(END)elf
-	cp ../images/zImage.chrp $(TFTPIMAGE).chrp$(END)
+znetboot: $(images)/vmlinux.coff $(images)/vmlinux.elf-pmac $(images)/zImage.chrp
+	cp $(images)/vmlinux.coff $(TFTPIMAGE).pmac$(END)
+	cp $(images)/vmlinux.elf-pmac $(TFTPIMAGE).pmac$(END)elf
+	cp $(images)/zImage.chrp $(TFTPIMAGE).chrp$(END)
 
-znetboot.initrd: vmlinux.initrd.coff vmlinux.initrd.elf-pmac
-	cp ../images/vmlinux.initrd.coff $(TFTPIMAGE).pmac$(END)
-	cp ../images/vmlinux.initrd.elf-pmac $(TFTPIMAGE).pmac$(END).elf
-	cp ../images/zImage.initrd.chrp $(TFTPIMAGE).chrp$(END)
+znetboot.initrd: $(images)/vmlinux.initrd.coff \
+		$(images)/vmlinux.initrd.elf-pmac \
+		$(images)/zImage.initrd.chrp
+	cp $(images)/vmlinux.initrd.coff $(TFTPIMAGE).pmac$(END)
+	cp $(images)/vmlinux.initrd.elf-pmac $(TFTPIMAGE).pmac$(END).elf
+	cp $(images)/zImage.initrd.chrp $(TFTPIMAGE).chrp$(END)
 
-miboot.image: ../common/dummy.o ../images/vmlinux.gz
-	$(OBJCOPY) $(OBJCOPY_ARGS) --add-section=image=../images/vmlinux.gz \
-		../common/dummy.o ../images/$@
+$(images)/miboot.image: $(obj)/dummy.o $(images)/vmlinux.gz
+	$(OBJCOPY) $(OBJCOPY_ARGS) --add-section=image=$(images)/vmlinux.gz \
+		$(obj)/dummy.o $@
 
-miboot.initrd.image: miboot.image ../images/ramdisk.image.gz
+$(images)/miboot.initrd.image: $(images)/miboot.image $(images)/ramdisk.image.gz
 	$(OBJCOPY) $(OBJCOPY_ARGS) \
-		--add-section=initrd=../images/ramdisk.image.gz \
-		../images/miboot.image ../images/$@
+		--add-section=initrd=$(images)/ramdisk.image.gz \
+		$(images)/miboot.image $@
 
-coffboot: $(COFFOBJS) image.o $(LIBS)
+$(obj)/coffcrt0.o: $(common)/crt0.S
+	$(CC) $(AFLAGS) -DXCOFF -traditional -c -o $@ $(common)/crt0.S
+
+$(obj)/crt0.o: $(common)/crt0.S
+	$(CC) $(AFLAGS) -traditional -c -o $@ $(common)/crt0.S
+
+$(obj)/coffboot: $(COFFOBJS) $(obj)/image.o $(LIBS)
 	$(LD) -o $@ $(COFF_LD_ARGS) $^
 	$(OBJCOPY) $@ $@ -R .comment -R .ramdisk
 
-coffboot.initrd: $(COFFOBJS) image-initrd.o $(LIBS)
+$(obj)/coffboot.initrd: $(COFFOBJS) $(obj)/image-initrd.o $(LIBS)
 	$(LD) -o $@ $(COFF_LD_ARGS) $^
 	$(OBJCOPY) $@ $@ -R .comment
 
-vmlinux.coff: coffboot $(HACKCOFF)
-	$(OBJCOPY) $(OBJCOPY_ARGS) coffboot ../images/$@
-	$(HACKCOFF) ../images/$@
-	rm -f coffboot
-	ln -sf vmlinux.coff ../images/zImage.pmac
+$(images)/vmlinux.coff: $(obj)/coffboot
+	$(OBJCOPY) $(OBJCOPY_ARGS) $(obj)/coffboot $@
+	$(HACKCOFF) $@
+	ln -sf vmlinux.coff $(images)/zImage.pmac
 
-vmlinux.initrd.coff: coffboot.initrd $(HACKCOFF)
-	$(OBJCOPY) $(OBJCOPY_ARGS) coffboot.initrd ../images/$@
-	$(HACKCOFF) ../images/$@
-	rm -f coffboot.initrd
-	ln -sf vmlinux.initrd.coff ../images/zImage.initrd.pmac
+$(images)/vmlinux.initrd.coff: $(obj)/coffboot.initrd
+	$(OBJCOPY) $(OBJCOPY_ARGS) $(obj)/coffboot.initrd $@
+	$(HACKCOFF) $@
+	ln -sf vmlinux.initrd.coff $(images)/zImage.initrd.pmac
 
-vmlinux.elf-pmac: $(NEWWORLDOBJS) $(LIBS) image.o
-	$(LD) $(NEWWORLD_LD_ARGS) -o ../images/$@ $^
+$(images)/vmlinux.elf-pmac: $(NEWWORLDOBJS) $(LIBS) $(obj)/image.o $(obj)/note
+	$(LD) $(NEWWORLD_LD_ARGS) -o $@ $(NEWWORLDOBJS) $(LIBS) $(obj)/image.o
+	$(OBJCOPY) $@ $@ \
+		--add-section=.note=$(obj)/note -R .comment -R .ramdisk
 
-vmlinux.initrd.elf-pmac: $(NEWWORLDOBJS) $(LIBS) image-initrd.o
-	$(LD) $(NEWWORLD_LD_ARGS) -o ../images/$@ $^
+$(images)/vmlinux.initrd.elf-pmac: $(NEWWORLDOBJS) $(LIBS) \
+		$(obj)/image-initrd.o $(obj)/note
+	$(LD) $(NEWWORLD_LD_ARGS) -o $@ $(NEWWORLDOBJS) $(LIBS) \
+		$(obj)/image-initrd.o
+	$(OBJCOPY) $@ $@ \
+		--add-section=.note=$(obj)/note -R .comment
 
-zImage.chrp: $(CHRPOBJS) image.o $(LIBS)
-	$(LD) $(CHRP_LD_ARGS) -o ../images/$@ $^
+$(images)/zImage.chrp: $(CHRPOBJS) $(obj)/image.o $(LIBS)
+	$(LD) $(CHRP_LD_ARGS) -o $@ $^
+	$(OBJCOPY) $@ $@ -R .comment -R .ramdisk
 
-zImage.initrd.chrp: $(CHRPOBJS) image-initrd.o $(LIBS)
-	$(LD) $(CHRP_LD_ARGS) -o ../images/$@ $^
+$(images)/zImage.initrd.chrp: $(CHRPOBJS) $(obj)/image-initrd.o $(LIBS)
+	$(LD) $(CHRP_LD_ARGS) -o $@ $^
+	$(OBJCOPY) $@ $@ -R .comment
 
-zImage: vmlinux.coff vmlinux.elf-pmac zImage.chrp miboot.image $(ADDNOTE) \
-	note
-	$(OBJCOPY) ../images/vmlinux.elf-pmac ../images/vmlinux.elf-pmac \
-		--add-section=.note=note -R .comment -R .ramdisk
-	$(OBJCOPY) ../images/zImage.chrp ../images/zImage.chrp \
-		-R .comment -R .ramdisk
-	cp ../images/zImage.chrp ../images/zImage.chrp-rs6k
-	$(ADDNOTE) ../images/zImage.chrp-rs6k
+$(images)/zImage.chrp-rs6k: $(images)/zImage.chrp
+	cp $(images)/zImage.chrp $@
+	$(ADDNOTE) $@
 
-zImage.initrd: vmlinux.initrd.coff vmlinux.initrd.elf-pmac zImage.initrd.chrp \
-	miboot.initrd.image $(ADDNOTE) note
-	$(OBJCOPY) ../images/vmlinux.initrd.elf-pmac \
-		../images/vmlinux.initrd.elf-pmac --add-section=.note=note \
-		-R .comment
-	$(OBJCOPY) ../images/zImage.initrd.chrp ../images/zImage.initrd.chrp \
-		-R .comment
-	cp ../images/zImage.initrd.chrp ../images/zImage.initrd.chrp-rs6k
-	$(ADDNOTE) ../images/zImage.initrd.chrp-rs6k
+$(images)/zImage.initrd.chrp-rs6k: $(images)/zImage.initrd.chrp
+	cp $(images)/zImage.initrd.chrp $@
+	$(ADDNOTE) $@
+
+zImage: $(images)/vmlinux.coff $(images)/vmlinux.elf-pmac \
+		$(images)/zImage.chrp $(images)/miboot.image
+
+zImage.initrd: $(images)/vmlinux.initrd.coff $(images)/vmlinux.initrd.elf-pmac\
+		$(images)/zImage.initrd.chrp $(images)/miboot.initrd.image
 
 clean:
-	rm -f note
-
-include $(TOPDIR)/Rules.make
+	rm -f $(obj)/note $(obj)/image.o $(obj)/coffboot $(obj)/coffboot.initrd
