@@ -174,9 +174,15 @@ static struct mtd_partition assabet5_partitions[] = {
 
 #ifdef CONFIG_SA1100_BADGE4
 /*
- * 1 x Intel 28F320C3BA100 Advanced+ Boot Block Flash (32 Mi bit)
+ * 1 x Intel 28F320C3 Advanced+ Boot Block Flash (32 Mi bit)
  *   Eight 4 KiW Parameter Bottom Blocks (64 KiB)
  *   Sixty-three 32 KiW Main Blocks (4032 Ki b)
+ *
+ * <or>
+ *
+ * 1 x Intel 28F640C3 Advanced+ Boot Block Flash (64 Mi bit)
+ *   Eight 4 KiW Parameter Bottom Blocks (64 KiB)
+ *   One-hundred-twenty-seven 32 KiW Main Blocks (8128 Ki b)
  */
 static struct mtd_partition badge4_partitions[] = {
 	{
@@ -187,10 +193,6 @@ static struct mtd_partition badge4_partitions[] = {
 		.name		= "params",
 		.offset		= MTDPART_OFS_APPEND,
 		.size		= 0x00006000
-	}, {
-		.name		= "kernel",
-		.offset		= MTDPART_OFS_APPEND,
-		.size		= 0x00100000
 	}, {
 		.name		= "root",
 		.offset		= MTDPART_OFS_APPEND,
@@ -1119,7 +1121,7 @@ static int __init sa1100_locate_flash(void)
 	}
 	if (machine_is_badge4()) {
 		info[0].base = SA1100_CS0_PHYS;
-		info[0].size = SZ_4M;
+		info[0].size = SZ_64M;
 		nr = 1;
 	}
 	if (machine_is_cerf()) {
