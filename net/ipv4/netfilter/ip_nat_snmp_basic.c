@@ -50,7 +50,6 @@
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv4/ip_nat.h>
 #include <linux/netfilter_ipv4/ip_nat_helper.h>
-#include <linux/types.h>
 #include <linux/ip.h>
 #include <net/udp.h>
 #include <asm/uaccess.h>

@@ -269,7 +269,7 @@ err_out_free_msgbuf:
 	pci_free_consistent (pdev, MSG_BUF_SIZE, pDpa->msgbuf,
 			     pDpa->msgbuf_dma);
 err_out_free_dev:
-	kfree (dev);
+	free_netdev (dev);
 err_out:
 	card_idx--;
 	return error;

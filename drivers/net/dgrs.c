@@ -1275,7 +1275,7 @@ dgrs_found_device(
 	SET_MODULE_OWNER(dev);
 
 	if (register_netdev(dev) != 0) {
-		kfree(dev);
+		free_netdev(dev);
 		return -EIO;
 	}
 
@@ -1322,7 +1322,7 @@ dgrs_found_device(
 
 		ret = -EIO;
 		if (register_netdev(devN)) {
-			kfree(devN);
+			free_netdev(devN);
 			goto fail;
 		}
 		privN->chan = i+1;

@@ -785,7 +785,7 @@ err_out_unmap_tx:
 	pci_free_consistent(pdev, TX_TOTAL_SIZE, hmp->tx_ring, 
 		hmp->tx_ring_dma);
 err_out_cleardev:
-	kfree (dev);
+	free_netdev (dev);
 err_out_iounmap:
 	iounmap((char *)ioaddr);
 err_out_release:

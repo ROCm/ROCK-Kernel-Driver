@@ -689,7 +689,7 @@ err_out_free_tx:
 err_out_free_rx:
 	pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring, np->rx_ring_dma);
 err_out_free_dev:
-	kfree(dev);
+	free_netdev(dev);
 err_out_unmap:
 #ifndef USE_IO_OPS
 	iounmap((void *)ioaddr);

@@ -949,7 +949,7 @@ out1:
 	i = 4;
 out:
 	while (i--)
-		kfree(qe_devs[i]);
+		free_netdev(qe_devs[i]);
 	return res;
 }
 

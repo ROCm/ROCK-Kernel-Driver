@@ -1324,7 +1324,7 @@ static int __init lp486e_init_module(void) {
 	dev->base_addr = io;
 	dev->init = lp486e_probe;
 	if (register_netdev(dev) != 0) {
-		kfree(dev);
+		free_netdev(dev);
 		return -EIO;
 	}
 	dev_lp486e = dev;

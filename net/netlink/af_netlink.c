@@ -968,7 +968,7 @@ int netlink_post(int unit, struct sk_buff *skb)
 #ifdef CONFIG_PROC_FS
 static struct sock *netlink_seq_socket_idx(struct seq_file *seq, loff_t pos)
 {
-	int i;
+	long i;
 	struct sock *s;
 	struct hlist_node *node;
 	loff_t off = 0;
@@ -1002,7 +1002,7 @@ static void *netlink_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 		
 	s = sk_next(v);
 	if (!s) {
-		int i = (int) seq->private; 
+		long i = (long)seq->private;
 
 		while (++i < MAX_LINKS) {
 			s = sk_head(&nl_table[i]);

@@ -213,9 +213,11 @@ sb1000_probe_one(struct pnp_dev *pdev, const struct pnp_device_id *id)
 
 	error = register_netdev(dev);
 	if (error)
-		goto out_release_regions;
+		goto out_free_netdev;
 	return 0;
 
+ out_free_netdev:
+	free_netdev(dev);
  out_release_regions:
 	release_region(ioaddr[1], 16);
  out_release_region0:

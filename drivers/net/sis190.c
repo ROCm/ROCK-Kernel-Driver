@@ -470,7 +470,7 @@ SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 
 	rc = pci_set_dma_mask(pdev, 0xffffffffULL);
 	if (rc)
-		goto err_out;
+		goto err_out_disable;
 
 	mmio_start = pci_resource_start(pdev, 0);
 	mmio_end = pci_resource_end(pdev, 0);
@@ -482,18 +482,18 @@ SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 		printk(KERN_ERR PFX
 		       "region #0 not an MMIO resource, aborting\n");
 		rc = -ENODEV;
-		goto err_out;
+		goto err_out_disable;
 	}
 	// check for weird/broken PCI region reporting
 	if (mmio_len < SiS190_MIN_IO_SIZE) {
 		printk(KERN_ERR PFX "Invalid PCI region size(s), aborting\n");
 		rc = -ENODEV;
-		goto err_out;
+		goto err_out_disable;
 	}
 
 	rc = pci_request_regions(pdev, dev->name);
 	if (rc)
-		goto err_out;
+		goto err_out_disable;
 
 	// enable PCI bus-mastering
 	pci_set_master(pdev);
@@ -521,9 +521,10 @@ SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 err_out_free_res:
 	pci_release_regions(pdev);
 
-err_out:
+err_out_disable:
 	pci_disable_device(pdev);
-	kfree(dev);
+err_out:
+	free_netdev(dev);
 	return rc;
 }
 
@@ -603,7 +604,7 @@ SiS190_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		iounmap(ioaddr);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
-		kfree(dev);
+		free_netdev(dev);
 		return rc;
 	}
 
