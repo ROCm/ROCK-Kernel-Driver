@@ -553,7 +553,7 @@ int blk_queue_resize_tags(request_queue_t *q, int new_depth)
 
 	memcpy(bqt->tag_index, tag_index, max_depth * sizeof(struct request *));
 	bits = max_depth / BLK_TAGS_PER_LONG;
-	memcpy(bqt->tag_map, bqt->tag_map, bits * sizeof(unsigned long));
+	memcpy(bqt->tag_map, tag_map, bits * sizeof(unsigned long));
 
 	kfree(tag_index);
 	kfree(tag_map);

@@ -666,8 +666,10 @@ static void cdrom_end_request (ide_drive_t *drive, int uptodate)
 		struct cdrom_info *info = drive->driver_data;
 		void *sense = &info->sense_data;
 		
-		if (failed && failed->sense)
+		if (failed && failed->sense) {
 			sense = failed->sense;
+			failed->sense_len = rq->sense_len;
+		}
 
 		cdrom_analyze_sense_data(drive, failed, sense);
 	}
@@ -723,7 +725,7 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 		 * scsi status byte
 		 */
 		if ((rq->flags & REQ_BLOCK_PC) && !rq->errors)
-			rq->errors = CHECK_CONDITION;
+			rq->errors = SAM_STAT_CHECK_CONDITION;
 
 		/* Check for tray open. */
 		if (sense_key == NOT_READY) {
@@ -1471,8 +1473,9 @@ static ide_startstop_t cdrom_pc_intr (ide_drive_t *drive)
 		/* Keep count of how much data we've moved. */
 		rq->data += thislen;
 		rq->data_len -= thislen;
-		if (rq->cmd[0] == GPCMD_REQUEST_SENSE)
-			rq->sense_len++;
+
+		if (rq->flags & REQ_SENSE)
+			rq->sense_len += thislen;
 	} else {
 confused:
 		printk ("%s: cdrom_pc_intr: The drive "
@@ -1609,10 +1612,18 @@ static inline int cdrom_write_check_ireason(ide_drive_t *drive, int len, int ire
 
 static void post_transform_command(struct request *req)
 {
-	char *ibuf = req->buffer;
 	u8 *c = req->cmd;
+	char *ibuf;
 
 	if (!blk_pc_request(req))
+		return;
+
+	if (req->bio)
+		ibuf = bio_data(req->bio);
+	else
+		ibuf = req->data;
+
+	if (!ibuf)
 		return;
 
 	/*
