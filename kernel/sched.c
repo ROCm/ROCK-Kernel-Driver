@@ -581,6 +581,8 @@ static inline void finish_task_switch(task_t *prev)
 	finish_arch_switch(rq, prev);
 	if (mm)
 		mmdrop(mm);
+	if (prev->state & (TASK_DEAD | TASK_ZOMBIE))
+		put_task_struct(prev);
 }
 
 /**
@@ -1185,7 +1187,7 @@ asmlinkage void schedule(void)
 	 * schedule() atomically, we ignore that path for now.
 	 * Otherwise, whine if we are scheduling when we should not be.
 	 */
-	if (likely(current->state != TASK_ZOMBIE)) {
+	if (likely(!(current->state & (TASK_DEAD | TASK_ZOMBIE)))) {
 		if (unlikely(in_atomic())) {
 			printk(KERN_ERR "bad: scheduling while atomic!\n");
 			dump_stack();
