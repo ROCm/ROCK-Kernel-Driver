@@ -1320,6 +1320,7 @@ static int set_io_32bit(ide_drive_t *drive, int arg)
 
 static int set_using_dma (ide_drive_t *drive, int arg)
 {
+#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (!drive->id || !(drive->id->capability & 1))
 		return -EPERM;
 	if (HWIF(drive)->ide_dma_check == NULL)
@@ -1332,6 +1333,9 @@ static int set_using_dma (ide_drive_t *drive, int arg)
 			return -EIO;
 	}
 	return 0;
+#else
+	return -EPERM;
+#endif
 }
 
 static int set_pio_mode (ide_drive_t *drive, int arg)

@@ -1626,6 +1626,9 @@ extern ide_startstop_t __ide_dma_queued_read(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_write(ide_drive_t *drive);
 extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
 #endif
+
+#else
+static inline int __ide_dma_off(ide_drive_t *drive) { return 0; }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
 #ifndef CONFIG_BLK_DEV_IDEDMA_PCI
