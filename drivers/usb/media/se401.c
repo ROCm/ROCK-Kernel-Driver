@@ -1578,9 +1578,7 @@ static int __init usb_se401_init(void)
 			info("Invallid flickerless value, use 0, 50 or 60.");
 			return -1;
 	}
-	if (usb_register(&se401_driver) < 0)
-		return -1;
-	return 0;
+	return usb_register(&se401_driver);
 }
 
 static void __exit usb_se401_exit(void)
