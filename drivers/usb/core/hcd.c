@@ -790,6 +790,8 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	usb_dev->epmaxpacketin[0] = usb_dev->epmaxpacketout[0] = 64;
 	retval = usb_get_device_descriptor(usb_dev, USB_DT_DEVICE_SIZE);
 	if (retval != sizeof usb_dev->descriptor) {
+		usb_dev->bus->root_hub = NULL;
+		up (&usb_bus_list_lock);
 		dev_dbg (parent_dev, "can't read %s device descriptor %d\n",
 				usb_dev->dev.bus_id, retval);
 		return (retval < 0) ? retval : -EMSGSIZE;
