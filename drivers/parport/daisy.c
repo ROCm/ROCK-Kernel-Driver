@@ -19,6 +19,7 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/module.h>
 #include <linux/parport.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
@@ -634,3 +635,13 @@ int parport_find_class (parport_device_class cls, int from)
 	spin_unlock(&topology_lock);
 	return res;
 }
+
+EXPORT_SYMBOL(parport_open);
+EXPORT_SYMBOL(parport_close);
+EXPORT_SYMBOL(parport_device_num);
+EXPORT_SYMBOL(parport_device_coords);
+EXPORT_SYMBOL(parport_daisy_deselect_all);
+EXPORT_SYMBOL(parport_daisy_select);
+EXPORT_SYMBOL(parport_daisy_init);
+EXPORT_SYMBOL(parport_find_device);
+EXPORT_SYMBOL(parport_find_class);

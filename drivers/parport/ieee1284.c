@@ -17,6 +17,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/threads.h>
 #include <linux/parport.h>
 #include <linux/delay.h>
@@ -806,3 +807,15 @@ long parport_set_timeout (struct pardevice *dev, long inactivity)
 
 	return old;
 }
+
+/* Exported symbols for modules. */
+
+EXPORT_SYMBOL(parport_negotiate);
+EXPORT_SYMBOL(parport_write);
+EXPORT_SYMBOL(parport_read);
+EXPORT_SYMBOL(parport_ieee1284_wakeup);
+EXPORT_SYMBOL(parport_wait_peripheral);
+EXPORT_SYMBOL(parport_poll_peripheral);
+EXPORT_SYMBOL(parport_wait_event);
+EXPORT_SYMBOL(parport_set_timeout);
+EXPORT_SYMBOL(parport_ieee1284_interrupt);

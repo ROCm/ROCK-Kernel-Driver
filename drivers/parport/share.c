@@ -1060,6 +1060,27 @@ void parport_release(struct pardevice *dev)
 	}
 }
 
+/* Exported symbols for modules. */
+
+EXPORT_SYMBOL(parport_claim);
+EXPORT_SYMBOL(parport_claim_or_block);
+EXPORT_SYMBOL(parport_release);
+EXPORT_SYMBOL(parport_register_port);
+EXPORT_SYMBOL(parport_announce_port);
+EXPORT_SYMBOL(parport_unregister_port);
+EXPORT_SYMBOL(parport_register_driver);
+EXPORT_SYMBOL(parport_unregister_driver);
+EXPORT_SYMBOL(parport_register_device);
+EXPORT_SYMBOL(parport_unregister_device);
+EXPORT_SYMBOL(parport_enumerate);
+EXPORT_SYMBOL(parport_get_port);
+EXPORT_SYMBOL(parport_put_port);
+EXPORT_SYMBOL(parport_find_number);
+EXPORT_SYMBOL(parport_find_base);
+
+EXPORT_SYMBOL(parport_parse_irqs);
+EXPORT_SYMBOL(parport_parse_dmas);
+
 static int parport_parse_params (int nports, const char *str[], int val[],
 				 int automatic, int none, int nofifo)
 {

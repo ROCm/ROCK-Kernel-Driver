@@ -14,6 +14,7 @@
 
 #include <linux/string.h>
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -528,3 +529,10 @@ int parport_default_proc_unregister (void)
 	return 0;
 }
 #endif
+
+EXPORT_SYMBOL(parport_proc_register);
+EXPORT_SYMBOL(parport_proc_unregister);
+EXPORT_SYMBOL(parport_device_proc_register);
+EXPORT_SYMBOL(parport_device_proc_unregister);
+EXPORT_SYMBOL(parport_default_proc_register);
+EXPORT_SYMBOL(parport_default_proc_unregister);
