@@ -61,7 +61,7 @@ extern unsigned char software_suspend_enabled;
 
 extern void software_suspend(void);
 #else	/* CONFIG_SOFTWARE_SUSPEND */
-static inline int software_suspend(void)
+static inline void software_suspend(void)
 {
 	printk("Warning: fake suspend called\n");
 }
