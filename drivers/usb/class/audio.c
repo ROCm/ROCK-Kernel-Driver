@@ -3523,7 +3523,7 @@ static void usb_audio_recurseunit(struct consmixstate *state, unsigned char unit
 	unsigned char *p1;
 	unsigned int i, j;
 
-	if (test_and_set_bit(unitid, &state->unitbitmap)) {
+	if (test_and_set_bit(unitid, state->unitbitmap)) {
 		printk(KERN_INFO "usbaudio: mixer path revisits unit %d\n", unitid);
 		return;
 	}
@@ -3571,7 +3571,7 @@ static void usb_audio_recurseunit(struct consmixstate *state, unsigned char unit
 		return;		
 
 	case PROCESSING_UNIT:
-		if (p1[0] < 13 || p1[0] < 13+p1[6] || p1[0] < 13+p1[6]+p1[11+p1[6]] || p1[0] < 13+p1[6]+p1[11+p1[6]]+p1[13+p1[6]+p1[11+p1[6]]]) {
+		if (p1[0] < 13 || p1[0] < 13+p1[6] || p1[0] < 13+p1[6]+p1[11+p1[6]]) {
 			printk(KERN_ERR "usbaudio: unit %u: invalid PROCESSING_UNIT descriptor\n", unitid);
 			return;
 		}
@@ -3613,7 +3613,7 @@ static void usb_audio_constructmixer(struct usb_audio_state *s, unsigned char *b
 	state.buffer = buffer;
 	state.buflen = buflen;
 	state.ctrlif = ctrlif;
-	set_bit(oterm[3], &state.unitbitmap);  /* mark terminal ID as visited */
+	set_bit(oterm[3], state.unitbitmap);  /* mark terminal ID as visited */
 	printk(KERN_DEBUG "usbaudio: constructing mixer for Terminal %u type 0x%04x\n",
 	       oterm[3], oterm[4] | (oterm[5] << 8));
 	usb_audio_recurseunit(&state, oterm[7]);

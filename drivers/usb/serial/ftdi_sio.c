@@ -197,6 +197,7 @@ static struct usb_serial_device_type ftdi_sio_device = {
 };
 
 static struct usb_serial_device_type ftdi_8U232AM_device = {
+	owner:			THIS_MODULE,
 	name:			"FTDI 8U232AM",
 	id_table:		id_table_8U232AM,
 	num_interrupt_in:	0,

@@ -144,7 +144,7 @@ struct acm {
 	struct usb_device *dev;				/* the coresponding usb device */
 	struct usb_interface *iface;			/* the interfaces - +0 control +1 data */
 	struct tty_struct *tty;				/* the coresponding tty */
-	struct urb ctrlurb, readurb, writeurb;		/* urbs */
+	struct urb *ctrlurb, *readurb, *writeurb;	/* urbs */
 	struct acm_line line;				/* line coding (bits, stop, parity) */
 	struct tq_struct tqueue;			/* task queue for line discipline waking up */
 	unsigned int ctrlin;				/* input control lines (DCD, DSR, RI, break, overruns) */
@@ -316,12 +316,12 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 
         unlock_kernel();
 
-	acm->ctrlurb.dev = acm->dev;
-	if (usb_submit_urb(&acm->ctrlurb, GFP_KERNEL))
+	acm->ctrlurb->dev = acm->dev;
+	if (usb_submit_urb(acm->ctrlurb, GFP_KERNEL))
 		dbg("usb_submit_urb(ctrl irq) failed");
 
-	acm->readurb.dev = acm->dev;
-	if (usb_submit_urb(&acm->readurb, GFP_KERNEL))
+	acm->readurb->dev = acm->dev;
+	if (usb_submit_urb(acm->readurb, GFP_KERNEL))
 		dbg("usb_submit_urb(read bulk) failed");
 
 	acm_set_control(acm, acm->ctrlout = ACM_CTRL_DTR | ACM_CTRL_RTS);
@@ -342,12 +342,15 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 	if (!--acm->used) {
 		if (acm->dev) {
 			acm_set_control(acm, acm->ctrlout = 0);
-			usb_unlink_urb(&acm->ctrlurb);
-			usb_unlink_urb(&acm->writeurb);
-			usb_unlink_urb(&acm->readurb);
+			usb_unlink_urb(acm->ctrlurb);
+			usb_unlink_urb(acm->writeurb);
+			usb_unlink_urb(acm->readurb);
 		} else {
 			tty_unregister_devfs(&acm_tty_driver, acm->minor);
 			acm_table[acm->minor] = NULL;
+			usb_free_urb(acm->ctrlurb);
+			usb_free_urb(acm->readurb);
+			usb_free_urb(acm->writeurb);
 			kfree(acm);
 		}
 	}
@@ -359,20 +362,20 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 	struct acm *acm = tty->driver_data;
 
 	if (!ACM_READY(acm)) return -EINVAL;
-	if (acm->writeurb.status == -EINPROGRESS) return 0;
+	if (acm->writeurb->status == -EINPROGRESS) return 0;
 	if (!count) return 0;
 
 	count = (count > acm->writesize) ? acm->writesize : count;
 
 	if (from_user)
-		copy_from_user(acm->writeurb.transfer_buffer, buf, count);
+		copy_from_user(acm->writeurb->transfer_buffer, buf, count);
 	else
-		memcpy(acm->writeurb.transfer_buffer, buf, count);
+		memcpy(acm->writeurb->transfer_buffer, buf, count);
 
-	acm->writeurb.transfer_buffer_length = count;
-	acm->writeurb.dev = acm->dev;
+	acm->writeurb->transfer_buffer_length = count;
+	acm->writeurb->dev = acm->dev;
 
-	if (usb_submit_urb(&acm->writeurb, GFP_KERNEL))
+	if (usb_submit_urb(acm->writeurb, GFP_KERNEL))
 		dbg("usb_submit_urb(write bulk) failed");
 
 	return count;
@@ -382,14 +385,14 @@ static int acm_tty_write_room(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
 	if (!ACM_READY(acm)) return -EINVAL;
-	return acm->writeurb.status == -EINPROGRESS ? 0 : acm->writesize;
+	return acm->writeurb->status == -EINPROGRESS ? 0 : acm->writesize;
 }
 
 static int acm_tty_chars_in_buffer(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
 	if (!ACM_READY(acm)) return -EINVAL;
-	return acm->writeurb.status == -EINPROGRESS ? acm->writeurb.transfer_buffer_length : 0;
+	return acm->writeurb->status == -EINPROGRESS ? acm->writeurb->transfer_buffer_length : 0;
 }
 
 static void acm_tty_throttle(struct tty_struct *tty)
@@ -404,8 +407,8 @@ static void acm_tty_unthrottle(struct tty_struct *tty)
 	struct acm *acm = tty->driver_data;
 	if (!ACM_READY(acm)) return;
 	acm->throttle = 0;
-	if (acm->readurb.status != -EINPROGRESS)
-		acm_read_bulk(&acm->readurb);
+	if (acm->readurb->status != -EINPROGRESS)
+		acm_read_bulk(acm->readurb);
 }
 
 static void acm_tty_break_ctl(struct tty_struct *tty, int state)
@@ -585,16 +588,38 @@ static void *acm_probe(struct usb_device *dev, unsigned int ifnum,
 			return NULL;
 		}
 
-		FILL_INT_URB(&acm->ctrlurb, dev, usb_rcvintpipe(dev, epctrl->bEndpointAddress),
+		acm->ctrlurb = usb_alloc_urb(0, GFP_KERNEL);
+		if (!acm->ctrlurb) {
+			err("out of memory");
+			kfree(acm);
+			return NULL;
+		}
+		acm->readurb = usb_alloc_urb(0, GFP_KERNEL);
+		if (!acm->readurb) {
+			err("out of memory");
+			usb_free_urb(acm->ctrlurb);
+			kfree(acm);
+			return NULL;
+		}
+		acm->writeurb = usb_alloc_urb(0, GFP_KERNEL);
+		if (!acm->writeurb) {
+			err("out of memory");
+			usb_free_urb(acm->readurb);
+			usb_free_urb(acm->ctrlurb);
+			kfree(acm);
+			return NULL;
+		}
+
+		usb_fill_int_urb(acm->ctrlurb, dev, usb_rcvintpipe(dev, epctrl->bEndpointAddress),
 			buf, ctrlsize, acm_ctrl_irq, acm, epctrl->bInterval);
 
-		FILL_BULK_URB(&acm->readurb, dev, usb_rcvbulkpipe(dev, epread->bEndpointAddress),
+		usb_fill_bulk_urb(acm->readurb, dev, usb_rcvbulkpipe(dev, epread->bEndpointAddress),
 			buf += ctrlsize, readsize, acm_read_bulk, acm);
-		acm->readurb.transfer_flags |= USB_NO_FSBR;
+		acm->readurb->transfer_flags |= USB_NO_FSBR;
 
-		FILL_BULK_URB(&acm->writeurb, dev, usb_sndbulkpipe(dev, epwrite->bEndpointAddress),
+		usb_fill_bulk_urb(acm->writeurb, dev, usb_sndbulkpipe(dev, epwrite->bEndpointAddress),
 			buf += readsize, acm->writesize, acm_write_bulk, acm);
-		acm->writeurb.transfer_flags |= USB_NO_FSBR;
+		acm->writeurb->transfer_flags |= USB_NO_FSBR;
 
 		printk(KERN_INFO "ttyACM%d: USB ACM device\n", minor);
 
@@ -625,11 +650,11 @@ static void acm_disconnect(struct usb_device *dev, void *ptr)
 
 	acm->dev = NULL;
 
-	usb_unlink_urb(&acm->ctrlurb);
-	usb_unlink_urb(&acm->readurb);
-	usb_unlink_urb(&acm->writeurb);
+	usb_unlink_urb(acm->ctrlurb);
+	usb_unlink_urb(acm->readurb);
+	usb_unlink_urb(acm->writeurb);
 
-	kfree(acm->ctrlurb.transfer_buffer);
+	kfree(acm->ctrlurb->transfer_buffer);
 
 	usb_driver_release_interface(&acm_driver, acm->iface + 0);
 	usb_driver_release_interface(&acm_driver, acm->iface + 1);
@@ -637,6 +662,9 @@ static void acm_disconnect(struct usb_device *dev, void *ptr)
 	if (!acm->used) {
 		tty_unregister_devfs(&acm_tty_driver, acm->minor);
 		acm_table[acm->minor] = NULL;
+		usb_free_urb(acm->ctrlurb);
+		usb_free_urb(acm->readurb);
+		usb_free_urb(acm->writeurb);
 		kfree(acm);
 		return;
 	}

@@ -98,16 +98,16 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, int flags)
 }
 
 /* to share a qh (cpu threads, or hc) */
-static inline struct ehci_qh *qh_put (/* ehci, */ struct ehci_qh *qh)
+static inline struct ehci_qh *qh_get (/* ehci, */ struct ehci_qh *qh)
 {
-	// dbg ("put %p (%d++)", qh, qh->refcount.counter);
+	// dbg ("get %p (%d++)", qh, qh->refcount.counter);
 	atomic_inc (&qh->refcount);
 	return qh;
 }
 
-static void qh_unput (struct ehci_hcd *ehci, struct ehci_qh *qh)
+static void qh_put (struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
-	// dbg ("unput %p (--%d)", qh, qh->refcount.counter);
+	// dbg ("put %p (--%d)", qh, qh->refcount.counter);
 	if (!atomic_dec_and_test (&qh->refcount))
 		return;
 	/* clean qtds first, and know this is not linked */

@@ -89,7 +89,7 @@ void ohci_dump_periodic (struct ohci_hcd *ohci, char *label)
 			continue;
 		printed = 1;
 		printk (KERN_DEBUG "%s, ohci %s frame %2d:",
-				label, ohci->hcd.bus_name, i);
+				label, ohci->hcd.self.bus_name, i);
 		while (*ed_p != 0 && j--) {
 			struct ed *ed = dma_to_ed (ohci, le32_to_cpup(ed_p));
 			printk (" %p/%08x;", ed, ed->hwINFO);
@@ -99,7 +99,7 @@ void ohci_dump_periodic (struct ohci_hcd *ohci, char *label)
 	}
 	if (!printed)
 		printk (KERN_DEBUG "%s, ohci %s, empty periodic schedule\n",
-				label, ohci->hcd.bus_name);
+				label, ohci->hcd.self.bus_name);
 }
 #endif
 
@@ -229,7 +229,7 @@ static void ohci_dump_roothub (struct ohci_hcd *controller, int verbose)
 
 static void ohci_dump (struct ohci_hcd *controller, int verbose)
 {
-	dbg ("OHCI controller %s state", controller->hcd.bus_name);
+	dbg ("OHCI controller %s state", controller->hcd.self.bus_name);
 
 	// dumps some of the state we know about
 	ohci_dump_status (controller);

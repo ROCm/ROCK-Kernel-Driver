@@ -4,7 +4,6 @@
 
 O_TARGET	:= usb-image.o
 
-obj-$(CONFIG_USB_DC2XX)		+= dc2xx.o
 obj-$(CONFIG_USB_MDC800)	+= mdc800.o
 obj-$(CONFIG_USB_HPUSBSCSI)	+= hpusbscsi.o
 obj-$(CONFIG_USB_MICROTEK)	+= microtek.o
