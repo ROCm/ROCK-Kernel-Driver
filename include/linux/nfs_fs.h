@@ -288,6 +288,8 @@ static inline int nfs_verify_change_attribute(struct inode *inode, unsigned long
 /*
  * linux/fs/nfs/inode.c
  */
+extern struct inode_operations nfs3_special_inode_operations;
+
 extern void nfs_zap_caches(struct inode *);
 extern struct inode *nfs_fhget(struct super_block *, struct nfs_fh *,
 				struct nfs_fattr *);
@@ -323,6 +325,7 @@ extern u32 root_nfs_parse_addr(char *name); /*__init*/
  * linux/fs/nfs/file.c
  */
 extern struct inode_operations nfs_file_inode_operations;
+extern struct inode_operations nfs3_file_inode_operations;
 extern struct file_operations nfs_file_operations;
 extern struct address_space_operations nfs_file_aops;
 
@@ -367,8 +370,11 @@ extern ssize_t nfs_file_direct_write(struct kiocb *iocb, const char __user *buf,
  * linux/fs/nfs/dir.c
  */
 extern struct inode_operations nfs_dir_inode_operations;
+extern struct inode_operations nfs3_dir_inode_operations;
 extern struct file_operations nfs_dir_operations;
 extern struct dentry_operations nfs_dentry_operations;
+
+extern int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fh, struct nfs_fattr *fattr);
 
 /*
  * linux/fs/nfs/symlink.c

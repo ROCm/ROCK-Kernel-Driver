@@ -31,7 +31,6 @@
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include <linux/namei.h>
-#include <linux/posix_acl.h>
 
 #include "delegation.h"
 
@@ -73,11 +72,28 @@ struct inode_operations nfs_dir_inode_operations = {
 	.permission	= nfs_permission,
 	.getattr	= nfs_getattr,
 	.setattr	= nfs_setattr,
+};
+
+#ifdef CONFIG_NFS_V3
+struct inode_operations nfs3_dir_inode_operations = {
+	.create		= nfs_create,
+	.lookup		= nfs_lookup,
+	.link		= nfs_link,
+	.unlink		= nfs_unlink,
+	.symlink	= nfs_symlink,
+	.mkdir		= nfs_mkdir,
+	.rmdir		= nfs_rmdir,
+	.mknod		= nfs_mknod,
+	.rename		= nfs_rename,
+	.permission	= nfs_permission,
+	.getattr	= nfs_getattr,
+	.setattr	= nfs_setattr,
 	.listxattr	= nfs_listxattr,
 	.getxattr	= nfs_getxattr,
 	.setxattr	= nfs_setxattr,
 	.removexattr	= nfs_removexattr,
 };
+#endif  /* CONFIG_NFS_V3 */
 
 #ifdef CONFIG_NFS_V4
 
@@ -943,7 +959,7 @@ static struct dentry *nfs_readdir_lookup(nfs_readdir_descriptor_t *desc)
 /*
  * Code common to create, mkdir, and mknod.
  */
-static int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fhandle,
+int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fhandle,
 				struct nfs_fattr *fattr)
 {
 	struct inode *inode;
@@ -977,41 +993,6 @@ out_err:
 	return error;
 }
 
-static int nfs_set_default_acl(struct inode *dir, struct inode *inode,
-			       mode_t mode)
-{
-#ifdef CONFIG_NFS_ACL
-	struct posix_acl *dfacl, *acl;
-	int error = 0;
-
-	if (NFS_PROTO(inode)->version != 3 ||
-	    !NFS_PROTO(dir)->getacl || !NFS_PROTO(inode)->setacls)
-		return 0;
-	dfacl = NFS_PROTO(dir)->getacl(dir, ACL_TYPE_DEFAULT);
-	if (IS_ERR(dfacl)) {
-		error = PTR_ERR(dfacl);
-		return (error == -EOPNOTSUPP) ? 0 : error;
-	}
-	if (!dfacl)
-		return 0;
-	acl = posix_acl_clone(dfacl, GFP_KERNEL);
-	error = -ENOMEM;
-	if (!acl)
-		goto out;
-	error = posix_acl_create_masq(acl, &mode);
-	if (error < 0)
-		goto out;
-	error = NFS_PROTO(inode)->setacls(inode, acl, S_ISDIR(inode->i_mode) ?
-						      dfacl : NULL);
-out:
-	posix_acl_release(acl);
-	posix_acl_release(dfacl);
-	return error;
-#else
-	return 0;
-#endif
-}
-
 /*
  * Following a failed create operation, we drop the dentry rather
  * than retain a negative dentry. This avoids a problem in the event
@@ -1029,7 +1010,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	dfprintk(VFS, "NFS: create(%s/%ld, %s\n", dir->i_sb->s_id, 
 		dir->i_ino, dentry->d_name.name);
 
-	attr.ia_mode = mode & ~current->fs->umask;
+	attr.ia_mode = mode;
 	attr.ia_valid = ATTR_MODE;
 
 	if (nd && (nd->flags & LOOKUP_CREATE))
@@ -1043,7 +1024,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 		d_instantiate(dentry, inode);
 		nfs_renew_times(dentry);
 		nfs_set_verifier(dentry, nfs_save_change_attribute(dir));
-		error = nfs_set_default_acl(dir, inode, mode);
+		error = 0;
 	} else {
 		error = PTR_ERR(inode);
 		d_drop(dentry);
@@ -1059,9 +1040,7 @@ static int
 nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	struct iattr attr;
-	struct nfs_fattr fattr;
-	struct nfs_fh fhandle;
-	int error;
+	int status;
 
 	dfprintk(VFS, "NFS: mknod(%s/%ld, %s\n", dir->i_sb->s_id,
 		dir->i_ino, dentry->d_name.name);
@@ -1069,22 +1048,17 @@ nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	if (!new_valid_dev(rdev))
 		return -EINVAL;
 
-	attr.ia_mode = mode & ~current->fs->umask;
+	attr.ia_mode = mode;
 	attr.ia_valid = ATTR_MODE;
 
 	lock_kernel();
 	nfs_begin_data_update(dir);
-	error = NFS_PROTO(dir)->mknod(dir, &dentry->d_name, &attr, rdev,
-					&fhandle, &fattr);
+	status = NFS_PROTO(dir)->mknod(dir, dentry, &attr, rdev);
 	nfs_end_data_update(dir);
-	if (!error)
-		error = nfs_instantiate(dentry, &fhandle, &fattr);
-	else
+	if (status)
 		d_drop(dentry);
-	if (!error)
-		error = nfs_set_default_acl(dir, dentry->d_inode, mode);
 	unlock_kernel();
-	return error;
+	return status;
 }
 
 /*
@@ -1093,15 +1067,13 @@ nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	struct iattr attr;
-	struct nfs_fattr fattr;
-	struct nfs_fh fhandle;
-	int error;
+	int status;
 
 	dfprintk(VFS, "NFS: mkdir(%s/%ld, %s\n", dir->i_sb->s_id,
 		dir->i_ino, dentry->d_name.name);
 
 	attr.ia_valid = ATTR_MODE;
-	attr.ia_mode = (mode & ~current->fs->umask) | S_IFDIR;
+	attr.ia_mode = mode | S_IFDIR;
 
 	lock_kernel();
 #if 0
@@ -1114,17 +1086,12 @@ static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	d_drop(dentry);
 #endif
 	nfs_begin_data_update(dir);
-	error = NFS_PROTO(dir)->mkdir(dir, &dentry->d_name, &attr, &fhandle,
-					&fattr);
+	status = NFS_PROTO(dir)->mkdir(dir, dentry, &attr);
 	nfs_end_data_update(dir);
-	if (!error)
-		error = nfs_instantiate(dentry, &fhandle, &fattr);
-	else
+	if (status)
 		d_drop(dentry);
-	if (!error)
-		error = nfs_set_default_acl(dir, dentry->d_inode, mode);
 	unlock_kernel();
-	return error;
+	return status;
 }
 
 static int nfs_rmdir(struct inode *dir, struct dentry *dentry)

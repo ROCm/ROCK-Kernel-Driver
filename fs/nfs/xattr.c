@@ -11,9 +11,6 @@ nfs_listxattr(struct dentry *dentry, char *buffer, size_t size)
 	struct posix_acl *acl;
 	int pos=0, len=0;
 
-	if (NFS_PROTO(inode)->version != 3 || !NFS_PROTO(inode)->getacl)
-		return -EOPNOTSUPP;
-
 #	define output(s) do {						\
 			if (pos + sizeof(s) <= size) {			\
 				memcpy(buffer + pos, s, sizeof(s));	\
@@ -61,9 +58,7 @@ nfs_getxattr(struct dentry *dentry, const char *name, void *buffer, size_t size)
 	else
 		return -EOPNOTSUPP;
 
-	acl = ERR_PTR(-EOPNOTSUPP);
-	if (NFS_PROTO(inode)->version == 3 && NFS_PROTO(inode)->getacl)
-		acl = NFS_PROTO(inode)->getacl(inode, type);
+	acl = NFS_PROTO(inode)->getacl(inode, type);
 	if (IS_ERR(acl))
 		return PTR_ERR(acl);
 	else if (acl) {
@@ -92,8 +87,6 @@ nfs_setxattr(struct dentry *dentry, const char *name,
 		type = ACL_TYPE_DEFAULT;
 	else
 		return -EOPNOTSUPP;
-	if (NFS_PROTO(inode)->version != 3 || !NFS_PROTO(inode)->setacl)
-		return -EOPNOTSUPP;
 
 	acl = posix_acl_from_xattr(value, size);
 	if (IS_ERR(acl))
@@ -108,7 +101,7 @@ int
 nfs_removexattr(struct dentry *dentry, const char *name)
 {
 	struct inode *inode = dentry->d_inode;
-	int error, type;
+	int type;
 
 	if (strcmp(name, XATTR_NAME_ACL_ACCESS) == 0)
 		type = ACL_TYPE_ACCESS;
@@ -117,9 +110,5 @@ nfs_removexattr(struct dentry *dentry, const char *name)
 	else
 		return -EOPNOTSUPP;
 
-	error = -EOPNOTSUPP;
-	if (NFS_PROTO(inode)->version == 3 && NFS_PROTO(inode)->setacl)
-		error = NFS_PROTO(inode)->setacl(inode, type, NULL);
-
-	return error;
+	return NFS_PROTO(inode)->setacl(inode, type, NULL);
 }

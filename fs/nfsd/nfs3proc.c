@@ -646,7 +646,7 @@ nfsd3_proc_getacl(struct svc_rqst * rqstp, struct nfsd3_getaclargs *argp,
 	fh = fh_copy(&resp->fh, &argp->fh);
 	if ((nfserr = fh_verify(rqstp, &resp->fh, 0, MAY_NOP)))
 		RETURN_STATUS(nfserr_inval);
-	
+
 	if (argp->mask & ~(NFS3_ACL|NFS3_ACLCNT|NFS3_DFACL|NFS3_DFACLCNT))
 		RETURN_STATUS(nfserr_inval);
 	resp->mask = argp->mask;
@@ -712,7 +712,7 @@ nfsd3_proc_setacl(struct svc_rqst * rqstp, struct nfsd3_setaclargs *argp,
 
 	fh = fh_copy(&resp->fh, &argp->fh);
 	nfserr = fh_verify(rqstp, &resp->fh, 0, MAY_NOP);
-	
+
 	if (!nfserr) {
 		nfserr = nfserrno( nfsd_set_posix_acl(
 			fh, ACL_TYPE_ACCESS, argp->acl_access) );

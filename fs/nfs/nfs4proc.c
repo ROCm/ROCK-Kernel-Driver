@@ -1539,49 +1539,50 @@ static int nfs4_proc_symlink(struct inode *dir, struct qstr *name,
 	return err;
 }
 
-static int _nfs4_proc_mkdir(struct inode *dir, struct qstr *name,
-		struct iattr *sattr, struct nfs_fh *fhandle,
-		struct nfs_fattr *fattr)
+static int _nfs4_proc_mkdir(struct inode *dir, struct dentry *dentry,
+		struct iattr *sattr)
 {
 	struct nfs_server *server = NFS_SERVER(dir);
+	struct nfs_fh fh;
+	struct nfs_fattr fattr;
 	struct nfs4_create_arg arg = {
 		.dir_fh = NFS_FH(dir),
 		.server = server,
-		.name = name,
+		.name = &dentry->d_name,
 		.attrs = sattr,
 		.ftype = NF4DIR,
 		.bitmask = server->attr_bitmask,
 	};
 	struct nfs4_create_res res = {
 		.server = server,
-		.fh = fhandle,
-		.fattr = fattr,
+		.fh = &fh,
+		.fattr = &fattr,
 	};
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CREATE],
 		.rpc_argp = &arg,
 		.rpc_resp = &res,
 	};
-	int			status;
+	int status;
 
-	fattr->valid = 0;
+	fattr.valid = 0;
 	
 	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
-	if (!status)
+	if (!status) {
 		update_changeattr(dir, &res.dir_cinfo);
+		status = nfs_instantiate(dentry, &fh, &fattr);
+	}
 	return status;
 }
 
-static int nfs4_proc_mkdir(struct inode *dir, struct qstr *name,
-		struct iattr *sattr, struct nfs_fh *fhandle,
-		struct nfs_fattr *fattr)
+static int nfs4_proc_mkdir(struct inode *dir, struct dentry *dentry,
+		struct iattr *sattr)
 {
 	struct nfs4_exception exception = { };
 	int err;
 	do {
 		err = nfs4_handle_exception(NFS_SERVER(dir),
-				_nfs4_proc_mkdir(dir, name, sattr,
-					fhandle, fattr),
+				_nfs4_proc_mkdir(dir, dentry, sattr),
 				&exception);
 	} while (exception.retry);
 	return err;
@@ -1630,22 +1631,23 @@ static int nfs4_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 	return err;
 }
 
-static int _nfs4_proc_mknod(struct inode *dir, struct qstr *name,
-		struct iattr *sattr, dev_t rdev, struct nfs_fh *fh,
-		struct nfs_fattr *fattr)
+static int _nfs4_proc_mknod(struct inode *dir, struct dentry *dentry,
+		struct iattr *sattr, dev_t rdev)
 {
 	struct nfs_server *server = NFS_SERVER(dir);
+	struct nfs_fh fh;
+	struct nfs_fattr fattr;
 	struct nfs4_create_arg arg = {
 		.dir_fh = NFS_FH(dir),
 		.server = server,
-		.name = name,
+		.name = &dentry->d_name,
 		.attrs = sattr,
 		.bitmask = server->attr_bitmask,
 	};
 	struct nfs4_create_res res = {
 		.server = server,
-		.fh = fh,
-		.fattr = fattr,
+		.fh = &fh,
+		.fattr = &fattr,
 	};
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CREATE],
@@ -1655,7 +1657,7 @@ static int _nfs4_proc_mknod(struct inode *dir, struct qstr *name,
 	int			status;
 	int                     mode = sattr->ia_mode;
 
-	fattr->valid = 0;
+	fattr.valid = 0;
 
 	BUG_ON(!(sattr->ia_valid & ATTR_MODE));
 	BUG_ON(!S_ISFIFO(mode) && !S_ISBLK(mode) && !S_ISCHR(mode) && !S_ISSOCK(mode));
@@ -1677,19 +1679,19 @@ static int _nfs4_proc_mknod(struct inode *dir, struct qstr *name,
 	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
 	if (!status)
 		update_changeattr(dir, &res.dir_cinfo);
+	if (!status)
+		status = nfs_instantiate(dentry, &fh, &fattr);
 	return status;
 }
 
-static int nfs4_proc_mknod(struct inode *dir, struct qstr *name,
-		struct iattr *sattr, dev_t rdev, struct nfs_fh *fh,
-		struct nfs_fattr *fattr)
+static int nfs4_proc_mknod(struct inode *dir, struct dentry *dentry,
+		struct iattr *sattr, dev_t rdev)
 {
 	struct nfs4_exception exception = { };
 	int err;
 	do {
 		err = nfs4_handle_exception(NFS_SERVER(dir),
-				_nfs4_proc_mknod(dir, name, sattr, rdev,
-					fh, fattr),
+				_nfs4_proc_mknod(dir, dentry, sattr, rdev),
 				&exception);
 	} while (exception.retry);
 	return err;
@@ -2577,6 +2579,7 @@ nfs4_proc_lock(struct file *filp, int cmd, struct file_lock *request)
 struct nfs_rpc_ops	nfs_v4_clientops = {
 	.version	= 4,			/* protocol version */
 	.dentry_ops	= &nfs4_dentry_operations,
+	.file_inode_ops	= &nfs_file_inode_operations,
 	.dir_inode_ops	= &nfs4_dir_inode_operations,
 	.getroot	= nfs4_proc_get_root,
 	.getattr	= nfs4_proc_getattr,

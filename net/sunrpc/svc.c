@@ -454,16 +454,13 @@ err_bad_auth:
 	goto sendit;
 
 err_bad_prog:
-#ifdef RPC_PARANOIA
-	if (prog != NFSACL_PROGRAM || serv->sv_program->pg_prog != NFS_PROGRAM)
-		printk("svc: unknown program %d\n", prog);
-#endif
+	dprintk("svc: unknown program %d\n", prog);
 	serv->sv_stats->rpcbadfmt++;
 	svc_putu32(resv, rpc_prog_unavail);
 	goto sendit;
 
 err_bad_vers:
-	if (prog == NFSACL_PROGRAM && vers == 2) {
+	if (prog == 100227 && vers == 2) {
 		/* If the nfs_acl program is available, Solaris clients expect
 		   both version 2 and version 3 to be available;
 		   RPC_PROG_MISMATCH leads to a mount failure. Fake

@@ -689,7 +689,9 @@ struct nfs_access_entry;
 struct nfs_rpc_ops {
 	int	version;		/* Protocol version */
 	struct dentry_operations *dentry_ops;
+	struct inode_operations *file_inode_ops;
 	struct inode_operations *dir_inode_ops;
+	struct inode_operations *special_inode_ops;
 
 	int	(*getroot) (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsinfo *);
@@ -717,13 +719,12 @@ struct nfs_rpc_ops {
 	int	(*symlink) (struct inode *, struct qstr *, struct qstr *,
 			    struct iattr *, struct nfs_fh *,
 			    struct nfs_fattr *);
-	int	(*mkdir)   (struct inode *, struct qstr *, struct iattr *,
-			    struct nfs_fh *, struct nfs_fattr *);
+	int	(*mkdir)   (struct inode *, struct dentry *, struct iattr *);
 	int	(*rmdir)   (struct inode *, struct qstr *);
 	int	(*readdir) (struct dentry *, struct rpc_cred *,
 			    u64, struct page *, unsigned int, int);
-	int	(*mknod)   (struct inode *, struct qstr *, struct iattr *,
-			    dev_t, struct nfs_fh *, struct nfs_fattr *);
+	int	(*mknod)   (struct inode *, struct dentry *, struct iattr *,
+			    dev_t);
 	int	(*statfs)  (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsstat *);
 	int	(*fsinfo)  (struct nfs_server *, struct nfs_fh *,

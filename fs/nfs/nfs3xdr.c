@@ -1066,7 +1066,7 @@ nfs3_xdr_getaclres(struct rpc_rqst *req, u32 *p,
 	struct posix_acl **acl;
 	unsigned int *aclcnt;
 	int err, base;
-	
+
 	if (status != 0)
 		return -nfs_stat_to_errno(status);
 	p = xdr_decode_post_op_attr(p, res->fattr);
@@ -1074,7 +1074,7 @@ nfs3_xdr_getaclres(struct rpc_rqst *req, u32 *p,
 	if (res->mask & ~(NFS3_ACL|NFS3_ACLCNT|NFS3_DFACL|NFS3_DFACLCNT))
 		return -EINVAL;
 	base = (char *)p - (char *)req->rq_rcv_buf.head->iov_base;
-	
+
 	acl = (res->mask & NFS3_ACL) ? &res->acl_access : NULL;
 	aclcnt = (res->mask & NFS3_ACLCNT) ? &res->acl_access_count : NULL;
 	err = nfsacl_decode(buf, base, aclcnt, acl);

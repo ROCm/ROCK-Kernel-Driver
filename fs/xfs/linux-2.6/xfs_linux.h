@@ -64,6 +64,7 @@
 #include <sema.h>
 #include <time.h>
 
+#include <support/qsort.h>
 #include <support/ktrace.h>
 #include <support/debug.h>
 #include <support/move.h>

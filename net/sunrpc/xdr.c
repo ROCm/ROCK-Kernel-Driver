@@ -964,10 +964,10 @@ static int
 xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 		 struct xdr_array2_desc *desc, int encode)
 {
-	char elem[desc->elem_size], *c;
+	char *elem = NULL, *c;
 	unsigned int copied = 0, todo, avail_here;
 	struct page **ppages = NULL;
-	int err = 0;
+	int err;
 
 	if (encode) {
 		if (xdr_encode_word(buf, base, desc->array_len) != 0)
@@ -984,7 +984,7 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 		return 0;
 
 	todo = desc->array_len * desc->elem_size;
-	
+
 	/* process head */
 	if (todo && base < buf->head->iov_len) {
 		c = buf->head->iov_base + base;
@@ -1000,6 +1000,12 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 			avail_here -= desc->elem_size;
 		}
 		if (avail_here) {
+			if (!elem) {
+				elem = kmalloc(desc->elem_size, GFP_KERNEL);
+				err = -ENOMEM;
+				if (!elem)
+					goto out;
+			}
 			if (encode) {
 				err = desc->xcode(desc, elem);
 				if (err)
@@ -1024,7 +1030,7 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 		ppages = buf->pages + (base >> PAGE_CACHE_SHIFT);
 		base &= ~PAGE_CACHE_MASK;
 		avail_page = min_t(unsigned int, PAGE_CACHE_SIZE - base,
-				   avail_here);
+					avail_here);
 		c = kmap(*ppages) + base;
 
 		while (avail_here) {
@@ -1032,6 +1038,13 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 			if (copied || avail_page < desc->elem_size) {
 				unsigned int l = min(avail_page,
 					desc->elem_size - copied);
+				if (!elem) {
+					elem = kmalloc(desc->elem_size,
+						       GFP_KERNEL);
+					err = -ENOMEM;
+					if (!elem)
+						goto out;
+				}
 				if (encode) {
 					if (!copied) {
 						err = desc->xcode(desc, elem);
@@ -1065,6 +1078,13 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 			if (avail_page) {
 				unsigned int l = min(avail_page,
 					    desc->elem_size - copied);
+				if (!elem) {
+					elem = kmalloc(desc->elem_size,
+						       GFP_KERNEL);
+					err = -ENOMEM;
+					if (!elem)
+						goto out;
+				}
 				if (encode) {
 					if (!copied) {
 						err = desc->xcode(desc, elem);
@@ -1124,8 +1144,11 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 			todo -= desc->elem_size;
 		}
 	}
-	
+	err = 0;
+
 out:
+	if (elem)
+		kfree(elem);
 	if (ppages)
 		kunmap(*ppages);
 	return err;

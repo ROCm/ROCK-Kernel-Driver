@@ -143,6 +143,7 @@ xfs-y				+= $(addprefix linux-2.6/, \
 xfs-y				+= $(addprefix support/, \
 				   debug.o \
 				   move.o \
+				   qsort.o \
 				   uuid.o)
 
 xfs-$(CONFIG_XFS_TRACE)		+= support/ktrace.o

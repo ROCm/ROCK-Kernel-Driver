@@ -1011,12 +1011,10 @@ call_verify(struct rpc_task *task)
 				break;
 			case RPC_MISMATCH:
 				printk(KERN_WARNING "%s: RPC call version mismatch!\n", __FUNCTION__);
-				error = -ENOSYS;
-				goto out_err;
+				goto out_eio;
 			default:
 				printk(KERN_WARNING "%s: RPC call rejected, unknown error: %x\n", __FUNCTION__, n);
-				error = -ENOSYS;
-				goto out_err;
+				goto out_eio;
 		}
 		if (--len < 0)
 			goto out_overflow;
@@ -1066,11 +1064,9 @@ call_verify(struct rpc_task *task)
 	case RPC_SUCCESS:
 		return p;
 	case RPC_PROG_UNAVAIL:
-		if (task->tk_client->cl_prog != NFSACL_PROGRAM) {
-			printk(KERN_WARNING "RPC: call_verify: program %u is unsupported by server %s\n",
-				(unsigned int)task->tk_client->cl_prog,
-				task->tk_client->cl_server);
-		}
+		dprintk(KERN_WARNING "RPC: call_verify: program %u is unsupported by server %s\n",
+			(unsigned int)task->tk_client->cl_prog,
+			task->tk_client->cl_server);
 		error = -ENOSYS;
 		goto out_err;
 	case RPC_PROG_MISMATCH:
@@ -1086,7 +1082,7 @@ call_verify(struct rpc_task *task)
 				task->tk_client->cl_prog,
 				task->tk_client->cl_vers,
 				task->tk_client->cl_server);
-		error = -ENOSYS;
+		error = -EOPNOTSUPP;
 		goto out_err;
 	case RPC_GARBAGE_ARGS:
 		dprintk("RPC: %4d %s: server saw garbage\n", task->tk_pid, __FUNCTION__);
@@ -1105,6 +1101,7 @@ out_retry:
 		return NULL;
 	}
 	printk(KERN_WARNING "RPC %s: retry failed, exit EIO\n", __FUNCTION__);
+out_eio:
 	error = -EIO;
 out_err:
 	rpc_exit(task, error);

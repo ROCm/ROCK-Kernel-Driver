@@ -498,6 +498,8 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 		server->client_acl = clnt;
 		/* Initially assume the nfsacl program is supported */
 		server->flags |= NFSACL;
+		/* The nfs client applies the umask itself when needed. */
+		sb->s_flags |= MS_POSIXACL;
 	}
 #endif
 	if (server->flags & NFS_MOUNT_VER3) {
@@ -688,7 +690,7 @@ nfs_init_locked(struct inode *inode, void *opaque)
 #define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
 
 #ifdef CONFIG_NFS_ACL
-static struct inode_operations nfs_special_inode_operations = {
+struct inode_operations nfs3_special_inode_operations = {
 	.permission =	nfs_permission,
 	.getattr =	nfs_getattr,
 	.setattr =	nfs_setattr,
@@ -739,7 +741,7 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		/* Why so? Because we want revalidate for devices/FIFOs, and
 		 * that's precisely what we have in nfs_file_inode_operations.
 		 */
-		inode->i_op = &nfs_file_inode_operations;
+		inode->i_op = NFS_SB(sb)->rpc_ops->file_inode_ops;
 		if (S_ISREG(inode->i_mode)) {
 			inode->i_fop = &nfs_file_operations;
 			inode->i_data.a_ops = &nfs_file_aops;
@@ -753,9 +755,9 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		} else if (S_ISLNK(inode->i_mode))
 			inode->i_op = &nfs_symlink_inode_operations;
 		else {
-#ifdef CONFIG_NFS_ACL
-			inode->i_op = &nfs_special_inode_operations;
-#endif
+			if (NFS_SB(sb)->rpc_ops->special_inode_ops)
+				inode->i_op = NFS_SB(sb)->rpc_ops->
+						       special_inode_ops;
 			init_special_inode(inode, inode->i_mode, fattr->rdev);
 		}
 
@@ -1588,8 +1590,6 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 		return ERR_PTR(error);
 	}
 	s->s_flags |= MS_ACTIVE;
-	/* The nfs client applies the umask itself when needed. */
-	s->s_flags |= MS_POSIXACL;
 	return s;
 }
 

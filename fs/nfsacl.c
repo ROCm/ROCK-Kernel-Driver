@@ -25,6 +25,7 @@
 #include <linux/sunrpc/xdr.h>
 #include <linux/nfsacl.h>
 #include <linux/nfs3.h>
+#include <linux/sort.h>
 
 MODULE_LICENSE("GPL");
 
@@ -164,8 +165,10 @@ xdr_nfsace_decode(struct xdr_array2_desc *desc, void *elem)
 }
 
 static int
-cmp_acl_entry(const struct posix_acl_entry *a, const struct posix_acl_entry *b)
+cmp_acl_entry(const void *x, const void *y)
 {
+	const struct posix_acl_entry *a = x, *b = y;
+
 	if (a->e_tag != b->e_tag)
 		return a->e_tag - b->e_tag;
 	else if (a->e_id > b->e_id)
@@ -188,8 +191,8 @@ posix_acl_from_nfsacl(struct posix_acl *acl)
 	if (!acl)
 		return 0;
 
-	qsort(acl->a_entries, acl->a_count, sizeof(struct posix_acl_entry),
-	      (int(*)(const void *,const void *))cmp_acl_entry);
+	sort(acl->a_entries, acl->a_count, sizeof(struct posix_acl_entry),
+	     cmp_acl_entry, NULL);
 
 	/* Clear undefined identifier fields and find the ACL_GROUP_OBJ
 	   and ACL_MASK entries. */
