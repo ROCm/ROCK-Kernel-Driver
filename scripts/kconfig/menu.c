@@ -194,8 +194,8 @@ void menu_finalize(struct menu *parent)
 		}
 		for (menu = parent->list; menu; menu = menu->next)
 			menu_finalize(menu);
-	} else if (sym && parent->prompt) {
-		basedep = E_EXPR(parent->prompt->visible);
+	} else if (sym) {
+		basedep = parent->prompt ? E_EXPR(parent->prompt->visible) : NULL;
 		basedep = expr_trans_compare(basedep, E_UNEQUAL, &symbol_no);
 		basedep = expr_eliminate_dups(expr_transform(basedep));
 		last_menu = NULL;
