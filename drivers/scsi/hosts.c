@@ -215,6 +215,10 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	scsi_proc_host_rm(shost);
 	scsi_forget_host(shost);
 	scsi_sysfs_remove_host(shost);
+
+	if (shost->hostt->release)
+		(*shost->hostt->release)(shost);
+
 	return 0;
 }
 
