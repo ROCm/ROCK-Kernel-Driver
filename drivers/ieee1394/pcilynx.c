@@ -29,6 +29,7 @@
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
+#include <linux/smp_lock.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/io.h>
@@ -732,8 +733,9 @@ static unsigned int aux_poll(struct file *file, poll_table *pt)
 
 loff_t mem_llseek(struct file *file, loff_t offs, int orig)
 {
-        loff_t newoffs;
+        loff_t newoffs = -1;
 
+        lock_kernel();
         switch (orig) {
         case 0:
                 newoffs = offs;
@@ -743,12 +745,12 @@ loff_t mem_llseek(struct file *file, loff_t offs, int orig)
                 break;
         case 2:
                 newoffs = PCILYNX_MAX_MEMORY + 1 + offs;
-                break;
-        default:
-                return -EINVAL;
         }
 
-        if (newoffs < 0 || newoffs > PCILYNX_MAX_MEMORY + 1) return -EINVAL;
+        if (newoffs < 0 || newoffs > PCILYNX_MAX_MEMORY + 1) {
+                lock_kernel();
+                return -EINVAL;
+        }
 
         file->f_pos = newoffs;
         return newoffs;

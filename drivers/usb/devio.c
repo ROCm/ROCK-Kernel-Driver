@@ -58,21 +58,26 @@ struct async {
 
 static loff_t usbdev_lseek(struct file *file, loff_t offset, int orig)
 {
+	loff_t ret;
+
+	lock_kernel();
+
 	switch (orig) {
 	case 0:
 		file->f_pos = offset;
-		return file->f_pos;
-
+		ret = file->f_pos;
+		break;
 	case 1:
 		file->f_pos += offset;
-		return file->f_pos;
-
+		ret = file->f_pos;
+		break;
 	case 2:
-		return -EINVAL;
-
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
 	}
+
+	unlock_kernel();
+	return ret;
 }
 
 static ssize_t usbdev_read(struct file *file, char * buf, size_t nbytes, loff_t *ppos)

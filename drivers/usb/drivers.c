@@ -38,6 +38,7 @@
 #include <linux/mm.h>
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 
 /*****************************************************************/
@@ -96,21 +97,24 @@ static ssize_t usb_driver_read(struct file *file, char *buf, size_t nbytes, loff
 
 static loff_t usb_driver_lseek(struct file * file, loff_t offset, int orig)
 {
+	loff_t ret;
+
+	lock_kernel();
 	switch (orig) {
 	case 0:
 		file->f_pos = offset;
-		return file->f_pos;
-
+		ret = file->f_pos;
+		break;
 	case 1:
 		file->f_pos += offset;
-		return file->f_pos;
-
+		ret = file->f_pos;
+		break;
 	case 2:
-		return -EINVAL;
-
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
 	}
+	unlock_kernel();
+	return ret;
 }
 
 struct file_operations usbdevfs_drivers_fops = {

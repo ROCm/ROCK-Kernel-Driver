@@ -13,6 +13,7 @@
 #include <linux/fcntl.h>
 #include <linux/nvram.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <asm/nvram.h>
 
@@ -20,6 +21,7 @@
 
 static loff_t nvram_llseek(struct file *file, loff_t offset, int origin)
 {
+	lock_kernel();
 	switch (origin) {
 	case 1:
 		offset += file->f_pos;
@@ -28,9 +30,12 @@ static loff_t nvram_llseek(struct file *file, loff_t offset, int origin)
 		offset += NVRAM_SIZE;
 		break;
 	}
-	if (offset < 0)
+	if (offset < 0) {
+		unlock_kernel();
 		return -EINVAL;
+	}
 	file->f_pos = offset;
+	unlock_kernel();
 	return file->f_pos;
 }
 

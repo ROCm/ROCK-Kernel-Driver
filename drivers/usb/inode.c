@@ -36,7 +36,7 @@
 #include <linux/proc_fs.h>
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
-
+#include <linux/smp_lock.h>
 
 static struct super_operations usbfs_ops;
 static struct address_space_operations usbfs_aops;
@@ -295,6 +295,7 @@ static loff_t default_file_lseek (struct file *file, loff_t offset, int orig)
 {
 	loff_t retval = -EINVAL;
 
+	lock_kernel();
 	switch(orig) {
 	case 0:
 		if (offset > 0) {
@@ -311,6 +312,7 @@ static loff_t default_file_lseek (struct file *file, loff_t offset, int orig)
 	default:
 		break;
 	}
+	unlock_kernel();
 	return retval;
 }
 

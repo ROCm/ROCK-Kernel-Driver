@@ -554,21 +554,26 @@ static int usb_device_release(struct inode *inode, struct file *file)
 
 static loff_t usb_device_lseek(struct file * file, loff_t offset, int orig)
 {
+	loff_t ret;
+
+	lock_kernel();
+
 	switch (orig) {
 	case 0:
 		file->f_pos = offset;
-		return file->f_pos;
-
+		ret = file->f_pos;
+		break;
 	case 1:
 		file->f_pos += offset;
-		return file->f_pos;
-
+		ret = file->f_pos;
+		break;
 	case 2:
-		return -EINVAL;
-
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
 	}
+
+	unlock_kernel();
+	return ret;
 }
 
 struct file_operations usbdevfs_devices_fops = {

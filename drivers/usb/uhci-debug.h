@@ -12,6 +12,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
+#include <linux/smp_lock.h>
 #include <asm/io.h>
 
 #include "uhci.h"
@@ -507,8 +508,11 @@ out:
 
 static loff_t uhci_proc_lseek(struct file *file, loff_t off, int whence)
 {
-	struct uhci_proc *up = file->private_data;
-	loff_t new;
+	struct uhci_proc *up;
+	loff_t new = -1;
+
+	lock_kernel();
+	up = file->private_data;
 
 	switch (whence) {
 	case 0:
@@ -517,12 +521,12 @@ static loff_t uhci_proc_lseek(struct file *file, loff_t off, int whence)
 	case 1:
 		new = file->f_pos + off;
 		break;
-	case 2:
-	default:
+	}
+	if (new < 0 || new > up->size) {
+		unlock_kernel();
 		return -EINVAL;
 	}
-	if (new < 0 || new > up->size)
-		return -EINVAL;
+	unlock_kernel();
 	return (file->f_pos = new);
 }
 

@@ -83,6 +83,7 @@ flash_mmap(struct file *file, struct vm_area_struct *vma)
 static long long
 flash_llseek(struct file *file, long long offset, int origin)
 {
+	lock_kernel();
 	switch (origin) {
 		case 0:
 			file->f_pos = offset;
@@ -96,8 +97,10 @@ flash_llseek(struct file *file, long long offset, int origin)
 			file->f_pos = flash.read_size;
 			break;
 		default:
+			unlock_kernel();
 			return -EINVAL;
 	}
+	unlock_kernel();
 	return file->f_pos;
 }
 

@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -341,6 +342,7 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 {
 	loff_t retval = -EINVAL;
 
+	lock_kernel();
 	switch(orig) {
 	case 0:
 		if (offset > 0) {
@@ -357,6 +359,7 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 	default:
 		break;
 	}
+	unlock_kernel();
 	return retval;
 }
 

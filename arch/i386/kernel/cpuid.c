@@ -35,6 +35,7 @@
 #include <linux/poll.h>
 #include <linux/smp.h>
 #include <linux/major.h>
+#include <linux/smp_lock.h>
 
 #include <asm/processor.h>
 #include <asm/msr.h>
@@ -82,16 +83,24 @@ static inline void do_cpuid(int cpu, u32 reg, u32 *data)
 
 static loff_t cpuid_seek(struct file *file, loff_t offset, int orig)
 {
+  loff_t ret;
+
+  lock_kernel();
+
   switch (orig) {
   case 0:
     file->f_pos = offset;
-    return file->f_pos;
+    ret = file->f_pos;
+    break;
   case 1:
     file->f_pos += offset;
-    return file->f_pos;
+    ret = file->f_pos;
   default:
-    return -EINVAL;	/* SEEK_END not supported */
+    ret = -EINVAL;
   }
+
+  unlock_kernel();
+  return ret;
 }
 
 static ssize_t cpuid_read(struct file * file, char * buf,

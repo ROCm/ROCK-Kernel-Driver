@@ -21,6 +21,7 @@
 #include <linux/raw.h>
 #include <linux/tty.h>
 #include <linux/capability.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -466,16 +467,23 @@ static loff_t null_lseek(struct file * file, loff_t offset, int orig)
  */
 static loff_t memory_lseek(struct file * file, loff_t offset, int orig)
 {
+	int ret;
+
+	lock_kernel();
 	switch (orig) {
 		case 0:
 			file->f_pos = offset;
-			return file->f_pos;
+			ret = file->f_pos;
+			break;
 		case 1:
 			file->f_pos += offset;
-			return file->f_pos;
+			ret = file->f_pos;
+			break;
 		default:
-			return -EINVAL;
+			ret = -EINVAL;
 	}
+	unlock_kernel();
+	return ret;
 }
 
 static int open_port(struct inode * inode, struct file * filp)

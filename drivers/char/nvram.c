@@ -216,6 +216,7 @@ void nvram_set_checksum( void )
 
 static long long nvram_llseek(struct file *file,loff_t offset, int origin )
 {
+	lock_kernel();
 	switch( origin ) {
 	  case 0:
 		/* nothing to do */
@@ -227,6 +228,7 @@ static long long nvram_llseek(struct file *file,loff_t offset, int origin )
 		offset += NVRAM_BYTES;
 		break;
 	}
+	unlock_kernel();
 	return( (offset >= 0) ? (file->f_pos = offset) : -EINVAL );
 }
 

@@ -12,6 +12,7 @@
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
@@ -21,8 +22,9 @@
 static loff_t
 proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 {
-	loff_t new;
+	loff_t new = -1;
 
+	lock_kernel();
 	switch (whence) {
 	case 0:
 		new = off;
@@ -33,9 +35,8 @@ proc_bus_pci_lseek(struct file *file, loff_t off, int whence)
 	case 2:
 		new = PCI_CFG_SPACE_SIZE + off;
 		break;
-	default:
-		return -EINVAL;
 	}
+	unlock_kernel();
 	if (new < 0 || new > PCI_CFG_SPACE_SIZE)
 		return -EINVAL;
 	return (file->f_pos = new);

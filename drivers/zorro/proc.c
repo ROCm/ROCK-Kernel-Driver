@@ -14,6 +14,7 @@
 #include <linux/zorro.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <asm/amigahw.h>
 #include <asm/setup.h>
@@ -21,7 +22,7 @@
 static loff_t
 proc_bus_zorro_lseek(struct file *file, loff_t off, int whence)
 {
-	loff_t new;
+	loff_t new = -1;
 
 	switch (whence) {
 	case 0:
@@ -33,11 +34,12 @@ proc_bus_zorro_lseek(struct file *file, loff_t off, int whence)
 	case 2:
 		new = sizeof(struct ConfigDev) + off;
 		break;
-	default:
+	}
+	if (new < 0 || new > sizeof(struct ConfigDev)) {
+		unlock_kernel();
 		return -EINVAL;
 	}
-	if (new < 0 || new > sizeof(struct ConfigDev))
-		return -EINVAL;
+	unlock_kernel();
 	return (file->f_pos = new);
 }
 
