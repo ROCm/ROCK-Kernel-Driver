@@ -1072,6 +1072,8 @@ typedef struct hwif_s {
 	unsigned	highmem    : 1;	/* can do full 32-bit dma */
 	unsigned	no_dsc     : 1;	/* 0 default, 1 dsc_overlap disabled */
 
+	struct device	gendev;
+
 	void		*hwif_data;	/* extra hwif data */
 } ide_hwif_t;
 
@@ -1758,5 +1760,7 @@ extern void ide_toggle_bounce(ide_drive_t *drive, int on);
 extern spinlock_t ide_lock;
 
 #define local_irq_set(flags)	do { local_save_flags((flags)); local_irq_enable(); } while (0)
+
+extern struct bus_type ide_bus_type;
 
 #endif /* _IDE_H */

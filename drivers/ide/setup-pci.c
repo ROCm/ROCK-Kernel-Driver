@@ -666,6 +666,9 @@ controller_ok:
 		if ((hwif = ide_hwif_configure(dev, d, mate, port, pciirq)) == NULL)
 			continue;
 
+		/* setup proper ancestral information */
+		hwif->gendev.parent = &dev->dev;
+
 		if (hwif->channel) {
 			index.b.high = hwif->index;
 		} else {

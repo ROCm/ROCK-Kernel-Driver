@@ -152,6 +152,7 @@
 #include <linux/reboot.h>
 #include <linux/cdrom.h>
 #include <linux/seq_file.h>
+#include <linux/device.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -3524,6 +3525,10 @@ static struct notifier_block ide_notifier = {
 	5
 };
 
+struct bus_type ide_bus_type = {
+	.name		= "ide",
+};
+
 /*
  * This is gets invoked once during initialization, to set *everything* up
  */
@@ -3536,6 +3541,8 @@ int __init ide_init (void)
 		system_bus_speed = ide_system_bus_speed();
 		banner_printed = 1;
 	}
+
+	bus_register(&ide_bus_type);
 
 	init_ide_data();
 
@@ -3591,6 +3598,8 @@ void cleanup_module (void)
 	proc_ide_destroy();
 #endif
 	devfs_unregister (ide_devfs_handle);
+
+	bus_unregister(&ide_bus_type);
 }
 
 #else /* !MODULE */

@@ -563,6 +563,11 @@ static void hwif_register (ide_hwif_t *hwif)
 {
 	u32 i = 0;
 
+	/* register with global device tree */
+	strncpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
+	snprintf(hwif->gendev.name,DEVICE_NAME_SIZE,"IDE Controller");
+	device_register(&hwif->gendev);
+
 	if (hwif->mmio == 2)
 		return;
 	if (hwif->io_ports[IDE_CONTROL_OFFSET])
@@ -715,8 +720,9 @@ int probe_hwif_init (ide_hwif_t *hwif)
 		u16 unit = 0;
 		for (unit = 0; unit < MAX_DRIVES; ++unit) {
 			ide_drive_t *drive = &hwif->drives[unit];
-			if (drive->present)
+			if (drive->present) {
 				ata_attach(drive);
+			}
 		}
 	}
 #endif
@@ -973,6 +979,15 @@ static void init_gendisk (ide_hwif_t *hwif)
 		gd[unit].major_name = names + 4*unit;
 		gd[unit].minor_shift = PARTN_BITS; 
 		gd[unit].fops = ide_fops;
+
+		snprintf(gd[unit].disk_dev.bus_id,BUS_ID_SIZE,"%u.%u",
+			 hwif->index,unit);
+		snprintf(gd[unit].disk_dev.name,DEVICE_NAME_SIZE,
+			 "%s","IDE Drive");
+		gd[unit].disk_dev.parent = &hwif->gendev;
+		gd[unit].disk_dev.bus = &ide_bus_type;
+		device_register(&gd[unit].disk_dev);
+
 		hwif->drives[unit].disk = gd + unit;
 	}
 
