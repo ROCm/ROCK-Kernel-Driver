@@ -59,7 +59,6 @@ EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
 #ifdef CONFIG_INET
-EXPORT_SYMBOL(ip_defrag);
 EXPORT_SYMBOL(inet_peer_idlock);
 
 /* Route manipulation */
