@@ -397,17 +397,23 @@ cheetah_patch_copyops:
 	ULTRA3_DO_PATCH(__copy_from_user, U3copy_from_user)
 	ULTRA3_DO_PATCH(__copy_to_user, U3copy_to_user)
 	ULTRA3_DO_PATCH(__copy_in_user, U3copy_in_user)
+#if 0 /* Causes data corruption, nop out the optimization
+       * for now -DaveM
+       */
 	ldxa			[%g0] ASI_DCU_CONTROL_REG, %g3
 	sethi			%uhi(DCU_PE), %o3
 	sllx			%o3, 32, %o3
 	andcc			%g3, %o3, %g0
 	be,pn			%xcc, pcache_disabled
 	 nop
+#endif
 	ULTRA3_PCACHE_DO_NOP(U3memcpy)
 	ULTRA3_PCACHE_DO_NOP(U3copy_from_user)
 	ULTRA3_PCACHE_DO_NOP(U3copy_to_user)
 	ULTRA3_PCACHE_DO_NOP(cheetah_copy_user_page)
+#if 0
 pcache_disabled:
+#endif
 	retl
 	 nop
 #undef BRANCH_ALWAYS
