@@ -131,6 +131,15 @@ static int stripe_ctr(struct dm_target *ti, int argc, char **argv)
 		return -EINVAL;
 	}
 
+	/*
+	 * Do we have enough arguments for that many stripes ?
+	 */
+	if (argc != (2 + 2 * stripes)) {
+		ti->error = "dm-stripe: Not enough destinations "
+			"specified";
+		return -EINVAL;
+	}
+
 	sc = alloc_context(stripes);
 	if (!sc) {
 		ti->error = "dm-stripe: Memory allocation for striped context "
@@ -151,13 +160,6 @@ static int stripe_ctr(struct dm_target *ti, int argc, char **argv)
 	 * Get the stripe destinations.
 	 */
 	for (i = 0; i < stripes; i++) {
-		if (argc < 2) {
-			ti->error = "dm-stripe: Not enough destinations "
-				"specified";
-			kfree(sc);
-			return -EINVAL;
-		}
-
 		argv += 2;
 
 		r = get_stripe(ti, sc, i, argv);
