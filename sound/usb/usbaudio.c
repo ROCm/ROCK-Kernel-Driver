@@ -45,7 +45,6 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/usb.h>
-#include <linux/usb_ch9.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/pcm.h>
