@@ -52,7 +52,7 @@ obj-m		:= $(filter-out %/, $(obj-m))
 # add it to $(subdir-m)
 
 both-m          := $(filter $(mod-subdirs), $(subdir-y))
-SUB_DIRS	:= $(subdir-y)
+SUB_DIRS	:= $(subdir-y) $(if $(BUILD_MODULES),$(subdir-m))
 MOD_SUB_DIRS	:= $(sort $(subdir-m) $(both-m))
 ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 
@@ -90,7 +90,7 @@ real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m
 #
 # Get things started.
 #
-first_rule: vmlinux
+first_rule: vmlinux $(if $(BUILD_MODULES),$(obj-m))
 
 #
 # Common rules
