@@ -57,8 +57,9 @@ void platform_device_unregister(struct platform_device * pdev)
  *	type of device, like "pci" or "floppy", and <instance> is the 
  *	enumerated instance of the device, like '0' or '42'.
  *	Driver IDs are simply "<name>". 
- *	So, extract the <name> from the device, and compare it against 
- *	the name of the driver. Return whether they match or not.
+ *	So, extract the <name> from the platform_device structure, 
+ *	and compare it against the name of the driver. Return whether 
+ *	they match or not.
  */
 
 static int platform_match(struct device * dev, struct device_driver * drv)
