@@ -184,6 +184,8 @@ static void print_ident(struct synaptics_data *priv)
 		if (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap))
 			printk(KERN_INFO " -> %d multi-buttons, i.e. besides standard buttons\n",
 			       (int)(SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap)));
+		if (SYN_CAP_MIDDLE_BUTTON(priv->capabilities))
+			printk(KERN_INFO " -> middle button\n");
 		if (SYN_CAP_FOUR_BUTTON(priv->capabilities))
 			printk(KERN_INFO " -> four buttons\n");
 		if (SYN_CAP_MULTIFINGER(priv->capabilities))
@@ -342,6 +344,9 @@ static void set_input_params(struct input_dev *dev, struct synaptics_data *priv)
 	set_bit(BTN_LEFT, dev->keybit);
 	set_bit(BTN_RIGHT, dev->keybit);
 
+	if (SYN_CAP_MIDDLE_BUTTON(priv->capabilities))
+		set_bit(BTN_MIDDLE, dev->keybit);
+
 	if (SYN_CAP_FOUR_BUTTON(priv->capabilities)) {
 		set_bit(BTN_FORWARD, dev->keybit);
 		set_bit(BTN_BACK, dev->keybit);
@@ -470,6 +475,9 @@ static void synaptics_parse_hw_state(unsigned char buf[], struct synaptics_data 
 		hw->left  = (buf[0] & 0x01) ? 1 : 0;
 		hw->right = (buf[0] & 0x02) ? 1 : 0;
 
+		if (SYN_CAP_MIDDLE_BUTTON(priv->capabilities))
+			hw->middle = ((buf[0] ^ buf[3]) & 0x01) ? 1 : 0;
+
 		if (SYN_CAP_FOUR_BUTTON(priv->capabilities)) {
 			hw->up   = ((buf[0] ^ buf[3]) & 0x01) ? 1 : 0;
 			hw->down = ((buf[0] ^ buf[3]) & 0x02) ? 1 : 0;
@@ -568,6 +576,9 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 
 	input_report_key(dev, BTN_LEFT, hw.left);
 	input_report_key(dev, BTN_RIGHT, hw.right);
+
+	if (SYN_CAP_MIDDLE_BUTTON(priv->capabilities))
+		input_report_key(dev, BTN_MIDDLE, hw.middle);
 
 	if (SYN_CAP_FOUR_BUTTON(priv->capabilities)) {
 		input_report_key(dev, BTN_FORWARD, hw.up);

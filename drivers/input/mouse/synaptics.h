@@ -44,6 +44,7 @@ extern void synaptics_reset(struct psmouse *psmouse);
 
 /* synaptics capability bits */
 #define SYN_CAP_EXTENDED(c)		((c) & (1 << 23))
+#define SYN_CAP_MIDDLE_BUTTON(c)	((c) & (1 << 18))
 #define SYN_CAP_PASS_THROUGH(c)		((c) & (1 << 7))
 #define SYN_CAP_SLEEP(c)		((c) & (1 << 4))
 #define SYN_CAP_FOUR_BUTTON(c)		((c) & (1 << 3))
@@ -88,6 +89,7 @@ struct synaptics_hw_state {
 	int w;
 	unsigned int left:1;
 	unsigned int right:1;
+	unsigned int middle:1;
 	unsigned int up:1;
 	unsigned int down:1;
 	unsigned char ext_buttons;
