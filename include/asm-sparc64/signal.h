@@ -145,7 +145,7 @@ struct sigstack {
 #define SA_INTERRUPT	0x10
 #define SA_NOMASK	0x20
 #define SA_SHIRQ	0x40
-#define SA_NOCLDWAIT    0x100 /* not supported yet */
+#define SA_NOCLDWAIT    0x100
 #define SA_SIGINFO      0x200
 
 
