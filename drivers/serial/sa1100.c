@@ -602,22 +602,22 @@ sa1100_verify_port(struct uart_port *port, struct serial_struct *ser)
 }
 
 static struct uart_ops sa1100_pops = {
-	tx_empty:	sa1100_tx_empty,
-	set_mctrl:	sa1100_set_mctrl,
-	get_mctrl:	sa1100_get_mctrl,
-	stop_tx:	sa1100_stop_tx,
-	start_tx:	sa1100_start_tx,
-	stop_rx:	sa1100_stop_rx,
-	enable_ms:	sa1100_enable_ms,
-	break_ctl:	sa1100_break_ctl,
-	startup:	sa1100_startup,
-	shutdown:	sa1100_shutdown,
-	change_speed:	sa1100_change_speed,
-	type:		sa1100_type,
-	release_port:	sa1100_release_port,
-	request_port:	sa1100_request_port,
-	config_port:	sa1100_config_port,
-	verify_port:	sa1100_verify_port,
+	.tx_empty	= sa1100_tx_empty,
+	.set_mctrl	= sa1100_set_mctrl,
+	.get_mctrl	= sa1100_get_mctrl,
+	.stop_tx	= sa1100_stop_tx,
+	.start_tx	= sa1100_start_tx,
+	.stop_rx	= sa1100_stop_rx,
+	.enable_ms	= sa1100_enable_ms,
+	.break_ctl	= sa1100_break_ctl,
+	.startup	= sa1100_startup,
+	.shutdown	= sa1100_shutdown,
+	.change_speed	= sa1100_change_speed,
+	.type		= sa1100_type,
+	.release_port	= sa1100_release_port,
+	.request_port	= sa1100_request_port,
+	.config_port	= sa1100_config_port,
+	.verify_port	= sa1100_verify_port,
 };
 
 static struct sa1100_port sa1100_ports[NR_PORTS];
@@ -820,12 +820,12 @@ sa1100_console_setup(struct console *co, char *options)
 }
 
 static struct console sa1100_console = {
-	name:		"ttySA",
-	write:		sa1100_console_write,
-	device:		sa1100_console_device,
-	setup:		sa1100_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "ttySA",
+	.write		= sa1100_console_write,
+	.device		= sa1100_console_device,
+	.setup		= sa1100_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 void __init sa1100_rs_console_init(void)
@@ -840,17 +840,17 @@ void __init sa1100_rs_console_init(void)
 #endif
 
 static struct uart_driver sa1100_reg = {
-	owner:			THIS_MODULE,
-	driver_name:		"ttySA",
+	.owner			= THIS_MODULE,
+	.driver_name		= "ttySA",
 #ifdef CONFIG_DEVFS_FS
-	dev_name:		"ttySA%d",
+	.dev_name		= "ttySA%d",
 #else
-	dev_name:		"ttySA",
+	.dev_name		= "ttySA",
 #endif
-	major:			SERIAL_SA1100_MAJOR,
-	minor:			MINOR_START,
-	nr:			NR_PORTS,
-	cons:			SA1100_CONSOLE,
+	.major			= SERIAL_SA1100_MAJOR,
+	.minor			= MINOR_START,
+	.nr			= NR_PORTS,
+	.cons			= SA1100_CONSOLE,
 };
 
 static int __init sa1100_serial_init(void)

@@ -418,39 +418,39 @@ static int clps711xuart_request_port(struct uart_port *port)
 }
 
 static struct uart_ops clps711x_pops = {
-	tx_empty:	clps711xuart_tx_empty,
-	set_mctrl:	clps711xuart_set_mctrl_null,
-	get_mctrl:	clps711xuart_get_mctrl,
-	stop_tx:	clps711xuart_stop_tx,
-	start_tx:	clps711xuart_start_tx,
-	stop_rx:	clps711xuart_stop_rx,
-	enable_ms:	clps711xuart_enable_ms,
-	break_ctl:	clps711xuart_break_ctl,
-	startup:	clps711xuart_startup,
-	shutdown:	clps711xuart_shutdown,
-	change_speed:	clps711xuart_change_speed,
-	type:		clps711xuart_type,
-	config_port:	clps711xuart_config_port,
-	release_port:	clps711xuart_release_port,
-	request_port:	clps711xuart_request_port,
+	.tx_empty	= clps711xuart_tx_empty,
+	.set_mctrl	= clps711xuart_set_mctrl_null,
+	.get_mctrl	= clps711xuart_get_mctrl,
+	.stop_tx	= clps711xuart_stop_tx,
+	.start_tx	= clps711xuart_start_tx,
+	.stop_rx	= clps711xuart_stop_rx,
+	.enable_ms	= clps711xuart_enable_ms,
+	.break_ctl	= clps711xuart_break_ctl,
+	.startup	= clps711xuart_startup,
+	.shutdown	= clps711xuart_shutdown,
+	.change_speed	= clps711xuart_change_speed,
+	.type		= clps711xuart_type,
+	.config_port	= clps711xuart_config_port,
+	.release_port	= clps711xuart_release_port,
+	.request_port	= clps711xuart_request_port,
 };
 
 static struct uart_port clps711x_ports[UART_NR] = {
 	{
-		iobase:		SYSCON1,
-		irq:		IRQ_UTXINT1, /* IRQ_URXINT1, IRQ_UMSINT */
-		uartclk:	3686400,
-		fifosize:	16,
-		ops:		&clps711x_pops,
-		flags:		ASYNC_BOOT_AUTOCONF,
+		.iobase		= SYSCON1,
+		.irq		= IRQ_UTXINT1, /* IRQ_URXINT1, IRQ_UMSINT */
+		.uartclk	= 3686400,
+		.fifosize	= 16,
+		.ops		= &clps711x_pops,
+		.flags		= ASYNC_BOOT_AUTOCONF,
 	},
 	{
-		iobase:		SYSCON2,
-		irq:		IRQ_UTXINT2, /* IRQ_URXINT2 */
-		uartclk:	3686400,
-		fifosize:	16,
-		ops:		&clps711x_pops,
-		flags:		ASYNC_BOOT_AUTOCONF,
+		.iobase		= SYSCON2,
+		.irq		= IRQ_UTXINT2, /* IRQ_URXINT2 */
+		.uartclk	= 3686400,
+		.fifosize	= 16,
+		.ops		= &clps711x_pops,
+		.flags		= ASYNC_BOOT_AUTOCONF,
 	}
 };
 
@@ -560,12 +560,12 @@ static int __init clps711xuart_console_setup(struct console *co, char *options)
 }
 
 static struct console clps711x_console = {
-	name:		SERIAL_CLPS711X_NAME,
-	write:		clps711xuart_console_write,
-	device:		clps711xuart_console_device,
-	setup:		clps711xuart_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= SERIAL_CLPS711X_NAME,
+	.write		= clps711xuart_console_write,
+	.device		= clps711xuart_console_device,
+	.setup		= clps711xuart_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 void __init clps711xuart_console_init(void)
@@ -579,18 +579,18 @@ void __init clps711xuart_console_init(void)
 #endif
 
 static struct uart_driver clps711x_reg = {
-	driver_name:		"ttyCL",
+	.driver_name		= "ttyCL",
 #ifdef CONFIG_DEVFS_FS
-	dev_name:		SERIAL_CLPS711X_NAME,
+	.dev_name		= SERIAL_CLPS711X_NAME,
 #else
-	dev_name:		SERIAL_CLPS711X_NAME,
+	.dev_name		= SERIAL_CLPS711X_NAME,
 #endif
 
-	major:			SERIAL_CLPS711X_MAJOR,
-	minor:			SERIAL_CLPS711X_MINOR,
-	nr:			UART_NR,
+	.major			= SERIAL_CLPS711X_MAJOR,
+	.minor			= SERIAL_CLPS711X_MINOR,
+	.nr			= UART_NR,
 
-	cons:			CLPS711X_CONSOLE,
+	.cons			= CLPS711X_CONSOLE,
 };
 
 static int __init clps711xuart_init(void)
