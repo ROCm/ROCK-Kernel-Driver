@@ -105,6 +105,31 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 }
 
 
+#ifdef CONFIG_PCI_MMCONFIG
+static int __init acpi_parse_mcfg(unsigned long phys_addr, unsigned long size)
+{
+	struct acpi_table_mcfg *mcfg;
+
+	if (!phys_addr || !size)
+		return -EINVAL;
+
+	mcfg = (struct acpi_table_mcfg *) __acpi_map_table(phys_addr, size);
+	if (!mcfg) {
+		printk(KERN_WARNING PREFIX "Unable to map MCFG\n");
+		return -ENODEV;
+	}
+
+	if (mcfg->base_reserved) {
+		printk(KERN_ERR PREFIX "MMCONFIG not in low 4GB of memory\n");
+		return -ENODEV;
+	}
+
+	pci_mmcfg_base_addr = mcfg->base_address;
+
+	return 0;
+}
+#endif /* CONFIG_PCI_MMCONFIG */
+
 #ifdef CONFIG_X86_LOCAL_APIC
 static int __init
 acpi_parse_madt (
@@ -643,6 +668,12 @@ acpi_boot_init (void)
 
 #ifdef CONFIG_HPET_TIMER
 	(void) acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
+#endif
+
+#ifdef CONFIG_PCI_MMCONFIG
+	error = acpi_table_parse(ACPI_MCFG, acpi_parse_mcfg);
+	if (error)
+		printk(KERN_ERR PREFIX "Error %d parsing MCFG\n", error);
 #endif
 
 	return 0;
