@@ -1818,7 +1818,7 @@ lec_arp_expire_arp(unsigned long data)
 static void
 lec_arp_expire_vcc(unsigned long data)
 {
-	unsigned flags;
+	unsigned long flags;
         struct lec_arp_table *to_remove = (struct lec_arp_table*)data;
         struct lec_priv *priv = (struct lec_priv *)to_remove->priv;
         struct lec_arp_table *entry = NULL;
