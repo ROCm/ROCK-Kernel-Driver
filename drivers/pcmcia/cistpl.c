@@ -87,8 +87,8 @@ void release_cis_mem(struct pcmcia_socket *s)
     if (s->cis_mem.sys_start != 0) {
 	s->cis_mem.flags &= ~MAP_ACTIVE;
 	s->ss_entry->set_mem_map(s, &s->cis_mem);
-	if (!(s->cap.features & SS_CAP_STATIC_MAP))
-	    release_mem_region(s->cis_mem.sys_start, s->cap.map_size);
+	if (!(s->features & SS_CAP_STATIC_MAP))
+	    release_mem_region(s->cis_mem.sys_start, s->map_size);
 	iounmap(s->cis_virt);
 	s->cis_mem.sys_start = 0;
 	s->cis_virt = NULL;
@@ -104,26 +104,26 @@ static unsigned char *
 set_cis_map(struct pcmcia_socket *s, unsigned int card_offset, unsigned int flags)
 {
     pccard_mem_map *mem = &s->cis_mem;
-    if (!(s->cap.features & SS_CAP_STATIC_MAP) &&
+    if (!(s->features & SS_CAP_STATIC_MAP) &&
 	mem->sys_start == 0) {
-	int low = !(s->cap.features & SS_CAP_PAGE_REGS);
+	int low = !(s->features & SS_CAP_PAGE_REGS);
 	validate_mem(s);
 	mem->sys_start = 0;
-	if (find_mem_region(&mem->sys_start, s->cap.map_size,
-			    s->cap.map_size, low, "card services", s)) {
+	if (find_mem_region(&mem->sys_start, s->map_size,
+			    s->map_size, low, "card services", s)) {
 	    printk(KERN_NOTICE "cs: unable to map card memory!\n");
 	    return NULL;
 	}
-	mem->sys_stop = mem->sys_start+s->cap.map_size-1;
-	s->cis_virt = ioremap(mem->sys_start, s->cap.map_size);
+	mem->sys_stop = mem->sys_start+s->map_size-1;
+	s->cis_virt = ioremap(mem->sys_start, s->map_size);
     }
     mem->card_start = card_offset;
     mem->flags = flags;
     s->ss_entry->set_mem_map(s, mem);
-    if (s->cap.features & SS_CAP_STATIC_MAP) {
+    if (s->features & SS_CAP_STATIC_MAP) {
 	if (s->cis_virt)
 	    iounmap(s->cis_virt);
-	s->cis_virt = ioremap(mem->sys_start, s->cap.map_size);
+	s->cis_virt = ioremap(mem->sys_start, s->map_size);
     }
     return s->cis_virt;
 }
@@ -178,21 +178,21 @@ int read_cis_mem(struct pcmcia_socket *s, int attr, u_int addr,
 	    addr *= 2;
 	}
 
-	card_offset = addr & ~(s->cap.map_size-1);
+	card_offset = addr & ~(s->map_size-1);
 	while (len) {
 	    sys = set_cis_map(s, card_offset, flags);
 	    if (!sys) {
 		memset(ptr, 0xff, len);
 		return -1;
 	    }
-	    end = sys + s->cap.map_size;
-	    sys = sys + (addr & (s->cap.map_size-1));
+	    end = sys + s->map_size;
+	    sys = sys + (addr & (s->map_size-1));
 	    for ( ; len > 0; len--, buf++, sys += inc) {
 		if (sys == end)
 		    break;
 		*buf = readb(sys);
 	    }
-	    card_offset += s->cap.map_size;
+	    card_offset += s->map_size;
 	    addr = 0;
 	}
     }
@@ -239,20 +239,20 @@ void write_cis_mem(struct pcmcia_socket *s, int attr, u_int addr,
 	    addr *= 2;
 	}
 
-	card_offset = addr & ~(s->cap.map_size-1);
+	card_offset = addr & ~(s->map_size-1);
 	while (len) {
 	    sys = set_cis_map(s, card_offset, flags);
 	    if (!sys)
 		return; /* FIXME: error */
 
-	    end = sys + s->cap.map_size;
-	    sys = sys + (addr & (s->cap.map_size-1));
+	    end = sys + s->map_size;
+	    sys = sys + (addr & (s->map_size-1));
 	    for ( ; len > 0; len--, buf++, sys += inc) {
 		if (sys == end)
 		    break;
 		writeb(*buf, sys);
 	    }
-	    card_offset += s->cap.map_size;
+	    card_offset += s->map_size;
 	    addr = 0;
 	}
     }
@@ -418,7 +418,7 @@ int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
     tuple->TupleLink = tuple->Flags = 0;
 #ifdef CONFIG_CARDBUS
     if (s->state & SOCKET_CARDBUS) {
-	struct pci_dev *dev = s->cap.cb_dev;
+	struct pci_dev *dev = s->cb_dev;
 	u_int ptr;
 	pci_bus_read_config_dword(dev->subordinate, 0, PCI_CARDBUS_CIS, &ptr);
 	tuple->CISOffset = ptr & ~7;
