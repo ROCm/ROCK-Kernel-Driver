@@ -94,12 +94,15 @@
 #define I810_BACK    0x2
 #define I810_DEPTH   0x4
 
+typedef enum _drm_i810_init_func {
+	I810_INIT_DMA = 0x01,
+	I810_CLEANUP_DMA = 0x02,
+	I810_INIT_DMA_1_4 = 0x03
+ } drm_i810_init_func_t;
 
+/* This is the init structure after v1.2 */
 typedef struct _drm_i810_init {
-	enum {
-		I810_INIT_DMA = 0x01,
-		I810_CLEANUP_DMA = 0x02
-	} func;
+	drm_i810_init_func_t func;
 #if CONFIG_XFREE86_VERSION < XFREE86_VERSION(4,1,0,0)
 	int ring_map_idx;
 	int buffer_map_idx;
@@ -121,6 +124,24 @@ typedef struct _drm_i810_init {
 	unsigned int pitch;
 	unsigned int pitch_bits; 
 } drm_i810_init_t;
+
+/* This is the init structure prior to v1.2 */
+typedef struct _drm_i810_pre12_init {
+	drm_i810_init_func_t func;
+	unsigned int mmio_offset;
+	unsigned int buffers_offset;
+	int sarea_priv_offset;
+	unsigned int ring_start;
+	unsigned int ring_end;
+	unsigned int ring_size;
+	unsigned int front_offset;
+	unsigned int back_offset;
+	unsigned int depth_offset;
+	unsigned int w;
+	unsigned int h;
+	unsigned int pitch;
+	unsigned int pitch_bits; 
+} drm_i810_pre12_init_t;
 
 /* Warning: If you change the SAREA structure you must change the Xserver
  * structure as well */

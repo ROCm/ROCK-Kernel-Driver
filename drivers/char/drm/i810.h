@@ -55,9 +55,10 @@
  * 1.2.1 - Disable copying code (leave stub ioctls for backwards compatibility)
  *       - Remove requirement for interrupt (leave stubs again)
  * 1.3   - Add page flipping.
+ * 1.4   - fix DRM interface
  */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		3
+#define DRIVER_MINOR		4
 #define DRIVER_PATCHLEVEL	0
 
 #define DRIVER_IOCTLS							    \

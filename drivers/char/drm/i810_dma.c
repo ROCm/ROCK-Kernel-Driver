@@ -443,6 +443,49 @@ static int i810_dma_initialize(drm_device_t *dev,
    	return 0;
 }
 
+/* i810 DRM version 1.1 used a smaller init structure with different
+ * ordering of values than is currently used (drm >= 1.2). There is
+ * no defined way to detect the XFree version to correct this problem,
+ * however by checking using this procedure we can detect the correct
+ * thing to do.
+ *
+ * #1 Read the Smaller init structure from user-space
+ * #2 Verify the overlay_physical is a valid physical address, or NULL
+ *    If it isn't then we have a v1.1 client. Fix up params.
+ *    If it is, then we have a 1.2 client... get the rest of the data.
+ */
+int i810_dma_init_compat(drm_i810_init_t *init, unsigned long arg)
+{
+
+	/* Get v1.1 init data */
+	if (copy_from_user(init, (drm_i810_pre12_init_t *)arg,
+			  sizeof(drm_i810_pre12_init_t))) {
+		return -EFAULT;
+	}
+
+	if ((!init->overlay_physical) || (init->overlay_physical > 4096)) {
+
+		/* This is a v1.2 client, just get the v1.2 init data */
+		DRM_INFO("Using POST v1.2 init.\n");
+		if(copy_from_user(init, (drm_i810_init_t *)arg,
+				  sizeof(drm_i810_init_t))) {
+			return -EFAULT;
+		}
+	} else {
+
+		/* This is a v1.1 client, fix the params */
+		DRM_INFO("Using PRE v1.2 init.\n");
+	 	init->pitch_bits = init->h;
+	 	init->pitch = init->w;
+	 	init->h = init->overlay_physical;
+	 	init->w = init->overlay_offset;
+	 	init->overlay_physical = 0;
+	 	init->overlay_offset = 0;
+	}
+
+	return 0;
+}
+
 int i810_dma_init(struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg)
 {
@@ -452,22 +495,46 @@ int i810_dma_init(struct inode *inode, struct file *filp,
    	drm_i810_init_t init;
    	int retcode = 0;
 
-  	if (copy_from_user(&init, (drm_i810_init_t *)arg, sizeof(init)))
+	/* Get only the init func */
+  	if (copy_from_user(&init, (void *)arg, sizeof(drm_i810_init_func_t)))
 		return -EFAULT;
 
    	switch(init.func) {
 	 	case I810_INIT_DMA:
+	 	       	/* This case is for backward compatibility. It
+			 * handles XFree 4.1.0 and 4.2.0, and has to
+			 * do some parameter checking as described below.
+			 * It will someday go away.
+			 */
+			retcode = i810_dma_init_compat(&init, arg);
+			if (retcode)
+				return retcode;
+
 	   		dev_priv = DRM(alloc)(sizeof(drm_i810_private_t),
 					     DRM_MEM_DRIVER);
-	   		if(dev_priv == NULL) return -ENOMEM;
+	   		if (dev_priv == NULL)
+	   			return -ENOMEM;
 	   		retcode = i810_dma_initialize(dev, dev_priv, &init);
-	   	break;
+		   	break;
+
+		default:
+	 	case I810_INIT_DMA_1_4:
+			DRM_INFO("Using v1.4 init.\n");
+  			if (copy_from_user(&init, (drm_i810_init_t *)arg,
+					  sizeof(drm_i810_init_t))) {
+				return -EFAULT;
+			}
+	   		dev_priv = DRM(alloc)(sizeof(drm_i810_private_t),
+					     DRM_MEM_DRIVER);
+	   		if (dev_priv == NULL)
+	   			return -ENOMEM;
+	   		retcode = i810_dma_initialize(dev, dev_priv, &init);
+		   	break;
+
 	 	case I810_CLEANUP_DMA:
+		        DRM_INFO("DMA Cleanup\n");
 	   		retcode = i810_dma_cleanup(dev);
-	   	break;
-	 	default:
-	   		retcode = -EINVAL;
-	   	break;
+		   	break;
 	}
 
    	return retcode;
@@ -477,12 +544,16 @@ int i810_dma_init(struct inode *inode, struct file *filp,
 
 /* Most efficient way to verify state for the i810 is as it is
  * emitted.  Non-conformant state is silently dropped.
+ *
+ * Use 'volatile' & local var tmp to force the emitted values to be
+ * identical to the verified ones.
  */
 static void i810EmitContextVerified( drm_device_t *dev,
-				     unsigned int *code )
+				     volatile unsigned int *code )
 {
    	drm_i810_private_t *dev_priv = dev->dev_private;
 	int i, j = 0;
+	unsigned int tmp;
 	RING_LOCALS;
 
 	BEGIN_LP_RING( I810_CTX_SETUP_SIZE );
@@ -494,10 +565,12 @@ static void i810EmitContextVerified( drm_device_t *dev,
 	OUT_RING( code[I810_CTXREG_ST1] );
 
 	for ( i = 4 ; i < I810_CTX_SETUP_SIZE ; i++ ) {
-		if ((code[i] & (7<<29)) == (3<<29) &&
-		    (code[i] & (0x1f<<24)) < (0x1d<<24))
+		tmp = code[i];
+
+		if ((tmp & (7<<29)) == (3<<29) &&
+		    (tmp & (0x1f<<24)) < (0x1d<<24))
 		{
-			OUT_RING( code[i] );
+			OUT_RING( tmp );
 			j++;
 		}
 		else printk("constext state dropped!!!\n");
@@ -514,6 +587,7 @@ static void i810EmitTexVerified( drm_device_t *dev,
 {
    	drm_i810_private_t *dev_priv = dev->dev_private;
 	int i, j = 0;
+	unsigned int tmp;
 	RING_LOCALS;
 
 	BEGIN_LP_RING( I810_TEX_SETUP_SIZE );
@@ -524,11 +598,12 @@ static void i810EmitTexVerified( drm_device_t *dev,
 	OUT_RING( code[I810_TEXREG_MI3] );
 
 	for ( i = 4 ; i < I810_TEX_SETUP_SIZE ; i++ ) {
+		tmp = code[i];
 
-		if ((code[i] & (7<<29)) == (3<<29) &&
-		    (code[i] & (0x1f<<24)) < (0x1d<<24))
+		if ((tmp & (7<<29)) == (3<<29) &&
+		    (tmp & (0x1f<<24)) < (0x1d<<24))
 		{
-			OUT_RING( code[i] );
+			OUT_RING( tmp );
 			j++;
 		}
 		else printk("texture state dropped!!!\n");
@@ -556,9 +631,9 @@ static void i810EmitDestVerified( drm_device_t *dev,
 	if (tmp == dev_priv->front_di1 || tmp == dev_priv->back_di1) {
 		OUT_RING( CMD_OP_DESTBUFFER_INFO );
 		OUT_RING( tmp );
-	} 
-	else
-	   printk("buffer state dropped\n");
+	} else
+	   DRM_DEBUG("bad di1 %x (allow %x or %x)\n",
+		     tmp, dev_priv->front_di1, dev_priv->back_di1);
 
 	/* invarient:
 	 */
@@ -986,6 +1061,9 @@ int i810_dma_vertex(struct inode *inode, struct file *filp,
 		return -EINVAL;
 	}
 
+	DRM_DEBUG("i810 dma vertex, idx %d used %d discard %d\n",
+		  vertex.idx, vertex.used, vertex.discard);
+
 	if(vertex.idx < 0 || vertex.idx > dma->buf_count) return -EINVAL;
 
 	i810_dma_dispatch_vertex( dev,
@@ -1034,6 +1112,8 @@ int i810_swap_bufs(struct inode *inode, struct file *filp,
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;
 
+	DRM_DEBUG("i810_swap_bufs\n");
+
    	if(!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock)) {
 		DRM_ERROR("i810_swap_buf called without lock held\n");
 		return -EINVAL;
@@ -1080,6 +1160,9 @@ int i810_getbuf(struct inode *inode, struct file *filp, unsigned int cmd,
 	d.granted = 0;
 
 	retcode = i810_dma_get_buffer(dev, &d, filp);
+
+	DRM_DEBUG("i810_dma: %d returning %d, granted = %d\n",
+		  current->pid, retcode, d.granted);
 
 	if (copy_to_user((drm_dma_t *)arg, &d, sizeof(d)))
 		return -EFAULT;
