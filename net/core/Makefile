@@ -16,7 +16,8 @@ obj-$(CONFIG_FILTER) += filter.o
 
 obj-$(CONFIG_NET) += dev.o dev_mcast.o dst.o neighbour.o rtnetlink.o utils.o
 
-ifneq ($(CONFIG_LLC),n)
+# See p8022 in net/802/Makefile for config options to check
+ifneq ($(CONFIG_LLC)$(CONFIG_TR)$(CONFIG_IPX)$(CONFIG_ATALK),)
 obj-y += ext8022.o
 endif
 
