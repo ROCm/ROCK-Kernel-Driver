@@ -372,6 +372,7 @@ void fastcall __put_ioctx(struct kioctx *ctx)
 	if (unlikely(ctx->reqs_active))
 		BUG();
 
+	cancel_delayed_work(&ctx->wq);
 	flush_workqueue(aio_wq);
 	aio_free_ring(ctx);
 	mmdrop(ctx->mm);

@@ -34,6 +34,7 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 				       that will be inserted in the
 				       tree. */
 
+    BUG_ON (!th->t_trans_id);
 
     REISERFS_SB(sb)->s_direct2indirect ++;
 
@@ -162,42 +163,6 @@ void reiserfs_unmap_buffer(struct buffer_head *bh) {
     unlock_buffer(bh) ;
 }
 
-static void
-unmap_buffers(struct page *page, loff_t pos) {
-  struct buffer_head *bh ;
-  struct buffer_head *head ;
-  struct buffer_head *next ;
-  unsigned long tail_index ;
-  unsigned long cur_index ;
-
-  if (page) {
-    if (page_has_buffers(page)) {
-      tail_index = pos & (PAGE_CACHE_SIZE - 1) ;
-      cur_index = 0 ;
-      head = page_buffers(page) ;
-      bh = head ;
-      do {
-	next = bh->b_this_page ;
-
-        /* we want to unmap the buffers that contain the tail, and
-        ** all the buffers after it (since the tail must be at the
-        ** end of the file).  We don't want to unmap file data 
-        ** before the tail, since it might be dirty and waiting to 
-        ** reach disk
-        */
-        cur_index += bh->b_size ;
-        if (cur_index > tail_index) {
-          reiserfs_unmap_buffer(bh) ;
-        }
-	bh = next ;
-      } while (bh != head) ;
-      if ( PAGE_SIZE == bh->b_size ) {
-	clear_page_dirty(page);
-      }
-    }
-  } 
-}
-
 /* this first locks inode (neither reads nor sync are permitted),
    reads tail through page cache, insert direct item. When direct item
    inserted successfully inode is left locked. Return value is always
@@ -219,6 +184,8 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
     int tail_len, round_tail_len;
     loff_t pos, pos1; /* position of first byte of the tail */
     struct cpu_key key;
+
+    BUG_ON (!th->t_trans_id);
 
     REISERFS_SB(p_s_sb)->s_indirect2direct ++;
 
@@ -286,11 +253,6 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
 	return n_block_size - round_tail_len;
     }
     kunmap(page) ;
-
-    /* this will invalidate all the buffers in the page after
-    ** pos1
-    */
-    unmap_buffers(page, pos1) ;
 
     /* make sure to get the i_blocks changes from reiserfs_insert_item */
     reiserfs_update_sd(th, p_s_inode);
