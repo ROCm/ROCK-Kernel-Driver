@@ -14,6 +14,7 @@
 #include <linux/time.h>
 #include <linux/aio_abi.h>
 #include <linux/module.h>
+#include <linux/syscalls.h>
 
 #define DEBUG 0
 

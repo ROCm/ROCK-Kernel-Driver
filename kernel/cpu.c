@@ -124,6 +124,15 @@ int cpu_down(unsigned int cpu)
 		goto out;
 	}
 
+	err = notifier_call_chain(&cpu_chain, CPU_DOWN_PREPARE,
+						(void *)(long)cpu);
+	if (err == NOTIFY_BAD) {
+		printk("%s: attempt to take down CPU %u failed\n",
+				__FUNCTION__, cpu);
+		err = -EINVAL;
+		goto out;
+	}
+
 	/* Ensure that we are not runnable on dying cpu */
 	old_allowed = current->cpus_allowed;
 	tmp = CPU_MASK_ALL;
@@ -132,6 +141,11 @@ int cpu_down(unsigned int cpu)
 
 	p = __stop_machine_run(take_cpu_down, NULL, cpu);
 	if (IS_ERR(p)) {
+		/* CPU didn't die: tell everyone.  Can't complain. */
+		if (notifier_call_chain(&cpu_chain, CPU_DOWN_FAILED,
+				(void *)(long)cpu) == NOTIFY_BAD)
+			BUG();
+
 		err = PTR_ERR(p);
 		goto out_allowed;
 	}

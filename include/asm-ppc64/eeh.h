@@ -256,10 +256,6 @@ static inline void eeh_memcpy_toio(volatile void __iomem *dest, const void *src,
 
 #undef EEH_CHECK_ALIGN
 
-#define MAX_ISA_PORT 0x10000
-extern unsigned long io_page_mask;
-#define _IO_IS_VALID(port) ((port) >= MAX_ISA_PORT || (1 << (port>>PAGE_SHIFT)) & io_page_mask)
-
 static inline u8 eeh_inb(unsigned long port) {
 	u8 val;
 	if (!_IO_IS_VALID(port))

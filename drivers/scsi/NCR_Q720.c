@@ -358,13 +358,19 @@ struct mca_driver NCR_Q720_driver = {
 static int __init
 NCR_Q720_init(void)
 {
-	return mca_register_driver(&NCR_Q720_driver);
+	int ret = ncr53c8xx_init();
+	if (!ret)
+		ret = mca_register_driver(&NCR_Q720_driver);
+	if (ret)
+		ncr53c8xx_exit();
+	return ret;
 }
 
 static void __exit
 NCR_Q720_exit(void)
 {
 	mca_unregister_driver(&NCR_Q720_driver);
+	ncr53c8xx_exit();
 }
 
 module_init(NCR_Q720_init);

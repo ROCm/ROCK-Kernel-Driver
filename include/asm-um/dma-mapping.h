@@ -1,6 +1,8 @@
 #ifndef _ASM_DMA_MAPPING_H
 #define _ASM_DMA_MAPPING_H
 
+#include <asm/scatterlist.h>
+
 static inline int
 dma_supported(struct device *dev, u64 mask)
 {

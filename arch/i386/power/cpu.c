@@ -148,6 +148,6 @@ void restore_processor_state(void)
 	__restore_processor_state(&saved_context);
 }
 
-
+/* Needed by apm.c */
 EXPORT_SYMBOL(save_processor_state);
 EXPORT_SYMBOL(restore_processor_state);

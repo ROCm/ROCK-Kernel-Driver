@@ -1527,7 +1527,7 @@ sys_call_table:
 	data8 sys_mq_getsetattr
 	data8 sys_ni_syscall			// reserved for kexec_load
 	data8 sys_ni_syscall
-	data8 sys_ni_syscall			// 1270
+	data8 sys_setaltroot			// 1270
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall

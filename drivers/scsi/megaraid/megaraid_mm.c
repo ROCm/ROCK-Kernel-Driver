@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid_mm.c
- * Version	: v2.20.2.0 (August 19 2004)
+ * Version	: v2.20.2.1 (Oct 06 2004)
  *
  * Common management module
  */
@@ -60,7 +60,7 @@ EXPORT_SYMBOL(mraid_mm_register_adp);
 EXPORT_SYMBOL(mraid_mm_unregister_adp);
 
 static int majorno;
-static uint32_t drvr_ver	= 0x02200100;
+static uint32_t drvr_ver	= 0x02200201;
 
 static int adapters_count_g;
 static struct list_head adapters_list_g;
@@ -1120,9 +1120,7 @@ mraid_mm_init(void)
 
 	INIT_LIST_HEAD(&adapters_list_g);
 
-#ifdef CONFIG_COMPAT
 	register_ioctl32_conversion(MEGAIOCCMD, mraid_mm_compat_ioctl);
-#endif
 
 	return 0;
 }

@@ -4,7 +4,7 @@
  * PPC440GX system library
  *
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
- * Copyright (c) 2003 Zultys Technologies
+ * Copyright (c) 2003, 2004 Zultys Technologies
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -36,6 +36,9 @@ void ibm440gx_l2c_enable(void) __init;
 
 /* Disable L2 cache */
 void ibm440gx_l2c_disable(void) __init;
+
+/* Enable/disable L2 cache for a particular chip revision */
+void ibm440gx_l2c_setup(struct ibm44x_clocks*) __init;
 
 /* Get Ethernet Group */
 int ibm440gx_get_eth_grp(void) __init;

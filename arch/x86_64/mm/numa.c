@@ -264,11 +264,13 @@ __init int numa_setup(char *opt)
 { 
 	if (!strcmp(opt,"off"))
 		numa_off = 1;
+#ifdef CONFIG_NUMA_EMU
 	if(!strncmp(opt, "fake=", 5)) {
 		numa_fake = simple_strtoul(opt+5,NULL,0); ;
 		if (numa_fake >= MAX_NUMNODES)
 			numa_fake = MAX_NUMNODES;
 	}
+#endif
 	return 1;
 } 
 

@@ -61,7 +61,12 @@ EXPORT_SYMBOL(board_pci_channels);
 static struct sh7751_pci_address_map sh7751_pci_map = {
 	.window0	= {
 		.base	= SH7751_CS3_BASE_ADDR,
-		.size	= 0x03f00000,
+		.size	= 0x04000000,
+	},
+
+	.window1	= {
+		.base	= 0x00000000,	/* Unused */
+		.size	= 0x00000000,	/* Unused */
 	},
 
 	.flags	= SH7751_PCIC_NO_RESET,

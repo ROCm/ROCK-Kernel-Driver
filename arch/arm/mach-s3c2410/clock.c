@@ -46,6 +46,12 @@
 
 #include "clock.h"
 
+/* clock information */
+
+unsigned long s3c24xx_xtal = 12*1000*1000;	/* default 12MHz */
+unsigned long s3c24xx_fclk;
+unsigned long s3c24xx_hclk;
+unsigned long s3c24xx_pclk;
 
 static LIST_HEAD(clocks);
 static DECLARE_MUTEX(clocks_sem);
@@ -277,9 +283,9 @@ static int __init s3c2410_init_clocks(void)
 
 	/* initialise the main system clocks */
 
-	clk_h.rate = s3c2410_hclk;
-	clk_p.rate = s3c2410_pclk;
-	clk_f.rate = s3c2410_fclk;
+	clk_h.rate = s3c24xx_hclk;
+	clk_p.rate = s3c24xx_pclk;
+	clk_f.rate = s3c24xx_fclk;
 
 	/* set the enabled clocks to a minimal (known) state */
 	__raw_writel(S3C2410_CLKCON_PWMT | S3C2410_CLKCON_UART0 | S3C2410_CLKCON_UART1 | S3C2410_CLKCON_UART2 | S3C2410_CLKCON_GPIO | S3C2410_CLKCON_RTC, S3C2410_CLKCON);

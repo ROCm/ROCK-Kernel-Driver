@@ -179,6 +179,9 @@ static long restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig,
 	unsigned long err = 0;
 	unsigned long save_r13 = 0;
 	elf_greg_t *gregs = (elf_greg_t *)regs;
+#ifdef CONFIG_ALTIVEC
+	unsigned long msr;
+#endif
 	int i;
 
 	/* If this is not a signal return, we preserve the TLS in r13 */
@@ -204,13 +207,15 @@ static long restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig,
 
 #ifdef CONFIG_ALTIVEC
 	err |= __get_user(v_regs, &sc->v_regs);
+	err |= __get_user(msr, &sc->gp_regs[PT_MSR]);
 	if (err)
 		return err;
 	/* Copy 33 vec registers (vr0..31 and vscr) from the stack */
-	if (v_regs != 0 && (regs->msr & MSR_VEC) != 0)
-		err |= __copy_from_user(current->thread.vr, v_regs, 33 * sizeof(vector128));
+	if (v_regs != 0 && (msr & MSR_VEC) != 0)
+		err |= __copy_from_user(current->thread.vr, v_regs,
+					33 * sizeof(vector128));
 	else if (current->thread.used_vr)
-		memset(&current->thread.vr, 0, 33);
+		memset(current->thread.vr, 0, 33 * sizeof(vector128));
 	/* Always get VRSAVE back */
 	if (v_regs != 0)
 		err |= __get_user(current->thread.vrsave, (u32 __user *)&v_regs[33]);
@@ -218,6 +223,10 @@ static long restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig,
 		current->thread.vrsave = 0;
 #endif /* CONFIG_ALTIVEC */
 
+#ifndef CONFIG_SMP
+	last_task_used_math = NULL;
+	last_task_used_altivec = NULL;
+#endif
 	/* Force reload of FP/VEC */
 	regs->msr &= ~(MSR_FP | MSR_FE0 | MSR_FE1 | MSR_VEC);
 
@@ -420,7 +429,7 @@ static void setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 
 	/* Allocate a dummy caller frame for the signal handler. */
 	newsp = (unsigned long)frame - __SIGNAL_FRAMESIZE;
-	err |= put_user(0, (unsigned long __user *)newsp);
+	err |= put_user(regs->gpr[1], (unsigned long __user *)newsp);
 
 	/* Set up "regs" so we "return" to the signal handler. */
 	err |= get_user(regs->nip, &funct_desc_ptr->entry);

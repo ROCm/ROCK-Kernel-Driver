@@ -16,7 +16,6 @@
 #include <linux/notifier.h>
 #include <linux/init.h>
 #include <linux/sysrq.h>
-#include <linux/syscalls.h>
 #include <linux/interrupt.h>
 #include <linux/nmi.h>
 

@@ -104,7 +104,7 @@ s3c_lookup_cpu(unsigned long idcode)
 	int count;
 
 	tab = cpu_ids;
-	for (count = 0; count < ARRAY_SIZE(cpu_ids); count++) {
+	for (count = 0; count < ARRAY_SIZE(cpu_ids); count++, tab++) {
 		if ((idcode & tab->idmask) == tab->idcode)
 			return tab;
 	}

@@ -83,8 +83,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2004 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"3.01.16"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.16"
+#define MPT_LINUX_VERSION_COMMON	"3.01.17"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.17"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -206,7 +206,6 @@ typedef enum {
 	MPTSCSIH_DRIVER,	/* MPT SCSI host (initiator) class */
 	MPTLAN_DRIVER,		/* MPT LAN class */
 	MPTSTM_DRIVER,		/* MPT SCSI target mode class */
-	MPTDMP_DRIVER,		/* MPT Dynamic Multi-pathing class */
 	MPTUNKNOWN_DRIVER
 } MPT_DRIVER_CLASS;
 
@@ -226,8 +225,7 @@ struct mpt_pci_driver{
 
 typedef union _MPT_FRAME_TRACKER {
 	struct {
-		struct _MPT_FRAME_HDR	*forw;
-		struct _MPT_FRAME_HDR	*back;
+		struct list_head	list;
 		u32			 arg1;
 		u32			 pad;
 		void			*argp1;
@@ -290,15 +288,6 @@ typedef struct _MPT_FRAME_HDR {
 
 #define MPT_REQ_MSGFLAGS_DROPME		0x80
 
-/* Used for tracking the free request frames
- * and free reply frames.
- */
-typedef struct _MPT_Q_TRACKER {
-	MPT_FRAME_HDR	*head;
-	MPT_FRAME_HDR	*tail;
-} MPT_Q_TRACKER;
-
-
 typedef struct _MPT_SGL_HDR {
 	SGESimple32_t	 sge[1];
 } MPT_SGL_HDR;
@@ -307,16 +296,6 @@ typedef struct _MPT_SGL64_HDR {
 	SGESimple64_t	 sge[1];
 } MPT_SGL64_HDR;
 
-
-typedef struct _Q_ITEM {
-	struct _Q_ITEM	*forw;
-	struct _Q_ITEM	*back;
-} Q_ITEM;
-
-typedef struct _Q_TRACKER {
-	struct _Q_ITEM	*head;
-	struct _Q_ITEM	*tail;
-} Q_TRACKER;
 
 /*
  *  Chip-specific stuff... FC929 delineates break between
@@ -368,27 +347,6 @@ typedef struct _SYSIF_REGS
 /*
  *	Dynamic Multi-Pathing specific stuff...
  */
-#define DMP_MAX_PATHS	8
-
-typedef struct _PathInfo {
-	u8		 ioc;
-	u8		 target;
-	u8		 pad;
-	u8		 pflags;
-} PathInfo;
-
-#define PATHINFO_FLAGS_OWNED		0x01
-#define PATHINFO_FLAGS_EXISTS		0x02
-#define PATHINFO_FLAGS_AVAILABLE	0x04
-#define PATHINFO_FLAGS_SECONDARY	0x08
-
-#define PFLAGS_EXISTS_AND_AVAIL		(PATHINFO_FLAGS_EXISTS|PATHINFO_FLAGS_AVAILABLE)
-#define PFLAGS_AVAIL_AND_OWNED		(PATHINFO_FLAGS_AVAILABLE|PATHINFO_FLAGS_OWNED)
-
-typedef struct _ScsiCmndTracker {
-	void			*head;
-	void			*tail;
-} ScsiCmndTracker;
 
 /* VirtDevice negoFlags field */
 #define MPT_TARGET_NO_NEGO_WIDE		0x01
@@ -398,14 +356,9 @@ typedef struct _ScsiCmndTracker {
 
 /*
  *	VirtDevice - FC LUN device or SCSI target device
- *	(used to be FCSCSI_TARGET)
  */
 typedef struct _VirtDevice {
-	struct _VirtDevice	*forw;
-	struct _VirtDevice	*back;
 	struct scsi_device	*device;
-	rwlock_t		 VdevLock;
-	int			 ref_cnt;
 	u8			 tflags;
 	u8			 ioc_id;
 	u8			 target_id;
@@ -418,17 +371,8 @@ typedef struct _VirtDevice {
 	u8			 type;		/* byte 0 of Inquiry data */
 	u8			 cflags;	/* controller flags */
 	u8			 rsvd1raid;
-	int			 npaths;
 	u16			 fc_phys_lun;
 	u16			 fc_xlat_lun;
-	int			 stall_detected;
-	PathInfo		 path[DMP_MAX_PATHS];
-	struct timer_list	 stall_timer;
-	struct timer_list	 retry_timer;
-	struct timer_list	 gone_timer;
-	ScsiCmndTracker		 WaitQ;
-	ScsiCmndTracker		 SentQ;
-	ScsiCmndTracker		 DoneQ;
 	u32			 num_luns;
 	u32			 luns[8];		/* Max LUNs is 256 */
 	u8			 pad[4];
@@ -451,14 +395,6 @@ typedef struct _VirtDevice {
 #define MPT_TARGET_FLAGS_Q_YES		0x08
 #define MPT_TARGET_FLAGS_VALID_56	0x10
 #define MPT_TARGET_FLAGS_SAF_TE_ISSUED	0x20
-
-typedef struct _VirtDevTracker {
-	struct _VirtDevice	*head;
-	struct _VirtDevice	*tail;
-	rwlock_t		 VlistLock;
-	int			 pad;
-} VirtDevTracker;
-
 
 /*
  *	/proc/mpt interface
@@ -575,8 +511,6 @@ typedef	struct _ScsiCfgData {
  */
 typedef struct _MPT_ADAPTER
 {
-	struct _MPT_ADAPTER	*forw;
-	struct _MPT_ADAPTER	*back;
 	int			 id;		/* Unique adapter id N {0,1,2,...} */
 	int			 pci_irq;	/* This irq           */
 	char			 name[MPT_NAME_LENGTH];	/* "iocN"             */
@@ -607,7 +541,7 @@ typedef struct _MPT_ADAPTER
 	int			*ChainToChain;
 	u8			*ChainBuffer;
 	dma_addr_t		 ChainBufferDMA;
-	MPT_Q_TRACKER		 FreeChainQ;
+	struct list_head	 FreeChainQ;
 	spinlock_t		 FreeChainQlock;
 	CHIP_TYPE		 chip_type;
 		/* We (host driver) get to manage our own RequestQueue! */
@@ -617,7 +551,7 @@ typedef struct _MPT_ADAPTER
 	int			 req_depth;	/* Number of request frames */
 	int			 req_sz;	/* Request frame size (bytes) */
 	spinlock_t		 FreeQlock;
-	MPT_Q_TRACKER		 FreeQ;
+	struct list_head	 FreeQ;
 		/* Pool of SCSI sense buffers for commands coming from
 		 * the SCSI mid-layer.  We have one 256 byte sense buffer
 		 * for each REQ entry.
@@ -648,7 +582,7 @@ typedef struct _MPT_ADAPTER
 	struct _mpt_ioctl_events *events;	/* pointer to event log */
 	u8			*cached_fw;	/* Pointer to FW */
 	dma_addr_t	 	cached_fw_dma;
-	Q_TRACKER		 configQ;	/* linked list of config. requests */
+	struct list_head	 configQ;	/* linked list of config. requests */
 	int			 hs_reply_idx;
 #ifndef MFCNT
 	u32			 pad0;
@@ -674,12 +608,6 @@ typedef struct _MPT_ADAPTER
 	struct list_head	 list; 
 	struct net_device	*netdev;
 } MPT_ADAPTER;
-
-
-typedef struct _MPT_ADAPTER_TRACKER {
-	MPT_ADAPTER	*head;
-	MPT_ADAPTER	*tail;
-} MPT_ADAPTER_TRACKER;
 
 /*
  *  New return value convention:
@@ -902,41 +830,6 @@ typedef struct _mpt_sge {
 #define MPT_INDEX_2_RFPTR(ioc,idx) \
 	(MPT_FRAME_HDR*)( (u8*)(ioc)->reply_frames + (ioc)->req_sz * (idx) )
 
-#define Q_INIT(q,type)  (q)->head = (q)->tail = (type*)(q)
-#define Q_IS_EMPTY(q)   ((Q_ITEM*)(q)->head == (Q_ITEM*)(q))
-
-#define Q_ADD_TAIL(qt,i,type) { \
-	Q_TRACKER	*_qt = (Q_TRACKER*)(qt); \
-	Q_ITEM		*oldTail = _qt->tail; \
-	(i)->forw = (type*)_qt; \
-	(i)->back = (type*)oldTail; \
-	oldTail->forw = (Q_ITEM*)(i); \
-	_qt->tail = (Q_ITEM*)(i); \
-}
-
-#define Q_ADD_HEAD(qt,i,type) { \
-	Q_TRACKER	*_qt = (Q_TRACKER*)(qt); \
-	Q_ITEM		*oldHead = _qt->head; \
-	(i)->forw = (type*)oldHead; \
-	(i)->back = (type*)_qt; \
-	oldHead->back = (Q_ITEM*)(i); \
-	_qt->head = (Q_ITEM*)(i); \
-}
-
-#define Q_DEL_ITEM(i) { \
-	Q_ITEM  *_forw = (Q_ITEM*)(i)->forw; \
-	Q_ITEM  *_back = (Q_ITEM*)(i)->back; \
-	_back->forw = _forw; \
-	_forw->back = _back; \
-}
-
-#define SWAB4(value) \
-	(u32)(   (((value) & 0x000000ff) << 24) \
-	       | (((value) & 0x0000ff00) << 8)  \
-	       | (((value) & 0x00ff0000) >> 8)  \
-	       | (((value) & 0xff000000) >> 24) )
-
-
 #if defined(MPT_DEBUG) || defined(MPT_DEBUG_MSG_FRAME)
 #define DBG_DUMP_REPLY_FRAME(mfp) \
 	{	u32 *m = (u32 *)(mfp);					\
@@ -1017,13 +910,11 @@ typedef struct _MPT_SCSI_HOST {
 		/* Pool of memory for holding SCpnts before doing
 		 * OS callbacks. freeQ is the free pool.
 		 */
-	MPT_Q_TRACKER		  taskQ;		/* TM request Q */
-	int			  taskQcnt;
 	u8			  tmPending;
 	u8			  resetPending;
 	u8			  is_spi;		/* Parallel SCSI i/f */
 	u8			  negoNvram;		/* DV disabled, nego NVRAM */
-	u8			  is_multipath;		/* Multi-path compatible */
+	u8			  pad1;
 	u8                        tmState;
 	u8			  rsvd[2];
 	MPT_FRAME_HDR		 *tmPtr;		/* Ptr to TM request*/
@@ -1044,32 +935,12 @@ typedef struct _MPT_SCSI_HOST {
 /* Forward decl, a strange C thing, to prevent gcc compiler warnings */
 struct scsi_cmnd;
 
-/*
- *	DMP service layer structure / API interface
- */
-typedef struct _DmpServices {
-	VirtDevTracker	  VdevList;
-	struct semaphore *Daemon;
-	int		(*ScsiPathSelect)
-				(struct scsi_cmnd *, MPT_SCSI_HOST **hd, int *target, int *lun);
-	int		(*DmpIoDoneChk)
-				(MPT_SCSI_HOST *, struct scsi_cmnd *,
-				 SCSIIORequest_t *,
-				 SCSIIOReply_t *);
-	void		(*mptscsih_scanVlist)
-				(MPT_SCSI_HOST *, int portnum);
-	int		(*ScsiAbort)
-				(struct scsi_cmnd *);
-	int		(*ScsiBusReset)
-				(struct scsi_cmnd *);
-} DmpServices_t;
-
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
  * Generic structure passed to the base mpt_config function.
  */
 typedef struct _x_config_parms {
-	Q_ITEM			 linkage;	/* linked list */
+	struct list_head	 linkage;	/* linked list */
 	struct timer_list	 timer;		/* timer function for this request  */
 	ConfigPageHeader_t	*hdr;
 	dma_addr_t		 physAddr;
@@ -1099,10 +970,8 @@ extern MPT_FRAME_HDR	*mpt_get_msg_frame(int handle, MPT_ADAPTER *ioc);
 extern void	 mpt_free_msg_frame(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf);
 extern void	 mpt_put_msg_frame(int handle, MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf);
 extern void	 mpt_add_sge(char *pAddr, u32 flagslength, dma_addr_t dma_addr);
-extern void	 mpt_add_chain(char *pAddr, u8 next, u16 length, dma_addr_t dma_addr);
 
 extern int	 mpt_send_handshake_request(int handle, MPT_ADAPTER *ioc, int reqBytes, u32 *req, int sleepFlag);
-extern int	 mpt_handshake_req_reply_wait(MPT_ADAPTER *ioc, int reqBytes, u32 *req, int replyBytes, u16 *u16reply, int maxwait, int sleepFlag);
 extern int	 mpt_verify_adapter(int iocid, MPT_ADAPTER **iocpp);
 extern u32	 mpt_GetIocState(MPT_ADAPTER *ioc, int cooked);
 extern void	 mpt_print_ioc_summary(MPT_ADAPTER *ioc, char *buf, int *size, int len, int showlan);
@@ -1119,20 +988,12 @@ extern int	 mpt_read_ioc_pg_3(MPT_ADAPTER *ioc);
  */
 extern struct list_head	  ioc_list;
 extern struct proc_dir_entry	*mpt_proc_root_dir;
-extern DmpServices_t		*DmpService;
 
 extern int		  mpt_lan_index;	/* needed by mptlan.c */
 extern int		  mpt_stm_index;	/* needed by mptstm.c */
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 #endif		/* } __KERNEL__ */
-
-/*
- *  More (public) macros...
- */
-#ifndef offsetof
-#define offsetof(t, m)	((size_t) (&((t *)0)->m))
-#endif
 
 #if defined(__alpha__) || defined(__sparc_v9__) || defined(__ia64__) || defined(__x86_64__)
 #define CAST_U32_TO_PTR(x)	((void *)(u64)x)

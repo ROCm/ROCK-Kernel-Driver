@@ -1,10 +1,10 @@
 /*
- * arch/ppc/platforms/ebony.c
+ * arch/ppc/platforms/4xx/ebony.c
  *
  * Ebony board specific routines
  *
- * Matt Porter <mporter@mvista.com>
- * Copyright 2002 MontaVista Software Inc.
+ * Matt Porter <mporter@kernel.crashing.org>
+ * Copyright 2002-2004 MontaVista Software Inc.
  *
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
  * Copyright (c) 2003, 2004 Zultys Technologies
@@ -49,6 +49,10 @@
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 #include <asm/ppc4xx_pic.h>
+
+#include <syslib/gen550.h>
+
+static struct ibm44x_clocks clocks __initdata;
 
 /*
  * Ebony IRQ triggering/polarity settings
@@ -119,8 +123,6 @@ static u_char ebony_IRQ_initsenses[] __initdata = {
 	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 62: EMAC 1 */
 	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 63: EMAC 1 WOL */
 };
-
-static struct ibm44x_clocks clocks __initdata;
 
 static void __init
 ebony_calibrate_decr(void)
@@ -284,13 +286,24 @@ ebony_early_serial_map(void)
 		printk("Early serial init of port 0 failed\n");
 	}
 
+#if defined(CONFIG_SERIAL_TEXT_DEBUG) || defined(CONFIG_KGDB)
+	/* Configure debug serial access */
+	gen550_init(0, &port);
+#endif
+
 	port.membase = ioremap64(PPC440GP_UART1_ADDR, 8);
 	port.irq = 1;
+	port.uartclk = clocks.uart1;
 	port.line = 1;
 
 	if (early_serial_setup(&port) != 0) {
 		printk("Early serial init of port 1 failed\n");
 	}
+
+#if defined(CONFIG_SERIAL_TEXT_DEBUG) || defined(CONFIG_KGDB)
+	/* Configure debug serial access */
+	gen550_init(1, &port);
+#endif
 }
 
 static void __init
@@ -378,7 +391,6 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
-
 #ifdef CONFIG_KGDB
 	ppc_md.early_serial_map = ebony_early_serial_map;
 #endif

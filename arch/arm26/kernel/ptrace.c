@@ -614,7 +614,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 			/* make sure single-step breakpoint is gone. */
 			child->ptrace &= ~PT_SINGLESTEP;
 			ptrace_cancel_bpt(child);
-			if (child->state != TASK_ZOMBIE) {
+			if (child->exit_state != EXIT_ZOMBIE) {
 				child->exit_code = SIGKILL;
 				wake_up_process(child);
 			}

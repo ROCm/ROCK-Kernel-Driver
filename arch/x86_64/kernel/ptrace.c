@@ -395,7 +395,7 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 		long tmp;
 
 		ret = 0;
-		if (child->state == TASK_ZOMBIE)	/* already dead */
+		if (child->exit_state == EXIT_ZOMBIE)	/* already dead */
 			break;
 		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 		child->exit_code = SIGKILL;

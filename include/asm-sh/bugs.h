@@ -21,7 +21,7 @@ static void __init check_bugs(void)
 	char *p= &system_utsname.machine[2]; /* "sh" */
 
 	cpu_data->loops_per_jiffy = loops_per_jiffy;
-	
+
 	switch (cpu_data->type) {
 	case CPU_SH7604:
 		*p++ = '2';
@@ -29,7 +29,7 @@ static void __init check_bugs(void)
 	case CPU_SH7705 ... CPU_SH7300:
 		*p++ = '3';
 		break;
-	case CPU_SH7750 ... CPU_ST40GX1:
+	case CPU_SH7750 ... CPU_SH4_501:
 		*p++ = '4';
 		break;
 	default:

@@ -441,6 +441,8 @@ int um_request_irq(unsigned int irq, int fd, int type,
 		err = activate_fd(irq, fd, type, dev_id);
 	return(err);
 }
+EXPORT_SYMBOL(um_request_irq);
+EXPORT_SYMBOL(reactivate_fd);
 
 /* this was setup_x86_irq but it seems pretty generic */
 int setup_irq(unsigned int irq, struct irqaction * new)

@@ -14,17 +14,6 @@
 # this architecture
 #
 
-#
-# We don't necessarily agree with the top-level Makefile with regards to what
-# does and does not qualify as a noconfig_targets rule. In this case, we're
-# still dependant on .config settings in order for core-y (machdir-y in
-# particular) to resolve the proper directory. So we just manually include it
-# if it hasn't been already..
-# 
-ifndef include_config
--include .config
-endif
-
 cflags-y				:= -mb
 cflags-$(CONFIG_CPU_LITTLE_ENDIAN)	:= -ml
 
@@ -76,6 +65,7 @@ core-$(CONFIG_EMBEDDED_RAMDISK)	+= arch/sh/ramdisk/
 machdir-$(CONFIG_SH_SOLUTION_ENGINE)		:= se/770x
 machdir-$(CONFIG_SH_7751_SOLUTION_ENGINE)	:= se/7751
 machdir-$(CONFIG_SH_7300_SOLUTION_ENGINE)	:= se/7300
+machdir-$(CONFIG_SH_73180_SOLUTION_ENGINE)	:= se/73180
 machdir-$(CONFIG_SH_STB1_HARP)			:= harp
 machdir-$(CONFIG_SH_STB1_OVERDRIVE)		:= overdrive
 machdir-$(CONFIG_SH_HP620)			:= hp6xx/hp620
@@ -91,10 +81,13 @@ machdir-$(CONFIG_SH_BIGSUR)			:= bigsur
 machdir-$(CONFIG_SH_SH2000)			:= sh2000
 machdir-$(CONFIG_SH_ADX)			:= adx
 machdir-$(CONFIG_SH_MPC1211)			:= mpc1211
+machdir-$(CONFIG_SH_SH03)			:= sh03
 machdir-$(CONFIG_SH_SECUREEDGE5410)		:= snapgear
 machdir-$(CONFIG_SH_HS7751RVOIP)		:= renesas/hs7751rvoip
 machdir-$(CONFIG_SH_RTS7751R2D)			:= renesas/rts7751r2d
 machdir-$(CONFIG_SH_7751_SYSTEMH)		:= renesas/systemh
+machdir-$(CONFIG_SH_EDOSK7705)			:= renesas/edosk7705
+machdir-$(CONFIG_SH_SH4202_MICRODEV)		:= superh/microdev
 machdir-$(CONFIG_SH_UNKNOWN)			:= unknown
 
 incdir-y			:= $(notdir $(machdir-y))
@@ -102,9 +95,12 @@ incdir-y			:= $(notdir $(machdir-y))
 incdir-$(CONFIG_SH_SOLUTION_ENGINE)		:= se
 incdir-$(CONFIG_SH_7751_SOLUTION_ENGINE)	:= se7751
 incdir-$(CONFIG_SH_7300_SOLUTION_ENGINE)        := se7300
+incdir-$(CONFIG_SH_73180_SOLUTION_ENGINE)	:= se73180
 incdir-$(CONFIG_SH_HP600)			:= hp6xx
 
+ifneq ($(machdir-y),)
 core-y				+= arch/sh/boards/$(machdir-y)/
+endif
 
 # Companion chips
 core-$(CONFIG_HD64461)		+= arch/sh/cchips/hd6446x/hd64461/
@@ -124,22 +120,38 @@ boot := arch/sh/boot
 
 CPPFLAGS_vmlinux.lds := -traditional
 
-prepare: target_links
+#	Update machine arch and proc symlinks if something which affects
+#	them changed.  We use .arch and .mach to indicate when they were
+#	updated last, otherwise make uses the target directory mtime.
 
-.PHONY: target_links FORCE
+include/asm-sh/.cpu: $(wildcard include/config/cpu/*.h) include/config/MARKER
+	@echo '  SYMLINK include/asm-sh/cpu -> include/asm-sh/$(cpuincdir-y)'
+ifneq ($(KBUILD_SRC),)
+	$(Q)mkdir -p include/asm-sh
+	$(Q)ln -fsn $(srctree)/include/asm-sh/$(cpuincdir-y) include/asm-sh/cpu
+else
+	$(Q)ln -fsn $(cpuincdir-y) include/asm-sh/cpu
+endif
+	@touch $@
+
+include/asm-sh/.mach: $(wildcard include/config/sh/*.h) include/config/MARKER
+	@echo '  SYMLINK include/asm-sh/mach -> include/asm-sh/$(incdir-y)'
+ifneq ($(KBUILD_SRC),)
+	$(Q)mkdir -p include/asm-sh
+	$(Q)ln -fsn $(srctree)/include/asm-sh/$(incdir-y) include/asm-sh/mach
+else
+	$(Q)ln -fsn $(incdir-y) include/asm-sh/mach
+endif
+	@touch $@
+
+
+prepare: maketools include/asm-sh/.cpu include/asm-sh/.mach
+
+.PHONY: maketools FORCE
+maketools: include/asm-sh/asm-offsets.h include/linux/version.h FORCE
+	$(Q)$(MAKE) $(build)=arch/sh/tools include/asm-sh/machtypes.h
 
 all: zImage
-
-target_links:
-	@echo '  Making asm-sh/cpu -> asm-sh/$(cpuincdir-y) link'
-	@rm -f include/asm-sh/cpu
-	@ln -sf $(cpuincdir-y) include/asm-sh/cpu
-
-	@echo '  Making asm-sh/mach -> asm-sh/$(incdir-y) link'
-	@rm -f include/asm-sh/mach
-	@ln -sf $(incdir-y) include/asm-sh/mach
-
-	$(Q)$(MAKE) $(build)=arch/sh/tools include/asm-sh/machtypes.h
 
 zImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
@@ -148,6 +160,15 @@ compressed: zImage
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
+
+CLEAN_FILES += include/asm-sh/machtypes.h include/asm-sh/asm-offsets.h
+
+arch/sh/kernel/asm-offsets.s: include/asm include/linux/version.h \
+			      include/asm-sh/.cpu include/asm-sh/.mach
+
+include/asm-sh/asm-offsets.h: arch/sh/kernel/asm-offsets.s
+	$(call filechk,gen-asm-offsets)
+
 
 define archhelp
 	@echo '  zImage 	           - Compressed kernel image (arch/sh/boot/zImage)'
