@@ -676,6 +676,8 @@ xfs_write(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
 
+	fs_check_frozen(vp->v_vfsp, SB_FREEZE_WRITE);
+
 	if (ioflags & IO_ISDIRECT) {
 		xfs_buftarg_t	*target =
 			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
