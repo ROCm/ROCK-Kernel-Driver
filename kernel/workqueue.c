@@ -262,7 +262,6 @@ static void flush_cpu_workqueue(struct cpu_workqueue_struct *cwq)
 void fastcall flush_workqueue(struct workqueue_struct *wq)
 {
 	might_sleep();
-	lock_cpu_hotplug();
 
 	if (is_single_threaded(wq)) {
 		/* Always use cpu 0's area. */
@@ -270,11 +269,11 @@ void fastcall flush_workqueue(struct workqueue_struct *wq)
 	} else {
 		int cpu;
 
+		lock_cpu_hotplug();
 		for_each_online_cpu(cpu)
 			flush_cpu_workqueue(wq->cpu_wq + cpu);
+		unlock_cpu_hotplug();
 	}
-
-	unlock_cpu_hotplug();
 }
 
 static struct task_struct *create_workqueue_thread(struct workqueue_struct *wq,
