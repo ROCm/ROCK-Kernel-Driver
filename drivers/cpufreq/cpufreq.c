@@ -1,10 +1,8 @@
 /*
- *  linux/kernel/cpufreq.c
+ *  linux/drivers/cpufreq/cpufreq.c
  *
  *  Copyright (C) 2001 Russell King
  *            (C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
- *
- *  $Id: cpufreq.c,v 1.59 2003/01/20 17:31:48 db Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -743,26 +741,9 @@ int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu)
 EXPORT_SYMBOL(cpufreq_get_policy);
 
 
-/**
- *	cpufreq_set_policy - set a new CPUFreq policy
- *	@policy: policy to be set.
- *
- *	Sets a new CPU frequency and voltage scaling policy.
- */
-int cpufreq_set_policy(struct cpufreq_policy *policy)
+static int __cpufreq_set_policy(struct cpufreq_policy *data, struct cpufreq_policy *policy)
 {
 	int ret = 0;
-	struct cpufreq_policy *data;
-
-	if (!policy)
-		return -EINVAL;
-
-	data = cpufreq_cpu_get(policy->cpu);
-	if (!data)
-		return -EINVAL;
-
-	/* lock this CPU */
-	down(&data->lock);
 
 	memcpy(&policy->cpuinfo, 
 	       &data->cpuinfo, 
@@ -829,6 +810,36 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 	}
 
  error_out:
+	return ret;
+}
+
+/**
+ *	cpufreq_set_policy - set a new CPUFreq policy
+ *	@policy: policy to be set.
+ *
+ *	Sets a new CPU frequency and voltage scaling policy.
+ */
+int cpufreq_set_policy(struct cpufreq_policy *policy)
+{
+	int ret = 0;
+	struct cpufreq_policy *data;
+
+	if (!policy)
+		return -EINVAL;
+
+	data = cpufreq_cpu_get(policy->cpu);
+	if (!data)
+		return -EINVAL;
+
+	/* lock this CPU */
+	down(&data->lock);
+
+	ret = __cpufreq_set_policy(data, policy);
+	data->user_policy.min = data->min;
+	data->user_policy.max = data->max;
+	data->user_policy.policy = data->policy;
+	data->user_policy.governor = data->governor;
+
 	up(&data->lock);
 	cpufreq_cpu_put(data);
 
@@ -836,6 +847,41 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 }
 EXPORT_SYMBOL(cpufreq_set_policy);
 
+
+/**
+ *	cpufreq_update_policy - re-evaluate an existing cpufreq policy
+ *	@cpu: CPU which shall be re-evaluated
+ *
+ *	Usefull for policy notifiers which have different necessities
+ *	at different times.
+ */
+int cpufreq_update_policy(unsigned int cpu)
+{
+	struct cpufreq_policy *data = cpufreq_cpu_get(cpu);
+	struct cpufreq_policy policy;
+	int ret = 0;
+
+	if (!data)
+		return -ENODEV;
+
+	down(&data->lock);
+
+	memcpy(&policy, 
+	       &data, 
+	       sizeof(struct cpufreq_policy));
+	policy.min = data->user_policy.min;
+	policy.max = data->user_policy.max;
+	policy.policy = data->user_policy.policy;
+	policy.governor = data->user_policy.governor;
+
+	ret = __cpufreq_set_policy(data, &policy);
+
+	up(&data->lock);
+
+	cpufreq_cpu_put(data);
+	return ret;
+}
+EXPORT_SYMBOL(cpufreq_update_policy);
 
 
 /*********************************************************************
