@@ -4434,10 +4434,35 @@ static int snd_hdsp_hwdep_dummy_op(snd_hwdep_t *hw, struct file *file)
 }
 
 
-static int hdsp_9652_get_peak(hdsp_t *hdsp, hdsp_peak_rms_t __user *peak_rms)
+/* helper functions for copying meter values */
+static inline int copy_u32_le(void __user *dest, void __iomem *src)
+{
+	u32 val = readl(src);
+	return copy_to_user(dest, &val, 4);
+}
+
+static inline int copy_u64_le(void __user *dest, void __iomem *src_low, void __iomem *src_high)
 {
 	u32 rms_low, rms_high;
 	u64 rms;
+	rms_low = readl(src_low);
+	rms_high = readl(src_high);
+	rms = ((u64)rms_high << 32) | rms_low;
+	return copy_to_user(dest, &rms, 8);
+}
+
+static inline int copy_u48_le(void __user *dest, void __iomem *src_low, void __iomem *src_high)
+{
+	u32 rms_low, rms_high;
+	u64 rms;
+	rms_low = readl(src_low) & 0xffffff00;
+	rms_high = readl(src_high) & 0xffffff00;
+	rms = ((u64)rms_high << 32) | rms_low;
+	return copy_to_user(dest, &rms, 8);
+}
+
+static int hdsp_9652_get_peak(hdsp_t *hdsp, hdsp_peak_rms_t __user *peak_rms)
+{
 	int doublespeed = 0;
 	int i, j, channels, ofs;
 
@@ -4448,31 +4473,25 @@ static int hdsp_9652_get_peak(hdsp_t *hdsp, hdsp_peak_rms_t __user *peak_rms)
 		if (doublespeed && (i & 4))
 			continue;
 		ofs = HDSP_9652_peakBase - j * 4;
-		if (copy_to_user_fromio(&peak_rms->input_peaks[i], hdsp->iobase+ofs, 4))
+		if (copy_u32_le(&peak_rms->input_peaks[i], hdsp->iobase + ofs))
 			return -EFAULT;
 		ofs -= channels * 4;
-		if (copy_to_user_fromio(&peak_rms->playback_peaks[i], hdsp->iobase+ofs, 4))
+		if (copy_u32_le(&peak_rms->playback_peaks[i], hdsp->iobase + ofs))
 			return -EFAULT;
 		ofs -= channels * 4;
-		if (copy_to_user_fromio(&peak_rms->output_peaks[i], hdsp->iobase+ofs, 4))
+		if (copy_u32_le(&peak_rms->output_peaks[i], hdsp->iobase + ofs))
 			return -EFAULT;
 		ofs = HDSP_9652_rmsBase + j * 8;
-		rms_low = readl(hdsp->iobase+ofs) & 0xFFFFFF00;
-		rms_high = readl(hdsp->iobase+ofs+4) & 0xFFFFFF00;
-		rms = ((u64)rms_high << 32) | ((u64)rms_low << 8);
-		if (copy_to_user(&peak_rms->input_rms[i], &rms, 8))
+		if (copy_u48_le(&peak_rms->input_rms[i], hdsp->iobase + ofs,
+				hdsp->iobase + ofs + 4))
 			return -EFAULT;
 		ofs += channels * 8;
-		rms_low = readl(hdsp->iobase+ofs) & 0xFFFFFF00;
-		rms_high = readl(hdsp->iobase+ofs+4) & 0xFFFFFF00;
-		rms = ((u64)rms_high << 32) | ((u64)rms_low << 8);
-		if (copy_to_user(&peak_rms->playback_rms[i], &rms, 8))
+		if (copy_u48_le(&peak_rms->playback_rms[i], hdsp->iobase + ofs,
+				hdsp->iobase + ofs + 4))
 			return -EFAULT;
 		ofs += channels * 8;
-		rms_low = readl(hdsp->iobase+ofs) & 0xFFFFFF00;
-		rms_high = readl(hdsp->iobase+ofs+4) & 0xFFFFFF00;
-		rms = ((u64)rms_high << 32) | ((u64)rms_low << 8);
-		if (copy_to_user(&peak_rms->output_rms[i], &rms, 8))
+		if (copy_u48_le(&peak_rms->output_rms[i], hdsp->iobase + ofs,
+				hdsp->iobase + ofs + 4))
 			return -EFAULT;
 		j++;
 	}
@@ -4481,8 +4500,6 @@ static int hdsp_9652_get_peak(hdsp_t *hdsp, hdsp_peak_rms_t __user *peak_rms)
 
 static int hdsp_9632_get_peak(hdsp_t *hdsp, hdsp_peak_rms_t __user *peak_rms)
 {
-	u32 rms_low, rms_high;
-	u64 rms;
 	int i, j;
 	hdsp_9632_meters_t __iomem *m;
 	int doublespeed = 0;
@@ -4491,26 +4508,20 @@ static int hdsp_9632_get_peak(hdsp_t *hdsp, hdsp_peak_rms_t __user *peak_rms)
 		doublespeed = 1;
 	m = (hdsp_9632_meters_t __iomem *)(hdsp->iobase+HDSP_9632_metersBase);
 	for (i = 0, j = 0; i < 16; ++i, ++j) {
-		if (copy_to_user_fromio(&peak_rms->input_peaks[i], &m->input_peak[j], 4))
+		if (copy_u32_le(&peak_rms->input_peaks[i], &m->input_peak[j]))
 			return -EFAULT;
-		if (copy_to_user_fromio(&peak_rms->playback_peaks[i], &m->playback_peak[j], 4))
+		if (copy_u32_le(&peak_rms->playback_peaks[i], &m->playback_peak[j]))
 			return -EFAULT;
-		if (copy_to_user_fromio(&peak_rms->output_peaks[i], &m->output_peak[j], 4))
+		if (copy_u32_le(&peak_rms->output_peaks[i], &m->output_peak[j]))
 			return -EFAULT;
-		rms_low = readl(&m->input_rms_low[j]);
-		rms_high = readl(&m->input_rms_high[j]);
-		rms = ((u64)rms_high << 32) | rms_low;
-		if (copy_to_user(&peak_rms->input_rms[i], &rms, 8))
+		if (copy_u64_le(&peak_rms->input_rms[i], &m->input_rms_low[j],
+				&m->input_rms_high[j]))
 			return -EFAULT;
-		rms_low = readl(&m->playback_rms_low[j]);
-		rms_high = readl(&m->playback_rms_high[j]);
-		rms = ((u64)rms_high << 32) | rms_low;
-		if (copy_to_user(&peak_rms->playback_rms[i], &rms, 8))
+		if (copy_u64_le(&peak_rms->playback_rms[i], &m->playback_rms_low[j],
+				&m->playback_rms_high[j]))
 			return -EFAULT;
-		rms_low = readl(&m->output_rms_low[j]);
-		rms_high = readl(&m->output_rms_high[j]);
-		rms = ((u64)rms_high << 32) | rms_low;
-		if (copy_to_user(&peak_rms->output_rms[i], &rms, 8))
+		if (copy_u64_le(&peak_rms->output_rms[i], &m->output_rms_low[j],
+				&m->output_rms_high[j]))
 			return -EFAULT;
 		if (doublespeed && i == 3) i += 4;
 	}
@@ -4521,25 +4532,27 @@ static int hdsp_get_peak(hdsp_t *hdsp, hdsp_peak_rms_t __user *peak_rms)
 {
 	int i;
 
-	if (copy_to_user_fromio(peak_rms->playback_peaks, hdsp->iobase+HDSP_playbackPeakLevel, 26*4))
-		return -EFAULT;
-	if (copy_to_user_fromio(peak_rms->input_peaks, hdsp->iobase+HDSP_inputPeakLevel, 26*4))
-		return -EFAULT;
-	if (copy_to_user_fromio(peak_rms->output_peaks, hdsp->iobase+HDSP_outputPeakLevel, 28*4))
-		return -EFAULT;
-	for (i = 0; i < 26; ++i) {
-		u32 rms_low, rms_high;
-		u64 rms;
-		/* FIXME: is this order correct? */
-		rms_low = readl(hdsp->iobase+HDSP_playbackRmsLevel+i*8);
-		rms_high = readl(hdsp->iobase+HDSP_playbackRmsLevel+i*8+4);
-		rms = ((u64)rms_high << 32) | rms_low;
-		if (copy_to_user(&peak_rms->playback_rms[i], &rms, 8))
+	for (i = 0; i < 26; i++) {
+		if (copy_u32_le(&peak_rms->playback_peaks[i],
+				hdsp->iobase + HDSP_playbackPeakLevel + i * 4))
 			return -EFAULT;
-		rms_low = readl(hdsp->iobase+HDSP_inputRmsLevel+i*8);
-		rms_high = readl(hdsp->iobase+HDSP_inputRmsLevel+i*8+4);
-		rms = ((u64)rms_high << 32) | rms_low;
-		if (copy_to_user(&peak_rms->input_rms[i], &rms, 8))
+		if (copy_u32_le(&peak_rms->input_peaks[i],
+				hdsp->iobase + HDSP_inputPeakLevel + i * 4))
+			return -EFAULT;
+	}
+	for (i = 0; i < 28; i++) {
+		if (copy_u32_le(&peak_rms->output_peaks[i],
+				hdsp->iobase + HDSP_outputPeakLevel + i * 4))
+			return -EFAULT;
+	}
+	for (i = 0; i < 26; ++i) {
+		if (copy_u64_le(&peak_rms->playback_rms[i],
+				hdsp->iobase + HDSP_playbackRmsLevel + i * 8,
+				hdsp->iobase + HDSP_playbackRmsLevel + i * 8 + 4))
+			return -EFAULT;
+		if (copy_u64_le(&peak_rms->input_rms[i], 
+				hdsp->iobase + HDSP_inputRmsLevel + i * 8,
+				hdsp->iobase + HDSP_inputRmsLevel + i * 8 + 4))
 			return -EFAULT;
 	}
 	return 0;
