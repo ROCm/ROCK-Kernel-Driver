@@ -299,16 +299,6 @@ typedef struct mdk_thread_s {
 
 #define THREAD_WAKEUP  0
 
-#define MAX_DISKNAME_LEN 64
-
-typedef struct dev_name_s {
-	struct list_head list;
-	kdev_t dev;
-	char namebuf [MAX_DISKNAME_LEN];
-	char *name;
-} dev_name_t;
-
-
 #define __wait_event_lock_irq(wq, condition, lock) 			\
 do {									\
 	wait_queue_t __wait;						\

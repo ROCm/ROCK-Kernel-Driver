@@ -553,3 +553,47 @@ void del_gendisk(struct gendisk *disk)
 		disk->part = NULL;
 	}
 }
+
+struct dev_name {
+	struct list_head list;
+	dev_t dev;
+	char namebuf[64];
+	char *name;
+};
+
+static LIST_HEAD(device_names);
+
+char *partition_name(dev_t dev)
+{
+	struct gendisk *hd;
+	static char nomem [] = "<nomem>";
+	struct dev_name *dname;
+	struct list_head *tmp;
+
+	list_for_each(tmp, &device_names) {
+		dname = list_entry(tmp, struct dev_name, list);
+		if (dname->dev == dev)
+			return dname->name;
+	}
+
+	dname = kmalloc(sizeof(*dname), GFP_KERNEL);
+
+	if (!dname)
+		return nomem;
+	/*
+	 * ok, add this new device name to the list
+	 */
+	hd = get_gendisk(to_kdev_t(dev));
+	dname->name = NULL;
+	if (hd)
+		dname->name = disk_name(hd, MINOR(dev)-hd->first_minor, dname->namebuf);
+	if (!dname->name) {
+		sprintf(dname->namebuf, "[dev %s]", kdevname(to_kdev_t(dev)));
+		dname->name = dname->namebuf;
+	}
+
+	dname->dev = dev;
+	list_add(&dname->list, &device_names);
+
+	return dname->name;
+}
