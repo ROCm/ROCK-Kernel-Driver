@@ -61,7 +61,7 @@ static int atalk_seq_interface_show(struct seq_file *seq, void *v)
 	struct atalk_iface *iface;
 
 	if (v == (void *)1) {
-		seq_puts(seq, "Interface	  Address   Networks   "
+		seq_puts(seq, "Interface        Address   Networks  "
 			      "Status\n");
 		goto out;
 	}
