@@ -79,10 +79,10 @@ struct ea_buffer {
 #define EA_MALLOC	0x0008
 
 /* Forward references */
-void ea_release(struct inode *inode, struct ea_buffer *ea_buf);
+static void ea_release(struct inode *inode, struct ea_buffer *ea_buf);
 
 /*
- * NAME: jfs_WriteEAInLine
+ * NAME: ea_write_inline
  *                                                                    
  * FUNCTION: Attempt to write an EA inline if area is available
  *                                                                    
@@ -103,8 +103,8 @@ void ea_release(struct inode *inode, struct ea_buffer *ea_buf);
  *
  * RETURNS: 0 for successful copy to inline area; -1 if area not available
  */
-static int jfs_WriteEAInLine(struct inode *ip, struct jfs_ea_list *ealist,
-			     int size, dxd_t * ea)
+static int ea_write_inline(struct inode *ip, struct jfs_ea_list *ealist,
+			   int size, dxd_t * ea)
 {
 	struct jfs_inode_info *ji = JFS_IP(ip);
 
@@ -144,7 +144,7 @@ static int jfs_WriteEAInLine(struct inode *ip, struct jfs_ea_list *ealist,
 }
 
 /*
- * NAME: jfs_WriteEA
+ * NAME: ea_write
  *                                                                    
  * FUNCTION: Write an EA for an inode
  *                                                                    
@@ -162,7 +162,7 @@ static int jfs_WriteEAInLine(struct inode *ip, struct jfs_ea_list *ealist,
  *
  * RETURNS: 0 for success; Anything else indicates failure
  */
-static int jfs_WriteEA(struct inode *ip, struct jfs_ea_list *ealist, int size,
+static int ea_write(struct inode *ip, struct jfs_ea_list *ealist, int size,
 		       dxd_t * ea)
 {
 	struct super_block *sb = ip->i_sb;
@@ -181,7 +181,7 @@ static int jfs_WriteEA(struct inode *ip, struct jfs_ea_list *ealist, int size,
 	 * and empty EAs are all in-linable, provided the space exists.
 	 */
 	if (!ealist || size <= sizeof (ji->i_inline_ea)) {
-		if (!jfs_WriteEAInLine(ip, ealist, size, ea))
+		if (!ea_write_inline(ip, ealist, size, ea))
 			return 0;
 	}
 
@@ -257,7 +257,7 @@ static int jfs_WriteEA(struct inode *ip, struct jfs_ea_list *ealist, int size,
 }
 
 /*
- * NAME: jfs_ReadEAInLine
+ * NAME: ea_read_inline
  *                                                                    
  * FUNCTION: Read an inlined EA into user's buffer
  *                                                                    
@@ -267,7 +267,7 @@ static int jfs_WriteEA(struct inode *ip, struct jfs_ea_list *ealist, int size,
  *
  * RETURNS: 0
  */
-static int jfs_ReadEAInLine(struct inode *ip, struct jfs_ea_list *ealist)
+static int ea_read_inline(struct inode *ip, struct jfs_ea_list *ealist)
 {
 	struct jfs_inode_info *ji = JFS_IP(ip);
 	int ea_size = sizeDXD(&ji->ea);
@@ -288,7 +288,7 @@ static int jfs_ReadEAInLine(struct inode *ip, struct jfs_ea_list *ealist)
 }
 
 /*
- * NAME: jfs_ReadEA
+ * NAME: ea_read
  *                                                                    
  * FUNCTION: copy EA data into user's buffer
  *                                                                    
@@ -296,11 +296,11 @@ static int jfs_ReadEAInLine(struct inode *ip, struct jfs_ea_list *ealist)
  *	ip	- Inode pointer
  *	ealist	- Pointer to buffer to fill in with EA
  *
- * NOTES:  If EA is inline calls jfs_ReadEAInLine() to copy EA.
+ * NOTES:  If EA is inline calls ea_read_inline() to copy EA.
  *
  * RETURNS: 0 for success; other indicates failure
  */
-static int jfs_ReadEA(struct inode *ip, struct jfs_ea_list *ealist)
+static int ea_read(struct inode *ip, struct jfs_ea_list *ealist)
 {
 	struct super_block *sb = ip->i_sb;
 	struct jfs_inode_info *ji = JFS_IP(ip);
@@ -315,7 +315,7 @@ static int jfs_ReadEA(struct inode *ip, struct jfs_ea_list *ealist)
 
 	/* quick check for in-line EA */
 	if (ji->ea.flag & DXD_INLINE)
-		return jfs_ReadEAInLine(ip, ealist);
+		return ea_read_inline(ip, ealist);
 
 	nbytes = sizeDXD(&ji->ea);
 	assert(nbytes);
@@ -372,7 +372,7 @@ static int jfs_ReadEA(struct inode *ip, struct jfs_ea_list *ealist)
  *
  * RETURNS: 0 for success; Other indicates failure
  */
-int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
+static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 {
 	struct jfs_inode_info *ji = JFS_IP(inode);
 	struct super_block *sb = inode->i_sb;
@@ -436,8 +436,7 @@ int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		if (ea_size == 0)
 			return 0;
 
-		rc = jfs_ReadEA(inode, ea_buf->xattr);
-		if (rc) {
+		if ((rc = ea_read(inode, ea_buf->xattr))) {
 			kfree(ea_buf->xattr);
 			ea_buf->xattr = NULL;
 			return rc;
@@ -472,8 +471,7 @@ int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		    ~(sb->s_blocksize - 1);
 		if (ea_size == 0)
 			return 0;
-		rc = jfs_ReadEA(inode, ea_buf->xattr);
-		if (rc) {
+		if ((rc = ea_read(inode, ea_buf->xattr))) {
 			discard_metapage(ea_buf->mp);
 			dbFree(inode, blkno, (s64) blocks_needed);
 			return rc;
@@ -500,7 +498,7 @@ int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 	return ea_size;
 }
 
-void ea_release(struct inode *inode, struct ea_buffer *ea_buf)
+static void ea_release(struct inode *inode, struct ea_buffer *ea_buf)
 {
 	if (ea_buf->flag & EA_MALLOC)
 		kfree(ea_buf->xattr);
@@ -514,7 +512,7 @@ void ea_release(struct inode *inode, struct ea_buffer *ea_buf)
 	}
 }
 
-int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
+static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 {
 	struct jfs_inode_info *ji = JFS_IP(inode);
 	unsigned long old_blocks, new_blocks;
@@ -532,16 +530,14 @@ int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 		DXDaddress(&ea_buf->new_ea, 0);
 		DXDlength(&ea_buf->new_ea, 0);
 	} else if (ea_buf->flag & EA_MALLOC) {
-		rc = jfs_WriteEA(inode, ea_buf->xattr, new_size,
-				 &ea_buf->new_ea);
+		rc = ea_write(inode, ea_buf->xattr, new_size, &ea_buf->new_ea);
 		kfree(ea_buf->xattr);
 	} else if (ea_buf->flag & EA_NEW) {
 		/* We have already allocated a new dxd */
 		flush_metapage(ea_buf->mp);
 	} else {
 		/* ->xattr must point to original ea's metapage */
-		rc = jfs_WriteEA(inode, ea_buf->xattr, new_size,
-				 &ea_buf->new_ea);
+		rc = ea_write(inode, ea_buf->xattr, new_size, &ea_buf->new_ea);
 		discard_metapage(ea_buf->mp);
 	}
 	if (rc)
