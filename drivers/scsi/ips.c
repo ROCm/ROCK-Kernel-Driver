@@ -530,6 +530,7 @@ static void copy_mem_info(IPS_INFOSTR *, char *, int);
 static int copy_info(IPS_INFOSTR *, char *, ...);
 static int ips_get_version_info(ips_ha_t *ha, IPS_VERSION_DATA *Buffer, int intr );
 static void ips_version_check(ips_ha_t *ha, int intr);
+static int ips_abort_init(ips_ha_t *ha, struct Scsi_Host *sh, int index);
 static int ips_init_phase2( int index );
 
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
@@ -7392,6 +7393,14 @@ static Scsi_Host_Template driver_template = IPS;
 #include "scsi_module.c"
 #endif
 
+static int ips_abort_init(ips_ha_t *ha, struct Scsi_Host *sh, int index){
+   ha->active = 0;
+   ips_free(ha);
+   scsi_unregister(sh);
+   ips_ha[index] = 0;
+   ips_sh[index] = 0;
+   return -1;
+}
 
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
 
@@ -7582,24 +7591,14 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
 
     if (!ha->enq) {
        printk(KERN_WARNING "Unable to allocate host inquiry structure\n" );
-       ha->active = 0;
-       ips_free(ha);
-       scsi_unregister(sh);
-       ips_ha[index] = 0;
-       ips_sh[index] = 0;
-       return -1;
+       return ips_abort_init(ha, sh, index);
     }
 
     ha->adapt = pci_alloc_consistent(ha->pcidev, sizeof(IPS_ADAPTER) +
                                      sizeof(IPS_IO_CMD), &dma_address);
     if (!ha->adapt) {
        printk(KERN_WARNING "Unable to allocate host adapt & dummy structures\n");
-       ha->active = 0;
-       ips_free(ha);
-       scsi_unregister(sh);
-       ips_ha[index] = 0;
-       ips_sh[index] = 0;
-       return -1;
+       return ips_abort_init(ha, sh, index);
     }
     ha->adapt->hw_status_start = dma_address;
     ha->dummy = (void *)(ha->adapt + 1);
@@ -7608,36 +7607,21 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
 
     if (!ha->conf) {
        printk(KERN_WARNING "Unable to allocate host conf structure\n" );
-       ha->active = 0;
-       ips_free(ha);
-       scsi_unregister(sh);
-       ips_ha[index] = 0;
-       ips_sh[index] = 0;
-       return -1;
+       return ips_abort_init(ha, sh, index);
     }
 
     ha->nvram = kmalloc(sizeof(IPS_NVRAM_P5), GFP_KERNEL);
 
     if (!ha->nvram) {
        printk(KERN_WARNING "Unable to allocate host NVRAM structure\n" );
-       ha->active = 0;
-       ips_free(ha);
-       scsi_unregister(sh);
-       ips_ha[index] = 0;
-       ips_sh[index] = 0;
-       return -1;
+       return ips_abort_init(ha, sh, index);
     }
 
     ha->subsys = kmalloc(sizeof(IPS_SUBSYS), GFP_KERNEL);
 
     if (!ha->subsys) {
        printk(KERN_WARNING "Unable to allocate host subsystem structure\n" );
-       ha->active = 0;
-       ips_free(ha);
-       scsi_unregister(sh);
-       ips_ha[index] = 0;
-       ips_sh[index] = 0;
-       return -1;
+       return ips_abort_init(ha, sh, index);
     }
 
     for (count = PAGE_SIZE, ha->ioctl_order = 0;
@@ -7746,24 +7730,14 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
            * Initialization failed
            */
           printk(KERN_WARNING "Unable to initialize controller\n" );
-          ha->active = 0;
-          ips_free(ha);
-          scsi_unregister(sh);
-          ips_ha[index] = 0;
-          ips_sh[index] = 0;
-          return -1;
+          return ips_abort_init(ha, sh, index);
        }
     }
 
     /* Install the interrupt handler */
      if (request_irq(irq, do_ipsintr, SA_SHIRQ, ips_name, ha)) {
        printk(KERN_WARNING "Unable to install interrupt handler\n" );
-       ha->active = 0;
-       ips_free(ha);
-       scsi_unregister(sh);
-       ips_ha[index] = 0;
-       ips_sh[index] = 0;
-       return -1;
+       return ips_abort_init(ha, sh, index);
     }
 
     /*
@@ -7772,13 +7746,8 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
     ha->max_cmds = 1;
     if (!ips_allocatescbs(ha)) {
        printk(KERN_WARNING "Unable to allocate a CCB\n" );
-       ha->active = 0;
        free_irq(ha->irq, ha);
-       ips_free(ha);
-       scsi_unregister(sh);
-       ips_ha[index] = 0;
-       ips_sh[index] = 0;
-       return -1;
+       return ips_abort_init(ha, sh, index);
     }
 
     *indexPtr = index;
@@ -7814,13 +7783,8 @@ static int ips_init_phase2( int index )
 
     if (!ips_hainit(ha)) {
        printk(KERN_WARNING "Unable to initialize controller\n" );
-       ha->active = 0;
-       ips_free(ha);
        free_irq(ha->irq, ha);
-       scsi_unregister(sh);
-       ips_ha[index] = NULL;
-       ips_sh[index] = NULL;
-       return -1;
+       return ips_abort_init(ha, sh, index);
     }
     /* Free the temporary SCB */
     ips_deallocatescbs(ha, 1);
@@ -7828,13 +7792,8 @@ static int ips_init_phase2( int index )
     /* allocate CCBs */
     if (!ips_allocatescbs(ha)) {
        printk(KERN_WARNING "Unable to allocate CCBs\n" );
-       ha->active = 0;
-       ips_free(ha);
        free_irq(ha->irq, ha);
-       scsi_unregister(sh);
-       ips_ha[index] = NULL;
-       ips_sh[index] = NULL;
-       return -1;
+       return ips_abort_init(ha, sh, index);
     }
 
     /* finish setting values */
