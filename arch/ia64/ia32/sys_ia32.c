@@ -2395,7 +2395,7 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 		return shmctl32(first, second, (void *)AA(ptr));
 
 	      default:
-		return -EINVAL;
+		return -ENOSYS;
 	}
 	return -EINVAL;
 }
