@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#34 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#51 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.h,v 1.30 2000/11/10 20:13:40 gibbs Exp $
+ * $FreeBSD$
  */
 
 #ifndef _AIC7XXX_H_
@@ -51,6 +51,7 @@
 /************************* Forward Declarations *******************************/
 struct ahc_platform_data;
 struct scb_platform_data;
+struct seeprom_descriptor;
 
 /****************************** Useful Macros *********************************/
 #ifndef MAX
@@ -170,7 +171,7 @@ struct scb_platform_data;
 #define AHC_TMODE_CMDS	256
 
 /* Reset line assertion time in us */
-#define AHC_BUSRESET_DELAY	250
+#define AHC_BUSRESET_DELAY	25
 
 /******************* Chip Characteristics/Operating Settings  *****************/
 /*
@@ -350,9 +351,11 @@ typedef enum {
 					   */
 	AHC_BIOS_ENABLED      = 0x80000,
 	AHC_ALL_INTERRUPTS    = 0x100000,
-	AHC_PAGESCBS	      = 0x400000, /* Enable SCB paging */
-	AHC_EDGE_INTERRUPT    = 0x800000, /* Device uses edge triggered ints */
-	AHC_39BIT_ADDRESSING  = 0x1000000 /* Use 39 bit addressing scheme. */
+	AHC_PAGESCBS	      = 0x400000,  /* Enable SCB paging */
+	AHC_EDGE_INTERRUPT    = 0x800000,  /* Device uses edge triggered ints */
+	AHC_39BIT_ADDRESSING  = 0x1000000, /* Use 39 bit addressing scheme. */
+	AHC_LSCBS_ENABLED     = 0x2000000, /* 64Byte SCBs enabled */
+	AHC_SCB_CONFIG_USED   = 0x4000000  /* No SEEPROM but SCB2 had info. */
 } ahc_flag;
 
 /************************* Hardware  SCB Definition ***************************/
@@ -714,11 +717,6 @@ struct ahc_syncrate {
 };
 
 /*
- * The synchronouse transfer rate table.
- */
-extern struct ahc_syncrate ahc_syncrates[];
-
-/*
  * Indexes into our table of syncronous transfer rates.
  */
 #define AHC_SYNCRATE_DT		0
@@ -941,6 +939,7 @@ struct ahc_softc {
 	ahc_feature		  features;
 	ahc_bug			  bugs;
 	ahc_flag		  flags;
+	struct seeprom_config	 *seep_config;
 
 	/* Values to store in the SEQCTL register for pause and unpause */
 	uint8_t			  unpause;
@@ -1093,7 +1092,8 @@ int			 ahc_pci_config(struct ahc_softc *,
 /*************************** EISA/VL Front End ********************************/
 struct aic7770_identity *aic7770_find_device(uint32_t);
 int			 aic7770_config(struct ahc_softc *ahc,
-					struct aic7770_identity *);
+					struct aic7770_identity *,
+					u_int port);
 
 /************************** SCB and SCB queue management **********************/
 int		ahc_probe_scbs(struct ahc_softc *);
@@ -1116,6 +1116,7 @@ void			 ahc_pause_and_flushwork(struct ahc_softc *ahc);
 int			 ahc_suspend(struct ahc_softc *ahc); 
 int			 ahc_resume(struct ahc_softc *ahc);
 void			 ahc_softc_insert(struct ahc_softc *);
+struct ahc_softc	*ahc_find_softc(struct ahc_softc *ahc);
 void			 ahc_set_unit(struct ahc_softc *, int);
 void			 ahc_set_name(struct ahc_softc *, char *);
 void			 ahc_alloc_scbs(struct ahc_softc *ahc);
@@ -1146,6 +1147,11 @@ int			ahc_search_qinfifo(struct ahc_softc *ahc, int target,
 					   char channel, int lun, u_int tag,
 					   role_t role, uint32_t status,
 					   ahc_search_action action);
+int			ahc_search_untagged_queues(struct ahc_softc *ahc,
+						   ahc_io_ctx_t ctx,
+						   int target, char channel,
+						   int lun, uint32_t status,
+						   ahc_search_action action);
 int			ahc_search_disc_list(struct ahc_softc *ahc, int target,
 					     char channel, int lun, u_int tag,
 					     int stop_on_first, int remove,
@@ -1157,7 +1163,8 @@ int			ahc_abort_scbs(struct ahc_softc *ahc, int target,
 				       char channel, int lun, u_int tag,
 				       role_t role, uint32_t status);
 void			ahc_restart(struct ahc_softc *ahc);
-void			ahc_calc_residual(struct scb *scb);
+void			ahc_calc_residual(struct ahc_softc *ahc,
+					  struct scb *scb);
 /*************************** Utility Functions ********************************/
 struct ahc_phase_table_entry*
 			ahc_lookup_phase_entry(int phase);
@@ -1219,6 +1226,31 @@ cam_status	ahc_find_tmode_devs(struct ahc_softc *ahc,
 #endif
 #endif
 /******************************* Debug ***************************************/
+#ifdef AHC_DEBUG
+extern uint32_t ahc_debug;
+#define	AHC_SHOW_MISC		0x0001
+#define	AHC_SHOW_SENSE		0x0002
+#define AHC_DUMP_SEEPROM	0x0004
+#define AHC_SHOW_TERMCTL	0x0008
+#define AHC_SHOW_MEMORY		0x0010
+#define AHC_SHOW_MESSAGES	0x0020
+#define AHC_SHOW_SELTO		0x0080
+#define AHC_SHOW_QFULL		0x0200
+#define AHC_SHOW_QUEUE		0x0400
+#define AHC_SHOW_TQIN		0x0800
+#define AHC_DEBUG_SEQUENCER	0x1000
+#endif
 void			ahc_print_scb(struct scb *scb);
 void			ahc_dump_card_state(struct ahc_softc *ahc);
+int			ahc_print_register(ahc_reg_parse_entry_t *table,
+					   u_int num_entries,
+					   const char *name,
+					   u_int address,
+					   u_int value,
+					   u_int *cur_column,
+					   u_int wrap_point);
+/******************************* SEEPROM *************************************/
+int		ahc_acquire_seeprom(struct ahc_softc *ahc,
+				    struct seeprom_descriptor *sd);
+void		ahc_release_seeprom(struct seeprom_descriptor *sd);
 #endif /* _AIC7XXX_H_ */

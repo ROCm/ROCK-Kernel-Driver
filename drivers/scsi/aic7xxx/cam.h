@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/cam.h#11 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/cam.h#13 $
  */
 
 #ifndef _AIC7XXX_CAM_H
@@ -81,6 +81,8 @@ typedef enum {
 	CAM_DATA_RUN_ERR	= DID_ERROR,
 	/* Unexpected Bus Free */
 	CAM_UNEXP_BUSFREE	= DID_ERROR,
+	/* Protocol Violation */
+	CAM_SEQUENCE_FAIL	= DID_ERROR,
 	/* CCB length supplied is inadequate */
 	CAM_CCB_LEN_ERR		= DID_ERROR,
 	/* Unable to provide requested capability */
@@ -101,7 +103,7 @@ typedef enum {
 	 * requests for the target at the sim level
 	 * back into the XPT queue.
 	 */
-	CAM_REQUEUE_REQ		= DID_BUS_BUSY,
+	CAM_REQUEUE_REQ		= 0x3E, /* Another unsued value.*/
 
 	CAM_STATUS_MASK		= 0x3F
 } cam_status;

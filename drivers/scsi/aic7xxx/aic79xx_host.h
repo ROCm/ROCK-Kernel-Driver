@@ -1,5 +1,5 @@
 /*
- * Adaptec AIC7xxx device driver host template for Linux.
+ * Adaptec AIC79xx device driver host template for Linux.
  *
  * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
@@ -36,60 +36,72 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_linux_host.h#5 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_host.h#7 $
  */
 
-#ifndef _AIC7XXX_LINUX_HOST_H_
-#define _AIC7XXX_LINUX_HOST_H_
+#ifndef _AIC79XX_LINUX_HOST_H_
+#define _AIC79XX_LINUX_HOST_H_
 
-int		 ahc_linux_proc_info(char *, char **, off_t, int, int, int);
-int		 ahc_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
-int		 ahc_linux_detect(Scsi_Host_Template *);
-int		 ahc_linux_release(struct Scsi_Host *);
-const char	*ahc_linux_info(struct Scsi_Host *);
-int		 ahc_linux_biosparam(Disk *, struct block_device *, int[]);
-int		 ahc_linux_bus_reset(Scsi_Cmnd *);
-int		 ahc_linux_dev_reset(Scsi_Cmnd *);
-int		 ahc_linux_abort(Scsi_Cmnd *);
+int		 ahd_linux_proc_info(char *, char **, off_t, int, int, int);
+int		 ahd_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
+int		 ahd_linux_detect(Scsi_Host_Template *);
+int		 ahd_linux_release(struct Scsi_Host *);
+const char	*ahd_linux_info(struct Scsi_Host *);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+int		 ahd_linux_biosparam(Disk *, struct block_device *, int[]);
+#else
+int		 ahd_linux_biosparam(Disk *, kdev_t, int[]);
+#endif
+int		 ahd_linux_bus_reset(Scsi_Cmnd *);
+int		 ahd_linux_dev_reset(Scsi_Cmnd *);
+int		 ahd_linux_abort(Scsi_Cmnd *);
 
 #if defined(__i386__)
-#  define AIC7XXX_BIOSPARAM ahc_linux_biosparam
+#  define AIC79XX_BIOSPARAM ahd_linux_biosparam
 #else
-#  define AIC7XXX_BIOSPARAM NULL
+#  define AIC79XX_BIOSPARAM NULL
 #endif
 
 /*
- * Scsi_Host_Template (see hosts.h) for AIC-7xxx - some fields
+ * Scsi_Host_Template (see hosts.h) for AIC-79xx - some fields
  * to do with card config are filled in after the card is detected.
  */
-#define AIC7XXX	{						\
+#define AIC79XX_TEMPLATE_CORE					\
 	next: NULL,						\
 	module: NULL,						\
 	proc_dir: NULL,						\
-	proc_info: ahc_linux_proc_info,				\
+	proc_info: ahd_linux_proc_info,				\
 	name: NULL,						\
-	detect: ahc_linux_detect,				\
-	release: ahc_linux_release,				\
-	info: ahc_linux_info,					\
+	detect: ahd_linux_detect,				\
+	release: ahd_linux_release,				\
+	info: ahd_linux_info,					\
 	command: NULL,						\
-	queuecommand: ahc_linux_queue,				\
+	queuecommand: ahd_linux_queue,				\
 	eh_strategy_handler: NULL,				\
-	eh_abort_handler: ahc_linux_abort,			\
-	eh_device_reset_handler: ahc_linux_dev_reset,		\
-	eh_bus_reset_handler: ahc_linux_bus_reset,		\
+	eh_abort_handler: ahd_linux_abort,			\
+	eh_device_reset_handler: ahd_linux_dev_reset,		\
+	eh_bus_reset_handler: ahd_linux_bus_reset,		\
 	eh_host_reset_handler: NULL,				\
 	abort: NULL,						\
 	reset: NULL,						\
 	slave_attach: NULL,					\
-	bios_param: AIC7XXX_BIOSPARAM,				\
-	can_queue: 253,		/* max simultaneous cmds      */\
-	this_id: -1,		/* scsi id of host adapter    */\
-	sg_tablesize: 0,	/* max scatter-gather cmds    */\
-	cmd_per_lun: 2,		/* cmds per lun		      */\
-	present: 0,		/* number of 7xxx's present   */\
-	unchecked_isa_dma: 0,	/* no memory DMA restrictions */\
-	use_clustering: ENABLE_CLUSTERING,			\
-	highmem_io: 1						\
-}
+	bios_param: AIC79XX_BIOSPARAM,				\
+	can_queue: AHD_MAX_QUEUE,/* max simultaneous cmds     */\
+	this_id: -1,		 /* scsi id of host adapter   */\
+	sg_tablesize: AHD_NSEG,	 /* max scatter-gather cmds   */\
+	cmd_per_lun: 2,		 /* cmds per lun	      */\
+	present: 0,		 /* number of 7xxx's present  */\
+	unchecked_isa_dma: 0,	 /* no memory DMA restrictions*/\
+	use_clustering: ENABLE_CLUSTERING
 
-#endif /* _AIC7XXX_LINUX_HOST_H_ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+#define AIC79XX	{						\
+	AIC79XX_TEMPLATE_CORE					\
+}
+#else
+#define AIC79XX {						\
+	AIC79XX_TEMPLATE_CORE,					\
+	use_new_eh_code: 1					\
+}
+#endif
+#endif /* _AIC79XX_LINUX_HOST_H_ */
