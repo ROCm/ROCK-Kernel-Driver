@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#174 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#178 $
  *
  * $FreeBSD$
  */
@@ -4832,9 +4832,6 @@ ahd_softc_insert(struct ahd_softc *ahd)
 				slave->flags &= ~AHD_BIOS_ENABLED; 
 				slave->flags |=
 				    master->flags & AHD_BIOS_ENABLED;
-				slave->flags &= ~AHD_PRIMARY_CHANNEL; 
-				slave->flags |=
-				    master->flags & AHD_PRIMARY_CHANNEL;
 				break;
 			}
 		}
@@ -4846,7 +4843,7 @@ ahd_softc_insert(struct ahd_softc *ahd)
 	 */
 	list_ahd = TAILQ_FIRST(&ahd_tailq);
 	while (list_ahd != NULL
-	    && ahd_softc_comp(list_ahd, ahd) <= 0)
+	    && ahd_softc_comp(ahd, list_ahd) <= 0)
 		list_ahd = TAILQ_NEXT(list_ahd, links);
 	if (list_ahd != NULL)
 		TAILQ_INSERT_BEFORE(list_ahd, ahd, links);
@@ -6535,6 +6532,22 @@ ahd_parse_cfgdata(struct ahd_softc *ahd, struct seeprom_config *sc)
 	return (0);
 }
 
+/*
+ * Parse device configuration information.
+ */
+int
+ahd_parse_vpddata(struct ahd_softc *ahd, struct vpd_config *vpd)
+{
+	int error;
+
+	error = ahd_verify_vpd_cksum(vpd);
+	if (error == 0)
+		return (EINVAL);
+	if ((vpd->bios_flags & VPDBOOTHOST) != 0)
+		ahd->flags |= AHD_BOOT_CHANNEL;
+	return (0);
+}
+
 void
 ahd_intr_enable(struct ahd_softc *ahd, int enable)
 {
@@ -6815,7 +6828,6 @@ ahd_index_busy_tcl(struct ahd_softc *ahd, u_int *saved_scbid, u_int tcl)
 
 /*
  * Return the untagged transaction id for a given target/channel lun.
- * Optionally, clear the entry.
  */
 u_int
 ahd_find_busy_tcl(struct ahd_softc *ahd, u_int tcl)
@@ -7325,7 +7337,6 @@ ahd_abort_scbs(struct ahd_softc *ahd, int target, char channel,
 {
 	struct		scb *scbp;
 	struct		scb *scbp_next;
-	u_int		active_scb;
 	u_int		i, j;
 	u_int		maxtarget;
 	u_int		minlun;
@@ -7333,11 +7344,10 @@ ahd_abort_scbs(struct ahd_softc *ahd, int target, char channel,
 	int		found;
 	ahd_mode_state	saved_modes;
 
-	/* restore these when we're done */
-	active_scb = ahd_get_scbptr(ahd);
+	/* restore this when we're done */
 	saved_modes = ahd_save_modes(ahd);
-
 	ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
+
 	found = ahd_search_qinfifo(ahd, target, channel, lun, SCB_LIST_NULL,
 				   role, CAM_REQUEUE_REQ, SEARCH_COMPLETE);
 
@@ -7411,7 +7421,6 @@ ahd_abort_scbs(struct ahd_softc *ahd, int target, char channel,
 			found++;
 		}
 	}
-	ahd_set_scbptr(ahd, active_scb);
 	ahd_restore_modes(ahd, saved_modes);
 	ahd_platform_abort_scbs(ahd, target, channel, lun, tag, role, status);
 	ahd->flags |= AHD_UPDATE_PEND_CMDS;
@@ -8772,11 +8781,12 @@ ahd_dump_scbs(struct ahd_softc *ahd)
 /*
  * Read count 16bit words from 16bit word address start_addr from the
  * SEEPROM attached to the controller, into buf, using the controller's
- * SEEPROM reading state machine.
+ * SEEPROM reading state machine.  Optionally treat the data as a byte
+ * stream in terms of byte order.
  */
 int
 ahd_read_seeprom(struct ahd_softc *ahd, uint16_t *buf,
-		 u_int start_addr, u_int count)
+		 u_int start_addr, u_int count, int bytestream)
 {
 	u_int cur_addr;
 	u_int end_addr;
@@ -8790,13 +8800,26 @@ ahd_read_seeprom(struct ahd_softc *ahd, uint16_t *buf,
 	AHD_ASSERT_MODES(ahd, AHD_MODE_SCSI_MSK, AHD_MODE_SCSI_MSK);
 	end_addr = start_addr + count;
 	for (cur_addr = start_addr; cur_addr < end_addr; cur_addr++) {
+
 		ahd_outb(ahd, SEEADR, cur_addr);
 		ahd_outb(ahd, SEECTL, SEEOP_READ | SEESTART);
 		
 		error = ahd_wait_seeprom(ahd);
 		if (error)
 			break;
-		*buf++ = ahd_inw(ahd, SEEDAT);
+		if (bytestream != 0) {
+			uint8_t *bytestream_ptr;
+
+			bytestream_ptr = (uint8_t *)buf;
+			*bytestream_ptr++ = ahd_inb(ahd, SEEDAT);
+			*bytestream_ptr = ahd_inb(ahd, SEEDAT+1);
+		} else {
+			/*
+			 * ahd_inw() already handles machine byte order.
+			 */
+			*buf = ahd_inw(ahd, SEEDAT);
+		}
+		buf++;
 	}
 	return (error);
 }
@@ -8867,6 +8890,38 @@ ahd_wait_seeprom(struct ahd_softc *ahd)
 	if (cnt == 0)
 		return (ETIMEDOUT);
 	return (0);
+}
+
+/*
+ * Validate the two checksums in the per_channel
+ * vital product data struct.
+ */
+int
+ahd_verify_vpd_cksum(struct vpd_config *vpd)
+{
+	int i;
+	int maxaddr;
+	uint32_t checksum;
+	uint8_t *vpdarray;
+
+	vpdarray = (uint8_t *)vpd;
+	maxaddr = offsetof(struct vpd_config, vpd_checksum);
+	checksum = 0;
+	for (i = offsetof(struct vpd_config, resource_type); i < maxaddr; i++)
+		checksum = checksum + vpdarray[i];
+	if (checksum == 0
+	 || (-checksum & 0xFF) != vpd->vpd_checksum)
+		return (0);
+
+	checksum = 0;
+	maxaddr = offsetof(struct vpd_config, checksum);
+	for (i = offsetof(struct vpd_config, default_target_flags);
+	     i < maxaddr; i++)
+		checksum = checksum + vpdarray[i];
+	if (checksum == 0
+	 || (-checksum & 0xFF) != vpd->checksum)
+		return (0);
+	return (1);
 }
 
 int

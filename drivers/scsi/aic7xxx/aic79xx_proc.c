@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#13 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#14 $
  */
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
@@ -262,7 +262,8 @@ ahd_proc_write_seeprom(struct ahd_softc *ahd, char *buffer, int length)
 		ahd_write_seeprom(ahd, (u_int16_t *)buffer, start_addr,
 				  sizeof(struct seeprom_config)/2);
 		ahd_read_seeprom(ahd, (uint16_t *)ahd->seep_config,
-				 start_addr, sizeof(struct seeprom_config)/2);
+				 start_addr, sizeof(struct seeprom_config)/2,
+				 /*ByteStream*/FALSE);
 		ahd_release_seeprom(ahd);
 		written = length;
 	}

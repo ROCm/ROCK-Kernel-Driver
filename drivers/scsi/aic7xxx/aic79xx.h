@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#86 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#88 $
  *
  * $FreeBSD$
  */
@@ -322,7 +322,11 @@ typedef enum {
 	 * glitches.  This flag tells the firmware to tolerate
 	 * early REQ assertions.
 	 */
-	AHD_EARLY_REQ_BUG	= 0x400000
+	AHD_EARLY_REQ_BUG	= 0x400000,
+	/*
+	 * The LED does not stay on long enough in packetized modes.
+	 */
+	AHD_FAINT_LED_BUG	= 0x800000
 } ahd_bug;
 
 /*
@@ -332,10 +336,7 @@ typedef enum {
  */
 typedef enum {
 	AHD_FNONE	      = 0x00000,
-	AHD_PRIMARY_CHANNEL   = 0x00003,/*
-					 * The channel that should
-					 * be probed first.
-					 */
+	AHD_BOOT_CHANNEL      = 0x00001,/* We were set as the boot channel. */
 	AHD_USEDEFAULTS	      = 0x00004,/*
 					 * For cards without an seeprom
 					 * or a BIOS to initialize the chip's
@@ -900,6 +901,40 @@ struct seeprom_config {
 	uint16_t checksum;		/* word 31 */
 };
 
+/*
+ * Vital Product Data used during POST and by the BIOS.
+ */
+struct vpd_config {
+	uint8_t  bios_flags;
+#define		VPDMASTERBIOS	0x0001
+#define		VPDBOOTHOST	0x0002
+	uint8_t  reserved_1[21];
+	uint8_t  resource_type;
+	uint8_t  resource_len[2];
+	uint8_t  resource_data[8];
+	uint8_t  vpd_tag;
+	uint16_t vpd_len;
+	uint8_t  vpd_keyword[2];
+	uint8_t  length;
+	uint8_t  revision;
+	uint8_t  device_flags;
+	uint8_t  termnation_menus[2];
+	uint8_t  fifo_threshold;
+	uint8_t  end_tag;
+	uint8_t  vpd_checksum;
+	uint16_t default_target_flags;
+	uint16_t default_bios_flags;
+	uint16_t default_ctrl_flags;
+	uint8_t  default_irq;
+	uint8_t  pci_lattime;
+	uint8_t  max_target;
+	uint8_t  boot_lun;
+	uint16_t signature;
+	uint8_t  reserved_2;
+	uint8_t  checksum;
+	uint8_t	 reserved_3[4];
+};
+
 /****************************** Flexport Logic ********************************/
 #define FLXADDR_TERMCTL			0x0
 #define		FLX_TERMCTL_ENSECHIGH	0x8
@@ -932,11 +967,12 @@ struct seeprom_config {
 #define		FLX_CSTAT_INVALID	0x3
 
 int		ahd_read_seeprom(struct ahd_softc *ahd, uint16_t *buf,
-				 u_int start_addr, u_int count);
+				 u_int start_addr, u_int count, int bstream);
 
 int		ahd_write_seeprom(struct ahd_softc *ahd, uint16_t *buf,
 				  u_int start_addr, u_int count);
 int		ahd_wait_seeprom(struct ahd_softc *ahd);
+int		ahd_verify_vpd_cksum(struct vpd_config *vpd);
 int		ahd_verify_cksum(struct seeprom_config *sc);
 int		ahd_acquire_seeprom(struct ahd_softc *ahd);
 void		ahd_release_seeprom(struct ahd_softc *ahd);
@@ -1321,6 +1357,8 @@ int			 ahd_softc_init(struct ahd_softc *);
 void			 ahd_controller_info(struct ahd_softc *ahd, char *buf);
 int			 ahd_init(struct ahd_softc *ahd);
 int			 ahd_default_config(struct ahd_softc *ahd);
+int			 ahd_parse_vpddata(struct ahd_softc *ahd,
+					   struct vpd_config *vpd);
 int			 ahd_parse_cfgdata(struct ahd_softc *ahd,
 					   struct seeprom_config *sc);
 void			 ahd_intr_enable(struct ahd_softc *ahd, int enable);

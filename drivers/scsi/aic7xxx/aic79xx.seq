@@ -40,7 +40,7 @@
  * $FreeBSD$
  */
 
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#88 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#89 $"
 PATCH_ARG_LIST = "struct ahd_softc *ahd"
 PREFIX = "ahd_"
 
@@ -89,6 +89,13 @@ END_CRITICAL;
 idle_loop_check_nonpackreq:
 	test	SSTAT2, NONPACKREQ jz . + 2;
 	call	unexpected_nonpkt_phase_find_ctxt;
+	if ((ahd->bugs & AHD_FAINT_LED_BUG) != 0) {
+		and	A, FIFO0FREE|FIFO1FREE, DFFSTAT;
+		cmp	A, FIFO0FREE|FIFO1FREE jne . + 3;
+		and	SBLKCTL, ~DIAGLEDEN|DIAGLEDON;
+		jmp	. + 2;
+		or	SBLKCTL, DIAGLEDEN|DIAGLEDON;
+	}
 	call	idle_loop_gsfifo_in_scsi_mode;
 	call	idle_loop_service_fifos;
 	call	idle_loop_cchan;
