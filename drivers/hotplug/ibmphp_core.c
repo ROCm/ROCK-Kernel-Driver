@@ -1417,7 +1417,7 @@ static int __init ibmphp_init (void)
 
 	/* lock ourselves into memory with a module 
 	 * count of -1 so that no one can unload us. */
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 
 exit:
 	return rc;
