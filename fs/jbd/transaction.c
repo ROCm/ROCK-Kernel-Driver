@@ -1587,7 +1587,7 @@ static int __journal_try_to_free_buffer(struct buffer_head *bh,
 		goto out;
 	}
 
-	if (!buffer_uptodate(bh))
+	if (!buffer_uptodate(bh))	/* AKPM: why? */
 		goto out;
 
 	if (jh->b_next_transaction != 0)
@@ -1774,9 +1774,6 @@ static int journal_unmap_buffer(journal_t *journal, struct buffer_head *bh)
 	int may_free = 1;
 
 	BUFFER_TRACE(bh, "entry");
-
-	if (!buffer_mapped(bh))
-		return 1;
 
 	/* It is safe to proceed here without the
 	 * journal_datalist_spinlock because the buffers cannot be

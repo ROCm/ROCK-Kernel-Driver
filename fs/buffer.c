@@ -1091,17 +1091,15 @@ EXPORT_SYMBOL(set_bh_page);
 /*
  * Called when truncating a buffer on a page completely.
  */
-static void discard_buffer(struct buffer_head * bh)
+static /* inline */ void discard_buffer(struct buffer_head * bh)
 {
-	if (buffer_mapped(bh)) {
-		clear_buffer_dirty(bh);
-		lock_buffer(bh);
-		bh->b_bdev = NULL;
-		clear_buffer_mapped(bh);
-		clear_buffer_req(bh);
-		clear_buffer_new(bh);
-		unlock_buffer(bh);
-	}
+	lock_buffer(bh);
+	clear_buffer_dirty(bh);
+	bh->b_bdev = NULL;
+	clear_buffer_mapped(bh);
+	clear_buffer_req(bh);
+	clear_buffer_new(bh);
+	unlock_buffer(bh);
 }
 
 /**
