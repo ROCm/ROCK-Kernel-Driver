@@ -270,6 +270,9 @@ extern int dump_generic_skip_data(unsigned long loc, unsigned long sz);
 extern int dump_generic_write_buffer(void *buf, unsigned long len);
 extern int dump_generic_configure(unsigned long);
 extern int dump_generic_unconfigure(void);
+#ifdef CONFIG_DISCONTIGMEM
+extern void dump_reconfigure_mbanks(void);
+#endif
 
 /* Default scheme template */
 extern struct dump_scheme dump_scheme_singlestage;

@@ -353,6 +353,53 @@ int dump_generic_unconfigure(void)
 	return 0;
 }
 
+#ifdef CONFIG_DISCONTIGMEM
+
+void dump_reconfigure_mbanks(void) 
+{
+        pg_data_t *pgdat;
+        loff_t start, end, loc, loc_end;
+        int i=0;
+        struct dump_data_filter *filter = dump_config.dumper->filter;
+
+        for_each_pgdat(pgdat) {
+
+                start = (loff_t)(pgdat->node_start_pfn << PAGE_SHIFT);
+                end = ((loff_t)(pgdat->node_start_pfn + pgdat->node_spanned_pages) << PAGE_SHIFT);
+		for(loc = start; loc < end; loc += (DUMP_PAGE_SIZE)) {
+
+                        if(!(__dump_page_valid(loc >> PAGE_SHIFT)))
+                                continue;
+
+                        /* We found a valid page. This is the start */
+                        filter->start[i] = loc;
+
+                        /* Now loop here till you find the end */
+                        for(loc_end = loc; loc_end < end; loc_end += (DUMP_PAGE_SIZE)) {
+                                
+				if(__dump_page_valid(loc_end >> PAGE_SHIFT)) {
+                                /* This page could very well be the last page */
+                                        filter->end[i] = loc_end;
+                                        continue;
+                                }
+                                break;
+                        }
+                        i++;
+                        loc = loc_end;
+                }
+        }
+        filter->num_mbanks = i;
+
+        /* Propagate memory bank information to other filters */
+        for (filter = dump_config.dumper->filter, filter++ ;filter->selector; filter++) {
+                for(i = 0; i < dump_config.dumper->filter->num_mbanks; i++) {
+                        filter->start[i] = dump_config.dumper->filter->start[i];
+                        filter->end[i] = dump_config.dumper->filter->end[i];
+                        filter->num_mbanks = dump_config.dumper->filter->num_mbanks;
+                }
+        }
+}
+#endif
 
 /* Set up the default dump scheme */
 

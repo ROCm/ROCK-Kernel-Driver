@@ -118,6 +118,12 @@ int dump_generic_execute(const char *panic_str, const struct pt_regs *regs)
 {
 	int ret = 0;
 
+#ifdef CONFIG_DISCONTIGMEM
+        printk(KERN_INFO "Reconfiguring memory bank information....\n");
+        printk(KERN_INFO "This may take a while....\n");
+        dump_reconfigure_mbanks();
+#endif
+
 	if ((ret = dump_configure_header(panic_str, regs))) {
 		printk("dump config header failed ! error %d\n", ret);
 		return ret;	
