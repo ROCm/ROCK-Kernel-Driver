@@ -111,11 +111,6 @@ void __init set_num_var_ranges(void)
 	num_var_ranges = config & 0xff;
 }
 
-static char * attrib_to_str(int x)
-{
-	return (x <= 6) ? mtrr_strings[x] : "?";
-}
-
 static void init_table(void)
 {
 	int i, max;
@@ -362,8 +357,8 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 			if (type == MTRR_TYPE_UNCACHABLE)
 				continue;
 			printk (KERN_WARNING "mtrr: type mismatch for %lx000,%lx000 old: %s new: %s\n",
-			     base, size, attrib_to_str(ltype),
-			     attrib_to_str(type));
+			     base, size, mtrr_attrib_to_str(ltype),
+			     mtrr_attrib_to_str(type));
 			goto out;
 		}
 		if (increment)
@@ -703,16 +698,4 @@ static int __init mtrr_init(void)
 	return -ENXIO;
 }
 
-char *mtrr_strings[MTRR_NUM_TYPES] =
-{
-    "uncachable",               /* 0 */
-    "write-combining",          /* 1 */
-    "?",                        /* 2 */
-    "?",                        /* 3 */
-    "write-through",            /* 4 */
-    "write-protect",            /* 5 */
-    "write-back",               /* 6 */
-};
-
 subsys_initcall(mtrr_init);
-
