@@ -408,7 +408,7 @@ static struct pci_device_id trm290_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, trm290_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "TRM290 IDE",
+	.name		= "TRM290_IDE",
 	.id_table	= trm290_pci_tbl,
 	.probe		= trm290_init_one,
 };

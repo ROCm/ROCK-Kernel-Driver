@@ -782,7 +782,7 @@ static struct pci_device_id sgiioc4_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, sgiioc4_pci_tbl);
 
 static struct pci_driver driver = {
-	.name = "SGI-IOC4 IDE",
+	.name = "SGI-IOC4_IDE",
 	.id_table = sgiioc4_pci_tbl,
 	.probe = sgiioc4_init_one,
 };

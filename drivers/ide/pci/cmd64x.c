@@ -760,7 +760,7 @@ static struct pci_device_id cmd64x_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, cmd64x_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "CMD64x IDE",
+	.name		= "CMD64x_IDE",
 	.id_table	= cmd64x_pci_tbl,
 	.probe		= cmd64x_init_one,
 };

@@ -905,7 +905,7 @@ static struct pci_device_id pdc202xx_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, pdc202xx_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "Promise Old IDE",
+	.name		= "Promise_Old_IDE",
 	.id_table	= pdc202xx_pci_tbl,
 	.probe		= pdc202xx_init_one,
 };

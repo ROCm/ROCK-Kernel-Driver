@@ -1403,7 +1403,7 @@ static struct pci_device_id hpt366_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, hpt366_pci_tbl);
 
 static struct pci_driver driver = {
-	.name		= "HPT366 IDE",
+	.name		= "HPT366_IDE",
 	.id_table	= hpt366_pci_tbl,
 	.probe		= hpt366_init_one,
 };
