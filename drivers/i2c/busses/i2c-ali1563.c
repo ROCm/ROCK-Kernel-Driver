@@ -343,7 +343,7 @@ Err:
 	return -ENODEV;
 }
 
-static void __exit ali1563_shutdown(struct pci_dev * dev)
+static void ali1563_shutdown(struct pci_dev *dev)
 {
 	release_region(ali1563_smba,ALI1563_SMB_IOSIZE);
 }
