@@ -1100,6 +1100,7 @@ static void ip_encap(struct sk_buff *skb, u32 saddr, u32 daddr)
 
 	skb->h.ipiph = skb->nh.iph;
 	skb->nh.iph = iph;
+	memset(&(IPCB(skb)->opt), 0, sizeof(IPCB(skb)->opt));
 #ifdef CONFIG_NETFILTER
 	nf_conntrack_put(skb->nfct);
 	skb->nfct = NULL;
@@ -1108,12 +1109,14 @@ static void ip_encap(struct sk_buff *skb, u32 saddr, u32 daddr)
 
 static inline int ipmr_forward_finish(struct sk_buff *skb)
 {
-	struct dst_entry *dst = skb->dst;
+	struct ip_options * opt	= &(IPCB(skb)->opt);
 
-	if (skb->len <= dst_pmtu(dst))
-		return dst_output(skb);
-	else
-		return ip_fragment(skb, dst_output);
+	IP_INC_STATS_BH(IpForwDatagrams);
+
+	if (unlikely(opt->optlen))
+		ip_forward_options(skb);
+
+	return dst_output(skb);
 }
 
 /*
