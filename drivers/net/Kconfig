@@ -1486,7 +1486,7 @@ config E100
 
 config E100_NAPI
 	bool "Use Rx Polling (NAPI)"
-	depends on E100
+	depends on E100 && !PPC_PSERIES
 	help
 	  NAPI is a new driver API designed to reduce CPU and interrupt load
 	  when the driver is receiving lots of packets from the card. It is

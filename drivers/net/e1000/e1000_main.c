@@ -788,7 +788,7 @@ e1000_setup_tx_resources(struct e1000_adapter *adapter)
 	int size;
 
 	size = sizeof(struct e1000_buffer) * txdr->count;
-	txdr->buffer_info = kmalloc(size, GFP_KERNEL);
+	txdr->buffer_info = vmalloc(size);
 	if(!txdr->buffer_info) {
 		return -ENOMEM;
 	}
@@ -801,7 +801,7 @@ e1000_setup_tx_resources(struct e1000_adapter *adapter)
 
 	txdr->desc = pci_alloc_consistent(pdev, txdr->size, &txdr->dma);
 	if(!txdr->desc) {
-		kfree(txdr->buffer_info);
+		vfree(txdr->buffer_info);
 		return -ENOMEM;
 	}
 	memset(txdr->desc, 0, txdr->size);
@@ -824,7 +824,7 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 {
 	uint64_t tdba = adapter->tx_ring.dma;
 	uint32_t tdlen = adapter->tx_ring.count * sizeof(struct e1000_tx_desc);
-	uint32_t tctl, tipg;
+	uint32_t tctl, tipg, tspmt;
 
 	E1000_WRITE_REG(&adapter->hw, TDBAL, (tdba & 0x00000000ffffffffULL));
 	E1000_WRITE_REG(&adapter->hw, TDBAH, (tdba >> 32));
@@ -835,6 +835,10 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 
 	E1000_WRITE_REG(&adapter->hw, TDH, 0);
 	E1000_WRITE_REG(&adapter->hw, TDT, 0);
+
+	tspmt = E1000_READ_REG(&adapter->hw, TSPMT);
+        tspmt |= 0x0C000000;
+        E1000_WRITE_REG(&adapter->hw, TSPMT, tspmt);
 
 	/* Set the default values for the Tx Inter Packet Gap timer */
 
@@ -905,7 +909,7 @@ e1000_setup_rx_resources(struct e1000_adapter *adapter)
 	int size;
 
 	size = sizeof(struct e1000_buffer) * rxdr->count;
-	rxdr->buffer_info = kmalloc(size, GFP_KERNEL);
+	rxdr->buffer_info = vmalloc(size);
 	if(!rxdr->buffer_info) {
 		return -ENOMEM;
 	}
@@ -919,7 +923,7 @@ e1000_setup_rx_resources(struct e1000_adapter *adapter)
 	rxdr->desc = pci_alloc_consistent(pdev, rxdr->size, &rxdr->dma);
 
 	if(!rxdr->desc) {
-		kfree(rxdr->buffer_info);
+		vfree(rxdr->buffer_info);
 		return -ENOMEM;
 	}
 	memset(rxdr->desc, 0, rxdr->size);
@@ -1043,7 +1047,7 @@ e1000_free_tx_resources(struct e1000_adapter *adapter)
 
 	e1000_clean_tx_ring(adapter);
 
-	kfree(adapter->tx_ring.buffer_info);
+	vfree(adapter->tx_ring.buffer_info);
 	adapter->tx_ring.buffer_info = NULL;
 
 	pci_free_consistent(pdev, adapter->tx_ring.size,
@@ -1112,7 +1116,7 @@ e1000_free_rx_resources(struct e1000_adapter *adapter)
 
 	e1000_clean_rx_ring(adapter);
 
-	kfree(rx_ring->buffer_info);
+	vfree(rx_ring->buffer_info);
 	rx_ring->buffer_info = NULL;
 
 	pci_free_consistent(pdev, rx_ring->size, rx_ring->desc, rx_ring->dma);
@@ -1689,7 +1693,7 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 	 * know there are new descriptors to fetch.  (Only
 	 * applicable for weak-ordered memory model archs,
 	 * such as IA-64). */
-	wmb();
+	mb();
 
 	tx_ring->next_to_use = i;
 	E1000_WRITE_REG(&adapter->hw, TDT, i);
@@ -1862,7 +1866,8 @@ e1000_get_stats(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 
-	e1000_update_stats(adapter);
+	if (adapter->pdev->current_state == 0)
+		e1000_update_stats(adapter);
 	return &adapter->net_stats;
 }
 
@@ -2174,6 +2179,7 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	unsigned int i, eop;
 	boolean_t cleaned = FALSE;
 
+	spin_lock(&adapter->tx_lock);
 
 	i = tx_ring->next_to_clean;
 	eop = tx_ring->buffer_info[i].next_to_watch;
@@ -2215,8 +2221,6 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	}
 
 	tx_ring->next_to_clean = i;
-
-	spin_lock(&adapter->tx_lock);
 
 	if(cleaned && netif_queue_stopped(netdev) && netif_carrier_ok(netdev))
 		netif_wake_queue(netdev);
@@ -2413,7 +2417,7 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 			 * know there are new descriptors to fetch.  (Only
 			 * applicable for weak-ordered memory model archs,
 			 * such as IA-64). */
-			wmb();
+			mb();
 
 			E1000_WRITE_REG(&adapter->hw, RDT, i);
 		}

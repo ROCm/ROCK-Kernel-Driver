@@ -773,6 +773,8 @@ static inline int e100_exec_cmd(struct nic *nic, u8 cmd, dma_addr_t dma_addr)
 
 	spin_lock_irqsave(&nic->cmd_lock, flags);
 
+	mb();
+
 	/* Previous command is accepted when SCB clears */
 	for(i = 0; i < E100_WAIT_SCB_TIMEOUT; i++) {
 		if(likely(!readb(&nic->csr->scb.cmd_lo)))
@@ -823,8 +825,10 @@ static inline int e100_exec_cb(struct nic *nic, struct sk_buff *skb,
 	/* Order is important otherwise we'll be in a race with h/w:
 	 * set S-bit in current first, then clear S-bit in previous. */
 	cb->command |= cpu_to_le16(cb_s);
-	wmb();
+	mb();
 	cb->prev->command &= cpu_to_le16(~cb_s);
+
+	mb();
 
 	while(nic->cb_to_send != nic->cb_to_use) {
 		if(unlikely(e100_exec_cmd(nic, nic->cuc_cmd,
@@ -1406,7 +1410,7 @@ static inline int e100_rx_alloc_skb(struct nic *nic, struct rx *rx)
 		struct rfd *prev_rfd = (struct rfd *)rx->prev->skb->data;
 		put_unaligned(cpu_to_le32(rx->dma_addr),
 			(u32 *)&prev_rfd->link);
-		wmb();
+		mb();
 		prev_rfd->command &= ~cpu_to_le16(cb_el);
 		pci_dma_sync_single_for_device(nic->pdev, rx->prev->dma_addr,
 			sizeof(struct rfd), PCI_DMA_TODEVICE);
@@ -1435,6 +1439,8 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 	/* If data isn't ready, nothing to indicate */
 	if(unlikely(!(rfd_status & cb_complete)))
        		return -EAGAIN;
+
+	rmb();
 
 	/* Get actual data size */
 	actual_size = le16_to_cpu(rfd->actual_size) & 0x3FFF;
