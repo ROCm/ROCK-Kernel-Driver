@@ -101,7 +101,7 @@ static int driverfs_commit_write(struct file *file, struct page *page, unsigned 
 }
 
 
-struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
+static struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 {
 	struct inode *inode = new_inode(sb);
 
@@ -451,9 +451,9 @@ static struct super_block *driverfs_get_sb(struct file_system_type *fs_type,
 	return get_sb_single(fs_type, flags, data, driverfs_fill_super);
 }
 
-static struct file_system_type driverfs_fs_type = {
+static struct file_system_type sysfs_fs_type = {
 	.owner		= THIS_MODULE,
-	.name		= "driverfs",
+	.name		= "sysfs",
 	.get_sb		= driverfs_get_sb,
 	.kill_sb	= kill_litter_super,
 };
@@ -471,7 +471,7 @@ static int get_mount(void)
 	}
 
 	spin_unlock(&mount_lock);
-	mnt = kern_mount(&driverfs_fs_type);
+	mnt = kern_mount(&sysfs_fs_type);
 
 	if (IS_ERR(mnt)) {
 		printk(KERN_ERR "driverfs: could not mount!\n");
@@ -509,10 +509,12 @@ static void put_mount(void)
 	DBG("driverfs: mount_count = %d\n",mount_count);
 }
 
-int __init init_driverfs_fs(void)
+static int __init sysfs_init(void)
 {
-	return register_filesystem(&driverfs_fs_type);
+	return register_filesystem(&sysfs_fs_type);
 }
+
+core_initcall(sysfs_init);
 
 static struct dentry * get_dentry(struct dentry * parent, const char * name)
 {
@@ -525,12 +527,12 @@ static struct dentry * get_dentry(struct dentry * parent, const char * name)
 }
 
 /**
- * driverfs_create_dir - create a directory in the filesystem
+ * sysfs_create_dir - create a directory in the filesystem
  * @entry:	directory entry
  * @parent:	parent directory entry
  */
 int
-driverfs_create_dir(struct driver_dir_entry * entry,
+sysfs_create_dir(struct driver_dir_entry * entry,
 		    struct driver_dir_entry * parent)
 {
 	struct dentry * dentry = NULL;
@@ -569,12 +571,12 @@ driverfs_create_dir(struct driver_dir_entry * entry,
 }
 
 /**
- * driverfs_create_file - create a file
+ * sysfs_create_file - create a file
  * @entry:	structure describing the file
  * @parent:	directory to create it in
  */
 int
-driverfs_create_file(struct attribute * entry,
+sysfs_create_file(struct attribute * entry,
 		     struct driver_dir_entry * parent)
 {
 	struct dentry * dentry;
@@ -600,13 +602,13 @@ driverfs_create_file(struct attribute * entry,
 }
 
 /**
- * driverfs_create_symlink - make a symlink
+ * sysfs_create_symlink - make a symlink
  * @parent:	directory we're creating in 
  * @entry:	entry describing link
  * @target:	place we're symlinking to
  * 
  */
-int driverfs_create_symlink(struct driver_dir_entry * parent, 
+int sysfs_create_symlink(struct driver_dir_entry * parent, 
 			    char * name, char * target)
 {
 	struct dentry * dentry;
@@ -630,14 +632,14 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 }
 
 /**
- * driverfs_remove_file - exported file removal
+ * sysfs_remove_file - exported file removal
  * @dir:	directory the file supposedly resides in
  * @name:	name of the file
  *
  * Try and find the file in the dir's list.
  * If it's there, call __remove_file() (above) for the dentry.
  */
-void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
+void sysfs_remove_file(struct driver_dir_entry * dir, const char * name)
 {
 	struct dentry * dentry;
 
@@ -657,13 +659,13 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 }
 
 /**
- * driverfs_remove_dir - exportable directory removal
+ * sysfs_remove_dir - exportable directory removal
  * @dir:	directory to remove
  *
  * To make sure we don't orphan anyone, first remove
  * all the children in the list, then do clean up the directory.
  */
-void driverfs_remove_dir(struct driver_dir_entry * dir)
+void sysfs_remove_dir(struct driver_dir_entry * dir)
 {
 	struct list_head * node, * next;
 	struct dentry * dentry = dir->dentry;
@@ -698,9 +700,9 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 	put_mount();
 }
 
-EXPORT_SYMBOL(driverfs_create_file);
-EXPORT_SYMBOL(driverfs_create_symlink);
-EXPORT_SYMBOL(driverfs_create_dir);
-EXPORT_SYMBOL(driverfs_remove_file);
-EXPORT_SYMBOL(driverfs_remove_dir);
+EXPORT_SYMBOL(sysfs_create_file);
+EXPORT_SYMBOL(sysfs_create_symlink);
+EXPORT_SYMBOL(sysfs_create_dir);
+EXPORT_SYMBOL(sysfs_remove_file);
+EXPORT_SYMBOL(sysfs_remove_dir);
 MODULE_LICENSE("GPL");
