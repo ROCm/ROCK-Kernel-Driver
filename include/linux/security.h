@@ -1371,7 +1371,6 @@ extern int register_security	(struct security_operations *ops);
 extern int unregister_security	(struct security_operations *ops);
 extern int mod_reg_security	(const char *name, struct security_operations *ops);
 extern int mod_unreg_security	(const char *name, struct security_operations *ops);
-extern int capable		(int cap);
 
 
 #else /* CONFIG_SECURITY */

@@ -540,8 +540,10 @@ static inline int sas_ss_flags(unsigned long sp)
 }
 
 
-#ifndef CONFIG_SECURITY
-/* capable prototype and code are in security.[hc] if CONFIG_SECURITY */
+#ifdef CONFIG_SECURITY
+/* code is in security.c */
+extern int capable(int cap);
+#else
 static inline int capable(int cap)
 {
 	if (cap_raised(current->cap_effective, cap)) {
