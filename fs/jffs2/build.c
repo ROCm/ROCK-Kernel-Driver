@@ -7,13 +7,15 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.66 2004/11/20 19:18:07 dwmw2 Exp $
+ * $Id: build.c,v 1.68 2004/11/27 13:38:10 gleixner Exp $
  *
  */
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
+#include <linux/mtd/mtd.h>
 #include "nodelist.h"
 
 static void jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *, struct jffs2_inode_cache *, struct jffs2_full_dirent **);
@@ -312,7 +314,10 @@ int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 
 	c->free_size = c->flash_size;
 	c->nr_blocks = c->flash_size / c->sector_size;
-	c->blocks = kmalloc(sizeof(struct jffs2_eraseblock) * c->nr_blocks, GFP_KERNEL);
+ 	if (c->mtd->flags & MTD_NO_VIRTBLOCKS)
+		c->blocks = vmalloc(sizeof(struct jffs2_eraseblock) * c->nr_blocks);
+	else
+		c->blocks = kmalloc(sizeof(struct jffs2_eraseblock) * c->nr_blocks, GFP_KERNEL);
 	if (!c->blocks)
 		return -ENOMEM;
 	for (i=0; i<c->nr_blocks; i++) {

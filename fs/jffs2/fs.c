@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: fs.c,v 1.49 2004/11/16 20:36:11 dwmw2 Exp $
+ * $Id: fs.c,v 1.50 2004/11/23 15:37:31 gleixner Exp $
  *
  */
 
@@ -463,11 +463,13 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent)
 	 */
 	c->sector_size = c->mtd->erasesize; 
 	blocks = c->flash_size / c->sector_size;
-	while ((blocks * sizeof (struct jffs2_eraseblock)) > (128 * 1024)) {
-		blocks >>= 1;
-		c->sector_size <<= 1;
-	}	
-	
+	if (!(c->mtd->flags & MTD_NO_VIRTBLOCKS)) {
+		while ((blocks * sizeof (struct jffs2_eraseblock)) > (128 * 1024)) {
+			blocks >>= 1;
+			c->sector_size <<= 1;
+		}	
+	}
+
 	/*
 	 * Size alignment check
 	 */
@@ -533,7 +535,10 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent)
  out_nodes:
 	jffs2_free_ino_caches(c);
 	jffs2_free_raw_node_refs(c);
-	kfree(c->blocks);
+	if (c->mtd->flags & MTD_NO_VIRTBLOCKS)
+		vfree(c->blocks);
+	else
+		kfree(c->blocks);
  out_inohash:
 	kfree(c->inocache_list);
  out_wbuf:

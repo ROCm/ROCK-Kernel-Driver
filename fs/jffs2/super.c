@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: super.c,v 1.103 2004/11/16 20:36:12 dwmw2 Exp $
+ * $Id: super.c,v 1.104 2004/11/23 15:37:31 gleixner Exp $
  *
  */
 
@@ -277,7 +277,10 @@ static void jffs2_put_super (struct super_block *sb)
 	up(&c->alloc_sem);
 	jffs2_free_ino_caches(c);
 	jffs2_free_raw_node_refs(c);
-	kfree(c->blocks);
+	if (c->mtd->flags & MTD_NO_VIRTBLOCKS)
+		vfree(c->blocks);
+	else
+		kfree(c->blocks);
 	jffs2_flash_cleanup(c);
 	kfree(c->inocache_list);
 	if (c->mtd->sync)
