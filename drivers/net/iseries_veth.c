@@ -461,6 +461,11 @@ static void veth_statemachine(void *p)
 		if (cnx->msgs)
 			for (i = 0; i < VETH_NUMBUFFERS; ++i)
 				veth_recycle_msg(cnx, cnx->msgs + i);
+		spin_unlock_irq(&cnx->lock);
+		veth_flush_pending(cnx);
+		spin_lock_irq(&cnx->lock);
+		if (cnx->state & VETH_STATE_RESET)
+			goto restart;
 	}
 
 	if (cnx->state & VETH_STATE_SHUTDOWN)
@@ -975,26 +980,27 @@ static int veth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		lpmask = port->lpar_map;
 	}
 
+	spin_lock_irqsave(&port->pending_gate, flags);
+
 	lpmask = veth_transmit_to_many(skb, lpmask, dev);
 
 	if (! lpmask) {
 		dev_kfree_skb(skb);
 	} else {
-		spin_lock_irqsave(&port->pending_gate, flags);
 		if (port->pending_skb) {
 			veth_error("%s: Tx while skb was pending!\n",
 				   dev->name);
 			dev_kfree_skb(skb);
-                       spin_unlock_irqrestore(&port->pending_gate, flags);
+			spin_unlock_irqrestore(&port->pending_gate, flags);
 			return 1;
 		}
 
 		port->pending_skb = skb;
 		port->pending_lpmask = lpmask;
 		netif_stop_queue(dev);
-
-		spin_unlock_irqrestore(&port->pending_gate, flags);
 	}
+
+	spin_unlock_irqrestore(&port->pending_gate, flags);
 
 	return 0;
 }
@@ -1049,7 +1055,7 @@ static void veth_flush_pending(struct veth_lpar_connection *cnx)
 			if (! port->pending_lpmask) {
 				dev_kfree_skb_any(port->pending_skb);
 				port->pending_skb = NULL;
-				netif_start_queue(dev);
+				netif_wake_queue(dev);
 			}
 		}
 		spin_unlock_irqrestore(&port->pending_gate, flags);
