@@ -1304,7 +1304,8 @@ find_openstateowner_id(u32 st_id) {
 static inline int
 nfs4_check_fh(struct svc_fh *fhp, struct nfs4_stateid *stp)
 {
-	return (fhp->fh_dentry != stp->st_vfs_file.f_dentry);
+	return (stp->st_vfs_set == 0 ||
+		fhp->fh_dentry->d_inode != stp->st_vfs_file.f_dentry->d_inode);
 }
 
 static int
@@ -1347,6 +1348,7 @@ nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int fl
 	}
 	if ((flags & CHECK_FH) && nfs4_check_fh(current_fh, stp)) {
 		dprintk("NFSD: preprocess_stateid_op: fh-stateid mismatch!\n");
+		stp->st_vfs_set = 0;
 		goto out;
 	}
 	if (!stp->st_stateowner->so_confirmed) {
@@ -1415,6 +1417,7 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 
 	if ((flags & CHECK_FH) && nfs4_check_fh(current_fh, stp)) {
 		printk("NFSD: preprocess_seqid_op: fh-stateid mismatch!\n");
+		stp->st_vfs_set = 0;
 		goto out;
 	}
 
