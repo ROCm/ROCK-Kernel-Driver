@@ -2,7 +2,6 @@
  * We should not even be trying to compile this if we are not doing
  * a module.
  */
-#define __NO_VERSION__
 #include <linux/config.h>
 #include <linux/module.h>
 
