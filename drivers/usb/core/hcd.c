@@ -1251,13 +1251,14 @@ static int hcd_unlink_urb (struct urb *urb, int status)
 		goto done;
 	}
 
-	/* PCI IRQ setup can easily be broken so that USB controllers
+	/* IRQ setup can easily be broken so that USB controllers
 	 * never get completion IRQs ... maybe even the ones we need to
-	 * finish unlinking the initial failed usb_set_address().
+	 * finish unlinking the initial failed usb_set_address()
+	 * or device descriptor fetch.
 	 */
 	if (!hcd->saw_irq && hcd->self.root_hub != urb->dev) {
 		dev_warn (hcd->self.controller, "Unlink after no-IRQ?  "
-			"Different ACPI or APIC settings may help."
+			"Controller is probably using the wrong IRQ."
 			"\n");
 		hcd->saw_irq = 1;
 	}
