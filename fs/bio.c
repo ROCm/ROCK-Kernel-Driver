@@ -538,6 +538,8 @@ out:
  *	Unmap a bio previously mapped by bio_map_user(). The @write_to_vm
  *	must be the same as passed into bio_map_user(). Must be called with
  *	a process context.
+ *
+ *	bio_unmap_user() may sleep.
  */
 void bio_unmap_user(struct bio *bio, int write_to_vm)
 {
@@ -561,7 +563,7 @@ void bio_unmap_user(struct bio *bio, int write_to_vm)
 	 */
 	__bio_for_each_segment(bvec, bio, i, 0) {
 		if (write_to_vm)
-			set_page_dirty(bvec->bv_page);
+			set_page_dirty_lock(bvec->bv_page);
 
 		page_cache_release(bvec->bv_page);
 	}
@@ -601,7 +603,7 @@ void bio_set_pages_dirty(struct bio *bio)
 		struct page *page = bvec[i].bv_page;
 
 		if (page)
-			set_page_dirty(bvec[i].bv_page);
+			set_page_dirty_lock(bvec[i].bv_page);
 	}
 }
 
