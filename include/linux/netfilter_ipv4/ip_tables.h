@@ -283,6 +283,8 @@ struct ipt_get_entries
 	struct ipt_entry entrytable[0];
 };
 
+extern struct semaphore ipt_mutex;
+
 /* Standard return verdict, or do jump. */
 #define IPT_STANDARD_TARGET ""
 /* Error verdict. */
@@ -334,6 +336,7 @@ ipt_get_target(struct ipt_entry *e)
 /*
  *	Main firewall chains definitions and global var's definitions.
  */
+static DECLARE_MUTEX(ipt_mutex);
 #ifdef __KERNEL__
 
 #include <linux/init.h>
@@ -405,6 +408,11 @@ struct ipt_target
 	/* Set this to THIS_MODULE. */
 	struct module *me;
 };
+
+extern struct ipt_target *
+ipt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
+extern struct arpt_target *
+arpt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
 
 extern int ipt_register_target(struct ipt_target *target);
 extern void ipt_unregister_target(struct ipt_target *target);

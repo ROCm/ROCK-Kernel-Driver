@@ -4525,7 +4525,7 @@ static int mgsl_init_tty(void)
 
 /* enumerate user specified ISA adapters
  */
-static int mgsl_enum_isa_devices(void)
+static void mgsl_enum_isa_devices(void)
 {
 	struct mgsl_struct *info;
 	int i;
