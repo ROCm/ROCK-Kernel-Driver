@@ -93,6 +93,7 @@ static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
 #define	WD_TIMEOUT		4	/* 2 seconds for a timeout */
 static int timeout_val = WD_TIMEOUT;
 static int timeout = 2;
+static int expect_close = 0;
 
 MODULE_PARM(timeout,"i");
 MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=2)"); 
@@ -273,7 +274,7 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 		else
 			cdat = inb(current_readport + 1 );
 		spin_unlock(&io_lock);
-		rv = 0;
+		rv = WDIOF_MAGICCLOSE;
 
 		if (revision == PCWD_REVISION_A) 
 		{
@@ -402,8 +403,22 @@ static ssize_t pcwd_write(struct file *file, const char *buf, size_t len,
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
 
-	if (len)
-	{
+	if (len) {
+		if (!nowayout) {
+			size_t i;
+
+			/* In case it was set long ago */
+			expect_close = 0;
+
+			for (i = 0; i != len; i++) {
+				char c;
+
+				if (get_user(c, buf + i))
+					return -EFAULT;
+				if (c == 'V')
+					expect_close = 1;
+			}
+		}
 		pcwd_send_heartbeat();
 		return 1;
 	}
@@ -412,28 +427,26 @@ static ssize_t pcwd_write(struct file *file, const char *buf, size_t len,
 
 static int pcwd_open(struct inode *ino, struct file *filep)
 {
-        switch (minor(ino->i_rdev))
-        {
-                case WATCHDOG_MINOR:
-                    if ( !atomic_dec_and_test(&open_allowed) )
-		    {
+	switch (minor(ino->i_rdev)) {
+	case WATCHDOG_MINOR:
+		if (!atomic_dec_and_test(&open_allowed) ) {
 			atomic_inc( &open_allowed );
-                        return -EBUSY;
-                    }
-		    MOD_INC_USE_COUNT;
-                    /*  Enable the port  */
-                    if (revision == PCWD_REVISION_C)
-                    {
-                    	spin_lock(&io_lock);
-                    	outb_p(0x00, current_readport + 3);
-                    	spin_unlock(&io_lock);
-                    }
-                    return(0);
-                case TEMP_MINOR:
-                    return(0);
-                default:
-                    return (-ENODEV);
-        }
+			return -EBUSY;
+		}
+		MOD_INC_USE_COUNT;
+		/*  Enable the port  */
+		if (revision == PCWD_REVISION_C) {
+			spin_lock(&io_lock);
+			outb_p(0x00, current_readport + 3);
+			spin_unlock(&io_lock);
+		}
+		return(0);
+
+	case TEMP_MINOR:
+		return(0);
+	default:
+		return (-ENODEV);
+	}
 }
 
 static ssize_t pcwd_read(struct file *file, char *buf, size_t count,
@@ -465,10 +478,9 @@ static ssize_t pcwd_read(struct file *file, char *buf, size_t count,
 
 static int pcwd_close(struct inode *ino, struct file *filep)
 {
-	if (minor(ino->i_rdev)==WATCHDOG_MINOR)
-	{
-		if (!nowayout) {
-                        /*  Disable the board  */
+	if (minor(ino->i_rdev)==WATCHDOG_MINOR) {
+		if (expect_close) {
+			/*  Disable the board  */
 			if (revision == PCWD_REVISION_C) {
 				spin_lock(&io_lock);
 				outb_p(0xA5, current_readport + 3);
