@@ -1227,8 +1227,6 @@ pfm_reset_regs(pfm_context_t *ctx, unsigned long *ovfl_regs, int flag)
 			  is_long_reset ? "long" : "short", i, val));
 	}
 	ia64_srlz_d();
-	/* just in case ! */
-	ctx->ctx_ovfl_regs[0] = 0UL;
 }
 
 static int
@@ -1384,7 +1382,7 @@ static int
 pfm_write_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 {
 	pfarg_reg_t tmp, *req = (pfarg_reg_t *)arg;
-	unsigned long value;
+	unsigned long value, hw_value;
 	unsigned int cnum;
 	int i;
 	int ret;
@@ -1423,7 +1421,7 @@ pfm_write_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 			value = v;
 			ret = -EINVAL;
 		}
-
+		hw_value = value;
 		/*
 		 * no error on this register
 		 */
@@ -1440,6 +1438,8 @@ pfm_write_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 			ctx->ctx_soft_pmds[cnum].lval = value;
 			ctx->ctx_soft_pmds[cnum].val  = value & ~pmu_conf.perf_ovfl_val;
 
+			hw_value = value & pmu_conf.perf_ovfl_val; 
+
 			ctx->ctx_soft_pmds[cnum].long_reset  = tmp.reg_long_reset;
 			ctx->ctx_soft_pmds[cnum].short_reset = tmp.reg_short_reset;
 
@@ -1454,15 +1454,15 @@ pfm_write_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 		CTX_USED_PMD(ctx, RDEP(cnum));
 
 		/* writes to unimplemented part is ignored, so this is safe */
-		ia64_set_pmd(cnum, value);
+		ia64_set_pmd(cnum, hw_value);
 
 		/* to go away */
 		ia64_srlz_d();
 
-		DBprintk(("[%d] pmd[%u]: value=0x%lx soft_pmd=0x%lx  short_reset=0x%lx "
+		DBprintk(("[%d] pmd[%u]: value=0x%lx hw_value=0x%lx soft_pmd=0x%lx  short_reset=0x%lx "
 			  "long_reset=0x%lx hw_pmd=%lx notify=%c used_pmds=0x%lx reset_pmds=0x%lx\n",
 				task->pid, cnum,
-				value,
+				value, hw_value,
 				ctx->ctx_soft_pmds[cnum].val,
 				ctx->ctx_soft_pmds[cnum].short_reset,
 				ctx->ctx_soft_pmds[cnum].long_reset,
