@@ -35,6 +35,7 @@ struct spi_transport_attrs {
 	unsigned int rd_strm:1;	/* Read streaming enabled */
 	unsigned int rti:1;	/* Retain Training Information */
 	unsigned int pcomp_en:1;/* Precompensation enabled */
+	unsigned int dv_pending:1; /* Internal flag */
 };
 
 /* accessor functions */
@@ -89,5 +90,7 @@ struct spi_function_template {
 
 struct scsi_transport_template *spi_attach_transport(struct spi_function_template *);
 void spi_release_transport(struct scsi_transport_template *);
+void spi_schedule_dv_device(struct scsi_device *);
+void spi_dv_device(struct scsi_device *);
 
 #endif /* SCSI_TRANSPORT_SPI_H */

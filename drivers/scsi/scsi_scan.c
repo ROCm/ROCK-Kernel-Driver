@@ -643,6 +643,10 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	if (*bflags & BLIST_USE_10_BYTE_MS)
 		sdev->use_10_for_ms = 1;
 
+	/* set the device running here so that slave configure
+	 * may do I/O */
+	scsi_device_set_state(sdev, SDEV_RUNNING);
+
 	if(sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);
 
