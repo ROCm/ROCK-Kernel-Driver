@@ -515,8 +515,9 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 		stats->rx_bytes += pkt_len;
 		skb->tail += pkt_len;
 		skb->len = pkt_len;
-       		if (netif_running(dev))
+       	if (netif_running(dev))
 			skb->protocol = htons(ETH_P_HDLC);
+		skb->dev->last_rx = jiffies;
 		netif_rx(skb);
 		try_get_rx_skb(dpriv, cur, dev);
 	} else {
