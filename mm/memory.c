@@ -1071,6 +1071,8 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	page_cache_get(old_page);
 	spin_unlock(&mm->page_table_lock);
 
+	if (unlikely(anon_vma_prepare(vma)))
+		goto no_new_page;
 	new_page = alloc_page_vma(GFP_HIGHUSER, vma, address);
 	if (!new_page)
 		goto no_new_page;
@@ -1405,6 +1407,8 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		pte_unmap(page_table);
 		spin_unlock(&mm->page_table_lock);
 
+		if (unlikely(anon_vma_prepare(vma)))
+			goto no_mem;
 		page = alloc_page_vma(GFP_HIGHUSER, vma, addr);
 		if (!page)
 			goto no_mem;
@@ -1487,7 +1491,11 @@ retry:
 	 * Should we do an early C-O-W break?
 	 */
 	if (write_access && !(vma->vm_flags & VM_SHARED)) {
-		struct page *page = alloc_page_vma(GFP_HIGHUSER, vma, address);
+		struct page *page;
+
+		if (unlikely(anon_vma_prepare(vma)))
+			goto oom;
+		page = alloc_page_vma(GFP_HIGHUSER, vma, address);
 		if (!page)
 			goto oom;
 		copy_user_highpage(page, new_page, address);

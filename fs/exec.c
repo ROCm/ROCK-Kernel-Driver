@@ -303,6 +303,9 @@ void install_arg_page(struct vm_area_struct *vma,
 	pmd_t * pmd;
 	pte_t * pte;
 
+	if (unlikely(anon_vma_prepare(vma)))
+		goto out_sig;
+
 	flush_dcache_page(page);
 	pgd = pgd_offset(mm, address);
 
@@ -329,6 +332,7 @@ void install_arg_page(struct vm_area_struct *vma,
 	return;
 out:
 	spin_unlock(&mm->page_table_lock);
+out_sig:
 	__free_page(page);
 	force_sig(SIGKILL, current);
 }

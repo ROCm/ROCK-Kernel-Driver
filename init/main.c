@@ -42,6 +42,7 @@
 #include <linux/cpu.h>
 #include <linux/efi.h>
 #include <linux/unistd.h>
+#include <linux/rmap.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -461,6 +462,7 @@ asmlinkage void __init start_kernel(void)
 	pidmap_init();
 	pgtable_cache_init();
 	prio_tree_init();
+	anon_vma_init();
 #ifdef CONFIG_X86
 	if (efi_enabled)
 		efi_enter_virtual_mode();

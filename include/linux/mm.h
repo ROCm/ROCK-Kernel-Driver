@@ -15,6 +15,7 @@
 #include <linux/fs.h>
 
 struct mempolicy;
+struct anon_vma;
 
 #ifndef CONFIG_DISCONTIGMEM          /* Don't use mapnrs, do it properly */
 extern unsigned long max_mapnr;
@@ -77,6 +78,15 @@ struct vm_area_struct {
 
 		struct prio_tree_node prio_tree_node;
 	} shared;
+
+	/*
+	 * A file's MAP_PRIVATE vma can be in both i_mmap tree and anon_vma
+	 * list, after a COW of one of the file pages.  A MAP_SHARED vma
+	 * can only be in the i_mmap tree.  An anonymous MAP_PRIVATE, stack
+	 * or brk vma (with NULL file) can only be in an anon_vma list.
+	 */
+	struct list_head anon_vma_node;	/* Serialized by anon_vma->lock */
+	struct anon_vma *anon_vma;	/* Serialized by page_table_lock */
 
 	/* Function pointers to deal with this struct. */
 	struct vm_operations_struct * vm_ops;
@@ -201,7 +211,12 @@ struct page {
 					 * if PagePrivate set; used for
 					 * swp_entry_t if PageSwapCache
 					 */
-	struct address_space *mapping;	/* The inode (or ...) we belong to. */
+	struct address_space *mapping;	/* If PG_anon clear, points to
+					 * inode address_space, or NULL.
+					 * If page mapped as anonymous
+					 * memory, PG_anon is set, and
+					 * it points to anon_vma object.
+					 */
 	pgoff_t index;			/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list
 					 * protected by zone->lru_lock !
@@ -610,7 +625,8 @@ extern void vma_adjust(struct vm_area_struct *vma, unsigned long start,
 	unsigned long end, pgoff_t pgoff, struct vm_area_struct *insert);
 extern struct vm_area_struct *vma_merge(struct mm_struct *,
 	struct vm_area_struct *prev, unsigned long addr, unsigned long end,
-	unsigned long vm_flags, struct file *, pgoff_t, struct mempolicy *);
+	unsigned long vm_flags, struct anon_vma *, struct file *, pgoff_t,
+	struct mempolicy *);
 extern int split_vma(struct mm_struct *,
 	struct vm_area_struct *, unsigned long addr, int new_below);
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);

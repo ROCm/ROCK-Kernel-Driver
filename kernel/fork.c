@@ -322,8 +322,9 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 		tmp->vm_flags &= ~VM_LOCKED;
 		tmp->vm_mm = mm;
 		tmp->vm_next = NULL;
-		file = tmp->vm_file;
+		anon_vma_link(tmp);
 		vma_prio_tree_init(tmp);
+		file = tmp->vm_file;
 		if (file) {
 			struct inode *inode = file->f_dentry->d_inode;
 			get_file(file);
