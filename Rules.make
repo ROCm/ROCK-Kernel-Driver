@@ -209,10 +209,10 @@ define rule_cc_ver_c
 	$(if $($(quiet)cmd_cc_ver_c),echo '  $($(quiet)cmd_cc_ver_c)';) \
 	$(cmd_cc_ver_c); \
 	if [ ! -r $(depfile) ]; then exit 1; fi; \
-	$(TOPDIR)/scripts/fixdep $(depfile) $@ $(TOPDIR) '$(cmd_cc_ver_c)' > $(@D)/.$(@F).tmp; \
+	scripts/fixdep $(depfile) $@ '$(cmd_cc_ver_c)' > $(@D)/.$(@F).tmp; \
 	rm -f $(depfile); \
 	if [ ! -r $@ ] || cmp -s $@ $@.tmp; then \
-	  touch $(TOPDIR)/include/linux/modversions.h; \
+	  touch include/linux/modversions.h; \
 	fi; \
 	mv -f $@.tmp $@
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd
@@ -312,7 +312,7 @@ cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 	$(call if_changed_dep,cc_o_c)
 
 quiet_cmd_cc_lst_c = MKLST   $(echo_target)
-cmd_cc_lst_c       = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makelst $*.o $(TOPDIR)/System.map $(OBJDUMP) > $@
+cmd_cc_lst_c       = $(CC) $(c_flags) -g -c -o $*.o $< && sh scripts/makelst $*.o System.map $(OBJDUMP) > $@
 
 %.lst: %.c FORCE
 	$(call if_changed_dep,cc_lst_c)
@@ -561,7 +561,7 @@ if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
 	@set -e; \
 	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
 	$(cmd_$(1)); \
-	$(TOPDIR)/scripts/fixdep $(depfile) $@ $(TOPDIR) '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
+	scripts/fixdep $(depfile) $@ '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
 	rm -f $(depfile); \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)
 
