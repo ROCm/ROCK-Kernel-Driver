@@ -394,7 +394,7 @@ int hci_inquiry(unsigned long arg)
 {
 	struct hci_inquiry_req ir;
 	struct hci_dev *hdev;
-	int err = 0, do_inquiry = 0;
+	int err = 0, do_inquiry = 0, max_rsp;
 	long timeo;
 	__u8 *buf, *ptr;
 
@@ -417,16 +417,19 @@ int hci_inquiry(unsigned long arg)
 	if (do_inquiry && (err = hci_request(hdev, hci_inq_req, (unsigned long)&ir, timeo)) < 0)
 		goto done;
 
+	/* for unlimited number of responses we will use buffer with 255 entries */
+	max_rsp = (ir.num_rsp == 0) ? 255 : ir.num_rsp;
+
 	/* cache_dump can't sleep. Therefore we allocate temp buffer and then
 	 * copy it to the user space.
 	 */
-	if (!(buf = kmalloc(sizeof(struct inquiry_info) * ir.num_rsp, GFP_KERNEL))) {
+	if (!(buf = kmalloc(sizeof(struct inquiry_info) * max_rsp, GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto done;
 	}
 
 	hci_dev_lock_bh(hdev);
-	ir.num_rsp = inquiry_cache_dump(hdev, ir.num_rsp, buf);
+	ir.num_rsp = inquiry_cache_dump(hdev, max_rsp, buf);
 	hci_dev_unlock_bh(hdev);
 
 	BT_DBG("num_rsp %d", ir.num_rsp);

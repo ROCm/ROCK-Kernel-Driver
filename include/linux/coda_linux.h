@@ -42,26 +42,21 @@ int coda_permission(struct inode *inode, int mask, struct nameidata *nd);
 int coda_revalidate_inode(struct dentry *);
 int coda_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 int coda_setattr(struct dentry *, struct iattr *);
-int coda_isnullfid(ViceFid *fid);
 
 /* global variables */
 extern int coda_fake_statfs;
 
 /* this file:  heloers */
-static __inline__ struct ViceFid *coda_i2f(struct inode *);
+static __inline__ struct CodaFid *coda_i2f(struct inode *);
 static __inline__ char *coda_i2s(struct inode *);
 static __inline__ void coda_flag_inode(struct inode *, int flag);
-char *coda_f2s(ViceFid *f);
+char *coda_f2s(struct CodaFid *f);
 int coda_isroot(struct inode *i);
 int coda_iscontrol(const char *name, size_t length);
 
-void coda_load_creds(struct coda_cred *cred);
 void coda_vattr_to_iattr(struct inode *, struct coda_vattr *);
 void coda_iattr_to_vattr(struct iattr *, struct coda_vattr *);
 unsigned short coda_flags_to_cflags(unsigned short);
-void print_vattr( struct coda_vattr *attr );
-int coda_cred_ok(struct coda_cred *cred);
-int coda_cred_eq(struct coda_cred *cred1, struct coda_cred *cred2);
 
 /* sysctl.h */
 void coda_sysctl_init(void);
@@ -88,7 +83,7 @@ static inline struct coda_inode_info *ITOC(struct inode *inode)
 	return list_entry(inode, struct coda_inode_info, vfs_inode);
 }
 
-static __inline__ struct ViceFid *coda_i2f(struct inode *inode)
+static __inline__ struct CodaFid *coda_i2f(struct inode *inode)
 {
 	return &(ITOC(inode)->c_fid);
 }
