@@ -13,6 +13,7 @@
 #include <linux/list.h>
 #include <linux/mm.h>
 #include <linux/wait.h>
+#include <linux/nfs_fs_sb.h>
 #include <linux/sunrpc/auth.h>
 #include <linux/nfs_xdr.h>
 

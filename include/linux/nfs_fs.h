@@ -14,6 +14,8 @@
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 
+#include <linux/nfs_fs_sb.h>
+
 #include <linux/sunrpc/debug.h>
 #include <linux/sunrpc/auth.h>
 #include <linux/sunrpc/clnt.h>
@@ -174,7 +176,7 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
 	return list_entry(inode, struct nfs_inode, vfs_inode);
 }
-#define NFS_SB(s)		(&s->u.nfs_sb.s_server)
+#define NFS_SB(s)		((struct nfs_server *)(s->u.generic_sbp))
 
 #define NFS_FH(inode)			(&NFS_I(inode)->fh)
 #define NFS_SERVER(inode)		(NFS_SB(inode->i_sb))

@@ -262,7 +262,6 @@ int nfs_fill_super(struct super_block *sb, void *raw_data, int silent)
 	/* We probably want something more informative here */
 	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", major(sb->s_dev), minor(sb->s_dev));
 
-	memset(NFS_SB(sb), 0, sizeof(struct nfs_sb_info));
 	if (!data)
 		goto out_miss_args;
 
@@ -1145,17 +1144,56 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
  *  question being, when two NFS mounts are the same?  Identical IP
  *  of server + identical root fhandle?  Trond?
  */
+
+static int nfs_set_super(struct super_block *s, void *data)
+{
+	s->u.generic_sbp = data;
+	return set_anon_super(s, data);
+}
+
 static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 	int flags, char *dev_name, void *data)
 {
-	return get_sb_nodev(fs_type, flags, data, nfs_fill_super);
+	int error;
+	struct nfs_server *server;
+	struct super_block *s;
+
+	server = kmalloc(sizeof(struct nfs_server), GFP_KERNEL);
+	if (!server)
+		return ERR_PTR(-ENOMEM);
+	memset(server, 0, sizeof(struct nfs_server));
+
+	s = sget(fs_type, NULL, nfs_set_super, server);
+
+	if (IS_ERR(s) || s->s_root) {	/* the latter will be needed */
+		kfree(server);
+		return s;
+	}
+
+	s->s_flags = flags;
+
+	error = nfs_fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
+	if (error) {
+		up_write(&s->s_umount);
+		deactivate_super(s);
+		return ERR_PTR(error);
+	}
+	s->s_flags |= MS_ACTIVE;
+	return s;
+}
+
+static void nfs_kill_super(struct super_block *s)
+{
+	struct nfs_server *server = NFS_SB(s);
+	kill_anon_super(s);
+	kfree(server);
 }
 
 static struct file_system_type nfs_fs_type = {
 	owner:		THIS_MODULE,
 	name:		"nfs",
 	get_sb:		nfs_get_sb,
-	kill_sb:	kill_anon_super,
+	kill_sb:	nfs_kill_super,
 	fs_flags:	FS_ODD_RENAME,
 };
 
