@@ -429,7 +429,7 @@
     can_queue : 0,                        \
     this_id: -1,                          \
     sg_tablesize : IPS_MAX_SG,            \
-    cmd_per_lun: 16,                      \
+    cmd_per_lun: 3,                       \
     present : 0,                          \
     unchecked_isa_dma : 0,                \
     use_clustering : ENABLE_CLUSTERING,   \
@@ -458,7 +458,7 @@
     can_queue : 0,                        \
     this_id: -1,                          \
     sg_tablesize : IPS_MAX_SG,            \
-    cmd_per_lun: 16,                      \
+    cmd_per_lun: 3,                       \
     present : 0,                          \
     unchecked_isa_dma : 0,                \
     use_clustering : ENABLE_CLUSTERING,   \
@@ -488,7 +488,7 @@
     can_queue : 0,                        \
     this_id: -1,                          \
     sg_tablesize : IPS_MAX_SG,            \
-    cmd_per_lun: 16,                      \
+    cmd_per_lun: 3,                       \
     present : 0,                          \
     unchecked_isa_dma : 0,                \
     use_clustering : ENABLE_CLUSTERING,   \
