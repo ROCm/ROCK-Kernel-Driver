@@ -26,6 +26,7 @@
 #include "fpmodule.inl"
 
 #include <linux/compiler.h>
+#include <linux/string.h>
 #include <asm/system.h>
 
 /* forward declarations */

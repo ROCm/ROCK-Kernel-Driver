@@ -219,7 +219,6 @@ static char rcsid[] =
 #include <linux/pci.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/net.h>
@@ -229,10 +228,12 @@ static char rcsid[] =
 #include <linux/spinlock.h>
 #include <linux/if.h>
 #include <linux/version.h>
+
+#include <net/syncppp.h>
 #include <net/arp.h>
+
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <net/syncppp.h>
 
 #include "pc300.h"
 

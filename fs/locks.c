@@ -1766,7 +1766,7 @@ static void lock_get_status(char* out, struct file_lock *fl, int id, char *pfx)
 #else
 	/* kdevname is a broken interface.  but we expose it to userspace */
 	out += sprintf(out, "%d %s:%ld ", fl->fl_pid,
-			inode ? kdevname(to_kdev_t(inode->i_dev)) : "<none>",
+			inode ? kdevname(to_kdev_t(inode->i_sb->s_dev)) : "<none>",
 			inode ? inode->i_ino : 0);
 #endif
 	if (IS_POSIX(fl)) {

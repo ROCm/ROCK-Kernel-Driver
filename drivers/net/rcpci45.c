@@ -48,7 +48,6 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/in.h>
@@ -58,6 +57,7 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/timer.h>
+
 #include <asm/irq.h>		/* For NR_IRQS only. */
 #include <asm/bitops.h>
 #include <asm/uaccess.h>

@@ -5097,7 +5097,6 @@ advansys_detect(Scsi_Host_Template *tpnt)
                 ep->adapter_info[3] = asc_dvc_varp->cfg->adapter_info[3];
                 ep->adapter_info[4] = asc_dvc_varp->cfg->adapter_info[4];
                 ep->adapter_info[5] = asc_dvc_varp->cfg->adapter_info[5];
-                ep->adapter_info[6] = asc_dvc_varp->cfg->adapter_info[6];
 
                /*
                 * Modify board configuration.

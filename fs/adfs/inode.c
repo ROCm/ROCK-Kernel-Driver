@@ -179,13 +179,13 @@ adfs_mode2atts(struct super_block *sb, struct inode *inode)
  * Convert an ADFS time to Unix time.  ADFS has a 40-bit centi-second time
  * referenced to 1 Jan 1900 (til 2248)
  */
-static unsigned int
-adfs_adfs2unix_time(struct inode *inode)
+static void
+adfs_adfs2unix_time(struct timespec *tv, struct inode *inode)
 {
 	unsigned int high, low;
 
 	if (ADFS_I(inode)->stamped == 0)
-		return CURRENT_TIME;
+		goto cur_time;
 
 	high = ADFS_I(inode)->loadaddr << 24;
 	low  = ADFS_I(inode)->execaddr;
@@ -195,17 +195,32 @@ adfs_adfs2unix_time(struct inode *inode)
 
 	/* Files dated pre  01 Jan 1970 00:00:00. */
 	if (high < 0x336e996a)
-		return 0;
+		goto too_early;
 
 	/* Files dated post 18 Jan 2038 03:14:05. */
 	if (high >= 0x656e9969)
-		return 0x7ffffffd;
+		goto too_late;
 
 	/* discard 2208988800 (0x336e996a00) seconds of time */
 	high -= 0x336e996a;
 
 	/* convert 40-bit centi-seconds to 32-bit seconds */
-	return (((high % 100) << 8) + low) / 100 + (high / 100 << 8);
+	tv->tv_sec = (((high % 100) << 8) + low) / 100 + (high / 100 << 8);
+	tv->tv_nsec = 0;
+	return;
+
+ cur_time:
+	*tv = CURRENT_TIME;
+	return;
+
+ too_early:
+	tv->tv_sec = tv->tv_nsec = 0;
+	return;
+
+ too_late:
+	tv->tv_sec = 0x7ffffffd;
+	tv->tv_nsec = 0;
+	return;
 }
 
 /*
@@ -271,10 +286,9 @@ adfs_iget(struct super_block *sb, struct object_info *obj)
 	ADFS_I(inode)->stamped	  = ((obj->loadaddr & 0xfff00000) == 0xfff00000);
 
 	inode->i_mode	 = adfs_atts2mode(sb, inode);
-	inode->i_mtime.tv_sec	 =
-	inode->i_atime.tv_sec	 =
-	inode->i_ctime.tv_sec	 = adfs_adfs2unix_time(inode);
-	inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_atime.tv_nsec = 0;
+	adfs_adfs2unix_time(&inode->i_mtime, inode);
+	inode->i_atime = inode->i_mtime;
+	inode->i_ctime = inode->i_mtime;
 
 	if (S_ISDIR(inode->i_mode)) {
 		inode->i_op	= &adfs_dir_inode_operations;

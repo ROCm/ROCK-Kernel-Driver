@@ -64,14 +64,10 @@ struct device_class;
 
 struct bus_type {
 	char			* name;
-	struct rw_semaphore	rwsem;
-	atomic_t		refcount;
-	u32			present;
 
 	struct subsystem	subsys;
 	struct subsystem	drvsubsys;
 	struct subsystem	devsubsys;
-	struct list_head	node;
 	struct list_head	devices;
 	struct list_head	drivers;
 
@@ -87,11 +83,6 @@ extern void bus_unregister(struct bus_type * bus);
 
 extern struct bus_type * get_bus(struct bus_type * bus);
 extern void put_bus(struct bus_type * bus);
-
-extern int bus_for_each_dev(struct bus_type * bus, void * data, 
-			    int (*callback)(struct device * dev, void * data));
-extern int bus_for_each_drv(struct bus_type * bus, void * data,
-			    int (*callback)(struct device_driver * drv, void * data));
 
 
 /* driverfs interface for exporting bus attributes */
@@ -117,10 +108,7 @@ struct device_driver {
 	struct bus_type		* bus;
 	struct device_class	* devclass;
 
-	rwlock_t		lock;
-	atomic_t		refcount;
-	u32			present;
-
+	struct semaphore	unload_sem;
 	struct kobject		kobj;
 	struct list_head	bus_list;
 	struct list_head	class_list;
@@ -131,8 +119,6 @@ struct device_driver {
 	void	(*shutdown)	(struct device * dev);
 	int	(*suspend)	(struct device * dev, u32 state, u32 level);
 	int	(*resume)	(struct device * dev, u32 level);
-
-	void	(*release)	(struct device_driver * drv);
 };
 
 
@@ -141,10 +127,6 @@ extern void driver_unregister(struct device_driver * drv);
 
 extern struct device_driver * get_driver(struct device_driver * drv);
 extern void put_driver(struct device_driver * drv);
-extern void remove_driver(struct device_driver * drv);
-
-extern int driver_for_each_dev(struct device_driver * drv, void * data, 
-			       int (*callback)(struct device * dev, void * data));
 
 
 /* driverfs interface for exporting driver attributes */
@@ -171,19 +153,12 @@ extern void driver_remove_file(struct device_driver *, struct driver_attribute *
  */
 struct device_class {
 	char			* name;
-	struct rw_semaphore	rwsem;
-
-	atomic_t		refcount;
-	u32			present;
-
 	u32			devnum;
 
 	struct subsystem	subsys;
 	struct subsystem	devsubsys;
 	struct subsystem	drvsubsys;
-	struct list_head	node;
 	struct list_head	drivers;
-	struct list_head	intf_list;
 
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);
@@ -233,7 +208,6 @@ struct device_interface {
 	struct device_class	* devclass;
 
 	struct kobject		kobj;
-	struct list_head	node;
 	struct list_head	devices;
 
 	u32			devnum;
@@ -279,12 +253,6 @@ struct device {
 	char	name[DEVICE_NAME_SIZE];	/* descriptive ascii string */
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
 
-	spinlock_t	lock;		/* lock for the device to ensure two
-					   different layers don't access it at
-					   the same time. */
-	atomic_t	refcount;	/* refcount to make sure the device
-					 * persists for the right amount of time */
-
 	struct bus_type	* bus;		/* type of bus device is on */
 	struct device_driver *driver;	/* which driver has allocated this
 					   device */
@@ -296,7 +264,6 @@ struct device {
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 
-	enum device_state state;
 	u32		power_state;  /* Current operating state. In
 					   ACPI-speak, this is D0-D3, D0
 					   being fully functional, and D3
@@ -369,24 +336,6 @@ extern int (*platform_notify)(struct device * dev);
 
 extern int (*platform_notify_remove)(struct device * dev);
 
-static inline int device_present(struct device * dev)
-{
-	return (dev && (dev->state == DEVICE_INITIALIZED || dev->state == DEVICE_REGISTERED));
-}
-
-/* device and bus locking helpers.
- *
- * FIXME: Is there anything else we need to do?
- */
-static inline void lock_device(struct device * dev)
-{
-	spin_lock(&dev->lock);
-}
-
-static inline void unlock_device(struct device * dev)
-{
-	spin_unlock(&dev->lock);
-}
 
 /**
  * get_device - atomically increment the reference count for the device.

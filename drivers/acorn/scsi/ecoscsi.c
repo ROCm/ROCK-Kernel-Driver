@@ -54,6 +54,18 @@
 
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
+
+#define NCR5380_implementation_fields	int port, ctrl
+#define NCR5380_local_declare()		struct Scsi_Host *_instance
+#define NCR5380_setup(instance)		_instance = instance
+
+#define NCR5380_read(reg)		ecoscsi_read(_instance, reg)
+#define NCR5380_write(reg, value)	ecoscsi_write(_instance, reg, value)
+
+#define NCR5380_intr			ecoscsi_intr
+#define NCR5380_queue_command		ecoscsi_queue_command
+#define NCR5380_proc_info		ecoscsi_proc_info
+
 #include "../../scsi/NCR5380.h"
 
 #define ECOSCSI_PUBLIC_RELEASE 1
@@ -99,62 +111,45 @@ void ecoscsi_setup(char *str, int *ints) {
 
 int ecoscsi_detect(Scsi_Host_Template * tpnt)
 {
-	struct Scsi_Host *instance;
+	struct Scsi_Host *host;
 
 	tpnt->proc_name = "ecoscsi";
 
-	instance = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
-	if (!instance)
+	host = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
+	if (!host)
 		return 0;
 
-	instance->io_port = 0x80ce8000;
-	instance->n_io_port = 144;
-	instance->irq = IRQ_NONE;
+	host->io_port = 0x80ce8000;
+	host->n_io_port = 144;
+	host->irq = IRQ_NONE;
 
-	if ( !(request_region(instance->io_port, instance->n_io_port, "ecoscsi")) )
+	if ( !(request_region(host->io_port, host->n_io_port, "ecoscsi")) )
 		goto unregister_scsi;
 
-	ecoscsi_write (instance, MODE_REG, 0x20);		/* Is it really SCSI? */
-	if (ecoscsi_read (instance, MODE_REG) != 0x20) /* Write to a reg.    */
+	ecoscsi_write (host, MODE_REG, 0x20);		/* Is it really SCSI? */
+	if (ecoscsi_read (host, MODE_REG) != 0x20) /* Write to a reg.    */
 		goto release_reg;
 
-	ecoscsi_write( instance, MODE_REG, 0x00 );		/* it back.	      */
-	if (ecoscsi_read (instance, MODE_REG) != 0x00)
+	ecoscsi_write( host, MODE_REG, 0x00 );		/* it back.	      */
+	if (ecoscsi_read (host, MODE_REG) != 0x00)
 		goto release_reg;
 
-	NCR5380_init(instance, 0);
+	NCR5380_init(host, 0);
 
-	if (instance->irq != IRQ_NONE) {
-		if (request_irq(instance->irq, do_ecoscsi_intr, SA_INTERRUPT, "ecoscsi", NULL)) {
-			printk("scsi%d: IRQ%d not free, interrupts disabled\n",
-			instance->host_no, instance->irq);
-			instance->irq = IRQ_NONE;
-		}
-	}
-
-	if (instance->irq != IRQ_NONE) {
-		printk("scsi%d: eek! Interrupts enabled, but I don't think\n", instance->host_no);
-		printk("scsi%d: that the board had an interrupt!\n", instance->host_no);
-	}
-
-	printk("scsi%d: at port %X irq", instance->host_no, instance->io_port);
-	if (instance->irq == IRQ_NONE)
-		printk ("s disabled");
-	else
-		printk (" %d", instance->irq);
+	printk("scsi%d: at port 0x%08lx irqs disabled", host->host_no, host->io_port);
 	printk(" options CAN_QUEUE=%d CMD_PER_LUN=%d release=%d",
-	CAN_QUEUE, CMD_PER_LUN, ECOSCSI_PUBLIC_RELEASE);
-	printk("\nscsi%d:", instance->host_no);
-	NCR5380_print_options(instance);
+		host->can_queue, host->cmd_per_lun, ECOSCSI_PUBLIC_RELEASE);
+	printk("\nscsi%d:", host->host_no);
+	NCR5380_print_options(host);
 	printk("\n");
 
 	return 1;
 
 release_reg:
-	release_region(instance->io_port, instance->n_io_port);
+	release_region(host->io_port, host->n_io_port);
 unregister_scsi:
-	scsi_unregister(instance);
-	return 0
+	scsi_unregister(host);
+	return 0;
 }
 
 int ecoscsi_release (struct Scsi_Host *shpnt)
@@ -166,17 +161,18 @@ int ecoscsi_release (struct Scsi_Host *shpnt)
 	return 0;
 }
 
-const char * ecoscsi_info (struct Scsi_Host *spnt) {
-    return "";
+const char * ecoscsi_info (struct Scsi_Host *spnt)
+{
+	return "";
 }
 
 #if 0
 #define STAT(p) inw(p + 144)
 
-static inline int NCR5380_pwrite(struct Scsi_Host *instance, unsigned char *addr,
+static inline int NCR5380_pwrite(struct Scsi_Host *host, unsigned char *addr,
               int len)
 {
-  int iobase = instance->io_port;
+  int iobase = host->io_port;
 printk("writing %p len %d\n",addr, len);
   if(!len) return -1;
 
@@ -187,11 +183,11 @@ printk("writing %p len %d\n",addr, len);
   }
 }
 
-static inline int NCR5380_pread(struct Scsi_Host *instance, unsigned char *addr,
+static inline int NCR5380_pread(struct Scsi_Host *host, unsigned char *addr,
               int len)
 {
-  int iobase = instance->io_port;
-  int iobase2= instance->io_port + 0x100;
+  int iobase = host->io_port;
+  int iobase2= host->io_port + 0x100;
   unsigned char *start = addr;
   int s;
 printk("reading %p len %d\n",addr, len);
@@ -236,22 +232,6 @@ printk("reading %p len %d\n",addr, len);
 }
 #endif
 #undef STAT
-
-#define NCR5380_implementation_fields \
-    int port, ctrl
-
-#define NCR5380_local_declare() \
-        struct Scsi_Host *_instance
-
-#define NCR5380_setup(instance) \
-        _instance = instance
-
-#define NCR5380_read(reg) ecoscsi_read(_instance, reg)
-#define NCR5380_write(reg, value) ecoscsi_write(_instance, reg, value)
-
-#define NCR5380_intr		ecoscsi_intr
-#define NCR5380_queue_command	ecoscsi_queue_command
-#define NCR5380_proc_info	ecoscsi_proc_info
 
 int NCR5380_proc_info(char *buffer, char **start, off_t offset,
 		      int length, int hostno, int inout);

@@ -62,16 +62,12 @@ static int generic_remove (struct device *dev)
 {
 	return 0;
 }
-static void generic_release (struct device_driver * drv)
-{
-}
 
 static struct device_driver usb_generic_driver = {
 	.name =	"usb",
 	.bus = &usb_bus_type,
 	.probe = generic_probe,
 	.remove = generic_remove,
-	.release = generic_release,
 };
 	
 int usb_device_probe(struct device *dev)
@@ -1427,7 +1423,7 @@ static void __exit usb_exit(void)
 	usb_major_cleanup();
 	usbfs_cleanup();
 	usb_hub_cleanup();
-	put_bus(&usb_bus_type);
+	bus_unregister(&usb_bus_type);
 }
 
 subsys_initcall(usb_init);

@@ -7,10 +7,9 @@ static char version[] =
         "myri_sbus.c:v1.9 12/Sep/99 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
-
 #include <linux/config.h>
+#include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -20,22 +19,6 @@ static char version[] =
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
-#include <linux/errno.h>
-#include <asm/byteorder.h>
-
-#include <asm/idprom.h>
-#include <asm/sbus.h>
-#include <asm/openprom.h>
-#include <asm/oplib.h>
-#include <asm/auxio.h>
-#include <asm/pgtable.h>
-#include <asm/irq.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -45,10 +28,21 @@ static char version[] =
 #include <net/sock.h>
 #include <net/ipv6.h>
 
+#include <asm/system.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <asm/dma.h>
+#include <asm/byteorder.h>
+#include <asm/idprom.h>
+#include <asm/sbus.h>
+#include <asm/openprom.h>
+#include <asm/oplib.h>
+#include <asm/auxio.h>
+#include <asm/pgtable.h>
+#include <asm/irq.h>
 #include <asm/checksum.h>
 
 #include "myri_sbus.h"
-
 #include "myri_code.h"
 
 /* #define DEBUG_DETECT */

@@ -14,7 +14,6 @@
 #ifdef  __IN_PCMCIA_PACKAGE__
 #include <pcmcia/k_compat.h>
 #endif /* __IN_PCMCIA_PACKAGE__ */
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -24,9 +23,6 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/ioport.h>
-#include <asm/uaccess.h>
-#include <asm/io.h>
-#include <asm/system.h>
 #include <linux/proc_fs.h>
 #include <linux/netdevice.h>
 #include <linux/if_arp.h>
@@ -40,6 +36,10 @@
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ds.h>
 #include <pcmcia/bus_ops.h>
+
+#include <asm/uaccess.h>
+#include <asm/io.h>
+#include <asm/system.h>
 
 #include "orinoco.h"
 

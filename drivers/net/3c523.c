@@ -90,12 +90,15 @@
 #define DRV_NAME		"3c523"
 #define DRV_VERSION		"17-Nov-2001"
 
+#include <linux/init.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
+#include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
@@ -106,11 +109,6 @@
 #include <asm/processor.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/init.h>
 
 #include "3c523.h"
 

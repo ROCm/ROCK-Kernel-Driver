@@ -45,13 +45,14 @@
 static char version[] = "atarilance.c: v1.3 04/04/96 "
 					   "Roman.Hodek@informatik.uni-erlangen.de\n";
 
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/module.h>
-
 #include <linux/stddef.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
+#include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
@@ -62,10 +63,6 @@ static char version[] = "atarilance.c: v1.3 04/04/96 "
 #include <asm/atariints.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 
 /* Debug level:
  *  0 = silent, print only serious errors

@@ -117,24 +117,22 @@ static const char version[] =
 #endif
 
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
-#include <asm/io.h>
 #include <linux/in.h>
-#include <asm/system.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-
 #include <linux/inet.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+
+#include <asm/io.h>
+#include <asm/system.h>
 
 /* Constant definitions for the DE-620 registers, commands and bits */
 #include "de620.h"

@@ -36,22 +36,20 @@
 			   - Some minor bug fixes
 */
 
-
+#include <linux/mca.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+
 #include <asm/io.h>
 #include <asm/system.h>
 
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
 #include "8390.h"
 #include "smc-mca.h"
-#include <linux/mca.h>
 
 int ultramca_probe(struct net_device *dev);
 

@@ -21,7 +21,6 @@
 
 #include <linux/version.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/ptrace.h>
@@ -30,22 +29,22 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
-#include <asm/smp.h>
-
 #include <linux/in.h>
 #include <linux/if_arp.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+#include <linux/inet.h>
+#include <linux/workqueue.h>
+#include <linux/proc_fs.h>
+
+#include <net/syncppp.h>
+
 #include <asm/processor.h>             /* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <net/syncppp.h>
-#include <linux/inet.h>
-#include <linux/workqueue.h>
-#include <linux/proc_fs.h>
+#include <asm/smp.h>
 
 #include "lmc_ver.h"
 #include "lmc.h"

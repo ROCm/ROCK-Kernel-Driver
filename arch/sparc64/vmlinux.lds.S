@@ -24,6 +24,8 @@ SECTIONS
     CONSTRUCTORS
   }
   .data1   : { *(.data1) }
+  . = ALIGN(64);
+  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
   _edata  =  .;
   PROVIDE (edata = .);
   .fixup   : { *(.fixup) }
@@ -70,8 +72,6 @@ SECTIONS
   __per_cpu_end = .;
   . = ALIGN(8192);
   __init_end = .;
-  . = ALIGN(64);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
   __bss_start = .;
   .sbss      : { *(.sbss) *(.scommon) }
   .bss       :

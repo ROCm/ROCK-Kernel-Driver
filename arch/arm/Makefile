@@ -52,8 +52,8 @@ tune-$(CONFIG_CPU_XSCALE)	:=-mtune=strongarm #-mtune=xscale
 
 # Force -mno-fpu to be passed to the assembler.  Some versions of gcc don't
 # do this with -msoft-float
-CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu
-CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu
+CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
+CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
 AFLAGS		+=$(apcs-y) $(arch-y) -mno-fpu -msoft-float -Wa,-mno-fpu
 
 #Default value

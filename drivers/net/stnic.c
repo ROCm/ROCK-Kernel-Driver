@@ -9,15 +9,15 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/hitachi_se.h>

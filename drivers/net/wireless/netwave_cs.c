@@ -41,7 +41,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -51,16 +50,10 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/errno.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
-
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>
 #if WIRELESS_EXT > 12
@@ -75,6 +68,11 @@
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ds.h>
 #include <pcmcia/mem_op.h>
+
+#include <asm/system.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <asm/dma.h>
 
 #define NETWAVE_REGOFF         0x8000
 /* The Netwave IO registers, offsets to iobase */

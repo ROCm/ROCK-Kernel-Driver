@@ -57,7 +57,8 @@
  */
 extern int get_hardware_list(char *);
 extern int get_stram_list(char *);
-extern int get_device_list(char *);
+extern int get_chrdev_list(char *);
+extern int get_blkdev_list(char *);
 extern int get_filesystem_list(char *);
 extern int get_exec_domain_list(char *);
 extern int get_dma_list(char *);
@@ -180,8 +181,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.freeram),
 		K(i.sharedram),
 		K(i.bufferram),
-		K(ps.nr_pagecache-swapper_space.nrpages-i.bufferram),
-		K(swapper_space.nrpages),
+		K(ps.nr_pagecache-total_swapcache_pages-i.bufferram),
+		K(total_swapcache_pages),
 		K(active),
 		K(inactive),
 		K(i.totalhigh),
@@ -376,7 +377,8 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 static int devices_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
-	int len = get_device_list(page);
+	int len = get_chrdev_list(page);
+	len += get_blkdev_list(page+len);
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 

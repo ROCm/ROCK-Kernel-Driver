@@ -77,9 +77,7 @@ static const char *boot_msg =
 /* Include files */
 
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
@@ -88,15 +86,15 @@ static const char *boot_msg =
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
+#include <linux/ctype.h>	// isdigit
+#include <linux/netdevice.h>
+#include <linux/fddidevice.h>
+#include <linux/skbuff.h>
+
 #include <asm/byteorder.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <linux/ctype.h>	// isdigit
-
-#include <linux/netdevice.h>
-#include <linux/fddidevice.h>
-#include <linux/skbuff.h>
 
 #include	"h/types.h"
 #undef ADDR			// undo Linux definition

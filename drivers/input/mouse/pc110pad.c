@@ -37,6 +37,7 @@
 #include <linux/ioport.h>
 #include <linux/input.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>

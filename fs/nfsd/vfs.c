@@ -632,7 +632,7 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 #endif
 
 	/* Get readahead parameters */
-	ra = nfsd_get_raparms(inode->i_dev, inode->i_ino);
+	ra = nfsd_get_raparms(inode->i_sb->s_dev, inode->i_ino);
 	if (ra)
 		file.f_ra = ra->p_ra;
 
@@ -752,7 +752,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 		 */
 		if (EX_WGATHER(exp)) {
 			if (atomic_read(&inode->i_writecount) > 1
-			    || (last_ino == inode->i_ino && last_dev == inode->i_dev)) {
+			    || (last_ino == inode->i_ino && last_dev == inode->i_sb->s_dev)) {
 				dprintk("nfsd: write defer %d\n", current->pid);
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout((HZ+99)/100);
@@ -769,7 +769,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 #endif
 		}
 		last_ino = inode->i_ino;
-		last_dev = inode->i_dev;
+		last_dev = inode->i_sb->s_dev;
 	}
 
 	dprintk("nfsd: write complete err=%d\n", err);

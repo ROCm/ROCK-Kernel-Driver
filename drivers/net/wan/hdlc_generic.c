@@ -26,7 +26,6 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/poll.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/if_arp.h>
 #include <linux/init.h>

@@ -90,35 +90,33 @@ static const char version[] = "NET3 PLIP version 2.4-parport gniibe@mri.co.jp\n"
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
 #include <linux/string.h>
 #include <linux/if_ether.h>
-#include <asm/system.h>
 #include <linux/in.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
 #include <linux/lp.h>
 #include <linux/init.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/inetdevice.h>
 #include <linux/skbuff.h>
 #include <linux/if_plip.h>
-#include <net/neighbour.h>
-
 #include <linux/workqueue.h>
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
+#include <linux/parport.h>
+
+#include <net/neighbour.h>
+
+#include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/irq.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
-
-#include <linux/parport.h>
 
 /* Maximum number of devices to support. */
 #define PLIP_MAX  8
