@@ -159,16 +159,14 @@ encode_fattr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	}
 	*p++ = htonl((u32) stat.blksize);
 	if (S_ISCHR(type) || S_ISBLK(type))
-		*p++ = htonl((u32) stat.rdev);
+		*p++ = htonl((u32) old_encode_dev(stat.rdev));
 	else
 		*p++ = htonl(0xffffffff);
 	*p++ = htonl((u32) stat.blocks);
-	if (rqstp->rq_reffh->fh_version == 1 
-	    && rqstp->rq_reffh->fh_fsid_type == 1
-	    && (fhp->fh_export->ex_flags & NFSEXP_FSID))
+	if (is_fsid(fhp, rqstp->rq_reffh))
 		*p++ = htonl((u32) fhp->fh_export->ex_fsid);
 	else
-		*p++ = htonl((u32) stat.dev);
+		*p++ = htonl((u32) old_encode_dev(stat.dev));
 	*p++ = htonl((u32) stat.ino);
 	*p++ = htonl((u32) stat.atime.tv_sec);
 	*p++ = htonl(stat.atime.tv_nsec ? stat.atime.tv_nsec / 1000 : 0);

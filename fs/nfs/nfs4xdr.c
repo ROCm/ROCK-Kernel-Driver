@@ -1503,7 +1503,7 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
 		READ32(major);
 		READ32(minor);
 		nfp->rdev = MKDEV(major, minor);
-		dprintk("read_attrs: rdev=0x%x\n", nfp->rdev);
+		dprintk("read_attrs: rdev=%u:%u\n", major, minor);
         }
         if (bmval1 & FATTR4_WORD1_SPACE_AVAIL) {
                 READ_BUF(8);
