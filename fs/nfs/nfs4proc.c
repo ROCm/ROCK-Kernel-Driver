@@ -56,9 +56,6 @@ extern struct rpc_procinfo nfs4_procedures[];
 
 extern nfs4_stateid zero_stateid;
 
-static int nfs4_proc_fsinfo(struct nfs_server *, struct nfs_fh *, struct nfs_fsinfo *);
-
-
 static void
 nfs4_setup_compound(struct nfs4_compound *cp, struct nfs4_op *ops,
 		    struct nfs_server *server, char *tag)
@@ -398,41 +395,6 @@ nfs4_setup_savefh(struct nfs4_compound *cp)
 }
 
 static void
-nfs4_setup_setclientid(struct nfs4_compound *cp, u32 program, unsigned short port)
-{
-	struct nfs4_setclientid *setclientid = GET_OP(cp, setclientid);
-	struct nfs_server *server = cp->server;
-	struct timespec tv;
-	u32 *p;
-
-	tv = CURRENT_TIME;
- 	p = (u32 *)setclientid->sc_verifier.data;
-	*p++ = tv.tv_sec;
-	*p++ = tv.tv_nsec;
-	setclientid->sc_name = server->ip_addr;
-	sprintf(setclientid->sc_netid, "udp");
-	sprintf(setclientid->sc_uaddr, "%s.%d.%d", server->ip_addr, port >> 8, port & 255);
-	setclientid->sc_prog = program;
-	setclientid->sc_cb_ident = 0;
-	setclientid->sc_state = server->nfs4_state;
-	
-	OPNUM(cp) = OP_SETCLIENTID;
-	cp->req_nops++;
-}
-
-static void
-nfs4_setup_setclientid_confirm(struct nfs4_compound *cp)
-{
-	struct nfs4_client **client_state = GET_OP(cp, setclientid_confirm);
-
-	*client_state = cp->server->nfs4_state;
-
-	OPNUM(cp) = OP_SETCLIENTID_CONFIRM;
-	cp->req_nops++;
-	cp->renew_index = cp->req_nops;
-}
-
-static void
 renew_lease(struct nfs_server *server, unsigned long timestamp)
 {
 	struct nfs4_client *clp = server->nfs4_state;
@@ -701,51 +663,31 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	struct nfs4_client	*clp;
 	struct nfs4_compound	compound;
 	struct nfs4_op		ops[4];
-	struct nfs_fsinfo	fsinfo;
 	unsigned char *		p;
 	struct qstr		q;
-	unsigned long		last_renewed;
 	int			status;
 
 	clp = server->nfs4_state;
 
 	down_write(&clp->cl_sem);
 	/* Has the clientid already been initialized? */
-	if (clp->cl_state != NFS4CLNT_NEW) {
+	if (clp->cl_state != NFS4CLNT_NEW)
 		/* Yep, so just read the root attributes and the lease time. */
-		fattr->valid = 0;
-		nfs4_setup_compound(&compound, ops, server, "getrootfh");
-		nfs4_setup_putrootfh(&compound);
-		nfs4_setup_getattr(&compound, fattr);
-		nfs4_setup_getfh(&compound, fhandle);
-		if ((status = nfs4_call_compound(&compound, NULL, 0)))
-			goto out_unlock;
 		goto no_setclientid;
-	}
 
 	/* 
 	 * SETCLIENTID.
 	 * Until delegations are imported, we don't bother setting the program
 	 * number and port to anything meaningful.
 	 */
-	nfs4_setup_compound(&compound, ops, server, "setclientid");
-	nfs4_setup_setclientid(&compound, 0, 0);
-	last_renewed = jiffies;
-	if ((status = nfs4_call_compound(&compound, NULL, 0)))
+	if ((status = nfs4_proc_setclientid(clp, 0, 0)))
 		goto out_unlock;
 
 	/*
 	 * SETCLIENTID_CONFIRM, plus root filehandle.
 	 * We also get the lease time here.
 	 */
-	fattr->valid = 0;
-	nfs4_setup_compound(&compound, ops, server, "setclientid_confirm");
-	nfs4_setup_setclientid_confirm(&compound);
-	nfs4_setup_putrootfh(&compound);
-	nfs4_setup_getattr(&compound, fattr);
-	nfs4_setup_getfh(&compound, fhandle);
-	last_renewed = jiffies;
-	if ((status = nfs4_call_compound(&compound, NULL, 0)))
+	if ((status = nfs4_proc_setclientid_confirm(clp)))
 		goto out_unlock;
 
 	/*
@@ -754,10 +696,6 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	 * server.
 	 * FIXME: we only need one renewd daemon per server.
 	 */
-	if ((status = nfs4_proc_fsinfo(server, fhandle, &fsinfo)))
-		goto out_unlock;
-	clp->cl_lease_time = fsinfo.lease_time * HZ;
-	clp->cl_last_renewal = last_renewed;
 	nfs4_schedule_state_renewal(clp);
 	clp->cl_state = NFS4CLNT_OK;
 
@@ -770,6 +708,13 @@ no_setclientid:
 	 * catch an ERR_WRONGSEC if it occurs along the way...
 	 */
 	p = server->mnt_path;
+	fattr->valid = 0;
+	nfs4_setup_compound(&compound, ops, server, "getrootfh");
+	nfs4_setup_putrootfh(&compound);
+	nfs4_setup_getattr(&compound, fattr);
+	nfs4_setup_getfh(&compound, fhandle);
+	if ((status = nfs4_call_compound(&compound, NULL, 0)))
+		goto out;
 	for (;;) {
 		while (*p == '/')
 			p++;
@@ -798,6 +743,7 @@ no_setclientid:
 	return status;
 out_unlock:
 	up_write(&clp->cl_sem);
+out:
 	return status;
 }
 
@@ -1722,6 +1668,57 @@ nfs4_request_compatible(struct nfs_page *req, struct file *filp, struct page *pa
 	if (req->wb_cred != cred)
 		return 0;
 	return 1;
+}
+
+int
+nfs4_proc_setclientid(struct nfs4_client *clp,
+		u32 program, unsigned short port)
+{
+	u32 *p;
+	struct nfs4_setclientid setclientid;
+	struct timespec tv;
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_SETCLIENTID],
+		.rpc_argp = &setclientid,
+		.rpc_resp = clp,
+		.rpc_cred = clp->cl_cred,
+	};
+
+	tv = CURRENT_TIME;
+	p = (u32*)setclientid.sc_verifier.data;
+	*p++ = (u32)tv.tv_sec;
+	*p = (u32)tv.tv_nsec;
+	setclientid.sc_name = clp->cl_ipaddr;
+	sprintf(setclientid.sc_netid, "tcp");
+	sprintf(setclientid.sc_uaddr, "%s.%d.%d", clp->cl_ipaddr, port >> 8, port & 255);
+	setclientid.sc_prog = htonl(program);
+	setclientid.sc_cb_ident = 0;
+
+	return rpc_call_sync(clp->cl_rpcclient, &msg, 0);
+}
+
+int
+nfs4_proc_setclientid_confirm(struct nfs4_client *clp)
+{
+	struct nfs_fsinfo fsinfo;
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_SETCLIENTID_CONFIRM],
+		.rpc_argp = clp,
+		.rpc_resp = &fsinfo,
+		.rpc_cred = clp->cl_cred,
+	};
+	unsigned long now;
+	int status;
+
+	now = jiffies;
+	status = rpc_call_sync(clp->cl_rpcclient, &msg, 0);
+	if (status == 0) {
+		spin_lock(&clp->cl_lock);
+		clp->cl_lease_time = fsinfo.lease_time * HZ;
+		clp->cl_last_renewal = now;
+		spin_unlock(&clp->cl_lock);
+	}
+	return status;
 }
 
 struct nfs_rpc_ops	nfs_v4_clientops = {

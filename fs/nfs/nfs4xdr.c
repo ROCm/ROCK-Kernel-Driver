@@ -73,6 +73,8 @@ extern int			nfs_stat_to_errno(int);
 #define encode_putfh_maxsz	op_encode_hdr_maxsz + 1 + \
 				(NFS4_FHSIZE >> 2)
 #define decode_putfh_maxsz	op_decode_hdr_maxsz
+#define encode_putrootfh_maxsz	op_encode_hdr_maxsz
+#define decode_putrootfh_maxsz	op_decode_hdr_maxsz
 #define encode_getfh_maxsz      op_encode_hdr_maxsz
 #define decode_getfh_maxsz      op_decode_hdr_maxsz + 1 + \
                                 (NFS4_FHSIZE >> 2)
@@ -94,6 +96,21 @@ extern int			nfs_stat_to_errno(int);
 #define decode_fsinfo_maxsz	op_decode_hdr_maxsz + 11
 #define encode_renew_maxsz	op_encode_hdr_maxsz + 3
 #define decode_renew_maxsz	op_decode_hdr_maxsz
+#define encode_setclientid_maxsz \
+				op_encode_hdr_maxsz + \
+				4 /*server->ip_addr*/ + \
+				1 /*Netid*/ + \
+				6 /*uaddr*/ + \
+				6 + (NFS4_VERIFIER_SIZE >> 2)
+#define decode_setclientid_maxsz \
+				op_decode_hdr_maxsz + \
+				2 + \
+				1024 /* large value for CLID_INUSE */
+#define encode_setclientid_confirm_maxsz \
+				op_encode_hdr_maxsz + \
+				3 + (NFS4_VERIFIER_SIZE >> 2)
+#define decode_setclientid_confirm_maxsz \
+				op_decode_hdr_maxsz
 
 #define NFS4_enc_compound_sz	1024  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	1024  /* XXX: large enough? */
@@ -173,6 +190,20 @@ extern int			nfs_stat_to_errno(int);
 				encode_renew_maxsz
 #define NFS4_dec_renew_sz	compound_decode_hdr_maxsz + \
 				decode_renew_maxsz
+#define NFS4_enc_setclientid_sz	compound_encode_hdr_maxsz + \
+				encode_setclientid_maxsz
+#define NFS4_dec_setclientid_sz	compound_decode_hdr_maxsz + \
+				decode_setclientid_maxsz
+#define NFS4_enc_setclientid_confirm_sz \
+				compound_encode_hdr_maxsz + \
+				encode_setclientid_confirm_maxsz + \
+				encode_putrootfh_maxsz + \
+				encode_fsinfo_maxsz
+#define NFS4_dec_setclientid_confirm_sz \
+				compound_decode_hdr_maxsz + \
+				decode_setclientid_confirm_maxsz + \
+				decode_putrootfh_maxsz + \
+				decode_fsinfo_maxsz
 
 
 static struct {
@@ -918,12 +949,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_SAVEFH:
 			status = encode_savefh(xdr);
 			break;
-		case OP_SETCLIENTID:
-			status = encode_setclientid(xdr, &cp->ops[i].u.setclientid);
-			break;
-		case OP_SETCLIENTID_CONFIRM:
-			status = encode_setclientid_confirm(xdr, cp->ops[i].u.setclientid_confirm);
-			break;
 		default:
 			BUG();
 		}
@@ -1185,6 +1210,46 @@ nfs4_xdr_enc_renew(struct rpc_rqst *req, uint32_t *p, struct nfs4_client *clp)
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	encode_compound_hdr(&xdr, &hdr);
 	return encode_renew(&xdr, clp);
+}
+
+/*
+ * a SETCLIENTID request
+ */
+static int
+nfs4_xdr_enc_setclientid(struct rpc_rqst *req, uint32_t *p,
+		struct nfs4_setclientid *sc)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 1,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	return encode_setclientid(&xdr, sc);
+}
+
+/*
+ * a SETCLIENTID_CONFIRM request
+ */
+static int
+nfs4_xdr_enc_setclientid_confirm(struct rpc_rqst *req, uint32_t *p,
+		struct nfs4_client *clp)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_setclientid_confirm(&xdr, clp);
+	if (!status)
+		status = encode_putrootfh(&xdr);
+	if (!status)
+		status = encode_fsinfo(&xdr);
+	return status;
 }
 
 /*
@@ -2098,7 +2163,7 @@ decode_setattr(struct xdr_stream *xdr, struct nfs_setattrres *res)
 }
 
 static int
-decode_setclientid(struct xdr_stream *xdr, struct nfs4_setclientid *setclientid)
+decode_setclientid(struct xdr_stream *xdr, struct nfs4_client *clp)
 {
 	uint32_t *p;
 	uint32_t opnum;
@@ -2114,9 +2179,9 @@ decode_setclientid(struct xdr_stream *xdr, struct nfs4_setclientid *setclientid)
 	}
 	READ32(nfserr);
 	if (nfserr == NFS_OK) {
-		READ_BUF(8 + sizeof(setclientid->sc_state->cl_confirm.data));
-		READ64(setclientid->sc_state->cl_clientid);
-		COPYMEM(setclientid->sc_state->cl_confirm.data, sizeof(setclientid->sc_state->cl_confirm.data));
+		READ_BUF(8 + sizeof(clp->cl_confirm.data));
+		READ64(clp->cl_clientid);
+		COPYMEM(clp->cl_confirm.data, sizeof(clp->cl_confirm.data));
 	} else if (nfserr == NFSERR_CLID_INUSE) {
 		uint32_t len;
 
@@ -2230,12 +2295,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_SAVEFH:
 			status = decode_savefh(xdr);
-			break;
-		case OP_SETCLIENTID:
-			status = decode_setclientid(xdr, &op->u.setclientid);
-			break;
-		case OP_SETCLIENTID_CONFIRM:
-			status = decode_setclientid_confirm(xdr);
 			break;
 		default:
 			BUG();
@@ -2513,6 +2572,49 @@ nfs4_xdr_dec_renew(struct rpc_rqst *rqstp, uint32_t *p, void *dummy)
 	return status;
 }
 
+/*
+ * a SETCLIENTID request
+ */
+static int
+nfs4_xdr_dec_setclientid(struct rpc_rqst *req, uint32_t *p,
+		struct nfs4_client *clp)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (!status)
+		status = decode_setclientid(&xdr, clp);
+	if (!status)
+		status = -nfs_stat_to_errno(hdr.status);
+	return status;
+}
+
+/*
+ * a SETCLIENTID_CONFIRM request
+ */
+static int
+nfs4_xdr_dec_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, struct nfs_fsinfo *fsinfo)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (!status)
+		status = decode_setclientid_confirm(&xdr);
+	if (!status)
+		status = decode_putrootfh(&xdr);
+	if (!status)
+		status = decode_fsinfo(&xdr, fsinfo);
+	if (!status)
+		status = -nfs_stat_to_errno(hdr.status);
+	return status;
+}
+
 uint32_t *
 nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 {
@@ -2571,6 +2673,8 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(SETATTR,		enc_setattr,	dec_setattr),
   PROC(FSINFO,		enc_fsinfo,	dec_fsinfo),
   PROC(RENEW,		enc_renew,	dec_renew),
+  PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid),
+  PROC(SETCLIENTID_CONFIRM,	enc_setclientid_confirm,	dec_setclientid_confirm),
 };
 
 struct rpc_version		nfs_version4 = {

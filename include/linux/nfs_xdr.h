@@ -555,8 +555,6 @@ struct nfs4_op {
 		struct nfs4_rename	rename;
 		struct nfs4_client *	renew;
 		struct nfs4_setattr	setattr;
-		struct nfs4_setclientid	setclientid;
-		struct nfs4_client *	setclientid_confirm;
 	} u;
 };
 

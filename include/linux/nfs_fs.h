@@ -552,6 +552,8 @@ struct nfs4_state {
 
 
 /* nfs4proc.c */
+extern int nfs4_proc_setclientid(struct nfs4_client *, u32, unsigned short);
+extern int nfs4_proc_setclientid_confirm(struct nfs4_client *);
 extern int nfs4_proc_async_renew(struct nfs4_client *);
 extern int nfs4_do_close(struct inode *, struct nfs4_state *);
 
