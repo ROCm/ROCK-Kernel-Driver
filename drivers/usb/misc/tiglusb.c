@@ -390,6 +390,8 @@ tiglusb_probe (struct usb_interface *intf,
 static void
 tiglusb_disconnect (struct usb_interface *intf)
 {
+	char name[32];
+
 	ptiglusb_t s = dev_get_drvdata (&intf->dev);
 
 	dev_set_drvdata (&intf->dev, NULL);
