@@ -281,7 +281,6 @@ static int __init longhaul_get_ranges (void)
 		minmult=50;
 		maxmult=longhaul_get_cpu_mult();
 
-		dprintk(KERN_INFO PFX "maxmult: %d \n", maxmult);
 		fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
 		break;
 	}
