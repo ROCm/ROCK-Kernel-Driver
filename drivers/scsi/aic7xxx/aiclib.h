@@ -906,10 +906,10 @@ int		aic_inquiry_match(caddr_t /*inqbuffer*/,
 int		aic_static_inquiry_match(caddr_t /*inqbuffer*/,
 					 caddr_t /*table_entry*/);
 
-typedef void aic_option_callback_t(void *, int, int, int32_t);
+typedef void aic_option_callback_t(u_long, int, int, int32_t);
 char *		aic_parse_brace_option(char *opt_name, char *opt_arg,
 				       char *end, int depth,
-				       aic_option_callback_t *, void *);
+				       aic_option_callback_t *, u_long);
 
 static __inline void	 scsi_extract_sense(struct scsi_sense_data *sense,
 					    int *error_code, int *sense_key,

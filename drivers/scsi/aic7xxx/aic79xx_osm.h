@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#121 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#128 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -139,7 +139,7 @@ typedef Scsi_Cmnd      *ahd_io_ctx_t;
 #endif /* BYTE_ORDER */
 
 /************************* Configuration Data *********************************/
-extern int aic79xx_allow_memio;
+extern uint32_t aic79xx_allow_memio;
 extern int aic79xx_detect_complete;
 extern Scsi_Host_Template aic79xx_driver_template;
 
@@ -255,7 +255,7 @@ typedef struct timer_list ahd_timer_t;
 
 /***************************** Timer Facilities *******************************/
 #define ahd_timer_init init_timer
-#define ahd_timer_stop del_timer
+#define ahd_timer_stop del_timer_sync
 typedef void ahd_linux_callback_t (u_long);  
 static __inline void ahd_timer_reset(ahd_timer_t *timer, u_int usec,
 				     ahd_callback_t *func, void *arg);
@@ -293,7 +293,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHD_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.5"
+#define AIC79XX_DRIVER_VERSION "1.3.7"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -488,7 +488,18 @@ struct ahd_linux_target {
  * manner and are allocated below 4GB, the number of S/G segments is
  * unrestricted.
  */
-#define        AHD_NSEG 128
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+/*
+ * We dynamically adjust the number of segments in pre-2.5 kernels to
+ * avoid fragmentation issues in the SCSI mid-layer's private memory
+ * allocator.  See aic79xx_osm.c ahd_linux_size_nseg() for details.
+ */
+extern u_int ahd_linux_nseg;
+#define	AHD_NSEG ahd_linux_nseg
+#define	AHD_LINUX_MIN_NSEG 64
+#else
+#define	AHD_NSEG 128
+#endif
 
 /*
  * Per-SCB OSM storage.
@@ -532,9 +543,7 @@ struct ahd_platform_data {
 	TAILQ_HEAD(, ahd_linux_device) device_runq;
 	struct ahd_completeq	 completeq;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 	spinlock_t		 spin_lock;
-#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	struct tasklet_struct	 runq_tasklet;
 #endif
@@ -730,7 +739,6 @@ static __inline void ahd_list_lockinit(void);
 static __inline void ahd_list_lock(unsigned long *flags);
 static __inline void ahd_list_unlock(unsigned long *flags);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 static __inline void
 ahd_lockinit(struct ahd_softc *ahd)
 {
@@ -818,63 +826,6 @@ ahd_list_unlock(unsigned long *flags)
 	spin_unlock_irqrestore(&ahd_list_spinlock, *flags);
 }
 
-#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0) */
-
-ahd_lockinit(struct ahd_softc *ahd)
-{
-}
-
-static __inline void
-ahd_lock(struct ahd_softc *ahd, unsigned long *flags)
-{
-	save_flags(*flags);
-	cli();
-}
-
-static __inline void
-ahd_unlock(struct ahd_softc *ahd, unsigned long *flags)
-{
-	restore_flags(*flags);
-}
-
-ahd_done_lockinit(struct ahd_softc *ahd)
-{
-}
-
-static __inline void
-ahd_done_lock(struct ahd_softc *ahd, unsigned long *flags)
-{
-	/*
-	 * The done lock is always held while
-	 * the ahd lock is held so blocking
-	 * interrupts again would have no effect.
-	 */
-}
-
-static __inline void
-ahd_done_unlock(struct ahd_softc *ahd, unsigned long *flags)
-{
-}
-
-static __inline void
-ahd_list_lockinit()
-{
-}
-
-static __inline void
-ahd_list_lock(unsigned long *flags)
-{
-	save_flags(*flags);
-	cli();
-}
-
-static __inline void
-ahd_list_unlock(unsigned long *flags)
-{
-	restore_flags(*flags);
-}
-#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0) */
-
 /******************************* PCI Definitions ******************************/
 /*
  * PCIM_xxx: mask to locate subfield in register
@@ -945,16 +896,6 @@ void ahd_power_state_change(struct ahd_softc *ahd,
 			    ahd_power_state new_state);
 
 /******************************* PCI Routines *********************************/
-/*
- * We need to use the bios32.h routines if we are kernel version 2.1.92 or less.
- */
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
-#if defined(__sparc_v9__) || defined(__powerpc__)
-#error "PPC and Sparc platforms are only supported under 2.1.92 and above"
-#endif
-#include <linux/bios32.h>
-#endif
-
 int			 ahd_linux_pci_init(void);
 void			 ahd_linux_pci_exit(void);
 int			 ahd_pci_map_registers(struct ahd_softc *ahd);
@@ -1285,5 +1226,5 @@ void	ahd_platform_dump_card_state(struct ahd_softc *ahd);
 #define AHD_PCI_CONFIG 0
 #endif
 #define bootverbose aic79xx_verbose
-extern int aic79xx_verbose;
+extern uint32_t aic79xx_verbose;
 #endif /* _AIC79XX_LINUX_H_ */

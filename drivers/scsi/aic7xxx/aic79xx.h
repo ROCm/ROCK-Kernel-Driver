@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#88 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#89 $
  *
  * $FreeBSD$
  */
@@ -494,13 +494,11 @@ struct hardware_scb {
  *	  transfer.
  */ 
 #define SG_PTR_MASK	0xFFFFFFF8
-/*16*/	uint16_t tag;
-/*18*/	uint8_t  cdb_len;
-/*19*/	uint8_t  task_management;
-/*20*/	uint32_t next_hscb_busaddr;
-/*24*/	uint64_t dataptr;
-/*32*/	uint32_t datacnt;	/* Byte 3 is spare. */
-/*36*/	uint32_t sgptr;
+/*16*/	uint64_t dataptr;
+/*24*/	uint32_t datacnt;	/* Byte 3 is spare. */
+/*28*/	uint32_t sgptr;
+/*32*/	uint32_t hscb_busaddr;
+/*36*/	uint32_t next_hscb_busaddr;
 /*40*/	uint8_t  control;	/* See SCB_CONTROL in aic79xx.reg for details */
 /*41*/	uint8_t	 scsiid;	/*
 				 * Selection out Id
@@ -508,8 +506,10 @@ struct hardware_scb {
 				 */
 /*42*/	uint8_t  lun;
 /*43*/	uint8_t  task_attribute;
-/*44*/	uint32_t hscb_busaddr;
-/******* Long lun field only downloaded for full 8 byte lun support *******/
+/*44*/	uint8_t  cdb_len;
+/*45*/	uint8_t  task_management;
+/*46*/	uint16_t tag;		/* Reused by Sequencer. */
+/********** Long lun field only downloaded for full 8 byte lun support ********/
 /*48*/  uint8_t	 pkt_long_lun[8];
 /******* Fields below are not Downloaded (Sequencer may use for scratch) ******/
 /*56*/  uint8_t	 spare[8];

@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_inline.h#44 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_inline.h#45 $
  *
  * $FreeBSD$
  */
@@ -223,7 +223,7 @@ ahd_unpause(struct ahd_softc *ahd)
 		ahd_set_modes(ahd, ahd->saved_src_mode, ahd->saved_dst_mode);
 	}
 
-	if ((ahd_inb(ahd, INTSTAT) & ~(SWTMINT | CMDCMPLT)) == 0)
+	if ((ahd_inb(ahd, INTSTAT) & ~CMDCMPLT) == 0)
 		ahd_outb(ahd, HCNTRL, ahd->unpause);
 
 	ahd_known_modes(ahd, AHD_MODE_UNKNOWN, AHD_MODE_UNKNOWN);

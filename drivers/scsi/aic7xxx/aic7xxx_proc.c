@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_proc.c#24 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_proc.c#26 $
  */
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
@@ -148,8 +148,9 @@ ahc_dump_target_state(struct ahc_softc *ahc, struct info_str *info,
 
 	tinfo = ahc_fetch_transinfo(ahc, channel, our_id,
 				    target_id, &tstate);
-	copy_info(info, "Channel %c Target %d Negotiation Settings\n",
-		  channel, target_id);
+	if ((ahc->features & AHC_TWIN) != 0)
+		copy_info(info, "Channel %c ", channel);
+	copy_info(info, "Target %d Negotiation Settings\n", target_id);
 	copy_info(info, "\tUser: ");
 	ahc_format_transinfo(info, &tinfo->user);
 	targ = ahc->platform_data->targets[target_offset];
@@ -327,7 +328,10 @@ ahc_linux_proc_info(char *buffer, char **start, off_t offset,
 		  AIC7XXX_DRIVER_VERSION);
 	copy_info(&info, "%s\n", ahc->description);
 	ahc_controller_info(ahc, ahc_info);
-	copy_info(&info, "%s\n\n", ahc_info);
+	copy_info(&info, "%s\n", ahc_info);
+	copy_info(&info, "Allocated SCBs: %d, SG List Length: %d\n\n",
+		  ahc->scb_data->numscbs, ahc_linux_nseg);
+
 
 	if (ahc->seep_config == NULL)
 		copy_info(&info, "No Serial EEPROM\n");
