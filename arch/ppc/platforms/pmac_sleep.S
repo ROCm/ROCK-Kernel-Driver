@@ -10,10 +10,13 @@
  *
  */
 
+#include <linux/config.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/ppc_asm.h>
 #include <asm/cputable.h>
+#include <asm/thread_info.h>
+#include <asm/offsets.h>
 
 #define MAGIC	0x4c617273	/* 'Lars' */
 
@@ -34,20 +37,15 @@
 #define SL_DBAT3	0x50
 #define SL_IBAT3	0x58
 #define SL_TB		0x60
-#define SL_HID0		0x68
-#define SL_HID1		0x6c
-#define SL_MSSCR0	0x70
-#define SL_MSSSR0	0x74
-#define SL_ICTRL	0x78
-#define SL_LDSTCR	0x7c
-#define SL_LDSTDB	0x80
-#define SL_R2		0x84
-#define SL_CR		0x88
-#define SL_R12		0x8c	/* r12 to r31 */
+#define SL_R2		0x68
+#define SL_CR		0x6c
+#define SL_R12		0x70	/* r12 to r31 */
 #define SL_SIZE		(SL_R12 + 80)
 
-	.text
+	.section .text
 	.align	5
+
+#if defined(CONFIG_PMAC_PBOOK) || defined(CONFIG_CPU_FREQ_PMAC)
 
 /* This gets called by via-pmu.c late during the sleep process.
  * The PMU was already send the sleep command and will shut us down
@@ -122,34 +120,9 @@ _GLOBAL(low_sleep_handler)
 	mfibatl	r4,3
 	stw	r4,SL_IBAT3+4(r1)
 
-	/* Save HID0 */
-	mfspr	r4,HID0
-	stw	r4,SL_HID0(r1)
+	/* Backup various CPU config stuffs */
+	bl	__save_cpu_setup
 
-	/* Save 7400/7410/7450 specific registers */
-	mfspr	r3,PVR
-	srwi	r3,r3,16
-	cmpli	cr0,r3,0x8000
-	cmpli	cr1,r3,0x000c
-	cmpli	cr2,r3,0x800c
-	cror	4*cr1+eq,4*cr1+eq,4*cr2+eq
-	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq
-	bne	1f
-	mfspr	r4,SPRN_MSSCR0
-	stw	r4,SL_MSSCR0(r1)
-	mfspr	r4,SPRN_MSSSR0
-	stw	r4,SL_MSSSR0(r1)
-	/* Save 7450 specific registers */
-	beq	cr1,1f
-	mfspr	r4,HID1
-	stw	r4,SL_HID1(r1)
-	mfspr	r4,SPRN_ICTRL
-	stw	r4,SL_ICTRL(r1)
-	mfspr	r4,SPRN_LDSTCR
-	stw	r4,SL_LDSTCR(r1)
-	mfspr	r4,SPRN_LDSTDB
-	stw	r4,SL_LDSTDB(r1)
-1:
 	/* The ROM can wake us up via 2 different vectors:
 	 *  - On wallstreet & lombard, we must write a magic
 	 *    value 'Lars' at address 4 and a pointer to a
@@ -184,6 +157,10 @@ _GLOBAL(low_sleep_handler)
 	addi r3,r3,sleep_storage@l
 	stw r5,0(r3)
 
+BEGIN_FTR_SECTION
+	DSSALL
+	sync
+END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 
 /*
  * Flush the L1 data cache by reading the first 128kB of RAM
@@ -298,60 +275,11 @@ grackle_wake_up:
 	addis	r4,r4,0x1000	/* address of next segment */
 	bdnz	3b
 	
-	/* Restore the remaining bits of the HID0 register. */
 	subi	r1,r1,SL_PC
-	lwz	r3,SL_HID0(r1)
-	sync
-	isync
-	mtspr	HID0,r3
-	sync
-	isync
 
-	/* Restore 7400/7410/7450 specific registers */
-	mfspr	r3,PVR
-	srwi	r3,r3,16
-	cmpli	cr0,r3,0x8000
-	cmpli	cr1,r3,0x000c
-	cmpli	cr2,r3,0x800c
-	cror	4*cr1+eq,4*cr1+eq,4*cr2+eq
-	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq
-	bne	1f
-	lwz	r4,SL_MSSCR0(r1)
-	sync
-	mtspr	SPRN_MSSCR0,r4
-	sync
-	isync
-	lwz	r4,SL_MSSSR0(r1)
-	sync
-	mtspr	SPRN_MSSSR0,r4
-	sync
-	isync
-	bne	cr2,1f
-	li	r4,0
-	mtspr	SPRN_L2CR2,r4
-	/* Restore 7450 specific registers */
-	beq	cr1,1f
-	lwz	r4,SL_HID1(r1)
-	sync
-	mtspr	HID1,r4
-	isync
-	sync
-	lwz	r4,SPRN_ICTRL(r1)
-	sync
-	mtspr	SPRN_ICTRL,r4
-	isync
-	sync
-	lwz	r4,SPRN_LDSTCR(r1)
-	sync
-	mtspr	SPRN_LDSTCR,r4
-	isync
-	sync
-	lwz	r4,SL_LDSTDB(r1)
-	sync
-	mtspr	SPRN_LDSTDB,r4
-	isync
-	sync
-1:
+	/* Restore various CPU config stuffs */
+	bl	__restore_cpu_setup
+
 	/* Restore the BATs, and SDR1.  Then we can turn on the MMU. */
 	lwz	r4,SL_SDR1(r1)
 	mtsdr1	r4
@@ -437,6 +365,9 @@ turn_on_mmu:
 	sync
 	isync
 	rfi
+
+#endif /* defined(CONFIG_PMAC_PBOOK) || defined(CONFIG_CPU_FREQ) */
+
 
 	.data
 	.globl sleep_storage

@@ -890,7 +890,7 @@ load_up_altivec:
  */
 	mfmsr	r5
 	oris	r5,r5,MSR_VEC@h
-	mtmsr	r5			/* enable use of AltiVec now */
+	MTMSRD(r5)			/* enable use of AltiVec now */
 	isync
 /*
  * For SMP, we don't do lazy AltiVec switching because it just gets too
@@ -962,7 +962,7 @@ giveup_altivec:
 	mfmsr	r5
 	oris	r5,r5,MSR_VEC@h
 	SYNC
-	mtmsr	r5			/* enable use of AltiVec now */
+	MTMSRD(r5)			/* enable use of AltiVec now */
 	isync
 	cmpi	0,r3,0
 	beqlr-				/* if no previous owner, done */
@@ -999,7 +999,7 @@ giveup_fpu:
 	ori	r5,r5,MSR_FP
 	SYNC_601
 	ISYNC_601
-	mtmsr	r5			/* enable use of fpu now */
+	MTMSRD(r5)			/* enable use of fpu now */
 	SYNC_601
 	isync
 	cmpi	0,r3,0
@@ -1191,6 +1191,8 @@ __secondary_start:
 	MTMSRD(r0)
 	isync
 #endif
+	/* Copy some CPU settings from CPU 0 */
+	bl	__restore_cpu_setup
 
 	lis	r3,-KERNELBASE@h
 	mr	r4,r24
@@ -1236,248 +1238,21 @@ __secondary_start:
 #endif /* CONFIG_SMP */
 
 /*
- * Enable caches and 604-specific features if necessary.
+ * Those generic dummy functions are kept for CPUs not
+ * included in CONFIG_6xx
  */
-_GLOBAL(__setup_cpu_601)
-	blr
-_GLOBAL(__setup_cpu_603)
-	b	setup_common_caches
-_GLOBAL(__setup_cpu_604)
-	mflr	r4
-	bl	setup_common_caches
-	bl	setup_604_hid0
-	mtlr	r4
-	blr
-_GLOBAL(__setup_cpu_750)
-	mflr	r4
-	bl	setup_common_caches
-	bl	setup_750_7400_hid0
-	mtlr	r4
-	blr
-_GLOBAL(__setup_cpu_750cx)
-	mflr	r4
-	bl	setup_common_caches
-	bl	setup_750_7400_hid0
-	bl	setup_750cx
-	mtlr	r4
-	blr
-_GLOBAL(__setup_cpu_750fx)
-	mflr	r4
-	bl	setup_common_caches
-	bl	setup_750_7400_hid0
-	bl	setup_750fx
-	mtlr	r4
-	blr
-_GLOBAL(__setup_cpu_7400)
-	mflr	r4
-	bl	setup_7400_workarounds
-	bl	setup_common_caches
-	bl	setup_750_7400_hid0
-	mtlr	r4
-	blr
-_GLOBAL(__setup_cpu_7410)
-	mflr	r4
-	bl	setup_7410_workarounds
-	bl	setup_common_caches
-	bl	setup_750_7400_hid0
-	li	r3,0
-	mtspr	SPRN_L2CR2,r3
-	mtlr	r4
-	blr
-_GLOBAL(__setup_cpu_7450)
-	mflr	r4
-	bl	setup_common_caches
-	bl	setup_745x_specifics
-	mtlr	r4
-	blr
-_GLOBAL(__setup_cpu_7455)
-	mflr	r4
-	bl	setup_common_caches
-	bl	setup_745x_specifics
-	mtlr	r4
-	blr
 _GLOBAL(__setup_cpu_power3)
 	blr
 _GLOBAL(__setup_cpu_generic)
 	blr
 
-/* Enable caches for 603's, 604, 750 & 7400 */
-setup_common_caches:
-	mfspr	r11,HID0
-	andi.	r0,r11,HID0_DCE
-#ifdef CONFIG_DCACHE_DISABLE
-	ori	r11,r11,HID0_ICE
-#else
-	ori	r11,r11,HID0_ICE|HID0_DCE
-#endif
-	ori	r8,r11,HID0_ICFI
-	bne	1f			/* don't invalidate the D-cache */
-	ori	r8,r8,HID0_DCI		/* unless it wasn't enabled */
-1:	sync
-	mtspr	HID0,r8			/* enable and invalidate caches */
-	sync
-	mtspr	HID0,r11		/* enable caches */
-	sync
-	isync
+#ifndef CONFIG_6xx
+_GLOBAL(__save_cpu_setup)
 	blr
-
-/* 604, 604e, 604ev, ...
- * Enable superscalar execution & branch history table
- */
-setup_604_hid0:
-	mfspr	r11,HID0
-	ori	r11,r11,HID0_SIED|HID0_BHTE
-	ori	r8,r11,HID0_BTCD
-	sync
-	mtspr	HID0,r8		/* flush branch target address cache */
-	sync			/* on 604e/604r */
-	mtspr	HID0,r11
-	sync
-	isync
+_GLOBAL(__restore_cpu_setup)
 	blr
+#endif /* CONFIG_6xx */
 
-/* 7400 <= rev 2.7 and 7410 rev = 1.0 suffer from some
- * errata we work around here.
- * Moto MPC710CE.pdf describes them, those are errata
- * #3, #4 and #5
- * Note that we assume the firmware didn't choose to
- * apply other workarounds (there are other ones documented
- * in the .pdf). It appear that Apple firmware only works
- * around #3 and with the same fix we use. We may want to
- * check if the CPU is using 60x bus mode in which case
- * the workaround for errata #4 is useless. Also, we may
- * want to explicitely clear HID0_NOPDST as this is not
- * needed once we have applied workaround #5 (though it's
- * not set by Apple's firmware at least).
- */
-setup_7400_workarounds:
-	mfpvr	r3
-	rlwinm	r3,r3,0,20,31
-	cmpwi	0,r3,0x0207
-	ble	1f
-	blr
-setup_7410_workarounds:
-	mfpvr	r3
-	rlwinm	r3,r3,0,20,31
-	cmpwi	0,r3,0x0100
-	bnelr
-1:
-	mfspr	r11,SPRN_MSSSR0
-	/* Errata #3: Set L1OPQ_SIZE to 0x10 */
-	rlwinm	r11,r11,0,9,6
-	oris	r11,r11,0x0100
-	/* Errata #4: Set L2MQ_SIZE to 1 (check for MPX mode first ?) */
-	oris	r11,r11,0x0002
-	/* Errata #5: Set DRLT_SIZE to 0x01 */
-	rlwinm	r11,r11,0,5,2
-	oris	r11,r11,0x0800
-	sync
-	mtspr	SPRN_MSSSR0,r11
-	sync
-	isync
-	blr
-	
-/* 740/750/7400/7410
- * Enable Store Gathering (SGE), Address Brodcast (ABE),
- * Branch History Table (BHTE), Branch Target ICache (BTIC)
- * Dynamic Power Management (DPM), Speculative (SPD)
- * Clear Instruction cache throttling (ICTC)
- */
-setup_750_7400_hid0:
-	mfspr	r11,HID0
-	ori	r11,r11,HID0_SGE | HID0_ABE | HID0_BHTE | HID0_BTIC
-BEGIN_FTR_SECTION
-	oris	r11,r11,HID0_DPM@h	/* enable dynamic power mgmt */
-END_FTR_SECTION_IFCLR(CPU_FTR_NO_DPM)
-	li	r3,HID0_SPD
-	andc	r11,r11,r3		/* clear SPD: enable speculative */
- 	li	r3,0
- 	mtspr	ICTC,r3			/* Instruction Cache Throttling off */
-	isync
-	mtspr	HID0,r11
-	sync
-	isync
-	blr
-
-/* 750cx specific
- * Looks like we have to disable NAP feature for some PLL settings...
- * (waiting for confirmation)
- */
-setup_750cx:
-	mfspr	r10, SPRN_HID1
-	rlwinm	r10,r10,4,28,31
-	cmpi	cr0,r10,7
-	cmpi	cr1,r10,9
-	cmpi	cr2,r10,11
-	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq
-	cror	4*cr0+eq,4*cr0+eq,4*cr2+eq
-	bnelr
-	lwz	r6,CPU_SPEC_FEATURES(r5)
-	li	r7,CPU_FTR_CAN_NAP
-	andc	r6,r6,r7
-	stw	r6,CPU_SPEC_FEATURES(r5)
-	blr
-
-/* 750fx specific
- */
-setup_750fx:
-	blr
-
-/* MPC 745x
- * Enable Store Gathering (SGE), Branch Folding (FOLD)
- * Branch History Table (BHTE), Branch Target ICache (BTIC)
- * Dynamic Power Management (DPM), Speculative (SPD)
- * Ensure our data cache instructions really operate.
- * Timebase has to be running or we wouldn't have made it here,
- * just ensure we don't disable it.
- * Clear Instruction cache throttling (ICTC)
- * Enable L2 HW prefetch
- */
-setup_745x_specifics:
-	/* We check for the presence of an L3 cache setup by
-	 * the firmware. If any, we disable NAP capability as
-	 * it's known to be bogus on rev 2.1 and earlier
-	 */
-	mfspr	r11,SPRN_L3CR
-	andis.	r11,r11,L3CR_L3E@h
-	beq	1f
-	lwz	r6,CPU_SPEC_FEATURES(r5)
-	andi.	r0,r6,CPU_FTR_L3_DISABLE_NAP
-	beq	1f
-	li	r7,CPU_FTR_CAN_NAP
-	andc	r6,r6,r7
-	stw	r6,CPU_SPEC_FEATURES(r5)
-1:	
-	mfspr	r11,HID0
-
-	/* All of the bits we have to set.....
-	 */
-	ori	r11,r11,HID0_SGE | HID0_FOLD | HID0_BHTE | HID0_BTIC | HID0_LRSTK
-BEGIN_FTR_SECTION
-	oris	r11,r11,HID0_DPM@h	/* enable dynamic power mgmt */
-END_FTR_SECTION_IFCLR(CPU_FTR_NO_DPM)
-
-	/* All of the bits we have to clear....
-	 */
-	li	r3,HID0_SPD | HID0_NOPDST | HID0_NOPTI
-	andc	r11,r11,r3		/* clear SPD: enable speculative */
- 	li	r3,0
-
- 	mtspr	ICTC,r3			/* Instruction Cache Throttling off */
-	isync
-	mtspr	HID0,r11
-	sync
-	isync
-
-	/* Enable L2 HW prefetch
-	 */
-	mfspr	r3,SPRN_MSSCR0
-	ori	r3,r3,3
-	sync
-	mtspr	SPRN_MSSCR0,r3
-	sync
-	isync
-	blr
 
 /*
  * Load stuff into the MMU.  Intended to be called with
