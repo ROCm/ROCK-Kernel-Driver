@@ -1135,8 +1135,8 @@ typedef union {
 	uint16_t extended;
 	struct {
 		uint8_t reserved;
-		uint8_t standard;;
-	};
+		uint8_t standard;
+	} id;
 } target_id_t;
 
 #define SET_TARGET_ID(ha, to, from)			\
@@ -1144,7 +1144,7 @@ do {							\
 	if (HAS_EXTENDED_IDS(ha))			\
 		to.extended = cpu_to_le16(from);	\
 	else						\
-		to.standard = (uint8_t)from;		\
+		to.id.standard = (uint8_t)from;		\
 } while (0)
 
 /*
