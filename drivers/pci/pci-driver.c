@@ -291,6 +291,19 @@ static int pci_device_remove(struct device * dev)
 			drv->remove(pci_dev);
 		pci_dev->driver = NULL;
 	}
+
+#ifdef CONFIG_DEBUG_KERNEL
+	/*
+	 * If the driver decides to stop using the device, it should
+	 * call pci_disable_device().
+	 */
+	if (pci_dev->is_enabled) {
+		dev_warn(&pci_dev->dev, "Device was removed without properly "
+			 "calling pci_disable_device(). This may need fixing.\n");
+		/* WARN_ON(1); */
+	}
+#endif /* CONFIG_DEBUG_KERNEL */
+
 	pci_dev_put(pci_dev);
 	return 0;
 }
