@@ -87,9 +87,9 @@ CFLAGS += -march=i586
 endif
 
 ifdef CONFIG_VISWS
-MACHINE	:= visws
+MACHINE	:= mach-visws
 else
-MACHINE	:= generic
+MACHINE	:= mach-generic
 endif
 
 HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o

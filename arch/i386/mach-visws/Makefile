@@ -10,15 +10,16 @@
 .S.o:
 	$(CC) $(AFLAGS) -traditional -c $< -o $*.o
 
-all: generic.o
+all: mach-visws.o
 
-O_TARGET 	:= generic.o
+O_TARGET 	:= mach-visws.o
 EXTRA_CFLAGS	+= -I../kernel
 export-objs     := 
 
-obj-y				:= setup.o
+obj-y				:= setup.o traps.o
 
-obj-$(CONFIG_PCI)		+= pci-pc.o pci-irq.o
+obj-$(CONFIG_PCI)		+= pci-visws.o
+obj-$(CONFIG_X86_VISWS_APIC)	+= visws_apic.o
 obj-$(CONFIG_X86_LOCAL_APIC)	+= mpparse.o
 
 include $(TOPDIR)/Rules.make
