@@ -82,12 +82,15 @@ do {						\
 	flush_dcache_page(page);		\
 } while (0)
 
-#define pfn_valid(pfn)		((pfn) < max_mapnr)
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+
+#ifndef CONFIG_DISCONTIGMEM
+#define pfn_valid(pfn)		((pfn) < max_mapnr)
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 #define page_to_pfn(page)	((unsigned long) (page - mem_map))
 #define pfn_to_page(pfn)	(mem_map + (pfn))
 #define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
+#endif
 
 typedef union ia64_va {
 	struct {

@@ -34,6 +34,7 @@
 
 #include <asm/ia32.h>
 #include <asm/page.h>
+#include <asm/pgtable.h>
 #include <asm/machvec.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
@@ -48,9 +49,6 @@
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
 # error "struct cpuinfo_ia64 too big!"
 #endif
-
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#define MAX(a,b)	((a) > (b) ? (a) : (b))
 
 extern char _end;
 
@@ -95,6 +93,10 @@ struct rsvd_region {
 static struct rsvd_region rsvd_region[IA64_MAX_RSVD_REGIONS + 1];
 static int num_rsvd_regions;
 
+#define IGNORE_PFN0	1	/* XXX fix me: ignore pfn 0 until TLB miss handler is updated... */
+
+#ifndef CONFIG_DISCONTIGMEM
+
 static unsigned long bootmap_start; /* physical address where the bootmem map is located */
 
 static int
@@ -108,17 +110,60 @@ find_max_pfn (unsigned long start, unsigned long end, void *arg)
 	return 0;
 }
 
-#define IGNORE_PFN0	1	/* XXX fix me: ignore pfn 0 until TLB miss handler is updated... */
+#else /* CONFIG_DISCONTIGMEM */
+/*
+ * efi_memmap_walk() knows nothing about layout of memory across nodes. Find
+ * out to which node a block of memory belongs.  Ignore memory that we cannot
+ * identify, and split blocks that run across multiple nodes.
+ *
+ * Take this opportunity to round the start address up and the end address
+ * down to page boundaries.
+ */
+void
+call_pernode_memory (unsigned long start, unsigned long end, void *arg)
+{
+	unsigned long rs, re;
+	void (*func)(unsigned long, unsigned long, int, int);
+	int i;
+
+	start = PAGE_ALIGN(start);
+	end &= PAGE_MASK;
+	if (start >= end)
+		return;
+
+	func = arg;
+
+	if (!num_memblks) {
+		/* this machine doesn't have SRAT, */
+		/* so call func with nid=0, bank=0 */
+		if (start < end)
+			(*func)(start, end - start, 0, 0);
+		return;
+	}
+
+	for (i = 0; i < num_memblks; i++) {
+		rs = max(start, node_memblk[i].start_paddr);
+		re = min(end, node_memblk[i].start_paddr+node_memblk[i].size);
+
+		if (rs < re)
+			(*func)(rs, re-rs, node_memblk[i].nid,
+				node_memblk[i].bank);
+	}
+}
+#endif /* CONFIG_DISCONTIGMEM */
 
 /*
- * Free available memory based on the primitive map created from
- * the boot parameters. This routine does not assume the incoming
- * segments are sorted.
+ * Filter incoming memory segments based on the primitive map created from
+ * the boot parameters. Segments contained in the map are removed from the 
+ * memory ranges. A caller-specified function is called with the memory
+ * ranges that remain after filtering.
+ * This routine does not assume the incoming segments are sorted.
  */
-static int
-free_available_memory (unsigned long start, unsigned long end, void *arg)
+int
+filter_rsvd_memory (unsigned long start, unsigned long end, void *arg)
 {
 	unsigned long range_start, range_end, prev_start;
+	void (*func)(unsigned long, unsigned long);
 	int i;
 
 #if IGNORE_PFN0
@@ -132,13 +177,18 @@ free_available_memory (unsigned long start, unsigned long end, void *arg)
 	 * lowest possible address(walker uses virtual)
 	 */
 	prev_start = PAGE_OFFSET;
+	func = arg;
 
 	for (i = 0; i < num_rsvd_regions; ++i) {
-		range_start = MAX(start, prev_start);
-		range_end   = MIN(end, rsvd_region[i].start);
+		range_start = max(start, prev_start);
+		range_end   = min(end, rsvd_region[i].start);
 
 		if (range_start < range_end)
-			free_bootmem(__pa(range_start), range_end - range_start);
+#ifdef CONFIG_DISCONTIGMEM
+			call_pernode_memory(__pa(range_start), __pa(range_end), func);
+#else
+			(*func)(__pa(range_start), range_end - range_start);
+#endif
 
 		/* nothing more available in this segment */
 		if (range_end == end) return 0;
@@ -150,6 +200,7 @@ free_available_memory (unsigned long start, unsigned long end, void *arg)
 }
 
 
+#ifndef CONFIG_DISCONTIGMEM
 /*
  * Find a place to put the bootmap and return its starting address in bootmap_start.
  * This address must be page-aligned.
@@ -171,8 +222,8 @@ find_bootmap_location (unsigned long start, unsigned long end, void *arg)
 	free_start = PAGE_OFFSET;
 
 	for (i = 0; i < num_rsvd_regions; i++) {
-		range_start = MAX(start, free_start);
-		range_end   = MIN(end, rsvd_region[i].start & PAGE_MASK);
+		range_start = max(start, free_start);
+		range_end   = min(end, rsvd_region[i].start & PAGE_MASK);
 
 		if (range_end <= range_start) continue;	/* skip over empty range */
 
@@ -188,6 +239,7 @@ find_bootmap_location (unsigned long start, unsigned long end, void *arg)
 	}
 	return 0;
 }
+#endif /* CONFIG_DISCONTIGMEM */
 
 static void
 sort_regions (struct rsvd_region *rsvd_region, int max)
@@ -252,6 +304,14 @@ find_memory (void)
 
 	sort_regions(rsvd_region, num_rsvd_regions);
 
+#ifdef CONFIG_DISCONTIGMEM
+	{
+	extern void discontig_mem_init(void);
+	bootmap_size = max_pfn = 0;	/* stop gcc warnings */
+	discontig_mem_init();
+	}
+#else /* !CONFIG_DISCONTIGMEM */
+
 	/* first find highest page frame number */
 	max_pfn = 0;
 	efi_memmap_walk(find_max_pfn, &max_pfn);
@@ -268,8 +328,9 @@ find_memory (void)
 	bootmap_size = init_bootmem(bootmap_start >> PAGE_SHIFT, max_pfn);
 
 	/* Free all available memory, then mark bootmem-map as being in use.  */
-	efi_memmap_walk(free_available_memory, 0);
+	efi_memmap_walk(filter_rsvd_memory, free_bootmem);
 	reserve_bootmem(bootmap_start, bootmap_size);
+#endif /* !CONFIG_DISCONTIGMEM */
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (ia64_boot_param->initrd_start) {
@@ -540,6 +601,9 @@ setup_per_cpu_areas (void)
 	/* start_kernel() requires this... */
 }
 
+
+static unsigned long boot_cpu_data;
+
 /*
  * cpu_init() initializes state that is per-CPU.  This function acts
  * as a 'CPU state barrier', nothing should get across.
@@ -563,6 +627,21 @@ cpu_init (void)
 		panic("Per-cpu data area too big! (%Zu > %Zu)",
 		      __per_cpu_end - __per_cpu_start, PAGE_SIZE);
 
+#ifdef CONFIG_NUMA
+	/* get_free_pages() cannot be used before cpu_init() done.	*/
+	/* BSP allocates "NR_CPUS" pages for all CPUs to avoid		*/
+	/* that AP calls get_free_pages().				*/
+	if (cpu == 0)
+		boot_cpu_data = (unsigned long)alloc_bootmem_pages(PAGE_SIZE * NR_CPUS);
+	my_cpu_data = (void *)(boot_cpu_data + (cpu * PAGE_SIZE));
+
+	memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
+	__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
+	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
+
+	my_cpu_info->node_data = get_node_data_ptr();
+	my_cpu_info->nodeid = boot_get_local_nodeid();
+#else /* !CONFIG_NUMA */
 	/*
 	 * On the BSP, the page allocator isn't initialized by the time we get here.  On
 	 * the APs, the bootmem allocator is no longer available...
@@ -574,9 +653,10 @@ cpu_init (void)
 	memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 	__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
 	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
-#else
+#endif /* !CONFIG_NUMA */
+#else /* !CONFIG_SMP */
 	my_cpu_data = __phys_per_cpu_start;
-#endif
+#endif /* !CONFIG_SMP */
 	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
 
 	/*

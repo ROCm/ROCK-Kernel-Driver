@@ -15,8 +15,7 @@
 
 #ifdef CONFIG_DISCONTIGMEM
 # include <asm/mmzone.h>
-# define NR_NODES     (PLAT_MAX_COMPACT_NODES)
-# define NR_MEMBLKS   (PLAT_MAXCLUMPS)
+# define NR_MEMBLKS   (NR_BANKS)
 #else
 # define NR_NODES     (8)
 # define NR_MEMBLKS   (NR_NODES * 8)
