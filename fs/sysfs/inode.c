@@ -243,7 +243,7 @@ sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (kobj && kobj->subsys)
 		ops = kobj->subsys->sysfs_ops;
 	if (!ops || !ops->store)
-		return 0;
+		return -EINVAL;
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
