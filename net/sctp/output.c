@@ -456,8 +456,7 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 		tp->last_time_used = jiffies;
 
 		/* Restart the AUTOCLOSE timer when sending data. */
-		if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
-		    (asoc->autoclose)) {
+		if (sctp_state(asoc, ESTABLISHED) && asoc->autoclose) {
 			timer = &asoc->timers[SCTP_EVENT_TIMEOUT_AUTOCLOSE];
 			timeout = asoc->timeouts[SCTP_EVENT_TIMEOUT_AUTOCLOSE];
 
@@ -608,7 +607,7 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 	 * unacknowledged.
 	 */
 	if (!sp->nodelay && SCTP_IP_OVERHEAD == packet->size &&
-	    q->outstanding_bytes && SCTP_STATE_ESTABLISHED == asoc->state) {
+	    q->outstanding_bytes && sctp_state(asoc, ESTABLISHED)) {
 		unsigned len = datasize + q->out_qlen;
 
 		/* Check whether this chunk and all the rest of pending

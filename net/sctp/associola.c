@@ -299,8 +299,7 @@ void sctp_association_free(struct sctp_association *asoc)
 	list_del(&asoc->asocs);
 
 	/* Decrement the backlog value for a TCP-style listening socket. */
-	if ((SCTP_SOCKET_TCP == sctp_sk(sk)->type) &&
-	    (SCTP_SS_LISTENING == sk->state))
+	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))
 		sk->ack_backlog--;
 
 	/* Mark as dead, so other users can know this structure is
@@ -834,7 +833,7 @@ void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 	list_del(&assoc->asocs);
 
 	/* Decrement the backlog value for a TCP-style socket. */
-	if (SCTP_SOCKET_TCP == sctp_sk(oldsk)->type)
+	if (sctp_style(oldsk, TCP))
 		oldsk->ack_backlog--;
 
 	/* Release references to the old endpoint and the sock.  */
@@ -877,7 +876,7 @@ void sctp_assoc_update(struct sctp_association *asoc,
 	 * current next_tsn in case data sent to peer
 	 * has been discarded and needs retransmission.
 	 */
-	if (SCTP_STATE_ESTABLISHED == asoc->state) {
+	if (sctp_state(asoc, ESTABLISHED)) {
 
 		asoc->next_tsn = new->next_tsn;
 		asoc->ctsn_ack_point = new->ctsn_ack_point;
