@@ -1582,8 +1582,7 @@ i2StripFifo(i2eBordStrPtr pB)
 			WRITE_UNLOCK_IRQRESTORE(&pB->read_fifo_spinlock,bflags);
 
 #ifdef USE_IQ
-			queue_task(&pCh->tqueue_input, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
+			schedule_work(&pCh->tqueue_input);
 #else
 			do_input(pCh);
 #endif
@@ -1820,8 +1819,7 @@ i2StripFifo(i2eBordStrPtr pB)
 					}  /* End of switch on status type */
 					if (dss_change) {
 #ifdef USE_IQ
-						queue_task(&pCh->tqueue_status, &tq_immediate);
-						mark_bh(IMMEDIATE_BH);
+						schedule_work(&pCh->tqueue_status);
 #else
 						do_status(pCh);
 #endif

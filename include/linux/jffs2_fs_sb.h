@@ -5,7 +5,7 @@
 
 #include <linux/types.h>
 #include <linux/spinlock.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/completion.h>
 #include <asm/semaphore.h>
 #include <linux/list.h>
@@ -82,7 +82,7 @@ struct jffs2_sb_info {
 	uint32_t wbuf_ofs;
 	uint32_t wbuf_len;
 	uint32_t wbuf_pagesize;
-	struct tq_struct wbuf_task;		/* task for timed wbuf flush */
+	struct work_struct wbuf_task;		/* task for timed wbuf flush */
 	struct timer_list wbuf_timer;		/* timer for flushing wbuf */
 
 	/* OS-private pointer for getting back to master superblock info */

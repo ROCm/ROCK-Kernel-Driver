@@ -169,8 +169,7 @@ net_send_packet(struct sk_buff *skb, struct net_device *dev)
 	spin_unlock_irq(&lp->lock);
 
 	if (lp->sk_count <= 3) {
-		queue_task(&((hysdn_card *) dev->priv)->irq_queue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&((hysdn_card *) dev->priv)->irq_queue);
 	}
 	return (0);		/* success */
 }				/* net_send_packet */

@@ -22,7 +22,7 @@
 #include "hisax.h"
 #include <linux/module.h>
 #include <linux/kernel_stat.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #define HISAX_STATUS_BUFSIZE 4096
 #define INCLUDE_INLINE_FUNCS
@@ -1789,7 +1789,7 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	hisax_d_if->cs = cs;
 	cs->hw.hisax_d_if = hisax_d_if;
 	cs->cardmsg = hisax_cardmsg;
-	cs->tqueue.routine = (void *) (void *) hisax_bh;
+	INIT_WORK(&cs->tqueue, (void *) (void *) hisax_bh, NULL);
 	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
 	for (i = 0; i < 2; i++) {
 		cs->bcs[i].BC_SetStack = hisax_bc_setstack;
@@ -1818,8 +1818,7 @@ void hisax_unregister(struct hisax_d_if *hisax_d_if)
 static void hisax_sched_event(struct IsdnCardState *cs, int event)
 {
 	cs->event |= 1 << event;
-	queue_task(&cs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&cs->tqueue);
 }
 
 static void hisax_bh(struct IsdnCardState *cs)
@@ -1845,8 +1844,7 @@ static void hisax_bh(struct IsdnCardState *cs)
 static void hisax_b_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	queue_task(&bcs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&bcs->tqueue);
 }
 
 static inline void D_L2L1(struct hisax_d_if *d_if, int pr, void *arg)

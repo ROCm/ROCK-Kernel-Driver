@@ -138,8 +138,7 @@ void
 jade_sched_event(struct BCState *bcs, int event)
 {
     bcs->event |= 1 << event;
-    queue_task(&bcs->tqueue, &tq_immediate);
-    mark_bh(IMMEDIATE_BH);
+    schedule_work(&bcs->tqueue);
 }
 
 static void

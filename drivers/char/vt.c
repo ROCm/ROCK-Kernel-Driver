@@ -97,7 +97,7 @@
 #include <linux/interrupt.h>
 #include <linux/config.h>
 #include <linux/version.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/bootmem.h>
 #include <linux/pm.h>
 
@@ -161,9 +161,7 @@ static int vesa_blank_mode; /* 0:none 1:suspendV 2:suspendH 3:powerdown */
 static int blankinterval = 10*60*HZ;
 static int vesa_off_interval;
 
-static struct tq_struct console_callback_tq = {
-	routine: console_callback,
-};
+static DECLARE_WORK(console_work, console_callback, NULL);
 
 /*
  * fg_console is the current virtual console,
@@ -241,7 +239,7 @@ static inline void scrolldelta(int lines)
 
 void schedule_console_callback(void)
 {
-	schedule_task(&console_callback_tq);
+	schedule_work(&console_work);
 }
 
 static void scrup(int currcons, unsigned int t, unsigned int b, int nr)

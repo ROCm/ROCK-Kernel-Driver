@@ -22,10 +22,6 @@
 
 struct sx_port {
   struct gs_port          gs;
-  /*
-  struct tq_struct        tqueue;
-  struct tq_struct        tqueue_hangup;
-  */
   struct wait_queue       *shutdown_wait;
   int                     ch_base;
   int                     c_dcd;

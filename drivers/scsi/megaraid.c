@@ -491,7 +491,7 @@
 #include <linux/proc_fs.h>
 #include <linux/blk.h>
 #include <linux/wait.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/mm.h>
 #include <asm/pgtable.h>

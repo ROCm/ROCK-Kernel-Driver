@@ -131,7 +131,7 @@
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/fd.h>
 #include <linux/fd1772.h>
 #include <linux/errno.h>
@@ -324,8 +324,7 @@ static unsigned long changed_floppies = 0xff, fake_change = 0;
 
 static void fd1772_checkint(void);
 
-struct tq_struct fd1772_tq = 
-{ 0,0, (void *)fd1772_checkint, 0 };
+DECLARE_WORK(fd1772_tq, (void *)fd1772_checkint, NULL);
 /*
  * The driver is trying to determine the correct media format
  * while Probing is set. fd_rwsec_done() clears it after a
@@ -1288,8 +1287,7 @@ static void fd1772_checkint(void)
 		floppy_irqconsequencehandler();
 	if ((MultReadInProgress) && (fdc1772_bytestogo==0)) fd_readtrack_check(0);
 	if (fdc_busy) {
-		queue_task(&fd1772_tq,&tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&fd1772_tq);
 	}
 }
 
@@ -1311,8 +1309,7 @@ static void do_fd_request(request_queue_t* q)
 
 	redo_fd_request();
 
-	queue_task(&fd1772_tq,&tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&fd1772_tq);
 }
 
 

@@ -51,9 +51,7 @@ static void suspend_button_task_handler(void *data)
         suspend_button_pushed = 0;
 }
 
-static struct tq_struct suspend_button_task = {
-        routine: suspend_button_task_handler
-};
+static DECLARE_WORK(suspend_button_task, suspend_button_task_handler, NULL);
 
 static void power_event(struct input_handle *handle, unsigned int type, 
 		        unsigned int code, int down)
@@ -73,7 +71,7 @@ static void power_event(struct input_handle *handle, unsigned int type,
 
 				if (!suspend_button_pushed) {
                 			suspend_button_pushed = 1;
-                        		schedule_task(&suspend_button_task);
+                        		schedule_work(&suspend_button_task);
                 		}
 				break;
 			case KEY_POWER:

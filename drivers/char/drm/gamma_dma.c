@@ -128,8 +128,7 @@ void gamma_dma_service(int irq, void *device, struct pt_regs *regs)
 		clear_bit(0, &dev->dma_flag);
 
 				/* Dispatch new buffer */
-		queue_task(&dev->tq, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&dev->tq);
 	}
 }
 

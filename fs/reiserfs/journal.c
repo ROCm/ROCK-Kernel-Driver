@@ -59,11 +59,14 @@
 #include <linux/smp_lock.h>
 #include <linux/suspend.h>
 #include <linux/buffer_head.h>
+#include <linux/workqueue.h>
 
 /* the number of mounted filesystems.  This is used to decide when to
-** start and kill the commit thread
+** start and kill the commit workqueue
 */
 static int reiserfs_mounted_fs_count = 0 ;
+
+static struct workqueue_struct *commit_wq;
 
 #define JOURNAL_TRANS_HALF 1018   /* must be correct to keep the desc and commit
 				     structs at 4k */
@@ -1334,7 +1337,11 @@ static int do_journal_release(struct reiserfs_transaction_handle *th, struct sup
 
   reiserfs_mounted_fs_count-- ;
   /* wait for all commits to finish */
-  flush_scheduled_tasks();
+  flush_workqueue(commit_wq);
+  if (!reiserfs_mounted_fs_count) {
+    destroy_workqueue(commit_wq);
+    commit_wq = NULL;
+  }
 
   release_journal_dev( p_s_sb, SB_JOURNAL( p_s_sb ) );
   free_journal_ram(p_s_sb) ;
@@ -1798,12 +1805,11 @@ struct reiserfs_journal_commit_task {
                        ** is zero, we free the whole struct on finish
 		       */
   struct reiserfs_journal_commit_task *self ;
-  struct wait_queue *task_done ;
-  struct tq_struct task ;
+  struct work_struct work;
 } ;
 
-static void reiserfs_journal_commit_task_func(struct reiserfs_journal_commit_task *ct) {
-
+static void reiserfs_journal_commit_task_func(void *__ct) {
+  struct reiserfs_journal_commit_task *ct = __ct;
   struct reiserfs_journal_list *jl ;
 
   /* FIXMEL: is this needed? */
@@ -1829,12 +1835,8 @@ static void setup_commit_task_arg(struct reiserfs_journal_commit_task *ct,
   }
   ct->p_s_sb = p_s_sb ;
   ct->jindex = jindex ;
-  ct->task_done = NULL ;
-  INIT_LIST_HEAD(&ct->task.list) ;
-  ct->task.sync = 0 ;
-  ct->task.routine = (void *)(void *)reiserfs_journal_commit_task_func ; 
+  INIT_WORK(&ct->work, reiserfs_journal_commit_task_func, ct);
   ct->self = ct ;
-  ct->task.data = (void *)ct ;
 }
 
 static void commit_flush_async(struct super_block *p_s_sb, int jindex) {
@@ -1845,7 +1847,7 @@ static void commit_flush_async(struct super_block *p_s_sb, int jindex) {
   ct = reiserfs_kmalloc(sizeof(struct reiserfs_journal_commit_task), GFP_NOFS, p_s_sb) ;
   if (ct) {
     setup_commit_task_arg(ct, p_s_sb, jindex) ;
-    schedule_task(&ct->task) ;
+    queue_work(commit_wq, &ct->work) ;
   } else {
 #ifdef CONFIG_REISERFS_CHECK
     reiserfs_warning("journal-1540: kmalloc failed, doing sync commit\n") ;
@@ -2126,6 +2128,9 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
     return 0;
 
   reiserfs_mounted_fs_count++ ;
+  if (reiserfs_mounted_fs_count <= 1)
+    commit_wq = create_workqueue("reiserfs");
+
   return 0 ;
 
 }

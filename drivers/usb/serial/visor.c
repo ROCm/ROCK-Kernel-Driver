@@ -460,7 +460,7 @@ static void visor_write_bulk_callback (struct urb *urb)
 	/* free up the transfer buffer, as usb_free_urb() does not do this */
 	kfree (urb->transfer_buffer);
 
-	schedule_task(&port->tqueue);
+	schedule_work(&port->work);
 }
 
 

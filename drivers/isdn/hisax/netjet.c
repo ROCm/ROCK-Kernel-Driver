@@ -434,8 +434,7 @@ static void got_frame(struct BCState *bcs, int count) {
 		skb_queue_tail(&bcs->rqueue, skb);
 	}
 	bcs->event |= 1 << B_RCVBUFREADY;
-	queue_task(&bcs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&bcs->tqueue);
 	
 	if (bcs->cs->debug & L1_DEB_RECEIVE_FRAME)
 		printframe(bcs->cs, bcs->hw.tiger.rcvbuf, count, "rec");
@@ -791,8 +790,7 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 							cnt - s_cnt);
 				}
 				bcs->event |= 1 << B_XMTBUFREADY;
-				queue_task(&bcs->tqueue, &tq_immediate);
-				mark_bh(IMMEDIATE_BH);
+				schedule_work(&bcs->tqueue);
 			}
 		}
 	} else if (test_and_clear_bit(BC_FLG_NOFRAME, &bcs->Flag)) {

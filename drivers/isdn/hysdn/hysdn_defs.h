@@ -17,7 +17,7 @@
 #include <linux/config.h>
 #include <linux/hysdn_if.h>
 #include <linux/interrupt.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/skbuff.h>
 
 /****************************/
@@ -173,7 +173,7 @@ typedef struct HYSDN_CARD {
 	void (*set_errlog_state) (struct HYSDN_CARD *, int);
 
 	/* interrupt handler + interrupt synchronisation */
-	struct tq_struct irq_queue;	/* interrupt task queue */
+	struct work_struct irq_queue;	/* interrupt task queue */
 	uchar volatile irq_enabled;	/* interrupt enabled if != 0 */
 	uchar volatile hw_lock;	/* hardware is currently locked -> no access */
 

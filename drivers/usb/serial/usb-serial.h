@@ -87,7 +87,7 @@
  * @bulk_out_endpointAddress: endpoint address for the bulk out pipe for this
  *	port.
  * @write_wait: a wait_queue_head_t used by the port.
- * @tqueue: task queue for the line discipline waking up.
+ * @work: work queue entry for the line discipline waking up.
  * @open_count: number of times this port has been opened.
  * @sem: struct semaphore used to lock this structure.
  * @private: place to put any driver specific information that is needed.  The
@@ -117,7 +117,7 @@ struct usb_serial_port {
 	__u8			bulk_out_endpointAddress;
 
 	wait_queue_head_t	write_wait;
-	struct tq_struct	tqueue;
+	struct work_struct			work;
 	int			open_count;
 	struct semaphore	sem;
 	void *			private;

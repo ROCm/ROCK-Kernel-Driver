@@ -401,7 +401,7 @@ typedef struct _i2eBordStr
 	rwlock_t	write_fifo_spinlock;
 
 //	For queuing interupt bottom half handlers.	/\/\|=mhw=|\/\/
-	struct tq_struct	tqueue_interrupt;
+	struct work_struct	tqueue_interrupt;
 
 	struct timer_list  SendPendingTimer;   // Used by iiSendPending
 	unsigned int	SendPendingRetry;

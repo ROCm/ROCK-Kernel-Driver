@@ -208,7 +208,7 @@ typedef struct tlan_private_tag {
 	spinlock_t		lock;
 	u8			link;
 	u8			is_eisa;
-	struct tq_struct	tlan_tqueue;
+	struct work_struct			tlan_tqueue;
 	u8			neg_be_verbose;
 } TLanPrivateInfo;
 

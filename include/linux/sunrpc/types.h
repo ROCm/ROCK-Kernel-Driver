@@ -10,7 +10,7 @@
 #define _LINUX_SUNRPC_TYPES_H_
 
 #include <linux/timer.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/sunrpc/debug.h>
 #include <linux/list.h>
 

@@ -13,7 +13,7 @@
 
 #ifdef __KERNEL__
 
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #define NCP_DEFAULT_OPTIONS 0		/* 2 for packet signatures */
 
@@ -91,7 +91,7 @@ struct ncp_server {
 	void (*error_report)(struct sock* sk);
 	void (*write_space)(struct sock* sk);	/* STREAM mode only */
 	struct {
-		struct tq_struct tq;		/* STREAM/DGRAM: data/error ready */
+		struct work_struct tq;		/* STREAM/DGRAM: data/error ready */
 		struct ncp_request_reply* creq;	/* STREAM/DGRAM: awaiting reply from this request */
 		struct semaphore creq_sem;	/* DGRAM only: lock accesses to rcv.creq */
 
@@ -110,11 +110,11 @@ struct ncp_server {
 	} rcv;
 	struct {
 		struct list_head requests;	/* STREAM only: queued requests */
-		struct tq_struct tq;		/* STREAM only: transmitter ready */
+		struct work_struct tq;		/* STREAM only: transmitter ready */
 		struct ncp_request_reply* creq;	/* STREAM only: currently transmitted entry */
 	} tx;
 	struct timer_list timeout_tm;		/* DGRAM only: timeout timer */
-	struct tq_struct timeout_tq;		/* DGRAM only: associated queue, we run timers from process context */
+	struct work_struct timeout_tq;		/* DGRAM only: associated queue, we run timers from process context */
 	int timeout_last;			/* DGRAM only: current timeout length */
 	int timeout_retries;			/* DGRAM only: retries left */
 	struct {

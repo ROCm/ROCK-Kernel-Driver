@@ -41,7 +41,7 @@
 #include <linux/fcntl.h>
 #include <linux/init.h>
 #include <linux/skbuff.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/socket.h>
 #include <linux/ioctl.h>

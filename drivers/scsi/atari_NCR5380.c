@@ -640,13 +640,11 @@ __inline__ void NCR5380_print_phase(struct Scsi_Host *instance) { };
  * interrupt or bottom half.
  */
 
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 
 static volatile int main_running = 0;
-static struct tq_struct NCR5380_tqueue = {
-    routine:	(void (*)(void*))NCR5380_main	/* must have (void *) arg... */
-};
+static DECLARE_WORK(NCR5380_tqueue, (void (*)(void*))NCR5380_main, NULL);
 
 static __inline__ void queue_main(void)
 {
@@ -655,8 +653,7 @@ static __inline__ void queue_main(void)
 	   queue it on the 'immediate' task queue, to be processed
 	   immediately after the current interrupt processing has
 	   finished. */
-	queue_task(&NCR5380_tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&NCR5380_tqueue);
     }
     /* else: nothing to do: the running NCR5380_main() will pick up
        any newly queued command. */

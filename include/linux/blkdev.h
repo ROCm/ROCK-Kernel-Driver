@@ -4,7 +4,6 @@
 #include <linux/major.h>
 #include <linux/sched.h>
 #include <linux/genhd.h>
-#include <linux/tqueue.h>
 #include <linux/list.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>

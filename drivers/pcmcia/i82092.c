@@ -14,7 +14,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <pcmcia/cs_types.h>
 #include <pcmcia/ss.h>
@@ -315,9 +315,7 @@ static void i82092aa_bh(void *dummy)
 }
                                                                                                                                         
 
-static struct tq_struct i82092aa_task = {
-        routine:        i82092aa_bh
-};
+static DECLARE_WORK(i82092aa_task, i82092aa_bh, NULL);
         
 
 static void i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs)
@@ -367,7 +365,7 @@ static void i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs)
 			
 			if (events) {
 				sockets[i].pending_events |= events;
-				schedule_task(&i82092aa_task);
+				schedule_work(&i82092aa_task);
 			}
 			active |= events;
 		}

@@ -100,7 +100,7 @@
 #include <asm/bitops.h>
 #include <asm/types.h>
 #include <linux/termios.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #ifdef CONFIG_SYNCLINK_SYNCPPP_MODULE
 #define CONFIG_SYNCLINK_SYNCPPP 1
@@ -223,7 +223,7 @@ struct mgsl_struct {
 	struct mgsl_struct	*next_device;	/* device list link */
 	
 	spinlock_t irq_spinlock;		/* spinlock for synchronizing with ISR */
-	struct tq_struct task;		/* task structure for scheduling bh */
+	struct work_struct task;		/* task structure for scheduling bh */
 
 	u32 EventMask;			/* event trigger mask */
 	u32 RecordedEvents;		/* pending events */
@@ -1757,8 +1757,7 @@ static void mgsl_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		if ( debug_level >= DEBUG_LEVEL_ISR )	
 			printk("%s(%d):%s queueing bh task.\n",
 				__FILE__,__LINE__,info->device_name);
-		queue_task(&info->task, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&info->task);
 		info->bh_requested = 1;
 	}
 
@@ -4543,9 +4542,7 @@ struct mgsl_struct* mgsl_allocate_device()
 	} else {
 		memset(info, 0, sizeof(struct mgsl_struct));
 		info->magic = MGSL_MAGIC;
-		info->task.sync = 0;
-		info->task.routine = mgsl_bh_handler;
-		info->task.data    = info;
+		INIT_WORK(&info->task, mgsl_bh_handler, info);
 		info->max_frame_size = 4096;
 		info->close_delay = 5*HZ/10;
 		info->closing_wait = 30*HZ;

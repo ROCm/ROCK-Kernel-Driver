@@ -464,8 +464,7 @@ static void
 sched_event_D_sx(struct IsdnCardState *cs, int event)
 {
 	test_and_set_bit(event, &cs->event);
-	queue_task(&cs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&cs->tqueue);
 }
 
 /*********************************/
@@ -475,8 +474,7 @@ static void
 hfcsx_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	queue_task(&bcs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&bcs->tqueue);
 }
 
 /************************************************/
@@ -1412,7 +1410,7 @@ inithfcsx(struct IsdnCardState *cs)
 	cs->dbusytimer.function = (void *) hfcsx_dbusy_timer;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
-	cs->tqueue.routine = (void *) (void *) hfcsx_bh;
+	INIT_WORK(&cs->tqueue, (void *) (void *) hfcsx_bh, NULL);
 	cs->BC_Send_Data = &hfcsx_send_data;
 	cs->bcs[0].BC_SetStack = setstack_2b;
 	cs->bcs[1].BC_SetStack = setstack_2b;

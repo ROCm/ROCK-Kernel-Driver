@@ -304,8 +304,7 @@ static void
 dch_sched_event(struct IsdnCardState *cs, int event)
 {
 	set_bit(event, &cs->event);
-	queue_task(&cs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&cs->tqueue);
 }
 
 //----------------------------------------------------------
@@ -510,7 +509,7 @@ dch_init(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HiSax: IPACX ISDN driver v0.1.0\n");
 
-	cs->tqueue.routine  = (void *)(void *) dch_bh;
+	INIT_WORK(&cs->tqueue, (void *)(void *) dch_bh);
 	cs->setstack_d      = dch_setstack;
   
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;
@@ -593,8 +592,7 @@ static void
 bch_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	queue_task(&bcs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&bcs->tqueue);
 }
 
 //----------------------------------------------------------

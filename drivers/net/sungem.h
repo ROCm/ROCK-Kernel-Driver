@@ -967,7 +967,7 @@ struct gem {
 	int hw_running;
 	int opened;
 	struct semaphore pm_sem;
-	struct tq_struct pm_task;
+	struct work_struct pm_task;
 	struct timer_list pm_timer;
 
 	struct gem_init_block *init_block;
@@ -999,7 +999,7 @@ struct gem {
 	struct timer_list	link_timer;
 	int			timer_ticks;
 	int			wake_on_lan;
-	struct tq_struct	reset_task;
+	struct work_struct			reset_task;
 	volatile int		reset_task_pending;
 	
 	/* Diagnostic counters and state. */

@@ -30,6 +30,7 @@
 #include <linux/percpu.h>
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
+#include <linux/workqueue.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -477,7 +478,7 @@ static void __init do_initcalls(void)
 	} while (call < &__initcall_end);
 
 	/* Make sure there is no pending stuff from the initcall sequence */
-	flush_scheduled_tasks();
+	flush_scheduled_work();
 }
 
 /*
@@ -503,7 +504,7 @@ static void __init do_basic_setup(void)
 	/* Networking initialization needs a process context */ 
 	sock_init();
 
-	start_context_thread();
+	init_workqueues();
 	do_initcalls();
 }
 

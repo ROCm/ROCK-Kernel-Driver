@@ -138,7 +138,7 @@ static void receive_chars(struct uart_sunsab_port *up,
 		unsigned char ch = buf[i];
 
 		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
-			tty->flip.tqueue.routine((void *)tty);
+			tty->flip.work.func((void *)tty);
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
 				return; // if TTY_DONT_FLIP is set
 		}

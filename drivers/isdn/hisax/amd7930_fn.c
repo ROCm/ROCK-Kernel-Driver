@@ -277,8 +277,7 @@ Amd7930_sched_event(struct IsdnCardState *cs, int event) // ok
         }
 
         test_and_set_bit(event, &cs->event);
-	queue_task(&cs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&cs->tqueue);
 }
 
 static void
@@ -791,7 +790,7 @@ Amd7930_init(struct IsdnCardState *cs)
         cs->dc.amd7930.old_state = 0;
         cs->dc.amd7930.lmr1 = 0x40;
         cs->dc.amd7930.ph_command = Amd7930_ph_command;
-        cs->tqueue.routine = (void *) (void *) Amd7930_bh;
+	INIT_WORK(&cs->tqueue, (void *) (void *) Amd7930_bh, NULL);
 	cs->setstack_d = setstack_Amd7930;
 	cs->DC_Close = DC_Close_Amd7930;
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;

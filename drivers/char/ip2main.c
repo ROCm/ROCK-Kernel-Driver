@@ -1097,8 +1097,7 @@ ip2_init_board( int boardnum )
 		pCh++;
 	}
 ex_exit:
-	pB->tqueue_interrupt.routine = (void(*)(void*)) ip2_interrupt_bh;
-	pB->tqueue_interrupt.data = pB;
+	INIT_WORK(&pB->tqueue_interrupt, (void(*)(void*)) ip2_interrupt_bh, pB);
 	return;
 
 err_release_region:
@@ -1376,10 +1375,9 @@ ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			iiDisableMailIrq(pB);
 
 //			Park the board on the immediate queue for processing.
-			queue_task(&pB->tqueue_interrupt, &tq_immediate);
+			schedule_work(&pB->tqueue_interrupt);
 
 //			Make sure the immediate queue is flagged to fire.
-			mark_bh(IMMEDIATE_BH);
 		    }
 #else
 //		We are using immediate servicing here.  This sucks and can

@@ -488,7 +488,7 @@ static inline void pc_sched_event(struct channel *ch, int event)
 
 	ch->event |= 1 << event;
 	MOD_INC_USE_COUNT;
-	if (schedule_task(&ch->tqueue) == 0)
+	if (schedule_work(&ch->tqueue) == 0)
 		MOD_DEC_USE_COUNT;
 
 
@@ -2039,8 +2039,7 @@ static void post_fep_init(unsigned int crd)
 
 		ch->brdchan        = bc;
 		ch->mailbox        = gd; 
-		ch->tqueue.routine = do_softint;
-		ch->tqueue.data    = ch;
+		INIT_WORK(&ch->tqueue, do_softint, ch);
 		ch->board          = &boards[crd];
 
 		switch (bd->type)

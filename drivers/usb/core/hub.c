@@ -240,7 +240,7 @@ void usb_hub_tt_clear_buffer (struct usb_device *dev, int pipe)
 	/* tell keventd to clear state for this TT */
 	spin_lock_irqsave (&tt->lock, flags);
 	list_add_tail (&clear->clear_list, &tt->clear_list);
-	schedule_task (&tt->kevent);
+	schedule_work (&tt->kevent);
 	spin_unlock_irqrestore (&tt->lock, flags);
 }
 
@@ -337,7 +337,7 @@ static int usb_hub_configure(struct usb_hub *hub,
 
 	spin_lock_init (&hub->tt.lock);
 	INIT_LIST_HEAD (&hub->tt.clear_list);
-	INIT_TQUEUE (&hub->tt.kevent, hub_tt_kevent, hub);
+	INIT_WORK (&hub->tt.kevent, hub_tt_kevent, hub);
 	switch (dev->descriptor.bDeviceProtocol) {
 		case 0:
 			break;
@@ -452,7 +452,7 @@ static void hub_disconnect(struct usb_interface *intf)
 
 	/* assuming we used keventd, it must quiesce too */
 	if (hub->tt.hub)
-		flush_scheduled_tasks ();
+		flush_scheduled_work ();
 
 	if (hub->urb) {
 		usb_unlink_urb(hub->urb);
