@@ -676,7 +676,7 @@ static int prof_cpu_mask_write_proc (struct file *file, const char *buffer,
 #ifdef CONFIG_PPC_ISERIES
 	{
 		unsigned i;
-		for (i=0; i<MAX_PACAS; ++i) {
+		for (i=0; i<NR_CPUS; ++i) {
 			if ( paca[i].prof_buffer && (new_value & 1) )
 				paca[i].prof_enabled = 1;
 			else
