@@ -29,6 +29,22 @@
 #define _PCI_HOTPLUG_H
 
 
+/* These values come from the PCI Hotplug Spec */
+enum pci_bus_speed {
+	PCI_SPEED_33MHz			= 0x00,
+	PCI_SPEED_66MHz			= 0x01,
+	PCI_SPEED_66MHz_PCIX		= 0x02,
+	PCI_SPEED_100MHz_PCIX		= 0x03,
+	PCI_SPEED_133MHz_PCIX		= 0x04,
+	PCI_SPEED_66MHz_PCIX_266	= 0x09,
+	PCI_SPEED_100MHz_PCIX_266	= 0x0a,
+	PCI_SPEED_133MHz_PCIX_266	= 0x0b,
+	PCI_SPEED_66MHz_PCIX_533	= 0x11,
+	PCI_SPEED_100MHz_PCIX_533	= 0X12,
+	PCI_SPEED_133MHz_PCIX_533	= 0x13,
+	PCI_SPEED_UNKNOWN		= 0xff,
+};
+
 struct hotplug_slot;
 struct hotplug_slot_core;
 
@@ -50,7 +66,13 @@ struct hotplug_slot_core;
  * @get_latch_status: Called to get the current latch status of a slot.
  *	If this field is NULL, the value passed in the struct hotplug_slot_info
  *	will be used when this value is requested by a user.
- * @get_adapter_present: Called to get see if an adapter is present in the slot or not.
+ * @get_adapter_status: Called to get see if an adapter is present in the slot or not.
+ *	If this field is NULL, the value passed in the struct hotplug_slot_info
+ *	will be used when this value is requested by a user.
+ * @get_max_bus_speed: Called to get the max bus speed for a slot.
+ *	If this field is NULL, the value passed in the struct hotplug_slot_info
+ *	will be used when this value is requested by a user.
+ * @get_cur_bus_speed: Called to get the current bus speed for a slot.
  *	If this field is NULL, the value passed in the struct hotplug_slot_info
  *	will be used when this value is requested by a user.
  *
@@ -69,6 +91,8 @@ struct hotplug_slot_ops {
 	int (*get_attention_status)	(struct hotplug_slot *slot, u8 *value);
 	int (*get_latch_status)		(struct hotplug_slot *slot, u8 *value);
 	int (*get_adapter_status)	(struct hotplug_slot *slot, u8 *value);
+	int (*get_max_bus_speed)	(struct hotplug_slot *slot, enum pci_bus_speed *value);
+	int (*get_cur_bus_speed)	(struct hotplug_slot *slot, enum pci_bus_speed *value);
 };
 
 /**
@@ -85,6 +109,8 @@ struct hotplug_slot_info {
 	u8	attention_status;
 	u8	latch_status;
 	u8	adapter_status;
+	enum pci_bus_speed	max_bus_speed;
+	enum pci_bus_speed	cur_bus_speed;
 };
 
 /**
