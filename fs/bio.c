@@ -497,7 +497,7 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 	 * success
 	 */
 	if (!write_to_vm) {
-		unsigned long p = uaddr;
+		char __user *p = (char __user *) uaddr;
 
 		/*
 		 * for a write, copy in data to kernel pages
@@ -506,7 +506,7 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 		bio_for_each_segment(bvec, bio, i) {
 			char *addr = page_address(bvec->bv_page);
 
-			if (copy_from_user(addr, (char *) p, bvec->bv_len))
+			if (copy_from_user(addr, p, bvec->bv_len))
 				goto cleanup;
 			p += bvec->bv_len;
 		}
