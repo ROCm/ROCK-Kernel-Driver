@@ -36,7 +36,7 @@ struct iscsi_class_session {
 	union {
 		struct in6_addr sin6_addr;
 		struct in_addr sin_addr;
-	};
+	} u;
 	sa_family_t addr_type;		/* must be AF_INET or AF_INET6 */
 	uint16_t port;			/* must be in network byte order */
 	int initial_r2t;		/* 1 Yes, 0 No */
@@ -68,9 +68,9 @@ struct iscsi_class_session {
 #define iscsi_addr_type(x) \
 	(((struct iscsi_class_session *)&(x)->starget_data)->addr_type)
 #define iscsi_sin_addr(x) \
-	(((struct iscsi_class_session *)&(x)->starget_data)->sin_addr)
+	(((struct iscsi_class_session *)&(x)->starget_data)->u.sin_addr)
 #define iscsi_sin6_addr(x) \
-	(((struct iscsi_class_session *)&(x)->starget_data)->sin6_addr)
+	(((struct iscsi_class_session *)&(x)->starget_data)->u.sin6_addr)
 #define iscsi_tpgt(x) \
 	(((struct iscsi_class_session *)&(x)->starget_data)->tpgt)
 #define iscsi_initial_r2t(x) \
