@@ -18,8 +18,11 @@ leds-$(CONFIG_ARCH_CO285) += ebsa285-leds.o
 leds-$(CONFIG_ARCH_EBSA285) += ebsa285-leds.o
 leds-$(CONFIG_ARCH_NETWINDER) += netwinder-leds.o
 
-obj-$(CONFIG_ARCH_CATS) += cats-hw.o
-obj-$(CONFIG_ARCH_NETWINDER) += netwinder-hw.o
+obj-$(CONFIG_ARCH_CATS) += cats-hw.o isa-timer.o
+obj-$(CONFIG_ARCH_CO285) += dc21285-timer.o
+obj-$(CONFIG_ARCH_EBSA285) += dc21285-timer.o
+obj-$(CONFIG_ARCH_NETWINDER) += netwinder-hw.o isa-timer.o
+obj-$(CONFIG_ARCH_PERSONAL_SERVER) += dc21285-timer.o
 
 obj-$(CONFIG_PCI)	+=$(pci-y)
 obj-$(CONFIG_LEDS)	+=$(leds-y)

@@ -20,10 +20,7 @@
 
 #include <asm/mach/arch.h>
 
-extern void footbridge_map_io(void);
-extern void footbridge_init_irq(void);
-extern struct sys_timer footbridge_timer;
-extern struct sys_timer isa_timer;
+#include "common.h"
 
 unsigned int mem_fclk_21285 = 50000000;
 
