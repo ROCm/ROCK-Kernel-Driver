@@ -3056,6 +3056,7 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 				goto out;
 			AVC_AUDIT_DATA_INIT(&ad,NET);
 			ad.u.net.sport = htons(snum);
+			ad.u.net.family = family;
 			err = avc_has_perm(isec->sid, sid,
 					   isec->sclass,
 					   SOCKET__NAME_BIND, NULL, &ad);
