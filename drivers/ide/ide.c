@@ -54,7 +54,6 @@
 #include <linux/delay.h>
 #include <linux/ide.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/completion.h>
 #include <linux/reboot.h>
 #include <linux/cdrom.h>
 #include <linux/device.h>
@@ -354,6 +353,31 @@ void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
 	spin_unlock_irqrestore(ch->lock, flags);
 }
 
+static u8 auto_reduce_xfer(struct ata_device *drive)
+{
+	if (!drive->crc_count)
+		return drive->current_speed;
+	drive->crc_count = 0;
+
+	switch(drive->current_speed) {
+		case XFER_UDMA_7:	return XFER_UDMA_6;
+		case XFER_UDMA_6:	return XFER_UDMA_5;
+		case XFER_UDMA_5:	return XFER_UDMA_4;
+		case XFER_UDMA_4:	return XFER_UDMA_3;
+		case XFER_UDMA_3:	return XFER_UDMA_2;
+		case XFER_UDMA_2:	return XFER_UDMA_1;
+		case XFER_UDMA_1:	return XFER_UDMA_0;
+			/*
+			 * OOPS we do not goto non Ultra DMA modes
+			 * without iCRC's available we force
+			 * the system to PIO and make the user
+			 * invoke the ATA-1 ATA-2 DMA modes.
+			 */
+		case XFER_UDMA_0:
+		default:		return XFER_PIO_4;
+	}
+}
+
 static void check_crc_errors(struct ata_device *drive)
 {
 	if (!drive->using_dma)
@@ -362,8 +386,10 @@ static void check_crc_errors(struct ata_device *drive)
 	/* check the DMA crc count */
 	if (drive->crc_count) {
 		udma_enable(drive, 0, 0);
-		if ((drive->channel->speedproc) != NULL)
-		        drive->channel->speedproc(drive, ide_auto_reduce_xfer(drive));
+		if (drive->channel->speedproc) {
+			u8 pio = auto_reduce_xfer(drive);
+		        drive->channel->speedproc(drive, pio);
+		}
 		if (drive->current_speed >= XFER_SW_DMA_0)
 			udma_enable(drive, 1, 1);
 	} else
@@ -835,19 +861,6 @@ ide_startstop_t ide_error(struct ata_device *drive, struct request *rq, const ch
 }
 
 /*
- * Issue a simple drive command.  The drive must be selected beforehand.
- */
-void ide_cmd(struct ata_device *drive, byte cmd, byte nsect, ata_handler_t handler)
-{
-	ide_set_handler (drive, handler, WAIT_CMD, NULL);
-	if (IDE_CONTROL_REG)
-		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);	/* clear nIEN */
-	SELECT_MASK(drive->channel, drive, 0);
-	OUT_BYTE(nsect,IDE_NSECTOR_REG);
-	OUT_BYTE(cmd,IDE_COMMAND_REG);
-}
-
-/*
  * Invoked on completion of a special DRIVE_CMD.
  */
 static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *rq)
@@ -865,11 +878,25 @@ static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *
 	}
 
 	if (!OK_STAT(stat, READY_STAT, BAD_STAT))
-		return ide_error(drive, rq, "drive_cmd", stat); /* calls ide_end_drive_cmd */
+		return ide_error(drive, rq, "drive_cmd", stat); /* already calls ide_end_drive_cmd */
 	ide_end_drive_cmd(drive, rq, stat, GET_ERR());
 
 	return ide_stopped;
 }
+
+/*
+ * Issue a simple drive command.  The drive must be selected beforehand.
+ */
+static void drive_cmd(struct ata_device *drive, u8 cmd, u8 nsect)
+{
+	ide_set_handler(drive, drive_cmd_intr, WAIT_CMD, NULL);
+	if (IDE_CONTROL_REG)
+		OUT_BYTE(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
+	SELECT_MASK(drive->channel, drive, 0);
+	OUT_BYTE(nsect, IDE_NSECTOR_REG);
+	OUT_BYTE(cmd, IDE_COMMAND_REG);
+}
+
 
 /*
  * Busy-wait for the drive status to be not "busy".  Check then the status for
@@ -1014,12 +1041,12 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 			OUT_BYTE(0xc2, IDE_HCYL_REG);
 			OUT_BYTE(args[2],IDE_FEATURE_REG);
 			OUT_BYTE(args[1],IDE_SECTOR_REG);
-			ide_cmd(drive, args[0], args[3], &drive_cmd_intr);
+			drive_cmd(drive, args[0], args[3]);
 
 			return ide_started;
 		}
 		OUT_BYTE(args[2],IDE_FEATURE_REG);
-		ide_cmd(drive, args[0], args[1], &drive_cmd_intr);
+		drive_cmd(drive, args[0], args[1]);
 
 		return ide_started;
 	}
@@ -1187,10 +1214,10 @@ static struct ata_device *choose_urgent_device(struct ata_channel *channel)
 
 
 /*
- * Feed commands to a drive until it barfs.  Called with ide_lock/DRIVE_LOCK
- * held and busy channel.
+ * Feed commands to a drive until it barfs.  Called with queue lock held and
+ * busy channel.
  */
-static void queue_commands(struct ata_device *drive, int masked_irq)
+static void queue_commands(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
 	ide_startstop_t startstop = -1;
@@ -1199,7 +1226,7 @@ static void queue_commands(struct ata_device *drive, int masked_irq)
 		struct request *rq = NULL;
 
 		if (!test_bit(IDE_BUSY, &ch->active))
-			printk(KERN_ERR"%s: error: not busy while queueing!\n", drive->name);
+			printk(KERN_ERR "%s: error: not busy while queueing!\n", drive->name);
 
 		/* Abort early if we can't queue another command. for non
 		 * tcq, ata_can_queue is always 1 since we never get here
@@ -1214,7 +1241,7 @@ static void queue_commands(struct ata_device *drive, int masked_irq)
 		drive->sleep = 0;
 
 		if (test_bit(IDE_DMA, &ch->active)) {
-			printk("ide_do_request: DMA in progress...\n");
+			printk(KERN_ERR "%s: error: DMA in progress...\n", drive->name);
 			break;
 		}
 
@@ -1245,27 +1272,12 @@ static void queue_commands(struct ata_device *drive, int masked_irq)
 
 		drive->rq = rq;
 
-		/* Some systems have trouble with IDE IRQs arriving while the
-		 * driver is still setting things up.  So, here we disable the
-		 * IRQ used by this interface while the request is being
-		 * started.  This may look bad at first, but pretty much the
-		 * same thing happens anyway when any interrupt comes in, IDE
-		 * or otherwise -- the kernel masks the IRQ while it is being
-		 * handled.
-		 */
-
-		if (masked_irq && drive->channel->irq != masked_irq)
-			disable_irq_nosync(drive->channel->irq);
-
 		spin_unlock(drive->channel->lock);
 
 		ide__sti();	/* allow other IRQs while we start this request */
 		startstop = start_request(drive, rq);
 
 		spin_lock_irq(drive->channel->lock);
-
-		if (masked_irq && drive->channel->irq != masked_irq)
-			enable_irq(drive->channel->irq);
 
 		/* command started, we are busy */
 		if (startstop == ide_started)
@@ -1288,7 +1300,7 @@ static void queue_commands(struct ata_device *drive, int masked_irq)
  * Issue a new request.
  * Caller must have already done spin_lock_irqsave(channel->lock, ...)
  */
-static void ide_do_request(struct ata_channel *channel, int masked_irq)
+static void do_request(struct ata_channel *channel)
 {
 	ide_get_lock(&irq_lock, ata_irq_request, hwgroup);/* for atari only: POSSIBLY BROKEN HERE(?) */
 //	__cli();	/* necessary paranoia: ensure IRQs are masked on local CPU */
@@ -1319,14 +1331,14 @@ static void ide_do_request(struct ata_channel *channel, int masked_irq)
 		 */
 		ch->drive = drive;
 
-		queue_commands(drive, masked_irq);
+		queue_commands(drive);
 	}
 
 }
 
 void do_ide_request(request_queue_t *q)
 {
-	ide_do_request(q->queuedata, 0);
+	do_request(q->queuedata);
 }
 
 /*
@@ -1368,7 +1380,7 @@ static void dma_timeout_retry(struct ata_device *drive, struct request *rq)
 /*
  * This is our timeout function for all drive operations.  But note that it can
  * also be invoked as a result of a "sleep" operation triggered by the
- * mod_timer() call in ide_do_request.
+ * mod_timer() call in do_request.
  */
 void ide_timer_expiry(unsigned long data)
 {
@@ -1462,7 +1474,7 @@ void ide_timer_expiry(unsigned long data)
 		}
 	}
 
-	ide_do_request(ch->drive->channel, 0);
+	do_request(ch->drive->channel);
 
 	spin_unlock_irqrestore(ch->lock, flags);
 }
@@ -1606,12 +1618,12 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 	if (startstop == ide_stopped) {
 		if (!ch->handler) {	/* paranoia */
 			clear_bit(IDE_BUSY, &ch->active);
-			ide_do_request(ch, ch->irq);
+			do_request(ch);
 		} else {
 			printk("%s: %s: huh? expected NULL handler on exit\n", drive->name, __FUNCTION__);
 		}
 	} else if (startstop == ide_released)
-		queue_commands(drive, ch->irq);
+		queue_commands(drive);
 
 out_lock:
 	spin_unlock_irqrestore(ch->lock, flags);
@@ -1639,81 +1651,6 @@ struct ata_device *get_info_ptr(kdev_t i_rdev)
 		}
 	}
 	return NULL;
-}
-
-/*
- * This function is intended to be used prior to invoking ide_do_drive_cmd().
- */
-void ide_init_drive_cmd(struct request *rq)
-{
-	memset(rq, 0, sizeof(*rq));
-	rq->flags = REQ_DRIVE_CMD;
-}
-
-/*
- * This function issues a special IDE device request onto the request queue.
- *
- * If action is ide_wait, then the rq is queued at the end of the request
- * queue, and the function sleeps until it has been processed.  This is for use
- * when invoked from an ioctl handler.
- *
- * If action is ide_preempt, then the rq is queued at the head of the request
- * queue, displacing the currently-being-processed request and this function
- * returns immediately without waiting for the new rq to be completed.  This is
- * VERY DANGEROUS, and is intended for careful use by the ATAPI tape/cdrom
- * driver code.
- *
- * If action is ide_next, then the rq is queued immediately after the
- * currently-being-processed-request (if any), and the function returns without
- * waiting for the new rq to be completed.  As above, This is VERY DANGEROUS,
- * and is intended for careful use by the ATAPI tape/cdrom driver code.
- *
- * If action is ide_end, then the rq is queued at the end of the request queue,
- * and the function returns immediately without waiting for the new rq to be
- * completed. This is again intended for careful use by the ATAPI tape/cdrom
- * driver code.
- */
-int ide_do_drive_cmd(struct ata_device *drive, struct request *rq, ide_action_t action)
-{
-	unsigned long flags;
-	unsigned int major = drive->channel->major;
-	request_queue_t *q = &drive->queue;
-	struct list_head *queue_head = &q->queue_head;
-	DECLARE_COMPLETION(wait);
-
-#ifdef CONFIG_BLK_DEV_PDC4030
-	if (drive->channel->chipset == ide_pdc4030 && rq->buffer != NULL)
-		return -ENOSYS;  /* special drive cmds not supported */
-#endif
-	rq->errors = 0;
-	rq->rq_status = RQ_ACTIVE;
-	rq->rq_dev = mk_kdev(major,(drive->select.b.unit)<<PARTN_BITS);
-	if (action == ide_wait)
-		rq->waiting = &wait;
-
-	spin_lock_irqsave(drive->channel->lock, flags);
-
-	if (blk_queue_empty(&drive->queue) || action == ide_preempt) {
-		if (action == ide_preempt)
-			drive->rq = NULL;
-	} else {
-		if (action == ide_wait || action == ide_end)
-			queue_head = queue_head->prev;
-		else
-			queue_head = queue_head->next;
-	}
-	q->elevator.elevator_add_req_fn(q, rq, queue_head);
-	ide_do_request(drive->channel, 0);
-
-	spin_unlock_irqrestore(drive->channel->lock, flags);
-
-	if (action == ide_wait) {
-		wait_for_completion(&wait);	/* wait for it to be serviced */
-		return rq->errors ? -EIO : 0;	/* return -EIO if errors */
-	}
-
-	return 0;
-
 }
 
 /*
@@ -3206,13 +3143,10 @@ EXPORT_SYMBOL(ide_error);
 EXPORT_SYMBOL(ide_fixstring);
 EXPORT_SYMBOL(ide_wait_stat);
 EXPORT_SYMBOL(restart_request);
-EXPORT_SYMBOL(ide_init_drive_cmd);
-EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ide_end_drive_cmd);
 EXPORT_SYMBOL(__ide_end_request);
 EXPORT_SYMBOL(ide_end_request);
 EXPORT_SYMBOL(ide_revalidate_disk);
-EXPORT_SYMBOL(ide_cmd);
 EXPORT_SYMBOL(ide_delay_50ms);
 EXPORT_SYMBOL(ide_stall_queue);
 
@@ -3361,9 +3295,6 @@ static int __init ata_module_init(void)
 # endif
 # ifdef CONFIG_BLK_DEV_AMD74XX
 	init_amd74xx();
-# endif
-# ifdef CONFIG_BLK_DEV_PDC_ADMA
-	init_pdcadma();
 # endif
 # ifdef CONFIG_BLK_DEV_SVWKS
 	init_svwks();

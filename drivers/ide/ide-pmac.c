@@ -55,8 +55,6 @@
 #endif
 #include "ata-timing.h"
 
-extern spinlock_t ide_lock;
-
 #undef IDE_PMAC_DEBUG
 
 #define DMA_WAIT_TIMEOUT	500
@@ -1669,12 +1667,12 @@ idepmac_wake_drive(struct ata_device *drive, unsigned long base)
 			break;
 	}
 
-	/* We resume processing on the HW group */
-	spin_lock_irq(&ide_lock);
+	/* We resume processing on the lock group */
+	spin_lock_irq(drive->channel->lock);
 	clear_bit(IDE_BUSY, &drive->channel->active);
 	if (!list_empty(&drive->queue.queue_head))
 		do_ide_request(&drive->queue);
-	spin_unlock_irq(&ide_lock);
+	spin_unlock_irq(drive->channel->lock);
 }
 
 /* Note: We support only master drives for now. This will have to be

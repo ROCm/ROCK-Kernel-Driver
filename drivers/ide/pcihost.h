@@ -72,9 +72,6 @@ extern int init_cs5530(void);
 #ifdef CONFIG_BLK_DEV_AMD74XX
 extern int init_amd74xx(void);
 #endif
-#ifdef CONFIG_BLK_DEV_PDC_ADMA
-extern int init_pdcadma(void);
-#endif
 #ifdef CONFIG_BLK_DEV_SVWKS
 extern int init_svwks(void);
 #endif

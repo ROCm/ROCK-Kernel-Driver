@@ -90,7 +90,7 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 
 	printk(KERN_INFO "ATA: %s: invalidating pending queue (%d)\n", drive->name, ata_pending_commands(drive));
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(ch->lock, flags);
 
 	del_timer(&ch->timer);
 
@@ -144,7 +144,7 @@ out:
 	 * start doing stuff again
 	 */
 	q->request_fn(q);
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_unlock_irqrestore(ch->lock, flags);
 	printk(KERN_DEBUG "ATA: tcq_invalidate_queue: done\n");
 }
 
@@ -156,14 +156,14 @@ static void ata_tcq_irq_timeout(unsigned long data)
 
 	printk(KERN_ERR "ATA: %s: timeout waiting for interrupt...\n", __FUNCTION__);
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(ch->lock, flags);
 
 	if (test_and_set_bit(IDE_BUSY, &ch->active))
 		printk(KERN_ERR "ATA: %s: IRQ handler not busy\n", __FUNCTION__);
 	if (!ch->handler)
 		printk(KERN_ERR "ATA: %s: missing ISR!\n", __FUNCTION__);
 
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	/*
 	 * if pending commands, try service before giving up
@@ -181,7 +181,7 @@ static void set_irq(struct ata_device *drive, ata_handler_t *handler)
 	struct ata_channel *ch = drive->channel;
 	unsigned long flags;
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(ch->lock, flags);
 
 	/*
 	 * always just bump the timer for now, the timeout handling will
@@ -196,7 +196,7 @@ static void set_irq(struct ata_device *drive, ata_handler_t *handler)
 	mod_timer(&ch->timer, jiffies + 5 * HZ);
 	ch->handler = handler;
 
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_unlock_irqrestore(ch->lock, flags);
 }
 
 /*

@@ -316,8 +316,7 @@ int __init setup_pdc4030(struct ata_channel *hwif)
 	memcpy(hwif2->io_ports, hwif->hw.io_ports, sizeof(hwif2->io_ports));
 	hwif2->irq = hwif->irq;
 	hwif2->hw.irq = hwif->hw.irq = hwif->irq;
-	hwif->io_32bit = 3;
-	hwif2->io_32bit = 3;
+	hwif->io_32bit = hwif2->io_32bit = 1;
 	for (i=0; i<2 ; i++) {
 		if (!ident.current_tm[i].cyl)
 			hwif->drives[i].noprobe = 1;

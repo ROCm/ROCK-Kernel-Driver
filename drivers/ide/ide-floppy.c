@@ -879,7 +879,7 @@ static void idefloppy_retry_pc (ide_drive_t *drive)
 	pc = idefloppy_next_pc_storage (drive);
 	rq = idefloppy_next_rq_storage (drive);
 	idefloppy_create_request_sense_cmd (pc);
-	idefloppy_queue_pc_head (drive, pc, rq);
+	idefloppy_queue_pc_head(drive, pc, rq);
 }
 
 /*

@@ -54,7 +54,6 @@ ide-obj-$(CONFIG_BLK_DEV_OPTI621)	+= opti621.o
 ide-obj-$(CONFIG_BLK_DEV_SVWKS)		+= serverworks.o
 ide-obj-$(CONFIG_BLK_DEV_PDC202XX)	+= pdc202xx.o
 ide-obj-$(CONFIG_BLK_DEV_PDC4030)	+= pdc4030.o
-ide-obj-$(CONFIG_BLK_DEV_PDC_ADMA)	+= pdcadma.o
 ide-obj-$(CONFIG_BLK_DEV_PIIX)		+= piix.o
 ide-obj-$(CONFIG_BLK_DEV_QD65XX)	+= qd65xx.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_RAPIDE)	+= rapide.o
@@ -72,6 +71,6 @@ obj-$(CONFIG_BLK_DEV_ATARAID)		+= ataraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_PDC)	+= pdcraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
 
-ide-mod-objs		:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o ata-timing.o $(ide-obj-y)
+ide-mod-objs	:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o ata-timing.o $(ide-obj-y)
 
 include $(TOPDIR)/Rules.make

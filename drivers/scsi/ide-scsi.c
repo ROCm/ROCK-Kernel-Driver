@@ -792,18 +792,6 @@ abort:
  */
 int idescsi_device_reset (Scsi_Cmnd *cmd)
 {
-#if 0
-	ide_drive_t *drive = idescsi_drives[cmd->target];
-        struct request req;
-
-        ide_init_drive_cmd(&req);
-        req.flags = REQ_SPECIAL;
-
-	/* FIX ME, the next executable line causes on oops in lk 2.5.10-dj1
-	 * [code copied from ide-cd's ide_cdrom_reset(), does it work?]
-	 */
-        ide_do_drive_cmd(drive, &req, ide_wait);
-#endif
 	return SUCCESS;
 }
 

@@ -449,19 +449,20 @@ struct ata_channel {
 	spinlock_t *lock;
 
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
-	struct timer_list timer;	/* failsafe timer */
+	struct timer_list timer;				/* failsafe timer */
 	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
-	unsigned long poll_timeout;	/* timeout value during polled operations */
-	struct ata_device *drive;	/* last serviced drive */
+	unsigned long poll_timeout;				/* timeout value during polled operations */
+	struct ata_device *drive;				/* last serviced drive */
+
 	unsigned long active;		/* active processing request */
 
-	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
-	hw_regs_t	hw;		/* Hardware info */
+	ide_ioreg_t io_ports[IDE_NR_PORTS];	/* task file registers */
+	hw_regs_t hw;				/* hardware info */
 #ifdef CONFIG_PCI
-	struct pci_dev	*pci_dev;	/* for pci chipsets */
+	struct pci_dev *pci_dev;		/* for pci chipsets */
 #endif
 	struct ata_device drives[MAX_DRIVES];	/* drive info */
-	struct gendisk	*gd;		/* gendisk structure */
+	struct gendisk *gd;			/* gendisk structure */
 
 	/*
 	 * Routines to tune PIO and DMA mode for drives.
@@ -469,7 +470,11 @@ struct ata_channel {
 	 * A value of 255 indicates that the function should choose the optimal
 	 * mode itself.
 	 */
+
+	/* setup disk on a channel for a particular transfer mode */
 	void (*tuneproc) (struct ata_device *, byte pio);
+
+	/* setup the chipset timing for a particular transfer mode */
 	int (*speedproc) (struct ata_device *, byte pio);
 
 	/* tweaks hardware to select drive */
@@ -486,6 +491,9 @@ struct ata_channel {
 
 	/* check host's drive quirk list */
 	int (*quirkproc) (struct ata_device *);
+
+	/* driver soft-power interface */
+	int (*busproc)(struct ata_device *, int);
 
 	/* CPU-polled transfer routines */
 	void (*ata_read)(struct ata_device *, void *, unsigned int);
@@ -535,17 +543,14 @@ struct ata_channel {
 	unsigned no_io_32bit	: 1;	/* disallow enabling 32bit I/O */
 	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
 	unsigned auto_poll	: 1;	/* supports nop auto-poll */
-	byte		io_32bit;	/* 0=16-bit, 1=32-bit, 2/3=32bit+sync */
-	byte		unmask;		/* flag: okay to unmask other irqs */
-	byte		slow;		/* flag: slow data port */
+	unsigned unmask		: 1;	/* flag: okay to unmask other irqs */
+	unsigned slow		: 1;	/* flag: slow data port */
+	unsigned io_32bit	: 1;	/* 0=16-bit, 1=32-bit */
+	unsigned char bus_state;	/* power state of the IDE bus */
 
 #if (DISK_RECOVERY_TIME > 0)
-	unsigned long	last_time;	/* time when previous rq was done */
+	unsigned long last_time;	/* time when previous rq was done */
 #endif
-	/* driver soft-power interface */
-	int (*busproc)(struct ata_device *, int);
-
-	byte		bus_state;	/* power state of the IDE bus */
 };
 
 /*
@@ -656,12 +661,6 @@ extern ide_startstop_t ide_error(struct ata_device *, struct request *rq,
 		const char *, byte);
 
 /*
- * Issue a simple drive command
- * The drive must be selected beforehand.
- */
-void ide_cmd(struct ata_device *, byte, byte, ata_handler_t);
-
-/*
  * ide_fixstring() cleans up and (optionally) byte-swaps a text string,
  * removing leading/trailing blanks and compressing internal blanks.
  * It is primarily used to tidy up the model name/number fields as
@@ -710,7 +709,6 @@ extern void ide_init_drive_cmd(struct request *rq);
  */
 typedef enum {
 	ide_wait,	/* insert rq at end of list, and wait for it */
-	ide_next,	/* insert rq immediately after current request */
 	ide_preempt,	/* insert rq in front of current request */
 	ide_end		/* insert rq at end of list, but don't wait for it */
 } ide_action_t;
@@ -760,13 +758,10 @@ extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 
 void ide_delay_50ms(void);
 
-extern byte ide_auto_reduce_xfer(struct ata_device *);
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_driveid_update(struct ata_device *);
-extern int ide_ata66_check(struct ata_device *, struct ata_taskfile *);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
-extern int set_transfer(struct ata_device *, struct ata_taskfile *);
 
 extern int system_bus_speed;
 
