@@ -4249,3 +4249,10 @@ asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
 
 	return ret;
 }
+unsigned long sys32_mmap2(unsigned long addr, size_t len,
+			  unsigned long prot, unsigned long flags,
+			  unsigned long fd, unsigned long pgoff)
+{
+	/* This should remain 12 even if PAGE_SIZE changes */
+	return sys_mmap(addr, len, prot, flags, fd, pgoff << 12);
+}

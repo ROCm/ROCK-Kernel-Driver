@@ -696,7 +696,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_vfork
 	.llong .sys32_getrlimit	        /* 190 */
 	.llong .sys32_readahead
-	.llong .sys_ni_syscall		/* 192 - reserved - mmap2 */
+	.llong .ppc32_mmap2
 	.llong .sys32_truncate64	/* 193 - truncate64 */
 	.llong .sys32_ftruncate64	/* 194 - ftruncate64 */
 	.llong .sys_stat64      	/* 195 - stat64 */
