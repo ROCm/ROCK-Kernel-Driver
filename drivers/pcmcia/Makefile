@@ -21,7 +21,7 @@ yenta_socket-objs				:= pci_socket.o yenta.o
 
 pcmcia_core-objs-y				:= cistpl.o rsrc_mgr.o bulkmem.o cs.o
 pcmcia_core-objs-$(CONFIG_CARDBUS)		+= cardbus.o
-pcmcia_core-objs				:= $(pcmcia_core-y)
+pcmcia_core-objs				:= $(pcmcia_core-objs-y)
 
 sa1100_cs-objs-y				:= sa1100_generic.o
 sa1100_cs-objs-$(CONFIG_SA1100_ADSBITSY)	+= sa1100_adsbitsy.o sa1111_generic.o
