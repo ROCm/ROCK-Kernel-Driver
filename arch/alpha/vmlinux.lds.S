@@ -10,7 +10,7 @@ SECTIONS
 #ifdef CONFIG_ALPHA_LEGACY_START_ADDRESS
   . = 0xfffffc0000310000;
 #else
-  . = 0xfffffc0000810000;
+  . = 0xfffffc0001010000;
 #endif
 
   _text = .;					/* Text and read-only data */
