@@ -196,7 +196,7 @@ long sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
 	}
 }
 
-long sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+long sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss)
 {
 	return(do_sigaltstack(uss, uoss, PT_REGS_SP(&current->thread.regs)));
 }

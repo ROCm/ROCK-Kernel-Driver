@@ -81,7 +81,7 @@ long sys_ptrace(long request, long pid, long addr, long data)
 		copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 0);
 		if (copied != sizeof(tmp))
 			break;
-		ret = put_user(tmp,(unsigned long *) data);
+		ret = put_user(tmp, (unsigned long __user *) data);
 		break;
 	}
 
@@ -103,7 +103,7 @@ long sys_ptrace(long request, long pid, long addr, long data)
 			addr = addr >> 2;
 			tmp = child->thread.arch.debugregs[addr];
 		}
-		ret = put_user(tmp, (unsigned long *) data);
+		ret = put_user(tmp, (unsigned long __user *) data);
 		break;
 	}
 
@@ -201,7 +201,8 @@ long sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		}
 		for ( i = 0; i < FRAME_SIZE_OFFSET; i += sizeof(long) ) {
-			__put_user(getreg(child, i), (unsigned long *) data);
+			__put_user(getreg(child, i),
+				   (unsigned long __user *) data);
 			data += sizeof(long);
 		}
 		ret = 0;
@@ -217,7 +218,7 @@ long sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		}
 		for ( i = 0; i < FRAME_SIZE_OFFSET; i += sizeof(long) ) {
-			__get_user(tmp, (unsigned long *) data);
+			__get_user(tmp, (unsigned long __user *) data);
 			putreg(child, i, tmp);
 			data += sizeof(long);
 		}
@@ -251,14 +252,14 @@ long sys_ptrace(long request, long pid, long addr, long data)
 		fault = ((struct ptrace_faultinfo) 
 			{ .is_write	= child->thread.err,
 			  .addr		= child->thread.cr2 });
-		ret = copy_to_user((unsigned long *) data, &fault, 
+		ret = copy_to_user((unsigned long __user *) data, &fault,
 				   sizeof(fault));
 		if(ret)
 			break;
 		break;
 	}
 	case PTRACE_SIGPENDING:
-		ret = copy_to_user((unsigned long *) data, 
+		ret = copy_to_user((unsigned long __user *) data,
 				   &child->pending.signal,
 				   sizeof(child->pending.signal));
 		break;
@@ -266,7 +267,7 @@ long sys_ptrace(long request, long pid, long addr, long data)
 	case PTRACE_LDT: {
 		struct ptrace_ldt ldt;
 
-		if(copy_from_user(&ldt, (unsigned long *) data, 
+		if(copy_from_user(&ldt, (unsigned long __user *) data,
 				  sizeof(ldt))){
 			ret = -EIO;
 			break;

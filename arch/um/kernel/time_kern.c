@@ -111,19 +111,19 @@ irqreturn_t um_timer(int irq, void *dev, struct pt_regs *regs)
 	return(IRQ_HANDLED);
 }
 
-long um_time(int * tloc)
+long um_time(int __user *tloc)
 {
 	struct timeval now;
 
 	do_gettimeofday(&now);
 	if (tloc) {
- 		if (put_user(now.tv_sec,tloc))
+ 		if (put_user(now.tv_sec, tloc))
 			now.tv_sec = -EFAULT;
 	}
 	return now.tv_sec;
 }
 
-long um_stime(int * tptr)
+long um_stime(int __user *tptr)
 {
 	int value;
 	struct timespec new;

@@ -152,13 +152,13 @@ void __init init_IRQ(void)
 	int i;
 
 	irq_desc[TIMER_IRQ].status = IRQ_DISABLED;
-	irq_desc[TIMER_IRQ].action = 0;
+	irq_desc[TIMER_IRQ].action = NULL;
 	irq_desc[TIMER_IRQ].depth = 1;
 	irq_desc[TIMER_IRQ].handler = &SIGVTALRM_irq_type;
 	enable_irq(TIMER_IRQ);
 	for(i=1;i<NR_IRQS;i++){
 		irq_desc[i].status = IRQ_DISABLED;
-		irq_desc[i].action = 0;
+		irq_desc[i].action = NULL;
 		irq_desc[i].depth = 1;
 		irq_desc[i].handler = &SIGIO_irq_type;
 		enable_irq(i);

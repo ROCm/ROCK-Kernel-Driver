@@ -499,7 +499,7 @@ int mconsole_init(void)
 
 __initcall(mconsole_init);
 
-static int write_proc_mconsole(struct file *file, const char *buffer,
+static int write_proc_mconsole(struct file *file, const char __user *buffer,
 			       unsigned long count, void *data)
 {
 	char *buf;

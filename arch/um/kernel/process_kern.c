@@ -368,22 +368,22 @@ void *get_init_task(void)
 	return(&init_thread_union.thread_info.task);
 }
 
-int copy_to_user_proc(void *to, void *from, int size)
+int copy_to_user_proc(void __user *to, void *from, int size)
 {
 	return(copy_to_user(to, from, size));
 }
 
-int copy_from_user_proc(void *to, void *from, int size)
+int copy_from_user_proc(void *to, void __user *from, int size)
 {
 	return(copy_from_user(to, from, size));
 }
 
-int clear_user_proc(void *buf, int size)
+int clear_user_proc(void __user *buf, int size)
 {
 	return(clear_user(buf, size));
 }
 
-int strlen_user_proc(char *str)
+int strlen_user_proc(char __user *str)
 {
 	return(strlen_user(str));
 }

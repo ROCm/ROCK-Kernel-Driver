@@ -130,7 +130,7 @@ static void __init fixrange_init(unsigned long start, unsigned long end,
 	}
 }
 
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
@@ -235,7 +235,7 @@ struct page *arch_validate(struct page *page, int mask, int order)
 	addr = (unsigned long) page_address(page);
 	for(i = 0; i < (1 << order); i++){
 		current->thread.fault_addr = (void *) addr;
-		if(__do_copy_to_user((void *) addr, &zero,
+		if(__do_copy_to_user((void __user *) addr, &zero,
 				     sizeof(zero),
 				     &current->thread.fault_addr,
 				     &current->thread.fault_catcher)){

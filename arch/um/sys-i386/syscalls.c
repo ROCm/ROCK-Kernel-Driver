@@ -30,7 +30,7 @@ extern int old_mmap(unsigned long addr, unsigned long len,
 		    unsigned long prot, unsigned long flags,
 		    unsigned long fd, unsigned long offset);
 
-long old_mmap_i386(struct mmap_arg_struct *arg)
+long old_mmap_i386(struct mmap_arg_struct __user *arg)
 {
 	struct mmap_arg_struct a;
 	int err = -EFAULT;
@@ -45,11 +45,13 @@ long old_mmap_i386(struct mmap_arg_struct *arg)
 
 struct sel_arg_struct {
 	unsigned long n;
-	fd_set *inp, *outp, *exp;
-	struct timeval *tvp;
+	fd_set __user *inp;
+	fd_set __user *outp;
+	fd_set __user *exp;
+	struct timeval __user *tvp;
 };
 
-long old_select(struct sel_arg_struct *arg)
+long old_select(struct sel_arg_struct __user *arg)
 {
 	struct sel_arg_struct a;
 
@@ -62,8 +64,8 @@ long old_select(struct sel_arg_struct *arg)
 /* The i386 version skips reading from %esi, the fourth argument. So we must do
  * this, too.
  */
-long sys_clone(unsigned long clone_flags, unsigned long newsp, int *parent_tid,
-	       int unused, int *child_tid)
+long sys_clone(unsigned long clone_flags, unsigned long newsp,
+	       int __user *parent_tid, int unused, int __user *child_tid)
 {
 	long ret;
 
@@ -86,7 +88,7 @@ long sys_clone(unsigned long clone_flags, unsigned long newsp, int *parent_tid,
  * This is really horribly ugly.
  */
 long sys_ipc (uint call, int first, int second,
-	     int third, void *ptr, long fifth)
+	     int third, void *__user ptr, long fifth)
 {
 	int version, ret;
 

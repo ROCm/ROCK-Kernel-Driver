@@ -15,10 +15,12 @@ extern int modify_ldt(int func, void *ptr, unsigned long bytecount);
 
 /* XXX this needs copy_to_user and copy_from_user */
 
-int sys_modify_ldt_tt(int func, void *ptr, unsigned long bytecount)
+int sys_modify_ldt_tt(int func, void __user *ptr, unsigned long bytecount)
 {
-	if(verify_area(VERIFY_READ, ptr, bytecount)) return(-EFAULT);
-	return(modify_ldt(func, ptr, bytecount));
+	if (verify_area(VERIFY_READ, ptr, bytecount))
+		return -EFAULT;
+
+	return modify_ldt(func, ptr, bytecount);
 }
 #endif
 
@@ -27,7 +29,7 @@ extern int userspace_pid;
 
 #include "skas_ptrace.h"
 
-int sys_modify_ldt_skas(int func, void *ptr, unsigned long bytecount)
+int sys_modify_ldt_skas(int func, void __user *ptr, unsigned long bytecount)
 {
 	struct ptrace_ldt ldt;
 	void *buf;
@@ -76,7 +78,7 @@ int sys_modify_ldt_skas(int func, void *ptr, unsigned long bytecount)
 }
 #endif
 
-int sys_modify_ldt(int func, void *ptr, unsigned long bytecount)
+int sys_modify_ldt(int func, void __user *ptr, unsigned long bytecount)
 {
 	return(CHOOSE_MODE_PROC(sys_modify_ldt_tt, sys_modify_ldt_skas, func, 
 				ptr, bytecount));

@@ -27,10 +27,9 @@
 /*  Unlocked, I don't care if this is a bit off */
 int nsyscalls = 0;
 
-long um_mount(char * dev_name, char * dir_name, char * type,
-	      unsigned long new_flags, void * data)
+long um_mount(char __user * dev_name, char __user * dir_name,
+	      char __user * type, unsigned long new_flags, void __user * data)
 {
-	if(type == NULL) type = "";
 	return(sys_mount(dev_name, dir_name, type, new_flags, data));
 }
 
@@ -96,7 +95,7 @@ long old_mmap(unsigned long addr, unsigned long len,
  * sys_pipe() is the normal C calling standard for creating
  * a pipe. It's not the way unix traditionally does this, though.
  */
-long sys_pipe(unsigned long * fildes)
+long sys_pipe(unsigned long __user * fildes)
 {
         int fd[2];
         long error;

@@ -132,10 +132,10 @@ static int copy_chunk_from_user(unsigned long from, int len, void *arg)
 	return(0);
 }
 
-int copy_from_user_skas(void *to, const void *from, int n)
+int copy_from_user_skas(void *to, const void __user *from, int n)
 {
 	if(segment_eq(get_fs(), KERNEL_DS)){
-		memcpy(to, from, n);
+		memcpy(to, (__force void*)from, n);
 		return(0);
 	}
 
@@ -153,10 +153,10 @@ static int copy_chunk_to_user(unsigned long to, int len, void *arg)
 	return(0);
 }
 
-int copy_to_user_skas(void *to, const void *from, int n)
+int copy_to_user_skas(void __user *to, const void *from, int n)
 {
 	if(segment_eq(get_fs(), KERNEL_DS)){
-		memcpy(to, from, n);
+		memcpy((__force void*)to, from, n);
 		return(0);
 	}
 
@@ -179,13 +179,13 @@ static int strncpy_chunk_from_user(unsigned long from, int len, void *arg)
 	return(0);
 }
 
-int strncpy_from_user_skas(char *dst, const char *src, int count)
+int strncpy_from_user_skas(char *dst, const char __user *src, int count)
 {
 	int n;
 	char *ptr = dst;
 
 	if(segment_eq(get_fs(), KERNEL_DS)){
-		strncpy(dst, src, count);
+		strncpy(dst, (__force void*)src, count);
 		return(strnlen(dst, count));
 	}
 
@@ -205,15 +205,15 @@ static int clear_chunk(unsigned long addr, int len, void *unused)
 	return(0);
 }
 
-int __clear_user_skas(void *mem, int len)
+int __clear_user_skas(void __user *mem, int len)
 {
 	return(buffer_op((unsigned long) mem, len, 1, clear_chunk, NULL));
 }
 
-int clear_user_skas(void *mem, int len)
+int clear_user_skas(void __user *mem, int len)
 {
 	if(segment_eq(get_fs(), KERNEL_DS)){
-		memset(mem, 0, len);
+		memset((__force void*)mem, 0, len);
 		return(0);
 	}
 
@@ -233,12 +233,12 @@ static int strnlen_chunk(unsigned long str, int len, void *arg)
 	return(0);
 }
 
-int strnlen_user_skas(const void *str, int len)
+int strnlen_user_skas(const void __user *str, int len)
 {
 	int count = 0, n;
 
 	if(segment_eq(get_fs(), KERNEL_DS))
-		return(strnlen(str, len) + 1);
+		return(strnlen((__force char*)str, len) + 1);
 
 	n = buffer_op((unsigned long) str, len, 0, strnlen_chunk, &count);
 	if(n == 0)
