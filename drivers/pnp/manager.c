@@ -452,23 +452,19 @@ int pnp_auto_config_dev(struct pnp_dev *dev)
 
 	if (!dev->dependent) {
 		if (pnp_assign_resources(dev, 0))
-			return 1;
-		else
 			return 0;
+	} else {
+		dep = dev->dependent;
+		do {
+			if (pnp_assign_resources(dev, i))
+				return 0;
+			dep = dep->next;
+			i++;
+		} while (dep);
 	}
 
-	dep = dev->dependent;
-	do {
-		if (pnp_assign_resources(dev, i))
-			return 1;
-
-		/* if this dependent resource failed, try the next one */
-		dep = dep->next;
-		i++;
-	} while (dep);
-
 	pnp_err("Unable to assign resources to device %s.", dev->dev.bus_id);
-	return 0;
+	return -EBUSY;
 }
 
 /**
@@ -486,7 +482,7 @@ int pnp_activate_dev(struct pnp_dev *dev)
 	}
 
 	/* ensure resources are allocated */
-	if (!pnp_auto_config_dev(dev))
+	if (pnp_auto_config_dev(dev))
 		return -EBUSY;
 
 	if (!pnp_can_write(dev)) {

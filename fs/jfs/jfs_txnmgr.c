@@ -2977,11 +2977,12 @@ int jfs_sync(void *arg)
 					    anon_inode_list);
 			ip = &jfs_ip->vfs_inode;
 
-			/*
-			 * down_trylock returns 0 on success.  This is
-			 * inconsistent with spin_trylock.
-			 */
-			if (! down_trylock(&jfs_ip->commit_sem)) {
+			if (! igrab(ip)) {
+				/*
+				 * Inode is being freed
+				 */
+				list_del_init(&jfs_ip->anon_inode_list);
+			} else if (! down_trylock(&jfs_ip->commit_sem)) {
 				/*
 				 * inode will be removed from anonymous list
 				 * when it is committed
@@ -2991,6 +2992,8 @@ int jfs_sync(void *arg)
 				rc = txCommit(tid, 1, &ip, 0);
 				txEnd(tid);
 				up(&jfs_ip->commit_sem);
+
+				iput(ip);
 				/*
 				 * Just to be safe.  I don't know how
 				 * long we can run without blocking
@@ -3010,6 +3013,10 @@ int jfs_sync(void *arg)
 				/* Put on anon_list2 */
 				list_add(&jfs_ip->anon_inode_list,
 					 &TxAnchor.anon_list2);
+
+				TXN_UNLOCK();
+				iput(ip);
+				TXN_LOCK();
 			}
 		}
 		/* Add anon_list2 back to anon_list */

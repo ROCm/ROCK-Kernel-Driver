@@ -185,25 +185,28 @@ static int save_user_regs(struct pt_regs *regs, struct mcontext32 *frame, int si
  * Restore the current user register values from the user stack,
  * (except for MSR).
  */
-static int restore_user_regs(struct pt_regs *regs, struct mcontext32 __user *sr, int sig)
+static long restore_user_regs(struct pt_regs *regs,
+			      struct mcontext32 __user *sr, int sig)
 {
 	elf_greg_t64 *gregs = (elf_greg_t64 *)regs;
-	int i, err = 0;
+	int i;
+	long err = 0;
 	unsigned int save_r2;
 #ifdef CONFIG_ALTIVEC
 	unsigned long msr;
 #endif
 
 	/*
-	 * restore general registers but not including MSR. Also take
-	 * care of keeping r2 (TLS) intact if not a signal
+	 * restore general registers but not including MSR or SOFTE. Also
+	 * take care of keeping r2 (TLS) intact if not a signal
 	 */
 	if (!sig)
 		save_r2 = (unsigned int)regs->gpr[2];
-	for (i = 0; i < PT_MSR; i ++)
+	for (i = 0; i <= PT_RESULT; i++) {
+		if ((i == PT_MSR) || (i == PT_SOFTE))
+			continue;
 		err |= __get_user(gregs[i], &sr->mc_gregs[i]);
-	for (i ++; i <= PT_RESULT; i ++)
-		err |= __get_user(gregs[i], &sr->mc_gregs[i]);
+	}
 	if (!sig)
 		regs->gpr[2] = (unsigned long) save_r2;
 	if (err)
@@ -427,9 +430,9 @@ long sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 }
 
 
-static int copy_siginfo_to_user32(compat_siginfo_t *d, siginfo_t *s)
+static long copy_siginfo_to_user32(compat_siginfo_t *d, siginfo_t *s)
 {
-	int err;
+	long err;
 
 	if (!access_ok (VERIFY_WRITE, d, sizeof(*d)))
 		return -EFAULT;
