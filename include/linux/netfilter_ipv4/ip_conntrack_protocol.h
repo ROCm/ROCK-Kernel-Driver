@@ -75,6 +75,7 @@ extern int ip_conntrack_protocol_tcp_init(void);
 /* Log invalid packets */
 extern unsigned int ip_ct_log_invalid;
 
+#ifdef CONFIG_SYSCTL
 #ifdef DEBUG_INVALID_PACKETS
 #define LOG_INVALID(proto) \
 	(ip_ct_log_invalid == (proto) || ip_ct_log_invalid == IPPROTO_RAW)
@@ -83,5 +84,8 @@ extern unsigned int ip_ct_log_invalid;
 	((ip_ct_log_invalid == (proto) || ip_ct_log_invalid == IPPROTO_RAW) \
 	 && net_ratelimit())
 #endif
+#else
+#define LOG_INVALID(proto) 0
+#endif /* CONFIG_SYSCTL */
 
 #endif /*_IP_CONNTRACK_PROTOCOL_H*/

@@ -724,16 +724,23 @@ static void __init irqstack_early_init(void)
  */
 static void __init emergency_stack_init(void)
 {
+	unsigned long limit;
 	unsigned int i;
 
 	/*
 	 * Emergency stacks must be under 256MB, we cannot afford to take
 	 * SLB misses on them. The ABI also requires them to be 128-byte
 	 * aligned.
+	 *
+	 * Since we use these as temporary stacks during secondary CPU
+	 * bringup, we need to get at them in real mode. This means they
+	 * must also be within the RMO region.
 	 */
+	limit = min(0x10000000UL, lmb.rmo_size);
+
 	for_each_cpu(i)
 		paca[i].emergency_sp = __va(lmb_alloc_base(PAGE_SIZE, 128,
-						0x10000000)) + PAGE_SIZE;
+						limit)) + PAGE_SIZE;
 }
 
 /*
