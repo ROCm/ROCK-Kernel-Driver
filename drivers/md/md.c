@@ -119,7 +119,7 @@ static ctl_table raid_root_table[] = {
 		.procname	= "dev",
 		.maxlen		= 0,
 		.mode		= 0555,
-		.proc_handler	= raid_dir_table,
+		.child		= raid_dir_table,
 	},
 	{ .ctl_name = 0 }
 };
