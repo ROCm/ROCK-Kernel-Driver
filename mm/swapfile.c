@@ -670,12 +670,9 @@ static int try_to_unuse(unsigned int type)
 		 * report them; but do report if we reset SWAP_MAP_MAX.
 		 */
 		if (*swap_map == SWAP_MAP_MAX) {
-			swap_list_lock();
 			swap_device_lock(si);
-			nr_swap_pages++;
 			*swap_map = 1;
 			swap_device_unlock(si);
-			swap_list_unlock();
 			reset_overflow = 1;
 		}
 
