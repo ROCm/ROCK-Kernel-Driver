@@ -1483,7 +1483,6 @@ static inline struct hpsb_packet *ether1394_alloc_common_packet(struct hpsb_host
 	p = hpsb_alloc_packet(0);
 	if (p) {
 		p->host = host;
-		p->data = NULL;
 		p->generation = get_hpsb_generation(host);
 		p->type = hpsb_async;
 	}
@@ -1514,7 +1513,7 @@ static inline int ether1394_prep_write_packet(struct hpsb_packet *p,
 		| (1 << 8) | (TCODE_WRITEB << 4);
 
 	p->header[3] = tx_len << 16;
-	p->data_size = tx_len + (tx_len % 4 ? 4 - (tx_len % 4) : 0);
+	p->data_size = (tx_len + 3) & ~3;
 	p->data = (quadlet_t*)data;
 
 	return 0;

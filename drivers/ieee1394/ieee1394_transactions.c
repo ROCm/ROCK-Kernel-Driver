@@ -268,7 +268,7 @@ struct hpsb_packet *hpsb_make_readpacket(struct hpsb_host *host, nodeid_t node,
 	if (length == 0)
 		return NULL;
 
-	packet = hpsb_alloc_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	packet = hpsb_alloc_packet((length + 3) & ~3);
 	if (!packet)
 		return NULL;
 
@@ -296,7 +296,7 @@ struct hpsb_packet *hpsb_make_writepacket (struct hpsb_host *host, nodeid_t node
 	if (length == 0)
 		return NULL;
 
-	packet = hpsb_alloc_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	packet = hpsb_alloc_packet((length + 3) & ~3);
 	if (!packet)
 		return NULL;
 
@@ -330,7 +330,7 @@ struct hpsb_packet *hpsb_make_streampacket(struct hpsb_host *host, u8 *buffer, i
 	if (length == 0)
 		return NULL;
 
-	packet = hpsb_alloc_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	packet = hpsb_alloc_packet((length + 3) & ~3);
 	if (!packet)
 		return NULL;
 
