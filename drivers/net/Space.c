@@ -90,7 +90,7 @@ extern int mace_probe(struct net_device *dev);
 extern int macsonic_probe(struct net_device *dev);
 extern int mac8390_probe(struct net_device *dev);
 extern int mac89x0_probe(struct net_device *dev);
-extern int mc32_probe(struct net_device *dev);
+extern struct net_device *mc32_probe(int unit);
 extern struct net_device *cops_probe(int unit);
 extern struct net_device *ltpc_probe(void);
   
@@ -184,13 +184,13 @@ static struct devprobe mca_probes[] __initdata = {
 #ifdef CONFIG_ELMC		/* 3c523 */
 	{elmc_probe, 0},
 #endif
-#ifdef CONFIG_ELMC_II		/* 3c527 */
-	{mc32_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 mca_probes2[] __initdata = {
+#ifdef CONFIG_ELMC_II		/* 3c527 */
+	{mc32_probe, 0},
+#endif
 #ifdef CONFIG_SKMC              /* SKnet Microchannel */
         {skmca_probe, 0},
 #endif
