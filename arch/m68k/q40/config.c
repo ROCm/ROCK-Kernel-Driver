@@ -181,7 +181,7 @@ void __init config_q40(void)
     mach_get_model       = q40_get_model;
     mach_get_hardware_list = q40_get_hardware_list;
 
-#ifdef CONFIG_INPUT_M68K_BEEP
+#if defined(CONFIG_INPUT_M68K_BEEP) || defined(CONFIG_INPUT_M68K_BEEP_MODULE)
     mach_beep            = q40_mksound;
 #endif
 #ifdef CONFIG_HEARTBEAT

@@ -408,7 +408,7 @@ void __init config_amiga(void)
 #ifdef CONFIG_DUMMY_CONSOLE
   conswitchp           = &dummy_con;
 #endif
-#ifdef CONFIG_INPUT_M68K_BEEP
+#if defined(CONFIG_INPUT_M68K_BEEP) || defined(CONFIG_INPUT_M68K_BEEP_MODULE)
   mach_beep            = amiga_mksound;
 #endif
 

@@ -217,7 +217,7 @@ void __init config_mac(void)
 #if 0
 	mach_debug_init	 = mac_debug_init;
 #endif
-#ifdef CONFIG_INPUT_M68K_BEEP
+#if defined(CONFIG_INPUT_M68K_BEEP) || defined(CONFIG_INPUT_M68K_BEEP_MODULE)
         mach_beep            = mac_mksound;
 #endif
 #ifdef CONFIG_HEARTBEAT
