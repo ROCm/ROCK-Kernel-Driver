@@ -41,7 +41,7 @@
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
-	{      _STK_LIM, DEFAULT_USER_STACK_SIZE },	\
+	{      _STK_LIM, RLIM_INFINITY },		\
 	{             0, RLIM_INFINITY },		\
 	{ RLIM_INFINITY, RLIM_INFINITY },		\
 	{             0,             0 },		\
