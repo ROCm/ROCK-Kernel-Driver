@@ -956,6 +956,12 @@ CONFIG_BT_HCIVHCI=m
 # CONFIG_SOFT_WATCHDOG is not set
 
 #
+# Profiling support
+#
+CONFIG_PROFILING=y
+CONFIG_OPROFILE=m
+
+#
 # Kernel hacking
 #
 CONFIG_DEBUG_KERNEL=y

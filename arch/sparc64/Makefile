@@ -68,6 +68,9 @@ core-$(CONFIG_SOLARIS_EMUL)	+= arch/sparc64/solaris/
 core-y				+= arch/sparc64/math-emu/
 libs-y				+= arch/sparc64/prom/ arch/sparc64/lib/
 
+# FIXME: is drivers- right?
+drivers-$(CONFIG_OPROFILE)	+= arch/sparc64/oprofile/
+
 makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/sparc64/boot $(1)
 
 tftpboot.img vmlinux.aout:

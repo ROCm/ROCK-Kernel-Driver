@@ -84,9 +84,23 @@ static __inline__ void timer_check_rtc(void)
 	}
 }
 
-void sparc64_do_profile(unsigned long pc, unsigned long o7)
+void sparc64_do_profile(struct pt_regs *regs)
 {
-	if (prof_buffer && current->pid) {
+	unsigned long pc = regs->tpc;
+	unsigned long o7 = regs->u_regs[UREG_RETPC];
+#ifdef CONFIG_PROFILING
+	extern void sparc64_profile_hook(struct pt_regs *);
+
+	sparc64_profile_hook(regs);
+#endif
+
+	if (user_mode(regs))
+		return;
+
+	if (!prof_buffer)
+		return;
+
+	{
 		extern int _stext;
 		extern int rwlock_impl_begin, rwlock_impl_end;
 		extern int atomic_impl_begin, atomic_impl_end;
@@ -123,8 +137,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	do {
 #ifndef CONFIG_SMP
-		if ((regs->tstate & TSTATE_PRIV) != 0)
-			sparc64_do_profile(regs->tpc, regs->u_regs[UREG_RETPC]);
+		sparc64_do_profile(regs);
 #endif
 		do_timer(regs);
 

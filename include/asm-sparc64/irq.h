@@ -11,6 +11,7 @@
 #include <linux/config.h>
 #include <linux/linkage.h>
 #include <linux/kernel.h>
+#include <linux/errno.h>
 #include <asm/pil.h>
 #include <asm/ptrace.h>
 
@@ -155,5 +156,26 @@ static __inline__ unsigned long get_softint(void)
 			     : "=r" (retval));
 	return retval;
 }
+
+struct notifier_block;
+ 
+#ifdef CONFIG_PROFILING
+ 
+int register_profile_notifier(struct notifier_block *nb);
+int unregister_profile_notifier(struct notifier_block *nb);
+
+#else
+
+static inline int register_profile_notifier(struct notifier_block *nb)
+{
+	return -ENOSYS;
+}
+
+static inline int unregister_profile_notifier(struct notifier_block *nb)
+{
+	return -ENOSYS;
+}
+
+#endif /* CONFIG_PROFILING */
 
 #endif
