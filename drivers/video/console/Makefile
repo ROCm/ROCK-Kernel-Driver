@@ -27,7 +27,7 @@ obj-$(CONFIG_FONT_PEARL_8x8)      += font_pearl_8x8.o
 obj-$(CONFIG_FONT_ACORN_8x8)      += font_acorn_8x8.o
 obj-$(CONFIG_FONT_MINI_4x6)       += font_mini_4x6.o
 
-obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o fonts.o
+obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o fonts.o fbcon-accel.o
 
 # Generic Low Level Drivers
 
@@ -37,7 +37,6 @@ obj-$(CONFIG_FBCON_IPLAN2P2)      += fbcon-iplan2p2.o
 obj-$(CONFIG_FBCON_IPLAN2P4)      += fbcon-iplan2p4.o
 obj-$(CONFIG_FBCON_IPLAN2P8)      += fbcon-iplan2p8.o
 obj-$(CONFIG_FBCON_STI)           += fbcon-sti.o
-obj-$(CONFIG_FBCON_ACCEL)	  += fbcon-accel.o
 
 # Files generated that shall be removed upon make clean
 clean-files := promcon_tbl.c
