@@ -5,8 +5,8 @@ menu "Profiling support"
 config PROFILING
 	bool "Profiling support (EXPERIMENTAL)"
 	help
-	  Say Y here to enable the extended profiling support mechanisms used
-	  by profilers such as OProfile.
+	  Say Y here to enable profiling support mechanisms used by
+	  profilers such as readprofile or OProfile.
 
 
 config OPROFILE

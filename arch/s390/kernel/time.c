@@ -179,7 +179,7 @@ __calculate_ticks(__u64 elapsed)
 #endif /* CONFIG_ARCH_S390X */
 
 
-#if defined(CONFIG_OPROFILE) || defined(CONFIG_OPROFILE_MODULE)
+#ifdef CONFIG_PROFILING
 extern char _stext, _etext;
 
 /*
@@ -223,7 +223,7 @@ static inline void s390_do_profile(struct pt_regs * regs)
 }
 #else
 #define s390_do_profile(regs)  do { ; } while(0)
-#endif /* CONFIG_OPROFILE */
+#endif /* CONFIG_PROFILING */
 
 
 /*
