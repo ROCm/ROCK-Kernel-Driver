@@ -114,6 +114,7 @@ obj-$(CONFIG_SCSI_ATA_PIIX)	+= libata.o ata_piix.o
 obj-$(CONFIG_SCSI_SATA_PROMISE)	+= libata.o sata_promise.o
 obj-$(CONFIG_SCSI_SATA_SIL)	+= libata.o sata_sil.o
 obj-$(CONFIG_SCSI_SATA_VIA)	+= libata.o sata_via.o
+obj-$(CONFIG_SCSI_SATA_VITESSE)	+= libata.o sata_vsc.o
 
 obj-$(CONFIG_ARM)		+= arm/
 

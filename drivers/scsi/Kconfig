@@ -438,6 +438,14 @@ config SCSI_SATA_VIA
 
 	  If unsure, say N.
 
+config SCSI_SATA_VITESSE
+	tristate "VITESSE VSC-7174 SATA support"
+	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	help
+	  This option enables support for Vitesse VSC7174 Serial ATA.
+
+	  If unsure, say N.
+
 config SCSI_BUSLOGIC
 	tristate "BusLogic SCSI support"
 	depends on (PCI || ISA || MCA) && SCSI
