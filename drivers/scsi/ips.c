@@ -195,7 +195,7 @@
  * DRIVER_VER
  */
 #define IPS_VERSION_HIGH        "5.99"
-#define IPS_VERSION_LOW         ".00-BETA"
+#define IPS_VERSION_LOW         ".01-BETA"
 
 
 #if !defined(__i386__) && !defined(__ia64__)
@@ -241,6 +241,7 @@ static ips_ha_t    *ips_ha[IPS_MAX_ADAPTERS];        /* Array of HA structures *
 static unsigned int ips_next_controller = 0;
 static unsigned int ips_num_controllers = 0;
 static unsigned int ips_released_controllers = 0;
+static int          ips_hotplug;
 static int          ips_cmd_timeout = 60;
 static int          ips_reset_timeout = 60 * 5;
 static int          ips_force_memio = 1;             /* Always use Memory Mapped I/O    */
@@ -572,7 +573,7 @@ ips_detect(Scsi_Host_Template *SHT) {
          ips_free(ips_ha[i]);
          ips_released_controllers++;
    } 
-
+   ips_hotplug = 1;
    return (ips_num_controllers);
 }
 
@@ -702,6 +703,7 @@ ips_release(struct Scsi_Host *sh) {
    /* free IRQ */
    free_irq(ha->irq, ha);
 
+   IPS_REMOVE_HOST(sh);
    scsi_unregister(sh);
 
    ips_released_controllers++;
@@ -6764,6 +6766,7 @@ ips_register_scsi( int index){
 	sh->max_channel = ha->nbus - 1;
 	sh->can_queue = ha->max_cmds-1;
 
+	IPS_ADD_HOST(sh, NULL);
 	return 0;
 }
 
@@ -6804,7 +6807,7 @@ ips_module_init(void){
 		return -ENODEV;
 	ips_driver_template.module = THIS_MODULE;
 	ips_order_controllers();
-	if( scsi_register_host(&ips_driver_template) ){
+	if( IPS_REGISTER_HOSTS(&ips_driver_template) ){
 		pci_unregister_driver(&ips_pci_driver);
 		return -ENODEV;
 	}
@@ -6821,7 +6824,7 @@ ips_module_init(void){
 /****************************************************************************/
 static void __exit
 ips_module_exit(void){
-	scsi_unregister_host(&ips_driver_template);
+	IPS_UNREGISTER_HOSTS(&ips_driver_template);
 	pci_unregister_driver(&ips_pci_driver);
 	unregister_reboot_notifier(&ips_notifier);
 }
@@ -6850,6 +6853,12 @@ static int __devinit ips_insert_device(struct pci_dev *pci_dev, const struct pci
     rc = ips_init_phase1(pci_dev, &index);
     if (rc == SUCCESS)
        rc = ips_init_phase2(index);  
+
+    if(ips_hotplug)
+       if(ips_register_scsi(index)){
+          ips_free(ips_ha[index]);
+          rc = -1;
+       }
 
     if (rc == SUCCESS)
        ips_num_controllers++;

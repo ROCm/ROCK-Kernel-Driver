@@ -99,8 +99,15 @@
    #endif
 
    #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-      #define scsi_register_host(x)    scsi_register_module(MODULE_SCSI_HA,x)
-      #define scsi_unregister_host(x)  scsi_unregister_module(MODULE_SCSI_HA,x)
+      #define IPS_REGISTER_HOSTS(SHT)      scsi_register_module(MODULE_SCSI_HA,SHT)
+      #define IPS_UNREGISTER_HOSTS(SHT)    scsi_unregister_module(MODULE_SCSI_HA,SHT)
+      #define IPS_ADD_HOST(shost,device)
+      #define IPS_REMOVE_HOST(shost)
+   #else
+      #define IPS_REGISTER_HOSTS(SHT)      (!ips_detect(SHT))
+      #define IPS_UNREGISTER_HOSTS(SHT)
+      #define IPS_ADD_HOST(shost,device)   scsi_add_host(shost,device)
+      #define IPS_REMOVE_HOST(shost)       scsi_remove_host(shost)
    #endif
 
    #ifndef MDELAY
