@@ -65,7 +65,7 @@ else
    if [ "$CONFIG_DECSTATION" = "y" ]; then
       define_bool CONFIG_ULTRIX_PARTITION y
    fi
-   if [ "$ARCH" = "sparc" -o "$ARCH" = "sparc64" ]; then
+   if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
       define_bool CONFIG_SUN_PARTITION y
    fi
 fi
