@@ -1440,7 +1440,8 @@ void disable_IO_APIC(void)
  * by Matt Domsch <Matt_Domsch@dell.com>  Tue Dec 21 12:25:05 CST 1999
  */
 
-static void __init setup_ioapic_ids_from_mpc (void)
+#ifndef CONFIG_X86_NUMAQ
+static void __init setup_ioapic_ids_from_mpc(void)
 {
 	struct IO_APIC_reg_00 reg_00;
 	unsigned long phys_id_present_map;
@@ -1533,6 +1534,9 @@ static void __init setup_ioapic_ids_from_mpc (void)
 			printk(" ok.\n");
 	}
 }
+#else
+static void __init setup_ioapic_ids_from_mpc(void) { }
+#endif
 
 /*
  * There is a nasty bug in some older SMP boards, their mptable lies

@@ -44,8 +44,7 @@ int qnx4_sync_inode(struct inode *inode)
    	bh = qnx4_update_inode(inode);
 	if (bh && buffer_dirty(bh))
 	{
-		ll_rw_block(WRITE, 1, &bh);
-		wait_on_buffer(bh);
+		sync_dirty_buffer(bh);
 		if (buffer_req(bh) && !buffer_uptodate(bh))
 		{
 			printk ("IO error syncing qnx4 inode [%s:%08lx]\n",

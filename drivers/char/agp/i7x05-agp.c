@@ -13,16 +13,16 @@ static int intel_7505_fetch_size(void)
 	/* 
 	 * For AGP 3.0 APSIZE is now 16 bits
 	 */
-	pci_read_config_word (agp_bridge.dev, INTEL_I7505_APSIZE, &tmp);
+	pci_read_config_word (agp_bridge->dev, INTEL_I7505_APSIZE, &tmp);
 	tmp = (tmp & 0xfff);
 	
-	values = A_SIZE_16(agp_bridge.aperture_sizes);
+	values = A_SIZE_16(agp_bridge->aperture_sizes);
 
-	for (i=0; i < agp_bridge.num_aperture_sizes; i++) {
+	for (i=0; i < agp_bridge->num_aperture_sizes; i++) {
 		if (tmp == values[i].size_value) {
-			agp_bridge.previous_size = agp_bridge.current_size =
+			agp_bridge->previous_size = agp_bridge->current_size =
 					(void *)(values + i);
-			agp_bridge.aperture_size_idx = i;
+			agp_bridge->aperture_size_idx = i;
 			return values[i].size;
 		}
 	}
@@ -33,18 +33,18 @@ static int intel_7505_fetch_size(void)
 static void intel_7505_tlbflush(agp_memory *mem)
 {
 	u32 temp;
-	pci_read_config_dword(agp_bridge.dev, INTEL_I7505_AGPCTRL, &temp);
-	pci_write_config_dword(agp_bridge.dev, INTEL_I7505_AGPCTRL, temp & ~(1 << 7));
-	pci_read_config_dword(agp_bridge.dev, INTEL_I7505_AGPCTRL, &temp);
-	pci_write_config_dword(agp_bridge.dev, INTEL_I7505_AGPCTRL, temp | (1 << 7));
+	pci_read_config_dword(agp_bridge->dev, INTEL_I7505_AGPCTRL, &temp);
+	pci_write_config_dword(agp_bridge->dev, INTEL_I7505_AGPCTRL, temp & ~(1 << 7));
+	pci_read_config_dword(agp_bridge->dev, INTEL_I7505_AGPCTRL, &temp);
+	pci_write_config_dword(agp_bridge->dev, INTEL_I7505_AGPCTRL, temp | (1 << 7));
 }
 
 static void intel_7505_cleanup(void)
 {
 	aper_size_info_16 *previous_size;
 
-	previous_size = A_SIZE_16(agp_bridge.previous_size);
-	pci_write_config_byte(agp_bridge.dev, INTEL_I7505_APSIZE,
+	previous_size = A_SIZE_16(agp_bridge->previous_size);
+	pci_write_config_byte(agp_bridge->dev, INTEL_I7505_APSIZE,
 			      previous_size->size_value);
 }
 
@@ -54,25 +54,25 @@ static int intel_7505_configure(void)
 	u32 temp;
 	aper_size_info_16 *current_size;
 	
-	current_size = A_SIZE_16(agp_bridge.current_size);
+	current_size = A_SIZE_16(agp_bridge->current_size);
 
 	/* aperture size */
-	pci_write_config_word(agp_bridge.dev, INTEL_I7505_APSIZE,
+	pci_write_config_word(agp_bridge->dev, INTEL_I7505_APSIZE,
 			      current_size->size_value);
 
 	/* address to map to */
-	pci_read_config_dword(agp_bridge.dev, INTEL_I7505_NAPBASELO, &temp);
-	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
+	pci_read_config_dword(agp_bridge->dev, INTEL_I7505_NAPBASELO, &temp);
+	agp_bridge->gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 
 	/* attbase */ 
-	pci_write_config_dword(agp_bridge.dev, INTEL_I7505_ATTBASE,
-			       agp_bridge.gatt_bus_addr);
+	pci_write_config_dword(agp_bridge->dev, INTEL_I7505_ATTBASE,
+			       agp_bridge->gatt_bus_addr);
 
 	/* agpctrl */
-	pci_write_config_dword(agp_bridge.dev, INTEL_I7505_AGPCTRL, 0x0000);
+	pci_write_config_dword(agp_bridge->dev, INTEL_I7505_AGPCTRL, 0x0000);
 
 	/* clear error registers */
-	pci_write_config_byte(agp_bridge.dev, INTEL_I7505_ERRSTS, 0xff);
+	pci_write_config_byte(agp_bridge->dev, INTEL_I7505_ERRSTS, 0xff);
 	return 0;
 }
 
@@ -95,30 +95,30 @@ static void i7505_setup (u32 mode)
 
 static int __init intel_7505_setup (struct pci_dev *pdev)
 {
-	agp_bridge.masks = intel_generic_masks;
-	agp_bridge.aperture_sizes = (void *) intel_7505_sizes;
-	agp_bridge.size_type = U16_APER_SIZE;
-	agp_bridge.num_aperture_sizes = 7;
-	agp_bridge.dev_private_data = NULL;
-	agp_bridge.needs_scratch_page = FALSE;
-	agp_bridge.configure = intel_7505_configure;
-	agp_bridge.fetch_size = intel_7505_fetch_size;
-	agp_bridge.cleanup = intel_7505_cleanup;
-	agp_bridge.tlb_flush = intel_7505_tlbflush;
-	agp_bridge.mask_memory = intel_mask_memory;
-	agp_bridge.agp_enable = i7505_enable;
-	agp_bridge.cache_flush = global_cache_flush;
-	agp_bridge.create_gatt_table = agp_generic_create_gatt_table;
-	agp_bridge.free_gatt_table = agp_generic_free_gatt_table;
-	agp_bridge.insert_memory = agp_generic_insert_memory;
-	agp_bridge.remove_memory = agp_generic_remove_memory;
-	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge.free_by_type = agp_generic_free_by_type;
-	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge.suspend = agp_generic_suspend;
-	agp_bridge.resume = agp_generic_resume;
-	agp_bridge.cant_use_aperture = 0;
+	agp_bridge->masks = intel_generic_masks;
+	agp_bridge->aperture_sizes = (void *) intel_7505_sizes;
+	agp_bridge->size_type = U16_APER_SIZE;
+	agp_bridge->num_aperture_sizes = 7;
+	agp_bridge->dev_private_data = NULL;
+	agp_bridge->needs_scratch_page = FALSE;
+	agp_bridge->configure = intel_7505_configure;
+	agp_bridge->fetch_size = intel_7505_fetch_size;
+	agp_bridge->cleanup = intel_7505_cleanup;
+	agp_bridge->tlb_flush = intel_7505_tlbflush;
+	agp_bridge->mask_memory = intel_mask_memory;
+	agp_bridge->agp_enable = i7505_enable;
+	agp_bridge->cache_flush = global_cache_flush;
+	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
+	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
+	agp_bridge->insert_memory = agp_generic_insert_memory;
+	agp_bridge->remove_memory = agp_generic_remove_memory;
+	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
+	agp_bridge->free_by_type = agp_generic_free_by_type;
+	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge->suspend = agp_generic_suspend;
+	agp_bridge->resume = agp_generic_resume;
+	agp_bridge->cant_use_aperture = 0;
 	return 0;
 }
 
@@ -149,7 +149,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 		if (pdev->device == devs[j].device_id) {
 			printk (KERN_INFO PFX "Detected Intel %s chipset\n",
 				devs[j].chipset_name);
-			agp_bridge.type = devs[j].chipset;
+			agp_bridge->type = devs[j].chipset;
 
 			if (devs[j].chipset_setup != NULL)
 				return devs[j].chipset_setup(pdev);
@@ -177,10 +177,10 @@ static int __init agp_i7x05_probe (struct pci_dev *dev, const struct pci_device_
 		return -ENODEV;
 
 	if (agp_lookup_host_bridge(dev) != -ENODEV) {
-		agp_bridge.dev = dev;
-		agp_bridge.capndx = cap_ptr;
+		agp_bridge->dev = dev;
+		agp_bridge->capndx = cap_ptr;
 		/* Fill in the mode register */
-		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode)
+		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode)
 		i7x05_agp_driver.dev = dev;
 		agp_register_driver(&i7x05_agp_driver);
 		return 0;
@@ -215,7 +215,7 @@ int __init agp_i7x05_init(void)
 
 	ret_val = pci_module_init(&agp_i7x05_pci_driver);
 	if (ret_val)
-		agp_bridge.type = NOT_SUPPORTED;
+		agp_bridge->type = NOT_SUPPORTED;
 
 	return ret_val;
 }

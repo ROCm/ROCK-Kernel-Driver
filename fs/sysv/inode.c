@@ -265,8 +265,7 @@ int sysv_sync_inode(struct inode * inode)
 
         bh = sysv_update_inode(inode);
         if (bh && buffer_dirty(bh)) {
-                ll_rw_block(WRITE, 1, &bh);
-                wait_on_buffer(bh);
+                sync_dirty_buffer(bh);
                 if (buffer_req(bh) && !buffer_uptodate(bh)) {
                         printk ("IO error syncing sysv inode [%s:%08lx]\n",
                                 inode->i_sb->s_id, inode->i_ino);

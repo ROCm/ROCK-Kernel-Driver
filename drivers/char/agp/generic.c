@@ -52,16 +52,16 @@ void agp_free_key(int key)
 		return;
 
 	if (key < MAXKEY)
-		clear_bit(key, agp_bridge.key_list);
+		clear_bit(key, agp_bridge->key_list);
 }
 
 static int agp_get_key(void)
 {
 	int bit;
 
-	bit = find_first_zero_bit(agp_bridge.key_list, MAXKEY);
+	bit = find_first_zero_bit(agp_bridge->key_list, MAXKEY);
 	if (bit < MAXKEY) {
-		set_bit(bit, agp_bridge.key_list);
+		set_bit(bit, agp_bridge->key_list);
 		return bit;
 	}
 	return -1;
@@ -96,21 +96,21 @@ agp_memory *agp_create_memory(int scratch_pages)
 
 void agp_free_memory(agp_memory * curr)
 {
-	int i;
+	size_t i;
 
-	if ((agp_bridge.type == NOT_SUPPORTED) || (curr == NULL))
+	if ((agp_bridge->type == NOT_SUPPORTED) || (curr == NULL))
 		return;
 
 	if (curr->is_bound == TRUE)
 		agp_unbind_memory(curr);
 
 	if (curr->type != 0) {
-		agp_bridge.free_by_type(curr);
+		agp_bridge->free_by_type(curr);
 		return;
 	}
 	if (curr->page_count != 0) {
 		for (i = 0; i < curr->page_count; i++) {
-			agp_bridge.agp_destroy_page(phys_to_virt(curr->memory[i]));
+			agp_bridge->agp_destroy_page(phys_to_virt(curr->memory[i]));
 		}
 	}
 	agp_free_key(curr->key);
@@ -124,16 +124,16 @@ agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 {
 	int scratch_pages;
 	agp_memory *new;
-	int i;
+	size_t i;
 
-	if (agp_bridge.type == NOT_SUPPORTED)
+	if (agp_bridge->type == NOT_SUPPORTED)
 		return NULL;
 
-	if ((atomic_read(&agp_bridge.current_memory_agp) + page_count) > agp_bridge.max_memory_agp)
+	if ((atomic_read(&agp_bridge->current_memory_agp) + page_count) > agp_bridge->max_memory_agp)
 		return NULL;
 
 	if (type != 0) {
-		new = agp_bridge.alloc_by_type(page_count, type);
+		new = agp_bridge->alloc_by_type(page_count, type);
 		return new;
 	}
 
@@ -145,7 +145,7 @@ agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 		return NULL;
 
 	for (i = 0; i < page_count; i++) {
-		void *addr = agp_bridge.agp_alloc_page();
+		void *addr = agp_bridge->agp_alloc_page();
 
 		if (addr == NULL) {
 			agp_free_memory(new);
@@ -167,9 +167,9 @@ static int agp_return_size(void)
 	int current_size;
 	void *temp;
 
-	temp = agp_bridge.current_size;
+	temp = agp_bridge->current_size;
 
-	switch (agp_bridge.size_type) {
+	switch (agp_bridge->size_type) {
 	case U8_APER_SIZE:
 		current_size = A_SIZE_8(temp)->size;
 		break;
@@ -201,9 +201,9 @@ int agp_num_entries(void)
 	int num_entries;
 	void *temp;
 
-	temp = agp_bridge.current_size;
+	temp = agp_bridge->current_size;
 
-	switch (agp_bridge.size_type) {
+	switch (agp_bridge->size_type) {
 	case U8_APER_SIZE:
 		num_entries = A_SIZE_8(temp)->num_entries;
 		break;
@@ -235,20 +235,21 @@ int agp_num_entries(void)
 int agp_copy_info(agp_kern_info * info)
 {
 	memset(info, 0, sizeof(agp_kern_info));
-	if (agp_bridge.type == NOT_SUPPORTED) {
-		info->chipset = agp_bridge.type;
+	if (agp_bridge->type == NOT_SUPPORTED) {
+		info->chipset = agp_bridge->type;
 		return -EIO;
 	}
-	info->version.major = agp_bridge.version->major;
-	info->version.minor = agp_bridge.version->minor;
-	info->device = agp_bridge.dev;
-	info->chipset = agp_bridge.type;
-	info->mode = agp_bridge.mode;
-	info->aper_base = agp_bridge.gart_bus_addr;
+	info->version.major = agp_bridge->version->major;
+	info->version.minor = agp_bridge->version->minor;
+	info->device = agp_bridge->dev;
+	info->chipset = agp_bridge->type;
+	info->mode = agp_bridge->mode;
+	info->aper_base = agp_bridge->gart_bus_addr;
 	info->aper_size = agp_return_size();
-	info->max_memory = agp_bridge.max_memory_agp;
-	info->current_memory = atomic_read(&agp_bridge.current_memory_agp);
-	info->cant_use_aperture = agp_bridge.cant_use_aperture;
+	info->max_memory = agp_bridge->max_memory_agp;
+	info->current_memory = atomic_read(&agp_bridge->current_memory_agp);
+	info->cant_use_aperture = agp_bridge->cant_use_aperture;
+	info->vm_ops = agp_bridge->vm_ops;
 	info->page_mask = ~0UL;
 	return 0;
 }
@@ -265,7 +266,7 @@ int agp_bind_memory(agp_memory * curr, off_t pg_start)
 {
 	int ret_val;
 
-	if ((agp_bridge.type == NOT_SUPPORTED) ||
+	if ((agp_bridge->type == NOT_SUPPORTED) ||
 	    (curr == NULL) || (curr->is_bound == TRUE)) {
 		return -EINVAL;
 	}
@@ -273,7 +274,7 @@ int agp_bind_memory(agp_memory * curr, off_t pg_start)
 		CACHE_FLUSH();
 		curr->is_flushed = TRUE;
 	}
-	ret_val = agp_bridge.insert_memory(curr, pg_start, curr->type);
+	ret_val = agp_bridge->insert_memory(curr, pg_start, curr->type);
 
 	if (ret_val != 0)
 		return ret_val;
@@ -287,13 +288,13 @@ int agp_unbind_memory(agp_memory * curr)
 {
 	int ret_val;
 
-	if ((agp_bridge.type == NOT_SUPPORTED) || (curr == NULL))
+	if ((agp_bridge->type == NOT_SUPPORTED) || (curr == NULL))
 		return -EINVAL;
 
 	if (curr->is_bound != TRUE)
 		return -EINVAL;
 
-	ret_val = agp_bridge.remove_memory(curr, curr->pg_start, curr->type);
+	ret_val = agp_bridge->remove_memory(curr, curr->pg_start, curr->type);
 
 	if (ret_val != 0)
 		return ret_val;
@@ -395,15 +396,15 @@ void agp_generic_agp_enable(u32 mode)
 {
 	u32 command;
 
-	pci_read_config_dword(agp_bridge.dev,
-			      agp_bridge.capndx + PCI_AGP_STATUS,
+	pci_read_config_dword(agp_bridge->dev,
+			      agp_bridge->capndx + PCI_AGP_STATUS,
 			      &command);
 
 	command = agp_collect_device_status(mode, command);
 	command |= 0x100;
 
-	pci_write_config_dword(agp_bridge.dev,
-			       agp_bridge.capndx + PCI_AGP_COMMAND,
+	pci_write_config_dword(agp_bridge->dev,
+			       agp_bridge->capndx + PCI_AGP_COMMAND,
 			       command);
 
 	agp_device_command(command, 0);
@@ -421,17 +422,17 @@ int agp_generic_create_gatt_table(void)
 	struct page *page;
 
 	/* The generic routines can't handle 2 level gatt's */
-	if (agp_bridge.size_type == LVL2_APER_SIZE)
+	if (agp_bridge->size_type == LVL2_APER_SIZE)
 		return -EINVAL;
 
 	table = NULL;
-	i = agp_bridge.aperture_size_idx;
-	temp = agp_bridge.current_size;
+	i = agp_bridge->aperture_size_idx;
+	temp = agp_bridge->current_size;
 	size = page_order = num_entries = 0;
 
-	if (agp_bridge.size_type != FIXED_APER_SIZE) {
+	if (agp_bridge->size_type != FIXED_APER_SIZE) {
 		do {
-			switch (agp_bridge.size_type) {
+			switch (agp_bridge->size_type) {
 			case U8_APER_SIZE:
 				size = A_SIZE_8(temp)->size;
 				page_order =
@@ -462,15 +463,15 @@ int agp_generic_create_gatt_table(void)
 
 			if (table == NULL) {
 				i++;
-				switch (agp_bridge.size_type) {
+				switch (agp_bridge->size_type) {
 				case U8_APER_SIZE:
-					agp_bridge.current_size = A_IDX8();
+					agp_bridge->current_size = A_IDX8();
 					break;
 				case U16_APER_SIZE:
-					agp_bridge.current_size = A_IDX16();
+					agp_bridge->current_size = A_IDX16();
 					break;
 				case U32_APER_SIZE:
-					agp_bridge.current_size = A_IDX32();
+					agp_bridge->current_size = A_IDX32();
 					break;
 					/* This case will never really 
 					 * happen. 
@@ -478,15 +479,15 @@ int agp_generic_create_gatt_table(void)
 				case FIXED_APER_SIZE:
 				case LVL2_APER_SIZE:
 				default:
-					agp_bridge.current_size =
-					    agp_bridge.current_size;
+					agp_bridge->current_size =
+					    agp_bridge->current_size;
 					break;
 				}
-				temp = agp_bridge.current_size;	
+				temp = agp_bridge->current_size;	
 			} else {
-				agp_bridge.aperture_size_idx = i;
+				agp_bridge->aperture_size_idx = i;
 			}
-		} while ((table == NULL) && (i < agp_bridge.num_aperture_sizes));
+		} while ((table == NULL) && (i < agp_bridge->num_aperture_sizes));
 	} else {
 		size = ((struct aper_size_info_fixed *) temp)->size;
 		page_order = ((struct aper_size_info_fixed *) temp)->page_order;
@@ -502,14 +503,14 @@ int agp_generic_create_gatt_table(void)
 	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 		SetPageReserved(page);
 
-	agp_bridge.gatt_table_real = (u32 *) table;
+	agp_bridge->gatt_table_real = (u32 *) table;
 	agp_gatt_table = (void *)table; 
 	CACHE_FLUSH();
-	agp_bridge.gatt_table = ioremap_nocache(virt_to_phys(table),
+	agp_bridge->gatt_table = ioremap_nocache(virt_to_phys(table),
 					(PAGE_SIZE * (1 << page_order)));
 	CACHE_FLUSH();
 
-	if (agp_bridge.gatt_table == NULL) {
+	if (agp_bridge->gatt_table == NULL) {
 		for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 			ClearPageReserved(page);
 
@@ -517,11 +518,11 @@ int agp_generic_create_gatt_table(void)
 
 		return -ENOMEM;
 	}
-	agp_bridge.gatt_bus_addr = virt_to_phys(agp_bridge.gatt_table_real);
+	agp_bridge->gatt_bus_addr = virt_to_phys(agp_bridge->gatt_table_real);
 
 	/* AK: bogus, should encode addresses > 4GB */
 	for (i = 0; i < num_entries; i++)
-		agp_bridge.gatt_table[i] = (unsigned long) agp_bridge.scratch_page;
+		agp_bridge->gatt_table[i] = (unsigned long) agp_bridge->scratch_page;
 
 	return 0;
 }
@@ -543,9 +544,9 @@ int agp_generic_free_gatt_table(void)
 	void *temp;
 	struct page *page;
 
-	temp = agp_bridge.current_size;
+	temp = agp_bridge->current_size;
 
-	switch (agp_bridge.size_type) {
+	switch (agp_bridge->size_type) {
 	case U8_APER_SIZE:
 		page_order = A_SIZE_8(temp)->page_order;
 		break;
@@ -572,25 +573,27 @@ int agp_generic_free_gatt_table(void)
 	 * from the table.
 	 */
 
-	iounmap(agp_bridge.gatt_table);
-	table = (char *) agp_bridge.gatt_table_real;
+	iounmap(agp_bridge->gatt_table);
+	table = (char *) agp_bridge->gatt_table_real;
 	table_end = table + ((PAGE_SIZE * (1 << page_order)) - 1);
 
 	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 		ClearPageReserved(page);
 
-	free_pages((unsigned long) agp_bridge.gatt_table_real, page_order);
+	free_pages((unsigned long) agp_bridge->gatt_table_real, page_order);
 	return 0;
 }
 
 int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
-	int i, j, num_entries;
+	int num_entries;
+	size_t i;
+	off_t j;
 	void *temp;
 
-	temp = agp_bridge.current_size;
+	temp = agp_bridge->current_size;
 
-	switch (agp_bridge.size_type) {
+	switch (agp_bridge->size_type) {
 	case U8_APER_SIZE:
 		num_entries = A_SIZE_8(temp)->num_entries;
 		break;
@@ -627,7 +630,7 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	j = pg_start;
 
 	while (j < (pg_start + mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge.gatt_table[j])) {
+		if (!PGE_EMPTY(agp_bridge->gatt_table[j])) {
 			return -EBUSY;
 		}
 		j++;
@@ -639,16 +642,16 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++)
-		agp_bridge.gatt_table[j] =
-				agp_bridge.mask_memory(mem->memory[i], mem->type);
+		agp_bridge->gatt_table[j] =
+				agp_bridge->mask_memory(mem->memory[i], mem->type);
 
-	agp_bridge.tlb_flush(mem);
+	agp_bridge->tlb_flush(mem);
 	return 0;
 }
 
 int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
 {
-	int i;
+	size_t i;
 
 	if (type != 0 || mem->type != 0) {
 		/* The generic routines know nothing of memory types */
@@ -657,11 +660,11 @@ int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
 
 	/* AK: bogus, should encode addresses > 4GB */
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
-		agp_bridge.gatt_table[i] =
-		    (unsigned long) agp_bridge.scratch_page;
+		agp_bridge->gatt_table[i] =
+		    (unsigned long) agp_bridge->scratch_page;
 	}
 
-	agp_bridge.tlb_flush(mem);
+	agp_bridge->tlb_flush(mem);
 	return 0;
 }
 
@@ -700,7 +703,7 @@ void *agp_generic_alloc_page(void)
 
 	get_page(page);
 	SetPageLocked(page);
-	atomic_inc(&agp_bridge.current_memory_agp);
+	atomic_inc(&agp_bridge->current_memory_agp);
 	return page_address(page);
 }
 
@@ -716,16 +719,16 @@ void agp_generic_destroy_page(void *addr)
 	put_page(page);
 	unlock_page(page);
 	free_page((unsigned long)addr);
-	atomic_dec(&agp_bridge.current_memory_agp);
+	atomic_dec(&agp_bridge->current_memory_agp);
 }
 
 /* End Basic Page Allocation Routines */
 
 void agp_enable(u32 mode)
 {
-	if (agp_bridge.type == NOT_SUPPORTED)
+	if (agp_bridge->type == NOT_SUPPORTED)
 		return;
-	agp_bridge.agp_enable(mode);
+	agp_bridge->agp_enable(mode);
 }
 
 EXPORT_SYMBOL(agp_free_memory);

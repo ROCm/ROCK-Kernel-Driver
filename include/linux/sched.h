@@ -509,6 +509,7 @@ extern void __set_special_pids(pid_t session, pid_t pgrp);
 /* per-UID process charging. */
 extern struct user_struct * alloc_uid(uid_t);
 extern void free_uid(struct user_struct *);
+extern void switch_uid(struct user_struct *);
 
 #include <asm/current.h>
 

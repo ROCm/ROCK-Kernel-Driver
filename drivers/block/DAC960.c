@@ -1731,12 +1731,17 @@ static boolean DAC960_V2_ReadControllerConfiguration(DAC960_Controller_T
       if (!DAC960_V2_NewLogicalDeviceInfo(Controller, LogicalDeviceNumber))
 	break;
       LogicalDeviceNumber = NewLogicalDeviceInfo->LogicalDeviceNumber;
-      if (LogicalDeviceNumber > DAC960_MaxLogicalDrives)
-	panic("DAC960: Logical Drive Number %d not supported\n",
-		       LogicalDeviceNumber);
-      if (NewLogicalDeviceInfo->DeviceBlockSizeInBytes != DAC960_BlockSize)
-	panic("DAC960: Logical Drive Block Size %d not supported\n",
-	      NewLogicalDeviceInfo->DeviceBlockSizeInBytes);
+      if (LogicalDeviceNumber >= DAC960_MaxLogicalDrives) {
+	DAC960_Error("DAC960: Logical Drive Number %d not supported\n",
+		       Controller, LogicalDeviceNumber);
+		break;
+      }
+      if (NewLogicalDeviceInfo->DeviceBlockSizeInBytes != DAC960_BlockSize) {
+	DAC960_Error("DAC960: Logical Drive Block Size %d not supported\n",
+	      Controller, NewLogicalDeviceInfo->DeviceBlockSizeInBytes);
+        LogicalDeviceNumber++;
+        continue;
+      }
       PhysicalDevice.Controller = 0;
       PhysicalDevice.Channel = NewLogicalDeviceInfo->Channel;
       PhysicalDevice.TargetID = NewLogicalDeviceInfo->TargetID;

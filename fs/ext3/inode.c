@@ -1317,10 +1317,7 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 		goto out_fail;
 
 	needed = ext3_writepage_trans_blocks(inode);
-	if (wbc->for_reclaim)
-		handle = ext3_journal_try_start(inode, needed);
-	else
-		handle = ext3_journal_start(inode, needed);
+	handle = ext3_journal_start(inode, needed);
 				
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);

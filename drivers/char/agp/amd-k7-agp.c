@@ -45,7 +45,7 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 	CACHE_FLUSH();
 
 	for(i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++) {
-		page_map->remapped[i] = agp_bridge.scratch_page;
+		page_map->remapped[i] = agp_bridge->scratch_page;
 	}
 
 	return 0;
@@ -115,7 +115,7 @@ static int amd_create_gatt_pages(int nr_tables)
 
 #define GET_PAGE_DIR_OFF(addr) (addr >> 22)
 #define GET_PAGE_DIR_IDX(addr) (GET_PAGE_DIR_OFF(addr) - \
-	GET_PAGE_DIR_OFF(agp_bridge.gart_bus_addr))
+	GET_PAGE_DIR_OFF(agp_bridge->gart_bus_addr))
 #define GET_GATT_OFF(addr) ((addr & 0x003ff000) >> 12) 
 #define GET_GATT(addr) (amd_irongate_private.gatt_pages[\
 	GET_PAGE_DIR_IDX(addr)]->remapped)
@@ -129,7 +129,7 @@ static int amd_create_gatt_table(void)
 	u32 temp;
 	int i;
 
-	value = A_SIZE_LVL2(agp_bridge.current_size);
+	value = A_SIZE_LVL2(agp_bridge->current_size);
 	retval = amd_create_page_map(&page_dir);
 	if (retval != 0) {
 		return retval;
@@ -141,18 +141,18 @@ static int amd_create_gatt_table(void)
 		return retval;
 	}
 
-	agp_bridge.gatt_table_real = (u32 *)page_dir.real;
-	agp_bridge.gatt_table = (u32 *)page_dir.remapped;
-	agp_bridge.gatt_bus_addr = virt_to_phys(page_dir.real);
+	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
+	agp_bridge->gatt_table = (u32 *)page_dir.remapped;
+	agp_bridge->gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
 	 * This is a bus address even on the alpha, b/c its
 	 * used to program the agp master not the cpu
 	 */
 
-	pci_read_config_dword(agp_bridge.dev, AMD_APBASE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AMD_APBASE, &temp);
 	addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
-	agp_bridge.gart_bus_addr = addr;
+	agp_bridge->gart_bus_addr = addr;
 
 	/* Calculate the agp offset */
 	for(i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
@@ -168,8 +168,8 @@ static int amd_free_gatt_table(void)
 {
 	struct amd_page_map page_dir;
    
-	page_dir.real = (unsigned long *)agp_bridge.gatt_table_real;
-	page_dir.remapped = (unsigned long *)agp_bridge.gatt_table;
+	page_dir.real = (unsigned long *)agp_bridge->gatt_table_real;
+	page_dir.remapped = (unsigned long *)agp_bridge->gatt_table;
 
 	amd_free_gatt_pages();
 	amd_free_page_map(&page_dir);
@@ -182,15 +182,15 @@ static int amd_irongate_fetch_size(void)
 	u32 temp;
 	struct aper_size_info_lvl2 *values;
 
-	pci_read_config_dword(agp_bridge.dev, AMD_APSIZE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AMD_APSIZE, &temp);
 	temp = (temp & 0x0000000e);
-	values = A_SIZE_LVL2(agp_bridge.aperture_sizes);
-	for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
+	values = A_SIZE_LVL2(agp_bridge->aperture_sizes);
+	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
-			agp_bridge.previous_size =
-			    agp_bridge.current_size = (void *) (values + i);
+			agp_bridge->previous_size =
+			    agp_bridge->current_size = (void *) (values + i);
 
-			agp_bridge.aperture_size_idx = i;
+			agp_bridge->aperture_size_idx = i;
 			return values[i].size;
 		}
 	}
@@ -204,22 +204,22 @@ static int amd_irongate_configure(void)
 	u32 temp;
 	u16 enable_reg;
 
-	current_size = A_SIZE_LVL2(agp_bridge.current_size);
+	current_size = A_SIZE_LVL2(agp_bridge->current_size);
 
 	/* Get the memory mapped registers */
-	pci_read_config_dword(agp_bridge.dev, AMD_MMBASE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AMD_MMBASE, &temp);
 	temp = (temp & PCI_BASE_ADDRESS_MEM_MASK);
 	amd_irongate_private.registers = (volatile u8 *) ioremap(temp, 4096);
 
 	/* Write out the address of the gatt table */
 	OUTREG32(amd_irongate_private.registers, AMD_ATTBASE,
-		 agp_bridge.gatt_bus_addr);
+		 agp_bridge->gatt_bus_addr);
 
 	/* Write the Sync register */
-	pci_write_config_byte(agp_bridge.dev, AMD_MODECNTL, 0x80);
+	pci_write_config_byte(agp_bridge->dev, AMD_MODECNTL, 0x80);
    
    	/* Set indexing mode */
-   	pci_write_config_byte(agp_bridge.dev, AMD_MODECNTL2, 0x00);
+   	pci_write_config_byte(agp_bridge->dev, AMD_MODECNTL2, 0x00);
 
 	/* Write the enable register */
 	enable_reg = INREG16(amd_irongate_private.registers, AMD_GARTENABLE);
@@ -227,10 +227,10 @@ static int amd_irongate_configure(void)
 	OUTREG16(amd_irongate_private.registers, AMD_GARTENABLE, enable_reg);
 
 	/* Write out the size register */
-	pci_read_config_dword(agp_bridge.dev, AMD_APSIZE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AMD_APSIZE, &temp);
 	temp = (((temp & ~(0x0000000e)) | current_size->size_value)
 		| 0x00000001);
-	pci_write_config_dword(agp_bridge.dev, AMD_APSIZE, temp);
+	pci_write_config_dword(agp_bridge->dev, AMD_APSIZE, temp);
 
 	/* Flush the tlb */
 	OUTREG32(amd_irongate_private.registers, AMD_TLBFLUSH, 0x00000001);
@@ -244,16 +244,16 @@ static void amd_irongate_cleanup(void)
 	u32 temp;
 	u16 enable_reg;
 
-	previous_size = A_SIZE_LVL2(agp_bridge.previous_size);
+	previous_size = A_SIZE_LVL2(agp_bridge->previous_size);
 
 	enable_reg = INREG16(amd_irongate_private.registers, AMD_GARTENABLE);
 	enable_reg = (enable_reg & ~(0x0004));
 	OUTREG16(amd_irongate_private.registers, AMD_GARTENABLE, enable_reg);
 
 	/* Write back the previous size and disable gart translation */
-	pci_read_config_dword(agp_bridge.dev, AMD_APSIZE, &temp);
+	pci_read_config_dword(agp_bridge->dev, AMD_APSIZE, &temp);
 	temp = ((temp & ~(0x0000000f)) | previous_size->size_value);
-	pci_write_config_dword(agp_bridge.dev, AMD_APSIZE, temp);
+	pci_write_config_dword(agp_bridge->dev, AMD_APSIZE, temp);
 	iounmap((void *) amd_irongate_private.registers);
 }
 
@@ -274,7 +274,7 @@ static unsigned long amd_irongate_mask_memory(unsigned long addr, int type)
 {
 	/* Only type 0 is supported by the irongate */
 
-	return addr | agp_bridge.masks[0].mask;
+	return addr | agp_bridge->masks[0].mask;
 }
 
 static int amd_insert_memory(agp_memory * mem,
@@ -284,7 +284,7 @@ static int amd_insert_memory(agp_memory * mem,
 	unsigned long *cur_gatt;
 	unsigned long addr;
 
-	num_entries = A_SIZE_LVL2(agp_bridge.current_size)->num_entries;
+	num_entries = A_SIZE_LVL2(agp_bridge->current_size)->num_entries;
 
 	if (type != 0 || mem->type != 0) {
 		return -EINVAL;
@@ -295,7 +295,7 @@ static int amd_insert_memory(agp_memory * mem,
 
 	j = pg_start;
 	while (j < (pg_start + mem->page_count)) {
-		addr = (j * PAGE_SIZE) + agp_bridge.gart_bus_addr;
+		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
 		if (!PGE_EMPTY(cur_gatt[GET_GATT_OFF(addr)])) {
 			return -EBUSY;
@@ -309,12 +309,12 @@ static int amd_insert_memory(agp_memory * mem,
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
-		addr = (j * PAGE_SIZE) + agp_bridge.gart_bus_addr;
+		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
 		cur_gatt[GET_GATT_OFF(addr)] =
-			agp_bridge.mask_memory(mem->memory[i], mem->type);
+			agp_bridge->mask_memory(mem->memory[i], mem->type);
 	}
-	agp_bridge.tlb_flush(mem);
+	agp_bridge->tlb_flush(mem);
 	return 0;
 }
 
@@ -329,13 +329,13 @@ static int amd_remove_memory(agp_memory * mem, off_t pg_start,
 		return -EINVAL;
 	}
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
-		addr = (i * PAGE_SIZE) + agp_bridge.gart_bus_addr;
+		addr = (i * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
 		cur_gatt[GET_GATT_OFF(addr)] = 
-			(unsigned long) agp_bridge.scratch_page;
+			(unsigned long) agp_bridge->scratch_page;
 	}
 
-	agp_bridge.tlb_flush(mem);
+	agp_bridge->tlb_flush(mem);
 	return 0;
 }
 
@@ -357,30 +357,30 @@ static struct gatt_mask amd_irongate_masks[] =
 
 static int __init amd_irongate_setup (struct pci_dev *pdev)
 {
-	agp_bridge.masks = amd_irongate_masks;
-	agp_bridge.aperture_sizes = (void *) amd_irongate_sizes;
-	agp_bridge.size_type = LVL2_APER_SIZE;
-	agp_bridge.num_aperture_sizes = 7;
-	agp_bridge.dev_private_data = (void *) &amd_irongate_private;
-	agp_bridge.needs_scratch_page = FALSE;
-	agp_bridge.configure = amd_irongate_configure;
-	agp_bridge.fetch_size = amd_irongate_fetch_size;
-	agp_bridge.cleanup = amd_irongate_cleanup;
-	agp_bridge.tlb_flush = amd_irongate_tlbflush;
-	agp_bridge.mask_memory = amd_irongate_mask_memory;
-	agp_bridge.agp_enable = agp_generic_agp_enable;
-	agp_bridge.cache_flush = global_cache_flush;
-	agp_bridge.create_gatt_table = amd_create_gatt_table;
-	agp_bridge.free_gatt_table = amd_free_gatt_table;
-	agp_bridge.insert_memory = amd_insert_memory;
-	agp_bridge.remove_memory = amd_remove_memory;
-	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge.free_by_type = agp_generic_free_by_type;
-	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge.suspend = agp_generic_suspend;
-	agp_bridge.resume = agp_generic_resume;
-	agp_bridge.cant_use_aperture = 0;
+	agp_bridge->masks = amd_irongate_masks;
+	agp_bridge->aperture_sizes = (void *) amd_irongate_sizes;
+	agp_bridge->size_type = LVL2_APER_SIZE;
+	agp_bridge->num_aperture_sizes = 7;
+	agp_bridge->dev_private_data = (void *) &amd_irongate_private;
+	agp_bridge->needs_scratch_page = FALSE;
+	agp_bridge->configure = amd_irongate_configure;
+	agp_bridge->fetch_size = amd_irongate_fetch_size;
+	agp_bridge->cleanup = amd_irongate_cleanup;
+	agp_bridge->tlb_flush = amd_irongate_tlbflush;
+	agp_bridge->mask_memory = amd_irongate_mask_memory;
+	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->cache_flush = global_cache_flush;
+	agp_bridge->create_gatt_table = amd_create_gatt_table;
+	agp_bridge->free_gatt_table = amd_free_gatt_table;
+	agp_bridge->insert_memory = amd_insert_memory;
+	agp_bridge->remove_memory = amd_remove_memory;
+	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
+	agp_bridge->free_by_type = agp_generic_free_by_type;
+	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
+	agp_bridge->suspend = agp_generic_suspend;
+	agp_bridge->resume = agp_generic_resume;
+	agp_bridge->cant_use_aperture = 0;
 	return 0;
 }
 
@@ -416,7 +416,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 	while (devs[j].chipset_name != NULL) {
 		if (pdev->device == devs[j].device_id) {
 			printk (KERN_INFO PFX "Detected AMD %s chipset\n", devs[j].chipset_name);
-			agp_bridge.type = devs[j].chipset;
+			agp_bridge->type = devs[j].chipset;
 
 			if (devs[j].chipset_setup != NULL)
 				return devs[j].chipset_setup(pdev);
@@ -430,7 +430,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 	if (agp_try_unsupported) {
 		printk(KERN_WARNING PFX "Trying generic AMD routines"
 		       " for device id: %04x\n", pdev->device);
-		agp_bridge.type = AMD_GENERIC;
+		agp_bridge->type = AMD_GENERIC;
 		return amd_irongate_setup(pdev);
 	}
 
@@ -455,10 +455,10 @@ static int __init agp_amdk7_probe (struct pci_dev *dev, const struct pci_device_
 		return -ENODEV;
 
 	if (agp_lookup_host_bridge(dev) != -ENODEV) {
-		agp_bridge.dev = dev;
-		agp_bridge.capndx = cap_ptr;
+		agp_bridge->dev = dev;
+		agp_bridge->capndx = cap_ptr;
 		/* Fill in the mode register */
-		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+PCI_AGP_STATUS, &agp_bridge.mode);
+		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode);
 		amd_k7_agp_driver.dev = dev;
 		agp_register_driver(&amd_k7_agp_driver);
 		return 0;
@@ -492,7 +492,7 @@ static int __init agp_amdk7_init(void)
 
 	ret_val = pci_module_init(&agp_amdk7_pci_driver);
 	if (ret_val)
-		agp_bridge.type = NOT_SUPPORTED;
+		agp_bridge->type = NOT_SUPPORTED;
 
 	return ret_val;
 }

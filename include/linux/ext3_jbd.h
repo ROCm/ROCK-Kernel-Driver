@@ -210,14 +210,6 @@ static inline handle_t *ext3_journal_start(struct inode *inode, int nblocks)
 	return journal_start(journal, nblocks);
 }
 
-static inline handle_t *
-ext3_journal_try_start(struct inode *inode, int nblocks)
-{
-	if (inode->i_sb->s_flags & MS_RDONLY)
-		return ERR_PTR(-EROFS);
-	return journal_try_start(EXT3_JOURNAL(inode), nblocks);
-}
-
 /* 
  * The only special thing we need to do here is to make sure that all
  * journal_stop calls result in the superblock being marked dirty, so
