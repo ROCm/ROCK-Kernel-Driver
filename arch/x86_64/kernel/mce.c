@@ -25,7 +25,8 @@
 #define NR_BANKS 5
 
 static int mce_disabled __initdata;
-/* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic */ 
+/* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic,
+   3: never panic or exit (for testing only) */ 
 static int tolerant = 1;
 static int banks;
 static unsigned long bank[NR_BANKS] = { [0 ... NR_BANKS-1] = ~0UL };
@@ -96,7 +97,8 @@ static void mce_panic(char *msg, struct mce *backup, unsigned long start)
 	int i;
 	oops_begin();
 	for (i = 0; i < MCE_LOG_LEN; i++) {
-		if (mcelog.entry[i].tsc < start)
+		unsigned long tsc = mcelog.entry[i].tsc;
+		if (time_before(tsc, start))
 			continue;
 		print_mce(&mcelog.entry[i]); 
 		if (mcelog.entry[i].tsc == backup->tsc)
@@ -104,7 +106,10 @@ static void mce_panic(char *msg, struct mce *backup, unsigned long start)
 	}
 	if (backup)
 		print_mce(backup);
-	panic(msg);
+	if (tolerant >= 3)
+		printk("Fake panic: %s\n", msg);
+	else
+		panic(msg);
 } 
 
 static int mce_available(struct cpuinfo_x86 *c)
@@ -120,8 +125,8 @@ static int mce_available(struct cpuinfo_x86 *c)
 
 void do_machine_check(struct pt_regs * regs, long error_code)
 {
-	struct mce m;
-	int nowayout = 0;
+	struct mce m, panicm;
+	int nowayout = (tolerant < 1); 
 	int kill_it = 0;
 	u64 mcestart;
 	int i;
@@ -149,13 +154,31 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	for (i = 0; i < banks; i++) {
 		if (!bank[i])
 			continue;
+		
+		/* Did this bank cause the exception? */ 
+		/* Assume that the bank with fatal errors did it,
+		   and that there is only a single one. */
+		if ((m.status & MCI_STATUS_PCC)) { 
+			panicm = m; 
+		} else {
+			m.rip = 0;
+			m.cs = 0;
+		}
+
+		m.misc = 0; 
+		m.addr = 0;
 
 		rdmsrl(MSR_IA32_MC0_STATUS + i*4, m.status);
 		if ((m.status & MCI_STATUS_VAL) == 0)
 			continue;
+		/* Should be implied by the banks check above, but 
+		   check it anyways */
+		if ((m.status & MCI_STATUS_EN) == 0)
+			continue;
 
-		nowayout |= (tolerant < 1); 
-		nowayout |= !!(m.status & (MCI_STATUS_OVER|MCI_STATUS_PCC));
+		/* In theory _OVER could be a nowayout too, but 
+		   assume any overflowed errors were no fatal. */
+		nowayout |= !!(m.status & MCI_STATUS_PCC);
 		kill_it |= !!(m.status & MCI_STATUS_UC);
 		m.bank = i;
 
@@ -176,7 +199,10 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	if (nowayout)
 		mce_panic("Machine check", &m, mcestart);
 	if (kill_it) {
-		int user_space = (m.rip && (m.cs & 3));
+		int user_space = 0;
+
+		if (m.mcgstatus & MCG_STATUS_RIPV)
+			user_space = m.rip && (m.cs & 3);
 		
 		/* When the machine was in user space and the CPU didn't get
 		   confused it's normally not necessary to panic, unless you 
@@ -187,11 +213,12 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		   it is best to just halt the machine. */
 		if ((!user_space && (panic_on_oops || tolerant < 2)) ||
 		    (unsigned)current->pid <= 1)
-			mce_panic("Uncorrected machine check", &m, mcestart);
+			mce_panic("Uncorrected machine check", &panicm, mcestart);
 
 		/* do_exit takes an awful lot of locks and has as slight risk 
 		   of deadlocking. If you don't want that don't set tolerant >= 2 */
-		do_exit(SIGBUS);
+		if (tolerant < 3) 
+			do_exit(SIGBUS);
 	}
 }
 
@@ -207,7 +234,7 @@ static void mce_clear_all(void)
  * Periodic polling timer for "silent" machine check errors.
  */
 
-static int check_interval = 3600; /* one hour */
+static int check_interval = 5 * 60; /* 5 minutes */
 static void mcheck_timer(void *data);
 static DECLARE_WORK(mcheck_work, mcheck_timer, NULL);
 
