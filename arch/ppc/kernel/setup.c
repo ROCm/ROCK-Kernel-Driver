@@ -54,6 +54,7 @@ extern void kgdb_map_scc(void);
 #endif
 
 extern void ppc6xx_idle(void);
+extern void power4_idle(void);
 
 extern boot_infos_t *boot_infos;
 char saved_command_line[256];
@@ -529,8 +530,11 @@ machine_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	strcpy(cmd_line, CONFIG_CMDLINE);
 #endif /* CONFIG_CMDLINE */
 
-#if defined(CONFIG_6xx)
+#ifdef CONFIG_6xx
 	ppc_md.power_save = ppc6xx_idle;
+#endif
+#ifdef CONFIG_POWER4
+	ppc_md.power_save = power4_idle;
 #endif
 
 	platform_init(r3, r4, r5, r6, r7);
