@@ -97,12 +97,11 @@ static inline pte_t ptep_get_and_clear(pte_t *ptep)
 
 	pte_clear(ptep);
 	if (!pte_not_present(pte)) {
-		struct page *page;
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
-			page = pfn_to_page(pfn);
-			if (!page_mapping(page) ||
-			    !mapping_writably_mapped(page->mapping))
+			struct page *page = pfn_to_page(pfn);
+			struct address_space *mapping = page_mapping(page);
+			if (!mapping || !mapping_writably_mapped(mapping))
 				__clear_bit(PG_mapped, &page->flags);
 		}
 	}

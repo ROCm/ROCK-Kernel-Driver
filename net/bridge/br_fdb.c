@@ -14,11 +14,30 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/if_bridge.h>
+#include <linux/times.h>
+#include <linux/etherdevice.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
+
+static kmem_cache_t *br_fdb_cache;
+
+void __init br_fdb_init(void)
+{
+	br_fdb_cache = kmem_cache_create("bridge_fdb_cache",
+					 sizeof(struct net_bridge_fdb_entry),
+					 0,
+					 SLAB_HWCACHE_ALIGN, NULL, NULL);
+}
+
+void __exit br_fdb_fini(void)
+{
+	kmem_cache_destroy(br_fdb_cache);
+}
+
 
 /* if topology_changing then use forward_delay (default 15 sec)
  * otherwise keep longer (default 5 minutes)
@@ -35,7 +54,7 @@ static __inline__ int has_expired(const struct net_bridge *br,
 		&& time_before_eq(fdb->ageing_timer + hold_time(br), jiffies);
 }
 
-static __inline__ void copy_fdb(struct __fdb_entry *ent, 
+static inline void copy_fdb(struct __fdb_entry *ent, 
 				const struct net_bridge_fdb_entry *f)
 {
 	memset(ent, 0, sizeof(struct __fdb_entry));
@@ -43,7 +62,7 @@ static __inline__ void copy_fdb(struct __fdb_entry *ent,
 	ent->port_no = f->dst?f->dst->port_no:0;
 	ent->is_local = f->is_local;
 	ent->ageing_timer_value = f->is_static ? 0 
-		: ((jiffies - f->ageing_timer) * USER_HZ) / HZ;
+		: jiffies_to_clock_t(jiffies - f->ageing_timer);
 }
 
 static __inline__ int br_mac_hash(const unsigned char *mac)
@@ -173,7 +192,7 @@ struct net_bridge_fdb_entry *br_fdb_get(struct net_bridge *br, unsigned char *ad
 void br_fdb_put(struct net_bridge_fdb_entry *ent)
 {
 	if (atomic_dec_and_test(&ent->use_count))
-		kfree(ent);
+		kmem_cache_free(br_fdb_cache, ent);
 }
 
 int br_fdb_get_entries(struct net_bridge *br,
@@ -220,7 +239,7 @@ int br_fdb_get_entries(struct net_bridge *br,
 			
 			/* entry was deleted during copy_to_user */
 			if (atomic_dec_and_test(&f->use_count)) {
-				kfree(f);
+				kmem_cache_free(br_fdb_cache, f);
 				num = -EAGAIN;
 				goto out;
 			}
@@ -241,12 +260,16 @@ int br_fdb_get_entries(struct net_bridge *br,
 	return num;
 }
 
-void br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
-		   const unsigned char *addr, int is_local)
+int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
+		  const unsigned char *addr, int is_local)
 {
 	struct hlist_node *h;
 	struct net_bridge_fdb_entry *fdb;
 	int hash = br_mac_hash(addr);
+	int ret = 0;
+
+	if (!is_valid_ether_addr(addr))
+		return -EADDRNOTAVAIL;
 
 	write_lock_bh(&br->hash_lock);
 	hlist_for_each(h, &br->hash[hash]) {
@@ -262,6 +285,7 @@ void br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 					printk(KERN_WARNING "%s: received packet with "
 					       " own address as source address\n",
 					       source->dev->name);
+				ret = -EEXIST;
 				goto out;
 			}
 
@@ -275,9 +299,11 @@ void br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 		}
 	}
 
-	fdb = kmalloc(sizeof(*fdb), GFP_ATOMIC);
-	if (fdb == NULL) 
+	fdb = kmem_cache_alloc(br_fdb_cache, GFP_ATOMIC);
+	if (unlikely(fdb == NULL)) {
+		ret = -ENOMEM;
 		goto out;
+	}
 
 	memcpy(fdb->addr.addr, addr, ETH_ALEN);
 	atomic_set(&fdb->use_count, 1);
@@ -296,4 +322,6 @@ void br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	list_add_tail(&fdb->age_list, &br->age_list);
  out:
 	write_unlock_bh(&br->hash_lock);
+
+	return ret;
 }

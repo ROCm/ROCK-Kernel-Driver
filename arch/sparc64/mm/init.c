@@ -224,10 +224,11 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t p
 
 void flush_dcache_page(struct page *page)
 {
+	struct address_space *mapping = page_mapping(page);
 	int dirty = test_bit(PG_dcache_dirty, &page->flags);
 	int dirty_cpu = dcache_dirty_cpu(page);
 
-	if (page_mapping(page) && !mapping_mapped(page->mapping)) {
+	if (mapping && !mapping_mapped(mapping)) {
 		if (dirty) {
 			if (dirty_cpu == smp_processor_id())
 				return;

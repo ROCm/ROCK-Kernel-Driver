@@ -47,8 +47,8 @@ MODULE_PARM_DESC(ports, "port numbers of tftp servers");
 #endif
 
 #if 0
-#define DEBUGP(format, args...) printk(__FILE__ ":" __FUNCTION__ ": " \
-				       format, ## args)
+#define DEBUGP(format, args...) printk("%s:%s:" format, \
+                                       __FILE__, __FUNCTION__ , ## args)
 #else
 #define DEBUGP(format, args...)
 #endif

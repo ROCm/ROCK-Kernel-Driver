@@ -382,6 +382,7 @@ enum sock_flags {
 	SOCK_LINGER,
 	SOCK_DESTROY,
 	SOCK_BROADCAST,
+	SOCK_TIMESTAMP,
 };
 
 static inline void sock_set_flag(struct sock *sk, enum sock_flags flag)
@@ -561,8 +562,8 @@ extern void __lock_sock(struct sock *sk);
 extern void __release_sock(struct sock *sk);
 #define sock_owned_by_user(sk)	((sk)->sk_lock.owner)
 
-extern void lock_sock(struct sock *sk);
-extern void release_sock(struct sock *sk);
+extern void FASTCALL(lock_sock(struct sock *sk));
+extern void FASTCALL(release_sock(struct sock *sk));
 
 /* BH context may only use the following locking interface. */
 #define bh_lock_sock(__sk)	spin_lock(&((__sk)->sk_lock.slock))
@@ -623,9 +624,9 @@ extern int                      sock_no_ioctl(struct socket *, unsigned int,
 extern int			sock_no_listen(struct socket *, int);
 extern int                      sock_no_shutdown(struct socket *, int);
 extern int			sock_no_getsockopt(struct socket *, int , int,
-						   char *, int *);
+						   char __user *, int __user *);
 extern int			sock_no_setsockopt(struct socket *, int, int,
-						   char *, int);
+						   char __user *, int);
 extern int                      sock_no_sendmsg(struct kiocb *, struct socket *,
 						struct msghdr *, size_t);
 extern int                      sock_no_recvmsg(struct kiocb *, struct socket *,
@@ -1023,11 +1024,33 @@ static inline int sock_intr_errno(long timeo)
 static __inline__ void
 sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
 {
-	if (sk->sk_rcvtstamp)
-		put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMP, sizeof(skb->stamp), &skb->stamp);
-	else
-		sk->sk_stamp = skb->stamp;
+	struct timeval *stamp = &skb->stamp;
+	if (sk->sk_rcvtstamp) { 
+		/* Race occurred between timestamp enabling and packet
+		   receiving.  Fill in the current time for now. */
+		if (stamp->tv_sec == 0)
+			do_gettimeofday(stamp);
+		put_cmsg(msg, SOL_SOCKET, SO_TIMESTAMP, sizeof(struct timeval),
+			 stamp);
+	} else
+		sk->sk_stamp = *stamp;
 }
+
+extern atomic_t netstamp_needed;
+extern void sock_enable_timestamp(struct sock *sk);
+extern void sock_disable_timestamp(struct sock *sk);
+
+static inline void net_timestamp(struct timeval *stamp) 
+{ 
+	if (atomic_read(&netstamp_needed)) 
+		do_gettimeofday(stamp);
+	else {
+		stamp->tv_sec = 0;
+		stamp->tv_usec = 0;
+	}		
+} 
+
+extern int sock_get_timestamp(struct sock *, struct timeval *);
 
 /* 
  *	Enable debug/info messages 
@@ -1035,8 +1058,10 @@ sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
 
 #if 0
 #define NETDEBUG(x)	do { } while (0)
+#define LIMIT_NETDEBUG(x) do {} while(0)
 #else
 #define NETDEBUG(x)	do { x; } while (0)
+#define LIMIT_NETDEBUG(x) do { if (net_ratelimit()) { x; } } while(0)
 #endif
 
 /*

@@ -28,6 +28,7 @@ unsigned int boot_cpu_logical_apicid = -1U;
 /* Bitmask of physically existing CPUs */
 physid_mask_t phys_cpu_present_map;
 
+unsigned int __initdata maxcpus = NR_CPUS;
 
 /*
  * The Visual Workstation is Intel MP compliant in the hardware
@@ -88,6 +89,9 @@ void __init find_smp_config(void)
 
 		ncpus = CO_CPU_MAX;
 	}
+
+	if (ncpus > maxcpus)
+		ncpus = maxcpus;
 
 	smp_found_config = 1;
 	while (ncpus--)

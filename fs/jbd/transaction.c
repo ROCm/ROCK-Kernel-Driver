@@ -1111,18 +1111,14 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 	 * I _think_ we're OK here with SMP barriers - a mistaken decision will
 	 * result in this test being false, so we go in and take the locks.
 	 */
-	if (jh->b_transaction == handle->h_transaction &&
-					jh->b_jlist == BJ_Metadata) {
+	if (jh->b_transaction == transaction && jh->b_jlist == BJ_Metadata) {
 		JBUFFER_TRACE(jh, "fastpath");
 		J_ASSERT_JH(jh, jh->b_transaction ==
 					journal->j_running_transaction);
 		goto out_unlock_bh;
 	}
 
-	spin_lock(&journal->j_list_lock);
 	set_buffer_jbddirty(bh);
-
-	J_ASSERT_JH(jh, jh->b_transaction != NULL);
 
 	/* 
 	 * Metadata already on the current transaction list doesn't
@@ -1130,7 +1126,6 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 	 * be committing, and will be refiled once the commit completes:
 	 * leave it alone for now. 
 	 */
-
 	if (jh->b_transaction != transaction) {
 		JBUFFER_TRACE(jh, "already on other transaction");
 		J_ASSERT_JH(jh, jh->b_transaction ==
@@ -1138,17 +1133,15 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 		J_ASSERT_JH(jh, jh->b_next_transaction == transaction);
 		/* And this case is illegal: we can't reuse another
 		 * transaction's data buffer, ever. */
-		/* FIXME: writepage() should be journalled */
-		goto out_unlock_list;
+		goto out_unlock_bh;
 	}
 
 	/* That test should have eliminated the following case: */
 	J_ASSERT_JH(jh, jh->b_frozen_data == 0);
 
 	JBUFFER_TRACE(jh, "file as BJ_Metadata");
+	spin_lock(&journal->j_list_lock);
 	__journal_file_buffer(jh, handle->h_transaction, BJ_Metadata);
-
-out_unlock_list:
 	spin_unlock(&journal->j_list_lock);
 out_unlock_bh:
 	jbd_unlock_bh_state(bh);

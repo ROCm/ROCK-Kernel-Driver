@@ -606,7 +606,7 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 
 				if (copy_from_user(&uprog, (void *) arg, sizeof(uprog)))
 					return -EFAULT;
-				if (uprog.len > 0 && uprog.len < 65536) {
+				if (uprog.len > 0) {
 					len = uprog.len * sizeof(struct sock_filter);
 					code = kmalloc(len, GFP_KERNEL);
 					if (code == NULL)
@@ -1121,7 +1121,12 @@ isdn_ppp_push_higher(isdn_net_dev * net_dev, isdn_net_local * lp, struct sk_buff
 	 * the filter instructions are constructed assuming
 	 * a four-byte PPP header on each packet (which is still present) */
 	skb_push(skb, 4);
-	skb->data[0] = 0;	/* indicate inbound */
+
+	{
+		u_int16_t *p = (u_int16_t *) skb->data;
+
+		*p = 0;	/* indicate inbound in DLT_LINUX_SLL */
+	}
 
 	if (is->pass_filter.filter
 	    && sk_run_filter(skb, is->pass_filter.filter,
@@ -1263,8 +1268,13 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 	 * the filter instructions are constructed assuming
 	 * a four-byte PPP header on each packet */
 	skb_push(skb, 4);
-	skb->data[0] = 1;	/* indicate outbound */
-	*(u_int16_t *)(skb->data + 2) = htons(proto);
+
+	{
+		u_int16_t *p = (u_int16_t *) skb->data;
+
+		*p++ = htons(4); /* indicate outbound in DLT_LINUX_SLL */
+		*p   = htons(proto);
+	}
 
 	if (ipt->pass_filter.filter 
 	    && sk_run_filter(skb, ipt->pass_filter.filter,
@@ -1457,8 +1467,13 @@ int isdn_ppp_autodial_filter(struct sk_buff *skb, isdn_net_local *lp)
 	 * earlier.
 	 */
 	skb_pull(skb, IPPP_MAX_HEADER - 4);
-	skb->data[0] = 1;	/* indicate outbound */
-	*(u_int16_t *)(skb->data + 2) = htons(proto);
+
+	{
+		u_int16_t *p = (u_int16_t *) skb->data;
+
+		*p++ = htons(4);	/* indicate outbound in DLT_LINUX_SLL */
+		*p   = htons(proto);
+	}
 	
 	drop |= is->pass_filter.filter
 	        && sk_run_filter(skb, is->pass_filter.filter,

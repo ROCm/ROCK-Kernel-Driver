@@ -432,6 +432,14 @@ unsigned long netdev_boot_base(const char *prefix, int unit)
 	int i;
 
 	sprintf(name, "%s%d", prefix, unit);
+
+	/*
+	 * If device already registered then return base of 1
+	 * to indicate not to probe for this interface
+	 */
+	if (__dev_get_by_name(name))
+		return 1;
+
 	for (i = 0; i < NETDEV_BOOT_SETUP_MAX; i++)
 		if (!strcmp(name, s[i].name))
 			return s[i].map.base_addr;
@@ -1125,7 +1133,7 @@ int call_netdevice_notifiers(unsigned long val, void *v)
 void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct packet_type *ptype;
-	do_gettimeofday(&skb->stamp);
+	net_timestamp(&skb->stamp);
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
@@ -1546,9 +1554,9 @@ int netif_rx(struct sk_buff *skb)
 		return NET_RX_DROP;
 	}
 #endif
-
+	
 	if (!skb->stamp.tv_sec)
-		do_gettimeofday(&skb->stamp);
+		net_timestamp(&skb->stamp);
 
 	/*
 	 * The code is rearranged so that the path is the most
@@ -1710,7 +1718,7 @@ int netif_receive_skb(struct sk_buff *skb)
 #endif
 
 	if (!skb->stamp.tv_sec)
-		do_gettimeofday(&skb->stamp);
+		net_timestamp(&skb->stamp);
 
 	skb_bond(skb);
 
@@ -1903,7 +1911,7 @@ int register_gifconf(unsigned int family, gifconf_func_t * gifconf)
  *	match.  --pb
  */
 
-static int dev_ifname(struct ifreq *arg)
+static int dev_ifname(struct ifreq __user *arg)
 {
 	struct net_device *dev;
 	struct ifreq ifr;
@@ -1936,7 +1944,7 @@ static int dev_ifname(struct ifreq *arg)
  *	Thus we will need a 'compatibility mode'.
  */
 
-static int dev_ifconf(char *arg)
+static int dev_ifconf(char __user *arg)
 {
 	struct ifconf ifc;
 	struct net_device *dev;
@@ -2539,7 +2547,7 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
  *	positive or a negative errno code on error.
  */
 
-int dev_ioctl(unsigned int cmd, void *arg)
+int dev_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct ifreq ifr;
 	int ret;
@@ -2552,12 +2560,12 @@ int dev_ioctl(unsigned int cmd, void *arg)
 
 	if (cmd == SIOCGIFCONF) {
 		rtnl_shlock();
-		ret = dev_ifconf((char *) arg);
+		ret = dev_ifconf((char __user *) arg);
 		rtnl_shunlock();
 		return ret;
 	}
 	if (cmd == SIOCGIFNAME)
-		return dev_ifname((struct ifreq *)arg);
+		return dev_ifname((struct ifreq __user *)arg);
 
 	if (copy_from_user(&ifr, arg, sizeof(struct ifreq)))
 		return -EFAULT;

@@ -43,12 +43,9 @@ VERSION 1.2	<2002/11/30>
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
 #include <linux/init.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/io.h>
-
-/* FIXME: remove this, when the definitions are upstream */
-#define DMA_32BIT_MASK 0xffffffffULL
-#define DMA_64BIT_MASK 0xffffffffffffffffULL
 
 #define RTL8169_VERSION "1.2"
 #define MODULENAME "r8169"

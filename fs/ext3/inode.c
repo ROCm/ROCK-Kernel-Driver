@@ -1358,8 +1358,6 @@ static int ext3_ordered_writepage(struct page *page,
 	}
 
 	if (!page_has_buffers(page)) {
-		if (!PageUptodate(page))
-			buffer_error();
 		create_empty_buffers(page, inode->i_sb->s_blocksize,
 				(1 << BH_Dirty)|(1 << BH_Uptodate));
 	}
@@ -1527,7 +1525,7 @@ static int ext3_releasepage(struct page *page, int wait)
  * If the O_DIRECT write is intantiating holes inside i_size and the machine
  * crashes then stale disk data _may_ be exposed inside the file.
  */
-static int ext3_direct_IO(int rw, struct kiocb *iocb,
+static ssize_t ext3_direct_IO(int rw, struct kiocb *iocb,
 			const struct iovec *iov, loff_t offset,
 			unsigned long nr_segs)
 {
@@ -1535,7 +1533,7 @@ static int ext3_direct_IO(int rw, struct kiocb *iocb,
 	struct inode *inode = file->f_mapping->host;
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	handle_t *handle = NULL;
-	int ret;
+	ssize_t ret;
 	int orphan = 0;
 	size_t count = iov_length(iov, nr_segs);
 

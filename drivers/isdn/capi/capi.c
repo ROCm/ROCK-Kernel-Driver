@@ -37,6 +37,7 @@
 #include <linux/capi.h>
 #include <linux/kernelcapi.h>
 #include <linux/init.h>
+#include <linux/device.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/isdn/capiutil.h>
 #include <linux/isdn/capicmd.h>
@@ -55,6 +56,8 @@ MODULE_LICENSE("GPL");
 #undef _DEBUG_DATAFLOW		/* data flow */
 
 /* -------- driver information -------------------------------------- */
+
+static struct class_simple *capi_class;
 
 int capi_major = 68;		/* allocated */
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
@@ -1313,7 +1316,8 @@ static int capinc_tty_init(void)
 
 	drv->owner = THIS_MODULE;
 	drv->driver_name = "capi_nc";
-	drv->name = "capi/";
+	drv->devfs_name = "capi/";
+	drv->name = "capi";
 	drv->major = capi_ttymajor;
 	drv->minor_start = 0;
 	drv->type = TTY_DRIVER_TYPE_SERIAL;
@@ -1483,11 +1487,20 @@ static int __init capi_init(void)
 		return -EIO;
 	}
 
+	capi_class = class_simple_create(THIS_MODULE, "capi");
+	if (IS_ERR(capi_class)) {
+		unregister_chrdev(capi_major, "capi20");
+		return PTR_ERR(capi_class);
+	}
+
+	class_simple_device_add(capi_class, MKDEV(capi_major, 0), NULL, "capi");
 	devfs_mk_cdev(MKDEV(capi_major, 0), S_IFCHR | S_IRUSR | S_IWUSR,
 			"isdn/capi20");
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	if (capinc_tty_init() < 0) {
+		class_simple_device_remove(MKDEV(capi_major, 0));
+		class_simple_destroy(capi_class);
 		unregister_chrdev(capi_major, "capi20");
 		return -ENOMEM;
 	}
@@ -1514,6 +1527,8 @@ static void __exit capi_exit(void)
 {
 	proc_exit();
 
+	class_simple_device_remove(MKDEV(capi_major, 0));
+	class_simple_destroy(capi_class);
 	unregister_chrdev(capi_major, "capi20");
 	devfs_remove("isdn/capi20");
 

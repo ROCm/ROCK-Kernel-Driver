@@ -1632,7 +1632,7 @@ pagebuf_daemon(
 	do {
 		/* swsusp */
 		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(xfs_flush_interval);

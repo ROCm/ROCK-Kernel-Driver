@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * Copyright (c) 2001 International Business Machines Corp.
+ * (C) Copyright IBM Corp. 2001, 2004
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
@@ -134,7 +134,7 @@ void sctp_dbg_objcnt_init(void)
 /* Cleanup the objcount entry in the proc filesystem.  */
 void sctp_dbg_objcnt_exit(void)
 {
-	remove_proc_entry("sctp_dbg_objcount", proc_net_sctp);
+	remove_proc_entry("sctp_dbg_objcnt", proc_net_sctp);
 }
 
 

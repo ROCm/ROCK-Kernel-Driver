@@ -382,6 +382,7 @@ static int __init skge_probe (void)
 		dev->do_ioctl =		&SkGeIoctl;
 		dev->change_mtu =	&SkGeChangeMtu;
 		dev->flags &= 		~IFF_RUNNING;
+		SET_NETDEV_DEV(dev, &pdev->dev);
 
 #ifdef SK_ZEROCOPY
 #ifdef USE_SK_TX_CHECKSUM

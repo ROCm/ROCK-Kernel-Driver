@@ -487,7 +487,7 @@ _GLOBAL(enter_rtas)
 	mflr	r0
 	std	r0,16(r1)
         stdu	r1,-RTAS_FRAME_SIZE(r1)	/* Save SP and create stack space. */
-
+	
 	/* Because RTAS is running in 32b mode, it clobbers the high order half
 	 * of all registers that it saves.  We therefore save those registers
 	 * RTAS might touch to the stack.  (r0, r3-r13 are caller saved)
@@ -512,12 +512,25 @@ _GLOBAL(enter_rtas)
 	mfsrr1	r10
 	std	r10,_SRR1(r1)
 
+	/* There is no way it is acceptable to get here with interrupts enabled,
+	 * check it with the asm equivalent of WARN_ON
+	 */
+	mfmsr	r6
+	andi.	r0,r6,MSR_EE
+1:	tdnei	r0,0
+.section __bug_table,"a"
+	.llong	1b,__LINE__ + 0x1000000, 1f, 2f
+.previous
+.section .rodata,"a"
+1:	.asciz	__FILE__
+2:	.asciz "enter_rtas"
+.previous
+	
 	/* Unfortunately, the stack pointer and the MSR are also clobbered,
 	 * so they are saved in the PACA which allows us to restore
 	 * our original state after RTAS returns.
          */
 	std	r1,PACAR1(r13)
-	mfmsr	r6
         std	r6,PACASAVEDMSR(r13)
 
 	/* Setup our real return addr */	

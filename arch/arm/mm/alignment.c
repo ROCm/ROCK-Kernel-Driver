@@ -10,22 +10,14 @@
  */
 #include <linux/config.h>
 #include <linux/compiler.h>
-#include <linux/signal.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>
-#include <linux/types.h>
 #include <linux/ptrace.h>
-#include <linux/mman.h>
-#include <linux/mm.h>
 #include <linux/proc_fs.h>
-#include <linux/bitops.h>
 #include <linux/init.h>
 
-#include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/pgalloc.h>
-#include <asm/pgtable.h>
 #include <asm/unaligned.h>
 
 #include "fault.h"
@@ -112,10 +104,10 @@ proc_alignment_read(char *page, char **start, off_t off, int count, int *eof,
 	return len;
 }
 
-static int proc_alignment_write(struct file *file, const char *buffer,
+static int proc_alignment_write(struct file *file, const char __user *buffer,
 			       unsigned long count, void *data)
 {
-	int mode;
+	char mode;
 
 	if (count > 0) {
 		if (get_user(mode, buffer))

@@ -95,7 +95,7 @@ static long madvise_dontneed(struct vm_area_struct * vma,
 	if (vma->vm_flags & VM_LOCKED)
 		return -EINVAL;
 
-	zap_page_range(vma, start, end - start);
+	zap_page_range(vma, start, end - start, NULL);
 	return 0;
 }
 

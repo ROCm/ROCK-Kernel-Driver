@@ -1771,6 +1771,12 @@ jffs_write_super(struct super_block *sb)
 	unlock_kernel();
 }
 
+static int jffs_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_NODIRATIME;
+	return 0;
+}
+
 static struct super_operations jffs_ops =
 {
 	.read_inode	= jffs_read_inode,
@@ -1778,6 +1784,7 @@ static struct super_operations jffs_ops =
 	.put_super	= jffs_put_super,
 	.write_super	= jffs_write_super,
 	.statfs		= jffs_statfs,
+	.remount_fs	= jffs_remount,
 };
 
 static struct super_block *jffs_get_sb(struct file_system_type *fs_type,

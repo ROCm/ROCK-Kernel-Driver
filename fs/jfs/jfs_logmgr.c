@@ -2328,7 +2328,7 @@ int jfsIOWait(void *arg)
 		}
 		if (current->flags & PF_FREEZE) {
 			spin_unlock_irq(&log_redrive_lock);
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 		} else {
 			add_wait_queue(&jfs_IO_thread_wait, &wq);
 			set_current_state(TASK_INTERRUPTIBLE);

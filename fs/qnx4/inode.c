@@ -149,9 +149,13 @@ static int qnx4_remount(struct super_block *sb, int *flags, char *data)
 
 	qs = qnx4_sb(sb);
 	qs->Version = QNX4_VERSION;
+#ifndef CONFIG_QNX4FS_RW
+	*flags |= MS_RDONLY;
+#endif
 	if (*flags & MS_RDONLY) {
 		return 0;
 	}
+
 	mark_buffer_dirty(qs->sb_buf);
 
 	return 0;

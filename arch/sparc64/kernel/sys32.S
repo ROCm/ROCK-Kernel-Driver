@@ -68,6 +68,17 @@ sys32_mmap2:
 	jmpl		%g1 + %lo(sys_mmap), %g0
 	 sllx		%o5, 12, %o5
 
+	.globl		sys32_mq_timedsend
+sys32_mq_timedsend:
+	sethi		%hi(compat_sys_mq_timedsend), %g1
+	jmpl		%g1 + %lo(compat_sys_mq_timedsend), %g0
+	 srl		%o4, 0, %o4
+	.globl		sys32_mq_timedreceive
+sys32_mq_timedreceive:
+	sethi		%hi(compat_sys_mq_timedreceive), %g1
+	jmpl		%g1 + %lo(compat_sys_mq_timedreceive), %g0
+	 srl		%o4, 0, %o4
+
 	.align		32
 	.globl		sys32_socketcall
 sys32_socketcall:	/* %o0=call, %o1=args */

@@ -1340,8 +1340,6 @@ err_out:
 			void *kaddr;
 
 			clear_buffer_new(bh);
-			if (buffer_uptodate(bh))
-				buffer_error();
 			kaddr = kmap_atomic(page, KM_USER0);
 			memset(kaddr + block_start, 0, bh->b_size);
 			kunmap_atomic(kaddr, KM_USER0);

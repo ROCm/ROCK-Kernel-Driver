@@ -1382,7 +1382,7 @@ static void b44_set_rx_mode(struct net_device *dev)
 	spin_unlock_irq(&bp->lock);
 }
 
-static int b44_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static int b44_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
 {
 	struct b44 *bp = dev->priv;
 	struct pci_dev *pci_dev = bp->pdev;
@@ -1625,13 +1625,13 @@ static int b44_ethtool_ioctl (struct net_device *dev, void *useraddr)
 
 static int b44_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
+	struct mii_ioctl_data __user *data = (struct mii_ioctl_data __user *)&ifr->ifr_data;
 	struct b44 *bp = dev->priv;
 	int err;
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return b44_ethtool_ioctl(dev, (void *) ifr->ifr_data);
+		return b44_ethtool_ioctl(dev, (void __user*) ifr->ifr_data);
 
 	case SIOCGMIIPHY:
 		data->phy_id = bp->phy_addr;

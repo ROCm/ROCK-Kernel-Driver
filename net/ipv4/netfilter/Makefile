@@ -38,6 +38,7 @@ obj-$(CONFIG_IP_NF_IPTABLES) += ip_tables.o
 obj-$(CONFIG_IP_NF_FILTER) += iptable_filter.o
 obj-$(CONFIG_IP_NF_MANGLE) += iptable_mangle.o
 obj-$(CONFIG_IP_NF_NAT) += iptable_nat.o
+obj-$(CONFIG_IP_NF_RAW) += iptable_raw.o
 
 # matches
 obj-$(CONFIG_IP_NF_MATCH_HELPER) += ipt_helper.o
@@ -81,6 +82,7 @@ obj-$(CONFIG_IP_NF_NAT_SNMP_BASIC) += ip_nat_snmp_basic.o
 obj-$(CONFIG_IP_NF_TARGET_LOG) += ipt_LOG.o
 obj-$(CONFIG_IP_NF_TARGET_ULOG) += ipt_ULOG.o
 obj-$(CONFIG_IP_NF_TARGET_TCPMSS) += ipt_TCPMSS.o
+obj-$(CONFIG_IP_NF_TARGET_NOTRACK) += ipt_NOTRACK.o
 
 # generic ARP tables
 obj-$(CONFIG_IP_NF_ARPTABLES) += arp_tables.o

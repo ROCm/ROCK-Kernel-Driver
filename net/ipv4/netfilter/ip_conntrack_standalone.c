@@ -194,6 +194,26 @@ static unsigned int ip_confirm(unsigned int hooknum,
 	return ip_conntrack_confirm(*pskb);
 }
 
+static unsigned int ip_conntrack_defrag(unsigned int hooknum,
+				        struct sk_buff **pskb,
+				        const struct net_device *in,
+				        const struct net_device *out,
+				        int (*okfn)(struct sk_buff *))
+{
+	/* Previously seen (loopback)?  Ignore.  Do this before
+           fragment check. */
+	if ((*pskb)->nfct)
+		return NF_ACCEPT;
+
+	/* Gather fragments. */
+	if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
+		*pskb = ip_ct_gather_frags(*pskb);
+		if (!*pskb)
+			return NF_STOLEN;
+	}
+	return NF_ACCEPT;
+}
+
 static unsigned int ip_refrag(unsigned int hooknum,
 			      struct sk_buff **pskb,
 			      const struct net_device *in,
@@ -236,12 +256,28 @@ static unsigned int ip_conntrack_local(unsigned int hooknum,
 
 /* Connection tracking may drop packets, but never alters them, so
    make it the first hook. */
+static struct nf_hook_ops ip_conntrack_defrag_ops = {
+	.hook		= ip_conntrack_defrag,
+	.owner		= THIS_MODULE,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_PRE_ROUTING,
+	.priority	= NF_IP_PRI_CONNTRACK_DEFRAG,
+};
+
 static struct nf_hook_ops ip_conntrack_in_ops = {
 	.hook		= ip_conntrack_in,
 	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_PRE_ROUTING,
 	.priority	= NF_IP_PRI_CONNTRACK,
+};
+
+static struct nf_hook_ops ip_conntrack_defrag_local_out_ops = {
+	.hook		= ip_conntrack_defrag,
+	.owner		= THIS_MODULE,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_LOCAL_OUT,
+	.priority	= NF_IP_PRI_CONNTRACK_DEFRAG,
 };
 
 static struct nf_hook_ops ip_conntrack_local_out_ops = {
@@ -470,10 +506,20 @@ static int init_or_cleanup(int init)
 	if (!proc) goto cleanup_init;
 	proc->owner = THIS_MODULE;
 
+	ret = nf_register_hook(&ip_conntrack_defrag_ops);
+	if (ret < 0) {
+		printk("ip_conntrack: can't register pre-routing defrag hook.\n");
+		goto cleanup_proc;
+	}
+	ret = nf_register_hook(&ip_conntrack_defrag_local_out_ops);
+	if (ret < 0) {
+		printk("ip_conntrack: can't register local_out defrag hook.\n");
+		goto cleanup_defragops;
+	}
 	ret = nf_register_hook(&ip_conntrack_in_ops);
 	if (ret < 0) {
 		printk("ip_conntrack: can't register pre-routing hook.\n");
-		goto cleanup_proc;
+		goto cleanup_defraglocalops;
 	}
 	ret = nf_register_hook(&ip_conntrack_local_out_ops);
 	if (ret < 0) {
@@ -511,6 +557,10 @@ static int init_or_cleanup(int init)
 	nf_unregister_hook(&ip_conntrack_local_out_ops);
  cleanup_inops:
 	nf_unregister_hook(&ip_conntrack_in_ops);
+ cleanup_defraglocalops:
+	nf_unregister_hook(&ip_conntrack_defrag_local_out_ops);
+ cleanup_defragops:
+	nf_unregister_hook(&ip_conntrack_defrag_ops);
  cleanup_proc:
 	proc_net_remove("ip_conntrack");
  cleanup_init:
@@ -591,6 +641,7 @@ EXPORT_SYMBOL(ip_ct_refresh);
 EXPORT_SYMBOL(ip_ct_find_proto);
 EXPORT_SYMBOL(__ip_ct_find_proto);
 EXPORT_SYMBOL(ip_ct_find_helper);
+EXPORT_SYMBOL(ip_conntrack_expect_alloc);
 EXPORT_SYMBOL(ip_conntrack_expect_related);
 EXPORT_SYMBOL(ip_conntrack_change_expect);
 EXPORT_SYMBOL(ip_conntrack_unexpect_related);
@@ -602,5 +653,6 @@ EXPORT_SYMBOL(ip_conntrack_htable_size);
 EXPORT_SYMBOL(ip_conntrack_expect_list);
 EXPORT_SYMBOL(ip_conntrack_lock);
 EXPORT_SYMBOL(ip_conntrack_hash);
+EXPORT_SYMBOL(ip_conntrack_untracked);
 EXPORT_SYMBOL_GPL(ip_conntrack_find_get);
 EXPORT_SYMBOL_GPL(ip_conntrack_put);

@@ -19,7 +19,6 @@
 
 #include <asm/cacheflush.h>
 #include <asm/io.h>
-#include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
 
@@ -186,19 +185,20 @@ no_pmd:
 
 void __flush_dcache_page(struct page *page)
 {
+	struct address_space *mapping = page_mapping(page);
 	struct mm_struct *mm = current->active_mm;
 	struct list_head *l;
 
 	__cpuc_flush_dcache_page(page_address(page));
 
-	if (!page_mapping(page))
+	if (!mapping)
 		return;
 
 	/*
 	 * With a VIVT cache, we need to also write back
 	 * and invalidate any user data.
 	 */
-	list_for_each(l, &page->mapping->i_mmap_shared) {
+	list_for_each(l, &mapping->i_mmap_shared) {
 		struct vm_area_struct *mpnt;
 		unsigned long off;
 
@@ -224,10 +224,14 @@ void __flush_dcache_page(struct page *page)
 static void
 make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page, int dirty)
 {
+	struct address_space *mapping = page_mapping(page);
 	struct list_head *l;
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long pgoff;
 	int aliases = 0;
+
+	if (!mapping)
+		return;
 
 	pgoff = vma->vm_pgoff + ((addr - vma->vm_start) >> PAGE_SHIFT);
 
@@ -236,7 +240,7 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 	 * space, then we need to handle them specially to maintain
 	 * cache coherency.
 	 */
-	list_for_each(l, &page->mapping->i_mmap_shared) {
+	list_for_each(l, &mapping->i_mmap_shared) {
 		struct vm_area_struct *mpnt;
 		unsigned long off;
 

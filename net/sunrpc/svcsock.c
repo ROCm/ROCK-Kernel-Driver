@@ -591,6 +591,12 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 		/* possibly an icmp error */
 		dprintk("svc: recvfrom returned error %d\n", -err);
 	}
+	if (skb->stamp.tv_sec == 0) {
+		skb->stamp.tv_sec = xtime.tv_sec; 
+		skb->stamp.tv_usec = xtime.tv_nsec * 1000; 
+		/* Don't enable netstamp, sunrpc doesn't 
+		   need that much accuracy */
+	}
 	svsk->sk_sk->sk_stamp = skb->stamp;
 	set_bit(SK_DATA, &svsk->sk_flags); /* there may be more data... */
 
@@ -1226,7 +1232,7 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 		schedule_timeout(timeout);
 
 		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 
 		spin_lock_bh(&serv->sv_lock);
 		remove_wait_queue(&rqstp->rq_wait, &wait);

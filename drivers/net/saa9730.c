@@ -1146,6 +1146,7 @@ static int __devinit saa9730_init_one(struct pci_dev *pdev, const struct pci_dev
 	}
 
 	pci_set_drvdata(pdev, dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	return 0;
 	
 out2:

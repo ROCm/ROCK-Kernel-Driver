@@ -33,8 +33,8 @@ MODULE_PARM_DESC(ports, "port numbers of tftp servers");
 #endif
 
 #if 0
-#define DEBUGP(format, args...) printk(__FILE__ ":" __FUNCTION__ ": " \
-				       format, ## args)
+#define DEBUGP(format, args...) printk("%s:%s:" format, \
+                                       __FILE__, __FUNCTION__ , ## args)
 #else
 #define DEBUGP(format, args...)
 #endif
@@ -44,7 +44,7 @@ static int tftp_help(struct sk_buff *skb,
 		     enum ip_conntrack_info ctinfo)
 {
 	struct tftphdr tftph;
-	struct ip_conntrack_expect exp;
+	struct ip_conntrack_expect *exp;
 
 	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4 + sizeof(struct udphdr),
 			  &tftph, sizeof(tftph)) != 0)
@@ -57,19 +57,29 @@ static int tftp_help(struct sk_buff *skb,
 		DEBUGP("");
 		DUMP_TUPLE(&ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
 		DUMP_TUPLE(&ct->tuplehash[IP_CT_DIR_REPLY].tuple);
-		memset(&exp, 0, sizeof(exp));
 
-		exp.tuple = ct->tuplehash[IP_CT_DIR_REPLY].tuple;
-		exp.mask.src.ip = 0xffffffff;
-		exp.mask.dst.ip = 0xffffffff;
-		exp.mask.dst.u.udp.port = 0xffff;
-		exp.mask.dst.protonum = 0xffff;
-		exp.expectfn = NULL;
+		exp = ip_conntrack_expect_alloc();
+		if (exp == NULL)
+			return NF_ACCEPT;
+
+		exp->tuple = ct->tuplehash[IP_CT_DIR_REPLY].tuple;
+		exp->mask.src.ip = 0xffffffff;
+		exp->mask.dst.ip = 0xffffffff;
+		exp->mask.dst.u.udp.port = 0xffff;
+		exp->mask.dst.protonum = 0xffff;
+		exp->expectfn = NULL;
 
 		DEBUGP("expect: ");
-		DUMP_TUPLE(&exp.tuple);
-		DUMP_TUPLE(&exp.mask);
-		ip_conntrack_expect_related(ct, &exp);
+		DUMP_TUPLE(&exp->tuple);
+		DUMP_TUPLE(&exp->mask);
+		ip_conntrack_expect_related(exp, ct);
+		break;
+	case TFTP_OPCODE_DATA:
+	case TFTP_OPCODE_ACK:
+		DEBUGP("Data/ACK opcode\n");
+		break;
+	case TFTP_OPCODE_ERROR:
+		DEBUGP("Error opcode\n");
 		break;
 	default:
 		DEBUGP("Unknown opcode\n");

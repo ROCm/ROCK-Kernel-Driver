@@ -474,13 +474,7 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	switch(cmd) 
 	{
 	case SIOCGSTAMP:
-		if (!sk->sk_stamp.tv_sec)
-			return -ENOENT;
-		err = copy_to_user((void *)arg, &sk->sk_stamp,
-				   sizeof(struct timeval));
-		if (err)
-			return -EFAULT;
-		return 0;
+		return sock_get_timestamp(sk, (struct timeval *)arg);
 
 	case SIOCADDRT:
 	case SIOCDELRT:

@@ -427,8 +427,8 @@ int datagram_send_ctl(struct msghdr *msg, struct flowi *fl,
 			break;
 
 		default:
-			if (net_ratelimit())
-				printk(KERN_DEBUG "invalid cmsg type: %d\n", cmsg->cmsg_type);
+			LIMIT_NETDEBUG(
+				printk(KERN_DEBUG "invalid cmsg type: %d\n", cmsg->cmsg_type));
 			err = -EINVAL;
 			break;
 		};

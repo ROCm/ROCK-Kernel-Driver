@@ -58,7 +58,7 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/wrapper.h>
-#include <net/irda/irport.h>
+#include "irport.h"
 
 #define IO_EXTENT 8
 

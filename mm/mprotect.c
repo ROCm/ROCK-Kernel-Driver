@@ -114,10 +114,11 @@ static int
 mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
 		unsigned long end, int newflags)
 {
-	struct mm_struct * mm = vma->vm_mm;
+	struct mm_struct * mm;
 
 	if (!prev || !vma)
 		return 0;
+	mm = vma->vm_mm;
 	if (prev->vm_end != vma->vm_start)
 		return 0;
 	if (!can_vma_merge(prev, newflags))

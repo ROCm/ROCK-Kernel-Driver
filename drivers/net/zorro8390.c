@@ -150,7 +150,7 @@ static int __devinit zorro8390_init(struct net_device *dev,
 
 	while ((z_readb(ioaddr + NE_EN0_ISR) & ENISR_RESET) == 0)
 	    if (jiffies - reset_start_time > 2*HZ/100) {
-		printk(" not found (no reset ack).\n");
+		printk(KERN_WARNING " not found (no reset ack).\n");
 		return -ENODEV;
 	    }
 
@@ -233,7 +233,7 @@ static int __devinit zorro8390_init(struct net_device *dev,
 	return err;
     }
 
-    printk("%s: %s at 0x%08lx, Ethernet Address "
+    printk(KERN_INFO "%s: %s at 0x%08lx, Ethernet Address "
 	   "%02x:%02x:%02x:%02x:%02x:%02x\n", dev->name, name, board,
 	   dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
 	   dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5]);
@@ -250,7 +250,7 @@ static int zorro8390_open(struct net_device *dev)
 static int zorro8390_close(struct net_device *dev)
 {
     if (ei_debug > 1)
-	printk("%s: Shutting down ethercard.\n", dev->name);
+	printk(KERN_DEBUG "%s: Shutting down ethercard.\n", dev->name);
     ei_close(dev);
     return 0;
 }
@@ -262,7 +262,7 @@ static void zorro8390_reset_8390(struct net_device *dev)
     unsigned long reset_start_time = jiffies;
 
     if (ei_debug > 1)
-	printk("resetting the 8390 t=%ld...", jiffies);
+	printk(KERN_DEBUG "resetting the 8390 t=%ld...\n", jiffies);
 
     z_writeb(z_readb(NE_BASE + NE_RESET), NE_BASE + NE_RESET);
 
@@ -272,7 +272,8 @@ static void zorro8390_reset_8390(struct net_device *dev)
     /* This check _should_not_ be necessary, omit eventually. */
     while ((z_readb(NE_BASE+NE_EN0_ISR) & ENISR_RESET) == 0)
 	if (jiffies - reset_start_time > 2*HZ/100) {
-	    printk("%s: ne_reset_8390() did not complete.\n", dev->name);
+	    printk(KERN_WARNING "%s: ne_reset_8390() did not complete.\n",
+		   dev->name);
 	    break;
 	}
     z_writeb(ENISR_RESET, NE_BASE + NE_EN0_ISR);	/* Ack intr. */
@@ -291,7 +292,7 @@ static void zorro8390_get_8390_hdr(struct net_device *dev,
 
     /* This *shouldn't* happen. If it does, it's the last thing you'll see */
     if (ei_status.dmaing) {
-	printk("%s: DMAing conflict in ne_get_8390_hdr "
+	printk(KERN_ERR "%s: DMAing conflict in ne_get_8390_hdr "
 	   "[DMAstat:%d][irqlock:%d].\n", dev->name, ei_status.dmaing,
 	   ei_status.irqlock);
 	return;
@@ -332,7 +333,7 @@ static void zorro8390_block_input(struct net_device *dev, int count,
 
     /* This *shouldn't* happen. If it does, it's the last thing you'll see */
     if (ei_status.dmaing) {
-	printk("%s: DMAing conflict in ne_block_input "
+	printk(KERN_ERR "%s: DMAing conflict in ne_block_input "
 	   "[DMAstat:%d][irqlock:%d].\n",
 	   dev->name, ei_status.dmaing, ei_status.irqlock);
 	return;
@@ -372,7 +373,7 @@ static void zorro8390_block_output(struct net_device *dev, int count,
 
     /* This *shouldn't* happen. If it does, it's the last thing you'll see */
     if (ei_status.dmaing) {
-	printk("%s: DMAing conflict in ne_block_output."
+	printk(KERN_ERR "%s: DMAing conflict in ne_block_output."
 	   "[DMAstat:%d][irqlock:%d]\n", dev->name, ei_status.dmaing,
 	   ei_status.irqlock);
 	return;
@@ -398,7 +399,8 @@ static void zorro8390_block_output(struct net_device *dev, int count,
 
     while ((z_readb(NE_BASE + NE_EN0_ISR) & ENISR_RDC) == 0)
 	if (jiffies - dma_start > 2*HZ/100) {		/* 20ms */
-		printk("%s: timeout waiting for Tx RDC.\n", dev->name);
+		printk(KERN_ERR "%s: timeout waiting for Tx RDC.\n",
+		       dev->name);
 		zorro8390_reset_8390(dev);
 		NS8390_init(dev,1);
 		break;

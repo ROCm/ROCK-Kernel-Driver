@@ -15,7 +15,6 @@
 
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
-#include <linux/if_bridge.h>
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
@@ -32,7 +31,7 @@ static int br_dev_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	if (copy_from_user(args, data, 4*sizeof(unsigned long)))
 		return -EFAULT;
 
-	return br_ioctl(dev->priv, args[0], args[1], args[2], args[3]);
+	return br_ioctl_device(dev->priv, args[0], args[1], args[2], args[3]);
 }
 
 static struct net_device_stats *br_dev_get_stats(struct net_device *dev)

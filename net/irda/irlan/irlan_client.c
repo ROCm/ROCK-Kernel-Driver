@@ -343,6 +343,52 @@ void irlan_client_reconnect_data_channel(struct irlan_cb *self)
 	irttp_data_request(self->client.tsap_ctrl, skb);	
 }
 
+
+/*
+ * Function print_ret_code (code)
+ *
+ *    Print return code of request to peer IrLAN layer.
+ *
+ */
+static void print_ret_code(__u8 code) 
+{
+	switch(code) {
+	case 0:
+		printk(KERN_INFO "Success\n");
+		break;
+	case 1:
+		WARNING("IrLAN: Insufficient resources\n");
+		break;
+	case 2:
+		WARNING("IrLAN: Invalid command format\n");
+		break;
+	case 3:
+		WARNING("IrLAN: Command not supported\n");
+		break;
+	case 4:
+		WARNING("IrLAN: Parameter not supported\n");
+		break;
+	case 5:
+		WARNING("IrLAN: Value not supported\n");
+		break;
+	case 6:
+		WARNING("IrLAN: Not open\n");
+		break;
+	case 7:
+		WARNING("IrLAN: Authentication required\n");
+		break;
+	case 8:
+		WARNING("IrLAN: Invalid password\n");
+		break;
+	case 9:
+		WARNING("IrLAN: Protocol error\n");
+		break;
+	case 255:
+		WARNING("IrLAN: Asynchronous status\n");
+		break;
+	}
+}
+
 /*
  * Function irlan_client_parse_response (self, skb)
  *

@@ -439,22 +439,27 @@ struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
 void shmem_lock(struct file * file, int lock);
 int shmem_zero_setup(struct vm_area_struct *);
 
+struct zap_details;
 void zap_page_range(struct vm_area_struct *vma, unsigned long address,
-			unsigned long size);
+		unsigned long size, struct zap_details *);
 int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 		struct vm_area_struct *start_vma, unsigned long start_addr,
-		unsigned long end_addr, unsigned long *nr_accounted);
-void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
-			unsigned long address, unsigned long size);
+		unsigned long end_addr, unsigned long *nr_accounted,
+		struct zap_details *);
 void clear_page_tables(struct mmu_gather *tlb, unsigned long first, int nr);
 int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 			struct vm_area_struct *vma);
 int zeromap_page_range(struct vm_area_struct *vma, unsigned long from,
 			unsigned long size, pgprot_t prot);
+void unmap_mapping_range(struct address_space *mapping,
+		loff_t const holebegin, loff_t const holelen, int even_cows);
 
-extern void invalidate_mmap_range(struct address_space *mapping,
-				  loff_t const holebegin,
-				  loff_t const holelen);
+static inline void unmap_shared_mapping_range(struct address_space *mapping,
+		loff_t const holebegin, loff_t const holelen)
+{
+	unmap_mapping_range(mapping, holebegin, holelen, 0);
+}
+
 extern int vmtruncate(struct inode * inode, loff_t offset);
 extern pmd_t *FASTCALL(__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address));
 extern pte_t *FASTCALL(pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address));
@@ -526,9 +531,8 @@ extern void si_meminfo_node(struct sysinfo *val, int nid);
 extern void insert_vm_struct(struct mm_struct *, struct vm_area_struct *);
 extern void __vma_link_rb(struct mm_struct *, struct vm_area_struct *,
 	struct rb_node **, struct rb_node *);
-extern struct vm_area_struct *copy_vma(struct vm_area_struct *,
+extern struct vm_area_struct *copy_vma(struct vm_area_struct **,
 	unsigned long addr, unsigned long len, unsigned long pgoff);
-extern void vma_relink_file(struct vm_area_struct *, struct vm_area_struct *);
 extern void exit_mmap(struct mm_struct *);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);

@@ -1765,13 +1765,7 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 	switch(cmd) 
 	{
 		case SIOCGSTAMP:
-			if (!sk->sk_stamp.tv_sec)
-				return -ENOENT;
-			err = -EFAULT;
-			if (!copy_to_user((void *)arg, &sk->sk_stamp,
-			    sizeof(struct timeval)))
-				err = 0;
-			return err;
+			return sock_get_timestamp(sk, (struct timeval *)arg);
 
 		case SIOC_WANPIPE_CHECK_TX:
 

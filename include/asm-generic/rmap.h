@@ -57,7 +57,8 @@ static inline unsigned long ptep_to_address(pte_t * ptep)
 {
 	struct page * page = kmap_atomic_to_page(ptep);
 	unsigned long low_bits;
-	low_bits = ((unsigned long)ptep & ~PAGE_MASK) * PTRS_PER_PTE;
+	low_bits = ((unsigned long)ptep & (PTRS_PER_PTE*sizeof(pte_t) - 1))
+			* (PAGE_SIZE/sizeof(pte_t));
 	return page->index + low_bits;
 }
 

@@ -55,9 +55,10 @@ asmlinkage int sys_cacheflush(void *addr, int bytes, int cache)
 
 void flush_dcache_page(struct page *page)
 {
+	struct address_space *mapping = page_mapping(page);
 	unsigned long addr;
 
-	if (page_mapping(page) && !mapping_mapped(page->mapping)) {
+	if (mapping && !mapping_mapped(mapping)) {
 		SetPageDcacheDirty(page);
 		return;
 	}

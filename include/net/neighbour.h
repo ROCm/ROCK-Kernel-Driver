@@ -281,6 +281,8 @@ __neigh_lookup_errno(struct neigh_table *tbl, const void *pkey,
 	return neigh_create(tbl, pkey, dev);
 }
 
+#define LOCALLY_ENQUEUED -2
+
 #endif
 #endif
 

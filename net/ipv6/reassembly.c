@@ -426,6 +426,7 @@ static void ip6_frag_queue(struct frag_queue *fq, struct sk_buff *skb,
 			((u8 *) (fhdr + 1) - (u8 *) (skb->nh.ipv6h + 1)));
 
 	if ((unsigned int)end > IPV6_MAXPLEN) {
+		IP6_INC_STATS_BH(Ip6InHdrErrors);
  		icmpv6_param_prob(skb,ICMPV6_HDR_FIELD, (u8*)&fhdr->frag_off - skb->nh.raw);
  		return;
 	}
@@ -452,6 +453,7 @@ static void ip6_frag_queue(struct frag_queue *fq, struct sk_buff *skb,
 			/* RFC2460 says always send parameter problem in
 			 * this case. -DaveM
 			 */
+			IP6_INC_STATS_BH(Ip6InHdrErrors);
 			icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, 
 					  offsetof(struct ipv6hdr, payload_len));
 			return;
@@ -570,6 +572,7 @@ static void ip6_frag_queue(struct frag_queue *fq, struct sk_buff *skb,
 	return;
 
 err:
+	IP6_INC_STATS(Ip6ReasmFails);
 	kfree_skb(skb);
 }
 
@@ -694,10 +697,12 @@ static int ipv6_frag_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 
 	/* Jumbo payload inhibits frag. header */
 	if (hdr->payload_len==0) {
+		IP6_INC_STATS(Ip6InHdrErrors);
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, skb->h.raw-skb->nh.raw);
 		return -1;
 	}
 	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+sizeof(struct frag_hdr))) {
+		IP6_INC_STATS(Ip6InHdrErrors);
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, skb->h.raw-skb->nh.raw);
 		return -1;
 	}

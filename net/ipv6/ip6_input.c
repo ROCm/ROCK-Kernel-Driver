@@ -79,8 +79,10 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 	if (skb->len < sizeof(struct ipv6hdr))
 		goto err;
 
-	if (!pskb_may_pull(skb, sizeof(struct ipv6hdr)))
+	if (!pskb_may_pull(skb, sizeof(struct ipv6hdr))) {
+		IP6_INC_STATS_BH(Ip6InHdrErrors);
 		goto drop;
+	}
 
 	hdr = skb->nh.ipv6h;
 
@@ -94,8 +96,10 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 		if (pkt_len + sizeof(struct ipv6hdr) > skb->len)
 			goto truncated;
 		if (pkt_len + sizeof(struct ipv6hdr) < skb->len) {
-			if (__pskb_trim(skb, pkt_len + sizeof(struct ipv6hdr)))
+			if (__pskb_trim(skb, pkt_len + sizeof(struct ipv6hdr))){
+				IP6_INC_STATS_BH(Ip6InHdrErrors);
 				goto drop;
+			}
 			hdr = skb->nh.ipv6h;
 			if (skb->ip_summed == CHECKSUM_HW)
 				skb->ip_summed = CHECKSUM_NONE;
@@ -206,6 +210,7 @@ resubmit:
 	return 0;
 
 discard:
+	IP6_INC_STATS_BH(Ip6InDiscards);
 	rcu_read_unlock();
 	kfree_skb(skb);
 	return 0;

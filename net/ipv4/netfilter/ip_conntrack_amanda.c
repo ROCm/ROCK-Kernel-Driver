@@ -46,10 +46,11 @@ static DECLARE_LOCK(amanda_buffer_lock);
 static int help(struct sk_buff *skb,
                 struct ip_conntrack *ct, enum ip_conntrack_info ctinfo)
 {
-	struct ip_conntrack_expect exp;
+	struct ip_conntrack_expect *exp;
 	struct ip_ct_amanda_expect *exp_amanda_info;
 	char *data, *data_limit, *tmp;
 	unsigned int dataoff, i;
+	u_int16_t port, len;
 
 	/* Only look at packets from the Amanda server */
 	if (CTINFO2DIR(ctinfo) == IP_CT_DIR_ORIGINAL)
@@ -79,33 +80,40 @@ static int help(struct sk_buff *skb,
 		goto out;
 	data += strlen("CONNECT ");
 
-	memset(&exp, 0, sizeof(exp));
-	exp.tuple.src.ip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
-	exp.tuple.dst.ip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
-	exp.tuple.dst.protonum = IPPROTO_TCP;
-	exp.mask.src.ip = 0xFFFFFFFF;
-	exp.mask.dst.ip = 0xFFFFFFFF;
-	exp.mask.dst.protonum = 0xFFFF;
-	exp.mask.dst.u.tcp.port = 0xFFFF;
-
 	/* Only search first line. */	
 	if ((tmp = strchr(data, '\n')))
 		*tmp = '\0';
 
-	exp_amanda_info = &exp.help.exp_amanda_info;
 	for (i = 0; i < ARRAY_SIZE(conns); i++) {
 		char *match = strstr(data, conns[i]);
 		if (!match)
 			continue;
 		tmp = data = match + strlen(conns[i]);
-		exp_amanda_info->offset = data - amanda_buffer;
-		exp_amanda_info->port   = simple_strtoul(data, &data, 10);
-		exp_amanda_info->len    = data - tmp;
-		if (exp_amanda_info->port == 0 || exp_amanda_info->len > 5)
+		port = simple_strtoul(data, &data, 10);
+		len = data - tmp;
+		if (port == 0 || len > 5)
 			break;
 
-		exp.tuple.dst.u.tcp.port = htons(exp_amanda_info->port);
-		ip_conntrack_expect_related(ct, &exp);
+		exp = ip_conntrack_expect_alloc();
+		if (exp == NULL)
+			goto out;
+
+		exp->tuple.src.ip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
+		exp->tuple.dst.ip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
+		exp->tuple.dst.protonum = IPPROTO_TCP;
+		exp->mask.src.ip = 0xFFFFFFFF;
+		exp->mask.dst.ip = 0xFFFFFFFF;
+		exp->mask.dst.protonum = 0xFFFF;
+		exp->mask.dst.u.tcp.port = 0xFFFF;
+
+		exp_amanda_info = &exp->help.exp_amanda_info;
+		exp_amanda_info->offset = data - amanda_buffer;
+		exp_amanda_info->port   = port;
+		exp_amanda_info->len    = len;
+
+		exp->tuple.dst.u.tcp.port = htons(port);
+
+		ip_conntrack_expect_related(exp, ct);
 	}
 
 out:

@@ -4,9 +4,11 @@
 #ifdef __CHECKER__
 # define __user		__attribute__((noderef, address_space(1)))
 # define __kernel	/* default address space */
+# define __safe		__attribute__((safe))
 #else
 # define __user
 # define __kernel
+# define __safe
 #endif
 
 #ifdef __KERNEL__

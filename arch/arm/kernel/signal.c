@@ -8,22 +8,13 @@
  * published by the Free Software Foundation.
  */
 #include <linux/config.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/smp.h>
-#include <linux/smp_lock.h>
-#include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
-#include <linux/wait.h>
 #include <linux/ptrace.h>
 #include <linux/personality.h>
-#include <linux/tty.h>
-#include <linux/binfmts.h>
-#include <linux/elf.h>
 #include <linux/suspend.h>
 
-#include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -76,7 +67,7 @@ asmlinkage int sys_sigsuspend(int restart, unsigned long oldmask, old_sigset_t m
 }
 
 asmlinkage int
-sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
+sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize, struct pt_regs *regs)
 {
 	sigset_t saveset, newset;
 
@@ -104,8 +95,8 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
 }
 
 asmlinkage int 
-sys_sigaction(int sig, const struct old_sigaction *act,
-	      struct old_sigaction *oact)
+sys_sigaction(int sig, const struct old_sigaction __user *act,
+	      struct old_sigaction __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -147,15 +138,15 @@ struct sigframe
 
 struct rt_sigframe
 {
-	struct siginfo *pinfo;
-	void *puc;
+	struct siginfo __user *pinfo;
+	void __user *puc;
 	struct siginfo info;
 	struct ucontext uc;
 	unsigned long retcode;
 };
 
 static int
-restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
+restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc)
 {
 	int err = 0;
 
@@ -184,7 +175,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 
 asmlinkage int sys_sigreturn(struct pt_regs *regs)
 {
-	struct sigframe *frame;
+	struct sigframe __user *frame;
 	sigset_t set;
 
 	/* Always make any pending restarted system calls return -EINTR */
@@ -198,7 +189,7 @@ asmlinkage int sys_sigreturn(struct pt_regs *regs)
 	if (regs->ARM_sp & 7)
 		goto badframe;
 
-	frame = (struct sigframe *)regs->ARM_sp;
+	frame = (struct sigframe __user *)regs->ARM_sp;
 
 	if (verify_area(VERIFY_READ, frame, sizeof (*frame)))
 		goto badframe;
@@ -232,7 +223,7 @@ badframe:
 
 asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
 {
-	struct rt_sigframe *frame;
+	struct rt_sigframe __user *frame;
 	sigset_t set;
 
 	/* Always make any pending restarted system calls return -EINTR */
@@ -246,7 +237,7 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
 	if (regs->ARM_sp & 7)
 		goto badframe;
 
-	frame = (struct rt_sigframe *)regs->ARM_sp;
+	frame = (struct rt_sigframe __user *)regs->ARM_sp;
 
 	if (verify_area(VERIFY_READ, frame, sizeof (*frame)))
 		goto badframe;
@@ -276,7 +267,7 @@ badframe:
 }
 
 static int
-setup_sigcontext(struct sigcontext *sc, /*struct _fpstate *fpstate,*/
+setup_sigcontext(struct sigcontext __user *sc, /*struct _fpstate *fpstate,*/
 		 struct pt_regs *regs, unsigned long mask)
 {
 	int err = 0;
@@ -307,7 +298,7 @@ setup_sigcontext(struct sigcontext *sc, /*struct _fpstate *fpstate,*/
 	return err;
 }
 
-static inline void *
+static inline void __user *
 get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, int framesize)
 {
 	unsigned long sp = regs->ARM_sp;
@@ -321,12 +312,12 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs *regs, int framesize)
 	/*
 	 * ATPCS B01 mandates 8-byte alignment
 	 */
-	return (void *)((sp - framesize) & ~7);
+	return (void __user *)((sp - framesize) & ~7);
 }
 
 static int
 setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-	     unsigned long *rc, void *frame, int usig)
+	     unsigned long __user *rc, void __user *frame, int usig)
 {
 	unsigned long handler = (unsigned long)ka->sa.sa_handler;
 	unsigned long retcode;
@@ -387,7 +378,7 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 static int
 setup_frame(int usig, struct k_sigaction *ka, sigset_t *set, struct pt_regs *regs)
 {
-	struct sigframe *frame = get_sigframe(ka, regs, sizeof(*frame));
+	struct sigframe __user *frame = get_sigframe(ka, regs, sizeof(*frame));
 	int err = 0;
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof (*frame)))
@@ -410,7 +401,7 @@ static int
 setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
 	       sigset_t *set, struct pt_regs *regs)
 {
-	struct rt_sigframe *frame = get_sigframe(ka, regs, sizeof(*frame));
+	struct rt_sigframe __user *frame = get_sigframe(ka, regs, sizeof(*frame));
 	int err = 0;
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof (*frame)))

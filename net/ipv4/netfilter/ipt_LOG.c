@@ -19,6 +19,7 @@
 #include <net/tcp.h>
 #include <net/route.h>
 
+#include <linux/netfilter.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_LOG.h>
 
@@ -26,6 +27,10 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
 MODULE_DESCRIPTION("iptables syslog logging module");
 
+static unsigned int nflog = 1;
+MODULE_PARM(nflog, "i");
+MODULE_PARM_DESC(nflog, "register as internal netfilter logging module");
+ 
 #if 0
 #define DEBUGP printk
 #else
@@ -324,6 +329,53 @@ static void dump_packet(const struct ipt_log_info *info,
 	/* maxlen = 230+   91  + 230 + 252 = 803 */
 }
 
+static void
+ipt_log_packet(unsigned int hooknum,
+	       const struct sk_buff *skb,
+	       const struct net_device *in,
+	       const struct net_device *out,
+	       const struct ipt_log_info *loginfo,
+	       const char *level_string,
+	       const char *prefix)
+{
+	spin_lock_bh(&log_lock);
+	printk(level_string);
+	printk("%sIN=%s OUT=%s ",
+	       prefix == NULL ? loginfo->prefix : prefix,
+	       in ? in->name : "",
+	       out ? out->name : "");
+#ifdef CONFIG_BRIDGE_NETFILTER
+	if (skb->nf_bridge) {
+		struct net_device *physindev = skb->nf_bridge->physindev;
+		struct net_device *physoutdev = skb->nf_bridge->physoutdev;
+
+		if (physindev && in != physindev)
+			printk("PHYSIN=%s ", physindev->name);
+		if (physoutdev && out != physoutdev)
+			printk("PHYSOUT=%s ", physoutdev->name);
+	}
+#endif
+
+	if (in && !out) {
+		/* MAC logging for input chain only. */
+		printk("MAC=");
+		if (skb->dev && skb->dev->hard_header_len
+		    && skb->mac.raw != (void*)skb->nh.iph) {
+			int i;
+			unsigned char *p = skb->mac.raw;
+			for (i = 0; i < skb->dev->hard_header_len; i++,p++)
+				printk("%02x%c", *p,
+				       i==skb->dev->hard_header_len - 1
+				       ? ' ':':');
+		} else
+			printk(" ");
+	}
+
+	dump_packet(loginfo, skb, 0);
+	printk("\n");
+	spin_unlock_bh(&log_lock);
+}
+
 static unsigned int
 ipt_log_target(struct sk_buff **pskb,
 	       const struct net_device *in,
@@ -336,44 +388,25 @@ ipt_log_target(struct sk_buff **pskb,
 	char level_string[4] = "< >";
 
 	level_string[1] = '0' + (loginfo->level % 8);
-	spin_lock_bh(&log_lock);
-	printk(level_string);
-	printk("%sIN=%s OUT=%s ",
-	       loginfo->prefix,
-	       in ? in->name : "",
-	       out ? out->name : "");
-#ifdef CONFIG_BRIDGE_NETFILTER
-	if ((*pskb)->nf_bridge) {
-		struct net_device *physindev = (*pskb)->nf_bridge->physindev;
-		struct net_device *physoutdev = (*pskb)->nf_bridge->physoutdev;
-
-		if (physindev && in != physindev)
-			printk("PHYSIN=%s ", physindev->name);
-		if (physoutdev && out != physoutdev)
-			printk("PHYSOUT=%s ", physoutdev->name);
-	}
-#endif
-
-	if (in && !out) {
-		/* MAC logging for input chain only. */
-		printk("MAC=");
-		if ((*pskb)->dev && (*pskb)->dev->hard_header_len
-		    && (*pskb)->mac.raw != (void*)(*pskb)->nh.iph) {
-			int i;
-			unsigned char *p = (*pskb)->mac.raw;
-			for (i = 0; i < (*pskb)->dev->hard_header_len; i++,p++)
-				printk("%02x%c", *p,
-				       i==(*pskb)->dev->hard_header_len - 1
-				       ? ' ':':');
-		} else
-			printk(" ");
-	}
-
-	dump_packet(loginfo, *pskb, 0);
-	printk("\n");
-	spin_unlock_bh(&log_lock);
+	ipt_log_packet(hooknum, *pskb, in, out, loginfo, level_string, NULL);
 
 	return IPT_CONTINUE;
+}
+
+static void
+ipt_logfn(unsigned int hooknum,
+	  const struct sk_buff *skb,
+	  const struct net_device *in,
+	  const struct net_device *out,
+	  const char *prefix)
+{
+	struct ipt_log_info loginfo = { 
+		.level = 0, 
+		.logflags = IPT_LOG_MASK, 
+		.prefix = "" 
+	};
+
+	ipt_log_packet(hooknum, skb, in, out, &loginfo, KERN_WARNING, prefix);
 }
 
 static int ipt_log_checkentry(const char *tablename,
@@ -413,11 +446,18 @@ static struct ipt_target ipt_log_reg = {
 
 static int __init init(void)
 {
-	return ipt_register_target(&ipt_log_reg);
+	if (ipt_register_target(&ipt_log_reg))
+		return -EINVAL;
+	if (nflog)
+		nf_log_register(PF_INET, &ipt_logfn);
+	
+	return 0;
 }
 
 static void __exit fini(void)
 {
+	if (nflog)
+		nf_log_unregister(PF_INET, &ipt_logfn);
 	ipt_unregister_target(&ipt_log_reg);
 }
 

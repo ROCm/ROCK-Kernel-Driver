@@ -1514,6 +1514,9 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 
 		if(copy_from_user(&regs, addr, sizeof(regs)))
 			return -EFAULT;
+		memset(regs_buff, 0, sizeof(regs_buff));
+		if (regs.len > E1000_REGS_LEN)
+			regs.len = E1000_REGS_LEN;
 		e1000_ethtool_gregs(adapter, &regs, regs_buff);
 		if(copy_to_user(addr, &regs, sizeof(regs)))
 			return -EFAULT;

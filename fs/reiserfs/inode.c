@@ -1925,7 +1925,6 @@ static int map_block_for_writepage(struct inode *inode,
     th.t_trans_id = 0;
 
     if (!buffer_uptodate(bh_result)) {
-        buffer_error();
 	return -EIO;
     }
 
@@ -2057,8 +2056,6 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
      * in the BH_Uptodate is just a sanity check.
      */
     if (!page_has_buffers(page)) {
-	if (!PageUptodate(page))
-	    buffer_error();
 	create_empty_buffers(page, inode->i_sb->s_blocksize, 
 	                    (1 << BH_Dirty) | (1 << BH_Uptodate));
     }
@@ -2120,8 +2117,6 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	    }
 	}
 	if (test_clear_buffer_dirty(bh)) {
-	    if (!buffer_uptodate(bh))
-		buffer_error();
 	    mark_buffer_async_write(bh);
 	} else {
 	    unlock_buffer(bh);
@@ -2503,14 +2498,14 @@ static int reiserfs_releasepage(struct page *page, int unused_gfp_flags)
 
 /* We thank Mingming Cao for helping us understand in great detail what
    to do in this section of the code. */
-static int reiserfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
-			      loff_t offset, unsigned long nr_segs)
+static ssize_t reiserfs_direct_IO(int rw, struct kiocb *iocb,
+		const struct iovec *iov, loff_t offset, unsigned long nr_segs)
 {
     struct file *file = iocb->ki_filp;
     struct inode *inode = file->f_mapping->host;
 
     return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
-			      offset, nr_segs, reiserfs_get_blocks_direct_io, NULL);
+			offset, nr_segs, reiserfs_get_blocks_direct_io, NULL);
 }
 
 

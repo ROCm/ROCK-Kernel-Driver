@@ -2236,6 +2236,14 @@ static int irlap_state_sclose(struct irlap_cb *self, IRLAP_EVENT event,
 		irlap_disconnect_indication(self, LAP_DISC_INDICATION);
 		break;
 	case RECV_DM_RSP:
+		/* IrLAP-1.1 p.82: in SCLOSE, S and I type RSP frames
+		 * shall take us down into default NDM state, like DM_RSP
+		 */
+	case RECV_RR_RSP:
+	case RECV_RNR_RSP:
+	case RECV_REJ_RSP:
+	case RECV_SREJ_RSP:
+	case RECV_I_RSP:
 		/* Always switch state before calling upper layers */
 		irlap_next_state(self, LAP_NDM);
 
@@ -2253,6 +2261,17 @@ static int irlap_state_sclose(struct irlap_cb *self, IRLAP_EVENT event,
 		irlap_disconnect_indication(self, LAP_DISC_INDICATION);
 		break;
 	default:
+		/* IrLAP-1.1 p.82: in SCLOSE, basically any received frame
+		 * with pf=1 shall restart the wd-timer and resend the rd:rsp
+		 */
+		if (info != NULL  &&  info->pf) {
+			del_timer(&self->wd_timer);
+			irlap_wait_min_turn_around(self, &self->qos_tx);
+			irlap_send_rd_frame(self);
+			irlap_start_wd_timer(self, self->wd_timeout);
+			break;		/* stay in SCLOSE */
+		}
+
 		IRDA_DEBUG(1, "%s(), Unknown event %d, (%s)\n", __FUNCTION__,
 			   event, irlap_event[event]);
 

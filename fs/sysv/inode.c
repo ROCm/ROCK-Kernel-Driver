@@ -57,6 +57,16 @@ clean:
 	unlock_kernel();
 }
 
+static int sysv_remount(struct super_block *sb, int *flags, char *data)
+{
+	struct sysv_sb_info *sbi = SYSV_SB(sb);
+	if (sbi->s_forced_ro)
+		*flags |= MS_RDONLY;
+	if (!(*flags & MS_RDONLY))
+		sb->s_dirt = 1;
+	return 0;
+}
+
 static void sysv_put_super(struct super_block *sb)
 {
 	struct sysv_sb_info *sbi = SYSV_SB(sb);
@@ -321,6 +331,7 @@ struct super_operations sysv_sops = {
 	.delete_inode	= sysv_delete_inode,
 	.put_super	= sysv_put_super,
 	.write_super	= sysv_write_super,
+	.remount_fs	= sysv_remount,
 	.statfs		= sysv_statfs,
 };
 

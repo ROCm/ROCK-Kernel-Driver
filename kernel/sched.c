@@ -2779,7 +2779,7 @@ static int migration_thread(void * data)
 		migration_req_t *req;
 
 		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 
 		spin_lock_irq(&rq->lock);
 		head = &rq->migration_queue;

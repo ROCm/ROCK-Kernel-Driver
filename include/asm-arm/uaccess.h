@@ -75,7 +75,7 @@ static inline void set_fs (mm_segment_t fs)
 
 #define access_ok(type,addr,size)	(__range_ok(addr,size) == 0)
 
-static inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void __user *addr, unsigned long size)
 {
 	return access_ok(type, addr, size) ? 0 : -EFAULT;
 }
@@ -354,13 +354,13 @@ do {									\
 	: "r" (x), "i" (-EFAULT)				\
 	: "cc")
 
-extern unsigned long __arch_copy_from_user(void *to, const void *from, unsigned long n);
-extern unsigned long __arch_copy_to_user(void *to, const void *from, unsigned long n);
-extern unsigned long __arch_clear_user(void *addr, unsigned long n);
-extern unsigned long __arch_strncpy_from_user(char *to, const char *from, unsigned long count);
-extern unsigned long __arch_strnlen_user(const char *s, long n);
+extern unsigned long __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
+extern unsigned long __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
+extern unsigned long __arch_clear_user(void __user *addr, unsigned long n);
+extern unsigned long __arch_strncpy_from_user(char *to, const char __user *from, unsigned long count);
+extern unsigned long __arch_strnlen_user(const char __user *s, long n);
 
-static __inline__ unsigned long copy_from_user(void *to, const void *from, unsigned long n)
+static inline unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (access_ok(VERIFY_READ, from, n))
 		n = __arch_copy_from_user(to, from, n);
@@ -369,36 +369,36 @@ static __inline__ unsigned long copy_from_user(void *to, const void *from, unsig
 	return n;
 }
 
-static __inline__ unsigned long __copy_from_user(void *to, const void *from, unsigned long n)
+static inline unsigned long __copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	return __arch_copy_from_user(to, from, n);
 }
 
-static __inline__ unsigned long copy_to_user(void *to, const void *from, unsigned long n)
+static inline unsigned long copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (access_ok(VERIFY_WRITE, to, n))
 		n = __arch_copy_to_user(to, from, n);
 	return n;
 }
 
-static __inline__ unsigned long __copy_to_user(void *to, const void *from, unsigned long n)
+static inline unsigned long __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	return __arch_copy_to_user(to, from, n);
 }
 
-static __inline__ unsigned long clear_user (void *to, unsigned long n)
+static inline unsigned long clear_user (void __user *to, unsigned long n)
 {
 	if (access_ok(VERIFY_WRITE, to, n))
 		n = __arch_clear_user(to, n);
 	return n;
 }
 
-static __inline__ unsigned long __clear_user (void *to, unsigned long n)
+static inline unsigned long __clear_user (void __user *to, unsigned long n)
 {
 	return __arch_clear_user(to, n);
 }
 
-static __inline__ long strncpy_from_user (char *dst, const char *src, long count)
+static inline long strncpy_from_user (char *dst, const char __user *src, long count)
 {
 	long res = -EFAULT;
 	if (access_ok(VERIFY_READ, src, 1))
@@ -406,14 +406,14 @@ static __inline__ long strncpy_from_user (char *dst, const char *src, long count
 	return res;
 }
 
-static __inline__ long __strncpy_from_user (char *dst, const char *src, long count)
+static inline long __strncpy_from_user (char *dst, const char __user *src, long count)
 {
 	return __arch_strncpy_from_user(dst, src, count);
 }
 
 #define strlen_user(s)	strnlen_user(s, ~0UL >> 1)
 
-static inline long strnlen_user(const char *s, long n)
+static inline long strnlen_user(const char __user *s, long n)
 {
 	unsigned long res = 0;
 

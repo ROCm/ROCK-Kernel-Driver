@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -732,6 +733,8 @@ static struct file_operations	stl_fsiomem = {
 
 /*****************************************************************************/
 
+static struct class_simple *stallion_class;
+
 #ifdef MODULE
 
 /*
@@ -788,12 +791,15 @@ static void __exit stallion_module_exit(void)
 		restore_flags(flags);
 		return;
 	}
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < 4; i++) {
 		devfs_remove("staliomem/%d", i);
+		class_simple_device_remove(MKDEV(STL_SIOMEMMAJOR, i));
+	}
 	devfs_remove("staliomem");
 	if ((i = unregister_chrdev(STL_SIOMEMMAJOR, "staliomem")))
 		printk("STALLION: failed to un-register serial memory device, "
 			"errno=%d\n", -i);
+	class_simple_destroy(stallion_class);
 
 	if (stl_tmpwritebuf != (char *) NULL)
 		kfree(stl_tmpwritebuf);
@@ -3181,10 +3187,12 @@ int __init stl_init(void)
 		printk("STALLION: failed to register serial board device\n");
 	devfs_mk_dir("staliomem");
 
+	stallion_class = class_simple_create(THIS_MODULE, "staliomem");
 	for (i = 0; i < 4; i++) {
 		devfs_mk_cdev(MKDEV(STL_SIOMEMMAJOR, i),
 				S_IFCHR|S_IRUSR|S_IWUSR,
 				"staliomem/%d", i);
+		class_simple_device_add(stallion_class, MKDEV(STL_SIOMEMMAJOR, i), NULL, "staliomem%d", i);
 	}
 
 	stl_serial->owner = THIS_MODULE;

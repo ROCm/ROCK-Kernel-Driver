@@ -338,26 +338,6 @@ config PCI_MMCONFIG
 	depends on PCI
 	select ACPI_BOOT
 
-# the drivers/pci/msi.c code needs to be fixed first before enabling
-config PCI_USE_VECTOR
-	bool "Vector-based interrupt indexing"
-	depends on X86_LOCAL_APIC && NOTWORKING
-	default n
-	help
-	   This replaces the current existing IRQ-based index interrupt scheme
-	   with the vector-base index scheme. The advantages of vector base
-	   over IRQ base are listed below:
-	   1) Support MSI implementation.
-	   2) Support future IOxAPIC hotplug
-
-	   Note that this enables MSI, Message Signaled Interrupt, on all
-	   MSI capable device functions detected if users also install the
-	   MSI patch. Message Signal Interrupt enables an MSI-capable
-	   hardware device to send an inbound Memory Write on its PCI bus
-	   instead of asserting IRQ signal on device IRQ pin.
-
-	   If you don't know what to do here, say N.
-
 source "drivers/pci/Kconfig"
 
 source "drivers/pcmcia/Kconfig"

@@ -1206,14 +1206,10 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		}
 
 		case SIOCGSTAMP:
-			if (sk) {
-				rc = -ENOENT;
-				if (!sk->sk_stamp.tv_sec)
-					break;
-				rc = copy_to_user((void *)arg, &sk->sk_stamp,
-						  sizeof(struct timeval)) ? -EFAULT : 0;
-			}
 			rc = -EINVAL;
+			if (sk)
+				rc = sock_get_timestamp(sk, 
+						(struct timeval *)arg); 
 			break;
 		case SIOCGIFADDR:
 		case SIOCSIFADDR:

@@ -20,10 +20,8 @@ void huge_page_release(struct page *);
 int hugetlb_report_meminfo(char *);
 int is_hugepage_mem_enough(size_t);
 unsigned long hugetlb_total_pages(void);
-struct page *follow_huge_addr(struct mm_struct *mm, struct vm_area_struct *vma,
-			unsigned long address, int write);
-struct vm_area_struct *hugepage_vma(struct mm_struct *mm,
-					unsigned long address);
+struct page *follow_huge_addr(struct mm_struct *mm, unsigned long address,
+			      int write);
 struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 				pmd_t *pmd, int write);
 int is_aligned_hugepage_range(unsigned long addr, unsigned long len);
@@ -65,7 +63,7 @@ static inline unsigned long hugetlb_total_pages(void)
 }
 
 #define follow_hugetlb_page(m,v,p,vs,a,b,i)	({ BUG(); 0; })
-#define follow_huge_addr(mm, vma, addr, write)	0
+#define follow_huge_addr(mm, addr, write)	ERR_PTR(-EINVAL)
 #define copy_hugetlb_page_range(src, dst, vma)	({ BUG(); 0; })
 #define hugetlb_prefault(mapping, vma)		({ BUG(); 0; })
 #define zap_hugepage_range(vma, start, len)	BUG()
@@ -73,7 +71,6 @@ static inline unsigned long hugetlb_total_pages(void)
 #define huge_page_release(page)			BUG()
 #define is_hugepage_mem_enough(size)		0
 #define hugetlb_report_meminfo(buf)		0
-#define hugepage_vma(mm, addr)			0
 #define mark_mm_hugetlb(mm, vma)		do { } while (0)
 #define follow_huge_pmd(mm, addr, pmd, write)	0
 #define is_aligned_hugepage_range(addr, len)	0

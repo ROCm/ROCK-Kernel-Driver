@@ -60,7 +60,6 @@
 static int pc_debug;
 
 module_param(pc_debug, int, 0644);
-MODULE_PARM(pc_debug, "i");
 static const char *version =
 "tcic.c 1.111 2000/02/15 04:13:12 (David Hinds)";
 
@@ -91,7 +90,8 @@ static int do_scan = 1;
 
 /* Bit map of interrupts to choose from */
 static u_int irq_mask = 0xffff;
-static int irq_list[16] = { -1 };
+static int irq_list[16];
+static int irq_list_count;
 
 /* The card status change interrupt -- 0 means autoselect */
 static int cs_irq;
@@ -105,15 +105,15 @@ static int poll_quick = HZ/20;
 /* CCLK external clock time, in nanoseconds.  70 ns = 14.31818 MHz */
 static int cycle_time = 70;
 
-MODULE_PARM(tcic_base, "i");
-MODULE_PARM(ignore, "i");
-MODULE_PARM(do_scan, "i");
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-16i");
-MODULE_PARM(cs_irq, "i");
-MODULE_PARM(poll_interval, "i");
-MODULE_PARM(poll_quick, "i");
-MODULE_PARM(cycle_time, "i");
+module_param(tcic_base, int, 0444);
+module_param(ignore, int, 0444);
+module_param(do_scan, int, 0444);
+module_param(irq_mask, int, 0444);
+module_param_array(irq_list, int, irq_list_count, 0444);
+module_param(cs_irq, int, 0444);
+module_param(poll_interval, int, 0444);
+module_param(poll_quick, int, 0444);
+module_param(cycle_time, int, 0444);
 
 /*====================================================================*/
 
@@ -481,10 +481,10 @@ static int __init init_tcic(void)
 
     /* Build interrupt mask */
     printk(", %d sockets\n" KERN_INFO "  irq list (", sockets);
-    if (irq_list[0] == -1)
+    if (irq_list_count == 0)
 	mask = irq_mask;
     else
-	for (i = mask = 0; i < 16; i++)
+	for (i = mask = 0; i < irq_list_count; i++)
 	    mask |= (1<<irq_list[i]);
 
     /* irq 14, 11, 10, 7, 6, 5, 4, 3 */

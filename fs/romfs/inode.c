@@ -592,11 +592,18 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "romfs_inode_cache: not all structures were freed\n");
 }
 
+static int romfs_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_RDONLY;
+	return 0;
+}
+
 static struct super_operations romfs_ops = {
 	.alloc_inode	= romfs_alloc_inode,
 	.destroy_inode	= romfs_destroy_inode,
 	.read_inode	= romfs_read_inode,
 	.statfs		= romfs_statfs,
+	.remount_fs	= romfs_remount,
 };
 
 static struct super_block *romfs_get_sb(struct file_system_type *fs_type,
