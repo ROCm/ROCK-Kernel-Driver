@@ -6,6 +6,8 @@
 #ifndef _LINUX_BFS_FS_I
 #define _LINUX_BFS_FS_I
 
+#include <linux/fs.h>
+
 /*
  * BFS file system in-core inode info
  */

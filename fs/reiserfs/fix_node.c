@@ -36,7 +36,7 @@
 
 
 #include <linux/config.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/string.h>
 #include <linux/locks.h>
 #include <linux/reiserfs_fs.h>

@@ -8,7 +8,7 @@
  */
 
 #include "ext2.h"
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <asm/uaccess.h>
 
 

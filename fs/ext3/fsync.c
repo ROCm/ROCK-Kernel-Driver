@@ -22,7 +22,7 @@
  * we can depend on generic_block_fdatasync() to sync the data blocks.
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/fs.h>
 #include <linux/jbd.h>
 #include <linux/ext3_fs.h>

@@ -13,7 +13,7 @@
  * on code by Martin von Loewis <martin@mira.isdn.cs.tu-berlin.de>.
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/locks.h>
 #include <linux/fs.h>
 #include <linux/ufs_fs.h>

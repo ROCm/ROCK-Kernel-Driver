@@ -45,6 +45,7 @@
 #include <linux/completion.h>
 #include <linux/spinlock.h>
 #include <asm/system.h>
+#include <asm/byteorder.h>
 
 
 /*

@@ -8,10 +8,11 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/smp_lock.h>
 #include <linux/kmod.h>
 #include <linux/nfsd/interface.h>
+#include <linux/linkage.h>
 
 #if defined(CONFIG_NFSD_MODULE)
 struct nfsd_linkage *nfsd_linkage = NULL;

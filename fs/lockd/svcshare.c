@@ -6,7 +6,7 @@
  * Copyright (C) 1996 Olaf Kirch <okir@monad.swb.de>
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/unistd.h>
 #include <linux/string.h>
 #include <linux/slab.h>

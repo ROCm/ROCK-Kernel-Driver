@@ -33,7 +33,7 @@
  * Veritas filesystem driver - lookup and other directory related code.
  */
 #include <linux/fs.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/highmem.h>
 #include <linux/kernel.h>

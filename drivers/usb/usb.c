@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/spinlock.h>
+#include <asm/byteorder.h>
 
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG

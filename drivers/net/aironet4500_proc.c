@@ -33,15 +33,10 @@
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
 
-
 #ifdef CONFIG_PROC_FS
 
-#ifdef CONFIG_PROC_FS
 #include <linux/sysctl.h>
-#else
-#error awc driver needs CONFIG_PROC_FS
-#endif
-
+#include <linux/fs.h>
 
 #include "aironet4500.h"
 #include "aironet4500_rid.c"
@@ -602,6 +597,9 @@ static void aironet_proc_exit(void){
 
 module_init(aironet_proc_init);
 module_exit(aironet_proc_exit);
+
+#else
+#error awc driver needs CONFIG_PROC_FS
 
 #endif // whole proc system styff
 MODULE_LICENSE("GPL");

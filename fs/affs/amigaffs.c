@@ -10,7 +10,7 @@
 
 #include <stdarg.h>
 #include <linux/stat.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/affs_fs.h>
 #include <linux/string.h>
 #include <linux/locks.h>

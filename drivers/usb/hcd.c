@@ -50,6 +50,7 @@
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/unaligned.h>
+#include <asm/byteorder.h>
 
 
 /*-------------------------------------------------------------------------*/

@@ -57,6 +57,7 @@
 #include <linux/smp_lock.h>
 #undef DEBUG
 #include <linux/usb.h>
+#include <asm/byteorder.h>
 
 /*
  * Version Information

@@ -48,6 +48,7 @@
 #include <linux/etherdevice.h>
 #include <linux/usb.h>
 #include <linux/module.h>
+#include <asm/byteorder.h>
 #include "pegasus.h"
 
 /*

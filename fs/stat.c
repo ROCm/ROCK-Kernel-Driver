@@ -10,6 +10,7 @@
 #include <linux/file.h>
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
+#include <linux/fs.h>
 
 #include <asm/uaccess.h>
 

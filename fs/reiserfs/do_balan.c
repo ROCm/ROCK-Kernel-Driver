@@ -18,7 +18,7 @@
 
 #include <linux/config.h>
 #include <asm/uaccess.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/reiserfs_fs.h>
 
 #ifdef CONFIG_REISERFS_CHECK

@@ -9,6 +9,8 @@
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/err.h>
+#include <linux/stat.h>
 
 extern struct driver_file_entry * device_default_files[];
 

@@ -3,7 +3,7 @@
  */
 
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
 

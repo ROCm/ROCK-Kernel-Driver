@@ -7,6 +7,7 @@
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
+#include <linux/fs.h>
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>

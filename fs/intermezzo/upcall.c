@@ -28,7 +28,7 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/fs.h>
 #include <linux/stat.h>
 #include <linux/errno.h>

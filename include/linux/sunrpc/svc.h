@@ -14,6 +14,7 @@
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svcauth.h>
+#include <linux/wait.h>
 
 /*
  * RPC service.

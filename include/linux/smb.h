@@ -10,6 +10,7 @@
 #define _LINUX_SMB_H
 
 #include <linux/types.h>
+#include <linux/kdev_t.h>
 
 enum smb_protocol { 
 	SMB_PROTOCOL_NONE, 

@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/smp_lock.h>
 #include <linux/iobuf.h>
+#include <linux/fs.h>
 
 /* sysctl tunables... */
 struct files_stat_struct files_stat = {0, 0, NR_FILE};

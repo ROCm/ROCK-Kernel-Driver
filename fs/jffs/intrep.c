@@ -68,7 +68,7 @@
 #include <asm/byteorder.h>
 #include <linux/version.h>
 #include <linux/smp_lock.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/ctype.h>
 
 #include "intrep.h"

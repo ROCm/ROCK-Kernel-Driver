@@ -11,7 +11,7 @@
  */
 
 #define NFS_NEED_XDR_TYPES
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/nfs.h>

@@ -6,6 +6,8 @@
  */
 
 #include <linux/device.h>
+#include <linux/err.h>
+#include <linux/stat.h>
 
 /**
  * device_read_status - report some device information

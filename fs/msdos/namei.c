@@ -10,7 +10,7 @@
 #define __NO_VERSION__
 #include <linux/module.h>
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/msdos_fs.h>
 
 #define MSDOS_DEBUG 0

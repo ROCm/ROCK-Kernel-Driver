@@ -9,7 +9,7 @@
 #include <linux/fs.h>
 #include <linux/ufs_fs.h>
 #include <linux/stat.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/string.h>
 #include <linux/locks.h>
 #include <linux/quotaops.h>

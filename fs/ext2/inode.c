@@ -25,7 +25,7 @@
 #include "ext2.h"
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/highuid.h>
 #include <linux/quotaops.h>
 #include <linux/module.h>

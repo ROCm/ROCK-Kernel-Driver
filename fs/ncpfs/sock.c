@@ -10,7 +10,7 @@
 
 #include <linux/config.h>
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/socket.h>
 #include <linux/fcntl.h>

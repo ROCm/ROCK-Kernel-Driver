@@ -10,6 +10,7 @@
 #include <linux/shm.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
+#include <linux/fs.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>

@@ -328,6 +328,8 @@
  *      24 Bit Color ~ 70 secs - 3.6 Mbit/sec
  *       8 Bit Gray ~ 17 secs - 4.2 Mbit/sec */
 
+#include <asm/byteorder.h>
+
 /* 
  * Scanner definitions, macros, module info, 
  * debug/ioctl/data_dump enable, and other constants.

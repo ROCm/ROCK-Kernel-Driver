@@ -4,12 +4,13 @@
  *  Copyright (C) 1995  Linus Torvalds
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
 #include <linux/stat.h>
 #include <linux/file.h>
 #include <linux/smp_lock.h>
+#include <linux/fs.h>
 
 #include <asm/uaccess.h>
 

@@ -12,6 +12,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
+#include <linux/fs.h>
 
 static void wait_for_partner(struct inode* inode, unsigned int* cnt)
 {

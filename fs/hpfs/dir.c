@@ -7,7 +7,7 @@
  */
 
 #include "hpfs_fn.h"
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/smp_lock.h>
 
 int hpfs_dir_release(struct inode *inode, struct file *filp)

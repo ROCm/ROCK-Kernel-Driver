@@ -14,6 +14,7 @@
  */
 #include <linux/config.h>
 #include <linux/sched.h>
+#include <linux/err.h>
 #include <asm/semaphore.h>
 
 /*

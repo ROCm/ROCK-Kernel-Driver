@@ -10,7 +10,7 @@
  */
 
 #include <linux/param.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/utsname.h>

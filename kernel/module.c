@@ -10,6 +10,7 @@
 #include <linux/slab.h>
 #include <linux/kmod.h>
 #include <linux/seq_file.h>
+#include <linux/fs.h>
 
 /*
  * Originally by Anonymous (as far as I know...)

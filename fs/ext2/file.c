@@ -19,7 +19,7 @@
  */
 
 #include "ext2.h"
-#include <linux/sched.h>
+#include <linux/time.h>
 
 /*
  * Called when an inode is released. Note that this is different
