@@ -1117,7 +1117,8 @@ done:
  * For resident attributes, OTOH, ntfs_writepage() writes the @page by copying
  * the data to the mft record (which at this stage is most likely in memory).
  * The mft record is then marked dirty and written out asynchronously via the
- * vfs inode dirty code path.
+ * vfs inode dirty code path for the inode the mft record belongs to or via the
+ * vm page dirty code path for the page the mft record is in.
  *
  * Based on ntfs_readpage() and fs/buffer.c::block_write_full_page().
  *
@@ -1141,6 +1142,11 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	/* Is the page fully outside i_size? (truncate in progress) */
 	if (unlikely(page->index >= (vi->i_size + PAGE_CACHE_SIZE - 1) >>
 			PAGE_CACHE_SHIFT)) {
+		/*
+		 * The page may have dirty, unmapped buffers.  Make them
+		 * freeable here, so the page does not leak.
+		 */
+		block_invalidatepage(page, 0);
 		unlock_page(page);
 		ntfs_debug("Write outside i_size - truncated?");
 		return 0;

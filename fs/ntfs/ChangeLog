@@ -42,6 +42,9 @@ ToDo/Notes:
 	  mount time as this cannot work with the current implementation.
 	- Check for location of attribute name and improve error handling in
 	  general in fs/ntfs/inode.c::ntfs_read_locked_inode() and friends.
+	- In fs/ntfs/aops.c::ntfs_writepage(), if t he page is fully outside
+	  i_size, i.e. race with truncate, invalidate the buffers on the page
+	  so that they become freeable and hence the page does not leak.
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
