@@ -613,11 +613,6 @@ struct nfs4_readlink {
 	struct page **			rl_pages;   /* zero-copy data */
 };
 
-struct nfs4_remove {
-	struct qstr *			name;          /* request */
-	struct nfs4_change_info *	rm_cinfo;         /* response */
-};
-
 struct nfs4_remove_arg {
 	const struct nfs_fh *		fh;
 	const struct qstr *		name;
@@ -659,13 +654,11 @@ struct nfs4_op {
 	u32				opnum;
 	union {
 		struct nfs4_close	close;
-		struct nfs4_getattr	getattr;
 		struct nfs4_open	open;
 		struct nfs4_open_confirm open_confirm;
 		struct nfs4_putfh	putfh;
 		struct nfs4_readdir	readdir;
 		struct nfs4_readlink	readlink;
-		struct nfs4_remove	remove;
 		struct nfs4_client *	renew;
 		struct nfs4_setattr	setattr;
 	} u;

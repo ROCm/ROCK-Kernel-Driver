@@ -1138,9 +1138,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 
 	for (i = 0; i < cp->req_nops; i++) {
 		switch (cp->ops[i].opnum) {
-		case OP_GETATTR:
-			status = encode_getattr(xdr, &cp->ops[i].u.getattr);
-			break;
 		case OP_PUTFH:
 			status = encode_putfh(xdr, cp->ops[i].u.putfh.pf_fhandle);
 			break;
@@ -1149,9 +1146,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_READLINK:
 			status = encode_readlink(xdr, &cp->ops[i].u.readlink, req);
-			break;
-		case OP_REMOVE:
-			status = encode_remove(xdr, cp->ops[i].u.remove.name);
 			break;
 		default:
 			BUG();
@@ -3220,9 +3214,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 	op = &cp->ops[0];
 	for (cp->nops = 0; cp->nops < cp->resp_nops; cp->nops++, op++) {
 		switch (op->opnum) {
-		case OP_GETATTR:
-			status = decode_getattr(xdr, &op->u.getattr, cp->server);
-			break;
 		case OP_PUTFH:
 			status = decode_putfh(xdr);
 			break;
@@ -3231,9 +3222,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_READLINK:
 			status = decode_readlink(xdr, req, &op->u.readlink);
-			break;
-		case OP_REMOVE:
-			status = decode_remove(xdr, op->u.remove.rm_cinfo);
 			break;
 		default:
 			BUG();

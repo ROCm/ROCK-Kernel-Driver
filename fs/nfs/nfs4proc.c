@@ -116,27 +116,6 @@ u32 nfs4_pathconf_bitmap[2] = {
 	0
 };
 
-static inline void
-__nfs4_setup_getattr(struct nfs4_compound *cp, u32 *bitmap,
-		     struct nfs_fattr *fattr)
-{
-        struct nfs4_getattr *getattr = GET_OP(cp, getattr);
-
-	getattr->gt_bmval = bitmap;
-	getattr->gt_attrs = fattr;
-	getattr->gt_fsstat = NULL;
-
-        OPNUM(cp) = OP_GETATTR;
-        cp->req_nops++;
-}
-
-static void
-nfs4_setup_getattr(struct nfs4_compound *cp,
-		struct nfs_fattr *fattr)
-{
-	__nfs4_setup_getattr(cp, nfs4_fattr_bitmap, fattr);
-}
-
 static void
 nfs4_setup_putfh(struct nfs4_compound *cp, struct nfs_fh *fhandle)
 {
@@ -217,18 +196,6 @@ nfs4_setup_readlink(struct nfs4_compound *cp, int count, struct page **pages)
 	readlink->rl_pages = pages;
 
 	OPNUM(cp) = OP_READLINK;
-	cp->req_nops++;
-}
-
-static void
-nfs4_setup_remove(struct nfs4_compound *cp, struct qstr *name, struct nfs4_change_info *cinfo)
-{
-	struct nfs4_remove *remove = GET_OP(cp, remove);
-
-	remove->name = name;
-	remove->rm_cinfo = cinfo;
-
-	OPNUM(cp) = OP_REMOVE;
 	cp->req_nops++;
 }
 
@@ -1100,46 +1067,38 @@ static int nfs4_proc_remove(struct inode *dir, struct qstr *name)
 }
 
 struct unlink_desc {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[3];
-	struct nfs4_change_info	cinfo;
-	struct nfs_fattr	attrs;
+	struct nfs4_remove_arg	args;
+	struct nfs4_change_info	res;
 };
 
-static int
-nfs4_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir, struct qstr *name)
+static int nfs4_proc_unlink_setup(struct rpc_message *msg, struct dentry *dir,
+		struct qstr *name)
 {
-	struct unlink_desc *	up;
-	struct nfs4_compound *	cp;
+	struct unlink_desc *up;
 
 	up = (struct unlink_desc *) kmalloc(sizeof(*up), GFP_KERNEL);
 	if (!up)
 		return -ENOMEM;
-	cp = &up->compound;
 	
-	nfs4_setup_compound(cp, up->ops, NFS_SERVER(dir->d_inode), "unlink_setup");
-	nfs4_setup_putfh(cp, NFS_FH(dir->d_inode));
-	nfs4_setup_remove(cp, name, &up->cinfo);
-	nfs4_setup_getattr(cp, &up->attrs);
+	up->args.fh = NFS_FH(dir->d_inode);
+	up->args.name = name;
 	
-	msg->rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_COMPOUND];
-	msg->rpc_argp = cp;
-	msg->rpc_resp = cp;
+	msg->rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_REMOVE];
+	msg->rpc_argp = &up->args;
+	msg->rpc_resp = &up->res;
 	return 0;
 }
 
-static int
-nfs4_proc_unlink_done(struct dentry *dir, struct rpc_task *task)
+static int nfs4_proc_unlink_done(struct dentry *dir, struct rpc_task *task)
 {
 	struct rpc_message *msg = &task->tk_msg;
 	struct unlink_desc *up;
 	
-	if (msg->rpc_argp) {
-		up = (struct unlink_desc *) msg->rpc_argp;
-		process_lease(&up->compound);
-		process_cinfo(&up->cinfo, &up->attrs);
-		nfs_refresh_inode(dir->d_inode, &up->attrs);
+	if (msg->rpc_resp != NULL) {
+		up = container_of(msg->rpc_resp, struct unlink_desc, res);
+		update_changeattr(dir->d_inode, &up->res);
 		kfree(up);
+		msg->rpc_resp = NULL;
 		msg->rpc_argp = NULL;
 	}
 	return 0;
