@@ -481,9 +481,7 @@ static inline void pc_sched_event(struct channel *ch, int event)
 	-------------------------------------------------------------------------*/
 
 	ch->event |= 1 << event;
-	MOD_INC_USE_COUNT;
-	if (schedule_work(&ch->tqueue) == 0)
-		MOD_DEC_USE_COUNT;
+	schedule_work(&ch->tqueue);
 
 
 } /* End pc_sched_event */
@@ -604,7 +602,6 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 		                      ASYNC_CALLOUT_ACTIVE | ASYNC_CLOSING);
 		wake_up_interruptible(&ch->close_wait);
 
-		MOD_DEC_USE_COUNT;
 
 		restore_flags(flags);
 
@@ -691,10 +688,6 @@ static void pc_hangup(struct tty_struct *tty)
 			tty->ldisc.flush_buffer(tty);
 
 		shutdown(ch);
-
-		if (ch->count)
-			MOD_DEC_USE_COUNT;
-		
 
 		ch->tty   = NULL;
 		ch->event = 0;
@@ -1389,8 +1382,6 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 	}
 
 
-	MOD_INC_USE_COUNT;
-
 	ch = &digi_channels[line];
 	boardnum = ch->boardnum;
 
@@ -1714,6 +1705,7 @@ int __init pc_init(void)
 	memset(&pc_info, 0, sizeof(struct tty_driver));
 
 	pc_driver.magic = TTY_DRIVER_MAGIC;
+	pc_driver.owner = THIS_MODULE;
 	pc_driver.name = "ttyD"; 
 	pc_driver.major = DIGI_MAJOR; 
 	pc_driver.minor_start = 0;
