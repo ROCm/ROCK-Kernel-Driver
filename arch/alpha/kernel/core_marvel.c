@@ -1058,10 +1058,10 @@ marvel_agp_info(void)
 		}
 	}
 
-	printk("MARVEL - using hose %d as AGP\n", hose->index);
-
 	if (!hose || !hose->sg_pci)
 		return NULL;
+
+	printk("MARVEL - using hose %d as AGP\n", hose->index);
 
 	/* 
 	 * Get the csrs from the hose.
