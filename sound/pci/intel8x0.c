@@ -1022,6 +1022,7 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	ichdev_t *ichdev = get_ichdev(substream);
+	unsigned long flags;
 	size_t ptr1, ptr;
 
 	ptr1 = igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << chip->pcm_pos_shift;
@@ -1029,7 +1030,9 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 		ptr = ichdev->fragsize1 - ptr1;
 	else
 		ptr = 0;
+	spin_lock_irqsave(&chip->reg_lock, flags);
 	ptr += ichdev->position;
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	if (ptr >= ichdev->size)
 		return 0;
 	return bytes_to_frames(substream->runtime, ptr);
