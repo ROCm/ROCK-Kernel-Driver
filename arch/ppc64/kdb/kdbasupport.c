@@ -1784,6 +1784,12 @@ kdb_debugger(struct pt_regs *regs) {
 	if (regs) {
 		if (regs->trap==0x100) {
 			kdb_reset_debugger(regs);
+			if (!(regs->msr & MSR_RI)) {
+				/* unrecoverable exception, spin forever, 
+				 * don't return to exception handler
+				 */
+				while (1) {}
+			}	
 		} else {
 			kdb(KDB_REASON_ENTER,regs->trap,regs);   /* ok */
 		}
