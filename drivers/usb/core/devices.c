@@ -232,13 +232,21 @@ static char *usb_dump_endpoint_descriptor (
 	return start;
 }
 
-static char *usb_dump_interface_descriptor(char *start, char *end, const struct usb_interface *iface, int setno)
+static char *usb_dump_interface_descriptor(char *start, char *end,
+	const struct usb_interface_cache *intfc,
+	const struct usb_interface *iface,
+	int setno)
 {
-	struct usb_interface_descriptor *desc = &iface->altsetting[setno].desc;
+	struct usb_interface_descriptor *desc = &intfc->altsetting[setno].desc;
+	char *driver_name = "";
 
 	if (start > end)
 		return start;
 	down_read(&usb_bus_type.subsys.rwsem);
+	if (iface)
+		driver_name = (iface->dev.driver
+				? iface->dev.driver->name
+				: "(none)");
 	start += sprintf(start, format_iface,
 			 desc->bInterfaceNumber,
 			 desc->bAlternateSetting,
@@ -247,9 +255,7 @@ static char *usb_dump_interface_descriptor(char *start, char *end, const struct 
 			 class_decode(desc->bInterfaceClass),
 			 desc->bInterfaceSubClass,
 			 desc->bInterfaceProtocol,
-			 iface->dev.driver
-				? iface->dev.driver->name
-				: "(none)");
+			 driver_name);
 	up_read(&usb_bus_type.subsys.rwsem);
 	return start;
 }
@@ -258,13 +264,14 @@ static char *usb_dump_interface(
 	int speed,
 	char *start,
 	char *end,
+	const struct usb_interface_cache *intfc,
 	const struct usb_interface *iface,
 	int setno
 ) {
-	struct usb_host_interface *desc = &iface->altsetting[setno];
+	struct usb_host_interface *desc = &intfc->altsetting[setno];
 	int i;
 
-	start = usb_dump_interface_descriptor(start, end, iface, setno);
+	start = usb_dump_interface_descriptor(start, end, intfc, iface, setno);
 	for (i = 0; i < desc->desc.bNumEndpoints; i++) {
 		if (start > end)
 			return start;
@@ -303,6 +310,7 @@ static char *usb_dump_config (
 )
 {
 	int i, j;
+	struct usb_interface_cache *intfc;
 	struct usb_interface *interface;
 
 	if (start > end)
@@ -311,14 +319,13 @@ static char *usb_dump_config (
 		return start + sprintf(start, "(null Cfg. desc.)\n");
 	start = usb_dump_config_descriptor(start, end, &config->desc, active);
 	for (i = 0; i < config->desc.bNumInterfaces; i++) {
+		intfc = config->intf_cache[i];
 		interface = config->interface[i];
-		if (!interface)
-			break;
-		for (j = 0; j < interface->num_altsetting; j++) {
+		for (j = 0; j < intfc->num_altsetting; j++) {
 			if (start > end)
 				return start;
 			start = usb_dump_interface(speed,
-					start, end, interface, j);
+				start, end, intfc, interface, j);
 		}
 	}
 	return start;
@@ -395,7 +402,7 @@ static char *usb_dump_desc(char *start, char *end, struct usb_device *dev)
 		return start;
 	
 	start = usb_dump_device_strings (start, end, dev);
-	
+
 	for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
 		if (start > end)
 			return start;

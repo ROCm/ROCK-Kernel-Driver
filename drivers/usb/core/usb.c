@@ -1127,7 +1127,7 @@ int usb_new_device(struct usb_device *dev)
 			/* heuristic:  Linux is more likely to have class
 			 * drivers, so avoid vendor-specific interfaces.
 			 */
-			desc = &dev->config[i].interface[0]
+			desc = &dev->config[i].intf_cache[0]
 					->altsetting->desc;
 			if (desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC)
 				continue;

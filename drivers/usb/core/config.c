@@ -96,19 +96,14 @@ static int usb_parse_endpoint(struct device *ddev, int cfgno, int inum,
 	return buffer - buffer0 + i;
 }
 
-static void usb_free_intf(struct usb_interface *intf)
+static void usb_release_interface_cache(struct kref *ref)
 {
+	struct usb_interface_cache *intfc = ref_to_usb_interface_cache(ref);
 	int j;
 
-	if (intf->altsetting) {
-		for (j = 0; j < intf->num_altsetting; j++) {
-			struct usb_host_interface *alt = &intf->altsetting[j];
-
-			kfree(alt->endpoint);
-		}
-		kfree(intf->altsetting);
-	}
-	kfree(intf);
+	for (j = 0; j < intfc->num_altsetting; j++)
+		kfree(intfc->altsetting[j].endpoint);
+	kfree(intfc);
 }
 
 static int usb_parse_interface(struct device *ddev, int cfgno,
@@ -117,7 +112,7 @@ static int usb_parse_interface(struct device *ddev, int cfgno,
 	unsigned char *buffer0 = buffer;
 	struct usb_interface_descriptor	*d;
 	int inum, asnum;
-	struct usb_interface *interface;
+	struct usb_interface_cache *intfc;
 	struct usb_host_interface *alt;
 	int i, n;
 	int len, retval;
@@ -137,16 +132,16 @@ static int usb_parse_interface(struct device *ddev, int cfgno,
 	if (inum >= config->desc.bNumInterfaces)
 		goto skip_to_next_interface_descriptor;
 
-	interface = config->interface[inum];
+	intfc = config->intf_cache[inum];
 	asnum = d->bAlternateSetting;
-	if (asnum >= interface->num_altsetting) {
+	if (asnum >= intfc->num_altsetting) {
 		dev_err(ddev, "config %d interface %d has an invalid "
 		    "alternate setting number: %d but max is %d\n",
-		    cfgno, inum, asnum, interface->num_altsetting - 1);
+		    cfgno, inum, asnum, intfc->num_altsetting - 1);
 		return -EINVAL;
 	}
 
-	alt = &interface->altsetting[asnum];
+	alt = &intfc->altsetting[asnum];
 	if (alt->desc.bLength) {
 		dev_err(ddev, "Duplicate descriptor for config %d "
 		    "interface %d altsetting %d\n", cfgno, inum, asnum);
@@ -210,11 +205,12 @@ int usb_parse_configuration(struct device *ddev, int cfgidx,
 	int cfgno;
 	int nintf, nintf_orig;
 	int i, j, n;
-	struct usb_interface *interface;
+	struct usb_interface_cache *intfc;
 	unsigned char *buffer2;
 	int size2;
 	struct usb_descriptor_header *header;
 	int len, retval;
+	u8 nalts[USB_MAXINTERFACES];
 
 	memcpy(&config->desc, buffer, USB_DT_CONFIG_SIZE);
 	if (config->desc.bDescriptorType != USB_DT_CONFIG ||
@@ -237,14 +233,7 @@ int usb_parse_configuration(struct device *ddev, int cfgidx,
 		    cfgno, nintf, USB_MAXINTERFACES);
 		config->desc.bNumInterfaces = nintf = USB_MAXINTERFACES;
 	}
-
-	for (i = 0; i < nintf; ++i) {
-		interface = config->interface[i] =
-		    kmalloc(sizeof(struct usb_interface), GFP_KERNEL);
-		if (!interface)
-			return -ENOMEM;
-		memset(interface, 0, sizeof(struct usb_interface));
-	}
+	memset(nalts, 0, nintf);
 
 	/* Go through the descriptors, checking their length and counting the
 	 * number of altsettings for each interface */
@@ -277,8 +266,8 @@ int usb_parse_configuration(struct device *ddev, int cfgidx,
 				    cfgno, i, nintf_orig - 1);
 				return -EINVAL;
 			}
-			if (i < nintf)
-				++config->interface[i]->num_altsetting;
+			if (i < nintf && nalts[i] < 255)
+				++nalts[i];
 
 		} else if (header->bDescriptorType == USB_DT_DEVICE ||
 			    header->bDescriptorType == USB_DT_CONFIG) {
@@ -290,29 +279,29 @@ int usb_parse_configuration(struct device *ddev, int cfgidx,
 
 	}	/* for ((buffer2 = buffer, size2 = size); ...) */
 
-	/* Allocate the altsetting arrays */
+	/* Allocate the usb_interface_caches and altsetting arrays */
 	for (i = 0; i < nintf; ++i) {
-		interface = config->interface[i];
-		if (interface->num_altsetting > USB_MAXALTSETTING) {
+		j = nalts[i];
+		if (j > USB_MAXALTSETTING) {
 			dev_err(ddev, "too many alternate settings for "
 			    "config %d interface %d: %d, "
 			    "maximum allowed: %d\n",
-			    cfgno, i, interface->num_altsetting,
-			    USB_MAXALTSETTING);
+			    cfgno, i, j, USB_MAXALTSETTING);
 			return -EINVAL;
 		}
-		if (interface->num_altsetting == 0) {
+		if (j == 0) {
 			dev_err(ddev, "config %d has no interface number "
 			    "%d\n", cfgno, i);
 			return -EINVAL;
 		}
 
-		len = sizeof(*interface->altsetting) *
-		    interface->num_altsetting;
-		interface->altsetting = kmalloc(len, GFP_KERNEL);
-		if (!interface->altsetting)
+		len = sizeof(*intfc) + sizeof(struct usb_host_interface) * j;
+		config->intf_cache[i] = intfc = kmalloc(len, GFP_KERNEL);
+		if (!intfc)
 			return -ENOMEM;
-		memset(interface->altsetting, 0, len);
+		memset(intfc, 0, len);
+		intfc->num_altsetting = j;
+		kref_init(&intfc->ref, usb_release_interface_cache);
 	}
 
 	/* Skip over any Class Specific or Vendor Specific descriptors;
@@ -340,9 +329,9 @@ int usb_parse_configuration(struct device *ddev, int cfgidx,
 
 	/* Check for missing altsettings */
 	for (i = 0; i < nintf; ++i) {
-		interface = config->interface[i];
-		for (j = 0; j < interface->num_altsetting; ++j) {
-			if (!interface->altsetting[j].desc.bLength) {
+		intfc = config->intf_cache[i];
+		for (j = 0; j < intfc->num_altsetting; ++j) {
+			if (!intfc->altsetting[j].desc.bLength) {
 				dev_err(ddev, "config %d interface %d has no "
 				    "altsetting %d\n", cfgno, i, j);
 				return -EINVAL;
@@ -374,10 +363,8 @@ void usb_destroy_configuration(struct usb_device *dev)
 		struct usb_host_config *cf = &dev->config[c];
 
 		for (i = 0; i < cf->desc.bNumInterfaces; i++) {
-			struct usb_interface *ifp = cf->interface[i];
-
-			if (ifp)
-				usb_free_intf(ifp);
+			if (cf->intf_cache[i])
+				kref_put(&cf->intf_cache[i]->ref);
 		}
 	}
 	kfree(dev->config);
