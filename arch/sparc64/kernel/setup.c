@@ -465,8 +465,6 @@ extern int root_mountflags;
 char saved_command_line[256];
 char reboot_command[256];
 
-extern unsigned long phys_base;
-
 static struct pt_regs fake_swapper_regs = { { 0, }, 0, 0, 0, 0 };
 
 void register_prom_callbacks(void)
@@ -535,6 +533,7 @@ void __init setup_arch(char **cmdline_p)
 		if (highest_paddr < top)
 			highest_paddr = top;
 	}
+	pfn_base = phys_base >> PAGE_SHIFT;
 
 	if (!root_flags)
 		root_mountflags &= ~MS_RDONLY;

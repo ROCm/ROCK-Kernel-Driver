@@ -116,6 +116,7 @@ extern void _do_write_unlock(rwlock_t *rw);
 #endif
 
 extern unsigned long phys_base;
+extern unsigned long pfn_base;
 
 /* used by various drivers */
 #ifdef CONFIG_SMP
@@ -353,6 +354,7 @@ EXPORT_SYMBOL(__bzero_noasi);
 
 /* Various address conversion macros use this. */
 EXPORT_SYMBOL(phys_base);
+EXPORT_SYMBOL(pfn_base);
 EXPORT_SYMBOL(sparc64_valid_addr_bitmap);
 
 /* No version information on this, heavily used in inline asm,
