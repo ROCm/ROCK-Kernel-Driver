@@ -1,7 +1,7 @@
 /*
  *   fs/cifs_debug.c
  *
- *   Copyright (c) International Business Machines  Corp., 2000,2002
+ *   Copyright (C) International Business Machines  Corp., 2000,2003
  *
  *   Modified by Steve French (sfrench@us.ibm.com)
  *
@@ -84,12 +84,12 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) Name: %s  Domain: %s Mounts: %d ServerOS: %s  ServerNOS: %s\n\tCapabilities: 0x%x",
+			    "\n%d) Name: %s  Domain: %s Mounts: %d ServerOS: %s  \n\tServerNOS: %s\tCapabilities: 0x%x",
 				i, ses->serverName, ses->serverDomain, atomic_read(&ses->inUse),
 				ses->serverOS, ses->serverNOS, ses->capabilities);
 		buf += length;
 		if(ses->server)
-			buf += sprintf(buf, "\tLocal Users To Same Server: %d SecMode: 0x%x",
+			buf += sprintf(buf, "\n\tLocal Users To Same Server: %d SecMode: 0x%x",
 				atomic_read(&ses->server->socketUseCount),ses->server->secMode);
 	}
 	read_unlock(&GlobalSMBSeslock);
@@ -123,6 +123,8 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 			    sprintf(buf, " type: %d ",
 				    tcon->fsDevInfo.DeviceType);
 		buf += length;
+		if(tcon->tidStatus == CifsNeedReconnect)
+			buf += sprintf(buf, "\tDISCONNECTED ");
 	}
 	read_unlock(&GlobalSMBSeslock);
 	length = sprintf(buf, "\n");
