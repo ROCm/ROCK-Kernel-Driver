@@ -1027,10 +1027,10 @@ int blk_remove_plug(request_queue_t *q)
  */
 static inline void __generic_unplug_device(request_queue_t *q)
 {
-	if (!blk_remove_plug(q))
+	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
 		return;
 
-	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
+	if (!blk_remove_plug(q))
 		return;
 
 	del_timer(&q->unplug_timer);
