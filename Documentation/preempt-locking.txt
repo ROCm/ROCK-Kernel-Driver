@@ -70,7 +70,8 @@ duration of the critical region.
 preempt_enable()		decrement the preempt counter
 preempt_disable()		increment the preempt counter
 preempt_enable_no_resched()	decrement, but do not immediately preempt
-preempt_get_count()		return the preempt counter
+preempt_check_resched()		if needed, reschedule
+preempt_count()			return the preempt counter
 
 The functions are nestable.  In other words, you can call preempt_disable
 n-times in a code path, and preemption will not be reenabled until the n-th
