@@ -1043,7 +1043,7 @@ int pcmcia_bind_device(bind_req_t *req)
     client_t *client;
     struct pcmcia_socket *s;
 
-    s = pcmcia_get_socket_by_nr(req->Socket);
+    s = req->Socket;
     if (!s)
 	    return CS_BAD_SOCKET;
 
@@ -1079,7 +1079,7 @@ int pcmcia_bind_mtd(mtd_bind_t *req)
     socket_info_t *s;
     memory_handle_t region;
     
-    s = pcmcia_get_socket_by_nr(req->Socket);
+    s = req->Socket;
     if (!s)
 	    return CS_BAD_SOCKET;
     

@@ -301,7 +301,7 @@ static int bind_mtd(struct pcmcia_bus_socket *bus_sock, mtd_info_t *mtd_info)
 
     bind_req.dev_info = &mtd_info->dev_info;
     bind_req.Attributes = mtd_info->Attributes;
-    bind_req.Socket = bus_sock->socket_no;
+    bind_req.Socket = bus_sock->parent;
     bind_req.CardOffset = mtd_info->CardOffset;
     ret = pcmcia_bind_mtd(&bind_req);
     if (ret != CS_SUCCESS) {
@@ -351,7 +351,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     if (!try_module_get(driver->owner))
 	    return -EINVAL;
 
-    bind_req.Socket = s->socket_no;
+    bind_req.Socket = s->parent;
     bind_req.Function = bind_info->function;
     bind_req.dev_info = (dev_info_t *) driver->drv.name;
     ret = pcmcia_bind_device(&bind_req);
@@ -852,7 +852,7 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	/* Set up hotline to Card Services */
 	client_reg.dev_info = bind.dev_info = &dev_info;
 
-	bind.Socket = s->socket_no;
+	bind.Socket = socket;
 	bind.Function = BIND_FN_ALL;
 	ret = pcmcia_bind_device(&bind);
 	if (ret != CS_SUCCESS) {
