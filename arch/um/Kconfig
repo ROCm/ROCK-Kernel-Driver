@@ -263,7 +263,7 @@ source "drivers/base/Kconfig"
 
 source "arch/um/Kconfig_char"
 
-source "arch/um/Kconfig_block"
+source "drivers/block/Kconfig"
 
 config NETDEVICES
 	bool
