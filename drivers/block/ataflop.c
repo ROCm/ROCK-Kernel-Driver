@@ -625,8 +625,10 @@ static void fd_error( void )
 		wake_up( &format_wait );
 		return;
 	}
-		
-	if (QUEUE_EMPTY) return;
+
+	if (blk_queue_empty(QUEUE))
+		return;
+
 	CURRENT->errors++;
 	if (CURRENT->errors >= MAX_ERRORS) {
 		printk(KERN_ERR "fd%d: too many errors.\n", SelectedDrive );
@@ -1335,16 +1337,6 @@ static void finish_fdc_done( int dummy )
 static int fd_ref[4] = { 0,0,0,0 };
 static int fd_device[4] = { 0,0,0,0 };
 
-/*
- * Current device number. Taken either from the block header or from the
- * format request descriptor.
- */
-#define CURRENT_DEVICE (CURRENT->rq_dev)
-
-/* Current error count. */
-#define CURRENT_ERRORS (CURRENT->errors)
-
-
 /* dummy for blk.h */
 static void floppy_off( unsigned int nr) {}
 
@@ -1437,7 +1429,7 @@ static void setup_req_params( int drive )
 	ReqData = ReqBuffer + 512 * ReqCnt;
 
 	if (UseTrackbuffer)
-		read_track = (ReqCmd == READ && CURRENT_ERRORS == 0);
+		read_track = (ReqCmd == READ && CURRENT->errors == 0);
 	else
 		read_track = 0;
 
@@ -1451,18 +1443,14 @@ static void redo_fd_request(void)
 	int device, drive, type;
   
 	DPRINT(("redo_fd_request: CURRENT=%08lx CURRENT->dev=%04x CURRENT->sector=%ld\n",
-		(unsigned long)CURRENT, !QUEUE_EMPTY ? CURRENT->rq_dev : 0,
-		!QUEUE_EMPTY ? CURRENT->sector : 0 ));
+		(unsigned long)CURRENT, !blk_queue_empty(QUEUE) ? CURRENT->rq_dev : 0,
+		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0 ));
 
 	IsFormatting = 0;
 
-	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE){
-		return;
-	}
-
 repeat:
-    
-	if (QUEUE_EMPTY)
+
+	if (blk_queue_empty(QUEUE))
 		goto the_end;
 
 	if (major(CURRENT->rq_dev) != MAJOR_NR)
@@ -1471,7 +1459,7 @@ repeat:
 	if (CURRENT->bh && !buffer_locked(CURRENT->bh))
 		panic(DEVICE_NAME ": block not locked");
 
-	device = minor(CURRENT_DEVICE);
+	device = minor(CURRENT->rq_dev);
 	drive = device & 3;
 	type = device >> 2;
 	

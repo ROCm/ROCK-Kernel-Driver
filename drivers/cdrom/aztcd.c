@@ -226,9 +226,13 @@
 #define AZT_DEBUG_MULTISESSION
 #endif
 
-#define CURRENT_VALID \
-  (!QUEUE_EMPTY && major(CURRENT -> rq_dev) == MAJOR_NR && CURRENT -> cmd == READ \
-   && CURRENT -> sector != -1)
+static int current_valid(void)
+{
+        return !blk_queue_empty(QUEUE) &&
+	        major(CURRENT->rq_dev) == MAJOR_NR &&
+		CURRENT->cmd == READ &&
+		CURRENT->sector != -1;
+}
 
 #define AFL_STATUSorDATA (AFL_STATUS | AFL_DATA)
 #define AZT_BUF_SIZ 16
@@ -1554,34 +1558,33 @@ static void azt_transfer(void)
 #ifdef AZT_TEST
 	printk("aztcd: executing azt_transfer Time:%li\n", jiffies);
 #endif
-	if (CURRENT_VALID) {
-		while (CURRENT->nr_sectors) {
-			int bn = CURRENT->sector / 4;
-			int i;
-			for (i = 0; i < AZT_BUF_SIZ && azt_buf_bn[i] != bn;
-			     ++i);
-			if (i < AZT_BUF_SIZ) {
-				int offs =
-				    (i * 4 + (CURRENT->sector & 3)) * 512;
-				int nr_sectors = 4 - (CURRENT->sector & 3);
-				if (azt_buf_out != i) {
-					azt_buf_out = i;
-					if (azt_buf_bn[i] != bn) {
-						azt_buf_out = -1;
-						continue;
-					}
+	if (!current_valid())
+	        return;
+
+	while (CURRENT->nr_sectors) {
+		int bn = CURRENT->sector / 4;
+		int i;
+		for (i = 0; i < AZT_BUF_SIZ && azt_buf_bn[i] != bn; ++i);
+		if (i < AZT_BUF_SIZ) {
+			int offs = (i * 4 + (CURRENT->sector & 3)) * 512;
+			int nr_sectors = 4 - (CURRENT->sector & 3);
+			if (azt_buf_out != i) {
+				azt_buf_out = i;
+				if (azt_buf_bn[i] != bn) {
+					azt_buf_out = -1;
+					continue;
 				}
-				if (nr_sectors > CURRENT->nr_sectors)
-					nr_sectors = CURRENT->nr_sectors;
-				memcpy(CURRENT->buffer, azt_buf + offs,
-				       nr_sectors * 512);
-				CURRENT->nr_sectors -= nr_sectors;
-				CURRENT->sector += nr_sectors;
-				CURRENT->buffer += nr_sectors * 512;
-			} else {
-				azt_buf_out = -1;
-				break;
 			}
+			if (nr_sectors > CURRENT->nr_sectors)
+			    nr_sectors = CURRENT->nr_sectors;
+			memcpy(CURRENT->buffer, azt_buf + offs,
+				nr_sectors * 512);
+			CURRENT->nr_sectors -= nr_sectors;
+			CURRENT->sector += nr_sectors;
+			CURRENT->buffer += nr_sectors * 512;
+		} else {
+			azt_buf_out = -1;
+			break;
 		}
 	}
 }
@@ -1598,7 +1601,7 @@ static void do_aztcd_request(request_queue_t * q)
 		return;
 	}
 	azt_transfer_is_active = 1;
-	while (CURRENT_VALID) {
+	while (current_valid()) {
 		azt_transfer();
 		if (CURRENT->nr_sectors == 0) {
 			end_request(1);
@@ -1607,7 +1610,7 @@ static void do_aztcd_request(request_queue_t * q)
 			if (azt_state == AZT_S_IDLE) {
 				if ((!aztTocUpToDate) || aztDiskChanged) {
 					if (aztUpdateToc() < 0) {
-						while (CURRENT_VALID)
+						while (current_valid())
 							end_request(0);
 						break;
 					}
@@ -1991,7 +1994,7 @@ static void azt_poll(void)
 				AztTries = 0;
 				loop_ctl = 0;
 			}
-			if (CURRENT_VALID)
+			if (current_valid())
 				end_request(0);
 			AztTries = 5;
 		}
@@ -2065,7 +2068,7 @@ static void azt_poll(void)
 					break;
 				}
 				azt_state = AZT_S_IDLE;
-				while (CURRENT_VALID)
+				while (current_valid())
 					end_request(0);
 				return;
 			}
@@ -2120,12 +2123,12 @@ static void azt_poll(void)
 					break;
 				}
 				azt_state = AZT_S_IDLE;
-				while (CURRENT_VALID)
+				while (current_valid())
 					end_request(0);
 				return;
 			}
 
-			if (CURRENT_VALID) {
+			if (current_valid()) {
 				struct azt_Play_msf msf;
 				int i;
 				azt_next_bn = CURRENT->sector / 4;
@@ -2218,7 +2221,7 @@ static void azt_poll(void)
 						AztTries = 0;
 						break;
 					}
-					if (CURRENT_VALID)
+					if (current_valid())
 						end_request(0);
 					AztTries = 5;
 				}
@@ -2246,8 +2249,7 @@ static void azt_poll(void)
 				}
 #endif
 				AztTries = 5;
-				if (!CURRENT_VALID
-				    && azt_buf_in == azt_buf_out) {
+				if (!current_valid() && azt_buf_in == azt_buf_out) {
 					azt_state = AZT_S_STOP;
 					loop_ctl = 1;
 					break;
@@ -2319,7 +2321,7 @@ static void azt_poll(void)
 					}
 				}
 				if (!azt_transfer_is_active) {
-					while (CURRENT_VALID) {
+					while (current_valid()) {
 						azt_transfer();
 						if (CURRENT->nr_sectors ==
 						    0)
@@ -2329,7 +2331,7 @@ static void azt_poll(void)
 					}
 				}
 
-				if (CURRENT_VALID
+				if (current_valid()
 				    && (CURRENT->sector / 4 < azt_next_bn
 					|| CURRENT->sector / 4 >
 					azt_next_bn + AZT_BUF_SIZ)) {
@@ -2403,10 +2405,10 @@ static void azt_poll(void)
 
 #ifdef AZT_TEST3
 			printk("CURRENT_VALID %d azt_mode %d\n",
-			       CURRENT_VALID, azt_mode);
+			       current_valid(), azt_mode);
 #endif
 
-			if (CURRENT_VALID) {
+			if (current_valid()) {
 				if (st != -1) {
 					if (azt_mode == 1) {
 						azt_state = AZT_S_READ;

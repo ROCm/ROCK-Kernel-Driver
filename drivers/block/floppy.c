@@ -2918,14 +2918,8 @@ static void redo_fd_request(void)
 	if (current_drive < N_DRIVE)
 		floppy_off(current_drive);
 
-	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE){
-		CLEAR_INTR;
-		unlock_fdc();
-		return;
-	}
-
-	while(1){
-		if (QUEUE_EMPTY) {
+	for (;;) {
+		if (blk_queue_empty(QUEUE)) {
 			CLEAR_INTR;
 			unlock_fdc();
 			return;

@@ -19,15 +19,6 @@
 #define DEVICE_NR(device) (device)
 #define LOCAL_END_REQUEST
 #include <linux/blk.h>
-/* for old kernels... */
-#ifndef QUEUE_EMPTY
-#define QUEUE_EMPTY  (!CURRENT)
-#endif
-#if LINUX_VERSION_CODE < 0x20300
-#define QUEUE_PLUGGED (blk_dev[MAJOR_NR].plug_tq.sync)
-#else
-#define QUEUE_PLUGGED (blk_queue_plugged(QUEUE))
-#endif
 
 #ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
@@ -486,7 +477,7 @@ int mtdblock_thread(void *dummy)
 		add_wait_queue(&thr_wq, &wait);
 		set_current_state(TASK_INTERRUPTIBLE);
 		spin_lock_irq(QUEUE->queue_lock);
-		if (QUEUE_EMPTY || QUEUE_PLUGGED) {
+		if (blk_queue_empty(QUEUE) || blk_queue_plugged(QUEUE)) {
 			spin_unlock_irq(QUEUE->queue_lock);
 			schedule();
 			remove_wait_queue(&thr_wq, &wait); 

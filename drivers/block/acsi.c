@@ -768,7 +768,7 @@ static void unexpected_acsi_interrupt( void )
 static void bad_rw_intr( void )
 
 {
-	if (QUEUE_EMPTY)
+	if (blk_queue_empty(QUEUE))
 		return;
 
 	if (++CURRENT->errors >= MAX_ERRORS)
@@ -842,7 +842,8 @@ static void acsi_times_out( unsigned long dummy )
 
 	DEVICE_INTR = NULL;
 	printk( KERN_ERR "ACSI timeout\n" );
-	if (QUEUE_EMPTY) return;
+	if (blk_queue_empty(QUEUE))
+	    return;
 	if (++CURRENT->errors >= MAX_ERRORS) {
 #ifdef DEBUG
 		printk( KERN_ERR "ACSI: too many errors.\n" );
@@ -951,40 +952,20 @@ static void redo_acsi_request( void )
 	char 				*buffer;
 	unsigned long		pbuffer;
 	struct buffer_head	*bh;
-	
-	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE) {
-		if (!DEVICE_INTR) {
-			ENABLE_IRQ();
-			stdma_release();
-		}
-		return;
-	}
-
-	if (DEVICE_INTR)
-		return;
 
   repeat:
 	CLEAR_TIMER();
-	/* Another check here: An interrupt or timer event could have
-	 * happened since the last check!
-	 */
-	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE) {
-		if (!DEVICE_INTR) {
-			ENABLE_IRQ();
-			stdma_release();
-		}
-		return;
-	}
+
 	if (DEVICE_INTR)
 		return;
 
-	if (QUEUE_EMPTY) {
+	if (blk_queue_empty(QUEUE)) {
 		CLEAR_INTR;
 		ENABLE_IRQ();
 		stdma_release();
 		return;
 	}
-	
+
 	if (MAJOR(CURRENT->rq_dev) != MAJOR_NR)
 		panic(DEVICE_NAME ": request list destroyed");
 	if (CURRENT->bh) {

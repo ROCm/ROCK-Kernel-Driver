@@ -167,7 +167,7 @@ static void dump_status (const char *msg, unsigned int stat)
 	unsigned long flags;
 	char devc;
 
-	devc = !QUEUE_EMPTY ? 'a' + DEVICE_NR(CURRENT->rq_dev) : '?';
+	devc = !blk_queue_empty(QUEUE) ? 'a' + DEVICE_NR(CURRENT->rq_dev) : '?';
 	save_flags (flags);
 	sti();
 #ifdef VERBOSE_ERRORS
@@ -196,7 +196,7 @@ static void dump_status (const char *msg, unsigned int stat)
 		if (hd_error & (BBD_ERR|ECC_ERR|ID_ERR|MARK_ERR)) {
 			printk(", CHS=%d/%d/%d", (inb(HD_HCYL)<<8) + inb(HD_LCYL),
 				inb(HD_CURRENT) & 0xf, inb(HD_SECTOR));
-			if (!QUEUE_EMPTY)
+			if (!blk_queue_empty(QUEUE))
 				printk(", sector=%ld", CURRENT->sector);
 		}
 		printk("\n");
@@ -373,7 +373,7 @@ static void bad_rw_intr(void)
 {
 	int dev;
 
-	if (QUEUE_EMPTY)
+	if (blk_queue_empty(QUEUE))
 		return;
 	dev = DEVICE_NR(CURRENT->rq_dev);
 	if (++CURRENT->errors >= MAX_ERRORS || (hd_error & BBD_ERR)) {
@@ -436,7 +436,7 @@ ok_to_read:
 #if (HD_DELAY > 0)
 	last_req = read_timer();
 #endif
-	if (!QUEUE_EMPTY)
+	if (!blk_queue_empty(QUEUE))
 		hd_request();
 	return;
 }
@@ -497,8 +497,10 @@ static void hd_times_out(unsigned long dummy)
 	unsigned int dev;
 
 	DEVICE_INTR = NULL;
-	if (QUEUE_EMPTY)
+
+	if (blk_queue_empty(QUEUE))
 		return;
+
 	disable_irq(HD_IRQ);
 	sti();
 	reset = 1;
