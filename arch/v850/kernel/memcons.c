@@ -58,11 +58,12 @@ static void memcons_write (struct console *co, const char *buf, unsigned len)
 		len -= write (buf, len);
 }
 
-extern struct tty_driver tty_driver;
+static struct tty_driver *tty_driver;
+
 static struct tty_driver *memcons_device (struct console *co, int *index)
 {
 	*index = co->index;
-	return &tty_driver;
+	return tty_driver;
 }
 
 static struct console memcons =
@@ -81,8 +82,6 @@ void memcons_setup (void)
 }
 
 /* Higher level TTY interface.  */
-
-static struct tty_driver tty_driver = { 0 };
 
 int memcons_tty_open (struct tty_struct *tty, struct file *filp)
 {
@@ -106,21 +105,32 @@ int memcons_tty_chars_in_buffer (struct tty_struct *tty)
 	return 0;
 }
 
+static struct tty_operations ops = {
+	.open = memcons_tty_open,
+	.write = memcons_tty_write,
+	.write_room = memcons_tty_write_room,
+	.chars_in_buffer = memcons_tty_chars_in_buffer,
+};
+
 int __init memcons_tty_init (void)
 {
-	tty_driver.name = "memcons";
-	tty_driver.major = TTY_MAJOR;
-	tty_driver.minor_start = 64;
-	tty_driver.num = 1;
-	tty_driver.type = TTY_DRIVER_TYPE_SYSCONS;
+	int err;
+	struct tty_driver *driver = alloc_tty_driver(1);
+	if (!driver)
+		return -ENOMEM;
 
-	tty_driver.init_termios = tty_std_termios;
-
-	tty_driver.open = memcons_tty_open;
-	tty_driver.write = memcons_tty_write;
-	tty_driver.write_room = memcons_tty_write_room;
-	tty_driver.chars_in_buffer = memcons_tty_chars_in_buffer;
-
-	tty_register_driver (&tty_driver);
+	driver->name = "memcons";
+	driver->major = TTY_MAJOR;
+	driver->minor_start = 64;
+	driver->type = TTY_DRIVER_TYPE_SYSCONS;
+	driver->init_termios = tty_std_termios;
+	tty_set_operations(driver, &ops);
+	err = tty_register_driver(driver);
+	if (err) {
+		put_tty_driver(driver);
+		return err;
+	}
+	tty_driver = driver;
+	return 0;
 }
 __initcall (memcons_tty_init);
