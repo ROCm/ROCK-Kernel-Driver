@@ -59,6 +59,7 @@
 #include <linux/slab.h>
 #include <linux/hdreg.h>
 #include <linux/spinlock.h>
+#include <linux/bio.h>
 
 #include <linux/notifier.h>
 #include <linux/reboot.h>
@@ -173,6 +174,7 @@ struct i2ob_iop_queue
 	struct i2ob_request request_queue[MAX_I2OB_DEPTH];
 	struct i2ob_request *i2ob_qhead;
 	request_queue_t req_queue;
+	spinlock_t lock;
 };
 static struct i2ob_iop_queue *i2ob_queues[MAX_I2O_CONTROLLERS];
 static struct i2ob_request *i2ob_backlog[MAX_I2O_CONTROLLERS];
@@ -185,7 +187,8 @@ static struct i2ob_request *i2ob_backlog_tail[MAX_I2O_CONTROLLERS];
 static struct i2ob_device i2ob_dev[MAX_I2OB<<4];
 static int i2ob_dev_count = 0;
 static struct hd_struct i2ob[MAX_I2OB<<4];
-static struct gendisk i2ob_gendisk;	/* Declared later */
+static struct gendisk i2o_disk[MAX_I2OB];
+static char i2o_names[MAX_I2OB * 8];
 
 /*
  * Mutex and spin lock for event handling synchronization
@@ -211,7 +214,6 @@ static int i2ob_backlog_request(struct i2o_controller *, struct i2ob_device *);
 static int i2ob_init_iop(unsigned int);
 static request_queue_t* i2ob_get_queue(kdev_t);
 static int i2ob_query_device(struct i2ob_device *, int, int, void*, int);
-static int do_i2ob_revalidate(kdev_t, int);
 static int i2ob_evt(void *);
 
 static int evt_pid = 0;
@@ -477,10 +479,10 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 		ireq=&i2ob_queues[c->unit]->request_queue[m[3]];
 		ireq->req->errors++;
 
-		spin_lock_irqsave(&I2O_LOCK(c->unit), flags);
+		spin_lock_irqsave(I2O_LOCK(c->unit), flags);
 		i2ob_unhook_request(ireq, c->unit);
 		i2ob_end_request(ireq->req);
-		spin_unlock_irqrestore(&I2O_LOCK(c->unit), flags);
+		spin_unlock_irqrestore(I2O_LOCK(c->unit), flags);
 	
 		/* Now flush the message by making it a NOP */
 		m[0]&=0x00FFFFFF;
@@ -501,12 +503,12 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 
 	if(msg->function == I2O_CMD_BLOCK_CFLUSH)
 	{
-		spin_lock_irqsave(&I2O_LOCK(c->unit), flags);
+		spin_lock_irqsave(I2O_LOCK(c->unit), flags);
 		dev->constipated=0;
 		DEBUG(("unconstipated\n"));
 		if(i2ob_backlog_request(c, dev)==0)
 			i2ob_request(dev->req_queue);
-		spin_unlock_irqrestore(&I2O_LOCK(c->unit), flags);
+		spin_unlock_irqrestore(I2O_LOCK(c->unit), flags);
 		return;
 	}
 
@@ -522,10 +524,10 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 		ireq=&i2ob_queues[c->unit]->request_queue[m[3]];
 		ireq->req->errors++;
 		printk(KERN_WARNING "I2O Block: Data transfer to deleted device!\n");
-		spin_lock_irqsave(&I2O_LOCK(c->unit), flags);
+		spin_lock_irqsave(I2O_LOCK(c->unit), flags);
 		i2ob_unhook_request(ireq, c->unit);
 		i2ob_end_request(ireq->req);
-		spin_unlock_irqrestore(&I2O_LOCK(c->unit), flags);
+		spin_unlock_irqrestore(I2O_LOCK(c->unit), flags);
 		return;
 	}	
 
@@ -571,7 +573,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 		 */
 		 
 		
-		spin_lock_irqsave(&I2O_LOCK(c->unit), flags);
+		spin_lock_irqsave(I2O_LOCK(c->unit), flags);
 		if(err==4)
 		{
 			/*
@@ -616,7 +618,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 			 */
 			 
 			i2ob_request(dev->req_queue);
-			spin_unlock_irqrestore(&I2O_LOCK(c->unit), flags);
+			spin_unlock_irqrestore(I2O_LOCK(c->unit), flags);
 			
 			/*
 			 *	and out
@@ -624,7 +626,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 			 
 			return;	
 		}
-		spin_unlock_irqrestore(&I2O_LOCK(c->unit), flags);
+		spin_unlock_irqrestore(I2O_LOCK(c->unit), flags);
 		printk(KERN_ERR "\n/dev/%s error: %s", dev->i2odev->dev_name, 
 			bsa_errors[m[4]&0XFFFF]);
 		if(m[4]&0x00FF0000)
@@ -640,7 +642,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 	 *	may be running polled controllers from a BH...
 	 */
 
-	spin_lock_irqsave(&I2O_LOCK(c->unit), flags);
+	spin_lock_irqsave(I2O_LOCK(c->unit), flags);
 	i2ob_unhook_request(ireq, c->unit);
 	i2ob_end_request(ireq->req);
 	atomic_dec(&i2ob_queues[c->unit]->queue_depth);
@@ -652,7 +654,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 	if(i2ob_backlog_request(c, dev)==0)
 		i2ob_request(dev->req_queue);
 
-	spin_unlock_irqrestore(&I2O_LOCK(c->unit), flags);
+	spin_unlock_irqrestore(I2O_LOCK(c->unit), flags);
 }
 
 /* 
@@ -715,8 +717,14 @@ static int i2ob_evt(void *dummy)
 			 */
 			case I2O_EVT_IND_BSA_VOLUME_LOAD:
 			{
+				struct gendisk *p = &i2o_disk[unit>>4];
 				i2ob_install_device(i2ob_dev[unit].i2odev->controller, 
 					i2ob_dev[unit].i2odev, unit);
+				add_gendisk(p);
+				register_disk(p,
+					      mk_kdev(p->major, p->first_minor),
+					      1<<p->minor_shift, p->fops,
+					      i2ob[unit].nr_sects);
 				break;
 			}
 
@@ -728,12 +736,11 @@ static int i2ob_evt(void *dummy)
 			 */
 			case I2O_EVT_IND_BSA_VOLUME_UNLOAD:
 			{
+				struct gendisk *p = &i2o_disk[unit>>4];
+				wipe_partitions(mk_kdev(MAJOR_NR, unit));
+				del_gendisk(p);
 				for(i = unit; i <= unit+15; i++)
-				{
 					blk_queue_max_sectors(i2ob_dev[i].req_queue, 0);
-					i2ob[i].nr_sects = 0;
-					i2ob_gendisk.part[i].nr_sects = 0;
-				}
 				i2ob_media_change_flag[unit] = 1;
 				break;
 			}
@@ -758,16 +765,12 @@ static int i2ob_evt(void *dummy)
 			{
 				u64 size;
 
-				if(do_i2ob_revalidate(mk_kdev(MAJOR_NR, unit),0) != -EBUSY)
-					continue;
-
 	  			if(i2ob_query_device(&i2ob_dev[unit], 0x0004, 0, &size, 8) !=0 )
 					i2ob_query_device(&i2ob_dev[unit], 0x0000, 4, &size, 8);
 
-				spin_lock_irqsave(&I2O_LOCK(unit), flags);	
-				i2ob_gendisk.part[unit].nr_sects = size>>9;
-				i2ob[unit].nr_sects = (int)(size>>9);
-				spin_unlock_irqrestore(&I2O_LOCK(unit), flags);	
+				spin_lock_irqsave(I2O_LOCK(unit), flags);	
+				i2ob[unit].nr_sects = size>>9;
+				spin_unlock_irqrestore(I2O_LOCK(unit), flags);	
 				break;
 			}
 
@@ -827,7 +830,7 @@ static void i2ob_timer_handler(unsigned long q)
 	 * We cannot touch the request queue or the timer
          * flag without holding the queue_lock
 	 */
-	spin_lock_irqsave(&req_queue->queue_lock,flags);
+	spin_lock_irqsave(req_queue->queue_lock,flags);
 
 	/* 
 	 * Clear the timer started flag so that 
@@ -843,7 +846,7 @@ static void i2ob_timer_handler(unsigned long q)
 	/* 
 	 * Free the lock.
 	 */
-	spin_unlock_irqrestore(&req_queue->queue_lock,flags);
+	spin_unlock_irqrestore(req_queue->queue_lock,flags);
 }
 
 static int i2ob_backlog_request(struct i2o_controller *c, struct i2ob_device *dev)
@@ -1028,37 +1031,6 @@ static void i2o_block_biosparam(
 	*hds  = (unsigned char) heads; 
 }
 
-
-/*
- *	Rescan the partition tables
- */
- 
-static int do_i2ob_revalidate(kdev_t dev, int maxu)
-{
-	int minor=minor(dev);
-	int i;
-	
-	minor&=0xF0;
-
-	i2ob_dev[minor].refcnt++;
-	if(i2ob_dev[minor].refcnt>maxu+1)
-	{
-		i2ob_dev[minor].refcnt--;
-		return -EBUSY;
-	}
-	
-	wipe_partitions(mk_kdev(MAJOR_NR, minor), 1);
-
-	/*
-	 *	Do a physical check and then reconfigure
-	 */
-	 
-	i2ob_install_device(i2ob_dev[minor].controller, i2ob_dev[minor].i2odev,
-		minor);
-	i2ob_dev[minor].refcnt--;
-	return 0;
-}
-
 /*
  *	Issue device specific ioctl calls.
  */
@@ -1066,33 +1038,19 @@ static int do_i2ob_revalidate(kdev_t dev, int maxu)
 static int i2ob_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
+	struct hd_geometry g;
+	int u = minor(inode->i_rdev) & 0xF0;
 	/* Anyone capable of this syscall can do *real bad* things */
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
-	if (!inode || kdev_none(inode->i_rdev))
-		return -EINVAL;
 
-	switch (cmd) {
-		case HDIO_GETGEO:
-		{
-			struct hd_geometry g;
-			int u = minor(inode->i_rdev) & 0xF0;
-			i2o_block_biosparam(i2ob[u].nr_sects, 
+	if (cmd != HDIO_GETGEO)
+		return -EINVAL;
+	i2o_block_biosparam(i2ob[u].nr_sects, 
 				&g.cylinders, &g.heads, &g.sectors);
-			g.start = get_start_sect(inode->i_bdev);
-			return copy_to_user((void *)arg, &g, sizeof(g))
-				? -EFAULT : 0;
-		}
-	
-		case BLKRRPART:
-			if(!capable(CAP_SYS_ADMIN))
-				return -EACCES;
-			return do_i2ob_revalidate(inode->i_rdev,1);
-			
-		default:
-			return -EINVAL;
-	}
+	g.start = get_start_sect(inode->i_bdev);
+	return copy_to_user((void *)arg, &g, sizeof(g)) ? -EFAULT : 0;
 }
 
 /*
@@ -1265,8 +1223,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	
 	i2ob_query_device(dev, 0x0000, 5, &flags, 4);
 	i2ob_query_device(dev, 0x0000, 6, &status, 4);
-	i2ob_gendisk.part[unit].nr_sects = size>>9;
-	i2ob[unit].nr_sects = (int)(size>>9);
+	i2ob[unit].nr_sects = size>>9;
 
 	/* Set limit based on inbound frame size */
 	limit = (d->controller->status_block->inbound_frame_size - 8)/2;
@@ -1303,7 +1260,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	}
 
 
-	sprintf(d->dev_name, "%s%c", i2ob_gendisk.major_name, 'a' + (unit>>4));
+	strcpy(d->dev_name, i2o_disk[unit>>4].major_name);
 
 	printk(KERN_INFO "%s: Max segments %d, queue depth %d, byte limit %d.\n",
 		 d->dev_name, i2ob_dev[unit].max_segments, i2ob_dev[unit].depth, limit);
@@ -1363,8 +1320,6 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	 */
 	dev->req_queue = &i2ob_queues[c->unit]->req_queue;
 
-	grok_partitions(mk_kdev(MAJOR_NR, unit), (long)(size>>9));
-
 	/*
 	 * Register for the events we're interested in and that the
 	 * device actually supports.
@@ -1372,6 +1327,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	i2o_event_register(c, d->lct_data.tid, i2ob_context, unit, 
 		(I2OB_EVENT_MASK & d->lct_data.event_capabilities));
 
+	i2ob[unit].nr_sects = size>>9;
 	return 0;
 }
 
@@ -1398,13 +1354,14 @@ static int i2ob_init_iop(unsigned int unit)
 			&i2ob_queues[unit]->request_queue[i+1];
 		i2ob_queues[unit]->request_queue[i].num = i;
 	}
+	i2ob_queues[unit]->lock = SPIN_LOCK_UNLOCKED;
 	
 	/* Queue is MAX_I2OB + 1... */
 	i2ob_queues[unit]->request_queue[i].next = NULL;
 	i2ob_queues[unit]->i2ob_qhead = &i2ob_queues[unit]->request_queue[0];
 	atomic_set(&i2ob_queues[unit]->queue_depth, 0);
 
-	blk_init_queue(&i2ob_queues[unit]->req_queue, i2ob_request);
+	blk_init_queue(&i2ob_queues[unit]->req_queue, i2ob_request, &i2ob_queues[unit]->lock);
 	i2ob_queues[unit]->req_queue.queuedata = &i2ob_queues[unit];
 
 	return 0;
@@ -1510,6 +1467,12 @@ static void i2ob_scan(int bios)
 					printk(KERN_WARNING "Could not install I2O block device\n");
 				else
 				{
+					struct gendisk *p = &i2o_disk[scan_unit>>4];
+					add_gendisk(p);
+					register_disk(p,
+						      mk_kdev(p->major, p->first_minor),
+						      1<<p->minor_shift, p->fops,
+						      i2ob[scan_unit].nr_sects);
 					scan_unit+=16;
 					i2ob_dev_count++;
 
@@ -1597,6 +1560,12 @@ void i2ob_new_device(struct i2o_controller *c, struct i2o_device *d)
 		printk(KERN_ERR "i2o_block: Could not install new device\n");
 	else	
 	{
+		struct gendisk *p = &i2o_disk[unit>>4];
+		add_gendisk(p);
+		register_disk(p,
+			      mk_kdev(p->major, p->first_minor),
+			      1<<p->minor_shift, p->fops,
+			      i2ob[unit].nr_sects);
 		i2ob_dev_count++;
 		i2o_device_notify_on(d, &i2o_block_handler);
 	}
@@ -1617,7 +1586,7 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	int i = 0;
 	unsigned long flags;
 
-	spin_lock_irqsave(&I2O_LOCK(c->unit), flags);
+	spin_lock_irqsave(I2O_LOCK(c->unit), flags);
 
 	/*
 	 * Need to do this...we somtimes get two events from the IRTOS
@@ -1639,7 +1608,7 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	if(unit >= MAX_I2OB<<4)
 	{
 		printk(KERN_ERR "i2ob_del_device called, but not in dev table!\n");
-		spin_unlock_irqrestore(&I2O_LOCK(c->unit), flags);
+		spin_unlock_irqrestore(I2O_LOCK(c->unit), flags);
 		return;
 	}
 
@@ -1647,15 +1616,15 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	 * This will force errors when i2ob_get_queue() is called
 	 * by the kenrel.
 	 */
+	wipe_partitions(mk_kdev(MAJOR_NR, unit));
+	del_gendisk(&i2o_disk[unit>>4]);
 	i2ob_dev[unit].req_queue = NULL;
 	for(i = unit; i <= unit+15; i++)
 	{
 		i2ob_dev[i].i2odev = NULL;
 		blk_queue_max_sectors(i2ob_dev[i].req_queue, 0);
-		i2ob[i].nr_sects = 0;
-		i2ob_gendisk.part[i].nr_sects = 0;
 	}
-	spin_unlock_irqrestore(&I2O_LOCK(c->unit), flags);
+	spin_unlock_irqrestore(I2O_LOCK(c->unit), flags);
 
 	/*
 	 * Decrease usage count for module
@@ -1694,7 +1663,9 @@ static int i2ob_media_change(kdev_t dev)
 
 static int i2ob_revalidate(kdev_t dev)
 {
-	return do_i2ob_revalidate(dev, 0);
+	int minor = minor(dev) & ~15;
+	return i2ob_install_device(i2ob_dev[minor].controller, i2ob_dev[minor].i2odev,
+		minor);
 }
 
 /*
@@ -1751,17 +1722,6 @@ static struct block_device_operations i2ob_fops =
 	revalidate:		i2ob_revalidate,
 };
 
-static struct gendisk i2ob_gendisk = 
-{
-	major:		MAJOR_NR,
-	major_name:	"i2o/hd",
-	minor_shift:	4,
-	part:		i2ob,
-	nr_real:	MAX_I2OB,
-	fops:		&i2ob_fops,
-};
-
-
 /*
  * And here should be modules and kernel interface 
  *  (Just smiley confuses emacs :-)
@@ -1797,8 +1757,6 @@ int i2o_block_init(void)
 	 
 	blk_dev[MAJOR_NR].queue = i2ob_get_queue;
 	
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), i2ob_request);
-
 	for (i = 0; i < MAX_I2OB << 4; i++) {
 		i2ob_dev[i].refcnt = 0;
 		i2ob_dev[i].flags = 0;
@@ -1808,6 +1766,18 @@ int i2o_block_init(void)
 		i2ob_dev[i].head = NULL;
 		i2ob_dev[i].tail = NULL;
 		i2ob_dev[i].depth = MAX_I2OB_DEPTH;
+	}
+
+	for (i = 0; i < MAX_I2OB; i++) {
+		struct gendisk *disk = i2o_disk + i;
+		disk->major = MAJOR_NR;
+		disk->first_minor = i<<4;
+		disk->minor_shift = 4;
+		disk->part = i2ob + (i<<4);
+		disk->fops = &i2ob_fops;
+		disk->nr_real = 1;
+		disk->major_name = i2o_names + i*8;
+		sprintf(disk->major_name, "i2o/hd%c", 'a' + i);
 	}
 	
 	/*
@@ -1834,7 +1804,6 @@ int i2o_block_init(void)
 	if(i2o_install_handler(&i2o_block_handler)<0)
 	{
 		unregister_blkdev(MAJOR_NR, "i2o_block");
-		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		printk(KERN_ERR "i2o_block: unable to register OSM.\n");
 		return -EINVAL;
 	}
@@ -1856,15 +1825,8 @@ int i2o_block_init(void)
 	/*
 	 *	Finally see what is actually plugged in to our controllers
 	 */
-	for (i = 0; i < MAX_I2OB; i++)
-		register_disk(&i2ob_gendisk, mk_kdev(MAJOR_NR,i<<4), 1<<4,
-			&i2ob_fops, 0);
-	i2ob_probe();
 
-	/*
-	 *	Adding i2ob_gendisk into the gendisk list.
-	 */
-	add_gendisk(&i2ob_gendisk);
+	i2ob_probe();
 
 	return 0;
 }
@@ -1927,12 +1889,5 @@ void cleanup_module(void)
 	 */
 	if (unregister_blkdev(MAJOR_NR, "i2o_block") != 0)
 		printk("i2o_block: cleanup_module failed\n");
-
-	/*
-	 * free request queue
-	 */
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-
-	del_gendisk(&i2ob_gendisk);
 }
 #endif
