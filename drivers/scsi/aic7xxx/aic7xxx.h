@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#66 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#67 $
  *
  * $FreeBSD$
  */
@@ -1053,7 +1053,6 @@ struct ahc_softc {
 	u_int			  pci_cachesize;
 
 	u_int			  stack_size;
-	uint16_t		 *saved_stack;
 
 	/* Per-Unit descriptive information */
 	const char		 *description;

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#166 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#169 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -576,6 +576,7 @@ static void ahc_linux_run_device_queue(struct ahc_softc*,
 static void ahc_linux_setup_tag_info(char *p, char *end, char *s);
 static void ahc_linux_setup_tag_info_global(char *p);
 static void ahc_linux_setup_dv(char *p, char *end, char *s);
+static int  aic7xxx_setup(char *s);
 static int  ahc_linux_next_unit(void);
 static void ahc_runq_tasklet(unsigned long data);
 static int  ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf);
@@ -1297,12 +1298,14 @@ Scsi_Host_Template aic7xxx_driver_template = {
 	 */
 	.max_sectors		= 8192,
 #endif
+#if defined CONFIG_HIGHIO || LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
 /* Assume RedHat Distribution with its different HIGHIO conventions. */
 	.can_dma_32		= 1,
 	.single_sg_okay		= 1,
 #else
 	.highmem_io		= 1,
+#endif
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	.name			= "aic7xxx",
@@ -1764,7 +1767,7 @@ ahc_linux_setup_dv(char *p, char *end, char *s)
  * to a parameter with a ':' between the parameter and the value.
  * ie. aic7xxx=stpwlev:1,extended
  */
-int
+static int
 aic7xxx_setup(char *s)
 {
 	int	i, n;
@@ -1888,7 +1891,7 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	 * negotiation will occur for the first command, and DV
 	 * will comence should that first command be successful.
 	 */
-	for (target = 0; target < AHC_NUM_TARGETS; target++) {
+	for (target = 0; target < host->max_id*host->max_channel+1; target++) {
 		u_int channel;
 
 		channel = 0;
@@ -2732,6 +2735,22 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
 				break;
 			}
+#ifdef AHC_DEBUG
+			if (ahc_debug & AHC_SHOW_DV) {
+				int i;
+
+				ahc_print_devinfo(ahc, devinfo);
+				printf("Inquiry buffer mismatch:");
+				for (i = 0; i < AHC_LINUX_DV_INQ_LEN; i++) {
+					if ((i & 0xF) == 0)
+						printf("\n        ");
+					printf("0x%x:0x0%x ",
+					       ((uint8_t *)targ->inq_data)[i], 
+					       targ->dv_buffer[i]);
+				}
+				printf("\n");
+			}
+#endif
 
 			if (ahc_linux_fallback(ahc, devinfo) != 0) {
 				AHC_SET_DV_STATE(ahc, targ, AHC_DV_STATE_EXIT);
@@ -3365,6 +3384,8 @@ ahc_linux_fallback(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 		targ->dv_next_narrow_period = MAX(period, AHC_SYNCRATE_ULTRA2);
 	if (targ->dv_next_wide_period == 0)
 		targ->dv_next_wide_period = period;
+	if (targ->dv_max_width == 0)
+		targ->dv_max_width = width;
 	if (targ->dv_max_ppr_options == 0)
 		targ->dv_max_ppr_options = ppr_options;
 	if (targ->dv_last_ppr_options == 0)
@@ -3459,7 +3480,7 @@ ahc_linux_fallback(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 				period++;
 			}
 		} else if ((ahc->features & AHC_WIDE) != 0
-			&& tinfo->user.width != 0
+			&& targ->dv_max_width != 0
 			&& wide_speed >= fallback_speed
 			&& (targ->dv_next_wide_period <= AHC_ASYNC_XFER_PERIOD
 			 || period >= AHC_ASYNC_XFER_PERIOD)) {

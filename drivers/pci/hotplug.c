@@ -105,7 +105,7 @@ pci_free_resources(struct pci_dev *dev)
 void
 pci_remove_device(struct pci_dev *dev)
 {
-	put_device(&dev->dev);
+	device_unregister(&dev->dev);
 	list_del(&dev->bus_list);
 	list_del(&dev->global_list);
 	pci_free_resources(dev);
