@@ -121,7 +121,10 @@ int jfs_umount(struct super_block *sb)
 	 * list (to signify skip logredo()).
 	 */
 	if (log) {		/* log = NULL if read-only mount */
-		rc = updateSuper(sb, FM_CLEAN);
+		updateSuper(sb, FM_CLEAN);
+
+		/* Restore default gfp_mask for bdev */
+		mapping_set_gfp_mask(bdev_mapping, GFP_USER);
 
 		/*
 		 * close log: 
@@ -167,6 +170,9 @@ int jfs_umount_rw(struct super_block *sb)
 	filemap_fdatawait(bdev_mapping);
 
 	updateSuper(sb, FM_CLEAN);
+
+	/* Restore default gfp_mask for bdev */
+	mapping_set_gfp_mask(bdev_mapping, GFP_USER);
 
 	return lmLogClose(sb);
 }
