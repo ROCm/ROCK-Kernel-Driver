@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.53 $	 $Date: 2003/06/17 11:36:45 $
+ *    $Revision: 1.58 $	 $Date: 2003/09/22 13:33:56 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.53 $"
+#define VERSION_LCS_C  "$Revision: 1.58 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 
@@ -159,6 +159,7 @@ lcs_alloc_card(void)
 		return NULL;
 	memset(card, 0, sizeof(struct lcs_card));
 	card->lan_type = LCS_FRAME_TYPE_AUTO;
+	card->lancmd_timeout = LCS_LANCMD_TIMEOUT_DEFAULT;
 	return card;
 }
 
@@ -690,7 +691,7 @@ lcs_send_lancmd(struct lcs_card *card, struct lcs_buffer *buffer,
 	init_timer(&timer);
 	timer.function = lcs_lancmd_timeout;
 	timer.data = (unsigned long) &reply;
-	timer.expires = jiffies + HZ*5;
+	timer.expires = jiffies + HZ*card->lancmd_timeout;
 	add_timer(&timer);
 	wait_event(reply.wait_q, reply.received);
 	del_timer(&timer);
@@ -1675,8 +1676,55 @@ lcs_portno_store (struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(portno, 0644, lcs_portno_show, lcs_portno_store);
 
+static ssize_t
+lcs_type_show(struct device *dev, char *buf)
+{
+	struct ccwgroup_device *cgdev;
+
+	cgdev = to_ccwgroupdev(dev);
+	if (!cgdev)
+		return -ENODEV;
+
+	return sprintf(buf, "%s\n", cu3088_type[cgdev->cdev[0]->id.driver_info]);
+}
+
+static DEVICE_ATTR(type, 0444, lcs_type_show, NULL);
+
+static ssize_t
+lcs_timeout_show(struct device *dev, char *buf)
+{
+	struct lcs_card *card;
+
+	card = (struct lcs_card *)dev->driver_data;
+
+	return card ? sprintf(buf, "%u\n", card->lancmd_timeout) : 0;
+}
+
+static ssize_t
+lcs_timeout_store (struct device *dev, const char *buf, size_t count)
+{
+        struct lcs_card *card;
+        int value;
+
+	card = (struct lcs_card *)dev->driver_data;
+
+        if (!card)
+                return 0;
+
+        sscanf(buf, "%u", &value);
+        /* TODO: sanity checks */
+        card->lancmd_timeout = value;
+
+        return count;
+
+}
+
+DEVICE_ATTR(lancmd_timeout, 0644, lcs_timeout_show, lcs_timeout_store);
+
 static struct attribute * lcs_attrs[] = {
 	&dev_attr_portno.attr,
+	&dev_attr_type.attr,
+	&dev_attr_lancmd_timeout.attr,
 	NULL,
 };
 
@@ -1711,8 +1759,6 @@ lcs_probe_device(struct ccwgroup_device *ccwgdev)
 		return ret;
         }
 	ccwgdev->dev.driver_data = card;
-	snprintf(ccwgdev->dev.name, DEVICE_NAME_SIZE, "%s",
-		 cu3088_type[ccwgdev->cdev[0]->id.driver_info]);
 	ccwgdev->cdev[0]->dev.driver_data = card;
 	ccwgdev->cdev[0]->handler = lcs_irq;
 	ccwgdev->cdev[1]->dev.driver_data = card;
@@ -1797,6 +1843,18 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	SET_MODULE_OWNER(dev);
 	if (register_netdev(dev) != 0)
 		goto out;
+	/* Create symlinks. */
+	if (sysfs_create_link(&ccwgdev->dev.kobj, &dev->class_dev.kobj,
+			      dev->name)) {
+		unregister_netdev(dev);
+		goto out;
+	}
+	if (sysfs_create_link(&dev->class_dev.kobj, &ccwgdev->dev.kobj,
+			      ccwgdev->dev.bus_id)) {
+		sysfs_remove_link(&ccwgdev->dev.kobj, dev->name);
+		unregister_netdev(dev);
+		goto out;
+	}
 	netif_stop_queue(dev);
 	lcs_stopcard(card);
 	return 0;
@@ -1814,13 +1872,20 @@ static int
 lcs_shutdown_device(struct ccwgroup_device *ccwgdev)
 {
 	struct lcs_card *card;
+	int ret;
 
 	LCS_DBF_TEXT(3, setup, "shtdndev");
 	card = (struct lcs_card *)ccwgdev->dev.driver_data;
 	if (!card)
 		return -ENODEV;
 
-	return lcs_stop_device(card->dev);
+	ret = lcs_stop_device(card->dev);
+	if (ret)
+		return ret;
+	sysfs_remove_link(&card->dev->class_dev.kobj, ccwgdev->dev.bus_id);
+	sysfs_remove_link(&ccwgdev->dev.kobj, card->dev->name);
+	unregister_netdev(card->dev);
+	return 0;
 }
 
 /**
