@@ -2956,21 +2956,11 @@ static int ami_encode_var(struct fb_var_screeninfo *var,
 	var->bits_per_pixel = par->bpp;
 	var->grayscale = 0;
 
-	if (IS_AGA) {
-		var->red.offset = 0;
-		var->red.length = 8;
-		var->red.msb_right = 0;
-	} else {
-		if (clk_shift == TAG_SHRES) {
-			var->red.offset = 0;
-			var->red.length = 2;
-			var->red.msb_right = 0;
-		} else {
-			var->red.offset = 0;
-			var->red.length = 4;
-			var->red.msb_right = 0;
-		}
-	}
+	var->red.offset = 0;
+	var->red.msb_right = 0;
+	var->red.length = par->bpp;
+	if (par->bplcon0 & BPC0_HAM)
+	    var->red.length -= 2;
 	var->blue = var->green = var->red;
 	var->transp.offset = 0;
 	var->transp.length = 0;
