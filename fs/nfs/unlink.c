@@ -123,6 +123,8 @@ nfs_async_unlink_done(struct rpc_task *task)
 	struct dentry		*dir = data->dir;
 	struct inode		*dir_i;
 
+	if (nfs_async_handle_jukebox(task))
+		return;
 	if (!dir)
 		return;
 	dir_i = dir->d_inode;

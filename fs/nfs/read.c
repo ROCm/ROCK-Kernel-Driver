@@ -408,6 +408,9 @@ nfs_readpage_result(struct rpc_task *task)
 	dprintk("NFS: %4d nfs_readpage_result, (status %d)\n",
 		task->tk_pid, task->tk_status);
 
+	if (nfs_async_handle_jukebox(task))
+		return;
+
 	nfs_refresh_inode(inode, &data->fattr);
 	while (!list_empty(&data->pages)) {
 		struct nfs_page *req = nfs_list_entry(data->pages.next);

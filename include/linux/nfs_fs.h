@@ -16,6 +16,7 @@
 
 #include <linux/sunrpc/debug.h>
 #include <linux/sunrpc/auth.h>
+#include <linux/sunrpc/clnt.h>
 
 #include <linux/nfs.h>
 #include <linux/nfs2.h>
@@ -418,6 +419,29 @@ extern void * nfs_root_data(void);
 		wait_event(wq, condition);				\
 	__retval;							\
 })
+
+#ifdef CONFIG_NFS_V3
+
+#define NFS_JUKEBOX_RETRY_TIME (5 * HZ)
+static inline int
+nfs_async_handle_jukebox(struct rpc_task *task)
+{
+	if (task->tk_status != -EJUKEBOX)
+		return 0;
+	task->tk_status = 0;
+	rpc_restart_call(task);
+	rpc_delay(task, NFS_JUKEBOX_RETRY_TIME);
+	return 1;
+}
+
+#else
+
+static inline int
+nfs_async_handle_jukebox(struct rpc_task *task)
+{
+	return 0;
+}
+#endif /* CONFIG_NFS_V3 */
 
 #endif /* __KERNEL__ */
 
