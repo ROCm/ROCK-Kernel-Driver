@@ -56,7 +56,7 @@ MODULE_LICENSE ("GPL");
 MODULE_DESCRIPTION (DRIVER_DESC);
 
 static int *ops[MAX_OPS + 1];
-struct pci_ops *ibmphp_pci_root_ops;
+struct pci_bus *ibmphp_pci_bus;
 static int max_slots;
 
 static int irqs[16];    /* PIC mode IRQ's we're using so far (in case MPS tables don't provide default info for empty slots */
@@ -769,18 +769,6 @@ static struct pci_bus *find_bus (u8 busno)
 	return NULL;
 }
 
-/******************************************************************
- * This function is here because we can no longer use pci_root_ops
- ******************************************************************/
-static struct pci_ops *get_root_pci_ops (void)
-{
-	struct pci_bus * bus;
-
-	if ((bus = find_bus (0)))
-		return bus->ops;
-	return NULL;
-}
-
 /*************************************************************
  * This routine frees up memory used by struct slot, including
  * the pointers to pci_func, bus, hotplug_slot, controller,
@@ -975,8 +963,8 @@ static int configure_visit_pci_dev (struct pci_dev_wrapped *wrapped_dev, struct 
 	}
 
 	if (temp_func->dev) {
-		pci_proc_attach_device (temp_func->dev);
-		pci_announce_device_to_drivers (temp_func->dev);
+//		pci_proc_attach_device (temp_func->dev);
+//		pci_announce_device_to_drivers (temp_func->dev);
 	}
 
 	return 0;
@@ -995,22 +983,39 @@ static struct pci_visit configure_functions = {
 
 static u8 bus_structure_fixup (u8 busno)
 {
-	struct pci_bus bus_t;
-	struct pci_dev dev_t;
+	struct pci_bus *bus;
+	struct pci_dev *dev;
 	u16 l;
 
 	if (!find_bus (busno) || !(ibmphp_find_same_bus_num (busno)))
 		return 1;
-	bus_t.number = busno;
-	bus_t.ops = ibmphp_pci_root_ops;
-	dev_t.bus = &bus_t;
-	for (dev_t.devfn=0; dev_t.devfn<256; dev_t.devfn += 8) {
-		if (!pci_read_config_word (&dev_t, PCI_VENDOR_ID, &l) &&  l != 0x0000 && l != 0xffff) {
+
+	bus = kmalloc (sizeof (*bus), GFP_KERNEL);
+	if (!bus) {
+		err ("%s - out of memory\n", __FUNCTION__);
+		return 1;
+	}
+	dev = kmalloc (sizeof (*dev), GFP_KERNEL);
+	if (!dev) {
+		kfree (bus);
+		err ("%s - out of memory\n", __FUNCTION__);
+		return 1;
+	}
+
+	bus->number = busno;
+	bus->ops = ibmphp_pci_bus->ops;
+	dev->bus = bus;
+	for (dev->devfn = 0; dev->devfn < 256; dev->devfn += 8) {
+		if (!pci_read_config_word (dev, PCI_VENDOR_ID, &l) &&  l != 0x0000 && l != 0xffff) {
 			debug ("%s - Inside bus_struture_fixup() \n", __FUNCTION__);
-			pci_scan_bus (busno, ibmphp_pci_root_ops, NULL);
+			pci_scan_bus (busno, ibmphp_pci_bus->ops, NULL);
 			break;
 		}
 	}
+
+	kfree (dev);
+	kfree (bus);
+
 	return 0;
 }
 
@@ -1602,6 +1607,7 @@ static void ibmphp_unload (void)
 
 static int __init ibmphp_init (void)
 {
+	struct pci_bus *bus;
 	int i = 0;
 	int rc = 0;
 
@@ -1609,11 +1615,18 @@ static int __init ibmphp_init (void)
 
 	info (DRIVER_DESC " version: " DRIVER_VERSION "\n");
 
-	ibmphp_pci_root_ops = get_root_pci_ops ();
-	if (ibmphp_pci_root_ops == NULL) {
-		err ("cannot read bus operations... will not be able to read the cards.  Please check your system\n");
-		return -ENODEV;	
+	ibmphp_pci_bus = kmalloc (sizeof (*ibmphp_pci_bus), GFP_KERNEL);
+	if (!ibmphp_pci_bus) {
+		err ("out of memory\n");
+		return -ENOMEM;
 	}
+
+	bus = find_bus (0);
+	if (!bus) {
+		err ("Can't find the root pci bus, can not continue\n");
+		return -ENODEV;
+	}
+	memcpy (ibmphp_pci_bus, bus, sizeof (*ibmphp_pci_bus));
 
 	ibmphp_debug = debug;
 

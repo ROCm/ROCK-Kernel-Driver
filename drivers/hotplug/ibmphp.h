@@ -693,7 +693,7 @@ extern void ibmphp_hpc_stop_poll_thread (void);
 #define PCIX66		0x05
 #define PCI66		0x04
 
-extern struct pci_ops *ibmphp_pci_root_ops;
+extern struct pci_bus *ibmphp_pci_bus;
 
 /* Variables */
 
@@ -764,7 +764,6 @@ extern int ibmphp_disable_slot (struct hotplug_slot *);	/* This function is call
 extern int ibmphp_update_slot_info (struct slot *);	/* This function is called from HPC, so we need it to not be be static */
 extern int ibmphp_configure_card (struct pci_func *, u8);
 extern int ibmphp_unconfigure_card (struct slot **, int);
-extern void ibmphp_increase_count (void);
 extern struct hotplug_slot_ops ibmphp_hotplug_slot_ops;
 
 static inline void long_delay (int delay)

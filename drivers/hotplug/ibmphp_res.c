@@ -1932,7 +1932,7 @@ int static range_exists_already (struct range_node * range, struct bus_node * bu
  */
 static int __init update_bridge_ranges (struct bus_node **bus)
 {
-	u8 sec_busno, device, function, busno, hdr_type, start_io_address, end_io_address;
+	u8 sec_busno, device, function, hdr_type, start_io_address, end_io_address;
 	u16 vendor_id, upper_io_start, upper_io_end, start_mem_address, end_mem_address;
 	u32 start_address, end_address, upper_start, upper_end;
 	struct bus_node *bus_sec;
@@ -1941,21 +1941,24 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 	struct resource_node *mem;
 	struct resource_node *pfmem;
 	struct range_node *range;
+	unsigned int devfn;
+
 	bus_cur = *bus;
 	if (!bus_cur)
 		return -ENODEV;
-	busno = bus_cur->busno;
+	ibmphp_pci_bus->number = bus_cur->busno;
 
 	debug ("inside %s \n", __FUNCTION__);
 	debug ("bus_cur->busno = %x\n", bus_cur->busno);
 
 	for (device = 0; device < 32; device++) {
 		for (function = 0x00; function < 0x08; function++) {
-			pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_VENDOR_ID, &vendor_id);
+			devfn = PCI_DEVFN(device, function);
+			pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_VENDOR_ID, &vendor_id);
 
 			if (vendor_id != PCI_VENDOR_ID_NOTVALID) {
 				/* found correct device!!! */
-				pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_HEADER_TYPE, &hdr_type);
+				pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_HEADER_TYPE, &hdr_type);
 
 				switch (hdr_type) {
 					case PCI_HEADER_TYPE_NORMAL:
@@ -1974,7 +1977,7 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 						   temp++;
 						   }
 						 */
-						pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_SECONDARY_BUS, &sec_busno);
+						pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_SECONDARY_BUS, &sec_busno);
 						bus_sec = find_bus_wprev (sec_busno, NULL, 0); 
 						/* this bus structure doesn't exist yet, PPB was configured during previous loading of ibmphp */
 						if (!bus_sec) {
@@ -1982,10 +1985,10 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 							/* the rest will be populated during NVRAM call */
 							return 0;
 						}
-						pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_IO_BASE, &start_io_address);
-						pci_read_config_byte_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_IO_LIMIT, &end_io_address);
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_IO_BASE_UPPER16, &upper_io_start);
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_IO_LIMIT_UPPER16, &upper_io_end);
+						pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_IO_BASE, &start_io_address);
+						pci_bus_read_config_byte (ibmphp_pci_bus, devfn, PCI_IO_LIMIT, &end_io_address);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_IO_BASE_UPPER16, &upper_io_start);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_IO_LIMIT_UPPER16, &upper_io_end);
 						start_address = (start_io_address & PCI_IO_RANGE_MASK) << 8;
 						start_address |= (upper_io_start << 16);
 						end_address = (end_io_address & PCI_IO_RANGE_MASK) << 8;
@@ -2035,8 +2038,8 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 							}
 						}	
 
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_MEMORY_BASE, &start_mem_address);
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_MEMORY_LIMIT, &end_mem_address);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_BASE, &start_mem_address);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_MEMORY_LIMIT, &end_mem_address);
 
 						start_address = 0x00000000 | (start_mem_address & PCI_MEMORY_RANGE_MASK) << 16;
 						end_address = 0x00000000 | (end_mem_address & PCI_MEMORY_RANGE_MASK) << 16;
@@ -2086,10 +2089,10 @@ static int __init update_bridge_ranges (struct bus_node **bus)
 								ibmphp_add_resource (mem);
 							}
 						}
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_PREF_MEMORY_BASE, &start_mem_address);
-						pci_read_config_word_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_PREF_MEMORY_LIMIT, &end_mem_address);
-						pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_PREF_BASE_UPPER32, &upper_start);
-						pci_read_config_dword_nodev (ibmphp_pci_root_ops, busno, device, function, PCI_PREF_LIMIT_UPPER32, &upper_end);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_BASE, &start_mem_address);
+						pci_bus_read_config_word (ibmphp_pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, &end_mem_address);
+						pci_bus_read_config_dword (ibmphp_pci_bus, devfn, PCI_PREF_BASE_UPPER32, &upper_start);
+						pci_bus_read_config_dword (ibmphp_pci_bus, devfn, PCI_PREF_LIMIT_UPPER32, &upper_end);
 						start_address = 0x00000000 | (start_mem_address & PCI_MEMORY_RANGE_MASK) << 16;
 						end_address = 0x00000000 | (end_mem_address & PCI_MEMORY_RANGE_MASK) << 16;
 #if BITS_PER_LONG == 64
