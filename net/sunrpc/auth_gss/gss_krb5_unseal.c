@@ -68,7 +68,12 @@
 #endif
 
 
-/* message_buffer is an input if MIC and an output if WRAP. */
+/* message_buffer is an input if toktype is MIC and an output if it is WRAP:
+ * If toktype is MIC: read_token is a mic token, and message_buffer is the
+ *   data that the mic was supposedly taken over.
+ * If toktype is WRAP: read_token is a wrap token, and message_buffer is used
+ *   to return the decrypted data.
+ */
 
 u32
 krb5_read_token(struct krb5_ctx *ctx,
@@ -76,20 +81,13 @@ krb5_read_token(struct krb5_ctx *ctx,
 		struct xdr_netobj *message_buffer,
 		int *qop_state, int toktype)
 {
-	s32			code;
-	int			tmsglen = 0;
-	int			conflen = 0;
 	int			signalg;
 	int			sealalg;
 	struct xdr_netobj	token = {.len = 0, .data = NULL};
 	s32			checksum_type;
-	struct xdr_netobj	cksum;
 	struct xdr_netobj	md5cksum = {.len = 0, .data = NULL};
-	struct xdr_netobj	plaind;
-	char			*data_ptr;
 	s32			now;
 	unsigned char		*plain = NULL;
-	int			cksum_len = 0;
 	int			plainlen = 0;
 	int			direction;
 	s32			seqnum;
@@ -97,10 +95,9 @@ krb5_read_token(struct krb5_ctx *ctx,
 	int			bodysize;
 	u32			ret = GSS_S_DEFECTIVE_TOKEN;
 
-	dprintk("RPC: krb5_read_token\n");
+	dprintk("RPC:      krb5_read_token\n");
 
-	if (g_verify_token_header((struct xdr_netobj *) &ctx->mech_used,
-					&bodysize, &ptr, toktype,
+	if (g_verify_token_header(&ctx->mech_used, &bodysize, &ptr, toktype,
 					read_token->len))
 		goto out;
 
@@ -138,40 +135,22 @@ krb5_read_token(struct krb5_ctx *ctx,
 	     signalg != SGN_ALG_HMAC_SHA1_DES3_KD))
 		goto out;
 
-	/* starting with a single alg */
-	switch (signalg) {
-	case SGN_ALG_DES_MAC_MD5:
-		cksum_len = 8;
-		break;
-	default:
-		goto out;
-	}
-
-	if (toktype == KG_TOK_WRAP_MSG)
-		tmsglen = bodysize - (14 + cksum_len);
-
-	/* get the token parameters */
-
-	/* decode the message, if WRAP */
-
 	if (toktype == KG_TOK_WRAP_MSG) {
-		dprintk("RPC: krb5_read_token KG_TOK_WRAP_MSG\n");
+		int conflen = crypto_tfm_alg_blocksize(ctx->enc);
+		int padlen;
 
-		plain = kmalloc(tmsglen, GFP_KERNEL);
+		plainlen = bodysize - (14 + KRB5_CKSUM_LENGTH);
+		plain = ptr + 14 + KRB5_CKSUM_LENGTH;
+
+		ret = krb5_decrypt(ctx->enc, NULL, plain, plain, plainlen);
+		if (ret)
+			goto out;
+
 		ret = GSS_S_FAILURE;
-		if (plain ==  NULL)
+		padlen = plain[plainlen -1];
+		if ((padlen < 1) || (padlen > 8))
 			goto out;
-
-		code = krb5_decrypt(ctx->enc, NULL,
-				   ptr + 14 + cksum_len, plain,
-				   tmsglen);
-		if (code)
-			goto out;
-
-		plainlen = tmsglen;
-
-		conflen = crypto_tfm_alg_blocksize(ctx->enc);
-		token.len = tmsglen - conflen - plain[tmsglen - 1];
+		token.len = plainlen - conflen - padlen;
 
 		if (token.len) {
 			token.data = kmalloc(token.len, GFP_KERNEL);
@@ -181,15 +160,13 @@ krb5_read_token(struct krb5_ctx *ctx,
 		}
 
 	} else if (toktype == KG_TOK_MIC_MSG) {
-		dprintk("RPC: krb5_read_token KG_TOK_MIC_MSG\n");
 		token = *message_buffer;
 		plain = token.data;
 		plainlen = token.len;
 	} else {
-		token.len = 0;
-		token.data = NULL;
-		plain = token.data;
-		plainlen = token.len;
+		printk("RPC: bad toktype in krb5_read_token");
+		ret = GSS_S_FAILURE;
+		goto out;
 	}
 
 	dprintk("RPC krb5_read_token: token.len %d plainlen %d\n", token.len,
@@ -209,66 +186,25 @@ krb5_read_token(struct krb5_ctx *ctx,
 
 	switch (signalg) {
 	case SGN_ALG_DES_MAC_MD5:
-		dprintk("RPC krb5_read_token SGN_ALG_DES_MAC_MD5\n");
-		/* compute the checksum of the message.
-		 * 8 = bytes of token body to be checksummed according to spec 
-		 */
-
-		data_ptr = kmalloc(8 + plainlen, GFP_KERNEL);
-		ret = GSS_S_FAILURE;
-		if (!data_ptr)
+		ret = krb5_make_checksum(checksum_type, ptr - 2, plain,
+					 plainlen, &md5cksum);
+		if (ret)
 			goto out;
 
-		memcpy(data_ptr, ptr - 2, 8);
-		memcpy(data_ptr + 8, plain, plainlen);
-
-		plaind.len = 8 + plainlen;
-		plaind.data = data_ptr;
-
-		code = krb5_make_checksum(checksum_type,
-					    &plaind, &md5cksum);
-
-		kfree(data_ptr);
-
-		if (code)
+		ret = krb5_encrypt(ctx->seq, NULL, md5cksum.data,
+				   md5cksum.data, 16);
+		if (ret)
 			goto out;
 
-		code = krb5_encrypt(ctx->seq, NULL, md5cksum.data,
-					  md5cksum.data, 16);
-		if (code)
+		if (memcmp(md5cksum.data + 8, ptr + 14, 8)) {
+			ret = GSS_S_BAD_SIG;
 			goto out;
-
-		if (signalg == 0)
-			cksum.len = 8;
-		else
-			cksum.len = 16;
-		cksum.data = md5cksum.data + 16 - cksum.len;
-
-		dprintk
-		    ("RPC: krb5_read_token: memcmp digest cksum.len %d:\n",
-		     cksum.len);
-		dprintk("          md5cksum.data\n");
-		print_hexl((u32 *) md5cksum.data, 16, 0);
-		dprintk("          cksum.data:\n");
-		print_hexl((u32 *) cksum.data, cksum.len, 0);
-		{
-			u32 *p;
-
-			(u8 *) p = ptr + 14;
-			dprintk("          ptr+14:\n");
-			print_hexl(p, cksum.len, 0);
 		}
-
-		code = memcmp(cksum.data, ptr + 14, cksum.len);
 		break;
 	default:
 		ret = GSS_S_DEFECTIVE_TOKEN;
 		goto out;
 	}
-
-	ret = GSS_S_BAD_SIG;
-	if (code)
-		goto out;
 
 	/* it got through unscathed.  Make sure the context is unexpired */
 
@@ -287,8 +223,8 @@ krb5_read_token(struct krb5_ctx *ctx,
 	/* do sequencing checks */
 
 	ret = GSS_S_BAD_SIG;
-	if ((code = krb5_get_seq_num(ctx->seq, ptr + 14, ptr + 6, &direction,
-				   &seqnum)))
+	if ((ret = krb5_get_seq_num(ctx->seq, ptr + 14, ptr + 6, &direction,
+				    &seqnum)))
 		goto out;
 
 	if ((ctx->initiate && direction != 0xff) ||
@@ -298,9 +234,7 @@ krb5_read_token(struct krb5_ctx *ctx,
 	ret = GSS_S_COMPLETE;
 out:
 	if (md5cksum.data) kfree(md5cksum.data);
-	if (toktype == KG_TOK_WRAP_MSG) {
-		if (plain) kfree(plain);
-		if (ret && token.data) kfree(token.data);
-	}
+	if ((toktype == KG_TOK_WRAP_MSG) && ret && token.data)
+		kfree(token.data);
 	return ret;
 }

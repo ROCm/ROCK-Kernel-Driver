@@ -63,13 +63,12 @@
 #include <linux/jiffies.h>
 #include <linux/sunrpc/gss_krb5.h>
 #include <linux/random.h>
+#include <asm/scatterlist.h>
 #include <linux/crypto.h>
 
 #ifdef RPC_DEBUG
 # define RPCDBG_FACILITY        RPCDBG_AUTH
 #endif
-
-#define CKSUM_SIZE	8
 
 static inline int
 gss_krb5_padding(int blocksize, int length) {
@@ -77,29 +76,6 @@ gss_krb5_padding(int blocksize, int length) {
 	 * use only 8: */
 	BUG_ON(blocksize != 8);
 	return 8 - (length & 7);
-}
-
-/* checksum the plaintext data and the first 8 bytes of the krb5 token header,
- * as specified by the rfc: */
-static u32
-compute_checksum(s32 checksum_type, char *header, char *body, int body_len,
-		 struct xdr_netobj *md5cksum) {
-	char			*data_ptr;
-	struct xdr_netobj	plaind;
-	u32			code = GSS_S_FAILURE;
-
-	if (!(data_ptr = kmalloc(8 + body_len, GFP_KERNEL)))
-		goto out;
-	memcpy(data_ptr, header, 8);
-	memcpy(data_ptr + 8, body, body_len);
-	plaind.len = 8 + body_len;
-	plaind.data = data_ptr;
-	code = krb5_make_checksum(checksum_type, &plaind, md5cksum);
-	kfree(data_ptr);
-	code = 0;
-
-out:
-	return code;
 }
 
 u32
@@ -113,9 +89,11 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 	unsigned char		*ptr, *krb5_hdr, *msg_start;
 	s32			now;
 
-	dprintk("RPC: gss_krb5_seal");
+	dprintk("RPC:     gss_krb5_seal\n");
 
 	now = jiffies;
+
+	token->data = NULL;
 
 	if (qop_req != 0)
 		goto out_err;
@@ -167,8 +145,8 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 
 		memset(msg_start + blocksize + text->len, pad, pad);
 
-		if (compute_checksum(checksum_type, krb5_hdr, msg_start,
-				     tmsglen, &md5cksum))
+		if (krb5_make_checksum(checksum_type, krb5_hdr, msg_start,
+				       tmsglen, &md5cksum))
 			goto out_err;
 
 		if (krb5_encrypt(ctx->enc, NULL, msg_start, msg_start,
@@ -176,8 +154,8 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 			goto out_err;
 
 	} else { /* Sign only.  */
-		if (compute_checksum(checksum_type, krb5_hdr, text->data,
-					text->len, &md5cksum))
+		if (krb5_make_checksum(checksum_type, krb5_hdr, text->data,
+				       text->len, &md5cksum))
 			goto out_err;
 	}
 
@@ -187,10 +165,11 @@ krb5_make_token(struct krb5_ctx *ctx, int qop_req,
 				  md5cksum.data, md5cksum.len))
 			goto out_err;
 		memcpy(krb5_hdr + 16,
-		       md5cksum.data + md5cksum.len - CKSUM_SIZE, CKSUM_SIZE);
+		       md5cksum.data + md5cksum.len - KRB5_CKSUM_LENGTH,
+		       KRB5_CKSUM_LENGTH);
 
 		dprintk("make_seal_token: cksum data: \n");
-		print_hexl((u32 *) (krb5_hdr + 16), CKSUM_SIZE, 0);
+		print_hexl((u32 *) (krb5_hdr + 16), KRB5_CKSUM_LENGTH, 0);
 		break;
 	default:
 		BUG();

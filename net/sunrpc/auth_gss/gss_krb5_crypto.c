@@ -122,14 +122,23 @@ out:
 	return(ret);
 }
 
+void
+buf_to_sg(struct scatterlist *sg, char *ptr, int len) {
+	sg->page = virt_to_page(ptr);
+	sg->offset = offset_in_page(ptr);
+	sg->length = len;
+}
+
+/* checksum the plaintext data and the first 8 bytes of the krb5 token header,
+ * as specified by the rfc: */
 s32
-krb5_make_checksum(s32 cksumtype, struct xdr_netobj *input,
+krb5_make_checksum(s32 cksumtype, char *header, char *body, int body_len, 
 		   struct xdr_netobj *cksum)
 {
-	s32			ret = -EINVAL;
-	struct scatterlist	sg[1];
-	char			*cksumname;
-	struct crypto_tfm	*tfm;
+	char                            *cksumname;
+	struct crypto_tfm               *tfm = NULL; /* XXX add to ctx? */
+	struct scatterlist              sg[2];
+	u32                             code = GSS_S_FAILURE;
 
 	switch (cksumtype) {
 		case CKSUMTYPE_RSA_MD5:
@@ -143,24 +152,17 @@ krb5_make_checksum(s32 cksumtype, struct xdr_netobj *input,
 	if (!(tfm = crypto_alloc_tfm(cksumname, 0)))
 		goto out;
 	cksum->len = crypto_tfm_alg_digestsize(tfm);
+	if ((cksum->data = kmalloc(cksum->len, GFP_KERNEL)) == NULL)
+		goto out;
 
-	if ((cksum->data = kmalloc(cksum->len, GFP_KERNEL)) == NULL) {
-		ret = -ENOMEM;
-		goto out_free_tfm;
-	}
-	sg[0].page = virt_to_page(input->data);
-	sg[0].offset = offset_in_page(input->data);
-	sg[0].length = input->len;
-
+	buf_to_sg(&sg[0], header, 8);
+	buf_to_sg(&sg[1], body, body_len);
 	crypto_digest_init(tfm);
-	crypto_digest_update(tfm, sg, 1);
+	crypto_digest_update(tfm, sg, 2);
 	crypto_digest_final(tfm, cksum->data);
-
-	ret = 0;
-
-out_free_tfm:
-	crypto_free_tfm(tfm);
+	code = 0;
 out:
-	dprintk("RPC: gss_k5cksum: returning %d\n", ret);
-	return (ret);
+	if (tfm)
+		crypto_free_tfm(tfm);
+	return code;
 }

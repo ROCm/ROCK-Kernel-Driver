@@ -98,7 +98,7 @@ get_key(char **p, char *end, struct crypto_tfm **res)
 			alg_mode = CRYPTO_TFM_MODE_CBC;
 			break;
 		default:
-			dprintk("RPC: get_key: unsupported algorithm %d", alg);
+			dprintk("RPC: get_key: unsupported algorithm %d\n", alg);
 			goto out_err_free_key;
 	}
 	if (!(*res = crypto_alloc_tfm(alg_name, alg_mode)))
@@ -168,7 +168,7 @@ out_err:
 	return GSS_S_FAILURE;
 }
 
-void
+static void
 gss_delete_sec_context_kerberos(void *internal_ctx) {
 	struct krb5_ctx *kctx = internal_ctx;
 
@@ -181,16 +181,16 @@ gss_delete_sec_context_kerberos(void *internal_ctx) {
 	kfree(kctx);
 }
 
-u32
+static u32
 gss_verify_mic_kerberos(struct gss_ctx		*ctx,
-			struct xdr_netobj	*signbuf,
-			struct xdr_netobj	*checksum,
-			u32		*qstate) {
+			struct xdr_netobj	*message,
+			struct xdr_netobj	*mic_token,
+			u32			*qstate) {
 	u32 maj_stat = 0;
 	int qop_state;
 	struct krb5_ctx *kctx = ctx->internal_ctx_id;
 
-	maj_stat = krb5_read_token(kctx, checksum, signbuf, &qop_state,
+	maj_stat = krb5_read_token(kctx, mic_token, message, &qop_state,
 				   KG_TOK_MIC_MSG);
 	if (!maj_stat && qop_state)
 	    *qstate = qop_state;
@@ -199,21 +199,17 @@ gss_verify_mic_kerberos(struct gss_ctx		*ctx,
 	return maj_stat;
 }
 
-u32
+static u32
 gss_get_mic_kerberos(struct gss_ctx	*ctx,
 		     u32		qop,
-		     struct xdr_netobj	*message_buffer,
-		     struct xdr_netobj	*message_token) {
+		     struct xdr_netobj	*message,
+		     struct xdr_netobj	*mic_token) {
 	u32 err = 0;
 	struct krb5_ctx *kctx = ctx->internal_ctx_id;
 
-	if (!message_buffer->data) return GSS_S_FAILURE;
+	if (!message->data) return GSS_S_FAILURE;
 
-	dprintk("RPC: gss_get_mic_kerberos:"
-		" message_buffer->len %d\n",message_buffer->len);
-
-	err = krb5_make_token(kctx, qop, message_buffer,
-			      message_token, KG_TOK_MIC_MSG);
+	err = krb5_make_token(kctx, qop, message, mic_token, KG_TOK_MIC_MSG);
 
 	dprintk("RPC: gss_get_mic_kerberos returning %d\n",err);
 

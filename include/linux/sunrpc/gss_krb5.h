@@ -50,7 +50,6 @@ struct krb5_ctx {
 	struct crypto_tfm	*seq;
 	s32			endtime;
 	u32			seq_send;
-	u32			seq_recv;
 	struct xdr_netobj	mech_used;
 };
 
@@ -73,7 +72,7 @@ enum seal_alg {
 	SEAL_ALG_DES3KD = 0x0002
 };
 
-#define RSA_MD5_CKSUM_LENGTH 16
+#define KRB5_CKSUM_LENGTH 8
 
 #define CKSUMTYPE_CRC32			0x0001
 #define CKSUMTYPE_RSA_MD4		0x0002
@@ -100,16 +99,6 @@ enum seal_alg {
 #define KG_EMPTY_CCACHE                          (39756044L)
 #define KG_NO_CTYPES                             (39756045L)
 
-#define KV5M_PRINCIPAL                           (-1760647423L)
-#define KV5M_KEYBLOCK                            (-1760647421L)
-#define KV5M_CHECKSUM                            (-1760647420L)
-#define KV5M_ADDRESS                             (-1760647390L)
-#define KV5M_AUTHENTICATOR                       (-1760647410L)
-#define KV5M_AUTH_CONTEXT                        (-1760647383L)
-#define KV5M_AUTHDATA                            (-1760647414L)
-#define KV5M_GSS_OID                             (-1760647372L)
-#define KV5M_GSS_QUEUE                           (-1760647371L)
-
 /* per Kerberos v5 protocol spec crypto types from the wire. 
  * these get mapped to linux kernel crypto routines.  
  */
@@ -126,14 +115,13 @@ enum seal_alg {
 #define ENCTYPE_UNKNOWN         0x01ff
 
 s32
-krb5_make_checksum(s32 cksumtype,
-		   struct xdr_netobj *input,
+krb5_make_checksum(s32 cksumtype, char *header, char *body, int body_len,
 		   struct xdr_netobj *cksum);
 
 u32
 krb5_make_token(struct krb5_ctx *context_handle, int qop_req,
-	struct xdr_netobj * input_message_buffer,
-	struct xdr_netobj * output_message_buffer, int toktype);
+	struct xdr_netobj *input_message_buffer,
+	struct xdr_netobj *output_message_buffer, int toktype);
 
 u32
 krb5_read_token(struct krb5_ctx *context_handle,
