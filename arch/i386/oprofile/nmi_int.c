@@ -65,14 +65,14 @@ static int __init init_driverfs(void)
 {
 	int error;
 	if (!(error = sysdev_class_register(&oprofile_sysclass)))
-		error = sys_device_register(&device_oprofile);
+		error = sysdev_register(&device_oprofile);
 	return error;
 }
 
 
 static void __exit exit_driverfs(void)
 {
-	sys_device_unregister(&device_oprofile);
+	sysdev_unregister(&device_oprofile);
 	sysdev_class_unregister(&oprofile_sysclass);
 }
 

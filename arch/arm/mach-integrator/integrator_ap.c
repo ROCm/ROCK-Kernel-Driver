@@ -173,7 +173,7 @@ static int __init irq_init_sysfs(void)
 {
 	int ret = sysdev_class_register(&irq_class);
 	if (ret == 0)
-		ret = sys_device_register(&irq_device);
+		ret = sysdev_register(&irq_device);
 	return ret;
 }
 
