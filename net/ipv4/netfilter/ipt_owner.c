@@ -169,7 +169,7 @@ checkentry(const char *tablename,
         }
 
 	if (matchsize != IPT_ALIGN(sizeof(struct ipt_owner_info))) {
-		printk("Matchsize %u != %u\n", matchsize,
+		printk("Matchsize %u != %Zu\n", matchsize,
 		       IPT_ALIGN(sizeof(struct ipt_owner_info)));
 		return 0;
 	}
