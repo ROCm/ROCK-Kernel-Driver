@@ -53,7 +53,7 @@ static struct sock *tcpnl;
    RTA_DATA(rta); })
 
 static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
-			int ext, u32 pid, u32 seq)
+			int ext, u32 pid, u32 seq, u16 nlmsg_flags)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -65,6 +65,7 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 	unsigned char	 *b = skb->tail;
 
 	nlh = NLMSG_PUT(skb, pid, seq, TCPDIAG_GETSOCK, sizeof(*r));
+	nlh->nlmsg_flags = nlmsg_flags;
 	r = NLMSG_DATA(nlh);
 	if (sk->sk_state != TCP_TIME_WAIT) {
 		if (ext & (1<<(TCPDIAG_MEMINFO-1)))
@@ -236,7 +237,7 @@ static int tcpdiag_get_exact(struct sk_buff *in_skb, const struct nlmsghdr *nlh)
 
 	if (tcpdiag_fill(rep, sk, req->tcpdiag_ext,
 			 NETLINK_CB(in_skb).pid,
-			 nlh->nlmsg_seq) <= 0)
+			 nlh->nlmsg_seq, 0) <= 0)
 		BUG();
 
 	err = netlink_unicast(tcpnl, rep, NETLINK_CB(in_skb).pid, MSG_DONTWAIT);
@@ -442,7 +443,7 @@ static int tcpdiag_dump_sock(struct sk_buff *skb, struct sock *sk,
 	}
 
 	return tcpdiag_fill(skb, sk, r->tcpdiag_ext, NETLINK_CB(cb->skb).pid,
-			    cb->nlh->nlmsg_seq);
+			    cb->nlh->nlmsg_seq, NLM_F_MULTI);
 }
 
 static int tcpdiag_fill_req(struct sk_buff *skb, struct sock *sk,
@@ -456,6 +457,7 @@ static int tcpdiag_fill_req(struct sk_buff *skb, struct sock *sk,
 	long tmo;
 
 	nlh = NLMSG_PUT(skb, pid, seq, TCPDIAG_GETSOCK, sizeof(*r));
+	nlh->nlmsg_flags = NLM_F_MULTI;
 	r = NLMSG_DATA(nlh);
 
 	r->tcpdiag_family = sk->sk_family;
