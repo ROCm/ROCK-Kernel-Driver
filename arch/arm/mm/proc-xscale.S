@@ -21,6 +21,7 @@
  */
 
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
@@ -582,11 +583,6 @@ ENTRY(cpu_xscale_set_pgd)
  */
 	.align	5
 ENTRY(cpu_xscale_set_pmd)
-#if PMD_CACHE_WRITE_ALLOCATE
-	and	r2, r1, #PMD_TYPE_MASK|PMD_SECT_CACHEABLE|PMD_SECT_BUFFERABLE
-	cmp	r2, #PMD_TYPE_SECT|PMD_SECT_CACHEABLE|PMD_SECT_BUFFERABLE
-	orreq	r1, r1, #PMD_SECT_TEX(1)
-#endif
 	str	r1, [r0]
 	mov	ip, #0
 	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
@@ -668,7 +664,7 @@ cpu_pxa250_name:
 
 	.align
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 __xscale_setup:
 	mov	r0, #PSR_F_BIT|PSR_I_BIT|SVC_MODE

@@ -37,6 +37,7 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/init.h>
@@ -203,9 +204,7 @@ void release_fiq(struct fiq_handler *f)
 	if (current_fiq != f) {
 		printk(KERN_ERR "%s FIQ trying to release %s FIQ\n",
 		       f->name, current_fiq->name);
-#ifdef CONFIG_DEBUG_ERRORS
-		__backtrace();
-#endif
+		dump_stack();
 		return;
 	}
 

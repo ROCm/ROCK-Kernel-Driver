@@ -259,7 +259,7 @@ struct pci_fixup pcibios_fixups[] = {
 	}, { 0 }
 };
 
-void __init
+void __devinit
 pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 			struct resource *res, int resource)
 {
@@ -300,7 +300,7 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 	}
 }
 
-void __init pcibios_update_irq(struct pci_dev *dev, int irq)
+void __devinit pcibios_update_irq(struct pci_dev *dev, int irq)
 {
 	if (debug_pci)
 		printk("PCI: Assigning IRQ %02d to %s\n", irq, dev->name);
@@ -321,7 +321,7 @@ static inline int pdev_bad_for_parity(struct pci_dev *dev)
 /*
  * Adjust the device resources from bus-centric to Linux-centric.
  */
-static void __init
+static void __devinit
 pdev_fixup_device_resources(struct pci_sys_data *root, struct pci_dev *dev)
 {
 	unsigned long offset;
@@ -340,7 +340,7 @@ pdev_fixup_device_resources(struct pci_sys_data *root, struct pci_dev *dev)
 	}
 }
 
-static void __init
+static void __devinit
 pbus_assign_bus_resources(struct pci_bus *bus, struct pci_sys_data *root)
 {
 	struct pci_dev *dev = bus->self;
@@ -359,7 +359,7 @@ pbus_assign_bus_resources(struct pci_bus *bus, struct pci_sys_data *root)
  * pcibios_fixup_bus - Called after each bus is probed,
  * but before its children are examined.
  */
-void __init pcibios_fixup_bus(struct pci_bus *bus)
+void __devinit pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct pci_sys_data *root = bus->sysdata;
 	struct list_head *walk;
@@ -428,7 +428,7 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 /*
  * Convert from Linux-centric to bus-centric addresses for bridge devices.
  */
-void __init
+void __devinit
 pcibios_fixup_pbus_ranges(struct pci_bus *bus, struct pbus_set_ranges_data *ranges)
 {
 	struct pci_sys_data *root = bus->sysdata;
@@ -587,12 +587,12 @@ char * __init pcibios_setup(char *str)
 void pcibios_align_resource(void *data, struct resource *res,
 			    unsigned long size, unsigned long align)
 {
-	if (res->flags & IORESOURCE_IO) {
-		unsigned long start = res->start;
+	unsigned long start = res->start;
 
-		if (start & 0x300)
-			res->start = (start + 0x3ff) & ~0x3ff;
-	}
+	if (res->flags & IORESOURCE_IO && start & 0x300)
+		start = (start + 0x3ff) & ~0x3ff;
+
+	res->start = (start + align - 1) & ~(align - 1);
 }
 
 /**
@@ -623,6 +623,13 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 		if (r->flags & IORESOURCE_MEM)
 			cmd |= PCI_COMMAND_MEMORY;
 	}
+
+	/*
+	 * Bridges (eg, cardbus bridges) need to be fully enabled
+	 */
+	if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE)
+		cmd |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY;
+
 	if (cmd != old_cmd) {
 		printk("PCI: enabling device %s (%04x -> %04x)\n",
 		       dev->slot_name, old_cmd, cmd);

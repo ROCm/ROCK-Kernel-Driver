@@ -12,7 +12,7 @@
 #endif
 
 	.macro	zero_fp
-#ifndef CONFIG_NO_FRAME_POINTER
+#ifdef CONFIG_FRAME_POINTER
 	mov	fp, #0
 #endif
 	.endm

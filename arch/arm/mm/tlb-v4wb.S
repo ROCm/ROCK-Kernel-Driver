@@ -13,6 +13,7 @@
  *  Processors: ARM920 ARM922 ARM926 SA110 SA1100 SA1110 XScale
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/constants.h>
 #include <asm/tlbflush.h>
 #include "proc-macros.S"
@@ -110,7 +111,7 @@ ENTRY(v4wbi_flush_kern_tlb_range)
 	blo	1b
 	mov	pc, lr
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 	.type	v4wb_tlb_fns, #object
 ENTRY(v4wb_tlb_fns)

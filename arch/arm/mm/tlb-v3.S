@@ -12,6 +12,7 @@
  * Processors: ARM610, ARM710.
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/constants.h>
 #include <asm/tlbflush.h>
 #include "proc-macros.S"
@@ -41,7 +42,7 @@ ENTRY(v3_flush_kern_tlb_range)
 	blo	1b
 	mov	pc, lr
 
-	.section ".text.init", #alloc, #execinstr
+	__INIT
 
 	.type	v3_tlb_fns, #object
 ENTRY(v3_tlb_fns)

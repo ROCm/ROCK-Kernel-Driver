@@ -11,6 +11,7 @@
  *  functions on the ARM610 & ARM710.
  */
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
@@ -316,7 +317,7 @@ cpu_arm710_name:
 		.asciz	"ARM 710"
 		.align
 
-		.section ".text.init", #alloc, #execinstr
+		__INIT
 
 __arm6_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c0		@ flush caches on v3

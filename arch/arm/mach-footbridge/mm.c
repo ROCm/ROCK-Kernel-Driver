@@ -84,12 +84,8 @@ void __init footbridge_map_io(void)
  */
 unsigned long __virt_to_bus(unsigned long res)
 {
-#ifdef CONFIG_DEBUG_ERRORS
-	if (res < PAGE_OFFSET || res >= (unsigned long)high_memory) {
-		printk("__virt_to_bus: invalid virtual address 0x%08lx\n", res);
-		__backtrace();
-	}
-#endif
+	WARN_ON(res < PAGE_OFFSET || res >= (unsigned long)high_memory);
+
 	return (res - PAGE_OFFSET) + (*CSR_PCISDRAMBASE & 0xfffffff0);
 }
 
@@ -98,12 +94,8 @@ unsigned long __bus_to_virt(unsigned long res)
 	res -= (*CSR_PCISDRAMBASE & 0xfffffff0);
 	res += PAGE_OFFSET;
 
-#ifdef CONFIG_DEBUG_ERRORS
-	if (res < PAGE_OFFSET || res >= (unsigned long)high_memory) {
-		printk("__bus_to_virt: invalid virtual address 0x%08lx\n", res);
-		__backtrace();
-	}
-#endif
+	WARN_ON(res < PAGE_OFFSET || res >= (unsigned long)high_memory);
+
 	return res;
 }
 
