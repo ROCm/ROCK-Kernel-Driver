@@ -114,9 +114,6 @@ static ssize_t coda_psdev_write(struct file *file, const char *buf,
 	if (copy_from_user(&hdr, buf, 2 * sizeof(u_long)))
 	        return -EFAULT;
 
-	CDEBUG(D_PSDEV, "(process,opc,uniq)=(%d,%ld,%ld), nbytes %ld\n", 
-	       current->pid, hdr.opcode, hdr.unique, (long)nbytes);
-
         if (DOWNCALL(hdr.opcode)) {
 		struct super_block *sb = NULL;
                 union outputArgs *dcbuf;
@@ -124,11 +121,9 @@ static ssize_t coda_psdev_write(struct file *file, const char *buf,
 
 		sb = vcp->vc_sb;
 		if ( !sb ) {
-			CDEBUG(D_PSDEV, "coda_psdev_write: downcall, no SB!\n");
                         count = nbytes;
                         goto out;
 		}
-		CDEBUG(D_PSDEV, "handling downcall\n");
 
 		if  ( nbytes < sizeof(struct coda_out_hdr) ) {
 		        printk("coda_downcall opc %ld uniq %ld, not enough!\n",
@@ -182,8 +177,6 @@ static ssize_t coda_psdev_write(struct file *file, const char *buf,
 		goto out;
 	}
 
-	CDEBUG(D_PSDEV,"Eureka: uniq %ld on queue!\n", hdr.unique);
-
         /* move data into response buffer. */
 	if (req->uc_outSize < nbytes) {
                 printk("psdev_write: too much cnt: %d, cnt: %ld, opc: %ld, uniq: %ld.\n",
@@ -208,10 +201,6 @@ static ssize_t coda_psdev_write(struct file *file, const char *buf,
 			(struct coda_open_by_fd_out *)req->uc_data;
 		outp->fh = fget(outp->fd);
 	}
-
-	CDEBUG(D_PSDEV, 
-	       "Found! Count %ld for (opc,uniq)=(%ld,%ld), upc_req at %p\n", 
-	        (long)count, hdr.opcode, hdr.unique, &req);
 
         wake_up(&req->uc_sleep);
 out:
@@ -277,9 +266,6 @@ static ssize_t coda_psdev_read(struct file * file, char * buf,
 		goto out;
 	}
 
-	CDEBUG(D_PSDEV, "vcread: signal msg (%d, %d)\n", 
-			req->uc_opcode, req->uc_unique);
-
 	CODA_FREE(req->uc_data, sizeof(struct coda_in_hdr));
 	upc_free(req);
 out:
@@ -315,8 +301,6 @@ static int coda_psdev_open(struct inode * inode, struct file * file)
 	
 	file->private_data = vcp;
 
-	CDEBUG(D_PSDEV, "device %i - inuse: %d\n", idx, vcp->vc_inuse);
-
 	unlock_kernel();
         return 0;
 }
@@ -335,14 +319,12 @@ static int coda_psdev_release(struct inode * inode, struct file * file)
 		return -1;
 	}
 
-	CDEBUG(D_PSDEV, "psdev_release: inuse %d\n", vcp->vc_inuse);
 	if (--vcp->vc_inuse) {
 		unlock_kernel();
 		return 0;
 	}
         
         /* Wakeup clients so they can return. */
-	CDEBUG(D_PSDEV, "wake up pending clients\n");
 	lh = vcp->vc_pending.next;
 	next = lh;
 	while ( (lh = next) != &vcp->vc_pending) {
@@ -359,13 +341,11 @@ static int coda_psdev_release(struct inode * inode, struct file * file)
         }
         
 	lh = &vcp->vc_processing;
-	CDEBUG(D_PSDEV, "wake up processing clients\n");
 	while ( (lh = lh->next) != &vcp->vc_processing) {
 		req = list_entry(lh, struct upc_req, uc_chain);
 		req->uc_flags |= REQ_ABORT;
 	        wake_up(&req->uc_sleep);
         }
-	CDEBUG(D_PSDEV, "Done.\n");
 
 	unlock_kernel();
 	return 0;
