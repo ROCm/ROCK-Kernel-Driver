@@ -35,10 +35,11 @@ show_##field (struct device *dev, char *buf)				\
 }									\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
 
-pci_config_attr(vendor, "%x\n");
-pci_config_attr(device, "%x\n");
-pci_config_attr(subsystem_vendor, "%x\n");
-pci_config_attr(subsystem_device, "%x\n");
+pci_config_attr(vendor, "%04x\n");
+pci_config_attr(device, "%04x\n");
+pci_config_attr(subsystem_vendor, "%04x\n");
+pci_config_attr(subsystem_device, "%04x\n");
+pci_config_attr(class, "%06x\n");
 pci_config_attr(irq, "%u\n");
 
 /* show resources */
@@ -69,6 +70,7 @@ void pci_create_sysfs_dev_files (struct pci_dev *pdev)
 	device_create_file (dev, &dev_attr_device);
 	device_create_file (dev, &dev_attr_subsystem_vendor);
 	device_create_file (dev, &dev_attr_subsystem_device);
+	device_create_file (dev, &dev_attr_class);
 	device_create_file (dev, &dev_attr_irq);
 	device_create_file (dev, &dev_attr_resource);
 }
