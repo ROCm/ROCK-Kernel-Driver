@@ -44,6 +44,7 @@ struct serial8250_config {
 };
 
 #define UART_CAP_FIFO	(1 << 8)	/* UART has FIFO */
+#define UART_CAP_SLEEP	(1 << 10)	/* UART has IER sleep */
 
 #undef SERIAL_DEBUG_PCI
 
