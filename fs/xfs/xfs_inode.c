@@ -1015,7 +1015,7 @@ xfs_ialloc(
 	xfs_inode_t	*pip,
 	mode_t		mode,
 	nlink_t		nlink,
-	dev_t		rdev,
+	xfs_dev_t	rdev,
 	cred_t		*cr,
 	xfs_prid_t	prid,
 	int		okalloc,
@@ -1066,9 +1066,6 @@ xfs_ialloc(
 	ip->i_d.di_gid = current->fsgid;
 	ip->i_d.di_projid = prid;
 	bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
-
-	/* now that we have a v_type we can set Linux inode ops (& unlock) */
-	linvfs_set_inode_ops(LINVFS_GET_IP(XFS_ITOV(ip)));
 
 	/*
 	 * If the superblock version is up to where we support new format
@@ -1128,7 +1125,7 @@ xfs_ialloc(
 	case IFBLK:
 	case IFSOCK:
 		ip->i_d.di_format = XFS_DINODE_FMT_DEV;
-		ip->i_df.if_u2.if_rdev = IRIX_MKDEV(MAJOR(rdev), MINOR(rdev));
+		ip->i_df.if_u2.if_rdev = rdev;
 		ip->i_df.if_flags = 0;
 		flags |= XFS_ILOG_DEV;
 		break;
@@ -1172,6 +1169,10 @@ xfs_ialloc(
 	 * Log the new values stuffed into the inode.
 	 */
 	xfs_trans_log_inode(tp, ip, flags);
+
+	/* now that we have a v_type we can set Linux inode ops (& unlock) */
+	VFS_INIT_VNODE(XFS_MTOVFS(tp->t_mountp), vp, XFS_ITOBHV(ip), 1);
+
 	*ipp = ip;
 	return 0;
 }

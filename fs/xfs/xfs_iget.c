@@ -31,6 +31,7 @@
  */
 
 #include <xfs.h>
+#include <linux/pagemap.h>
 
 
 /*
@@ -109,17 +110,35 @@ xfs_chash_free(xfs_mount_t *mp)
 	mp->m_chash = NULL;
 }
 
-
-static inline void
-xfs_iget_vnode_init(
+void
+xfs_revalidate_inode(
 	xfs_mount_t	*mp,
 	vnode_t		*vp,
 	xfs_inode_t	*ip)
 {
-	vp->v_vfsp  = XFS_MTOVFS(mp);
-	vp->v_type  = IFTOVT(ip->i_d.di_mode);
-}
+	struct inode	*inode = LINVFS_GET_IP(vp);
 
+	inode->i_mode	= (ip->i_d.di_mode & MODEMASK) | VTTOIF(vp->v_type);
+	inode->i_nlink	= ip->i_d.di_nlink;
+	inode->i_uid	= ip->i_d.di_uid;
+	inode->i_gid 	= ip->i_d.di_gid;
+	if (((1 << vp->v_type) & ((1<<VBLK) | (1<<VCHR))) == 0) {
+		inode->i_rdev	= NODEV;
+	} else {
+		xfs_dev_t dev = ip->i_df.if_u2.if_rdev;
+		inode->i_rdev	= XFS_DEV_TO_KDEVT(dev);
+	}
+	inode->i_blksize = PAGE_CACHE_SIZE;
+	inode->i_generation = ip->i_d.di_gen;
+	inode->i_size	= ip->i_d.di_size;
+	inode->i_blocks =
+		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
+	inode->i_atime	= ip->i_d.di_atime.t_sec;
+	inode->i_mtime	= ip->i_d.di_mtime.t_sec;
+	inode->i_ctime	= ip->i_d.di_ctime.t_sec;
+
+	vp->v_flag &= ~VMODIFIED;
+}
 
 /*
  * Look up an inode by number in the given file system.
@@ -198,15 +217,8 @@ again:
 					goto again;
 				}
 
-				xfs_iget_vnode_init(mp, vp, ip);
-
 				vn_trace_exit(vp, "xfs_iget.alloc",
 					(inst_t *)__return_address);
-
-				bhv_desc_init(&(ip->i_bhv_desc), ip, vp,
-							&xfs_vnodeops);
-				vn_bhv_insert_initial(VN_BHV_HEAD(vp),
-							&(ip->i_bhv_desc));
 
 				XFS_STATS_INC(xfsstats.xs_ig_found);
 
@@ -239,11 +251,6 @@ again:
 			read_unlock(&ih->ih_lock);
 
 			XFS_STATS_INC(xfsstats.xs_ig_found);
-
-			/*
-			 * Make sure the vnode and the inode are hooked up
-			 */
-			xfs_iget_vnode_init(mp, vp, ip);
 
 finish_inode:
 			if (lock_flags != 0) {
@@ -281,18 +288,7 @@ finish_inode:
 		return error;
 	}
 
-	/*
-	 * Vnode provided by vn_initialize.
-	 */
-
-	xfs_iget_vnode_init(mp, vp, ip);
-
 	vn_trace_exit(vp, "xfs_iget.alloc", (inst_t *)__return_address);
-
-	if (vp->v_fbhv == NULL) {
-		bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
-		vn_bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
-	}
 
 	xfs_inode_lock_init(ip, vp);
 	xfs_iocore_inode_init(ip);
@@ -426,12 +422,7 @@ finish_inode:
 	 * If we have a real type for an on-disk inode, we can set ops(&unlock)
 	 * now.	 If it's a new inode being created, xfs_ialloc will handle it.
 	 */
-	if (vp->v_type != VNON) {
-		linvfs_set_inode_ops(LINVFS_GET_IP(vp));
-	}
-
-	/* Update the linux inode */
-	error = vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);
+	VFS_INIT_VNODE(XFS_MTOVFS(mp), vp, XFS_ITOBHV(ip), 1);
 
 	return 0;
 }
@@ -496,7 +487,6 @@ inode_allocate:
 			newnode = (ip->i_d.di_mode == 0);
 			if (newnode)
 				xfs_iocore_inode_reinit(ip);
-			vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);
 			XFS_STATS_INC(xfsstats.xs_ig_found);
 			*ipp = ip;
 			error = 0;
@@ -506,7 +496,6 @@ inode_allocate:
 
 	return error;
 }
-
 
 /*
  * Do the setup for the various locks within the incore inode.

@@ -516,7 +516,7 @@ int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			  xfs_inode_t **, xfs_daddr_t);
 int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
 int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, nlink_t,
-			   dev_t, struct cred *, xfs_prid_t, int,
+			   xfs_dev_t, struct cred *, xfs_prid_t, int,
 			   struct xfs_buf **, boolean_t *, xfs_inode_t **);
 void		xfs_xlate_dinode_core(xfs_caddr_t, struct xfs_dinode_core *, int,
 			   xfs_arch_t);
@@ -550,7 +550,7 @@ void		xfs_lock_inodes(xfs_inode_t **, int, int, uint);
 
 #define xfs_ipincount(ip)	((unsigned int) atomic_read(&ip->i_pincount))
 
-
+void xfs_revalidate_inode(struct xfs_mount *, vnode_t *vp, xfs_inode_t *);
 
 #ifdef DEBUG
 void		xfs_isize_check(struct xfs_mount *, xfs_inode_t *, xfs_fsize_t);

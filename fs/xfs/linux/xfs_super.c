@@ -390,7 +390,6 @@ linvfs_fill_super(
 		goto fail_unmount;
 
 	ip = LINVFS_GET_IP(rootvp);
-	linvfs_revalidate_core(ip, ATTR_COMM);
 
 	sb->s_root = d_alloc_root(ip);
 	if (!sb->s_root)
@@ -444,12 +443,6 @@ linvfs_set_inode_ops(
 {
 	vnode_t			*vp = LINVFS_GET_VP(inode);
 
-	inode->i_mode = VTTOIF(vp->v_type);
-
-	/* If this isn't a new inode, nothing to do */
-	if (!(inode->i_state & I_NEW))
-		return;
-
 	if (vp->v_type == VNON) {
 		make_bad_inode(inode);
 	} else if (S_ISREG(inode->i_mode)) {
@@ -468,8 +461,6 @@ linvfs_set_inode_ops(
 		init_special_inode(inode, inode->i_mode,
 					kdev_t_to_nr(inode->i_rdev));
 	}
-
-	unlock_new_inode(inode);
 }
 
 /*
@@ -530,8 +521,8 @@ void
 linvfs_put_super(
 	struct super_block	*sb)
 {
-	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 	int			error;
+	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
 
 	VFS_DOUNMOUNT(vfsp, 0, NULL, NULL, error);
 	if (error) {
@@ -674,7 +665,6 @@ linvfs_get_parent(
 			VN_RELE(cvp);
 			return ERR_PTR(-EACCES);
 		}
-		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 	}
 	if (error)
 		return ERR_PTR(-error);

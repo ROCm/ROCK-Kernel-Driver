@@ -528,14 +528,14 @@ typedef struct vattr {
 	mode_t		va_mode;	/* file access mode */
 	uid_t		va_uid;		/* owner user id */
 	gid_t		va_gid;		/* owner group id */
-	dev_t		va_fsid;	/* file system id (dev for now) */
+	xfs_dev_t	va_fsid;	/* file system id (dev for now) */
 	xfs_ino_t	va_nodeid;	/* node id */
 	nlink_t		va_nlink;	/* number of references to file */
 	xfs_off_t	va_size;	/* file size in bytes */
 	timespec_t	va_atime;	/* time of last access */
 	timespec_t	va_mtime;	/* time of last modification */
 	timespec_t	va_ctime;	/* time file ``created'' */
-	dev_t		va_rdev;	/* device the file represents */
+	xfs_dev_t	va_rdev;	/* device the file represents */
 	u_long		va_blksize;	/* fundamental block size */
 	__int64_t	va_nblocks;	/* # of blocks allocated */
 	u_long		va_vcode;	/* version code */
@@ -642,7 +642,7 @@ typedef struct vnode_map {
 				 (vmap).v_ino	 = (ip)->i_ino; }
 extern void	vn_purge(struct vnode *, vmap_t *);
 extern vnode_t	*vn_get(struct vnode *, vmap_t *);
-extern int	vn_revalidate(struct vnode *, int);
+extern int	vn_revalidate(struct vnode *);
 extern void	vn_remove(struct vnode *);
 
 static inline int vn_count(struct vnode *vp)

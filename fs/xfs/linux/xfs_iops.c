@@ -98,7 +98,7 @@ linvfs_mknod(
 
 	switch (mode & S_IFMT) {
 	case S_IFCHR: case S_IFBLK: case S_IFIFO: case S_IFSOCK:
-		va.va_rdev = rdev;
+		va.va_rdev = XFS_MKDEV(MAJOR(rdev), MINOR(rdev));
 		va.va_mask |= AT_RDEV;
 		/*FALLTHROUGH*/
 	case S_IFREG:
@@ -122,8 +122,6 @@ linvfs_mknod(
 
 		if (S_ISCHR(mode) || S_ISBLK(mode))
 			ip->i_rdev = to_kdev_t(rdev);
-		/* linvfs_revalidate_core returns (-) errors */
-		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 		validate_fields(dir);
 		d_instantiate(dentry, ip);
 		mark_inode_dirty_sync(ip);
@@ -186,7 +184,6 @@ linvfs_lookup(
 			VN_RELE(cvp);
 			return ERR_PTR(-EACCES);
 		}
-		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 	}
 	if (error && (error != ENOENT))
 		return ERR_PTR(-error);
@@ -278,8 +275,6 @@ linvfs_symlink(
 			error = ENOMEM;
 			VN_RELE(cvp);
 		} else {
-			/* linvfs_revalidate_core returns (-) errors */
-			error = -linvfs_revalidate_core(ip, ATTR_COMM);
 			d_instantiate(dentry, ip);
 			validate_fields(dir);
 			mark_inode_dirty_sync(ip);
@@ -441,16 +436,6 @@ linvfs_permission(
  * from the results of a getattr. This gets called out of things
  * like stat.
  */
-int
-linvfs_revalidate_core(
-	struct inode	*inode,
-	int		flags)
-{
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-
-	/* vn_revalidate returns (-) error so this is ok */
-	return vn_revalidate(vp, flags);
-}
 
 STATIC int
 linvfs_getattr(
@@ -463,7 +448,7 @@ linvfs_getattr(
 	int		error = 0;
 
 	if (unlikely(vp->v_flag & VMODIFIED)) {
-		error = linvfs_revalidate_core(inode, 0);
+		error = vn_revalidate(vp);
 	}
 	if (!error)
 		generic_fillattr(inode, stat);
@@ -528,7 +513,7 @@ linvfs_setattr(
 	}
 
 	if (!error) {
-		vn_revalidate(vp, 0);
+		vn_revalidate(vp);
 		mark_inode_dirty_sync(inode);
 	}
 	return error;
@@ -618,29 +603,16 @@ linvfs_setxattr(
 		error = -ENOATTR;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
 		if (strcmp(p, POSIXACL_ACCESS) == 0) {
-			if (vp->v_flag & VMODIFIED) {
-				error = linvfs_revalidate_core(inode, 0);
-				if (error)
-					return error;
-			}
 			error = xfs_acl_vset(vp, data, size, _ACL_TYPE_ACCESS);
-			if (!error) {
-				VMODIFY(vp);
-				error = linvfs_revalidate_core(inode, 0);
-			}
 		}
 		else if (strcmp(p, POSIXACL_DEFAULT) == 0) {
-			error = linvfs_revalidate_core(inode, 0);
-			if (error)
-				return error;
 			error = xfs_acl_vset(vp, data, size, _ACL_TYPE_DEFAULT);
-			if (!error) {
-				VMODIFY(vp);
-				error = linvfs_revalidate_core(inode, 0);
-			}
 		}
 		else if (strcmp(p, POSIXCAP) == 0) {
 			error = xfs_cap_vset(vp, data, size);
+		}
+		if (!error) {
+			error = vn_revalidate(vp);
 		}
 		return error;
 	}
@@ -689,19 +661,9 @@ linvfs_getxattr(
 		error = -ENOATTR;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
 		if (strcmp(p, POSIXACL_ACCESS) == 0) {
-			if (vp->v_flag & VMODIFIED) {
-				error = linvfs_revalidate_core(inode, 0);
-				if (error)
-					return error;
-			}
 			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_ACCESS);
 		}
 		else if (strcmp(p, POSIXACL_DEFAULT) == 0) {
-			if (vp->v_flag & VMODIFIED) {
-				error = linvfs_revalidate_core(inode, 0);
-				if (error)
-					return error;
-			}
 			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_DEFAULT);
 		}
 		else if (strcmp(p, POSIXCAP) == 0) {

@@ -208,7 +208,7 @@ xfs_getattr(
 				(mp->m_sb.sb_rextsize << mp->m_sb.sb_blocklog);
 		}
 	} else {
-		vap->va_rdev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
+		vap->va_rdev = ip->i_df.if_u2.if_rdev;
 		vap->va_blksize = BLKDEV_IOSIZE;
 	}
 
@@ -1970,7 +1970,7 @@ xfs_create(
 	vnode_t			*vp=NULL;
 	xfs_trans_t		*tp;
 	xfs_mount_t		*mp;
-	dev_t			rdev;
+	xfs_dev_t		rdev;
 	int			error;
 	xfs_bmap_free_t		free_list;
 	xfs_fsblock_t		first_block;
@@ -2955,8 +2955,7 @@ xfs_mkdir(
 	xfs_inode_t		*cdp;	/* inode of created dir */
 	vnode_t			*cvp;	/* vnode of created dir */
 	xfs_trans_t		*tp;
-	dev_t			rdev;
-	mode_t			mode;
+	xfs_dev_t		rdev;
 	xfs_mount_t		*mp;
 	int			cancel_flags;
 	int			error;
@@ -3062,8 +3061,9 @@ xfs_mkdir(
 	 * create the directory inode.
 	 */
 	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : 0;
-	mode = IFDIR | (vap->va_mode & ~IFMT);
-	error = xfs_dir_ialloc(&tp, dp, mode, 2, rdev, credp, prid, resblks > 0,
+	error = xfs_dir_ialloc(&tp, dp, 
+			MAKEIMODE(vap->va_type,vap->va_mode), 2,
+			rdev, credp, prid, resblks > 0,
 		&cdp, NULL);
 	if (error) {
 		if (error == ENOSPC)
@@ -3521,7 +3521,7 @@ xfs_symlink(
 	xfs_inode_t		*ip;
 	int			error;
 	int			pathlen;
-	dev_t			rdev;
+	xfs_dev_t		rdev;
 	xfs_bmap_free_t		free_list;
 	xfs_fsblock_t		first_block;
 	boolean_t		dp_joined_to_trans;

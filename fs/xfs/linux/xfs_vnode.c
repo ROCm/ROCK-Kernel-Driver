@@ -203,7 +203,7 @@ vn_get(struct vnode *vp, vmap_t *vmap)
  * "revalidate" the linux inode.
  */
 int
-vn_revalidate(struct vnode *vp, int flags)
+vn_revalidate(struct vnode *vp)
 {
 	int		error;
 	struct inode	*inode;
@@ -215,7 +215,7 @@ vn_revalidate(struct vnode *vp, int flags)
 
 	ASSERT(vp->v_bh.bh_first != NULL);
 
-	VOP_GETATTR(vp, &va, flags & ATTR_LAZY, NULL, error);
+	VOP_GETATTR(vp, &va, 0, NULL, error);
 
 	if (! error) {
 		inode = LINVFS_GET_IP(vp);
@@ -225,27 +225,14 @@ vn_revalidate(struct vnode *vp, int flags)
 		inode->i_nlink	    = va.va_nlink;
 		inode->i_uid	    = va.va_uid;
 		inode->i_gid	    = va.va_gid;
-		inode->i_rdev	    = mk_kdev(MAJOR(va.va_rdev),
-						MINOR(va.va_rdev));
-		inode->i_blksize    = PAGE_CACHE_SIZE;
+		inode->i_rdev	    = XFS_DEV_TO_KDEVT(va.va_rdev);
 		inode->i_generation = va.va_gencount;
-		if ((flags & ATTR_COMM) ||
-		    S_ISREG(inode->i_mode) ||
-		    S_ISDIR(inode->i_mode) ||
-		    S_ISLNK(inode->i_mode)) {
-			inode->i_size	    = va.va_size;
-			inode->i_blocks	    = va.va_nblocks;
-			inode->i_atime	    = va.va_atime.tv_sec;
-			inode->i_mtime	    = va.va_mtime.tv_sec;
-			inode->i_ctime	    = va.va_ctime.tv_sec;
-		}
-		if (flags & ATTR_LAZY)
-			vp->v_flag &= ~VMODIFIED;
-		else
-			VUNMODIFY(vp);
-	} else {
-		vn_trace_exit(vp, "vn_revalidate.error",
-					(inst_t *)__return_address);
+		inode->i_size	    = va.va_size;
+		inode->i_blocks	    = va.va_nblocks;
+		inode->i_mtime	    = va.va_mtime.tv_sec;
+		inode->i_ctime	    = va.va_ctime.tv_sec;
+		inode->i_atime	    = va.va_atime.tv_sec;
+		VUNMODIFY(vp);
 	}
 
 	return -error;

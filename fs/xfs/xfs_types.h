@@ -315,16 +315,16 @@ extern struct xfsstats xfsstats;
 #define MKDEV(major, minor)	makedev(major, minor)
 #endif
 
-#define IRIX_DEV_BITSMAJOR	14
-#define IRIX_DEV_BITSMINOR	18
-#define IRIX_DEV_MAXMAJ		0x1ff
-#define IRIX_DEV_MAXMIN		0x3ffff
-#define IRIX_DEV_MAJOR(dev)	((int)(((unsigned)(dev)>>IRIX_DEV_BITSMINOR) \
-				    & IRIX_DEV_MAXMAJ))
-#define IRIX_DEV_MINOR(dev)	((int)((dev)&IRIX_DEV_MAXMIN))
-#define IRIX_MKDEV(major,minor) ((xfs_dev_t)(((major)<<IRIX_DEV_BITSMINOR) \
-				    | (minor&IRIX_DEV_MAXMIN)))
+#define XFS_DEV_BITSMAJOR	14
+#define XFS_DEV_BITSMINOR	18
+#define XFS_DEV_MAXMAJ		0x1ff
+#define XFS_DEV_MAXMIN		0x3ffff
+#define XFS_DEV_MAJOR(dev)	((int)(((unsigned)(dev)>>XFS_DEV_BITSMINOR) \
+				    & XFS_DEV_MAXMAJ))
+#define XFS_DEV_MINOR(dev)	((int)((dev)&XFS_DEV_MAXMIN))
+#define XFS_MKDEV(major,minor) ((xfs_dev_t)(((major)<<XFS_DEV_BITSMINOR) \
+				    | (minor&XFS_DEV_MAXMIN)))
 
-#define IRIX_DEV_TO_KDEVT(dev)	MKDEV(IRIX_DEV_MAJOR(dev),IRIX_DEV_MINOR(dev))
+#define XFS_DEV_TO_KDEVT(dev)	mk_kdev(XFS_DEV_MAJOR(dev),XFS_DEV_MINOR(dev))
 
 #endif	/* !__XFS_TYPES_H */

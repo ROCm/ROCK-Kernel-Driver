@@ -264,12 +264,6 @@ xfs_vget_fsop_handlereq(
 	vpp = XFS_ITOV(ip);
 	inodep = LINVFS_GET_IP(vpp);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-	error = linvfs_revalidate_core(inodep, ATTR_COMM);
-	if (error) {
-		iput(inodep);
-		/* this error is (-) but our callers expect + */
-		return XFS_ERROR(-error);
-	}
 
 	*vp = vpp;
 	*inode = inodep;

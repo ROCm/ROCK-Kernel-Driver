@@ -132,7 +132,7 @@ xfs_dir_ialloc(
 					   the inode. */
 	mode_t		mode,
 	nlink_t		nlink,
-	dev_t		rdev,
+	xfs_dev_t	rdev,
 	cred_t		*credp,
 	prid_t		prid,		/* project id */
 	int		okalloc,	/* ok to allocate new space */
