@@ -30,6 +30,12 @@ struct scsi_transport_template;
 #define DISABLE_CLUSTERING 0
 #define ENABLE_CLUSTERING 1
 
+enum scsi_eh_timer_return {
+	EH_NOT_HANDLED,
+	EH_HANDLED,
+	EH_RESET_TIMER,
+};
+
 
 struct scsi_host_template {
 	struct module *module;
@@ -124,6 +130,20 @@ struct scsi_host_template {
 	int (* eh_device_reset_handler)(struct scsi_cmnd *);
 	int (* eh_bus_reset_handler)(struct scsi_cmnd *);
 	int (* eh_host_reset_handler)(struct scsi_cmnd *);
+
+	/*
+	 * This is an optional routine to notify the host that the scsi
+	 * timer just fired.  The returns tell the timer routine what to
+	 * do about this:
+	 *
+	 * EH_HANDLED:		I fixed the error, please complete the command
+	 * EH_RESET_TIMER:	I need more time, reset the timer and
+	 *			begin counting again
+	 * EH_NOT_HANDLED	Begin normal error recovery
+	 *
+	 * Status: OPTIONAL
+	 */
+	enum scsi_eh_timer_return (* eh_timed_out)(struct scsi_cmnd *);
 
 	/*
 	 * Old EH handlers, no longer used. Make them warn the user of old

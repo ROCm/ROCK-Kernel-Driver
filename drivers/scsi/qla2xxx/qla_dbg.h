@@ -182,7 +182,9 @@
 /*
  * Firmware Dump structure definition
  */
-#define FW_DUMP_SIZE	0xBC000		/* bytes */
+#define FW_DUMP_SIZE_128K	0xBC000
+#define FW_DUMP_SIZE_512K	0x2FC000
+#define FW_DUMP_SIZE_1M		0x5FC000
 
 struct qla2300_fw_dump {
 	uint16_t hccr;
@@ -205,7 +207,7 @@ struct qla2300_fw_dump {
 	uint16_t fpm_b1_reg[64];
 	uint16_t risc_ram[0xf800];
 	uint16_t stack_ram[0x1000];
-	uint16_t data_ram[0xF000];
+	uint16_t data_ram[1];
 };
 
 struct qla2100_fw_dump {

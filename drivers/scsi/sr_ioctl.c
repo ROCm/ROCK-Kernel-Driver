@@ -10,9 +10,13 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include "scsi.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
+#include <scsi/scsi_request.h>
 
 #include "sr.h"
 
@@ -65,7 +69,7 @@ static int sr_fake_playtrkind(struct cdrom_device_info *cdi, struct cdrom_ti *ti
 	cgc.cmd[6] = trk1_te.cdte_addr.msf.minute;
 	cgc.cmd[7] = trk1_te.cdte_addr.msf.second;
 	cgc.cmd[8] = trk1_te.cdte_addr.msf.frame;
-	cgc.data_direction = SCSI_DATA_NONE;
+	cgc.data_direction = DMA_NONE;
 	cgc.timeout = IOCTL_TIMEOUT;
 	return sr_do_ioctl(cdi->handle, &cgc);
 }
@@ -138,7 +142,7 @@ int sr_do_ioctl(Scsi_CD *cd, struct packet_command *cgc)
 			if (!cgc->quiet)
 				printk(KERN_INFO "%s: CDROM not ready.  Make sure there is a disc in the drive.\n", cd->cdi.name);
 #ifdef DEBUG
-			print_req_sense("sr", SRpnt);
+			scsi_print_req_sense("sr", SRpnt);
 #endif
 			err = -ENOMEDIUM;
 			break;
@@ -149,14 +153,14 @@ int sr_do_ioctl(Scsi_CD *cd, struct packet_command *cgc)
 				/* sense: Invalid command operation code */
 				err = -EDRIVE_CANT_DO_THIS;
 #ifdef DEBUG
-			print_command(cgc->cmd);
-			print_req_sense("sr", SRpnt);
+			__scsi_print_command(cgc->cmd);
+			scsi_print_req_sense("sr", SRpnt);
 #endif
 			break;
 		default:
 			printk(KERN_ERR "%s: CDROM (ioctl) error, command: ", cd->cdi.name);
-			print_command(cgc->cmd);
-			print_req_sense("sr", SRpnt);
+			__scsi_print_command(cgc->cmd);
+			scsi_print_req_sense("sr", SRpnt);
 			err = -EIO;
 		}
 	}
@@ -183,7 +187,7 @@ static int test_unit_ready(Scsi_CD *cd)
 	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = GPCMD_TEST_UNIT_READY;
 	cgc.quiet = 1;
-	cgc.data_direction = SCSI_DATA_NONE;
+	cgc.data_direction = DMA_NONE;
 	cgc.timeout = IOCTL_TIMEOUT;
 	return sr_do_ioctl(cd, &cgc);
 }
@@ -196,7 +200,7 @@ int sr_tray_move(struct cdrom_device_info *cdi, int pos)
 	memset(&cgc, 0, sizeof(struct packet_command));
 	cgc.cmd[0] = GPCMD_START_STOP_UNIT;
 	cgc.cmd[4] = (pos == 0) ? 0x03 /* close */ : 0x02 /* eject */ ;
-	cgc.data_direction = SCSI_DATA_NONE;
+	cgc.data_direction = DMA_NONE;
 	cgc.timeout = IOCTL_TIMEOUT;
 	return sr_do_ioctl(cd, &cgc);
 }
@@ -280,7 +284,7 @@ int sr_get_mcn(struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 	cgc.cmd[8] = 24;
 	cgc.buffer = buffer;
 	cgc.buflen = 24;
-	cgc.data_direction = SCSI_DATA_READ;
+	cgc.data_direction = DMA_FROM_DEVICE;
 	cgc.timeout = IOCTL_TIMEOUT;
 	result = sr_do_ioctl(cd, &cgc);
 
@@ -310,7 +314,7 @@ int sr_select_speed(struct cdrom_device_info *cdi, int speed)
 	cgc.cmd[0] = GPCMD_SET_SPEED;	/* SET CD SPEED */
 	cgc.cmd[2] = (speed >> 8) & 0xff;	/* MSB for speed (in kbytes/sec) */
 	cgc.cmd[3] = speed & 0xff;	/* LSB */
-	cgc.data_direction = SCSI_DATA_NONE;
+	cgc.data_direction = DMA_NONE;
 	cgc.timeout = IOCTL_TIMEOUT;
 
 	if (sr_do_ioctl(cd, &cgc))
@@ -347,7 +351,7 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 			cgc.buffer = buffer;
 			cgc.buflen = 12;
 			cgc.quiet = 1;
-			cgc.data_direction = SCSI_DATA_READ;
+			cgc.data_direction = DMA_FROM_DEVICE;
 
 			result = sr_do_ioctl(cd, &cgc);
 
@@ -367,7 +371,7 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 			cgc.cmd[8] = 12;		/* LSB of length */
 			cgc.buffer = buffer;
 			cgc.buflen = 12;
-			cgc.data_direction = SCSI_DATA_READ;
+			cgc.data_direction = DMA_FROM_DEVICE;
 
 			result = sr_do_ioctl(cd, &cgc);
 
@@ -393,7 +397,7 @@ int sr_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd, void *arg)
 		cgc.cmd[5] = ti->cdti_ind0;
 		cgc.cmd[7] = ti->cdti_trk1;
 		cgc.cmd[8] = ti->cdti_ind1;
-		cgc.data_direction = SCSI_DATA_NONE;
+		cgc.data_direction = DMA_NONE;
 
 		result = sr_do_ioctl(cd, &cgc);
 		if (result == -EDRIVE_CANT_DO_THIS)
@@ -462,7 +466,7 @@ static int sr_read_cd(Scsi_CD *cd, unsigned char *dest, int lba, int format, int
 	}
 	cgc.buffer = dest;
 	cgc.buflen = blksize;
-	cgc.data_direction = SCSI_DATA_READ;
+	cgc.data_direction = DMA_FROM_DEVICE;
 	cgc.timeout = IOCTL_TIMEOUT;
 	return sr_do_ioctl(cd, &cgc);
 }
@@ -503,7 +507,7 @@ static int sr_read_sector(Scsi_CD *cd, int lba, int blksize, unsigned char *dest
 	cgc.cmd[8] = 1;
 	cgc.buffer = dest;
 	cgc.buflen = blksize;
-	cgc.data_direction = SCSI_DATA_READ;
+	cgc.data_direction = DMA_FROM_DEVICE;
 	cgc.timeout = IOCTL_TIMEOUT;
 	rc = sr_do_ioctl(cd, &cgc);
 

@@ -32,11 +32,13 @@
 #include <linux/blkdev.h>
 #include <asm/semaphore.h>
 
+#include <scsi/scsi.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_devinfo.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_request.h>
 #include <scsi/scsi_transport.h>
-#include "scsi.h"
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -660,6 +662,9 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 
 	if (*bflags & BLIST_MS_192_BYTES_FOR_3F)
 		sdev->use_192_bytes_for_3f = 1;
+
+	if (*bflags & BLIST_NOT_LOCKABLE)
+		sdev->lockable = 0;
 
 	if(sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);
