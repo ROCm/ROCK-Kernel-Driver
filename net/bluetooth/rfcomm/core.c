@@ -263,7 +263,7 @@ static void rfcomm_dlc_unlink(struct rfcomm_dlc *d)
 	rfcomm_session_put(s);
 }
 
-static struct rfcomm_dlc *rfcomm_dlc_get(struct rfcomm_session *s, int dlci)
+static struct rfcomm_dlc *rfcomm_dlc_get(struct rfcomm_session *s, u8 dlci)
 {
 	struct rfcomm_dlc *d;
 	struct list_head *p;
@@ -279,7 +279,8 @@ static struct rfcomm_dlc *rfcomm_dlc_get(struct rfcomm_session *s, int dlci)
 static int __rfcomm_dlc_open(struct rfcomm_dlc *d, bdaddr_t *src, bdaddr_t *dst, u8 channel)
 {
 	struct rfcomm_session *s;
-	int err = 0, dlci = __dlci(0, channel);
+	u8 dlci = __dlci(0, channel);
+	int err = 0;
 
 	BT_DBG("dlc %p state %ld %s %s channel %d dlci %d", 
 			d, d->state, batostr(src), batostr(dst), channel, dlci);
@@ -923,7 +924,7 @@ static void rfcomm_make_uih(struct sk_buff *skb, u8 addr)
 }
 
 /* ---- RFCOMM frame reception ---- */
-static int rfcomm_recv_ua(struct rfcomm_session *s, int dlci)
+static int rfcomm_recv_ua(struct rfcomm_session *s, u8 dlci)
 {
 	BT_DBG("session %p state %ld dlci %d", s, s->state, dlci);
 
@@ -964,7 +965,7 @@ static int rfcomm_recv_ua(struct rfcomm_session *s, int dlci)
 	return 0;
 }
 
-static int rfcomm_recv_dm(struct rfcomm_session *s, int dlci)
+static int rfcomm_recv_dm(struct rfcomm_session *s, u8 dlci)
 {
 	int err = 0;
 
@@ -994,7 +995,7 @@ static int rfcomm_recv_dm(struct rfcomm_session *s, int dlci)
 	return 0;
 }
 
-static int rfcomm_recv_disc(struct rfcomm_session *s, int dlci)
+static int rfcomm_recv_disc(struct rfcomm_session *s, u8 dlci)
 {
 	int err = 0;
 
@@ -1030,10 +1031,10 @@ static int rfcomm_recv_disc(struct rfcomm_session *s, int dlci)
 	return 0;
 }
 
-static int rfcomm_recv_sabm(struct rfcomm_session *s, int dlci)
+static int rfcomm_recv_sabm(struct rfcomm_session *s, u8 dlci)
 {
 	struct rfcomm_dlc *d;
-	int channel;
+	u8 channel;
 
 	BT_DBG("session %p state %ld dlci %d", s, s->state, dlci);
 
@@ -1116,7 +1117,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 {
 	struct rfcomm_pn *pn = (void *) skb->data;
 	struct rfcomm_dlc *d;
-	int dlci = pn->dlci;
+	u8 dlci = pn->dlci;
 
 	BT_DBG("session %p state %ld dlci %d", s, s->state, dlci);
 
@@ -1141,7 +1142,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 			}
 		}
 	} else {
-		int channel = __srv_channel(dlci);
+		u8 channel = __srv_channel(dlci);
 
 		if (!cr)
 			return 0;
@@ -1167,7 +1168,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 static int rfcomm_recv_rpn(struct rfcomm_session *s, int cr, int len, struct sk_buff *skb)
 {
 	struct rfcomm_rpn *rpn = (void *) skb->data;
-	int dlci = __get_dlci(rpn->dlci);
+	u8 dlci = __get_dlci(rpn->dlci);
 
 	u8 bit_rate  = 0;
 	u8 data_bits = 0;
@@ -1257,7 +1258,7 @@ static int rfcomm_recv_msc(struct rfcomm_session *s, int cr, struct sk_buff *skb
 {
 	struct rfcomm_msc *msc = (void *) skb->data;
 	struct rfcomm_dlc *d;
-	int dlci = __get_dlci(msc->dlci);
+	u8 dlci = __get_dlci(msc->dlci);
 
 	BT_DBG("dlci %d cr %d v24 0x%x", dlci, cr, msc->v24_sig);
 
@@ -1323,7 +1324,7 @@ static int rfcomm_recv_mcc(struct rfcomm_session *s, struct sk_buff *skb)
 	return 0;
 }
 
-static int rfcomm_recv_data(struct rfcomm_session *s, int dlci, int pf, struct sk_buff *skb)
+static int rfcomm_recv_data(struct rfcomm_session *s, u8 dlci, int pf, struct sk_buff *skb)
 {
 	struct rfcomm_dlc *d;
 
