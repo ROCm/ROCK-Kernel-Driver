@@ -1689,7 +1689,7 @@ static void ttusb_dec_init_frontend(struct ttusb_dec *dec)
 
 static void ttusb_dec_exit_frontend(struct ttusb_dec *dec)
 {
-	dvb_unregister_frontend_new(dec->frontend_ioctl, dec->adapter);
+	dvb_unregister_frontend(dec->frontend_ioctl, dec->adapter);
 }
 
 static void ttusb_dec_init_filters(struct ttusb_dec *dec)

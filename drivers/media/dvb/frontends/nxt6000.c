@@ -872,7 +872,7 @@ out:
 static int detach_client(struct i2c_client *client)
 {
 	struct nxt6000_config *state = (struct nxt6000_config *) i2c_get_clientdata(client);
-	dvb_unregister_frontend_new(nxt6000_ioctl, state->dvb);
+	dvb_unregister_frontend(nxt6000_ioctl, state->dvb);
 	i2c_detach_client(client);
 	BUG_ON(state->dvb);
 	kfree(client);

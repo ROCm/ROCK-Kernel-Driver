@@ -840,7 +840,7 @@ static int mt352_detach_client(struct i2c_client *client)
 {
 	struct mt352_state *state = i2c_get_clientdata(client);
 
-	dvb_unregister_frontend_new (mt352_ioctl, state->dvb);
+	dvb_unregister_frontend (mt352_ioctl, state->dvb);
 	i2c_detach_client(client);
 	BUG_ON(state->dvb);
 	kfree(client);

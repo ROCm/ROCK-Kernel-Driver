@@ -514,7 +514,7 @@ static int detach_client(struct i2c_client *client)
 {
 	struct at76c651_state *state = i2c_get_clientdata(client);
 
-	dvb_unregister_frontend_new(at76c651_ioctl, state->dvb);
+	dvb_unregister_frontend(at76c651_ioctl, state->dvb);
 	i2c_detach_client(client);
 	BUG_ON(state->dvb);
 	kfree(client);

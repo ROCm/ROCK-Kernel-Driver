@@ -578,7 +578,7 @@ static int attach_adapter(struct i2c_adapter *adapter)
 static int detach_client(struct i2c_client *client)
 {
 	struct ves1820_state *state = (struct ves1820_state *) i2c_get_clientdata(client);
-	dvb_unregister_frontend_new(ves1820_ioctl, state->dvb);
+	dvb_unregister_frontend(ves1820_ioctl, state->dvb);
 	device_remove_file(&client->dev, &dev_attr_client_name);
 	i2c_detach_client(client);
 	BUG_ON(state->dvb);

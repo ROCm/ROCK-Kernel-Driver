@@ -42,6 +42,8 @@
 #define I2C_DRIVERID_DVBFE_ALPS_TDMB7	I2C_DRIVERID_EXP2
 #define I2C_DRIVERID_DVBFE_AT76C651	I2C_DRIVERID_EXP2
 #define I2C_DRIVERID_DVBFE_CX24110	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_CX22702	I2C_DRIVERID_EXP2
+#define I2C_DRIVERID_DVBFE_DIB3000MB	I2C_DRIVERID_EXP2
 #define I2C_DRIVERID_DVBFE_DST		I2C_DRIVERID_EXP2
 #define I2C_DRIVERID_DVBFE_DUMMY	I2C_DRIVERID_EXP2
 #define I2C_DRIVERID_DVBFE_L64781	I2C_DRIVERID_EXP2
@@ -102,7 +104,7 @@ dvb_register_frontend (int (*ioctl) (struct dvb_frontend *frontend,
 		       struct module *module);
 
 extern int
-dvb_unregister_frontend_new (int (*ioctl) (struct dvb_frontend *frontend,
+dvb_unregister_frontend (int (*ioctl) (struct dvb_frontend *frontend,
 				       unsigned int cmd, void *arg),
 			 struct dvb_adapter *dvb_adapter);
 

@@ -762,6 +762,13 @@ static int dvb_frontend_ioctl (struct inode *inode, struct file *file,
 			fe->parameters.inversion = INVERSION_AUTO;
 			fetunesettings.parameters.inversion = INVERSION_AUTO;
 		}
+		if (fe->info->type == FE_OFDM) {
+			/* without hierachical coding code_rate_LP is irrelevant,
+			 * so we tolerate the otherwise invalid FEC_NONE setting */
+			if (fe->parameters.u.ofdm.hierarchy_information == HIERARCHY_NONE &&
+			    fe->parameters.u.ofdm.code_rate_LP == FEC_NONE)
+				fe->parameters.u.ofdm.code_rate_LP = FEC_AUTO;
+		}
 
 		/* get frontend-specific tuning settings */
 		if (dvb_frontend_internal_ioctl(&fe->frontend, FE_GET_TUNE_SETTINGS,
@@ -1180,7 +1187,7 @@ dvb_register_frontend (int (*ioctl) (struct dvb_frontend *frontend,
 	return 0;
 }
 
-int dvb_unregister_frontend_new (int (*ioctl) (struct dvb_frontend *frontend,
+int dvb_unregister_frontend (int (*ioctl) (struct dvb_frontend *frontend,
 					   unsigned int cmd, void *arg),
 			     struct dvb_adapter *dvb_adapter)
 {

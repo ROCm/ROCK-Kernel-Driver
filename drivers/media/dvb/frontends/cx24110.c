@@ -708,7 +708,7 @@ static int detach_client (struct i2c_client *client)
 {
 	struct cx24110_state *state = i2c_get_clientdata(client);
 
-	dvb_unregister_frontend_new(cx24110_ioctl, state->dvb);
+	dvb_unregister_frontend(cx24110_ioctl, state->dvb);
 	i2c_detach_client(client);
 	BUG_ON(state->dvb);
 	kfree(client);

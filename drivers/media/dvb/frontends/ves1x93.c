@@ -28,6 +28,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 
 #include "dvb_frontend.h"
 
@@ -48,7 +49,7 @@ static struct dvb_frontend_info ves1x93_info = {
 	.type			= FE_QPSK,
 	.frequency_min		= 950000,
 	.frequency_max		= 2150000,
-	.frequency_stepsize	= 250,           /* kHz for QPSK frontends */
+	.frequency_stepsize	= 125,		 /* kHz for QPSK frontends */
 	.frequency_tolerance	= 29500,
 	.symbol_rate_min	= 1000000,
 	.symbol_rate_max	= 45000000,
@@ -170,10 +171,26 @@ static int tuner_write (struct i2c_adapter *i2c, u8 *data, u8 len)
  *   set up the downconverter frequency divisor for a
  *   reference clock comparision frequency of 125 kHz.
  */
-static int sp5659_set_tv_freq (struct i2c_adapter *i2c, u32 freq, u8 pwr)
+static int sp5659_set_tv_freq (struct i2c_adapter *i2c, u32 freq)
 {
+	u8 pwr = 0;
+   	u8 buf[4];
         u32 div = (freq + 479500) / 125;
-	u8 buf [4] = { (div >> 8) & 0x7f, div & 0xff, 0x95, (pwr << 5) | 0x30 };
+
+	if (freq > 2000000) pwr = 3;
+	else if (freq > 1800000) pwr = 2;
+	else if (freq > 1600000) pwr = 1;
+	else if (freq > 1200000) pwr = 0;
+	else if (freq >= 1100000) pwr = 1;
+	else pwr = 2;
+
+   	buf[0] = (div >> 8) & 0x7f;
+   	buf[1] = div & 0xff;
+   	buf[2] = ((div & 0x18000) >> 10) | 0x95;
+   	buf[3] = (pwr << 6) | 0x30;
+
+   	// NOTE: since we're using a prescaler of 2, we set the
+	// divisor frequency to 62.5kHz and divide by 125 above
 
 	return tuner_write (i2c, buf, sizeof(buf));
 }
@@ -195,10 +212,10 @@ static int tsa5059_set_tv_freq (struct i2c_adapter *i2c, u32 freq)
 }
 
 
-static int tuner_set_tv_freq (struct i2c_adapter *i2c, u32 freq, u8 pwr)
+static int tuner_set_tv_freq (struct i2c_adapter *i2c, u32 freq)
 {
 	if ((demod_type == DEMOD_VES1893) && (board_type == BOARD_SIEMENS_PCI))
-		return sp5659_set_tv_freq (i2c, freq, pwr);
+		return sp5659_set_tv_freq (i2c, freq);
 	else if (demod_type == DEMOD_VES1993)
 		return tsa5059_set_tv_freq (i2c, freq);
 
@@ -252,17 +269,10 @@ static int ves1x93_init (struct i2c_adapter *i2c)
 
 static int ves1x93_clr_bit (struct i2c_adapter *i2c)
 {
+	msleep(10);
         ves1x93_writereg (i2c, 0, init_1x93_tab[0] & 0xfe);
         ves1x93_writereg (i2c, 0, init_1x93_tab[0]);
-	msleep(5);
-	return 0;
-}
-
-static int ves1x93_init_aquire (struct i2c_adapter *i2c)
-{
-        ves1x93_writereg (i2c, 3, 0x00);
-	ves1x93_writereg (i2c, 3, init_1x93_tab[3]);
-	msleep(5);
+	msleep(50);
 	return 0;
 }
 
@@ -414,26 +424,6 @@ static int ves1x93_set_symbolrate (struct i2c_adapter *i2c, u32 srate)
 	return 0;
 }
 
-
-static int ves1x93_afc (struct i2c_adapter *i2c, u32 freq, u32 srate)
-{
-	int afc;
-
-	afc = ((int)((ves1x93_readreg (i2c, 0x0a) << 1) & 0xff))/2;
-	afc = (afc * (int)(srate/1000/8))/16;
-    
-	if (afc) {
-	
-		freq -= afc;
-
-		tuner_set_tv_freq (i2c, freq, 0);
-
-		ves1x93_init_aquire (i2c);
-	}
-       
-	return 0;
-}
-
 static int ves1x93_set_voltage (struct i2c_adapter *i2c, fe_sec_voltage_t voltage)
 {
 	switch (voltage) {
@@ -463,6 +453,21 @@ static int ves1x93_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	{
 		fe_status_t *status = arg;
 		u8 sync = ves1x93_readreg (i2c, 0x0e);
+
+		/*
+		 * The ves1893 sometimes returns sync values that make no sense,
+		 * because, e.g., the SIGNAL bit is 0, while some of the higher
+		 * bits are 1 (and how can there be a CARRIER w/o a SIGNAL?).
+		 * Tests showed that the the VITERBI and SYNC bits are returned
+		 * reliably, while the SIGNAL and CARRIER bits ar sometimes wrong.
+		 * If such a case occurs, we read the value again, until we get a
+		 * valid value.
+		 */
+		int maxtry = 10; /* just for safety - let's not get stuck here */
+		while ((sync & 0x03) != 0x03 && (sync & 0x0c) && maxtry--) {
+			msleep(10);
+			sync = ves1x93_readreg (i2c, 0x0e);
+		}
 
 		*status = 0;
 
@@ -525,11 +530,10 @@ static int ves1x93_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
         {
 		struct dvb_frontend_parameters *p = arg;
 
-		tuner_set_tv_freq (i2c, p->frequency, 0);
+		tuner_set_tv_freq (i2c, p->frequency);
 		ves1x93_set_inversion (i2c, p->inversion);
 		ves1x93_set_fec (i2c, p->u.qpsk.fec_inner);
 		ves1x93_set_symbolrate (i2c, p->u.qpsk.symbol_rate);
-		ves1x93_afc (i2c, p->frequency, p->u.qpsk.symbol_rate);	    
 		state->inversion = p->inversion;
                 break;
         }
@@ -650,7 +654,7 @@ static int attach_adapter(struct i2c_adapter *adapter)
 static int detach_client(struct i2c_client *client)
 {
 	struct ves1x93_state *state = (struct ves1x93_state*)i2c_get_clientdata(client);
-	dvb_unregister_frontend_new(ves1x93_ioctl, state->dvb);
+	dvb_unregister_frontend(ves1x93_ioctl, state->dvb);
 	i2c_detach_client(client);
 	BUG_ON(state->dvb);
 	kfree(client);

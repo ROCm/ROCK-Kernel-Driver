@@ -207,7 +207,7 @@ static int dvbdummyfe_detach_client(struct i2c_client *client)
 {
 	struct dvb_adapter *dvb = i2c_get_clientdata(client);
 
-	dvb_unregister_frontend_new(dvbdummyfe_ioctl, dvb);
+	dvb_unregister_frontend(dvbdummyfe_ioctl, dvb);
 	i2c_detach_client(client);
 	kfree(client);
 	return 0;

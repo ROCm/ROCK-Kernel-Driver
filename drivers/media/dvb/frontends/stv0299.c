@@ -1414,7 +1414,7 @@ static int detach_client(struct i2c_client *client)
 {
 	struct stv0299_state *state = (struct stv0299_state*)i2c_get_clientdata(client);
 
-	dvb_unregister_frontend_new (uni0299_ioctl, state->dvb);
+	dvb_unregister_frontend (uni0299_ioctl, state->dvb);
 	i2c_detach_client(client);
 	kfree(client);
 	kfree(state);

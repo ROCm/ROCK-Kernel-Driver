@@ -492,7 +492,7 @@ static int tda8083_detach_client(struct i2c_client *client)
 {
 	struct tda8083_state *state = i2c_get_clientdata(client);
 
-	dvb_unregister_frontend_new (tda8083_ioctl, state->dvb);
+	dvb_unregister_frontend (tda8083_ioctl, state->dvb);
 	i2c_detach_client(client);
 	BUG_ON(state->dvb);
 	kfree(client);

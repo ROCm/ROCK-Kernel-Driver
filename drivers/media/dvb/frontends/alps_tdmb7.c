@@ -470,7 +470,7 @@ static int detach_client (struct i2c_client *client)
 
 	dprintk ("%s\n", __FUNCTION__);
 
-	dvb_unregister_frontend_new (tdmb7_ioctl, state->dvb);
+	dvb_unregister_frontend (tdmb7_ioctl, state->dvb);
 	i2c_detach_client(client);
 	BUG_ON(state->dvb);
 	kfree(client);
