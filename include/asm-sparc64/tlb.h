@@ -16,12 +16,12 @@ do {	if (!(tlb)->fullmm)	\
 		flush_tlb_range(vma, vma->vm_start, vma->vm_end); \
 } while (0)
 
-#define tlb_remove_tlb_entry(tlb, ptep, address) \
+#define __tlb_remove_tlb_entry(tlb, ptep, address) \
 	do { } while (0)
 
 #include <asm-generic/tlb.h>
 
-#define pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
-#define pte_free_tlb(tlb, pte)	pte_free(pte)
+#define __pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
+#define __pte_free_tlb(tlb, pte)	pte_free(pte)
 
 #endif /* _SPARC64_TLB_H */

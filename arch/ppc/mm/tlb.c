@@ -4,7 +4,7 @@
 /*
  * This file contains the routines for TLB flushing.
  * On machines where the MMU uses a hash table to store virtual to
- * physical translations, these routines flush entries from the the
+ * physical translations, these routines flush entries from the 
  * hash table also.
  *  -- paulus
  * 

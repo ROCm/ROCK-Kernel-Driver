@@ -1180,8 +1180,10 @@ int __init kbd_init(void)
         for (i = 0 ; i < MAX_NR_CONSOLES ; i++)
                 kbd_table[i] = kbd0;
 
+	input_register_handler(&kbd_handler);
+
 	tasklet_enable(&keyboard_tasklet);
 	tasklet_schedule(&keyboard_tasklet);
-	input_register_handler(&kbd_handler);
+
 	return 0;
 }

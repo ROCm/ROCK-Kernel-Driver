@@ -1,30 +1,15 @@
 /*
- * $Id: hid-core.c,v 1.6 2002/06/09 17:34:55 jdeneux Exp $
+ *  USB HID support for Linux
  *
  *  Copyright (c) 1999 Andreas Gal
- *  Copyright (c) 2000-2001 Vojtech Pavlik
- *
- *  USB HID support for Linux
+ *  Copyright (c) 2000-2001 Vojtech Pavlik <vojtech@suse.cz>
  */
 
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  */
 
 #include <linux/module.h>
@@ -52,8 +37,8 @@
  * Version Information
  */
 
-#define DRIVER_VERSION "v1.31"
-#define DRIVER_AUTHOR "Andreas Gal, Vojtech Pavlik <vojtech@ucw.cz>"
+#define DRIVER_VERSION "v2.0"
+#define DRIVER_AUTHOR "Andreas Gal, Vojtech Pavlik"
 #define DRIVER_DESC "USB HID core driver"
 #define DRIVER_LICENSE "GPL"
 
@@ -559,6 +544,7 @@ static void hid_free_device(struct hid_device *device)
 	}
 
 	if (device->rdesc) kfree(device->rdesc);
+	kfree(device);
 }
 
 /*
@@ -651,9 +637,8 @@ static struct hid_device *hid_parse_report(__u8 *start, unsigned size)
 		return NULL;
 	memset(device, 0, sizeof(struct hid_device));
 
-	if (!(device->collection = kmalloc(sizeof(struct hid_collection) *
-					   HID_DEFAULT_NUM_COLLECTIONS,
-					   GFP_KERNEL))) {
+	if (!(device->collection =kmalloc(sizeof(struct hid_collection) *
+				   HID_DEFAULT_NUM_COLLECTIONS, GFP_KERNEL))) {
 		kfree(device);
 		return NULL;
 	}
@@ -1071,11 +1056,11 @@ static int hid_submit_ctrl(struct hid_device *hid)
 	hid->urbctrl->pipe = (dir == USB_DIR_OUT) ?  usb_sndctrlpipe(hid->dev, 0) : usb_rcvctrlpipe(hid->dev, 0);
 	hid->urbctrl->dev = hid->dev;
 
-	hid->cr.bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE | dir;
-	hid->cr.bRequest = (dir == USB_DIR_OUT) ? HID_REQ_SET_REPORT : HID_REQ_GET_REPORT;
-	hid->cr.wValue = cpu_to_le16(((report->type + 1) << 8) | report->id);
-	hid->cr.wIndex = cpu_to_le16(hid->ifnum);
-	hid->cr.wLength = cpu_to_le16(hid->urbctrl->transfer_buffer_length);
+	hid->cr->bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE | dir;
+	hid->cr->bRequest = (dir == USB_DIR_OUT) ? HID_REQ_SET_REPORT : HID_REQ_GET_REPORT;
+	hid->cr->wValue = cpu_to_le16(((report->type + 1) << 8) | report->id);
+	hid->cr->wIndex = cpu_to_le16(hid->ifnum);
+	hid->cr->wLength = cpu_to_le16(hid->urbctrl->transfer_buffer_length);
 
 	dbg("submitting ctrl urb");
 
@@ -1338,6 +1323,32 @@ struct hid_blacklist {
 	{ 0, 0 }
 };
 
+static int hid_alloc_buffers(struct usb_device *dev, struct hid_device *hid)
+{
+	if (!(hid->inbuf = usb_buffer_alloc(dev, HID_BUFFER_SIZE, SLAB_ATOMIC, &hid->inbuf_dma)))
+		return -1;
+	if (!(hid->outbuf = usb_buffer_alloc(dev, HID_BUFFER_SIZE, SLAB_ATOMIC, &hid->outbuf_dma)))
+		return -1;
+	if (!(hid->cr = usb_buffer_alloc(dev, sizeof(*(hid->cr)), SLAB_ATOMIC, &hid->cr_dma)))
+		return -1;
+	if (!(hid->ctrlbuf = usb_buffer_alloc(dev, HID_BUFFER_SIZE, SLAB_ATOMIC, &hid->ctrlbuf_dma)))
+		return -1;
+
+	return 0;
+}
+
+static void hid_free_buffers(struct usb_device *dev, struct hid_device *hid)
+{
+	if (hid->inbuf)
+		usb_buffer_free(dev, HID_BUFFER_SIZE, hid->inbuf, hid->inbuf_dma);
+	if (hid->outbuf)
+		usb_buffer_free(dev, HID_BUFFER_SIZE, hid->outbuf, hid->outbuf_dma);
+	if (hid->cr)
+		usb_buffer_free(dev, sizeof(*(hid->cr)), hid->cr, hid->cr_dma);
+	if (hid->ctrlbuf)
+		usb_buffer_free(dev, HID_BUFFER_SIZE, hid->ctrlbuf, hid->ctrlbuf_dma);
+}
+
 static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 {
 	struct usb_interface_descriptor *interface = dev->actconfig->interface[ifnum].altsetting + 0;
@@ -1397,6 +1408,11 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 	kfree(rdesc);
 	hid->quirks = quirks;
 
+	if (hid_alloc_buffers(dev, hid)) {
+		hid_free_buffers(dev, hid);
+		goto fail;
+	}
+
 	for (n = 0; n < interface->bNumEndpoints; n++) {
 
 		struct usb_endpoint_descriptor *endpoint = &interface->endpoint[n];
@@ -1411,14 +1427,20 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 			if (!(hid->urbin = usb_alloc_urb(0, GFP_KERNEL)))
 				goto fail;
 			pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
-			FILL_INT_URB(hid->urbin, dev, pipe, hid->inbuf, 0, hid_irq_in, hid, endpoint->bInterval);
+			usb_fill_int_urb(hid->urbin, dev, pipe, hid->inbuf, 0,
+					 hid_irq_in, hid, endpoint->bInterval);
+			hid->urbin->transfer_dma = hid->inbuf_dma;
+			hid->urbin->transfer_flags |= URB_NO_DMA_MAP;
 		} else {
 			if (hid->urbout)
 				continue;
 			if (!(hid->urbout = usb_alloc_urb(0, GFP_KERNEL)))
 				goto fail;
 			pipe = usb_sndbulkpipe(dev, endpoint->bEndpointAddress);
-			FILL_BULK_URB(hid->urbout, dev, pipe, hid->outbuf, 0, hid_irq_out, hid);
+			usb_fill_bulk_urb(hid->urbout, dev, pipe, hid->outbuf, 0,
+					  hid_irq_out, hid);
+			hid->urbout->transfer_dma = hid->outbuf_dma;
+			hid->urbout->transfer_flags |= URB_NO_DMA_MAP;
 		}
 	}
 
@@ -1458,16 +1480,21 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 	kfree(buf);
 
 	hid->urbctrl = usb_alloc_urb(0, GFP_KERNEL);
-	FILL_CONTROL_URB(hid->urbctrl, dev, 0, (void*) &hid->cr, hid->ctrlbuf, 1, hid_ctrl, hid);
+	usb_fill_control_urb(hid->urbctrl, dev, 0, (void *) hid->cr,
+			     hid->ctrlbuf, 1, hid_ctrl, hid);
+	hid->urbctrl->setup_dma = hid->cr_dma;
+	hid->urbctrl->transfer_dma = hid->ctrlbuf_dma;
+	hid->urbctrl->transfer_flags |= URB_NO_DMA_MAP;
 
 	return hid;
 
 fail:
 
-	hid_free_device(hid);
 	if (hid->urbin) usb_free_urb(hid->urbin);
 	if (hid->urbout) usb_free_urb(hid->urbout);
 	if (hid->urbctrl) usb_free_urb(hid->urbctrl);
+	hid_free_buffers(dev, hid);
+	hid_free_device(hid);
 
 	return NULL;
 }
@@ -1490,6 +1517,7 @@ static void hid_disconnect(struct usb_device *dev, void *ptr)
 	if (hid->urbout)
 		usb_free_urb(hid->urbout);
 
+	hid_free_buffers(dev, hid);
 	hid_free_device(hid);
 }
 

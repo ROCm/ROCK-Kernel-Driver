@@ -55,7 +55,7 @@ static inline void pte_free(struct page *page)
 	__free_page(page);
 }
 
-static inline void pte_free_tlb(mmu_gather_t *tlb, struct page *page)
+static inline void __pte_free_tlb(mmu_gather_t *tlb, struct page *page)
 {
 	cache_page(kmap(page));
 	kunmap(page);
@@ -73,7 +73,7 @@ static inline int pmd_free(pmd_t *pmd)
 	return free_pointer_table(pmd);
 }
 
-static inline int pmd_free_tlb(mmu_gather_t *tlb, pmd_t *pmd)
+static inline int __pmd_free_tlb(mmu_gather_t *tlb, pmd_t *pmd)
 {
 	return free_pointer_table(pmd);
 }

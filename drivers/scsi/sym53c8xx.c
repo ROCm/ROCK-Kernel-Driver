@@ -2650,7 +2650,7 @@ static	struct script script0 __initdata = {
 	**	The below GETJOB_BEGIN to GETJOB_END section of SCRIPTS 
 	**	is a critical path. If it is partially executed, it then 
 	**	may happen that the job address is not yet in the DSA 
-	**	and the the next queue position points to the next JOB.
+	**	and the next queue position points to the next JOB.
 	*/
 	SCR_LOAD_ABS (dsa, 4),
 		PADDRH (startpos),
@@ -12884,7 +12884,7 @@ static void __init ncr_detect_pqs_pds(void)
 **    differ and attach them using the order in the NVRAM.
 **
 **    If no NVRAM is found or data appears invalid attach boards in 
-**    the the order they are detected.
+**    the order they are detected.
 **===================================================================
 */
 int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)

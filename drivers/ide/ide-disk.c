@@ -1629,20 +1629,26 @@ static void idedisk_setup (ide_drive_t *drive)
 
 static int idedisk_cleanup (ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (do_idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
-	return ide_unregister_subdriver(drive);
+	if (ide_unregister_subdriver(drive))
+		return 1;
+	del_gendisk(g);
+	return 0;
 }
 
-int idedisk_init (void);
-int idedisk_reinit(ide_drive_t *drive);
+static int idedisk_reinit(ide_drive_t *drive);
 
 /*
  *      IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idedisk_driver = {
+	owner:			THIS_MODULE,
 	name:			"ide-disk",
 	version:		IDEDISK_VERSION,
 	media:			ide_disk,
@@ -1667,92 +1673,64 @@ static ide_driver_t idedisk_driver = {
 	capacity:		idedisk_capacity,
 	special:		idedisk_special,
 	proc:			idedisk_proc,
-	init:			idedisk_init,
 	reinit:			idedisk_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
-};
-
-static ide_module_t idedisk_module = {
-	IDE_DRIVER_MODULE,
-	idedisk_init,
-	&idedisk_driver,
-	NULL
+	drives:			LIST_HEAD_INIT(idedisk_driver.drives),
 };
 
 MODULE_DESCRIPTION("ATA DISK Driver");
 
-int idedisk_reinit (ide_drive_t *drive)
+static int idedisk_reinit(ide_drive_t *drive)
 {
-	int failed = 0;
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
 
-	MOD_INC_USE_COUNT;
+	/* strstr("foo", "") is non-NULL */
+	if (!strstr("ide-disk", drive->driver_req))
+		goto failed;
+	if (!drive->present)
+		goto failed;
+	if (drive->media != ide_disk)
+		goto failed;
 
 	if (ide_register_subdriver (drive, &idedisk_driver, IDE_SUBDRIVER_VERSION)) {
 		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
-		return 1;
+		goto failed;
 	}
 	DRIVER(drive)->busy++;
 	idedisk_setup(drive);
 	if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
 		printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n",
 			drive->name, drive->head);
-		(void) idedisk_cleanup(drive);
+		if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
+			if (do_idedisk_flushcache(drive))
+				printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
+					drive->name);
+		ide_unregister_subdriver(drive);
 		DRIVER(drive)->busy--;
-		return 1;
+		goto failed;
 	}
 	DRIVER(drive)->busy--;
-	failed--;
-
-	ide_register_module(&idedisk_module);
-	MOD_DEC_USE_COUNT;
+	g->minor_shift = PARTN_BITS;
+	add_gendisk(g);
+	register_disk(g, mk_kdev(g->major,g->first_minor),
+		      1<<g->minor_shift, ide_fops,
+		      current_capacity(drive));
 	return 0;
+failed:
+	return 1;
 }
 
 static void __exit idedisk_exit (void)
 {
-	ide_drive_t *drive;
-	int failed = 0;
-
-	while ((drive = ide_scan_devices (ide_disk, idedisk_driver.name, &idedisk_driver, failed)) != NULL) {
-		if (idedisk_cleanup (drive)) {
-			printk (KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
-		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
-#ifdef CONFIG_PROC_FS
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, idedisk_proc);
-#endif
-	}
-	ide_unregister_module(&idedisk_module);
+	ide_unregister_driver(&idedisk_driver);
 }
 
-int idedisk_init (void)
+static int idedisk_init (void)
 {
-	ide_drive_t *drive;
-	int failed = 0;
-	
-	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices (ide_disk, idedisk_driver.name, NULL, failed++)) != NULL) {
-		if (ide_register_subdriver (drive, &idedisk_driver, IDE_SUBDRIVER_VERSION)) {
-			printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
-			continue;
-		}
-		DRIVER(drive)->busy++;
-		idedisk_setup(drive);
-		if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
-			printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n", drive->name, drive->head);
-			(void) idedisk_cleanup(drive);
-			DRIVER(drive)->busy--;
-			continue;
-		}
-		DRIVER(drive)->busy--;
-		failed--;
-	}
-	ide_register_module(&idedisk_module);
-	MOD_DEC_USE_COUNT;
+	ide_register_driver(&idedisk_driver);
 	return 0;
 }
 

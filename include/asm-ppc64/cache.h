@@ -12,5 +12,6 @@
 #define L1_CACHE_BYTES	(1 << L1_CACHE_SHIFT)
 
 #define SMP_CACHE_BYTES L1_CACHE_BYTES
+#define L1_CACHE_SHIFT_MAX 7	/* largest L1 which this arch supports */
 
 #endif

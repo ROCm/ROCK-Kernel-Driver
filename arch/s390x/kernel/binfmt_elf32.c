@@ -166,7 +166,6 @@ struct elf_prpsinfo32
 #define NEW_TO_OLD_GID(gid) ((gid) > 65535) ? (u16)overflowgid : (u16)(gid) 
 
 #define elf_addr_t	u32
-#define elf_caddr_t	u32
 /*
 #define init_elf_binfmt init_elf32_binfmt
 */

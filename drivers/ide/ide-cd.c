@@ -3005,14 +3005,8 @@ int ide_cdrom_check_media_change (ide_drive_t *drive)
 static
 void ide_cdrom_revalidate (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
 	struct request_sense sense;
-
 	cdrom_read_toc(drive, &sense);
-	g->minor_shift = 0;
-	grok_partitions(mk_kdev(g->major, drive->select.b.unit), current_capacity(drive));
 }
 
 static
@@ -3031,6 +3025,9 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *devinfo = &info->devinfo;
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
 
 	if (ide_unregister_subdriver (drive))
 		return 1;
@@ -3044,13 +3041,14 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 		printk ("%s: ide_cdrom_cleanup failed to unregister device from the cdrom driver.\n", drive->name);
 	kfree(info);
 	drive->driver_data = NULL;
+	del_gendisk(g);
 	return 0;
 }
 
-int ide_cdrom_init(void);
-int ide_cdrom_reinit (ide_drive_t *drive);
+static int ide_cdrom_reinit (ide_drive_t *drive);
 
 static ide_driver_t ide_cdrom_driver = {
+	owner:			THIS_MODULE,
 	name:			"ide-cdrom",
 	version:		IDECD_VERSION,
 	media:			ide_cdrom,
@@ -3079,17 +3077,10 @@ static ide_driver_t ide_cdrom_driver = {
 	capacity:		ide_cdrom_capacity,
 	special:		NULL,
 	proc:			NULL,
-	init:			ide_cdrom_init,
 	reinit:			ide_cdrom_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
-};
-
-static ide_module_t ide_cdrom_module = {
-	IDE_DRIVER_MODULE,
-	ide_cdrom_init,
-	&ide_cdrom_driver,
-	NULL
+	drives:			LIST_HEAD_INIT(ide_cdrom_driver.drives),
 };
 
 /* options */
@@ -3098,95 +3089,81 @@ char *ignore = NULL;
 MODULE_PARM(ignore, "s");
 MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
 
-int ide_cdrom_reinit (ide_drive_t *drive)
+static int ide_cdrom_reinit (ide_drive_t *drive)
 {
 	struct cdrom_info *info;
-	int failed = 0;
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
+	struct request_sense sense;
 
-	MOD_INC_USE_COUNT;
+	if (!strstr("ide-cdrom", drive->driver_req))
+		goto failed;
+	if (!drive->present)
+		goto failed;
+	if (drive->media != ide_cdrom)
+		goto failed;
+	/* skip drives that we were told to ignore */
+	if (ignore != NULL) {
+		if (strstr(ignore, drive->name)) {
+			printk("ide-cd: ignoring drive %s\n", drive->name);
+			goto failed;
+		}
+	}
+	if (drive->scsi) {
+		printk("ide-cd: passing drive %s to ide-scsi emulation.\n", drive->name);
+		goto failed;
+	}
 	info = (struct cdrom_info *) kmalloc (sizeof (struct cdrom_info), GFP_KERNEL);
 	if (info == NULL) {
 		printk ("%s: Can't allocate a cdrom structure\n", drive->name);
-		return 1;
+		goto failed;
 	}
 	if (ide_register_subdriver (drive, &ide_cdrom_driver, IDE_SUBDRIVER_VERSION)) {
 		printk ("%s: Failed to register the driver with ide.c\n", drive->name);
 		kfree (info);
-		return 1;
+		goto failed;
 	}
 	memset (info, 0, sizeof (struct cdrom_info));
 	drive->driver_data = info;
 	DRIVER(drive)->busy++;
 	if (ide_cdrom_setup (drive)) {
+		struct cdrom_device_info *devinfo = &info->devinfo;
 		DRIVER(drive)->busy--;
-		if (ide_cdrom_cleanup (drive))
-			printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
-		return 1;
+		ide_unregister_subdriver (drive);
+		if (info->buffer != NULL)
+			kfree(info->buffer);
+		if (info->toc != NULL)
+			kfree(info->toc);
+		if (info->changer_info != NULL)
+			kfree(info->changer_info);
+		if (devinfo->handle == drive && unregister_cdrom (devinfo))
+			printk ("%s: ide_cdrom_cleanup failed to unregister device from the cdrom driver.\n", drive->name);
+		kfree(info);
+		drive->driver_data = NULL;
+		goto failed;
 	}
 	DRIVER(drive)->busy--;
-	failed--;
 
-	ide_register_module(&ide_cdrom_module);
-	MOD_DEC_USE_COUNT;
+	cdrom_read_toc(drive, &sense);
+	g->minor_shift = 0;
+	add_gendisk(g);
+	register_disk(g, mk_kdev(g->major,g->first_minor),
+		      1<<g->minor_shift, ide_fops,
+		      g->part[0].nr_sects);
 	return 0;
+failed:
+	return 1;
 }
 
 static void __exit ide_cdrom_exit(void)
 {
-	ide_drive_t *drive;
-	int failed = 0;
-
-	while ((drive = ide_scan_devices (ide_cdrom, ide_cdrom_driver.name, &ide_cdrom_driver, failed)) != NULL)
-		if (ide_cdrom_cleanup (drive)) {
-			printk ("%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
-		}
-	ide_unregister_module (&ide_cdrom_module);
+	ide_unregister_driver(&ide_cdrom_driver);
 }
  
-int ide_cdrom_init(void)
+static int ide_cdrom_init(void)
 {
-	ide_drive_t *drive;
-	struct cdrom_info *info;
-	int failed = 0;
-
-	MOD_INC_USE_COUNT;
-	while ((drive = ide_scan_devices (ide_cdrom, ide_cdrom_driver.name, NULL, failed++)) != NULL) {
-		/* skip drives that we were told to ignore */
-		if (ignore != NULL) {
-			if (strstr(ignore, drive->name)) {
-				printk("ide-cd: ignoring drive %s\n", drive->name);
-				continue;
-			}
-		}
-		if (drive->scsi) {
-			printk("ide-cd: passing drive %s to ide-scsi emulation.\n", drive->name);
-			continue;
-		}
-		info = (struct cdrom_info *) kmalloc (sizeof (struct cdrom_info), GFP_KERNEL);
-		if (info == NULL) {
-			printk ("%s: Can't allocate a cdrom structure\n", drive->name);
-			continue;
-		}
-		if (ide_register_subdriver (drive, &ide_cdrom_driver, IDE_SUBDRIVER_VERSION)) {
-			printk ("%s: Failed to register the driver with ide.c\n", drive->name);
-			kfree (info);
-			continue;
-		}
-		memset (info, 0, sizeof (struct cdrom_info));
-		drive->driver_data = info;
-		DRIVER(drive)->busy++;
-		if (ide_cdrom_setup (drive)) {
-			DRIVER(drive)->busy--;
-			if (ide_cdrom_cleanup (drive))
-				printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
-			continue;
-		}
-		DRIVER(drive)->busy--;
-		failed--;
-	}
-	ide_register_module(&ide_cdrom_module);
-	MOD_DEC_USE_COUNT;
+	ide_register_driver(&ide_cdrom_driver);
 	return 0;
 }
 

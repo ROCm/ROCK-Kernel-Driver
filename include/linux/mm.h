@@ -157,7 +157,7 @@ struct page {
 	struct address_space *mapping;	/* The inode (or ...) we belong to. */
 	unsigned long index;		/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list;
-					   protected by pagemap_lru_lock !! */
+					   protected by zone->lru_lock !! */
 	union {
 		struct pte_chain * chain;	/* Reverse pte mapping pointer.
 					 * protected by PG_chainlock */
@@ -268,10 +268,10 @@ void FASTCALL(__free_pages_ok(struct page *page, unsigned int order));
 #define NODE_SHIFT 4
 #define ZONE_SHIFT (BITS_PER_LONG - 8)
 
-struct zone_struct;
-extern struct zone_struct *zone_table[];
+struct zone;
+extern struct zone *zone_table[];
 
-static inline zone_t *page_zone(struct page *page)
+static inline struct zone *page_zone(struct page *page)
 {
 	return zone_table[page->flags >> ZONE_SHIFT];
 }
@@ -449,7 +449,6 @@ static inline int can_vma_merge(struct vm_area_struct * vma, unsigned long vm_fl
 		return 0;
 }
 
-struct zone_t;
 /* filemap.c */
 extern unsigned long page_unuse(struct page *);
 extern void truncate_inode_pages(struct address_space *, loff_t);

@@ -96,7 +96,8 @@ struct wacom_features {
 };
 
 struct wacom {
-	signed char data[10];
+	signed char *data;
+	dma_addr_t data_dma;
 	struct input_dev dev;
 	struct usb_device *usbdev;
 	struct urb *irq;
@@ -364,8 +365,15 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 	if (!(wacom = kmalloc(sizeof(struct wacom), GFP_KERNEL))) return NULL;
 	memset(wacom, 0, sizeof(struct wacom));
 
+	wacom->data = usb_buffer_alloc(dev, 10, SLAB_ATOMIC, &wacom->data_dma);
+	if (!wacom->data) {
+		kfree(wacom);
+		return NULL;
+	}
+
 	wacom->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!wacom->irq) {
+		usb_buffer_free(dev, 10, wacom->data, wacom->data_dma);
 		kfree(wacom);
 		return NULL;
 	}
@@ -413,8 +421,15 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 
 	endpoint = dev->config[0].interface[ifnum].altsetting[0].endpoint + 0;
 
-	FILL_INT_URB(wacom->irq, dev, usb_rcvintpipe(dev, endpoint->bEndpointAddress),
-		     wacom->data, wacom->features->pktlen, wacom->features->irq, wacom, endpoint->bInterval);
+	if (wacom->features->pktlen > 10)
+		BUG();
+
+	usb_fill_int_urb(wacom->irq, dev,
+			 usb_rcvintpipe(dev, endpoint->bEndpointAddress),
+			 wacom->data, wacom->features->pktlen,
+			 wacom->features->irq, wacom, endpoint->bInterval);
+	wacom->irq->transfer_dma = wacom->data_dma;
+	wacom->irq->transfer_flags |= URB_NO_DMA_MAP;
 
 	input_register_device(&wacom->dev);
 
@@ -429,6 +444,7 @@ static void wacom_disconnect(struct usb_device *dev, void *ptr)
 	usb_unlink_urb(wacom->irq);
 	input_unregister_device(&wacom->dev);
 	usb_free_urb(wacom->irq);
+	usb_buffer_free(dev, 10, wacom->data, wacom->data_dma);
 	kfree(wacom);
 }
 

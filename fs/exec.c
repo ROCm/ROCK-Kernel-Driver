@@ -323,9 +323,50 @@ int setup_arg_pages(struct linux_binprm *bprm)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
+	struct mm_struct *mm = current->mm;
 	int i;
 
-	stack_base = STACK_TOP - MAX_ARG_PAGES*PAGE_SIZE;
+#ifdef ARCH_STACK_GROWSUP
+	/* Move the argument and environment strings to the bottom of the
+	 * stack space.
+	 */
+	int offset, j;
+	char *to, *from;
+
+	/* Start by shifting all the pages down */
+	i = 0;
+	for (j = 0; j < MAX_ARG_PAGES; j++) {
+		struct page *page = bprm->page[j];
+		if (!page)
+			continue;
+		bprm->page[i++] = page;
+	}
+
+	/* Now move them within their pages */
+	offset = bprm->p % PAGE_SIZE;
+	to = kmap(bprm->page[0]);
+	for (j = 1; j < i; j++) {
+		memmove(to, to + offset, PAGE_SIZE - offset);
+		from = kmap(bprm->page[j]);
+		memcpy(to + PAGE_SIZE - offset, from, offset);
+		kunmap(bprm[j - 1]);
+		to = from;
+	}
+	memmove(to, to + offset, PAGE_SIZE - offset);
+	kunmap(bprm[j - 1]);
+
+	/* Adjust bprm->p to point to the end of the strings. */
+	bprm->p = PAGE_SIZE * i - offset;
+	stack_base = STACK_TOP - current->rlim[RLIMIT_STACK].rlim_max;
+	mm->arg_start = stack_base;
+
+	/* zero pages that were copied above */
+	while (i < MAX_ARG_PAGES)
+		bprm->page[i++] = NULL;
+#else
+	stack_base = STACK_TOP - MAX_ARG_PAGES * PAGE_SIZE;
+	mm->arg_start = bprm->p + stack_base;
+#endif
 
 	bprm->p += stack_base;
 	if (bprm->loader)
@@ -333,7 +374,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	bprm->exec += stack_base;
 
 	mpnt = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!mpnt) 
+	if (!mpnt)
 		return -ENOMEM;
 
 	if (!vm_enough_memory((STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
@@ -341,19 +382,25 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		return -ENOMEM;
 	}
 
-	down_write(&current->mm->mmap_sem);
+	down_write(&mm->mmap_sem);
 	{
-		mpnt->vm_mm = current->mm;
+		mpnt->vm_mm = mm;
+#ifdef ARCH_STACK_GROWSUP
+		mpnt->vm_start = stack_base;
+		mpnt->vm_end = PAGE_MASK &
+			(PAGE_SIZE - 1 + (unsigned long) bprm->p);
+#else
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = STACK_TOP;
+#endif
 		mpnt->vm_page_prot = PAGE_COPY;
 		mpnt->vm_flags = VM_STACK_FLAGS;
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = 0;
 		mpnt->vm_file = NULL;
 		mpnt->vm_private_data = (void *) 0;
-		insert_vm_struct(current->mm, mpnt);
-		current->mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
+		insert_vm_struct(mm, mpnt);
+		mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 	} 
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
@@ -364,7 +411,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		}
 		stack_base += PAGE_SIZE;
 	}
-	up_write(&current->mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	
 	return 0;
 }
@@ -732,7 +779,6 @@ void compute_creds(struct linux_binprm *bprm)
 	security_ops->bprm_compute_creds(bprm);
 }
 
-
 void remove_arg_zero(struct linux_binprm *bprm)
 {
 	if (bprm->argc) {
@@ -853,7 +899,6 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 	}
 	return retval;
 }
-
 
 /*
  * sys_execve() executes a new program.

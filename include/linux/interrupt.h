@@ -50,9 +50,9 @@ enum {
 #if !CONFIG_SMP
 # define cli()			local_irq_disable()
 # define sti()			local_irq_enable()
-# define save_flags(x)		local_irq_save(x)
+# define save_flags(x)		local_save_flags(x)
 # define restore_flags(x)	local_irq_restore(x)
-# define save_and_cli(x)	local_irq_save_off(x)
+# define save_and_cli(x)	local_irq_save(x)
 #endif
 
 

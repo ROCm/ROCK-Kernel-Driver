@@ -410,46 +410,46 @@ static int tumbler_put_mono(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucon
 }
 
 static struct tumbler_mono_vol tumbler_pcm_vol_info = {
-	index: VOL_IDX_PCM,
-	reg: TAS_REG_PCM,
-	bytes: 3,
-	max: number_of(mixer_volume_table),
-	table: mixer_volume_table,
+	.index = VOL_IDX_PCM,
+	.reg = TAS_REG_PCM,
+	.bytes = 3,
+	.max = number_of(mixer_volume_table),
+	.table = mixer_volume_table,
 };
 
 #if 0 // for what?
 static struct tumbler_mono_vol tumbler_altpcm_vol_info = {
-	index: VOL_IDX_ALTPCM,
-	reg: TAS_REG_INPUT2,
-	bytes: 3,
-	max: number_of(mixer_volume_table),
-	table: mixer_volume_table,
+	.index = VOL_IDX_ALTPCM,
+	.reg = TAS_REG_INPUT2,
+	.bytes = 3,
+	.max = number_of(mixer_volume_table),
+	.table = mixer_volume_table,
 };
 #endif
 
 static struct tumbler_mono_vol tumbler_bass_vol_info = {
-	index: VOL_IDX_BASS,
-	reg: TAS_REG_BASS,
-	bytes: 1,
-	max: number_of(bass_volume_table),
-	table: bass_volume_table,
+	.index = VOL_IDX_BASS,
+	.reg = TAS_REG_BASS,
+	.bytes = 1,
+	.max = number_of(bass_volume_table),
+	.table = bass_volume_table,
 };
 
 static struct tumbler_mono_vol tumbler_treble_vol_info = {
-	index: VOL_IDX_TREBLE,
-	reg: TAS_REG_TREBLE,
-	bytes: 1,
-	max: number_of(treble_volume_table),
-	table: treble_volume_table,
+	.index = VOL_IDX_TREBLE,
+	.reg = TAS_REG_TREBLE,
+	.bytes = 1,
+	.max = number_of(treble_volume_table),
+	.table = treble_volume_table,
 };
 
 #define DEFINE_MONO(xname,type) { \
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,\
-	name: xname, \
-	info: tumbler_info_mono, \
-	get: tumbler_get_mono, \
-	put: tumbler_put_mono, \
-	private_value: (unsigned long)(&tumbler_##type##_vol_info), \
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,\
+	.name = xname, \
+	.info = tumbler_info_mono, \
+	.get = tumbler_get_mono, \
+	.put = tumbler_put_mono, \
+	.private_value = (unsigned long)(&tumbler_##type##_vol_info), \
 }
 
 /*
@@ -491,51 +491,51 @@ static int tumbler_put_mute_switch(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 /*
  */
 static snd_kcontrol_new_t tumbler_mixers[] __initdata = {
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Master Playback Volume",
-	  info: tumbler_info_master_volume,
-	  get: tumbler_get_master_volume,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Master Playback Volume",
+	  .info = tumbler_info_master_volume,
+	  .get = tumbler_get_master_volume,
 	  put: tumbler_put_master_volume
 	},
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "Master Playback Switch",
-	  info: snd_pmac_boolean_stereo_info,
-	  get: tumbler_get_master_switch,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "Master Playback Switch",
+	  .info = snd_pmac_boolean_stereo_info,
+	  .get = tumbler_get_master_switch,
 	  put: tumbler_put_master_switch
 	},
 	DEFINE_MONO("Tone Control - Bass", bass),
 	DEFINE_MONO("Tone Control - Treble", treble),
 	DEFINE_MONO("PCM Playback Volume", pcm),
 	//  DEFINE_MONO("Mixer2 Playback Volume", altpcm),
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "DRC Switch",
-	  info: snd_pmac_boolean_mono_info,
-	  get: tumbler_get_drc_switch,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "DRC Switch",
+	  .info = snd_pmac_boolean_mono_info,
+	  .get = tumbler_get_drc_switch,
 	  put: tumbler_put_drc_switch
 	},
-	{ iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	  name: "DRC Range",
-	  info: tumbler_info_drc_value,
-	  get: tumbler_get_drc_value,
+	{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	  .name = "DRC Range",
+	  .info = tumbler_info_drc_value,
+	  .get = tumbler_get_drc_value,
 	  put: tumbler_put_drc_value
 	},
 };
 
 static snd_kcontrol_new_t tumbler_hp_sw __initdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Headphone Playback Switch",
-	info: snd_pmac_boolean_mono_info,
-	get: tumbler_get_mute_switch,
-	put: tumbler_put_mute_switch,
-	private_value: TUMBLER_MUTE_HP,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "Headphone Playback Switch",
+	.info = snd_pmac_boolean_mono_info,
+	.get = tumbler_get_mute_switch,
+	.put = tumbler_put_mute_switch,
+	.private_value = TUMBLER_MUTE_HP,
 };
 static snd_kcontrol_new_t tumbler_speaker_sw __initdata = {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "PC Speaker Playback Switch",
-	info: snd_pmac_boolean_mono_info,
-	get: tumbler_get_mute_switch,
-	put: tumbler_put_mute_switch,
-	private_value: TUMBLER_MUTE_AMP,
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "PC Speaker Playback Switch",
+	.info = snd_pmac_boolean_mono_info,
+	.get = tumbler_get_mute_switch,
+	.put = tumbler_put_mute_switch,
+	.private_value = TUMBLER_MUTE_AMP,
 };
 
 #ifdef PMAC_SUPPORT_AUTOMUTE

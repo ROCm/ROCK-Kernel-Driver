@@ -29,6 +29,8 @@
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/ethtool.h>
+#include <asm/uaccess.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 
@@ -176,6 +178,37 @@ static void print_binary(unsigned int number)
 }
 #endif
 
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+	
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strncpy(info.driver, "xircom_cb", sizeof(info.driver)-1);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	}
+	
+	return -EOPNOTSUPP;
+}
+
+static int private_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+
+       switch(cmd) {
+       case SIOCETHTOOL:
+	       return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
 /* xircom_probe is the code that gets called on device insertion.
    it sets up the hardware and registers the device to the networklayer.
    
@@ -265,6 +298,7 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
 	dev->stop = &xircom_close;
 	dev->get_stats = &xircom_get_stats;
 	dev->priv = private;
+	dev->do_ioctl = &private_ioctl;
 	pdev->driver_data = dev;
 
 	

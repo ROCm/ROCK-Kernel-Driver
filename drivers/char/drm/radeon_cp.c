@@ -1307,12 +1307,12 @@ int radeon_cp_start( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( dev_priv->cp_running ) {
-		DRM_DEBUG( "%s while CP running\n", __func__ );
+		DRM_DEBUG( "%s while CP running\n", __FUNCTION__ );
 		return 0;
 	}
 	if ( dev_priv->cp_mode == RADEON_CSQ_PRIDIS_INDDIS ) {
 		DRM_DEBUG( "%s called with bogus CP mode (%d)\n",
-			   __func__, dev_priv->cp_mode );
+			   __FUNCTION__, dev_priv->cp_mode );
 		return 0;
 	}
 
@@ -1374,7 +1374,7 @@ int radeon_cp_reset( DRM_IOCTL_ARGS )
 	LOCK_TEST_WITH_RETURN( dev );
 
 	if ( !dev_priv ) {
-		DRM_DEBUG( "%s called before init done\n", __func__ );
+		DRM_DEBUG( "%s called before init done\n", __FUNCTION__ );
 		return DRM_ERR(EINVAL);
 	}
 

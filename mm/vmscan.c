@@ -23,6 +23,7 @@
 #include <linux/writeback.h>
 #include <linux/suspend.h>
 #include <linux/buffer_head.h>		/* for try_to_release_page() */
+#include <linux/mm_inline.h>
 #include <linux/pagevec.h>
 
 #include <asm/pgalloc.h>
@@ -93,7 +94,7 @@ static inline int is_page_cache_freeable(struct page *page)
 }
 
 static /* inline */ int
-shrink_list(struct list_head *page_list, int nr_pages, zone_t *classzone,
+shrink_list(struct list_head *page_list, int nr_pages,
 		unsigned int gfp_mask, int priority, int *max_scan)
 {
 	struct address_space *mapping;
@@ -109,8 +110,6 @@ shrink_list(struct list_head *page_list, int nr_pages, zone_t *classzone,
 
 		page = list_entry(page_list->prev, struct page, lru);
 		list_del(&page->lru);
-		if (!memclass(page_zone(page), classzone))
-			goto keep;
 
 		if (TestSetPageLocked(page))
 			goto keep;
@@ -264,7 +263,7 @@ keep:
 }
 
 /*
- * pagemap_lru_lock is heavily contented.  We relieve it by quickly privatising
+ * zone->lru_lock is heavily contented.  We relieve it by quickly privatising
  * a batch of pages and working on them outside the lock.  Any pages which were
  * not freed will be added back to the LRU.
  *
@@ -275,7 +274,7 @@ keep:
  * in the kernel (apart from the copy_*_user functions).
  */
 static /* inline */ int
-shrink_cache(int nr_pages, zone_t *classzone,
+shrink_cache(int nr_pages, struct zone *zone,
 		unsigned int gfp_mask, int priority, int max_scan)
 {
 	LIST_HEAD(page_list);
@@ -292,15 +291,17 @@ shrink_cache(int nr_pages, zone_t *classzone,
 	pagevec_init(&pvec);
 
 	lru_add_drain();
-	spin_lock_irq(&_pagemap_lru_lock);
+	spin_lock_irq(&zone->lru_lock);
 	while (max_scan > 0 && nr_pages > 0) {
 		struct page *page;
 		int n = 0;
 
-		while (n < nr_to_process && !list_empty(&inactive_list)) {
-			page = list_entry(inactive_list.prev, struct page, lru);
+		while (n < nr_to_process && !list_empty(&zone->inactive_list)) {
+			page = list_entry(zone->inactive_list.prev,
+					struct page, lru);
 
-			prefetchw_prev_lru_page(page, &inactive_list, flags);
+			prefetchw_prev_lru_page(page,
+						&zone->inactive_list, flags);
 
 			if (!TestClearPageLRU(page))
 				BUG();
@@ -308,28 +309,28 @@ shrink_cache(int nr_pages, zone_t *classzone,
 			if (page_count(page) == 0) {
 				/* It is currently in pagevec_release() */
 				SetPageLRU(page);
-				list_add(&page->lru, &inactive_list);
+				list_add(&page->lru, &zone->inactive_list);
 				continue;
 			}
 			list_add(&page->lru, &page_list);
 			page_cache_get(page);
 			n++;
 		}
-		spin_unlock_irq(&_pagemap_lru_lock);
+		zone->nr_inactive -= n;
+		spin_unlock_irq(&zone->lru_lock);
 
 		if (list_empty(&page_list))
 			goto done;
 
 		max_scan -= n;
-		mod_page_state(nr_inactive, -n);
 		KERNEL_STAT_ADD(pgscan, n);
-		nr_pages = shrink_list(&page_list, nr_pages, classzone,
+		nr_pages = shrink_list(&page_list, nr_pages,
 					gfp_mask, priority, &max_scan);
 
 		if (nr_pages <= 0 && list_empty(&page_list))
 			goto done;
 
-		spin_lock_irq(&_pagemap_lru_lock);
+		spin_lock_irq(&zone->lru_lock);
 		/*
 		 * Put back any unfreeable pages.
 		 */
@@ -339,17 +340,17 @@ shrink_cache(int nr_pages, zone_t *classzone,
 				BUG();
 			list_del(&page->lru);
 			if (PageActive(page))
-				__add_page_to_active_list(page);
+				add_page_to_active_list(zone, page);
 			else
-				add_page_to_inactive_list(page);
+				add_page_to_inactive_list(zone, page);
 			if (!pagevec_add(&pvec, page)) {
-				spin_unlock_irq(&_pagemap_lru_lock);
+				spin_unlock_irq(&zone->lru_lock);
 				__pagevec_release(&pvec);
-				spin_lock_irq(&_pagemap_lru_lock);
+				spin_lock_irq(&zone->lru_lock);
 			}
 		}
   	}
-	spin_unlock_irq(&_pagemap_lru_lock);
+	spin_unlock_irq(&zone->lru_lock);
 done:
 	pagevec_release(&pvec);
 	return nr_pages;	
@@ -362,9 +363,9 @@ done:
  * processes, from rmap.
  *
  * If the pages are mostly unmapped, the processing is fast and it is
- * appropriate to hold pagemap_lru_lock across the whole operation.  But if
+ * appropriate to hold zone->lru_lock across the whole operation.  But if
  * the pages are mapped, the processing is slow (page_referenced()) so we
- * should drop pagemap_lru_lock around each page.  It's impossible to balance
+ * should drop zone->lru_lock around each page.  It's impossible to balance
  * this, so instead we remove the pages from the LRU while processing them.
  * It is safe to rely on PG_active against the non-LRU pages in here because
  * nobody will play with that bit on a non-LRU page.
@@ -372,7 +373,8 @@ done:
  * The downside is that we have to touch page->count against each page.
  * But we had to alter page->flags anyway.
  */
-static /* inline */ void refill_inactive(const int nr_pages_in)
+static /* inline */ void
+refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 {
 	int pgdeactivate = 0;
 	int nr_pages = nr_pages_in;
@@ -383,24 +385,24 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 	struct pagevec pvec;
 
 	lru_add_drain();
-	spin_lock_irq(&_pagemap_lru_lock);
-	while (nr_pages && !list_empty(&active_list)) {
-		page = list_entry(active_list.prev, struct page, lru);
-		prefetchw_prev_lru_page(page, &active_list, flags);
+	spin_lock_irq(&zone->lru_lock);
+	while (nr_pages && !list_empty(&zone->active_list)) {
+		page = list_entry(zone->active_list.prev, struct page, lru);
+		prefetchw_prev_lru_page(page, &zone->active_list, flags);
 		if (!TestClearPageLRU(page))
 			BUG();
 		list_del(&page->lru);
 		if (page_count(page) == 0) {
 			/* It is currently in pagevec_release() */
 			SetPageLRU(page);
-			list_add(&page->lru, &active_list);
+			list_add(&page->lru, &zone->active_list);
 			continue;
 		}
 		page_cache_get(page);
 		list_add(&page->lru, &l_hold);
 		nr_pages--;
 	}
-	spin_unlock_irq(&_pagemap_lru_lock);
+	spin_unlock_irq(&zone->lru_lock);
 
 	while (!list_empty(&l_hold)) {
 		page = list_entry(l_hold.prev, struct page, lru);
@@ -419,7 +421,7 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 	}
 
 	pagevec_init(&pvec);
-	spin_lock_irq(&_pagemap_lru_lock);
+	spin_lock_irq(&zone->lru_lock);
 	while (!list_empty(&l_inactive)) {
 		page = list_entry(l_inactive.prev, struct page, lru);
 		prefetchw_prev_lru_page(page, &l_inactive, flags);
@@ -427,11 +429,11 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 			BUG();
 		if (!TestClearPageActive(page))
 			BUG();
-		list_move(&page->lru, &inactive_list);
+		list_move(&page->lru, &zone->inactive_list);
 		if (!pagevec_add(&pvec, page)) {
-			spin_unlock_irq(&_pagemap_lru_lock);
+			spin_unlock_irq(&zone->lru_lock);
 			__pagevec_release(&pvec);
-			spin_lock_irq(&_pagemap_lru_lock);
+			spin_lock_irq(&zone->lru_lock);
 		}
 	}
 	while (!list_empty(&l_active)) {
@@ -440,31 +442,30 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 		if (TestSetPageLRU(page))
 			BUG();
 		BUG_ON(!PageActive(page));
-		list_move(&page->lru, &active_list);
+		list_move(&page->lru, &zone->active_list);
 		if (!pagevec_add(&pvec, page)) {
-			spin_unlock_irq(&_pagemap_lru_lock);
+			spin_unlock_irq(&zone->lru_lock);
 			__pagevec_release(&pvec);
-			spin_lock_irq(&_pagemap_lru_lock);
+			spin_lock_irq(&zone->lru_lock);
 		}
 	}
-	spin_unlock_irq(&_pagemap_lru_lock);
+	zone->nr_active -= pgdeactivate;
+	zone->nr_inactive += pgdeactivate;
+	spin_unlock_irq(&zone->lru_lock);
 	pagevec_release(&pvec);
 
-	mod_page_state(nr_active, -pgdeactivate);
-	mod_page_state(nr_inactive, pgdeactivate);
 	KERNEL_STAT_ADD(pgscan, nr_pages_in - nr_pages);
 	KERNEL_STAT_ADD(pgdeactivate, pgdeactivate);
 }
 
 static /* inline */ int
-shrink_caches(zone_t *classzone, int priority,
-		unsigned int gfp_mask, int nr_pages)
+shrink_zone(struct zone *zone, int priority,
+	unsigned int gfp_mask, int nr_pages)
 {
 	unsigned long ratio;
-	struct page_state ps;
 	int max_scan;
-	static atomic_t nr_to_refill = ATOMIC_INIT(0);
 
+	/* This is bogus for ZONE_HIGHMEM? */
 	if (kmem_cache_reap(gfp_mask) >= nr_pages)
   		return 0;
 
@@ -478,17 +479,16 @@ shrink_caches(zone_t *classzone, int priority,
 	 * just to make sure that the kernel will slowly sift through the
 	 * active list.
 	 */
-	get_page_state(&ps);
-	ratio = (unsigned long)nr_pages * ps.nr_active /
-				((ps.nr_inactive | 1) * 2);
-	atomic_add(ratio+1, &nr_to_refill);
-	if (atomic_read(&nr_to_refill) > SWAP_CLUSTER_MAX) {
-		atomic_sub(SWAP_CLUSTER_MAX, &nr_to_refill);
-		refill_inactive(SWAP_CLUSTER_MAX);
+	ratio = (unsigned long)nr_pages * zone->nr_active /
+				((zone->nr_inactive | 1) * 2);
+	atomic_add(ratio+1, &zone->refill_counter);
+	if (atomic_read(&zone->refill_counter) > SWAP_CLUSTER_MAX) {
+		atomic_sub(SWAP_CLUSTER_MAX, &zone->refill_counter);
+		refill_inactive_zone(zone, SWAP_CLUSTER_MAX);
 	}
 
-	max_scan = ps.nr_inactive / priority;
-	nr_pages = shrink_cache(nr_pages, classzone,
+	max_scan = zone->nr_inactive / priority;
+	nr_pages = shrink_cache(nr_pages, zone,
 				gfp_mask, priority, max_scan);
 
 	if (nr_pages <= 0)
@@ -507,7 +507,31 @@ shrink_caches(zone_t *classzone, int priority,
 	return nr_pages;
 }
 
-int try_to_free_pages(zone_t *classzone, unsigned int gfp_mask, unsigned int order)
+static int
+shrink_caches(struct zone *classzone, int priority,
+		int gfp_mask, int nr_pages)
+{
+	struct zone *first_classzone;
+	struct zone *zone;
+
+	first_classzone = classzone->zone_pgdat->node_zones;
+	zone = classzone;
+	while (zone >= first_classzone) {
+		if (zone->free_pages <= zone->pages_high) {
+			nr_pages = shrink_zone(zone, priority,
+					gfp_mask, nr_pages);
+		}
+		zone--;
+	}
+	return nr_pages;
+}
+
+/*
+ * This is the main entry point to page reclaim.
+ */
+int
+try_to_free_pages(struct zone *classzone,
+		unsigned int gfp_mask, unsigned int order)
 {
 	int priority = DEF_PRIORITY;
 	int nr_pages = SWAP_CLUSTER_MAX;
@@ -515,24 +539,20 @@ int try_to_free_pages(zone_t *classzone, unsigned int gfp_mask, unsigned int ord
 	KERNEL_STAT_INC(pageoutrun);
 
 	do {
-		nr_pages = shrink_caches(classzone, priority, gfp_mask, nr_pages);
+		nr_pages = shrink_caches(classzone, priority,
+					gfp_mask, nr_pages);
 		if (nr_pages <= 0)
 			return 1;
 	} while (--priority);
-
-	/*
-	 * Hmm.. Cache shrink failed - time to kill something?
-	 * Mhwahahhaha! This is the part I really like. Giggle.
-	 */
 	out_of_memory();
 	return 0;
 }
 
 DECLARE_WAIT_QUEUE_HEAD(kswapd_wait);
 
-static int check_classzone_need_balance(zone_t * classzone)
+static int check_classzone_need_balance(struct zone *classzone)
 {
-	zone_t * first_classzone;
+	struct zone *first_classzone;
 
 	first_classzone = classzone->zone_pgdat->node_zones;
 	while (classzone >= first_classzone) {
@@ -546,7 +566,7 @@ static int check_classzone_need_balance(zone_t * classzone)
 static int kswapd_balance_pgdat(pg_data_t * pgdat)
 {
 	int need_more_balance = 0, i;
-	zone_t * zone;
+	struct zone *zone;
 
 	for (i = pgdat->nr_zones-1; i >= 0; i--) {
 		zone = pgdat->node_zones + i;
@@ -584,7 +604,7 @@ static void kswapd_balance(void)
 
 static int kswapd_can_sleep_pgdat(pg_data_t * pgdat)
 {
-	zone_t * zone;
+	struct zone *zone;
 	int i;
 
 	for (i = pgdat->nr_zones-1; i >= 0; i--) {

@@ -107,7 +107,7 @@ void make_intc2_irq(unsigned int irq, unsigned int addr,
 	}
 
 	disable_irq_nosync(irq);
-	/* Fill the the data we need */
+	/* Fill the data we need */
 	intc2_data[offset].addr=addr;
 	intc2_data[offset].mask=1<<pos;
 		

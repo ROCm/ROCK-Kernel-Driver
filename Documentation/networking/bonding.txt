@@ -266,7 +266,7 @@ Questions :
 	If not explicitly configured with ifconfig, the MAC address of the
 	bonding device is taken from its first slave device. This MAC address
 	is then passed to all following slaves and remains persistent (even if
-	the the first slave is removed) until the bonding device is brought
+	the first slave is removed) until the bonding device is brought
 	down or reconfigured.
 	
 	If you wish to change the MAC address, you can set it with ifconfig:

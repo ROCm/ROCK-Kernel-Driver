@@ -1,27 +1,13 @@
 /*
- * $Id: atkbd.c,v 1.33 2002/02/12 09:34:34 vojtech Exp $
+ * AT and PS/2 keyboard driver
  *
- *  Copyright (c) 1999-2001 Vojtech Pavlik
+ * Copyright (c) 1999-2002 Vojtech Pavlik
  */
 
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  */
 
 #include <linux/delay.h>
@@ -33,7 +19,7 @@
 #include <linux/serio.h>
 #include <linux/tqueue.h>
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
 MODULE_PARM(atkbd_set, "1i");
 MODULE_LICENSE("GPL");
@@ -94,9 +80,11 @@ static unsigned char atkbd_set3_keycode[512] = {
 #define ATKBD_CMD_SETLEDS	0x10ed
 #define ATKBD_CMD_GSCANSET	0x11f0
 #define ATKBD_CMD_SSCANSET	0x10f0
-#define ATKBD_CMD_GETID		0x02f2
+#define ATKBD_CMD_GETID		0x01f2
+#define ATKBD_CMD_GETID2	0x0100
 #define ATKBD_CMD_ENABLE	0x00f4
 #define ATKBD_CMD_RESET_DIS	0x00f5
+#define ATKBD_CMD_RESET_BAT	0x01ff
 #define ATKBD_CMD_SETALL_MB	0x00f8
 #define ATKBD_CMD_RESEND	0x00fe
 #define ATKBD_CMD_EX_ENABLE	0x10ea
@@ -147,7 +135,7 @@ static void atkbd_interrupt(struct serio *serio, unsigned char data, unsigned in
 #endif
 
 	/* Interface error.  Request that the keyboard resend. */
-	if ((flags & (SERIO_FRAME | SERIO_PARITY)) && atkbd->write) {
+	if ((flags & (SERIO_FRAME | SERIO_PARITY)) && (~flags & SERIO_TIMEOUT) && atkbd->write) {
 		printk("atkbd.c: frame/parity error: %02x\n", flags);
 		serio_write(serio, ATKBD_CMD_RESEND);
 		return;
@@ -360,70 +348,60 @@ static int atkbd_probe(struct atkbd *atkbd)
 	unsigned char param[2];
 
 /*
- * Full reset with selftest can on some keyboards be annoyingly slow,
- * so we just do a reset-and-disable on the keyboard, which
- * is considerably faster, but doesn't have to reset everything.
+ * Some systems, where the bit-twiddling when testing the io-lines of the
+ * controller may confuse the keyboard need a full reset of the keyboard. On
+ * these systems the BIOS also usually doesn't do it for us.
  */
 
-	if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_DIS))
+#ifdef CONFIG_KEYBOARD_ATKBD_RESET
+	if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT))
 		printk(KERN_WARNING "atkbd.c: keyboard reset failed\n");
+#endif
 
 /*
- * Next, we check if it's a keyboard. It should send 0xab83
- * (0xab84 on IBM ThinkPad, and 0xaca1 on a NCD Sun layout keyboard,
- * 0xab02 on unxlated i8042 and 0xab03 on unxlated ThinkPad, 0xab7f
- * on Fujitsu Lifebook).
- * If it's a mouse, it'll only send 0x00 (0x03 if it's MS mouse),
- * and we'll time out here, and report an error.
+ * Next we check we can set LEDs on the keyboard. This should work on every
+ * keyboard out there. It also turns the LEDs off, which we want anyway.
  */
 
-	param[0] = param[1] = 0;
-
-	if (atkbd_command(atkbd, param, ATKBD_CMD_GETID))
+	param[0] = 0;
+	if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
 		return -1;
 
-	atkbd->id = (param[0] << 8) | param[1];
-
-	if (atkbd->id != 0xab83 && atkbd->id != 0xab84 && atkbd->id != 0xaca1 &&
-	    atkbd->id != 0xab7f && atkbd->id != 0xab02 && atkbd->id != 0xab03)
-		printk(KERN_WARNING "atkbd.c: Unusual keyboard ID: %#x on %s\n",
-			atkbd->id, atkbd->serio->phys);
-
-	return 0;
-}
-
 /*
- * atkbd_initialize() sets the keyboard into a sane state.
+ * Then we check the keyboard ID. We should get 0xab83 under normal conditions.
+ * Some keyboards report different values, but the first byte is always 0xab or
+ * 0xac. Some old AT keyboards don't report anything.
  */
 
-static void atkbd_initialize(struct atkbd *atkbd)
-{
-	unsigned char param;	
+	if (atkbd_command(atkbd, param, ATKBD_CMD_GETID)) {
+		atkbd->id = 0xabba;
+		return 0;
+	}
+	if (param[0] != 0xab && param[0] != 0xac)
+		return -1;
+	atkbd->id = param[0] << 8;
+	if (atkbd_command(atkbd, param, ATKBD_CMD_GETID2))
+		return -1;
+	atkbd->id |= param[0];
 
 /*
  * Disable autorepeat. We don't need it, as we do it in software anyway,
- * because that way can get faster repeat, and have less system load
- * (less accesses to the slow ISA hardware). If this fails, we don't care,
- * and will just ignore the repeated keys.
+ * because that way can get faster repeat, and have less system load (less
+ * accesses to the slow ISA hardware). If this fails, we don't care, and will
+ * just ignore the repeated keys.
  */
 
 	atkbd_command(atkbd, NULL, ATKBD_CMD_SETALL_MB);
 
 /*
- * We also shut off all the leds. The console code will turn them back on,
- * if needed.
- */
-
-	param = 0;
-	atkbd_command(atkbd, &param, ATKBD_CMD_SETLEDS);
-
-/*
- * Last, we enable the keyboard so that we get keypresses from it.
+ * Last, we enable the keyboard to make sure  that we get keypresses from it.
  */
 
 	if (atkbd_command(atkbd, NULL, ATKBD_CMD_ENABLE))
 		printk(KERN_ERR "atkbd.c: Failed to enable keyboard on %s\n",
 			atkbd->serio->phys);
+
+	return 0;
 }
 
 /*
@@ -524,9 +502,6 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	input_register_device(&atkbd->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", atkbd->name, serio->phys);
-
-	if (atkbd->write)
-		atkbd_initialize(atkbd);
 }
 
 

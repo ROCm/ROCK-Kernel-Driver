@@ -108,7 +108,7 @@ pmd_free (pmd_t *pmd)
 	++pgtable_cache_size;
 }
 
-#define pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
+#define __pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
 
 static inline void
 pmd_populate (struct mm_struct *mm, pmd_t *pmd_entry, struct page *pte)
@@ -154,7 +154,7 @@ pte_free_kernel (pte_t *pte)
 	free_page((unsigned long) pte);
 }
 
-#define pte_free_tlb(tlb, pte)	tlb_remove_page((tlb), (pte))
+#define __pte_free_tlb(tlb, pte)	tlb_remove_page((tlb), (pte))
 
 extern void check_pgt_cache (void);
 

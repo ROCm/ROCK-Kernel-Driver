@@ -7,4 +7,6 @@
 
 #define L1_CACHE_BYTES 32
 
+#define L1_CACHE_SHIFT_MAX 5	/* largest L1 which this arch supports */
+
 #endif /* _ASM_CACHE_H */
