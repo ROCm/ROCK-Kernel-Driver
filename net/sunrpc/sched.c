@@ -704,9 +704,6 @@ __rpc_schedule(void)
 
 	dprintk("RPC:      rpc_schedule enter\n");
 	while (1) {
-		/* Ensure equal rights for tcp tasks... */
-		rpciod_tcp_dispatcher();
-
 		spin_lock_bh(&rpc_queue_lock);
 
 		task_for_first(task, &schedq.tasks) {
@@ -1030,7 +1027,7 @@ static DECLARE_MUTEX_LOCKED(rpciod_running);
 static inline int
 rpciod_task_pending(void)
 {
-	return !list_empty(&schedq.tasks) || xprt_tcp_pending();
+	return !list_empty(&schedq.tasks);
 }
 
 
