@@ -1,3 +1,7 @@
+/*
+ * Generic routines for AGP 3.0 compliant bridges.
+ */
+
 #include <linux/list.h>
 #include <linux/pci.h>
 #include <linux/agp_backend.h>
