@@ -102,6 +102,7 @@ static int aha1740_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start
     if (len > length)
 	len = length;
     return len;
+}
 
 
 static int aha1740_makecode(unchar *sense, unchar *status)
