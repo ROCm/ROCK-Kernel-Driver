@@ -614,7 +614,7 @@ fst_tx_config ( struct fst_port_info *port )
 
 /*      Control signal change interrupt event
  */
-static void
+static irqreturn_t
 fst_intr_ctlchg ( struct fst_card_info *card, struct fst_port_info *port )
 {
         int signals;
@@ -637,6 +637,7 @@ fst_intr_ctlchg ( struct fst_card_info *card, struct fst_port_info *port )
                         netif_carrier_off ( port_to_dev ( port ));
                 }
         }
+	return IRQ_HANDLED;
 }
 
 

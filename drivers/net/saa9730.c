@@ -745,7 +745,7 @@ static int lan_saa9730_rx(struct net_device *dev)
 	return 0;
 }
 
-static void lan_saa9730_interrupt(const int irq, void *dev_id,
+static irqreturn_t lan_saa9730_interrupt(const int irq, void *dev_id,
 				  struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
@@ -773,7 +773,7 @@ static void lan_saa9730_interrupt(const int irq, void *dev_id,
 	/* Enable the EVM LAN interrupt. */
 	evm_saa9730_unblock_lan_int(lp);
 
-	return;
+	return IRQ_HANDLED;
 }
 
 static int lan_saa9730_open_fail(struct net_device *dev)

@@ -478,7 +478,7 @@ static int   SK_probe(struct net_device *dev, short ioaddr);
 static void  SK_timeout(struct net_device *dev);
 static int   SK_open(struct net_device *dev);
 static int   SK_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void  SK_interrupt(int irq, void *dev_id, struct pt_regs * regs);
+static irqreturn_t SK_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 static void  SK_rxintr(struct net_device *dev);
 static void  SK_txintr(struct net_device *dev);
 static int   SK_close(struct net_device *dev);
@@ -1337,7 +1337,7 @@ static int SK_send_packet(struct sk_buff *skb, struct net_device *dev)
  *     YY/MM/DD  uid  Description
 -*/
 
-static void SK_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t SK_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
     int csr0;
     struct net_device *dev = dev_id;
@@ -1386,6 +1386,7 @@ static void SK_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     SK_write_reg(CSR0, CSR0_INEA); /* Enable Interrupts */
 
     spin_unlock (&SK_lock);
+    return IRQ_HANDLED;
 } /* End of SK_interrupt() */ 
 
 

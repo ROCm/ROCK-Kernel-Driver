@@ -119,7 +119,7 @@ sizeof(nop_cmd) = 8;
      DELAY_16(); DELAY_16(); } }
 
 static int     sun3_82586_probe1(struct net_device *dev,int ioaddr);
-static void    sun3_82586_interrupt(int irq,void *dev_id,struct pt_regs *reg_ptr);
+static irqreturn_t sun3_82586_interrupt(int irq,void *dev_id,struct pt_regs *reg_ptr);
 static int     sun3_82586_open(struct net_device *dev);
 static int     sun3_82586_close(struct net_device *dev);
 static int     sun3_82586_send_packet(struct sk_buff *,struct net_device *);
@@ -665,7 +665,7 @@ static void *alloc_rfa(struct net_device *dev,void *ptr)
  * Interrupt Handler ...
  */
 
-static void sun3_82586_interrupt(int irq,void *dev_id,struct pt_regs *reg_ptr)
+static irqreturn_t sun3_82586_interrupt(int irq,void *dev_id,struct pt_regs *reg_ptr)
 {
 	struct net_device *dev = dev_id;
 	unsigned short stat;
@@ -674,7 +674,7 @@ static void sun3_82586_interrupt(int irq,void *dev_id,struct pt_regs *reg_ptr)
 
 	if (!dev) {
 		printk ("sun3_82586-interrupt: irq %d for unknown device.\n",irq);
-		return;
+		return IRQ_NONE;
 	}
 	p = (struct priv *) dev->priv;
 
@@ -733,6 +733,7 @@ static void sun3_82586_interrupt(int irq,void *dev_id,struct pt_regs *reg_ptr)
 
 	if(debuglevel > 1)
 		printk("i");
+	return IRQ_HANDLED;
 }
 
 /*******************************************************

@@ -198,7 +198,7 @@ static void 	open_sap(unsigned char type, struct net_device *dev);
 static void 	tok_set_multicast_list(struct net_device *dev);
 static int 	tok_send_packet(struct sk_buff *skb, struct net_device *dev);
 static int 	tok_close(struct net_device *dev);
-void 		tok_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+irqreturn_t tok_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void 	initial_tok_int(struct net_device *dev);
 static void 	tr_tx(struct net_device *dev);
 static void 	tr_rx(struct net_device *dev);
@@ -1166,7 +1166,7 @@ void dir_open_adapter (struct net_device *dev) {
 
 /******************************************************************************/
 
-void tok_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t tok_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned char status;
 	/*  unsigned char status_even ; */
@@ -1182,7 +1182,7 @@ void tok_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 	ti = (struct tok_info *) dev->priv;
 	if (ti->sram_virt & 1)
-		return;         /* PCMCIA card extraction flag */
+		return IRQ_NONE;         /* PCMCIA card extraction flag */
 	spin_lock(&(ti->lock));
 #ifdef ENABLE_PAGING
 	save_srpr = readb(ti->mmio + ACA_OFFSET + ACA_RW + SRPR_EVEN);
@@ -1202,7 +1202,7 @@ void tok_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                 writeb(save_srpr, ti->mmio + ACA_OFFSET + ACA_RW + SRPR_EVEN);
 #endif
                 spin_unlock(&(ti->lock));
-                return;
+                return IRQ_HANDLED;
         }
 	/*  Begin interrupt handler HERE inline to avoid the extra
 	    levels of logic and call depth for the original solution. */
@@ -1241,7 +1241,7 @@ void tok_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		outb(0, dev->base_addr + ADAPTRESET);
 		ibmtr_reset_timer(&(ti->tr_timer), dev);/*BMS try to reopen*/
 		spin_unlock(&(ti->lock));
-		return;
+		return IRQ_HANDLED;
 	}
 	if (readb(ti->mmio + ACA_OFFSET + ACA_RW + ISRP_EVEN)
 		& (TCR_INT | ERR_INT | ACCESS_INT)) {
@@ -1256,7 +1256,7 @@ void tok_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                 writeb(save_srpr, ti->mmio + ACA_OFFSET + ACA_RW + SRPR_EVEN);
 #endif
                 spin_unlock(&(ti->lock));
-                return;
+                return IRQ_HANDLED;
         }
 	if (status & SRB_RESP_INT) {	/* SRB response */
 		SET_PAGE(ti->srb_page);
@@ -1487,6 +1487,7 @@ void tok_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 	writeb(INT_ENABLE, ti->mmio + ACA_OFFSET + ACA_SET + ISRP_EVEN);
 	spin_unlock(&(ti->lock));
+	return IRQ_HANDLED;
 }				/*tok_interrupt */
 
 /*****************************************************************************/

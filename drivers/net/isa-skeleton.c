@@ -109,7 +109,7 @@ extern int netcard_probe(struct net_device *dev);
 static int	netcard_probe1(struct net_device *dev, int ioaddr);
 static int	net_open(struct net_device *dev);
 static int	net_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void	net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void	net_rx(struct net_device *dev);
 static int	net_close(struct net_device *dev);
 static struct	net_device_stats *net_get_stats(struct net_device *dev);
@@ -470,16 +470,21 @@ void net_tx(struct net_device *dev)
  * The typical workload of the driver:
  * Handle the network interface interrupts.
  */
-static void net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = dev_id;
 	struct net_local *np;
 	int ioaddr, status;
+	int handled = 0;
 
 	ioaddr = dev->base_addr;
 
 	np = (struct net_local *)dev->priv;
 	status = inw(ioaddr + 0);
+
+	if (status == 0)
+		goto out;
+	handled = 1;
 
 	if (status & RX_INTR) {
 		/* Got a packet(s). */
@@ -497,6 +502,8 @@ static void net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		/* Increment the appropriate 'localstats' field. */
 		np->stats.tx_window_errors++;
 	}
+out:
+	return IRQ_RETVAL(handled);
 }
 
 /* We have a good packet(s), get it/them out of the buffers. */

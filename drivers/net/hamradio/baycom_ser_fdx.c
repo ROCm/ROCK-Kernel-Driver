@@ -279,7 +279,7 @@ static __inline__ void ser12_rx(struct net_device *dev, struct baycom_state *bc,
 
 /* --------------------------------------------------------------------- */
 
-static void ser12_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ser12_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct baycom_state *bc = (struct baycom_state *)dev->priv;
@@ -288,10 +288,10 @@ static void ser12_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned int txcount = 0;
 
 	if (!bc || bc->hdrv.magic != HDLCDRV_MAGIC)
-		return;
+		return IRQ_NONE;
 	/* fast way out for shared irq */
 	if ((iir = inb(IIR(dev->base_addr))) & 1) 	
-		return;
+		return IRQ_NONE;
 	/* get current time */
 	do_gettimeofday(&tv);
 	msr = inb(MSR(dev->base_addr));
@@ -362,6 +362,7 @@ static void ser12_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	hdlcdrv_transmitter(dev, &bc->hdrv);
 	hdlcdrv_receiver(dev, &bc->hdrv);
 	local_irq_disable();
+	return IRQ_HANDLED;
 }
 
 /* --------------------------------------------------------------------- */
