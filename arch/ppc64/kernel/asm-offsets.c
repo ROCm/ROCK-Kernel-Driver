@@ -90,6 +90,7 @@ int main(void)
         DEFINE(PACALPQUEUE, offsetof(struct paca_struct, lpQueuePtr));
 	DEFINE(PACATOC, offsetof(struct paca_struct, xTOC));
 	DEFINE(PACAEXCSP, offsetof(struct paca_struct, exception_sp));
+	DEFINE(PACASPARE1, offsetof(struct paca_struct, spare1));
 	DEFINE(PACAPROCENABLED, offsetof(struct paca_struct, xProcEnabled));
 	DEFINE(PACADEFAULTDECR, offsetof(struct paca_struct, default_decr));
 	DEFINE(PACAPROFENABLED, offsetof(struct paca_struct, prof_enabled));

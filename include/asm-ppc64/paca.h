@@ -67,7 +67,7 @@ struct paca_struct {
 	struct ItLpQueue *lpQueuePtr;	/* LpQueue handled by this processor    0x30 */
 	u64  xTOC;			/* Kernel TOC address			0x38 */
 	STAB xStab_data;		/* Segment table information		0x40,0x48,0x50 */
-	u8 *exception_sp;		/*                                      0x58 */
+	long exception_sp;		/*                                      0x58 */
 	u8 xProcEnabled;		/*                                      0x59 */
 	u8 prof_enabled;		/* 1=iSeries profiling enabled          0x60 */
 	u8 resv1[38];			/*					0x61-0x7F */

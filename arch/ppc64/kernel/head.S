@@ -204,35 +204,35 @@ _GLOBAL(__secondary_hold)
 	mtspr   SPRG2,r20;              /* use SPRG2 as scratch reg   */ \
 	mtspr   SPRG1,r21;              /* save r21                   */ \
 	mfspr   r20,SPRG3;              /* get paca virt addr         */ \
+	std	r23,PACASPARE1(r20);					 \
+	mfcr    r23;                    /* save CR in r23             */ \
 	ld      r21,PACAEXCSP(r20);     /* get exception stack ptr    */ \
-	addi    r21,r21,EXC_FRAME_SIZE; /* make exception frame       */ \
+	addi	r21,r21,1;		/* advance to next frame      */ \
+	cmpldi	r21,1;							 \
+	bgt	exception_overflow;					 \
+	std	r21,PACAEXCSP(r20);					 \
+	sldi	r21,r21,6;						 \
+	add	r21,r20,r21;						 \
+	addi	r21,r21,PACAEXC;					 \
 	std	r22,EX_R22(r21);	/* Save r22 in exc. frame     */ \
+	mfspr	r22,SRR1;						 \
+	andi.	r22,r22,MSR_RI;						 \
+	beq-	exception_overflow;					 \
+	mtcrf	0x80,r23;						 \
+	ld	r22,PACASPARE1(r20);					 \
+	std	r22,EX_R23(r21);					 \
 	li	r22,n;                  /* Save the ex # in exc. frame*/ \
 	stw	r22,EX_TRAP(r21);	/*                            */ \
-	std	r23,EX_R23(r21);	/* Save r23 in exc. frame     */ \
 	mfspr   r22,SRR0;               /* EA of interrupted instr    */ \
 	std	r22,EX_SRR0(r21);	/* Save SRR0 in exc. frame    */ \
 	mfspr   r23,SRR1;               /* machine state at interrupt */ \
 	std	r23,EX_SRR1(r21);	/* Save SRR1 in exc. frame    */ \
                                                                          \
-	mfspr   r23,DAR;                /* Save DAR in exc. frame      */ \
-	std	r23,EX_DAR(r21);	                                  \
-	mfspr	r23,DSISR;		/* Save DSISR in exc. frame    */ \
-	stw	r23,EX_DSISR(r21);	                                  \
-	mfspr	r23,SPRG2;		/* Save r20 in exc. frame      */ \
-	std	r23,EX_R20(r21);	                                  \
-                                                                         \
 	clrrdi  r22,r20,60;             /* Get 0xc part of the vaddr  */ \
 	ori	r22,r22,(label)@l;      /* add in the vaddr offset    */ \
 		                        /*   assumes *_common < 16b   */ \
-	mfmsr   r23;                                                     \
-	rotldi  r23,r23,4;                                               \
-	ori     r23,r23,0x32B;          /* Set IR, DR, RI, SF, ISF, HV*/ \
-	rotldi  r23,r23,60;             /* for generic handlers       */ \
-	mtspr   SRR0,r22;                                                \
-	mtspr   SRR1,r23;                                                \
-	mfcr    r23;                    /* save CR in r23             */ \
-	rfid
+	b	prolog_cont
+
 
 /*
  * This is the start of the interrupt handlers for iSeries
@@ -274,8 +274,6 @@ _GLOBAL(__secondary_hold)
 #define EXCEPTION_PROLOG_COMMON                                           \
 	mfspr	r22,SPRG1;		/* Save r21 in exc. frame      */ \
 	std	r22,EX_R21(r21);	                                  \
-	std     r21,PACAEXCSP(r20);     /* update exception stack ptr  */ \
-		                        /*   iff no protection flt     */ \
 	ld	r22,EX_SRR1(r21);	/* Get SRR1 from exc. frame    */ \
 	andi.   r22,r22,MSR_PR;         /* Set CR for later branch     */ \
 	mr      r22,r1;                 /* Save r1                     */ \
@@ -307,12 +305,13 @@ _GLOBAL(__secondary_hold)
 	std	r22,SOFTE(r1);		                                  \
 	ld	r22,EX_SRR0(r21);	/* get SRR0 from exc. frame    */ \
 	ld	r23,EX_SRR1(r21);	/* get SRR1 from exc. frame    */ \
-	addi    r21,r21,-EXC_FRAME_SIZE;/* pop off exception frame     */ \
-	std     r21,PACAEXCSP(r20);                                       \
 	SAVE_GPR(0, r1);                /* save r0 in stackframe       */ \
 	SAVE_8GPRS(2, r1);              /* save r2 - r13 in stackframe */ \
 	SAVE_4GPRS(10, r1);                                               \
 	ld      r2,PACATOC(r20);	                                  \
+	ld	r13,PACAEXCSP(r20);					  \
+	addi    r13,r13,-1;             /* pop off exception frame     */ \
+	std     r13,PACAEXCSP(r20);                                       \
 	mr	r13,r20
 
 /*
@@ -417,7 +416,93 @@ __start_interrupts:
 	.globl AltivecUnavailable_Pseries;
 .AltivecUnavailable_Pseries:
 	EXCEPTION_PROLOG_PSERIES(0xf20, AltivecUnavailable_common)
-	
+
+	. = 0x3200
+
+prolog_cont:
+	mfspr   r23,DAR;                /* Save DAR in exc. frame     */
+	std	r23,EX_DAR(r21);	                                 
+	mfspr	r23,DSISR;		/* Save DSISR in exc. frame   */ 
+	stw	r23,EX_DSISR(r21);	                                 
+	mfspr	r23,SPRG2;		/* Save r20 in exc. frame     */ 
+	std	r23,EX_R20(r21);	                                 
+                                                                         
+	mfmsr   r23
+	rotldi  r23,r23,4
+	ori     r23,r23,0x32B           /* Set IR, DR, RI, SF, ISF, HV*/
+	rotldi  r23,r23,60              /* for generic handlers       */
+	mtspr   SRR0,r22
+	mtspr   SRR1,r23
+	mfcr    r23                     /* save CR in r23             */
+	rfid
+
+/*
+ * Here r20 is in sprg2, r21 is in sprg1, paca pointer is in r20, CR is in r23,
+ * r23 is in paca->spare1.
+ */
+exception_overflow:
+	.long	0x200
+	addi	r21,r20,8192-64-INT_FRAME_SIZE
+	std	r22,GPR22(r21)
+	std	r23,_CCR(r21)
+	std	r1,GPR1(r21)
+	mr	r1,r21
+	addi	r21,r21,INT_FRAME_SIZE
+	std	r21,0(r1)
+	li	r22,0
+	std	r22,0(r21)
+	mfspr	r22,SPRG2
+	mfspr	r23,SPRG1
+	std	r22,GPR20(r1)
+	std	r23,GPR21(r1)
+	ld	r22,PACASPARE1(r20)
+	std	r22,GPR23(r1)
+	mflr	r22
+	std	r22,_LINK(r1)
+	mfctr	r23
+	std	r23,_CTR(r1)
+	mfspr	r22,XER
+	std	r22,_XER(r1)
+	mfspr	r23,DAR
+	std	r23,_DAR(r1)
+	mfspr	r22,DSISR
+	std	r22,_DSISR(r1)
+	mfspr	r22,SRR0
+	std	r22,_NIP(r1)
+	mfspr	r23,SRR1
+	std	r23,_MSR(r1)
+	SAVE_GPR(0, r1)
+	SAVE_10GPRS(2, r1)
+	SAVE_8GPRS(12, r1)
+	SAVE_8GPRS(24, r1)
+	ld	r2,PACATOC(r20)
+	mr	r13,r20
+
+	li	r0,-1
+	std	r0,PACAEXCSP(r13)
+	li	r0,16
+	mtctr	r0
+	addi	r10,r13,PACAEXC
+1:	ld	r0,0(r10)
+	std	r0,128(r10)
+	addi	r10,r10,8
+	bdnz	1b
+	li	r6,0
+	std	r6,TRAP(r1)
+
+	lis	r23,1
+	addi	r23,r23,0x32B
+	rotldi	r23,r23,60
+	LOADADDR(r22, emergency_stop)
+	mtspr	SRR0,r22
+	mtspr	SRR1,r23
+	rfid
+
+emergency_stop:
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	li	r6,0
+	bl	.xmon
+	b	.	
 		
 	/* Space for the naca.  Architected to be located at real address
 	 * NACA_PHYS_ADDR.  Various tools rely on this location being fixed.
@@ -593,7 +678,6 @@ __start_stab:
 	.globl __end_stab
 __end_stab:
 
-
 /*** Common interrupt handlers ***/
 
 	STD_EXCEPTION_COMMON( 0x100, SystemReset, .SystemResetException )
@@ -655,6 +739,7 @@ BEGIN_FTR_SECTION
 	beq-	.do_stab_bolted
 END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 stab_bolted_user_return:
+
 	EXCEPTION_PROLOG_COMMON
 	ld      r3,_DSISR(r1)
 	andis.	r0,r3,0xa450		/* weird error? */
@@ -993,8 +1078,10 @@ _GLOBAL(do_stab_bolted)
 3:
 	/* All done -- return from exception. */
 	mfsprg  r20,3                   /* Load the PACA pointer  */
-	ld      r21,PACAEXCSP(r20)      /* Get the exception frame pointer */
-	addi    r21,r21,EXC_FRAME_SIZE
+	ld	r21,PACAEXCSP(r20)
+	sldi	r21,r21,6
+	add	r21,r20,r21
+	addi	r21,r21,PACAEXC
 	lwz	r23,EX_CCR(r21)		/* get saved CR */
 	/* note that this is almost identical to maskable_exception_exit */
 	mtcr    r23                     /* restore CR */
@@ -1010,6 +1097,9 @@ _GLOBAL(do_stab_bolted)
 	mtspr   SRR1,r23
 	ld	r22,EX_R22(r21)		/* restore r22 and r23 */
 	ld	r23,EX_R23(r21)
+	ld	r21,PACAEXCSP(r20)
+	addi	r21,r21,-1
+	std	r21,PACAEXCSP(r20)
 	mfspr	r20,SPRG2
 	mfspr	r21,SPRG1
 	rfid
@@ -1062,6 +1152,12 @@ SLB_NUM_ENTRIES = 64
 	cmpd	r23,r21
 	beq-	1b
 
+        /* Invalidate the old entry */
+        slbmfee r21,r22
+        rldicl  r21,r21,36,28
+        rldicr  r21,r21,28,35
+	slbie   r21
+
 	/* r20 = paca, r22 = entry */
 
 	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
@@ -1087,12 +1183,12 @@ SLB_NUM_ENTRIES = 64
 	sldi	r23,r23,12
 
 BEGIN_FTR_SECTION
-	/* set kp and c bits */
-	ori	r23,r23,0x480
+	/* set kp bit */
+	ori	r23,r23,0x400
 END_FTR_SECTION_IFCLR(CPU_FTR_16M_PAGE)
 BEGIN_FTR_SECTION
-	/* set kp, l and c bits */
-	ori	r23,r23,0x580
+	/* set kp and l bits */
+	ori	r23,r23,0x500
 END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
 
 	/* r20 = paca, r22 = entry, r23 = slb word1 */
@@ -1113,7 +1209,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
 
 	/* All done -- return from exception. */
 	ld	r21,PACAEXCSP(r20)	/* Get the exception frame pointer */
-	addi	r21,r21,EXC_FRAME_SIZE
+	sldi	r21,r21,6
+	add	r21,r20,r21
+	addi	r21,r21,PACAEXC
 	lwz	r23,EX_CCR(r21)		/* get saved CR */
 	/* note that this is almost identical to maskable_exception_exit */
 
@@ -1139,6 +1237,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
 	ld	r23,EX_SRR1(r21)	/* Get SRR1 from exc. frame */
 	mtspr	SRR0,r22
 	mtspr	SRR1,r23
+	ld	r22,PACAEXCSP(r20)
+	addi	r22,r22,-1
+	std	r22,PACAEXCSP(r20)
 	ld	r22,EX_R22(r21)		/* restore r22 and r23 */
 	ld	r23,EX_R23(r21)
 	ld	r20,EX_R20(r21)

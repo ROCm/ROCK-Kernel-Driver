@@ -177,8 +177,6 @@ struct task_struct *__switch_to(struct task_struct *prev,
 		} esid_data;
 
 		esid_data.word0 = 0;
-		/* class bit is in valid field for slbie instruction */
-		esid_data.data.v = 1;
 		esid_data.data.esid = GET_ESID(__get_SP());
 		asm volatile("isync; slbie %0; isync" : : "r" (esid_data));
 	}
