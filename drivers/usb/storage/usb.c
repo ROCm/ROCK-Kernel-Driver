@@ -174,7 +174,7 @@ MODULE_DEVICE_TABLE (usb, storage_usb_ids);
 	.productName = product_name,	\
 	.useProtocol = use_protocol,	\
 	.useTransport = use_transport,	\
-	initFunction : init_function,	\
+	.initFunction = init_function,	\
 	.flags = Flags, \
 }
 
