@@ -45,7 +45,7 @@ hpusbscsi_usb_probe(struct usb_interface *intf,
 	struct usb_host_interface *altsetting =	intf->altsetting;
 	struct hpusbscsi *new;
 	int error = -ENOMEM;
-	int i, result;
+	int i;
 
 	if (altsetting->desc.bNumEndpoints != 3) {
 		printk (KERN_ERR "Wrong number of endpoints\n");
