@@ -68,8 +68,10 @@ static int ah_output(struct sk_buff *skb)
 		char 		buf[60];
 	} tmp_iph;
 
-	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL)
-		return -EINVAL;
+	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
+		err = -EINVAL;
+		goto error_nolock;
+	}
 
 	spin_lock_bh(&x->lock);
 	if ((err = xfrm_state_check_expire(x)) != 0)

@@ -60,9 +60,11 @@ int ah6_output(struct sk_buff *skb)
 	struct ah_data *ahp;
 	u16 nh_offset = 0;
 	u8 nexthdr;
-printk(KERN_DEBUG "%s\n", __FUNCTION__);
-	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL)
-		return -EINVAL;
+
+	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
+		err = -EINVAL;
+		goto error_nolock;
+	}
 
 	spin_lock_bh(&x->lock);
 	if ((err = xfrm_state_check_expire(x)) != 0)
