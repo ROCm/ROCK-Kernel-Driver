@@ -1394,10 +1394,7 @@ static int do_md_run(mddev_t * mddev)
 			printk(TOO_SMALL_CHUNKSIZE, chunk_size, PAGE_SIZE);
 			return -EINVAL;
 		}
-	} else
-		if (chunk_size)
-			printk(KERN_INFO "md: RAID level %d does not need chunksize! Continuing anyway.\n",
-			       mddev->level);
+	}
 
 	if (pnum >= MAX_PERSONALITY) {
 		MD_BUG();
