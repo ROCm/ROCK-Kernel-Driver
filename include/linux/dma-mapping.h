@@ -42,6 +42,32 @@ static inline u64 dma_get_required_mask(struct device *dev)
 }
 #endif
 
+/* flags for the coherent memory api */
+#define	DMA_MEMORY_MAP			0x01
+#define DMA_MEMORY_IO			0x02
+#define DMA_MEMORY_INCLUDES_CHILDREN	0x04
+#define DMA_MEMORY_EXCLUSIVE		0x08
+
+#ifndef ARCH_HAS_DMA_DECLARE_COHERENT_MEMORY
+static inline int
+dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
+			    dma_addr_t device_addr, size_t size, int flags)
+{
+	return 0;
+}
+
+static inline void
+dma_release_declared_memory(struct device *dev)
+{
+}
+
+void *dma_mark_declared_memory_occupied(struct device *dev,
+					dma_addr_t device_addr, size_t size)
+{
+	return ERR_PTR(-EBUSY);
+}
+#endif
+
 #endif
 
 
