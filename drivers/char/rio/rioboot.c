@@ -326,6 +326,7 @@ register struct DownLoad *rbp;
 
 			if ( copyin((int)rbp->DataP,DownCode,rbp->Count)==COPYFAIL ) {
 				rio_dprintk (RIO_DEBUG_BOOT, "Bad copyin of host data\n");
+				sysfree( DownCode, rbp->Count );
 				p->RIOError.Error = COPYIN_FAILED;
 				func_exit ();
 				return -EFAULT;
