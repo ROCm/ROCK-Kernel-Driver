@@ -1543,6 +1543,10 @@ static struct module *load_module(void __user *umod,
 				      / sizeof(struct obsolete_modparm),
 				      sechdrs, symindex,
 				      (char *)sechdrs[strindex].sh_addr);
+		if (setupindex)
+			printk(KERN_WARNING "%s: Ignoring new-style "
+			       "parameters in presence of obsolete ones\n",
+			       mod->name);
 	} else {
 		/* Size of section 0 is 0, so this works well if no params */
 		err = parse_args(mod->name, mod->args,
