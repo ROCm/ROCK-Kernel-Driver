@@ -584,7 +584,7 @@ EVENT("error code 0x%x/0x%x\n",(here[3] & uPD98401_AAL5_ES) >>
 #ifdef CONFIG_ATM_ZATM_EXACT_TS
 		skb->stamp = exact_time(zatm_dev,here[1]);
 #else
-		skb->stamp = xtime;
+		do_gettimeofday(&skb->stamp);
 #endif
 #if 0
 printk("[-3..0] 0x%08lx 0x%08lx 0x%08lx 0x%08lx\n",((unsigned *) skb->data)[-3],
