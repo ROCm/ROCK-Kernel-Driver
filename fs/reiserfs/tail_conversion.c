@@ -139,11 +139,10 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 
 /* stolen from fs/buffer.c */
 void reiserfs_unmap_buffer(struct buffer_head *bh) {
-  if (buffer_mapped(bh)) {
+    lock_buffer(bh) ;
     if (buffer_journaled(bh) || buffer_journal_dirty(bh)) {
       BUG() ;
     }
-    lock_buffer(bh) ;
     clear_buffer_dirty(bh) ;
     /* Remove the buffer from whatever list it belongs to. We are mostly
        interested in removing it from per-sb j_dirty_buffers list, to avoid
@@ -161,7 +160,6 @@ void reiserfs_unmap_buffer(struct buffer_head *bh) {
     clear_buffer_new(bh);
     bh->b_bdev = NULL;
     unlock_buffer(bh) ;
-  }
 }
 
 static void
