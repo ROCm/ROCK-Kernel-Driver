@@ -492,10 +492,6 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	    dn->eeh_mode & EEH_MODE_NOCHECK) 
 		goto ok_return;
 
-        /* Make sure we aren't ISA */
-        if (!strcmp(dn->type, "isa")) 
-                goto ok_return;
-
 	if (!dn->eeh_config_addr) 
 		goto ok_return;
 
@@ -586,6 +582,10 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 	 */
 	enable = 1;	/* i.e. we will do checking */
 	if ((*class_code >> 16) == PCI_BASE_CLASS_DISPLAY)
+		enable = 0;
+
+	/* Make sure we aren't ISA */
+	if (dn->type && !strcmp(dn->type, "isa"))
 		enable = 0;
 
 	if (!eeh_check_opts_config(dn, *class_code, *vendor_id, *device_id,
