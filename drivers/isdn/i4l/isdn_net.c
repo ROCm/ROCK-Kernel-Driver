@@ -1365,7 +1365,6 @@ isdn_net_header(struct sk_buff *skb, struct net_device *dev, unsigned short type
 		void *daddr, void *saddr, unsigned plen)
 {
 	isdn_net_local *lp = dev->priv;
-	unsigned char *p;
 	ushort len = 0;
 
 	switch (lp->p_encap) {
@@ -1383,14 +1382,6 @@ isdn_net_header(struct sk_buff *skb, struct net_device *dev, unsigned short type
 			/* HDLC with UI-Frames (for ispa with -h1 option) */
 			*((ushort *) skb_push(skb, 2)) = htons(0x0103);
 			len = 2;
-			break;
-		case ISDN_NET_ENCAP_CISCOHDLC:
-		case ISDN_NET_ENCAP_CISCOHDLCK:
-			p = skb_push(skb, 4);
-			p += put_u8 (p, CISCO_ADDR_UNICAST);
-			p += put_u8 (p, CISCO_CTRL);
-			p += put_u16(p, type);
-			len = 4;
 			break;
 		default:
 			printk(KERN_WARNING "isdn_net_header called with encap %d!\n", lp->p_encap);
@@ -2078,13 +2069,16 @@ isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 		break;
 	}
 
-	switch (cfg->p_encap) {
+	lp->p_encap = cfg->p_encap;
+
+	switch (lp->p_encap) {
 	case ISDN_NET_ENCAP_SYNCPPP:
 		retval = isdn_ppp_setup(p);
 		break;
 	case ISDN_NET_ENCAP_X25IFACE:
 		retval = isdn_x25_setup(p, cfg->p_encap);
 		break;
+	case ISDN_NET_ENCAP_CISCOHDLC:
 	case ISDN_NET_ENCAP_CISCOHDLCK:
 		retval = isdn_ciscohdlck_setup(p);
 		break;
@@ -2098,8 +2092,6 @@ isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 		retval = isdn_other_setup(p);
 		break;
 	}
-	if (retval == 0)
-		lp->p_encap = cfg->p_encap;
 
  out:
 	return retval;

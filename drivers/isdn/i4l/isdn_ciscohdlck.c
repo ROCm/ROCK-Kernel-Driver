@@ -371,10 +371,33 @@ isdn_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 	kfree_skb(skb);
 }
 
-int isdn_ciscohdlck_setup(isdn_net_dev *p)
+static int
+isdn_ciscohdlck_header(struct sk_buff *skb, struct net_device *dev, 
+		      unsigned short type,
+		      void *daddr, void *saddr, unsigned plen)
 {
-	isdn_other_setup(p);
-	p->dev.do_ioctl = isdn_ciscohdlck_dev_ioctl;
+	unsigned char *p = skb_push(skb, 4);
+
+	p += put_u8 (p, CISCO_ADDR_UNICAST);
+	p += put_u8 (p, CISCO_CTRL);
+	p += put_u16(p, type);
+	
+	return 4;
+}
+
+int
+isdn_ciscohdlck_setup(isdn_net_dev *p)
+{
+	isdn_net_local *lp = &p->local;
+
+	p->dev.hard_header = isdn_ciscohdlck_header;
+	p->dev.hard_header_cache = NULL;
+	p->dev.header_cache_update = NULL;
+	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
+	if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK)
+		p->dev.do_ioctl = isdn_ciscohdlck_dev_ioctl;
+	else
+		p->dev.do_ioctl = NULL;
 
 	return 0;
 }

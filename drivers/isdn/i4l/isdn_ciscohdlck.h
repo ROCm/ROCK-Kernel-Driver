@@ -11,9 +11,9 @@
 #ifndef ISDN_CISCOHDLCK_H
 #define ISDN_CISCOHDLCK_H
 
+int  isdn_ciscohdlck_setup(isdn_net_dev *p);
 void isdn_ciscohdlck_connected(isdn_net_local *lp);
 void isdn_ciscohdlck_disconnected(isdn_net_local *lp);
-int  isdn_ciscohdlck_setup(isdn_net_dev *p);
 void isdn_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb);
 
 #endif
