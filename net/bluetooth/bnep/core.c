@@ -574,7 +574,7 @@ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 
 	__bnep_link_session(s);
 	
-	err = kernel_thread(bnep_session, s, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	err = kernel_thread(bnep_session, s, CLONE_KERNEL);
 	if (err < 0) {
 		/* Session thread start failed, gotta cleanup. */
 		unregister_netdev(dev);

@@ -248,8 +248,7 @@ static int __init serio_init(void)
 {
 	int pid;
 
-	pid = kernel_thread(serio_thread, NULL,
-		CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	pid = kernel_thread(serio_thread, NULL, CLONE_KERNEL);
 
 	if (!pid) {
 		printk(KERN_WARNING "serio: Failed to start kseriod\n");

@@ -293,7 +293,7 @@ diva_init_thread(void)
 {
   int pid = 0;
 
-  pid = kernel_thread(divad_thread, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+  pid = kernel_thread(divad_thread, NULL, CLONE_KERNEL);
   if (pid >= 0) {
        divad_pid = pid;
   }
