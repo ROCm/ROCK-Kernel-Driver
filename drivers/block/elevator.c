@@ -361,6 +361,16 @@ void elv_put_request(request_queue_t *q, struct request *rq)
 		e->elevator_put_req_fn(q, rq);
 }
 
+int elv_may_queue(request_queue_t *q, int rw)
+{
+	elevator_t *e = &q->elevator;
+
+	if (e->elevator_may_queue_fn)
+		return e->elevator_may_queue_fn(q, rw);
+
+	return 1;
+}
+
 int elv_register_queue(struct gendisk *disk)
 {
 	request_queue_t *q = disk->queue;

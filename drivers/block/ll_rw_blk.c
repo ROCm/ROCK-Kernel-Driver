@@ -1294,7 +1294,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	struct request_list *rl = &q->rq;
 
 	spin_lock_irq(q->queue_lock);
-	if (rl->count[rw] == BLKDEV_MAX_RQ) {
+	if (rl->count[rw] == BLKDEV_MAX_RQ || !elv_may_queue(q, rw)) {
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}
