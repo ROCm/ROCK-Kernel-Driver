@@ -7,9 +7,8 @@ config ALPHA
 	default y
 	help
 	  The Alpha is a 64-bit general-purpose processor designed and
-	  marketed by the Digital Equipment Corporation of blessed memory, now
-	  Compaq.  Alpha Linux dates from 1995-1996 and was the first non-x86
-	  port. The Alpha Linux project has a home page at
+	  marketed by the Digital Equipment Corporation of blessed memory,
+	  now Hewlett-Packard.  The Alpha Linux project has a home page at
 	  <http://www.alphalinux.org/>.
 
 config MMU
@@ -42,9 +41,6 @@ menu "System setup"
 choice
 	prompt "Alpha system type"
 	default ALPHA_GENERIC
-
-config ALPHA_GENERIC
-	bool "Generic"
 	---help---
 	  This is the system type of your hardware.  A "generic" kernel will
 	  run on any supported Alpha system. However, if you configure a
@@ -83,6 +79,11 @@ config ALPHA_GENERIC
 	  Wildfire            AlphaServer GS 40/80/160/320
 
 	  If you don't know what to do, choose "generic".
+
+config ALPHA_GENERIC
+	bool "Generic"
+	help
+	  A generic kernel will run on all supported Alpha hardware.
 
 config ALPHA_ALCOR
 	bool "Alcor/Alpha-XLT"
