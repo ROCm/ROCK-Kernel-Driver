@@ -1796,7 +1796,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 	 *	we'll leave the limitation below for the 2.2.x tree.
 	 */
 
-	if (strstr(drive->id->model, "IOMEGA ZIP") != NULL) {
+	if (!strncmp(drive->id->model, "IOMEGA ZIP 100 ATAPI", 20)) {
 		set_bit(IDEFLOPPY_ZIP_DRIVE, &floppy->flags);
 		/* This value will be visible in the /proc/ide/hdx/settings */
 		floppy->ticks = IDEFLOPPY_TICKS_DELAY;
