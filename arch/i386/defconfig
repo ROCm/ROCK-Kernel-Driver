@@ -848,10 +848,16 @@ CONFIG_USB_STORAGE=y
 #
 # USB Human Interface Devices (HID)
 #
+# CONFIG_USB_HID is not set
 
 #
-#   Input core support is needed for USB HID
+#     Input core support is needed for USB HID input layer or HIDBP support
 #
+# CONFIG_USB_HIDINPUT is not set
+# CONFIG_USB_HIDDEV is not set
+# CONFIG_USB_KBD is not set
+# CONFIG_USB_MOUSE is not set
+# CONFIG_USB_WACOM is not set
 
 #
 # USB Imaging devices
@@ -874,6 +880,7 @@ CONFIG_USB_STORAGE=y
 # USB Network adaptors
 #
 # CONFIG_USB_PEGASUS is not set
+# CONFIG_USB_RTL8150 is not set
 # CONFIG_USB_KAWETH is not set
 # CONFIG_USB_CATC is not set
 # CONFIG_USB_CDCETHER is not set
@@ -908,9 +915,11 @@ CONFIG_USB_STORAGE=y
 # CONFIG_USB_SERIAL_KEYSPAN_USA18X is not set
 # CONFIG_USB_SERIAL_KEYSPAN_USA19W is not set
 # CONFIG_USB_SERIAL_KEYSPAN_USA49W is not set
-# CONFIG_USB_SERIAL_MCT_U232 is not set
 # CONFIG_USB_SERIAL_KLSI is not set
+# CONFIG_USB_SERIAL_MCT_U232 is not set
 # CONFIG_USB_SERIAL_PL2303 is not set
+# CONFIG_USB_SERIAL_SAFE is not set
+# CONFIG_USB_SERIAL_SAFE_PADDED is not set
 # CONFIG_USB_SERIAL_CYBERJACK is not set
 # CONFIG_USB_SERIAL_XIRCOM is not set
 # CONFIG_USB_SERIAL_OMNINET is not set
@@ -920,6 +929,7 @@ CONFIG_USB_STORAGE=y
 #
 # CONFIG_USB_RIO500 is not set
 # CONFIG_USB_AUERSWALD is not set
+# CONFIG_USB_TIGL is not set
 
 #
 # Kernel hacking
