@@ -878,6 +878,8 @@ fb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
+	u32 *buffer, *dst, *src;
+	int c, i, cnt = 0, err = 0;
 
 	if (!info || ! info->screen_base)
 		return -ENODEV;
@@ -894,18 +896,45 @@ fb_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	    count = info->fix.smem_len;
 	if (count + p > info->fix.smem_len)
 		count = info->fix.smem_len - p;
+
+	cnt = 0;
+	buffer = kmalloc((count > PAGE_SIZE) ? PAGE_SIZE : count,
+			 GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+
+	src = (u32 *) (info->screen_base + p);
+
 	if (info->fbops->fb_sync)
 		info->fbops->fb_sync(info);
-	if (count) {
-	    char *base_addr;
 
-	    base_addr = info->screen_base;
-	    count -= copy_to_user(buf, base_addr+p, count);
-	    if (!count)
-		return -EFAULT;
-	    *ppos += count;
+	while (count) {
+		c  = (count > PAGE_SIZE) ? PAGE_SIZE : count;
+		dst = buffer;
+		for (i = c >> 2; i--; )
+			*dst++ = fb_readl(src++);
+		if (c & 3) {
+			u8 *dst8 = (u8 *) dst;
+			u8 *src8 = (u8 *) src;
+
+			for (i = c & 3; i--;)
+				*dst8++ = fb_readb(src8++);
+
+			src = (u32 *) src8;
+		}
+
+		if (copy_to_user(buf, buffer, c)) {
+			err = -EFAULT;
+			break;
+		}
+		*ppos += c;
+		buf += c;
+		cnt += c;
+		count -= c;
 	}
-	return count;
+
+	kfree(buffer);
+	return (err) ? err : cnt;
 }
 
 static ssize_t
@@ -915,7 +944,8 @@ fb_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
-	int err;
+	u32 *buffer, *dst, *src;
+	int c, i, cnt = 0, err;
 
 	if (!info || !info->screen_base)
 		return -ENODEV;
@@ -935,19 +965,43 @@ fb_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 	    count = info->fix.smem_len - p;
 	    err = -ENOSPC;
 	}
+	cnt = 0;
+	buffer = kmalloc((count > PAGE_SIZE) ? PAGE_SIZE : count,
+			 GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+
+	dst = (u32 *) (info->screen_base + p);
+
 	if (info->fbops->fb_sync)
 		info->fbops->fb_sync(info);
-	if (count) {
-	    char *base_addr;
 
-	    base_addr = info->screen_base;
-	    count -= copy_from_user(base_addr+p, buf, count);
-	    *ppos += count;
-	    err = -EFAULT;
+	while (count) {
+		c = (count > PAGE_SIZE) ? PAGE_SIZE : count;
+		src = buffer;
+		if (copy_from_user(src, buf, c)) {
+			err = -EFAULT;
+			break;
+		}
+		for (i = c >> 2; i--; )
+			fb_writel(*src++, dst++);
+		if (c & 3) {
+			u8 *src8 = (u8 *) src;
+			u8 *dst8 = (u8 *) dst;
+
+			for (i = c & 3; i--; )
+				fb_writeb(*src8++, dst8++);
+
+			dst = (u32 *) dst8;
+		}
+		*ppos += c;
+		buf += c;
+		cnt += c;
+		count -= c;
 	}
-	if (count)
-		return count;
-	return err;
+	kfree(buffer);
+
+	return (err) ? err : cnt;
 }
 
 #ifdef CONFIG_KMOD
