@@ -510,7 +510,7 @@ start_journal_io:
 		journal_unlock_journal_head(jh);
 		__brelse(bh);
 		J_ASSERT_BH(bh, atomic_read(&bh->b_count) == 0);
-		put_unused_buffer_head(bh);
+		free_buffer_head(bh);
 
 		/* We also have to unlock and free the corresponding
                    shadowed buffer */

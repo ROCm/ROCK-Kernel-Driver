@@ -30,27 +30,12 @@
 #include <linux/iobuf.h>
 #include <linux/module.h>
 #include <linux/writeback.h>
+#include <linux/mempool.h>
 #include <asm/bitops.h>
 
 #define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
-#define NR_RESERVED (10*MAX_BUF_PER_PAGE)
-#define MAX_UNUSED_BUFFERS NR_RESERVED+20 /* don't ever have more than this 
-					     number of unused buffer heads */
-
-/* Anti-deadlock ordering:
- *	i_bufferlist_lock > unused_list_lock
- */
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_inode_buffers)
-
-/*
- * A local cache of buffer_heads is maintained at unused_list.
- * Free buffers are chained through their b_private field.
- */
-static struct buffer_head *unused_list;
-static int nr_unused_buffer_heads;
-static spinlock_t unused_list_lock = SPIN_LOCK_UNLOCKED;
-static DECLARE_WAIT_QUEUE_HEAD(buffer_wait);
 
 /* This is used by some architectures to estimate available memory. */
 atomic_t buffermem_pages = ATOMIC_INIT(0);
@@ -723,33 +708,6 @@ void invalidate_inode_buffers(struct inode *inode)
 	spin_unlock(&inode->i_bufferlist_lock);
 }
 
-static void __put_unused_buffer_head(struct buffer_head * bh)
-{
-	if (bh->b_inode)
-		BUG();
-	if (nr_unused_buffer_heads >= MAX_UNUSED_BUFFERS) {
-		kmem_cache_free(bh_cachep, bh);
-	} else {
-		bh->b_bdev = NULL;
-		bh->b_blocknr = -1;
-		bh->b_this_page = NULL;
-
-		nr_unused_buffer_heads++;
-		bh->b_private = unused_list;
-		unused_list = bh;
-		if (waitqueue_active(&buffer_wait))
-			wake_up(&buffer_wait);
-	}
-}
-
-void put_unused_buffer_head(struct buffer_head *bh)
-{
-	spin_lock(&unused_list_lock);
-	__put_unused_buffer_head(bh);
-	spin_unlock(&unused_list_lock);
-}
-EXPORT_SYMBOL(put_unused_buffer_head);
-
 /*
  * Create the appropriate buffers when given a page for data area and
  * the size of each buffer.. Use the bh->b_this_page linked list to
@@ -769,7 +727,7 @@ try_again:
 	head = NULL;
 	offset = PAGE_SIZE;
 	while ((offset -= size) >= 0) {
-		bh = get_unused_buffer_head(async);
+		bh = alloc_buffer_head(async);
 		if (!bh)
 			goto no_grow;
 
@@ -792,13 +750,11 @@ try_again:
  */
 no_grow:
 	if (head) {
-		spin_lock(&unused_list_lock);
 		do {
 			bh = head;
 			head = head->b_this_page;
-			__put_unused_buffer_head(bh);
+			free_buffer_head(bh);
 		} while (head);
-		spin_unlock(&unused_list_lock);
 	}
 
 	/*
@@ -1086,54 +1042,6 @@ struct buffer_head * __bread(struct block_device *bdev, int block, int size)
 	brelse(bh);
 	return NULL;
 }
-
-/*
- * Reserve NR_RESERVED buffer heads for async IO requests to avoid
- * no-buffer-head deadlock.  Return NULL on failure; waiting for
- * buffer heads is now handled in create_buffers().
- */ 
-struct buffer_head * get_unused_buffer_head(int async)
-{
-	struct buffer_head * bh;
-
-	spin_lock(&unused_list_lock);
-	if (nr_unused_buffer_heads > NR_RESERVED) {
-		bh = unused_list;
-		unused_list = bh->b_private;
-		nr_unused_buffer_heads--;
-		spin_unlock(&unused_list_lock);
-		return bh;
-	}
-	spin_unlock(&unused_list_lock);
-
-	/* This is critical.  We can't call out to the FS
-	 * to get more buffer heads, because the FS may need
-	 * more buffer-heads itself.  Thus SLAB_NOFS.
-	 */
-	if((bh = kmem_cache_alloc(bh_cachep, SLAB_NOFS)) != NULL) {
-		bh->b_blocknr = -1;
-		bh->b_this_page = NULL;
-		return bh;
-	}
-
-	/*
-	 * If we need an async buffer, use the reserved buffer heads.
-	 */
-	if (async) {
-		spin_lock(&unused_list_lock);
-		if (unused_list) {
-			bh = unused_list;
-			unused_list = bh->b_private;
-			nr_unused_buffer_heads--;
-			spin_unlock(&unused_list_lock);
-			return bh;
-		}
-		spin_unlock(&unused_list_lock);
-	}
-
-	return NULL;
-}
-EXPORT_SYMBOL(get_unused_buffer_head);
 
 void set_bh_page(struct buffer_head *bh,
 		struct page *page, unsigned long offset)
@@ -2285,15 +2193,13 @@ static /*inline*/ int drop_buffers(struct page *page)
 	if (!was_uptodate && Page_Uptodate(page))
 		buffer_error();
 
-	spin_lock(&unused_list_lock);
 	do {
 		struct buffer_head *next = bh->b_this_page;
 
 		__remove_inode_queue(bh);
-		__put_unused_buffer_head(bh);
+		free_buffer_head(bh);
 		bh = next;
 	} while (bh != head);
-	spin_unlock(&unused_list_lock);
 	__clear_page_buffers(page);
 	return 1;
 failed:
@@ -2350,4 +2256,58 @@ asmlinkage long sys_bdflush(int func, long data)
 void wakeup_bdflush(void)
 {
  	pdflush_flush(0);
+}
+
+/*
+ * Buffer-head allocation
+ */
+static kmem_cache_t *bh_cachep;
+static mempool_t *bh_mempool;
+
+struct buffer_head *alloc_buffer_head(int async)
+{
+	return mempool_alloc(bh_mempool, GFP_NOFS);
+}
+EXPORT_SYMBOL(alloc_buffer_head);
+
+void free_buffer_head(struct buffer_head *bh)
+{
+	if (bh->b_inode)
+		BUG();
+	mempool_free(bh, bh_mempool);
+}
+EXPORT_SYMBOL(free_buffer_head);
+
+static void init_buffer_head(void *data, kmem_cache_t *cachep, unsigned long flags)
+{
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+			    SLAB_CTOR_CONSTRUCTOR) {
+		struct buffer_head * bh = (struct buffer_head *)data;
+
+		memset(bh, 0, sizeof(*bh));
+		bh->b_blocknr = -1;
+		init_waitqueue_head(&bh->b_wait);
+	}
+}
+
+static void *bh_mempool_alloc(int gfp_mask, void *pool_data)
+{
+	return kmem_cache_alloc(bh_cachep, gfp_mask);
+}
+
+static void bh_mempool_free(void *element, void *pool_data)
+{
+	return kmem_cache_free(bh_cachep, element);
+}
+
+#define NR_RESERVED (10*MAX_BUF_PER_PAGE)
+#define MAX_UNUSED_BUFFERS NR_RESERVED+20
+
+void __init buffer_init(void)
+{
+	bh_cachep = kmem_cache_create("buffer_head",
+			sizeof(struct buffer_head), 0,
+			SLAB_HWCACHE_ALIGN, init_buffer_head, NULL);
+	bh_mempool = mempool_create(MAX_UNUSED_BUFFERS, bh_mempool_alloc,
+				bh_mempool_free, NULL);
 }

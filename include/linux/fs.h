@@ -206,7 +206,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 extern void update_atime (struct inode *);
 #define UPDATE_ATIME(inode) update_atime (inode)
 
-extern void buffer_init(unsigned long);
+extern void buffer_init(void);
 extern void inode_init(unsigned long);
 extern void mnt_init(unsigned long);
 extern void files_init(unsigned long);
@@ -1536,8 +1536,8 @@ static inline void map_bh(struct buffer_head *bh, struct super_block *sb, int bl
 }
 
 extern void wakeup_bdflush(void);
-extern void put_unused_buffer_head(struct buffer_head * bh);
-extern struct buffer_head * get_unused_buffer_head(int async);
+extern struct buffer_head *alloc_buffer_head(int async);
+extern void free_buffer_head(struct buffer_head * bh);
 
 extern int brw_page(int, struct page *, struct block_device *, sector_t [], int);
 
