@@ -100,6 +100,7 @@ struct autofs_sb_info {
 	int reghost_enabled;
 	int needs_reghost;
 	struct super_block *sb;
+	struct semaphore wq_sem;
 	struct autofs_wait_queue *queues; /* Wait queue pointer */
 };
 
