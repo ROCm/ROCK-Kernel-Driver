@@ -95,12 +95,19 @@ END(sys32_sigsuspend)
 GLOBAL_ENTRY(ia32_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+{	/*
+	 * Some versions of gas generate bad unwind info if the first instruction of a
+	 * procedure doesn't go into the first slot of a bundle.  This is a workaround.
+	 */
+	nop.m 0
+	nop.i 0
 	/*
 	 * We need to call schedule_tail() to complete the scheduling process.
 	 * Called by ia64_switch_to after do_fork()->copy_thread().  r8 contains the
 	 * address of the previously executing task.
 	 */
 	br.call.sptk.many rp=ia64_invoke_schedule_tail
+}
 .ret1:
 #endif
 	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13

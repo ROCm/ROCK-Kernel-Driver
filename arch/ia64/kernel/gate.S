@@ -144,15 +144,18 @@ END(fsys_fallback_syscall)
 	 * call stack.
 	 */
 
+#define SIGTRAMP_SAVES										\
+	.unwabi @svr4, 's'		// mark this as a sigtramp handler (saves scratch regs)	\
+	.savesp ar.unat, UNAT_OFF+SIGCONTEXT_OFF						\
+	.savesp ar.fpsr, FPSR_OFF+SIGCONTEXT_OFF						\
+	.savesp pr, PR_OFF+SIGCONTEXT_OFF							\
+	.savesp rp, RP_OFF+SIGCONTEXT_OFF							\
+	.vframesp SP_OFF+SIGCONTEXT_OFF
+
 GLOBAL_ENTRY(ia64_sigtramp)
 	// describe the state that is active when we get here:
 	.prologue
-	.unwabi @svr4, 's'		// mark this as a sigtramp handler (saves scratch regs)
-	.savesp ar.unat, UNAT_OFF+SIGCONTEXT_OFF
-	.savesp ar.fpsr, FPSR_OFF+SIGCONTEXT_OFF
-	.savesp pr, PR_OFF+SIGCONTEXT_OFF
-	.savesp rp, RP_OFF+SIGCONTEXT_OFF
-	.vframesp SP_OFF+SIGCONTEXT_OFF
+	SIGTRAMP_SAVES
 	.body
 
 	.label_state 1
@@ -237,10 +240,11 @@ back_from_restore_rbs:
 	ldf.fill f14=[base0],32
 	ldf.fill f15=[base1],32
 	mov r15=__NR_rt_sigreturn
+	.restore sp				// pop .prologue
 	break __BREAK_SYSCALL
 
-	.body
-	.copy_state 1
+	.prologue
+	SIGTRAMP_SAVES
 setup_rbs:
 	mov ar.rsc=0				// put RSE into enforced lazy mode
 	;;
@@ -252,6 +256,7 @@ setup_rbs:
 	;;
 	.spillsp ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
 	st8 [r14]=r16				// save sc_ar_rnat
+	.body
 	adds r14=(LOADRS_OFF+SIGCONTEXT_OFF),sp
 
 	mov.m r16=ar.bsp			// sc_loadrs <- (new bsp - new bspstore) << 16
@@ -263,10 +268,11 @@ setup_rbs:
 	;;
 	st8 [r14]=r15				// save sc_loadrs
 	mov ar.rsc=0xf				// set RSE into eager mode, pl 3
+	.restore sp				// pop .prologue
 	br.cond.sptk back_from_setup_rbs
 
 	.prologue
-	.copy_state 1
+	SIGTRAMP_SAVES
 	.spillsp ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
 	.body
 restore_rbs:
