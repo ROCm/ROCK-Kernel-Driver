@@ -107,9 +107,6 @@ static const char udsl_driver_name [] = "speedtch";
 #define UDSL_NUM_SND_BUFS		(2*UDSL_NUM_SND_URBS)
 #define UDSL_RCV_BUF_SIZE		64 /* ATM cells */
 #define UDSL_SND_BUF_SIZE		64 /* ATM cells */
-/* max should be (1500 IP mtu + 2 ppp bytes + 32 * 5 cellheader overhead) for
- * PPPoA and (1500 + 14 + 32*5 cellheader overhead) for PPPoE */
-#define UDSL_MAX_AAL5_MRU		2048
 
 #define UDSL_IOCTL_LINE_UP		1
 #define UDSL_IOCTL_LINE_DOWN		2
@@ -118,6 +115,7 @@ static const char udsl_driver_name [] = "speedtch";
 #define UDSL_ENDPOINT_DATA_IN		0x87
 
 #define ATM_CELL_HEADER			(ATM_CELL_SIZE - ATM_CELL_PAYLOAD)
+#define UDSL_NUM_CELLS(x)		(((x) + ATM_AAL5_TRAILER + ATM_CELL_PAYLOAD - 1) / ATM_CELL_PAYLOAD)
 
 #define hex2int(c) ( (c >= '0') && (c <= '9') ? (c - '0') : ((c & 0xf) + 9) )
 
@@ -146,7 +144,7 @@ struct udsl_vcc_data {
 
 	/* raw cell reassembly */
 	struct sk_buff *skb;
-	unsigned short max_pdu;
+	unsigned int max_pdu;
 };
 
 /* send */
@@ -416,7 +414,7 @@ static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb)
 	ctrl->cell_header [3] = vcc->vci << 4;
 	ctrl->cell_header [4] = 0xec;
 
-	ctrl->num_cells = (skb->len + ATM_AAL5_TRAILER + ATM_CELL_PAYLOAD - 1) / ATM_CELL_PAYLOAD;
+	ctrl->num_cells = UDSL_NUM_CELLS (skb->len);
 	ctrl->num_entire = skb->len / ATM_CELL_PAYLOAD;
 
 	zero_padding = ctrl->num_cells * ATM_CELL_PAYLOAD - skb->len - ATM_AAL5_TRAILER;
@@ -921,7 +919,7 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 		return -EINVAL;
 
 	/* only support AAL5 */
-	if (vcc->qos.aal != ATM_AAL5)
+	if (vcc->qos.aal != ATM_AAL5 || vcc->qos.rxtp.max_sdu < 0 || vcc->qos.rxtp.max_sdu > ATM_MAX_AAL5_PDU)
 		return -EINVAL;
 
 	if (!instance->firmware_loaded) {
@@ -945,7 +943,7 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	new->vcc = vcc;
 	new->vpi = vpi;
 	new->vci = vci;
-	new->max_pdu = UDSL_MAX_AAL5_MRU;
+	new->max_pdu = max (1, UDSL_NUM_CELLS (vcc->qos.rxtp.max_sdu)) * ATM_CELL_PAYLOAD;
 
 	vcc->dev_data = new;
 	vcc->vpi = vpi;
