@@ -551,7 +551,7 @@ typedef struct hwif_s {
 	struct proc_dir_entry *proc;	/* /proc/ide/ directory entry */
 	int		irq;		/* our irq number */
 	byte		major;		/* our major number */
-	char 		name[6];	/* name of interface, eg. "ide0" */
+	char 		name[80];	/* name of interface */
 	byte		index;		/* 0 for ide0; 1 for ide1; ... */
 	hwif_chipset_t	chipset;	/* sub-module for tuning.. */
 	unsigned	noprobe    : 1;	/* don't probe for this interface */
