@@ -695,6 +695,13 @@ static int pccardd(void *__skt)
 		skt->thread = NULL;
 		complete_and_exit(&skt->thread_done, 0);
 	}
+	if (pccard_sysfs_init(skt)) {
+		printk(KERN_WARNING "PCMCIA: unable to register sysfs attributes for socket 0x%p\n",
+			skt);
+		skt->thread = NULL;
+		class_device_unregister(&skt->dev);
+		complete_and_exit(&skt->thread_done, 0);
+	}
 	complete(&skt->thread_done);
 
 	add_wait_queue(&skt->thread_wait, &wait);
