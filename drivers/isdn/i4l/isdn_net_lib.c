@@ -66,6 +66,7 @@ static struct fsm isdn_net_fsm;
 
 enum {
 	ST_NULL,
+	ST_OUT_BOUND,
 	ST_OUT_WAIT_DCONN,
 	ST_OUT_WAIT_BCONN,
 	ST_IN_WAIT_DCONN,
@@ -78,6 +79,7 @@ enum {
 
 static char *isdn_net_st_str[] = {
 	"ST_NULL",
+	"ST_OUT_BOUND",
 	"ST_OUT_WAIT_DCONN",
 	"ST_OUT_WAIT_BCONN",
 	"ST_IN_WAIT_DCONN",
@@ -446,7 +448,7 @@ isdn_net_dev_delete(isdn_net_dev *idev)
 	isdn_net_rmallphone(idev);
 
 	if (idev->exclusive >= 0)
-		isdn_free_slot(idev->exclusive);
+		isdn_slot_free(idev->exclusive);
 
 	list_del(&idev->slaves);
 	
@@ -1156,17 +1158,41 @@ isdn_net_dial_timer(unsigned long data)
 }
 
 /*
+ * Unbind a net-interface
+ */
+static void
+isdn_net_unbind_channel(isdn_net_dev *idev)
+{
+	isdn_net_local *mlp = idev->mlp;
+
+	if (idev->isdn_slot < 0) {
+		isdn_BUG();
+		return;
+	}
+
+	if (mlp->ops->unbind)
+		mlp->ops->unbind(idev);
+
+	isdn_slot_set_idev(idev->isdn_slot, NULL);
+
+	skb_queue_purge(&idev->super_tx_queue);
+
+	if (idev->isdn_slot != idev->exclusive)
+		isdn_slot_free(idev->isdn_slot);
+
+	idev->isdn_slot = -1;
+
+	fsm_change_state(&idev->fi, ST_NULL);
+}
+
+/*
  * Assign an ISDN-channel to a net-interface
  */
-int
+static int
 isdn_net_bind_channel(isdn_net_dev *idev, int slot)
 {
 	isdn_net_local *mlp = idev->mlp;
 	int retval = 0;
-	unsigned long flags;
-
-	save_flags(flags);
-	cli();
 
 	idev->isdn_slot = slot;
 	isdn_slot_set_idev(idev->isdn_slot, idev);
@@ -1177,70 +1203,19 @@ isdn_net_bind_channel(isdn_net_dev *idev, int slot)
 	if (retval < 0)
 		isdn_net_unbind_channel(idev);
 
-	restore_flags(flags);
 	return retval;
-}
-
-/*
- * Unbind a net-interface
- */
-void
-isdn_net_unbind_channel(isdn_net_dev *idev)
-{
-	isdn_net_local *mlp = idev->mlp;
-	ulong flags;
-
-	save_flags(flags);
-	cli();
-
-	if (idev->isdn_slot < 0) {
-		isdn_BUG();
-		return;
-	}
-
-	if (mlp->ops->unbind)
-		mlp->ops->unbind(idev);
-
-	skb_queue_purge(&idev->super_tx_queue);
-
-	fsm_change_state(&idev->fi, ST_NULL);
-
-	isdn_slot_set_idev(idev->isdn_slot, NULL);
-	isdn_slot_free(idev->isdn_slot);
-
-	idev->isdn_slot = -1;
-
-	restore_flags(flags);
 }
 
 int
 isdn_net_dial(isdn_net_dev *idev)
 {
-	int slot;
-	isdn_net_local *mlp = idev->mlp;
+	int retval;
 
-	if (isdn_net_bound(idev))
-		return -EBUSY;
+	retval = fsm_event(&idev->fi, EV_DO_DIAL, NULL);
+	if (retval == -ESRCH) /* event not handled in this state */
+		retval = -EBUSY;
 
-	if (idev->exclusive >= 0)
-		slot = idev->exclusive;
-	else
-		slot = isdn_get_free_slot(ISDN_USAGE_NET, mlp->l2_proto,
-					  mlp->l3_proto, idev->pre_device, 
-					  idev->pre_channel, mlp->msn);
-	if (slot < 0)
-		goto err;
-
-	if (isdn_net_bind_channel(idev, slot) < 0)
-		goto err;
-	
-	// FIXME do the above in state machine
-	/* Initiate dialing */
-	fsm_event(&idev->fi, EV_DO_DIAL, NULL);
-	return 0;
-
- err:
-	return -EAGAIN;
+	return retval;
 }
 
 static int
@@ -1251,8 +1226,6 @@ accept_icall(struct fsm_inst *fi, int pr, void *arg)
 	isdn_ctrl cmd;
 	int slot = (int) arg;
 
-	// FIXME this really should be done in generic code
-	
 	isdn_net_bind_channel(idev, slot);
 	
 	idev->outgoing = 0;
@@ -1276,36 +1249,15 @@ static int
 do_callback(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
-	isdn_net_local *mlp = idev->mlp;
-	int slot;
-	/* Is the state MANUAL?
-	 * If so, no callback can be made */
-	if (ISDN_NET_DIALMODE(*mlp) == ISDN_NET_DM_OFF) {
-		printk(KERN_INFO "incoming call for callback, "
-		       "interface %s `off' -> rejected\n", idev->name);
-		return 3;
-	}
+
 	printk(KERN_DEBUG "%s: start callback\n", idev->name);
-	
-	/* Grab a free ISDN-Channel */
-	slot = isdn_get_free_slot(ISDN_USAGE_NET, mlp->l2_proto, mlp->l3_proto,
-				  idev->pre_device, idev->pre_channel, mlp->msn);
-	if (slot < 0)
-		goto err;
 
-	if (isdn_net_bind_channel(idev, slot) < 0)
-		goto err;
-
-	/* Setup dialstate. */
 	idev->dial_timer.expires = jiffies + mlp->cbdelay;
 	idev->dial_event = EV_TIMER_CB_IN;
 	add_timer(&idev->dial_timer);
 	fsm_change_state(&idev->fi, ST_WAIT_BEFORE_CB);
 
 	return 0;
-
- err:
-	return -EBUSY;
 }
 
 static int
@@ -1501,18 +1453,33 @@ dialout_first(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
 	isdn_net_local *mlp = idev->mlp;
+	int slot;
 
-	if (ISDN_NET_DIALMODE(*mlp) == ISDN_NET_DM_OFF) {
-		isdn_net_unbind_channel(idev);
+	if (ISDN_NET_DIALMODE(*mlp) == ISDN_NET_DM_OFF)
 		return -EPERM;
-	}
-	if (list_empty(&mlp->phone[1])) {
-		isdn_net_unbind_channel(idev);
+
+	if (list_empty(&mlp->phone[1])) /* no number to dial ? */
 		return -EINVAL;
+
+	if (idev->exclusive >= 0)
+		slot = idev->exclusive;
+	else
+		slot = isdn_get_free_slot(ISDN_USAGE_NET, mlp->l2_proto,
+					  mlp->l3_proto, idev->pre_device, 
+					  idev->pre_channel, mlp->msn);
+	if (slot < 0)
+		return -EAGAIN;
+
+	if (isdn_net_bind_channel(idev, slot) < 0) {
+		/* has freed the slot as well */
+		return -EAGAIN;
 	}
+
+	fsm_change_state(fi, ST_OUT_BOUND);
 
 	idev->dial = 0;
 	idev->dialretry = 0;
+
 	return dialout_next(fi, pr, arg);
 }
 
