@@ -69,7 +69,6 @@ extern volatile unsigned char *chrp_int_ack_special;
 void chrp_progress(char *, unsigned short);
 
 extern void openpic_init_IRQ(void);
-extern void init_ras_IRQ(void);
 
 extern void find_and_init_phbs(void);
 
@@ -239,7 +238,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		ppc_md.init_IRQ       = xics_init_IRQ;
 		ppc_md.get_irq        = xics_get_irq;
 	}
-	ppc_md.init_ras_IRQ = init_ras_IRQ;
 
 	ppc_md.init           = chrp_init2;
 

@@ -596,7 +596,6 @@ void __init init_IRQ(void)
 		once++;
 	
 	ppc_md.init_IRQ();
-	if(ppc_md.init_ras_IRQ) ppc_md.init_ras_IRQ(); 
 }
 
 static struct proc_dir_entry * root_irq_dir;

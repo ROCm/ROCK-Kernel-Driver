@@ -58,7 +58,6 @@ static irqreturn_t ras_epow_interrupt(int irq, void *dev_id,
 					struct pt_regs * regs);
 static irqreturn_t ras_error_interrupt(int irq, void *dev_id,
 					struct pt_regs * regs);
-void init_ras_IRQ(void);
 
 /* #define DEBUG */
 
@@ -66,7 +65,8 @@ void init_ras_IRQ(void);
  * Initialize handlers for the set of interrupts caused by hardware errors
  * and power system events.
  */
-void init_ras_IRQ(void) {
+static int __init init_ras_IRQ(void)
+{
 	struct device_node *np;
 	unsigned int *ireg, len, i;
 
@@ -91,7 +91,10 @@ void init_ras_IRQ(void) {
 			ireg++;
 		}
 	}
+
+	return 1;
 }
+__initcall(init_ras_IRQ);
 
 /*
  * Handle power subsystem events (EPOW).

@@ -312,7 +312,6 @@ iSeries_init_early(void)
 	ppc_md.setup_residual	 	= iSeries_setup_residual;
 	ppc_md.get_cpuinfo	 	= iSeries_get_cpuinfo;
 	ppc_md.init_IRQ		 	= iSeries_init_IRQ;
-	ppc_md.init_ras_IRQ		= NULL;
 	ppc_md.get_irq		 	= iSeries_get_irq;
 	ppc_md.init		 	= NULL;
 
