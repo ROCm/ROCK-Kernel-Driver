@@ -18,65 +18,17 @@
 #include "2_5compat.h"
 #include "os.h"
 #include "time_user.h"
-
-/* See comment above fork_tramp for why sigstop is defined and used like
- * this
- */
-
-static int sigstop = SIGSTOP;
-
-static int exec_tramp(void *sig_stack)
-{
-	int sig = sigstop;
-
-	init_new_thread(sig_stack, NULL);
-	kill(os_getpid(), sig);
-	return(0);
-}
+#include "choose-mode.h"
+#include "mode_kern.h"
 
 void flush_thread(void)
 {
-	unsigned long stack;
-	int new_pid;
-
-	stack = alloc_stack(0, 0);
-	if(stack == 0){
-		printk(KERN_ERR 
-		       "flush_thread : failed to allocate temporary stack\n");
-		do_exit(SIGKILL);
-	}
-		
-	new_pid = start_fork_tramp((void *) current->thread.kernel_stack,
-				   stack, 0, exec_tramp);
-	if(new_pid < 0){
-		printk(KERN_ERR 
-		       "flush_thread : new thread failed, errno = %d\n",
-		       -new_pid);
-		do_exit(SIGKILL);
-	}
-
-	if(current->thread_info->cpu == 0)
-		forward_interrupts(new_pid);
-	current->thread.request.op = OP_EXEC;
-	current->thread.request.u.exec.pid = new_pid;
-	unprotect_stack((unsigned long) current->thread_info);
-	os_usr1_process(os_getpid());
-
-	enable_timer();
-	free_page(stack);
-	protect(uml_reserved, high_physmem - uml_reserved, 1, 1, 0, 1);
-	task_protections((unsigned long) current->thread_info);
-	force_flush_all();
-	unblock_signals();
+	CHOOSE_MODE(flush_thread_tt(), flush_thread_skas());
 }
 
 void start_thread(struct pt_regs *regs, unsigned long eip, unsigned long esp)
 {
-	set_fs(USER_DS);
-	flush_tlb_mm(current->mm);
-	PT_REGS_IP(regs) = eip;
-	PT_REGS_SP(regs) = esp;
-	PT_FIX_EXEC_STACK(esp);
+	CHOOSE_MODE_PROC(start_thread_tt, start_thread_skas, regs, eip, esp);
 }
 
 static int execve1(char *file, char **argv, char **env)
@@ -93,8 +45,12 @@ static int execve1(char *file, char **argv, char **env)
 
 int um_execve(char *file, char **argv, char **env)
 {
-	if(execve1(file, argv, env) == 0) do_longjmp(current->thread.jmp);
-	return(-1);
+	int err;
+
+	err = execve1(file, argv, env);
+	if(!err) 
+		do_longjmp(current->thread.exec_buf, 1);
+	return(err);
 }
 
 int sys_execve(char *file, char **argv, char **env)

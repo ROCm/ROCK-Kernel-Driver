@@ -19,6 +19,8 @@
 #include "user.h"
 #include "helper.h"
 #include "os.h"
+#include "choose-mode.h"
+#include "mode.h"
 
 void generic_close(int fd, void *unused)
 {
@@ -144,32 +146,6 @@ static int winch_thread(void *arg)
 	}
 }
 
-static int tracer_winch[2];
-
-static void tracer_winch_handler(int sig)
-{
-	char c = 1;
-
-	if(write(tracer_winch[1], &c, sizeof(c)) != sizeof(c))
-		printk("tracer_winch_handler - write failed, errno = %d\n",
-		       errno);
-}
-
-/* Called only by the tracing thread during initialization */
-
-void setup_tracer_winch(void)
-{
-	int err;
-
-	err = os_pipe(tracer_winch, 1, 1);
-	if(err){
-		printk("setup_tracer_winch : os_pipe failed, errno = %d\n", 
-		       -err);
-		return;
-	}
-	signal(SIGWINCH, tracer_winch_handler);
-}
-
 static int winch_tramp(int fd, void *device_data, int *fd_out)
 {
 	struct winch_data data;
@@ -212,9 +188,8 @@ void register_winch(int fd, void *device_data)
 	if(!isatty(fd)) return;
 
 	pid = tcgetpgrp(fd);
-	if(pid == tracing_pid)
-		register_winch_irq(tracer_winch[0], fd, -1, device_data);
-	else if(pid == -1){
+	if(!CHOOSE_MODE(is_tracer_winch(pid, fd, device_data), 0) && 
+	   (pid == -1)){
 		thread = winch_tramp(fd, device_data, &thread_fd);
 		if(fd != -1){
 			register_winch_irq(thread_fd, fd, thread, device_data);

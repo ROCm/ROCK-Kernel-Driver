@@ -8,34 +8,34 @@
 
 #include "sysdep/frame.h"
 
-struct sc_frame {
+struct frame_common {
 	void *data;
 	int len;
 	int sig_index;
-	int sc_index;
 	int sr_index;
 	int sr_relative;
 	int sp_index;
+};
+
+struct sc_frame {
+	struct frame_common common;
+	int sc_index;
 	struct arch_frame_data arch;
 };
 
 extern struct sc_frame signal_frame_sc;
 
+extern struct sc_frame signal_frame_sc_sr;
+
 struct si_frame {
-	void *data;
-	int len;
-	int sig_index;
+	struct frame_common common;
 	int sip_index;
 	int si_index;
-	int sr_index;
-	int sr_relative;
-	int sp_index;
 };
 
 extern struct si_frame signal_frame_si;
 
 extern void capture_signal_stack(void);
-extern void set_sc_ip_sp(void *sc_ptr, unsigned long ip, unsigned long sp);
 
 #endif
 

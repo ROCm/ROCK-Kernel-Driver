@@ -103,9 +103,15 @@ extern int os_write_file(int fd, char *buf, int count);
 extern unsigned long os_process_pc(int pid);
 extern int os_process_parent(int pid);
 extern void os_stop_process(int pid);
-extern void os_kill_process(int pid);
+extern void os_kill_process(int pid, int reap_child);
 extern void os_usr1_process(int pid);
 extern int os_getpid(void);
+
+extern int os_map_memory(void *virt, int fd, unsigned long off, 
+			 unsigned long len, int r, int w, int x);
+extern int os_protect_memory(void *addr, unsigned long len, 
+			     int r, int w, int x);
+extern int os_unmap_memory(void *addr, int len);
 
 #endif
 

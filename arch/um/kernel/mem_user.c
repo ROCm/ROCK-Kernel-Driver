@@ -181,44 +181,22 @@ void log(char *fmt, ...)
 }
 #endif
 
-void map(unsigned long virt, unsigned long phys, unsigned long len, 
-	 int r, int w, int x)
+int map_memory(unsigned long virt, unsigned long phys, unsigned long len, 
+	       int r, int w, int x)
 {
-	struct mem_region *region;
-	void *loc;
-	int prot;
+	struct mem_region *region = phys_region(phys);
 
-	prot = (r ? PROT_READ : 0) | (w ? PROT_WRITE : 0) | 
-		(x ? PROT_EXEC : 0);
-	region = phys_region(phys);
-
-	loc = mmap((void *) virt, len, prot, MAP_SHARED | MAP_FIXED, 
-		   region->fd, phys_offset(phys));
-	if(loc != (void *) virt){
-		panic("Error mapping a page - errno = %d", errno);
-	}
+	return(os_map_memory((void *) virt, region->fd, phys_offset(phys), len,
+			     r, w, x));
 }
 
-int unmap(void *addr, int len)
+int protect_memory(unsigned long addr, unsigned long len, int r, int w, int x,
+		   int must_succeed)
 {
-	int err;
-
-	err = munmap(addr, len);
-	if(err < 0) return(-errno);
-	else return(err);
-}
-
-int protect(unsigned long addr, unsigned long len, int r, int w, int x,
-	    int must_succeed)
-{
-	int prot;
-
-	prot = (r ? PROT_READ : 0) | (w ? PROT_WRITE : 0) | 
-		(x ? PROT_EXEC : 0);
-	if(mprotect((void *) addr, len, prot) == -1){
-		if(must_succeed)
-			panic("protect failed, errno = %d", errno);
-		else return(-errno);
+	if(os_protect_memory((void *) addr, len, r, w, x) < 0){
+                if(must_succeed)
+                        panic("protect failed, errno = %d", errno);
+                else return(-errno);
 	}
 	return(0);
 }
