@@ -455,6 +455,7 @@ static ssize_t qla2x00_sysfs_write_fw_dump(struct kobject *kobj, char *buf,
 	struct scsi_qla_host *ha = to_qla_host(dev_to_shost(container_of(kobj,
 	    struct device, kobj)));
 	int reading;
+	uint32_t dump_size;
 
 	if (off != 0)
 		return (0);
@@ -480,11 +481,16 @@ static ssize_t qla2x00_sysfs_write_fw_dump(struct kobject *kobj, char *buf,
 		if (ha->fw_dump != NULL && !ha->fw_dump_reading) {
 			ha->fw_dump_reading = 1;
 
-			ha->fw_dump_buffer = (char *)vmalloc(FW_DUMP_SIZE);
+			dump_size = FW_DUMP_SIZE_1M;
+			if (ha->fw_memory_size < 0x20000) 
+				dump_size = FW_DUMP_SIZE_128K;
+			else if (ha->fw_memory_size < 0x80000) 
+				dump_size = FW_DUMP_SIZE_512K;
+			ha->fw_dump_buffer = (char *)vmalloc(dump_size);
 			if (ha->fw_dump_buffer == NULL) {
 				qla_printk(KERN_WARNING, ha,
 				    "Unable to allocate memory for firmware "
-				    "dump buffer (%d).\n", FW_DUMP_SIZE);
+				    "dump buffer (%d).\n", dump_size);
 
 				ha->fw_dump_reading = 0;
 				return (count);
@@ -492,7 +498,7 @@ static ssize_t qla2x00_sysfs_write_fw_dump(struct kobject *kobj, char *buf,
 			qla_printk(KERN_INFO, ha,
 			    "Firmware dump ready for read on (%ld).\n",
 			    ha->host_no);
-			memset(ha->fw_dump_buffer, 0, FW_DUMP_SIZE);
+			memset(ha->fw_dump_buffer, 0, dump_size);
 			if (IS_QLA2100(ha) || IS_QLA2200(ha))
  				qla2100_ascii_fw_dump(ha);
  			else

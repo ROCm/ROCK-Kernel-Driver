@@ -546,7 +546,7 @@ qla2x00_execute_fw(scsi_qla_host_t *ha)
  */
 void
 qla2x00_get_fw_version(scsi_qla_host_t *ha, uint16_t *major, uint16_t *minor,
-    uint16_t *subminor, uint16_t *attributes)
+    uint16_t *subminor, uint16_t *attributes, uint32_t *memory)
 {
 	int		rval;
 	mbx_cmd_t	mc;
@@ -556,7 +556,7 @@ qla2x00_get_fw_version(scsi_qla_host_t *ha, uint16_t *major, uint16_t *minor,
 
 	mcp->mb[0] = MBC_GET_FIRMWARE_VERSION;
 	mcp->out_mb = MBX_0;
-	mcp->in_mb = MBX_6|MBX_3|MBX_2|MBX_1|MBX_0;
+	mcp->in_mb = MBX_6|MBX_5|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
 	mcp->flags = 0;
 	mcp->tov = 30;
 	rval = qla2x00_mailbox_command(ha, mcp);
@@ -566,6 +566,10 @@ qla2x00_get_fw_version(scsi_qla_host_t *ha, uint16_t *major, uint16_t *minor,
 	*minor = mcp->mb[2];
 	*subminor = mcp->mb[3];
 	*attributes = mcp->mb[6];
+	if (IS_QLA2100(ha) || IS_QLA2200(ha))
+		*memory = 0x1FFFF;			/* Defaults to 128KB. */
+	else
+		*memory = (mcp->mb[5] << 16) | mcp->mb[4];
 
 	if (rval != QLA_SUCCESS) {
 		/*EMPTY*/

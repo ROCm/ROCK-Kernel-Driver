@@ -220,11 +220,6 @@ check_fw_ready_again:
 	} while (restart_risc && retry--);
 
 	if (rval == QLA_SUCCESS) {
-		/* Retrieve firmware information */
-		qla2x00_get_fw_version(ha, &ha->fw_major_version,
-		    &ha->fw_minor_version, &ha->fw_subminor_version,
-		    &ha->fw_attributes);
-
 		clear_bit(RESET_MARKER_NEEDED, &ha->dpc_flags);
 		ha->marker_needed = 1;
 		qla2x00_marker(ha, 0, 0, MK_SYNC_ALL);
@@ -730,6 +725,14 @@ qla2x00_setup_chip(scsi_qla_host_t *ha)
 			    "firmware.\n", ha->host_no));
 
 			rval = qla2x00_execute_fw(ha);
+			/* Retrieve firmware information. */
+			if (rval == QLA_SUCCESS && ha->fw_major_version == 0) {
+				qla2x00_get_fw_version(ha,
+				    &ha->fw_major_version,
+				    &ha->fw_minor_version,
+				    &ha->fw_subminor_version,
+				    &ha->fw_attributes, &ha->fw_memory_size);
+			}
 		}
 		else {
 			DEBUG2(printk(KERN_INFO

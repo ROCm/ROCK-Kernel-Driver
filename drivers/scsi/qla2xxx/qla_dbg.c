@@ -40,9 +40,10 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	uint16_t	*dmp_reg;
 	unsigned long	flags;
 	struct qla2300_fw_dump	*fw;
+	uint32_t	dump_size, data_ram_cnt;
 
 	reg = ha->iobase;
-	risc_address = 0;
+	risc_address = data_ram_cnt = 0;
 	mb0 = mb2 = 0;
 	flags = 0;
 
@@ -57,13 +58,15 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	}
 
 	/* Allocate (large) dump buffer. */
-	ha->fw_dump_order = get_order(sizeof(struct qla2300_fw_dump));
+	dump_size = sizeof(struct qla2300_fw_dump);
+	dump_size += (ha->fw_memory_size - 0x11000) * sizeof(uint16_t);
+	ha->fw_dump_order = get_order(dump_size);
 	ha->fw_dump = (struct qla2300_fw_dump *) __get_free_pages(GFP_ATOMIC,
 	    ha->fw_dump_order);
 	if (ha->fw_dump == NULL) {
 		qla_printk(KERN_WARNING, ha,
-		    "Unable to allocated memory for firmware dump (%d/%Zd).\n",
-		    ha->fw_dump_order, sizeof(struct qla2300_fw_dump));
+		    "Unable to allocated memory for firmware dump (%d/%d).\n",
+		    ha->fw_dump_order, dump_size);
 		goto qla2300_fw_dump_failed;
 	}
 	fw = ha->fw_dump;
@@ -304,10 +307,11 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	if (rval == QLA_SUCCESS) {
 		/* Get data SRAM. */
 		risc_address = 0x11000;
+		data_ram_cnt = ha->fw_memory_size - risc_address + 1;
  		WRT_MAILBOX_REG(ha, reg, 0, MBC_READ_RAM_EXTENDED);
 		clear_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
 	}
-	for (cnt = 0; cnt < sizeof(fw->data_ram) / 2 && rval == QLA_SUCCESS;
+	for (cnt = 0; cnt < data_ram_cnt && rval == QLA_SUCCESS;
 	    cnt++, risc_address++) {
  		WRT_MAILBOX_REG(ha, reg, 1, LSW(risc_address));
  		WRT_MAILBOX_REG(ha, reg, 8, MSW(risc_address));
@@ -386,6 +390,7 @@ qla2300_ascii_fw_dump(scsi_qla_host_t *ha)
 	char *uiter;
 	char fw_info[30];
 	struct qla2300_fw_dump *fw;
+	uint32_t data_ram_cnt;
 
 	uiter = ha->fw_dump_buffer;
 	fw = ha->fw_dump;
@@ -550,7 +555,8 @@ qla2300_ascii_fw_dump(scsi_qla_host_t *ha)
 	}
 
 	qla_uprintf(&uiter, "\n\nData RAM Dump:");
-	for (cnt = 0; cnt < sizeof (fw->data_ram) / 2; cnt++) {
+	data_ram_cnt = ha->fw_memory_size - 0x11000 + 1;
+	for (cnt = 0; cnt < data_ram_cnt; cnt++) {
 		if (cnt % 8 == 0) {
 			qla_uprintf(&uiter, "\n%05x: ", cnt + 0x11000);
 		}
