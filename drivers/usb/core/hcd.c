@@ -779,10 +779,22 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	set_bit (devnum, usb_dev->bus->devmap.devicemap);
 	usb_dev->state = USB_STATE_ADDRESS;
 
+	usb_dev->epmaxpacketin[0] = usb_dev->epmaxpacketout[0] = 64;
+	retval = usb_get_device_descriptor(usb_dev, USB_DT_DEVICE_SIZE);
+	if (retval != sizeof usb_dev->descriptor) {
+		dev_dbg (parent_dev, "can't read %s device descriptor %d\n",
+				usb_dev->dev.bus_id, retval);
+		return (retval < 0) ? retval : -EMSGSIZE;
+	}
+
+	(void) usb_get_dev (usb_dev);
+	down (&usb_dev->serialize);
 	retval = usb_new_device (usb_dev);
 	if (retval)
 		dev_err (parent_dev, "can't register root hub for %s, %d\n",
 				usb_dev->dev.bus_id, retval);
+	up (&usb_dev->serialize);
+	usb_put_dev (usb_dev);
 	return retval;
 }
 EXPORT_SYMBOL (usb_register_root_hub);
