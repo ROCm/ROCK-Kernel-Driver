@@ -164,6 +164,8 @@ nomem:
 	return -ENOMEM;
 }
 
+/* no force parameter right now unlike get_user_pages itself.
+   Could get funny effects on ptrace/core dumps. */
 int
 follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		    struct page **pages, struct vm_area_struct **vmas,
@@ -171,6 +173,10 @@ follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 {
 	unsigned long vpfn, vaddr = *position;
 	int remainder = *length;
+	
+	long needed_flags = write ? VM_WRITE : VM_READ; 
+	if ((vma->vm_flags & needed_flags) == 0)
+		return -EFAULT;
 
 	spin_lock(&mm->page_table_lock);
 	vpfn = vaddr/PAGE_SIZE;
@@ -184,10 +190,6 @@ follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 				pte = huge_pte_offset(mm, vaddr);
 				if (pte && !pte_none(*pte))
 					break; 
-				if (!write) { 
-					spin_unlock(&mm->page_table_lock);
-					return -EFAULT;
-				}
 				switch (hugetlb_alloc_fault(mm, vma, vaddr, 0)) { 
 				case VM_FAULT_SIGBUS:
 					return -EFAULT;
@@ -355,7 +357,7 @@ static int
 hugetlb_alloc_fault(struct mm_struct *mm, struct vm_area_struct *vma, 
 			       unsigned long addr, int flush)
 {
-		unsigned long idx;
+	unsigned long idx;
 	int ret;
 	pte_t *pte;
 	struct page *page = NULL;

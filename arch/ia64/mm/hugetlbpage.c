@@ -192,6 +192,10 @@ follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	int len = *length;
 	struct page *page;
 
+	long needed_flags = write ? VM_WRITE : VM_READ; 
+	if ((vma->vm_flags & needed_flags) == 0)
+		return -EFAULT;
+
 	spin_lock(&mm->page_table_lock);
 	do {
 		pstart = start & HPAGE_MASK;
@@ -200,10 +204,6 @@ follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 			pte = huge_pte_offset(mm, start);
 			if (pte && !pte_none(*pte))
 				break; 
-			if (!write) { 
-				spin_unlock(&mm->page_table_lock);
-				return -EFAULT;
-			}
 			spin_unlock(&mm->page_table_lock); 
 			switch (arch_hugetlb_fault(mm, vma, start, write)) { 
 			case VM_FAULT_SIGBUS:
