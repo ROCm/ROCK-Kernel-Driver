@@ -1844,13 +1844,13 @@ cleanup1:
 /*
  * Map (physical) PCI mem into (virtual) kernel space
  */
-static ulong remap_pci_mem(ulong base, ulong size)
+static void __iomem * remap_pci_mem(ulong base, ulong size)
 {
         ulong page_base        = ((ulong) base) & PAGE_MASK;
         ulong page_offs        = ((ulong) base) - page_base;
-        ulong page_remapped    = (ulong) ioremap(page_base, page_offs+size);
+        void __iomem *page_remapped = ioremap(page_base, page_offs+size);
 
-        return (ulong) (page_remapped ? (page_remapped + page_offs) : 0UL);
+        return (page_remapped ? (page_remapped + page_offs) : (void __iomem *)0UL);
 }
 
 /* 
@@ -2373,7 +2373,7 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 #ifdef CCISS_DEBUG
 	printk("address 0 = %x\n", c->paddr);
 #endif /* CCISS_DEBUG */ 
-	c->vaddr = (void __iomem *)remap_pci_mem(c->paddr, 200);
+	c->vaddr = remap_pci_mem(c->paddr, 200);
 
 	/* Wait for the board to become ready.  (PCI hotplug needs this.)
 	 * We poll for up to 120 secs, once per 100ms. */
