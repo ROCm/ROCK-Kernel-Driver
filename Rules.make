@@ -129,18 +129,32 @@ endif
 # Rule to link composite objects
 #
 
-# for make >= 3.78 the following is cleaner:
-# multi-used := $(foreach m,$(obj-y) $(obj-m), $(if $($(basename $(m))-objs), $(m)))
+# export.o is never a composite object, since $(export-objs) has a
+# fixed meaning (== objects which EXPORT_SYMBOL())
 __obj-y = $(filter-out export.o,$(obj-y))
 __obj-m = $(filter-out export.o,$(obj-m))
-multi-used-y := $(sort $(foreach m,$(__obj-y),$(patsubst %,$(m),$($(basename $(m))-objs))))
-multi-used-m := $(sort $(foreach m,$(__obj-m),$(patsubst %,$(m),$($(basename $(m))-objs))))
-ld-multi-used-y := $(filter-out $(list-multi),$(multi-used-y))
-ld-multi-used-m := $(filter-out $(list-multi),$(multi-used-m))
-ld-multi-objs-y := $(foreach m, $(ld-multi-used-y), $($(basename $(m))-objs))
-ld-multi-objs-m := $(foreach m, $(ld-multi-used-m), $($(basename $(m))-objs))
 
-$(ld-multi-used-y) : %.o: $(ld-multi-objs-y)
+# if $(foo-objs) exists, foo.o is a composite object 
+__multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(basename $(m))-objs), $(m))))
+__multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(basename $(m))-objs), $(m))))
+
+# Backwards compatibility: if a composite object is listed in
+# $(list-multi), skip it here, since the Makefile will have an explicit
+# link rule for it
+
+multi-used-y := $(filter-out $(list-multi),$(__multi-used-y))
+multi-used-m := $(filter-out $(list-multi),$(__multi-used-m))
+
+# Build list of the parts of our composite objects, our composite
+# objects depend on those (obviously)
+multi-objs-y := $(foreach m, $(multi-used-y), $($(basename $(m))-objs))
+multi-objs-m := $(foreach m, $(multi-used-m), $($(basename $(m))-objs))
+
+# We would rather have a list of rules like
+# 	foo.o: $(foo-objs)
+# but that's not so easy, so we rather make all composite objects depend
+# on the set of all their parts
+$(multi-used-y) : %.o: $(multi-objs-y)
 	rm -f $@
 	$(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs), $^)
 	@ ( \
@@ -149,7 +163,7 @@ $(ld-multi-used-y) : %.o: $(ld-multi-objs-y)
 	    echo 'endif' \
 	) > $(dir $@)/.$(notdir $@).flags
 
-$(ld-multi-used-m) : %.o: $(ld-multi-objs-m)
+$(multi-used-m) : %.o: $(multi-objs-m)
 	rm -f $@
 	$(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs), $^)
 	@ ( \
