@@ -288,6 +288,7 @@ struct hci_dev *hci_dev_get(int index)
 	read_unlock(&hci_dev_list_lock);
 	return hdev;
 }
+EXPORT_SYMBOL(hci_dev_get);
 
 /* ---- Inquiry support ---- */
 void inquiry_cache_flush(struct hci_dev *hdev)
@@ -779,6 +780,7 @@ struct hci_dev *hci_alloc_dev(void)
 
 	return hdev;
 }
+EXPORT_SYMBOL(hci_alloc_dev);
 
 /* Free HCI device */
 void hci_free_dev(struct hci_dev *hdev)
@@ -786,6 +788,7 @@ void hci_free_dev(struct hci_dev *hdev)
 	/* will free via class release */
 	class_device_put(&hdev->class_dev);
 }
+EXPORT_SYMBOL(hci_free_dev);
 
 /* Register HCI device */
 int hci_register_dev(struct hci_dev *hdev)
@@ -845,6 +848,7 @@ int hci_register_dev(struct hci_dev *hdev)
 
 	return id;
 }
+EXPORT_SYMBOL(hci_register_dev);
 
 /* Unregister HCI device */
 int hci_unregister_dev(struct hci_dev *hdev)
@@ -864,6 +868,7 @@ int hci_unregister_dev(struct hci_dev *hdev)
 	__hci_dev_put(hdev);
 	return 0;
 }
+EXPORT_SYMBOL(hci_unregister_dev);
 
 /* Suspend HCI device */
 int hci_suspend_dev(struct hci_dev *hdev)
@@ -871,6 +876,7 @@ int hci_suspend_dev(struct hci_dev *hdev)
 	hci_notify(hdev, HCI_DEV_SUSPEND);
 	return 0;
 }
+EXPORT_SYMBOL(hci_suspend_dev);
 
 /* Resume HCI device */
 int hci_resume_dev(struct hci_dev *hdev)
@@ -878,6 +884,7 @@ int hci_resume_dev(struct hci_dev *hdev)
 	hci_notify(hdev, HCI_DEV_RESUME);
 	return 0;
 }       
+EXPORT_SYMBOL(hci_resume_dev);
 
 /* ---- Interface to upper protocols ---- */
 
@@ -903,6 +910,7 @@ int hci_register_proto(struct hci_proto *hp)
 
 	return err;
 }
+EXPORT_SYMBOL(hci_register_proto);
 
 int hci_unregister_proto(struct hci_proto *hp)
 {
@@ -924,6 +932,7 @@ int hci_unregister_proto(struct hci_proto *hp)
 
 	return err;
 }
+EXPORT_SYMBOL(hci_unregister_proto);
 
 static int hci_send_frame(struct sk_buff *skb)
 {
@@ -980,6 +989,7 @@ int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *p
 
 	return 0;
 }
+EXPORT_SYMBOL(hci_send_cmd);
 
 /* Get data from the previously sent command */
 void *hci_sent_cmd_data(struct hci_dev *hdev, __u16 ogf, __u16 ocf)
@@ -1056,6 +1066,7 @@ int hci_send_acl(struct hci_conn *conn, struct sk_buff *skb, __u16 flags)
 	hci_sched_tx(hdev);
 	return 0;
 }
+EXPORT_SYMBOL(hci_send_acl);
 
 /* Send SCO data */
 int hci_send_sco(struct hci_conn *conn, struct sk_buff *skb)
@@ -1082,6 +1093,7 @@ int hci_send_sco(struct hci_conn *conn, struct sk_buff *skb)
 	hci_sched_tx(hdev);
 	return 0;
 }
+EXPORT_SYMBOL(hci_send_sco);
 
 /* ---- HCI TX task (outgoing data) ---- */
 

@@ -252,6 +252,7 @@ struct hci_dev *hci_get_route(bdaddr_t *dst, bdaddr_t *src)
 	read_unlock_bh(&hci_dev_list_lock);
 	return hdev;
 }
+EXPORT_SYMBOL(hci_get_route);
 
 /* Create SCO or ACL connection.
  * Device _must_ be locked */
@@ -294,6 +295,7 @@ struct hci_conn * hci_connect(struct hci_dev *hdev, int type, bdaddr_t *dst)
 		return acl;
 	}
 }
+EXPORT_SYMBOL(hci_connect);
 
 /* Authenticate remote device */
 int hci_conn_auth(struct hci_conn *conn)
@@ -310,6 +312,7 @@ int hci_conn_auth(struct hci_conn *conn)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(hci_conn_auth);
 
 /* Enable encryption */
 int hci_conn_encrypt(struct hci_conn *conn)
@@ -330,6 +333,7 @@ int hci_conn_encrypt(struct hci_conn *conn)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(hci_conn_encrypt);
 
 /* Drop all connection on the device */
 void hci_conn_hash_flush(struct hci_dev *hdev)

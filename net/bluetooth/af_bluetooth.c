@@ -57,6 +57,7 @@
 #endif
 
 struct proc_dir_entry *proc_bt;
+EXPORT_SYMBOL(proc_bt);
 
 /* Bluetooth sockets */
 #define BT_MAX_PROTO	6
@@ -75,6 +76,7 @@ int bt_sock_register(int proto, struct net_proto_family *ops)
 	bt_proto[proto] = ops;
 	return 0;
 }
+EXPORT_SYMBOL(bt_sock_register);
 
 int bt_sock_unregister(int proto)
 {
@@ -87,6 +89,7 @@ int bt_sock_unregister(int proto)
 	bt_proto[proto] = NULL;
 	return 0;
 }
+EXPORT_SYMBOL(bt_sock_unregister);
 
 static int bt_sock_create(struct socket *sock, int proto)
 {
@@ -136,6 +139,7 @@ struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio
 
 	return sk;
 }
+EXPORT_SYMBOL(bt_sock_alloc);
 
 void bt_sock_link(struct bt_sock_list *l, struct sock *sk)
 {
@@ -143,6 +147,7 @@ void bt_sock_link(struct bt_sock_list *l, struct sock *sk)
 	sk_add_node(sk, &l->head);
 	write_unlock_bh(&l->lock);
 }
+EXPORT_SYMBOL(bt_sock_link);
 
 void bt_sock_unlink(struct bt_sock_list *l, struct sock *sk)
 {
@@ -150,6 +155,7 @@ void bt_sock_unlink(struct bt_sock_list *l, struct sock *sk)
 	sk_del_node_init(sk);
 	write_unlock_bh(&l->lock);
 }
+EXPORT_SYMBOL(bt_sock_unlink);
 
 void bt_accept_enqueue(struct sock *parent, struct sock *sk)
 {
@@ -160,6 +166,7 @@ void bt_accept_enqueue(struct sock *parent, struct sock *sk)
 	bt_sk(sk)->parent = parent;
 	parent->sk_ack_backlog++;
 }
+EXPORT_SYMBOL(bt_accept_enqueue);
 
 static void bt_accept_unlink(struct sock *sk)
 {
@@ -199,6 +206,7 @@ struct sock *bt_accept_dequeue(struct sock *parent, struct socket *newsock)
 	}
 	return NULL;
 }
+EXPORT_SYMBOL(bt_accept_dequeue);
 
 int bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
 	struct msghdr *msg, size_t len, int flags)
@@ -235,6 +243,7 @@ int bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 	return err ? : copied;
 }
+EXPORT_SYMBOL(bt_sock_recvmsg);
 
 static inline unsigned int bt_accept_poll(struct sock *parent)
 {
@@ -287,6 +296,7 @@ unsigned int bt_sock_poll(struct file * file, struct socket *sock, poll_table *w
 
 	return mask;
 }
+EXPORT_SYMBOL(bt_sock_poll);
 
 int bt_sock_wait_state(struct sock *sk, int state, unsigned long timeo)
 {
@@ -322,6 +332,7 @@ int bt_sock_wait_state(struct sock *sk, int state, unsigned long timeo)
 	remove_wait_queue(sk->sk_sleep, &wait);
 	return err;
 }
+EXPORT_SYMBOL(bt_sock_wait_state);
 
 static struct net_proto_family bt_sock_family_ops = {
 	.owner  = THIS_MODULE,

@@ -28,6 +28,9 @@
  * $Id: lib.c,v 1.1 2002/03/08 21:06:59 maxk Exp $
  */
 
+#include <linux/config.h>
+#include <linux/module.h>
+
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 #include <linux/string.h>
@@ -58,6 +61,7 @@ void bt_dump(char *pref, __u8 *buf, int count)
 	if (line[0])
 		printk(KERN_INFO "%s:%s\n", pref, line);
 }
+EXPORT_SYMBOL(bt_dump);
 
 void baswap(bdaddr_t *dst, bdaddr_t *src)
 {
@@ -68,6 +72,7 @@ void baswap(bdaddr_t *dst, bdaddr_t *src)
 	for (i = 0; i < 6; i++)
 		d[i] = s[5 - i];
 }
+EXPORT_SYMBOL(baswap);
 
 char *batostr(bdaddr_t *ba)
 {
@@ -81,6 +86,7 @@ char *batostr(bdaddr_t *ba)
 
 	return str[i];
 }
+EXPORT_SYMBOL(batostr);
 
 /* Bluetooth error codes to Unix errno mapping */
 int bt_err(__u16 code)
@@ -173,3 +179,4 @@ int bt_err(__u16 code)
 		return ENOSYS;
 	}
 }
+EXPORT_SYMBOL(bt_err);
