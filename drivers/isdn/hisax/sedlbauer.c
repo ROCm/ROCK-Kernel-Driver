@@ -401,30 +401,23 @@ sedlbauer_isar_release(struct IsdnCardState *cs)
 	hisax_release_resources(cs);
 }
 
-static int
-Sedl_card_msg(struct IsdnCardState *cs, int mt, void *arg)
+static void
+sedlbauer_led_handler(struct IsdnCardState *cs)
 {
-	switch (mt) {
-		case MDL_INFO_CONN:
-			if (cs->subtyp != SEDL_SPEEDFAX_PYRAMID)
-				return(0);
-			if ((long) arg)
-				cs->hw.sedl.reset_off &= ~SEDL_ISAR_PCI_LED2;
-			else
-				cs->hw.sedl.reset_off &= ~SEDL_ISAR_PCI_LED1;
-			byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_off);
-			break;
-		case MDL_INFO_REL:
-			if (cs->subtyp != SEDL_SPEEDFAX_PYRAMID)
-				return(0);
-			if ((long) arg)
-				cs->hw.sedl.reset_off |= SEDL_ISAR_PCI_LED2;
-			else
-				cs->hw.sedl.reset_off |= SEDL_ISAR_PCI_LED1;
-			byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_off);
-			break;
-	}
-	return(0);
+	if (cs->subtyp != SEDL_SPEEDFAX_PYRAMID)
+		return;
+
+	if (cs->status & 0x2000)
+		cs->hw.sedl.reset_off &= ~SEDL_ISAR_PCI_LED2;
+	else
+		cs->hw.sedl.reset_off |=  SEDL_ISAR_PCI_LED2;
+
+	if (cs->status & 0x1000)
+		cs->hw.sedl.reset_off &= ~SEDL_ISAR_PCI_LED1;
+	else
+		cs->hw.sedl.reset_off |=  SEDL_ISAR_PCI_LED1;
+
+	byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_off);
 }
 
 static void
@@ -436,24 +429,27 @@ sedlbauer_isar_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops sedlbauer_ops = {
-	.init     = inithscxisac,
-	.reset    = sedlbauer_reset,
-	.release  = hisax_release_resources,
-	.irq_func = sedlbauer_interrupt,
+	.init        = inithscxisac,
+	.reset       = sedlbauer_reset,
+	.release     = hisax_release_resources,
+	.led_handler = sedlbauer_led_handler,
+	.irq_func    = sedlbauer_interrupt,
 };
 
 static struct card_ops sedlbauer_ipac_ops = {
-	.init     = ipac_init,
-	.reset    = sedlbauer_reset,
-	.release  = hisax_release_resources,
-	.irq_func = ipac_irq,
+	.init        = ipac_init,
+	.reset       = sedlbauer_reset,
+	.release     = hisax_release_resources,
+	.led_handler = sedlbauer_led_handler,
+	.irq_func    = ipac_irq,
 };
 
 static struct card_ops sedlbauer_isar_ops = {
-	.init     = sedlbauer_isar_init,
-	.reset    = sedlbauer_reset,
-	.release  = sedlbauer_isar_release,
-	.irq_func = sedlbauer_isar_interrupt,
+	.init        = sedlbauer_isar_init,
+	.reset       = sedlbauer_reset,
+	.release     = sedlbauer_isar_release,
+	.led_handler = sedlbauer_led_handler,
+	.irq_func    = sedlbauer_isar_interrupt,
 };
 
 static struct pci_dev *dev_sedl __devinitdata = NULL;
@@ -628,8 +624,6 @@ ready:
 	       cs->hw.sedl.cfg_reg,
 	       cs->hw.sedl.cfg_reg + bytecnt,
 	       cs->irq);
-
-	cs->cardmsg = &Sedl_card_msg;
 
 /*
  * testing ISA and PCMCIA Cards for IPAC, default is ISAC

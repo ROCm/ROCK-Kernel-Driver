@@ -443,20 +443,12 @@ diva_reset(struct IsdnCardState *cs)
 	return 0;
 }
 
-#define DIVA_ASSIGN 1
-
 static void
 diva_led_handler(struct IsdnCardState *cs)
 {
 	int blink = 0;
 
-//	if ((cs->subtyp == DIVA_IPAC_ISA) || (cs->subtyp == DIVA_IPAC_PCI))
-	if ((cs->subtyp == DIVA_IPAC_ISA) ||
-	    (cs->subtyp == DIVA_IPAC_PCI) ||
-	    (cs->subtyp == DIVA_IPACX_PCI)   )
-		return;
-	del_timer(&cs->hw.diva.tl);
-	if (cs->hw.diva.status & DIVA_ASSIGN)
+	if (cs->status & 0x0001)
 		cs->hw.diva.ctrl_reg |= (DIVA_ISA == cs->subtyp) ?
 			DIVA_ISA_LED_A : DIVA_PCI_LED_A;
 	else {
@@ -464,10 +456,10 @@ diva_led_handler(struct IsdnCardState *cs)
 			DIVA_ISA_LED_A : DIVA_PCI_LED_A;
 		blink = 250;
 	}
-	if (cs->hw.diva.status & 0xf000)
+	if (cs->status & 0xf000)
 		cs->hw.diva.ctrl_reg |= (DIVA_ISA == cs->subtyp) ?
 			DIVA_ISA_LED_B : DIVA_PCI_LED_B;
-	else if (cs->hw.diva.status & 0x0f00) {
+	else if (cs->status & 0x0f00) {
 		cs->hw.diva.ctrl_reg ^= (DIVA_ISA == cs->subtyp) ?
 			DIVA_ISA_LED_B : DIVA_PCI_LED_B;
 		blink = 500;
@@ -476,50 +468,8 @@ diva_led_handler(struct IsdnCardState *cs)
 			DIVA_ISA_LED_B : DIVA_PCI_LED_B);
 
 	byteout(cs->hw.diva.ctrl, cs->hw.diva.ctrl_reg);
-	if (blink) {
-		init_timer(&cs->hw.diva.tl);
-		cs->hw.diva.tl.expires = jiffies + ((blink * HZ) / 1000);
-		add_timer(&cs->hw.diva.tl);
-	}
-}
-
-static int
-Diva_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	switch (mt) {
-		case (MDL_REMOVE | REQUEST):
-			cs->hw.diva.status = 0;
-			break;
-		case (MDL_ASSIGN | REQUEST):
-			cs->hw.diva.status |= DIVA_ASSIGN;
-			break;
-		case MDL_INFO_SETUP:
-			if ((long)arg)
-				cs->hw.diva.status |=  0x0200;
-			else
-				cs->hw.diva.status |=  0x0100;
-			break;
-		case MDL_INFO_CONN:
-			if ((long)arg)
-				cs->hw.diva.status |=  0x2000;
-			else
-				cs->hw.diva.status |=  0x1000;
-			break;
-		case MDL_INFO_REL:
-			if ((long)arg) {
-				cs->hw.diva.status &=  ~0x2000;
-				cs->hw.diva.status &=  ~0x0200;
-			} else {
-				cs->hw.diva.status &=  ~0x1000;
-				cs->hw.diva.status &=  ~0x0100;
-			}
-			break;
-	}
-	if ((cs->subtyp != DIVA_IPAC_ISA) && 
-	    (cs->subtyp != DIVA_IPAC_PCI) &&
-	    (cs->subtyp != DIVA_IPACX_PCI)   )
-		diva_led_handler(cs);
-	return(0);
+	if (blink)
+		mod_timer(&cs->hw.diva.tl, jiffies + (blink * HZ) / 1000);
 }
 
 static void
@@ -537,31 +487,32 @@ diva_ipac_pci_init(struct IsdnCardState *cs)
 }
 
 static struct card_ops diva_ops = {
-	.init     = inithscxisac,
-	.reset    = diva_reset,
-	.release  = diva_release,
-	.irq_func = diva_interrupt,
+	.init        = inithscxisac,
+	.reset       = diva_reset,
+	.release     = diva_release,
+	.led_handler = diva_led_handler,
+	.irq_func    = diva_interrupt,
 };
 
 static struct card_ops diva_ipac_isa_ops = {
-	.init     = ipac_init,
-	.reset    = diva_ipac_isa_reset,
-	.release  = hisax_release_resources,
-	.irq_func = ipac_irq,
+	.init        = ipac_init,
+	.reset       = diva_ipac_isa_reset,
+	.release     = hisax_release_resources,
+	.irq_func    = ipac_irq,
 };
 
 static struct card_ops diva_ipac_pci_ops = {
-	.init     = diva_ipac_pci_init,
-	.reset    = diva_ipac_pci_reset,
-	.release  = diva_ipac_pci_release,
-	.irq_func = diva_ipac_pci_irq,
+	.init        = diva_ipac_pci_init,
+	.reset       = diva_ipac_pci_reset,
+	.release     = diva_ipac_pci_release,
+	.irq_func    = diva_ipac_pci_irq,
 };
 
 static struct card_ops diva_ipacx_pci_ops = {
-	.init     = diva_ipacx_pci_init,
-	.reset    = diva_ipacx_pci_reset,
-	.release  = diva_ipac_pci_release,
-	.irq_func = diva_ipacx_pci_irq,
+	.init        = diva_ipacx_pci_init,
+	.reset       = diva_ipacx_pci_reset,
+	.release     = diva_ipac_pci_release,
+	.irq_func    = diva_ipacx_pci_irq,
 };
 
 static struct pci_dev *dev_diva __initdata = NULL;
@@ -607,7 +558,6 @@ setup_diva(struct IsdnCard *card)
 	printk(KERN_INFO "HiSax: Eicon.Diehl Diva driver Rev. %s\n", HiSax_getrev(tmp));
 	if (cs->typ != ISDN_CTYPE_DIEHLDIVA)
 		return(0);
-	cs->hw.diva.status = 0;
 	if (card->para[1]) {
 		cs->hw.diva.ctrl_reg = 0;
 		cs->hw.diva.cfg_reg = card->para[1];
@@ -775,7 +725,6 @@ ready:
 		if (!request_io(&cs->rs, cs->hw.diva.cfg_reg, bytecnt, "diva isdn"))
 			return 0;
 	}
-	cs->cardmsg = &Diva_card_msg;
 	if (cs->subtyp == DIVA_IPAC_ISA) {
 		diva_ipac_isa_reset(cs);
 		cs->dc_hw_ops = &ipac_dc_ops;

@@ -106,7 +106,6 @@ const char *ITACVer[] =
 /* Status Flags */
 #define ELSA_TIMER_AKTIV 1
 #define ELSA_BAD_PWR     2
-#define ELSA_ASSIGN      4
 
 #define RS_ISR_PASS_LIMIT 256
 #define _INLINE_ inline
@@ -553,8 +552,15 @@ elsa_led_handler(struct IsdnCardState *cs)
 
 	if (cs->subtyp == ELSA_PCMCIA || cs->subtyp == ELSA_PCMCIA_IPAC)
 		return;
-	del_timer(&cs->hw.elsa.tl);
-	if (cs->hw.elsa.status & ELSA_ASSIGN)
+
+	if (cs->typ == ISDN_CTYPE_ELSA) {
+		int pwr = bytein(cs->hw.elsa.ale);
+		if (pwr & 0x08)
+			cs->hw.elsa.status |= ELSA_BAD_PWR;
+		else
+			cs->hw.elsa.status &= ~ELSA_BAD_PWR;
+	}
+	if (cs->status & 0x0001)
 		cs->hw.elsa.ctrl_reg |= ELSA_STAT_LED;
 	else if (cs->hw.elsa.status & ELSA_BAD_PWR)
 		cs->hw.elsa.ctrl_reg &= ~ELSA_STAT_LED;
@@ -562,9 +568,9 @@ elsa_led_handler(struct IsdnCardState *cs)
 		cs->hw.elsa.ctrl_reg ^= ELSA_STAT_LED;
 		blink = 250;
 	}
-	if (cs->hw.elsa.status & 0xf000)
+	if (cs->status & 0xf000)
 		cs->hw.elsa.ctrl_reg |= ELSA_LINE_LED;
-	else if (cs->hw.elsa.status & 0x0f00) {
+	else if (cs->status & 0x0f00) {
 		cs->hw.elsa.ctrl_reg ^= ELSA_LINE_LED;
 		blink = 500;
 	} else
@@ -580,56 +586,9 @@ elsa_led_handler(struct IsdnCardState *cs)
 		writereg(cs, cs->hw.elsa.isac, IPAC_ATX, led);
 	} else
 		byteout(cs->hw.elsa.ctrl, cs->hw.elsa.ctrl_reg);
-	if (blink) {
-		init_timer(&cs->hw.elsa.tl);
-		cs->hw.elsa.tl.expires = jiffies + ((blink * HZ) / 1000);
-		add_timer(&cs->hw.elsa.tl);
-	}
-}
 
-static int
-Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	int ret = 0;
-
-	switch (mt) {
-		case (MDL_REMOVE | REQUEST):
-			cs->hw.elsa.status &= 0;
-			break;
-		case (MDL_ASSIGN | REQUEST):
-			cs->hw.elsa.status |= ELSA_ASSIGN;
-			break;
-		case MDL_INFO_SETUP:
-			if ((long) arg)
-				cs->hw.elsa.status |= 0x0200;
-			else
-				cs->hw.elsa.status |= 0x0100;
-			break;
-		case MDL_INFO_CONN:
-			if ((long) arg)
-				cs->hw.elsa.status |= 0x2000;
-			else
-				cs->hw.elsa.status |= 0x1000;
-			break;
-		case MDL_INFO_REL:
-			if ((long) arg) {
-				cs->hw.elsa.status &= ~0x2000;
-				cs->hw.elsa.status &= ~0x0200;
-			} else {
-				cs->hw.elsa.status &= ~0x1000;
-				cs->hw.elsa.status &= ~0x0100;
-			}
-			break;
-	}
-	if (cs->typ == ISDN_CTYPE_ELSA) {
-		int pwr = bytein(cs->hw.elsa.ale);
-		if (pwr & 0x08)
-			cs->hw.elsa.status |= ELSA_BAD_PWR;
-		else
-			cs->hw.elsa.status &= ~ELSA_BAD_PWR;
-	}
-	elsa_led_handler(cs);
-	return(ret);
+	if (blink)
+		mod_timer(&cs->hw.elsa.tl, jiffies + (blink * HZ) / 1000);
 }
 
 #if ARCOFI_USE
@@ -712,21 +671,23 @@ elsa_test(struct IsdnCardState *cs)
 }
 
 static struct card_ops elsa_ops = {
-	.init     = elsa_init,
-	.test     = elsa_test,
-	.reset    = elsa_reset,
-	.release  = elsa_release,
-	.aux_ind  = elsa_aux_ind,
-	.irq_func = elsa_interrupt,
+	.init        = elsa_init,
+	.test        = elsa_test,
+	.reset       = elsa_reset,
+	.release     = elsa_release,
+	.aux_ind     = elsa_aux_ind,
+	.led_handler = elsa_led_handler,
+	.irq_func    = elsa_interrupt,
 };
 
 static struct card_ops elsa_ipac_ops = {
-	.init     = elsa_ipac_init,
-	.test     = elsa_test,
-	.reset    = elsa_reset,
-	.release  = elsa_release,
-	.aux_ind  = elsa_aux_ind,
-	.irq_func = elsa_interrupt_ipac,
+	.init        = elsa_ipac_init,
+	.test        = elsa_test,
+	.reset       = elsa_reset,
+	.release     = elsa_release,
+	.aux_ind     = elsa_aux_ind,
+	.led_handler = elsa_led_handler,
+	.irq_func    = elsa_interrupt_ipac,
 };
 
 static unsigned char
@@ -1085,7 +1046,6 @@ setup_elsa(struct IsdnCard *card)
 		}
 		printk(KERN_INFO "Elsa: timer OK; resetting card\n");
 	}
-	cs->cardmsg = &Elsa_card_msg;
 	elsa_reset(cs);
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI) || (cs->subtyp == ELSA_PCMCIA_IPAC)) {
 		cs->dc_hw_ops = &ipac_dc_ops;

@@ -77,15 +77,17 @@ static char *strTeiEvent[] =
 static inline void
 mdl_assign(struct IsdnCardState *cs)
 {
-	if (cs->cardmsg)
-		cs->cardmsg(cs, MDL_ASSIGN | REQUEST, NULL);
+	cs->status |= 0x0001;
+	if (cs->card_ops->led_handler)
+		cs->card_ops->led_handler(cs);
 }
 
 static inline void
 mdl_remove(struct IsdnCardState *cs)
 {
-	if (cs->cardmsg)
-		cs->cardmsg(cs, MDL_REMOVE | REQUEST, NULL);
+	cs->status = 0;
+	if (cs->card_ops->led_handler)
+		cs->card_ops->led_handler(cs);
 }
 
 unsigned int

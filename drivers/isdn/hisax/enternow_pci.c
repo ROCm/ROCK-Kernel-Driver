@@ -178,25 +178,18 @@ enpci_bc_deactivate(struct IsdnCardState *cs, int chan)
 	}
 }
 
-static int
-enpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
+static void
+enpci_led_handler(struct IsdnCardState *cs)
 {
-	if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "enter:now PCI: card_msg: 0x%04X", mt);
-
-        switch (mt) {
-                case MDL_ASSIGN:
-                        /* TEI assigned, LED1 on */
-                        cs->hw.njet.auxd = TJ_AMD_IRQ << 1;
-                        OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
-                        break;
-                case MDL_REMOVE:
-                        /* TEI removed, LEDs off */
-	                cs->hw.njet.auxd = 0;
-                        OutByte(cs->hw.njet.base + NETJET_AUXDATA, 0x00);
-                        break;
+	if (cs->status & 0x0001) {
+		/* TEI assigned, LED1 on */
+		cs->hw.njet.auxd = TJ_AMD_IRQ << 1;
+		OutByte(cs->hw.njet.base + NETJET_AUXDATA, cs->hw.njet.auxd);
+	} else {
+		/* TEI removed, LEDs off */
+		cs->hw.njet.auxd = 0;
+		OutByte(cs->hw.njet.base + NETJET_AUXDATA, 0x00);
 	}
-	return(0);
 }
 
 static void
@@ -262,10 +255,11 @@ enpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 }
 
 static struct card_ops enpci_ops = {
-	.init     = enpci_init,
-	.reset    = enpci_reset,
-	.release  = netjet_release,
-	.irq_func = enpci_interrupt,
+	.init        = enpci_init,
+	.reset       = enpci_reset,
+	.release     = netjet_release,
+	.led_handler = enpci_led_handler,
+	.irq_func    = enpci_interrupt,
 };
 
 static struct pci_dev *dev_netjet __initdata = NULL;
@@ -350,7 +344,6 @@ setup_enternow_pci(struct IsdnCard *card)
 	cs->dc_hw_ops = &enternow_ops;
         cs->dc.amd7930.setIrqMask = &enpci_setIrqMask;
 
-	cs->cardmsg = &enpci_card_msg;
 	cs->irq_flags |= SA_SHIRQ;
 	cs->card_ops = &enpci_ops;
 

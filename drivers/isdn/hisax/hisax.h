@@ -70,9 +70,6 @@
 #define MDL_ASSIGN	0x0280
 #define MDL_REMOVE	0x0284
 #define MDL_ERROR	0x0288
-#define MDL_INFO_SETUP	0x02E0
-#define MDL_INFO_CONN	0x02E4
-#define MDL_INFO_REL	0x02E8
 
 #define CC_SETUP	0x0300
 #define CC_RESUME	0x0304
@@ -619,7 +616,6 @@ struct diva_hw {
 	unsigned int isac;
 	unsigned long hscx_adr;
 	unsigned int hscx;
-	unsigned int status;
 	struct timer_list tl;
 	u8 ctrl_reg;
 };
@@ -885,12 +881,13 @@ struct IsdnCardState;
 /* Methods provided by driver for a specific card */
 
 struct card_ops {
-	void   (*init)      (struct IsdnCardState *);
-	void   (*test)      (struct IsdnCardState *);
-	int    (*reset)     (struct IsdnCardState *);
-	void   (*release)   (struct IsdnCardState *);
-	void   (*aux_ind)   (struct IsdnCardState *, void *);
-	void   (*irq_func)  (int, void *, struct pt_regs *);
+	void   (*init)       (struct IsdnCardState *);
+	void   (*test)       (struct IsdnCardState *);
+	int    (*reset)      (struct IsdnCardState *);
+	void   (*release)    (struct IsdnCardState *);
+	void   (*aux_ind)    (struct IsdnCardState *, void *);
+	void   (*led_handler)(struct IsdnCardState *);
+	void   (*irq_func)   (int, void *, struct pt_regs *);
 };
 
 /* Card specific drivers provide methods to access the
@@ -950,6 +947,7 @@ struct IsdnCardState {
 	struct resources rs;
 	unsigned int irq;
 	unsigned long irq_flags;
+	int status;
 	long HW_Flags;
 	int *busy_flag;
         int chanlimit; /* limited number of B-chans to use */
