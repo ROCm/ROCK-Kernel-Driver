@@ -514,9 +514,11 @@ no_rx_wrap:
 no_rx_buf:
 			usb_free_urb(urb);
 no_rx_urb:
+			;
 		}
 		kfree(info);
 no_private:
+		;
 	}
 	return -ENOMEM;
 }
