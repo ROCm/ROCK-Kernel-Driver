@@ -1081,15 +1081,28 @@ static int ext3_prepare_write(struct file *file, struct page *page,
 	struct inode *inode = page->mapping->host;
 	int ret, needed_blocks = ext3_writepage_trans_blocks(inode);
 	handle_t *handle;
+	int tried_commit = 0;
 
+retry:
 	handle = ext3_journal_start(inode, needed_blocks);
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
 		goto out;
 	}
 	ret = block_prepare_write(page, from, to, ext3_get_block);
-	if (ret != 0)
-		goto prepare_write_failed;
+	if (ret) {
+		if (ret != -ENOSPC || tried_commit)
+			goto prepare_write_failed;
+		/*
+		 * It could be that there _is_ free space, but it's all tied up
+		 * in uncommitted bitmaps.  So force a commit here, which makes
+		 * those blocks allocatable and try again.
+		 */
+		tried_commit = 1;
+		handle->h_sync = 1;
+		ext3_journal_stop(handle);
+		goto retry;
+	}
 
 	if (ext3_should_journal_data(inode)) {
 		ret = walk_page_buffers(handle, page_buffers(page),
