@@ -95,8 +95,8 @@ void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	struct ipv6hdr *iph = (struct ipv6hdr *)skb->data;
 	struct sctphdr *sh = (struct sctphdr *)(skb->data + offset);
 	struct sock *sk;
-	sctp_endpoint_t *ep;
-	sctp_association_t *asoc;
+	struct sctp_endpoint *ep;
+	struct sctp_association *asoc;
 	struct sctp_transport *transport;
 	struct ipv6_pinfo *np;
 	char *saveip, *savesctp;
@@ -116,7 +116,7 @@ void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 		return;
 	}
 
-	/* Warning:  The sock lock is held.  Remember to call 
+	/* Warning:  The sock lock is held.  Remember to call
 	 * sctp_err_finish!
 	 */
 
@@ -142,7 +142,7 @@ out_unlock:
 }
 
 /* Based on tcp_v6_xmit() in tcp_ipv6.c. */
-static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport, 
+static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 			int ipfragok)
 {
 	struct sock *sk = skb->sk;
@@ -187,7 +187,7 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 /* Returns the dst cache entry for the given source and destination ip
  * addresses.
  */
-struct dst_entry *sctp_v6_get_dst(sctp_association_t *asoc,
+struct dst_entry *sctp_v6_get_dst(struct sctp_association *asoc,
 				  union sctp_addr *daddr,
 				  union sctp_addr *saddr)
 {
@@ -245,7 +245,7 @@ static inline int sctp_v6_addr_match_len(union sctp_addr *s1,
 /* Fills in the source address(saddr) based on the destination address(daddr)
  * and asoc's bind address list.
  */
-void sctp_v6_get_saddr(sctp_association_t *asoc, struct dst_entry *dst,
+void sctp_v6_get_saddr(struct sctp_association *asoc, struct dst_entry *dst,
 		       union sctp_addr *daddr, union sctp_addr *saddr)
 {
 	sctp_bind_addr_t *bp;
@@ -385,7 +385,7 @@ static void sctp_v6_dst_saddr(union sctp_addr *addr, struct dst_entry *dst,
 	ipv6_addr_copy(&addr->v6.sin6_addr, &rt->rt6i_src.addr);
 }
 
-/* Compare addresses exactly.  
+/* Compare addresses exactly.
  * FIXME: v4-mapped-v6.
  */
 static int sctp_v6_cmp_addr(const union sctp_addr *addr1,
@@ -562,7 +562,7 @@ static void sctp_inet6_msgname(char *msgname, int *addr_len)
 }
 
 /* Initialize a PF_INET msgname from a ulpevent. */
-static void sctp_inet6_event_msgname(struct sctp_ulpevent *event, 
+static void sctp_inet6_event_msgname(struct sctp_ulpevent *event,
 				     char *msgname, int *addrlen)
 {
 	struct sockaddr_in6 *sin6, *sin6from;
@@ -589,7 +589,7 @@ static void sctp_inet6_event_msgname(struct sctp_ulpevent *event,
 
 		sin6from = &event->asoc->peer.primary_addr.v6;
 		ipv6_addr_copy(&sin6->sin6_addr, &sin6from->sin6_addr);
-		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL) 
+		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL)
 			sin6->sin6_scope_id = sin6from->sin6_scope_id;
 	}
 }
@@ -689,7 +689,7 @@ static int sctp_inet6_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 			if (addr->v6.sin6_scope_id)
 				sk->bound_dev_if = addr->v6.sin6_scope_id;
 			if (!sk->bound_dev_if)
-				return 0;			
+				return 0;
 		}
 		af = opt->pf->af;
 	}
@@ -719,11 +719,11 @@ static int sctp_inet6_send_verify(struct sctp_opt *opt, union sctp_addr *addr)
 			if (addr->v6.sin6_scope_id)
 				sk->bound_dev_if = addr->v6.sin6_scope_id;
 			if (!sk->bound_dev_if)
-				return 0;			
+				return 0;
 		}
 		af = opt->pf->af;
 	}
-	
+
 	return af != NULL;
 }
 

@@ -2064,7 +2064,7 @@ int sctp_process_param(struct sctp_association *asoc, union sctp_params param,
 }
 
 /* Select a new verification tag.  */
-__u32 sctp_generate_tag(const sctp_endpoint_t *ep)
+__u32 sctp_generate_tag(const struct sctp_endpoint *ep)
 {
 	/* I believe that this random number generator complies with RFC1750.
 	 * A tag of 0 is reserved for special cases (e.g. INIT).
@@ -2079,7 +2079,7 @@ __u32 sctp_generate_tag(const sctp_endpoint_t *ep)
 }
 
 /* Select an initial TSN to send during startup.  */
-__u32 sctp_generate_tsn(const sctp_endpoint_t *ep)
+__u32 sctp_generate_tsn(const struct sctp_endpoint *ep)
 {
 	__u32 retval;
 

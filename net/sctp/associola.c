@@ -58,23 +58,23 @@
 #include <net/sctp/sctp.h>
 
 /* Forward declarations for internal functions. */
-static void sctp_assoc_bh_rcv(sctp_association_t *asoc);
+static void sctp_assoc_bh_rcv(struct sctp_association *asoc);
 
 
 /* 1st Level Abstractions. */
 
 /* Allocate and initialize a new association */
-sctp_association_t *sctp_association_new(const sctp_endpoint_t *ep,
+struct sctp_association *sctp_association_new(const struct sctp_endpoint *ep,
 					 const struct sock *sk,
-					 sctp_scope_t scope, int priority)
+					 sctp_scope_t scope, int gfp)
 {
-	sctp_association_t *asoc;
+	struct sctp_association *asoc;
 
-	asoc = t_new(sctp_association_t, priority);
+	asoc = t_new(struct sctp_association, gfp);
 	if (!asoc)
 		goto fail;
 
-	if (!sctp_association_init(asoc, ep, sk, scope, priority))
+	if (!sctp_association_init(asoc, ep, sk, scope, gfp))
 		goto fail_init;
 
 	asoc->base.malloced = 1;
@@ -89,11 +89,11 @@ fail:
 }
 
 /* Intialize a new association from provided memory. */
-sctp_association_t *sctp_association_init(sctp_association_t *asoc,
-					  const sctp_endpoint_t *ep,
+struct sctp_association *sctp_association_init(struct sctp_association *asoc,
+					  const struct sctp_endpoint *ep,
 					  const struct sock *sk,
 					  sctp_scope_t scope,
-					  int priority)
+					  int gfp)
 {
 	struct sctp_opt *sp;
 	struct sctp_protocol *proto = sctp_get_protocol();
@@ -103,10 +103,10 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	sp = sctp_sk((struct sock *)sk);
 
 	/* Init all variables to a known value.  */
-	memset(asoc, 0, sizeof(sctp_association_t));
+	memset(asoc, 0, sizeof(struct sctp_association));
 
 	/* Discarding const is appropriate here.  */
-	asoc->ep = (sctp_endpoint_t *)ep;
+	asoc->ep = (struct sctp_endpoint *)ep;
 	sctp_endpoint_hold(asoc->ep);
 
 	/* Hold the sock.  */
@@ -289,7 +289,7 @@ fail_init:
 /* Free this association if possible.  There may still be users, so
  * the actual deallocation may be delayed.
  */
-void sctp_association_free(sctp_association_t *asoc)
+void sctp_association_free(struct sctp_association *asoc)
 {
 	struct sock *sk = asoc->base.sk;
 	struct sctp_transport *transport;
@@ -352,7 +352,7 @@ void sctp_association_free(sctp_association_t *asoc)
 }
 
 /* Cleanup and free up an association. */
-static void sctp_association_destroy(sctp_association_t *asoc)
+static void sctp_association_destroy(struct sctp_association *asoc)
 {
 	SCTP_ASSERT(asoc->base.dead, "Assoc is not dead", return);
 
@@ -385,7 +385,7 @@ void sctp_assoc_set_primary(struct sctp_association *asoc,
 /* Add a transport address to an association.  */
 struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 					   const union sctp_addr *addr,
-					   int priority)
+					   int gfp)
 {
 	struct sctp_transport *peer;
 	struct sctp_opt *sp;
@@ -404,7 +404,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	if (peer)
 		return peer;
 
-	peer = sctp_transport_new(addr, priority);
+	peer = sctp_transport_new(addr, gfp);
 	if (!peer)
 		return NULL;
 
@@ -490,8 +490,9 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 }
 
 /* Lookup a transport by address. */
-struct sctp_transport *sctp_assoc_lookup_paddr(const sctp_association_t *asoc,
-					  const union sctp_addr *address)
+struct sctp_transport *sctp_assoc_lookup_paddr(
+					const struct sctp_association *asoc,
+					const union sctp_addr *address)
 {
 	struct sctp_transport *t;
 	struct list_head *pos;
@@ -511,7 +512,7 @@ struct sctp_transport *sctp_assoc_lookup_paddr(const sctp_association_t *asoc,
  * Mark the transport up or down and send a notification to the user.
  * Select and update the new active and retran paths.
  */
-void sctp_assoc_control_transport(sctp_association_t *asoc,
+void sctp_assoc_control_transport(struct sctp_association *asoc,
 				  struct sctp_transport *transport,
 				  sctp_transport_cmd_t command,
 				  sctp_sn_error_t error)
@@ -601,7 +602,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 }
 
 /* Hold a reference to an association. */
-void sctp_association_hold(sctp_association_t *asoc)
+void sctp_association_hold(struct sctp_association *asoc)
 {
 	atomic_inc(&asoc->base.refcnt);
 }
@@ -609,7 +610,7 @@ void sctp_association_hold(sctp_association_t *asoc)
 /* Release a reference to an association and cleanup
  * if there are no more references.
  */
-void sctp_association_put(sctp_association_t *asoc)
+void sctp_association_put(struct sctp_association *asoc)
 {
 	if (atomic_dec_and_test(&asoc->base.refcnt))
 		sctp_association_destroy(asoc);
@@ -618,7 +619,7 @@ void sctp_association_put(sctp_association_t *asoc)
 /* Allocate the next TSN, Transmission Sequence Number, for the given
  * association.
  */
-__u32 sctp_association_get_next_tsn(sctp_association_t *asoc)
+__u32 sctp_association_get_next_tsn(struct sctp_association *asoc)
 {
 	/* From Section 1.6 Serial Number Arithmetic:
 	 * Transmission Sequence Numbers wrap around when they reach
@@ -633,7 +634,7 @@ __u32 sctp_association_get_next_tsn(sctp_association_t *asoc)
 }
 
 /* Allocate 'num' TSNs by incrementing the association's TSN by num. */
-__u32 sctp_association_get_tsn_block(sctp_association_t *asoc, int num)
+__u32 sctp_association_get_tsn_block(struct sctp_association *asoc, int num)
 {
 	__u32 retval = asoc->next_tsn;
 
@@ -681,7 +682,7 @@ sctp_chunk_t *sctp_get_ecne_prepend(struct sctp_association *asoc)
 /* Use this function for the packet prepend callback when no ECNE
  * packet is desired (e.g. some packets don't like to be bundled).
  */
-sctp_chunk_t *sctp_get_no_prepend(sctp_association_t *asoc)
+sctp_chunk_t *sctp_get_no_prepend(struct sctp_association *asoc)
 {
 	return NULL;
 }
@@ -689,7 +690,7 @@ sctp_chunk_t *sctp_get_no_prepend(sctp_association_t *asoc)
 /*
  * Find which transport this TSN was sent on.
  */
-struct sctp_transport *sctp_assoc_lookup_tsn(sctp_association_t *asoc, __u32 tsn)
+struct sctp_transport *sctp_assoc_lookup_tsn(struct sctp_association *asoc, __u32 tsn)
 {
 	struct sctp_transport *active;
 	struct sctp_transport *match;
@@ -746,7 +747,7 @@ out:
 }
 
 /* Is this the association we are looking for? */
-struct sctp_transport *sctp_assoc_is_match(sctp_association_t *asoc,
+struct sctp_transport *sctp_assoc_is_match(struct sctp_association *asoc,
 					   const union sctp_addr *laddr,
 					   const union sctp_addr *paddr)
 {
@@ -772,9 +773,9 @@ out:
 }
 
 /* Do delayed input processing.  This is scheduled by sctp_rcv(). */
-static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
+static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 {
-	sctp_endpoint_t *ep;
+	struct sctp_endpoint *ep;
 	sctp_chunk_t *chunk;
 	struct sock *sk;
 	struct sctp_inq *inqueue;
@@ -820,7 +821,7 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 }
 
 /* This routine moves an association from its old sk to a new sk.  */
-void sctp_assoc_migrate(sctp_association_t *assoc, struct sock *newsk)
+void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 {
 	struct sctp_opt *newsp = sctp_sk(newsk);
 	struct sock *oldsk = assoc->base.sk;
@@ -851,7 +852,7 @@ void sctp_assoc_migrate(sctp_association_t *assoc, struct sock *newsk)
 }
 
 /* Update an association (possibly from unexpected COOKIE-ECHO processing).  */
-void sctp_assoc_update(sctp_association_t *asoc, sctp_association_t *new)
+void sctp_assoc_update(struct sctp_association *asoc, struct sctp_association *new)
 {
 	/* Copy in new parameters of peer. */
 	asoc->c = new->c;
@@ -899,7 +900,7 @@ void sctp_assoc_update(sctp_association_t *asoc, sctp_association_t *new)
  * through the inactive transports as this is the next best thing
  * we can try.
  */
-void sctp_assoc_update_retran_path(sctp_association_t *asoc)
+void sctp_assoc_update_retran_path(struct sctp_association *asoc)
 {
 	struct sctp_transport *t, *next;
 	struct list_head *head = &asoc->peer.transport_addr_list;
@@ -945,7 +946,7 @@ void sctp_assoc_update_retran_path(sctp_association_t *asoc)
 }
 
 /* Choose the transport for sending a SHUTDOWN packet.  */
-struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *asoc)
+struct sctp_transport *sctp_assoc_choose_shutdown_transport(struct sctp_association *asoc)
 {
 	/* If this is the first time SHUTDOWN is sent, use the active path,
 	 * else use the retran path. If the last SHUTDOWN was sent over the
@@ -964,7 +965,7 @@ struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *
 /* Update the association's pmtu and frag_point by going through all the
  * transports. This routine is called when a transport's PMTU has changed.
  */
-void sctp_assoc_sync_pmtu(sctp_association_t *asoc)
+void sctp_assoc_sync_pmtu(struct sctp_association *asoc)
 {
 	struct sctp_transport *t;
 	struct list_head *pos;
@@ -1008,7 +1009,7 @@ static inline int sctp_peer_needs_update(struct sctp_association *asoc)
 }
 
 /* Increase asoc's rwnd by len and send any window update SACK if needed. */
-void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
+void sctp_assoc_rwnd_increase(struct sctp_association *asoc, int len)
 {
 	sctp_chunk_t *sack;
 	struct timer_list *timer;
@@ -1054,7 +1055,7 @@ void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 }
 
 /* Decrease asoc's rwnd by len. */
-void sctp_assoc_rwnd_decrease(sctp_association_t *asoc, int len)
+void sctp_assoc_rwnd_decrease(struct sctp_association *asoc, int len)
 {
 	SCTP_ASSERT(asoc->rwnd, "rwnd zero", return);
 	SCTP_ASSERT(!asoc->rwnd_over, "rwnd_over not zero", return);
@@ -1093,7 +1094,7 @@ int sctp_assoc_set_bind_addr_from_ep(struct sctp_association *asoc, int gfp)
 }
 
 /* Build the association's bind address list from the cookie.  */
-int sctp_assoc_set_bind_addr_from_cookie(sctp_association_t *asoc,
+int sctp_assoc_set_bind_addr_from_cookie(struct sctp_association *asoc,
 					 sctp_cookie_t *cookie, int gfp)
 {
 	int var_size2 = ntohs(cookie->peer_init->chunk_hdr.length);

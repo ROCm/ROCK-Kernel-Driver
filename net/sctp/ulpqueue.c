@@ -57,11 +57,11 @@ static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *,
 /* 1st Level Abstractions */
 
 /* Create a new ULP queue.  */
-struct sctp_ulpq *sctp_ulpq_new(sctp_association_t *asoc, int priority)
+struct sctp_ulpq *sctp_ulpq_new(struct sctp_association *asoc, int gfp)
 {
 	struct sctp_ulpq *ulpq;
 
-	ulpq = kmalloc(sizeof(struct sctp_ulpq), priority);
+	ulpq = kmalloc(sizeof(struct sctp_ulpq), gfp);
 	if (!ulpq)
 		goto fail;
 	if (!sctp_ulpq_init(ulpq, asoc))
@@ -77,7 +77,7 @@ fail:
 
 /* Initialize a ULP queue from a block of memory.  */
 struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *ulpq,
-				 sctp_association_t *asoc)
+				 struct sctp_association *asoc)
 {
 	memset(ulpq, sizeof(struct sctp_ulpq), 0x00);
 
@@ -119,7 +119,7 @@ void sctp_ulpq_free(struct sctp_ulpq *ulpq)
 
 /* Process an incoming DATA chunk.  */
 int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
-			int priority)
+			int gfp)
 {
 	struct sk_buff_head temp;
 	sctp_data_chunk_t *hdr;
@@ -128,7 +128,7 @@ int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
 	hdr = (sctp_data_chunk_t *) chunk->chunk_hdr;
 
 	/* Create an event from the incoming chunk. */
-	event = sctp_ulpevent_make_rcvmsg(chunk->asoc, chunk, priority);
+	event = sctp_ulpevent_make_rcvmsg(chunk->asoc, chunk, gfp);
 	if (!event)
 		return -ENOMEM;
 
@@ -705,7 +705,7 @@ static __u16 sctp_ulpq_renege_frags(struct sctp_ulpq *ulpq, __u16 needed)
 
 /* Partial deliver the first message as there is pressure on rwnd. */
 void sctp_ulpq_partial_delivery(struct sctp_ulpq *ulpq,
-				struct sctp_chunk *chunk, int priority)
+				struct sctp_chunk *chunk, int gfp)
 {
 	struct sctp_ulpevent *event;
 	struct sctp_association *asoc;
@@ -729,7 +729,7 @@ void sctp_ulpq_partial_delivery(struct sctp_ulpq *ulpq,
 
 /* Renege some packets to make room for an incoming chunk.  */
 void sctp_ulpq_renege(struct sctp_ulpq *ulpq, struct sctp_chunk *chunk,
-		      int priority)
+		      int gfp)
 {
 	struct sctp_association *asoc;
 	__u16 needed, freed;
@@ -755,9 +755,9 @@ void sctp_ulpq_renege(struct sctp_ulpq *ulpq, struct sctp_chunk *chunk,
 		__u32 tsn;
 		tsn = ntohl(chunk->subh.data_hdr->tsn);
 		sctp_tsnmap_mark(&asoc->peer.tsn_map, tsn);
-		sctp_ulpq_tail_data(ulpq, chunk, priority);
+		sctp_ulpq_tail_data(ulpq, chunk, gfp);
 		
-		sctp_ulpq_partial_delivery(ulpq, chunk, priority);
+		sctp_ulpq_partial_delivery(ulpq, chunk, gfp);
 	}
 
 	return;
@@ -768,7 +768,7 @@ void sctp_ulpq_renege(struct sctp_ulpq *ulpq, struct sctp_chunk *chunk,
 /* Notify the application if an association is aborted and in
  * partial delivery mode.  Send up any pending received messages.
  */
-void sctp_ulpq_abort_pd(struct sctp_ulpq *ulpq, int priority)
+void sctp_ulpq_abort_pd(struct sctp_ulpq *ulpq, int gfp)
 {
 	struct sctp_ulpevent *ev = NULL;
 	struct sock *sk;
@@ -781,7 +781,7 @@ void sctp_ulpq_abort_pd(struct sctp_ulpq *ulpq, int priority)
 				       &sctp_sk(sk)->subscribe))
 		ev = sctp_ulpevent_make_pdapi(ulpq->asoc,
 					      SCTP_PARTIAL_DELIVERY_ABORTED,
-					      priority);
+					      gfp);
 	if (ev)
 		__skb_queue_tail(&sk->receive_queue, sctp_event2skb(ev));
 

@@ -83,14 +83,11 @@ struct sctp_outq;
 struct sctp_bind_addr;
 struct sctp_ulpq;
 struct sctp_opt;
-struct sctp_endpoint_common;
+struct sctp_ep_common;
 struct sctp_ssnmap;
 
-typedef struct sctp_endpoint sctp_endpoint_t;
-typedef struct sctp_association sctp_association_t;
 typedef struct sctp_chunk sctp_chunk_t;
 typedef struct sctp_bind_addr sctp_bind_addr_t;
-typedef struct sctp_endpoint_common sctp_endpoint_common_t;
 
 #include <net/sctp/tsnmap.h>
 #include <net/sctp/ulpevent.h>
@@ -114,7 +111,7 @@ typedef struct sctp_bind_hashbucket {
 /* Used for hashing all associations.  */
 typedef struct sctp_hashbucket {
 	rwlock_t	lock;
-	sctp_endpoint_common_t  *chain;
+	struct sctp_ep_common  *chain;
 } sctp_hashbucket_t __attribute__((__aligned__(8)));
 
 
@@ -517,7 +514,7 @@ struct sctp_chunk {
 	struct sctp_association *asoc;
 
 	/* What endpoint received this chunk? */
-	sctp_endpoint_common_t *rcvr;
+	struct sctp_ep_common *rcvr;
 
 	/* We fill this in if we are calculating RTT. */
 	unsigned long sent_at;
@@ -976,7 +973,7 @@ int sctp_is_any(const union sctp_addr *addr);
 int sctp_addr_is_valid(const union sctp_addr *addr);
 
 
-/* What type of sctp_endpoint_common?  */
+/* What type of endpoint?  */
 typedef enum {
 	SCTP_EP_TYPE_SOCKET,
 	SCTP_EP_TYPE_ASSOCIATION,
@@ -998,10 +995,10 @@ typedef enum {
  *
  */
 
-struct sctp_endpoint_common {
+struct sctp_ep_common {
 	/* Fields to help us manage our entries in the hash tables. */
-	sctp_endpoint_common_t *next;
-	sctp_endpoint_common_t **pprev;
+	struct sctp_ep_common *next;
+	struct sctp_ep_common **pprev;
 	int hashent;
 
 	/* Runtime type information.  What kind of endpoint is this? */
@@ -1055,7 +1052,7 @@ struct sctp_endpoint_common {
 
 struct sctp_endpoint {
 	/* Common substructure for endpoint and association. */
-	sctp_endpoint_common_t base;
+	struct sctp_ep_common base;
 
 	/* Associations: A list of current associations and mappings
 	 *            to the data consumers for each association. This
@@ -1090,7 +1087,7 @@ struct sctp_endpoint {
 };
 
 /* Recover the outter endpoint structure. */
-static inline struct sctp_endpoint *sctp_ep(sctp_endpoint_common_t *base)
+static inline struct sctp_endpoint *sctp_ep(struct sctp_ep_common *base)
 {
 	struct sctp_endpoint *ep;
 
@@ -1110,7 +1107,7 @@ struct sctp_association *sctp_endpoint_lookup_assoc(
 	const struct sctp_endpoint *ep,
 	const union sctp_addr *paddr,
 	struct sctp_transport **);
-int sctp_endpoint_is_peeled_off(struct sctp_endpoint *, 
+int sctp_endpoint_is_peeled_off(struct sctp_endpoint *,
 				const union sctp_addr *);
 struct sctp_endpoint *sctp_endpoint_is_match(struct sctp_endpoint *,
 					const union sctp_addr *);
@@ -1149,7 +1146,7 @@ struct sctp_association {
 	 * In this context, it represents the associations's view
 	 * of the local endpoint of the association.
 	 */
-	sctp_endpoint_common_t base;
+	struct sctp_ep_common base;
 
 	/* Associations on the same socket. */
 	struct list_head asocs;
@@ -1558,7 +1555,7 @@ enum {
 };
 
 /* Recover the outter association structure. */
-static inline struct sctp_association *sctp_assoc(sctp_endpoint_common_t *base)
+static inline struct sctp_association *sctp_assoc(struct sctp_ep_common *base)
 {
 	struct sctp_association *asoc;
 
