@@ -341,10 +341,6 @@
       drivers will be on pci directory, because its API is identical
       with the standard PCI cards. 
       </para>
-
-      <para>
-        At this moment, only VX-pocket driver exists.
-      </para>
     </section>
 
     <section id="file-tree-oss-directory">
@@ -4094,14 +4090,11 @@ struct _snd_pcm_runtime {
         The <structfield>wait</structfield> callback is used for a
       certain wait at the standard initialization of the codec. If the
       chip requires the extra wait-time, define this callback. 
-      This callback is always non-atomic, because it's never called
-      in the resume mode.
       </para>
 
       <para>
         The <structfield>init</structfield> callback is used for
-      additional initialization of the codec.  This callback is called
-      after the reset, and should be atomic in the resume mode.
+      additional initialization of the codec.
       </para>
     </section>
 
@@ -4674,10 +4667,7 @@ struct _snd_pcm_runtime {
           </programlisting>
         </informalexample>
 
-        Note that you have to pre-allocate to use this function
-        (i.e. you cannot use this function for
-        <link linkend="buffer-and-memory-non-contiguous"><citetitle>
-        a scatter-gather buffer</citetitle></link>).
+        Note that you have to pre-allocate to use this function.
       </para>
     </section>
 
@@ -4905,6 +4895,8 @@ struct _snd_pcm_runtime {
         When a SG-handler is used, you need to set
       <function>snd_pcm_sgbuf_ops_page</function> as
       the <structfield>page</structfield> callback.
+      (See <link linkend="pcm-interface-operators-page-callback">
+      <citetitle>page callback section</citetitle></link>.)
       </para>
 
       <para>
