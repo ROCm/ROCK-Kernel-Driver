@@ -40,7 +40,7 @@
  * $FreeBSD$
  */
 
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#77 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#78 $"
 PATCH_ARG_LIST = "struct ahd_softc *ahd"
 PREFIX = "ahd_"
 
@@ -107,6 +107,16 @@ idle_loop_gsfifo_in_scsi_mode:
 good_status_IU_done:
 	bmov	SCBPTR, GSFIFO, 2;
 	clr	SCB_SCSI_STATUS;
+	/*
+	 * If a command completed before an attempted task management
+	 * function completed, notify the host after disabling any
+	 * pending select-outs.
+	 */
+	test	SCB_TASK_MANAGEMENT, 0xFF jz gsfifo_complete_normally;
+	test	SSTAT0, SELDO|SELINGO jnz . + 2;
+	and	SCSISEQ0, ~ENSELO;
+	SET_SEQINTCODE(TASKMGMT_CMD_CMPLT_OKAY)
+gsfifo_complete_normally:
 	or	SCB_CONTROL, STATUS_RCVD;
 
 	/*
@@ -471,7 +481,7 @@ select_in:
 		/*
 		 * This exposes a window whereby a
 		 * busfree just after a selection will
-		 * be missed, but there is not other safe
+		 * be missed, but there is no other safe
 		 * way to enable busfree detection if
 		 * the busfreerev function is broken.
 		 */
@@ -597,7 +607,6 @@ select_out_inc_tid_q:
 	cmp	WAITING_TID_HEAD[1], SCB_LIST_NULL jne . + 2;
 	mvi	WAITING_TID_TAIL[1], SCB_LIST_NULL;
 	bmov	SCBPTR, CURRSCB, 2;
-END_CRITICAL;
 	mvi	CLRSINT0, CLRSELDO;
 	test	LQOSTAT2, LQOPHACHGOUTPKT jnz unexpected_nonpkt_phase;
 	test	LQOSTAT1, LQOPHACHGINPKT jnz unexpected_nonpkt_phase;
@@ -606,17 +615,23 @@ END_CRITICAL;
 	 * If this is a packetized connection, return to our
 	 * idle_loop and let our interrupt handler deal with
 	 * any connection setup/teardown issues.  The only
-	 * exception is the case of MK_MESSAGE SCBs.  In the
-	 * A, the LQO manager transitions to LQOSTOP0 even if
-	 * we have selected out with ATN asserted and the target
-	 * REQs in a non-packet phase.
+	 * exceptions are the case of MK_MESSAGE and task management
+	 * SCBs.
 	 */
 	if ((ahd->bugs & AHD_LQO_ATNO_BUG) != 0) {
+		/*
+		 * In the A, the LQO manager transitions to LQOSTOP0 even if
+		 * we have selected out with ATN asserted and the target
+		 * REQs in a non-packet phase.
+		 */
 		test 	SCB_CONTROL, MK_MESSAGE jz select_out_no_message;
 		test	SCSISIGO, ATNO jnz select_out_non_packetized;
 select_out_no_message:
 	}
-	test	LQOSTAT2, LQOSTOP0 jnz idle_loop;
+	test	LQOSTAT2, LQOSTOP0 jz select_out_non_packetized;
+	test	SCB_TASK_MANAGEMENT, 0xFF jz idle_loop;
+	SET_SEQINTCODE(TASKMGMT_FUNC_COMPLETE)
+	jmp	idle_loop;
 
 select_out_non_packetized:
 	/* Non packetized request. */
@@ -625,7 +640,7 @@ select_out_non_packetized:
 		/*
 		 * This exposes a window whereby a
 		 * busfree just after a selection will
-		 * be missed, but there is not other safe
+		 * be missed, but there is no other safe
 		 * way to enable busfree detection if
 		 * the busfreerev function is broken.
 		 */
@@ -634,6 +649,8 @@ select_out_non_packetized:
 	}
 	mov	SAVED_SCSIID, SCB_SCSIID;
 	mov	SAVED_LUN, SCB_LUN;
+	mvi	SEQ_FLAGS, NO_CDB_SENT;
+END_CRITICAL;
 	or	SXFRCTL0, SPIOEN;
 
 	/*
@@ -642,7 +659,6 @@ select_out_non_packetized:
 	 * asserted.
 	 */
 	mvi	MSG_OUT, MSG_IDENTIFYFLAG;
-	mvi	SEQ_FLAGS, NO_CDB_SENT;
 
 	/*
 	 * Main loop for information transfer phases.  Wait for the
@@ -1608,7 +1624,12 @@ cfg4istat_setup_handler:
 	/*
 	 * Status pkt is transferring to host.
 	 * Wait in idle loop for transfer to complete.
+	 * If a command completed before an attempted
+	 * task management function completed, notify the host.
 	 */
+	test	SCB_TASK_MANAGEMENT, 0xFF jz cfg4istat_no_taskmgmt_func;
+	SET_SEQINTCODE(TASKMGMT_CMD_CMPLT_OKAY)
+cfg4istat_no_taskmgmt_func:
 	call	pkt_handle_status;
 	or	SEQINTCTL, IRET ret;
 

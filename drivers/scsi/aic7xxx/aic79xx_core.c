@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#150 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#151 $
  *
  * $FreeBSD$
  */
@@ -438,11 +438,27 @@ ahd_flush_qoutfifo(struct ahd_softc *ahd)
 		scbid = next_scbid;
 	}
 	ahd_outw(ahd, COMPLETE_SCB_HEAD, SCB_LIST_NULL);
+	ahd_set_scbptr(ahd, saved_scbptr);
+
+	/*
+	 * Flush the good status FIFO for compelted packetized commands.
+	 */
+	ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
+	while ((ahd_inb(ahd, LQISTAT2) & LQIGSAVAIL) != 0) {
+		scbid = (ahd_inb(ahd, GSFIFO+1) << 8)
+		      | ahd_inb(ahd, GSFIFO);
+		scb = ahd_lookup_scb(ahd, scbid);
+		if (scb == NULL) {
+			printf("%s: Warning - GSFIFO SCB %d invalid\n",
+			       ahd_name(ahd), scbid);
+			continue;
+		}
+		ahd_complete_scb(ahd, scb);
+	}
 
 	/*
 	 * Restore state.
 	 */
-	ahd_set_scbptr(ahd, saved_scbptr);
 	ahd_restore_modes(ahd, saved_modes);
 	ahd->flags |= AHD_UPDATE_PEND_CMDS;
 }
@@ -986,6 +1002,63 @@ ahd_handle_seqint(struct ahd_softc *ahd, u_int intstat)
 					   SEARCH_REMOVE);
 		ahd_outb(ahd, SCB_CONTROL,
 			 ahd_inb(ahd, SCB_CONTROL) & ~MK_MESSAGE);
+		break;
+	}
+	case TASKMGMT_FUNC_COMPLETE:
+	{
+		u_int	scbid;
+		struct	scb *scb;
+
+		scbid = ahd_get_scbptr(ahd);
+		scb = ahd_lookup_scb(ahd, scbid);
+		if (scb != NULL) {
+			u_int	   lun;
+			u_int	   tag;
+			cam_status error;
+
+			lun = CAM_LUN_WILDCARD;
+			tag = SCB_LIST_NULL;
+
+			switch (scb->hscb->task_management) {
+			case SIU_TASKMGMT_ABORT_TASK:
+				tag = scb->hscb->tag;
+			case SIU_TASKMGMT_ABORT_TASK_SET:
+			case SIU_TASKMGMT_CLEAR_TASK_SET:
+				lun = scb->hscb->lun;
+				error = CAM_REQ_ABORTED;
+				break;
+			case SIU_TASKMGMT_LUN_RESET:
+				lun = scb->hscb->lun;
+			case SIU_TASKMGMT_TARGET_RESET:
+				error = CAM_BDR_SENT;
+				break;
+			default:
+				panic("Unexpected TaskMgmt Func\n");
+				break;
+			}
+			ahd_abort_scbs(ahd, SCB_GET_TARGET(ahd, scb),
+				       'A', lun, tag, ROLE_INITIATOR, error);
+		}
+		break;
+	}
+	case TASKMGMT_CMD_CMPLT_OKAY:
+	{
+		u_int	scbid;
+		struct	scb *scb;
+
+		scbid = ahd_get_scbptr(ahd);
+		scb = ahd_lookup_scb(ahd, scbid);
+		if (scb != NULL) {
+			/*
+                         * Remove the second instance of this SCB from
+			 * the QINFIFO if it is still there.
+                         */
+			ahd_search_qinfifo(ahd, SCB_GET_TARGET(ahd, scb),
+					   SCB_GET_CHANNEL(ahd, scb),  
+					   SCB_GET_LUN(scb), scb->hscb->tag, 
+					   ROLE_INITIATOR, /*status*/0,   
+					   SEARCH_REMOVE);
+		}
 		break;
 	}
 	case TRACEPOINT0:
@@ -2410,8 +2483,9 @@ ahd_update_neg_request(struct ahd_softc *ahd, struct ahd_devinfo *devinfo,
 		 * occurs the need to renegotiate is
 		 * recorded persistently.
 		 */
+		if ((ahd->features & AHD_WIDE) != 0)
+			tinfo->curr.width = AHD_WIDTH_UNKNOWN;
 		tinfo->curr.period = AHD_PERIOD_UNKNOWN;
-		tinfo->curr.width = AHD_WIDTH_UNKNOWN;
 		tinfo->curr.offset = AHD_OFFSET_UNKNOWN;
 	}
 	if (tinfo->curr.period != tinfo->goal.period
