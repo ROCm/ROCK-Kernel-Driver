@@ -16,7 +16,16 @@
 
 #include <asm/io.h>
 
+#ifdef CONFIG_PPC_OF
+#include <asm/prom.h>
+#endif
+
 #include <video/radeon.h>
+
+/* Some weird black magic use by Apple driver that we don't use for
+ * now --BenH
+ */
+#undef HAS_PLL_M9_GPIO_MAGIC
 
 /***************************************************************
  * Most of the definitions here are adapted right from XFree86 *
@@ -33,7 +42,8 @@ enum radeon_family {
 	CHIP_FAMILY_RV100,
 	CHIP_FAMILY_RS100,    /* U1 (IGP320M) or A3 (IGP320)*/
 	CHIP_FAMILY_RV200,
-	CHIP_FAMILY_RS200,    /* U2 (IGP330M/340M/350M) or A4 (IGP330/340/345/350), RS250 (IGP 7000) */
+	CHIP_FAMILY_RS200,    /* U2 (IGP330M/340M/350M) or A4 (IGP330/340/345/350),
+				 RS250 (IGP 7000) */
 	CHIP_FAMILY_R200,
 	CHIP_FAMILY_RV250,
 	CHIP_FAMILY_RS300,    /* Radeon 9000 IGP */
@@ -41,8 +51,25 @@ enum radeon_family {
 	CHIP_FAMILY_R300,
 	CHIP_FAMILY_R350,
 	CHIP_FAMILY_RV350,
+	CHIP_FAMILY_RV380,    /* RV370/RV380/M22/M24 */
+	CHIP_FAMILY_R420,     /* R420/R423/M18 */
 	CHIP_FAMILY_LAST,
 };
+
+#define IS_RV100_VARIANT(rinfo) (((rinfo)->family == CHIP_FAMILY_RV100)  || \
+				 ((rinfo)->family == CHIP_FAMILY_RV200)  || \
+				 ((rinfo)->family == CHIP_FAMILY_RS100)  || \
+				 ((rinfo)->family == CHIP_FAMILY_RS200)  || \
+				 ((rinfo)->family == CHIP_FAMILY_RV250)  || \
+				 ((rinfo)->family == CHIP_FAMILY_RV280)  || \
+				 ((rinfo)->family == CHIP_FAMILY_RS300))
+
+
+#define IS_R300_VARIANT(rinfo) (((rinfo)->family == CHIP_FAMILY_R300)  || \
+				((rinfo)->family == CHIP_FAMILY_RV350) || \
+				((rinfo)->family == CHIP_FAMILY_R350)  || \
+				((rinfo)->family == CHIP_FAMILY_RV380) || \
+				((rinfo)->family == CHIP_FAMILY_R420))
 
 /*
  * Chip flags
@@ -100,21 +127,6 @@ struct pll_info {
 	int sclk, mclk;
 	int ref_div;
 	int ref_clk;
-};
-
-/*
- * VRAM infos
- */
-struct ram_info {
-	int ml;
-	int mb;
-	int trcd;
-	int trp;
-	int twr;
-	int cl;
-	int tr2w;
-	int loop_latency;
-	int rloop;
 };
 
 
@@ -210,6 +222,7 @@ struct radeon_regs {
 	u32		ppll_div_3;
 	u32		ppll_ref_div;
 	u32		vclk_ecp_cntl;
+	u32		clk_cntl_index;
 
 	/* Computed values for PLL2 */
 	u32		dot_clock_freq_2;
@@ -250,6 +263,12 @@ struct radeon_i2c_chan {
 };
 #endif
 
+enum radeon_pm_mode {
+	radeon_pm_none	= 0,		/* Nothing supported */
+	radeon_pm_d2	= 0x00000001,	/* Can do D2 state */
+	radeon_pm_off	= 0x00000002,	/* Can resume from D3 cold */
+};
+
 struct radeonfb_info {
 	struct fb_info		*info;
 
@@ -257,7 +276,6 @@ struct radeonfb_info {
 	struct radeon_regs	init_state;
 
 	char			name[DEVICE_NAME_SIZE];
-	char			ram_type[12];
 
 	unsigned long		mmio_base_phys;
 	unsigned long		fb_base_phys;
@@ -268,6 +286,9 @@ struct radeonfb_info {
 	unsigned long		fb_local_base;
 
 	struct pci_dev		*pdev;
+#ifdef CONFIG_PPC_OF
+	struct device_node	*of_node;
+#endif
 
 	void __iomem		*bios_seg;
 	int			fp_bios_start;
@@ -281,6 +302,8 @@ struct radeonfb_info {
 	u8			rev;
 	unsigned long		video_ram;
 	unsigned long		mapped_vram;
+	int			vram_width;
+	int			vram_ddr;
 
 	int			pitch, bpp, depth;
 
@@ -288,6 +311,7 @@ struct radeonfb_info {
 	int			is_mobility;
 	int			is_IGP;
 	int			R300_cg_workaround;
+	int			m9p_workaround;
 	int			reversed_DAC;
 	int			reversed_TMDS;
 	struct panel_info	panel_info;
@@ -302,14 +326,16 @@ struct radeonfb_info {
 
 	struct pll_info		pll;
 
-	struct ram_info		ram;
-
 	int			mtrr_hdl;
 
 	int			pm_reg;
-	u32			save_regs[64];
+	u32			save_regs[100];
 	int			asleep;
 	int			lock_blank;
+	int			dynclk;
+	int			no_schedule;
+	enum radeon_pm_mode	pm_mode;
+	void			(*reinit_func)(struct radeonfb_info *rinfo);
 
 	/* Lock on register access */
 	spinlock_t		reg_lock;
@@ -317,11 +343,12 @@ struct radeonfb_info {
 	/* Timer used for delayed LVDS operations */
 	struct timer_list	lvds_timer;
 	u32			pending_lvds_gen_cntl;
-	u32			pending_pixclks_cntl;
 
 #ifdef CONFIG_FB_RADEON_I2C
 	struct radeon_i2c_chan 	i2c[4];
 #endif
+
+	u32			cfg_save[64];
 };
 
 
@@ -353,6 +380,22 @@ struct radeonfb_info {
 #define INREG(addr)		readl((rinfo->mmio_base)+addr)
 #define OUTREG(addr,val)	writel(val, (rinfo->mmio_base)+addr)
 
+static inline void _OUTREGP(struct radeonfb_info *rinfo, u32 addr,
+		       u32 val, u32 mask)
+{
+	unsigned long flags;
+	unsigned int tmp;
+
+	spin_lock_irqsave(&rinfo->reg_lock, flags);
+	tmp = INREG(addr);
+	tmp &= (mask);
+	tmp |= (val);
+	OUTREG(addr, tmp);
+	spin_unlock_irqrestore(&rinfo->reg_lock, flags);
+}
+
+#define OUTREGP(addr,val,mask)	_OUTREGP(rinfo, addr, val,mask)
+
 static inline void R300_cg_workardound(struct radeonfb_info *rinfo)
 {
 	u32 save, tmp;
@@ -363,18 +406,35 @@ static inline void R300_cg_workardound(struct radeonfb_info *rinfo)
 	OUTREG(CLOCK_CNTL_INDEX, save);
 }
 
-#define __OUTPLL(addr,val)	\
-	do {	\
-		OUTREG8(CLOCK_CNTL_INDEX, (addr & 0x0000003f) | 0x00000080); \
-		OUTREG(CLOCK_CNTL_DATA, val); \
-} while(0)
-
 
 static inline u32 __INPLL(struct radeonfb_info *rinfo, u32 addr)
 {
 	u32 data;
+#ifdef HAS_PLL_M9_GPIO_MAGIC
+	u32 sv[3];
+
+	if (rinfo->m9p_workaround) {
+		sv[0] = INREG(0x19c);
+		sv[1] = INREG(0x1a0);
+		sv[2] = INREG(0x198);
+		OUTREG(0x198, 0);
+		OUTREG(0x1a0, 0);
+		OUTREG(0x19c, 0);
+	}
+#endif /* HAS_PLL_M9_GPIO_MAGIC */
+
 	OUTREG8(CLOCK_CNTL_INDEX, addr & 0x0000003f);
 	data = (INREG(CLOCK_CNTL_DATA));
+
+#ifdef HAS_PLL_M9_GPIO_MAGIC
+	if (rinfo->m9p_workaround) {
+		(void)INREG(CRTC_GEN_CNTL);
+		data = INREG(CLOCK_CNTL_DATA);
+		OUTREG(0x19c, sv[0]);
+		OUTREG(0x1a0, sv[1]);
+		OUTREG(0x198, sv[2]);
+	}
+#endif /* HAS_PLL_M9_GPIO_MAGIC */
 	if (rinfo->R300_cg_workaround)
 		R300_cg_workardound(rinfo);
 	return data;
@@ -393,37 +453,61 @@ static inline u32 _INPLL(struct radeonfb_info *rinfo, u32 addr)
 
 #define INPLL(addr)		_INPLL(rinfo, addr)
 
-#define OUTPLL(addr,val)	\
-	do {	\
-		unsigned long flags;\
-		spin_lock_irqsave(&rinfo->reg_lock, flags); \
-		__OUTPLL(addr, val); \
-		spin_unlock_irqrestore(&rinfo->reg_lock, flags); \
-	} while(0)
 
-#define OUTPLLP(addr,val,mask)  					\
-	do {								\
-		unsigned long flags;                                    \
-		unsigned int _tmp;					\
-		spin_lock_irqsave(&rinfo->reg_lock, flags); 		\
-		_tmp  = __INPLL(rinfo,addr);				\
-		_tmp &= (mask);						\
-		_tmp |= (val);						\
-		__OUTPLL(addr, _tmp);					\
-		spin_unlock_irqrestore(&rinfo->reg_lock, flags); 	\
-	} while (0)
+static inline void __OUTPLL(struct radeonfb_info *rinfo, unsigned int index, u32 val)
+{
+#ifdef HAS_PLL_M9_GPIO_MAGIC
+	u32 sv[3];
 
-#define OUTREGP(addr,val,mask)  					\
-	do {								\
-		unsigned long flags;                                    \
-		unsigned int _tmp;					\
-		spin_lock_irqsave(&rinfo->reg_lock, flags); 		\
-		_tmp = INREG(addr);				       	\
-		_tmp &= (mask);						\
-		_tmp |= (val);						\
-		OUTREG(addr, _tmp);					\
-		spin_unlock_irqrestore(&rinfo->reg_lock, flags); 	\
-	} while (0)
+	if (rinfo->m9p_workaround) {
+		sv[0] = INREG(0x19c);
+		sv[1] = INREG(0x1a0);
+		sv[2] = INREG(0x198);
+		OUTREG(0x198, 0);
+		OUTREG(0x1a0, 0);
+		OUTREG(0x19c, 0);
+		mdelay(1);
+	}
+#endif /* HAS_PLL_M9_GPIO_MAGIC */
+
+	OUTREG8(CLOCK_CNTL_INDEX, (index & 0x0000003f) | 0x00000080);
+	OUTREG(CLOCK_CNTL_DATA, val);
+
+#ifdef HAS_PLL_M9_GPIO_MAGIC
+	if (rinfo->m9p_workaround) {
+		OUTREG(0x19c, sv[0]);
+		OUTREG(0x1a0, sv[1]);
+		OUTREG(0x198, sv[2]);
+	}
+#endif /* HAS_PLL_M9_GPIO_MAGIC */
+}
+
+static inline void _OUTPLL(struct radeonfb_info *rinfo, unsigned int index, u32 val)
+{
+       	unsigned long flags;
+	spin_lock_irqsave(&rinfo->reg_lock, flags);
+	__OUTPLL(rinfo, index, val);
+	spin_unlock_irqrestore(&rinfo->reg_lock, flags);
+}
+
+static inline void _OUTPLLP(struct radeonfb_info *rinfo, unsigned int index,
+			    u32 val, u32 mask)
+{
+	unsigned long flags;
+	unsigned int tmp;
+
+	spin_lock_irqsave(&rinfo->reg_lock, flags);
+	tmp  = __INPLL(rinfo, index);
+	tmp &= (mask);
+	tmp |= (val);
+	__OUTPLL(rinfo, index, tmp);
+	spin_unlock_irqrestore(&rinfo->reg_lock, flags);
+}
+
+
+#define OUTPLL(index, val)		_OUTPLL(rinfo, index, val)
+#define OUTPLLP(index, val, mask)	_OUTPLLP(rinfo, index, val, mask)
+
 
 #define BIOS_IN8(v)  	(readb(rinfo->bios_seg + (v)))
 #define BIOS_IN16(v) 	(readb(rinfo->bios_seg + (v)) | \
@@ -484,7 +568,7 @@ static inline void radeon_engine_flush (struct radeonfb_info *rinfo)
 }
 
 
-static inline void _radeon_fifo_wait (struct radeonfb_info *rinfo, int entries)
+static inline void _radeon_fifo_wait(struct radeonfb_info *rinfo, int entries)
 {
 	int i;
 
@@ -497,7 +581,7 @@ static inline void _radeon_fifo_wait (struct radeonfb_info *rinfo, int entries)
 }
 
 
-static inline void _radeon_engine_idle (struct radeonfb_info *rinfo)
+static inline void _radeon_engine_idle(struct radeonfb_info *rinfo)
 {
 	int i;
 
@@ -514,8 +598,24 @@ static inline void _radeon_engine_idle (struct radeonfb_info *rinfo)
 	printk(KERN_ERR "radeonfb: Idle Timeout !\n");
 }
 
+/* Note about this function: we have some rare cases where we must not schedule,
+ * this typically happen with our special "wake up early" hook which allows us to
+ * wake up the graphic chip (and thus get the console back) before everything else
+ * on some machines that support that mecanism. At this point, interrupts are off
+ * and scheduling is not permitted
+ */
+static inline void _radeon_msleep(struct radeonfb_info *rinfo, unsigned long ms)
+{
+	if (rinfo->no_schedule)
+		mdelay(ms);
+	else
+		msleep(ms);
+}
+
+
 #define radeon_engine_idle()		_radeon_engine_idle(rinfo)
 #define radeon_fifo_wait(entries)	_radeon_fifo_wait(rinfo,entries)
+#define radeon_msleep(ms)		_radeon_msleep(rinfo,ms)
 
 
 /* I2C Functions */
@@ -524,10 +624,10 @@ extern void radeon_delete_i2c_busses(struct radeonfb_info *rinfo);
 extern int radeon_probe_i2c_connector(struct radeonfb_info *rinfo, int conn, u8 **out_edid);
 
 /* PM Functions */
-extern void radeon_pm_disable_dynamic_mode(struct radeonfb_info *rinfo);
-extern void radeon_pm_enable_dynamic_mode(struct radeonfb_info *rinfo);
 extern int radeonfb_pci_suspend(struct pci_dev *pdev, u32 state);
 extern int radeonfb_pci_resume(struct pci_dev *pdev);
+extern void radeonfb_pm_init(struct radeonfb_info *rinfo, int dynclk);
+extern void radeonfb_pm_exit(struct radeonfb_info *rinfo);
 
 /* Monitor probe functions */
 extern void radeon_probe_screens(struct radeonfb_info *rinfo,
@@ -546,7 +646,9 @@ extern void radeonfb_engine_init (struct radeonfb_info *rinfo);
 extern void radeonfb_engine_reset(struct radeonfb_info *rinfo);
 
 /* Other functions */
-extern int radeonfb_blank(int blank, struct fb_info *info);
-extern int radeonfb_set_par(struct fb_info *info);
+extern int radeon_screen_blank(struct radeonfb_info *rinfo, int blank, int mode_switch);
+extern void radeon_save_state (struct radeonfb_info *rinfo, struct radeon_regs *save);
+extern void radeon_write_mode (struct radeonfb_info *rinfo, struct radeon_regs *mode,
+			       int reg_only);
 
 #endif /* __RADEONFB_H__ */
