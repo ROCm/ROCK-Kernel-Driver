@@ -318,6 +318,7 @@ setup_rt_frame(struct pt_regs *regs, struct sigregs *frame,
 		goto badframe;
 	flush_icache_range((unsigned long) &frame->tramp[0],
 			   (unsigned long) &frame->tramp[2]);
+	current->thread.fpscr = 0;	/* turn off all fp exceptions */
 
 	/* Retrieve rt_sigframe from stack and
 	   set up registers for signal handler
@@ -435,6 +436,7 @@ setup_frame(struct pt_regs *regs, struct sigregs *frame,
 		goto badframe;
 	flush_icache_range((unsigned long) &frame->tramp[0],
 			   (unsigned long) &frame->tramp[2]);
+	current->thread.fpscr = 0;	/* turn off all fp exceptions */
 
 	newsp -= __SIGNAL_FRAMESIZE;
 	if ( get_user(temp_ptr, &sc->handler))

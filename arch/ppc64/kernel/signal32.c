@@ -448,6 +448,7 @@ setup_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 
 	flush_icache_range((unsigned long) &frame->tramp[0],
 			   (unsigned long) &frame->tramp[2]);
+	current->thread.fpscr = 0;	/* turn off all fp exceptions */
 
 	newsp -= __SIGNAL_FRAMESIZE32;
 	if (put_user(regs->gpr[1], (u32*)(u64)newsp)
@@ -1063,6 +1064,7 @@ setup_rt_frame32(struct pt_regs *regs, struct sigregs32 *frame,
 
 	flush_icache_range((unsigned long) &frame->tramp[0],
 			   (unsigned long) &frame->tramp[2]);
+	current->thread.fpscr = 0;	/* turn off all fp exceptions */
 
   
 	/* Retrieve rt_sigframe from stack and
