@@ -1287,6 +1287,11 @@ running once the system is up.
 			This is actually a boot loader parameter; the value is
 			passed to the kernel using a special protocol.
 
+	vm_reserve=nn[KM]
+			[KNL,BOOT,IA-32] force use of a specific amount of
+			virtual memory for vmalloc and ioremap allocations
+			minimum 32 MB maximum 800 MB
+
 	vmhalt=		[KNL,S390]
 
 	vmpoff=		[KNL,S390] 

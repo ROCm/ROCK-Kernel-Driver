@@ -101,6 +101,11 @@ unsigned int mca_pentium_flag;
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
 
+/* reserved mapping space for vmalloc and ioremap */
+unsigned long vmalloc_reserve = __VMALLOC_RESERVE_DEFAULT;
+EXPORT_SYMBOL(vmalloc_reserve);
+static unsigned long vm_reserve __initdata = -1;
+
 /* user-defined highmem size */
 static unsigned int highmem_pages = -1;
 
@@ -825,7 +830,16 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		 */
 		if (c == ' ' && !memcmp(from, "highmem=", 8))
 			highmem_pages = memparse(from+8, &from) >> PAGE_SHIFT;
-	
+
+		/*
+		 * vm_reserve=size forces to reserve 'size' bytes for vmalloc and
+		 * ioremap areas minimum is 32 MB maximum is 800 MB
+		 * the default without vm_reserve depends on the total amount of
+		 * memory the minimum default is 128 MB
+		 */
+		if (c == ' ' && !memcmp(from, "vm_reserve=", 11))
+			vm_reserve = memparse(from+11, &from);
+
 		c = *(from++);
 		if (!c)
 			break;
@@ -1030,7 +1044,28 @@ static unsigned long __init setup_memory(void)
 	start_pfn = PFN_UP(init_pg_tables_end);
 
 	find_max_pfn();
+	
+	/* 
+	 * calculate the default size of vmalloc/ioremap area
+	 * overwrite with the value of the vm_reserve= option
+	 * if set
+	 */
 
+	if (max_pfn >= PFN_UP(KERNEL_MAXMEM - __VMALLOC_RESERVE_DEFAULT))
+		vmalloc_reserve = __VMALLOC_RESERVE_DEFAULT;
+	else
+		vmalloc_reserve = KERNEL_MAXMEM - PFN_PHYS(max_pfn);
+	if (vm_reserve != -1) {
+		if (vm_reserve < __VMALLOC_RESERVE_MIN)
+			vm_reserve = __VMALLOC_RESERVE_MIN;
+		if (vm_reserve > __VMALLOC_RESERVE_MAX)
+			vm_reserve = __VMALLOC_RESERVE_MAX;
+		vmalloc_reserve = vm_reserve;
+	}
+	
+        printk(KERN_NOTICE "%ldMB vmalloc/ioremap area available.\n",
+                        vmalloc_reserve>>20);
+                        	
 	max_low_pfn = find_max_low_pfn();
 
 #ifdef CONFIG_HIGHMEM

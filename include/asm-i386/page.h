@@ -98,9 +98,14 @@ typedef struct { unsigned long pgprot; } pgprot_t;
  * This much address space is reserved for vmalloc() and iomap()
  * as well as fixmap mappings.
  */
-#define __VMALLOC_RESERVE	(128 << 20)
+#define __VMALLOC_RESERVE_MIN		(32 << 20)
+#define __VMALLOC_RESERVE_DEFAULT	(128 << 20)
+#define __VMALLOC_RESERVE_MAX		(800 << 20)
+#define __RESERVED_AREA			(10 << 20)
 
 #ifndef __ASSEMBLY__
+
+extern unsigned long vmalloc_reserve;
 
 /* Pure 2^n version of get_order */
 static __inline__ int get_order(unsigned long size)
@@ -126,11 +131,14 @@ static __inline__ int get_order(unsigned long size)
 
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
-#define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)
-#define MAXMEM			(-__PAGE_OFFSET-__VMALLOC_RESERVE)
+#define KERNEL_MEMORY		((unsigned long)(FIXADDR_START - __PAGE_OFFSET))
+#define RESERVED_AREA		((unsigned long)__RESERVED_AREA) 
+#define KERNEL_MAXMEM		((unsigned long)(KERNEL_MEMORY - RESERVED_AREA))
+#define __MAXMEM		(-__PAGE_OFFSET-__VMALLOC_RESERVE_MAX)
+#define MAXMEM			((unsigned long)(-PAGE_OFFSET-vmalloc_reserve))
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
-#define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)
+#define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
 #ifndef CONFIG_DISCONTIGMEM
 #define pfn_to_page(pfn)	(mem_map + (pfn))
 #define page_to_pfn(page)	((unsigned long)((page) - mem_map))

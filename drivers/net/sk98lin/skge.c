@@ -437,6 +437,8 @@ static int __devinit sk98lin_init_device(struct pci_dev *pdev,
 	dev->change_mtu =	&SkGeChangeMtu;
 	dev->flags &= 		~IFF_RUNNING;
 
+	SET_NETDEV_DEV(dev, &pdev->dev);
+
 	pAC->Index = sk98lin_boards_found;
 
 	if (SkGeBoardInit(dev, pAC)) {
