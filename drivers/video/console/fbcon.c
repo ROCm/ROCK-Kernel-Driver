@@ -545,7 +545,7 @@ static const char *fbcon_startup(void)
 		return display_desc;
 	done = 1;
 
-	info = registered_fb[num_registered_fb-1];	
+	info = registered_fb[0];	
 	if (!info)	return NULL;
 	info->currcon = -1;
 	
