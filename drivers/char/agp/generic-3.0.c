@@ -342,6 +342,9 @@ int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode, u32 minor)
 	/* Find all AGP devices, and add them to dev_list. */
 	pci_for_each_dev(dev) { 
 		mcapndx = pci_find_capability(dev, PCI_CAP_ID_AGP);
+		if (mcapndx == 0)
+			continue;
+
 		switch ((dev->class >>8) & 0xff00) {
 			case 0x0600:    /* Bridge */
 				/* Skip bridges. We should call this function for each one. */
@@ -357,9 +360,6 @@ int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode, u32 minor)
 
 			case 0x0300:    /* Display controller */
 			case 0x0400:    /* Multimedia controller */
-				if (mcapndx == 0)
-					continue;
-
 				if((cur = kmalloc(sizeof(*cur), GFP_KERNEL)) == NULL) {
 					ret = -ENOMEM;
 					goto free_and_exit;
