@@ -34,9 +34,11 @@
 #define CH_DT_MAX       16
 #define CH_TYPES        8
 
+#include <scsi/scsi_driver.h>
+#include <scsi/scsi_ioctl.h>
+
 #include "scsi.h"
 #include "hosts.h"
-#include <scsi/scsi_ioctl.h>
 
 MODULE_SUPPORTED_DEVICE("sch");
 MODULE_DESCRIPTION("device driver for scsi media changer devices");
