@@ -2,7 +2,7 @@
  *                  QLOGIC LINUX SOFTWARE
  *
  * QLogic ISP2x00 device driver for Linux 2.6.x
- * Copyright (C) 2003 QLogic Corporation
+ * Copyright (C) 2003-2004 QLogic Corporation
  * (www.qlogic.com)
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -240,3 +240,52 @@ qla2x00_issue_marker(scsi_qla_host_t *ha, int ha_locked)
 	}
 	return (QLA_SUCCESS);
 }
+
+static __inline__ void qla2x00_add_timer_to_cmd(srb_t *, int);
+static __inline__ void qla2x00_delete_timer_from_cmd(srb_t *);
+
+/**************************************************************************
+*   qla2x00_add_timer_to_cmd
+*
+* Description:
+*       Creates a timer for the specified command. The timeout is usually
+*       the command time from kernel minus 2 secs.
+*
+* Input:
+*     sp - pointer to validate
+*
+* Returns:
+*     None.
+**************************************************************************/
+static inline void
+qla2x00_add_timer_to_cmd(srb_t *sp, int timeout)
+{
+	init_timer(&sp->timer);
+	sp->timer.expires = jiffies + timeout * HZ;
+	sp->timer.data = (unsigned long) sp;
+	sp->timer.function = (void (*) (unsigned long))qla2x00_cmd_timeout;
+	add_timer(&sp->timer);
+}
+
+/**************************************************************************
+*   qla2x00_delete_timer_from_cmd
+*
+* Description:
+*       Delete the timer for the specified command.
+*
+* Input:
+*     sp - pointer to validate
+*
+* Returns:
+*     None.
+**************************************************************************/
+static inline void 
+qla2x00_delete_timer_from_cmd(srb_t *sp)
+{
+	if (sp->timer.function != NULL) {
+		del_timer(&sp->timer);
+		sp->timer.function =  NULL;
+		sp->timer.data = (unsigned long) NULL;
+	}
+}
+

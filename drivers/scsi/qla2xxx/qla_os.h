@@ -2,7 +2,7 @@
  *                  QLOGIC LINUX SOFTWARE
  *
  * QLogic ISP2x00 device driver for Linux 2.6.x
- * Copyright (C) 2003 QLogic Corporation
+ * Copyright (C) 2003-2004 QLogic Corporation
  * (www.qlogic.com)
  *
  * Portions (C) Arjan van de Ven <arjanv@redhat.com> for Red Hat, Inc.
@@ -41,6 +41,8 @@
 #include <linux/slab.h>
 #include <linux/mempool.h>
 #include <linux/vmalloc.h>
+#define __KERNEL_SYSCALLS__
+#include <linux/unistd.h>
 #include <linux/smp_lock.h>
 #include <linux/bio.h>
 #include <linux/moduleparam.h>

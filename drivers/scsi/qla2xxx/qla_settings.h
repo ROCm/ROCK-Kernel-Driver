@@ -2,7 +2,7 @@
  *                  QLOGIC LINUX SOFTWARE
  *
  * QLogic ISP2x00 device driver for Linux 2.6.x
- * Copyright (C) 2003 QLogic Corporation
+ * Copyright (C) 2003-2004 QLogic Corporation
  * (www.qlogic.com)
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -54,6 +54,11 @@
 /* Max time to wait for the loop to be in LOOP_READY state */
 #define MAX_LOOP_TIMEOUT	(60 * 5)
 #define EH_ACTIVE		1	/* Error handler active */
+
+#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
+/* Default: IOCTL pass-thru command timeout in seconds.   */
+#define QLA_PT_CMD_TOV		(66)
+#endif
 
 /*
  * Some vendor subsystems do not recover properly after a device reset.  Define

@@ -62,4 +62,3 @@ char	*qla2x00_model_desc[QLA_MODEL_NAMES] = {
 	"133MHz PCI-X to 2Gb FC Optical",		/* 0x119 */
 	"133MHz PCI-X to 2Gb FC Copper"			/* 0x11A */
 };
-

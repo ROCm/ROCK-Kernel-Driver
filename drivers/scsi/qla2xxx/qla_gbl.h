@@ -2,7 +2,7 @@
 *                  QLOGIC LINUX SOFTWARE
 *
 * QLogic ISP2x00 device driver for Linux 2.6.x
-* Copyright (C) 2003 QLogic Corporation
+* Copyright (C) 2003-2004 QLogic Corporation
 * (www.qlogic.com)
 *
 * This program is free software; you can redistribute it and/or modify it
@@ -65,6 +65,10 @@ extern int ql2xmaxqdepth;
 extern int displayConfig;
 extern int ql2xplogiabsentdevice;
 extern int ql2xintrdelaytimer;
+extern int ql2xloginretrycount;
+#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
+extern int ql2xioctltimeout;
+#endif
 
 extern int ConfigRequired;
 
@@ -77,6 +81,8 @@ extern struct list_head qla_hostlist;
 extern rwlock_t qla_hostlist_lock;
 
 extern char *qla2x00_get_fw_version_str(struct scsi_qla_host *, char *);
+
+extern void qla2x00_cmd_timeout(srb_t *);
 
 extern int qla2x00_queuecommand(struct scsi_cmnd *,
     void (*)(struct scsi_cmnd *));
@@ -195,7 +201,7 @@ extern int
 qla2x00_get_port_name(scsi_qla_host_t *, uint16_t, uint8_t *, uint8_t);
 
 extern uint8_t
-qla2x00_get_link_status(scsi_qla_host_t *, uint8_t, void *, uint16_t *);
+qla2x00_get_link_status(scsi_qla_host_t *, uint8_t, link_stat_t *, uint16_t *);
 
 extern int
 qla2x00_lip_reset(scsi_qla_host_t *);
@@ -295,7 +301,10 @@ extern void qla2x00_cancel_io_descriptors(scsi_qla_host_t *);
 /*
  * Global Function Prototypes in qla_xioctl.c source file.
  */
-#ifdef CONFIG_SCSI_QLA2XXX_IOCTL
+#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
+extern int qla2x00_ioctl(struct scsi_device *, int , void *);
+extern int qla2x00_ioctl_init(void);
+extern int qla2x00_ioctl_exit(void);
 extern void qla2x00_enqueue_aen(scsi_qla_host_t *, uint16_t, void *);
 extern int qla2x00_alloc_ioctl_mem(scsi_qla_host_t *);
 extern void qla2x00_free_ioctl_mem(scsi_qla_host_t *);

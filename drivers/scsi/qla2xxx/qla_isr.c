@@ -2,7 +2,7 @@
  *                  QLOGIC LINUX SOFTWARE
  *
  * QLogic ISP2x00 device driver for Linux 2.6.x
- * Copyright (C) 2003 QLogic Corporation
+ * Copyright (C) 2003-2004 QLogic Corporation
  * (www.qlogic.com)
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -452,6 +452,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		if (atomic_read(&ha->loop_state) != LOOP_DOWN) {
 			atomic_set(&ha->loop_state, LOOP_DOWN);
 			atomic_set(&ha->loop_down_timer, LOOP_DOWN_TIME);
+			ha->device_flags |= DFLG_NO_CABLE;
 			qla2x00_mark_all_devices_lost(ha);
 		}
 
@@ -1139,6 +1140,10 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 		if ((sp->flags & SRB_IOCTL) ||
 		    atomic_read(&fcport->state) == FCS_DEVICE_DEAD) {
 			cp->result = DID_NO_CONNECT << 16;
+			if (atomic_read(&ha->loop_state) == LOOP_DOWN) 
+				sp->err_id = SRB_ERR_LOOP;
+			else
+				sp->err_id = SRB_ERR_PORT;
 			add_to_done_queue(ha, sp);
 		} else {
 			qla2x00_extend_timeout(cp, EXTEND_CMD_TIMEOUT);
