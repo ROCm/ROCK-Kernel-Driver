@@ -185,13 +185,6 @@ extern inline void sync(void)
 	asm volatile("sync; isync");
 }
 
-extern inline void __delay(unsigned int loops)
-{
-	if (loops != 0)
-		__asm__ __volatile__("mtctr %0; 1: bdnz 1b" : :
-				     "r" (loops) : "ctr");
-}
-
 /* (Ref: 64-bit PowerPC ELF ABI Spplement; Ian Lance Taylor, Zembu Labs).
  A PPC stack frame looks like this:
 

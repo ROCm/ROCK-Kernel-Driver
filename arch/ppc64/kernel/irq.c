@@ -1,6 +1,4 @@
 /*
- * 
- *
  *  arch/ppc/kernel/irq.c
  *
  *  Derived from arch/i386/kernel/irq.c
@@ -24,7 +22,6 @@
  * shouldn't result in any weird surprises, and installing new handlers
  * should be easier.
  */
-
 
 #include <linux/ptrace.h>
 #include <linux/errno.h>
