@@ -537,7 +537,7 @@ sn_sal_connect_interrupt(void)
 	int result;
 
 	console_nasid = ia64_sn_get_console_nasid();
-	intr_cpuid = NODEPDA(NASID_TO_COMPACT_NODEID(console_nasid))->node_first_cpu;
+	intr_cpuid = first_cpu(node_to_cpumask(NASID_TO_COMPACT_NODEID(console_nasid)));
 	intr_cpuloc = cpu_physical_id(intr_cpuid);
 	console_irq = CPU_VECTOR_TO_IRQ(intr_cpuloc, SGI_UART_VECTOR);
 
