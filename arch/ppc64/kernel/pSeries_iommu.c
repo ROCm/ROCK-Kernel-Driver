@@ -290,7 +290,11 @@ static void iommu_buses_init_lpar(struct list_head *bus_list)
 
 	for (ln=bus_list->next; ln != bus_list; ln=ln->next) {
 		bus = pci_bus_b(ln);
-		busdn = PCI_GET_DN(bus);
+
+		if (bus->self)
+			busdn = pci_device_to_OF_node(bus->self);
+		else
+			busdn = bus->sysdata;   /* must be a phb */
 
 		dma_window = (unsigned int *)get_property(busdn, "ibm,dma-window", NULL);
 		if (dma_window) {
@@ -427,7 +431,7 @@ void iommu_setup_pSeries(void)
 	 * up the device tree to find it.
 	 */
 	for_each_pci_dev(dev) {
-		mydn = dn = PCI_GET_DN(dev);
+		mydn = dn = pci_device_to_OF_node(dev);
 
 		while (dn && dn->iommu_table == NULL)
 			dn = dn->parent;

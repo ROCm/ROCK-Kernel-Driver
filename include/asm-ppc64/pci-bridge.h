@@ -94,11 +94,6 @@ extern void pci_process_bridge_OF_ranges(struct pci_controller *hose,
 
 extern int pcibios_remove_root_bus(struct pci_controller *phb);
 
-/* Use this macro after the PCI bus walk for max performance when it
- * is known that sysdata is correct.
- */
-#define PCI_GET_DN(dev) ((struct device_node *)((dev)->sysdata))
-
 extern void phbs_remap_io(void);
 
 static inline struct pci_controller *pci_bus_to_host(struct pci_bus *bus)
