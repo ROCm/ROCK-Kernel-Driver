@@ -166,7 +166,7 @@ struct xfrm_policy_afinfo {
 	struct dst_ops		*dst_ops;
 	void			(*garbage_collect)(void);
 	int			(*dst_lookup)(struct xfrm_dst **dst, struct flowi *fl);
-	struct dst_entry	*(*find_bundle)(struct flowi *fl, struct rtable *rt, struct xfrm_policy *policy);
+	struct dst_entry	*(*find_bundle)(struct flowi *fl, struct xfrm_policy *policy);
 	int			(*bundle_create)(struct xfrm_policy *policy, 
 						 struct xfrm_state **xfrm, 
 						 int nx,

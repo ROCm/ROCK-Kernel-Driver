@@ -76,6 +76,8 @@ struct digest_alg {
 	void (*dia_init)(void *ctx);
 	void (*dia_update)(void *ctx, const u8 *data, unsigned int len);
 	void (*dia_final)(void *ctx, u8 *out);
+	int (*dia_setkey)(void *ctx, const u8 *key,
+	                  unsigned int keylen, u32 *flags);
 };
 
 struct compress_alg {
@@ -157,6 +159,8 @@ struct digest_tfm {
 	void (*dit_final)(struct crypto_tfm *tfm, u8 *out);
 	void (*dit_digest)(struct crypto_tfm *tfm, struct scatterlist *sg,
 	                   unsigned int nsg, u8 *out);
+	int (*dit_setkey)(struct crypto_tfm *tfm,
+	                  const u8 *key, unsigned int keylen);
 #ifdef CONFIG_CRYPTO_HMAC
 	void *dit_hmac_block;
 #endif
@@ -280,6 +284,15 @@ static inline void crypto_digest_digest(struct crypto_tfm *tfm,
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
 	tfm->crt_digest.dit_digest(tfm, sg, nsg, out);
+}
+
+static inline int crypto_digest_setkey(struct crypto_tfm *tfm,
+                                       const u8 *key, unsigned int keylen)
+{
+	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_DIGEST);
+	if (tfm->crt_digest.dit_setkey == NULL)
+		return -ENOSYS;
+	return tfm->crt_digest.dit_setkey(tfm, key, keylen);
 }
 
 static inline int crypto_cipher_setkey(struct crypto_tfm *tfm,

@@ -52,7 +52,7 @@ static ssize_t show_inquiry_cache(struct class_device *cdev, char *buf)
 		n += sprintf(buf + n, "%s %d %d %d 0x%.2x%.2x%.2x 0x%.4x 0x%.2x %u\n",
 				batostr(&bdaddr),
 				info->pscan_rep_mode, info->pscan_period_mode, info->pscan_mode,
-				info->dev_class[0], info->dev_class[1], info->dev_class[2],
+				info->dev_class[2], info->dev_class[1], info->dev_class[0],
 				info->clock_offset, 0, e->timestamp);
 	}
 

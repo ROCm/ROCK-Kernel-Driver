@@ -61,7 +61,7 @@ static char *tvmem;
 static char *check[] = {
 	"des", "md5", "des3_ede", "rot13", "sha1", "sha256", "blowfish",
 	"twofish", "serpent", "sha384", "sha512", "md4", "aes", "cast6", 
-	"arc4", "deflate", NULL
+	"arc4", "michael_mic", "deflate", NULL
 };
 
 static void
@@ -112,6 +112,10 @@ test_hash (char * algo, struct hash_testvec * template, unsigned int tcount)
 		sg[0].length = hash_tv[i].psize;
 
 		crypto_digest_init (tfm);
+		if (tfm->crt_u.digest.dit_setkey) {
+			crypto_digest_setkey (tfm, hash_tv[i].key,
+					      hash_tv[i].ksize);
+		}
 		crypto_digest_update (tfm, sg, 1);
 		crypto_digest_final (tfm, result);
 
@@ -568,6 +572,8 @@ do_test(void)
 		test_hmac("sha1", hmac_sha1_tv_template, HMAC_SHA1_TEST_VECTORS);		
 		test_hmac("sha256", hmac_sha256_tv_template, HMAC_SHA256_TEST_VECTORS);
 #endif		
+
+		test_hash("michael_mic", michael_mic_tv_template, MICHAEL_MIC_TEST_VECTORS);
 		break;
 
 	case 1:
@@ -645,6 +651,10 @@ do_test(void)
 	case 16:
 		test_cipher ("arc4", MODE_ECB, ENCRYPT, arc4_enc_tv_template, ARC4_ENC_TEST_VECTORS);
 		test_cipher ("arc4", MODE_ECB, DECRYPT, arc4_dec_tv_template, ARC4_DEC_TEST_VECTORS);
+		break;
+
+	case 17:
+		test_hash("michael_mic", michael_mic_tv_template, MICHAEL_MIC_TEST_VECTORS);
 		break;
 
 #ifdef CONFIG_CRYPTO_HMAC
