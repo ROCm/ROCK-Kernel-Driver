@@ -723,6 +723,12 @@ struct xfrm_algo_desc {
 	struct sadb_alg desc;
 };
 
+/* XFRM tunnel handlers.  */
+struct xfrm_tunnel {
+	int (*handler)(struct sk_buff *skb);
+	void (*err_handler)(struct sk_buff *skb, void *info);
+};
+
 extern void xfrm_init(void);
 extern void xfrm4_init(void);
 extern void xfrm4_fini(void);
@@ -752,6 +758,8 @@ extern void xfrm_replay_advance(struct xfrm_state *x, u32 seq);
 extern int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl);
 extern int xfrm4_rcv(struct sk_buff *skb);
 extern int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type);
+extern int xfrm4_tunnel_register(struct xfrm_tunnel *handler);
+extern int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler);
 extern int xfrm6_rcv(struct sk_buff **pskb);
 extern int xfrm6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int dir);
 extern int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen);

@@ -23,21 +23,21 @@ extern int fcntl_getlease(struct file *filp);
 void set_close_on_exec(unsigned int fd, int flag)
 {
 	struct files_struct *files = current->files;
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	if (flag)
 		FD_SET(fd, files->close_on_exec);
 	else
 		FD_CLR(fd, files->close_on_exec);
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 }
 
 static inline int get_close_on_exec(unsigned int fd)
 {
 	struct files_struct *files = current->files;
 	int res;
-	read_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	res = FD_ISSET(fd, files->close_on_exec);
-	read_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	return res;
 }
 
@@ -134,15 +134,15 @@ static int dupfd(struct file *file, int start)
 	struct files_struct * files = current->files;
 	int fd;
 
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	fd = locate_fd(files, file, start);
 	if (fd >= 0) {
 		FD_SET(fd, files->open_fds);
 		FD_CLR(fd, files->close_on_exec);
-		write_unlock(&files->file_lock);
+		spin_unlock(&files->file_lock);
 		fd_install(fd, file);
 	} else {
-		write_unlock(&files->file_lock);
+		spin_unlock(&files->file_lock);
 		fput(file);
 	}
 
@@ -155,7 +155,7 @@ asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
 	struct file * file, *tofree;
 	struct files_struct * files = current->files;
 
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	if (!(file = fcheck(oldfd)))
 		goto out_unlock;
 	err = newfd;
@@ -186,7 +186,7 @@ asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
 	files->fd[newfd] = file;
 	FD_SET(newfd, files->open_fds);
 	FD_CLR(newfd, files->close_on_exec);
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 
 	if (tofree)
 		filp_close(tofree, files);
@@ -194,11 +194,11 @@ asmlinkage long sys_dup2(unsigned int oldfd, unsigned int newfd)
 out:
 	return err;
 out_unlock:
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	goto out;
 
 out_fput:
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	fput(file);
 	goto out;
 }

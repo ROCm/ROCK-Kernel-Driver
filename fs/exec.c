@@ -314,7 +314,6 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	}
 	lru_cache_add_active(page);
 	flush_dcache_page(page);
-	flush_page_to_ram(page);
 	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, PAGE_COPY))));
 	pte_chain = page_add_rmap(page, pte, pte_chain);
 	pte_unmap(pte);
@@ -407,7 +406,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = STACK_TOP;
 #endif
-		mpnt->vm_page_prot = PAGE_COPY;
+		mpnt->vm_page_prot = protection_map[VM_STACK_FLAGS & 0x7];
 		mpnt->vm_flags = VM_STACK_FLAGS;
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = 0;
@@ -750,7 +749,7 @@ static inline void flush_old_files(struct files_struct * files)
 {
 	long j = -1;
 
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	for (;;) {
 		unsigned long set, i;
 
@@ -762,16 +761,16 @@ static inline void flush_old_files(struct files_struct * files)
 		if (!set)
 			continue;
 		files->close_on_exec->fds_bits[j] = 0;
-		write_unlock(&files->file_lock);
+		spin_unlock(&files->file_lock);
 		for ( ; set ; i++,set >>= 1) {
 			if (set & 1) {
 				sys_close(i);
 			}
 		}
-		write_lock(&files->file_lock);
+		spin_lock(&files->file_lock);
 
 	}
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 }
 
 int flush_old_exec(struct linux_binprm * bprm)

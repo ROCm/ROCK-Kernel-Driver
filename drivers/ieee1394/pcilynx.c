@@ -72,9 +72,9 @@
 
 
 /* Module Parameters */
+static int skip_eeprom = 0;
 module_param(skip_eeprom, int, 0444);
 MODULE_PARM_DESC(skip_eeprom, "Use generic bus info block instead of serial eeprom (default = 0).");
-static int skip_eeprom = 0;
 
 
 static struct hpsb_host_driver lynx_driver;

@@ -41,7 +41,11 @@ SECTIONS
 
   . = ALIGN(8192);
   __init_begin = .;
-  .init.text : { *(.init.text) }
+  .init.text : { 
+	_sinittext = .;
+	*(.init.text)
+	_einittext = .;
+  }
   .init.data : { *(.init.data) }
   . = ALIGN(16);
   __setup_start = .;

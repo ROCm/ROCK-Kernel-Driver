@@ -18,11 +18,6 @@
 #define flush_kernel_dcache_range(start,size) \
 	flush_kernel_dcache_range_asm((start), (start)+(size));
 
-static inline void
-flush_page_to_ram(struct page *page)
-{
-}
-
 extern void flush_cache_all_local(void);
 
 static inline void cacheflush_h_tmp_function(void *dummy)

@@ -641,7 +641,6 @@ static int try_to_unuse(unsigned int type)
 		shmem = 0;
 		swcount = *swap_map;
 		if (swcount > 1) {
-			flush_page_to_ram(page);
 			if (start_mm == &init_mm)
 				shmem = shmem_unuse(entry, page);
 			else

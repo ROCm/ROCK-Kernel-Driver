@@ -173,20 +173,6 @@ nfsd4_renew(clientid_t *clientid)
 	return nfs_ok;
 }
 
-static inline int
-nfsd4_setclientid(struct svc_rqst *rqstp, struct nfsd4_setclientid *setclientid)
-{
-	memset(&setclientid->se_clientid, 0, sizeof(clientid_t));
-	memset(&setclientid->se_confirm, 0, sizeof(nfs4_verifier));
-	return nfs_ok;
-}
-
-static inline int
-nfsd4_setclientid_confirm(struct svc_rqst *rqstp, struct nfsd4_setclientid_confirm *setclientid_confirm)
-{
-	return nfs_ok;
-}
-
 /*
  * filehandle-manipulating ops.
  */

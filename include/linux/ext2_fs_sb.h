@@ -16,6 +16,9 @@
 #ifndef _LINUX_EXT2_FS_SB
 #define _LINUX_EXT2_FS_SB
 
+#include <linux/blockgroup_lock.h>
+#include <linux/percpu_counter.h>
+
 /*
  * second extended-fs super-block data in memory
  */
@@ -45,6 +48,10 @@ struct ext2_sb_info {
 	u32 s_next_generation;
 	unsigned long s_dir_count;
 	u8 *s_debts;
+	struct percpu_counter s_freeblocks_counter;
+	struct percpu_counter s_freeinodes_counter;
+	struct percpu_counter s_dirs_counter;
+	struct blockgroup_lock s_blockgroup_lock;
 };
 
 #endif	/* _LINUX_EXT2_FS_SB */

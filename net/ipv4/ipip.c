@@ -115,6 +115,7 @@
 #include <net/protocol.h>
 #include <net/ipip.h>
 #include <net/inet_ecn.h>
+#include <net/xfrm.h>
 
 #define HASH_SIZE  16
 #define HASH(addr) ((addr^(addr>>4))&0xF)
@@ -285,7 +286,7 @@ static void ipip_tunnel_uninit(struct net_device *dev)
 	dev_put(dev);
 }
 
-void ipip_err(struct sk_buff *skb, u32 info)
+void ipip_err(struct sk_buff *skb, void *__unused)
 {
 #ifndef I_WISH_WORLD_WERE_PERFECT
 
@@ -468,11 +469,13 @@ out:
 #endif
 }
 
-static inline void ipip_ecn_decapsulate(struct iphdr *iph, struct sk_buff *skb)
+static inline void ipip_ecn_decapsulate(struct iphdr *outer_iph, struct sk_buff *skb)
 {
-	if (INET_ECN_is_ce(iph->tos) &&
-	    INET_ECN_is_not_ce(skb->nh.iph->tos))
-		IP_ECN_set_ce(iph);
+	struct iphdr *inner_iph = skb->nh.iph;
+
+	if (INET_ECN_is_ce(outer_iph->tos) &&
+	    INET_ECN_is_not_ce(inner_iph->tos))
+		IP_ECN_set_ce(inner_iph);
 }
 
 int ipip_rcv(struct sk_buff *skb)
@@ -511,10 +514,8 @@ int ipip_rcv(struct sk_buff *skb)
 	}
 	read_unlock(&ipip_lock);
 
-	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PROT_UNREACH, 0);
 out:
-	kfree_skb(skb);
-	return 0;
+	return -1;
 }
 
 /*
@@ -867,7 +868,7 @@ int __init ipip_fb_tunnel_init(struct net_device *dev)
 	return 0;
 }
 
-static struct inet_protocol ipip_protocol = {
+static struct xfrm_tunnel ipip_handler = {
 	.handler	=	ipip_rcv,
 	.err_handler	=	ipip_err,
 };
@@ -879,8 +880,8 @@ int __init ipip_init(void)
 {
 	printk(banner);
 
-	if (inet_add_protocol(&ipip_protocol, IPPROTO_IPIP) < 0) {
-		printk(KERN_INFO "ipip init: can't add protocol\n");
+	if (xfrm4_tunnel_register(&ipip_handler) < 0) {
+		printk(KERN_INFO "ipip init: can't register tunnel\n");
 		return -EAGAIN;
 	}
 
@@ -892,8 +893,8 @@ int __init ipip_init(void)
 
 static void __exit ipip_fini(void)
 {
-	if (inet_del_protocol(&ipip_protocol, IPPROTO_IPIP) < 0)
-		printk(KERN_INFO "ipip close: can't remove protocol\n");
+	if (xfrm4_tunnel_deregister(&ipip_handler) < 0)
+		printk(KERN_INFO "ipip close: can't deregister tunnel\n");
 
 	unregister_netdev(&ipip_fb_tunnel_dev);
 }

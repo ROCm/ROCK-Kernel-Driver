@@ -603,7 +603,7 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 
 	atomic_set(&newf->count, 1);
 
-	newf->file_lock	    = RW_LOCK_UNLOCKED;
+	newf->file_lock	    = SPIN_LOCK_UNLOCKED;
 	newf->next_fd	    = 0;
 	newf->max_fds	    = NR_OPEN_DEFAULT;
 	newf->max_fdset	    = __FD_SETSIZE;
@@ -616,13 +616,13 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 	size = oldf->max_fdset;
 	if (size > __FD_SETSIZE) {
 		newf->max_fdset = 0;
-		write_lock(&newf->file_lock);
+		spin_lock(&newf->file_lock);
 		error = expand_fdset(newf, size-1);
-		write_unlock(&newf->file_lock);
+		spin_unlock(&newf->file_lock);
 		if (error)
 			goto out_release;
 	}
-	read_lock(&oldf->file_lock);
+	spin_lock(&oldf->file_lock);
 
 	open_files = count_open_files(oldf, size);
 
@@ -633,15 +633,15 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 	 */
 	nfds = NR_OPEN_DEFAULT;
 	if (open_files > nfds) {
-		read_unlock(&oldf->file_lock);
+		spin_unlock(&oldf->file_lock);
 		newf->max_fds = 0;
-		write_lock(&newf->file_lock);
+		spin_lock(&newf->file_lock);
 		error = expand_fd_array(newf, open_files-1);
-		write_unlock(&newf->file_lock);
+		spin_unlock(&newf->file_lock);
 		if (error) 
 			goto out_release;
 		nfds = newf->max_fds;
-		read_lock(&oldf->file_lock);
+		spin_lock(&oldf->file_lock);
 	}
 
 	old_fds = oldf->fd;
@@ -656,7 +656,7 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 			get_file(f);
 		*new_fds++ = f;
 	}
-	read_unlock(&oldf->file_lock);
+	spin_unlock(&oldf->file_lock);
 
 	/* compute the remainder to be cleared */
 	size = (newf->max_fds - open_files) * sizeof(struct file *);

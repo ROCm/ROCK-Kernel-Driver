@@ -64,7 +64,6 @@ BTFIXUPDEF_CALL(void, flush_sig_insns, struct mm_struct *, unsigned long)
 
 extern void sparc_flush_page_to_ram(struct page *page);
 
-#define flush_page_to_ram(page)			do { } while (0)
 #define flush_dcache_page(page)			sparc_flush_page_to_ram(page)
 
 #endif /* _SPARC_CACHEFLUSH_H */

@@ -34,7 +34,11 @@ SECTIONS
   /* will be freed after init */
   . = ALIGN(8192);	/* Init code and data */
 __init_begin = .;
-  	.init.text : { *(.init.text) }
+	.init.text : { 
+		_sinittext = .;
+		*(.init.text)
+		_einittext = .;
+	}
   	.init.data : { *(.init.data) }
 	. = ALIGN(16);
 	__setup_start = .;

@@ -832,7 +832,6 @@ repeat:
 			shmem_swp_unmap(entry);
 			delete_from_swap_cache(swappage);
 			spin_unlock(&info->lock);
-			flush_page_to_ram(swappage);
 			copy_highpage(filepage, swappage);
 			unlock_page(swappage);
 			page_cache_release(swappage);
@@ -953,7 +952,6 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 		return (error == -ENOMEM)? NOPAGE_OOM: NOPAGE_SIGBUS;
 
 	mark_page_accessed(page);
-	flush_page_to_ram(page);
 	return page;
 }
 
@@ -981,7 +979,6 @@ static int shmem_populate(struct vm_area_struct *vma,
 			return err;
 		if (page) {
 			mark_page_accessed(page);
-			flush_page_to_ram(page);
 			err = install_page(mm, vma, addr, page, prot);
 			if (err) {
 				page_cache_release(page);
