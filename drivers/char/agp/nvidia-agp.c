@@ -140,7 +140,12 @@ static void nvidia_cleanup(void)
 }
 
 
-#if 0
+/*
+ * Note we can't use the generic routines, even though they are 99% the same.
+ * Aperture sizes <64M still requires a full 64k GART directory, but
+ * only use the portion of the TLB entries that correspond to the apertures
+ * alignment inside the surrounding 64M block.
+ */
 extern int agp_memory_reserved;
 
 static int nvidia_insert_memory(agp_memory * mem, off_t pg_start, int type)
@@ -166,9 +171,10 @@ static int nvidia_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++)
 		agp_bridge->gatt_table[nvidia_private.pg_offset + j] = mem->memory[i];
 
-	agp_bridge->tlb_flush(mem);
+	agp_bridge->driver->tlb_flush(mem);
 	return 0;
 }
+
 
 static int nvidia_remove_memory(agp_memory * mem, off_t pg_start, int type)
 {
@@ -182,10 +188,9 @@ static int nvidia_remove_memory(agp_memory * mem, off_t pg_start, int type)
 		    (unsigned long) agp_bridge->scratch_page;
 	}
 
-	agp_bridge->tlb_flush(mem);
+	agp_bridge->driver->tlb_flush(mem);
 	return 0;
 }
-#endif
 
 
 static void nvidia_tlbflush(agp_memory * mem)
@@ -251,8 +256,8 @@ struct agp_bridge_driver nvidia_driver = {
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
 	.free_gatt_table	= agp_generic_free_gatt_table,
-	.insert_memory		= agp_generic_insert_memory,
-	.remove_memory		= agp_generic_remove_memory,
+	.insert_memory		= nvidia_insert_memory,
+	.remove_memory		= nvidia_remove_memory,
 	.alloc_by_type		= agp_generic_alloc_by_type,
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
