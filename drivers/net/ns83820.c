@@ -64,6 +64,8 @@
  *				tuning
  *			0.20 -	fix stupid RFEN thinko.  i am such a smurf.
  *
+ *	20040828	0.21 -	add hardware vlan accleration
+ *				by Neil Horman <nhorman@redhat.com>
  * Driver Overview
  * ===============
  *
@@ -92,6 +94,7 @@
 //#define dprintk		printk
 #define dprintk(x...)		do { } while (0)
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -108,6 +111,7 @@
 #include <linux/prefetch.h>
 #include <linux/ethtool.h>
 #include <linux/timer.h>
+#include <linux/if_vlan.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -138,6 +142,9 @@ static int lnksts = 0;		/* CFG_LNKSTS bit polarity */
 
 /* tunables */
 #define RX_BUF_SIZE	1500	/* 8192 */
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+#define NS83820_VLAN_ACCEL_SUPPORT
+#endif
 
 /* Must not exceed ~65000. */
 #define NR_RX_DESC	64
@@ -262,6 +269,8 @@ static int lnksts = 0;		/* CFG_LNKSTS bit polarity */
 #define EXTSTS_UDPPKT	0x00200000
 #define EXTSTS_TCPPKT	0x00080000
 #define EXTSTS_IPPKT	0x00020000
+#define EXTSTS_VPKT	0x00010000
+#define EXTSTS_VTG_MASK	0x0000ffff
 
 #define SPDSTS_POLARITY	(CFG_SPDSTS1 | CFG_SPDSTS0 | CFG_DUPSTS | (lnksts ? CFG_LNKSTS : 0))
 
@@ -403,6 +412,7 @@ static int lnksts = 0;		/* CFG_LNKSTS bit polarity */
 #define CMDSTS_INTR	0x20000000
 #define CMDSTS_ERR	0x10000000
 #define CMDSTS_OK	0x08000000
+#define CMDSTS_RUNT	0x00200000
 #define CMDSTS_LEN_MASK	0x0000ffff
 
 #define CMDSTS_DEST_MASK	0x01800000
@@ -431,6 +441,10 @@ struct ns83820 {
 	u8			*base;
 
 	struct pci_dev		*pci_dev;
+
+#ifdef NS83820_VLAN_ACCEL_SUPPORT
+	struct vlan_group	*vlgrp;
+#endif
 
 	struct rx_info		rx_info;
 	struct tasklet_struct	rx_tasklet;
@@ -493,6 +507,33 @@ static inline void kick_rx(struct net_device *ndev)
 #define start_tx_okay(dev)	\
 	(((NR_TX_DESC-2 + dev->tx_done_idx - dev->tx_free_idx) % NR_TX_DESC) > MIN_TX_DESC_FREE)
 
+
+#ifdef NS83820_VLAN_ACCEL_SUPPORT 
+static void ns83820_vlan_rx_register(struct net_device *ndev, struct vlan_group *grp)
+{
+	struct ns83820 *dev = PRIV(ndev);
+
+	spin_lock_irq(&dev->misc_lock);
+	spin_lock(&dev->tx_lock);
+
+	dev->vlgrp = grp;
+
+	spin_unlock(&dev->tx_lock);
+	spin_unlock_irq(&dev->misc_lock);
+}
+
+static void ns83820_vlan_rx_kill_vid(struct net_device *ndev, unsigned short vid)
+{
+	struct ns83820 *dev = PRIV(ndev);
+
+	spin_lock_irq(&dev->misc_lock);
+	spin_lock(&dev->tx_lock);
+	if (dev->vlgrp)
+		dev->vlgrp->vlan_devices[vid] = NULL;
+	spin_unlock(&dev->tx_lock);
+	spin_unlock_irq(&dev->misc_lock);
+}
+#endif
 
 /* Packet Receiver
  *
@@ -836,6 +877,7 @@ static void fastcall rx_irq(struct net_device *ndev)
 	struct ns83820 *dev = PRIV(ndev);
 	struct rx_info *info = &dev->rx_info;
 	unsigned next_rx;
+	int rx_rc, len;
 	u32 cmdsts, *desc;
 	unsigned long flags;
 	int nr = 0;
@@ -876,8 +918,24 @@ static void fastcall rx_irq(struct net_device *ndev)
 
 		pci_unmap_single(dev->pci_dev, bufptr,
 				 RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
+		len = cmdsts & CMDSTS_LEN_MASK;
+#ifdef NS83820_VLAN_ACCEL_SUPPORT
+		/* NH: As was mentioned below, this chip is kinda
+		 * brain dead about vlan tag stripping.  Frames
+		 * that are 64 bytes with a vlan header appended
+		 * like arp frames, or pings, are flagged as Runts
+		 * when the tag is stripped and hardware.  This
+		 * also means that the OK bit in the descriptor 
+		 * is cleared when the frame comes in so we have
+		 * to do a specific length check here to make sure
+		 * the frame would have been ok, had we not stripped
+		 * the tag.
+		 */ 
+		if (likely((CMDSTS_OK & cmdsts) ||
+			((cmdsts & CMDSTS_RUNT) && len >= 56))) {   
+#else
 		if (likely(CMDSTS_OK & cmdsts)) {
-			int len = cmdsts & 0xffff;
+#endif
 			skb_put(skb, len);
 			if (unlikely(!skb))
 				goto netdev_mangle_me_harder_failed;
@@ -891,7 +949,18 @@ static void fastcall rx_irq(struct net_device *ndev)
 				skb->ip_summed = CHECKSUM_NONE;
 			}
 			skb->protocol = eth_type_trans(skb, ndev);
-			if (NET_RX_DROP == netif_rx(skb)) {
+#ifdef NS83820_VLAN_ACCEL_SUPPORT 
+			if(extsts & EXTSTS_VPKT) {
+				unsigned short tag;
+				tag = ntohs(extsts & EXTSTS_VTG_MASK);
+				rx_rc = vlan_hwaccel_rx(skb,dev->vlgrp,tag);
+			} else {
+				rx_rc = netif_rx(skb);
+			}
+#else
+			rx_rc = netif_rx(skb);
+#endif
+			if (NET_RX_DROP == rx_rc) {
 netdev_mangle_me_harder_failed:
 				dev->stats.rx_dropped ++;
 			}
@@ -1098,6 +1167,17 @@ again:
 		else if (IPPROTO_UDP == skb->nh.iph->protocol)
 			extsts |= EXTSTS_UDPPKT;
 	}
+
+#ifdef NS83820_VLAN_ACCEL_SUPPORT
+	if(vlan_tx_tag_present(skb)) {
+		/* fetch the vlan tag info out of the
+		 * ancilliary data if the vlan code
+		 * is using hw vlan acceleration
+		 */
+		short tag = vlan_tx_tag_get(skb);
+		extsts |= (EXTSTS_VPKT | htons(tag));
+	}
+#endif
 
 	len = skb->len;
 	if (nr_frags)
@@ -1887,7 +1967,6 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	ndev->do_ioctl = ns83820_ioctl;
 	ndev->tx_timeout = ns83820_tx_timeout;
 	ndev->watchdog_timeo = 5 * HZ;
-
 	pci_set_drvdata(pci_dev, ndev);
 
 	ns83820_do_reset(dev, CR_RST);
@@ -2013,11 +2092,25 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	 * a ping with a VLAN header) then the card, strips the 4 byte VLAN
 	 * tag and then checks the packet size, so if RXCFG_ARP is not enabled,
 	 * it discrards it!.  These guys......
+	 * also turn on tag stripping if hardware acceleration is enabled
 	 */
-	writel(VRCR_IPEN | VRCR_VTDEN, dev->base + VRCR);
+#ifdef NS83820_VLAN_ACCEL_SUPPORT
+#define VRCR_INIT_VALUE (VRCR_IPEN|VRCR_VTDEN|VRCR_VTREN) 
+#else
+#define VRCR_INIT_VALUE (VRCR_IPEN|VRCR_VTDEN)
+#endif
+	writel(VRCR_INIT_VALUE, dev->base + VRCR);
 
-	/* Enable per-packet TCP/UDP/IP checksumming */
-	writel(VTCR_PPCHK, dev->base + VTCR);
+	/* Enable per-packet TCP/UDP/IP checksumming
+	 * and per packet vlan tag insertion if
+	 * vlan hardware acceleration is enabled
+	 */
+#ifdef NS83820_VLAN_ACCEL_SUPPORT
+#define VTCR_INIT_VALUE (VTCR_PPCHK|VTCR_VPPTI)
+#else
+#define VTCR_INIT_VALUE VTCR_PPCHK
+#endif
+	writel(VTCR_INIT_VALUE, dev->base + VTCR);
 
 	/* Ramit : Enable async and sync pause frames */
 	/* writel(0, dev->base + PCR); */
@@ -2033,6 +2126,13 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	/* Yes, we support dumb IP checksum on transmit */
 	ndev->features |= NETIF_F_SG;
 	ndev->features |= NETIF_F_IP_CSUM;
+
+#ifdef NS83820_VLAN_ACCEL_SUPPORT
+	/* We also support hardware vlan acceleration */
+	ndev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
+	ndev->vlan_rx_register = ns83820_vlan_rx_register;
+	ndev->vlan_rx_kill_vid = ns83820_vlan_rx_kill_vid;
+#endif
 
 	if (using_dac) {
 		printk(KERN_INFO "%s: using 64 bit addressing.\n",
