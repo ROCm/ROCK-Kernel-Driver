@@ -62,6 +62,7 @@
 #define WRT_REG_WORD(addr, data)	writew(data, addr)
 #else				/* MEMORY_MAPPED_IO */
 #define RD_REG_WORD(addr)		inw((unsigned long)addr)
+#define RD_REG_WORD_dmasync(addr)	RD_REG_WORD(addr)
 #define WRT_REG_WORD(addr, data)	outw(data, (unsigned long)addr)
 #endif				/* MEMORY_MAPPED_IO */
 
