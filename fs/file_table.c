@@ -54,7 +54,7 @@ struct file * get_empty_filp(void)
 			return NULL;
 		}
 		atomic_set(&f->f_count,1);
-		f->f_version = ++event;
+		f->f_version = 0;
 		f->f_uid = current->fsuid;
 		f->f_gid = current->fsgid;
 		f->f_owner.lock = RW_LOCK_UNLOCKED;
