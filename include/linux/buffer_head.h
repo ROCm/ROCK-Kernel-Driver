@@ -62,13 +62,6 @@ struct buffer_head {
 };
 
 /*
- * Debug
- */
-
-void __buffer_error(char *file, int line);
-#define buffer_error() __buffer_error(__FILE__, __LINE__)
-
-/*
  * macro tricks to expand the set_buffer_foo(), clear_buffer_foo()
  * and buffer_foo() functions.
  */

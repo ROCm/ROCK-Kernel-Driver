@@ -1925,7 +1925,6 @@ static int map_block_for_writepage(struct inode *inode,
     th.t_trans_id = 0;
 
     if (!buffer_uptodate(bh_result)) {
-        buffer_error();
 	return -EIO;
     }
 
@@ -2057,8 +2056,6 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
      * in the BH_Uptodate is just a sanity check.
      */
     if (!page_has_buffers(page)) {
-	if (!PageUptodate(page))
-	    buffer_error();
 	create_empty_buffers(page, inode->i_sb->s_blocksize, 
 	                    (1 << BH_Dirty) | (1 << BH_Uptodate));
     }
@@ -2120,8 +2117,6 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
 	    }
 	}
 	if (test_clear_buffer_dirty(bh)) {
-	    if (!buffer_uptodate(bh))
-		buffer_error();
 	    mark_buffer_async_write(bh);
 	} else {
 	    unlock_buffer(bh);
