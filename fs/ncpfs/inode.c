@@ -90,7 +90,7 @@ static struct super_operations ncp_sops =
 	statfs:		ncp_statfs,
 };
 
-extern struct dentry_operations ncp_dentry_operations;
+extern struct dentry_operations ncp_root_dentry_operations;
 #ifdef CONFIG_NCPFS_EXTRAS
 extern struct address_space_operations ncp_symlink_aops;
 extern int ncp_symlink(struct inode*, struct dentry*, const char*);
@@ -502,7 +502,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 	sb->s_root = d_alloc_root(root_inode);
         if (!sb->s_root)
 		goto out_no_root;
-	sb->s_root->d_op = &ncp_dentry_operations;
+	sb->s_root->d_op = &ncp_root_dentry_operations;
 	return 0;
 
 out_no_root:
