@@ -75,9 +75,12 @@ extern struct inode_operations ntfs_dir_inode_ops;
 extern struct  file_operations ntfs_empty_file_ops;
 extern struct inode_operations ntfs_empty_inode_ops;
 
-/* Generic macro to convert pointers to values for comparison purposes. */
+/* Generic macros to convert pointers to values and vice versa. */
 #ifndef p2n
 #define p2n(p)          ((ptrdiff_t)((ptrdiff_t*)(p)))
+#endif
+#ifndef n2p
+#define n2p(p)          ((ptrdiff_t*)((ptrdiff_t)(p)))
 #endif
 
 /**

@@ -597,8 +597,9 @@ lock_retry_remap:
 			lcn = vcn_to_lcn(rl, vcn);
 		} else
 			lcn = (LCN)LCN_RL_NOT_MAPPED;
-		ntfs_debug("Reading vcn = 0x%Lx, lcn = 0x%Lx.",
-				(long long)vcn, (long long)lcn);
+		ntfs_debug("Reading vcn = 0x%llx, lcn = 0x%llx.",
+				(unsigned long long)vcn,
+				(unsigned long long)lcn);
 		if (lcn < 0) {
 			/*
 			 * When we reach the first sparse cluster we have

@@ -1,7 +1,7 @@
 /**
  * attrib.c - NTFS attribute operations. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
@@ -9,13 +9,13 @@
  * by the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program/include file is distributed in the hope that it will be 
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program (in the main directory of the Linux-NTFS 
+ * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -623,8 +623,8 @@ run_list_element *ntfs_merge_run_lists(run_list_element *drl,
 			int slots = 0;
 
 			if (drl[ds].vcn == marker_vcn) {
-				ntfs_debug("Old marker = 0x%Lx, replacing with "
-						"LCN_ENOENT.\n",
+				ntfs_debug("Old marker = 0x%llx, replacing "
+						"with LCN_ENOENT.\n",
 						(unsigned long long)
 						drl[ds].lcn);
 				drl[ds].lcn = (LCN)LCN_ENOENT;
@@ -889,19 +889,19 @@ mpa_err:
 		 * likely, there are more extents following this one.
 		 */
 		if (deltaxcn < --max_cluster) {
-			ntfs_debug("More extents to follow; deltaxcn = 0x%Lx, "
-					"max_cluster = 0x%Lx",
-					(long long)deltaxcn,
-					(long long)max_cluster);
+			ntfs_debug("More extents to follow; deltaxcn = 0x%llx, "
+					"max_cluster = 0x%llx",
+					(unsigned long long)deltaxcn,
+					(unsigned long long)max_cluster);
 			rl[rlpos].vcn = vcn;
 			vcn += rl[rlpos].length = max_cluster - deltaxcn;
 			rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
 			rlpos++;
 		} else if (unlikely(deltaxcn > max_cluster)) {
 			ntfs_error(vol->sb, "Corrupt attribute. deltaxcn = "
-					"0x%Lx, max_cluster = 0x%Lx",
-					(long long)deltaxcn,
-					(long long)max_cluster);
+					"0x%llx, max_cluster = 0x%llx",
+					(unsigned long long)deltaxcn,
+					(unsigned long long)max_cluster);
 			goto mpa_err;
 		}
 		rl[rlpos].lcn = (LCN)LCN_ENOENT;
@@ -933,7 +933,7 @@ err_out:
 
 /**
  * map_run_list - map (a part of) a run list of an ntfs inode
- * @ni:		ntfs inode for which to map (part of) a run list 
+ * @ni:		ntfs inode for which to map (part of) a run list
  * @vcn:	map run list part containing this vcn
  *
  * Map the part of a run list containing the @vcn of an the ntfs inode @ni.
@@ -947,8 +947,8 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	MFT_RECORD *mrec;
 	int err = 0;
 	
-	ntfs_debug("Mapping run list part containing vcn 0x%Lx.",
-			(long long)vcn);
+	ntfs_debug("Mapping run list part containing vcn 0x%llx.",
+			(unsigned long long)vcn);
 
 	if (!NInoAttr(ni))
 		base_ni = ni;
@@ -1136,7 +1136,7 @@ BOOL find_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
 			break;
 		if (a->type != type)
 			continue;
-		/* 
+		/*
 		 * If @name is present, compare the two names. If @name is
 		 * missing, assume we want an unnamed attribute.
 		 */
@@ -1257,8 +1257,9 @@ int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al_start,
 	/* Read all clusters specified by the run list one run at a time. */
 	while (rl->length) {
 		lcn = vcn_to_lcn(rl, rl->vcn);
-		ntfs_debug("Reading vcn = 0x%Lx, lcn = 0x%Lx.",
-				(long long)rl->vcn, (long long)lcn);
+		ntfs_debug("Reading vcn = 0x%llx, lcn = 0x%llx.",
+				(unsigned long long)rl->vcn,
+				(unsigned long long)lcn);
 		/* The attribute list cannot be sparse. */
 		if (lcn < 0) {
 			ntfs_error(sb, "vcn_to_lcn() failed. Cannot read "

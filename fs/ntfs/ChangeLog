@@ -39,6 +39,10 @@ ToDo:
 	  and store it in ntfs_volume->mftmirr_size (fs/ntfs/super.c).
 	- Load the mft mirror at mount time and compare the mft records stored
 	  in it to the ones in the mft (fs/ntfs/super.c).
+	- Fix type casting related warnings on 64-bit architectures.  Thanks
+	  to Meelis Roos for reporting them.
+	- Move %L to %ll as %L is floating point and %ll is integer which is
+	  what we want.
 
 2.1.7 - Enable NFS exporting of mounted NTFS volumes.
 

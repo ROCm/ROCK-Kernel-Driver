@@ -77,7 +77,7 @@ static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 		}
 	} else {
 		clear_buffer_uptodate(bh);
-		ntfs_error(ni->vol->sb, "Buffer I/O error, logical block %Lu.",
+		ntfs_error(ni->vol->sb, "Buffer I/O error, logical block %llu.",
 				(unsigned long long)bh->b_blocknr);
 		SetPageError(page);
 	}
@@ -120,10 +120,10 @@ static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 				continue;
 			nr_err++;
 			ntfs_error(ni->vol->sb, "post_read_mst_fixup() failed, "
-					"corrupt %s record 0x%Lx. Run chkdsk.",
+					"corrupt %s record 0x%llx. Run chkdsk.",
 					ni->mft_no ? "index" : "mft",
-					(long long)(((s64)page->index <<
-					PAGE_CACHE_SHIFT >>
+					(unsigned long long)(((s64)page->index
+					<< PAGE_CACHE_SHIFT >>
 					ni->itype.index.block_size_bits) + i));
 		}
 		flush_dcache_page(page);
@@ -263,9 +263,10 @@ lock_retry_remap:
 			}
 			/* Hard error, zero out region. */
 			SetPageError(page);
-			ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%Lx) failed "
-					"with error code 0x%Lx%s.",
-					(long long)vcn, (long long)-lcn,
+			ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%llx) failed "
+					"with error code 0x%llx%s.",
+					(unsigned long long)vcn,
+					(unsigned long long)-lcn,
 					is_retry ? " even after retrying" : "");
 			// FIXME: Depending on vol->on_errors, do something.
 		}
@@ -667,9 +668,10 @@ lock_retry_remap:
 		}
 		/* Failed to map the buffer, even after retrying. */
 		bh->b_blocknr = -1UL;
-		ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%Lx) failed "
-				"with error code 0x%Lx%s.",
-				(long long)vcn, (long long)-lcn,
+		ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%llx) failed "
+				"with error code 0x%llx%s.",
+				(unsigned long long)vcn,
+				(unsigned long long)-lcn,
 				is_retry ? " even after retrying" : "");
 		// FIXME: Depending on vol->on_errors, do something.
 		if (!err)
@@ -914,15 +916,16 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	attr_len = le32_to_cpu(ctx->attr->data.resident.value_length);
 
 	if (unlikely(vi->i_size != attr_len)) {
-		ntfs_error(vi->i_sb, "BUG()! i_size (0x%Lx) doesn't match "
+		ntfs_error(vi->i_sb, "BUG()! i_size (0x%llx) doesn't match "
 				"attr_len (0x%x). Aborting write.", vi->i_size,
 				attr_len);
 		err = -EIO;
 		goto err_out;
 	}
 	if (unlikely(attr_pos >= attr_len)) {
-		ntfs_error(vi->i_sb, "BUG()! attr_pos (0x%Lx) > attr_len (0x%x)"
-				". Aborting write.", attr_pos, attr_len);
+		ntfs_error(vi->i_sb, "BUG()! attr_pos (0x%llx) > attr_len "
+				"(0x%x). Aborting write.",
+				(unsigned long long)attr_pos, attr_len);
 		err = -EIO;
 		goto err_out;
 	}
@@ -1221,11 +1224,13 @@ lock_retry_remap:
 				 * retrying.
 				 */
 				bh->b_blocknr = -1UL;
-				ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%Lx) "
+				ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%llx) "
 						"failed with error code "
-						"0x%Lx%s.", (long long)vcn,
-						(long long)-lcn, is_retry ?
-						" even after retrying" : "");
+						"0x%llx%s.",
+						(unsigned long long)vcn,
+						(unsigned long long)-lcn,
+						is_retry ? " even after "
+						"retrying" : "");
 				// FIXME: Depending on vol->on_errors, do
 				// something.
 				if (!err)
@@ -1675,15 +1680,16 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	attr_len = le32_to_cpu(ctx->attr->data.resident.value_length);
 
 	if (unlikely(vi->i_size != attr_len)) {
-		ntfs_error(vi->i_sb, "BUG()! i_size (0x%Lx) doesn't match "
+		ntfs_error(vi->i_sb, "BUG()! i_size (0x%llx) doesn't match "
 				"attr_len (0x%x). Aborting write.", vi->i_size,
 				attr_len);
 		err = -EIO;
 		goto err_out;
 	}
 	if (unlikely(attr_pos >= attr_len)) {
-		ntfs_error(vi->i_sb, "BUG()! attr_pos (0x%Lx) > attr_len (0x%x)"
-				". Aborting write.", attr_pos, attr_len);
+		ntfs_error(vi->i_sb, "BUG()! attr_pos (0x%llx) > attr_len "
+				"(0x%x). Aborting write.",
+				(unsigned long long)attr_pos, attr_len);
 		err = -EIO;
 		goto err_out;
 	}

@@ -853,8 +853,8 @@ skip_attr_list_load:
 		/* Consistency check bitmap size vs. index allocation size. */
 		if ((bvi->i_size << 3) < (vi->i_size >>
 				ni->itype.index.block_size_bits)) {
-			ntfs_error(vi->i_sb, "Index bitmap too small (0x%Lx) "
-					"for index allocation (0x%Lx).",
+			ntfs_error(vi->i_sb, "Index bitmap too small (0x%llx) "
+					"for index allocation (0x%llx).",
 					bvi->i_size << 3, vi->i_size);
 			goto unm_err_out;
 		}
@@ -1692,9 +1692,9 @@ void ntfs_read_inode_mount(struct inode *vi)
 		ntfs_error(sb, "Failed to load the complete run list "
 				"for $MFT/$DATA. Driver bug or "
 				"corrupt $MFT. Run chkdsk.");
-		ntfs_debug("highest_vcn = 0x%Lx, last_vcn - 1 = 0x%Lx",
-				(long long)highest_vcn,
-				(long long)last_vcn - 1);
+		ntfs_debug("highest_vcn = 0x%llx, last_vcn - 1 = 0x%llx",
+				(unsigned long long)highest_vcn,
+				(unsigned long long)last_vcn - 1);
 		goto put_err_out;
 	}
 	put_attr_search_ctx(ctx);

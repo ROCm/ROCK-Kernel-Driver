@@ -627,7 +627,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		return FALSE;
 	}
 	vol->nr_clusters = ll;
-	ntfs_debug("vol->nr_clusters = 0x%Lx", (long long)vol->nr_clusters);
+	ntfs_debug("vol->nr_clusters = 0x%llx", (long long)vol->nr_clusters);
 	/*
 	 * On an architecture where unsigned long is 32-bits, we restrict the
 	 * volume size to 2TiB (2^41). On a 64-bit architecture, the compiler
@@ -635,10 +635,11 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	 */
 	if (sizeof(unsigned long) < 8) {
 		if ((ll << vol->cluster_size_bits) >= (1ULL << 41)) {
-			ntfs_error(vol->sb, "Volume size (%LuTiB) is too large "
-					"for this architecture. Maximim "
+			ntfs_error(vol->sb, "Volume size (%lluTiB) is too "
+					"large for this architecture. Maximum "
 					"supported is 2TiB. Sorry.",
-					ll >> (40 - vol->cluster_size_bits));
+					(unsigned long long)ll >> (40 -
+					vol->cluster_size_bits));
 			return FALSE;
 		}
 	}
@@ -648,7 +649,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		return FALSE;
 	}
 	vol->mft_lcn = ll;
-	ntfs_debug("vol->mft_lcn = 0x%Lx", (long long)vol->mft_lcn);
+	ntfs_debug("vol->mft_lcn = 0x%llx", (long long)vol->mft_lcn);
 	ll = sle64_to_cpu(b->mftmirr_lcn);
 	if (ll >= vol->nr_clusters) {
 		ntfs_error(vol->sb, "MFTMirr LCN is beyond end of volume. "
@@ -656,7 +657,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		return FALSE;
 	}
 	vol->mftmirr_lcn = ll;
-	ntfs_debug("vol->mftmirr_lcn = 0x%Lx", (long long)vol->mftmirr_lcn);
+	ntfs_debug("vol->mftmirr_lcn = 0x%llx", (long long)vol->mftmirr_lcn);
 #ifdef NTFS_RW
 	/*
 	 * Work out the size of the mft mirror in number of mft records. If the
@@ -674,7 +675,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	ntfs_debug("vol->mftmirr_size = %i", vol->mftmirr_size);
 #endif /* NTFS_RW */
 	vol->serial_no = le64_to_cpu(b->volume_serial_number);
-	ntfs_debug("vol->serial_no = 0x%Lx",
+	ntfs_debug("vol->serial_no = 0x%llx",
 			(unsigned long long)vol->serial_no);
 	/*
 	 * Determine MFT zone size. This is not strictly the right place to do
@@ -703,9 +704,9 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 			vol->mft_zone_multiplier);
 	vol->mft_zone_start = vol->mft_lcn;
 	vol->mft_zone_end += vol->mft_lcn;
-	ntfs_debug("vol->mft_zone_start = 0x%Lx",
+	ntfs_debug("vol->mft_zone_start = 0x%llx",
 			(long long)vol->mft_zone_start);
-	ntfs_debug("vol->mft_zone_end = 0x%Lx", (long long)vol->mft_zone_end);
+	ntfs_debug("vol->mft_zone_end = 0x%llx", (long long)vol->mft_zone_end);
 	return TRUE;
 }
 
@@ -925,7 +926,7 @@ read_partial_upcase_page:
 			goto read_partial_upcase_page;
 	}
 	vol->upcase_len = ino->i_size >> UCHAR_T_SIZE_BITS;
-	ntfs_debug("Read %Lu bytes from $UpCase (expected %u bytes).",
+	ntfs_debug("Read %lu bytes from $UpCase (expected %u bytes).",
 			ino->i_size, 64 * 1024 * sizeof(uchar_t));
 	iput(ino);
 	down(&ntfs_lock);
@@ -1097,6 +1098,8 @@ get_ctx_vol_failed:
 	 * Get the inode for the logfile and empty it if this is a read-write
 	 * mount.
 	 */
+	// TODO: vol->logfile_ino = ;
+	// TODO: Cleanup for error case at end of function.
 	tmp_ino = ntfs_iget(sb, FILE_LogFile);
 	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
 		if (!IS_ERR(tmp_ino))
@@ -1211,17 +1214,22 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 	vol->lcnbmp_ino = NULL;
 	up_write(&vol->lcnbmp_lock);
 
+	down_write(&vol->mftbmp_lock);
+	iput(vol->mftbmp_ino);
+	vol->mftbmp_ino = NULL;
+	up_write(&vol->mftbmp_lock);
+
 #ifdef NTFS_RW
+	if (vol->logfile_ino) {
+		iput(vol->logfile_ino);
+		vol->logfile_ino = NULL;
+	}
+
 	if (vol->mftmirr_ino) {
 		iput(vol->mftmirr_ino);
 		vol->mftmirr_ino = NULL;
 	}
 #endif /* NTFS_RW */
-
-	down_write(&vol->mftbmp_lock);
-	iput(vol->mftbmp_ino);
-	vol->mftbmp_ino = NULL;
-	up_write(&vol->mftbmp_lock);
 
 	iput(vol->mft_ino);
 	vol->mft_ino = NULL;
@@ -1540,6 +1548,7 @@ struct super_operations ntfs_sops = {
 	//					   0 and i_nlink is also 0. */
 	//.write_super	= NULL,			/* Flush dirty super block to
 	//					   disk. */
+	//.sync_fs	= NULL,			/* ? */
 	//.write_super_lockfs	= NULL,		/* ? */
 	//.unlockfs	= NULL,			/* ? */
 #endif /* NTFS_RW */
@@ -1638,6 +1647,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	init_rwsem(&vol->mftbmp_lock);
 #ifdef NTFS_RW
 	vol->mftmirr_ino = NULL;
+	vol->mftmirr_size = 0;
+	vol->logfile_ino = NULL;
 #endif /* NTFS_RW */
 	vol->lcnbmp_ino = NULL;
 	init_rwsem(&vol->lcnbmp_lock);
@@ -1733,7 +1744,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 * Poison vol->mft_ino so we know whether iget() called into our
 	 * ntfs_read_inode_mount() method.
 	 */
-#define OGIN	((struct inode*)le32_to_cpu(0x4e49474f))	/* OGIN */
+#define OGIN	((struct inode*)n2p(le32_to_cpu(0x4e49474f)))	/* OGIN */
 	vol->mft_ino = OGIN;
 	sb->s_op = &ntfs_mount_sops;
 	tmp_ino = iget(vol->sb, FILE_MFT);

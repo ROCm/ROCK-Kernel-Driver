@@ -86,6 +86,8 @@ typedef struct {
 #ifdef NTFS_RW
 	struct inode *mftmirr_ino;	/* The VFS inode of $MFTMirr. */
 	int mftmirr_size;		/* Size of mft mirror in mft records. */
+
+	struct inode *logfile_ino;	/* The VFS inode of $LogFile. */
 #endif /* NTFS_RW */
 
 	struct inode *lcnbmp_ino;	/* The VFS inode of $Bitmap. */
