@@ -340,8 +340,8 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 	p_priv = usb_get_serial_port_data(port);
 	d_details = p_priv->device_details;
 
-	dbg("%s - for port %d (%d chars [%x]), flip=%d",
-	    __FUNCTION__, port->number, count, buf[0], p_priv->out_flip);
+	dbg("%s - for port %d (%d chars), flip=%d",
+	    __FUNCTION__, port->number, count, p_priv->out_flip);
 
 	for (left = count; left > 0; left -= todo) {
 		todo = left;

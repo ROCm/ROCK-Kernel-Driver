@@ -14,6 +14,29 @@
 #include "hcd.h"
 
 /**
+ * usb_init_urb - initializes a urb so that it can be used by a USB driver
+ * @urb: pointer to the urb to initialize
+ *
+ * Initializes a urb so that the USB subsystem can use it properly.
+ *
+ * If a urb is created with a call to usb_alloc_urb() it is not
+ * necessary to call this function.  Only use this if you allocate the
+ * space for a struct urb on your own.  If you call this function, be
+ * careful when freeing the memory for your urb that it is no longer in
+ * use by the USB core.
+ *
+ * Only use this function if you _really_ understand what you are doing.
+ */
+void usb_init_urb(struct urb *urb)
+{
+	if (urb) {
+		memset(urb, 0, sizeof(*urb));
+		urb->count = (atomic_t)ATOMIC_INIT(1);
+		spin_lock_init(&urb->lock);
+	}
+}
+
+/**
  * usb_alloc_urb - creates a new urb for a USB driver to use
  * @iso_packets: number of iso packets for this urb
  * @mem_flags: the type of memory to allocate, see kmalloc() for a list of
@@ -40,11 +63,7 @@ struct urb *usb_alloc_urb(int iso_packets, int mem_flags)
 		err("alloc_urb: kmalloc failed");
 		return NULL;
 	}
-
-	memset(urb, 0, sizeof(*urb));
-	urb->count = (atomic_t)ATOMIC_INIT(1);
-	spin_lock_init(&urb->lock);
-
+	usb_init_urb(urb);
 	return urb;
 }
 
@@ -387,7 +406,7 @@ int usb_unlink_urb(struct urb *urb)
 		return -ENODEV;
 }
 
-// asynchronous request completion model
+EXPORT_SYMBOL(usb_init_urb);
 EXPORT_SYMBOL(usb_alloc_urb);
 EXPORT_SYMBOL(usb_free_urb);
 EXPORT_SYMBOL(usb_get_urb);

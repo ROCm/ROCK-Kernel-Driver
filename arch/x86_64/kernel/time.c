@@ -195,7 +195,7 @@ static void set_rtc_mmss(unsigned long nowtime)
 	spin_unlock(&rtc_lock);
 }
 
-static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	static unsigned long rtc_update = 0;
 
@@ -255,6 +255,8 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
  
 	write_sequnlock(&xtime_lock);
+
+	return IRQ_HANDLED;
 }
 
 unsigned long get_cmos_time(void)

@@ -573,8 +573,8 @@ static void sw_connect(struct gameport *gameport, struct gameport_dev *dev)
 {
 	struct sw *sw;
 	int i, j, k, l;
-	unsigned char buf[SW_LENGTH];
-	unsigned char idbuf[SW_LENGTH];
+	unsigned char *buf = NULL;	/* [SW_LENGTH] */
+	unsigned char *idbuf = NULL;	/* [SW_LENGTH] */
 	unsigned char m = 1;
 	char comment[40];
 
@@ -582,6 +582,11 @@ static void sw_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	if (!(sw = kmalloc(sizeof(struct sw), GFP_KERNEL))) return;
 	memset(sw, 0, sizeof(struct sw));
+
+	buf = kmalloc(SW_LENGTH, GFP_KERNEL);
+	idbuf = kmalloc(SW_LENGTH, GFP_KERNEL);
+	if (!buf || !idbuf)
+		goto fail1;
 
 	gameport->private = sw;
 
@@ -739,6 +744,8 @@ static void sw_connect(struct gameport *gameport, struct gameport_dev *dev)
 	return;
 fail2:	gameport_close(gameport);
 fail1:	kfree(sw);
+	kfree(buf);
+	kfree(idbuf);
 }
 
 static void sw_disconnect(struct gameport *gameport)

@@ -370,7 +370,7 @@ static inline void usb_serial_debug_data (const char *file, const char *function
 
 /* Use our own dbg macro */
 #undef dbg
-#define dbg(format, arg...) do { if (debug) printk(KERN_DEBUG __FILE__ ": " format "\n" , ## arg); } while (0)
+#define dbg(format, arg...) do { if (debug) printk(KERN_DEBUG "%s: " format "\n" , __FILE__ , ## arg); } while (0)
 
 
 

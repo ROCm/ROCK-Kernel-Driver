@@ -855,28 +855,14 @@ asmlinkage long sys32_time(int * tloc)
 	return i;
 }
 
+extern asmlinkage long
+compat_sys_wait4(compat_pid_t pid, compat_uint_t * stat_addr, int options,
+		 struct compat_rusage *ru);
+
 asmlinkage long
 sys32_waitpid(compat_pid_t pid, unsigned int *stat_addr, int options)
 {
 	return compat_sys_wait4(pid, stat_addr, options, NULL);
-}
-
-
-extern asmlinkage long
-sys_getrusage(int who, struct rusage *ru);
-
-asmlinkage long
-sys32_getrusage(int who, struct rusage32 *ru)
-{
-	struct rusage r;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-		
-	set_fs (KERNEL_DS);
-	ret = sys_getrusage(who, &r);
-	set_fs (old_fs);
-	if (put_rusage (ru, &r)) return -EFAULT;
-	return ret;
 }
 
 int sys32_ni_syscall(int call)
