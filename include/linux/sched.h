@@ -424,6 +424,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_IOTHREAD	0x00020000	/* this thread is needed for doing I/O to swap */
 #define PF_FROZEN	0x00040000	/* frozen for system suspend */
 #define PF_SYNC		0x00080000	/* performing fsync(), etc */
+#define PF_FSTRANS	0x00100000	/* inside a filesystem transaction */
 
 /*
  * Ptrace flags
