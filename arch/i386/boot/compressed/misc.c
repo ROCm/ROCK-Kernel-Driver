@@ -120,7 +120,7 @@ static char *vidmem = (char *)0xb8000;
 static int vidport;
 static int lines, cols;
 
-#ifdef CONFIG_MULTIQUAD
+#ifdef CONFIG_X86_NUMAQ
 static void * xquad_portio = NULL;
 #endif
 

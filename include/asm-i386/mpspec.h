@@ -16,11 +16,11 @@
 /*
  * a maximum of 16 APICs with the current APIC ID architecture.
  */
-#ifdef CONFIG_MULTIQUAD
+#ifdef CONFIG_X86_NUMAQ
 #define MAX_APICS 256
-#else /* !CONFIG_MULTIQUAD */
+#else /* !CONFIG_X86_NUMAQ */
 #define MAX_APICS 16
-#endif /* CONFIG_MULTIQUAD */
+#endif /* CONFIG_X86_NUMAQ */
 
 #define MAX_MPC_ENTRY 1024
 
@@ -184,11 +184,11 @@ struct mpc_config_translation
  *	7	2 CPU MCA+PCI
  */
 
-#ifdef CONFIG_MULTIQUAD
+#ifdef CONFIG_X86_NUMAQ
 #define MAX_IRQ_SOURCES 512
-#else /* !CONFIG_MULTIQUAD */
+#else /* !CONFIG_X86_NUMAQ */
 #define MAX_IRQ_SOURCES 256
-#endif /* CONFIG_MULTIQUAD */
+#endif /* CONFIG_X86_NUMAQ */
 
 #define MAX_MP_BUSSES 32
 enum mp_bustype {

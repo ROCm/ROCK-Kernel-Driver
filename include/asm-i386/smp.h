@@ -22,7 +22,7 @@
 #endif
 
 #ifdef CONFIG_SMP
-# ifdef CONFIG_MULTIQUAD
+# ifdef CONFIG_CLUSTERED_APIC
 #  define TARGET_CPUS 0xf     /* all CPUs in *THIS* quad */
 #  define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
 # else
@@ -35,13 +35,13 @@
 #endif
 
 #ifndef clustered_apic_mode
- #ifdef CONFIG_MULTIQUAD
+ #ifdef CONFIG_CLUSTERED_APIC
   #define clustered_apic_mode (1)
   #define esr_disable (1)
- #else /* !CONFIG_MULTIQUAD */
+ #else /* !CONFIG_CLUSTERED_APIC */
   #define clustered_apic_mode (0)
   #define esr_disable (0)
- #endif /* CONFIG_MULTIQUAD */
+ #endif /* CONFIG_CLUSTERED_APIC */
 #endif 
 
 #ifdef CONFIG_SMP

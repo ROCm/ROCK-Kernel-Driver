@@ -300,7 +300,7 @@ static inline void slow_down_io(void) {
 		: : );
 }
 
-#ifdef CONFIG_MULTIQUAD
+#ifdef CONFIG_X86_NUMAQ
 extern void *xquad_portio;    /* Where the IO area was mapped */
 #define XQUAD_PORT_ADDR(port, quad) (xquad_portio + (XQUAD_PORTIO_QUAD*quad) + port)
 #define __BUILDIO(bwl,bw,type) \

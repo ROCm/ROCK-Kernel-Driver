@@ -174,7 +174,7 @@ else
      #Platform Choices
      bool 'Multiquad (IBM/Sequent) NUMAQ support' CONFIG_X86_NUMAQ
      if [ "$CONFIG_X86_NUMAQ" = "y" ]; then
-        define_bool CONFIG_MULTIQUAD y
+        define_bool CONFIG_CLUSTERED_APIC y
      fi
      # Common NUMA Features
      if [ "$CONFIG_X86_NUMAQ" = "y" ]; then

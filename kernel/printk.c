@@ -30,7 +30,7 @@
 
 #include <asm/uaccess.h>
 
-#if defined(CONFIG_MULTIQUAD) || defined(CONFIG_IA64)
+#if defined(CONFIG_X86_NUMAQ) || defined(CONFIG_IA64)
 #define LOG_BUF_LEN	(65536)
 #elif defined(CONFIG_ARCH_S390)
 #define LOG_BUF_LEN	(131072)
