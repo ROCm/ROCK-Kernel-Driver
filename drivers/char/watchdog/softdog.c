@@ -79,7 +79,7 @@ static int timer_alive;
 static void watchdog_fire(unsigned long data)
 {
 #ifdef ONLY_TESTING
-		printk(KERN_CRIT "SOFTDOG: Would Reboot.\n");
+	printk(KERN_CRIT "SOFTDOG: Would Reboot.\n");
 #else
 	printk(KERN_CRIT "SOFTDOG: Initiating system reboot.\n");
 	machine_restart(NULL);
