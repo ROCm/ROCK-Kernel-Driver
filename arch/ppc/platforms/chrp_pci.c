@@ -33,7 +33,7 @@ unsigned long gg2_pci_config_base;
 int __chrp gg2_read_config(struct pci_bus *bus, unsigned int devfn, int off,
 			   int len, u32 *val)
 {
-	volatile unsigned char *cfg_data;
+	volatile void __iomem *cfg_data;
 	struct pci_controller *hose = bus->sysdata;
 
 	if (bus->number > 7)
@@ -45,13 +45,13 @@ int __chrp gg2_read_config(struct pci_bus *bus, unsigned int devfn, int off,
 	cfg_data = hose->cfg_data + ((bus->number<<16) | (devfn<<8) | off);
 	switch (len) {
 	case 1:
-		*val =  in_8((u8 *)cfg_data);
+		*val =  in_8(cfg_data);
 		break;
 	case 2:
-		*val = in_le16((u16 *)cfg_data);
+		*val = in_le16(cfg_data);
 		break;
 	default:
-		*val = in_le32((u32 *)cfg_data);
+		*val = in_le32(cfg_data);
 		break;
 	}
 	return PCIBIOS_SUCCESSFUL;
@@ -60,7 +60,7 @@ int __chrp gg2_read_config(struct pci_bus *bus, unsigned int devfn, int off,
 int __chrp gg2_write_config(struct pci_bus *bus, unsigned int devfn, int off,
 			    int len, u32 val)
 {
-	volatile unsigned char *cfg_data;
+	volatile void __iomem *cfg_data;
 	struct pci_controller *hose = bus->sysdata;
 
 	if (bus->number > 7)
@@ -72,13 +72,13 @@ int __chrp gg2_write_config(struct pci_bus *bus, unsigned int devfn, int off,
 	cfg_data = hose->cfg_data + ((bus->number<<16) | (devfn<<8) | off);
 	switch (len) {
 	case 1:
-		out_8((u8 *)cfg_data, val);
+		out_8(cfg_data, val);
 		break;
 	case 2:
-		out_le16((u16 *)cfg_data, val);
+		out_le16(cfg_data, val);
 		break;
 	default:
-		out_le32((u32 *)cfg_data, val);
+		out_le32(cfg_data, val);
 		break;
 	}
 	return PCIBIOS_SUCCESSFUL;
@@ -254,8 +254,7 @@ chrp_find_bridges(void)
 			setup_grackle(hose);
 		} else if (is_longtrail) {
 			hose->ops = &gg2_pci_ops;
-			hose->cfg_data = (unsigned char *)
-				ioremap(GG2_PCI_CONFIG_BASE, 0x80000);
+			hose->cfg_data = ioremap(GG2_PCI_CONFIG_BASE, 0x80000);
 			gg2_pci_config_base = (unsigned long) hose->cfg_data;
 		} else {
 			printk("No methods for %s (model %s), using RTAS\n",

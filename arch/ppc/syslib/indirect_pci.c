@@ -32,7 +32,7 @@ indirect_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		     int len, u32 *val)
 {
 	struct pci_controller *hose = bus->sysdata;
-	volatile unsigned char *cfg_data;
+	volatile void __iomem *cfg_data;
 	u8 cfg_type = 0;
 
 	if (ppc_md.pci_exclude_device)
@@ -54,13 +54,13 @@ indirect_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	cfg_data = hose->cfg_data + (offset & 3);
 	switch (len) {
 	case 1:
-		*val = in_8((u8 *)cfg_data);
+		*val = in_8(cfg_data);
 		break;
 	case 2:
-		*val = in_le16((u16 *)cfg_data);
+		*val = in_le16(cfg_data);
 		break;
 	default:
-		*val = in_le32((u32 *)cfg_data);
+		*val = in_le32(cfg_data);
 		break;
 	}
 	return PCIBIOS_SUCCESSFUL;
@@ -71,7 +71,7 @@ indirect_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		      int len, u32 val)
 {
 	struct pci_controller *hose = bus->sysdata;
-	volatile unsigned char *cfg_data;
+	volatile void __iomem *cfg_data;
 	u8 cfg_type = 0;
 
 	if (ppc_md.pci_exclude_device)
@@ -93,13 +93,13 @@ indirect_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	cfg_data = hose->cfg_data + (offset & 3);
 	switch (len) {
 	case 1:
-		out_8((u8 *)cfg_data, val);
+		out_8(cfg_data, val);
 		break;
 	case 2:
-		out_le16((u16 *)cfg_data, val);
+		out_le16(cfg_data, val);
 		break;
 	default:
-		out_le32((u32 *)cfg_data, val);
+		out_le32(cfg_data, val);
 		break;
 	}
 	return PCIBIOS_SUCCESSFUL;
@@ -116,7 +116,7 @@ setup_indirect_pci_nomap(struct pci_controller* hose, u32 cfg_addr,
 	u32 cfg_data)
 {
 	hose->cfg_addr = (unsigned int *)cfg_addr;
-	hose->cfg_data = (unsigned char *)cfg_data;
+	hose->cfg_data = (void __iomem *)cfg_data;
 	hose->ops = &indirect_pci_ops;
 }
 

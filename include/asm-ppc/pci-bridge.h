@@ -58,7 +58,7 @@ struct pci_controller {
 
 	struct pci_ops *ops;
 	volatile unsigned int *cfg_addr;
-	volatile unsigned char *cfg_data;
+	volatile void __iomem *cfg_data;
 	/*
 	 * If set, indirect method will set the cfg_type bit as
 	 * needed to generate type 1 configuration transactions.
