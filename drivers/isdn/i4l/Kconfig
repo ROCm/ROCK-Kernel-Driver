@@ -31,6 +31,17 @@ config ISDN_MPP
 	  by bundling several ISDN-connections, using this protocol. See
 	  <file:Documentation/isdn/README.syncppp> for more information.
 
+config IPPP_FILTER
+	bool "Filtering for synchronous PPP"
+	depends on ISDN_PPP
+	help
+	  Say Y here if you want to be able to filter the packets passing over
+	  IPPP interfaces.  This allows you to control which packets count as
+	  activity (i.e. which packets will reset the idle timer or bring up
+	  a demand-dialled link) and which packets are to be dropped entirely.
+	  You need to say Y here if you wish to use the pass-filter and
+	  active-filter options to ipppd.
+
 config ISDN_PPP_BSDCOMP
 	tristate "Support BSD compression"
 	depends on ISDN_PPP
