@@ -180,7 +180,7 @@ UNUSUAL_DEV(  0x04e6, 0x0001, 0x0200, 0x0200,
 UNUSUAL_DEV(  0x04e6, 0x0002, 0x0100, 0x0100, 
 		"Shuttle",
 		"eUSCSI Bridge",
-		US_SC_SCSI, US_PR_BULK, usb_stor_euscsi_init, 
+		US_SC_DEVICE, US_PR_DEVICE, usb_stor_euscsi_init, 
 		US_FL_SCM_MULT_TARG ), 
 
 #ifdef CONFIG_USB_STORAGE_SDDR09
