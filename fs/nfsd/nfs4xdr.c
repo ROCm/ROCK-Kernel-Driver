@@ -2091,7 +2091,7 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 {
 	int maxcount;
 	loff_t offset;
-	u32 *page;
+	u32 *page, *savep;
 	ENCODE_HEAD;
 
 	if (nfserr)
@@ -2100,6 +2100,7 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 		return nfserr_resource;
 
 	RESERVE_SPACE(8);  /* verifier */
+	savep = p;
 
 	/* XXX: Following NFSv3, we ignore the READDIR verifier for now. */
 	WRITE32(0);
@@ -2117,8 +2118,10 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	 * pointer and eof field.
 	 */
 	maxcount = (maxcount >> 2) - 4;
-	if (maxcount < 0)
-		return nfserr_toosmall;
+	if (maxcount < 0) {
+		nfserr =  nfserr_toosmall;
+		goto err_no_verf;
+	}
 
 	svc_take_page(resp->rqstp);
 	page = page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
@@ -2136,7 +2139,7 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	    readdir->buffer == page) 
 		nfserr = nfserr_toosmall;
 	if (nfserr)
-		return nfserr;
+		goto err_no_verf;
 
 	if (readdir->offset)
 		xdr_encode_hyper(readdir->offset, offset);
@@ -2156,6 +2159,10 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	resp->end = resp->p + PAGE_SIZE/4;
 
 	return 0;
+err_no_verf:
+	p = savep;
+	ADJUST_ARGS();
+	return nfserr;
 }
 
 static void
