@@ -74,11 +74,11 @@ int register_vio_slot(struct device_node *dn)
 	int rc = 1;
 	struct slot *slot = NULL;
 	
+	name = rpaphp_get_drc_name(dn);
+	if (!name)
+		goto exit_rc;
 	index = (u32 *) get_property(dn, "ibm,my-drc-index", NULL);
 	if (!index)
-		goto exit_rc;
-	name = get_property(dn, "ibm,loc-code", NULL);
-	if (!name)
 		goto exit_rc;
 	if (!(slot = alloc_slot_struct(dn, *index, name, 0))) {
 		rc = -ENOMEM;
