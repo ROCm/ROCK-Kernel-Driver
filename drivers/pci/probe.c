@@ -364,6 +364,7 @@ int pci_setup_device(struct pci_dev * dev)
 
 	sprintf(dev->slot_name, "%02x:%02x.%d", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
 	sprintf(dev->name, "PCI device %04x:%04x", dev->vendor, dev->device);
+	INIT_LIST_HEAD(&dev->pools);
 	
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class);
 	class >>= 8;				    /* upper 3 bytes */
