@@ -997,6 +997,82 @@ int cifs_flush(struct file *file)
 
 
 ssize_t
+cifs_user_read(struct file * file, char __user *read_data, size_t read_size,
+	  loff_t * poffset)
+{
+	int rc = -EACCES;
+	unsigned int bytes_read = 0;
+	unsigned int total_read = 0;
+	unsigned int current_read_size;
+	struct cifs_sb_info *cifs_sb;
+	struct cifsTconInfo *pTcon;
+	int xid;
+	struct cifsFileInfo * open_file;
+	char * smb_read_data;
+	char * current_offset;
+	struct smb_com_read_rsp * pSMBr;
+
+	xid = GetXid();
+	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
+	pTcon = cifs_sb->tcon;
+
+	if (file->private_data == NULL) {
+		FreeXid(xid);
+		return -EBADF;
+	}
+	open_file = (struct cifsFileInfo *)file->private_data;
+
+	if((file->f_flags & O_ACCMODE) == O_WRONLY) {
+		cFYI(1,("attempting read on write only file instance"));
+	}
+
+	for (total_read = 0,current_offset=read_data; read_size > total_read;
+				total_read += bytes_read,current_offset+=bytes_read) {
+		current_read_size = min_t(const int,read_size - total_read,cifs_sb->rsize);
+		rc = -EAGAIN;
+		smb_read_data = NULL;
+		while(rc == -EAGAIN) {
+			if ((open_file->invalidHandle) && (!open_file->closePend)) {
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file,TRUE);
+				if(rc != 0)
+					break;
+			}
+
+			rc = CIFSSMBRead(xid, pTcon,
+				 open_file->netfid,
+				 current_read_size, *poffset,
+				 &bytes_read, &smb_read_data);
+
+			pSMBr = (struct smb_com_read_rsp *)smb_read_data;
+            copy_to_user(current_offset,smb_read_data + 4 /* RFC1001 hdr */ + le16_to_cpu(pSMBr->DataOffset), bytes_read);
+			if(smb_read_data) {
+				cifs_buf_release(smb_read_data);
+				smb_read_data = NULL;
+			}
+		}
+		if (rc || (bytes_read == 0)) {
+			if (total_read) {
+				break;
+			} else {
+				FreeXid(xid);
+				return rc;
+			}
+		} else {
+#ifdef CONFIG_CIFS_STATS
+			atomic_inc(&pTcon->num_reads);
+			spin_lock(&pTcon->stat_lock);
+			pTcon->bytes_read += total_read;
+			spin_unlock(&pTcon->stat_lock);
+#endif
+			*poffset += bytes_read;
+		}
+	}
+	FreeXid(xid);
+	return total_read;
+}
+
+ssize_t
 cifs_read(struct file * file, char *read_data, size_t read_size,
 	  loff_t * poffset)
 {

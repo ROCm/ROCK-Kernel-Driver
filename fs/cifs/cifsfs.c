@@ -57,8 +57,20 @@ unsigned int multiuser_mount = 0;
 unsigned int extended_security = 0;
 unsigned int ntlmv2_support = 0;
 unsigned int sign_CIFS_PDUs = 1;
-unsigned int CIFSMaximumBufferSize = CIFS_MAX_MSGSIZE;
 struct task_struct * oplockThread = NULL;
+unsigned int CIFSMaxBufSize = CIFS_MAX_MSGSIZE;
+module_param(CIFSMaxBufSize, int, CIFS_MAX_MSGSIZE);
+MODULE_PARM_DESC(CIFSMaxBufSize,"Network buffer size (not including header). Default: 16384 Range: 4096 to 130048");
+unsigned int cifs_min_rcv = CIFS_MIN_RCV_POOL;
+module_param(cifs_min_rcv, int, CIFS_MIN_RCV_POOL);
+MODULE_PARM_DESC(cifs_min_rcv,"Network buffers in pool. Default: 4 Range: 1 to 64");
+unsigned int cifs_min_small = 30;
+module_param(cifs_min_small, int, 30);
+MODULE_PARM_DESC(cifs_small_rcv,"Small network buffers in pool. Default: 30 Range: 2 to 256");
+unsigned int cifs_max_pending = CIFS_MAX_REQ;
+module_param(cifs_max_pending, int, CIFS_MAX_REQ);
+MODULE_PARM_DESC(cifs_max_pending,"Simultaneous requests to server. Default: 50 Range: 2 to 256");
+
 
 extern int cifs_mount(struct super_block *, struct cifs_sb_info *, char *,
 			const char *);
@@ -434,14 +446,14 @@ cifs_read_wrapper(struct file * file, char __user *read_data, size_t read_size,
 
 	cFYI(1,("In read_wrapper size %zd at %lld",read_size,*poffset));
 
-#ifdef CONFIG_CIFS_EXPERIMENTAL    /* BB fixme - fix user char * to kernel char * mapping here BB */
+#ifdef CONFIG_CIFS_EXPERIMENTAL
 	/* check whether we can cache writes locally */
 	if(file->f_dentry->d_sb) {
 		struct cifs_sb_info *cifs_sb;
 		cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 		if(cifs_sb != NULL) {
 			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DIRECT_IO)
-				return cifs_read(file,read_data,
+				return cifs_user_read(file,read_data,
 							read_size,poffset);
 		}
 	}
@@ -620,6 +632,13 @@ cifs_destroy_inodecache(void)
 static int
 cifs_init_request_bufs(void)
 {
+	if(CIFSMaxBufSize < 4096) {
+		CIFSMaxBufSize = 4096;
+		cFYI(1,("Buffer size set to minimum of 1 page (4096)"));
+	} else if (CIFSMaxBufSize > 1024*127) {
+		CIFSMaxBufSize = 1024 * 127;
+		cFYI(1,("Buffer size set to maximum"));
+	}
 	cifs_req_cachep = kmem_cache_create("cifs_request",
 					    CIFS_MAX_MSGSIZE +
 					    MAX_CIFS_HDR_SIZE, 0,
@@ -627,7 +646,14 @@ cifs_init_request_bufs(void)
 	if (cifs_req_cachep == NULL)
 		return -ENOMEM;
 
-	cifs_req_poolp = mempool_create(CIFS_MIN_RCV_POOL,
+	if(cifs_min_rcv < 1)
+		cifs_min_rcv = 1;
+	else if (cifs_min_rcv > 64) {
+		cifs_min_rcv = 64;
+		cFYI(1,("cifs_min_rcv set to maximum (64)"));
+	}
+
+	cifs_req_poolp = mempool_create(cifs_min_rcv,
 					mempool_alloc_slab,
 					mempool_free_slab,
 					cifs_req_cachep);
@@ -652,7 +678,14 @@ cifs_init_request_bufs(void)
 		return -ENOMEM;              
 	}
 
-	cifs_sm_req_poolp = mempool_create(30,
+	if(cifs_min_small < 2)
+		cifs_min_small = 2;
+	else if (cifs_min_small > 256) {
+		cifs_min_small = 256;
+		cFYI(1,("cifs_min_small set to maximum (256)"));
+	}
+
+	cifs_sm_req_poolp = mempool_create(cifs_min_small,
 				mempool_alloc_slab,
 				mempool_free_slab,
 				cifs_sm_req_cachep);
@@ -819,6 +852,14 @@ init_cifs(void)
 	GlobalMaxActiveXid = 0;
 	GlobalSMBSeslock = RW_LOCK_UNLOCKED;
 	GlobalMid_Lock = SPIN_LOCK_UNLOCKED;
+
+	if(cifs_max_pending < 2) {
+		cifs_max_pending = 2;
+		cFYI(1,("cifs_max_pending set to min of 2"));
+	} else if(cifs_max_pending > 256) {
+		cifs_max_pending = 256;
+		cFYI(1,("cifs_max_pending set to max of 256"));
+	}
 
 	rc = cifs_init_inodecache();
 	if (!rc) {

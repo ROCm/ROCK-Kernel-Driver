@@ -211,11 +211,11 @@ CIFSSendRcv(const unsigned int xid, struct cifsSesInfo *ses,
 	} else {
 		spin_lock(&GlobalMid_Lock); 
 		while(1) {        
-			if(atomic_read(&ses->server->inFlight) >= CIFS_MAX_REQ){
+			if(atomic_read(&ses->server->inFlight) >= cifs_max_pending){
 				spin_unlock(&GlobalMid_Lock);
 				wait_event(ses->server->request_q,
 					atomic_read(&ses->server->inFlight)
-					 < CIFS_MAX_REQ);
+					 < cifs_max_pending);
 				spin_lock(&GlobalMid_Lock);
 			} else {
 				if(ses->server->tcpStatus == CifsExiting) {
@@ -341,11 +341,11 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	} else {
 		spin_lock(&GlobalMid_Lock); 
 		while(1) {        
-			if(atomic_read(&ses->server->inFlight) >= CIFS_MAX_REQ){
+			if(atomic_read(&ses->server->inFlight) >= cifs_max_pending){
 				spin_unlock(&GlobalMid_Lock);
 				wait_event(ses->server->request_q,
 					atomic_read(&ses->server->inFlight)
-					 < CIFS_MAX_REQ);
+					 < cifs_max_pending);
 				spin_lock(&GlobalMid_Lock);
 			} else {
 				if(ses->server->tcpStatus == CifsExiting) {

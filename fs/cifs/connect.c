@@ -217,7 +217,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 	write_unlock(&GlobalSMBSeslock);
 	if(length  > 1) {
 		mempool_resize(cifs_req_poolp,
-			length + CIFS_MIN_RCV_POOL,
+			length + cifs_min_rcv,
 			GFP_KERNEL);
 	}
 
@@ -489,7 +489,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 	write_unlock(&GlobalSMBSeslock);
 	if(length  > 0) {
 		mempool_resize(cifs_req_poolp,
-			length + CIFS_MIN_RCV_POOL,
+			length + cifs_min_rcv,
 			GFP_KERNEL);
 	}
 

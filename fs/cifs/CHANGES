@@ -4,7 +4,9 @@ Turn off DNOTIFY (directory change notification support) by default
 (unless built with the experimental flag) to fix hang with KDE
 file browser. Fix DNOTIFY flag mappings.  Fix hang (in wait_event
 waiting on an SMB response) in SendReceive when session dies but
-reconnects quickly from another task.
+reconnects quickly from another task.  Add module init  parms for
+minimum number of large and small network buffers in the buffer pools,
+and for the maximum number of simultaneous requests.
 
 Version 1.26
 ------------

@@ -63,7 +63,7 @@ extern struct file_operations cifs_file_ops;
 extern int cifs_open(struct inode *inode, struct file *file);
 extern int cifs_close(struct inode *inode, struct file *file);
 extern int cifs_closedir(struct inode *inode, struct file *file);
-extern ssize_t cifs_read(struct file *file, char *read_data,
+extern ssize_t cifs_user_read(struct file *file, char __user *read_data,
 			 size_t read_size, loff_t * poffset);
 extern ssize_t cifs_write(struct file *file, const char *write_data,
 			  size_t write_size, loff_t * poffset);
