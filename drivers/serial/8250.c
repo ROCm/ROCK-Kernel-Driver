@@ -2350,22 +2350,23 @@ static int __init serial8250_init(void)
 		"%d ports, IRQ sharing %sabled\n", (int) UART_NR,
 		share_irqs ? "en" : "dis");
 
-	ret = driver_register(&serial8250_isa_driver);
-	if (ret)
-		goto out;
-
 	for (i = 0; i < NR_IRQS; i++)
 		spin_lock_init(&irq_lists[i].lock);
 
 	ret = uart_register_driver(&serial8250_reg);
 	if (ret)
-		goto unreg;
+		goto out;
 
 	serial8250_register_ports(&serial8250_reg, NULL);
+
+	ret = driver_register(&serial8250_isa_driver);
+	if (ret)
+		goto unreg;
+
 	goto out;
 
  unreg:
-	driver_unregister(&serial8250_isa_driver);
+	uart_unregister_driver(&serial8250_reg);
  out:
 	return ret;
 }
@@ -2374,11 +2375,12 @@ static void __exit serial8250_exit(void)
 {
 	int i;
 
+	driver_unregister(&serial8250_isa_driver);
+
 	for (i = 0; i < UART_NR; i++)
 		uart_remove_one_port(&serial8250_reg, &serial8250_ports[i].port);
 
 	uart_unregister_driver(&serial8250_reg);
-	driver_unregister(&serial8250_isa_driver);
 }
 
 module_init(serial8250_init);
