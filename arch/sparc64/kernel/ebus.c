@@ -525,9 +525,6 @@ void __init ebus_init(void)
 	int nd, ebusnd, is_rio;
 	int num_ebus = 0;
 
-	if (!pci_present())
-		return;
-
 	pdev = find_next_ebus(NULL, &is_rio);
 	if (!pdev) {
 		printk("ebus: No EBus's found.\n");
