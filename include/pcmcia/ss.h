@@ -165,7 +165,6 @@ typedef struct window_t {
 #define MAX_WIN 4
 
 struct config_t;
-struct region_t;
 struct pcmcia_callback;
 
 
@@ -185,7 +184,6 @@ struct pcmcia_socket {
 	} irq;
 	io_window_t			io[MAX_IO_WIN];
 	window_t			win[MAX_WIN];
-	struct region_t			*c_region, *a_region;
 	struct list_head		cis_cache;
 	u_int				fake_cis_len;
 	char				*fake_cis;

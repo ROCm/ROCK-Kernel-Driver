@@ -341,24 +341,12 @@ EXPORT_SYMBOL(pcmcia_get_socket_by_nr);
 
 /*======================================================================
 
-    Shutdown_Socket() and setup_socket() are scheduled using add_timer
-    calls by the main event handler when card insertion and removal
-    events are received.  Shutdown_Socket() unconfigures a socket and
-    turns off socket power.  Setup_socket() turns on socket power
-    and resets the socket, in two stages.
+    socket_setup() and shutdown_socket() are called by the main event
+    handler when card insertion and removal events are received.
+    socket_setup() turns on socket power and resets the socket, in two stages.
+    shutdown_socket() unconfigures a socket and turns off socket power.
 
 ======================================================================*/
-
-static void free_regions(memory_handle_t *list)
-{
-    memory_handle_t tmp;
-    while (*list != NULL) {
-	tmp = *list;
-	*list = tmp->info.next;
-	tmp->region_magic = 0;
-	kfree(tmp);
-    }
-}
 
 static void shutdown_socket(struct pcmcia_socket *s)
 {
@@ -379,8 +367,6 @@ static void shutdown_socket(struct pcmcia_socket *s)
 	kfree(s->config);
 	s->config = NULL;
     }
-    free_regions(&s->a_region);
-    free_regions(&s->c_region);
 
     {
 	int status;
