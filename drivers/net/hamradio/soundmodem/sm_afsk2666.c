@@ -114,7 +114,7 @@ static void modulator_2666_s16(struct sm_state *sm, short *buf, unsigned int buf
 
 /* --------------------------------------------------------------------- */
 
-extern __inline__ int convolution12_u8(const unsigned char *st, const int *coeff, int csum)
+static __inline__ int convolution12_u8(const unsigned char *st, const int *coeff, int csum)
 {
 	int sum = -0x80 * csum;
 	
@@ -134,7 +134,7 @@ extern __inline__ int convolution12_u8(const unsigned char *st, const int *coeff
 	return sum;
 }
 
-extern __inline__ int convolution12_s16(const short *st, const int *coeff, int csum)
+static __inline__ int convolution12_s16(const short *st, const int *coeff, int csum)
 {
 	int sum = 0;
 	

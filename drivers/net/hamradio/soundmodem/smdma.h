@@ -52,7 +52,7 @@
 /*
  * returns the number of samples per fragment
  */
-extern __inline__ unsigned int dma_setup(struct sm_state *sm, int send, unsigned int dmanr)
+static __inline__ unsigned int dma_setup(struct sm_state *sm, int send, unsigned int dmanr)
 {
 	if (send) {
 		disable_dma(dmanr);
@@ -79,7 +79,7 @@ extern __inline__ unsigned int dma_setup(struct sm_state *sm, int send, unsigned
 
 /* --------------------------------------------------------------------- */
 
-extern __inline__ unsigned int dma_ptr(struct sm_state *sm, int send, unsigned int dmanr,
+static __inline__ unsigned int dma_ptr(struct sm_state *sm, int send, unsigned int dmanr,
 				       unsigned int *curfrag)
 {
 	unsigned int dmaptr, sz, frg, offs;
@@ -120,7 +120,7 @@ extern __inline__ unsigned int dma_ptr(struct sm_state *sm, int send, unsigned i
 
 /* --------------------------------------------------------------------- */
 
-extern __inline__ int dma_end_transmit(struct sm_state *sm, unsigned int curfrag)
+static __inline__ int dma_end_transmit(struct sm_state *sm, unsigned int curfrag)
 {
 	unsigned int diff = (NUM_FRAGMENTS + curfrag - sm->dma.ofragptr) % NUM_FRAGMENTS;
 
@@ -137,7 +137,7 @@ extern __inline__ int dma_end_transmit(struct sm_state *sm, unsigned int curfrag
 	return 0;
 }
 
-extern __inline__ void dma_transmit(struct sm_state *sm)
+static __inline__ void dma_transmit(struct sm_state *sm)
 {
 	void *p;
 
@@ -155,13 +155,13 @@ extern __inline__ void dma_transmit(struct sm_state *sm)
 	}
 }
 
-extern __inline__ void dma_init_transmit(struct sm_state *sm)
+static __inline__ void dma_init_transmit(struct sm_state *sm)
 {
 	sm->dma.ofragptr = 0;
 	sm->dma.ptt_cnt = 0;
 }
 
-extern __inline__ void dma_start_transmit(struct sm_state *sm)
+static __inline__ void dma_start_transmit(struct sm_state *sm)
 {
 	sm->dma.ofragptr = 0;
 	if (sm->dma.o16bit) {
@@ -174,7 +174,7 @@ extern __inline__ void dma_start_transmit(struct sm_state *sm)
 	sm->dma.ptt_cnt = 1;
 }
 
-extern __inline__ void dma_clear_transmit(struct sm_state *sm)
+static __inline__ void dma_clear_transmit(struct sm_state *sm)
 {
 	sm->dma.ptt_cnt = 0;
 	memset(sm->dma.obuf, (sm->dma.o16bit) ? 0 : 0x80, sm->dma.ofragsz * NUM_FRAGMENTS);
@@ -182,7 +182,7 @@ extern __inline__ void dma_clear_transmit(struct sm_state *sm)
 
 /* --------------------------------------------------------------------- */
 
-extern __inline__ void dma_receive(struct sm_state *sm, unsigned int curfrag)
+static __inline__ void dma_receive(struct sm_state *sm, unsigned int curfrag)
 {
 	void *p;
 
@@ -205,7 +205,7 @@ extern __inline__ void dma_receive(struct sm_state *sm, unsigned int curfrag)
 	}
 }
 
-extern __inline__ void dma_init_receive(struct sm_state *sm)
+static __inline__ void dma_init_receive(struct sm_state *sm)
 {
 	sm->dma.ifragptr = 0;
 }

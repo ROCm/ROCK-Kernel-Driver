@@ -94,7 +94,7 @@ static void modulator_1200_s16(struct sm_state *sm, short *buf, unsigned int buf
 
 /* --------------------------------------------------------------------- */
 
-extern __inline__ int convolution8_u8(const unsigned char *st, const int *coeff, int csum)
+static __inline__ int convolution8_u8(const unsigned char *st, const int *coeff, int csum)
 {
 	int sum = -0x80 * csum;
 	
@@ -111,7 +111,7 @@ extern __inline__ int convolution8_u8(const unsigned char *st, const int *coeff,
 	return sum * sum;
 }
 
-extern __inline__ int convolution8_s16(const short *st, const int *coeff, int csum)
+static __inline__ int convolution8_s16(const short *st, const int *coeff, int csum)
 {
 	int sum = 0;
 	
@@ -128,7 +128,7 @@ extern __inline__ int convolution8_s16(const short *st, const int *coeff, int cs
 	return sum * sum;
 }
 
-extern __inline__ int do_filter_1200_u8(const unsigned char *buf)
+static __inline__ int do_filter_1200_u8(const unsigned char *buf)
 {
 	int sum = convolution8_u8(buf, afsk12_tx_lo_i, SUM_AFSK12_TX_LO_I);
 	sum += convolution8_u8(buf, afsk12_tx_lo_q, SUM_AFSK12_TX_LO_Q);
@@ -137,7 +137,7 @@ extern __inline__ int do_filter_1200_u8(const unsigned char *buf)
 	return sum;
 }
 
-extern __inline__ int do_filter_1200_s16(const short *buf)
+static __inline__ int do_filter_1200_s16(const short *buf)
 {
 	int sum = convolution8_s16(buf, afsk12_tx_lo_i, SUM_AFSK12_TX_LO_I);
 	sum += convolution8_s16(buf, afsk12_tx_lo_q, SUM_AFSK12_TX_LO_Q);

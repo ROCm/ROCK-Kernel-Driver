@@ -302,7 +302,7 @@ static const unsigned short crc_ccitt_table[] = {
 /*---------------------------------------------------------------------------*/
 
 #if 0
-extern inline void append_crc_ccitt(unsigned char *buffer, int len)
+static inline void append_crc_ccitt(unsigned char *buffer, int len)
 {
  	unsigned int crc = 0xffff;
 
@@ -316,7 +316,7 @@ extern inline void append_crc_ccitt(unsigned char *buffer, int len)
 
 /*---------------------------------------------------------------------------*/
 
-extern inline int check_crc_ccitt(const unsigned char *buf, int cnt)
+static inline int check_crc_ccitt(const unsigned char *buf, int cnt)
 {
 	unsigned int crc = 0xffff;
 
@@ -327,7 +327,7 @@ extern inline int check_crc_ccitt(const unsigned char *buf, int cnt)
 
 /*---------------------------------------------------------------------------*/
 
-extern inline int calc_crc_ccitt(const unsigned char *buf, int cnt)
+static inline int calc_crc_ccitt(const unsigned char *buf, int cnt)
 {
 	unsigned int crc = 0xffff;
 
