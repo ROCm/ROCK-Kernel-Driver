@@ -1,7 +1,7 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 /*
- * Function: xscale_abort
+ * Function: v5tj_early_abort
  *
  * Params  : r2 = address of aborted instruction
  *         : r3 = saved SPSR
@@ -16,19 +16,21 @@
  * Note: we read user space.  This means we might cause a data
  * abort here if the I-TLB and D-TLB aren't seeing the same
  * picture.  Unfortunately, this does happen.  We live with it.
- *
- * Note: Xscale is contains non-standard architecture extensions.
- * It requires its own early abort handler
  */
 	.align	5
-ENTRY(xscale_abort)
+ENTRY(v5tj_early_abort)
 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-	tst	r3, #PSR_T_BIT
+	bic	r1, r1, #1 << 11 | 1 << 10	@ clear bits 11 and 10 of FSR
+	tst	r3, #PSR_J_BIT			@ Java?
+	orrne	r1, r1, #1 << 11		@ always assume write
+	movne	pc, lr
+	tst	r3, #PSR_T_BIT			@ Thumb?
 	ldrneh	r3, [r2]			@ read aborted thumb instruction
 	ldreq	r3, [r2]			@ read aborted ARM instruction
-	bic	r1, r1, #1 << 11		@ clear bits 11 of FSR
 	movne	r3, r3, lsl #(21 - 12)		@ move thumb bit 11 to ARM bit 20
-	tst	r3, #1 << 20			@ check write
-	orreq	r1, r1, #1 << 11
+	tst	r3, #1 << 20			@ L = 0 -> write
+	orreq	r1, r1, #1 << 11		@ yes.
 	mov	pc, lr
+
+
