@@ -181,7 +181,7 @@ rpcauth_gc_credcache(struct rpc_auth *auth, struct list_head *free)
 /*
  * Look up a process' credentials in the authentication cache
  */
-static struct rpc_cred *
+struct rpc_cred *
 rpcauth_lookup_credcache(struct rpc_auth *auth, struct auth_cred * acred,
 		int taskflags)
 {
@@ -360,10 +360,7 @@ rpcauth_invalcred(struct rpc_task *task)
 int
 rpcauth_uptodatecred(struct rpc_task *task)
 {
-	int retval;
-	spin_lock(&rpc_credcache_lock);
-	retval = !(task->tk_msg.rpc_cred) ||
+	return !(task->tk_msg.rpc_cred) ||
 		(task->tk_msg.rpc_cred->cr_flags & RPCAUTH_CRED_UPTODATE);
-	spin_unlock(&rpc_credcache_lock);
-	return retval;
 }
+

@@ -71,6 +71,7 @@ struct rpc_gss_init_res {
  * the wire when communicating with a server. */
 
 struct gss_cl_ctx {
+	atomic_t		count;
 	u32			gc_proc;
 	u32			gc_seq;
 	spinlock_t		gc_seq_lock;
