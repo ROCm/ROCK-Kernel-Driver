@@ -17,6 +17,7 @@
 
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <asm/timex.h>
 #include "sound_config.h"
 
 #include "pas2.h"
@@ -62,13 +63,13 @@ static int pcm_set_speed(int arg)
 
 	if (pcm_channels & 2)
 	{
-		foo = (596590 + (arg / 2)) / arg;
-		arg = (596590 + (foo / 2)) / foo;
+		foo = ((CLOCK_TICK_RATE / 2) + (arg / 2)) / arg;
+		arg = ((CLOCK_TICK_RATE / 2) + (foo / 2)) / foo;
 	}
 	else
 	{
-		foo = (1193180 + (arg / 2)) / arg;
-		arg = (1193180 + (foo / 2)) / foo;
+		foo = (CLOCK_TICK_RATE + (arg / 2)) / arg;
+		arg = (CLOCK_TICK_RATE + (foo / 2)) / foo;
 	}
 
 	pcm_speed = arg;
