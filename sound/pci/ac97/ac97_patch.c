@@ -1013,8 +1013,20 @@ static int patch_ad198x_post_spdif(ac97_t * ac97)
  	return patch_build_controls(ac97, &snd_ac97_ad198x_spdif_source, 1);
 }
 
+static const snd_kcontrol_new_t snd_ac97_ad1981x_jack_sense[] = {
+	AC97_SINGLE("Headphone Jack Sense", AC97_AD_JACK_SPDIF, 11, 1, 0),
+	AC97_SINGLE("Line Jack Sense", AC97_AD_JACK_SPDIF, 12, 1, 0),
+};
+
+static int patch_ad1981a_specific(ac97_t * ac97)
+{
+	return patch_build_controls(ac97, snd_ac97_ad1981x_jack_sense,
+				    ARRAY_SIZE(snd_ac97_ad1981x_jack_sense));
+}
+
 static struct snd_ac97_build_ops patch_ad1981a_build_ops = {
-	.build_post_spdif = patch_ad198x_post_spdif
+	.build_post_spdif = patch_ad198x_post_spdif,
+	.build_specific = patch_ad1981a_specific
 };
 
 int patch_ad1981a(ac97_t *ac97)
@@ -1023,6 +1035,7 @@ int patch_ad1981a(ac97_t *ac97)
 	ac97->build_ops = &patch_ad1981a_build_ops;
 	snd_ac97_update_bits(ac97, AC97_AD_MISC, AC97_AD198X_MSPLT, AC97_AD198X_MSPLT);
 	ac97->flags |= AC97_STEREO_MUTES;
+	snd_ac97_update_bits(ac97, AC97_AD_JACK_SPDIF, 1<<11, 1<<11); /* HP jack sense */
 	return 0;
 }
 
@@ -1031,7 +1044,12 @@ AC97_SINGLE("Stereo Mic", AC97_AD_MISC, 6, 1, 0);
 
 static int patch_ad1981b_specific(ac97_t *ac97)
 {
-	return patch_build_controls(ac97, &snd_ac97_ad198x_2cmic, 1);
+	int err;
+
+	if ((err = patch_build_controls(ac97, &snd_ac97_ad198x_2cmic, 1)) < 0)
+		return err;
+	return patch_build_controls(ac97, snd_ac97_ad1981x_jack_sense,
+				    ARRAY_SIZE(snd_ac97_ad1981x_jack_sense));
 }
 
 static struct snd_ac97_build_ops patch_ad1981b_build_ops = {
@@ -1045,6 +1063,7 @@ int patch_ad1981b(ac97_t *ac97)
 	ac97->build_ops = &patch_ad1981b_build_ops;
 	snd_ac97_update_bits(ac97, AC97_AD_MISC, AC97_AD198X_MSPLT, AC97_AD198X_MSPLT);
 	ac97->flags |= AC97_STEREO_MUTES;
+	snd_ac97_update_bits(ac97, AC97_AD_JACK_SPDIF, 1<<11, 1<<11); /* HP jack sense */
 	return 0;
 }
 
