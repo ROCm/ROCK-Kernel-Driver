@@ -58,25 +58,25 @@
 #define VENDOR_TOSHIBA         3
 #define VENDOR_WRITER          4	/* pre-scsi3 writers */
 
-void sr_vendor_init(Scsi_CD *SCp)
+void sr_vendor_init(Scsi_CD *cd)
 {
 #ifndef CONFIG_BLK_DEV_SR_VENDOR
-	SCp->vendor = VENDOR_SCSI3;
+	cd->vendor = VENDOR_SCSI3;
 #else
-	char *vendor = SCp->device->vendor;
-	char *model = SCp->device->model;
+	char *vendor = cd->device->vendor;
+	char *model = cd->device->model;
 	
 	/* default */
-	SCp->vendor = VENDOR_SCSI3;
-	if (SCp->readcd_known)
+	cd->vendor = VENDOR_SCSI3;
+	if (cd->readcd_known)
 		/* this is true for scsi3/mmc drives - no more checks */
 		return;
 
-	if (SCp->device->type == TYPE_WORM) {
-		SCp->vendor = VENDOR_WRITER;
+	if (cd->device->type == TYPE_WORM) {
+		cd->vendor = VENDOR_WRITER;
 
 	} else if (!strncmp(vendor, "NEC", 3)) {
-		SCp->vendor = VENDOR_NEC;
+		cd->vendor = VENDOR_NEC;
 		if (!strncmp(model, "CD-ROM DRIVE:25", 15) ||
 		    !strncmp(model, "CD-ROM DRIVE:36", 15) ||
 		    !strncmp(model, "CD-ROM DRIVE:83", 15) ||
@@ -88,10 +88,10 @@ void sr_vendor_init(Scsi_CD *SCp)
 #endif
 		    )
 			/* these can't handle multisession, may hang */
-			SCp->cdi.mask |= CDC_MULTI_SESSION;
+			cd->cdi.mask |= CDC_MULTI_SESSION;
 
 	} else if (!strncmp(vendor, "TOSHIBA", 7)) {
-		SCp->vendor = VENDOR_TOSHIBA;
+		cd->vendor = VENDOR_TOSHIBA;
 
 	}
 #endif
@@ -106,11 +106,11 @@ int sr_set_blocklength(int minor, int blocklength)
 	unsigned char *buffer;	/* the buffer for the ioctl */
 	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
 	struct ccs_modesel_head *modesel;
-	Scsi_CD *SCp = &scsi_CDs[minor];
+	Scsi_CD *cd = &scsi_CDs[minor];
 	int rc, density = 0;
 
 #ifdef CONFIG_BLK_DEV_SR_VENDOR
-	if (SCp->vendor == VENDOR_TOSHIBA)
+	if (cd->vendor == VENDOR_TOSHIBA)
 		density = (blocklength > 2048) ? 0x81 : 0x83;
 #endif
 
@@ -119,12 +119,12 @@ int sr_set_blocklength(int minor, int blocklength)
 		return -ENOMEM;
 
 #ifdef DEBUG
-	printk("%s: MODE SELECT 0x%x/%d\n", SCp->cdi.name, density, blocklength);
+	printk("%s: MODE SELECT 0x%x/%d\n", cd->cdi.name, density, blocklength);
 #endif
 	memset(cmd, 0, MAX_COMMAND_SIZE);
 	cmd[0] = MODE_SELECT;
-	cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-	         (SCp->device->lun << 5) : 0;
+	cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+	         (cd->device->lun << 5) : 0;
 	cmd[1] |= (1 << 4);
 	cmd[4] = 12;
 	modesel = (struct ccs_modesel_head *) buffer;
@@ -134,12 +134,12 @@ int sr_set_blocklength(int minor, int blocklength)
 	modesel->block_length_med = (blocklength >> 8) & 0xff;
 	modesel->block_length_lo = blocklength & 0xff;
 	if (0 == (rc = sr_do_ioctl(minor, cmd, buffer, sizeof(*modesel), 0, SCSI_DATA_WRITE, NULL))) {
-		SCp->device->sector_size = blocklength;
+		cd->device->sector_size = blocklength;
 	}
 #ifdef DEBUG
 	else
 		printk("%s: switching blocklength to %d bytes failed\n",
-		       SCp->cdi.name, blocklength);
+		       cd->cdi.name, blocklength);
 #endif
 	kfree(buffer);
 	return rc;
@@ -152,14 +152,14 @@ int sr_set_blocklength(int minor, int blocklength)
 
 int sr_cd_check(struct cdrom_device_info *cdi)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 	unsigned long sector;
 	unsigned char *buffer;	/* the buffer for the ioctl */
 	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
 	int rc, no_multi, minor;
 
 	minor = minor(cdi->dev);
-	if (SCp->cdi.mask & CDC_MULTI_SESSION)
+	if (cd->cdi.mask & CDC_MULTI_SESSION)
 		return 0;
 
 	buffer = (unsigned char *) kmalloc(512, GFP_KERNEL | GFP_DMA);
@@ -170,13 +170,13 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	no_multi = 0;		/* flag: the drive can't handle multisession */
 	rc = 0;
 
-	switch (SCp->vendor) {
+	switch (cd->vendor) {
 
 	case VENDOR_SCSI3:
 		memset(cmd, 0, MAX_COMMAND_SIZE);
 		cmd[0] = READ_TOC;
-		cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-		         (SCp->device->lun << 5) : 0;
+		cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+		         (cd->device->lun << 5) : 0;
 		cmd[8] = 12;
 		cmd[9] = 0x40;
 		rc = sr_do_ioctl(minor, cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
@@ -184,7 +184,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			break;
 		if ((buffer[0] << 8) + buffer[1] < 0x0a) {
 			printk(KERN_INFO "%s: Hmm, seems the drive "
-			   "doesn't support multisession CD's\n", SCp->cdi.name);
+			   "doesn't support multisession CD's\n", cd->cdi.name);
 			no_multi = 1;
 			break;
 		}
@@ -201,8 +201,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			unsigned long min, sec, frame;
 			memset(cmd, 0, MAX_COMMAND_SIZE);
 			cmd[0] = 0xde;
-			cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-			         (SCp->device->lun << 5) : 0;
+			cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+			         (cd->device->lun << 5) : 0;
 			cmd[1] |= 0x03;
 			cmd[2] = 0xb0;
 			rc = sr_do_ioctl(minor, cmd, buffer, 0x16, 1, SCSI_DATA_READ, NULL);
@@ -210,7 +210,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 				break;
 			if (buffer[14] != 0 && buffer[14] != 0xb0) {
 				printk(KERN_INFO "%s: Hmm, seems the cdrom "
-				       "doesn't support multisession CD's\n", SCp->cdi.name);
+				       "doesn't support multisession CD's\n", cd->cdi.name);
 				no_multi = 1;
 				break;
 			}
@@ -228,13 +228,13 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			 * where starts the last session ?) */
 			memset(cmd, 0, MAX_COMMAND_SIZE);
 			cmd[0] = 0xc7;
-			cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-			         (SCp->device->lun << 5) : 0;
+			cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+			         (cd->device->lun << 5) : 0;
 			cmd[1] |= 0x03;
 			rc = sr_do_ioctl(minor, cmd, buffer, 4, 1, SCSI_DATA_READ, NULL);
 			if (rc == -EINVAL) {
 				printk(KERN_INFO "%s: Hmm, seems the drive "
-				       "doesn't support multisession CD's\n", SCp->cdi.name);
+				       "doesn't support multisession CD's\n", cd->cdi.name);
 				no_multi = 1;
 				break;
 			}
@@ -253,8 +253,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	case VENDOR_WRITER:
 		memset(cmd, 0, MAX_COMMAND_SIZE);
 		cmd[0] = READ_TOC;
-		cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-		         (SCp->device->lun << 5) : 0;
+		cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+		         (cd->device->lun << 5) : 0;
 		cmd[8] = 0x04;
 		cmd[9] = 0x40;
 		rc = sr_do_ioctl(minor, cmd, buffer, 0x04, 1, SCSI_DATA_READ, NULL);
@@ -263,12 +263,12 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 		}
 		if ((rc = buffer[2]) == 0) {
 			printk(KERN_WARNING
-			       "%s: No finished session\n", SCp->cdi.name);
+			       "%s: No finished session\n", cd->cdi.name);
 			break;
 		}
 		cmd[0] = READ_TOC;	/* Read TOC */
-		cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-		         (SCp->device->lun << 5) : 0;
+		cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+		         (cd->device->lun << 5) : 0;
 		cmd[6] = rc & 0x7f;	/* number of last session */
 		cmd[8] = 0x0c;
 		cmd[9] = 0x40;
@@ -285,17 +285,17 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 		/* should not happen */
 		printk(KERN_WARNING
 		   "%s: unknown vendor code (%i), not initialized ?\n",
-		       SCp->cdi.name, SCp->vendor);
+		       cd->cdi.name, cd->vendor);
 		sector = 0;
 		no_multi = 1;
 		break;
 	}
-	SCp->ms_offset = sector;
-	SCp->xa_flag = 0;
+	cd->ms_offset = sector;
+	cd->xa_flag = 0;
 	if (CDS_AUDIO != sr_disk_status(cdi) && 1 == sr_is_xa(minor))
-		SCp->xa_flag = 1;
+		cd->xa_flag = 1;
 
-	if (2048 != SCp->device->sector_size) {
+	if (2048 != cd->device->sector_size) {
 		sr_set_blocklength(minor, 2048);
 	}
 	if (no_multi)
@@ -304,7 +304,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 #ifdef DEBUG
 	if (sector)
 		printk(KERN_DEBUG "%s: multisession offset=%lu\n",
-		       SCp->cdi.name, sector);
+		       cd->cdi.name, sector);
 #endif
 	kfree(buffer);
 	return rc;

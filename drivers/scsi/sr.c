@@ -99,13 +99,13 @@ static int sr_packet(struct cdrom_device_info *, struct cdrom_generic_command *)
 
 static void sr_release(struct cdrom_device_info *cdi)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 
-	if (SCp->device->sector_size > 2048)
+	if (cd->device->sector_size > 2048)
 		sr_set_blocklength(minor(cdi->dev), 2048);
-	SCp->device->access_count--;
-	if (SCp->device->host->hostt->module)
-		__MOD_DEC_USE_COUNT(SCp->device->host->hostt->module);
+	cd->device->access_count--;
+	if (cd->device->host->hostt->module)
+		__MOD_DEC_USE_COUNT(cd->device->host->hostt->module);
 	if (sr_template.module)
 		__MOD_DEC_USE_COUNT(sr_template.module);
 }
@@ -146,7 +146,7 @@ static struct cdrom_device_ops sr_dops =
 
 int sr_media_change(struct cdrom_device_info *cdi, int slot)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 	int retval;
 
 	if (CDSL_CURRENT != slot) {
@@ -154,19 +154,19 @@ int sr_media_change(struct cdrom_device_info *cdi, int slot)
 		return -EINVAL;
 	}
 
-	retval = scsi_ioctl(SCp->device, SCSI_IOCTL_TEST_UNIT_READY, 0);
+	retval = scsi_ioctl(cd->device, SCSI_IOCTL_TEST_UNIT_READY, 0);
 	if (retval) {
 		/* Unable to test, unit probably not ready.  This usually
 		 * means there is no disc in the drive.  Mark as changed,
 		 * and we will figure it out later once the drive is
 		 * available again.  */
-		SCp->device->changed = 1;
+		cd->device->changed = 1;
 		return 1;	/* This will force a flush, if called from
 				 * check_disk_change */
 	};
 
-	retval = SCp->device->changed;
-	SCp->device->changed = 0;
+	retval = cd->device->changed;
+	cd->device->changed = 0;
 	/* If the disk changed, the capacity will now be different,
 	 * so we force a re-read of this information */
 	if (retval) {
@@ -180,8 +180,8 @@ int sr_media_change(struct cdrom_device_info *cdi, int slot)
 		 * be trying to use something that is too small if the disc
 		 * has changed.
 		 */
-		SCp->needs_sector_size = 1;
-		SCp->device->sector_size = 2048;
+		cd->needs_sector_size = 1;
+		cd->device->sector_size = 2048;
 	}
 	return retval;
 }
@@ -198,7 +198,7 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 	int good_sectors = (result == 0 ? this_count : 0);
 	int block_sectors = 0;
 	int device_nr = DEVICE_NR(SCpnt->request->rq_dev);
-	Scsi_CD *SCp = &scsi_CDs[device_nr];
+	Scsi_CD *cd = &scsi_CDs[device_nr];
 
 #ifdef DEBUG
 	printk("sr.c done: %x %p\n", result, SCpnt->request->bh->b_data);
@@ -223,7 +223,7 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 			block_sectors = bio_sectors(SCpnt->request->bio);
 		if (block_sectors < 4)
 			block_sectors = 4;
-		if (SCp->device->sector_size == 2048)
+		if (cd->device->sector_size == 2048)
 			error_sector <<= 2;
 		error_sector &= ~(block_sectors - 1);
 		good_sectors = error_sector - SCpnt->request->sector;
@@ -236,7 +236,7 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 		 * 75 2K sectors, we decrease the saved size value.
 		 */
 		if ((error_sector >> 1) < sr_sizes[device_nr] &&
-		    SCp->capacity - error_sector < 4 * 75)
+		    cd->capacity - error_sector < 4 * 75)
 			sr_sizes[device_nr] = error_sector >> 1;
 	}
 
@@ -251,34 +251,34 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 
 static request_queue_t *sr_find_queue(kdev_t dev)
 {
-	Scsi_CD *SCp;
+	Scsi_CD *cd;
 
 	if (minor(dev) >= sr_template.dev_max)
 		return NULL;
-	SCp = &scsi_CDs[minor(dev)];
-	if (!SCp->device)
+	cd = &scsi_CDs[minor(dev)];
+	if (!cd->device)
 		return NULL;
-	return &SCp->device->request_queue;
+	return &cd->device->request_queue;
 }
 
 static int sr_init_command(Scsi_Cmnd * SCpnt)
 {
 	int dev, devm, block=0, this_count, s_size;
-	Scsi_CD *SCp;
+	Scsi_CD *cd;
 
 	devm = minor(SCpnt->request->rq_dev);
 	dev = DEVICE_NR(SCpnt->request->rq_dev);
-	SCp = &scsi_CDs[dev];
+	cd = &scsi_CDs[dev];
 
 	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %d, block = %d\n", devm, block));
 
-	if (dev >= sr_template.nr_dev || !SCp->device || !SCp->device->online) {
+	if (dev >= sr_template.nr_dev || !cd->device || !cd->device->online) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", SCpnt->request->nr_sectors));
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
 		return 0;
 	}
 
-	if (SCp->device->changed) {
+	if (cd->device->changed) {
 		/*
 		 * quietly refuse to do anything to a changed disc until the
 		 * changed bit has been reset
@@ -295,7 +295,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	 * we do lazy blocksize switching (when reading XA sectors,
 	 * see CDROMREADMODE2 ioctl) 
 	 */
-	s_size = SCp->device->sector_size;
+	s_size = cd->device->sector_size;
 	if (s_size > 2048) {
 		if (!in_interrupt())
 			sr_set_blocklength(DEVICE_NR(CURRENT->rq_dev), 2048);
@@ -309,7 +309,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	}
 
 	if (rq_data_dir(SCpnt->request) == WRITE) {
-		if (!SCp->device->writeable)
+		if (!cd->device->writeable)
 			return 0;
 		SCpnt->cmnd[0] = WRITE_10;
 		SCpnt->sc_data_direction = SCSI_DATA_WRITE;
@@ -333,7 +333,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 
 
 	SCSI_LOG_HLQUEUE(2, printk("%s : %s %d/%ld 512 byte blocks.\n",
-                                   SCp->cdi.name,
+                                   cd->cdi.name,
 		   (rq_data_dir(SCpnt->request) == WRITE) ? "writing" : "reading",
 				 this_count, SCpnt->request->nr_sectors));
 
@@ -358,7 +358,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	 * host adapter, it's safe to assume that we can at least transfer
 	 * this many bytes between each connect / disconnect.
 	 */
-	SCpnt->transfersize = SCp->device->sector_size;
+	SCpnt->transfersize = cd->device->sector_size;
 	SCpnt->underflow = this_count << 9;
 
 	SCpnt->allowed = MAX_RETRIES;
@@ -400,21 +400,21 @@ struct block_device_operations sr_bdops =
 
 static int sr_open(struct cdrom_device_info *cdi, int purpose)
 {
-	Scsi_CD *SCp = cdi->handle;
+	Scsi_CD *cd = cdi->handle;
 
-	if (minor(cdi->dev) >= sr_template.dev_max || !SCp->device) {
+	if (minor(cdi->dev) >= sr_template.dev_max || !cd->device) {
 		return -ENXIO;	/* No such device */
 	}
 	/*
 	 * If the device is in error recovery, wait until it is done.
 	 * If the device is offline, then disallow any access to it.
 	 */
-	if (!scsi_block_when_processing_errors(SCp->device)) {
+	if (!scsi_block_when_processing_errors(cd->device)) {
 		return -ENXIO;
 	}
-	SCp->device->access_count++;
-	if (SCp->device->host->hostt->module)
-		__MOD_INC_USE_COUNT(SCp->device->host->hostt->module);
+	cd->device->access_count++;
+	if (cd->device->host->hostt->module)
+		__MOD_INC_USE_COUNT(cd->device->host->hostt->module);
 	if (sr_template.module)
 		__MOD_INC_USE_COUNT(sr_template.module);
 
@@ -423,7 +423,7 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	 * this is the case, and try again.
 	 */
 
-	if (SCp->needs_sector_size)
+	if (cd->needs_sector_size)
 		get_sectorsize(minor(cdi->dev));
 
 	return 0;
@@ -477,22 +477,22 @@ void get_sectorsize(int i)
 	int the_result, retries = 3;
 	int sector_size;
 	Scsi_Request *SRpnt = NULL;
-	Scsi_CD *SCp;
+	Scsi_CD *cd;
 	request_queue_t *queue;
 
-	SCp = &scsi_CDs[i];
+	cd = &scsi_CDs[i];
 
 	buffer = kmalloc(512, GFP_DMA);
 	if (!buffer)
 		goto Enomem;
-	SRpnt = scsi_allocate_request(SCp->device);
+	SRpnt = scsi_allocate_request(cd->device);
 	if (!SRpnt)
 		goto Enomem;
 
 	do {
 		cmd[0] = READ_CAPACITY;
-		cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-			 ((SCp->device->lun << 5) & 0xe0) : 0;
+		cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+			 ((cd->device->lun << 5) & 0xe0) : 0;
 		memset((void *) &cmd[2], 0, 8);
 		SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;	/* Mark as really busy */
 		SRpnt->sr_cmd_len = 0;
@@ -515,15 +515,15 @@ void get_sectorsize(int i)
 	SRpnt = NULL;
 
 	if (the_result) {
-		SCp->capacity = 0x1fffff;
+		cd->capacity = 0x1fffff;
 		sector_size = 2048;	/* A guess, just in case */
-		SCp->needs_sector_size = 1;
+		cd->needs_sector_size = 1;
 	} else {
 #if 0
-		if (cdrom_get_last_written(&SCp->cdi,
-					   &SCp->capacity))
+		if (cdrom_get_last_written(&cd->cdi,
+					   &cd->capacity))
 #endif
-			SCp->capacity = 1 + ((buffer[0] << 24) |
+			cd->capacity = 1 + ((buffer[0] << 24) |
 						    (buffer[1] << 16) |
 						    (buffer[2] << 8) |
 						    buffer[3]);
@@ -542,37 +542,37 @@ void get_sectorsize(int i)
 			sector_size = 2048;
 			/* fall through */
 		case 2048:
-			SCp->capacity *= 4;
+			cd->capacity *= 4;
 			/* fall through */
 		case 512:
 			break;
 		default:
 			printk("%s: unsupported sector size %d.\n",
-			       SCp->cdi.name, sector_size);
-			SCp->capacity = 0;
-			SCp->needs_sector_size = 1;
+			       cd->cdi.name, sector_size);
+			cd->capacity = 0;
+			cd->needs_sector_size = 1;
 		}
 
-		SCp->device->sector_size = sector_size;
+		cd->device->sector_size = sector_size;
 
 		/*
 		 * Add this so that we have the ability to correctly gauge
 		 * what the device is capable of.
 		 */
-		SCp->needs_sector_size = 0;
-		sr_sizes[i] = SCp->capacity >> (BLOCK_SIZE_BITS - 9);
+		cd->needs_sector_size = 0;
+		sr_sizes[i] = cd->capacity >> (BLOCK_SIZE_BITS - 9);
 	}
 
-	queue = &SCp->device->request_queue;
+	queue = &cd->device->request_queue;
 	blk_queue_hardsect_size(queue, sector_size);
 out:
 	kfree(buffer);
 	return;
 
 Enomem:
-	SCp->capacity = 0x1fffff;
+	cd->capacity = 0x1fffff;
 	sector_size = 2048;	/* A guess, just in case */
-	SCp->needs_sector_size = 1;
+	cd->needs_sector_size = 1;
 	if (SRpnt)
 		scsi_release_request(SRpnt);
 	goto out;
@@ -580,7 +580,7 @@ Enomem:
 
 void get_capabilities(int i)
 {
-	Scsi_CD *SCp;
+	Scsi_CD *cd;
 	unsigned char cmd[6];
 	unsigned char *buffer;
 	int rc, n;
@@ -597,7 +597,7 @@ void get_capabilities(int i)
 		""
 	};
 
-	SCp = &scsi_CDs[i];
+	cd = &scsi_CDs[i];
 	buffer = kmalloc(512, GFP_DMA);
 	if (!buffer)
 	{
@@ -605,8 +605,8 @@ void get_capabilities(int i)
 		return;
 	}
 	cmd[0] = MODE_SENSE;
-	cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
-		 ((SCp->device->lun << 5) & 0xe0) : 0;
+	cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+		 ((cd->device->lun << 5) & 0xe0) : 0;
 	cmd[2] = 0x2a;
 	cmd[4] = 128;
 	cmd[3] = cmd[5] = 0;
@@ -614,22 +614,22 @@ void get_capabilities(int i)
 
 	if (rc) {
 		/* failed, drive doesn't have capabilities mode page */
-		SCp->cdi.speed = 1;
-		SCp->cdi.mask |= (CDC_CD_R | CDC_CD_RW | CDC_DVD_R |
+		cd->cdi.speed = 1;
+		cd->cdi.mask |= (CDC_CD_R | CDC_CD_RW | CDC_DVD_R |
 					 CDC_DVD | CDC_DVD_RAM |
 					 CDC_SELECT_DISC | CDC_SELECT_SPEED);
 		kfree(buffer);
-		printk("%s: scsi-1 drive\n", SCp->cdi.name);
+		printk("%s: scsi-1 drive\n", cd->cdi.name);
 		return;
 	}
 	n = buffer[3] + 4;
-	SCp->cdi.speed = ((buffer[n + 8] << 8) + buffer[n + 9]) / 176;
-	SCp->readcd_known = 1;
-	SCp->readcd_cdda = buffer[n + 5] & 0x01;
+	cd->cdi.speed = ((buffer[n + 8] << 8) + buffer[n + 9]) / 176;
+	cd->readcd_known = 1;
+	cd->readcd_cdda = buffer[n + 5] & 0x01;
 	/* print some capability bits */
-	printk("%s: scsi3-mmc drive: %dx/%dx %s%s%s%s%s%s\n", SCp->cdi.name,
+	printk("%s: scsi3-mmc drive: %dx/%dx %s%s%s%s%s%s\n", cd->cdi.name,
 	       ((buffer[n + 14] << 8) + buffer[n + 15]) / 176,
-	       SCp->cdi.speed,
+	       cd->cdi.speed,
 	       buffer[n + 3] & 0x01 ? "writer " : "",	/* CD Writer */
 	       buffer[n + 3] & 0x20 ? "dvd-ram " : "",
 	       buffer[n + 2] & 0x02 ? "cd/rw " : "",	/* can read rewriteable */
@@ -638,38 +638,38 @@ void get_capabilities(int i)
 	       loadmech[buffer[n + 6] >> 5]);
 	if ((buffer[n + 6] >> 5) == 0)
 		/* caddy drives can't close tray... */
-		SCp->cdi.mask |= CDC_CLOSE_TRAY;
+		cd->cdi.mask |= CDC_CLOSE_TRAY;
 	if ((buffer[n + 2] & 0x8) == 0)
 		/* not a DVD drive */
-		SCp->cdi.mask |= CDC_DVD;
+		cd->cdi.mask |= CDC_DVD;
 	if ((buffer[n + 3] & 0x20) == 0) {
 		/* can't write DVD-RAM media */
-		SCp->cdi.mask |= CDC_DVD_RAM;
+		cd->cdi.mask |= CDC_DVD_RAM;
 	} else {
-		SCp->device->writeable = 1;
+		cd->device->writeable = 1;
 	}
 	if ((buffer[n + 3] & 0x10) == 0)
 		/* can't write DVD-R media */
-		SCp->cdi.mask |= CDC_DVD_R;
+		cd->cdi.mask |= CDC_DVD_R;
 	if ((buffer[n + 3] & 0x2) == 0)
 		/* can't write CD-RW media */
-		SCp->cdi.mask |= CDC_CD_RW;
+		cd->cdi.mask |= CDC_CD_RW;
 	if ((buffer[n + 3] & 0x1) == 0)
 		/* can't write CD-R media */
-		SCp->cdi.mask |= CDC_CD_R;
+		cd->cdi.mask |= CDC_CD_R;
 	if ((buffer[n + 6] & 0x8) == 0)
 		/* can't eject */
-		SCp->cdi.mask |= CDC_OPEN_TRAY;
+		cd->cdi.mask |= CDC_OPEN_TRAY;
 
 	if ((buffer[n + 6] >> 5) == mechtype_individual_changer ||
 	    (buffer[n + 6] >> 5) == mechtype_cartridge_changer)
-		SCp->cdi.capacity =
-		    cdrom_number_of_slots(&SCp->cdi);
-	if (SCp->cdi.capacity <= 1)
+		cd->cdi.capacity =
+		    cdrom_number_of_slots(&cd->cdi);
+	if (cd->cdi.capacity <= 1)
 		/* not a changer */
-		SCp->cdi.mask |= CDC_SELECT_DISC;
+		cd->cdi.mask |= CDC_SELECT_DISC;
 	/*else    I don't think it can close its tray
-		SCp->cdi.mask |= CDC_CLOSE_TRAY; */
+		cd->cdi.mask |= CDC_CLOSE_TRAY; */
 
 	kfree(buffer);
 }
@@ -680,8 +680,8 @@ void get_capabilities(int i)
  */
 static int sr_packet(struct cdrom_device_info *cdi, struct cdrom_generic_command *cgc)
 {
-	Scsi_CD *SCp = cdi->handle;
-	Scsi_Device *device = SCp->device;
+	Scsi_CD *cd = cdi->handle;
+	Scsi_Device *device = cd->device;
 	
 	/* set the LUN */
 	if (device->scsi_level <= SCSI_2)
@@ -758,59 +758,59 @@ void sr_finish()
 	blk_size[MAJOR_NR] = sr_sizes;
 
 	for (i = 0; i < sr_template.nr_dev; ++i) {
-		Scsi_CD *SCp = &scsi_CDs[i];
+		Scsi_CD *cd = &scsi_CDs[i];
 		/* If we have already seen this, then skip it.  Comes up
 		 * with loadable modules. */
-		if (SCp->capacity)
+		if (cd->capacity)
 			continue;
-		SCp->capacity = 0x1fffff;
-		SCp->device->sector_size = 2048;/* A guess, just in case */
-		SCp->needs_sector_size = 1;
-		SCp->device->changed = 1;	/* force recheck CD type */
+		cd->capacity = 0x1fffff;
+		cd->device->sector_size = 2048;/* A guess, just in case */
+		cd->needs_sector_size = 1;
+		cd->device->changed = 1;	/* force recheck CD type */
 #if 0
 		/* seems better to leave this for later */
 		get_sectorsize(i);
-		printk("Scd sectorsize = %d bytes.\n", SCp->sector_size);
+		printk("Scd sectorsize = %d bytes.\n", cd->sector_size);
 #endif
-		SCp->use = 1;
+		cd->use = 1;
 
-		SCp->device->ten = 1;
-		SCp->device->remap = 1;
-		SCp->readcd_known = 0;
-		SCp->readcd_cdda = 0;
-		sr_sizes[i] = SCp->capacity >> (BLOCK_SIZE_BITS - 9);
+		cd->device->ten = 1;
+		cd->device->remap = 1;
+		cd->readcd_known = 0;
+		cd->readcd_cdda = 0;
+		sr_sizes[i] = cd->capacity >> (BLOCK_SIZE_BITS - 9);
 
-		SCp->cdi.ops = &sr_dops;
-		SCp->cdi.handle = SCp;
-		SCp->cdi.dev = mk_kdev(MAJOR_NR, i);
-		SCp->cdi.mask = 0;
-		SCp->cdi.capacity = 1;
+		cd->cdi.ops = &sr_dops;
+		cd->cdi.handle = cd;
+		cd->cdi.dev = mk_kdev(MAJOR_NR, i);
+		cd->cdi.mask = 0;
+		cd->cdi.capacity = 1;
 		/*
 		 *	FIXME: someone needs to handle a get_capabilities
 		 *	failure properly ??
 		 */
 		get_capabilities(i);
-		sr_vendor_init(SCp);
+		sr_vendor_init(cd);
 
-		sprintf(SCp->cdi.cdrom_driverfs_dev.bus_id, "%s:cd",
-			SCp->device->sdev_driverfs_dev.bus_id);
-		sprintf(SCp->cdi.cdrom_driverfs_dev.name, "%scdrom",
-			SCp->device->sdev_driverfs_dev.name);
-		SCp->cdi.cdrom_driverfs_dev.parent = 
-			&SCp->device->sdev_driverfs_dev;
-		SCp->cdi.cdrom_driverfs_dev.bus = &scsi_driverfs_bus_type;
-		SCp->cdi.cdrom_driverfs_dev.driver_data = 
+		sprintf(cd->cdi.cdrom_driverfs_dev.bus_id, "%s:cd",
+			cd->device->sdev_driverfs_dev.bus_id);
+		sprintf(cd->cdi.cdrom_driverfs_dev.name, "%scdrom",
+			cd->device->sdev_driverfs_dev.name);
+		cd->cdi.cdrom_driverfs_dev.parent = 
+			&cd->device->sdev_driverfs_dev;
+		cd->cdi.cdrom_driverfs_dev.bus = &scsi_driverfs_bus_type;
+		cd->cdi.cdrom_driverfs_dev.driver_data = 
 			(void *)(long)__mkdev(MAJOR_NR, i);
-		device_register(&SCp->cdi.cdrom_driverfs_dev);
-		device_create_file(&SCp->cdi.cdrom_driverfs_dev,
+		device_register(&cd->cdi.cdrom_driverfs_dev);
+		device_create_file(&cd->cdi.cdrom_driverfs_dev,
 				   &dev_attr_type);
-		device_create_file(&SCp->cdi.cdrom_driverfs_dev,
+		device_create_file(&cd->cdi.cdrom_driverfs_dev,
 				   &dev_attr_kdev);
-                SCp->cdi.de = devfs_register(SCp->device->de, "cd",
+                cd->cdi.de = devfs_register(cd->device->de, "cd",
                                     DEVFS_FL_DEFAULT, MAJOR_NR, i,
                                     S_IFBLK | S_IRUGO | S_IWUGO,
                                     &sr_bdops, NULL);
-		register_cdrom(&SCp->cdi);
+		register_cdrom(&cd->cdi);
 	}
 }
 
