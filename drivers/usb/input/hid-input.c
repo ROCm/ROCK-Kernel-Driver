@@ -185,9 +185,9 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 			break;
 
 		case HID_UP_LED:
-			if (usage->hid - 1 >= LED_MAX)
+			if (((usage->hid - 1) & 0xffff) >= LED_MAX)
 				goto ignore;
-			map_led(usage->hid - 1);
+			map_led((usage->hid - 1) & 0xffff);
 			break;
 
 		case HID_UP_DIGITIZER:
