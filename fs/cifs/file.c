@@ -1257,6 +1257,11 @@ construct_dentry(struct qstr *qstring, struct file *file,
 		}
 	} else {
 		tmp_dentry = d_alloc(file->f_dentry, qstring);
+		if(tmp_dentry == NULL) {
+			cERROR(1,("Failed allocating dentry"));
+			return;
+		}
+			
 		*ptmp_inode = new_inode(file->f_dentry->d_sb);
 		tmp_dentry->d_op = &cifs_dentry_ops;
 		cFYI(0, (" instantiate dentry 0x%p with inode 0x%p ",
