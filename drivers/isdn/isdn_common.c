@@ -2178,7 +2178,6 @@ static void isdn_register_devfs(int k)
 
 static void isdn_unregister_devfs(int k)
 {
-	devfs_unregister (dev->devfs_handle_isdnX[k]);
 	devfs_unregister (dev->devfs_handle_isdnctrlX[k]);
 }
 
@@ -2226,22 +2225,18 @@ static void isdn_cleanup_devfs(void)
 #else   /* CONFIG_DEVFS_FS */
 static void isdn_register_devfs(int dummy)
 {
-	return;
 }
 
 static void isdn_unregister_devfs(int dummy)
 {
-	return;
 }
 
 static void isdn_init_devfs(void)
 {
-    return;
 }
 
 static void isdn_cleanup_devfs(void)
 {
-    return;
 }
 
 #endif  /* CONFIG_DEVFS_FS */
