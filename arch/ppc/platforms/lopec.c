@@ -1,12 +1,12 @@
 /*
- * arch/ppc/platforms/lopec_setup.c
+ * arch/ppc/platforms/lopec.c
  *
  * Setup routines for the Motorola LoPEC.
  *
  * Author: Dan Cox
- *         danc@mvista.com
+ * Maintainer: Tom Rini <trini@kernel.crashing.org>
  *
- * 2001-2002 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2001-2004 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -23,7 +23,10 @@
 #include <linux/initrd.h>
 #include <linux/console.h>
 #include <linux/root_dev.h>
+#include <linux/pci.h>
 
+#include <asm/machdep.h>
+#include <asm/pci-bridge.h>
 #include <asm/io.h>
 #include <asm/open_pic.h>
 #include <asm/i8259.h>
@@ -32,8 +35,7 @@
 #include <asm/mpc10x.h>
 #include <asm/hw_irq.h>
 #include <asm/prep_nvram.h>
-
-extern void lopec_find_bridges(void);
+#include <asm/kgdb.h>
 
 /*
  * Define all of the IRQ senses and polarities.  Taken from the
@@ -57,6 +59,83 @@ static u_char lopec_openpic_initsenses[16] __initdata = {
 	(IRQ_SENSE_EDGE | IRQ_POLARITY_NEGATIVE),	/* IRQ 14 */
 	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE)	/* IRQ 15 */
 };
+
+static inline int __init
+lopec_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
+{
+	int irq;
+	static char pci_irq_table[][4] = {
+		{16, 0, 0, 0}, /* ID 11 - Winbond */
+		{22, 0, 0, 0}, /* ID 12 - SCSI */
+		{0, 0, 0, 0}, /* ID 13 - nothing */
+		{17, 0, 0, 0}, /* ID 14 - 82559 Ethernet */
+		{27, 0, 0, 0}, /* ID 15 - USB */
+		{23, 0, 0, 0}, /* ID 16 - PMC slot 1 */
+		{24, 0, 0, 0}, /* ID 17 - PMC slot 2 */
+		{25, 0, 0, 0}, /* ID 18 - PCI slot */
+		{0, 0, 0, 0}, /* ID 19 - nothing */
+		{0, 0, 0, 0}, /* ID 20 - nothing */
+		{0, 0, 0, 0}, /* ID 21 - nothing */
+		{0, 0, 0, 0}, /* ID 22 - nothing */
+		{0, 0, 0, 0}, /* ID 23 - nothing */
+		{0, 0, 0, 0}, /* ID 24 - PMC slot 1b */
+		{0, 0, 0, 0}, /* ID 25 - nothing */
+		{0, 0, 0, 0}  /* ID 26 - PMC Slot 2b */
+	};
+	const long min_idsel = 11, max_idsel = 26, irqs_per_slot = 4;
+
+	irq = PCI_IRQ_TABLE_LOOKUP;
+	if (!irq)
+		return 0;
+
+	return irq;
+}
+
+static void __init
+lopec_setup_winbond_83553(struct pci_controller *hose)
+{
+	int devfn;
+
+	devfn = PCI_DEVFN(11,0);
+
+	/* IDE interrupt routing (primary 14, secondary 15) */
+	early_write_config_byte(hose, 0, devfn, 0x43, 0xef);
+	/* PCI interrupt routing */
+	early_write_config_word(hose, 0, devfn, 0x44, 0x0000);
+
+	/* ISA-PCI address decoder */
+	early_write_config_byte(hose, 0, devfn, 0x48, 0xf0);
+
+	/* RTC, kb, not used in PPC */
+	early_write_config_byte(hose, 0, devfn, 0x4d, 0x00);
+	early_write_config_byte(hose, 0, devfn, 0x4e, 0x04);
+	devfn = PCI_DEVFN(11, 1);
+	early_write_config_byte(hose, 0, devfn, 0x09, 0x8f);
+	early_write_config_dword(hose, 0, devfn, 0x40, 0x00ff0011);
+}
+
+static void __init
+lopec_find_bridges(void)
+{
+	struct pci_controller *hose;
+
+	hose = pcibios_alloc_controller();
+	if (!hose)
+		return;
+
+	hose->first_busno = 0;
+	hose->last_busno = 0xff;
+
+	if (mpc10x_bridge_init(hose, MPC10X_MEM_MAP_B, MPC10X_MEM_MAP_B,
+				MPC10X_MAPB_EUMB_BASE) == 0) {
+
+		hose->mem_resources[0].end = 0xffffffff;
+		lopec_setup_winbond_83553(hose);
+		hose->last_busno = pciauto_bus_scan(hose, hose->first_busno);
+		ppc_md.pci_swizzle = common_swizzle;
+		ppc_md.pci_map_irq = lopec_map_irq;
+	}
+}
 
 static int
 lopec_show_cpuinfo(struct seq_file *m)
@@ -154,18 +233,16 @@ lopec_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data,
 	uint alt_status_base;
 	int i;
 
-	for(i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
+	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
 		hw->io_ports[i] = reg++;
 
 	if (data == lopec_ide_regbase[0]) {
 		alt_status_base = lopec_ide_ctl_regbase[0] + 2;
 		hw->irq = 14;
-	}
-	else if (data == lopec_ide_regbase[1]) {
+	} else if (data == lopec_ide_regbase[1]) {
 		alt_status_base = lopec_ide_ctl_regbase[1] + 2;
 		hw->irq = 15;
-	}
-	else {
+	} else {
 		alt_status_base = 0;
 		hw->irq = 0;
 	}
@@ -234,59 +311,17 @@ lopec_map_io(void)
 	io_block_mapping(0xb0000000, 0xb0000000, 0x10000000, _PAGE_IO);
 }
 
-static void __init
+/*
+ * Set BAT 3 to map 0xf8000000 to end of physical memory space 1-to-1.
+ */
+static __inline__ void
 lopec_set_bat(void)
 {
-	unsigned long batu, batl;
-
-	__asm__ __volatile__(
-		"lis %0,0xf800\n \
-                 ori %1,%0,0x002a\n \
-                 ori %0,%0,0x0ffe\n \
-                 mtspr 0x21e,%0\n \
-                 mtspr 0x21f,%1\n \
-                 isync\n \
-                 sync "
-		: "=r" (batu), "=r" (batl));
+	mb();
+	mtspr(DBAT1U, 0xf8000ffe);
+	mtspr(DBAT1L, 0xf800002a);
+	mb();
 }
-
-#ifdef  CONFIG_SERIAL_TEXT_DEBUG
-#include <linux/serial.h>
-#include <linux/serialP.h>
-#include <linux/serial_reg.h>
-#include <asm/serial.h>
-
-static struct serial_state rs_table[RS_TABLE_SIZE] = {
-	SERIAL_PORT_DFNS	/* Defined in <asm/serial.h> */
-};
-
-volatile unsigned char *com_port;
-volatile unsigned char *com_port_lsr;
-
-static void
-serial_writechar(char c)
-{
-	while ((*com_port_lsr & UART_LSR_THRE) == 0)
-		;
-	*com_port = c;
-}
-
-void
-lopec_progress(char *s, unsigned short hex)
-{
-	volatile char c;
-
-	com_port = (volatile unsigned char *) rs_table[0].port;
-	com_port_lsr = com_port + UART_LSR;
-
-	while ((c = *s++) != 0)
-		serial_writechar(c);
-
-	/* Most messages don't have a newline in them */
-	serial_writechar('\n');
-	serial_writechar('\r');
-}
-#endif	/* CONFIG_SERIAL_TEXT_DEBUG */
 
 TODC_ALLOC();
 
@@ -307,7 +342,7 @@ lopec_setup_arch(void)
 	else
 #elif defined(CONFIG_ROOT_NFS)
         	ROOT_DEV = Root_NFS;
-#elif defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
+#elif defined(CONFIG_BLK_DEV_IDEDISK)
 	        ROOT_DEV = Root_HDA1;
 #else
         	ROOT_DEV = Root_SDA1;
@@ -373,6 +408,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_ide_md.ide_init_hwif = lopec_ide_init_hwif_ports;
 #endif
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
-	ppc_md.progress = lopec_progress;
+	ppc_md.progress = gen550_progress;
 #endif
 }
