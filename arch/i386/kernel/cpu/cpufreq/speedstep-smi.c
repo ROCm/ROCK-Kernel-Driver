@@ -23,6 +23,8 @@
 
 #include "speedstep-lib.h"
 
+#define PFX "speedstep-smi: "
+
 /* speedstep system management interface port/command.
  *
  * These parameters are got from IST-SMI BIOS call.
@@ -234,7 +236,7 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 		/* fall back to speedstep_lib.c dection mechanism: try both states out */
 		unsigned int speedstep_processor = speedstep_detect_processor();
 
-		dprintk(KERN_INFO "speedstep-smi: could not detect low and high frequencies by SMI call.\n");
+		dprintk(KERN_INFO PFX "could not detect low and high frequencies by SMI call.\n");
 		if (!speedstep_processor)
 			return -ENODEV;
 
@@ -244,10 +246,10 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 				&speedstep_set_state);
 
 		if (result) {
-			dprintk(KERN_INFO "speedstep-smi: could not detect two different speeds -- aborting.\n");
+			dprintk(KERN_INFO PFX "could not detect two different speeds -- aborting.\n");
 			return result;
 		} else
-			dprintk(KERN_INFO "speedstep-smi: workaround worked.\n");
+			dprintk(KERN_INFO PFX "workaround worked.\n");
 	}
 
 	/* get current speed setting */
@@ -298,11 +300,11 @@ static int __init speedstep_init(void)
     struct cpuinfo_x86 *c = cpu_data;
 
     if (c->x86_vendor != X86_VENDOR_INTEL) {
-		printk (KERN_INFO "speedstep-smi: No Intel CPU detected.\n");
+		printk (KERN_INFO PFX "No Intel CPU detected.\n");
 		return -ENODEV;
 	}
 
-	dprintk("speedstep-smi: signature:0%.8lx, command:0lx%.8lx, event:0x%.8lx, perf_level:0x%.8lx.\n", 
+	dprintk(KERN_DEBUG PFX "signature:0%.8lx, command:0lx%.8lx, event:0x%.8lx, perf_level:0x%.8lx.\n", 
 		ist_info.signature, ist_info.command, ist_info.event, ist_info.perf_level);
 
 
