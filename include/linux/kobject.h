@@ -22,6 +22,7 @@
 #include <linux/sysfs.h>
 #include <linux/rwsem.h>
 #include <linux/kref.h>
+#include <linux/kobject_uevent.h>
 #include <asm/atomic.h>
 
 #define KOBJ_NAME_LEN	20
@@ -235,32 +236,10 @@ struct subsys_attribute {
 extern int subsys_create_file(struct subsystem * , struct subsys_attribute *);
 extern void subsys_remove_file(struct subsystem * , struct subsys_attribute *);
 
-
 #ifdef CONFIG_HOTPLUG
-extern void kobject_hotplug(const char *action, struct kobject *kobj);
+extern void kobject_hotplug(struct kobject *kobj, enum kobject_action action);
 #else
-static inline void kobject_hotplug(const char *action, struct kobject *kobj) { }
-#endif
-
-
-#ifdef CONFIG_KOBJECT_UEVENT
-extern int kobject_uevent(const char *signal, struct kobject *kobj,
-			  struct attribute *attr);
-
-extern int kobject_uevent_atomic(const char *signal, struct kobject *kobj,
-				 struct attribute *attr);
-#else
-static inline int kobject_uevent(const char *signal, struct kobject *kobj,
-				 struct attribute *attr)
-{
-	return 0;
-}
-
-static inline int kobject_uevent_atomic(const char *signal, struct kobject *kobj,
-					struct attribute *attr)
-{
-	return 0;
-}
+static inline void kobject_hotplug(struct kobject *kobj, enum kobject_action action) { }
 #endif
 
 #endif /* __KERNEL__ */

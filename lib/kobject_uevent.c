@@ -19,8 +19,28 @@
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
 #include <linux/string.h>
+#include <linux/kobject_uevent.h>
 #include <linux/kobject.h>
 #include <net/sock.h>
+
+/* 
+ * These must match up with the values for enum kobject_action
+ * as found in include/linux/kobject_uevent.h
+ */
+static char *actions[] = {
+	"add",		/* 0x00 */
+	"remove",	/* 0x01 */
+	"change",	/* 0x02 */
+	"mount",	/* 0x03 */
+};
+
+static char *action_to_string(enum kobject_action action)
+{
+	if (action >= KOBJ_MAX_ACTION)
+		return NULL;
+	else
+		return actions[action];
+}
 
 #ifdef CONFIG_KOBJECT_UEVENT
 static struct sock *uevent_sock;
@@ -60,17 +80,22 @@ static int send_uevent(const char *signal, const char *obj, const void *buf,
 	return netlink_broadcast(uevent_sock, skb, 0, 1, gfp_mask);
 }
 
-static int do_kobject_uevent(const char *signal, struct kobject *kobj,
+static int do_kobject_uevent(struct kobject *kobj, enum kobject_action action, 
 			     struct attribute *attr, int gfp_mask)
 {
 	char *path;
 	char *attrpath;
+	char *signal;
 	int len;
 	int rc = -ENOMEM;
 
 	path = kobject_get_path(kobj, gfp_mask);
 	if (!path)
 		return -ENOMEM;
+
+	signal = action_to_string(action);
+	if (!signal)
+		return -EINVAL;
 
 	if (attr) {
 		len = strlen(path);
@@ -97,17 +122,17 @@ exit:
  * @kobj: struct kobject that the event is happening to
  * @attr: optional struct attribute the event belongs to
  */
-int kobject_uevent(const char *signal, struct kobject *kobj,
+int kobject_uevent(struct kobject *kobj, enum kobject_action action,
 		   struct attribute *attr)
 {
-	return do_kobject_uevent(signal, kobj, attr, GFP_KERNEL);
+	return do_kobject_uevent(kobj, action, attr, GFP_KERNEL);
 }
 EXPORT_SYMBOL_GPL(kobject_uevent);
 
-int kobject_uevent_atomic(const char *signal, struct kobject *kobj,
+int kobject_uevent_atomic(struct kobject *kobj, enum kobject_action action,
 			  struct attribute *attr)
 {
-	return do_kobject_uevent(signal, kobj, attr, GFP_ATOMIC);
+	return do_kobject_uevent(kobj, action, attr, GFP_ATOMIC);
 }
 
 EXPORT_SYMBOL_GPL(kobject_uevent_atomic);
@@ -149,7 +174,7 @@ static spinlock_t sequence_lock = SPIN_LOCK_UNLOCKED;
  * @action: action that is happening (usually "ADD" or "REMOVE")
  * @kobj: struct kobject that the action is happening to
  */
-void kobject_hotplug(const char *action, struct kobject *kobj)
+void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 {
 	char *argv [3];
 	char **envp = NULL;
@@ -159,6 +184,7 @@ void kobject_hotplug(const char *action, struct kobject *kobj)
 	int retval;
 	char *kobj_path = NULL;
 	char *name = NULL;
+	char *action_string;
 	u64 seq;
 	struct kobject *top_kobj = kobj;
 	struct kset *kset;
@@ -182,6 +208,10 @@ void kobject_hotplug(const char *action, struct kobject *kobj)
 	}
 
 	pr_debug ("%s\n", __FUNCTION__);
+
+	action_string = action_to_string(action);
+	if (!action_string)
+		return;
 
 	envp = kmalloc(NUM_ENVP * sizeof (char *), GFP_KERNEL);
 	if (!envp)
@@ -208,7 +238,7 @@ void kobject_hotplug(const char *action, struct kobject *kobj)
 	scratch = buffer;
 
 	envp [i++] = scratch;
-	scratch += sprintf(scratch, "ACTION=%s", action) + 1;
+	scratch += sprintf(scratch, "ACTION=%s", action_string) + 1;
 
 	kobj_path = kobject_get_path(kobj, GFP_KERNEL);
 	if (!kobj_path)
@@ -242,7 +272,7 @@ void kobject_hotplug(const char *action, struct kobject *kobj)
 	pr_debug ("%s: %s %s %s %s %s %s %s\n", __FUNCTION__, argv[0], argv[1],
 		  envp[0], envp[1], envp[2], envp[3], envp[4]);
 
-	send_uevent(action, kobj_path, buffer, scratch - buffer, GFP_KERNEL);
+	send_uevent(action_string, kobj_path, buffer, scratch - buffer, GFP_KERNEL);
 
 	if (!hotplug_path[0])
 		goto exit;

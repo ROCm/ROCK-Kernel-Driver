@@ -186,7 +186,7 @@ int kobject_add(struct kobject * kobj)
 		if (parent)
 			kobject_put(parent);
 	} else {
-		kobject_hotplug("add", kobj);
+		kobject_hotplug(kobj, KOBJ_ADD);
 	}
 
 	return error;
@@ -300,7 +300,7 @@ int kobject_rename(struct kobject * kobj, char *new_name)
 
 void kobject_del(struct kobject * kobj)
 {
-	kobject_hotplug("remove", kobj);
+	kobject_hotplug(kobj, KOBJ_REMOVE);
 	sysfs_remove_dir(kobj);
 	unlink(kobj);
 }
