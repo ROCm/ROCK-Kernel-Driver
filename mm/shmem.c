@@ -315,7 +315,6 @@ shmem_truncate_indirect(struct shmem_inode_info *info, unsigned long index)
 	return shmem_truncate_direct(base, start, len);
 }
 
-/* SMP-safe */
 static void shmem_truncate (struct inode * inode)
 {
 	unsigned long index;
@@ -1039,7 +1038,6 @@ static int shmem_statfs(struct super_block *sb, struct statfs *buf)
 /*
  * File creation. Allocate an inode, and we're done..
  */
-/* SMP-safe */
 static int shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
 {
 	struct inode * inode = shmem_get_inode(dir->i_sb, mode, dev);
