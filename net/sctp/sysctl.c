@@ -42,7 +42,7 @@
 #include <net/sctp/structs.h>
 #include <linux/sysctl.h>
 
-extern sctp_protocol_t sctp_proto;
+extern struct sctp_protocol sctp_proto;
 
 static ctl_table sctp_table[] = {
 	{

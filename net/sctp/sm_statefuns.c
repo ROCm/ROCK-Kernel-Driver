@@ -189,7 +189,7 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 	sctp_chunk_t *repl;
 	sctp_association_t *new_asoc;
 	sctp_chunk_t *err_chunk;
-	sctp_packet_t *packet;
+	struct sctp_packet *packet;
 	sctp_unrecognized_param_t *unk_param;
 	int len;
 
@@ -354,9 +354,8 @@ sctp_disposition_t sctp_sf_do_5_1C_ack(const sctp_endpoint_t *ep,
 	sctp_init_chunk_t *initchunk;
 	__u32 init_tag;
 	sctp_chunk_t *err_chunk;
-	sctp_packet_t *packet;
+	struct sctp_packet *packet;
 	sctp_disposition_t ret;
-
 
 	/* 6.10 Bundling
 	 * An endpoint MUST NOT bundle INIT, INIT ACK or
@@ -912,14 +911,14 @@ static int sctp_sf_send_restart_abort(union sctp_addr *ssa,
 				      sctp_cmd_seq_t *commands)
 {
 	int len;
-	sctp_packet_t *pkt;
+	struct sctp_packet *pkt;
 	sctp_addr_param_t *addrparm;
 	sctp_errhdr_t *errhdr;
 	sctp_endpoint_t *ep;
 	char buffer[sizeof(sctp_errhdr_t) + sizeof(sctp_addr_param_t)];
 
-	/* Build the error on the stack.   We are way to malloc
-	 * malloc crazy throughout the code today.
+	/* Build the error on the stack.   We are way to malloc crazy
+	 * throughout the code today.
 	 */
 	errhdr = (sctp_errhdr_t *)buffer;
 	addrparm = (sctp_addr_param_t *)errhdr->variable;
@@ -1105,10 +1104,9 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 	sctp_chunk_t *repl;
 	sctp_association_t *new_asoc;
 	sctp_chunk_t *err_chunk;
-	sctp_packet_t *packet;
+	struct sctp_packet *packet;
 	sctp_unrecognized_param_t *unk_param;
 	int len;
-
 
 	/* 6.10 Bundling
 	 * An endpoint MUST NOT bundle INIT, INIT ACK or
@@ -2351,7 +2349,7 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const sctp_endpoint_t *ep,
 		 * room.   Note: Playing nice with a confused sender.  A
 		 * malicious sender can still eat up all our buffer
 		 * space and in the future we may want to detect and
-		 * do more drastic reneging. 
+		 * do more drastic reneging.
 		 */
 		if (sctp_tsnmap_has_gap(&asoc->peer.tsn_map) &&
 		    (sctp_tsnmap_get_ctsn(&asoc->peer.tsn_map) + 1) == tsn) {
@@ -2751,7 +2749,7 @@ sctp_disposition_t sctp_sf_tabort_8_4_8(const sctp_endpoint_t *ep,
 					void *arg,
 					sctp_cmd_seq_t *commands)
 {
-	sctp_packet_t *packet = NULL;
+	struct sctp_packet *packet = NULL;
 	sctp_chunk_t *chunk = arg;
 	sctp_chunk_t *abort;
 
@@ -2953,7 +2951,7 @@ sctp_disposition_t sctp_sf_shut_8_4_5(const sctp_endpoint_t *ep,
 				      void *arg,
 				      sctp_cmd_seq_t *commands)
 {
-	sctp_packet_t *packet = NULL;
+	struct sctp_packet *packet = NULL;
 	sctp_chunk_t *chunk = arg;
 	sctp_chunk_t *shut;
 
@@ -4377,13 +4375,13 @@ sctp_sackhdr_t *sctp_sm_pull_sack(sctp_chunk_t *chunk)
 /* Create an ABORT packet to be sent as a response, with the specified
  * error causes.
  */
-sctp_packet_t *sctp_abort_pkt_new(const sctp_endpoint_t *ep,
+struct sctp_packet *sctp_abort_pkt_new(const sctp_endpoint_t *ep,
 				  const sctp_association_t *asoc,
 				  sctp_chunk_t *chunk,
 				  const void *payload,
 				  size_t paylen)
 {
-	sctp_packet_t *packet;
+	struct sctp_packet *packet;
 	sctp_chunk_t *abort;
 
 	packet = sctp_ootb_pkt_new(asoc, chunk);
@@ -4413,10 +4411,10 @@ sctp_packet_t *sctp_abort_pkt_new(const sctp_endpoint_t *ep,
 }
 
 /* Allocate a packet for responding in the OOTB conditions.  */
-sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
+struct sctp_packet *sctp_ootb_pkt_new(const sctp_association_t *asoc,
 				 const sctp_chunk_t *chunk)
 {
-	sctp_packet_t *packet;
+	struct sctp_packet *packet;
 	struct sctp_transport *transport;
 	__u16 sport;
 	__u16 dport;
@@ -4449,7 +4447,7 @@ sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
 		goto nomem;
 
 	/* Allocate a new packet for sending the response. */
-	packet = t_new(sctp_packet_t, GFP_ATOMIC);
+	packet = t_new(struct sctp_packet, GFP_ATOMIC);
 	if (!packet)
 		goto nomem_packet;
 
@@ -4471,7 +4469,7 @@ nomem:
 }
 
 /* Free the packet allocated earlier for responding in the OOTB condition.  */
-void sctp_ootb_pkt_free(sctp_packet_t *packet)
+void sctp_ootb_pkt_free(struct sctp_packet *packet)
 {
 	sctp_transport_free(packet->transport);
 	sctp_packet_free(packet);
@@ -4484,7 +4482,7 @@ void sctp_send_stale_cookie_err(const sctp_endpoint_t *ep,
 				sctp_cmd_seq_t *commands,
 				sctp_chunk_t *err_chunk)
 {
-	sctp_packet_t *packet;
+	struct sctp_packet *packet;
 
 	if (err_chunk) {
 		packet = sctp_ootb_pkt_new(asoc, chunk);
