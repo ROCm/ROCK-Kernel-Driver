@@ -159,6 +159,8 @@ extern void acpi_reserve_bootmem(void);
 extern int acpi_disabled;
 extern int acpi_pci_disabled;
 
+extern u8 x86_acpiid_to_apicid[];
+
 #endif /*__KERNEL__*/
 
 #endif /*_ASM_ACPI_H*/

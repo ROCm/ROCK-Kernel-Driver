@@ -906,8 +906,7 @@ acpi_ds_init_aml_walk (
 	struct acpi_namespace_node      *method_node,
 	u8                              *aml_start,
 	u32                             aml_length,
-	union acpi_operand_object       **params,
-	union acpi_operand_object       **return_obj_desc,
+	struct acpi_parameter_info      *info,
 	u32                             pass_number)
 {
 	acpi_status                     status;
@@ -926,8 +925,17 @@ acpi_ds_init_aml_walk (
 	/* The next_op of the next_walk will be the beginning of the method */
 
 	walk_state->next_op             = NULL;
-	walk_state->params              = params;
-	walk_state->caller_return_desc  = return_obj_desc;
+
+	if (info) {
+		if (info->parameter_type == ACPI_PARAM_GPE) {
+			walk_state->gpe_event_info = ACPI_CAST_PTR (struct acpi_gpe_event_info,
+					   info->parameters);
+		}
+		else {
+			walk_state->params              = info->parameters;
+			walk_state->caller_return_desc  = &info->return_object;
+		}
+	}
 
 	status = acpi_ps_init_scope (&walk_state->parser_state, op);
 	if (ACPI_FAILURE (status)) {
@@ -949,7 +957,7 @@ acpi_ds_init_aml_walk (
 
 		/* Init the method arguments */
 
-		status = acpi_ds_method_data_init_args (params, ACPI_METHOD_NUM_ARGS, walk_state);
+		status = acpi_ds_method_data_init_args (walk_state->params, ACPI_METHOD_NUM_ARGS, walk_state);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}

@@ -171,27 +171,40 @@ u8                                  acpi_gbl_shutdown = TRUE;
 
 const u8                            acpi_gbl_decode_to8bit [8] = {1,2,4,8,16,32,64,128};
 
-const char                          *acpi_gbl_sleep_state_names[ACPI_S_STATE_COUNT] = {
-			  "\\_S0_",
-			  "\\_S1_",
-			  "\\_S2_",
-			  "\\_S3_",
-			  "\\_S4_",
-			  "\\_S5_"};
+const char                          *acpi_gbl_sleep_state_names[ACPI_S_STATE_COUNT] =
+{
+	"\\_S0_",
+	"\\_S1_",
+	"\\_S2_",
+	"\\_S3_",
+	"\\_S4_",
+	"\\_S5_"
+};
 
-const char                          *acpi_gbl_highest_dstate_names[4] = {
-					   "_S1D",
-					   "_S2D",
-					   "_S3D",
-					   "_S4D"};
+const char                          *acpi_gbl_highest_dstate_names[4] =
+{
+	"_S1D",
+	"_S2D",
+	"_S3D",
+	"_S4D"
+};
 
-/* Strings supported by the _OSI predefined (internal) method */
-
-const char                          *acpi_gbl_valid_osi_strings[ACPI_NUM_OSI_STRINGS] = {
-							 "Linux",
-							 "Windows 2000",
-							 "Windows 2001",
-							 "Windows 2001.1"};
+/*
+ * Strings supported by the _OSI predefined (internal) method.
+ * When adding strings, be sure to update ACPI_NUM_OSI_STRINGS.
+ */
+const char                          *acpi_gbl_valid_osi_strings[ACPI_NUM_OSI_STRINGS] =
+{
+	"Linux",
+	"Windows 2000",
+	"Windows 2001",
+	"Windows 2001.1",
+	"Windows 2001 SP0",
+	"Windows 2001 SP1",
+	"Windows 2001 SP2",
+	"Windows 2001 SP3",
+	"Windows 2001 SP4"
+};
 
 
 /******************************************************************************
@@ -213,7 +226,7 @@ const struct acpi_predefined_names      acpi_gbl_pre_defined_names[] =
 	{"_PR_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
 	{"_SB_",    ACPI_TYPE_DEVICE,           NULL},
 	{"_SI_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
-	{"_TZ_",    ACPI_TYPE_LOCAL_SCOPE,      NULL},
+	{"_TZ_",    ACPI_TYPE_THERMAL,          NULL},
 	{"_REV",    ACPI_TYPE_INTEGER,          "2"},
 	{"_OS_",    ACPI_TYPE_STRING,           ACPI_OS_NAME},
 	{"_GL_",    ACPI_TYPE_MUTEX,            "0"},
@@ -561,25 +574,36 @@ acpi_ut_get_node_name (
 	struct acpi_namespace_node      *node = (struct acpi_namespace_node *) object;
 
 
+	/* Must return a string of exactly 4 characters == ACPI_NAME_SIZE */
+
 	if (!object)
 	{
-		return ("NULL NODE");
+		return ("NULL");
 	}
 
-	if (object == ACPI_ROOT_OBJECT)
+	/* Check for Root node */
+
+	if ((object == ACPI_ROOT_OBJECT) ||
+		(object == acpi_gbl_root_node))
 	{
-		node = acpi_gbl_root_node;
+		return ("\"\\\" ");
 	}
+
+	/* Descriptor must be a namespace node */
 
 	if (node->descriptor != ACPI_DESC_TYPE_NAMED)
 	{
-		return ("****");
+		return ("####");
 	}
+
+	/* Name must be a valid ACPI name */
 
 	if (!acpi_ut_valid_acpi_name (* (u32 *) node->name.ascii))
 	{
-		return ("----");
+		return ("????");
 	}
+
+	/* Return the name */
 
 	return (node->name.ascii);
 }
@@ -783,10 +807,6 @@ acpi_ut_init_globals (
 
 	ACPI_FUNCTION_TRACE ("ut_init_globals");
 
-	/* Runtime configuration */
-
-	acpi_gbl_create_osi_method = TRUE;
-	acpi_gbl_all_methods_serialized = FALSE;
 
 	/* Memory allocation and cache lists */
 
@@ -880,6 +900,7 @@ acpi_ut_init_globals (
 	/* Hardware oriented */
 
 	acpi_gbl_events_initialized         = FALSE;
+	acpi_gbl_system_awake_and_running   = TRUE;
 
 	/* Namespace */
 

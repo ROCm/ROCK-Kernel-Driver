@@ -174,14 +174,18 @@ acpi_evaluate_object (
 {
 	acpi_status                     status;
 	acpi_status                     status2;
-	union acpi_operand_object       **internal_params = NULL;
-	union acpi_operand_object       *internal_return_obj = NULL;
+	struct acpi_parameter_info      info;
 	acpi_size                       buffer_space_needed;
 	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_evaluate_object");
 
+
+	info.node = handle;
+	info.parameters = NULL;
+	info.return_object = NULL;
+	info.parameter_type = ACPI_PARAM_ARGS;
 
 	/*
 	 * If there are parameters to be passed to the object
@@ -193,9 +197,10 @@ acpi_evaluate_object (
 		 * Allocate a new parameter block for the internal objects
 		 * Add 1 to count to allow for null terminated internal list
 		 */
-		internal_params = ACPI_MEM_CALLOCATE (((acpi_size) external_params->count + 1) *
-				  sizeof (void *));
-		if (!internal_params) {
+		info.parameters = ACPI_MEM_CALLOCATE (
+				 ((acpi_size) external_params->count + 1) *
+				 sizeof (void *));
+		if (!info.parameters) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
@@ -205,14 +210,15 @@ acpi_evaluate_object (
 		 */
 		for (i = 0; i < external_params->count; i++) {
 			status = acpi_ut_copy_eobject_to_iobject (&external_params->pointer[i],
-					  &internal_params[i]);
+					  &info.parameters[i]);
 			if (ACPI_FAILURE (status)) {
-				acpi_ut_delete_internal_object_list (internal_params);
+				acpi_ut_delete_internal_object_list (info.parameters);
 				return_ACPI_STATUS (status);
 			}
 		}
-		internal_params[external_params->count] = NULL;
+		info.parameters[external_params->count] = NULL;
 	}
+
 
 	/*
 	 * Three major cases:
@@ -225,8 +231,7 @@ acpi_evaluate_object (
 		/*
 		 *  The path is fully qualified, just evaluate by name
 		 */
-		status = acpi_ns_evaluate_by_name (pathname, internal_params,
-				 &internal_return_obj);
+		status = acpi_ns_evaluate_by_name (pathname, &info);
 	}
 	else if (!handle) {
 		/*
@@ -256,15 +261,13 @@ acpi_evaluate_object (
 			 * The null pathname case means the handle is for
 			 * the actual object to be evaluated
 			 */
-			status = acpi_ns_evaluate_by_handle (handle, internal_params,
-					  &internal_return_obj);
+			status = acpi_ns_evaluate_by_handle (&info);
 		}
 		else {
 		   /*
 			* Both a Handle and a relative Pathname
 			*/
-			status = acpi_ns_evaluate_relative (handle, pathname, internal_params,
-					  &internal_return_obj);
+			status = acpi_ns_evaluate_relative (pathname, &info);
 		}
 	}
 
@@ -274,11 +277,11 @@ acpi_evaluate_object (
 	 * copy the return value to an external object.
 	 */
 	if (return_buffer) {
-		if (!internal_return_obj) {
+		if (!info.return_object) {
 			return_buffer->length = 0;
 		}
 		else {
-			if (ACPI_GET_DESCRIPTOR_TYPE (internal_return_obj) == ACPI_DESC_TYPE_NAMED) {
+			if (ACPI_GET_DESCRIPTOR_TYPE (info.return_object) == ACPI_DESC_TYPE_NAMED) {
 				/*
 				 * If we received a NS Node as a return object, this means that
 				 * the object we are evaluating has nothing interesting to
@@ -288,7 +291,7 @@ acpi_evaluate_object (
 				 * support for various types at a later date if necessary.
 				 */
 				status = AE_TYPE;
-				internal_return_obj = NULL; /* No need to delete a NS Node */
+				info.return_object = NULL;  /* No need to delete a NS Node */
 				return_buffer->length = 0;
 			}
 
@@ -297,7 +300,7 @@ acpi_evaluate_object (
 				 * Find out how large a buffer is needed
 				 * to contain the returned object
 				 */
-				status = acpi_ut_get_object_size (internal_return_obj,
+				status = acpi_ut_get_object_size (info.return_object,
 						   &buffer_space_needed);
 				if (ACPI_SUCCESS (status)) {
 					/* Validate/Allocate/Clear caller buffer */
@@ -309,13 +312,14 @@ acpi_evaluate_object (
 						 */
 						ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 							"Needed buffer size %X, %s\n",
-							(u32) buffer_space_needed, acpi_format_exception (status)));
+							(u32) buffer_space_needed,
+							acpi_format_exception (status)));
 					}
 					else {
 						/*
 						 *  We have enough space for the object, build it
 						 */
-						status = acpi_ut_copy_iobject_to_eobject (internal_return_obj,
+						status = acpi_ut_copy_iobject_to_eobject (info.return_object,
 								  return_buffer);
 					}
 				}
@@ -323,7 +327,7 @@ acpi_evaluate_object (
 		}
 	}
 
-	if (internal_return_obj) {
+	if (info.return_object) {
 		/*
 		 * Delete the internal return object.  NOTE: Interpreter
 		 * must be locked to avoid race condition.
@@ -334,7 +338,7 @@ acpi_evaluate_object (
 			 * Delete the internal return object. (Or at least
 			 * decrement the reference count by one)
 			 */
-			acpi_ut_remove_reference (internal_return_obj);
+			acpi_ut_remove_reference (info.return_object);
 			acpi_ex_exit_interpreter ();
 		}
 	}
@@ -342,10 +346,10 @@ acpi_evaluate_object (
 	/*
 	 * Free the input parameter list (if we created one),
 	 */
-	if (internal_params) {
+	if (info.parameters) {
 		/* Free the allocated parameter block */
 
-		acpi_ut_delete_internal_object_list (internal_params);
+		acpi_ut_delete_internal_object_list (info.parameters);
 	}
 
 	return_ACPI_STATUS (status);
