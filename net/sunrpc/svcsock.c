@@ -1015,6 +1015,7 @@ static void
 svc_tcp_init(struct svc_sock *svsk)
 {
 	struct sock	*sk = svsk->sk_sk;
+	struct tcp_opt  *tp = tcp_sk(sk);
 
 	svsk->sk_recvfrom = svc_tcp_recvfrom;
 	svsk->sk_sendto = svc_tcp_sendto;
@@ -1031,6 +1032,8 @@ svc_tcp_init(struct svc_sock *svsk)
 
 		svsk->sk_reclen = 0;
 		svsk->sk_tcplen = 0;
+
+		tp->nonagle = 1;        /* disable Nagle's algorithm */
 
 		/* initialise setting must have enough space to
 		 * receive and respond to one request.  
