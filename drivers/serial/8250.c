@@ -1885,7 +1885,7 @@ static int __register_serial(struct serial_struct *req, int line)
 	port.line     = line;
 
 	if (HIGH_BITS_OFFSET)
-		port.iobase |= req->port_high << HIGH_BITS_OFFSET;
+		port.iobase |= (long) req->port_high << HIGH_BITS_OFFSET;
 
 	/*
 	 * If a clock rate wasn't specified by the low level
