@@ -44,7 +44,8 @@ struct riva_i2c_chan {
 
 struct riva_par {
 	RIVA_HW_INST riva;	/* interface to riva_hw.c */
-
+	u32 pseudo_palette[16]; /* default palette */
+	u32 palette[16];        /* for Riva128 */
 	caddr_t ctrl_base;	/* virtual control register base addr */
 	unsigned dclk_max;	/* max DCLK */
 
@@ -54,8 +55,6 @@ struct riva_par {
 	struct vgastate state;
 #endif
 	atomic_t ref_count;
-	u32 cursor_data[32 * 32/4];
-	int cursor_reset;
 	unsigned char *EDID;
 	unsigned int Chipset;
 	int forceCRTC;
