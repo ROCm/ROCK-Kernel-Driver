@@ -105,8 +105,80 @@ static int sg_emulated_host(request_queue_t *q, int __user *p)
 	return put_user(1, p);
 }
 
-static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
-		 struct sg_io_hdr *hdr)
+#define CMD_READ_SAFE	0x01
+#define CMD_WRITE_SAFE	0x02
+#define safe_for_read(cmd)	[cmd] = CMD_READ_SAFE
+#define safe_for_write(cmd)	[cmd] = CMD_WRITE_SAFE
+
+static int verify_command(struct file *file, unsigned char *cmd)
+{
+	static const unsigned char cmd_type[256] = {
+
+		/* Basic read-only commands */
+		safe_for_read(TEST_UNIT_READY),
+		safe_for_read(REQUEST_SENSE),
+		safe_for_read(READ_6),
+		safe_for_read(READ_10),
+		safe_for_read(READ_12),
+		safe_for_read(READ_16),
+		safe_for_read(READ_BUFFER),
+		safe_for_read(READ_LONG),
+		safe_for_read(INQUIRY),
+		safe_for_read(MODE_SENSE),
+		safe_for_read(MODE_SENSE_10),
+		safe_for_read(START_STOP),
+
+		/* Audio CD commands */
+		safe_for_read(GPCMD_PLAY_CD),
+		safe_for_read(GPCMD_PLAY_AUDIO_10),
+		safe_for_read(GPCMD_PLAY_AUDIO_MSF),
+		safe_for_read(GPCMD_PLAY_AUDIO_TI),
+
+		/* CD/DVD data reading */
+		safe_for_read(GPCMD_READ_CD),
+		safe_for_read(GPCMD_READ_CD_MSF),
+		safe_for_read(GPCMD_READ_DISC_INFO),
+		safe_for_read(GPCMD_READ_CDVD_CAPACITY),
+		safe_for_read(GPCMD_READ_DVD_STRUCTURE),
+		safe_for_read(GPCMD_READ_HEADER),
+		safe_for_read(GPCMD_READ_TRACK_RZONE_INFO),
+		safe_for_read(GPCMD_READ_SUBCHANNEL),
+		safe_for_read(GPCMD_READ_TOC_PMA_ATIP),
+		safe_for_read(GPCMD_REPORT_KEY),
+		safe_for_read(GPCMD_SCAN),
+
+		/* Basic writing commands */
+		safe_for_write(WRITE_6),
+		safe_for_write(WRITE_10),
+		safe_for_write(WRITE_VERIFY),
+		safe_for_write(WRITE_12),
+		safe_for_write(WRITE_VERIFY_12),
+		safe_for_write(WRITE_16),
+		safe_for_write(WRITE_BUFFER),
+		safe_for_write(WRITE_LONG),
+	};
+	unsigned char type = cmd_type[cmd[0]];
+
+	/* Anybody who can open the device can do a read-safe command */
+	if (type & CMD_READ_SAFE)
+		return 0;
+
+	/* Write-safe commands just require a writable open.. */
+	if (type & CMD_WRITE_SAFE) {
+		if (file->f_mode & FMODE_WRITE)
+			return 0;
+	}
+
+	/* And root can do any command.. */
+	if (capable(CAP_SYS_RAWIO))
+		return 0;
+
+	/* Otherwise fail it with an "Operation not permitted" */
+	return -EPERM;
+}
+
+static int sg_io(struct file *file, request_queue_t *q,
+		struct gendisk *bd_disk, struct sg_io_hdr *hdr)
 {
 	unsigned long start_time;
 	int reading, writing;
@@ -115,14 +187,14 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	char sense[SCSI_SENSE_BUFFERSIZE];
 	unsigned char cmd[BLK_MAX_CDB];
 
-	if (!capable(CAP_SYS_RAWIO))
-		return -EPERM;
 	if (hdr->interface_id != 'S')
 		return -EINVAL;
 	if (hdr->cmd_len > BLK_MAX_CDB)
 		return -EINVAL;
 	if (copy_from_user(cmd, hdr->cmdp, hdr->cmd_len))
 		return -EFAULT;
+	if (verify_command(file, cmd))
+		return -EPERM;
 
 	/*
 	 * we'll do that later
@@ -228,15 +300,13 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 #define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
 #define OMAX_SB_LEN 16          /* For backward compatibility */
 
-static int sg_scsi_ioctl(request_queue_t *q, struct gendisk *bd_disk,
-			 Scsi_Ioctl_Command __user *sic)
+static int sg_scsi_ioctl(struct file *file, request_queue_t *q,
+			 struct gendisk *bd_disk, Scsi_Ioctl_Command __user *sic)
 {
 	struct request *rq;
 	int err, in_len, out_len, bytes, opcode, cmdlen;
 	char *buffer = NULL, sense[SCSI_SENSE_BUFFERSIZE];
 
-	if (!capable(CAP_SYS_RAWIO))
-		return -EPERM;
 	/*
 	 * get in an out lengths, verify they don't exceed a page worth of data
 	 */
@@ -271,6 +341,10 @@ static int sg_scsi_ioctl(request_queue_t *q, struct gendisk *bd_disk,
 		goto error;
 
 	if (copy_from_user(buffer, sic->data + cmdlen, in_len))
+		goto error;
+
+	err = verify_command(file, rq->cmd);
+	if (err)
 		goto error;
 
 	switch (opcode) {
@@ -370,7 +444,7 @@ int scsi_cmd_ioctl(struct file *file, struct gendisk *bd_disk, unsigned int cmd,
 			err = -EFAULT;
 			if (copy_from_user(&hdr, arg, sizeof(hdr)))
 				break;
-			err = sg_io(q, bd_disk, &hdr);
+			err = sg_io(file, q, bd_disk, &hdr);
 			if (err == -EFAULT)
 				break;
 
@@ -418,7 +492,7 @@ int scsi_cmd_ioctl(struct file *file, struct gendisk *bd_disk, unsigned int cmd,
 			hdr.cmdp = ((struct cdrom_generic_command __user*) arg)->cmd;
 			hdr.cmd_len = sizeof(cgc.cmd);
 
-			err = sg_io(q, bd_disk, &hdr);
+			err = sg_io(file, q, bd_disk, &hdr);
 			if (err == -EFAULT)
 				break;
 
@@ -441,7 +515,7 @@ int scsi_cmd_ioctl(struct file *file, struct gendisk *bd_disk, unsigned int cmd,
 			if (!arg)
 				break;
 
-			err = sg_scsi_ioctl(q, bd_disk, arg);
+			err = sg_scsi_ioctl(file, q, bd_disk, arg);
 			break;
 		case CDROMCLOSETRAY:
 			close = 1;
