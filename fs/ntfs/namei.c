@@ -21,6 +21,7 @@
  */
 
 #include <linux/dcache.h>
+#include <linux/security.h>
 
 #include "ntfs.h"
 #include "dir.h"
@@ -280,7 +281,7 @@ handle_name:
 	 * has a 'disconnected' dentry (i.e. IS_ROOT and DCACHE_DISCONNECTED),
 	 * in which case d_move() that in place of the found dentry.
 	 */
-	if (!S_ISDIR(dent_inode)) {
+	if (!S_ISDIR(dent_inode->i_mode)) {
 		/* Not a directory; everything is easy. */
 		d_instantiate(real_dent, dent_inode);
 		return real_dent;
@@ -304,7 +305,7 @@ handle_name:
 	 */
 	new_dent = list_entry(dent_inode->i_dentry.next, struct dentry,
 			d_alias);
-	__dget_locked(new_dent);
+	dget_locked(new_dent);
 	spin_unlock(&dcache_lock);
 	/* Do security vodoo. */
 	security_d_instantiate(real_dent, dent_inode);
