@@ -366,19 +366,19 @@ static ssize_t show_scaling_available_governors (struct cpufreq_policy * policy,
 
 
 #define define_one_ro(_name) \
-struct freq_attr _name = { \
+static struct freq_attr _name = { \
 	.attr = { .name = __stringify(_name), .mode = 0444 }, \
 	.show = show_##_name, \
 }
 
 #define define_one_ro0400(_name) \
-struct freq_attr _name = { \
+static struct freq_attr _name = { \
 	.attr = { .name = __stringify(_name), .mode = 0400 }, \
 	.show = show_##_name, \
 }
 
 #define define_one_rw(_name) \
-struct freq_attr _name = { \
+static struct freq_attr _name = { \
 	.attr = { .name = __stringify(_name), .mode = 0644 }, \
 	.show = show_##_name, \
 	.store = store_##_name, \
