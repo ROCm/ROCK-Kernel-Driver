@@ -153,9 +153,6 @@ extern struct tcp_hashinfo {
 #define tcp_lhash_wait	(tcp_hashinfo.__tcp_lhash_wait)
 #define tcp_portalloc_lock (tcp_hashinfo.__tcp_portalloc_lock)
 
-/* SLAB cache for TCP socks */
-extern kmem_cache_t *tcp_sk_cachep;
-
 extern kmem_cache_t *tcp_bucket_cachep;
 extern struct tcp_bind_bucket *tcp_bucket_create(struct tcp_bind_hashbucket *head,
 						 unsigned short snum);

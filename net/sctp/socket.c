@@ -4622,4 +4622,34 @@ struct proto sctp_prot = {
 	.hash        =	sctp_hash,
 	.unhash      =	sctp_unhash,
 	.get_port    =	sctp_get_port,
+	.slab_obj_size = sizeof(struct sctp_sock),
 };
+
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+struct ipv6_sk_offset sctp_sock_offset = {
+	.offset = offsetof(struct sctp6_sock, inet6),
+};
+
+struct proto sctpv6_prot = {
+	.name		= "SCTPv6",
+	.close		= sctp_close,
+	.connect	= sctp_connect,
+	.disconnect	= sctp_disconnect,
+	.accept		= sctp_accept,
+	.ioctl		= sctp_ioctl,
+	.init		= sctp_init_sock,
+	.destroy	= sctp_destroy_sock,
+	.shutdown	= sctp_shutdown,
+	.setsockopt	= sctp_setsockopt,
+	.getsockopt	= sctp_getsockopt,
+	.sendmsg	= sctp_sendmsg,
+	.recvmsg	= sctp_recvmsg,
+	.bind		= sctp_bind,
+	.backlog_rcv	= sctp_backlog_rcv,
+	.hash		= sctp_hash,
+	.unhash		= sctp_unhash,
+	.get_port	= sctp_get_port,
+	.slab_obj_size	= sizeof(struct sctp6_sock),
+	.af_specific	= &sctp_sock_offset,
+};
+#endif /* defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE) */

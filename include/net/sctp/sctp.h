@@ -505,6 +505,7 @@ for (pos = chunk->subh.fwdtsn_hdr->skip;\
 /* External references. */
 
 extern struct proto sctp_prot;
+extern struct proto sctpv6_prot;
 extern struct proc_dir_entry *proc_net_sctp;
 void sctp_put_port(struct sock *sk);
 

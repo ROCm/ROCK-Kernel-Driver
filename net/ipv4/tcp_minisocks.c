@@ -687,7 +687,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 	/* allocate the newsk from the same slab of the master sock,
 	 * if not, at sk_free time we'll try to free it from the wrong
 	 * slabcache (i.e. is it TCPv4 or v6?) -acme */
-	struct sock *newsk = sk_alloc(PF_INET, GFP_ATOMIC, 0, sk->sk_slab);
+	struct sock *newsk = sk_alloc(PF_INET, GFP_ATOMIC, 0, sk->sk_prot->slab);
 
 	if(newsk != NULL) {
 		struct tcp_opt *newtp;

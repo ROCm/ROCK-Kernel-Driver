@@ -121,11 +121,6 @@ atomic_t inet_sock_nr;
 
 extern void ip_mc_drop_socket(struct sock *sk);
 
-/* Per protocol sock slabcache */
-kmem_cache_t *tcp_sk_cachep;
-static kmem_cache_t *udp_sk_cachep;
-static kmem_cache_t *raw4_sk_cachep;
-
 /* The inetsw table contains everything that inet_create needs to
  * build a new socket.
  */
@@ -228,28 +223,6 @@ out:
 	return err;
 }
 
-static __inline__ kmem_cache_t *inet_sk_slab(int protocol)
-{
-	kmem_cache_t* rc = tcp_sk_cachep;
-
-	if (protocol == IPPROTO_UDP)
-		rc = udp_sk_cachep;
-	else if (protocol == IPPROTO_RAW)
-		rc = raw4_sk_cachep;
-	return rc;
-}
-
-static __inline__ int inet_sk_size(int protocol)
-{
-	int rc = sizeof(struct tcp_sock);
-
-	if (protocol == IPPROTO_UDP)
-		rc = sizeof(struct udp_sock);
-	else if (protocol == IPPROTO_RAW)
-		rc = sizeof(struct raw_sock);
-	return rc;
-}
-
 /*
  *	Create an inet socket.
  */
@@ -260,13 +233,12 @@ static int inet_create(struct socket *sock, int protocol)
 	struct list_head *p;
 	struct inet_protosw *answer;
 	struct inet_opt *inet;
-	int err = -ENOBUFS;
+	struct proto *answer_prot;
+	unsigned char answer_flags;
+	char answer_no_check;
+	int err;
 
 	sock->state = SS_UNCONNECTED;
-	sk = sk_alloc(PF_INET, GFP_KERNEL, inet_sk_size(protocol),
-		      inet_sk_slab(protocol));
-	if (!sk)
-		goto out;
 
 	/* Look for the requested type/protocol pair. */
 	answer = NULL;
@@ -292,20 +264,34 @@ static int inet_create(struct socket *sock, int protocol)
 
 	err = -ESOCKTNOSUPPORT;
 	if (!answer)
-		goto out_sk_free;
+		goto out_rcu_unlock;
 	err = -EPERM;
 	if (answer->capability > 0 && !capable(answer->capability))
-		goto out_sk_free;
+		goto out_rcu_unlock;
 	err = -EPROTONOSUPPORT;
 	if (!protocol)
-		goto out_sk_free;
-	err = 0;
+		goto out_rcu_unlock;
+
 	sock->ops = answer->ops;
-	sk->sk_prot = answer->prot;
-	sk->sk_no_check = answer->no_check;
-	if (INET_PROTOSW_REUSE & answer->flags)
-		sk->sk_reuse = 1;
+	answer_prot = answer->prot;
+	answer_no_check = answer->no_check;
+	answer_flags = answer->flags;
 	rcu_read_unlock();
+
+	BUG_TRAP(answer_prot->slab != NULL);
+
+	err = -ENOBUFS;
+	sk = sk_alloc(PF_INET, GFP_KERNEL,
+		      answer_prot->slab_obj_size,
+		      answer_prot->slab);
+	if (sk == NULL)
+		goto out;
+
+	err = 0;
+	sk->sk_prot = answer_prot;
+	sk->sk_no_check = answer_no_check;
+	if (INET_PROTOSW_REUSE & answer_flags)
+		sk->sk_reuse = 1;
 
 	inet = inet_sk(sk);
 
@@ -359,9 +345,8 @@ static int inet_create(struct socket *sock, int protocol)
 	}
 out:
 	return err;
-out_sk_free:
+out_rcu_unlock:
 	rcu_read_unlock();
-	sk_free(sk);
 	goto out;
 }
 
@@ -1010,24 +995,29 @@ static int __init inet_init(void)
 	struct sk_buff *dummy_skb;
 	struct inet_protosw *q;
 	struct list_head *r;
+	int rc = -EINVAL;
 
 	if (sizeof(struct inet_skb_parm) > sizeof(dummy_skb->cb)) {
 		printk(KERN_CRIT "%s: panic\n", __FUNCTION__);
-		return -EINVAL;
+		goto out;
 	}
 
-	tcp_sk_cachep = kmem_cache_create("tcp_sock",
-					  sizeof(struct tcp_sock), 0,
-					  SLAB_HWCACHE_ALIGN, NULL, NULL);
-	udp_sk_cachep = kmem_cache_create("udp_sock",
-					  sizeof(struct udp_sock), 0,
-					  SLAB_HWCACHE_ALIGN, NULL, NULL);
-	raw4_sk_cachep = kmem_cache_create("raw4_sock",
-					   sizeof(struct raw_sock), 0,
-					   SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!tcp_sk_cachep || !udp_sk_cachep || !raw4_sk_cachep)
-		printk(KERN_CRIT
-		       "inet_init: Can't create protocol sock SLAB caches!\n");
+	rc = sk_alloc_slab(&tcp_prot, "tcp_sock");
+	if (rc) {
+		sk_alloc_slab_error(&tcp_prot);
+		goto out;
+	}
+	rc = sk_alloc_slab(&udp_prot, "udp_sock");
+	if (rc) {
+		sk_alloc_slab_error(&udp_prot);
+		goto out_tcp_free_slab;
+	}
+	rc = sk_alloc_slab(&raw_prot, "raw_sock");
+	if (rc) {
+		sk_alloc_slab_error(&raw_prot);
+		goto out_udp_free_slab;
+	}
+
 	/*
 	 *	Tell SOCKET that we are alive... 
 	 */
@@ -1097,7 +1087,14 @@ static int __init inet_init(void)
 
 	ipfrag_init();
 
-	return 0;
+	rc = 0;
+out:
+	return rc;
+out_tcp_free_slab:
+	sk_free_slab(&tcp_prot);
+out_udp_free_slab:
+	sk_free_slab(&udp_prot);
+	goto out;
 }
 
 module_init(inet_init);

@@ -2119,6 +2119,10 @@ void tcp6_proc_exit(void)
 }
 #endif
 
+struct ipv6_sk_offset tcp_sock_offset = {
+	.offset = offsetof(struct tcp6_sock, inet6),
+};
+
 struct proto tcpv6_prot = {
 	.name			= "TCPv6",
 	.close			= tcp_close,
@@ -2145,6 +2149,8 @@ struct proto tcpv6_prot = {
 	.sysctl_wmem		= sysctl_tcp_wmem,
 	.sysctl_rmem		= sysctl_tcp_rmem,
 	.max_header		= MAX_TCP_HEADER,
+	.slab_obj_size		= sizeof(struct tcp6_sock),
+	.af_specific		= &tcp_sock_offset,
 };
 
 static struct inet6_protocol tcpv6_protocol = {
