@@ -136,7 +136,7 @@ int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	unsigned char *tmp_hdr = NULL;
 	int hdr_len = 0;
 	u16 nh_offset = 0;
-	u8 nexthdr = 0;
+	int nexthdr = 0;
 
 	nh_offset = ((unsigned char*)&skb->nh.ipv6h->nexthdr) - skb->nh.raw;
 	hdr_len = sizeof(struct ipv6hdr);
