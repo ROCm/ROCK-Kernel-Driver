@@ -807,7 +807,7 @@ static int init_or_cleanup(int init)
  cleanup_defragops:
 	/* Frag queues may hold fragments with skb->dst == NULL */
 	ip_ct_no_defrag = 1;
-	smp_wmb();
+	synchronize_net();
 	local_bh_disable();
 	ipfrag_flush();
 	local_bh_enable();
