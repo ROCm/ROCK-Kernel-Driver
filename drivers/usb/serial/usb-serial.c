@@ -910,7 +910,7 @@ int usb_serial_probe(struct usb_interface *interface,
 			kfree (serial);
 			return -EIO;
 		}
-		retval = type->probe (serial);
+		retval = type->probe (serial, id);
 		module_put(type->owner);
 
 		if (retval < 0) {
