@@ -846,6 +846,12 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 		else
 			rq.nr_sectors = data_size / SECTOR_SIZE;
 
+		if (!rq.nr_sectors) {
+			printk(KERN_ERR "%s: in/out command without data\n",
+					drive->name);
+			return -EFAULT;
+		}
+
 		rq.hard_nr_sectors = rq.nr_sectors;
 		rq.hard_cur_sectors = rq.current_nr_sectors = rq.nr_sectors;
 	}
@@ -1330,9 +1336,6 @@ ide_startstop_t flagged_task_in_intr (ide_drive_t *drive)
 	char *pBuf		= NULL;
 	int retries             = 5;
 
-	if (rq->current_nr_sectors == 0) 
-		return DRIVER(drive)->error(drive, "flagged_task_in_intr (no data requested)", stat); 
-
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & ERR_STAT) {
 			return DRIVER(drive)->error(drive, "flagged_task_in_intr", stat);
@@ -1378,9 +1381,6 @@ ide_startstop_t flagged_task_mulin_intr (ide_drive_t *drive)
 	char *pBuf		= NULL;
 	int retries             = 5;
 	unsigned int msect, nsect;
-
-	if (rq->current_nr_sectors == 0) 
-		return DRIVER(drive)->error(drive, "flagged_task_mulin_intr (no data requested)", stat); 
 
 	msect = drive->mult_count;
 	if (msect == 0) 
@@ -1433,13 +1433,7 @@ ide_startstop_t flagged_task_mulin_intr (ide_drive_t *drive)
  */
 ide_startstop_t flagged_pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
-	u8 stat			= hwif->INB(IDE_STATUS_REG);
 	ide_startstop_t startstop;
-
-	if (!rq->current_nr_sectors) {
-		return DRIVER(drive)->error(drive, "flagged_pre_task_out_intr (write data not specified)", stat);
-	}
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY,
 			BAD_W_STAT, WAIT_DRQ)) {
@@ -1501,9 +1495,6 @@ ide_startstop_t flagged_pre_task_mulout_intr (ide_drive_t *drive, struct request
 	char *pBuf		= NULL;
 	ide_startstop_t startstop;
 	unsigned int msect, nsect;
-
-	if (!rq->current_nr_sectors) 
-		return DRIVER(drive)->error(drive, "flagged_pre_task_mulout_intr (write data not specified)", stat);
 
 	msect = drive->mult_count;
 	if (msect == 0)
