@@ -79,9 +79,9 @@ static unsigned long last_empty_jifs;
  */
 struct pdflush_work {
 	struct task_struct *who;	/* The thread */
-	void (*fn)(unsigned long);	/* A callback function for pdflush to work on */
-	unsigned long arg0;		/* An argument to the callback function */
-	struct list_head list;		/* On pdflush_list, when the thread is idle */
+	void (*fn)(unsigned long);	/* A callback function */
+	unsigned long arg0;		/* An argument to the callback */
+	struct list_head list;		/* On pdflush_list, when idle */
 	unsigned long when_i_went_to_sleep;
 };
 
@@ -99,24 +99,35 @@ static int __pdflush(struct pdflush_work *my_work)
 	current->flags |= PF_FLUSHER;
 	my_work->fn = NULL;
 	my_work->who = current;
+	INIT_LIST_HEAD(&my_work->list);
 
 	spin_lock_irq(&pdflush_lock);
 	nr_pdflush_threads++;
-//	printk("pdflush %d [%d] starts\n", nr_pdflush_threads, current->pid);
 	for ( ; ; ) {
 		struct pdflush_work *pdf;
 
-		list_add(&my_work->list, &pdflush_list);
-		my_work->when_i_went_to_sleep = jiffies;
 		set_current_state(TASK_INTERRUPTIBLE);
+		list_move(&my_work->list, &pdflush_list);
+		my_work->when_i_went_to_sleep = jiffies;
 		spin_unlock_irq(&pdflush_lock);
 
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
 		schedule();
 
-		if (my_work->fn)
-			(*my_work->fn)(my_work->arg0);
+		spin_lock_irq(&pdflush_lock);
+		if (!list_empty(&my_work->list)) {
+			printk("pdflush: bogus wakeup!\n");
+			my_work->fn = NULL;
+			continue;
+		}
+		if (my_work->fn == NULL) {
+			printk("pdflush: NULL work function\n");
+			continue;
+		}
+		spin_unlock_irq(&pdflush_lock);
+
+		(*my_work->fn)(my_work->arg0);
 
 		/*
 		 * Thread creation: For how long have there been zero
@@ -132,6 +143,7 @@ static int __pdflush(struct pdflush_work *my_work)
 		}
 
 		spin_lock_irq(&pdflush_lock);
+		my_work->fn = NULL;
 
 		/*
 		 * Thread destruction: For how long has the sleepiest
@@ -143,13 +155,12 @@ static int __pdflush(struct pdflush_work *my_work)
 			continue;
 		pdf = list_entry(pdflush_list.prev, struct pdflush_work, list);
 		if (jiffies - pdf->when_i_went_to_sleep > 1 * HZ) {
-			pdf->when_i_went_to_sleep = jiffies;	/* Limit exit rate */
+			/* Limit exit rate */
+			pdf->when_i_went_to_sleep = jiffies;
 			break;					/* exeunt */
 		}
-		my_work->fn = NULL;
 	}
 	nr_pdflush_threads--;
-//	printk("pdflush %d [%d] ends\n", nr_pdflush_threads, current->pid);
 	spin_unlock_irq(&pdflush_lock);
 	return 0;
 }
@@ -191,11 +202,10 @@ int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0)
 		list_del_init(&pdf->list);
 		if (list_empty(&pdflush_list))
 			last_empty_jifs = jiffies;
-		spin_unlock_irqrestore(&pdflush_lock, flags);
 		pdf->fn = fn;
 		pdf->arg0 = arg0;
-		wmb();			/* ? */
 		wake_up_process(pdf->who);
+		spin_unlock_irqrestore(&pdflush_lock, flags);
 	}
 	return ret;
 }

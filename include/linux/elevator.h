@@ -52,12 +52,10 @@ extern inline struct list_head *elv_get_sort_head(request_queue_t *, struct requ
 extern elevator_t elevator_noop;
 
 /*
- * elevator linus. based on linus ideas of starvation control, using
- * sequencing to manage inserts and merges.
+ * deadline i/o scheduler. uses request time outs to prevent indefinite
+ * starvation
  */
-extern elevator_t elevator_linus;
-#define elv_linus_sequence(rq)	((long)(rq)->elevator_private)
-#define ELV_LINUS_SEEK_COST	16
+extern elevator_t iosched_deadline;
 
 /*
  * use the /proc/iosched interface, all the below is history ->

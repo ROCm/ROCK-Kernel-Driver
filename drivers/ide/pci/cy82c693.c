@@ -338,6 +338,9 @@ static void cy82c693_tune_drive (ide_drive_t *drive, u8 pio)
  */
 unsigned int __init init_chipset_cy82c693(struct pci_dev *dev, const char *name)
 {
+	if (PCI_FUNC(dev->devfn) != 1)
+		return 0;
+
 #ifdef CY82C693_SETDMA_CLOCK
 	u8 data = 0;
 #endif /* CY82C693_SETDMA_CLOCK */ 
@@ -411,20 +414,30 @@ void __init init_hwif_cy82c693(ide_hwif_t *hwif)
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
-void __init init_dma_cy82c693 (ide_hwif_t *hwif, unsigned long dmabase)
-{
-	ide_setup_dma(hwif, dmabase, 8);
-}
+static __initdata ide_hwif_t *primary;
 
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
+void __init init_iops_cy82c693(ide_hwif_t *hwif)
+{
+	if (PCI_FUNC(hwif->pci_dev->devfn) == 1)
+		primary = hwif;
+	else {
+		hwif->mate = primary;
+		hwif->channel = 1;
+	}
+}
 
 static int __devinit cy82c693_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	ide_pci_device_t *d = &cy82c693_chipsets[id->driver_data];
-        if ((!(PCI_FUNC(dev->devfn) & 1) ||
-	    (!((dev->class >> 8) == PCI_CLASS_STORAGE_IDE))))
-		return 0;	/* CY82C693 is more than only a IDE controller */
-	ide_setup_pci_device(dev, d);
+	struct pci_dev *dev2;
+
+	/* CY82C693 is more than only a IDE controller.
+	   Function 1 is primary IDE channel, function 2 - secondary. */
+        if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE &&
+	    PCI_FUNC(dev->devfn) == 1) {
+		dev2 = pci_find_slot(dev->bus->number, dev->devfn + 1);
+		ide_setup_pci_devices(dev, dev2, d);
+	}
 	return 0;
 }
 

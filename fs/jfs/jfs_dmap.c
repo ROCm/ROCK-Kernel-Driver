@@ -648,7 +648,7 @@ int dbNextAG(struct inode *ipbmap)
 	agpref = bmp->db_agpref;
 	if ((atomic_read(&bmp->db_active[agpref]) == 0) &&
 	    (bmp->db_agfree[agpref] >= avgfree))
-		goto found;
+		goto unlock;
 
 	/* From the last preferred ag, find the next one with at least
 	 * average free space.
@@ -660,9 +660,12 @@ int dbNextAG(struct inode *ipbmap)
 		if (atomic_read(&bmp->db_active[agpref]))
 			/* open file is currently growing in this ag */
 			continue;
-		if (bmp->db_agfree[agpref] >= avgfree)
-			goto found;
-		else if (bmp->db_agfree[agpref] > hwm) {
+		if (bmp->db_agfree[agpref] >= avgfree) {
+			/* Return this one */
+			bmp->db_agpref = agpref;
+			goto unlock;
+		} else if (bmp->db_agfree[agpref] > hwm) {
+			/* Less than avg. freespace, but best so far */
 			hwm = bmp->db_agfree[agpref];
 			next_best = agpref;
 		}
@@ -673,12 +676,9 @@ int dbNextAG(struct inode *ipbmap)
 	 * next best
 	 */
 	if (next_best != -1)
-		agpref = next_best;
-
-	/* else agpref should be back to its original value */
-
-found:
-	bmp->db_agpref = agpref;
+		bmp->db_agpref = next_best;
+	/* else leave db_agpref unchanged */
+unlock:
 	BMAP_UNLOCK(bmp);
 
 	/* return the preferred group.

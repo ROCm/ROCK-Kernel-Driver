@@ -1370,6 +1370,9 @@ static inline void * __kmem_cache_alloc (kmem_cache_t *cachep, int flags)
 	unsigned long save_flags;
 	void* objp;
 
+	if (flags & __GFP_WAIT)
+		might_sleep();
+
 	kmem_cache_alloc_head(cachep, flags);
 try_again:
 	local_irq_save(save_flags);
@@ -1496,7 +1499,11 @@ static inline void kmem_cache_free_one(kmem_cache_t *cachep, void *objp)
 		if (unlikely(!--slabp->inuse)) {
 			/* Was partial or full, now empty. */
 			list_del(&slabp->list);
-			list_add(&slabp->list, &cachep->slabs_free);
+/*			list_add(&slabp->list, &cachep->slabs_free); 		*/
+			if (unlikely(list_empty(&cachep->slabs_partial)))
+				list_add(&slabp->list, &cachep->slabs_partial);
+			else
+				kmem_slab_destroy(cachep, slabp);
 		} else if (unlikely(inuse == cachep->num)) {
 			/* Was full. */
 			list_del(&slabp->list);
@@ -1970,7 +1977,7 @@ static int s_show(struct seq_file *m, void *p)
 	}
 	list_for_each(q,&cachep->slabs_partial) {
 		slabp = list_entry(q, slab_t, list);
-		if (slabp->inuse == cachep->num || !slabp->inuse)
+		if (slabp->inuse == cachep->num)
 			BUG();
 		active_objs += slabp->inuse;
 		active_slabs++;

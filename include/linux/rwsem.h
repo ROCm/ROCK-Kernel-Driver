@@ -40,6 +40,7 @@ extern void FASTCALL(rwsemtrace(struct rw_semaphore *sem, const char *str));
  */
 static inline void down_read(struct rw_semaphore *sem)
 {
+	might_sleep();
 	rwsemtrace(sem,"Entering down_read");
 	__down_read(sem);
 	rwsemtrace(sem,"Leaving down_read");
@@ -62,6 +63,7 @@ static inline int down_read_trylock(struct rw_semaphore *sem)
  */
 static inline void down_write(struct rw_semaphore *sem)
 {
+	might_sleep();
 	rwsemtrace(sem,"Entering down_write");
 	__down_write(sem);
 	rwsemtrace(sem,"Leaving down_write");

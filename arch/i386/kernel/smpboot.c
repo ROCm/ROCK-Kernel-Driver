@@ -1060,11 +1060,11 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
         if (clustered_apic_mode && (numnodes > 1)) {
                 printk("Remapping cross-quad port I/O for %d quads\n",
 			numnodes);
+                xquad_portio = ioremap (XQUAD_PORTIO_BASE, 
+			numnodes * XQUAD_PORTIO_QUAD);
                 printk("xquad_portio vaddr 0x%08lx, len %08lx\n",
                         (u_long) xquad_portio, 
-			(u_long) numnodes * XQUAD_PORTIO_LEN);
-                xquad_portio = ioremap (XQUAD_PORTIO_BASE, 
-			numnodes * XQUAD_PORTIO_LEN);
+			(u_long) numnodes * XQUAD_PORTIO_QUAD);
         }
 
 	/*

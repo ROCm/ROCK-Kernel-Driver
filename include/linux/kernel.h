@@ -40,6 +40,13 @@
 
 struct completion;
 
+#ifdef CONFIG_DEBUG_KERNEL
+void __might_sleep(char *file, int line);
+#define might_sleep() __might_sleep(__FILE__, __LINE__)
+#else
+#define might_sleep() do {} while(0)
+#endif
+
 extern struct notifier_block *panic_notifier_list;
 NORET_TYPE void panic(const char * fmt, ...)
 	__attribute__ ((NORET_AND format (printf, 1, 2)));
