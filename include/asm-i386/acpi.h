@@ -116,13 +116,17 @@ extern int acpi_lapic;
 extern int acpi_ioapic;
 extern int acpi_noirq;
 extern int acpi_strict;
+extern int acpi_disabled;
+extern int acpi_ht;
+static inline void disable_acpi(void) { acpi_disabled = 1; acpi_ht = 0; }
 
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
 
+extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
 #ifdef CONFIG_X86_IO_APIC
 extern int skip_ioapic_setup;
-extern int acpi_irq_to_vector(u32 irq);
+extern int acpi_irq_to_vector(u32 irq);	/* deprecated in favor of acpi_gsi_to_irq */
 
 static inline void disable_ioapic_setup(void)
 {

@@ -255,6 +255,7 @@ config X86_PM_TIMER
 	bool "Power Management Timer Support"
 	depends on X86 && ACPI
 	depends on ACPI_BOOT && EXPERIMENTAL
+	depends on !X86_64
 	default n
 	help
 	  The Power Management Timer is available on all ACPI-capable,
