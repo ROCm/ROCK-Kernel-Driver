@@ -314,9 +314,8 @@ static unsigned int rates[14] = {
 };
 
 static snd_pcm_hw_constraint_list_t hw_constraints_rates = {
-	count: 14,
-	list: rates,
-	mask: 0,
+	.count	= 14,
+	.list	= rates,
 };
 
 static int snd_cs4231_xrate(snd_pcm_runtime_t *runtime)
@@ -1418,44 +1417,42 @@ static int snd_cs4231_probe(cs4231_t *chip)
 
 static snd_pcm_hardware_t snd_cs4231_playback =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info			= (SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
+	.formats		= (SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
 				 SNDRV_PCM_FMTBIT_IMA_ADPCM |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S16_BE),
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5510,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(32*1024),
-	period_bytes_min:	4096,
-	period_bytes_max:	(32*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates			= SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
+	.rate_min		= 5510,
+	.rate_max		= 48000,
+	.channels_min		= 1,
+	.channels_max		= 2,
+	.buffer_bytes_max	= (32*1024),
+	.period_bytes_min	= 4096,
+	.period_bytes_max	= (32*1024),
+	.periods_min		= 1,
+	.periods_max		= 1024,
 };
 
 static snd_pcm_hardware_t snd_cs4231_capture =
 {
-	info:			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+	.info			= (SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
-	formats:		(SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
+	.formats		= (SNDRV_PCM_FMTBIT_MU_LAW | SNDRV_PCM_FMTBIT_A_LAW |
 				 SNDRV_PCM_FMTBIT_IMA_ADPCM |
 				 SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S16_BE),
-	rates:			SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
-	rate_min:		5510,
-	rate_max:		48000,
-	channels_min:		1,
-	channels_max:		2,
-	buffer_bytes_max:	(32*1024),
-	period_bytes_min:	4096,
-	period_bytes_max:	(32*1024),
-	periods_min:		1,
-	periods_max:		1024,
-	fifo_size:		0,
+	.rates			= SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000,
+	.rate_min		= 5510,
+	.rate_max		= 48000,
+	.channels_min		= 1,
+	.channels_max		= 2,
+	.buffer_bytes_max	= (32*1024),
+	.period_bytes_min	= 4096,
+	.period_bytes_max	= (32*1024),
+	.periods_min		= 1,
+	.periods_max		= 1024,
 };
 
 static int snd_cs4231_playback_open(snd_pcm_substream_t *substream)
@@ -1821,16 +1818,16 @@ int snd_cs4231_put_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 #define CS4231_CONTROLS (sizeof(snd_cs4231_controls)/sizeof(snd_kcontrol_new_t))
 
 #define CS4231_SINGLE(xname, xindex, reg, shift, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4231_info_single, \
-  get: snd_cs4231_get_single, put: snd_cs4231_put_single, \
-  private_value: reg | (shift << 8) | (mask << 16) | (invert << 24) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_cs4231_info_single, \
+  .get = snd_cs4231_get_single, .put = snd_cs4231_put_single, \
+  .private_value = reg | (shift << 8) | (mask << 16) | (invert << 24) }
 
 #define CS4231_DOUBLE(xname, xindex, left_reg, right_reg, shift_left, shift_right, mask, invert) \
-{ iface: SNDRV_CTL_ELEM_IFACE_MIXER, name: xname, index: xindex, \
-  info: snd_cs4231_info_double, \
-  get: snd_cs4231_get_double, put: snd_cs4231_put_double, \
-  private_value: left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
+{ .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex, \
+  .info = snd_cs4231_info_double, \
+  .get = snd_cs4231_get_double, .put = snd_cs4231_put_double, \
+  .private_value = left_reg | (right_reg << 8) | (shift_left << 16) | (shift_right << 19) | (mask << 24) | (invert << 22) }
 
 static snd_kcontrol_new_t snd_cs4231_controls[] = {
 CS4231_DOUBLE("PCM Playback Switch", 0, CS4231_LEFT_OUTPUT, CS4231_RIGHT_OUTPUT, 7, 7, 1, 1),
@@ -1847,11 +1844,11 @@ CS4231_SINGLE("Mono Output Playback Switch", 0, CS4231_MONO_CTRL, 6, 1, 1),
 CS4231_SINGLE("Mono Output Playback Bypass", 0, CS4231_MONO_CTRL, 5, 1, 0),
 CS4231_DOUBLE("Capture Volume", 0, CS4231_LEFT_INPUT, CS4231_RIGHT_INPUT, 0, 0, 15, 0),
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "Capture Source",
-	info: snd_cs4231_info_mux,
-	get: snd_cs4231_get_mux,
-	put: snd_cs4231_put_mux,
+	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name	= "Capture Source",
+	.info	= snd_cs4231_info_mux,
+	.get	= snd_cs4231_get_mux,
+	.put	= snd_cs4231_put_mux,
 },
 CS4231_DOUBLE("Mic Boost", 0, CS4231_LEFT_INPUT, CS4231_RIGHT_INPUT, 5, 5, 1, 0),
 CS4231_SINGLE("Loopback Capture Switch", 0, CS4231_LOOPBACK, 0, 1, 0),
