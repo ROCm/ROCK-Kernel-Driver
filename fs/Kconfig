@@ -1531,6 +1531,10 @@ config ROOT_NFS
 config LOCKD
 	tristate
 
+config STATD
+	bool "Use kernel statd implementation"
+	depends on LOCKD && EXPERIMENTAL
+
 config LOCKD_V4
 	bool
 	depends on NFSD_V3 || NFS_V3
