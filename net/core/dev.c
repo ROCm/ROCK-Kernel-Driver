@@ -2943,6 +2943,12 @@ int register_netdevice(struct net_device *dev)
 		dev->features &= ~NETIF_F_SG;
 	}
 
+	if (dev->features & NETIF_F_TSO) {
+		printk("%s: TCP Segmentation Offload (TSO) disabled by default\n",
+			dev->name);
+		dev->features &= ~NETIF_F_TSO;
+	}
+
 	/*
 	 *	nil rebuild_header routine,
 	 *	that should be never called and used as just bug trap.
