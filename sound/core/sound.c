@@ -159,7 +159,7 @@ static int snd_open(struct inode *inode, struct file *file)
 	return err;
 }
 
-struct file_operations snd_fops =
+static struct file_operations snd_fops =
 {
 	.owner =	THIS_MODULE,
 	.open =		snd_open
@@ -446,8 +446,6 @@ EXPORT_SYMBOL(snd_dma_pointer);
   /* info.c */
 #ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(snd_seq_root);
-EXPORT_SYMBOL(snd_create_proc_entry);
-EXPORT_SYMBOL(snd_remove_proc_entry);
 EXPORT_SYMBOL(snd_iprintf);
 EXPORT_SYMBOL(snd_info_get_line);
 EXPORT_SYMBOL(snd_info_get_str);

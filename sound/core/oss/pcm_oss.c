@@ -77,7 +77,7 @@ static inline void snd_leave_user(mm_segment_t fs)
 	set_fs(fs);
 }
 
-int snd_pcm_oss_plugin_clear(snd_pcm_substream_t *substream)
+static int snd_pcm_oss_plugin_clear(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	snd_pcm_plugin_t *plugin, *next;
@@ -92,7 +92,7 @@ int snd_pcm_oss_plugin_clear(snd_pcm_substream_t *substream)
 	return 0;
 }
 
-int snd_pcm_plugin_insert(snd_pcm_plugin_t *plugin)
+static int snd_pcm_plugin_insert(snd_pcm_plugin_t *plugin)
 {
 	snd_pcm_runtime_t *runtime = plugin->plug->runtime;
 	plugin->next = runtime->oss.plugin_first;

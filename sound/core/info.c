@@ -125,8 +125,8 @@ static inline void snd_info_entry_prepare(struct proc_dir_entry *de)
 	de->owner = THIS_MODULE;
 }
 
-void snd_remove_proc_entry(struct proc_dir_entry *parent,
-			   struct proc_dir_entry *de)
+static void snd_remove_proc_entry(struct proc_dir_entry *parent,
+				  struct proc_dir_entry *de)
 {
 	if (de)
 		remove_proc_entry(de->name, parent);
@@ -521,8 +521,8 @@ static struct file_operations snd_info_entry_operations =
  *
  * Returns the pointer of new instance or NULL on failure.
  */
-struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode,
-					     struct proc_dir_entry *parent)
+static struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode,
+						    struct proc_dir_entry *parent)
 {
 	struct proc_dir_entry *p;
 	p = create_proc_entry(name, mode, parent);

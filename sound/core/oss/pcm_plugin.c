@@ -651,8 +651,8 @@ snd_pcm_sframes_t snd_pcm_plug_client_channels_buf(snd_pcm_plug_t *plug,
 	return count;
 }
 
-int snd_pcm_plug_playback_channels_mask(snd_pcm_plug_t *plug,
-					bitset_t *client_vmask)
+static int snd_pcm_plug_playback_channels_mask(snd_pcm_plug_t *plug,
+					       bitset_t *client_vmask)
 {
 	snd_pcm_plugin_t *plugin = snd_pcm_plug_last(plug);
 	if (plugin == NULL) {
@@ -678,33 +678,6 @@ int snd_pcm_plug_playback_channels_mask(snd_pcm_plug_t *plug,
 			plugin = plugin->prev;
 		}
 		bitset_and(client_vmask, dstmask, plugin->src_format.channels);
-		return 0;
-	}
-}
-
-int snd_pcm_plug_capture_channels_mask(snd_pcm_plug_t *plug,
-				       bitset_t *client_vmask)
-{
-	snd_pcm_plugin_t *plugin = snd_pcm_plug_first(plug);
-	if (plugin == NULL) {
-		return 0;
-	} else {
-		int schannels = plugin->src_format.channels;
-		bitset_t bs[bitset_size(schannels)];
-		bitset_t *srcmask = bs;
-		bitset_t *dstmask;
-		int err;
-		bitset_one(srcmask, schannels);
-		while (1) {
-			err = plugin->dst_channels_mask(plugin, srcmask, &dstmask);
-			if (err < 0)
-				return err;
-			srcmask = dstmask;
-			if (plugin->next == NULL)
-				break;
-			plugin = plugin->next;
-		}
-		bitset_and(client_vmask, srcmask, plugin->dst_format.channels);
 		return 0;
 	}
 }

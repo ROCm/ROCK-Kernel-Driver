@@ -89,7 +89,7 @@ void snd_memory_done(void)
 	}
 }
 
-void *__snd_kmalloc(size_t size, int flags, void *caller)
+static void *__snd_kmalloc(size_t size, int flags, void *caller)
 {
 	unsigned long cpu_flags;
 	struct snd_alloc_track *t;

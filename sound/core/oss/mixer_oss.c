@@ -360,8 +360,8 @@ static int snd_mixer_oss_ioctl1(snd_mixer_oss_file_t *fmixer, unsigned int cmd, 
 }
 
 /* FIXME: need to unlock BKL to allow preemption */
-int snd_mixer_oss_ioctl(struct inode *inode, struct file *file,
-			unsigned int cmd, unsigned long arg)
+static int snd_mixer_oss_ioctl(struct inode *inode, struct file *file,
+			       unsigned int cmd, unsigned long arg)
 {
 	int err;
 	/* FIXME: need to unlock BKL to allow preemption */

@@ -353,9 +353,9 @@ static void route_to_channel(snd_pcm_plugin_t *plugin,
 	}
 }
 
-int route_src_channels_mask(snd_pcm_plugin_t *plugin,
-			  bitset_t *dst_vmask,
-			  bitset_t **src_vmask)
+static int route_src_channels_mask(snd_pcm_plugin_t *plugin,
+				   bitset_t *dst_vmask,
+				   bitset_t **src_vmask)
 {
 	route_t *data = (route_t *)plugin->extra_data;
 	int schannels = plugin->src_format.channels;
@@ -377,9 +377,9 @@ int route_src_channels_mask(snd_pcm_plugin_t *plugin,
 	return 0;
 }
 
-int route_dst_channels_mask(snd_pcm_plugin_t *plugin,
-			  bitset_t *src_vmask,
-			  bitset_t **dst_vmask)
+static int route_dst_channels_mask(snd_pcm_plugin_t *plugin,
+				   bitset_t *src_vmask,
+				   bitset_t **dst_vmask)
 {
 	route_t *data = (route_t *)plugin->extra_data;
 	int dchannels = plugin->dst_format.channels;

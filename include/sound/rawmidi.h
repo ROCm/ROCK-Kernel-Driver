@@ -152,13 +152,6 @@ int snd_rawmidi_new(snd_card_t * card, char *id, int device,
 		    snd_rawmidi_t ** rmidi);
 void snd_rawmidi_set_ops(snd_rawmidi_t * rmidi, int stream, snd_rawmidi_ops_t * ops);
 
-/* control functions */
-
-int snd_rawmidi_control_ioctl(snd_card_t * card,
-			      snd_ctl_file_t * control,
-			      unsigned int cmd,
-			      unsigned long arg);
-
 /* callbacks */
 
 void snd_rawmidi_receive_reset(snd_rawmidi_substream_t * substream);
