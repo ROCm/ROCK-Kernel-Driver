@@ -256,7 +256,6 @@ static int cache_nbs (void)
 	/* cache pci_devs of northbridges. */
 	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev)) != NULL) {
 		if (loop_dev->bus->number == 0 &&
-		    PCI_FUNC(loop_dev->devfn) == 3 &&
 		    PCI_SLOT(loop_dev->devfn) >= 24 &&
 		    PCI_SLOT(loop_dev->devfn) <= 31) {
 			hammers[i++] = loop_dev;
@@ -335,8 +334,7 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 	struct pci_dev *loop_dev = NULL;
 	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev)) != NULL) {
 		if (loop_dev->bus->number == 0 &&
-		    PCI_SLOT(loop_dev->devfn) == 24 &&
-		    PCI_FUNC(loop_dev->devfn) == 3) {
+		    PCI_SLOT(loop_dev->devfn) == 24) { 
 			/* For UP, we only care about the first GART. */
 			hammers[0] = loop_dev;
 			nr_garts = 1;
