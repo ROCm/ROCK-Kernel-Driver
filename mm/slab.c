@@ -504,8 +504,10 @@ static struct cache_names __initdata cache_names[] = {
 #undef CACHE
 };
 
-struct arraycache_init initarray_cache __initdata = { { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
-struct arraycache_init initarray_generic __initdata = { { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
+static struct arraycache_init initarray_cache __initdata =
+	{ { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
+static struct arraycache_init initarray_generic __initdata =
+	{ { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
 
 /* internal cache of cache description objs */
 static kmem_cache_t cache_cache = {
@@ -523,8 +525,7 @@ static kmem_cache_t cache_cache = {
 
 /* Guard access to the cache-chain. */
 static struct semaphore	cache_chain_sem;
-
-struct list_head cache_chain;
+static struct list_head cache_chain;
 
 /*
  * vm_enough_memory() looks at this to determine how many
@@ -539,7 +540,7 @@ EXPORT_SYMBOL(slab_reclaim_pages);
  * chicken and egg problem: delay the per-cpu array allocation
  * until the general caches are up.
  */
-enum {
+static enum {
 	NONE,
 	PARTIAL,
 	FULL
@@ -822,7 +823,7 @@ void __init kmem_cache_init(void)
 	 */
 }
 
-int __init cpucache_init(void)
+static int __init cpucache_init(void)
 {
 	int cpu;
 
