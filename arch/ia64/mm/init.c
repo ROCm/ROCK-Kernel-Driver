@@ -40,6 +40,7 @@
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 extern void ia64_tlb_init (void);
+extern void efi_get_pal_addr (void);
 
 unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 
@@ -296,7 +297,7 @@ ia64_mmu_init (void *my_cpu_data)
 {
 	unsigned long psr, pta, impl_va_bits;
 	extern void __devinit tlb_init (void);
-	int cpu;
+	struct cpuinfo_ia64 *cpuinfo;
 
 #ifdef CONFIG_DISABLE_VHPT
 #	define VHPT_ENABLE_BIT	0
@@ -362,19 +363,21 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_srlz_d();
 #endif
 
-	cpu = smp_processor_id();
+	/*
+	 * The MCA info structure was allocated earlier and a physical address pointer
+	 * saved in k3.  Move that pointer into the cpuinfo structure and save
+	 * the physical address of the cpuinfo structure in k3.
+	 */
+	cpuinfo = (struct cpuinfo_ia64 *)my_cpu_data;
+	cpuinfo->ia64_pa_mca_data = (__u64 *)ia64_get_kr(IA64_KR_PA_CPU_INFO);
 
-	/* mca handler uses cr.lid as key to pick the right entry */
-	ia64_mca_tlb_list[cpu].cr_lid = ia64_getreg(_IA64_REG_CR_LID);
+	cpuinfo->percpu_paddr = pte_val(mk_pte_phys(__pa(my_cpu_data), PAGE_KERNEL));
+	ia64_set_kr(IA64_KR_PA_CPU_INFO, __pa(my_cpu_data));
 
-	/* insert this percpu data information into our list for MCA recovery purposes */
-	ia64_mca_tlb_list[cpu].percpu_paddr = pte_val(mk_pte_phys(__pa(my_cpu_data), PAGE_KERNEL));
-	/* Also save per-cpu tlb flush recipe for use in physical mode mca handler */
-	ia64_mca_tlb_list[cpu].ptce_base = local_cpu_data->ptce_base;
-	ia64_mca_tlb_list[cpu].ptce_count[0] = local_cpu_data->ptce_count[0];
-	ia64_mca_tlb_list[cpu].ptce_count[1] = local_cpu_data->ptce_count[1];
-	ia64_mca_tlb_list[cpu].ptce_stride[0] = local_cpu_data->ptce_stride[0];
-	ia64_mca_tlb_list[cpu].ptce_stride[1] = local_cpu_data->ptce_stride[1];
+	/*
+	 * Set pal_base and pal_paddr in cpuinfo structure.
+	 */
+	efi_get_pal_addr();
 }
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP

@@ -3067,6 +3067,15 @@ int idle_cpu(int cpu)
 EXPORT_SYMBOL_GPL(idle_cpu);
 
 /**
+ * idle_task - return the idle task for a given cpu.
+ * @cpu: the processor in question.
+ */
+task_t *idle_task(int cpu)
+{
+	return cpu_rq(cpu)->idle;
+}
+
+/**
  * find_process_by_pid - find a process with a matching PID value.
  * @pid: the pid in question.
  */

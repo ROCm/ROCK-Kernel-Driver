@@ -37,12 +37,15 @@
  * go virtual and don't want to destroy the iip or ipsr.
  */
 #define MINSTATE_START_SAVE_MIN_PHYS								\
-(pKStk) movl sp=ia64_init_stack+IA64_STK_OFFSET-IA64_PT_REGS_SIZE;				\
+(pKStk) mov r3=ar.k3;;										\
+(pKStk) addl r3=IA64_CPUINFO_PA_MCA_INFO,r3;;							\
+(pKStk) ld8 r3 = [r3];;										\
+(pKStk) addl r3=IA64_INIT_STACK,r3;;								\
+(pKStk) addl sp=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r3;						\
 (pUStk)	mov ar.rsc=0;		/* set enforced lazy mode, pl 0, little-endian, loadrs=0 */	\
 (pUStk)	addl r22=IA64_RBS_OFFSET,r1;		/* compute base of register backing store */	\
 	;;											\
 (pUStk)	mov r24=ar.rnat;									\
-(pKStk) tpa r1=sp;				/* compute physical addr of sp	*/		\
 (pUStk)	addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1;	/* compute base of memory stack */	\
 (pUStk)	mov r23=ar.bspstore;				/* save ar.bspstore */			\
 (pUStk)	dep r22=-1,r22,61,3;			/* compute kernel virtual addr of RBS */	\

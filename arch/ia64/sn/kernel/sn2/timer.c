@@ -15,7 +15,6 @@
 #include <asm/hw_irq.h>
 #include <asm/system.h>
 
-#include "shub.h"
 #include <asm/sn/leds.h>
 #include <asm/sn/shub_mmr.h>
 #include <asm/sn/clksupport.h>
@@ -26,12 +25,12 @@ static struct time_interpolator sn2_interpolator = {
 	.drift = -1,
 	.shift = 10,
 	.mask = (1LL << 55) - 1,
-	.source = TIME_SOURCE_MMIO64,
-	.addr = RTC_COUNTER_ADDR
+	.source = TIME_SOURCE_MMIO64
 };
 
 void __init sn_timer_init(void)
 {
 	sn2_interpolator.frequency = sn_rtc_cycles_per_second;
+	sn2_interpolator.addr = RTC_COUNTER_ADDR;
 	register_time_interpolator(&sn2_interpolator);
 }

@@ -32,9 +32,10 @@
 #define  SN_SAL_NO_FAULT_ZONE_VIRTUAL		   0x02000010
 #define  SN_SAL_NO_FAULT_ZONE_PHYSICAL		   0x02000011
 #define  SN_SAL_PRINT_ERROR			   0x02000012
-#define  SN_SAL_GET_SAPIC_INFO                     0x02009999	//ZZZZ fix
 #define  SN_SAL_SET_ERROR_HANDLING_FEATURES	   0x0200001a	// reentrant
 #define  SN_SAL_GET_FIT_COMPT			   0x0200001b	// reentrant
+#define  SN_SAL_GET_HUB_INFO                       0x0200001c
+#define  SN_SAL_GET_SAPIC_INFO                     0x0200001d
 #define  SN_SAL_CONSOLE_PUTC                       0x02000021
 #define  SN_SAL_CONSOLE_GETC                       0x02000022
 #define  SN_SAL_CONSOLE_PUTS                       0x02000023
@@ -847,6 +848,14 @@ ia64_sn_irtr_init(nasid_t nasid, void *buf, int len)
 
 /*
  * Returns the nasid, subnode & slice corresponding to a SAPIC ID
+ *
+ *  In:
+ *	arg0 - SN_SAL_GET_SAPIC_INFO
+ *	arg1 - sapicid (lid >> 16) 
+ *  Out:
+ *	v0 - nasid
+ *	v1 - subnode
+ *	v2 - slice
  */
 static inline u64
 ia64_sn_get_sapic_info(int sapicid, int *nasid, int *subnode, int *slice)
@@ -859,7 +868,7 @@ ia64_sn_get_sapic_info(int sapicid, int *nasid, int *subnode, int *slice)
 	ret_stuff.v2 = 0;
 	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_SAPIC_INFO, sapicid, 0, 0, 0, 0, 0, 0);
 
-/***** BEGIN HACK - temp til new proms available ********/
+/***** BEGIN HACK - temp til old proms no longer supported ********/
 	if (ret_stuff.status == SALRET_NOT_IMPLEMENTED) {
 		if (nasid) *nasid = sapicid & 0xfff;
 		if (subnode) *subnode = (sapicid >> 13) & 1;
@@ -876,6 +885,46 @@ ia64_sn_get_sapic_info(int sapicid, int *nasid, int *subnode, int *slice)
 	if (slice) *slice = (int) ret_stuff.v2;
 	return 0;
 }
+ 
+/*
+ * Returns information about the HUB/SHUB.
+ *  In:
+ *	arg0 - SN_SAL_GET_HUB_INFO
+ * 	arg1 - 0 (other values reserved for future use)
+ *  Out:
+ *	v0 - shub type (0=shub1, 1=shub2)
+ *	v1 - masid mask (ex., 0x7ff for 11 bit nasid)
+ *	v2 - bit position of low nasid bit
+ */
+static inline u64
+ia64_sn_get_hub_info(int fc, u64 *arg1, u64 *arg2, u64 *arg3)
+{
+	struct ia64_sal_retval ret_stuff;
+
+	ret_stuff.status = 0;
+	ret_stuff.v0 = 0;
+	ret_stuff.v1 = 0;
+	ret_stuff.v2 = 0;
+	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_HUB_INFO, fc, 0, 0, 0, 0, 0, 0);
+
+/***** BEGIN HACK - temp til old proms no longer supported ********/
+	if (ret_stuff.status == SALRET_NOT_IMPLEMENTED) {
+		if (arg1) *arg1 = 0;
+		if (arg2) *arg2 = 0x7ff;
+		if (arg3) *arg3 = 38;
+		return 0;
+	}
+/***** END HACK *******/
+
+	if (ret_stuff.status < 0)
+		return ret_stuff.status;
+
+	if (arg1) *arg1 = ret_stuff.v0;
+	if (arg2) *arg2 = ret_stuff.v1;
+	if (arg3) *arg3 = ret_stuff.v2;
+	return 0;
+}
+ 
 /*
  * This is the access point to the Altix PROM hardware performance
  * and status monitoring interface. For info on using this, see
