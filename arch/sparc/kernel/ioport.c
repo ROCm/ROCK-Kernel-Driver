@@ -351,7 +351,7 @@ void sbus_free_consistent(struct sbus_dev *sdev, long n, void *p, u32 ba)
  * CPU view of this memory may be inconsistent with
  * a device view and explicit flushing is necessary.
  */
-u32 sbus_map_single(struct sbus_dev *sdev, void *va, long len, int direction)
+dma_addr_t sbus_map_single(struct sbus_dev *sdev, void *va, size_t len, int direction)
 {
 #if 0 /* This is the version that abuses consistent space */
 	unsigned long len_total = (len + PAGE_SIZE-1) & PAGE_MASK;
@@ -398,7 +398,7 @@ u32 sbus_map_single(struct sbus_dev *sdev, void *va, long len, int direction)
 #endif
 }
 
-void sbus_unmap_single(struct sbus_dev *sdev, u32 ba, long n, int direction)
+void sbus_unmap_single(struct sbus_dev *sdev, dma_addr_t ba, size_t n, int direction)
 {
 #if 0 /* This is the version that abuses consistent space */
 	struct resource *res;
@@ -445,7 +445,7 @@ void sbus_unmap_sg(struct sbus_dev *sdev, struct scatterlist *sg, int n, int dir
 
 /*
  */
-void sbus_dma_sync_single(struct sbus_dev *sdev, u32 ba, long size, int direction)
+void sbus_dma_sync_single(struct sbus_dev *sdev, dma_addr_t ba, size_t size, int direction)
 {
 #if 0
 	unsigned long va;
