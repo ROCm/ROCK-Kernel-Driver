@@ -1235,7 +1235,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	DECLARE_BITMAP(used_mask, MAX_NUMNODES);
 
 	/* initialize zonelists */
-	for (i = 0; i < MAX_NR_ZONES; i++) {
+	for (i = 0; i < GFP_ZONETYPES; i++) {
 		zonelist = pgdat->node_zonelists + i;
 		memset(zonelist, 0, sizeof(*zonelist));
 		zonelist->zones[0] = NULL;
@@ -1257,7 +1257,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 			node_load[node] += load;
 		prev_node = node;
 		load--;
-		for (i = 0; i < MAX_NR_ZONES; i++) {
+		for (i = 0; i < GFP_ZONETYPES; i++) {
 			zonelist = pgdat->node_zonelists + i;
 			for (j = 0; zonelist->zones[j] != NULL; j++);
 
@@ -1280,7 +1280,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	int i, j, k, node, local_node;
 
 	local_node = pgdat->node_id;
-	for (i = 0; i < MAX_NR_ZONES; i++) {
+	for (i = 0; i < GFP_ZONETYPES; i++) {
 		struct zonelist *zonelist;
 
 		zonelist = pgdat->node_zonelists + i;
@@ -1840,7 +1840,7 @@ static void setup_per_zone_protection(void)
 		 * For each of the different allocation types:
 		 * GFP_DMA -> GFP_KERNEL -> GFP_HIGHMEM
 		 */
-		for (i = 0; i < MAX_NR_ZONES; i++) {
+		for (i = 0; i < GFP_ZONETYPES; i++) {
 			/*
 			 * For each of the zones:
 			 * ZONE_HIGHMEM -> ZONE_NORMAL -> ZONE_DMA
