@@ -271,10 +271,9 @@ extern void ioctime_init(void);
 static irqreturn_t
 clps7500_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	do_timer(regs);
-	do_set_rtc();
-	do_profile(regs);
+	timer_tick(regs);
 
+	/* Why not using do_leds interface?? */
 	{
 		/* Twinkle the lights. */
 		static int count, state = 0xff00;

@@ -52,15 +52,11 @@ EXPORT_SYMBOL(rtc_lock);
 /* change this if you have some constant time drift */
 #define USECS_PER_JIFFY	(1000000/HZ)
 
-static int dummy_set_rtc(void)
-{
-	return 0;
-}
 
 /*
  * hook for setting the RTC's idea of the current time.
  */
-int (*set_rtc)(void) = dummy_set_rtc;
+int (*set_rtc)(void);
 
 static unsigned long dummy_gettimeoffset(void)
 {
@@ -86,7 +82,7 @@ unsigned long long __attribute__((weak)) sched_clock(void)
 /*
  * Handle kernel profile stuff...
  */
-void do_profile(struct pt_regs *regs)
+static inline void do_profile(struct pt_regs *regs)
 {
 
 	profile_hook(regs);
@@ -116,7 +112,7 @@ static unsigned long next_rtc_update;
  * called as close as possible to 500 ms before the new second
  * starts.
  */
-void do_set_rtc(void)
+static inline void do_set_rtc(void)
 {
 	if (time_status & STA_UNSYNC || set_rtc == NULL)
 		return;
@@ -240,7 +236,8 @@ device_initcall(leds_init);
 EXPORT_SYMBOL(leds_event);
 #endif
 
-void do_leds(void)
+#ifdef CONFIG_LEDS_TIMER
+static inline void do_leds(void)
 {
 	static unsigned int count = 50;
 
@@ -249,6 +246,9 @@ void do_leds(void)
 		leds_event(led_timer);
 	}
 }
+#else
+#define	do_leds()
+#endif
 
 void do_gettimeofday(struct timeval *tv)
 {
@@ -314,6 +314,14 @@ int do_settimeofday(struct timespec *tv)
 }
 
 EXPORT_SYMBOL(do_settimeofday);
+
+void timer_tick(struct pt_regs *regs)
+{
+	do_profile(regs);
+	do_leds();
+	do_set_rtc();
+	do_timer(regs);
+}
 
 void (*init_arch_time)(void);
 

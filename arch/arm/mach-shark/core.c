@@ -35,9 +35,7 @@ static void __init shark_map_io(void)
 static irqreturn_t
 shark_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	do_leds();
-	do_timer(regs);
-	do_profile(regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }

@@ -41,10 +41,7 @@ static irqreturn_t
 lh7a40x_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	TIMER_EOI = 0;
-	do_profile (regs);
-	do_leds();
-	do_set_rtc();
-	do_timer (regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }

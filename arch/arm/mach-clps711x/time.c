@@ -49,9 +49,7 @@ static unsigned long clps711x_gettimeoffset(void)
 static irqreturn_t
 p720t_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	do_leds();
-	do_timer(regs);
-	do_profile(regs);
+	timer_tick(regs);
 	return IRQ_HANDLED;
 }
 

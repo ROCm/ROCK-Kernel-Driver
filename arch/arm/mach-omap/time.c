@@ -183,9 +183,7 @@ omap_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	ilatency = MPUTICKS_PER_SEC / 100 - read_mputimer2();
 	systimer_mark = now - ilatency;
 
-	do_leds();
-	do_timer(regs);
-	do_profile(regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }

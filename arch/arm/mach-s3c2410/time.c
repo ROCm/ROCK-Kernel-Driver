@@ -74,12 +74,7 @@ static unsigned long s3c2410_gettimeoffset (void)
 static irqreturn_t
 s3c2410_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	do_leds();
-	do_timer(regs);
-
-	do_set_rtc();
-	//s3c2410_rtc_check();
-	do_profile(regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }

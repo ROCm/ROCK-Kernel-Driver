@@ -12,13 +12,9 @@
 
 extern void (*init_arch_time)(void);
 
-void do_set_rtc(void);
-
-void do_profile(struct pt_regs *);
-
-void do_leds(void);
-
 extern int (*set_rtc)(void);
 extern unsigned long(*gettimeoffset)(void);
+
+void timer_tick(struct pt_regs *);
 
 #endif

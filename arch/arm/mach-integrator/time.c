@@ -139,9 +139,7 @@ integrator_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	// ...clear the interrupt
 	timer1->TimerClear = 1;
 
-	do_leds();
-	do_timer(regs);
-	do_profile(regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }

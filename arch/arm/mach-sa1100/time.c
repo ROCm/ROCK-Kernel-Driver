@@ -78,14 +78,10 @@ sa1100_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned int next_match;
 
 	do {
-		do_leds();
-		do_timer(regs);
+		timer_tick(regs);
 		OSSR = OSSR_M0;  /* Clear match on timer 0 */
 		next_match = (OSMR0 += LATCH);
-		do_set_rtc();
 	} while ((signed long)(next_match - OSCR) <= 0);
-
-	do_profile(regs);
 
 	return IRQ_HANDLED;
 }

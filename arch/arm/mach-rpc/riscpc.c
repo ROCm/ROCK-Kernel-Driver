@@ -88,9 +88,7 @@ void __init rpc_map_io(void)
 static irqreturn_t
 rpc_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	do_timer(regs);
-	do_set_rtc();
-	do_profile(regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }

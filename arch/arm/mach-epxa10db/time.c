@@ -47,9 +47,7 @@ epxa10db_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	// ...clear the interrupt
 	*TIMER0_CR(IO_ADDRESS(EXC_TIMER00_BASE))|=TIMER0_CR_CI_MSK;
 
-	do_leds();
-	do_timer(regs);
-	do_profile(regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }

@@ -74,8 +74,6 @@ pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int next_match;
 
-	do_profile(regs);
-
 	/* Loop until we get ahead of the free running timer.
 	 * This ensures an exact clock tick count and time accuracy.
 	 * IRQs are disabled inside the loop to ensure coherence between
@@ -92,9 +90,7 @@ pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * exactly one tick period which should be a pretty rare event.
 	 */
 	do {
-		do_leds();
-		do_set_rtc();
-		do_timer(regs);
+		timer_tick(regs);
 		OSSR = OSSR_M0;  /* Clear match on timer 0 */
 		next_match = (OSMR0 += LATCH);
 	} while( (signed long)(next_match - OSCR) <= 8 );

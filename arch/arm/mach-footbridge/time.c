@@ -83,12 +83,7 @@ static unsigned long isa_gettimeoffset(void)
 static irqreturn_t
 isa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	if (machine_is_netwinder())
-		do_leds();
-
-	do_timer(regs);
-	do_set_rtc();
-	do_profile(regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }
@@ -206,11 +201,7 @@ timer1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	*CSR_TIMER1_CLR = 0;
 
-	/* Do the LEDs things */
-	do_leds();
-	do_timer(regs);
-	do_set_rtc();
-	do_profile(regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }

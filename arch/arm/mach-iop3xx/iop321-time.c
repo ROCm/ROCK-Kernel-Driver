@@ -63,7 +63,7 @@ iop321_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	asm volatile("mcr p6, 0, %0, c6, c1, 0" : : "r" (tisr));
 
-	do_timer(regs);
+	timer_tick(regs);
 
 	return IRQ_HANDLED;
 }
