@@ -72,9 +72,9 @@ static void q40_mem_console_write(struct console *co, const char *b,
 extern int ql_ticks;
 
 static struct console q40_console_driver = {
-	name:		"debug",
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"debug",
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 

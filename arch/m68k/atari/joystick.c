@@ -120,11 +120,11 @@ static unsigned int joystick_poll(struct file *file, poll_table *wait)
 }
 
 struct file_operations atari_joystick_fops = {
-	read:		read_joystick,
-	write:		write_joystick,
-	poll:		joystick_poll,
-	open:		open_joystick,
-	release:	release_joystick,
+	.read =		read_joystick,
+	.write =	write_joystick,
+	.poll =		joystick_poll,
+	.open =		open_joystick,
+	.release =	release_joystick,
 };
 
 int __init atari_joystick_init(void)

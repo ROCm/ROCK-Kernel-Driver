@@ -334,12 +334,12 @@ static void __init hades_conf_device(unsigned char bus, unsigned char device_fn)
 }
 
 static struct pci_ops hades_pci_ops = {
-	read_byte:	hades_read_config_byte
-	read_word:	hades_read_config_word
-	read_dword:	hades_read_config_dword
-	write_byte:	hades_write_config_byte
-	write_word:	hades_write_config_word
-	write_dword:	hades_write_config_dword
+	.read_byte =	hades_read_config_byte,
+	.read_word =	hades_read_config_word,
+	.read_dword =	hades_read_config_dword,
+	.write_byte =	hades_write_config_byte,
+	.write_word =	hades_write_config_word,
+	.write_dword =	hades_write_config_dword
 };
 
 /*
