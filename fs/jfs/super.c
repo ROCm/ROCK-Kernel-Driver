@@ -318,9 +318,14 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	if (!sbi->nls_tab)
 		sbi->nls_tab = load_nls_default();
 
+	/* logical blocks are represented by 40 bits in pxd_t, etc. */
 	sb->s_maxbytes = ((u64) sb->s_blocksize) << 40;
 #if BITS_PER_LONG == 32
-	sb->s_maxbytes = min((u64)PAGE_CACHE_SIZE << 32, sb->s_maxbytes);
+	/*
+	 * Page cache is indexed by long.
+	 * I would use MAX_LFS_FILESIZE, but it's only half as big
+	 */
+	sb->s_maxbytes = min(((u64)PAGE_CACHE_SIZE << 32) - 1, sb->s_maxbytes);
 #endif
 
 	return 0;
