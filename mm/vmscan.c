@@ -209,6 +209,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 	int pgactivate = 0;
 	int ret = 0;
 
+	cond_resched();
+
 	pagevec_init(&freed_pvec, 1);
 	while (!list_empty(page_list)) {
 		struct page *page;
