@@ -188,6 +188,14 @@ nfsd(struct svc_rqst *rqstp)
 	list_add(&me.list, &nfsd_list);
 
 	unlock_kernel();
+
+	/*
+	 * We want less throttling in balance_dirty_pages() so that nfs to
+	 * localhost doesn't cause nfsd to lock up due to all the client's
+	 * dirty pages.
+	 */
+	current->flags |= PF_LESS_THROTTLE;
+
 	/*
 	 * The main request loop
 	 */
