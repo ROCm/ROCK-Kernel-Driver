@@ -141,7 +141,7 @@ void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf)
 	}
 
 	if (is_addr && (tf->flags & ATA_TFLAG_LBA48)) {
-		outb(tf->hob_feature, ioaddr->error_addr);
+		outb(tf->hob_feature, ioaddr->feature_addr);
 		outb(tf->hob_nsect, ioaddr->nsect_addr);
 		outb(tf->hob_lbal, ioaddr->lbal_addr);
 		outb(tf->hob_lbam, ioaddr->lbam_addr);
@@ -155,7 +155,7 @@ void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf)
 	}
 
 	if (is_addr) {
-		outb(tf->feature, ioaddr->error_addr);
+		outb(tf->feature, ioaddr->feature_addr);
 		outb(tf->nsect, ioaddr->nsect_addr);
 		outb(tf->lbal, ioaddr->lbal_addr);
 		outb(tf->lbam, ioaddr->lbam_addr);
@@ -199,7 +199,7 @@ void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 	}
 
 	if (is_addr && (tf->flags & ATA_TFLAG_LBA48)) {
-		writeb(tf->hob_feature, (void *) ioaddr->error_addr);
+		writeb(tf->hob_feature, (void *) ioaddr->feature_addr);
 		writeb(tf->hob_nsect, (void *) ioaddr->nsect_addr);
 		writeb(tf->hob_lbal, (void *) ioaddr->lbal_addr);
 		writeb(tf->hob_lbam, (void *) ioaddr->lbam_addr);
@@ -213,7 +213,7 @@ void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 	}
 
 	if (is_addr) {
-		writeb(tf->feature, (void *) ioaddr->error_addr);
+		writeb(tf->feature, (void *) ioaddr->feature_addr);
 		writeb(tf->nsect, (void *) ioaddr->nsect_addr);
 		writeb(tf->lbal, (void *) ioaddr->lbal_addr);
 		writeb(tf->lbam, (void *) ioaddr->lbam_addr);
@@ -250,7 +250,7 @@ void ata_exec_command_pio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	DPRINTK("ata%u: cmd 0x%X\n", ap->id, tf->command);
 
-       	outb(tf->command, ap->ioaddr.cmdstat_addr);
+       	outb(tf->command, ap->ioaddr.command_addr);
 	ata_pause(ap);
 }
 
@@ -271,7 +271,7 @@ void ata_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	DPRINTK("ata%u: cmd 0x%X\n", ap->id, tf->command);
 
-       	writeb(tf->command, (void *) ap->ioaddr.cmdstat_addr);
+       	writeb(tf->command, (void *) ap->ioaddr.command_addr);
 	ata_pause(ap);
 }
 
@@ -417,7 +417,7 @@ void ata_tf_read_mmio(struct ata_port *ap, struct ata_taskfile *tf)
  */
 u8 ata_check_status_pio(struct ata_port *ap)
 {
-	return inb(ap->ioaddr.cmdstat_addr);
+	return inb(ap->ioaddr.status_addr);
 }
 
 /**
@@ -433,7 +433,7 @@ u8 ata_check_status_pio(struct ata_port *ap)
  */
 u8 ata_check_status_mmio(struct ata_port *ap)
 {
-       	return readb((void *) ap->ioaddr.cmdstat_addr);
+       	return readb((void *) ap->ioaddr.status_addr);
 }
 
 static const char * udma_str[] = {
@@ -3026,12 +3026,14 @@ void ata_std_ports(struct ata_ioports *ioaddr)
 {
 	ioaddr->data_addr = ioaddr->cmd_addr + ATA_REG_DATA;
 	ioaddr->error_addr = ioaddr->cmd_addr + ATA_REG_ERR;
+	ioaddr->feature_addr = ioaddr->cmd_addr + ATA_REG_FEATURE;
 	ioaddr->nsect_addr = ioaddr->cmd_addr + ATA_REG_NSECT;
 	ioaddr->lbal_addr = ioaddr->cmd_addr + ATA_REG_LBAL;
 	ioaddr->lbam_addr = ioaddr->cmd_addr + ATA_REG_LBAM;
 	ioaddr->lbah_addr = ioaddr->cmd_addr + ATA_REG_LBAH;
 	ioaddr->device_addr = ioaddr->cmd_addr + ATA_REG_DEVICE;
-	ioaddr->cmdstat_addr = ioaddr->cmd_addr + ATA_REG_CMD;
+	ioaddr->status_addr = ioaddr->cmd_addr + ATA_REG_STATUS;
+	ioaddr->command_addr = ioaddr->cmd_addr + ATA_REG_CMD;
 }
 
 /**
@@ -3153,12 +3155,14 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 
 	if (legacy_mode) {
 		probe_ent->port[0].cmd_addr = 0x1f0;
+		probe_ent->port[0].altstatus_addr =
 		probe_ent->port[0].ctl_addr = 0x3f6;
 		probe_ent->n_ports = 1;
 		probe_ent->irq = 14;
 		ata_std_ports(&probe_ent->port[0]);
 
 		probe_ent2->port[0].cmd_addr = 0x170;
+		probe_ent2->port[0].altstatus_addr =
 		probe_ent2->port[0].ctl_addr = 0x376;
 		probe_ent2->port[0].bmdma_addr = pci_resource_start(pdev, 4)+8;
 		probe_ent2->n_ports = 1;
@@ -3173,11 +3177,13 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 	} else {
 		probe_ent->port[0].cmd_addr = pci_resource_start(pdev, 0);
 		ata_std_ports(&probe_ent->port[0]);
+		probe_ent->port[0].altstatus_addr =
 		probe_ent->port[0].ctl_addr =
 			pci_resource_start(pdev, 1) | ATA_PCI_CTL_OFS;
 
 		probe_ent->port[1].cmd_addr = pci_resource_start(pdev, 2);
 		ata_std_ports(&probe_ent->port[1]);
+		probe_ent->port[1].altstatus_addr =
 		probe_ent->port[1].ctl_addr =
 			pci_resource_start(pdev, 3) | ATA_PCI_CTL_OFS;
 		probe_ent->port[1].bmdma_addr = pci_resource_start(pdev, 4) + 8;

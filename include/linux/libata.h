@@ -183,12 +183,15 @@ struct ata_ioports {
 	unsigned long		cmd_addr;
 	unsigned long		data_addr;
 	unsigned long		error_addr;
+	unsigned long		feature_addr;
 	unsigned long		nsect_addr;
 	unsigned long		lbal_addr;
 	unsigned long		lbam_addr;
 	unsigned long		lbah_addr;
 	unsigned long		device_addr;
-	unsigned long		cmdstat_addr;
+	unsigned long		status_addr;
+	unsigned long		command_addr;
+	unsigned long		altstatus_addr;
 	unsigned long		ctl_addr;
 	unsigned long		bmdma_addr;
 	unsigned long		scr_addr;
@@ -465,8 +468,8 @@ static inline u8 ata_chk_status(struct ata_port *ap)
 static inline u8 ata_altstatus(struct ata_port *ap)
 {
 	if (ap->flags & ATA_FLAG_MMIO)
-		return readb(ap->ioaddr.ctl_addr);
-	return inb(ap->ioaddr.ctl_addr);
+		return readb(ap->ioaddr.altstatus_addr);
+	return inb(ap->ioaddr.altstatus_addr);
 }
 
 static inline void ata_pause(struct ata_port *ap)
@@ -494,7 +497,7 @@ static inline u8 ata_wait_idle(struct ata_port *ap)
 	u8 status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
 
 	if (status & (ATA_BUSY | ATA_DRQ)) {
-		unsigned long l = ap->ioaddr.cmdstat_addr;
+		unsigned long l = ap->ioaddr.status_addr;
 		printk(KERN_WARNING
 		       "ATA: abnormal status 0x%X on port 0x%lX\n",
 		       status, l);
