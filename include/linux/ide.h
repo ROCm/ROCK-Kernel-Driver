@@ -766,8 +766,7 @@ typedef struct ide_drive_s {
 	unsigned int	failures;	/* current failure count */
 	unsigned int	max_failures;	/* maximum allowed failure count */
 
-	u32		capacity;	/* total number of sectors */
-	u64		capacity48;	/* total number of sectors */
+	u64		capacity64;	/* total number of sectors */
 
 	int		last_lun;	/* last logical unit */
 	int		forced_lun;	/* if hdxlun was given at boot */
