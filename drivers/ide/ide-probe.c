@@ -745,6 +745,18 @@ static void probe_hwif(ide_hwif_t *hwif)
 		ide_drive_t *drive = &hwif->drives[unit];
 		drive->dn = (hwif->channel ? 2 : 0) + unit;
 		(void) probe_for_drive(drive);
+		if (drive->present && hwif->present && unit == 1) {
+			if (strcmp(hwif->drives[0].id->model, drive->id->model) == 0 &&
+			    /* Don't do this for noprobe or non ATA */
+			    strcmp(drive->id->model, "UNKNOWN") &&
+			    /* And beware of confused Maxtor drives that go "M0000000000"
+			      "The SN# is garbage in the ID block..." [Eric] */
+			    strncmp(drive->id->serial_no, "M0000000000000000000", 20) &&
+			    strncmp(hwif->drives[0].id->serial_no, drive->id->serial_no, 20) == 0) {
+				printk(KERN_WARNING "ide-probe: ignoring undecoded slave\n");
+				drive->present = 0;
+			}
+		}
 		if (drive->present && !hwif->present) {
 			hwif->present = 1;
 			if (hwif->chipset != ide_4drives ||
