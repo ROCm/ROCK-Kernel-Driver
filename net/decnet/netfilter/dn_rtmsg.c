@@ -55,7 +55,7 @@ static struct sk_buff *dnrmg_build_message(struct sk_buff *rt_skb, int *errp)
 
 nlmsg_failure:
 	if (skb)
-		kfree(skb);
+		kfree_skb(skb);
 	*errp = -ENOMEM;
 	if (net_ratelimit())
 		printk(KERN_ERR "dn_rtmsg: error creating netlink message\n");
