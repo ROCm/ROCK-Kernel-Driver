@@ -43,14 +43,10 @@ static int __xfrm4_bundle_ok(struct xfrm_dst *xdst, struct flowi *fl)
 }
 
 static struct dst_entry *
-__xfrm4_find_bundle(struct flowi *fl, struct rtable *rt, struct xfrm_policy *policy)
+__xfrm4_find_bundle(struct flowi *fl, struct xfrm_policy *policy)
 {
 	struct dst_entry *dst;
 
-	if (!fl->fl4_src)
-		fl->fl4_src = rt->rt_src;
-	if (!fl->fl4_dst)
-		fl->fl4_dst = rt->rt_dst;
 	read_lock_bh(&policy->lock);
 	for (dst = policy->bundles; dst; dst = dst->next) {
 		struct xfrm_dst *xdst = (struct xfrm_dst*)dst;
