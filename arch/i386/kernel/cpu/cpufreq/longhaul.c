@@ -40,7 +40,7 @@
 #define dprintk(msg...) do { } while(0);
 #endif
 
-static int numscales=16, numvscales;
+static unsigned int numscales=16, numvscales;
 static int minvid, maxvid;
 static int can_scale_voltage;
 static int can_scale_fsb;
@@ -51,7 +51,7 @@ static int vrmrev;
 static int prefer_slow_fsb;
 static int dont_scale_voltage;
 static int dont_scale_fsb;
-static int current_fsb;
+static unsigned int current_fsb;
 
 #define __hlt()     __asm__ __volatile__("hlt": : :"memory")
 
@@ -258,7 +258,7 @@ static int __initdata mobilevrmscales[32] = {
 static int clock_ratio[32];
 static int eblcr_table[32];
 static int voltage_table[32];
-static int highest_speed, lowest_speed; /* kHz */
+static unsigned int highest_speed, lowest_speed; /* kHz */
 static int longhaul; /* version. */
 static struct cpufreq_frequency_table *longhaul_table;
 
