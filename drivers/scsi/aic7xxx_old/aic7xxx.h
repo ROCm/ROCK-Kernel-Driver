@@ -46,7 +46,9 @@
 	eh_host_reset_handler: NULL,				\
 	abort: aic7xxx_abort,					\
 	reset: aic7xxx_reset,					\
-	slave_attach: NULL,					\
+	select_queue_depths: NULL,				\
+	slave_attach: aic7xxx_slave_attach,			\
+	slave_detach: aic7xxx_slave_detach,			\
 	bios_param: aic7xxx_biosparam,				\
 	can_queue: 255,		/* max simultaneous cmds      */\
 	this_id: -1,		/* scsi id of host adapter    */\
@@ -64,6 +66,8 @@ extern int aic7xxx_command(Scsi_Cmnd *);
 extern int aic7xxx_reset(Scsi_Cmnd *, unsigned int);
 extern int aic7xxx_abort(Scsi_Cmnd *);
 extern int aic7xxx_release(struct Scsi_Host *);
+extern int aic7xxx_slave_attach(Scsi_Device *);
+extern void aic7xxx_slave_detach(Scsi_Device *);
 
 extern const char *aic7xxx_info(struct Scsi_Host *);
 

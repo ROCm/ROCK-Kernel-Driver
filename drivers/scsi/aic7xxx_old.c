@@ -976,7 +976,7 @@ struct aic7xxx_host {
 #define  DEVICE_DTR_SCANNED             0x40
   volatile unsigned char   dev_flags[MAX_TARGETS];
   volatile unsigned char   dev_active_cmds[MAX_TARGETS];
-  volatile unsigned char   dev_temp_queue_depth[MAX_TARGETS];
+  volatile unsigned short  dev_temp_queue_depth[MAX_TARGETS];
   unsigned char            dev_commands_sent[MAX_TARGETS];
 
   unsigned int             dev_timer_active; /* Which devs have a timer set */
@@ -988,7 +988,9 @@ struct aic7xxx_host {
 
   unsigned char            dev_last_queue_full[MAX_TARGETS];
   unsigned char            dev_last_queue_full_count[MAX_TARGETS];
-  unsigned char            dev_max_queue_depth[MAX_TARGETS];
+  unsigned char            dev_lun_queue_depth[MAX_TARGETS];
+  unsigned short           dev_scbs_needed[MAX_TARGETS];
+  unsigned short           dev_max_queue_depth[MAX_TARGETS];
 
   volatile scb_queue_type  delayed_scbs[MAX_TARGETS];
 
@@ -1035,6 +1037,7 @@ struct aic7xxx_host {
   ahc_chip                 chip;             /* chip type */
   ahc_bugs                 bugs;
   dma_addr_t		   fifo_dma;	     /* DMA handle for fifo arrays */
+  Scsi_Device		  *Scsi_Dev[MAX_TARGETS][MAX_LUNS];
 
   /*
    * Statistics Kept:
@@ -2818,94 +2821,6 @@ aic7xxx_done(struct aic7xxx_host *p, struct aic7xxx_scb *scb)
   if (scb->flags & (SCB_RESET|SCB_ABORT))
   {
     cmd->result |= (DID_RESET << 16);
-  }
-
-  if (!(p->dev_flags[tindex] & DEVICE_PRESENT))
-  {
-    if ( (cmd->cmnd[0] == INQUIRY) && (cmd->result == DID_OK) )
-    {
-    
-      p->dev_flags[tindex] |= DEVICE_PRESENT;
-#define WIDE_INQUIRY_BITS 0x60
-#define SYNC_INQUIRY_BITS 0x10
-#define SCSI_VERSION_BITS 0x07
-#define SCSI_DT_BIT       0x04
-      if(!(p->dev_flags[tindex] & DEVICE_DTR_SCANNED)) {
-        char *buffer;
-
-        if(cmd->use_sg)
-          BUG();
-
-        buffer = (char *)cmd->request_buffer;
-
-        if ( (buffer[7] & WIDE_INQUIRY_BITS) &&
-             (p->features & AHC_WIDE) )
-        {
-          p->needwdtr |= (1<<tindex);
-          p->needwdtr_copy |= (1<<tindex);
-          p->transinfo[tindex].goal_width = p->transinfo[tindex].user_width;
-        }
-        else
-        {
-          p->needwdtr &= ~(1<<tindex);
-          p->needwdtr_copy &= ~(1<<tindex);
-          pause_sequencer(p);
-          aic7xxx_set_width(p, cmd->target, cmd->channel, cmd->lun,
-                            MSG_EXT_WDTR_BUS_8_BIT, (AHC_TRANS_ACTIVE |
-                                                     AHC_TRANS_GOAL |
-                                                     AHC_TRANS_CUR) );
-          unpause_sequencer(p, FALSE);
-        }
-        if ( (buffer[7] & SYNC_INQUIRY_BITS) &&
-              p->transinfo[tindex].user_offset )
-        {
-          p->transinfo[tindex].goal_period = p->transinfo[tindex].user_period;
-          p->transinfo[tindex].goal_options = p->transinfo[tindex].user_options;
-          if (p->features & AHC_ULTRA2)
-            p->transinfo[tindex].goal_offset = MAX_OFFSET_ULTRA2;
-          else if (p->transinfo[tindex].goal_width == MSG_EXT_WDTR_BUS_16_BIT)
-            p->transinfo[tindex].goal_offset = MAX_OFFSET_16BIT;
-          else
-            p->transinfo[tindex].goal_offset = MAX_OFFSET_8BIT;
-          if ( (((buffer[2] & SCSI_VERSION_BITS) >= 3) ||
-                 (buffer[56] & SCSI_DT_BIT) ||
-                 (p->dev_flags[tindex] & DEVICE_SCSI_3) ) &&
-                 (p->transinfo[tindex].user_period <= 9) &&
-                 (p->transinfo[tindex].user_options) )
-          {
-            p->needppr |= (1<<tindex);
-            p->needppr_copy |= (1<<tindex);
-            p->needsdtr &= ~(1<<tindex);
-            p->needsdtr_copy &= ~(1<<tindex);
-            p->needwdtr &= ~(1<<tindex);
-            p->needwdtr_copy &= ~(1<<tindex);
-            p->dev_flags[tindex] |= DEVICE_SCSI_3;
-          }
-          else
-          {
-            p->needsdtr |= (1<<tindex);
-            p->needsdtr_copy |= (1<<tindex);
-            p->transinfo[tindex].goal_period = 
-              MAX(10, p->transinfo[tindex].goal_period);
-            p->transinfo[tindex].goal_options = 0;
-          }
-        }
-        else
-        {
-          p->needsdtr &= ~(1<<tindex);
-          p->needsdtr_copy &= ~(1<<tindex);
-          p->transinfo[tindex].goal_period = 255;
-          p->transinfo[tindex].goal_offset = 0;
-          p->transinfo[tindex].goal_options = 0;
-        }
-        p->dev_flags[tindex] |= DEVICE_DTR_SCANNED;
-        p->dev_flags[tindex] |= DEVICE_PRINT_DTR;
-      }
-#undef WIDE_INQUIRY_BITS
-#undef SYNC_INQUIRY_BITS
-#undef SCSI_VERSION_BITS
-#undef SCSI_DT_BIT
-    }
   }
 
   if ((scb->flags & SCB_MSGOUT_BITS) != 0)
@@ -4919,15 +4834,29 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
                 if ( (p->dev_last_queue_full_count[tindex] > 14) &&
                      (p->dev_active_cmds[tindex] > 4) )
                 {
+		  int diff, lun;
+		  if (p->dev_active_cmds[tindex] > p->dev_lun_queue_depth[tindex])
+		    /* We don't know what to do here, so bail. */
+		    break;
                   if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
                     printk(INFO_LEAD "Queue depth reduced to %d\n", p->host_no,
                       CTL_OF_SCB(scb), p->dev_active_cmds[tindex]);
-                  p->dev_max_queue_depth[tindex] = 
-                      p->dev_active_cmds[tindex];
+		  diff = p->dev_lun_queue_depth[tindex] -
+			 p->dev_active_cmds[tindex];
+		  p->dev_lun_queue_depth[tindex] -= diff;
+		  for(lun = 0; lun < p->host->max_lun; lun++)
+		  {
+		    if(p->Scsi_Dev[tindex][lun] != NULL)
+		    {
+		      p->dev_max_queue_depth[tindex] -= diff;
+		      scsi_adjust_queue_depth(p->Scsi_Dev[tindex][lun], 1,
+				              p->dev_lun_queue_depth[tindex]);
+		      if(p->dev_temp_queue_depth[tindex] > p->dev_max_queue_depth[tindex])
+		        p->dev_temp_queue_depth[tindex] = p->dev_max_queue_depth[tindex];
+		    }
+		  }
                   p->dev_last_queue_full[tindex] = 0;
                   p->dev_last_queue_full_count[tindex] = 0;
-                  p->dev_temp_queue_depth[tindex] = 
-                    p->dev_active_cmds[tindex];
                 }
                 else if (p->dev_active_cmds[tindex] == 0)
                 {
@@ -7023,10 +6952,10 @@ do_aic7xxx_isr(int irq, void *dev_id, struct pt_regs *regs)
  *   with queue depths for individual devices.  It also allows tagged
  *   queueing to be [en|dis]abled for a specific adapter.
  *-F*************************************************************************/
-static int
+static void
 aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
 {
-  int default_depth = 3;
+  int default_depth = p->host->hostt->cmd_per_lun;
   unsigned char tindex;
   unsigned short target_mask;
 
@@ -7036,12 +6965,69 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
   if (p->dev_max_queue_depth[tindex] > 1)
   {
     /*
-     * We've already scanned this device, leave it alone
+     * We've already scanned some lun on this device and enabled tagged
+     * queueing on it.  So, as long as this lun also supports tagged
+     * queueing, enable it here with the same depth.  Call SCSI mid layer
+     * to adjust depth on this device, and add enough to the max_queue_depth
+     * to cover the commands for this lun.
+     *
+     * Note: there is a shortcoming here.  The aic7xxx driver really assumes
+     * that if any lun on a device supports tagged queueing, then they *all*
+     * do.  Our p->tagenable field is on a per target id basis and doesn't
+     * differentiate for different luns.  If we end up with one lun that
+     * doesn't support tagged queueing, it's going to disable tagged queueing
+     * on *all* the luns on that target ID :-(
      */
-    return(p->dev_max_queue_depth[tindex]);
+    if(device->tagged_supported) {
+      if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
+      {
+        printk(INFO_LEAD "Enabled tagged queuing, queue depth %d.\n",
+               p->host_no, device->channel, device->id,
+               device->lun, device->queue_depth);
+      }
+      p->dev_max_queue_depth[tindex] += p->dev_lun_queue_depth[tindex];
+      p->dev_temp_queue_depth[tindex] += p->dev_lun_queue_depth[tindex];
+      scsi_adjust_queue_depth(device, 1, p->dev_lun_queue_depth[tindex]);
+    }
+    else
+    {
+      int lun;
+      /*
+       * Uh ohh, this is what I was talking about.  All the other devices on
+       * this target ID that support tagged queueing are going to end up
+       * getting tagged queueing turned off because of this device.  Print
+       * out a message to this effect for the user, then disable tagged
+       * queueing on all the devices on this ID.
+       */
+      printk(WARN_LEAD "does not support tagged queuing while other luns on\n"
+             "          the same target ID do!!  Tagged queueing will be disabled for\n"
+             "          all luns on this target ID!!\n", p->host_no,
+	     device->channel, device->id, device->lun);
+      
+      p->dev_lun_queue_depth[tindex] = default_depth;
+      p->dev_scbs_needed[tindex] = 0;
+      p->dev_temp_queue_depth[tindex] = 1;
+      p->dev_max_queue_depth[tindex] = 1;
+      p->tagenable &= ~target_mask;
+
+      for(lun=0; lun < p->host->max_lun; lun++)
+      {
+        if(p->Scsi_Dev[tindex][lun] != NULL)
+	{
+          printk(WARN_LEAD "disabling tagged queuing.\n", p->host_no,
+                 p->Scsi_Dev[tindex][lun]->channel,
+		 p->Scsi_Dev[tindex][lun]->id,
+		 p->Scsi_Dev[tindex][lun]->lun);
+          scsi_adjust_queue_depth(p->Scsi_Dev[tindex][lun], 0, default_depth);
+	  p->dev_scbs_needed[tindex] += default_depth;
+	}
+      }
+    }
+    return;
   }
 
-  device->queue_depth = default_depth;
+  p->dev_lun_queue_depth[tindex] = default_depth;
+  p->dev_scbs_needed[tindex] = default_depth;
   p->dev_temp_queue_depth[tindex] = 1;
   p->dev_max_queue_depth[tindex] = 1;
   p->tagenable &= ~target_mask;
@@ -7051,7 +7037,7 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
     int tag_enabled = TRUE;
 
     default_depth = AIC7XXX_CMDS_PER_DEVICE;
- 
+
     if (!(p->discenable & target_mask))
     {
       if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
@@ -7072,7 +7058,7 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
                            " the aic7xxx.c source file.\n");
           print_warning = FALSE;
         }
-        device->queue_depth = default_depth;
+        p->dev_lun_queue_depth[tindex] = default_depth;
       }
       else
       {
@@ -7080,19 +7066,18 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
         if (aic7xxx_tag_info[p->instance].tag_commands[tindex] == 255)
         {
           tag_enabled = FALSE;
-          device->queue_depth = 3;  /* Tagged queueing is disabled. */
         }
         else if (aic7xxx_tag_info[p->instance].tag_commands[tindex] == 0)
         {
-          device->queue_depth = default_depth;
+          p->dev_lun_queue_depth[tindex] = default_depth;
         }
         else
         {
-          device->queue_depth =
+          p->dev_lun_queue_depth[tindex] =
             aic7xxx_tag_info[p->instance].tag_commands[tindex];
         }
       }
-      if ((device->tagged_queue == 0) && tag_enabled)
+      if (tag_enabled)
       {
         if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
         {
@@ -7100,46 +7085,70 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
                 p->host_no, device->channel, device->id,
                 device->lun, device->queue_depth);
         }
-        p->dev_max_queue_depth[tindex] = device->queue_depth;
-        p->dev_temp_queue_depth[tindex] = device->queue_depth;
+        p->dev_max_queue_depth[tindex] = p->dev_lun_queue_depth[tindex];
+        p->dev_temp_queue_depth[tindex] = p->dev_lun_queue_depth[tindex];
+        p->dev_scbs_needed[tindex] = p->dev_lun_queue_depth[tindex];
         p->tagenable |= target_mask;
         p->orderedtag |= target_mask;
-        device->tagged_queue = 1;
-        device->current_tag = SCB_LIST_NULL;
+	scsi_adjust_queue_depth(device, 1, p->dev_lun_queue_depth[tindex]);
       }
     }
   }
-  return(p->dev_max_queue_depth[tindex]);
+  return;
 }
 
 /*+F*************************************************************************
  * Function:
- *   aic7xxx_select_queue_depth
+ *   aic7xxx_slave_detach
  *
  * Description:
- *   Sets the queue depth for each SCSI device hanging off the input
- *   host adapter.  We use a queue depth of 2 for devices that do not
- *   support tagged queueing.  If AIC7XXX_CMDS_PER_LUN is defined, we
- *   use that for tagged queueing devices; otherwise we use our own
- *   algorithm for determining the queue depth based on the maximum
- *   SCBs for the controller.
+ *   prepare for this device to go away
  *-F*************************************************************************/
-static void
-aic7xxx_select_queue_depth(struct Scsi_Host *host,
-    Scsi_Device *scsi_devs)
+void
+aic7xxx_slave_detach(Scsi_Device *sdpnt)
 {
-  Scsi_Device *device;
-  struct aic7xxx_host *p = (struct aic7xxx_host *) host->hostdata;
-  int scbnum;
+  struct aic7xxx_host *p = (struct aic7xxx_host *) sdpnt->host->hostdata;
+  int lun, tindex;
 
-  scbnum = 0;
-  for (device = scsi_devs; device != NULL; device = device->next)
+  tindex = sdpnt->id | (sdpnt->channel << 3);
+  lun = sdpnt->lun;
+  if(p->Scsi_Dev[tindex][lun] == NULL)
+    return;
+
+  if(p->tagenable & (1 << tindex))
   {
-    if (device->host == host)
-    {
-      scbnum += aic7xxx_device_queue_depth(p, device);
-    }
+    p->dev_max_queue_depth[tindex] -= p->dev_lun_queue_depth[tindex];
+    if(p->dev_temp_queue_depth[tindex] > p->dev_max_queue_depth[tindex])
+      p->dev_temp_queue_depth[tindex] = p->dev_max_queue_depth[tindex];
   }
+  p->dev_scbs_needed[tindex] -= p->dev_lun_queue_depth[tindex];
+  p->Scsi_Dev[tindex][lun] = NULL;
+  return;
+}
+
+/*+F*************************************************************************
+ * Function:
+ *   aic7xxx_slave_attach
+ *
+ * Description:
+ *   Configure the device we are attaching to the controller.  This is
+ *   where we get to do things like scan the INQUIRY data, set queue
+ *   depths, allocate command structs, etc.
+ *-F*************************************************************************/
+int
+aic7xxx_slave_attach(Scsi_Device *sdpnt)
+{
+  struct aic7xxx_host *p = (struct aic7xxx_host *) sdpnt->host->hostdata;
+  int scbnum, tindex, i;
+
+  tindex = sdpnt->id | (sdpnt->channel << 3);
+  p->dev_flags[tindex] |= DEVICE_PRESENT;
+
+  p->Scsi_Dev[tindex][sdpnt->lun] = sdpnt;
+  aic7xxx_device_queue_depth(p, sdpnt);
+
+  for(i = 0, scbnum = 0; i < p->host->max_id; i++)
+    scbnum += p->dev_scbs_needed[i];
   while (scbnum > p->scb_data->numscbs)
   {
     /*
@@ -7148,8 +7157,77 @@ aic7xxx_select_queue_depth(struct Scsi_Host *host,
      * the SCB in order to perform a swap operation (possible deadlock)
      */
     if ( aic7xxx_allocate_scb(p) == 0 )
-      return;
+      break;
   }
+
+  /*
+   * We only need to check INQUIRY data on one lun of multi lun devices
+   * since speed negotiations are not lun specific.  Once we've check this
+   * particular target id once, the DEVICE_PRESENT flag will be set.
+   */
+  if (!(p->dev_flags[tindex] & DEVICE_DTR_SCANNED))
+  {
+    p->dev_flags[tindex] |= DEVICE_DTR_SCANNED;
+
+    if ( sdpnt->wdtr && (p->features & AHC_WIDE) )
+    {
+      p->needwdtr |= (1<<tindex);
+      p->needwdtr_copy |= (1<<tindex);
+      p->transinfo[tindex].goal_width = p->transinfo[tindex].user_width;
+    }
+    else
+    {
+      p->needwdtr &= ~(1<<tindex);
+      p->needwdtr_copy &= ~(1<<tindex);
+      pause_sequencer(p);
+      aic7xxx_set_width(p, sdpnt->id, sdpnt->channel, sdpnt->lun,
+                        MSG_EXT_WDTR_BUS_8_BIT, (AHC_TRANS_ACTIVE |
+                                                 AHC_TRANS_GOAL |
+                                                 AHC_TRANS_CUR) );
+      unpause_sequencer(p, FALSE);
+    }
+    if ( sdpnt->sdtr && p->transinfo[tindex].user_offset )
+    {
+      p->transinfo[tindex].goal_period = p->transinfo[tindex].user_period;
+      p->transinfo[tindex].goal_options = p->transinfo[tindex].user_options;
+      if (p->features & AHC_ULTRA2)
+        p->transinfo[tindex].goal_offset = MAX_OFFSET_ULTRA2;
+      else if (p->transinfo[tindex].goal_width == MSG_EXT_WDTR_BUS_16_BIT)
+        p->transinfo[tindex].goal_offset = MAX_OFFSET_16BIT;
+      else
+        p->transinfo[tindex].goal_offset = MAX_OFFSET_8BIT;
+      if ( sdpnt->ppr && p->transinfo[tindex].user_period <= 9 &&
+             p->transinfo[tindex].user_options )
+      {
+        p->needppr |= (1<<tindex);
+        p->needppr_copy |= (1<<tindex);
+        p->needsdtr &= ~(1<<tindex);
+        p->needsdtr_copy &= ~(1<<tindex);
+        p->needwdtr &= ~(1<<tindex);
+        p->needwdtr_copy &= ~(1<<tindex);
+        p->dev_flags[tindex] |= DEVICE_SCSI_3;
+      }
+      else
+      {
+        p->needsdtr |= (1<<tindex);
+        p->needsdtr_copy |= (1<<tindex);
+        p->transinfo[tindex].goal_period = 
+          MAX(10, p->transinfo[tindex].goal_period);
+        p->transinfo[tindex].goal_options = 0;
+      }
+    }
+    else
+    {
+      p->needsdtr &= ~(1<<tindex);
+      p->needsdtr_copy &= ~(1<<tindex);
+      p->transinfo[tindex].goal_period = 255;
+      p->transinfo[tindex].goal_offset = 0;
+      p->transinfo[tindex].goal_options = 0;
+    }
+    p->dev_flags[tindex] |= DEVICE_PRINT_DTR;
+  }
+
+  return(0);
 }
 
 /*+F*************************************************************************
@@ -8246,7 +8324,6 @@ aic7xxx_register(Scsi_Host_Template *template, struct aic7xxx_host *p,
   host->can_queue = AIC7XXX_MAXSCB;
   host->cmd_per_lun = 3;
   host->sg_tablesize = AIC7XXX_MAX_SG;
-  host->select_queue_depths = aic7xxx_select_queue_depth;
   host->this_id = p->scsi_id;
   host->io_port = p->base;
   host->n_io_port = 0xFF;
