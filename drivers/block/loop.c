@@ -439,10 +439,9 @@ static int loop_end_io_transfer(struct bio *bio, unsigned int bytes_done, int er
 	return 0;
 }
 
-static struct bio *loop_copy_bio(struct bio *rbh, int gfp_mask, int copy)
+static struct bio *loop_copy_bio(struct bio *rbh, int gfp_mask)
 {
 	struct bio *bio;
-	unsigned long flags = 0; /* gcc silly */
 	struct bio_vec *bv;
 	int i;
 
@@ -451,11 +450,10 @@ static struct bio *loop_copy_bio(struct bio *rbh, int gfp_mask, int copy)
 		return NULL;
 
 	/*
-	 * iterate iovec list and alloc pages + copy data
+	 * iterate iovec list and alloc pages
 	 */
 	__bio_for_each_segment(bv, rbh, i, 0) {
 		struct bio_vec *bbv = &bio->bi_io_vec[i];
-		char *vfrom, *vto;
 
 		bbv->bv_page = alloc_page(gfp_mask);
 		if (bbv->bv_page == NULL)
@@ -463,37 +461,7 @@ static struct bio *loop_copy_bio(struct bio *rbh, int gfp_mask, int copy)
 
 		bbv->bv_len = bv->bv_len;
 		bbv->bv_offset = bv->bv_offset;
-
-		/*
-		 * if doing a copy for a READ request, no need
-		 * to memcpy page data
-		 */
-		if (!copy)
-			continue;
-
-		if (gfp_mask & __GFP_WAIT) {
-			vfrom = kmap(bv->bv_page);
-			vto = kmap(bbv->bv_page);
-		} else {
-			local_irq_save(flags);
-			vfrom = kmap_atomic(bv->bv_page, KM_BIO_SRC_IRQ);
-			vto = kmap_atomic(bbv->bv_page, KM_BIO_DST_IRQ);
-		}
-
-		memcpy(vto + bbv->bv_offset, vfrom + bv->bv_offset, bv->bv_len);
-		if (gfp_mask & __GFP_WAIT) {
-			kunmap(bbv->bv_page);
-			kunmap(bv->bv_page);
-		} else {
-			kunmap_atomic(vto, KM_BIO_DST_IRQ);
-			kunmap_atomic(vfrom, KM_BIO_SRC_IRQ);
-			local_irq_restore(flags);
-		}
 	}
-
-	bio->bi_sector = rbh->bi_sector;
-	bio->bi_bdev = rbh->bi_bdev;
-	bio->bi_rw = rbh->bi_rw;
 
 	bio->bi_vcnt = rbh->bi_vcnt;
 	bio->bi_size = rbh->bi_size;
@@ -531,8 +499,7 @@ static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 
 		current->flags &= ~PF_MEMALLOC;
 		bio = loop_copy_bio(rbh,
-				    (GFP_ATOMIC & ~__GFP_HIGH) | __GFP_NOWARN,
-					rbh->bi_rw & WRITE);
+				    (GFP_ATOMIC & ~__GFP_HIGH) | __GFP_NOWARN);
 		current->flags = flags;
 		if (bio == NULL)
 			blk_congestion_wait(WRITE, HZ/10);
