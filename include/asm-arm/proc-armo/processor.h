@@ -20,26 +20,8 @@
 #define __ASM_PROC_PROCESSOR_H
 
 #include <linux/string.h>
-#include <asm/proc/ptrace.h>
 
 #define KERNEL_STACK_SIZE 4096
-
-struct cpu_context_save {
-	unsigned long r4;
-	unsigned long r5;
-	unsigned long r6;
-	unsigned long r7;
-	unsigned long r8;
-	unsigned long r9;
-	unsigned long sl;
-	unsigned long fp;
-	unsigned long pc;
-};
-
-static inline void init_pc_psr(struct cpu_context_save *s, void *fn)
-{
-	s->pc = ((unsigned long)fn) | PSR_I_BIT | SVC26_MODE;
-}
 
 typedef struct {
 	void (*put_byte)(void);			/* Special calling convention */
@@ -75,7 +57,7 @@ extern uaccess_t uaccess_user, uaccess_kernel;
 	regs->ARM_r0 = stack[0];	/* r0 (argc) */			\
 })
 
-#define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1022])
-#define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1020])
+#define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1020])
+#define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)))[1018])
 
 #endif

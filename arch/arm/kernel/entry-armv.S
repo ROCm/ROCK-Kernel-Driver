@@ -958,20 +958,15 @@ ENTRY(fp_enter)
 		.text
 /*
  * Register switch for ARMv3 and ARMv4 processors
- * r0 = previous thread_info, r1 = next thread_info, return previous.
+ * r0 = previous thread_info, r1 = next thread_info
  * previous and next are guaranteed not to be the same.
  */
 ENTRY(__switch_to)
-		stmfd	sp!, {r4 - sl, fp, lr}		@ Store most regs on stack
-		mrs	ip, cpsr
-		str	ip, [sp, #-4]!			@ Save cpsr_SVC
-		str	sp, [r0, #TI_CPU_SAVE]		@ Save sp_SVC
-		ldr	sp, [r1, #TI_CPU_SAVE]		@ Get saved sp_SVC
-		ldr	r2, [r1, #TI_CPU_DOMAIN]
-		ldr	ip, [sp], #4
+		add	ip, r0, #TI_CPU_SAVE
+		ldr	r2, [r1, #TI_CPU_DOMAIN]!
+		stmia	ip, {r4 - sl, fp, sp, lr}	@ Store most regs on stack
 		mcr	p15, 0, r2, c3, c0		@ Set domain register
-		msr	spsr, ip			@ Save tasks CPSR into SPSR for this return
-		ldmfd	sp!, {r4 - sl, fp, pc}^		@ Load all regs saved previously
+		ldmib	r1, {r4 - sl, fp, sp, pc}	@ Load all regs saved previously
 
 		.section ".text.init",#alloc,#execinstr
 /*

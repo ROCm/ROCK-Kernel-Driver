@@ -185,7 +185,7 @@ void show_regs(struct pt_regs * regs)
 		get_fs() == get_ds() ? "kernel" : "user");
 #if defined(CONFIG_CPU_32)
 	{
-		int ctrl, transbase, dac;
+		unsigned int ctrl, transbase, dac;
 		  __asm__ (
 		"	mrc p15, 0, %0, c1, c0\n"
 		"	mrc p15, 0, %1, c2, c0\n"
@@ -314,19 +314,17 @@ int
 copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	    unsigned long unused, struct task_struct *p, struct pt_regs *regs)
 {
+	struct thread_info *thread = p->thread_info;
 	struct pt_regs *childregs;
-	struct cpu_context_save *save;
 
-	childregs = ((struct pt_regs *)((unsigned long)p->thread_info + THREAD_SIZE)) - 1;
+	childregs = ((struct pt_regs *)((unsigned long)thread + THREAD_SIZE - 8)) - 1;
 	*childregs = *regs;
 	childregs->ARM_r0 = 0;
 	childregs->ARM_sp = esp;
 
-	save = ((struct cpu_context_save *)(childregs)) - 1;
-	memset(save, 0, sizeof(struct cpu_context_save));
-	init_pc_psr(save, ret_from_fork);
-
-	p->thread_info->cpu_context = save;
+	memset(&thread->cpu_context, 0, sizeof(struct cpu_context_save));
+	thread->cpu_context.sp = (unsigned long)childregs;
+	thread->cpu_context.pc = (unsigned long)ret_from_fork;
 
 	return 0;
 }

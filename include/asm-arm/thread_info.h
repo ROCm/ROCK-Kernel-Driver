@@ -22,20 +22,35 @@ struct exec_domain;
 #include <asm/ptrace.h>
 #include <asm/types.h>
 
-typedef unsigned long mm_segment_t;		/* domain register	*/
+typedef unsigned long mm_segment_t;
+
+struct cpu_context_save {
+	__u32	r4;
+	__u32	r5;
+	__u32	r6;
+	__u32	r7;
+	__u32	r8;
+	__u32	r9;
+	__u32	sl;
+	__u32	fp;
+	__u32	sp;
+	__u32	pc;
+	__u32	extra[2];		/* Xscale 'acc' register, etc */
+};
 
 /*
  * low level task data that entry.S needs immediate access to.
+ * We assume cpu_context follows immedately after cpu_domain.
  */
 struct thread_info {
 	unsigned long		flags;		/* low level flags */
 	__s32			preempt_count;	/* 0 => preemptable, <0 => bug */
 	mm_segment_t		addr_limit;	/* address limit */
-	__u32			cpu;		/* cpu */
-	struct cpu_context_save	*cpu_context;	/* cpu context */
-	__u32			cpu_domain;	/* cpu domain */
 	struct task_struct	*task;		/* main task structure */
 	struct exec_domain	*exec_domain;	/* execution domain */
+	__u32			cpu;		/* cpu */
+	__u32			cpu_domain;	/* cpu domain */
+	struct cpu_context_save	cpu_context;	/* cpu context */
 	union fp_state		fpstate;
 };
 
@@ -71,34 +86,20 @@ extern void free_thread_info(struct thread_info *);
 #define get_thread_info(ti)	get_task_struct((ti)->task)
 #define put_thread_info(ti)	put_task_struct((ti)->task)
 
-static inline unsigned long __thread_saved_pc(struct thread_info *thread)
-{
-	struct cpu_context_save *context = thread->cpu_context;
-
-	return context ? pc_pointer(context->pc) : 0;
-}
-
-static inline unsigned long __thread_saved_fp(struct thread_info *thread)
-{
-	struct cpu_context_save *context = thread->cpu_context;
-
-	return context ? context->fp : 0;
-}
-
-#define thread_saved_pc(tsk)	__thread_saved_pc((tsk)->thread_info)
-#define thread_saved_fp(tsk)	__thread_saved_fp((tsk)->thread_info)
+#define thread_saved_pc(tsk)	(pc_pointer((tsk)->thread_info->cpu_context.pc))
+#define thread_saved_fp(tsk)	((tsk)->thread_info->cpu_context.fp)
 
 #else /* !__ASSEMBLY__ */
 
 #define TI_FLAGS	0
 #define TI_PREEMPT	4
 #define TI_ADDR_LIMIT	8
-#define TI_CPU		12
-#define TI_CPU_SAVE	16
-#define TI_CPU_DOMAIN	20
-#define TI_TASK		24
-#define TI_EXEC_DOMAIN	28
-#define TI_FPSTATE	32
+#define TI_TASK		12
+#define TI_EXEC_DOMAIN	16
+#define TI_CPU		20
+#define TI_CPU_DOMAIN	24
+#define TI_CPU_SAVE	28
+#define TI_FPSTATE	76
 
 #endif
 
