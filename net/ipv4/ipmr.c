@@ -1119,7 +1119,7 @@ static inline int ipmr_forward_finish(struct sk_buff *skb)
 	if (unlikely(opt->optlen))
 		ip_forward_options(skb);
 
-	return dst_output(skb);
+	return ip_dst_output(skb);
 }
 
 /*

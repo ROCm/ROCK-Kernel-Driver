@@ -178,6 +178,8 @@ struct xfrm_policy_afinfo {
 
 extern int xfrm_policy_register_afinfo(struct xfrm_policy_afinfo *afinfo);
 extern int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo);
+extern struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family);
+extern void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo);
 
 #define XFRM_ACQ_EXPIRES	30
 
@@ -531,6 +533,9 @@ struct sec_path
 {
 	atomic_t		refcnt;
 	int			len;
+#ifdef CONFIG_NETFILTER
+	int			decap_done;
+#endif
 	struct sec_decap_state	x[XFRM_MAX_DEPTH];
 };
 

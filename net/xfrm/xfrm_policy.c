@@ -21,6 +21,7 @@
 #include <linux/workqueue.h>
 #include <linux/notifier.h>
 #include <linux/netdevice.h>
+#include <linux/netfilter.h>
 #include <linux/module.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
@@ -43,8 +44,8 @@ static struct list_head xfrm_policy_gc_list =
 	LIST_HEAD_INIT(xfrm_policy_gc_list);
 static DEFINE_SPINLOCK(xfrm_policy_gc_lock);
 
-static struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family);
-static void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo);
+struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family);
+void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo);
 
 int xfrm_register_type(struct xfrm_type *type, unsigned short family)
 {
@@ -931,6 +932,7 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 
 	if (_decode_session(skb, &fl, family) < 0)
 		return 0;
+	nf_nat_decode_session(skb, &fl, family);
 
 	/* First, check used SA against their selectors. */
 	if (skb->sp) {
@@ -1225,7 +1227,7 @@ int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo)
 }
 EXPORT_SYMBOL(xfrm_policy_unregister_afinfo);
 
-static struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family)
+struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family)
 {
 	struct xfrm_policy_afinfo *afinfo;
 	if (unlikely(family >= NPROTO))
@@ -1237,13 +1239,15 @@ static struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family)
 	read_unlock(&xfrm_policy_afinfo_lock);
 	return afinfo;
 }
+EXPORT_SYMBOL(xfrm_policy_get_afinfo);
 
-static void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo)
+void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo)
 {
 	if (unlikely(afinfo == NULL))
 		return;
 	read_unlock(&afinfo->lock);
 }
+EXPORT_SYMBOL(xfrm_policy_put_afinfo);
 
 static int xfrm_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
