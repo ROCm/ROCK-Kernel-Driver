@@ -627,7 +627,6 @@ struct sched_domain {
 	.per_cpu_gain		= 15,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
 				| SD_BALANCE_EXEC	\
-				| SD_BALANCE_CLONE	\
 				| SD_WAKE_AFFINE	\
 				| SD_WAKE_IDLE		\
 				| SD_SHARE_CPUPOWER,	\
@@ -650,7 +649,6 @@ struct sched_domain {
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
 				| SD_BALANCE_EXEC	\
-				| SD_BALANCE_CLONE	\
 				| SD_WAKE_AFFINE	\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
@@ -672,7 +670,6 @@ struct sched_domain {
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_BALANCE_EXEC	\
-				| SD_BALANCE_CLONE	\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
