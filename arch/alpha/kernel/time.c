@@ -316,7 +316,7 @@ time_init(void)
 		diff = cycle_freq - est_cycle_freq;
 		if (diff < 0)
 			diff = -diff;
-		if (diff > one_percent) {
+		if ((unsigned long)diff > one_percent) {
 			cycle_freq = est_cycle_freq;
 			printk("HWRPB cycle frequency bogus.  "
 			       "Estimated %lu Hz\n", cycle_freq);
