@@ -701,7 +701,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	 * NOTE: alloc, loadrs, and cover can't be predicated.
 	 */
 (pNonSys) br.cond.dpnt dont_preserve_current_frame
-	cover				// add current frame into dirty partition
+	cover				// add current frame into dirty partition and set cr.ifs
 	;;
 	mov r19=ar.bsp			// get new backing store pointer
 	sub r16=r16,r18			// krbs = old bsp - size of dirty partition
@@ -727,7 +727,7 @@ dont_preserve_current_frame:
 #	define Nregs	14
 #endif
 	alloc loc0=ar.pfs,2,Nregs-2,2,0
-	shr.u loc1=r18,9		// RNaTslots <= dirtySize / (64*8) + 1
+	shr.u loc1=r18,9		// RNaTslots <= floor(dirtySize / (64*8))
 	sub r17=r17,r18			// r17 = (physStackedSize + 8) - dirtySize
 	;;
 	mov ar.rsc=r19			// load ar.rsc to be used for "loadrs"
@@ -774,13 +774,13 @@ rse_clear_invalid:
 	;;
 	mov loc3=0
 	mov loc4=0
-	mov loc9=0
 	mov loc5=0
 	mov loc6=0
+	mov loc7=0
 (pRecurse) br.call.sptk.many b6=rse_clear_invalid
 	;;
-	mov loc7=0
 	mov loc8=0
+	mov loc9=0
 	cmp.ne pReturn,p0=r0,in1	// if recursion count != 0, we need to do a br.ret
 	mov loc10=0
 	mov loc11=0
@@ -904,13 +904,14 @@ ENTRY(notify_resume_user)
 	mov r9=ar.unat
 	mov loc0=rp				// save return address
 	mov out0=0				// there is no "oldset"
-	adds out1=0,sp				// out1=&sigscratch
+	adds out1=8,sp				// out1=&sigscratch->ar_pfs
 (pSys)	mov out2=1				// out2==1 => we're in a syscall
 	;;
 (pNonSys) mov out2=0				// out2==0 => not a syscall
 	.fframe 16
 	.spillpsp ar.unat, 16			// (note that offset is relative to psp+0x10!)
 	st8 [sp]=r9,-16				// allocate space for ar.unat and save it
+	st8 [out1]=loc1,-8			// save ar.pfs, out1=&sigscratch
 	.body
 	br.call.sptk.many rp=do_notify_resume_user
 .ret15:	.restore sp
@@ -931,11 +932,12 @@ GLOBAL_ENTRY(sys_rt_sigsuspend)
 	mov loc0=rp				// save return address
 	mov out0=in0				// mask
 	mov out1=in1				// sigsetsize
-	adds out2=0,sp				// out2=&sigscratch
+	adds out2=8,sp				// out2=&sigscratch->ar_pfs
 	;;
 	.fframe 16
 	.spillpsp ar.unat, 16			// (note that offset is relative to psp+0x10!)
 	st8 [sp]=r9,-16				// allocate space for ar.unat and save it
+	st8 [out2]=loc1,-8			// save ar.pfs, out2=&sigscratch
 	.body
 	br.call.sptk.many rp=ia64_rt_sigsuspend
 .ret17:	.restore sp
