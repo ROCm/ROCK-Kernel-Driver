@@ -82,6 +82,7 @@
 #include	<linux/compiler.h>
 #include	<linux/seq_file.h>
 #include	<linux/notifier.h>
+#include	<linux/kallsyms.h>
 #include	<asm/uaccess.h>
 
 /*
@@ -801,11 +802,15 @@ static void check_poison_obj(kmem_cache_t *cachep, void *addr)
 		printk(KERN_ERR "Slab corruption: start=%p, expend=%p, "
 				"problemat=%p\n", addr, addr+size-1, end);
 		if (cachep->flags & SLAB_STORE_USER) {
-			if (cachep->flags & SLAB_RED_ZONE)
-				printk(KERN_ERR "Last user: [<%p>]\n", *(void**)(addr+size+BYTES_PER_WORD));
-			else
-				printk(KERN_ERR "Last user: [<%p>]\n", *(void**)(addr+size));
+			void *pc;
 
+			if (cachep->flags & SLAB_RED_ZONE)
+				pc = *(void**)(addr+size+BYTES_PER_WORD);
+			else
+				pc = *(void**)(addr+size);
+			printk(KERN_ERR "Last user: [<%p>]", pc);
+			print_symbol("(%s)", (unsigned long)pc);
+			printk("\n");
 		}
 		printk(KERN_ERR "Data: ");
 		for (s = 0; s < size; s++) {
