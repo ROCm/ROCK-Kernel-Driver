@@ -61,6 +61,7 @@
  *					return ENOTCONN for unconnected sockets (POSIX)
  *		Janos Farkas	:	don't deliver multi/broadcasts to a different
  *					bound-to-device socket
+ *		Arnaldo C. Melo :	move proc routines to ip_proc.c.
  *
  *
  *		This program is free software; you can redistribute it and/or
@@ -982,66 +983,6 @@ csum_error:
 	UDP_INC_STATS_BH(UdpInErrors);
 	kfree_skb(skb);
 	return(0);
-}
-
-static void get_udp_sock(struct sock *sp, char *tmpbuf, int i)
-{
-	struct inet_opt *inet = inet_sk(sp);
-	unsigned int dest, src;
-	__u16 destp, srcp;
-
-	dest  = inet->daddr;
-	src   = inet->rcv_saddr;
-	destp = ntohs(inet->dport);
-	srcp  = ntohs(inet->sport);
-	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
-		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
-		i, src, srcp, dest, destp, sp->state, 
-		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
-		0, 0L, 0,
-		sock_i_uid(sp), 0,
-		sock_i_ino(sp),
-		atomic_read(&sp->refcnt), sp);
-}
-
-int udp_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	int len = 0, num = 0, i;
-	off_t pos = 0;
-	off_t begin;
-	char tmpbuf[129];
-
-	if (offset < 128) 
-		len += sprintf(buffer, "%-127s\n",
-			       "  sl  local_address rem_address   st tx_queue "
-			       "rx_queue tr tm->when retrnsmt   uid  timeout inode");
-	pos = 128;
-	read_lock(&udp_hash_lock);
-	for (i = 0; i < UDP_HTABLE_SIZE; i++) {
-		struct sock *sk;
-
-		for (sk = udp_hash[i]; sk; sk = sk->next, num++) {
-			if (sk->family != PF_INET)
-				continue;
-			pos += 128;
-			if (pos <= offset)
-				continue;
-			get_udp_sock(sk, tmpbuf, i);
-			len += sprintf(buffer+len, "%-127s\n", tmpbuf);
-			if(len >= length)
-				goto out;
-		}
-	}
-out:
-	read_unlock(&udp_hash_lock);
-	begin = len - (pos - offset);
-	*start = buffer + begin;
-	len -= begin;
-	if(len > length)
-		len = length;
-	if (len < 0)
-		len = 0; 
-	return len;
 }
 
 struct proto udp_prot = {
