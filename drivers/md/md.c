@@ -2473,12 +2473,6 @@ static struct block_device_operations md_fops =
 	.ioctl		= md_ioctl,
 };
 
-
-static inline void flush_curr_signals(void)
-{
-	flush_signals(current);
-}
-
 int md_thread(void * arg)
 {
 	mdk_thread_t *thread = arg;
@@ -2525,7 +2519,7 @@ int md_thread(void * arg)
 			blk_run_queues();
 		}
 		if (signal_pending(current))
-			flush_curr_signals();
+			flush_signals(current);
 	}
 	complete(thread->event);
 	return 0;
@@ -2945,7 +2939,7 @@ void md_handle_safemode(mddev_t *mddev)
 	if (signal_pending(current)) {
 		printk(KERN_INFO "md: md%d in safe mode\n",mdidx(mddev));
 		mddev->safemode= 1;
-		flush_curr_signals();
+		flush_signals(current);
 	}
 	if (mddev->safemode)
 		md_enter_safemode(mddev);
@@ -2996,7 +2990,7 @@ static void md_do_sync(void *data)
 				}
 				if (wait_event_interruptible(resync_wait,
 							     mddev2->curr_resync < mddev->curr_resync)) {
-					flush_curr_signals();
+					flush_signals(current);
 					err = -EINTR;
 					mddev_put(mddev2);
 					goto skip;
@@ -3079,7 +3073,7 @@ static void md_do_sync(void *data)
 			 * got a signal, exit.
 			 */
 			printk(KERN_INFO "md: md_do_sync() got signal ... exiting\n");
-			flush_curr_signals();
+			flush_signals(current);
 			err = -EINTR;
 			goto out;
 		}
