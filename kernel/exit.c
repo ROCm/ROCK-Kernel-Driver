@@ -542,9 +542,32 @@ static inline void forget_original_parent(struct task_struct * father)
  * Send signals to all our closest relatives so that they know
  * to properly mourn us..
  */
-static void exit_notify(void)
+static void exit_notify(struct task_struct *tsk)
 {
 	struct task_struct *t;
+
+	if (signal_pending(tsk) && !tsk->sig->group_exit
+	    && !thread_group_empty(tsk)) {
+		/*
+		 * This occurs when there was a race between our exit
+		 * syscall and a group signal choosing us as the one to
+		 * wake up.  It could be that we are the only thread
+		 * alerted to check for pending signals, but another thread
+		 * should be woken now to take the signal since we will not.
+		 * Now we'll wake all the threads in the group just to make
+		 * sure someone gets all the pending signals.
+		 */
+		read_lock(&tasklist_lock);
+		spin_lock_irq(&tsk->sig->siglock);
+		for (t = next_thread(tsk); t != tsk; t = next_thread(t))
+			if (!signal_pending(t) && !(t->flags & PF_EXITING)) {
+				recalc_sigpending_tsk(t);
+				if (signal_pending(t))
+					signal_wake_up(t, 0);
+			}
+		spin_unlock_irq(&tsk->sig->siglock);
+		read_unlock(&tasklist_lock);
+	}
 
 	write_lock_irq(&tasklist_lock);
 
@@ -557,8 +580,8 @@ static void exit_notify(void)
 	 *	jobs, send them a SIGHUP and then a SIGCONT.  (POSIX 3.2.2.2)
 	 */
 
-	forget_original_parent(current);
-	BUG_ON(!list_empty(&current->children));
+	forget_original_parent(tsk);
+	BUG_ON(!list_empty(&tsk->children));
 
 	/*
 	 * Check to see if any process groups have become orphaned
@@ -570,14 +593,14 @@ static void exit_notify(void)
 	 * is about to become orphaned.
 	 */
 	 
-	t = current->parent;
+	t = tsk->parent;
 	
-	if ((t->pgrp != current->pgrp) &&
-	    (t->session == current->session) &&
-	    will_become_orphaned_pgrp(current->pgrp, current) &&
-	    has_stopped_jobs(current->pgrp)) {
-		__kill_pg_info(SIGHUP, (void *)1, current->pgrp);
-		__kill_pg_info(SIGCONT, (void *)1, current->pgrp);
+	if ((t->pgrp != tsk->pgrp) &&
+	    (t->session == tsk->session) &&
+	    will_become_orphaned_pgrp(tsk->pgrp, tsk) &&
+	    has_stopped_jobs(tsk->pgrp)) {
+		__kill_pg_info(SIGHUP, (void *)1, tsk->pgrp);
+		__kill_pg_info(SIGCONT, (void *)1, tsk->pgrp);
 	}
 
 	/* Let father know we died 
@@ -596,17 +619,17 @@ static void exit_notify(void)
 	 *	
 	 */
 	
-	if (current->exit_signal != SIGCHLD && current->exit_signal != -1 &&
-	    ( current->parent_exec_id != t->self_exec_id  ||
-	      current->self_exec_id != current->parent_exec_id) 
+	if (tsk->exit_signal != SIGCHLD && tsk->exit_signal != -1 &&
+	    ( tsk->parent_exec_id != t->self_exec_id  ||
+	      tsk->self_exec_id != tsk->parent_exec_id)
 	    && !capable(CAP_KILL))
-		current->exit_signal = SIGCHLD;
+		tsk->exit_signal = SIGCHLD;
 
 
-	if (current->exit_signal != -1)
-		do_notify_parent(current, current->exit_signal);
+	if (tsk->exit_signal != -1)
+		do_notify_parent(tsk, tsk->exit_signal);
 
-	current->state = TASK_ZOMBIE;
+	tsk->state = TASK_ZOMBIE;
 	/*
 	 * No need to unlock IRQs, we'll schedule() immediately
 	 * anyway. In the preemption case this also makes it
@@ -637,7 +660,6 @@ NORET_TYPE void do_exit(long code)
 
 	profile_exit_task(tsk);
  
-fake_volatile:
 	acct_process(code);
 	__exit_mm(tsk);
 
@@ -655,49 +677,16 @@ fake_volatile:
 		module_put(tsk->binfmt->module);
 
 	tsk->exit_code = code;
-	exit_notify();
+	exit_notify(tsk);
 	preempt_disable();
-	if (signal_pending(tsk) && !tsk->sig->group_exit
-	    && !thread_group_empty(tsk)) {
-		/*
-		 * This occurs when there was a race between our exit
-		 * syscall and a group signal choosing us as the one to
-		 * wake up.  It could be that we are the only thread
-		 * alerted to check for pending signals, but another thread
-		 * should be woken now to take the signal since we will not.
-		 * Now we'll wake all the threads in the group just to make
-		 * sure someone gets all the pending signals.
-		 */
-		struct task_struct *t;
-		read_lock(&tasklist_lock);
-		spin_lock_irq(&tsk->sig->siglock);
-		for (t = next_thread(tsk); t != tsk; t = next_thread(t))
-			if (!signal_pending(t) && !(t->flags & PF_EXITING)) {
-				recalc_sigpending_tsk(t);
-				if (signal_pending(t))
-					signal_wake_up(t, 0);
-			}
-		spin_unlock_irq(&tsk->sig->siglock);
-		read_unlock(&tasklist_lock);
-	}
+
 	if (tsk->exit_signal == -1)
 		release_task(tsk);
+
 	schedule();
 	BUG();
-/*
- * In order to get rid of the "volatile function does return" message
- * I did this little loop that confuses gcc to think do_exit really
- * is volatile. In fact it's schedule() that is volatile in some
- * circumstances: when current->state = ZOMBIE, schedule() never
- * returns.
- *
- * In fact the natural way to do all this is to have the label and the
- * goto right after each other, but I put the fake_volatile label at
- * the start of the function just in case something /really/ bad
- * happens, and the schedule returns. This way we can try again. I'm
- * not paranoid: it's just that everybody is out to get me.
- */
-	goto fake_volatile;
+	/* Avoid "noreturn function does return".  */
+	for (;;) ;
 }
 
 NORET_TYPE void complete_and_exit(struct completion *comp, long code)
