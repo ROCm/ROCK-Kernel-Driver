@@ -747,8 +747,8 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address,
  * Do a quick page-table lookup for a single page.
  * mm->page_table_lock must be held.
  */
-struct page *
-follow_page(struct mm_struct *mm, unsigned long address, int write) 
+static struct page *
+__follow_page(struct mm_struct *mm, unsigned long address, int read, int write)
 {
 	pgd_t *pgd;
 	pud_t *pud;
@@ -784,6 +784,8 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 	if (pte_present(pte)) {
 		if (write && !pte_write(pte))
 			goto out;
+		if (read && !pte_read(pte))
+			goto out;
 		pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			page = pfn_to_page(pfn);
@@ -797,6 +799,20 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 out:
 	return NULL;
 }
+
+struct page *
+follow_page(struct mm_struct *mm, unsigned long address, int write)
+{
+	return __follow_page(mm, address, /*read*/0, write);
+}
+
+int
+check_user_page_readable(struct mm_struct *mm, unsigned long address)
+{
+	return __follow_page(mm, address, /*read*/1, /*write*/0) != NULL;
+}
+
+EXPORT_SYMBOL(check_user_page_readable);
 
 /* 
  * Given a physical address, is there a useful struct page pointing to
