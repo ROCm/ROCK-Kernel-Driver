@@ -51,7 +51,6 @@ extern int have_print;
 #define outl(data,addr)		writel(data,((unsigned long)(addr)))
 #else
 #define IS_MAPPED_VADDR(port)	((unsigned long)(port) >> 60UL)
-#ifdef CONFIG_PPC_EEH
 #define readb(addr)		eeh_readb((void*)(addr))  
 #define readw(addr)		eeh_readw((void*)(addr))  
 #define readl(addr)		eeh_readl((void*)(addr))
@@ -61,17 +60,6 @@ extern int have_print;
 #define memset_io(a,b,c)	eeh_memset((void *)(a),(b),(c))
 #define memcpy_fromio(a,b,c)	eeh_memcpy_fromio((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	eeh_memcpy_toio((void *)(a),(b),(c))
-#else
-#define readb(addr)		in_8((volatile u8 *)(addr))
-#define writeb(b,addr)		out_8((volatile u8 *)(addr), (b))
-#define readw(addr)		in_le16((volatile u16 *)(addr))
-#define readl(addr)		in_le32((volatile u32 *)(addr))
-#define writew(b,addr)		out_le16((volatile u16 *)(addr),(b))
-#define writel(b,addr)		out_le32((volatile u32 *)(addr),(b))
-#define memset_io(a,b,c)	memset((void *)(a),(b),(c))
-#define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
-#define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
-#endif
 #define inb(port)		_inb((unsigned long)port)
 #define outb(val, port)		_outb(val, (unsigned long)port)
 #define inw(port)		_inw((unsigned long)port)
@@ -259,11 +247,9 @@ extern inline void out_be32(volatile unsigned *addr, int val)
 	__asm__ __volatile__("stw%U0%X0 %1,%0" : "=m" (*addr) : "r" (val));
 }
 
-#ifdef CONFIG_PPC_EEH
-#include <asm/eeh.h>
-#endif
-
 #ifndef CONFIG_PPC_ISERIES 
+#include <asm/eeh.h>
+
 static inline u8 _inb(unsigned long port) {
 	if (IS_MAPPED_VADDR(port))
 		return readb((void *)port);

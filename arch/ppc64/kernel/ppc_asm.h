@@ -1,5 +1,5 @@
 /*
- * arch/ppc/kernel/ppc_asm.h
+ * arch/ppc64/kernel/ppc_asm.h
  *
  * Definitions used by various bits of low-level assembly code on PowerPC.
  *

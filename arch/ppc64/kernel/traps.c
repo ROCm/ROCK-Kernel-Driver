@@ -40,6 +40,9 @@
 extern int fix_alignment(struct pt_regs *);
 extern void bad_page_fault(struct pt_regs *, unsigned long);
 
+/* This is true if we are using the firmware NMI handler (typically LPAR) */
+extern int fwnmi_active;
+
 #ifdef CONFIG_XMON
 extern void xmon(struct pt_regs *regs);
 extern int xmon_bpt(struct pt_regs *regs);
@@ -91,13 +94,55 @@ _exception(int signr, struct pt_regs *regs)
 	force_sig(signr, current);
 }
 
+/* Get the error information for errors coming through the
+ * FWNMI vectors.  The pt_regs' r3 will be updated to reflect
+ * the actual r3 if possible, and a ptr to the error log entry
+ * will be returned if found.
+ */
+static struct rtas_error_log *FWNMI_get_errinfo(struct pt_regs *regs)
+{
+	unsigned long errdata = regs->gpr[3];
+	struct rtas_error_log *errhdr = NULL;
+	unsigned long *savep;
+
+	if ((errdata >= 0x7000 && errdata < 0x7fff0) ||
+	    (errdata >= rtas.base && errdata < rtas.base + rtas.size - 16)) {
+		savep = __va(errdata);
+		regs->gpr[3] = savep[0];	/* restore original r3 */
+		errhdr = (struct rtas_error_log *)(savep + 1);
+	} else {
+		printk("FWNMI: corrupt r3\n");
+	}
+	return errhdr;
+}
+
+/* Call this when done with the data returned by FWNMI_get_errinfo.
+ * It will release the saved data area for other CPUs in the
+ * partition to receive FWNMI errors.
+ */
+static void FWNMI_release_errinfo(void)
+{
+	unsigned long ret = rtas_call(rtas_token("ibm,nmi-interlock"), 0, 1, NULL);
+	if (ret != 0)
+		printk("FWNMI: nmi-interlock failed: %ld\n", ret);
+}
+
 void
 SystemResetException(struct pt_regs *regs)
 {
-	udbg_printf("System Reset in kernel mode.\n");
-	printk("System Reset in kernel mode.\n");
+	char *msg = "System Reset in kernel mode.\n";
+	udbg_printf(msg); printk(msg);
+	if (fwnmi_active) {
+		unsigned long *r3 = __va(regs->gpr[3]); /* for FWNMI debug */
+		struct rtas_error_log *errlog;
+
+		msg = "FWNMI is active with save area at %016lx\n";
+		udbg_printf(msg, r3); printk(msg, r3);
+		errlog = FWNMI_get_errinfo(regs);
+	}
 #if defined(CONFIG_XMON)
 	xmon(regs);
+	udbg_printf("leaving xmon...\n");
 #else
 	for(;;);
 #endif
@@ -106,6 +151,13 @@ SystemResetException(struct pt_regs *regs)
 void
 MachineCheckException(struct pt_regs *regs)
 {
+	if (fwnmi_active) {
+		struct rtas_error_log *errhdr = FWNMI_get_errinfo(regs);
+		if (errhdr) {
+			/* ToDo: attempt to recover from some errors here */
+		}
+		FWNMI_release_errinfo();
+	}
 	if ( !user_mode(regs) )
 	{
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)

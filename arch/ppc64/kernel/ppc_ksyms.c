@@ -191,13 +191,11 @@ EXPORT_SYMBOL(iSeries_memcpy_fromio);
 EXPORT_SYMBOL(iSeries_Read_Word);
 EXPORT_SYMBOL(iSeries_Read_Byte);
 EXPORT_SYMBOL(iSeries_Write_Byte);
-
 #endif /* CONFIG_PPC_ISERIES */
-#ifdef CONFIG_PPC_EEH
+#ifndef CONFIG_PPC_ISERIES
 EXPORT_SYMBOL(eeh_check_failure);
 EXPORT_SYMBOL(eeh_total_mmio_ffs);
-EXPORT_SYMBOL(eeh_total_mmio_reads);
-#endif /* CONFIG_PPC_EEH */
+#endif /* CONFIG_PPC_ISERIES */
 #endif /* CONFIG_PCI */
 
 EXPORT_SYMBOL(iSeries_veth_dev);
@@ -241,10 +239,6 @@ EXPORT_SYMBOL(machine_is_compatible);
 EXPORT_SYMBOL(find_all_nodes);
 EXPORT_SYMBOL(get_property);
 
-#ifdef CONFIG_NVRAM
-EXPORT_SYMBOL(nvram_read_byte);
-EXPORT_SYMBOL(nvram_write_byte);
-#endif /* CONFIG_NVRAM */
 
 EXPORT_SYMBOL_NOVERS(__ashrdi3);
 EXPORT_SYMBOL_NOVERS(__ashldi3);

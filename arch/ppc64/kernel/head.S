@@ -490,6 +490,24 @@ maskable_exception_exit:
 	mfspr	r20,SPRG2
 	rfid
 
+/*
+ * Data area reserved for FWNMI option.
+ */
+        .= 0x7000
+	.globl fwnmi_data_area
+fwnmi_data_area:
+
+/*
+ * Vectors for the FWNMI option.  Share common code.
+ */
+	. = 0x8000
+	.globl SystemReset_FWNMI
+SystemReset_FWNMI:
+	//EXCEPTION_PROLOG_PSERIES(0x100, SystemReset_common)
+	.globl MachineCheck_FWNMI
+MachineCheck_FWNMI:
+	//EXCEPTION_PROLOG_PSERIES(0x200, MachineCheck_common)
+
 /*** Common interrupt handlers ***/
 
 	STD_EXCEPTION_COMMON( 0x100, SystemReset, .SystemResetException )
@@ -1285,7 +1303,7 @@ _STATIC(__after_prom_start)
 					/* this includes the code being   */
 					/* executed here.                 */
 
-	li	r0,4f@l			/* Jump to the copy of this code  */
+        LOADADDR(r0, 4f)                /* Jump to the copy of this code  */
 	mtctr	r0			/* that we just made              */
 	bctr
 
