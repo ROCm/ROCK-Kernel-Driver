@@ -1873,7 +1873,6 @@ STATIC void
 pagebuf_daemon_stop(void)
 {
 	if (pb_daemon) {
-		flush_workqueue(pagebuf_workqueue);
 		destroy_workqueue(pagebuf_workqueue);
 
 		pb_daemon->active = 0;
