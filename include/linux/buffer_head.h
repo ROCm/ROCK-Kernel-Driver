@@ -56,9 +56,6 @@ struct buffer_head {
 	char * b_data;			/* pointer to data block */
 	bh_end_io_t *b_end_io;		/* I/O completion */
  	void *b_private;		/* reserved for b_end_io */
-
-	wait_queue_head_t b_wait;
-
 	struct list_head     b_inode_buffers; /* list of inode dirty buffers */
 };
 
@@ -166,6 +163,8 @@ void invalidate_bdev(struct block_device *, int);
 void __invalidate_buffers(kdev_t dev, int);
 int sync_buffers(struct block_device *, int);
 void __wait_on_buffer(struct buffer_head *);
+void sleep_on_buffer(struct buffer_head *bh);
+void wake_up_buffer(struct buffer_head *bh);
 int fsync_dev(kdev_t);
 int fsync_bdev(struct block_device *);
 int fsync_super(struct super_block *);

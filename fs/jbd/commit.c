@@ -530,7 +530,7 @@ start_journal_io:
 		journal_file_buffer(jh, commit_transaction, BJ_Forget);
 		/* Wake up any transactions which were waiting for this
 		   IO to complete */
-		wake_up(&bh->b_wait);
+		wake_up_buffer(bh);
 		JBUFFER_TRACE(jh, "brelse shadowed buffer");
 		__brelse(bh);
 	}

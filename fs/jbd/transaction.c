@@ -654,7 +654,7 @@ repeat:
 			spin_unlock(&journal_datalist_lock);
 			unlock_journal(journal);
 			/* commit wakes up all shadow buffers after IO */
-			sleep_on(&jh2bh(jh)->b_wait);
+			sleep_on_buffer(jh2bh(jh));
 			lock_journal(journal);
 			goto repeat;
 		}

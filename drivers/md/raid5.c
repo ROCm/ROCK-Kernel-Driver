@@ -166,7 +166,6 @@ static int grow_buffers(struct stripe_head *sh, int num, int b_size, int priorit
 		if (!bh)
 			return 1;
 		memset(bh, 0, sizeof (struct buffer_head));
-		init_waitqueue_head(&bh->b_wait);
 		if ((page = alloc_page(priority)))
 			bh->b_data = page_address(page);
 		else {

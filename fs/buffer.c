@@ -19,6 +19,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -31,12 +32,21 @@
 #include <linux/module.h>
 #include <linux/writeback.h>
 #include <linux/mempool.h>
+#include <linux/hash.h>
 #include <asm/bitops.h>
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_inode_buffers)
 
 /* This is used by some architectures to estimate available memory. */
 atomic_t buffermem_pages = ATOMIC_INIT(0);
+
+/*
+ * Hashed waitqueue_head's for wait_on_buffer()
+ */
+#define BH_WAIT_TABLE_ORDER	7
+static struct bh_wait_queue_head {
+	wait_queue_head_t wqh;
+} ____cacheline_aligned_in_smp bh_wait_queue_heads[1<<BH_WAIT_TABLE_ORDER];
 
 /*
  * Several of these buffer list functions are exported to filesystems,
@@ -76,6 +86,35 @@ init_buffer(struct buffer_head *bh, bh_end_io_t *handler, void *private)
 	bh->b_private = private;
 }
 
+/*
+ * Return the address of the waitqueue_head to be used for this
+ * buffer_head
+ */
+static wait_queue_head_t *bh_waitq_head(struct buffer_head *bh)
+{
+	return &bh_wait_queue_heads[hash_ptr(bh, BH_WAIT_TABLE_ORDER)].wqh;
+}
+
+/*
+ * Wait on a buffer until someone does a wakeup on it.  Needs
+ * lots of external locking.  ext3 uses this.  Fix it.
+ */
+void sleep_on_buffer(struct buffer_head *bh)
+{
+	wait_queue_head_t *wq = bh_waitq_head(bh);
+	sleep_on(wq);
+}
+EXPORT_SYMBOL(sleep_on_buffer);
+
+void wake_up_buffer(struct buffer_head *bh)
+{
+	wait_queue_head_t *wq = bh_waitq_head(bh);
+
+	if (waitqueue_active(wq))
+		wake_up_all(wq);
+}
+EXPORT_SYMBOL(wake_up_buffer);
+
 void unlock_buffer(struct buffer_head *bh)
 {
 	/*
@@ -89,8 +128,32 @@ void unlock_buffer(struct buffer_head *bh)
 
 	clear_buffer_locked(bh);
 	smp_mb__after_clear_bit();
-	if (waitqueue_active(&bh->b_wait))
-		wake_up(&bh->b_wait);
+	wake_up_buffer(bh);
+}
+
+/*
+ * Block until a buffer comes unlocked.  This doesn't stop it
+ * from becoming locked again - you have to lock it yourself
+ * if you want to preserve its state.
+ */
+void __wait_on_buffer(struct buffer_head * bh)
+{
+	wait_queue_head_t *wq = bh_waitq_head(bh);
+	struct task_struct *tsk = current;
+	DECLARE_WAITQUEUE(wait, tsk);
+
+	get_bh(bh);
+	add_wait_queue(wq, &wait);
+	do {
+		run_task_queue(&tq_disk);
+		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+		if (!buffer_locked(bh))
+			break;
+		schedule();
+	} while (buffer_locked(bh));
+	tsk->state = TASK_RUNNING;
+	remove_wait_queue(wq, &wait);
+	put_bh(bh);
 }
 
 static inline void
@@ -119,30 +182,6 @@ __clear_page_buffers(struct page *page)
 	}
 	clear_page_buffers(page);
 	page_cache_release(page);
-}
-
-/*
- * Block until a buffer comes unlocked.  This doesn't stop it
- * from becoming locked again - you have to lock it yourself
- * if you want to preserve its state.
- */
-void __wait_on_buffer(struct buffer_head * bh)
-{
-	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
-
-	get_bh(bh);
-	add_wait_queue(&bh->b_wait, &wait);
-	do {
-		run_task_queue(&tq_disk);
-		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (!buffer_locked(bh))
-			break;
-		schedule();
-	} while (buffer_locked(bh));
-	tsk->state = TASK_RUNNING;
-	remove_wait_queue(&bh->b_wait, &wait);
-	put_bh(bh);
 }
 
 /*
@@ -2265,7 +2304,6 @@ static void init_buffer_head(void *data, kmem_cache_t *cachep, unsigned long fla
 		memset(bh, 0, sizeof(*bh));
 		bh->b_blocknr = -1;
 		INIT_LIST_HEAD(&bh->b_inode_buffers);
-		init_waitqueue_head(&bh->b_wait);
 	}
 }
 
@@ -2284,9 +2322,13 @@ static void bh_mempool_free(void *element, void *pool_data)
 
 void __init buffer_init(void)
 {
+	int i;
+
 	bh_cachep = kmem_cache_create("buffer_head",
 			sizeof(struct buffer_head), 0,
 			SLAB_HWCACHE_ALIGN, init_buffer_head, NULL);
 	bh_mempool = mempool_create(MAX_UNUSED_BUFFERS, bh_mempool_alloc,
 				bh_mempool_free, NULL);
+	for (i = 0; i < ARRAY_SIZE(bh_wait_queue_heads); i++)
+		init_waitqueue_head(&bh_wait_queue_heads[i].wqh);
 }
