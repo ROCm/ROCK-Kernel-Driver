@@ -498,7 +498,7 @@ int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *da
 		return -ENOMEM;
 	}
 	memcpy (transfer_buffer, data, length);
-	result = usb_control_msg (serial->dev, usb_sndctrlpipe(serial->dev, 0), bRequest, 0x40, address, 0, transfer_buffer, length, 300);
+	result = usb_control_msg (serial->dev, usb_sndctrlpipe(serial->dev, 0), bRequest, 0x40, address, 0, transfer_buffer, length, 3*HZ);
 	kfree (transfer_buffer);
 	return result;
 }
