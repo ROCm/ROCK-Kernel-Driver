@@ -725,7 +725,7 @@ static int harmony_audio_ioctl(struct inode *inode,
                 info.fragments = MAX_BUFS - harmony.nb_filled_play;
 		info.fragsize = HARMONY_BUF_SIZE;
                 info.bytes = info.fragments * info.fragsize;
-		return copy_to_user((void *)arg, &info, sizeof(info));
+		return copy_to_user((void *)arg, &info, sizeof(info)) ? -EFAULT : 0;
 
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
@@ -734,7 +734,7 @@ static int harmony_audio_ioctl(struct inode *inode,
                 info.fragments = /*MAX_BUFS-*/ harmony.nb_filled_record;
 		info.fragsize = HARMONY_BUF_SIZE;
                 info.bytes = info.fragments * info.fragsize;
-		return copy_to_user((void *)arg, &info, sizeof(info));
+		return copy_to_user((void *)arg, &info, sizeof(info)) ? -EFAULT : 0;
 	
 	case SNDCTL_DSP_SYNC:
 		return 0;
