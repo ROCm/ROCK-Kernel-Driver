@@ -1,5 +1,5 @@
 /*
- * $Id: rpxlite.c,v 1.19 2003/05/21 12:45:19 dwmw2 Exp $
+ * $Id: rpxlite.c,v 1.20 2004/07/12 21:59:44 dwmw2 Exp $
  *
  * Handle mapping of the flash on the RPX Lite and CLLF boards
  */
@@ -21,7 +21,7 @@ static struct mtd_info *mymtd;
 static struct map_info rpxlite_map = {
 	.name = "RPX",
 	.size = WINDOW_SIZE,
-	.buswidth = 4,
+	.bankwidth = 4,
 	.phys = WINDOW_ADDR,
 };
 

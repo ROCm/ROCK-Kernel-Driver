@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: file.c,v 1.96 2003/10/11 11:47:23 dwmw2 Exp $
+ * $Id: file.c,v 1.98 2004/03/19 16:41:09 dwmw2 Exp $
  *
  */
 
@@ -72,7 +72,7 @@ int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg)
 	unsigned char *pg_buf;
 	int ret;
 
-	D1(printk(KERN_DEBUG "jffs2_do_readpage_nolock(): ino #%lu, page at offset 0x%lx\n", inode->i_ino, pg->index << PAGE_CACHE_SHIFT));
+	D2(printk(KERN_DEBUG "jffs2_do_readpage_nolock(): ino #%lu, page at offset 0x%lx\n", inode->i_ino, pg->index << PAGE_CACHE_SHIFT));
 
 	if (!PageLocked(pg))
                 PAGE_BUG(pg);
@@ -93,7 +93,7 @@ int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg)
 	flush_dcache_page(pg);
 	kunmap(pg);
 
-	D1(printk(KERN_DEBUG "readpage finished\n"));
+	D2(printk(KERN_DEBUG "readpage finished\n"));
 	return 0;
 }
 
@@ -207,6 +207,7 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(inode->i_sb);
 	struct jffs2_raw_inode *ri;
+	unsigned aligned_start = start & ~3;
 	int ret = 0;
 	uint32_t writtenlen = 0;
 
@@ -240,9 +241,9 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 	   hurt to do it again. The alternative is ifdefs, which are ugly. */
 	kmap(pg);
 
-	ret = jffs2_write_inode_range(c, f, ri, page_address(pg) + start,
-				      (pg->index << PAGE_CACHE_SHIFT) + start,
-				      end - start, &writtenlen);
+	ret = jffs2_write_inode_range(c, f, ri, page_address(pg) + aligned_start,
+				      (pg->index << PAGE_CACHE_SHIFT) + aligned_start,
+				      end - aligned_start, &writtenlen);
 
 	kunmap(pg);
 
@@ -250,6 +251,12 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 		/* There was an error writing. */
 		SetPageError(pg);
 	}
+	
+	/* Adjust writtenlen for the padding we did, so we don't confuse our caller */
+	if (writtenlen < (start&3))
+		writtenlen = 0;
+	else
+		writtenlen -= (start&3);
 
 	if (writtenlen) {
 		if (inode->i_size < (pg->index << PAGE_CACHE_SHIFT) + start + writtenlen) {

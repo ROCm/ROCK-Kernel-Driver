@@ -1,22 +1,44 @@
 /*
- *  drivers/mtd/nand_ecc.c
- *
- *  Copyright (C) 2000 Steven J. Hill (sjhill@realitydiluted.com)
- *                     Toshiba America Electronics Components, Inc.
- *
- * $Id: nand_ecc.c,v 1.9 2003/02/20 13:34:19 sjhill Exp $
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public License
- * version 2.1 as published by the Free Software Foundation.
- *
  * This file contains an ECC algorithm from Toshiba that detects and
  * corrects 1 bit errors in a 256 byte block of data.
+ *
+ * drivers/mtd/nand/nand_ecc.c
+ *
+ * Copyright (C) 2000-2004 Steven J. Hill (sjhill@realitydiluted.com)
+ *                         Toshiba America Electronics Components, Inc.
+ *
+ * $Id: nand_ecc.c,v 1.14 2004/06/16 15:34:37 gleixner Exp $
+ *
+ * This file is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 or (at your option) any
+ * later version.
+ * 
+ * This file is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * for more details.
+ * 
+ * You should have received a copy of the GNU General Public License along
+ * with this file; if not, write to the Free Software Foundation, Inc.,
+ * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
+ * 
+ * As a special exception, if other files instantiate templates or use
+ * macros or inline functions from these files, or you compile these
+ * files and link them with other works to produce a work based on these
+ * files, these files do not by themselves cause the resulting work to be
+ * covered by the GNU General Public License. However the source code for
+ * these files must still be made available in accordance with section (3)
+ * of the GNU General Public License.
+ * 
+ * This exception does not invalidate any other reasons why a work based on
+ * this file might be covered by the GNU General Public License.
  */
 
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/mtd/nand_ecc.h>
 
 /*
  * Pre-calculated 256-way 1 byte column parity
@@ -41,7 +63,12 @@ static const u_char nand_ecc_precalc_table[] = {
 };
 
 
-/*
+/**
+ * nand_trans_result - [GENERIC] create non-inverted ECC
+ * @reg2:	line parity reg 2
+ * @reg3:	line parity reg 3
+ * @ecc_code:	ecc 
+ *
  * Creates non-inverted ECC code from line parity
  */
 static void nand_trans_result(u_char reg2, u_char reg3,
@@ -81,10 +108,13 @@ static void nand_trans_result(u_char reg2, u_char reg3,
 	ecc_code[1] = tmp2;
 }
 
-/*
- * Calculate 3 byte ECC code for 256 byte block
+/**
+ * nand_calculate_ecc - [NAND Interface] Calculate 3 byte ECC code for 256 byte block
+ * @mtd:	MTD block structure
+ * @dat:	raw data
+ * @ecc_code:	buffer for ECC
  */
-void nand_calculate_ecc (const u_char *dat, u_char *ecc_code)
+int nand_calculate_ecc(struct mtd_info *mtd, const u_char *dat, u_char *ecc_code)
 {
 	u_char idx, reg1, reg2, reg3;
 	int j;
@@ -114,12 +144,19 @@ void nand_calculate_ecc (const u_char *dat, u_char *ecc_code)
 	ecc_code[0] = ~ecc_code[0];
 	ecc_code[1] = ~ecc_code[1];
 	ecc_code[2] = ((~reg1) << 2) | 0x03;
+	return 0;
 }
 
-/*
+/**
+ * nand_correct_data - [NAND Interface] Detect and correct bit error(s)
+ * @mtd:	MTD block structure
+ * @dat:	raw data read from the chip
+ * @read_ecc:	ECC from the chip
+ * @calc_ecc:	the ECC calculated from raw data
+ *
  * Detect and correct a 1 bit error for 256 byte block
  */
-int nand_correct_data (u_char *dat, u_char *read_ecc, u_char *calc_ecc)
+int nand_correct_data(struct mtd_info *mtd, u_char *dat, u_char *read_ecc, u_char *calc_ecc)
 {
 	u_char a, b, c, d1, d2, d3, add, bit, i;
 	

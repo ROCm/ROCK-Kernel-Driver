@@ -1,5 +1,5 @@
 /*
- * $Id: lubbock-flash.c,v 1.9 2003/06/23 11:48:18 dwmw2 Exp $
+ * $Id: lubbock-flash.c,v 1.15 2004/07/12 21:59:44 dwmw2 Exp $
  *
  * Map driver for the Lubbock developer platform.
  *
@@ -28,12 +28,19 @@
 
 #define WINDOW_SIZE 	64*1024*1024
 
+static void lubbock_map_inval_cache(struct map_info *map, unsigned long from, ssize_t len)
+{
+	consistent_sync((char *)map->cached + from, len, DMA_FROM_DEVICE);
+}
+
 static struct map_info lubbock_maps[2] = { {
 	.size =		WINDOW_SIZE,
 	.phys =		0x00000000,
+	.inval_cache = 	lubbock_map_inval_cache,
 }, {
 	.size =		WINDOW_SIZE,
 	.phys =		0x04000000,
+	.inval_cache = 	lubbock_map_inval_cache,
 } };
 
 static struct mtd_partition lubbock_partitions[] = {
@@ -64,7 +71,7 @@ static int __init init_lubbock(void)
 	int flashboot = (LUB_CONF_SWITCHES & 1);
 	int ret = 0, i;
 
-	lubbock_maps[0].buswidth = lubbock_maps[1].buswidth = 
+	lubbock_maps[0].bankwidth = lubbock_maps[1].bankwidth = 
 		(BOOT_DEF & 1) ? 2 : 4;
 
 	/* Compensate for the nROMBT switch which swaps the flash banks */
@@ -82,16 +89,23 @@ static int __init init_lubbock(void)
 				ret = -ENOMEM;
 			continue;
 		}
+		lubbock_maps[i].cached = __ioremap(lubbock_maps[i].phys,
+						   WINDOW_SIZE,
+						   L_PTE_CACHEABLE, 1);
+		if (!lubbock_maps[i].cached)
+			printk(KERN_WARNING "Failed to ioremap cached %s\n", lubbock_maps[i].name);
 		simple_map_init(&lubbock_maps[i]);
 
-		printk(KERN_NOTICE "Probing %s at physical address 0x%08lx (%d-bit buswidth)\n",
+		printk(KERN_NOTICE "Probing %s at physical address 0x%08lx (%d-bit bankwidth)\n",
 		       lubbock_maps[i].name, lubbock_maps[i].phys, 
-		       lubbock_maps[i].buswidth * 8);
+		       lubbock_maps[i].bankwidth * 8);
 
 		mymtds[i] = do_map_probe("cfi_probe", &lubbock_maps[i]);
 		
 		if (!mymtds[i]) {
 			iounmap((void *)lubbock_maps[i].virt);
+			if (lubbock_maps[i].cached)
+				iounmap(lubbock_maps[i].cached);
 			if (!ret)
 				ret = -EIO;
 			continue;
@@ -138,6 +152,8 @@ static void __exit cleanup_lubbock(void)
 
 		map_destroy(mymtds[i]);
 		iounmap((void *)lubbock_maps[i].virt);
+		if (lubbock_maps[i].cached)
+			iounmap(lubbock_maps[i].cached);
 
 		if (parsed_parts[i])
 			kfree(parsed_parts[i]);

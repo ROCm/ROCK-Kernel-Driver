@@ -1,5 +1,5 @@
 /*
- * $Id: dbox2-flash.c,v 1.9 2003/05/21 12:45:18 dwmw2 Exp $
+ * $Id: dbox2-flash.c,v 1.11 2004/07/12 21:59:43 dwmw2 Exp $
  *
  * D-Box 2 flash driver
  */
@@ -13,6 +13,7 @@
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
 #include <linux/config.h>
+#include <linux/errno.h>
 
 /* partition_info gives details on the logical partitions that the split the
  * single flash device into. If the size if zero we use up to the end of the
@@ -25,31 +26,31 @@ static struct mtd_partition partition_info[]= {
 	.mask_flags	= MTD_WRITEABLE
 	},
 	{
-	.name		= "flfs (ppcboot)",
+	.name		= "FLFS (U-Boot)",
 	.size		= 128 * 1024, 
 	.offset		= MTDPART_OFS_APPEND, 
 	.mask_flags	= 0
 	},
 	{
-	.name		= "root (cramfs)",	
+	.name		= "Root (SquashFS)",	
 	.size		= 7040 * 1024, 
 	.offset		= MTDPART_OFS_APPEND, 
 	.mask_flags	= 0
 	},
 	{
-	.name		= "var (jffs2)",
+	.name		= "var (JFFS2)",
 	.size		= 896 * 1024, 
 	.offset		= MTDPART_OFS_APPEND, 
 	.mask_flags	= 0
 	},
 	{
-	.name		= "flash without bootloader",	
+	.name		= "Flash without bootloader",	
 	.size		= MTDPART_SIZ_FULL, 
 	.offset		= 128 * 1024, 
 	.mask_flags	= 0
 	},
 	{
-	.name		= "complete flash",	
+	.name		= "Complete Flash",	
 	.size		= MTDPART_SIZ_FULL, 
 	.offset		= 0, 
 	.mask_flags	= MTD_WRITEABLE
@@ -67,7 +68,7 @@ static struct mtd_info *mymtd;
 struct map_info dbox2_flash_map = {
 	.name		= "D-Box 2 flash memory",
 	.size		= WINDOW_SIZE,
-	.buswidth	= 4,
+	.bankwidth	= 4,
 	.phys		= WINDOW_ADDR,
 };
 
@@ -86,7 +87,7 @@ int __init init_dbox2_flash(void)
 	mymtd = do_map_probe("cfi_probe", &dbox2_flash_map);
 	if (!mymtd) {
 	    // Probe for single Intel 28F640
-	    dbox2_flash_map.buswidth = 2;
+	    dbox2_flash_map.bankwidth = 2;
 	
 	    mymtd = do_map_probe("cfi_probe", &dbox2_flash_map);
 	}

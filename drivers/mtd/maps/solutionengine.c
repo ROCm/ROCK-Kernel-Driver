@@ -1,5 +1,5 @@
 /*
- * $Id: solutionengine.c,v 1.10 2003/05/21 12:45:20 dwmw2 Exp $
+ * $Id: solutionengine.c,v 1.13 2004/07/12 21:59:45 dwmw2 Exp $
  *
  * Flash and EPROM on Hitachi Solution Engine and similar boards.
  *
@@ -17,7 +17,7 @@
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
 #include <linux/config.h>
-
+#include <linux/errno.h>
 
 static struct mtd_info *flash_mtd;
 static struct mtd_info *eprom_mtd;
@@ -27,13 +27,13 @@ static struct mtd_partition *parsed_parts;
 struct map_info soleng_eprom_map = {
 	.name = "Solution Engine EPROM",
 	.size = 0x400000,
-	.buswidth = 4,
+	.bankwidth = 4,
 };
 
 struct map_info soleng_flash_map = {
 	.name = "Solution Engine FLASH",
 	.size = 0x400000,
-	.buswidth = 4,
+	.bankwidth = 4,
 };
 
 static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };

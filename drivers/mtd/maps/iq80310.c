@@ -1,5 +1,5 @@
 /*
- * $Id: iq80310.c,v 1.17 2003/06/23 11:48:18 dwmw2 Exp $
+ * $Id: iq80310.c,v 1.18 2004/07/12 21:59:44 dwmw2 Exp $
  *
  * Mapping for the Intel XScale IQ80310 evaluation board
  *
@@ -31,7 +31,7 @@ static struct mtd_info *mymtd;
 static struct map_info iq80310_map = {
 	.name = "IQ80310 flash",
 	.size = WINDOW_SIZE,
-	.buswidth = BUSWIDTH,
+	.bankwidth = BUSWIDTH,
 	.phys = WINDOW_ADDR
 };
 

@@ -1,10 +1,17 @@
-
-/* $Id: mtd.h,v 1.45 2003/05/20 21:56:40 dwmw2 Exp $ */
+/* 
+ * $Id: mtd.h,v 1.54 2004/07/15 01:13:12 dwmw2 Exp $
+ *
+ * Copyright (C) 1999-2003 David Woodhouse <dwmw2@infradead.org> et al.
+ *
+ * Released under GPL
+ */
 
 #ifndef __MTD_MTD_H__
 #define __MTD_MTD_H__
 
-#ifdef __KERNEL__
+#ifndef __KERNEL__
+#error This is a kernel header. Perhaps include mtd-user.h instead?
+#endif
 
 #include <linux/config.h>
 #include <linux/version.h>
@@ -12,104 +19,11 @@
 #include <linux/module.h>
 #include <linux/uio.h>
 
-#endif /* __KERNEL__ */
-
-struct erase_info_user {
-	u_int32_t start;
-	u_int32_t length;
-};
-
-struct mtd_oob_buf {
-	u_int32_t start;
-	u_int32_t length;
-	unsigned char __user *ptr;
-};
+#include <mtd/mtd-abi.h>
 
 #define MTD_CHAR_MAJOR 90
 #define MTD_BLOCK_MAJOR 31
 #define MAX_MTD_DEVICES 16
-
-
-
-#define MTD_ABSENT		0
-#define MTD_RAM			1
-#define MTD_ROM			2
-#define MTD_NORFLASH		3
-#define MTD_NANDFLASH		4
-#define MTD_PEROM		5
-#define MTD_OTHER		14
-#define MTD_UNKNOWN		15
-
-
-
-#define MTD_CLEAR_BITS		1       // Bits can be cleared (flash)
-#define MTD_SET_BITS		2       // Bits can be set
-#define MTD_ERASEABLE		4       // Has an erase function
-#define MTD_WRITEB_WRITEABLE	8       // Direct IO is possible
-#define MTD_VOLATILE		16      // Set for RAMs
-#define MTD_XIP			32	// eXecute-In-Place possible
-#define MTD_OOB			64	// Out-of-band data (NAND flash)
-#define MTD_ECC			128	// Device capable of automatic ECC
-
-// Some common devices / combinations of capabilities
-#define MTD_CAP_ROM		0
-#define MTD_CAP_RAM		(MTD_CLEAR_BITS|MTD_SET_BITS|MTD_WRITEB_WRITEABLE)
-#define MTD_CAP_NORFLASH        (MTD_CLEAR_BITS|MTD_ERASEABLE)
-#define MTD_CAP_NANDFLASH       (MTD_CLEAR_BITS|MTD_ERASEABLE|MTD_OOB)
-#define MTD_WRITEABLE		(MTD_CLEAR_BITS|MTD_SET_BITS)
-
-
-// Types of automatic ECC/Checksum available
-#define MTD_ECC_NONE		0 	// No automatic ECC available
-#define MTD_ECC_RS_DiskOnChip	1	// Automatic ECC on DiskOnChip
-#define MTD_ECC_SW		2	// SW ECC for Toshiba & Samsung devices
-
-struct mtd_info_user {
-	u_char type;
-	u_int32_t flags;
-	u_int32_t size;	 // Total size of the MTD
-	u_int32_t erasesize;
-	u_int32_t oobblock;  // Size of OOB blocks (e.g. 512)
-	u_int32_t oobsize;   // Amount of OOB data per block (e.g. 16)
-	u_int32_t ecctype;
-	u_int32_t eccsize;
-};
-
-struct region_info_user {
-	u_int32_t offset;		/* At which this region starts, 
-					 * from the beginning of the MTD */
-	u_int32_t erasesize;		/* For this region */
-	u_int32_t numblocks;		/* Number of blocks in this region */
-	u_int32_t regionindex;
-};
-
-#define MEMGETINFO              _IOR('M', 1, struct mtd_info_user)
-#define MEMERASE                _IOW('M', 2, struct erase_info_user)
-#define MEMWRITEOOB             _IOWR('M', 3, struct mtd_oob_buf)
-#define MEMREADOOB              _IOWR('M', 4, struct mtd_oob_buf)
-#define MEMLOCK                 _IOW('M', 5, struct erase_info_user)
-#define MEMUNLOCK               _IOW('M', 6, struct erase_info_user)
-#define MEMGETREGIONCOUNT	_IOR('M', 7, int)
-#define MEMGETREGIONINFO	_IOWR('M', 8, struct region_info_user)
-#define MEMSETOOBSEL		_IOW('M', 9, struct nand_oobinfo)
-
-struct nand_oobinfo {
-	int	useecc;
-	int	eccpos[6];	
-};
-
-
-#ifndef __KERNEL__
-
-typedef struct mtd_info_user mtd_info_t;
-typedef struct erase_info_user erase_info_t;
-typedef struct region_info_user region_info_t;
-typedef struct nand_oobinfo nand_oobinfo_t;
-
-	/* User-space ioctl definitions */
-
-#else /* __KERNEL__ */
-
 
 #define MTD_ERASE_PENDING      	0x01
 #define MTD_ERASING		0x02
@@ -117,10 +31,14 @@ typedef struct nand_oobinfo nand_oobinfo_t;
 #define MTD_ERASE_DONE          0x08
 #define MTD_ERASE_FAILED        0x10
 
+/* If the erase fails, fail_addr might indicate exactly which block failed.  If
+   fail_addr = 0xffffffff, the failure was not at the device level or was not
+   specific to any particular block. */
 struct erase_info {
 	struct mtd_info *mtd;
 	u_int32_t addr;
 	u_int32_t len;
+	u_int32_t fail_addr;
 	u_long time;
 	u_long retries;
 	u_int dev;
@@ -150,6 +68,7 @@ struct mtd_info {
 
 	u_int32_t oobblock;  // Size of OOB blocks (e.g. 512)
 	u_int32_t oobsize;   // Amount of OOB data per block (e.g. 16)
+	u_int32_t oobavail;  // Number of bytes in OOB area available for fs 
 	u_int32_t ecctype;
 	u_int32_t eccsize;
 	
@@ -223,6 +142,10 @@ struct mtd_info {
 	int (*suspend) (struct mtd_info *mtd);
 	void (*resume) (struct mtd_info *mtd);
 
+	/* Bad block management functions */
+	int (*block_isbad) (struct mtd_info *mtd, loff_t ofs);
+	int (*block_markbad) (struct mtd_info *mtd, loff_t ofs);
+
 	void *priv;
 
 	struct module *owner;
@@ -287,7 +210,5 @@ int default_mtd_readv(struct mtd_info *mtd, struct kvec *vecs,
 #define DEBUG(n, args...) do { } while(0)
 
 #endif /* CONFIG_MTD_DEBUG */
-
-#endif /* __KERNEL__ */
 
 #endif /* __MTD_MTD_H__ */

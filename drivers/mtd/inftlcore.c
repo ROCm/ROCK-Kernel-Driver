@@ -7,7 +7,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * Author: David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: inftlcore.c,v 1.14 2003/06/26 08:28:26 dwmw2 Exp $
+ * $Id: inftlcore.c,v 1.16 2004/07/12 12:34:58 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -55,8 +55,18 @@ static void inftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 	struct INFTLrecord *inftl;
 	unsigned long temp;
 
-	if (mtd->ecctype != MTD_ECC_RS_DiskOnChip)
+	if (mtd->type != MTD_NANDFLASH)
 		return;
+	/* OK, this is moderately ugly.  But probably safe.  Alternatives? */
+	if (memcmp(mtd->name, "DiskOnChip", 10))
+		return;
+
+	if (!mtd->block_isbad) {
+		printk(KERN_ERR
+"INFTL no longer supports the old DiskOnChip drivers loaded via docprobe.\n"
+"Please use the new diskonchip driver under the NAND subsystem.\n");
+		return;
+	}
 
 	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: add_mtd for %s\n", mtd->name);
 
@@ -72,6 +82,8 @@ static void inftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 	inftl->mbd.devnum = -1;
 	inftl->mbd.blksize = 512;
 	inftl->mbd.tr = tr;
+	memcpy(&inftl->oobinfo, &mtd->oobinfo, sizeof(struct nand_oobinfo));
+	inftl->oobinfo.useecc = MTD_NANDECC_PLACEONLY;
 
         if (INFTL_mount(inftl) < 0) {
 		printk(KERN_WARNING "INFTL: could not mount device\n");
@@ -284,21 +296,22 @@ static u16 INFTL_foldchain(struct INFTLrecord *inftl, unsigned thisVUC, unsigned
                 if (BlockMap[block] == BLOCK_NIL)
                         continue;
                 
-                ret = MTD_READECC(inftl->mbd.mtd, (inftl->EraseSize *
+                ret = MTD_READ(inftl->mbd.mtd, (inftl->EraseSize *
 			BlockMap[block]) + (block * SECTORSIZE), SECTORSIZE,
-			&retlen, movebuf, (char *)&oob, NULL); 
+			&retlen, movebuf); 
                 if (ret < 0) {
-			ret = MTD_READECC(inftl->mbd.mtd, (inftl->EraseSize *
+			ret = MTD_READ(inftl->mbd.mtd, (inftl->EraseSize *
 				BlockMap[block]) + (block * SECTORSIZE),
-				SECTORSIZE, &retlen, movebuf, (char *)&oob,
-				NULL); 
+				SECTORSIZE, &retlen, movebuf);
 			if (ret != -EIO) 
                         	DEBUG(MTD_DEBUG_LEVEL1, "INFTL: error went "
 					"away on retry?\n");
                 }
+                memset(&oob, 0xff, sizeof(struct inftl_oob));
+                oob.b.Status = oob.b.Status1 = SECTOR_USED;
                 MTD_WRITEECC(inftl->mbd.mtd, (inftl->EraseSize * targetEUN) +
 			(block * SECTORSIZE), SECTORSIZE, &retlen,
-			movebuf, (char *)&oob, NULL);
+			movebuf, (char *)&oob, &inftl->oobinfo);
 	}
 
 	/*
@@ -326,7 +339,6 @@ static u16 INFTL_foldchain(struct INFTLrecord *inftl, unsigned thisVUC, unsigned
                 if (INFTL_formatblock(inftl, thisEUN) < 0) {
 			/*
 			 * Could not erase : mark block as reserved.
-			 * FixMe: Update Bad Unit Table on disk.
 			 */
 			inftl->PUtable[thisEUN] = BLOCK_RESERVED;
                 } else {
@@ -668,7 +680,6 @@ static void INFTL_trydeletechain(struct INFTLrecord *inftl, unsigned thisVUC)
                 if (INFTL_formatblock(inftl, thisEUN) < 0) {
 			/*
 			 * Could not erase : mark block as reserved.
-			 * FixMe: Update Bad Unit Table on medium.
 			 */
 			inftl->PUtable[thisEUN] = BLOCK_RESERVED;
                 } else {
@@ -754,7 +765,7 @@ static int inftl_writeblock(struct mtd_blktrans_dev *mbd, unsigned long block,
 	unsigned int writeEUN;
 	unsigned long blockofs = (block * SECTORSIZE) & (inftl->EraseSize - 1);
 	size_t retlen;
-	u8 eccbuf[6];
+	struct inftl_oob oob;
 	char *p, *pend;
 
 	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: inftl_writeblock(inftl=0x%x,block=%ld,"
@@ -778,11 +789,13 @@ static int inftl_writeblock(struct mtd_blktrans_dev *mbd, unsigned long block,
 			return 1;
 		}
 
+		memset(&oob, 0xff, sizeof(struct inftl_oob));
+		oob.b.Status = oob.b.Status1 = SECTOR_USED;
 		MTD_WRITEECC(inftl->mbd.mtd, (writeEUN * inftl->EraseSize) +
 			blockofs, SECTORSIZE, &retlen, (char *)buffer,
-			(char *)eccbuf, NULL);
+			(char *)&oob, &inftl->oobinfo);
 		/*
-		 * No need to write SECTOR_USED flags since they are written
+		 * need to write SECTOR_USED flags since they are not written
 		 * in mtd_writeecc
 		 */
 	} else {
@@ -846,9 +859,8 @@ foundit:
 	} else {
         	size_t retlen;
 		loff_t ptr = (thisEUN * inftl->EraseSize) + blockofs;
-		u_char eccbuf[6];
-		if (MTD_READECC(inftl->mbd.mtd, ptr, SECTORSIZE, &retlen,
-		    buffer, eccbuf, NULL))
+		if (MTD_READ(inftl->mbd.mtd, ptr, SECTORSIZE, &retlen,
+		    buffer))
 			return -EIO;
 	}
 	return 0;
@@ -881,7 +893,7 @@ extern char inftlmountrev[];
 
 int __init init_inftl(void)
 {
-	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.14 $, "
+	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.16 $, "
 		"inftlmount.c %s\n", inftlmountrev);
 
 	return register_mtd_blktrans(&inftl_tr);

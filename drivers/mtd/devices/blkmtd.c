@@ -1,5 +1,5 @@
 /*
- * $Id: blkmtd-25.c,v 1.5 2003/07/16 06:48:27 spse Exp $
+ * $Id: blkmtd-25.c,v 1.6 2004/07/15 15:09:15 dwmw2 Exp $
  *
  * blkmtd.c - use a block device as a fake MTD
  *
@@ -39,7 +39,7 @@
 
 /* Default erase size in K, always make it a multiple of PAGE_SIZE */
 #define CONFIG_MTD_BLKDEV_ERASESIZE (128 << 10)	/* 128KiB */
-#define VERSION "$Revision: 1.5 $"
+#define VERSION "$Revision: 1.6 $"
 
 /* Info for the block device */
 struct blkmtd_dev {
