@@ -35,6 +35,7 @@
 #include <net/sock.h>
 #include <net/checksum.h>
 #include <net/ip.h>
+#include <net/tcp.h>
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
 
@@ -116,6 +117,22 @@ svc_release_skb(struct svc_rqst *rqstp)
 }
 
 /*
+ * Any space to write?
+ */
+static inline unsigned long
+svc_sock_wspace(struct svc_sock *svsk)
+{
+	int wspace;
+
+	if (svsk->sk_sock->type == SOCK_STREAM)
+		wspace = tcp_wspace(svsk->sk_sk);
+	else
+		wspace = sock_wspace(svsk->sk_sk);
+
+	return wspace;
+}
+
+/*
  * Queue up a socket with data pending. If there are idle nfsd
  * processes, wake 'em up.
  *
@@ -150,13 +167,13 @@ svc_sock_enqueue(struct svc_sock *svsk)
 	}
 
 	if (((svsk->sk_reserved + serv->sv_bufsz)*2
-	     > sock_wspace(svsk->sk_sk))
+	     > svc_sock_wspace(svsk))
 	    && !test_bit(SK_CLOSE, &svsk->sk_flags)
 	    && !test_bit(SK_CONN, &svsk->sk_flags)) {
 		/* Don't enqueue while not enough space for reply */
 		dprintk("svc: socket %p  no space, %d*2 > %ld, not enqueued\n",
 			svsk->sk_sk, svsk->sk_reserved+serv->sv_bufsz,
-			sock_wspace(svsk->sk_sk));
+			svc_sock_wspace(svsk));
 		goto out_unlock;
 	}
 
