@@ -69,8 +69,8 @@ extern int set_con2fb_map(int unit, int newidx);
 /* Monochrome */
 #define attr_bold(s) \
 	((s) & 0x200)
-#define attr_reverse(s, inverse) \
-	(((s) & 0x800) ^ (inverse ? 0x800 : 0))
+#define attr_reverse(s) \
+	((s) & 0x800)
 #define attr_underline(s) \
 	((s) & 0x400)
 #define attr_blink(s) \

@@ -383,11 +383,11 @@ struct fb_cursor {
 	__u16 set;		/* what to set */
 	__u16 enable;		/* cursor on/off */
 	__u16 rop;		/* bitop operation */
-	__u16 ul;               /* underlined? */
-	__u16 rev;              /* reversed? */
 	const char *mask;	/* cursor mask bits */
 	struct fbcurpos hot;	/* cursor hot spot */
 	struct fb_image	image;	/* Cursor image */
+/* all fields below are for fbcon use only */
+	char  *data;             /* copy of bitmap */
 };
 
 #ifdef __KERNEL__

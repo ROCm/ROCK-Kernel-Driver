@@ -408,7 +408,6 @@ int set_con2fb_map(int unit, int newidx)
 static inline int get_color(struct vc_data *vc, struct fb_info *info,
 			    u16 c, int is_fg)
 {
-	struct display *p = &fb_display[fg_console];
 	int depth = fb_get_color_depth(info);
 	int color = 0;
 
@@ -422,9 +421,8 @@ static inline int get_color(struct vc_data *vc, struct fb_info *info,
 		/* 0 or 1 */
 		int fg = (info->fix.visual != FB_VISUAL_MONO01) ? 1 : 0;
 		int bg = (info->fix.visual != FB_VISUAL_MONO01) ? 0 : 1;
-		int reverse = attr_reverse(c, p->inverse);
 
-		color = (is_fg) ? (reverse) ? bg : fg : (reverse) ? fg : bg;
+		color = (is_fg) ? fg : bg;
 		break;
 	}
 	case 2:
@@ -447,13 +445,45 @@ static inline int get_color(struct vc_data *vc, struct fb_info *info,
 	return color;
 }
 
-static inline int is_underline(struct fb_info *info, u16 c)
-{
-	int underline = 0;
+#define FBCON_ATTRIBUTE_UNDERLINE 1
+#define FBCON_ATTRIBUTE_REVERSE   2
+#define FBCON_ATTRIBUTE_BOLD      4
 
-	if (fb_get_color_depth(info) == 1)
-		underline = attr_underline(c);
-	return underline;
+static inline int get_attribute(struct fb_info *info, u16 c)
+{
+	int attribute = 0;
+
+	if (fb_get_color_depth(info) == 1) {
+		if (attr_underline(c))
+			attribute |= FBCON_ATTRIBUTE_UNDERLINE;
+		if (attr_reverse(c))
+			attribute |= FBCON_ATTRIBUTE_REVERSE;
+		if (attr_bold(c))
+			attribute |= FBCON_ATTRIBUTE_BOLD;
+	}
+
+	return attribute;
+}
+
+static inline void update_attr(u8 *dst, u8 *src, int attribute,
+			       struct vc_data *vc)
+{
+	int i, offset = (vc->vc_font.height < 10) ? 1 : 2;
+	int width = (vc->vc_font.width + 7) >> 3;
+	unsigned int cellsize = vc->vc_font.height * width;
+	u8 c;
+
+	offset = cellsize - (offset * width);
+	for (i = 0; i < cellsize; i++) {
+		c = src[i];
+		if (attribute & FBCON_ATTRIBUTE_UNDERLINE && i >= offset)
+			c = 0xff;
+		if (attribute & FBCON_ATTRIBUTE_BOLD)
+			c |= c >> 1;
+		if (attribute & FBCON_ATTRIBUTE_REVERSE)
+			c = ~c;
+		dst[i] = c;
+	}
 }
 
 void accel_bmove(struct vc_data *vc, struct fb_info *info, int sy, 
@@ -506,11 +536,11 @@ void accel_putcs(struct vc_data *vc, struct fb_info *info,
 	unsigned int shift_low = 0, mod = vc->vc_font.width % 8;
 	unsigned int shift_high = 8, pitch, cnt, size, k;
 	unsigned int idx = vc->vc_font.width >> 3;
-	unsigned int underline = is_underline(info, scr_readw(s));
+	unsigned int attribute = get_attribute(info, scr_readw(s));
 	struct fb_image image;
 	u8 *src, *dst, *buf = NULL;
 
-	if (underline) {
+	if (attribute) {
 		buf = kmalloc(cellsize, GFP_KERNEL);
 		if (!buf)
 			return;
@@ -549,17 +579,14 @@ void accel_putcs(struct vc_data *vc, struct fb_info *info,
 				src = vc->vc_font.data + (scr_readw(s++)&
 							  charmask)*cellsize;
 
-				if (underline) {
-					int offset = (vc->vc_font.height < 10) ? 1 : 2;
-
-					memcpy(buf, src, cellsize);
-					memset(buf + cellsize - offset, 0xff,
-					       offset * width);
+				if (attribute) {
+					update_attr(buf, src, attribute, vc);
 					src = buf;
 				}
+
 				move_unaligned(info, &info->pixmap, dst, pitch,
-						       src, idx, image.height,
-						       shift_high, shift_low, mod);
+					       src, idx, image.height,
+					       shift_high, shift_low, mod);
 				shift_low += mod;
 				dst += (shift_low >= 8) ? width : width - 1;
 				shift_low &= 7;
@@ -569,16 +596,14 @@ void accel_putcs(struct vc_data *vc, struct fb_info *info,
 			while (k--) {
 				src = vc->vc_font.data + (scr_readw(s++)&
 							  charmask)*cellsize;
-				if (underline) {
-					int offset = (vc->vc_font.height < 10) ? 1 : 2;
 
-					memcpy(buf, src, cellsize);
-					memset(buf + cellsize - offset, 0xff,
-					       offset * width);
+				if (attribute) {
+					update_attr(buf, src, attribute, vc);
 					src = buf;
 				}
+
 				move_aligned(info, &info->pixmap, dst, pitch,
-						     src, idx, image.height);
+					     src, idx, image.height);
 				dst += width;
 			}
 		}
@@ -586,7 +611,9 @@ void accel_putcs(struct vc_data *vc, struct fb_info *info,
 		image.dx += cnt * vc->vc_font.width;
 		count -= cnt;
 	}
-	kfree(buf);
+
+	if (buf)
+		kfree(buf);
 }
 
 void accel_clear_margins(struct vc_data *vc, struct fb_info *info,
@@ -1074,14 +1101,15 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 
 static void fbcon_cursor(struct vc_data *vc, int mode)
 {
+	struct fb_cursor cursor;
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	struct display *p = &fb_display[vc->vc_num];
 	int w = (vc->vc_font.width + 7) >> 3, c;
 	int y = real_y(p, vc->vc_y), fg, bg;
-	int underline;
-	struct fb_cursor cursor;
-	
+	int attribute;
+	u8 *src;
+
 	if (mode & CM_SOFTBACK) {
 		mode &= ~CM_SOFTBACK;
 		if (softback_lines) {
@@ -1094,8 +1122,22 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 		fbcon_set_origin(vc);
 
  	c = scr_readw((u16 *) vc->vc_pos);
-	underline = is_underline(info, c);
-	cursor.image.data = vc->vc_font.data + ((c & charmask) * (w * vc->vc_font.height));
+	attribute = get_attribute(info, c);
+	src = vc->vc_font.data + ((c & charmask) * (w * vc->vc_font.height));
+	if (attribute) {
+		u8 *dst;
+
+		dst = kmalloc(w * vc->vc_font.height, GFP_ATOMIC);
+		if (!dst)
+			return;
+		if (info->cursor.data)
+			kfree(info->cursor.data);
+		info->cursor.data = dst;
+		update_attr(dst, src, attribute, vc);
+		src = dst;
+	}
+
+	cursor.image.data = src;
 	cursor.set = FB_CUR_SETCUR;
 	cursor.image.depth = 1;
 	
@@ -1139,24 +1181,19 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 			cursor.set |= FB_CUR_SETHOT;
 		}
 
-		if ((cursor.set & FB_CUR_SETSIZE) || ((vc->vc_cursor_type & 0x0f) != p->cursor_shape)
-		    || info->cursor.mask == NULL || info->cursor.ul != attr_underline(c) ||
-		    info->cursor.rev != attr_reverse(c, p->inverse)) {
+		if ((cursor.set & FB_CUR_SETSIZE) ||
+		    ((vc->vc_cursor_type & 0x0f) != p->cursor_shape)
+		    || info->cursor.mask == NULL) {
 			char *mask = kmalloc(w*vc->vc_font.height, GFP_ATOMIC);
 			int cur_height, size, i = 0;
 			u8 msk = 0xff;
 
-			if (!mask)	return;	
+			if (!mask)
+				return;
 		
 			if (info->cursor.mask)
 				kfree(info->cursor.mask);
 			info->cursor.mask = mask;
-	
-			info->cursor.ul = attr_underline(c);
-			info->cursor.rev = attr_reverse(c, p->inverse);
-
-			if (info->cursor.rev)
-				msk = 0;
 			p->cursor_shape = vc->vc_cursor_type & 0x0f;
 			cursor.set |= FB_CUR_SETSHAPE;
 
@@ -1185,10 +1222,6 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 			while (size--)
 				mask[i++] = ~msk;
 			size = cur_height * w;
-			if (info->cursor.ul)
-				msk = ~msk;
-			if (info->cursor.ul)
-				msk = ~msk;
 			while (size--)
 				mask[i++] = msk;
 		}

@@ -981,13 +981,14 @@ fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
 	if (copy_from_user(&cursor_user, sprite, sizeof(struct fb_cursor_user)))
 		return -EFAULT;
 
-	memcpy(&cursor, &cursor_user, sizeof(cursor));
+	memcpy(&cursor, &cursor_user, sizeof(cursor_user));
 	cursor.mask = NULL;
 	cursor.image.data = NULL;
 	cursor.image.cmap.red = NULL;
 	cursor.image.cmap.green = NULL;
 	cursor.image.cmap.blue = NULL;
 	cursor.image.cmap.transp = NULL;
+	cursor.data = NULL;
 
 	if (cursor.set & FB_CUR_SETCUR)
 		info->cursor.enable = 1;
