@@ -184,8 +184,11 @@ xfs_read(
 	/* END copy & waste from filemap.c */
 
 	if (direct) {
-		if ((*offset & mp->m_blockmask) ||
-		    (size & mp->m_blockmask)) {
+		pb_target_t	*target =
+			(ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
+				mp->m_rtdev_targp : mp->m_ddev_targp;
+		if ((*offset & target->pbr_smask) ||
+		    (size & target->pbr_smask)) {
 			if (*offset == ip->i_d.di_size) {
 				return (0);
 			}
@@ -566,8 +569,12 @@ xfs_write(
 	}
 
 	if (direct) {
-		if ((*offset & mp->m_blockmask) ||
-		    (size & mp->m_blockmask)) {
+		pb_target_t	*target =
+			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
+				mp->m_rtdev_targp : mp->m_ddev_targp;
+
+		if ((*offset & target->pbr_smask) ||
+		    (size & target->pbr_smask)) {
 			return XFS_ERROR(-EINVAL);
 		}
 		iolock = XFS_IOLOCK_SHARED;

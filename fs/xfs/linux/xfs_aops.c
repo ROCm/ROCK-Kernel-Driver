@@ -903,7 +903,7 @@ linvfs_get_block_core(
 	 */
 	if (create &&
 	    ((!buffer_mapped(bh_result) && !buffer_uptodate(bh_result)) ||
-	     (offset >= inode->i_size))) {
+	     (offset >= inode->i_size) || (pbmap.pbm_flags & PBMF_NEW))) {
 		set_buffer_new(bh_result);
 	}
 
@@ -968,10 +968,18 @@ linvfs_direct_IO(
 	loff_t			offset,
 	unsigned long		nr_segs)
 {
-	struct file *file = iocb->ki_filp;
-	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+	struct file	*file = iocb->ki_filp;
+	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	page_buf_bmap_t	pbmap;
+	int		maps = 1;
+	int		error;
 
-        return blockdev_direct_IO(rw, iocb, inode, NULL,
+	VOP_BMAP(vp, offset, 0, BMAP_DEVICE, &pbmap, &maps, error);
+	if (error)
+		return -error;
+
+        return blockdev_direct_IO(rw, iocb, inode, pbmap.pbm_target->pbr_bdev,
 		iov, offset, nr_segs,
 		linvfs_get_blocks_direct,
 		linvfs_unwritten_convert_direct);
