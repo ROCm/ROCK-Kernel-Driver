@@ -1707,7 +1707,7 @@ struct gealist {
 struct fea {
 	unsigned char EA_flags;
 	__u8 name_len;
-	__u16 value_len;
+	__le16 value_len;
 	char name[1];
 	/* optionally followed by value */
 };
@@ -1715,7 +1715,7 @@ struct fea {
 #define FEA_NEEDEA         0x80	/* need EA bit */
 
 struct fealist {
-	__u32 list_len;
+	__le32 list_len;
 	struct fea list[1];
 };
 

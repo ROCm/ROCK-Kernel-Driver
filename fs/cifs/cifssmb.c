@@ -3107,10 +3107,8 @@ QAllEAsRetry:
 			ea_response_data = (struct fealist *)
 				(((char *) &pSMBr->hdr.Protocol) +
 				data_offset);
-			ea_response_data->list_len = 
-				cpu_to_le32(ea_response_data->list_len);
-			cFYI(1,("ea length %d",ea_response_data->list_len));
-			name_len = ea_response_data->list_len;
+			name_len = le32_to_cpu(ea_response_data->list_len);
+			cFYI(1,("ea length %d", name_len));
 			if(name_len <= 8) {
 			/* returned EA size zeroed at top of function */
 				cFYI(1,("empty EA list returned from server"));
@@ -3120,6 +3118,7 @@ QAllEAsRetry:
 				temp_fea = ea_response_data->list;
 				temp_ptr = (char *)temp_fea;
 				while(name_len > 0) {
+					__u16 value_len;
 					name_len -= 4;
 					temp_ptr += 4;
 					rc += temp_fea->name_len;
@@ -3145,9 +3144,9 @@ QAllEAsRetry:
 					/* account for trailing null */
 					name_len--;
 					temp_ptr++;
-					temp_fea->value_len = cpu_to_le16(temp_fea->value_len);
-					name_len -= temp_fea->value_len;
-					temp_ptr += temp_fea->value_len;
+					value_len = le16_to_cpu(temp_fea->value_len);
+					name_len -= value_len;
+					temp_ptr += value_len;
 					/* BB check that temp_ptr is still within smb BB*/
 				/* no trailing null to account for in value len */
 					/* go on to next EA */
@@ -3250,10 +3249,8 @@ QEARetry:
 			ea_response_data = (struct fealist *)
 				(((char *) &pSMBr->hdr.Protocol) +
 				data_offset);
-			ea_response_data->list_len = 
-				cpu_to_le32(ea_response_data->list_len);
-			cFYI(1,("ea length %d",ea_response_data->list_len));
-			name_len = ea_response_data->list_len;
+			name_len = le32_to_cpu(ea_response_data->list_len);
+			cFYI(1,("ea length %d", name_len));
 			if(name_len <= 8) {
 			/* returned EA size zeroed at top of function */
 				cFYI(1,("empty EA list returned from server"));
@@ -3265,15 +3262,16 @@ QEARetry:
 				/* loop through checking if we have a matching
 				name and then return the associated value */
 				while(name_len > 0) {
+					__u16 value_len;
 					name_len -= 4;
 					temp_ptr += 4;
-					temp_fea->value_len = cpu_to_le16(temp_fea->value_len);
+					value_len = le16_to_cpu(temp_fea->value_len);
 				/* BB validate that value_len falls within SMB, 
 				even though maximum for name_len is 255 */ 
 					if(memcmp(temp_fea->name,ea_name,
 						  temp_fea->name_len) == 0) {
 						/* found a match */
-						rc = temp_fea->value_len;
+						rc = value_len;
 				/* account for prefix user. and trailing null */
 						if(rc<=(int)buf_size) {
 							memcpy(ea_value,
@@ -3294,8 +3292,8 @@ QEARetry:
 					/* account for trailing null */
 					name_len--;
 					temp_ptr++;
-					name_len -= temp_fea->value_len;
-					temp_ptr += temp_fea->value_len;
+					name_len -= value_len;
+					temp_ptr += value_len;
 				/* no trailing null to account for in value len */
 					/* go on to next EA */
 					temp_fea = (struct fea *)temp_ptr;
@@ -3378,7 +3376,7 @@ SetEARetry:
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
 	byte_count = 3 /* pad */  + params + count;
 	pSMB->DataCount = cpu_to_le16(count);
-	parm_data->list_len = (__u32)(pSMB->DataCount);
+	parm_data->list_len = cpu_to_le32(count);
 	parm_data->list[0].EA_flags = 0;
 	/* we checked above that name len is less than 255 */
 	parm_data->list[0].name_len = (__u8)name_len;;
