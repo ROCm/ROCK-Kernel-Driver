@@ -262,6 +262,13 @@ static inline void sctp_icmp_frag_needed(struct sock *sk,
 					 struct sctp_transport *transport,
 					 __u32 pmtu)
 {
+	if (unlikely(pmtu < SCTP_DEFAULT_MINSEGMENT)) {
+		printk(KERN_WARNING "%s: Reported pmtu %d too low, "
+		       "using default minimum of %d\n", __FUNCTION__, pmtu,
+		       SCTP_DEFAULT_MINSEGMENT);
+		pmtu = SCTP_DEFAULT_MINSEGMENT;
+	}
+
 	if (!sock_owned_by_user(sk) && transport && (transport->pmtu != pmtu)) {
 		transport->pmtu = pmtu;
 		sctp_assoc_sync_pmtu(asoc);
@@ -352,7 +359,7 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 			goto out_unlock;
 
 		/* PMTU discovery (RFC1191) */
-		if (code == ICMP_FRAG_NEEDED) {
+		if (ICMP_FRAG_NEEDED == code) {
 			sctp_icmp_frag_needed(sk, asoc, transport, info);
 			goto out_unlock;
 		}
@@ -360,6 +367,12 @@ void sctp_v4_err(struct sk_buff *skb, __u32 info)
 		err = icmp_err_convert[code].errno;
 		break;
 	case ICMP_TIME_EXCEEDED:
+		/* Ignore any time exceeded errors due to fragment reassembly
+		 * timeouts.
+		 */
+		if (ICMP_EXC_FRAGTIME == code)
+			goto out_unlock;
+
 		err = EHOSTUNREACH;
 		break;
 	default:
@@ -419,17 +432,17 @@ int sctp_rcv_ootb(struct sk_buff *skb)
 		 * chunk, the receiver should silently discard the packet
 		 * and take no further action.
 		 */
-		if (ch->type == SCTP_CID_SHUTDOWN_COMPLETE)
+		if (SCTP_CID_SHUTDOWN_COMPLETE == ch->type)
 			goto discard;
 
 		/* RFC 8.4, 7) If the packet contains a "Stale cookie" ERROR
 		 * or a COOKIE ACK the SCTP Packet should be silently
 		 * discarded.
 		 */
-		if (ch->type == SCTP_CID_COOKIE_ACK)
+		if (SCTP_CID_COOKIE_ACK == ch->type)
 			goto discard;
 
-		if (ch->type == SCTP_CID_ERROR) {
+		if (SCTP_CID_ERROR == ch->type) {
 			err = (sctp_errhdr_t *)(ch + sizeof(sctp_chunkhdr_t));
 			if (SCTP_ERROR_STALE_COOKIE == err->cause)
 				goto discard;
