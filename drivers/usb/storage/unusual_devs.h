@@ -102,6 +102,12 @@ UNUSUAL_DEV(  0x0482, 0x0101, 0x0100, 0x0100,
 		"Finecam S4",
 		US_SC_8070, US_PR_CB, NULL, US_FL_FIX_INQUIRY),
 
+/* Patch submitted by Stephane Galles <stephane.galles@free.fr> */
+UNUSUAL_DEV(  0x0482, 0x0103, 0x0100, 0x0100,
+		"Kyocera",
+		"Finecam S5",
+		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+
 /* Reported by Paul Stewart <stewart@wetlogic.net>
  * This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x04a4, 0x0004, 0x0001, 0x0001,
