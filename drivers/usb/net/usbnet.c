@@ -2391,7 +2391,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	if (retval) {
 		devdbg (dev, "drop, code %d", retval);
 drop:
-		retval = NET_XMIT_DROP;
+		retval = NET_XMIT_SUCCESS;
 		dev->stats.tx_dropped++;
 		if (skb)
 			dev_kfree_skb_any (skb);

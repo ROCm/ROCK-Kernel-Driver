@@ -94,7 +94,7 @@ static int datafab_read_data(struct us_data *us,
 			     unsigned char *dest, 
 			     int use_sg)
 {
-	unsigned char command[8] = { 0, 0, 0, 0, 0, 0xE0, 0x20, 0x01 };
+	unsigned char *command = us->iobuf;
 	unsigned char *buffer = NULL;
 	unsigned char *ptr;
 	unsigned char  thistime;
@@ -116,8 +116,6 @@ static int datafab_read_data(struct us_data *us,
 			return rc;
 	}
 
-	command[5] += (info->lun << 4);
-
 	totallen = sectors * info->ssize;
 
 	do {
@@ -138,10 +136,13 @@ static int datafab_read_data(struct us_data *us,
 		command[3] = (sector >> 8) & 0xFF;
 		command[4] = (sector >> 16) & 0xFF;
 	
+		command[5] = 0xE0 + (info->lun << 4);
 		command[5] |= (sector >> 24) & 0x0F;
+		command[6] = 0x20;
+		command[7] = 0x01;
 
 		// send the read command
-		result = datafab_bulk_write(us, command, sizeof(command));
+		result = datafab_bulk_write(us, command, 8);
 		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
@@ -180,8 +181,8 @@ static int datafab_write_data(struct us_data *us,
 			      unsigned char *src, 
 			      int use_sg)
 {
-	unsigned char command[8] = { 0, 0, 0, 0, 0, 0xE0, 0x30, 0x02 };
-	unsigned char reply[2] = { 0, 0 };
+	unsigned char *command = us->iobuf;
+	unsigned char *reply = us->iobuf;
 	unsigned char *buffer = NULL;
 	unsigned char *ptr;
 	unsigned char thistime;
@@ -201,8 +202,6 @@ static int datafab_write_data(struct us_data *us,
 		if (rc != USB_STOR_TRANSPORT_GOOD)
 			return rc;
 	}
-
-	command[5] += (info->lun << 4);
 
 	// If we're using scatter-gather, we have to create a new
 	// buffer to read all of the data in first, since a
@@ -237,10 +236,13 @@ static int datafab_write_data(struct us_data *us,
 		command[3] = (sector >> 8) & 0xFF;
 		command[4] = (sector >> 16) & 0xFF;
 
+		command[5] = 0xE0 + (info->lun << 4);
 		command[5] |= (sector >> 24) & 0x0F;
+		command[6] = 0x30;
+		command[7] = 0x02;
 
 		// send the command
-		result = datafab_bulk_write(us, command, sizeof(command));
+		result = datafab_bulk_write(us, command, 8);
 		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
@@ -250,7 +252,7 @@ static int datafab_write_data(struct us_data *us,
 			goto leave;
 
 		// read the result
-		result = datafab_bulk_read(us, reply, sizeof(reply));
+		result = datafab_bulk_read(us, reply, 2);
 		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
@@ -291,11 +293,17 @@ static int datafab_determine_lun(struct us_data *us,
 	//
 	// There might be a better way of doing this?
 
-	unsigned char command[8] = { 0, 1, 0, 0, 0, 0xa0, 0xec, 1 };
-	unsigned char buf[512];
+	static unsigned char scommand[8] = { 0, 1, 0, 0, 0, 0xa0, 0xec, 1 };
+	unsigned char *command = us->iobuf;
+	unsigned char *buf;
 	int count = 0, rc;
 
 	if (!us || !info)
+		return USB_STOR_TRANSPORT_ERROR;
+
+	memcpy(command, scommand, 8);
+	buf = kmalloc(512, GFP_NOIO);
+	if (!buf)
 		return USB_STOR_TRANSPORT_ERROR;
 
 	US_DEBUGP("datafab_determine_lun:  locating...\n");
@@ -306,31 +314,41 @@ static int datafab_determine_lun(struct us_data *us,
 		command[5] = 0xa0;
 
 		rc = datafab_bulk_write(us, command, 8);
-		if (rc != USB_STOR_XFER_GOOD) 
-			return USB_STOR_TRANSPORT_ERROR;
+		if (rc != USB_STOR_XFER_GOOD) {
+			rc = USB_STOR_TRANSPORT_ERROR;
+			goto leave;
+		}
 
-		rc = datafab_bulk_read(us, buf, sizeof(buf));
+		rc = datafab_bulk_read(us, buf, 512);
 		if (rc == USB_STOR_XFER_GOOD) {
 			info->lun = 0;
-			return USB_STOR_TRANSPORT_GOOD;
+			rc = USB_STOR_TRANSPORT_GOOD;
+			goto leave;
 		}
 
 		command[5] = 0xb0;
 
 		rc = datafab_bulk_write(us, command, 8);
-		if (rc != USB_STOR_XFER_GOOD) 
-			return USB_STOR_TRANSPORT_ERROR;
+		if (rc != USB_STOR_XFER_GOOD) {
+			rc = USB_STOR_TRANSPORT_ERROR;
+			goto leave;
+		}
 
-		rc = datafab_bulk_read(us, buf, sizeof(buf));
+		rc = datafab_bulk_read(us, buf, 512);
 		if (rc == USB_STOR_XFER_GOOD) {
 			info->lun = 1;
-			return USB_STOR_TRANSPORT_GOOD;
+			rc = USB_STOR_TRANSPORT_GOOD;
+			goto leave;
 		}
 
 		wait_ms(20);
 	}
 
-	return USB_STOR_TRANSPORT_ERROR;
+	rc = USB_STOR_TRANSPORT_ERROR;
+
+ leave:
+	kfree(buf);
+	return rc;
 }
 
 static int datafab_id_device(struct us_data *us,
@@ -340,8 +358,9 @@ static int datafab_id_device(struct us_data *us,
 	// to the ATA spec, 'Sector Count' isn't used but the Windows driver
 	// sets this bit so we do too...
 	//
-	unsigned char command[8] = { 0, 1, 0, 0, 0, 0xa0, 0xec, 1 };
-	unsigned char reply[512];
+	static unsigned char scommand[8] = { 0, 1, 0, 0, 0, 0xa0, 0xec, 1 };
+	unsigned char *command = us->iobuf;
+	unsigned char *reply;
 	int rc;
 
 	if (!us || !info)
@@ -353,11 +372,18 @@ static int datafab_id_device(struct us_data *us,
 			return rc;
 	}
 
+	memcpy(command, scommand, 8);
+	reply = kmalloc(512, GFP_NOIO);
+	if (!reply)
+		return USB_STOR_TRANSPORT_ERROR;
+
 	command[5] += (info->lun << 4);
 
 	rc = datafab_bulk_write(us, command, 8);
-	if (rc != USB_STOR_XFER_GOOD) 
-		return USB_STOR_TRANSPORT_ERROR;
+	if (rc != USB_STOR_XFER_GOOD) {
+		rc = USB_STOR_TRANSPORT_ERROR;
+		goto leave;
+	}
 
 	// we'll go ahead and extract the media capacity while we're here...
 	//
@@ -369,10 +395,15 @@ static int datafab_id_device(struct us_data *us,
 				((u32)(reply[116]) << 16) |
 				((u32)(reply[115]) <<  8) | 
 				((u32)(reply[114])      );
-		return USB_STOR_TRANSPORT_GOOD;
+		rc = USB_STOR_TRANSPORT_GOOD;
+		goto leave;
 	}
-		
-	return USB_STOR_TRANSPORT_ERROR;
+
+	rc = USB_STOR_TRANSPORT_ERROR;
+
+ leave:
+	kfree(reply);
+	return rc;
 }
 
 
@@ -571,8 +602,7 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 		return USB_STOR_TRANSPORT_ERROR;
 	}
 
-	// don't bother implementing READ_6 or WRITE_6.  Just set MODE_XLATE and
-	// let the usb storage code convert to READ_10/WRITE_10
+	// don't bother implementing READ_6 or WRITE_6.
 	//
 	if (srb->cmnd[0] == READ_10) {
 		block = ((u32)(srb->cmnd[2]) << 24) | ((u32)(srb->cmnd[3]) << 16) |
