@@ -4,7 +4,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.30 $
+ * $Revision: 1.32 $
  */
 
 #include <linux/config.h>
@@ -80,6 +80,7 @@ static struct ccw_driver dasd_fba_driver = {
 	.remove      = dasd_generic_remove,
 	.set_offline = dasd_generic_set_offline,
 	.set_online  = dasd_fba_set_online,
+	.notify      = dasd_generic_notify,
 };
 
 static inline void
@@ -269,7 +270,7 @@ dasd_fba_build_cp(struct dasd_device * device, struct request *req)
 				return ERR_PTR(-EINVAL);
 			count += bv->bv_len >> (device->s2b_shift + 9);
 #if defined(CONFIG_ARCH_S390X)
-			cidaw += idal_nr_words(kmap(bv->bv_page) +
+			cidaw += idal_nr_words(page_address(bv->bv_page) +
 					       bv->bv_offset, bv->bv_len);
 #endif
 		}
@@ -309,7 +310,7 @@ dasd_fba_build_cp(struct dasd_device * device, struct request *req)
 	}
 	recid = first_rec;
 	rq_for_each_bio(bio, req) bio_for_each_segment(bv, bio, i) {
-		dst = kmap(bv->bv_page) + bv->bv_offset;
+		dst = page_address(bv->bv_page) + bv->bv_offset;
 		for (off = 0; off < bv->bv_len; off += blksize) {
 			/* Locate record for stupid devices. */
 			if (private->rdc_data.mode.bits.data_chain == 0) {

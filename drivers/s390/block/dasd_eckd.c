@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.47 $
+ * $Revision: 1.49 $
  */
 
 #include <linux/config.h>
@@ -103,6 +103,7 @@ static struct ccw_driver dasd_eckd_driver = {
 	.remove      = dasd_generic_remove,
 	.set_offline = dasd_generic_set_offline,
 	.set_online  = dasd_eckd_set_online,
+	.notify      = dasd_generic_notify,
 };
 
 static const int sizes_trk0[] = { 28, 148, 84 };
@@ -460,8 +461,8 @@ dasd_eckd_check_characteristics(struct dasd_device *device)
 	/* Invalidate status of initial analysis. */
 	private->init_cqr_status = -1;
 	/* Set default cache operations. */
-	private->attrib.operation = DASD_SEQ_ACCESS;
-	private->attrib.nr_cyl = 0x02;
+	private->attrib.operation = DASD_NORMAL_CACHE;
+	private->attrib.nr_cyl = 0;
 
 	/* Read Device Characteristics */
 	rdc_data = (void *) &(private->rdc_data);
@@ -1292,6 +1293,36 @@ dasd_eckd_performance(struct block_device *bdev, int no, long args)
 }
 
 /*
+ * Get attributes (cache operations)
+ * Returnes the cache attributes used in Define Extend (DE).
+ */
+static int
+dasd_eckd_get_attrib (struct block_device *bdev, int no, long args)
+{
+	struct dasd_device *device;
+        struct dasd_eckd_private *private;
+        struct attrib_data_t attrib;
+	int rc;
+
+        if (!capable(CAP_SYS_ADMIN))
+                return -EACCES;
+        if (!args)
+                return -EINVAL;
+
+        device = bdev->bd_disk->private_data;
+        if (device == NULL)
+                return -ENODEV;
+
+        private = (struct dasd_eckd_private *) device->private;
+        attrib = private->attrib;
+	
+        rc = copy_to_user((long *) args, (long *) &attrib,
+			  sizeof (struct attrib_data_t));
+	
+	return rc;
+}
+
+/*
  * Set attributes (cache operations)
  * Stores the attributes for cache operation to be used in Define Extend (DE).
  */
@@ -1433,6 +1464,8 @@ dasd_eckd_init(void)
 {
 	int ret;
 
+	dasd_ioctl_no_register(THIS_MODULE, BIODASDGATTR,
+			       dasd_eckd_get_attrib);
 	dasd_ioctl_no_register(THIS_MODULE, BIODASDSATTR,
 			       dasd_eckd_set_attrib);
 	dasd_ioctl_no_register(THIS_MODULE, BIODASDPSRD,
@@ -1448,6 +1481,8 @@ dasd_eckd_init(void)
 
 	ret = ccw_driver_register(&dasd_eckd_driver);
 	if (ret) {
+		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDGATTR,
+					 dasd_eckd_get_attrib);
 		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDSATTR,
 					 dasd_eckd_set_attrib);
 		dasd_ioctl_no_unregister(THIS_MODULE, BIODASDPSRD,
@@ -1470,6 +1505,8 @@ dasd_eckd_cleanup(void)
 {
 	ccw_driver_unregister(&dasd_eckd_driver);
 
+	dasd_ioctl_no_unregister(THIS_MODULE, BIODASDGATTR,
+				 dasd_eckd_get_attrib);
 	dasd_ioctl_no_unregister(THIS_MODULE, BIODASDSATTR,
 				 dasd_eckd_set_attrib);
 	dasd_ioctl_no_unregister(THIS_MODULE, BIODASDPSRD,

@@ -8,7 +8,7 @@
  * any future changes wrt the API will result in a change of the APIVERSION reported
  * to userspace by the DASDAPIVER-ioctl
  *
- * $Revision: 1.4 $
+ * $Revision: 1.6 $
  *
  */
 
@@ -69,9 +69,11 @@ typedef struct dasd_information2_t {
  * values to be used for dasd_information_t.features
  * 0x00: default features
  * 0x01: readonly (ro)
+ * 0x02: use diag discipline (diag)
  */
 #define DASD_FEATURE_DEFAULT  0
 #define DASD_FEATURE_READONLY 1
+#define DASD_FEATURE_USEDIAG  2
 
 #define DASD_PARTN_BITS 2
 
@@ -234,6 +236,8 @@ typedef struct attrib_data_t {
 #define BIODASDINFO2   _IOR(DASD_IOCTL_LETTER,3,dasd_information2_t)
 /* Performance Statistics Read */
 #define BIODASDPSRD    _IOR(DASD_IOCTL_LETTER,4,dasd_rssd_perf_stats_t)
+/* Get Attributes (cache operations) */
+#define BIODASDGATTR   _IOR(DASD_IOCTL_LETTER,5,attrib_data_t) 
 
 
 /* #define BIODASDFORMAT  _IOW(IOCTL_LETTER,0,format_data_t) , deprecated */
