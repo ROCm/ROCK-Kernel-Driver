@@ -188,35 +188,21 @@ int register_pccard_driver(dev_info_t *dev_info,
 			   void (*detach)(dev_link_t *))
 {
     struct pcmcia_driver *driver;
-    socket_bind_t *b;
-    struct pcmcia_bus_socket *bus_sock;
 
     DEBUG(0, "ds: register_pccard_driver('%s')\n", (char *)dev_info);
     driver = get_pcmcia_driver(dev_info);
-    if (!driver) {
-	driver = kmalloc(sizeof(struct pcmcia_driver), GFP_KERNEL);
-	if (!driver) return -ENOMEM;
-	memset(driver, 0, sizeof(struct pcmcia_driver));
-	driver->drv.name = (char *)dev_info;
-	pcmcia_register_driver(driver);
-    }
+    if (driver)
+	    return -EBUSY;
+
+    driver = kmalloc(sizeof(struct pcmcia_driver), GFP_KERNEL);
+    if (!driver) return -ENOMEM;
+    memset(driver, 0, sizeof(struct pcmcia_driver));
+    driver->drv.name = (char *)dev_info;
+    pcmcia_register_driver(driver);
 
     driver->attach = attach;
     driver->detach = detach;
-    if (driver->use_count == 0) return 0;
-    
-    /* Instantiate any already-bound devices */
-    down_read(&bus_socket_list_rwsem);
-    list_for_each_entry(bus_sock, &bus_socket_list, socket_list) {
-	for (b = bus_sock->bind; b; b = b->next) {
-	    if (b->driver != driver) continue;
-	    b->instance = driver->attach();
-	    if (b->instance == NULL)
-		printk(KERN_NOTICE "ds: unable to create instance "
-		       "of '%s'!\n", driver->drv.name);
-	}
-    }
-    up_read(&bus_socket_list_rwsem);
+
     return 0;
 } /* register_pccard_driver */
 
@@ -414,13 +400,8 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     DEBUG(2, "bind_request(%d, '%s')\n", i,
 	  (char *)bind_info->dev_info);
     driver = get_pcmcia_driver(&bind_info->dev_info);
-    if (driver == NULL) {
-	driver = kmalloc(sizeof(struct pcmcia_driver), GFP_KERNEL);
-	if (!driver) return -ENOMEM;
-	memset(driver, 0, sizeof(struct pcmcia_driver));
-	driver->drv.name = bind_info->dev_info;
-	pcmcia_register_driver(driver);
-    }
+    if (!driver)
+	    return -EINVAL;
 
     for (b = s->bind; b; b = b->next)
 	if ((driver == b->driver) &&
