@@ -543,7 +543,7 @@ struct smt_p_001c {
 
 struct smt_p_001d {
 	struct smt_para	para ;		/* generic parameter header */
-	u_int		allocatable ;	/* total sync bw availabel for alloc */
+	u_int		allocatable ;	/* total sync bw available for alloc */
 } ;
 
 /*
