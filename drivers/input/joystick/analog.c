@@ -137,10 +137,9 @@ struct analog_port {
  */
 
 #ifdef __i386__
-#define TSC_PRESENT	(test_bit(X86_FEATURE_TSC, &boot_cpu_data.x86_capability))
-#define GET_TIME(x)	do { if (TSC_PRESENT) rdtscl(x); else x = get_time_pit(); } while (0)
-#define DELTA(x,y)	(TSC_PRESENT?((y)-(x)):((x)-(y)+((x)<(y)?1193180L/HZ:0)))
-#define TIME_NAME	(TSC_PRESENT?"TSC":"PIT")
+#define GET_TIME(x)	do { if (cpu_has_tsc) rdtscl(x); else x = get_time_pit(); } while (0)
+#define DELTA(x,y)	(cpu_has_tsc?((y)-(x)):((x)-(y)+((x)<(y)?1193180L/HZ:0)))
+#define TIME_NAME	(cpu_has_tsc?"TSC":"PIT")
 static unsigned int get_time_pit(void)
 {
         extern spinlock_t i8253_lock;
