@@ -461,7 +461,8 @@ map_unwritten(
 		struct page		*page;
 
 		tlast = i_size_read(inode) >> PAGE_CACHE_SHIFT;
-		tloff = min(tlast, start_page->index + pb->pb_page_count - 1);
+		tloff = (mp->pbm_offset + mp->pbm_bsize) >> PAGE_CACHE_SHIFT;
+		tloff = min(tlast, tloff);
 		for (tindex = start_page->index + 1; tindex < tloff; tindex++) {
 			page = probe_unwritten_page(mapping, tindex, mp, pb,
 						PAGE_CACHE_SIZE, &bs, bbits);
@@ -1041,6 +1042,8 @@ count_page_state(
 	do {
 		if (buffer_uptodate(bh) && !buffer_mapped(bh))
 			(*unmapped) = 1;
+		else if (buffer_unwritten(bh) && !buffer_delay(bh))
+			clear_buffer_unwritten(bh);
 		else if (buffer_unwritten(bh))
 			(*unwritten) = 1;
 		else if (buffer_delay(bh))

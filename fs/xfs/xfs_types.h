@@ -83,7 +83,7 @@ typedef __uint64_t __psunsigned_t;
  * XFS_BIG_INUMS needs the VFS inode number to be 64 bits, as well
  * as requiring XFS_BIG_BLKNOS to be set.
  */
-#if defined(CONFIG_LBD) || (defined(HAVE_SECTOR_T) && (BITS_PER_LONG == 64))
+#if defined(CONFIG_LBD) || (BITS_PER_LONG == 64)
 # define XFS_BIG_BLKNOS	1
 # if BITS_PER_LONG == 64
 #  define XFS_BIG_INUMS	1

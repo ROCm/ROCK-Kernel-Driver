@@ -141,7 +141,7 @@ pagebuf_param_t pb_params = {
  * Pagebuf statistics variables
  */
 
-struct pbstats pbstats;
+DEFINE_PER_CPU(struct pbstats, pbstats);
 
 /*
  * Pagebuf allocation / freeing.
@@ -293,7 +293,7 @@ _pagebuf_initialize(
 	atomic_set(&pb->pb_pin_count, 0);
 	init_waitqueue_head(&pb->pb_waiters);
 
-	PB_STATS_INC(pbstats.pb_create);
+	PB_STATS_INC(pb_create);
 	PB_TRACE(pb, PB_TRACE_REC(get), target);
 }
 
@@ -485,7 +485,7 @@ _pagebuf_lookup_pages(
 			page = find_or_create_page(aspace, index, gfp_mask);
 			if (!page) {
 				if (--retry_count > 0) {
-					PB_STATS_INC(pbstats.pb_page_retries);
+					PB_STATS_INC(pb_page_retries);
 					pagebuf_daemon_wakeup(1);
 					current->state = TASK_UNINTERRUPTIBLE;
 					schedule_timeout(10);
@@ -495,7 +495,7 @@ _pagebuf_lookup_pages(
 				all_mapped = 0;
 				continue;
 			}
-			PB_STATS_INC(pbstats.pb_page_found);
+			PB_STATS_INC(pb_page_found);
 			mark_page_accessed(page);
 			pb->pb_pages[pi] = page;
 		} else {
@@ -645,7 +645,7 @@ _pagebuf_find(				/* find buffer for block	*/
 		h->pb_count++;
 		list_add(&new_pb->pb_hash_list, &h->pb_hash);
 	} else {
-		PB_STATS_INC(pbstats.pb_miss_locked);
+		PB_STATS_INC(pb_miss_locked);
 	}
 
 	spin_unlock(&h->pb_hash_lock);
@@ -665,7 +665,7 @@ found:
 			/* wait for buffer ownership */
 			PB_TRACE(pb, PB_TRACE_REC(get_lk), 0);
 			pagebuf_lock(pb);
-			PB_STATS_INC(pbstats.pb_get_locked_waited);
+			PB_STATS_INC(pb_get_locked_waited);
 		} else {
 			/* We asked for a trylock and failed, no need
 			 * to look at file offset and length here, we
@@ -675,7 +675,7 @@ found:
 			 */
 
 			pagebuf_rele(pb);
-			PB_STATS_INC(pbstats.pb_busy_locked);
+			PB_STATS_INC(pb_busy_locked);
 			return (NULL);
 		}
 	} else {
@@ -691,7 +691,7 @@ found:
 				_PBF_ADDR_ALLOCATED | \
 				_PBF_MEM_ALLOCATED;
 	PB_TRACE(pb, PB_TRACE_REC(got_lk), 0);
-	PB_STATS_INC(pbstats.pb_get_locked);
+	PB_STATS_INC(pb_get_locked);
 	return (pb);
 }
 
@@ -747,7 +747,7 @@ pagebuf_get(				/* allocate a buffer		*/
 			return (NULL);
 	}
 
-	PB_STATS_INC(pbstats.pb_get);
+	PB_STATS_INC(pb_get);
 
 	/* fill in any missing pages */
 	error = _pagebuf_lookup_pages(pb, pb->pb_target->pbr_mapping, flags);
@@ -766,7 +766,7 @@ pagebuf_get(				/* allocate a buffer		*/
 	if (flags & PBF_READ) {
 		if (PBF_NOT_DONE(pb)) {
 			PB_TRACE(pb, PB_TRACE_REC(get_read), flags);
-			PB_STATS_INC(pbstats.pb_get_read);
+			PB_STATS_INC(pb_get_read);
 			pagebuf_iostart(pb, flags);
 		} else if (flags & PBF_ASYNC) {
 			/*
@@ -1677,6 +1677,9 @@ pagebuf_daemon(
 					break;
 				}
 
+				pb->pb_flags &= ~PBF_DELWRI;
+				pb->pb_flags |= PBF_WRITE;
+
 				list_del(&pb->pb_list);
 				list_add(&pb->pb_list, &tmp);
 
@@ -1688,8 +1691,6 @@ pagebuf_daemon(
 		while (!list_empty(&tmp)) {
 			pb = list_entry(tmp.next, page_buf_t, pb_list);
 			list_del_init(&pb->pb_list);
-			pb->pb_flags &= ~PBF_DELWRI;
-			pb->pb_flags |= PBF_WRITE;
 
 			pagebuf_iostrategy(pb);
 		}
@@ -1720,6 +1721,7 @@ pagebuf_delwri_flush(
 	int			flush_cnt = 0;
 
 	pagebuf_runall_queues(pagebuf_dataio_workqueue);
+	pagebuf_runall_queues(pagebuf_logio_workqueue);
 
 	spin_lock(&pbd_delwrite_lock);
 	INIT_LIST_HEAD(&tmp);
@@ -1742,46 +1744,31 @@ pagebuf_delwri_flush(
 			continue;
 		}
 
-		if (flags & PBDF_TRYLOCK) {
-			if (!pagebuf_cond_lock(pb)) {
-				pincount++;
-				continue;
-			}
-		}
-
-		list_del_init(&pb->pb_list);
-		if (flags & PBDF_WAIT) {
-			list_add(&pb->pb_list, &tmp);
-			pb->pb_flags &= ~PBF_ASYNC;
-		}
-
-		spin_unlock(&pbd_delwrite_lock);
-
-		if ((flags & PBDF_TRYLOCK) == 0) {
-			pagebuf_lock(pb);
-		}
-
 		pb->pb_flags &= ~PBF_DELWRI;
 		pb->pb_flags |= PBF_WRITE;
+		list_move(&pb->pb_list, &tmp);
+	}
+	/* ok found all the items that can be worked on 
+	 * drop the lock and process the private list */
+	spin_unlock(&pbd_delwrite_lock);
 
+	list_for_each_safe(curr, next, &tmp) {
+		pb = list_entry(curr, page_buf_t, pb_list);
+
+		if (flags & PBDF_WAIT)
+			pb->pb_flags &= ~PBF_ASYNC;
+		else
+			list_del_init(curr);
+
+		pagebuf_lock(pb);
 		pagebuf_iostrategy(pb);
 		if (++flush_cnt > 32) {
 			blk_run_queues();
 			flush_cnt = 0;
 		}
-
-		spin_lock(&pbd_delwrite_lock);
 	}
 
-	spin_unlock(&pbd_delwrite_lock);
-
 	blk_run_queues();
-
-	if (pinptr)
-		*pinptr = pincount;
-
-	if ((flags & PBDF_WAIT) == 0)
-		return;
 
 	while (!list_empty(&tmp)) {
 		pb = list_entry(tmp.next, page_buf_t, pb_list);
@@ -1792,6 +1779,9 @@ pagebuf_delwri_flush(
 			pagebuf_unlock(pb);
 		pagebuf_rele(pb);
 	}
+
+	if (pinptr)
+		*pinptr = pincount;
 }
 
 STATIC int
@@ -1846,14 +1836,18 @@ pb_stats_clear_handler(
 	void			*buffer,
 	size_t			*lenp)
 {
-	int			ret;
+	int			c, ret;
 	int			*valp = ctl->data;
 
 	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
 
 	if (!ret && write && *valp) {
 		printk("XFS Clearing pbstats\n");
-		memset(&pbstats, 0, sizeof(pbstats));
+		for (c = 0; c < NR_CPUS; c++) {
+			if (!cpu_possible(c)) continue;
+				memset(&per_cpu(pbstats, c), 0,
+				       sizeof(struct pbstats));
+		}
 		pb_params.stats_clear.val = 0;
 	}
 
@@ -1907,13 +1901,17 @@ pagebuf_readstats(
 	int			*eof,
 	void			*data)
 {
-	int			i, len;
+	int			c, i, len, val;
 
 	len = 0;
 	len += sprintf(buffer + len, "pagebuf");
-	for (i = 0; i < sizeof(pbstats) / sizeof(u_int32_t); i++) {
-		len += sprintf(buffer + len, " %u",
-			*(((u_int32_t*)&pbstats) + i));
+	for (i = 0; i < sizeof(struct pbstats) / sizeof(u_int32_t); i++) {
+		val = 0;
+		for (c = 0 ; c < NR_CPUS; c++) {
+			if (!cpu_possible(c)) continue;
+			val += *(((u_int32_t*)&per_cpu(pbstats, c) + i));
+		}
+		len += sprintf(buffer + len, " %u", val);
 	}
 	buffer[len++] = '\n';
 
