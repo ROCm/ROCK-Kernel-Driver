@@ -1953,9 +1953,7 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 	}
 
 	spin_lock_irq(&current->sig->siglock);
-	sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
-	if (!sig)
-		sig = dequeue_signal(&current->pending, &these, &info);
+	sig = dequeue_signal(&these, &info);
 	if (!sig) {
 		/* None ready -- temporarily unblock those we're interested
 		   in so that we'll be awakened when they arrive.  */
@@ -1973,9 +1971,7 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 		timeout = schedule_timeout(timeout);
 
 		spin_lock_irq(&current->sig->siglock);
-		sig = dequeue_signal(&current->sig->shared_pending, &these, &info);
-		if (!sig)
-			sig = dequeue_signal(&current->pending, &these, &info);
+		sig = dequeue_signal(&these, &info);
 		current->blocked = current->real_blocked;
 		siginitset(&current->real_blocked, 0);
 		recalc_sigpending();

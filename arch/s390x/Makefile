@@ -18,9 +18,7 @@ OBJCOPYFLAGS	:= -O binary
 LDFLAGS_vmlinux := -e start
 MODFLAGS += -fpic
 
-CFLAGS_PIPE := -pipe
-CFLAGS_NSR  := -fno-strength-reduce
-CFLAGS := $(CFLAGS) $(CFLAGS_PIPE) $(CFLAGS_NSR)
+CFLAGS += -pipe -fno-strength-reduce
 
 HEAD := arch/s390x/kernel/head.o arch/s390x/kernel/init_task.o
 
@@ -42,7 +40,20 @@ install: vmlinux
 	@$(MAKEBOOT) BOOTIMAGE=image install
 
 archclean:
-	@$(MAKEBOOT) clean
-	$(MAKE) -C arch/$(ARCH)/kernel clean
 
 archmrproper:
+
+prepare: include/asm-$(ARCH)/offsets.h
+
+arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+				   include/config/MARKER
+
+include/asm-$(ARCH)/offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
+	@$(generate-asm-offsets.h) < $< > $@
+
+include/asm-$(ARCH)/offsets.h: include/asm-$(ARCH)/offsets.h.tmp
+	@echo -n '  Generating $@'
+	@$(update-if-changed)
+
+CLEAN_FILES += include/asm-$(ARCH)/offsets.h.tmp \
+	       include/asm-$(ARCH)/offsets.h

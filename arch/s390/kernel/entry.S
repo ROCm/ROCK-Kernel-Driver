@@ -17,8 +17,7 @@
 #include <asm/errno.h>
 #include <asm/ptrace.h>
 #include <asm/thread_info.h>
-
-#include "asm-offsets.h"
+#include <asm/offsets.h>
 
 /*
  * Stack layout for the system_call stack entry.

@@ -25,9 +25,9 @@
 #include <linux/ext2_fs.h>
 #include <linux/hdreg.h>
 #include <linux/if_bonding.h>
-#include <linux/loop.h>
 #include <linux/blkpg.h>
 #include <linux/blk.h>
+#include <linux/loop.h>
 #include <linux/elevator.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>

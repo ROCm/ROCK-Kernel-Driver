@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.26 $
+ *   $Revision: 1.27 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -27,6 +27,7 @@
 #include "cio.h"
 #include "cio_debug.h"
 #include "ioinfo.h"
+#include "chsc.h"
 #include "s390io.h" /* FIXME: try to do without this */
 
 static atomic_t sync_isc = ATOMIC_INIT (-1);

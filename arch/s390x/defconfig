@@ -93,6 +93,7 @@ CONFIG_SCSI_LOGGING=y
 #
 # CONFIG_SCSI_7000FASST is not set
 # CONFIG_SCSI_ACARD is not set
+# CONFIG_SCSI_AACRAID is not set
 # CONFIG_SCSI_AIC7XXX is not set
 # CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_DPT_I2O is not set
@@ -123,6 +124,7 @@ CONFIG_SCSI_LOGGING=y
 # CONFIG_SCSI_SYM53C416 is not set
 # CONFIG_SCSI_T128 is not set
 # CONFIG_SCSI_U14_34F is not set
+# CONFIG_SCSI_NSP32 is not set
 # CONFIG_SCSI_DEBUG is not set
 
 #
