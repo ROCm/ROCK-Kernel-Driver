@@ -41,7 +41,6 @@
 #include <linux/irq.h>
 
 #include <asm/io.h>
-#include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 #include <asm/gt64260.h>
@@ -240,4 +239,3 @@ gt64260_mask_irq(unsigned int irq)
 		udelay(1);
 	}
 }
-

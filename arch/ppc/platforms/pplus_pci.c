@@ -27,7 +27,6 @@
 #include <asm/ptrace.h>
 #include <asm/pci-bridge.h>
 #include <asm/residual.h>
-#include <asm/processor.h>
 #include <asm/irq.h>
 #include <asm/machdep.h>
 
@@ -529,4 +528,3 @@ pplus_setup_hose(void)
 	ppc_md.pci_swizzle = common_swizzle;
 	pplus_set_board_type();
 }
-

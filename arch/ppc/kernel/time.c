@@ -59,7 +59,6 @@
 
 #include <asm/segment.h>
 #include <asm/io.h>
-#include <asm/processor.h>
 #include <asm/nvram.h>
 #include <asm/cache.h>
 #include <asm/8xx_immap.h>
@@ -431,4 +430,3 @@ unsigned mulhwu_scale_factor(unsigned inscale, unsigned outscale) {
 	if (err <= inscale/2) mlt++;
 	return mlt;
 }
-

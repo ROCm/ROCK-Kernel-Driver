@@ -22,7 +22,6 @@
 #include <linux/string.h>
 
 #include <asm/page.h>
-#include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/bootinfo.h>
 #ifdef CONFIG_44x

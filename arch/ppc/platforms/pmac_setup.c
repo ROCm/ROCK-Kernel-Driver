@@ -52,7 +52,7 @@
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 
-#include <asm/processor.h>
+#include <asm/reg.h>
 #include <asm/sections.h>
 #include <asm/prom.h>
 #include <asm/system.h>

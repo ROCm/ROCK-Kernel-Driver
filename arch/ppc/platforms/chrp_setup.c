@@ -38,7 +38,6 @@
 #include <linux/root_dev.h>
 #include <linux/initrd.h>
 
-#include <asm/processor.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/prom.h>

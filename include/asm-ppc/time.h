@@ -13,7 +13,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/threads.h>
 
-#include <asm/processor.h>
+#include <asm/reg.h>
 
 /* time.c */
 extern unsigned tb_ticks_per_jiffy;

@@ -46,7 +46,6 @@
 
 #include <asm/sections.h>
 #include <asm/mmu.h>
-#include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/residual.h>
 #include <asm/io.h>

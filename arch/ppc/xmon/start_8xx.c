@@ -12,7 +12,6 @@
 #include <asm/io.h>
 #include <asm/page.h>
 #include <linux/kernel.h>
-#include <asm/processor.h>
 #include <asm/8xx_immap.h>
 #include <asm/mpc8xx.h>
 #include <asm/commproc.h>

@@ -1,5 +1,5 @@
 #include <asm/ppc_asm.h>
-#include <asm/processor.h>
+#include <asm/reg.h>
 #include <asm/cache.h>
 
 	.text

@@ -23,7 +23,6 @@
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 #include <asm/mmu.h>
-#include <asm/processor.h>
 #include <asm/residual.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>

@@ -24,7 +24,6 @@
 #include <asm/ppc4xx_pic.h>
 #include <asm/system.h>
 #include <asm/pci-bridge.h>
-#include <asm/processor.h>
 #include <asm/machdep.h>
 #include <asm/page.h>
 #include <asm/time.h>

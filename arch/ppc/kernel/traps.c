@@ -35,7 +35,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/processor.h>
+#include <asm/reg.h>
 #include <asm/xmon.h>
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>

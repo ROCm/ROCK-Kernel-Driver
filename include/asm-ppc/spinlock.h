@@ -2,7 +2,6 @@
 #define __ASM_SPINLOCK_H
 
 #include <asm/system.h>
-#include <asm/processor.h>
 
 /*
  * Simple spin lock operations.
