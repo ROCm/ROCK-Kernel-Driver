@@ -273,7 +273,7 @@ ia32_sys_call_table:
 	.quad sys_setreuid16	/* 70 */
 	.quad sys_setregid16
 	.quad stub32_sigsuspend
-	.quad sys32_sigpending
+	.quad compat_sys_sigpending
 	.quad sys_sethostname
 	.quad sys32_setrlimit	/* 75 */
 	.quad sys32_old_getrlimit	/* old_getrlimit */
@@ -326,7 +326,7 @@ ia32_sys_call_table:
 	.quad sys32_modify_ldt
 	.quad sys32_adjtimex
 	.quad sys32_mprotect		/* 125 */
-	.quad sys32_sigprocmask
+	.quad compat_sys_sigprocmask
 	.quad sys32_module_warning	/* create_module */
 	.quad sys_init_module
 	.quad sys_delete_module
