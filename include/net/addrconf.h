@@ -160,8 +160,8 @@ static inline void in6_ifa_put(struct inet6_ifaddr *ifp)
 		inet6_ifa_finish_destroy(ifp);
 }
 
-#define __in6_ifa_put(idev)  atomic_dec(&(idev)->refcnt)
-#define in6_ifa_hold(idev)   atomic_inc(&(idev)->refcnt)
+#define __in6_ifa_put(ifp)	atomic_dec(&(ifp)->refcnt)
+#define in6_ifa_hold(ifp)	atomic_inc(&(ifp)->refcnt)
 
 
 extern void			addrconf_forwarding_on(void);
