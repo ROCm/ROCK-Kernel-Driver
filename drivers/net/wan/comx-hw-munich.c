@@ -2823,7 +2823,7 @@ static struct comx_hardware pcicomhw =
 
 /* Module management */
 
-int __init init_mister(void)
+static int __init init_mister(void)
 {
     printk(VERSIONSTR);
     comx_register_hardware(&slicecomhw);
