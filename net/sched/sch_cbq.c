@@ -1614,16 +1614,6 @@ static int cbq_dump_attr(struct sk_buff *skb, struct cbq_class *cl)
 	return 0;
 }
 
-int cbq_copy_xstats(struct sk_buff *skb, struct tc_cbq_xstats *st)
-{
-	RTA_PUT(skb, TCA_XSTATS, sizeof(*st), st);
-	return 0;
-
-rtattr_failure:
-	return -1;
-}
-
-
 static int cbq_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
 	struct cbq_sched_data *q = qdisc_priv(sch);
@@ -1655,7 +1645,6 @@ static int
 cbq_dump_class(struct Qdisc *sch, unsigned long arg,
 	       struct sk_buff *skb, struct tcmsg *tcm)
 {
-	struct cbq_sched_data *q = qdisc_priv(sch);
 	struct cbq_class *cl = (struct cbq_class*)arg;
 	unsigned char	 *b = skb->tail;
 	struct rtattr *rta;
@@ -1672,25 +1661,35 @@ cbq_dump_class(struct Qdisc *sch, unsigned long arg,
 	if (cbq_dump_attr(skb, cl) < 0)
 		goto rtattr_failure;
 	rta->rta_len = skb->tail - b;
-	cl->stats.qlen = cl->q->q.qlen;
-	if (qdisc_copy_stats(skb, &cl->stats, cl->stats_lock))
-		goto rtattr_failure;
-	spin_lock_bh(&sch->dev->queue_lock);
-	cl->xstats.avgidle = cl->avgidle;
-	cl->xstats.undertime = 0;
-	if (!PSCHED_IS_PASTPERFECT(cl->undertime))
-		cl->xstats.undertime = PSCHED_TDIFF(cl->undertime, q->now);
-	if (cbq_copy_xstats(skb, &cl->xstats)) {
-		spin_unlock_bh(&sch->dev->queue_lock);
-		goto rtattr_failure;
-	}
-	spin_unlock_bh(&sch->dev->queue_lock);
-
 	return skb->len;
 
 rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
+}
+
+static int
+cbq_dump_class_stats(struct Qdisc *sch, unsigned long arg,
+	struct gnet_dump *d)
+{
+	struct cbq_sched_data *q = qdisc_priv(sch);
+	struct cbq_class *cl = (struct cbq_class*)arg;
+
+	cl->qstats.qlen = cl->q->q.qlen;
+	cl->xstats.avgidle = cl->avgidle;
+	cl->xstats.undertime = 0;
+
+	if (!PSCHED_IS_PASTPERFECT(cl->undertime))
+		cl->xstats.undertime = PSCHED_TDIFF(cl->undertime, q->now);
+
+	if (gnet_stats_copy_basic(d, &cl->bstats) < 0 ||
+#ifdef CONFIG_NET_ESTIMATOR
+	    gnet_stats_copy_rate_est(d, &cl->rate_est) < 0 ||
+#endif
+	    gnet_stats_copy_queue(d, &cl->qstats) < 0)
+		return -1;
+
+	return gnet_stats_copy_app(d, &cl->xstats, sizeof(cl->xstats));
 }
 
 static int cbq_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
@@ -2121,6 +2120,7 @@ static struct Qdisc_class_ops cbq_class_ops = {
 	.bind_tcf	=	cbq_bind_filter,
 	.unbind_tcf	=	cbq_unbind_filter,
 	.dump		=	cbq_dump_class,
+	.dump_stats	=	cbq_dump_class_stats,
 };
 
 static struct Qdisc_ops cbq_qdisc_ops = {
