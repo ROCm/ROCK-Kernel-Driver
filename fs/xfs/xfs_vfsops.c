@@ -1582,7 +1582,6 @@ xfs_vget(
 
 vfsops_t xfs_vfsops = {
 	.vfs_mount		= xfs_mount,
-	.vfs_dounmount		= fs_dounmount,
 	.vfs_unmount		= xfs_unmount,
 	.vfs_root		= xfs_root,
 	.vfs_statvfs		= xfs_statvfs,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -34,8 +34,6 @@
 
 #ifdef __KERNEL__
 
-#include <linux/types.h>
-
 /*
  * POSIX Extensions
  */
@@ -56,9 +54,7 @@ typedef unsigned int		__uint32_t;
 typedef signed long long int	__int64_t;
 typedef unsigned long long int	__uint64_t;
 
-typedef enum { B_FALSE, B_TRUE } boolean_t;
-
-
+typedef enum { B_FALSE,B_TRUE }	boolean_t;
 typedef __int64_t		prid_t;		/* project ID */
 typedef __uint32_t		inst_t;		/* an instruction */
 
@@ -67,12 +63,6 @@ typedef __u64			xfs_ino_t;	/* <inode> type */
 typedef __s64			xfs_daddr_t;	/* <disk address> type */
 typedef char *			xfs_caddr_t;	/* <core address> type */
 typedef __u32			xfs_dev_t;
-
-typedef struct timespec		timespec_t;
-
-typedef struct {
-	unsigned char	__u_bits[16];
-} uuid_t;
 
 /* __psint_t is the same size as a pointer */
 #if (BITS_PER_LONG == 32)
@@ -184,6 +174,18 @@ typedef __uint8_t	xfs_arch_t;	/* architecture of an xfs fs */
  * the longest permissible file (component) name.
  */
 #define MAXNAMELEN	256
+
+typedef struct xfs_dirent {		/* data from readdir() */
+	xfs_ino_t	d_ino;		/* inode number of entry */
+	xfs_off_t	d_off;		/* offset of disk directory entry */
+	unsigned short	d_reclen;	/* length of this record */
+	char		d_name[1];	/* name of file */
+} xfs_dirent_t;
+
+#define DIRENTBASESIZE		(((xfs_dirent_t *)0)->d_name - (char *)0)
+#define DIRENTSIZE(namelen)	\
+	((DIRENTBASESIZE + (namelen) + \
+		sizeof(xfs_off_t)) & ~(sizeof(xfs_off_t) - 1))
 
 typedef enum {
 	XFS_LOOKUP_EQi, XFS_LOOKUP_LEi, XFS_LOOKUP_GEi

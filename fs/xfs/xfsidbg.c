@@ -4162,8 +4162,6 @@ xfsidbg_xinodes_quiesce(xfs_mount_t *mp)
 			}
 			if (!(ip->i_flags & XFS_IQUIESCE)) {
 				kdb_printf("ip 0x%p not quiesced\n", ip);
-			} else if (!BHV_IS_WRITE_LOCKED(VN_BHV_HEAD(XFS_ITOV(ip)))) {
-				kdb_printf("ip 0x%p not write locked\n", ip);
 			}
 			ip = ip->i_mnext;
 		} while (ip != mp->m_inodes);

@@ -13,7 +13,6 @@
 
 #define DEVFS_FL_NONE           0x000 /* This helps to make code more readable
 				       */
-#define DEVFS_FL_REMOVABLE      0x008 /* This is a removable media device    */
 #define DEVFS_FL_WAIT           0x010 /* Wait for devfsd to finish           */
 #define DEVFS_FL_CURRENT_OWNER  0x020 /* Set initial ownership to current    */
 #define DEVFS_FL_DEFAULT        DEVFS_FL_NONE
@@ -37,7 +36,6 @@ struct unique_numspace
 
 #define UNIQUE_NUMBERSPACE_INITIALISER {SPIN_LOCK_UNLOCKED, 0, 0, 0, NULL}
 
-extern void devfs_put (devfs_handle_t de);
 extern devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 				      unsigned int flags,
 				      unsigned int major, unsigned int minor,
@@ -66,10 +64,6 @@ struct unique_numspace
 
 #define UNIQUE_NUMBERSPACE_INITIALISER {0}
 
-static inline void devfs_put (devfs_handle_t de)
-{
-    return;
-}
 static inline devfs_handle_t devfs_register (devfs_handle_t dir,
 					     const char *name,
 					     unsigned int flags,

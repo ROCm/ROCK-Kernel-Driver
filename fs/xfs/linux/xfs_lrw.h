@@ -47,36 +47,36 @@ struct page_buf_bmap_s;
  */
 #define XFS_MAX_RW_NBMAPS	4
 
-extern int xfs_bmap (struct bhv_desc *, xfs_off_t, ssize_t, int,
+extern int xfs_bmap(struct bhv_desc *, xfs_off_t, ssize_t, int,
 			struct page_buf_bmap_s *, int *);
-extern int xfsbdstrat (struct xfs_mount *, struct page_buf_s *);
-extern int xfs_bdstrat_cb (struct page_buf_s *);
+extern int xfsbdstrat(struct xfs_mount *, struct page_buf_s *);
+extern int xfs_bdstrat_cb(struct page_buf_s *);
 
-extern int xfs_zero_eof (struct vnode *, struct xfs_iocore *, xfs_off_t,
+extern int xfs_zero_eof(struct vnode *, struct xfs_iocore *, xfs_off_t,
 				xfs_fsize_t, xfs_fsize_t);
-extern ssize_t xfs_read (struct bhv_desc *, struct file *,
+extern ssize_t xfs_read(struct bhv_desc *, struct file *,
 				const struct iovec *, unsigned long,
 				loff_t *, struct cred *);
-extern ssize_t xfs_write (struct bhv_desc *, struct file *,
+extern ssize_t xfs_write(struct bhv_desc *, struct file *,
 				const struct iovec *, unsigned long,
 				loff_t *, struct cred *);
-extern ssize_t xfs_sendfile (struct bhv_desc *, struct file *,
+extern ssize_t xfs_sendfile(struct bhv_desc *, struct file *,
 				loff_t *, size_t, read_actor_t,
 				void *, struct cred *);
 
-extern int xfs_iomap (struct xfs_iocore *, xfs_off_t, ssize_t, int,
+extern int xfs_iomap(struct xfs_iocore *, xfs_off_t, ssize_t, int,
 				struct page_buf_bmap_s *, int *);
-extern int xfs_iomap_write_direct (struct xfs_inode *, loff_t, size_t,
+extern int xfs_iomap_write_direct(struct xfs_inode *, loff_t, size_t,
 				int, struct xfs_bmbt_irec *, int *, int);
-extern int xfs_iomap_write_delay (struct xfs_inode *, loff_t, size_t,
+extern int xfs_iomap_write_delay(struct xfs_inode *, loff_t, size_t,
 				int, struct xfs_bmbt_irec *, int *);
-extern int xfs_iomap_write_allocate (struct xfs_inode *,
+extern int xfs_iomap_write_allocate(struct xfs_inode *,
 				struct xfs_bmbt_irec *, int *);
-extern int xfs_iomap_write_unwritten (struct xfs_inode *, loff_t, size_t);
+extern int xfs_iomap_write_unwritten(struct xfs_inode *, loff_t, size_t);
 
-extern int xfs_dev_is_read_only (struct xfs_mount *, char *);
+extern int xfs_dev_is_read_only(struct xfs_mount *, char *);
 
-extern void XFS_log_write_unmount_ro (struct bhv_desc *);
+extern void XFS_log_write_unmount_ro(struct bhv_desc *);
 
 #define XFS_FSB_TO_DB_IO(io,fsb) \
 		(((io)->io_flags & XFS_IOCORE_RT) ? \

@@ -33,48 +33,6 @@
 #include <xfs.h>
 
 /*
- * Implementation for VFS_DOUNMOUNT.
- */
-int
-fs_dounmount(
-	bhv_desc_t	*bdp,
-	int		flags,
-	vnode_t		*rootvp,
-	cred_t		*cr)
-{
-	struct vfs	*vfsp = bhvtovfs(bdp);
-	bhv_desc_t	*fbdp = vfsp->vfs_fbhv;
-	int		error;
-
-	/*
-	 * Wait for sync to finish and lock vfsp.  This also sets the
-	 * VFS_OFFLINE flag.  Once we do this we can give up reference
-	 * the root vnode which we hold to avoid the another unmount
-	 * ripping the vfs out from under us before we get to lock it.
-	 * The VFS_DOUNMOUNT calling convention is that the reference
-	 * on the rot vnode is released whether the call succeeds or
-	 * fails.
-	 */
-	if (rootvp)
-		VN_RELE(rootvp);
-
-	/*
-	 * Now invoke SYNC and UNMOUNT ops, using the PVFS versions is
-	 * OK since we already have a behavior lock as a result of
-	 * being in VFS_DOUNMOUNT.  It is necessary to do things this
-	 * way since using the VFS versions would cause us to get the
-	 * behavior lock twice which can cause deadlock as well as
-	 * making the coding of vfs relocation unnecessarilty difficult
-	 * by making relocations invoked by unmount occur in a different
-	 * environment than those invoked by mount-update.
-	 */
-	PVFS_SYNC(fbdp, SYNC_ATTR|SYNC_DELWRI, cr, error);
-	if (error == 0)
-		PVFS_UNMOUNT(fbdp, flags, cr, error);
-	return error;
-}
-
-/*
  * Stub for no-op vnode operations that return error status.
  */
 int

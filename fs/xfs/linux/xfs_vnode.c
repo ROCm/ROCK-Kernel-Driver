@@ -137,6 +137,7 @@ vn_initialize(struct inode *inode)
 	struct vnode	*vp = LINVFS_GET_VP(inode);
 
 	XFS_STATS_INC(xfsstats.vn_active);
+	XFS_STATS_INC(xfsstats.vn_alloc);
 
 	vp->v_flag = VMODIFIED;
 	spinlock_init(&vp->v_lock, "v_lock");
