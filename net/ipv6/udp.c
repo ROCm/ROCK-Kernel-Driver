@@ -1044,7 +1044,14 @@ static int udpv6_setsockopt(struct sock *sk, int level, int optname,
 		break;
 		
 	case UDP_ENCAP:
-		up->encap_type = val;
+		switch (val) {
+		case 0:
+			up->encap_type = val;
+			break;
+		default:
+			err = -ENOPROTOOPT;
+			break;
+		}
 		break;
 
 	default:

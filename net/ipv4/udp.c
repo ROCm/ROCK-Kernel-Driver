@@ -964,6 +964,7 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 	len = skb->tail - udpdata;
 
 	switch (encap_type) {
+	default:
 	case UDP_ENCAP_ESPINUDP:
 		/* Check if this is a keepalive packet.  If so, eat it. */
 		if (len == 1 && udpdata[0] == 0xff) {
@@ -1016,12 +1017,6 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 		} else
 			/* Must be an IKE packet.. pass it through */
 			return 1;
-
-	default:
-		if (net_ratelimit())
-			printk(KERN_INFO "udp_encap_rcv(): Unhandled UDP encap type: %u\n",
-			       encap_type);
-		return 1;
 	}
 #endif
 }
@@ -1297,7 +1292,16 @@ static int udp_setsockopt(struct sock *sk, int level, int optname,
 		break;
 		
 	case UDP_ENCAP:
-		up->encap_type = val;
+		switch (val) {
+		case 0:
+		case UDP_ENCAP_ESPINUDP:
+		case UDP_ENCAP_ESPINUDP_NON_IKE:
+			up->encap_type = val;
+			break;
+		default:
+			err = -ENOPROTOOPT;
+			break;
+		}
 		break;
 
 	default:
