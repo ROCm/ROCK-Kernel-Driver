@@ -2428,28 +2428,22 @@ struct raw32_config_request
         __u64   block_minor;
 } __attribute__((packed));
 
-static int get_raw32_request(struct raw_config_request *req, struct raw32_config_request *user_req)
+static int get_raw32_request(struct raw_config_request *req, struct raw32_config_request __user *user_req)
 {
-        __u32   lo_maj, hi_maj, lo_min, hi_min;
         int ret;
 
         if ((ret = verify_area(VERIFY_READ, user_req,
                                sizeof(struct raw32_config_request))))
                 return ret;
 
-        __get_user(req->raw_minor, &user_req->raw_minor);
-        __get_user(lo_maj, (__u32*)&user_req->block_major);
-        __get_user(hi_maj, ((__u32*)(&user_req->block_major) + 1));
-        __get_user(lo_min, (__u32*)&user_req->block_minor);
-        __get_user(hi_min, ((__u32*)(&user_req->block_minor) + 1));
+        ret = __get_user(req->raw_minor, &user_req->raw_minor);
+        ret |= __get_user(req->block_major, &user_req->block_major);
+        ret |= __get_user(req->block_minor, &user_req->block_minor);
 
-        req->block_major = lo_maj | (((__u64)hi_maj) << 32);
-        req->block_minor = lo_min | (((__u64)hi_min) << 32);
-
-        return ret;
+        return ret ? -EFAULT : 0;
 }
 
-static int set_raw32_request(struct raw_config_request *req, struct raw32_config_request *user_req)
+static int set_raw32_request(struct raw_config_request *req, struct raw32_config_request __user *user_req)
 {
 	int ret;
 
@@ -2457,13 +2451,11 @@ static int set_raw32_request(struct raw_config_request *req, struct raw32_config
                                sizeof(struct raw32_config_request))))
                 return ret;
 
-        __put_user(req->raw_minor, &user_req->raw_minor);
-        __put_user((__u32)(req->block_major), (__u32*)&user_req->block_major);
-        __put_user((__u32)(req->block_major >> 32), ((__u32*)(&user_req->block_major) + 1));
-        __put_user((__u32)(req->block_minor), (__u32*)&user_req->block_minor);
-        __put_user((__u32)(req->block_minor >> 32), ((__u32*)(&user_req->block_minor) + 1));
+        ret = __put_user(req->raw_minor, &user_req->raw_minor);
+        ret |= __put_user(req->block_major, &user_req->block_major);
+        ret |= __put_user(req->block_minor, &user_req->block_minor);
 
-        return ret;
+        return ret ? -EFAULT : 0;
 }
 
 static int raw_ioctl(unsigned fd, unsigned cmd, unsigned long arg)
@@ -2474,7 +2466,7 @@ static int raw_ioctl(unsigned fd, unsigned cmd, unsigned long arg)
         case RAW_SETBIND:
         case RAW_GETBIND: {
                 struct raw_config_request req;
-                struct raw32_config_request *user_req = compat_ptr(arg);
+                struct raw32_config_request __user *user_req = compat_ptr(arg);
                 mm_segment_t oldfs = get_fs();
 
                 if ((ret = get_raw32_request(&req, user_req)))
