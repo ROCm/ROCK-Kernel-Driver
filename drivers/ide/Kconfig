@@ -273,15 +273,6 @@ config IDE_TASK_IOCTL
 
 	  If you are unsure, say N here.
 
-config IDE_TASKFILE_IO
-	bool 'IDE Taskfile IO (EXPERIMENTAL)'
-	depends on EXPERIMENTAL
-	default n
-	---help---
-	  Use new taskfile IO code.
-
-	  It is safe to say Y to this question, in most cases.
-
 comment "IDE chipset support/bugfixes"
 
 config IDE_GENERIC
