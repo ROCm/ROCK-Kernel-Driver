@@ -2,7 +2,7 @@
  * This file implement the Wireless Extensions APIs.
  *
  * Authors :	Jean Tourrilhes - HPL - <jt@hpl.hp.com>
- * Copyright (c) 1997-2001 Jean Tourrilhes, All Rights Reserved.
+ * Copyright (c) 1997-2002 Jean Tourrilhes, All Rights Reserved.
  *
  * (As all part of the Linux kernel, this file is GPL)
  */
@@ -25,6 +25,14 @@
  *	o Added iw_handler handling ;-)
  *	o Added standard ioctl description
  *	o Initial dumb commit strategy based on orinoco.c
+ *
+ * v3 - 19.12.01 - Jean II
+ *	o Make sure we don't go out of standard_ioctl[] in ioctl_standard_call
+ *	o Fix /proc/net/wireless to handle __u8 to __s8 change in iwqual
+ *	o Add event dispatcher function
+ *	o Add event description
+ *	o Propagate events as rtnetlink IFLA_WIRELESS option
+ *	o Generate event on selected SET requests
  */
 
 /***************************** INCLUDES *****************************/
@@ -33,6 +41,7 @@
 #include <linux/config.h>		/* Not needed ??? */
 #include <linux/types.h>		/* off_t */
 #include <linux/netdevice.h>		/* struct ifreq, dev_get_by_name() */
+#include <linux/rtnetlink.h>		/* rtnetlink stuff */
 
 #include <linux/wireless.h>		/* Pretty obvious */
 #include <net/iw_handler.h>		/* New driver API */
@@ -44,14 +53,23 @@
 
 /* Debuging stuff */
 #undef WE_IOCTL_DEBUG		/* Debug IOCTL API */
+#undef WE_EVENT_DEBUG		/* Debug Event dispatcher */
+
+/* Options */
+#define WE_EVENT_NETLINK	/* Propagate events using rtnetlink */
+#define WE_SET_EVENT		/* Generate an event on some set commands */
 
 /************************* GLOBAL VARIABLES *************************/
 /*
  * You should not use global variables, because or re-entrancy.
  * On our case, it's only const, so it's OK...
  */
+/*
+ * Meta-data about all the standard Wireless Extension request we
+ * know about.
+ */
 static const struct iw_ioctl_description	standard_ioctl[] = {
-	/* SIOCSIWCOMMIT (internal) */
+	/* SIOCSIWCOMMIT */
 	{ IW_HEADER_TYPE_NULL, 0, 0, 0, 0, 0},
 	/* SIOCGIWNAME */
 	{ IW_HEADER_TYPE_CHAR, 0, 0, 0, 0, IW_DESCR_FLAG_DUMP},
@@ -99,10 +117,10 @@ static const struct iw_ioctl_description	standard_ioctl[] = {
 	{ IW_HEADER_TYPE_NULL, 0, 0, 0, 0, 0},
 	/* SIOCGIWAPLIST */
 	{ IW_HEADER_TYPE_POINT, 0, (sizeof(struct sockaddr) + sizeof(struct iw_quality)), 0, IW_MAX_AP, 0},
-	/* -- hole -- */
-	{ IW_HEADER_TYPE_NULL, 0, 0, 0, 0, 0},
-	/* -- hole -- */
-	{ IW_HEADER_TYPE_NULL, 0, 0, 0, 0, 0},
+	/* SIOCSIWSCAN */
+	{ IW_HEADER_TYPE_PARAM, 0, 0, 0, 0, 0},
+	/* SIOCGIWSCAN */
+	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_SCAN_MAX_DATA, 0},
 	/* SIOCSIWESSID */
 	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ESSID_MAX_SIZE, IW_DESCR_FLAG_EVENT},
 	/* SIOCGIWESSID */
@@ -136,7 +154,7 @@ static const struct iw_ioctl_description	standard_ioctl[] = {
 	/* SIOCGIWRETRY */
 	{ IW_HEADER_TYPE_PARAM, 0, 0, 0, 0, 0},
 	/* SIOCSIWENCODE */
-	{ IW_HEADER_TYPE_POINT, 4, 1, 0, IW_ENCODING_TOKEN_MAX, IW_DESCR_FLAG_EVENT | IW_DESCR_FLAG_RESTRICT},
+	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ENCODING_TOKEN_MAX, IW_DESCR_FLAG_EVENT | IW_DESCR_FLAG_RESTRICT},
 	/* SIOCGIWENCODE */
 	{ IW_HEADER_TYPE_POINT, 0, 1, 0, IW_ENCODING_TOKEN_MAX, IW_DESCR_FLAG_DUMP | IW_DESCR_FLAG_RESTRICT},
 	/* SIOCSIWPOWER */
@@ -144,9 +162,38 @@ static const struct iw_ioctl_description	standard_ioctl[] = {
 	/* SIOCGIWPOWER */
 	{ IW_HEADER_TYPE_PARAM, 0, 0, 0, 0, 0},
 };
+static const int standard_ioctl_num = (sizeof(standard_ioctl) /
+				       sizeof(struct iw_ioctl_description));
+
+/*
+ * Meta-data about all the additional standard Wireless Extension events
+ * we know about.
+ */
+static const struct iw_ioctl_description	standard_event[] = {
+	/* IWEVTXDROP */
+	{ IW_HEADER_TYPE_ADDR, 0, 0, 0, 0, 0},
+	/* IWEVQUAL */
+	{ IW_HEADER_TYPE_QUAL, 0, 0, 0, 0, 0},
+};
+static const int standard_event_num = (sizeof(standard_event) /
+				       sizeof(struct iw_ioctl_description));
 
 /* Size (in bytes) of the various private data types */
-char priv_type_size[] = { 0, 1, 1, 0, 4, 4, 0, 0 };
+static const char priv_type_size[] = { 0, 1, 1, 0, 4, 4, 0, 0 };
+
+/* Size (in bytes) of various events */
+static const int event_type_size[] = {
+	IW_EV_LCP_LEN,
+	0,
+	IW_EV_CHAR_LEN,
+	0,
+	IW_EV_UINT_LEN,
+	IW_EV_FREQ_LEN,
+	IW_EV_POINT_LEN,		/* Without variable payload */
+	IW_EV_PARAM_LEN,
+	IW_EV_ADDR_LEN,
+	IW_EV_QUAL_LEN,
+};
 
 /************************ COMMON SUBROUTINES ************************/
 /*
@@ -162,7 +209,8 @@ char priv_type_size[] = { 0, 1, 1, 0, 4, 4, 0, 0 };
 static inline iw_handler get_handler(struct net_device *dev,
 				     unsigned int cmd)
 {
-	unsigned int	index;		/* MUST be unsigned */
+	/* Don't "optimise" the following variable, it will crash */
+	unsigned int	index;		/* *MUST* be unsigned */
 
 	/* Check if we have some wireless handlers defined */
 	if(dev->wireless_handlers == NULL)
@@ -269,9 +317,9 @@ static inline int sprintf_wireless_stats(char *buffer, struct net_device *dev)
 			       stats->status,
 			       stats->qual.qual,
 			       stats->qual.updated & 1 ? '.' : ' ',
-			       stats->qual.level,
+			       ((__u8) stats->qual.level),
 			       stats->qual.updated & 2 ? '.' : ' ',
-			       stats->qual.noise,
+			       ((__u8) stats->qual.noise),
 			       stats->qual.updated & 4 ? '.' : ' ',
 			       stats->discard.nwid,
 			       stats->discard.code,
@@ -423,12 +471,14 @@ static inline int ioctl_standard_call(struct net_device *	dev,
 	int					ret = -EINVAL;
 
 	/* Get the description of the IOCTL */
+	if((cmd - SIOCIWFIRST) >= standard_ioctl_num)
+		return -EOPNOTSUPP;
 	descr = &(standard_ioctl[cmd - SIOCIWFIRST]);
 
 #ifdef WE_IOCTL_DEBUG
-	printk(KERN_DEBUG "%s : Found standard handler for 0x%04X\n",
+	printk(KERN_DEBUG "%s (WE) : Found standard handler for 0x%04X\n",
 	       ifr->ifr_name, cmd);
-	printk(KERN_DEBUG "Header type : %d, token type : %d, token_size : %d, max_token : %d\n", descr->header_type, descr->token_type, descr->token_size, descr->max_tokens);
+	printk(KERN_DEBUG "%s (WE) : Header type : %d, Token type : %d, size : %d, token : %d\n", dev->name, descr->header_type, descr->token_type, descr->token_size, descr->max_tokens);
 #endif	/* WE_IOCTL_DEBUG */
 
 	/* Prepare the call */
@@ -437,8 +487,16 @@ static inline int ioctl_standard_call(struct net_device *	dev,
 
 	/* Check if we have a pointer to user space data or not */
 	if(descr->header_type != IW_HEADER_TYPE_POINT) {
+
 		/* No extra arguments. Trivial to handle */
 		ret = handler(dev, &info, &(iwr->u), NULL);
+
+#ifdef WE_SET_EVENT
+		/* Generate an event to notify listeners of the change */
+		if((descr->flags & IW_DESCR_FLAG_EVENT) &&
+		   ((ret == 0) || (ret == -EIWCOMMIT)))
+			wireless_send_event(dev, cmd, &(iwr->u), NULL);
+#endif	/* WE_SET_EVENT */
 	} else {
 		char *	extra;
 		int	err;
@@ -466,8 +524,8 @@ static inline int ioctl_standard_call(struct net_device *	dev,
 		}
 
 #ifdef WE_IOCTL_DEBUG
-		printk(KERN_DEBUG "Malloc %d bytes\n",
-		       descr->max_tokens * descr->token_size);
+		printk(KERN_DEBUG "%s (WE) : Malloc %d bytes\n",
+		       dev->name, descr->max_tokens * descr->token_size);
 #endif	/* WE_IOCTL_DEBUG */
 
 		/* Always allocate for max space. Easier, and won't last
@@ -488,7 +546,8 @@ static inline int ioctl_standard_call(struct net_device *	dev,
 				return -EFAULT;
 			}
 #ifdef WE_IOCTL_DEBUG
-			printk(KERN_DEBUG "Got %d bytes\n",
+			printk(KERN_DEBUG "%s (WE) : Got %d bytes\n",
+			       dev->name,
 			       iwr->u.data.length * descr->token_size);
 #endif	/* WE_IOCTL_DEBUG */
 		}
@@ -504,10 +563,25 @@ static inline int ioctl_standard_call(struct net_device *	dev,
 			if (err)
 				ret =  -EFAULT;				   
 #ifdef WE_IOCTL_DEBUG
-			printk(KERN_DEBUG "Wrote %d bytes\n",
+			printk(KERN_DEBUG "%s (WE) : Wrote %d bytes\n",
+			       dev->name,
 			       iwr->u.data.length * descr->token_size);
 #endif	/* WE_IOCTL_DEBUG */
 		}
+
+#ifdef WE_SET_EVENT
+		/* Generate an event to notify listeners of the change */
+		if((descr->flags & IW_DESCR_FLAG_EVENT) &&
+		   ((ret == 0) || (ret == -EIWCOMMIT))) {
+			if(descr->flags & IW_DESCR_FLAG_RESTRICT)
+				/* If the event is restricted, don't
+				 * export the payload */
+				wireless_send_event(dev, cmd, &(iwr->u), NULL);
+			else
+				wireless_send_event(dev, cmd, &(iwr->u),
+						    extra);
+		}
+#endif	/* WE_SET_EVENT */
 
 		/* Cleanup - I told you it wasn't that long ;-) */
 		kfree(extra);
@@ -558,11 +632,12 @@ static inline int ioctl_private_call(struct net_device *	dev,
 		}
 
 #ifdef WE_IOCTL_DEBUG
-	printk(KERN_DEBUG "%s : Found private handler for 0x%04X\n",
+	printk(KERN_DEBUG "%s (WE) : Found private handler for 0x%04X\n",
 	       ifr->ifr_name, cmd);
 	if(descr) {
-		printk(KERN_DEBUG "Name %s, set %X, get %X\n",
-		       descr->name, descr->set_args, descr->get_args);
+		printk(KERN_DEBUG "%s (WE) : Name %s, set %X, get %X\n",
+		       dev->name, descr->name,
+		       descr->set_args, descr->get_args);
 	}
 #endif	/* WE_IOCTL_DEBUG */
 
@@ -617,7 +692,8 @@ static inline int ioctl_private_call(struct net_device *	dev,
 		}
 
 #ifdef WE_IOCTL_DEBUG
-		printk(KERN_DEBUG "Malloc %d bytes\n", extra_size);
+		printk(KERN_DEBUG "%s (WE) : Malloc %d bytes\n",
+		       dev->name, extra_size);
 #endif	/* WE_IOCTL_DEBUG */
 
 		/* Always allocate for max space. Easier, and won't last
@@ -636,7 +712,8 @@ static inline int ioctl_private_call(struct net_device *	dev,
 				return -EFAULT;
 			}
 #ifdef WE_IOCTL_DEBUG
-			printk(KERN_DEBUG "Got %d elem\n", iwr->u.data.length);
+			printk(KERN_DEBUG "%s (WE) : Got %d elem\n",
+			       dev->name, iwr->u.data.length);
 #endif	/* WE_IOCTL_DEBUG */
 		}
 
@@ -650,8 +727,8 @@ static inline int ioctl_private_call(struct net_device *	dev,
 			if (err)
 				ret =  -EFAULT;				   
 #ifdef WE_IOCTL_DEBUG
-			printk(KERN_DEBUG "Wrote %d elem\n",
-			       iwr->u.data.length);
+			printk(KERN_DEBUG "%s (WE) : Wrote %d elem\n",
+			       dev->name, iwr->u.data.length);
 #endif	/* WE_IOCTL_DEBUG */
 		}
 
@@ -730,4 +807,178 @@ int wireless_process_ioctl(struct ifreq *ifr, unsigned int cmd)
 	}
 	/* Not reached */
 	return -EINVAL;
+}
+
+/************************* EVENT PROCESSING *************************/
+/*
+ * Process events generated by the wireless layer or the driver.
+ * Most often, the event will be propagated through rtnetlink
+ */
+
+#ifdef WE_EVENT_NETLINK
+/* "rtnl" is defined in net/core/rtnetlink.c, but we need it here.
+ * It is declared in <linux/rtnetlink.h> */
+
+/* ---------------------------------------------------------------- */
+/*
+ * Fill a rtnetlink message with our event data.
+ * Note that we propage only the specified event and don't dump the
+ * current wireless config. Dumping the wireless config is far too
+ * expensive (for each parameter, the driver need to query the hardware).
+ */
+static inline int rtnetlink_fill_iwinfo(struct sk_buff *	skb,
+					struct net_device *	dev,
+					int			type,
+					char *			event,
+					int			event_len)
+{
+	struct ifinfomsg *r;
+	struct nlmsghdr  *nlh;
+	unsigned char	 *b = skb->tail;
+
+	nlh = NLMSG_PUT(skb, 0, 0, type, sizeof(*r));
+	r = NLMSG_DATA(nlh);
+	r->ifi_family = AF_UNSPEC;
+	r->ifi_type = dev->type;
+	r->ifi_index = dev->ifindex;
+	r->ifi_flags = dev->flags;
+	r->ifi_change = 0;	/* Wireless changes don't affect those flags */
+
+	/* Add the wireless events in the netlink packet */
+	RTA_PUT(skb, IFLA_WIRELESS,
+		event_len, event);
+
+	nlh->nlmsg_len = skb->tail - b;
+	return skb->len;
+
+nlmsg_failure:
+rtattr_failure:
+	skb_trim(skb, b - skb->data);
+	return -1;
+}
+
+/* ---------------------------------------------------------------- */
+/*
+ * Create and broadcast and send it on the standard rtnetlink socket
+ * This is a pure clone rtmsg_ifinfo() in net/core/rtnetlink.c
+ * Andrzej Krzysztofowicz mandated that I used a IFLA_XXX field
+ * within a RTM_NEWLINK event.
+ */
+static inline void rtmsg_iwinfo(struct net_device *	dev,
+				char *			event,
+				int			event_len)
+{
+	struct sk_buff *skb;
+	int size = NLMSG_GOODSIZE;
+
+	skb = alloc_skb(size, GFP_ATOMIC);
+	if (!skb)
+		return;
+
+	if (rtnetlink_fill_iwinfo(skb, dev, RTM_NEWLINK,
+				  event, event_len) < 0) {
+		kfree_skb(skb);
+		return;
+	}
+	NETLINK_CB(skb).dst_groups = RTMGRP_LINK;
+	netlink_broadcast(rtnl, skb, 0, RTMGRP_LINK, GFP_ATOMIC);
+}
+#endif	/* WE_EVENT_NETLINK */
+
+/* ---------------------------------------------------------------- */
+/*
+ * Main event dispatcher. Called from other parts and drivers.
+ * Send the event on the apropriate channels.
+ * May be called from interrupt context.
+ */
+void wireless_send_event(struct net_device *	dev,
+			 unsigned int		cmd,
+			 union iwreq_data *	wrqu,
+			 char *			extra)
+{
+	const struct iw_ioctl_description *	descr = NULL;
+	int extra_len = 0;
+	struct iw_event  *event;		/* Mallocated whole event */
+	int event_len;				/* Its size */
+	int hdr_len;				/* Size of the event header */
+	/* Don't "optimise" the following variable, it will crash */
+	unsigned	cmd_index;		/* *MUST* be unsigned */
+
+	/* Get the description of the IOCTL */
+	if(cmd <= SIOCIWLAST) {
+		cmd_index = cmd - SIOCIWFIRST;
+		if(cmd_index < standard_ioctl_num)
+			descr = &(standard_ioctl[cmd_index]);
+	} else {
+		cmd_index = cmd - IWEVFIRST;
+		if(cmd_index < standard_event_num)
+			descr = &(standard_event[cmd_index]);
+	}
+	/* Don't accept unknown events */
+	if(descr == NULL) {
+		/* Note : we don't return an error to the driver, because
+		 * the driver would not know what to do about it. It can't
+		 * return an error to the user, because the event is not
+		 * initiated by a user request.
+		 * The best the driver could do is to log an error message.
+		 * We will do it ourselves instead...
+		 */
+	  	printk(KERN_ERR "%s (WE) : Invalid Wireless Event (0x%04X)\n",
+		       dev->name, cmd);
+		return;
+	}
+#ifdef WE_EVENT_DEBUG
+	printk(KERN_DEBUG "%s (WE) : Got event 0x%04X\n",
+	       dev->name, cmd);
+	printk(KERN_DEBUG "%s (WE) : Header type : %d, Token type : %d, size : %d, token : %d\n", dev->name, descr->header_type, descr->token_type, descr->token_size, descr->max_tokens);
+#endif	/* WE_EVENT_DEBUG */
+
+	/* Check extra parameters and set extra_len */
+	if(descr->header_type == IW_HEADER_TYPE_POINT) {
+		/* Check if number of token fits within bounds */
+		if(wrqu->data.length > descr->max_tokens) {
+		  	printk(KERN_ERR "%s (WE) : Wireless Event too big (%d)\n", dev->name, wrqu->data.length);
+			return;
+		}
+		if(wrqu->data.length < descr->min_tokens) {
+		  	printk(KERN_ERR "%s (WE) : Wireless Event too small (%d)\n", dev->name, wrqu->data.length);
+			return;
+		}
+		/* Calculate extra_len - extra is NULL for restricted events */
+		if(extra != NULL)
+			extra_len = wrqu->data.length * descr->token_size;
+#ifdef WE_EVENT_DEBUG
+		printk(KERN_DEBUG "%s (WE) : Event 0x%04X, tokens %d, extra_len %d\n", dev->name, cmd, wrqu->data.length, extra_len);
+#endif	/* WE_EVENT_DEBUG */
+	}
+
+	/* Total length of the event */
+	hdr_len = event_type_size[descr->header_type];
+	event_len = hdr_len + extra_len;
+
+#ifdef WE_EVENT_DEBUG
+	printk(KERN_DEBUG "%s (WE) : Event 0x%04X, hdr_len %d, event_len %d\n", dev->name, cmd, hdr_len, event_len);
+#endif	/* WE_EVENT_DEBUG */
+
+	/* Create temporary buffer to hold the event */
+	event = kmalloc(event_len, GFP_ATOMIC);
+	if(event == NULL)
+		return;
+
+	/* Fill event */
+	event->len = event_len;
+	event->cmd = cmd;
+	memcpy(&event->u, wrqu, hdr_len - IW_EV_LCP_LEN);
+	if(extra != NULL)
+		memcpy(((char *) event) + hdr_len, extra, extra_len);
+
+#ifdef WE_EVENT_NETLINK
+	/* rtnetlink event channel */
+	rtmsg_iwinfo(dev, (char *) event, event_len);
+#endif	/* WE_EVENT_NETLINK */
+
+	/* Cleanup */
+	kfree(event);
+
+	return;		/* Always success, I guess ;-) */
 }
