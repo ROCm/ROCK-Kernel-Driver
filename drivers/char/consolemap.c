@@ -577,6 +577,7 @@ con_set_default_unimap(int con)
 	dflt = p;
 	return err;
 }
+EXPORT_SYMBOL(con_set_default_unimap);
 
 int
 con_copy_unimap(int dstcon, int srccon)
