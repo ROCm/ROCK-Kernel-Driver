@@ -1,7 +1,7 @@
 /* linux/drivers/char/watchdog/s3c2410_wdt.c
  *
  * Copyright (c) 2004 Simtec Electronics
- * Ben Dooks <ben@simtec.co.uk>
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * S3C2410 Watchdog Timer Support
  *
@@ -21,6 +21,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Changelog:
+ *	05-Oct-2004	BJD	Added semaphore init to stop crashes on open
+ *				Fixed tmr_count / wdt_count confusion
+ *				Added configurable debug
 */
 
 #include <linux/module.h>
@@ -50,34 +55,21 @@
 
 #define PFX "s3c2410-wdt: "
 
-#ifdef CONFIG_S3C2410_WATCHDOG_DEBUG
-#undef pr_debug
-#define pr_debug(msg, x...) do { printk(KERN_INFO msg, x); } while(0)
-#endif
+#define CONFIG_WATCHDOG_NOWAYOUT		(0)
+#define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
+#define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
 
-/* configurations from makefile */
-
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-#define CONFIG_WATCHDOG_NOWAYOUT (0)
-#endif
-
-#ifndef CONFIG_S3C2410_WATCHDOG_ATBOOT
-#define CONFIG_S3C2410_WATCHDOG_ATBOOT (0)
-#endif
-
-#ifndef CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME
-#define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME (15)
-#endif
-
-static int tmr_margin  = CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME;
-static int tmr_atboot  = CONFIG_S3C2410_WATCHDOG_ATBOOT;
-static int nowayout    = CONFIG_WATCHDOG_NOWAYOUT;
-static int soft_noboot = 0;
+static int tmr_margin	= CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME;
+static int tmr_atboot	= CONFIG_S3C2410_WATCHDOG_ATBOOT;
+static int nowayout	= CONFIG_WATCHDOG_NOWAYOUT;
+static int soft_noboot	= 0;
+static int debug	= 0;
 
 module_param(tmr_margin,  int, 0);
 module_param(tmr_atboot,  int, 0);
 module_param(nowayout,    int, 0);
 module_param(soft_noboot, int, 0);
+module_param(debug,	  int, 0);
 
 MODULE_PARM_DESC(tmr_margin, "Watchdog tmr_margin in seconds. default=" __MODULE_STRING(CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME) ")");
 
@@ -87,13 +79,16 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 
 MODULE_PARM_DESC(soft_noboot, "Watchdog action, set to 1 to ignore reboots, 0 to reboot (default depends on ONLY_TESTING)");
 
+MODULE_PARM_DESC(debug, "Watchdog debug, set to >1 for debug, (default 0)");
+
 
 typedef enum close_state {
 	CLOSE_STATE_NOT,
 	CLOSE_STATE_ALLOW=0x4021
 } close_state_t;
 
-static struct semaphore	 open_lock;
+static DECLARE_MUTEX(open_lock);
+
 static struct resource	*wdt_mem;
 static struct resource	*wdt_irq;
 static struct clk	*wdt_clock;
@@ -101,9 +96,14 @@ static void __iomem	*wdt_base;
 static unsigned int	 wdt_count;
 static close_state_t	 allow_close;
 
-static unsigned int tmr_count;
-
 /* watchdog control routines */
+
+#define DBG(msg...) do { \
+	if (debug) \
+		printk(KERN_INFO msg); \
+	} while(0)
+
+/* functions */
 
 static int s3c2410wdt_keepalive(void)
 {
@@ -126,6 +126,8 @@ static int s3c2410wdt_start(void)
 {
 	unsigned long wtcon;
 
+	s3c2410wdt_stop();
+
 	wtcon = readl(wdt_base + S3C2410_WTCON);
 	wtcon |= S3C2410_WTCON_ENABLE | S3C2410_WTCON_DIV128;
 
@@ -137,12 +139,11 @@ static int s3c2410wdt_start(void)
 		wtcon |= S3C2410_WTCON_RSTEN;
 	}
 
-	clk_enable(wdt_clock);
+	DBG("%s: wdt_count=0x%08x, wtcon=%08lx\n",
+	    __FUNCTION__, wdt_count, wtcon);
 
-	pr_debug("%s: tmr_count=0x%08x, wtcon=%08lx\n",
-		 __FUNCTION__, tmr_count, wtcon);
-
-	writel(tmr_count, wdt_base + S3C2410_WTDAT);
+	writel(wdt_count, wdt_base + S3C2410_WTDAT);
+	writel(wdt_count, wdt_base + S3C2410_WTCNT);
 	writel(wtcon, wdt_base + S3C2410_WTCON);
 
 	return 0;
@@ -167,8 +168,8 @@ static int s3c2410wdt_set_heartbeat(int timeout)
 	freq /= 128/2;
 	count = timeout * freq;
 
-	pr_debug("%s: count=%d, timeout=%d, freq=%d\n",
-		 __FUNCTION__, count, timeout, freq);
+	DBG("%s: count=%d, timeout=%d, freq=%d\n",
+	    __FUNCTION__, count, timeout, freq);
 
 	/* if the count is bigger than the watchdog register,
 	   then work out what we need to do (and if) we can
@@ -187,11 +188,11 @@ static int s3c2410wdt_set_heartbeat(int timeout)
 		}
 	}
 
-	pr_debug("%s: timeout=%d, divisor=%d, count=%d (%08x)\n",
-		 __FUNCTION__, timeout, divisor, count, count/divisor);
+	DBG("%s: timeout=%d, divisor=%d, count=%d (%08x)\n",
+	    __FUNCTION__, timeout, divisor, count, count/divisor);
 
 	count /= divisor;
-	tmr_count = count;
+	wdt_count = count;
 
 	/* update the pre-scaler */
 	wtcon = readl(wdt_base + S3C2410_WTCON);
@@ -372,7 +373,7 @@ static int s3c2410wdt_probe(struct device *dev)
 	int ret;
 	int size;
 
-	pr_debug("%s: probe=%p, device=%p\n", __FUNCTION__, pdev, dev);
+	DBG("%s: probe=%p, device=%p\n", __FUNCTION__, pdev, dev);
 
 	/* get the memory region for the watchdog timer */
 
@@ -395,7 +396,7 @@ static int s3c2410wdt_probe(struct device *dev)
 		return -EINVAL;
 	}
 
-	pr_debug("wdt_base=%08lx\n", wdt_base);
+	DBG("probe: mapped wdt_base=%px\n", wdt_base);
 
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (res == NULL) {
@@ -416,6 +417,7 @@ static int s3c2410wdt_probe(struct device *dev)
 	}
 
 	clk_use(wdt_clock);
+	clk_enable(wdt_clock);
 
 	/* see if we can actually set the requested timer margin, and if
 	 * not, try the default value */
@@ -487,7 +489,7 @@ static struct device_driver s3c2410wdt_driver = {
 
 
 
-static char banner[] __initdata = KERN_INFO "S3C2410 Watchdog Timer, (c) 2004 Simtec Electronics";
+static char banner[] __initdata = KERN_INFO "S3C2410 Watchdog Timer, (c) 2004 Simtec Electronics\n";
 
 static int __init watchdog_init(void)
 {
