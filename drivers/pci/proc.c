@@ -579,19 +579,17 @@ static struct file_operations proc_bus_pci_dev_operations = {
 
 static int __init pci_proc_init(void)
 {
-	if (pci_present()) {
-		struct proc_dir_entry *entry;
-		struct pci_dev *dev = NULL;
-		proc_bus_pci_dir = proc_mkdir("pci", proc_bus);
-		entry = create_proc_entry("devices", 0, proc_bus_pci_dir);
-		if (entry)
-			entry->proc_fops = &proc_bus_pci_dev_operations;
-		proc_initialized = 1;
-		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-			pci_proc_attach_device(dev);
-		}
-		legacy_proc_init();
+	struct proc_dir_entry *entry;
+	struct pci_dev *dev = NULL;
+	proc_bus_pci_dir = proc_mkdir("pci", proc_bus);
+	entry = create_proc_entry("devices", 0, proc_bus_pci_dir);
+	if (entry)
+		entry->proc_fops = &proc_bus_pci_dev_operations;
+	proc_initialized = 1;
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+		pci_proc_attach_device(dev);
 	}
+	legacy_proc_init();
 	return 0;
 }
 
