@@ -456,7 +456,7 @@ static void qe_tx_reclaim(struct sunqe *qep);
  * so we just run through each qe and check to see who is signaling
  * and thus needs to be serviced.
  */
-static void qec_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t qec_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct sunqec *qecp = (struct sunqec *) dev_id;
 	u32 qec_status;
@@ -495,6 +495,8 @@ static void qec_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		qec_status >>= 4;
 		channel++;
 	}
+
+	return IRQ_HANDLED;
 }
 
 static int qe_open(struct net_device *dev)
