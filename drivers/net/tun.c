@@ -18,6 +18,9 @@
 /*
  *  Changes:
  *
+ *  Mark Smith <markzzzsmith@yahoo.com.au>
+ *   Use random_ether_addr() for tap MAC address.
+ *
  *  Harald Roelle <harald.roelle@ifi.lmu.de>  2004/04/20
  *    Fixes in packet dropping, queue length setting and queue wakeup.
  *    Increased default tx queue length.
@@ -42,7 +45,6 @@
 #include <linux/poll.h>
 #include <linux/fcntl.h>
 #include <linux/init.h>
-#include <linux/random.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -158,11 +160,8 @@ static void tun_net_init(struct net_device *dev)
 		/* Ethernet TAP Device */
 		dev->set_multicast_list = tun_net_mclist;
 
-		/* Generate random Ethernet address.  */
-		*(u16 *)dev->dev_addr = htons(0x00FF);
-		get_random_bytes(dev->dev_addr + sizeof(u16), 4);
-
 		ether_setup(dev);
+		random_ether_addr(dev->dev_addr);
 		dev->tx_queue_len = TUN_READQ_SIZE;  /* We prefer our own queue length */
 		break;
 	}
