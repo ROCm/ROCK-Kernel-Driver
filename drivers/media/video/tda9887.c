@@ -26,17 +26,7 @@
 /* Addresses to scan */
 static unsigned short normal_i2c[] = {I2C_CLIENT_END};
 static unsigned short normal_i2c_range[] = {0x86>>1,0x86>>1,I2C_CLIENT_END};
-static unsigned short probe[2]        = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short probe_range[2]  = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore[2]       = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore_range[2] = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short force[2]        = { I2C_CLIENT_END, I2C_CLIENT_END };
-static struct i2c_client_address_data addr_data = {
-	normal_i2c, normal_i2c_range, 
-	probe, probe_range, 
-	ignore, ignore_range, 
-	force
-};
+I2C_CLIENT_INSMOD;
 
 /* insmod options */
 static int debug =  0;
@@ -145,8 +135,8 @@ static int tda9887_miro(struct tda9887 *t)
 	u8   bOutPort2    = cOutputPort2Inactive;
 #endif
 	u8   bVideoTrap   = cVideoTrapBypassOFF;
-#if 0
-	u8   bTopAdjust   = mbAGC;
+#if 1
+	u8   bTopAdjust   = 0x0e /* -2dB */;
 #else
 	u8   bTopAdjust   = 0;
 #endif
@@ -456,18 +446,19 @@ tda9887_command(struct i2c_client *client, unsigned int cmd, void *arg)
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_driver driver = {
-        name:           "i2c tda9887 driver",
-        id:             -1, /* FIXME */
-        flags:          I2C_DF_NOTIFY,
-        attach_adapter: tda9887_probe,
-        detach_client:  tda9887_detach,
-        command:        tda9887_command,
+	.owner          = THIS_MODULE,
+        .name           = "i2c tda9887 driver",
+        .id             = -1, /* FIXME */
+        .flags          = I2C_DF_NOTIFY,
+        .attach_adapter = tda9887_probe,
+        .detach_client  = tda9887_detach,
+        .command        = tda9887_command,
 };
 static struct i2c_client client_template =
 {
-        name:   "tda9887",
-	flags:  I2C_CLIENT_ALLOW_USE,
-        driver: &driver,
+        .name   = "tda9887",
+	.flags  = I2C_CLIENT_ALLOW_USE,
+        .driver = &driver,
 };
 
 static int tda9887_init_module(void)
