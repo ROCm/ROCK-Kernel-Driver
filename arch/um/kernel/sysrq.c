@@ -76,6 +76,16 @@ void show_trace(unsigned long * stack)
         printk("\n");
 }
 
+/*
+ * The architecture-independent dump_stack generator
+ */
+void dump_stack(void)
+{
+	unsigned long stack;
+
+	show_trace(&stack);
+}
+
 void show_trace_task(struct task_struct *tsk)
 {
 	unsigned long esp = PT_REGS_SP(&tsk->thread.regs);
