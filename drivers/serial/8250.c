@@ -124,6 +124,8 @@ struct uart_8250_port {
 	unsigned char		ier;
 	unsigned char		rev;
 	unsigned char		lcr;
+	unsigned char		mcr_mask;	/* mask of user bits */
+	unsigned char		mcr_force;	/* mask of forced bits */
 	unsigned int		lsr_break_flag;
 
 	/*
@@ -1065,7 +1067,7 @@ static unsigned int serial8250_get_mctrl(struct uart_port *port)
 static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	unsigned char mcr = ALPHA_KLUDGE_MCR;
+	unsigned char mcr = 0;
 
 	if (mctrl & TIOCM_RTS)
 		mcr |= UART_MCR_RTS;
@@ -1077,6 +1079,8 @@ static void serial8250_set_mctrl(struct uart_port *port, unsigned int mctrl)
 		mcr |= UART_MCR_OUT2;
 	if (mctrl & TIOCM_LOOP)
 		mcr |= UART_MCR_LOOP;
+
+	mcr = (mcr & up->mcr_mask) | up->mcr_force;
 
 	serial_out(up, UART_MCR, mcr);
 }
@@ -1723,11 +1727,20 @@ static void __init serial8250_register_ports(struct uart_driver *drv)
 	serial8250_isa_init_ports();
 
 	for (i = 0; i < UART_NR; i++) {
-		serial8250_ports[i].port.line = i;
-		serial8250_ports[i].port.ops = &serial8250_pops;
-		init_timer(&serial8250_ports[i].timer);
-		serial8250_ports[i].timer.function = serial8250_timeout;
-		uart_add_one_port(drv, &serial8250_ports[i].port);
+		struct uart_8250_port *up = &serial8250_ports[i];
+
+		up->port.line = i;
+		up->port.ops = &serial8250_pops;
+		init_timer(&up->timer);
+		up->timer.function = serial8250_timeout;
+
+		/*
+		 * ALPHA_KLUDGE_MCR needs to be killed.
+		 */
+		up->mcr_mask = ~ALPHA_KLUDGE_MCR;
+		up->mcr_force = ALPHA_KLUDGE_MCR;
+
+		uart_add_one_port(drv, &up->port);
 	}
 }
 
