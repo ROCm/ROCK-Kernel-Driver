@@ -1,7 +1,7 @@
 /* 
    Common Flash Interface probe code.
    (C) 2000 Red Hat. GPL'd.
-   $Id: jedec_probe.c,v 1.58 2004/11/16 18:29:00 dwmw2 Exp $
+   $Id: jedec_probe.c,v 1.59 2004/11/17 09:46:24 dvrabel Exp $
    See JEDEC (http://www.jedec.org/) standard JESD21C (section 3.5)
    for the standard this probe goes back to.
 
@@ -514,15 +514,20 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x10000,8),
 		}
 	}, {
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29F002T,
-		name: "AMD AM29F002T",
-		DevSize: SIZE_256KiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,3),
-			  ERASEINFO(0x08000,1),
-			  ERASEINFO(0x02000,2),
-			  ERASEINFO(0x04000,1)
+		.mfr_id		= MANUFACTURER_AMD,
+		.dev_id		= AM29F002T,
+		.name		= "AMD AM29F002T",
+		.uaddr		= {
+			[0] = MTD_UADDR_0x0555_0x02AA /* x8 */
+		},
+		.DevSize	= SIZE_256KiB,
+		.CmdSet		= P_ID_AMD_STD,
+		.NumEraseRegions= 4,
+		.regions	= {
+			ERASEINFO(0x10000,3),
+			ERASEINFO(0x08000,1),
+			ERASEINFO(0x02000,2),
+			ERASEINFO(0x04000,1),
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_ATMEL,
@@ -770,15 +775,20 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_HYUNDAI,
-		dev_id: HY29F002T,
-		name: "Hyundai HY29F002T",
-		DevSize: SIZE_256KiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,3),
-			  ERASEINFO(0x08000,1),
-			  ERASEINFO(0x02000,2),
-			  ERASEINFO(0x04000,1)
+		.mfr_id		= MANUFACTURER_HYUNDAI,
+		.dev_id		= HY29F002T,
+		.name		= "Hyundai HY29F002T",
+		.uaddr		= {
+			[0] = MTD_UADDR_0x0555_0x02AA /* x8 */
+		},
+		.DevSize	= SIZE_256KiB,
+		.CmdSet		= P_ID_AMD_STD,
+		.NumEraseRegions= 4,
+		.regions	= {
+			ERASEINFO(0x10000,3),
+			ERASEINFO(0x08000,1),
+			ERASEINFO(0x02000,2),
+			ERASEINFO(0x04000,1),
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_INTEL,
@@ -1177,15 +1187,20 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x10000,7),
 		}
 	}, {
-		mfr_id: MANUFACTURER_MACRONIX,
-		dev_id: MX29F002T,
-		name: "Macronix MX29F002T",
-		DevSize: SIZE_256KiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,3),
-			  ERASEINFO(0x08000,1),
-			  ERASEINFO(0x02000,2),
-			  ERASEINFO(0x04000,1)
+		.mfr_id		= MANUFACTURER_MACRONIX,
+		.dev_id		= MX29F002T,
+		.name		= "Macronix MX29F002T",
+		.uaddr		= {
+			[0] = MTD_UADDR_0x0555_0x02AA /* x8 */
+		},
+		.DevSize	= SIZE_256KiB,
+		.CmdSet		= P_ID_AMD_STD,
+		.NumEraseRegions= 4,
+		.regions	= {
+			ERASEINFO(0x10000,3),
+			ERASEINFO(0x08000,1),
+			ERASEINFO(0x02000,2),
+			ERASEINFO(0x04000,1),
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_PMC,
