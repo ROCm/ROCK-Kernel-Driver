@@ -171,7 +171,7 @@
  *          Auto detects if U14F boards have an old firmware revision.
  *          Max number of scatter/gather lists set to 16 for all boards
  *          (most installation run fine using 33 sglists, while other
- *          has problems when using more then 16).
+ *          has problems when using more than 16).
  *
  *      16 Jan 1995 rev. 1.13 for linux 1.1.81
  *          Display a message if check_region detects a port address
@@ -279,7 +279,7 @@
  *
  *  For U34F boards the latest bios prom is 38008-002 (BIOS rev. 2.01),
  *  the latest firmware prom is 28008-006. Older firmware 28008-005 has
- *  problems when using more then 16 scatter/gather lists.
+ *  problems when using more than 16 scatter/gather lists.
  *
  *  The list of i/o ports to be probed can be totally replaced by the
  *  boot command line option: "u14-34f=port0,port1,port2,...", where the
