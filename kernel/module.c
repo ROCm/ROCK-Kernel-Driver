@@ -30,6 +30,7 @@
 #include <linux/moduleparam.h>
 #include <linux/errno.h>
 #include <linux/err.h>
+#include <linux/vermagic.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
@@ -725,6 +726,8 @@ static int obsolete_params(const char *name,
 }
 #endif /* CONFIG_OBSOLETE_MODPARM */
 
+static const char vermagic[] = VERMAGIC_STRING;
+
 #ifdef CONFIG_MODVERSIONS
 static int check_version(Elf_Shdr *sechdrs,
 			 unsigned int versindex,
@@ -768,6 +771,18 @@ static int check_version(Elf_Shdr *sechdrs,
 	return 1;
 }
 
+static inline int check_modstruct_version(Elf_Shdr *sechdrs,
+					  unsigned int versindex,
+					  struct module *mod)
+{
+	unsigned int i;
+	struct kernel_symbol_group *ksg;
+
+	if (!__find_symbol("struct_module", &ksg, &i, 1))
+		BUG();
+	return check_version(sechdrs, versindex, "struct_module", mod, ksg, i);
+}
+
 /* First part is kernel version, which we ignore. */
 static inline int same_magic(const char *amagic, const char *bmagic)
 {
@@ -782,6 +797,13 @@ static inline int check_version(Elf_Shdr *sechdrs,
 				struct module *mod, 
 				struct kernel_symbol_group *ksg,
 				unsigned int symidx)
+{
+	return 1;
+}
+
+static inline int check_modstruct_version(Elf_Shdr *sechdrs,
+					  unsigned int versindex,
+					  struct module *mod)
 {
 	return 1;
 }
@@ -1036,9 +1058,6 @@ static void set_license(struct module *mod, Elf_Shdr *sechdrs, int licenseidx)
 	}
 }
 
-/* From init/vermagic.o */
-extern char vermagic[];
-
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
 static struct module *load_module(void *umod,
@@ -1184,6 +1203,12 @@ static struct module *load_module(void *umod,
 		goto free_hdr;
 	}
 	mod = (void *)sechdrs[modindex].sh_addr;
+
+	/* Check module struct version now, before we try to use module. */
+	if (!check_modstruct_version(sechdrs, versindex, mod)) {
+		err = -ENOEXEC;
+		goto free_hdr;
+	}
 
 	/* This is allowed: modprobe --force will invalidate it. */
 	if (!vmagindex) {
@@ -1455,9 +1480,9 @@ static const char *get_ksymbol(struct module *mod,
 
 	/* At worse, next value is at end of module */
 	if (within(addr, mod->module_init, mod->init_size))
-		nextval = (unsigned long)mod->module_core+mod->core_size;
+		nextval = (unsigned long)mod->module_init + mod->init_size;
 	else 
-		nextval = (unsigned long)mod->module_init+mod->init_size;
+		nextval = (unsigned long)mod->module_core + mod->core_size;
 
 	/* Scan for closest preceeding symbol, and next symbol. (ELF
            starts real symbols at 1). */
@@ -1630,3 +1655,9 @@ static int __init symbols_init(void)
 }
 
 __initcall(symbols_init);
+
+#ifdef CONFIG_MODVERSIONS
+/* Generate the signature for struct module here, too, for modversions. */
+void struct_module(struct module *mod) { return; }
+EXPORT_SYMBOL(struct_module);
+#endif

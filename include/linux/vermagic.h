@@ -16,7 +16,8 @@
 #define MODULE_ARCH_VERMAGIC ""
 #endif
 
-const char vermagic[] __attribute__((section("__vermagic"))) =
-       UTS_RELEASE " "
-       MODULE_VERMAGIC_SMP MODULE_VERMAGIC_PREEMPT MODULE_ARCH_VERMAGIC
-       "gcc-" __stringify(__GNUC__) "." __stringify(__GNUC_MINOR__);
+#define VERMAGIC_STRING 						\
+	UTS_RELEASE " "							\
+	MODULE_VERMAGIC_SMP MODULE_VERMAGIC_PREEMPT 			\
+	MODULE_ARCH_VERMAGIC 						\
+	"gcc-" __stringify(__GNUC__) "." __stringify(__GNUC_MINOR__)
