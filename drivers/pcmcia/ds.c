@@ -253,13 +253,10 @@ static int handle_request(struct pcmcia_bus_socket *s, event_t event)
     if (s->state & SOCKET_BUSY)
 	s->req_pending = 1;
     handle_event(s, event);
-    if (s->req_pending > 0) {
-	interruptible_sleep_on(&s->request);
-	if (signal_pending(current))
-	    return CS_IN_USE;
-	else
-	    return s->req_result;
-    }
+    if (wait_event_interruptible(s->request, s->req_pending <= 0))
+        return CS_IN_USE;
+    if (s->state & SOCKET_BUSY)
+        return s->req_result;
     return CS_SUCCESS;
 }
 
@@ -566,8 +563,11 @@ static int ds_release(struct inode *inode, struct file *file)
     s = user->socket;
 
     /* Unlink user data structure */
-    if ((file->f_flags & O_ACCMODE) != O_RDONLY)
+    if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
 	s->state &= ~SOCKET_BUSY;
+	s->req_pending = 0;
+	wake_up_interruptible(&s->request);
+    }
     file->private_data = NULL;
     for (link = &s->user; *link; link = &(*link)->next)
 	if (*link == user) break;
@@ -589,6 +589,7 @@ static ssize_t ds_read(struct file *file, char *buf,
     socket_t i = iminor(file->f_dentry->d_inode);
     struct pcmcia_bus_socket *s;
     user_info_t *user;
+    int ret;
 
     DEBUG(2, "ds_read(socket %d)\n", i);
     
@@ -603,13 +604,11 @@ static ssize_t ds_read(struct file *file, char *buf,
     if (s->state & SOCKET_DEAD)
         return -EIO;
 
-    if (queue_empty(user)) {
-	interruptible_sleep_on(&s->queue);
-	if (signal_pending(current))
-	    return -EINTR;
-    }
+    ret = wait_event_interruptible(s->queue, !queue_empty(user));
+    if (ret == 0)
+	ret = put_user(get_queued_event(user), (int *)buf) ? -EFAULT : 4;
 
-    return put_user(get_queued_event(user), (int *)buf) ? -EFAULT : 4;
+    return ret;
 } /* ds_read */
 
 /*====================================================================*/
