@@ -138,7 +138,6 @@ chrp_setup_arch(void)
  	if (ROOT_DEV == 0) {
  		printk("No ramdisk, default root is /dev/sda2\n");
  		ROOT_DEV = Root_SDA2;
-		ROOT_DEV = Root_SDA3;
  	}
 
 	printk("Boot arguments: %s\n", cmd_line);
