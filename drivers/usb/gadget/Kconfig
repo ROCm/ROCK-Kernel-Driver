@@ -3,6 +3,15 @@
 #    (a) a peripheral controller, and
 #    (b) the gadget driver using it.
 #
+# NOTE:  Gadget support ** DOES NOT ** depend on host-side CONFIG_USB !!
+#
+#  - Host systems (like PCs) need CONFIG_USB (with "A" jacks).
+#  - Peripherals (like PDAs) need CONFIG_USB_GADGET (with "B" jacks).
+#  - Some systems have both kinds of of controller.
+#
+# With help from a special transceiver and a "Mini-AB" jack, systems with
+# both kinds of controller can also support "USB On-the-Go" (CONFIG_USB_OTG).
+#
 menu "USB Gadget Support"
 
 config USB_GADGET
@@ -11,7 +20,7 @@ config USB_GADGET
 	   USB is a master/slave protocol, organized with one master
 	   host (such as a PC) controlling up to 127 peripheral devices.
 	   The USB hardware is asymmetric, which makes it easier to set up:
-	   you can't connect two "to-the-host" connectors to each other.
+	   you can't connect a "to-the-host" connector to a peripheral.
 
 	   Linux can run in the host, or in the peripheral.  In both cases
 	   you need a low level bus controller driver, and some software
