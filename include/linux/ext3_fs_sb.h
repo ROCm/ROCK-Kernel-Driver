@@ -50,6 +50,8 @@ struct ext3_sb_info {
 	u32 s_next_generation;
 	u32 s_hash_seed[4];
 	int s_def_hash_version;
+	unsigned long s_dir_count;
+	u8 *s_debts;
 
 	/* Journaling */
 	struct inode * s_journal_inode;
