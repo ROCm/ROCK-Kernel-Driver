@@ -429,8 +429,12 @@ static int pp_ioctl(struct inode *inode, struct file *file,
 	    {
 		unsigned int modes;
 
-		modes = pp->pdev->port->modes;
-		if (copy_to_user ((unsigned int *)arg, &modes, sizeof (port->modes))) {
+		port = parport_find_number (minor);
+		if (!port)
+			return -ENODEV;
+
+		modes = port->modes;
+		if (copy_to_user ((unsigned int *)arg, &modes, sizeof (modes))) {
 			return -EFAULT;
 		}
 		return 0;
