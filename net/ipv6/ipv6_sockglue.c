@@ -164,7 +164,7 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname,
 			ipv6_sock_mc_close(sk);
 
 			if (sk->sk_protocol == IPPROTO_TCP) {
-				struct tcp_opt *tp = tcp_sk(sk);
+				struct tcp_sock *tp = tcp_sk(sk);
 
 				local_bh_disable();
 				sock_prot_dec_use(sk->sk_prot);
@@ -281,7 +281,7 @@ update:
 		retv = 0;
 		if (sk->sk_type == SOCK_STREAM) {
 			if (opt) {
-				struct tcp_opt *tp = tcp_sk(sk);
+				struct tcp_sock *tp = tcp_sk(sk);
 				if (!((1 << sk->sk_state) &
 				      (TCPF_LISTEN | TCPF_CLOSE))
 				    && inet_sk(sk)->daddr != LOOPBACK4_IPV6) {

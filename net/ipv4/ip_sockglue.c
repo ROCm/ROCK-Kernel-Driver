@@ -429,7 +429,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char __user *optval, 
 			if (err)
 				break;
 			if (sk->sk_type == SOCK_STREAM) {
-				struct tcp_opt *tp = tcp_sk(sk);
+				struct tcp_sock *tp = tcp_sk(sk);
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 				if (sk->sk_family == PF_INET ||
 				    (!((1 << sk->sk_state) &

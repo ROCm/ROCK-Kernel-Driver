@@ -123,7 +123,7 @@ enum tcp_tw_status
 tcp_timewait_state_process(struct tcp_tw_bucket *tw, struct sk_buff *skb,
 			   struct tcphdr *th, unsigned len)
 {
-	struct tcp_opt tp;
+	struct tcp_sock tp;
 	int paws_reject = 0;
 
 	tp.saw_tstamp = 0;
@@ -327,7 +327,7 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 void tcp_time_wait(struct sock *sk, int state, int timeo)
 {
 	struct tcp_tw_bucket *tw = NULL;
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	int recycle_ok = 0;
 
 	if (sysctl_tcp_tw_recycle && tp->ts_recent_stamp)
@@ -690,7 +690,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 	struct sock *newsk = sk_alloc(PF_INET, GFP_ATOMIC, 0, sk->sk_prot->slab);
 
 	if(newsk != NULL) {
-		struct tcp_opt *newtp;
+		struct tcp_sock *newtp;
 		struct sk_filter *filter;
 
 		memcpy(newsk, sk, sizeof(struct tcp_sock));
@@ -734,7 +734,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			return NULL;
 		}
 
-		/* Now setup tcp_opt */
+		/* Now setup tcp_sock */
 		newtp = tcp_sk(newsk);
 		newtp->pred_flags = 0;
 		newtp->rcv_nxt = req->rcv_isn + 1;
@@ -858,10 +858,10 @@ struct sock *tcp_check_req(struct sock *sk,struct sk_buff *skb,
 			   struct open_request **prev)
 {
 	struct tcphdr *th = skb->h.th;
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	u32 flg = tcp_flag_word(th) & (TCP_FLAG_RST|TCP_FLAG_SYN|TCP_FLAG_ACK);
 	int paws_reject = 0;
-	struct tcp_opt ttp;
+	struct tcp_sock ttp;
 	struct sock *child;
 
 	ttp.saw_tstamp = 0;
