@@ -7,8 +7,6 @@ O_TARGET     := isa.o
 
 mod-subdirs  := ad1816a ad1848 cs423x es1688 gus opti9xx sb wavefront
 
-subdir-y     := ad1816a ad1848 cs423x es1688 gus opti9xx sb wavefront
-
 snd-als100-objs := als100.o
 snd-azt2320-objs := azt2320.o
 snd-cmi8330-objs := cmi8330.o
@@ -25,5 +23,17 @@ obj-$(CONFIG_SND_DT0197H) += snd-dt0197h.o
 obj-$(CONFIG_SND_ES18XX) += snd-es18xx.o
 obj-$(CONFIG_SND_OPL3SA2) += snd-opl3sa2.o
 obj-$(CONFIG_SND_SGALAXY) += snd-sgalaxy.o
+
+subdir-$(CONFIG_SND) += ad1816a ad1848 cs423x es1688 gus opti9xx sb wavefront
+ifeq ($(CONFIG_SND),y)
+  obj-y += ad1816a/_ad1816a.o \
+	   ad1848/_ad1848.o \
+	   cs423x/_cs423x.o \
+	   es1688/_es1688.o \
+	   gus/_gus.o \
+	   opti9xx/_opti9xx.o \
+	   sb/_sb.o \
+	   wavefront/_wavefront.o
+endif
 
 include $(TOPDIR)/Rules.make
