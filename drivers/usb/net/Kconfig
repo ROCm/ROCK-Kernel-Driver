@@ -260,13 +260,13 @@ comment "USB Network Adapters"
 	depends on USB_USBNET
 
 config USB_AX8817X
-	boolean "ASIX AX88172 Based USB 2.0 Ethernet Devices"
+	boolean "ASIX AX88xxx Based USB 2.0 Ethernet Devices"
 	depends on USB_USBNET && NET_ETHERNET
 	select CRC32
 	select MII
 	default y
 	help
-	  This option adds support for ASIX AX88172 based USB 2.0
+	  This option adds support for ASIX AX88xxx based USB 2.0
 	  10/100 Ethernet devices.
 
  	  This driver should work with at least the following devices:
