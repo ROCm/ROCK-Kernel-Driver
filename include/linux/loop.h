@@ -70,8 +70,7 @@ struct loop_device {
 /*
  * Loop flags
  */
-#define LO_FLAGS_DO_BMAP	1
-#define LO_FLAGS_READ_ONLY	2
+#define LO_FLAGS_READ_ONLY	1
 
 #include <asm/posix_types.h>	/* for __kernel_old_dev_t */
 #include <asm/types.h>		/* for __u64 */
