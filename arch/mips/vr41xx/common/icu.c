@@ -51,6 +51,12 @@ extern void giuint_irq_dispatch(struct pt_regs *regs);
 static uint32_t icu1_base;
 static uint32_t icu2_base;
 
+static struct irqaction icu_cascade = {
+	.handler	= no_action,
+	.mask		= CPU_MASK_NONE,
+	.name		= "cascade",
+};
+
 static unsigned char sysint1_assign[16] = {
 	0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 static unsigned char sysint2_assign[16] = {
@@ -673,8 +679,6 @@ static int __init vr41xx_icu_init(void)
 early_initcall(vr41xx_icu_init);
 
 /*=======================================================================*/
-
-static struct irqaction icu_cascade = {no_action, 0, 0, "cascade", NULL, NULL};
 
 static inline void init_vr41xx_icu_irq(void)
 {
