@@ -144,9 +144,10 @@ long sys_remap_file_pages(unsigned long start, unsigned long size,
 		return err;
 #endif
 
-	down_read(&mm->mmap_sem);
-
+	/* We need down_write() to change vma->vm_flags. */
+	down_write(&mm->mmap_sem);
 	vma = find_vma(mm, start);
+
 	/*
 	 * Make sure the vma is shared, that it supports prefaulting,
 	 * and that the remapped range is valid and fully within
@@ -155,11 +156,27 @@ long sys_remap_file_pages(unsigned long start, unsigned long size,
 	if (vma && (vma->vm_flags & VM_SHARED) &&
 		vma->vm_ops && vma->vm_ops->populate &&
 			end > start && start >= vma->vm_start &&
-				end <= vma->vm_end)
-		err = vma->vm_ops->populate(vma, start, size, vma->vm_page_prot,
-				pgoff, flags & MAP_NONBLOCK);
+				end <= vma->vm_end) {
 
-	up_read(&mm->mmap_sem);
+		/* Must set VM_NONLINEAR before any pages are populated. */
+		if (pgoff != ((start - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff)
+			vma->vm_flags |= VM_NONLINEAR;
+
+		/* ->populate can take a long time, so downgrade the lock. */
+		downgrade_write(&mm->mmap_sem);
+		err = vma->vm_ops->populate(vma, start, size,
+					    vma->vm_page_prot,
+					    pgoff, flags & MAP_NONBLOCK);
+
+		/*
+		 * We can't clear VM_NONLINEAR because we'd have to do
+		 * it after ->populate completes, and that would prevent
+		 * downgrading the lock.  (Locks can't be upgraded).
+		 */
+		up_read(&mm->mmap_sem);
+	} else {
+		up_write(&mm->mmap_sem);
+	}
 
 	return err;
 }

@@ -220,6 +220,7 @@ static inline void free_pages_check(const char *function, struct page *page)
 			1 << PG_locked	|
 			1 << PG_active	|
 			1 << PG_reclaim	|
+			1 << PG_slab	|
 			1 << PG_writeback )))
 		bad_page(function, page);
 	if (PageDirty(page))
@@ -542,8 +543,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	int do_retry;
 	struct reclaim_state reclaim_state;
 
-	if (wait)
-		might_sleep();
+	might_sleep_if(wait);
 
 	cold = 0;
 	if (gfp_mask & __GFP_COLD)

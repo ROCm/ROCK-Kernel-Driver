@@ -54,7 +54,7 @@ struct capi_ctr {
 			     int count, int *eof, struct capi_ctr *card);
 
 	/* filled in before calling ready callback */
-	u8 manu[CAPI_MANUFACTURER_LEN];	/* CAPI_GET_MANUFACTURER */
+	u8 manu[CAPI_MANUFACTURER_LEN];		/* CAPI_GET_MANUFACTURER */
 	capi_version version;			/* CAPI_GET_VERSION */
 	capi_profile profile;			/* CAPI_GET_PROFILE */
 	u8 serial[CAPI_SERIAL_LEN];		/* CAPI_GET_SERIAL */

@@ -1,5 +1,5 @@
 /*
- * P4 specific Machine Check Exception Reporting
+ * Non Fatal Machine Check Exception Reporting
  */
 
 #include <linux/init.h>

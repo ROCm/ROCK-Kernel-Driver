@@ -148,30 +148,31 @@ void b1_getrevision(avmcard *card)
     card->revision = inb(card->port + B1_REVISION);
 }
 
+#define FWBUF_SIZE	256
 int b1_load_t4file(avmcard *card, capiloaddatapart * t4file)
 {
-	unsigned char buf[256];
+	unsigned char buf[FWBUF_SIZE];
 	unsigned char *dp;
 	int i, left;
 	unsigned int base = card->port;
 
 	dp = t4file->data;
 	left = t4file->len;
-	while (left > sizeof(buf)) {
+	while (left > FWBUF_SIZE) {
 		if (t4file->user) {
-			if (copy_from_user(buf, dp, sizeof(buf)))
+			if (copy_from_user(buf, dp, FWBUF_SIZE))
 				return -EFAULT;
 		} else {
-			memcpy(buf, dp, sizeof(buf));
+			memcpy(buf, dp, FWBUF_SIZE);
 		}
-		for (i = 0; i < sizeof(buf); i++)
+		for (i = 0; i < FWBUF_SIZE; i++)
 			if (b1_save_put_byte(base, buf[i]) < 0) {
 				printk(KERN_ERR "%s: corrupted firmware file ?\n",
 						card->name);
 				return -EIO;
 			}
-		left -= sizeof(buf);
-		dp += sizeof(buf);
+		left -= FWBUF_SIZE;
+		dp += FWBUF_SIZE;
 	}
 	if (left) {
 		if (t4file->user) {
@@ -192,7 +193,7 @@ int b1_load_t4file(avmcard *card, capiloaddatapart * t4file)
 
 int b1_load_config(avmcard *card, capiloaddatapart * config)
 {
-	unsigned char buf[256];
+	unsigned char buf[FWBUF_SIZE];
 	unsigned char *dp;
 	unsigned int base = card->port;
 	int i, j, left;
@@ -205,21 +206,21 @@ int b1_load_config(avmcard *card, capiloaddatapart * config)
 		b1_put_byte(base, SEND_CONFIG);
         	b1_put_word(base, left);
 	}
-	while (left > sizeof(buf)) {
+	while (left > FWBUF_SIZE) {
 		if (config->user) {
-			if (copy_from_user(buf, dp, sizeof(buf)))
+			if (copy_from_user(buf, dp, FWBUF_SIZE))
 				return -EFAULT;
 		} else {
-			memcpy(buf, dp, sizeof(buf));
+			memcpy(buf, dp, FWBUF_SIZE);
 		}
-		for (i = 0; i < sizeof(buf); ) {
+		for (i = 0; i < FWBUF_SIZE; ) {
 			b1_put_byte(base, SEND_CONFIG);
 			for (j=0; j < 4; j++) {
 				b1_put_byte(base, buf[i++]);
 			}
 		}
-		left -= sizeof(buf);
-		dp += sizeof(buf);
+		left -= FWBUF_SIZE;
+		dp += FWBUF_SIZE;
 	}
 	if (left) {
 		if (config->user) {
@@ -785,7 +786,7 @@ static int __init b1_init(void)
 	char rev[32];
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strlcpy(rev, p + 2, sizeof(rev));
+		strlcpy(rev, p + 2, 32);
 		if ((p = strchr(rev, '$')) != 0 && p > rev)
 		   *(p-1) = 0;
 	} else

@@ -15,6 +15,8 @@
 #include <linux/config.h>
 #include <asm/arch/memory.h>
 
+#ifndef __ASSEMBLY__
+
 /*
  * PFNs are used to describe any physical page; this means
  * PFN 0 == physical address 0.
@@ -118,5 +120,7 @@ static inline void *phys_to_virt(unsigned long x)
  * We should really eliminate virt_to_bus() here - it's deprecated.
  */
 #define page_to_bus(page)	(virt_to_bus(page_address(page)))
+
+#endif
 
 #endif

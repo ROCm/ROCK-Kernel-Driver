@@ -150,8 +150,7 @@ list_conntracks(char *buffer, char **start, off_t offset, int length)
 	}
 
 	/* Now iterate through expecteds. */
-	for (e = ip_conntrack_expect_list.next; 
-	     e != &ip_conntrack_expect_list; e = e->next) {
+	list_for_each(e, &ip_conntrack_expect_list) {
 		unsigned int last_len;
 		struct ip_conntrack_expect *expect
 			= (struct ip_conntrack_expect *)e;
@@ -319,7 +318,7 @@ int ip_conntrack_protocol_register(struct ip_conntrack_protocol *proto)
 	struct list_head *i;
 
 	WRITE_LOCK(&ip_conntrack_lock);
-	for (i = protocol_list.next; i != &protocol_list; i = i->next) {
+	list_for_each(i, &protocol_list) {
 		if (((struct ip_conntrack_protocol *)i)->proto
 		    == proto->proto) {
 			ret = -EBUSY;

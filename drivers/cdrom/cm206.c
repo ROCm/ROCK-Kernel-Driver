@@ -1616,7 +1616,7 @@ static int __init cm206_setup(char *s)
 __setup("cm206=", cm206_setup);
 
 #endif				/* !MODULE */
-
+MODULE_ALIAS_BLOCKDEV_MAJOR(CM206_CDROM_MAJOR);
 
 /*
  * Local variables:

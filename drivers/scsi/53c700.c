@@ -1758,7 +1758,7 @@ NCR_700_queuecommand(Scsi_Cmnd *SCp, void (*done)(Scsi_Cmnd *))
 	printk("53c700: scsi%d, command ", SCp->device->host->host_no);
 	print_command(SCp->cmnd);
 #endif
-	if(SCp->device->tagged_supported && !SCp->device->tagged_queue
+	if(SCp->device->tagged_supported && !SCp->device->simple_tags
 	   && (hostdata->tag_negotiated &(1<<SCp->device->id)) == 0
 	   && NCR_700_is_flag_clear(SCp->device, NCR_700_DEV_BEGIN_TAG_QUEUEING)) {
 		/* upper layer has indicated tags are supported.  We don't

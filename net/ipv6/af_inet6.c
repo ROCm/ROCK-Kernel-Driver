@@ -40,7 +40,6 @@
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/init.h>
-#include <linux/version.h>
 
 #include <linux/inet.h>
 #include <linux/netdevice.h>
@@ -723,8 +722,6 @@ static int __init inet6_init(void)
 	__this_module.can_unload = &ipv6_unload;
 #endif
 #endif
-
-	printk(KERN_INFO "IPv6 v0.8 for NET4.0\n");
 
 	if (sizeof(struct inet6_skb_parm) > sizeof(dummy_skb->cb))
 	{

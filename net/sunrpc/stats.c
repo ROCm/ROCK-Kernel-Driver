@@ -20,7 +20,6 @@
 #include <linux/proc_fs.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/svcsock.h>
-#include <linux/init.h>
 
 #define RPCDBG_FACILITY	RPCDBG_MISC
 

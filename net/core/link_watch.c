@@ -11,7 +11,6 @@
  *
  */
 
-#include <linux/workqueue.h>
 #include <linux/config.h>
 #include <linux/netdevice.h>
 #include <linux/if.h>

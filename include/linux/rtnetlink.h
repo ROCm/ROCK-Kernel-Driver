@@ -3,9 +3,6 @@
 
 #include <linux/netlink.h>
 
-#define RTNL_DEBUG 1
-
-
 /****
  *		Routing/neighbour discovery messages.
  ****/

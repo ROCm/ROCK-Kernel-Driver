@@ -295,6 +295,31 @@ static void sctp_v4_to_sk_daddr(union sctp_addr *addr, struct sock *sk)
 	inet_sk(sk)->daddr = addr->v4.sin_addr.s_addr;
 }
 
+/* Initialize a sctp_addr from an address parameter. */
+static void sctp_v4_from_addr_param(union sctp_addr *addr,
+				    union sctp_addr_param *param,
+				    __u16 port, int iif)
+{
+	addr->v4.sin_family = AF_INET;
+	addr->v4.sin_port = port;
+	addr->v4.sin_addr.s_addr = param->v4.addr.s_addr;
+}
+
+/* Initialize an address parameter from a sctp_addr and return the length
+ * of the address parameter.
+ */
+static int sctp_v4_to_addr_param(const union sctp_addr *addr,
+				 union sctp_addr_param *param)
+{
+	int length = sizeof(sctp_ipv4addr_param_t);
+
+	param->v4.param_hdr.type = SCTP_PARAM_IPV4_ADDRESS;
+	param->v4.param_hdr.length = ntohs(length);
+	param->v4.addr.s_addr = addr->v4.sin_addr.s_addr;	
+
+	return length;
+}
+
 /* Initialize a sctp_addr from a dst_entry. */
 static void sctp_v4_dst_saddr(union sctp_addr *saddr, struct dst_entry *dst,
 			      unsigned short port)
@@ -862,6 +887,8 @@ struct sctp_af sctp_ipv4_specific = {
 	.from_sk        = sctp_v4_from_sk,
 	.to_sk_saddr    = sctp_v4_to_sk_saddr,
 	.to_sk_daddr    = sctp_v4_to_sk_daddr,
+	.from_addr_param= sctp_v4_from_addr_param,
+	.to_addr_param  = sctp_v4_to_addr_param,	
 	.dst_saddr      = sctp_v4_dst_saddr,
 	.cmp_addr       = sctp_v4_cmp_addr,
 	.addr_valid     = sctp_v4_addr_valid,

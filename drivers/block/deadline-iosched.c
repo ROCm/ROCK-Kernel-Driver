@@ -33,13 +33,7 @@ static const int deadline_hash_shift = 5;
 #define DL_HASH_ENTRIES		(1 << deadline_hash_shift)
 #define rq_hash_key(rq)		((rq)->sector + (rq)->nr_sectors)
 #define list_entry_hash(ptr)	list_entry((ptr), struct deadline_rq, hash)
-#define ON_HASH(drq)		(drq)->hash_valid_count
-
-#define DL_INVALIDATE_HASH(dd)				\
-	do {						\
-		if (!++(dd)->hash_valid_count)		\
-			(dd)->hash_valid_count = 1;	\
-	} while (0)
+#define ON_HASH(drq)		(drq)->on_hash
 
 struct deadline_data {
 	/*
@@ -58,7 +52,6 @@ struct deadline_data {
 	struct deadline_rq *next_drq[2];
 	struct list_head *dispatch;	/* driver dispatch queue */
 	struct list_head *hash;		/* request hash */
-	unsigned long hash_valid_count;	/* barrier hash count */
 	unsigned int batching;		/* number of sequential requests made */
 	sector_t last_sector;		/* head position */
 	unsigned int starved;		/* times reads have starved writes */
@@ -90,7 +83,7 @@ struct deadline_rq {
 	 * request hash, key is the ending offset (for back merge lookup)
 	 */
 	struct list_head hash;
-	unsigned long hash_valid_count;
+	char on_hash;
 
 	/*
 	 * expire fifo
@@ -110,7 +103,7 @@ static kmem_cache_t *drq_pool;
  */
 static inline void __deadline_del_drq_hash(struct deadline_rq *drq)
 {
-	drq->hash_valid_count = 0;
+	drq->on_hash = 0;
 	list_del_init(&drq->hash);
 }
 
@@ -125,7 +118,7 @@ deadline_remove_merge_hints(request_queue_t *q, struct deadline_rq *drq)
 {
 	deadline_del_drq_hash(drq);
 
-	if (q->last_merge == &drq->request->queuelist)
+	if (q->last_merge == drq->request)
 		q->last_merge = NULL;
 }
 
@@ -136,7 +129,7 @@ deadline_add_drq_hash(struct deadline_data *dd, struct deadline_rq *drq)
 
 	BUG_ON(ON_HASH(drq));
 
-	drq->hash_valid_count = dd->hash_valid_count;
+	drq->on_hash = 1;
 	list_add(&drq->hash, &dd->hash[DL_HASH_FN(rq_hash_key(rq))]);
 }
 
@@ -169,8 +162,7 @@ deadline_find_drq_hash(struct deadline_data *dd, sector_t offset)
 		
 		BUG_ON(!ON_HASH(drq));
 
-		if (!rq_mergeable(__rq)
-		    || drq->hash_valid_count != dd->hash_valid_count) {
+		if (!rq_mergeable(__rq)) {
 			__deadline_del_drq_hash(drq);
 			continue;
 		}
@@ -324,7 +316,7 @@ static void deadline_remove_request(request_queue_t *q, struct request *rq)
 }
 
 static int
-deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
+deadline_merge(request_queue_t *q, struct request **req, struct bio *bio)
 {
 	struct deadline_data *dd = q->elevator.elevator_data;
 	struct request *__rq;
@@ -335,7 +327,7 @@ deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 	 */
 	ret = elv_try_last_merge(q, bio);
 	if (ret != ELEVATOR_NO_MERGE) {
-		__rq = list_entry_rq(q->last_merge);
+		__rq = q->last_merge;
 		goto out_insert;
 	}
 
@@ -371,11 +363,11 @@ deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 
 	return ELEVATOR_NO_MERGE;
 out:
-	q->last_merge = &__rq->queuelist;
+	q->last_merge = __rq;
 out_insert:
 	if (ret)
 		deadline_hot_drq_hash(dd, RQ_DATA(__rq));
-	*insert = &__rq->queuelist;
+	*req = __rq;
 	return ret;
 }
 
@@ -398,7 +390,7 @@ static void deadline_merged_request(request_queue_t *q, struct request *req)
 		deadline_add_drq_rb(dd, drq);
 	}
 
-	q->last_merge = &req->queuelist;
+	q->last_merge = req;
 }
 
 static void
@@ -621,39 +613,35 @@ dispatch:
 }
 
 static void
-deadline_insert_request(request_queue_t *q, struct request *rq,
-			struct list_head *insert_here)
+deadline_insert_request(request_queue_t *q, struct request *rq, int where)
 {
 	struct deadline_data *dd = q->elevator.elevator_data;
 	struct deadline_rq *drq = RQ_DATA(rq);
 
-	if (unlikely(rq->flags & REQ_HARDBARRIER)) {
-		DL_INVALIDATE_HASH(dd);
-		q->last_merge = NULL;
-
-		while (deadline_dispatch_requests(dd))
-			;
-
-		list_add_tail(&rq->queuelist, dd->dispatch);
-		return;
-	}
-
-	if (unlikely(!blk_fs_request(rq))) {
-		if (!insert_here)
-			insert_here = dd->dispatch->prev;
-
-		list_add(&rq->queuelist, insert_here);
-		return;
+	switch (where) {
+		case ELEVATOR_INSERT_BACK:
+			while (deadline_dispatch_requests(dd))
+				;
+			list_add_tail(&rq->queuelist, dd->dispatch);
+			break;
+		case ELEVATOR_INSERT_FRONT:
+			list_add(&rq->queuelist, dd->dispatch);
+			break;
+		case ELEVATOR_INSERT_SORT:
+			BUG_ON(!blk_fs_request(rq));
+			deadline_add_request(dd, drq);
+			break;
+		default:
+			printk("%s: bad insert point %d\n", __FUNCTION__,where);
+			return;
 	}
 
 	if (rq_mergeable(rq)) {
 		deadline_add_drq_hash(dd, drq);
 
 		if (!q->last_merge)
-			q->last_merge = &rq->queuelist;
+			q->last_merge = rq;
 	}
-
-	deadline_add_request(dd, drq);
 }
 
 static int deadline_queue_empty(request_queue_t *q)
@@ -744,7 +732,6 @@ static int deadline_init(request_queue_t *q, elevator_t *e)
 	dd->dispatch = &q->queue_head;
 	dd->fifo_expire[READ] = read_expire;
 	dd->fifo_expire[WRITE] = write_expire;
-	dd->hash_valid_count = 1;
 	dd->writes_starved = writes_starved;
 	dd->front_merges = 1;
 	dd->fifo_batch = fifo_batch;
@@ -775,7 +762,7 @@ deadline_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 		drq->request = rq;
 
 		INIT_LIST_HEAD(&drq->hash);
-		drq->hash_valid_count = 0;
+		drq->on_hash = 0;
 
 		INIT_LIST_HEAD(&drq->fifo);
 

@@ -503,8 +503,7 @@ struct pte_chain *pte_chain_alloc(int gfp_flags)
 	struct pte_chain *ret;
 	struct pte_chain **pte_chainp;
 
-	if (gfp_flags & __GFP_WAIT)
-		might_sleep();
+	might_sleep_if(gfp_flags & __GFP_WAIT);
 
 	pte_chainp = &get_cpu_var(local_pte_chain);
 	if (*pte_chainp) {

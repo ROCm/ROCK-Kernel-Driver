@@ -95,8 +95,8 @@ typedef struct avmcard {
 
 	struct avmctrl_info *ctrlinfo;
 
-	int nr_controllers;
-	int nlogcontr;
+	u_int nr_controllers;
+	u_int nlogcontr;
 	struct list_head list;
 } avmcard;
 

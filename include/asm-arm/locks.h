@@ -1,5 +1,5 @@
 /*
- *  linux/include/asm-arm/proc-armv/locks.h
+ *  linux/include/asm-arm/locks.h
  *
  *  Copyright (C) 2000 Russell King
  *

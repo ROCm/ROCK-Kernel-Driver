@@ -104,6 +104,7 @@ static int pvc_getname(struct socket *sock,struct sockaddr *sockaddr,
 
 static struct proto_ops pvc_proto_ops = {
 	.family =	PF_ATMPVC,
+	.owner =	THIS_MODULE,
 
 	.release =	vcc_release,
 	.bind =		pvc_bind,
@@ -134,6 +135,7 @@ static int pvc_create(struct socket *sock,int protocol)
 static struct net_proto_family pvc_family_ops = {
 	.family = PF_ATMPVC,
 	.create = pvc_create,
+	.owner = THIS_MODULE,
 };
 
 

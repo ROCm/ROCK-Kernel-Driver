@@ -2499,3 +2499,4 @@ static int azt_bcd2bin(unsigned char bcd)
 }
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_BLOCKDEV_MAJOR(AZTECH_CDROM_MAJOR);

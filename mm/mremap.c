@@ -420,7 +420,7 @@ unsigned long do_mremap(unsigned long addr,
 	if (flags & MREMAP_MAYMOVE) {
 		if (!(flags & MREMAP_FIXED)) {
 			unsigned long map_flags = 0;
-			if (vma->vm_flags & VM_SHARED)
+			if (vma->vm_flags & VM_MAYSHARE)
 				map_flags |= MAP_SHARED;
 
 			new_addr = get_unmapped_area(vma->vm_file, 0, new_len,

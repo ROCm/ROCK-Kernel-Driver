@@ -316,7 +316,7 @@ static	Scsi_Request * osst_do_scsi(Scsi_Request *SRpnt, OS_Scsi_Tape *STp,
 	static   int   repeat = 0;
 #endif
 	if (SRpnt == NULL) {
-		if ((SRpnt = scsi_allocate_request(STp->device)) == NULL) {
+		if ((SRpnt = scsi_allocate_request(STp->device, GFP_ATOMIC)) == NULL) {
 			printk(KERN_ERR "%s:E: Can't get SCSI request.\n", tape_name(STp));
 			if (signal_pending(current))
 				(STp->buffer)->syscall_result = (-EINTR);

@@ -703,7 +703,7 @@ void blk_queue_invalidate_tags(request_queue_t *q)
 			blk_queue_end_tag(q, rq);
 
 		rq->flags &= ~REQ_STARTED;
-		__elv_add_request(q, rq, 0, 0);
+		__elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 0);
 	}
 }
 
@@ -1632,11 +1632,16 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	if(reinsert) {
 		blk_requeue_request(q, rq);
 	} else {
+		int where = ELEVATOR_INSERT_BACK;
+
+		if (at_head)
+			where = ELEVATOR_INSERT_FRONT;
+
 		if (blk_rq_tagged(rq))
 			blk_queue_end_tag(q, rq);
 
 		drive_stat_acct(rq, rq->nr_sectors, 1);
-		__elv_add_request(q, rq, !at_head, 0);
+		__elv_add_request(q, rq, where, 0);
 	}
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
@@ -1660,7 +1665,7 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 	}
 	if (new_io) {
 		disk_round_stats(rq->rq_disk);
-		disk_stat_inc(rq->rq_disk, in_flight);
+		rq->rq_disk->in_flight++;
 	}
 }
 
@@ -1669,8 +1674,7 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
  * queue lock is held and interrupts disabled, as we muck with the
  * request queue list.
  */
-static inline void add_request(request_queue_t * q, struct request * req,
-			       struct list_head *insert_here)
+static inline void add_request(request_queue_t * q, struct request * req)
 {
 	drive_stat_acct(req, req->nr_sectors, 1);
 
@@ -1681,7 +1685,7 @@ static inline void add_request(request_queue_t * q, struct request * req,
 	 * elevator indicated where it wants this request to be
 	 * inserted at elevator_merge time
 	 */
-	__elv_add_request_pos(q, req, insert_here);
+	__elv_add_request(q, req, ELEVATOR_INSERT_SORT, 0);
 }
  
 /*
@@ -1704,10 +1708,10 @@ void disk_round_stats(struct gendisk *disk)
 	unsigned long now = jiffies;
 
 	disk_stat_add(disk, time_in_queue, 
-			disk_stat_read(disk, in_flight) * (now - disk->stamp));
+			disk->in_flight * (now - disk->stamp));
 	disk->stamp = now;
 
-	if (disk_stat_read(disk, in_flight))
+	if (disk->in_flight)
 		disk_stat_add(disk, io_ticks, (now - disk->stamp_idle));
 	disk->stamp_idle = now;
 }
@@ -1819,7 +1823,7 @@ static int attempt_merge(request_queue_t *q, struct request *req,
 
 	if (req->rq_disk) {
 		disk_round_stats(req->rq_disk);
-		disk_stat_dec(req->rq_disk, in_flight);
+		req->rq_disk->in_flight--;
 	}
 
 	__blk_put_request(q, next);
@@ -1880,7 +1884,6 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 {
 	struct request *req, *freereq = NULL;
 	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier, ra;
-	struct list_head *insert_here;
 	sector_t sector;
 
 	sector = bio->bi_sector;
@@ -1903,7 +1906,6 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 	ra = bio->bi_rw & (1 << BIO_RW_AHEAD);
 
 again:
-	insert_here = NULL;
 	spin_lock_irq(q->queue_lock);
 
 	if (elv_queue_empty(q)) {
@@ -1913,17 +1915,13 @@ again:
 	if (barrier)
 		goto get_rq;
 
-	el_ret = elv_merge(q, &insert_here, bio);
+	el_ret = elv_merge(q, &req, bio);
 	switch (el_ret) {
 		case ELEVATOR_BACK_MERGE:
-			req = list_entry_rq(insert_here);
-
 			BUG_ON(!rq_mergeable(req));
 
-			if (!q->back_merge_fn(q, req, bio)) {
-				insert_here = &req->queuelist;
+			if (!q->back_merge_fn(q, req, bio))
 				break;
-			}
 
 			req->biotail->bi_next = bio;
 			req->biotail = bio;
@@ -1934,14 +1932,10 @@ again:
 			goto out;
 
 		case ELEVATOR_FRONT_MERGE:
-			req = list_entry_rq(insert_here);
-
 			BUG_ON(!rq_mergeable(req));
 
-			if (!q->front_merge_fn(q, req, bio)) {
-				insert_here = req->queuelist.prev;
+			if (!q->front_merge_fn(q, req, bio))
 				break;
-			}
 
 			bio->bi_next = req->bio;
 			req->cbio = req->bio = bio;
@@ -2029,7 +2023,7 @@ get_rq:
 	req->rq_disk = bio->bi_bdev->bd_disk;
 	req->start_time = jiffies;
 
-	add_request(q, req, insert_here);
+	add_request(q, req);
 out:
 	if (freereq)
 		__blk_put_request(q, freereq);
@@ -2480,7 +2474,7 @@ void end_that_request_last(struct request *req)
 			break;
 		}
 		disk_round_stats(disk);
-		disk_stat_dec(disk, in_flight);
+		disk->in_flight--;
 	}
 	__blk_put_request(req->q, req);
 	/* Do this LAST! The structure may be freed immediately afterwards */

@@ -1359,8 +1359,6 @@ static int set_io_32bit(ide_drive_t *drive, int arg)
 
 static int set_using_dma (ide_drive_t *drive, int arg)
 {
-	if (!DRIVER(drive)->supports_dma)
-		return -EPERM;
 	if (!drive->id || !(drive->id->capability & 1))
 		return -EPERM;
 	if (HWIF(drive)->ide_dma_check == NULL)
@@ -2406,6 +2404,13 @@ static ide_startstop_t default_abort (ide_drive_t *drive, const char *msg)
 	return ide_abort(drive, msg);
 }
 
+static ide_startstop_t default_start_power_step(ide_drive_t *drive,
+						struct request *rq)
+{
+	rq->pm->pm_step = ide_pm_state_completed;
+	return ide_stopped;
+}
+
 static void setup_driver_defaults (ide_driver_t *d)
 {
 	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
@@ -2420,6 +2425,8 @@ static void setup_driver_defaults (ide_driver_t *d)
 	if (d->capacity == NULL)	d->capacity = default_capacity;
 	if (d->special == NULL)		d->special = default_special;
 	if (d->attach == NULL)		d->attach = default_attach;
+	if (d->start_power_step == NULL)
+		d->start_power_step = default_start_power_step;
 }
 
 int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version)
@@ -2443,9 +2450,6 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 	if ((drive->autotune == IDE_TUNE_DEFAULT) ||
 		(drive->autotune == IDE_TUNE_AUTO)) {
 		/* DMA timings and setup moved to ide-probe.c */
-		if (!driver->supports_dma && HWIF(drive)->ide_dma_off_quietly)
-//			HWIF(drive)->ide_dma_off_quietly(drive);
-			HWIF(drive)->ide_dma_off(drive);
 		drive->dsc_overlap = (drive->next != drive && driver->supports_dsc_overlap);
 		drive->nice1 = 1;
 	}

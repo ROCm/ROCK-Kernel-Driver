@@ -422,26 +422,31 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, int vpi,
 	}
 	if (!error) error = adjust_tp(&vcc->qos.txtp,vcc->qos.aal);
 	if (!error) error = adjust_tp(&vcc->qos.rxtp,vcc->qos.aal);
-	if (error) {
-		vcc_remove_socket(vcc->sk);
-		return error;
-	}
+	if (error)
+		goto fail;
 	DPRINTK("VCC %d.%d, AAL %d\n",vpi,vci,vcc->qos.aal);
 	DPRINTK("  TX: %d, PCR %d..%d, SDU %d\n",vcc->qos.txtp.traffic_class,
 	    vcc->qos.txtp.min_pcr,vcc->qos.txtp.max_pcr,vcc->qos.txtp.max_sdu);
 	DPRINTK("  RX: %d, PCR %d..%d, SDU %d\n",vcc->qos.rxtp.traffic_class,
 	    vcc->qos.rxtp.min_pcr,vcc->qos.rxtp.max_pcr,vcc->qos.rxtp.max_sdu);
-	if (!try_module_get(dev->ops->owner))
-		return -ENODEV;
+	if (!try_module_get(dev->ops->owner)) {
+		error = -ENODEV;
+		goto fail;
+	}
+
 	if (dev->ops->open) {
-		error = dev->ops->open(vcc,vpi,vci);
-		if (error) {
-			module_put(dev->ops->owner);
-			vcc_remove_socket(vcc->sk);
-			return error;
-		}
+		if ((error = dev->ops->open(vcc,vpi,vci)))
+			goto put_module_fail;
 	}
 	return 0;
+
+put_module_fail:
+	module_put(dev->ops->owner);
+fail:
+	vcc_remove_socket(vcc->sk);
+	/* ensure we get dev module ref count correct */
+	vcc->dev = NULL;
+	return error;
 }
 
 
@@ -1109,12 +1114,10 @@ static int __init atm_init(void)
 		printk(KERN_ERR "atmsvc_init() failed with %d\n", error);
 		goto failure;
 	}
-#ifdef CONFIG_PROC_FS
         if ((error = atm_proc_init()) < 0) {
 		printk(KERN_ERR "atm_proc_init() failed with %d\n",error);
 		goto failure;
 	}
-#endif
 	return 0;
 
 failure:
@@ -1125,9 +1128,7 @@ failure:
 
 static void __exit atm_exit(void)
 {
-#ifdef CONFIG_PROC_FS
 	atm_proc_exit();
-#endif
 	atmsvc_exit();
 	atmpvc_exit();
 }

@@ -787,7 +787,8 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 	 * vm_scan(). Shouldn't be a worry.
 	 */
 	while (i--) {
-		ClearPageSlab(page);
+		if (!TestClearPageSlab(page))
+			BUG();
 		page++;
 	}
 	sub_page_state(nr_slab, nr_freed);
@@ -1813,8 +1814,7 @@ alloc_done:
 static inline void
 cache_alloc_debugcheck_before(kmem_cache_t *cachep, int flags)
 {
-	if (flags & __GFP_WAIT)
-		might_sleep();
+	might_sleep_if(flags & __GFP_WAIT);
 #if DEBUG
 	kmem_flagcheck(cachep, flags);
 #endif

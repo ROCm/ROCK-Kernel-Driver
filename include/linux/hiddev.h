@@ -207,7 +207,7 @@ void hiddev_hid_event(struct hid_device *hid, struct hid_field *field,
 		      struct hid_usage *usage, __s32 value, struct pt_regs *regs);
 void hiddev_report_event(struct hid_device *hid, struct hid_report *report);
 int __init hiddev_init(void);
-void __exit hiddev_exit(void);
+void hiddev_exit(void);
 #else
 static inline int hiddev_connect(struct hid_device *hid) { return -1; }
 static inline void hiddev_disconnect(struct hid_device *hid) { }

@@ -685,7 +685,7 @@ check_infoelements(struct l3_process *pc, struct sk_buff *skb, int *checklist)
 	p += l;
 	mt = *p++;
 	oldpos = 0;
-	while ((p - skb->data) < skb->len) {
+	while ((u_int)(p - skb->data) < skb->len) {
 		if ((*p & 0xf0) == 0x90) { /* shift codeset */
 			old_codeset = codeset;
 			codeset = *p & 7;
@@ -2859,7 +2859,7 @@ global_handler(struct PStack *st, int mt, struct sk_buff *skb)
 	u8 tmp[16];
 	u8 *p = tmp;
 	int l;
-	int i;
+	u_int i;
 	struct l3_process *proc = st->l3.global;
 
 	if ( skb )	
@@ -2900,7 +2900,8 @@ global_handler(struct PStack *st, int mt, struct sk_buff *skb)
 static void
 ni1up(struct PStack *st, int pr, void *arg)
 {
-	int i, mt, cr, cause, callState;
+	u_int i; 
+	int mt, cr, cause, callState;
 	char *ptr;
 	u8 *p;
 	struct sk_buff *skb = arg;
@@ -2941,7 +2942,7 @@ ni1up(struct PStack *st, int pr, void *arg)
 		return;
 	}
 	cr = getcallref(skb->data);
-	if (skb->len < ((skb->data[1] & 0x0f) + 3)) {
+	if (skb->len < (u_int)((skb->data[1] & 0x0f) + 3)) {
 		l3_debug(st, "ni1up frame too short(%d)", skb->len);
 		dev_kfree_skb(skb);
 		return;
@@ -3086,7 +3087,8 @@ ni1up(struct PStack *st, int pr, void *arg)
 static void
 ni1down(struct PStack *st, int pr, void *arg)
 {
-	int i, cr;
+	u_int i;
+	int cr;
 	struct l3_process *proc;
 	struct Channel *chan;
 
@@ -3137,7 +3139,7 @@ ni1down(struct PStack *st, int pr, void *arg)
 static void
 ni1man(struct PStack *st, int pr, void *arg)
 {
-        int i;
+        u_int i;
         struct l3_process *proc = arg;
 
         if (!proc) {

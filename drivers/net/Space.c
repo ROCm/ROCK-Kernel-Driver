@@ -32,13 +32,12 @@
  */
 #include <linux/config.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/trdevice.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/netlink.h>
 #include <linux/divert.h>
-
-#define	NEXT_DEV	NULL
-
 
 /* A unified ethernet device probe.  This is the easiest way to have every
    ethernet adaptor have the name "eth[0123...]".
@@ -62,7 +61,6 @@ extern int eth16i_probe(struct net_device *);
 extern int depca_probe(struct net_device *);
 extern int i82596_probe(struct net_device *);
 extern int ewrk3_probe(struct net_device *);
-extern int de4x5_probe(struct net_device *);
 extern int el1_probe(struct net_device *);
 extern int wavelan_probe(struct net_device *);
 extern int arlan_probe(struct net_device *);
@@ -89,7 +87,6 @@ extern int apne_probe(struct net_device *);
 extern int bionet_probe(struct net_device *);
 extern int pamsnet_probe(struct net_device *);
 extern int cs89x0_probe(struct net_device *dev);
-extern int ethertap_probe(struct net_device *dev);
 extern int hplance_probe(struct net_device *dev);
 extern int bagetlance_probe(struct net_device *);
 extern int mvme147lance_probe(struct net_device *dev);
@@ -100,6 +97,9 @@ extern int macsonic_probe(struct net_device *dev);
 extern int mac8390_probe(struct net_device *dev);
 extern int mac89x0_probe(struct net_device *dev);
 extern int mc32_probe(struct net_device *dev);
+extern struct net_device *sdla_init(void);
+extern struct net_device *cops_probe(int unit);
+extern struct net_device *ltpc_probe(void);
   
 /* Detachable devices ("pocket adaptors") */
 extern int de620_probe(struct net_device *);
@@ -108,7 +108,7 @@ extern int de620_probe(struct net_device *);
 extern int iph5526_probe(struct net_device *dev);
 
 /* SBNI adapters */
-extern int sbni_probe(struct net_device *);
+extern int sbni_probe(void);
 
 struct devprobe
 {
@@ -153,12 +153,9 @@ static int __init probe_list(struct net_device *dev, struct devprobe *plist)
  * This is a bit of an artificial separation as there are PCI drivers
  * that also probe for EISA cards (in the PCI group) and there are ISA
  * drivers that probe for EISA cards (in the ISA group).  These are the
- * EISA only driver probes, and also the legacy PCI probes
+ * legacy EISA only driver probes, and also the legacy PCI probes
  */
 static struct devprobe eisa_probes[] __initdata = {
-#ifdef CONFIG_DE4X5             /* DEC DE425, DE434, DE435 adapters */
-	{de4x5_probe, 0},
-#endif
 #ifdef CONFIG_ULTRA32 
 	{ultra32_probe, 0},	
 #endif
@@ -357,135 +354,43 @@ static struct devprobe mips_probes[] __initdata = {
  * per bus interface. This drives the legacy devices only for now.
  */
  
-static int __init ethif_probe(struct net_device *dev)
+static int __init ethif_probe(void)
 {
-	unsigned long base_addr = dev->base_addr;
+	struct net_device *dev;
+	int err = -ENODEV;
+
+	dev = alloc_etherdev(0);
+	if (!dev)
+		return -ENOMEM;
+
+	netdev_boot_setup_check(dev);
 
 	/* 
 	 * Backwards compatibility - historically an I/O base of 1 was 
 	 * used to indicate not to probe for this ethN interface 
 	 */
-	if (base_addr == 1)
-		return 1;		/* ENXIO */
+	if (dev->base_addr == 1) {
+		free_netdev(dev);
+		return -ENXIO;
+	}
 
 	/* 
 	 * The arch specific probes are 1st so that any on-board ethernet
 	 * will be probed before other ISA/EISA/MCA/PCI bus cards.
 	 */
-	if (probe_list(dev, m68k_probes) == 0)
-		return 0;
-	if (probe_list(dev, mips_probes) == 0)
-		return 0;
-	if (probe_list(dev, eisa_probes) == 0)
-		return 0;
-	if (probe_list(dev, mca_probes) == 0)
-		return 0;
-	if (probe_list(dev, isa_probes) == 0) 
-		return 0;
-	if (probe_list(dev, parport_probes) == 0)
-		return 0;
-	return -ENODEV;
+	if (probe_list(dev, m68k_probes) == 0 ||
+	    probe_list(dev, mips_probes) == 0 ||
+	    probe_list(dev, eisa_probes) == 0 ||
+	    probe_list(dev, mca_probes) == 0 ||
+	    probe_list(dev, isa_probes) == 0 ||
+	    probe_list(dev, parport_probes) == 0) 
+		err = register_netdev(dev);
+
+	if (err)
+		free_netdev(dev);
+	return err;
+
 }
-
-#ifdef CONFIG_ETHERTAP
-static struct net_device tap0_dev = {
-	.name		= "tap0",
-	.base_addr	= NETLINK_TAPBASE,
-	.next		= NEXT_DEV,
-	.init		= ethertap_probe,
-};
-#undef NEXT_DEV
-#define NEXT_DEV	(&tap0_dev)
-#endif
-
-#ifdef CONFIG_SDLA
-extern int sdla_init(struct net_device *);
-static struct net_device sdla0_dev = {
-	.name		=  "sdla0",
-	.next		=  NEXT_DEV,
-	.init		=  sdla_init,
-};
-#undef NEXT_DEV
-#define NEXT_DEV	(&sdla0_dev)
-#endif
-
-#if defined(CONFIG_LTPC)
-extern int ltpc_probe(struct net_device *);
-static struct net_device dev_ltpc = {
-	.name		= "lt0",
-	.next		= NEXT_DEV,
-	.init		= ltpc_probe
-};
-#undef NEXT_DEV
-#define NEXT_DEV	(&dev_ltpc)
-#endif  /* LTPC */
-
-#if defined(CONFIG_COPS)
-extern int cops_probe(struct net_device *);
-static struct net_device cops2_dev = {
-	.name		= "lt2",
-	.next		= NEXT_DEV,
-	.init		= cops_probe,
-};
-static struct net_device cops1_dev = {
-	.name		= "lt1",
-	.next		= &cops2_dev,
-	.init		= cops_probe,
-};
-static struct net_device cops0_dev = {
-	.name		= "lt0",
-	.next		= &cops1_dev,
-	.init		= cops_probe,
-};
-#undef NEXT_DEV
-#define NEXT_DEV     (&cops0_dev)
-#endif  /* COPS */
-
-static struct net_device eth7_dev = {
-	.name		= "eth%d",
-	.next		= NEXT_DEV,
-	.init		= ethif_probe,
-};
-static struct net_device eth6_dev = {
-	.name		= "eth%d",
-	.next		= &eth7_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth5_dev = {
-	.name		= "eth%d",
-	.next		= &eth6_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth4_dev = {
-	.name		= "eth%d",
-	.next		= &eth5_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth3_dev = {
-	.name		= "eth%d",
-	.next		= &eth4_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth2_dev = {
-	.name		= "eth%d",
-	.next		= &eth3_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth1_dev = {
-	.name		= "eth%d",
-	.next		= &eth2_dev,
-	.init		= ethif_probe,
-};
-static struct net_device eth0_dev = {
-	.name		= "eth%d",
-	.next		= &eth1_dev,
-	.init		= ethif_probe,
-};
-
-#undef NEXT_DEV
-#define NEXT_DEV	(&eth0_dev)
-
-
 
 #ifdef CONFIG_TR
 /* Token-ring device probe */
@@ -494,129 +399,82 @@ extern int sk_isa_probe(struct net_device *);
 extern int proteon_probe(struct net_device *);
 extern int smctr_probe(struct net_device *);
 
-static int
-trif_probe(struct net_device *dev)
+static __init int trif_probe(void)
 {
-    if (1
+	struct net_device *dev;
+	int err = -ENODEV;
+	
+	dev = alloc_trdev(0);
+	if (!dev)
+		return -ENOMEM;
+
+	netdev_boot_setup_check(dev);
+	if (
 #ifdef CONFIG_IBMTR
-	&& ibmtr_probe(dev)
+	    ibmtr_probe(dev) == 0  ||
 #endif
 #ifdef CONFIG_SKISA
-	&& sk_isa_probe(dev)
+	    sk_isa_probe(dev) == 0 || 
 #endif
 #ifdef CONFIG_PROTEON
-	&& proteon_probe(dev)
+	    proteon_probe(dev) == 0 ||
 #endif
 #ifdef CONFIG_SMCTR
-	&& smctr_probe(dev)
+	    smctr_probe(dev) == 0 ||
 #endif
-	&& 1 ) {
-	return 1;	/* -ENODEV or -EAGAIN would be more accurate. */
-    }
-    return 0;
+	    0 ) 
+		err = register_netdev(dev);
+		
+	if (err)
+		free_netdev(dev);
+	return err;
+
 }
-static struct net_device tr7_dev = {
-	.name		= "tr%d",
-	.next		= NEXT_DEV,
-	.init		= trif_probe,
-};
-static struct net_device tr6_dev = {
-	.name		= "tr%d",
-	.next		= &tr7_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr5_dev = {
-	.name		= "tr%d",
-	.next		= &tr6_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr4_dev = {
-	.name		= "tr%d",
-	.next		= &tr5_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr3_dev = {
-	.name		= "tr%d",
-	.next		= &tr4_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr2_dev = {
-	.name		= "tr%d",
-	.next		= &tr3_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr1_dev = {
-	.name		= "tr%d",
-	.next		= &tr2_dev,
-	.init		= trif_probe,
-};
-static struct net_device tr0_dev = {
-	.name		= "tr%d",
-	.next		= &tr1_dev,
-	.init		= trif_probe,
-};
-#undef       NEXT_DEV
-#define      NEXT_DEV        (&tr0_dev)
+#endif
 
-#endif 
-
-#ifdef CONFIG_SBNI
-static struct net_device sbni7_dev = {
-	.name		= "sbni7",
-	.next		= NEXT_DEV,
-	.init		= sbni_probe,
-};
-static struct net_device sbni6_dev = {
-	.name		= "sbni6",
-	.next		= &sbni7_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni5_dev = {
-	.name		= "sbni5",
-	.next		= &sbni6_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni4_dev = {
-	.name		= "sbni4",
-	.next		= &sbni5_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni3_dev = {
-	.name		= "sbni3",
-	.next		= &sbni4_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni2_dev = {
-	.name		= "sbni2",
-	.next		= &sbni3_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni1_dev = {
-	.name		= "sbni1",
-	.next		= &sbni2_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni0_dev = {
-	.name		= "sbni0",
-	.next		= &sbni1_dev,
-	.init		= sbni_probe,
-};
-
-#undef	NEXT_DEV
-#define	NEXT_DEV	(&sbni0_dev)
-#endif 
 	
 /*
  *	The loopback device is global so it can be directly referenced
  *	by the network code. Also, it must be first on device list.
  */
+extern int loopback_init(void);
 
-extern int loopback_init(struct net_device *dev);
-struct net_device loopback_dev = {
-	.name		= "lo",
-	.next		= NEXT_DEV,
-	.init		= loopback_init
-};
+/*  Statically configured drivers -- order matters here. */
+void __init probe_old_netdevs(void)
+{
+	int num;
+
+	if (loopback_init()) {
+		printk(KERN_ERR "Network loopback device setup failed\n");
+	}
+
+	
+#ifdef CONFIG_SBNI
+	for (num = 0; num < 8; ++num)
+		if (sbni_probe())
+			break;
+#endif
+#ifdef CONFIG_TR
+	for (num = 0; num < 8; ++num)
+		if (trif_probe())
+			break;
+#endif
+	for (num = 0; num < 8; ++num)
+		if (ethif_probe())
+			break;
+#ifdef CONFIG_COPS
+	cops_probe(0);
+	cops_probe(1);
+	cops_probe(2);
+#endif
+#ifdef CONFIG_LTPC
+	ltpc_probe();
+#endif
+#ifdef CONFIG_SDLA
+	sdla_init();
+#endif
+
+}
 
 /*
  * The @dev_base list is protected by @dev_base_lock and the rtln
@@ -637,6 +495,6 @@ struct net_device loopback_dev = {
  * unregister_netdevice(), which must be called with the rtnl
  * semaphore held.
  */
-struct net_device *dev_base = &loopback_dev;
+struct net_device *dev_base;
 rwlock_t dev_base_lock = RW_LOCK_UNLOCKED;
 

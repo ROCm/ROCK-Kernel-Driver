@@ -201,8 +201,10 @@ void diva_os_remove_irq (void* context, byte irq);
 /*
 ** module locking
 */
+/* 
 #define DIVA_LOCK_MODULE MOD_INC_USE_COUNT
 #define DIVA_UNLOCK_MODULE MOD_DEC_USE_COUNT
+*/
 
 /*
 **  Spin Lock framework

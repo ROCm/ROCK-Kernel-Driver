@@ -748,9 +748,6 @@ static void __init init_hwif_pdc202xx (ide_hwif_t *hwif)
 	hwif->tuneproc  = &config_chipset_for_pio;
 	hwif->quirkproc = &pdc202xx_quirkproc;
 
-	if (hwif->pci_dev->device == PCI_DEVICE_ID_PROMISE_20265)
-		hwif->no_lba48 = (hwif->channel) ? 0 : 1;
-
 	if (hwif->pci_dev->device != PCI_DEVICE_ID_PROMISE_20246) {
 		hwif->busproc   = &pdc202xx_tristate;
 		hwif->resetproc = &pdc202xx_reset;

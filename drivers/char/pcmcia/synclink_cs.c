@@ -1,7 +1,7 @@
 /*
  * linux/drivers/char/pcmcia/synclink_cs.c
  *
- * $Id: synclink_cs.c,v 4.13 2003/06/18 15:29:32 paulkf Exp $
+ * $Id: synclink_cs.c,v 4.15 2003/09/05 15:26:02 paulkf Exp $
  *
  * Device driver for Microgate SyncLink PC Card
  * multiprotocol serial adapter.
@@ -491,7 +491,7 @@ MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICE_COUNT) "i");
 MODULE_LICENSE("GPL");
 
 static char *driver_name = "SyncLink PC Card driver";
-static char *driver_version = "$Revision: 4.13 $";
+static char *driver_version = "$Revision: 4.15 $";
 
 static struct tty_driver *serial_driver;
 
@@ -838,6 +838,9 @@ static inline int mgslpc_paranoia_check(MGSLPC_INFO *info,
 		printk(badmagic, name, routine);
 		return 1;
 	}
+#else
+	if (!info)
+		return 1;
 #endif
 	return 0;
 }

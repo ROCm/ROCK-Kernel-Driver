@@ -88,14 +88,18 @@ extern void __up_wakeup(struct semaphore *);
 
 static inline void __down(struct semaphore *sem)
 {
-	long count = atomic_dec_return(&sem->count);
+	long count;
+	might_sleep();
+	count = atomic_dec_return(&sem->count);
 	if (unlikely(count < 0))
 		__down_failed(sem);
 }
 
 static inline int __down_interruptible(struct semaphore *sem)
 {
-	long count = atomic_dec_return(&sem->count);
+	long count;
+	might_sleep();
+	count = atomic_dec_return(&sem->count);
 	if (unlikely(count < 0))
 		return __down_failed_interruptible(sem);
 	return 0;

@@ -676,7 +676,6 @@ config NET_SCHED
 
 source "net/sched/Kconfig"
 
-#bool 'Network code profiler' CONFIG_NET_PROFILE
 endmenu
 
 menu "Network testing"
