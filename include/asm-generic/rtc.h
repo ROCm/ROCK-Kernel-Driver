@@ -22,9 +22,8 @@
 #define RTC_AIE 0x20		/* alarm interrupt enable */
 #define RTC_UIE 0x10		/* update-finished interrupt enable */
 
-extern void gen_rtc_interrupt(unsigned long);
-
 /* some dummy definitions */
+#define RTC_BATT_BAD 0x100	/* battery bad */
 #define RTC_SQWE 0x08		/* enable square-wave output */
 #define RTC_DM_BINARY 0x04	/* all time/date values are BCD if clear */
 #define RTC_24H 0x02		/* 24 hour mode - else hours bit 7 means pm */
@@ -43,7 +42,7 @@ static inline unsigned char rtc_is_updating(void)
 	return uip;
 }
 
-static inline void get_rtc_time(struct rtc_time *time)
+static inline unsigned int get_rtc_time(struct rtc_time *time)
 {
 	unsigned long uip_watchdog = jiffies;
 	unsigned char ctrl;
@@ -108,6 +107,8 @@ static inline void get_rtc_time(struct rtc_time *time)
 		time->tm_year += 100;
 
 	time->tm_mon--;
+
+	return RTC_24H;
 }
 
 /* Set the current date and time in the real time clock. */
