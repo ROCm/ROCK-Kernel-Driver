@@ -274,7 +274,8 @@ AFLAGS_KERNEL	=
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 CPPFLAGS        := -D__KERNEL__ -Iinclude \
-		   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include)
+		   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include) \
+		   $(if $(ARCH_FLAVOR),-DARCH_FLAVOR_$(shell echo $(ARCH_FLAVOR) | tr a-z- A-Z_))
 
 CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs \
 	  	   -fno-strict-aliasing -fno-common
@@ -661,8 +662,35 @@ define filechk_version.h
 	)
 endef
 
-include/linux/version.h: Makefile
-	$(call filechk,version.h)
+# Run version.h through the C pre-processor to determine which symbols
+# it defines: The simple version that filechk_version.h produces is not
+# byte-wise identical to our version for multiple configurations.
+# ---------------------------------------------------------------------------
+
+include/linux/version.h: FORCE
+	@echo '  CHK     $@';				\
+	if [ -e $@ ]; then				\
+	    CURRENT="$$(				\
+		( echo '#include "$@"';			\
+		  echo UTS_RELEASE;			\
+		  echo LINUX_VERSION_CODE		\
+		) | cpp | tail -n 2)";			\
+	    NEW="$$(					\
+		echo \"$(KERNELRELEASE)\";		\
+		expr $(VERSION) \* 65536 +		\
+		     $(PATCHLEVEL) \* 256 +		\
+		     $(SUBLEVEL)			\
+		)";					\
+	    test "$$CURRENT" = "$$NEW";			\
+	else						\
+	    false;					\
+	fi;						\
+	if test $$? -ne 0; then				\
+	    echo '  UPD     $@';			\
+	    mkdir -p $(dir $@);				\
+	    $(call filechk_version.h) > $@;		\
+	fi
+
 
 # ---------------------------------------------------------------------------
 

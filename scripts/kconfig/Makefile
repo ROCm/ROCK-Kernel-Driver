@@ -3,60 +3,72 @@
 # These targets are used from top-level makefile
 
 .PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig \
-	cloneconfig
+	cloneconfig check-meta
 
-xconfig: $(obj)/qconf
+check-meta:
+	@if [ -e .config ] &&						\
+		grep /var/adm/running-kernel.make .config; then		\
+	    echo;							\
+	    echo "The .config file is a merged configuration; please"	\
+		 "remove it by hand before creating your own."		\
+		 "You can use one of the files arch/$(ARCH)/defconfig.*" \
+		 "as a template.";					\
+	    echo;							\
+	    exit 1;							\
+	fi
+
+xconfig: check-meta $(obj)/qconf
 	$< arch/$(ARCH)/Kconfig
 
-gconfig: $(obj)/gconf
+gconfig: $check-meta (obj)/gconf
 	./$<  arch/$(ARCH)/Kconfig
 
-menuconfig: $(obj)/mconf
+menuconfig: check-meta $(obj)/mconf
 	$(Q)$(MAKE) $(build)=scripts/lxdialog
 	$< arch/$(ARCH)/Kconfig
 
-config: $(obj)/conf
+config: check-meta $(obj)/conf
 	$< arch/$(ARCH)/Kconfig
 
-oldconfig: $(obj)/conf
+oldconfig: check-meta $(obj)/conf
 	$< -o arch/$(ARCH)/Kconfig
 
-silentoldconfig: $(obj)/conf
+silentoldconfig: check-meta $(obj)/conf
 	$< -s arch/$(ARCH)/Kconfig
 
 check_CONFIG_IKCONFIG_PROC:
-	$(Q)if ! [ -f /proc/config.gz ]; then					\
-	    echo "Running kernel compiled without CONFIG_IKCONFIG_PROC";	\
-	    false;								\
+	$(Q)if ! [ -f /proc/config.gz ]; then				\
+	    echo "Running kernel compiled without CONFIG_IKCONFIG_PROC"; \
+	    false;							\
 	fi
 
 _cloneconfig: check_CONFIG_IKCONFIG_PROC
 	$(Q)gzip -cd /proc/config.gz > $(obj)/.config
-cloneconfig: _cloneconfig oldconfig
+cloneconfig: check-meta _cloneconfig oldconfig
 
 .PHONY: randconfig allyesconfig allnoconfig allmodconfig defconfig
 
-randconfig: $(obj)/conf
+randconfig: check-meta $(obj)/conf
 	$< -r arch/$(ARCH)/Kconfig
 
-allyesconfig: $(obj)/conf
+allyesconfig: check-meta $(obj)/conf
 	$< -y arch/$(ARCH)/Kconfig
 
-allnoconfig: $(obj)/conf
+allnoconfig: check-meta $(obj)/conf
 	$< -n arch/$(ARCH)/Kconfig
 
-allmodconfig: $(obj)/conf
+allmodconfig: check-meta $(obj)/conf
 	$< -m arch/$(ARCH)/Kconfig
 
 _defconfig: check_CONFIG_IKCONFIG_PROC
-	$(Q)eval "$$(gzip -cd /proc/config.gz)";				\
-	config=$(srctree)/arch/$(ARCH)/defconfig.$$CONFIG_CFGNAME;		\
-	if ! [ -e $$config ]; then						\
-	    echo "Config file $$config not found";				\
-	    false;								\
-	fi;									\
-	cp $$config $(obj)/.config;
-defconfig: _defconfig oldconfig
+	$(Q)eval "$$(gzip -cd /proc/config.gz)";			\
+	config=$(srctree)/arch/$(ARCH)/defconfig.$$CONFIG_CFGNAME;	\
+	if ! [ -e $$config ]; then					\
+	    echo "Config file $$config not found";			\
+	    false;							\
+	fi;								\
+	cp $$config $(obj)/.config
+defconfig: check-meta _defconfig oldconfig
 
 # Help text used by make help
 help:
