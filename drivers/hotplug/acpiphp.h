@@ -36,7 +36,6 @@
 
 #include <linux/acpi.h>
 #include "pci_hotplug.h"
-#include "acpi_bus.h"
 
 #define dbg(format, arg...)					\
 	do {							\
