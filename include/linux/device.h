@@ -27,9 +27,9 @@
 #include <linux/ioport.h>
 #include <linux/kobject.h>
 #include <linux/list.h>
-#include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
+#include <asm/semaphore.h>
 #include <asm/atomic.h>
 
 #define DEVICE_NAME_SIZE	50
