@@ -1275,6 +1275,8 @@ acpi_thermal_add (
 	if (result)
 		return_VALUE(result);
 
+	init_timer(&tz->timer);
+
 	acpi_thermal_check(tz);
 
 	status = acpi_install_notify_handler(tz->handle,
@@ -1285,8 +1287,6 @@ acpi_thermal_add (
 		result = -ENODEV;
 		goto end;
 	}
-
-	init_timer(&tz->timer);
 
 	printk(KERN_INFO PREFIX "%s [%s] (%ld C)\n",
 		acpi_device_name(device), acpi_device_bid(device),
