@@ -1,3 +1,39 @@
+/*
+ * budget-core.c: driver for the SAA7146 based Budget DVB cards
+ *
+ * Compiled from various sources by Michael Hunold <michael@mihu.de>
+ *
+ * Copyright (C) 2002 Ralph Metzler <rjkm@metzlerbros.de>
+ *
+ * Copyright (C) 1999-2002 Ralph  Metzler
+ *			 & Marcus Metzler for convergence integrated media GmbH
+ *
+ * 26feb2004 Support for FS Activy Card (Grundig tuner) by
+ *	     Michael Dreher <michael@5dot1.de>,
+ *	     Oliver Endriss <o.endriss@gmx.de>,
+ *	     Andreas 'randy' Weinberger
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * GNU General Public License for more details.
+ *
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
+ *
+ *
+ * the project's page is at http://www.linuxtv.org/dvb/
+ */
+
 #include "budget.h"
 #include "ttpci-eeprom.h"
 
@@ -38,10 +74,33 @@ static int start_ts_capture (struct budget *budget)
 
         budget->tsf=0xff;
         budget->ttbp=0;
+
+	/*
+	 *  Signal path on the Activy:
+	 *
+	 *  tuner -> SAA7146 port A -> SAA7146 BRS -> SAA7146 DMA3 -> memory
+	 *
+	 *  Since the tuner feeds 204 bytes packets into the SAA7146,
+	 *  DMA3 is configured to strip the trailing 16 FEC bytes:
+	 *	Pitch: 188, NumBytes3: 188, NumLines3: 1024
+	 */
+
+	if (budget->card->type == BUDGET_FS_ACTIVY) {
+		saa7146_write(dev, DD1_INIT, 0x04000000);
+		saa7146_write(dev, MC2, (MASK_09 | MASK_25));
+		saa7146_write(dev, BRS_CTRL, 0x00000000);
+	} else {
+		if (budget->video_port == BUDGET_VIDEO_PORTA) {
+			saa7146_write(dev, DD1_INIT, 0x06000200);
+			saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
+			saa7146_write(dev, BRS_CTRL, 0x00000000);
+		} else {
         saa7146_write(dev, DD1_INIT, 0x02000600);
         saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
-
         saa7146_write(dev, BRS_CTRL, 0x60000000);	
+		}
+	}
+
       	saa7146_write(dev, MC2, (MASK_08 | MASK_24));
         mdelay(10);
 
@@ -49,9 +108,15 @@ static int start_ts_capture (struct budget *budget)
         saa7146_write(dev, BASE_EVEN3, 0);
         saa7146_write(dev, PROT_ADDR3, TS_WIDTH*TS_HEIGHT);	
         saa7146_write(dev, BASE_PAGE3, budget->pt.dma |ME1|0x90);
-        saa7146_write(dev, PITCH3, TS_WIDTH);
 
+	if (budget->card->type == BUDGET_FS_ACTIVY) {
+		saa7146_write(dev, PITCH3, TS_WIDTH/2);
+		saa7146_write(dev, NUM_LINE_BYTE3, ((TS_HEIGHT*2)<<16)|(TS_WIDTH/2));
+	} else {
+		saa7146_write(dev, PITCH3, TS_WIDTH);
         saa7146_write(dev, NUM_LINE_BYTE3, (TS_HEIGHT<<16)|TS_WIDTH);
+	}
+
       	saa7146_write(dev, MC2, (MASK_04 | MASK_20));
      	saa7146_write(dev, MC1, (MASK_04 | MASK_20)); // DMA3 on
 
@@ -99,23 +164,31 @@ static int budget_start_feed(struct dvb_demux_feed *feed)
 {
         struct dvb_demux *demux = feed->demux;
         struct budget *budget = (struct budget*) demux->priv;
+	int status;
 
 	DEB_EE(("budget: %p\n",budget));
 
         if (!demux->dmx.frontend)
                 return -EINVAL;
 
-	return start_ts_capture (budget); 
+   	spin_lock(&budget->feedlock);   
+	status = start_ts_capture (budget);
+   	spin_unlock(&budget->feedlock);
+	return status;
 }
 
 static int budget_stop_feed(struct dvb_demux_feed *feed)
 {
         struct dvb_demux *demux = feed->demux;
         struct budget *budget = (struct budget *) demux->priv;
+	int status;
 
 	DEB_EE(("budget: %p\n",budget));
 
-	return stop_ts_capture (budget); 
+   	spin_lock(&budget->feedlock);
+	status = stop_ts_capture (budget);
+   	spin_unlock(&budget->feedlock);
+	return status;
 }
 
 
@@ -208,18 +281,27 @@ int ttpci_budget_init (struct budget *budget,
 	budget->card = bi;
 	budget->dev = (struct saa7146_dev *) dev;
 
-	dvb_register_adapter(&budget->dvb_adapter, budget->card->name);
+	dvb_register_adapter(&budget->dvb_adapter, budget->card->name, THIS_MODULE);
 
 	/* set dd1 stream a & b */
       	saa7146_write(dev, DD1_STREAM_B, 0x00000000);
+	saa7146_write(dev, MC2, (MASK_09 | MASK_25));
+	saa7146_write(dev, MC2, (MASK_10 | MASK_26));
 	saa7146_write(dev, DD1_INIT, 0x02000000);
 	saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
 
+       	if (bi->type != BUDGET_FS_ACTIVY)
+		budget->video_port = BUDGET_VIDEO_PORTB;
+	else
+		budget->video_port = BUDGET_VIDEO_PORTA;
+	spin_lock_init(&budget->feedlock);
+
 	/* the Siemens DVB needs this if you want to have the i2c chips
            get recognized before the main driver is loaded */
-        saa7146_write(dev, GPIO_CTRL, 0x500000);
+	if (bi->type != BUDGET_FS_ACTIVY)
+		saa7146_write(dev, GPIO_CTRL, 0x500000); /* GPIO 3 = 1 */
 	
-	saa7146_i2c_adapter_prepare(dev, NULL, SAA7146_I2C_BUS_BIT_RATE_120);
+	saa7146_i2c_adapter_prepare(dev, NULL, 0, SAA7146_I2C_BUS_BIT_RATE_120);
 
 	budget->i2c_bus = dvb_register_i2c_bus (master_xfer, dev,
 						budget->dvb_adapter, 0);
@@ -242,7 +324,11 @@ int ttpci_budget_init (struct budget *budget,
 
 	tasklet_init (&budget->vpe_tasklet, vpeirq, (unsigned long) budget);
 
-	saa7146_setgpio(dev, 2, SAA7146_GPIO_OUTHI); /* frontend power on */
+	/* frontend power on */
+	if (bi->type == BUDGET_FS_ACTIVY)
+		saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI);
+	else
+		saa7146_setgpio(dev, 2, SAA7146_GPIO_OUTHI);
 
         if (budget_register(budget) == 0) {
 		return 0;
@@ -292,10 +378,28 @@ void ttpci_budget_irq10_handler (struct saa7146_dev* dev, u32 *isr)
 		tasklet_schedule (&budget->vpe_tasklet);
 }
 
+void ttpci_budget_set_video_port(struct saa7146_dev* dev, int video_port)
+{
+	struct budget *budget = (struct budget*)dev->ext_priv;
+
+	spin_lock(&budget->feedlock);
+	budget->video_port = video_port;
+	if (budget->feeding) {
+		int oldfeeding = budget->feeding;
+	   	budget->feeding = 1;
+		stop_ts_capture(budget);
+		start_ts_capture(budget);
+	   	budget->feeding = oldfeeding;
+	}
+   	spin_unlock(&budget->feedlock);
+}
+
+
 
 EXPORT_SYMBOL_GPL(ttpci_budget_init);
 EXPORT_SYMBOL_GPL(ttpci_budget_deinit);
 EXPORT_SYMBOL_GPL(ttpci_budget_irq10_handler);
+EXPORT_SYMBOL_GPL(ttpci_budget_set_video_port);
 EXPORT_SYMBOL_GPL(budget_debug);
 
 MODULE_PARM(budget_debug,"i");
