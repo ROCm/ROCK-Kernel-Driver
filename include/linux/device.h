@@ -66,9 +66,8 @@ struct bus_type {
 	char			* name;
 
 	struct subsystem	subsys;
-	struct subsystem	drvsubsys;
-	struct subsystem	devsubsys;
-	struct list_head	devices;
+	struct subsystem	drivers;
+	struct subsystem	devices;
 
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);

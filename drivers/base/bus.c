@@ -16,8 +16,6 @@
 #include <linux/string.h>
 #include "base.h"
 
-static DECLARE_MUTEX(bus_sem);
-
 #define to_dev(node) container_of(node,struct device,bus_list)
 #define to_drv(node) container_of(node,struct device_driver,kobj.entry)
 
@@ -169,7 +167,7 @@ int bus_for_each_dev(struct bus_type * bus, struct device * start,
 	if (!(bus = get_bus(bus)))
 		return -EINVAL;
 
-	head = start ? &start->bus_list : &bus->devices;
+	head = start ? &start->bus_list : &bus->devices.list;
 
 	down_read(&bus->subsys.rwsem);
 	list_for_each(entry,head) {
@@ -212,9 +210,9 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 	if(!(bus = get_bus(bus)))
 		return -EINVAL;
 
-	head = start ? &start->kobj.entry : &bus->drvsubsys.list;
+	head = start ? &start->kobj.entry : &bus->drivers.list;
 
-	down_read(&bus->drvsubsys.rwsem);
+	down_read(&bus->subsys.rwsem);
 	list_for_each(entry,head) {
 		struct device_driver * drv = get_driver(to_drv(entry));
 		error = fn(drv,data);
@@ -222,7 +220,7 @@ int bus_for_each_drv(struct bus_type * bus, struct device_driver * start,
 		if(error)
 			break;
 	}
-	up_read(&bus->drvsubsys.rwsem);
+	up_read(&bus->subsys.rwsem);
 	return error;
 }
 
@@ -296,7 +294,7 @@ static int device_attach(struct device * dev)
 	if (!bus->match)
 		return 0;
 
-	list_for_each(entry,&bus->drvsubsys.list) {
+	list_for_each(entry,&bus->drivers.list) {
 		struct device_driver * drv = to_drv(entry);
 		if (!(error = bus_match(dev,drv)))
 			break;
@@ -324,7 +322,7 @@ static int driver_attach(struct device_driver * drv)
 	if (!bus->match)
 		return 0;
 
-	list_for_each(entry,&bus->devices) {
+	list_for_each(entry,&bus->devices.list) {
 		struct device * dev = container_of(entry,struct device,bus_list);
 		if (!dev->driver) {
 			if (!bus_match(dev,drv) && dev->driver)
@@ -397,10 +395,10 @@ int bus_add_device(struct device * dev)
 	if (bus) {
 		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: add device %s\n",bus->name,dev->bus_id);
-		list_add_tail(&dev->bus_list,&dev->bus->devices);
+		list_add_tail(&dev->bus_list,&dev->bus->devices.list);
 		device_attach(dev);
 		up_write(&dev->bus->subsys.rwsem);
-		sysfs_create_link(&bus->devsubsys.kobj,&dev->kobj,dev->bus_id);
+		sysfs_create_link(&bus->devices.kobj,&dev->kobj,dev->bus_id);
 	}
 	return 0;
 }
@@ -417,7 +415,7 @@ int bus_add_device(struct device * dev)
 void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
-		sysfs_remove_link(&dev->bus->devsubsys.kobj,dev->bus_id);
+		sysfs_remove_link(&dev->bus->devices.kobj,dev->bus_id);
 		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: remove device %s\n",dev->bus->name,dev->bus_id);
 		device_detach(dev);
@@ -442,7 +440,7 @@ int bus_add_driver(struct device_driver * drv)
 
 		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
 		drv->kobj.ktype = &ktype_driver;
-		drv->kobj.subsys = &bus->drvsubsys;
+		drv->kobj.subsys = &bus->drivers;
 		kobject_register(&drv->kobj);
 
 		devclass_add_driver(drv);
@@ -489,32 +487,26 @@ void put_bus(struct bus_type * bus)
  *	bus_register - register a bus with the system.
  *	@bus:	bus.
  *
- *	We take bus_sem here to protect against the bus being 
- *	unregistered during the registration process.
  *	Once we have that, we registered the bus with the kobject
  *	infrastructure, then register the children subsystems it has:
  *	the devices and drivers that belong to the bus. 
  */
 int bus_register(struct bus_type * bus)
 {
-	INIT_LIST_HEAD(&bus->devices);
-
-	down(&bus_sem);
 	strncpy(bus->subsys.kobj.name,bus->name,KOBJ_NAME_LEN);
 	bus->subsys.kobj.ktype = &ktype_bus;
 	bus->subsys.kobj.subsys = &bus_subsys;
 	subsystem_register(&bus->subsys);
 
-	snprintf(bus->devsubsys.kobj.name,KOBJ_NAME_LEN,"devices");
-	bus->devsubsys.parent = &bus->subsys;
-	subsystem_register(&bus->devsubsys);
+	snprintf(bus->devices.kobj.name,KOBJ_NAME_LEN,"devices");
+	bus->devices.parent = &bus->subsys;
+	subsystem_register(&bus->devices);
 
-	snprintf(bus->drvsubsys.kobj.name,KOBJ_NAME_LEN,"drivers");
-	bus->drvsubsys.parent = &bus->subsys;
-	subsystem_register(&bus->drvsubsys);
+	snprintf(bus->drivers.kobj.name,KOBJ_NAME_LEN,"drivers");
+	bus->drivers.parent = &bus->subsys;
+	subsystem_register(&bus->drivers);
 
 	pr_debug("bus type '%s' registered\n",bus->name);
-	up(&bus_sem);
 	return 0;
 }
 
@@ -523,19 +515,15 @@ int bus_register(struct bus_type * bus)
  *	bus_unregister - remove a bus from the system 
  *	@bus:	bus.
  *
- *	Take bus_sem, in case the bus we're registering hasn't 
- *	finished registering. Once we have it, unregister the child
- *	subsystems and the bus itself.
+ *	Unregister the child subsystems and the bus itself.
  *	Finally, we call put_bus() to release the refcount
  */
 void bus_unregister(struct bus_type * bus)
 {
-	down(&bus_sem);
 	pr_debug("bus %s: unregistering\n",bus->name);
-	subsystem_unregister(&bus->drvsubsys);
-	subsystem_unregister(&bus->devsubsys);
+	subsystem_unregister(&bus->drivers);
+	subsystem_unregister(&bus->devices);
 	subsystem_unregister(&bus->subsys);
-	up(&bus_sem);
 }
 
 static int __init bus_subsys_init(void)
