@@ -305,6 +305,8 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 #define ATTR_MTIME_SET	256
 #define ATTR_FORCE	512	/* Not a change, but a change it */
 #define ATTR_ATTR_FLAG	1024
+#define ATTR_KILL_SUID	2048
+#define ATTR_KILL_SGID	4096
 
 /*
  * This is the Inode Attributes structure, used for notify_change().  It
@@ -1313,7 +1315,7 @@ static inline struct inode *iget(struct super_block *sb, unsigned long ino)
 
 extern void clear_inode(struct inode *);
 extern struct inode *new_inode(struct super_block *);
-extern void remove_suid(struct inode *inode);
+extern void remove_suid(struct dentry *);
 extern void insert_inode_hash(struct inode *);
 extern void remove_inode_hash(struct inode *);
 extern struct file * get_empty_filp(void);

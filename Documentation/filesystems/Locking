@@ -65,7 +65,7 @@ rename:		no	yes (all)	(see below)
 readlink:	no	no
 follow_link:	no	no
 truncate:	no	yes		(see below)
-setattr:	yes	if ATTR_SIZE
+setattr:	no	yes
 permission:	yes	no
 getattr:				(see below)
 revalidate:	no			(see below)
