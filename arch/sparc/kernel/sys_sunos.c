@@ -279,11 +279,11 @@ asmlinkage unsigned long sunos_sigblock(unsigned long blk_mask)
 {
 	unsigned long old;
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	old = current->blocked.sig[0];
 	current->blocked.sig[0] |= (blk_mask & _BLOCKABLE);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	return old;
 }
 
@@ -291,11 +291,11 @@ asmlinkage unsigned long sunos_sigsetmask(unsigned long newmask)
 {
 	unsigned long retval;
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	retval = current->blocked.sig[0];
 	current->blocked.sig[0] = (newmask & _BLOCKABLE);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	return retval;
 }
 

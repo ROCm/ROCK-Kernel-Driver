@@ -143,11 +143,11 @@ asmlinkage void _sigpause32_common(old_sigset_t32 set, struct pt_regs *regs)
 	sigset_t saveset;
 
 	set &= _BLOCKABLE;
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, set);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	
 	regs->tpc = regs->tnpc;
 	regs->tnpc += 4;
@@ -198,11 +198,11 @@ asmlinkage void do_rt_sigsuspend32(u32 uset, size_t sigsetsize, struct pt_regs *
 	case 1: set.sig[0] = set32.sig[0] + (((long)set32.sig[1]) << 32);
 	}
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	oldset = current->blocked;
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	
 	regs->tpc = regs->tnpc;
 	regs->tnpc += 4;
@@ -311,10 +311,10 @@ void do_new_sigreturn32(struct pt_regs *regs)
 		case 1: set.sig[0] = seta[0] + (((long)seta[1]) << 32);
 	}
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	return;
 
 segv:
@@ -358,10 +358,10 @@ asmlinkage void do_sigreturn32(struct pt_regs *regs)
 		case 1: set.sig[0] = seta[0] + (((long)seta[1]) << 32);
 	}
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	
 	if (test_thread_flag(TIF_32BIT)) {
 		pc &= 0xffffffff;
@@ -460,10 +460,10 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 		case 1: set.sig[0] = seta.sig[0] + (((long)seta.sig[1]) << 32);
 	}
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	return;
 segv:
 	do_exit(SIGSEGV);
@@ -1058,10 +1058,10 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t *c, struct pt_regs *regs)
 	set_fs(old_fs);
 	
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	regs->tpc = pc;
 	regs->tnpc = npc | 1;
 	if (test_thread_flag(TIF_32BIT)) {
@@ -1240,11 +1240,11 @@ static inline void handle_signal32(unsigned long signr, struct k_sigaction *ka,
 	if (ka->sa.sa_flags & SA_ONESHOT)
 		ka->sa.sa_handler = SIG_DFL;
 	if (!(ka->sa.sa_flags & SA_NOMASK)) {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,signr);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 	}
 }
 
@@ -1291,9 +1291,9 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 			spin_unlock(&current->sig->siglock);
 		}
 		if (!signr) {
-			spin_lock(&current->sigmask_lock);
+			spin_lock(&current->sig->siglock);
 			signr = dequeue_signal(&current->pending, mask, &info);
-			spin_unlock(&current->sigmask_lock);
+			spin_unlock(&current->sig->siglock);
 		}
 		local_irq_enable();
 		

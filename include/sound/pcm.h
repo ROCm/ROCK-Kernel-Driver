@@ -123,6 +123,7 @@ typedef struct _snd_pcm_ops {
 #define SNDRV_PCM_DMA_TYPE_CONTINUOUS	0	/* continuous no-DMA memory */
 #define SNDRV_PCM_DMA_TYPE_ISA		1	/* ISA continuous */
 #define SNDRV_PCM_DMA_TYPE_PCI		2	/* PCI continuous */
+#define SNDRV_PCM_DMA_TYPE_SBUS		3	/* SBUS continuous */
 
 /* If you change this don't forget to changed snd_pcm_rates table in pcm_lib.c */
 #define SNDRV_PCM_RATE_5512		(1<<0)		/* 5512Hz */
@@ -863,6 +864,15 @@ int snd_pcm_lib_preallocate_pci_pages_for_all(struct pci_dev *pci,
 					      snd_pcm_t *pcm,
 					      size_t size,
 					      size_t max);
+#endif
+#ifdef CONFIG_SBUS
+int snd_pcm_lib_preallocate_sbus_pages(struct sbus_dev *sdev,
+				       snd_pcm_substream_t *substream,
+				       size_t size, size_t max);
+int snd_pcm_lib_preallocate_sbus_pages_for_all(struct sbus_dev *sdev,
+					       snd_pcm_t *pcm,
+					       size_t size,
+					       size_t max);
 #endif
 
 static inline void snd_pcm_limit_isa_dma_size(int dma, size_t *max)

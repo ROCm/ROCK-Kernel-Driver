@@ -950,8 +950,8 @@ int probe_irq_off(unsigned long mask)
 }
 
 /* This is gets the master TICK_INT timer going. */
-void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
-		 unsigned long *clock)
+void sparc64_init_timers(void (*cfunc)(int, void *, struct pt_regs *),
+			 unsigned long *clock)
 {
 	unsigned long pstate;
 	extern unsigned long timer_tick_offset;

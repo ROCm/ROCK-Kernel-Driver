@@ -8,7 +8,7 @@ EXTRA_AFLAGS := -ansi
 
 EXTRA_TARGETS	:= head.o init_task.o
 
-export-objs	:= sparc64_ksyms.o
+export-objs	:= sparc64_ksyms.o ebus.o
 obj-y		:= process.o setup.o cpu.o idprom.o \
 		   traps.o devices.o auxio.o \
 		   irq.o ptrace.o time.o sys_sparc.o signal.o \

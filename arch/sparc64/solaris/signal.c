@@ -99,16 +99,16 @@ static inline long solaris_signal(int sig, u32 arg)
 static long solaris_sigset(int sig, u32 arg)
 {
 	if (arg != 2) /* HOLD */ {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		sigdelsetmask(&current->blocked, _S(sig));
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 		return sig_handler (sig, arg, 0);
 	} else {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		sigaddsetmask(&current->blocked, (_S(sig) & ~_BLOCKABLE));
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 		return 0;
 	}
 }
@@ -120,10 +120,10 @@ static inline long solaris_sighold(int sig)
 
 static inline long solaris_sigrelse(int sig)
 {
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	sigdelsetmask(&current->blocked, _S(sig));
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	return 0;
 }
 
@@ -311,10 +311,10 @@ asmlinkage int solaris_sigpending(int which, u32 set)
 	u32 tmp[4];
 	switch (which) {
 	case 1: /* sigpending */
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		sigandsets(&s, &current->blocked, &current->pending.signal);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 		break;
 	case 2: /* sigfillset - I just set signals which have linux equivalents */
 		sigfillset(&s);

@@ -429,6 +429,11 @@ EXPORT_SYMBOL(snd_malloc_pci_pages);
 EXPORT_SYMBOL(snd_malloc_pci_pages_fallback);
 EXPORT_SYMBOL(snd_free_pci_pages);
 #endif
+#ifdef CONFIG_SBUS
+EXPORT_SYMBOL(snd_malloc_sbus_pages);
+EXPORT_SYMBOL(snd_malloc_sbus_pages_fallback);
+EXPORT_SYMBOL(snd_free_sbus_pages);
+#endif
 EXPORT_SYMBOL(copy_to_user_fromio);
 EXPORT_SYMBOL(copy_from_user_toio);
   /* init.c */

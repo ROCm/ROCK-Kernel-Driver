@@ -267,7 +267,7 @@ static __inline__ int ffs(int x)
 {
 	if (!x)
 		return 0;
-	return __ffs((unsigned long)x);
+	return __ffs((unsigned long)x) + 1;
 }
 
 /*

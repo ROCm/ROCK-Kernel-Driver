@@ -30,6 +30,7 @@ Possible options for midisynth module:
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include <linux/string.h>
 #include <asm/semaphore.h>
 #include <sound/core.h>
 #include <sound/rawmidi.h>
