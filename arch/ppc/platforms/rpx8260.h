@@ -70,5 +70,12 @@ extern volatile u_char *rpx6_csr_addr;
 
 #define PHY_INTERRUPT	SIU_INT_IRQ7
 
+/* For our show_cpuinfo hooks. */
+#define CPUINFO_VENDOR		"Embedded Planet"
+#define CPUINFO_MACHINE		"EP8260 PowerPC"
+
+/* Warm reset vector. */
+#define BOOTROM_RESTART_ADDR	((uint)0xfff00104)
+
 #endif /* __ASM_PLATFORMS_RPX8260_H__ */
 #endif /* __KERNEL__ */

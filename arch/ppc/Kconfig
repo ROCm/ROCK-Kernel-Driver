@@ -685,7 +685,8 @@ config PPC_OF
 
 config PPC_GEN550
 	bool
-	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE || PRPMC750 || K2 || PRPMC800
+	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE || \
+		PRPMC750 || K2 || PRPMC800 || LOPEC
 	default y
 
 config FORCE
