@@ -105,8 +105,7 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *, sctp_association_t *,
 #define DEBUG_POST_SFX \
 	SCTP_DEBUG_PRINTK("sctp_do_sm post sfx: error %d, asoc %p[%s]\n", \
 			  error, asoc, \
-			  sctp_state_tbl[sctp_id2assoc(ep->base.sk, \
-			  sctp_assoc2id(asoc))?asoc->state:SCTP_STATE_CLOSED])
+			  sctp_state_tbl[asoc?asoc->state:SCTP_STATE_CLOSED])
 
 /*
  * This is the master state machine processing function.
@@ -1238,12 +1237,19 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 			wake_up_interruptible(&asoc->wait);
 
 		/* Wake up any processes waiting in the sk's sleep queue of
-		 * a tcp-style or udp-style peeled-off socket in
+		 * a TCP-style or UDP-style peeled-off socket in
 		 * sctp_wait_for_accept() or sctp_wait_for_packet().
-		 * For a udp-style socket, the waiters are woken up by the
+		 * For a UDP-style socket, the waiters are woken up by the
 		 * notifications.
 		 */
-		if (sp->type != SCTP_SOCKET_UDP)
+		if (SCTP_SOCKET_UDP != sp->type)
 			sk->state_change(sk);
 	}
+
+	/* Change the sk->state of a TCP-style socket that has sucessfully
+	 * completed a connect() call.
+	 */
+	if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
+	    (SCTP_SOCKET_TCP == sp->type) && (SCTP_SS_CLOSED == sk->state))
+	    sk->state = SCTP_SS_ESTABLISHED;
 }

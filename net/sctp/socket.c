@@ -1592,8 +1592,14 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	sp = sctp_sk(sk);
 	ep = sp->ep;
 
-	/* connect() cannot be done on a peeled-off socket. */
-	if (SCTP_SOCKET_UDP_HIGH_BANDWIDTH == sp->type) {
+	/* connect() cannot be done on a socket that is already in ESTABLISHED
+	 * state - UDP-style peeled off socket or a TCP-style socket that
+	 * is already connected. 
+	 * It cannot be done even on a TCP-style listening socket.
+	 */
+	if ((SCTP_SS_ESTABLISHED == sk->state) ||
+	    ((SCTP_SOCKET_TCP == sp->type) &&
+	     (SCTP_SS_LISTENING == sk->state))) {
 		err = -EISCONN;
 		goto out_unlock;
 	}
