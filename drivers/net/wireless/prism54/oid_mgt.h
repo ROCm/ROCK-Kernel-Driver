@@ -32,6 +32,8 @@ extern const int frequency_list_bg[];
 
 extern const int frequency_list_a[];
 
+void mgt_le_to_cpu(int, void *);
+
 int mgt_set_request(islpci_private *, enum oid_num_t, int, void *);
 
 int mgt_get_request(islpci_private *, enum oid_num_t, int, void *,
@@ -46,6 +48,8 @@ void mgt_commit(islpci_private *);
 int mgt_mlme_answer(islpci_private *);
 
 enum oid_num_t mgt_oidtonum(u32 oid);
+
+int mgt_response_to_str(enum oid_num_t, union oid_res_t *, char *);
 
 #endif				/* !defined(_OID_MGT_H) */
 /* EOF */
