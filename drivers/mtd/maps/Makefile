@@ -1,7 +1,7 @@
 #
 # linux/drivers/maps/Makefile
 #
-# $Id: Makefile.common,v 1.21 2004/12/09 20:01:05 holindho Exp $
+# $Id: Makefile.common,v 1.23 2005/01/05 17:06:36 dwmw2 Exp $
 
 ifeq ($(CONFIG_MTD_COMPLEX_MAPPINGS),y)
 obj-$(CONFIG_MTD)		+= map_funcs.o
@@ -54,7 +54,7 @@ obj-$(CONFIG_MTD_EDB7312)	+= edb7312.o
 obj-$(CONFIG_MTD_IMPA7)		+= impa7.o
 obj-$(CONFIG_MTD_FORTUNET)	+= fortunet.o
 obj-$(CONFIG_MTD_REDWOOD)	+= redwood.o
-obj-$(CONFIG_CHESTNUT)		+= chestnut.o
+obj-$(CONFIG_MTD_CHESTNUT)	+= chestnut.o
 obj-$(CONFIG_MTD_UCLINUX)	+= uclinux.o
 obj-$(CONFIG_MTD_NETtel)	+= nettel.o
 obj-$(CONFIG_MTD_SCB2_FLASH)	+= scb2_flash.o

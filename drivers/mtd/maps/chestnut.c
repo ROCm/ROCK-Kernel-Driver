@@ -1,9 +1,11 @@
 /*
  * drivers/mtd/maps/chestnut.c
  *
+ * $Id: chestnut.c,v 1.1 2005/01/05 16:59:50 dwmw2 Exp $
+ *
  * Flash map driver for IBM Chestnut (750FXGX Eval)
  *
- * Chose not to enable 8 bit flash as it contains the firware and board
+ * Chose not to enable 8 bit flash as it contains the firmware and board
  * info.  Thus only the 32bit flash is supported.
  *
  * Author: <source@mvista.com>
@@ -85,5 +87,5 @@ module_init(init_chestnut);
 module_exit(cleanup_chestnut);
 
 MODULE_DESCRIPTION("MTD map and partitions for IBM Chestnut (750fxgx Eval)");
-MODULE_AUTHOR("<mvista.com>");
+MODULE_AUTHOR("<source@mvista.com>");
 MODULE_LICENSE("GPL");
