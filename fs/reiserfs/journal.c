@@ -2464,8 +2464,20 @@ void reiserfs_wait_on_write_block(struct super_block *s) {
 }
 
 static void queue_log_writer(struct super_block *s) {
+    wait_queue_t wait;
     set_bit(WRITERS_QUEUED, &SB_JOURNAL(s)->j_state);
-    sleep_on(&SB_JOURNAL(s)->j_join_wait);
+
+    /*
+     * we don't want to use wait_event here because
+     * we only want to wait once.
+     */
+    init_waitqueue_entry(&wait, current);
+    add_wait_queue(&SB_JOURNAL(s)->j_join_wait, &wait);
+    set_current_state(TASK_UNINTERRUPTIBLE);
+    if (test_bit(WRITERS_QUEUED, &SB_JOURNAL(s)->j_state))
+        schedule();
+    current->state = TASK_RUNNING;
+    remove_wait_queue(&SB_JOURNAL(s)->j_join_wait, &wait);
 }
 
 static void wake_queued_writers(struct super_block *s) {
