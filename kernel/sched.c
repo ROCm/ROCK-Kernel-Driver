@@ -684,7 +684,8 @@ void wake_up_forked_process(task_t * p)
 	unsigned long flags;
 	runqueue_t *rq = task_rq_lock(current, &flags);
 
-	p->state = TASK_RUNNING;
+	BUG_ON(p->state != TASK_RUNNING);
+
 	/*
 	 * We decrease the sleep average of forking parents
 	 * and children as well, to keep max-interactive tasks
