@@ -2572,21 +2572,15 @@ proc_pdrv(adapter_t *adapter, char *page, int channel)
 	}
 
 	if( (inquiry = mega_allocate_inquiry(&dma_handle, pdev)) == NULL ) {
-		free_local_pdev(pdev);
-		return len;
+		goto free_pdev;
 	}
 
 	if( mega_adapinq(adapter, dma_handle) != 0 ) {
-
 		len = sprintf(page, "Adapter inquiry failed.\n");
 
 		printk(KERN_WARNING "megaraid: inquiry failed.\n");
 
-		mega_free_inquiry(inquiry, dma_handle, pdev);
-
-		free_local_pdev(pdev);
-
-		return len;
+		goto free_inquiry;
 	}
 
 
@@ -2595,11 +2589,7 @@ proc_pdrv(adapter_t *adapter, char *page, int channel)
 	if( scsi_inq == NULL ) {
 		len = sprintf(page, "memory not available for scsi inq.\n");
 
-		mega_free_inquiry(inquiry, dma_handle, pdev);
-
-		free_local_pdev(pdev);
-
-		return len;
+		goto free_inquiry;
 	}
 
 	if( adapter->flag & BOARD_40LD ) {
@@ -2612,7 +2602,9 @@ proc_pdrv(adapter_t *adapter, char *page, int channel)
 
 	max_channels = adapter->product_info.nchannels;
 
-	if( channel >= max_channels ) return 0;
+	if( channel >= max_channels ) {
+		goto free_pci;
+	}
 
 	for( tgt = 0; tgt <= MAX_TARGET; tgt++ ) {
 
@@ -2677,10 +2669,11 @@ proc_pdrv(adapter_t *adapter, char *page, int channel)
 		len += mega_print_inquiry(page+len, scsi_inq);
 	}
 
+free_pci:
 	pci_free_consistent(pdev, 256, scsi_inq, scsi_inq_dma_handle);
-
+free_inquiry:
 	mega_free_inquiry(inquiry, dma_handle, pdev);
-
+free_pdev:
 	free_local_pdev(pdev);
 
 	return len;
