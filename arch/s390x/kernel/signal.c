@@ -455,7 +455,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 	if (!oldset)
 		oldset = &current->blocked;
 #ifdef CONFIG_S390_SUPPORT 
-	if (current->thread.flags & S390_FLAG_31BIT) {
+	if (test_thread_flag(TIF_31BIT)) {
 		extern asmlinkage int do_signal32(struct pt_regs *regs, sigset_t *oldset); 
 		return do_signal32(regs, oldset);
         }

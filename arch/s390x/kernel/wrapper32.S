@@ -1204,3 +1204,8 @@ sys32_sched_getaffinity_wrapper:
 sys32_exit_group_wrapper:
 	lgfr	%r2,%r2			# int
 	jg	sys_exit_group		# branch to system call
+
+	.globl  sys32_set_tid_address_wrapper
+sys32_set_tid_address_wrapper:
+	llgtr	%r2,%r2			# int *
+	jg	sys_set_tid_address	# branch to system call

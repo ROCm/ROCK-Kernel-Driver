@@ -206,7 +206,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 
 	/* Set a new TLS ?  */
 	if (clone_flags & CLONE_SETTLS) {
-		if (current->thread.flags & S390_FLAG_31BIT) {
+		if (test_thread_flag(TIF_31BIT)) {
 			frame->childregs.acrs[0] =
 				(unsigned int) regs->gprs[6];
 		} else {

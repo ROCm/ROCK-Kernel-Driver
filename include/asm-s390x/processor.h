@@ -55,8 +55,6 @@ extern void print_cpu_info(struct cpuinfo_S390 *);
 /* Lazy FPU handling on uni-processor */
 extern struct task_struct *last_task_used_math;
 
-#define S390_FLAG_31BIT 0x01UL
-
 /*
  * User space process size: 4TB (default).
  */
@@ -66,8 +64,8 @@ extern struct task_struct *last_task_used_math;
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE      ((current->thread.flags & S390_FLAG_31BIT) ? \
-	(TASK31_SIZE / 2) : (TASK_SIZE / 2))
+#define TASK_UNMAPPED_BASE \
+	(test_thread_flag(TIF_31BIT) ? (TASK31_SIZE / 2) : (TASK_SIZE / 2))
 
 #define THREAD_SIZE (4*PAGE_SIZE)
 

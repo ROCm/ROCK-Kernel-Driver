@@ -39,7 +39,7 @@ typedef s390_regs elf_gregset_t;
 #define ELF_PLAT_INIT(_r) \
 	do { \
 	_r->gprs[14] = 0; \
-	current->thread.flags = 0; \
+	clear_thread_flag(TIF_31BIT); \
 	} while(0)
 
 #define USE_ELF_CORE_DUMP
@@ -83,6 +83,7 @@ do {							\
 		set_personality(PER_SVR4);		\
 	else if (current->personality != PER_LINUX32)	\
 		set_personality(PER_LINUX);		\
+	clear_thread_flag(TIF_31BIT);			\
 } while (0)
 #endif
 
