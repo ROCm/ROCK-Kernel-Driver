@@ -129,9 +129,6 @@ unsigned long mmu_cr4_features;
 /*
  * Bus types ..
  */
-#ifdef CONFIG_EISA
-int EISA_bus;
-#endif
 int MCA_bus;
 
 /* for MCA, but anyone else can use it if they want */
