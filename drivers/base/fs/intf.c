@@ -4,6 +4,8 @@
 
 #include <linux/device.h>
 #include <linux/slab.h>
+#include <linux/limits.h>
+#include <linux/errno.h>
 #include "fs.h"
 
 /**

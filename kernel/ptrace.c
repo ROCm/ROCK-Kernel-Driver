@@ -14,6 +14,7 @@
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include <linux/ptrace.h>
+#include <linux/security.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -100,8 +101,7 @@ int ptrace_attach(struct task_struct *task)
 	/* the same process cannot be attached many times */
 	if (task->ptrace & PT_PTRACED)
 		goto bad;
-	retval = security_ops->ptrace(current, task);
-	if (retval)
+	if ((retval = security_ptrace(current, task)))
 		goto bad;
 
 	/* Go */

@@ -69,6 +69,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 
@@ -1305,8 +1306,7 @@ int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 	error = -EIO;
 	if (!f->f_op || !f->f_op->read || !f->f_op->write)
 		goto out_f;
-	error = security_ops->quota_on(f);
-	if (error)
+	if ((error = security_quota_on(f)))
 		goto out_f;
 	inode = f->f_dentry->d_inode;
 	error = -EACCES;
