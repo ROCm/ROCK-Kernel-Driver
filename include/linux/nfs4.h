@@ -86,6 +86,7 @@ enum nfs_opnum4 {
 	OP_SETCLIENTID_CONFIRM = 36,
 	OP_VERIFY = 37,
 	OP_WRITE = 38,
+	OP_RELEASE_LOCKOWNER = 39,
 };
 
 enum nfsstat4 {

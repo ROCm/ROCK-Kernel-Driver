@@ -993,6 +993,20 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 }
 
 static int
+nfsd4_decode_release_lockowner(struct nfsd4_compoundargs *argp, struct nfsd4_release_lockowner *rlockowner)
+{
+	DECODE_HEAD;
+
+	READ_BUF(12);
+	COPYMEM(&rlockowner->rl_clientid, sizeof(clientid_t));
+	READ32(rlockowner->rl_owner.len);
+	READ_BUF(rlockowner->rl_owner.len);
+	READMEM(rlockowner->rl_owner.data, rlockowner->rl_owner.len);
+
+	DECODE_TAIL;
+}
+
+static int
 nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 {
 	DECODE_HEAD;
@@ -1156,6 +1170,9 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 			break;
 		case OP_WRITE:
 			op->status = nfsd4_decode_write(argp, &op->u.write);
+			break;
+		case OP_RELEASE_LOCKOWNER:
+			op->status = nfsd4_decode_release_lockowner(argp, &op->u.release_lockowner);
 			break;
 		default:
 			/*
@@ -2348,6 +2365,8 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_WRITE:
 		nfsd4_encode_write(resp, op->status, &op->u.write);
+		break;
+	case OP_RELEASE_LOCKOWNER:
 		break;
 	default:
 		break;

@@ -728,6 +728,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		   (op->opnum == OP_SETCLIENTID) ||
 		   (op->opnum == OP_SETCLIENTID_CONFIRM) ||
 		   (op->opnum == OP_RENEW) || (op->opnum == OP_RESTOREFH) ||
+		   (op->opnum == OP_RELEASE_LOCKOWNER) ||
 		   (op->opnum == OP_SETATTR))) {
 			op->status = nfserr_nofilehandle;
 			goto encode_op;
@@ -833,6 +834,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_WRITE:
 			op->status = nfsd4_write(rqstp, &current_fh, &op->u.write);
+			break;
+		case OP_RELEASE_LOCKOWNER:
+			op->status = nfsd4_release_lockowner(rqstp, &op->u.release_lockowner);
 			break;
 		default:
 			BUG_ON(op->status == nfs_ok);

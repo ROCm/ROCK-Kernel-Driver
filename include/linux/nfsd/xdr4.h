@@ -263,6 +263,10 @@ struct nfsd4_readdir {
 	u32 *			offset;
 };
 
+struct nfsd4_release_lockowner {
+	clientid_t        rl_clientid;
+	struct xdr_netobj rl_owner;
+};
 struct nfsd4_readlink {
 	struct svc_rqst *rl_rqstp;          /* request */
 	struct svc_fh *	rl_fhp;             /* request */
@@ -359,6 +363,7 @@ struct nfsd4_op {
 		struct nfsd4_setclientid_confirm setclientid_confirm;
 		struct nfsd4_verify		verify;
 		struct nfsd4_write		write;
+		struct nfsd4_release_lockowner	release_lockowner;
 	} u;
 	struct nfs4_replay *			replay;
 };
@@ -441,6 +446,9 @@ extern int nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 		struct nfsd4_lockt *lockt);
 extern int nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, 
 		struct nfsd4_locku *locku);
+extern int
+nfsd4_release_lockowner(struct svc_rqst *rqstp,
+		struct nfsd4_release_lockowner *rlockowner);
 #endif
 
 /*

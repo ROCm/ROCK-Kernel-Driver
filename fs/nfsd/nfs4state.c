@@ -43,6 +43,7 @@
 #include <linux/nfsd/cache.h>
 #include <linux/mount.h>
 #include <linux/workqueue.h>
+#include <linux/smp_lock.h>
 #include <linux/nfs4.h>
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
@@ -2136,6 +2137,84 @@ out:
 out_nfserr:
 	status = nfserrno(status);
 	goto out;
+}
+
+/*
+ * returns
+ * 	1: locks held by lockowner
+ * 	0: no locks held by lockowner
+ */
+static int
+check_for_locks(struct file *filp, struct nfs4_stateowner *lowner)
+{
+	struct file_lock **flpp;
+	struct inode *inode = filp->f_dentry->d_inode;
+	int status = 0;
+
+	lock_kernel();
+	for (flpp = &inode->i_flock; *flpp != NULL; flpp = &(*flpp)->fl_next) {
+		if ((*flpp)->fl_owner == (fl_owner_t)lowner)
+			status = 1;
+			goto out;
+	}
+out:
+	unlock_kernel();
+	return status;
+}
+
+int
+nfsd4_release_lockowner(struct svc_rqst *rqstp, struct nfsd4_release_lockowner *rlockowner)
+{
+	clientid_t *clid = &rlockowner->rl_clientid;
+	struct list_head *pos, *next;
+	struct nfs4_stateowner *local = NULL;
+	struct xdr_netobj *owner = &rlockowner->rl_owner;
+	int status, i;
+
+	dprintk("nfsd4_release_lockowner clientid: (%08x/%08x):\n",
+		clid->cl_boot, clid->cl_id);
+
+	/* XXX check for lease expiration */
+
+	status = nfserr_stale_clientid;
+	if (STALE_CLIENTID(clid)) {
+		printk("NFSD: nfsd4_release_lockowner: clientid is stale!\n");
+		return status;
+	}
+
+	nfs4_lock_state();
+
+	/* find the lockowner */
+        status = nfs_ok;
+	for (i=0; i < LOCK_HASH_SIZE; i++) {
+		list_for_each_safe(pos, next, &lock_ownerstr_hashtbl[i]) {
+			local = list_entry(pos, struct nfs4_stateowner,
+						so_strhash);
+			if(cmp_owner_str(local, owner, clid))
+				break;
+		}
+	}
+	if (local) {
+		struct nfs4_stateid *stp;
+
+		/* check for any locks held by any stateid associated with the
+		 * (lock) stateowner */
+		status = nfserr_locks_held;
+		list_for_each_safe(pos, next, &local->so_perfilestate) {
+			stp = list_entry(pos, struct nfs4_stateid,
+					                    st_perfilestate);
+			if(stp->st_vfs_set) {
+				if (check_for_locks(&stp->st_vfs_file, local))
+					goto out;
+			}
+		}
+		/* no locks held by (lock) stateowner */
+		status = nfs_ok;
+		release_stateowner(local);
+	}
+out:
+	nfs4_unlock_state();
+	return status;
 }
 
 /* 

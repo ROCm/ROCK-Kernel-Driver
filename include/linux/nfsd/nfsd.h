@@ -194,6 +194,7 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_attrnotsupp	__constant_htonl(NFSERR_ATTRNOTSUPP)
 #define	nfserr_bad_xdr		__constant_htonl(NFSERR_BAD_XDR)
 #define	nfserr_openmode		__constant_htonl(NFSERR_OPENMODE)
+#define	nfserr_locks_held	__constant_htonl(NFSERR_LOCKS_HELD)
 
 /* error codes for internal use */
 /* if a request fails due to kmalloc failure, it gets dropped.
