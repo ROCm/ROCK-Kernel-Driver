@@ -1348,16 +1348,9 @@ ppp_input(struct ppp_channel *chan, struct sk_buff *skb)
 	struct channel *pch = chan->ppp;
 	int proto;
 
-	if (pch == 0)
-		goto drop;
-
-	/* need to have PPP header */
-	if (!pskb_may_pull(skb, 2)) {
-		if (pch->ppp) {
-			++pch->ppp->stats.rx_length_errors;
-			ppp_receive_error(pch->ppp);
-		}
-		goto drop;
+	if (pch == 0 || skb->len == 0) {
+		kfree_skb(skb);
+		return;
 	}
 	
 	proto = PPP_PROTO(skb);
@@ -1374,10 +1367,6 @@ ppp_input(struct ppp_channel *chan, struct sk_buff *skb)
 		ppp_do_recv(pch->ppp, skb, pch);
 	}
 	read_unlock_bh(&pch->upl);
-	return;
- drop:
-	kfree_skb(skb);
-	return;
 }
 
 /* Put a 0-length skb in the receive queue as an error indication */
@@ -1409,13 +1398,23 @@ ppp_input_error(struct ppp_channel *chan, int code)
 static void
 ppp_receive_frame(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 {
+	if (skb->len >= 2) {
 #ifdef CONFIG_PPP_MULTILINK
-	/* XXX do channel-level decompression here */
-	if (PPP_PROTO(skb) == PPP_MP)
-		ppp_receive_mp_frame(ppp, skb, pch);
-	else
+		/* XXX do channel-level decompression here */
+		if (PPP_PROTO(skb) == PPP_MP)
+			ppp_receive_mp_frame(ppp, skb, pch);
+		else
 #endif /* CONFIG_PPP_MULTILINK */
-		ppp_receive_nonmp_frame(ppp, skb);
+			ppp_receive_nonmp_frame(ppp, skb);
+		return;
+	}
+
+	if (skb->len > 0)
+		/* note: a 0-length skb is used as an error indication */
+		++ppp->stats.rx_length_errors;
+
+	kfree_skb(skb);
+	ppp_receive_error(ppp);
 }
 
 static void
@@ -1448,7 +1447,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		if (ppp->vj == 0 || (ppp->flags & SC_REJ_COMP_TCP))
 			goto err;
 
-		if (skb_tailroom(skb) < 124 || skb_is_nonlinear(skb) ) {
+		if (skb_tailroom(skb) < 124) {
 			/* copy to a new sk_buff with more tailroom */
 			ns = dev_alloc_skb(skb->len + 128);
 			if (ns == 0) {
@@ -1460,6 +1459,9 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 			kfree_skb(skb);
 			skb = ns;
 		}
+		else if (!pskb_may_pull(skb, skb->len))
+			goto err;
+
 		len = slhc_uncompress(ppp->vj, skb->data + 2, skb->len - 2);
 		if (len <= 0) {
 			printk(KERN_DEBUG "PPP: VJ decompression error\n");
@@ -2033,12 +2035,12 @@ ppp_set_compress(struct ppp *ppp, unsigned long arg)
 static void
 ppp_ccp_peek(struct ppp *ppp, struct sk_buff *skb, int inbound)
 {
-	unsigned char *dp = skb->data + 2;
+	unsigned char *dp;
 	int len;
 
-	if (!pskb_may_pull(skb, CCP_HDRLEN + 2)
-	    || skb->len < (len = CCP_LENGTH(dp)) + 2)
-		return;		/* too short */
+	if (!pskb_may_pull(skb, CCP_HDRLEN + 2))
+		return;	/* no header */
+	dp = skb->data + 2;
 
 	switch (CCP_CODE(dp)) {
 	case CCP_CONFREQ:
@@ -2071,10 +2073,8 @@ ppp_ccp_peek(struct ppp *ppp, struct sk_buff *skb, int inbound)
 	case CCP_CONFACK:
 		if ((ppp->flags & (SC_CCP_OPEN | SC_CCP_UP)) != SC_CCP_OPEN)
 			break;
-
-		if (!pskb_may_pull(skb, len))
-			break;
-
+		if (!pskb_may_pull(skb, len = CCP_LENGTH(dp)) + 2)
+			return;		/* too short */
 		dp += CCP_HDRLEN;
 		len -= CCP_HDRLEN;
 		if (len < CCP_OPT_MINLEN || len < CCP_OPT_LENGTH(dp))

@@ -22,8 +22,8 @@
  */
 #define RT_CACHE_DEBUG		0
 
-#define DST_GC_MIN	(1*HZ)
-#define DST_GC_INC	(5*HZ)
+#define DST_GC_MIN	(HZ/10)
+#define DST_GC_INC	(HZ/2)
 #define DST_GC_MAX	(120*HZ)
 
 /* Each dst_entry has reference count and sits in some parent list(s).
