@@ -109,14 +109,7 @@ static int	       vga_can_do_color = 0;	/* Do we support colors? */
 static unsigned int    vga_default_font_height;	/* Height of default screen font */
 static unsigned char   vga_video_type;		/* Card type */
 static unsigned char   vga_hardscroll_enabled;
-#ifdef CONFIG_IA64_SOFTSDV_HACKS
-/*
- * SoftSDV doesn't have hardware assist VGA scrolling 
- */
-static unsigned char   vga_hardscroll_user_enable = 0;
-#else
 static unsigned char   vga_hardscroll_user_enable = 1;
-#endif
 static unsigned char   vga_font_is_default = 1;
 static int	       vga_vesa_blanked;
 static int	       vga_palette_blanked;
