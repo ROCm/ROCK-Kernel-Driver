@@ -447,6 +447,7 @@ int try_to_unmap(struct page * page)
 		ret = try_to_unmap_one(page, page->pte.direct);
 		if (ret == SWAP_SUCCESS) {
 			page->pte.direct = 0;
+			dec_page_state(nr_reverse_maps);
 			ClearPageDirect(page);
 		}
 		goto out;
