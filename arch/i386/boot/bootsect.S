@@ -158,9 +158,7 @@ got_sectors:
 	movw	$sread, %si		# the boot sector has already been read
 	movw	%ax, (%si)
 
-	xorw	%ax, %ax		# reset FDC
-	xorb	%dl, %dl
-	int	$0x13
+	call	kill_motor		# reset FDC
 	movw	$0x0200, %bx		# address = 512, in INITSEG
 next_step:
 	movb	setup_sects, %al
