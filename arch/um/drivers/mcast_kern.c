@@ -32,15 +32,13 @@ void mcast_init(struct net_device *dev, void *data)
 	struct mcast_data *dpri;
 	struct mcast_init *init = data;
 
-	init_etherdev(dev, 0);
 	pri = dev->priv;
 	dpri = (struct mcast_data *) pri->user;
-	*dpri = ((struct mcast_data)
-		{ .addr 	= init->addr,
-		  .port 	= init->port,
-		  .ttl 		= init->ttl,
-		  .mcast_addr 	= NULL,
-		  .dev 		= dev });
+	dpri->addr = init->addr;
+	dpri->port = init->port;
+	dpri->ttl = init->ttl;
+	dpri->dev = dev;
+
 	printk("mcast backend ");
 	printk("multicast adddress: %s:%u, TTL:%u ",
 	       dpri->addr, dpri->port, dpri->ttl);

@@ -909,16 +909,11 @@ EXPORT_SYMBOL(proc_ide_create);
 void proc_ide_destroy(void)
 {
 #ifdef CONFIG_BLK_DEV_IDEPCI
-	ide_pci_host_proc_t *p = ide_pci_host_proc_list;
-	char name[32];
+	ide_pci_host_proc_t *p;
 
-	while ((p->name != NULL) && (p->set) && (p->get_info != NULL)) {
-		name[0] = '\0';
-		sprintf(name, "ide/%s", p->name);
+	for (p = ide_pci_host_proc_list; p; p = p->next) {
 		if (p->set == 2)
 			remove_proc_entry(p->name, p->parent);
-		if (p->next == NULL) break;
-		p = p->next;
 	}
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 	remove_proc_entry("ide/drivers", proc_ide_root);
