@@ -43,7 +43,7 @@
 
 static __inline__ int test_bit(unsigned long nr, __const__ volatile unsigned long *addr)
 {
-	return (1UL & (((__const__ long *) addr)[nr >> 6] >> (nr & 63)));
+	return (1UL & (addr[nr >> 6] >> (nr & 63)));
 }
 
 static __inline__ void set_bit(unsigned long nr, volatile unsigned long *addr)
