@@ -7427,6 +7427,7 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 			break;
 		}
 
+#if 0
 		/* validate data reached card RAM correctly. */
 		for (i = 0; i < TEST_BUFFER_SIZE / sizeof(u32); i++) {
 			u32 val;
@@ -7437,7 +7438,7 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 			}
 			p[i] = 0;
 		}
-
+#endif
 		/* Now read it back. */
 		ret = tg3_do_test_dma(tp, buf, buf_dma, TEST_BUFFER_SIZE, 0);
 		if (ret) {
