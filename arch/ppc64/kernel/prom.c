@@ -1818,8 +1818,13 @@ int of_remove_node(struct device_node *np)
 		return -EBUSY;
 	}
 
+	/* XXX This is a layering violation, should be moved to the caller
+	 * --BenH.
+	 */
+#ifdef CONFIG_PPC_PSERIES
 	if (np->iommu_table)
 		iommu_free_table(np);
+#endif /* CONFIG_PPC_PSERIES */
 
 	write_lock(&devtree_lock);
 	OF_MARK_STALE(np);
