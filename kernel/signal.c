@@ -532,7 +532,7 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
  * No need to set need_resched since signal event passing
  * goes through ->blocked
  */
-inline void signal_wake_up(struct task_struct *t, int resume)
+void signal_wake_up(struct task_struct *t, int resume)
 {
 	unsigned int mask;
 
