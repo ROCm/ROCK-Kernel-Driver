@@ -41,6 +41,8 @@ int suspend_device(struct device * dev, u32 state)
 
 	dev_dbg(dev, "suspending\n");
 
+	dev->power.prev_state = dev->power.power_state;
+
 	if (dev->bus && dev->bus->suspend && !dev->power.power_state)
 		error = dev->bus->suspend(dev,state);
 
