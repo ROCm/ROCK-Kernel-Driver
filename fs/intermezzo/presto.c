@@ -259,11 +259,8 @@ int lento_cancel_lml(char *path,
 
 
         if (info->flags & LENTO_FL_WRITE_KML) {
-                struct file file;
-                file.private_data = NULL;
-                file.f_dentry = dentry; 
                 presto_getversion(&new_ver, dentry->d_inode);
-                error = presto_journal_close(&rec, fset, &file, dentry, 
+                error = presto_journal_close(&rec, fset, NULL, dentry,
                                              &new_ver);
                 if ( error ) {
                         EXIT; 

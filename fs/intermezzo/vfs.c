@@ -321,7 +321,7 @@ int presto_do_close(struct presto_file_set *fset, struct file *file)
         }
 
         if (fdata->fd_info.flags & LENTO_FL_KML) 
-                rc = presto_journal_close(&rec, fset, file, file->f_dentry,
+                rc = presto_journal_close(&rec, fset, fdata, file->f_dentry,
                                           &fdata->fd_version, 
                                           &fdata->fd_info.remote_version);
         if (rc) { 
@@ -431,14 +431,11 @@ int presto_do_setattr(struct presto_file_set *fset, struct dentry *dentry,
 
         if ( presto_do_kml(info, dentry) ) {
                 if ((iattr->ia_valid & ATTR_SIZE) && (old_size != inode->i_size)) {
-                        struct file file;
                         /* Journal a close whenever we see a potential truncate
                         * At the receiving end, lento should explicitly remove
                         * ATTR_SIZE from the list of valid attributes */
                         presto_getversion(&new_ver, inode);
-                        file.private_data = NULL;
-                        file.f_dentry = dentry;
-                        error = presto_journal_close(&rec, fset, &file, dentry,
+                        error = presto_journal_close(&rec, fset, NULL, dentry,
                                                      &old_ver, &new_ver);
                 }
 
