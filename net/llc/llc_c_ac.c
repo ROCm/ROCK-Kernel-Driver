@@ -33,6 +33,13 @@ static int llc_conn_ac_inc_vs_by_1(struct sock *sk, struct sk_buff *skb);
 static void llc_process_tmr_ev(struct sock *sk, struct sk_buff *skb);
 static int llc_conn_ac_data_confirm(struct sock *sk, struct sk_buff *ev);
 
+static int llc_conn_ac_inc_npta_value(struct sock *sk, struct sk_buff *skb);
+
+static int llc_conn_ac_send_rr_rsp_f_set_ackpf(struct sock *sk,
+					       struct sk_buff *skb);
+
+static int llc_conn_ac_set_p_flag_1(struct sock *sk, struct sk_buff *skb);
+
 #define INCORRECT 0
 
 int llc_conn_ac_clear_remote_busy(struct sock *sk, struct sk_buff *skb)
@@ -185,11 +192,6 @@ int llc_conn_ac_rst_confirm(struct sock *sk, struct sk_buff *skb)
 	return 0;
 }
 
-int llc_conn_ac_report_status(struct sock *sk, struct sk_buff *skb)
-{
-	return 0;
-}
-
 int llc_conn_ac_clear_remote_busy_if_f_eq_1(struct sock *sk,
 					    struct sk_buff *skb)
 {
@@ -274,32 +276,6 @@ int llc_conn_ac_send_dm_rsp_f_set_1(struct sock *sk, struct sk_buff *skb)
 		struct llc_opt *llc = llc_sk(sk);
 		struct llc_sap *sap = llc->sap;
 		u8 f_bit = 1;
-
-		nskb->dev = llc->dev;
-		llc_pdu_header_init(nskb, LLC_PDU_TYPE_U, sap->laddr.lsap,
-				    llc->daddr.lsap, LLC_PDU_RSP);
-		llc_pdu_init_as_dm_rsp(nskb, f_bit);
-		rc = llc_mac_hdr_init(nskb, llc->dev->dev_addr, llc->daddr.mac);
-		if (rc)
-			goto free;
-		llc_conn_send_pdu(sk, nskb);
-	}
-out:
-	return rc;
-free:
-	kfree_skb(nskb);
-	goto out;
-}
-
-int llc_conn_ac_send_dm_rsp_f_set_f_flag(struct sock *sk, struct sk_buff *skb)
-{
-	int rc = -ENOBUFS;
-	struct sk_buff *nskb = llc_alloc_frame();
-
-	if (nskb) {
-		struct llc_opt *llc = llc_sk(sk);
-		struct llc_sap *sap = llc->sap;
-		u8 f_bit = llc->f_flag;
 
 		nskb->dev = llc->dev;
 		llc_pdu_header_init(nskb, LLC_PDU_TYPE_U, sap->laddr.lsap,
@@ -426,7 +402,7 @@ int llc_conn_ac_send_i_cmd_p_set_1(struct sock *sk, struct sk_buff *skb)
 	return rc;
 }
 
-int llc_conn_ac_send_i_cmd_p_set_0(struct sock *sk, struct sk_buff *skb)
+static int llc_conn_ac_send_i_cmd_p_set_0(struct sock *sk, struct sk_buff *skb)
 {
 	int rc;
 	struct llc_opt *llc = llc_sk(sk);
@@ -440,27 +416,6 @@ int llc_conn_ac_send_i_cmd_p_set_0(struct sock *sk, struct sk_buff *skb)
 		llc_conn_send_pdu(sk, skb);
 		llc_conn_ac_inc_vs_by_1(sk, skb);
 	}
-	return rc;
-}
-
-int llc_conn_ac_resend_i_cmd_p_set_1(struct sock *sk, struct sk_buff *skb)
-{
-	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
-	u8 nr = LLC_I_GET_NR(pdu);
-
-	llc_conn_resend_i_pdu_as_cmd(sk, nr, 1);
-	return 0;
-}
-
-int llc_conn_ac_resend_i_cmd_p_set_1_or_send_rr(struct sock *sk,
-						struct sk_buff *skb)
-{
-	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
-	u8 nr = LLC_I_GET_NR(pdu);
-	int rc = llc_conn_ac_send_rr_cmd_p_set_1(sk, skb);
-
-	if (!rc)
-		llc_conn_resend_i_pdu_as_cmd(sk, nr, 0);
 	return rc;
 }
 
@@ -745,31 +700,6 @@ free:
 	goto out;
 }
 
-int llc_conn_ac_send_ack_cmd_p_set_1(struct sock *sk, struct sk_buff *skb)
-{
-	int rc = -ENOBUFS;
-	struct sk_buff *nskb = llc_alloc_frame();
-
-	if (nskb) {
-		struct llc_opt *llc = llc_sk(sk);
-		struct llc_sap *sap = llc->sap;
-
-		nskb->dev = llc->dev;
-		llc_pdu_header_init(nskb, LLC_PDU_TYPE_S, sap->laddr.lsap,
-				    llc->daddr.lsap, LLC_PDU_CMD);
-		llc_pdu_init_as_rr_cmd(nskb, 1, llc->vR);
-		rc = llc_mac_hdr_init(nskb, llc->dev->dev_addr, llc->daddr.mac);
-		if (rc)
-			goto free;
-		llc_conn_send_pdu(sk, nskb);
-	}
-out:
-	return rc;
-free:
-	kfree_skb(nskb);
-	goto out;
-}
-
 int llc_conn_ac_send_rr_rsp_f_set_1(struct sock *sk, struct sk_buff *skb)
 {
 	int rc = -ENOBUFS;
@@ -911,31 +841,6 @@ free:
 	goto out;
 }
 
-int llc_conn_ac_send_ua_rsp_f_set_f_flag(struct sock *sk, struct sk_buff *skb)
-{
-	int rc = -ENOBUFS;
-	struct sk_buff *nskb = llc_alloc_frame();
-
-	if (nskb) {
-		struct llc_opt *llc = llc_sk(sk);
-		struct llc_sap *sap = llc->sap;
-
-		nskb->dev = llc->dev;
-		llc_pdu_header_init(nskb, LLC_PDU_TYPE_U, sap->laddr.lsap,
-				    llc->daddr.lsap, LLC_PDU_RSP);
-		llc_pdu_init_as_ua_rsp(nskb, llc->f_flag);
-		rc = llc_mac_hdr_init(nskb, llc->dev->dev_addr, llc->daddr.mac);
-		if (rc)
-			goto free;
-		llc_conn_send_pdu(sk, nskb);
-	}
-out:
-	return rc;
-free:
-	kfree_skb(nskb);
-	goto out;
-}
-
 int llc_conn_ac_send_ua_rsp_f_set_p(struct sock *sk, struct sk_buff *skb)
 {
 	u8 f_bit;
@@ -1041,7 +946,8 @@ int llc_conn_ac_rst_sendack_flag(struct sock *sk, struct sk_buff *skb)
  *	set to one if one PDU with p-bit set to one is received.  Returns 0 for
  *	success, 1 otherwise.
  */
-int llc_conn_ac_send_i_rsp_f_set_ackpf(struct sock *sk, struct sk_buff *skb)
+static int llc_conn_ac_send_i_rsp_f_set_ackpf(struct sock *sk,
+					      struct sk_buff *skb)
 {
 	int rc;
 	struct llc_opt *llc = llc_sk(sk);
@@ -1091,7 +997,8 @@ int llc_conn_ac_send_i_as_ack(struct sock *sk, struct sk_buff *skb)
  *	if there is any. ack_pf flag indicates if a PDU has been received with
  *	p-bit set to one. Returns 0 for success, 1 otherwise.
  */
-int llc_conn_ac_send_rr_rsp_f_set_ackpf(struct sock *sk, struct sk_buff *skb)
+static int llc_conn_ac_send_rr_rsp_f_set_ackpf(struct sock *sk,
+					       struct sk_buff *skb)
 {
 	int rc = -ENOBUFS;
 	struct sk_buff *nskb = llc_alloc_frame();
@@ -1126,7 +1033,7 @@ free:
  *	acknowledgements decreases by increasing of "npta". Returns 0 for
  *	success, 1 otherwise.
  */
-int llc_conn_ac_inc_npta_value(struct sock *sk, struct sk_buff *skb)
+static int llc_conn_ac_inc_npta_value(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_opt *llc = llc_sk(sk);
 
@@ -1387,7 +1294,7 @@ int llc_conn_ac_set_p_flag_0(struct sock *sk, struct sk_buff *skb)
 	return 0;
 }
 
-int llc_conn_ac_set_p_flag_1(struct sock *sk, struct sk_buff *skb)
+static int llc_conn_ac_set_p_flag_1(struct sock *sk, struct sk_buff *skb)
 {
 	llc_conn_set_p_flag(sk, 1);
 	return 0;
@@ -1450,12 +1357,6 @@ int llc_conn_ac_set_vs_nr(struct sock *sk, struct sk_buff *skb)
 int llc_conn_ac_inc_vs_by_1(struct sock *sk, struct sk_buff *skb)
 {
 	llc_sk(sk)->vS = (llc_sk(sk)->vS + 1) % 128;
-	return 0;
-}
-
-int llc_conn_ac_set_f_flag_p(struct sock *sk, struct sk_buff *skb)
-{
-	llc_pdu_decode_pf_bit(skb, &llc_sk(sk)->f_flag);
 	return 0;
 }
 

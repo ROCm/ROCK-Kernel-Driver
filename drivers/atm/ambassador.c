@@ -1692,7 +1692,7 @@ static unsigned int command_timeouts [] = {
 };
 
 
-unsigned int command_successes [] = {
+static unsigned int command_successes [] = {
 	[host_memory_test]     = COMMAND_PASSED_TEST,
 	[read_adapter_memory]  = COMMAND_READ_DATA_OK,
 	[write_adapter_memory] = COMMAND_WRITE_DATA_OK,
@@ -2088,7 +2088,7 @@ static void __init amb_ucode_version (amb_dev * dev) {
 }
   
 // swap bits within byte to get Ethernet ordering
-u8 bit_swap (u8 byte)
+static u8 bit_swap (u8 byte)
 {
     const u8 swap[] = {
       0x0, 0x8, 0x4, 0xc,

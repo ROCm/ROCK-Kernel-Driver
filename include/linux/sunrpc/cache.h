@@ -257,8 +257,6 @@ RTN *FNAME ARGS										\
 
 	     
 
-extern void cache_defer_req(struct cache_req *req, struct cache_head *item);
-extern void cache_revisit_request(struct cache_head *item);
 extern void cache_clean_deferred(void *owner);
 
 static inline struct cache_head  *cache_get(struct cache_head *h)
@@ -286,14 +284,11 @@ extern void cache_fresh(struct cache_detail *detail,
 			struct cache_head *head, time_t expiry);
 extern int cache_check(struct cache_detail *detail,
 		       struct cache_head *h, struct cache_req *rqstp);
-extern int cache_clean(void);
 extern void cache_flush(void);
 extern void cache_purge(struct cache_detail *detail);
 #define NEVER (0x7FFFFFFF)
 extern void cache_register(struct cache_detail *cd);
 extern int cache_unregister(struct cache_detail *cd);
-extern struct cache_detail *cache_find(char *name);
-extern void cache_drop(struct cache_detail *detail);
 
 extern void qword_add(char **bpp, int *lp, char *str);
 extern void qword_addhex(char **bpp, int *lp, char *buf, int blen);

@@ -175,9 +175,9 @@ void irlan_provider_connect_response(struct irlan_cb *self,
 	irttp_connect_response(tsap, IRLAN_MTU, NULL);
 }
 
-void irlan_provider_disconnect_indication(void *instance, void *sap, 
-					  LM_REASON reason, 
-					  struct sk_buff *userdata) 
+static void irlan_provider_disconnect_indication(void *instance, void *sap, 
+						 LM_REASON reason, 
+						 struct sk_buff *userdata) 
 {
 	struct irlan_cb *self;
 	struct tsap_cb *tsap;

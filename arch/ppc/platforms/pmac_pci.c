@@ -142,14 +142,14 @@ fixup_bus_range(struct device_node *bridge)
 	|(((unsigned long)(off)) & 0xFCUL) \
 	|1UL)
 
-static unsigned int __pmac
+static void volatile __iomem * __pmac
 macrisc_cfg_access(struct pci_controller* hose, u8 bus, u8 dev_fn, u8 offset)
 {
 	unsigned int caddr;
 
 	if (bus == hose->first_busno) {
 		if (dev_fn < (11 << 3))
-			return 0;
+			return NULL;
 		caddr = MACRISC_CFA0(dev_fn, offset);
 	} else
 		caddr = MACRISC_CFA1(bus, dev_fn, offset);
@@ -160,7 +160,7 @@ macrisc_cfg_access(struct pci_controller* hose, u8 bus, u8 dev_fn, u8 offset)
 	} while (in_le32(hose->cfg_addr) != caddr);
 
 	offset &= has_uninorth ? 0x07 : 0x03;
-	return (unsigned int)(hose->cfg_data) + (unsigned int)offset;
+	return hose->cfg_data + offset;
 }
 
 static int __pmac
@@ -168,7 +168,7 @@ macrisc_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		    int len, u32 *val)
 {
 	struct pci_controller *hose = bus->sysdata;
-	unsigned int addr;
+	void volatile __iomem *addr;
 
 	addr = macrisc_cfg_access(hose, bus->number, devfn, offset);
 	if (!addr)
@@ -179,13 +179,13 @@ macrisc_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	 */
 	switch (len) {
 	case 1:
-		*val = in_8((u8 *)addr);
+		*val = in_8(addr);
 		break;
 	case 2:
-		*val = in_le16((u16 *)addr);
+		*val = in_le16(addr);
 		break;
 	default:
-		*val = in_le32((u32 *)addr);
+		*val = in_le32(addr);
 		break;
 	}
 	return PCIBIOS_SUCCESSFUL;
@@ -196,7 +196,7 @@ macrisc_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		     int len, u32 val)
 {
 	struct pci_controller *hose = bus->sysdata;
-	unsigned int addr;
+	void volatile __iomem *addr;
 
 	addr = macrisc_cfg_access(hose, bus->number, devfn, offset);
 	if (!addr)
@@ -207,16 +207,16 @@ macrisc_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	 */
 	switch (len) {
 	case 1:
-		out_8((u8 *)addr, val);
-		(void) in_8((u8 *)addr);
+		out_8(addr, val);
+		(void) in_8(addr);
 		break;
 	case 2:
-		out_le16((u16 *)addr, val);
-		(void) in_le16((u16 *)addr);
+		out_le16(addr, val);
+		(void) in_le16(addr);
 		break;
 	default:
-		out_le32((u32 *)addr, val);
-		(void) in_le32((u32 *)addr);
+		out_le32(addr, val);
+		(void) in_le32(addr);
 		break;
 	}
 	return PCIBIOS_SUCCESSFUL;
@@ -295,7 +295,7 @@ static struct pci_ops chaos_pci_ops =
 		+ (((unsigned long)bus) << 16) \
 		+ 0x01000000UL)
 
-static unsigned long __pmac
+static void volatile __iomem * __pmac
 u3_ht_cfg_access(struct pci_controller* hose, u8 bus, u8 devfn, u8 offset)
 {
 	if (bus == hose->first_busno) {
@@ -303,9 +303,9 @@ u3_ht_cfg_access(struct pci_controller* hose, u8 bus, u8 devfn, u8 offset)
 		if (PCI_FUNC(devfn) != 0 || PCI_SLOT(devfn) > 7 ||
 		    PCI_SLOT(devfn) < 1)
 			return 0;
-		return ((unsigned long)hose->cfg_data) + U3_HT_CFA0(devfn, offset);
+		return hose->cfg_data + U3_HT_CFA0(devfn, offset);
 	} else
-		return ((unsigned long)hose->cfg_data) + U3_HT_CFA1(bus, devfn, offset);
+		return hose->cfg_data + U3_HT_CFA1(bus, devfn, offset);
 }
 
 static int __pmac
@@ -313,7 +313,7 @@ u3_ht_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		    int len, u32 *val)
 {
 	struct pci_controller *hose = bus->sysdata;
-	unsigned int addr;
+	void volatile __iomem *addr;
 	int i;
 
 	struct device_node *np = pci_busdev_to_OF_node(bus, devfn);
@@ -347,13 +347,13 @@ u3_ht_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	 */
 	switch (len) {
 	case 1:
-		*val = in_8((u8 *)addr);
+		*val = in_8(addr);
 		break;
 	case 2:
-		*val = in_le16((u16 *)addr);
+		*val = in_le16(addr);
 		break;
 	default:
-		*val = in_le32((u32 *)addr);
+		*val = in_le32(addr);
 		break;
 	}
 	return PCIBIOS_SUCCESSFUL;
@@ -364,7 +364,7 @@ u3_ht_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		     int len, u32 val)
 {
 	struct pci_controller *hose = bus->sysdata;
-	unsigned int addr;
+	void volatile __iomem *addr;
 	int i;
 
 	struct device_node *np = pci_busdev_to_OF_node(bus, devfn);
@@ -388,16 +388,16 @@ u3_ht_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 	 */
 	switch (len) {
 	case 1:
-		out_8((u8 *)addr, val);
-		(void) in_8((u8 *)addr);
+		out_8(addr, val);
+		(void) in_8(addr);
 		break;
 	case 2:
-		out_le16((u16 *)addr, val);
-		(void) in_le16((u16 *)addr);
+		out_le16(addr, val);
+		(void) in_le16(addr);
 		break;
 	default:
-		out_le32((u32 *)addr, val);
-		(void) in_le32((u32 *)addr);
+		out_le32(addr, val);
+		(void) in_le32(addr);
 		break;
 	}
 	return PCIBIOS_SUCCESSFUL;
@@ -424,7 +424,7 @@ init_bandit(struct pci_controller *bp)
 	/* read the word at offset 0 in config space for device 11 */
 	out_le32(bp->cfg_addr, (1UL << BANDIT_DEVNUM) + PCI_VENDOR_ID);
 	udelay(2);
-	vendev = in_le32((volatile unsigned int *)bp->cfg_data);
+	vendev = in_le32(bp->cfg_data);
 	if (vendev == (PCI_DEVICE_ID_APPLE_BANDIT << 16) +
 			PCI_VENDOR_ID_APPLE) {
 		/* read the revision id */
@@ -443,12 +443,12 @@ init_bandit(struct pci_controller *bp)
 	/* read the word at offset 0x50 */
 	out_le32(bp->cfg_addr, (1UL << BANDIT_DEVNUM) + BANDIT_MAGIC);
 	udelay(2);
-	magic = in_le32((volatile unsigned int *)bp->cfg_data);
+	magic = in_le32(bp->cfg_data);
 	if ((magic & BANDIT_COHERENT) != 0)
 		return;
 	magic |= BANDIT_COHERENT;
 	udelay(2);
-	out_le32((volatile unsigned int *)bp->cfg_data, magic);
+	out_le32(bp->cfg_data, magic);
 	printk(KERN_INFO "Cache coherency enabled for bandit/PSX\n");
 }
 
@@ -622,12 +622,12 @@ static inline void grackle_set_stg(struct pci_controller* bp, int enable)
 	unsigned int val;
 
 	out_be32(bp->cfg_addr, GRACKLE_CFA(0, 0, 0xa8));
-	val = in_le32((volatile unsigned int *)bp->cfg_data);
+	val = in_le32(bp->cfg_data);
 	val = enable? (val | GRACKLE_PICR1_STG) :
 		(val & ~GRACKLE_PICR1_STG);
 	out_be32(bp->cfg_addr, GRACKLE_CFA(0, 0, 0xa8));
-	out_le32((volatile unsigned int *)bp->cfg_data, val);
-	(void)in_le32((volatile unsigned int *)bp->cfg_data);
+	out_le32(bp->cfg_data, val);
+	(void)in_le32(bp->cfg_data);
 }
 
 static inline void grackle_set_loop_snoop(struct pci_controller *bp, int enable)
@@ -635,12 +635,12 @@ static inline void grackle_set_loop_snoop(struct pci_controller *bp, int enable)
 	unsigned int val;
 
 	out_be32(bp->cfg_addr, GRACKLE_CFA(0, 0, 0xa8));
-	val = in_le32((volatile unsigned int *)bp->cfg_data);
+	val = in_le32(bp->cfg_data);
 	val = enable? (val | GRACKLE_PICR1_LOOPSNOOP) :
 		(val & ~GRACKLE_PICR1_LOOPSNOOP);
 	out_be32(bp->cfg_addr, GRACKLE_CFA(0, 0, 0xa8));
-	out_le32((volatile unsigned int *)bp->cfg_data, val);
-	(void)in_le32((volatile unsigned int *)bp->cfg_data);
+	out_le32(bp->cfg_data, val);
+	(void)in_le32(bp->cfg_data);
 }
 
 static int __init
@@ -659,10 +659,8 @@ static void __init
 setup_bandit(struct pci_controller* hose, struct reg_property* addr)
 {
 	hose->ops = &macrisc_pci_ops;
-	hose->cfg_addr = (volatile unsigned int *)
-		ioremap(addr->address + 0x800000, 0x1000);
-	hose->cfg_data = (volatile unsigned char *)
-		ioremap(addr->address + 0xc00000, 0x1000);
+	hose->cfg_addr = ioremap(addr->address + 0x800000, 0x1000);
+	hose->cfg_data = ioremap(addr->address + 0xc00000, 0x1000);
 	init_bandit(hose);
 }
 
@@ -671,10 +669,8 @@ setup_chaos(struct pci_controller* hose, struct reg_property* addr)
 {
 	/* assume a `chaos' bridge */
 	hose->ops = &chaos_pci_ops;
-	hose->cfg_addr = (volatile unsigned int *)
-		ioremap(addr->address + 0x800000, 0x1000);
-	hose->cfg_data = (volatile unsigned char *)
-		ioremap(addr->address + 0xc00000, 0x1000);
+	hose->cfg_addr = ioremap(addr->address + 0x800000, 0x1000);
+	hose->cfg_data = ioremap(addr->address + 0xc00000, 0x1000);
 }
 
 #ifdef CONFIG_POWER4
@@ -713,7 +709,7 @@ setup_u3_ht(struct pci_controller* hose, struct reg_property *addr)
 	 * the reg address cell, we shall fix that by killing struct
 	 * reg_property and using some accessor functions instead
 	 */
-	hose->cfg_data = (volatile unsigned char *)ioremap(0xf2000000, 0x02000000);
+	hose->cfg_data = ioremap(0xf2000000, 0x02000000);
 
 	/*
 	 * /ht node doesn't expose a "ranges" property, so we "remove" regions that

@@ -105,14 +105,6 @@ int llc_conn_ev_conn_req(struct sock *sk, struct sk_buff *skb)
 	       ev->prim_type == LLC_PRIM_TYPE_REQ ? 0 : 1;
 }
 
-int llc_conn_ev_conn_resp(struct sock *sk, struct sk_buff *skb)
-{
-	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-
-	return ev->prim == LLC_CONN_PRIM &&
-	       ev->prim_type == LLC_PRIM_TYPE_RESP ? 0 : 1;
-}
-
 int llc_conn_ev_data_req(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
@@ -135,14 +127,6 @@ int llc_conn_ev_rst_req(struct sock *sk, struct sk_buff *skb)
 
 	return ev->prim == LLC_RESET_PRIM &&
 	       ev->prim_type == LLC_PRIM_TYPE_REQ ? 0 : 1;
-}
-
-int llc_conn_ev_rst_resp(struct sock *sk, struct sk_buff *skb)
-{
-	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-
-	return ev->prim == LLC_RESET_PRIM &&
-	       ev->prim_type == LLC_PRIM_TYPE_RESP ? 0 : 1;
 }
 
 int llc_conn_ev_local_busy_detected(struct sock *sk, struct sk_buff *skb)
@@ -474,27 +458,6 @@ int llc_conn_ev_rx_xxx_cmd_pbit_set_1(struct sock *sk, struct sk_buff *skb)
 	return rc;
 }
 
-int llc_conn_ev_rx_xxx_cmd_pbit_set_0(struct sock *sk, struct sk_buff *skb)
-{
-	u16 rc = 1;
-	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
-
-	if (LLC_PDU_IS_CMD(pdu)) {
-		if (LLC_PDU_TYPE_IS_I(pdu) || LLC_PDU_TYPE_IS_S(pdu)) {
-			if (LLC_I_PF_IS_0(pdu))
-				rc = 0;
-		} else if (LLC_PDU_TYPE_IS_U(pdu))
-			switch (LLC_U_PDU_CMD(pdu)) {
-			case LLC_2_PDU_CMD_SABME:
-			case LLC_2_PDU_CMD_DISC:
-				if (LLC_U_PF_IS_0(pdu))
-					rc = 0;
-				break;
-			}
-	}
-	return rc;
-}
-
 int llc_conn_ev_rx_xxx_cmd_pbit_set_x(struct sock *sk, struct sk_buff *skb)
 {
 	u16 rc = 1;
@@ -554,26 +517,6 @@ int llc_conn_ev_rx_xxx_rsp_fbit_set_x(struct sock *sk, struct sk_buff *skb)
 			}
 	}
 
-	return rc;
-}
-
-int llc_conn_ev_rx_xxx_yyy(struct sock *sk, struct sk_buff *skb)
-{
-	u16 rc = 1;
-	struct llc_pdu_un *pdu = llc_pdu_un_hdr(skb);
-
-	if (LLC_PDU_TYPE_IS_I(pdu) || LLC_PDU_TYPE_IS_S(pdu))
-		rc = 0;
-	else if (LLC_PDU_TYPE_IS_U(pdu))
-		switch (LLC_U_PDU_CMD(pdu)) {
-		case LLC_2_PDU_CMD_SABME:
-		case LLC_2_PDU_CMD_DISC:
-		case LLC_2_PDU_RSP_UA:
-		case LLC_2_PDU_RSP_DM:
-		case LLC_2_PDU_RSP_FRMR:
-			rc = 0;
-			break;
-		}
 	return rc;
 }
 
@@ -644,16 +587,6 @@ int llc_conn_ev_busy_tmr_exp(struct sock *sk, struct sk_buff *skb)
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 	return ev->type != LLC_CONN_EV_TYPE_BUSY_TMR;
-}
-
-int llc_conn_ev_any_tmr_exp(struct sock *sk, struct sk_buff *skb)
-{
-	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-
-	return ev->type == LLC_CONN_EV_TYPE_P_TMR ||
-	       ev->type == LLC_CONN_EV_TYPE_ACK_TMR ||
-	       ev->type == LLC_CONN_EV_TYPE_REJ_TMR ||
-	       ev->type == LLC_CONN_EV_TYPE_BUSY_TMR ? 0 : 1;
 }
 
 int llc_conn_ev_init_p_f_cycle(struct sock *sk, struct sk_buff *skb)
@@ -778,11 +711,6 @@ int llc_conn_ev_qlfy_cause_flag_eq_0(struct sock *sk, struct sk_buff *skb)
 	return llc_sk(sk)->cause_flag;
 }
 
-int llc_conn_ev_qlfy_init_p_f_cycle(struct sock *sk, struct sk_buff *skb)
-{
-	return 0;
-}
-
 int llc_conn_ev_qlfy_set_status_conn(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
@@ -796,14 +724,6 @@ int llc_conn_ev_qlfy_set_status_disc(struct sock *sk, struct sk_buff *skb)
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 	ev->status = LLC_STATUS_DISC;
-	return 0;
-}
-
-int llc_conn_ev_qlfy_set_status_impossible(struct sock *sk, struct sk_buff *skb)
-{
-	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-
-	ev->status = LLC_STATUS_IMPOSSIBLE;
 	return 0;
 }
 
@@ -821,14 +741,6 @@ int llc_conn_ev_qlfy_set_status_remote_busy(struct sock *sk,
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 
 	ev->status = LLC_STATUS_REMOTE_BUSY;
-	return 0;
-}
-
-int llc_conn_ev_qlfy_set_status_received(struct sock *sk, struct sk_buff *skb)
-{
-	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-
-	ev->status = LLC_STATUS_RECEIVED;
 	return 0;
 }
 

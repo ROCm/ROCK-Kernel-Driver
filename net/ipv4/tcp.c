@@ -460,7 +460,7 @@ int tcp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 int tcp_listen_start(struct sock *sk)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcp_listen_opt *lopt;
 
@@ -1772,7 +1772,7 @@ static inline int tcp_need_reset(int state)
 
 int tcp_disconnect(struct sock *sk, int flags)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
 	int err = 0;
 	int old_state = sk->sk_state;

@@ -75,7 +75,6 @@ struct ircomm_info {
 };
 
 extern char *ircomm_state[];
-extern char *ircomm_event[];
 
 struct ircomm_cb;   /* Forward decl. */
 

@@ -92,23 +92,6 @@ static pi_major_info_t pi_major_call_table[] = {
 pi_param_info_t ircomm_param_info = { pi_major_call_table, 3, 0x0f, 4 };
 
 /*
- * Function ircomm_param_flush (self)
- *
- *    Flush (send) out all queued parameters
- *
- */
-int ircomm_param_flush(struct ircomm_tty_cb *self)
-{
-	/* we should lock here, but I guess this function is unused...
-	 * Jean II */
-	if (self->ctrl_skb) {
-		ircomm_control_request(self->ircomm, self->ctrl_skb);
-		self->ctrl_skb = NULL;	
-	}
-	return 0;
-}
-
-/*
  * Function ircomm_param_request (self, pi, flush)
  *
  *    Queue a parameter for the control channel

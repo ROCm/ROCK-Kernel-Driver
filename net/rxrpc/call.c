@@ -26,10 +26,10 @@ __RXACCT_DECL(atomic_t rxrpc_message_count);
 LIST_HEAD(rxrpc_calls);
 DECLARE_RWSEM(rxrpc_calls_sem);
 
-unsigned rxrpc_call_rcv_timeout		= HZ/3;
-unsigned rxrpc_call_acks_timeout	= HZ/3;
-unsigned rxrpc_call_dfr_ack_timeout	= HZ/20;
-unsigned short rxrpc_call_max_resend	= HZ/10;
+unsigned rxrpc_call_rcv_timeout			= HZ/3;
+static unsigned rxrpc_call_acks_timeout		= HZ/3;
+static unsigned rxrpc_call_dfr_ack_timeout	= HZ/20;
+static unsigned short rxrpc_call_max_resend	= HZ/10;
 
 const char *rxrpc_call_states[] = {
 	"COMPLETE",
@@ -58,7 +58,7 @@ const char *rxrpc_pkts[] = {
 	"?09", "?10", "?11", "?12", "?13", "?14", "?15"
 };
 
-const char *rxrpc_acks[] = {
+static const char *rxrpc_acks[] = {
 	"---", "REQ", "DUP", "SEQ", "WIN", "MEM", "PNG", "PNR", "DLY", "IDL",
 	"-?-"
 };
@@ -79,6 +79,9 @@ static int rxrpc_call_record_ACK(struct rxrpc_call *call,
 				 struct rxrpc_message *msg,
 				 rxrpc_seq_t seq,
 				 size_t count);
+
+static int rxrpc_call_flush(struct rxrpc_call *call);
+
 #define _state(call) \
 	_debug("[[[ state %s ]]]", rxrpc_call_states[call->app_call_state]);
 
@@ -2079,7 +2082,7 @@ int rxrpc_call_write_data(struct rxrpc_call *call,
 /*
  * flush outstanding packets to the network
  */
-int rxrpc_call_flush(struct rxrpc_call *call)
+static int rxrpc_call_flush(struct rxrpc_call *call)
 {
 	struct rxrpc_message *msg;
 	int ret = 0;

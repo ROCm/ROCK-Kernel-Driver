@@ -114,10 +114,9 @@ static __inline__ struct ipv6_pinfo *inet6_sk_generic(struct sock *sk)
 
 static int inet6_create(struct socket *sock, int protocol)
 {
-	struct inet_opt *inet;
+	struct inet_sock *inet;
 	struct ipv6_pinfo *np;
 	struct sock *sk;
-	struct tcp6_sock* tcp6sk;
 	struct list_head *p;
 	struct inet_protosw *answer;
 	struct proto *answer_prot;
@@ -196,8 +195,7 @@ static int inet6_create(struct socket *sock, int protocol)
 
 	sk->sk_backlog_rcv	= answer->prot->backlog_rcv;
 
-	tcp6sk		= (struct tcp6_sock *)sk;
-	tcp6sk->pinet6 = np = inet6_sk_generic(sk);
+	inet_sk(sk)->pinet6 = np = inet6_sk_generic(sk);
 	np->hop_limit	= -1;
 	np->mcast_hops	= -1;
 	np->mc_loop	= 1;
@@ -252,7 +250,7 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in6 *addr=(struct sockaddr_in6 *)uaddr;
 	struct sock *sk = sock->sk;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	__u32 v4addr = 0;
 	unsigned short snum;
@@ -410,7 +408,7 @@ int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 {
 	struct sockaddr_in6 *sin=(struct sockaddr_in6 *)uaddr;
 	struct sock *sk = sock->sk;
-	struct inet_opt *inet = inet_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
   
 	sin->sin6_family = AF_INET6;

@@ -546,7 +546,7 @@ static void netlink_overrun(struct sock *sk)
 	}
 }
 
-struct sock *netlink_getsockbypid(struct sock *ssk, u32 pid)
+static struct sock *netlink_getsockbypid(struct sock *ssk, u32 pid)
 {
 	int protocol = ssk->sk_protocol;
 	struct sock *sock;
@@ -1210,30 +1210,6 @@ static rwlock_t nl_emu_lock = RW_LOCK_UNLOCKED;
  *	Backward compatibility.
  */	
  
-int netlink_attach(int unit, int (*function)(int, struct sk_buff *skb))
-{
-	struct sock *sk = netlink_kernel_create(unit, NULL);
-	if (sk == NULL)
-		return -ENOBUFS;
-	nlk_sk(sk)->handler = function;
-	write_lock_bh(&nl_emu_lock);
-	netlink_kernel[unit] = sk->sk_socket;
-	write_unlock_bh(&nl_emu_lock);
-	return 0;
-}
-
-void netlink_detach(int unit)
-{
-	struct socket *sock;
-
-	write_lock_bh(&nl_emu_lock);
-	sock = netlink_kernel[unit];
-	netlink_kernel[unit] = NULL;
-	write_unlock_bh(&nl_emu_lock);
-
-	sock_release(sock);
-}
-
 int netlink_post(int unit, struct sk_buff *skb)
 {
 	struct socket *sock;
@@ -1522,7 +1498,5 @@ EXPORT_SYMBOL(netlink_unicast);
 EXPORT_SYMBOL(netlink_unregister_notifier);
 
 #if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
-EXPORT_SYMBOL(netlink_attach);
-EXPORT_SYMBOL(netlink_detach);
 EXPORT_SYMBOL(netlink_post);
 #endif

@@ -129,11 +129,9 @@ typedef int (*llc_conn_ev_t)(struct sock *sk, struct sk_buff *skb);
 typedef int (*llc_conn_ev_qfyr_t)(struct sock *sk, struct sk_buff *skb);
 
 extern int llc_conn_ev_conn_req(struct sock *sk, struct sk_buff *skb);
-extern int llc_conn_ev_conn_resp(struct sock *sk, struct sk_buff *skb);
 extern int llc_conn_ev_data_req(struct sock *sk, struct sk_buff *skb);
 extern int llc_conn_ev_disc_req(struct sock *sk, struct sk_buff *skb);
 extern int llc_conn_ev_rst_req(struct sock *sk, struct sk_buff *skb);
-extern int llc_conn_ev_rst_resp(struct sock *sk, struct sk_buff *skb);
 extern int llc_conn_ev_local_busy_detected(struct sock *sk,
 					   struct sk_buff *skb);
 extern int llc_conn_ev_local_busy_cleared(struct sock *sk, struct sk_buff *skb);
@@ -162,7 +160,6 @@ extern int llc_conn_ev_rx_xxx_cmd_pbit_set_x(struct sock *sk,
 					     struct sk_buff *skb);
 extern int llc_conn_ev_rx_xxx_rsp_fbit_set_x(struct sock *sk,
 					     struct sk_buff *skb);
-extern int llc_conn_ev_rx_xxx_yyy(struct sock *sk, struct sk_buff *skb);
 extern int llc_conn_ev_rx_zzz_cmd_pbit_set_x_inval_nr(struct sock *sk,
 						      struct sk_buff *skb);
 extern int llc_conn_ev_rx_zzz_rsp_fbit_set_x_inval_nr(struct sock *sk,
@@ -171,12 +168,9 @@ extern int llc_conn_ev_p_tmr_exp(struct sock *sk, struct sk_buff *skb);
 extern int llc_conn_ev_ack_tmr_exp(struct sock *sk, struct sk_buff *skb);
 extern int llc_conn_ev_rej_tmr_exp(struct sock *sk, struct sk_buff *skb);
 extern int llc_conn_ev_busy_tmr_exp(struct sock *sk, struct sk_buff *skb);
-extern int llc_conn_ev_any_tmr_exp(struct sock *sk, struct sk_buff *skb);
 extern int llc_conn_ev_sendack_tmr_exp(struct sock *sk, struct sk_buff *skb);
 /* NOT_USED functions and their variations */
 extern int llc_conn_ev_rx_xxx_cmd_pbit_set_1(struct sock *sk,
-					     struct sk_buff *skb);
-extern int llc_conn_ev_rx_xxx_cmd_pbit_set_0(struct sock *sk,
 					     struct sk_buff *skb);
 extern int llc_conn_ev_rx_xxx_rsp_fbit_set_1(struct sock *sk,
 					     struct sk_buff *skb);
@@ -252,20 +246,14 @@ extern int llc_conn_ev_qlfy_cause_flag_eq_1(struct sock *sk,
 					    struct sk_buff *skb);
 extern int llc_conn_ev_qlfy_cause_flag_eq_0(struct sock *sk,
 					    struct sk_buff *skb);
-extern int llc_conn_ev_qlfy_init_p_f_cycle(struct sock *sk,
-					   struct sk_buff *skb);
 extern int llc_conn_ev_qlfy_set_status_conn(struct sock *sk,
 					    struct sk_buff *skb);
 extern int llc_conn_ev_qlfy_set_status_disc(struct sock *sk,
 					    struct sk_buff *skb);
 extern int llc_conn_ev_qlfy_set_status_failed(struct sock *sk,
 					      struct sk_buff *skb);
-extern int llc_conn_ev_qlfy_set_status_impossible(struct sock *sk,
-						  struct sk_buff *skb);
 extern int llc_conn_ev_qlfy_set_status_remote_busy(struct sock *sk,
 						  struct sk_buff *skb);
-extern int llc_conn_ev_qlfy_set_status_received(struct sock *sk,
-						struct sk_buff *skb);
 extern int llc_conn_ev_qlfy_set_status_refuse(struct sock *sk,
 					      struct sk_buff *skb);
 extern int llc_conn_ev_qlfy_set_status_conflict(struct sock *sk,

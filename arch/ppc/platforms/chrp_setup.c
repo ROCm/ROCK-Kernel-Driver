@@ -118,13 +118,12 @@ chrp_show_cpuinfo(struct seq_file *m)
 	if (!strncmp(model, "IBM,LongTrail", 13)) {
 		/* VLSI VAS96011/12 `Golden Gate 2' */
 		/* Memory banks */
-		sdramen = (in_le32((unsigned *)(gg2_pci_config_base+
-						GG2_PCI_DRAM_CTRL))
+		sdramen = (in_le32(gg2_pci_config_base + GG2_PCI_DRAM_CTRL)
 			   >>31) & 1;
 		for (i = 0; i < (sdramen ? 4 : 6); i++) {
-			t = in_le32((unsigned *)(gg2_pci_config_base+
+			t = in_le32(gg2_pci_config_base+
 						 GG2_PCI_DRAM_BANK0+
-						 i*4));
+						 i*4);
 			if (!(t & 1))
 				continue;
 			switch ((t>>8) & 0x1f) {
@@ -154,7 +153,7 @@ chrp_show_cpuinfo(struct seq_file *m)
 				   gg2_memtypes[sdramen ? 1 : ((t>>1) & 3)]);
 		}
 		/* L2 cache */
-		t = in_le32((unsigned *)(gg2_pci_config_base+GG2_PCI_CC_CTRL));
+		t = in_le32(gg2_pci_config_base+GG2_PCI_CC_CTRL);
 		seq_printf(m, "board l2\t: %s %s (%s)\n",
 			   gg2_cachesizes[(t>>7) & 3],
 			   gg2_cachetypes[(t>>2) & 3],

@@ -31,6 +31,9 @@
 static void rose_ftimer_expiry(unsigned long);
 static void rose_t0timer_expiry(unsigned long);
 
+static void rose_transmit_restart_confirmation(struct rose_neigh *neigh);
+static void rose_transmit_restart_request(struct rose_neigh *neigh);
+
 void rose_start_ftimer(struct rose_neigh *neigh)
 {
 	del_timer(&neigh->ftimer);
@@ -42,7 +45,7 @@ void rose_start_ftimer(struct rose_neigh *neigh)
 	add_timer(&neigh->ftimer);
 }
 
-void rose_start_t0timer(struct rose_neigh *neigh)
+static void rose_start_t0timer(struct rose_neigh *neigh)
 {
 	del_timer(&neigh->t0timer);
 
@@ -68,7 +71,7 @@ int rose_ftimer_running(struct rose_neigh *neigh)
 	return timer_pending(&neigh->ftimer);
 }
 
-int rose_t0timer_running(struct rose_neigh *neigh)
+static int rose_t0timer_running(struct rose_neigh *neigh)
 {
 	return timer_pending(&neigh->t0timer);
 }
@@ -165,7 +168,7 @@ void rose_link_rx_restart(struct sk_buff *skb, struct rose_neigh *neigh, unsigne
 /*
  *	This routine is called when a Restart Request is needed
  */
-void rose_transmit_restart_request(struct rose_neigh *neigh)
+static void rose_transmit_restart_request(struct rose_neigh *neigh)
 {
 	struct sk_buff *skb;
 	unsigned char *dptr;
@@ -194,7 +197,7 @@ void rose_transmit_restart_request(struct rose_neigh *neigh)
 /*
  * This routine is called when a Restart Confirmation is needed
  */
-void rose_transmit_restart_confirmation(struct rose_neigh *neigh)
+static void rose_transmit_restart_confirmation(struct rose_neigh *neigh)
 {
 	struct sk_buff *skb;
 	unsigned char *dptr;
@@ -213,34 +216,6 @@ void rose_transmit_restart_confirmation(struct rose_neigh *neigh)
 	*dptr++ = ROSE_GFI;
 	*dptr++ = 0x00;
 	*dptr++ = ROSE_RESTART_CONFIRMATION;
-
-	if (!rose_send_frame(skb, neigh))
-		kfree_skb(skb);
-}
-
-/*
- * This routine is called when a Diagnostic is required.
- */
-void rose_transmit_diagnostic(struct rose_neigh *neigh, unsigned char diag)
-{
-	struct sk_buff *skb;
-	unsigned char *dptr;
-	int len;
-
-	len = AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN + ROSE_MIN_LEN + 2;
-
-	if ((skb = alloc_skb(len, GFP_ATOMIC)) == NULL)
-		return;
-
-	skb_reserve(skb, AX25_BPQ_HEADER_LEN + AX25_MAX_HEADER_LEN);
-
-	dptr = skb_put(skb, ROSE_MIN_LEN + 2);
-
-	*dptr++ = AX25_P_ROSE;
-	*dptr++ = ROSE_GFI;
-	*dptr++ = 0x00;
-	*dptr++ = ROSE_DIAGNOSTIC;
-	*dptr++ = diag;
 
 	if (!rose_send_frame(skb, neigh))
 		kfree_skb(skb);

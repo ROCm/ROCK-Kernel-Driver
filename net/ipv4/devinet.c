@@ -380,7 +380,7 @@ struct in_ifaddr *inet_ifa_byprefix(struct in_device *in_dev, u32 prefix,
 	return NULL;
 }
 
-int inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
+static int inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 {
 	struct rtattr **rta = arg;
 	struct in_device *in_dev;
@@ -412,7 +412,7 @@ out:
 	return -EADDRNOTAVAIL;
 }
 
-int inet_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
+static int inet_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 {
 	struct rtattr **rta = arg;
 	struct net_device *dev;

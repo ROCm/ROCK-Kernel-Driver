@@ -121,26 +121,6 @@ int ax25cmp(ax25_address *a, ax25_address *b)
 }
 
 /*
- *	Compare two AX.25 digipeater paths.
- */
-int ax25digicmp(ax25_digi *digi1, ax25_digi *digi2)
-{
-	int i;
-
-	if (digi1->ndigi != digi2->ndigi)
-		return 1;
-
-	if (digi1->lastrepeat != digi2->lastrepeat)
-		return 1;
-
-	for (i = 0; i < digi1->ndigi; i++)
-		if (ax25cmp(&digi1->calls[i], &digi2->calls[i]) != 0)
-			return 1;
-
-	return 0;
-}
-
-/*
  *	Given an AX.25 address pull of to, from, digi list, command/response and the start of data
  *
  */
