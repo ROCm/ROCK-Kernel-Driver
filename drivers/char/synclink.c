@@ -327,7 +327,6 @@ struct mgsl_struct {
 	char netname[10];
 	struct net_device *netdev;
 	struct net_device_stats netstats;
-	struct net_device netdevice;
 #endif
 };
 
@@ -737,8 +736,8 @@ int mgsl_ioctl_common(struct mgsl_struct *info, unsigned int cmd, unsigned long 
 
 #ifdef CONFIG_SYNCLINK_SYNCPPP
 /* SPPP/HDLC stuff */
-void mgsl_sppp_init(struct mgsl_struct *info);
-void mgsl_sppp_delete(struct mgsl_struct *info);
+static void mgsl_sppp_init(struct mgsl_struct *info);
+static void mgsl_sppp_delete(struct mgsl_struct *info);
 int mgsl_sppp_open(struct net_device *d);
 int mgsl_sppp_close(struct net_device *d);
 void mgsl_sppp_tx_timeout(struct net_device *d);
@@ -7820,36 +7819,45 @@ int usc_loopmode_send_active( struct mgsl_struct * info )
 #ifdef CONFIG_SYNCLINK_SYNCPPP
 /* syncppp net device routines
  */
+static void mgsl_setup(struct net_device *dev)
+{
+	dev->open = mgsl_sppp_open;
+	dev->stop = mgsl_sppp_close;
+	dev->hard_start_xmit = mgsl_sppp_tx;
+	dev->do_ioctl = mgsl_sppp_ioctl;
+	dev->get_stats = mgsl_net_stats;
+	dev->tx_timeout = mgsl_sppp_tx_timeout;
+	dev->watchdog_timeo = 10*HZ;
+}
 
-void mgsl_sppp_init(struct mgsl_struct *info)
+static void mgsl_sppp_init(struct mgsl_struct *info)
 {
 	struct net_device *d;
 
 	sprintf(info->netname,"mgsl%d",info->line);
 
+	d = alloc_netdev(0, info->netname, mgsl_setup);
+	if (!d) {
+		printk(KERN_WARNING "%s: alloc_netdev failed.\n",
+						info->netname);
+		return;
+	}
+
 	info->if_ptr = &info->pppdev;
-	info->netdev = info->pppdev.dev = &info->netdevice;
+	info->netdev = info->pppdev.dev = d;
 
 	sppp_attach(&info->pppdev);
 
-	d = info->netdev;
-	strcpy(d->name,info->netname);
 	d->base_addr = info->io_base;
 	d->irq = info->irq_level;
 	d->dma = info->dma_level;
 	d->priv = info;
-	d->init = NULL;
-	d->open = mgsl_sppp_open;
-	d->stop = mgsl_sppp_close;
-	d->hard_start_xmit = mgsl_sppp_tx;
-	d->do_ioctl = mgsl_sppp_ioctl;
-	d->get_stats = mgsl_net_stats;
-	d->tx_timeout = mgsl_sppp_tx_timeout;
-	d->watchdog_timeo = 10*HZ;
 
 	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(info->netdev);
+		info->netdev = NULL;
+		free_netdev(d);
 		return;
 	}
 
@@ -7861,8 +7869,11 @@ void mgsl_sppp_delete(struct mgsl_struct *info)
 {
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("mgsl_sppp_delete(%s)\n",info->netname);	
-	sppp_detach(info->netdev);
 	unregister_netdev(info->netdev);
+	sppp_detach(info->netdev);
+	free_netdev(info->netdev);
+	info->netdev = NULL;
+	info->pppdev.dev = NULL;
 }
 
 int mgsl_sppp_open(struct net_device *d)
