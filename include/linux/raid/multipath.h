@@ -49,14 +49,9 @@ struct multipath_bh {
 					    * used from IRQ handlers
 					    */
 	int			cmd;
-	unsigned long		state;
 	mddev_t			*mddev;
 	struct bio		*master_bio;
 	struct bio		*bio;
 	struct multipath_bh	*next_mp; /* next for retry or in free list */
 };
-/* bits for multipath_bh.state */
-#define	MPBH_Uptodate	1
-#define	MPBH_SyncPhase	2
-#define	MPBH_PreAlloc	3	/* this was pre-allocated, add to free list */
 #endif

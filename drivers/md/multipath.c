@@ -130,24 +130,6 @@ void multipath_end_request(struct bio *bio)
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 	struct multipath_bh * mp_bh = (struct multipath_bh *)(bio->bi_private);
 
-	/*
-	 * this branch is our 'one multipath IO has finished' event handler:
-	 */
-	if (!uptodate)
-		md_error (mp_bh->mddev, bio->bi_bdev);
-	else
-		/*
-		 * Set MPBH_Uptodate in our master buffer_head, so that
-		 * we will return a good error code for to the higher
-		 * levels even if IO on some other multipathed buffer fails.
-		 *
-		 * The 'master' represents the complex operation to 
-		 * user-side. So if something waits for IO, then it will
-		 * wait for the 'master' buffer_head.
-		 */
-		set_bit (MPBH_Uptodate, &mp_bh->state);
-
-		
 	if (uptodate) {
 		multipath_end_bh_io(mp_bh, uptodate);
 		return;
@@ -155,6 +137,7 @@ void multipath_end_request(struct bio *bio)
 	/*
 	 * oops, IO error:
 	 */
+	md_error (mp_bh->mddev, bio->bi_bdev);
 	printk(KERN_ERR "multipath: %s: rescheduling sector %lu\n", 
 		 bdev_partition_name(bio->bi_bdev), bio->bi_sector);
 	multipath_reschedule_retry(mp_bh);
