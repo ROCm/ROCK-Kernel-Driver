@@ -110,8 +110,8 @@ int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
 		snd_printk(KERN_ERR  "BUG: stream = %i, pos = 0x%lx, buffer size = 0x%lx, period size = 0x%lx\n", substream->stream, pos, runtime->buffer_size, runtime->period_size);
 	} else
 #endif
-	snd_runtime_check(pos <= runtime->buffer_size, return 0);
-	  
+	snd_runtime_check(pos < runtime->buffer_size, return 0);
+
 	pos -= pos % runtime->min_align;
 	new_hw_ptr = runtime->hw_ptr_base + pos;
 
@@ -176,8 +176,8 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 		snd_printk(KERN_ERR "BUG: stream = %i, pos = 0x%lx, buffer size = 0x%lx, period size = 0x%lx\n", substream->stream, pos, runtime->buffer_size, runtime->period_size);
 	} else
 #endif
-	snd_runtime_check(pos <= runtime->buffer_size, return 0);
-	  
+	snd_runtime_check(pos < runtime->buffer_size, return 0);
+
 	pos -= pos % runtime->min_align;
 	new_hw_ptr = runtime->hw_ptr_base + pos;
 

@@ -283,6 +283,8 @@ static int snd_seq_device_dev_disconnect(snd_device_t *device)
 		return -ENOENT;
 
 	free_device(dev, ops);
+
+	unlock_driver(ops);
 	return 0;
 }
 

@@ -140,7 +140,6 @@ typedef struct _pcm_channel_descriptor_t {
 	dsp_scb_descriptor_t * pcm_reader_scb;
 	dsp_scb_descriptor_t * src_scb;
 	dsp_scb_descriptor_t * mixer_scb;
-	int pcm_channel_id;
 
 	void * private_data;
 } pcm_channel_descriptor_t;

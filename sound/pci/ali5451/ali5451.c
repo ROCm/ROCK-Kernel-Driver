@@ -1210,59 +1210,64 @@ static int snd_ali_trigger(snd_pcm_substream_t *substream,
 	unsigned int what, whati, capture_flag;
 	snd_ali_voice_t *pvoice = NULL, *evoice = NULL;
 	unsigned int val;
+	int do_start;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
+		do_start = 1; break;
 	case SNDRV_PCM_TRIGGER_STOP:
-	{
-		what = whati = capture_flag = 0;
-		s = substream;
-		do {
-			if ((ali_t *) _snd_pcm_chip(s->pcm) == codec) {
-				pvoice = (snd_ali_voice_t *) s->runtime->private_data;
-				evoice = pvoice->extra;
-				what |= 1 << (pvoice->number & 0x1f);
-				if (evoice == NULL) {
-					whati |= 1 << (pvoice->number & 0x1f);
-				} else {
-					whati |= 1 << (evoice->number & 0x1f);
-					what |= 1 << (evoice->number & 0x1f);
-				}
-				if (cmd == SNDRV_PCM_TRIGGER_START) {
-					pvoice->running = 1;
-					if (evoice != NULL)
-						evoice->running = 1;
-				}
-				snd_pcm_trigger_done(s, substream);
-				if (pvoice->mode)
-					capture_flag = 1;
-			}
-			s = s->link_next;
-		} while (s != substream);
-		spin_lock(&codec->reg_lock);
-		if (cmd == SNDRV_PCM_TRIGGER_STOP) {
-			outl(what, ALI_REG(codec, ALI_STOP));
-			pvoice->running = 0;
-			if (evoice != NULL)
-				evoice->running = 0;
-		}
-		val = inl(ALI_REG(codec, ALI_AINTEN));
-		if (cmd == SNDRV_PCM_TRIGGER_START) {
-			val |= whati;
-		} else {
-			val &= ~whati;
-		}
-		outl(val, ALI_REG(codec, ALI_AINTEN));
-		if (cmd == SNDRV_PCM_TRIGGER_START) {
-			outl(what, ALI_REG(codec, ALI_START));
-		}
-		snd_ali_printk("trigger: what=%xh whati=%xh\n",what,whati);
-		spin_unlock(&codec->reg_lock);
-		break;
-	}
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+		do_start = 0; break;
 	default:
 		return -EINVAL;
 	}
+
+	what = whati = capture_flag = 0;
+	s = substream;
+	do {
+		if ((ali_t *) _snd_pcm_chip(s->pcm) == codec) {
+			pvoice = (snd_ali_voice_t *) s->runtime->private_data;
+			evoice = pvoice->extra;
+			what |= 1 << (pvoice->number & 0x1f);
+			if (evoice == NULL) {
+				whati |= 1 << (pvoice->number & 0x1f);
+			} else {
+				whati |= 1 << (evoice->number & 0x1f);
+				what |= 1 << (evoice->number & 0x1f);
+			}
+			if (do_start) {
+				pvoice->running = 1;
+				if (evoice != NULL)
+					evoice->running = 1;
+			} else {
+				pvoice->running = 0;
+				if (evoice != NULL)
+					evoice->running = 0;
+			}
+			snd_pcm_trigger_done(s, substream);
+			if (pvoice->mode)
+				capture_flag = 1;
+		}
+		s = s->link_next;
+	} while (s != substream);
+	spin_lock(&codec->reg_lock);
+	if (! do_start) {
+		outl(what, ALI_REG(codec, ALI_STOP));
+	}
+	val = inl(ALI_REG(codec, ALI_AINTEN));
+	if (do_start) {
+		val |= whati;
+	} else {
+		val &= ~whati;
+	}
+	outl(val, ALI_REG(codec, ALI_AINTEN));
+	if (do_start) {
+		outl(what, ALI_REG(codec, ALI_START));
+	}
+	snd_ali_printk("trigger: what=%xh whati=%xh\n",what,whati);
+	spin_unlock(&codec->reg_lock);
+
 	return 0;
 }
 
@@ -1544,7 +1549,9 @@ static snd_pcm_hardware_t snd_ali_playback =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
-				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
+				 SNDRV_PCM_INFO_MMAP_VALID |
+				 SNDRV_PCM_INFO_RESUME |
+				 SNDRV_PCM_INFO_SYNC_START),
 	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE),
 	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,
@@ -1568,7 +1575,9 @@ static snd_pcm_hardware_t snd_ali_capture =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
-				 SNDRV_PCM_INFO_MMAP_VALID | SNDRV_PCM_INFO_SYNC_START),
+				 SNDRV_PCM_INFO_MMAP_VALID |
+				 SNDRV_PCM_INFO_RESUME |
+				 SNDRV_PCM_INFO_SYNC_START),
 	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE |
 				 SNDRV_PCM_FMTBIT_S8 | SNDRV_PCM_FMTBIT_U16_LE),
 	.rates =		SNDRV_PCM_RATE_CONTINUOUS | SNDRV_PCM_RATE_8000_48000,

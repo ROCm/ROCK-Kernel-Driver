@@ -475,6 +475,20 @@
 		}
 	}
 },
+{
+	USB_DEVICE(0x0582, 0x0033),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "EDIROL",
+		.product_name = "PCR",
+		.ifnum = 0,
+		.type = QUIRK_MIDI_FIXED_ENDPOINT,
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.epnum = -1,
+			.out_cables = 0x0003,
+			.in_cables  = 0x0007
+		}
+	}
+},
 
 /* Midiman/M-Audio devices */
 {
@@ -484,7 +498,10 @@
 		.product_name = "MidiSport 2x2",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_MIDI_MIDIMAN,
-		.data = (void*) 2
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.out_cables = 0x0003,
+			.in_cables  = 0x0003
+		}
 	}
 },
 {
@@ -494,7 +511,10 @@
 		.product_name = "MidiSport 1x1",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_MIDI_MIDIMAN,
-		.data = (void*) 1
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.out_cables = 0x0001,
+			.in_cables  = 0x0001
+		}
 	}
 },
 {
@@ -504,7 +524,10 @@
 		.product_name = "Keystation",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_MIDI_MIDIMAN,
-		.data = (void*) 1
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.out_cables = 0x0001,
+			.in_cables  = 0x0001
+		}
 	}
 },
 {
@@ -514,7 +537,10 @@
 		.product_name = "MidiSport 4x4",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_MIDI_MIDIMAN,
-		.data = (void*) 4
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.out_cables = 0x000f,
+			.in_cables  = 0x000f
+		}
 	}
 },
 {
@@ -524,7 +550,23 @@
 		.product_name = "MidiSport 8x8",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_MIDI_MIDIMAN,
-		.data = (void*) 9
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.out_cables = 0x01ff,
+			.in_cables  = 0x01ff
+		}
+	}
+},
+{
+	USB_DEVICE_VENDOR_SPEC(0x0763, 0x1041),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "M-Audio",
+		.product_name = "MidiSport 2x4",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_MIDI_MIDIMAN,
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.out_cables = 0x000f,
+			.in_cables  = 0x0003
+		}
 	}
 },
 {
@@ -534,7 +576,10 @@
 		.product_name = "Quattro",
 		.ifnum = 9,
 		.type = QUIRK_MIDI_MIDIMAN,
-		.data = (void*) 1
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.out_cables = 0x0001,
+			.in_cables  = 0x0001
+		}
 	}
 },
 {
@@ -544,7 +589,10 @@
 		.product_name = "AudioPhile",
 		.ifnum = 9,
 		.type = QUIRK_MIDI_MIDIMAN,
-		.data = (void*) 1
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.out_cables = 0x0001,
+			.in_cables  = 0x0001
+		}
 	}
 },
 

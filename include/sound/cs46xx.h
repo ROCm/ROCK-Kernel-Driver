@@ -1663,6 +1663,8 @@ typedef struct _snd_cs46xx_pcm_t {
 	snd_pcm_substream_t *substream;
 
 	pcm_channel_descriptor_t * pcm_channel;
+
+	int pcm_channel_id;    /* Fron Rear, Center Lfe  ... */
 } cs46xx_pcm_t;
 
 typedef struct {

@@ -444,8 +444,7 @@ static int snd_es18xx_playback_hw_params(snd_pcm_substream_t * substream,
 	if (snd_pcm_format_width(params_format(hw_params)) == 16)
 		shift++;
 
-	switch (substream->number) {
-	case 0:
+	if (substream->number == 0 && (chip->caps & ES18XX_PCM2)) {
 		if ((chip->caps & ES18XX_DUPLEX_MONO) &&
 		    (chip->capture_a_substream) &&
 		    params_channels(hw_params) != 1) {
@@ -453,10 +452,8 @@ static int snd_es18xx_playback_hw_params(snd_pcm_substream_t * substream,
 			return -EBUSY;
 		}
 		chip->dma2_shift = shift;
-		break;
-	case 1:
+	} else {
 		chip->dma1_shift = shift;
-		break;
 	}
 	if ((err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params))) < 0)
 		return err;
@@ -495,19 +492,12 @@ static int snd_es18xx_playback1_trigger(es18xx_t *chip,
 					snd_pcm_substream_t * substream,
 					int cmd)
 {
-        if (cmd == SNDRV_PCM_TRIGGER_START) {
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
 		if (chip->active & DAC2)
 			return 0;
 		chip->active |= DAC2;
-	} else if (cmd == SNDRV_PCM_TRIGGER_STOP) {
-		if (!(chip->active & DAC2))
-			return 0;
-		chip->active &= ~DAC2;
-	} else {
-		return -EINVAL;
-	}
-
-	if (cmd == SNDRV_PCM_TRIGGER_START) {	
                 /* Start DMA */
 		if (chip->dma2 >= 4)
 			snd_es18xx_mixer_write(chip, 0x78, 0xb3);
@@ -523,8 +513,12 @@ static int snd_es18xx_playback1_trigger(es18xx_t *chip,
 			/* Enable PCM output */
 			snd_es18xx_dsp_command(chip, 0xD1);
 #endif
-        }
-        else {
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+		if (!(chip->active & DAC2))
+			return 0;
+		chip->active &= ~DAC2;
                 /* Stop DMA */
                 snd_es18xx_mixer_write(chip, 0x78, 0x00);
 #ifdef AVOID_POPS
@@ -536,7 +530,10 @@ static int snd_es18xx_playback1_trigger(es18xx_t *chip,
 			/* Disable PCM output */
 			snd_es18xx_dsp_command(chip, 0xD3);
 #endif
-        }
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -608,24 +605,27 @@ static int snd_es18xx_capture_trigger(snd_pcm_substream_t *substream,
 {
         es18xx_t *chip = snd_pcm_substream_chip(substream);
 
-        if (cmd == SNDRV_PCM_TRIGGER_START) {
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
 		if (chip->active & ADC1)
 			return 0;
 		chip->active |= ADC1;
-	} else if (cmd == SNDRV_PCM_TRIGGER_STOP) {
+                /* Start DMA */
+                snd_es18xx_write(chip, 0xB8, 0x0f);
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
 		if (!(chip->active & ADC1))
 			return 0;
 		chip->active &= ~ADC1;
-	} else {
+                /* Stop DMA */
+                snd_es18xx_write(chip, 0xB8, 0x00);
+		break;
+	default:
 		return -EINVAL;
 	}
 
-	if (cmd == SNDRV_PCM_TRIGGER_START)
-                /* Start DMA */
-                snd_es18xx_write(chip, 0xB8, 0x0f);
-        else
-                /* Stop DMA */
-                snd_es18xx_write(chip, 0xB8, 0x00);
 	return 0;
 }
 
@@ -670,19 +670,12 @@ static int snd_es18xx_playback2_trigger(es18xx_t *chip,
 					snd_pcm_substream_t *substream,
 					int cmd)
 {
-        if (cmd == SNDRV_PCM_TRIGGER_START) {
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
 		if (chip->active & DAC1)
 			return 0;
 		chip->active |= DAC1;
-        } else if (cmd == SNDRV_PCM_TRIGGER_STOP) {
-		if (!(chip->active & DAC1))
-			return 0;
-		chip->active &= ~DAC1;
-	} else {
-		return -EINVAL;
-	}
-
-	if (cmd == SNDRV_PCM_TRIGGER_START) {
                 /* Start DMA */
                 snd_es18xx_write(chip, 0xB8, 0x05);
 #ifdef AVOID_POPS
@@ -691,8 +684,12 @@ static int snd_es18xx_playback2_trigger(es18xx_t *chip,
                 /* Enable Audio 1 */
                 snd_es18xx_dsp_command(chip, 0xD1);
 #endif
-        }
-        else {
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+		if (!(chip->active & DAC1))
+			return 0;
+		chip->active &= ~DAC1;
                 /* Stop DMA */
                 snd_es18xx_write(chip, 0xB8, 0x00);
 #ifdef AVOID_POPS
@@ -701,33 +698,31 @@ static int snd_es18xx_playback2_trigger(es18xx_t *chip,
                 /* Disable Audio 1 */
                 snd_es18xx_dsp_command(chip, 0xD3);
 #endif
-        }
+		break;
+	default:
+		return -EINVAL;
+	}
+
 	return 0;
 }
 
 static int snd_es18xx_playback_prepare(snd_pcm_substream_t *substream)
 {
         es18xx_t *chip = snd_pcm_substream_chip(substream);
-	switch (substream->number) {
-	case 0:
+	if (substream->number == 0 && (chip->caps & ES18XX_PCM2))
 		return snd_es18xx_playback1_prepare(chip, substream);
-	case 1:
+	else
 		return snd_es18xx_playback2_prepare(chip, substream);
-	}
-	return -EINVAL;
 }
 
 static int snd_es18xx_playback_trigger(snd_pcm_substream_t *substream,
 				       int cmd)
 {
         es18xx_t *chip = snd_pcm_substream_chip(substream);
-	switch (substream->number) {
-	case 0:
+	if (substream->number == 0 && (chip->caps & ES18XX_PCM2))
 		return snd_es18xx_playback1_trigger(chip, substream, cmd);
-	case 1:
+	else
 		return snd_es18xx_playback2_trigger(chip, substream, cmd);
-	}
-	return -EINVAL;
 }
 
 static void snd_es18xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -798,19 +793,17 @@ static snd_pcm_uframes_t snd_es18xx_playback_pointer(snd_pcm_substream_t * subst
         es18xx_t *chip = snd_pcm_substream_chip(substream);
 	int pos;
 
-	switch (substream->number) {
-	case 0:
+	if (substream->number == 0 && (chip->caps & ES18XX_PCM2)) {
 		if (!(chip->active & DAC2))
 			return 0;
 		pos = chip->dma2_size - snd_dma_residue(chip->dma2);
 		return pos >> chip->dma2_shift;
-	case 1:
+	} else {
 		if (!(chip->active & DAC1))
 			return 0;
 		pos = chip->dma1_size - snd_dma_residue(chip->dma1);
 		return pos >> chip->dma1_shift;
 	}
-	return 0;
 }
 
 static snd_pcm_uframes_t snd_es18xx_capture_pointer(snd_pcm_substream_t * substream)
@@ -827,6 +820,7 @@ static snd_pcm_uframes_t snd_es18xx_capture_pointer(snd_pcm_substream_t * substr
 static snd_pcm_hardware_t snd_es18xx_playback =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+				 SNDRV_PCM_INFO_RESUME |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 | 
 				 SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_U16_LE),
@@ -846,6 +840,7 @@ static snd_pcm_hardware_t snd_es18xx_playback =
 static snd_pcm_hardware_t snd_es18xx_capture =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+				 SNDRV_PCM_INFO_RESUME |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =		(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 | 
 				 SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_U16_LE),
@@ -867,20 +862,17 @@ static int snd_es18xx_playback_open(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
         es18xx_t *chip = snd_pcm_substream_chip(substream);
 
-	switch (substream->number) {
-	case 0:
+	if (substream->number == 0 && (chip->caps & ES18XX_PCM2)) {
 		if ((chip->caps & ES18XX_DUPLEX_MONO) &&
 		    chip->capture_a_substream && 
 		    chip->capture_a_substream->runtime->channels != 1)
 			return -EAGAIN;
 		chip->playback_a_substream = substream;
-		break;
-	case 1:
+	} else if (substream->number <= 1) {
 		if (chip->capture_a_substream)
 			return -EAGAIN;
 		chip->playback_b_substream = substream;
-		break;
-	default:
+	} else {
 		snd_BUG();
 		return -EINVAL;
 	}
@@ -912,17 +904,10 @@ static int snd_es18xx_playback_close(snd_pcm_substream_t * substream)
 {
         es18xx_t *chip = snd_pcm_substream_chip(substream);
 
-	switch (substream->number) {
-	case 0:
+	if (substream->number == 0 && (chip->caps & ES18XX_PCM2))
 		chip->playback_a_substream = NULL;
-		break;
-	case 1:
+	else
 		chip->playback_b_substream = NULL;
-		break;
-	default:
-		snd_BUG();
-		return -EINVAL;
-	}
 	
 	snd_pcm_lib_free_pages(substream);
 	return 0;
@@ -1544,6 +1529,9 @@ static int __init snd_es18xx_probe(es18xx_t *chip)
 
         snd_printd("[0x%lx] ESS%x chip found\n", chip->port, chip->version);
 
+	if (chip->dma1 == chip->dma2)
+		chip->caps &= ~(ES18XX_PCM2 | ES18XX_DUPLEX_SAME);
+
         return snd_es18xx_initialize(chip);
 }
 
@@ -1600,6 +1588,8 @@ int __init snd_es18xx_pcm(es18xx_t *chip, int device, snd_pcm_t ** rpcm)
         pcm->info_flags = 0;
 	if (chip->caps & ES18XX_DUPLEX_SAME)
 		pcm->info_flags |= SNDRV_PCM_INFO_JOINT_DUPLEX;
+	if (! (chip->caps & ES18XX_PCM2))
+		pcm->info_flags |= SNDRV_PCM_INFO_HALF_DUPLEX;
 	sprintf(pcm->name, "ESS AudioDrive ES%x", chip->version);
         chip->pcm = pcm;
 
@@ -1709,7 +1699,7 @@ static int snd_es18xx_free(es18xx_t *chip)
 		disable_dma(chip->dma1);
 		free_dma(chip->dma1);
 	}
-	if (chip->dma2 >= 0) {
+	if (chip->dma2 >= 0 && chip->dma1 != chip->dma2) {
 		disable_dma(chip->dma2);
 		free_dma(chip->dma2);
 	}
@@ -1773,7 +1763,7 @@ static int __init snd_es18xx_new_device(snd_card_t * card,
 	}
 	chip->dma1 = dma1;
 
-	if (request_dma(dma2, "ES18xx DMA 2")) {
+	if (dma2 != dma1 && request_dma(dma2, "ES18xx DMA 2")) {
 		snd_es18xx_free(chip);
 		printk(KERN_ERR PFX "unable to grap DMA2 %d\n", dma2);
 		return -EBUSY;
@@ -2181,10 +2171,16 @@ static int __init snd_audiodrive_probe(int dev)
 #endif
 	sprintf(card->driver, "ES%x", chip->version);
 	sprintf(card->shortname, "ESS AudioDrive ES%x", chip->version);
-	sprintf(card->longname, "%s at 0x%lx, irq %d, dma1 %d, dma2 %d",
-		card->shortname,
-		chip->port,
-		xirq, xdma1, xdma2);
+	if (xdma1 != xdma2)
+		sprintf(card->longname, "%s at 0x%lx, irq %d, dma1 %d, dma2 %d",
+			card->shortname,
+			chip->port,
+			xirq, xdma1, xdma2);
+	else
+		sprintf(card->longname, "%s at 0x%lx, irq %d, dma %d",
+			card->shortname,
+			chip->port,
+			xirq, xdma1);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;

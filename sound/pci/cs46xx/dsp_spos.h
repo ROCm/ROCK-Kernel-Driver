@@ -197,7 +197,7 @@ static inline u8 _wrap_all_bits (u8 val) {
 		((val & 0x10) >> 1) |
 		((val & 0x20) >> 3) |
 		((val & 0x40) >> 5) |
-		((val & 0x80) >> 6);
+		((val & 0x80) >> 7);
 
 	return wrapped;
 

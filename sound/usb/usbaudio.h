@@ -172,7 +172,8 @@ struct snd_usb_midi_endpoint_info {
 
 /* for QUIRK_MIDI_YAMAHA, data is NULL */
 
-/* for QUIRK_MIDI_MIDIMAN, data is the number of ports */
+/* for QUIRK_MIDI_MIDIMAN, data points to a snd_usb_midi_endpoint_info
+ * structure (out_cables and in_cables only) */
 
 /* for QUIRK_ROLAND_UA100, data is NULL */
 

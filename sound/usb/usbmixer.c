@@ -81,8 +81,7 @@ struct usb_mixer_elem_info {
 	int channels;
 	int val_type;
 	int min, max, res;
-	unsigned int initialized: 1,
-		     hack_hole1: 1;		/* -256 value is missing */
+	unsigned int initialized: 1;
 };
 
 
@@ -281,17 +280,20 @@ static int get_ctl_value(usb_mixer_elem_info_t *cval, int request, int validx, i
 {
 	unsigned char buf[2];
 	int val_len = cval->val_type >= USB_MIXER_S16 ? 2 : 1;
+	int timeout = 10;
  
-	if (usb_control_msg(cval->chip->dev, usb_rcvctrlpipe(cval->chip->dev, 0),
-			    request,
-			    USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_IN,
-			    validx, cval->ctrlif | (cval->id << 8),
-			    buf, val_len, HZ) < 0) {
-		snd_printdd(KERN_ERR "cannot get ctl value: req = 0x%x, idx = 0x%x, val = 0x%x, type = %d\n", request, validx, cval->ctrlif | (cval->id << 8), cval->val_type);
-		return -EINVAL;
+	while (timeout-- > 0) {
+		if (usb_control_msg(cval->chip->dev, usb_rcvctrlpipe(cval->chip->dev, 0),
+				    request,
+				    USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_IN,
+				    validx, cval->ctrlif | (cval->id << 8),
+				    buf, val_len, HZ / 10) >= 0) {
+			*value_ret = convert_signed_value(cval, snd_usb_combine_bytes(buf, val_len));
+			return 0;
+		}
 	}
-	*value_ret = convert_signed_value(cval, snd_usb_combine_bytes(buf, val_len));
-	return 0;
+	snd_printdd(KERN_ERR "cannot get ctl value: req = 0x%x, idx = 0x%x, val = 0x%x, type = %d\n", request, validx, cval->ctrlif | (cval->id << 8), cval->val_type);
+	return -EINVAL;
 }
 
 static int get_cur_ctl_value(usb_mixer_elem_info_t *cval, int validx, int *value)
@@ -313,15 +315,19 @@ static int set_ctl_value(usb_mixer_elem_info_t *cval, int request, int validx, i
 {
 	unsigned char buf[2];
 	int val_len = cval->val_type >= USB_MIXER_S16 ? 2 : 1;
+	int timeout = 10;
  
 	value_set = convert_bytes_value(cval, value_set);
 	buf[0] = value_set & 0xff;
 	buf[1] = (value_set >> 8) & 0xff;
-	return usb_control_msg(cval->chip->dev, usb_sndctrlpipe(cval->chip->dev, 0),
-			       request,
-			       USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_OUT,
-			       validx, cval->ctrlif | (cval->id << 8),
-			       buf, val_len, HZ);
+	while (timeout -- > 0)
+		if (usb_control_msg(cval->chip->dev, usb_sndctrlpipe(cval->chip->dev, 0),
+				    request,
+				    USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_OUT,
+				    validx, cval->ctrlif | (cval->id << 8),
+				    buf, val_len, HZ / 10) >= 0)
+			return 0;
+	return -EINVAL;
 }
 
 static int set_cur_ctl_value(usb_mixer_elem_info_t *cval, int validx, int value)
