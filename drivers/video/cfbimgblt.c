@@ -107,12 +107,11 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 				dst++;
 			}
 		
-			if (n) {	
+			if (n) {
+				end_mask = 0;	
 				for (j = n; j > 0; j--) {
-					end_mask = 0;
-	
 					if (test_bit(l, src))
-						end_mask |= (tmp >> (p->var.bits_per_pixel*(k-1)));
+						end_mask |= (tmp >> (p->var.bits_per_pixel*(j-1)));
 					l--;
 					if (l < 0) { l = 7; src++; }
 				}
@@ -125,9 +124,6 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 	} else {
 		/* Draw the penguin */
 		n = ((image->width * p->var.bits_per_pixel) >> 3);
-		//shift = ((unsigned long) dst1 & (bpl -1));		
 		end_mask = 0;
-	
-	//	n = n/bpl;
 	}
 }

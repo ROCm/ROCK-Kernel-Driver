@@ -1659,7 +1659,7 @@ aty128_init(struct fb_info_aty128 *info, const char *name)
 {
     struct fb_var_screeninfo var;
     u32 dac;
-    int j, k;
+    int j, k, size;
     u8 chip_rev;
     const struct aty128_chip_info *aci = &aty128_pci_probe_list[0];
     char *video_card = "Rage128";
@@ -1771,6 +1771,9 @@ aty128_init(struct fb_info_aty128 *info, const char *name)
     aty128_init_engine(&info->default_par, info);
 
     board_list = aty128_board_list_add(board_list, info);
+
+    size = (fb_display[con].var.bits_per_pixel <= 8) ? 256 : 32;
+    fb_alloc_cmap(info->fb_info.cmap, size, 0);	
 
     if (register_framebuffer(&info->fb_info) < 0)
 	return 0;
