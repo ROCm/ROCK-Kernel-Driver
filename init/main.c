@@ -638,7 +638,7 @@ static void free_initmem_on_exec(void)
 	int fd[2]; 
 
 	do_pipe(fd);
-	kernel_thread(free_initmem_on_exec_helper, &fd, 0);
+	kernel_thread(free_initmem_on_exec_helper, &fd, SIGCHLD);
 
 	sys_dup2(fd[1], 255);   /* to get it out of the way */
 	sys_close(fd[0]);
