@@ -717,8 +717,17 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 		 */
 		if ((regs->xcs & 3) == 0)
 			goto clear_TF_reenable;
-		if ((tsk->ptrace & (PT_DTRACE|PT_PTRACED)) == PT_DTRACE)
-			goto clear_TF;
+
+		/*
+		 * Was the TF flag set by a debugger? If so, clear it now,
+		 * so that register information is correct.
+		 */
+		if (tsk->ptrace & PT_DTRACE) {
+			regs->eflags &= ~TF_MASK;
+			tsk->ptrace &= ~PT_DTRACE;
+			if (!tsk->ptrace & PT_DTRACE)
+				goto clear_TF;
+		}
 	}
 
 	/* Ok, finally something we can handle */

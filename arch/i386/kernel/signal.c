@@ -270,7 +270,6 @@ setup_sigcontext(struct sigcontext __user *sc, struct _fpstate __user *fpstate,
 		 struct pt_regs *regs, unsigned long mask)
 {
 	int tmp, err = 0;
-	unsigned long eflags;
 
 	tmp = 0;
 	__asm__("movl %%gs,%0" : "=r"(tmp): "0"(tmp));
@@ -292,16 +291,7 @@ setup_sigcontext(struct sigcontext __user *sc, struct _fpstate __user *fpstate,
 	err |= __put_user(current->thread.error_code, &sc->err);
 	err |= __put_user(regs->eip, &sc->eip);
 	err |= __put_user(regs->xcs, (unsigned int __user *)&sc->cs);
-
-	/*
-	 * Iff TF was set because the program is being single-stepped by a
-	 * debugger, don't save that information on the signal stack.. We
-	 * don't want debugging to change state.
-	 */
-	eflags = regs->eflags;
-	if (current->ptrace & PT_DTRACE)
-		eflags &= ~TF_MASK;
-	err |= __put_user(eflags, &sc->eflags);
+	err |= __put_user(regs->eflags, &sc->eflags);
 	err |= __put_user(regs->esp, &sc->esp_at_signal);
 	err |= __put_user(regs->xss, (unsigned int __user *)&sc->ss);
 
@@ -424,11 +414,9 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	 * The tracer may want to single-step inside the
 	 * handler too.
 	 */
-	if (regs->eflags & TF_MASK) {
-		regs->eflags &= ~TF_MASK;
-		if (current->ptrace & PT_DTRACE)
-			ptrace_notify(SIGTRAP);
-	}
+	regs->eflags &= ~TF_MASK;
+	if (test_thread_flag(TIF_SINGLESTEP))
+		ptrace_notify(SIGTRAP);
 
 #if DEBUG_SIG
 	printk("SIG deliver (%s:%d): sp=%p pc=%p ra=%p\n",
@@ -519,11 +507,9 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	 * The tracer may want to single-step inside the
 	 * handler too.
 	 */
-	if (regs->eflags & TF_MASK) {
-		regs->eflags &= ~TF_MASK;
-		if (current->ptrace & PT_DTRACE)
-			ptrace_notify(SIGTRAP);
-	}
+	regs->eflags &= ~TF_MASK;
+	if (test_thread_flag(TIF_SINGLESTEP))
+		ptrace_notify(SIGTRAP);
 
 #if DEBUG_SIG
 	printk("SIG deliver (%s:%d): sp=%p pc=%p ra=%p\n",

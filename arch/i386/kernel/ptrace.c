@@ -42,6 +42,12 @@
  */
 #define EFL_OFFSET ((EFL-2)*4-sizeof(struct pt_regs))
 
+static inline struct pt_regs *get_child_regs(struct task_struct *task)
+{
+	void *stack_top = (void *)task->thread.esp0;
+	return stack_top - sizeof(struct pt_regs);
+}
+
 /*
  * this routine will get a word off of the processes privileged stack. 
  * the offset is how far from the base addr as stored in the TSS.  
@@ -140,22 +146,35 @@ static unsigned long getreg(struct task_struct *child,
 
 static void set_singlestep(struct task_struct *child)
 {
-	long eflags;
+	struct pt_regs *regs = get_child_regs(child);
 
+	/*
+	 * Always set TIF_SINGLESTEP - this guarantees that 
+	 * we single-step system calls etc..  This will also
+	 * cause us to set TF when returning to user mode.
+	 */
 	set_tsk_thread_flag(child, TIF_SINGLESTEP);
-	eflags = get_stack_long(child, EFL_OFFSET);
-	put_stack_long(child, EFL_OFFSET, eflags | TRAP_FLAG);
+
+	/*
+	 * If TF was already set, don't do anything else
+	 */
+	if (regs->eflags & TRAP_FLAG)
+		return;
+
+	/* Set TF on the kernel stack, and set the flag to say so */
+	regs->eflags |= TRAP_FLAG;
 	child->ptrace |= PT_DTRACE;
 }
 
 static void clear_singlestep(struct task_struct *child)
 {
-	if (child->ptrace & PT_DTRACE) {
-		long eflags;
+	/* Always clear TIF_SINGLESTEP... */
+	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 
-		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
-		eflags = get_stack_long(child, EFL_OFFSET);
-		put_stack_long(child, EFL_OFFSET, eflags & ~TRAP_FLAG);
+	/* But touch TF only if it was set by us.. */
+	if (child->ptrace & PT_DTRACE) {
+		struct pt_regs *regs = get_child_regs(child);
+		regs->eflags &= ~TRAP_FLAG;
 		child->ptrace &= ~PT_DTRACE;
 	}
 }
