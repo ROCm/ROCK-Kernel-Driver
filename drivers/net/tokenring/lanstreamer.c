@@ -228,7 +228,6 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
 	int rc = 0;
 	static int card_no=-1;
 	u16 pcr;
-	u8 cls = 0;
 
 #if STREAMER_DEBUG
 	printk("lanstreamer::streamer_init_one, entry pdev %p\n",pdev);
@@ -254,20 +253,28 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
 #endif
 #endif
 
-	if (pci_set_dma_mask(pdev, 0xFFFFFFFF)) {
+	rc = pci_set_dma_mask(pdev, 0xFFFFFFFFULL);
+	if (rc) {
 		printk(KERN_ERR "%s: No suitable PCI mapping available.\n",
 				dev->name);
 		rc = -ENODEV;
 		goto err_out;
 	}
 
-	if (pci_enable_device(pdev)) {
+	rc = pci_enable_device(pdev);
+	if (rc) {
 		printk(KERN_ERR "lanstreamer: unable to enable pci device\n");
 		rc=-EIO;
 		goto err_out;
 	}
 
 	pci_set_master(pdev);
+
+	rc = pci_set_mwi(pdev);
+	if (rc) {
+		printk(KERN_ERR "lanstreamer: unable to enable MWI on pci device\n");
+		goto err_out_disable;
+	}
 
 	pio_start = pci_resource_start(pdev, 0);
 	pio_end = pci_resource_end(pdev, 0);
@@ -290,7 +297,7 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
 		printk(KERN_ERR "lanstreamer: unable to get pci io addr %lx\n",
 			pio_start);
 		rc= -EBUSY;
-		goto err_out;
+		goto err_out_mwi;
 	}
 
 	if (!request_mem_region(mmio_start, mmio_len, "lanstreamer")) {
@@ -341,26 +348,9 @@ static int __devinit streamer_init_one(struct pci_dev *pdev,
 
 	spin_lock_init(&streamer_priv->streamer_lock);
 
-	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cls);
-	cls <<= 2;
-	if (cls != SMP_CACHE_BYTES) {
-		printk(KERN_INFO "  PCI cache line size set incorrectly "
-				"(%i bytes) by BIOS/FW, ", cls);
-		if (cls > SMP_CACHE_BYTES)
-			printk("expecting %i\n", SMP_CACHE_BYTES);
-		else {
-			printk("correcting to %i\n", SMP_CACHE_BYTES);
-			pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE,
-							SMP_CACHE_BYTES >> 2);
-		}
-	}
-
 	pci_read_config_word (pdev, PCI_COMMAND, &pcr);
-
-	pcr |= (PCI_COMMAND_INVALIDATE | PCI_COMMAND_SERR);
-
+	pcr |= PCI_COMMAND_SERR;
 	pci_write_config_word (pdev, PCI_COMMAND, pcr);
-	pci_read_config_word (pdev, PCI_COMMAND, &pcr);
 
 	printk("%s \n", version);
 	printk("%s: %s. I/O at %hx, MMIO at %p, using irq %d\n",dev->name,
@@ -383,8 +373,12 @@ err_out_free_mmio:
 	release_mem_region(mmio_start, mmio_len);
 err_out_free_pio:
 	release_region(pio_start, pio_len);
+err_out_mwi:
+	pci_clear_mwi(pdev);
+err_out_disable:
+	pci_disable_device(pdev);
 err_out:
-	kfree(dev);
+	free_netdev(dev);
 #if STREAMER_DEBUG
 	printk("lanstreamer: Exit error %x\n",rc);
 #endif
@@ -430,9 +424,11 @@ static void __devexit streamer_remove_one(struct pci_dev *pdev)
 #endif
 
 	unregister_netdev(dev);
-	/* shouldn't we do iounmap here? */
-	release_region(pci_resource_start(pdev, 0), pci_resource_len(pdev,0));
+	iounmap(streamer_priv->streamer_mmio);
 	release_mem_region(pci_resource_start(pdev, 1), pci_resource_len(pdev,1));
+	release_region(pci_resource_start(pdev, 0), pci_resource_len(pdev,0));
+	pci_clear_mwi(pdev);
+	pci_disable_device(pdev);
 	free_netdev(dev);
 	pci_set_drvdata(pdev, NULL);
 }

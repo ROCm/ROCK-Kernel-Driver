@@ -136,6 +136,12 @@ struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 	return ret;
 }
 
+void blk_queue_activity_fn(request_queue_t *q, activity_fn *fn, void *data)
+{
+	q->activity_fn = fn;
+	q->activity_data = data;
+}
+
 /**
  * blk_queue_prep_rq - set a prepare_request function for queue
  * @q:		queue
@@ -225,6 +231,8 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
 
 	INIT_LIST_HEAD(&q->plug_list);
+
+	blk_queue_activity_fn(q, NULL, NULL);
 }
 
 /**
@@ -1314,7 +1322,7 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 
 	if (!printed) {
 		printed = 1;
-		printk("Using %s elevator\n", chosen_elevator->elevator_name);
+		printk("Using %s io scheduler\n", chosen_elevator->elevator_name);
 	}
 
 	if (elevator_init(q, chosen_elevator))
@@ -1665,6 +1673,9 @@ static inline void add_request(request_queue_t * q, struct request * req,
 			       struct list_head *insert_here)
 {
 	drive_stat_acct(req, req->nr_sectors, 1);
+
+	if (q->activity_fn)
+		q->activity_fn(q->activity_data, rq_data_dir(req));
 
 	/*
 	 * elevator indicated where it wants this request to be

@@ -1809,10 +1809,6 @@ static int __devinit eni_start(struct atm_dev *dev)
 		    "master (0x%02x)\n",dev->number,error);
 		return error;
 	}
-#ifdef __sparc_v9__ /* copied from drivers/net/sunhme.c */
-	/* NOTE: Cache line size is in 32-bit word units. */
-	pci_write_config_byte(eni_dev->pci_dev, PCI_CACHE_LINE_SIZE, 0x10);
-#endif
 	if ((error = pci_write_config_byte(eni_dev->pci_dev,PCI_TONGA_CTRL,
 	    END_SWAP_DMA))) {
 		printk(KERN_ERR DEV_LABEL "(itf %d): can't set endian swap "
