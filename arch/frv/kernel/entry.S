@@ -1421,11 +1421,11 @@ sys_call_table:
 	.long sys_add_key
 	.long sys_request_key
 	.long sys_keyctl
-	.long sys_vperfctr_open
-	.long sys_vperfctr_control	/* 290 */
-	.long sys_vperfctr_unlink
-	.long sys_vperfctr_iresume
-	.long sys_vperfctr_read
+	.long sys_ni_syscall // sys_vperfctr_open
+	.long sys_ni_syscall // sys_vperfctr_control	/* 290 */
+	.long sys_ni_syscall // sys_vperfctr_unlink
+	.long sys_ni_syscall // sys_vperfctr_iresume
+	.long sys_ni_syscall // sys_vperfctr_read
 
 
 syscall_table_size = (. - sys_call_table)
