@@ -13,6 +13,8 @@
  *  Derived from "arch/alpha/kernel/setup.c"
  *    Copyright (C) 1995 Linus Torvalds
  *
+ *  Maintained by Benjamin Herrenschmidt (benh@kernel.crashing.org)
+ *
  *  This program is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
  *  as published by the Free Software Foundation; either version
@@ -106,9 +108,11 @@ extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
 extern char pckbd_unexpected_up(unsigned char keycode);
 extern int keyboard_sends_linux_keycodes;
 extern void pmac_nvram_update(void);
-
+extern unsigned char pmac_nvram_read_byte(int addr);
+extern void pmac_nvram_write_byte(int addr, unsigned char val);
 extern int pmac_pci_enable_device_hook(struct pci_dev *dev, int initial);
 extern void pmac_pcibios_after_init(void);
+extern int of_show_percpuinfo(struct seq_file *m, int i);
 
 extern kdev_t sd_find_target(void *host, int tgt);
 
@@ -139,48 +143,7 @@ sys_ctrler_t sys_ctrler = SYS_CTRLER_UNKNOWN;
 #ifdef CONFIG_SMP
 extern struct smp_ops_t psurge_smp_ops;
 extern struct smp_ops_t core99_smp_ops;
-
-volatile static long int core99_l2_cache;
-void __init
-core99_init_l2(void)
-{
-	int cpu = smp_processor_id();
-
-	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR))
-		return;
-
-	if (cpu == 0){
-		core99_l2_cache = _get_L2CR();
-		printk("CPU0: L2CR is %lx\n", core99_l2_cache);
-	} else {
-		printk("CPU%d: L2CR was %lx\n", cpu, _get_L2CR());
-		_set_L2CR(0);
-		_set_L2CR(core99_l2_cache);
-		printk("CPU%d: L2CR set to %lx\n", cpu, core99_l2_cache);
-	}
-}
 #endif /* CONFIG_SMP */
-
-/*
- * Assume here that all clock rates are the same in a
- * smp system.  -- Cort
- */
-int __openfirmware
-of_show_percpuinfo(struct seq_file *m, int i)
-{
-	struct device_node *cpu_node;
-	int *fp, s;
-			
-	cpu_node = find_type_devices("cpu");
-	if (!cpu_node)
-		return 0;
-	for (s = 0; s < i && cpu_node->next; s++)
-		cpu_node = cpu_node->next;
-	fp = (int *) get_property(cpu_node, "clock-frequency", NULL);
-	if (fp)
-		seq_printf(m, "clock\t\t: %dMHz\n", *fp / 1000000);
-	return 0;
-}
 
 int __pmac
 pmac_show_cpuinfo(struct seq_file *m)
@@ -188,7 +151,15 @@ pmac_show_cpuinfo(struct seq_file *m)
 	struct device_node *np;
 	char *pp;
 	int plen;
+	int mbmodel = pmac_call_feature(PMAC_FTR_GET_MB_INFO,
+		NULL, PMAC_MB_INFO_MODEL, 0);
+	unsigned int mbflags = (unsigned int)pmac_call_feature(PMAC_FTR_GET_MB_INFO,
+		NULL, PMAC_MB_INFO_FLAGS, 0);
+	char* mbname;
 
+	if (pmac_call_feature(PMAC_FTR_GET_MB_INFO, NULL, PMAC_MB_INFO_NAME, (int)&mbname) != 0)
+		mbname = "Unknown";
+		
 	/* find motherboard type */
 	seq_printf(m, "machine\t\t: ");
 	np = find_devices("device-tree");
@@ -212,6 +183,10 @@ pmac_show_cpuinfo(struct seq_file *m)
 	} else
 		seq_printf(m, "PowerMac\n");
 
+	/* print parsed model */
+	seq_printf(m, "detected as\t: %d (%s)\n", mbmodel, mbname);
+	seq_printf(m, "pmac flags\t: %08x\n", mbflags);
+	
 	/* find l2 cache info */
 	np = find_devices("l2-cache");
 	if (np == 0)
@@ -341,11 +316,6 @@ pmac_setup_arch(void)
 		printk(KERN_INFO "L2CR overriden (0x%x), backside cache is %s\n",
 			ppc_override_l2cr_value, (ppc_override_l2cr_value & 0x80000000)
 				? "enabled" : "disabled");
-
-#ifdef CONFIG_SMP
-	/* somewhat of a hack */
-	core99_init_l2();
-#endif
 	
 #ifdef CONFIG_KGDB
 	zs_kgdb_hook(0);
@@ -419,21 +389,6 @@ void *boot_host;
 int boot_target;
 int boot_part;
 extern kdev_t boot_dev;
-
-void __init
-pmac_init2(void)
-{
-#ifdef CONFIG_ADB_PMU
-	via_pmu_start();
-#endif
-#ifdef CONFIG_ADB_CUDA
-	via_cuda_start();
-#endif
-#ifdef CONFIG_PMAC_PBOOK
-	media_bay_init();
-#endif
-	pmac_feature_late_init();
-}
 
 #ifdef CONFIG_SCSI
 void __init
@@ -736,7 +691,6 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.irq_cannonicalize = NULL;
 	ppc_md.init_IRQ       = pmac_pic_init;
 	ppc_md.get_irq        = pmac_get_irq; /* Changed later on ... */
-	ppc_md.init           = pmac_init2;
 	
 	ppc_md.pcibios_fixup  = pmac_pcibios_fixup;
 	ppc_md.pcibios_enable_device_hook = pmac_pci_enable_device_hook;
@@ -750,6 +704,11 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.set_rtc_time   = pmac_set_rtc_time;
 	ppc_md.get_rtc_time   = pmac_get_rtc_time;
 	ppc_md.calibrate_decr = pmac_calibrate_decr;
+
+#ifdef CONFIG_NVRAM
+	ppc_md.nvram_read_val	= pmac_nvram_read_byte;
+	ppc_md.nvram_write_val	= pmac_nvram_write_byte;
+#endif
 
 	ppc_md.find_end_of_memory = pmac_find_end_of_memory;
 

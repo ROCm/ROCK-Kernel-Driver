@@ -1,6 +1,23 @@
 /*
  * BK Id: %F% %I% %G% %U% %#%
  */
+/*
+ *  Support for the interrupt controllers found on Power Macintosh,
+ *  currently Apple's "Grand Central" interrupt controller in all
+ *  it's incarnations. OpenPIC support used on newer machines is
+ *  in a separate file
+ *
+ *  Copyright (C) 1997 Paul Mackerras (paulus@cs.anu.edu.au)
+ *
+ *  Maintained by Benjamin Herrenschmidt (benh@kernel.crashing.org)
+ *
+ *  This program is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either version
+ *  2 of the License, or (at your option) any later version.
+ *
+ */
+
 #include <linux/config.h>
 #include <linux/stddef.h>
 #include <linux/init.h>

@@ -105,8 +105,140 @@ static int psurge_type;
 #define PSURGE_QUAD_COTTON	2
 #define PSURGE_QUAD_ICEGRASS	3
 
-/* l2 cache stuff for dual G4 macs */
-extern void core99_init_l2(void);
+volatile static long int core99_l2_cache;
+volatile static long int core99_l3_cache;
+
+static void __init
+core99_init_caches(void)
+{
+	int cpu = smp_processor_id();
+
+	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR))
+		return;
+
+	if (cpu == 0){
+		core99_l2_cache = _get_L2CR();
+		printk("CPU0: L2CR is %lx\n", core99_l2_cache);
+	} else {
+		printk("CPU%d: L2CR was %lx\n", cpu, _get_L2CR());
+		_set_L2CR(0);
+		_set_L2CR(core99_l2_cache);
+		printk("CPU%d: L2CR set to %lx\n", cpu, core99_l2_cache);
+	}
+
+	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L3CR))
+		return;
+
+	if (cpu == 0){
+		core99_l3_cache = _get_L3CR();
+		printk("CPU0: L3CR is %lx\n", core99_l3_cache);
+	} else {
+		printk("CPU%d: L3CR was %lx\n", cpu, _get_L3CR());
+		_set_L3CR(0);
+		_set_L3CR(core99_l3_cache);
+		printk("CPU%d: L3CR set to %lx\n", cpu, core99_l3_cache);
+	}
+}
+
+/* Some CPU registers have to be saved from the first CPU and
+ * applied to others. Note that we override what is setup by
+ * the cputable intentionally.
+ */
+
+#define	reg_hid0	0
+#define	reg_hid1	1
+#define	reg_msscr0	2
+#define	reg_msssr0	3
+#define	reg_ictrl	4
+#define	reg_ldstcr	5
+#define	reg_ldstdb	6
+#define	reg_count	7
+
+static unsigned long cpu_regs[reg_count];
+
+static void __pmac
+cpu_setup_grab(void)
+{
+	unsigned int pvers = mfspr(SPRN_PVR)>>16;
+
+	/* Read cache setting of CPU 0 */
+	core99_init_caches();
+
+	/* 7400/7410/7450 */
+	if (pvers == 0x8000 || pvers == 0x000c || pvers == 0x800c) {
+		cpu_regs[reg_hid0] = mfspr(SPRN_HID0);
+		cpu_regs[reg_msscr0] = mfspr(SPRN_MSSCR0);
+		cpu_regs[reg_msssr0] = mfspr(SPRN_MSSSR0);
+	}
+	/* 7450 only */
+	if (pvers == 0x8000) {
+		cpu_regs[reg_hid1] = mfspr(SPRN_HID1);
+		cpu_regs[reg_ictrl] = mfspr(SPRN_ICTRL);
+		cpu_regs[reg_ldstcr] = mfspr(SPRN_LDSTCR);
+		cpu_regs[reg_ldstdb] = mfspr(SPRN_LDSTDB);
+	}
+	flush_dcache_range((unsigned long)cpu_regs, (unsigned long)&cpu_regs[reg_count]);
+}
+
+static void __pmac
+cpu_setup_apply(int cpu_nr)
+{
+	unsigned int pvers = mfspr(SPRN_PVR)>>16;
+
+	/* Apply cache setting from CPU 0 */
+	core99_init_caches();
+
+	/* 7400/7410/7450 */
+	if (pvers == 0x8000 || pvers == 0x000c || pvers == 0x800c) {
+		unsigned long tmp;
+		__asm__ __volatile__ (
+			"lwz	%0,4*"stringify(reg_hid0)"(%1)\n"
+			"sync\n"
+			"mtspr	"stringify(SPRN_HID0)", %0\n"
+			"isync;sync\n"
+			"lwz	%0, 4*"stringify(reg_msscr0)"(%1)\n"
+			"sync\n"
+			"mtspr	"stringify(SPRN_MSSCR0)", %0\n"
+			"isync;sync\n"
+//			"lwz	%0, "stringify(reg_msssr0)"(%1)\n"
+//			"sync\n"
+//			"mtspr	"stringify(SPRN_MSSSR0)", %0\n"
+//			"isync;sync\n"
+		: "=&r" (tmp) : "r" (cpu_regs));			
+	}
+	/* 7410 only */
+	if (pvers == 0x800c) {
+		unsigned long tmp;
+		__asm__ __volatile__ (
+			"li	%0, 0\n"
+			"sync\n"
+			"mtspr	"stringify(SPRN_L2CR2)", %0\n"
+			"isync;sync\n"
+		: "=&r" (tmp));		
+	}
+	/* 7450 only */
+	if (pvers == 0x8000) {
+		unsigned long tmp;
+		__asm__ __volatile__ (
+			"lwz	%0, 4*"stringify(reg_hid1)"(%1)\n"
+			"sync\n"
+			"mtspr	"stringify(SPRN_HID1)", %0\n"
+			"isync;sync\n"
+			"lwz	%0, 4*"stringify(reg_ictrl)"(%1)\n"
+			"sync\n"
+			"mtspr	"stringify(SPRN_ICTRL)", %0\n"
+			"isync;sync\n"
+			"lwz	%0, 4*"stringify(reg_ldstcr)"(%1)\n"
+			"sync\n"
+			"mtspr	"stringify(SPRN_LDSTCR)", %0\n"
+			"isync;sync\n"
+			"lwz	%0, 4*"stringify(reg_ldstdb)"(%1)\n"
+			"sync\n"
+			"mtspr	"stringify(SPRN_LDSTDB)", %0\n"
+			"isync;sync\n"
+		: "=&r" (tmp) : "r" (cpu_regs));		
+	}
+}
 
 /*
  * Set and clear IPIs for powersurge.
@@ -383,6 +515,7 @@ smp_core99_probe(void)
 {
 	struct device_node *cpus;
 	int i, ncpus = 1;
+	extern int powersave_nap;
 
 	if (ppc_md.progress) ppc_md.progress("smp_core99_probe", 0x345);
 	cpus = find_type_devices("cpu");
@@ -394,6 +527,8 @@ smp_core99_probe(void)
 		openpic_request_IPIs();
 		for (i = 1; i < ncpus; ++i)
 			smp_hw_index[i] = i;
+		powersave_nap = 0;
+		cpu_setup_grab();
 	}
 
 	return ncpus;
@@ -404,17 +539,11 @@ smp_core99_kick_cpu(int nr)
 {
 	unsigned long save_vector, new_vector;
 	unsigned long flags;
-#if 1 /* New way... */
+
 	volatile unsigned long *vector
 		 = ((volatile unsigned long *)(KERNELBASE+0x100));
 	if (nr < 1 || nr > 3)
 		return;
-#else
-	volatile unsigned long *vector
-		 = ((volatile unsigned long *)(KERNELBASE+0x500));
-	if (nr != 1)
-		return;
-#endif
 	if (ppc_md.progress) ppc_md.progress("smp_core99_kick_cpu", 0x346);
 
 	local_irq_save(flags);
@@ -463,13 +592,15 @@ smp_core99_kick_cpu(int nr)
 static void __init
 smp_core99_setup_cpu(int cpu_nr)
 {
+	/* Setup some registers */
+	if (cpu_nr != 0)
+		cpu_setup_apply(cpu_nr);
+	
 	/* Setup openpic */
 	do_openpic_setup_cpu();
 
-	/* Setup L2 */
-	if (cpu_nr != 0)
-		core99_init_l2();
-	else
+	/* Setup L2/L3 */
+	if (cpu_nr == 0)
 		if (ppc_md.progress) ppc_md.progress("core99_setup_cpu 0 done", 0x349);
 }
 

@@ -189,14 +189,24 @@ pcibios_fixup_cardbus(struct pci_dev* dev)
 	if (_machine != _MACH_Pmac)
 		return;
 	/*
-	 * Fix the interrupt routing on the TI1211 chip on the 1999
-	 * G3 powerbook, which doesn't get initialized properly by OF.
-	 * Same problem with the 1410 of the new titanium pbook which
-	 * has the same register.
+	 * Fix the interrupt routing on the various cardbus bridges
+	 * used on powerbooks
 	 */
-	if (dev->vendor == PCI_VENDOR_ID_TI
-	    && (dev->device == PCI_DEVICE_ID_TI_1211 ||
-	        dev->device == PCI_DEVICE_ID_TI_1410)) {
+	if (dev->vendor != PCI_VENDOR_ID_TI)
+		return;
+	if (dev->device == PCI_DEVICE_ID_TI_1130 ||
+	    dev->device == PCI_DEVICE_ID_TI_1131) {
+		u8 val;
+	    	/* Enable PCI interrupt */
+		if (pci_read_config_byte(dev, 0x91, &val) == 0)
+			pci_write_config_byte(dev, 0x91, val | 0x30);
+		/* Disable ISA interrupt mode */	
+		if (pci_read_config_byte(dev, 0x92, &val) == 0)
+			pci_write_config_byte(dev, 0x92, val & ~0x06);
+	}
+	if (dev->device == PCI_DEVICE_ID_TI_1210 ||
+	    dev->device == PCI_DEVICE_ID_TI_1211 ||
+	    dev->device == PCI_DEVICE_ID_TI_1410) {
 		u8 val;
 		/* 0x8c == TI122X_IRQMUX, 2 says to route the INTA
 		   signal out the MFUNC0 pin */
@@ -223,7 +233,8 @@ pcibios_fixup_cardbus(struct pci_dev* dev)
  * which might have be mirrored at 0x0100-0x03ff..
  */
 void
-pcibios_align_resource(void *data, struct resource *res, unsigned long size)
+pcibios_align_resource(void *data, struct resource *res, unsigned long size,
+		       unsigned long align)
 {
 	struct pci_dev *dev = data;
 

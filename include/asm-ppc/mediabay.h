@@ -20,7 +20,6 @@
 #define MB_POWER	6	/* media bay contains a Power device (???) */
 #define MB_NO		7	/* media bay contains nothing */
 
-void media_bay_init(void);
 int check_media_bay(struct device_node *which_bay, int what);
 int check_media_bay_by_base(unsigned long base, int what);
 

@@ -38,9 +38,11 @@
  */
 
 /* PowerSurge are the first generation of PCI Pmacs. This include
- * all of the Grand-Central based machines
+ * all of the Grand-Central based machines. We currently don't
+ * differenciate most of them.
  */
 #define PMAC_TYPE_PSURGE		0x10	/* PowerSurge */
+#define PMAC_TYPE_ANS			0x11	/* Apple Network Server */
 
 /* Here is the infamous serie of OHare based machines
  */
@@ -84,6 +86,7 @@
 #define PMAC_TYPE_PISMO			0x46	/* Pismo PowerBook */
 #define PMAC_TYPE_TITANIUM		0x47	/* Titanium PowerBook */
 #define PMAC_TYPE_TITANIUM2		0x48	/* Titanium II PowerBook */
+#define PMAC_TYPE_TITANIUM3		0x49	/* Titanium III PowerBook (with L3) */
 #define PMAC_TYPE_UNKNOWN_CORE99	0x5f
 
 /* MacRISC2 machines based on the Pangea chipset
@@ -245,7 +248,6 @@ static inline int pmac_call_feature(int selector, struct device_node* node,
 /* Don't use those directly, they are for the sake of pmac_setup.c */
 extern int pmac_do_feature_call(unsigned int selector, ...);
 extern void pmac_feature_init(void);
-extern void pmac_feature_late_init(void);
 
 #define PMAC_FTR_DEF(x) ((_MACH_Pmac << 16) | (x))
 
