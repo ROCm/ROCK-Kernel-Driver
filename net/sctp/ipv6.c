@@ -158,35 +158,60 @@ static inline int sctp_v6_xmit(struct sk_buff *skb)
 }
 #endif /* TEST_FRAME */
 
-/* Returns the mtu for the given v6 destination address. */
-int sctp_v6_get_dst_mtu(const sockaddr_storage_t *address)
+/* FIXME: This macro needs to be moved to a common header file. */
+#define NIP6(addr) \
+        ntohs((addr)->s6_addr16[0]), \
+        ntohs((addr)->s6_addr16[1]), \
+        ntohs((addr)->s6_addr16[2]), \
+        ntohs((addr)->s6_addr16[3]), \
+        ntohs((addr)->s6_addr16[4]), \
+        ntohs((addr)->s6_addr16[5]), \
+        ntohs((addr)->s6_addr16[6]), \
+        ntohs((addr)->s6_addr16[7])
+
+/* Returns the dst cache entry for the given source and destination ip
+ * addresses.
+ */
+struct dst_entry *sctp_v6_get_dst(sockaddr_storage_t *daddr,
+				  sockaddr_storage_t *saddr)
 {
 	struct dst_entry *dst;
-	struct flowi fl;
-	int dst_mtu = SCTP_DEFAULT_MAXSEGMENT;
+	struct flowi fl = { .nl_u = { .ip6_u = { .daddr = &daddr->v6.sin6_addr,
+					       } } };
 
-	fl.proto = 0;
-	fl.fl6_dst = (struct in6_addr *)&address->v6.sin6_addr;
-	fl.fl6_src = NULL;
-	fl.fl6_flowlabel = 0;
-	fl.oif = 0;
-	fl.uli_u.ports.sport = 0;
-	fl.uli_u.ports.dport = 0;
+
+	SCTP_DEBUG_PRINTK("%s: DST=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ",
+			  __FUNCTION__, NIP6(fl.fl6_dst)); 
+
+	if (saddr) {
+		fl.fl6_src = &saddr->v6.sin6_addr;
+		SCTP_DEBUG_PRINTK(
+			"SRC=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x - ",
+			NIP6(fl.fl6_src));
+	}
 
 	dst = ip6_route_output(NULL, &fl);
 	if (dst) {
-		dst_mtu = dst_pmtu(dst);
-		SCTP_DEBUG_PRINTK("sctp_v6_get_dst_mtu: "
-				  "ip6_route_output: dev:%s pmtu:%d\n",
-				  dst->dev->name, dst_mtu);
-		dst_release(dst);
+		struct rt6_info *rt;
+		rt = (struct rt6_info *)dst;
+		SCTP_DEBUG_PRINTK(
+			"rt6_dst:%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x "
+			"rt6_src:%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x\n",
+			NIP6(&rt->rt6i_dst.addr), NIP6(&rt->rt6i_src.addr));
 	} else {
-		SCTP_DEBUG_PRINTK("sctp_v6_get_dst_mtu: "
-				  "ip6_route_output failed, returning "
-				  "%d as dst_mtu\n", dst_mtu);
+		SCTP_DEBUG_PRINTK("NO ROUTE\n");
+		return NULL;
 	}
 
-	return dst_mtu;
+	return dst;
+}
+
+/* Check if the dst entry's source addr matches the given source addr. */
+int sctp_v6_cmp_saddr(struct dst_entry *dst, sockaddr_storage_t *saddr)
+{
+	struct rt6_info *rt = (struct rt6_info *)dst;
+
+	return ipv6_addr_cmp(&rt->rt6i_src.addr, &saddr->v6.sin6_addr); 
 }
 
 /* Initialize a PF_INET6 socket msg_name. */
@@ -301,7 +326,8 @@ static sctp_func_t sctp_ipv6_specific = {
 	.queue_xmit      = sctp_v6_xmit,
 	.setsockopt      = ipv6_setsockopt,
 	.getsockopt      = ipv6_getsockopt,
-	.get_dst_mtu     = sctp_v6_get_dst_mtu,
+	.get_dst	 = sctp_v6_get_dst,
+	.cmp_saddr	 = sctp_v6_cmp_saddr,
 	.net_header_len  = sizeof(struct ipv6hdr),
 	.sockaddr_len    = sizeof(struct sockaddr_in6),
 	.sa_family       = AF_INET6,

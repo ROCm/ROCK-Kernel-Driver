@@ -246,7 +246,10 @@ typedef struct sctp_func {
 					 int optname,
 					 char *optval,
 					 int *optlen);
-	int		(*get_dst_mtu)	(const sockaddr_storage_t *address);
+	struct dst_entry *(*get_dst)	(sockaddr_storage_t *daddr,
+					 sockaddr_storage_t *saddr);
+	int		(*cmp_saddr)	(struct dst_entry *dst,
+					 sockaddr_storage_t *saddr);
 	__u16		net_header_len;	
 	int		sockaddr_len;
 	sa_family_t	sa_family;
@@ -476,6 +479,8 @@ struct SCTP_chunk {
 
 	/* What is the origin IP address for this chunk?  */
 	sockaddr_storage_t source;
+	/* Destination address for this chunk. */
+	sockaddr_storage_t dest;
 
 	/* For an inbound chunk, this tells us where it came from.
 	 * For an outbound chunk, it tells us where we'd like it to
@@ -492,7 +497,7 @@ void  *sctp_addto_chunk(sctp_chunk_t *chunk, int len, const void *data);
 int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data);
 sctp_chunk_t *sctp_chunkify(struct sk_buff *, const sctp_association_t *,
 			    struct sock *);
-void sctp_init_source(sctp_chunk_t *chunk);
+void sctp_init_addrs(sctp_chunk_t *chunk);
 const sockaddr_storage_t *sctp_source(const sctp_chunk_t *chunk);
 
 /* This is a structure for holding either an IPv6 or an IPv4 address.  */
@@ -655,6 +660,9 @@ struct SCTP_transport {
 	/* PMTU       : The current known path MTU.  */
 	__u32 pmtu;
 
+	/* Destination */
+	struct dst_entry *dst;
+
 	/* When was the last time(in jiffies) that a data packet was sent on
 	 * this transport?  This is used to adjust the cwnd when the transport
 	 * becomes inactive.
@@ -735,6 +743,7 @@ extern sctp_transport_t *sctp_transport_new(const sockaddr_storage_t *, int);
 extern sctp_transport_t *sctp_transport_init(sctp_transport_t *,
 					     const sockaddr_storage_t *, int);
 extern void sctp_transport_set_owner(sctp_transport_t *, sctp_association_t *);
+extern void sctp_transport_route(sctp_transport_t *, sockaddr_storage_t *);
 extern void sctp_transport_free(sctp_transport_t *);
 extern void sctp_transport_destroy(sctp_transport_t *);
 extern void sctp_transport_reset_timers(sctp_transport_t *);

@@ -66,7 +66,8 @@ static void sctp_do_ecn_cwr_work(sctp_association_t *asoc,
 static void sctp_do_8_2_transport_strike(sctp_association_t *asoc,
 					 sctp_transport_t *transport);
 static void sctp_cmd_init_failed(sctp_cmd_seq_t *, sctp_association_t *asoc);
-static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *, sctp_association_t *asoc);
+static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *, sctp_association_t *asoc,
+				  sctp_event_t event_type, sctp_chunk_t *chunk);
 static void sctp_cmd_process_init(sctp_cmd_seq_t *, sctp_association_t *asoc,
 				  sctp_chunk_t *chunk,
 				  sctp_init_chunk_t *peer_init,
@@ -251,7 +252,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	int force;
 	sctp_cmd_t *command;
 	sctp_chunk_t *new_obj;
-	sctp_chunk_t *chunk;
+	sctp_chunk_t *chunk = NULL;
 	sctp_packet_t *packet;
 	struct list_head *pos;
 	struct timer_list *timer;
@@ -259,7 +260,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 	sctp_transport_t *t;
 	sctp_sackhdr_t sackh;
 
-	chunk = (sctp_chunk_t *) event_arg;
+	if(SCTP_EVENT_T_TIMEOUT != event_type)
+		chunk = (sctp_chunk_t *) event_arg;
 
 	/* Note:  This whole file is a huge candidate for rework.
 	 * For example, each command could either have its own handler, so
@@ -504,7 +506,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_ASSOC_FAILED:
-			sctp_cmd_assoc_failed(commands, asoc);
+			sctp_cmd_assoc_failed(commands, asoc, event_type,
+					      chunk);
 			break;
 
 		case SCTP_CMD_COUNTER_INC:
@@ -595,10 +598,7 @@ nomem:
 /* A helper function for delayed processing of INET ECN CE bit. */
 static void sctp_do_ecn_ce_work(sctp_association_t *asoc, __u32 lowest_tsn)
 {
-	/*
-	 * Save the TSN away for comparison when we receive CWR
-	 * Note: dp->TSN is expected in host endian
-	 */
+	/* Save the TSN away for comparison when we receive CWR */
 
 	asoc->last_ecne_tsn = lowest_tsn;
 	asoc->need_ecne = 1;
@@ -621,7 +621,6 @@ static sctp_chunk_t *sctp_do_ecn_ecne_work(sctp_association_t *asoc,
 					   sctp_chunk_t *chunk)
 {
 	sctp_chunk_t *repl;
-	sctp_transport_t *transport;
 
 	/* Our previously transmitted packet ran into some congestion
 	 * so we should take action by reducing cwnd and ssthresh
@@ -629,43 +628,28 @@ static sctp_chunk_t *sctp_do_ecn_ecne_work(sctp_association_t *asoc,
 	 * sending a CWR.
 	 */
 
-	/* Find which transport's congestion variables
-	 * need to be adjusted.
+	/* First, try to determine if we want to actually lower
+	 * our cwnd variables.  Only lower them if the ECNE looks more
+	 * recent than the last response.
 	 */
+	if (TSN_lt(asoc->last_cwr_tsn, lowest_tsn)) {
+		sctp_transport_t *transport;
 
-	transport = sctp_assoc_lookup_tsn(asoc, lowest_tsn);
+		/* Find which transport's congestion variables
+		 * need to be adjusted.
+		 */
+		transport = sctp_assoc_lookup_tsn(asoc, lowest_tsn);
 
-	/* Update the congestion variables. */
-	if (transport)
-		sctp_transport_lower_cwnd(transport, SCTP_LOWER_CWND_ECNE);
+		/* Update the congestion variables. */
+		if (transport)
+			sctp_transport_lower_cwnd(transport,
+						  SCTP_LOWER_CWND_ECNE);
+		asoc->last_cwr_tsn = lowest_tsn;
+	}
 
-	/* Save away a rough idea of when we last sent out a CWR.
-	 * We compare against this value (see above) to decide if
-	 * this is a fairly new request.
-	 * Note that this is not a perfect solution.  We may
-	 * have moved beyond the window (several times) by the
-	 * next time we get an ECNE.  However, it is cute.  This idea
-	 * came from Randy's reference code.
-	 *
-	 * Here's what RFC 2960 has to say about CWR.  This is NOT
-	 * what we do.
-	 *
-	 * RFC 2960 Appendix A
-	 *
-	 *    CWR:
-	 *
-	 *    RFC 2481 details a specific bit for a sender to send in
-	 *    the header of its next outbound TCP segment to indicate
-	 *    to its peer that it has reduced its congestion window.
-	 *    This is termed the CWR bit.  For SCTP the same
-	 *    indication is made by including the CWR chunk.  This
-	 *    chunk contains one data element, i.e. the TSN number
-	 *    that was sent in the ECNE chunk.  This element
-	 *    represents the lowest TSN number in the datagram that
-	 *    was originally marked with the CE bit.
+	/* Always try to quiet the other end.  In case of lost CWR,
+	 * resend last_cwr_tsn.  
 	 */
-	asoc->last_cwr_tsn = asoc->next_tsn - 1;
-
 	repl = sctp_make_cwr(asoc, asoc->last_cwr_tsn, chunk);
 
 	/* If we run out of memory, it will look like a lost CWR.  We'll
@@ -1038,14 +1022,26 @@ static void sctp_cmd_init_failed(sctp_cmd_seq_t *commands,
 
 /* Worker routine to handle SCTP_CMD_ASSOC_FAILED.  */
 static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
-				  sctp_association_t *asoc)
+				  sctp_association_t *asoc,
+				  sctp_event_t event_type,
+				  sctp_chunk_t *chunk)
 {
 	sctp_ulpevent_t *event;
+	__u16 error = 0;
+
+	if (event_type == SCTP_EVENT_T_PRIMITIVE)
+		error = SCTP_ERROR_USER_ABORT;
+
+	if (chunk && (SCTP_CID_ABORT == chunk->chunk_hdr->type) &&
+	    (ntohs(chunk->chunk_hdr->length) >= (sizeof(struct sctp_chunkhdr) +
+				 		 sizeof(struct sctp_errhdr)))) {
+		error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
+	}
 
 	event = sctp_ulpevent_make_assoc_change(asoc,
 						0,
 						SCTP_COMM_LOST,
-						0, 0, 0,
+						error, 0, 0,
 						GFP_ATOMIC);
 
 	if (event)

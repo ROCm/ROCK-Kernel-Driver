@@ -47,6 +47,7 @@
  *    Dajiang Zhang	    <dajiang.zhang@nokia.com>
  *    Sridhar Samudrala	    <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -838,6 +839,53 @@ no_mem:
 	return retval;
 }
 
+/* Helper to create ABORT with a SCTP_ERROR_USER_ABORT error.  */
+sctp_chunk_t *sctp_make_abort_user(const sctp_association_t *asoc,
+				   const sctp_chunk_t *chunk,
+				   const struct msghdr *msg)
+{
+	sctp_chunk_t *retval;
+	void *payload = NULL, *payoff;
+	size_t paylen;
+	struct iovec *iov = msg->msg_iov;
+	int iovlen = msg->msg_iovlen;
+
+	paylen = get_user_iov_size(iov, iovlen);
+	retval = sctp_make_abort(asoc, chunk, sizeof(sctp_errhdr_t) + paylen);
+	if (!retval)
+		goto err_chunk;
+
+	if (paylen) {
+		/* Put the msg_iov together into payload.  */
+		payload = kmalloc(paylen, GFP_ATOMIC);
+		if (!payload)
+			goto err_payload;
+		payoff = payload;
+
+		for (; iovlen > 0; --iovlen) {
+			if (copy_from_user(payoff, iov->iov_base, iov->iov_len))
+				goto err_copy;
+			payoff += iov->iov_len;
+			iov++;
+		}
+	}
+
+	sctp_init_cause(retval, SCTP_ERROR_USER_ABORT, payload, paylen);
+
+	if (paylen)
+		kfree(payload);
+
+	return retval;
+
+err_copy:
+	kfree(payload);
+err_payload:
+	sctp_free_chunk(retval);
+	retval = NULL;
+err_chunk:
+	return retval;
+}
+
 /* Make a HEARTBEAT chunk.  */
 sctp_chunk_t *sctp_make_heartbeat(const sctp_association_t *asoc,
 				  const sctp_transport_t *transport,
@@ -982,16 +1030,17 @@ nodata:
 	return retval;
 }
 
-/* Set chunk->source based on the IP header in chunk->skb.  */
-void sctp_init_source(sctp_chunk_t *chunk)
+/* Set chunk->source and dest based on the IP header in chunk->skb.  */
+void sctp_init_addrs(sctp_chunk_t *chunk)
 {
-	sockaddr_storage_t *source;
+	sockaddr_storage_t *source, *dest;
 	struct sk_buff *skb;
 	struct sctphdr *sh;
 	struct iphdr *ih4;
 	struct ipv6hdr *ih6;
 
 	source = &chunk->source;
+	dest = &chunk->dest;
 	skb = chunk->skb;
 	ih4 = skb->nh.iph;
 	ih6 = skb->nh.ipv6h;
@@ -1002,6 +1051,9 @@ void sctp_init_source(sctp_chunk_t *chunk)
 		source->v4.sin_family = AF_INET;
 		source->v4.sin_port = ntohs(sh->source);
 		source->v4.sin_addr.s_addr = ih4->saddr;
+		dest->v4.sin_family = AF_INET;
+		dest->v4.sin_port = ntohs(sh->dest);
+		dest->v4.sin_addr.s_addr = ih4->daddr;
 		break;
 
 	case 6:
@@ -1009,6 +1061,9 @@ void sctp_init_source(sctp_chunk_t *chunk)
 			source->v6.sin6_family = AF_INET6;
 			source->v6.sin6_port = ntohs(sh->source);
 			source->v6.sin6_addr = ih6->saddr;
+			dest->v6.sin6_family = AF_INET6;
+			dest->v6.sin6_port = ntohs(sh->dest);
+			dest->v6.sin6_addr = ih6->daddr;
 			/* FIXME:  What do we do with scope, etc. ? */
 			break;
 		)
