@@ -95,9 +95,21 @@ static inline struct thread_info *current_thread_info(void)
 }
 
 /* thread information allocation */
-#define alloc_thread_info(task) \
-	((struct thread_info *) __get_free_pages(GFP_KERNEL,1))
-#define free_thread_info(ti) free_pages((unsigned long) (ti), 1)
+#if CONFIG_DEBUG_STACK_USAGE
+#define alloc_thread_info(tsk)					\
+	({							\
+		struct thread_info *ret;			\
+	 							\
+	 	ret = kmalloc(THREAD_SIZE, GFP_KERNEL);		\
+	 	if (ret)					\
+	 		memset(ret, 0, THREAD_SIZE);		\
+	 	ret;						\
+	 })
+#else
+#define alloc_thread_info(tsk) kmalloc(THREAD_SIZE, GFP_KERNEL)
+#endif
+
+#define free_thread_info(info) kfree(info)
 #define get_thread_info(ti) get_task_struct((ti)->task)
 #define put_thread_info(ti) put_task_struct((ti)->task)
 
