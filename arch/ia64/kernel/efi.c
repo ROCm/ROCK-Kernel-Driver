@@ -297,9 +297,9 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 		u64 start;
 		u64 end;
 	} prev, curr;
-	void *efi_map_start, *efi_map_end, *p, *q, *r;
+	void *efi_map_start, *efi_map_end, *p, *q;
 	efi_memory_desc_t *md, *check_md;
-	u64 efi_desc_size, start, end, granule_addr, first_non_wb_addr = 0;
+	u64 efi_desc_size, start, end, granule_addr, last_granule_addr, first_non_wb_addr = 0;
 
 	efi_map_start = __va(ia64_boot_param->efi_memmap);
 	efi_map_end   = efi_map_start + ia64_boot_param->efi_memmap_size;
@@ -312,40 +312,33 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
 		if (!(md->attribute & EFI_MEMORY_WB))
 			continue;
 
-		if (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) > first_non_wb_addr) {
-			/*
-			 * Search for the next run of contiguous WB memory.  Start search
-			 * at first granule boundary covered by md.
-			 */
-			granule_addr = ((md->phys_addr + IA64_GRANULE_SIZE - 1)
-					& -IA64_GRANULE_SIZE);
-			first_non_wb_addr = granule_addr;
-			for (q = p; q < efi_map_end; q += efi_desc_size) {
-				check_md = q;
+		/*
+		 * granule_addr is the base of md's first granule.
+		 * [granule_addr - first_non_wb_addr) is guaranteed to
+		 * be contiguous WB memory.
+		 */
+		granule_addr = md->phys_addr & ~(IA64_GRANULE_SIZE - 1);
+		first_non_wb_addr = max(first_non_wb_addr, granule_addr);
 
-				if (check_md->attribute & EFI_MEMORY_WB)
-					trim_bottom(check_md, granule_addr);
-
-				if (check_md->phys_addr < granule_addr)
-					continue;
-
-				if (!(check_md->attribute & EFI_MEMORY_WB))
-					break;	/* hit a non-WB region; stop search */
-
-				if (check_md->phys_addr != first_non_wb_addr)
-					break;	/* hit a memory hole; stop search */
-
-				first_non_wb_addr += check_md->num_pages << EFI_PAGE_SHIFT;
-			}
-			/* round it down to the previous granule-boundary: */
-			first_non_wb_addr &= -IA64_GRANULE_SIZE;
-
-			if (!(first_non_wb_addr > granule_addr))
-				continue;	/* couldn't find enough contiguous memory */
-
-			for (r = p; r < q; r += efi_desc_size)
-				trim_top(r, first_non_wb_addr);
+		if (first_non_wb_addr < md->phys_addr) {
+			trim_bottom(md, granule_addr + IA64_GRANULE_SIZE);
+			granule_addr = md->phys_addr & ~(IA64_GRANULE_SIZE - 1);
+			first_non_wb_addr = max(first_non_wb_addr, granule_addr);
 		}
+
+		for (q = p; q < efi_map_end; q += efi_desc_size) {
+			check_md = q;
+
+			if ((check_md->attribute & EFI_MEMORY_WB) &&
+			    (check_md->phys_addr == first_non_wb_addr))
+				first_non_wb_addr += check_md->num_pages << EFI_PAGE_SHIFT;
+			else
+				break;		/* non-WB or hole */
+		}
+
+		last_granule_addr = first_non_wb_addr & ~(IA64_GRANULE_SIZE - 1);
+		if (last_granule_addr < md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT))
+			trim_top(md, last_granule_addr);
 
 		if (is_available_memory(md)) {
 			if (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) > mem_limit) {

@@ -36,11 +36,12 @@ typedef struct {
  */
 typedef struct {
 	unsigned long	hdr_count;		/* how many valid entries */
-	void		*hdr_cur_pos;		/* current position in the buffer */
-	void		*hdr_last_pos;		/* first byte beyond buffer */
+	unsigned long	hdr_cur_offs;		/* current offset from top of buffer */
+	unsigned long	hdr_reserved2;		/* reserved for future use */
 
 	unsigned long	hdr_overflows;		/* how many times the buffer overflowed */
 	unsigned long   hdr_buf_size;		/* how many bytes in the buffer */
+
 	unsigned int	hdr_version;		/* contains perfmon version (smpl format diffs) */
 	unsigned int	hdr_reserved1;		/* for future use */
 	unsigned long	hdr_reserved[10];	/* for future use */

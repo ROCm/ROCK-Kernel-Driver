@@ -13,6 +13,7 @@
 #include <linux/elf.h>
 #include <linux/mm.h>
 #include <linux/mmzone.h>
+#include <linux/module.h>
 #include <linux/personality.h>
 #include <linux/reboot.h>
 #include <linux/slab.h>
@@ -43,6 +44,8 @@ unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 #ifdef CONFIG_VIRTUAL_MEM_MAP
   unsigned long vmalloc_end = VMALLOC_END_INIT;
   struct page *vmem_map;
+
+  EXPORT_SYMBOL(vmem_map);
 #endif
 
 static int pgt_cache_water[2] = { 25, 50 };
