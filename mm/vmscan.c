@@ -815,7 +815,7 @@ int kswapd(void *unused)
 		 * up on a more timely basis.
 		 */
 		kswapd_balance();
-		run_task_queue(&tq_disk);
+		blk_run_queues();
 	}
 }
 

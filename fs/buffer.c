@@ -138,7 +138,7 @@ void __wait_on_buffer(struct buffer_head * bh)
 	get_bh(bh);
 	add_wait_queue(wq, &wait);
 	do {
-		run_task_queue(&tq_disk);
+		blk_run_queues();
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 		if (!buffer_locked(bh))
 			break;
@@ -488,7 +488,7 @@ static void free_more_memory(void)
 
 	wakeup_bdflush();
 	try_to_free_pages(zone, GFP_NOFS, 0);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 	__set_current_state(TASK_RUNNING);
 	yield();
 }
@@ -1014,7 +1014,7 @@ no_grow:
 	 * the reserve list is empty, we're sure there are 
 	 * async buffer heads in use.
 	 */
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 
 	free_more_memory();
 	goto try_again;
@@ -2475,7 +2475,7 @@ EXPORT_SYMBOL(try_to_free_buffers);
 
 int block_sync_page(struct page *page)
 {
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 	return 0;
 }
 

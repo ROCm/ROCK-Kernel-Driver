@@ -168,7 +168,7 @@ void do_page_cache_readahead(struct file *file,
 	 * will then handle the error.
 	 */
 	read_pages(mapping, &page_pool, nr_to_really_read);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 	BUG_ON(!list_empty(&page_pool));
 	return;
 }
