@@ -65,6 +65,8 @@ config X86_VOYAGER
 
 config X86_NUMAQ
 	bool "NUMAQ (IBM/Sequent)"
+	select DISCONTIGMEM
+	select NUMA
 	help
 	  This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
 	  multiquad box. This changes the way that processors are bootstrapped,
