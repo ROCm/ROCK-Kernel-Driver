@@ -208,6 +208,9 @@ int ide_build_sglist(ide_drive_t *drive, struct request *rq)
 	ide_hwif_t *hwif = HWIF(drive);
 	struct scatterlist *sg = hwif->sg_table;
 
+	if ((rq->flags & REQ_DRIVE_TASKFILE) && rq->nr_sectors > 256)
+		BUG();
+
 	ide_map_sg(drive, rq);
 
 	if (rq_data_dir(rq) == READ)
@@ -219,37 +222,6 @@ int ide_build_sglist(ide_drive_t *drive, struct request *rq)
 }
 
 EXPORT_SYMBOL_GPL(ide_build_sglist);
-
-/**
- *	ide_raw_build_sglist	-	map IDE scatter gather for DMA
- *	@drive: the drive to build the DMA table for
- *	@rq: the request holding the sg list
- *
- *	Perform the PCI mapping magic necessary to access the source or
- *	target buffers of a taskfile request via PCI DMA. The lower layers 
- *	of the  kernel provide the necessary cache management so that we can
- *	operate in a portable fashion
- */
-
-int ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	struct scatterlist *sg = hwif->sg_table;
-	ide_task_t *args = rq->special;
-
-	if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
-		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
-	else
-		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
-
-	BUG_ON(rq->nr_sectors > 256);
-
-	ide_map_sg(drive, rq);
-
-	return pci_map_sg(hwif->pci_dev, sg, hwif->sg_nents, hwif->sg_dma_direction);
-}
-
-EXPORT_SYMBOL_GPL(ide_raw_build_sglist);
 
 /**
  *	ide_build_dmatable	-	build IDE DMA table
@@ -272,10 +244,7 @@ int ide_build_dmatable (ide_drive_t *drive, struct request *rq)
 	int i;
 	struct scatterlist *sg;
 
-	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE)
-		hwif->sg_nents = i = ide_raw_build_sglist(drive, rq);
-	else
-		hwif->sg_nents = i = ide_build_sglist(drive, rq);
+	hwif->sg_nents = i = ide_build_sglist(drive, rq);
 
 	if (!i)
 		return 0;

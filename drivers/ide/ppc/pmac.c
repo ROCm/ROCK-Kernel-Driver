@@ -1582,11 +1582,8 @@ pmac_ide_build_dmatable(ide_drive_t *drive, struct request *rq)
 	while (readl(&dma->status) & RUN)
 		udelay(1);
 
-	/* Build sglist */
-	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE)
-		hwif->sg_nents = i = ide_raw_build_sglist(drive, rq);
-	else
-		hwif->sg_nents = i = ide_build_sglist(drive, rq);
+	hwif->sg_nents = i = ide_build_sglist(drive, rq);
+
 	if (!i)
 		return 0;
 
