@@ -179,7 +179,7 @@ snd_wavefront_fx_ioctl (snd_hwdep_t *sdev, struct file *file,
 	acard = card->private_data;
 	dev = &acard->wavefront;
 
-	if (copy_from_user (&r, (unsigned char *) arg, sizeof (wavefront_fx_info)))
+	if (copy_from_user (&r, (void __user *)arg, sizeof (wavefront_fx_info)))
 		return -EFAULT;
 
 	switch (r.request) {
@@ -201,7 +201,7 @@ snd_wavefront_fx_ioctl (snd_hwdep_t *sdev, struct file *file,
 				return -EIO;
 			}
 			if (copy_from_user (page_data,
-					    (unsigned char *) r.data[3],
+					    (unsigned char __user *) r.data[3],
 					    r.data[2]))
 				return -EFAULT;
 			pd = page_data;
