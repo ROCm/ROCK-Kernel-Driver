@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -251,7 +251,7 @@ acpi_enter_sleep_state (
 		}
 	}
 
-	status = acpi_hw_disable_non_wakeup_gpes();
+	status = acpi_hw_disable_non_wakeup_gpes ();
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -273,6 +273,11 @@ acpi_enter_sleep_state (
 
 	PM1Acontrol |= (acpi_gbl_sleep_type_a << sleep_type_reg_info->bit_position);
 	PM1Bcontrol |= (acpi_gbl_sleep_type_b << sleep_type_reg_info->bit_position);
+
+	/*
+	 * We split the writes of SLP_TYP and SLP_EN to workaround
+	 * poorly implemented hardware.
+	 */
 
 	/* Write #1: fill in SLP_TYP data */
 
@@ -313,7 +318,7 @@ acpi_enter_sleep_state (
 		 * Wait ten seconds, then try again. This is to get S4/S5 to work on all machines.
 		 *
 		 * We wait so long to allow chipsets that poll this reg very slowly to
-		 * still read the right value. Ideally, this entire block would go
+		 * still read the right value. Ideally, this block would go
 		 * away entirely.
 		 */
 		acpi_os_stall (10000000);
@@ -365,12 +370,22 @@ acpi_enter_sleep_state_s4bios (
 	ACPI_FUNCTION_TRACE ("acpi_enter_sleep_state_s4bios");
 
 
-	acpi_set_register (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
-	acpi_hw_clear_acpi_status(ACPI_MTX_DO_NOT_LOCK);
+	status = acpi_set_register (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
-	acpi_hw_disable_non_wakeup_gpes();
+	status = acpi_hw_clear_acpi_status (ACPI_MTX_DO_NOT_LOCK);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
-	ACPI_FLUSH_CPU_CACHE();
+	status = acpi_hw_disable_non_wakeup_gpes ();
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	ACPI_FLUSH_CPU_CACHE ();
 
 	status = acpi_os_write_port (acpi_gbl_FADT->smi_cmd, (u32) acpi_gbl_FADT->S4bios_req, 8);
 
@@ -407,30 +422,47 @@ acpi_leave_sleep_state (
 	acpi_status                     status;
 	struct acpi_bit_register_info   *sleep_type_reg_info;
 	struct acpi_bit_register_info   *sleep_enable_reg_info;
-	u32                             pm1x_control;
+	u32                             PM1Acontrol;
+	u32                             PM1Bcontrol;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_leave_sleep_state");
 
-	/* Some machines require SLP_TYPE and SLP_EN to be cleared */
 
-	sleep_type_reg_info = acpi_hw_get_bit_register_info (ACPI_BITREG_SLEEP_TYPE_A);
-	sleep_enable_reg_info = acpi_hw_get_bit_register_info (ACPI_BITREG_SLEEP_ENABLE);
-
-	/* Get current value of PM1A control */
-
-	status = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK,
-			 ACPI_REGISTER_PM1_CONTROL, &pm1x_control);
+	/*
+	 * Set SLP_TYPE and SLP_EN to state S0.
+	 * This is unclear from the ACPI Spec, but it is required
+	 * by some machines.
+	 */
+	status = acpi_get_sleep_type_data (ACPI_STATE_S0,
+			  &acpi_gbl_sleep_type_a, &acpi_gbl_sleep_type_b);
 	if (ACPI_SUCCESS (status)) {
-		/* Clear SLP_TYP and SLP_EN */
+		sleep_type_reg_info = acpi_hw_get_bit_register_info (ACPI_BITREG_SLEEP_TYPE_A);
+		sleep_enable_reg_info = acpi_hw_get_bit_register_info (ACPI_BITREG_SLEEP_ENABLE);
 
-		pm1x_control &= ~(sleep_type_reg_info->access_bit_mask |
-				   sleep_enable_reg_info->access_bit_mask);
+		/* Get current value of PM1A control */
 
-		acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
-				ACPI_REGISTER_PM1A_CONTROL, pm1x_control);
-		acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
-				ACPI_REGISTER_PM1B_CONTROL, pm1x_control);
+		status = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK,
+				 ACPI_REGISTER_PM1_CONTROL, &PM1Acontrol);
+		if (ACPI_SUCCESS (status)) {
+			/* Clear SLP_EN and SLP_TYP fields */
+
+			PM1Acontrol &= ~(sleep_type_reg_info->access_bit_mask |
+					   sleep_enable_reg_info->access_bit_mask);
+			PM1Bcontrol = PM1Acontrol;
+
+			/* Insert SLP_TYP bits */
+
+			PM1Acontrol |= (acpi_gbl_sleep_type_a << sleep_type_reg_info->bit_position);
+			PM1Bcontrol |= (acpi_gbl_sleep_type_b << sleep_type_reg_info->bit_position);
+
+			/* Just ignore any errors */
+
+			(void) acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
+					  ACPI_REGISTER_PM1A_CONTROL, PM1Acontrol);
+			(void) acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
+					  ACPI_REGISTER_PM1B_CONTROL, PM1Bcontrol);
+		}
 	}
 
 	/* Ensure enter_sleep_state_prep -> enter_sleep_state ordering */
@@ -464,7 +496,7 @@ acpi_leave_sleep_state (
 
 	/* _WAK returns stuff - do we want to look at it? */
 
-	status = acpi_hw_enable_non_wakeup_gpes();
+	status = acpi_hw_enable_non_wakeup_gpes ();
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}

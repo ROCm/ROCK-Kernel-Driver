@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -233,6 +233,15 @@ acpi_tb_validate_rsdt (
 			acpi_gbl_RSDP->rsdt_physical_address,
 			(void *) (acpi_native_uint) acpi_gbl_RSDP->rsdt_physical_address));
 
+		if (acpi_gbl_RSDP->revision < 2) {
+			ACPI_REPORT_ERROR (("Looking for RSDT (RSDP->Rev < 2)\n"))
+		}
+		else {
+			ACPI_REPORT_ERROR (("Looking for XSDT (RSDP->Rev >= 2)\n"))
+		}
+
+		ACPI_DUMP_BUFFER ((char *) table_ptr, 48);
+
 		return (AE_BAD_SIGNATURE);
 	}
 
@@ -305,7 +314,7 @@ acpi_tb_get_table_rsdt (
 		return_ACPI_STATUS (status);
 	}
 
-	acpi_gbl_XSDT = (XSDT_DESCRIPTOR *) table_info.pointer;
+	acpi_gbl_XSDT = ACPI_CAST_PTR (XSDT_DESCRIPTOR, table_info.pointer);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "XSDT located at %p\n", acpi_gbl_XSDT));
 	return_ACPI_STATUS (status);

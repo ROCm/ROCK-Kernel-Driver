@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2003, R. Byron Moore
+ * Copyright (C) 2000 - 2004, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -601,7 +601,6 @@ acpi_ds_store_object_to_local (
 	new_obj_desc = obj_desc;
 	if (obj_desc->common.reference_count > 1) {
 		status = acpi_ut_copy_iobject_to_iobject (obj_desc, &new_obj_desc, walk_state);
-		new_obj_desc;
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
