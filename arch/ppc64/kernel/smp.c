@@ -230,9 +230,236 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
 	do_openpic_setup_cpu();
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+/* Get state of physical CPU.
+ * Return codes:
+ *	0	- The processor is in the RTAS stopped state
+ *	1	- stop-self is in progress
+ *	2	- The processor is not in the RTAS stopped state
+ *	-1	- Hardware Error
+ *	-2	- Hardware Busy, Try again later.
+ */
+static int query_cpu_stopped(unsigned int pcpu)
+{
+	long cpu_status;
+	int status, qcss_tok;
+
+	qcss_tok = rtas_token("query-cpu-stopped-state");
+	BUG_ON(qcss_tok == RTAS_UNKNOWN_SERVICE);
+	status = rtas_call(qcss_tok, 1, 2, &cpu_status, pcpu);
+	if (status != 0) {
+		printk(KERN_ERR
+		       "RTAS query-cpu-stopped-state failed: %i\n", status);
+		return status;
+	}
+
+	return cpu_status;
+}
+
+int __cpu_disable(void)
+{
+	/* FIXME: go put this in a header somewhere */
+	extern void xics_migrate_irqs_away(void);
+
+	systemcfg->processorCount--;
+
+	/*fix boot_cpuid here*/
+	if (smp_processor_id() == boot_cpuid)
+		boot_cpuid = any_online_cpu(cpu_online_map);
+
+	/* FIXME: abstract this to not be platform specific later on */
+	xics_migrate_irqs_away();
+	return 0;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	int tries;
+	int cpu_status;
+	unsigned int pcpu = get_hard_smp_processor_id(cpu);
+
+	for (tries = 0; tries < 5; tries++) {
+		cpu_status = query_cpu_stopped(pcpu);
+
+		if (cpu_status == 0)
+			break;
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ);
+	}
+	if (cpu_status != 0) {
+		printk("Querying DEAD? cpu %i (%i) shows %i\n",
+		       cpu, pcpu, cpu_status);
+	}
+
+	/* Isolation and deallocation are definatly done by
+	 * drslot_chrp_cpu.  If they were not they would be
+	 * done here.  Change isolate state to Isolate and
+	 * change allocation-state to Unusable.
+	 */
+	paca[cpu].xProcStart = 0;
+
+	/* So we can recognize if it fails to come up next time. */
+	cpu_callin_map[cpu] = 0;
+}
+
+/* Kill this cpu */
+void cpu_die(void)
+{
+	local_irq_disable();
+	rtas_stop_self();
+	/* Should never get here... */
+	BUG();
+	for(;;);
+}
+
+/* Search all cpu device nodes for an offline logical cpu.  If a
+ * device node has a "ibm,my-drc-index" property (meaning this is an
+ * LPAR), paranoid-check whether we own the cpu.  For each "thread"
+ * of a cpu, if it is offline and has the same hw index as before,
+ * grab that in preference.
+ */
+static unsigned int find_physical_cpu_to_start(unsigned int old_hwindex)
+{
+	struct device_node *np = NULL;
+	unsigned int best = -1U;
+
+	while ((np = of_find_node_by_type(np, "cpu"))) {
+		int nr_threads, len;
+		u32 *index = (u32 *)get_property(np, "ibm,my-drc-index", NULL);
+		u32 *tid = (u32 *)
+			get_property(np, "ibm,ppc-interrupt-server#s", &len);
+
+		if (!tid)
+			tid = (u32 *)get_property(np, "reg", &len);
+
+		if (!tid)
+			continue;
+
+		/* If there is a drc-index, make sure that we own
+		 * the cpu.
+		 */
+		if (index) {
+			int state;
+			int rc = rtas_get_sensor(9003, *index, &state);
+			if (rc != 0 || state != 1)
+				continue;
+		}
+
+		nr_threads = len / sizeof(u32);
+
+		while (nr_threads--) {
+			if (0 == query_cpu_stopped(tid[nr_threads])) {
+				best = tid[nr_threads];
+				if (best == old_hwindex)
+					goto out;
+			}
+		}
+	}
+out:
+	of_node_put(np);
+	return best;
+}
+
+/**
+ * smp_startup_cpu() - start the given cpu
+ *
+ * At boot time, there is nothing to do.  At run-time, call RTAS with
+ * the appropriate start location, if the cpu is in the RTAS stopped
+ * state.
+ *
+ * Returns:
+ *	0	- failure
+ *	1	- success
+ */
+static inline int __devinit smp_startup_cpu(unsigned int lcpu)
+{
+	int status;
+	extern void (*pseries_secondary_smp_init)(unsigned int cpu);
+	unsigned long start_here = __pa(pseries_secondary_smp_init);
+	unsigned int pcpu;
+
+	/* At boot time the cpus are already spinning in hold
+	 * loops, so nothing to do. */
+ 	if (system_state == SYSTEM_BOOTING)
+		return 1;
+
+	pcpu = find_physical_cpu_to_start(get_hard_smp_processor_id(lcpu));
+	if (pcpu == -1U) {
+		printk(KERN_INFO "No more cpus available, failing\n");
+		return 0;
+	}
+
+	/* Fixup atomic count: it exited inside IRQ handler. */
+	((struct task_struct *)paca[lcpu].xCurrent)->thread_info->preempt_count
+		= 0;
+	/* Fixup SLB round-robin so next segment (kernel) goes in segment 0 */
+	paca[lcpu].xStab_data.next_round_robin = 0;
+
+	/* At boot this is done in prom.c. */
+	paca[lcpu].xHwProcNum = pcpu;
+
+	status = rtas_call(rtas_token("start-cpu"), 3, 1, NULL,
+			   pcpu, start_here, lcpu);
+	if (status != 0) {
+		printk(KERN_ERR "start-cpu failed: %i\n", status);
+		return 0;
+	}
+	return 1;
+}
+
+static inline void look_for_more_cpus(void)
+{
+	int num_addr_cell, num_size_cell, len, i, maxcpus;
+	struct device_node *np;
+	unsigned int *ireg;
+
+	/* Find the property which will tell us about how many CPUs
+	 * we're allowed to have. */
+	if ((np = find_path_device("/rtas")) == NULL) {
+		printk(KERN_ERR "Could not find /rtas in device tree!");
+		return;
+	}
+	num_addr_cell = prom_n_addr_cells(np);
+	num_size_cell = prom_n_size_cells(np);
+
+	ireg = (unsigned int *)get_property(np, "ibm,lrdr-capacity", &len);
+	if (ireg == NULL) {
+		/* FIXME: make sure not marked as lrdr_capable() */
+		return;
+	}
+
+	maxcpus = ireg[num_addr_cell + num_size_cell];
+	/* DRENG need to account for threads here too */
+
+	if (maxcpus > NR_CPUS) {
+		printk(KERN_WARNING
+		       "Partition configured for %d cpus, "
+		       "operating system maximum is %d.\n", maxcpus, NR_CPUS);
+		maxcpus = NR_CPUS;
+	} else
+		printk(KERN_INFO "Partition configured for %d cpus.\n",
+		       maxcpus);
+
+	/* Make those cpus (which might appear later) possible too. */
+	for (i = 0; i < maxcpus; i++)
+		cpu_set(i, cpu_possible_map);
+}
+#else /* ... CONFIG_HOTPLUG_CPU */
+static inline int __devinit smp_startup_cpu(unsigned int lcpu)
+{
+	return 1;
+}
+static inline void look_for_more_cpus(void)
+{
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 static void smp_pSeries_kick_cpu(int nr)
 {
 	BUG_ON(nr < 0 || nr >= NR_CPUS);
+
+	if (!smp_startup_cpu(nr))
+		return;
 
 	/* The processor is currently spinning, waiting
 	 * for the xProcStart field to become non-zero
@@ -241,7 +468,7 @@ static void smp_pSeries_kick_cpu(int nr)
 	 */
 	paca[nr].xProcStart = 1;
 }
-#endif
+#endif /* CONFIG_PPC_PSERIES */
 
 static void __init smp_space_timers(unsigned int max_cpus)
 {
@@ -462,11 +689,8 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 		       int wait)
 { 
 	struct call_data_struct data;
-	int ret = -1, cpus = num_online_cpus()-1;
+	int ret = -1, cpus;
 	unsigned long timeout;
-
-	if (!cpus)
-		return 0;
 
 	data.func = func;
 	data.info = info;
@@ -476,6 +700,14 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 		atomic_set(&data.finished, 0);
 
 	spin_lock(&call_lock);
+	/* Must grab online cpu count with preempt disabled, otherwise
+	 * it can change. */
+	cpus = num_online_cpus() - 1;
+	if (!cpus) {
+		ret = 0;
+		goto out;
+	}
+
 	call_data = &data;
 	wmb();
 	/* Send a message to all other CPUs and wait for them to respond */
@@ -565,8 +797,31 @@ static void __devinit smp_store_cpu_info(int id)
 	per_cpu(pvr, id) = _get_PVR();
 }
 
+static void __init smp_create_idle(unsigned int cpu)
+{
+	struct pt_regs regs;
+	struct task_struct *p;
+
+	/* create a process for the processor */
+	/* only regs.msr is actually used, and 0 is OK for it */
+	memset(&regs, 0, sizeof(struct pt_regs));
+	p = copy_process(CLONE_VM | CLONE_IDLETASK,
+			 0, &regs, 0, NULL, NULL);
+	if (IS_ERR(p))
+		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
+
+	wake_up_forked_process(p);
+	init_idle(p, cpu);
+	unhash_process(p);
+
+	paca[cpu].xCurrent = (u64)p;
+	current_set[cpu] = p->thread_info;
+}
+
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
+	unsigned int cpu;
+
 	/* 
 	 * setup_cpu may need to be called on the boot cpu. We havent
 	 * spun any cpus up but lets be paranoid.
@@ -593,6 +848,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	 * number of msecs off until someone does a settimeofday()
 	 */
 	do_gtod.tb_orig_stamp = tb_last_stamp;
+
+	look_for_more_cpus();
 #endif
 
 	max_cpus = smp_ops->probe();
@@ -601,19 +858,30 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	__save_cpu_setup();
 
 	smp_space_timers(max_cpus);
+
+	for_each_cpu(cpu)
+		if (cpu != boot_cpuid)
+			smp_create_idle(cpu);
 }
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	cpu_set(smp_processor_id(), cpu_online_map);
-	/* FIXME: what about cpu_possible()? */
+	BUG_ON(smp_processor_id() != boot_cpuid);
+
+	/* cpu_possible is set up in prom.c */
+	cpu_set(boot_cpuid, cpu_online_map);
+
+	paca[boot_cpuid].xCurrent = (u64)current;
+	current_set[boot_cpuid] = current->thread_info;
 }
 
 int __devinit __cpu_up(unsigned int cpu)
 {
-	struct pt_regs regs;
-	struct task_struct *p;
 	int c;
+
+	/* At boot, don't bother with non-present cpus -JSCHOPP */
+	if (system_state == SYSTEM_BOOTING && !cpu_present_at_boot(cpu))
+		return -ENOENT;
 
 	paca[cpu].prof_counter = 1;
 	paca[cpu].prof_multiplier = 1;
@@ -632,19 +900,9 @@ int __devinit __cpu_up(unsigned int cpu)
 		paca[cpu].xStab_data.real = virt_to_abs(tmp);
 	}
 
-	/* create a process for the processor */
-	/* only regs.msr is actually used, and 0 is OK for it */
-	memset(&regs, 0, sizeof(struct pt_regs));
-	p = copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
-	if (IS_ERR(p))
-		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
-
-	wake_up_forked_process(p);
-	init_idle(p, cpu);
-	unhash_process(p);
-
-	paca[cpu].xCurrent = (u64)p;
-	current_set[cpu] = p->thread_info;
+	/* The information for processor bringup must be written out
+	 * to main store before we release the processor. */
+	mb();
 
 	/* The information for processor bringup must
 	 * be written out to main store before we release
@@ -676,6 +934,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	return 0;
 }
 
+extern unsigned int default_distrib_server;
 /* Activate a secondary processor. */
 int __devinit start_secondary(void *unused)
 {
@@ -698,6 +957,15 @@ int __devinit start_secondary(void *unused)
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		vpa_init(cpu); 
 	}
+
+#ifdef CONFIG_IRQ_ALL_CPUS
+	/* Put the calling processor into the GIQ.  This is really only
+	 * necessary from a secondary thread as the OF start-cpu interface
+	 * performs this function for us on primary threads.
+	 */
+	/* TODO: 9005 is #defined in rtas-proc.c -- move to a header */
+	rtas_set_indicator(9005, default_distrib_server, 1);
+#endif
 #endif
 
 	local_irq_enable();
@@ -728,71 +996,3 @@ void __init smp_cpus_done(unsigned int max_cpus)
 
 	set_cpus_allowed(current, old_mask);
 }
-
-#ifdef CONFIG_NUMA
-static struct node node_devices[MAX_NUMNODES];
-
-static void register_nodes(void)
-{
-	int i;
-	int ret;
-
-	for (i = 0; i < MAX_NUMNODES; i++) {
-		if (node_online(i)) {
-			int p_node = parent_node(i);
-			struct node *parent = NULL;
-
-			if (p_node != i)
-				parent = &node_devices[p_node];
-
-			ret = register_node(&node_devices[i], i, parent);
-			if (ret)
-				printk(KERN_WARNING "register_nodes: "
-				       "register_node %d failed (%d)", i, ret);
-		}
-	}
-}
-#else
-static void register_nodes(void)
-{
-	return;
-}
-#endif
-
-/* Only valid if CPU is online. */
-static ssize_t show_physical_id(struct sys_device *dev, char *buf)
-{
-	struct cpu *cpu = container_of(dev, struct cpu, sysdev);
-
-	return sprintf(buf, "%u\n", get_hard_smp_processor_id(cpu->sysdev.id));
-}
-static SYSDEV_ATTR(physical_id, 0444, show_physical_id, NULL);
-
-static DEFINE_PER_CPU(struct cpu, cpu_devices);
-
-static int __init topology_init(void)
-{
-	int cpu;
-	struct node *parent = NULL;
-	int ret;
-
-	register_nodes();
-
-	for_each_cpu(cpu) {
-#ifdef CONFIG_NUMA
-		parent = &node_devices[cpu_to_node(cpu)];
-#endif
-		ret = register_cpu(&per_cpu(cpu_devices, cpu), cpu, parent);
-		if (ret)
-			printk(KERN_WARNING "topology_init: register_cpu %d "
-			       "failed (%d)\n", cpu, ret);
-
-		ret = sysdev_create_file(&per_cpu(cpu_devices, cpu).sysdev,
-					 &attr_physical_id);
-		if (ret)
-			printk(KERN_WARNING "toplogy_init: sysdev_create_file "
-			       "%d failed (%d)\n", cpu, ret);
-	}
-	return 0;
-}
-__initcall(topology_init);

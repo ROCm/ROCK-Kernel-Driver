@@ -719,10 +719,12 @@ static ctl_table vm_table[] = {
 	 {
 		.ctl_name	= VM_HUGETLB_PAGES,
 		.procname	= "nr_hugepages",
-		.data		= &htlbpage_max,
-		.maxlen		= sizeof(int),
+		.data		= &max_huge_pages,
+		.maxlen		= sizeof(unsigned long),
 		.mode		= 0644,
 		.proc_handler	= &hugetlb_sysctl_handler,
+		.extra1		= (void *)&hugetlb_zero,
+		.extra2		= (void *)&hugetlb_infinity,
 	 },
 #endif
 	{
@@ -731,7 +733,7 @@ static ctl_table vm_table[] = {
 		.data		= &sysctl_lower_zone_protection,
 		.maxlen		= sizeof(sysctl_lower_zone_protection),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_minmax,
+		.proc_handler	= &lower_zone_protection_sysctl_handler,
 		.strategy	= &sysctl_intvec,
 		.extra1		= &zero,
 	},
@@ -752,6 +754,26 @@ static ctl_table vm_table[] = {
 		.maxlen		= sizeof(sysctl_max_map_count),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
+	},
+	{
+		.ctl_name	= VM_LAPTOP_MODE,
+		.procname	= "laptop_mode",
+		.data		= &laptop_mode,
+		.maxlen		= sizeof(laptop_mode),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
+	},
+	{
+		.ctl_name	= VM_BLOCK_DUMP,
+		.procname	= "block_dump",
+		.data		= &block_dump,
+		.maxlen		= sizeof(block_dump),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
 	},
 	{ .ctl_name = 0 }
 };

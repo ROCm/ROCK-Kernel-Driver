@@ -138,25 +138,21 @@ void __init setup_arch(char **cmdline_p)
 	register_console((struct console *)&gdb_console);
 #endif
 
-	printk("\r\n\nuClinux " CPU "\n");
-	printk("Target Hardware: %s\n",_target_name);
-	printk("Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne\n");
-	printk("H8/300 series support by Yoshinori Sato <ysato@users.sourceforge.jp>\n");
+	printk(KERN_INFO "\r\n\nuClinux " CPU "\n");
+	printk(KERN_INFO "Target Hardware: %s\n",_target_name);
+	printk(KERN_INFO "Flat model support (C) 1998,1999 Kenneth Albanowski, D. Jeff Dionne\n");
+	printk(KERN_INFO "H8/300 series support by Yoshinori Sato <ysato@users.sourceforge.jp>\n");
 
 #ifdef DEBUG
-	printk("KERNEL -> TEXT=0x%06x-0x%06x DATA=0x%06x-0x%06x "
+	printk(KERN_DEBUG "KERNEL -> TEXT=0x%06x-0x%06x DATA=0x%06x-0x%06x "
 		"BSS=0x%06x-0x%06x\n", (int) &_stext, (int) &_etext,
 		(int) &_sdata, (int) &_edata,
 		(int) &_sbss, (int) &_ebss);
-	printk("KERNEL -> ROMFS=0x%06x-0x%06x MEM=0x%06x-0x%06x "
+	printk(KERN_DEBUG "KERNEL -> ROMFS=0x%06x-0x%06x MEM=0x%06x-0x%06x "
 		"STACK=0x%06x-0x%06x\n",
 	       (int) &_ebss, (int) memory_start,
 		(int) memory_start, (int) memory_end,
 		(int) memory_end, (int) &_ramend);
-#endif
-
-#ifdef CONFIG_BLK_DEV_BLKMEM
-	ROOT_DEV = MKDEV(BLKMEM_MAJOR,0);
 #endif
 
 #ifdef CONFIG_DEFAULT_CMDLINE
@@ -171,7 +167,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef DEBUG
 	if (strlen(*cmdline_p)) 
-		printk("Command line: '%s'\n", *cmdline_p);
+		printk(KERN_DEBUG "Command line: '%s'\n", *cmdline_p);
 #endif
 
 	/*
@@ -195,28 +191,8 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 	h8300_gpio_init();
 #ifdef DEBUG
-	printk("Done setup_arch\n");
+	printk(KERN_DEBUG "Done setup_arch\n");
 #endif
-}
-
-int get_cpuinfo(char * buffer)
-{
-    char *cpu;
-    u_long clockfreq;
-
-    cpu = CPU;
-
-    clockfreq = CONFIG_CPU_CLOCK;
-
-    return(sprintf(buffer, "CPU:\t\t%s\n"
-		   "Clock:\t%lu.%1luMHz\n"
-		   "BogoMips:\t%lu.%02lu\n"
-		   "Calibration:\t%lu loops\n",
-		   cpu,
-		   clockfreq/100,clockfreq%100,
-		   (loops_per_jiffy*HZ)/500000,((loops_per_jiffy*HZ)/5000)%100,
-		   (loops_per_jiffy*HZ)));
-
 }
 
 /*
@@ -226,17 +202,19 @@ int get_cpuinfo(char * buffer)
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
     char *cpu;
+    int mode;
     u_long clockfreq;
 
     cpu = CPU;
+    mode = *(volatile unsigned char *)MDCR & 0x07;
 
     clockfreq = CONFIG_CPU_CLOCK;
 
-    seq_printf(m,  "CPU:\t\t%s\n"
-		   "Clock:\t%lu.%1luMHz\n"
+    seq_printf(m,  "CPU:\t\t%s (mode:%d)\n"
+		   "Clock:\t\t%lu.%1luMHz\n"
 		   "BogoMips:\t%lu.%02lu\n"
 		   "Calibration:\t%lu loops\n",
-		   cpu,
+	           cpu,mode,
 		   clockfreq/100,clockfreq%100,
 		   (loops_per_jiffy*HZ)/500000,((loops_per_jiffy*HZ)/5000)%100,
 		   (loops_per_jiffy*HZ));

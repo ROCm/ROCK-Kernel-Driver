@@ -358,17 +358,15 @@ int journal_revoke(handle_t *handle, unsigned long blocknr,
 		bh2 = __find_get_block(bdev, blocknr, journal->j_blocksize);
 		if (bh2) {
 			/* ... and it has RevokeValid status... */
-			if ((bh2 != bh) &&
-			    test_bit(BH_RevokeValid, &bh2->b_state))
+			if (bh2 != bh && buffer_revokevalid(bh2))
 				/* ...then it better be revoked too,
 				 * since it's illegal to create a revoke
 				 * record against a buffer_head which is
 				 * not marked revoked --- that would
 				 * risk missing a subsequent revoke
 				 * cancel. */
-				J_ASSERT_BH(bh2, test_bit(BH_Revoked, &
-							  bh2->b_state));
-			__brelse(bh2);
+				J_ASSERT_BH(bh2, buffer_revoked(bh2));
+			put_bh(bh2);
 		}
 	}
 #endif
@@ -377,9 +375,9 @@ int journal_revoke(handle_t *handle, unsigned long blocknr,
            first having the revoke cancelled: it's illegal to free a
            block twice without allocating it in between! */
 	if (bh) {
-		J_ASSERT_BH(bh, !test_bit(BH_Revoked, &bh->b_state));
-		set_bit(BH_Revoked, &bh->b_state);
-		set_bit(BH_RevokeValid, &bh->b_state);
+		J_ASSERT_BH(bh, !buffer_revoked(bh));
+		set_buffer_revoked(bh);
+		set_buffer_revokevalid(bh);
 		if (bh_in) {
 			BUFFER_TRACE(bh_in, "call journal_forget");
 			journal_forget(handle, bh_in);
@@ -400,7 +398,7 @@ int journal_revoke(handle_t *handle, unsigned long blocknr,
  * Cancel an outstanding revoke.  For use only internally by the
  * journaling code (called from journal_get_write_access).
  *
- * We trust the BH_Revoked bit on the buffer if the buffer is already
+ * We trust buffer_revoked() on the buffer if the buffer is already
  * being journaled: if there is no revoke pending on the buffer, then we
  * don't do anything here.
  *
@@ -427,11 +425,11 @@ int journal_cancel_revoke(handle_t *handle, struct journal_head *jh)
 	 * only perform the full cancel if the revoke bit is set.  If
 	 * not, we can't trust the revoke bit, and we need to do the
 	 * full search for a revoke record. */
-	if (test_and_set_bit(BH_RevokeValid, &bh->b_state))
-		need_cancel = (test_and_clear_bit(BH_Revoked, &bh->b_state));
-	else {
+	if (test_set_buffer_revokevalid(bh)) {
+		need_cancel = test_clear_buffer_revoked(bh);
+	} else {
 		need_cancel = 1;
-		clear_bit(BH_Revoked, &bh->b_state);
+		clear_buffer_revoked(bh);
 	}
 
 	if (need_cancel) {
@@ -462,7 +460,7 @@ int journal_cancel_revoke(handle_t *handle, struct journal_head *jh)
 		bh2 = __find_get_block(bh->b_bdev, bh->b_blocknr, bh->b_size);
 		if (bh2) {
 			if (bh2 != bh)
-				clear_bit(BH_Revoked, &bh2->b_state);
+				clear_buffer_revoked(bh2);
 			__brelse(bh2);
 		}
 	}
@@ -597,24 +595,20 @@ static void flush_descriptor(journal_t *journal,
 			     int offset)
 {
 	journal_revoke_header_t *header;
+	struct buffer_head *bh = jh2bh(descriptor);
 
 	if (is_journal_aborted(journal)) {
-		JBUFFER_TRACE(descriptor, "brelse");
-		__brelse(jh2bh(descriptor));
+		put_bh(bh);
 		return;
 	}
 
 	header = (journal_revoke_header_t *) jh2bh(descriptor)->b_data;
 	header->r_count = htonl(offset);
-	set_bit(BH_JWrite, &jh2bh(descriptor)->b_state);
-	{
-		struct buffer_head *bh = jh2bh(descriptor);
-		BUFFER_TRACE(bh, "write");
-		set_buffer_uptodate(bh);
-		ll_rw_block (WRITE, 1, &bh);
-	}
+	set_buffer_jwrite(bh);
+	BUFFER_TRACE(bh, "write");
+	set_buffer_uptodate(bh);
+	ll_rw_block(WRITE, 1, &bh);
 }
-
 #endif
 
 /* 

@@ -105,12 +105,20 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 #ifdef CONFIG_KALLSYMS
 	printk("\n");
 #endif
-	while (!kstack_end(stack)) {
-		addr = *stack++;
-		if (kernel_text_address(addr)) {
-			printk(" [<%08lx>] ", addr);
-			print_symbol("%s\n", addr);
+	while (1) {
+		struct thread_info *context;
+		context = (struct thread_info*) ((unsigned long)stack & (~(THREAD_SIZE - 1)));
+		while (!kstack_end(stack)) {
+			addr = *stack++;
+			if (kernel_text_address(addr)) {
+				printk(" [<%08lx>] ", addr);
+				print_symbol("%s\n", addr);
+			}
 		}
+		stack = (unsigned long*)context->previous_esp;
+		if (!stack)
+			break;
+		printk(" =======================\n");
 	}
 	printk("\n");
 }

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.110 $
+ *   $Revision: 1.113 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -120,6 +120,7 @@ void io_subchannel_irq (struct device *);
 static int io_subchannel_notify(struct device *, int);
 static void io_subchannel_verify(struct device *);
 static void io_subchannel_ioterm(struct device *);
+static void io_subchannel_shutdown(struct device *);
 
 struct css_driver io_subchannel_driver = {
 	.subchannel_type = SUBCHANNEL_TYPE_IO,
@@ -128,6 +129,7 @@ struct css_driver io_subchannel_driver = {
 		.bus  = &css_bus_type,
 		.probe = &io_subchannel_probe,
 		.remove = &io_subchannel_remove,
+		.shutdown = &io_subchannel_shutdown,
 	},
 	.irq = io_subchannel_irq,
 	.notify = io_subchannel_notify,
@@ -764,6 +766,37 @@ io_subchannel_ioterm(struct device *dev)
 	if (cdev->handler)
 		cdev->handler(cdev, cdev->private->intparm,
 			      ERR_PTR(-EIO));
+}
+
+static void
+io_subchannel_shutdown(struct device *dev)
+{
+	struct subchannel *sch;
+	struct ccw_device *cdev;
+	int ret;
+
+	sch = to_subchannel(dev);
+	cdev = dev->driver_data;
+
+	if (cio_is_console(sch->irq))
+		return;
+	if (!sch->schib.pmcw.ena)
+		/* Nothing to do. */
+		return;
+	ret = cio_disable_subchannel(sch);
+	if (ret != -EBUSY)
+		/* Subchannel is disabled, we're done. */
+		return;
+	cdev->private->state = DEV_STATE_QUIESCE;
+	if (cdev->handler)
+		cdev->handler(cdev, cdev->private->intparm,
+			      ERR_PTR(-EIO));
+	ret = ccw_device_cancel_halt_clear(cdev);
+	if (ret == -EBUSY) {
+		ccw_device_set_timeout(cdev, HZ/10);
+		wait_event(cdev->private->wait_q, dev_fsm_final_state(cdev));
+	}
+	cio_disable_subchannel(sch);
 }
 
 #ifdef CONFIG_CCW_CONSOLE

@@ -67,7 +67,6 @@ static void openpic_disable_irq(u_int irq);
 static void openpic_initirq(u_int irq, u_int pri, u_int vector, int polarity,
 			    int is_level);
 static void openpic_mapirq(u_int irq, u_int cpumask);
-static void openpic_set_sense(u_int irq, int sense);
 
 static void find_ISUs(void);
 
@@ -170,7 +169,7 @@ void __init pSeries_init_openpic(void)
         int i;
         unsigned int *addrp;
         unsigned char* chrp_int_ack_special = 0;
-        unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
+        unsigned char init_senses[NR_IRQS - NUM_ISA_INTERRUPTS];
         int nmi_irq = -1;
 #if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)
         struct device_node *kbd;
@@ -185,12 +184,12 @@ void __init pSeries_init_openpic(void)
 			__ioremap(addrp[prom_n_addr_cells(np)-1], 1, _PAGE_NO_CACHE);
         /* hydra still sets OpenPIC_InitSenses to a static set of values */
         if (OpenPIC_InitSenses == NULL) {
-                prom_get_irq_senses(init_senses, NUM_8259_INTERRUPTS, NR_IRQS);
+                prom_get_irq_senses(init_senses, NUM_ISA_INTERRUPTS, NR_IRQS);
                 OpenPIC_InitSenses = init_senses;
-                OpenPIC_NumInitSenses = NR_IRQS - NUM_8259_INTERRUPTS;
+                OpenPIC_NumInitSenses = NR_IRQS - NUM_ISA_INTERRUPTS;
         }
-        openpic_init(1, NUM_8259_INTERRUPTS, chrp_int_ack_special, nmi_irq);
-        for ( i = 0 ; i < NUM_8259_INTERRUPTS  ; i++ )
+        openpic_init(1, NUM_ISA_INTERRUPTS, chrp_int_ack_special, nmi_irq);
+        for (i = 0; i < NUM_ISA_INTERRUPTS; i++)
                 irq_desc[i].handler = &i8259_pic;
 	of_node_put(np);
 }
@@ -441,7 +440,7 @@ static int __init openpic_setup_i8259(void)
 
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
 		/* Initialize the cascade */
-		if (request_irq(NUM_8259_INTERRUPTS, no_action, SA_INTERRUPT,
+		if (request_irq(NUM_ISA_INTERRUPTS, no_action, SA_INTERRUPT,
 				"82c59 cascade", NULL))
 			printk(KERN_ERR "Unable to get OpenPIC IRQ 0 for cascade\n");
 		i8259_init();
@@ -820,12 +819,20 @@ static void openpic_mapirq(u_int irq, u_int physmask)
  *
  *  sense: 1 for level, 0 for edge
  */
-static inline void openpic_set_sense(u_int irq, int sense)
+#if 0	/* not used */
+static void openpic_set_sense(u_int irq, int sense)
 {
 	openpic_safe_writefield(&GET_ISU(irq).Vector_Priority,
 				OPENPIC_SENSE_LEVEL,
 				(sense ? OPENPIC_SENSE_LEVEL : 0));
 }
+
+static int openpic_get_sense(u_int irq)
+{
+	return openpic_readfield(&GET_ISU(irq).Vector_Priority,
+				 OPENPIC_SENSE_LEVEL) != 0;
+}
+#endif
 
 static void openpic_end_irq(unsigned int irq_nr)
 {

@@ -3,7 +3,7 @@
 /* These definitions are for GCC v3.x.  */
 #include <linux/compiler-gcc.h>
 
-#if __GNUC_MINOR__ >= 1
+#if __GNUC_MINOR__ >= 1  && __GNUC_MINOR__ < 4
 # define inline		__inline__ __attribute__((always_inline))
 # define __inline__	__inline__ __attribute__((always_inline))
 # define __inline	__inline__ __attribute__((always_inline))

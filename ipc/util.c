@@ -25,8 +25,6 @@
 #include <linux/rcupdate.h>
 #include <linux/workqueue.h>
 
-#if defined(CONFIG_SYSVIPC)
-
 #include "util.h"
 
 /**
@@ -531,20 +529,3 @@ int ipc_parse_version (int *cmd)
 }
 
 #endif /* __ia64__ */
-
-#else
-/*
- * Dummy functions when SYSV IPC isn't configured
- */
-
-int copy_semundo(unsigned long clone_flags, struct task_struct *tsk)
-{
-	return 0;
-}
-
-void exit_sem(struct task_struct *tsk)
-{
-	return;
-}
-
-#endif /* CONFIG_SYSVIPC */

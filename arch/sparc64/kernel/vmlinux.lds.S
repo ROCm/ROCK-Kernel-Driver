@@ -15,6 +15,7 @@ SECTIONS
   .text 0x0000000000404000 :
   {
     *(.text)
+    SCHED_TEXT
     *(.gnu.warning)
   } =0
   _etext = .;

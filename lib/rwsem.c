@@ -5,6 +5,7 @@
  */
 #include <linux/rwsem.h>
 #include <linux/sched.h>
+#include <linux/init.h>
 #include <linux/module.h>
 
 struct rwsem_waiter {
@@ -162,7 +163,7 @@ static inline struct rw_semaphore *rwsem_down_failed_common(struct rw_semaphore 
 /*
  * wait for the read lock to be granted
  */
-struct rw_semaphore fastcall *rwsem_down_read_failed(struct rw_semaphore *sem)
+struct rw_semaphore fastcall __sched *rwsem_down_read_failed(struct rw_semaphore *sem)
 {
 	struct rwsem_waiter waiter;
 
@@ -178,7 +179,7 @@ struct rw_semaphore fastcall *rwsem_down_read_failed(struct rw_semaphore *sem)
 /*
  * wait for the write lock to be granted
  */
-struct rw_semaphore fastcall *rwsem_down_write_failed(struct rw_semaphore *sem)
+struct rw_semaphore fastcall __sched *rwsem_down_write_failed(struct rw_semaphore *sem)
 {
 	struct rwsem_waiter waiter;
 

@@ -83,13 +83,30 @@ config SYSVIPC
 	  exchange information. It is generally considered to be a good thing,
 	  and some programs won't run unless you say Y here. In particular, if
 	  you want to run the DOS emulator dosemu under Linux (read the
-	  DOSEMU-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>), you'll need to say Y
-	  here.
+	  DOSEMU-HOWTO, available from <http://www.tldp.org/docs.html#howto>),
+	  you'll need to say Y here.
 
 	  You can find documentation about IPC with "info ipc" and also in
 	  section 6.4 of the Linux Programmer's Guide, available from
-	  <http://www.tldp.org/docs.html#guide>.
+	  <http://www.tldp.org/guides.html>.
+
+config POSIX_MQUEUE
+	bool "POSIX Message Queues"
+	depends on EXPERIMENTAL
+	---help---
+	  POSIX variant of message queues is a part of IPC. In POSIX message
+	  queues every message has a priority which decides about succession
+	  of receiving it by a process. If you want to compile and run
+	  programs written e.g. for Solaris with use of its POSIX message
+	  queues (functions mq_*) say Y here. To use this feature you will
+	  also need mqueue library, available from
+	  <http://www.mat.uni.torun.pl/~wrona/posix_ipc/>
+
+	  POSIX message queues are visible as a filesystem called 'mqueue'
+	  and can be mounted somewhere if you want to do filesystem
+	  operations on message queues.
+
+	  If unsure, say Y.
 
 config BSD_PROCESS_ACCT
 	bool "BSD Process Accounting"
@@ -119,6 +136,26 @@ config SYSCTL
 	  As it is generally a good thing, you should say Y here unless
 	  building a kernel for install/rescue disks or your system is very
 	  limited in memory.
+
+config AUDIT
+	bool "Auditing support"
+	default y if SECURITY_SELINUX
+	default n
+	help
+	  Enable auditing infrastructure that can be used with another
+	  kernel subsystem, such as SELinux (which requires this for
+	  logging of avc messages output).  Does not do system-call
+	  auditing without CONFIG_AUDITSYSCALL.
+
+config AUDITSYSCALL
+	bool "Enable system-call auditing support"
+	depends on AUDIT && (X86 || PPC64)
+	default y if SECURITY_SELINUX
+	default n
+	help
+	  Enable low-overhead system-call auditing infrastructure that
+	  can be used independently or with another kernel subsystem,
+	  such as SELinux.
 
 config LOG_BUF_SHIFT
 	int "Kernel log buffer size (16 => 64KB, 17 => 128KB)" if DEBUG_KERNEL
@@ -183,12 +220,12 @@ config IKCONFIG_PROC
 
 
 menuconfig EMBEDDED
-	bool "Remove kernel features (for embedded systems)"
+	bool "Configure standard kernel features (for small systems)"
 	help
-	  This option allows certain base kernel features to be removed from
-	  the build.  This is for specialized environments which can tolerate
-	  a "non-standard" kernel.  Only use this if you really know what you
-	  are doing.
+	  This option allows certain base kernel options and settings
+          to be disabled or tweaked. This is for specialized
+          environments which can tolerate a "non-standard" kernel.
+          Only use this if you really know what you are doing.
 
 config KALLSYMS
 	 bool "Load all symbols for debugging/kksymoops" if EMBEDDED

@@ -101,8 +101,8 @@ static inline pte_t ptep_get_and_clear(pte_t *ptep)
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			page = pfn_to_page(pfn);
-			if (!page->mapping
-			    || list_empty(&page->mapping->i_mmap_shared))
+			if (!page_mapping(page) ||
+			    !mapping_writably_mapped(page->mapping))
 				__clear_bit(PG_mapped, &page->flags);
 		}
 	}

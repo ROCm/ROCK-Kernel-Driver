@@ -694,7 +694,7 @@ static int rdstatus(char *stp, unsigned size, char qcmd)
 		*q = inb_p(QIC02_DATA_PORT);	/* read status byte */
 
 		if (TP_DIAGS(current_type))
-			printk("[%1d]=0x%x  ", q - stp, (unsigned) (*q) & 0xff);
+			printk("[%1zd]=0x%x  ", q - stp, (unsigned) (*q) & 0xff);
 
 		outb_p(ctlbits | QIC02_CTL_REQUEST, QIC02_CTL_PORT);	/* set request */
 

@@ -869,7 +869,7 @@ struct v4l2_streamparm
 #define VIDIOC_S_MODULATOR	_IOW  ('V', 55, struct v4l2_modulator)
 #define VIDIOC_G_FREQUENCY	_IOWR ('V', 56, struct v4l2_frequency)
 #define VIDIOC_S_FREQUENCY	_IOW  ('V', 57, struct v4l2_frequency)
-#define VIDIOC_CROPCAP		_IOR  ('V', 58, struct v4l2_cropcap)
+#define VIDIOC_CROPCAP		_IOWR ('V', 58, struct v4l2_cropcap)
 #define VIDIOC_G_CROP		_IOWR ('V', 59, struct v4l2_crop)
 #define VIDIOC_S_CROP		_IOW  ('V', 60, struct v4l2_crop)
 #define VIDIOC_G_JPEGCOMP	_IOR  ('V', 61, struct v4l2_jpegcompression)
@@ -887,6 +887,7 @@ struct v4l2_streamparm
 #define VIDIOC_S_CTRL_OLD      	_IOW  ('V', 28, struct v4l2_control)
 #define VIDIOC_G_AUDIO_OLD     	_IOWR ('V', 33, struct v4l2_audio)
 #define VIDIOC_G_AUDOUT_OLD    	_IOWR ('V', 49, struct v4l2_audioout)
+#define VIDIOC_CROPCAP_OLD     	_IOR  ('V', 58, struct v4l2_cropcap)
 
 #define BASE_VIDIOC_PRIVATE	192		/* 192-255 are private */
 

@@ -53,4 +53,8 @@ extern int can_request_irq(unsigned int, unsigned long flags);
 #define ARCH_HAS_NMI_WATCHDOG		/* See include/linux/nmi.h */
 #endif
 
+struct irqaction;
+struct pt_regs;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
+
 #endif /* _ASM_IRQ_H */

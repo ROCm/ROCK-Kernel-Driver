@@ -66,9 +66,9 @@ a view can be inspected simply by reading the corresponding proc file.
 All debug logs have an an actual debug level (range from 0 to 6).
 The default level is 3. Event and Exception functions have a 'level'
 parameter. Only debug entries with a level that is lower or equal
-than the actual level are written to the log. This means that high 
-priority log entries should have a low level value whereas low priority
-entries should have a high one. 
+than the actual level are written to the log. This means, when
+writing events, high priority log entries should have a low level
+value whereas low priority entries should have a high one.
 The actual debug level can be changed with the help of the proc-filesystem 
 through writing a number string "x" to the 'level' proc file which is
 provided for every debug log. Debugging can be switched off completely

@@ -5,6 +5,7 @@
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
+#include <linux/init.h>
 
 /*
  * Semaphores are complex as we wish to avoid using two variables.
@@ -58,7 +59,7 @@ void __up(struct semaphore *sem)
 	sem->count += (sem->count < 0) ? 1 : - 1;
 	
 
-void __down(struct semaphore * sem)
+void __sched __down(struct semaphore * sem)
 {
 	DOWN_HEAD
 
@@ -74,7 +75,7 @@ void __down(struct semaphore * sem)
 	UPDATE_COUNT
 }
 
-int __down_interruptible(struct semaphore * sem)
+int __sched __down_interruptible(struct semaphore * sem)
 {
 	DOWN_HEAD
 

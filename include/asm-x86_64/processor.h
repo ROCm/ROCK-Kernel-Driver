@@ -59,6 +59,7 @@ struct cpuinfo_x86 {
 	char	x86_model_id[64];
 	int 	x86_cache_size;  /* in KB */
 	int	x86_clflush_size;
+	int	x86_cache_alignment;
 	int	x86_tlbsize;	/* number of 4K pages in DTLB/ITLB combined(in pages)*/
         __u8    x86_virt_bits, x86_phys_bits;
         __u32   x86_power; 	
@@ -453,6 +454,6 @@ static inline void __mwait(unsigned long eax, unsigned long ecx)
 	ti->task;					\
 })
 
-#define cache_line_size() (boot_cpu_data.x86_clflush_size)
+#define cache_line_size() (boot_cpu_data.x86_cache_alignment)
 
 #endif /* __ASM_X86_64_PROCESSOR_H */

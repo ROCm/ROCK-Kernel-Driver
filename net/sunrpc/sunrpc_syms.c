@@ -134,6 +134,7 @@ EXPORT_SYMBOL(xdr_read_pages);
 EXPORT_SYMBOL(xdr_buf_from_iov);
 EXPORT_SYMBOL(xdr_buf_subsegment);
 EXPORT_SYMBOL(xdr_buf_read_netobj);
+EXPORT_SYMBOL(read_bytes_from_xdr_buf);
 
 /* Debugging symbols */
 #ifdef RPC_DEBUG

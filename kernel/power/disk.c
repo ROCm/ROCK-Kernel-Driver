@@ -84,7 +84,6 @@ static void free_some_memory(void)
 	while (shrink_all_memory(10000))
 		printk(".");
 	printk("|\n");
-	blk_run_queues();
 }
 
 
@@ -285,11 +284,16 @@ static ssize_t disk_store(struct subsystem * s, const char * buf, size_t n)
 {
 	int error = 0;
 	int i;
+	int len;
+	char *p;
 	u32 mode = 0;
+
+	p = memchr(buf, '\n', n);
+	len = p ? p - buf : n;
 
 	down(&pm_sem);
 	for (i = PM_DISK_FIRMWARE; i < PM_DISK_MAX; i++) {
-		if (!strcmp(buf,pm_disk_modes[i])) {
+		if (!strncmp(buf, pm_disk_modes[i], len)) {
 			mode = i;
 			break;
 		}

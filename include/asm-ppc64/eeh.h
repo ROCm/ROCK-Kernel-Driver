@@ -199,74 +199,71 @@ static inline void eeh_memcpy_toio(void *dest, void *src, unsigned long n) {
 	memcpy(vdest, src, n);
 }
 
-/* The I/O macros must handle ISA ports as well as PCI I/O bars.
- * ISA does not implement EEH and ISA may not exist in the system.
- * For PCI we check for EEH failures.
- */
-#define _IO_IS_ISA(port) ((port) < 0x10000)
-#define _IO_HAS_ISA_BUS	(isa_io_base != 0)
+#define MAX_ISA_PORT 0x10000
+extern unsigned long io_page_mask;
+#define _IO_IS_VALID(port) ((port) >= MAX_ISA_PORT || (1 << (port>>PAGE_SHIFT)) & io_page_mask)
 
 static inline u8 eeh_inb(unsigned long port) {
 	u8 val;
-	if (_IO_IS_ISA(port) && !_IO_HAS_ISA_BUS)
+	if (!_IO_IS_VALID(port))
 		return ~0;
 	val = in_8((u8 *)(port+pci_io_base));
-	if (!_IO_IS_ISA(port) && EEH_POSSIBLE_IO_ERROR(val, u8))
+	if (EEH_POSSIBLE_IO_ERROR(val, u8))
 		return eeh_check_failure((void*)(port), val);
 	return val;
 }
 
 static inline void eeh_outb(u8 val, unsigned long port) {
-	if (!_IO_IS_ISA(port) || _IO_HAS_ISA_BUS)
+	if (_IO_IS_VALID(port))
 		return out_8((u8 *)(port+pci_io_base), val);
 }
 
 static inline u16 eeh_inw(unsigned long port) {
 	u16 val;
-	if (_IO_IS_ISA(port) && !_IO_HAS_ISA_BUS)
+	if (!_IO_IS_VALID(port))
 		return ~0;
 	val = in_le16((u16 *)(port+pci_io_base));
-	if (!_IO_IS_ISA(port) && EEH_POSSIBLE_IO_ERROR(val, u16))
+	if (EEH_POSSIBLE_IO_ERROR(val, u16))
 		return eeh_check_failure((void*)(port), val);
 	return val;
 }
 
 static inline void eeh_outw(u16 val, unsigned long port) {
-	if (!_IO_IS_ISA(port) || _IO_HAS_ISA_BUS)
+	if (_IO_IS_VALID(port))
 		return out_le16((u16 *)(port+pci_io_base), val);
 }
 
 static inline u32 eeh_inl(unsigned long port) {
 	u32 val;
-	if (_IO_IS_ISA(port) && !_IO_HAS_ISA_BUS)
+	if (!_IO_IS_VALID(port))
 		return ~0;
 	val = in_le32((u32 *)(port+pci_io_base));
-	if (!_IO_IS_ISA(port) && EEH_POSSIBLE_IO_ERROR(val, u32))
+	if (EEH_POSSIBLE_IO_ERROR(val, u32))
 		return eeh_check_failure((void*)(port), val);
 	return val;
 }
 
 static inline void eeh_outl(u32 val, unsigned long port) {
-	if (!_IO_IS_ISA(port) || _IO_HAS_ISA_BUS)
+	if (_IO_IS_VALID(port))
 		return out_le32((u32 *)(port+pci_io_base), val);
 }
 
 /* in-string eeh macros */
 static inline void eeh_insb(unsigned long port, void * buf, int ns) {
 	_insb((u8 *)(port+pci_io_base), buf, ns);
-	if (!_IO_IS_ISA(port) && EEH_POSSIBLE_IO_ERROR((*(((u8*)buf)+ns-1)), u8))
+	if (EEH_POSSIBLE_IO_ERROR((*(((u8*)buf)+ns-1)), u8))
 		eeh_check_failure((void*)(port), *(u8*)buf);
 }
 
 static inline void eeh_insw_ns(unsigned long port, void * buf, int ns) {
 	_insw_ns((u16 *)(port+pci_io_base), buf, ns);
-	if (!_IO_IS_ISA(port) && EEH_POSSIBLE_IO_ERROR((*(((u16*)buf)+ns-1)), u16))
+	if (EEH_POSSIBLE_IO_ERROR((*(((u16*)buf)+ns-1)), u16))
 		eeh_check_failure((void*)(port), *(u16*)buf);
 }
 
 static inline void eeh_insl_ns(unsigned long port, void * buf, int nl) {
 	_insl_ns((u32 *)(port+pci_io_base), buf, nl);
-	if (!_IO_IS_ISA(port) && EEH_POSSIBLE_IO_ERROR((*(((u32*)buf)+nl-1)), u32))
+	if (EEH_POSSIBLE_IO_ERROR((*(((u32*)buf)+nl-1)), u32))
 		eeh_check_failure((void*)(port), *(u32*)buf);
 }
 

@@ -403,6 +403,8 @@ struct tss_struct {
 	unsigned long stack[64];
 } __attribute__((packed));
 
+#define ARCH_MIN_TASKALIGN	16
+
 struct thread_struct {
 /* cached TLS descriptors. */
 	struct desc_struct tls_array[GDT_ENTRY_TLS_ENTRIES];

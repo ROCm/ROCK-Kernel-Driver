@@ -70,7 +70,7 @@ int rotate_reclaimable_page(struct page *page)
 		list_add_tail(&page->lru, &zone->inactive_list);
 		inc_page_state(pgrotated);
 	}
-	if (!TestClearPageWriteback(page))
+	if (!test_clear_page_writeback(page))
 		BUG();
 	spin_unlock_irqrestore(&zone->lru_lock, flags);
 	return 0;
@@ -353,10 +353,18 @@ void pagevec_strip(struct pagevec *pvec)
  *
  * pagevec_lookup() returns the number of pages which were found.
  */
-unsigned int pagevec_lookup(struct pagevec *pvec, struct address_space *mapping,
-		pgoff_t start, unsigned int nr_pages)
+unsigned pagevec_lookup(struct pagevec *pvec, struct address_space *mapping,
+		pgoff_t start, unsigned nr_pages)
 {
 	pvec->nr = find_get_pages(mapping, start, nr_pages, pvec->pages);
+	return pagevec_count(pvec);
+}
+
+unsigned pagevec_lookup_tag(struct pagevec *pvec, struct address_space *mapping,
+		pgoff_t *index, int tag, unsigned nr_pages)
+{
+	pvec->nr = find_get_pages_tag(mapping, index, tag,
+					nr_pages, pvec->pages);
 	return pagevec_count(pvec);
 }
 

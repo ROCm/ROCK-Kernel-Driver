@@ -533,6 +533,8 @@ is_disk1:
 	movw	$0xAA, (0x1ff)			# device present
 no_psmouse:
 
+#include "../../i386/boot/edd.S"
+
 # Now we want to move to protected mode ...
 	cmpw	$0, %cs:realmode_swtch
 	jz	rmodeswtch_normal

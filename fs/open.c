@@ -57,9 +57,18 @@ static int vfs_statfs_native(struct super_block *sb, struct statfs *buf)
 		memcpy(buf, &st, sizeof(st));
 	else {
 		if (sizeof buf->f_blocks == 4) {
-			if ((st.f_blocks | st.f_bfree |
-			     st.f_bavail | st.f_files | st.f_ffree) &
+			if ((st.f_blocks | st.f_bfree | st.f_bavail) &
 			    0xffffffff00000000ULL)
+				return -EOVERFLOW;
+			/*
+			 * f_files and f_ffree may be -1; it's okay to stuff
+			 * that into 32 bits
+			 */
+			if (st.f_files != -1 &&
+			    (st.f_files & 0xffffffff00000000ULL))
+				return -EOVERFLOW;
+			if (st.f_ffree != -1 &&
+			    (st.f_ffree & 0xffffffff00000000ULL))
 				return -EOVERFLOW;
 		}
 
@@ -192,7 +201,9 @@ int do_truncate(struct dentry *dentry, loff_t length)
 	newattrs.ia_size = length;
 	newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;
 	down(&dentry->d_inode->i_sem);
+	down_write(&dentry->d_inode->i_alloc_sem);
 	err = notify_change(dentry, &newattrs);
+	up_write(&dentry->d_inode->i_alloc_sem);
 	up(&dentry->d_inode->i_sem);
 	return err;
 }
@@ -1037,7 +1048,7 @@ EXPORT_SYMBOL(sys_close);
 asmlinkage long sys_vhangup(void)
 {
 	if (capable(CAP_SYS_TTY_CONFIG)) {
-		tty_vhangup(current->tty);
+		tty_vhangup(current->signal->tty);
 		return 0;
 	}
 	return -EPERM;

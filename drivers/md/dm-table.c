@@ -279,6 +279,9 @@ void dm_table_get(struct dm_table *t)
 
 void dm_table_put(struct dm_table *t)
 {
+	if (!t)
+		return;
+
 	if (atomic_dec_and_test(&t->holders))
 		table_destroy(t);
 }
@@ -867,9 +870,39 @@ void dm_table_resume_targets(struct dm_table *t)
 	}
 }
 
+int dm_table_any_congested(struct dm_table *t, int bdi_bits)
+{
+	struct list_head *d, *devices;
+	int r = 0;
+
+	devices = dm_table_get_devices(t);
+	for (d = devices->next; d != devices; d = d->next) {
+		struct dm_dev *dd = list_entry(d, struct dm_dev, list);
+		request_queue_t *q = bdev_get_queue(dd->bdev);
+		r |= bdi_congested(&q->backing_dev_info, bdi_bits);
+	}
+
+	return r;
+}
+
+void dm_table_unplug_all(struct dm_table *t)
+{
+	struct list_head *d, *devices = dm_table_get_devices(t);
+
+	for (d = devices->next; d != devices; d = d->next) {
+		struct dm_dev *dd = list_entry(d, struct dm_dev, list);
+		request_queue_t *q = bdev_get_queue(dd->bdev);
+
+		if (q->unplug_fn)
+			q->unplug_fn(q);
+	}
+}
 
 EXPORT_SYMBOL(dm_vcalloc);
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
 EXPORT_SYMBOL(dm_table_event);
 EXPORT_SYMBOL(dm_table_get_mode);
+EXPORT_SYMBOL(dm_table_put);
+EXPORT_SYMBOL(dm_table_get);
+EXPORT_SYMBOL(dm_table_unplug_all);

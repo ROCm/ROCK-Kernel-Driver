@@ -297,10 +297,10 @@ static void kgdb_break_interrupt(int irq, void *ptr, struct pt_regs *regs)
 #if defined(__H8300S__)
 enum { sci_disable, sci_enable };
 
-static void h8300_sci_enable(struct sci_port* port, unsigned int ctrl)
+static void h8300_sci_enable(struct uart_port* port, unsigned int ctrl)
 {
 	volatile unsigned char *mstpcrl=(volatile unsigned char *)MSTPCRL;
-	int ch = (port->base  - SMR0) >> 3;
+	int ch = (port->mapbase  - SMR0) >> 3;
 	unsigned char mask = 1 << (ch+1);
 
 	if (ctrl == sci_disable) {
@@ -313,9 +313,9 @@ static void h8300_sci_enable(struct sci_port* port, unsigned int ctrl)
 
 #if defined(SCI_ONLY) || defined(SCI_AND_SCIF)
 #if defined(__H8300H__) || defined(__H8300S__)
-static void sci_init_pins_sci(struct sci_port* port, unsigned int cflag)
+static void sci_init_pins_sci(struct uart_port* port, unsigned int cflag)
 {
-	int ch = (port->base - SMR0) >> 3;
+	int ch = (port->mapbase - SMR0) >> 3;
 
 	/* set DDR regs */
 	H8300_GPIO_DDR(h8300_sci_pins[ch].port,h8300_sci_pins[ch].rx,H8300_GPIO_INPUT);
@@ -418,11 +418,15 @@ static void sci_transmit_chars(struct uart_port *port)
 		return;
 	}
 
+#if !defined(SCI_ONLY)
 	if (port->type == PORT_SCIF) {
 		txroom = 16 - (sci_in(port, SCFDR)>>8);
 	} else {
 		txroom = (sci_in(port, SCxSR) & SCI_TDRE)?1:0;
 	}
+#else
+	txroom = (sci_in(port, SCxSR) & SCI_TDRE)?1:0;
+#endif
 
 	count = txroom;
 
@@ -454,10 +458,12 @@ static void sci_transmit_chars(struct uart_port *port)
 		local_irq_save(flags);
 		ctrl = sci_in(port, SCSCR);
 
+#if !defined(SCI_ONLY)
 		if (port->type == PORT_SCIF) {
 			sci_in(port, SCxSR); /* Dummy read */
 			sci_out(port, SCxSR, SCxSR_TDxE_CLEAR(port));
 		}
+#endif
 
 		ctrl |= SCI_CTRL_FLAGS_TIE;
 		sci_out(port, SCSCR, ctrl);
@@ -480,11 +486,15 @@ static inline void sci_receive_chars(struct uart_port *port,
 		return;
 
 	while (1) {
+#if !defined(SCI_ONLY)
 		if (port->type == PORT_SCIF) {
 			count = sci_in(port, SCFDR)&0x001f;
 		} else {
 			count = (sci_in(port, SCxSR)&SCxSR_RDxF(port))?1:0;
 		}
+#else
+		count = (sci_in(port, SCxSR)&SCxSR_RDxF(port))?1:0;
+#endif
 
 		/* Don't copy more bytes than there is room for in the buffer */
 		if (tty->flip.count + count > TTY_FLIPBUF_SIZE)
@@ -936,9 +946,11 @@ static void sci_set_termios(struct uart_port *port, struct termios *termios,
 
 	sci_out(port, SCSCR, 0x00);	/* TE=0, RE=0, CKE1=0 */
 
+#if !defined(SCI_ONLY)
 	if (port->type == PORT_SCIF) {
 		sci_out(port, SCFCR, SCFCR_RFRST | SCFCR_TFRST);
 	}
+#endif
 
 	smr_val = sci_in(port, SCSMR) & 3;
 	if ((termios->c_cflag & CSIZE) == CS7)
@@ -1276,7 +1288,7 @@ static struct sci_port sci_ports[SCI_NPORTS] = {
 			.line		= 1,
 		},
 		.type		= PORT_SCI,
-		.irqs		= H8S_IRQS1,
+		.irqs		= H8S_SCI_IRQS1,
 		.init_pins	= sci_init_pins_sci,
 	},
 	{
@@ -1290,7 +1302,7 @@ static struct sci_port sci_ports[SCI_NPORTS] = {
 			.line		= 2,
 		},
 		.type		= PORT_SCI,
-		.irqs		= H8S_IRQS2,
+		.irqs		= H8S_SCI_IRQS2,
 		.init_pins	= sci_init_pins_sci,
 	},
 #else
@@ -1328,8 +1340,11 @@ static int __init serial_console_setup(struct console *co, char *options)
 	 * We need to set the initial uartclk here, since otherwise it will
 	 * only ever be setup at sci_init() time.
 	 */
+#if !defined(__H8300H__) && !defined(__H8300S__)
 	port->uartclk = current_cpu_data.module_clock * 16;
-
+#else
+	port->uartclk = CONFIG_CPU_CLOCK;
+#endif
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
 
@@ -1468,7 +1483,11 @@ static int __init sci_init(void)
 		for (chan = 0; chan < SCI_NPORTS; chan++) {
 			struct sci_port *sciport = &sci_ports[chan];
 
+#if !defined(__H8300H__) && !defined(__H8300S__)
 			sciport->port.uartclk = (current_cpu_data.module_clock * 16);
+#else
+			sciport->port.uartclk = CONFIG_CPU_CLOCK;
+#endif
 			uart_add_one_port(&sci_uart_driver, &sciport->port);
 			sciport->break_timer.data = (unsigned long)sciport;
 			sciport->break_timer.function = sci_break_timer;

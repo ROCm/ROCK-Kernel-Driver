@@ -377,6 +377,16 @@ out:
 	return rc;
 }
 
+static inline void
+tape_cleanup_device(struct tape_device *device)
+{
+	tapeblock_cleanup_device(device);
+	tapechar_cleanup_device(device);
+	device->discipline->cleanup_device(device);
+	tape_remove_minor(device);
+	tape_med_state_set(device, MS_UNKNOWN);
+}
+
 /*
  * Set device offline.
  *
@@ -399,12 +409,13 @@ tape_generic_offline(struct tape_device *device)
 	switch (device->tape_state) {
 		case TS_INIT:
 		case TS_NOT_OPER:
+			spin_unlock_irq(get_ccwdev_lock(device->cdev));
 			break;
 		case TS_UNUSED:
-			tapeblock_cleanup_device(device);
-			tapechar_cleanup_device(device);
-			device->discipline->cleanup_device(device);
-			tape_remove_minor(device);
+			tape_state_set(device, TS_INIT);
+			spin_unlock_irq(get_ccwdev_lock(device->cdev));
+			tape_cleanup_device(device);
+			break;
 		default:
 			DBF_EVENT(3, "(%08x): Set offline failed "
 				"- drive in use.\n",
@@ -415,9 +426,6 @@ tape_generic_offline(struct tape_device *device)
 			spin_unlock_irq(get_ccwdev_lock(device->cdev));
 			return -EBUSY;
 	}
-	spin_unlock_irq(get_ccwdev_lock(device->cdev));
-
-	tape_med_state_set(device, MS_UNKNOWN);
 
 	DBF_LH(3, "(%08x): Drive set offline.\n", device->cdev_id);
 	return 0;
@@ -543,26 +551,12 @@ tape_generic_probe(struct ccw_device *cdev)
 	return 0;
 }
 
-/*
- * Driverfs tape remove function.
- *
- * This function is called whenever the common I/O layer detects the device
- * gone. This can happen at any time and we cannot refuse.
- */
-void
-tape_generic_remove(struct ccw_device *cdev)
+static inline void
+__tape_discard_requests(struct tape_device *device)
 {
-	struct tape_device *	device;
 	struct tape_request *	request;
 	struct list_head *	l, *n;
 
-	device = cdev->dev.driver_data;
-	DBF_LH(3, "(%08x): tape_generic_remove(%p)\n", device->cdev_id, cdev);
-
-	/*
-	 * No more requests may be processed. So just post them as i/o errors.
-	 */
-	spin_lock_irq(get_ccwdev_lock(device->cdev));
 	list_for_each_safe(l, n, &device->req_queue) {
 		request = list_entry(l, struct tape_request, list);
 		if (request->status == TAPE_REQUEST_IN_IO)
@@ -575,28 +569,66 @@ tape_generic_remove(struct ccw_device *cdev)
 		if (request->callback != NULL)
 			request->callback(request, request->callback_data);
 	}
+}
 
-	if (device->tape_state != TS_UNUSED && device->tape_state != TS_INIT) {
-		DBF_EVENT(3, "(%08x): Drive in use vanished!\n",
-			device->cdev_id);
-		PRINT_WARN("(%s): Drive in use vanished - expect trouble!\n",
-			device->cdev->dev.bus_id);
-		PRINT_WARN("State was %i\n", device->tape_state);
-		device->tape_state = TS_NOT_OPER;
-		tapeblock_cleanup_device(device);
-		tapechar_cleanup_device(device);
-		device->discipline->cleanup_device(device);
-		tape_remove_minor(device);
+/*
+ * Driverfs tape remove function.
+ *
+ * This function is called whenever the common I/O layer detects the device
+ * gone. This can happen at any time and we cannot refuse.
+ */
+void
+tape_generic_remove(struct ccw_device *cdev)
+{
+	struct tape_device *	device;
+
+	device = cdev->dev.driver_data;
+	if (!device) {
+		PRINT_ERR("No device pointer in tape_generic_remove!\n");
+		return;
 	}
-	device->tape_state = TS_NOT_OPER;
-	tape_med_state_set(device, MS_UNKNOWN);
-	spin_unlock_irq(get_ccwdev_lock(device->cdev));
+	DBF_LH(3, "(%08x): tape_generic_remove(%p)\n", device->cdev_id, cdev);
+
+	spin_lock_irq(get_ccwdev_lock(device->cdev));
+	switch (device->tape_state) {
+		case TS_INIT:
+			tape_state_set(device, TS_NOT_OPER);
+		case TS_NOT_OPER:
+			/*
+			 * Nothing to do.
+			 */
+			spin_unlock_irq(get_ccwdev_lock(device->cdev));
+			break;
+		case TS_UNUSED:
+			/*
+			 * Need only to release the device.
+			 */
+			tape_state_set(device, TS_NOT_OPER);
+			spin_unlock_irq(get_ccwdev_lock(device->cdev));
+			tape_cleanup_device(device);
+			break;
+		default:
+			/*
+			 * There may be requests on the queue. We will not get
+			 * an interrupt for a request that was running. So we
+			 * just post them all as I/O errors.
+			 */
+			DBF_EVENT(3, "(%08x): Drive in use vanished!\n",
+				device->cdev_id);
+			PRINT_WARN("(%s): Drive in use vanished - "
+				"expect trouble!\n",
+				device->cdev->dev.bus_id);
+			PRINT_WARN("State was %i\n", device->tape_state);
+			tape_state_set(device, TS_NOT_OPER);
+			__tape_discard_requests(device);
+			spin_unlock_irq(get_ccwdev_lock(device->cdev));
+			tape_cleanup_device(device);
+	}
 
 	if (cdev->dev.driver_data != NULL) {
 		sysfs_remove_group(&cdev->dev.kobj, &tape_attr_group);
 		cdev->dev.driver_data = tape_put_device(cdev->dev.driver_data);
 	}
-
 }
 
 /*
@@ -1149,7 +1181,7 @@ tape_init (void)
 #ifdef DBF_LIKE_HELL
 	debug_set_level(tape_dbf_area, 6);
 #endif
-	DBF_EVENT(3, "tape init: ($Revision: 1.48 $)\n");
+	DBF_EVENT(3, "tape init: ($Revision: 1.49 $)\n");
 	tape_proc_init();
 	tapechar_init ();
 	tapeblock_init ();
@@ -1174,7 +1206,7 @@ tape_exit(void)
 MODULE_AUTHOR("(C) 2001 IBM Deutschland Entwicklung GmbH by Carsten Otte and "
 	      "Michael Holzheu (cotte@de.ibm.com,holzheu@de.ibm.com)");
 MODULE_DESCRIPTION("Linux on zSeries channel attached "
-		   "tape device driver ($Revision: 1.48 $)");
+		   "tape device driver ($Revision: 1.49 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_init);

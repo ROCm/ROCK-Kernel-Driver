@@ -35,7 +35,7 @@ extern void ia64_elf32_init (struct pt_regs *regs);
 
 static void elf32_set_personality (void);
 
-#define setup_arg_pages(bprm)		ia32_setup_arg_pages(bprm)
+#define setup_arg_pages(bprm,exec)		ia32_setup_arg_pages(bprm,exec)
 #define elf_map				elf32_map
 
 #undef SET_PERSONALITY
@@ -149,7 +149,7 @@ ia64_elf32_init (struct pt_regs *regs)
 }
 
 int
-ia32_setup_arg_pages (struct linux_binprm *bprm)
+ia32_setup_arg_pages (struct linux_binprm *bprm, int executable_stack)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
@@ -178,8 +178,14 @@ ia32_setup_arg_pages (struct linux_binprm *bprm)
 		mpnt->vm_mm = current->mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = IA32_STACK_TOP;
-		mpnt->vm_page_prot = PAGE_COPY;
-		mpnt->vm_flags = VM_STACK_FLAGS;
+		if (executable_stack == EXSTACK_ENABLE_X)
+			mpnt->vm_flags = VM_STACK_FLAGS |  VM_EXEC;
+		else if (executable_stack == EXSTACK_DISABLE_X)
+			mpnt->vm_flags = VM_STACK_FLAGS & ~VM_EXEC;
+		else
+			mpnt->vm_flags = VM_STACK_FLAGS;
+		mpnt->vm_page_prot = (mpnt->vm_flags & VM_EXEC)?
+					PAGE_COPY_EXEC: PAGE_COPY;
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = 0;
 		mpnt->vm_file = NULL;
@@ -192,7 +198,7 @@ ia32_setup_arg_pages (struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current, page, stack_base, PAGE_COPY);
+			put_dirty_page(current, page, stack_base, mpnt->vm_page_prot);
 		}
 		stack_base += PAGE_SIZE;
 	}

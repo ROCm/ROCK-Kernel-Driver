@@ -57,17 +57,17 @@ config H8300H_GENERIC
 config H8300H_AKI3068NET
 	bool "AE-3068/69"
 	help
-	  AKI-H8/3068F / AKI-H8/3069F Flashmicom LAN Board Suppot
+	  AKI-H8/3068F / AKI-H8/3069F Flashmicom LAN Board Support
 	  More Information. (Japanese Only)
 	  <http://akizukidensi.com/catalog/h8.html>
-	  AE-3068/69 Evalution Board Support
+	  AE-3068/69 Evaluation Board Support
 	  More Information.
 	  <http://www.microtronique.com/ae3069lan.htm>
 
 config H8300H_H8MAX
 	bool "H8MAX"
 	help
-	  H8MAX Evalution Board Suooprt
+	  H8MAX Evaluation Board Support
 	  More Information. (Japanese Only)
 	  <http://strawberry-linux.com/h8/index.html>
 
@@ -81,7 +81,7 @@ config H8300H_SIM
 config H8S_EDOSK2674
 	bool "EDOSK-2674"
 	help
-	  Renesas EDOSK-2674R Evalution Board Support
+	  Renesas EDOSK-2674 Evaluation Board Support
 	  More Information.
 	  <http://www.azpower.com/H8-uClinux/index.html>
  	  <http://www.eu.renesas.com/tools/edk/support/edosk2674.html>
@@ -240,70 +240,6 @@ config HW_CONSOLE
 	depends on VT && !S390 && !UM
 	default y
 
-config SERIAL
-	tristate "Serial (8250, 16450, 16550 or compatible) support"
-	---help---
-	  This selects whether you want to include the driver for the standard
-	  serial ports.  The standard answer is Y.  People who might say N
-	  here are those that are setting up dedicated Ethernet WWW/FTP
-	  servers, or users that have one of the various bus mice instead of a
-	  serial mouse and don't intend to use their machine's standard serial
-	  port for anything.  (Note that the Cyclades and Stallion multi
-	  serial port drivers do not need this driver built in for them to
-	  work.)
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called serial.
-	  [WARNING: Do not compile this driver as a module if you are using
-	  non-standard serial ports, since the configuration information will
-	  be lost when the driver is unloaded.  This limitation may be lifted
-	  in the future.]
-
-	  BTW1: If you have a mouseman serial mouse which is not recognized by
-	  the X window system, try running gpm first.
-
-	  BTW2: If you intend to use a software modem (also called Winmodem)
-	  under Linux, forget it.  These modems are crippled and require
-	  proprietary drivers which are only available under Windows.
-
-	  Most people will say Y or M here, so that they can use serial mice,
-	  modems and similar devices connecting to the standard serial ports.
-
-config SH_SCI
-	tristate "Serial (SCI, SCIF) support"
-	help
-	  Selecting this option will allow the Linux kernel to transfer data
-	  over SCI (Serial Communication Interface) and/or SCIF (Serial
-	  Communication Interface with FIFO) which are built into the Hitachi
-	  SuperH processor.  The option provides 1 to 3 (depending
-	  on the CPU model) standard Linux tty devices, /dev/ttySC[012]; one
-	  of these is normally used as the system console.
-
-	  If in doubt, press "y".
-
-config SERIAL_CONSOLE
-	bool "Support for console on serial port"
-	depends on SERIAL=y || SH_SCI=y
-	---help---
-	  If you say Y here, it will be possible to use a serial port as the
-	  system console (the system console is the device which receives all
-	  kernel messages and warnings and which allows logins in single user
-	  mode). This could be useful if some terminal or printer is connected
-	  to that serial port.
-
-	  Even if you say Y here, the currently visible virtual console
-	  (/dev/tty0) will still be used as the system console by default, but
-	  you can alter that using a kernel command line option such as
-	  "console=ttyS1". (Try "man bootparam" or see the documentation of
-	  your boot loader (lilo or loadlin) about how to pass options to the
-	  kernel at boot time.)
-
-	  If you don't have a VGA card installed and you say Y here, the
-	  kernel will automatically use the first serial line, /dev/ttyS0, as
-	  system console.
-
-	  If unsure, say N.
-
 comment "Unix98 PTY support"
 
 config UNIX98_PTYS
@@ -396,7 +332,7 @@ config SYSCALL_PRINT
 
 config GDB_DEBUG
    	bool "Use gdb stub"
-	depends on (!H8300H_SIM && H8S_SIM)
+	depends on (!H8300H_SIM && !H8S_SIM)
 	help
 	  gdb stub exception support
 

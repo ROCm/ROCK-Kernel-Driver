@@ -254,6 +254,8 @@ values.  To do the latter, you can stick the following in your .emacs file:
   (interactive)
   (c-mode)
   (c-set-style "K&R")
+  (setq tab-width 8)
+  (setq indent-tabs-mode t)
   (setq c-basic-offset 8))
 
 This will define the M-x linux-c-mode command.  When hacking on a

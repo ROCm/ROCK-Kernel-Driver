@@ -72,15 +72,15 @@ void die_if_kernel(char *str, struct pt_regs *fp, int nr)
 		return;
 
 	console_verbose();
-	printk("%s: %08x\n",str,nr);
-	printk("PC: [<%08lx>]\nSR: %04x  SP: %p  a2: %08lx\n",
+	printk(KERN_EMERG "%s: %08x\n",str,nr);
+	printk(KERN_EMERG "PC: [<%08lx>]\nSR: %04x  SP: %p  a2: %08lx\n",
 	       fp->pc, fp->sr, fp, fp->a2);
-	printk("d0: %08lx    d1: %08lx    d2: %08lx    d3: %08lx\n",
+	printk(KERN_EMERG "d0: %08lx    d1: %08lx    d2: %08lx    d3: %08lx\n",
 	       fp->d0, fp->d1, fp->d2, fp->d3);
-	printk("d4: %08lx    d5: %08lx    a0: %08lx    a1: %08lx\n",
+	printk(KERN_EMERG "d4: %08lx    d5: %08lx    a0: %08lx    a1: %08lx\n",
 	       fp->d4, fp->d5, fp->a0, fp->a1);
 
-	printk("Process %s (pid: %d, stackpage=%08lx)\n",
+	printk(KERN_EMERG "Process %s (pid: %d, stackpage=%08lx)\n",
 		current->comm, current->pid, PAGE_SIZE+(unsigned long)current);
 	show_stack(NULL, (unsigned long *)fp);
 	do_exit(SIGSEGV);
@@ -93,12 +93,12 @@ asmlinkage void buserr_c(struct frame *fp)
 		current->thread.esp0 = (unsigned long) fp;
 
 #if DEBUG
-	printk ("*** Bus Error *** Format is %x\n", fp->ptregs.format);
+	printk (KERN_DEBUG "*** Bus Error *** Format is %x\n", fp->ptregs.format);
 #endif
 
 	die_if_kernel("bad frame format",&fp->ptregs,0);
 #if DEBUG
-	printk("Unknown SIGSEGV - 4\n");
+	printk(KERN_DEBUG "Unknown SIGSEGV - 4\n");
 #endif
 	force_sig(SIGSEGV, current);
 }
@@ -119,16 +119,16 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 	addr = (unsigned long) esp;
 	endstack = (unsigned long *) PAGE_ALIGN(addr);
 
-	printk("Stack from %08lx:", (unsigned long)stack);
+	printk(KERN_EMERG "Stack from %08lx:", (unsigned long)stack);
 	for (i = 0; i < kstack_depth_to_print; i++) {
 		if (stack + 1 > endstack)
 			break;
 		if (i % 8 == 0)
-			printk("\n       ");
-		printk(" %08lx", *stack++);
+			printk(KERN_EMERG "\n       ");
+		printk(KERN_EMERG " %08lx", *stack++);
 	}
 
-	printk("\nCall Trace:");
+	printk(KERN_EMERG "\nCall Trace:");
 	i = 0;
 	while (stack + 1 <= endstack) {
 		addr = *stack++;
@@ -143,26 +143,26 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 		if (((addr >= (unsigned long) &_start) &&
 		     (addr <= (unsigned long) &_etext))) {
 			if (i % 4 == 0)
-				printk("\n       ");
-			printk(" [<%08lx>]", addr);
+				printk(KERN_EMERG "\n       ");
+			printk(KERN_EMERG " [<%08lx>]", addr);
 			i++;
 		}
 	}
-	printk("\n");
+	printk(KERN_EMERG "\n");
 }
 
 void bad_super_trap(struct frame *fp)
 {
 	console_verbose();
 	if (fp->ptregs.vector < 4*sizeof(vec_names)/sizeof(vec_names[0]))
-		printk ("*** %s ***   FORMAT=%X\n",
+		printk (KERN_WARNING "*** %s ***   FORMAT=%X\n",
 			vec_names[(fp->ptregs.vector) >> 2],
 			fp->ptregs.format);
 	else
-		printk ("*** Exception %d ***   FORMAT=%X\n",
+		printk (KERN_WARNING "*** Exception %d ***   FORMAT=%X\n",
 			(fp->ptregs.vector) >> 2, 
 			fp->ptregs.format);
-	printk ("Current process id is %d\n", current->pid);
+	printk (KERN_WARNING "Current process id is %d\n", current->pid);
 	die_if_kernel("BAD KERNEL TRAP", &fp->ptregs, 0);
 }
 
@@ -295,9 +295,15 @@ asmlinkage void set_esp0(unsigned long ssp)
 	current->thread.esp0 = ssp;
 }
 
-void show_trace_task(struct task_struct *tsk)
+
+/*
+ * The architecture-independent backtrace generator
+ */
+void dump_stack(void)
 {
-	printk("STACK ksp=0x%lx, usp=0x%lx\n", tsk->thread.ksp, tsk->thread.usp);
+	unsigned long stack;
+
+	show_stack(current, &stack);
 }
 
 #ifdef CONFIG_M68KFPU_EMU

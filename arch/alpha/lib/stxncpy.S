@@ -317,7 +317,7 @@ $unaligned:
 	cmpbge	zero, t1, t8	# .. e1 : is there a zero?
 	andnot	t2, t6, t12	# e0    : dest mask for a single word copy
 	or	t8, t10, t5	# .. e1 : test for end-of-count too
-	cmpbge	zero, t2, t3	# e0    :
+	cmpbge	zero, t12, t3	# e0    :
 	cmoveq	a2, t5, t8	# .. e1 :
 	andnot	t8, t3, t8	# e0    :
 	beq	t8, $u_head	# .. e1 (zdb)

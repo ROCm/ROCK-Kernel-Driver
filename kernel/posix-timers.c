@@ -317,12 +317,21 @@ static void timer_notify_task(struct k_itimer *timr)
 	if (timr->it_incr)
 		timr->sigq->info.si_sys_private = ++timr->it_requeue_pending;
 
-	if (timr->it_sigev_notify & SIGEV_THREAD_ID )
+	if (timr->it_sigev_notify & SIGEV_THREAD_ID) {
+		if (unlikely(timr->it_process->flags & PF_EXITING)) {
+			timr->it_sigev_notify = SIGEV_SIGNAL;
+			put_task_struct(timr->it_process);
+			timr->it_process = timr->it_process->group_leader;
+			goto group;
+		}
 		ret = send_sigqueue(timr->it_sigev_signo, timr->sigq,
 			timr->it_process);
-	else
+	}
+	else {
+	group:
 		ret = send_group_sigqueue(timr->it_sigev_signo, timr->sigq,
 			timr->it_process);
+	}
 	if (ret) {
 		/*
 		 * signal was not sent because of sig_ignor
@@ -352,7 +361,7 @@ static void posix_timer_fn(unsigned long __data)
 
 static inline struct task_struct * good_sigevent(sigevent_t * event)
 {
-	struct task_struct *rtn = current;
+	struct task_struct *rtn = current->group_leader;
 
 	if ((event->sigev_notify & SIGEV_THREAD_ID ) &&
 		(!(rtn = find_task_by_pid(event->sigev_notify_thread_id)) ||
@@ -395,11 +404,15 @@ static struct k_itimer * alloc_posix_timer(void)
 static void release_posix_timer(struct k_itimer *tmr)
 {
 	if (tmr->it_id != -1) {
-		spin_lock_irq(&idr_lock);
+		unsigned long flags;
+		spin_lock_irqsave(&idr_lock, flags);
 		idr_remove(&posix_timers_id, tmr->it_id);
-		spin_unlock_irq(&idr_lock);
+		spin_unlock_irqrestore(&idr_lock, flags);
 	}
 	sigqueue_free(tmr->sigq);
+	if (unlikely(tmr->it_process) &&
+	    tmr->it_sigev_notify == (SIGEV_SIGNAL|SIGEV_THREAD_ID))
+		put_task_struct(tmr->it_process);
 	kmem_cache_free(posix_timers_cache, tmr);
 }
 
@@ -414,6 +427,7 @@ sys_timer_create(clockid_t which_clock,
 	struct k_itimer *new_timer = NULL;
 	timer_t new_timer_id;
 	struct task_struct *process = 0;
+	unsigned long flags;
 	sigevent_t event;
 
 	if ((unsigned) which_clock >= MAX_CLOCKS ||
@@ -458,7 +472,7 @@ sys_timer_create(clockid_t which_clock,
 			 * We may be setting up this process for another
 			 * thread.  It may be exiting.  To catch this
 			 * case the we check the PF_EXITING flag.  If
-			 * the flag is not set, the task_lock will catch
+			 * the flag is not set, the siglock will catch
 			 * him before it is too late (in exit_itimers).
 			 *
 			 * The exec case is a bit more invloved but easy
@@ -469,13 +483,14 @@ sys_timer_create(clockid_t which_clock,
 			 * for us to die which means we can finish this
 			 * linkage with our last gasp. I.e. no code :)
 			 */
-			task_lock(process);
+			spin_lock_irqsave(&process->sighand->siglock, flags);
 			if (!(process->flags & PF_EXITING)) {
 				list_add(&new_timer->list,
-					 &process->posix_timers);
-				task_unlock(process);
+					 &process->signal->posix_timers);
+				spin_unlock_irqrestore(&process->sighand->siglock, flags);
+				get_task_struct(process);
 			} else {
-				task_unlock(process);
+				spin_unlock_irqrestore(&process->sighand->siglock, flags);
 				process = 0;
 			}
 		}
@@ -491,10 +506,10 @@ sys_timer_create(clockid_t which_clock,
 		new_timer->it_sigev_notify = SIGEV_SIGNAL;
 		new_timer->it_sigev_signo = SIGALRM;
 		new_timer->it_sigev_value.sival_int = new_timer->it_id;
-		process = current;
-		task_lock(process);
-		list_add(&new_timer->list, &process->posix_timers);
-		task_unlock(process);
+		process = current->group_leader;
+		spin_lock_irqsave(&process->sighand->siglock, flags);
+		list_add(&new_timer->list, &process->signal->posix_timers);
+		spin_unlock_irqrestore(&process->sighand->siglock, flags);
 	}
 
 	new_timer->it_clock = which_clock;
@@ -925,14 +940,18 @@ retry_delete:
 #else
 	p_timer_del(&posix_clocks[timer->it_clock], timer);
 #endif
-	task_lock(timer->it_process);
+	spin_lock(&current->sighand->siglock);
 	list_del(&timer->list);
-	task_unlock(timer->it_process);
+	spin_unlock(&current->sighand->siglock);
 	/*
 	 * This keeps any tasks waiting on the spin lock from thinking
 	 * they got something (see the lock code above).
 	 */
+	if (timer->it_process) {
+		if (timer->it_sigev_notify == (SIGEV_SIGNAL|SIGEV_THREAD_ID))
+			put_task_struct(timer->it_process);
 	timer->it_process = NULL;
+	}
 	unlock_timer(timer, flags);
 	release_posix_timer(timer);
 	return 0;
@@ -942,24 +961,50 @@ retry_delete:
  */
 static inline void itimer_delete(struct k_itimer *timer)
 {
-	if (sys_timer_delete(timer->it_id))
-		BUG();
+	unsigned long flags;
+
+#ifdef CONFIG_SMP
+	int error;
+retry_delete:
+#endif
+	spin_lock_irqsave(&timer->it_lock, flags);
+
+#ifdef CONFIG_SMP
+	error = p_timer_del(&posix_clocks[timer->it_clock], timer);
+
+	if (error == TIMER_RETRY) {
+		unlock_timer(timer, flags);
+		goto retry_delete;
+	}
+#else
+	p_timer_del(&posix_clocks[timer->it_clock], timer);
+#endif
+	list_del(&timer->list);
+	/*
+	 * This keeps any tasks waiting on the spin lock from thinking
+	 * they got something (see the lock code above).
+	 */
+	if (timer->it_process) {
+		if (timer->it_sigev_notify == (SIGEV_SIGNAL|SIGEV_THREAD_ID))
+			put_task_struct(timer->it_process);
+		timer->it_process = NULL;
+	}
+	unlock_timer(timer, flags);
+	release_posix_timer(timer);
 }
+
 /*
- * This is exported to exit and exec
+ * This is called by __exit_signal, only when there are no more
+ * references to the shared signal_struct.
  */
-void exit_itimers(struct task_struct *tsk)
+void exit_itimers(struct signal_struct *sig)
 {
 	struct k_itimer *tmr;
 
-	task_lock(tsk);
-	while (!list_empty(&tsk->posix_timers)) {
-		tmr = list_entry(tsk->posix_timers.next, struct k_itimer, list);
-		task_unlock(tsk);
+	while (!list_empty(&sig->posix_timers)) {
+		tmr = list_entry(sig->posix_timers.next, struct k_itimer, list);
 		itimer_delete(tmr);
-		task_lock(tsk);
 	}
-	task_unlock(tsk);
 }
 
 /*

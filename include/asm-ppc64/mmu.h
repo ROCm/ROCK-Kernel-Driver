@@ -23,12 +23,12 @@ typedef unsigned long mm_context_id_t;
 typedef struct {
 	mm_context_id_t id;
 #ifdef CONFIG_HUGETLB_PAGE
-	int low_hpages;
+	u16 htlb_segs; /* bitmask */
 #endif
 } mm_context_t;
 
 #ifdef CONFIG_HUGETLB_PAGE
-#define KERNEL_LOW_HPAGES	.low_hpages = 0,
+#define KERNEL_LOW_HPAGES	.htlb_segs = 0,
 #else
 #define KERNEL_LOW_HPAGES
 #endif

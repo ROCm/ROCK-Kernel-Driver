@@ -415,38 +415,65 @@ static void netlink_overrun(struct sock *sk)
 	}
 }
 
-int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 pid, int nonblock)
+struct sock *netlink_getsockbypid(struct sock *ssk, u32 pid)
 {
-	struct sock *sk;
-	struct netlink_opt *nlk;
-	int len = skb->len;
 	int protocol = ssk->sk_protocol;
-	long timeo;
-        DECLARE_WAITQUEUE(wait, current);
+	struct sock *sock;
+	struct netlink_opt *nlk;
 
-	timeo = sock_sndtimeo(ssk, nonblock);
-
-retry:
-	sk = netlink_lookup(protocol, pid);
-	if (sk == NULL)
-		goto no_dst;
-	nlk = nlk_sk(sk);
+	sock = netlink_lookup(protocol, pid);
+	if (!sock)
+		return ERR_PTR(-ECONNREFUSED);
 
 	/* Don't bother queuing skb if kernel socket has no input function */
-        if (nlk->pid == 0 && !nlk->data_ready)
-        	goto no_dst;
+	nlk = nlk_sk(sock);
+	if (nlk->pid == 0 && !nlk->data_ready) {
+		sock_put(sock);
+		return ERR_PTR(-ECONNREFUSED);
+	}
+	return sock;
+}
+
+struct sock *netlink_getsockbyfilp(struct file *filp)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct socket *socket;
+	struct sock *sock;
+
+	if (!inode->i_sock || !(socket = SOCKET_I(inode)))
+		return ERR_PTR(-ENOTSOCK);
+
+	sock = socket->sk;
+	if (sock->sk_family != AF_NETLINK)
+		return ERR_PTR(-EINVAL);
+
+	sock_hold(sock);
+	return sock;
+}
+
+/*
+ * Attach a skb to a netlink socket.
+ * The caller must hold a reference to the destination socket. On error, the
+ * reference is dropped. The skb is not send to the destination, just all
+ * all error checks are performed and memory in the queue is reserved.
+ * Return values:
+ * < 0: error. skb freed, reference to sock dropped.
+ * 0: continue
+ * 1: repeat lookup - reference dropped while waiting for socket memory.
+ */
+int netlink_attachskb(struct sock *sk, struct sk_buff *skb, int nonblock, long timeo)
+{
+	struct netlink_opt *nlk;
+
+	nlk = nlk_sk(sk);
 
 #ifdef NL_EMULATE_DEV
-	if (nlk->handler) {
-		skb_orphan(skb);
-		len = nlk->handler(protocol, skb);
-		sock_put(sk);
-		return len;
-	}
+	if (nlk->handler)
+		return 0;
 #endif
-
 	if (atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf ||
 	    test_bit(0, &nlk->state)) {
+		DECLARE_WAITQUEUE(wait, current);
 		if (!timeo) {
 			if (!nlk->pid)
 				netlink_overrun(sk);
@@ -471,19 +498,60 @@ retry:
 			kfree_skb(skb);
 			return sock_intr_errno(timeo);
 		}
-		goto retry;
+		return 1;
 	}
-
 	skb_orphan(skb);
 	skb_set_owner_r(skb, sk);
+	return 0;
+}
+
+int netlink_sendskb(struct sock *sk, struct sk_buff *skb, int protocol)
+{
+	struct netlink_opt *nlk;
+	int len = skb->len;
+
+	nlk = nlk_sk(sk);
+#ifdef NL_EMULATE_DEV
+	if (nlk->handler) {
+		skb_orphan(skb);
+		len = nlk->handler(protocol, skb);
+		sock_put(sk);
+		return len;
+	}
+#endif
+
 	skb_queue_tail(&sk->sk_receive_queue, skb);
 	sk->sk_data_ready(sk, len);
 	sock_put(sk);
 	return len;
+}
 
-no_dst:
+void netlink_detachskb(struct sock *sk, struct sk_buff *skb)
+{
 	kfree_skb(skb);
-	return -ECONNREFUSED;
+	sock_put(sk);
+}
+
+int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 pid, int nonblock)
+{
+	struct sock *sk;
+	int err;
+	long timeo;
+
+	timeo = sock_sndtimeo(ssk, nonblock);
+retry:
+	sk = netlink_getsockbypid(ssk, pid);
+	if (IS_ERR(sk)) {
+		kfree_skb(skb);
+		return PTR_ERR(skb);
+	}
+	err = netlink_attachskb(sk, skb, nonblock, timeo);
+	if (err == 1)
+		goto retry;
+	if (err)
+		return err;
+
+	return netlink_sendskb(sk, skb, ssk->sk_protocol);
 }
 
 static __inline__ int netlink_broadcast_deliver(struct sock *sk, struct sk_buff *skb)

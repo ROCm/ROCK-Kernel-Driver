@@ -872,7 +872,7 @@ int rme96xx_init(rme96xx_info* s)
 	int status;
 	unsigned short rev;
 
-	DBG(printk(__FUNCTION__"\n"));
+	DBG(printk("%s\n", __FUNCTION__));
 	numcards++;
 
 	s->magic = RME96xx_MAGIC; 
@@ -972,7 +972,7 @@ static int __devinit rme96xx_probe(struct pci_dev *pcidev, const struct pci_devi
 	int i;
 	rme96xx_info *s;
 
-	DBG(printk(__FUNCTION__"\n"));
+	DBG(printk("%s\n", __FUNCTION__));
 	
 	if (pcidev->irq == 0) 
 		return -1;
@@ -1501,7 +1501,7 @@ static int rme96xx_release(struct inode *in, struct file *file)
 {
 	struct dmabuf * dma = (struct dmabuf*) file->private_data;
 	/* int hwp;  ... was unused   HP20020201 */
-	DBG(printk(__FUNCTION__"\n"));
+	DBG(printk("%s\n", __FUNCTION__));
 
 	COMM          ("draining")
 	if (dma->open_mode & FMODE_WRITE) {

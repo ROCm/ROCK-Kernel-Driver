@@ -94,7 +94,12 @@ static inline int debugger_dabr_match(struct pt_regs *regs) { return 0; }
 static inline int debugger_fault_handler(struct pt_regs *regs) { return 0; }
 #endif
 
+extern int fix_alignment(struct pt_regs *regs);
+extern void bad_page_fault(struct pt_regs *regs, unsigned long address,
+			   int sig);
 extern void show_regs(struct pt_regs * regs);
+extern int die(const char *str, struct pt_regs *regs, long err);
+
 extern void flush_instruction_cache(void);
 extern int _get_PVR(void);
 extern void giveup_fpu(struct task_struct *);

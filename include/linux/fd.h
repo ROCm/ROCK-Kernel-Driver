@@ -17,6 +17,7 @@ struct floppy_struct {
 			stretch;	/* !=0 means double track steps */
 #define FD_STRETCH 1
 #define FD_SWAPSIDES 2
+#define FD_ZEROBASED 4
 
 	unsigned char	gap,		/* gap1 size */
 

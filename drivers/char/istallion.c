@@ -2050,7 +2050,6 @@ static int stli_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 {
 	stliport_t	*portp;
 	stlibrd_t	*brdp;
-	unsigned long	lval;
 	unsigned int	ival;
 	int		rc;
 

@@ -50,13 +50,20 @@ update_dn_pci_info(struct device_node *dn, void *data)
 	struct pci_controller *phb = (struct pci_controller *)data;
 	u32 *regs;
 	char *device_type = get_property(dn, "device_type", 0);
+	char *model;
 
 	dn->phb = phb;
 	if (device_type && strcmp(device_type, "pci") == 0 && get_property(dn, "class-code", 0) == 0) {
 		/* special case for PHB's.  Sigh. */
 		regs = (u32 *)get_property(dn, "bus-range", 0);
 		dn->busno = regs[0];
-		dn->devfn = 0;	/* assumption */
+
+		model = (char *)get_property(dn, "model", NULL);
+
+		if (strstr(model, "U3"))
+			dn->devfn = -1;
+		else
+			dn->devfn = 0;	/* assumption */
 	} else {
 		regs = (u32 *)get_property(dn, "reg", 0);
 		if (regs) {

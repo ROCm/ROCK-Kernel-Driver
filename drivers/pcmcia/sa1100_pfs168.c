@@ -101,7 +101,7 @@ pfs168_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt,
     }
 
     if (state->Vpp != state->Vcc && state->Vpp != 0) {
-      printk(KERN_ERR "%s(): CompactFlash socket does not support VPP %uV\n"
+      printk(KERN_ERR "%s(): CompactFlash socket does not support VPP %uV\n",
 	     __FUNCTION__, state->Vpp / 10);
       return -1;
     }

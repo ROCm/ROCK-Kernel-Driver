@@ -28,6 +28,7 @@
 #include <linux/config.h>
 #include <linux/reboot.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #include <asm/oplib.h>
 #include <asm/uaccess.h>
@@ -822,9 +823,6 @@ asmlinkage int sparc_execve(struct pt_regs *regs)
 out:
 	return error;
 }
-
-extern void scheduling_functions_start_here(void);
-extern void scheduling_functions_end_here(void);
 
 unsigned long get_wchan(struct task_struct *task)
 {

@@ -778,7 +778,7 @@ static int moxa_tiocmset(struct tty_struct *tty, struct file *file,
 {
 	struct moxa_str *ch = (struct moxa_str *) tty->driver_data;
 	int port;
-	int flag = 0, dtr, rts;
+	int dtr, rts;
 
 	port = PORTNO(tty);
 	if ((port != MAX_PORTS) && (!ch))
@@ -802,8 +802,7 @@ static int moxa_ioctl(struct tty_struct *tty, struct file *file,
 {
 	struct moxa_str *ch = (struct moxa_str *) tty->driver_data;
 	register int port;
-	int retval, dtr, rts;
-	unsigned long flag;
+	int retval;
 
 	port = PORTNO(tty);
 	if ((port != MAX_PORTS) && (!ch))

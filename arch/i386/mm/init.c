@@ -523,30 +523,20 @@ void __init mem_init(void)
 #endif
 }
 
-kmem_cache_t *pgd_cache;
-kmem_cache_t *pmd_cache;
+#ifdef CONFIG_X86_PAE
+struct kmem_cache_s *pae_pgd_cachep;
 
 void __init pgtable_cache_init(void)
 {
-	if (PTRS_PER_PMD > 1) {
-		pmd_cache = kmem_cache_create("pmd",
-					PTRS_PER_PMD*sizeof(pmd_t),
-					0,
-					SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN,
-					pmd_ctor,
-					NULL);
-		if (!pmd_cache)
-			panic("pgtable_cache_init(): cannot create pmd cache");
-	}
-	pgd_cache = kmem_cache_create("pgd",
-				PTRS_PER_PGD*sizeof(pgd_t),
-				0,
-				SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN,
-				pgd_ctor,
-				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
-	if (!pgd_cache)
-		panic("pgtable_cache_init(): Cannot create pgd cache");
+	/*
+	 * PAE pgds must be 16-byte aligned:
+	 */
+	pae_pgd_cachep = kmem_cache_create("pae_pgd", 32, 0,
+		SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
+	if (!pae_pgd_cachep)
+		panic("init_pae(): Cannot alloc pae_pgd SLAB cache");
 }
+#endif
 
 /*
  * This function cannot be __init, since exceptions don't work in that

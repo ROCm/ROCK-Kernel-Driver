@@ -401,6 +401,8 @@ endmenu
 
 source drivers/Kconfig
 
+source "drivers/firmware/Kconfig"
+
 source fs/Kconfig
 
 source "arch/x86_64/oprofile/Kconfig"
@@ -480,11 +482,18 @@ config FRAME_POINTER
 
 config IOMMU_DEBUG
        depends on GART_IOMMU && DEBUG_KERNEL
-       bool "Force IOMMU to on" 
+       bool "Enable IOMMU debugging"
        help
-         Force the IOMMU to on even when you have less than 4GB of memory and add 
-	 debugging code. 
-	 Can be disabled at boot time with iommu=noforce.
+         Force the IOMMU to on even when you have less than 4GB of
+	 memory and add debugging code. On overflow always panic. And
+	 allow to enable IOMMU leak tracing. Can be disabled at boot
+	 time with iommu=noforce. This will also enable scatter gather
+	 list merging.  Currently not recommended for production
+	 code. When you use it make sure you have a big enough
+	 IOMMU/AGP aperture.  Most of the options enabled by this can
+	 be set more finegrained using the iommu= command line
+	 options. See Documentation/x86_64/boot-options.txt for more
+	 details.
 
 config IOMMU_LEAK
        bool "IOMMU leak tracing"

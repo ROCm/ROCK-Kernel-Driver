@@ -150,6 +150,13 @@ void elv_merge_requests(request_queue_t *q, struct request *rq,
 void elv_requeue_request(request_queue_t *q, struct request *rq)
 {
 	/*
+	 * it already went through dequeue, we need to decrement the
+	 * in_flight count again
+	 */
+	if (blk_account_rq(rq))
+		q->in_flight--;
+
+	/*
 	 * if iosched has an explicit requeue hook, then use that. otherwise
 	 * just put the request at the front of the queue
 	 */
@@ -231,6 +238,16 @@ struct request *elv_next_request(request_queue_t *q)
 void elv_remove_request(request_queue_t *q, struct request *rq)
 {
 	elevator_t *e = &q->elevator;
+
+	/*
+	 * the time frame between a request being removed from the lists
+	 * and to it is freed is accounted as io that is in progress at
+	 * the driver side. note that we only account requests that the
+	 * driver has seen (REQ_STARTED set), to avoid false accounting
+	 * for request-request merges
+	 */
+	if (blk_account_rq(rq))
+		q->in_flight++;
 
 	/*
 	 * the main clearing point for q->last_merge is on retrieval of
@@ -320,6 +337,12 @@ int elv_may_queue(request_queue_t *q, int rw)
 void elv_completed_request(request_queue_t *q, struct request *rq)
 {
 	elevator_t *e = &q->elevator;
+
+	/*
+	 * request is released from the driver, io must be done
+	 */
+	if (blk_account_rq(rq))
+		q->in_flight--;
 
 	if (e->elevator_completed_req_fn)
 		e->elevator_completed_req_fn(q, rq);

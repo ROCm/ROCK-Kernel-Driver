@@ -93,7 +93,7 @@ void __init init_IRQ(void)
 	if (ramvec == NULL)
 		panic("interrupt vector serup failed.");
 	else
-		printk("virtual vector at 0x%08lx\n",(unsigned long)ramvec);
+		printk(KERN_INFO "virtual vector at 0x%08lx\n",(unsigned long)ramvec);
 
 	/* create redirect table */
 	ramvec_p = ramvec;
@@ -118,11 +118,11 @@ void __init init_IRQ(void)
 	ramvec_p = ramvec;
 	for (i = 0; i < NR_IRQS; i++) {
 		if ((i % 8) == 0)
-			printk("\n%p: ",ramvec_p);
-		printk("%p ",*ramvec_p);
+			printk(KERN_DEBUG "\n%p: ",ramvec_p);
+		printk(KERN_DEBUG "%p ",*ramvec_p);
 		ramvec_p++;
 	}
-	printk("\n");
+	printk(KERN_DEBUG "\n");
 #endif
 #endif
 }
@@ -133,9 +133,10 @@ int request_irq(unsigned int irq,
 {
 	irq_handler_t *irq_handle;
 	if (irq < 0 || irq >= NR_IRQS) {
-		printk("Incorrect IRQ %d from %s\n", irq, devname);
+		printk(KERN_ERR "Incorrect IRQ %d from %s\n", irq, devname);
 		return -EINVAL;
 	}
+
 	if (irq_list[irq] || (h8300_enable_irq_pin(irq) == -EBUSY))
 		return -EBUSY;
 
@@ -156,6 +157,11 @@ int request_irq(unsigned int irq,
 	irq_handle->dev_id  = dev_id;
 	irq_handle->devname = devname;
 	irq_list[irq] = irq_handle;
+
+	if (irq_handle->flags & SA_SAMPLE_RANDOM)
+		rand_initialize_irq(irq);
+
+	enable_irq(irq);
 	return 0;
 }
 
@@ -163,12 +169,13 @@ EXPORT_SYMBOL(request_irq);
 
 void free_irq(unsigned int irq, void *dev_id)
 {
-	if (irq >= NR_IRQS) {
+	if (irq >= NR_IRQS)
 		return;
-	}
+
 	if (!irq_list[irq] || irq_list[irq]->dev_id != dev_id)
-		printk("Removing probably wrong IRQ %d from %s\n",
+		printk(KERN_WARNING "Removing probably wrong IRQ %d from %s\n",
 		       irq, irq_list[irq]->devname);
+	disable_irq(irq);
 	h8300_disable_irq_pin(irq);
 	if (((unsigned long)irq_list[irq] & 0x80000000) == 0) {
 		kfree(irq_list[irq]);

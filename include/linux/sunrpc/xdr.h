@@ -145,6 +145,7 @@ extern void _copy_from_pages(char *, struct page **, size_t, size_t);
 extern void xdr_buf_from_iov(struct iovec *, struct xdr_buf *);
 extern int xdr_buf_subsegment(struct xdr_buf *, struct xdr_buf *, int, int);
 extern int xdr_buf_read_netobj(struct xdr_buf *, struct xdr_netobj *, int);
+extern int read_bytes_from_xdr_buf(struct xdr_buf *buf, int base, void *obj, int len);
 
 /*
  * Helper structure for copying from an sk_buff.

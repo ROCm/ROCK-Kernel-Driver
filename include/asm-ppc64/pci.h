@@ -64,13 +64,13 @@ struct pci_dma_ops {
 				       void *vaddr, dma_addr_t dma_handle);
 
 	dma_addr_t	(*pci_map_single)(struct pci_dev *hwdev, void *ptr,
-					  size_t size, int direction);
+					  size_t size, enum dma_data_direction direction);
 	void		(*pci_unmap_single)(struct pci_dev *hwdev, dma_addr_t dma_addr,
-					    size_t size, int direction);
+					    size_t size, enum dma_data_direction direction);
 	int		(*pci_map_sg)(struct pci_dev *hwdev, struct scatterlist *sg,
-				      int nents, int direction);
+				      int nents, enum dma_data_direction direction);
 	void		(*pci_unmap_sg)(struct pci_dev *hwdev, struct scatterlist *sg,
-					int nents, int direction);
+					int nents, enum dma_data_direction direction);
 	int		(*pci_dma_supported)(struct pci_dev *hwdev, u64 mask);
 	int		(*pci_dac_dma_supported)(struct pci_dev *hwdev, u64 mask);
 };
@@ -92,25 +92,29 @@ static inline void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 					size_t size, int direction)
 {
-	return pci_dma_ops.pci_map_single(hwdev, ptr, size, direction); 
+	return pci_dma_ops.pci_map_single(hwdev, ptr, size,
+			(enum dma_data_direction)direction);
 }
 
 static inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 				    size_t size, int direction)
 {
-	pci_dma_ops.pci_unmap_single(hwdev, dma_addr, size, direction);
+	pci_dma_ops.pci_unmap_single(hwdev, dma_addr, size,
+			(enum dma_data_direction)direction);
 }
 
 static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 			     int nents, int direction)
 {
-	return pci_dma_ops.pci_map_sg(hwdev, sg, nents, direction);
+	return pci_dma_ops.pci_map_sg(hwdev, sg, nents,
+			(enum dma_data_direction)direction);
 }
 
 static inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 				int nents, int direction)
 {
-	pci_dma_ops.pci_unmap_sg(hwdev, sg, nents, direction);
+	pci_dma_ops.pci_unmap_sg(hwdev, sg, nents,
+			(enum dma_data_direction)direction);
 }
 
 static inline void pci_dma_sync_single_for_cpu(struct pci_dev *hwdev,

@@ -84,22 +84,7 @@
  */
 #define NR_VECTORS 256
 
-#ifdef CONFIG_PCI_USE_VECTOR
-#define NR_IRQS FIRST_SYSTEM_VECTOR
-#define NR_IRQ_VECTORS NR_IRQS
-#else
-#ifdef CONFIG_X86_IO_APIC
-#define NR_IRQS 224
-# if (224 >= 32 * NR_CPUS)
-# define NR_IRQ_VECTORS NR_IRQS
-# else
-# define NR_IRQ_VECTORS (32 * NR_CPUS)
-# endif
-#else
-#define NR_IRQS 16
-#define NR_IRQ_VECTORS NR_IRQS
-#endif
-#endif
+#include "irq_vectors_limits.h"
 
 #define FPU_IRQ			13
 

@@ -131,8 +131,8 @@ ENTRY(ret_from_fork)
 	CFI_DEFAULT_STACK
 	call schedule_tail
 	GET_THREAD_INFO(%rcx)
-	bt $TIF_SYSCALL_TRACE,threadinfo_flags(%rcx)
-	jc rff_trace
+	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),threadinfo_flags(%rcx)
+	jnz rff_trace
 rff_action:	
 	RESTORE_REST
 	testl $3,CS-ARGOFFSET(%rsp)	# from kernel_thread?
@@ -143,7 +143,7 @@ rff_action:
 	jmp ret_from_sys_call
 rff_trace:
 	movq %rsp,%rdi
-	call syscall_trace
+	call syscall_trace_leave
 	GET_THREAD_INFO(%rcx)	
 	jmp rff_action
 	CFI_ENDPROC
@@ -185,8 +185,8 @@ ENTRY(system_call)
 	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp) 
 	movq  %rcx,RIP-ARGOFFSET(%rsp)  
 	GET_THREAD_INFO(%rcx)
-	bt    $TIF_SYSCALL_TRACE,threadinfo_flags(%rcx) 
-	jc    tracesys
+	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),threadinfo_flags(%rcx)
+	jnz tracesys
 	cmpq $__NR_syscall_max,%rax
 	ja badsys
 	movq %r10,%rcx
@@ -244,7 +244,7 @@ tracesys:
 	movq $-ENOSYS,RAX(%rsp)
 	FIXUP_TOP_OF_STACK %rdi
 	movq %rsp,%rdi
-	call syscall_trace
+	call syscall_trace_enter
 	LOAD_ARGS ARGOFFSET  /* reload args from stack in case ptrace changed it */
 	RESTORE_REST
 	cmpq $__NR_syscall_max,%rax
@@ -254,7 +254,7 @@ tracesys:
 	movq %rax,RAX-ARGOFFSET(%rsp)
 1:	SAVE_REST
 	movq %rsp,%rdi
-	call syscall_trace
+	call syscall_trace_leave
 	RESTORE_TOP_OF_STACK %rbx
 	RESTORE_REST
 	jmp ret_from_sys_call
@@ -297,13 +297,14 @@ int_very_careful:
 	sti
 	SAVE_REST
 	/* Check for syscall exit trace */	
-	bt $TIF_SYSCALL_TRACE,%edx
-	jnc int_signal
+	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),%edx
+	jz int_signal
 	pushq %rdi
 	leaq 8(%rsp),%rdi	# &ptregs -> arg1	
-	call syscall_trace
+	call syscall_trace_leave
 	popq %rdi
 	btr  $TIF_SYSCALL_TRACE,%edi
+	btr  $TIF_SYSCALL_AUDIT,%edi
 	jmp int_restore_rest
 	
 int_signal:

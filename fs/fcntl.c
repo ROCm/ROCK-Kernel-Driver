@@ -282,80 +282,88 @@ void f_delown(struct file *filp)
 
 EXPORT_SYMBOL(f_delown);
 
-static long do_fcntl(unsigned int fd, unsigned int cmd,
-		     unsigned long arg, struct file * filp)
+long generic_file_fcntl(int fd, unsigned int cmd,
+			unsigned long arg, struct file *filp)
 {
 	long err = -EINVAL;
 
 	switch (cmd) {
-		case F_DUPFD:
-			get_file(filp);
-			err = dupfd(filp, arg);
+	case F_DUPFD:
+		get_file(filp);
+		err = dupfd(filp, arg);
+		break;
+	case F_GETFD:
+		err = get_close_on_exec(fd) ? FD_CLOEXEC : 0;
+		break;
+	case F_SETFD:
+		err = 0;
+		set_close_on_exec(fd, arg & FD_CLOEXEC);
+		break;
+	case F_GETFL:
+		err = filp->f_flags;
+		break;
+	case F_SETFL:
+		err = setfl(fd, filp, arg);
+		break;
+	case F_GETLK:
+		err = fcntl_getlk(filp, (struct flock __user *) arg);
+		break;
+	case F_SETLK:
+	case F_SETLKW:
+		err = fcntl_setlk(filp, cmd, (struct flock __user *) arg);
+		break;
+	case F_GETOWN:
+		/*
+		 * XXX If f_owner is a process group, the
+		 * negative return value will get converted
+		 * into an error.  Oops.  If we keep the
+		 * current syscall conventions, the only way
+		 * to fix this will be in libc.
+		 */
+		err = filp->f_owner.pid;
+		force_successful_syscall_return();
+		break;
+	case F_SETOWN:
+		err = f_setown(filp, arg, 1);
+		break;
+	case F_GETSIG:
+		err = filp->f_owner.signum;
+		break;
+	case F_SETSIG:
+		/* arg == 0 restores default behaviour. */
+		if (arg < 0 || arg > _NSIG) {
 			break;
-		case F_GETFD:
-			err = get_close_on_exec(fd) ? FD_CLOEXEC : 0;
-			break;
-		case F_SETFD:
-			err = 0;
-			set_close_on_exec(fd, arg & FD_CLOEXEC);
-			break;
-		case F_GETFL:
-			err = filp->f_flags;
-			break;
-		case F_SETFL:
-			err = setfl(fd, filp, arg);
-			break;
-		case F_GETLK:
-			err = fcntl_getlk(filp, (struct flock __user *) arg);
-			break;
-		case F_SETLK:
-		case F_SETLKW:
-			err = fcntl_setlk(filp, cmd, (struct flock __user *) arg);
-			break;
-		case F_GETOWN:
-			/*
-			 * XXX If f_owner is a process group, the
-			 * negative return value will get converted
-			 * into an error.  Oops.  If we keep the
-			 * current syscall conventions, the only way
-			 * to fix this will be in libc.
-			 */
-			err = filp->f_owner.pid;
-			force_successful_syscall_return();
-			break;
-		case F_SETOWN:
-			err = f_setown(filp, arg, 1);
-			break;
-		case F_GETSIG:
-			err = filp->f_owner.signum;
-			break;
-		case F_SETSIG:
-			/* arg == 0 restores default behaviour. */
-			if (arg < 0 || arg > _NSIG) {
-				break;
-			}
-			err = 0;
-			filp->f_owner.signum = arg;
-			break;
-		case F_GETLEASE:
-			err = fcntl_getlease(filp);
-			break;
-		case F_SETLEASE:
-			err = fcntl_setlease(fd, filp, arg);
-			break;
-		case F_NOTIFY:
-			err = fcntl_dirnotify(fd, filp, arg);
-			break;
-		default:
-			break;
+		}
+		err = 0;
+		filp->f_owner.signum = arg;
+		break;
+	case F_GETLEASE:
+		err = fcntl_getlease(filp);
+		break;
+	case F_SETLEASE:
+		err = fcntl_setlease(fd, filp, arg);
+		break;
+	case F_NOTIFY:
+		err = fcntl_dirnotify(fd, filp, arg);
+		break;
+	default:
+		break;
 	}
-
 	return err;
 }
+EXPORT_SYMBOL(generic_file_fcntl);
 
-asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
+static long do_fcntl(int fd, unsigned int cmd,
+			unsigned long arg, struct file *filp)
+{
+	if (filp->f_op && filp->f_op->fcntl)
+		return filp->f_op->fcntl(fd, cmd, arg, filp);
+	return generic_file_fcntl(fd, cmd, arg, filp);
+}
+
+asmlinkage long sys_fcntl(int fd, unsigned int cmd, unsigned long arg)
 {	
-	struct file * filp;
+	struct file *filp;
 	long err = -EBADF;
 
 	filp = fget(fd);

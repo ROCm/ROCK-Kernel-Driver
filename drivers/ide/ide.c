@@ -1889,7 +1889,7 @@ int __init ide_setup (char *s)
 		 * Be VERY CAREFUL changing this: note hardcoded indexes below
 		 * (-8, -9, -10) are reserved to ease the hardcoding.
 		 */
-		const char *ide_words[] = {
+		static const char *ide_words[] = {
 			"noprobe", "serialize", "autotune", "noautotune", 
 			"reset", "dma", "ata66", "minus8", "minus9",
 			"minus10", "four", "qd65xx", "ht6560b", "cmd640_vlb",

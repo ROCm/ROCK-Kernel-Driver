@@ -7,6 +7,7 @@
 
 #include <linux/errno.h>
 #include <linux/sched.h>
+#include <linux/init.h>
 
 /*
  * This is basically the PPC semaphore scheme ported to use
@@ -60,7 +61,7 @@ static inline int __sem_update_count(struct semaphore *sem, int incr)
  * Either form may be used in conjunction with "up()".
  */
 
-void
+void __sched
 __down_failed(struct semaphore *sem)
 {
 	struct task_struct *tsk = current;
@@ -101,7 +102,7 @@ __down_failed(struct semaphore *sem)
 #endif
 }
 
-int
+int __sched
 __down_failed_interruptible(struct semaphore *sem)
 {
 	struct task_struct *tsk = current;
@@ -159,7 +160,7 @@ __up_wakeup(struct semaphore *sem)
 	wake_up(&sem->wait);
 }
 
-void
+void __sched
 down(struct semaphore *sem)
 {
 #if WAITQUEUE_DEBUG
@@ -173,7 +174,7 @@ down(struct semaphore *sem)
 	__down(sem);
 }
 
-int
+int __sched
 down_interruptible(struct semaphore *sem)
 {
 #if WAITQUEUE_DEBUG

@@ -522,7 +522,7 @@ static inline void unmap_cpu_to_node(int cpu)
 	printk("Unmapping cpu %d from all nodes\n", cpu);
 	for (node = 0; node < MAX_NUMNODES; node ++)
 		cpu_clear(cpu, node_2_cpu_mask[node]);
-	cpu_2_node[cpu] = -1;
+	cpu_2_node[cpu] = 0;
 }
 #else /* !CONFIG_NUMA */
 
@@ -814,6 +814,8 @@ static int __init do_boot_cpu(int apicid)
 	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 	/* Stack for startup_32 can be just as for start_secondary onwards */
 	stack_start.esp = (void *) idle->thread.esp;
+
+	irq_ctx_init(cpu);
 
 	/*
 	 * This grunge runs the startup process for

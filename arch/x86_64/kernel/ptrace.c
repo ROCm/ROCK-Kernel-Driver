@@ -16,6 +16,7 @@
 #include <linux/ptrace.h>
 #include <linux/user.h>
 #include <linux/security.h>
+#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -486,7 +487,7 @@ out:
 	return ret;
 }
 
-asmlinkage void syscall_trace(struct pt_regs *regs)
+static void syscall_trace(struct pt_regs *regs)
 {
 
 #if 0
@@ -496,11 +497,6 @@ asmlinkage void syscall_trace(struct pt_regs *regs)
 	       current_thread_info()->flags, current->ptrace); 
 #endif
 
-	if (!test_thread_flag(TIF_SYSCALL_TRACE))
-		return; 
-	if (!(current->ptrace & PT_PTRACED))
-		return;
-	
 	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
 				? 0x80 : 0));
 	/*
@@ -512,4 +508,26 @@ asmlinkage void syscall_trace(struct pt_regs *regs)
 		send_sig(current->exit_code, current, 1);
 		current->exit_code = 0;
 	}
+}
+
+asmlinkage void syscall_trace_enter(struct pt_regs *regs)
+{
+	if (unlikely(current->audit_context))
+		audit_syscall_entry(current, regs->orig_rax,
+				    regs->rdi, regs->rsi,
+				    regs->rdx, regs->r10);
+
+	if (test_thread_flag(TIF_SYSCALL_TRACE)
+	    && (current->ptrace & PT_PTRACED))
+		syscall_trace(regs);
+}
+
+asmlinkage void syscall_trace_leave(struct pt_regs *regs)
+{
+	if (unlikely(current->audit_context))
+		audit_syscall_exit(current, regs->rax);
+
+	if (test_thread_flag(TIF_SYSCALL_TRACE)
+	    && (current->ptrace & PT_PTRACED))
+		syscall_trace(regs);
 }

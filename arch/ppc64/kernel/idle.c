@@ -26,6 +26,7 @@
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/cpu.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -150,17 +151,24 @@ int default_idle(void)
 		}
 
 		schedule();
+		if (cpu_is_offline(smp_processor_id()) &&
+				system_state == SYSTEM_RUNNING)
+			cpu_die();
 	}
 
 	return 0;
 }
 
 #ifdef CONFIG_PPC_PSERIES
+
+DECLARE_PER_CPU(unsigned long, smt_snooze_delay);
+
 int dedicated_idle(void)
 {
 	long oldval;
 	struct paca_struct *lpaca = get_paca(), *ppaca;
 	unsigned long start_snooze;
+	unsigned long *smt_snooze_delay = &__get_cpu_var(smt_snooze_delay);
 
 	ppaca = &paca[smp_processor_id() ^ 1];
 
@@ -173,14 +181,14 @@ int dedicated_idle(void)
 		if (!oldval) {
 			set_thread_flag(TIF_POLLING_NRFLAG);
 			start_snooze = __get_tb() +
-				naca->smt_snooze_delay*tb_ticks_per_usec;
+				*smt_snooze_delay * tb_ticks_per_usec;
 			while (!need_resched()) {
 				/* need_resched could be 1 or 0 at this 
 				 * point.  If it is 0, set it to 0, so
 				 * an IPI/Prod is sent.  If it is 1, keep
 				 * it that way & schedule work.
 				 */
-				if (naca->smt_snooze_delay == 0 ||
+				if (*smt_snooze_delay == 0 ||
 				    __get_tb() < start_snooze) {
 					HMT_low(); /* Low thread priority */
 					continue;
@@ -236,6 +244,9 @@ int dedicated_idle(void)
 		HMT_medium();
 		lpaca->xLpPaca.xIdle = 0;
 		schedule();
+		if (cpu_is_offline(smp_processor_id()) &&
+				system_state == SYSTEM_RUNNING)
+			cpu_die();
 	}
 	return 0;
 }
@@ -245,6 +256,10 @@ int shared_idle(void)
 	struct paca_struct *lpaca = get_paca();
 
 	while (1) {
+		if (cpu_is_offline(smp_processor_id()) &&
+				system_state == SYSTEM_RUNNING)
+			cpu_die();
+
 		/* Indicate to the HV that we are idle.  Now would be
 		 * a good time to find other work to dispatch. */
 		lpaca->xLpPaca.xIdle = 1;

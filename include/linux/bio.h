@@ -119,11 +119,13 @@ struct bio {
  * bit 1 -- rw-ahead when set
  * bit 2 -- barrier
  * bit 3 -- fail fast, don't want low level driver retries
+ * bit 4 -- synchronous I/O hint: the block layer will unplug immediately
  */
 #define BIO_RW		0
 #define BIO_RW_AHEAD	1
 #define BIO_RW_BARRIER	2
 #define BIO_RW_FAILFAST	3
+#define BIO_RW_SYNC	4
 
 /*
  * various member access, note that bio_data should of course not be used
@@ -138,6 +140,7 @@ struct bio {
 #define bio_cur_sectors(bio)	(bio_iovec(bio)->bv_len >> 9)
 #define bio_data(bio)		(page_address(bio_page((bio))) + bio_offset((bio)))
 #define bio_barrier(bio)	((bio)->bi_rw & (1 << BIO_RW_BARRIER))
+#define bio_sync(bio)		((bio)->bi_rw & (1 << BIO_RW_SYNC))
 
 /*
  * will die

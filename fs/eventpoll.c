@@ -59,10 +59,10 @@
  * we need a lock that will allow us to sleep. This lock is a
  * read-write semaphore (ep->sem). It is acquired on read during
  * the event transfer loop and in write during epoll_ctl(EPOLL_CTL_DEL)
- * and during eventpoll_release(). Then we also need a global
- * semaphore to serialize eventpoll_release() and ep_free().
+ * and during eventpoll_release_file(). Then we also need a global
+ * semaphore to serialize eventpoll_release_file() and ep_free().
  * This semaphore is acquired by ep_free() during the epoll file
- * cleanup path and it is also acquired by eventpoll_release()
+ * cleanup path and it is also acquired by eventpoll_release_file()
  * if a file has been pushed inside an epoll set and it is then
  * close()d without a previous call toepoll_ctl(EPOLL_CTL_DEL).
  * It is possible to drop the "ep->sem" and to use the global
@@ -329,7 +329,7 @@ static struct super_block *eventpollfs_get_sb(struct file_system_type *fs_type,
 					      void *data);
 
 /*
- * This semaphore is used to serialize ep_free() and eventpoll_release().
+ * This semaphore is used to serialize ep_free() and eventpoll_release_file().
  */
 struct semaphore epsem;
 
@@ -887,10 +887,10 @@ static void ep_free(struct eventpoll *ep)
 
 	/*
 	 * We need to lock this because we could be hit by
-	 * eventpoll_release() while we're freeing the "struct eventpoll".
+	 * eventpoll_release_file() while we're freeing the "struct eventpoll".
 	 * We do not need to hold "ep->sem" here because the epoll file
 	 * is on the way to be removed and no one has references to it
-	 * anymore. The only hit might come from eventpoll_release() but
+	 * anymore. The only hit might come from eventpoll_release_file() but
 	 * holding "epsem" is sufficent here.
 	 */
 	down(&epsem);
@@ -1552,7 +1552,7 @@ static int ep_events_transfer(struct eventpoll *ep,
 
 	/*
 	 * We need to lock this because we could be hit by
-	 * eventpoll_release() and epoll_ctl(EPOLL_CTL_DEL).
+	 * eventpoll_release_file() and epoll_ctl(EPOLL_CTL_DEL).
 	 */
 	down_read(&ep->sem);
 

@@ -412,13 +412,13 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	 */
 	tot_len = 0;
 	ret = -EINVAL;
-	for (seg = 0 ; seg < nr_segs; seg++) {
-		ssize_t tmp = tot_len;
+	for (seg = 0; seg < nr_segs; seg++) {
 		ssize_t len = (ssize_t)iov[seg].iov_len;
+
 		if (len < 0)	/* size_t not fitting an ssize_t .. */
 			goto out;
 		tot_len += len;
-		if (tot_len < tmp) /* maths overflow on the ssize_t */
+		if ((ssize_t)tot_len < 0) /* maths overflow on the ssize_t */
 			goto out;
 	}
 	if (tot_len == 0) {

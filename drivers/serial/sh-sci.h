@@ -240,11 +240,11 @@ struct sci_port {
   }
 
 #define CPU_SCI_FNS(name, sci_offset, sci_size)				\
-  static inline unsigned int sci_##name##_in(struct sci_port* port)	\
+  static inline unsigned int sci_##name##_in(struct uart_port* port)	\
   {									\
     SCI_IN(sci_size, sci_offset);		 			\
   }									\
-  static inline void sci_##name##_out(struct sci_port* port, unsigned int value) \
+  static inline void sci_##name##_out(struct uart_port* port, unsigned int value) \
   {									\
     SCI_OUT(sci_size, sci_offset, value);				\
   }
@@ -379,9 +379,9 @@ static inline int sci_rxd_in(struct uart_port *port)
 
 }
 #elif defined(__H8300H__) || defined(__H8300S__)
-static inline int sci_rxd_in(struct sci_port *port)
+static inline int sci_rxd_in(struct uart_port *port)
 {
-	int ch = (port->base - SMR0) >> 3;
+	int ch = (port->mapbase - SMR0) >> 3;
 	return (H8300_SCI_DR(ch) & h8300_sci_pins[ch].rx) ? 1 : 0;
 }
 #endif

@@ -1307,7 +1307,7 @@ static int sl_ioctl(struct net_device *dev,struct ifreq *rq,int cmd)
 		/* Resolve race condition, when ioctl'ing hanged up 
 		   and opened by another process device.
 		 */
-		if (sl->tty != current->tty && sl->pid != current->pid) {
+		if (sl->tty != current->signal->tty && sl->pid != current->pid) {
 			spin_unlock_bh(&sl->lock);
 			return -EPERM;
 		}

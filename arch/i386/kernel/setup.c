@@ -47,8 +47,8 @@
 #include <asm/sections.h>
 #include <asm/io_apic.h>
 #include <asm/ist.h>
+#include <asm/std_resources.h>
 #include "setup_arch_pre.h"
-#include "mach_resources.h"
 
 /* This value is set up by the early boot code to point to the value
    immediately after the boot time page tables.  It contains a *physical*
@@ -134,19 +134,6 @@ unsigned char __initdata boot_params[PARAM_SIZE];
 
 static struct resource code_resource = { "Kernel code", 0x100000, 0 };
 static struct resource data_resource = { "Kernel data", 0, 0 };
-
-static void __init probe_roms(void)
-{
-	int roms = 1;
-
-	request_resource(&iomem_resource, rom_resources+0);
-
-	/* Video ROM is standard at C000:0000 - C7FF:0000, check signature */
-	probe_video_rom(roms);
-
-	/* Extension roms */
-	probe_extension_roms(roms);
-}
 
 static void __init limit_regions(unsigned long long size)
 {
@@ -951,19 +938,17 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 static void __init register_memory(unsigned long max_low_pfn)
 {
 	unsigned long low_mem_size;
-	int i;
 
 	if (efi_enabled)
 		efi_initialize_iomem_resources(&code_resource, &data_resource);
 	else
 		legacy_init_iomem_resources(&code_resource, &data_resource);
 
- 	 /* EFI systems may still have VGA */
+	/* EFI systems may still have VGA */
 	request_graphics_resource();
 
 	/* request I/O space for devices used on all i[345]86 PCs */
-	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
-		request_resource(&ioport_resource, standard_io_resources+i);
+	request_standard_io_resources();
 
 	/* Tell the PCI layer not to allocate too close to the RAM area.. */
 	low_mem_size = ((max_low_pfn << PAGE_SHIFT) + 0xfffff) & ~0xfffff;

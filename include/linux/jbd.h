@@ -42,6 +42,11 @@
  */
 #undef JBD_PARANOID_IOFAIL
 
+/*
+ * The default maximum commit age, in seconds.
+ */
+#define JBD_DEFAULT_MAX_COMMIT_AGE 5
+
 #ifdef CONFIG_JBD_DEBUG
 /*
  * Define JBD_EXPENSIVE_CHECKING to enable more expensive internal
@@ -300,6 +305,10 @@ BUFFER_FNS(JBD, jbd)
 BUFFER_FNS(JWrite, jwrite)
 BUFFER_FNS(JBDDirty, jbddirty)
 TAS_BUFFER_FNS(JBDDirty, jbddirty)
+BUFFER_FNS(Revoked, revoked)
+TAS_BUFFER_FNS(Revoked, revoked)
+BUFFER_FNS(RevokeValid, revokevalid)
+TAS_BUFFER_FNS(RevokeValid, revokevalid)
 BUFFER_FNS(Freed, freed)
 
 static inline struct buffer_head *jh2bh(struct journal_head *jh)
@@ -485,6 +494,12 @@ struct transaction_s
 	 * modified by this transaction [j_list_lock]
 	 */
 	struct journal_head	*t_reserved_list;
+
+	/*
+	 * Doubly-linked circular list of all buffers under writeout during
+	 * commit [j_list_lock]
+	 */
+	struct journal_head	*t_locked_list;
 
 	/*
 	 * Doubly-linked circular list of all metadata buffers owned by this
@@ -1001,10 +1016,10 @@ extern int	cleanup_journal_tail(journal_t *);
 /* Debugging code only: */
 
 #define jbd_ENOSYS() \
-do {								      \
-	printk (KERN_ERR "JBD unimplemented function " __FUNCTION__); \
-	current->state = TASK_UNINTERRUPTIBLE;			      \
-	schedule();						      \
+do {								           \
+	printk (KERN_ERR "JBD unimplemented function %s\n", __FUNCTION__); \
+	current->state = TASK_UNINTERRUPTIBLE;			           \
+	schedule();						           \
 } while (1)
 
 /*
@@ -1079,7 +1094,8 @@ static inline int jbd_space_needed(journal_t *journal)
 #define BJ_Shadow	5	/* Buffer contents being shadowed to the log */
 #define BJ_LogCtl	6	/* Buffer contains log descriptors */
 #define BJ_Reserved	7	/* Buffer is reserved for access by journal */
-#define BJ_Types	8
+#define BJ_Locked	8	/* Locked for I/O during commit */
+#define BJ_Types	9
  
 extern int jbd_blocks_per_page(struct inode *inode);
 

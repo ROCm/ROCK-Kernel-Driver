@@ -471,7 +471,7 @@ kbd_ioctl(struct kbd_data *kbd, struct file *file,
 	 * To have permissions to do most of the vt ioctls, we either have
 	 * to be the owner of the tty, or have CAP_SYS_TTY_CONFIG.
 	 */
-	perm = current->tty == kbd->tty || capable(CAP_SYS_TTY_CONFIG);
+	perm = current->signal->tty == kbd->tty || capable(CAP_SYS_TTY_CONFIG);
 	switch (cmd) {
 	case KDGKBTYPE:
 		return put_user(KB_101, (char*) arg);

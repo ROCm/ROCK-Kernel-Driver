@@ -54,6 +54,15 @@ struct per_cpu_pageset {
 	struct per_cpu_pages pcp[2];	/* 0: hot.  1: cold */
 } ____cacheline_aligned_in_smp;
 
+#define ZONE_DMA		0
+#define ZONE_NORMAL		1
+#define ZONE_HIGHMEM		2
+
+#define MAX_NR_ZONES		3	/* Sync this with ZONES_SHIFT */
+#define ZONES_SHIFT		2	/* ceil(log2(MAX_NR_ZONES)) */
+
+#define GFP_ZONEMASK	0x03
+
 /*
  * On machines where it is needed (eg PCs) we divide physical memory
  * into multiple physical zones. On a PC we have 3 zones:
@@ -70,6 +79,19 @@ struct zone {
 	spinlock_t		lock;
 	unsigned long		free_pages;
 	unsigned long		pages_min, pages_low, pages_high;
+	/*
+	 * protection[] is a pre-calculated number of extra pages that must be
+	 * available in a zone in order for __alloc_pages() to allocate memory
+	 * from the zone. i.e., for a GFP_KERNEL alloc of "order" there must
+	 * be "(1<<order) + protection[ZONE_NORMAL]" free pages in the zone
+	 * for us to choose to allocate the page from that zone.
+	 *
+	 * It uses both min_free_kbytes and sysctl_lower_zone_protection.
+	 * The protection values are recalculated if either of these values
+	 * change.  The array elements are in zonelist order:
+	 *	[0] == GFP_DMA, [1] == GFP_KERNEL, [2] == GFP_HIGHMEM.
+	 */
+	unsigned long		protection[MAX_NR_ZONES];
 
 	ZONE_PADDING(_pad1_)
 
@@ -157,14 +179,6 @@ struct zone {
 	unsigned long		present_pages;	/* amount of memory (excluding holes) */
 } ____cacheline_maxaligned_in_smp;
 
-#define ZONE_DMA		0
-#define ZONE_NORMAL		1
-#define ZONE_HIGHMEM		2
-
-#define MAX_NR_ZONES		3	/* Sync this with ZONES_SHIFT */
-#define ZONES_SHIFT		2	/* ceil(log2(MAX_NR_ZONES)) */
-
-#define GFP_ZONEMASK	0x03
 
 /*
  * The "priority" of VM scanning is how much of the queues we will scan in one
@@ -227,6 +241,11 @@ void get_zone_counts(unsigned long *active, unsigned long *inactive,
 			unsigned long *free);
 void build_all_zonelists(void);
 void wakeup_kswapd(struct zone *zone);
+
+/*
+ * zone_idx() returns 0 for the ZONE_DMA zone, 1 for the ZONE_NORMAL zone, etc.
+ */
+#define zone_idx(zone)		((zone) - (zone)->zone_pgdat->node_zones)
 
 /**
  * for_each_pgdat - helper macro to iterate over all nodes
@@ -299,7 +318,9 @@ static inline int is_normal(struct zone *zone)
 struct ctl_table;
 struct file;
 int min_free_kbytes_sysctl_handler(struct ctl_table *, int, struct file *, 
-					  void __user *, size_t *);
+					void __user *, size_t *);
+int lower_zone_protection_sysctl_handler(struct ctl_table *, int, struct file *,
+					void __user *, size_t *);
 
 #include <linux/topology.h>
 /* Returns the number of the current Node. */
