@@ -829,6 +829,12 @@ islpci_setup(struct pci_dev *pdev)
 	priv->ndev->type = (priv->iw_mode == IW_MODE_MONITOR) ?
 		priv->monitor_type : ARPHRD_ETHER;
 
+#if WIRELESS_EXT > 16
+	/* Add pointers to enable iwspy support. */
+	priv->wireless_data.spy_data = &priv->spy_data;
+	ndev->wireless_data = &priv->wireless_data;
+#endif /* WIRELESS_EXT > 16 */
+
 	/* save the start and end address of the PCI memory area */
 	ndev->mem_start = (unsigned long) priv->device_base;
 	ndev->mem_end = ndev->mem_start + ISL38XX_PCI_MEM_SIZE;
