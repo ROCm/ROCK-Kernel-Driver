@@ -38,7 +38,7 @@ DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
 struct pglist_data *pgdat_list;
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
-int nr_swap_pages;
+long nr_swap_pages;
 int numnodes = 1;
 int sysctl_lower_zone_protection = 0;
 

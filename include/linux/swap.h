@@ -156,7 +156,7 @@ extern void swapin_readahead(swp_entry_t, unsigned long, struct vm_area_struct *
 /* linux/mm/page_alloc.c */
 extern unsigned long totalram_pages;
 extern unsigned long totalhigh_pages;
-extern int nr_swap_pages;	/* XXX: shouldn't this be ulong? --hch */
+extern long nr_swap_pages;
 extern unsigned int nr_free_pages(void);
 extern unsigned int nr_free_pages_pgdat(pg_data_t *pgdat);
 extern unsigned int nr_free_buffer_pages(void);
