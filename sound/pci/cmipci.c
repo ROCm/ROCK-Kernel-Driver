@@ -725,6 +725,7 @@ static int set_dac_channels(cmipci_t *cm, cmipci_pcm_t *rec, int channels)
 
 		spin_lock_irqsave(&cm->reg_lock, flags);
 		snd_cmipci_set_bit(cm, CM_REG_LEGACY_CTRL, CM_NXCHG);
+		snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_XCHGDAC);
 		if (channels > 4) {
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_CHB3D);
 			snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_CHB3D5C);
@@ -749,6 +750,7 @@ static int set_dac_channels(cmipci_t *cm, cmipci_pcm_t *rec, int channels)
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_CHB3D5C);
 			snd_cmipci_clear_bit(cm, CM_REG_LEGACY_CTRL, CM_CHB3D6C);
 			snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_ENCENTER);
+			snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_XCHGDAC);
 			spin_unlock_irqrestore(&cm->reg_lock, flags);
 		}
 	}
@@ -2671,10 +2673,13 @@ static int snd_cmipci_spdout_enable_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 
 /* both for CM8338/8738 */
 static snd_kcontrol_new_t snd_cmipci_mixer_switches[] __devinitdata = {
-	DEFINE_MIXER_SWITCH("Exchange DAC", exchange_dac),
 	DEFINE_MIXER_SWITCH("Four Channel Mode", fourch),
 	DEFINE_MIXER_SWITCH("Line-In As Rear", line_rear),
 };
+
+/* for non-multichannel chips */
+static snd_kcontrol_new_t snd_cmipci_nomulti_switch __devinitdata =
+DEFINE_MIXER_SWITCH("Exchange DAC", exchange_dac);
 
 /* only for CM8738 */
 static snd_kcontrol_new_t snd_cmipci_8738_mixer_switches[] __devinitdata = {
@@ -2748,6 +2753,11 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 	sw = snd_cmipci_mixer_switches;
 	for (idx = 0; idx < num_controls(snd_cmipci_mixer_switches); idx++, sw++) {
 		err = snd_ctl_add(cm->card, snd_ctl_new1(sw, cm));
+		if (err < 0)
+			return err;
+	}
+	if (! cm->can_multi_ch) {
+		err = snd_ctl_add(cm->card, snd_ctl_new1(&snd_cmipci_nomulti_switch, cm));
 		if (err < 0)
 			return err;
 	}
