@@ -14,10 +14,8 @@ config USB_DABUSB
 	  isochronous transactions. URB's are explained in
 	  <file:Documentation/usb/URB.txt>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called dabusb.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called dabusb.
 
 comment "Video4Linux support is needed for USB Multimedia device support"
 	depends on USB && VIDEO_DEV=n
@@ -33,10 +31,8 @@ config USB_VICAM
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called vicam. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called vicam.
 
 config USB_DSBR
 	tristate "D-Link USB FM radio support (EXPERIMENTAL)"
@@ -53,10 +49,8 @@ config USB_DSBR
 	  "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called dsbr100. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called dsbr100.
 
 config USB_IBMCAM
 	tristate "USB IBM (Xirlink) C-it Camera support"
@@ -72,13 +66,12 @@ config USB_IBMCAM
 	  "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ibmcam.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>. This
-	  camera has several configuration options which can be specified when
-	  you load the module.  Read <file:Documentation/usb/ibmcam.txt> to
-	  learn more.
+	  To compile this driver as a module, say M here: the
+	  module will be called ibmcam.
+
+	  This camera has several configuration options which
+	  can be specified when you load the module. Read
+	  <file:Documentation/usb/ibmcam.txt> to learn more.
 
 config USB_KONICAWC
 	tristate "USB Konica Webcam support"
@@ -93,10 +86,8 @@ config USB_KONICAWC
 	  "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called konicawc. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called konicawc.
 
 config USB_OV511
 	tristate "USB OV511 Camera support"
@@ -111,10 +102,8 @@ config USB_OV511
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ov511. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called ov511.
 
 config USB_PWC
 	tristate "USB Philips Cameras"
@@ -152,10 +141,8 @@ config USB_PWC
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pwc.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called pwc.
 
 config USB_SE401
 	tristate "USB SE401 Camera support"
@@ -170,10 +157,8 @@ config USB_SE401
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called se401. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called se401.
 
 config USB_STV680
 	tristate "USB STV680 (Pencam) Camera support"
@@ -189,8 +174,6 @@ config USB_STV680
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called stv680. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, say M here: the
+	  module will be called stv680.
 
