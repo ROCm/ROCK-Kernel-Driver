@@ -693,13 +693,6 @@ Your cooperation is appreciated.
 		    ...
 		 31 = /dev/fb31		32nd frame buffer
 
-		For backwards compatibility {2.6} the following
-		progression is also handled by current kernels:
-		  0 = /dev/fb0
-		 32 = /dev/fb1
-		    ...
-		224 = /dev/fb7
-
     block	Aztech/Orchid/Okano/Wearnes CD-ROM
 		  0 = /dev/aztcd	Aztech CD-ROM
 

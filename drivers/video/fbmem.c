@@ -629,7 +629,6 @@ static void __init fb_set_logo(struct fb_info *info,
  */
 static struct logo_data {
 	int depth;
-	int needs_logo;
 	int needs_directpalette;
 	int needs_truepalette;
 	int needs_cmapreset;
@@ -642,51 +641,34 @@ int fb_prepare_logo(struct fb_info *info)
 
 	switch (info->fix.visual) {
 	case FB_VISUAL_TRUECOLOR:
-		if (info->var.bits_per_pixel >= 8) {
+		if (info->var.bits_per_pixel >= 8)
 			fb_logo.needs_truepalette = 1;
-			fb_logo.needs_logo = 8;
-		} else if (info->var.bits_per_pixel >= 4)
-			fb_logo.needs_logo = 4;
-		else 
-			fb_logo.needs_logo = 1;
 		break;
 	case FB_VISUAL_DIRECTCOLOR:
 		if (info->var.bits_per_pixel >= 24) {
 			fb_logo.needs_directpalette = 1;
 			fb_logo.needs_cmapreset = 1;
-			fb_logo.needs_logo = 8;
-		} else if (info->var.bits_per_pixel >= 16)	/* 16 colors */
-			fb_logo.needs_logo = 4;
-		else
-			fb_logo.needs_logo = 1;	/* 2 colors */
+		}
 		break;
-	case FB_VISUAL_MONO01:
-		/* reversed 0 = fg, 1 = bg */
-		fb_logo.needs_logo = ~1;
-		break;
-	case FB_VISUAL_MONO10:
-		fb_logo.needs_logo = 1;
-		break;
-	case FB_VISUAL_STATIC_PSEUDOCOLOR:
-		if (info->var.bits_per_pixel >= 8) {
-			fb_logo.needs_logo = 8;
-			if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR)
-				fb_logo.needs_cmapreset = 1;
-		} else if (info->var.bits_per_pixel >= 4)
-			fb_logo.needs_logo = 4;	/* 16 colors */
-		else
-			fb_logo.needs_logo = 1;	
+	case FB_VISUAL_PSEUDOCOLOR:
+		fb_logo.needs_cmapreset = 1;
 		break;
 	}
 
-	fb_logo.depth = info->var.bits_per_pixel;
-	
 	/* Return if no suitable logo was found */
-	fb_logo.logo = find_logo(fb_logo.needs_logo);
+	fb_logo.logo = find_logo(info->var.bits_per_pixel);
+	
 	if (!fb_logo.logo || fb_logo.logo->height > info->var.yres) {
 		fb_logo.logo = NULL;
 		return 0;
 	}
+	/* What depth we asked for might be different from what we get */
+	if (fb_logo.logo->type == LINUX_LOGO_CLUT224)
+		fb_logo.depth = 8;
+	else if (fb_logo.logo->type = LINUX_LOGO_VGA16)
+		fb_logo.depth = 4;
+	else
+		fb_logo.depth = 1;		
 	return fb_logo.logo->height;
 }
 
@@ -722,7 +704,7 @@ int fb_show_logo(struct fb_info *info)
 		info->pseudo_palette = palette;
 	}
 
-	if (fb_logo.needs_logo != 8) {
+	if (fb_logo.depth == 4) {
 		logo_new = kmalloc(fb_logo.logo->width * fb_logo.logo->height, 
 				   GFP_KERNEL);
 		if (logo_new == NULL) {
@@ -1125,6 +1107,8 @@ fb_open(struct inode *inode, struct file *file)
 	struct fb_info *info;
 	int res = 0;
 
+	if (fbidx >= FB_MAX)
+		return -ENODEV;
 #ifdef CONFIG_KMOD
 	if (!(info = registered_fb[fbidx]))
 		try_to_load(fbidx);
@@ -1208,7 +1192,7 @@ register_framebuffer(struct fb_info *fb_info)
 	if (fb_info->pixmap.inbuf == NULL)
 		fb_info->pixmap.inbuf = sys_inbuf;
 	spin_lock_init(&fb_info->pixmap.lock);
-	
+
 	registered_fb[i] = fb_info;
 	sprintf(name_buf, "fb/%d", i);
 	devfs_register(NULL, name_buf, DEVFS_FL_DEFAULT,
