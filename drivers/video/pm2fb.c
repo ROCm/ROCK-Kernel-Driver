@@ -57,7 +57,7 @@
 #error	"The endianness of the target host has not been defined."
 #endif
 
-#if defined(__BIG_ENDIAN) && !defined(__sparc__)
+#if defined(__BIG_ENDIAN) && !defined(__sparc__) && (!defined(CONFIG_PPC) || defined(CONFIG_FB_PM2_CVPPC))
 #define PM2FB_BE_APERTURE
 #endif
 
