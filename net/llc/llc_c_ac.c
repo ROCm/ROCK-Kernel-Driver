@@ -813,6 +813,16 @@ int llc_conn_ac_send_ack_xxx_x_set_0(struct sock *sk, struct sk_buff *skb)
 	return rc;
 }
 
+void llc_conn_set_p_flag(struct sock *sk, u8 value)
+{
+	int state_changed = llc_sk(sk)->p_flag && !value;
+
+	llc_sk(sk)->p_flag = value;
+
+	if (state_changed)
+		sk->state_change(sk);
+}
+
 int llc_conn_ac_send_sabme_cmd_p_set_x(struct sock *sk, struct sk_buff *skb)
 {
 	int rc = 1;
@@ -834,7 +844,8 @@ int llc_conn_ac_send_sabme_cmd_p_set_x(struct sock *sk, struct sk_buff *skb)
 		rc = 0;
 		llc_conn_send_pdu(sk, nskb);
 	}
-	llc->p_flag = p_bit;
+	llc_conn_set_p_flag(sk, p_bit);
+
 	return rc;
 }
 
@@ -897,7 +908,7 @@ int llc_conn_ac_start_p_timer(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_opt *llc = llc_sk(sk);
 
-	llc->p_flag = 1;
+	llc_conn_set_p_flag(sk, 1);
 	mod_timer(&llc->pf_cycle_timer.timer,
 		  jiffies + llc->pf_cycle_timer.expire * HZ);
 	return 0;
@@ -1205,7 +1216,7 @@ int llc_conn_ac_stop_p_timer(struct sock *sk, struct sk_buff *skb)
 	struct llc_opt *llc = llc_sk(sk);
 
 	del_timer(&llc->pf_cycle_timer.timer);
-	llc->p_flag = 0;
+	llc_conn_set_p_flag(sk, 0);
 	return 0;
 }
 
@@ -1259,7 +1270,7 @@ int llc_conn_ac_upd_p_flag(struct sock *sk, struct sk_buff *skb)
 
 		llc_pdu_decode_pf_bit(skb, &f_bit);
 		if (f_bit) {
-			llc_sk(sk)->p_flag = 0;
+			llc_conn_set_p_flag(sk, 0);
 			llc_conn_ac_stop_p_timer(sk, skb);
 		}
 	}
@@ -1294,13 +1305,13 @@ int llc_conn_ac_set_data_flag_1_if_data_flag_eq_0(struct sock *sk,
 
 int llc_conn_ac_set_p_flag_0(struct sock *sk, struct sk_buff *skb)
 {
-	llc_sk(sk)->p_flag = 0;
+	llc_conn_set_p_flag(sk, 0);
 	return 0;
 }
 
 int llc_conn_ac_set_p_flag_1(struct sock *sk, struct sk_buff *skb)
 {
-	llc_sk(sk)->p_flag = 1;
+	llc_conn_set_p_flag(sk, 1);
 	return 0;
 }
 

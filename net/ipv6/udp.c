@@ -50,6 +50,18 @@
 
 struct udp_mib udp_stats_in6[NR_CPUS*2];
 
+static __inline__ int udv6_rcv_saddr_equal(struct sock *sk, struct sock *sk2)
+{
+	struct ipv6_pinfo *np = inet6_sk(sk);
+	int addr_type = ipv6_addr_type(&np->rcv_saddr);
+
+	return !inet_sk(sk2)->rcv_saddr || addr_type == IPV6_ADDR_ANY ||
+	       (sk2->family == AF_INET6 &&
+	        !ipv6_addr_cmp(&np->rcv_saddr, &inet6_sk(sk2)->rcv_saddr)) ||
+	       (addr_type == IPV6_ADDR_MAPPED && sk2->family == AF_INET &&
+		inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr);
+}
+
 /* Grrr, addr_type already calculated by caller, but I don't want
  * to add some silly "cookie" argument to this method just for that.
  */
@@ -98,25 +110,15 @@ gotit:
 		udp_port_rover = snum = result;
 	} else {
 		struct sock *sk2;
-		struct ipv6_pinfo *np = inet6_sk(sk);
-		int addr_type = ipv6_addr_type(&np->rcv_saddr);
 
 		for (sk2 = udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
 		     sk2 != NULL;
 		     sk2 = sk2->next) {
-			struct inet_opt *inet2 = inet_sk(sk2);
-			struct ipv6_pinfo *np2 = inet6_sk(sk2);
-
-			if (inet2->num == snum &&
+			if (inet_sk(sk2)->num == snum &&
 			    sk2 != sk &&
 			    sk2->bound_dev_if == sk->bound_dev_if &&
-			    (!inet2->rcv_saddr ||
-			     addr_type == IPV6_ADDR_ANY ||
-			     !ipv6_addr_cmp(&np->rcv_saddr, &np2->rcv_saddr) ||
-			     (addr_type == IPV6_ADDR_MAPPED &&
-			      sk2->family == AF_INET &&
-			      inet_sk(sk)->rcv_saddr == inet2->rcv_saddr)) &&
-			    (!sk2->reuse || !sk->reuse))
+			    (!sk2->reuse || !sk->reuse) &&
+			    udv6_rcv_saddr_equal(sk, sk2))
 				goto fail;
 		}
 	}
