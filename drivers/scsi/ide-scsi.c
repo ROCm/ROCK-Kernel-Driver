@@ -45,6 +45,7 @@
 #include <linux/hdreg.h>
 #include <linux/slab.h>
 #include <linux/ide.h>
+#include <linux/scatterlist.h>
 
 #include <asm/io.h>
 #include <asm/bitops.h>
@@ -253,17 +254,6 @@ static inline void idescsi_transform_pc2 (ide_drive_t *drive, idescsi_pc_t *pc)
 		kfree(atapi_buf);
 }
 
-static inline void idescsi_free_bio (struct bio *bio)
-{
-	struct bio *bhp;
-
-	while (bio) {
-		bhp = bio;
-		bio = bio->bi_next;
-		bio_put(bhp);
-	}
-}
-
 static void hexdump(u8 *x, int len)
 {
 	int i;
@@ -421,7 +411,6 @@ static int idescsi_end_request (ide_drive_t *drive, int uptodate, int nrsecs)
 	spin_lock_irqsave(host->host_lock, flags);
 	pc->done(pc->scsi_cmd);
 	spin_unlock_irqrestore(host->host_lock, flags);
-	idescsi_free_bio(rq->bio);
 	kfree(pc);
 	kfree(rq);
 	scsi->pc = NULL;
@@ -585,6 +574,50 @@ static ide_startstop_t idescsi_transfer_pc(ide_drive_t *drive)
 	return ide_started;
 }
 
+static inline int idescsi_set_direction(idescsi_pc_t *pc)
+{
+	switch (pc->c[0]) {
+		case READ_6: case READ_10: case READ_12:
+			clear_bit(PC_WRITING, &pc->flags);
+			return 0;
+		case WRITE_6: case WRITE_10: case WRITE_12:
+			set_bit(PC_WRITING, &pc->flags);
+			return 0;
+		default:
+			return 1;
+	}
+}
+
+static int idescsi_map_sg(ide_drive_t *drive, idescsi_pc_t *pc)
+{
+	ide_hwif_t *hwif = drive->hwif;
+	struct scatterlist *sg, *scsi_sg;
+	int segments;
+
+	if (!pc->request_transfer || pc->request_transfer % 1024)
+		return 1;
+
+	if (idescsi_set_direction(pc))
+		return 1;
+
+	sg = hwif->sg_table;
+	scsi_sg = pc->scsi_cmd->request_buffer;
+	segments = pc->scsi_cmd->use_sg;
+
+	if (segments > hwif->sg_max_nents)
+		return 1;
+
+	if (!segments) {
+		hwif->sg_nents = 1;
+		sg_init_one(sg, pc->scsi_cmd->request_buffer, pc->request_transfer);
+	} else {
+		hwif->sg_nents = segments;
+		memcpy(sg, scsi_sg, sizeof(*sg) * segments);
+	}
+
+	return 0;
+}
+
 /*
  *	Issue a packet command
  */
@@ -594,7 +627,6 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	ide_hwif_t *hwif = drive->hwif;
 	atapi_feature_t feature;
 	atapi_bcount_t bcount;
-	struct request *rq = pc->rq;
 
 	scsi->pc=pc;							/* Set the current packet command */
 	pc->actually_transferred=0;					/* We haven't transferred any data yet */
@@ -602,8 +634,11 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	bcount.all = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
 	feature.all = 0;
-	if (drive->using_dma && rq->bio)
+	if (drive->using_dma && !idescsi_map_sg(drive, pc)) {
+		hwif->sg_mapped = 1;
 		feature.b.dma = !hwif->dma_setup(drive);
+		hwif->sg_mapped = 0;
+	}
 
 	SELECT_DRIVE(drive);
 	if (IDE_CONTROL_REG)
@@ -775,81 +810,6 @@ static int idescsi_ioctl (struct scsi_device *dev, int cmd, void __user *arg)
 	return -EINVAL;
 }
 
-static inline struct bio *idescsi_kmalloc_bio (int count)
-{
-	struct bio *bh, *bhp, *first_bh;
-
-	if ((first_bh = bhp = bh = bio_alloc(GFP_ATOMIC, 1)) == NULL)
-		goto abort;
-	bio_init(bh);
-	bh->bi_vcnt = 1;
-	while (--count) {
-		if ((bh = bio_alloc(GFP_ATOMIC, 1)) == NULL)
-			goto abort;
-		bio_init(bh);
-		bh->bi_vcnt = 1;
-		bhp->bi_next = bh;
-		bhp = bh;
-		bh->bi_next = NULL;
-	}
-	return first_bh;
-abort:
-	idescsi_free_bio (first_bh);
-	return NULL;
-}
-
-static inline int idescsi_set_direction (idescsi_pc_t *pc)
-{
-	switch (pc->c[0]) {
-		case READ_6: case READ_10: case READ_12:
-			clear_bit (PC_WRITING, &pc->flags);
-			return 0;
-		case WRITE_6: case WRITE_10: case WRITE_12:
-			set_bit (PC_WRITING, &pc->flags);
-			return 0;
-		default:
-			return 1;
-	}
-}
-
-static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
-{
-	struct bio *bh = NULL, *first_bh = NULL;
-	int segments = pc->scsi_cmd->use_sg;
-	struct scatterlist *sg = pc->scsi_cmd->request_buffer;
-
-	if (!drive->using_dma || !pc->request_transfer || pc->request_transfer % 1024)
-		return NULL;
-	if (idescsi_set_direction(pc))
-		return NULL;
-	if (segments) {
-		if ((first_bh = bh = idescsi_kmalloc_bio (segments)) == NULL)
-			return NULL;
-#if IDESCSI_DEBUG_LOG
-		printk ("ide-scsi: %s: building DMA table, %d segments, %dkB total\n", drive->name, segments, pc->request_transfer >> 10);
-#endif /* IDESCSI_DEBUG_LOG */
-		while (segments--) {
-			bh->bi_io_vec[0].bv_page = sg->page;
-			bh->bi_io_vec[0].bv_len = sg->length;
-			bh->bi_io_vec[0].bv_offset = sg->offset;
-			bh->bi_size = sg->length;
-			bh = bh->bi_next;
-			sg++;
-		}
-	} else {
-		if ((first_bh = bh = idescsi_kmalloc_bio (1)) == NULL)
-			return NULL;
-#if IDESCSI_DEBUG_LOG
-		printk ("ide-scsi: %s: building DMA table for a single buffer (%dkB)\n", drive->name, pc->request_transfer >> 10);
-#endif /* IDESCSI_DEBUG_LOG */
-		bh->bi_io_vec[0].bv_page = virt_to_page(pc->scsi_cmd->request_buffer);
-		bh->bi_io_vec[0].bv_offset = offset_in_page(pc->scsi_cmd->request_buffer);
-		bh->bi_io_vec[0].bv_len = pc->request_transfer;
-		bh->bi_size = pc->request_transfer;
-	}
-	return first_bh;
-}
-
 static inline int should_transform(ide_drive_t *drive, struct scsi_cmnd *cmd)
 {
 	idescsi_scsi_t *scsi = drive_to_idescsi(drive);
@@ -921,7 +881,6 @@ static int idescsi_queue (struct scsi_cmnd *cmd,
 
 	ide_init_drive_cmd (rq);
 	rq->special = (char *) pc;
-	rq->bio = idescsi_dma_bio (drive, pc);
 	rq->flags = REQ_SPECIAL;
 	spin_unlock_irq(host->host_lock);
 	(void) ide_do_drive_cmd (drive, rq, ide_end);
@@ -975,7 +934,6 @@ static int idescsi_eh_abort (struct scsi_cmnd *cmd)
 		 */
 		printk (KERN_ERR "ide-scsi: cmd aborted!\n");
 
-		idescsi_free_bio(scsi->pc->rq->bio);
 		if (scsi->pc->rq->flags & REQ_SENSE)
 			kfree(scsi->pc->buffer);
 		kfree(scsi->pc->rq);
@@ -1024,7 +982,6 @@ static int idescsi_eh_reset (struct scsi_cmnd *cmd)
 	/* kill current request */
 	blkdev_dequeue_request(req);
 	end_that_request_last(req);
-	idescsi_free_bio(req->bio);
 	if (req->flags & REQ_SENSE)
 		kfree(scsi->pc->buffer);
 	kfree(scsi->pc);

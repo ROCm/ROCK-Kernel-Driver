@@ -132,7 +132,8 @@ int ptrace_attach(struct task_struct *task)
 		goto bad;
 
 	/* Go */
-	task->ptrace |= PT_PTRACED | PT_ATTACHED;
+	task->ptrace |= PT_PTRACED | ((task->real_parent != current)
+				      ? PT_ATTACHED : 0);
 	if (capable(CAP_SYS_PTRACE))
 		task->ptrace |= PT_PTRACE_CAP;
 	task_unlock(task);
