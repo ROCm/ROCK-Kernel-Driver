@@ -329,9 +329,7 @@ static struct pci_driver orinoco_plx_driver = {
 static char version[] __initdata = "orinoco_plx.c 0.13e (Daniel Barlow <dan@telent.net>, David Gibson <hermes@gibson.dropbear.id.au>)";
 MODULE_AUTHOR("Daniel Barlow <dan@telent.net>");
 MODULE_DESCRIPTION("Driver for wireless LAN cards using the PLX9052 PCI bridge");
-#ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
-#endif
 
 static int __init orinoco_plx_init(void)
 {

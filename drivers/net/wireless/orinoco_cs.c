@@ -47,9 +47,7 @@
 
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for PCMCIA Lucent Orinoco, Prism II based and similar wireless cards");
-#ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
-#endif
 
 /* Module parameters */
 
@@ -144,15 +142,6 @@ orinoco_cs_hard_reset(struct orinoco_private *priv)
 /* PCMCIA stuff     						    */
 /********************************************************************/
 
-/* In 2.5 (as of 2.5.69 at least) there is a cs_error exported which
- * does this, but it's not in 2.4 so we do our own for now. */
-static void
-orinoco_cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err = { func, ret };
-	pcmcia_report_error(handle, &err);
-}
-
 /*
  * This creates an "instance" of the driver, allocating local data
  * structures for one device.  The device is registered with Card
@@ -216,7 +205,7 @@ orinoco_cs_attach(void)
 
 	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != CS_SUCCESS) {
-		orinoco_cs_error(link->handle, RegisterClient, ret);
+		cs_error(link->handle, RegisterClient, ret);
 		orinoco_cs_detach(link);
 		return NULL;
 	}
@@ -495,7 +484,7 @@ orinoco_cs_config(dev_link_t *link)
 	return;
 
  cs_failed:
-	orinoco_cs_error(link->handle, last_fn, last_ret);
+	cs_error(link->handle, last_fn, last_ret);
 
  failed:
 	orinoco_cs_release(link);

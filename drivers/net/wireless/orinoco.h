@@ -14,32 +14,9 @@
 #include <linux/version.h>
 #include "hermes.h"
 
-/* Workqueue / task queue backwards compatibility stuff */
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
-#include <linux/workqueue.h>
-#else
-#include <linux/tqueue.h>
-#define work_struct tq_struct
-#define INIT_WORK INIT_TQUEUE
-#define schedule_work schedule_task
-#endif
-
-/* Interrupt handler backwards compatibility stuff */
-#ifndef IRQ_NONE
-
-#define IRQ_NONE
-#define IRQ_HANDLED
-typedef void irqreturn_t;
-
-#endif
-
 /* To enable debug messages */
 //#define ORINOCO_DEBUG		3
 
-#if (! defined (WIRELESS_EXT)) || (WIRELESS_EXT < 10)
-#error "orinoco driver requires Wireless extensions v10 or later."
-#endif /* (! defined (WIRELESS_EXT)) || (WIRELESS_EXT < 10) */
 #define WIRELESS_SPY		// enable iwspy support
 
 #define ORINOCO_MAX_KEY_SIZE	14

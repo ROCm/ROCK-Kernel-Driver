@@ -446,9 +446,7 @@
 
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for Lucent Orinoco, Prism II based and similar wireless cards");
-#ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
-#endif
 
 /* Level of debugging. Used in the macros in orinoco.h */
 #ifdef ORINOCO_DEBUG
@@ -463,11 +461,6 @@ MODULE_PARM(suppress_linkstatus, "i");
 /********************************************************************/
 /* Compile time configuration and compatibility stuff               */
 /********************************************************************/
-
-/* Wireless extensions backwards compatibility */
-#ifndef SIOCIWFIRSTPRIV
-#define SIOCIWFIRSTPRIV		SIOCDEVPRIVATE
-#endif /* SIOCIWFIRSTPRIV */
 
 /* We do this this way to avoid ifdefs in the actual code */
 #ifdef WIRELESS_SPY
@@ -1614,13 +1607,11 @@ static void __orinoco_ev_info(struct net_device *dev, hermes_t *hw)
 				le16_to_cpu(tallies.RxDiscards_WEPExcluded);
 		wstats->discard.misc +=
 			le16_to_cpu(tallies.TxDiscardsWrongSA);
-#if WIRELESS_EXT > 11
 		wstats->discard.fragment +=
 			le16_to_cpu(tallies.RxMsgInBadMsgFragments);
 		wstats->discard.retries +=
 			le16_to_cpu(tallies.TxRetryLimitExceeded);
 		/* wstats->miss.beacon - no match */
-#endif /* WIRELESS_EXT > 11 */
 	}
 	break;
 	case HERMES_INQ_LINKSTATUS: {
@@ -2582,10 +2573,8 @@ static int orinoco_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq
 
 	/* Much of this shamelessly taken from wvlan_cs.c. No idea
 	 * what it all means -dgibson */
-#if WIRELESS_EXT > 10
 	range.we_version_compiled = WIRELESS_EXT;
 	range.we_version_source = 11;
-#endif /* WIRELESS_EXT > 10 */
 
 	range.min_nwid = range.max_nwid = 0; /* We don't use nwids */
 
@@ -2612,22 +2601,17 @@ static int orinoco_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq
 		range.max_qual.qual = 0;
 		range.max_qual.level = 0;
 		range.max_qual.noise = 0;
-#if WIRELESS_EXT > 11
 		range.avg_qual.qual = 0;
 		range.avg_qual.level = 0;
 		range.avg_qual.noise = 0;
-#endif /* WIRELESS_EXT > 11 */
-
 	} else {
 		range.max_qual.qual = 0x8b - 0x2f;
 		range.max_qual.level = 0x2f - 0x95 - 1;
 		range.max_qual.noise = 0x2f - 0x95 - 1;
-#if WIRELESS_EXT > 11
 		/* Need to get better values */
 		range.avg_qual.qual = 0x24;
 		range.avg_qual.level = 0xC2;
 		range.avg_qual.noise = 0x9E;
-#endif /* WIRELESS_EXT > 11 */
 	}
 
 	err = orinoco_hw_get_bitratelist(priv, &numrates,
@@ -2680,7 +2664,6 @@ static int orinoco_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq
 	range.txpower[0] = 15; /* 15dBm */
 	range.txpower_capa = IW_TXPOW_DBM;
 
-#if WIRELESS_EXT > 10
 	range.retry_capa = IW_RETRY_LIMIT | IW_RETRY_LIFETIME;
 	range.retry_flags = IW_RETRY_LIMIT;
 	range.r_time_flags = IW_RETRY_LIFETIME;
@@ -2688,7 +2671,6 @@ static int orinoco_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq
 	range.max_retry = 65535;	/* ??? */
 	range.min_r_time = 0;
 	range.max_r_time = 65535 * 1000;	/* ??? */
-#endif /* WIRELESS_EXT > 10 */
 
 	if (copy_to_user(rrq->pointer, &range, sizeof(range)))
 		return -EFAULT;
@@ -3354,7 +3336,6 @@ static int orinoco_ioctl_getpower(struct net_device *dev, struct iw_param *prq)
 	return err;
 }
 
-#if WIRELESS_EXT > 10
 static int orinoco_ioctl_getretry(struct net_device *dev, struct iw_param *rrq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
@@ -3406,7 +3387,6 @@ static int orinoco_ioctl_getretry(struct net_device *dev, struct iw_param *rrq)
 
 	return err;
 }
-#endif /* WIRELESS_EXT > 10 */
 
 static int orinoco_ioctl_setibssport(struct net_device *dev, struct iwreq *wrq)
 {
@@ -3790,7 +3770,6 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		wrq->u.txpower.flags = IW_TXPOW_DBM;
 		break;
 
-#if WIRELESS_EXT > 10
 	case SIOCSIWRETRY:
 		err = -EOPNOTSUPP;
 		break;
@@ -3798,7 +3777,6 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case SIOCGIWRETRY:
 		err = orinoco_ioctl_getretry(dev, &wrq->u.retry);
 		break;
-#endif /* WIRELESS_EXT > 10 */
 
 	case SIOCSIWSPY:
 		err = orinoco_ioctl_setspy(dev, &wrq->u.data);

@@ -207,9 +207,7 @@ static struct pci_driver orinoco_tmd_driver = {
 static char version[] __initdata = "orinoco_tmd.c 0.01 (Joerg Dorchain <joerg@dorchain.net>)";
 MODULE_AUTHOR("Joerg Dorchain <joerg@dorchain.net>");
 MODULE_DESCRIPTION("Driver for wireless LAN cards using the TMD7160 PCI bridge");
-#ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual MPL/GPL");
-#endif
 
 static int __init orinoco_tmd_init(void)
 {
