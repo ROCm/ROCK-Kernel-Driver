@@ -143,4 +143,8 @@ static inline void get_device(struct device * dev)
 
 extern void put_device(struct device * dev);
 
+/* drivers/base/sys.c */
+extern int register_sys_device(struct device * dev);
+extern void unregister_sys_device(struct device * dev);
+
 #endif /* _DEVICE_H_ */
