@@ -452,7 +452,6 @@ static void shutdown_socket(struct pcmcia_socket *s)
     cs_dbg(s, 1, "shutdown_socket\n");
 
     /* Blank out the socket state */
-    s->state &= SOCKET_PRESENT|SOCKET_INUSE;
     s->socket = dead_socket;
     s->ops->init(s);
     s->ops->set_socket(s, &s->socket);
@@ -542,9 +541,10 @@ static void socket_shutdown(struct pcmcia_socket *skt)
 	cs_dbg(skt, 4, "shutdown\n");
 
 	socket_remove_drivers(skt);
+	skt->state &= SOCKET_INUSE|SOCKET_PRESENT;
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(cs_to_timeout(shutdown_delay));
-	skt->state &= ~SOCKET_PRESENT;
+	skt->state &= SOCKET_INUSE;
 	shutdown_socket(skt);
 }
 
