@@ -220,16 +220,6 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case EVIOCGID:
 			return copy_to_user((void *) arg, &dev->id, sizeof(struct input_id)) ? -EFAULT : 0;
 		
-		case EVIOCGREP:
-			if (put_user(dev->rep[0], ((int *) arg) + 0)) return -EFAULT;
-			if (put_user(dev->rep[1], ((int *) arg) + 1)) return -EFAULT;
-			return 0;
-
-		case EVIOCSREP:
-			if (get_user(dev->rep[0], ((int *) arg) + 0)) return -EFAULT;
-			if (get_user(dev->rep[1], ((int *) arg) + 1)) return -EFAULT;
-			return 0;
-
 		case EVIOCGKEYCODE:
 			if (get_user(t, ((int *) arg) + 0)) return -EFAULT;
 			if (t < 0 || t > dev->keycodemax || !dev->keycodesize) return -EINVAL;
