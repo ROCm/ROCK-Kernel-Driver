@@ -27,10 +27,8 @@ tsunami_flush_cache_range:
 	ld	[%o0 + 0x0], %o0	/* XXX vma->vm_mm, GROSS XXX */
 tsunami_flush_cache_mm:
 	ld	[%o0 + AOFF_mm_context], %g2
-#ifndef CONFIG_SMP
 	cmp	%g2, -1
 	be	tsunami_flush_cache_out
-#endif
 tsunami_flush_cache_all:
 	WINDOW_FLUSH(%g4, %g5)
 tsunami_flush_page_for_dma:
@@ -50,11 +48,9 @@ tsunami_flush_sig_insns:
 tsunami_flush_tlb_range:
 	ld	[%o0 + 0x00], %o0	/* XXX vma->vm_mm GROSS XXX */
 tsunami_flush_tlb_mm:
-#ifndef CONFIG_SMP
 	ld	[%o0 + AOFF_mm_context], %g2
 	cmp	%g2, -1
 	be	tsunami_flush_tlb_out
-#endif
 tsunami_flush_tlb_all:
 	 mov	0x400, %o1
 	sta	%g0, [%o1] ASI_M_FLUSH_PROBE
@@ -73,10 +69,8 @@ tsunami_flush_tlb_page:
 	mov	SRMMU_CTX_REG, %g1
 	ld	[%o0 + AOFF_mm_context], %o3
 	andn	%o1, (PAGE_SIZE - 1), %o1
-#ifndef CONFIG_SMP
 	cmp	%o3, -1
 	be	tsunami_flush_tlb_page_out
-#endif
 	 lda	[%g1] ASI_M_MMUREGS, %g5
 	sta	%o3, [%g1] ASI_M_MMUREGS
 	sta	%g0, [%o1] ASI_M_FLUSH_PROBE

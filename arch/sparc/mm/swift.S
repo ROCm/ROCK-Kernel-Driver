@@ -53,11 +53,9 @@ swift_flush_cache_all:
 
 	.globl	swift_flush_cache_mm
 swift_flush_cache_mm:
-#ifndef CONFIG_SMP
 	ld	[%o0 + AOFF_mm_context], %g2
 	cmp	%g2, -1
 	be	swift_flush_cache_mm_out
-#endif
 	WINDOW_FLUSH(%g4, %g5)
 	rd	%psr, %g1
 	andn	%g1, PSR_ET, %g3
@@ -121,11 +119,9 @@ swift_flush_cache_range:
 swift_flush_cache_page:
 	ld	[%o0 + 0x0], %o0		/* XXX vma->vm_mm, GROSS XXX */
 70:
-#ifndef CONFIG_SMP
 	ld	[%o0 + AOFF_mm_context], %g2
 	cmp	%g2, -1
 	be	swift_flush_cache_page_out
-#endif
 	WINDOW_FLUSH(%g4, %g5)
 	rd	%psr, %g1
 	andn	%g1, PSR_ET, %g3
@@ -226,11 +222,9 @@ swift_flush_sig_insns:
 swift_flush_tlb_range:
 	ld	[%o0 + 0x00], %o0	/* XXX vma->vm_mm GROSS XXX */
 swift_flush_tlb_mm:
-#ifndef CONFIG_SMP
 	ld	[%o0 + AOFF_mm_context], %g2
 	cmp	%g2, -1
 	be	swift_flush_tlb_all_out
-#endif
 swift_flush_tlb_all:
 	mov	0x400, %o1
 	sta	%g0, [%o1] ASI_M_FLUSH_PROBE
@@ -244,11 +238,9 @@ swift_flush_tlb_page:
 	mov	SRMMU_CTX_REG, %g1
 	ld	[%o0 + AOFF_mm_context], %o3
 	andn	%o1, (PAGE_SIZE - 1), %o1
-#ifndef CONFIG_SMP
 	cmp	%o3, -1
 	be	swift_flush_tlb_page_out
 	 nop
-#endif
 #if 1
 	mov	0x400, %o1
 	sta	%g0, [%o1] ASI_M_FLUSH_PROBE	

@@ -1437,8 +1437,6 @@ P:	Anton Blanchard
 M:	anton@samba.org
 L:	sparclinux@vger.kernel.org
 L:	ultralinux@vger.kernel.org
-W:	http://ultra.linux.cz
-W:	http://www.geog.ubc.ca/s_linux.html
 S:	Maintained
 
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER

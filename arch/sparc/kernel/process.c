@@ -83,7 +83,7 @@ int cpu_idle(void)
 				fps = (fps + (faults - last_faults)) >> 1;
 				last_faults = faults;
 #if 0
-				printk("kernel faults / second = %d\n", fps);
+				printk("kernel faults / second = %ld\n", fps);
 #endif
 				if (fps >= SUN4C_FAULT_HIGH) {
 					sun4c_grow_kernel_ring();
