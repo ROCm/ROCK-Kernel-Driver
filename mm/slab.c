@@ -387,14 +387,15 @@ static struct cache_sizes {
 };
 
 /* Must match cache_sizes above. Out of line to keep cache footprint low. */
-static struct { 
-	char *name; 
+static struct {
+	char *name;
 	char *name_dma;
-} cache_names[] = { 
+} cache_names[] = {
 #define CACHE(x) { .name = "size-" #x, .name_dma = "size-" #x "(DMA)" },
 #include <linux/kmalloc_sizes.h>
+	{ 0, }
 #undef CACHE
-}; 
+};
 
 struct arraycache_init initarray_cache __initdata = { { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
 struct arraycache_init initarray_generic __initdata = { { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
