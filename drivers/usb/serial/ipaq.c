@@ -288,8 +288,8 @@ static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 	/*
 	 * shut down bulk read and write
 	 */
-	usb_unlink_urb(port->write_urb);
-	usb_unlink_urb(port->read_urb);
+	usb_kill_urb(port->write_urb);
+	usb_kill_urb(port->read_urb);
 	ipaq_destroy_lists(port);
 	kfree(priv);
 	usb_set_serial_port_data(port, NULL);
