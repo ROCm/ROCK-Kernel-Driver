@@ -69,11 +69,12 @@ module_param_named(max_cstate, max_cstate, uint, 0644);
  */
 static int no_c2c3(struct dmi_system_id *id)
 {
-	if (max_cstate > ACPI_C_STATES_MAX)
+	if (max_cstate > ACPI_PROCESSOR_MAX_POWER)
 		return 0;
 
 	printk(KERN_NOTICE PREFIX "%s detected - C2,C3 disabled."
-		" Override with \"processor.max_cstate=9\"\n", id->ident);
+		" Override with \"processor.max_cstate=%d\"\n", id->ident,
+	       ACPI_PROCESSOR_MAX_POWER + 1);
 
 	max_cstate = 1;
 
@@ -304,7 +305,8 @@ static void acpi_processor_idle (void)
 	 * mastering activity may prevent promotions.
 	 * Do not promote above max_cstate.
 	 */
-	if (cx->promotion.state && (cx->promotion.state->type <= max_cstate)) {
+	if (cx->promotion.state &&
+	    ((cx->promotion.state - pr->power.states) <= max_cstate)) {
 		if (sleep_ticks > cx->promotion.threshold.ticks) {
 			cx->promotion.count++;
  			cx->demotion.count = 0;
@@ -344,7 +346,7 @@ end:
 	/*
 	 * Demote if current state exceeds max_cstate
 	 */
-	if (pr->power.state->type > max_cstate) {
+	if ((pr->power.state - pr->power.states) > max_cstate) {
 		if (cx->demotion.state)
 			next_state = cx->demotion.state;
 	}
