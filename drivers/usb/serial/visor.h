@@ -25,6 +25,7 @@
 #define PALM_M505_ID			0x0002
 #define PALM_M515_ID			0x0003
 #define PALM_M125_ID			0x0040
+#define PALM_M130_ID			0x0050
 
 #define SONY_VENDOR_ID			0x054C
 #define SONY_CLIE_3_5_ID		0x0038

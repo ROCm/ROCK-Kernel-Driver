@@ -11,7 +11,11 @@
  *	(at your option) any later version.
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
- * 
+ *
+ * (03/21/2002) gkh
+ *	Added support for the Palm m130 device, thanks to Udo Eisenbarth
+ *	<udo.eisenbarth@web.de> for the information.
+ *
  * (02/27/2002) gkh
  *	Reworked the urb handling logic.  We have no more pool, but dynamically
  *	allocate the urb and the transfer buffer on the fly.  In testing this
@@ -169,6 +173,7 @@ static __devinitdata struct usb_device_id combined_id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M130_ID) },
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
@@ -186,6 +191,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M130_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_3_5_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
