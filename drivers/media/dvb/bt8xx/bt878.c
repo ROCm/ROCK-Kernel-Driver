@@ -520,7 +520,7 @@ static void __devexit bt878_remove(struct pci_dev *pci_dev)
 
 	/* first disable interrupts before unmapping the memory! */
 	btwrite(0, BT878_AINT_MASK);
-	btwrite(~0x0UL, BT878_AINT_STAT);
+	btwrite(~0U, BT878_AINT_STAT);
 
 	/* disable PCI bus-mastering */
 	pci_read_config_byte(bt->dev, PCI_COMMAND, &command);
