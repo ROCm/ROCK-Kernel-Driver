@@ -176,8 +176,10 @@ static inline int svc_take_page(struct svc_rqst *rqstp)
 {
 	if (rqstp->rq_arghi <= rqstp->rq_argused)
 		return -ENOMEM;
-	rqstp->rq_respages[rqstp->rq_resused++] =
-		rqstp->rq_argpages[--rqstp->rq_arghi];
+	rqstp->rq_arghi--;
+	rqstp->rq_respages[rqstp->rq_resused] =
+		rqstp->rq_argpages[rqstp->rq_arghi];
+	rqstp->rq_resused++;
 	return 0;
 }
 
