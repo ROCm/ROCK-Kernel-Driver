@@ -1560,7 +1560,7 @@ ahd_linux_dev_reset(Scsi_Cmnd *cmd)
 	hscb = scb->hscb;
 	hscb->control = 0;
 	hscb->scsiid = BUILD_SCSIID(ahd, cmd);
-	hscb->lun = cmd->lun;
+	hscb->lun = cmd->device->lun;
 	hscb->cdb_len = 0;
 	hscb->task_management = SIU_TASKMGMT_LUN_RESET;
 	scb->flags |= SCB_DEVICE_RESET|SCB_RECOVERY_SCB|SCB_ACTIVE;
