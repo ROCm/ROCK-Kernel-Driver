@@ -259,11 +259,14 @@ ippp_ccp_free(struct ippp_ccp *ccp)
 {
 	int id;
 
-	if (ccp->comp_stat)
+	if (ccp->comp_stat) {
 		ccp->compressor->free(ccp->comp_stat);
-	if (ccp->decomp_stat)
+		module_put(ccp->compressor->owner);
+	}
+	if (ccp->decomp_stat) {
 		ccp->decompressor->free(ccp->decomp_stat);
-
+		module_put(ccp->decompressor->owner);
+	}
 	for (id = 0; id < 256; id++) {
 		if (ccp->reset->rs[id])
 			ippp_ccp_reset_free_state(ccp, id);
@@ -572,25 +575,34 @@ ippp_ccp_set_compressor(struct ippp_ccp *ccp, int unit,
 		if (ipc->num != num)
 			continue;
 		
+		if (!try_module_get(ipc->owner))
+			continue;
+
 		stat = ipc->alloc(data);
 		if (!stat) {
 			printk(KERN_ERR "Can't alloc (de)compression!\n");
+			module_put(ipc->owner);
 			break;
 		}
 		ret = ipc->init(stat, data, unit, 0);
 		if(!ret) {
 			printk(KERN_ERR "Can't init (de)compression!\n");
 			ipc->free(stat);
+			module_put(ipc->owner);
 			break;
 		}
 		if (data->flags & IPPP_COMP_FLAG_XMIT) {
-			if (ccp->comp_stat)
+			if (ccp->comp_stat) {
 				ccp->compressor->free(ccp->comp_stat);
+				module_put(ccp->compressor->owner);
+			}
 			ccp->comp_stat = stat;
 			ccp->compressor = ipc;
 		} else {
-			if (ccp->decomp_stat)
+			if (ccp->decomp_stat) {
 				ccp->decompressor->free(ccp->decomp_stat);
+				module_put(ccp->decompressor->owner);
+			}
 			ccp->decomp_stat = stat;
 			ccp->decompressor = ipc;
 		}

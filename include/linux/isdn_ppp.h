@@ -95,6 +95,7 @@ struct isdn_ppp_resetparams {
  * check the original include for more information
  */
 struct isdn_ppp_compressor {
+	struct module *owner;
 	struct isdn_ppp_compressor *next, *prev;
 	int num; /* CCP compression protocol number */
   
