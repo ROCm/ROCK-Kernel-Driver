@@ -344,5 +344,5 @@ void __init openpic2_init(int offset)
 	openpic2_set_priority(0);
 	openpic2_disable_8259_pass_through();
 
-	ppc64_boot_msg(0x25, "OpenPic2 Done");
+	ppc64_boot_msg(0x25, "OpenPic U3 Done");
 }

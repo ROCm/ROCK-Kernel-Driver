@@ -2665,7 +2665,7 @@ set_initial_features(void)
 			struct device_node *p = of_get_parent(ui2c);
 			if (p && !strcmp(p->name, "uni-n"))
 				break;
-			ui2c = of_find_node_by_type(np, "i2c");
+			ui2c = of_find_node_by_type(ui2c, "i2c");
 		}
 		if (ui2c == NULL)
 			break;

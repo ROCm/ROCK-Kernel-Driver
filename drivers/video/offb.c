@@ -28,7 +28,8 @@
 #include <linux/ioport.h>
 #include <asm/io.h>
 #include <asm/prom.h>
-#ifdef CONFIG_BOOTX_TEXT
+
+#ifdef CONFIG_PPC32
 #include <asm/bootx.h>
 #endif
 
@@ -70,7 +71,7 @@ static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			  u_int transp, struct fb_info *info);
 static int offb_blank(int blank, struct fb_info *info);
 
-#ifdef CONFIG_BOOTX_TEXT
+#ifdef CONFIG_PPC32
 extern boot_infos_t *boot_infos;
 #endif
 
@@ -245,11 +246,8 @@ static int offb_blank(int blank, struct fb_info *info)
 
 int __init offb_init(void)
 {
-	struct device_node *dp;
-	unsigned int dpy;
-	char *option = NULL;
+	struct device_node *dp = NULL, *boot_disp = NULL;
 #if defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32)
-	struct device_node *displays = find_type_devices("display");
 	struct device_node *macos_display = NULL;
 #endif
 	if (fb_get_options("offb", NULL))
@@ -257,11 +255,11 @@ int __init offb_init(void)
 
 #if defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32)
 	/* If we're booted from BootX... */
-	if (prom_num_displays == 0 && boot_infos != 0) {
+	if (boot_infos != 0) {
 		unsigned long addr =
 		    (unsigned long) boot_infos->dispDeviceBase;
 		/* find the device node corresponding to the macos display */
-		for (dp = displays; dp != NULL; dp = dp->next) {
+		while ((dp = of_find_node_by_type(dp, "display"))) {
 			int i;
 			/*
 			 * Grrr...  It looks like the MacOS ATI driver
@@ -330,10 +328,19 @@ int __init offb_init(void)
 	}
 #endif /* defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32) */
 
-	for (dpy = 0; dpy < prom_num_displays; dpy++) {
-		if ((dp = find_path_device(prom_display_paths[dpy])))
+	for (dp = NULL; (dp = of_find_node_by_type(dp, "display"));) {
+		if (get_property(dp, "linux,opened", NULL) &&
+		    get_property(dp, "linux,boot-display", NULL)) {
+			boot_disp = dp;
+			offb_init_nodriver(dp);
+		}
+	}
+	for (dp = NULL; (dp = of_find_node_by_type(dp, "display"));) {
+		if (get_property(dp, "linux,opened", NULL) &&
+		    dp != boot_disp)
 			offb_init_nodriver(dp);
 	}
+
 	return 0;
 }
 

@@ -301,7 +301,6 @@ static int __pmac pmu_set_cpu_speed(int low_speed)
 static int __pmac do_set_cpu_speed(int speed_mode)
 {
 	struct cpufreq_freqs freqs;
-	int rc;
 
 	freqs.old = cur_freq;
 	freqs.new = (speed_mode == PMAC_CPU_HIGH_SPEED) ? hi_freq : low_freq;
@@ -315,7 +314,7 @@ static int __pmac do_set_cpu_speed(int speed_mode)
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 	cur_freq = (speed_mode == PMAC_CPU_HIGH_SPEED) ? hi_freq : low_freq;
 
-	return rc;
+	return 0;
 }
 
 static int __pmac pmac_cpufreq_verify(struct cpufreq_policy *policy)

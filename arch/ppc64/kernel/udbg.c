@@ -84,22 +84,37 @@ static unsigned char scc_inittab[] = {
 
 void udbg_init_scc(struct device_node *np)
 {
+	u32 *reg;
 	unsigned long addr;
 	int i, x;
 
 	if (np == NULL)
 		np = of_find_node_by_name(NULL, "escc");
-	if (np == NULL)
+	if (np == NULL || np->parent == NULL)
 		return;
-	
-	/* Lock-enable the SCC channel */
-	pmac_call_feature(PMAC_FTR_SCC_ENABLE, np, PMAC_SCC_ASYNC | PMAC_SCC_FLAG_XMON, 1);
+
+	udbg_printf("found SCC...\n");
+	/* Get address within mac-io ASIC */ 
+	reg = (u32 *)get_property(np, "reg", NULL);
+	if (reg == NULL)
+		return;
+	addr = reg[0];
+	udbg_printf("local addr: %lx\n", addr);
+	/* Get address of mac-io PCI itself */
+	reg = (u32 *)get_property(np->parent, "assigned-addresses", NULL);
+	if (reg == NULL)
+		return;
+	addr += reg[2];
+	udbg_printf("final addr: %lx\n", addr);
 
 	/* Setup for 57600 8N1 */
-	addr = np->addrs[0].address + 0x20;
+	addr += 0x20;
 	sccc = (volatile u8 *) ioremap(addr & PAGE_MASK, PAGE_SIZE) ;
 	sccc += addr & ~PAGE_MASK;
 	sccd = sccc + 0x10;
+
+	udbg_printf("ioremap result sccc: %p\n", sccc);
+	mb();
 
 	for (i = 20000; i != 0; --i)
 		x = *sccc; eieio();
@@ -117,6 +132,30 @@ void udbg_init_scc(struct device_node *np)
 	udbg_puts("Hello World !\n");
 }
 
+#endif /* CONFIG_PPC_PMAC */
+
+#if CONFIG_PPC_PMAC
+extern u8 real_readb(volatile u8 *addr);
+extern void real_writeb(u8 data, volatile u8 *addr);
+
+static void udbg_real_putc(unsigned char c)
+{
+	while ((real_readb(sccc) & SCC_TXRDY) == 0)
+		;
+	real_writeb(c, sccd);
+	if (c == '\n')
+		udbg_real_putc('\r');
+}
+
+void udbg_init_pmac_realmode(void)
+{
+	sccc = (volatile u8 *)0x80013020ul;
+	sccd = (volatile u8 *)0x80013030ul;
+
+	ppc_md.udbg_putc = udbg_real_putc;
+	ppc_md.udbg_getc = NULL;
+	ppc_md.udbg_getc_poll = NULL;
+}
 #endif /* CONFIG_PPC_PMAC */
 
 void udbg_putc(unsigned char c)
@@ -191,9 +230,12 @@ void udbg_puts(const char *s)
 			while ((c = *s++) != '\0')
 				ppc_md.udbg_putc(c);
 		}
-	} else {
+	}
+#if 0
+	else {
 		printk("%s", s);
 	}
+#endif
 }
 
 int udbg_write(const char *s, int n)
@@ -218,7 +260,7 @@ int udbg_read(char *buf, int buflen)
 	char c, *p = buf;
 	int i;
 
-	if (!ppc_md.udbg_putc)
+	if (!ppc_md.udbg_getc)
 		return 0;
 
 	for (i = 0; i < buflen; ++i) {

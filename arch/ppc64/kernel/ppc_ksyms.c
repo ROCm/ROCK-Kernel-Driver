@@ -119,7 +119,6 @@ EXPORT_SYMBOL(start_thread);
 EXPORT_SYMBOL(kernel_thread);
 
 EXPORT_SYMBOL(flush_instruction_cache);
-EXPORT_SYMBOL(_get_PVR);
 EXPORT_SYMBOL(giveup_fpu);
 #ifdef CONFIG_ALTIVEC
 EXPORT_SYMBOL(giveup_altivec);

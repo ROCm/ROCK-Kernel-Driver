@@ -70,8 +70,8 @@ struct pci_controller {
  * for a device on a PCI bus, given its device_node struct.
  * It returns 0 if OK, -1 on error.
  */
-int pci_device_loc(struct device_node *dev, unsigned char *bus_ptr,
-		   unsigned char *devfn_ptr);
+extern int pci_device_loc(struct device_node *dev, unsigned char *bus_ptr,
+			  unsigned char *devfn_ptr);
 
 struct device_node *fetch_dev_dn(struct pci_dev *dev);
 
@@ -86,6 +86,9 @@ static inline struct device_node *pci_device_to_OF_node(struct pci_dev *dev)
 	else
 		return fetch_dev_dn(dev);
 }
+
+extern void pci_process_bridge_OF_ranges(struct pci_controller *hose,
+					 struct device_node *dev, int primary);
 
 /* Use this macro after the PCI bus walk for max performance when it
  * is known that sysdata is correct.

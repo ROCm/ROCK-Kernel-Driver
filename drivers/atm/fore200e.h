@@ -565,7 +565,7 @@ typedef struct host_cmdq_entry {
 typedef struct chunk {
     void* alloc_addr;    /* base address of allocated chunk */
     void* align_addr;    /* base address of aligned chunk   */
-    u32   dma_addr;      /* DMA address of aligned chunk    */
+    dma_addr_t dma_addr; /* DMA address of aligned chunk    */
     int   direction;     /* direction of DMA mapping        */
     u32   alloc_size;    /* length of allocated chunk       */
     u32   align_size;    /* length of aligned chunk         */

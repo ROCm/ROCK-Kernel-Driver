@@ -16,6 +16,8 @@
  * bootup setup stuff..
  */
 
+#undef DEBUG
+
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -64,7 +66,11 @@
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
 
-void chrp_progress(char *, unsigned short);
+#ifdef DEBUG
+#define DBG(fmt...) udbg_printf(fmt)
+#else
+#define DBG(fmt...)
+#endif
 
 extern void pSeries_init_openpic(void);
 
@@ -74,12 +80,10 @@ extern void pSeries_final_fixup(void);
 extern void pSeries_get_boot_time(struct rtc_time *rtc_time);
 extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
-void pSeries_calibrate_decr(void);
-void fwnmi_init(void);
+extern void find_udbg_vterm(void);
 extern void SystemReset_FWNMI(void), MachineCheck_FWNMI(void);	/* from head.S */
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 
-dev_t boot_dev;
 unsigned long  virtPython0Facilities = 0;  // python0 facility area (memory mapped io) (64-bit format) VIRTUAL address.
 
 extern unsigned long loops_per_jiffy;
@@ -87,7 +91,7 @@ extern unsigned long loops_per_jiffy;
 extern unsigned long ppc_proc_freq;
 extern unsigned long ppc_tb_freq;
 
-void chrp_get_cpuinfo(struct seq_file *m)
+void pSeries_get_cpuinfo(struct seq_file *m)
 {
 	struct device_node *root;
 	const char *model = "";
@@ -99,35 +103,40 @@ void chrp_get_cpuinfo(struct seq_file *m)
 	of_node_put(root);
 }
 
-#define I8042_DATA_REG 0x60
-
-void __init chrp_request_regions(void)
+/* Initialize firmware assisted non-maskable interrupts if
+ * the firmware supports this feature.
+ *
+ */
+static void __init fwnmi_init(void)
 {
-	struct device_node *i8042;
-
-	request_region(0x20,0x20,"pic1");
-	request_region(0xa0,0x20,"pic2");
-	request_region(0x00,0x20,"dma1");
-	request_region(0x40,0x20,"timer");
-	request_region(0x80,0x10,"dma page reg");
-	request_region(0xc0,0x20,"dma2");
-
-	/*
-	 * Some machines have an unterminated i8042 so check the device
-	 * tree and reserve the region if it does not appear. Later on
-	 * the i8042 code will try and reserve this region and fail.
-	 */
-	if (!(i8042 = of_find_node_by_type(NULL, "8042")))
-		request_region(I8042_DATA_REG, 16, "reserved (no i8042)");
-	of_node_put(i8042);
+	int ret;
+	int ibm_nmi_register = rtas_token("ibm,nmi-register");
+	if (ibm_nmi_register == RTAS_UNKNOWN_SERVICE)
+		return;
+	ret = rtas_call(ibm_nmi_register, 2, 1, NULL,
+			__pa((unsigned long)SystemReset_FWNMI),
+			__pa((unsigned long)MachineCheck_FWNMI));
+	if (ret == 0)
+		fwnmi_active = 1;
 }
 
-void __init
-chrp_setup_arch(void)
+static void __init pSeries_setup_arch(void)
 {
 	struct device_node *root;
 	unsigned int *opprop;
-	
+
+	/* Fixup ppc_md depending on the type of interrupt controller */
+	if (naca->interrupt_controller == IC_OPEN_PIC) {
+		ppc_md.init_IRQ       = pSeries_init_openpic; 
+		ppc_md.get_irq        = openpic_get_irq;
+	} else {
+		ppc_md.init_IRQ       = xics_init_IRQ;
+		ppc_md.get_irq        = xics_get_irq;
+	}
+
+#ifdef CONFIG_SMP
+	smp_init_pSeries();
+#endif
 	/* openpic global configuration register (64-bit format). */
 	/* openpic Interrupt Source Unit pointer (64-bit format). */
 	/* python0 facility area (mmio) (64-bit format) REAL address. */
@@ -142,12 +151,10 @@ chrp_setup_arch(void)
 
 	fwnmi_init();
 
-#ifndef CONFIG_PPC_ISERIES
 	/* Find and initialize PCI host bridges */
 	/* iSeries needs to be done much later. */
 	eeh_init();
 	find_and_init_phbs();
-#endif
 
 	/* Find the Open PIC if present */
 	root = of_find_node_by_path("/");
@@ -168,94 +175,88 @@ chrp_setup_arch(void)
 	conswitchp = &dummy_con;
 #endif
 
-#ifdef CONFIG_PPC_PSERIES
 	pSeries_nvram_init();
-#endif
 }
 
-void __init
-chrp_init2(void)
+static int __init pSeries_init_panel(void)
 {
 	/* Manually leave the kernel version on the panel. */
 	ppc_md.progress("Linux ppc64\n", 0);
 	ppc_md.progress(UTS_RELEASE, 0);
-}
 
-/* Initialize firmware assisted non-maskable interrupts if
- * the firmware supports this feature.
- *
- */
-void __init fwnmi_init(void)
+	return 0;
+}
+arch_initcall(pSeries_init_panel);
+
+
+
+void __init pSeries_find_serial_port(void)
 {
-	int ret;
-	int ibm_nmi_register = rtas_token("ibm,nmi-register");
-	if (ibm_nmi_register == RTAS_UNKNOWN_SERVICE)
+	struct device_node *np;
+	unsigned long encode_phys_size = 32;
+	u32 *sizeprop;
+
+	struct isa_reg_property {
+		u32 space;
+		u32 address;
+		u32 size;
+	};
+	struct pci_reg_property {
+		struct pci_address addr;
+		u32 size_hi;
+		u32 size_lo;
+	};                                                                        
+
+	DBG(" -> pSeries_find_serial_port()\n");
+
+	naca->serialPortAddr = 0;
+
+	np = of_find_node_by_path("/");
+	if (!np)
 		return;
-	ret = rtas_call(ibm_nmi_register, 2, 1, NULL,
-			__pa((unsigned long)SystemReset_FWNMI),
-			__pa((unsigned long)MachineCheck_FWNMI));
-	if (ret == 0)
-		fwnmi_active = 1;
-}
+	sizeprop = (u32 *)get_property(np, "#size-cells", NULL);
+	if (sizeprop != NULL)
+		encode_phys_size = (*sizeprop) << 5;
+	
+	for (np = NULL; (np = of_find_node_by_type(np, "serial"));) {
+		struct device_node *isa, *pci;
+		struct isa_reg_property *reg;
+		union pci_range *rangesp;
+		char *typep;
 
-/* Early initialization.  Relocation is on but do not reference unbolted pages */
-void __init pSeries_init_early(void)
-{
-	void *comport;
+	 	typep = (char *)get_property(np, "ibm,aix-loc", NULL);
+		if ((typep == NULL) || (typep && strcmp(typep, "S1")))
+			continue;
 
-	hpte_init_pSeries();
+		reg = (struct isa_reg_property *)get_property(np, "reg", NULL);	
 
-	if (ppc64_iommu_off)
-		pci_dma_init_direct();
-	else
-		tce_init_pSeries();
+		isa = of_get_parent(np);
+		if (!isa) {
+			DBG("no isa parent found\n");
+			break;
+		}
+		pci = of_get_parent(isa);
+		if (!pci) {
+			DBG("no pci parent found\n");
+			break;
+		}
 
-#ifdef CONFIG_SMP
-	smp_init_pSeries();
-#endif
+		rangesp = (union pci_range *)get_property(pci, "ranges", NULL);
 
-	/* Map the uart for udbg. */
-	comport = (void *)__ioremap(naca->serialPortAddr, 16, _PAGE_NO_CACHE);
-	udbg_init_uart(comport);
-
-	ppc_md.udbg_putc = udbg_putc;
-	ppc_md.udbg_getc = udbg_getc;
-	ppc_md.udbg_getc_poll = udbg_getc_poll;
-}
-
-void __init
-chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	  unsigned long r6, unsigned long r7)
-{
-	ppc_md.setup_arch     = chrp_setup_arch;
-	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
-	if (naca->interrupt_controller == IC_OPEN_PIC) {
-		ppc_md.init_IRQ       = pSeries_init_openpic; 
-		ppc_md.get_irq        = openpic_get_irq;
-	} else {
-		ppc_md.init_IRQ       = xics_init_IRQ;
-		ppc_md.get_irq        = xics_get_irq;
+		if ( encode_phys_size == 32 )
+			naca->serialPortAddr = rangesp->pci32.phys+reg->address;
+		else {
+			naca->serialPortAddr =
+				((((unsigned long)rangesp->pci64.phys_hi) << 32)
+				|
+			(rangesp->pci64.phys_lo)) + reg->address;
+		}
+		break;
 	}
 
-	ppc_md.log_error      = pSeries_log_error;
-
-	ppc_md.init           = chrp_init2;
-
-	ppc_md.pcibios_fixup  = pSeries_final_fixup;
-
-	ppc_md.restart        = rtas_restart;
-	ppc_md.power_off      = rtas_power_off;
-	ppc_md.halt           = rtas_halt;
-	ppc_md.panic          = rtas_os_term;
-
-	ppc_md.get_boot_time  = pSeries_get_boot_time;
-	ppc_md.get_rtc_time   = pSeries_get_rtc_time;
-	ppc_md.set_rtc_time   = pSeries_set_rtc_time;
-	ppc_md.calibrate_decr = pSeries_calibrate_decr;
-
-	ppc_md.progress       = chrp_progress;
-
+	DBG(" <- pSeries_find_serial_port()\n");
 }
+
 
 /* Build up the firmware_features bitmask field
  * using contents of device-tree/ibm,hypertas-functions.
@@ -266,6 +267,8 @@ void __init fw_feature_init(void)
 	struct device_node * dn;
 	char * hypertas;
 	unsigned int len;
+
+	DBG(" -> fw_feature_init()\n");
 
 	cur_cpu_spec->firmware_features = 0;
 	dn = of_find_node_by_path("/rtas");
@@ -298,9 +301,83 @@ void __init fw_feature_init(void)
  no_rtas:
 	printk(KERN_INFO "firmware_features = 0x%lx\n", 
 	       cur_cpu_spec->firmware_features);
+
+	DBG(" <- fw_feature_init()\n");
 }
 
-void chrp_progress(char *s, unsigned short hex)
+
+static  void __init pSeries_discover_pic(void)
+{
+	struct device_node *np;
+	char *typep;
+
+	/*
+	 * Setup interrupt mapping options that are needed for finish_device_tree
+	 * to properly parse the OF interrupt tree & do the virtual irq mapping
+	 */
+	__irq_offset_value = NUM_ISA_INTERRUPTS;
+	naca->interrupt_controller = IC_INVALID;
+	for (np = NULL; (np = of_find_node_by_name(np, "interrupt-controller"));) {
+		typep = (char *)get_property(np, "compatible", NULL);
+		if (strstr(typep, "open-pic"))
+			naca->interrupt_controller = IC_OPEN_PIC;
+		else if (strstr(typep, "ppc-xicp"))
+			naca->interrupt_controller = IC_PPC_XIC;
+		else
+			printk("initialize_naca: failed to recognize"
+			       " interrupt-controller\n");
+		break;
+	}
+}
+
+/*
+ * Early initialization.  Relocation is on but do not reference unbolted pages
+ */
+static void __init pSeries_init_early(void)
+{
+	void *comport;
+	int iommu_off = 0;
+
+	DBG(" -> pSeries_init_early()\n");
+
+	fw_feature_init();
+	
+	if (systemcfg->platform & PLATFORM_LPAR)
+		hpte_init_lpar();
+	else {
+		hpte_init_native();
+		iommu_off = (of_chosen &&
+			     get_property(of_chosen, "linux,iommu-off", NULL));
+	}
+
+	pSeries_find_serial_port();
+
+	if (systemcfg->platform & PLATFORM_LPAR)
+		find_udbg_vterm();
+	else if (naca->serialPortAddr) {
+		/* Map the uart for udbg. */
+		comport = (void *)__ioremap(naca->serialPortAddr, 16, _PAGE_NO_CACHE);
+		udbg_init_uart(comport);
+
+		ppc_md.udbg_putc = udbg_putc;
+		ppc_md.udbg_getc = udbg_getc;
+		ppc_md.udbg_getc_poll = udbg_getc_poll;
+		DBG("Hello World !\n");
+	}
+
+
+	if (iommu_off)
+		pci_dma_init_direct();
+	else
+		tce_init_pSeries();
+
+	pSeries_discover_pic();
+
+	DBG(" <- pSeries_init_early()\n");
+}
+
+
+static void pSeries_progress(char *s, unsigned short hex)
 {
 	struct device_node *root;
 	int width, *p;
@@ -407,7 +484,7 @@ extern void setup_default_decr(void);
 #define DEFAULT_TB_FREQ		125000000UL
 #define DEFAULT_PROC_FREQ	(DEFAULT_TB_FREQ * 8)
 
-void __init pSeries_calibrate_decr(void)
+static void __init pSeries_calibrate_decr(void)
 {
 	struct device_node *cpu;
 	struct div_result divres;
@@ -464,3 +541,39 @@ void __init pSeries_calibrate_decr(void)
 
 	setup_default_decr();
 }
+
+/*
+ * Called very early, MMU is off, device-tree isn't unflattened
+ */
+extern struct machdep_calls pSeries_md;
+
+static int __init pSeries_probe(int platform)
+{
+	if (platform != PLATFORM_PSERIES &&
+	    platform != PLATFORM_PSERIES_LPAR)
+		return 0;
+
+	/* if we have some ppc_md fixups for LPAR to do, do
+	 * it here ...
+	 */
+
+	return 1;
+}
+
+struct machdep_calls __initdata pSeries_md = {
+	.probe			= pSeries_probe,
+	.setup_arch		= pSeries_setup_arch,
+	.init_early		= pSeries_init_early,
+	.get_cpuinfo		= pSeries_get_cpuinfo,
+	.log_error		= pSeries_log_error,
+	.pcibios_fixup		= pSeries_final_fixup,
+	.restart		= rtas_restart,
+	.power_off		= rtas_power_off,
+	.halt			= rtas_halt,
+	.panic			= rtas_os_term,
+	.get_boot_time		= pSeries_get_boot_time,
+	.get_rtc_time		= pSeries_get_rtc_time,
+	.set_rtc_time		= pSeries_set_rtc_time,
+	.calibrate_decr		= pSeries_calibrate_decr,
+	.progress		= pSeries_progress,
+};

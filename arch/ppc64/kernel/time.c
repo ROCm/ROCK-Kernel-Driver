@@ -84,7 +84,7 @@ static unsigned long first_settimeofday = 1;
 #define XSEC_PER_SEC (1024*1024)
 
 unsigned long tb_ticks_per_jiffy;
-unsigned long tb_ticks_per_usec;
+unsigned long tb_ticks_per_usec = 100; /* sane default */
 unsigned long tb_ticks_per_sec;
 unsigned long next_xtime_sync_tb;
 unsigned long xtime_sync_interval;

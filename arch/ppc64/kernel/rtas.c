@@ -42,13 +42,16 @@ char rtas_err_buf[RTAS_ERROR_LOG_MAX];
 
 spinlock_t rtas_data_buf_lock = SPIN_LOCK_UNLOCKED;
 char rtas_data_buf[RTAS_DATA_BUF_SIZE]__page_aligned;
+unsigned long rtas_rmo_buf;
 
 void
-call_rtas_display_status(char c)
+call_rtas_display_status(unsigned char c)
 {
 	struct rtas_args *args = &rtas.args;
 	unsigned long s;
 
+	if (!rtas.base)
+		return;
 	spin_lock_irqsave(&rtas.lock, s);
 
 	args->token = 10;
@@ -60,6 +63,31 @@ call_rtas_display_status(char c)
 	enter_rtas(__pa(args));
 
 	spin_unlock_irqrestore(&rtas.lock, s);
+}
+
+void
+call_rtas_display_status_delay(unsigned char c)
+{
+	static int pending_newline = 0;  /* did last write end with unprinted newline? */
+	static int width = 16;
+
+	if (c == '\n') {	
+		while (width-- > 0)
+			call_rtas_display_status(' ');
+		width = 16;
+		udelay(500000);
+		pending_newline = 1;
+	} else {
+		if (pending_newline) {
+			call_rtas_display_status('\r');
+			call_rtas_display_status('\n');
+		} 
+		pending_newline = 0;
+		if (width--) {
+			call_rtas_display_status(c);
+			udelay(10000);
+		}
+	}
 }
 
 int
@@ -425,7 +453,6 @@ void rtas_os_term(char *str)
 	} while (status == RTAS_BUSY);
 }
 
-unsigned long rtas_rmo_buf = 0;
 
 asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 {
@@ -535,6 +562,53 @@ int rtas_get_error_log_max(void)
 	}
 	return rtas_error_log_max;
 }
+
+/*
+ * Call early during boot, before mem init or bootmem, to retreive the RTAS
+ * informations from the device-tree and allocate the RMO buffer for userland
+ * accesses.
+ */
+void __init rtas_initialize(void)
+{
+	/* Get RTAS dev node and fill up our "rtas" structure with infos
+	 * about it.
+	 */
+	rtas.dev = of_find_node_by_name(NULL, "rtas");
+	if (rtas.dev) {
+		u64 *basep, *entryp;
+		u32 *sizep;
+
+		basep = (u64 *)get_property(of_chosen, "linux,rtas-base", NULL);
+		sizep = (u32 *)get_property(of_chosen, "linux,rtas-size", NULL);
+		if (basep != NULL && sizep != NULL) {
+			rtas.base = *basep;
+			rtas.size = *sizep;
+			entryp = (u64 *)get_property(of_chosen, "linux,rtas-entry", NULL);
+			if (entryp == NULL) /* Ugh */
+				rtas.entry = rtas.base;
+			else
+				rtas.entry = *entryp;
+		} else
+			rtas.dev = NULL;
+	}
+	/* If RTAS was found, allocate the RMO buffer for it and look for
+	 * the stop-self token if any
+	 */
+	if (rtas.dev) {
+		unsigned long rtas_region = RTAS_INSTANTIATE_MAX;
+		if (systemcfg->platform == PLATFORM_PSERIES_LPAR)
+			rtas_region = min(lmb.rmo_size, RTAS_INSTANTIATE_MAX);
+
+		rtas_rmo_buf = lmb_alloc_base(RTAS_RMOBUF_MAX, PAGE_SIZE,
+							rtas_region);
+
+#ifdef CONFIG_HOTPLUG_CPU
+		rtas_stop_self_args.token = rtas_token("stop-self");
+#endif /* CONFIG_HOTPLUG_CPU */
+	}
+
+}
+
 
 EXPORT_SYMBOL(rtas_firmware_flash_list);
 EXPORT_SYMBOL(rtas_token);

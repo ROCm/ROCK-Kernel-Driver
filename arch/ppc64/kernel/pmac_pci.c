@@ -746,6 +746,9 @@ void __init pmac_pci_init(void)
 	 * the exception of U3/AGP (hook into pci_set_mwi)
 	 */
 	pci_cache_line_size = 16; /* 64 bytes */
+
+	/* Allow all IO */
+	io_page_mask = -1;
 }
 
 /*

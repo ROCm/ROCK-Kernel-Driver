@@ -2291,11 +2291,10 @@ static int __init do_pci_device(struct pci_dev *pci_dev)
 
 	// read resources from PCI configuration space
 	u8 irq = pci_dev->irq;
-	u32 * membase = bus_to_virt (pci_resource_start (pci_dev, 0));
-	u32 iobase = pci_resource_start (pci_dev, 1);
 
 	PRINTD (DBG_INFO, "found Madge ATM adapter (amb) at"
-		" IO %x, IRQ %u, MEM %p", iobase, irq, membase);
+		" IO %x, IRQ %u, MEM %p", pci_resource_start(pci_dev, 1),
+		irq, bus_to_virt(pci_resource_start(pci_dev, 0)));
 
 	// check IO region
 	err = pci_request_region(pci_dev, 1, DEV_LABEL);

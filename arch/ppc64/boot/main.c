@@ -31,13 +31,9 @@ unsigned long strlen(const char *s);
 void *memmove(void *dest, const void *src, unsigned long n);
 void *memcpy(void *dest, const void *src, unsigned long n);
 
-static struct bi_record *make_bi_recs(unsigned long);
-
-#define RAM_START	0x00000000
-#define RAM_END		(64<<20)
-
 /* Value picked to match that used by yaboot */
 #define PROG_START	0x01400000
+#define RAM_END		(256<<20) // Fixme: use OF */
 
 char *avail_ram;
 char *begin_avail, *end_avail;
@@ -48,8 +44,6 @@ unsigned int heap_max;
 extern char _start[];
 extern char _vmlinux_start[];
 extern char _vmlinux_end[];
-extern char _sysmap_start[];
-extern char _sysmap_end[];
 extern char _initrd_start[];
 extern char _initrd_end[];
 extern unsigned long vmlinux_filesize;
@@ -62,7 +56,6 @@ struct addr_range {
 };
 struct addr_range vmlinux = {0, 0, 0};
 struct addr_range vmlinuz = {0, 0, 0};
-struct addr_range sysmap  = {0, 0, 0};
 struct addr_range initrd  = {0, 0, 0};
 
 static char scratch[128<<10];	/* 128kB of scratch space for gunzip */
@@ -70,7 +63,7 @@ static char scratch[128<<10];	/* 128kB of scratch space for gunzip */
 typedef void (*kernel_entry_t)( unsigned long,
                                 unsigned long,
                                 void *,
-				struct bi_record *);
+				void *);
 
 
 int (*prom)(void *);
@@ -80,12 +73,31 @@ void *stdin;
 void *stdout;
 void *stderr;
 
+#define DEBUG
 
-void
-start(unsigned long a1, unsigned long a2, void *promptr)
+static unsigned long claim_base = PROG_START;
+
+static unsigned long try_claim(unsigned long size)
 {
-	unsigned long i, claim_addr, claim_size;
-	struct bi_record *bi_recs;
+	unsigned long addr = 0;
+
+	for(; claim_base < RAM_END; claim_base += 0x100000) {
+#ifdef DEBUG
+		printf("    trying: 0x%08lx\n\r", claim_base);
+#endif
+		addr = (unsigned long)claim(claim_base, size, 0);
+		if ((void *)addr != (void *)-1)
+			break;
+	}
+	if (addr == 0)
+		return 0;
+	claim_base = PAGE_ALIGN(claim_base + size);
+	return addr;
+}
+
+void start(unsigned long a1, unsigned long a2, void *promptr)
+{
+	unsigned long i;
 	kernel_entry_t kernel_entry;
 	Elf64_Ehdr *elf64;
 	Elf64_Phdr *elf64ph;
@@ -102,61 +114,59 @@ start(unsigned long a1, unsigned long a2, void *promptr)
 
 	printf("zImage starting: loaded at 0x%x\n\r", (unsigned)_start);
 
-#if 0
-	sysmap.size = (unsigned long)(_sysmap_end - _sysmap_start);
-	sysmap.memsize = sysmap.size;
-	if ( sysmap.size > 0 ) {
-		sysmap.addr = (RAM_END - sysmap.size) & ~0xFFF;
-		claim(sysmap.addr, RAM_END - sysmap.addr, 0);
-		printf("initial ramdisk moving 0x%lx <- 0x%lx (%lx bytes)\n\r",
-		       sysmap.addr, (unsigned long)_sysmap_start, sysmap.size);
-		memcpy((void *)sysmap.addr, (void *)_sysmap_start, sysmap.size);
+	/*
+	 * Now we try to claim some memory for the kernel itself
+	 * our "vmlinux_memsize" is the memory footprint in RAM, _HOWEVER_, what
+	 * our Makefile stuffs in is an image containing all sort of junk including
+	 * an ELF header. We need to do some calculations here to find the right
+	 * size... In practice we add 1Mb, that is enough, but we should really
+	 * consider fixing the Makefile to put a _raw_ kernel in there !
+	 */
+	vmlinux_memsize += 0x100000;
+	printf("Allocating 0x%lx bytes for kernel ...\n\r", vmlinux_memsize);
+	vmlinux.addr = try_claim(vmlinux_memsize);
+	if (vmlinux.addr == 0) {
+		printf("Can't allocate memory for kernel image !\n\r");
+		exit();
 	}
-#endif
-
-	initrd.size = (unsigned long)(_initrd_end - _initrd_start);
-	initrd.memsize = initrd.size;
-	if ( initrd.size > 0 ) {
-		initrd.addr = (RAM_END - initrd.size) & ~0xFFF;
-		a1 = a2 = 0;
-		claim(initrd.addr, RAM_END - initrd.addr, 0);
-		printf("initial ramdisk moving 0x%lx <- 0x%lx (%lx bytes)\n\r",
-		       initrd.addr, (unsigned long)_initrd_start, initrd.size);
-		memcpy((void *)initrd.addr, (void *)_initrd_start, initrd.size);
-	}
-
 	vmlinuz.addr = (unsigned long)_vmlinux_start;
 	vmlinuz.size = (unsigned long)(_vmlinux_end - _vmlinux_start);
-	vmlinux.addr = (unsigned long)(void *)-1;
 	vmlinux.size = PAGE_ALIGN(vmlinux_filesize);
 	vmlinux.memsize = vmlinux_memsize;
 
-	claim_size = vmlinux.memsize /* PPPBBB: + fudge for bi_recs */;
-	for(claim_addr = PROG_START; 
-	    claim_addr <= PROG_START * 8; 
-	    claim_addr += 0x100000) {
-#ifdef DEBUG
-		printf("    trying: 0x%08lx\n\r", claim_addr);
-#endif
-		vmlinux.addr = (unsigned long)claim(claim_addr, claim_size, 0);
-		if ((void *)vmlinux.addr != (void *)-1) break;
-	}
-	if ((void *)vmlinux.addr == (void *)-1) {
-		printf("claim error, can't allocate kernel memory\n\r");
-		exit();
+	/*
+	 * Now we try to claim memory for the initrd (and copy it there)
+	 */
+	initrd.size = (unsigned long)(_initrd_end - _initrd_start);
+	initrd.memsize = initrd.size;
+	if ( initrd.size > 0 ) {
+		printf("Allocating 0x%lx bytes for initrd ...\n\r", initrd.size);
+		initrd.addr = try_claim(initrd.size);
+		if (initrd.addr == 0) {
+			printf("Can't allocate memory for initial ramdisk !\n\r");
+			exit();
+		}
+		a1 = initrd.addr;
+		a2 = initrd.size;
+		printf("initial ramdisk moving 0x%lx <- 0x%lx (%lx bytes)\n\r",
+		       initrd.addr, (unsigned long)_initrd_start, initrd.size);
+		memmove((void *)initrd.addr, (void *)_initrd_start, initrd.size);
+		printf("initrd head: 0x%lx\n", *((u32 *)initrd.addr));
 	}
 
-	/* PPPBBB: should kernel always be gziped? */
+	/* Eventually gunzip the kernel */
 	if (*(unsigned short *)vmlinuz.addr == 0x1f8b) {
+		int len;
 		avail_ram = scratch;
 		begin_avail = avail_high = avail_ram;
 		end_avail = scratch + sizeof(scratch);
 		printf("gunzipping (0x%lx <- 0x%lx:0x%0lx)...",
 		       vmlinux.addr, vmlinuz.addr, vmlinuz.addr+vmlinuz.size);
+		len = vmlinuz.size;
 		gunzip((void *)vmlinux.addr, vmlinux.size,
-			(unsigned char *)vmlinuz.addr, (int *)&vmlinuz.size);
-		printf("done %lu bytes\n\r", vmlinuz.size);
-		printf("%u bytes of heap consumed, max in use %u\n\r",
+			(unsigned char *)vmlinuz.addr, &len);
+		printf("done 0x%lx bytes\n\r", len);
+		printf("0x%x bytes of heap consumed, max in use 0x%\n\r",
 		       (unsigned)(avail_high - begin_avail), heap_max);
 	} else {
 		memmove((void *)vmlinux.addr,(void *)vmlinuz.addr,vmlinuz.size);
@@ -192,7 +202,8 @@ start(unsigned long a1, unsigned long a2, void *promptr)
 
 	flush_cache((void *)vmlinux.addr, vmlinux.memsize);
 
-	bi_recs = make_bi_recs(vmlinux.addr + vmlinux.memsize);
+	if (a1)
+		printf("initrd head: 0x%lx\n\r", *((u32 *)initrd.addr));
 
 	kernel_entry = (kernel_entry_t)vmlinux.addr;
 #ifdef DEBUG
@@ -203,63 +214,14 @@ start(unsigned long a1, unsigned long a2, void *promptr)
 		"        prom       = 0x%lx,\n\r"
 		"        bi_recs    = 0x%lx,\n\r",
 		(unsigned long)kernel_entry, a1, a2,
-		(unsigned long)prom, (unsigned long)bi_recs);
+		(unsigned long)prom, NULL);
 #endif
 
-	kernel_entry( a1, a2, prom, bi_recs );
+	kernel_entry( a1, a2, prom, NULL );
 
 	printf("Error: Linux kernel returned to zImage bootloader!\n\r");
 
 	exit();
-}
-
-static struct bi_record *
-make_bi_recs(unsigned long addr)
-{
-	struct bi_record *bi_recs;
-	struct bi_record *rec;
-
-	bi_recs = rec = bi_rec_init(addr);
-
-	rec = bi_rec_alloc(rec, 2);
-	rec->tag = BI_FIRST;
-	/* rec->data[0] = ...;	# Written below before return */
-	/* rec->data[1] = ...;	# Written below before return */
-
-	rec = bi_rec_alloc_bytes(rec, strlen("chrpboot")+1);
-	rec->tag = BI_BOOTLOADER_ID;
-	sprintf( (char *)rec->data, "chrpboot");
-
-	rec = bi_rec_alloc(rec, 2);
-	rec->tag = BI_MACHTYPE;
-	rec->data[0] = PLATFORM_PSERIES;
-	rec->data[1] = 1;
-
-	if ( initrd.size > 0 ) {
-		rec = bi_rec_alloc(rec, 2);
-		rec->tag = BI_INITRD;
-		rec->data[0] = initrd.addr;
-		rec->data[1] = initrd.size;
-	}
-
-	if ( sysmap.size > 0 ) {
-		rec = bi_rec_alloc(rec, 2);
-		rec->tag = BI_SYSMAP;
-		rec->data[0] = (unsigned long)sysmap.addr;
-		rec->data[1] = (unsigned long)sysmap.size;
-	}
-
-	rec = bi_rec_alloc(rec, 1);
-	rec->tag = BI_LAST;
-	rec->data[0] = (bi_rec_field)bi_recs;
-
-	/* Save the _end_ address of the bi_rec's in the first bi_rec
-	 * data field for easy access by the kernel.
-	 */
-	bi_recs->data[0] = (bi_rec_field)rec;
-	bi_recs->data[1] = (bi_rec_field)rec + rec->size - (bi_rec_field)bi_recs;
-
-	return bi_recs;
 }
 
 struct memchunk {

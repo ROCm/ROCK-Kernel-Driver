@@ -416,6 +416,9 @@ static void __init init_hwif_amd74xx(ide_hwif_t *hwif)
 {
 	int i;
 
+	if (!hwif->irq)
+		hwif->irq = hwif->channel ? 15 : 14;
+
 	hwif->autodma = 0;
 
 	hwif->tuneproc = &amd74xx_tune_drive;

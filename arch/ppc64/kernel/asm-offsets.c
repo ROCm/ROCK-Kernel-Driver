@@ -33,7 +33,6 @@
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/HvLpEvent.h>
-#include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/cputable.h>
 
@@ -108,7 +107,6 @@ int main(void)
         DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
 	DEFINE(LPPACAANYINT, offsetof(struct ItLpPaca, xIntDword.xAnyInt));
 	DEFINE(LPPACADECRINT, offsetof(struct ItLpPaca, xIntDword.xFields.xDecrInt));
-	DEFINE(PROMENTRY, offsetof(struct prom_t, entry));
 
 	/* RTAS */
 	DEFINE(RTASBASE, offsetof(struct rtas_t, base));
