@@ -327,7 +327,8 @@ struct page * lookup_swap_cache(swp_entry_t entry)
  * A failure return means that either the page allocation failed or that
  * the swap entry is no longer in use.
  */
-struct page * read_swap_cache_async(swp_entry_t entry)
+struct page *read_swap_cache_async(swp_entry_t entry,
+			struct vm_area_struct *vma, unsigned long addr)
 {
 	struct page *found_page, *new_page = NULL;
 	int err;
@@ -351,7 +352,7 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 		 * Get a new page to read into from swap.
 		 */
 		if (!new_page) {
-			new_page = alloc_page(GFP_HIGHUSER);
+			new_page = alloc_page_vma(GFP_HIGHUSER, vma, addr);
 			if (!new_page)
 				break;		/* Out of memory */
 		}
