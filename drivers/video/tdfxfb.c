@@ -166,7 +166,11 @@ static int tdfxfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *inf
 static void tdfxfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect);
 static void tdfxfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);  
 static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image); 
+#ifdef CONFIG_FB_3DFX_ACCEL
 static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor);
+#else /* !CONFIG_FB_3DFX_ACCEL */
+#define tdfxfb_cursor soft_cursor
+#endif /* CONFIG_FB_3DFX_ACCEL */
 static int banshee_wait_idle(struct fb_info *info);
 
 static struct fb_ops tdfxfb_ops = {
@@ -180,7 +184,7 @@ static struct fb_ops tdfxfb_ops = {
 	.fb_copyarea	= tdfxfb_copyarea,
 	.fb_imageblit	= tdfxfb_imageblit,
 	.fb_sync	= banshee_wait_idle,
-	.fb_cursor	= soft_cursor,
+	.fb_cursor	= tdfxfb_cursor,
 };
 
 /*
@@ -1001,6 +1005,7 @@ static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image)
 	banshee_wait_idle(info);
 }
 
+#ifdef CONFIG_FB_3DFX_ACCEL
 static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
 	struct tdfx_par *par = (struct tdfx_par *) info->par;
@@ -1137,6 +1142,7 @@ static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	spin_unlock_irqrestore(&par->DAClock, flags);
 	return 0;
 }
+#endif /* CONFIG_FB_3DFX_ACCEL */
 
 /**
  *      tdfxfb_probe - Device Initializiation
