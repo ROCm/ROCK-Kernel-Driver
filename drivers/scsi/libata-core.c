@@ -68,11 +68,11 @@ MODULE_DESCRIPTION("Library module for ATA devices");
 MODULE_LICENSE("GPL");
 
 /**
- *	ata_tf_load_pio - send taskfile registers to host controller
+ *	ata_tf_load - send taskfile registers to host controller
  *	@ap: Port to which output is sent
  *	@tf: ATA taskfile register set
  *
- *	Outputs ATA taskfile to standard ATA host controller using PIO.
+ *	Outputs ATA taskfile to standard ATA host controller.
  *
  *	LOCKING:
  *	Inherited from caller.
@@ -192,11 +192,11 @@ void ata_tf_load(struct ata_port *ap, struct ata_taskfile *tf)
 }
 
 /**
- *	ata_exec_command_pio - issue ATA command to host controller
+ *	ata_exec_command - issue ATA command to host controller
  *	@ap: port to which command is being issued
  *	@tf: ATA taskfile register set
  *
- *	Issues PIO write to ATA command register, with proper
+ *	Issues PIO/MMIO write to ATA command register, with proper
  *	synchronization with interrupt handler / other threads.
  *
  *	LOCKING:
@@ -245,7 +245,7 @@ void ata_exec_command(struct ata_port *ap, struct ata_taskfile *tf)
  *	@ap: port to which command is being issued
  *	@tf: ATA taskfile register set
  *
- *	Issues PIO write to ATA command register, with proper
+ *	Issues PIO/MMIO write to ATA command register, with proper
  *	synchronization with interrupt handler / other threads.
  *
  *	LOCKING:
@@ -268,7 +268,7 @@ static inline void ata_exec(struct ata_port *ap, struct ata_taskfile *tf)
  *	@tf: ATA taskfile register set
  *
  *	Issues ATA taskfile register set to ATA host controller,
- *	via PIO, with proper synchronization with interrupt handler and
+ *	with proper synchronization with interrupt handler and
  *	other threads.
  *
  *	LOCKING:
@@ -288,7 +288,7 @@ static void ata_tf_to_host(struct ata_port *ap, struct ata_taskfile *tf)
  *	@tf: ATA taskfile register set
  *
  *	Issues ATA taskfile register set to ATA host controller,
- *	via PIO, with proper synchronization with interrupt handler and
+ *	with proper synchronization with interrupt handler and
  *	other threads.
  *
  *	LOCKING:
@@ -302,12 +302,12 @@ void ata_tf_to_host_nolock(struct ata_port *ap, struct ata_taskfile *tf)
 }
 
 /**
- *	ata_tf_read_pio - input device's ATA taskfile shadow registers
+ *	ata_tf_read - input device's ATA taskfile shadow registers
  *	@ap: Port from which input is read
  *	@tf: ATA taskfile register set for storing input
  *
  *	Reads ATA taskfile registers for currently-selected device
- *	into @tf via PIO.
+ *	into @tf.
  *
  *	LOCKING:
  *	Inherited from caller.
@@ -374,11 +374,11 @@ void ata_tf_read(struct ata_port *ap, struct ata_taskfile *tf)
 }
 
 /**
- *	ata_check_status_pio - Read device status reg & clear interrupt
+ *	ata_check_status - Read device status reg & clear interrupt
  *	@ap: port where the device is
  *
  *	Reads ATA taskfile status register for currently-selected device
- *	via PIO and return it's value. This also clears pending interrupts
+ *	and return it's value. This also clears pending interrupts
  *      from this device
  *
  *	LOCKING:
@@ -2637,7 +2637,7 @@ int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_bmdma_setup_mmio - Set up PCI IDE BMDMA transaction (MMIO)
+ *	ata_bmdma_setup - Set up PCI IDE BMDMA transaction
  *	@qc: Info associated with this ATA transaction.
  *
  *	LOCKING:
@@ -2667,7 +2667,7 @@ static void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_bmdma_start_mmio - Start a PCI IDE BMDMA transaction (MMIO)
+ *	ata_bmdma_start - Start a PCI IDE BMDMA transaction
  *	@qc: Info associated with this ATA transaction.
  *
  *	LOCKING:
