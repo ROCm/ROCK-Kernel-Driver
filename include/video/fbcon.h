@@ -18,6 +18,7 @@
 
 #include <asm/io.h>
 
+struct display;
 
     /*                                  
      *  `switch' for the Low Level Operations
@@ -51,10 +52,6 @@ extern struct display_switch fbcon_dummy;
 
 struct display {
     /* Filled in by the frame buffer device */
-
-    struct fb_var_screeninfo var;   /* variable infos. yoffset and vmode */
-                                    /* are updated by fbcon.c */
-    struct fb_cmap cmap;            /* colormap */
     u_short can_soft_blank;         /* zero if no hardware blanking */
     u_short inverse;                /* != 0 text black on white as default */
     struct display_switch *dispsw;  /* low level operations */
@@ -183,44 +180,6 @@ extern int set_all_vcs(int fbidx, struct fb_ops *fb,
  */
 /* Namespace consistency */
 #define SCROLL_YNOPARTIAL	__SCROLL_YNOPARTIAL
-
-
-#if defined(__sparc__)
-
-/* We map all of our framebuffers such that big-endian accesses
- * are what we want, so the following is sufficient.
- */
-
-#define fb_readb sbus_readb
-#define fb_readw sbus_readw
-#define fb_readl sbus_readl
-#define fb_writeb sbus_writeb
-#define fb_writew sbus_writew
-#define fb_writel sbus_writel
-#define fb_memset sbus_memset_io
-
-#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__)
-
-#define fb_readb __raw_readb
-#define fb_readw __raw_readw
-#define fb_readl __raw_readl
-#define fb_writeb __raw_writeb
-#define fb_writew __raw_writew
-#define fb_writel __raw_writel
-#define fb_memset memset_io
-
-#else
-
-#define fb_readb(addr) (*(volatile u8 *) (addr))
-#define fb_readw(addr) (*(volatile u16 *) (addr))
-#define fb_readl(addr) (*(volatile u32 *) (addr))
-#define fb_writeb(b,addr) (*(volatile u8 *) (addr) = (b))
-#define fb_writew(b,addr) (*(volatile u16 *) (addr) = (b))
-#define fb_writel(b,addr) (*(volatile u32 *) (addr) = (b))
-#define fb_memset memset
-
-#endif
-
 
 extern void fbcon_redraw_clear(struct vc_data *, struct display *, int, int, int, int);
 extern void fbcon_redraw_bmove(struct display *, int, int, int, int, int, int);
