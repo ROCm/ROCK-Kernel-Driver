@@ -354,6 +354,21 @@ static int dummy_inode_removexattr (struct dentry *dentry, char *name)
 	return 0;
 }
 
+static int dummy_inode_getsecurity(struct dentry *dentry, const char *name, void *buffer, size_t size)
+{
+	return -EOPNOTSUPP;
+}
+
+static int dummy_inode_setsecurity(struct dentry *dentry, const char *name, const void *value, size_t size, int flags) 
+{
+	return -EOPNOTSUPP;
+}
+
+static int dummy_inode_listsecurity(struct dentry *dentry, char *buffer)
+{
+	return 0;
+}
+
 static int dummy_file_permission (struct file *file, int mask)
 {
 	return 0;
@@ -825,6 +840,9 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, inode_getxattr);
 	set_to_dummy_if_null(ops, inode_listxattr);
 	set_to_dummy_if_null(ops, inode_removexattr);
+	set_to_dummy_if_null(ops, inode_getsecurity);
+	set_to_dummy_if_null(ops, inode_setsecurity);
+	set_to_dummy_if_null(ops, inode_listsecurity);
 	set_to_dummy_if_null(ops, file_permission);
 	set_to_dummy_if_null(ops, file_alloc_security);
 	set_to_dummy_if_null(ops, file_free_security);
