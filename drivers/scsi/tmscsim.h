@@ -62,7 +62,7 @@ u8		AdaptStatus;
 u8		TargetStatus;
 
 u8		ScsiPhase;
-u8		TagNumber;
+s8		TagNumber;
 u8		SGIndex;
 u8		SGcount;
 

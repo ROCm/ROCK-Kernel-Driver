@@ -8,9 +8,9 @@
 static void __inline__
 dc390_freetag (struct dc390_dcb* pDCB, struct dc390_srb* pSRB)
 {
-	if (pSRB->TagNumber < 255) {
+	if (pSRB->TagNumber != SCSI_NO_TAG) {
 		pDCB->TagMask &= ~(1 << pSRB->TagNumber);   /* free tag mask */
-		pSRB->TagNumber = 255;
+		pSRB->TagNumber = SCSI_NO_TAG;
 	}
 }
 
@@ -69,7 +69,7 @@ dc390_StartSCSI( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_sr
     /* Change 99/05/31: Don't use tags when not disconnecting (BUSY) */
     if ((pDCB->SyncMode & EN_TAG_QUEUEING) && disc_allowed)
       {
-	u8 tag_no = 0;
+	s8 tag_no = 0;
 	while ((1 << tag_no) & pDCB->TagMask) tag_no++;
 	if (tag_no >= sizeof (pDCB->TagMask)*8 || tag_no >= pDCB->MaxCommand) { 
 		printk (KERN_WARNING "DC390: Out of tags for Dev. %02x %02x\n", pDCB->TargetID, pDCB->TargetLUN); 
@@ -604,7 +604,7 @@ dc390_EnableMsgOut_Abort ( struct dc390_acb* pACB, struct dc390_srb* pSRB )
 }
 
 static struct dc390_srb*
-dc390_MsgIn_QTag (struct dc390_acb* pACB, struct dc390_dcb* pDCB, u8 tag)
+dc390_MsgIn_QTag (struct dc390_acb* pACB, struct dc390_dcb* pDCB, s8 tag)
 {
   struct dc390_srb* lastSRB = pDCB->pGoingLast;
   struct dc390_srb* pSRB = pDCB->pGoingSRB;
@@ -1291,49 +1291,6 @@ dc390_Reselect( struct dc390_acb* pACB )
     DC390_write8 (ScsiCmd, MSG_ACCEPTED_CMD);	/* ;to release the /ACK signal */
 }
 
-static u8 __inline__
-dc390_tagq_blacklist (char* name)
-{
-   u8 i;
-   for(i=0; i<BADDEVCNT; i++)
-     if (memcmp (name, dc390_baddevname1[i], 28) == 0)
-	return 1;
-   return 0;
-}
-   
-
-static void 
-dc390_disc_tagq_set (struct dc390_dcb* pDCB, PSCSI_INQDATA ptr)
-{
-   /* Check for SCSI format (ANSI and Response data format) */
-   if ( (ptr->Vers & 0x07) >= 2 || (ptr->RDF & 0x0F) == 2 )
-   {
-	if ( (ptr->Flags & SCSI_INQ_CMDQUEUE) &&
-	    (pDCB->DevMode & TAG_QUEUEING_) &&
-	    /* ((pDCB->DevType == TYPE_DISK) 
-		|| (pDCB->DevType == TYPE_MOD)) &&*/
-	    !dc390_tagq_blacklist (((char*)ptr)+8) )
-	  {
-	     if (pDCB->MaxCommand ==1) pDCB->MaxCommand = pDCB->pDCBACB->TagMaxNum;
-	     pDCB->SyncMode |= EN_TAG_QUEUEING /* | EN_ATN_STOP */;
-	     //pDCB->TagMask = 0;
-	  }
-	else
-	     pDCB->MaxCommand = 1;
-     }
-}
-
-
-static void 
-dc390_add_dev (struct dc390_acb* pACB, struct dc390_dcb* pDCB, PSCSI_INQDATA ptr)
-{
-   u8 bval1 = ptr->DevType & SCSI_DEVTYPE;
-   pDCB->DevType = bval1;
-   /* if (bval1 == TYPE_DISK || bval1 == TYPE_MOD) */
-	dc390_disc_tagq_set (pDCB, ptr);
-}
-
-
 static void __inline__
 dc390_RequestSense(struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB)
 {
@@ -1544,15 +1501,11 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 	    pDCB->Inquiry7 = ptr->Flags;
 
 ckc_e:
-    if( pcmd->cmnd[0] == INQUIRY && 
-	(pcmd->result == (DID_OK << 16) || status_byte(pcmd->result) & CHECK_CONDITION) )
-     {
-	if ((ptr->DevType & SCSI_DEVTYPE) != TYPE_NODEV)
-	  {
-	     /* device found: add */ 
-	     dc390_add_dev (pACB, pDCB, ptr);
-	  }
-     }
+    if (pcmd->cmnd[0] == INQUIRY && 
+	(pcmd->result == (DID_OK << 16) || status_byte(pcmd->result) & CHECK_CONDITION) &&
+	(ptr->DevType & SCSI_DEVTYPE) != TYPE_NODEV)
+	/* device found: add */ 
+	pDCB->DevType = ptr->DevType & SCSI_DEVTYPE;
 
     pcmd->resid = pcmd->request_bufflen - pSRB->TotalXferredLen;
 

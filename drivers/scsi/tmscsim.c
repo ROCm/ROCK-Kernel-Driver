@@ -242,6 +242,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsicam.h>
+#include <scsi/scsi_tcq.h>
 
 
 #define DC390_BANNER "Tekram DC390/AM53C974"
@@ -276,8 +277,6 @@ static void dc390_ScsiRstDetect( struct dc390_acb* pACB );
 static void dc390_ResetSCSIBus( struct dc390_acb* pACB );
 static void dc390_EnableMsgOut_Abort(struct dc390_acb*, struct dc390_srb*);
 static irqreturn_t do_DC390_Interrupt( int, void *, struct pt_regs *);
-
-static void   dc390_updateDCB (struct dc390_acb* pACB, struct dc390_dcb* pDCB);
 
 static u32	dc390_laststatus = 0;
 static u8	dc390_adapterCnt = 0;
@@ -342,12 +341,6 @@ static char* dc390_p1_str[] = {
        "dc390_Nop_1"
        };
 #endif   
-
-/* Devices erroneously pretending to be able to do TagQ */
-static u8  dc390_baddevname1[2][28] ={
-       "SEAGATE ST3390N         9546",
-       "HP      C3323-300       4269"};
-#define BADDEVCNT	2
 
 static u8  dc390_eepromBuf[MAX_ADAPTER_NUM][EE_LEN];
 static u8  dc390_clock_period1[] = {4, 5, 6, 7, 8, 10, 13, 20};
@@ -648,7 +641,7 @@ static int DC390_queuecommand(struct scsi_cmnd *cmd,
 	srb->SGToBeXferLen = 0;
 	srb->ScsiPhase = 0;
 	srb->EndMessage = 0;
-	srb->TagNumber = 255;
+	srb->TagNumber = SCSI_NO_TAG;
 
 	if (dc390_StartSCSI(acb, dcb, srb)) {
 		dc390_Waiting_insert(dcb, srb);
@@ -825,35 +818,6 @@ static int DC390_bus_reset (struct scsi_cmnd *cmd)
 
 #include "scsiiom.c"
 
-/***********************************************************************
- * Function : static void dc390_updateDCB()
- *
- * Purpose :  Set the configuration dependent DCB parameters
- ***********************************************************************/
-
-static void dc390_updateDCB (struct dc390_acb* pACB, struct dc390_dcb* pDCB)
-{
-  pDCB->SyncMode &= EN_TAG_QUEUEING | SYNC_NEGO_DONE /*| EN_ATN_STOP*/;
-  if (pDCB->DevMode & TAG_QUEUEING_) {
-	//if (pDCB->SyncMode & EN_TAG_QUEUEING) pDCB->MaxCommand = pACB->TagMaxNum;
-  } else {
-	pDCB->SyncMode &= ~EN_TAG_QUEUEING;
-	pDCB->MaxCommand = 1;
-  }
-
-  if( pDCB->DevMode & SYNC_NEGO_ )
-	pDCB->SyncMode |= SYNC_ENABLE;
-  else {
-	pDCB->SyncMode &= ~(SYNC_NEGO_DONE | SYNC_ENABLE);
-	pDCB->SyncOffset &= ~0x0f;
-  }
-
-  //if (! (pDCB->DevMode & EN_DISCONNECT_)) pDCB->SyncMode &= ~EN_ATN_STOP; 
-
-  pDCB->CtrlR1 = pACB->pScsiHost->this_id;
-  if( pDCB->DevMode & PARITY_CHK_ )
-	pDCB->CtrlR1 |= PARITY_ERR_REPO;
-}  
 
 /**
  * dc390_slave_alloc - Called by the scsi mid layer to tell us about a new
@@ -894,7 +858,7 @@ static int dc390_slave_alloc(struct scsi_device *scsi_device)
 	 */
 	if (lun && (pDCB2 = dc390_findDCB(pACB, id, 0))) {
 		pDCB->DevMode = pDCB2->DevMode;
-		pDCB->SyncMode = pDCB2->SyncMode;
+		pDCB->SyncMode = pDCB2->SyncMode & SYNC_NEGO_DONE;
 		pDCB->SyncPeriod = pDCB2->SyncPeriod;
 		pDCB->SyncOffset = pDCB2->SyncOffset;
 		pDCB->NegoPeriod = pDCB2->NegoPeriod;
@@ -915,7 +879,16 @@ static int dc390_slave_alloc(struct scsi_device *scsi_device)
 			pDCB->CtrlR4 |= NEGATE_REQACKDATA | NEGATE_REQACK;
 	}
 
-	dc390_updateDCB(pACB, pDCB);
+	if (pDCB->DevMode & SYNC_NEGO_)
+		pDCB->SyncMode |= SYNC_ENABLE;
+	else {
+		pDCB->SyncMode = 0;
+		pDCB->SyncOffset &= ~0x0f;
+	}
+
+	pDCB->CtrlR1 = pACB->pScsiHost->this_id;
+	if (pDCB->DevMode & PARITY_CHK_)
+		pDCB->CtrlR1 |= PARITY_ERR_REPO;
 
 	pACB->scan_devices = 1;
 	scsi_device->hostdata = pDCB;
@@ -963,10 +936,16 @@ static void dc390_slave_destroy(struct scsi_device *scsi_device)
 	pACB->DCBCnt--;
 }
 
-static int dc390_slave_configure(struct scsi_device *scsi_device)
+static int dc390_slave_configure(struct scsi_device *sdev)
 {
-	struct dc390_acb* pACB = (struct dc390_acb*) scsi_device->host->hostdata;
-	pACB->scan_devices = 0;
+	struct dc390_acb *acb = (struct dc390_acb *)sdev->host->hostdata;
+	struct dc390_dcb *dcb = (struct dc390_dcb *)sdev->hostdata;
+
+	acb->scan_devices = 0;
+	if (sdev->tagged_supported && (dcb->DevMode & TAG_QUEUEING_)) {
+		dcb->SyncMode |= EN_TAG_QUEUEING;
+		dcb->MaxCommand = dcb->pDCBACB->TagMaxNum;
+	}
 	return 0;
 }
 
