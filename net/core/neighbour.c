@@ -1120,6 +1120,7 @@ struct neigh_parms *neigh_parms_alloc(struct net_device *dev,
 	if (p) {
 		memcpy(p, &tbl->parms, sizeof(*p));
 		p->tbl		  = tbl;
+		INIT_RCU_HEAD(&p->rcu_head);
 		p->reachable_time =
 				neigh_rand_reach_time(p->base_reachable_time);
 		if (dev && dev->neigh_setup && dev->neigh_setup(dev, p)) {
@@ -1135,6 +1136,14 @@ struct neigh_parms *neigh_parms_alloc(struct net_device *dev,
 	return p;
 }
 
+static void neigh_rcu_free_parms(struct rcu_head *head)
+{
+	struct neigh_parms *parms =
+		container_of(head, struct neigh_parms, rcu_head);
+
+	kfree(parms);
+}
+
 void neigh_parms_release(struct neigh_table *tbl, struct neigh_parms *parms)
 {
 	struct neigh_parms **p;
@@ -1146,7 +1155,7 @@ void neigh_parms_release(struct neigh_table *tbl, struct neigh_parms *parms)
 		if (*p == parms) {
 			*p = parms->next;
 			write_unlock_bh(&tbl->lock);
-			kfree(parms);
+			call_rcu(&parms->rcu_head, neigh_rcu_free_parms);
 			return;
 		}
 	}
@@ -1159,6 +1168,7 @@ void neigh_table_init(struct neigh_table *tbl)
 {
 	unsigned long now = jiffies;
 
+	INIT_RCU_HEAD(&tbl->parms.rcu_head);
 	tbl->parms.reachable_time =
 			  neigh_rand_reach_time(tbl->parms.base_reachable_time);
 
