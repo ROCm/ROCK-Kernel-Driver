@@ -6,7 +6,7 @@
  * Author: Mark A. Greer
  *         mgreer@mvista.com
  *
- * Copyright 2001 MontaVista Software Inc.
+ * Copyright 2001-2002 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -31,7 +31,6 @@
 #include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/ide.h>
-#include <linux/irq.h>
 #include <linux/seq_file.h>
 
 #include <asm/system.h>
@@ -125,7 +124,7 @@ mcpn765_setup_arch(void)
 	OpenPIC_NumInitSenses = sizeof(mcpn765_openpic_initsenses);
 
 	printk("Motorola MCG MCPN765 cPCI Non-System Board\n");
-	printk("MCPN765 port (C) 2001 MontaVista Software, Inc. (source@mvista.com)\n");
+	printk("MCPN765 port (MontaVista Software, Inc. (source@mvista.com))\n");
 
 	if ( ppc_md.progress )
 		ppc_md.progress("mcpn765_setup_arch: exit", 0);

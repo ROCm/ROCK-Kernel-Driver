@@ -209,17 +209,6 @@ static int fd_ref[4] = { 0,0,0,0 };
 static kdev_t fd_device[4] = { NODEV, NODEV, NODEV, NODEV };
 
 /*
- * Current device number. Taken either from the block header or from the
- * format request descriptor.
- */
-#define CURRENT_DEVICE (CURRENT->rq_dev)
-
-/* Current error count. */
-#define CURRENT_ERRORS (CURRENT->errors)
-
-
-
-/*
  * Here come the actual hardware access and helper functions.
  * They are not reentrant and single threaded because all drives
  * share the same hardware and the same trackbuffer.
@@ -1383,12 +1372,8 @@ static void redo_fd_request(void)
 	char *data;
 	unsigned long flags;
 
-	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE){
-		return;
-	}
-
  repeat:
-	if (QUEUE_EMPTY) {
+	if (blk_queue_empty(QUEUE)) {
 		/* Nothing left to do */
 		return;
 	}
@@ -1396,7 +1381,7 @@ static void redo_fd_request(void)
 	if (major(CURRENT->rq_dev) != MAJOR_NR)
 		panic(DEVICE_NAME ": request list destroyed");
 
-	device = minor(CURRENT_DEVICE);
+	device = minor(CURRENT->rq_dev);
 	if (device < 8) {
 		/* manual selection */
 		drive = device & 3;

@@ -709,11 +709,9 @@ acpi_system_write_sleep (
 	if (!system->states[state])
 		return_VALUE(-ENODEV);
 
-	
 #ifdef CONFIG_SOFTWARE_SUSPEND
 	if (state == 4) {
-		/* We are working from process context, that's why we may call it directly. */ 
-		do_software_suspend();
+		software_suspend();
 		return_VALUE(count);
 	}
 #endif

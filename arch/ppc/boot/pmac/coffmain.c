@@ -47,6 +47,8 @@ char *avail_high;
 
 static char heap[SCRATCH_SIZE];
 
+typedef void (*kernel_start_t)(int, int, void *);
+
 void boot(int a1, int a2, void *prom)
 {
     unsigned sa, len;
@@ -95,7 +97,7 @@ void boot(int a1, int a2, void *prom)
     sa = (unsigned long)PROG_START;
     printf("start address = 0x%x\n", sa);
 
-    (*(void (*)())sa)(a1, a2, prom);
+    (*(kernel_start_t)sa)(a1, a2, prom);
 
     printf("returned?\n");
 

@@ -53,8 +53,6 @@ static inline int _hycapi_appCheck(int app_id, int ctrl_no)
 	return ((hycapi_applications[app_id-1].ctrl_mask & (1 << (ctrl_no-1))) != 0);
 }
 
-struct capi_driver_interface *hy_di = NULL;
-
 /******************************
 Kernel-Capi callback reset_ctr
 ******************************/     
@@ -68,7 +66,7 @@ hycapi_reset_ctr(struct capi_ctr *ctrl)
 	printk(KERN_NOTICE "HYCAPI hycapi_reset_ctr\n");
 #endif
 	capilib_release(&cinfo->ncci_head);
-	ctrl->reseted(ctrl);
+	capi_ctr_reseted(ctrl);
 }
 
 /******************************
@@ -94,7 +92,7 @@ hycapi_remove_ctr(struct capi_ctr *ctrl)
 		return;
 	}    
 	card = cinfo->card;
-	ctrl->suspend_output(ctrl);
+	capi_ctr_suspend_output(ctrl);
 	for(i=0; i<CAPI_MAXAPPL;i++) {
 		if(hycapi_applications[i].listen_req[ctrl->cnr-1]) {
 			kfree_skb(hycapi_applications[i].listen_req[ctrl->cnr-1]);
@@ -133,7 +131,7 @@ hycapi_sendmsg_internal(struct capi_ctr *ctrl, struct sk_buff *skb)
 		/* inform upper layers we're full */
 		printk(KERN_ERR "HYSDN Card%d: CAPI-buffer overrun!\n",
 		       card->myid);	
-		ctrl->suspend_output(ctrl);
+		capi_ctr_suspend_output(ctrl);
 	}
 	cinfo->tx_skb = skb;
 	spin_unlock_irq(&cinfo->lock);
@@ -334,7 +332,7 @@ int hycapi_capi_release(hysdn_card *card)
 	printk(KERN_NOTICE "hycapi_capi_release\n");
 #endif
 	if(cinfo) {
-		ctrl = cinfo->capi_ctrl;
+		ctrl = &cinfo->capi_ctrl;
 		hycapi_remove_ctr(ctrl);
 	}
 	return 0;
@@ -354,14 +352,9 @@ int hycapi_capi_stop(hysdn_card *card)
 	printk(KERN_NOTICE "hycapi_capi_stop\n");
 #endif
 	if(cinfo) {
-		if(cinfo->capi_ctrl) {
-			ctrl = cinfo->capi_ctrl;
-/*			ctrl->suspend_output(ctrl); */
-			ctrl->reseted(ctrl);
-
-		} else {
-			printk(KERN_NOTICE "hycapi_capi_stop: cinfo but no capi_ctrl\n");
-		}
+		ctrl = &cinfo->capi_ctrl;
+/*		ctrl->suspend_output(ctrl); */
+		capi_ctr_reseted(ctrl);
 	}
 	return 0;
 }
@@ -552,11 +545,7 @@ hycapi_rx_capipkt(hysdn_card * card, uchar * buf, word len)
 	if(!cinfo) {
 		return;
 	}
-	ctrl = cinfo->capi_ctrl;
-	if(!ctrl)
-	{
-		return;
-	}
+	ctrl = &cinfo->capi_ctrl;
 	if(len < CAPI_MSG_BASELEN) {
 		printk(KERN_ERR "HYSDN Card%d: invalid CAPI-message, lenght %d!\n",
 		       card->myid, len);
@@ -635,7 +624,7 @@ hycapi_rx_capipkt(hysdn_card * card, uchar * buf, word len)
 		default:
 			break;
 	}
-	ctrl->handle_capimsg(ctrl, ApplId, skb);
+	capi_ctr_handle_message(ctrl, ApplId, skb);
 }
 
 /******************************************************************
@@ -662,7 +651,7 @@ void hycapi_tx_capiack(hysdn_card * card)
 		cinfo->out_idx = 0;	/* wrap around */
 
 	if (cinfo->sk_count-- == HYSDN_MAX_CAPI_SKB)	/* dec usage count */
-		cinfo->capi_ctrl->resume_output(cinfo->capi_ctrl);
+		capi_ctr_resume_output(&cinfo->capi_ctrl);
 	spin_unlock_irq(&cinfo->lock);
 }
 
@@ -687,22 +676,6 @@ hycapi_tx_capiget(hysdn_card *card)
 }
 
 
-static struct capi_driver hycapi_driver = {
-	owner: THIS_MODULE,
-	name: "hysdn",
-	revision: "0.0",
-	load_firmware: hycapi_load_firmware, 
-	reset_ctr: hycapi_reset_ctr,
-	register_appl: hycapi_register_appl,
-	release_appl: hycapi_release_appl,
-	send_message: hycapi_send_message,
-
-	procinfo: hycapi_procinfo,
-	ctr_read_proc: hycapi_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
-};
-
-
 /**********************************************************
 int hycapi_init()
 
@@ -712,16 +685,11 @@ attach the capi-driver to the kernel-capi.
 
 int hycapi_init()
 {
-	struct capi_driver *driver;
 	int i;
 	if(hy_di) {
 		printk(KERN_NOTICE "HyDI allready set\n");
 		return 0;
 	}
-	driver = &hycapi_driver;
-	printk(KERN_NOTICE "HYSDN: Attaching capi-driver\n");
-	attach_capi_driver(driver);
-
 	for(i=0;i<CAPI_MAXAPPL;i++) {
 		memset(&(hycapi_applications[i]), 0, sizeof(hycapi_appl));
 	}
@@ -738,16 +706,6 @@ free some more ressources. Do that later.
 void 
 hycapi_cleanup(void)
 {
-	struct capi_driver *driver;
-	driver = &hycapi_driver;
-	if (!hy_di) {
-		printk(KERN_ERR "HYSDN: no capi-driver to detach (?)\n");
-		return;
-	}
-	printk(KERN_NOTICE "HYSDN: Detaching capi-driver\n");
-	detach_capi_driver(driver);
-	hy_di = 0;
-	return;
 }
 
 /********************************************************************
@@ -762,8 +720,7 @@ static void hycapi_fill_profile(hysdn_card *card)
 	struct capi_ctr *ctrl = NULL;
 	cinfo = card->hyctrlinfo;
 	if(!cinfo) return;
-	ctrl = cinfo->capi_ctrl;
-	if(!ctrl) return;
+	ctrl = &cinfo->capi_ctrl;
 	strcpy(ctrl->manu, "Hypercope");	
 	ctrl->version.majorversion = 2;
 	ctrl->version.minorversion = 0;
@@ -791,6 +748,7 @@ hycapi_capi_create(hysdn_card *card)
 {
 	hycapictrl_info *cinfo = NULL;
 	struct capi_ctr *ctrl = NULL;
+	int retval;
 #ifdef HYCAPI_PRINTFNAMES
 	printk(KERN_NOTICE "hycapi_capi_create\n");        
 #endif
@@ -818,28 +776,34 @@ hycapi_capi_create(hysdn_card *card)
 			default: strcpy(cinfo->cardname,"HYSDN ???"); break;
 		}
 
-		cinfo->capi_ctrl = attach_capi_ctr(&hycapi_driver, 
-						   cinfo->cardname, cinfo);
-		ctrl = cinfo->capi_ctrl;
-		if (!ctrl) {
-			printk(KERN_ERR "%s: attach controller failed.\n",
-			       hycapi_driver.name);
+		ctrl = &cinfo->capi_ctrl;
+		ctrl->driver_name   = "hycapi";
+		ctrl->driverdata    = cinfo;
+		ctrl->register_appl = hycapi_register_appl;
+		ctrl->release_appl  = hycapi_release_appl;
+		ctrl->send_message  = hycapi_send_message;
+		ctrl->load_firmware = hycapi_load_firmware;
+		ctrl->reset_ctr     = hycapi_reset_ctr;
+		ctrl->procinfo      = hycapi_procinfo;
+		ctrl->ctr_read_proc = hycapi_read_proc;
+		strcpy(ctrl->name, cinfo->cardname);
+		SET_MODULE_OWNER(ctrl);
+
+		retval = attach_capi_ctr(ctrl);
+		if (retval) {
+			printk(KERN_ERR "hycapi: attach controller failed.\n");
 			return -EBUSY;
 		}
 		/* fill in the blanks: */
 		hycapi_fill_profile(card);
-		ctrl->ready(ctrl);
+		capi_ctr_ready(ctrl);
 	} else {
 		/* resume output on stopped ctrl */
-		ctrl = card->hyctrlinfo->capi_ctrl;
-		if(ctrl) {
-			hycapi_fill_profile(card);
-			ctrl->ready(ctrl);
-			hycapi_restart_internal(ctrl); 
-/*			ctrl->resume_output(ctrl); */
-		} else {
-			printk(KERN_WARNING "HYSDN: No ctrl???? How come?\n");
-		}
+		ctrl = &card->hyctrlinfo->capi_ctrl;
+		hycapi_fill_profile(card);
+		capi_ctr_ready(ctrl);
+		hycapi_restart_internal(ctrl); 
+/*		ctrl->resume_output(ctrl); */
 	}
 	return 0;
 }

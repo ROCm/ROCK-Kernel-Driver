@@ -3,11 +3,6 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
 ifdef CONFIG_PPC64BRIDGE
 EXTRA_AFLAGS		:= -Wa,-mppc64bridge
@@ -21,13 +16,12 @@ CFLAGS_btext.o		+= -mrelocatable-lib
 
 # Start off with 'head.o', change as needed.
 HEAD-y				:= head.o
-HEAD-$(CONFIG_4xx)		:= head_4xx.o
+HEAD-$(CONFIG_40x)		:= head_4xx.o
 HEAD-$(CONFIG_8xx)		:= head_8xx.o
 HEAD-$(CONFIG_PPC_ISERIES)	:= iSeries_head.o
 
-all: $(HEAD-y) kernel.o
-
-O_TARGET := kernel.o
+O_TARGET 	:= kernel.o
+EXTRA_TARGETS	:= $(HEAD-y)
 
 export-objs			:= ppc_ksyms.o time.o ppc405_dma.o
 
@@ -54,19 +48,18 @@ obj-$(CONFIG_PM)		+= ppc4xx_pm.o
 endif
 obj-$(CONFIG_8xx)		+= m8xx_setup.o ppc8xx_pic.o
 ifeq ($(CONFIG_8xx),y)
-obj-$(CONFIG_PCI)		+= qspan_pci.o
-ifndef CONFIG_MATH_EMULATION
+obj-$(CONFIG_PCI)		+= qspan_pci.o i8259.o
+ifneq ($(CONFIG_MATH_EMULATION),n)
 obj-y				+= softemu8xx.o
 endif
 endif
-obj-$(CONFIG_MBX)		+= i8259.o
 obj-$(CONFIG_ALL_PPC)		+= prom_init.o prom.o open_pic.o \
 					indirect_pci.o i8259.o
 obj-$(CONFIG_ADIR)		+= i8259.o indirect_pci.o pci_auto.o \
 					todc_time.o
 obj-$(CONFIG_EV64260)		+= gt64260_common.o gt64260_pic.o \
 					indirect_pci.o todc_time.o pci_auto.o
-obj-$(CONFIG_GEMINI)		+= open_pic.o
+obj-$(CONFIG_GEMINI)		+= open_pic.o i8259.o
 obj-$(CONFIG_K2)		+= i8259.o indirect_pci.o todc_time.o \
 					pci_auto.o
 obj-$(CONFIG_LOPEC)		+= mpc10x_common.o indirect_pci.o pci_auto.o \

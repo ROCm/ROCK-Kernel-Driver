@@ -1,15 +1,19 @@
 /*
- *  linux/kernel/sched.c
+ *  kernel/sched.c
  *
  *  Kernel scheduler and related syscalls
  *
- *  Copyright (C) 1991, 1992  Linus Torvalds
+ *  Copyright (C) 1991-2002  Linus Torvalds
  *
  *  1996-12-23  Modified by Dave Grothe to fix bugs in semaphores and
  *              make semaphores SMP safe
  *  1998-11-19	Implemented schedule_timeout() and related stuff
  *		by Andrea Arcangeli
- *  1998-12-28  Implemented better SMP scheduling by Ingo Molnar
+ *  2002-01-04	New ultra-scalable O(1) scheduler by Ingo Molnar:
+ *  		hybrid priority-list and round-robin design with
+ *  		an array-switch method of distributing timeslices
+ *  		and per-CPU runqueues.  Additional code by Davide
+ *  		Libenzi, Robert Love, and Rusty Russell.
  */
 
 #include <linux/mm.h>
@@ -133,6 +137,7 @@ struct runqueue {
 	spinlock_t lock;
 	spinlock_t frozen;
 	unsigned long nr_running, nr_switches, expired_timestamp;
+	signed long nr_uninterruptible;
 	task_t *curr, *idle;
 	prio_array_t *active, *expired, arrays[2];
 	int prev_nr_running[NR_CPUS];
@@ -240,6 +245,8 @@ static inline void activate_task(task_t *p, runqueue_t *rq)
 static inline void deactivate_task(struct task_struct *p, runqueue_t *rq)
 {
 	rq->nr_running--;
+	if (p->state == TASK_UNINTERRUPTIBLE)
+		rq->nr_uninterruptible++;
 	dequeue_task(p, p->array);
 	p->array = NULL;
 }
@@ -319,11 +326,15 @@ static int try_to_wake_up(task_t * p)
 {
 	unsigned long flags;
 	int success = 0;
+	long old_state;
 	runqueue_t *rq;
 
 	rq = task_rq_lock(p, &flags);
+	old_state = p->state;
 	p->state = TASK_RUNNING;
 	if (!p->array) {
+		if (old_state == TASK_UNINTERRUPTIBLE)
+			rq->nr_uninterruptible--;
 		activate_task(p, rq);
 		if (p->prio < rq->curr->prio)
 			resched_task(rq->curr);
@@ -425,6 +436,16 @@ unsigned long nr_running(void)
 
 	for (i = 0; i < smp_num_cpus; i++)
 		sum += cpu_rq(cpu_logical_map(i))->nr_running;
+
+	return sum;
+}
+
+unsigned long nr_uninterruptible(void)
+{
+	unsigned long i, sum = 0;
+
+	for (i = 0; i < smp_num_cpus; i++)
+		sum += cpu_rq(cpu_logical_map(i))->nr_uninterruptible;
 
 	return sum;
 }
@@ -1660,6 +1681,16 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 * migrate the process off to a proper CPU.
 	 */
 	if (new_mask & (1UL << p->thread_info->cpu)) {
+		task_rq_unlock(rq, &flags);
+		goto out;
+	}
+
+	/*
+	 * If the task is not on a runqueue, then it is sufficient
+	 * to simply update the task's cpu field.
+	 */
+	if (!p->array) {
+		p->thread_info->cpu = __ffs(p->cpus_allowed);
 		task_rq_unlock(rq, &flags);
 		goto out;
 	}

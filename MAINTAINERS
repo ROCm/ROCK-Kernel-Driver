@@ -574,6 +574,11 @@ M:	matthew@wil.cx
 L:	linux-fsdevel@vger.kernel.org
 S:	Maintained
 
+FILESYSTEMS (VFS and infrastructure)
+P:	Alexander Viro
+M:	viro@math.psu.edu
+S:	Maintained
+
 FPU EMULATOR
 P:	Bill Metzenthen
 M:	billm@suburbia.net

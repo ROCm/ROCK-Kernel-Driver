@@ -1513,6 +1513,13 @@ S: Botanicka' 68a
 S: 602 00 Brno
 S: Czech Republic
 
+N: Jakob Kemi
+E: jakob.kemi@telia.com
+D: V4L W9966 Webcam driver
+S: Forsbyvägen 33
+S: 74143 Knivsta
+S: Sweden
+
 N: Fred N. van Kempen
 E: waltje@linux.com
 D: NET-2
@@ -1682,13 +1689,6 @@ D: PIIX chipset IDE
 S: ul. Matemblewska 1B/10
 S: 80-283 Gdansk
 S: Poland
-
-N: Jakob Kemi
-E: jakob.kemi@telia.com
-D: V4L W9966 Webcam driver
-S: Forsbyvägen 33
-S: 74143 Knivsta
-S: Sweden
 
 N: Gero Kuhlmann
 E: gero@gkminix.han.de

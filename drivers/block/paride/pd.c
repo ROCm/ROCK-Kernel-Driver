@@ -877,10 +877,9 @@ static void pd_next_buf( int unit )
 	
 /* paranoia */
 
-	if (QUEUE_EMPTY ||
+	if (blk_queue_empty(QUEUE) ||
 	    (rq_data_dir(CURRENT) != pd_cmd) ||
 	    (minor(CURRENT->rq_dev) != pd_dev) ||
-	    (CURRENT->rq_status == RQ_INACTIVE) ||
 	    (CURRENT->sector != pd_block)) 
 		printk("%s: OUCH: request list changed unexpectedly\n",
 			PD.name);

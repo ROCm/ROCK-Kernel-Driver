@@ -14,7 +14,7 @@
     HW-initalization based on material of
     Randy Dunlap + Johannes Erdfelt + Gregory P. Smith + Linus Torvalds 
 
-    $Id: usb-uhci-mem.c,v 1.1 2002/05/14 20:36:57 acher Exp $
+    $Id: usb-uhci-mem.c,v 1.3 2002/05/25 16:42:41 acher Exp $
  */
 
 /*###########################################################################*/
@@ -387,10 +387,9 @@ static void uhci_switch_timer_int(struct uhci_hcd *uhci)
 	wmb();
 }
 /*-------------------------------------------------------------------*/
-#ifdef CONFIG_USB_UHCI_HIGH_BANDWIDTH
 static void enable_desc_loop(struct uhci_hcd *uhci, struct urb *urb)
 {
-	int flags;
+	unsigned long flags;
 
 	if (urb->transfer_flags & USB_NO_FSBR)
 		return;
@@ -405,7 +404,7 @@ static void enable_desc_loop(struct uhci_hcd *uhci, struct urb *urb)
 /*-------------------------------------------------------------------*/
 static void disable_desc_loop(struct uhci_hcd *uhci, struct urb *urb)
 {
-	int flags;
+	unsigned long flags;
 
 	if (urb->transfer_flags & USB_NO_FSBR)
 		return;
@@ -422,18 +421,16 @@ static void disable_desc_loop(struct uhci_hcd *uhci, struct urb *urb)
 	}
 	spin_unlock_irqrestore (&uhci->qh_lock, flags);
 }
-#endif
 /*-------------------------------------------------------------------*/
 static void queue_urb_unlocked (struct uhci_hcd *uhci, struct urb *urb)
 {
 	urb_priv_t *priv=(urb_priv_t*)urb->hcpriv;
-#ifdef CONFIG_USB_UHCI_HIGH_BANDWIDTH
 	int type;
 	type=usb_pipetype (urb->pipe);
 	
-	if ((type == PIPE_BULK) || (type == PIPE_CONTROL))
+	if (high_bw && ((type == PIPE_BULK) || (type == PIPE_CONTROL)))
 			enable_desc_loop(uhci, urb);
-#endif
+
 	urb->status = -EINPROGRESS;
 	priv->started=jiffies;
 
@@ -455,14 +452,12 @@ static void queue_urb (struct uhci_hcd *uhci, struct urb *urb)
 static void dequeue_urb (struct uhci_hcd *uhci, struct urb *urb)
 {
 	urb_priv_t *priv=(urb_priv_t*)urb->hcpriv;
-#ifdef CONFIG_USB_UHCI_HIGH_BANDWIDTH
 	int type;
 	dbg("dequeue URB %p",urb);
 	type=usb_pipetype (urb->pipe);
 
-	if ((type == PIPE_BULK) || (type == PIPE_CONTROL))
+	if (high_bw && ((type == PIPE_BULK) || (type == PIPE_CONTROL)))
 		disable_desc_loop(uhci, urb);
-#endif
 
 	list_del (&priv->urb_list);
 	if (urb->timeout && uhci->timeout_urbs)
@@ -624,10 +619,10 @@ static int init_skel (struct uhci_hcd *uhci)
 	insert_qh (uhci, uhci->bulk_chain, qh, 0);
 	uhci->control_chain = qh;
 
-#ifdef	CONFIG_USB_UHCI_HIGH_BANDWIDTH
 	// disabled reclamation loop
-	set_qh_head(uhci->chain_end, uhci->control_chain->dma_addr | UHCI_PTR_QH | UHCI_PTR_TERM);
-#endif
+	if (high_bw)
+		set_qh_head(uhci->chain_end, uhci->control_chain->dma_addr | UHCI_PTR_QH | UHCI_PTR_TERM);
+
 
 	init_dbg("allocating qh: ls_control_chain");
 	if (alloc_qh (uhci, &qh))

@@ -33,19 +33,6 @@
  * or with "USB On The Go" additions to USB 2.0 ...)
  */
 
-/*
- * Ceiling microseconds (typical) for that many bytes at high speed
- * ISO is a bit less, no ACK ... from USB 2.0 spec, 5.11.3 (and needed
- * to preallocate bandwidth)
- */
-#define EHCI_HOST_DELAY	5	/* nsec, guess */
-#define HS_USECS(bytes) NS_TO_US ( ((55 * 8 * 2083)/1000) \
-	+ ((2083UL * (3167 + BitTime (bytes)))/1000) \
-	+ EHCI_HOST_DELAY)
-#define HS_USECS_ISO(bytes) NS_TO_US ( ((long)(38 * 8 * 2.083)) \
-	+ ((2083UL * (3167 + BitTime (bytes)))/1000) \
-	+ EHCI_HOST_DELAY)
-	
 static int ehci_get_frame (struct usb_hcd *hcd);
 
 /*-------------------------------------------------------------------------*/
@@ -124,6 +111,9 @@ periodic_usecs (struct ehci_hcd *ehci, unsigned frame, unsigned uframe)
 			/* is it in the S-mask? */
 			if (q->qh->hw_info2 & cpu_to_le32 (1 << uframe))
 				usecs += q->qh->usecs;
+			/* ... or C-mask? */
+			if (q->qh->hw_info2 & cpu_to_le32 (1 << (8 + uframe)))
+				usecs += q->qh->c_usecs;
 			q = &q->qh->qh_next;
 			break;
 		case Q_TYPE_FSTN:
@@ -273,6 +263,12 @@ static int check_period (
 	unsigned	period,
 	unsigned	usecs
 ) {
+	/* complete split running into next frame?
+	 * given FSTN support, we could sometimes check...
+	 */
+	if (uframe >= 8)
+		return 0;
+
 	/*
 	 * 80% periodic == 100 usec/uframe available
 	 * convert "usecs we need" to "max already claimed" 
@@ -284,6 +280,8 @@ static int check_period (
 
 // FIXME delete when intr_submit handles non-empty queues
 // this gives us a one intr/frame limit (vs N/uframe)
+// ... and also lets us avoid tracking split transactions
+// that might collide at a given TT/hub.
 		if (ehci->pshadow [frame].ptr)
 			return 0;
 
@@ -305,20 +303,54 @@ static int intr_submit (
 	int			mem_flags
 ) {
 	unsigned		epnum, period;
-	unsigned short		usecs;
+	unsigned short		usecs, c_usecs, gap_uf;
 	unsigned long		flags;
 	struct ehci_qh		*qh;
 	struct hcd_dev		*dev;
+	int			is_input;
 	int			status = 0;
 
-	/* get endpoint and transfer data */
+	/* get endpoint and transfer/schedule data */
 	epnum = usb_pipeendpoint (urb->pipe);
-	if (usb_pipein (urb->pipe))
+	is_input = usb_pipein (urb->pipe);
+	if (is_input)
 		epnum |= 0x10;
-	if (urb->dev->speed != USB_SPEED_HIGH) {
-		dbg ("no intr/tt scheduling yet"); 
-		status = -ENOSYS;
-		goto done;
+
+	/*
+	 * HS interrupt transfers are simple -- only one microframe.  FS/LS
+	 * interrupt transfers involve a SPLIT in one microframe and CSPLIT
+	 * sometime later.  We need to know how much time each will be
+	 * needed in each microframe and, for FS/LS, how many microframes
+	 * separate the two in the best case.
+	 */
+	usecs = usb_calc_bus_time (USB_SPEED_HIGH, is_input, 0,
+			urb->transfer_buffer_length);
+	if (urb->dev->speed == USB_SPEED_HIGH) {
+		gap_uf = 0;
+		c_usecs = 0;
+
+		/* FIXME handle HS periods of less than 1 frame. */
+		period = urb->interval >> 3;
+		if (period < 1) {
+			dbg ("intr period %d uframes, NYET!", urb->interval);
+			status = -EINVAL;
+			goto done;
+		}
+	} else {
+		/* gap is a function of full/low speed transfer times */
+		gap_uf = 1 + usb_calc_bus_time (urb->dev->speed, is_input, 0,
+				urb->transfer_buffer_length) / (125 * 1000);
+
+		/* FIXME this just approximates SPLIT/CSPLIT times */
+		if (is_input) {		// SPLIT, gap, CSPLIT+DATA
+			c_usecs = usecs + HS_USECS (0);
+			usecs = HS_USECS (1);
+		} else {		// SPLIT+DATA, gap, CSPLIT
+			usecs = usecs + HS_USECS (1);
+			c_usecs = HS_USECS (0);
+		}
+
+		period = urb->interval;
 	}
 
 	/*
@@ -335,16 +367,6 @@ static int intr_submit (
 	 */
 	if (unlikely (qtd_list->next != qtd_list->prev)) {
 		dbg ("only one intr qtd per urb allowed"); 
-		status = -EINVAL;
-		goto done;
-	}
-
-	usecs = HS_USECS (urb->transfer_buffer_length);
-
-	/* FIXME handle HS periods of less than 1 frame. */
-	period = urb->interval >> 3;
-	if (period < 1) {
-		dbg ("intr period %d uframes, NYET!", urb->interval);
 		status = -EINVAL;
 		goto done;
 	}
@@ -392,6 +414,7 @@ static int intr_submit (
 
 		qh->hw_next = EHCI_LIST_END;
 		qh->usecs = usecs;
+		qh->c_usecs = c_usecs;
 
 		urb->hcpriv = qh_get (qh);
 		status = -ENOSPC;
@@ -399,18 +422,47 @@ static int intr_submit (
 		/* pick a set of schedule slots, link the QH into them */
 		do {
 			int	uframe;
+			u32	c_mask = 0;
 
 			/* pick a set of slots such that all uframes have
 			 * enough periodic bandwidth available.
-			 *
-			 * FIXME for TT splits, need uframes for start and end.
-			 * FSTNs can put end into next frame (uframes 0 or 1).
 			 */
 			frame--;
 			for (uframe = 0; uframe < 8; uframe++) {
 				if (check_period (ehci, frame, uframe,
-						period, usecs) != 0)
-					break;
+						period, usecs) == 0)
+					continue;
+
+				/* If this is a split transaction, check the
+				 * bandwidth available for the completion
+				 * too.  check both best and worst case gaps:
+				 * worst case is SPLIT near uframe end, and
+				 * CSPLIT near start ... best is vice versa.
+				 * Difference can be almost two uframe times.
+				 *
+				 * FIXME don't even bother unless we know
+				 * this TT is idle in that uframe ... right
+				 * now we know only one interrupt transfer
+				 * will be scheduled per frame, so we don't
+				 * need to update/check TT state when we
+				 * schedule a split (QH, SITD, or FSTN).
+				 *
+				 * FIXME ehci 0.96 and above can use FSTNs
+				 */
+				if (!c_usecs)
+				    	break;
+				if (check_period (ehci, frame,
+						uframe + gap_uf,
+						period, c_usecs) == 0)
+					continue;
+				if (check_period (ehci, frame,
+						uframe + gap_uf + 1,
+						period, c_usecs) == 0)
+					continue;
+
+				c_mask = 0x03 << (8 + uframe + gap_uf);
+				c_mask = cpu_to_le32 (c_mask);
+				break;
 			}
 			if (uframe == 8)
 				continue;
@@ -419,13 +471,14 @@ static int intr_submit (
 			urb->start_frame = frame;
 			status = 0;
 
-			/* set S-frame mask */
-			qh->hw_info2 |= cpu_to_le32 (1 << uframe);
+			/* reset S-frame and (maybe) C-frame masks */
+			qh->hw_info2 &= ~0xffff;
+			qh->hw_info2 |= cpu_to_le32 (1 << uframe) | c_mask;
 			// dbg_qh ("Schedule INTR qh", ehci, qh);
 
 			/* stuff into the periodic schedule */
 			qh->qh_state = QH_STATE_LINKED;
-			vdbg ("qh %p usecs %d period %d starting %d.%d",
+			vdbg ("qh %p usecs %d period %d.0 starting %d.%d",
 				qh, qh->usecs, period, frame, uframe);
 			do {
 				if (unlikely (ehci->pshadow [frame].ptr != 0)) {
@@ -443,7 +496,8 @@ static int intr_submit (
 			} while (frame < ehci->periodic_size);
 
 			/* update bandwidth utilization records (for usbfs) */
-			usb_claim_bandwidth (urb->dev, urb, usecs/period, 0);
+			usb_claim_bandwidth (urb->dev, urb,
+				(usecs + c_usecs) / period, 0);
 
 			/* maybe enable periodic schedule processing */
 			if (!ehci->periodic_urbs++)
@@ -557,6 +611,7 @@ itd_fill (
 	u32		buf1;
 	unsigned	i, epnum, maxp, multi;
 	unsigned	length;
+	int		is_input;
 
 	itd->hw_next = EHCI_LIST_END;
 	itd->urb = urb;
@@ -578,7 +633,8 @@ itd_fill (
 	 * as encoded in the ep descriptor's maxpacket field
 	 */
 	epnum = usb_pipeendpoint (urb->pipe);
-	if (usb_pipein (urb->pipe)) {
+	is_input = usb_pipein (urb->pipe);
+	if (is_input) {
 		maxp = urb->dev->epmaxpacketin [epnum];
 		buf1 = (1 << 11);
 	} else {
@@ -598,7 +654,7 @@ itd_fill (
 			urb->iso_frame_desc [index].length);
 		return -ENOSPC;
 	}
-	itd->usecs = HS_USECS_ISO (length);
+	itd->usecs = usb_calc_bus_time (USB_SPEED_HIGH, is_input, 1, length);
 
 	/* "plus" info in low order bits of buffer pointers */
 	itd->hw_bufp [0] |= cpu_to_le32 ((epnum << 8) | urb->dev->devnum);
@@ -919,17 +975,9 @@ itd_complete (
 		return flags;
 
 	/*
-	 * For now, always give the urb back to the driver ... expect it
-	 * to submit a new urb (or resubmit this), and to have another
-	 * already queued when un-interrupted transfers are needed.
-	 * No, that's not what OHCI or UHCI are now doing.
-	 *
-	 * FIXME Revisit the ISO URB model.  It's cleaner not to have all
-	 * the special case magic, but it'd be faster to reuse existing
-	 * ITD/DMA setup and schedule state.  Easy to dma_sync/complete(),
-	 * then either reschedule or, if unlinking, free and giveback().
-	 * But we can't overcommit like the full and low speed HCs do, and
-	 * there's no clean way to report an error when rescheduling...
+	 * Always give the urb back to the driver ... expect it to submit
+	 * a new urb (or resubmit this), and to have another already queued
+	 * when un-interrupted transfers are needed.
 	 *
 	 * NOTE that for now we don't accelerate ISO unlinks; they just
 	 * happen according to the current schedule.  Means a delay of

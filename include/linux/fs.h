@@ -107,6 +107,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_SYNCHRONOUS	16	/* Writes are synced at once */
 #define MS_REMOUNT	32	/* Alter flags of a mounted FS */
 #define MS_MANDLOCK	64	/* Allow mandatory locks on an FS */
+#define MS_DIRSYNC	128	/* Directory modifications are synchronous */
 #define MS_NOATIME	1024	/* Do not update access times. */
 #define MS_NODIRATIME	2048	/* Do not update directory access times */
 #define MS_BIND		4096
@@ -137,6 +138,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define S_IMMUTABLE	16	/* Immutable file */
 #define S_DEAD		32	/* removed, but still open directory */
 #define S_NOQUOTA	64	/* Inode is not counted to quota */
+#define S_DIRSYNC	128	/* Directory modifications are synchronous */
 
 /*
  * Note that nosuid etc flags are inode-specific: setting some file-system
@@ -154,7 +156,10 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define __IS_FLG(inode,flg) ((inode)->i_sb->s_flags & (flg))
 
 #define IS_RDONLY(inode) ((inode)->i_sb->s_flags & MS_RDONLY)
-#define IS_SYNC(inode)		(__IS_FLG(inode, MS_SYNCHRONOUS) || ((inode)->i_flags & S_SYNC))
+#define IS_SYNC(inode)		(__IS_FLG(inode, MS_SYNCHRONOUS) || \
+					((inode)->i_flags & S_SYNC))
+#define IS_DIRSYNC(inode)	(__IS_FLG(inode, MS_SYNCHRONOUS|MS_DIRSYNC) || \
+					((inode)->i_flags & (S_SYNC|S_DIRSYNC)))
 #define IS_MANDLOCK(inode)	__IS_FLG(inode, MS_MANDLOCK)
 
 #define IS_QUOTAINIT(inode)	((inode)->i_flags & S_QUOTA)
@@ -282,13 +287,16 @@ struct address_space_operations {
 	int (*sync_page)(struct page *);
 
 	/* Write back some dirty pages from this mapping. */
-	int (*writeback_mapping)(struct address_space *, int *nr_to_write);
+	int (*writepages)(struct address_space *, int *nr_to_write);
 
 	/* Perform a writeback as a memory-freeing operation. */
 	int (*vm_writeback)(struct page *, int *nr_to_write);
 
 	/* Set a page dirty */
 	int (*set_page_dirty)(struct page *page);
+
+	int (*readpages)(struct address_space *mapping,
+			struct list_head *pages, unsigned nr_pages);
 
 	/*
 	 * ext3 requires that a successful prepare_write() call be followed
@@ -395,7 +403,6 @@ struct inode {
 	unsigned char		i_sock;
 
 	atomic_t		i_writecount;
-	unsigned int		i_attr_flags;
 	__u32			i_generation;
 	union {
 		void				*generic_ip;
@@ -1079,6 +1086,7 @@ extern int blkdev_get(struct block_device *, mode_t, unsigned, int);
 extern int blkdev_put(struct block_device *, int);
 extern int bd_claim(struct block_device *, void *);
 extern void bd_release(struct block_device *);
+extern void blk_run_queues(void);
 
 /* fs/devices.c */
 extern const struct block_device_operations *get_blkfops(unsigned int);
@@ -1181,6 +1189,7 @@ extern void iput(struct inode *);
 extern void force_delete(struct inode *);
 extern struct inode * igrab(struct inode *);
 extern ino_t iunique(struct super_block *, ino_t);
+extern int inode_needs_sync(struct inode *inode);
 
 extern struct inode * iget5_locked(struct super_block *, unsigned long, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *);
 extern struct inode * iget_locked(struct super_block *, unsigned long);

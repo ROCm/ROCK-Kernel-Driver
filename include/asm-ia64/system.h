@@ -14,6 +14,7 @@
  */
 #include <linux/config.h>
 
+#include <asm/kregs.h>
 #include <asm/page.h>
 
 #define KERNEL_START		(PAGE_OFFSET + 68*1024*1024)
@@ -30,7 +31,7 @@ struct pci_vector_struct {
 	__u16 bus;	/* PCI Bus number */
 	__u32 pci_id;	/* ACPI split 16 bits device, 16 bits function (see section 6.1.1) */
 	__u8 pin;	/* PCI PIN (0 = A, 1 = B, 2 = C, 3 = D) */
-	__u8 irq;	/* IRQ assigned */
+	__u32 irq;	/* IRQ assigned */
 };
 
 extern struct ia64_boot_param {
@@ -135,16 +136,21 @@ do {											\
 	}										\
 } while (0)
 
-# define local_irq_restore(x)						 \
-do {									 \
-	unsigned long ip, old_psr, psr = (x);				 \
-									 \
-	__asm__ __volatile__ (";;mov %0=psr; mov psr.l=%1;; srlz.d"	 \
-			      : "=&r" (old_psr) : "r" (psr) : "memory"); \
-	if ((old_psr & (1UL << 14)) && !(psr & (1UL << 14))) {		 \
-		__asm__ ("mov %0=ip" : "=r"(ip));			 \
-		last_cli_ip = ip;					 \
-	}								 \
+# define local_irq_restore(x)							\
+do {										\
+	unsigned long ip, old_psr, psr = (x);					\
+										\
+	__asm__ __volatile__ ("mov %0=psr;"					\
+			      "cmp.ne p6,p7=%1,r0;;"				\
+			      "(p6) ssm psr.i;"					\
+			      "(p7) rsm psr.i;;"				\
+			      "srlz.d"						\
+			      : "=&r" (old_psr) : "r"((psr) & IA64_PSR_I)	\
+			      : "p6", "p7", "memory");				\
+	if ((old_psr & IA64_PSR_I) && !(psr & IA64_PSR_I)) {			\
+		__asm__ ("mov %0=ip" : "=r"(ip));				\
+		last_cli_ip = ip;						\
+	}									\
 } while (0)
 
 #else /* !CONFIG_IA64_DEBUG_IRQ */
@@ -153,8 +159,12 @@ do {									 \
 						      : "=r" (x) :: "memory")
 # define local_irq_disable()	__asm__ __volatile__ (";; rsm psr.i;;" ::: "memory")
 /* (potentially) setting psr.i requires data serialization: */
-# define local_irq_restore(x)	__asm__ __volatile__ (";; mov psr.l=%0;; srlz.d"	\
-						      :: "r" (x) : "memory")
+# define local_irq_restore(x)	__asm__ __volatile__ ("cmp.ne p6,p7=%0,r0;;"	\
+						      "(p6) ssm psr.i;"		\
+						      "(p7) rsm psr.i;;"	\
+						      "srlz.d"			\
+						      :: "r"((x) & IA64_PSR_I)	\
+						      : "p6", "p7", "memory")
 #endif /* !CONFIG_IA64_DEBUG_IRQ */
 
 #define local_irq_enable()	__asm__ __volatile__ (";; ssm psr.i;; srlz.d" ::: "memory")

@@ -45,6 +45,7 @@ restrictions referred to are that the relevant option is valid if:
 	SERIAL	Serial support is enabled.
 	SMP 	The kernel is an SMP kernel.
 	SOUND	Appropriate sound system support is enabled.
+	SWSUSP  Software suspension is enabled.
 	V4L	Video For Linux support is enabled.
 	VGA 	The VGA console has been enabled.
 	VT	Virtual terminal support is enabled.
@@ -392,6 +393,8 @@ running once the system is up.
 			initial RAM disk.
 
 	nointroute	[IA-64]
+
+	noresume	[SWSUSP] Disables resume and restore original swap space.
  
 	no-scroll	[VGA]
 
@@ -518,6 +521,8 @@ running once the system is up.
 	reboot=		[BUGS=ix86]
 
 	reserve=	[KNL,BUGS] force the kernel to ignore some iomem area.
+
+	resume=		[SWSUSP] specify the partition device for software suspension.
 
 	riscom8=	[HW,SERIAL]
 

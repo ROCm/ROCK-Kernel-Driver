@@ -202,9 +202,9 @@ fail_base2:
 						xsurf_offsets, 0,
 						(ide_ioreg_t)(buddha_board+xsurf_irqports[i]),
 						xsurf_ack_intr, IRQ_AMIGA_PORTS);
-			}	
-			
-			index = ide_register_hw(&hw, NULL);
+			}
+
+			index = ide_register_hw(&hw);
 			if (index != -1) {
 				printk("ide%d: ", index);
 				switch(type) {

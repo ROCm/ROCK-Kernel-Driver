@@ -117,9 +117,6 @@ prep_show_cpuinfo(struct seq_file *m)
 {
 	extern char *Motherboard_map_name;
 	int cachew;
-#ifdef CONFIG_PREP_RESIDUAL
-	int i;
-#endif
 
 	seq_printf(m, "machine\t\t: PReP %s\n", Motherboard_map_name);
 
@@ -180,6 +177,8 @@ prep_show_cpuinfo(struct seq_file *m)
 no_l2:
 #ifdef CONFIG_PREP_RESIDUAL
 	if (res->ResidualLength != 0) {
+		int i;
+
 		/* print info about SIMMs */
 		seq_printf(m, "simms\t\t: ");
 		for (i = 0; (res->ActualNumMemories) && (i < MAX_MEMS); i++) {
@@ -812,8 +811,8 @@ prep_map_io(void)
 	io_block_mapping(0xf0000000, PREP_ISA_MEM_BASE, 0x08000000, _PAGE_IO);
 }
 
-static void __init
-prep_init2(void)
+static int __init
+prep_request_io(void)
 {
 #ifdef CONFIG_NVRAM
 	request_region(PREP_NVRAM_AS0, 0x8, "nvram");
@@ -822,7 +821,11 @@ prep_init2(void)
 	request_region(0x40,0x20,"timer");
 	request_region(0x80,0x10,"dma page reg");
 	request_region(0xc0,0x20,"dma2");
+
+	return 0;
 }
+
+device_initcall(prep_request_io);
 
 void __init
 prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
@@ -863,7 +866,6 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.init_IRQ       = prep_init_IRQ;
 	/* this gets changed later on if we have an OpenPIC -- Cort */
 	ppc_md.get_irq        = i8259_irq;
-	ppc_md.init           = prep_init2;
 
 	ppc_md.restart        = prep_restart;
 	ppc_md.power_off      = prep_power_off;

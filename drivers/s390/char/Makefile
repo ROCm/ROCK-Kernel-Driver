@@ -2,8 +2,6 @@
 # S/390 character devices
 #
 
-O_TARGET := s390-char.o
-
 export-objs	:= hwc_rw.o
 
 tub3270-objs := tuball.o tubfs.o tubtty.o \

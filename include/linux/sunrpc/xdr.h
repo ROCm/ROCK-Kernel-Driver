@@ -35,6 +35,31 @@ struct xdr_netobj {
 typedef int	(*kxdrproc_t)(void *rqstp, u32 *data, void *obj);
 
 /*
+ * Basic structure for transmission/reception of a client XDR message.
+ * Features a header (for a linear buffer containing RPC headers
+ * and the data payload for short messages), and then an array of
+ * pages.
+ * The tail iovec allows you to append data after the page array. Its
+ * main interest is for appending padding to the pages in order to
+ * satisfy the int_32-alignment requirements in RFC1832.
+ *
+ * For the future, we might want to string several of these together
+ * in a list if anybody wants to make use of NFSv4 COMPOUND
+ * operations and/or has a need for scatter/gather involving pages.
+ */
+struct xdr_buf {
+	struct iovec	head[1],	/* RPC header + non-page data */
+			tail[1];	/* Appended after page data */
+
+	struct page **	pages;		/* Array of contiguous pages */
+	unsigned int	page_base,	/* Start of page data */
+			page_len;	/* Length of page data */
+
+	unsigned int	len;		/* Total length of data */
+
+};
+
+/*
  * pre-xdr'ed macros.
  */
 
@@ -68,6 +93,11 @@ u32 *	xdr_encode_netobj(u32 *p, const struct xdr_netobj *);
 u32 *	xdr_decode_netobj(u32 *p, struct xdr_netobj *);
 u32 *	xdr_decode_netobj_fixed(u32 *p, void *obj, unsigned int len);
 
+void	xdr_encode_pages(struct xdr_buf *, struct page **, unsigned int,
+			 unsigned int);
+void	xdr_inline_pages(struct xdr_buf *, unsigned int,
+			 struct page **, unsigned int, unsigned int);
+
 /*
  * Decode 64bit quantities (NFSv3 support)
  */
@@ -98,6 +128,40 @@ xdr_adjust_iovec(struct iovec *iov, u32 *p)
 
 void xdr_shift_iovec(struct iovec *, int, size_t);
 void xdr_zero_iovec(struct iovec *, int, size_t);
+
+/*
+ * Maximum number of iov's we use.
+ */
+#define MAX_IOVEC	(12)
+
+/*
+ * XDR buffer helper functions
+ */
+extern int xdr_kmap(struct iovec *, struct xdr_buf *, unsigned int);
+extern void xdr_kunmap(struct xdr_buf *, unsigned int);
+extern void xdr_shift_buf(struct xdr_buf *, unsigned int);
+extern void xdr_zero_buf(struct xdr_buf *, unsigned int);
+
+/*
+ * Helper structure for copying from an sk_buff.
+ */
+typedef struct {
+	struct sk_buff	*skb;
+	unsigned int	offset;
+	size_t		count;
+	unsigned int	csum;
+} skb_reader_t;
+
+typedef size_t (*skb_read_actor_t)(skb_reader_t *desc, void *to, size_t len);
+
+extern void xdr_partial_copy_from_skb(struct xdr_buf *, unsigned int,
+		skb_reader_t *, skb_read_actor_t);
+
+extern int xdr_copy_skb(struct xdr_buf *xdr, unsigned int base,
+		struct sk_buff *skb, unsigned int offset);
+
+extern int xdr_copy_and_csum_skb(struct xdr_buf *xdr, unsigned int base,
+		struct sk_buff *skb, unsigned int offset, unsigned int csum);
 
 #endif /* __KERNEL__ */
 

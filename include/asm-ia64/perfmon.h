@@ -23,6 +23,7 @@
 #define PFM_GET_FEATURES	0x0c
 #define PFM_DEBUG		0x0d
 #define PFM_UNPROTECT_CONTEXT	0x0e
+#define PFM_GET_PMC_RESET_VAL	0x0f
 
 
 /*
@@ -172,6 +173,8 @@ extern int  pfm_release_debug_registers(struct task_struct *);
 extern int  pfm_cleanup_smpl_buf(struct task_struct *);
 extern void pfm_syst_wide_update_task(struct task_struct *, int);
 extern void pfm_ovfl_block_reset (void);
+
+extern int pfm_syst_wide;
 
 #endif /* __KERNEL__ */
 

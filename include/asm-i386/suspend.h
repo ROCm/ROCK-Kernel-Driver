@@ -1,13 +1,8 @@
-#ifndef __ASM_I386_SUSPEND_H
-#define __ASM_I386_SUSPEND_H
-#endif
-
 /*
  * Copyright 2001-2002 Pavel Machek <pavel@suse.cz>
  * Based on code
  * Copyright 2001 Patrick Mochel <mochel@osdl.org>
  */
-#if defined(SUSPEND_C) || defined(ACPI_C)
 #include <asm/desc.h>
 #include <asm/i387.h>
 
@@ -225,7 +220,6 @@ static inline void restore_processor_context (void)
 	do_fpu_end();
 }
 
-#endif
 #ifdef SUSPEND_C
 /* Local variables for do_magic */
 static int loop __nosavedata = 0;

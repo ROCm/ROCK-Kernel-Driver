@@ -224,15 +224,11 @@ void add_gd_partition(struct gendisk *hd, int minor, int start, int size)
 static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor)
 {
 	devfs_handle_t de = NULL;
-	static int first_time = 1;
 	unsigned long first_sector;
 	struct block_device *bdev;
 	char buf[64];
 	int i;
 
-	if (first_time)
-		printk(KERN_INFO "Partition check:\n");
-	first_time = 0;
 	first_sector = hd->part[minor(dev)].start_sect;
 
 	/*

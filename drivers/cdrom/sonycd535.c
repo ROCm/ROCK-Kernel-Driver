@@ -1486,6 +1486,7 @@ sony535_init(void)
 	int  got_result = 0;
 	int  tmp_irq;
 	int  i;
+	devfs_handle_t sony_devfs_handle;
 
 	/* Setting the base I/O address to 0 will disable it. */
 	if ((sony535_cd_base_io == 0xffff)||(sony535_cd_base_io == 0))
@@ -1509,11 +1510,6 @@ sony535_init(void)
 	printk(KERN_INFO CDU535_MESSAGE_NAME ": probing base address %03X\n",
 			sony535_cd_base_io);
 #endif
-	if (check_region(sony535_cd_base_io,4)) {
-		printk(CDU535_MESSAGE_NAME ": my base address is not free!\n");
-		return -EIO;
-	}
-
 	/* look for the CD-ROM, follows the procedure in the DOS driver */
 	inb(select_unit_reg);
 	/* wait for 40 18 Hz ticks (reverse-engineered from DOS driver) */
@@ -1586,13 +1582,14 @@ sony535_init(void)
 					printk("IRQ%d, ", tmp_irq);
 				printk("using %d byte buffer\n", sony_buffer_size);
 
-				devfs_register (NULL, CDU535_HANDLE,
-						DEVFS_FL_DEFAULT,
-						MAJOR_NR, 0,
-						S_IFBLK | S_IRUGO | S_IWUGO,
-						&cdu_fops, NULL);
+				sony_devfs_handle = devfs_register (NULL, CDU535_HANDLE,
+								DEVFS_FL_DEFAULT,
+								MAJOR_NR, 0,
+								S_IFBLK | S_IRUGO | S_IWUGO,
+								&cdu_fops, NULL);
 				if (devfs_register_blkdev(MAJOR_NR, CDU535_HANDLE, &cdu_fops)) {
 					printk("Unable to get major %d for %s\n",
+					devfs_unregister(sony_devfs_handle);
 							MAJOR_NR, CDU535_MESSAGE_NAME);
 					return -EIO;
 				}
@@ -1604,6 +1601,8 @@ sony535_init(void)
 					kmalloc(sizeof *sony_toc, GFP_KERNEL);
 				if (sony_toc == NULL) {
 					blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+					devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+					devfs_unregister(sony_devfs_handle);
 					return -ENOMEM;
 				}
 				last_sony_subcode = (struct s535_sony_subcode *)
@@ -1611,6 +1610,8 @@ sony535_init(void)
 				if (last_sony_subcode == NULL) {
 					blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 					kfree(sony_toc);
+					devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+					devfs_unregister(sony_devfs_handle);
 					return -ENOMEM;
 				}
 				sony_buffer = (Byte **)
@@ -1619,6 +1620,8 @@ sony535_init(void)
 					blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 					kfree(sony_toc);
 					kfree(last_sony_subcode);
+					devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+					devfs_unregister(sony_devfs_handle);
 					return -ENOMEM;
 				}
 				for (i = 0; i < sony_buffer_sectors; i++) {
@@ -1631,6 +1634,8 @@ sony535_init(void)
 						kfree(sony_buffer);
 						kfree(sony_toc);
 						kfree(last_sony_subcode);
+						devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+						devfs_unregister(sony_devfs_handle);
 						return -ENOMEM;
 					}
 				}
@@ -1643,7 +1648,25 @@ sony535_init(void)
 		printk("Did not find a " CDU535_MESSAGE_NAME " drive\n");
 		return -EIO;
 	}
-	request_region(sony535_cd_base_io, 4, CDU535_HANDLE);
+	if (!request_region(sony535_cd_base_io, 4, CDU535_HANDLE))
+		{
+		printk(KERN_WARNING"sonycd535: Unable to request region 0x%x\n",
+			sony535_cd_base_io);
+		for (i = 0; i < sony_buffer_sectors; i++)
+			if (sony_buffer[i]) 
+				kfree(sony_buffer[i]);
+		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+		kfree(sony_buffer);
+		kfree(sony_toc);
+		kfree(last_sony_subcode);
+		devfs_unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
+		devfs_unregister(sony_devfs_handle);
+		if (sony535_irq_used)
+			free_irq(sony535_irq_used, NULL);
+		}
+	
+		return -EIO;
+		}
 	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &cdu_fops, 0);
 	return 0;
 }

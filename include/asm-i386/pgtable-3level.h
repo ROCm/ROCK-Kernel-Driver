@@ -99,4 +99,9 @@ static inline pte_t pfn_pte(unsigned long page_nr, pgprot_t pgprot)
 	return pte;
 }
 
+static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
+{
+	return __pmd(((unsigned long long)page_nr << PAGE_SHIFT) | pgprot_val(pgprot));
+}
+
 #endif /* _I386_PGTABLE_3LEVEL_H */

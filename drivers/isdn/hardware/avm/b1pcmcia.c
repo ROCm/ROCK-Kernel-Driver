@@ -25,8 +25,6 @@
 #include <linux/isdn/capilli.h>
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.12.6.5 $";
-
 /* ------------------------------------------------------------- */
 
 MODULE_DESCRIPTION("CAPI4Linux: Driver for AVM PCMCIA cards");
@@ -51,10 +49,12 @@ static void b1pcmcia_remove_ctr(struct capi_ctr *ctrl)
 
 /* ------------------------------------------------------------- */
 
-static int b1pcmcia_add_card(struct capi_driver *driver,
-				unsigned int port,
-				unsigned irq,
-				enum avmcardtype cardtype)
+static LIST_HEAD(cards);
+
+static char *b1pcmcia_procinfo(struct capi_ctr *ctrl);
+
+static int b1pcmcia_add_card(unsigned int port, unsigned irq,
+			     enum avmcardtype cardtype)
 {
 	avmctrl_info *cinfo;
 	avmcard *card;
@@ -63,7 +63,7 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 
 	card = b1_alloc_card(1);
 	if (!card) {
-		printk(KERN_WARNING "%s: no memory.\n", driver->name);
+		printk(KERN_WARNING "b1pcmcia: no memory.\n");
 		retval = -ENOMEM;
 		goto err;
 	}
@@ -80,26 +80,36 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 
 	retval = request_irq(card->irq, b1_interrupt, 0, card->name, card);
 	if (retval) {
-		printk(KERN_ERR "%s: unable to get IRQ %d.\n",
-				driver->name, card->irq);
+		printk(KERN_ERR "b1pcmcia: unable to get IRQ %d.\n",
+		       card->irq);
 		retval = -EBUSY;
 		goto err_free;
 	}
 	b1_reset(card->port);
 	if ((retval = b1_detect(card->port, card->cardtype)) != 0) {
-		printk(KERN_NOTICE "%s: NO card at 0x%x (%d)\n",
-					driver->name, card->port, retval);
+		printk(KERN_NOTICE "b1pcmcia: NO card at 0x%x (%d)\n",
+		       card->port, retval);
 		retval = -ENODEV;
 		goto err_free_irq;
 	}
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
-	if (!cinfo->capi_ctrl) {
-		printk(KERN_ERR "%s: attach controller failed.\n",
-				driver->name);
-		retval = -EBUSY;
+	cinfo->capi_ctrl.driver_name   = "b1pcmcia";
+	cinfo->capi_ctrl.driverdata    = cinfo;
+	cinfo->capi_ctrl.register_appl = b1_register_appl;
+	cinfo->capi_ctrl.release_appl  = b1_release_appl;
+	cinfo->capi_ctrl.send_message  = b1_send_message;
+	cinfo->capi_ctrl.load_firmware = b1_load_firmware;
+	cinfo->capi_ctrl.reset_ctr     = b1_reset_ctr;
+	cinfo->capi_ctrl.procinfo      = b1pcmcia_procinfo;
+	cinfo->capi_ctrl.ctr_read_proc = b1ctl_read_proc;
+	strcpy(cinfo->capi_ctrl.name, card->name);
+	SET_MODULE_OWNER(&cinfo->capi_ctrl);
+
+	retval = attach_capi_ctr(&cinfo->capi_ctrl);
+	if (retval) {
+		printk(KERN_ERR "b1pcmcia: attach controller failed.\n");
 		goto err_free_irq;
 	}
 	switch (cardtype) {
@@ -108,11 +118,11 @@ static int b1pcmcia_add_card(struct capi_driver *driver,
 		default    : cardname = "B1 PCMCIA"; break;
 	}
 
-	printk(KERN_INFO
-		"%s: AVM %s at i/o %#x, irq %d, revision %d\n",
-		driver->name, cardname, card->port, card->irq, card->revision);
+	printk(KERN_INFO "b1pcmcia: AVM %s at i/o %#x, irq %d, revision %d\n",
+	       cardname, card->port, card->irq, card->revision);
 
-	return cinfo->capi_ctrl->cnr;
+	list_add(&card->list, &cards);
+	return cinfo->capi_ctrl.cnr;
 
  err_free_irq:
 	free_irq(card->irq, card);
@@ -142,49 +152,30 @@ static char *b1pcmcia_procinfo(struct capi_ctr *ctrl)
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver b1pcmcia_driver = {
-	owner: THIS_MODULE,
-	name: "b1pcmcia",
-	revision: "0.0",
-	load_firmware: b1_load_firmware,
-	reset_ctr: b1_reset_ctr,
-	register_appl: b1_register_appl,
-	release_appl: b1_release_appl,
-	send_message: b1_send_message,
-	
-	procinfo: b1pcmcia_procinfo,
-	ctr_read_proc: b1ctl_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
-};
-
-/* ------------------------------------------------------------- */
-
 int b1pcmcia_addcard_b1(unsigned int port, unsigned irq)
 {
-	return b1pcmcia_add_card(&b1pcmcia_driver, port, irq, avm_b1pcmcia);
+	return b1pcmcia_add_card(port, irq, avm_b1pcmcia);
 }
 
 int b1pcmcia_addcard_m1(unsigned int port, unsigned irq)
 {
-	return b1pcmcia_add_card(&b1pcmcia_driver, port, irq, avm_m1);
+	return b1pcmcia_add_card(port, irq, avm_m1);
 }
 
 int b1pcmcia_addcard_m2(unsigned int port, unsigned irq)
 {
-	return b1pcmcia_add_card(&b1pcmcia_driver, port, irq, avm_m2);
+	return b1pcmcia_add_card(port, irq, avm_m2);
 }
 
 int b1pcmcia_delcard(unsigned int port, unsigned irq)
 {
 	struct list_head *l;
-	struct capi_ctr *ctrl;
 	avmcard *card;
 	
-	list_for_each(l, &b1pcmcia_driver.contr_head) {
-		ctrl = list_entry(l, struct capi_ctr, driver_list);
-		card = ((avmctrl_info *)(ctrl->driverdata))->card;
+	list_for_each(l, &cards) {
+		card = list_entry(l, avmcard, list);
 		if (card->port == port && card->irq == irq) {
-			b1pcmcia_remove_ctr(ctrl);
+			b1pcmcia_remove_ctr(&card->ctrlinfo[0].capi_ctrl);
 			return 0;
 		}
 	}
@@ -195,21 +186,3 @@ EXPORT_SYMBOL(b1pcmcia_addcard_b1);
 EXPORT_SYMBOL(b1pcmcia_addcard_m1);
 EXPORT_SYMBOL(b1pcmcia_addcard_m2);
 EXPORT_SYMBOL(b1pcmcia_delcard);
-
-/* ------------------------------------------------------------- */
-
-static int __init b1pcmcia_init(void)
-{
-	b1_set_revision(&b1pcmcia_driver, revision);
-        attach_capi_driver(&b1pcmcia_driver);
-
-	return 0;
-}
-
-static void __exit b1pcmcia_exit(void)
-{
-	detach_capi_driver(&b1pcmcia_driver);
-}
-
-module_init(b1pcmcia_init);
-module_exit(b1pcmcia_exit);

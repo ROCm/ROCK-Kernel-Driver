@@ -91,7 +91,7 @@ static int __pdflush(struct pdflush_work *my_work)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
-	current->flags |= PF_FLUSHER | PF_KERNTHREAD;
+	current->flags |= PF_FLUSHER;
 	my_work->fn = NULL;
 	my_work->who = current;
 
@@ -106,11 +106,8 @@ static int __pdflush(struct pdflush_work *my_work)
 		set_current_state(TASK_INTERRUPTIBLE);
 		spin_unlock_irq(&pdflush_lock);
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
-		run_task_queue(&tq_bdflush);
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
-#endif
 		schedule();
 
 		if (my_work->fn)

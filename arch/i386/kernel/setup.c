@@ -172,6 +172,8 @@ void __init visws_get_board_type_and_rev(void);
 static int disable_x86_serial_nr __initdata = 1;
 static int disable_x86_fxsr __initdata = 0;
 
+unsigned long saved_videomode;
+
 extern unsigned long saved_videomode;
 
 /*
@@ -665,10 +667,8 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_APM
 	apm_info.bios = APM_BIOS_INFO;
 #endif
-#ifdef CONFIG_ACPI_SLEEP
 	saved_videomode = VIDEO_MODE;
 	printk("Video mode to be used for restore is %lx\n", saved_videomode);
-#endif
 	if( SYS_DESC_TABLE.length != 0 ) {
 		MCA_bus = SYS_DESC_TABLE.table[3] &0x2;
 		machine_id = SYS_DESC_TABLE.table[0];

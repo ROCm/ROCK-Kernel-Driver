@@ -125,7 +125,7 @@ static void pppoatm_unassign_vcc(struct atm_vcc *atmvcc)
 	pvcc = atmvcc_to_pvcc(atmvcc);
 	atmvcc->push = pvcc->old_push;
 	atmvcc->pop = pvcc->old_pop;
-	tasklet_disable(&pvcc->wakeup_tasklet);
+	tasklet_kill(&pvcc->wakeup_tasklet);
 	ppp_unregister_channel(&pvcc->chan);
 	atmvcc->user_back = NULL;
 	kfree(pvcc);

@@ -59,21 +59,6 @@ int b1_irq_table[16] =
 
 /* ------------------------------------------------------------- */	
 
-void b1_set_revision(struct capi_driver *driver, char *rev)
-{
-	char *p;
-
-	if ((p = strchr(rev, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-}
-
-/* ------------------------------------------------------------- */	
-
 avmcard *b1_alloc_card(int nr_controllers)
 {
 	avmcard *card;
@@ -99,6 +84,7 @@ avmcard *b1_alloc_card(int nr_controllers)
 		cinfo[i].card = card;
 	}
 	spin_lock_init(&card->lock);
+	card->nr_controllers = nr_controllers;
 
 	return card;
 }
@@ -344,7 +330,7 @@ void b1_reset_ctr(struct capi_ctr *ctrl)
 
 	memset(cinfo->version, 0, sizeof(cinfo->version));
 	capilib_release(&cinfo->ncci_head);
-	ctrl->reseted(ctrl);
+	capi_ctr_reseted(ctrl);
 }
 
 void b1_register_appl(struct capi_ctr *ctrl,
@@ -433,7 +419,7 @@ u16 b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 
 void b1_parse_version(avmctrl_info *cinfo)
 {
-	struct capi_ctr *ctrl = cinfo->capi_ctrl;
+	struct capi_ctr *ctrl = &cinfo->capi_ctrl;
 	avmcard *card = cinfo->card;
 	capi_profile *profp;
 	u8 *dversion;
@@ -509,7 +495,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
 	avmcard *card = devptr;
 	avmctrl_info *cinfo = &card->ctrlinfo[0];
-	struct capi_ctr *ctrl = cinfo->capi_ctrl;
+	struct capi_ctr *ctrl = &cinfo->capi_ctrl;
 	unsigned char b1cmd;
 	struct sk_buff *skb;
 
@@ -543,7 +529,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 		} else {
 			memcpy(skb_put(skb, MsgLen), card->msgbuf, MsgLen);
 			memcpy(skb_put(skb, DataB3Len), card->databuf, DataB3Len);
-			ctrl->handle_capimsg(ctrl, ApplId, skb);
+			capi_ctr_handle_message(ctrl, ApplId, skb);
 		}
 		break;
 
@@ -561,7 +547,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 						     CAPIMSG_NCCI(skb->data),
 						     CAPIMSG_MSGID(skb->data));
 
-			ctrl->handle_capimsg(ctrl, ApplId, skb);
+			capi_ctr_handle_message(ctrl, ApplId, skb);
 		}
 		break;
 
@@ -587,11 +573,11 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 	case RECEIVE_START:
 	   	/* b1_put_byte(card->port, SEND_POLLACK); */
-		ctrl->resume_output(ctrl);
+		capi_ctr_resume_output(ctrl);
 		break;
 
 	case RECEIVE_STOP:
-		ctrl->suspend_output(ctrl);
+		capi_ctr_suspend_output(ctrl);
 		break;
 
 	case RECEIVE_INIT:
@@ -602,7 +588,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 		       card->name,
 		       cinfo->version[VER_CARDTYPE],
 		       cinfo->version[VER_DRIVER]);
-		ctrl->ready(ctrl);
+		capi_ctr_ready(ctrl);
 		break;
 
 	case RECEIVE_TASK_READY:
@@ -774,7 +760,6 @@ EXPORT_SYMBOL(avmcard_dma_free);
 
 EXPORT_SYMBOL(b1_irq_table);
 
-EXPORT_SYMBOL(b1_set_revision);
 EXPORT_SYMBOL(b1_alloc_card);
 EXPORT_SYMBOL(b1_free_card);
 EXPORT_SYMBOL(b1_detect);

@@ -1,15 +1,8 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
-EXTRA_AFLAGS	:= -traditional
-
-all: kernel.o head.o init_task.o
+EXTRA_TARGETS := head.o init_task.o
 
 O_TARGET := kernel.o
 
@@ -30,5 +23,7 @@ obj-$(CONFIG_APM)		+= apm.o
 obj-$(CONFIG_X86_SMP)		+= smp.o smpboot.o trampoline.o
 obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o nmi.o
 obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o
+
+EXTRA_AFLAGS	:= -traditional
 
 include $(TOPDIR)/Rules.make

@@ -132,7 +132,7 @@ static void mtdblock_request(RQFUNC_ARG)
 
       mtd = __get_mtd_device(NULL, minor(current_request->rq_dev));
       if (!mtd) {
-	      printk("MTD device %d doesn't appear to exist any more\n", CURRENT_DEV);
+	      printk("MTD device %d doesn't appear to exist any more\n", DEVICE_NR(CURRENT->rq_dev));
 	      mtdblock_end_request(current_request, 0);
       }
 

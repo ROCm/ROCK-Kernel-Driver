@@ -3,8 +3,6 @@
 #
 # $Id: Makefile,v 1.13 2001/08/16 15:16:58 rmk Exp $
 
-O_TARGET	:= mapslink.o
-
 # Chip mappings
 obj-$(CONFIG_MTD_CDB89712)      += cdb89712.o
 obj-$(CONFIG_MTD_ARM_INTEGRATOR)+= integrator-flash.o

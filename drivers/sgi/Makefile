@@ -5,8 +5,8 @@
 #
 # Character and Audio devices for SGI machines.
 #
-subdir-y	+= char
 subdir-m	+= char
-obj-y		+= char/sgichar.o
+
+obj-y		+= char/
 
 include $(TOPDIR)/Rules.make

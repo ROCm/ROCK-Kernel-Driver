@@ -1,7 +1,9 @@
 #ifndef _LINUX_SWSUSP_H
 #define _LINUX_SWSUSP_H
 
+#if defined(SUSPEND_C) || defined(ACPI_C)
 #include <asm/suspend.h>
+#endif
 #include <linux/swap.h>
 #include <linux/notifier.h>
 #include <linux/config.h>

@@ -61,12 +61,6 @@ DRIVERS += arch/cris/drivers/drivers.o
 LIBGCC = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
 LIBS := $(TOPDIR)/arch/cris/lib/lib.a $(LIBS) $(TOPDIR)/arch/cris/lib/lib.a $(LIBGCC)
 
-arch/cris/kernel: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/cris/kernel
-
-arch/cris/mm: dummy
-	$(MAKE) linuxsubdirs SUBDIRS=arch/cris/mm
-
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux.bin: vmlinux
@@ -88,10 +82,10 @@ cramfs:
 
 clinux: vmlinux.bin decompress.bin rescue.bin
 
-decompress.bin: dummy
+decompress.bin: FORCE
 	@make -C arch/cris/boot/compressed decompress.bin
 
-rescue.bin: dummy
+rescue.bin: FORCE
 	@make -C arch/cris/boot/rescue rescue.bin
 
 zImage: vmlinux.bin

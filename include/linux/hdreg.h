@@ -331,10 +331,13 @@ enum {
 #define HDIO_GETGEO_BIG_RAW	0x0331	/* */
 
 #define __NEW_HD_DRIVE_ID
-/* structure returned by HDIO_GET_IDENTITY,
- * as per ANSI NCITS ATA6 rev.1b spec
+
+/*
+ * Structure returned by HDIO_GET_IDENTITY, as per ANSI NCITS ATA6 rev.1b spec.
+ *
+ * If you change something here, please remember to update fix_driveid() in
+ * ide/probe.c.
  */
-/* if you change something here remember to update ide_fix_driveid() */
 struct hd_driveid {
 	unsigned short	config;		/* lots of obsolete bit flags */
 	unsigned short	cyls;		/* Obsolete, "physical" cyls */

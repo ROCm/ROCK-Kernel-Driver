@@ -94,8 +94,6 @@ static int hpt34x_get_info (char *buffer, char **addr, off_t offset, int count)
 
 byte hpt34x_proc = 0;
 
-extern char *ide_xfer_verbose(byte xfer_rate);
-
 static void hpt34x_clear_chipset(struct ata_device *drive)
 {
 	unsigned int reg1	= 0, tmp1 = 0;
@@ -132,15 +130,13 @@ static int hpt34x_tune_chipset(struct ata_device *drive, byte speed)
 	pci_write_config_dword(drive->channel->pci_dev, 0x48, tmp2);
 
 #if HPT343_DEBUG_DRIVE_INFO
-	printk("%s: %s drive%d (0x%04x 0x%04x) (0x%04x 0x%04x)" \
+	printk("%s: %02x drive%d (0x%04x 0x%04x) (0x%04x 0x%04x)" \
 		" (0x%02x 0x%02x) 0x%04x\n",
-		drive->name, ide_xfer_verbose(speed),
+		drive->name, speed,
 		drive->dn, reg1, tmp1, reg2, tmp2,
 		hi_speed, lo_speed, err);
-#endif /* HPT343_DEBUG_DRIVE_INFO */
+#endif
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 	return ide_config_drive_speed(drive, speed);
 }

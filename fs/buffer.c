@@ -122,8 +122,6 @@ void unlock_buffer(struct buffer_head *bh)
 	wake_up_buffer(bh);
 }
 
-DECLARE_TASK_QUEUE(tq_bdflush);
-
 /*
  * Block until a buffer comes unlocked.  This doesn't stop it
  * from becoming locked again - you have to lock it yourself
@@ -138,7 +136,7 @@ void __wait_on_buffer(struct buffer_head * bh)
 	get_bh(bh);
 	add_wait_queue(wq, &wait);
 	do {
-		run_task_queue(&tq_disk);
+		blk_run_queues();
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 		if (!buffer_locked(bh))
 			break;
@@ -167,8 +165,9 @@ __clear_page_buffers(struct page *page)
 
 static void buffer_io_error(struct buffer_head *bh)
 {
-	printk(KERN_ERR "Buffer I/O error on device %s, logical block %Ld\n",
-			bdevname(bh->b_bdev), (u64)bh->b_blocknr);
+	printk(KERN_ERR "Buffer I/O error on device %s, logical block %Lu\n",
+			bdevname(bh->b_bdev),
+			(unsigned long long)bh->b_blocknr);
 }
 
 /*
@@ -487,7 +486,7 @@ static void free_more_memory(void)
 
 	wakeup_bdflush();
 	try_to_free_pages(zone, GFP_NOFS, 0);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 	__set_current_state(TASK_RUNNING);
 	yield();
 }
@@ -543,6 +542,14 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	 */
 	if (page_uptodate && !PageError(page))
 		SetPageUptodate(page);
+
+	/*
+	 * swap page handling is a bit hacky.  A standalone completion handler
+	 * for swapout pages would fix that up.  swapin can use this function.
+	 */
+	if (PageSwapCache(page) && PageWriteback(page))
+		end_page_writeback(page);
+
 	unlock_page(page);
 	return;
 
@@ -771,11 +778,11 @@ EXPORT_SYMBOL(sync_mapping_buffers);
  *
  * The private_list buffers generally contain filesystem indirect blocks.
  * The idea is that the filesystem can start I/O against the indirects at
- * the same time as running generic_writeback_mapping(), so the indirect's
+ * the same time as running generic_writepages(), so the indirect's
  * I/O will be merged with the data.
  *
  * We sneakliy write the buffers in probable tail-to-head order.  This is
- * because generic_writeback_mapping writes in probable head-to-tail
+ * because generic_writepages() writes in probable head-to-tail
  * order.  If the file is so huge that the data or the indirects overflow
  * the request queue we will at least get some merging this way.
  *
@@ -835,6 +842,7 @@ int write_mapping_buffers(struct address_space *mapping)
 out:
 	return ret;
 }
+EXPORT_SYMBOL(write_mapping_buffers);
 
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 {
@@ -1004,7 +1012,7 @@ no_grow:
 	 * the reserve list is empty, we're sure there are 
 	 * async buffer heads in use.
 	 */
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 
 	free_more_memory();
 	goto try_again;
@@ -1400,7 +1408,6 @@ void create_empty_buffers(struct page *page,
 	head = create_buffers(page, blocksize, 1);
 	bh = head;
 	do {
-		bh->b_end_io = NULL;
 		bh->b_state |= b_state;
 		tail = bh;
 		bh = bh->b_this_page;
@@ -1439,11 +1446,11 @@ EXPORT_SYMBOL(create_empty_buffers);
  * wait on that I/O in bforget() - it's more efficient to wait on the I/O
  * only if we really need to.  That happens here.
  */
-static void unmap_underlying_metadata(struct buffer_head *bh)
+void unmap_underlying_metadata(struct block_device *bdev, sector_t block)
 {
 	struct buffer_head *old_bh;
 
-	old_bh = __get_hash_table(bh->b_bdev, bh->b_blocknr, 0);
+	old_bh = __get_hash_table(bdev, block, 0);
 	if (old_bh) {
 #if 0	/* This happens.  Later. */
 		if (buffer_dirty(old_bh))
@@ -1539,7 +1546,8 @@ static int __block_write_full_page(struct inode *inode,
 			if (buffer_new(bh)) {
 				/* blockdev mappings never come here */
 				clear_buffer_new(bh);
-				unmap_underlying_metadata(bh);
+				unmap_underlying_metadata(bh->b_bdev,
+							bh->b_blocknr);
 			}
 		}
 		bh = bh->b_this_page;
@@ -1666,18 +1674,22 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	    block++, block_start=block_end, bh = bh->b_this_page) {
 		block_end = block_start + blocksize;
 		if (block_end <= from || block_start >= to) {
-			if (PageUptodate(page))
-				set_buffer_uptodate(bh);
+			if (PageUptodate(page)) {
+				if (!buffer_uptodate(bh))
+					set_buffer_uptodate(bh);
+			}
 			continue;
 		}
-		clear_buffer_new(bh);
+		if (buffer_new(bh))
+			clear_buffer_new(bh);
 		if (!buffer_mapped(bh)) {
 			err = get_block(inode, block, bh, 1);
 			if (err)
 				goto out;
 			if (buffer_new(bh)) {
 				clear_buffer_new(bh);
-				unmap_underlying_metadata(bh);
+				unmap_underlying_metadata(bh->b_bdev,
+							bh->b_blocknr);
 				if (PageUptodate(page)) {
 					if (!buffer_mapped(bh))
 						buffer_error();
@@ -1695,7 +1707,8 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 			}
 		}
 		if (PageUptodate(page)) {
-			set_buffer_uptodate(bh);
+			if (!buffer_uptodate(bh))
+				set_buffer_uptodate(bh);
 			continue; 
 		}
 		if (!buffer_uptodate(bh) &&
@@ -2074,11 +2087,10 @@ int block_truncate_page(struct address_space *mapping,
 
 	err = 0;
 	if (!buffer_mapped(bh)) {
-		/* Hole? Nothing to do */
-		if (buffer_uptodate(bh))
+		err = get_block(inode, iblock, bh, 0);
+		if (err)
 			goto unlock;
-		get_block(inode, iblock, bh, 0);
-		/* Still unmapped? Nothing to do */
+		/* unmapped? It's a hole - nothing to do */
 		if (!buffer_mapped(bh))
 			goto unlock;
 	}
@@ -2179,7 +2191,8 @@ int generic_direct_IO(int rw, struct inode *inode,
 			}
 		} else {
 			if (buffer_new(&bh))
-				unmap_underlying_metadata(&bh);
+				unmap_underlying_metadata(bh.b_bdev,
+							bh.b_blocknr);
 			if (!buffer_mapped(&bh))
 				BUG();
 		}
@@ -2267,6 +2280,9 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
  * calls block_flushpage() under spinlock and hits a locked buffer, and
  * schedules under spinlock.   Another approach would be to teach
  * find_trylock_page() to also trylock the page's writeback flags.
+ *
+ * Swap pages are also marked PageWriteback when they are being written
+ * so that memory allocators will throttle on them.
  */
 int brw_page(int rw, struct page *page,
 		struct block_device *bdev, sector_t b[], int size)
@@ -2296,6 +2312,11 @@ int brw_page(int rw, struct page *page,
 		mark_buffer_async_read(bh);
 		bh = bh->b_this_page;
 	} while (bh != head);
+
+	if (rw == WRITE) {
+		BUG_ON(PageWriteback(page));
+		SetPageWriteback(page);
+	}
 
 	/* Stage 2: start the IO */
 	do {
@@ -2452,7 +2473,7 @@ EXPORT_SYMBOL(try_to_free_buffers);
 
 int block_sync_page(struct page *page)
 {
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 	return 0;
 }
 

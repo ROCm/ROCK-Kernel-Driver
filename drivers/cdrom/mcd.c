@@ -119,9 +119,13 @@ static int mcdPresent;
 #define QUICK_LOOP_DELAY udelay(45)	/* use udelay */
 #define QUICK_LOOP_COUNT 20
 
-#define CURRENT_VALID \
-(!QUEUE_EMPTY && major(CURRENT -> rq_dev) == MAJOR_NR && CURRENT -> cmd == READ \
-&& CURRENT -> sector != -1)
+static int current_valid(void)
+{
+        return !blk_queue_empty(QUEUE) &&
+	        major(CURRENT->rq_dev) == MAJOR_NR &&
+		CURRENT->cmd == READ &&
+		CURRENT->sector != -1;
+}
 
 #define MFL_STATUSorDATA (MFL_STATUS | MFL_DATA)
 #define MCD_BUF_SIZ 16
@@ -556,33 +560,33 @@ int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 
 static void mcd_transfer(void)
 {
-	if (CURRENT_VALID) {
-		while (CURRENT->nr_sectors) {
-			int bn = CURRENT->sector / 4;
-			int i;
-			for (i = 0; i < MCD_BUF_SIZ && mcd_buf_bn[i] != bn;
-			     ++i);
-			if (i < MCD_BUF_SIZ) {
-				int offs =(i * 4 + (CURRENT->sector & 3)) * 512;
-				int nr_sectors = 4 - (CURRENT->sector & 3);
-				if (mcd_buf_out != i) {
-					mcd_buf_out = i;
-					if (mcd_buf_bn[i] != bn) {
-						mcd_buf_out = -1;
-						continue;
-					}
+	if (!current_valid())
+		return;
+
+	while (CURRENT->nr_sectors) {
+		int bn = CURRENT->sector / 4;
+		int i;
+		for (i = 0; i < MCD_BUF_SIZ && mcd_buf_bn[i] != bn; ++i)
+			;
+		if (i < MCD_BUF_SIZ) {
+			int offs =(i * 4 + (CURRENT->sector & 3)) * 512;
+			int nr_sectors = 4 - (CURRENT->sector & 3);
+			if (mcd_buf_out != i) {
+				mcd_buf_out = i;
+				if (mcd_buf_bn[i] != bn) {
+					mcd_buf_out = -1;
+					continue;
 				}
-				if (nr_sectors > CURRENT->nr_sectors)
-					nr_sectors = CURRENT->nr_sectors;
-				memcpy(CURRENT->buffer, mcd_buf + offs,
-				       nr_sectors * 512);
-				CURRENT->nr_sectors -= nr_sectors;
-				CURRENT->sector += nr_sectors;
-				CURRENT->buffer += nr_sectors * 512;
-			} else {
-				mcd_buf_out = -1;
-				break;
 			}
+			if (nr_sectors > CURRENT->nr_sectors)
+				nr_sectors = CURRENT->nr_sectors;
+			memcpy(CURRENT->buffer, mcd_buf + offs, nr_sectors * 512);
+			CURRENT->nr_sectors -= nr_sectors;
+			CURRENT->sector += nr_sectors;
+			CURRENT->buffer += nr_sectors * 512;
+		} else {
+		        mcd_buf_out = -1;
+			break;
 		}
 	}
 }
@@ -614,7 +618,7 @@ static void do_mcd_request(request_queue_t * q)
 	       CURRENT->nr_sectors));
 
 		mcd_transfer_is_active = 1;
-	while (CURRENT_VALID) {
+	while (current_valid()) {
 		mcd_transfer();
 		if (CURRENT->nr_sectors == 0) {
 			end_request(1);
@@ -623,7 +627,7 @@ static void do_mcd_request(request_queue_t * q)
 			if (mcd_state == MCD_S_IDLE) {
 				if (!tocUpToDate) {
 					if (updateToc() < 0) {
-						while (CURRENT_VALID)
+						while (current_valid())
 							end_request(0);
 						break;
 					}
@@ -688,7 +692,7 @@ static void mcd_poll(unsigned long dummy)
 					McdTries = 0;
 					goto ret;
 				}
-				if (CURRENT_VALID)
+				if (current_valid())
 					end_request(0);
 				McdTries = MCD_RETRY_ATTEMPTS;
 			}
@@ -745,7 +749,7 @@ set_mode_immediately:
 				       "mcd: door open\n" :
 				       "mcd: disk removed\n");
 				mcd_state = MCD_S_IDLE;
-				while (CURRENT_VALID)
+				while (current_valid())
 					end_request(0);
 				goto out;
 			}
@@ -779,12 +783,12 @@ read_immediately:
 				       "mcd: door open\n" :
 				       "mcd: disk removed\n");
 				mcd_state = MCD_S_IDLE;
-				while (CURRENT_VALID)
+				while (current_valid())
 					end_request(0);
 				goto out;
 			}
 
-			if (CURRENT_VALID) {
+			if (current_valid()) {
 				struct mcd_Play_msf msf;
 				mcd_next_bn = CURRENT->sector / 4;
 				hsg2msf(mcd_next_bn, &msf.start);
@@ -820,7 +824,7 @@ data_immediately:
 					McdTries = 0;
 					break;
 				}
-				if (CURRENT_VALID)
+				if (current_valid())
 					end_request(0);
 				McdTries = 5;
 			}
@@ -833,7 +837,7 @@ data_immediately:
 
 		default:
 			McdTries = 5;
-			if (!CURRENT_VALID && mcd_buf_in == mcd_buf_out) {
+			if (!current_valid() && mcd_buf_in == mcd_buf_out) {
 				mcd_state = MCD_S_STOP;
 				goto immediately;
 			}
@@ -845,7 +849,7 @@ data_immediately:
 				mcd_buf_out = mcd_buf_in;
 			mcd_buf_in = mcd_buf_in + 1 == MCD_BUF_SIZ ? 0 : mcd_buf_in + 1;
 			if (!mcd_transfer_is_active) {
-				while (CURRENT_VALID) {
+				while (current_valid()) {
 					mcd_transfer();
 					if (CURRENT->nr_sectors == 0)
 						end_request(1);
@@ -854,7 +858,7 @@ data_immediately:
 				}
 			}
 
-			if (CURRENT_VALID
+			if (current_valid()
 			    && (CURRENT->sector / 4 < mcd_next_bn ||
 				CURRENT->sector / 4 > mcd_next_bn + 16)) {
 				mcd_state = MCD_S_STOP;
@@ -933,8 +937,9 @@ do_not_work_around_mitsumi_bug_93_1:
 		st = -1;
 
 do_not_work_around_mitsumi_bug_93_2:
-		test3(printk("CURRENT_VALID %d mcd_mode %d\n", CURRENT_VALID, mcd_mode));
-		if (CURRENT_VALID) {
+		test3(printk("CURRENT_VALID %d mcd_mode %d\n", current_valid(),
+			    mcd_mode));
+		if (current_valid()) {
 			if (st != -1) {
 				if (mcd_mode == 1)
 					goto read_immediately;

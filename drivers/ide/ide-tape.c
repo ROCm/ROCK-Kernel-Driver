@@ -2789,14 +2789,14 @@ static idetape_stage_t *__idetape_kmalloc_stage (idetape_tape_t *tape, int full,
 	struct bio *prev_bio, *bio;
 	int pages = tape->pages_per_stage;
 	char *b_data = NULL;
-	struct bio_vec *bv; 
+	struct bio_vec *bv;
 
 	if ((stage = (idetape_stage_t *) kmalloc (sizeof (idetape_stage_t),GFP_KERNEL)) == NULL)
 		return NULL;
 	stage->next = NULL;
 
 	bio = stage->bio = bio_alloc(GFP_KERNEL,1);
-	bv = bio_iovec(bio);	
+	bv = bio_iovec(bio);
 	bv->bv_len = 0;
 	if (bio == NULL)
 		goto abort;
@@ -2806,9 +2806,14 @@ static idetape_stage_t *__idetape_kmalloc_stage (idetape_tape_t *tape, int full,
 	if (clear)
 		memset(bio_data(bio), 0, PAGE_SIZE);
 	bio->bi_size = PAGE_SIZE;
-	if(bv->bv_len == full) bv->bv_len = bio->bi_size;
-	set_bit (BH_Lock, &bio->bi_flags);
+	if(bv->bv_len == full)
+	    bv->bv_len = bio->bi_size;
+#if 0
 
+	/* FIXME: What what this supposed to achieve? */
+
+	set_bit (BH_Lock, &bio->bi_flags);
+#endif
 	while (--pages) {
 		if ((bio->bi_io_vec[pages].bv_page = alloc_page(GFP_KERNEL)) == NULL)
 			goto abort;
@@ -2837,7 +2842,11 @@ static idetape_stage_t *__idetape_kmalloc_stage (idetape_tape_t *tape, int full,
 		//bio->bi_io_vec[0].bv_offset = b_data;
 		bio->bi_size = PAGE_SIZE;
 		atomic_set(&bio->bi_cnt, full ? bio->bi_size : 0);
+#if 0
+		/* FIXME: What what this supposed to achieve? */
+
 		set_bit (BH_Lock, &bio->bi_flags);
+#endif
 		prev_bio->bi_next = bio;
 	}
 	bio->bi_size -= tape->excess_bh_size;
@@ -6153,7 +6162,7 @@ static void idetape_attach(struct ata_device *drive)
 	channel = drive->channel;
 	unit = drive - channel->drives;
 
-	ide_revalidate_disk(mk_kdev(channel->major, unit << PARTN_BITS));
+	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
 }
 
 MODULE_DESCRIPTION("ATAPI Streaming TAPE Driver");

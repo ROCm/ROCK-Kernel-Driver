@@ -25,8 +25,6 @@
 #include <linux/isdn/capilli.h>
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.10.6.6 $";
-
 /* ------------------------------------------------------------- */
 
 MODULE_DESCRIPTION("CAPI4Linux: Driver for AVM B1 ISA card");
@@ -35,24 +33,28 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver b1isa_driver;
-
 static void b1isa_remove(struct pci_dev *pdev)
 {
 	avmctrl_info *cinfo = pci_get_drvdata(pdev);
-	avmcard *card = cinfo->card;
-	unsigned int port = cinfo->card->port;
+	avmcard *card;
 
-	b1_reset(port);
-	b1_reset(port);
+	if (!cinfo)
+		return;
 
-	detach_capi_ctr(cinfo->capi_ctrl);
+	card = cinfo->card;
+
+	b1_reset(card->port);
+	b1_reset(card->port);
+
+	detach_capi_ctr(&cinfo->capi_ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
 }
 
 /* ------------------------------------------------------------- */
+
+static char *b1isa_procinfo(struct capi_ctr *ctrl);
 
 static int __init b1isa_probe(struct pci_dev *pdev)
 {
@@ -106,16 +108,26 @@ static int __init b1isa_probe(struct pci_dev *pdev)
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	cinfo->capi_ctrl = attach_capi_ctr(&b1isa_driver, card->name, cinfo);
-	if (!cinfo->capi_ctrl) {
+	cinfo->capi_ctrl.driver_name   = "b1isa";
+	cinfo->capi_ctrl.driverdata    = cinfo;
+	cinfo->capi_ctrl.register_appl = b1_register_appl;
+	cinfo->capi_ctrl.release_appl  = b1_release_appl;
+	cinfo->capi_ctrl.send_message  = b1_send_message;
+	cinfo->capi_ctrl.load_firmware = b1_load_firmware;
+	cinfo->capi_ctrl.reset_ctr     = b1_reset_ctr;
+	cinfo->capi_ctrl.procinfo      = b1isa_procinfo;
+	cinfo->capi_ctrl.ctr_read_proc = b1ctl_read_proc;
+	strcpy(cinfo->capi_ctrl.name, card->name);
+	SET_MODULE_OWNER(&cinfo->capi_ctrl);
+
+	retval = attach_capi_ctr(&cinfo->capi_ctrl);
+	if (retval) {
 		printk(KERN_ERR "b1isa: attach controller failed.\n");
-		retval = -EBUSY;
 		goto err_free_irq;
 	}
 
-	printk(KERN_INFO
-		"%s: AVM B1 ISA at i/o %#x, irq %d, revision %d\n",
-		b1isa_driver.name, card->port, card->irq, card->revision);
+	printk(KERN_INFO "b1isa: AVM B1 ISA at i/o %#x, irq %d, revision %d\n",
+	       card->port, card->irq, card->revision);
 
 	pci_set_drvdata(pdev, cinfo);
 	return 0;
@@ -148,21 +160,6 @@ static char *b1isa_procinfo(struct capi_ctr *ctrl)
 
 /* ------------------------------------------------------------- */
 
-static struct capi_driver b1isa_driver = {
-	owner: THIS_MODULE,
-	name: "b1isa",
-	revision: "0.0",
-	load_firmware: b1_load_firmware,
-	reset_ctr: b1_reset_ctr,
-	register_appl: b1_register_appl,
-	release_appl: b1_release_appl,
-	send_message: b1_send_message,
-	
-	procinfo: b1isa_procinfo,
-	ctr_read_proc: b1ctl_read_proc,
-	driver_read_proc: 0,	/* use standard driver_read_proc */
-};
-
 #define MAX_CARDS 4
 static struct pci_dev isa_dev[MAX_CARDS];
 static int io[MAX_CARDS];
@@ -175,11 +172,8 @@ MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
 
 static int __init b1isa_init(void)
 {
-	int i, retval;
+	int i;
 	int found = 0;
-
-	b1_set_revision(&b1isa_driver, revision);
-        attach_capi_driver(&b1isa_driver);
 
 	for (i = 0; i < MAX_CARDS; i++) {
 		if (!io[i])
@@ -191,17 +185,10 @@ static int __init b1isa_init(void)
 		if (b1isa_probe(&isa_dev[i]) == 0)
 			found++;
 	}
-	if (found == 0) {
-		retval = -ENODEV;
-		goto err;
-	}
-	retval = 0;
-	goto out;
+	if (found == 0)
+		return -ENODEV;
 
- err:
-	detach_capi_driver(&b1isa_driver);
- out:
-	return retval;
+	return 0;
 }
 
 static void __exit b1isa_exit(void)
@@ -214,7 +201,6 @@ static void __exit b1isa_exit(void)
 
 		b1isa_remove(&isa_dev[i]);
 	}
-	detach_capi_driver(&b1isa_driver);
 }
 
 module_init(b1isa_init);

@@ -23,23 +23,34 @@
 #include <video/fbcon.h>
 #include <video/fbcon-cfb16.h>
 
-static u16 colreg[16];
+static u32 colreg[16];
 static struct fb_info fb_info;
 static struct display display;
 
-static int
-anakinfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
-			u_int *transp, struct fb_info *info)
-{
-	if (regno > 15)
-		return 1;
+static struct fb_var_screeninfo anakinfb_var = {
+	xres:		400,
+	yres:		234,
+	xres_virtual:	400,
+	yres_virtual:	234,
+	bits_per_pixel:	16,
+	red:		{ 11, 5, 0 },
+	green:		{  5, 6, 0 }, 
+	blue:		{  0, 5, 0 },
+        activate:       FB_ACTIVATE_NOW,
+        height:         -1,
+        width:          -1,
+        vmode:          FB_VMODE_NONINTERLACED,
+};
 
-	*red = colreg[regno] & 0xf800;
-	*green = colreg[regno] & 0x7e0 << 5;
-	*blue = colreg[regno] & 0x1f << 11;
-	*transp = 0;
-	return 0;
-}
+static struct fb_fix_screeninfo anakinfb_fix = {
+	id:		"AnakinFB",
+	smem_start:	VGA_START,
+	smem_len:	VGA_SIZE,
+	type:		FB_TYPE_PACKED_PIXELS,
+	visual:		FB_VISUAL_TRUECOLOR,
+	line_length:	400*2,
+	accel:		FB_ACCEL_NONE,
+};
 
 static int
 anakinfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
@@ -53,153 +64,48 @@ anakinfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	return 0;
 }
 
-static int
-anakinfb_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
-{
-	memset(fix, 0, sizeof(struct fb_fix_screeninfo));
-	strcpy(fix->id, "AnakinFB");
-	fix->smem_start = VGA_START;
-	fix->smem_len = VGA_SIZE;
-	fix->type = FB_TYPE_PACKED_PIXELS;
-	fix->type_aux = 0;
-	fix->visual = FB_VISUAL_TRUECOLOR;
-	fix->xpanstep = 0;
-	fix->ypanstep = 0;
-	fix->ywrapstep = 0;
-        fix->line_length = 400 * 2;
-	fix->accel = FB_ACCEL_NONE;
-	return 0;
-}
-        
-static int
-anakinfb_get_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	memset(var, 0, sizeof(struct fb_var_screeninfo));
-	var->xres = 400;
-	var->yres = 234;
-	var->xres_virtual = 400;
-	var->yres_virtual = 234;
-	var->xoffset = 0;
-	var->yoffset = 0;
-	var->bits_per_pixel = 16;
-	var->grayscale = 0;
-	var->red.offset = 11;
-	var->red.length = 5;
-	var->green.offset = 5;
-	var->green.length = 6;
-	var->blue.offset = 0;
-	var->blue.length = 5;
-	var->transp.offset = 0;
-	var->transp.length = 0;
-	var->nonstd = 0;
-	var->activate = FB_ACTIVATE_NOW;
-	var->height = -1;
-	var->width = -1;
-	var->pixclock = 0;
-	var->left_margin = 0;
-	var->right_margin = 0;
-	var->upper_margin = 0;
-	var->lower_margin = 0;
-	var->hsync_len = 0;
-	var->vsync_len = 0;
-	var->sync = 0;
-	var->vmode = FB_VMODE_NONINTERLACED;
-	return 0;
-}
-
-static int
-anakinfb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	return -EINVAL;
-}
-
-static int
-anakinfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			struct fb_info *info)
-{
-	if (con == info->currcon)
-		return fb_get_cmap(cmap, kspc, anakinfb_getcolreg, info);
-	else if (fb_display[con].cmap.len)
-		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
-	else
-		fb_copy_cmap(fb_default_cmap(16), cmap, kspc ? 0 : 2);
-	return 0;
-}
-
-static int
-anakinfb_switch_con(int con, struct fb_info *info)
-{ 
-	info->currcon = con;
-	return 0;
-
-}
-
-static int
-anakinfb_updatevar(int con, struct fb_info *info)
-{
-	return 0;
-}
-
-static void
-anakinfb_blank(int blank, struct fb_info *info)
-{
-	/*
-	 * TODO: use I2C to blank/unblank the screen
-	 */
-}
-
 static struct fb_ops anakinfb_ops = {
 	owner:		THIS_MODULE,
-	fb_get_fix:	anakinfb_get_fix,
-	fb_get_var:	anakinfb_get_var,
-	fb_set_var:	anakinfb_set_var,
-	fb_get_cmap:	anakinfb_get_cmap,
+	fb_get_fix:	gen_get_fix,
+	fb_get_var:	gen_get_var,
+	fb_set_var:	gen_set_var,
+	fb_get_cmap:	gen_get_cmap,
 	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	anakinfb_setcolreg,
-	fb_blank:	anakinfb_blank,
+	fb_fillrect:	cfb_fillrect,
+	fb_copyarea:	cfb_copyarea,
+	fb_imageblit:	cfb_imageblit,
 };
 
 int __init
 anakinfb_init(void)
 {
 	memset(&fb_info, 0, sizeof(struct fb_info));
-	strcpy(fb_info.modename, "AnakinFB");
-	fb_info.node = NODEV;
+	memset(&display, 0, sizeof(struct display));
+
+	strcpy(fb_info.modename, anakinfb_fix.id);
+	fb_info.node = fb_info.currcon = -1;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.fbops = &anakinfb_ops;
-	fb_info.currcon = -1;
+	fb_info.var = anakinfb_var;
+	fb_info.fix = anakinfb_fix;
 	fb_info.disp = &display;
 	strcpy(fb_info.fontname, "VGA8x16");
 	fb_info.changevar = NULL;
-	fb_info.switch_con = &anakinfb_switch_con;
-	fb_info.updatevar = &anakinfb_updatevar;
-
-	memset(&display, 0, sizeof(struct display));
-	anakinfb_get_var(&display.var, 0, &fb_info);
+	fb_info.switch_con = gen_switch_con;
+	fb_info.updatevar = gen_update_var;
 	if (!(request_mem_region(VGA_START, VGA_SIZE, "vga")))
 		return -ENOMEM;
-	if (!(fb_info.screen_base = ioremap(VGA_START, VGA_SIZE))) {
+	if (fb_info.screen_base = ioremap(VGA_START, VGA_SIZE)) {
 		release_mem_region(VGA_START, VGA_SIZE);
 		return -EIO;
 	}
-	display.visual = FB_VISUAL_TRUECOLOR;
-	display.type = FB_TYPE_PACKED_PIXELS;
-	display.type_aux = 0;
-	display.ypanstep = 0;
-	display.ywrapstep = 0;
-	display.line_length = 400 * 2;
-	display.can_soft_blank = 1;
-	display.inverse = 0;
 
-#ifdef FBCON_HAS_CFB16
-	display.dispsw = &fbcon_cfb16;
-	display.dispsw_data = colreg;
-#else
-	display.dispsw = &fbcon_dummy;
-#endif
+	fb_alloc_cmap(&fb_info.cmap, 16, 0);
+	gen_set_disp(-1, &fb_info);
 
 	if (register_framebuffer(&fb_info) < 0) {
-		iounmap(fb_info.screen_base);
+		iounmap(display.screen_base);
 		release_mem_region(VGA_START, VGA_SIZE);
 		return -EINVAL;
 	}

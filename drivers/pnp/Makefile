@@ -2,8 +2,6 @@
 # Makefile for the kernel Plug-and-Play device drivers.
 #
 
-O_TARGET := pnp.o
-
 export-objs := isapnp.o pnpbios_core.o
 
 isa-pnp-proc-$(CONFIG_PROC_FS) = isapnp_proc.o

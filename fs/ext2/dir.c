@@ -68,7 +68,7 @@ static int ext2_commit_chunk(struct page *page, unsigned from, unsigned to)
 	int err = 0;
 	dir->i_version = ++event;
 	page->mapping->a_ops->commit_write(NULL, page, from, to);
-	if (IS_SYNC(dir))
+	if (IS_DIRSYNC(dir))
 		err = write_one_page(page, 1);
 	else
 		unlock_page(page);

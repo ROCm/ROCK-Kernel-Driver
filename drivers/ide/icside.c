@@ -27,8 +27,6 @@
 #include <asm/io.h>
 #include <asm/page.h>
 
-extern char *ide_xfer_verbose (byte xfer_rate);
-
 /*
  * Maximum number of interfaces per card
  */
@@ -364,16 +362,13 @@ icside_config_if(struct ata_device *drive, int xfer_mode)
 
 	drive->drive_data = cycle_time;
 
-	if (!drive->init_speed)
-		drive->init_speed = xfer_mode;
-
 	if (cycle_time && ide_config_drive_speed(drive, xfer_mode) == 0)
 		on = 1;
 	else
 		drive->drive_data = 480;
 
-	printk("%s: %s selected (peak %dMB/s)\n", drive->name,
-		ide_xfer_verbose(xfer_mode), 2000 / drive->drive_data);
+	printk("%s: %02x selected (peak %dMB/s)\n", drive->name,
+		xfer_mode, 2000 / drive->drive_data);
 
 	drive->current_speed = xfer_mode;
 

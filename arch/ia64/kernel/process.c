@@ -194,13 +194,15 @@ ia64_save_extra (struct task_struct *task)
 		pfm_save_regs(task);
 
 # ifdef CONFIG_SMP
-	if (local_cpu_data->pfm_syst_wide)
+	if (this_cpu(pfm_syst_wide))
 		pfm_syst_wide_update_task(task, 0);
 # endif
 #endif
 
+#ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
 		ia32_save_state(task);
+#endif
 }
 
 void
@@ -214,12 +216,14 @@ ia64_load_extra (struct task_struct *task)
 		pfm_load_regs(task);
 
 # ifdef CONFIG_SMP
-	if (local_cpu_data->pfm_syst_wide) pfm_syst_wide_update_task(task, 1);
+	if (this_cpu(pfm_syst_wide)) pfm_syst_wide_update_task(task, 1);
 # endif
 #endif
 
+#ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(ia64_task_regs(task)))
 		ia32_load_state(task);
+#endif
 }
 
 /*
@@ -357,6 +361,8 @@ copy_thread (int nr, unsigned long clone_flags,
 	 */
 	atomic_set(&p->thread.pfm_notifiers_check, 0);
 	atomic_set(&p->thread.pfm_owners_check, 0);
+	/* clear list of sampling buffer to free for new task */
+	p->thread.pfm_smpl_buf_list = NULL;
 
 	if (current->thread.pfm_context) retval = pfm_inherit(p, child_ptregs);
 #endif
@@ -566,9 +572,8 @@ exit_thread (void)
 		pfm_flush_regs(current);
 
 	/* free debug register resources */
-	if ((current->thread.flags & IA64_THREAD_DBG_VALID) != 0) {
+	if (current->thread.flags & IA64_THREAD_DBG_VALID)
 		pfm_release_debug_registers(current);
-	}
 #endif
 }
 

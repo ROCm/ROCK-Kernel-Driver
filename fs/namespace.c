@@ -197,6 +197,7 @@ static int show_vfsmnt(struct seq_file *m, void *v)
 		char *str;
 	} fs_info[] = {
 		{ MS_SYNCHRONOUS, ",sync" },
+		{ MS_DIRSYNC, ",dirsync" },
 		{ MS_MANDLOCK, ",mand" },
 		{ MS_NOATIME, ",noatime" },
 		{ MS_NODIRATIME, ",nodiratime" },

@@ -5,14 +5,6 @@
 #
 # Makefile for the ITE 8172 (qed-4n-s01b) board, generic files.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-
-EXTRA_AFLAGS := $(CFLAGS)
-
-all: it8172.o
 
 O_TARGET := it8172.o
 
@@ -29,5 +21,7 @@ endif
 ifdef CONFIG_REMOTE_DEBUG
  obj-y += dbg_io.o             
 endif
+
+EXTRA_AFLAGS := $(CFLAGS)
 
 include $(TOPDIR)/Rules.make

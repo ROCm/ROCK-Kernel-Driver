@@ -36,32 +36,28 @@ typedef struct capicardparams {
 	unsigned int membase;
 } capicardparams;
 
-struct capi_driver;
-
 struct capi_ctr {
-        struct list_head driver_list;		/* contrs by driver */
-        struct capi_driver *driver;
-	int cnr;				/* controller number */
-	char name[32];				/* name of controller */
-	volatile unsigned short cardstate;	/* controller state */
-	volatile int blocked;			/* output blocked */
-	int traceflag;				/* capi trace */
-
+	/* filled in before calling attach_capi_ctr */
+	struct module *owner;
 	void *driverdata;			/* driver specific */
+	char name[32];				/* name of controller */
+	char *driver_name;			/* name of driver */
+	int (*load_firmware)(struct capi_ctr *, capiloaddata *);
+	void (*reset_ctr)(struct capi_ctr *);
+	void (*register_appl)(struct capi_ctr *, u16 appl,
+			      capi_register_params *);
+	void (*release_appl)(struct capi_ctr *, u16 appl);
+	u16  (*send_message)(struct capi_ctr *, struct sk_buff *skb);
+	
+	char *(*procinfo)(struct capi_ctr *);
+	int (*ctr_read_proc)(char *page, char **start, off_t off,
+			     int count, int *eof, struct capi_ctr *card);
 
-	/* filled before calling ready callback */
-	__u8 manu[CAPI_MANUFACTURER_LEN];	/* CAPI_GET_MANUFACTURER */
+	/* filled in before calling ready callback */
+	u8 manu[CAPI_MANUFACTURER_LEN];	/* CAPI_GET_MANUFACTURER */
 	capi_version version;			/* CAPI_GET_VERSION */
 	capi_profile profile;			/* CAPI_GET_PROFILE */
-	__u8 serial[CAPI_SERIAL_LEN];		/* CAPI_GET_SERIAL */
-
-	/* functions */
-        void (*ready)(struct capi_ctr * card);
-        void (*reseted)(struct capi_ctr * card);
-        void (*suspend_output)(struct capi_ctr * card);
-        void (*resume_output)(struct capi_ctr * card);
-        void (*handle_capimsg)(struct capi_ctr * card,
-			   	__u16 appl, struct sk_buff *skb);
+	u8 serial[CAPI_SERIAL_LEN];		/* CAPI_GET_SERIAL */
 
 	/* management information for kcapi */
 
@@ -70,42 +66,23 @@ struct capi_ctr {
 	unsigned long nsentctlpkt;
 	unsigned long nsentdatapkt;
 
+	int cnr;				/* controller number */
+	volatile unsigned short cardstate;	/* controller state */
+	volatile int blocked;			/* output blocked */
+	int traceflag;				/* capi trace */
+
 	struct proc_dir_entry *procent;
         char procfn[128];
 };
 
-struct capi_driver {
-	struct module *owner;
-	char name[32];				/* driver name */
-	char revision[32];
-	int (*load_firmware)(struct capi_ctr *, capiloaddata *);
-	void (*reset_ctr)(struct capi_ctr *);
-	void (*register_appl)(struct capi_ctr *, __u16 appl,
-			      capi_register_params *);
-	void (*release_appl)(struct capi_ctr *, __u16 appl);
-	u16  (*send_message)(struct capi_ctr *, struct sk_buff *skb);
-	
-	char *(*procinfo)(struct capi_ctr *);
-	int (*ctr_read_proc)(char *page, char **start, off_t off,
-			     int count, int *eof, struct capi_ctr *card);
-	int (*driver_read_proc)(char *page, char **start, off_t off,
-				int count, int *eof, struct capi_driver *driver);
-	
-	/* intitialized by kcapi */
-	struct list_head contr_head;		/* list of controllers */
-	struct list_head driver_list;
-	int ncontroller;
-	struct proc_dir_entry *procent;
-	char procfn[128];
-};
-
-void attach_capi_driver(struct capi_driver *driver);
-void detach_capi_driver(struct capi_driver *driver);
-
-struct capi_ctr *attach_capi_ctr(struct capi_driver *driver, char *name, void *data);
+int attach_capi_ctr(struct capi_ctr *);
 int detach_capi_ctr(struct capi_ctr *);
 
-
+void capi_ctr_ready(struct capi_ctr * card);
+void capi_ctr_reseted(struct capi_ctr * card);
+void capi_ctr_suspend_output(struct capi_ctr * card);
+void capi_ctr_resume_output(struct capi_ctr * card);
+void capi_ctr_handle_message(struct capi_ctr * card, u16 appl, struct sk_buff *skb);
 
 // ---------------------------------------------------------------------------
 // library functions for use by hardware controller drivers

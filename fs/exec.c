@@ -391,48 +391,31 @@ fail:
 	return result;
 }
 
-static int exec_mmap(void)
+static int exec_mmap(struct mm_struct *mm)
 {
-	struct mm_struct * mm, * old_mm;
+	struct mm_struct * old_mm, *active_mm;
 
+	/* Add it to the list of mm's */
+	spin_lock(&mmlist_lock);
+	list_add(&mm->mmlist, &init_mm.mmlist);
+	mmlist_nr++;
+	spin_unlock(&mmlist_lock);
+
+	task_lock(current);
 	old_mm = current->mm;
-	if (old_mm && atomic_read(&old_mm->mm_users) == 1) {
-		mm_release();
-		exit_mmap(old_mm);
+	active_mm = current->active_mm;
+	current->mm = mm;
+	current->active_mm = mm;
+	activate_mm(active_mm, mm);
+	task_unlock(current);
+	mm_release();
+	if (old_mm) {
+		if (active_mm != old_mm) BUG();
+		mmput(old_mm);
 		return 0;
 	}
-
-	mm = mm_alloc();
-	if (mm) {
-		struct mm_struct *active_mm;
-
-		if (init_new_context(current, mm)) {
-			mmdrop(mm);
-			return -ENOMEM;
-		}
-
-		/* Add it to the list of mm's */
-		spin_lock(&mmlist_lock);
-		list_add(&mm->mmlist, &init_mm.mmlist);
-		mmlist_nr++;
-		spin_unlock(&mmlist_lock);
-
-		task_lock(current);
-		active_mm = current->active_mm;
-		current->mm = mm;
-		current->active_mm = mm;
-		activate_mm(active_mm, mm);
-		task_unlock(current);
-		mm_release();
-		if (old_mm) {
-			if (active_mm != old_mm) BUG();
-			mmput(old_mm);
-			return 0;
-		}
-		mmdrop(active_mm);
-		return 0;
-	}
-	return -ENOMEM;
+	mmdrop(active_mm);
+	return 0;
 }
 
 /*
@@ -571,7 +554,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 	/* 
 	 * Release all of the old mmap stuff
 	 */
-	retval = exec_mmap();
+	retval = exec_mmap(bprm->mm);
 	if (retval) goto mmap_failed;
 
 	/* This is the point of no return */
@@ -902,17 +885,23 @@ int do_execve(char * filename, char ** argv, char ** envp, struct pt_regs * regs
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
-	if ((bprm.argc = count(argv, bprm.p / sizeof(void *))) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.argc;
-	}
 
-	if ((bprm.envc = count(envp, bprm.p / sizeof(void *))) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.envc;
-	}
+	bprm.mm = mm_alloc();
+	retval = -ENOMEM;
+	if (!bprm.mm)
+		goto out_file;
+
+	retval = init_new_context(current, bprm.mm);
+	if (retval < 0)
+		goto out_mm;
+
+	bprm.argc = count(argv, bprm.p / sizeof(void *));
+	if ((retval = bprm.argc) < 0)
+		goto out_mm;
+
+	bprm.envc = count(envp, bprm.p / sizeof(void *));
+	if ((retval = bprm.envc) < 0)
+		goto out_mm;
 
 	retval = prepare_binprm(&bprm);
 	if (retval < 0) 
@@ -938,16 +927,20 @@ int do_execve(char * filename, char ** argv, char ** envp, struct pt_regs * regs
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
-	allow_write_access(bprm.file);
-	if (bprm.file)
-		fput(bprm.file);
-
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
 		struct page * page = bprm.page[i];
 		if (page)
 			__free_page(page);
 	}
 
+out_mm:
+	mmdrop(bprm.mm);
+
+out_file:
+	if (bprm.file) {
+		allow_write_access(bprm.file);
+		fput(bprm.file);
+	}
 	return retval;
 }
 

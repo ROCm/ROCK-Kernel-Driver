@@ -27,8 +27,6 @@
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 int nr_swap_pages;
-int nr_active_pages;
-int nr_inactive_pages;
 struct list_head inactive_list;
 struct list_head active_list;
 pg_data_t *pgdat_list;
@@ -249,42 +247,26 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 }
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
-int is_head_of_free_region(struct page *p)
+int is_head_of_free_region(struct page *page)
 {
-	pg_data_t *pgdat = pgdat_list;
-	unsigned type;
-	unsigned long flags;
+        zone_t *zone = page_zone(page);
+        unsigned long flags;
+	int order;
+	list_t *curr;
 
-	for (type=0;type < MAX_NR_ZONES; type++) {
-		zone_t *zone = pgdat->node_zones + type;
-		int order = MAX_ORDER - 1;
-		free_area_t *area;
-		struct list_head *head, *curr;
-		spin_lock_irqsave(&zone->lock, flags);	/* Should not matter as we need quiescent system for suspend anyway, but... */
-
-		do {
-			area = zone->free_area + order;
-			head = &area->free_list;
-			curr = head;
-
-			for(;;) {
-				if(!curr) {
-//					printk("FIXME: this should not happen but it does!!!");
-					break;
-				}
-				if(p != memlist_entry(curr, struct page, list)) {
-					curr = memlist_next(curr);
-					if (curr == head)
-						break;
-					continue;
-				}
+	/*
+	 * Should not matter as we need quiescent system for
+	 * suspend anyway, but...
+	 */
+	spin_lock_irqsave(&zone->lock, flags);
+	for (order = MAX_ORDER - 1; order >= 0; --order)
+		list_for_each(curr, &zone->free_area[order].free_list)
+			if (page == list_entry(curr, struct page, list)) {
+				spin_unlock_irqrestore(&zone->lock, flags);
 				return 1 << order;
 			}
-		} while(order--);
-		spin_unlock_irqrestore(&zone->lock, flags);
-
-	}
-	return 0;
+	spin_unlock_irqrestore(&zone->lock, flags);
+        return 0;
 }
 #endif /* CONFIG_SOFTWARE_SUSPEND */
 
@@ -528,7 +510,7 @@ void free_pages(unsigned long addr, unsigned int order)
 /*
  * Total amount of free (allocatable) RAM:
  */
-unsigned int nr_free_pages (void)
+unsigned int nr_free_pages(void)
 {
 	unsigned int sum;
 	zone_t *zone;
@@ -543,16 +525,13 @@ unsigned int nr_free_pages (void)
 	return sum;
 }
 
-/*
- * Amount of free RAM allocatable as buffer memory:
- */
-unsigned int nr_free_buffer_pages (void)
+static unsigned int nr_free_zone_pages(int offset)
 {
 	pg_data_t *pgdat = pgdat_list;
 	unsigned int sum = 0;
 
 	do {
-		zonelist_t *zonelist = pgdat->node_zonelists + (GFP_USER & GFP_ZONEMASK);
+		zonelist_t *zonelist = pgdat->node_zonelists + offset;
 		zone_t **zonep = zonelist->zones;
 		zone_t *zone;
 
@@ -570,30 +549,19 @@ unsigned int nr_free_buffer_pages (void)
 }
 
 /*
- * Amount of free RAM allocatable as pagecache memory:
+ * Amount of free RAM allocatable within ZONE_DMA and ZONE_NORMAL
+ */
+unsigned int nr_free_buffer_pages(void)
+{
+	return nr_free_zone_pages(GFP_USER & GFP_ZONEMASK);
+}
+
+/*
+ * Amount of free RAM allocatable within all zones
  */
 unsigned int nr_free_pagecache_pages(void)
 {
-	pg_data_t *pgdat = pgdat_list;
-	unsigned int sum = 0;
-
-	do {
-		zonelist_t *zonelist = pgdat->node_zonelists +
-				(GFP_HIGHUSER & GFP_ZONEMASK);
-		zone_t **zonep = zonelist->zones;
-		zone_t *zone;
-
-		for (zone = *zonep++; zone; zone = *zonep++) {
-			unsigned long size = zone->size;
-			unsigned long high = zone->pages_high;
-			if (size > high)
-				sum += size - high;
-		}
-
-		pgdat = pgdat->node_next;
-	} while (pgdat);
-
-	return sum;
+	return nr_free_zone_pages(GFP_HIGHUSER & GFP_ZONEMASK);
 }
 
 #if CONFIG_HIGHMEM
@@ -622,10 +590,7 @@ void get_page_state(struct page_state *ret)
 {
 	int pcpu;
 
-	ret->nr_dirty = 0;
-	ret->nr_writeback = 0;
-	ret->nr_pagecache = 0;
-
+	memset(ret, 0, sizeof(*ret));
 	for (pcpu = 0; pcpu < smp_num_cpus; pcpu++) {
 		struct page_state *ps;
 
@@ -633,6 +598,8 @@ void get_page_state(struct page_state *ret)
 		ret->nr_dirty += ps->nr_dirty;
 		ret->nr_writeback += ps->nr_writeback;
 		ret->nr_pagecache += ps->nr_pagecache;
+		ret->nr_active += ps->nr_active;
+		ret->nr_inactive += ps->nr_inactive;
 	}
 }
 
@@ -672,6 +639,9 @@ void show_free_areas_core(pg_data_t *pgdat)
  	unsigned int order;
 	unsigned type;
 	pg_data_t *tmpdat = pgdat;
+	struct page_state ps;
+
+	get_page_state(&ps);
 
 	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
 		K(nr_free_pages()),
@@ -692,10 +662,12 @@ void show_free_areas_core(pg_data_t *pgdat)
 		tmpdat = tmpdat->node_next;
 	}
 
-	printk("( Active: %d, inactive: %d, free: %d )\n",
-	       nr_active_pages,
-	       nr_inactive_pages,
-	       nr_free_pages());
+	printk("( Active:%lu inactive:%lu dirty:%lu writeback:%lu free:%u )\n",
+		ps.nr_active,
+		ps.nr_inactive,
+		ps.nr_dirty,
+		ps.nr_writeback,
+		nr_free_pages());
 
 	for (type = 0; type < MAX_NR_ZONES; type++) {
 		struct list_head *head, *curr;

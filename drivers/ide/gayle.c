@@ -150,7 +150,7 @@ void __init gayle_init(void)
 	ide_setup_ports(&hw, base, gayle_offsets,
 			ctrlport, irqport, ack_intr, IRQ_AMIGA_PORTS);
 
-	index = ide_register_hw(&hw, NULL);
+	index = ide_register_hw(&hw);
 	if (index != -1) {
 	    switch (i) {
 		case 0:

@@ -168,7 +168,8 @@ static void figure_loop_size(struct loop_device *lo)
 					
 }
 
-static int lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
+static int
+do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 {
 	struct file *file = lo->lo_backing_file; /* kudos to NFsckingS */
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
@@ -178,12 +179,13 @@ static int lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t po
 	unsigned long index;
 	unsigned size, offset;
 	int len;
+	int ret = 0;
 
 	down(&mapping->host->i_sem);
 	index = pos >> PAGE_CACHE_SHIFT;
 	offset = pos & (PAGE_CACHE_SIZE - 1);
-	len = bio->bi_size;
-	data = bio_data(bio);
+	data = kmap(bvec->bv_page) + bvec->bv_offset;
+	len = bvec->bv_len;
 	while (len > 0) {
 		int IV = index * (PAGE_CACHE_SIZE/bsize) + offset/bsize;
 		int transfer_result;
@@ -221,14 +223,34 @@ static int lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t po
 		page_cache_release(page);
 	}
 	up(&mapping->host->i_sem);
-	return 0;
+out:
+	kunmap(bvec->bv_page);
+	return ret;
 
 unlock:
 	unlock_page(page);
 	page_cache_release(page);
 fail:
 	up(&mapping->host->i_sem);
-	return -1;
+	ret = -1;
+	goto out;
+}
+
+static int
+lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
+{
+	unsigned vecnr;
+	int ret = 0;
+
+	for (vecnr = 0; vecnr < bio->bi_vcnt; vecnr++) {
+		struct bio_vec *bvec = &bio->bi_io_vec[vecnr];
+
+		ret = do_lo_send(lo, bvec, bsize, pos);
+		if (ret < 0)
+			break;
+		pos += bvec->bv_len;
+	}
+	return ret;
 }
 
 struct lo_read_data {
@@ -262,24 +284,44 @@ static int lo_read_actor(read_descriptor_t * desc, struct page *page, unsigned l
 	return size;
 }
 
-static int lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
+static int
+do_lo_receive(struct loop_device *lo,
+		struct bio_vec *bvec, int bsize, loff_t pos)
 {
 	struct lo_read_data cookie;
 	read_descriptor_t desc;
 	struct file *file;
 
 	cookie.lo = lo;
-	cookie.data = bio_data(bio);
+	cookie.data = kmap(bvec->bv_page) + bvec->bv_offset;
 	cookie.bsize = bsize;
 	desc.written = 0;
-	desc.count = bio->bi_size;
+	desc.count = bvec->bv_len;
 	desc.buf = (char*)&cookie;
 	desc.error = 0;
 	spin_lock_irq(&lo->lo_lock);
 	file = lo->lo_backing_file;
 	spin_unlock_irq(&lo->lo_lock);
 	do_generic_file_read(file, &pos, &desc, lo_read_actor);
+	kunmap(bvec->bv_page);
 	return desc.error;
+}
+
+static int
+lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
+{
+	unsigned vecnr;
+	int ret = 0;
+
+	for (vecnr = 0; vecnr < bio->bi_vcnt; vecnr++) {
+		struct bio_vec *bvec = &bio->bi_io_vec[vecnr];
+
+		ret = do_lo_receive(lo, bvec, bsize, pos);
+		if (ret < 0)
+			break;
+		pos += bvec->bv_len;
+	}
+	return ret;
 }
 
 static inline int loop_get_bs(struct loop_device *lo)
@@ -535,7 +577,9 @@ static int loop_thread(void *data)
 	daemonize();
 
 	sprintf(current->comm, "loop%d", lo->lo_number);
-	current->flags |= PF_IOTHREAD;
+	current->flags |= PF_IOTHREAD;	/* loop can be used in an encrypted device
+					   hence, it mustn't be stopped at all because it could
+					   be indirectly used during suspension */
 
 	spin_lock_irq(&current->sigmask_lock);
 	sigfillset(&current->blocked);

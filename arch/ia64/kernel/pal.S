@@ -216,7 +216,7 @@ GLOBAL_ENTRY(ia64_pal_call_phys_stacked)
 	mov out3 = in3		// copy arg3
 	;;
 	mov loc3 = psr		// save psr
-	;; 
+	;;
 	mov loc4=ar.rsc			// save RSE configuration
 	dep.z loc2=loc2,0,61		// convert pal entry point to physical
 	;;

@@ -262,7 +262,6 @@ ENTRY(saved_esp)	.long	0
 
 ENTRY(saved_magic)	.long	0
 ENTRY(saved_magic2)	.long	0	
-ENTRY(saved_videomode)	.long	0
 
 ALIGN
 # saved registers

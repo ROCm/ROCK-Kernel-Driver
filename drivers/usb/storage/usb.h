@@ -4,7 +4,7 @@
  * $Id: usb.h,v 1.21 2002/04/21 02:57:59 mdharm Exp $
  *
  * Current development and maintenance by:
- *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
+ *   (c) 1999-2002 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
  *
  * Initial work by:
  *   (c) 1999 Michael Gee (michael@linuxspecific.com)
@@ -103,11 +103,15 @@ struct us_unusual_dev {
 #define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets */
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing */
 
-#define US_STATE_DETACHED	1	/* State machine states */
-#define US_STATE_IDLE		2
-#define US_STATE_RUNNING	3
-#define US_STATE_RESETTING	4
-#define US_STATE_ABORTING	5
+/* device attached/detached states */
+#define US_STATE_DETACHED	1
+#define US_STATE_ATTACHED	2
+
+/* processing state machine states */
+#define US_STATE_IDLE		1
+#define US_STATE_RUNNING	2
+#define US_STATE_RESETTING	3
+#define US_STATE_ABORTING	4
 
 #define USB_STOR_STRING_LEN 32
 
@@ -120,8 +124,13 @@ typedef void (*extra_data_destructor)(void *);	 /* extra data destructor   */
 struct us_data {
 	struct us_data		*next;		 /* next device */
 
-	/* the device we're working with */
+	/* The device we're working with
+	 * It's important to note:
+	 *    (o) you must hold dev_semaphore to change pusb_dev
+	 *    (o) device_state should change whenever pusb_dev does
+	 */
 	struct semaphore	dev_semaphore;	 /* protect pusb_dev */
+	atomic_t		device_state;	 /* attached or detached */
 	struct usb_device	*pusb_dev;	 /* this usb_device */
 
 	unsigned int		flags;		 /* from filter initially */

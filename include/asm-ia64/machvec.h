@@ -18,6 +18,7 @@ struct pci_dev;
 struct pt_regs;
 struct scatterlist;
 struct irq_desc;
+struct page;
 
 typedef void ia64_mv_setup_t (char **);
 typedef void ia64_mv_cpu_init_t(void);
@@ -45,6 +46,8 @@ typedef void ia64_mv_pci_unmap_sg (struct pci_dev *, struct scatterlist *, int, 
 typedef void ia64_mv_pci_dma_sync_single (struct pci_dev *, dma_addr_t, size_t, int);
 typedef void ia64_mv_pci_dma_sync_sg (struct pci_dev *, struct scatterlist *, int, int);
 typedef unsigned long ia64_mv_pci_dma_address (struct scatterlist *);
+typedef int ia64_mv_pci_dma_supported (struct pci_dev *, u64);
+
 /*
  * WARNING: The legacy I/O space is _architected_.  Platforms are
  * expected to follow this architected model (see Section 10.7 in the
@@ -101,6 +104,7 @@ extern void machvec_noop (void);
 #  define platform_pci_dma_sync_single	ia64_mv.sync_single
 #  define platform_pci_dma_sync_sg	ia64_mv.sync_sg
 #  define platform_pci_dma_address	ia64_mv.dma_address
+#  define platform_pci_dma_supported	ia64_mv.dma_supported
 #  define platform_irq_desc		ia64_mv.irq_desc
 #  define platform_irq_to_vector	ia64_mv.irq_to_vector
 #  define platform_local_vector_to_irq	ia64_mv.local_vector_to_irq
@@ -136,6 +140,7 @@ struct ia64_machine_vector {
 	ia64_mv_pci_dma_sync_single *sync_single;
 	ia64_mv_pci_dma_sync_sg *sync_sg;
 	ia64_mv_pci_dma_address *dma_address;
+	ia64_mv_pci_dma_supported *dma_supported;
 	ia64_mv_irq_desc *irq_desc;
 	ia64_mv_irq_to_vector *irq_to_vector;
 	ia64_mv_local_vector_to_irq *local_vector_to_irq;
@@ -172,6 +177,7 @@ struct ia64_machine_vector {
 	platform_pci_dma_sync_single,		\
 	platform_pci_dma_sync_sg,		\
 	platform_pci_dma_address,		\
+	platform_pci_dma_supported,		\
 	platform_irq_desc,			\
 	platform_irq_to_vector,			\
 	platform_local_vector_to_irq,		\
@@ -268,6 +274,9 @@ extern ia64_mv_pci_dma_address swiotlb_dma_address;
 #endif
 #ifndef platform_pci_dma_address
 # define  platform_pci_dma_address	swiotlb_dma_address
+#endif
+#ifndef platform_pci_dma_supported
+# define  platform_pci_dma_supported	swiotlb_pci_dma_supported
 #endif
 #ifndef platform_irq_desc
 # define platform_irq_desc		__ia64_irq_desc

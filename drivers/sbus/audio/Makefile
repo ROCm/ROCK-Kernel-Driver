@@ -5,8 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-O_TARGET := sparcaudio.o
-
 export-objs	:= audio.o amd7930.o dbri.o
 
 obj-$(CONFIG_SPARCAUDIO)		+= audio.o

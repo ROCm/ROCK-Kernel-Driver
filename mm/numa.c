@@ -65,8 +65,8 @@ void __init free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
 	int i, size = 0;
 	struct page *discard;
 
-	if (mem_map == (mem_map_t *)NULL)
-		mem_map = (mem_map_t *)PAGE_OFFSET;
+	if (mem_map == NULL)
+		mem_map = (struct page *)PAGE_OFFSET;
 
 	free_area_init_core(nid, pgdat, &discard, zones_size, zone_start_paddr,
 					zholes_size, pmap);

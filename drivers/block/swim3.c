@@ -313,7 +313,7 @@ static void start_request(struct floppy_state *fs)
 		wake_up(&fs->wait);
 		return;
 	}
-	while (!QUEUE_EMPTY && fs->state == idle) {
+	while (!blk_queue_empty(QUEUE) && fs->state == idle) {
 		if (major(CURRENT->rq_dev) != MAJOR_NR)
 			panic(DEVICE_NAME ": request list destroyed");
 //		if (CURRENT->bh && !buffer_locked(CURRENT->bh))

@@ -76,7 +76,7 @@ extern plat_pg_data_t *plat_node_data[];
 #define MIPS64_NR(kaddr) (((unsigned long)(kaddr) > (unsigned long)high_memory)\
 		? (max_mapnr + 1) : (LOCAL_MAP_NR((kaddr)) + \
 		(((unsigned long)ADDR_TO_MAPBASE((kaddr)) - PAGE_OFFSET) / \
-		sizeof(mem_map_t))))
+		sizeof(struct page))))
 
 #define kern_addr_valid(addr)	((KVADDR_TO_NID((unsigned long)addr) > \
 	-1) ? 0 : (test_bit(LOCAL_MAP_NR((addr)), \

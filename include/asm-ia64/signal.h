@@ -166,6 +166,8 @@ struct k_sigaction {
 
 #  include <asm/sigcontext.h>
 
+#define HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+
 #endif /* __KERNEL__ */
 
 # endif /* !__ASSEMBLY__ */

@@ -2918,14 +2918,8 @@ static void redo_fd_request(void)
 	if (current_drive < N_DRIVE)
 		floppy_off(current_drive);
 
-	if (!QUEUE_EMPTY && CURRENT->rq_status == RQ_INACTIVE){
-		CLEAR_INTR;
-		unlock_fdc();
-		return;
-	}
-
-	while(1){
-		if (QUEUE_EMPTY) {
+	for (;;) {
+		if (blk_queue_empty(QUEUE)) {
 			CLEAR_INTR;
 			unlock_fdc();
 			return;
@@ -3900,7 +3894,7 @@ static int __floppy_read_block_0(struct block_device *bdev)
 	bio.bi_end_io = floppy_rb0_complete;
 
 	submit_bio(READ, &bio);
-	run_task_queue(&tq_disk);
+	generic_unplug_device(bdev_get_queue(bdev));
 	process_fd_request();
 	wait_for_completion(&complete);
 
@@ -4226,14 +4220,15 @@ static int __init floppy_setup(char *str)
 
 static int have_no_fdc= -ENODEV;
 
-static struct device device_floppy;
+static struct device device_floppy = {
+	name:		"floppy",
+	bus_id:		"03?0",
+};
 
 int __init floppy_init(void)
 {
 	int i,unit,drive;
 
-	strcpy(device_floppy.name, "floppy");
-	strcpy(device_floppy.bus_id, "03?0");
 	register_sys_device(&device_floppy);
 
 	raw_cmd = NULL;

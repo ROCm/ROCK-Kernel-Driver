@@ -183,10 +183,6 @@ static struct termios *serial_termios_locked[NR_PORTS];
 #define TX_NUM_FIFO	4
 #define TX_BUF_SIZE	32
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 /* The async_struct in serial.h does not really give us what we
  * need, so define our own here.
  */
@@ -1098,7 +1094,7 @@ static int rs_8xx_write(struct tty_struct * tty, int from_user,
 	bdp = info->tx_cur;
 
 	while (1) {
-		c = MIN(count, TX_BUF_SIZE);
+		c = min(count, TX_BUF_SIZE);
 
 		if (c <= 0)
 			break;
@@ -1807,7 +1803,7 @@ static void rs_8xx_wait_until_sent(struct tty_struct *tty, int timeout)
 	 */
 	char_time = 1;
 	if (timeout)
-		char_time = MIN(char_time, timeout);
+		char_time = min(char_time, timeout);
 #ifdef SERIAL_DEBUG_RS_WAIT_UNTIL_SENT
 	printk("In rs_wait_until_sent(%d) check=%lu...", timeout, char_time);
 	printk("jiff=%lu...", jiffies);

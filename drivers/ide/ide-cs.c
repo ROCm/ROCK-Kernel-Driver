@@ -233,7 +233,8 @@ int idecs_register (int arg1, int arg2, int irq)
         ide_init_hwif_ports(&hw, (ide_ioreg_t) arg1, (ide_ioreg_t) arg2, NULL);
         hw.irq = irq;
         hw.chipset = ide_pci; /* this enables IRQ sharing w/ PCI irqs */
-        return ide_register_hw(&hw, NULL);
+
+        return ide_register_hw(&hw);
 }
 
 void ide_config(dev_link_t *link)

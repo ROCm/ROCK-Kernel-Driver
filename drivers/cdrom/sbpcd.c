@@ -4902,7 +4902,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 #ifdef DEBUG_GTL
 	xnr=++xx_nr;
 
-	if(QUEUE_EMPTY)
+	if(blk_queue_empty(QUEUE))
 	{
 		printk( "do_sbpcd_request[%di](NULL), Pid:%d, Time:%li\n",
 			xnr, current->pid, jiffies);

@@ -98,7 +98,7 @@
 #undef DISPLAY_SVWKS_TIMINGS
 #undef SVWKS_DEBUG_DRIVE_INFO
 
-static u8 svwks_revision = 0;
+static u8 svwks_revision;
 
 #if defined(DISPLAY_SVWKS_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>
@@ -230,13 +230,12 @@ static int svwks_get_info (char *buffer, char **addr, off_t offset, int count)
 				((reg40&0x005D0000)==0x005D0000)?"0":"?");
 	return p-buffer;	 /* => must be less than 4k! */
 }
+
+static byte svwks_proc;
+
 #endif  /* defined(DISPLAY_SVWKS_TIMINGS) && defined(CONFIG_PROC_FS) */
 
 #define SVWKS_CSB5_REVISION_NEW	0x92 /* min PCI_REVISION_ID for UDMA5 (A2.0) */
-
-byte svwks_proc = 0;
-
-extern char *ide_xfer_verbose (byte xfer_rate);
 
 static struct pci_dev *isa_dev;
 
@@ -262,7 +261,6 @@ static int svwks_ratemask(struct ata_device *drive)
 
 static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 {
-	static u8 udma_modes[]	= { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05 };
 	static u8 dma_modes[]	= { 0x77, 0x21, 0x20 };
 	static u8 pio_modes[]	= { 0x5d, 0x47, 0x34, 0x22, 0x20 };
 
@@ -271,26 +269,23 @@ static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 	byte unit		= (drive->select.b.unit & 0x01);
 	byte csb5		= (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE) ? 1 : 0;
 
-	byte drive_pci		= 0x00;
-	byte drive_pci2		= 0x00;
-	byte drive_pci3		= hwif->unit ? 0x57 : 0x56;
+	byte drive_pci, drive_pci2;
+	byte drive_pci3	= hwif->unit ? 0x57 : 0x56;
 
-	byte ultra_enable	= 0x00;
-	byte ultra_timing	= 0x00;
-	byte dma_timing		= 0x00;
-	byte pio_timing		= 0x00;
-	unsigned short csb5_pio	= 0x00;
+	byte ultra_enable, ultra_timing, dma_timing, pio_timing;
+	unsigned short csb5_pio;
 
 	byte pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
         switch (drive->dn) {
-		case 0: drive_pci = 0x41; drive_pci2 = 0x45; break;
-		case 1: drive_pci = 0x40; drive_pci2 = 0x44; break;
-		case 2: drive_pci = 0x43; drive_pci2 = 0x47; break;
-		case 3: drive_pci = 0x42; drive_pci2 = 0x46; break;
+		case 0: drive_pci = 0x41; break;
+		case 1: drive_pci = 0x40; break;
+		case 2: drive_pci = 0x43; break;
+		case 3: drive_pci = 0x42; break;
 		default:
 			return -1;
 	}
+	drive_pci2 = drive_pci + 4;
 
 	pci_read_config_byte(dev, drive_pci, &pio_timing);
 	pci_read_config_byte(dev, drive_pci2, &dma_timing);
@@ -337,7 +332,7 @@ static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 			pio_timing   |= pio_modes[pio];
 			csb5_pio     |= (pio << (4*drive->dn));
 			dma_timing   |= dma_modes[2];
-			ultra_timing |= ((udma_modes[speed - XFER_UDMA_0]) << (4*unit));
+			ultra_timing |= ((speed - XFER_UDMA_0) << (4*unit));
 			ultra_enable |= (0x01 << drive->dn);
 #endif
 		default:
@@ -350,8 +345,8 @@ static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 #endif
 
 #if SVWKS_DEBUG_DRIVE_INFO
-	printk("%s: %s drive%d\n", drive->name, ide_xfer_verbose(speed), drive->dn);
-#endif /* SVWKS_DEBUG_DRIVE_INFO */
+	printk("%s: %02x drive%d\n", drive->name, speed, drive->dn);
+#endif
 
 	pci_write_config_byte(dev, drive_pci, pio_timing);
 	if (csb5)
@@ -362,8 +357,6 @@ static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 	pci_write_config_byte(dev, drive_pci3, ultra_timing);
 	pci_write_config_byte(dev, 0x54, ultra_enable);
 #endif
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 	return ide_config_drive_speed(drive, speed);
@@ -684,7 +677,8 @@ static struct ata_pci_device chipsets[] __initdata = {
 		init_chipset: svwks_init_chipset,
 		ata66_check: svwks_ata66_check,
 		init_channel: ide_init_svwks,
-		bootable: ON_BOARD
+		bootable: ON_BOARD,
+		flags: ATA_F_SIMPLEX
 	},
 };
 
