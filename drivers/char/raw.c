@@ -70,10 +70,10 @@ static int raw_open(struct inode *inode, struct file *filp)
 		} else {
 			err = set_blocksize(bdev, bdev_hardsect_size(bdev));
 			if (err == 0) {
-				raw_devices[minor].inuse++;
-				filp->f_dentry->d_inode->i_mapping =
-					bdev->bd_inode->i_mapping;
 				filp->f_flags |= O_DIRECT;
+				if (++raw_devices[minor].inuse == 1)
+					filp->f_dentry->d_inode->i_mapping =
+						bdev->bd_inode->i_mapping;
 			}
 		}
 	}
@@ -83,6 +83,10 @@ out:
 	return err;
 }
 
+/*
+ * When the final fd which refers to this character-special node is closed, we
+ * make its ->mapping point back at its own i_data.
+ */
 static int raw_release(struct inode *inode, struct file *filp)
 {
 	const int minor= minor(inode->i_rdev);
@@ -90,12 +94,12 @@ static int raw_release(struct inode *inode, struct file *filp)
 
 	down(&raw_mutex);
 	bdev = raw_devices[minor].binding;
-	raw_devices[minor].inuse--;
+	if (--raw_devices[minor].inuse == 0) {
+		/* Here  inode->i_mapping == bdev->bd_inode->i_mapping  */
+		inode->i_mapping = &inode->i_data;
+		inode->i_mapping->backing_dev_info = &default_backing_dev_info;
+	}
 	up(&raw_mutex);
-
-	/* Here  inode->i_mapping == bdev->bd_inode->i_mapping  */
-	inode->i_mapping = &inode->i_data;
-	inode->i_mapping->backing_dev_info = &default_backing_dev_info;
 	
 	bd_release(bdev);
 	blkdev_put(bdev, BDEV_RAW);
