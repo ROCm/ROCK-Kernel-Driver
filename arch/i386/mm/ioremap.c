@@ -12,6 +12,9 @@
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/fixmap.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
+
 
 static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
 	unsigned long phys_addr, unsigned long flags)

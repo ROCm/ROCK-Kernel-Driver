@@ -14,6 +14,7 @@
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 
 /*
  * Called with mm->page_table_lock held to protect against other
