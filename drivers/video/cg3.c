@@ -385,6 +385,9 @@ static void cg3_init_one(struct sbus_dev *sdev)
 	all->par.physbase = sdev->reg_addrs[0].phys_addr;
 
 	sbusfb_fill_var(&all->info.var, sdev->prom_node, 8);
+	all->info.var.red.length = 8;
+	all->info.var.green.length = 8;
+	all->info.var.blue.length = 8;
 	if (!strcmp(sdev->prom_name, "cgRDI"))
 		all->par.flags |= CG3_FLAG_RDI;
 	if (all->par.flags & CG3_FLAG_RDI)
@@ -419,6 +422,7 @@ static void cg3_init_one(struct sbus_dev *sdev)
 		kfree(all);
 		return;
 	}
+	fb_set_cmap(&all->info.cmap, &all->info);
 
 	cg3_init_fix(&all->info, linebytes);
 
