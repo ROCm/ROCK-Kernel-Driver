@@ -38,7 +38,7 @@ typedef s16 fixp_t;
 #define FRAC_MASK ((1<<FRAC_N)-1)
 
 // Not to be used directly. Use fixp_{cos,sin}
-fixp_t cos_table[45] = {
+static fixp_t cos_table[45] = {
 	0x0100,	0x00FF,	0x00FF,	0x00FE,	0x00FD,	0x00FC,	0x00FA,	0x00F8,
 	0x00F6,	0x00F3,	0x00F0,	0x00ED,	0x00E9,	0x00E6,	0x00E2,	0x00DD,
 	0x00D9,	0x00D4,	0x00CF,	0x00C9,	0x00C4,	0x00BE,	0x00B8,	0x00B1,
@@ -49,7 +49,7 @@ fixp_t cos_table[45] = {
 
 
 /* a: 123 -> 123.0 */
-inline fixp_t fixp_new(s16 a)
+static inline fixp_t fixp_new(s16 a)
 {
 	return a<<FRAC_N;
 }
@@ -58,12 +58,12 @@ inline fixp_t fixp_new(s16 a)
       0x8000 -> 1.0
       0x0000 -> 0.0
 */
-inline fixp_t fixp_new16(s16 a)
+static inline fixp_t fixp_new16(s16 a)
 {
 	return ((s32)a)>>(16-FRAC_N);
 }
 
-inline fixp_t fixp_cos(unsigned int degrees)
+static inline fixp_t fixp_cos(unsigned int degrees)
 {
 	int quadrant = (degrees / 90) & 3;
 	unsigned int i = degrees % 90;
@@ -77,12 +77,12 @@ inline fixp_t fixp_cos(unsigned int degrees)
 	return (quadrant == 1 || quadrant == 2)? -cos_table[i] : cos_table[i];
 }
 
-inline fixp_t fixp_sin(unsigned int degrees)
+static inline fixp_t fixp_sin(unsigned int degrees)
 {
 	return -fixp_cos(degrees + 90);
 }
 
-inline fixp_t fixp_mult(fixp_t a, fixp_t b)
+static inline fixp_t fixp_mult(fixp_t a, fixp_t b)
 {
 	return ((s32)(a*b))>>FRAC_N;
 }

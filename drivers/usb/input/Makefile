@@ -19,6 +19,9 @@ endif
 ifeq ($(CONFIG_LOGITECH_FF),y)
 	hid-objs	+= hid-lgff.o
 endif
+ifeq ($(CONFIG_THRUSTMASTER_FF),y)
+	hid-objs	+= hid-tmff.o
+endif
 ifeq ($(CONFIG_HID_FF),y)
 	hid-objs	+= hid-ff.o
 endif
