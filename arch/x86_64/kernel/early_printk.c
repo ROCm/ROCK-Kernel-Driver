@@ -1,9 +1,9 @@
+#define printk real_printk
 #include <asm/io.h>
+#undef printk
 
-/* This is "wrong" address to access it, we should access it using
-   0xffff8000000b8000ul; but 0xffff8000000b8000ul is not available
-   early at boot. */
-#define VGABASE		0xffffffff800b8000ul	
+
+#define VGABASE		0xffffffff800b8000ul	/* This is "wrong" address to access it, we should access it using 0xffff8000000b8000ul; but 0xffff8000000b8000ul is not available early at boot. */
 
 #define MAX_YPOS	25
 #define MAX_XPOS	80
@@ -61,6 +61,8 @@ early_puts (const char *str)
 }
 
 static char buf[1024];
+
+int printk(const char *fmt, ...) __attribute__((alias("early_printk"))); 
 
 int early_printk(const char *fmt, ...)
 {

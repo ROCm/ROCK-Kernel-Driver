@@ -3,7 +3,6 @@
 
 #include <linux/config.h>
 #include <asm/types.h>
-#include <asm/mpspec.h>
 
 /*
  * Intel IO-APIC support for SMP and UP systems.
@@ -16,7 +15,8 @@
 #define APIC_MISMATCH_DEBUG
 
 #define IO_APIC_BASE(idx) \
-		((volatile int *)__fix_to_virt(FIX_IO_APIC_BASE_0 + idx))
+		((volatile int *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + idx) \
+		+ (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
 
 /*
  * The structure of the IO-APIC:

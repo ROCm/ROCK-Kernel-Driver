@@ -1,17 +1,18 @@
 /*
  * Compatibility mode system call entry point for x86-64. 
  * 		
- * Copyright 2000,2001,2002 Andi Kleen, SuSE Labs.
+ * Copyright 2000,2001 Andi Kleen, SuSE Labs.
  * 
- * $Id: ia32entry.S,v 1.24 2001/11/11 17:47:47 ak Exp $ 		
+ * $Id: ia32entry.S,v 1.31 2002/03/24 13:01:45 ak Exp $ 		
  */		 
 
 #include <asm/calling.h>
 #include <asm/offset.h>
-#include <asm/thread_info.h>
+#include <asm/current.h>
 #include <linux/linkage.h>
 #include <asm/errno.h>
 #include <asm/ia32_unistd.h>	
+#include <asm/thread_info.h>	
 
 	.macro IA32_ARG_FIXUP
 	movl	%edi,%r8d
@@ -29,7 +30,7 @@
  */ 	
 ENTRY(ia32_cstar_target)
 	movq $-ENOSYS,%rax
-	SYSRET32
+	sysret
 	
 /* 
  * Emulated IA32 system calls via int 0x80. 
@@ -65,7 +66,6 @@ ia32_do_syscall:
 	cmpl $(IA32_NR_syscalls),%eax
 	jae  ia32_badsys
 	IA32_ARG_FIXUP
-	movl $1,%r10d
 	call *ia32_sys_call_table(,%rax,8) # xxx: rip relative
 	movq %rax,RAX-ARGOFFSET(%rsp)
 	jmp int_ret_from_sys_call 
@@ -106,7 +106,7 @@ ni_syscall:
 	PTREGSCALL stub32_rt_sigsuspend, sys_rt_sigsuspend
 
 ENTRY(ia32_ptregs_common)
-	popq %r11	/* save return address outside the stack frame. */
+	popq %r11
 	SAVE_REST
 	movq %r11, %r15
 	call *%rax
@@ -241,14 +241,14 @@ ia32_sys_call_table:
 	.quad stub32_clone		/* 120 */
 	.quad sys_setdomainname
 	.quad sys_newuname
-	.quad ni_syscall	/* modify_ldt */
+	.quad sys_modify_ldt
 	.quad sys32_adjtimex
-	.quad sys_mprotect		/* 125 */
+	.quad sys32_mprotect		/* 125 */
 	.quad sys32_sigprocmask
-	.quad ni_syscall	/* query_module */
-	.quad ni_syscall	/* init_module */
-	.quad ni_syscall	/* delete module */
-	.quad ni_syscall	/* 130  get_kernel_syms */
+	.quad sys32_module_warning	/* create_module */
+	.quad sys32_module_warning	/* init_module */
+	.quad sys32_module_warning	/* delete module */
+	.quad sys32_module_warning	/* 130  get_kernel_syms */
 	.quad ni_syscall	/* quotactl */ 
 	.quad sys_getpgid
 	.quad sys_fchdir
@@ -287,7 +287,7 @@ ia32_sys_call_table:
 	.quad ni_syscall	/* vm86 */ 
 	.quad ni_syscall	/* query_module */
 	.quad sys_poll
-	.quad ni_syscall	/* nfsserverctl */ 
+	.quad sys32_nfsservctl
 	.quad sys_setresgid16	/* 170 */
 	.quad sys_getresgid16
 	.quad sys_prctl
@@ -302,8 +302,8 @@ ia32_sys_call_table:
 	.quad sys32_pwrite
 	.quad sys_chown16
 	.quad sys_getcwd
-	.quad ni_syscall	/* capget */
-	.quad ni_syscall	/* capset */
+	.quad sys_capget
+	.quad sys_capset
 	.quad stub32_sigaltstack
 	.quad sys32_sendfile
 	.quad ni_syscall		/* streams1 */
@@ -338,7 +338,7 @@ ia32_sys_call_table:
 	.quad sys_pivot_root
 	.quad sys_mincore
 	.quad sys_madvise
-	.quad sys_getdents64	/* 220 */ 
+	.quad sys_getdents64	/* 220 getdents64 */ 
 	.quad sys32_fcntl64	
 	.quad sys_ni_syscall	/* tux */
 	.quad sys_ni_syscall    /* security */
@@ -357,6 +357,10 @@ ia32_sys_call_table:
 	.quad sys_lremovexattr
 	.quad sys_fremovexattr
 	.quad sys_tkill		/* 238 */ 
+	.quad sys_sendfile64 
+	.quad sys_futex
+        .quad sys32_sched_setaffinity
+        .quad sys32_sched_getaffinity
 ia32_syscall_end:		
 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
 		.quad ni_syscall

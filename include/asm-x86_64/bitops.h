@@ -30,13 +30,15 @@
  *
  * This function is atomic and may not be reordered.  See __set_bit()
  * if you do not require the atomic guarantees.
+ * Note that @nr may be almost arbitrarily large; this function is not
+ * restricted to acting on a single-word quantity.
  */
-static __inline__ void set_bit(int nr, volatile void * addr)
+static __inline__ void set_bit(long nr, volatile void * addr)
 {
 	__asm__ __volatile__( LOCK_PREFIX
-		"btsl %1,%0"
+		"btsq %1,%0"
 		:"=m" (ADDR)
-		:"dIr" (nr));
+		:"dIr" (nr) : "memory");
 }
 
 /**
@@ -50,10 +52,10 @@ static __inline__ void set_bit(int nr, volatile void * addr)
  */
 static __inline__ void __set_bit(int nr, volatile void * addr)
 {
-	__asm__(
+	__asm__ volatile(
 		"btsl %1,%0"
 		:"=m" (ADDR)
-		:"dIr" (nr));
+		:"dIr" (nr) : "memory");
 }
 
 /**
@@ -79,8 +81,9 @@ static __inline__ void __clear_bit(int nr, volatile void * addr)
 	__asm__ __volatile__(
 		"btrl %1,%0"
 		:"=m" (ADDR)
-		:"Ir" (nr));
+		:"dIr" (nr));
 }
+
 #define smp_mb__before_clear_bit()	barrier()
 #define smp_mb__after_clear_bit()	barrier()
 
@@ -274,7 +277,7 @@ static __inline__ int find_first_zero_bit(void * addr, unsigned size)
 		return 0;
 	__asm__ __volatile__(
 		"movl $-1,%%eax\n\t"
-		"xorq %%rdx,%%rdx\n\t"
+		"xorl %%edx,%%edx\n\t"
 		"repe; scasl\n\t"
 		"je 1f\n\t"
 		"xorl -4(%%rdi),%%eax\n\t"
@@ -287,6 +290,39 @@ static __inline__ int find_first_zero_bit(void * addr, unsigned size)
 		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr) : "memory");
 	return res;
 }
+
+/**
+ * find_next_zero_bit - find the first zero bit in a memory region
+ * @addr: The address to base the search on
+ * @offset: The bitnumber to start searching at
+ * @size: The maximum size to search
+ */
+static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
+{
+	unsigned long * p = ((unsigned long *) addr) + (offset >> 6);
+	unsigned long set = 0;
+	long res, bit = offset&63;
+	
+	if (bit) {
+		/*
+		 * Look for zero in first word
+		 */
+		__asm__("bsfq %1,%0\n\t"
+			"cmoveq %2,%0"
+			: "=r" (set)
+			: "r" (~(*p >> bit)), "r"(64L));
+		if (set < (64 - bit))
+			return set + offset;
+		set = 64 - bit;
+		p++;
+	}
+	/*
+	 * No zero yet, search remaining full words for a zero
+	 */
+	res = find_first_zero_bit (p, size - 64 * (p - (unsigned long *) addr));
+	return (offset + set + res);
+}
+
 
 /**
  * find_first_bit - find the first set bit in a memory region
@@ -302,53 +338,20 @@ static __inline__ int find_first_bit(void * addr, unsigned size)
 	int res;
 
 	/* This looks at memory. Mark it volatile to tell gcc not to move it around */
-	/* Work in 32bit for now */ 
 	__asm__ __volatile__(
 		"xorl %%eax,%%eax\n\t"
 		"repe; scasl\n\t"
 		"jz 1f\n\t"
 		"leaq -4(%%rdi),%%rdi\n\t"
-		"bsfl (%%rdi),%%eax\n"
-		"1:\tsubq %%rbx,%%rdi\n\t"
-		"shlq $3,%%rdi\n\t"
-		"addq %%rdi,%%rax"
+		"bsfq (%%rdi),%%rax\n"
+		"1:\tsubl %%ebx,%%edi\n\t"
+		"shll $3,%%edi\n\t"
+		"addl %%edi,%%eax"
 		:"=a" (res), "=&c" (d0), "=&D" (d1)
 		:"1" ((size + 31) >> 5), "2" (addr), "b" (addr));
 	return res;
 }
 
-/**
- * find_next_zero_bit - find the first zero bit in a memory region
- * @addr: The address to base the search on
- * @offset: The bitnumber to start searching at
- * @size: The maximum size to search
- */
-static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
-{
-	unsigned int * p = ((unsigned int *) addr) + (offset >> 5);
-	int set = 0, bit = offset & 31, res;
-	
-	if (bit) {
-		/*
-		 * Look for zero in the first 32 bits.
-		 */
-		__asm__("bsfl %1,%0\n\t"
-			"jne 1f\n\t"
-			"movl $32, %0\n"
-			"1:"
-			: "=r" (set)
-			: "r" (~(*p >> bit)));
-		if (set < (32 - bit))
-			return set + offset;
-		set = 32 - bit;
-		p++;
-	}
-	/*
-	 * No zero yet, search remaining full bytes for a zero
-	 */
-	res = find_first_zero_bit (p, size - 32 * (p - (unsigned int *) addr));
-	return (offset + set + res);
-}
 
 /**
  * find_next_bit - find the first set bit in a memory region
@@ -356,30 +359,28 @@ static __inline__ int find_next_zero_bit (void * addr, int size, int offset)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ int find_next_bit (void * addr, int size, int offset)
+static __inline__ int find_next_bit(void * addr, int size, int offset)
 {
-	unsigned long * p = ((unsigned long *) addr) + (offset >> 5);
-	unsigned long set = 0, bit = offset & 63, res;
-
+	unsigned int * p = ((unsigned int *) addr) + (offset >> 5);
+	int set = 0, bit = offset & 31, res;
+	
 	if (bit) {
 		/*
-		 * Look for nonzero in the first 64 bits:
+		 * Look for nonzero in the first 32 bits:
 		 */
-		__asm__("bsfq %1,%0\n\t"
-			"jne 1f\n\t"
-			"movq $64, %0\n"
-			"1:"
+		__asm__("bsfl %1,%0\n\t"
+			"cmovel %2,%0\n\t"
 			: "=r" (set)
-			: "r" (*p >> bit));
-		if (set < (64 - bit))
+			: "r" (*p >> bit), "r" (32));
+		if (set < (32 - bit))
 			return set + offset;
-		set = 64 - bit;
+		set = 32 - bit;
 		p++;
 	}
 	/*
 	 * No set bit yet, search remaining full words for a bit
 	 */
-	res = find_first_bit (p, size - 64 * (p - (unsigned long *) addr));
+	res = find_first_bit (p, size - 32 * (p - (unsigned int *) addr));
 	return (offset + set + res);
 }
 
@@ -436,9 +437,8 @@ static __inline__ int ffs(int x)
 	int r;
 
 	__asm__("bsfl %1,%0\n\t"
-		"jnz 1f\n\t"
-		"movl $-1,%0\n"
-		"1:" : "=r" (r) : "g" (x));
+		"cmovzl %2,%0" 
+		: "=r" (r) : "g" (x), "r" (32));
 	return r+1;
 }
 
@@ -457,18 +457,23 @@ static __inline__ int ffs(int x)
 
 #ifdef __KERNEL__
 
-#define ext2_set_bit                 __test_and_set_bit
-#define ext2_clear_bit               __test_and_clear_bit
-#define ext2_test_bit                test_bit
-#define ext2_find_first_zero_bit     find_first_zero_bit
-#define ext2_find_next_zero_bit      find_next_zero_bit
+#define ext2_set_bit(nr,addr) \
+	__test_and_set_bit((nr),(unsigned long*)addr)
+#define ext2_clear_bit(nr, addr) \
+	__test_and_clear_bit((nr),(unsigned long*)addr)
+#define ext2_test_bit(nr, addr)      test_bit((nr),(unsigned long*)addr)
+#define ext2_find_first_zero_bit(addr, size) \
+	find_first_zero_bit((unsigned long*)addr, size)
+#define ext2_find_next_zero_bit(addr, size, off) \
+	find_next_zero_bit((unsigned long*)addr, size, off)
 
 /* Bitmap functions for the minix filesystem.  */
-#define minix_test_and_set_bit(nr,addr) __test_and_set_bit(nr,addr)
-#define minix_set_bit(nr,addr) __set_bit(nr,addr)
-#define minix_test_and_clear_bit(nr,addr) __test_and_clear_bit(nr,addr)
-#define minix_test_bit(nr,addr) test_bit(nr,addr)
-#define minix_find_first_zero_bit(addr,size) find_first_zero_bit(addr,size)
+#define minix_test_and_set_bit(nr,addr) __test_and_set_bit(nr,(void*)addr)
+#define minix_set_bit(nr,addr) __set_bit(nr,(void*)addr)
+#define minix_test_and_clear_bit(nr,addr) __test_and_clear_bit(nr,(void*)addr)
+#define minix_test_bit(nr,addr) test_bit(nr,(void*)addr)
+#define minix_find_first_zero_bit(addr,size) \
+	find_first_zero_bit((void*)addr,size)
 
 #endif /* __KERNEL__ */
 

@@ -435,36 +435,7 @@ no_disk1:
 	rep
 	stosb
 is_disk1:
-# check for Micro Channel (MCA) bus
-	movw	%cs, %ax			# aka SETUPSEG
-	subw	$DELTA_INITSEG, %ax		# aka INITSEG
-	movw	%ax, %ds
-	xorw	%ax, %ax
-	movw	%ax, (0xa0)			# set table length to 0
-	movb	$0xc0, %ah
-	stc
-	int	$0x15				# moves feature table to es:bx
-	jc	no_mca
 
-	pushw	%ds
-	movw	%es, %ax
-	movw	%ax, %ds
-	movw	%cs, %ax			# aka SETUPSEG
-	subw	$DELTA_INITSEG, %ax		# aka INITSEG
-	movw	%ax, %es
-	movw	%bx, %si
-	movw	$0xa0, %di
-	movw	(%si), %cx
-	addw	$2, %cx				# table length is a short
-	cmpw	$0x10, %cx
-	jc	sysdesc_ok
-
-	movw	$0x10, %cx			# we keep only first 16 bytes
-sysdesc_ok:
-	rep
-	movsb
-	popw	%ds
-no_mca:
 # Check for PS/2 pointing device
 	movw	%cs, %ax			# aka SETUPSEG
 	subw	$DELTA_INITSEG, %ax		# aka INITSEG
@@ -477,71 +448,11 @@ no_mca:
 	movw	$0xAA, (0x1ff)			# device present
 no_psmouse:
 
-#if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
-# Then check for an APM BIOS...
-						# %ds points to the bootsector
-	movw	$0, 0x40			# version = 0 means no APM BIOS
-	movw	$0x05300, %ax			# APM BIOS installation check
-	xorw	%bx, %bx
-	int	$0x15
-	jc	done_apm_bios			# Nope, no APM BIOS
-	
-	cmpw	$0x0504d, %bx			# Check for "PM" signature
-	jne	done_apm_bios			# No signature, no APM BIOS
-
-	andw	$0x02, %cx			# Is 32 bit supported?
-	je	done_apm_bios			# No 32-bit, no (good) APM BIOS
-
-	movw	$0x05304, %ax			# Disconnect first just in case
-	xorw	%bx, %bx
-	int	$0x15				# ignore return code
-	movw	$0x05303, %ax			# 32 bit connect
-	xorl	%ebx, %ebx
-	xorw	%cx, %cx			# paranoia :-)
-	xorw	%dx, %dx			#   ...
-	xorl	%esi, %esi			#   ...
-	xorw	%di, %di			#   ...
-	int	$0x15
-	jc	no_32_apm_bios			# Ack, error. 
-
-	movw	%ax,  (66)			# BIOS code segment
-	movl	%ebx, (68)			# BIOS entry point offset
-	movw	%cx,  (72)			# BIOS 16 bit code segment
-	movw	%dx,  (74)			# BIOS data segment
-	movl	%esi, (78)			# BIOS code segment lengths
-	movw	%di,  (82)			# BIOS data segment length
-# Redo the installation check as the 32 bit connect
-# modifies the flags returned on some BIOSs
-	movw	$0x05300, %ax			# APM BIOS installation check
-	xorw	%bx, %bx
-	xorw	%cx, %cx			# paranoia
-	int	$0x15
-	jc	apm_disconnect			# error -> shouldn't happen
-
-	cmpw	$0x0504d, %bx			# check for "PM" signature
-	jne	apm_disconnect			# no sig -> shouldn't happen
-
-	movw	%ax, (64)			# record the APM BIOS version
-	movw	%cx, (76)			# and flags
-	jmp	done_apm_bios
-
-apm_disconnect:					# Tidy up
-	movw	$0x05304, %ax			# Disconnect
-	xorw	%bx, %bx
-	int	$0x15				# ignore return code
-
-	jmp	done_apm_bios
-
-no_32_apm_bios:
-	andw	$0xfffd, (76)			# remove 32 bit support bit
-done_apm_bios:
-#endif
-
 # Now we want to move to protected mode ...
 	cmpw	$0, %cs:realmode_swtch
 	jz	rmodeswtch_normal
 
-	lcall	*%cs:realmode_swtch
+	lcall	%cs:realmode_swtch
 
 	jmp	rmodeswtch_end
 

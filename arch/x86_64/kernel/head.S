@@ -4,29 +4,30 @@
  *  Copyright (C) 2000 Andrea Arcangeli <andrea@suse.de> SuSE
  *  Copyright (C) 2000 Pavel Machek <pavel@suse.cz>
  *  Copyright (C) 2000 Karsten Keil <kkeil@suse.de>
- *  Copyright (C) 2001 2002 Andi Kleen <ak@suse.de>
+ *  Copyright (C) 2001,2002 Andi Kleen <ak@suse.de>
  *
- *  $Id: head.S,v 1.41 2001/07/05 23:43:45 ak Exp $
+ *  $Id: head.S,v 1.49 2002/03/19 17:39:25 ak Exp $
  */
-.code64
-.text
+
 
 #include <linux/linkage.h>
 #include <linux/threads.h>
 #include <asm/desc.h>
 #include <asm/segment.h>
 #include <asm/page.h>
-#include <asm/offset.h>
+#include <asm/msr.h>
 	
-/* we don't able to switch in one step to final KERNEL ADDRESS SPACE
+/* we are not able to switch in one step to the final KERNEL ADRESS SPACE
  * because we need identity-mapped pages on setup so define __START_KERNEL to
  * 0x100000 for this stage
  * 
  */
 
-
+	.text
+	.code32
+/* %bx:	 1 if comming from smp trampoline on secondary cpu */ 
 startup_32:
-.code32
+	
 	/*
 	 * At this point the CPU runs in 32bit protected mode (CS.D = 1) with
 	 * paging disabled and the point of this file is to switch to 64bit
@@ -35,7 +36,9 @@ startup_32:
  	 * There is no stack until we set one up.
 	 */
 
-	/* As first check if extended functions are implemented */
+	movl %ebx,%ebp	/* Save trampoline flag */
+	
+	/* First check if extended functions are implemented */
 	movl	$0x80000000, %eax
 	cpuid
 	cmpl	$0x80000000, %eax
@@ -46,6 +49,8 @@ startup_32:
 	btl	$29, %edx
 	jnc	no_long_mode
 
+	movl	%edx,%edi
+	
 	/*
 	 * Prepare for entering 64bits mode
 	 */
@@ -61,14 +66,23 @@ startup_32:
 	movl	%eax, %cr3
 
 	/* Setup EFER (Extended Feature Enable Register) */
-	movl	$0xc0000080, %ecx
+	movl	$MSR_EFER, %ecx
 	rdmsr
 	/* Fool rdmsr and reset %eax to avoid dependences */
 	xorl	%eax, %eax
 	/* Enable Long Mode */
-	btsl	$8, %eax
+	btsl	$_EFER_LME, %eax
 	/* Enable System Call */
-	btsl	$0, %eax
+	btsl	$_EFER_SCE, %eax
+
+#if 0
+	/* No Execute supported? */	
+	btl	$20,%edi
+	jnc     1f
+	btsl	$_EFER_NX, %eax
+1:	
+#endif
+				
 	/* Make changes effective */
 	wrmsr
 
@@ -99,27 +113,37 @@ reach_compatibility_mode:
 	 * the new gdt/idt that has __KERNEL_CS with CS.L = 1.
 	 */
 
+	testw %bp,%bp	/* secondary CPU? */ 
+	jnz   second	
+	
 	/* Load new GDT with the 64bit segment using 32bit descriptor */
 	/* to avoid 32bit relocations we use fixed adresses here */
 	movl	$0x100F00, %eax
 	lgdt	(%eax)
+
 	movl    $0x100F10, %eax
 	/* Finally jump in 64bit mode */
 	ljmp	*(%eax)
 
-.code64
-reach_long64:
-	/*
-	 * Where we're running at 0x0000000000100000, and yes, finally
-	 * in 64bit mode.
-	 */
-	.globl	init_rsp
+second:
+	/* abuse syscall to get into 64bit mode. this way we don't need
+	   a working low identity mapping just for the short 32bit roundtrip. 
+	   XXX kludge. this should not be needed. */
+	movl  $MSR_STAR,%ecx
+	xorl  %eax,%eax
+	movl  $(__USER32_CS<<16)|__KERNEL_CS,%edx
+	wrmsr
 
-	/* Setup the first kernel stack (this instruction is modified by smpboot) */
-	.byte 0x48, 0xb8	/* movq *init_rsp,%rax */ 
-init_rsp:
-	.quad init_thread_union+THREAD_SIZE
-	movq	%rax, %rsp
+	movl  $MSR_CSTAR,%ecx
+	movl  $0xffffffff,%edx
+	movl  $0x80100100,%eax	# reach_long64 absolute
+	wrmsr
+	syscall
+
+	.code64
+	.org 0x100	
+reach_long64:
+	movq init_rsp(%rip),%rsp
 
 	/* zero EFLAGS after setting rsp */
 	pushq $0
@@ -133,15 +157,15 @@ init_rsp:
 	 */
 	lgdt	pGDT64
 
+	movl $__KERNEL_DS,%eax
+	movl %eax,%ds	
+	movl %eax,%ss
+	movl %eax,%es
+			
 	/* esi is pointer to real mode structure with interesting info.
 	   pass it to C */
 	movl	%esi, %edi
-
-	movl $__KERNEL_DS,%eax
-	movl %eax,%ss
-	movl %eax,%ds	
-	movl %eax,%es
-			
+	
 	/* Finally jump to run C code and to be on real kernel address
 	 * Since we are running on identity-mapped space we have to jump
 	 * to the full 64bit address , this is only possible as indirect
@@ -150,11 +174,14 @@ init_rsp:
 	movq	initial_code(%rip),%rax
 	jmp	*%rax
 
-
-	/* SMP bootup changes this */	
+	/* SMP bootup changes these two */	
 	.globl	initial_code
 initial_code:
 	.quad	x86_64_start_kernel
+	.globl init_rsp
+init_rsp:
+	.quad  init_thread_union+THREAD_SIZE-8
+
 
 .code32
 ENTRY(no_long_mode)
@@ -165,7 +192,7 @@ ENTRY(no_long_mode)
 .org 0xf00
 pGDT32:
 	.word	gdt32_end-gdt_table32
-	.quad	gdt_table32-__START_KERNEL+0x100000
+	.long	gdt_table32-__START_KERNEL+0x100000
 
 .org 0xf10	
 ljumpvector:
@@ -182,10 +209,9 @@ ENTRY(_stext)
 	 * 2Mbyte large pages provided by PAE mode)
 	 */
 .org 0x1000
-ENTRY(level4_pgt)
+ENTRY(init_level4_pgt)
 	.quad	0x0000000000102007		/* -> level3_ident_pgt */
 	.fill	255,8,0
-	/* __PAGE_OFFSET 0xffff800000000000 */
 	.quad	0x000000000010a007
 	.fill	254,8,0
 	/* (2^48-(2*1024*1024*1024))/(2^39) = 511 */
@@ -193,7 +219,6 @@ ENTRY(level4_pgt)
 
 .org 0x2000
 /* Kernel does not "know" about 4-th level of page tables. */
-ENTRY(swapper_pg_dir)
 ENTRY(level3_ident_pgt)
 	.quad	0x0000000000104007
 	.fill	511,8,0
@@ -207,10 +232,8 @@ ENTRY(level3_kernel_pgt)
 
 .org 0x4000
 ENTRY(level2_ident_pgt)
-	/* 2 Mbytes are enough, this is necessary only for head.S */
+	/* 40MB for bootup. 	*/
 	.quad	0x0000000000000283
-	/* .fill	511,8,0 */
-	/* Jan needs more than 2Mbytes, so set a 40Mbyte mapping instead */
 	.quad	0x0000000000200183
 	.quad	0x0000000000400183
 	.quad	0x0000000000600183
@@ -230,10 +253,15 @@ ENTRY(level2_ident_pgt)
 	.quad	0x0000000002200183
 	.quad	0x0000000002400183
 	.quad	0x0000000002600183
+	/* Temporary mappings for the super early allocator in arch/x86_64/mm/init.c */
+	.globl temp_boot_pmds
+temp_boot_pmds:
 	.fill	492,8,0
 	
 .org 0x5000
 ENTRY(level2_kernel_pgt)
+	/* 40MB kernel mapping. The kernel code cannot be bigger than that.
+	   When you change this change KERNEL_TEXT_SIZE in pgtable.h too. */
 	/* (2^48-(2*1024*1024*1024)-((2^39)*511)-((2^30)*510)) = 0 */
 	.quad	0x0000000000000183
 	.quad	0x0000000000200183
@@ -255,11 +283,7 @@ ENTRY(level2_kernel_pgt)
 	.quad	0x0000000002200183
 	.quad	0x0000000002400183
 	.quad	0x0000000002600183
-	/*
-	 * We could go ahead without any downside (except typing programmer
-	 * wise :) but 40Mbyte are just enough for the kernel statically
-	 * linked part (and extending it is trivial).
-	 */
+	/* Module mapping starts here */
 	.fill	492,8,0
 
 .org 0x6000
@@ -278,11 +302,7 @@ ENTRY(empty_bad_pmd_table)
 ENTRY(level3_physmem_pgt)
 	.quad	0x0000000000105007		/* -> level2_kernel_pgt (so that __va works even before pagetable_init) */
 
-
-
 .org 0xb000
-
-
 .data
 
 .globl SYMBOL_NAME(gdt)
@@ -317,16 +337,17 @@ ENTRY(gdt_table)
 	.quad	0x00cffe000000ffff	/* __USER32_CS */
 	.quad	0x00cff2000000ffff	/* __USER_DS, __USER32_DS  */		
 	.quad	0x00affa000000ffff	/* __USER_CS */
+	.word	0xFFFF				# 4Gb - (0x100000*0x1000 = 4Gb)
+	.word	0				# base address = 0
+	.word	0x9A00				# code read/exec
+	.word	0x00CF				# granularity = 4096, 386
+						#  (+5th nibble of limit)
+					/* __KERNEL32_CS */
 
 	.globl  tss_start
 tss_start:
 	.rept NR_CPUS	 	
-	.quad   0,0					/* TSS descriptors. filled in later */
-	.endr
-	.globl ldt_start
-ldt_start:	
-	.rept NR_CPUS
-	.quad   0,0					/* LDT descriptors. filled in later */ 
+	.quad   0,0,0,0,0,0,0,0		/* TSS/LDT/per cpu entries. filled in later */
 	.endr	
 gdt_end:	
 	.globl gdt_end
@@ -337,6 +358,3 @@ ENTRY(idt_table)
 	.quad   0
 	.quad 	0
 	.endr
-	
-.section .text.lock
-ENTRY(stext_lock)

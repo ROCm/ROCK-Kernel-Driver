@@ -31,13 +31,21 @@
  * value at reset if we support XMM instructions and then
  * remeber the current task has used the FPU.
  */
-void init_fpu(void)
+void init_fpu(struct task_struct *tsk)
 {
-	__asm__("fninit");
-	if ( cpu_has_xmm )
-		load_mxcsr(0x1f80);
-		
-	current->used_math = 1;
+	if (cpu_has_fxsr) {
+		memset(&tsk->thread.i387.fxsave, 0, sizeof(struct i387_fxsave_struct));
+		tsk->thread.i387.fxsave.cwd = 0x37f;
+		if (cpu_has_xmm)
+			tsk->thread.i387.fxsave.mxcsr = 0x1f80;
+	} else {
+		memset(&tsk->thread.i387.fsave, 0, sizeof(struct i387_fsave_struct));
+		tsk->thread.i387.fsave.cwd = 0xffff037f;
+		tsk->thread.i387.fsave.swd = 0xffff0000;
+		tsk->thread.i387.fsave.twd = 0xffffffff;
+		tsk->thread.i387.fsave.fos = 0xffff0000;
+	}
+	tsk->used_math = 1;
 }
 
 /*

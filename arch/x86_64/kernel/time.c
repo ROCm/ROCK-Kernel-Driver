@@ -63,19 +63,19 @@
 #include <linux/irq.h>
 
 
-unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
+unsigned int cpu_khz;	/* Detected as we calibrate the TSC */
 
 /* Number of usecs that the last interrupt was delayed */
 int __delay_at_last_interrupt __section_delay_at_last_interrupt;
 
-unsigned long __last_tsc_low __section_last_tsc_low; /* lsb 32 bits of Time Stamp Counter */
+unsigned int __last_tsc_low __section_last_tsc_low; /* lsb 32 bits of Time Stamp Counter */
 
 /* Cached *multiplier* to convert TSC counts to microseconds.
  * (see the equation below).
  * Equal to 2^32 * (1 / (clocks per usec) ).
  * Initialized in time_init.
  */
-unsigned long __fast_gettimeoffset_quotient __section_fast_gettimeoffset_quotient;
+unsigned int __fast_gettimeoffset_quotient __section_fast_gettimeoffset_quotient;
 
 extern rwlock_t xtime_lock;
 struct timeval __xtime __section_xtime;
@@ -85,9 +85,9 @@ struct timezone __sys_tz __section_sys_tz;
  
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
-static inline unsigned long do_gettimeoffset(void)
+inline unsigned long do_gettimeoffset(void)
 {
-	register unsigned long eax, edx;
+	register unsigned int eax, edx;
 
 	/* Read the Time Stamp Counter */
 
@@ -105,47 +105,20 @@ static inline unsigned long do_gettimeoffset(void)
 	 * in the critical path.
          */
 
-	edx = (eax*fast_gettimeoffset_quotient) >> 32;
+	__asm__("mull %2"
+		:"=a" (eax), "=d" (edx)
+		:"rm" (fast_gettimeoffset_quotient),
+		 "0" (eax));
 
 	/* our adjusted time offset in microseconds */
 	return delay_at_last_interrupt + edx;
 }
-
-
-
 
 #define TICK_SIZE tick
 
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 
 extern spinlock_t i8259A_lock;
-
-
-static inline unsigned long do_fast_gettimeoffset(void)
-{
-	register unsigned long eax, edx;
-
-	/* Read the Time Stamp Counter */
-
-	rdtsc(eax,edx);
-
-	/* .. relative to previous jiffy (32 bits is enough) */
-	eax -= last_tsc_low;	/* tsc_low delta */
-
-	/*
-         * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
-         *             = (tsc_low delta) * (usecs_per_clock)
-         *             = (tsc_low delta) * (usecs_per_jiffy / clocks_per_jiffy)
-	 *
-	 * Using a mull instead of a divl saves up to 31 clock cycles
-	 * in the critical path.
-         */
-
-	edx = (eax*fast_gettimeoffset_quotient) >> 32;
-
-	/* our adjusted time offset in microseconds */
-	return delay_at_last_interrupt + edx;
-}
 
 /*
  * This version of gettimeofday has microsecond resolution
@@ -390,15 +363,15 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 unsigned long get_cmos_time(void)
 {
 	unsigned int year, mon, day, hour, min, sec;
+	int i;
 
+	spin_lock(&rtc_lock); 
 	/* The Linux interpretation of the CMOS clock register contents:
 	 * When the Update-In-Progress (UIP) flag goes from 1 to 0, the
 	 * RTC registers show the second which has precisely just started.
 	 * Let's hope other operating systems interpret the RTC the same way.
 	 */
-#ifndef CONFIG_SIMNOW
-	int i;
-	/* FIXME: This would take eons in emulated environment */
+
 	/* read RTC exactly on falling edge of update flag */
 	for (i = 0 ; i < 1000000 ; i++)	/* may take up to 1 second... */
 		if (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP)
@@ -406,7 +379,6 @@ unsigned long get_cmos_time(void)
 	for (i = 0 ; i < 1000000 ; i++)	/* must try at least 2.228 ms */
 		if (!(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP))
 			break;
-#endif
 	do { /* Isn't this overkill ? UIP above should guarantee consistency */
 		sec = CMOS_READ(RTC_SECONDS);
 		min = CMOS_READ(RTC_MINUTES);
@@ -424,6 +396,7 @@ unsigned long get_cmos_time(void)
 	    BCD_TO_BIN(mon);
 	    BCD_TO_BIN(year);
 	  }
+	spin_unlock(&rtc_lock); 
 	if ((year += 1900) < 1970)
 		year += 100;
 	return mktime(year, mon, day, hour, min, sec);
@@ -443,6 +416,7 @@ static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0, "timer", NUL
 #define CALIBRATE_LATCH	(5 * LATCH)
 #define CALIBRATE_TIME	(5 * 1000020/HZ)
 
+/* Could use 64bit arithmetic on x86-64, but the code is too fragile */
 static unsigned long __init calibrate_tsc(void)
 {
        /* Set the Gate high, disable speaker */
@@ -460,40 +434,41 @@ static unsigned long __init calibrate_tsc(void)
 	outb(CALIBRATE_LATCH >> 8, 0x42);	/* MSB of count */
 
 	{
-		unsigned long start;
-		unsigned long end;
-		unsigned long count;
+		unsigned int startlow, starthigh;
+		unsigned int endlow, endhigh;
+		unsigned int count;
 
-		{
-			int low, high;
-			rdtsc(low,high);
-			start = ((u64)high)<<32 | low;
-		}
+		rdtsc(startlow,starthigh);
 		count = 0;
 		do {
 			count++;
 		} while ((inb(0x61) & 0x20) == 0);
+		rdtsc(endlow,endhigh);
 
-		{
-			int low, high;
-			rdtsc(low,high);
-			end = ((u64)high)<<32 | low;
-			last_tsc_low = low;
-		}
-
+		last_tsc_low = endlow; 
 
 		/* Error: ECTCNEVERSET */
 		if (count <= 1)
 			goto bad_ctc;
 
-		end -= start;
+		__asm__("subl %2,%0\n\t"
+			"sbbl %3,%1"
+			:"=a" (endlow), "=d" (endhigh)
+			:"g" (startlow), "g" (starthigh),
+			 "0" (endlow), "1" (endhigh));
 
+		/* Error: ECPUTOOFAST */
+		if (endhigh)
+			goto bad_ctc;
 		/* Error: ECPUTOOSLOW */
-		if (end  <= CALIBRATE_TIME)
+		if (endlow  <= CALIBRATE_TIME)
 			goto bad_ctc;
 
-		end = (((u64)CALIBRATE_TIME)<<32)/end;
-		return end;
+		__asm__("divl %2"
+			:"=a" (endlow), "=d" (endhigh)
+			:"r" (endlow), "0" (0), "1" (CALIBRATE_TIME));
+      	
+		return endlow;
 	}
 
 	/*
@@ -525,7 +500,7 @@ void __init time_init(void)
  */
 
 	if (cpu_has_tsc) {
-		unsigned long tsc_quotient = calibrate_tsc();
+		unsigned int tsc_quotient = calibrate_tsc();
 		if (tsc_quotient) {
 			fast_gettimeoffset_quotient = tsc_quotient;
 			use_tsc = 1;
@@ -539,9 +514,13 @@ void __init time_init(void)
 			 * The formula is (10^6 * 2^32) / (2^32 * 1 / (clocks/us)) =
 			 * clock/second. Our precision is about 100 ppm.
 			 */
-			{			
-			        cpu_khz = ((1000*(1UL<<32)) / tsc_quotient); 
-				printk("Detected %ld Hz processor.\n", cpu_khz);
+			{	unsigned int eax=0, edx=1000;
+				__asm__("divl %2"
+		       		:"=a" (cpu_khz), "=d" (edx)
+        	       		:"r" (tsc_quotient),
+	                	"0" (eax), "1" (edx));
+				printk("Detected %u.%03u MHz processor.\n", 
+				       cpu_khz / 1000, cpu_khz % 1000);
 			}
 		}
 	}

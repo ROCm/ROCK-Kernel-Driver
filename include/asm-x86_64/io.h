@@ -166,11 +166,11 @@ extern void iounmap(void *addr);
 /*
  * However PCI ones are not necessarily 1:1 and therefore these interfaces
  * are forbidden in portable PCI drivers.
+ *
+ * Allow them on x86 for legacy drivers, though.
  */
-extern unsigned long virt_to_bus_not_defined_use_pci_map(volatile void *addr);
-#define virt_to_bus virt_to_bus_not_defined_use_pci_map
-extern unsigned long bus_to_virt_not_defined_use_pci_map(volatile void *addr);
-#define bus_to_virt bus_to_virt_not_defined_use_pci_map
+#define virt_to_bus virt_to_phys
+#define bus_to_virt phys_to_virt
 
 /*
  * readX/writeX() are used to access memory mapped devices. On some
@@ -225,6 +225,17 @@ extern unsigned long bus_to_virt_not_defined_use_pci_map(volatile void *addr);
 #define eth_io_copy_and_sum(a,b,c,d)		eth_copy_and_sum((a),__io_virt(b),(c),(d))
 #define isa_eth_io_copy_and_sum(a,b,c,d)	eth_copy_and_sum((a),__io_virt(__ISA_IO_base + (b)),(c),(d))
 
+/**
+ *	check_signature		-	find BIOS signatures
+ *	@io_addr: mmio address to check 
+ *	@signature:  signature block
+ *	@length: length of signature
+ *
+ *	Perform a signature comparison with the mmio address io_addr. This
+ *	address should have been obtained by ioremap.
+ *	Returns 1 on a match.
+ */
+ 
 static inline int check_signature(unsigned long io_addr,
 	const unsigned char *signature, int length)
 {
@@ -240,6 +251,20 @@ static inline int check_signature(unsigned long io_addr,
 out:
 	return retval;
 }
+
+/**
+ *	isa_check_signature		-	find BIOS signatures
+ *	@io_addr: mmio address to check 
+ *	@signature:  signature block
+ *	@length: length of signature
+ *
+ *	Perform a signature comparison with the ISA mmio address io_addr.
+ *	Returns 1 on a match.
+ *
+ *	This function is deprecated. New drivers should use ioremap and
+ *	check_signature.
+ */
+ 
 
 static inline int isa_check_signature(unsigned long io_addr,
 	const unsigned char *signature, int length)

@@ -8,15 +8,14 @@
 #ifndef __ASSEMBLY__
 
 /* Keep this syncronized with kernel/head.S */
-#define TSS_START (7 * 8)
-#define LDT_START (TSS_START + NR_CPUS*16) 
+#define TSS_START (8 * 8)
+#define LDT_START (TSS_START + 16) 
 
-#define __TSS(n)  (TSS_START + (n)*16)
-#define __LDT(n)  (LDT_START + (n)*16)
+#define __TSS(n)  (TSS_START + (n)*64)
+#define __LDT(n)  (LDT_START + (n)*64)
 
 extern __u8 tss_start[]; 
 extern __u8 gdt_table[];
-extern __u8 ldt_start[];
 extern __u8 gdt_end[];
 
 enum { 
@@ -50,7 +49,6 @@ struct desc_struct {
 enum { 
 	DESC_TSS = 0x9,
 	DESC_LDT = 0x2,
-	TSSLIMIT = 0x67,	
 }; 
 
 // LDT or TSS descriptor in the GDT. 16 bytes.
@@ -68,9 +66,9 @@ struct desc_ptr {
 	unsigned long address;
 } __attribute__((packed)) ;
 
-/* FIXME: these should use more generic register classes */
-#define load_TR(n) asm volatile("ltr %%ax"::"a" (__TSS(n)))
-#define __load_LDT(n) asm volatile("lldt %%ax"::"a" (__LDT(n)))
+#define load_TR(n) asm volatile("ltr %w0"::"r" (__TSS(n)))
+#define __load_LDT(n) asm volatile("lldt %w0"::"r" (__LDT(n)))
+#define clear_LDT(n)  asm volatile("lldt %w0"::"r" (0))
 
 /*
  * This is the ldt that every process will get unless we need
@@ -111,21 +109,6 @@ static inline void set_system_gate(int nr, void *func)
 	_set_gate(&idt_table[nr], GATE_INTERRUPT, (unsigned long) func, 3, 0); 
 } 
 
-static inline void set_trap_gate(int nr, void *func) 
-{ 
-	_set_gate(&idt_table[nr], GATE_TRAP, (unsigned long) func, 0, 0); 
-} 
-
-static inline void set_call_gate(void *adr, void *func) 
-{ 
-	_set_gate(adr, GATE_CALL, (unsigned long) func, 3, 0); 
-} 
-
-static inline void set_priv_gate(int nr, void *func) 
-{ 
-	_set_gate(&idt_table[nr], GATE_TRAP, (unsigned long) func, 0, 0); 	
-} 
-
 static inline void set_tssldt_descriptor(void *ptr, unsigned long tss, unsigned type, 
 					 unsigned size) 
 { 
@@ -144,24 +127,16 @@ static inline void set_tssldt_descriptor(void *ptr, unsigned long tss, unsigned 
 
 static inline void set_tss_desc(unsigned n, void *addr)
 { 
-	set_tssldt_descriptor((__u8*)gdt_table + __TSS(n), (unsigned long)addr, DESC_TSS, 
-			      TSSLIMIT); 
+	set_tssldt_descriptor((__u8*)gdt_table + __TSS(n), (unsigned long)addr, 
+			      DESC_TSS,
+			      sizeof(struct tss_struct)); 
 } 
 
 static inline void set_ldt_desc(unsigned n, void *addr, int size)
 { 
-	set_tssldt_descriptor((__u8*)gdt_table + __LDT(n), (unsigned long)addr, DESC_LDT, size); 
-} 
-
-
-#ifndef MINIKERNEL
-extern inline void clear_LDT(void)
-{
-	int cpu = smp_processor_id();
-	set_ldt_desc(cpu, &default_ldt[0], 5);
-	__load_LDT(cpu);
+	set_tssldt_descriptor((__u8*)gdt_table + __LDT(n), (unsigned long)addr, 
+			      DESC_LDT, size); 
 }
-
 
 /*
  * load one particular LDT into the current CPU
@@ -170,17 +145,15 @@ extern inline void load_LDT (struct mm_struct *mm)
 {
 	int cpu = smp_processor_id();
 	void *segments = mm->context.segments;
-	int count = LDT_ENTRIES;
 
 	if (!segments) {
-		segments = &default_ldt[0];
-		count = 5;
+		clear_LDT(cpu);
+		return;
 	}
 		
-	set_ldt_desc(cpu, segments, count);
+	set_ldt_desc(cpu, segments, LDT_ENTRIES);
 	__load_LDT(cpu);
 }
-#endif
 
 #endif /* !__ASSEMBLY__ */
 

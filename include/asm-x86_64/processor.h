@@ -28,6 +28,10 @@
 #define VIP_MASK	0x00100000	/* virtual interrupt pending */
 #define ID_MASK		0x00200000
 
+/*
+ * Default implementation of macro that returns current
+ * instruction pointer ("program counter").
+ */
 #define current_text_addr() ({ void *pc; asm volatile("leaq 1f(%%rip),%0\n1:":"=r"(pc)); pc; })
 
 /*
@@ -218,6 +222,10 @@ static inline void clear_in_cr4 (unsigned long mask)
 		:"ax");
 }
 
+#if 0
+/*
+ *      Cyrix CPU configuration register indexes
+ */
 #define CX86_CCR0 0xc0
 #define CX86_CCR1 0xc1
 #define CX86_CCR2 0xc2
@@ -242,6 +250,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 	outb((data), 0x23); \
 } while (0)
 
+#endif
 
 /*
  * Bus types
@@ -262,7 +271,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define TASK_UNMAPPED_32 0x40000000
 #define TASK_UNMAPPED_64 (TASK_SIZE/3) 
 #define TASK_UNMAPPED_BASE	\
-	((current->thread.flags & THREAD_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
+	(test_thread_flags(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
 
 /*
  * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
@@ -271,54 +280,22 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 
-/* We'll have to decide which format to use for floating stores, and
-   kill all others... */
-struct i387_fsave_struct {
-	u32	cwd;
-	u32	swd;
-	u32	twd;
-	u32	fip;
-	u32	fcs;
-	u32	foo;
-	u32	fos;
-	u32	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
-	u32	status;		/* software status information */
-};
-
 struct i387_fxsave_struct {
 	u16	cwd;
 	u16	swd;
 	u16	twd;
 	u16	fop;
-	u32	fip;
-	u32	fcs;
-	u32	foo;
-	u32	fos;
+	u64	rip;
+	u64	rdp; 
 	u32	mxcsr;
-	u32	reserved;
+	u32	mxcsr_mask;
 	u32	st_space[32];	/* 8*16 bytes for each FP-reg = 128 bytes */
-	u32	xmm_space[32];	/* 8*16 bytes for each XMM-reg = 128 bytes */
-	u32	padding[56];
+	u32	xmm_space[64];	/* 16*16 bytes for each XMM-reg = 128 bytes */
+	u32	padding[24];
 } __attribute__ ((aligned (16)));
 
-struct i387_soft_struct {
-	u32	cwd;
-	u32	swd;
-	u32	twd;
-	u32	fip;
-	u32	fcs;
-	u32	foo;
-	u32	fos;
-	u32	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
-	unsigned char	ftop, changed, lookahead, no_update, rm, alimit;
-	struct info	*info;
-	unsigned long	entry_eip;
-};
-
 union i387_union {
-	struct i387_fsave_struct	fsave;
 	struct i387_fxsave_struct	fxsave;
-	struct i387_soft_struct soft;
 };
 
 typedef struct {
@@ -365,26 +342,11 @@ struct thread_struct {
 #define INIT_MMAP \
 { &init_mm, 0, 0, NULL, PAGE_SHARED, VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
 
-
-#ifndef CONFIG_SMP
-extern char stackfault_stack[]; 
-#define STACKDESC rsp2: (unsigned long)stackfault_stack,
-#define STACKFAULT_STACK 2
-#else
-#define STACKFAULT_STACK 0
-#define STACKDESC
-#endif
-
-/* Doublefault currently shares the same stack on all CPUs. Hopefully
-   only one gets into this unfortunate condition at a time. Cannot do
-   the same for SF because that can be easily triggered by user
-   space. */
-#define INIT_TSS  {						\
-	rsp1: (unsigned long)doublefault_stack, 		\
-	STACKDESC \
-}
-
-extern char doublefault_stack[];
+#define STACKFAULT_STACK 1
+#define DOUBLEFAULT_STACK 2 
+#define NMI_STACK 3 
+#define N_EXCEPTION_STACKS 3  /* hw limit: 7 */
+#define EXCEPTION_STKSZ 1024
 
 #define start_thread(regs,new_rip,new_rsp) do { \
 	__asm__("movl %0,%%fs; movl %0,%%es; movl %0,%%ds": :"r" (0));		 \
@@ -414,22 +376,14 @@ extern void release_segments(struct mm_struct * mm);
 
 /*
  * Return saved PC of a blocked thread.
+ * What is this good for? it will be always the scheduler or ret_from_fork.
  */
-extern inline unsigned long thread_saved_pc(struct task_struct *t)
-{
-	return -1;  /* FIXME */
-}
+#define thread_saved_pc(t) (*(unsigned long *)((t)->thread.rsp - 8))
 
-unsigned long get_wchan(struct task_struct *p);
-
-
-/* FIXME: this is incorrect when the task is sleeping in a syscall entered
-   through SYSCALL. */ 
-#define __kstk_regs(tsk)  \
-	((struct pt_regs *)\
-	(((char *)(tsk)->thread_info) + THREAD_SIZE - sizeof(struct pt_regs)))
-#define KSTK_EIP(tsk) (__kstk_regs(tsk)->rip)
-#define KSTK_ESP(tsk) (__kstk_regs(tsk)->rsp)
+extern unsigned long get_wchan(struct task_struct *p);
+#define KSTK_EIP(tsk) \
+	(((struct pt_regs *)(tsk->thread.rsp0 - sizeof(struct pt_regs)))->rip)
+#define KSTK_ESP(tsk) -1 /* sorry. doesn't work for syscall. */
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 extern inline void rep_nop(void)
@@ -439,23 +393,12 @@ extern inline void rep_nop(void)
 
 #define cpu_has_fpu 1
 
-/* 3d now! prefetch instructions. Could also use the SSE flavours; not sure
-   if it makes a difference. gcc 3.1 has __builtin_prefetch too, but I am
-   not sure it makes sense to use them. */ 
-
 #define ARCH_HAS_PREFETCH
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
 
-extern inline void prefetch(const void *x)
-{
-    __asm__ __volatile__ ("prefetch (%0)" : : "r"(x));
-}
-
-extern inline void prefetchw(const void *x)
-{
-    __asm__ __volatile__ ("prefetchw (%0)" : : "r"(x));
-}
+#define prefetch(x) __builtin_prefetch((x),0)
+#define prefetchw(x) __builtin_prefetch((x),1)
 #define spin_lock_prefetch(x)  prefetchw(x)
 #define cpu_relax()   rep_nop()
 

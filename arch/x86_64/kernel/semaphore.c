@@ -14,7 +14,7 @@
  */
 #include <linux/config.h>
 #include <linux/sched.h>
-#include <linux/err.h>
+#include <asm/errno.h>
 
 #include <asm/semaphore.h>
 
@@ -168,58 +168,4 @@ int __down_trylock(struct semaphore * sem)
 	return 1;
 }
 
-
-/*
- * The semaphore operations have a special calling sequence that
- * allow us to do a simpler in-line version of them. These routines
- * need to convert that sequence back into the C sequence when
- * there is contention on the semaphore.
- *
- * %rcx contains the semaphore pointer on entry. Save all the callee
- * clobbered registers.  It would be better if the compiler had a way 
- * to specify that for the callee.
- */
-
-
-#define PUSH_CLOBBER "pushq %rdi ; pushq %rsi ; pushq %rdx ; pushq %rcx ;" \
- "pushq %rbx ; pushq %r8 ; push %r9\n\t" 
-#define POP_CLOBBER "popq %r9 ; popq %r8 ; popq %rbx ; popq %rcx ; " \
-	"popq %rdx ; popq %rsi ; popq %rdi\n\t"     
-
-#define SEM_ENTRY(label, name) asm( \
-	".p2align\n\t.globl " #label "\n\t" \
-	#label ":\n\t" PUSH_CLOBBER "call " #name "\n\t" POP_CLOBBER "ret" )
-
-SEM_ENTRY(__down_failed, __down);
-SEM_ENTRY(__down_failed_interruptible, __down_interruptible); 
-SEM_ENTRY(__down_failed_trylock, __down_trylock); 
-SEM_ENTRY(__up_wakeup, __up);
-
-
-#if defined(CONFIG_SMP)
-asm(
-".p2align"
-"\n.globl	__write_lock_failed"
-"\n__write_lock_failed:"
-"\n	" LOCK "addl	$" RW_LOCK_BIAS_STR ",(%rax)"
-"\n1:	rep; nop; cmpl	$" RW_LOCK_BIAS_STR ",(%rax)"
-"\n	jne	1b"
-
-"\n	" LOCK "subl	$" RW_LOCK_BIAS_STR ",(%rax)"
-"\n	jnz	__write_lock_failed"
-"\n	ret"
-
-
-"\n.p2align"
-"\n.globl	__read_lock_failed"
-"\n__read_lock_failed:"
-"\n	lock ; incl	(%rax)"
-"\n1:	rep; nop; cmpl	$1,(%rax)"
-"\n	js	1b"
-
-"\n	lock ; decl	(%rax)"
-"\n	js	__read_lock_failed"
-"\n	ret"
-);
-#endif
 
