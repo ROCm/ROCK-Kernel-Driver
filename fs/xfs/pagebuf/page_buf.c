@@ -1291,13 +1291,18 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 /*
  * Helper routine for pagebuf_iorequest
  */
-STATIC void
+STATIC int
 bio_end_io_pagebuf(
-	struct bio		*bio)
+	struct bio		*bio,
+	unsigned int		bytes_done,
+	int			error)
 {
 	page_buf_t		*pb = (page_buf_t *)bio->bi_private;
 	unsigned int		i, blocksize = pb->pb_target->pbr_blocksize;
 	struct bio_vec		*bvec = bio->bi_io_vec;
+
+	if (bio->bi_size)
+		return 1;
 
 	if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
 		pb->pb_error = EIO;
@@ -1335,6 +1340,7 @@ bio_end_io_pagebuf(
 	}
 
 	bio_put(bio);
+	return 0;
 }
 
 /*

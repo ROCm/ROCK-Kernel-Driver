@@ -1969,12 +1969,15 @@ static int lbmIOWait(struct lbuf * bp, int flag)
  *
  * executed at INTIODONE level
  */
-static void lbmIODone(struct bio *bio)
+static int lbmIODone(struct bio *bio, unsigned int bytes_done, int error)
 {
 	struct lbuf *bp = bio->bi_private;
 	struct lbuf *nextbp, *tail;
 	struct jfs_log *log;
 	unsigned long flags;
+
+	if (bio->bi_size)
+		return 1;
 
 	/*
 	 * get back jfs buffer bound to the i/o buffer
@@ -2004,7 +2007,7 @@ static void lbmIODone(struct bio *bio)
 		/* wakeup I/O initiator */
 		LCACHE_WAKEUP(&bp->l_ioevent);
 
-		return;
+		return 0;
 	}
 
 	/*
@@ -2029,7 +2032,7 @@ static void lbmIODone(struct bio *bio)
 	if (bp->l_flag & lbmDIRECT) {
 		LCACHE_WAKEUP(&bp->l_ioevent);
 		LCACHE_UNLOCK(flags);
-		return;
+		return 0;
 	}
 
 	tail = log->wqueue;
@@ -2108,6 +2111,8 @@ static void lbmIODone(struct bio *bio)
 
 		LCACHE_UNLOCK(flags);	/* unlock+enable */
 	}
+
+	return 0;
 }
 
 int jfsIOWait(void *arg)
