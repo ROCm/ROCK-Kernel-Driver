@@ -31,6 +31,8 @@
 #include <linux/buffer_head.h>		/* for fsync_super() */
 #include <asm/uaccess.h>
 
+#include <linux/security.h>
+
 void get_filesystem(struct file_system_type *fs);
 void put_filesystem(struct file_system_type *fs);
 struct file_system_type *get_fs_type(const char *name);
@@ -49,6 +51,11 @@ static struct super_block *alloc_super(void)
 	struct super_block *s = kmalloc(sizeof(struct super_block),  GFP_USER);
 	if (s) {
 		memset(s, 0, sizeof(struct super_block));
+		if (security_ops->sb_alloc_security(s)) {
+			kfree(s);
+			s = NULL;
+			goto out;
+		}
 		INIT_LIST_HEAD(&s->s_dirty);
 		INIT_LIST_HEAD(&s->s_io);
 		INIT_LIST_HEAD(&s->s_locked_inodes);
@@ -67,6 +74,7 @@ static struct super_block *alloc_super(void)
 		s->dq_op = sb_dquot_ops;
 		s->s_qcop = sb_quotactl_ops;
 	}
+out:
 	return s;
 }
 
@@ -78,6 +86,7 @@ static struct super_block *alloc_super(void)
  */
 static inline void destroy_super(struct super_block *s)
 {
+	security_ops->sb_free_security(s);
 	kfree(s);
 }
 
