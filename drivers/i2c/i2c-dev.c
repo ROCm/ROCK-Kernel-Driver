@@ -124,6 +124,13 @@ static ssize_t show_dev(struct class_device *class_dev, char *buf)
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
 
+static ssize_t show_adapter_name(struct class_device *class_dev, char *buf)
+{
+	struct i2c_dev *i2c_dev = to_i2c_dev(class_dev);
+	return sprintf(buf, "%s\n", i2c_dev->adap->name);
+}
+static CLASS_DEVICE_ATTR(name, S_IRUGO, show_adapter_name, NULL);
+
 static ssize_t i2cdev_read (struct file *file, char __user *buf, size_t count,
                             loff_t *offset)
 {
@@ -459,6 +466,7 @@ static int i2cdev_attach_adapter(struct i2c_adapter *adap)
 	if (retval)
 		goto error;
 	class_device_create_file(&i2c_dev->class_dev, &class_device_attr_dev);
+	class_device_create_file(&i2c_dev->class_dev, &class_device_attr_name);
 	return 0;
 error:
 	return_i2c_dev(i2c_dev);
