@@ -126,7 +126,6 @@ typedef struct {
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0 }
 
 #define rwlock_init(x)		do { *(x) = RW_LOCK_UNLOCKED; } while(0)
-#define rwlock_is_locked(x)	(*(volatile int *) (x) != 0)
 
 #define _raw_read_lock(rw)								\
 do {											\

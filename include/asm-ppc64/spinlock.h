@@ -147,7 +147,6 @@ static void __inline__ _raw_spin_lock_flags(spinlock_t *lock, unsigned long flag
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0 }
 
 #define rwlock_init(x)		do { *(x) = RW_LOCK_UNLOCKED; } while(0)
-#define rwlock_is_locked(x)	((x)->lock)
 
 static __inline__ int is_read_locked(rwlock_t *rw)
 {
