@@ -36,7 +36,6 @@
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
-#include <linux/proc_fs.h>
 #include <linux/pagemap.h>
 #include <linux/dma-mapping.h>
 #include <linux/sched.h>
@@ -76,6 +75,8 @@ static int ibmvscsis_debug = 0;
 #define SENSE_INVALID_CMD   6
 #define SENSE_INTERMEDIATE  7
 #define SENSE_WRITE_PROT    8
+
+#define TARGET_MAX_NAME_LEN 128
 
 static unsigned char ibmvscsis_sense_data[][3] = {
 /*
@@ -117,16 +118,6 @@ struct inquiry_data {
 	char version_descriptor[16];
 	char reserved2[22];
 };
-
-/*
- * Our proc dir entry under /proc/drivers.  We use proc to configure
- * this driver right now.
- * TODO: For 2.5 move to sysfs
- */
-#ifdef CONFIG_PROC_FS
-#define IBMVSCSIS_PROC_DIR "ibmvscsis"
-static struct proc_dir_entry *ibmvscsis_proc_dir;
-#endif
 
 extern int vio_num_address_cells;
 
@@ -194,9 +185,10 @@ struct vdev {
 	atomic_t refcount;
 	int disabled;
 	u64 lun;
+	struct kobject kobj;
 	struct {
+		char device_name[TARGET_MAX_NAME_LEN];
 		struct block_device *bdev;
-		dev_t dev;
 		long blksize;
 		long lastlba;
 		int ro;
@@ -211,6 +203,9 @@ struct vdev {
 #define BUS_PER_ADAPTER (8)
 struct vbus {
 	struct vdev *vdev[TARGETS_PER_BUS];
+	atomic_t num_targets;
+	struct kobject kobj;
+	int bus_num;
 };
 
 /*
@@ -242,6 +237,9 @@ struct server_adapter {
 	char name[32];
 	unsigned long liobn;
 	unsigned long riobn;
+
+	atomic_t num_buses;
+	struct kobject stats_kobj;
 
 	/* This ugly expression allocates a bit array of 
 	 * in-use flags large enough for the number of buffers
@@ -1146,14 +1144,13 @@ static void process_rw(char *cmd, int rw, struct iu_entry *iue, long lba,
 	int cur_biovec;
 	long flags;
 
-	dbg("%s %16.16lx[%d:%d:%d][%d:%d] lba %ld len %ld reladr %d link %d\n",
+	dbg("%s %16.16lx[%d:%d:%d][%s] lba %ld len %ld reladr %d link %d\n",
 	    cmd,
 	    iue->iu->srp.cmd.lun,
 	    GETBUS(iue->iu->srp.cmd.lun),
 	    GETTARGET(iue->iu->srp.cmd.lun),
 	    GETLUN(iue->iu->srp.cmd.lun),
-	    MAJOR(iue->req.vd->b.dev),
-	    MINOR(iue->req.vd->b.dev),
+	    iue->req.vd->b.device_name,
 	    lba,
 	    len / iue->req.vd->b.blksize,
 	    iue->iu->srp.cmd.cdb[1] & 0x01, iue->req.linked);
@@ -2158,322 +2155,422 @@ static void release_crq_queue(struct crq_queue *queue,
 /*
  * Add a block device as a SCSI LUN
  */
-static void add_block_device(int majo, int mino, int bus, int target,
-			     struct server_adapter *adapter, int ro)
+static int activate_block_device(struct vdev *vdev)
 {
-	struct vdev *vd;
-	struct vbus *newbus = NULL;
-	mode_t mode;
-	unsigned long flags;
-	dev_t kd = MKDEV(majo, mino);
+	struct block_device *bdev;
+	char *name = vdev->b.device_name;
+	int ro = vdev->b.ro;
 
-	if (bus >= BUS_PER_ADAPTER) {
-		err("Invalid bus %u specified\n", bus);
-		return;
-	}
+	bdev = open_bdev_excl(name, ro, activate_block_device);
+	if (IS_ERR(bdev))
+		return PTR_ERR(bdev);;
 
-	if (target >= TARGETS_PER_BUS) {
-		err("Invalid target %u specified\n", bus);
-		return;
-	}
+	vdev->b.bdev = bdev;
+	vdev->disabled = 0;
 
-	vd = (struct vdev *)kmalloc(sizeof(struct vdev), GFP_KERNEL);
-	if (vd == NULL) {
-		err("Unable to allocate memory for vdev structure");
-		return;
-	}
+	info("Activating block device %s as %sLUN 0x%lx\n",
+	     name, ro ? "read only " : "", vdev->lun);
 
-	memset(vd, 0x00, sizeof(*vd));
-	vd->type = 'B';
-	vd->lun = make_lun(bus, target, 0);
-	vd->b.dev = kd;
-	vd->b.bdev = bdget(kd);
-	vd->b.blksize = 512;
-	vd->b.ro = ro;
-
-	if (ro) {
-		mode = FMODE_READ;
-	} else {
-		mode = FMODE_READ | FMODE_WRITE;
-	}
-
-	if (blkdev_get(vd->b.bdev, mode, 0) != 0) {
-		err("Error opening block device\n");
-		kfree(vd);
-		return;
-	}
-
-	if (adapter->vbus[bus] == NULL) {
-		newbus =
-		    (struct vbus *)kmalloc(sizeof(struct vbus), GFP_KERNEL);
-		memset(newbus, 0x00, sizeof(*newbus));
-	}
-
-	spin_lock_irqsave(&adapter->lock, flags);
-	if ((newbus) && (adapter->vbus[bus] == NULL)) {
-		adapter->vbus[bus] = newbus;
-		newbus = NULL;
-	}
-
-	if (adapter->vbus[bus]->vdev[target] != NULL) {
-		spin_unlock_irqrestore(&adapter->lock, flags);
-		err("Error: Duplicate vdev as lun 0x%lx\n", vd->lun);
-		kfree(vd);
-		return;
-	}
-
-	adapter->vbus[bus]->vdev[target] = vd;
-	adapter->nvdevs++;
-
-	spin_unlock_irqrestore(&adapter->lock, flags);
-
-	if (newbus)
-		kfree(newbus);
-
-	info("Adding block device %d:%d as %sLUN 0x%lx\n",
-	     majo, mino, ro ? "read only " : "", vd->lun);
-	return;
+	return 0;
 }
 
-static void remove_block_device(int bus, int target,
-				struct server_adapter *adapter)
+static void deactivate_block_device(struct vdev *vdev)
 {
-	struct vdev *vd;
-	unsigned long flags;
-
-	spin_lock_irqsave(&adapter->lock, flags);
-
-	if ((!adapter->vbus[bus]) || (!adapter->vbus[bus]->vdev[target])) {
-		spin_unlock_irqrestore(&adapter->lock, flags);
-		err("Error removing non-existant device at bus %d, target %d\n",
-		    bus, target);
-		return;
-	}
-
-	vd = adapter->vbus[bus]->vdev[target];
-
-	if (vd->disabled) {
-		spin_unlock_irqrestore(&adapter->lock, flags);
-		err("Device at bus %d, target %d removed twice\n", bus, target);
-		return;
-	}
-
-	adapter->nvdevs--;
-
-	vd->disabled = 1;
-
-	spin_unlock_irqrestore(&adapter->lock, flags);
+	info("Deactivating block device, LUN 0x%lx\n", vdev->lun);
 
 	/* Wait while any users of this device finish.  Note there should
 	 * be no new users, since we have marked this disabled
 	 *
-	 * We just poll here, since we are blocking a proc_write
+	 * We just poll here, since we are blocking write
 	 */
-	while (atomic_read(&vd->refcount)) {
+	while (atomic_read(&vdev->refcount)) {
 		schedule_timeout(HZ / 4);	/* 1/4 second */
 	}
 
-	spin_lock_irqsave(&adapter->lock, flags);
-	adapter->vbus[bus]->vdev[target] = NULL;
-	spin_unlock_irqrestore(&adapter->lock, flags);
-
-	if (blkdev_put(vd->b.bdev)) {
-		err("Error closing block device!\n");
-	}
-	kfree(vd);
-
-	info("Removed block device at %d:%d\n", bus, target);
+	close_bdev_excl(vdev->b.bdev);
+	vdev->disabled = 1;
 }
 
-/*
- * Handle read from our proc system file.  There is one of these
- * files per adapter
- */
-static int ibmvscsis_proc_read(char *page, char **start, off_t off,
-			       int count, int *eof, void *data)
+
+#define ATTR(_type, _name, _mode)      \
+struct attribute vscsi_##_type##_##_name##_attr = {               \
+.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE \
+};
+
+static struct kobj_type ktype_vscsi_target;
+static struct kobj_type ktype_vscsi_bus;
+static struct kobj_type ktype_vscsi_stats;
+
+static void set_num_targets(struct vbus* vbus, long value)
 {
-	struct server_adapter *adapter = (struct server_adapter *)data;
-	int len = 0;
-	int bus;
-	int target;
-	struct vdev *vd;
+	struct device *dev = 
+		container_of(vbus->kobj.parent, struct device , kobj);
+	struct server_adapter *adapter = (struct server_adapter *)to_vio_dev(dev)->driver_data;
+	int cur_num_targets = atomic_read(&vbus->num_targets);
 	unsigned long flags;
 
-	len += sprintf(page + len, "IBM VSCSI Server: %s\n", adapter->name);
-	len += sprintf(page + len, "interrupts: %10d\t\tread ops:   %10d\n",
-		       atomic_read(&adapter->interrupts),
-		       atomic_read(&adapter->read_processed));
-	len += sprintf(page + len, "crq msgs:   %10d\t\twrite ops:  %10d\n",
-		       atomic_read(&adapter->crq_processed),
-		       atomic_read(&adapter->write_processed));
-	len += sprintf(page + len, "iu alloc:   %10d\t\tbio alloc:  %10d\n",
-		       atomic_read(&adapter->iu_count),
-		       atomic_read(&adapter->bio_count));
+	spin_lock_irqsave(&adapter->lock, flags);
 
-	len += sprintf(page + len, "buf alloc:  %10d\t\terrors:     %10d\n",
-		       atomic_read(&adapter->buffers_allocated),
-		       atomic_read(&adapter->errors));
+	if (cur_num_targets < value) { //growing
+		int i;
+		for (i = cur_num_targets; i < value; i++) {
+			vbus->vdev[i] = (struct vdev *)
+				kmalloc(sizeof(struct vdev), GFP_KERNEL);
+			if (!vbus->vdev[i]) {
+				spin_unlock_irqrestore(&adapter->lock, flags);
+				err("Couldn't malloc target%d\n", i);
+				return;
+			}
+			memset(vbus->vdev[i], 0x00, sizeof(struct vdev));
+
+			vbus->vdev[i]->lun = make_lun(vbus->bus_num, i, 0);
+			vbus->vdev[i]->b.blksize = 512;
+			vbus->vdev[i]->disabled = 1;
+
+			vbus->vdev[i]->kobj.parent = &vbus->kobj;
+			sprintf(vbus->vdev[i]->kobj.name, "target%d", i);
+			vbus->vdev[i]->kobj.ktype = &ktype_vscsi_target;
+			kobject_register(&vbus->vdev[i]->kobj);
+			adapter->nvdevs++;
+			atomic_inc(&vbus->num_targets);
+		}
+	} else { //shrinking
+		int i;
+		for (i = cur_num_targets - 1; i >= value; i--)
+		{
+			if (!vbus->vdev[i]->disabled) {
+				spin_unlock_irqrestore(&adapter->lock, flags);
+				err("Can't remove active target%d\n", i);
+				return;
+			}
+
+			kobject_unregister(&vbus->vdev[i]->kobj);
+
+			kfree(vbus->vdev[i]);
+
+			adapter->nvdevs--;
+			atomic_dec(&vbus->num_targets);
+		}
+	}
+	spin_unlock_irqrestore(&adapter->lock, flags);
+}
+
+static void set_num_buses(struct device *dev, long value)
+{
+	struct server_adapter *adapter = (struct server_adapter *)to_vio_dev(dev)->driver_data;
+	int cur_num_buses = atomic_read(&adapter->num_buses);
+	unsigned long flags;
+
+
+	if (cur_num_buses < value) { // growing
+		int i;
+		for (i = cur_num_buses; i < value; i++) {
+			adapter->vbus[i] = (struct vbus *)
+				kmalloc(sizeof(struct vbus), GFP_KERNEL);
+			if (!adapter->vbus[i]) {
+				spin_unlock_irqrestore(&adapter->lock, flags);
+				err("Couldn't malloc bus%d\n", i);
+				return;
+			}
+			memset(adapter->vbus[i], 0x00, sizeof(struct vbus));
+
+			spin_lock_irqsave(&adapter->lock, flags);
+
+			adapter->vbus[i]->bus_num = i;
+
+			adapter->vbus[i]->kobj.parent = &dev->kobj;
+			sprintf(adapter->vbus[i]->kobj.name, "bus%d", i);
+			adapter->vbus[i]->kobj.ktype = &ktype_vscsi_bus; 
+			kobject_register(&adapter->vbus[i]->kobj);
+			
+			atomic_inc(&adapter->num_buses);
+			spin_unlock_irqrestore(&adapter->lock, flags);
+
+			set_num_targets(adapter->vbus[i], 1);
+		}
+
+	} else if (cur_num_buses > value) { //shrinking
+		int i, j, active_target;
+		for (i = cur_num_buses - 1; i >= value; i--) {
+			active_target = -1;
+			for (j = 0; j < TARGETS_PER_BUS; j++) {
+				if (adapter->vbus[i]->vdev[j] && 
+				    !adapter->vbus[i]->vdev[j]->disabled) {
+					active_target = j;
+					break;
+				}
+			}
+			if (active_target != -1) {
+				err("Can't remove bus%d, target%d active\n", 
+					i, active_target);
+				return ;
+			}
+
+			set_num_targets(adapter->vbus[i], 0);
+
+			spin_lock_irqsave(&adapter->lock, flags);
+			atomic_dec(&adapter->num_buses);
+			kobject_unregister(&adapter->vbus[i]->kobj);
+			kfree(adapter->vbus[i]);
+			adapter->vbus[i] = NULL;
+			spin_unlock_irqrestore(&adapter->lock, flags);
+		}
+	}
+}
+
+
+/* Target sysfs stuff */
+static ATTR(target, type, 0644);
+static ATTR(target, device, 0644);
+static ATTR(target, active, 0644);
+static ATTR(target, ro, 0644);
+
+static ssize_t vscsi_target_show(struct kobject * kobj, struct attribute * attr, char * buf)
+{
+	struct vdev *vdev = container_of(kobj, struct vdev, kobj);
+	struct device *dev = container_of(kobj->parent->parent, struct device, kobj);
+	struct server_adapter *adapter = (struct server_adapter *)to_vio_dev(dev)->driver_data;
+	unsigned long flags;
+	ssize_t returned;
 
 	spin_lock_irqsave(&adapter->lock, flags);
 
-	/* loop through the bus */
-	for (bus = 0; bus < BUS_PER_ADAPTER; bus++) {
-		/* If this bus exists */
-		if (adapter->vbus[bus]) {
-			/* loop through the targets */
-			for (target = 0; target < TARGETS_PER_BUS; target++) {
-				/* If the target exists */
-				if (adapter->vbus[bus]->vdev[target]) {
-					vd = adapter->vbus[bus]->vdev[target];
-					if (vd->type == 'B') {
-						len +=
-						    sprintf(page + len,
-							    "Block Device Major %d, Minor %d, Bus %d, Target %d LUN %d\n",
-							    MAJOR(vd->b.dev),
-							    MINOR(vd->b.dev),
-							    GETBUS(vd->lun),
-							    GETTARGET(vd->lun),
-							    GETLUN(vd->lun));
-					}
-				}
-			}
-		}
+	if (attr == &vscsi_target_type_attr)
+		returned = sprintf(buf, "%c\n", vdev->type);
+	else if (attr == &vscsi_target_device_attr)
+		returned = sprintf(buf, "%s\n", vdev->b.device_name);
+	else if (attr == &vscsi_target_active_attr)
+		returned = sprintf(buf, "%d\n", !vdev->disabled);
+	else if (attr == &vscsi_target_ro_attr)
+		returned = sprintf(buf, "%d\n", vdev->b.ro);
+	else {
+		spin_unlock_irqrestore(&adapter->lock, flags);
+		BUG();
 	}
 
 	spin_unlock_irqrestore(&adapter->lock, flags);
 
-	*eof = 1;
-	return len;
+	return returned;
 }
 
-/*
- * Handle proc file system write.  One per adapter, currently used just
- * to add virtual devices to our adapters.
- */
-static int ibmvscsis_proc_write(struct file *file, const char *buffer,
-				unsigned long count, void *data)
+static ssize_t vscsi_target_store(struct kobject * kobj, struct attribute * attr, const char * buf, size_t count)
 {
-	int offset = 0;
-	int bytes;
-	char token[10];
-	char type[4];
-	int majo = -1;
-	int mino = -1;
-	unsigned int bus = -1;
-	unsigned int target = -1;
-	int ro = 0;
+	struct vdev *vdev = container_of(kobj, struct vdev, kobj);
+	struct device *dev = container_of(kobj->parent->parent, struct device, kobj);
+	struct server_adapter *adapter = (struct server_adapter *)to_vio_dev(dev)->driver_data;
+	long flags;
+	long value = simple_strtol(buf, NULL, 10);
 
-	struct server_adapter *adapter = (struct server_adapter *)data;
-
-	if (sscanf(buffer + offset, "%9s%n", token, &bytes) != 1) {
-		err("Error on read of proc file\n");
-		return count;
+	if (attr != &vscsi_target_active_attr) {
+		err("Error: Can't modify properties while target is active.\n");
+		return -EPERM;
 	}
-	offset += bytes;
 
-	if (strcmp(token, "add") == 0) {
+	spin_lock_irqsave(&adapter->lock, flags);
 
-		if (sscanf(buffer + offset, "%3s%n", type, &bytes) != 1) {
-			err("Error on read of proc file\n");
-			return count;
-		}
-		offset += bytes;
-
-		sscanf(buffer + offset, "%i%n", &majo, &bytes);
-		offset += bytes;
-
-		sscanf(buffer + offset, "%i%n", &mino, &bytes);
-		offset += bytes;
-
-		sscanf(buffer + offset, "%i%n", &bus, &bytes);
-		offset += bytes;
-
-		sscanf(buffer + offset, "%i%n", &target, &bytes);
-		offset += bytes;
-
-		if (strcmp(type, "b") == 0) {
-			ro = 0;
-		} else if (strcmp(type, "br") == 0) {
-			ro = 1;
+	if (attr == &vscsi_target_type_attr) {
+		if (buf[0] == 'B' ||  buf[0] == 'b')
+			vdev->type = 'B';
+		else if (buf[0] == 'S' || buf[0] == 's') {
+			// TODO
+			spin_unlock_irqrestore(&adapter->lock, flags);
+			err ("SCSI mode not supported yet\n");		
+			return -EINVAL;
 		} else {
-			err("Invalid type %s on add request\n", type);
-			return count;
+			spin_unlock_irqrestore(&adapter->lock, flags);
+			return -EINVAL;
 		}
-
-		if ((majo == -1) || (mino == -1)) {
-			err("Ignoring command %s device %d::%ds type %s\n",
-			    token, majo, mino, type);
-			return count;
+	} else if (attr == &vscsi_target_device_attr) {
+		int i;
+		i  = strlcpy(vdev->b.device_name, buf, TARGET_MAX_NAME_LEN);
+		for (; i >= 0; i--)
+			if (vdev->b.device_name[i] == '\n')
+				vdev->b.device_name[i] = '\0';
+	} else if (attr == &vscsi_target_active_attr) {
+		if (value) {
+			int rc;
+			if (!vdev->disabled) {
+				spin_unlock_irqrestore(&adapter->lock, flags);
+				warn("Warning: Target was already active\n");
+				return -EINVAL;
+			}
+			if (vdev->type == '\0') {
+				spin_unlock_irqrestore(&adapter->lock, flags);
+				err("Error: Type not specified\n");
+				return -EPERM;
+			}
+			rc = activate_block_device(vdev);
+			if (rc) {
+				spin_unlock_irqrestore(&adapter->lock, flags);
+				err("Error opening block device=%d\n", rc);
+				return rc;
+			}
+		} else {
+			deactivate_block_device(vdev);
 		}
-		add_block_device(majo, mino, bus, target, adapter, ro);
-	} else if (strcmp(token, "remove") == 0) {
-		if (sscanf(buffer + offset, "%3s%n", type, &bytes) != 1) {
-			err("Error on read of proc file\n");
-			return count;
-		}
-		offset += bytes;
-
-		sscanf(buffer + offset, "%i%n", &bus, &bytes);
-		offset += bytes;
-
-		sscanf(buffer + offset, "%i%n", &target, &bytes);
-		offset += bytes;
-
-		if ((strcmp(type, "b") != 0) && (strcmp(type, "br") != 0)) {
-			err("Ignoring remove command for invalid type %s\n",
-			    type);
-			return count;
-		}
-
-		if ((bus == -1) || (target == -1)) {
-			err("Ignoring remove command bus %d target%ds\n",
-			    bus, target);
-			return count;
-		}
-
-		remove_block_device(bus, target, adapter);
-	} else if (strcmp(token, "debug") == 0) {
-		ibmvscsis_debug = 1;
-		dbg("debugging on\n");
-	} else {
-		err("Ignoring command %s\n", token);
+	} else if (attr == &vscsi_target_ro_attr)
+		vdev->b.ro = value > 0 ? 1 : 0;
+	else {
+		spin_unlock_irqrestore(&adapter->lock, flags);
+		BUG();
 	}
+
+	spin_unlock_irqrestore(&adapter->lock, flags);
 
 	return count;
 }
 
-static void ibmvscsis_proc_register_driver(void)
+static struct attribute * vscsi_target_attrs[] = {
+	&vscsi_target_type_attr,
+	&vscsi_target_device_attr,
+	&vscsi_target_active_attr,
+	&vscsi_target_ro_attr,
+	NULL,
+};
+
+static struct sysfs_ops vscsi_target_ops = {
+	.show   = vscsi_target_show,
+	.store  = vscsi_target_store,
+};
+
+static struct kobj_type ktype_vscsi_target = {
+	.release        = NULL,
+	.sysfs_ops      = &vscsi_target_ops, 
+	.default_attrs  = vscsi_target_attrs,
+};
+
+
+
+/* Bus sysfs stuff */
+static ssize_t vscsi_bus_show(struct kobject * kobj, struct attribute * attr, char * buf)
 {
-#ifdef CONFIG_PROC_FS
-	ibmvscsis_proc_dir =
-	    create_proc_entry(IBMVSCSIS_PROC_DIR, S_IFDIR, proc_root_driver);
-#endif
+	struct vbus *vbus = container_of(kobj, struct vbus, kobj);
+	return sprintf(buf, "%d\n", atomic_read(&vbus->num_targets));
 }
 
-static void ibmvscsis_proc_unregister_driver(void)
+static ssize_t vscsi_bus_store(struct kobject * kobj, struct attribute * attr, 
+const char * buf, size_t count)
 {
-#ifdef CONFIG_PROC_FS
-	remove_proc_entry(IBMVSCSIS_PROC_DIR, proc_root_driver);
-#endif
+	struct vbus *vbus = container_of(kobj, struct vbus, kobj);
+	long value = simple_strtol(buf, NULL, 10);
+	
+	if (value < 0 || value > TARGETS_PER_BUS)
+		return -EINVAL;
+	
+	set_num_targets(vbus, value);
+
+	return count;
 }
 
-static void ibmvscsis_proc_register_adapter(struct server_adapter *adapter)
+
+static ATTR(bus, num_targets, 0644);
+
+static struct attribute * vscsi_bus_attrs[] = {
+	&vscsi_bus_num_targets_attr,
+	NULL,
+};
+
+static struct sysfs_ops vscsi_bus_ops = {
+	.show   = vscsi_bus_show,
+	.store  = vscsi_bus_store,
+};
+
+static struct kobj_type ktype_vscsi_bus = {
+	.release        = NULL,
+	.sysfs_ops      = &vscsi_bus_ops, 
+	.default_attrs  = vscsi_bus_attrs,
+};
+
+
+/* Device attributes */
+static ssize_t vscsi_dev_bus_show(struct device * dev, char * buf)
 {
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *entry;
-	entry = create_proc_entry(adapter->name, S_IFREG, ibmvscsis_proc_dir);
-	entry->data = (void *)adapter;
-	entry->read_proc = ibmvscsis_proc_read;
-	entry->write_proc = ibmvscsis_proc_write;
-#endif
+	struct server_adapter *adapter = (struct server_adapter *)to_vio_dev(dev)->driver_data;
+
+	return sprintf(buf, "%d\n", atomic_read(&adapter->num_buses));
 }
 
-static void ibmvscsis_proc_unregister_adapter(struct server_adapter *adapter)
+static ssize_t vscsi_dev_bus_store(struct device * dev, const char * buf, size_t count)
 {
-#ifdef CONFIG_PROC_FS
-	remove_proc_entry(adapter->name, ibmvscsis_proc_dir);
-#endif
+	long value = simple_strtol(buf, NULL, 10);
+	
+	if (value < 0 || value > BUS_PER_ADAPTER)
+		return -EINVAL;
+
+	set_num_buses(dev, value);
+	return count;
 }
+
+static DEVICE_ATTR(num_buses, 0644, vscsi_dev_bus_show, vscsi_dev_bus_store);
+
+
+/* Stats kobj stuff */
+
+static ATTR(stats, interrupts, 0444);
+static ATTR(stats, read_ops, 0444);
+static ATTR(stats, write_ops, 0444);
+static ATTR(stats, crq_msgs, 0444);
+static ATTR(stats, iu_allocs, 0444);
+static ATTR(stats, bio_allocs, 0444);
+static ATTR(stats, buf_allocs, 0444);
+static ATTR(stats, errors, 0444);
+
+static struct attribute * vscsi_stats_attrs[] = {
+	&vscsi_stats_interrupts_attr,
+	&vscsi_stats_read_ops_attr,
+	&vscsi_stats_write_ops_attr,
+	&vscsi_stats_crq_msgs_attr,
+	&vscsi_stats_iu_allocs_attr,
+	&vscsi_stats_bio_allocs_attr,
+	&vscsi_stats_buf_allocs_attr,
+	&vscsi_stats_errors_attr,
+	NULL,
+};
+
+
+static ssize_t vscsi_stats_show(struct kobject * kobj, struct attribute * attr, char * buf)
+{
+	struct server_adapter *adapter= container_of(kobj, struct server_adapter, stats_kobj);
+	if (attr == &vscsi_stats_interrupts_attr)
+		return sprintf(buf, "%d\n", 
+		 atomic_read(&adapter->interrupts));
+	if (attr == &vscsi_stats_read_ops_attr)
+		return sprintf(buf, "%d\n", 
+		 atomic_read(&adapter->read_processed));
+	if (attr == &vscsi_stats_write_ops_attr)
+		return sprintf(buf, "%d\n", 
+		 atomic_read(&adapter->write_processed));
+	if (attr == &vscsi_stats_crq_msgs_attr)
+		return sprintf(buf, "%d\n", 
+		 atomic_read(&adapter->crq_processed));
+	if (attr == &vscsi_stats_iu_allocs_attr)
+		return sprintf(buf, "%d\n", 
+		 atomic_read(&adapter->iu_count));
+	if (attr == &vscsi_stats_bio_allocs_attr)
+		return sprintf(buf, "%d\n", 
+		 atomic_read(&adapter->bio_count));
+	if (attr == &vscsi_stats_buf_allocs_attr)
+		return sprintf(buf, "%d\n", 
+		 atomic_read(&adapter->buffers_allocated));
+	if (attr == &vscsi_stats_errors_attr)
+		return sprintf(buf, "%d\n", 
+		 atomic_read(&adapter->errors));
+	
+	BUG();
+	return 0;
+}
+
+static struct sysfs_ops vscsi_stats_ops = {
+	.show   = vscsi_stats_show,
+	.store  = NULL,
+};
+
+static struct kobj_type ktype_vscsi_stats = {
+	.release        = NULL,
+	.sysfs_ops      = &vscsi_stats_ops, 
+	.default_attrs  = vscsi_stats_attrs,
+};
+
 
 static int ibmvscsis_probe(struct vio_dev *dev, const struct vio_device_id *id)
 {
@@ -2545,7 +2642,13 @@ static int ibmvscsis_probe(struct vio_dev *dev, const struct vio_device_id *id)
 		return rc;
 	}
 
-	ibmvscsis_proc_register_adapter(adapter);
+	set_num_buses(&dev->dev, 1);
+	device_create_file(&dev->dev, &dev_attr_num_buses);
+
+	adapter->stats_kobj.parent = &dev->dev.kobj;
+	strcpy(adapter->stats_kobj.name, "stats");
+	adapter->stats_kobj.ktype = & ktype_vscsi_stats;
+	kobject_register(&adapter->stats_kobj);
 
 	return 0;
 }
@@ -2554,18 +2657,15 @@ static int ibmvscsis_remove(struct vio_dev *dev)
 {
 	int bus;
 	int target;
-
+	unsigned long flags;
 	struct server_adapter *adapter =
 	    (struct server_adapter *)dev->driver_data;
 
 	info("entering remove for UA 0x%x\n", dev->unit_address);
 
-	ibmvscsis_proc_unregister_adapter(adapter);
+	spin_lock_irqsave(&adapter->lock, flags);
 
 	/* 
-	 * No one should be adding any devices at this point because we blew 
-	 * away the proc file system entry 
-	 *
 	 * Loop through the bus
 	 */
 	for (bus = 0; bus < BUS_PER_ADAPTER; bus++) {
@@ -2574,19 +2674,28 @@ static int ibmvscsis_remove(struct vio_dev *dev)
 			/* loop through the targets */
 			for (target = 0; target < TARGETS_PER_BUS; target++) {
 				/* If the target exists */
-				if (adapter->vbus[bus]->vdev[target]) {
-					remove_block_device(bus, target,
-							    adapter);
+				if (adapter->vbus[bus]->vdev[target] &&
+				    !adapter->vbus[bus]->vdev[target]
+				     ->disabled) {
+					deactivate_block_device(adapter->
+					 vbus[bus]->vdev[target]);
 				}
 			}
+			spin_unlock_irqrestore(&adapter->lock, flags);
+			set_num_targets(adapter->vbus[bus], 0);
+			spin_lock_irqsave(&adapter->lock, flags);
 		}
 	}
 
+	spin_unlock_irqrestore(&adapter->lock, flags);
+	set_num_buses(adapter->dev, 0);
 	release_crq_queue(&adapter->queue, adapter);
 
 	release_iu_pool(adapter);
 
 	release_data_buffer(adapter);
+
+	kobject_unregister(&adapter->stats_kobj);
 
 	kfree(adapter);
 
@@ -2601,7 +2710,7 @@ static struct vio_device_id ibmvscsis_device_table[] __devinitdata = {
 MODULE_DEVICE_TABLE(vio, ibmvscsis_device_table);
 
 static struct vio_driver ibmvscsis_driver = {
-	.name = "ibmvscss",
+	.name = "ibmvscsis",
 	.id_table = ibmvscsis_device_table,
 	.probe = ibmvscsis_probe,
 	.remove = ibmvscsis_remove,
@@ -2612,8 +2721,6 @@ static int mod_init(void)
 	int rc;
 
 	info("ibmvscsis initialized\n");
-
-	ibmvscsis_proc_register_driver();
 
 	rc = vio_register_driver(&ibmvscsis_driver);
 
@@ -2629,8 +2736,6 @@ static void mod_exit(void)
 	info("terminated\n");
 
 	vio_unregister_driver(&ibmvscsis_driver);
-
-	ibmvscsis_proc_unregister_driver();
 }
 
 module_init(mod_init);
