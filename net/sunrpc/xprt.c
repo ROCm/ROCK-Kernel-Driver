@@ -944,7 +944,7 @@ tcp_state_change(struct sock *sk)
  * low.
  */
 static void
-tcp_write_space(struct sock *sk)
+xprt_write_space(struct sock *sk)
 {
 	struct rpc_xprt	*xprt;
 	struct socket	*sock;
@@ -971,31 +971,6 @@ tcp_write_space(struct sock *sk)
 			wake_up_interruptible(sk->sleep);
 		}
 	}
-}
-
-static void
-udp_write_space(struct sock *sk)
-{
-	struct rpc_xprt *xprt;
-
-	if (!(xprt = xprt_from_sock(sk)))
-		return;
-	if (xprt->shutdown)
-		return;
-
-	/* Wait until we have enough socket memory. */
-	if (!sock_writeable(sk))
-		return;
-
-	if (!xprt_test_and_set_wspace(xprt)) {
-		spin_lock(&xprt->sock_lock);
-		if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->sending)
-			rpc_wake_up_task(xprt->snd_task);
-		spin_unlock(&xprt->sock_lock);
-	}
-
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible(sk->sleep);
 }
 
 /*
@@ -1414,15 +1389,14 @@ xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 	xprt->old_write_space = sk->write_space;
 	if (xprt->prot == IPPROTO_UDP) {
 		sk->data_ready = udp_data_ready;
-		sk->write_space = udp_write_space;
 		sk->no_check = UDP_CSUM_NORCV;
 		xprt_set_connected(xprt);
 	} else {
 		sk->data_ready = tcp_data_ready;
 		sk->state_change = tcp_state_change;
-		sk->write_space = tcp_write_space;
 		xprt_clear_connected(xprt);
 	}
+	sk->write_space = xprt_write_space;
 
 	/* Reset to new socket */
 	xprt->sock = sock;
