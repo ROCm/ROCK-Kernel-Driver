@@ -793,7 +793,6 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 			rtn = host->hostt->queuecommand(SCpnt, scsi_done);
 			spin_unlock_irqrestore(host->host_lock, flags);
 			if (rtn != 0) {
-				scsi_delete_timer(SCpnt);
 				scsi_mlqueue_insert(SCpnt, rtn == SCSI_MLQUEUE_DEVICE_BUSY ? rtn : SCSI_MLQUEUE_HOST_BUSY);
 				SCSI_LOG_MLQUEUE(3,
 				   printk("queuecommand : request rejected\n"));                                
