@@ -1011,6 +1011,7 @@ static __init void dmi_check_blacklist(void)
 				printk(KERN_NOTICE "ACPI disabled because your bios is from %s and too old\n", s);
 				printk(KERN_NOTICE "You can enable it with acpi=force\n");
 				acpi_disabled = 1; 
+				acpi_ht = 0;
 			} 
 		}
 	}
