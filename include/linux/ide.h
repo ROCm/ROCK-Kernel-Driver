@@ -849,8 +849,6 @@ typedef struct hwif_s {
 
 	struct pci_dev  *pci_dev;	/* for pci chipsets */
 	struct ide_pci_device_s	*cds;	/* chipset device struct */
-	
-	struct pnp_dev  *pnp_dev;	/* for PnP devices */
 
 	ide_startstop_t (*rw_disk)(ide_drive_t *, struct request *, sector_t);
 
