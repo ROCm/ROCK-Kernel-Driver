@@ -426,7 +426,10 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 		ice->num_total_adcs = 8;
 		break;
 	case ICE1712_SUBDEVICE_EWS88D:
-		break; /* no analog */
+		/* Note: not analog but ADAT I/O */
+		ice->num_total_dacs = 8;
+		ice->num_total_adcs = 8;
+		break;
 	case ICE1712_SUBDEVICE_DMX6FIRE:
 		ice->num_total_dacs = 6;
 		ice->num_total_adcs = 6;
