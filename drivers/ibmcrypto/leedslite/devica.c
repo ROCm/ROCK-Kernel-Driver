@@ -687,6 +687,7 @@ static void __exit ica_cleanup_module(void)
 #endif
 	devfs_remove("ica");
 	devfs_remove("devica");
+	class_simple_device_remove(MKDEV(driver_major, 0));
 	class_simple_destroy(ica_dev_class);
 
 	unregister_chrdev(driver_major, "ica");
