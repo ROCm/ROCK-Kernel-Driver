@@ -966,8 +966,8 @@ int ntfs_map_runlist(ntfs_inode *ni, VCN vcn)
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (!lookup_attr(ni->type, ni->name, ni->name_len, CASE_SENSITIVE, vcn,
-			NULL, 0, ctx)) {
+	if (!ntfs_attr_lookup(ni->type, ni->name, ni->name_len, CASE_SENSITIVE,
+			vcn, NULL, 0, ctx)) {
 		put_attr_search_ctx(ctx);
 		err = -ENOENT;
 		goto err_out;
@@ -1148,7 +1148,7 @@ lock_retry_remap:
 }
 
 /**
- * find_attr - find (next) attribute in mft record
+ * ntfs_attr_find - find (next) attribute in mft record
  * @type:	attribute type to find
  * @name:	attribute name to find (optional, i.e. NULL means don't care)
  * @name_len:	attribute name length (only needed if @name present)
@@ -1157,47 +1157,49 @@ lock_retry_remap:
  * @val_len:	attribute value length
  * @ctx:	search context with mft record and attribute to search from
  *
- * You shouldn't need to call this function directly. Use lookup_attr() instead.
+ * You should not need to call this function directly.  Use ntfs_attr_lookup()
+ * instead.
  *
- * find_attr() takes a search context @ctx as parameter and searches the mft
- * record specified by @ctx->mrec, beginning at @ctx->attr, for an attribute of
- * @type, optionally @name and @val. If found, find_attr() returns TRUE and
- * @ctx->attr will point to the found attribute. If not found, find_attr()
- * returns FALSE and @ctx->attr is undefined (i.e. do not rely on it not
- * changing).
+ * ntfs_attr_find() takes a search context @ctx as parameter and searches the
+ * mft record specified by @ctx->mrec, beginning at @ctx->attr, for an
+ * attribute of @type, optionally @name and @val.  If found, ntfs_attr_find()
+ * returns TRUE and @ctx->attr will point to the found attribute.  If not
+ * found, ntfs_attr_find() returns FALSE and @ctx->attr is undefined (i.e. do
+ * not rely on it not changing).
  *
- * If @ctx->is_first is TRUE, the search begins with @ctx->attr itself. If it
+ * If @ctx->is_first is TRUE, the search begins with @ctx->attr itself.  If it
  * is FALSE, the search begins after @ctx->attr.
  *
  * If @ic is IGNORE_CASE, the @name comparisson is not case sensitive and
  * @ctx->ntfs_ino must be set to the ntfs inode to which the mft record
- * @ctx->mrec belongs. This is so we can get at the ntfs volume and hence at
- * the upcase table. If @ic is CASE_SENSITIVE, the comparison is case
- * sensitive. When @name is present, @name_len is the @name length in Unicode
+ * @ctx->mrec belongs.  This is so we can get at the ntfs volume and hence at
+ * the upcase table.  If @ic is CASE_SENSITIVE, the comparison is case
+ * sensitive.  When @name is present, @name_len is the @name length in Unicode
  * characters.
  *
  * If @name is not present (NULL), we assume that the unnamed attribute is
  * being searched for.
  *
- * Finally, the resident attribute value @val is looked for, if present. If @val
- * is not present (NULL), @val_len is ignored.
+ * Finally, the resident attribute value @val is looked for, if present.  If
+ * @val is not present (NULL), @val_len is ignored.
  *
- * find_attr() only searches the specified mft record and it ignores the
+ * ntfs_attr_find() only searches the specified mft record and it ignores the
  * presence of an attribute list attribute (unless it is the one being searched
- * for, obviously). If you need to take attribute lists into consideration, use
- * lookup_attr() instead (see below). This also means that you cannot use
- * find_attr() to search for extent records of non-resident attributes, as
- * extents with lowest_vcn != 0 are usually described by the attribute list
- * attribute only. - Note that it is possible that the first extent is only in
- * the attribute list while the last extent is in the base mft record, so don't
- * rely on being able to find the first extent in the base mft record.
+ * for, obviously).  If you need to take attribute lists into consideration,
+ * use ntfs_attr_lookup() instead (see below).  This also means that you cannot
+ * use ntfs_attr_find() to search for extent records of non-resident
+ * attributes, as extents with lowest_vcn != 0 are usually described by the
+ * attribute list attribute only. - Note that it is possible that the first
+ * extent is only in the attribute list while the last extent is in the base
+ * mft record, so do not rely on being able to find the first extent in the
+ * base mft record.
  *
  * Warning: Never use @val when looking for attribute types which can be
  *	    non-resident as this most likely will result in a crash!
  */
-BOOL find_attr(const ATTR_TYPES type, const ntfschar *name, const u32 name_len,
-		const IGNORE_CASE_BOOL ic, const u8 *val, const u32 val_len,
-		attr_search_context *ctx)
+BOOL ntfs_attr_find(const ATTR_TYPES type, const ntfschar *name,
+		const u32 name_len, const IGNORE_CASE_BOOL ic,
+		const u8 *val, const u32 val_len, attr_search_context *ctx)
 {
 	ATTR_RECORD *a;
 	ntfs_volume *vol;
@@ -1419,7 +1421,7 @@ err_out:
 }
 
 /**
- * find_external_attr - find an attribute in the attribute list of an ntfs inode
+ * ntfs_external_attr_find - find an attribute in the attribute list of an inode
  * @type:	attribute type to find
  * @name:	attribute name to find (optional, i.e. NULL means don't care)
  * @name_len:	attribute name length (only needed if @name present)
@@ -1429,34 +1431,35 @@ err_out:
  * @val_len:	attribute value length
  * @ctx:	search context with mft record and attribute to search from
  *
- * You shouldn't need to call this function directly. Use lookup_attr() instead.
+ * You should not need to call this function directly.  Use ntfs_attr_lookup()
+ * instead.
  *
  * Find an attribute by searching the attribute list for the corresponding
- * attribute list entry. Having found the entry, map the mft record for read
- * if the attribute is in a different mft record/inode, find_attr the attribute
+ * attribute list entry.  Having found the entry, map the mft record if the
+ * attribute is in a different mft record/inode, ntfs_attr_find() the attribute
  * in there and return it.
  *
  * On first search @ctx->ntfs_ino must be the base mft record and @ctx must
- * have been obtained from a call to get_attr_search_ctx(). On subsequent calls
- * @ctx->ntfs_ino can be any extent inode, too (@ctx->base_ntfs_ino is then the
- * base inode).
+ * have been obtained from a call to get_attr_search_ctx().  On subsequent
+ * calls @ctx->ntfs_ino can be any extent inode, too (@ctx->base_ntfs_ino is
+ * then the base inode).
  *
  * After finishing with the attribute/mft record you need to call
  * put_attr_search_ctx() to cleanup the search context (unmapping any mapped
  * inodes, etc).
  *
- * Return TRUE if the search was successful and FALSE if not. When TRUE,
- * @ctx->attr is the found attribute and it is in mft record @ctx->mrec. When
+ * Return TRUE if the search was successful and FALSE if not.  When TRUE,
+ * @ctx->attr is the found attribute and it is in mft record @ctx->mrec.  When
  * FALSE, @ctx->attr is the attribute which collates just after the attribute
  * being searched for in the base ntfs inode, i.e. if one wants to add the
  * attribute to the mft record this is the correct place to insert it into
  * and if there is not enough space, the attribute should be placed in an
  * extent mft record.
  */
-static BOOL find_external_attr(const ATTR_TYPES type, const ntfschar *name,
-		const u32 name_len, const IGNORE_CASE_BOOL ic,
-		const VCN lowest_vcn, const u8 *val, const u32 val_len,
-		attr_search_context *ctx)
+static BOOL ntfs_external_attr_find(const ATTR_TYPES type,
+		const ntfschar *name, const u32 name_len,
+		const IGNORE_CASE_BOOL ic, const VCN lowest_vcn,
+		const u8 *val, const u32 val_len, attr_search_context *ctx)
 {
 	ntfs_inode *base_ni, *ni;
 	ntfs_volume *vol;
@@ -1538,10 +1541,11 @@ static BOOL find_external_attr(const ATTR_TYPES type, const ntfschar *name,
 				continue;
 			/*
 			 * FIXME: Reverse engineering showed 0, IGNORE_CASE but
-			 * that is inconsistent with find_attr(). The subsequent
-			 * rc checks were also different. Perhaps I made a
-			 * mistake in one of the two. Need to recheck which is
-			 * correct or at least see what is going on... (AIA)
+			 * that is inconsistent with ntfs_attr_find().  The
+			 * subsequent rc checks were also different.  Perhaps I
+			 * made a mistake in one of the two.  Need to recheck
+			 * which is correct or at least see what is going on...
+			 * (AIA)
 			 */
 			rc = ntfs_collate_names(name, name_len, al_name,
 					al_name_len, 1, CASE_SENSITIVE,
@@ -1609,14 +1613,14 @@ static BOOL find_external_attr(const ATTR_TYPES type, const ntfschar *name,
 		 * current al_entry.
 		 */
 		/*
-		 * We could call into find_attr() to find the right attribute
-		 * in this mft record but this would be less efficient and not
-		 * quite accurate as find_attr() ignores the attribute instance
-		 * numbers for example which become important when one plays
-		 * with attribute lists. Also, because a proper match has been
-		 * found in the attribute list entry above, the comparison can
-		 * now be optimized. So it is worth re-implementing a
-		 * simplified find_attr() here.
+		 * We could call into ntfs_attr_ind() to find the right
+		 * attribute in this mft record but this would be less
+		 * efficient and not quite accurate as ntfs_attr_find() ignores
+		 * the attribute instance numbers for example which become
+		 * important when one plays with attribute lists.  Also,
+		 * because a proper match has been found in the attribute list
+		 * entry above, the comparison can now be optimized.  So it is
+		 * worth re-implementing a simplified ntfs_attr_find() here.
 		 */
 		a = ctx->attr;
 		/*
@@ -1689,13 +1693,13 @@ not_found:
 	 * FIXME: Do we really want to do this here? Think about it... (AIA)
 	 */
 	reinit_attr_search_ctx(ctx);
-	find_attr(type, name, name_len, ic, val, val_len, ctx);
+	ntfs_attr_find(type, name, name_len, ic, val, val_len, ctx);
 	ntfs_debug("Done, not found.");
 	return FALSE;
 }
 
 /**
- * lookup_attr - find an attribute in an ntfs inode
+ * ntfs_attr_lookup - find an attribute in an ntfs inode
  * @type:	attribute type to find
  * @name:	attribute name to find (optional, i.e. NULL means don't care)
  * @name_len:	attribute name length (only needed if @name present)
@@ -1722,7 +1726,7 @@ not_found:
  * being searched for, i.e. if one wants to add the attribute to the mft
  * record this is the correct place to insert it into.
  */
-BOOL lookup_attr(const ATTR_TYPES type, const ntfschar *name,
+BOOL ntfs_attr_lookup(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		attr_search_context *ctx)
@@ -1737,9 +1741,10 @@ BOOL lookup_attr(const ATTR_TYPES type, const ntfschar *name,
 	/* Sanity check, just for debugging really. */
 	BUG_ON(!base_ni);
 	if (!NInoAttrList(base_ni))
-		return find_attr(type, name, name_len, ic, val, val_len, ctx);
-	return find_external_attr(type, name, name_len, ic, lowest_vcn, val,
-			val_len, ctx);
+		return ntfs_attr_find(type, name, name_len, ic, val, val_len,
+				ctx);
+	return ntfs_external_attr_find(type, name, name_len, ic, lowest_vcn,
+			val, val_len, ctx);
 }
 
 /**

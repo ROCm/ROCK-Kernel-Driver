@@ -336,7 +336,8 @@ static int ntfs_write_volume_flags(ntfs_volume *vol, const VOLUME_FLAGS flags)
 		err = -ENOMEM;
 		goto put_unm_err_out;
 	}
-	if (!lookup_attr(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0, ctx)) {
+	if (!ntfs_attr_lookup(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0,
+			ctx)) {
 		err = -EIO;
 		goto put_unm_err_out;
 	}
@@ -1432,8 +1433,8 @@ iput_volume_failed:
 		ntfs_error(sb, "Failed to get attribute search context.");
 		goto get_ctx_vol_failed;
 	}
-	if (!lookup_attr(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0, ctx) ||
-			ctx->attr->non_resident || ctx->attr->flags) {
+	if (!ntfs_attr_lookup(AT_VOLUME_INFORMATION, NULL, 0, 0, 0, NULL, 0,
+			ctx) || ctx->attr->non_resident || ctx->attr->flags) {
 err_put_vol:
 		put_attr_search_ctx(ctx);
 get_ctx_vol_failed:

@@ -28,6 +28,13 @@ ToDo/Notes:
 	- Fix scheduling latencies in ntfs_fill_super() by dropping the BKL
 	  because the code itself is using the ntfs_lock semaphore which
 	  provides safe locking.  (Ingo Molnar)
+	- Fix a potential bug in fs/ntfs/mft.c::map_extent_mft_record() that
+	  could occur in the future for when we start closing/freeing extent
+	  inodes if we don't set base_ni->ext.extent_ntfs_inos to NULL after
+	  we free it.
+	- Rename {find,lookup}_attr() to ntfs_attr_{find,lookup}() as well as
+	  find_external_attr() to ntfs_external_attr_find() to cleanup the
+	  namespace a bit and to be more consistent with libntfs.
 
 2.1.17 - Fix bugs in mount time error code paths and other updates.
 

@@ -441,7 +441,7 @@ static int ntfs_is_extended_system_file(attr_search_context *ctx)
 	nr_links = le16_to_cpu(ctx->mrec->link_count);
 
 	/* Loop through all hard links. */
-	while (lookup_attr(AT_FILE_NAME, NULL, 0, 0, 0, NULL, 0, ctx)) {
+	while (ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, 0, 0, NULL, 0, ctx)) {
 		FILE_NAME_ATTR *file_name_attr;
 		ATTR_RECORD *attr = ctx->attr;
 		u8 *p, *p2;
@@ -608,7 +608,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	 * in fact fail if the standard information is in an extent record, but
 	 * I don't think this actually ever happens.
 	 */
-	if (!lookup_attr(AT_STANDARD_INFORMATION, NULL, 0, 0, 0, NULL, 0,
+	if (!ntfs_attr_lookup(AT_STANDARD_INFORMATION, NULL, 0, 0, 0, NULL, 0,
 			ctx)) {
 		/*
 		 * TODO: We should be performing a hot fix here (if the recover
@@ -647,7 +647,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 
 	/* Find the attribute list attribute if present. */
 	reinit_attr_search_ctx(ctx);
-	if (lookup_attr(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx)) {
 		if (vi->i_ino == FILE_MFT)
 			goto skip_attr_list_load;
 		ntfs_debug("Attribute list found in inode 0x%lx.", vi->i_ino);
@@ -734,7 +734,7 @@ skip_attr_list_load:
 
 		/* It is a directory, find index root attribute. */
 		reinit_attr_search_ctx(ctx);
-		if (!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0,
+		if (!ntfs_attr_lookup(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0,
 				NULL, 0, ctx)) {
 			// FIXME: File is corrupt! Hot-fix with empty index
 			// root attribute if recovery option is set.
@@ -850,8 +850,8 @@ skip_attr_list_load:
 		NInoSetIndexAllocPresent(ni);
 		/* Find index allocation attribute. */
 		reinit_attr_search_ctx(ctx);
-		if (!lookup_attr(AT_INDEX_ALLOCATION, I30, 4, CASE_SENSITIVE,
-				0, NULL, 0, ctx)) {
+		if (!ntfs_attr_lookup(AT_INDEX_ALLOCATION, I30, 4,
+				CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 			ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute "
 					"is not present but $INDEX_ROOT "
 					"indicated it is.");
@@ -946,7 +946,7 @@ skip_large_dir_stuff:
 		ni->name_len = 0;
 
 		/* Find first extent of the unnamed data attribute. */
-		if (!lookup_attr(AT_DATA, NULL, 0, 0, 0, NULL, 0, ctx)) {
+		if (!ntfs_attr_lookup(AT_DATA, NULL, 0, 0, 0, NULL, 0, ctx)) {
 			vi->i_size = ni->initialized_size =
 					ni->allocated_size = 0LL;
 			/*
@@ -1169,8 +1169,8 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 	}
 
 	/* Find the attribute. */
-	if (!lookup_attr(ni->type, ni->name, ni->name_len, CASE_SENSITIVE, 0,
-			NULL, 0, ctx))
+	if (!ntfs_attr_lookup(ni->type, ni->name, ni->name_len, CASE_SENSITIVE,
+			0, NULL, 0, ctx))
 		goto unm_err_out;
 
 	if (!ctx->attr->non_resident) {
@@ -1425,8 +1425,8 @@ static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
 		goto unm_err_out;
 	}
 	/* Find the index root attribute. */
-	if (!lookup_attr(AT_INDEX_ROOT, ni->name, ni->name_len, CASE_SENSITIVE,
-			0, NULL, 0, ctx)) {
+	if (!ntfs_attr_lookup(AT_INDEX_ROOT, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		ntfs_error(vi->i_sb, "$INDEX_ROOT attribute is missing.");
 		goto unm_err_out;
 	}
@@ -1506,7 +1506,7 @@ static int ntfs_read_locked_index_inode(struct inode *base_vi, struct inode *vi)
 	NInoSetIndexAllocPresent(ni);
 	/* Find index allocation attribute. */
 	reinit_attr_search_ctx(ctx);
-	if (!lookup_attr(AT_INDEX_ALLOCATION, ni->name, ni->name_len,
+	if (!ntfs_attr_lookup(AT_INDEX_ALLOCATION, ni->name, ni->name_len,
 			CASE_SENSITIVE, 0, NULL, 0, ctx)) {
 		ntfs_error(vi->i_sb, "$INDEX_ALLOCATION attribute is not "
 				"present but $INDEX_ROOT indicated it is.");
@@ -1619,16 +1619,16 @@ err_out:
  * is not initialized and hence we cannot get at the contents of mft records
  * by calling map_mft_record*().
  *
- * Further it needs to cope with the circular references problem, i.e. can't
+ * Further it needs to cope with the circular references problem, i.e. cannot
  * load any attributes other than $ATTRIBUTE_LIST until $DATA is loaded, because
- * we don't know where the other extent mft records are yet and again, because
- * we cannot call map_mft_record*() yet. Obviously this applies only when an
+ * we do not know where the other extent mft records are yet and again, because
+ * we cannot call map_mft_record*() yet.  Obviously this applies only when an
  * attribute list is actually present in $MFT inode.
  *
  * We solve these problems by starting with the $DATA attribute before anything
- * else and iterating using lookup_attr($DATA) over all extents. As each extent
- * is found, we decompress_mapping_pairs() including the implied
- * merge_runlists(). Each step of the iteration necessarily provides
+ * else and iterating using ntfs_attr_lookup($DATA) over all extents.  As each
+ * extent is found, we decompress_mapping_pairs() including the implied
+ * ntfs_merge_runlists().  Each step of the iteration necessarily provides
  * sufficient information for the next step to complete.
  *
  * This should work but there are two possible pit falls (see inline comments
@@ -1726,7 +1726,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 	}
 
 	/* Find the attribute list attribute if present. */
-	if (lookup_attr(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx)) {
+	if (ntfs_attr_lookup(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx)) {
 		ATTR_LIST_ENTRY *al_entry, *next_al_entry;
 		u8 *al_end;
 
@@ -1860,7 +1860,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 	/* Now load all attribute extents. */
 	attr = NULL;
 	next_vcn = last_vcn = highest_vcn = 0;
-	while (lookup_attr(AT_DATA, NULL, 0, 0, next_vcn, NULL, 0, ctx)) {
+	while (ntfs_attr_lookup(AT_DATA, NULL, 0, 0, next_vcn, NULL, 0, ctx)) {
 		runlist_element *nrl;
 
 		/* Cache the current attribute. */
@@ -2347,7 +2347,7 @@ int ntfs_write_inode(struct inode *vi, int sync)
 		err = -ENOMEM;
 		goto unm_err_out;
 	}
-	if (unlikely(!lookup_attr(AT_STANDARD_INFORMATION, NULL, 0,
+	if (unlikely(!ntfs_attr_lookup(AT_STANDARD_INFORMATION, NULL, 0,
 			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
 		put_attr_search_ctx(ctx);
 		err = -ENOENT;

@@ -168,7 +168,7 @@ int ntfs_index_lookup(const void *key, const int key_len,
 		goto err_out;
 	}
 	/* Find the index root attribute in the mft record. */
-	if (!lookup_attr(AT_INDEX_ROOT, idx_ni->name, idx_ni->name_len,
+	if (!ntfs_attr_lookup(AT_INDEX_ROOT, idx_ni->name, idx_ni->name_len,
 			CASE_SENSITIVE, 0, NULL, 0, actx)) {
 		ntfs_error(sb, "Index root attribute missing in inode 0x%lx.",
 				idx_ni->mft_no);

@@ -402,7 +402,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 		err = -ENOMEM;
 		goto unm_err_out;
 	}
-	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
+	if (unlikely(!ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
 			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
 		err = -ENOENT;
 		goto put_unm_err_out;
@@ -1122,7 +1122,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
+	if (unlikely(!ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
 			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
 		err = -ENOENT;
 		goto err_out;
@@ -1683,7 +1683,7 @@ static int ntfs_prepare_write(struct file *file, struct page *page,
 	 * We thus defer the uptodate bringing of the page region outside the
 	 * region written to to ntfs_commit_write(). The reason for doing this
 	 * is that we save one round of:
-	 *	map_mft_record(), get_attr_search_ctx(), lookup_attr(),
+	 *	map_mft_record(), get_attr_search_ctx(), ntfs_attr_lookup(),
 	 *	kmap_atomic(), kunmap_atomic(), put_attr_search_ctx(),
 	 *	unmap_mft_record().
 	 * Which is obviously a very worthwhile save.
@@ -1896,7 +1896,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 		err = -ENOMEM;
 		goto err_out;
 	}
-	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
+	if (unlikely(!ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
 			CASE_SENSITIVE, 0, NULL, 0, ctx))) {
 		err = -ENOENT;
 		goto err_out;

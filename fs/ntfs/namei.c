@@ -205,8 +205,8 @@ handle_name:
 			ATTR_RECORD *a;
 			u32 val_len;
 
-			if (!lookup_attr(AT_FILE_NAME, NULL, 0, 0, 0, NULL, 0,
-					ctx)) {
+			if (!ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, 0, 0,
+					NULL, 0, ctx)) {
 				ntfs_error(vol->sb, "Inode corrupt: No WIN32 "
 						"namespace counterpart to DOS "
 						"file name. Run chkdsk.");
@@ -385,8 +385,8 @@ struct dentry *ntfs_get_parent(struct dentry *child_dent)
 		return ERR_PTR(-ENOMEM);
 	}
 try_next:
-	if (unlikely(!lookup_attr(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE, 0,
-			NULL, 0, ctx))) {
+	if (unlikely(!ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE,
+			0, NULL, 0, ctx))) {
 		put_attr_search_ctx(ctx);
 		unmap_mft_record(ni);
 		ntfs_error(vi->i_sb, "Inode 0x%lx does not have a file name "
