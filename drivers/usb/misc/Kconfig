@@ -99,10 +99,13 @@ config USB_SPEEDTOUCH
 
 config USB_TEST
 	tristate "USB testing driver (DEVELOPMENT)"
-	depends on USB_DEVICEFS && EXPERIMENTAL
+	depends on USB && USB_DEVICEFS && EXPERIMENTAL
 	help
 
 	  This driver is for testing host controller software.  It is used
 	  with specialized device firmware for regression and stress testing,
 	  to help prevent problems from cropping up with "real" drivers.
+
+	  See <http://www.linux-usb.org/usbtest> for more information,
+	  including sample test device firmware and "how to use it".
 
