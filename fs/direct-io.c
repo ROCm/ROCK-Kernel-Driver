@@ -209,7 +209,7 @@ static struct page *dio_get_page(struct dio *dio)
  */
 static void dio_complete(struct dio *dio, loff_t offset, ssize_t bytes)
 {
-	if (dio->end_io)
+	if (dio->end_io && dio->result)
 		dio->end_io(dio->inode, offset, bytes, dio->map_bh.b_private);
 	if (dio->needs_locking)
 		up_read(&dio->inode->i_alloc_sem);
@@ -225,8 +225,14 @@ static void finished_one_bio(struct dio *dio)
 		if (dio->is_async) {
 			dio_complete(dio, dio->block_in_file << dio->blkbits,
 					dio->result);
-			aio_complete(dio->iocb, dio->result, 0);
-			kfree(dio);
+			/* Complete AIO later if falling back to buffered i/o */
+			if (dio->result != -ENOTBLK) {
+				aio_complete(dio->iocb, dio->result, 0);
+				kfree(dio);
+			} else {
+				if (dio->waiter)
+					wake_up_process(dio->waiter);
+			}
 		}
 	}
 }
@@ -877,8 +883,6 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	int ret2;
 	size_t bytes;
 
-	dio->is_async = !is_sync_kiocb(iocb);
-
 	dio->bio = NULL;
 	dio->inode = inode;
 	dio->rw = rw;
@@ -975,10 +979,11 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	dio_cleanup(dio);
 
 	/*
-	 * All new block allocations have been performed.  We can let i_sem
-	 * go now.
+	 * All block lookups have been performed. For READ requests
+	 * we can let i_sem go now that its achieved its purpose
+	 * of protecting us from looking up uninitialized blocks.
 	 */
-	if (dio->needs_locking)
+	if ((rw == READ) && dio->needs_locking)
 		up(&dio->inode->i_sem);
 
 	/*
@@ -988,8 +993,31 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	if (dio->is_async) {
 		if (ret == 0)
 			ret = dio->result;	/* Bytes written */
+		if (ret == -ENOTBLK) {
+			/*
+			 * The request will be reissued via buffered I/O
+			 * when we return; Any I/O already issued
+			 * effectively becomes redundant.
+			 */
+			dio->result = ret;
+			dio->waiter = current;
+		}
 		finished_one_bio(dio);		/* This can free the dio */
 		blk_run_queues();
+		if (ret == -ENOTBLK) {
+			/*
+			 * Wait for already issued I/O to drain out and
+			 * release its references to user-space pages
+			 * before returning to fallback on buffered I/O
+			 */
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			while (atomic_read(&dio->bio_count)) {
+				io_schedule();
+				set_current_state(TASK_UNINTERRUPTIBLE);
+			}
+			set_current_state(TASK_RUNNING);
+			dio->waiter = NULL;
+		}
 	} else {
 		finished_one_bio(dio);
 		ret2 = dio_await_completion(dio);
@@ -1009,6 +1037,9 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 				ret = i_size - offset;
 		}
 		dio_complete(dio, offset, ret);
+		/* We could have also come here on an AIO file extend */
+		if (!is_sync_kiocb(iocb) && (ret != -ENOTBLK))
+			aio_complete(iocb, ret, 0);
 		kfree(dio);
 	}
 	return ret;
@@ -1035,6 +1066,7 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	unsigned bdev_blkbits = 0;
 	unsigned blocksize_mask = (1 << blkbits) - 1;
 	ssize_t retval = -EINVAL;
+	loff_t end = offset;
 	struct dio *dio;
 	int needs_locking;
 
@@ -1053,6 +1085,7 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	for (seg = 0; seg < nr_segs; seg++) {
 		addr = (unsigned long)iov[seg].iov_base;
 		size = iov[seg].iov_len;
+		end += size;
 		if ((addr & blocksize_mask) || (size & blocksize_mask))  {
 			if (bdev)
 				 blkbits = bdev_blkbits;
@@ -1090,11 +1123,17 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 		down_read(&inode->i_alloc_sem);
 	}
 	dio->needs_locking = needs_locking;
+	/*
+	 * For file extending writes updating i_size before data
+	 * writeouts complete can expose uninitialized blocks. So
+	 * even for AIO, we need to wait for i/o to complete before
+	 * returning in this case.
+	 */
+	dio->is_async = !is_sync_kiocb(iocb) && !((rw == WRITE) &&
+		(end > i_size_read(inode)));
 
 	retval = direct_io_worker(rw, iocb, inode, iov, offset,
 				nr_segs, blkbits, get_blocks, end_io, dio);
-	if (needs_locking && rw == WRITE)
-		down(&inode->i_sem);
 out:
 	return retval;
 }
