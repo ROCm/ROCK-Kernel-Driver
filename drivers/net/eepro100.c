@@ -2205,6 +2205,8 @@ static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 
 	if (!netif_running(dev))
 		return 0;
+		
+	del_timer_sync(&sp->timer);
 
 	netif_device_detach(dev);
 	outl(PortPartialReset, ioaddr + SCBPort);
@@ -2237,6 +2239,8 @@ static int eepro100_resume(struct pci_dev *pdev)
 	sp->rx_mode = -1;
 	sp->flow_ctrl = sp->partner = 0;
 	set_rx_mode(dev);
+	sp->timer.expires = RUN_AT(2*HZ);
+	add_timer(&sp->timer);
 	return 0;
 }
 #endif /* CONFIG_PM */
