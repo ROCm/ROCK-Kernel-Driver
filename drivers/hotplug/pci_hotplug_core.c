@@ -76,7 +76,6 @@ struct hotplug_slot_core {
 };
 
 static struct super_operations pcihpfs_ops;
-static struct file_operations pcihpfs_dir_operations;
 static struct file_operations default_file_operations;
 static struct inode_operations pcihpfs_dir_inode_operations;
 static struct vfsmount *pcihpfs_mount;	/* one of the mounts of our fs for reference counting */
@@ -93,13 +92,6 @@ static int pcihpfs_statfs (struct super_block *sb, struct statfs *buf)
 	buf->f_bsize = PAGE_CACHE_SIZE;
 	buf->f_namelen = 255;
 	return 0;
-}
-
-/* SMP-safe */
-static struct dentry *pcihpfs_lookup (struct inode *dir, struct dentry *dentry)
-{
-	d_add(dentry, NULL);
-	return NULL;
 }
 
 static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, int dev)
@@ -123,7 +115,7 @@ static struct inode *pcihpfs_get_inode (struct super_block *sb, int mode, int de
 			break;
 		case S_IFDIR:
 			inode->i_op = &pcihpfs_dir_inode_operations;
-			inode->i_fop = &pcihpfs_dir_operations;
+			inode->i_fop = &simple_dir_operations;
 			break;
 		}
 	}
@@ -241,11 +233,6 @@ static int default_open (struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static struct file_operations pcihpfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	dcache_readdir,
-};
-
 static struct file_operations default_file_operations = {
 	read:		default_read_file,
 	write:		default_write_file,
@@ -302,7 +289,7 @@ static struct file_operations test_file_operations = {
 
 static struct inode_operations pcihpfs_dir_inode_operations = {
 	create:		pcihpfs_create,
-	lookup:		pcihpfs_lookup,
+	lookup:		simple_lookup,
 	unlink:		pcihpfs_unlink,
 	mkdir:		pcihpfs_mkdir,
 	rmdir:		pcihpfs_rmdir,
@@ -310,7 +297,7 @@ static struct inode_operations pcihpfs_dir_inode_operations = {
 };
 
 static struct super_operations pcihpfs_ops = {
-	statfs:		pcihpfs_statfs,
+	statfs:		simple_statfs,
 	put_inode:	force_delete,
 };
 

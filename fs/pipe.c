@@ -589,16 +589,9 @@ no_files:
  * any operations on the root directory. However, we need a non-trivial
  * d_name - pipe: will go nicely and kill the special-casing in procfs.
  */
-static int pipefs_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = PIPEFS_MAGIC;
-	buf->f_bsize = 1024;
-	buf->f_namelen = 255;
-	return 0;
-}
 
 static struct super_operations pipefs_ops = {
-	statfs:		pipefs_statfs,
+	statfs:		simple_statfs,
 };
 
 static int pipefs_fill_super(struct super_block *sb, void *data, int silent)

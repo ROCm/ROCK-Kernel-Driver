@@ -90,11 +90,9 @@ static void autofs4_put_super(struct super_block *sb)
 	DPRINTK(("autofs: shutting down\n"));
 }
 
-static int autofs4_statfs(struct super_block *sb, struct statfs *buf);
-
 static struct super_operations autofs4_sops = {
 	put_super:	autofs4_put_super,
-	statfs:		autofs4_statfs,
+	statfs:		simple_statfs,
 };
 
 static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid,
@@ -280,14 +278,6 @@ fail_unlock:
 	return -EINVAL;
 }
 
-static int autofs4_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = AUTOFS_SUPER_MAGIC;
-	buf->f_bsize = 1024;
-	buf->f_namelen = NAME_MAX;
-	return 0;
-}
-
 struct inode *autofs4_get_inode(struct super_block *sb,
 				struct autofs_info *inf)
 {
@@ -313,7 +303,7 @@ struct inode *autofs4_get_inode(struct super_block *sb,
 	if (S_ISDIR(inf->mode)) {
 		inode->i_nlink = 2;
 		inode->i_op = &autofs4_dir_inode_operations;
-		inode->i_fop = &autofs4_dir_operations;
+		inode->i_fop = &simple_dir_operations;
 	} else if (S_ISLNK(inf->mode)) {
 		inode->i_size = inf->size;
 		inode->i_op = &autofs4_symlink_inode_operations;

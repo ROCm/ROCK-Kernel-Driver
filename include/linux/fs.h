@@ -1456,7 +1456,6 @@ extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, r
 extern loff_t no_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t remote_llseek(struct file *file, loff_t offset, int origin);
-extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 extern int generic_file_open(struct inode * inode, struct file * filp);
 
 extern struct file_operations generic_ro_fops;
@@ -1468,7 +1467,6 @@ extern int page_follow_link(struct dentry *, struct nameidata *);
 extern struct inode_operations page_symlink_inode_operations;
 
 extern int vfs_readdir(struct file *, filldir_t, void *);
-extern int dcache_readdir(struct file *, void *, filldir_t);
 
 extern int vfs_stat(char *, struct kstat *);
 extern int vfs_lstat(char *, struct kstat *);
@@ -1480,6 +1478,12 @@ extern void drop_super(struct super_block *sb);
 extern kdev_t ROOT_DEV;
 extern char root_device_name[];
 
+extern int dcache_readdir(struct file *, void *, filldir_t);
+extern int simple_statfs(struct super_block *, struct statfs *);
+extern struct dentry *simple_lookup(struct inode *, struct dentry *);
+extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
+extern struct file_operations simple_dir_operations;
+extern struct inode_operations simple_dir_inode_operations;
 
 extern void show_buffers(void);
 

@@ -616,36 +616,10 @@ static struct file_operations bm_status_operations = {
 	write:		bm_status_write,
 };
 
-/* / */
-
-/* SMP-safe */
-static struct dentry * bm_lookup(struct inode *dir, struct dentry *dentry)
-{
-	d_add(dentry, NULL);
-	return NULL;
-}
-
-static struct file_operations bm_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	dcache_readdir,
-};
-
-static struct inode_operations bm_dir_inode_operations = {
-	lookup:		bm_lookup,
-};
-
 /* Superblock handling */
 
-static int bm_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = sb->s_magic;
-	buf->f_bsize = PAGE_CACHE_SIZE;
-	buf->f_namelen = 255;
-	return 0;
-}
-
 static struct super_operations s_ops = {
-	statfs:		bm_statfs,
+	statfs:		simple_statfs,
 	put_inode:	force_delete,
 	clear_inode:	bm_clear_inode,
 };
@@ -670,8 +644,8 @@ static int bm_fill_super(struct super_block * sb, void * data, int silent)
 	inode = bm_get_inode(sb, S_IFDIR | 0755);
 	if (!inode)
 		return -ENOMEM;
-	inode->i_op = &bm_dir_inode_operations;
-	inode->i_fop = &bm_dir_operations;
+	inode->i_op = &simple_dir_inode_operations;
+	inode->i_fop = &simple_dir_operations;
 	dentry[0] = d_alloc_root(inode);
 	if (!dentry[0]) {
 		iput(inode);

@@ -263,13 +263,6 @@ int move_addr_to_user(void *kaddr, int klen, void *uaddr, int *ulen)
 }
 
 #define SOCKFS_MAGIC 0x534F434B
-static int sockfs_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = SOCKFS_MAGIC;
-	buf->f_bsize = 1024;
-	buf->f_namelen = 255;
-	return 0;
-}
 
 static kmem_cache_t * sock_inode_cachep;
 
@@ -321,7 +314,7 @@ static int init_inodecache(void)
 static struct super_operations sockfs_ops = {
 	alloc_inode:	sock_alloc_inode,
 	destroy_inode:	sock_destroy_inode,
-	statfs:		sockfs_statfs,
+	statfs:		simple_statfs,
 };
 
 static int sockfs_fill_super(struct super_block *sb, void *data, int silent)

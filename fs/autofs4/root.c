@@ -32,11 +32,6 @@ struct file_operations autofs4_root_operations = {
 	ioctl:		autofs4_root_ioctl,
 };
 
-struct file_operations autofs4_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	dcache_readdir,
-};
-
 struct inode_operations autofs4_root_inode_operations = {
 	lookup:		autofs4_root_lookup,
 	unlink:		autofs4_dir_unlink,

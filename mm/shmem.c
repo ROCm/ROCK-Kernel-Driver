@@ -42,7 +42,6 @@ static struct super_operations shmem_ops;
 static struct address_space_operations shmem_aops;
 static struct file_operations shmem_file_operations;
 static struct inode_operations shmem_inode_operations;
-static struct file_operations shmem_dir_operations;
 static struct inode_operations shmem_dir_inode_operations;
 static struct vm_operations_struct shmem_vm_ops;
 
@@ -708,7 +707,7 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 		case S_IFDIR:
 			inode->i_nlink++;
 			inode->i_op = &shmem_dir_inode_operations;
-			inode->i_fop = &shmem_dir_operations;
+			inode->i_fop = &simple_dir_operations;
 			break;
 		case S_IFLNK:
 			break;
@@ -968,17 +967,6 @@ static int shmem_statfs(struct super_block *sb, struct statfs *buf)
 	spin_unlock (&sbinfo->stat_lock);
 	buf->f_namelen = 255;
 	return 0;
-}
-
-/*
- * Lookup the data. This is trivial - if the dentry didn't already
- * exist, we know it is negative.
- */
-/* SMP-safe */
-static struct dentry * shmem_lookup(struct inode *dir, struct dentry *dentry)
-{
-	d_add(dentry, NULL);
-	return NULL;
 }
 
 /*
@@ -1376,18 +1364,10 @@ static struct inode_operations shmem_inode_operations = {
 	truncate:	shmem_truncate,
 };
 
-static struct file_operations shmem_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	dcache_readdir,
-#ifdef CONFIG_TMPFS
-	fsync:		shmem_sync_file,
-#endif
-};
-
 static struct inode_operations shmem_dir_inode_operations = {
 #ifdef CONFIG_TMPFS
 	create:		shmem_create,
-	lookup:		shmem_lookup,
+	lookup:		simple_lookup,
 	link:		shmem_link,
 	unlink:		shmem_unlink,
 	symlink:	shmem_symlink,

@@ -2541,17 +2541,6 @@ static int devfs_notify_change (struct dentry *dentry, struct iattr *iattr)
     return 0;
 }   /*  End Function devfs_notify_change  */
 
-static int devfs_statfs (struct super_block *sb, struct statfs *buf)
-{
-    buf->f_type = DEVFS_SUPER_MAGIC;
-    buf->f_bsize = FAKE_BLOCK_SIZE;
-    buf->f_bfree = 0;
-    buf->f_bavail = 0;
-    buf->f_ffree = 0;
-    buf->f_namelen = NAME_MAX;
-    return 0;
-}   /*  End Function devfs_statfs  */
-
 static void devfs_clear_inode (struct inode *inode)
 {
     if ( S_ISBLK (inode->i_mode) ) bdput (inode->i_bdev);
@@ -2561,7 +2550,7 @@ static struct super_operations devfs_sops =
 { 
     put_inode:     force_delete,
     clear_inode:   devfs_clear_inode,
-    statfs:        devfs_statfs,
+    statfs:        simple_statfs,
 };
 
 
