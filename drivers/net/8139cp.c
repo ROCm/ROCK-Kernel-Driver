@@ -27,7 +27,6 @@
 	TODO:
 	* Test Tx checksumming thoroughly
 	* Implement dev->tx_timeout
-	* Implement __cp_get_stats
 
 	Low priority TODO:
 	* Complete reset on PciErr
@@ -159,6 +158,7 @@ enum {
 	TxConfig	= 0x40, /* Tx configuration */
 	ChipVersion	= 0x43, /* 8-bit chip version, inside TxConfig */
 	RxConfig	= 0x44, /* Rx configuration */
+	RxMissed	= 0x4C,	/* 24 bits valid, write clears */
 	Cfg9346		= 0x50, /* EEPROM select/control; Cfg reg [un]lock */
 	Config1		= 0x52, /* Config1 */
 	Config3		= 0x59, /* Config3 */
@@ -546,6 +546,7 @@ rx_status_loop:
 			 */
 			cp_rx_err_acct(cp, rx_tail, status, len);
 			cp->net_stats.rx_dropped++;
+			cp->cp_stats.rx_frags++;
 			goto rx_next;
 		}
 
@@ -939,7 +940,9 @@ static void cp_set_rx_mode (struct net_device *dev)
 
 static void __cp_get_stats(struct cp_private *cp)
 {
-	/* XXX implement */
+	/* only lower 24 bits valid; write any value to clear */
+	cp->net_stats.rx_missed_errors += (cpr32 (RxMissed) & 0xffffff);
+	cpw32 (RxMissed, 0);
 }
 
 static struct net_device_stats *cp_get_stats(struct net_device *dev)
