@@ -188,6 +188,7 @@ static void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	struct resource *res;
 	int np, na = prom_n_addr_cells(dev);
 	unsigned long pci_addr, cpu_phys_addr;
+	struct device_node *isa_dn;
 
 	np = na + 5;
 
@@ -219,8 +220,11 @@ static void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 						       size, _PAGE_NO_CACHE);
 			if (primary) {
 				pci_io_base = (unsigned long)hose->io_base_virt;
-				if (find_type_devices("isa"))
+				isa_dn = of_find_node_by_type(NULL, "isa");
+				if (isa_dn) {
 					isa_io_base = pci_io_base;
+					of_node_put(isa_dn);
+				}
 			}
 
 			res = &hose->io_resource;
@@ -386,7 +390,7 @@ unsigned long __init find_and_init_phbs(void)
 	unsigned int root_size_cells = 0;
 	unsigned int index;
 	unsigned int *opprop;
-	struct device_node *root = find_path_device("/");
+	struct device_node *root = of_find_node_by_path("/");
 
 	read_pci_config = rtas_token("read-pci-config");
 	write_pci_config = rtas_token("write-pci-config");
@@ -402,7 +406,9 @@ unsigned long __init find_and_init_phbs(void)
 
 	index = 0;
 
-	for (node = root->child; node != NULL; node = node->sibling) {
+	for (node = of_get_next_child(root, NULL);
+	     node != NULL;
+	     node = of_get_next_child(root, node)) {
 		if (node->type == NULL || strcmp(node->type, "pci") != 0)
 			continue;
 
@@ -420,6 +426,7 @@ unsigned long __init find_and_init_phbs(void)
 		index++;
 	}
 
+	of_node_put(root);
 	pci_devs_phb_init();
 
 	return 0;
@@ -525,11 +532,12 @@ static void check_s7a(void)
 	struct device_node *root;
 	char *model;
 
-	root = find_path_device("/");
+	root = of_find_node_by_path("/");
 	if (root) {
 		model = get_property(root, "model", NULL);
 		if (model && !strcmp(model, "IBM,7013-S7A"))
 			s7a_workaround = 1;
+		of_node_put(root);
 	}
 }
 

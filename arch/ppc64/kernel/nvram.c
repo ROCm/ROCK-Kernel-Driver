@@ -116,7 +116,7 @@ int __init nvram_init(void)
 {
 	struct device_node *nvram;
 	unsigned int *nbytes_p, proplen;
-	if ((nvram = find_type_devices("nvram")) != NULL) {
+	if ((nvram = of_find_node_by_type(NULL, "nvram")) != NULL) {
 		nbytes_p = (unsigned int *)get_property(nvram, "#bytes", &proplen);
 		if (nbytes_p && proplen == sizeof(unsigned int)) {
 			rtas_nvram_size = *nbytes_p;
@@ -125,6 +125,7 @@ int __init nvram_init(void)
 	nvram_fetch = rtas_token("nvram-fetch");
 	nvram_store = rtas_token("nvram-store");
 	printk(KERN_INFO "PPC64 nvram contains %d bytes\n", rtas_nvram_size);
+	of_node_put(nvram);
 
 	return misc_register(&nvram_dev);
 }

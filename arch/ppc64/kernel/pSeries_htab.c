@@ -389,10 +389,11 @@ void hpte_init_pSeries(void)
 	ppc_md.hpte_remove     	= pSeries_hpte_remove;
 
 	/* Disable TLB batching on nighthawk */
-	root = find_path_device("/");
+	root = of_find_node_by_path("/");
 	if (root) {
 		model = get_property(root, "model", NULL);
 		if (strcmp(model, "CHRP IBM,9076-N81"))
 			ppc_md.flush_hash_range = pSeries_flush_hash_range;
+		of_node_put(root);
 	}
 }

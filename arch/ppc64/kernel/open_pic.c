@@ -142,7 +142,7 @@ void __init openpic_init_IRQ(void)
         struct device_node *kbd;
 #endif
 
-        if (!(np = find_devices("pci"))
+        if (!(np = of_find_node_by_name(NULL, "pci"))
             || !(addrp = (unsigned int *)
                  get_property(np, "8259-interrupt-acknowledge", NULL)))
                 printk(KERN_ERR "Cannot find pci to get ack address\n");
@@ -158,6 +158,7 @@ void __init openpic_init_IRQ(void)
         openpic_init(1, NUM_8259_INTERRUPTS, chrp_int_ack_special, nmi_irq);
         for ( i = 0 ; i < NUM_8259_INTERRUPTS  ; i++ )
                 irq_desc[i].handler = &i8259_pic;
+	of_node_put(np);
 }
 
 static inline u_int openpic_read(volatile u_int *addr)

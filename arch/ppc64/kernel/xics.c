@@ -398,7 +398,7 @@ void xics_init_IRQ(void)
 	ibm_int_on  = rtas_token("ibm,int-on");
 	ibm_int_off = rtas_token("ibm,int-off");
 
-	np = find_type_devices("PowerPC-External-Interrupt-Presentation");
+	np = of_find_node_by_type(NULL, "PowerPC-External-Interrupt-Presentation");
 	if (!np) {
 		printk(KERN_WARNING "Can't find Interrupt Presentation\n");
 		udbg_printf("Can't find Interrupt Presentation\n");
@@ -433,11 +433,13 @@ nextnode:
 		if (indx >= NR_CPUS) break;
 	}
 
-	np = np->next;
+	np = of_find_node_by_type(np, "PowerPC-External-Interrupt-Presentation");
 	if ((indx < NR_CPUS) && np) goto nextnode;
 
 	/* Find the server numbers for the boot cpu. */
-	for (np = find_type_devices("cpu"); np; np = np->next) {
+	for (np = of_find_node_by_type(NULL, "cpu");
+	     np;
+	     np = of_find_node_by_type(np, "cpu")) {
 		ireg = (uint *)get_property(np, "reg", &ilen);
 		if (ireg && ireg[0] == smp_processor_id()) {
 			ireg = (uint *)get_property(np, "ibm,ppc-interrupt-gserver#s", &ilen);
@@ -449,11 +451,12 @@ nextnode:
 			break;
 		}
 	}
+	of_node_put(np);
 
 	intr_base = inodes[0].addr;
 	intr_size = (ulong)inodes[0].size;
 
-	np = find_type_devices("interrupt-controller");
+	np = of_find_node_by_type(NULL, "interrupt-controller");
 	if (!np) {
 		printk(KERN_WARNING "xics:  no ISA Interrupt Controller\n");
 		xics_irq_8259_cascade_real = -1;
@@ -467,6 +470,7 @@ nextnode:
 		}
 		xics_irq_8259_cascade_real = *ireg;
 		xics_irq_8259_cascade = virt_irq_create_mapping(xics_irq_8259_cascade_real);
+		of_node_put(np);
 	}
 
 	if (systemcfg->platform == PLATFORM_PSERIES) {

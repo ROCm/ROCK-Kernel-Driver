@@ -1504,7 +1504,7 @@ finish_device_tree(void)
 
 	klimit = mem;
 
-	rtas.dev = find_devices("rtas");
+	rtas.dev = of_find_node_by_name(NULL, "rtas");
 }
 
 static unsigned long __init
@@ -1956,11 +1956,14 @@ int
 machine_is_compatible(const char *compat)
 {
 	struct device_node *root;
-	
-	root = find_path_device("/");
-	if (root == 0)
-		return 0;
-	return device_is_compatible(root, compat);
+	int rc = 0;
+  
+	root = of_find_node_by_path("/");
+	if (root) {
+		rc = device_is_compatible(root, compat);
+		of_node_put(root);
+	}
+	return rc;
 }
 
 /*
