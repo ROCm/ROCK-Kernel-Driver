@@ -7,5 +7,3 @@ EXTRA_CFLAGS += -I.
 
 include $(TOPDIR)/Rules.make
 
-clean:
-	rm -f *.o
