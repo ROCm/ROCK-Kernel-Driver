@@ -35,6 +35,7 @@
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
 #include <asm/errno.h>
+#include <asm/pgtable.h>
 #ifdef CONFIG_DEBUGREG
 #include <asm/debugreg.h>
 #endif
@@ -612,7 +613,7 @@ static inline pte_t *get_one_pte(struct mm_struct *mm, unsigned long addr)
 	pmd_t * pmd;
 	pte_t * pte = NULL;
 
-	pgd = pgd_offset(mm, addr);
+	pgd = pgd_offset_k(addr);
 	if (pgd_none(*pgd))
 		goto end;
 	if (pgd_bad(*pgd)) {
@@ -730,8 +731,10 @@ static int process_recs_in_cow_pages (struct dp_module_struct *m,
 		 */
 		page = dp_vaddr_to_page (vma, addr, &swapped_pages_list);
 		spin_unlock(&mm->page_table_lock);
-		if (!page)
+		if (!page) {
+			vma = __vma_prio_tree_next(vma, head, &iter, start, end);
 			continue;
+		}
 		if (IS_COW_PAGE(page, m->inode)) {	
 			(*process_recs_in_page)(m, page, start, end, vma);
 		}
