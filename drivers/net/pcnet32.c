@@ -456,6 +456,14 @@ static struct pcnet32_access pcnet32_dwio = {
     .reset	= pcnet32_dwio_reset
 };
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void pcnet32_poll_controller(struct net_device *dev)
+{ 
+	disable_irq(dev->irq);
+	pcnet32_interrupt(0, dev, NULL);
+	enable_irq(dev->irq);
+} 
+#endif
 
 
 /* only probes for non-PCI devices, the rest are handled by 
@@ -805,6 +813,9 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     dev->do_ioctl = &pcnet32_ioctl;
     dev->tx_timeout = pcnet32_tx_timeout;
     dev->watchdog_timeo = (5*HZ);
+#ifdef CONFIG_NET_POLL_CONTROLLER
+    dev->poll_controller = pcnet32_poll_controller;
+#endif    
 
     lp->next = pcnet32_dev;
     pcnet32_dev = dev;
