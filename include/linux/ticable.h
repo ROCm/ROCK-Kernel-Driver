@@ -38,5 +38,7 @@
 #define IOCTL_TIUSB_TIMEOUT        _IOW('N', 0x20, int) /* set timeout */
 #define IOCTL_TIUSB_RESET_DEVICE   _IOW('N', 0x21, int) /* reset device */
 #define IOCTL_TIUSB_RESET_PIPES    _IOW('N', 0x22, int) /* reset both pipes*/
+#define IOCTL_TIUSB_GET_MAXPS      _IOR('N', 0x23, int) /* max packet size */
+#define IOCTL_TIUSB_GET_DEVID      _IOR('N', 0x24, int) /* get device type */
 
 #endif /* TICABLE_H */
