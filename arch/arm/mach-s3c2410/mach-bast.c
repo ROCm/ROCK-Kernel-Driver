@@ -274,17 +274,14 @@ void __init bast_init_irq(void)
 
 #ifdef CONFIG_PM
 
-/* bast_init_pm
+/* bast_init_machine
  *
  * enable the power management functions for the EB2410ITX
 */
 
-static __init int bast_init_pm(void)
+static __init void bast_init_machine(void)
 {
 	unsigned long gstatus4;
-
-	if (!machine_is_bast())
-		return 0;
 
 	printk(KERN_INFO "BAST Power Manangement" COPYRIGHT "\n");
 
@@ -292,13 +289,13 @@ static __init int bast_init_pm(void)
 	gstatus4 |= (__raw_readl(S3C2410_BANKCON6) & 0x3) << 28;
 	gstatus4 |= (__raw_readl(S3C2410_BANKSIZE) & S3C2410_BANKSIZE_MASK);
 
-	printk(KERN_DEBUG "setting GSTATUS4 to %08lx\n", gstatus4);
 	__raw_writel(gstatus4, S3C2410_GSTATUS4);
 
-	return s3c2410_pm_init();
+	s3c2410_pm_init();
 }
 
-late_initcall(bast_init_pm);
+#else
+#define bast_init_machine NULL
 #endif
 
 
@@ -308,5 +305,6 @@ MACHINE_START(BAST, "Simtec-BAST")
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(bast_map_io)
      INITIRQ(bast_init_irq)
+	.init_machine	= bast_init_machine,
      .timer		= &s3c2410_timer,
 MACHINE_END
