@@ -207,6 +207,7 @@ struct ata_probe_ent {
 	unsigned int		irq_flags;
 	unsigned long		host_flags;
 	void			*mmio_base;
+	void			*private_data;
 };
 
 struct ata_host_set {
@@ -371,6 +372,8 @@ struct ata_port_operations {
 
 	int (*port_start) (struct ata_port *ap);
 	void (*port_stop) (struct ata_port *ap);
+
+	void (*host_stop) (struct ata_host_set *host_set);
 };
 
 struct ata_port_info {

@@ -2849,6 +2849,7 @@ int ata_device_add(struct ata_probe_ent *ent)
 	host_set->n_ports = ent->n_ports;
 	host_set->irq = ent->irq;
 	host_set->mmio_base = ent->mmio_base;
+	host_set->private_data = ent->private_data;
 
 	/* register each port bound to this device */
 	for (i = 0; i < ent->n_ports; i++) {
@@ -3191,6 +3192,8 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 	free_irq(host_set->irq, host_set);
 	if (host_set->mmio_base)
 		iounmap(host_set->mmio_base);
+	if (host_set->ports[0]->ops->host_stop)
+		host_set->ports[0]->ops->host_stop(host_set);
 
 	for (i = 0; i < host_set->n_ports; i++) {
 		Scsi_Host_Template *sht;
