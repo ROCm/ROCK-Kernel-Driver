@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.60 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.61 $"
 
 #include <linux/blkdev.h>
 
@@ -345,7 +345,7 @@ zfcp_scsi_queuecommand(struct scsi_cmnd *scpnt,
 
 	/* reset the status for this request */
 	scpnt->result = 0;
-	/* save address of mid layer call back function */
+	scpnt->host_scribble = NULL;
 	scpnt->scsi_done = done;
 
 	/*
