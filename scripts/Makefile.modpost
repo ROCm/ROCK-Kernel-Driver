@@ -35,6 +35,8 @@ targets += $(modules)
 
 # Compile version info for unresolved symbols
 
+modname = $(*F)
+
 quiet_cmd_cc_o_c = CC      $@
       cmd_cc_o_c = $(CC) $(c_flags) $(CFLAGS_MODULE)	\
 		   -c -o $@ $<

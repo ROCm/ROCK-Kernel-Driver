@@ -343,6 +343,9 @@ handle_modversions(struct module *mod, struct elf_info *info,
 		/* ignore global offset table */
 		if (strcmp(symname, "_GLOBAL_OFFSET_TABLE_") == 0)
 			break;
+		/* ignore __this_module, it will be resolved shortly */
+		if (strcmp(symname, MODULE_SYMBOL_PREFIX "__this_module") == 0)
+			break;
 #ifdef STT_REGISTER
 		if (info->hdr->e_machine == EM_SPARC ||
 		    info->hdr->e_machine == EM_SPARCV9) {
@@ -468,6 +471,15 @@ add_header(struct buffer *b)
 	buf_printf(b, "#include <linux/compiler.h>\n");
 	buf_printf(b, "\n");
 	buf_printf(b, "MODULE_INFO(vermagic, VERMAGIC_STRING);\n");
+	buf_printf(b, "\n");
+	buf_printf(b, "struct module __this_module\n");
+	buf_printf(b, "__attribute__((section(\".gnu.linkonce.this_module\"))) = {\n");
+	buf_printf(b, " .name = __stringify(KBUILD_MODNAME),\n");
+	buf_printf(b, " .init = init_module,\n");
+	buf_printf(b, "#ifdef CONFIG_MODULE_UNLOAD\n");
+	buf_printf(b, " .exit = cleanup_module,\n");
+	buf_printf(b, "#endif\n");
+	buf_printf(b, "};\n");
 }
 
 /* Record CRCs for unresolved symbols */
