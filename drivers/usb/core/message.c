@@ -36,7 +36,7 @@ static void timeout_kill(unsigned long data)
 		usb_pipecontrol(urb->pipe) ? "control" : "bulk",
 		usb_pipeendpoint(urb->pipe),
 		usb_pipein(urb->pipe) ? "in" : "out");
-	usb_unlink_urb(urb);
+	usb_kill_urb(urb);
 }
 
 // Starts urb and waits for completion or timeout
@@ -251,7 +251,7 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 			if (!io->urbs [i] || !io->urbs [i]->dev)
 				continue;
 			if (found) {
-				status = usb_unlink_urb (io->urbs [i]);
+				status = usb_kill_urb (io->urbs [i]);
 				if (status != -EINPROGRESS && status != -EBUSY)
 					dev_err (&io->dev->dev,
 						"%s, unlink --> %d\n",
@@ -525,7 +525,7 @@ void usb_sg_cancel (struct usb_sg_request *io)
 
 			if (!io->urbs [i]->dev)
 				continue;
-			retval = usb_unlink_urb (io->urbs [i]);
+			retval = usb_kill_urb (io->urbs [i]);
 			if (retval != -EINPROGRESS && retval != -EBUSY)
 				dev_warn (&io->dev->dev, "%s, unlink --> %d\n",
 					__FUNCTION__, retval);
