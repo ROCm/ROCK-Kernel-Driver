@@ -60,6 +60,8 @@ struct cfq_data {
 
 	mempool_t *crq_pool;
 
+	request_queue_t *queue;
+
 	/*
 	 * tunables
 	 */
@@ -95,7 +97,8 @@ struct cfq_rq {
 
 static void cfq_put_queue(struct cfq_data *cfqd, struct cfq_queue *cfqq);
 static struct cfq_queue *cfq_find_cfq_hash(struct cfq_data *cfqd, int pid);
-static void cfq_dispatch_sort(struct list_head *head, struct cfq_rq *crq);
+static void cfq_dispatch_sort(struct cfq_data *cfqd, struct cfq_queue *cfqq,
+			      struct cfq_rq *crq);
 
 /*
  * lots of deadline iosched dupes, can be abstracted later...
@@ -212,8 +215,7 @@ retry:
 		return;
 	}
 
-	cfq_del_crq_rb(cfqq, __alias);
-	cfq_dispatch_sort(cfqd->dispatch, __alias);
+	cfq_dispatch_sort(cfqd, cfqq, __alias);
 	goto retry;
 }
 
@@ -327,10 +329,15 @@ cfq_merged_requests(request_queue_t *q, struct request *req,
 	cfq_remove_request(q, next);
 }
 
-static void cfq_dispatch_sort(struct list_head *head, struct cfq_rq *crq)
+static void
+cfq_dispatch_sort(struct cfq_data *cfqd, struct cfq_queue *cfqq,
+		  struct cfq_rq *crq)
 {
-	struct list_head *entry = head;
+	struct list_head *head = cfqd->dispatch, *entry = head;
 	struct request *__rq;
+
+	cfq_del_crq_rb(cfqq, crq);
+	cfq_remove_merge_hints(cfqd->queue, crq);
 
 	if (!list_empty(head)) {
 		__rq = list_entry_rq(head->next);
@@ -358,9 +365,7 @@ __cfq_dispatch_requests(request_queue_t *q, struct cfq_data *cfqd,
 {
 	struct cfq_rq *crq = rb_entry_crq(rb_first(&cfqq->sort_list));
 
-	cfq_del_crq_rb(cfqq, crq);
-	cfq_remove_merge_hints(q, crq);
-	cfq_dispatch_sort(cfqd->dispatch, crq);
+	cfq_dispatch_sort(cfqd, cfqq, crq);
 }
 
 static int cfq_dispatch_requests(request_queue_t *q, struct cfq_data *cfqd)
@@ -668,6 +673,7 @@ static int cfq_init(request_queue_t *q, elevator_t *e)
 
 	cfqd->dispatch = &q->queue_head;
 	e->elevator_data = cfqd;
+	cfqd->queue = q;
 
 	/*
 	 * just set it to some high value, we want anyone to be able to queue
