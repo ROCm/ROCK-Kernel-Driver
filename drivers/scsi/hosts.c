@@ -353,11 +353,7 @@ void scsi_unregister(struct Scsi_Host *shost)
 	shost->hostt->present--;
 
 	/* Cleanup proc and driverfs */
-#ifdef CONFIG_PROC_FS
 	scsi_proc_host_rm(shost);
-	if (!shost->hostt->present)
-		remove_proc_entry(shost->hostt->proc_name, proc_scsi);
-#endif
 	device_unregister(&shost->host_driverfs_dev);
 
 	kfree(shost);
@@ -471,12 +467,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 found:
 	spin_unlock(&scsi_host_list_lock);
 
-#ifdef CONFIG_PROC_FS
-	/* Add the new driver to /proc/scsi if not already there */
-	if (!shost_tp->proc_dir)
-		scsi_proc_host_mkdir(shost_tp);
 	scsi_proc_host_add(shost);
-#endif
 
 	strncpy(shost->host_driverfs_dev.name, shost_tp->proc_name,
 		DEVICE_NAME_SIZE-1);

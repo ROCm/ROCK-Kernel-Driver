@@ -391,6 +391,11 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #include "scsi_obsolete.h"
 
 /*
+ * Forward-declaration of structs for prototypes.
+ */
+struct Scsi_Host;
+
+/*
  * Add some typedefs so that we can prototyope a bunch of the functions.
  */
 typedef struct scsi_device Scsi_Device;
@@ -496,8 +501,21 @@ extern void scsi_init_cmd_from_req(Scsi_Cmnd *, Scsi_Request *);
 /*
  * Prototypes for functions in scsi_proc.c
  */
-extern void proc_print_scsidevice(Scsi_Device *, char *, int *, int);
+#ifdef CONFIG_PROC_FS
+extern int scsi_init_procfs(void);
+extern void scsi_exit_procfs(void);
+
+extern void scsi_proc_host_add(struct Scsi_Host *);
+extern void scsi_proc_host_rm(struct Scsi_Host *);
+
 extern struct proc_dir_entry *proc_scsi;
+#else
+static inline int scsi_init_procfs(void) { return 0; };
+static inline void scsi_exit_procfs(void) { };
+
+static inline void scsi_proc_host_add(struct Scsi_Host *);
+static inline void scsi_proc_host_rm(struct Scsi_Host *);
+#endif /* CONFIG_PROC_FS */
 
 /*
  * Prototypes for functions in constants.c
@@ -536,6 +554,8 @@ struct scsi_dev_info_list {
 	unsigned flags;
 	unsigned compatible; /* for use with scsi_static_device_list entries */
 };
+extern struct list_head scsi_dev_info_list;
+extern int scsi_dev_info_list_add_str(char *);
 
 /*
  *  The scsi_device struct contains what we know about each given scsi

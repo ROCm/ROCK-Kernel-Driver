@@ -509,10 +509,6 @@ typedef struct SHN
 	unsigned short host_registered;
 } Scsi_Host_Name;
 	
-extern void scsi_proc_host_mkdir(Scsi_Host_Template *);
-extern void scsi_proc_host_add(struct Scsi_Host *);
-extern void scsi_proc_host_rm(struct Scsi_Host *);
-
 extern void scsi_register_blocked_host(struct Scsi_Host *);
 extern void scsi_deregister_blocked_host(struct Scsi_Host *);
 
