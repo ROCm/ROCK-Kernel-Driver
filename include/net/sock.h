@@ -698,8 +698,6 @@ static inline int sk_stream_rmem_schedule(struct sock *sk, struct sk_buff *skb)
  * Since ~2.3.5 it is also exclusive sleep lock serializing
  * accesses from user process context.
  */
-extern void __lock_sock(struct sock *sk);
-extern void __release_sock(struct sock *sk);
 #define sock_owned_by_user(sk)	((sk)->sk_lock.owner)
 
 extern void FASTCALL(lock_sock(struct sock *sk));

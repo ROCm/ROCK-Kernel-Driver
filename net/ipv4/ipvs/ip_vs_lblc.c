@@ -409,7 +409,7 @@ static int ip_vs_lblc_init_svc(struct ip_vs_service *svc)
 	for (i=0; i<IP_VS_LBLC_TAB_SIZE; i++) {
 		INIT_LIST_HEAD(&tbl->bucket[i]);
 	}
-	tbl->lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&tbl->lock);
 	tbl->max_size = IP_VS_LBLC_TAB_SIZE*16;
 	tbl->rover = 0;
 	tbl->counter = 1;

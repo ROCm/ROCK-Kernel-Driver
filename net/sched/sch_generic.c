@@ -483,10 +483,32 @@ static void __qdisc_destroy(struct rcu_head *head)
 
 void qdisc_destroy(struct Qdisc *qdisc)
 {
+	struct list_head cql = LIST_HEAD_INIT(cql);
+	struct Qdisc *cq, *q, *n;
+
 	if (qdisc->flags & TCQ_F_BUILTIN ||
 		!atomic_dec_and_test(&qdisc->refcnt))
 		return;
-	list_del(&qdisc->list);
+
+	if (!list_empty(&qdisc->list)) {
+		if (qdisc->ops->cl_ops == NULL)
+			list_del(&qdisc->list);
+		else
+			list_move(&qdisc->list, &cql);
+	}
+
+	/* unlink inner qdiscs from dev->qdisc_list immediately */
+	list_for_each_entry(cq, &cql, list)
+		list_for_each_entry_safe(q, n, &qdisc->dev->qdisc_list, list)
+			if (TC_H_MAJ(q->parent) == TC_H_MAJ(cq->handle)) {
+				if (q->ops->cl_ops == NULL)
+					list_del_init(&q->list);
+				else
+					list_move_tail(&q->list, &cql);
+			}
+	list_for_each_entry_safe(cq, n, &cql, list)
+		list_del_init(&cq->list);
+
 	call_rcu(&qdisc->q_rcu, __qdisc_destroy);
 }
 

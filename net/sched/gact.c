@@ -53,14 +53,14 @@ static rwlock_t gact_lock = RW_LOCK_UNLOCKED;
 
 #ifdef CONFIG_GACT_PROB
 typedef int (*g_rand)(struct tcf_gact *p);
-int
+static int
 gact_net_rand(struct tcf_gact *p) {
 	if (net_random()%p->pval)
 		return p->action;
 	return p->paction;
 }
 
-int
+static int
 gact_determ(struct tcf_gact *p) {
 	if (p->bstats.packets%p->pval)
 		return p->action;
@@ -71,7 +71,7 @@ gact_determ(struct tcf_gact *p) {
 g_rand gact_rand[MAX_RAND]= { NULL,gact_net_rand, gact_determ};
 
 #endif
-int
+static int
 tcf_gact_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int ovr,int bind)
 {
 	struct rtattr *tb[TCA_GACT_MAX];
@@ -129,7 +129,7 @@ override:
 	return ret;
 }
 
-int
+static int
 tcf_gact_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_gact *p;
@@ -139,7 +139,7 @@ tcf_gact_cleanup(struct tc_action *a, int bind)
 	return 0;
 }
 
-int
+static int
 tcf_gact(struct sk_buff **pskb, struct tc_action *a)
 {
 	struct tcf_gact *p;
@@ -173,7 +173,7 @@ tcf_gact(struct sk_buff **pskb, struct tc_action *a)
 	return action;
 }
 
-int
+static int
 tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 {
 	unsigned char *b = skb->tail;
@@ -214,7 +214,7 @@ tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	return -1;
 }
 
-struct tc_action_ops act_gact_ops = {
+static struct tc_action_ops act_gact_ops = {
 	.next		=	NULL,
 	.kind		=	"gact",
 	.type		=	TCA_ACT_GACT,

@@ -227,7 +227,7 @@ struct xfrm_policy *xfrm_policy_alloc(int gfp)
 	if (policy) {
 		memset(policy, 0, sizeof(struct xfrm_policy));
 		atomic_set(&policy->refcnt, 1);
-		policy->lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&policy->lock);
 		init_timer(&policy->timer);
 		policy->timer.data = (unsigned long)policy;
 		policy->timer.function = xfrm_policy_timer;

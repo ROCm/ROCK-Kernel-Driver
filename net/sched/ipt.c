@@ -42,7 +42,7 @@
 #define MY_TAB_SIZE     16
 #define MY_TAB_MASK     15
 
-u32 idx_gen;
+static u32 idx_gen;
 static struct tcf_ipt *tcf_ipt_ht[MY_TAB_SIZE];
 /* ipt hash table lock */
 static rwlock_t ipt_lock = RW_LOCK_UNLOCKED;
@@ -93,7 +93,7 @@ init_targ(struct tcf_ipt *p)
 	return ret;
 }
 
-int
+static int
 tcf_ipt_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a, int ovr, int bind)
 {
 	struct ipt_entry_target *t;
@@ -231,7 +231,7 @@ override:
 
 }
 
-int
+static int
 tcf_ipt_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_ipt *p;
@@ -241,7 +241,7 @@ tcf_ipt_cleanup(struct tc_action *a, int bind)
 	return 0;
 }
 
-int
+static int
 tcf_ipt(struct sk_buff **pskb, struct tc_action *a)
 {
 	int ret = 0, result = 0;
@@ -293,7 +293,7 @@ tcf_ipt(struct sk_buff **pskb, struct tc_action *a)
 
 }
 
-int
+static int
 tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 {
 	struct ipt_entry_target *t;
@@ -345,7 +345,7 @@ tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	return -1;
 }
 
-struct tc_action_ops act_ipt_ops = {
+static struct tc_action_ops act_ipt_ops = {
 	.next		=	NULL,
 	.kind		=	"ipt",
 	.type		=	TCA_ACT_IPT,

@@ -125,7 +125,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	/* Initialize the bind addr area.  */
 	sctp_bind_addr_init(&asoc->base.bind_addr, ep->base.bind_addr.port);
-	asoc->base.addr_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&asoc->base.addr_lock);
 
 	asoc->state = SCTP_STATE_CLOSED;
 

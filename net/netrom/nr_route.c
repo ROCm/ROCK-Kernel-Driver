@@ -186,7 +186,7 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 		nr_node->which = 0;
 		nr_node->count = 1;
 		atomic_set(&nr_node->refcount, 1);
-		nr_node->node_lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&nr_node->node_lock);
 
 		nr_node->routes[0].quality   = quality;
 		nr_node->routes[0].obs_count = obs_count;

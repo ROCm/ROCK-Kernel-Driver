@@ -1822,7 +1822,7 @@ void __init dn_route_init(void)
 
 	dn_rt_hash_mask--;
         for(i = 0; i <= dn_rt_hash_mask; i++) {
-                dn_rt_hash_table[i].lock = SPIN_LOCK_UNLOCKED;
+                spin_lock_init(&dn_rt_hash_table[i].lock);
                 dn_rt_hash_table[i].chain = NULL;
         }
 

@@ -2755,7 +2755,7 @@ int __init ip_rt_init(void)
 
 	rt_hash_mask--;
 	for (i = 0; i <= rt_hash_mask; i++) {
-		rt_hash_table[i].lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&rt_hash_table[i].lock);
 		rt_hash_table[i].chain = NULL;
 	}
 

@@ -223,6 +223,21 @@ config CRYPTO_KHAZAD
 	  See also:
 	  http://planeta.terra.com.br/informatica/paulobarreto/KhazadPage.html
 
+config CRYPTO_ANUBIS
+	tristate "Anubis cipher algorithm"
+	depends on CRYPTO
+	help
+	  Anubis cipher algorithm.
+
+	  Anubis is a variable key length cipher which can use keys from 
+	  128 bits to 320 bits in length.  It was evaluated as a entrant
+	  in the NESSIE competition.
+	  
+	  See also:
+	  https://www.cosic.esat.kuleuven.ac.be/nessie/reports/
+	  http://planeta.terra.com.br/informatica/paulobarreto/AnubisPage.html
+
+
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"
 	depends on CRYPTO

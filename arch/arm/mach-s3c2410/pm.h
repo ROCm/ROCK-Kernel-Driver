@@ -34,3 +34,16 @@ extern void s3c2410_cpu_suspend(unsigned long *saveblk);
 extern void s3c2410_cpu_resume(void);
 
 extern unsigned long s3c2410_sleep_save_phys;
+
+/* sleep save info */
+
+struct sleep_save {
+	unsigned long	reg;
+	unsigned long	val;
+};
+
+#define SAVE_ITEM(x) \
+	{ .reg = (x) }
+
+extern void s3c2410_pm_do_save(struct sleep_save *ptr, int count);
+extern void s3c2410_pm_do_restore(struct sleep_save *ptr, int count);

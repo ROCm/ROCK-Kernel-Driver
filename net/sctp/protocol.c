@@ -1084,7 +1084,7 @@ __init int sctp_init(void)
 		goto err_ahash_alloc;
 	}
 	for (i = 0; i < sctp_assoc_hashsize; i++) {
-		sctp_assoc_hashtable[i].lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&sctp_assoc_hashtable[i].lock);
 		sctp_assoc_hashtable[i].chain = NULL;
 	}
 
@@ -1098,7 +1098,7 @@ __init int sctp_init(void)
 		goto err_ehash_alloc;
 	}
 	for (i = 0; i < sctp_ep_hashsize; i++) {
-		sctp_ep_hashtable[i].lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&sctp_ep_hashtable[i].lock);
 		sctp_ep_hashtable[i].chain = NULL;
 	}
 
@@ -1117,11 +1117,11 @@ __init int sctp_init(void)
 		goto err_bhash_alloc;
 	}
 	for (i = 0; i < sctp_port_hashsize; i++) {
-		sctp_port_hashtable[i].lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&sctp_port_hashtable[i].lock);
 		sctp_port_hashtable[i].chain = NULL;
 	}
 
-	sctp_port_alloc_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&sctp_port_alloc_lock);
 	sctp_port_rover = sysctl_local_port_range[0] - 1;
 
 	printk(KERN_INFO "SCTP: Hash tables configured "
@@ -1152,7 +1152,7 @@ __init int sctp_init(void)
 
 	/* Initialize the local address list. */
 	INIT_LIST_HEAD(&sctp_local_addr_list);
-	sctp_local_addr_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&sctp_local_addr_lock);
 
 	/* Register notifier for inet address additions/deletions. */
 	register_inetaddr_notifier(&sctp_inetaddr_notifier);

@@ -196,10 +196,14 @@ struct Qdisc *qdisc_lookup(struct net_device *dev, u32 handle)
 {
 	struct Qdisc *q;
 
+	read_lock_bh(&qdisc_tree_lock);
 	list_for_each_entry(q, &dev->qdisc_list, list) {
-		if (q->handle == handle)
+		if (q->handle == handle) {
+			read_unlock_bh(&qdisc_tree_lock);
 			return q;
+		}
 	}
+	read_unlock_bh(&qdisc_tree_lock);
 	return NULL;
 }
 
@@ -229,8 +233,11 @@ struct Qdisc_ops *qdisc_lookup_ops(struct rtattr *kind)
 	if (kind) {
 		read_lock(&qdisc_mod_lock);
 		for (q = qdisc_base; q; q = q->next) {
-			if (rtattr_strcmp(kind, q->id) == 0)
+			if (rtattr_strcmp(kind, q->id) == 0) {
+				if (!try_module_get(q->owner))
+					q = NULL;
 				break;
+			}
 		}
 		read_unlock(&qdisc_mod_lock);
 	}
@@ -408,9 +415,6 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 
 	err = -EINVAL;
 	if (ops == NULL)
-		goto err_out;
-	err = -EBUSY;
-	if (!try_module_get(ops->owner))
 		goto err_out;
 
 	/* ensure that the Qdisc and the private data are 32-byte aligned */

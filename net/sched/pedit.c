@@ -53,7 +53,7 @@ static rwlock_t pedit_lock = RW_LOCK_UNLOCKED;
 #include <net/pkt_act.h>
 
 
-int
+static int
 tcf_pedit_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int ovr, int bind)
 {
 	struct rtattr *tb[TCA_PEDIT_MAX];
@@ -100,7 +100,7 @@ override:
 	return ret;
 }
 
-int
+static int
 tcf_pedit_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_pedit *p;
@@ -113,7 +113,7 @@ tcf_pedit_cleanup(struct tc_action *a, int bind)
 /*
 **
 */
-int
+static int
 tcf_pedit(struct sk_buff **pskb, struct tc_action *a)
 {
 	struct tcf_pedit *p;
@@ -191,7 +191,7 @@ done:
 	return p->action;
 }
 
-int
+static int
 tcf_pedit_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 {
 	unsigned char *b = skb->tail;

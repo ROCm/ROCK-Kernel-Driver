@@ -2453,30 +2453,6 @@ static void rp_cleanup_module(void)
 }
 #endif
 
-/***********************************************************************
-		Copyright 1994 Comtrol Corporation.
-			All Rights Reserved.
-
-The following source code is subject to Comtrol Corporation's
-Developer's License Agreement.
-
-This source code is protected by United States copyright law and 
-international copyright treaties.
-
-This source code may only be used to develop software products that
-will operate with Comtrol brand hardware.
-
-You may not reproduce nor distribute this source code in its original
-form but must produce a derivative work which includes portions of
-this source code only.
-
-The portions of this source code which you use in your derivative
-work must bear Comtrol's copyright notice:
-
-		Copyright 1994 Comtrol Corporation.
-
-***********************************************************************/
-
 #ifndef TRUE
 #define TRUE 1
 #endif

@@ -23,6 +23,7 @@ struct meminfo;
 #define MT_MINICLEAN	2
 #define MT_VECTORS	3
 #define MT_MEMORY	4
+#define MT_ROM		5
 
 extern void create_memmap_holes(struct meminfo *);
 extern void memtable_init(struct meminfo *);

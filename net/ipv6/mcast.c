@@ -709,7 +709,7 @@ static void mld_add_delrec(struct inet6_dev *idev, struct ifmcaddr6 *im)
 		return;
 	memset(pmc, 0, sizeof(*pmc));
 	spin_lock_bh(&im->mca_lock);
-	pmc->mca_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&pmc->mca_lock);
 	pmc->idev = im->idev;
 	in6_dev_hold(idev);
 	pmc->mca_addr = im->mca_addr;
@@ -849,7 +849,7 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 	/* mca_stamp should be updated upon changes */
 	mc->mca_cstamp = mc->mca_tstamp = jiffies;
 	atomic_set(&mc->mca_refcnt, 2);
-	mc->mca_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&mc->mca_lock);
 
 	/* initial mode is (EX, empty) */
 	mc->mca_sfmode = MCAST_EXCLUDE;
@@ -2072,7 +2072,7 @@ void ipv6_mc_init_dev(struct inet6_dev *idev)
 	struct in6_addr maddr;
 
 	write_lock_bh(&idev->lock);
-	idev->mc_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&idev->mc_lock);
 	idev->mc_gq_running = 0;
 	init_timer(&idev->mc_gq_timer);
 	idev->mc_gq_timer.data = (unsigned long) idev;

@@ -114,7 +114,8 @@ static struct class bt_class = {
 int hci_register_sysfs(struct hci_dev *hdev)
 {
 	struct class_device *cdev = &hdev->class_dev;
-	int i, err;
+	unsigned int i;
+	int err;
 
 	BT_DBG("%p name %s type %d", hdev, hdev->name, hdev->type);
 

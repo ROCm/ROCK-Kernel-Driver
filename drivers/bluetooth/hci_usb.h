@@ -56,8 +56,6 @@ struct _urb {
 	struct urb        urb;
 };
 
-struct _urb *_urb_alloc(int isoc, int gfp);
-
 static inline void _urb_free(struct _urb *_urb)
 {
 	kfree(_urb);
@@ -95,8 +93,6 @@ static inline void _urb_unlink(struct _urb *_urb)
 		spin_unlock_irqrestore(&q->lock, flags);
 	}
 }
-
-struct _urb *_urb_dequeue(struct _urb_queue *q);
 
 struct hci_usb {
 	struct hci_dev		*hdev;
