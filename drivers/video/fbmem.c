@@ -501,7 +501,7 @@ static void __init fb_set_logo(struct fb_info *info, u8 *logo, int needs_logo)
 int fb_show_logo(struct fb_info *info)
 {
 	unsigned char *fb = info->screen_base, *logo_new = NULL;
-	u32 *palette = NULL, *saved_palette = NULL;
+	u32 *palette = NULL, *saved_pseudo_palette = NULL;
 	int needs_directpalette = 0;
 	int needs_truepalette = 0;
 	int needs_cmapreset = 0;
@@ -578,7 +578,7 @@ int fb_show_logo(struct fb_info *info)
 		else
 			fb_set_logo_directpalette(info, palette);
 
-		saved_palette = info->pseudo_palette;
+		saved_pseudo_palette = info->pseudo_palette;
 		info->pseudo_palette = palette;
 	}
 
@@ -587,8 +587,8 @@ int fb_show_logo(struct fb_info *info)
 		if (logo_new == NULL) {
 			if (palette)
 				kfree(palette);
-			if (saved_palette)
-				info->pseudo_palette = saved_palette;
+			if (saved_pseudo_palette)
+				info->pseudo_palette = saved_pseudo_palette;
 			return 1;
 		}
 
@@ -609,8 +609,8 @@ int fb_show_logo(struct fb_info *info)
 
 	if (palette != NULL)
 		kfree(palette);
-	if (saved_palette != NULL)
-		info->pseudo_palette = saved_palette;
+	if (saved_pseudo_palette != NULL)
+		info->pseudo_palette = saved_pseudo_palette;
 	if (logo_new != NULL)
 		kfree(logo_new);
 	return 0;

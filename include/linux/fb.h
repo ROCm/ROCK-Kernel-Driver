@@ -469,6 +469,10 @@ extern int num_registered_fb;
 extern int fbmon_valid_timings(u_int pixclock, u_int htotal, u_int vtotal,
 			       const struct fb_info *fb_info);
 extern int fbmon_dpms(const struct fb_info *fb_info);
+extern int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var,
+		       struct fb_info *info);
+extern int fb_validate_mode(struct fb_var_screeninfo *var,
+			    struct fb_info *info);
 
 /* drivers/video/fbcmap.c */
 extern int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp);
