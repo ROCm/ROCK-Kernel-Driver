@@ -155,6 +155,15 @@ struct nfsd4_open_confirm {
 	struct nfs4_stateowner * oc_stateowner;	/* response */
 };
 
+struct nfsd4_open_downgrade {
+	stateid_t       od_stateid;
+	u32             od_seqid;
+	u32             od_share_access;
+	u32             od_share_deny;
+	struct nfs4_stateowner *od_stateowner;
+};
+
+
 struct nfsd4_read {
 	stateid_t	rd_stateid;         /* request */
 	u64		rd_offset;          /* request */
@@ -261,6 +270,7 @@ struct nfsd4_op {
 		struct nfsd4_verify		nverify;
 		struct nfsd4_open		open;
 		struct nfsd4_open_confirm	open_confirm;
+		struct nfsd4_open_downgrade	open_downgrade;
 		struct nfsd4_putfh		putfh;
 		struct nfsd4_read		read;
 		struct nfsd4_readdir		readdir;
@@ -343,7 +353,8 @@ extern int nfsd4_open_confirm(struct svc_rqst *rqstp,
 		struct svc_fh *current_fh, struct nfsd4_open_confirm *oc);
 extern  int nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, 
 		struct nfsd4_close *close);
-
+extern int nfsd4_open_downgrade(struct svc_rqst *rqstp, 
+		struct svc_fh *current_fh, struct nfsd4_open_downgrade *od);
 #endif
 
 /*

@@ -602,6 +602,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		case OP_OPEN_CONFIRM:
 			op->status = nfsd4_open_confirm(rqstp, &current_fh, &op->u.open_confirm);
 			break;
+		case OP_OPEN_DOWNGRADE:
+			op->status = nfsd4_open_downgrade(rqstp, &current_fh, &op->u.open_downgrade);
+			break;
 		case OP_PUTFH:
 			op->status = nfsd4_putfh(rqstp, &current_fh, &op->u.putfh);
 			break;

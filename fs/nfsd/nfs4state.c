@@ -939,6 +939,30 @@ nfs4_init_ino(nfs4_ino_desc_t *ino, struct svc_fh *fhp)
 	ino->generation = inode->i_generation;
 }
 
+int
+nfs4_share_conflict(struct svc_fh *current_fh, unsigned int deny_type)
+{
+	nfs4_ino_desc_t ino;
+	unsigned int fi_hashval;
+	struct nfs4_file *fp;
+	struct nfs4_stateid *stp;
+	struct list_head *pos, *next;
+
+	dprintk("NFSD: nfs4_share_conflict\n");
+
+	nfs4_init_ino(&ino, current_fh);
+	fi_hashval = file_hashval(&ino);
+	if (find_file(fi_hashval, &ino, &fp)) {
+	/* Search for conflicting share reservations */
+		list_for_each_safe(pos, next, &fp->fi_perfile) {
+			stp = list_entry(pos, struct nfs4_stateid, st_perfile);
+			if (stp->st_share_deny & deny_type)
+				return nfserr_share_denied;
+		}
+	}
+	return nfs_ok;
+}
+
 static inline int
 nfs4_file_upgrade(struct file *filp, unsigned int share_access)
 {
@@ -952,6 +976,15 @@ int status;
 			return nfserrno(status);
 	}
 	return nfs_ok;
+}
+
+static inline void
+nfs4_file_downgrade(struct file *filp, unsigned int share_access)
+{
+	if (share_access & NFS4_SHARE_ACCESS_WRITE) {
+		put_write_access(filp->f_dentry->d_inode);
+		filp->f_mode = FMODE_READ;
+	}
 }
 
 
@@ -1280,6 +1313,59 @@ STALE_STATEID(stateid_t *stateid)
 }
 
 
+/*
+* Checks for stateid operations
+*/
+int
+nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int flags, struct nfs4_stateid **stpp)
+{
+	struct nfs4_stateid *stp;
+	int status;
+
+	dprintk("NFSD: preprocess_stateid_op:stateid = (%08x/%08x/%08x/%08x)\n",
+		stateid->si_boot, stateid->si_stateownerid, 
+		stateid->si_fileid, stateid->si_generation); 
+
+	*stpp = NULL;
+
+	/* STALE STATEID */
+	status = nfserr_stale_stateid;
+	if (STALE_STATEID(stateid)) 
+		goto out;
+
+	/* BAD STATEID */
+	status = nfserr_bad_stateid;
+	if (!(stp = find_stateid(stateid))) {
+		dprintk("NFSD: process stateid: no open stateid!\n");
+		goto out;
+	}
+	if ((flags & CHECK_FH) && nfs4_check_fh(current_fh, stp)) {
+		dprintk("NFSD: preprocess_seqid_op: fh-stateid mismatch!\n");
+		goto out;
+	}
+	if (!stp->st_stateowner->so_confirmed) {
+		dprintk("process_stateid: lockowner not confirmed yet!\n");
+		goto out;
+	}
+	if (stateid->si_generation > stp->st_stateid.si_generation) {
+		dprintk("process_stateid: future stateid?!\n");
+		goto out;
+	}
+
+	/* OLD STATEID */
+	status = nfserr_old_stateid;
+	if (stateid->si_generation < stp->st_stateid.si_generation) {
+		dprintk("process_stateid: old stateid!\n");
+		goto out;
+	}
+	*stpp = stp;
+	status = nfs_ok;
+	renew_client(stp->st_stateowner->so_client);
+out:
+	return status;
+}
+
+
 /* 
  * Checks for sequence id mutating operations. 
  *
@@ -1398,8 +1484,9 @@ nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfs
 	struct nfs4_stateowner *sop;
 	struct nfs4_stateid *stp;
 
-	dprintk("NFSD: nfsd4_open_confirm on file %s\n",
-			current_fh->fh_dentry->d_name);
+	dprintk("NFSD: nfsd4_open_confirm on file %.*s\n",
+			current_fh->fh_dentry->d_name.len,
+			current_fh->fh_dentry->d_name.name);
 	oc->oc_stateowner = NULL;
 	down(&client_sema); /* XXX need finer grained locking */
 
@@ -1425,6 +1512,45 @@ out:
 	up(&client_sema);
 	return status;
 }
+int
+nfsd4_open_downgrade(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open_downgrade *od)
+{
+	int status;
+	struct nfs4_stateid *stp;
+
+	dprintk("NFSD: nfsd4_open_downgrade on file %.*s\n", 
+			current_fh->fh_dentry->d_name.len, 
+			current_fh->fh_dentry->d_name.name);
+
+	down(&client_sema); /* XXX need finer grained locking */
+	if ((status = nfs4_preprocess_seqid_op(current_fh, od->od_seqid, 
+					&od->od_stateid, 
+					CHECK_FH, &od->od_stateowner, &stp)))
+		goto out; 
+
+	status = nfserr_inval;
+	if (od->od_share_access & ~stp->st_share_access) {
+		dprintk("NFSD:access not a subset current=%08x, desired=%08x\n", 
+			stp->st_share_access, od->od_share_access); 
+		goto out;
+	}
+	if (od->od_share_deny & ~stp->st_share_deny) {
+		dprintk("NFSD:deny not a subset current=%08x, desired=%08x\n", 
+			stp->st_share_deny, od->od_share_deny);
+		goto out;
+	}
+	nfs4_file_downgrade(&stp->st_vfs_file, 
+	stp->st_share_access & ~od->od_share_access);
+	stp->st_share_access = od->od_share_access;
+	stp->st_share_deny = od->od_share_deny;
+	update_stateid(&stp->st_stateid);
+	memcpy(&od->od_stateid, &stp->st_stateid, sizeof(stateid_t));
+	status = nfs_ok;
+out:
+	up(&client_sema);
+	return status;
+}
+
 int
 nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_close *close)
 {

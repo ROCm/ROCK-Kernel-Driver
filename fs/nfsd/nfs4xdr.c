@@ -673,6 +673,21 @@ nfsd4_decode_open_confirm(struct nfsd4_compoundargs *argp, struct nfsd4_open_con
 }
 
 static int
+nfsd4_decode_open_downgrade(struct nfsd4_compoundargs *argp, struct nfsd4_open_downgrade *open_down)
+{
+	DECODE_HEAD;
+		    
+	READ_BUF(4 + sizeof(stateid_t));
+	READ32(open_down->od_stateid.si_generation);
+	COPYMEM(&open_down->od_stateid.si_opaque, sizeof(stateid_opaque_t));
+	READ32(open_down->od_seqid);
+	READ32(open_down->od_share_access);
+	READ32(open_down->od_share_deny);
+						        
+	DECODE_TAIL;
+}
+
+static int
 nfsd4_decode_putfh(struct nfsd4_compoundargs *argp, struct nfsd4_putfh *putfh)
 {
 	DECODE_HEAD;
@@ -968,6 +983,9 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 			break;
 		case OP_OPEN_CONFIRM:
 			op->status = nfsd4_decode_open_confirm(argp, &op->u.open_confirm);
+			break;
+		case OP_OPEN_DOWNGRADE:
+			op->status = nfsd4_decode_open_downgrade(argp, &op->u.open_downgrade);
 			break;
 		case OP_PUTFH:
 			op->status = nfsd4_decode_putfh(argp, &op->u.putfh);
@@ -1748,6 +1766,21 @@ nfsd4_encode_open_confirm(struct nfsd4_compoundres *resp, int nfserr, struct nfs
 }
 
 static int
+nfsd4_encode_open_downgrade(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open_downgrade *od)
+{
+	ENCODE_HEAD;
+				        
+	if (!nfserr) {
+		RESERVE_SPACE(sizeof(stateid_t));
+		WRITE32(od->od_stateid.si_generation);
+		WRITEMEM(&od->od_stateid.si_opaque, sizeof(stateid_opaque_t));
+		ADJUST_ARGS();
+	}
+
+	ENCODE_SEQID_OP_TAIL(od->od_stateowner);
+}
+
+static int
 nfsd4_encode_read(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_read *read)
 {
 	u32 eof;
@@ -2061,6 +2094,9 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_OPEN_CONFIRM:
 		nfsd4_encode_open_confirm(resp, op->status, &op->u.open_confirm);
+		break;
+	case OP_OPEN_DOWNGRADE:
+		nfsd4_encode_open_downgrade(resp, op->status, &op->u.open_downgrade);
 		break;
 	case OP_PUTFH:
 		break;
