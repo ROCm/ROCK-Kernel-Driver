@@ -65,22 +65,22 @@ static int hpusbscsi_scsi_abort (Scsi_Cmnd *srb);
 static void issue_request_sense (struct hpusbscsi *hpusbscsi);
 
 static Scsi_Host_Template hpusbscsi_scsi_host_template = {
-	name:           "hpusbscsi",
-	detect:		hpusbscsi_scsi_detect,
-//	release:	hpusbscsi_scsi_release,
-	queuecommand:	hpusbscsi_scsi_queuecommand,
+	.name			= "hpusbscsi",
+	.detect			= hpusbscsi_scsi_detect,
+//	.release		= hpusbscsi_scsi_release,
+	.queuecommand		= hpusbscsi_scsi_queuecommand,
 
-	eh_abort_handler:	hpusbscsi_scsi_abort,
-	eh_host_reset_handler:	hpusbscsi_scsi_host_reset,
+	.eh_abort_handler	= hpusbscsi_scsi_abort,
+	.eh_host_reset_handler	= hpusbscsi_scsi_host_reset,
 
-	sg_tablesize:		SG_ALL,
-	can_queue:		1,
-	this_id:		-1,
-	cmd_per_lun:		1,
-	present:		0,
-	unchecked_isa_dma:	FALSE,
-	use_clustering:		TRUE,
-	emulated:		TRUE
+	.sg_tablesize		= SG_ALL,
+	.can_queue		= 1,
+	.this_id		= -1,
+	.cmd_per_lun		= 1,
+	.present		= 0,
+	.unchecked_isa_dma	= FALSE,
+	.use_clustering		= TRUE,
+	.emulated		= TRUE
 };
 
 /* defines for internal driver state */

@@ -217,7 +217,7 @@ static void snd_usbmidi_in_midiman_complete(struct urb* urb, struct pt_regs *reg
 			}
 		}
 	}
-	snd_usbmidi_in_urb_complete(urb);
+	snd_usbmidi_in_urb_complete(urb, regs);
 }
 
 static void snd_usbmidi_out_urb_complete(struct urb* urb, struct pt_regs *regs)

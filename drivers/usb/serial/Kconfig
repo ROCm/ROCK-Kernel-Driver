@@ -326,6 +326,25 @@ config USB_SERIAL_KLSI
 	  The module will be called kl5kusb105.o. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
+config USB_SERIAL_KOBIL_SCT
+        tristate "USB KOBIL chipcard reader (EXPERIMENTAL)"
+        depends on USB_SERIAL && EXPERIMENTAL
+        ---help---
+          Say Y here if you want to use one of the following KOBIL USB chipcard
+          readers:
+
+            - USB TWIN
+            - KAAN Standard Plus
+            - SecOVID Reader Plus
+            - B1 Professional
+            - KAAN Professional
+
+          Note that you need a current CT-API.
+          This code is also available as a module ( = code which can be
+          inserted in and removed from the running kernel whenever you want).
+          The module will be called kobil_sct.o. If you want to compile it as
+          a module, say M here and read <file:Documentation/modules.txt>.
+
 config USB_SERIAL_MCT_U232
 	tristate "USB MCT Single Port Serial Driver"
 	depends on USB_SERIAL

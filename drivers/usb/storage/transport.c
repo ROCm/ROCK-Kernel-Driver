@@ -503,6 +503,35 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, unsigned int pipe,
 	return status;
 }
 
+/* This is our function to submit interrupt URBs with enough control
+ * to make aborts/resets/timeouts work
+ *
+ * This routine always uses us->recv_intr_pipe as the pipe and
+ * us->ep_bInterval as the interrupt interval.
+ */
+int usb_stor_interrupt_msg(struct us_data *us, void *data,
+			unsigned int len, unsigned int *act_len)
+{
+	unsigned int pipe = us->recv_intr_pipe;
+	unsigned int maxp;
+	int status;
+
+	/* calculate the max packet size */
+	maxp = usb_maxpacket(us->pusb_dev, pipe, usb_pipeout(pipe));
+	if (maxp > len)
+		maxp = len;
+
+	/* fill and submit the URB */
+	usb_fill_int_urb(us->current_urb, us->pusb_dev, pipe, data,
+			maxp, usb_stor_blocking_completion, NULL,
+			us->ep_bInterval);
+	status = usb_stor_msg_common(us);
+
+	/* store the actual length of the data transferred */
+	*act_len = us->current_urb->actual_length;
+	return status;
+}
+
 /* This is a version of usb_clear_halt() that doesn't read the status from
  * the device -- this is because some devices crash their internal firmware
  * when the status is requested after a halt.
@@ -624,6 +653,29 @@ int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 		result = 0;
 	}
 	return interpret_urb_result(us, pipe, size, result, partial);
+}
+
+/*
+ * Receive one buffer via interrupt transfer
+ *
+ * This function does basically the same thing as usb_stor_interrupt_msg()
+ * above, except that return codes are USB_STOR_XFER_xxx rather than the
+ * urb status.
+ */
+int usb_stor_intr_transfer(struct us_data *us, void *buf,
+		unsigned int length, unsigned int *act_len)
+{
+	int result;
+	unsigned int partial;
+
+	/* transfer the data */
+	US_DEBUGP("usb_stor_intr_transfer(): xfer %u bytes\n", length);
+	result = usb_stor_interrupt_msg(us, buf, length, &partial);
+	if (act_len)
+		*act_len = partial;
+
+	return interpret_urb_result(us, us->recv_intr_pipe,
+			length, result, partial);
 }
 
 /*
@@ -947,7 +999,7 @@ void usb_stor_abort_transport(struct us_data *us)
 	host = us->srb->host;
 	scsi_unlock(host);
 
-	/* If the state machine is blocked waiting for an URB or an IRQ,
+	/* If the state machine is blocked waiting for an URB,
 	 * let's wake it up */
 
 	/* If we have an URB pending, cancel it.  The test_and_clear_bit()
@@ -964,12 +1016,6 @@ void usb_stor_abort_transport(struct us_data *us)
 		usb_sg_cancel(us->current_sg);
 	}
 
-	/* If we are waiting for an IRQ, simulate it */
-	if (test_bit(US_FLIDX_IP_WANTED, &us->flags)) {
-		US_DEBUGP("-- simulating missing IRQ\n");
-		usb_stor_CBI_irq(us->irq_urb, NULL);
-	}
-
 	/* Wait for the aborted command to finish */
 	wait_for_completion(&us->notify);
 
@@ -981,93 +1027,10 @@ void usb_stor_abort_transport(struct us_data *us)
  * Control/Bulk/Interrupt transport
  */
 
-/* The interrupt handler for CBI devices */
-void usb_stor_CBI_irq(struct urb *urb, struct pt_regs *regs)
-{
-	struct us_data *us = (struct us_data *)urb->context;
-	int status;
-
-	US_DEBUGP("USB IRQ received for device on host %d\n", us->host_no);
-	US_DEBUGP("-- IRQ data length is %d\n", urb->actual_length);
-	US_DEBUGP("-- IRQ state is %d\n", urb->status);
-	US_DEBUGP("-- Interrupt Status (0x%x, 0x%x)\n",
-			us->irqbuf[0], us->irqbuf[1]);
-
-	/* has the current command been aborted? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-
-		/* was this a wanted interrupt? */
-		if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags)) {
-			US_DEBUGP("ERROR: Unwanted interrupt received!\n");
-			goto exit;
-		}
-		US_DEBUGP("-- command aborted\n");
-
-		/* wake up the command thread */
-		up(&us->ip_waitq);
-		goto exit;
-	}
-
-	/* is the device removed? */
-	if (urb->status == -ENOENT) {
-		US_DEBUGP("-- device has been removed\n");
-
-		/* was this a wanted interrupt? */
-		if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags))
-			return;
-
-		/* indicate a transport error -- this is the best we can do */
-		us->irqdata[0] = us->irqdata[1] = 0xFF;
-
-		/* wake up the command thread */
-		up(&us->ip_waitq);
-		return;
-	}
-
-	/* reject improper IRQs */
-	if (urb->actual_length != 2) {
-		US_DEBUGP("-- IRQ too short\n");
-		goto exit;
-	}
-
-	/* was this a command-completion interrupt? */
-	if (us->irqbuf[0] && (us->subclass != US_SC_UFI)) {
-		US_DEBUGP("-- not a command-completion IRQ\n");
-		goto exit;
-	}
-
-	/* was this a wanted interrupt? */
-	if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags)) {
-		US_DEBUGP("ERROR: Unwanted interrupt received!\n");
-		goto exit;
-	}
-		
-	/* copy the valid data */
-	us->irqdata[0] = us->irqbuf[0];
-	us->irqdata[1] = us->irqbuf[1];
-
-	/* wake up the command thread */
-	up(&(us->ip_waitq));
-
-exit:
-	/* resubmit the urb */
-	status = usb_submit_urb (urb, GFP_ATOMIC);
-	if (status)
-		err ("%s - usb_submit_urb failed with result %d",
-		     __FUNCTION__, status);
-}
-
 int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 {
 	unsigned int transfer_length = usb_stor_transfer_length(srb);
 	int result;
-
-	/* re-initialize the mutex so that we avoid any races with
-	 * early/late IRQs from previous commands */
-	init_MUTEX_LOCKED(&(us->ip_waitq));
-
-	/* Set up for status notification */
-	set_bit(US_FLIDX_IP_WANTED, &us->flags);
 
 	/* COMMAND STAGE */
 	/* let's send the command via the control pipe */
@@ -1079,8 +1042,6 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* check the return code for the command */
 	US_DEBUGP("Call to usb_stor_ctrl_transfer() returned %d\n", result);
 	if (result != USB_STOR_XFER_GOOD) {
-		/* Reset flag for status notification */
-		clear_bit(US_FLIDX_IP_WANTED, &us->flags);
 		/* Uh oh... serious problem here */
 		return USB_STOR_TRANSPORT_ERROR;
 	}
@@ -1093,25 +1054,17 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
 					transfer_length);
 		US_DEBUGP("CBI data stage result is 0x%x\n", result);
-		if (result == USB_STOR_XFER_ERROR) {
-			clear_bit(US_FLIDX_IP_WANTED, &us->flags);
+		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
-		}
 	}
 
 	/* STATUS STAGE */
-
-	/* go to sleep until we get this interrupt */
-	down(&(us->ip_waitq));
-
-	/* has the current command been aborted? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("CBI interrupt aborted\n");
-		return USB_STOR_TRANSPORT_ERROR;
-	}
-
+	result = usb_stor_intr_transfer(us, us->irqdata,
+					sizeof(us->irqdata), NULL);
 	US_DEBUGP("Got interrupt data (0x%x, 0x%x)\n", 
 			us->irqdata[0], us->irqdata[1]);
+	if (result != USB_STOR_XFER_GOOD)
+		return USB_STOR_TRANSPORT_ERROR;
 
 	/* UFI gives us ASC and ASCQ, like a request sense
 	 *
