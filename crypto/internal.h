@@ -11,9 +11,9 @@
  */
 #ifndef _CRYPTO_INTERNAL_H
 #define _CRYPTO_INTERNAL_H
-
 #include <linux/mm.h>
 #include <linux/highmem.h>
+#include <linux/init.h>
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 
@@ -62,6 +62,13 @@ static inline int crypto_alloc_hmac_block(struct crypto_tfm *tfm)
 }
 
 static inline void crypto_free_hmac_block(struct crypto_tfm *tfm)
+{ }
+#endif
+
+#ifdef CONFIG_PROC_FS
+void __init crypto_init_proc(void);
+#else
+static inline void crypto_init_proc(void)
 { }
 #endif
 

@@ -5,8 +5,10 @@
 export-objs := api.o hmac.o
 
 autoload-crypto-$(CONFIG_KMOD) = autoload.o
+proc-crypto-$(CONFIG_PROC_FS) = proc.o
 
-obj-$(CONFIG_CRYPTO) += api.o cipher.o digest.o compress.o $(autoload-crypto-y)
+obj-$(CONFIG_CRYPTO) += api.o cipher.o digest.o compress.o \
+			$(autoload-crypto-y) $(proc-crypto-y)
 
 obj-$(CONFIG_CRYPTO_HMAC) += hmac.o
 obj-$(CONFIG_CRYPTO_NULL) += crypto_null.o
