@@ -1076,7 +1076,7 @@ long do_fork(unsigned long clone_flags,
 			init_completion(&vfork);
 		}
 
-		if (p->ptrace & PT_PTRACED) {
+		if ((p->ptrace & PT_PTRACED) || (clone_flags & CLONE_STOPPED)) {
 			/*
 			 * We'll start up with an immediate SIGSTOP.
 			 */
@@ -1084,7 +1084,9 @@ long do_fork(unsigned long clone_flags,
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
-		wake_up_forked_process(p);		/* do this last */
+		p->state = TASK_STOPPED;
+		if (!(clone_flags & CLONE_STOPPED))
+			wake_up_forked_process(p);	/* do this last */
 		++total_forks;
 
 		if (unlikely (trace)) {
