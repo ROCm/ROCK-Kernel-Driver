@@ -95,14 +95,4 @@ static inline pgd_t * pgd_alloc(struct mm_struct *mm)
 
 #define pgd_populate(mm, pmd, pte) BUG()
 
-
-/* Reserved PMEGs. */
-extern char sun3_reserved_pmeg[SUN3_PMEGS_NUM];
-extern unsigned long pmeg_vaddr[SUN3_PMEGS_NUM];
-extern unsigned char pmeg_alloc[SUN3_PMEGS_NUM];
-extern unsigned char pmeg_ctx[SUN3_PMEGS_NUM];
-
-
-#define check_pgt_cache()	do { } while (0)
-
 #endif /* SUN3_PGALLOC_H */
