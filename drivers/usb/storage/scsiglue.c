@@ -217,7 +217,6 @@ static int usb_storage_device_reset( Scsi_Cmnd *srb )
 static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 {
 	struct us_data *us;
-	int i;
 	int result;
 
 	/* we use the usb_reset_device() function to handle this for us */
