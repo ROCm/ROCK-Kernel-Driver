@@ -112,9 +112,10 @@ enum sndrv_hwdep_iface {
 	SNDRV_HWDEP_IFACE_EMUX_WAVETABLE, /* EmuX wavetable */	
 	SNDRV_HWDEP_IFACE_BLUETOOTH,	/* Bluetooth audio */
 	SNDRV_HWDEP_IFACE_USX2Y_PCM,	/* Tascam US122, US224 & US428 rawusb pcm */
+	SNDRV_HWDEP_IFACE_PCXHR,	/* Digigram PCXHR */
 
 	/* Don't forget to change the following: */
-	SNDRV_HWDEP_IFACE_LAST = SNDRV_HWDEP_IFACE_USX2Y_PCM,
+	SNDRV_HWDEP_IFACE_LAST = SNDRV_HWDEP_IFACE_PCXHR
 };
 
 struct sndrv_hwdep_info {
