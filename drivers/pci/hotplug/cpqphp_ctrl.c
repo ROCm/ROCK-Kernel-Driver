@@ -478,15 +478,14 @@ static struct pci_resource *do_pre_bridge_resource_split(struct pci_resource **h
 	/* Now unlink it */
 	if (*head == node) {
 		*head = node->next;
-		node->next = NULL;
 	} else {
 		prevnode = *head;
 		while (prevnode->next != node)
 			prevnode = prevnode->next;
 
 		prevnode->next = node->next;
-		node->next = NULL;
 	}
+	node->next = NULL;
 
 	return node;
 }
@@ -502,9 +501,6 @@ static struct pci_resource *do_bridge_resource_split(struct pci_resource **head,
 	struct pci_resource *node;
 	u32 rc;
 	u32 temp_dword;
-
-	if (!(*head))
-		return NULL;
 
 	rc = cpqhp_resource_sort_and_combine(head);
 
@@ -654,9 +650,6 @@ static struct pci_resource *get_max_resource(struct pci_resource **head, u32 siz
 	struct pci_resource *split_node;
 	u32 temp_dword;
 
-	if (!(*head))
-		return NULL;
-
 	if (cpqhp_resource_sort_and_combine(head))
 		return NULL;
 
@@ -750,9 +743,6 @@ static struct pci_resource *get_resource(struct pci_resource **head, u32 size)
 	struct pci_resource *node;
 	struct pci_resource *split_node;
 	u32 temp_dword;
-
-	if (!(*head))
-		return NULL;
 
 	if (cpqhp_resource_sort_and_combine(head))
 		return NULL;
@@ -1061,9 +1051,6 @@ static int bridge_slot_remove(struct pci_func *bridge)
 	u8 subordinateBus, secondaryBus;
 	u8 tempBus;
 	struct pci_func *next;
-
-	if (bridge == NULL)
-		return 1;
 
 	secondaryBus = (bridge->config_space[0x06] >> 8) & 0xFF;
 	subordinateBus = (bridge->config_space[0x06] >> 16) & 0xFF;
@@ -1700,9 +1687,6 @@ static u32 remove_board(struct pci_func * func, u32 replace_flag, struct control
 	struct resource_lists res_lists;
 	struct pci_func *temp_func;
 
-	if (func == NULL)
-		return 1;
-
 	if (cpqhp_unconfigure_device(func))
 		return 1;
 
@@ -2080,9 +2064,6 @@ int cpqhp_process_SI(struct controller *ctrl, struct pci_func *func)
 	int rc;
 	struct slot* p_slot;
 	int physical_slot = 0;
-
-	if (!ctrl)
-		return 1;
 
 	tempdword = 0;
 
