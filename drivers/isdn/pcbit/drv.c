@@ -430,7 +430,7 @@ int pcbit_writecmd(const u_char* buf, int len, int user, int driver, int channel
 	switch(dev->l2_state) {
 	case L2_LWMODE:
 		/* check (size <= rdp_size); write buf into board */
-		if (len > BANK4 + 1)
+		if (len < 0 || len > BANK4 + 1 || len > 1024)
 		{
 			printk("pcbit_writecmd: invalid length %d\n", len);
 			return -EINVAL;

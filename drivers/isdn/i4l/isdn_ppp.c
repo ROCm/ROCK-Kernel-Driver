@@ -706,7 +706,7 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
  *           reports, that there is data
  */
 
-static int
+static ssize_t
 isdn_ppp_read(struct file *file, char *buf, size_t count, loff_t *off)
 {
 	struct ippp_struct *is;
@@ -765,7 +765,7 @@ isdn_ppp_read(struct file *file, char *buf, size_t count, loff_t *off)
  * ipppd wanna write a packet to the card .. non-blocking
  */
 
-static int
+static ssize_t
 isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 {
 	isdn_net_local *lp;
