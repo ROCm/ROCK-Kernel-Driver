@@ -21,7 +21,6 @@
  *
  *  PCI functions for Integrator
  */
-#include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/ptrace.h>

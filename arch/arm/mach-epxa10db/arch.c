@@ -19,12 +19,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include <linux/types.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
-#include <asm/irq.h>
 #include <asm/setup.h>
 #include <asm/mach-types.h>
 

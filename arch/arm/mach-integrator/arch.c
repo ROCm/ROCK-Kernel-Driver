@@ -19,8 +19,6 @@
  */
 #include <linux/config.h>
 #include <linux/types.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>

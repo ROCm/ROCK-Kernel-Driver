@@ -23,7 +23,6 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/tty.h>
-#include <linux/sched.h>
 #include <linux/pm.h>
 #include <linux/serial_core.h>
 

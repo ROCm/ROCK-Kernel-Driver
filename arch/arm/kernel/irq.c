@@ -20,7 +20,6 @@
 #include <linux/config.h>
 #include <linux/kernel_stat.h>
 #include <linux/signal.h>
-#include <linux/sched.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/ptrace.h>
@@ -661,7 +660,7 @@ unsigned int probe_irq_mask(unsigned long irqs)
 	unsigned int mask = 0, i;
 
 	spin_lock_irq(&irq_controller_lock);
-	for(i = 0; i < 16 && i < NR_IRQS; i++)
+	for (i = 0; i < 16 && i < NR_IRQS; i++)
 		if (irq_desc[i].probing && irq_desc[i].triggered)
 			mask |= 1 << i;
 	spin_unlock_irq(&irq_controller_lock);

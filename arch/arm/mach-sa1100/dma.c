@@ -11,8 +11,8 @@
  */
 
 #include <linux/module.h>
+#include <linux/interrupt.h>
 #include <linux/init.h>
-#include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 
