@@ -382,6 +382,7 @@ struct _snd_via82xx {
 	struct via_rate_lock rates[2]; /* playback and capture */
 	unsigned int dxs_fixed: 1;	/* DXS channel accepts only 48kHz */
 	unsigned int no_vra: 1;		/* no need to set VRA on DXS channels */
+	unsigned int spdif_on: 1;	/* only spdif rates work to external DACs */
 
 	snd_rawmidi_t *rmidi;
 
@@ -1062,6 +1063,7 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 		{48000, SNDRV_PCM_RATE_48000},
 	};
 	int i;
+	u8 val;
 
 	runtime->hw = snd_via82xx_hw;
 	
@@ -1069,7 +1071,11 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 	ratep = &chip->rates[viadev->direction];
 	spin_lock_irqsave(&ratep->lock, flags);
 	ratep->used++;
-	if (chip->dxs_fixed && viadev->reg_offset < 0x40) {
+	if (chip->spdif_on) {
+		runtime->hw.rates = SNDRV_PCM_RATE_32000|SNDRV_PCM_RATE_44100|SNDRV_PCM_RATE_48000;
+		runtime->hw.rate_min = 32000;
+		runtime->hw.rate_max = 48000;
+	} else if (chip->dxs_fixed && viadev->reg_offset < 0x40) {
 		/* fixed DXS playback rate */
 		runtime->hw.rates = SNDRV_PCM_RATE_48000;
 		runtime->hw.rate_min = runtime->hw.rate_max = 48000;
@@ -1429,6 +1435,8 @@ static int snd_via8233_capture_source_put(snd_kcontrol_t *kcontrol, snd_ctl_elem
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	oval = inb(port);
 	val = oval & ~VIA_REG_CAPTURE_CHANNEL_MIC;
+	/* save the spdif flag for rate filtering */
+	chip->spdif_on = ucontrol->value.integer.value[0] ? 1 : 0;
 	if (ucontrol->value.enumerated.item[0])
 		val |= VIA_REG_CAPTURE_CHANNEL_MIC;
 	if (val != oval)
