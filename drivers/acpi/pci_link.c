@@ -487,13 +487,13 @@ static int __initdata acpi_irq_penalty[ACPI_MAX_IRQS] = {
 };
 
 int
-acpi_pci_link_check (void)
+acpi_irq_penalty_init(void)
 {
 	struct list_head	*node = NULL;
 	struct acpi_pci_link    *link = NULL;
 	int			i = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_pci_link_check");
+	ACPI_FUNCTION_TRACE("acpi_irq_penalty_init");
 
 	/*
 	 * Update penalties to facilitate IRQ balancing.
