@@ -212,10 +212,10 @@ static void emi26_disconnect(struct usb_device *dev, void *drv_context)
 }
 
 struct usb_driver emi26_driver = {
-name:			"emi26 - firmware loader",
-probe:			emi26_probe,
-disconnect:		emi26_disconnect,
-id_table:		NULL,
+.name			= "emi26 - firmware loader",
+.probe			= emi26_probe,
+.disconnect		= emi26_disconnect,
+.id_table		= NULL,
 };
 
 static int __init emi26_init (void)
