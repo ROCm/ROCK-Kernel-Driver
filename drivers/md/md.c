@@ -276,7 +276,7 @@ char * partition_name(kdev_t dev)
 	hd = get_gendisk (dev);
 	dname->name = NULL;
 	if (hd)
-		dname->name = disk_name (hd, minor(dev), dname->namebuf);
+		dname->name = disk_name(hd, minor(dev)-hd->first_minor, dname->namebuf);
 	if (!dname->name) {
 		sprintf (dname->namebuf, "[dev %s]", kdevname(dev));
 		dname->name = dname->namebuf;

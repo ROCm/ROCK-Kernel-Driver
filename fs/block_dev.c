@@ -528,16 +528,21 @@ int check_disk_change(struct block_device *bdev)
 int full_check_disk_change(struct block_device *bdev)
 {
 	int res;
+	if (bdev->bd_contains != bdev)
+		BUG();
 	down(&bdev->bd_sem);
 	res = check_disk_change(bdev);
 	if (bdev->bd_invalidated && !bdev->bd_part_count) {
-		struct gendisk *g = get_gendisk(to_kdev_t(bdev->bd_dev));
-		struct hd_struct *part;
-		part = g->part + MINOR(bdev->bd_dev) - g->first_minor;
+		struct gendisk *disk = get_gendisk(to_kdev_t(bdev->bd_dev));
+		int p;
 		bdev->bd_invalidated = 0;
-		wipe_partitions(to_kdev_t(bdev->bd_dev));
-		if (part[0].nr_sects)
-			check_partition(g, bdev);
+		for (p = 1; p < 1<<disk->minor_shift; p++) {
+			disk->part[p].start_sect = 0;
+			disk->part[p].nr_sects = 0;
+		}
+		res = invalidate_device(to_kdev_t(bdev->bd_dev), 1);
+		if (disk->part[0].nr_sects)
+			check_partition(disk, bdev);
 	}
 	up(&bdev->bd_sem);
 	return res;
@@ -650,11 +655,14 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			bdev->bd_inode->i_data.backing_dev_info = bdi;
 		}
 		if (bdev->bd_invalidated && !bdev->bd_part_count) {
-			struct hd_struct *part;
-			part = g->part + minor(dev) - g->first_minor;
+			int p;
 			bdev->bd_invalidated = 0;
-			wipe_partitions(dev);
-			if (part[0].nr_sects)
+			for (p = 1; p < 1<<g->minor_shift; p++) {
+				g->part[p].start_sect = 0;
+				g->part[p].nr_sects = 0;
+			}
+			invalidate_device(dev, 1);
+			if (g->part[0].nr_sects)
 				check_partition(g, bdev);
 		}
 	} else {
@@ -791,12 +799,10 @@ static int blkdev_reread_part(struct block_device *bdev)
 {
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *disk = get_gendisk(dev);
-	struct hd_struct *part;
-	int res;
+	int p, res;
 
-	if (!disk || !disk->minor_shift)
+	if (!disk || !disk->minor_shift || bdev != bdev->bd_contains)
 		return -EINVAL;
-	part = disk->part + minor(dev) - disk->first_minor;
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 	if (down_trylock(&bdev->bd_sem))
@@ -805,11 +811,15 @@ static int blkdev_reread_part(struct block_device *bdev)
 		up(&bdev->bd_sem);
 		return -EBUSY;
 	}
-	res = wipe_partitions(dev);
+	for (p = 1; p < 1 << disk->minor_shift; p++) {
+		disk->part[p].start_sect = 0;
+		disk->part[p].nr_sects = 0;
+	}
+	res = invalidate_device(dev, 1);
 	if (!res) {
 		if (bdev->bd_op->revalidate)
 			bdev->bd_op->revalidate(dev);
-		if (part[0].nr_sects)
+		if (disk->part[0].nr_sects)
 			check_partition(disk, bdev);
 	}
 	up(&bdev->bd_sem);

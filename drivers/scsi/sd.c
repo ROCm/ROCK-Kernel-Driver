@@ -126,8 +126,6 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt);
 
 static Scsi_Disk * sd_get_sdisk(int index);
 
-extern void driverfs_remove_partitions(struct gendisk *hd, int minor);
-
 #if defined(CONFIG_PPC32)
 /**
  *	sd_find_target - find kdev_t of first scsi disk that matches
@@ -1424,7 +1422,7 @@ static void sd_detach(Scsi_Device * sdp)
 	if (sdkp->has_been_registered) {
 		sdkp->has_been_registered = 0;
 		dev = MKDEV_SD(dsk_nr);
-		driverfs_remove_partitions(sd_disks[dsk_nr], minor(dev));
+		driverfs_remove_partitions(sd_disks[dsk_nr]);
 		del_gendisk(sd_disks[dsk_nr]);
 	}
 	sdp->attached--;

@@ -240,11 +240,10 @@ struct unixware_disklabel {
 
 #ifdef __KERNEL__
 
-char *disk_name (struct gendisk *hd, int minor, char *buf);
+char *disk_name (struct gendisk *hd, int part, char *buf);
 
-extern void devfs_register_partitions (struct gendisk *dev, int minor,
-				       int unregister);
-extern void driverfs_remove_partitions (struct gendisk *hd, int minor);
+extern void devfs_register_partitions (struct gendisk *dev, int unregister);
+extern void driverfs_remove_partitions (struct gendisk *hd);
 
 static inline unsigned int disk_index (kdev_t dev)
 {

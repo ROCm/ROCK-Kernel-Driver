@@ -81,7 +81,7 @@ del_gendisk(struct gendisk *disk)
 {
 	struct gendisk **p;
 
-	wipe_partitions(mk_kdev(disk->major, disk->first_minor));
+	wipe_partitions(disk);
 	write_lock(&gendisk_lock);
 	for (p = &gendisk_head; *p; p = &((*p)->next))
 		if (*p == disk)
@@ -89,7 +89,7 @@ del_gendisk(struct gendisk *disk)
 	if (*p)
 		*p = (*p)->next;
 	write_unlock(&gendisk_lock);
-	devfs_register_partitions(disk, disk->first_minor, 1);
+	devfs_register_partitions(disk, 1);
 }
 
 EXPORT_SYMBOL(del_gendisk);
@@ -168,7 +168,7 @@ static int show_partition(struct seq_file *part, void *v)
 		seq_printf(part, "%4d  %4d %10ld %s\n",
 			sgp->major, n + sgp->first_minor,
 			sgp->part[n].nr_sects >> 1 ,
-			disk_name(sgp, n + sgp->first_minor, buf));
+			disk_name(sgp, n, buf));
 	}
 
 	return 0;
