@@ -805,7 +805,8 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 
 	port->irq              = new_serial.irq;
 	port->uartclk          = new_serial.baud_base * 16;
-	port->flags            = new_serial.flags & UPF_CHANGE_MASK;
+	port->flags            = (port->flags & ~UPF_CHANGE_MASK) |
+				 (new_serial.flags & UPF_CHANGE_MASK);
 	port->custom_divisor   = new_serial.custom_divisor;
 	state->close_delay     = new_serial.close_delay * HZ / 100;
 	state->closing_wait    = new_serial.closing_wait * HZ / 100;
@@ -882,6 +883,8 @@ uart_set_modem_info(struct uart_port *port, unsigned int cmd,
 
 	if (get_user(arg, value))
 		return -EFAULT;
+
+	arg &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2;
 
 	set = clear = 0;
 	switch (cmd) {
@@ -1279,7 +1282,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 			schedule_timeout(state->close_delay);
 			set_current_state(TASK_RUNNING);
 		}
-	} else {
+	} else if (!port->cons || port->cons->index != port->line) {
 		if (port->ops->pm)
 			port->ops->pm(port, 3, 0);
 	}
@@ -1374,6 +1377,7 @@ static void uart_hangup(struct tty_struct *tty)
 		state->info->flags &= ~UIF_NORMAL_ACTIVE;
 		state->info->tty = NULL;
 		wake_up_interruptible(&state->info->open_wait);
+		wake_up_interruptible(&state->info->delta_msr_wait);
 	}
 	up(&state->sem);
 }
