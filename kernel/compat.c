@@ -417,9 +417,7 @@ asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 					if (__get_user(um, user_mask_ptr))
 						return -EFAULT;
 					user_mask_ptr++;
-					m <<= 4*sizeof(um);
-					m <<= 4*sizeof(um);
-					m |= um;
+					m |= (unsigned long)um << (8*sizeof(um)*j);
 				}
 				*k++ = m;
 			}
