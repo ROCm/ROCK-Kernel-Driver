@@ -467,6 +467,8 @@ config CRASH_DUMP_COMPRESS_RLE
 
 config CRASH_DUMP_COMPRESS_GZIP
        tristate "Crash dump GZIP compression"
+       select ZLIB_INFLATE
+       select ZLIB_DEFLATE
        depends on CRASH_DUMP
        help
          Say Y to allow saving dumps with Gnu Zip compression.

@@ -27,8 +27,8 @@ static unsigned long workspace_paddr[2];
  * Func: Compress a DUMP_PAGE_SIZE page using gzip-style algorithms (the.
  *       deflate functions similar to what's used in PPP).
  */
-static u16
-dump_compress_gzip(const u8 *old, u16 oldsize, u8 *new, u16 newsize,
+static u32
+dump_compress_gzip(const u8 *old, u32 oldsize, u8 *new, u32 newsize,
 		unsigned long loc)
 {
 	/* error code and dump stream */

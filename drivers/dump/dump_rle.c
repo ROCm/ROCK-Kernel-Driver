@@ -21,8 +21,8 @@
  * Func: Compress a DUMP_PAGE_SIZE (hardware) page down to something more
  *       reasonable, if possible.  This is the same routine we use in IRIX.
  */
-static u16
-dump_compress_rle(const u8 *old, u16 oldsize, u8 *new, u16 newsize,
+static u32
+dump_compress_rle(const u8 *old, u32 oldsize, u8 *new, u32 newsize,
 		unsigned long loc)
 {
 	u16 ri, wi, count = 0;

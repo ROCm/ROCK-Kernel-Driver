@@ -76,8 +76,16 @@
  *
  *	1. the dump header (padded to fill the complete buffer)
  *	2. the possibly compressed page headers and data
+ *   
+ *  = 256k for page size >= 64k
+ *  = 64k  for page size < 64k
  */
+#if (PAGE_SHIFT >= 16)
+#define DUMP_BUFFER_SIZE	(256 * 1024)  /* size of dump buffer         */
+#else
 #define DUMP_BUFFER_SIZE	(64 * 1024)  /* size of dump buffer         */
+#endif
+
 #define DUMP_HEADER_SIZE	DUMP_BUFFER_SIZE
 
 /* standard header definitions */
@@ -292,7 +300,7 @@ struct __dump_compress {
 	const char *compress_name;
 
 	/* the compression function to call */
-	u16 (*compress_func)(const u8 *, u16, u8 *, u16, unsigned long);
+	u32 (*compress_func)(const u8 *, u32, u8 *, u32, unsigned long);
 };
 
 /* functions for dump compression registration */

@@ -334,14 +334,7 @@ static inline void dumper_reset(void)
  */
 static inline void *dump_alloc_mem(unsigned long size)
 {
-#if defined(CONFIG_IA64) && defined(CONFIG_IA64_PAGE_SIZE_64KB)
-	/*
-	 * Ok, kmalloc does not allow more than 128K. 
-	 */
 	return (void *) __get_free_pages(GFP_KERNEL, get_order(size));
-#else
-	return kmalloc(size, GFP_KERNEL);
-#endif
 }
 
 static inline void dump_free_mem(void *buf)
@@ -353,15 +346,11 @@ static inline void dump_free_mem(void *buf)
 		if (PageReserved(page))
 			return;
 	}
-#if defined(CONFIG_IA64) && defined(CONFIG_IA64_PAGE_SIZE_64KB)
 	/*
 	 * Allocated using __get_free_pages().
 	 */
 	free_pages((unsigned long)buf, 
 		get_order(DUMP_BUFFER_SIZE + 3 * DUMP_PAGE_SIZE));
-#else
-	kfree(buf);
-#endif
 }
 
 

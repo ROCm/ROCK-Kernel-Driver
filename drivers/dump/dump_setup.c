@@ -150,7 +150,7 @@ extern struct __dump_header dump_header;
 struct dump_dev *dump_dev = NULL;  /* Active dump device                   */
 static int dump_compress = 0;
 
-static u16 dump_compress_none(const u8 *old, u16 oldsize, u8 *new, u16 newsize,
+static u32 dump_compress_none(const u8 *old, u32 oldsize, u8 *new, u32 newsize,
 				unsigned long loc);
 struct __dump_compress dump_none_compression = {
 	.compress_type	= DUMP_COMPRESS_NONE,
@@ -285,8 +285,8 @@ static struct ctl_table_header *sysctl_header;
  * Name: dump_compress_none()
  * Func: Don't do any compression, period.
  */
-static u16
-dump_compress_none(const u8 *old, u16 oldsize, u8 *new, u16 newsize,
+static u32
+dump_compress_none(const u8 *old, u32 oldsize, u8 *new, u32 newsize,
 		unsigned long loc)
 {
 	/* just return the old size */
