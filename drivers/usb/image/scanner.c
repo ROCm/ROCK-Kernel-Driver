@@ -1,7 +1,7 @@
 /* -*- linux-c -*- */
 
 /* 
- * Driver for USB Scanners (linux-2.4.18)
+ * Driver for USB Scanners (linux-2.5.52)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  *
@@ -312,6 +312,17 @@
  *      Karl Heinz Kremer <khk@khk.net>.
  *    - Changed maintainership from David E. Nelson to Brian
  *      Beattie <beattie@beattie-home.net>.
+ *
+ * 0.4.9  12/19/2002
+ *    - Added vendor/product ids for Nikon, Mustek, Plustek, Genius, Epson,
+ *      Canon, Umax, Hewlett-Packard, Benq, Agfa, Minolta scanners.
+ *      Thanks to Dieter Faulbaum <faulbaum@mail.bessy.de>, Stian Jordet
+ *      <liste@jordet.nu>, "Yann E. MORIN" <yann.morin.1998@anciens.enib.fr>,
+ *      "Jaeger, Gerhard" <gerhard@gjaeger.de>, Ira Childress 
+ *      <ichildress@mn.rr.com>, Till Kamppeter <till.kamppeter@gmx.net>,
+ *      Ed Hamrick <EdHamrick@aol.com>, Oliver Schwartz
+ *	<Oliver.Schwartz@gmx.de> and everyone else who sent ids.
+ *    - Some Benq, Genius and Plustek ids are identified now.
  *
  * TODO
  *    - Remove the 2/3 endpoint limitation
