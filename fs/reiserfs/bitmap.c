@@ -37,7 +37,7 @@
 
 #define SET_OPTION(optname) \
    do { \
-        reiserfs_warning("reiserfs: option \"%s\" is set\n", #optname); \
+        reiserfs_warning(s, "reiserfs: option \"%s\" is set", #optname); \
         set_bit(_ALLOC_ ## optname , &SB_ALLOC_OPTS(s)); \
     } while(0)
 #define TEST_OPTION(optname, s) \
@@ -60,7 +60,7 @@ int is_reusable (struct super_block * s, b_blocknr_t block, int bit_value)
     int i, j;
 
     if (block == 0 || block >= SB_BLOCK_COUNT (s)) {
-	reiserfs_warning ("vs-4010: is_reusable: block number is out of range %lu (%u)\n",
+	reiserfs_warning (s, "vs-4010: is_reusable: block number is out of range %lu (%u)",
 			  block, SB_BLOCK_COUNT (s));
 	return 0;
     }
@@ -68,8 +68,8 @@ int is_reusable (struct super_block * s, b_blocknr_t block, int bit_value)
     /* it can't be one of the bitmap blocks */
     for (i = 0; i < SB_BMAP_NR (s); i ++)
 	if (block == SB_AP_BITMAP (s)[i].bh->b_blocknr) {
-	    reiserfs_warning ("vs: 4020: is_reusable: "
-			      "bitmap block %lu(%u) can't be freed or reused\n",
+	    reiserfs_warning (s, "vs: 4020: is_reusable: "
+			      "bitmap block %lu(%u) can't be freed or reused",
 			      block, SB_BMAP_NR (s));
 	    return 0;
 	}
@@ -77,8 +77,8 @@ int is_reusable (struct super_block * s, b_blocknr_t block, int bit_value)
     get_bit_address (s, block, &i, &j);
 
     if (i >= SB_BMAP_NR (s)) {
-	reiserfs_warning ("vs-4030: is_reusable: there is no so many bitmap blocks: "
-			  "block=%lu, bitmap_nr=%d\n", block, i);
+	reiserfs_warning (s, "vs-4030: is_reusable: there is no so many bitmap blocks: "
+			  "block=%lu, bitmap_nr=%d", block, i);
 	return 0;
     }
 
@@ -86,16 +86,16 @@ int is_reusable (struct super_block * s, b_blocknr_t block, int bit_value)
          reiserfs_test_le_bit(j, SB_AP_BITMAP(s)[i].bh->b_data)) ||
 	(bit_value == 1 && 
 	 reiserfs_test_le_bit(j, SB_AP_BITMAP (s)[i].bh->b_data) == 0)) {
-	reiserfs_warning ("vs-4040: is_reusable: corresponding bit of block %lu does not "
-			  "match required value (i==%d, j==%d) test_bit==%d\n",
+	reiserfs_warning (s, "vs-4040: is_reusable: corresponding bit of block %lu does not "
+			  "match required value (i==%d, j==%d) test_bit==%d",
 		block, i, j, reiserfs_test_le_bit (j, SB_AP_BITMAP (s)[i].bh->b_data));
 
 	return 0;
     }
 
     if (bit_value == 0 && block == SB_ROOT_BLOCK (s)) {
-	reiserfs_warning ("vs-4050: is_reusable: this is root block (%u), "
-			  "it must be busy\n", SB_ROOT_BLOCK (s));
+	reiserfs_warning (s, "vs-4050: is_reusable: this is root block (%u), "
+			  "it must be busy", SB_ROOT_BLOCK (s));
 	return 0;
     }
 
@@ -134,7 +134,7 @@ static int scan_bitmap_block (struct reiserfs_transaction_handle *th,
     int end, next;
     int org = *beg;
 
-    RFALSE(bmap_n >= SB_BMAP_NR (s), "Bitmap %d is out of range (0..%d)\n",bmap_n, SB_BMAP_NR (s) - 1);
+    RFALSE(bmap_n >= SB_BMAP_NR (s), "Bitmap %d is out of range (0..%d)",bmap_n, SB_BMAP_NR (s) - 1);
     PROC_INFO_INC( s, scan_bitmap.bmap );
 /* this is unclear and lacks comments, explain how journal bitmaps
    work here for the reader.  Convey a sense of the design here. What
@@ -142,7 +142,7 @@ static int scan_bitmap_block (struct reiserfs_transaction_handle *th,
 /* - I mean `a window of zero bits' as in description of this function - Zam. */
   
     if ( !bi ) {
-	printk("Hey, bitmap info pointer is zero for bitmap %d!\n",bmap_n);
+	reiserfs_warning (s, "NULL bitmap info pointer for bitmap %d", bmap_n);
 	return 0;
     }
     if (buffer_locked (bi->bh)) {
@@ -300,8 +300,8 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th,
     get_bit_address (s, block, &nr, &offset);
 
     if (nr >= sb_bmap_nr (rs)) {
-	reiserfs_warning ("vs-4075: reiserfs_free_block: "
-			  "block %lu is out of range on %s\n", 
+	reiserfs_warning (s, "vs-4075: reiserfs_free_block: "
+			  "block %lu is out of range on %s",
 			  block, reiserfs_bdevname (s));
 	return;
     }
@@ -310,8 +310,8 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th,
 
     /* clear bit for the given block in bit map */
     if (!reiserfs_test_and_clear_le_bit (offset, apbi[nr].bh->b_data)) {
-	reiserfs_warning ("vs-4080: reiserfs_free_block: "
-			  "free_block (%s:%lu)[dev:blocknr]: bit already cleared\n", 
+	reiserfs_warning (s, "vs-4080: reiserfs_free_block: "
+			  "free_block (%s:%lu)[dev:blocknr]: bit already cleared",
 			  reiserfs_bdevname (s), block);
     }
     if (offset < apbi[nr].first_zero_hint) {
@@ -358,7 +358,7 @@ static void __discard_prealloc (struct reiserfs_transaction_handle * th,
     struct inode *inode = &ei->vfs_inode;
 #ifdef CONFIG_REISERFS_CHECK
     if (ei->i_prealloc_count < 0)
-	reiserfs_warning("zam-4001:%s: inode has negative prealloc blocks count.\n", __FUNCTION__ );
+	reiserfs_warning (th->t_super, "zam-4001:%s: inode has negative prealloc blocks count.", __FUNCTION__ );
 #endif
     while (ei->i_prealloc_count > 0) {
 	reiserfs_free_prealloc_block(th, inode, ei->i_prealloc_block);
@@ -390,7 +390,7 @@ void reiserfs_discard_all_prealloc (struct reiserfs_transaction_handle *th)
 	ei = list_entry(plist->next, struct reiserfs_inode_info, i_prealloc_list);
 #ifdef CONFIG_REISERFS_CHECK
 	if (!ei->i_prealloc_count) {
-	    reiserfs_warning("zam-4001:%s: inode is in prealloc list but has no preallocated blocks.\n", __FUNCTION__);
+	    reiserfs_warning (th->t_super, "zam-4001:%s: inode is in prealloc list but has no preallocated blocks.", __FUNCTION__);
 	}
 #endif
 	__discard_prealloc(th, ei);
@@ -476,7 +476,8 @@ int reiserfs_parse_alloc_options(struct super_block * s, char * options)
 	    continue;
 	}
 
-	reiserfs_warning("zam-4001: %s : unknown option - %s\n", __FUNCTION__ , this_char);
+	reiserfs_warning (s, "zam-4001: %s : unknown option - %s",
+			  __FUNCTION__ , this_char);
 	return 1;
       }
   
@@ -516,7 +517,7 @@ static inline void get_left_neighbor(reiserfs_blocknr_hint_t *hint)
 
     path = hint->path;
     bh = get_last_bh(path);
-    RFALSE( !bh, "green-4002: Illegal path specified to get_left_neighbor\n");
+    RFALSE( !bh, "green-4002: Illegal path specified to get_left_neighbor");
     ih = get_ih(path);
     pos_in_item = path->pos_in_item;
     item = get_item (path);
@@ -783,14 +784,14 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
     if (!hint->formatted_node) {
         int quota_ret;
 #ifdef REISERQUOTA_DEBUG
-	printk(KERN_DEBUG "reiserquota: allocating %d blocks id=%u\n", amount_needed, hint->inode->i_uid);
+	reiserfs_debug (s, "reiserquota: allocating %d blocks id=%u", amount_needed, hint->inode->i_uid);
 #endif
 	quota_ret = DQUOT_ALLOC_BLOCK_NODIRTY(hint->inode, amount_needed);
 	if (quota_ret)    /* Quota exceeded? */
 	    return QUOTA_EXCEEDED;
 	if (hint->preallocate && hint->prealloc_size ) {
 #ifdef REISERQUOTA_DEBUG
-	    printk(KERN_DEBUG "reiserquota: allocating (prealloc) %d blocks id=%u\n", hint->prealloc_size, hint->inode->i_uid);
+	    reiserfs_debug (s, "reiserquota: allocating (prealloc) %d blocks id=%u", hint->prealloc_size, hint->inode->i_uid);
 #endif
 	    quota_ret = DQUOT_PREALLOC_BLOCK_NODIRTY(hint->inode, hint->prealloc_size);
 	    if (quota_ret)
@@ -807,7 +808,7 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 	if (second_pass) {	/* it was a second pass; we must free all blocks */
 	    if (!hint->formatted_node) {
 #ifdef REISERQUOTA_DEBUG
-		printk(KERN_DEBUG "reiserquota: freeing (nospace) %d blocks id=%u\n", amount_needed + hint->prealloc_size - nr_allocated, hint->inode->i_uid);
+		reiserfs_debug (s, "reiserquota: freeing (nospace) %d blocks id=%u", amount_needed + hint->prealloc_size - nr_allocated, hint->inode->i_uid);
 #endif
 		DQUOT_FREE_BLOCK_NODIRTY(hint->inode, amount_needed + hint->prealloc_size - nr_allocated);     /* Free not allocated blocks */
 	    }
@@ -827,7 +828,7 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 	 nr_allocated + REISERFS_I(hint->inode)->i_prealloc_count) {
     /* Some of preallocation blocks were not allocated */
 #ifdef REISERQUOTA_DEBUG
-	printk(KERN_DEBUG "reiserquota: freeing (failed prealloc) %d blocks id=%u\n", amount_needed + hint->prealloc_size - nr_allocated - INODE_INFO(hint->inode)->i_prealloc_count, hint->inode->i_uid);
+	reiserfs_debug (s, "reiserquota: freeing (failed prealloc) %d blocks id=%u", amount_needed + hint->prealloc_size - nr_allocated - INODE_INFO(hint->inode)->i_prealloc_count, hint->inode->i_uid);
 #endif
 	DQUOT_FREE_BLOCK_NODIRTY(hint->inode, amount_needed +
 	                         hint->prealloc_size - nr_allocated -

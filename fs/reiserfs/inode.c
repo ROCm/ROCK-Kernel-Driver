@@ -774,7 +774,7 @@ start_trans:
 		retval = convert_tail_for_hole(inode, bh_result, tail_offset) ;
 		if (retval) {
 		    if ( retval != -ENOSPC )
-			printk("clm-6004: convert tail failed inode %lu, error %d\n", inode->i_ino, retval) ;
+			reiserfs_warning (inode->i_sb, "clm-6004: convert tail failed inode %lu, error %d", inode->i_ino, retval) ;
 		    if (allocated_block_nr) {
 			/* the bitmap, the super, and the stat data == 3 */
 			if (!th)
@@ -911,8 +911,8 @@ start_trans:
 	    goto failure;
 	}
 	if (retval == POSITION_FOUND) {
-	    reiserfs_warning ("vs-825: reiserfs_get_block: "
-			      "%K should not be found\n", &key);
+	    reiserfs_warning (inode->i_sb, "vs-825: reiserfs_get_block: "
+			      "%K should not be found", &key);
 	    retval = -EEXIST;
 	    if (allocated_block_nr)
 	        reiserfs_free_block (th, inode, allocated_block_nr, 1);
@@ -1222,7 +1222,7 @@ void reiserfs_update_sd_size (struct reiserfs_transaction_handle *th,
 	/* look for the object's stat data */
 	retval = search_item (inode->i_sb, &key, &path);
 	if (retval == IO_ERROR) {
-	    reiserfs_warning ("vs-13050: reiserfs_update_sd: "
+	    reiserfs_warning (inode->i_sb, "vs-13050: reiserfs_update_sd: "
 			      "i/o failure occurred trying to update %K stat data",
 			      &key);
 	    return;
@@ -1231,11 +1231,11 @@ void reiserfs_update_sd_size (struct reiserfs_transaction_handle *th,
 	    pos = PATH_LAST_POSITION (&path);
 	    pathrelse(&path) ;
 	    if (inode->i_nlink == 0) {
-		/*printk ("vs-13050: reiserfs_update_sd: i_nlink == 0, stat data not found\n");*/
+		/*reiserfs_warning (inode->i_sb, "vs-13050: reiserfs_update_sd: i_nlink == 0, stat data not found");*/
 		return;
 	    }
-	    reiserfs_warning ("vs-13060: reiserfs_update_sd: "
-			      "stat data of object %k (nlink == %d) not found (pos %d)\n", 
+	    reiserfs_warning (inode->i_sb, "vs-13060: reiserfs_update_sd: "
+			      "stat data of object %k (nlink == %d) not found (pos %d)",
 			      INODE_PKEY (inode), inode->i_nlink, pos);
 	    reiserfs_check_path(&path) ;
 	    return;
@@ -1308,9 +1308,9 @@ void reiserfs_read_locked_inode (struct inode * inode, struct reiserfs_iget_args
     /* look for the object's stat data */
     retval = search_item (inode->i_sb, &key, &path_to_sd);
     if (retval == IO_ERROR) {
-	reiserfs_warning ("vs-13070: reiserfs_read_locked_inode: "
-                    "i/o failure occurred trying to find stat data of %K\n",
-                    &key);
+	reiserfs_warning (inode->i_sb, "vs-13070: reiserfs_read_locked_inode: "
+			  "i/o failure occurred trying to find stat data of %K",
+			  &key);
 	reiserfs_make_bad_inode(inode) ;
 	return;
     }
@@ -1340,9 +1340,10 @@ void reiserfs_read_locked_inode (struct inode * inode, struct reiserfs_iget_args
        during mount (fs/reiserfs/super.c:finish_unfinished()). */
     if( ( inode -> i_nlink == 0 ) && 
 	! REISERFS_SB(inode -> i_sb) -> s_is_unlinked_ok ) {
-	    reiserfs_warning( "vs-13075: reiserfs_read_locked_inode: "
+	    reiserfs_warning (inode->i_sb,
+			      "vs-13075: reiserfs_read_locked_inode: "
 			      "dead inode read from disk %K. "
-			      "This is likely to be race with knfsd. Ignore\n", 
+			      "This is likely to be race with knfsd. Ignore",
 			      &key );
 	    reiserfs_make_bad_inode( inode );
     }
@@ -1445,7 +1446,7 @@ struct dentry *reiserfs_decode_fh(struct super_block *sb, __u32 *data,
      */
     if (fhtype > len) {
 	    if (fhtype != 6 || len != 5)
-		    printk(KERN_WARNING "nfsd/reiserfs, fhtype=%d, len=%d - odd\n",
+		    reiserfs_warning (sb, "nfsd/reiserfs, fhtype=%d, len=%d - odd",
 			   fhtype, len);
 	    fhtype = 5;
     }
@@ -1508,8 +1509,9 @@ void reiserfs_write_inode (struct inode * inode, int do_sync) {
     int jbegin_count = 1 ;
 
     if (inode->i_sb->s_flags & MS_RDONLY) {
-        reiserfs_warning("clm-6005: writing inode %lu on readonly FS\n", 
-	                  inode->i_ino) ;
+        reiserfs_warning (inode->i_sb,
+			  "clm-6005: writing inode %lu on readonly FS",
+			  inode->i_ino) ;
         return ;
     }
     /* memory pressure can sometimes initiate write_inode calls with sync == 1,
@@ -1572,13 +1574,13 @@ static int reiserfs_new_directory (struct reiserfs_transaction_handle *th,
     /* look for place in the tree for new item */
     retval = search_item (sb, &key, path);
     if (retval == IO_ERROR) {
-	reiserfs_warning ("vs-13080: reiserfs_new_directory: "
-			  "i/o failure occurred creating new directory\n");
+	reiserfs_warning (sb, "vs-13080: reiserfs_new_directory: "
+			  "i/o failure occurred creating new directory");
 	return -EIO;
     }
     if (retval == ITEM_FOUND) {
 	pathrelse (path);
-	reiserfs_warning ("vs-13070: reiserfs_new_directory: "
+	reiserfs_warning (sb, "vs-13070: reiserfs_new_directory: "
 			  "object with this key exists (%k)", &(ih->ih_key));
 	return -EEXIST;
     }
@@ -1609,13 +1611,13 @@ static int reiserfs_new_symlink (struct reiserfs_transaction_handle *th,
     /* look for place in the tree for new item */
     retval = search_item (sb, &key, path);
     if (retval == IO_ERROR) {
-	reiserfs_warning ("vs-13080: reiserfs_new_symlinik: "
-			  "i/o failure occurred creating new symlink\n");
+	reiserfs_warning (sb, "vs-13080: reiserfs_new_symlinik: "
+			  "i/o failure occurred creating new symlink");
 	return -EIO;
     }
     if (retval == ITEM_FOUND) {
 	pathrelse (path);
-	reiserfs_warning ("vs-13080: reiserfs_new_symlink: "
+	reiserfs_warning (sb, "vs-13080: reiserfs_new_symlink: "
 			  "object with this key exists (%k)", &(ih->ih_key));
 	return -EEXIST;
     }
@@ -1800,7 +1802,8 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
             goto out_inserted_sd;
         }
     } else if (inode->i_sb->s_flags & MS_POSIXACL) {
-        reiserfs_warning ("ACLs aren't enabled in the fs, but vfs thinks they are!\n");
+	reiserfs_warning (inode->i_sb, "ACLs aren't enabled in the fs, "
+			  "but vfs thinks they are!");
     }
 
     insert_inode_hash (inode);
@@ -1898,9 +1901,10 @@ static int grab_tail_page(struct inode *p_s_inode,
 	** I've screwed up the code to find the buffer, or the code to
 	** call prepare_write
 	*/
-	reiserfs_warning("clm-6000: error reading block %lu on dev %s\n",
-			 bh->b_blocknr,
-			 reiserfs_bdevname (p_s_inode->i_sb)) ;
+	reiserfs_warning (p_s_inode->i_sb,
+			  "clm-6000: error reading block %lu on dev %s",
+			  bh->b_blocknr,
+			  reiserfs_bdevname (p_s_inode->i_sb)) ;
 	error = -EIO ;
 	goto unlock ;
     }
@@ -1940,7 +1944,9 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
 	    // and get_block_create_0 could not find a block to read in,
 	    // which is ok.
 	    if (error != -ENOENT)
-	        reiserfs_warning("clm-6001: grab_tail_page failed %d\n", error);
+	        reiserfs_warning (p_s_inode->i_sb,
+				  "clm-6001: grab_tail_page failed %d",
+				  error);
 	    page = NULL ;
 	    bh = NULL ;
 	}
@@ -2038,7 +2044,8 @@ research:
     /* we've found an unformatted node */
     if (indirect_item_found(retval, ih)) {
 	if (bytes_copied > 0) {
-	    reiserfs_warning("clm-6002: bytes_copied %d\n", bytes_copied) ;
+	    reiserfs_warning (inode->i_sb, "clm-6002: bytes_copied %d",
+			      bytes_copied) ;
 	}
         if (!get_block_num(item, pos_in_item)) {
 	    /* crap, we are writing to a hole */
@@ -2086,7 +2093,9 @@ research:
 	    goto research ;
 	}
     } else {
-        reiserfs_warning("clm-6003: bad item inode %lu, device %s\n", inode->i_ino, reiserfs_bdevname (inode->i_sb)) ;
+        reiserfs_warning (inode->i_sb,
+			  "clm-6003: bad item inode %lu, device %s",
+			  inode->i_ino, reiserfs_bdevname (inode->i_sb)) ;
         retval = -EIO ;
 	goto out ;
     }

@@ -298,8 +298,9 @@ int reiserfs_allocate_blocks_for_region(
 		    if ( res != ITEM_NOT_FOUND ) {
 			/* item should not exist, otherwise we have error */
 			if ( res != -ENOSPC ) {
-			    reiserfs_warning ("green-9008: search_by_key (%K) returned %d\n",
-					       &key, res);
+			    reiserfs_warning (inode->i_sb,
+				"green-9008: search_by_key (%K) returned %d",
+					      &key, res);
 			}
 			res = -EIO;
 		        kfree(zeros);
@@ -446,8 +447,9 @@ retry:
 		/* Well, if we have found such item already, or some error
 		   occured, we need to warn user and return error */
 		if ( res != -ENOSPC ) {
-		    reiserfs_warning ("green-9009: search_by_key (%K) returned %d\n",
-			              &key, res);
+		    reiserfs_warning (inode->i_sb,
+				      "green-9009: search_by_key (%K) "
+				      "returned %d", &key, res);
 		}
 		res = -EIO;
 		goto error_exit_free_blocks;
@@ -799,7 +801,9 @@ int reiserfs_prepare_file_region_for_write(
 
 
     if ( num_pages < 1 ) {
-	reiserfs_warning("green-9001: reiserfs_prepare_file_region_for_write called with zero number of pages to process\n");
+	reiserfs_warning (inode->i_sb,
+			  "green-9001: reiserfs_prepare_file_region_for_write "
+			  "called with zero number of pages to process");
 	return -EFAULT;
     }
 

@@ -126,7 +126,7 @@ int search_by_entry_key (struct super_block * sb, const struct cpu_key * key,
     switch (retval) {
     case ITEM_NOT_FOUND:
 	if (!PATH_LAST_POSITION (path)) {
-	    reiserfs_warning ("vs-7000: search_by_entry_key: search_by_key returned item position == 0");
+	    reiserfs_warning (sb, "vs-7000: search_by_entry_key: search_by_key returned item position == 0");
 	    pathrelse(path) ;
 	    return IO_ERROR ;
 	}
@@ -140,7 +140,7 @@ int search_by_entry_key (struct super_block * sb, const struct cpu_key * key,
 
     default:
 	pathrelse (path);
-	reiserfs_warning ("vs-7002: search_by_entry_key: no path to here");
+	reiserfs_warning (sb, "vs-7002: search_by_entry_key: no path to here");
 	return IO_ERROR;
     }
 
@@ -299,7 +299,8 @@ static int reiserfs_find_entry (struct inode * dir, const char * name, int namel
     while (1) {
 	retval = search_by_entry_key (dir->i_sb, &key_to_search, path_to_entry, de);
 	if (retval == IO_ERROR) {
-	    reiserfs_warning ("zam-7001: io error in %s\n", __FUNCTION__);
+	    reiserfs_warning (dir->i_sb, "zam-7001: io error in %s",
+			      __FUNCTION__);
 	    return IO_ERROR;
 	}
 
@@ -484,8 +485,9 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
 	}
 
         if (retval != NAME_FOUND) {
-	    reiserfs_warning ("zam-7002:%s: \"reiserfs_find_entry\" has returned"
-                              " unexpected value (%d)\n", __FUNCTION__, retval);
+	    reiserfs_warning (dir->i_sb, "zam-7002:%s: \"reiserfs_find_entry\" "
+			      "has returned unexpected value (%d)",
+			      __FUNCTION__, retval);
        }
 
 	return -EEXIST;
@@ -494,7 +496,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
     gen_number = find_first_zero_bit ((unsigned long *)bit_string, MAX_GENERATION_NUMBER + 1);
     if (gen_number > MAX_GENERATION_NUMBER) {
       /* there is no free generation number */
-      reiserfs_warning ("reiserfs_add_entry: Congratulations! we have got hash function screwed up\n");
+      reiserfs_warning (dir->i_sb, "reiserfs_add_entry: Congratulations! we have got hash function screwed up");
       if (buffer != small_buf)
           reiserfs_kfree (buffer, buflen, dir->i_sb);
       pathrelse (&path);
@@ -509,8 +511,9 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
  		  
     if (gen_number != 0) {	/* we need to re-search for the insertion point */
       if (search_by_entry_key (dir->i_sb, &entry_key, &path, &de) != NAME_NOT_FOUND) {
-            reiserfs_warning ("vs-7032: reiserfs_add_entry: "
-                            "entry with this key (%K) already exists\n", &entry_key);
+            reiserfs_warning (dir->i_sb, "vs-7032: reiserfs_add_entry: "
+                              "entry with this key (%K) already exists",
+                              &entry_key);
 
 	    if (buffer != small_buf)
 		reiserfs_kfree (buffer, buflen, dir->i_sb);
@@ -835,7 +838,8 @@ static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
 	goto end_rmdir;
 
     if ( inode->i_nlink != 2 && inode->i_nlink != 1 )
-	printk ("reiserfs_rmdir: empty directory has nlink != 2 (%d)\n", inode->i_nlink);
+	reiserfs_warning (inode->i_sb, "%s: empty directory has nlink "
+			  "!= 2 (%d)", __FUNCTION__, inode->i_nlink);
 
     inode->i_nlink = 0;
     inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
@@ -902,8 +906,10 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
     }
   
     if (!inode->i_nlink) {
-	printk("reiserfs_unlink: deleting nonexistent file (%s:%lu), %d\n",
-	       reiserfs_bdevname (inode->i_sb), inode->i_ino, inode->i_nlink);
+	reiserfs_warning (inode->i_sb, "%s: deleting nonexistent file "
+			  "(%s:%lu), %d", __FUNCTION__,
+			  reiserfs_bdevname (inode->i_sb), inode->i_ino,
+			  inode->i_nlink);
 	inode->i_nlink = 1;
     }
 
@@ -1337,7 +1343,7 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
     // anybody, but it will panic if will not be able to find the
     // entry. This needs one more clean up
     if (reiserfs_cut_from_item (&th, &old_entry_path, &(old_de.de_entry_key), old_dir, NULL, 0) < 0)
-	reiserfs_warning ("vs-7060: reiserfs_rename: couldn't not cut old name. Fsck later?\n");
+	reiserfs_warning (old_dir->i_sb, "vs-7060: reiserfs_rename: couldn't not cut old name. Fsck later?");
 
     old_dir->i_size -= DEH_SIZE + old_de.de_entrylen;
 

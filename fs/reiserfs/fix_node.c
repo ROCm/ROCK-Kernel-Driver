@@ -483,7 +483,8 @@ static int get_num_ver (int mode, struct tree_balance * tb, int h,
 	snum012[needed_nodes - 1 + 3] = units;
 
 	if (needed_nodes > 2)
-	    reiserfs_warning ("vs-8111: get_num_ver: split_item_position is out of boundary\n");
+	    reiserfs_warning (tb->tb_sb, "vs-8111: get_num_ver: "
+			      "split_item_position is out of boundary");
 	snum012[needed_nodes - 1] ++;
 	split_item_positions[needed_nodes - 1] = i;
 	needed_nodes ++;
@@ -510,7 +511,8 @@ static int get_num_ver (int mode, struct tree_balance * tb, int h,
 	snum012[4] = op_unit_num (&vn->vn_vi[split_item_num]) - snum012[4] - bytes_to_r - bytes_to_l - bytes_to_S1new;
 
 	if (vn->vn_vi[split_item_num].vi_index != TYPE_DIRENTRY)
-	    reiserfs_warning ("vs-8115: get_num_ver: not directory item\n");
+	    reiserfs_warning (tb->tb_sb, "vs-8115: get_num_ver: not "
+			      "directory item");
     }
 
     /* now we know S2bytes, calculate S1bytes */
@@ -1974,11 +1976,12 @@ void * reiserfs_kmalloc (size_t size, int flags, struct super_block * s)
     if (vp) {
 	REISERFS_SB(s)->s_kmallocs += size;
 	if (REISERFS_SB(s)->s_kmallocs > malloced + 200000) {
-	    reiserfs_warning ("vs-8301: reiserfs_kmalloc: allocated memory %d\n", REISERFS_SB(s)->s_kmallocs);
+	    reiserfs_warning (s,
+			      "vs-8301: reiserfs_kmalloc: allocated memory %d",
+			      REISERFS_SB(s)->s_kmallocs);
 	    malloced = REISERFS_SB(s)->s_kmallocs;
 	}
     }
-/*printk ("malloc : size %d, allocated %d\n", size, REISERFS_SB(s)->s_kmallocs);*/
     return vp;
 }
 
@@ -1988,7 +1991,8 @@ void reiserfs_kfree (const void * vp, size_t size, struct super_block * s)
   
     REISERFS_SB(s)->s_kmallocs -= size;
     if (REISERFS_SB(s)->s_kmallocs < 0)
-	reiserfs_warning ("vs-8302: reiserfs_kfree: allocated memory %d\n", REISERFS_SB(s)->s_kmallocs);
+	reiserfs_warning (s, "vs-8302: reiserfs_kfree: allocated memory %d",
+			  REISERFS_SB(s)->s_kmallocs);
 
 }
 #endif
@@ -2048,8 +2052,9 @@ static int get_mem_for_virtual_node (struct tree_balance * tb)
 	    buf = reiserfs_kmalloc(size, GFP_NOFS, tb->tb_sb);
 	    if ( !buf ) {
 #ifdef CONFIG_REISERFS_CHECK
-		reiserfs_warning ("vs-8345: get_mem_for_virtual_node: "
-				  "kmalloc failed. reiserfs kmalloced %d bytes\n",
+		reiserfs_warning (tb->tb_sb,
+				  "vs-8345: get_mem_for_virtual_node: "
+				  "kmalloc failed. reiserfs kmalloced %d bytes",
 				  REISERFS_SB(tb->tb_sb)->s_kmallocs);
 #endif
 		tb->vn_buf_size = 0;
@@ -2211,7 +2216,10 @@ static int wait_tb_buffers_until_unlocked (struct tree_balance * p_s_tb)
 #ifdef CONFIG_REISERFS_CHECK
 	    repeat_counter++;
 	    if ( (repeat_counter % 10000) == 0) {
-		reiserfs_warning ("wait_tb_buffers_until_released(): too many iterations waiting for buffer to unlock (%b)\n", locked);
+		reiserfs_warning (p_s_tb->tb_sb,
+				  "wait_tb_buffers_until_released(): too many "
+				  "iterations waiting for buffer to unlock "
+				  "(%b)", locked);
 
 		/* Don't loop forever.  Try to recover from possible error. */
 
@@ -2324,8 +2332,7 @@ int fix_nodes (int n_op_mode,
     case M_CUT:
 	if ( n_item_num < 0 || n_item_num >= B_NR_ITEMS(p_s_tbS0) ) {
 	    print_block (p_s_tbS0, 0, -1, -1);
-	    printk("mode = %c insert_size = %d\n", n_op_mode, p_s_tb->insert_size[0]);
-	    reiserfs_panic(p_s_tb->tb_sb,"PAP-8335: fix_nodes: Incorrect item number(%d)", n_item_num);
+	    reiserfs_panic(p_s_tb->tb_sb,"PAP-8335: fix_nodes: Incorrect item number(%d); mode = %c insert_size = %d\n", n_item_num, n_op_mode, p_s_tb->insert_size[0]);
 	}
 	break;
     default:

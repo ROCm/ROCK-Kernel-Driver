@@ -271,7 +271,7 @@ int reiserfs_allocate_list_bitmaps(struct super_block *p_s_sb,
     jb->journal_list = NULL ;
     jb->bitmaps = vmalloc( mem ) ;
     if (!jb->bitmaps) {
-      reiserfs_warning("clm-2000, unable to allocate bitmaps for journal lists\n") ;
+      reiserfs_warning(p_s_sb, "clm-2000, unable to allocate bitmaps for journal lists") ;
       failed = 1;   
       break ;
     }
@@ -345,7 +345,7 @@ static struct reiserfs_journal_cnode *allocate_cnodes(int num_cnodes) {
 static struct reiserfs_journal_cnode *get_cnode(struct super_block *p_s_sb) {
   struct reiserfs_journal_cnode *cn ;
 
-  reiserfs_check_lock_depth("get_cnode") ;
+  reiserfs_check_lock_depth(p_s_sb, "get_cnode") ;
 
   if (SB_JOURNAL(p_s_sb)->j_cnode_free <= 0) {
     return NULL ;
@@ -369,7 +369,7 @@ static struct reiserfs_journal_cnode *get_cnode(struct super_block *p_s_sb) {
 */
 static void free_cnode(struct super_block *p_s_sb, struct reiserfs_journal_cnode *cn) {
 
-  reiserfs_check_lock_depth("free_cnode") ;
+  reiserfs_check_lock_depth(p_s_sb, "free_cnode") ;
 
   SB_JOURNAL(p_s_sb)->j_cnode_used-- ;
   SB_JOURNAL(p_s_sb)->j_cnode_free++ ;
@@ -422,11 +422,10 @@ inline int mark_buffer_not_journaled(struct buffer_head *bh) {
 /* utility function to force a BUG if it is called without the big
 ** kernel lock held.  caller is the string printed just before calling BUG()
 */
-void reiserfs_check_lock_depth(char *caller) {
+void reiserfs_check_lock_depth(struct super_block *sb, char *caller) {
 #ifdef CONFIG_SMP
   if (current->lock_depth < 0) {
-    printk("%s called without kernel lock held\n", caller) ;
-    BUG() ;
+    reiserfs_panic (sb, "%s called without kernel lock held", caller) ;
   }
 #else
   ;
@@ -559,9 +558,8 @@ static inline void put_journal_list(struct super_block *s,
                                    struct reiserfs_journal_list *jl)
 {
     if (jl->j_refcount < 1) {
-        printk("trans id %lu, refcount at %d\n", jl->j_trans_id,
+        reiserfs_panic (s, "trans id %lu, refcount at %d", jl->j_trans_id,
 	                                         jl->j_refcount);
-        BUG();
     }
     if (--jl->j_refcount == 0)
         reiserfs_kfree(jl, sizeof(struct reiserfs_journal_list), s);
@@ -601,7 +599,7 @@ static void reiserfs_end_buffer_io_sync(struct buffer_head *bh, int uptodate) {
     char b[BDEVNAME_SIZE];
 
     if (buffer_journaled(bh)) {
-        reiserfs_warning("clm-2084: pinned buffer %lu:%s sent to disk\n",
+        reiserfs_warning(NULL, "clm-2084: pinned buffer %lu:%s sent to disk",
 	                 bh->b_blocknr, bdevname(bh->b_bdev, b)) ;
     }
     if (uptodate)
@@ -912,7 +910,7 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
   struct buffer_head *tbh = NULL ;
   unsigned long trans_id = jl->j_trans_id;
 
-  reiserfs_check_lock_depth("flush_commit_list") ;
+  reiserfs_check_lock_depth(s, "flush_commit_list") ;
 
   if (atomic_read(&jl->j_older_commits_done)) {
     return 0 ;
@@ -1007,7 +1005,7 @@ static int flush_commit_list(struct super_block *s, struct reiserfs_journal_list
   bforget(jl->j_commit_bh) ;
   if (SB_JOURNAL(s)->j_last_commit_id != 0 &&
      (jl->j_trans_id - SB_JOURNAL(s)->j_last_commit_id) != 1) {
-      reiserfs_warning("clm-2200: last commit %lu, current %lu\n",
+      reiserfs_warning(s, "clm-2200: last commit %lu, current %lu",
                        SB_JOURNAL(s)->j_last_commit_id,
 		       jl->j_trans_id);
   }
@@ -1066,8 +1064,8 @@ static void remove_all_from_journal_list(struct super_block *p_s_sb, struct reis
   while(cn) {
     if (cn->blocknr != 0) {
       if (debug) {
-        printk("block %u, bh is %d, state %ld\n", cn->blocknr, cn->bh ? 1: 0,
-	        cn->state) ;
+       reiserfs_warning (p_s_sb, "block %u, bh is %d, state %ld", cn->blocknr,
+                         cn->bh ? 1: 0, cn->state) ;
       }
       cn->state = 0 ;
       remove_journal_hash(p_s_sb, SB_JOURNAL(p_s_sb)->j_list_hash_table, jl, cn->blocknr, 1) ;
@@ -1104,7 +1102,7 @@ static int _update_journal_header_block(struct super_block *p_s_sb, unsigned lon
     set_buffer_dirty(SB_JOURNAL(p_s_sb)->j_header_bh) ;
     sync_dirty_buffer(SB_JOURNAL(p_s_sb)->j_header_bh) ;
     if (!buffer_uptodate(SB_JOURNAL(p_s_sb)->j_header_bh)) {
-      printk( "reiserfs: journal-837: IO error during journal replay\n" );
+      reiserfs_warning (p_s_sb, "journal-837: IO error during journal replay");
       return -EIO ;
     }
   }
@@ -1178,7 +1176,7 @@ static int flush_journal_list(struct super_block *s,
   }
 
   if (atomic_read(&SB_JOURNAL(s)->j_wcount) != 0) {
-    reiserfs_warning("clm-2048: flush_journal_list called with wcount %d\n",
+    reiserfs_warning(s, "clm-2048: flush_journal_list called with wcount %d",
                       atomic_read(&SB_JOURNAL(s)->j_wcount)) ;
   }
   if (jl->j_trans_id == 0)
@@ -1277,8 +1275,10 @@ static int flush_journal_list(struct super_block *s,
     ** is not marked JDirty_wait
     */
     if ((!was_jwait) && !buffer_locked(saved_bh)) {
-printk("journal-813: BAD! buffer %llu %cdirty %cjwait, not in a newer tranasction\n", (unsigned long long)saved_bh->b_blocknr,
-        was_dirty ? ' ' : '!', was_jwait ? ' ' : '!') ;
+	reiserfs_warning (s, "journal-813: BAD! buffer %llu %cdirty %cjwait, "
+			  "not in a newer tranasction",
+			  (unsigned long long)saved_bh->b_blocknr,
+			  was_dirty ? ' ' : '!', was_jwait ? ' ' : '!') ;
     }
     if (was_dirty) { 
       /* we inc again because saved_bh gets decremented at free_cnode */
@@ -1293,8 +1293,8 @@ printk("journal-813: BAD! buffer %llu %cdirty %cjwait, not in a newer tranasctio
         unlock_buffer(saved_bh);
       count++ ;
     } else {
-      printk("clm-2082: Unable to flush buffer %llu in flush_journal_list\n",
-              (unsigned long long)saved_bh->b_blocknr) ;
+      reiserfs_warning (s, "clm-2082: Unable to flush buffer %llu in %s",
+                        (unsigned long long)saved_bh->b_blocknr, __FUNCTION__);
     }
 free_cnode:
     last = cn ;
@@ -1303,7 +1303,7 @@ free_cnode:
       /* we incremented this to keep others from taking the buffer head away */
       put_bh(saved_bh) ;
       if (atomic_read(&(saved_bh->b_count)) < 0) {
-        printk("journal-945: saved_bh->b_count < 0") ;
+        reiserfs_warning (s, "journal-945: saved_bh->b_count < 0");
       }
     }
   }
@@ -1363,7 +1363,7 @@ flush_older_and_return:
 
   if (SB_JOURNAL(s)->j_last_flush_id != 0 &&
      (jl->j_trans_id - SB_JOURNAL(s)->j_last_flush_id) != 1) {
-      reiserfs_warning("clm-2201: last flush %lu, current %lu\n",
+      reiserfs_warning(s, "clm-2201: last flush %lu, current %lu",
                        SB_JOURNAL(s)->j_last_flush_id,
 		       jl->j_trans_id);
   }
@@ -1712,19 +1712,19 @@ static int journal_transaction_is_valid(struct super_block *p_s_sb, struct buffe
     if (oldest_invalid_trans_id && *oldest_invalid_trans_id && get_desc_trans_id(desc) > *oldest_invalid_trans_id) {
       reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-986: transaction "
 	              "is valid returning because trans_id %d is greater than "
-		      "oldest_invalid %lu\n", get_desc_trans_id(desc), 
+		      "oldest_invalid %lu", get_desc_trans_id(desc),
 		       *oldest_invalid_trans_id);
       return 0 ;
     }
     if (newest_mount_id && *newest_mount_id > get_desc_mount_id (desc)) {
       reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1087: transaction "
                      "is valid returning because mount_id %d is less than "
-		     "newest_mount_id %lu\n", get_desc_mount_id (desc), 
+		     "newest_mount_id %lu", get_desc_mount_id (desc),
 		     *newest_mount_id) ;
       return -1 ;
     }
     if ( get_desc_trans_len(desc) > SB_JOURNAL_TRANS_MAX(p_s_sb) ) {
-      reiserfs_warning("journal-2018: Bad transaction length %d encountered, ignoring transaction\n", get_desc_trans_len(desc));
+      reiserfs_warning(p_s_sb, "journal-2018: Bad transaction length %d encountered, ignoring transaction", get_desc_trans_len(desc));
       return -1 ;
     }
     offset = d_bh->b_blocknr - SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) ;
@@ -1738,7 +1738,7 @@ static int journal_transaction_is_valid(struct super_block *p_s_sb, struct buffe
     if (journal_compare_desc_commit(p_s_sb, desc, commit)) {
       reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, 
                      "journal_transaction_is_valid, commit offset %ld had bad "
-		     "time %d or length %d\n", 
+		     "time %d or length %d",
 		     c_bh->b_blocknr -  SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb),
 		     get_commit_trans_id (commit), 
 		     get_commit_trans_len(commit));
@@ -1746,14 +1746,14 @@ static int journal_transaction_is_valid(struct super_block *p_s_sb, struct buffe
       if (oldest_invalid_trans_id) {
 	*oldest_invalid_trans_id = get_desc_trans_id(desc) ;
 	reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1004: "
-	               "transaction_is_valid setting oldest invalid trans_id "
-		       "to %d\n", get_desc_trans_id(desc)) ;
+		       "transaction_is_valid setting oldest invalid trans_id "
+		       "to %d", get_desc_trans_id(desc)) ;
       }
       return -1; 
     }
     brelse(c_bh) ;
     reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1006: found valid "
-                   "transaction start offset %llu, len %d id %d\n",
+                   "transaction start offset %llu, len %d id %d",
 		   d_bh->b_blocknr - SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb), 
 		   get_desc_trans_len(desc), get_desc_trans_id(desc)) ;
     return 1 ;
@@ -1793,12 +1793,12 @@ static int journal_read_transaction(struct super_block *p_s_sb, unsigned long cu
   desc = (struct reiserfs_journal_desc *)d_bh->b_data ;
   trans_offset = d_bh->b_blocknr - SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) ;
   reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1037: "
-                 "journal_read_transaction, offset %llu, len %d mount_id %d\n",
+                 "journal_read_transaction, offset %llu, len %d mount_id %d",
 		 d_bh->b_blocknr - SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb), 
 		 get_desc_trans_len(desc), get_desc_mount_id(desc)) ;
   if (get_desc_trans_id(desc) < oldest_trans_id) {
     reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1039: "
-                   "journal_read_trans skipping because %lu is too old\n", 
+                   "journal_read_trans skipping because %lu is too old",
 		   cur_dblock - SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb)) ;
     brelse(d_bh) ;
     return 1 ;
@@ -1806,7 +1806,7 @@ static int journal_read_transaction(struct super_block *p_s_sb, unsigned long cu
   if (get_desc_mount_id(desc) != newest_mount_id) {
     reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1146: "
                    "journal_read_trans skipping because %d is != "
-		   "newest_mount_id %lu\n", get_desc_mount_id(desc), 
+		   "newest_mount_id %lu", get_desc_mount_id(desc),
 		    newest_mount_id) ;
     brelse(d_bh) ;
     return 1 ;
@@ -1821,7 +1821,7 @@ static int journal_read_transaction(struct super_block *p_s_sb, unsigned long cu
   commit = (struct reiserfs_journal_commit *)c_bh->b_data ;
   if (journal_compare_desc_commit(p_s_sb, desc, commit)) {
     reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal_read_transaction, "
-                   "commit offset %llu had bad time %d or length %d\n",
+                   "commit offset %llu had bad time %d or length %d",
 		   c_bh->b_blocknr -  SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb), 
 		   get_commit_trans_id(commit), get_commit_trans_len(commit));
     brelse(c_bh) ;
@@ -1837,7 +1837,7 @@ static int journal_read_transaction(struct super_block *p_s_sb, unsigned long cu
     brelse(d_bh) ;
     reiserfs_kfree(log_blocks, get_desc_trans_len(desc) * sizeof(struct buffer_head *), p_s_sb) ;
     reiserfs_kfree(real_blocks, get_desc_trans_len(desc) * sizeof(struct buffer_head *), p_s_sb) ;
-    reiserfs_warning("journal-1169: kmalloc failed, unable to mount FS\n") ;
+    reiserfs_warning(p_s_sb, "journal-1169: kmalloc failed, unable to mount FS") ;
     return -1 ;
   }
   /* get all the buffer heads */
@@ -1850,12 +1850,12 @@ static int journal_read_transaction(struct super_block *p_s_sb, unsigned long cu
       real_blocks[i] = sb_getblk(p_s_sb, le32_to_cpu(commit->j_realblock[i - trans_half])) ;
     }
     if ( real_blocks[i]->b_blocknr > SB_BLOCK_COUNT(p_s_sb) ) {
-      reiserfs_warning("journal-1207: REPLAY FAILURE fsck required! Block to replay is outside of filesystem\n");
+      reiserfs_warning(p_s_sb, "journal-1207: REPLAY FAILURE fsck required! Block to replay is outside of filesystem");
       goto abort_replay;
     }
     /* make sure we don't try to replay onto log or reserved area */
     if (is_block_in_log_or_reserved_area(p_s_sb, real_blocks[i]->b_blocknr)) {
-      reiserfs_warning("journal-1204: REPLAY FAILURE fsck required! Trying to replay onto a log block\n") ;
+      reiserfs_warning(p_s_sb, "journal-1204: REPLAY FAILURE fsck required! Trying to replay onto a log block") ;
 abort_replay:
       brelse_array(log_blocks, i) ;
       brelse_array(real_blocks, i) ;
@@ -1871,7 +1871,7 @@ abort_replay:
   for (i = 0 ; i < get_desc_trans_len(desc) ; i++) {
     wait_on_buffer(log_blocks[i]) ;
     if (!buffer_uptodate(log_blocks[i])) {
-      reiserfs_warning("journal-1212: REPLAY FAILURE fsck required! buffer write failed\n") ;
+      reiserfs_warning(p_s_sb, "journal-1212: REPLAY FAILURE fsck required! buffer write failed") ;
       brelse_array(log_blocks + i, get_desc_trans_len(desc) - i) ;
       brelse_array(real_blocks, get_desc_trans_len(desc)) ;
       brelse(c_bh) ;
@@ -1892,7 +1892,7 @@ abort_replay:
   for (i = 0 ; i < get_desc_trans_len(desc) ; i++) {
     wait_on_buffer(real_blocks[i]) ; 
     if (!buffer_uptodate(real_blocks[i])) {
-      reiserfs_warning("journal-1226: REPLAY FAILURE, fsck required! buffer write failed\n") ;
+      reiserfs_warning(p_s_sb, "journal-1226: REPLAY FAILURE, fsck required! buffer write failed") ;
       brelse_array(real_blocks + i, get_desc_trans_len(desc) - i) ;
       brelse(c_bh) ;
       brelse(d_bh) ;
@@ -1904,7 +1904,7 @@ abort_replay:
   }
   cur_dblock =  SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + ((trans_offset + get_desc_trans_len(desc) + 2) % SB_ONDISK_JOURNAL_SIZE(p_s_sb)) ;
   reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1095: setting journal "
-                 "start to offset %ld\n", 
+                 "start to offset %ld",
 		 cur_dblock -  SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb)) ;
   
   /* init starting values for the first transaction, in case this is the last transaction to be replayed. */
@@ -1986,9 +1986,8 @@ static int journal_read(struct super_block *p_s_sb) {
   char b[BDEVNAME_SIZE];
 
   cur_dblock = SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) ;
-  printk("reiserfs: checking transaction log (%s) for (%s)\n",
-	 bdevname(SB_JOURNAL(p_s_sb)->j_dev_bd, b),
-	 reiserfs_bdevname(p_s_sb));
+  reiserfs_info (p_s_sb, "checking transaction log (%s)\n",
+	 bdevname(SB_JOURNAL(p_s_sb)->j_dev_bd, b));
   start = get_seconds();
 
   /* step 1, read in the journal header block.  Check the transaction it says 
@@ -2011,7 +2010,7 @@ static int journal_read(struct super_block *p_s_sb) {
     newest_mount_id = le32_to_cpu(jh->j_mount_id);
     reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1153: found in "
                    "header: first_unflushed_offset %d, last_flushed_trans_id "
-		   "%lu\n", le32_to_cpu(jh->j_first_unflushed_offset), 
+		   "%lu", le32_to_cpu(jh->j_first_unflushed_offset),
 		   le32_to_cpu(jh->j_last_flush_trans_id)) ;
     valid_journal_header = 1 ;
 
@@ -2029,7 +2028,8 @@ static int journal_read(struct super_block *p_s_sb) {
   }
 
   if (continue_replay && bdev_read_only(p_s_sb->s_bdev)) {
-    printk("clm-2076: device is readonly, unable to replay log\n") ;
+    reiserfs_warning (p_s_sb,
+		      "clm-2076: device is readonly, unable to replay log") ;
     return -1 ;
   }
 
@@ -2049,7 +2049,7 @@ static int journal_read(struct super_block *p_s_sb) {
 	oldest_start = d_bh->b_blocknr ;
 	newest_mount_id = get_desc_mount_id(desc) ;
 	reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1179: Setting "
-	               "oldest_start to offset %llu, trans_id %lu\n",
+	               "oldest_start to offset %llu, trans_id %lu",
 		       oldest_start - SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb), 
 		       oldest_trans_id) ;
       } else if (oldest_trans_id > get_desc_trans_id(desc)) { 
@@ -2057,14 +2057,14 @@ static int journal_read(struct super_block *p_s_sb) {
         oldest_trans_id = get_desc_trans_id(desc) ;
 	oldest_start = d_bh->b_blocknr ;
 	reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1180: Resetting "
-	               "oldest_start to offset %lu, trans_id %lu\n", 
+	               "oldest_start to offset %lu, trans_id %lu",
 			oldest_start - SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb), 
 			oldest_trans_id) ;
       }
       if (newest_mount_id < get_desc_mount_id(desc)) {
         newest_mount_id = get_desc_mount_id(desc) ;
 	reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1299: Setting "
-	              "newest_mount_id to %d\n", get_desc_mount_id(desc));
+	              "newest_mount_id to %d", get_desc_mount_id(desc));
       }
       cur_dblock += get_desc_trans_len(desc) + 2 ;
     } else {
@@ -2077,7 +2077,7 @@ start_log_replay:
   cur_dblock = oldest_start ;
   if (oldest_trans_id)  {
     reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1206: Starting replay "
-                   "from offset %llu, trans_id %lu\n",
+                   "from offset %llu, trans_id %lu",
 		   cur_dblock - SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb), 
 		   oldest_trans_id) ;
 
@@ -2098,7 +2098,7 @@ start_log_replay:
 
   if (oldest_trans_id == 0) {
     reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1225: No valid "
-                   "transactions found\n") ;
+                   "transactions found") ;
   }
   /* j_start does not get set correctly if we don't replay any transactions.
   ** if we had a valid journal_header, set j_start to the first unflushed transaction value,
@@ -2113,11 +2113,11 @@ start_log_replay:
     SB_JOURNAL(p_s_sb)->j_mount_id = newest_mount_id + 1 ;
   }
   reiserfs_debug(p_s_sb, REISERFS_DEBUG_CODE, "journal-1299: Setting "
-                 "newest_mount_id to %lu\n", SB_JOURNAL(p_s_sb)->j_mount_id) ;
+                 "newest_mount_id to %lu", SB_JOURNAL(p_s_sb)->j_mount_id) ;
   SB_JOURNAL(p_s_sb)->j_first_unflushed_offset = SB_JOURNAL(p_s_sb)->j_start ; 
   if (replay_count > 0) {
-    printk("reiserfs: replayed %d transactions in %lu seconds\n", replay_count, 
-	    get_seconds() - start) ;
+    reiserfs_info (p_s_sb, "replayed %d transactions in %lu seconds\n",
+		   replay_count, get_seconds() - start) ;
   }
   if (!bdev_read_only(p_s_sb->s_bdev) && 
        _update_journal_header_block(p_s_sb, SB_JOURNAL(p_s_sb)->j_start, 
@@ -2172,7 +2172,7 @@ static int release_journal_dev( struct super_block *super,
     }
 
     if( result != 0 ) {
-	reiserfs_warning("sh-457: release_journal_dev: Cannot release journal device: %i\n", result );
+	reiserfs_warning(super, "sh-457: release_journal_dev: Cannot release journal device: %i", result );
     }
     return result;
 }
@@ -2202,8 +2202,9 @@ static int journal_init_dev( struct super_block *super,
 		if (IS_ERR(journal->j_dev_bd)) {
 			result = PTR_ERR(journal->j_dev_bd);
 			journal->j_dev_bd = NULL;
-			printk( "sh-458: journal_init_dev: cannot init journal device\n '%s': %i", 
-				__bdevname(jdev, b), result );
+			reiserfs_warning (super, "sh-458: journal_init_dev: "
+					  "cannot init journal device '%s': %i",
+					  __bdevname(jdev, b), result );
 			return result;
 		} else if (jdev != super->s_dev)
 			set_blocksize(journal->j_dev_bd, super->s_blocksize);
@@ -2214,7 +2215,8 @@ static int journal_init_dev( struct super_block *super,
 	if( !IS_ERR( journal -> j_dev_file ) ) {
 		struct inode *jdev_inode = journal->j_dev_file->f_mapping->host;
 		if( !S_ISBLK( jdev_inode -> i_mode ) ) {
-			printk( "journal_init_dev: '%s' is not a block device\n", jdev_name );
+			reiserfs_warning  (super, "journal_init_dev: '%s' is "
+					   "not a block device", jdev_name );
 			result = -ENOTBLK;
 		} else  {
 			/* ok */
@@ -2224,12 +2226,14 @@ static int journal_init_dev( struct super_block *super,
 	} else {
 		result = PTR_ERR( journal -> j_dev_file );
 		journal -> j_dev_file = NULL;
-		printk( "journal_init_dev: Cannot open '%s': %i\n", jdev_name, result );
+		reiserfs_warning (super,
+				  "journal_init_dev: Cannot open '%s': %i",
+				  jdev_name, result );
 	}
 	if( result != 0 ) {
 		release_journal_dev( super, journal );
 	}
-	printk( "journal_init_dev: journal device: %s\n",
+	reiserfs_info(super, "journal_init_dev: journal device: %s\n",
 		bdevname(journal->j_dev_bd, b));
 	return result;
 }
@@ -2248,7 +2252,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
 
     journal = SB_JOURNAL(p_s_sb) = vmalloc(sizeof (struct reiserfs_journal)) ;
     if (!journal) {
-	printk("journal-1256: unable to get memory for journal structure\n") ;
+	reiserfs_warning (p_s_sb, "journal-1256: unable to get memory for journal structure") ;
 	return 1 ;
     }
     memset(journal, 0, sizeof(struct reiserfs_journal)) ;
@@ -2270,14 +2274,16 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
        (actual for small blocksizes) */
     if ( !SB_ONDISK_JOURNAL_DEVICE( p_s_sb ) &&
          (SB_JOURNAL_1st_RESERVED_BLOCK(p_s_sb) + SB_ONDISK_JOURNAL_SIZE(p_s_sb) > p_s_sb->s_blocksize * 8) ) {
-	printk("journal-1393: journal does not fit for area addressed by first of bitmap blocks. "
-	       "It starts at %u and its size is %u. Block size %ld\n",
-		SB_JOURNAL_1st_RESERVED_BLOCK(p_s_sb), SB_ONDISK_JOURNAL_SIZE(p_s_sb), p_s_sb->s_blocksize) ;
+	reiserfs_warning (p_s_sb, "journal-1393: journal does not fit for area "
+			  "addressed by first of bitmap blocks. It starts at "
+			  "%u and its size is %u. Block size %ld",
+			  SB_JOURNAL_1st_RESERVED_BLOCK(p_s_sb),
+			  SB_ONDISK_JOURNAL_SIZE(p_s_sb), p_s_sb->s_blocksize);
 	goto free_and_return;
     }
 
     if( journal_init_dev( p_s_sb, journal, j_dev_name ) != 0 ) {
-      printk( "sh-462: unable to initialize jornal device\n");
+      reiserfs_warning (p_s_sb, "sh-462: unable to initialize jornal device");
       goto free_and_return;
     }
 
@@ -2287,18 +2293,19 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
      bhjh = journal_bread(p_s_sb,
 		   SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + SB_ONDISK_JOURNAL_SIZE(p_s_sb));
      if (!bhjh) {
-	 printk("sh-459: unable to read  journal header\n") ;
+	 reiserfs_warning (p_s_sb, "sh-459: unable to read journal header");
 	 goto free_and_return;
      }
      jh = (struct reiserfs_journal_header *)(bhjh->b_data);
      
      /* make sure that journal matches to the super block */
      if (is_reiserfs_jr(rs) && (jh->jh_journal.jp_journal_magic != sb_jp_journal_magic(rs))) {
-	 printk("sh-460: journal header magic %x (device %s) does not match "
-		"to magic found in super block %x (device %s)\n",
-		jh->jh_journal.jp_journal_magic,
-		bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd, b),
-		sb_jp_journal_magic(rs), reiserfs_bdevname (p_s_sb));
+	 reiserfs_warning (p_s_sb, "sh-460: journal header magic %x "
+			   "(device %s) does not match to magic found in super "
+			   "block %x",
+			   jh->jh_journal.jp_journal_magic,
+			   bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd, b),
+			   sb_jp_journal_magic(rs));
 	 brelse (bhjh);
 	 goto free_and_return;
   }
@@ -2324,7 +2331,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
       SB_JOURNAL_TRANS_MAX(p_s_sb) = JOURNAL_TRANS_MIN_DEFAULT / ratio;
     
     if (SB_JOURNAL_TRANS_MAX(p_s_sb) != initial)
-      printk ("sh-461: journal_init: wrong transaction max size (%u). Changed to %u\n",
+      reiserfs_warning (p_s_sb, "sh-461: journal_init: wrong transaction max size (%u). Changed to %u",
 	      initial, SB_JOURNAL_TRANS_MAX(p_s_sb));
 
     SB_JOURNAL_MAX_BATCH(p_s_sb) = SB_JOURNAL_TRANS_MAX(p_s_sb)*
@@ -2353,16 +2360,16 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
       SB_JOURNAL_MAX_TRANS_AGE(p_s_sb) = commit_max_age;
   }
 
-  printk ("Reiserfs journal params: device %s, size %u, "
-	  "journal first block %u, max trans len %u, max batch %u, "
-	  "max commit age %u, max trans age %u\n",
-	  bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd, b),
-	  SB_ONDISK_JOURNAL_SIZE(p_s_sb),
-	  SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb),
-	  SB_JOURNAL_TRANS_MAX(p_s_sb),
-	  SB_JOURNAL_MAX_BATCH(p_s_sb),
-	  SB_JOURNAL_MAX_COMMIT_AGE(p_s_sb),
-	  SB_JOURNAL_MAX_TRANS_AGE(p_s_sb));
+  reiserfs_info (p_s_sb, "journal params: device %s, size %u, "
+		 "journal first block %u, max trans len %u, max batch %u, "
+		 "max commit age %u, max trans age %u\n",
+		 bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd, b),
+		 SB_ONDISK_JOURNAL_SIZE(p_s_sb),
+		 SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb),
+		 SB_JOURNAL_TRANS_MAX(p_s_sb),
+		 SB_JOURNAL_MAX_BATCH(p_s_sb),
+		 SB_JOURNAL_MAX_COMMIT_AGE(p_s_sb),
+		 SB_JOURNAL_MAX_TRANS_AGE(p_s_sb));
 
   brelse (bhjh);
      
@@ -2401,11 +2408,11 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   jl = SB_JOURNAL(p_s_sb)->j_current_jl;
   jl->j_list_bitmap = get_list_bitmap(p_s_sb, jl);
   if (!jl->j_list_bitmap) {
-    reiserfs_warning("journal-2005, get_list_bitmap failed for journal list 0\n") ;
+    reiserfs_warning(p_s_sb, "journal-2005, get_list_bitmap failed for journal list 0") ;
     goto free_and_return;
   }
   if (journal_read(p_s_sb) < 0) {
-    reiserfs_warning("Replay Failure, unable to mount\n") ;
+    reiserfs_warning(p_s_sb, "Replay Failure, unable to mount") ;
     goto free_and_return;
   }
 
@@ -2522,7 +2529,7 @@ static int do_journal_begin_r(struct reiserfs_transaction_handle *th, struct sup
   struct reiserfs_transaction_handle myth;
   int sched_count = 0;
 
-  reiserfs_check_lock_depth("journal_begin") ;
+  reiserfs_check_lock_depth(p_s_sb, "journal_begin") ;
   RFALSE( p_s_sb->s_flags & MS_RDONLY, 
 	  "clm-2078: calling journal_begin on readonly FS") ;
 
@@ -2664,14 +2671,14 @@ int journal_begin(struct reiserfs_transaction_handle *th, struct super_block  * 
 	      cur_th->t_refcount++ ;
 	      memcpy(th, cur_th, sizeof(*th));
 	      if (th->t_refcount <= 1)
-		      printk("BAD: refcount <= 1, but journal_info != 0\n");
+		      reiserfs_warning (p_s_sb, "BAD: refcount <= 1, but journal_info != 0");
 	      return 0;
 	} else {
 	    /* we've ended up with a handle from a different filesystem.
 	    ** save it and restore on journal_end.  This should never
 	    ** really happen...
 	    */
-	    reiserfs_warning("clm-2100: nesting info a different FS\n") ;
+	    reiserfs_warning(p_s_sb, "clm-2100: nesting info a different FS") ;
 	    th->t_handle_save = current->journal_info ;
 	    current->journal_info = th;
 	}
@@ -2718,14 +2725,16 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
   ** could get to disk too early.  NOT GOOD.
   */
   if (!prepared || buffer_dirty(bh)) {
-    printk("journal-1777: buffer %llu bad state %cPREPARED %cLOCKED %cDIRTY %cJDIRTY_WAIT\n", (unsigned long long)bh->b_blocknr, prepared ? ' ' : '!', 
-                            buffer_locked(bh) ? ' ' : '!',
+    reiserfs_warning (p_s_sb, "journal-1777: buffer %llu bad state "
+		      "%cPREPARED %cLOCKED %cDIRTY %cJDIRTY_WAIT",
+		      (unsigned long long)bh->b_blocknr, prepared ? ' ' : '!',
+			    buffer_locked(bh) ? ' ' : '!',
 			    buffer_dirty(bh) ? ' ' : '!',
 			    buffer_journal_dirty(bh) ? ' ' : '!') ;
   }
 
   if (atomic_read(&(SB_JOURNAL(p_s_sb)->j_wcount)) <= 0) {
-    printk("journal-1409: journal_mark_dirty returning because j_wcount was %d\n", atomic_read(&(SB_JOURNAL(p_s_sb)->j_wcount))) ;
+    reiserfs_warning (p_s_sb, "journal-1409: journal_mark_dirty returning because j_wcount was %d", atomic_read(&(SB_JOURNAL(p_s_sb)->j_wcount))) ;
     return 1 ;
   }
   /* this error means I've screwed up, and we've overflowed the transaction.  
@@ -2785,7 +2794,8 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
 
 int journal_end(struct reiserfs_transaction_handle *th, struct super_block *p_s_sb, unsigned long nblocks) {
   if (!current->journal_info && th->t_refcount > 1)
-    printk("REISER-NESTING: th NULL, refcount %d\n", th->t_refcount);
+    reiserfs_warning (p_s_sb, "REISER-NESTING: th NULL, refcount %d",
+                      th->t_refcount);
 
   th->t_refcount--;
   if (th->t_refcount > 0) {
@@ -2844,7 +2854,7 @@ static int remove_from_transaction(struct super_block *p_s_sb, b_blocknr_t block
     mark_buffer_notjournal_dirty(bh) ; 
     put_bh(bh) ;
     if (atomic_read(&(bh->b_count)) < 0) {
-      printk("journal-1752: remove from trans, b_count < 0\n") ;
+      reiserfs_warning (p_s_sb, "journal-1752: remove from trans, b_count < 0");
     }
     ret = 1 ;
   }
@@ -3142,7 +3152,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
 	    cleaned = 1 ;
 	    put_bh(cn->bh) ;
 	    if (atomic_read(&(cn->bh->b_count)) < 0) {
-	      printk("journal-2138: cn->bh->b_count < 0\n") ;
+	      reiserfs_warning (p_s_sb, "journal-2138: cn->bh->b_count < 0");
 	    }
 	  }
 	  if (cn->jlist) { /* since we are clearing the bh, we MUST dec nonzerolen */
@@ -3158,7 +3168,7 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
   if (bh) {
     put_bh(bh) ; /* get_hash grabs the buffer */
     if (atomic_read(&(bh->b_count)) < 0) {
-      printk("journal-2165: bh->b_count < 0\n") ;
+      reiserfs_warning (p_s_sb, "journal-2165: bh->b_count < 0");
     }
   }
   return 0 ;
@@ -3318,7 +3328,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
     BUG() ;
 
   current->journal_info = th->t_handle_save;
-  reiserfs_check_lock_depth("journal end");
+  reiserfs_check_lock_depth(p_s_sb, "journal end");
   if (SB_JOURNAL(p_s_sb)->j_len == 0) {
       reiserfs_prepare_for_journal(p_s_sb, SB_BUFFER_WITH_SB(p_s_sb), 1) ;
       journal_mark_dirty(th, p_s_sb, SB_BUFFER_WITH_SB(p_s_sb)) ;
@@ -3480,7 +3490,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
       clear_bit(BH_JDirty, &(cn->bh->b_state)) ;
     } else {
       /* JDirty cleared sometime during transaction.  don't log this one */
-      reiserfs_warning("journal-2048: do_journal_end: BAD, buffer in journal hash, but not JDirty!\n") ;
+      reiserfs_warning(p_s_sb, "journal-2048: do_journal_end: BAD, buffer in journal hash, but not JDirty!") ;
       brelse(cn->bh) ;
     }
     next = cn->next ;
@@ -3612,7 +3622,7 @@ first_jl:
 	  flush_commit_list(p_s_sb, jl, 1) ;
   }
 out:
-  reiserfs_check_lock_depth("journal end2");
+  reiserfs_check_lock_depth(p_s_sb, "journal end2");
   th->t_trans_id = 0;
   return 0 ;
 }

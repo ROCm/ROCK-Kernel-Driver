@@ -54,7 +54,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 
     reiserfs_write_lock(inode->i_sb);
 
-    reiserfs_check_lock_depth("readdir") ;
+    reiserfs_check_lock_depth(inode->i_sb, "readdir") ;
 
     /* form key for search the next directory entry using f_pos field of
        file structure */
@@ -62,7 +62,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		  TYPE_DIRENTRY, 3);
     next_pos = cpu_key_k_offset (&pos_key);
 
-    /*  reiserfs_warning ("reiserfs_readdir 1: f_pos = %Ld\n", filp->f_pos);*/
+    /*  reiserfs_warning (inode->i_sb, "reiserfs_readdir 1: f_pos = %Ld", filp->f_pos);*/
 
     while (1) {
     research:

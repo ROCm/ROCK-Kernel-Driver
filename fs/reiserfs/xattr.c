@@ -326,7 +326,7 @@ research:
 	ih = de.de_ih;
 
 	if (!is_direntry_le_ih(ih)) {
-            reiserfs_warning("not direntry %h\n", ih);
+            reiserfs_warning(inode->i_sb, "not direntry %h", ih);
 	    break;
         }
 	copy_item_head(&tmp_ih, ih);
@@ -671,9 +671,8 @@ reiserfs_xattr_get (const struct inode *inode, const char *name, void *buffer,
             if (rxh->h_magic != cpu_to_le32 (REISERFS_XATTR_MAGIC)) {
                 unlock_page (page);
                 reiserfs_put_page (page);
-                reiserfs_warning ("reiserfs: Invalid magic for xattr (%s) "
-                                  "associated with %s %k\n", name,
-                                  reiserfs_bdevname (inode->i_sb),
+                reiserfs_warning (inode->i_sb, "Invalid magic for xattr (%s) "
+                                  "associated with %k", name,
                                   INODE_PKEY (inode));
                 err = -EIO;
                 goto out_dput;
@@ -690,9 +689,8 @@ reiserfs_xattr_get (const struct inode *inode, const char *name, void *buffer,
     err = isize - sizeof (struct reiserfs_xattr_header);
 
     if (xattr_hash (buffer, isize - sizeof (struct reiserfs_xattr_header)) != hash) {
-        reiserfs_warning ("reiserfs: Invalid hash for xattr (%s) associated "
-                          "with %s %k\n", name,
-                          reiserfs_bdevname (inode->i_sb), INODE_PKEY (inode));
+        reiserfs_warning (inode->i_sb, "Invalid hash for xattr (%s) associated "
+                          "with %k", name, INODE_PKEY (inode));
         err = -EIO;
     }
 
@@ -724,7 +722,8 @@ __reiserfs_xattr_del (struct dentry *xadir, const char *name, int namelen)
         goto out_file;
 
     if (!is_reiserfs_priv_object (dentry->d_inode)) {
-        reiserfs_warning ("OID %08x [%.*s/%.*s] doesn't have priv flag set [parent is %sset].\n",
+        reiserfs_warning (dir->i_sb, "OID %08x [%.*s/%.*s] doesn't have "
+                                     "priv flag set [parent is %sset].",
                         le32_to_cpu (INODE_PKEY (dentry->d_inode)->k_objectid),
                         xadir->d_name.len, xadir->d_name.name, namelen, name,
                         is_reiserfs_priv_object (xadir->d_inode) ? "" : "not ");
@@ -828,7 +827,8 @@ reiserfs_delete_xattrs (struct inode *inode)
         reiserfs_write_unlock_xattrs (inode->i_sb);
         dput (root);
     } else {
-        reiserfs_warning ("Couldn't remove all entries in directory\n");
+        reiserfs_warning (inode->i_sb,
+                          "Couldn't remove all entries in directory");
     }
     unlock_kernel ();
 
@@ -1264,8 +1264,8 @@ reiserfs_xattr_init (struct super_block *s, int mount_flags)
   } else if (reiserfs_xattrs_optional (s)) {
     /* Old format filesystem, but optional xattrs have been enabled
      * at mount time. Error out. */
-    reiserfs_warning ("reiserfs: xattrs/ACLs not supported on pre v3.6 "
-                      "format filesystem. Failing mount.\n");
+    reiserfs_warning (s, "xattrs/ACLs not supported on pre v3.6 "
+                      "format filesystem. Failing mount.");
     err = -EOPNOTSUPP;
     goto error;
   } else {
@@ -1291,8 +1291,8 @@ reiserfs_xattr_init (struct super_block *s, int mount_flags)
             }
 
             if (dentry && dentry->d_inode)
-                reiserfs_warning ("reiserfs: Created %s on %s - reserved for "
-                                  "xattr storage.\n", PRIVROOT_NAME,
+                reiserfs_warning (s, "Created %s on %s - reserved for "
+                                  "xattr storage.", PRIVROOT_NAME,
                                   reiserfs_bdevname (inode->i_sb));
         } else if (!dentry->d_inode) {
             dput (dentry);
@@ -1309,8 +1309,8 @@ reiserfs_xattr_init (struct super_block *s, int mount_flags)
           /* If we're read-only it just means that the dir hasn't been
            * created. Not an error -- just no xattrs on the fs. We'll
            * check again if we go read-write */
-          reiserfs_warning ("reiserfs: xattrs/ACLs enabled and couldn't "
-                            "find/create .reiserfs_priv. Failing mount.\n");
+          reiserfs_warning (s, "xattrs/ACLs enabled and couldn't "
+                            "find/create .reiserfs_priv. Failing mount.");
           err = -EOPNOTSUPP;
       }
   }

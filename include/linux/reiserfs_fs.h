@@ -75,6 +75,7 @@
 */
 #define REISERFS_DEBUG_CODE 5 /* extra messages to help find/debug errors */ 
 
+void reiserfs_warning (struct super_block *s, const char * fmt, ...);
 /* assertions handling */
 
 /** always check a condition and panic if it's false. */
@@ -562,9 +563,6 @@ struct item_head
 #define V1_DIRENTRY_UNIQUENESS 500
 #define V1_ANY_UNIQUENESS 555 // FIXME: comment is required
 
-extern void reiserfs_warning (const char * fmt, ...);
-/* __attribute__( ( format ( printf, 1, 2 ) ) ); */
-
 //
 // here are conversion routines
 //
@@ -577,7 +575,8 @@ static inline int uniqueness2type (__u32 uniqueness)
     case V1_DIRECT_UNIQUENESS: return TYPE_DIRECT;
     case V1_DIRENTRY_UNIQUENESS: return TYPE_DIRENTRY;
     default:
-	    reiserfs_warning( "vs-500: unknown uniqueness %d\n", uniqueness);
+	    reiserfs_warning (NULL, "vs-500: unknown uniqueness %d",
+			      uniqueness);
 	case V1_ANY_UNIQUENESS:
 	    return TYPE_ANY;
     }
@@ -592,7 +591,7 @@ static inline __u32 type2uniqueness (int type)
     case TYPE_DIRECT: return V1_DIRECT_UNIQUENESS;
     case TYPE_DIRENTRY: return V1_DIRENTRY_UNIQUENESS;
     default:
-	    reiserfs_warning( "vs-501: unknown type %d\n", type);
+	    reiserfs_warning (NULL, "vs-501: unknown type %d", type);
 	case TYPE_ANY:
 	    return V1_ANY_UNIQUENESS;
     }
@@ -1771,7 +1770,7 @@ void reiserfs_update_inode_transaction(struct inode *) ;
 void reiserfs_wait_on_write_block(struct super_block *s) ;
 void reiserfs_block_writes(struct reiserfs_transaction_handle *th) ;
 void reiserfs_allow_writes(struct super_block *s) ;
-void reiserfs_check_lock_depth(char *caller) ;
+void reiserfs_check_lock_depth(struct super_block *s, char *caller) ;
 int reiserfs_prepare_for_journal(struct super_block *, struct buffer_head *bh, int wait) ;
 void reiserfs_restore_prepared_buffer(struct super_block *, struct buffer_head *bh) ;
 int journal_init(struct super_block *, const char * j_dev_name, int old_format, unsigned int) ;
@@ -2063,10 +2062,10 @@ void free_buffers_in_tb (struct tree_balance * p_s_tb);
 
 
 /* prints.c */
-void reiserfs_panic (struct super_block * s, const char * fmt, ...)
-__attribute__ ( ( noreturn ) );/* __attribute__( ( format ( printf, 2, 3 ) ) ) */
+void reiserfs_panic (struct super_block * s, const char * fmt, ...) __attribute__ ( ( noreturn ) );
+void reiserfs_info (struct super_block *s, const char * fmt, ...);
+void reiserfs_printk (const char * fmt, ...);
 void reiserfs_debug (struct super_block *s, int level, const char * fmt, ...);
-/* __attribute__( ( format ( printf, 3, 4 ) ) ); */
 void print_virtual_node (struct virtual_node * vn);
 void print_indirect_item (struct buffer_head * bh, int item_num);
 void store_print_tb (struct tree_balance * tb);
