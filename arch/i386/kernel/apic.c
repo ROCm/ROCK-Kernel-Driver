@@ -692,6 +692,12 @@ static int __init detect_init_APIC (void)
 
 	if (!cpu_has_apic) {
 		/*
+		 * Over-ride BIOS and try to enable LAPIC
+		 * only if "lapic" specified
+		 */
+		if (enable_local_apic != 1)
+			goto no_apic;
+		/*
 		 * Some BIOSes disable the local APIC in the
 		 * APIC_BASE MSR. This can only be done in
 		 * software for Intel P6 and AMD K7 (Model > 1).
