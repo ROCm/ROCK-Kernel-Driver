@@ -658,6 +658,9 @@ static int __init acpi_sleep_init(void)
 
 	ACPI_FUNCTION_TRACE("acpi_system_add_fs");
 
+	if (acpi_disabled)
+		return_VALUE(0);
+
 	printk(KERN_INFO PREFIX "(supports");
 	for (i=0; i<ACPI_S_STATE_COUNT; i++) {
 		u8 type_a, type_b;

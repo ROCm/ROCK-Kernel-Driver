@@ -122,6 +122,9 @@ static int __init acpi_event_init(void)
 
 	ACPI_FUNCTION_TRACE("acpi_event_init");
 
+	if (acpi_disabled)
+		return_VALUE(0);
+
 	/* 'event' [R] */
 	entry = create_proc_entry("event", S_IRUSR, acpi_root_dir);
 	if (entry)

@@ -90,6 +90,9 @@ static int __init acpi_debug_init(void)
 
 	ACPI_FUNCTION_TRACE("acpi_debug_init");
 
+	if (acpi_disabled)
+		return_VALUE(0);
+
 	/* 'debug_layer' [R/W] */
 	name = ACPI_SYSTEM_FILE_DEBUG_LAYER;
 	entry = create_proc_read_entry(name, S_IFREG|S_IRUGO|S_IWUSR, acpi_root_dir,

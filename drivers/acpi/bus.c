@@ -1830,16 +1830,19 @@ static int __init acpi_init (void)
 
 	result = acpi_bus_init();
 
-#ifdef CONFIG_PM
 	if (!result) {
+#ifdef CONFIG_PM
 		if (!PM_IS_ACTIVE())
 			pm_active = 1;
 		else {
 			printk(KERN_INFO PREFIX "APM is already active, exiting\n");
+			acpi_disabled = 1;
 			result = -ENODEV;
 		}
-	}
 #endif
+	} else
+		acpi_disabled = 1;
+
 	return_VALUE(result);
 }
 
