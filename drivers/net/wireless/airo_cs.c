@@ -626,26 +626,25 @@ static int airo_event(event_t event, int priority,
 	return 0;
 } /* airo_event */
 
-/*====================================================================*/
+static struct pcmcia_driver airo_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "airo_cs",
+	},
+	.attach		= airo_attach,
+	.detach		= airo_detach,
+};
 
 static int airo_cs_init(void)
 {
-	servinfo_t serv;
-	DEBUG(0, "%s\n", version);
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "airo_cs: Card Services release "
-		       "does not match!\n");
-		return -1;
-	}
-	register_pcmcia_driver(&dev_info, &airo_attach, &airo_detach);
-	return 0;
+	return pcmcia_register_driver(&airo_driver);
 }
 
 static void airo_cs_cleanup(void)
 {
-	DEBUG(0, "airo_cs: unloading\n");
-	unregister_pcmcia_driver(&dev_info);
+	pcmcia_unregister_driver(&airo_driver);
+
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG)
 			airo_release((u_long)dev_list);

@@ -310,29 +310,30 @@ static int ixj_event(event_t event, int priority, event_callback_args_t * args)
 	return 0;
 }
 
-int __init ixj_register_pcmcia(void)
+static struct pcmcia_driver ixj_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "ixj_cs",
+	},
+	.attach		= ixj_attach,
+	.detach		= ixj_detach,
+};
+
+static int __init ixj_pcmcia_init(void)
 {
-	servinfo_t serv;
-	DEBUG(0, "%s\n", version);
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "ixj_cs: Card Services release does not match!\n");
-		return -EINVAL;
-	}
-	register_pcmcia_driver(&dev_info, &ixj_attach, &ixj_detach);
-	return 0;
+	return pcmcia_register_driver(&ixj_driver);
 }
 
-static void ixj_pcmcia_unload(void)
+static void ixj_pcmcia_exit(void)
 {
-	DEBUG(0, "ixj_cs: unloading\n");
-	unregister_pcmcia_driver(&dev_info);
+	pcmcia_unregister_driver(&ixj_driver);
+
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL)
 		ixj_detach(dev_list);
 }
 
-module_init(ixj_register_pcmcia);
-module_exit(ixj_pcmcia_unload);
+module_init(ixj_pcmcia_init);
+module_exit(ixj_pcmcia_exit);
 
 MODULE_LICENSE("GPL");
-

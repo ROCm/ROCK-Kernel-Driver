@@ -1987,32 +1987,26 @@ static int nsp_cs_event(event_t		       event,
 	return 0;
 } /* nsp_cs_event */
 
-/*======================================================================*
- *	module entry point
- *====================================================================*/
+static struct pcmcia_driver nsp_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "nsp_cs",
+	},
+	.attach		= nsp_cs_attach,
+	.detach		= nsp_cs_detach,
+};
+
 static int __init nsp_cs_init(void)
 {
-	servinfo_t serv;
-
-	DEBUG(0, "%s: in\n", __FUNCTION__);
-	DEBUG(0, "%s\n", version);
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_DEBUG "nsp_cs: Card Services release "
-		       "does not match!\n");
-		return -1;
-	}
-	register_pcmcia_driver(&dev_info, &nsp_cs_attach, &nsp_cs_detach);
-
-	DEBUG(0, "%s: out\n", __FUNCTION__);
-	return 0;
+	return pcmcia_register_driver(&nsp_driver);
 }
 
 
-static void __exit nsp_cs_cleanup(void)
+static void __exit nsp_cs_exit(void)
 {
-	DEBUG(0, "%s: unloading\n", __FUNCTION__);
-	unregister_pcmcia_driver(&dev_info);
+	pcmcia_unregister_driver(&nsp_driver);
+
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG) {
 			nsp_cs_release((u_long)dev_list);
@@ -2022,11 +2016,4 @@ static void __exit nsp_cs_cleanup(void)
 }
 
 module_init(nsp_cs_init)
-module_exit(nsp_cs_cleanup)
-
-/*
- *
- *
- */
-
-/* end */
+module_exit(nsp_cs_exit)
