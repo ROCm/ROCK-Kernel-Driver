@@ -58,38 +58,6 @@
  ***********************************************************************/
 
 /*
- * Fix-up the return data from an INQUIRY command to show 
- * ANSI SCSI rev 2 so we don't confuse the SCSI layers above us
- */
-static void fix_inquiry_data(struct scsi_cmnd *srb)
-{
-	unsigned char databuf[3];
-	unsigned int index, offset;
-
-	/* verify that it's an INQUIRY command */
-	if (srb->cmnd[0] != INQUIRY)
-		return;
-
-	index = offset = 0;
-	if (usb_stor_access_xfer_buf(databuf, sizeof(databuf), srb,
-			&index, &offset, FROM_XFER_BUF) != sizeof(databuf))
-		return;
-
-	if ((databuf[2] & 7) == 2)
-		return;
-
-	US_DEBUGP("Fixing INQUIRY data to show SCSI rev 2 - was %d\n",
-		  databuf[2] & 7);
-
-	/* Change the SCSI revision number */
-	databuf[2] = (databuf[2] & ~7) | 2;
-
-	index = offset = 0;
-	usb_stor_access_xfer_buf(databuf, sizeof(databuf), srb,
-			&index, &offset, TO_XFER_BUF);
-}
-
-/*
  * Fix-up the return data from a READ CAPACITY command. My Feiya reader
  * returns a value that is 1 too large.
  */
@@ -137,10 +105,6 @@ void usb_stor_qic157_command(struct scsi_cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
-	if (srb->result == SAM_STAT_GOOD) {
-		/* fix the INQUIRY data if necessary */
-		fix_inquiry_data(srb);
-	}
 }
 
 void usb_stor_ATAPI_command(struct scsi_cmnd *srb, struct us_data *us)
@@ -160,11 +124,6 @@ void usb_stor_ATAPI_command(struct scsi_cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
-
-	if (srb->result == SAM_STAT_GOOD) {
-		/* fix the INQUIRY data if necessary */
-		fix_inquiry_data(srb);
-	}
 }
 
 
@@ -208,11 +167,6 @@ void usb_stor_ufi_command(struct scsi_cmnd *srb, struct us_data *us)
 
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
-
-	if (srb->result == SAM_STAT_GOOD) {
-		/* Fix the data for an INQUIRY, if necessary */
-		fix_inquiry_data(srb);
-	}
 }
 
 void usb_stor_transparent_scsi_command(struct scsi_cmnd *srb,
@@ -222,9 +176,6 @@ void usb_stor_transparent_scsi_command(struct scsi_cmnd *srb,
 	usb_stor_invoke_transport(srb, us);
 
 	if (srb->result == SAM_STAT_GOOD) {
-		/* Fix the INQUIRY data if necessary */
-		fix_inquiry_data(srb);
-
 		/* Fix the READ CAPACITY result if necessary */
 		if (us->flags & US_FL_FIX_CAPACITY)
 			fix_read_capacity(srb);

@@ -20,7 +20,7 @@
 #include <asm/uaccess.h>
 
 /* Version Information */
-#define DRIVER_VERSION "v0.6.1 (2004/03/13)"
+#define DRIVER_VERSION "v0.6.2 (2004/08/27)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "rtl8150 based usb-ethernet driver"
 
@@ -392,10 +392,10 @@ static void free_all_urbs(rtl8150_t * dev)
 
 static void unlink_all_urbs(rtl8150_t * dev)
 {
-	usb_unlink_urb(dev->rx_urb);
-	usb_unlink_urb(dev->tx_urb);
-	usb_unlink_urb(dev->intr_urb);
-	usb_unlink_urb(dev->ctrl_urb);
+	usb_kill_urb(dev->rx_urb);
+	usb_kill_urb(dev->tx_urb);
+	usb_kill_urb(dev->intr_urb);
+	usb_kill_urb(dev->ctrl_urb);
 }
 
 static inline struct sk_buff *pull_skb(rtl8150_t *dev)

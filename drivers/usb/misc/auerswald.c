@@ -516,7 +516,7 @@ static void auerchain_unlink_all (pauerchain_t acp)
                 urbp = acep->urbp;
                 urbp->transfer_flags &= ~URB_ASYNC_UNLINK;
                 dbg ("unlink active urb");
-                usb_unlink_urb (urbp);
+                usb_kill_urb (urbp);
         }
 }
 
@@ -1171,22 +1171,16 @@ intoend:
    endpoint. This function returns 0 if successful or an error code.
    NOTE: no mutex please!
 */
-static int auerswald_int_release (pauerswald_t cp)
+static void auerswald_int_release (pauerswald_t cp)
 {
-        int ret = 0;
         dbg ("auerswald_int_release");
 
         /* stop the int endpoint */
-        if (cp->inturbp) {
-                ret = usb_unlink_urb (cp->inturbp);
-                if (ret)
-	                dbg ("nonzero int unlink result received: %d", ret);
-        }
+        if (cp->inturbp)
+                usb_kill_urb (cp->inturbp);
 
         /* deallocate memory */
         auerswald_int_free (cp);
-
-        return ret;
 }
 
 /* --------------------------------------------------------------------- */

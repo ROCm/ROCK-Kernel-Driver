@@ -911,7 +911,6 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	int result;
 
 	/* issue the command */
-	us->iobuf[0] = 0;
 	result = usb_stor_control_msg(us, us->recv_ctrl_pipe,
 				 US_BULK_GET_MAX_LUN, 
 				 USB_DIR_IN | USB_TYPE_CLASS | 
@@ -922,7 +921,7 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 		  result, us->iobuf[0]);
 
 	/* if we have a successful request, return the result */
-	if (result >= 0)
+	if (result > 0)
 		return us->iobuf[0];
 
 	/* 
@@ -934,13 +933,16 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	if (result == -EPIPE) {
 		usb_stor_clear_halt(us, us->recv_bulk_pipe);
 		usb_stor_clear_halt(us, us->send_bulk_pipe);
-		/* return the default -- no LUNs */
-		return 0;
 	}
 
-	/* An answer or a STALL are the only valid responses.  If we get
-	 * something else, return an indication of error */
-	return -1;
+	/*
+	 * Some devices don't like GetMaxLUN.  They may STALL the control
+	 * pipe, they may return a zero-length result, they may do nothing at
+	 * all and timeout, or they may fail in even more bizarrely creative
+	 * ways.  In these cases the best approach is to use the default
+	 * value: only one LUN.
+	 */
+	return 0;
 }
 
 int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
@@ -1055,8 +1057,13 @@ int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 
 	/* try to compute the actual residue, based on how much data
 	 * was really transferred and what the device tells us */
-	residue = min(residue, transfer_length);
-	srb->resid = max(srb->resid, (int) residue);
+	if (residue) {
+		if (!(us->flags & US_FL_IGNORE_RESIDUE) ||
+				srb->sc_data_direction == DMA_TO_DEVICE) {
+			residue = min(residue, transfer_length);
+			srb->resid = max(srb->resid, (int) residue);
+		}
+	}
 
 	/* based on the status code, we report good or bad */
 	switch (bcs->Status) {

@@ -418,13 +418,14 @@ static int ati_remote_sendpacket(struct ati_remote *ati_remote, u16 cmd, unsigne
 
 	while (timeout && (ati_remote->out_urb->status == -EINPROGRESS) 
 	       && !(ati_remote->send_flags & SEND_FLAG_COMPLETE)) {
+		set_current_state(TASK_INTERRUPTIBLE);
 		timeout = schedule_timeout(timeout);
 		rmb();
 	}
 
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&ati_remote->wait, &wait);
-	usb_unlink_urb(ati_remote->out_urb);
+	usb_kill_urb(ati_remote->out_urb);
 	
 	return retval;
 }
@@ -624,10 +625,10 @@ static void ati_remote_delete(struct ati_remote *ati_remote)
 	if (!ati_remote) return;
 
 	if (ati_remote->irq_urb)
-		usb_unlink_urb(ati_remote->irq_urb);
+		usb_kill_urb(ati_remote->irq_urb);
 
 	if (ati_remote->out_urb)
-		usb_unlink_urb(ati_remote->out_urb);
+		usb_kill_urb(ati_remote->out_urb);
 
 	input_unregister_device(&ati_remote->idev);
 

@@ -155,7 +155,7 @@ MODULE_PARM_DESC (log2_irq_thresh, "log2 IRQ latency, 1-64 microframes");
  * before driver shutdown. But it also seems to be caused by bugs in cardbus
  * bridge shutdown:  shutting down the bridge before the devices using it.
  */
-static int handshake (u32 __iomem *ptr, u32 mask, u32 done, int usec)
+static int handshake (void __iomem *ptr, u32 mask, u32 done, int usec)
 {
 	u32	result;
 
@@ -341,8 +341,7 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 	spin_lock_init (&ehci->lock);
 
 	ehci->caps = hcd->regs;
-	ehci->regs = (hcd->regs + 
-				HC_LENGTH (readl (&ehci->caps->hc_capbase)));
+	ehci->regs = hcd->regs + HC_LENGTH (readl (&ehci->caps->hc_capbase));
 	dbg_hcs_params (ehci, "reset");
 	dbg_hcc_params (ehci, "reset");
 
@@ -695,9 +694,18 @@ static void ehci_work (struct ehci_hcd *ehci, struct pt_regs *regs)
 	timer_action_done (ehci, TIMER_IO_WATCHDOG);
 	if (ehci->reclaim_ready)
 		end_unlink_async (ehci, regs);
+
+	/* another CPU may drop ehci->lock during a schedule scan while
+	 * it reports urb completions.  this flag guards against bogus
+	 * attempts at re-entrant schedule scanning.
+	 */
+	if (ehci->scanning)
+		return;
+	ehci->scanning = 1;
 	scan_async (ehci, regs);
 	if (ehci->next_uframe != -1)
 		scan_periodic (ehci, regs);
+	ehci->scanning = 0;
 
 	/* the IO watchdog guards against hardware or driver bugs that
 	 * misplace IRQs, and should let us run completely without IRQs.

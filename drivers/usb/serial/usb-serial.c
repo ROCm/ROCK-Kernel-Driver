@@ -388,7 +388,7 @@ static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_po
 
 		good_spot = 1;
 		for (j = 1; j <= num_ports-1; ++j)
-			if ((serial_table[i+j]) || (i+j >= SERIAL_TTY_MINORS)) {
+			if ((i+j >= SERIAL_TTY_MINORS) || (serial_table[i+j])) {
 				good_spot = 0;
 				i += j;
 				break;
@@ -405,7 +405,7 @@ static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_po
 	return NULL;
 }
 
-static void return_serial (struct usb_serial *serial)
+static void return_serial(struct usb_serial *serial)
 {
 	int i;
 
@@ -417,8 +417,6 @@ static void return_serial (struct usb_serial *serial)
 	for (i = 0; i < serial->num_ports; ++i) {
 		serial_table[serial->minor + i] = NULL;
 	}
-
-	return;
 }
 
 static void destroy_serial(struct kref *kref)
@@ -455,15 +453,15 @@ static void destroy_serial(struct kref *kref)
 			if (!port)
 				continue;
 			if (port->read_urb) {
-				usb_unlink_urb(port->read_urb);
+				usb_kill_urb(port->read_urb);
 				usb_free_urb(port->read_urb);
 			}
 			if (port->write_urb) {
-				usb_unlink_urb(port->write_urb);
+				usb_kill_urb(port->write_urb);
 				usb_free_urb(port->write_urb);
 			}
 			if (port->interrupt_in_urb) {
-				usb_unlink_urb(port->interrupt_in_urb);
+				usb_kill_urb(port->interrupt_in_urb);
 				usb_free_urb(port->interrupt_in_urb);
 			}
 			kfree(port->bulk_in_buffer);
@@ -621,15 +619,12 @@ static void serial_throttle (struct tty_struct * tty)
 
 	if (!port->open_count) {
 		dbg ("%s - port not open", __FUNCTION__);
-		goto exit;
+		return;
 	}
 
 	/* pass on to the driver specific version of this function */
 	if (port->serial->type->throttle)
 		port->serial->type->throttle(port);
-
-exit:
-	;
 }
 
 static void serial_unthrottle (struct tty_struct * tty)
@@ -640,15 +635,12 @@ static void serial_unthrottle (struct tty_struct * tty)
 
 	if (!port->open_count) {
 		dbg("%s - port not open", __FUNCTION__);
-		goto exit;
+		return;
 	}
 
 	/* pass on to the driver specific version of this function */
 	if (port->serial->type->unthrottle)
 		port->serial->type->unthrottle(port);
-
-exit:
-	;
 }
 
 static int serial_ioctl (struct tty_struct *tty, struct file * file, unsigned int cmd, unsigned long arg)
@@ -681,15 +673,12 @@ static void serial_set_termios (struct tty_struct *tty, struct termios * old)
 
 	if (!port->open_count) {
 		dbg("%s - port not open", __FUNCTION__);
-		goto exit;
+		return;
 	}
 
 	/* pass on to the driver specific version of this function if it is available */
 	if (port->serial->type->set_termios)
 		port->serial->type->set_termios(port, old);
-
-exit:
-	;
 }
 
 static void serial_break (struct tty_struct *tty, int break_state)
@@ -700,15 +689,12 @@ static void serial_break (struct tty_struct *tty, int break_state)
 
 	if (!port->open_count) {
 		dbg("%s - port not open", __FUNCTION__);
-		goto exit;
+		return;
 	}
 
 	/* pass on to the driver specific version of this function if it is available */
 	if (port->serial->type->break_ctl)
 		port->serial->type->break_ctl(port, break_state);
-
-exit:
-	;
 }
 
 static int serial_read_proc (char *page, char **start, off_t off, int count, int *eof, void *data)
@@ -814,15 +800,15 @@ static void port_release(struct device *dev)
 
 	dbg ("%s - %s", __FUNCTION__, dev->bus_id);
 	if (port->read_urb) {
-		usb_unlink_urb(port->read_urb);
+		usb_kill_urb(port->read_urb);
 		usb_free_urb(port->read_urb);
 	}
 	if (port->write_urb) {
-		usb_unlink_urb(port->write_urb);
+		usb_kill_urb(port->write_urb);
 		usb_free_urb(port->write_urb);
 	}
 	if (port->interrupt_in_urb) {
-		usb_unlink_urb(port->interrupt_in_urb);
+		usb_kill_urb(port->interrupt_in_urb);
 		usb_free_urb(port->interrupt_in_urb);
 	}
 	kfree(port->bulk_in_buffer);
@@ -853,6 +839,25 @@ static struct usb_serial * create_serial (struct usb_device *dev,
 	return serial;
 }
 
+static struct usb_serial_device_type *search_serial_device(struct usb_interface *iface)
+{
+	struct list_head *p;
+	const struct usb_device_id *id;
+	struct usb_serial_device_type *t;
+
+	/* List trough know devices and see if the usb id matches */
+	list_for_each(p, &usb_serial_driver_list) {
+		t = list_entry(p, struct usb_serial_device_type, driver_list);
+		id = usb_match_id(iface, t->id_table);
+		if (id != NULL) {
+			dbg("descriptor matches");
+			return t;
+		}
+	}
+
+	return NULL;
+}
+
 int usb_serial_probe(struct usb_interface *interface,
 			       const struct usb_device_id *id)
 {
@@ -865,9 +870,7 @@ int usb_serial_probe(struct usb_interface *interface,
 	struct usb_endpoint_descriptor *bulk_in_endpoint[MAX_NUM_PORTS];
 	struct usb_endpoint_descriptor *bulk_out_endpoint[MAX_NUM_PORTS];
 	struct usb_serial_device_type *type = NULL;
-	struct list_head *tmp;
 	int retval;
-	int found;
 	int minor;
 	int buffer_size;
 	int i;
@@ -876,22 +879,9 @@ int usb_serial_probe(struct usb_interface *interface,
 	int num_bulk_out = 0;
 	int num_ports = 0;
 	int max_endpoints;
-	const struct usb_device_id *id_pattern = NULL;
 
-	/* loop through our list of known serial converters, and see if this
-	   device matches. */
-	found = 0;
-	list_for_each (tmp, &usb_serial_driver_list) {
-		type = list_entry(tmp, struct usb_serial_device_type, driver_list);
-		id_pattern = usb_match_id(interface, type->id_table);
-		if (id_pattern != NULL) {
-			dbg("descriptor matches");
-			found = 1;
-			break;
-		}
-	}
-	if (!found) {
-		/* no match */
+	type = search_serial_device(interface);
+	if (!type) {
 		dbg("none matched");
 		return -ENODEV;
 	}
@@ -899,17 +889,21 @@ int usb_serial_probe(struct usb_interface *interface,
 	serial = create_serial (dev, interface, type);
 	if (!serial) {
 		dev_err(&interface->dev, "%s - out of memory\n", __FUNCTION__);
-		return -ENODEV;
+		return -ENOMEM;
 	}
 
 	/* if this device type has a probe function, call it */
 	if (type->probe) {
+		const struct usb_device_id *id;
+
 		if (!try_module_get(type->owner)) {
 			dev_err(&interface->dev, "module get failed, exiting\n");
 			kfree (serial);
 			return -EIO;
 		}
-		retval = type->probe (serial, id_pattern);
+
+		id = usb_match_id(interface, type->id_table);
+		retval = type->probe(serial, id);
 		module_put(type->owner);
 
 		if (retval) {
@@ -1224,7 +1218,7 @@ struct tty_driver *usb_serial_tty_driver;
 static int __init usb_serial_init(void)
 {
 	int i;
-	int result = 0;
+	int result;
 
 	usb_serial_tty_driver = alloc_tty_driver(SERIAL_TTY_MINORS);
 	if (!usb_serial_tty_driver)
@@ -1235,13 +1229,17 @@ static int __init usb_serial_init(void)
 		serial_table[i] = NULL;
 	}
 
-	bus_register(&usb_serial_bus_type);
+	result = bus_register(&usb_serial_bus_type);
+	if (result) {
+		err("%s - registering bus driver failed", __FUNCTION__);
+		goto exit_bus;
+	}
 
 	/* register the generic driver, if we should */
 	result = usb_serial_generic_register(debug);
 	if (result < 0) {
 		err("%s - registering generic driver failed", __FUNCTION__);
-		goto exit;
+		goto exit_generic;
 	}
 
 	usb_serial_tty_driver->owner = THIS_MODULE;
@@ -1259,7 +1257,7 @@ static int __init usb_serial_init(void)
 	result = tty_register_driver(usb_serial_tty_driver);
 	if (result) {
 		err("%s - tty_register_driver failed", __FUNCTION__);
-		goto exit_generic;
+		goto exit_reg_driver;
 	}
 
 	/* register the USB driver */
@@ -1276,10 +1274,13 @@ static int __init usb_serial_init(void)
 exit_tty:
 	tty_unregister_driver(usb_serial_tty_driver);
 
-exit_generic:
+exit_reg_driver:
 	usb_serial_generic_deregister();
 
-exit:
+exit_generic:
+	bus_unregister(&usb_serial_bus_type);
+
+exit_bus:
 	err ("%s - returning with error %d", __FUNCTION__, result);
 	put_tty_driver(usb_serial_tty_driver);
 	return result;
@@ -1332,17 +1333,13 @@ int usb_serial_register(struct usb_serial_device_type *new_device)
 	/* Add this device to our list of devices */
 	list_add(&new_device->driver_list, &usb_serial_driver_list);
 
-	retval =  usb_serial_bus_register (new_device);
-
-	if (retval)
-		goto error;
-
-	info("USB Serial support registered for %s", new_device->name);
-
-	return retval;
-error:
-	err("problem %d when registering driver %s", retval, new_device->name);
-	list_del(&new_device->driver_list);
+	retval = usb_serial_bus_register(new_device);
+	if (retval) {
+		err("problem %d when registering driver %s", retval, new_device->name);
+		list_del(&new_device->driver_list);
+	}
+	else
+		info("USB Serial support registered for %s", new_device->name);
 
 	return retval;
 }
@@ -1369,6 +1366,7 @@ EXPORT_SYMBOL(usb_serial_port_softint);
 /* Module information */
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_VERSION( DRIVER_VERSION );
 MODULE_LICENSE("GPL");
 
 module_param(debug, bool, S_IRUGO | S_IWUSR);

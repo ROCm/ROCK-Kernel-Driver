@@ -141,7 +141,7 @@ static void touchkit_close(struct input_dev *input)
 	struct touchkit_usb *touchkit = input->private;
 
 	if (!--touchkit->open)
-		usb_unlink_urb(touchkit->irq);
+		usb_kill_urb(touchkit->irq);
 }
 
 static int touchkit_alloc_buffers(struct usb_device *udev,
@@ -276,7 +276,7 @@ static void touchkit_disconnect(struct usb_interface *intf)
 	dbg("%s - touchkit is initialized, cleaning up", __FUNCTION__);
 	usb_set_intfdata(intf, NULL);
 	input_unregister_device(&touchkit->input);
-	usb_unlink_urb(touchkit->irq);
+	usb_kill_urb(touchkit->irq);
 	usb_free_urb(touchkit->irq);
 	touchkit_free_buffers(interface_to_usbdev(intf), touchkit);
 	kfree(touchkit);

@@ -668,7 +668,7 @@ static int kaweth_open(struct net_device *net)
 		INTBUFFERSIZE,
 		int_callback,
 		kaweth,
-		8);
+		250); /* overriding the descriptor */
 	kaweth->irq_urb->transfer_dma = kaweth->intbufferhandle;
 	kaweth->irq_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
@@ -1250,13 +1250,11 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
                 return status;
         }
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
 	while (timeout && !awd.done) {
-		timeout = schedule_timeout(timeout);
 		set_current_state(TASK_UNINTERRUPTIBLE);
+		timeout = schedule_timeout(timeout);
 	}
 
-        set_current_state(TASK_RUNNING);
         remove_wait_queue(&awd.wqh, &wait);
 
         if (!timeout) {

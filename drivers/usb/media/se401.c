@@ -514,7 +514,7 @@ static int se401_stop_stream(struct usb_se401 *se401)
 	se401_sndctrl(1, se401, SE401_REQ_CAMERA_POWER, 0, NULL, 0);
 
 	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
-		usb_unlink_urb(se401->urb[i]);
+		usb_kill_urb(se401->urb[i]);
 		usb_free_urb(se401->urb[i]);
 		se401->urb[i]=NULL;
 		kfree(se401->sbuf[i].data);
@@ -883,7 +883,7 @@ static void usb_se401_remove_disconnected (struct usb_se401 *se401)
         se401->dev = NULL;
 
 	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
-		usb_unlink_urb(se401->urb[i]);
+		usb_kill_urb(se401->urb[i]);
 		usb_free_urb(se401->urb[i]);
 		se401->urb[i] = NULL;
 		kfree(se401->sbuf[i].data);
@@ -892,7 +892,7 @@ static void usb_se401_remove_disconnected (struct usb_se401 *se401)
 		kfree(se401->scratch[i].data);
 	}
 	if (se401->inturb) {
-		usb_unlink_urb(se401->inturb);
+		usb_kill_urb(se401->inturb);
 		usb_free_urb(se401->inturb);
 	}
         info("%s disconnected", se401->camera_name);

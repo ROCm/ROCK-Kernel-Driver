@@ -97,6 +97,11 @@ MODULE_AUTHOR("Matthew Dharm <mdharm-usb@one-eyed-alien.net>");
 MODULE_DESCRIPTION("USB Mass Storage driver for Linux");
 MODULE_LICENSE("GPL");
 
+static unsigned int delay_use = 5;
+module_param(delay_use, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(delay_use, "seconds to delay before using a new device");
+
+
 static int storage_probe(struct usb_interface *iface,
 			 const struct usb_device_id *id);
 
@@ -882,6 +887,42 @@ static void dissociate_dev(struct us_data *us)
 	kfree(us);
 }
 
+/* Thread to carry out delayed SCSI-device scanning */
+static int usb_stor_scan_thread(void * __us)
+{
+	struct us_data *us = (struct us_data *)__us;
+
+	/*
+	 * This thread doesn't need any user-level access,
+	 * so get rid of all our resources.
+	 */
+	lock_kernel();
+	daemonize("usb-stor");
+	current->flags |= PF_NOFREEZE;
+	unlock_kernel();
+
+	printk(KERN_DEBUG
+		"usb-storage: device found at %d\n", us->pusb_dev->devnum);
+
+	/* Wait for the timeout to expire or for a disconnect */
+	if (delay_use > 0) {
+		printk(KERN_DEBUG "usb-storage: waiting for device "
+				"to settle before scanning\n");
+		wait_event_interruptible_timeout(us->scsi_scan_wait,
+				test_bit(US_FLIDX_DISCONNECTING, &us->flags),
+				delay_use * HZ);
+	}
+
+	/* If the device is still connected, perform the scanning */
+	if (!test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+		scsi_scan_host(us->host);
+		printk(KERN_DEBUG "usb-storage: device scan complete\n");
+	}
+
+	complete_and_exit(&us->scsi_scan_done, 0);
+}
+
+
 /* Probe to see if we can drive a newly-connected USB device */
 static int storage_probe(struct usb_interface *intf,
 			 const struct usb_device_id *id)
@@ -903,6 +944,8 @@ static int storage_probe(struct usb_interface *intf,
 	init_MUTEX_LOCKED(&(us->sema));
 	init_completion(&(us->notify));
 	init_waitqueue_head(&us->dev_reset_wait);
+	init_waitqueue_head(&us->scsi_scan_wait);
+	init_completion(&us->scsi_scan_done);
 
 	/* Associate the us_data structure with the USB device */
 	result = associate_dev(us, intf);
@@ -951,12 +994,10 @@ static int storage_probe(struct usb_interface *intf,
 	if (result)
 		goto BadDevice;
 
-	/* Acquire all the other resources */
+	/* Acquire all the other resources and add the host */
 	result = usb_stor_acquire_resources(us);
 	if (result)
 		goto BadDevice;
-
-	/* Finally, add the host (this does SCSI device scanning) */
 	result = scsi_add_host(us->host, &intf->dev);
 	if (result) {
 		printk(KERN_WARNING USB_STORAGE
@@ -964,10 +1005,15 @@ static int storage_probe(struct usb_interface *intf,
 		goto BadDevice;
 	}
 
-	scsi_scan_host(us->host);
+	/* Start up the thread for delayed SCSI-device scanning */
+	result = kernel_thread(usb_stor_scan_thread, us, CLONE_VM);
+	if (result < 0) {
+		printk(KERN_WARNING USB_STORAGE 
+		       "Unable to start the device-scanning thread\n");
+		scsi_remove_host(us->host);
+		goto BadDevice;
+	}
 
-	printk(KERN_DEBUG 
-	       "USB Mass Storage device found at %d\n", us->pusb_dev->devnum);
 	return 0;
 
 	/* We come here if there are any problems */
@@ -991,6 +1037,11 @@ static void storage_disconnect(struct usb_interface *intf)
 	usb_stor_stop_transport(us);
 	wake_up(&us->dev_reset_wait);
 
+	/* Interrupt the SCSI-device-scanning thread's time delay, and
+	 * wait for the thread to finish */
+	wake_up(&us->scsi_scan_wait);
+	wait_for_completion(&us->scsi_scan_done);
+
 	/* Wait for the current command to finish, then remove the host */
 	down(&us->dev_semaphore);
 	up(&us->dev_semaphore);
@@ -1012,12 +1063,9 @@ static int __init usb_stor_init(void)
 
 	/* register the driver, return usb_register return code if error */
 	retval = usb_register(&usb_storage_driver);
-	if (retval)
-		goto out;
+	if (retval == 0)
+		printk(KERN_INFO "USB Mass Storage support registered.\n");
 
-	/* we're all set */
-	printk(KERN_INFO "USB Mass Storage support registered.\n");
-out:
 	return retval;
 }
 

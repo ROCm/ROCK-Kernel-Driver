@@ -106,7 +106,7 @@ hpusbscsi_usb_probe(struct usb_interface *intf,
 	/* In host->hostdata we store a pointer to desc */
 	new->host = scsi_host_alloc(&hpusbscsi_scsi_host_template, sizeof(new));
 	if (!new->host)
-		goto out_unlink_controlurb;
+		goto out_kill_controlurb;
 
 	new->host->hostdata[0] = (unsigned long)new;
 	scsi_add_host(new->host, &intf->dev); /* XXX handle failure */
@@ -118,8 +118,8 @@ hpusbscsi_usb_probe(struct usb_interface *intf,
 	usb_set_intfdata(intf, new);
 	return 0;
 
- out_unlink_controlurb:
-	usb_unlink_urb(new->controlurb);
+ out_kill_controlurb:
+	usb_kill_urb(new->controlurb);
  out_free_controlurb:
 	usb_free_urb(new->controlurb);
  out_free_dataurb:
@@ -137,7 +137,7 @@ hpusbscsi_usb_disconnect(struct usb_interface *intf)
 	usb_set_intfdata(intf, NULL);
 
 	scsi_remove_host(desc->host);
-	usb_unlink_urb(desc->controlurb);
+	usb_kill_urb(desc->controlurb);
 	scsi_host_put(desc->host);
 
 	usb_free_urb(desc->controlurb);
@@ -280,8 +280,8 @@ static int hpusbscsi_scsi_abort (Scsi_Cmnd *srb)
 	struct hpusbscsi* hpusbscsi = (struct hpusbscsi*)(srb->device->host->hostdata[0]);
 	printk(KERN_DEBUG"Requested is canceled.\n");
 
-	usb_unlink_urb(hpusbscsi->dataurb);
-	usb_unlink_urb(hpusbscsi->controlurb);
+	usb_kill_urb(hpusbscsi->dataurb);
+	usb_kill_urb(hpusbscsi->controlurb);
 	hpusbscsi->state = HP_STATE_FREE;
 
 	return SCSI_ABORT_PENDING;

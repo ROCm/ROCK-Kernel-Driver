@@ -17,6 +17,8 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/timer.h>
+#include <linux/ctype.h>
+#include <linux/device.h>
 #include <asm/byteorder.h>
 
 #include "hcd.h"	/* for usbcore internals */
@@ -623,6 +625,20 @@ int usb_get_string(struct usb_device *dev, unsigned short langid,
 	return result;
 }
 
+static void usb_try_string_workarounds(unsigned char *buf, int *length)
+{
+	int newlength, oldlength = *length;
+
+	for (newlength = 2; newlength + 1 < oldlength; newlength += 2)
+		if (!isprint(buf[newlength]) || buf[newlength + 1])
+			break;
+
+	if (newlength > 2) {
+		buf[0] = newlength;
+		*length = newlength;
+	}
+}
+
 static int usb_string_sub(struct usb_device *dev, unsigned int langid,
 		unsigned int index, unsigned char *buf)
 {
@@ -634,19 +650,26 @@ static int usb_string_sub(struct usb_device *dev, unsigned int langid,
 
 	/* If that failed try to read the descriptor length, then
 	 * ask for just that many bytes */
-	if (rc < 0) {
+	if (rc < 2) {
 		rc = usb_get_string(dev, langid, index, buf, 2);
 		if (rc == 2)
 			rc = usb_get_string(dev, langid, index, buf, buf[0]);
 	}
 
-	if (rc >= 0) {
+	if (rc >= 2) {
+		if (!buf[0] && !buf[1])
+			usb_try_string_workarounds(buf, &rc);
+
 		/* There might be extra junk at the end of the descriptor */
 		if (buf[0] < rc)
 			rc = buf[0];
-		if (rc < 2)
-			rc = -EINVAL;
+
+		rc = rc - (rc & 1); /* force a multiple of two */
 	}
+
+	if (rc < 2)
+		rc = (rc < 0 ? rc : -EINVAL);
+
 	return rc;
 }
 
@@ -723,6 +746,9 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	}
 	buf[idx] = 0;
 	err = idx;
+
+	if (tbuf[1] != USB_DT_STRING)
+		dev_dbg(&dev->dev, "wrong descriptor type %02x for string %d (\"%s\")\n", tbuf[1], index, buf);
 
  errout:
 	kfree(tbuf);
@@ -1132,6 +1158,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
  * use usb_set_interface() on the interfaces it claims.  Resetting the whole
  * configuration would affect other drivers' interfaces.
  *
+ * The caller must own the device lock.
+ *
  * Returns zero on success, else a negative error code.
  */
 int usb_reset_configuration(struct usb_device *dev)
@@ -1142,9 +1170,9 @@ int usb_reset_configuration(struct usb_device *dev)
 	if (dev->state == USB_STATE_SUSPENDED)
 		return -EHOSTUNREACH;
 
-	/* caller must own dev->serialize (config won't change)
-	 * and the usb bus readlock (so driver bindings are stable);
-	 * so calls during probe() are fine
+	/* caller must have locked the device and must own
+	 * the usb bus readlock (so driver bindings are stable);
+	 * calls during probe() are fine
 	 */
 
 	for (i = 1; i < 16; ++i) {
@@ -1199,7 +1227,7 @@ static void release_interface(struct device *dev)
  * usb_set_configuration - Makes a particular device setting be current
  * @dev: the device whose configuration is being updated
  * @configuration: the configuration being chosen.
- * Context: !in_interrupt(), caller holds dev->serialize
+ * Context: !in_interrupt(), caller owns the device lock
  *
  * This is used to enable non-default device modes.  Not all devices
  * use this kind of configurability; many devices only have one
@@ -1220,8 +1248,8 @@ static void release_interface(struct device *dev)
  * usb_set_interface().
  *
  * This call is synchronous. The calling context must be able to sleep,
- * and must not hold the driver model lock for USB; usb device driver
- * probe() methods may not use this routine.
+ * must own the device lock, and must not hold the driver model's USB
+ * bus rwsem; usb device driver probe() methods cannot use this routine.
  *
  * Returns zero on success, or else the status code returned by the
  * underlying call that failed.  On succesful completion, each interface
@@ -1235,8 +1263,6 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	struct usb_host_config *cp = NULL;
 	struct usb_interface **new_interfaces = NULL;
 	int n, nintf;
-
-	/* dev->serialize guards all config changes */
 
 	for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
 		if (dev->config[i].desc.bConfigurationValue == configuration) {

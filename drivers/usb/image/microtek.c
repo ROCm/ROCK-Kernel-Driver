@@ -324,7 +324,7 @@ static inline void mts_urb_abort(struct mts_desc* desc) {
 	MTS_DEBUG_GOT_HERE();
 	mts_debug_dump(desc);
 
-	usb_unlink_urb( desc->urb );
+	usb_kill_urb( desc->urb );
 }
 
 static int mts_scsi_abort (Scsi_Cmnd *srb)
@@ -341,12 +341,18 @@ static int mts_scsi_abort (Scsi_Cmnd *srb)
 static int mts_scsi_host_reset (Scsi_Cmnd *srb)
 {
 	struct mts_desc* desc = (struct mts_desc*)(srb->device->host->hostdata[0]);
+	int result, rc;
 
 	MTS_DEBUG_GOT_HERE();
 	mts_debug_dump(desc);
 
-	usb_reset_device(desc->usb_dev); /*FIXME: untested on new reset code */
-	return 0;  /* RANT why here 0 and not SUCCESS */
+	rc = usb_lock_device_for_reset(desc->usb_dev, desc->usb_intf);
+	if (rc < 0)
+		return FAILED;
+	result = usb_reset_device(desc->usb_dev);;
+	if (rc)
+		usb_unlock_device(desc->usb_dev);
+	return result ? FAILED : SUCCESS;
 }
 
 static
@@ -777,6 +783,7 @@ static int mts_usb_probe(struct usb_interface *intf,
 		goto out_kfree;
 
 	new_desc->usb_dev = dev;
+	new_desc->usb_intf = intf;
 	init_MUTEX(&new_desc->lock);
 
 	/* endpoints */
@@ -822,10 +829,10 @@ static void mts_usb_disconnect (struct usb_interface *intf)
 
 	usb_set_intfdata(intf, NULL);
 
+	usb_kill_urb(desc->urb);
 	scsi_remove_host(desc->host);
-	usb_unlink_urb(desc->urb);
-	scsi_host_put(desc->host);
 
+	scsi_host_put(desc->host);
 	usb_free_urb(desc->urb);
 	kfree(desc);
 }
