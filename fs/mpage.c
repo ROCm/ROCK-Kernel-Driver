@@ -695,6 +695,7 @@ mpage_writepages(struct address_space *mapping,
 			unlock_page(page);
 		}
 		page_cache_release(page);
+		cond_resched();
 		spin_lock(&mapping->page_lock);
 	}
 	/*

@@ -1342,8 +1342,8 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     REISERFS_SB(s)->s_alloc_options.bits = ( 1 << 5);
     /* If file grew past 4 blocks, start preallocation blocks for it. */
     REISERFS_SB(s)->s_alloc_options.preallocmin = 4;
-    /* Preallocate by 8 blocks (9-1) at once */
-    REISERFS_SB(s)->s_alloc_options.preallocsize = 9;
+    /* Preallocate by 16 blocks (17-1) at once */
+    REISERFS_SB(s)->s_alloc_options.preallocsize = 17;
     /* Initialize the rwsem for xattr dir */
     init_rwsem(&REISERFS_SB(s)->xattr_dir_sem);
 

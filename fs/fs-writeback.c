@@ -315,6 +315,7 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 			writeback_release(bdi);
 		spin_unlock(&inode_lock);
 		iput(inode);
+		cond_resched();
 		spin_lock(&inode_lock);
 		if (wbc->nr_to_write <= 0)
 			break;
@@ -360,6 +361,7 @@ writeback_inodes(struct writeback_control *wbc)
 	}
 	spin_unlock(&sb_lock);
 	spin_unlock(&inode_lock);
+	cond_resched();
 }
 
 /*
