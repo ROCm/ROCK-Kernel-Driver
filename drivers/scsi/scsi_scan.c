@@ -465,12 +465,12 @@ static void scsi_initialize_merge_fn(struct scsi_device *sd)
  * Return value:
  *     Scsi_Device pointer, or NULL on failure.
  **/
-static Scsi_Device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
+struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 				    uint id, uint lun)
 {
-	Scsi_Device *sdev;
+	struct scsi_device *sdev;
 
-	sdev = (Scsi_Device *) kmalloc(sizeof(Scsi_Device), GFP_ATOMIC);
+	sdev = kmalloc(sizeof(*sdev), GFP_ATOMIC);
 	if (sdev == NULL)
 		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
 	else {
@@ -522,7 +522,7 @@ static Scsi_Device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
  *     Undo the actions in scsi_alloc_sdev, including removing @sdev from
  *     the list, and freeing @sdev.
  **/
-static void scsi_free_sdev(Scsi_Device *sdev)
+void scsi_free_sdev(struct scsi_device *sdev)
 {
 	if (sdev->prev != NULL)
 		sdev->prev->next = sdev->next;

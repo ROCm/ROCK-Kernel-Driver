@@ -7,48 +7,17 @@
  *                        of people at Linux Expo.
  */
 
-/*
- * The fundamental purpose of this file is to contain a library of utility
- * routines that can be used by low-level drivers.   Ultimately the idea
- * is that there should be a sufficiently rich number of functions that it
- * would be possible for a driver author to fashion a queueing function for
- * a low-level driver if they wished.   Note however that this file also
- * contains the "default" versions of these functions, as we don't want to
- * go through and retrofit queueing functions into all 30 some-odd drivers.
- */
-
-#include <linux/module.h>
-
-#include <linux/sched.h>
-#include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/bio.h>
-#include <linux/ioport.h>
 #include <linux/kernel.h>
-#include <linux/stat.h>
 #include <linux/blk.h>
-#include <linux/interrupt.h>
-#include <linux/delay.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
-
-
-#define __KERNEL_SYSCALLS__
-
-#include <linux/unistd.h>
-
-#include <asm/system.h>
-#include <asm/irq.h>
-#include <asm/dma.h>
 
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsi_ioctl.h>
-
-/*
- * This entire source file deals with the new queueing code.
- */
 
 /*
  * Function:    scsi_insert_special_cmd()
@@ -259,7 +228,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	/*
 	 * Just hit the requeue function for the queue.
 	 */
-	q->request_fn(q);
+	__blk_run_queue(q);
 
 	SDpnt = (Scsi_Device *) q->queuedata;
 	SHpnt = SDpnt->host;
@@ -272,8 +241,6 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	 * use function pointers to pick the right one.
 	 */
 	if (SDpnt->single_lun && blk_queue_empty(q) && SDpnt->device_busy ==0) {
-		request_queue_t *q;
-
 		for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
 			if (((SHpnt->can_queue > 0)
 			     && (SHpnt->host_busy >= SHpnt->can_queue))
@@ -283,8 +250,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 				break;
 			}
 
-			q = &SDpnt->request_queue;
-			q->request_fn(q);
+			__blk_run_queue(&SDpnt->request_queue);
 		}
 	}
 
@@ -299,7 +265,6 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 	all_clear = 1;
 	if (SHpnt->some_device_starved) {
 		for (SDpnt = SHpnt->host_queue; SDpnt; SDpnt = SDpnt->next) {
-			request_queue_t *q;
 			if ((SHpnt->can_queue > 0 && (SHpnt->host_busy >= SHpnt->can_queue))
 			    || (SHpnt->host_blocked) 
 			    || (SHpnt->host_self_blocked)) {
@@ -308,8 +273,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 			if (SDpnt->device_blocked || !SDpnt->starved) {
 				continue;
 			}
-			q = &SDpnt->request_queue;
-			q->request_fn(q);
+			__blk_run_queue(&SDpnt->request_queue);
 			all_clear = 0;
 		}
 		if (SDpnt == NULL && all_clear) {
@@ -1021,10 +985,11 @@ void scsi_request_fn(request_queue_t * q)
 			break;
 
 		if(!req) {
-			/* can happen if the prep fails 
-			 * FIXME: elv_next_request() should be plugging the
-			 * queue */
-			blk_plug_device(q);
+			/* If the device is busy, a returning I/O
+			 * will restart the queue.  Otherwise, we have
+			 * to plug the queue */
+			if(SDpnt->device_busy == 0)
+				blk_plug_device(q);
 			break;
 		}
 

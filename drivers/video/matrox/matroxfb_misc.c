@@ -849,7 +849,7 @@ static int parse_pins4(WPMINFO const struct matrox_bios* bd) {
 					  ( bd->pins[86]        & 0x0000000F);
 	MINFO->values.reg.opt		= ((bd->pins[53] << 15) & 0x00400000) |
 					  ((bd->pins[53] << 22) & 0x10000000) |
-					  ((bd->pins[53] << 10) & 0x00001C00);
+					  ((bd->pins[53] <<  7) & 0x00001C00);
 	MINFO->values.reg.opt3		= get_u32(bd->pins + 67);
 	MINFO->values.pll.system	= (bd->pins[ 65] == 0xFF) ? 200000 			: bd->pins[ 65] * 4000;
 	MINFO->features.pll.ref_freq	= (bd->pins[ 92] & 0x01) ? 14318 : 27000;
