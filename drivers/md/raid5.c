@@ -1780,3 +1780,4 @@ static void raid5_exit (void)
 module_init(raid5_init);
 module_exit(raid5_exit);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("md-personality-4"); /* RAID5 */

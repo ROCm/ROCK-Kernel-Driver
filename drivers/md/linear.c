@@ -295,3 +295,4 @@ static void linear_exit (void)
 module_init(linear_init);
 module_exit(linear_exit);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("md-personality-1"); /* LINEAR */

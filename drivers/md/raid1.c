@@ -1196,3 +1196,4 @@ static void raid_exit(void)
 module_init(raid_init);
 module_exit(raid_exit);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("md-personality-3"); /* RAID1 */
