@@ -6,8 +6,6 @@
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
- * $Id: sctp.h,v 1.40 2002/08/21 18:34:03 jgrimm Exp $
- * 
  * The base lksctp header. 
  * 
  * The SCTP reference implementation is free software; 
@@ -85,9 +83,9 @@
 #include <asm/uaccess.h>
 #include <asm/page.h>
 #include <net/sock.h>
-#include <net/sctp/sctp_structs.h>
-#include <net/sctp/sctp_constants.h>
-#include <net/sctp/sctp_sm.h>
+#include <net/sctp/structs.h>
+#include <net/sctp/constants.h>
+#include <net/sctp/sm.h>
 
 
 /* Set SCTP_DEBUG flag via config if not already set. */
