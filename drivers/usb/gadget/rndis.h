@@ -10,10 +10,8 @@
  *		modify it under the terms of the GNU General Public License
  *		version 2, as published by the Free Software Foundation. 
  * 
- * 		Due to the Remote NDIS Specification License Agreement this 
- *		program may only be used to interact with a Microsoft Windows
- * 		operating system or a bus/network-connected communication 
- *		device.
+ *		This software was originally developed in conformance with
+ *		Microsoft's Remote NDIS Specification License Agreement.
  */
 
 #ifndef _LINUX_RNDIS_H
