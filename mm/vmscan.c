@@ -835,7 +835,7 @@ try_to_free_pages(struct zone *classzone,
 		wakeup_bdflush(total_scanned);
 
 		/* Take a nap, wait for some writeback to complete */
-		blk_congestion_wait(WRITE, HZ/4);
+		blk_congestion_wait(WRITE, HZ/10);
 		shrink_slab(total_scanned, gfp_mask);
 	}
 	if (gfp_mask & __GFP_FS)
@@ -904,7 +904,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 		}
 		if (all_zones_ok)
 			break;
-		blk_congestion_wait(WRITE, HZ/4);
+		blk_congestion_wait(WRITE, HZ/10);
 	}
 	return nr_pages - to_free;
 }

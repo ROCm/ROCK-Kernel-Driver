@@ -1604,13 +1604,9 @@ void blk_congestion_wait(int rw, long timeout)
 	DEFINE_WAIT(wait);
 	struct congestion_state *cs = &congestion_states[rw];
 
-	if (!atomic_read(&cs->nr_active_queues))
-		return;
-
 	blk_run_queues();
 	prepare_to_wait(&cs->wqh, &wait, TASK_UNINTERRUPTIBLE);
-	if (atomic_read(&cs->nr_active_queues))
-		io_schedule_timeout(timeout);
+	io_schedule_timeout(timeout);
 	finish_wait(&cs->wqh, &wait);
 }
 
