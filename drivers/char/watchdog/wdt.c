@@ -265,9 +265,8 @@ static ssize_t wdt_write(struct file *file, const char *buf, size_t count, loff_
 			}
 		}
 		wdt_ping();
-		return 1;
 	}
-	return 0;
+	return count;
 }
 
 /**
