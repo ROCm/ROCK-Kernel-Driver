@@ -17,9 +17,6 @@
     This file contains the module in binary form and, under the terms
     of the GPL, in source form. The source is located at the end of the file.
 
-    For all queries about this code, please contact the current author, 
-    Simon Kelley <simon@thekelleys.org.uk> and not Atmel Corporation.
-
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -33,6 +30,12 @@
     You should have received a copy of the GNU General Public License
     along with Atmel wireless lan drivers; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+    For all queries about this code, please contact the current author, 
+    Simon Kelley <simon@thekelleys.org.uk> and not Atmel Corporation.
+
+    Credit is due to HP UK and Cambridge Online Systems Ltd for supplying
+    hardware used during development of this driver.
 
 ******************************************************************************/
 
@@ -67,7 +70,7 @@
 #include "ieee802_11.h"
 
 #define DRIVER_MAJOR 0
-#define DRIVER_MINOR 9
+#define DRIVER_MINOR 91
 
 MODULE_AUTHOR("Simon Kelley");
 MODULE_DESCRIPTION("Support for Atmel at76c50x 802.11 wireless ethernet cards.");
@@ -469,7 +472,6 @@ struct atmel_private {
 		CARD_TYPE_SPI_FLASH,
 		CARD_TYPE_EEPROM 
 	} card_type;
-	int is3com; /* is this a 3com card? they are uniquely borken */
 	int do_rx_crc; /* If we need to CRC incoming packets */
 	int probe_crc; /* set if we don't yet know */
 	int crc_ok_cnt, crc_ko_cnt; /* counters for probing */
@@ -484,7 +486,7 @@ struct atmel_private {
 	u8 group_cipher_suite, pairwise_cipher_suite;
 	u8 wep_keys[MAX_ENCRYPTION_KEYS][MAX_ENCRYPTION_KEY_SIZE];
 	int wep_key_len[MAX_ENCRYPTION_KEYS]; 
-	int use_wpa;
+	int use_wpa, radio_on_broken; /* firmware dependent stuff. */
 
 	u16 host_info_base;
 	struct host_info_struct { 
@@ -1386,7 +1388,7 @@ static int atmel_read_proc(char *page, char **start, off_t off,
         return len;
 }
 
-struct net_device *init_atmel_card( unsigned short irq, int port, char *firmware_id, int is3com,  
+struct net_device *init_atmel_card( unsigned short irq, int port, char *firmware_id,  
 				    struct device *sys_dev, int (*card_present)(void *), void *card)
 {
 	struct net_device *dev;
@@ -1418,7 +1420,6 @@ struct net_device *init_atmel_card( unsigned short irq, int port, char *firmware
 		strcpy(priv->firmware_template, firmware_id);
 	priv->bus_type = card_present ? BUS_TYPE_PCCARD : BUS_TYPE_PCI;
 	priv->station_state = STATION_STATE_DOWN;
-	priv->is3com = is3com;
 	priv->do_rx_crc = 0;
 	/* For PCMCIA cards, some chips need CRC, some don't
 	   so we have to probe. */
@@ -1525,16 +1526,15 @@ EXPORT_SYMBOL(init_atmel_card);
 void stop_atmel_card(struct net_device *dev, int freeres)
 {
 	struct atmel_private *priv = dev->priv;
-	unregister_netdev(dev);
-	
+		
 	/* put a brick on it... */
-
 	if (priv->bus_type == BUS_TYPE_PCCARD) 
 		atmel_write16(dev, GCR, 0x0060);
 	atmel_write16(dev, GCR, 0x0040);
-
-	remove_proc_entry("driver/atmel", NULL);
+	
 	del_timer_sync(&priv->management_timer);
+	unregister_netdev(dev);
+	remove_proc_entry("driver/atmel", NULL);
 	free_irq(dev->irq, dev);
 	if (priv->firmware)
 		kfree(priv->firmware);
@@ -1995,8 +1995,8 @@ static int atmel_set_freq(struct net_device *dev,
 	
 	/* If setting by frequency, convert to a channel */
 	if((fwrq->e == 1) &&
-	   (fwrq->m >= (int) 2.412e8) &&
-	   (fwrq->m <= (int) 2.487e8)) {
+	   (fwrq->m >= (int) 241200000) &&
+	   (fwrq->m <= (int) 248700000)) {
 		int f = fwrq->m / 100000;
 		int c = 0;
 		while((c < 14) && (f != frequency_list[c]))
@@ -3594,8 +3594,12 @@ int reset_atmel_card(struct net_device *dev)
 		return 0;
 
 	/* Check the version and set the correct flag for wpa stuff,
-	   old and new firmware is incompatible. */
-	priv->use_wpa = (priv->host_info.major_version >= 4);
+	   old and new firmware is incompatible.
+	   The pre-wpa 3com firmware reports major version 5,
+	   the wpa 3com firmware is major version 4 and doesn't need
+	   the 3com broken-ness filter. */
+	priv->use_wpa = (priv->host_info.major_version == 4);
+	priv->radio_on_broken = (priv->host_info.major_version == 5);
 	
         /* unmask all irq sources */
 	atmel_wmem8(priv, atmel_hi(priv, IFACE_INT_MASK_OFFSET), 0xff);
@@ -3640,7 +3644,7 @@ int reset_atmel_card(struct net_device *dev)
 	if ((channel = atmel_validate_channel(priv, priv->channel)))
 		priv->channel = channel;
 	
-	if (!priv->is3com) {
+	if (!priv->radio_on_broken) {
 		if (atmel_send_command_wait(priv, CMD_EnableRadio, NULL, 0) == 
 		    CMD_STATUS_REJECTED_RADIO_OFF) {
 			printk(KERN_INFO 
@@ -3853,7 +3857,6 @@ static void atmel_wmem32(struct atmel_private *priv, u16 pos, u32 data)
 	atmel_write16(priv->dev, DR, data); /* card is little-endian */
 	atmel_write16(priv->dev, DR, data >> 16);
 }
-
 
 /***************************************************************************/
 /* There follows the source form of the MAC address reading firmware       */
