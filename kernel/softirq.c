@@ -9,8 +9,6 @@
 #include <linux/module.h>
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
-#include <linux/notifier.h>
-#include <linux/percpu.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
