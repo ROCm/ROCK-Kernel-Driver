@@ -386,7 +386,7 @@ static struct file_operations rt_cache_seq_fops = {
 	.open	 = rt_cache_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = ip_seq_release,
+	.release = seq_release_private,
 };
 
 int __init rt_cache_proc_init(void)
@@ -455,7 +455,7 @@ out:	return ret;
 }
 
 /* This runs via a timer and thus is always in BH context. */
-static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
+static void rt_check_expire(unsigned long dummy)
 {
 	static int rover;
 	int i = rover, t;
@@ -498,12 +498,10 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 	mod_timer(&rt_periodic_timer, now + ip_rt_gc_interval);
 }
 
-SMP_TIMER_DEFINE(rt_check_expire, rt_gc_task);
-
 /* This can run from both BH and non-BH contexts, the latter
  * in the case of a forced flush event.
  */
-static void SMP_TIMER_NAME(rt_run_flush)(unsigned long dummy)
+static void rt_run_flush(unsigned long dummy)
 {
 	int i;
 	struct rtable *rth, *next;
@@ -526,8 +524,6 @@ static void SMP_TIMER_NAME(rt_run_flush)(unsigned long dummy)
 	}
 }
 
-SMP_TIMER_DEFINE(rt_run_flush, rt_cache_flush_task);
-  
 static spinlock_t rt_flush_lock = SPIN_LOCK_UNLOCKED;
 
 void rt_cache_flush(int delay)
@@ -559,7 +555,7 @@ void rt_cache_flush(int delay)
 
 	if (delay <= 0) {
 		spin_unlock_bh(&rt_flush_lock);
-		SMP_TIMER_NAME(rt_run_flush)(0);
+		rt_run_flush(0);
 		return;
 	}
 
@@ -958,12 +954,15 @@ void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
  				INIT_RCU_HEAD(&rt->u.dst.rcu_head);
 				rt->u.dst.__use		= 1;
 				atomic_set(&rt->u.dst.__refcnt, 1);
+				rt->u.dst.child		= NULL;
 				if (rt->u.dst.dev)
 					dev_hold(rt->u.dst.dev);
+				rt->u.dst.obsolete	= 0;
 				rt->u.dst.lastuse	= jiffies;
+				rt->u.dst.path		= &rt->u.dst;
 				rt->u.dst.neighbour	= NULL;
 				rt->u.dst.hh		= NULL;
-				rt->u.dst.obsolete	= 0;
+				rt->u.dst.xfrm		= NULL;
 
 				rt->rt_flags		|= RTCF_REDIRECTED;
 
@@ -1150,7 +1149,7 @@ static __inline__ unsigned short guess_mtu(unsigned short old_mtu)
 {
 	int i;
 	
-	for (i = 0; i < sizeof(mtu_plateau) / sizeof(mtu_plateau[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(mtu_plateau); i++)
 		if (old_mtu > mtu_plateau[i])
 			return mtu_plateau[i];
 	return 68;

@@ -25,12 +25,14 @@ struct inflate_codes_state;
    at least ten.  The ten bytes are six bytes for the longest length/
    distance pair plus four bytes for overloading the bit buffer. */
 
-int zlib_inflate_fast(bl, bd, tl, td, s, z)
-uInt bl, bd;
-inflate_huft *tl;
-inflate_huft *td; /* need separate declaration for Borland C++ */
-inflate_blocks_statef *s;
-z_streamp z;
+int zlib_inflate_fast(
+	uInt bl,
+	uInt bd,
+	inflate_huft *tl,
+	inflate_huft *td, /* need separate declaration for Borland C++ */
+	inflate_blocks_statef *s,
+	z_streamp z
+)
 {
   inflate_huft *t;      /* temporary pointer */
   uInt e;               /* extra bits or operation */

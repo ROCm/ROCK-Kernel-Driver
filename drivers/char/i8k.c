@@ -167,7 +167,7 @@ static int i8k_get_bios_version(void)
  */
 static int i8k_get_serial_number(unsigned char *buff)
 {
-    strncpy(buff, serial_number, 16);
+    strlcpy(buff, serial_number, sizeof(serial_number));
     return 0;
 }
 
@@ -551,24 +551,24 @@ static void __init dmi_decode(DMIHeader *dmi)
     case  0:	/* BIOS Information */
 	p = dmi_string(dmi,data[5]);
 	if (*p) {
-	    strncpy(bios_version, p, sizeof(bios_version));
+	    strlcpy(bios_version, p, sizeof(bios_version));
 	    string_trim(bios_version, sizeof(bios_version));
 	}
 	break;	
     case 1:	/* System Information */
 	p = dmi_string(dmi,data[4]);
 	if (*p) {
-	    strncpy(system_vendor, p, sizeof(system_vendor));
+	    strlcpy(system_vendor, p, sizeof(system_vendor));
 	    string_trim(system_vendor, sizeof(system_vendor));
 	}
 	p = dmi_string(dmi,data[5]);
 	if (*p) {
-	    strncpy(product_name, p, sizeof(product_name));
+	    strlcpy(product_name, p, sizeof(product_name));
 	    string_trim(product_name, sizeof(product_name));
 	}
 	p = dmi_string(dmi,data[7]);
 	if (*p) {
-	    strncpy(serial_number, p, sizeof(serial_number));
+	    strlcpy(serial_number, p, sizeof(serial_number));
 	    string_trim(serial_number, sizeof(serial_number));
 	}
 	break;
@@ -757,7 +757,7 @@ int __init i8k_init(void)
 	return -ENOENT;
     }
     proc_i8k->proc_fops = &i8k_fops;
-    SET_MODULE_OWNER(proc_i8k);
+    proc_i8k->owner = THIS_MODULE;
 
     printk(KERN_INFO
 	   "Dell laptop SMM driver v%s Massimo Dal Zotto (dz@debian.org)\n",

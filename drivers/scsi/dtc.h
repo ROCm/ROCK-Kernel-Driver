@@ -36,8 +36,6 @@ static int dtc_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int dtc_bus_reset(Scsi_Cmnd *);
 static int dtc_device_reset(Scsi_Cmnd *);
 static int dtc_host_reset(Scsi_Cmnd *);
-static int dtc_proc_info (char *buffer, char **start, off_t offset,
-		   int length, int hostno, int inout);
 
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2

@@ -42,9 +42,9 @@
 
 static struct agp_front_data agp_fe;
 
-static agp_memory *agp_find_mem_by_key(int key)
+static struct agp_memory *agp_find_mem_by_key(int key)
 {
-	agp_memory *curr;
+	struct agp_memory *curr;
 
 	if (agp_fe.current_controller == NULL)
 		return NULL;
@@ -61,10 +61,10 @@ static agp_memory *agp_find_mem_by_key(int key)
 	return curr;
 }
 
-static void agp_remove_from_pool(agp_memory * temp)
+static void agp_remove_from_pool(struct agp_memory *temp)
 {
-	agp_memory *prev;
-	agp_memory *next;
+	struct agp_memory *prev;
+	struct agp_memory *next;
 
 	/* Check to see if this is even in the memory pool */
 
@@ -218,9 +218,9 @@ static int agp_create_segment(struct agp_client *client, struct agp_region *regi
 /* End - Routines for managing each client's segment list */
 
 /* This function must only be called when current_controller != NULL */
-static void agp_insert_into_pool(agp_memory * temp)
+static void agp_insert_into_pool(struct agp_memory * temp)
 {
-	agp_memory *prev;
+	struct agp_memory *prev;
 
 	prev = agp_fe.current_controller->pool;
 
@@ -289,15 +289,15 @@ void agp_remove_file_private(struct agp_file_private * priv)
  * Wrappers for agp_free_memory & agp_allocate_memory 
  * These make sure that internal lists are kept updated.
  */
-static void agp_free_memory_wrap(agp_memory * memory)
+static void agp_free_memory_wrap(struct agp_memory *memory)
 {
 	agp_remove_from_pool(memory);
 	agp_free_memory(memory);
 }
 
-static agp_memory *agp_allocate_memory_wrap(size_t pg_count, u32 type)
+static struct agp_memory *agp_allocate_memory_wrap(size_t pg_count, u32 type)
 {
-	agp_memory *memory;
+	struct agp_memory *memory;
 
 	memory = agp_allocate_memory(pg_count, type);
    	printk(KERN_DEBUG "agp_allocate_memory: %p\n", memory);
@@ -383,8 +383,8 @@ static void agp_remove_all_clients(struct agp_controller *controller)
 
 static void agp_remove_all_memory(struct agp_controller *controller)
 {
-	agp_memory *memory;
-	agp_memory *temp;
+	struct agp_memory *memory;
+	struct agp_memory *temp;
 
 	memory = controller->pool;
 
@@ -596,7 +596,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 	unsigned long offset;
 	struct agp_client *client;
 	struct agp_file_private *priv = file->private_data;
-	agp_kern_info kerninfo;
+	struct agp_kern_info kerninfo;
 
 	down(&(agp_fe.agp_mutex));
 
@@ -756,7 +756,7 @@ static ssize_t agp_write(struct file *file, const char *buf,
 static int agpioc_info_wrap(struct agp_file_private *priv, unsigned long arg)
 {
 	struct agp_info userinfo;
-	agp_kern_info kerninfo;
+	struct agp_kern_info kerninfo;
 
 	agp_copy_info(&kerninfo);
 
@@ -912,7 +912,7 @@ static int agpioc_protect_wrap(struct agp_file_private *priv, unsigned long arg)
 
 static int agpioc_allocate_wrap(struct agp_file_private *priv, unsigned long arg)
 {
-	agp_memory *memory;
+	struct agp_memory *memory;
 	struct agp_allocate alloc;
 
 	DBG("");
@@ -936,7 +936,7 @@ static int agpioc_allocate_wrap(struct agp_file_private *priv, unsigned long arg
 
 static int agpioc_deallocate_wrap(struct agp_file_private *priv, unsigned long arg)
 {
-	agp_memory *memory;
+	struct agp_memory *memory;
 
 	DBG("");
 	memory = agp_find_mem_by_key((int) arg);
@@ -951,7 +951,7 @@ static int agpioc_deallocate_wrap(struct agp_file_private *priv, unsigned long a
 static int agpioc_bind_wrap(struct agp_file_private *priv, unsigned long arg)
 {
 	struct agp_bind bind_info;
-	agp_memory *memory;
+	struct agp_memory *memory;
 
 	DBG("");
 	if (copy_from_user(&bind_info, (void *) arg, sizeof(struct agp_bind)))
@@ -967,7 +967,7 @@ static int agpioc_bind_wrap(struct agp_file_private *priv, unsigned long arg)
 
 static int agpioc_unbind_wrap(struct agp_file_private *priv, unsigned long arg)
 {
-	agp_memory *memory;
+	struct agp_memory *memory;
 	struct agp_unbind unbind;
 
 	DBG("");

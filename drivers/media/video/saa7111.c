@@ -122,7 +122,7 @@ static int saa7111_attach(struct i2c_adapter *adap, int addr, int kind)
 	}
 
 	memset(decoder, 0, sizeof(*decoder));
-	strncpy(client->dev.name, "saa7111", DEVICE_NAME_SIZE);
+	strlcpy(client->dev.name, "saa7111", DEVICE_NAME_SIZE);
 	decoder->client = client;
 	i2c_set_clientdata(client, decoder);
 	decoder->addr = addr;

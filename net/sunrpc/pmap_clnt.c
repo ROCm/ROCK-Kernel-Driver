@@ -288,7 +288,7 @@ static struct rpc_stat		pmap_stats;
 struct rpc_program	pmap_program = {
 	.name		= "portmap",
 	.number		= RPC_PMAP_PROGRAM,
-	.nrvers		= sizeof(pmap_version)/sizeof(pmap_version[0]),
+	.nrvers		= ARRAY_SIZE(pmap_version),
 	.version	= pmap_version,
 	.stats		= &pmap_stats,
 };

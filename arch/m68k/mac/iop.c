@@ -153,7 +153,7 @@ static struct iop_msg iop_msg_pool[NUM_IOP_MSGS];
 static struct iop_msg *iop_send_queue[NUM_IOPS][NUM_IOP_CHAN];
 static struct listener iop_listeners[NUM_IOPS][NUM_IOP_CHAN];
 
-void iop_ism_irq(int, void *, struct pt_regs *);
+irqreturn_t iop_ism_irq(int, void *, struct pt_regs *);
 
 extern void oss_irq_enable(int);
 
@@ -585,7 +585,7 @@ __u8 *iop_compare_code(uint iop_num, __u8 *code_start,
  * Handle an ISM IOP interrupt
  */
 
-void iop_ism_irq(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t iop_ism_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	uint iop_num = (uint) dev_id;
 	volatile struct mac_iop *iop = iop_base[iop_num];
@@ -636,7 +636,7 @@ void iop_ism_irq(int irq, void *dev_id, struct pt_regs *regs)
 		printk("\n");
 #endif
 	}
-
+	return IRQ_HANDLED;
 }
 
 #ifdef CONFIG_PROC_FS

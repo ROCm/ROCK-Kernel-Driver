@@ -403,14 +403,14 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	 * are used for initrd_start and initrd_size,
 	 * otherwise they contain 0xdeadbeef.  
 	 */
+	cmd_line[0] = 0;
 	if (r3 >= 0x4000 && r3 < 0x800000 && r4 == 0) {
-		cmd_line[0] = 0;
-		strncpy(cmd_line, (char *)r3 + KERNELBASE,
+		strlcpy(cmd_line, (char *)r3 + KERNELBASE,
 			sizeof(cmd_line));
 	} else if (boot_infos != 0) {
 		/* booted by BootX - check for ramdisk */
 		if (boot_infos->kernelParamsOffset != 0)
-			strncpy(cmd_line, (char *) boot_infos
+			strlcpy(cmd_line, (char *) boot_infos
 				+ boot_infos->kernelParamsOffset,
 				sizeof(cmd_line));
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -439,12 +439,10 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		if (chosen != NULL) {
 			p = get_property(chosen, "bootargs", NULL);
 			if (p && *p) {
-				cmd_line[0] = 0;
-				strncpy(cmd_line, p, sizeof(cmd_line));
+				strlcpy(cmd_line, p, sizeof(cmd_line));
 			}
 		}
 	}
-	cmd_line[sizeof(cmd_line) - 1] = 0;
 #ifdef CONFIG_ADB
 	if (strstr(cmd_line, "adb_sync")) {
 		extern int __adb_probe_sync;

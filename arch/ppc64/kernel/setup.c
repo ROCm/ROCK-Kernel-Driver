@@ -193,7 +193,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("naca                          = 0x%p\n", naca);
 	printk("naca->pftSize                 = 0x%lx\n", naca->pftSize);
 	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
-	printk("naca->interrupt_controller    = 0x%lx\n", naca->interrupt_controller);
+	printk("naca->interrupt_controller    = 0x%ld\n", naca->interrupt_controller);
 	printk("systemcfg                      = 0x%p\n", systemcfg);
 	printk("systemcfg->processorCount     = 0x%lx\n", systemcfg->processorCount);
 	printk("systemcfg->physicalMemorySize = 0x%lx\n", systemcfg->physicalMemorySize);
@@ -365,16 +365,15 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	cmd_line[0] = 0;
 
 #ifdef CONFIG_CMDLINE
-	strcpy(cmd_line, CONFIG_CMDLINE);
+	strlcpy(cmd_line, CONFIG_CMDLINE, sizeof(cmd_line));
 #endif /* CONFIG_CMDLINE */
 
 	chosen = find_devices("chosen");
 	if (chosen != NULL) {
 		p = get_property(chosen, "bootargs", NULL);
 		if (p != NULL && p[0] != 0)
-			strncpy(cmd_line, p, sizeof(cmd_line));
+			strlcpy(cmd_line, p, sizeof(cmd_line));
 	}
-	cmd_line[sizeof(cmd_line) - 1] = 0;
 
 	/* Look for mem= option on command line */
 	if (strstr(cmd_line, "mem=")) {

@@ -11,7 +11,7 @@
  *
  *     Copyright (c) 1998-1999 Dag Brattli <dagb@cs.uit.no>,
  *     All Rights Reserved.
- *     Copyright (c) 2000-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 2000-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *
  *     This program is free software; you can redistribute it and/or
  *     modify it under the terms of the GNU General Public License as
@@ -295,8 +295,6 @@ static void irlmp_state_standby(struct lap_cb *self, IRLMP_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown event %s\n",
 			   __FUNCTION__, irlmp_event[event]);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 }
@@ -373,8 +371,6 @@ static void irlmp_state_u_connect(struct lap_cb *self, IRLMP_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown event %s\n",
 			 __FUNCTION__, irlmp_event[event]);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 }
@@ -468,8 +464,6 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown event %s\n",
 			 __FUNCTION__, irlmp_event[event]);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 }
@@ -499,6 +493,9 @@ static int irlmp_state_disconnected(struct lsap_cb *self, IRLMP_EVENT event,
 	switch (event) {
 #ifdef CONFIG_IRDA_ULTRA
 	case LM_UDATA_INDICATION:
+		/* This is most bizzare. Those packets are  aka unreliable
+		 * connected, aka IrLPT or SOCK_DGRAM/IRDAPROTO_UNITDATA.
+		 * Why do we pass them as Ultra ??? Jean II */
 		irlmp_connless_data_indication(self, skb);
 		break;
 #endif /* CONFIG_IRDA_ULTRA */
@@ -510,6 +507,8 @@ static int irlmp_state_disconnected(struct lsap_cb *self, IRLMP_EVENT event,
 					__FUNCTION__);
 			return -EBUSY;
 		}
+		/* Don't forget to refcount it (see irlmp_connect_request()) */
+		skb_get(skb);
 		self->conn_skb = skb;
 
 		irlmp_next_lsap_state(self, LSAP_SETUP_PEND);
@@ -525,6 +524,8 @@ static int irlmp_state_disconnected(struct lsap_cb *self, IRLMP_EVENT event,
 					__FUNCTION__);
 			return -EBUSY;
 		}
+		/* Don't forget to refcount it (see irlap_driver_rcv()) */
+		skb_get(skb);
 		self->conn_skb = skb;
 
 		irlmp_next_lsap_state(self, LSAP_CONNECT_PEND);
@@ -547,8 +548,6 @@ static int irlmp_state_disconnected(struct lsap_cb *self, IRLMP_EVENT event,
 	default:
 		IRDA_DEBUG(1, "%s(), Unknown event %s on LSAP %#02x\n",
 			   __FUNCTION__, irlmp_event[event], self->slsap_sel);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 	return ret;
@@ -606,8 +605,6 @@ static int irlmp_state_connect(struct lsap_cb *self, IRLMP_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown event %s on LSAP %#02x\n", 
 			   __FUNCTION__, irlmp_event[event], self->slsap_sel);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 	return ret;
@@ -622,6 +619,7 @@ static int irlmp_state_connect(struct lsap_cb *self, IRLMP_EVENT event,
 static int irlmp_state_connect_pend(struct lsap_cb *self, IRLMP_EVENT event,
 				    struct sk_buff *skb)
 {
+	struct sk_buff *tx_skb;
 	int ret = 0;
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
@@ -647,10 +645,12 @@ static int irlmp_state_connect_pend(struct lsap_cb *self, IRLMP_EVENT event,
 		IRDA_DEBUG(4, "%s(), LS_CONNECT_CONFIRM\n",  __FUNCTION__);
 		irlmp_next_lsap_state(self, LSAP_CONNECT);
 
-		skb = self->conn_skb;
+		tx_skb = self->conn_skb;
 		self->conn_skb = NULL;
 
-		irlmp_connect_indication(self, skb);
+		irlmp_connect_indication(self, tx_skb);
+		/* Drop reference count - see irlmp_connect_indication(). */
+		dev_kfree_skb(tx_skb);
 		break;
 	case LM_WATCHDOG_TIMEOUT:
 		/* Will happen in some rare cases because of a race condition.
@@ -668,8 +668,6 @@ static int irlmp_state_connect_pend(struct lsap_cb *self, IRLMP_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown event %s on LSAP %#02x\n",
 			   __FUNCTION__, irlmp_event[event], self->slsap_sel);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 	return ret;
@@ -716,7 +714,7 @@ static int irlmp_state_dtr(struct lsap_cb *self, IRLMP_EVENT event,
 		break;
 	case LM_CONNECT_RESPONSE:
 		IRDA_DEBUG(0, "%s(), LM_CONNECT_RESPONSE, "
-			   "error, LSAP allready connected\n", __FUNCTION__);
+			   "error, LSAP already connected\n", __FUNCTION__);
 		/* Keep state */
 		break;
 	case LM_DISCONNECT_REQUEST:
@@ -759,8 +757,6 @@ static int irlmp_state_dtr(struct lsap_cb *self, IRLMP_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown event %s on LSAP %#02x\n",
 			   __FUNCTION__, irlmp_event[event], self->slsap_sel);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 	return ret;
@@ -832,8 +828,6 @@ static int irlmp_state_setup(struct lsap_cb *self, IRLMP_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown event %s on LSAP %#02x\n",
 			   __FUNCTION__, irlmp_event[event], self->slsap_sel);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 	return ret;
@@ -850,6 +844,7 @@ static int irlmp_state_setup(struct lsap_cb *self, IRLMP_EVENT event,
 static int irlmp_state_setup_pend(struct lsap_cb *self, IRLMP_EVENT event,
 				  struct sk_buff *skb)
 {
+	struct sk_buff *tx_skb;
 	LM_REASON reason;
 	int ret = 0;
 
@@ -862,11 +857,13 @@ static int irlmp_state_setup_pend(struct lsap_cb *self, IRLMP_EVENT event,
 	case LM_LAP_CONNECT_CONFIRM:
 		ASSERT(self->conn_skb != NULL, return -1;);
 
-		skb = self->conn_skb;
+		tx_skb = self->conn_skb;
 		self->conn_skb = NULL;
 
 		irlmp_send_lcf_pdu(self->lap, self->dlsap_sel,
-				   self->slsap_sel, CONNECT_CMD, skb);
+				   self->slsap_sel, CONNECT_CMD, tx_skb);
+		/* Drop reference count - see irlap_data_request(). */
+		dev_kfree_skb(tx_skb);
 
 		irlmp_next_lsap_state(self, LSAP_SETUP);
 		break;
@@ -891,8 +888,6 @@ static int irlmp_state_setup_pend(struct lsap_cb *self, IRLMP_EVENT event,
 	default:
 		IRDA_DEBUG(0, "%s(), Unknown event %s on LSAP %#02x\n",
 			   __FUNCTION__, irlmp_event[event], self->slsap_sel);
-		if (skb)
-			dev_kfree_skb(skb);
 		break;
 	}
 	return ret;

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.67 $
+ *   $Revision: 1.69 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -71,12 +71,11 @@ chsc_validate_chpids(struct subchannel *sch)
 }
 
 /* FIXME: this is _always_ called for every subchannel. shouldn't we
- *	  process more than one at a time?*/
+ *	  process more than one at a time? */
 static int
-chsc_get_sch_desc_irq(int irq)
+chsc_get_sch_desc_irq(int irq, void *page)
 {
 	int ccode, chpid, j;
-	int ret;
 
 	struct {
 		struct chsc_header request;
@@ -100,11 +99,7 @@ chsc_get_sch_desc_irq(int irq)
 		u16 fla[8];	  /* full link addresses 0-7 */
 	} *ssd_area;
 
-	ssd_area = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
-	if (!ssd_area) {
-		CIO_CRW_EVENT(0, "No memory for ssd area!\n");
-		return -ENOMEM;
-	}
+	ssd_area = page;
 
 	ssd_area->request = (struct chsc_header) {
 		.length = 0x0010,
@@ -117,33 +112,28 @@ chsc_get_sch_desc_irq(int irq)
 	ccode = chsc(ssd_area);
 	if (ccode > 0) {
 		pr_debug("chsc returned with ccode = %d\n", ccode);
-		ret = (ccode == 3) ? -ENODEV : -EBUSY;
-		goto out;
+		return (ccode == 3) ? -ENODEV : -EBUSY;
 	}
 
 	switch (ssd_area->response.code) {
 	case 0x0001: /* everything ok */
-		ret = 0;
 		break;
 	case 0x0002:
 		CIO_CRW_EVENT(2, "Invalid command!\n");
 	case 0x0003:
 		CIO_CRW_EVENT(2, "Error in chsc request block!\n");
-		ret = -EINVAL;
+		return -EINVAL;
 		break;
 	case 0x0004:
 		CIO_CRW_EVENT(2, "Model does not provide ssd\n");
-		ret = -EOPNOTSUPP;
+		return -EOPNOTSUPP;
 		break;
 	default:
 		CIO_CRW_EVENT(2, "Unknown CHSC response %d\n",
 			      ssd_area->response.code);
-		ret = -EIO;
+		return -EIO;
 		break;
 	}
-
-	if (ret != 0)
-		goto out;
 
 	/*
 	 * ssd_area->st stores the type of the detected
@@ -167,14 +157,14 @@ chsc_get_sch_desc_irq(int irq)
 		 * time since this code was written; since we don't know which
 		 * fields have meaning and what to do with it we just jump out
 		 */
-		goto out;
+		return 0;
 	} else {
 		const char *type[4] = {"I/O", "chsc", "message", "ADM"};
 		CIO_CRW_EVENT(6, "ssd: sch %x is %s subchannel\n",
 			      irq, type[ssd_area->st]);
 		if (ioinfo[irq] == NULL)
 			/* FIXME: we should do device rec. here... */
-			goto out;
+			return 0;
 
 		ioinfo[irq]->ssd_info.valid = 1;
 		ioinfo[irq]->ssd_info.type = ssd_area->st;
@@ -195,9 +185,8 @@ chsc_get_sch_desc_irq(int irq)
 			ioinfo[irq]->ssd_info.fla[j]   = ssd_area->fla[j];
 		}
 	}
-out:
-	free_page ((unsigned long) ssd_area);
-	return ret;
+
+	return 0;
 }
 
 static int
@@ -205,6 +194,7 @@ chsc_get_sch_descriptions(void)
 {
 	int irq;
 	int err;
+	void *page;
 
 	CIO_TRACE_EVENT( 4, "gsdesc");
 
@@ -212,11 +202,15 @@ chsc_get_sch_descriptions(void)
 	 * get information about chpids and link addresses
 	 * by executing the chsc command 'store subchannel description'
 	 */
+	page = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
+	if (!page)
+		return -ENOMEM;
+
 	for (irq = 0; irq <= highest_subchannel; irq++) {
 		/*
 		 * retrieve information for each sch
 		 */
-		err = chsc_get_sch_desc_irq(irq);
+		err = chsc_get_sch_desc_irq(irq, page);
 		if (err) {
 			static int cio_chsc_err_msg;
 
@@ -230,8 +224,10 @@ chsc_get_sch_descriptions(void)
 			}
 			return err;
 		}
+		clear_page(page);
 	}
 	cio_chsc_desc_avail = 1;
+	free_page((unsigned long)page);
 	return 0;
 }
 
@@ -352,14 +348,14 @@ s390_set_chpid_offline( __u8 chpid)
 
 static int
 s390_process_res_acc_sch(u8 chpid, __u16 fla, u32 fla_mask,
-			 struct subchannel *sch)
+			 struct subchannel *sch, void *page)
 {
 	int found;
 	int chp;
 	int ccode;
 	
 	/* Update our ssd_info */
-	if (chsc_get_sch_desc_irq(sch->irq))
+	if (chsc_get_sch_desc_irq(sch->irq, page))
 		return 0;
 	
 	found = 0;
@@ -396,6 +392,7 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 	int irq;
 	int ret;
 	char dbf_txt[15];
+	void *page;
 
 	sprintf(dbf_txt, "accpr%x", chpid);
 	CIO_TRACE_EVENT( 2, dbf_txt);
@@ -412,21 +409,12 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 	 * will we have to do.
 	 */
 
-	if (!cio_chsc_desc_avail)
-		chsc_get_sch_descriptions();
-
-	if (!cio_chsc_desc_avail) {
-		/*
-		 * Something went wrong...
-		 */
-		CIO_CRW_EVENT(0, "Error: Could not retrieve "
-			      "subchannel descriptions, will not process css"
-			      "machine check...\n");
-		return;
-	}
-
 	if (!test_bit(chpid, chpids_logical))
 		return; /* no need to do the rest */
+
+	page = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
+	if (!page)
+		return;
 
 	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		int chp_mask;
@@ -450,7 +438,10 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 	
 		spin_lock_irq(&sch->lock);
 
-		chp_mask = s390_process_res_acc_sch(chpid, fla, fla_mask, sch);
+		chp_mask = s390_process_res_acc_sch(chpid, fla, fla_mask,
+						    sch, page);
+		clear_page(page);
+
 		if (chp_mask == 0) {
 
 			spin_unlock_irq(&sch->lock);
@@ -475,6 +466,7 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 		if (fla_mask != 0)
 			break;
 	}
+	free_page((unsigned long)page);
 }
 
 static void

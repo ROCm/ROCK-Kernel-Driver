@@ -39,7 +39,7 @@ static int uninorth_fetch_size(void)
 	return 0;
 }
 
-static void uninorth_tlbflush(agp_memory * mem)
+static void uninorth_tlbflush(struct agp_memory *mem)
 {
 	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
 			UNI_N_CFG_GART_ENABLE | UNI_N_CFG_GART_INVAL);
@@ -89,7 +89,8 @@ static int uninorth_configure(void)
 	return 0;
 }
 
-static int uninorth_insert_memory(agp_memory * mem, off_t pg_start, int type)
+static int uninorth_insert_memory(struct agp_memory *mem, off_t pg_start,
+				int type)
 {
 	int i, j, num_entries;
 	void *temp;
@@ -280,8 +281,6 @@ struct agp_bridge_driver uninorth_agp_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 	.cant_use_aperture	= 1,
 };
 

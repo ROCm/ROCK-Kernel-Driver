@@ -418,11 +418,15 @@ static int tcp_tw_death_row_slot = 0;
 
 static void tcp_twkill(unsigned long);
 
+/* TIME_WAIT reaping mechanism. */
+#define TCP_TWKILL_SLOTS	8	/* Please keep this a power of 2. */
+#define TCP_TWKILL_PERIOD	(TCP_TIMEWAIT_LEN/TCP_TWKILL_SLOTS)
+
 static struct tcp_tw_bucket *tcp_tw_death_row[TCP_TWKILL_SLOTS];
 static spinlock_t tw_death_lock = SPIN_LOCK_UNLOCKED;
 static struct timer_list tcp_tw_timer = TIMER_INITIALIZER(tcp_twkill, 0, 0);
 
-static void SMP_TIMER_NAME(tcp_twkill)(unsigned long dummy)
+static void tcp_twkill(unsigned long dummy)
 {
 	struct tcp_tw_bucket *tw;
 	int killed = 0;
@@ -461,8 +465,6 @@ static void SMP_TIMER_NAME(tcp_twkill)(unsigned long dummy)
 out:
 	spin_unlock(&tw_death_lock);
 }
-
-SMP_TIMER_DEFINE(tcp_twkill, tcp_twkill_task);
 
 /* These are always called from BH context.  See callers in
  * tcp_input.c to verify this.
@@ -575,7 +577,7 @@ void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)
 	spin_unlock(&tw_death_lock);
 }
 
-void SMP_TIMER_NAME(tcp_twcal_tick)(unsigned long dummy)
+void tcp_twcal_tick(unsigned long dummy)
 {
 	int n, slot;
 	unsigned long j;
@@ -625,9 +627,6 @@ out:
 	NET_ADD_STATS_BH(TimeWaitKilled, killed);
 	spin_unlock(&tw_death_lock);
 }
-
-SMP_TIMER_DEFINE(tcp_twcal_tick, tcp_twcal_tasklet);
-
 
 /* This is not only more efficient than what we used to do, it eliminates
  * a lot of code duplication between IPv4/IPv6 SYN recv processing. -DaveM

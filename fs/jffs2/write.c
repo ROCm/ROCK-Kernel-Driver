@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: write.c,v 1.60 2002/09/09 16:29:08 dwmw2 Exp $
+ * $Id: write.c,v 1.65 2003/01/21 18:11:29 dwmw2 Exp $
  *
  */
 
@@ -47,7 +47,7 @@ int jffs2_do_new_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, uint
 	ri->nodetype = cpu_to_je16(JFFS2_NODETYPE_INODE);
 	ri->totlen = cpu_to_je32(PAD(sizeof(*ri)));
 	ri->hdr_crc = cpu_to_je32(crc32(0, ri, sizeof(struct jffs2_unknown_node)-4));
-	ri->mode = cpu_to_je32(mode);
+	ri->mode = cpu_to_jemode(mode);
 
 	f->highest_version = 1;
 	ri->version = cpu_to_je32(f->highest_version);
@@ -55,6 +55,7 @@ int jffs2_do_new_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, uint
 	return 0;
 }
 
+#if CONFIG_JFFS2_FS_DEBUG > 0
 static void writecheck(struct jffs2_sb_info *c, uint32_t ofs)
 {
 	unsigned char buf[16];
@@ -63,7 +64,7 @@ static void writecheck(struct jffs2_sb_info *c, uint32_t ofs)
 
 	ret = jffs2_flash_read(c, ofs, 16, &retlen, buf);
 	if (ret || (retlen != 16)) {
-		D1(printk(KERN_DEBUG "read failed or short in writecheck(). ret %d, retlen %d\n", ret, retlen));
+		D1(printk(KERN_DEBUG "read failed or short in writecheck(). ret %d, retlen %zd\n", ret, retlen));
 		return;
 	}
 	ret = 0;
@@ -79,7 +80,7 @@ static void writecheck(struct jffs2_sb_info *c, uint32_t ofs)
 		       buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15]);
 	}
 }
-
+#endif
 
 
 /* jffs2_write_dnode - given a raw_inode, allocate a full_dnode for it, 
@@ -105,10 +106,10 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 	vecs[1].iov_base = (unsigned char *)data;
 	vecs[1].iov_len = datalen;
 
-	writecheck(c, flash_ofs);
+	D1(writecheck(c, flash_ofs));
 
 	if (je32_to_cpu(ri->totlen) != sizeof(*ri) + datalen) {
-		printk(KERN_WARNING "jffs2_write_dnode: ri->totlen (0x%08x) != sizeof(*ri) (0x%08x) + datalen (0x%08x)\n", je32_to_cpu(ri->totlen), sizeof(*ri), datalen);
+		printk(KERN_WARNING "jffs2_write_dnode: ri->totlen (0x%08x) != sizeof(*ri) (0x%08zx) + datalen (0x%08x)\n", je32_to_cpu(ri->totlen), sizeof(*ri), datalen);
 	}
 	raw = jffs2_alloc_raw_node_ref();
 	if (!raw)
@@ -135,7 +136,7 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 	ret = jffs2_flash_writev(c, vecs, cnt, flash_ofs, &retlen);
 		
 	if (ret || (retlen != sizeof(*ri) + datalen)) {
-		printk(KERN_NOTICE "Write of %d bytes at 0x%08x failed. returned %d, retlen %d\n", 
+		printk(KERN_NOTICE "Write of %zd bytes at 0x%08x failed. returned %d, retlen %zd\n", 
 		       sizeof(*ri)+datalen, flash_ofs, ret, retlen);
 		/* Mark the space as dirtied */
 		if (retlen) {
@@ -162,20 +163,27 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 		return ERR_PTR(ret?ret:-EIO);
 	}
 	/* Mark the space used */
-	if (datalen == PAGE_CACHE_SIZE)
+	/* If node covers at least a whole page, or if it starts at the 
+	   beginning of a page and runs to the end of the file, or if 
+	   it's a hole node, mark it REF_PRISTINE, else REF_NORMAL. 
+	*/
+	if ((je32_to_cpu(ri->dsize) >= PAGE_CACHE_SIZE) ||
+	    ( ((je32_to_cpu(ri->offset)&(PAGE_CACHE_SIZE-1))==0) &&
+	      (je32_to_cpu(ri->dsize)+je32_to_cpu(ri->offset) ==  je32_to_cpu(ri->isize)))) {
 		raw->flash_offset |= REF_PRISTINE;
-	else
+	} else {
 		raw->flash_offset |= REF_NORMAL;
+	}
 	jffs2_add_physical_node_ref(c, raw);
 
 	/* Link into per-inode list */
 	raw->next_in_ino = f->inocache->nodes;
 	f->inocache->nodes = raw;
 
-	D1(printk(KERN_DEBUG "jffs2_write_dnode wrote node at 0x%08x with dsize 0x%x, csize 0x%x, node_crc 0x%08x, data_crc 0x%08x, totlen 0x%08x\n",
-		  flash_ofs, je32_to_cpu(ri->dsize), je32_to_cpu(ri->csize),
-		  je32_to_cpu(ri->node_crc), je32_to_cpu(ri->data_crc), 
-		  je32_to_cpu(ri->totlen)));
+	D1(printk(KERN_DEBUG "jffs2_write_dnode wrote node at 0x%08x(%d) with dsize 0x%x, csize 0x%x, node_crc 0x%08x, data_crc 0x%08x, totlen 0x%08x\n",
+		  flash_ofs, ref_flags(raw), je32_to_cpu(ri->dsize), 
+		  je32_to_cpu(ri->csize), je32_to_cpu(ri->node_crc),
+		  je32_to_cpu(ri->data_crc), je32_to_cpu(ri->totlen)));
 	if (writelen)
 		*writelen = retlen;
 
@@ -194,7 +202,7 @@ struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jff
 	D1(printk(KERN_DEBUG "jffs2_write_dirent(ino #%u, name at *0x%p \"%s\"->ino #%u, name_crc 0x%08x)\n", 
 		  je32_to_cpu(rd->pino), name, name, je32_to_cpu(rd->ino),
 		  je32_to_cpu(rd->name_crc)));
-	writecheck(c, flash_ofs);
+	D1(writecheck(c, flash_ofs));
 
 	D1(if(je32_to_cpu(rd->hdr_crc) != crc32(0, rd, sizeof(struct jffs2_unknown_node)-4)) {
 		printk(KERN_CRIT "Eep. CRC not correct in jffs2_write_dirent()\n");
@@ -233,7 +241,7 @@ struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jff
 
 	ret = jffs2_flash_writev(c, vecs, 2, flash_ofs, &retlen);
 	if (ret || (retlen != sizeof(*rd) + namelen)) {
-		printk(KERN_NOTICE "Write of %d bytes at 0x%08x failed. returned %d, retlen %d\n", 
+		printk(KERN_NOTICE "Write of %zd bytes at 0x%08x failed. returned %d, retlen %zd\n", 
 			       sizeof(*rd)+namelen, flash_ofs, ret, retlen);
 		/* Mark the space as dirtied */
 		if (retlen) {
@@ -290,7 +298,7 @@ int jffs2_write_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		}
 		down(&f->sem);
 		datalen = writelen;
-		cdatalen = min(alloclen - sizeof(*ri), writelen);
+		cdatalen = min_t(uint32_t, alloclen - sizeof(*ri), writelen);
 
 		comprbuf = kmalloc(cdatalen, GFP_KERNEL);
 		if (comprbuf) {
@@ -392,7 +400,7 @@ int jffs2_do_create(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, str
 	fn = jffs2_write_dnode(c, f, ri, NULL, 0, phys_ofs, &writtenlen);
 
 	D1(printk(KERN_DEBUG "jffs2_do_create created file with mode 0x%x\n",
-		  je32_to_cpu(ri->mode)));
+		  jemode_to_cpu(ri->mode)));
 
 	if (IS_ERR(fn)) {
 		D1(printk(KERN_DEBUG "jffs2_write_dnode() failed\n"));

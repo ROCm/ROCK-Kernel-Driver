@@ -944,10 +944,10 @@ static void cs_play_setup(struct cs_state *state)
 
 }
 
-struct InitStruct
+static struct InitStruct
 {
-    u32 long off;
-    u32 long val;
+    u32 off;
+    u32 val;
 } InitArray[] = { {0x00000040, 0x3fc0000f},
                   {0x0000004c, 0x04800000},
 

@@ -155,7 +155,7 @@ static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_sock
 	socket->cls_d.ops = &pci_socket_operations;
 	socket->cls_d.class_dev.class = &pcmcia_socket_class;
 	socket->cls_d.class_dev.dev = &dev->dev;
-	strncpy(socket->cls_d.class_dev.class_id, dev->dev.bus_id, BUS_ID_SIZE);
+	strlcpy(socket->cls_d.class_dev.class_id, dev->dev.bus_id, BUS_ID_SIZE);
 	class_set_devdata(&socket->cls_d.class_dev, &socket->cls_d);
 
 	/* prepare pci_socket_t */
@@ -196,9 +196,9 @@ static void __devexit cardbus_remove (struct pci_dev *dev)
 	pci_socket_t *socket = pci_get_drvdata(dev);
 
 	/* note: we are already unregistered from the cs core */
+	class_device_unregister(&socket->cls_d.class_dev);
 	if (socket->op && socket->op->close)
 		socket->op->close(socket);
-	class_device_unregister(&socket->cls_d.class_dev);
 	pci_set_drvdata(dev, NULL);
 }
 

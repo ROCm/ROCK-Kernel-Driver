@@ -393,7 +393,7 @@ net2280_free_request (struct usb_ep *_ep, struct usb_request *_req)
 	struct net2280_request	*req;
 
 	ep = container_of (_ep, struct net2280_ep, ep);
-	if (!ep || !_req)
+	if (!_ep || !_req)
 		return;
 
 	req = container_of (_req, struct net2280_request, req);
@@ -442,7 +442,7 @@ net2280_alloc_buffer (
 	struct net2280_ep	*ep;
 
 	ep = container_of (_ep, struct net2280_ep, ep);
-	if (!ep || (!ep->desc && ep->num != 0))
+	if (!_ep || (!ep->desc && ep->num != 0))
 		return 0;
 
 	*dma = DMA_ADDR_INVALID;
@@ -561,16 +561,12 @@ static void out_flush (struct net2280_ep *ep)
 	writel ((1 << FIFO_FLUSH), statp);
 	mb ();
 	tmp = readl (statp);
-	if (tmp & (1 << DATA_OUT_PING_TOKEN_INTERRUPT)) {
+	if (tmp & (1 << DATA_OUT_PING_TOKEN_INTERRUPT)
+			/* high speed did bulk NYET; fifo isn't filling */
+			&& ep->dev->gadget.speed == USB_SPEED_FULL) {
 		unsigned	usec;
 
-		if (ep->dev->gadget.speed == USB_SPEED_HIGH) {
-			if (ep->ep.maxpacket <= 512)
-				usec = 10;	/* 512 byte bulk */
-			else
-				usec = 21;	/* 1024 byte interrupt */
-		} else
-			usec = 50;		/* 64 byte bulk/interrupt */
+		usec = 50;		/* 64 byte bulk/interrupt */
 		handshake (statp, (1 << USB_OUT_PING_NAK_SENT),
 				(1 << USB_OUT_PING_NAK_SENT), usec);
 		/* NAK done; now CLEAR_NAK_OUT_PACKETS is safe */
@@ -614,15 +610,13 @@ read_fifo (struct net2280_ep *ep, struct net2280_request *req)
 	count = readl (&regs->ep_avail);
 	tmp = req->req.length - req->req.actual;
 	if (count > tmp) {
-		unsigned	over = tmp % ep->ep.maxpacket;
-
-		/* FIXME handle this consistently between PIO and DMA */
-		if (over) {
+		/* as with DMA, data overflow gets flushed */
+		if ((tmp % ep->ep.maxpacket) != 0) {
 			ERROR (ep->dev,
-				"%s out fifo %d bytes, over %d extra %d\n",
-				ep->ep.name, count, over, count - tmp);
+				"%s out fifo %d bytes, expected %d\n",
+				ep->ep.name, count, tmp);
 			req->req.status = -EOVERFLOW;
-			tmp -= over;
+			cleanup = 1;
 		}
 		count = tmp;
 	}
@@ -670,10 +664,12 @@ fill_dma_desc (struct net2280_ep *ep, struct net2280_request *req, int valid)
 
 	/* don't let DMA continue after a short OUT packet,
 	 * so overruns can't affect the next transfer.
+	 * in case of overruns on max-size packets, we can't
+	 * stop the fifo from filling but we can flush it.
 	 */
 	if (ep->is_in)
 		dmacount |= (1 << DMA_DIRECTION);
-	else if ((dmacount % ep->ep.maxpacket) != 0)
+	else
 		dmacount |= (1 << END_OF_CHAIN);
 
 	req->valid = valid;
@@ -897,8 +893,12 @@ net2280_queue (struct usb_ep *_ep, struct usb_request *_req, int gfp_flags)
 			start_dma (ep, req);
 		else {
 			/* maybe there's no control data, just status ack */
-			if (ep->num == 0 && _req->length == 0)
+			if (ep->num == 0 && _req->length == 0) {
+				allow_status (ep);
+				done (ep, req, 0);
+				VDEBUG (dev, "%s status ack\n", ep->ep.name);
 				goto done;
+			}
 
 			/* PIO ... stuff the fifo, or unblock it.  */
 			if (ep->is_in)
@@ -948,10 +948,9 @@ net2280_queue (struct usb_ep *_ep, struct usb_request *_req, int gfp_flags)
 
 	} /* else the irq handler advances the queue. */
 
-	if (req) {
-done:
+	if (req)
 		list_add_tail (&req->queue, &ep->queue);
-	}
+done:
 	spin_unlock_irqrestore (&dev->lock, flags);
 
 	/* pci writes may still be posted */
@@ -992,6 +991,8 @@ static void scan_dma_completions (struct net2280_ep *ep)
 		/* SHORT_PACKET_TRANSFERRED_INTERRUPT handles "usb-short"
 		 * packets, including overruns, even when the transfer was
 		 * exactly the length requested (dmacount now zero).
+		 * FIXME there's an overrun case here too, where we expect
+		 * a short packet but receive a max length one (won't NAK).
 		 */
 		if (!ep->is_in && (req->req.length % ep->ep.maxpacket) != 0) {
 			req->dma_done = 1;
@@ -1186,7 +1187,8 @@ net2280_set_halt (struct usb_ep *_ep, int value)
 		return -EINVAL;
 	if (!ep->dev->driver || ep->dev->gadget.speed == USB_SPEED_UNKNOWN)
 		return -ESHUTDOWN;
-	if ((ep->desc->bmAttributes & 0x03) == USB_ENDPOINT_XFER_ISOC)
+	if (ep->desc /* not ep0 */ && (ep->desc->bmAttributes & 0x03)
+						== USB_ENDPOINT_XFER_ISOC)
 		return -EINVAL;
 
 	VDEBUG (ep->dev, "%s %s halt\n", _ep->name, value ? "set" : "clear");
@@ -1712,7 +1714,7 @@ static void usb_reinit (struct net2280 *dev)
 
 static void ep0_start (struct net2280 *dev)
 {
-	writel (  (1 << SET_EP_HIDE_STATUS_PHASE)
+	writel (  (1 << CLEAR_EP_HIDE_STATUS_PHASE)
 		| (1 << CLEAR_NAK_OUT_PACKETS)
 		| (1 << CLEAR_CONTROL_STATUS_PHASE_HANDSHAKE)
 		, &dev->epregs [0].ep_rsp);
@@ -1916,22 +1918,27 @@ static void handle_ep_small (struct net2280_ep *ep)
 		if (ep->is_in) {
 			/* status; stop NAKing */
 			if (t & (1 << DATA_OUT_PING_TOKEN_INTERRUPT)) {
-				if (ep->dev->protocol_stall)
+				if (ep->dev->protocol_stall) {
+					ep->stopped = 1;
 					set_halt (ep);
+				}
 				mode = 2;
-			/* reply to extra IN tokens with a zlp */
+			/* reply to extra IN data tokens with a zlp */
 			} else if (t & (1 << DATA_IN_TOKEN_INTERRUPT)) {
 				if (ep->dev->protocol_stall) {
+					ep->stopped = 1;
 					set_halt (ep);
 					mode = 2;
-				} else if (!req)
+				} else if (!req && ep->stopped)
 					write_fifo (ep, 0);
 			}
 		} else {
 			/* status; stop NAKing */
 			if (t & (1 << DATA_IN_TOKEN_INTERRUPT)) {
-				if (ep->dev->protocol_stall)
+				if (ep->dev->protocol_stall) {
+					ep->stopped = 1;
 					set_halt (ep);
+				}
 				mode = 2;
 			/* an extra OUT token is an error */
 			} else if (((t & (1 << DATA_OUT_PING_TOKEN_INTERRUPT))
@@ -2031,6 +2038,10 @@ static void handle_ep_small (struct net2280_ep *ep)
 
 		/* maybe advance queue to next request */
 		if (ep->num == 0) {
+			/* FIXME need mechanism (request flag?) so control OUT
+			 * can decide to stall ep0 after that done() returns,
+			 * from non-irq context
+			 */
 			allow_status (ep);
 			req = 0;
 		} else {
@@ -2171,6 +2182,7 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 			struct net2280_ep	*e;
 			u16			status;
 
+			/* hw handles device and interface status */
 			if (u.r.bRequestType != (USB_DIR_IN|USB_RECIP_ENDPOINT))
 				goto delegate;
 			if ((e = get_ep_by_addr (dev, u.r.wIndex)) == 0
@@ -2188,12 +2200,14 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 			set_fifo_bytecount (ep, u.r.wLength);
 			writel (status, &dev->epregs [0].ep_data);
 			allow_status (ep);
+			VDEBUG (dev, "%s stat %02x\n", ep->ep.name, status);
 			goto next_endpoints;
 			}
 			break;
 		case USB_REQ_CLEAR_FEATURE: {
 			struct net2280_ep	*e;
 
+			/* hw handles device features */
 			if (u.r.bRequestType != USB_RECIP_ENDPOINT)
 				goto delegate;
 			if (u.r.wIndex != 0 /* HALT feature */
@@ -2202,11 +2216,15 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 			if ((e = get_ep_by_addr (dev, u.r.wIndex)) == 0)
 				goto do_stall;
 			clear_halt (e);
+			allow_status (ep);
+			VDEBUG (dev, "%s clear halt\n", ep->ep.name);
+			goto next_endpoints;
 			}
 			break;
 		case USB_REQ_SET_FEATURE: {
 			struct net2280_ep	*e;
 
+			/* hw handles device features */
 			if (u.r.bRequestType != USB_RECIP_ENDPOINT)
 				goto delegate;
 			if (u.r.wIndex != 0 /* HALT feature */
@@ -2215,6 +2233,9 @@ static void handle_stat0_irqs (struct net2280 *dev, u32 stat)
 			if ((e = get_ep_by_addr (dev, u.r.wIndex)) == 0)
 				goto do_stall;
 			set_halt (e);
+			allow_status (ep);
+			VDEBUG (dev, "%s set halt\n", ep->ep.name);
+			goto next_endpoints;
 			}
 			break;
 		default:
@@ -2235,23 +2256,12 @@ do_stall:
 			VDEBUG (dev, "req %02x.%02x protocol STALL; stat %d\n",
 					u.r.bRequestType, u.r.bRequest, tmp);
 			dev->protocol_stall = 1;
-
-		/* when there's no data, queueing a response is optional */
-		} else if (list_empty (&ep->queue)) {
-			if (u.r.wLength == 0) {
-				/* done() not possible/requested */
-				allow_status (ep);
-			} else {
-				DEBUG (dev, "req %02x.%02x v%04x "
-					"gadget error, len %d, stat %d\n",
-					u.r.bRequestType, u.r.bRequest,
-					le16_to_cpu (u.r.wValue),
-					u.r.wLength, tmp);
-				dev->protocol_stall = 1;
-			}
 		}
 
-		/* some in/out token irq should follow; maybe stall then. */
+		/* some in/out token irq should follow; maybe stall then.
+		 * driver must queue a request (even zlp) or halt ep0
+		 * before the host times out.
+		 */
 	}
 
 next_endpoints:
@@ -2642,7 +2652,7 @@ done:
 
 /*-------------------------------------------------------------------------*/
 
-static const struct pci_device_id __devinitdata pci_ids [] = { {
+static struct pci_device_id __devinitdata pci_ids [] = { {
 	.class = 	((PCI_CLASS_SERIAL_USB << 8) | 0xfe),
 	.class_mask = 	~0,
 	.vendor =	0x17cc,

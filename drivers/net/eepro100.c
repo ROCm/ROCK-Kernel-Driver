@@ -678,6 +678,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	}
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	if (dev->mem_start > 0)
 		option = dev->mem_start;
@@ -829,6 +830,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	pci_set_power_state(pdev, acpi_idle_state);
 
 	pci_set_drvdata (pdev, dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	dev->irq = pdev->irq;
 

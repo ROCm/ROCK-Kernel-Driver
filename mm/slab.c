@@ -116,10 +116,12 @@
 # define CREATE_MASK	(SLAB_DEBUG_INITIAL | SLAB_RED_ZONE | \
 			 SLAB_POISON | SLAB_HWCACHE_ALIGN | \
 			 SLAB_NO_REAP | SLAB_CACHE_DMA | \
-			 SLAB_MUST_HWCACHE_ALIGN | SLAB_STORE_USER)
+			 SLAB_MUST_HWCACHE_ALIGN | SLAB_STORE_USER | \
+			 SLAB_RECLAIM_ACCOUNT )
 #else
 # define CREATE_MASK	(SLAB_HWCACHE_ALIGN | SLAB_NO_REAP | \
-			 SLAB_CACHE_DMA | SLAB_MUST_HWCACHE_ALIGN)
+			 SLAB_CACHE_DMA | SLAB_MUST_HWCACHE_ALIGN | \
+			 SLAB_RECLAIM_ACCOUNT)
 #endif
 
 /*
@@ -418,6 +420,14 @@ static kmem_cache_t cache_cache = {
 static struct semaphore	cache_chain_sem;
 
 struct list_head cache_chain;
+
+/*
+ * vm_enough_memory() looks at this to determine how many
+ * slab-allocated pages are possibly freeable under pressure
+ *
+ * SLAB_RECLAIM_ACCOUNT turns this on per-slab
+ */
+atomic_t slab_reclaim_pages;
 
 /*
  * chicken and egg problem: delay the per-cpu array allocation
@@ -720,6 +730,8 @@ static inline void * kmem_getpages (kmem_cache_t *cachep, unsigned long flags)
 	 * would be relatively rare and ignorable.
 	 */
 	flags |= cachep->gfpflags;
+	if ( cachep->flags & SLAB_RECLAIM_ACCOUNT) 
+		atomic_add(1<<cachep->gfporder, &slab_reclaim_pages);
 	addr = (void*) __get_free_pages(flags, cachep->gfporder);
 	/* Assume that now we have the pages no one else can legally
 	 * messes with the 'struct page's.
@@ -750,6 +762,8 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 	if (current->reclaim_state)
 		current->reclaim_state->reclaimed_slab += nr_freed;
 	free_pages((unsigned long)addr, cachep->gfporder);
+	if (cachep->flags & SLAB_RECLAIM_ACCOUNT) 
+		atomic_sub(1<<cachep->gfporder, &slab_reclaim_pages);
 }
 
 #if DEBUG

@@ -10,6 +10,7 @@
 
 #include <linux/netfilter_bridge/ebtables.h>
 #include <linux/module.h>
+
 #define NAT_VALID_HOOKS ((1 << NF_BR_PRE_ROUTING) | (1 << NF_BR_LOCAL_OUT) | \
    (1 << NF_BR_POST_ROUTING))
 
@@ -104,7 +105,7 @@ static int __init init(void)
 	ret = ebt_register_table(&frame_nat);
 	if (ret < 0)
 		return ret;
-	for (i = 0; i < sizeof(ebt_ops_nat) / sizeof(ebt_ops_nat[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(ebt_ops_nat); i++)
 		if ((ret = nf_register_hook(&ebt_ops_nat[i])) < 0)
 			goto cleanup;
 	return ret;
@@ -119,7 +120,7 @@ static void __exit fini(void)
 {
 	int i;
 
-	for (i = 0; i < sizeof(ebt_ops_nat) / sizeof(ebt_ops_nat[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(ebt_ops_nat); i++)
 		nf_unregister_hook(&ebt_ops_nat[i]);
 	ebt_unregister_table(&frame_nat);
 }

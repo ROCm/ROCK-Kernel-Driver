@@ -2993,12 +2993,6 @@ static int ide_cdrom_prep_fs(request_queue_t *q, struct request *rq)
 	long block = (long)rq->hard_sector / (hard_sect >> 9);
 	unsigned long blocks = rq->hard_nr_sectors / (hard_sect >> 9);
 
-	BUG_ON(sizeof(rq->hard_sector) > 4 && (rq->hard_sector >> 32));
-
-	if (rq->hard_nr_sectors != rq->nr_sectors) {
-		printk(KERN_ERR "ide-cd: hard_nr_sectors differs from nr_sectors! %lu %lu\n",
-				rq->nr_sectors, rq->hard_nr_sectors);
-	}
 	memset(rq->cmd, 0, sizeof(rq->cmd));
 
 	if (rq_data_dir(rq) == READ)

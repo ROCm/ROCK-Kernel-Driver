@@ -20,27 +20,15 @@
  */
 
 #include <linux/config.h>
-#include <linux/buffer_head.h>		/* for invalidate_bdev() */
-
-#ifdef CONFIG_BLK_DEV_IDE
-#include <linux/hdreg.h>
-#include <linux/ide.h>	/* IDE xlate */
-#elif defined(CONFIG_BLK_DEV_IDE_MODULE)
-#include <linux/module.h>
-
-int (*ide_xlate_1024_hook)(struct block_device *, int, int, const char *);
-EXPORT_SYMBOL(ide_xlate_1024_hook);
-#define ide_xlate_1024 ide_xlate_1024_hook
-#endif
 
 #include "check.h"
 #include "msdos.h"
 #include "efi.h"
 
 /*
- * Many architectures don't like unaligned accesses, which is
- * frequently the case with the nr_sects and start_sect partition
- * table entries.
+ * Many architectures don't like unaligned accesses, while
+ * the nr_sects and start_sect partition table entries are
+ * at a 2 (mod 4) address.
  */
 #include <asm/unaligned.h>
 

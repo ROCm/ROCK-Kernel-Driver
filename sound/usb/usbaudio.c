@@ -2392,8 +2392,7 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 		len = 0;
 	if (len <= 0) {
  		if (quirk && quirk->product_name) {
-			strncpy(card->shortname, quirk->product_name, sizeof(card->shortname) - 1);
-			card->shortname[sizeof(card->shortname) - 1] = '\0';
+			strlcpy(card->shortname, quirk->product_name, sizeof(card->shortname));
 		} else {
 			sprintf(card->shortname, "USB Device %#04x:%#04x",
 				dev->descriptor.idVendor, dev->descriptor.idProduct);
@@ -2403,37 +2402,32 @@ static int snd_usb_audio_create(snd_card_t *card, struct usb_device *dev,
 	/* retrieve the vendor and device strings as longname */
 	if (dev->descriptor.iManufacturer)
 		len = usb_string(dev, dev->descriptor.iManufacturer,
-				 card->longname, sizeof(card->longname) - 1);
+				 card->longname, sizeof(card->longname));
 	else
 		len = 0;
 	if (len <= 0) {
 		if (quirk && quirk->vendor_name) {
-			strncpy(card->longname, quirk->vendor_name, sizeof(card->longname) - 2);
-			card->longname[sizeof(card->longname) - 2] = '\0';
-			len = strlen(card->longname);
+			len = strlcpy(card->longname, quirk->vendor_name, sizeof(card->longname));
 		} else {
 			len = 0;
 		}
 	}
-	if (len > 0) {
-		card->longname[len] = ' ';
-		len++;
-	}
-	card->longname[len] = '\0';
+	if (len > 0)
+		strlcat(card->longname, ' ', sizeof(card->longname));
+
+	len = strlen(card->longname);
+
 	if ((!dev->descriptor.iProduct
 	     || usb_string(dev, dev->descriptor.iProduct,
 			   card->longname + len, sizeof(card->longname) - len) <= 0)
 	    && quirk && quirk->product_name) {
-		strncpy(card->longname + len, quirk->product_name, sizeof(card->longname) - len - 1);
-		card->longname[sizeof(card->longname) - 1] = '\0';
+		strlcat(card->longname, quirk->product_name, sizeof(card->longname));
 	}
-	/* add device path to longname */
-	len = strlen(card->longname);
-	if (sizeof(card->longname) - len > 10) {
-		strcpy(card->longname + len, " at ");
-		len += 4;
+
+	len = strlcat(card->longname, " at ", sizeof(card->longname));
+
+	if (len < sizeof(card->longname))
 		usb_make_path(dev, card->longname + len, sizeof(card->longname) - len);
-	}
 
 	*rchip = chip;
 	return 0;

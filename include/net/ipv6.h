@@ -334,8 +334,7 @@ extern void			ip6_flush_pending_frames(struct sock *sk);
 
 extern int			ip6_dst_lookup(struct sock *sk,
 					       struct dst_entry **dst,
-					       struct flowi *fl,
-					       struct in6_addr **saddr);
+					       struct flowi *fl);
 
 /*
  *	skb processing functions

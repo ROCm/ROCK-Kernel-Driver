@@ -71,10 +71,10 @@ struct cycx_device {
 };
 
 /* Public Functions */
-void cyclomx_set_state(struct cycx_device *card, int state);
+void cycx_set_state(struct cycx_device *card, int state);
 
 #ifdef CONFIG_CYCLOMX_X25
-int cyx_init(struct cycx_device *card, wandev_conf_t *conf);
+int cycx_x25_wan_init(struct cycx_device *card, wandev_conf_t *conf);
 #endif
 #endif	/* __KERNEL__ */
 #endif	/* _CYCLOMX_H */

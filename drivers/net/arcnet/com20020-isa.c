@@ -54,10 +54,6 @@ static int __init com20020isa_probe(struct net_device *dev)
 	unsigned long airqmask;
 	struct arcnet_local *lp = dev->priv;
 
-#ifndef MODULE
-	arcnet_init();
-#endif
-
 	BUGLVL(D_NORMAL) printk(VERSION);
 
 	ioaddr = dev->base_addr;

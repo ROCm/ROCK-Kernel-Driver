@@ -9,9 +9,9 @@
 
 static unsigned int
 target(struct sk_buff **pskb,
-       unsigned int hooknum,
        const struct net_device *in,
        const struct net_device *out,
+       unsigned int hooknum,
        const void *targinfo,
        void *userinfo)
 {

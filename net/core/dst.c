@@ -123,6 +123,7 @@ void * dst_alloc(struct dst_ops * ops)
 	if (!dst)
 		return NULL;
 	memset(dst, 0, ops->entry_size);
+	atomic_set(&dst->__refcnt, 0);
 	dst->ops = ops;
 	dst->lastuse = jiffies;
 	dst->path = dst;

@@ -456,29 +456,17 @@ static void check_conf(struct menu *menu)
 		return;
 
 	sym = menu->sym;
-	if (!sym)
-		goto conf_childs;
-
-	if (sym_is_choice(sym)) {
-		if (!sym_has_value(sym)) {
+	if (sym) {
+		if (sym_is_changable(sym) && !sym_has_value(sym)) {
 			if (!conf_cnt++)
 				printf("*\n* Restart config...\n*\n");
 			rootEntry = menu_get_parent_menu(menu);
 			conf(rootEntry);
 		}
-		if (sym_get_tristate_value(sym) != mod)
+		if (sym_is_choice(sym) && sym_get_tristate_value(sym) != mod)
 			return;
-		goto conf_childs;
 	}
 
-	if (!sym_has_value(sym)) {
-		if (!conf_cnt++)
-			printf("*\n* Restart config...\n*\n");
-		rootEntry = menu_get_parent_menu(menu);
-		conf(rootEntry);
-	}
-
-conf_childs:
 	for (child = menu->list; child; child = child->next)
 		check_conf(child);
 }

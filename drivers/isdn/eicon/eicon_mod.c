@@ -834,7 +834,7 @@ eicon_alloccard(int Type, int membase, int irq, char *id, int card_id)
 		tasklet_init(&card->snd_tq, eicon_transmit, (unsigned long)card);
 		tasklet_init(&card->rcv_tq, eicon_rcv_dispatch, (unsigned long)card);
 		tasklet_init(&card->ack_tq, eicon_ack_dispatch, (unsigned long)card);
-		SET_MODULE_OWNER(&card->interface);
+		card->interface.owner = THIS_MODULE;
 		card->interface.maxbufsize = 4000;
 		card->interface.command = if_command;
 		card->interface.writebuf_skb = if_sendbuf;
@@ -848,7 +848,7 @@ eicon_alloccard(int Type, int membase, int irq, char *id, int card_id)
 			ISDN_FEATURE_P_UNKNOWN;
 		card->interface.hl_hdrlen = 20;
 		card->ptype = ISDN_PTYPE_UNKNOWN;
-		strncpy(card->interface.id, id, sizeof(card->interface.id) - 1);
+		strlcpy(card->interface.id, id, sizeof(card->interface.id));
 		card->myid = -1;
 		card->type = Type;
 		switch (Type) {

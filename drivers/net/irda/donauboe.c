@@ -1051,7 +1051,9 @@ toshoboe_hard_xmit (struct sk_buff *skb, struct net_device *dev)
 
   toshoboe_checkstuck (self);
 
-  /* Check if we need to change the speed */
+  dev->trans_start = jiffies;
+
+ /* Check if we need to change the speed */
   /* But not now. Wait after transmission if mtt not required */
   speed=irda_get_next_speed(skb);
   if ((speed != self->io.speed) && (speed != -1))

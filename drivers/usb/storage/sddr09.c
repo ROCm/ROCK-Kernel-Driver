@@ -1562,8 +1562,10 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 			  "sending" : "receiving",
 			  srb->request_bufflen);
 
-		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
-							srb->request_bufflen);
+		result = usb_stor_bulk_transfer_sg(us, pipe,
+					srb->request_buffer,
+					srb->request_bufflen,
+					srb->use_sg, &srb->resid);
 
 		return (result == USB_STOR_XFER_GOOD ?
 			USB_STOR_TRANSPORT_GOOD : USB_STOR_TRANSPORT_ERROR);

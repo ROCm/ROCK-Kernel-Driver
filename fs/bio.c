@@ -33,6 +33,13 @@ static kmem_cache_t *bio_slab;
 
 #define BIOVEC_NR_POOLS 6
 
+/*
+ * a small number of entries is fine, not going to be performance critical.
+ * basically we just need to survive
+ */
+#define BIO_SPLIT_ENTRIES 8	
+mempool_t *bio_split_pool;
+
 struct biovec_pool {
 	int nr_vecs;
 	char *name; 
@@ -734,6 +741,91 @@ void bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 		bio->bi_end_io(bio, bytes_done, error);
 }
 
+void bio_pair_release(struct bio_pair *bp)
+{
+	if (atomic_dec_and_test(&bp->cnt)) {
+		struct bio *master = bp->bio1.bi_private;
+
+		bio_endio(master, master->bi_size, bp->error);
+		mempool_free(bp, bp->bio2.bi_private);
+	}
+}
+
+static int bio_pair_end_1(struct bio * bi, unsigned int done, int err)
+{
+	struct bio_pair *bp = container_of(bi, struct bio_pair, bio1);
+
+	if (bi->bi_size)
+		return 1;
+	if (err)
+		bp->error = err;
+
+	bio_pair_release(bp);
+	return 0;
+}
+
+static int bio_pair_end_2(struct bio * bi, unsigned int done, int err)
+{
+	struct bio_pair *bp = container_of(bi, struct bio_pair, bio2);
+
+	if (bi->bi_size)
+		return 1;
+	if (err)
+		bp->error = err;
+
+	bio_pair_release(bp);
+	return 0;
+}
+
+/*
+ * split a bio - only worry about a bio with a single page
+ * in it's iovec
+ */
+struct bio_pair *bio_split(struct bio *bi, mempool_t *pool, int first_sectors)
+{
+	struct bio_pair *bp = mempool_alloc(pool, GFP_NOIO);
+
+	if (!bp)
+		return bp;
+
+	BUG_ON(bi->bi_vcnt != 1);
+	BUG_ON(bi->bi_idx != 0);
+	atomic_set(&bp->cnt, 3);
+	bp->error = 0;
+	bp->bio1 = *bi;
+	bp->bio2 = *bi;
+	bp->bio2.bi_sector += first_sectors;
+	bp->bio2.bi_size -= first_sectors << 9;
+	bp->bio1.bi_size = first_sectors << 9;
+
+	bp->bv1 = bi->bi_io_vec[0];
+	bp->bv2 = bi->bi_io_vec[0];
+	bp->bv2.bv_offset += first_sectors << 9;
+	bp->bv2.bv_len -= first_sectors << 9;
+	bp->bv1.bv_len = first_sectors << 9;
+
+	bp->bio1.bi_io_vec = &bp->bv1;
+	bp->bio2.bi_io_vec = &bp->bv2;
+
+	bp->bio1.bi_end_io = bio_pair_end_1;
+	bp->bio2.bi_end_io = bio_pair_end_2;
+
+	bp->bio1.bi_private = bi;
+	bp->bio2.bi_private = pool;
+
+	return bp;
+}
+
+static void *bio_pair_alloc(int gfp_flags, void *data)
+{
+	return kmalloc(sizeof(struct bio_pair), gfp_flags);
+}
+
+static void bio_pair_free(void *bp, void *data)
+{
+	kfree(bp);
+}
+
 static void __init biovec_init_pools(void)
 {
 	int i, size, megabytes, pool_entries = BIO_POOL_SIZE;
@@ -800,6 +892,10 @@ static int __init init_bio(void)
 
 	biovec_init_pools();
 
+	bio_split_pool = mempool_create(BIO_SPLIT_ENTRIES, bio_pair_alloc, bio_pair_free, NULL);
+	if (!bio_split_pool)
+		panic("bio: can't create split pool\n");
+
 	return 0;
 }
 
@@ -818,3 +914,6 @@ EXPORT_SYMBOL(bio_add_page);
 EXPORT_SYMBOL(bio_get_nr_vecs);
 EXPORT_SYMBOL(bio_map_user);
 EXPORT_SYMBOL(bio_unmap_user);
+EXPORT_SYMBOL(bio_pair_release);
+EXPORT_SYMBOL(bio_split);
+EXPORT_SYMBOL(bio_split_pool);

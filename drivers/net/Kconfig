@@ -1870,7 +1870,7 @@ config 68360_ENET
 
 config FEC
 	bool "FEC ethernet controller (of ColdFire 5272)"
-	depends on M5272
+	depends on M5272 || M5282
 	help
 	  Say Y here if you want to use the built-in 10/100 Fast ethernet
 	  controller on the Motorola ColdFire 5272 processor.

@@ -98,7 +98,6 @@ static struct board_info boards[MAXBOARDS];
 /* ------------- Begin structures used for driver registeration ---------- */
 
 struct tty_driver pc_driver;
-struct tty_driver pc_callout;
 struct tty_driver pc_info;
 
 /* The below structures are used to initialize the tty_driver structures. */
@@ -562,9 +561,6 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
 			ch->normal_termios = *tty->termios;
 
-		if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE)
-			ch->callout_termios = *tty->termios;
-
 		tty->closing = 1;
 
 		if (ch->asyncflags & ASYNC_INITIALIZED) 
@@ -599,7 +595,7 @@ static void pc_close(struct tty_struct * tty, struct file * filp)
 		} /* End if blocked_open */
 
 		ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_INITIALIZED | 
-		                      ASYNC_CALLOUT_ACTIVE | ASYNC_CLOSING);
+		                      ASYNC_CLOSING);
 		wake_up_interruptible(&ch->close_wait);
 
 
@@ -693,7 +689,7 @@ static void pc_hangup(struct tty_struct *tty)
 		ch->event = 0;
 		ch->count = 0;
 		restore_flags(flags);
-		ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_INITIALIZED | ASYNC_CALLOUT_ACTIVE);
+		ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_INITIALIZED);
 		wake_up_interruptible(&ch->open_wait);
 
 	} /* End if ch != NULL */
@@ -1233,31 +1229,6 @@ static int block_til_ready(struct tty_struct *tty,
 			return -ERESTARTSYS;
 	}
 
-	/* ----------------------------------------------------------------- 
-	   If this is a callout device, then just make sure the normal
-	   device isn't being used.
-	-------------------------------------------------------------------- */
-
-	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) 
-	{ /* A cud device has been opened */
-		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-
-		if ((ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&
-		    (ch->asyncflags & ASYNC_SESSION_LOCKOUT) &&
-		    (ch->session != current->session))
-		    return -EBUSY;
-
-		if ((ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&
-		    (ch->asyncflags & ASYNC_PGRP_LOCKOUT) &&
-		    (ch->pgrp != current->pgrp))
-		    return -EBUSY;
- 
-		ch->asyncflags |= ASYNC_CALLOUT_ACTIVE;
-
-		return 0;
-	} /* End a cud device has been opened */
-
 	if (filp->f_flags & O_NONBLOCK) 
 	{
 		/* ----------------------------------------------------------------- 
@@ -1265,25 +1236,14 @@ static int block_til_ready(struct tty_struct *tty,
 	  	 and then exit.
 		-------------------------------------------------------------------- */
 
-		if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
-
 		ch->asyncflags |= ASYNC_NORMAL_ACTIVE;
 
 		return 0;
 	}
 
 
-	if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE) 
-	{
-		if (ch->normal_termios.c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
-	else 
-	{
-		if (tty->termios->c_cflag & CLOCAL)
-			do_clocal = 1;
-	}
+	if (tty->termios->c_cflag & CLOCAL)
+		do_clocal = 1;
 	
    /* Block waiting for the carrier detect and the line to become free */
 	
@@ -1317,7 +1277,6 @@ static int block_til_ready(struct tty_struct *tty,
 		}
 
 		if (!(ch->asyncflags & ASYNC_CLOSING) && 
-		    !(ch->asyncflags & ASYNC_CALLOUT_ACTIVE) &&
 			  (do_clocal || (ch->imodem & ch->dcd)))
 			break;
 
@@ -1453,14 +1412,8 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 	/* Should this be here except for SPLIT termios ? */
 	if (ch->count == 1) 
 	{
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = ch->normal_termios;
-		else 
-			*tty->termios = ch->callout_termios;
+		*tty->termios = ch->normal_termios;
 	}
-
-	ch->session = current->session;
-	ch->pgrp = current->pgrp;
 
 	save_flags(flags);
 	cli();
@@ -1558,7 +1511,6 @@ static void __exit epca_module_exit(void)
 	cli();
 
 	if ((tty_unregister_driver(&pc_driver)) ||  
-	    (tty_unregister_driver(&pc_callout)) ||
 	    (tty_unregister_driver(&pc_info)))
 	{
 		printk(KERN_WARNING "<Error> - DIGI : cleanup_module failed to un-register tty driver\n");
@@ -1701,7 +1653,6 @@ int __init pc_init(void)
 #endif /* ENABLE_PCI */
 
 	memset(&pc_driver, 0, sizeof(struct tty_driver));
-	memset(&pc_callout, 0, sizeof(struct tty_driver));
 	memset(&pc_info, 0, sizeof(struct tty_driver));
 
 	pc_driver.magic = TTY_DRIVER_MAGIC;
@@ -1747,13 +1698,6 @@ int __init pc_init(void)
 	pc_driver.throttle = pc_throttle;
 	pc_driver.unthrottle = pc_unthrottle;
 	pc_driver.hangup = pc_hangup;
-	pc_callout = pc_driver;
-
-	pc_callout.name = "cud";
-	pc_callout.major = DIGICU_MAJOR;
-	pc_callout.minor_start = 0;
-	pc_callout.init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
-	pc_callout.subtype = SERIAL_TYPE_CALLOUT;
 
 	pc_info = pc_driver;
 	pc_info.name = "digi_ctl";
@@ -1888,9 +1832,6 @@ int __init pc_init(void)
 
 	if (tty_register_driver(&pc_driver))
 		panic("Couldn't register Digi PC/ driver");
-
-	if (tty_register_driver(&pc_callout))
-		panic("Couldn't register Digi PC/ callout");
 
 	if (tty_register_driver(&pc_info))
 		panic("Couldn't register Digi PC/ info ");
@@ -2165,7 +2106,6 @@ static void post_fep_init(unsigned int crd)
 		ch->close_delay = 50;
 		ch->count = 0;
 		ch->blocked_open = 0;
-		ch->callout_termios = pc_callout.init_termios;
 		ch->normal_termios = pc_driver.init_termios;
 		init_waitqueue_head(&ch->open_wait);
 		init_waitqueue_head(&ch->close_wait);
@@ -2712,7 +2652,7 @@ static void epcaparam(struct tty_struct *tty, struct channel *ch)
 			the driver will wait on carrier detect.
 		------------------------------------------------------------------- */
 
-		if ((ts->c_cflag & CLOCAL) || (tty->driver->subtype == SERIAL_TYPE_CALLOUT))
+		if (ts->c_cflag & CLOCAL)
 		{ /* Begin it is a cud device or a ttyD device with CLOCAL on */
 			ch->asyncflags &= ~ASYNC_CHECK_CD;
 		} /* End it is a cud device or a ttyD device with CLOCAL on */
@@ -3406,7 +3346,7 @@ static void do_softint(void *private_)
 
 				tty_hangup(tty);	/* FIXME: module removal race here - AKPM */
 				wake_up_interruptible(&ch->open_wait);
-				ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE);
+				ch->asyncflags &= ~ASYNC_NORMAL_ACTIVE;
 
 			} /* End if clear_bit */
 		}

@@ -23,7 +23,6 @@
 #include <linux/mount.h>
 #include <asm/uaccess.h>
 
-extern struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
 extern int __init init_rootfs(void);
 extern int __init fs_subsys_init(void);
 
@@ -39,7 +38,7 @@ static inline unsigned long hash(struct vfsmount *mnt, struct dentry *dentry)
 	return tmp & hash_mask;
 }
 
-struct vfsmount *alloc_vfsmnt(char *name)
+struct vfsmount *alloc_vfsmnt(const char *name)
 {
 	struct vfsmount *mnt = kmem_cache_alloc(mnt_cache, GFP_KERNEL); 
 	if (mnt) {
@@ -63,8 +62,7 @@ struct vfsmount *alloc_vfsmnt(char *name)
 
 void free_vfsmnt(struct vfsmount *mnt)
 {
-	if (mnt->mnt_devname)
-		kfree(mnt->mnt_devname);
+	kfree(mnt->mnt_devname);
 	kmem_cache_free(mnt_cache, mnt);
 }
 
@@ -211,19 +209,10 @@ static int show_vfsmnt(struct seq_file *m, void *v)
 		{ 0, NULL }
 	};
 	struct proc_fs_info *fs_infop;
-	char *path_buf, *path;
-
-	path_buf = (char *) __get_free_page(GFP_KERNEL);
-	if (!path_buf)
-		return -ENOMEM;
-	path = d_path(mnt->mnt_root, mnt, path_buf, PAGE_SIZE);
-	if (IS_ERR(path))
-		path = " (too long)";
 
 	mangle(m, mnt->mnt_devname ? mnt->mnt_devname : "none");
 	seq_putc(m, ' ');
-	mangle(m, path);
-	free_page((unsigned long) path_buf);
+	seq_path(m, mnt, mnt->mnt_root, " \t\n\\");
 	seq_putc(m, ' ');
 	mangle(m, mnt->mnt_sb->s_type->name);
 	seq_puts(m, mnt->mnt_sb->s_flags & MS_RDONLY ? " ro" : " rw");
@@ -495,9 +484,11 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 	if (err)
 		goto out_unlock;
 
+	err = -ENOENT;
 	spin_lock(&dcache_lock);
 	if (IS_ROOT(nd->dentry) || !d_unhashed(nd->dentry)) {
 		struct list_head head;
+
 		attach_mnt(mnt, nd);
 		list_add_tail(&head, &mnt->mnt_list);
 		list_splice(&head, current->namespace->list.prev);

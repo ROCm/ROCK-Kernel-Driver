@@ -1336,8 +1336,7 @@ int __init retz3fb_setup(char *options)
 			z3fb_inverse = 1;
 			fb_invert_cmaps();
 		} else if (!strncmp(this_opt, "font:", 5)) {
-			strncpy(fontname, this_opt+5, 39);
-			fontname[39] = '\0';
+			strlcpy(fontname, this_opt+5, sizeof(fontname));
 		} else
 			z3fb_mode = get_video_mode(this_opt);
 	}
@@ -1410,7 +1409,7 @@ int __init retz3fb_init(void)
 		fb_info->switch_con = &z3fb_switch;
 		fb_info->updatevar = &z3fb_updatevar;
 		fb_info->flags = FBINFO_FLAG_DEFAULT;
-		strncpy(fb_info->fontname, fontname, 40);
+		strlcpy(fb_info->fontname, fontname, sizeof(fb_info->fontname));
 
 		if (z3fb_mode == -1)
 			retz3fb_default = retz3fb_predefined[0].var;

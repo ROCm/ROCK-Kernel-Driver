@@ -913,7 +913,7 @@ eicon_alloccard(DESCRIPTOR *d)
 	skb_queue_head_init(&card->sackq);
 	skb_queue_head_init(&card->statq);
 	card->statq_entries = 0;
-	SET_MODULE_OWNER(&card->interface);
+	card->interface.owner = THIS_MODULE;
 	card->interface.maxbufsize = 4000;
 	card->interface.command = if_command;
 	card->interface.writebuf_skb = if_sendbuf;

@@ -1,5 +1,6 @@
 /*
- * AGPGART module version 0.100
+ * AGPGART backend specific includes. Not for userspace consumption.
+ *
  * Copyright (C) 2002-2003 Dave Jones
  * Copyright (C) 1999 Jeff Hartmann
  * Copyright (C) 1999 Precision Insight, Inc.
@@ -28,6 +29,8 @@
 #ifndef _AGP_BACKEND_H
 #define _AGP_BACKEND_H 1
 
+#ifdef __KERNEL__
+
 #ifndef TRUE
 #define TRUE 1
 #endif
@@ -46,7 +49,7 @@ struct agp_version {
 	u16 minor;
 };
 
-typedef struct _agp_kern_info {
+struct agp_kern_info {
 	struct agp_version version;
 	struct pci_dev *device;
 	enum chipset_type chipset;
@@ -58,7 +61,7 @@ typedef struct _agp_kern_info {
 	int cant_use_aperture;
 	unsigned long page_mask;
 	struct vm_operations_struct *vm_ops;
-} agp_kern_info;
+};
 
 /* 
  * The agp_memory structure has information about the block of agp memory
@@ -68,10 +71,10 @@ typedef struct _agp_kern_info {
  * the items to detrimine the status of this block of agp memory. 
  */
 
-typedef struct _agp_memory {
+struct agp_memory {
 	int key;
-	struct _agp_memory *next;
-	struct _agp_memory *prev;
+	struct agp_memory *next;
+	struct agp_memory *prev;
 	size_t page_count;
 	int num_scratch_pages;
 	unsigned long *memory;
@@ -80,15 +83,15 @@ typedef struct _agp_memory {
 	u32 physical;
 	u8 is_bound;
 	u8 is_flushed;
-} agp_memory;
+};
 
 #define AGP_NORMAL_MEMORY 0
 
-extern void agp_free_memory(agp_memory *);
-extern agp_memory *agp_allocate_memory(size_t, u32);
-extern int agp_copy_info(agp_kern_info *);
-extern int agp_bind_memory(agp_memory *, off_t);
-extern int agp_unbind_memory(agp_memory *);
+extern void agp_free_memory(struct agp_memory *);
+extern struct agp_memory *agp_allocate_memory(size_t, u32);
+extern int agp_copy_info(struct agp_kern_info *);
+extern int agp_bind_memory(struct agp_memory *, off_t);
+extern int agp_unbind_memory(struct agp_memory *);
 extern void agp_enable(u32);
 extern int agp_backend_acquire(void);
 extern void agp_backend_release(void);
@@ -99,16 +102,17 @@ extern void agp_backend_release(void);
  * use it.  Keith Owens <kaos@ocs.com.au> 28 Oct 2000.
  */
 typedef struct {
-	void       (*free_memory)(agp_memory *);
-	agp_memory *(*allocate_memory)(size_t, u32);
-	int        (*bind_memory)(agp_memory *, off_t);
-	int        (*unbind_memory)(agp_memory *);
-	void       (*enable)(u32);
-	int        (*acquire)(void);
-	void       (*release)(void);
-	int        (*copy_info)(agp_kern_info *);
+	void			(*free_memory)(struct agp_memory *);
+	struct agp_memory *	(*allocate_memory)(size_t, u32);
+	int			(*bind_memory)(struct agp_memory *, off_t);
+	int			(*unbind_memory)(struct agp_memory *);
+	void			(*enable)(u32);
+	int			(*acquire)(void);
+	void			(*release)(void);
+	int			(*copy_info)(struct agp_kern_info *);
 } drm_agp_t;
 
 extern const drm_agp_t *drm_agp_p;
 
+#endif				/* __KERNEL__ */
 #endif				/* _AGP_BACKEND_H */

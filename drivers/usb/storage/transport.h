@@ -105,6 +105,8 @@ struct bulk_cs_wrap {
 
 #define US_BULK_CS_WRAP_LEN	13
 #define US_BULK_CS_SIGN		0x53425355	/* spells out 'USBS' */
+/* This is for Olympus Camedia digital cameras */
+#define US_BULK_CS_OLYMPUS_SIGN		0x55425355	/* spells out 'USBU' */
 #define US_BULK_STAT_OK		0
 #define US_BULK_STAT_FAIL	1
 #define US_BULK_STAT_PHASE	2
@@ -177,11 +179,5 @@ extern int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 		unsigned int *act_len);
 extern int usb_stor_bulk_transfer_sg(struct us_data *us, unsigned int pipe,
 		void *buf, unsigned int length, int use_sg, int *residual);
-
-static __inline__ int usb_stor_bulk_transfer_srb(struct us_data *us,
-		unsigned int pipe, Scsi_Cmnd *srb, unsigned int length) {
-	return usb_stor_bulk_transfer_sg(us, pipe, srb->request_buffer,
-			length, srb->use_sg, &srb->resid);
-}
 
 #endif

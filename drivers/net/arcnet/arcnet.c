@@ -106,13 +106,15 @@ static int arcnet_rebuild_header(struct sk_buff *skb);
 static struct net_device_stats *arcnet_get_stats(struct net_device *dev);
 static int go_tx(struct net_device *dev);
 
-void __init arcnet_init(void)
+static int debug = ARCNET_DEBUG;
+MODULE_PARM(debug, "i");
+MODULE_LICENSE("GPL");
+
+static int __init arcnet_init(void)
 {
-	static int arcnet_inited;
 	int count;
 
-	if (arcnet_inited++)
-		return;
+	arcnet_debug = debug;
 
 	printk(VERSION);
 
@@ -138,47 +140,15 @@ void __init arcnet_init(void)
 		sizeof(struct arc_rfc1051), sizeof(struct arc_eth_encap),
 		   sizeof(struct archdr));
 
-#ifdef CONFIG_ARCNET		/* We're not built as a module */
-	printk("arcnet: Available protocols:");
-#ifdef CONFIG_ARCNET_1201
-	printk(" RFC1201");
-	arcnet_rfc1201_init();
-#endif
-#ifdef CONFIG_ARCNET_1051
-	printk(" RFC1051");
-	arcnet_rfc1051_init();
-#endif
-#ifdef CONFIG_ARCNET_RAW
-	printk(" RAW");
-	arcnet_raw_init();
-#endif
-	printk("\n");
-#ifdef CONFIG_ARCNET_COM90xx
-	com90xx_probe(NULL);
-#endif
-#endif
-}
-
-
-#ifdef MODULE
-
-static int debug = ARCNET_DEBUG;
-MODULE_PARM(debug, "i");
-MODULE_LICENSE("GPL");
-
-int __init init_module(void)
-{
-	arcnet_debug = debug;
-	arcnet_init();
 	return 0;
 }
 
-void cleanup_module(void)
+static void __exit arcnet_exit(void)
 {
 }
 
-#endif
-
+module_init(arcnet_init);
+module_exit(arcnet_exit);
 
 /*
  * Dump the contents of an sk_buff
@@ -701,7 +671,7 @@ static void arcnet_timeout(struct net_device *dev)
  * interrupts. Establish which device needs attention, and call the correct
  * chipset interrupt handler.
  */
-void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct arcnet_local *lp;
@@ -726,7 +696,7 @@ void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			ACOMMAND(CFLAGScmd | RESETclear);
 		AINTMASK(0);
 		spin_unlock(&arcnet_lock);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	BUGMSG(D_DURING, "in arcnet_inthandler (status=%Xh, intmask=%Xh)\n",
@@ -894,6 +864,7 @@ void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	AINTMASK(lp->intmask);
 	
 	spin_unlock(&arcnet_lock);
+	return IRQ_RETVAL(didsomething);
 }
 
 

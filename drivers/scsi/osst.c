@@ -2227,8 +2227,7 @@ static int __osst_analyze_headers(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt, in
 	}
 	if (strncmp(header->ident_str, "ADR_SEQ", 7) != 0 &&
 	    strncmp(header->ident_str, "ADR-SEQ", 7) != 0) {
-		strncpy(id_string, header->ident_str, 7);
-		id_string[7] = 0;
+		strlcpy(id_string, header->ident_str, 8);
 #if DEBUG
 		printk(OSST_DEB_MSG "%s:D: Invalid header identification string %s\n", name, id_string);
 #endif

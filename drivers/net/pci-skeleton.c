@@ -610,6 +610,7 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	tp = dev->priv;
 
 	/* enable device (incl. PCI PM wakeup), and bus-mastering */

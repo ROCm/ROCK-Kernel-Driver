@@ -23,6 +23,7 @@
 #include <linux/version.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <sound/memalloc.h>
 

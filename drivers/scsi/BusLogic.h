@@ -56,7 +56,7 @@ extern int BusLogic_QueueCommand(SCSI_Command_T *,
 				 void (*CompletionRoutine)(SCSI_Command_T *));
 extern int BusLogic_BIOSDiskParameters(struct scsi_device *,
 		struct block_device *, sector_t, int *);
-extern int BusLogic_ProcDirectoryInfo(char *, char **, off_t, int, int, int);
+extern int BusLogic_ProcDirectoryInfo(struct Scsi_Host *, char *, char **, off_t, int, int);
 extern int BusLogic_SlaveConfigure(SCSI_Device_T *);
 
 #ifdef BusLogic_DriverVersion

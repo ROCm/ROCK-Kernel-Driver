@@ -253,9 +253,6 @@ struct device;
  * treatment, but (1) the default 80x24 is usually right and (2) it's
  * most often used by a windowing system, which will set the correct
  * size each time the window is created or resized anyway.
- * IMPORTANT: since this structure is dynamically allocated, it must
- * be no larger than 4096 bytes.  Changing TTY_FLIPBUF_SIZE will change
- * the size of this structure, and it needs to be done with care.
  * 						- TYT, 9/14/92
  */
 struct tty_struct {
@@ -345,7 +342,6 @@ struct tty_struct {
 extern void tty_write_flush(struct tty_struct *);
 
 extern struct termios tty_std_termios;
-extern struct tty_struct * redirect;
 extern struct tty_ldisc ldiscs[];
 extern int fg_console, last_console, want_console;
 

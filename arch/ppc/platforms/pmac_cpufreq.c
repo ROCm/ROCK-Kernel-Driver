@@ -330,7 +330,7 @@ out:
 	driver->setpolicy	= &pmac_cpufreq_setpolicy;
 	driver->init		= NULL;
 	driver->exit		= NULL;
-	strncpy(driver->name, "powermac", CPUFREQ_NAME_LEN);
+	strlcpy(driver->name, "powermac", sizeof(driver->name));
 
 	driver->policy[0].cpu				= 0;
 	driver->policy[0].cpuinfo.transition_latency	= CPUFREQ_ETERNAL;

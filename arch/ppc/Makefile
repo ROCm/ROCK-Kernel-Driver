@@ -11,10 +11,10 @@
 #
 
 # This must match PAGE_OFFSET in include/asm-ppc/page.h.
-KERNELLOAD	=$(CONFIG_KERNEL_START)
+KERNELLOAD	:= $(CONFIG_KERNEL_START)
 
 LDFLAGS_BLOB	:= --format binary --oformat elf32-powerpc
-LDFLAGS_vmlinux	= -Ttext $(KERNELLOAD) -Bstatic
+LDFLAGS_vmlinux	:= -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	+= -Iarch/$(ARCH)
 AFLAGS		+= -Iarch/$(ARCH)
 cflags-y	+= -Iarch/$(ARCH) -msoft-float -pipe \

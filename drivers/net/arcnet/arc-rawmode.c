@@ -53,9 +53,11 @@ struct ArcProto rawmode_proto =
 };
 
 
-void arcnet_raw_init(void)
+static int __init arcnet_raw_init(void)
 {
 	int count;
+
+	printk(VERSION);
 
 	for (count = 0; count < 256; count++)
 		if (arc_proto_map[count] == arc_proto_default)
@@ -66,26 +68,18 @@ void arcnet_raw_init(void)
 		arc_bcast_proto = &rawmode_proto;
 
 	arc_proto_default = &rawmode_proto;
-}
-
-
-#ifdef MODULE
-
-int __init init_module(void)
-{
-	printk(VERSION);
-	arcnet_raw_init();
 	return 0;
 }
 
-void cleanup_module(void)
+static void __exit arcnet_raw_exit(void)
 {
 	arcnet_unregister_proto(&rawmode_proto);
 }
 
-MODULE_LICENSE("GPL");
-#endif				/* MODULE */
+module_init(arcnet_raw_init);
+module_exit(arcnet_raw_exit);
 
+MODULE_LICENSE("GPL");
 
 
 /* packet receiver */

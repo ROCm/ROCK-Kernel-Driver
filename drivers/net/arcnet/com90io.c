@@ -151,10 +151,6 @@ static int __init com90io_probe(struct net_device *dev)
 	int ioaddr = dev->base_addr, status;
 	unsigned long airqmask;
 
-#ifndef MODULE
-	arcnet_init();
-#endif
-
 	BUGLVL(D_NORMAL) printk(VERSION);
 	BUGLVL(D_NORMAL) printk("E-mail me if you actually test this driver, please!\n");
 

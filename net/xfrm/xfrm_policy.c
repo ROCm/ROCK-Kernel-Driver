@@ -244,22 +244,34 @@ static u32 xfrm_gen_index(int dir)
 int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 {
 	struct xfrm_policy *pol, **p;
+	struct xfrm_policy *delpol = NULL;
+	struct xfrm_policy **newpos = NULL;
 
 	write_lock_bh(&xfrm_policy_lock);
 	for (p = &xfrm_policy_list[dir]; (pol=*p)!=NULL; p = &pol->next) {
-		if (memcmp(&policy->selector, &pol->selector, sizeof(pol->selector)) == 0) {
+		if (!delpol && memcmp(&policy->selector, &pol->selector, sizeof(pol->selector)) == 0) {
 			if (excl) {
 				write_unlock_bh(&xfrm_policy_lock);
 				return -EEXIST;
 			}
+			*p = pol->next;
+			delpol = pol;
+			if (policy->priority > pol->priority)
+				continue;
+		} else if (policy->priority >= pol->priority)
+			continue;
+		if (!newpos)
+			newpos = p;
+		if (delpol)
 			break;
-		}
 	}
+	if (newpos)
+		p = newpos;
 	xfrm_pol_hold(policy);
-	policy->next = pol ? pol->next : NULL;
+	policy->next = *p;
 	*p = policy;
 	atomic_inc(&flow_cache_genid);
-	policy->index = pol ? pol->index : xfrm_gen_index(dir);
+	policy->index = delpol ? delpol->index : xfrm_gen_index(dir);
 	policy->curlft.add_time = (unsigned long)xtime.tv_sec;
 	policy->curlft.use_time = 0;
 	if (policy->lft.hard_add_expires_seconds &&
@@ -267,10 +279,10 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 		xfrm_pol_hold(policy);
 	write_unlock_bh(&xfrm_policy_lock);
 
-	if (pol) {
-		atomic_dec(&pol->refcnt);
-		xfrm_policy_kill(pol);
-		xfrm_pol_put(pol);
+	if (delpol) {
+		atomic_dec(&delpol->refcnt);
+		xfrm_policy_kill(delpol);
+		xfrm_pol_put(delpol);
 	}
 	return 0;
 }
@@ -314,7 +326,7 @@ struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete)
 	return pol;
 }
 
-void xfrm_policy_flush()
+void xfrm_policy_flush(void)
 {
 	struct xfrm_policy *xp;
 	int dir;

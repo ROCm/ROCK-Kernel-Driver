@@ -291,10 +291,18 @@ out:
 	return rc;
 
 proc_sockstat6_fail:
-	remove_proc_entry("dev_snmp6", proc_net);
+	proc_net_remove("dev_snmp6");
 proc_dev_snmp6_fail:
-	remove_proc_entry("snmp6", proc_net);
+	proc_net_remove("snmp6");
 proc_snmp6_fail:
 	rc = -ENOMEM;
 	goto out;
 }
+
+void ipv6_misc_proc_exit(void)
+{
+	proc_net_remove("sockstat6");
+	proc_net_remove("dev_snmp6");
+	proc_net_remove("snmp6");
+}
+

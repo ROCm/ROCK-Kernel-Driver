@@ -170,7 +170,7 @@ acpi_ev_gpe_detect (
 			/* Read the Status Register */
 
 			status = acpi_hw_low_level_read (ACPI_GPE_REGISTER_WIDTH, &in_value,
-					 &gpe_register_info->status_address, 0);
+					 &gpe_register_info->status_address);
 			gpe_register_info->status = (u8) in_value;
 			if (ACPI_FAILURE (status)) {
 				goto unlock_and_exit;
@@ -179,7 +179,7 @@ acpi_ev_gpe_detect (
 			/* Read the Enable Register */
 
 			status = acpi_hw_low_level_read (ACPI_GPE_REGISTER_WIDTH, &in_value,
-					 &gpe_register_info->enable_address, 0);
+					 &gpe_register_info->enable_address);
 			gpe_register_info->enable = (u8) in_value;
 			if (ACPI_FAILURE (status)) {
 				goto unlock_and_exit;

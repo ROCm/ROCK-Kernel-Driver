@@ -220,7 +220,7 @@ static struct {
 	},
 };
 
-int __init init_netlink(void)
+static int __init init_netlink(void)
 {
 	int i;
 
@@ -232,7 +232,7 @@ int __init init_netlink(void)
 	devfs_mk_dir("netlink");
 
 	/*  Someone tell me the official names for the uppercase ones  */
-	for (i = 0; i < sizeof(entries)/sizeof(entries[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(entries); i++) {
 		devfs_mk_cdev(MKDEV(NETLINK_MAJOR, entries[i].minor),
 			S_IFCHR|S_IRUSR|S_IWUSR, "netlink/%s", entries[i].name);
 	}
@@ -245,21 +245,11 @@ int __init init_netlink(void)
 	return 0;
 }
 
-#ifdef MODULE
-
-MODULE_LICENSE("GPL");
-
-int init_module(void)
-{
-	printk(KERN_INFO "Network Kernel/User communications module 0.04\n");
-	return init_netlink();
-}
-
-void cleanup_module(void)
+static void __exit cleanup_netlink(void)
 {
 	int i;
 
-	for (i = 0; i < sizeof(entries)/sizeof(entries[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(entries); i++)
 		devfs_remove("netlink/%s", entries[i].name);
 	for (i = 0; i < 16; i++)
 		devfs_remove("netlink/tap%d", i);
@@ -267,4 +257,6 @@ void cleanup_module(void)
 	unregister_chrdev(NETLINK_MAJOR, "netlink");
 }
 
-#endif
+MODULE_LICENSE("GPL");
+module_init(init_netlink);
+module_exit(cleanup_netlink);

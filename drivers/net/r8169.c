@@ -373,6 +373,7 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	}
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	tp = dev->priv;
 
 	// enable device (incl. PCI PM wakeup and hotplug setup)

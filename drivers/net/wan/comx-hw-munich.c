@@ -858,7 +858,7 @@ static int munich_probe(void)
 		board->linecode = SLICECOM_LINECODE_DEFAULT;
 		board->clock_source = SLICECOM_CLOCK_SOURCE_DEFAULT;
 		board->loopback = SLICECOM_LOOPBACK_DEFAULT;
-		SET_MODULE_OWNER(board);
+		board->owner = THIS_MODULE;
 	    }
 	    else
 	    {

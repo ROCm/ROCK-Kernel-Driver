@@ -1166,7 +1166,7 @@ static int c4_add_card(struct capicardparams *p, struct pci_dev *dev,
 		cinfo->capi_ctrl.procinfo      = c4_procinfo;
 		cinfo->capi_ctrl.ctr_read_proc = c4_read_proc;
 		strcpy(cinfo->capi_ctrl.name, card->name);
-		SET_MODULE_OWNER(&cinfo->capi_ctrl);
+		cinfo->capi_ctrl.owner = THIS_MODULE;
 
 		retval = attach_capi_ctr(&cinfo->capi_ctrl);
 		if (retval) {

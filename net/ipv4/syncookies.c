@@ -17,6 +17,7 @@
 #include <linux/tcp.h>
 #include <linux/slab.h>
 #include <linux/random.h>
+#include <linux/kernel.h>
 #include <net/tcp.h>
 
 extern int sysctl_tcp_syncookies;
@@ -38,7 +39,7 @@ static __u16 const msstab[] = {
 	(__u16)-1
 };
 /* The number doesn't include the -1 terminator */
-#define NUM_MSS (sizeof(msstab)/sizeof(msstab[0]) - 1)
+#define NUM_MSS (ARRAY_SIZE(msstab) - 1)
 
 /*
  * Generate a syncookie.  mssp points to the mss, which is returned

@@ -560,6 +560,7 @@ static int __devinit xircom_init_one(struct pci_dev *pdev, const struct pci_devi
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	dev->base_addr = ioaddr;
 	dev->irq = pdev->irq;

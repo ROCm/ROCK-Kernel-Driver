@@ -11,6 +11,7 @@ endif
 obj-$(CONFIG_E100) += e100/
 obj-$(CONFIG_E1000) += e1000/
 obj-$(CONFIG_IXGB) += ixgb/
+obj-$(CONFIG_BONDING) += bonding/
 
 #
 # link order important here
@@ -108,7 +109,6 @@ ifeq ($(CONFIG_SLIP_COMPRESSED),y)
 endif
 
 obj-$(CONFIG_DUMMY) += dummy.o
-obj-$(CONFIG_BONDING) += bonding.o
 obj-$(CONFIG_DE600) += de600.o
 obj-$(CONFIG_DE620) += de620.o
 obj-$(CONFIG_AT1500) += lance.o

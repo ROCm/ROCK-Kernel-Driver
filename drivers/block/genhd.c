@@ -13,13 +13,14 @@
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
+#include <linux/kobj_map.h>
 
 #define MAX_PROBE_HASH 255	/* random */
 
 static struct subsystem block_subsys;
 
 /*
- * Can be merged with blk_probe or deleted altogether. Later.
+ * Can be deleted altogether. Later.
  *
  * Modified under both block_subsys.rwsem and major_names_lock.
  */
@@ -31,25 +32,10 @@ static struct blk_major_name {
 
 static spinlock_t major_names_lock = SPIN_LOCK_UNLOCKED;
 
-static struct blk_probe {
-	struct blk_probe *next;
-	dev_t dev;
-	unsigned long range;
-	struct module *owner;
-	struct gendisk *(*get)(dev_t dev, int *part, void *data);
-	int (*lock)(dev_t, void *);
-	void *data;
-} *probes[MAX_PROBE_HASH];
-
 /* index in the above - for now: assume no multimajor ranges */
 static inline int major_to_index(int major)
 {
 	return major % MAX_PROBE_HASH;
-}
-
-static inline int dev_to_index(dev_t dev)
-{
-	return major_to_index(MAJOR(dev));
 }
 
 /* get block device names in somewhat random order */
@@ -103,8 +89,7 @@ int register_blkdev(unsigned int major, const char *name)
 	}
 
 	p->major = major;
-	strncpy(p->name, name, sizeof(p->name)-1);
-	p->name[sizeof(p->name)-1] = 0;
+	strlcpy(p->name, name, sizeof(p->name));
 	p->next = 0;
 	index = major_to_index(major);
 
@@ -156,59 +141,32 @@ int unregister_blkdev(unsigned int major, const char *name)
 	return ret;
 }
 
+static struct kobj_map *bdev_map;
+
 /*
  * Register device numbers dev..(dev+range-1)
  * range must be nonzero
  * The hash chain is sorted on range, so that subranges can override.
  */
 void blk_register_region(dev_t dev, unsigned long range, struct module *module,
-			 struct gendisk *(*probe)(dev_t, int *, void *),
+			 struct kobject *(*probe)(dev_t, int *, void *),
 			 int (*lock)(dev_t, void *), void *data)
 {
-	int index = dev_to_index(dev);
-	struct blk_probe *p = kmalloc(sizeof(struct blk_probe), GFP_KERNEL);
-	struct blk_probe **s;
-
-	if (p == NULL)
-		return;
-
-	p->owner = module;
-	p->get = probe;
-	p->lock = lock;
-	p->dev = dev;
-	p->range = range;
-	p->data = data;
-	down_write(&block_subsys.rwsem);
-	for (s = &probes[index]; *s && (*s)->range < range; s = &(*s)->next)
-		;
-	p->next = *s;
-	*s = p;
-	up_write(&block_subsys.rwsem);
+	kobj_map(bdev_map, dev, range, module, probe, lock, data);
 }
 
 void blk_unregister_region(dev_t dev, unsigned long range)
 {
-	int index = dev_to_index(dev);
-	struct blk_probe **s;
-
-	down_write(&block_subsys.rwsem);
-	for (s = &probes[index]; *s; s = &(*s)->next) {
-		struct blk_probe *p = *s;
-		if (p->dev == dev && p->range == range) {
-			*s = p->next;
-			kfree(p);
-			break;
-		}
-	}
-	up_write(&block_subsys.rwsem);
+	kobj_unmap(bdev_map, dev, range);
 }
 
 EXPORT_SYMBOL(blk_register_region);
 EXPORT_SYMBOL(blk_unregister_region);
 
-static struct gendisk *exact_match(dev_t dev, int *part, void *data)
+static struct kobject *exact_match(dev_t dev, int *part, void *data)
 {
-	return data;
+	struct gendisk *p = data;
+	return &p->kobj;
 }
 
 static int exact_lock(dev_t dev, void *data)
@@ -246,6 +204,8 @@ void unlink_gendisk(struct gendisk *disk)
 			      disk->minors);
 }
 
+#define to_disk(obj) container_of(obj,struct gendisk,kobj)
+
 /**
  * get_gendisk - get partitioning information for a given device
  * @dev: device to get partitioning information for
@@ -253,46 +213,10 @@ void unlink_gendisk(struct gendisk *disk)
  * This function gets the structure containing partitioning
  * information for the given device @dev.
  */
-struct gendisk *
-get_gendisk(dev_t dev, int *part)
+struct gendisk *get_gendisk(dev_t dev, int *part)
 {
-	int index = dev_to_index(dev);
-	struct gendisk *disk;
-	struct blk_probe *p;
-	unsigned best = ~0U;
-
-retry:
-	down_read(&block_subsys.rwsem);
-	for (p = probes[index]; p; p = p->next) {
-		struct gendisk *(*probe)(dev_t, int *, void *);
-		struct module *owner;
-		void *data;
-
-		if (p->dev > dev || p->dev + p->range - 1 < dev)
-			continue;
-		if (p->range - 1 >= best)
-			break;
-		if (!try_module_get(p->owner))
-			continue;
-		owner = p->owner;
-		data = p->data;
-		probe = p->get;
-		best = p->range - 1;
-		*part = dev - p->dev;
-		if (p->lock && p->lock(dev, data) < 0) {
-			module_put(owner);
-			continue;
-		}
-		up_read(&block_subsys.rwsem);
-		disk = probe(dev, part, data);
-		/* Currently ->owner protects _only_ ->probe() itself. */
-		module_put(owner);
-		if (disk)
-			return disk;
-		goto retry;		/* this terminates: best decreases */
-	}
-	up_read(&block_subsys.rwsem);
-	return NULL;
+	struct kobject *kobj = kobj_lookup(bdev_map, dev, part);
+	return  kobj ? to_disk(kobj) : NULL;
 }
 
 #ifdef CONFIG_PROC_FS
@@ -365,7 +289,7 @@ struct seq_operations partitions_op = {
 
 extern int blk_dev_init(void);
 
-static struct gendisk *base_probe(dev_t dev, int *part, void *data)
+static struct kobject *base_probe(dev_t dev, int *part, void *data)
 {
 	request_module("block-major-%d", MAJOR(dev));
 	return NULL;
@@ -373,14 +297,7 @@ static struct gendisk *base_probe(dev_t dev, int *part, void *data)
 
 int __init device_init(void)
 {
-	struct blk_probe *base = kmalloc(sizeof(struct blk_probe), GFP_KERNEL);
-	int i;
-	memset(base, 0, sizeof(struct blk_probe));
-	base->dev = 1;
-	base->range = ~0;		/* range 1 .. ~0 */
-	base->get = base_probe;
-	for (i = 0; i < MAX_PROBE_HASH; i++)
-		probes[i] = base;	/* must remain last in chain */
+	bdev_map = kobj_map_init(base_probe, &block_subsys);
 	blk_dev_init();
 	subsystem_register(&block_subsys);
 	return 0;
@@ -393,8 +310,6 @@ subsys_initcall(device_init);
 /*
  * kobject & sysfs bindings for block devices
  */
-
-#define to_disk(obj) container_of(obj,struct gendisk,kobj)
 
 struct disk_attribute {
 	struct attribute attr;
@@ -632,7 +547,7 @@ struct gendisk *alloc_disk(int minors)
 	return disk;
 }
 
-struct gendisk *get_disk(struct gendisk *disk)
+struct kobject *get_disk(struct gendisk *disk)
 {
 	struct module *owner;
 	struct kobject *kobj;
@@ -647,7 +562,7 @@ struct gendisk *get_disk(struct gendisk *disk)
 		module_put(owner);
 		return NULL;
 	}
-	return to_disk(kobj);
+	return kobj;
 
 }
 

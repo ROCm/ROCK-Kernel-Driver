@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.10 2003/03/28 08:54:40 mschwide Exp $
+ * $Id: iucv.c,v 1.11 2003/04/15 16:45:37 aberg Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.10 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.11 $
  *
  */
 
@@ -332,7 +332,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.10 $";
+	char vbuf[] = "$Revision: 1.11 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -842,7 +842,6 @@ iucv_register_program (__u8 pgmname[16],
 		}
 		register_flag = 1;
 	}
-	MOD_INC_USE_COUNT;
 	iucv_debug(1, "exiting");
 	return new_handler;
 }				/* end of register function */
@@ -903,7 +902,6 @@ iucv_unregister_program (iucv_handle_t handle)
 	iucv_remove_handler(h);
 	kfree(h);
 
-	MOD_DEC_USE_COUNT;
 	iucv_debug(1, "exiting");
 	return 0;
 }

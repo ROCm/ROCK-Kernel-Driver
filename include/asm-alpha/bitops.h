@@ -233,7 +233,7 @@ __test_and_change_bit(unsigned long nr, volatile void * addr)
 }
 
 static inline int
-test_bit(int nr, volatile void * addr)
+test_bit(int nr, const volatile void * addr)
 {
 	return (1UL & (((const int *) addr)[nr >> 5] >> (nr & 31))) != 0UL;
 }

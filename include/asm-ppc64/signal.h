@@ -156,4 +156,7 @@ extern long sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
 extern long sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
 #define ptrace_signal_deliver(regs, cookie) do { } while (0)
 
+struct pt_regs;
+int do_signal32(sigset_t *oldset, struct pt_regs *regs);
+
 #endif /* _ASMPPC64_SIGNAL_H */

@@ -1122,6 +1122,7 @@ static int __init init_ipv4_mibs(void)
 }
 
 int ipv4_proc_init(void);
+extern void ipfrag_init(void);
 
 static int __init inet_init(void)
 {
@@ -1224,6 +1225,9 @@ static int __init inet_init(void)
 		printk(KERN_CRIT "inet_init: Cannot init ipv4 mibs\n"); ;
 	
 	ipv4_proc_init();
+
+	ipfrag_init();
+
 	return 0;
 }
 
@@ -1237,10 +1241,10 @@ extern void fib_proc_exit(void);
 extern int  ip_misc_proc_init(void);
 extern int  raw_proc_init(void);
 extern void raw_proc_exit(void);
-extern int  tcp_proc_init(void);
-extern void tcp_proc_exit(void);
-extern int  udp_proc_init(void);
-extern void udp_proc_exit(void);
+extern int  tcp4_proc_init(void);
+extern void tcp4_proc_exit(void);
+extern int  udp4_proc_init(void);
+extern void udp4_proc_exit(void);
 
 int __init ipv4_proc_init(void)
 {
@@ -1248,9 +1252,9 @@ int __init ipv4_proc_init(void)
 
 	if (raw_proc_init())
 		goto out_raw;
-	if (tcp_proc_init())
+	if (tcp4_proc_init())
 		goto out_tcp;
-	if (udp_proc_init())
+	if (udp4_proc_init())
 		goto out_udp;
 	if (fib_proc_init())
 		goto out_fib;
@@ -1261,9 +1265,9 @@ out:
 out_misc:
 	fib_proc_exit();
 out_fib:
-	udp_proc_exit();
+	udp4_proc_exit();
 out_udp:
-	tcp_proc_exit();
+	tcp4_proc_exit();
 out_tcp:
 	raw_proc_exit();
 out_raw:

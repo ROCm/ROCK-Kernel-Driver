@@ -507,7 +507,7 @@ ret_from_except:
 	MTMSRD(r10)		/* disable interrupts */
 
 	lwz	r3,_MSR(r1)	/* Returning to user mode? */
-	andi.	r3,r3,MSR_PR
+	andi.	r0,r3,MSR_PR
 	beq	resume_kernel
 
 user_exc_return:		/* r10 contains MSR_KERNEL here */
@@ -528,15 +528,33 @@ restore_user:
 #ifdef CONFIG_PREEMPT
 	b	restore
 
+/* N.B. the only way to get here is from the beq following ret_from_except. */
 resume_kernel:
 	/* check current_thread_info->preempt_count */
 	rlwinm	r9,r1,0,0,18
-	lwz	r3,TI_PREEMPT(r9)
-	cmpwi	0,r3,0		/* if non-zero, just restore regs and return */
+	lwz	r0,TI_PREEMPT(r9)
+	cmpwi	0,r0,0		/* if non-zero, just restore regs and return */
 	bne	restore
-	lwz	r9,TI_FLAGS(r9)
-	andi.	r0,r9,_TIF_NEED_RESCHED
-	bne	do_resched
+	lwz	r0,TI_FLAGS(r9)
+	andi.	r0,r0,_TIF_NEED_RESCHED
+	beq+	restore
+	andi.	r0,r3,MSR_EE	/* interrupts off? */
+	beq	restore		/* don't schedule if so */
+1:	lis	r0,PREEMPT_ACTIVE@h
+	stw	r0,TI_PREEMPT(r9)
+	ori	r10,r10,MSR_EE
+	SYNC
+	MTMSRD(r10)		/* hard-enable interrupts */
+	bl	schedule
+	LOAD_MSR_KERNEL(r10,MSR_KERNEL)
+	SYNC
+	MTMSRD(r10)		/* disable interrupts */
+	rlwinm	r9,r1,0,0,18
+	li	r0,0
+	stw	r0,TI_PREEMPT(r9)
+	lwz	r3,TI_FLAGS(r9)
+	andi.	r0,r3,_TIF_NEED_RESCHED
+	bne-	1b
 #else
 resume_kernel:
 #endif /* CONFIG_PREEMPT */
@@ -740,13 +758,6 @@ recheck:
 	lwz	r9,TI_FLAGS(r9)
 	andi.	r0,r9,_TIF_NEED_RESCHED
 	bne-	do_resched
-
-#ifdef CONFIG_PREEMPT
-	lwz	r0,_MSR(r1)
-	andi.	r0,r0,MSR_PR
-	beq	restore
-#endif
-
 	andi.	r0,r9,_TIF_SIGPENDING
 	beq	restore_user
 do_user_signal:			/* r10 contains MSR_KERNEL here */

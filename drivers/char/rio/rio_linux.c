@@ -111,18 +111,11 @@ know why. If you want to try anyway you'll have to increase the number
 of boards in rio.h.  You'll have to allocate more majors if you need
 more than 512 ports.... */
 
-
-/* Why the hell am I defining these here? */
-#define RIO_TYPE_NORMAL 1
-#define RIO_TYPE_CALLOUT 2
-
 #ifndef RIO_NORMAL_MAJOR0
 /* This allows overriding on the compiler commandline, or in a "major.h" 
    include or something like that */
 #define RIO_NORMAL_MAJOR0  154
-#define RIO_CALLOUT_MAJOR0 155
 #define RIO_NORMAL_MAJOR1  156
-#define RIO_CALLOUT_MAJOR1 157
 #endif
 
 #ifndef PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8
@@ -208,8 +201,7 @@ static int rio_init_drivers(void);
 
 void my_hd (void *addr, int len);
 
-static struct tty_driver rio_driver, rio_callout_driver;
-static struct tty_driver rio_driver2, rio_callout_driver2;
+static struct tty_driver rio_driver, rio_driver2;
 
 static struct tty_struct * rio_table[RIO_NPORTS];
 static struct termios ** rio_termios;
@@ -889,7 +881,7 @@ static int rio_init_drivers(void)
   rio_driver.major = RIO_NORMAL_MAJOR0;
   rio_driver.num = 256;
   rio_driver.type = TTY_DRIVER_TYPE_SERIAL;
-  rio_driver.subtype = RIO_TYPE_NORMAL;
+  rio_driver.subtype = SERIAL_TYPE_NORMAL;
   rio_driver.init_termios = tty_std_termios;
   rio_driver.init_termios.c_cflag =
     B9600 | CS8 | CREAD | HUPCL | CLOCAL;
@@ -920,28 +912,14 @@ static int rio_init_drivers(void)
   rio_driver2.termios += 256;
   rio_driver2.termios_locked += 256;
 
-  rio_callout_driver = rio_driver;
-  rio_callout_driver.name = "cusr";
-  rio_callout_driver.major = RIO_CALLOUT_MAJOR0;
-  rio_callout_driver.subtype = RIO_TYPE_CALLOUT;
-
-  rio_callout_driver2 = rio_callout_driver;
-  rio_callout_driver2.major = RIO_CALLOUT_MAJOR1;
-  rio_callout_driver2.termios += 256;
-  rio_callout_driver2.termios_locked += 256;
-
   rio_dprintk (RIO_DEBUG_INIT, "set_termios = %p\n", gs_set_termios);
 
   if ((error = tty_register_driver(&rio_driver))) goto bad1;
   if ((error = tty_register_driver(&rio_driver2))) goto bad2;
-  if ((error = tty_register_driver(&rio_callout_driver))) goto bad3;
-  if ((error = tty_register_driver(&rio_callout_driver2))) goto bad4;
 
   func_exit();
   return 0;
   /* 
- bad5:tty_unregister_driver (&rio_callout_driver2); */
- bad4:tty_unregister_driver (&rio_callout_driver);
  bad3:tty_unregister_driver (&rio_driver2);
  bad2:tty_unregister_driver (&rio_driver);
  bad1:printk(KERN_ERR "rio: Couldn't register a rio driver, error = %d\n",
@@ -1006,7 +984,6 @@ static int rio_init_datastructures (void)
     }
     rio_dprintk (RIO_DEBUG_INIT, "initing port %d (%d)\n", i, port->Mapped);
     port->PortNum = i;
-    port->gs.callout_termios = tty_std_termios;
     port->gs.normal_termios  = tty_std_termios;
     port->gs.magic = RIO_MAGIC;
     port->gs.close_delay = HZ/2;
@@ -1051,8 +1028,6 @@ static int rio_init_datastructures (void)
 static void  __exit rio_release_drivers(void)
 {
   func_enter();
-  tty_unregister_driver (&rio_callout_driver2);
-  tty_unregister_driver (&rio_callout_driver);
   tty_unregister_driver (&rio_driver2);
   tty_unregister_driver (&rio_driver);
   func_exit();

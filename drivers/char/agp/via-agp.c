@@ -68,7 +68,7 @@ static void via_cleanup(void)
 }
 
 
-static void via_tlbflush(agp_memory * mem)
+static void via_tlbflush(struct agp_memory *mem)
 {
 	pci_write_config_dword(agp_bridge->dev, VIA_GARTCTRL, 0x0000008f);
 	pci_write_config_dword(agp_bridge->dev, VIA_GARTCTRL, 0x0000000f);
@@ -136,7 +136,7 @@ static void via_cleanup_agp3(void)
 }
 
 
-static void via_tlbflush_agp3(agp_memory * mem)
+static void via_tlbflush_agp3(struct agp_memory *mem)
 {
 	u32 temp;
 

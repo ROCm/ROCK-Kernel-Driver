@@ -175,6 +175,11 @@ asmlinkage long sys_lookup_dcookie(u64 cookie64, char * buf, size_t len)
 	/* FIXME: (deleted) ? */
 	path = d_path(dcs->dentry, dcs->vfsmnt, kbuf, PAGE_SIZE);
 
+	if (IS_ERR(path)) {
+		err = PTR_ERR(path);
+		goto out_free;
+	}
+
 	err = -ERANGE;
  
 	pathlen = kbuf + PAGE_SIZE - path;
@@ -184,6 +189,7 @@ asmlinkage long sys_lookup_dcookie(u64 cookie64, char * buf, size_t len)
 			err = -EFAULT;
 	}
 
+out_free:
 	kfree(kbuf);
 out:
 	up(&dcookie_sem);

@@ -83,11 +83,8 @@
 
 static DECLARE_TASK_QUEUE(tq_riscom);
 
-#define RISCOM_TYPE_NORMAL	1
-#define RISCOM_TYPE_CALLOUT	2
-
 static struct riscom_board * IRQ_to_board[16];
-static struct tty_driver riscom_driver, riscom_callout_driver;
+static struct tty_driver riscom_driver;
 static int    riscom_refcount;
 static struct tty_struct * riscom_table[RC_NBOARD * RC_NPORT];
 static struct termios * riscom_termios[RC_NBOARD * RC_NPORT];
@@ -550,10 +547,8 @@ static inline void rc_check_modem(struct riscom_board const * bp)
 	if (mcr & MCR_CDCHG)  {
 		if (rc_in(bp, CD180_MSVR) & MSVR_CD) 
 			wake_up_interruptible(&port->open_wait);
-		else if (!((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-			   (port->flags & ASYNC_CALLOUT_NOHUP))) {
+		else
 			schedule_task(&port->tqueue_hangup);
-		}
 	}
 	
 #ifdef RISCOM_BRAIN_DAMAGED_CTS
@@ -986,44 +981,18 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	}
 
 	/*
-	 * If this is a callout device, then just make sure the normal
-	 * device isn't being used.
-	 */
-	if (tty->driver->subtype == RISCOM_TYPE_CALLOUT) {
-		if (port->flags & ASYNC_NORMAL_ACTIVE)
-			return -EBUSY;
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_SESSION_LOCKOUT) &&
-		    (port->session != current->session))
-		    return -EBUSY;
-		if ((port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    (port->flags & ASYNC_PGRP_LOCKOUT) &&
-		    (port->pgrp != current->pgrp))
-		    return -EBUSY;
-		port->flags |= ASYNC_CALLOUT_ACTIVE;
-		return 0;
-	}
-	
-	/*
 	 * If non-blocking mode is set, or the port is not enabled,
 	 * then make the check up front and then exit.
 	 */
 	if ((filp->f_flags & O_NONBLOCK) ||
 	    (tty->flags & (1 << TTY_IO_ERROR))) {
-		if (port->flags & ASYNC_CALLOUT_ACTIVE)
-			return -EBUSY;
 		port->flags |= ASYNC_NORMAL_ACTIVE;
 		return 0;
 	}
 
-	if (port->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (port->normal_termios.c_cflag & CLOCAL) 
-			do_clocal = 1;
-	} else {
-		if (C_CLOCAL(tty))  
-			do_clocal = 1;
-	}
-	
+	if (C_CLOCAL(tty))  
+		do_clocal = 1;
+
 	/*
 	 * Block waiting for the carrier detect and the line to become
 	 * free (i.e., not in use by the callout).  While we are in
@@ -1042,11 +1011,9 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 		cli();
 		rc_out(bp, CD180_CAR, port_No(port));
 		CD = rc_in(bp, CD180_MSVR) & MSVR_CD;
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE))  {
-			rc_out(bp, CD180_MSVR, MSVR_RTS);
-			bp->DTR &= ~(1u << port_No(port));
-			rc_out(bp, RC_DTR, bp->DTR);
-		}
+		rc_out(bp, CD180_MSVR, MSVR_RTS);
+		bp->DTR &= ~(1u << port_No(port));
+		rc_out(bp, RC_DTR, bp->DTR);
 		sti();
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) ||
@@ -1057,8 +1024,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 				retval = -ERESTARTSYS;	
 			break;
 		}
-		if (!(port->flags & ASYNC_CALLOUT_ACTIVE) &&
-		    !(port->flags & ASYNC_CLOSING) &&
+		if (!(port->flags & ASYNC_CLOSING) &&
 		    (do_clocal || CD))
 			break;
 		if (signal_pending(current)) {
@@ -1110,18 +1076,11 @@ static int rc_open(struct tty_struct * tty, struct file * filp)
 		return error;
 	
 	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == RISCOM_TYPE_NORMAL)
-			*tty->termios = port->normal_termios;
-		else
-			*tty->termios = port->callout_termios;
+		*tty->termios = port->normal_termios;
 		save_flags(flags); cli();
 		rc_change_speed(bp, port);
 		restore_flags(flags);
 	}
-
-	port->session = current->session;
-	port->pgrp = current->pgrp;
-	
 	return 0;
 }
 
@@ -1161,8 +1120,6 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 	 */
 	if (port->flags & ASYNC_NORMAL_ACTIVE)
 		port->normal_termios = *tty->termios;
-	if (port->flags & ASYNC_CALLOUT_ACTIVE)
-		port->callout_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -1210,8 +1167,7 @@ static void rc_close(struct tty_struct * tty, struct file * filp)
 		}
 		wake_up_interruptible(&port->open_wait);
 	}
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
-			 ASYNC_CLOSING);
+	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&port->close_wait);
 out:	restore_flags(flags);
 }
@@ -1689,7 +1645,7 @@ static void rc_hangup(struct tty_struct * tty)
 	rc_shutdown_port(bp, port);
 	port->event = 0;
 	port->count = 0;
-	port->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	port->flags &= ~ASYNC_NORMAL_ACTIVE;
 	port->tty = 0;
 	wake_up_interruptible(&port->open_wait);
 }
@@ -1757,7 +1713,7 @@ static inline int rc_init_drivers(void)
 	riscom_driver.major = RISCOM8_NORMAL_MAJOR;
 	riscom_driver.num = RC_NBOARD * RC_NPORT;
 	riscom_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	riscom_driver.subtype = RISCOM_TYPE_NORMAL;
+	riscom_driver.subtype = SERIAL_TYPE_NORMAL;
 	riscom_driver.init_termios = tty_std_termios;
 	riscom_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
@@ -1783,11 +1739,6 @@ static inline int rc_init_drivers(void)
 	riscom_driver.start = rc_start;
 	riscom_driver.hangup = rc_hangup;
 
-	riscom_callout_driver = riscom_driver;
-	riscom_callout_driver.name = "cul";
-	riscom_callout_driver.major = RISCOM8_CALLOUT_MAJOR;
-	riscom_callout_driver.subtype = RISCOM_TYPE_CALLOUT;
-	
 	if ((error = tty_register_driver(&riscom_driver)))  {
 		free_page((unsigned long)tmp_buf);
 		printk(KERN_ERR "rc: Couldn't register RISCom/8 driver, "
@@ -1795,18 +1746,9 @@ static inline int rc_init_drivers(void)
 		       error);
 		return 1;
 	}
-	if ((error = tty_register_driver(&riscom_callout_driver)))  {
-		free_page((unsigned long)tmp_buf);
-		tty_unregister_driver(&riscom_driver);
-		printk(KERN_ERR "rc: Couldn't register RISCom/8 callout "
-				"driver, error = %d\n",
-		       error);
-		return 1;
-	}
-	
+
 	memset(rc_port, 0, sizeof(rc_port));
 	for (i = 0; i < RC_NPORT * RC_NBOARD; i++)  {
-		rc_port[i].callout_termios = riscom_callout_driver.init_termios;
 		rc_port[i].normal_termios  = riscom_driver.init_termios;
 		rc_port[i].magic = RISCOM8_MAGIC;
 		rc_port[i].tqueue.routine = do_softint;
@@ -1831,7 +1773,6 @@ static void rc_release_drivers(void)
 	remove_bh(RISCOM8_BH);
 	free_page((unsigned long)tmp_buf);
 	tty_unregister_driver(&riscom_driver);
-	tty_unregister_driver(&riscom_callout_driver);
 	restore_flags(flags);
 }
 

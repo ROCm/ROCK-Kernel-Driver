@@ -230,10 +230,6 @@ acpi_db_decode_and_display_object (
 	char                            *output_type);
 
 void
-acpi_db_decode_node (
-	struct acpi_namespace_node      *node);
-
-void
 acpi_db_display_result_object (
 	union acpi_operand_object       *obj_desc,
 	struct acpi_walk_state          *walk_state);
@@ -241,11 +237,6 @@ acpi_db_display_result_object (
 acpi_status
 acpi_db_display_all_methods (
 	char                            *display_count_arg);
-
-void
-acpi_db_display_internal_object (
-	union acpi_operand_object       *obj_desc,
-	struct acpi_walk_state          *walk_state);
 
 void
 acpi_db_display_arguments (
@@ -264,6 +255,10 @@ acpi_db_display_calling_tree (
 	void);
 
 void
+acpi_db_display_object_type (
+	char                            *object_arg);
+
+void
 acpi_db_display_argument_object (
 	union acpi_operand_object       *obj_desc,
 	struct acpi_walk_state          *walk_state);
@@ -275,10 +270,6 @@ acpi_db_dump_parser_descriptor (
 void *
 acpi_db_get_pointer (
 	void                            *target);
-
-void
-acpi_db_decode_internal_object (
-	union acpi_operand_object       *obj_desc);
 
 
 /*

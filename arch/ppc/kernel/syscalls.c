@@ -35,6 +35,7 @@
 #include <linux/ipc.h>
 #include <linux/utsname.h>
 #include <linux/file.h>
+#include <linux/unistd.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -43,30 +44,6 @@
 void
 check_bugs(void)
 {
-}
-
-int sys_ioperm(unsigned long from, unsigned long num, int on)
-{
-	printk(KERN_ERR "sys_ioperm()\n");
-	return -EIO;
-}
-
-int sys_iopl(int a1, int a2, int a3, int a4)
-{
-	printk(KERN_ERR "sys_iopl(%x, %x, %x, %x)!\n", a1, a2, a3, a4);
-	return (-ENOSYS);
-}
-
-int sys_vm86(int a1, int a2, int a3, int a4)
-{
-	printk(KERN_ERR "sys_vm86(%x, %x, %x, %x)!\n", a1, a2, a3, a4);
-	return (-ENOSYS);
-}
-
-int sys_modify_ldt(int a1, int a2, int a3, int a4)
-{
-	printk(KERN_ERR "sys_modify_ldt(%x, %x, %x, %x)!\n", a1, a2, a3, a4);
-	return (-ENOSYS);
 }
 
 /*
@@ -291,12 +268,6 @@ int sys_olduname(struct oldold_utsname * name)
 	return error;
 }
 
-#ifndef CONFIG_PCI
-/*
- * Those are normally defined in arch/ppc/kernel/pci.c. But when CONFIG_PCI is
- * not defined, this file is not linked at all, so here are the "empty" versions
- */
-int sys_pciconfig_read(void) { return -ENOSYS; }
-int sys_pciconfig_write(void) { return -ENOSYS; }
-long sys_pciconfig_iobase(void) { return -ENOSYS; }
-#endif
+cond_syscall(sys_pciconfig_read);
+cond_syscall(sys_pciconfig_write);
+cond_syscall(sys_pciconfig_iobase);

@@ -1272,10 +1272,11 @@ void d_move(struct dentry * dentry, struct dentry * target)
  * @buflen: buffer length
  *
  * Convert a dentry into an ASCII path name. If the entry has been deleted
- * the string " (deleted)" is appended. Note that this is ambiguous. Returns
- * the buffer.
+ * the string " (deleted)" is appended. Note that this is ambiguous.
  *
- * "buflen" should be %PAGE_SIZE or more. Caller holds the dcache_lock.
+ * Returns the buffer or an error code if the path was too long.
+ *
+ * "buflen" should be positive. Caller holds the dcache_lock.
  */
 static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 			struct dentry *root, struct vfsmount *rootmnt,
@@ -1290,9 +1291,13 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 	if (!IS_ROOT(dentry) && d_unhashed(dentry)) {
 		buflen -= 10;
 		end -= 10;
+		if (buflen < 0)
+			goto Elong;
 		memcpy(end, " (deleted)", 10);
 	}
 
+	if (buflen < 1)
+		goto Elong;
 	/* Get '/' right */
 	retval = end-1;
 	*retval = '/';
@@ -1315,7 +1320,7 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 		namelen = dentry->d_name.len;
 		buflen -= namelen + 1;
 		if (buflen < 0)
-			return ERR_PTR(-ENAMETOOLONG);
+			goto Elong;
 		end -= namelen;
 		memcpy(end, dentry->d_name.name, namelen);
 		*--end = '/';
@@ -1328,12 +1333,13 @@ static char * __d_path( struct dentry *dentry, struct vfsmount *vfsmnt,
 global_root:
 	namelen = dentry->d_name.len;
 	buflen -= namelen;
-	if (buflen >= 0) {
-		retval -= namelen-1;	/* hit the slash */
-		memcpy(retval, dentry->d_name.name, namelen);
-	} else
-		retval = ERR_PTR(-ENAMETOOLONG);
+	if (buflen < 0)
+		goto Elong;
+	retval -= namelen-1;	/* hit the slash */
+	memcpy(retval, dentry->d_name.name, namelen);
 	return retval;
+Elong:
+	return ERR_PTR(-ENAMETOOLONG);
 }
 
 /* write full pathname into buffer and return start of pathname */
@@ -1547,7 +1553,7 @@ static void __init dcache_init(unsigned long mempages)
 	dentry_cache = kmem_cache_create("dentry_cache",
 					 sizeof(struct dentry),
 					 0,
-					 SLAB_HWCACHE_ALIGN,
+					 SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					 NULL, NULL);
 	if (!dentry_cache)
 		panic("Cannot create dentry cache");
@@ -1601,6 +1607,7 @@ kmem_cache_t *filp_cachep;
 EXPORT_SYMBOL(d_genocide);
 
 extern void bdev_cache_init(void);
+extern void chrdev_init(void);
 
 void __init vfs_caches_init(unsigned long mempages)
 {
@@ -1621,4 +1628,5 @@ void __init vfs_caches_init(unsigned long mempages)
 	files_init(mempages); 
 	mnt_init(mempages);
 	bdev_cache_init();
+	chrdev_init();
 }

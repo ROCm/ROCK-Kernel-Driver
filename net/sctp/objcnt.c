@@ -38,6 +38,7 @@
  * be incorporated into the next SCTP release.
  */
 
+#include <linux/kernel.h>
 #include <net/sctp/sctp.h>
 
 /*
@@ -88,7 +89,7 @@ static int sctp_dbg_objcnt_read(char *buffer, char **start, off_t offset,
 	char temp[128];
 
 	/* How many entries? */
-	entries = sizeof(sctp_dbg_objcnt)/sizeof(sctp_dbg_objcnt[0]);
+	entries = ARRAY_SIZE(sctp_dbg_objcnt);
 
 	/* Walk the entries and print out the debug information
 	 * for proc fs.

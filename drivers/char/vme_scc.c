@@ -83,14 +83,14 @@ static int scc_ioctl(struct tty_struct * tty, struct file * filp,
                      unsigned int cmd, unsigned long arg);
 static void scc_throttle(struct tty_struct *tty);
 static void scc_unthrottle(struct tty_struct *tty);
-static void scc_tx_int(int irq, void *data, struct pt_regs *fp);
-static void scc_rx_int(int irq, void *data, struct pt_regs *fp);
-static void scc_stat_int(int irq, void *data, struct pt_regs *fp);
-static void scc_spcond_int(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t scc_tx_int(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t scc_rx_int(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t scc_stat_int(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t scc_spcond_int(int irq, void *data, struct pt_regs *fp);
 static void scc_setsignals(struct scc_port *port, int dtr, int rts);
 static void scc_break_ctl(struct tty_struct *tty, int break_state);
 
-static struct tty_driver scc_driver, scc_callout_driver;
+static struct tty_driver scc_driver;
 
 static struct tty_struct *scc_table[2] = { NULL, };
 static struct termios * scc_termios[2];
@@ -167,23 +167,8 @@ static int scc_init_drivers(void)
 	scc_driver.hangup = gs_hangup;
 	scc_driver.break_ctl = scc_break_ctl;
 
-	scc_callout_driver = scc_driver;
-#ifdef CONFIG_DEVFS_FS
-	scc_callout_driver.name = "cua/";
-#else
-	scc_callout_driver.name = "cua";
-#endif
-	scc_callout_driver.major = TTYAUX_MAJOR;
-	scc_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
 	if ((error = tty_register_driver(&scc_driver))) {
 		printk(KERN_ERR "scc: Couldn't register scc driver, error = %d\n",
-		       error);
-		return 1;
-	}
-	if ((error = tty_register_driver(&scc_callout_driver))) {
-		tty_unregister_driver(&scc_driver);
-		printk(KERN_ERR "scc: Couldn't register scc callout driver, error = %d\n",
 		       error);
 		return 1;
 	}
@@ -202,7 +187,6 @@ static void scc_init_portstructs(void)
 
 	for (i = 0; i < 2; i++) {
 		port = scc_ports + i;
-		port->gs.callout_termios = tty_std_termios;
 		port->gs.normal_termios = tty_std_termios;
 		port->gs.magic = SCC_MAGIC;
 		port->gs.close_delay = HZ/2;
@@ -448,7 +432,7 @@ int vme_scc_init(void)
  * Interrupt handlers
  *--------------------------------------------------------------------------*/
 
-static void scc_rx_int(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t scc_rx_int(int irq, void *data, struct pt_regs *fp)
 {
 	unsigned char	ch;
 	struct scc_port *port = data;
@@ -459,7 +443,7 @@ static void scc_rx_int(int irq, void *data, struct pt_regs *fp)
 	if (!tty) {
 		printk(KERN_WARNING "scc_rx_int with NULL tty!\n");
 		SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
-		return;
+		return IRQ_HANDLED;
 	}
 	if (tty->flip.count < TTY_FLIPBUF_SIZE) {
 		*tty->flip.char_buf_ptr = ch;
@@ -476,16 +460,17 @@ static void scc_rx_int(int irq, void *data, struct pt_regs *fp)
 	if (SCCread(INT_PENDING_REG) &
 	    (port->channel == CHANNEL_A ? IPR_A_RX : IPR_B_RX)) {
 		scc_spcond_int (irq, data, fp);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
 
 	tty_flip_buffer_push(tty);
+	return IRQ_HANDLED;
 }
 
 
-static void scc_spcond_int(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t scc_spcond_int(int irq, void *data, struct pt_regs *fp)
 {
 	struct scc_port *port = data;
 	struct tty_struct *tty = port->gs.tty;
@@ -498,7 +483,7 @@ static void scc_spcond_int(int irq, void *data, struct pt_regs *fp)
 		printk(KERN_WARNING "scc_spcond_int with NULL tty!\n");
 		SCCwrite(COMMAND_REG, CR_ERROR_RESET);
 		SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
-		return;
+		return IRQ_HANDLED;
 	}
 	do {
 		stat = SCCread(SPCOND_STATUS_REG);
@@ -532,10 +517,11 @@ static void scc_spcond_int(int irq, void *data, struct pt_regs *fp)
 	SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
 
 	tty_flip_buffer_push(tty);
+	return IRQ_HANDLED;
 }
 
 
-static void scc_tx_int(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t scc_tx_int(int irq, void *data, struct pt_regs *fp)
 {
 	struct scc_port *port = data;
 	SCC_ACCESS_INIT(port);
@@ -545,7 +531,7 @@ static void scc_tx_int(int irq, void *data, struct pt_regs *fp)
 		SCCmod (INT_AND_DMA_REG, ~IDR_TX_INT_ENAB, 0);
 		SCCwrite(COMMAND_REG, CR_TX_PENDING_RESET);
 		SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
-		return;
+		return IRQ_HANDLED;
 	}
 	while ((SCCread_NB(STATUS_REG) & SR_TX_BUF_EMPTY)) {
 		if (port->x_char) {
@@ -577,10 +563,11 @@ static void scc_tx_int(int irq, void *data, struct pt_regs *fp)
 	}
 
 	SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
+	return IRQ_HANDLED;
 }
 
 
-static void scc_stat_int(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t scc_stat_int(int irq, void *data, struct pt_regs *fp)
 {
 	struct scc_port *port = data;
 	unsigned channel = port->channel;
@@ -596,22 +583,16 @@ static void scc_stat_int(int irq, void *data, struct pt_regs *fp)
 		if (!(port->gs.flags & ASYNC_CHECK_CD))
 			;	/* Don't report DCD changes */
 		else if (port->c_dcd) {
-			if (~(port->gs.flags & ASYNC_NORMAL_ACTIVE) ||
-				~(port->gs.flags & ASYNC_CALLOUT_ACTIVE)) {
-				/* Are we blocking in open?*/
-				wake_up_interruptible(&port->gs.open_wait);
-			}
+			wake_up_interruptible(&port->gs.open_wait);
 		}
 		else {
-			if (!((port->gs.flags & ASYNC_CALLOUT_ACTIVE) &&
-					(port->gs.flags & ASYNC_CALLOUT_NOHUP))) {
-				if (port->gs.tty)
-					tty_hangup (port->gs.tty);
-			}
+			if (port->gs.tty)
+				tty_hangup (port->gs.tty);
 		}
 	}
 	SCCwrite(COMMAND_REG, CR_EXTSTAT_RESET);
 	SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
+	return IRQ_HANDLED;
 }
 
 
@@ -945,15 +926,10 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 	}
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
-			*tty->termios = port->gs.normal_termios;
-		else 
-			*tty->termios = port->gs.callout_termios;
+		*tty->termios = port->gs.normal_termios;
 		scc_set_real_termios (port);
 	}
 
-	port->gs.session = current->session;
-	port->gs.pgrp = current->pgrp;
 	port->c_dcd = scc_get_CD (port);
 
 	scc_enable_rx_interrupts(port);

@@ -524,7 +524,7 @@ static int __init apm_emu_init(void)
 		
 	apm_proc = create_proc_info_entry("apm", 0, NULL, apm_emu_get_info);
 	if (apm_proc)
-		SET_MODULE_OWNER(apm_proc);
+		apm_proc->owner = THIS_MODULE;
 
 	misc_register(&apm_device);
 

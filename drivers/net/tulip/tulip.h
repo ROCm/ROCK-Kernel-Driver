@@ -193,16 +193,6 @@ enum desc_status_bits {
 };
 
 
-enum t21041_csr13_bits {
-	csr13_eng = (0xEF0<<4), /* for eng. purposes only, hardcode at EF0h */
-	csr13_aui = (1<<3), /* clear to force 10bT, set to force AUI/BNC */
-	csr13_cac = (1<<2), /* CSR13/14/15 autoconfiguration */
-	csr13_srl = (1<<0), /* When reset, resets all SIA functions, machines */
-
-	csr13_mask_auibnc = (csr13_eng | csr13_aui | csr13_srl),
-	csr13_mask_10bt = (csr13_eng | csr13_srl),
-};
-
 enum t21143_csr6_bits {
 	csr6_sc = (1<<31),
 	csr6_ra = (1<<30),
@@ -449,9 +439,6 @@ extern const char * const medianame[];
 extern const char tulip_media_cap[];
 extern struct tulip_chip_table tulip_tbl[];
 extern u8 t21040_csr13[];
-extern u16 t21041_csr13[];
-extern u16 t21041_csr14[];
-extern u16 t21041_csr15[];
 
 #ifndef USE_IO_OPS
 #undef inb

@@ -398,7 +398,7 @@ alloc_pa_dev(unsigned long hpa, struct hardware_path *mod_path)
 	dev->hpa = hpa;
 	name = parisc_hardware_description(&dev->id);
 	if (name) {
-		strncpy(dev->name, name, sizeof(dev->name)-1);
+		strlcpy(dev->name, name, sizeof(dev->name));
 	}
 
 	return dev;
@@ -601,7 +601,7 @@ static void parisc_generic_device_register_recursive( struct parisc_device *dev 
 		    ndev = ndev->parent) {
 			snprintf(tmp2, sizeof(tmp2), "%d:%s",
 				 ndev->hw_path, tmp1);
-			strncpy(tmp1, tmp2, sizeof(tmp1));
+			strlcpy(tmp1, tmp2, sizeof(tmp1));
 		}
 	}
 

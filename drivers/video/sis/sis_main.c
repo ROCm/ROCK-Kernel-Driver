@@ -2868,8 +2868,8 @@ static int sisfb_heap_init(void)
 	unsigned long *write_port = 0;
 	SIS_CMDTYPE    cmd_type;
 #ifndef AGPOFF
-	agp_kern_info  *agp_info;
-	agp_memory     *agp;
+	struct agp_kern_info  *agp_info;
+	struct agp_memory     *agp;
 	u32            agp_phys;
 #endif
 #endif
@@ -2946,8 +2946,8 @@ static int sisfb_heap_init(void)
 
 #ifndef AGPOFF
 	if (sisfb_queuemode == AGP_CMD_QUEUE) {
-		agp_info = vmalloc(sizeof(agp_kern_info));
-		memset((void*)agp_info, 0x00, sizeof(agp_kern_info));
+		agp_info = vmalloc(sizeof(*agp_info));
+		memset((void*)agp_info, 0x00, sizeof(*agp_info));
 		agp_copy_info(agp_info);
 
 		agp_backend_acquire();

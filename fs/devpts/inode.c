@@ -16,6 +16,7 @@
 #include <linux/sched.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
+#include "xattr.h"
 
 #define DEVPTS_SUPER_MAGIC 0x1cd1
 
@@ -72,7 +73,8 @@ static struct super_operations devpts_sops = {
 	.remount_fs	= devpts_remount,
 };
 
-static int devpts_fill_super(struct super_block *s, void *data, int silent)
+static int
+devpts_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * inode;
 
@@ -105,7 +107,7 @@ fail:
 }
 
 static struct super_block *devpts_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_single(fs_type, flags, data, devpts_fill_super);
 }
@@ -130,6 +132,13 @@ static struct dentry *get_node(int num)
 	return lookup_one_len(s, root, sprintf(s, "%d", num));
 }
 
+static struct inode_operations devpts_file_inode_operations = {
+	.setxattr	= devpts_setxattr,
+	.getxattr	= devpts_getxattr,
+	.listxattr	= devpts_listxattr,
+	.removexattr	= devpts_removexattr,
+};
+
 void devpts_pty_new(int number, dev_t device)
 {
 	struct dentry *dentry;
@@ -142,6 +151,7 @@ void devpts_pty_new(int number, dev_t device)
 	inode->i_gid = config.setgid ? config.gid : current->fsgid;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	init_special_inode(inode, S_IFCHR|config.mode, device);
+	inode->i_op = &devpts_file_inode_operations;
 
 	dentry = get_node(number);
 	if (!IS_ERR(dentry) && !dentry->d_inode)
@@ -167,12 +177,14 @@ void devpts_pty_kill(int number)
 
 static int __init init_devpts_fs(void)
 {
-	int err = register_filesystem(&devpts_fs_type);
+	int err = init_devpts_xattr();
+	if (err)
+		return err;
+	err = register_filesystem(&devpts_fs_type);
 	if (!err) {
 		devpts_mnt = kern_mount(&devpts_fs_type);
-		err = PTR_ERR(devpts_mnt);
-		if (!IS_ERR(devpts_mnt))
-			err = 0;
+		if (IS_ERR(devpts_mnt))
+			err = PTR_ERR(devpts_mnt);
 	}
 	return err;
 }
@@ -181,6 +193,7 @@ static void __exit exit_devpts_fs(void)
 {
 	unregister_filesystem(&devpts_fs_type);
 	mntput(devpts_mnt);
+	exit_devpts_xattr();
 }
 
 module_init(init_devpts_fs)

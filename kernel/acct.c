@@ -323,8 +323,7 @@ static void do_acct_process(long exitcode, struct file *file)
 	 */
 	memset((caddr_t)&ac, 0, sizeof(struct acct));
 
-	strncpy(ac.ac_comm, current->comm, ACCT_COMM);
-	ac.ac_comm[ACCT_COMM - 1] = '\0';
+	strlcpy(ac.ac_comm, current->comm, sizeof(ac.ac_comm));
 
 	elapsed = get_jiffies_64() - current->start_time;
 	ac.ac_etime = encode_comp_t(elapsed < (unsigned long) -1l ?

@@ -159,7 +159,6 @@ int imm_command(Scsi_Cmnd *);
 int imm_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 int imm_abort(Scsi_Cmnd *);
 int imm_reset(Scsi_Cmnd *);
-int imm_proc_info(char *, char **, off_t, int, int, int);
 int imm_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int *);
 

@@ -207,6 +207,7 @@ int __init ultramca_probe(struct device *gen_dev)
 		return -ENODEV;
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, gen_dev);
 
 	if((i = register_netdev(dev)) != 0)
 		return i;

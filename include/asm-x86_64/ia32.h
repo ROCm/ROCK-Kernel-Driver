@@ -133,6 +133,25 @@ typedef struct siginfo32 {
 	} _sifields;
 } siginfo_t32;
 
+struct sigframe32
+{
+        u32 pretcode;
+        int sig;
+        struct sigcontext_ia32 sc;
+        struct _fpstate_ia32 fpstate;
+        unsigned int extramask[_COMPAT_NSIG_WORDS-1];
+};
+
+struct rt_sigframe32
+{
+        u32 pretcode;
+        int sig;
+        u32 pinfo;
+        u32 puc;
+        struct siginfo32 info;
+        struct ucontext_ia32 uc;
+        struct _fpstate_ia32 fpstate;
+};
 
 struct ustat32 {
 	__u32	f_tfree;

@@ -23,6 +23,7 @@
 #include <asm/percpu.h>
 #include <asm/mtrr.h>
 #include <asm/proto.h>
+#include <asm/mman.h>
 
 char x86_boot_params[2048] __initdata = {0,};
 
@@ -40,21 +41,78 @@ struct desc_ptr idt_descr = { 256 * 16, (unsigned long) idt_table };
 char boot_cpu_stack[IRQSTACKSIZE] __cacheline_aligned;
 
 unsigned long __supported_pte_mask = ~0UL;
-static int do_not_nx = 1;
+static int do_not_nx __initdata = 0;
+unsigned long vm_stack_flags = __VM_STACK_FLAGS; 
+unsigned long vm_stack_flags32 = __VM_STACK_FLAGS; 
+unsigned long vm_data_default_flags = __VM_DATA_DEFAULT_FLAGS; 
+unsigned long vm_data_default_flags32 = __VM_DATA_DEFAULT_FLAGS; 
+unsigned long vm_force_exec32 = PROT_EXEC; 
 
+/* noexec=on|off
+Control non executable mappings for 64bit processes.
+
+on	Enable
+off	Disable
+noforce (default) Don't enable by default for heap/stack/data, 
+	but allow PROT_EXEC to be effective
+
+*/ 
 static int __init nonx_setup(char *str)
 {
-        if (!strncmp(str,"off",3)) { 
-                __supported_pte_mask &= ~_PAGE_NX; 
-                do_not_nx = 1; 
-        } else if (!strncmp(str, "on",3)) { 
-                do_not_nx = 0; 
+	if (!strncmp(str, "on",3)) { 
                 __supported_pte_mask |= _PAGE_NX; 
+ 		do_not_nx = 0; 
+ 		vm_data_default_flags &= ~VM_EXEC; 
+ 		vm_stack_flags &= ~VM_EXEC;  
+	} else if (!strncmp(str, "noforce",7) || !strncmp(str,"off",3)) { 
+		do_not_nx = (str[0] == 'o');
+		if (do_not_nx)
+			__supported_pte_mask &= ~_PAGE_NX; 
+		vm_data_default_flags |= VM_EXEC; 
+		vm_stack_flags |= VM_EXEC;
         } 
         return 1;
 } 
 
 __setup("noexec=", nonx_setup); 
+
+/* noexec32=opt{,opt} 
+
+Control the no exec default for 32bit processes. Can be also overwritten
+per executable using ELF header flags (e.g. needed for the X server)
+Requires noexec=on or noexec=noforce to be effective.
+
+Valid options: 
+   all,on    Heap,stack,data is non executable. 	
+   off       (default) Heap,stack,data is executable
+   stack     Stack is non executable, heap/data is.
+   force     Don't imply PROT_EXEC for PROT_READ 
+   compat    (default) Imply PROT_EXEC for PROT_READ
+
+*/
+ static int __init nonx32_setup(char *str)
+ {
+	char *s;
+	while ((s = strsep(&str, ",")) != NULL) { 
+		if (!strcmp(s, "all") || !strcmp(s,"on")) {
+			vm_data_default_flags32 &= ~VM_EXEC; 
+			vm_stack_flags32 &= ~VM_EXEC;  
+		} else if (!strcmp(s, "off")) { 
+			vm_data_default_flags32 |= VM_EXEC; 
+			vm_stack_flags32 |= VM_EXEC;  
+		} else if (!strcmp(s, "stack")) { 
+			vm_data_default_flags32 |= VM_EXEC; 
+			vm_stack_flags32 &= ~VM_EXEC;  		
+		} else if (!strcmp(s, "force")) { 
+			vm_force_exec32 = 0; 
+		} else if (!strcmp(s, "compat")) { 
+			vm_force_exec32 = PROT_EXEC;
+		} 
+	} 
+ 	return 1;
+} 
+
+__setup("noexec32=", nonx32_setup); 
 
 #ifndef  __GENERIC_PER_CPU
 

@@ -105,7 +105,7 @@ static int init_inodecache(void)
 {
 	isofs_inode_cachep = kmem_cache_create("isofs_inode_cache",
 					     sizeof(struct iso_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (isofs_inode_cachep == NULL)
 		return -ENOMEM;
@@ -1279,11 +1279,12 @@ static void isofs_read_inode(struct inode * inode)
 	}
 #endif
 
-	inode->i_mtime.tv_sec = inode->i_atime.tv_sec = inode->i_ctime.tv_sec =
-		iso_date(de->date, high_sierra);
-	inode->i_mtime.tv_nsec = 0;
-	inode->i_atime.tv_nsec = 0;
-	inode->i_mtime.tv_nsec = 0;
+	inode->i_mtime.tv_sec =
+	inode->i_atime.tv_sec =
+	inode->i_ctime.tv_sec = iso_date(de->date, high_sierra);
+	inode->i_mtime.tv_nsec =
+	inode->i_atime.tv_nsec =
+	inode->i_ctime.tv_nsec = 0;
 
 	ei->i_first_extent = (isonum_733 (de->extent) +
 			      isonum_711 (de->ext_attr_length));
@@ -1376,7 +1377,7 @@ void leak_check_brelse(struct buffer_head * bh){
 #endif
 
 static struct super_block *isofs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, isofs_fill_super);
 }

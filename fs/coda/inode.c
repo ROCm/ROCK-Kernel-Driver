@@ -70,7 +70,7 @@ int coda_init_inodecache(void)
 {
 	coda_inode_cachep = kmem_cache_create("coda_inode_cache",
 					     sizeof(struct coda_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN||SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (coda_inode_cachep == NULL)
 		return -ENOMEM;
@@ -303,7 +303,7 @@ static int coda_statfs(struct super_block *sb, struct statfs *buf)
 /* init_coda: used by filesystems.c to register coda */
 
 static struct super_block *coda_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_nodev(fs_type, flags, data, coda_fill_super);
 }

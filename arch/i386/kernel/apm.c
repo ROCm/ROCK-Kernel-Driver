@@ -512,9 +512,8 @@ static unsigned long apm_save_cpus(void)
 {
 	unsigned long x = current->cpus_allowed;
 	/* Some bioses don't like being called from CPU != 0 */
-	set_cpus_allowed(current, 1 << 0);
-	if (unlikely(smp_processor_id() != 0))
-		BUG();
+	set_cpus_allowed(current, 1UL << 0);
+	BUG_ON(smp_processor_id() != 0);
 	return x;
 }
 
@@ -914,11 +913,8 @@ static void apm_power_off(void)
 	 */
 #ifdef CONFIG_SMP
 	/* Some bioses don't like being called from CPU != 0 */
-	if (smp_processor_id() != 0) {
-		set_cpus_allowed(current, 1 << 0);
-		if (unlikely(smp_processor_id() != 0))
-			BUG();
-	}
+	set_cpus_allowed(current, 1UL << 0);
+	BUG_ON(smp_processor_id() != 0);
 #endif
 	if (apm_info.realmode_power_off)
 	{
@@ -1708,11 +1704,8 @@ static int apm(void *unused)
 	 * Some bioses don't like being called from CPU != 0.
 	 * Method suggested by Ingo Molnar.
 	 */
-	if (smp_processor_id() != 0) {
-		set_cpus_allowed(current, 1 << 0);
-		if (unlikely(smp_processor_id() != 0))
-			BUG();
-	}
+	set_cpus_allowed(current, 1UL << 0);
+	BUG_ON(smp_processor_id() != 0);
 #endif
 
 	if (apm_info.connection_version == 0) {
@@ -2013,7 +2006,7 @@ static int __init apm_init(void)
 
 	apm_proc = create_proc_info_entry("apm", 0, NULL, apm_get_info);
 	if (apm_proc)
-		SET_MODULE_OWNER(apm_proc);
+		apm_proc->owner = THIS_MODULE;
 
 	kernel_thread(apm, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND | SIGCHLD);
 

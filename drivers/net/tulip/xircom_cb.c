@@ -243,39 +243,31 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
 		return -ENODEV;
 	}
 
-	
 	/* 
 	   Before changing the hardware, allocate the memory.
 	   This way, we can fail gracefully if not enough memory
 	   is available. 
 	 */
-	private = kmalloc(sizeof(*private),GFP_KERNEL);
-	memset(private, 0, sizeof(struct xircom_private));
+	if ((dev = init_etherdev(NULL, sizeof(struct xircom_private))) == NULL) {
+		printk(KERN_ERR "xircom_probe: failed to allocate etherdev\n");
+		goto device_fail;
+	}
+	private = dev->priv;
 	
 	/* Allocate the send/receive buffers */
 	private->rx_buffer = pci_alloc_consistent(pdev,8192,&private->rx_dma_handle);
-	
 	if (private->rx_buffer == NULL) {
  		printk(KERN_ERR "xircom_probe: no memory for rx buffer \n");
- 		kfree(private);
-		return -ENODEV;
+		goto rx_buf_fail;
 	}	
 	private->tx_buffer = pci_alloc_consistent(pdev,8192,&private->tx_dma_handle);
 	if (private->tx_buffer == NULL) {
 		printk(KERN_ERR "xircom_probe: no memory for tx buffer \n");
-		kfree(private->rx_buffer);
-		kfree(private);
-		return -ENODEV;
+		goto tx_buf_fail;
 	}
-	dev = init_etherdev(dev, 0);
-	if (dev == NULL) {
-		printk(KERN_ERR "xircom_probe: failed to allocate etherdev\n");
-		kfree(private->rx_buffer);
-		kfree(private->tx_buffer);
-		kfree(private);
-		return -ENODEV;
-	}
+
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	printk(KERN_INFO "%s: Xircom cardbus revision %i at irq %i \n", dev->name, chip_rev, pdev->irq);
 
 	private->dev = dev;
@@ -304,14 +296,21 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
 	transceiver_voodoo(private);
 	
 	spin_lock_irqsave(&private->lock,flags);
-	  activate_transmitter(private);
-	  activate_receiver(private);
+	activate_transmitter(private);
+	activate_receiver(private);
 	spin_unlock_irqrestore(&private->lock,flags);
 	
 	trigger_receive(private);
 	
 	leave("xircom_probe");
 	return 0;
+
+tx_buf_fail:
+	kfree(private->rx_buffer);
+rx_buf_fail:
+	kfree(dev);
+device_fail:
+	return -ENODEV;
 }
 
 
@@ -336,7 +335,6 @@ static void __devexit xircom_remove(struct pci_dev *pdev)
 				pci_free_consistent(pdev,8192,card->tx_buffer,card->tx_dma_handle);
 			card->tx_buffer = NULL;			
 		}
-		kfree(card);
 	}
 	release_region(dev->base_addr, 128);
 	unregister_netdev(dev);

@@ -376,6 +376,25 @@ struct swap_info_struct;
  * 	Check permission before removing the extended attribute
  * 	identified by @name for @dentry.
  * 	Return 0 if permission is granted.
+ * @inode_getsecurity:
+ *	Copy the extended attribute representation of the security label 
+ *	associated with @name for @dentry into @buffer.  @buffer may be 
+ *	NULL to request the size of the buffer required.  @size indicates
+ *	the size of @buffer in bytes.  Note that @name is the remainder
+ *	of the attribute name after the security. prefix has been removed.
+ *	Return number of bytes used/required on success.
+ * @inode_setsecurity:
+ *	Set the security label associated with @name for @dentry from the 
+ *	extended attribute value @value.  @size indicates the size of the
+ *	@value in bytes.  @flags may be XATTR_CREATE, XATTR_REPLACE, or 0.
+ *	Note that @name is the remainder of the attribute name after the 
+ *	security. prefix has been removed.
+ *	Return 0 on success.
+ * @inode_listsecurity:
+ *	Copy the extended attribute names for the security labels
+ *	associated with @dentry into @buffer.  @buffer may be NULL to 
+ *	request the size of the buffer required.  
+ *	Returns number of bytes used/required on success.
  *
  * Security hooks for file operations
  *
@@ -596,6 +615,11 @@ struct swap_info_struct;
  * 	Set the security attributes in @p->security for a kernel thread that
  * 	is being reparented to the init task.
  *	@p contains the task_struct for the kernel thread.
+ * @task_to_inode:
+ * 	Set the security attributes for an inode based on an associated task's
+ * 	security attributes, e.g. for /proc/pid inodes.
+ *	@p contains the task_struct for the task.
+ *	@inode contains the inode structure for the inode.
  *
  * Security hooks for Netlink messaging.
  *
@@ -1044,6 +1068,9 @@ struct security_operations {
 	int (*inode_getxattr) (struct dentry *dentry, char *name);
 	int (*inode_listxattr) (struct dentry *dentry);
 	int (*inode_removexattr) (struct dentry *dentry, char *name);
+  	int (*inode_getsecurity)(struct dentry *dentry, const char *name, void *buffer, size_t size);
+  	int (*inode_setsecurity)(struct dentry *dentry, const char *name, const void *value, size_t size, int flags);
+  	int (*inode_listsecurity)(struct dentry *dentry, char *buffer);
 
 	int (*file_permission) (struct file * file, int mask);
 	int (*file_alloc_security) (struct file * file);
@@ -1086,6 +1113,7 @@ struct security_operations {
 			   unsigned long arg5);
 	void (*task_kmod_set_label) (void);
 	void (*task_reparent_to_init) (struct task_struct * p);
+	void (*task_to_inode)(struct task_struct *p, struct inode *inode);
 
 	int (*ipc_permission) (struct kern_ipc_perm * ipcp, short flag);
 
@@ -1127,6 +1155,9 @@ struct security_operations {
 	                            struct security_operations *ops);
 
 	void (*d_instantiate) (struct dentry *dentry, struct inode *inode);
+
+ 	int (*getprocattr)(struct task_struct *p, char *name, void *value, size_t size);
+ 	int (*setprocattr)(struct task_struct *p, char *name, void *value, size_t size);
 
 #ifdef CONFIG_SECURITY_NETWORK
 	int (*unix_stream_connect) (struct socket * sock,
@@ -1490,6 +1521,21 @@ static inline int security_inode_removexattr (struct dentry *dentry, char *name)
 	return security_ops->inode_removexattr (dentry, name);
 }
 
+static inline int security_inode_getsecurity(struct dentry *dentry, const char *name, void *buffer, size_t size)
+{
+	return security_ops->inode_getsecurity(dentry, name, buffer, size);
+}
+
+static inline int security_inode_setsecurity(struct dentry *dentry, const char *name, const void *value, size_t size, int flags) 
+{
+	return security_ops->inode_setsecurity(dentry, name, value, size, flags);
+}
+
+static inline int security_inode_listsecurity(struct dentry *dentry, char *buffer)
+{
+	return security_ops->inode_listsecurity(dentry, buffer);
+}
+
 static inline int security_file_permission (struct file *file, int mask)
 {
 	return security_ops->file_permission (file, mask);
@@ -1656,6 +1702,11 @@ static inline void security_task_reparent_to_init (struct task_struct *p)
 	security_ops->task_reparent_to_init (p);
 }
 
+static inline void security_task_to_inode(struct task_struct *p, struct inode *inode)
+{
+	security_ops->task_to_inode(p, inode);
+}
+
 static inline int security_ipc_permission (struct kern_ipc_perm *ipcp,
 					   short flag)
 {
@@ -1764,6 +1815,16 @@ static inline int security_sem_semop (struct sem_array * sma,
 static inline void security_d_instantiate (struct dentry *dentry, struct inode *inode)
 {
 	security_ops->d_instantiate (dentry, inode);
+}
+
+static inline int security_getprocattr(struct task_struct *p, char *name, void *value, size_t size)
+{
+	return security_ops->getprocattr(p, name, value, size);
+}
+
+static inline int security_setprocattr(struct task_struct *p, char *name, void *value, size_t size)
+{
+	return security_ops->setprocattr(p, name, value, size);
 }
 
 static inline int security_netlink_send(struct sk_buff * skb)
@@ -2093,6 +2154,21 @@ static inline int security_inode_removexattr (struct dentry *dentry, char *name)
 	return 0;
 }
 
+static inline int security_inode_getsecurity(struct dentry *dentry, const char *name, void *buffer, size_t size)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int security_inode_setsecurity(struct dentry *dentry, const char *name, const void *value, size_t size, int flags) 
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int security_inode_listsecurity(struct dentry *dentry, char *buffer)
+{
+	return 0;
+}
+
 static inline int security_file_permission (struct file *file, int mask)
 {
 	return 0;
@@ -2255,6 +2331,9 @@ static inline void security_task_reparent_to_init (struct task_struct *p)
 	cap_task_reparent_to_init (p);
 }
 
+static inline void security_task_to_inode(struct task_struct *p, struct inode *inode)
+{ }
+
 static inline int security_ipc_permission (struct kern_ipc_perm *ipcp,
 					   short flag)
 {
@@ -2354,6 +2433,16 @@ static inline int security_sem_semop (struct sem_array * sma,
 
 static inline void security_d_instantiate (struct dentry *dentry, struct inode *inode)
 { }
+
+static inline int security_getprocattr(struct task_struct *p, char *name, void *value, size_t size)
+{
+	return -EINVAL;
+}
+
+static inline int security_setprocattr(struct task_struct *p, char *name, void *value, size_t size)
+{
+	return -EINVAL;
+}
 
 /*
  * The netlink capability defaults need to be used inline by default

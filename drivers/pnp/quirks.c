@@ -15,6 +15,7 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/slab.h>
 
 #ifdef CONFIG_PNP_DEBUG
 	#define DEBUG
@@ -39,9 +40,13 @@ static void quirk_awe32_resources(struct pnp_dev *dev)
 	 */
 	for ( ; res ; res = res->dep ) {
 		port2 = pnp_alloc(sizeof(struct pnp_port));
-		port3 = pnp_alloc(sizeof(struct pnp_port));
-		if (!port2 || !port3)
+		if (!port2)
 			return;
+		port3 = pnp_alloc(sizeof(struct pnp_port));
+		if (!port3) {
+			kfree(port2);
+			return;
+		}
 		port = res->port;
 		memcpy(port2, port, sizeof(struct pnp_port));
 		memcpy(port3, port, sizeof(struct pnp_port));

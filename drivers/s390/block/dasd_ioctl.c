@@ -59,7 +59,6 @@ dasd_ioctl_no_register(struct module *owner, int no, dasd_ioctl_fn_t handler)
 	new->no = no;
 	new->handler = handler;
 	list_add(&new->list, &dasd_ioctl_list);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -76,7 +75,6 @@ dasd_ioctl_no_unregister(struct module *owner, int no, dasd_ioctl_fn_t handler)
 		return -EINVAL;
 	list_del(&old->list);
 	kfree(old);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

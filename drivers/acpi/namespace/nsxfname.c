@@ -51,7 +51,7 @@
 	 ACPI_MODULE_NAME    ("nsxfname")
 
 
-/****************************************************************************
+/******************************************************************************
  *
  * FUNCTION:    acpi_get_handle
  *
@@ -119,7 +119,8 @@ acpi_get_handle (
 	/*
 	 *  Find the Node and convert to a handle
 	 */
-	status = acpi_ns_get_node_by_path (pathname, prefix_node, ACPI_NS_NO_UPSEARCH, &node);
+	status = acpi_ns_get_node_by_path (pathname, prefix_node, ACPI_NS_NO_UPSEARCH,
+			  &node);
 
 	*ret_handle = NULL;
 	if (ACPI_SUCCESS (status)) {
@@ -130,7 +131,7 @@ acpi_get_handle (
 }
 
 
-/****************************************************************************
+/******************************************************************************
  *
  * FUNCTION:    acpi_get_name
  *
@@ -211,7 +212,7 @@ unlock_and_exit:
 }
 
 
-/****************************************************************************
+/******************************************************************************
  *
  * FUNCTION:    acpi_get_object_info
  *
@@ -229,20 +230,25 @@ unlock_and_exit:
 acpi_status
 acpi_get_object_info (
 	acpi_handle                     handle,
-	struct acpi_device_info         *info)
+	struct acpi_buffer              *buffer)
 {
-	struct acpi_device_id           hid;
-	struct acpi_device_id           uid;
 	acpi_status                     status;
-	u32                             device_status = 0;
-	acpi_integer                    address = 0;
 	struct acpi_namespace_node      *node;
+	struct acpi_device_info         info;
+	struct acpi_device_info         *return_info;
+	struct acpi_compatible_id_list *cid_list = NULL;
+	acpi_size                       size;
 
 
 	/* Parameter validation */
 
-	if (!handle || !info) {
+	if (!handle || !buffer) {
 		return (AE_BAD_PARAMETER);
+	}
+
+	status = acpi_ut_validate_buffer (buffer);
+	if (ACPI_FAILURE (status)) {
+		return (status);
 	}
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
@@ -256,69 +262,94 @@ acpi_get_object_info (
 		return (AE_BAD_PARAMETER);
 	}
 
-	info->type = node->type;
-	info->name = node->name.integer;
+	/* Init return structure */
+
+	size = sizeof (struct acpi_device_info);
+	ACPI_MEMSET (&info, 0, size);
+
+	info.type  = node->type;
+	info.name  = node->name.integer;
+	info.valid = 0;
 
 	status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	if (ACPI_FAILURE (status)) {
 		return (status);
 	}
 
-	/*
-	 * If not a device, we are all done.
-	 */
-	if (info->type != ACPI_TYPE_DEVICE) {
-		return (AE_OK);
+	/* If not a device, we are all done */
+
+	if (info.type == ACPI_TYPE_DEVICE) {
+		/*
+		 * Get extra info for ACPI Devices objects only:
+		 * Run the Device _HID, _UID, _CID, _STA, and _ADR methods.
+		 *
+		 * Note: none of these methods are required, so they may or may
+		 * not be present for this device.  The Info.Valid bitfield is used
+		 * to indicate which methods were found and ran successfully.
+		 */
+
+		/* Execute the Device._HID method */
+
+		status = acpi_ut_execute_HID (node, &info.hardware_id);
+		if (ACPI_SUCCESS (status)) {
+			info.valid |= ACPI_VALID_HID;
+		}
+
+		/* Execute the Device._UID method */
+
+		status = acpi_ut_execute_UID (node, &info.unique_id);
+		if (ACPI_SUCCESS (status)) {
+			info.valid |= ACPI_VALID_UID;
+		}
+
+		/* Execute the Device._CID method */
+
+		status = acpi_ut_execute_CID (node, &cid_list);
+		if (ACPI_SUCCESS (status)) {
+			size += ((acpi_size) cid_list->count - 1) *
+					 sizeof (struct acpi_compatible_id);
+			info.valid |= ACPI_VALID_CID;
+		}
+
+		/* Execute the Device._STA method */
+
+		status = acpi_ut_execute_STA (node, &info.current_status);
+		if (ACPI_SUCCESS (status)) {
+			info.valid |= ACPI_VALID_STA;
+		}
+
+		/* Execute the Device._ADR method */
+
+		status = acpi_ut_evaluate_numeric_object (METHOD_NAME__ADR, node,
+				  &info.address);
+		if (ACPI_SUCCESS (status)) {
+			info.valid |= ACPI_VALID_ADR;
+		}
+
+		status = AE_OK;
+	}
+
+	/* Validate/Allocate/Clear caller buffer */
+
+	status = acpi_ut_initialize_buffer (buffer, size);
+	if (ACPI_FAILURE (status)) {
+		goto cleanup;
+	}
+
+	/* Populate the return buffer */
+
+	return_info = buffer->pointer;
+	ACPI_MEMCPY (return_info, &info, sizeof (struct acpi_device_info));
+
+	if (cid_list) {
+		ACPI_MEMCPY (&return_info->compatibility_id, cid_list, cid_list->size);
 	}
 
 
-	/*
-	 * Get extra info for ACPI devices only.  Run the
-	 * _HID, _UID, _STA, and _ADR methods.  Note: none
-	 * of these methods are required, so they may or may
-	 * not be present.  The Info->Valid bits are used
-	 * to indicate which methods ran successfully.
-	 */
-	info->valid = 0;
-
-	/* Execute the _HID method and save the result */
-
-	status = acpi_ut_execute_HID (node, &hid);
-	if (ACPI_SUCCESS (status)) {
-		ACPI_STRNCPY (info->hardware_id, hid.buffer, sizeof(info->hardware_id));
-		info->valid |= ACPI_VALID_HID;
+cleanup:
+	if (cid_list) {
+		ACPI_MEM_FREE (cid_list);
 	}
-
-	/* Execute the _UID method and save the result */
-
-	status = acpi_ut_execute_UID (node, &uid);
-	if (ACPI_SUCCESS (status)) {
-		ACPI_STRCPY (info->unique_id, uid.buffer);
-		info->valid |= ACPI_VALID_UID;
-	}
-
-	/*
-	 * Execute the _STA method and save the result
-	 * _STA is not always present
-	 */
-	status = acpi_ut_execute_STA (node, &device_status);
-	if (ACPI_SUCCESS (status)) {
-		info->current_status = device_status;
-		info->valid |= ACPI_VALID_STA;
-	}
-
-	/*
-	 * Execute the _ADR method and save result if successful
-	 * _ADR is not always present
-	 */
-	status = acpi_ut_evaluate_numeric_object (METHOD_NAME__ADR,
-			  node, &address);
-
-	if (ACPI_SUCCESS (status)) {
-		info->address = address;
-		info->valid |= ACPI_VALID_ADR;
-	}
-
-	return (AE_OK);
+	return (status);
 }
 

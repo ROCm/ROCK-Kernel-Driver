@@ -1647,7 +1647,8 @@ static int shmem_remount_fs(struct super_block *sb, int *flags, char *data)
 }
 #endif
 
-static int shmem_fill_super(struct super_block *sb, void *data, int silent)
+static int shmem_fill_super(struct super_block *sb,
+			    void *data, int silent)
 {
 	struct inode *inode;
 	struct dentry *root;
@@ -1744,7 +1745,7 @@ static int init_inodecache(void)
 {
 	shmem_inode_cachep = kmem_cache_create("shmem_inode_cache",
 					     sizeof(struct shmem_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (shmem_inode_cachep == NULL)
 		return -ENOMEM;
@@ -1814,7 +1815,7 @@ static struct vm_operations_struct shmem_vm_ops = {
 };
 
 static struct super_block *shmem_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_nodev(fs_type, flags, data, shmem_fill_super);
 }

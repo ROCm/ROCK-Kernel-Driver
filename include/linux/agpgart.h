@@ -183,7 +183,7 @@ struct agp_controller {
 	struct agp_controller *prev;
 	pid_t pid;
 	int num_clients;
-	agp_memory *pool;
+	struct agp_memory *pool;
 	struct agp_client *clients;
 };
 

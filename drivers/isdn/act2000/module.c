@@ -587,7 +587,7 @@ act2000_alloccard(int bus, int port, int irq, char *id)
 	INIT_WORK(&card->rcv_tq, (void *) (void *) actcapi_dispatch, card);
 	INIT_WORK(&card->poll_tq, (void *) (void *) act2000_receive, card);
 	init_timer(&card->ptimer);
-	SET_MODULE_OWNER(&card->interface);
+	card->interface.owner = THIS_MODULE;
         card->interface.channels = ACT2000_BCH;
         card->interface.maxbufsize = 4000;
         card->interface.command = if_command;
@@ -601,7 +601,7 @@ act2000_alloccard(int bus, int port, int irq, char *id)
 		ISDN_FEATURE_P_UNKNOWN;
         card->interface.hl_hdrlen = 20;
         card->ptype = ISDN_PTYPE_EURO;
-        strncpy(card->interface.id, id, sizeof(card->interface.id) - 1);
+        strlcpy(card->interface.id, id, sizeof(card->interface.id));
         for (i=0; i<ACT2000_BCH; i++) {
                 card->bch[i].plci = 0x8000;
                 card->bch[i].ncci = 0x8000;

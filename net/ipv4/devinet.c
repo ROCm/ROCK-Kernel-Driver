@@ -1302,9 +1302,7 @@ static void devinet_sysctl_register(struct in_device *in_dev,
 	if (!t)
 		return;
 	memcpy(t, &devinet_sysctl, sizeof(*t));
-	for (i = 0;
-	     i < sizeof(t->devinet_vars) / sizeof(t->devinet_vars[0]) - 1;
-	     i++) {
+	for (i = 0; i < ARRAY_SIZE(t->devinet_vars) - 1; i++) {
 		t->devinet_vars[i].data += (char *)p - (char *)&ipv4_devconf;
 		t->devinet_vars[i].de = NULL;
 	}

@@ -19,105 +19,85 @@
 MODULE_LICENSE("GPL");
 
 /* set ECT codepoint from IP header.
- * 	return 0 in case there was no ECT codepoint
- * 	return 1 in case ECT codepoint has been overwritten
- * 	return < 0 in case there was error */
+ * 	return 0 if there was an error. */
 static inline int
-set_ect_ip(struct sk_buff **pskb, struct iphdr *iph,
-	   const struct ipt_ECN_info *einfo)
+set_ect_ip(struct sk_buff **pskb, const struct ipt_ECN_info *einfo)
 {
-	if ((iph->tos & IPT_ECN_IP_MASK)
+	if (((*pskb)->nh.iph->tos & IPT_ECN_IP_MASK)
 	    != (einfo->ip_ect & IPT_ECN_IP_MASK)) {
 		u_int16_t diffs[2];
 
-		/* raw socket (tcpdump) may have clone of incoming
-		 * skb: don't disturb it --RR */
-		if (skb_cloned(*pskb) && !(*pskb)->sk) {
-			struct sk_buff *nskb = skb_copy(*pskb, GFP_ATOMIC);
-			if (!nskb)
-				return NF_DROP;
-			kfree_skb(*pskb);
-			*pskb = nskb;
-			iph = (*pskb)->nh.iph;
-		}
+		if (!skb_ip_make_writable(pskb, sizeof(struct iphdr)))
+			return 0;
 
-		diffs[0] = htons(iph->tos) ^ 0xFFFF;
-		iph->tos = iph->tos & ~IPT_ECN_IP_MASK;
-		iph->tos = iph->tos | (einfo->ip_ect & IPT_ECN_IP_MASK);
-		diffs[1] = htons(iph->tos);
-		iph->check = csum_fold(csum_partial((char *)diffs,
-		                                    sizeof(diffs),
-		                                    iph->check^0xFFFF));
+		diffs[0] = htons((*pskb)->nh.iph->tos) ^ 0xFFFF;
+		(*pskb)->nh.iph->tos &= ~IPT_ECN_IP_MASK;
+		(*pskb)->nh.iph->tos |= (einfo->ip_ect & IPT_ECN_IP_MASK);
+		diffs[1] = htons((*pskb)->nh.iph->tos);
+		(*pskb)->nh.iph->check
+			= csum_fold(csum_partial((char *)diffs,
+						 sizeof(diffs),
+						 (*pskb)->nh.iph->check
+						 ^0xFFFF));
 		(*pskb)->nfcache |= NFC_ALTERED;
-
-		return 1;
 	} 
-	return 0;
+	return 1;
 }
 
+/* Return 0 if there was an error. */
 static inline int
-set_ect_tcp(struct sk_buff **pskb, struct iphdr *iph,
-	    const struct ipt_ECN_info *einfo)
+set_ect_tcp(struct sk_buff **pskb, const struct ipt_ECN_info *einfo)
 {
-
-	struct tcphdr *tcph = (void *) iph + iph->ihl * 4;
-	u_int16_t *tcpflags = (u_int16_t *)tcph + 6;
+	struct tcphdr tcph;
 	u_int16_t diffs[2];
 
-	/* raw socket (tcpdump) may have clone of incoming
-	 * skb: don't disturb it --RR */
-	if (skb_cloned(*pskb) && !(*pskb)->sk) {
-		struct sk_buff *nskb = skb_copy(*pskb, GFP_ATOMIC);
-		if (!nskb)
-			return NF_DROP;
-		kfree_skb(*pskb);
-		*pskb = nskb;
-		iph = (*pskb)->nh.iph;
-	}
+	/* Not enought header? */
+	if (skb_copy_bits(*pskb, (*pskb)->nh.iph->ihl*4, &tcph, sizeof(tcph))
+	    < 0)
+		return 0;
 
-	diffs[0] = *tcpflags;
+	diffs[0] = ((u_int16_t *)&tcph)[6];
+	if (einfo->operation & IPT_ECN_OP_SET_ECE)
+		tcph.ece = einfo->proto.tcp.ece;
 
-	if (einfo->operation & IPT_ECN_OP_SET_ECE
-	    && tcph->ece != einfo->proto.tcp.ece) {
-		tcph->ece = einfo->proto.tcp.ece;
-	}
+	if (einfo->operation & IPT_ECN_OP_SET_CWR)
+		tcph.cwr = einfo->proto.tcp.cwr;
+	diffs[1] = ((u_int16_t *)&tcph)[6];
 
-	if (einfo->operation & IPT_ECN_OP_SET_CWR
-	    && tcph->cwr != einfo->proto.tcp.cwr) {
-		tcph->cwr = einfo->proto.tcp.cwr;
-	}
-	
-	if (diffs[0] != *tcpflags) {
+	/* Only mangle if it's changed. */
+	if (diffs[0] != diffs[1]) {
 		diffs[0] = diffs[0] ^ 0xFFFF;
-		diffs[1] = *tcpflags;
-		tcph->check = csum_fold(csum_partial((char *)diffs,
+		if (!skb_ip_make_writable(pskb,
+					  (*pskb)->nh.iph->ihl*4+sizeof(tcph)))
+			return 0;
+		tcph.check = csum_fold(csum_partial((char *)diffs,
 		                                    sizeof(diffs),
-		                                    tcph->check^0xFFFF));
+		                                    tcph.check^0xFFFF));
+		memcpy((*pskb)->data + (*pskb)->nh.iph->ihl*4,
+		       &tcph, sizeof(tcph));
 		(*pskb)->nfcache |= NFC_ALTERED;
-
-		return 1;
 	}
-
-	return 0;
+	return 1;
 }
 
 static unsigned int
 target(struct sk_buff **pskb,
-       unsigned int hooknum,
        const struct net_device *in,
        const struct net_device *out,
+       unsigned int hooknum,
        const void *targinfo,
        void *userinfo)
 {
-	struct iphdr *iph = (*pskb)->nh.iph;
 	const struct ipt_ECN_info *einfo = targinfo;
 
 	if (einfo->operation & IPT_ECN_OP_SET_IP)
-		set_ect_ip(pskb, iph, einfo);
+		if (!set_ect_ip(pskb, einfo))
+			return NF_DROP;
 
 	if (einfo->operation & (IPT_ECN_OP_SET_ECE | IPT_ECN_OP_SET_CWR)
-	    && iph->protocol == IPPROTO_TCP)
-		set_ect_tcp(pskb, iph, einfo);
+	    && (*pskb)->nh.iph->protocol == IPPROTO_TCP)
+		if (!set_ect_tcp(pskb, einfo))
+			return NF_DROP;
 
 	return IPT_CONTINUE;
 }

@@ -120,9 +120,6 @@ static int	stl_nrbrds = sizeof(stl_brdconf) / sizeof(stlconf_t);
 #define	STL_CALLOUTMAJOR	25
 #endif
 
-#define	STL_DRVTYPSERIAL	1
-#define	STL_DRVTYPCALLOUT	2
-
 /*
  *	Set the TX buffer size. Bigger is better, but we don't want
  *	to chew too much memory with buffers!
@@ -141,14 +138,11 @@ static char	*stl_drvname = "stallion";
 static char	*stl_drvversion = "5.6.0";
 #ifdef CONFIG_DEVFS_FS
 static char	*stl_serialname = "tts/E%d";
-static char	*stl_calloutname = "cua/E%d";
 #else
 static char	*stl_serialname = "ttyE";
-static char	*stl_calloutname = "cue";
 #endif
 
 static struct tty_driver	stl_serial;
-static struct tty_driver	stl_callout;
 static struct tty_struct	*stl_ttys[STL_MAXDEVS];
 static struct termios		*stl_termios[STL_MAXDEVS];
 static struct termios		*stl_termioslocked[STL_MAXDEVS];
@@ -799,10 +793,9 @@ static void __exit stallion_module_exit(void)
  *	hanging onto ports.
  */
 	i = tty_unregister_driver(&stl_serial);
-	j = tty_unregister_driver(&stl_callout);
-	if (i || j) {
+	if (i) {
 		printk("STALLION: failed to un-register tty driver, "
-			"errno=%d,%d\n", -i, -j);
+			"errno=%d\n", -i);
 		restore_flags(flags);
 		return;
 	}
@@ -1087,39 +1080,16 @@ static int stl_open(struct tty_struct *tty, struct file *filp)
  *	previous opens still in effect. If we are a normal serial device
  *	then also we might have to wait for carrier.
  */
-	if (tty->driver->subtype == STL_DRVTYPCALLOUT) {
-		if (portp->flags & ASYNC_NORMAL_ACTIVE)
-			return(-EBUSY);
-		if (portp->flags & ASYNC_CALLOUT_ACTIVE) {
-			if ((portp->flags & ASYNC_SESSION_LOCKOUT) &&
-			    (portp->session != current->session))
-				return(-EBUSY);
-			if ((portp->flags & ASYNC_PGRP_LOCKOUT) &&
-			    (portp->pgrp != current->pgrp))
-				return(-EBUSY);
-		}
-		portp->flags |= ASYNC_CALLOUT_ACTIVE;
-	} else {
-		if (filp->f_flags & O_NONBLOCK) {
-			if (portp->flags & ASYNC_CALLOUT_ACTIVE)
-				return(-EBUSY);
-		} else {
-			if ((rc = stl_waitcarrier(portp, filp)) != 0)
-				return(rc);
-		}
-		portp->flags |= ASYNC_NORMAL_ACTIVE;
+	if (!(filp->f_flags & O_NONBLOCK)) {
+		if ((rc = stl_waitcarrier(portp, filp)) != 0)
+			return(rc);
 	}
+	portp->flags |= ASYNC_NORMAL_ACTIVE;
 
 	if ((portp->refcount == 1) && (portp->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver->subtype == STL_DRVTYPSERIAL)
-			*tty->termios = portp->normaltermios;
-		else
-			*tty->termios = portp->callouttermios;
+		*tty->termios = portp->normaltermios;
 		stl_setport(portp, tty->termios);
 	}
-
-	portp->session = current->session;
-	portp->pgrp = current->pgrp;
 	return(0);
 }
 
@@ -1142,13 +1112,8 @@ static int stl_waitcarrier(stlport_t *portp, struct file *filp)
 	rc = 0;
 	doclocal = 0;
 
-	if (portp->flags & ASYNC_CALLOUT_ACTIVE) {
-		if (portp->normaltermios.c_cflag & CLOCAL)
-			doclocal++;
-	} else {
-		if (portp->tty->termios->c_cflag & CLOCAL)
-			doclocal++;
-	}
+	if (portp->tty->termios->c_cflag & CLOCAL)
+		doclocal++;
 
 	save_flags(flags);
 	cli();
@@ -1157,8 +1122,7 @@ static int stl_waitcarrier(stlport_t *portp, struct file *filp)
 		portp->refcount--;
 
 	for (;;) {
-		if ((portp->flags & ASYNC_CALLOUT_ACTIVE) == 0)
-			stl_setsignals(portp, 1, 1);
+		stl_setsignals(portp, 1, 1);
 		if (tty_hung_up_p(filp) ||
 		    ((portp->flags & ASYNC_INITIALIZED) == 0)) {
 			if (portp->flags & ASYNC_HUP_NOTIFY)
@@ -1167,8 +1131,7 @@ static int stl_waitcarrier(stlport_t *portp, struct file *filp)
 				rc = -ERESTARTSYS;
 			break;
 		}
-		if (((portp->flags & ASYNC_CALLOUT_ACTIVE) == 0) &&
-		    ((portp->flags & ASYNC_CLOSING) == 0) &&
+		if (((portp->flags & ASYNC_CLOSING) == 0) &&
 		    (doclocal || (portp->sigs & TIOCM_CD))) {
 			break;
 		}
@@ -1220,8 +1183,6 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 
 	if (portp->flags & ASYNC_NORMAL_ACTIVE)
 		portp->normaltermios = *tty->termios;
-	if (portp->flags & ASYNC_CALLOUT_ACTIVE)
-		portp->callouttermios = *tty->termios;
 
 /*
  *	May want to wait for any data to drain before closing. The BUSY
@@ -1260,8 +1221,7 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 		wake_up_interruptible(&portp->open_wait);
 	}
 
-	portp->flags &= ~(ASYNC_CALLOUT_ACTIVE | ASYNC_NORMAL_ACTIVE |
-		ASYNC_CLOSING);
+	portp->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&portp->close_wait);
 	restore_flags(flags);
 }
@@ -1838,7 +1798,7 @@ static void stl_hangup(struct tty_struct *tty)
 		portp->tx.tail = (char *) NULL;
 	}
 	portp->tty = (struct tty_struct *) NULL;
-	portp->flags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE);
+	portp->flags &= ~ASYNC_NORMAL_ACTIVE;
 	portp->refcount = 0;
 	wake_up_interruptible(&portp->open_wait);
 }
@@ -2256,12 +2216,8 @@ static void stl_offintr(void *private)
 		if ((portp->sigs & TIOCM_CD) && ((oldsigs & TIOCM_CD) == 0))
 			wake_up_interruptible(&portp->open_wait);
 		if ((oldsigs & TIOCM_CD) && ((portp->sigs & TIOCM_CD) == 0)) {
-			if (portp->flags & ASYNC_CHECK_CD) {
-				if (! ((portp->flags & ASYNC_CALLOUT_ACTIVE) &&
-				    (portp->flags & ASYNC_CALLOUT_NOHUP))) {
-					tty_hangup(tty);	/* FIXME: module removal race here - AKPM */
-				}
-			}
+			if (portp->flags & ASYNC_CHECK_CD)
+				tty_hangup(tty);	/* FIXME: module removal race here - AKPM */
 		}
 	}
 	unlock_kernel();
@@ -2340,7 +2296,6 @@ static int __init stl_initports(stlbrd_t *brdp, stlpanel_t *panelp)
 		portp->close_delay = STL_CLOSEDELAY;
 		portp->closing_wait = 30 * HZ;
 		portp->normaltermios = stl_deftermios;
-		portp->callouttermios = stl_deftermios;
 		INIT_WORK(&portp->tqueue, stl_offintr, portp);
 		init_waitqueue_head(&portp->open_wait);
 		init_waitqueue_head(&portp->close_wait);
@@ -3218,7 +3173,6 @@ int __init stl_init(void)
 
 /*
  *	Set up the tty driver structure and register us as a driver.
- *	Also setup the callout tty device.
  */
 	memset(&stl_serial, 0, sizeof(struct tty_driver));
 	stl_serial.magic = TTY_DRIVER_MAGIC;
@@ -3229,7 +3183,7 @@ int __init stl_init(void)
 	stl_serial.minor_start = 0;
 	stl_serial.num = STL_MAXBRDS * STL_MAXPORTS;
 	stl_serial.type = TTY_DRIVER_TYPE_SERIAL;
-	stl_serial.subtype = STL_DRVTYPSERIAL;
+	stl_serial.subtype = SERIAL_TYPE_NORMAL;
 	stl_serial.init_termios = stl_deftermios;
 	stl_serial.flags = TTY_DRIVER_REAL_RAW;
 	stl_serial.refcount = &stl_refcount;
@@ -3257,16 +3211,8 @@ int __init stl_init(void)
 	stl_serial.send_xchar = stl_sendxchar;
 	stl_serial.read_proc = stl_readproc;
 
-	stl_callout = stl_serial;
-	stl_callout.name = stl_calloutname;
-	stl_callout.major = STL_CALLOUTMAJOR;
-	stl_callout.subtype = STL_DRVTYPCALLOUT;
-	stl_callout.read_proc = 0;
-
 	if (tty_register_driver(&stl_serial))
 		printk("STALLION: failed to register serial driver\n");
-	if (tty_register_driver(&stl_callout))
-		printk("STALLION: failed to register callout driver\n");
 
 	return(0);
 }

@@ -332,7 +332,7 @@ NCR_D700_probe(struct device *dev)
 	}
 
 	mca_device_set_claim(mca_dev, 1);
-	strncpy(dev->name, "NCR_D700", sizeof(dev->name));
+	strlcpy(dev->name, "NCR_D700", sizeof(dev->name));
 	dev_set_drvdata(dev, p);
 	return 0;
 }
@@ -385,6 +385,7 @@ static int __init NCR_D700_init(void)
 static void __exit NCR_D700_exit(void)
 {
 	mca_unregister_driver(&NCR_D700_driver);
+	scsi_sysfs_release_attributes();
 }
 
 module_init(NCR_D700_init);

@@ -529,7 +529,7 @@ int pci_hp_register (struct hotplug_slot *slot)
 	if ((slot->info == NULL) || (slot->ops == NULL))
 		return -EINVAL;
 
-	strncpy(slot->kobj.name, slot->name, KOBJ_NAME_LEN);
+	strlcpy(slot->kobj.name, slot->name, KOBJ_NAME_LEN);
 	kobj_set_kset_s(slot, hotplug_slots_subsys);
 
 	/* this can fail if we have already registered a slot with the same name */

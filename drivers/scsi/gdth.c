@@ -2295,15 +2295,15 @@ GDTH_INITFUNC(static int, gdth_search_drives(int hanum))
         TRACE2(("gdth_search_drives(): CACHE_READ_OEM_STRING_RECORD OK\n"));
         printk("GDT CTR%d Vendor: %s\n",hanum,oemstr->text.oem_company_name);
         /* Save the Host Drive inquiry data */
-        strncpy(ha->oem_name,oemstr->text.scsi_host_drive_inquiry_vendor_id,7);
-        ha->oem_name[7] = '\0';
+        strlcpy(ha->oem_name,oemstr->text.scsi_host_drive_inquiry_vendor_id,
+		sizeof(ha->oem_name));
     } else {
         /* Old method, based on PCI ID */
         TRACE2(("gdth_search_drives(): CACHE_READ_OEM_STRING_RECORD failed\n"));
         if (ha->oem_id == OEM_ID_INTEL)
-            strcpy(ha->oem_name,"Intel  ");
+            strlcpy(ha->oem_name,"Intel  ", sizeof(ha->oem_name));
         else
-            strcpy(ha->oem_name,"ICP    ");
+            strlcpy(ha->oem_name,"ICP    ", sizeof(ha->oem_name));
     }
 
     /* scanning for host drives */

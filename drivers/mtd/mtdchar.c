@@ -1,8 +1,7 @@
 /*
- * $Id: mtdchar.c,v 1.44 2001/10/02 15:05:11 dwmw2 Exp $
+ * $Id: mtdchar.c,v 1.54 2003/05/21 10:50:43 dwmw2 Exp $
  *
  * Character-device access to raw MTD devices.
- * Pure 2.4 version - compatibility cruft removed to mtdchar-compat.c
  *
  */
 
@@ -10,8 +9,10 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mtd/mtd.h>
-#include <linux/smp_lock.h>
 #include <linux/slab.h>
+#include <linux/init.h>
+#include <linux/fs.h>
+#include <asm/uaccess.h>
 
 #ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
@@ -29,7 +30,6 @@ static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 {
 	struct mtd_info *mtd=(struct mtd_info *)file->private_data;
 
-	lock_kernel();
 	switch (orig) {
 	case 0:
 		/* SEEK_SET */
@@ -44,7 +44,6 @@ static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 		file->f_pos =mtd->size + offset;
 		break;
 	default:
-		unlock_kernel();
 		return -EINVAL;
 	}
 
@@ -53,7 +52,6 @@ static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 	else if (file->f_pos >= mtd->size)
 		file->f_pos = mtd->size - 1;
 
-	unlock_kernel();
 	return file->f_pos;
 }
 
@@ -288,7 +286,12 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 
 	case MEMERASE:
 	{
-		struct erase_info *erase=kmalloc(sizeof(struct erase_info),GFP_KERNEL);
+		struct erase_info *erase;
+
+		if(!(file->f_mode & 2))
+			return -EPERM;
+
+		erase=kmalloc(sizeof(struct erase_info),GFP_KERNEL);
 		if (!erase)
 			ret = -ENOMEM;
 		else {
@@ -339,6 +342,9 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		void *databuf;
 		ssize_t retlen;
 		
+		if(!(file->f_mode & 2))
+			return -EPERM;
+
 		if (copy_from_user(&buf, (struct mtd_oob_buf *)arg, sizeof(struct mtd_oob_buf)))
 			return -EFAULT;
 		
@@ -435,6 +441,12 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
+	case MEMSETOOBSEL:
+	{
+		if (copy_from_user(&mtd->oobinfo ,(void *)arg, sizeof(struct nand_oobinfo)))
+			return -EFAULT;
+		break;
+	}
 		
 	default:
 		DEBUG(MTD_DEBUG_LEVEL0, "Invalid ioctl %x (MEMGETINFO = %x)\n", cmd, MEMGETINFO);
@@ -446,12 +458,12 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 
 static struct file_operations mtd_fops = {
 	.owner		= THIS_MODULE,
-	.llseek		= mtd_lseek,	/* lseek */
-	.read		= mtd_read,	/* read */
-	.write 		= mtd_write, 	/* write */
-	.ioctl		= mtd_ioctl,	/* ioctl */
-	.open		= mtd_open,	/* open */
-	.release	= mtd_close,	/* release */
+	.llseek		= mtd_lseek,
+	.read		= mtd_read,
+	.write		= mtd_write,
+	.ioctl		= mtd_ioctl,
+	.open		= mtd_open,
+	.release	= mtd_close,
 };
 
 

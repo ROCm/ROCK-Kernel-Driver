@@ -324,6 +324,7 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 	const u8	*bufp = 0;
 	u8		*ubuf = urb->transfer_buffer;
 	int		len = 0;
+	unsigned long	flags;
 
 	typeReq  = (cmd->bRequestType << 8) | cmd->bRequest;
 	wValue   = le16_to_cpu (cmd->wValue);
@@ -436,7 +437,9 @@ error:
 	}
 
 	/* any errors get returned through the urb completion */
+	local_irq_save (flags);
 	usb_hcd_giveback_urb (hcd, urb, NULL);
+	local_irq_restore (flags);
 	return 0;
 }
 
@@ -454,20 +457,22 @@ static int rh_status_urb (struct usb_hcd *hcd, struct urb *urb)
 	int	len = 1 + (urb->dev->maxchild / 8);
 
 	/* rh_timer protected by hcd_data_lock */
-	if (timer_pending (&hcd->rh_timer)
+	if (hcd->rh_timer.data
 			|| urb->status != -EINPROGRESS
 			|| urb->transfer_buffer_length < len) {
-		dev_dbg (hcd->controller, "not queuing status urb, stat %d\n", urb->status);
+		dev_dbg (hcd->controller,
+				"not queuing rh status urb, stat %d\n",
+				urb->status);
 		return -EINVAL;
 	}
 
-	urb->hcpriv = hcd;	/* nonzero to indicate it's queued */
 	init_timer (&hcd->rh_timer);
 	hcd->rh_timer.function = rh_report_status;
 	hcd->rh_timer.data = (unsigned long) urb;
 	/* USB 2.0 spec says 256msec; this is close enough */
 	hcd->rh_timer.expires = jiffies + HZ/4;
 	add_timer (&hcd->rh_timer);
+	urb->hcpriv = hcd;	/* nonzero to indicate it's queued */
 	return 0;
 }
 
@@ -481,39 +486,37 @@ static void rh_report_status (unsigned long ptr)
 	unsigned long	flags;
 
 	urb = (struct urb *) ptr;
-	spin_lock_irqsave (&urb->lock, flags);
-	if (!urb->dev) {
-		spin_unlock_irqrestore (&urb->lock, flags);
+	local_irq_save (flags);
+	spin_lock (&urb->lock);
+
+	/* do nothing if the hc is gone or the urb's been unlinked */
+	if (!urb->dev
+			|| urb->status != -EINPROGRESS
+			|| (hcd = urb->dev->bus->hcpriv) == 0
+			|| !HCD_IS_RUNNING (hcd->state)) {
+		spin_unlock (&urb->lock);
+		local_irq_restore (flags);
 		return;
 	}
 
-	hcd = urb->dev->bus->hcpriv;
-	if (urb->status == -EINPROGRESS) {
-		if (HCD_IS_RUNNING (hcd->state)) {
-			length = hcd->driver->hub_status_data (hcd,
-					urb->transfer_buffer);
-			spin_unlock_irqrestore (&urb->lock, flags);
-			if (length > 0) {
-				urb->actual_length = length;
-				urb->status = 0;
-				urb->hcpriv = 0;
-				urb->complete (urb, NULL);
-				return;
-			}
-		} else
-			spin_unlock_irqrestore (&urb->lock, flags);
+	length = hcd->driver->hub_status_data (hcd, urb->transfer_buffer);
 
-		/* retrigger timer until completion:  success or unlink */
-		spin_lock_irqsave (&hcd_data_lock, flags);
-		rh_status_urb (hcd, urb);
-		spin_unlock_irqrestore (&hcd_data_lock, flags);
-	} else {
-		/* this urb's been unlinked */
+	/* complete the status urb, or retrigger the timer */
+	spin_lock (&hcd_data_lock);
+	if (length > 0) {
+		hcd->rh_timer.data = 0;
+		urb->actual_length = length;
+		urb->status = 0;
 		urb->hcpriv = 0;
-		spin_unlock_irqrestore (&urb->lock, flags);
+	} else
+		mod_timer (&hcd->rh_timer, jiffies + HZ/4);
+	spin_unlock (&hcd_data_lock);
+	spin_unlock (&urb->lock);
 
+	/* local irqs are always blocked in completions */
+	if (length > 0)
 		usb_hcd_giveback_urb (hcd, urb, NULL);
-	}
+	local_irq_restore (flags);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -541,13 +544,14 @@ void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
 {
 	unsigned long	flags;
 
-	spin_lock_irqsave (&hcd_data_lock, flags);
+	/* note:  always a synchronous unlink */
 	del_timer_sync (&hcd->rh_timer);
 	hcd->rh_timer.data = 0;
-	spin_unlock_irqrestore (&hcd_data_lock, flags);
 
-	/* we rely on RH callback code not unlinking its URB! */
+	local_irq_save (flags);
+	urb->hcpriv = 0;
 	usb_hcd_giveback_urb (hcd, urb, NULL);
+	local_irq_restore (flags);
 }
 
 /*-------------------------------------------------------------------------*/

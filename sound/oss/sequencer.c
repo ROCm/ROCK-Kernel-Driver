@@ -1477,7 +1477,7 @@ int sequencer_ioctl(int dev, struct file *file, unsigned int cmd, caddr_t arg)
 			if (!(synth_open_mask & (1 << dev)) && !orig_dev)
 				return -EBUSY;
 			memcpy(&inf, synth_devs[dev]->info, sizeof(inf));
-			strncpy(inf.name, synth_devs[dev]->id, sizeof(inf.name));
+			strlcpy(inf.name, synth_devs[dev]->id, sizeof(inf.name));
 			inf.device = dev;
 			return copy_to_user(arg, &inf, sizeof(inf))?-EFAULT:0;
 

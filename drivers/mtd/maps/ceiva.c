@@ -11,7 +11,7 @@
  *
  * (C) 2000 Nicolas Pitre <nico@cam.org>
  *
- * $Id: ceiva.c,v 1.2 2002/10/14 12:50:22 rmk Exp $
+ * $Id: ceiva.c,v 1.8 2003/05/21 12:45:18 dwmw2 Exp $
  */
 
 #include <linux/config.h>
@@ -19,6 +19,7 @@
 #include <linux/types.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -31,61 +32,9 @@
 #include <asm/sizes.h>
 
 /*
- * This isnt complete yet, so...
+ * This isn't complete yet, so...
  */
 #define CONFIG_MTD_CEIVA_STATICMAP
-
-static __u8 clps_read8(struct map_info *map, unsigned long ofs)
-{
-	return readb(map->map_priv_1 + ofs);
-}
-
-static __u16 clps_read16(struct map_info *map, unsigned long ofs)
-{
-	return readw(map->map_priv_1 + ofs);
-}
-
-static __u32 clps_read32(struct map_info *map, unsigned long ofs)
-{
-	return readl(map->map_priv_1 + ofs);
-}
-
-static void clps_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy(to, (void *)(map->map_priv_1 + from), len);
-}
-
-static void clps_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	writeb(d, map->map_priv_1 + adr);
-}
-
-static void clps_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	writew(d, map->map_priv_1 + adr);
-}
-
-static void clps_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	writel(d, map->map_priv_1 + adr);
-}
-
-static void clps_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy((void *)(map->map_priv_1 + to), from, len);
-}
-
-static struct map_info clps_map __initdata = {
-	.name		= "clps flash",
-	.read8		= clps_read8,
-	.read16		= clps_read16,
-	.read32		= clps_read32,
-	.copy_from	= clps_copy_from,
-	.write8		= clps_write8,
-	.write16	= clps_write16,
-	.write32	= clps_write32,
-	.copy_to	= clps_copy_to,
-};
 
 #ifdef CONFIG_MTD_CEIVA_STATICMAP
 /*
@@ -94,7 +43,7 @@ static struct map_info clps_map __initdata = {
  *
  * Please note:
  *  1. The flash size given should be the largest flash size that can
- *     be accommodated.
+ *     be accomodated.
  *
  *  2. The bus width must defined in clps_setup_flash.
  *
@@ -115,25 +64,23 @@ static struct map_info clps_map __initdata = {
 
 static struct mtd_partition ceiva_partitions[] = {
 	{
-		.name	= "Ceiva BOOT partition",
-		.size	= BOOT_PARTITION_SIZE_KiB*1024,
+		name: "Ceiva BOOT partition",
+		size:   BOOT_PARTITION_SIZE_KiB*1024,
+		offset: 0,
 
-	},
-	{
-		.name	= "Ceiva parameters partition",
-		.size	= PARAMS_PARTITION_SIZE_KiB*1024,
-		.offset	= (16 + 8) * 1024,
-	},
-	{
-		.name	= "Ceiva kernel partition",
-		.size	= (KERNEL_PARTITION_SIZE_KiB)*1024,
-		.offset	= 0x20000,
+	},{
+		name: "Ceiva parameters partition",
+		size:   PARAMS_PARTITION_SIZE_KiB*1024,
+		offset: (16 + 8) * 1024,
+	},{
+		name: "Ceiva kernel partition",
+		size: (KERNEL_PARTITION_SIZE_KiB)*1024,
+		offset: 0x20000,
 
-	},
-	{
-		.name	= "Ceiva root filesystem partition",
-		.offset	= MTDPART_OFS_APPEND,
-		.size	= (ROOT_PARTITION_SIZE_KiB)*1024,
+	},{
+		name: "Ceiva root filesystem partition",
+		offset: MTDPART_OFS_APPEND,
+		size: (ROOT_PARTITION_SIZE_KiB)*1024,
 	}
 };
 #endif
@@ -178,7 +125,7 @@ static int __init clps_setup_mtd(struct clps_info *clps, int nr, struct mtd_info
 	maps = kmalloc(sizeof(struct map_info) * nr, GFP_KERNEL);
 	if (!maps)
 		return -ENOMEM;
-
+	memset(maps, 0, sizeof(struct map_info) * nr);
 	/*
 	 * Claim and then map the memory regions.
 	 */
@@ -193,7 +140,9 @@ static int __init clps_setup_mtd(struct clps_info *clps, int nr, struct mtd_info
 		}
 
 		clps[i].map = maps + i;
-		memcpy(clps[i].map, &clps_map, sizeof(struct map_info));
+
+		clps[i].map->name = "clps flash";
+		clps[i].map->phys = clps[i].base;
 
 		clps[i].vbase = ioremap(clps[i].base, clps[i].size);
 		if (!clps[i].vbase) {
@@ -201,16 +150,18 @@ static int __init clps_setup_mtd(struct clps_info *clps, int nr, struct mtd_info
 			break;
 		}
 
-		clps[i].map->map_priv_1 = (unsigned long)clps[i].vbase;
+		clps[i].map->virt = (unsigned long)clps[i].vbase;
 		clps[i].map->buswidth = clps[i].width;
 		clps[i].map->size = clps[i].size;
+
+		simple_map_init(&clps[i].map);
 
 		clps[i].mtd = do_map_probe("jedec_probe", clps[i].map);
 		if (clps[i].mtd == NULL) {
 			ret = -ENXIO;
 			break;
 		}
-		clps[i].mtd->module = THIS_MODULE;
+		clps[i].mtd->owner = THIS_MODULE;
 		subdev[i] = clps[i].mtd;
 
 		printk(KERN_INFO "clps flash: JEDEC device at 0x%08lx, %dMiB, "
@@ -320,10 +271,8 @@ static int __init clps_setup_flash(void)
 	return nr;
 }
 
-extern int parse_redboot_partitions(struct mtd_info *master, struct mtd_partition **pparts);
-extern int parse_cmdline_partitions(struct mtd_info *master, struct mtd_partition **pparts, char *);
-
 static struct mtd_partition *parsed_parts;
+static const char *probes[] = { "cmdlinepart", "RedBoot", NULL };
 
 static void __init clps_locate_partitions(struct mtd_info *mtd)
 {
@@ -333,20 +282,11 @@ static void __init clps_locate_partitions(struct mtd_info *mtd)
 		/*
 		 * Partition selection stuff.
 		 */
-#ifdef CONFIG_MTD_CMDLINE_PARTS
-		nr_parts = parse_cmdline_partitions(mtd, &parsed_parts, "clps");
+		nr_parts = parse_mtd_partitions(mtd, probes, &parsed_parts, 0);
 		if (nr_parts > 0) {
 			part_type = "command line";
 			break;
 		}
-#endif
-#ifdef CONFIG_MTD_REDBOOT_PARTS
-		nr_parts = parse_redboot_partitions(mtd, &parsed_parts);
-		if (nr_parts > 0) {
-			part_type = "RedBoot";
-			break;
-		}
-#endif
 #ifdef CONFIG_MTD_CEIVA_STATICMAP
 		nr_parts = clps_static_partitions(&parsed_parts);
 		if (nr_parts > 0) {

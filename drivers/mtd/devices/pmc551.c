@@ -1,5 +1,5 @@
 /*
- * $Id: pmc551.c,v 1.19 2001/10/02 15:05:13 dwmw2 Exp $
+ * $Id: pmc551.c,v 1.24 2003/05/20 21:03:08 dwmw2 Exp $
  *
  * PMC551 PCI Mezzanine Ram Device
  *
@@ -30,7 +30,7 @@
  *	 
  * Notes:
  *	 Due to what I assume is more buggy SROM, the 64M PMC551 I
- *	 have available claims that all 4 of its DRAM banks have 64M
+ *	 have available claims that all 4 of it's DRAM banks have 64M
  *	 of ram configured (making a grand total of 256M onboard).
  *	 This is slightly annoying since the BAR0 size reflects the
  *	 aperture size, not the dram size, and the V370PDC supplies no
@@ -98,7 +98,6 @@
 #include <linux/ioctl.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#include <stdarg.h>
 #include <linux/pci.h>
 
 #ifndef CONFIG_PCI
@@ -215,7 +214,7 @@ static int pmc551_point (struct mtd_info *mtd, loff_t from, size_t len, size_t *
 }
 
 
-static void pmc551_unpoint (struct mtd_info *mtd, u_char *addr)
+static void pmc551_unpoint (struct mtd_info *mtd, u_char *addr, loff_t from, size_t len)
 {
 #ifdef CONFIG_MTD_PMC551_DEBUG
 	printk(KERN_DEBUG "pmc551_unpoint()\n");
@@ -788,10 +787,10 @@ int __init init_pmc551(void)
                 mtd->write 	= pmc551_write;
                 mtd->point 	= pmc551_point;
                 mtd->unpoint 	= pmc551_unpoint;
-                mtd->module 	= THIS_MODULE;
                 mtd->type 	= MTD_RAM;
                 mtd->name 	= "PMC551 RAM board";
                 mtd->erasesize 	= 0x10000;
+		mtd->owner = THIS_MODULE;
 
                 if (add_mtd_device(mtd)) {
                         printk(KERN_NOTICE "pmc551: Failed to register new device\n");

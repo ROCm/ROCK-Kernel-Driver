@@ -37,20 +37,36 @@ config SOUND_CMPCI
 config SOUND_CMPCI_FM
 	bool "Enable legacy FM"
 	depends on SOUND_CMPCI
+	help
+	  Say Y here to enable the legacy FM (frequency-modulation) synthesis
+	  support on a card using the CMI8338 or CMI8378 chipset.
+	  Say N here if you don't need this.
 
 config SOUND_CMPCI_FMIO
 	hex "FM I/O 388, 3C8, 3E0, 3E8"
 	depends on SOUND_CMPCI_FM
 	default "388"
+	help
+	  Set the base I/O address for FM synthesis control on a card using
+	  the CMI8338 or CMI8378 chipset.
+	  The default is 388; other choices are 3c8, 3e0, or 3e8.
 
 config SOUND_CMPCI_MIDI
 	bool "Enable legacy MPU-401"
 	depends on SOUND_CMPCI
+	help
+	  Say Y here to enable the legacy MP401 MIDI synthesis support on a
+	  card using the CMI8338 or CMI8378 chipset.
+	  Say N here if you don't need this.
 
 config SOUND_CMPCI_MPUIO
 	hex "MPU-401 I/O 330, 320, 310, 300"
 	depends on SOUND_CMPCI_MIDI
 	default "330"
+	help
+	  Set the base I/O address for MP401 MIDI synthesis control on a card
+	  using the CMI8338 or CMI8378 chipset.
+	  The default is 330; other choices are 320, 310, or 300.
 
 config SOUND_CMPCI_JOYSTICK
 	bool "Enable joystick"
@@ -75,6 +91,10 @@ config SOUND_CMPCI_CM8738
 config SOUND_CMPCI_SPDIFINVERSE
 	bool "Inverse S/PDIF in for CMI8738"
 	depends on SOUND_CMPCI_CM8738
+	help
+	  Say Y here to have the driver invert the signal presented on SPDIF IN
+	  of a card using the CMI8338 or CMI8378 chipset.
+	  Say N here if you don't need this.
 
 config SOUND_CMPCI_SPDIFLOOP
 	bool "Enable S/PDIF loop for CMI8738"
@@ -101,10 +121,16 @@ config SOUND_CMPCI_SPEAKERS
 config SOUND_CMPCI_LINE_REAR
 	bool "Use Line-in as Read-out"
 	depends on SOUND_CMPCI_CM8738 && SOUND_CMPCI_SPEAKERS!=2
+	help
+	  Say Y here to enable using line-in jack as an output jack for a rear
+	  speaker.  Say N here if you don't need this.
 
 config SOUND_CMPCI_LINE_BASS
 	bool "Use Line-in as Bass"
 	depends on SOUND_CMPCI_CM8738 && SOUND_CMPCI_SPEAKERS!=2
+	help
+	  Say Y here to enable using line-in jack as an output jack for a bass
+	  speaker.  Say N here if you don't need this.
 
 config SOUND_EMU10K1
 	tristate "Creative SBLive! (EMU10K1)"
@@ -237,6 +263,10 @@ config SOUND_VWSND
 config SOUND_VRC5477
 	tristate "NEC Vrc5477 AC97 sound"
 	depends on SOUND_PRIME!=n && DDB5477 && SOUND
+	help
+	  Say Y here to enable sound support for the NEC Vrc5477 chip, an
+	  integrated, multi-function controller chip for MIPS CPUs.  Works
+	  with the AC97 codec.
 
 config SOUND_TRIDENT
 	tristate "Trident 4DWave DX/NX, SiS 7018 or ALi 5451 PCI Audio Core"
@@ -1015,6 +1045,10 @@ config SC6600_CDROM
 	int "SC-6600 CDROM Interface (4=None, 3=IDE, 1=Panasonic, 0=?Sony?)"
 	depends on SC6600
 	default "4"
+	help
+	  This is used to activate the CD-ROM interface of the Audio Excel
+	  DSP 16 card. Enter: 0 for Sony, 1 for Panasonic, 2 for IDE, 4 for no
+	  CD-ROM present.
 
 config SC6600_CDROMBASE
 	hex "SC-6600 CDROM Interface I/O Address"

@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/rte_cb_leds.c -- Midas lab RTE-CB board LED device support
  *
- *  Copyright (C) 2002  NEC Corporation
- *  Copyright (C) 2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2002,03  NEC Electronics Corporation
+ *  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -14,6 +14,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/fs.h>
 #include <linux/miscdevice.h>
 
 #include <asm/uaccess.h>

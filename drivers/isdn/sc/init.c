@@ -287,7 +287,7 @@ static int __init sc_init(void)
 		}
 		memset(interface, 0, sizeof(isdn_if));
 
-		SET_MODULE_OWNER(interface);
+		interface->owner = THIS_MODULE;
 		interface->hl_hdrlen = 0;
 		interface->channels = channels;
 		interface->maxbufsize = BUFFER_SIZE;

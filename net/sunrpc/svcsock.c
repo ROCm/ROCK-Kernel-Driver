@@ -35,6 +35,7 @@
 #include <net/sock.h>
 #include <net/checksum.h>
 #include <net/ip.h>
+#include <net/tcp.h>
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
 
@@ -116,6 +117,22 @@ svc_release_skb(struct svc_rqst *rqstp)
 }
 
 /*
+ * Any space to write?
+ */
+static inline unsigned long
+svc_sock_wspace(struct svc_sock *svsk)
+{
+	int wspace;
+
+	if (svsk->sk_sock->type == SOCK_STREAM)
+		wspace = tcp_wspace(svsk->sk_sk);
+	else
+		wspace = sock_wspace(svsk->sk_sk);
+
+	return wspace;
+}
+
+/*
  * Queue up a socket with data pending. If there are idle nfsd
  * processes, wake 'em up.
  *
@@ -149,16 +166,18 @@ svc_sock_enqueue(struct svc_sock *svsk)
 		goto out_unlock;
 	}
 
+	set_bit(SOCK_NOSPACE, &svsk->sk_sock->flags);
 	if (((svsk->sk_reserved + serv->sv_bufsz)*2
-	     > sock_wspace(svsk->sk_sk))
+	     > svc_sock_wspace(svsk))
 	    && !test_bit(SK_CLOSE, &svsk->sk_flags)
 	    && !test_bit(SK_CONN, &svsk->sk_flags)) {
 		/* Don't enqueue while not enough space for reply */
 		dprintk("svc: socket %p  no space, %d*2 > %ld, not enqueued\n",
 			svsk->sk_sk, svsk->sk_reserved+serv->sv_bufsz,
-			sock_wspace(svsk->sk_sk));
+			svc_sock_wspace(svsk));
 		goto out_unlock;
 	}
+	clear_bit(SOCK_NOSPACE, &svsk->sk_sock->flags);
 
 	/* Mark socket as busy. It will remain in this state until the
 	 * server has processed all pending data and put the socket back
@@ -341,9 +360,6 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 
 	slen = xdr->len;
 
-	/* Grab svsk->sk_sem to serialize outgoing data. */
-	down(&svsk->sk_sem);
-
 	if (rqstp->rq_prot == IPPROTO_UDP) {
 		/* set the destination */
 		struct msghdr	msg;
@@ -396,8 +412,6 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 			len += result;
 	}
 out:
-	up(&svsk->sk_sem);
-
 	dprintk("svc: socket %p sendto([%p %Zu... ], %d) = %d (addr %x)\n",
 			rqstp->rq_sock, xdr->head[0].iov_base, xdr->head[0].iov_len, xdr->len, len,
 		rqstp->rq_addr.sin_addr.s_addr);
@@ -886,8 +900,12 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 			goto error;
 		svsk->sk_tcplen += len;
 
-		if (len < want)
-			return 0;
+		if (len < want) {
+			dprintk("svc: short recvfrom while reading record length (%d of %lu)\n",
+			        len, want);
+			svc_sock_received(svsk);
+			return -EAGAIN; /* record header not complete */
+		}
 
 		svsk->sk_reclen = ntohl(svsk->sk_reclen);
 		if (!(svsk->sk_reclen & 0x80000000)) {
@@ -1011,6 +1029,7 @@ static void
 svc_tcp_init(struct svc_sock *svsk)
 {
 	struct sock	*sk = svsk->sk_sk;
+	struct tcp_opt  *tp = tcp_sk(sk);
 
 	svsk->sk_recvfrom = svc_tcp_recvfrom;
 	svsk->sk_sendto = svc_tcp_sendto;
@@ -1027,6 +1046,8 @@ svc_tcp_init(struct svc_sock *svsk)
 
 		svsk->sk_reclen = 0;
 		svsk->sk_tcplen = 0;
+
+		tp->nonagle = 1;        /* disable Nagle's algorithm */
 
 		/* initialise setting must have enough space to
 		 * receive and respond to one request.  
@@ -1232,7 +1253,13 @@ svc_send(struct svc_rqst *rqstp)
 		xb->page_len +
 		xb->tail[0].iov_len;
 
-	len = svsk->sk_sendto(rqstp);
+	/* Grab svsk->sk_sem to serialize outgoing data. */
+	down(&svsk->sk_sem);
+	if (test_bit(SK_DEAD, &svsk->sk_flags))
+		len = -ENOTCONN;
+	else
+		len = svsk->sk_sendto(rqstp);
+	up(&svsk->sk_sem);
 	svc_sock_release(rqstp);
 
 	if (len == -ECONNREFUSED || len == -ENOTCONN || len == -EAGAIN)

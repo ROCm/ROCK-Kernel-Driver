@@ -53,9 +53,9 @@ redirect_check(const char *tablename,
 
 static unsigned int
 redirect_target(struct sk_buff **pskb,
-		unsigned int hooknum,
 		const struct net_device *in,
 		const struct net_device *out,
+		unsigned int hooknum,
 		const void *targinfo,
 		void *userinfo)
 {

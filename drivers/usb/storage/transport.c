@@ -511,9 +511,8 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	 * short-circuit all other processing
 	 */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("-- transport indicates command was aborted\n");
-		srb->result = DID_ABORT << 16;
-		return;
+		US_DEBUGP("-- command was aborted\n");
+		goto Handle_Abort;
 	}
 
 	/* if there is a transport error, reset and don't auto-sense */
@@ -634,8 +633,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("-- auto-sense aborted\n");
-			srb->result = DID_ABORT << 16;
-			return;
+			goto Handle_Abort;
 		}
 		if (temp_result != USB_STOR_TRANSPORT_GOOD) {
 			US_DEBUGP("-- auto-sense failure\n");
@@ -688,6 +686,15 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	    (result == USB_STOR_TRANSPORT_GOOD) &&
 	    ((srb->sense_buffer[2] & 0xf) == 0x0))
 		srb->sense_buffer[0] = 0x0;
+	return;
+
+	/* abort processing: the bulk-only transport requires a reset
+	 * following an abort */
+	Handle_Abort:
+	srb->result = DID_ABORT << 16;
+	if (us->protocol == US_PR_BULK) {
+		us->transport_reset(us);
+	}
 }
 
 /* Abort the currently running scsi command or device reset.
@@ -772,8 +779,9 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (transfer_length) {
 		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
-		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
-					transfer_length);
+		result = usb_stor_bulk_transfer_sg(us, pipe,
+					srb->request_buffer, transfer_length,
+					srb->use_sg, &srb->resid);
 		US_DEBUGP("CBI data stage result is 0x%x\n", result);
 		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
@@ -862,8 +870,9 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (transfer_length) {
 		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
-		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
-					transfer_length);
+		result = usb_stor_bulk_transfer_sg(us, pipe,
+					srb->request_buffer, transfer_length,
+					srb->use_sg, &srb->resid);
 		US_DEBUGP("CB data stage result is 0x%x\n", result);
 		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
@@ -944,8 +953,9 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	if (transfer_length) {
 		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
 				us->recv_bulk_pipe : us->send_bulk_pipe;
-		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
-					transfer_length);
+		result = usb_stor_bulk_transfer_sg(us, pipe,
+					srb->request_buffer, transfer_length,
+					srb->use_sg, &srb->resid);
 		US_DEBUGP("Bulk data transfer result 0x%x\n", result);
 		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
@@ -978,7 +988,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	US_DEBUGP("Bulk status Sig 0x%x T 0x%x R %d Stat 0x%x\n",
 		  le32_to_cpu(bcs.Signature), bcs.Tag, 
 		  bcs.Residue, bcs.Status);
-	if (bcs.Signature != cpu_to_le32(US_BULK_CS_SIGN) || 
+	if ((bcs.Signature != cpu_to_le32(US_BULK_CS_SIGN) && bcs.Signature != cpu_to_le32(US_BULK_CS_OLYMPUS_SIGN)) || 
 	    bcs.Tag != bcb.Tag || 
 	    bcs.Status > US_BULK_STAT_PHASE) {
 		US_DEBUGP("Bulk logical error\n");

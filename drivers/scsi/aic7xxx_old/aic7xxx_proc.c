@@ -80,10 +80,9 @@ aic7xxx_set_info(char *buffer, int length, struct Scsi_Host *HBAptr)
  *   Return information to handle /proc support for the driver.
  *-F*************************************************************************/
 int
-aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length, 
-                    int hostno, int inout)
+aic7xxx_proc_info ( struct Scsi_Host *HBAptr, char *buffer, char **start, off_t offset, int length, 
+                    int inout)
 {
-  struct Scsi_Host *HBAptr;
   struct aic7xxx_host *p;
   struct aic_dev_data *aic_dev;
   struct scsi_device *sdptr;
@@ -93,12 +92,12 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
 
   HBAptr = NULL;
 
-  for(p=first_aic7xxx; p->host->host_no != hostno; p=p->next)
+  for(p=first_aic7xxx; p->host != HBAptr; p=p->next)
     ;
 
   if (!p)
   {
-    size += sprintf(buffer, "Can't find adapter for host number %d\n", hostno);
+    size += sprintf(buffer, "Can't find adapter for host number %d\n", HBAptr->host_no);
     if (size > length)
     {
       return (size);
@@ -108,8 +107,6 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
       return (length);
     }
   }
-
-  HBAptr = p->host;
 
   if (inout == TRUE) /* Has data been written to the file? */ 
   {

@@ -1801,6 +1801,8 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
+
 	cp = dev->priv;
 	cp->pdev = pdev;
 	cp->board_type = board_type;

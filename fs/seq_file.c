@@ -297,6 +297,37 @@ int seq_printf(struct seq_file *m, const char *f, ...)
 	return -1;
 }
 
+int seq_path(struct seq_file *m,
+		struct vfsmount *mnt, struct dentry *dentry,
+		char *esc)
+{
+	if (m->count < m->size) {
+		char *s = m->buf + m->count;
+		char *p = d_path(dentry, mnt, s, m->size - m->count);
+		if (!IS_ERR(p)) {
+			while (s <= p) {
+				char c = *p++;
+				if (!c) {
+					p = m->buf + m->count;
+					m->count = s - m->buf;
+					return s - p;
+				} else if (!strchr(esc, c)) {
+					*s++ = c;
+				} else if (s + 4 > p) {
+					break;
+				} else {
+					*s++ = '\\';
+					*s++ = '0' + ((c & 0300) >> 6);
+					*s++ = '0' + ((c & 070) >> 3);
+					*s++ = '0' + (c & 07);
+				}
+			}
+		}
+	}
+	m->count = m->size;
+	return -1;
+}
+
 static void *single_start(struct seq_file *p, loff_t *pos)
 {
 	return NULL + (*pos == 0);

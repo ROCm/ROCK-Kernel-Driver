@@ -59,7 +59,7 @@
 #define ERRfilexists 80		/* The file named in the request already exists. */
 #define ERRinvparm   87
 #define ERRdiskfull  112
-#define ERRinvnum    123
+#define ERRinvname   123
 #define ERRdirnotempty 145
 #define ERRnotlocked   158
 #define ERRalreadyexists 183
@@ -109,4 +109,5 @@ class.*/
 #define ERRbadclient      2240
 #define ERRbadLogonTime   2241
 #define ERRpasswordExpired 2242
+#define ERRnetlogonNotStarted 2455
 #define ERRnosupport       0xFFFF

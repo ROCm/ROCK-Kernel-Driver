@@ -289,6 +289,7 @@ static void fini(void)
 	}
 }
 
+PROVIDES_CONNTRACK(irc);
 EXPORT_SYMBOL(ip_irc_lock);
 
 module_init(init);

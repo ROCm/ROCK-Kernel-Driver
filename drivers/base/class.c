@@ -88,7 +88,7 @@ int class_register(struct class * cls)
 	INIT_LIST_HEAD(&cls->children);
 	INIT_LIST_HEAD(&cls->interfaces);
 	
-	strncpy(cls->subsys.kset.kobj.name,cls->name,KOBJ_NAME_LEN);
+	strlcpy(cls->subsys.kset.kobj.name,cls->name,KOBJ_NAME_LEN);
 	subsys_set_kset(cls,class_subsys);
 	subsystem_register(&cls->subsys);
 
@@ -258,7 +258,7 @@ int class_device_add(struct class_device *class_dev)
 		 class_dev->class_id);
 
 	/* first, register with generic layer. */
-	strncpy(class_dev->kobj.name, class_dev->class_id, KOBJ_NAME_LEN);
+	strlcpy(class_dev->kobj.name, class_dev->class_id, KOBJ_NAME_LEN);
 	kobj_set_kset_s(class_dev, class_obj_subsys);
 	if (parent)
 		class_dev->kobj.parent = &parent->subsys.kset.kobj;

@@ -199,6 +199,8 @@ void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
 				fle->genid = atomic_read(&flow_cache_genid);
 				fle->object = obj;
 				fle->object_ref = obj_ref;
+				if (obj)
+					atomic_inc(fle->object_ref);
 
 				flow_count(cpu)++;
 			}

@@ -8,6 +8,8 @@
 
 struct seq_operations;
 struct file;
+struct vfsmount;
+struct dentry;
 struct inode;
 
 struct seq_file {
@@ -57,6 +59,8 @@ static inline int seq_puts(struct seq_file *m, const char *s)
 
 int seq_printf(struct seq_file *, const char *, ...)
 	__attribute__ ((format (printf,2,3)));
+
+int seq_path(struct seq_file *, struct vfsmount *, struct dentry *, char *);
 
 int single_open(struct file *, int (*)(struct seq_file *, void *), void *);
 int single_release(struct inode *, struct file *);

@@ -245,7 +245,13 @@ struct signal_struct {
 	/* thread group exit support */
 	int			group_exit;
 	int			group_exit_code;
+	/* overloaded:
+	 * - notify group_exit_task when ->count is equal to notify_count
+	 * - everyone except group_exit_task is stopped during signal delivery
+	 *   of fatal signals, group_exit_task processes the signal.
+	 */
 	struct task_struct	*group_exit_task;
+	int			notify_count;
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
@@ -429,6 +435,8 @@ struct task_struct {
    	u32 self_exec_id;
 /* Protection of (de-)allocation: mm, files, fs, tty */
 	spinlock_t alloc_lock;
+/* Protection of proc_dentry: nesting proc_lock, dcache_lock, write_lock_irq(&tasklist_lock); */
+	spinlock_t proc_lock;
 /* context-switch lock */
 	spinlock_t switch_lock;
 

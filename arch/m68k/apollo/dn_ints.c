@@ -14,19 +14,20 @@
 
 static irq_handler_t dn_irqs[16];
 
-void dn_process_int(int irq, struct pt_regs *fp) {
-
+irqreturn_t dn_process_int(int irq, struct pt_regs *fp)
+{
+  irqreturn_t res = IRQ_NONE;
 
   if(dn_irqs[irq-160].handler) {
-    dn_irqs[irq-160].handler(irq,dn_irqs[irq-160].dev_id,fp);
-  }
-  else {
+    res = dn_irqs[irq-160].handler(irq,dn_irqs[irq-160].dev_id,fp);
+  } else {
     printk("spurious irq %d occurred\n",irq);
   }
 
   *(volatile unsigned char *)(pica)=0x20;
   *(volatile unsigned char *)(picb)=0x20;
 
+  return res;
 }
 
 void dn_init_IRQ(void) {
@@ -42,7 +43,7 @@ void dn_init_IRQ(void) {
   
 }
 
-int dn_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id) {
+int dn_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id) {
 
   if((irq<0) || (irq>15)) {
     printk("Trying to request illegal IRQ\n");

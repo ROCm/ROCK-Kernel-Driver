@@ -1060,7 +1060,8 @@ static void __init setup_ioapic_ids_from_mpc (void)
 			phys_id_present_map |= 1 << i;
 			mp_ioapics[apic].mpc_apicid = i;
 		} else {
-			printk("Setting %d in the phys_id_present_map\n", mp_ioapics[apic].mpc_apicid);
+			printk(KERN_INFO 
+			       "Using IO-APIC %d\n", mp_ioapics[apic].mpc_apicid);
 			phys_id_present_map |= 1 << mp_ioapics[apic].mpc_apicid;
 		}
 

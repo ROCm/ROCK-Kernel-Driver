@@ -1010,7 +1010,11 @@ int shrink_all_memory(int nr_pages)
 	pg_data_t *pgdat;
 	int nr_to_free = nr_pages;
 	int ret = 0;
+	struct reclaim_state reclaim_state = {
+		.reclaimed_slab = 0,
+	};
 
+	current->reclaim_state = &reclaim_state;
 	for_each_pgdat(pgdat) {
 		int freed;
 		struct page_state ps;
@@ -1022,6 +1026,7 @@ int shrink_all_memory(int nr_pages)
 		if (nr_to_free <= 0)
 			break;
 	}
+	current->reclaim_state = NULL;
 	return ret;
 }
 #endif

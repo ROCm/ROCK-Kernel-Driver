@@ -218,14 +218,18 @@ struct tss_struct {
 
 struct thread_struct {
 	unsigned long	rsp0;
-	unsigned long	rip;
 	unsigned long	rsp;
 	unsigned long 	userrsp;	/* Copy from PDA */ 
 	unsigned long	fs;
 	unsigned long	gs;
 	unsigned short	es, ds, fsindex, gsindex;	
 /* Hardware debugging registers */
-	unsigned long	debugreg[8];  /* %%db0-7 debug registers */
+	unsigned long	debugreg0;  
+	unsigned long	debugreg1;  
+	unsigned long	debugreg2;  
+	unsigned long	debugreg3;  
+	unsigned long	debugreg6;  
+	unsigned long	debugreg7;  
 /* fault info */
 	unsigned long	cr2, trap_no, error_code;
 /* floating point info */
@@ -304,17 +308,30 @@ extern inline void sync_core(void)
 
 #define cpu_has_fpu 1
 
-#if 0
-/* disabled for now to work around opteron errata #91. Also gcc 3.2
-   doesn't like this in some cases. */
+/* Some early Opteron versions incorrectly fault on prefetch (errata #91). 
+   If this happens just jump back. */
 #define ARCH_HAS_PREFETCH
-#define prefetch(x) __builtin_prefetch((x),0,1)
-#endif
+static inline void prefetch(void *x) 
+{ 
+	asm volatile("2: prefetchnta %0\n1:\t" 
+		    ".section __ex_table,\"a\"\n\t"
+		    "  .align 8\n\t"
+		    "  .quad  2b,1b\n\t"
+		    ".previous" :: "m" (*(unsigned long *)x));
+} 
 
 #define ARCH_HAS_PREFETCHW
+static inline void prefetchw(void *x) 
+{ 
+	asm volatile("2: prefetchw %0\n1:\t" 
+		    ".section __ex_table,\"a\"\n\t"
+		    "  .align 8\n\t"
+		    "  .quad  2b,1b\n\t"
+		    ".previous" :: "m" (*(unsigned long *)x));
+} 
+
 #define ARCH_HAS_SPINLOCK_PREFETCH
 
-#define prefetchw(x) __builtin_prefetch((x),1,1)
 #define spin_lock_prefetch(x)  prefetchw(x)
 #define cpu_relax()   rep_nop()
 

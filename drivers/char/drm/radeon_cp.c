@@ -1151,10 +1151,11 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		(drm_radeon_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				       init->sarea_priv_offset);
 
+#if __REALLY_HAVE_AGP
 	if ( !dev_priv->is_pci ) {
-		DRM_IOREMAP( dev_priv->cp_ring );
-		DRM_IOREMAP( dev_priv->ring_rptr );
-		DRM_IOREMAP( dev_priv->buffers );
+		DRM_IOREMAP( dev_priv->cp_ring, dev );
+		DRM_IOREMAP( dev_priv->ring_rptr, dev );
+		DRM_IOREMAP( dev_priv->buffers, dev );
 		if(!dev_priv->cp_ring->handle ||
 		   !dev_priv->ring_rptr->handle ||
 		   !dev_priv->buffers->handle) {
@@ -1163,7 +1164,9 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 			radeon_do_cleanup_cp(dev);
 			return DRM_ERR(EINVAL);
 		}
-	} else {
+	} else
+#endif
+	{
 		dev_priv->cp_ring->handle =
 			(void *)dev_priv->cp_ring->offset;
 		dev_priv->ring_rptr->handle =
@@ -1210,7 +1213,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 
 	dev_priv->ring.high_mark = RADEON_RING_HIGH_MARK;
 
-#if __REALLY_HAVE_SG
 	if ( dev_priv->is_pci ) {
 		if (!DRM(ati_pcigart_init)( dev, &dev_priv->phys_pci_gart,
 					    &dev_priv->bus_pci_gart)) {
@@ -1240,15 +1242,12 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		RADEON_WRITE( RADEON_MC_AGP_LOCATION, 0xffffffc0 ); /* ?? */
 		RADEON_WRITE( RADEON_AGP_COMMAND, 0 ); /* clear AGP_COMMAND */
 	} else {
-#endif /* __REALLY_HAVE_SG */
 		/* Turn off PCI GART
 		 */
 		tmp = RADEON_READ( RADEON_AIC_CNTL )
 		      & ~RADEON_PCIGART_TRANSLATE_EN;
 		RADEON_WRITE( RADEON_AIC_CNTL, tmp );
-#if __REALLY_HAVE_SG
 	}
-#endif /* __REALLY_HAVE_SG */
 
 	radeon_cp_load_microcode( dev_priv );
 	radeon_cp_init_ring_buffer( dev, dev_priv );
@@ -1277,20 +1276,21 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_radeon_private_t *dev_priv = dev->dev_private;
 
+#if __REALLY_HAVE_AGP
 		if ( !dev_priv->is_pci ) {
 			if ( dev_priv->cp_ring != NULL )
-				DRM_IOREMAPFREE( dev_priv->cp_ring );
+				DRM_IOREMAPFREE( dev_priv->cp_ring, dev );
 			if ( dev_priv->ring_rptr != NULL )
-				DRM_IOREMAPFREE( dev_priv->ring_rptr );
+				DRM_IOREMAPFREE( dev_priv->ring_rptr, dev );
 			if ( dev_priv->buffers != NULL )
-				DRM_IOREMAPFREE( dev_priv->buffers );
-		} else {
-#if __REALLY_HAVE_SG
+				DRM_IOREMAPFREE( dev_priv->buffers, dev );
+		} else
+#endif
+		{
 			if (!DRM(ati_pcigart_cleanup)( dev,
 						dev_priv->phys_pci_gart,
 						dev_priv->bus_pci_gart ))
 				DRM_ERROR( "failed to cleanup PCI GART!\n" );
-#endif /* __REALLY_HAVE_SG */
 		}
 
 		DRM(free)( dev->dev_private, sizeof(drm_radeon_private_t),
@@ -1300,6 +1300,176 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 
 	return 0;
 }
+
+/* This code will reinit the Radeon CP hardware after a resume from disc.  
+ * AFAIK, it would be very difficult to pickle the state at suspend time, so 
+ * here we make sure that all Radeon hardware initialisation is re-done without
+ * affecting running applications.  This function is called radeon_do_resume_cp()
+ * as it was derived from radeon_init_cp, where most of the initialisation takes
+ * place during DRI init.
+ *
+ * This patch is NOT to be confused with my and Michel Daenzer's earlier DRI
+ * reinit work, which de- and re-initialised the complete DRI at every VT
+ * switch.
+ *
+ * Charl P. Botha <http://cpbotha.net>
+ */
+static int radeon_do_resume_cp( drm_device_t *dev)
+{
+	drm_radeon_private_t *dev_priv;
+	u32 tmp;
+	DRM_DEBUG( "\n" );
+	
+	DRM_DEBUG("Starting radeon_do_resume_cp()\n");
+
+	/* get the existing dev_private */
+	dev_priv = dev->dev_private;
+
+#if !defined(PCIGART_ENABLED)
+	/* PCI support is not 100% working, so we disable it here.
+	 */
+	if ( dev_priv->is_pci ) {
+		DRM_ERROR( "PCI GART not yet supported for Radeon!\n" );
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+#endif
+
+	if ( dev_priv->is_pci && !dev->sg ) {
+		DRM_ERROR( "PCI GART memory not allocated!\n" );
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+
+	if ( dev_priv->usec_timeout < 1 ||
+	     dev_priv->usec_timeout > RADEON_MAX_USEC_TIMEOUT ) {
+		DRM_DEBUG( "TIMEOUT problem!\n" );
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+
+	if ( ( dev_priv->cp_mode != RADEON_CSQ_PRIBM_INDDIS ) &&
+	     ( dev_priv->cp_mode != RADEON_CSQ_PRIBM_INDBM ) ) {
+		DRM_DEBUG( "BAD cp_mode (%x)!\n", dev_priv->cp_mode );
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+
+	if(!dev_priv->sarea) {
+		DRM_ERROR("could not find sarea!\n");
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+
+	if(!dev_priv->fb) {
+		DRM_ERROR("could not find framebuffer!\n");
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+
+	if(!dev_priv->mmio) {
+		DRM_ERROR("could not find mmio region!\n");
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+
+	if(!dev_priv->cp_ring) {
+		DRM_ERROR("could not find cp ring region!\n");
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+
+	if(!dev_priv->ring_rptr) {
+		DRM_ERROR("could not find ring read pointer!\n");
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+
+	if(!dev_priv->buffers) {
+		DRM_ERROR("could not find dma buffer region!\n");
+		radeon_do_cleanup_cp(dev);
+		return DRM_ERR(EINVAL);
+	}
+
+	if ( !dev_priv->is_pci ) {
+		if(!dev_priv->agp_textures) {
+			DRM_ERROR("could not find agp texture region!\n");
+			radeon_do_cleanup_cp(dev);
+			return DRM_ERR(EINVAL);
+		}
+	}
+
+	if ( !dev_priv->is_pci ) {
+		if(!dev_priv->cp_ring->handle ||
+		   !dev_priv->ring_rptr->handle ||
+		   !dev_priv->buffers->handle) {
+			DRM_ERROR("could not find ioremap agp regions!\n");
+			radeon_do_cleanup_cp(dev);
+			return DRM_ERR(EINVAL);
+		}
+	} else {
+		DRM_DEBUG( "dev_priv->cp_ring->handle %p\n",
+			   dev_priv->cp_ring->handle );
+		DRM_DEBUG( "dev_priv->ring_rptr->handle %p\n",
+			   dev_priv->ring_rptr->handle );
+		DRM_DEBUG( "dev_priv->buffers->handle %p\n",
+			   dev_priv->buffers->handle );
+	}
+
+
+	DRM_DEBUG( "dev_priv->agp_size %d\n",
+		   dev_priv->agp_size );
+	DRM_DEBUG( "dev_priv->agp_vm_start 0x%x\n",
+		   dev_priv->agp_vm_start );
+	DRM_DEBUG( "dev_priv->agp_buffers_offset 0x%lx\n",
+		   dev_priv->agp_buffers_offset );
+
+#if __REALLY_HAVE_AGP
+	if ( !dev_priv->is_pci ) {
+		/* Turn off PCI GART
+		 */
+		tmp = RADEON_READ( RADEON_AIC_CNTL )
+		      & ~RADEON_PCIGART_TRANSLATE_EN;
+		RADEON_WRITE( RADEON_AIC_CNTL, tmp );
+	} else
+#endif
+	{
+	        /* I'm not so sure about this ati_picgart_init after at resume-time... */
+	        if (!DRM(ati_pcigart_init)( dev, &dev_priv->phys_pci_gart,
+					    &dev_priv->bus_pci_gart)) {   
+		    DRM_ERROR( "failed to init PCI GART!\n" );        
+		    radeon_do_cleanup_cp(dev);                        
+		    return DRM_ERR(ENOMEM);                           
+		}
+
+		tmp = RADEON_READ( RADEON_AIC_CNTL )
+		      | RADEON_PCIGART_TRANSLATE_EN;
+		RADEON_WRITE( RADEON_AIC_CNTL, tmp );
+
+		/* set PCI GART page-table base address
+		 */
+		RADEON_WRITE( RADEON_AIC_PT_BASE, dev_priv->bus_pci_gart );
+
+		/* set address range for PCI address translate
+		 */
+		RADEON_WRITE( RADEON_AIC_LO_ADDR, dev_priv->agp_vm_start );
+		RADEON_WRITE( RADEON_AIC_HI_ADDR, dev_priv->agp_vm_start
+						  + dev_priv->agp_size - 1);
+
+		/* Turn off AGP aperture -- is this required for PCIGART?
+		 */
+		RADEON_WRITE( RADEON_MC_AGP_LOCATION, 0xffffffc0 ); /* ?? */
+		RADEON_WRITE( RADEON_AGP_COMMAND, 0 ); /* clear AGP_COMMAND */
+	}
+
+	radeon_cp_load_microcode( dev_priv );
+	radeon_cp_init_ring_buffer( dev, dev_priv );
+
+	radeon_do_engine_reset( dev );
+
+	return 0;
+}
+
 
 int radeon_cp_init( DRM_IOCTL_ARGS )
 {
@@ -1455,6 +1625,16 @@ int radeon_cp_idle( DRM_IOCTL_ARGS )
 
 	return radeon_do_cp_idle( dev_priv );
 }
+
+/* Added by Charl P. Botha to call radeon_do_resume_cp().
+ */
+int radeon_cp_resume( DRM_IOCTL_ARGS )
+{
+	DRM_DEVICE;
+
+	return radeon_do_resume_cp(dev);
+}
+
 
 int radeon_engine_reset( DRM_IOCTL_ARGS )
 {

@@ -118,7 +118,7 @@ static int __init b1isa_probe(struct pci_dev *pdev)
 	cinfo->capi_ctrl.procinfo      = b1isa_procinfo;
 	cinfo->capi_ctrl.ctr_read_proc = b1ctl_read_proc;
 	strcpy(cinfo->capi_ctrl.name, card->name);
-	SET_MODULE_OWNER(&cinfo->capi_ctrl);
+	cinfo->capi_ctrl.owner = THIS_MODULE;
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {

@@ -194,7 +194,6 @@
 #define ioremap(a,b) vremap((a),(b))
 #define iounmap(a) vfree((a))
 #define SERIAL_TYPE_NORMAL	1
-#define SERIAL_TYPE_CALLOUT	2
 #define schedule_timeout(a){current->timeout = jiffies + (a); schedule();}
 #define signal_pending(a) ((a)->signal & ~(a)->blocked)
 #define in_interrupt()	intr_count
@@ -232,16 +231,13 @@ static char *pcVersion = "1.2.14";
 static char *pcDriver_name   = "ip2";
 #ifdef	CONFIG_DEVFS_FS
 static char *pcTty    		 = "tts/F%d";
-static char *pcCallout		 = "cua/F%d";
 #else
 static char *pcTty    		 = "ttyF";
-static char *pcCallout		 = "cuf";
 #endif
 static char *pcIpl    		 = "ip2ipl";
 
 /* Serial subtype definitions */
 #define SERIAL_TYPE_NORMAL    1
-#define SERIAL_TYPE_CALLOUT   2
 
 // cheezy kludge or genius - you decide?
 int ip2_loadmain(int *, int *, unsigned char *, int);
@@ -307,7 +303,6 @@ static unsigned short find_eisa_board(int);
 /***************/
 
 static struct tty_driver ip2_tty_driver;
-static struct tty_driver ip2_callout_driver;
 
 static int ref_count;
 
@@ -522,9 +517,6 @@ cleanup_module(void)
 	devfs_remove("ip2");
 	if ( ( err = tty_unregister_driver ( &ip2_tty_driver ) ) ) {
 		printk(KERN_ERR "IP2: failed to unregister tty driver (%d)\n", err);
-	}
-	if ( ( err = tty_unregister_driver ( &ip2_callout_driver ) ) ) {
-		printk(KERN_ERR "IP2: failed to unregister callout driver (%d)\n", err);
 	}
 	if ( ( err = unregister_chrdev ( IP2_IPL_MAJOR, pcIpl ) ) ) {
 		printk(KERN_ERR "IP2: failed to unregister IPL driver (%d)\n", err);
@@ -834,26 +826,11 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 	ip2_tty_driver.start           = ip2_start;
 	ip2_tty_driver.hangup          = ip2_hangup;
 
-	/* Initialise the callout driver structure from the tty driver, and
-	 * make the needed adjustments.
-	 */
-	ip2_callout_driver         = ip2_tty_driver;
-	ip2_callout_driver.name    = pcCallout;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,1,0)
-	ip2_callout_driver.driver_name = pcDriver_name;
-	ip2_callout_driver.read_proc  = NULL;
-#endif
-	ip2_callout_driver.major   = IP2_CALLOUT_MAJOR;
-	ip2_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
-
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, 3, 0 );
 
 	/* Register the tty devices. */
 	if ( ( err = tty_register_driver ( &ip2_tty_driver ) ) ) {
 		printk(KERN_ERR "IP2: failed to register tty driver (%d)\n", err);
-	} else
-	if ( ( err = tty_register_driver ( &ip2_callout_driver ) ) ) {
-		printk(KERN_ERR "IP2: failed to register callout driver (%d)\n", err);
 	} else
 	/* Register the IPL driver. */
 	if ( ( err = register_chrdev ( IP2_IPL_MAJOR, pcIpl, &ip2_ipl ) ) ) {
@@ -891,9 +868,6 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 				    if ( pB->i2eChannelMap[box] & (1 << j) )
 				    {
 				        tty_register_device(&ip2_tty_driver,
-					    j + ABS_BIGGEST_BOX *
-						    (box+i*ABS_MAX_BOXES), NULL);
-				            tty_register_device(&ip2_callout_driver,
 					    j + ABS_BIGGEST_BOX *
 						    (box+i*ABS_MAX_BOXES), NULL);
 			    	    }
@@ -1497,7 +1471,7 @@ skip_this:
 				if ( pCh->wopen ) {
 					wake_up_interruptible ( &pCh->open_wait );
 				}
-			} else if ( !(pCh->flags & ASYNC_CALLOUT_ACTIVE) ) {
+			} else {
 				if (pCh->pTTY &&  (!(pCh->pTTY->termios->c_cflag & CLOCAL)) ) {
 					tty_hangup( pCh->pTTY );
 				}
@@ -1603,35 +1577,9 @@ ip2_open( PTTY tty, struct file *pFile )
 	remove_wait_queue(&pCh->close_wait, &wait);
 
 	/*
-	 * 2. If this is a callout device, make sure the normal port is not in
-	 *    use, and that someone else doesn't have the callout device locked.
-	 *    (These are the only tests the standard serial driver makes for
-	 *    callout devices.)
-	 */
-	if ( tty->driver->subtype == SERIAL_TYPE_CALLOUT ) {
-		if ( pCh->flags & ASYNC_NORMAL_ACTIVE ) {
-			return -EBUSY;
-		}
-		if ( ( pCh->flags & ASYNC_CALLOUT_ACTIVE )  &&
-		    ( pCh->flags & ASYNC_SESSION_LOCKOUT ) &&
-		    ( pCh->session != current->session ) ) {
-			return -EBUSY;
-		}
-		if ( ( pCh->flags & ASYNC_CALLOUT_ACTIVE ) &&
-		    ( pCh->flags & ASYNC_PGRP_LOCKOUT )   &&
-		    ( pCh->pgrp != current->pgrp ) ) {
-			return -EBUSY;
-		}
-		pCh->flags |= ASYNC_CALLOUT_ACTIVE;
-		goto noblock;
-	}
-	/*
 	 * 3. Handle a non-blocking open of a normal port.
 	 */
 	if ( (pFile->f_flags & O_NONBLOCK) || (tty->flags & (1<<TTY_IO_ERROR) )) {
-		if ( pCh->flags & ASYNC_CALLOUT_ACTIVE ) {
-			return -EBUSY;
-		}
 		pCh->flags |= ASYNC_NORMAL_ACTIVE;
 		goto noblock;
 	}
@@ -1639,15 +1587,8 @@ ip2_open( PTTY tty, struct file *pFile )
 	 * 4. Now loop waiting for the port to be free and carrier present
 	 *    (if required).
 	 */
-	if ( pCh->flags & ASYNC_CALLOUT_ACTIVE ) {
-		if ( pCh->NormalTermios.c_cflag & CLOCAL ) {
-			do_clocal = 1;
-		}
-	} else {
-		if ( tty->termios->c_cflag & CLOCAL ) {
-			do_clocal = 1;
-		}
-	}
+	if ( tty->termios->c_cflag & CLOCAL )
+		do_clocal = 1;
 
 #ifdef IP2DEBUG_OPEN
 	printk(KERN_DEBUG "OpenBlock: do_clocal = %d\n", do_clocal);
@@ -1659,32 +1600,27 @@ ip2_open( PTTY tty, struct file *pFile )
 	add_wait_queue(&pCh->open_wait, &wait);
 
 	for(;;) {
-		if ( !(pCh->flags & ASYNC_CALLOUT_ACTIVE)) {
-			i2QueueCommands(PTYPE_INLINE, pCh, 100, 2, CMD_DTRUP, CMD_RTSUP);
-			pCh->dataSetOut |= (I2_DTR | I2_RTS);
-			set_current_state( TASK_INTERRUPTIBLE );
-			serviceOutgoingFifo( pCh->pMyBord );
-		}
+		i2QueueCommands(PTYPE_INLINE, pCh, 100, 2, CMD_DTRUP, CMD_RTSUP);
+		pCh->dataSetOut |= (I2_DTR | I2_RTS);
+		set_current_state( TASK_INTERRUPTIBLE );
+		serviceOutgoingFifo( pCh->pMyBord );
 		if ( tty_hung_up_p(pFile) ) {
 			set_current_state( TASK_RUNNING );
 			remove_wait_queue(&pCh->open_wait, &wait);
 			return ( pCh->flags & ASYNC_HUP_NOTIFY ) ? -EBUSY : -ERESTARTSYS;
 		}
-		if ( !(pCh->flags & ASYNC_CALLOUT_ACTIVE) &&
-				!(pCh->flags & ASYNC_CLOSING) && 
+		if (!(pCh->flags & ASYNC_CLOSING) && 
 				(do_clocal || (pCh->dataSetIn & I2_DCD) )) {
 			rc = 0;
 			break;
 		}
 
 #ifdef IP2DEBUG_OPEN
-		printk(KERN_DEBUG "ASYNC_CALLOUT_ACTIVE = %s\n",
-			(pCh->flags & ASYNC_CALLOUT_ACTIVE)?"True":"False");
 		printk(KERN_DEBUG "ASYNC_CLOSING = %s\n",
 			(pCh->flags & ASYNC_CLOSING)?"True":"False");
 		printk(KERN_DEBUG "OpenBlock: waiting for CD or signal\n");
 #endif
-		ip2trace (CHANN, ITRC_OPEN, 3, 2, (pCh->flags & ASYNC_CALLOUT_ACTIVE),
+		ip2trace (CHANN, ITRC_OPEN, 3, 2, 0,
 				(pCh->flags & ASYNC_CLOSING) );
 		/* check for signal */
 		if (signal_pending(current)) {
@@ -1711,19 +1647,11 @@ noblock:
 	if ( tty->count == 1 ) {
 		i2QueueCommands(PTYPE_INLINE, pCh, 0, 2, CMD_CTSFL_DSAB, CMD_RTSFL_DSAB);
 		if ( pCh->flags & ASYNC_SPLIT_TERMIOS ) {
-			if ( tty->driver->subtype == SERIAL_TYPE_NORMAL ) {
-				*tty->termios = pCh->NormalTermios;
-			} else {
-				*tty->termios = pCh->CalloutTermios;
-			}
+			*tty->termios = pCh->NormalTermios;
 		}
 		/* Now we must send the termios settings to the loadware */
 		set_params( pCh, NULL );
 	}
-
-	/* override previous and never reset ??? */
-	pCh->session = current->session;
-	pCh->pgrp = current->pgrp;
 
 	/*
 	 * Now set any i2lib options. These may go away if the i2lib code ends
@@ -1786,8 +1714,6 @@ ip2_close( PTTY tty, struct file *pFile )
 	 */
 	if (pCh->flags & ASYNC_NORMAL_ACTIVE)
 		pCh->NormalTermios = *tty->termios;
-	if (pCh->flags & ASYNC_CALLOUT_ACTIVE)
-		pCh->CalloutTermios = *tty->termios;
 
 	tty->closing = 1;
 
@@ -1833,7 +1759,7 @@ ip2_close( PTTY tty, struct file *pFile )
 		wake_up_interruptible(&pCh->open_wait);
 	}
 
-	pCh->flags &=~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|ASYNC_CLOSING);
+	pCh->flags &=~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&pCh->close_wait);
 
 #ifdef IP2DEBUG_OPEN
@@ -1883,7 +1809,7 @@ ip2_hangup ( PTTY tty )
 
 	wake_up_interruptible ( &pCh->delta_msr_wait );
 
-	pCh->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
+	pCh->flags &= ~ASYNC_NORMAL_ACTIVE;
 	pCh->pTTY = NULL;
 	wake_up_interruptible ( &pCh->open_wait );
 

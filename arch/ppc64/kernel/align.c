@@ -21,6 +21,8 @@
 #include <asm/system.h>
 #include <asm/cache.h>
 
+void disable_kernel_fp(void); /* asm function from head.S */
+
 struct aligninfo {
 	unsigned char len;
 	unsigned char flags;

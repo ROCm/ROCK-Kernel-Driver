@@ -237,14 +237,13 @@ tapeblock_setup_device(struct tape_device * device)
 	blk_queue_segment_boundary(q, -1L);
 
 	disk->major = tapeblock_major;
-	disk->first_minor = i;
+	disk->first_minor = device->first_minor;
 	disk->fops = &tapeblock_fops;
 	disk->private_data = device;
 	disk->queue = q;
-	set_capacity(disk, size);
+	//set_capacity(disk, size);
 
-	sprintf(disk->disk_name, "tBLK%d", i);
-	sprintf(disk->disk_name, "tBLK/%d", i);
+	sprintf(disk->disk_name, "tBLK/%d", device->first_minor / TAPE_MINORS_PER_DEV);
 
 	add_disk(disk);
 	d->disk = disk;
@@ -302,10 +301,16 @@ static int tapeblock_mediumdetect(struct tape_device *device)
 static int
 tapeblock_open(struct inode *inode, struct file *filp)
 {
-	struct gendisk *disk = inp->i_bdev->bd_disk;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct tape_device *device = disk->private_data;
 	int rc;
 
+	/*
+	 * FIXME: this new tapeblock_open function is from 2.5.69.
+	 * It doesn't do tape_get_device anymore but picks the device
+	 * pointer from disk->private_data. It is stored in 
+	 * tapeblock_setup_device but WITHOUT proper ref-counting.
+	 */
 	rc = tape_open(device);
 	if (rc)
 		goto put_device;
@@ -333,7 +338,7 @@ tapeblock_open(struct inode *inode, struct file *filp)
 static int
 tapeblock_release(struct inode *inode, struct file *filp)
 {
-	struct gendisk *disk = inp->i_bdev->bd_disk;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct tape_device *device = disk->private_data;
 
 	tape_release(device);

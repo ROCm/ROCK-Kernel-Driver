@@ -282,7 +282,7 @@ static void inline do_trap(long interruption_code, int signr, char *str,
                 const struct exception_table_entry *fixup;
                 fixup = search_exception_tables(regs->psw.addr & PSW_ADDR_INSN);
                 if (fixup)
-                        regs->psw.addr = fixup->fixup | ~PSW_ADDR_INSN;
+                        regs->psw.addr = fixup->fixup | PSW_ADDR_AMODE;
                 else
                         die(str, regs, interruption_code);
         }
@@ -293,27 +293,14 @@ static inline void *get_check_address(struct pt_regs *regs)
 	return (void *)((regs->psw.addr-S390_lowcore.pgm_ilc) & PSW_ADDR_INSN);
 }
 
-int do_debugger_trap(struct pt_regs *regs,int signal)
+static int do_debugger_trap(struct pt_regs *regs)
 {
-	if(regs->psw.mask&PSW_MASK_PSTATE)
-	{
-		if(current->ptrace & PT_PTRACED)
-			force_sig(signal,current);
-		else
-			return 1;
+	if ((regs->psw.mask & PSW_MASK_PSTATE) &&
+	    (current->ptrace & PT_PTRACED)) {
+		force_sig(SIGTRAP,current);
+		return 0;
 	}
-	else
-	{
-#ifdef CONFIG_REMOTE_DEBUG
-		if(gdb_stub_initialised)
-		{
-			gdb_stub_handle_exception(regs, signal);
-			return 0;
-		}
-#endif
-		return 1;
-	}
-	return 0;
+	return 1;
 }
 
 #define DO_ERROR(signr, str, name) \
@@ -400,7 +387,7 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 		*((__u16 *)opcode)=*((__u16 *)location);
 	if (*((__u16 *)opcode)==S390_BREAKPOINT_U16)
         {
-		if(do_debugger_trap(regs,SIGTRAP))
+		if(do_debugger_trap(regs))
 			signal = SIGILL;
 	}
 #ifdef CONFIG_MATHEMU
@@ -659,7 +646,7 @@ void handle_per_exception(struct pt_regs *regs)
 		per_info->lowcore.words.address=S390_lowcore.per_address;
 		per_info->lowcore.words.access_id=S390_lowcore.per_access_id;
 	}
-	if (do_debugger_trap(regs,SIGTRAP)) {
+	if (do_debugger_trap(regs)) {
 		/* I've seen this possibly a task structure being reused ? */
 		printk("Spurious per exception detected\n");
 		printk("switching off per tracing for this task.\n");

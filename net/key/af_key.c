@@ -2244,6 +2244,7 @@ static void dump_ah_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
 	p->sadb_prop_len = sizeof(struct sadb_prop)/8;
 	p->sadb_prop_exttype = SADB_EXT_PROPOSAL;
 	p->sadb_prop_replay = 32;
+	memset(p->sadb_prop_reserved, 0, sizeof(p->sadb_prop_reserved));
 
 	for (i = 0; ; i++) {
 		struct xfrm_algo_desc *aalg = xfrm_aalg_get_byidx(i);
@@ -2275,6 +2276,7 @@ static void dump_esp_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
 	p->sadb_prop_len = sizeof(struct sadb_prop)/8;
 	p->sadb_prop_exttype = SADB_EXT_PROPOSAL;
 	p->sadb_prop_replay = 32;
+	memset(p->sadb_prop_reserved, 0, sizeof(p->sadb_prop_reserved));
 
 	for (i=0; ; i++) {
 		struct xfrm_algo_desc *ealg = xfrm_ealg_get_byidx(i);

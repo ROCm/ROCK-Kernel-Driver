@@ -85,9 +85,9 @@
 	NFSERR_NOFILEHANDLE = 10020,	/*       v4 */
 	NFSERR_MINOR_VERS_MISMATCH = 10021,   /* v4 */
 	NFSERR_STALE_CLIENTID = 10022,	/*       v4 */
-	NFSERR_STALE_STATEID = 10023,	/*       v4 */
-	NFSERR_OLD_STATEID = 10024,	/*       v4 */
-	NFSERR_BAD_STATEID = 10025,	/*       v4 */
+	NFSERR_STALE_STATEID = 10023,   /*       v4 */
+	NFSERR_OLD_STATEID = 10024,     /*       v4 */
+	NFSERR_BAD_STATEID = 10025,     /*       v4 */  
 	NFSERR_BAD_SEQID = 10026,	/*       v4 */
 	NFSERR_NOT_SAME = 10027,	/*       v4 */
 	NFSERR_LOCK_RANGE = 10028,	/*       v4 */
@@ -99,7 +99,8 @@
 	NFSERR_RECLAIM_BAD = 10034,	/*       v4 */
 	NFSERR_RECLAIM_CONFLICT = 10035,/*       v4 */
 	NFSERR_BAD_XDR = 10036,		/*       v4 */
-	NFSERR_LOCKS_HELD = 10037	/*       v4 */
+	NFSERR_LOCKS_HELD = 10037,	/*       v4 */
+	NFSERR_REPLAY_ME = 10038	/*       v4 */
 };
 
 /* NFSv2 file types - beware, these are not the same in NFSv3 */

@@ -212,7 +212,7 @@ static void hp_zx1_cleanup(void)
 	iounmap((void *) hp->registers);
 }
 
-static void hp_zx1_tlbflush(agp_memory * mem)
+static void hp_zx1_tlbflush(struct agp_memory *mem)
 {
 	struct _hp_private *hp = &hp_private;
 
@@ -259,7 +259,8 @@ static int hp_zx1_free_gatt_table(void)
 	return 0;
 }
 
-static int hp_zx1_insert_memory(agp_memory * mem, off_t pg_start, int type)
+static int hp_zx1_insert_memory(struct agp_memory *mem, off_t pg_start,
+				int type)
 {
 	struct _hp_private *hp = &hp_private;
 	int i, k;
@@ -304,7 +305,8 @@ static int hp_zx1_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	return 0;
 }
 
-static int hp_zx1_remove_memory(agp_memory * mem, off_t pg_start, int type)
+static int hp_zx1_remove_memory(struct agp_memory *mem, off_t pg_start,
+				int type)
 {
 	struct _hp_private *hp = &hp_private;
 	int i, io_pg_start, io_pg_count;

@@ -55,7 +55,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.48 $"
+#define VERSION_QDIO_C "$Revision: 1.49 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -1668,6 +1668,7 @@ qdio_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 
 	switch (irq_ptr->state) {
 	case QDIO_IRQ_STATE_INACTIVE:
+		/* FIXME: defer this past interrupt time */
 		qdio_establish_handle_irq(cdev, cstat, dstat);
 		break;
 
@@ -1763,7 +1764,8 @@ qdio_check_siga_needs(int sch)
 		u8  ocnt;
 	} *ssqd_area;
 
-	ssqd_area = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
+	/* FIXME make this GFP_KERNEL */
+	ssqd_area = (void *)get_zeroed_page(GFP_ATOMIC | GFP_DMA);
 	if (!ssqd_area) {
 	        QDIO_PRINT_WARN("Could not get memory for chsc. Using all " \
 				"SIGAs for sch x%x.\n", sch);
@@ -2644,6 +2646,7 @@ qdio_establish(struct ccw_device *cdev)
 		return result;
 	}
 	
+	/* FIXME: don't wait forever if hardware is broken */
 	wait_event(cdev->private->wait_q,
 		   irq_ptr->state == QDIO_IRQ_STATE_ESTABLISHED ||
 		   irq_ptr->state == QDIO_IRQ_STATE_ERR);

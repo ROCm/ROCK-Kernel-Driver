@@ -638,6 +638,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 	    release_region(ioaddr, PCNET32_TOTAL_SIZE);
 	    return -ENOMEM;
     }
+    SET_NETDEV_DEV(dev, &pdev->dev);
 
     printk(KERN_INFO PFX "%s at %#3lx,", chipname, ioaddr);
 
@@ -718,6 +719,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
     spin_lock_init(&lp->lock);
     
     SET_MODULE_OWNER(dev);
+    SET_NETDEV_DEV(dev, &pdev->dev);
     dev->priv = lp;
     lp->name = chipname;
     lp->shared_irq = shared;

@@ -302,7 +302,7 @@ ProgramCheckException(struct pt_regs *regs)
 	int errcode;
 
 #if defined(CONFIG_4xx)
-	unsigned int esr = mfspr(SPRN_ESR);
+	unsigned int esr = regs->dsisr;
 	int isbpt = esr & ESR_PTR;
 	extern int do_mathemu(struct pt_regs *regs);
 

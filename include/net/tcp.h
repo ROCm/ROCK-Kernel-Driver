@@ -35,6 +35,7 @@
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 #include <linux/ipv6.h>
 #endif
+#include <linux/seq_file.h>
 
 /* This is for all connections with a full identity, no wildcards.
  * New scheme, half the table is for TIME_WAIT, the other half is
@@ -207,6 +208,8 @@ struct tcp_tw_bucket {
 #endif
 };
 
+#define tcptw_sk(__sk)	((struct tcp_tw_bucket *)(__sk))
+
 extern kmem_cache_t *tcp_timewait_cachep;
 
 static inline void tcp_tw_put(struct tcp_tw_bucket *tw)
@@ -245,7 +248,11 @@ extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 #endif /* __BIG_ENDIAN */
 #define TCP_IPV4_MATCH(__sk, __cookie, __saddr, __daddr, __ports, __dif)\
 	(((*((__u64 *)&(inet_sk(__sk)->daddr)))== (__cookie))	&&	\
-	 ((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))   &&	\
+	 ((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))	&&	\
+	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
+#define TCP_IPV4_TW_MATCH(__sk, __cookie, __saddr, __daddr, __ports, __dif)\
+	(((*((__u64 *)&(tcptw_sk(__sk)->daddr)))== (__cookie))	&&	\
+	 ((*((__u32 *)&(tcptw_sk(__sk)->dport)))== (__ports))	&&	\
 	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
 #else /* 32-bit arch */
 #define TCP_V4_ADDR_COOKIE(__name, __saddr, __daddr)
@@ -253,6 +260,11 @@ extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 	((inet_sk(__sk)->daddr			== (__saddr))	&&	\
 	 (inet_sk(__sk)->rcv_saddr		== (__daddr))	&&	\
 	 ((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))	&&	\
+	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
+#define TCP_IPV4_TW_MATCH(__sk, __cookie, __saddr, __daddr, __ports, __dif)\
+	((tcptw_sk(__sk)->daddr			== (__saddr))	&&	\
+	 (tcptw_sk(__sk)->rcv_saddr		== (__daddr))	&&	\
+	 ((*((__u32 *)&(tcptw_sk(__sk)->dport)))== (__ports))	&&	\
 	 (!((__sk)->bound_dev_if) || ((__sk)->bound_dev_if == (__dif))))
 #endif /* 64-bit arch */
 
@@ -361,10 +373,6 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 #define MAX_TCP_KEEPINTVL	32767
 #define MAX_TCP_KEEPCNT		127
 #define MAX_TCP_SYNCNT		127
-
-/* TIME_WAIT reaping mechanism. */
-#define TCP_TWKILL_SLOTS	8	/* Please keep this a power of 2. */
-#define TCP_TWKILL_PERIOD	(TCP_TIMEWAIT_LEN/TCP_TWKILL_SLOTS)
 
 #define TCP_SYNQ_INTERVAL	(HZ/5)	/* Period of SYNACK timer */
 #define TCP_SYNQ_HSIZE		512	/* Size of SYNACK hash table */
@@ -1892,5 +1900,32 @@ static inline void tcp_mib_init(void)
 	TCP_ADD_STATS_USER(TcpRtoMax, TCP_RTO_MAX*1000/HZ);
 	TCP_ADD_STATS_USER(TcpMaxConn, -1);
 }
+
+/* /proc */
+enum tcp_seq_states {
+	TCP_SEQ_STATE_LISTENING,
+	TCP_SEQ_STATE_OPENREQ,
+	TCP_SEQ_STATE_ESTABLISHED,
+	TCP_SEQ_STATE_TIME_WAIT,
+};
+
+struct tcp_seq_afinfo {
+	struct module		*owner;
+	char			*name;
+	sa_family_t		family;
+	int			(*seq_show) (struct seq_file *m, void *v);
+	struct file_operations	*seq_fops;
+};
+
+struct tcp_iter_state {
+	sa_family_t		family;
+	enum tcp_seq_states	state;
+	struct sock		*syn_wait_sk;
+	int			bucket, sbucket, num, uid;
+	struct seq_operations	seq_ops;
+};
+
+extern int tcp_proc_register(struct tcp_seq_afinfo *afinfo);
+extern void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo);
 
 #endif	/* _TCP_H */

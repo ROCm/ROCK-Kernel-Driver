@@ -613,7 +613,7 @@ static inline void tcpdiag_rcv_skb(struct sk_buff *skb)
 		if (nlh->nlmsg_len < sizeof(*nlh) || skb->len < nlh->nlmsg_len)
 			return;
 		err = tcpdiag_rcv_msg(skb, nlh);
-		if (err) 
+		if (err || nlh->nlmsg_flags & NLM_F_ACK) 
 			netlink_ack(skb, nlh, err);
 	}
 }

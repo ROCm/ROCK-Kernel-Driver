@@ -53,6 +53,7 @@
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/name_lookup.h>
 #include <linux/nfsd/nfsd.h>
+#include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
@@ -483,8 +484,8 @@ nfsd4_decode_close(struct nfsd4_compoundargs *argp, struct nfsd4_close *close)
 
 	READ_BUF(4 + sizeof(stateid_t));
 	READ32(close->cl_seqid);
-	READ32(close->cl_stateid.st_generation);
-	COPYMEM(&close->cl_stateid.st_other, sizeof(stateid_other_t));
+	READ32(close->cl_stateid.si_generation);
+	COPYMEM(&close->cl_stateid.si_opaque, sizeof(stateid_opaque_t));
 
 	DECODE_TAIL;
 }
@@ -595,11 +596,11 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 	READ32(open->op_share_access);
 	READ32(open->op_share_deny);
 	COPYMEM(&open->op_clientid, sizeof(clientid_t));
-	READ32(open->op_ownerlen);
+	READ32(open->op_owner.len);
 
 	/* owner, open_flag */
-	READ_BUF(open->op_ownerlen + 4);
-	SAVEMEM(open->op_owner, open->op_ownerlen);
+	READ_BUF(open->op_owner.len + 4);
+	SAVEMEM(open->op_owner.data, open->op_owner.len);
 	READ32(open->op_create);
 	switch (open->op_create) {
 	case NFS4_OPEN_NOCREATE:
@@ -632,10 +633,10 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 	case NFS4_OPEN_CLAIM_NULL:
 	case NFS4_OPEN_CLAIM_DELEGATE_PREV:
 		READ_BUF(4);
-		READ32(open->op_namelen);
-		READ_BUF(open->op_namelen);
-		SAVEMEM(open->op_name, open->op_namelen);
-		if ((status = check_filename(open->op_name, open->op_namelen, nfserr_inval)))
+		READ32(open->op_fname.len);
+		READ_BUF(open->op_fname.len);
+		SAVEMEM(open->op_fname.data, open->op_fname.len);
+		if ((status = check_filename(open->op_fname.data, open->op_fname.len, nfserr_inval)))
 			return status;
 		break;
 	case NFS4_OPEN_CLAIM_PREVIOUS:
@@ -645,10 +646,10 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 	case NFS4_OPEN_CLAIM_DELEGATE_CUR:
 		READ_BUF(sizeof(delegation_stateid_t) + 4);
 		COPYMEM(&open->op_delegate_stateid, sizeof(delegation_stateid_t));
-		READ32(open->op_namelen);
-		READ_BUF(open->op_namelen);
-		SAVEMEM(open->op_name, open->op_namelen);
-		if ((status = check_filename(open->op_name, open->op_namelen, nfserr_inval)))
+		READ32(open->op_fname.len);
+		READ_BUF(open->op_fname.len);
+		SAVEMEM(open->op_fname.data, open->op_fname.len);
+		if ((status = check_filename(open->op_fname.data, open->op_fname.len, nfserr_inval)))
 			return status;
 		break;
 	default:
@@ -679,8 +680,8 @@ nfsd4_decode_read(struct nfsd4_compoundargs *argp, struct nfsd4_read *read)
 	DECODE_HEAD;
 
 	READ_BUF(sizeof(stateid_t) + 12);
-	READ32(read->rd_stateid.st_generation);
-	COPYMEM(&read->rd_stateid.st_other, sizeof(stateid_other_t));
+	READ32(read->rd_stateid.si_generation);
+	COPYMEM(&read->rd_stateid.si_opaque, sizeof(stateid_opaque_t));
 	READ64(read->rd_offset);
 	READ32(read->rd_length);
 
@@ -755,8 +756,8 @@ nfsd4_decode_setattr(struct nfsd4_compoundargs *argp, struct nfsd4_setattr *seta
 	DECODE_HEAD;
 
 	READ_BUF(sizeof(stateid_t));
-	READ32(setattr->sa_stateid.st_generation);
-	COPYMEM(&setattr->sa_stateid.st_other, sizeof(stateid_other_t));
+	READ32(setattr->sa_stateid.si_generation);
+	COPYMEM(&setattr->sa_stateid.si_opaque, sizeof(stateid_opaque_t));
 	if ((status = nfsd4_decode_fattr(argp, setattr->sa_bmval, &setattr->sa_iattr)))
 		goto out;
 
@@ -825,8 +826,8 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 	DECODE_HEAD;
 
 	READ_BUF(sizeof(stateid_t) + 16);
-	READ32(write->wr_stateid.st_generation);
-	COPYMEM(&write->wr_stateid.st_other, sizeof(stateid_other_t));
+	READ32(write->wr_stateid.si_generation);
+	COPYMEM(&write->wr_stateid.si_opaque, sizeof(stateid_opaque_t));
 	READ64(write->wr_offset);
 	READ32(write->wr_stable_how);
 	if (write->wr_stable_how > 2)
@@ -1543,8 +1544,8 @@ nfsd4_encode_close(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_clos
 
 	if (!nfserr) {
 		RESERVE_SPACE(sizeof(stateid_t));
-		WRITE32(close->cl_stateid.st_generation);
-		WRITEMEM(&close->cl_stateid.st_other, sizeof(stateid_other_t));
+		WRITE32(close->cl_stateid.si_generation);
+		WRITEMEM(&close->cl_stateid.si_opaque, sizeof(stateid_opaque_t));
 		ADJUST_ARGS();
 	}
 }
@@ -1632,8 +1633,8 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 		return;
 
 	RESERVE_SPACE(36 + sizeof(stateid_t));
-	WRITE32(open->op_stateid.st_generation);
-	WRITEMEM(&open->op_stateid.st_other, sizeof(stateid_other_t));
+	WRITE32(open->op_stateid.si_generation);
+	WRITEMEM(&open->op_stateid.si_opaque, sizeof(stateid_opaque_t));
 	WRITECINFO(open->op_cinfo);
 	WRITE32(open->op_rflags);
 	WRITE32(2);

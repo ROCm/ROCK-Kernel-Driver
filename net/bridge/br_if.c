@@ -84,7 +84,7 @@ static struct net_bridge *new_nb(const char *name)
 	memset(br, 0, sizeof(*br));
 	dev = &br->dev;
 
-	strncpy(dev->name, name, IFNAMSIZ);
+	strlcpy(dev->name, name, sizeof(dev->name));
 	dev->priv = br;
 	dev->priv_flags = IFF_EBRIDGE;
 	ether_setup(dev);

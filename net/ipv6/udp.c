@@ -15,6 +15,7 @@
  *	Alexey Kuznetsov		allow both IPv4 and IPv6 sockets to bind
  *					a single port at the same time.
  *      Kazunori MIYAZAWA @USAGI:       change process style to use ip6_append_data
+ *      YOSHIFUJI Hideaki @USAGI:	convert /proc/net/udp6 to seq_file.
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -52,6 +53,9 @@
 
 #include <net/checksum.h>
 #include <net/xfrm.h>
+
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 DEFINE_SNMP_STAT(struct udp_mib, udp_stats_in6);
 
@@ -270,7 +274,7 @@ int udpv6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (usin->sin6_family != AF_INET6) 
 	  	return -EAFNOSUPPORT;
 
-	fl.fl6_flowlabel = 0;
+	memset(&fl, 0, sizeof(fl));
 	if (np->sndflow) {
 		fl.fl6_flowlabel = usin->sin6_flowinfo&IPV6_FLOWINFO_MASK;
 		if (fl.fl6_flowlabel&IPV6_FLOWLABEL_MASK) {
@@ -350,8 +354,8 @@ ipv4_connected:
 	 */
 
 	fl.proto = IPPROTO_UDP;
-	fl.fl6_dst = &np->daddr;
-	fl.fl6_src = &saddr;
+	ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
+	ipv6_addr_copy(&fl.fl6_src, &saddr);
 	fl.oif = sk->bound_dev_if;
 	fl.fl_ip_dport = inet->dport;
 	fl.fl_ip_sport = inet->sport;
@@ -362,11 +366,11 @@ ipv4_connected:
 	if (flowlabel) {
 		if (flowlabel->opt && flowlabel->opt->srcrt) {
 			struct rt0_hdr *rt0 = (struct rt0_hdr *) flowlabel->opt->srcrt;
-			fl.fl6_dst = rt0->addr;
+			ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 		}
 	} else if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *)np->opt->srcrt;
-		fl.fl6_dst = rt0->addr;
+		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
 	dst = ip6_route_output(sk, &fl);
@@ -377,7 +381,7 @@ ipv4_connected:
 		return err;
 	}
 
-	ip6_dst_store(sk, dst, fl.fl6_dst);
+	ip6_dst_store(sk, dst, &fl.fl6_dst);
 
 	/* get the source address used in the appropriate device */
 
@@ -784,8 +788,8 @@ static int udp_v6_push_pending_frames(struct sock *sk, struct udp_opt *up)
 	if (skb_queue_len(&sk->write_queue) == 1) {
 		skb->csum = csum_partial((char *)uh,
 				sizeof(struct udphdr), skb->csum);
-		uh->check = csum_ipv6_magic(fl->fl6_src,
-					    fl->fl6_dst,
+		uh->check = csum_ipv6_magic(&fl->fl6_src,
+					    &fl->fl6_dst,
 					    up->len, fl->proto, skb->csum);
 	} else {
 		u32 tmp_csum = 0;
@@ -795,8 +799,8 @@ static int udp_v6_push_pending_frames(struct sock *sk, struct udp_opt *up)
 		}
 		tmp_csum = csum_partial((char *)uh,
 				sizeof(struct udphdr), tmp_csum);
-                tmp_csum = csum_ipv6_magic(fl->fl6_src,
-					   fl->fl6_dst,
+                tmp_csum = csum_ipv6_magic(&fl->fl6_src,
+					   &fl->fl6_dst,
 					   up->len, fl->proto, tmp_csum);
                 uh->check = tmp_csum;
 
@@ -819,7 +823,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) msg->msg_name;
-	struct in6_addr *daddr, *saddr = NULL;
+	struct in6_addr *daddr;
 	struct ipv6_txoptions *opt = NULL;
 	struct ip6_flowlabel *flowlabel = NULL;
 	struct flowi fl;
@@ -849,8 +853,7 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	}
 	ulen += sizeof(struct udphdr);
 
-	fl.fl6_flowlabel = 0;
-	fl.oif = 0;
+	memset(&fl, 0, sizeof(fl));
 
 	if (sin6) {
 		if (sin6->sin6_family == AF_INET) {
@@ -919,7 +922,6 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 
 	if (!fl.oif)
 		fl.oif = sk->bound_dev_if;
-	fl.fl6_src = NULL;
 
 	if (msg->msg_controllen) {
 		opt = &opt_space;
@@ -944,26 +946,27 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		opt = fl6_merge_options(&opt_space, flowlabel, opt);
 
 	fl.proto = IPPROTO_UDP;
-	fl.fl6_dst = daddr;
-	if (fl.fl6_src == NULL && !ipv6_addr_any(&np->saddr))
-		fl.fl6_src = &np->saddr;
+	ipv6_addr_copy(&fl.fl6_dst, daddr);
+	if (ipv6_addr_any(&fl.fl6_src) && !ipv6_addr_any(&np->saddr))
+		ipv6_addr_copy(&fl.fl6_src, &np->saddr);
 	fl.fl_ip_dport = up->dport;
 	fl.fl_ip_sport = inet->sport;
 	
 	/* merge ip6_build_xmit from ip6_output */
 	if (opt && opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
-		fl.fl6_dst = rt0->addr;
+		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
-	if (!fl.oif && ipv6_addr_is_multicast(fl.nl_u.ip6_u.daddr))
+	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
 
-	err = ip6_dst_lookup(sk, &dst, &fl, &saddr);
-	if (err) goto out;
+	err = ip6_dst_lookup(sk, &dst, &fl);
+	if (err)
+		goto out;
 
 	if (hlimit < 0) {
-		if (ipv6_addr_is_multicast(fl.fl6_dst))
+		if (ipv6_addr_is_multicast(&fl.fl6_dst))
 			hlimit = np->mcast_hops;
 		else
 			hlimit = np->hop_limit;
@@ -998,13 +1001,14 @@ do_append_data:
 	else if (!corkreq)
 		err = udp_v6_push_pending_frames(sk, up);
 
-	ip6_dst_store(sk, dst, fl.nl_u.ip6_u.daddr == &np->daddr ? &np->daddr : NULL);
+	ip6_dst_store(sk, dst,
+		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
+		      &np->daddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
 	release_sock(sk);
 out:
 	fl6_sock_release(flowlabel);
-	if (saddr) kfree(saddr);
 	if (!err) {
 		UDP6_INC_STATS_USER(UdpOutDatagrams);
 		return len;
@@ -1116,10 +1120,10 @@ static struct inet6_protocol udpv6_protocol = {
 	.flags		=	INET6_PROTO_NOPOLICY|INET6_PROTO_FINAL,
 };
 
-#define LINE_LEN 190
-#define LINE_FMT "%-190s\n"
+/* ------------------------------------------------------------------------ */
+#ifdef CONFIG_PROC_FS
 
-static void get_udp6_sock(struct sock *sp, char *tmpbuf, int i)
+static void udp6_sock_seq_show(struct seq_file *seq, struct sock *sp, int bucket)
 {
 	struct inet_opt *inet = inet_sk(sp);
 	struct ipv6_pinfo *np = inet6_sk(sp);
@@ -1130,66 +1134,56 @@ static void get_udp6_sock(struct sock *sp, char *tmpbuf, int i)
 	src   = &np->rcv_saddr;
 	destp = ntohs(inet->dport);
 	srcp  = ntohs(inet->sport);
-	sprintf(tmpbuf,
-		"%4d: %08X%08X%08X%08X:%04X %08X%08X%08X%08X:%04X "
-		"%02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
-		i,
-		src->s6_addr32[0], src->s6_addr32[1],
-		src->s6_addr32[2], src->s6_addr32[3], srcp,
-		dest->s6_addr32[0], dest->s6_addr32[1],
-		dest->s6_addr32[2], dest->s6_addr32[3], destp,
-		sp->state, 
-		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
-		0, 0L, 0,
-		sock_i_uid(sp), 0,
-		sock_i_ino(sp),
-		atomic_read(&sp->refcnt), sp);
+	seq_printf(seq,
+		   "%4d: %08X%08X%08X%08X:%04X %08X%08X%08X%08X:%04X "
+		   "%02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p\n",
+		   bucket,
+		   src->s6_addr32[0], src->s6_addr32[1],
+		   src->s6_addr32[2], src->s6_addr32[3], srcp,
+		   dest->s6_addr32[0], dest->s6_addr32[1],
+		   dest->s6_addr32[2], dest->s6_addr32[3], destp,
+		   sp->state, 
+		   atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
+		   0, 0L, 0,
+		   sock_i_uid(sp), 0,
+		   sock_i_ino(sp),
+		   atomic_read(&sp->refcnt), sp);
 }
 
-int udp6_get_info(char *buffer, char **start, off_t offset, int length)
+static int udp6_seq_show(struct seq_file *seq, void *v)
 {
-	int len = 0, num = 0, i;
-	off_t pos = 0;
-	off_t begin;
-	char tmpbuf[LINE_LEN+2];
-
-	if (offset < LINE_LEN+1)
-		len += sprintf(buffer, LINE_FMT,
-			       "  sl  "						/* 6 */
-			       "local_address                         "		/* 38 */
-			       "remote_address                        "		/* 38 */
-			       "st tx_queue rx_queue tr tm->when retrnsmt"	/* 41 */
-			       "   uid  timeout inode");			/* 21 */
-										/*----*/
-										/*144 */
-	pos = LINE_LEN+1;
-	read_lock(&udp_hash_lock);
-	for (i = 0; i < UDP_HTABLE_SIZE; i++) {
-		struct sock *sk;
-
-		for (sk = udp_hash[i]; sk; sk = sk->next, num++) {
-			if (sk->family != PF_INET6)
-				continue;
-			pos += LINE_LEN+1;
-			if (pos <= offset)
-				continue;
-			get_udp6_sock(sk, tmpbuf, i);
-			len += sprintf(buffer+len, LINE_FMT, tmpbuf);
-			if(len >= length)
-				goto out;
-		}
-	}
-out:
-	read_unlock(&udp_hash_lock);
-	begin = len - (pos - offset);
-	*start = buffer + begin;
-	len -= begin;
-	if(len > length)
-		len = length;
-	if (len < 0)
-		len = 0; 
-	return len;
+	if (v == (void *)1)
+		seq_printf(seq,
+			   "  sl  "
+			   "local_address                         "
+			   "remote_address                        "
+			   "st tx_queue rx_queue tr tm->when retrnsmt"
+			   "   uid  timeout inode\n");
+	else
+		udp6_sock_seq_show(seq, v, ((struct udp_iter_state *)seq->private)->bucket);
+	return 0;
 }
+
+static struct file_operations udp6_seq_fops;
+static struct udp_seq_afinfo udp6_seq_afinfo = {
+	.owner		= THIS_MODULE,
+	.name		= "udp6",
+	.family		= AF_INET6,
+	.seq_show	= udp6_seq_show,
+	.seq_fops	= &udp6_seq_fops,
+};
+
+int __init udp6_proc_init(void)
+{
+	return udp_proc_register(&udp6_seq_afinfo);
+}
+
+void udp6_proc_exit(void) {
+	udp_proc_unregister(&udp6_seq_afinfo);
+}
+#endif /* CONFIG_PROC_FS */
+
+/* ------------------------------------------------------------------------ */
 
 struct proto udpv6_prot = {
 	.name =		"UDP",

@@ -131,16 +131,6 @@ extern int plip_init(void);
 NET_PROFILE_DEFINE(dev_queue_xmit)
 NET_PROFILE_DEFINE(softnet_process)
 
-const char *if_port_text[] = {
-  "unknown",
-  "BNC",
-  "10baseT",
-  "AUI",
-  "100baseT",
-  "100baseTX",
-  "100baseFX"
-};
-
 /*
  *	The list of packet types we will receive (as opposed to discard)
  *	and the routines to invoke.
@@ -203,7 +193,9 @@ int netdev_fastroute;
 int netdev_fastroute_obstacles;
 #endif
 
-static struct subsystem net_subsys;
+extern int netdev_sysfs_init(void);
+extern int netdev_register_sysfs(struct net_device *);
+extern void netdev_unregister_sysfs(struct net_device *);
 
 
 /*******************************************************************************
@@ -1393,8 +1385,10 @@ static __inline__ void skb_bond(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 
-	if (dev->master)
+	if (dev->master) {
+		skb->real_dev = skb->dev;
 		skb->dev = dev->master;
+	}
 }
 
 static void net_tx_action(struct softirq_action *h)
@@ -1464,15 +1458,6 @@ static __inline__ int handle_bridge(struct sk_buff *skb,
 }
 
 #endif
-
-static inline void handle_diverter(struct sk_buff *skb)
-{
-#ifdef CONFIG_NET_DIVERT
-	/* if diversion is supported on device, then divert */
-	if (skb->dev->divert && skb->dev->divert->divert)
-		divert_frame(skb);
-#endif
-}
 
 static inline int __handle_bridge(struct sk_buff *skb,
 			struct packet_type **pt_prev, int *ret)
@@ -2084,6 +2069,22 @@ void dev_set_allmulti(struct net_device *dev, int inc)
 		dev_mc_upload(dev);
 }
 
+unsigned dev_get_flags(const struct net_device *dev)
+{
+	unsigned flags;
+
+	flags = (dev->flags & ~(IFF_PROMISC |
+				IFF_ALLMULTI |
+				IFF_RUNNING)) | 
+		(dev->gflags & (IFF_PROMISC |
+				IFF_ALLMULTI));
+
+	if (netif_running(dev) && netif_carrier_ok(dev))
+		flags |= IFF_RUNNING;
+
+	return flags;
+}
+
 int dev_change_flags(struct net_device *dev, unsigned flags)
 {
 	int ret;
@@ -2146,6 +2147,32 @@ int dev_change_flags(struct net_device *dev, unsigned flags)
 	return ret;
 }
 
+int dev_set_mtu(struct net_device *dev, int new_mtu)
+{
+	int err;
+
+	if (new_mtu == dev->mtu)
+		return 0;
+
+	/*	MTU must be positive.	 */
+	if (new_mtu < 0)
+		return -EINVAL;
+
+	if (!netif_device_present(dev))
+		return -ENODEV;
+
+	err = 0;
+	if (dev->change_mtu)
+		err = dev->change_mtu(dev, new_mtu);
+	else
+		dev->mtu = new_mtu;
+	if (!err && dev->flags & IFF_UP)
+		notifier_call_chain(&netdev_chain,
+				    NETDEV_CHANGEMTU, dev);
+	return err;
+}
+
+
 /*
  *	Perform the SIOCxIFxxx calls.
  */
@@ -2159,13 +2186,7 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 
 	switch (cmd) {
 		case SIOCGIFFLAGS:	/* Get interface flags */
-			ifr->ifr_flags = (dev->flags & ~(IFF_PROMISC |
-							 IFF_ALLMULTI |
-							 IFF_RUNNING)) | 
-					 (dev->gflags & (IFF_PROMISC |
-							 IFF_ALLMULTI));
-			if (netif_running(dev) && netif_carrier_ok(dev))
-				ifr->ifr_flags |= IFF_RUNNING;
+			ifr->ifr_flags = dev_get_flags(dev);
 			return 0;
 
 		case SIOCSIFFLAGS:	/* Set interface flags */
@@ -2185,27 +2206,7 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 			return 0;
 
 		case SIOCSIFMTU:	/* Set the MTU of a device */
-			if (ifr->ifr_mtu == dev->mtu)
-				return 0;
-
-			/*
-			 *	MTU must be positive.
-			 */
-			if (ifr->ifr_mtu < 0)
-				return -EINVAL;
-
-			if (!netif_device_present(dev))
-				return -ENODEV;
-
-			err = 0;
-			if (dev->change_mtu)
-				err = dev->change_mtu(dev, ifr->ifr_mtu);
-			else
-				dev->mtu = ifr->ifr_mtu;
-			if (!err && dev->flags & IFF_UP)
-				notifier_call_chain(&netdev_chain,
-						    NETDEV_CHANGEMTU, dev);
-			return err;
+			return dev_set_mtu(dev, ifr->ifr_mtu);
 
 		case SIOCGIFHWADDR:
 			memcpy(ifr->ifr_hwaddr.sa_data, dev->dev_addr,
@@ -2293,6 +2294,7 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 				return -EEXIST;
 			memcpy(dev->name, ifr->ifr_newname, IFNAMSIZ);
 			dev->name[IFNAMSIZ - 1] = 0;
+			snprintf(dev->class_dev.class_id, BUS_ID_SIZE, dev->name);
 			notifier_call_chain(&netdev_chain,
 					    NETDEV_CHANGENAME, dev);
 			return 0;
@@ -2568,11 +2570,9 @@ int register_netdevice(struct net_device *dev)
 	dev->fastpath_lock = RW_LOCK_UNLOCKED;
 #endif
 
-#ifdef CONFIG_NET_DIVERT
 	ret = alloc_divert_blk(dev);
 	if (ret)
 		goto out;
-#endif /* CONFIG_NET_DIVERT */
 
 	dev->iflink = -1;
 
@@ -2591,11 +2591,10 @@ int register_netdevice(struct net_device *dev)
 		if (d == dev || !strcmp(d->name, dev->name))
 			goto out_err;
 	}
-	snprintf(dev->kobj.name,KOBJ_NAME_LEN,dev->name);
-	kobj_set_kset_s(dev,net_subsys);
-	if ((ret = kobject_register(&dev->kobj)))
-		goto out_err;
 	
+	if ((ret = netdev_register_sysfs(dev)))
+	    goto out_err;
+
 	/* Fix illegal SG+CSUM combinations. */
 	if ((dev->features & NETIF_F_SG) &&
 	    !(dev->features & (NETIF_F_IP_CSUM |
@@ -2638,9 +2637,7 @@ int register_netdevice(struct net_device *dev)
 out:
 	return ret;
 out_err:
-#ifdef CONFIG_NET_DIVERT
 	free_divert_blk(dev);
-#endif
 	goto out;
 }
 
@@ -2759,6 +2756,8 @@ void netdev_run_todo(void)
 
 		dev->next = NULL;
 
+		netdev_unregister_sysfs(dev);
+
 		netdev_wait_allrefs(dev);
 
 		BUG_ON(atomic_read(&dev->refcnt));
@@ -2845,11 +2844,7 @@ int unregister_netdevice(struct net_device *dev)
 	/* Notifier chain MUST detach us from master device. */
 	BUG_TRAP(!dev->master);
 
-#ifdef CONFIG_NET_DIVERT
 	free_divert_blk(dev);
-#endif
-
-	kobject_unregister(&dev->kobj);
 
 	spin_lock(&unregister_todo_lock);
 	dev->next = unregister_todo;
@@ -2870,11 +2865,6 @@ int unregister_netdevice(struct net_device *dev)
 
 extern void net_device_init(void);
 extern void ip_auto_config(void);
-#ifdef CONFIG_NET_DIVERT
-extern void dv_init(void);
-#endif /* CONFIG_NET_DIVERT */
-
-static decl_subsys(net,NULL,NULL);
 
 
 /*
@@ -2891,15 +2881,12 @@ static int __init net_dev_init(void)
 	if (dev_proc_init())
 		goto out;
 
-	subsystem_register(&net_subsys);
+	if (netdev_sysfs_init())
+		goto out;
 
 	INIT_LIST_HEAD(&ptype_all);
 	for (i = 0; i < 16; i++) 
 		INIT_LIST_HEAD(&ptype_base[i]);
-
-#ifdef CONFIG_NET_DIVERT
-	dv_init();
-#endif /* CONFIG_NET_DIVERT */
 
 	/*
 	 *	Initialise the packet receive queues.
@@ -2965,7 +2952,8 @@ static int __init net_dev_init(void)
 		 */
 		netdev_boot_setup_check(dev);
 
-		if (dev->init && dev->init(dev)) {
+		if ( (dev->init && dev->init(dev)) ||
+		     netdev_register_sysfs(dev) ) {
 			/*
 			 * It failed to come up. It will be unhooked later.
 			 * dev_alloc_name can now advance to next suitable

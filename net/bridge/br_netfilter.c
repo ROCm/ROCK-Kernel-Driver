@@ -468,8 +468,7 @@ static unsigned int br_nf_post_routing(unsigned int hook, struct sk_buff **pskb,
 	struct sk_buff *skb = *pskb;
 	struct nf_bridge_info *nf_bridge = (*pskb)->nf_bridge;
 
-	/* FIXME: skb as not been linearized.  Is this still true? --RR */
-	/* Be very paranoid.  */
+	/* Be very paranoid. Must be a device driver bug. */
 	if (skb->mac.raw < skb->head || skb->mac.raw + ETH_HLEN > skb->data) {
 		printk(KERN_CRIT "br_netfilter: Argh!! br_nf_post_routing: "
 				 "bad mac.raw pointer.");
@@ -620,13 +619,11 @@ static struct nf_hook_ops br_nf_ops[] = {
 	  .priority = NF_IP_PRI_FIRST, },
 };
 
-#define NUMHOOKS (sizeof(br_nf_ops)/sizeof(br_nf_ops[0]))
-
 int br_netfilter_init(void)
 {
 	int i;
 
-	for (i = 0; i < NUMHOOKS; i++) {
+	for (i = 0; i < ARRAY_SIZE(br_nf_ops); i++) {
 		int ret;
 
 		if ((ret = nf_register_hook(&br_nf_ops[i])) >= 0)
@@ -647,6 +644,6 @@ void br_netfilter_fini(void)
 {
 	int i;
 
-	for (i = NUMHOOKS - 1; i >= 0; i--)
+	for (i = ARRAY_SIZE(br_nf_ops) - 1; i >= 0; i--)
 		nf_unregister_hook(&br_nf_ops[i]);
 }

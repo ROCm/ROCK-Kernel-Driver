@@ -53,8 +53,10 @@ struct ArcProto rfc1051_proto =
 };
 
 
-void __init arcnet_rfc1051_init(void)
+static int __init arcnet_rfc1051_init(void)
 {
+	printk(VERSION);
+
 	arc_proto_map[ARC_P_IP_RFC1051]
 	    = arc_proto_map[ARC_P_ARP_RFC1051]
 	    = &rfc1051_proto;
@@ -63,27 +65,18 @@ void __init arcnet_rfc1051_init(void)
 	if (arc_bcast_proto == arc_proto_default)
 		arc_bcast_proto = &rfc1051_proto;
 
-}
-
-
-#ifdef MODULE
-
-MODULE_LICENSE("GPL");
-
-int __init init_module(void)
-{
-	printk(VERSION);
-	arcnet_rfc1051_init();
 	return 0;
 }
 
-void cleanup_module(void)
+static void __exit arcnet_rfc1051_exit(void)
 {
 	arcnet_unregister_proto(&rfc1051_proto);
 }
 
-#endif				/* MODULE */
+module_init(arcnet_rfc1051_init);
+module_exit(arcnet_rfc1051_exit);
 
+MODULE_LICENSE("GPL");
 
 /*
  * Determine a packet's protocol ID.

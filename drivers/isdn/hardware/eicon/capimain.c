@@ -149,7 +149,7 @@ void diva_os_set_controller_struct(struct capi_ctr *ctrl)
 	ctrl->load_firmware = 0;
 	ctrl->reset_ctr = 0;
 	ctrl->ctr_read_proc = diva_ctl_read_proc;
-	SET_MODULE_OWNER(ctrl);
+	ctrl->owner = THIS_MODULE;
 }
 
 /*

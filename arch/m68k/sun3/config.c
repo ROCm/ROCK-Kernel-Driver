@@ -37,7 +37,7 @@ char sun3_reserved_pmeg[SUN3_PMEGS_NUM];
 
 extern unsigned long sun3_gettimeoffset(void);
 extern int show_sun3_interrupts (struct seq_file *, void *);
-extern void sun3_sched_init(void (*handler)(int, void *, struct pt_regs *));
+extern void sun3_sched_init(irqreturn_t (*handler)(int, void *, struct pt_regs *));
 extern void sun3_get_model (char* model);
 extern void idprom_init (void);
 extern int sun3_hwclk(int set, struct rtc_time *t);
@@ -174,7 +174,7 @@ void __init config_sun3(void)
 	sun3_bootmem_alloc(memory_start, memory_end);
 }
 
-void __init sun3_sched_init(void (*timer_routine)(int, void *, struct pt_regs *))
+void __init sun3_sched_init(irqreturn_t (*timer_routine)(int, void *, struct pt_regs *))
 {
 	sun3_disable_interrupts();
         intersil_clock->cmd_reg=(INTERSIL_RUN|INTERSIL_INT_DISABLE|INTERSIL_24H_MODE);

@@ -120,68 +120,68 @@ DEFINE_SNMP_STAT(struct icmp_mib, icmp_statistics);
 
 struct icmp_err icmp_err_convert[] = {
 	{
-		.errno =ENETUNREACH,	/* ICMP_NET_UNREACH */
-		.fatal =0,
+		.errno = ENETUNREACH,	/* ICMP_NET_UNREACH */
+		.fatal = 0,
 	},
 	{
-		.errno =EHOSTUNREACH,	/* ICMP_HOST_UNREACH */
-		.fatal =0,
+		.errno = EHOSTUNREACH,	/* ICMP_HOST_UNREACH */
+		.fatal = 0,
 	},
 	{
-		.errno =ENOPROTOOPT	/* ICMP_PROT_UNREACH */,
-		.fatal =1,
+		.errno = ENOPROTOOPT	/* ICMP_PROT_UNREACH */,
+		.fatal = 1,
 	},
 	{
-		.errno =ECONNREFUSED,	/* ICMP_PORT_UNREACH */
-		.fatal =1,
+		.errno = ECONNREFUSED,	/* ICMP_PORT_UNREACH */
+		.fatal = 1,
 	},
 	{
-		.errno =EMSGSIZE,	/* ICMP_FRAG_NEEDED */
-		.fatal =0,
+		.errno = EMSGSIZE,	/* ICMP_FRAG_NEEDED */
+		.fatal = 0,
 	},
 	{
-		.errno =EOPNOTSUPP,	/* ICMP_SR_FAILED */
-		.fatal =0,
+		.errno = EOPNOTSUPP,	/* ICMP_SR_FAILED */
+		.fatal = 0,
 	},
 	{
-		.errno =ENETUNREACH,	/* ICMP_NET_UNKNOWN */
-		.fatal =1,
+		.errno = ENETUNREACH,	/* ICMP_NET_UNKNOWN */
+		.fatal = 1,
 	},
 	{
-		.errno =EHOSTDOWN,	/* ICMP_HOST_UNKNOWN */
-		.fatal =1,
+		.errno = EHOSTDOWN,	/* ICMP_HOST_UNKNOWN */
+		.fatal = 1,
 	},
 	{
-		.errno =ENONET,		/* ICMP_HOST_ISOLATED */
-		.fatal =1,
+		.errno = ENONET,	/* ICMP_HOST_ISOLATED */
+		.fatal = 1,
 	},
 	{
-		.errno =ENETUNREACH,	/* ICMP_NET_ANO	*/
-		.fatal =1,
+		.errno = ENETUNREACH,	/* ICMP_NET_ANO	*/
+		.fatal = 1,
 	},
 	{
-		.errno =EHOSTUNREACH,	/* ICMP_HOST_ANO */
-		.fatal =1,
+		.errno = EHOSTUNREACH,	/* ICMP_HOST_ANO */
+		.fatal = 1,
 	},
 	{
-		.errno =ENETUNREACH,	/* ICMP_NET_UNR_TOS */
-		.fatal =0,
+		.errno = ENETUNREACH,	/* ICMP_NET_UNR_TOS */
+		.fatal = 0,
 	},
 	{
-		.errno =EHOSTUNREACH,	/* ICMP_HOST_UNR_TOS */
-		.fatal =0,
+		.errno = EHOSTUNREACH,	/* ICMP_HOST_UNR_TOS */
+		.fatal = 0,
 	},
 	{
-		.errno =EHOSTUNREACH,	/* ICMP_PKT_FILTERED */
-		.fatal =1,
+		.errno = EHOSTUNREACH,	/* ICMP_PKT_FILTERED */
+		.fatal = 1,
 	},
 	{
-		.errno =EHOSTUNREACH,	/* ICMP_PREC_VIOLATION */
-		.fatal =1,
+		.errno = EHOSTUNREACH,	/* ICMP_PREC_VIOLATION */
+		.fatal = 1,
 	},
 	{
-		.errno =EHOSTUNREACH,	/* ICMP_PREC_CUTOFF */
-		.fatal =1,
+		.errno = EHOSTUNREACH,	/* ICMP_PREC_CUTOFF */
+		.fatal = 1,
 	},
 };
 
@@ -320,8 +320,8 @@ static void icmp_out_count(int type)
  *	Checksum each fragment, and on the first include the headers and final
  *	checksum.
  */
-int
-icmp_glue_bits(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb)
+int icmp_glue_bits(void *from, char *to, int offset, int len, int odd,
+		   struct sk_buff *skb)
 {
 	struct icmp_bxm *icmp_param = (struct icmp_bxm *)from;
 	unsigned int csum;
@@ -334,8 +334,8 @@ icmp_glue_bits(void *from, char *to, int offset, int len, int odd, struct sk_buf
 	return 0;
 }
 
-static void
-icmp_push_reply(struct icmp_bxm *icmp_param, struct ipcm_cookie *ipc, struct rtable *rt)
+static void icmp_push_reply(struct icmp_bxm *icmp_param,
+			    struct ipcm_cookie *ipc, struct rtable *rt)
 {
 	struct sk_buff *skb;
 
@@ -353,8 +353,8 @@ icmp_push_reply(struct icmp_bxm *icmp_param, struct ipcm_cookie *ipc, struct rta
 			csum = csum_add(csum, skb1->csum);
 		}
 		csum = csum_partial_copy_nocheck((void *)&icmp_param->data,
-						 (char*)icmph, icmp_param->head_len,	
-						 csum);
+						 (char *)icmph,
+						 icmp_param->head_len, csum);
 		icmph->checksum = csum_fold(csum);
 		skb->ip_summed = CHECKSUM_NONE;
 		ip_push_pending_frames(icmp_socket->sk);
@@ -728,20 +728,16 @@ static void icmp_redirect(struct sk_buff *skb)
 	ip = iph->daddr;
 
 	switch (skb->h.icmph->code & 7) {
-		case ICMP_REDIR_NET:
-		case ICMP_REDIR_NETTOS:
-			/*
-			 *	As per RFC recommendations now handle it as
-			 *	a host redirect.
-			 */
-		case ICMP_REDIR_HOST:
-		case ICMP_REDIR_HOSTTOS:
-			ip_rt_redirect(skb->nh.iph->saddr,
-				       ip, skb->h.icmph->un.gateway,
-				       iph->saddr, iph->tos, skb->dev);
-			break;
-		default:
-			break;
+	case ICMP_REDIR_NET:
+	case ICMP_REDIR_NETTOS:
+		/*
+		 * As per RFC recommendations now handle it as a host redirect.
+		 */
+	case ICMP_REDIR_HOST:
+	case ICMP_REDIR_HOSTTOS:
+		ip_rt_redirect(skb->nh.iph->saddr, ip, skb->h.icmph->un.gateway,
+			       iph->saddr, iph->tos, skb->dev);
+		break;
   	}
 out:
 	return;
@@ -966,7 +962,7 @@ int icmp_rcv(struct sk_buff *skb)
 	}
 
 	ICMP_INC_STATS_BH_FIELD(icmp_pointers[icmph->type].input_off);
-	(icmp_pointers[icmph->type].handler)(skb);
+	icmp_pointers[icmph->type].handler(skb);
 
 drop:
 	kfree_skb(skb);
@@ -980,8 +976,7 @@ error:
  *	This table is the definition of how we handle ICMP.
  */
 static struct icmp_control icmp_pointers[NR_ICMP_TYPES + 1] = {
-	/* ECHO REPLY (0) */
-	[0] = {
+	[ICMP_ECHOREPLY] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutEchoReps),
 		.input_off = offsetof(struct icmp_mib, IcmpInEchoReps),
 		.handler = icmp_discard,
@@ -998,22 +993,19 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES + 1] = {
 		.handler = icmp_discard,
 		.error = 1,
 	},
-	/* DEST UNREACH (3) */
-	[3] = {
+	[ICMP_DEST_UNREACH] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutDestUnreachs),
 		.input_off = offsetof(struct icmp_mib, IcmpInDestUnreachs),
 		.handler = icmp_unreach,
 		.error = 1,
 	},
-	/* SOURCE QUENCH (4) */
-	[4] = {
+	[ICMP_SOURCE_QUENCH] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutSrcQuenchs),
 		.input_off = offsetof(struct icmp_mib, IcmpInSrcQuenchs),
-		icmp_unreach,
+		.handler = icmp_unreach,
 		.error = 1,
 	},
-	/* REDIRECT (5) */
-	[5] = {
+	[ICMP_REDIRECT] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutRedirects),
 		.input_off = offsetof(struct icmp_mib, IcmpInRedirects),
 		.handler = icmp_redirect,
@@ -1031,12 +1023,10 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES + 1] = {
 		.handler = icmp_discard,
 		.error = 1,
 	},
-	/* ECHO (8) */
-	[8] = {
+	[ICMP_ECHO] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutEchos),
 		.input_off = offsetof(struct icmp_mib, IcmpInEchos),
 		.handler = icmp_echo,
-		.error = 0,
 	},
 	[9] = {
 		.output_off = offsetof(struct icmp_mib, dummy),
@@ -1050,56 +1040,48 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES + 1] = {
 		.handler = icmp_discard,
 		.error = 1,
 	},
-	/* TIME EXCEEDED (11) */
-	[11] = {
+	[ICMP_TIME_EXCEEDED] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutTimeExcds),
 		.input_off = offsetof(struct icmp_mib,IcmpInTimeExcds),
 		.handler = icmp_unreach,
 		.error = 1,
 	},
-	/* PARAMETER PROBLEM (12) */
-	[12] = {
+	[ICMP_PARAMETERPROB] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutParmProbs),
 		.input_off = offsetof(struct icmp_mib, IcmpInParmProbs),
 		.handler = icmp_unreach,
 		.error = 1,
 	},
-	/* TIMESTAMP (13) */
-	[13] = {
+	[ICMP_TIMESTAMP] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutTimestamps),
 		.input_off = offsetof(struct icmp_mib, IcmpInTimestamps),
 		.handler = icmp_timestamp,
 	},
-	/* TIMESTAMP REPLY (14) */
-	[14] = {
+	[ICMP_TIMESTAMPREPLY] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutTimestampReps),
 		.input_off = offsetof(struct icmp_mib, IcmpInTimestampReps),
 		.handler = icmp_discard,
 	},
-	/* INFO (15) */
-	[15] = {
+	[ICMP_INFO_REQUEST] = {
 		.output_off = offsetof(struct icmp_mib, dummy),
 		.input_off = offsetof(struct icmp_mib, dummy),
 		.handler = icmp_discard,
 	},
-	/* INFO REPLY (16) */
- 	[16] = {
+ 	[ICMP_INFO_REPLY] = {
 		.output_off = offsetof(struct icmp_mib, dummy),
 		.input_off = offsetof(struct icmp_mib, dummy),
 		.handler = icmp_discard,
 	},
-	/* ADDR MASK (17) */
-	[17] = {
+	[ICMP_ADDRESS] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutAddrMasks),
 		.input_off = offsetof(struct icmp_mib, IcmpInAddrMasks),
 		.handler = icmp_address,
 	},
-	/* ADDR MASK REPLY (18) */
-	[18] = {
+	[ICMP_ADDRESSREPLY] = {
 		.output_off = offsetof(struct icmp_mib, IcmpOutAddrMaskReps),
 		.input_off = offsetof(struct icmp_mib, IcmpInAddrMaskReps),
 		.handler = icmp_address_reply,
-	}
+	},
 };
 
 void __init icmp_init(struct net_proto_family *ops)

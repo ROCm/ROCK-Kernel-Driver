@@ -17,7 +17,6 @@ typedef	union _alpha_agp_mode {
 } alpha_agp_mode;
 
 typedef struct _alpha_agp_info {
-	enum chipset_type type;
 	struct pci_controller *hose;
 	struct {
 		dma_addr_t bus_base;

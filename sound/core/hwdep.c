@@ -169,8 +169,8 @@ static int snd_hwdep_info(snd_hwdep_t *hw, snd_hwdep_info_t *_info)
 	
 	memset(&info, 0, sizeof(info));
 	info.card = hw->card->number;
-	strncpy(info.id, hw->id, sizeof(info.id) - 1);	
-	strncpy(info.name, hw->name, sizeof(info.name) - 1);
+	strlcpy(info.id, hw->id, sizeof(info.id));	
+	strlcpy(info.name, hw->name, sizeof(info.name));
 	info.iface = hw->iface;
 	if (copy_to_user(_info, &info, sizeof(info)))
 		return -EFAULT;
@@ -343,7 +343,7 @@ int snd_hwdep_new(snd_card_t * card, char *id, int device, snd_hwdep_t ** rhwdep
 	hwdep->card = card;
 	hwdep->device = device;
 	if (id) {
-		strncpy(hwdep->id, id, sizeof(hwdep->id) - 1);
+		strlcpy(hwdep->id, id, sizeof(hwdep->id));
 	}
 #ifdef CONFIG_SND_OSSEMUL
 	hwdep->oss_type = -1;

@@ -12,7 +12,7 @@
 #include <linux/rwsem.h>
 #include <asm/atomic.h>
 
-#define KOBJ_NAME_LEN	16
+#define KOBJ_NAME_LEN	20
 
 struct kobject {
 	char			name[KOBJ_NAME_LEN];

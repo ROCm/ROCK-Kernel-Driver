@@ -671,8 +671,8 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	if (f->f_flags & O_DIRECT) {
 		if (!inode->i_mapping || !inode->i_mapping->a_ops ||
 			!inode->i_mapping->a_ops->direct_IO) {
-				error = -EINVAL;
-				goto cleanup_all;
+				fput(f);
+				f = ERR_PTR(-EINVAL);
 		}
 	}
 

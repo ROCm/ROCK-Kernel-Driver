@@ -1804,7 +1804,7 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 	}
 	memcpy(vdev, &pwc_template, sizeof(pwc_template));
 	strcpy(vdev->name, name);
-	SET_MODULE_OWNER(vdev);
+	vdev->owner = THIS_MODULE;
 	pdev->vdev = vdev;
 	vdev->priv = pdev;
 

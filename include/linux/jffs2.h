@@ -8,19 +8,23 @@
  * For licensing information, see the file 'LICENCE' in the 
  * jffs2 directory.
  *
- * $Id: jffs2.h,v 1.25 2002/08/20 21:37:27 dwmw2 Exp $
+ * $Id: jffs2.h,v 1.30 2003/02/15 00:15:22 dwmw2 Exp $
  *
  */
 
 #ifndef __LINUX_JFFS2_H__
 #define __LINUX_JFFS2_H__
 
+/* You must include something which defines the C99 uintXX_t types. 
+   We don't do it from here because this file is used in too many
+   different environments. */
+
 #define JFFS2_SUPER_MAGIC 0x72b6
 
 /* Values we may expect to find in the 'magic' field */
 #define JFFS2_OLD_MAGIC_BITMASK 0x1984
 #define JFFS2_MAGIC_BITMASK 0x1985
-#define KSAMTIB_CIGAM_2SFFJ 0x5981 /* For detecting wrong-endian fs */
+#define KSAMTIB_CIGAM_2SFFJ 0x8519 /* For detecting wrong-endian fs */
 #define JFFS2_EMPTY_BITMASK 0xffff
 #define JFFS2_DIRTY_BITMASK 0x0000
 
@@ -76,29 +80,42 @@ typedef struct {
 } __attribute__((packed))  jint32_t;
 
 typedef struct {
+	uint32_t m;
+} __attribute__((packed))  jmode_t;
+
+typedef struct {
 	uint16_t v16;
 } __attribute__((packed)) jint16_t;
 
 #define JFFS2_NATIVE_ENDIAN
 
+/* Note we handle mode bits conversion from JFFS2 (i.e. Linux) to/from
+   whatever OS we're actually running on here too. */
+
 #if defined(JFFS2_NATIVE_ENDIAN)
 #define cpu_to_je16(x) ((jint16_t){x})
 #define cpu_to_je32(x) ((jint32_t){x})
+#define cpu_to_jemode(x) ((jmode_t){os_to_jffs2_mode(x)})
 
 #define je16_to_cpu(x) ((x).v16)
 #define je32_to_cpu(x) ((x).v32)
+#define jemode_to_cpu(x) (jffs2_to_os_mode((x).m))
 #elif defined(JFFS2_BIG_ENDIAN)
 #define cpu_to_je16(x) ((jint16_t){cpu_to_be16(x)})
 #define cpu_to_je32(x) ((jint32_t){cpu_to_be32(x)})
+#define cpu_to_jemode(x) ((jmode_t){cpu_to_be32(os_to_jffs2_mode(x))})
 
 #define je16_to_cpu(x) (be16_to_cpu(x.v16))
 #define je32_to_cpu(x) (be32_to_cpu(x.v32))
+#define jemode_to_cpu(x) (be32_to_cpu(jffs2_to_os_mode((x).m)))
 #elif defined(JFFS2_LITTLE_ENDIAN)
 #define cpu_to_je16(x) ((jint16_t){cpu_to_le16(x)})
 #define cpu_to_je32(x) ((jint32_t){cpu_to_le32(x)})
+#define cpu_to_jemode(x) ((jmode_t){cpu_to_le32(os_to_jffs2_mode(x))})
 
 #define je16_to_cpu(x) (le16_to_cpu(x.v16))
 #define je32_to_cpu(x) (le32_to_cpu(x.v32))
+#define jemode_to_cpu(x) (le32_to_cpu(jffs2_to_os_mode((x).m)))
 #else 
 #error wibble
 #endif
@@ -144,7 +161,7 @@ struct jffs2_raw_inode
 	jint32_t hdr_crc;
 	jint32_t ino;        /* Inode number.  */
 	jint32_t version;    /* Version number.  */
-	jint32_t mode;       /* The file's type or mode.  */
+	jmode_t mode;       /* The file's type or mode.  */
 	jint16_t uid;        /* The file's owner.  */
 	jint16_t gid;        /* The file's group.  */
 	jint32_t isize;      /* Total resultant size of this inode (used for truncations)  */
@@ -159,7 +176,7 @@ struct jffs2_raw_inode
 	jint16_t flags;	     /* See JFFS2_INO_FLAG_* */
 	jint32_t data_crc;   /* CRC for the (compressed) data.  */
 	jint32_t node_crc;   /* CRC for the raw inode (excluding data)  */
-//	uint8_t data[dsize];
+	uint8_t data[0];
 } __attribute__((packed));
 
 union jffs2_node_union {

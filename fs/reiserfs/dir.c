@@ -21,6 +21,7 @@ struct file_operations reiserfs_dir_operations = {
     .read	= generic_read_dir,
     .readdir	= reiserfs_readdir,
     .fsync	= reiserfs_dir_fsync,
+    .ioctl	= reiserfs_ioctl,
 };
 
 int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry, int datasync) {

@@ -18,6 +18,7 @@
 #include <linux/signal.h>
 #include <linux/sched.h>	/* for MAX_SCHEDULE_TIMEOUT */
 #include <linux/futex.h>	/* for FUTEX_WAIT */
+#include <linux/unistd.h>
 
 #include <asm/uaccess.h>
 
@@ -211,21 +212,26 @@ asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t *set,
 	return ret;
 }
 
-extern long do_futex(unsigned long, int, int, unsigned long);
-
+#ifdef CONFIG_FUTEX
 asmlinkage long compat_sys_futex(u32 *uaddr, int op, int val,
-		struct compat_timespec *utime)
+		struct compat_timespec *utime, u32 *uaddr2)
 {
 	struct timespec t;
 	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;
+	int val2 = 0;
 
 	if ((op == FUTEX_WAIT) && utime) {
 		if (get_compat_timespec(&t, utime))
 			return -EFAULT;
 		timeout = timespec_to_jiffies(&t) + 1;
 	}
-	return do_futex((unsigned long)uaddr, op, val, timeout);
+	if (op == FUTEX_REQUEUE)
+		val2 = (int) (long) utime;
+
+	return do_futex((unsigned long)uaddr, op, val, timeout,
+			(unsigned long)uaddr2, val2);
 }
+#endif
 
 asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit *rlim);
 
@@ -362,8 +368,7 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t * stat_addr, int options,
 		ret = sys_wait4(pid, stat_addr ? &status : NULL, options, &r);
 		set_fs (old_fs);
 
-		if (!ret)
-		{
+		if (ret > 0) {
 			if (put_compat_rusage(ru, &r)) 
 				return -EFAULT;
 			if (stat_addr && put_user(status, stat_addr))

@@ -1963,7 +1963,8 @@ N: Pavel Machek
 E: pavel@ucw.cz
 E: pavel@suse.cz
 D: Softcursor for vga, hypertech cdrom support, vcsa bugfix, nbd
-D: sun4/330 port, capabilities for elf, speedup for rm on ext2, USB
+D: sun4/330 port, capabilities for elf, speedup for rm on ext2, USB,
+D: work on suspend-to-ram/disk, killing duplicates from ioctl32
 S: Volkova 1131
 S: 198 00 Praha 9
 S: Czech Republic
@@ -2966,12 +2967,11 @@ S: Cliffwood, New Jersey 07721
 S: USA
 
 N: Manfred Spraul
-E: manfreds@colorfullife.com
-W: http://colorfullife.com/~manfreds
-D: major SysV IPC changes
-D: various bug fixes (mostly SMP code)
-S: Warburgring 67
-S: 66424 Homburg 
+E: manfred@colorfullife.com
+W: http://www.colorfullife.com/~manfred
+D: Lots of tiny hacks. Larger improvments to SysV IPC msg,
+D: slab, pipe, select.
+S: 71701 Schwieberdingen
 S: Germany
 
 N: Andrew Stanley-Jones

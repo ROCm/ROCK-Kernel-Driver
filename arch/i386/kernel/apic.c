@@ -38,6 +38,8 @@
 
 #include "io_ports.h"
 
+static void apic_pm_activate(void);
+
 void __init apic_intr_init(void)
 {
 #ifdef CONFIG_SMP
@@ -291,6 +293,8 @@ void __init init_bsp_APIC(void)
 	value = apic_read(APIC_SPIV);
 	value &= ~APIC_VECTOR_MASK;
 	value |= APIC_SPIV_APIC_ENABLED;
+	
+	/* This bit is reserved on P4/Xeon and should be cleared */
 	if ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) && (boot_cpu_data.x86 == 15))
 		value &= ~APIC_SPIV_FOCUS_DISABLED;
 	else
@@ -451,6 +455,7 @@ void __init setup_local_APIC (void)
 
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		setup_apic_nmi_watchdog();
+	apic_pm_activate();
 }
 
 #ifdef CONFIG_PM
@@ -587,7 +592,7 @@ device_initcall(init_lapic_devicefs);
 
 #else	/* CONFIG_PM */
 
-static inline void apic_pm_activate(void) { }
+static void apic_pm_activate(void) { }
 
 #endif	/* CONFIG_PM */
 

@@ -255,7 +255,7 @@ static int packet_rcv_spkt(struct sk_buff *skb, struct net_device *dev,  struct 
 	 */
 
 	spkt->spkt_family = dev->type;
-	strncpy(spkt->spkt_device, dev->name, sizeof(spkt->spkt_device));
+	strlcpy(spkt->spkt_device, dev->name, sizeof(spkt->spkt_device));
 	spkt->spkt_protocol = skb->protocol;
 
 	/*
@@ -878,8 +878,7 @@ static int packet_bind_spkt(struct socket *sock, struct sockaddr *uaddr, int add
 	 
 	if(addr_len!=sizeof(struct sockaddr))
 		return -EINVAL;
-	strncpy(name,uaddr->sa_data,14);
-	name[14]=0;
+	strlcpy(name,uaddr->sa_data,sizeof(name));
 
 	dev = dev_get_by_name(name);
 	if (dev) {
@@ -1096,7 +1095,7 @@ static int packet_getname_spkt(struct socket *sock, struct sockaddr *uaddr,
 	uaddr->sa_family = AF_PACKET;
 	dev = dev_get_by_index(pkt_sk(sk)->ifindex);
 	if (dev) {
-		strncpy(uaddr->sa_data, dev->name, 15);
+		strlcpy(uaddr->sa_data, dev->name, 15);
 		dev_put(dev);
 	} else
 		memset(uaddr->sa_data, 0, 14);

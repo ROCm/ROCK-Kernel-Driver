@@ -53,6 +53,7 @@
 #define   USBPORTSC_RD		0x0040	/* Resume Detect */
 #define   USBPORTSC_LSDA	0x0100	/* Low Speed Device Attached */
 #define   USBPORTSC_PR		0x0200	/* Port Reset */
+#define   USBPORTSC_OC		0x0400	/* Over Current condition */
 #define   USBPORTSC_SUSP	0x1000	/* Suspend */
 
 /* Legacy support register */
@@ -282,6 +283,29 @@ static inline int __interval_to_skel(int interval)
 	return 0;				/* int128 for 128-255 ms (Max.) */
 }
 
+/*
+ * Device states for the host controller.
+ *
+ * To prevent "bouncing" in the presence of electrical noise,
+ * we insist on a 1-second "grace" period, before switching to
+ * the RUNNING or SUSPENDED states, during which the state is
+ * not allowed to change.
+ *
+ * The resume process is divided into substates in order to avoid
+ * potentially length delays during the timer handler.
+ *
+ * States in which the host controller is halted must have values <= 0.
+ */
+enum uhci_state {
+	UHCI_RESET,
+	UHCI_RUNNING_GRACE,		/* Before RUNNING */
+	UHCI_RUNNING,			/* The normal state */
+	UHCI_SUSPENDING_GRACE,		/* Before SUSPENDED */
+	UHCI_SUSPENDED = -10,		/* When no devices are attached */
+	UHCI_RESUMING_1,
+	UHCI_RESUMING_2
+};
+
 #define hcd_to_uhci(hcd_ptr) container_of(hcd_ptr, struct uhci_hcd, hcd)
 
 /*
@@ -313,7 +337,10 @@ struct uhci_hcd {
 	struct uhci_frame_list *fl;		/* P: uhci->frame_list_lock */
 	int fsbr;				/* Full speed bandwidth reclamation */
 	unsigned long fsbrtimeout;		/* FSBR delay */
-	int is_suspended;
+
+	enum uhci_state state;			/* FIXME: needs a spinlock */
+	unsigned long state_end;		/* Time of next transition */
+	int resume_detect;			/* Need a Global Resume */
 
 	/* Main list of URB's currently controlled by this HC */
 	spinlock_t urb_list_lock;
