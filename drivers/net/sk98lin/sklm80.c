@@ -2,8 +2,8 @@
  *
  * Name:	sklm80.c
  * Project:	Gigabit Ethernet Adapters, TWSI-Module
- * Version:	$Revision: 1.22 $
- * Date:	$Date: 2003/10/20 09:08:21 $
+ * Version:	$Revision: 1.1 $
+ * Date:	$Date: 2003/12/19 14:02:31 $
  * Purpose:	Functions to access Voltage and Temperature Sensor (LM80)
  *
  ******************************************************************************/
@@ -27,7 +27,7 @@
 */
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: sklm80.c,v 1.22 2003/10/20 09:08:21 rschmidt Exp $ (C) Marvell. ";
+	"@(#) $Id: sklm80.c,v 1.1 2003/12/19 14:02:31 mschmid Exp $ (C) Marvell. ";
 #endif
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
@@ -111,12 +111,12 @@ int		Reg)		/* register to read */
 /*
  * read a sensors value (LM80 specific)
  *
- * This function reads a sensors value from the I2C sensor chip LM80.
+ * This function reads a sensors value from the TWSI sensor chip LM80.
  * The sensor is defined by its index into the sensors database in the struct
  * pAC points to.
  *
  * Returns	1 if the read is completed
- *		0 if the read must be continued (I2C Bus still allocated)
+ *		0 if the read must be continued (TWSI Bus still allocated)
  */
 int SkLm80ReadSensor(
 SK_AC		*pAC,	/* Adapter Context */

@@ -3,7 +3,7 @@
  * Name:	sktypes.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
  * Version:	$Revision: 1.2 $
- * Date:	$Date: 2003/10/07 08:16:51 $
+ * Date:	$Date: 2004/07/09 13:29:49 $
  * Purpose:	Define data types for Linux
  *
  ******************************************************************************/
@@ -22,48 +22,28 @@
  *
  ******************************************************************************/
  
-/******************************************************************************
- *
- * Description:
- *
- * In this file, all data types that are needed by the common modules
- * are mapped to Linux data types.
- * 
- *
- * Include File Hierarchy:
- *
- *
- ******************************************************************************/
-
 #ifndef __INC_SKTYPES_H
 #define __INC_SKTYPES_H
 
+#define SK_I8    s8    /* 8 bits (1 byte) signed       */
+#define SK_U8    u8    /* 8 bits (1 byte) unsigned     */
+#define SK_I16  s16    /* 16 bits (2 bytes) signed     */
+#define SK_U16  u16    /* 16 bits (2 bytes) unsigned   */
+#define SK_I32  s32    /* 32 bits (4 bytes) signed     */
+#define SK_U32  u32    /* 32 bits (4 bytes) unsigned   */
+#define SK_I64  s64    /* 64 bits (8 bytes) signed     */
+#define SK_U64  u64    /* 64 bits (8 bytes) unsigned   */
 
-/* defines *******************************************************************/
+#define SK_UPTR	ulong  /* casting pointer <-> integral */
 
-/*
- * Data types with a specific size. 'I' = signed, 'U' = unsigned.
- */
-#define SK_I8	s8
-#define SK_U8	u8
-#define SK_I16	s16
-#define SK_U16	u16
-#define SK_I32	s32
-#define SK_U32	u32
-#define SK_I64	s64
-#define SK_U64	u64
-
-#define SK_UPTR	ulong		/* casting pointer <-> integral */
-
-/*
-* Boolean type.
-*/
-#define SK_BOOL		SK_U8
-#define SK_FALSE	0
-#define SK_TRUE		(!SK_FALSE)
-
-/* typedefs *******************************************************************/
-
-/* function prototypes ********************************************************/
+#define SK_BOOL   SK_U8
+#define SK_FALSE  0
+#define SK_TRUE   (!SK_FALSE)
 
 #endif	/* __INC_SKTYPES_H */
+
+/*******************************************************************************
+ *
+ * End of file
+ *
+ ******************************************************************************/
