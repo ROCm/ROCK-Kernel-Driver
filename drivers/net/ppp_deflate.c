@@ -88,7 +88,6 @@ z_comp_free(arg)
 		if (state->strm.workspace)
 			vfree(state->strm.workspace);
 		kfree(state);
-		MOD_DEC_USE_COUNT;
 	}
 }
 
@@ -118,7 +117,6 @@ z_comp_alloc(options, opt_len)
 	if (state == NULL)
 		return NULL;
 
-	MOD_INC_USE_COUNT;
 	memset (state, 0, sizeof (struct ppp_deflate_state));
 	state->strm.next_in   = NULL;
 	state->w_size         = w_size;
@@ -274,7 +272,6 @@ z_decomp_free(arg)
 		if (state->strm.workspace)
 			kfree(state->strm.workspace);
 		kfree(state);
-		MOD_DEC_USE_COUNT;
 	}
 }
 
@@ -303,7 +300,6 @@ z_decomp_alloc(options, opt_len)
 	if (state == NULL)
 		return NULL;
 
-	MOD_INC_USE_COUNT;
 	memset (state, 0, sizeof (struct ppp_deflate_state));
 	state->w_size         = w_size;
 	state->strm.next_out  = NULL;

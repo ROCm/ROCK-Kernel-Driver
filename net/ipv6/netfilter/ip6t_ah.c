@@ -19,13 +19,6 @@ MODULE_AUTHOR("Andras Kis-Szabo <kisza@sch.bme.hu>");
 #define DEBUGP(format, args...)
 #endif
 
-struct ahhdr {
-       __u8    nexthdr;
-       __u8    hdrlen;
-       __u16   reserved;
-       __u32   spi;
-};
-
 /* Returns 1 if the spi is matched by the range, 0 otherwise */
 static inline int
 spi_match(u_int32_t min, u_int32_t max, u_int32_t spi, int invert)
@@ -48,7 +41,7 @@ match(const struct sk_buff *skb,
       u_int16_t datalen,
       int *hotdrop)
 {
-       struct ahhdr *ah = NULL;
+       struct ip_auth_hdr *ah = NULL;
        const struct ip6t_ah *ahinfo = matchinfo;
        unsigned int temp;
        int len;
@@ -128,12 +121,12 @@ match(const struct sk_buff *skb,
        /* AH header not found */
        if ( temp != MASK_AH ) return 0;
 
-       if (len < (int)sizeof(struct ahhdr)){
+       if (len < (int)sizeof(struct ip_auth_hdr)){
 	       *hotdrop = 1;
        		return 0;
        }
 
-       ah=skb->data+ptr;
+       ah = (struct ip_auth_hdr *) (skb->data + ptr);
 
        DEBUGP("IPv6 AH LEN %u %u ", hdrlen, ah->hdrlen);
        DEBUGP("RES %04X ", ah->reserved);
