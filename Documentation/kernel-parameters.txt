@@ -652,6 +652,12 @@ running once the system is up.
 
 	mga=		[HW,DRM]
 
+	mousedev.tap_time=
+			[MOUSE] Maximum time between finger touching and
+			leaving touchpad surface for touch to be considered
+			a tap and be reported as a left button click (for
+			touchpads working in absolute mode only).
+			Format: <msecs>
 	mousedev.xres=	[MOUSE] Horizontal screen resolution, used for devices
 			reporting absolute coordinates, such as tablets
 	mousedev.yres=	[MOUSE] Vertical screen resolution, used for devices
