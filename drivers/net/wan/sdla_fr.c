@@ -225,10 +225,10 @@ typedef struct fr_channel
 	sdla_t *card;			/* -> owner */
 	unsigned route_flag;		/* Add/Rem dest addr in route tables */
 	unsigned inarp;			/* Inverse Arp Request status */ 
-	unsigned char inarp_ready;	/* Ready to send requests */
+	long inarp_ready;		/* Ready to send requests */
 	int inarp_interval;		/* Time between InArp Requests */
 	unsigned long inarp_tick;	/* InArp jiffies tick counter */
-	unsigned char interface_down;	/* Bring interface down on disconnect */
+	long interface_down;		/* Bring interface down on disconnect */
       #if defined(LINUX_2_1) || defined(LINUX_2_4)
 	struct net_device_stats ifstats;	/* interface statistics */
       #else
@@ -259,8 +259,8 @@ typedef struct fr_channel
 
 	u32 ip_local;
 	u32 ip_remote;
-	u8  config_dlci;
-	u32 unconfig_dlci;
+	long config_dlci;
+	long unconfig_dlci;
 
 	/* Whether this interface should be setup as a gateway.
 	 * Used by dynamic route setup code */
@@ -1459,7 +1459,8 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
         int err;
     	unsigned char *sendpacket;
     	fr508_flags_t* adptr_flags = card->flags;
-	int udp_type, delay_tx_queued=0;
+	int udp_type;
+	long delay_tx_queued = 0;
 	unsigned long smp_flags=0;
 	unsigned char attr = 0;
 
@@ -2811,7 +2812,7 @@ static void process_route (netdevice_t *dev)
 				chan->name, NIPQUAD(chan->ip_remote));
 
 		}else {
-			printk(KERN_INFO "%s: Route Added Successfully: %u.%u.%u.%U\n",
+			printk(KERN_INFO "%s: Route Added Successfully: %u.%u.%u.%u\n",
 				card->devname,NIPQUAD(chan->ip_remote));
 			chan->route_flag = ROUTE_ADDED;
 		}
