@@ -34,6 +34,7 @@ static int cg14_setcolreg(unsigned, unsigned, unsigned, unsigned,
 static int cg14_mmap(struct fb_info *, struct file *, struct vm_area_struct *);
 static int cg14_ioctl(struct inode *, struct file *, unsigned int,
 		      unsigned long, struct fb_info *);
+static int cg14_pan_display(struct fb_var_screeninfo *, struct fb_info *);
 
 /*
  *  Frame buffer operations
@@ -42,6 +43,7 @@ static int cg14_ioctl(struct inode *, struct file *, unsigned int,
 static struct fb_ops cg14_ops = {
 	.owner			= THIS_MODULE,
 	.fb_setcolreg		= cg14_setcolreg,
+	.fb_pan_display		= cg14_pan_display,
 	.fb_fillrect		= cfb_fillrect,
 	.fb_copyarea		= cfb_copyarea,
 	.fb_imageblit		= cfb_imageblit,

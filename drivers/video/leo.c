@@ -410,8 +410,9 @@ static void leo_init_wids(struct fb_info *info)
 
 }
 
-static void leo_switch_from_graph(struct leo_par *par)
+static void leo_switch_from_graph(struct fb_info *info)
 {
+	struct leo_par *par = (struct leo_par *) info->par;
 	struct leo_ld *ss = (struct leo_ld *) par->ld_ss0;
 	unsigned long flags;
 	u32 val;
@@ -438,17 +439,15 @@ static void leo_switch_from_graph(struct leo_par *par)
 		val = sbus_readl(&par->lc_ss0_usr->csr);
 	} while (val & 0x20000000);
 
-	spin_unlock_irqsave(&par->lock, flags);
+	spin_unlock_irqrestore(&par->lock, flags);
 }
 
 static int leo_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	struct leo_par *par = (struct leo_par *) info->par;
-
 	/* We just use this to catch switches out of
 	 * graphics mode.
 	 */
-	leo_switch_from_graph(par);
+	leo_switch_from_graph(info);
 
 	if (var->xoffset || var->yoffset || var->vmode)
 		return -EINVAL;
@@ -464,7 +463,7 @@ static void leo_init_hw(struct fb_info *info)
 	val |= LEO_SS1_MISC_ENABLE;
 	sbus_writel(val, &par->ld_ss1->ss1_misc);
 
-	leo_switch_from_graph(par);
+	leo_switch_from_graph(info);
 }
 
 static void leo_fixup_var_rgb(struct fb_var_screeninfo *var)
