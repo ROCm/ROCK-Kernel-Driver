@@ -141,10 +141,11 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 			if (sb->s_op && sb->s_op->dirty_inode)
 				sb->s_op->dirty_inode(inode);
 		}
+
 		/* avoid the locking if we can */
-		if ((inode->i_state & flags) != flags) {
-			return ;
-		}
+		if ((inode->i_state & flags) == flags)
+			return;
+
 		spin_lock(&inode_lock);
 		if ((inode->i_state & flags) != flags) {
 			inode->i_state |= flags;
