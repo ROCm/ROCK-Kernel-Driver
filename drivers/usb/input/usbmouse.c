@@ -100,10 +100,9 @@ static void usb_mouse_close(struct input_dev *dev)
 		usb_unlink_urb(mouse->irq);
 }
 
-static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
-			     const struct usb_device_id *id)
+static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_id * id)
 {
-	struct usb_interface *iface;
+	struct usb_device * dev = interface_to_usbdev(intf);
 	struct usb_interface_descriptor *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_mouse *mouse;
@@ -111,32 +110,35 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 	char path[64];
 	char *buf;
 
-	iface = &dev->actconfig->interface[ifnum];
-	interface = &iface->altsetting[iface->act_altsetting];
+	interface = &intf->altsetting[intf->act_altsetting];
 
-	if (interface->bNumEndpoints != 1) return NULL;
+	if (interface->bNumEndpoints != 1) 
+		return -ENODEV;
 
 	endpoint = interface->endpoint + 0;
-	if (!(endpoint->bEndpointAddress & 0x80)) return NULL;
-	if ((endpoint->bmAttributes & 3) != 3) return NULL;
+	if (!(endpoint->bEndpointAddress & 0x80)) 
+		return -ENODEV;
+	if ((endpoint->bmAttributes & 3) != 3) 
+		return -ENODEV;
 
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(dev, pipe, usb_pipeout(pipe));
 
-	if (!(mouse = kmalloc(sizeof(struct usb_mouse), GFP_KERNEL))) return NULL;
+	if (!(mouse = kmalloc(sizeof(struct usb_mouse), GFP_KERNEL))) 
+		return -ENOMEM;
 	memset(mouse, 0, sizeof(struct usb_mouse));
 
 	mouse->data = usb_buffer_alloc(dev, 8, SLAB_ATOMIC, &mouse->data_dma);
 	if (!mouse->data) {
 		kfree(mouse);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	mouse->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!mouse->irq) {
 		usb_buffer_free(dev, 8, mouse->data, mouse->data_dma);
 		kfree(mouse);
-		return NULL;
+		return -ENODEV;
 	}
 
 	mouse->usbdev = dev;
@@ -164,7 +166,7 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
 		usb_buffer_free(dev, 8, mouse->data, mouse->data_dma);
 		kfree(mouse);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	if (dev->descriptor.iManufacturer &&
@@ -187,20 +189,24 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 	mouse->irq->transfer_flags |= URB_NO_DMA_MAP;
 
 	input_register_device(&mouse->dev);
-
 	printk(KERN_INFO "input: %s on %s\n", mouse->name, path);
 
-	return mouse;
+	dev_set_drvdata(&intf->dev, mouse);
+	return 0;
 }
 
-static void usb_mouse_disconnect(struct usb_device *dev, void *ptr)
+static void usb_mouse_disconnect(struct usb_interface *intf)
 {
-	struct usb_mouse *mouse = ptr;
-	usb_unlink_urb(mouse->irq);
-	input_unregister_device(&mouse->dev);
-	usb_free_urb(mouse->irq);
-	usb_buffer_free(dev, 8, mouse->data, mouse->data_dma);
-	kfree(mouse);
+	struct usb_mouse *mouse = dev_get_drvdata(&intf->dev);
+	
+	dev_set_drvdata(&intf->dev, NULL);
+	if (mouse) {
+		usb_unlink_urb(mouse->irq);
+		input_unregister_device(&mouse->dev);
+		usb_free_urb(mouse->irq);
+		usb_buffer_free(interface_to_usbdev(intf), 8, mouse->data, mouse->data_dma);
+		kfree(mouse);
+	}
 }
 
 static struct usb_device_id usb_mouse_id_table [] = {
@@ -211,10 +217,10 @@ static struct usb_device_id usb_mouse_id_table [] = {
 MODULE_DEVICE_TABLE (usb, usb_mouse_id_table);
 
 static struct usb_driver usb_mouse_driver = {
-	.name =		"usb_mouse",
-	.probe =	usb_mouse_probe,
-	.disconnect =	usb_mouse_disconnect,
-	.id_table =	usb_mouse_id_table,
+	.name		= "usb_mouse",
+	.probe		= usb_mouse_probe,
+	.disconnect	= usb_mouse_disconnect,
+	.id_table	= usb_mouse_id_table,
 };
 
 static int __init usb_mouse_init(void)

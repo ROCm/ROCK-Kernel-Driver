@@ -78,6 +78,12 @@ static struct usb_device_id id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
+static struct usb_driver pl2303_driver = {
+	.name =		"pl2303",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table,
+};
 
 #define SET_LINE_REQUEST_TYPE		0x21
 #define SET_LINE_REQUEST		0x20
@@ -709,6 +715,7 @@ static void pl2303_write_bulk_callback (struct urb *urb)
 static int __init pl2303_init (void)
 {
 	usb_serial_register (&pl2303_device);
+	usb_register (&pl2303_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
@@ -716,6 +723,7 @@ static int __init pl2303_init (void)
 
 static void __exit pl2303_exit (void)
 {
+	usb_deregister (&pl2303_driver);
 	usb_serial_deregister (&pl2303_device);
 }
 

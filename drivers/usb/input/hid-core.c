@@ -1349,9 +1349,10 @@ static void hid_free_buffers(struct usb_device *dev, struct hid_device *hid)
 		usb_buffer_free(dev, HID_BUFFER_SIZE, hid->ctrlbuf, hid->ctrlbuf_dma);
 }
 
-static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
+static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 {
-	struct usb_interface_descriptor *interface = dev->actconfig->interface[ifnum].altsetting + 0;
+	struct usb_interface_descriptor *interface = intf->altsetting + intf->act_altsetting;
+	struct usb_device *dev = interface_to_usbdev (intf);
 	struct hid_descriptor *hdesc;
 	struct hid_device *hid;
 	unsigned quirks = 0, rsize = 0;
@@ -1472,7 +1473,7 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 		snprintf(hid->name, 128, "%04x:%04x", dev->descriptor.idVendor, dev->descriptor.idProduct);
 
 	usb_make_path(dev, buf, 64);
-	snprintf(hid->phys, 64, "%s/input%d", buf, ifnum);
+	snprintf(hid->phys, 64, "%s/input%d", buf, intf->altsetting[0].bInterfaceNumber);
 
 	if (usb_string(dev, dev->descriptor.iSerialNumber, hid->uniq, 64) <= 0)
 		hid->uniq[0] = 0;
@@ -1499,10 +1500,14 @@ fail:
 	return NULL;
 }
 
-static void hid_disconnect(struct usb_device *dev, void *ptr)
+static void hid_disconnect(struct usb_interface *intf)
 {
-	struct hid_device *hid = ptr;
+	struct hid_device *hid = dev_get_drvdata(&intf->dev);
 
+	if (!hid)
+		return;
+
+	dev_set_drvdata (&intf->dev, NULL);
 	usb_unlink_urb(hid->urbin);
 	usb_unlink_urb(hid->urbout);
 	usb_unlink_urb(hid->urbctrl);
@@ -1517,22 +1522,21 @@ static void hid_disconnect(struct usb_device *dev, void *ptr)
 	if (hid->urbout)
 		usb_free_urb(hid->urbout);
 
-	hid_free_buffers(dev, hid);
+	hid_free_buffers(hid->dev, hid);
 	hid_free_device(hid);
 }
 
-static void* hid_probe(struct usb_device *dev, unsigned int ifnum,
-		       const struct usb_device_id *id)
+static int hid_probe (struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct hid_device *hid;
 	char path[64];
 	int i;
 	char *c;
 
-	dbg("HID probe called for ifnum %d", ifnum);
+	dbg("HID probe called for ifnum %d", intf->ifnum);
 
-	if (!(hid = usb_hid_configure(dev, ifnum)))
-		return NULL;
+	if (!(hid = usb_hid_configure(intf)))
+		return -EIO;
 
 	hid_init_reports(hid);
 	hid_dump_device(hid);
@@ -1544,9 +1548,11 @@ static void* hid_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!hiddev_connect(hid))
 		hid->claimed |= HID_CLAIMED_HIDDEV;
 
+	dev_set_drvdata(&intf->dev, hid);
+
 	if (!hid->claimed) {
-		hid_disconnect(dev, hid);
-		return NULL;
+		hid_disconnect(intf);
+		return -EIO;
 	}
 
 	printk(KERN_INFO);
@@ -1568,12 +1574,12 @@ static void* hid_probe(struct usb_device *dev, unsigned int ifnum,
 		}
 	}
 
-	usb_make_path(dev, path, 63);
+	usb_make_path(interface_to_usbdev(intf), path, 63);
 
 	printk(": USB HID v%x.%02x %s [%s] on %s\n",
 		hid->version >> 8, hid->version & 0xff, c, hid->name, path);
 
-	return hid;
+	return 0;
 }
 
 static struct usb_device_id hid_usb_ids [] = {

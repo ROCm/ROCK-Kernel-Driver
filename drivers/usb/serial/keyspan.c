@@ -183,6 +183,7 @@ static int __init keyspan_init (void)
 	usb_serial_register (&keyspan_1port_device);
 	usb_serial_register (&keyspan_2port_device);
 	usb_serial_register (&keyspan_4port_device);
+	usb_register (&keyspan_driver);
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 
@@ -191,6 +192,7 @@ static int __init keyspan_init (void)
 
 static void __exit keyspan_exit (void)
 {
+	usb_deregister (&keyspan_driver);
 	usb_serial_deregister (&keyspan_pre_device);
 	usb_serial_deregister (&keyspan_1port_device);
 	usb_serial_deregister (&keyspan_2port_device);

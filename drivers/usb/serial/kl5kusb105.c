@@ -117,6 +117,12 @@ static struct usb_device_id id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
+static struct usb_driver kl5kusb105d_driver = {
+	.name =		"kl5kusb105d",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table,
+};
 
 static struct usb_serial_device_type kl5kusb105d_device = {
 	.owner =             THIS_MODULE,
@@ -1009,6 +1015,7 @@ static void klsi_105_unthrottle (struct usb_serial_port *port)
 static int __init klsi_105_init (void)
 {
 	usb_serial_register (&kl5kusb105d_device);
+	usb_register (&kl5kusb105d_driver);
 
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
@@ -1017,6 +1024,7 @@ static int __init klsi_105_init (void)
 
 static void __exit klsi_105_exit (void)
 {
+	usb_deregister (&kl5kusb105d_driver);
 	usb_serial_deregister (&kl5kusb105d_device);
 }
 

@@ -175,6 +175,7 @@ static void hub_tt_kevent (void *arg)
 	while (!list_empty (&hub->tt.clear_list)) {
 		struct list_head	*temp;
 		struct usb_tt_clear	*clear;
+		struct usb_device	*dev;
 		int			status;
 
 		temp = hub->tt.clear_list.next;
@@ -183,13 +184,13 @@ static void hub_tt_kevent (void *arg)
 
 		/* drop lock so HCD can concurrently report other TT errors */
 		spin_unlock_irqrestore (&hub->tt.lock, flags);
-		status = hub_clear_tt_buffer (hub->dev,
-				clear->devinfo, clear->tt);
+		dev = interface_to_usbdev (hub->intf);
+		status = hub_clear_tt_buffer (dev, clear->devinfo, clear->tt);
 		spin_lock_irqsave (&hub->tt.lock, flags);
 
 		if (status)
 			err ("usb-%s-%s clear tt %d (%04x) error %d",
-				hub->dev->bus->bus_name, hub->dev->devpath,
+				dev->bus->bus_name, dev->devpath,
 				clear->tt, clear->devinfo, status);
 		kfree (clear);
 	}
@@ -245,12 +246,14 @@ void usb_hub_tt_clear_buffer (struct usb_device *dev, int pipe)
 
 static void usb_hub_power_on(struct usb_hub *hub)
 {
+	struct usb_device *dev;
 	int i;
 
 	/* Enable power to the ports */
 	dbg("enabling power on all ports");
+	dev = interface_to_usbdev(hub->intf);
 	for (i = 0; i < hub->descriptor->bNbrPorts; i++)
-		usb_set_port_feature(hub->dev, i + 1, USB_PORT_FEAT_POWER);
+		usb_set_port_feature(dev, i + 1, USB_PORT_FEAT_POWER);
 
 	/* Wait for power to be enabled */
 	wait_ms(hub->descriptor->bPwrOn2PwrGood * 2);
@@ -259,7 +262,7 @@ static void usb_hub_power_on(struct usb_hub *hub)
 static int usb_hub_configure(struct usb_hub *hub,
 	struct usb_endpoint_descriptor *endpoint)
 {
-	struct usb_device *dev = hub->dev;
+	struct usb_device *dev = interface_to_usbdev (hub->intf);
 	struct usb_hub_status hubstatus;
 	unsigned int pipe;
 	int maxp, ret;
@@ -425,99 +428,15 @@ static int usb_hub_configure(struct usb_hub *hub,
 	return 0;
 }
 
-static void *hub_probe(struct usb_device *dev, unsigned int i,
-		       const struct usb_device_id *id)
+static void hub_disconnect(struct usb_interface *intf)
 {
-	struct usb_interface_descriptor *interface;
-	struct usb_endpoint_descriptor *endpoint;
-	struct usb_hub *hub;
+	struct usb_hub *hub = dev_get_drvdata (&intf->dev);
 	unsigned long flags;
 
-	interface = &dev->actconfig->interface[i].altsetting[0];
+	if (!hub)
+		return;
 
-	/* Some hubs have a subclass of 1, which AFAICT according to the */
-	/*  specs is not defined, but it works */
-	if ((interface->bInterfaceSubClass != 0) &&
-	    (interface->bInterfaceSubClass != 1)) {
-		err("invalid subclass (%d) for USB hub device #%d",
-			interface->bInterfaceSubClass, dev->devnum);
-		return NULL;
-	}
-
-	/* Multiple endpoints? What kind of mutant ninja-hub is this? */
-	if (interface->bNumEndpoints != 1) {
-		err("invalid bNumEndpoints (%d) for USB hub device #%d",
-			interface->bNumEndpoints, dev->devnum);
-		return NULL;
-	}
-
-	endpoint = &interface->endpoint[0];
-
-	/* Output endpoint? Curiousier and curiousier.. */
-	if (!(endpoint->bEndpointAddress & USB_DIR_IN)) {
-		err("Device #%d is hub class, but has output endpoint?",
-			dev->devnum);
-		return NULL;
-	}
-
-	/* If it's not an interrupt endpoint, we'd better punt! */
-	if ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
-			!= USB_ENDPOINT_XFER_INT) {
-		err("Device #%d is hub class, but endpoint is not interrupt?",
-			dev->devnum);
-		return NULL;
-	}
-
-	/* We found a hub */
-	info("USB hub found at %s", dev->devpath);
-
-	hub = kmalloc(sizeof(*hub), GFP_KERNEL);
-	if (!hub) {
-		err("couldn't kmalloc hub struct");
-		return NULL;
-	}
-
-	memset(hub, 0, sizeof(*hub));
-
-	INIT_LIST_HEAD(&hub->event_list);
-	hub->dev = dev;
-	init_MUTEX(&hub->khubd_sem);
-
-	/* Record the new hub's existence */
-	spin_lock_irqsave(&hub_event_lock, flags);
-	INIT_LIST_HEAD(&hub->hub_list);
-	list_add(&hub->hub_list, &hub_list);
-	spin_unlock_irqrestore(&hub_event_lock, flags);
-
-	if (usb_hub_configure(hub, endpoint) >= 0) {
-		strcpy (dev->actconfig->interface[i].dev.name,
-			"Hub/Port Status Changes");
-		return hub;
-	}
-
-	err("hub configuration failed for device at %s", dev->devpath);
-
-	/* free hub, but first clean up its list. */
-	spin_lock_irqsave(&hub_event_lock, flags);
-
-	/* Delete it and then reset it */
-	list_del(&hub->event_list);
-	INIT_LIST_HEAD(&hub->event_list);
-	list_del(&hub->hub_list);
-	INIT_LIST_HEAD(&hub->hub_list);
-
-	spin_unlock_irqrestore(&hub_event_lock, flags);
-
-	kfree(hub);
-
-	return NULL;
-}
-
-static void hub_disconnect(struct usb_device *dev, void *ptr)
-{
-	struct usb_hub *hub = (struct usb_hub *)ptr;
-	unsigned long flags;
-
+	dev_set_drvdata (&intf->dev, NULL);
 	spin_lock_irqsave(&hub_event_lock, flags);
 
 	/* Delete it and then reset it */
@@ -548,6 +467,84 @@ static void hub_disconnect(struct usb_device *dev, void *ptr)
 
 	/* Free the memory */
 	kfree(hub);
+}
+
+static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
+{
+	struct usb_interface_descriptor *desc;
+	struct usb_endpoint_descriptor *endpoint;
+	struct usb_device *dev;
+	struct usb_hub *hub;
+	unsigned long flags;
+
+	desc = intf->altsetting + intf->act_altsetting;
+	dev = interface_to_usbdev(intf);
+
+	/* Some hubs have a subclass of 1, which AFAICT according to the */
+	/*  specs is not defined, but it works */
+	if ((desc->bInterfaceSubClass != 0) &&
+	    (desc->bInterfaceSubClass != 1)) {
+		err("invalid subclass (%d) for USB hub device #%d",
+			desc->bInterfaceSubClass, dev->devnum);
+		return -EIO;
+	}
+
+	/* Multiple endpoints? What kind of mutant ninja-hub is this? */
+	if (desc->bNumEndpoints != 1) {
+		err("invalid bNumEndpoints (%d) for USB hub device #%d",
+			desc->bNumEndpoints, dev->devnum);
+		return -EIO;
+	}
+
+	endpoint = &desc->endpoint[0];
+
+	/* Output endpoint? Curiousier and curiousier.. */
+	if (!(endpoint->bEndpointAddress & USB_DIR_IN)) {
+		err("Device #%d is hub class, but has output endpoint?",
+			dev->devnum);
+		return -EIO;
+	}
+
+	/* If it's not an interrupt endpoint, we'd better punt! */
+	if ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+			!= USB_ENDPOINT_XFER_INT) {
+		err("Device #%d is hub class, but endpoint is not interrupt?",
+			dev->devnum);
+		return -EIO;
+	}
+
+	/* We found a hub */
+	info("USB hub found at %s", dev->devpath);
+
+	hub = kmalloc(sizeof(*hub), GFP_KERNEL);
+	if (!hub) {
+		err("couldn't kmalloc hub struct");
+		return -ENOMEM;
+	}
+
+	memset(hub, 0, sizeof(*hub));
+
+	INIT_LIST_HEAD(&hub->event_list);
+	hub->intf = intf;
+	init_MUTEX(&hub->khubd_sem);
+
+	/* Record the new hub's existence */
+	spin_lock_irqsave(&hub_event_lock, flags);
+	INIT_LIST_HEAD(&hub->hub_list);
+	list_add(&hub->hub_list, &hub_list);
+	spin_unlock_irqrestore(&hub_event_lock, flags);
+
+	dev_set_drvdata (&intf->dev, hub);
+
+	if (usb_hub_configure(hub, endpoint) >= 0) {
+		strcpy (intf->dev.name, "Hub/Port Status Changes");
+		return 0;
+	}
+
+	err("hub configuration failed for device at %s", dev->devpath);
+
+	hub_disconnect (intf);
+	return -ENODEV;
 }
 
 static int hub_ioctl(struct usb_device *hub, unsigned int code, void *user_data)
@@ -584,7 +581,7 @@ static int hub_ioctl(struct usb_device *hub, unsigned int code, void *user_data)
 
 static int usb_hub_reset(struct usb_hub *hub)
 {
-	struct usb_device *dev = hub->dev;
+	struct usb_device *dev = interface_to_usbdev(hub->intf);
 	int i;
 
 	/* Disconnect any attached devices */
@@ -796,7 +793,7 @@ static int usb_hub_port_debounce(struct usb_device *hub, int port)
 static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 					u16 portstatus, u16 portchange)
 {
-	struct usb_device *hub = hubstate->dev;
+	struct usb_device *hub = interface_to_usbdev(hubstate->intf);
 	struct usb_device *dev;
 	unsigned int delay = HUB_SHORT_RESET_TIME;
 	int i;
@@ -891,11 +888,10 @@ static void usb_hub_port_connect_change(struct usb_hub *hubstate, int port,
 		/* put the device in the global device tree. the hub port
 		 * is the "bus_id"; hubs show in hierarchy like bridges
 		 */
-		dev->dev.parent = &dev->parent->dev;
-		sprintf (&dev->dev.bus_id[0], "%d", port + 1);
+		dev->dev.parent = dev->parent->dev.parent->parent;
 
 		/* Run it through the hoops (find a driver, etc) */
-		if (!usb_new_device(dev))
+		if (!usb_new_device(dev, &hub->dev))
 			goto done;
 
 		/* Free the configuration if there was an error */
@@ -940,7 +936,7 @@ static void usb_hub_events(void)
 		tmp = hub_event_list.next;
 
 		hub = list_entry(tmp, struct usb_hub, event_list);
-		dev = hub->dev;
+		dev = interface_to_usbdev(hub->intf);
 
 		list_del(tmp);
 		INIT_LIST_HEAD(tmp);
@@ -1081,8 +1077,8 @@ MODULE_DEVICE_TABLE (usb, hub_id_table);
 static struct usb_driver hub_driver = {
 	.name =		"hub",
 	.probe =	hub_probe,
-	.ioctl =	hub_ioctl,
 	.disconnect =	hub_disconnect,
+	.ioctl =	hub_ioctl,
 	.id_table =	hub_id_table,
 };
 

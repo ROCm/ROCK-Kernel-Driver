@@ -270,7 +270,7 @@ extern void usb_hc_died (struct usb_hcd *hcd);
 /* -------------------------------------------------------------------------- */
 
 /* Enumeration is only for the hub driver, or HCD virtual root hubs */
-extern int usb_new_device(struct usb_device *dev);
+extern int usb_new_device(struct usb_device *dev, struct device *parent);
 extern void usb_connect(struct usb_device *dev);
 extern void usb_disconnect(struct usb_device **);
 
@@ -395,12 +395,6 @@ extern int usb_find_interface_driver (struct usb_device *dev,
 #define usb_endpoint_halt(dev, ep, out) ((dev)->halted[out] |= (1 << (ep)))
 
 #define usb_endpoint_out(ep_dir)	(!((ep_dir) & USB_DIR_IN))
-
-/* for probe/disconnect with correct module usage counting */
-void *usb_bind_driver(struct usb_driver *driver, struct usb_interface *intf);
-void usb_unbind_driver(struct usb_device *device, struct usb_interface *intf);
-
-extern struct list_head usb_driver_list;
 
 /*
  * USB device fs stuff

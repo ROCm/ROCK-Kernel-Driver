@@ -379,30 +379,23 @@ static struct usb_serial_device_type generic_device = {
 	.num_ports =		1,
 	.shutdown =		generic_shutdown,
 };
+
+/* we want to look at all devices, as the vendor/product id can change
+ * depending on the command line argument */
+static struct usb_device_id generic_serial_ids[] = {
+	{.driver_info = 42},
+	{}
+};
 #endif
 
-
-/* local function prototypes */
-static int  serial_open (struct tty_struct *tty, struct file * filp);
-static void serial_close (struct tty_struct *tty, struct file * filp);
-static int  serial_write (struct tty_struct * tty, int from_user, const unsigned char *buf, int count);
-static int  serial_write_room (struct tty_struct *tty);
-static int  serial_chars_in_buffer (struct tty_struct *tty);
-static void serial_throttle (struct tty_struct * tty);
-static void serial_unthrottle (struct tty_struct * tty);
-static int  serial_ioctl (struct tty_struct *tty, struct file * file, unsigned int cmd, unsigned long arg);
-static void serial_set_termios (struct tty_struct *tty, struct termios * old);
-static void serial_shutdown (struct usb_serial *serial);
-
-static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
-			       const struct usb_device_id *id);
-static void usb_serial_disconnect(struct usb_device *dev, void *ptr);
-
+/* Driver structure we register with the USB core */
 static struct usb_driver usb_serial_driver = {
 	.name =		"serial",
 	.probe =	usb_serial_probe,
 	.disconnect =	usb_serial_disconnect,
-	.id_table =	NULL, 			/* check all devices */
+#ifdef CONFIG_USB_SERIAL_GENERIC
+	.id_table =	generic_serial_ids,
+#endif
 };
 
 /* There is no MODULE_DEVICE_TABLE for usbserial.c.  Instead
@@ -411,7 +404,6 @@ static struct usb_driver usb_serial_driver = {
    via modprobe, and modprobe will load usbserial because the serial
    drivers depend on it.
 */
-
 
 static int			serial_refcount;
 static struct tty_driver	serial_tty_driver;
@@ -1161,12 +1153,12 @@ static struct usb_serial * create_serial (struct usb_device *dev,
 	return serial;
 }
 
-static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
+int usb_serial_probe(struct usb_interface *interface,
 			       const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev (interface);
 	struct usb_serial *serial = NULL;
 	struct usb_serial_port *port;
-	struct usb_interface *interface;
 	struct usb_interface_descriptor *iface_desc;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_endpoint_descriptor *interrupt_in_endpoint[MAX_NUM_PORTS];
@@ -1189,7 +1181,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	/* loop through our list of known serial converters, and see if this
 	   device matches. */
 	found = 0;
-	interface = &dev->actconfig->interface[ifnum];
 	list_for_each (tmp, &usb_serial_driver_list) {
 		type = list_entry(tmp, struct usb_serial_device_type, driver_list);
 		id_pattern = usb_match_id(interface, type->id_table);
@@ -1202,13 +1193,13 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!found) {
 		/* no match */
 		dbg("none matched");
-		return(NULL);
+		return -ENODEV;
 	}
 
 	serial = create_serial (dev, interface, type);
 	if (!serial) {
 		err ("%s - out of memory", __FUNCTION__);
-		return NULL;
+		return -ENODEV;
 	}
 
 	/* if this device type has a probe function, call it */
@@ -1222,7 +1213,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		if (retval < 0) {
 			dbg ("sub driver rejected device");
 			kfree (serial);
-			return NULL;
+			return -ENODEV;
 		}
 	}
 
@@ -1258,6 +1249,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	}
 
 #if defined(CONFIG_USB_SERIAL_PL2303) || defined(CONFIG_USB_SERIAL_PL2303_MODULE)
+#if 0
 	/* BEGIN HORRIBLE HACK FOR PL2303 */ 
 	/* this is needed due to the looney way its endpoints are set up */
 	if (ifnum == 1) {
@@ -1282,6 +1274,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	}
 	/* END HORRIBLE HACK FOR PL2303 */
 #endif
+#endif
 
 	/* found all that we need */
 	info("%s converter detected", type->name);
@@ -1292,7 +1285,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		if (num_ports == 0) {
 			err("Generic device with no bulk out, not allowed.");
 			kfree (serial);
-			return NULL;
+			return -EIO;
 		}
 	}
 #endif
@@ -1312,7 +1305,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	if (get_free_serial (serial, num_ports, &minor) == NULL) {
 		err("No more free serial devices");
 		kfree (serial);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	serial->minor = minor;
@@ -1424,7 +1417,8 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		if (retval > 0) {
 			/* quietly accept this device, but don't bind to a serial port
 			 * as it's about to disappear */
-			return serial;
+			dev_set_drvdata (&interface->dev, serial);
+			return 0;
 		}
 	}
 
@@ -1455,7 +1449,9 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	}
 #endif
 
-	return serial; /* success */
+	/* success */
+	dev_set_drvdata (&interface->dev, serial);
+	return 0;
 
 
 probe_error:
@@ -1486,16 +1482,18 @@ probe_error:
 
 	/* free up any memory that we allocated */
 	kfree (serial);
-	return NULL;
+	return -EIO;
 }
 
-static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
+void usb_serial_disconnect(struct usb_interface *interface)
 {
-	struct usb_serial *serial = (struct usb_serial *) ptr;
+	struct usb_serial *serial = dev_get_drvdata (&interface->dev);
 	struct usb_serial_port *port;
 	int i;
 
 	dbg ("%s", __FUNCTION__);
+
+	dev_set_drvdata (&interface->dev, NULL);
 	if (serial) {
 		/* fail all future close/read/write/ioctl/etc calls */
 		for (i = 0; i < serial->num_ports; ++i) {
@@ -1554,10 +1552,8 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 
 		/* free up any memory that we allocated */
 		kfree (serial);
-
-	} else {
-		info("device disconnected");
 	}
+	info("device disconnected");
 
 }
 
@@ -1663,8 +1659,6 @@ int usb_serial_register(struct usb_serial_device_type *new_device)
 
 	info ("USB Serial support registered for %s", new_device->name);
 
-	usb_scan_devices();
-
 	return 0;
 }
 
@@ -1681,7 +1675,7 @@ void usb_serial_deregister(struct usb_serial_device_type *device)
 		serial = serial_table[i];
 		if ((serial != NULL) && (serial->type == device)) {
 			usb_driver_release_interface (&usb_serial_driver, serial->interface);
-			usb_serial_disconnect (NULL, serial);
+			usb_serial_disconnect (serial->interface);
 		}
 	}
 
@@ -1694,6 +1688,8 @@ void usb_serial_deregister(struct usb_serial_device_type *device)
    need these symbols to load properly as modules. */
 EXPORT_SYMBOL(usb_serial_register);
 EXPORT_SYMBOL(usb_serial_deregister);
+EXPORT_SYMBOL(usb_serial_probe);
+EXPORT_SYMBOL(usb_serial_disconnect);
 #ifdef USES_EZUSB_FUNCTIONS
 	EXPORT_SYMBOL(ezusb_writememory);
 	EXPORT_SYMBOL(ezusb_set_reset);

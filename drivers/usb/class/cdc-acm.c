@@ -507,9 +507,10 @@ static void acm_tty_set_termios(struct tty_struct *tty, struct termios *termios_
  * USB probe and disconnect routines.
  */
 
-static void *acm_probe(struct usb_device *dev, unsigned int ifnum,
-		       const struct usb_device_id *id)
+static int acm_probe (struct usb_interface *intf,
+		      const struct usb_device_id *id)
 {
+	struct usb_device *dev;
 	struct acm *acm;
 	struct usb_config_descriptor *cfacm;
 	struct usb_interface_descriptor *ifcom, *ifdata;
@@ -517,6 +518,7 @@ static void *acm_probe(struct usb_device *dev, unsigned int ifnum,
 	int readsize, ctrlsize, minor, i;
 	unsigned char *buf;
 
+	dev = interface_to_usbdev (intf);
 	for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
 
 		cfacm = dev->config + i;
@@ -561,12 +563,12 @@ static void *acm_probe(struct usb_device *dev, unsigned int ifnum,
 		for (minor = 0; minor < ACM_TTY_MINORS && acm_table[minor]; minor++);
 		if (acm_table[minor]) {
 			err("no more free acm devices");
-			return NULL;
+			return -ENODEV;
 		}
 
 		if (!(acm = kmalloc(sizeof(struct acm), GFP_KERNEL))) {
 			err("out of memory");
-			return NULL;
+			return -ENOMEM;
 		}
 		memset(acm, 0, sizeof(struct acm));
 
@@ -583,21 +585,21 @@ static void *acm_probe(struct usb_device *dev, unsigned int ifnum,
 		if (!(buf = kmalloc(ctrlsize + readsize + acm->writesize, GFP_KERNEL))) {
 			err("out of memory");
 			kfree(acm);
-			return NULL;
+			return -ENOMEM;
 		}
 
 		acm->ctrlurb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!acm->ctrlurb) {
 			err("out of memory");
 			kfree(acm);
-			return NULL;
+			return -ENOMEM;
 		}
 		acm->readurb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!acm->readurb) {
 			err("out of memory");
 			usb_free_urb(acm->ctrlurb);
 			kfree(acm);
-			return NULL;
+			return -ENOMEM;
 		}
 		acm->writeurb = usb_alloc_urb(0, GFP_KERNEL);
 		if (!acm->writeurb) {
@@ -605,7 +607,7 @@ static void *acm_probe(struct usb_device *dev, unsigned int ifnum,
 			usb_free_urb(acm->readurb);
 			usb_free_urb(acm->ctrlurb);
 			kfree(acm);
-			return NULL;
+			return -ENOMEM;
 		}
 
 		usb_fill_int_urb(acm->ctrlurb, dev, usb_rcvintpipe(dev, epctrl->bEndpointAddress),
@@ -631,15 +633,18 @@ static void *acm_probe(struct usb_device *dev, unsigned int ifnum,
 		usb_driver_claim_interface(&acm_driver, acm->iface + 1, acm);
 
 		tty_register_devfs(&acm_tty_driver, 0, minor);
-		return acm_table[minor] = acm;
+
+		acm_table[minor] = acm;
+		dev_set_drvdata (&intf->dev, acm);
+		return 0;
 	}
 
-	return NULL;
+	return -EIO;
 }
 
-static void acm_disconnect(struct usb_device *dev, void *ptr)
+static void acm_disconnect(struct usb_interface *intf)
 {
-	struct acm *acm = ptr;
+	struct acm *acm = dev_get_drvdata (&intf->dev);
 
 	if (!acm || !acm->dev) {
 		dbg("disconnect on nonexisting interface");
@@ -647,6 +652,7 @@ static void acm_disconnect(struct usb_device *dev, void *ptr)
 	}
 
 	acm->dev = NULL;
+	dev_set_drvdata (&intf->dev, NULL);
 
 	usb_unlink_urb(acm->ctrlurb);
 	usb_unlink_urb(acm->readurb);

@@ -103,12 +103,13 @@ static void device_detach(struct device * dev)
 		devclass_remove_device(dev);
 		spin_lock(&device_lock);
 		drv = dev->driver;
-		dev->driver = NULL;
 		spin_unlock(&device_lock);
 
 		/* detach from driver */
 		if (drv && drv->remove)
 			drv->remove(dev);
+
+		dev->driver = NULL;
 	}
 }
 

@@ -713,9 +713,10 @@ static struct file_operations dabusb_fops =
 };
 
 /* --------------------------------------------------------------------- */
-static void *dabusb_probe (struct usb_device *usbdev, unsigned int ifnum,
-			   const struct usb_device_id *id)
+static int dabusb_probe (struct usb_interface *intf, 
+			 const struct usb_device_id *id)
 {
+	struct usb_device *usbdev = interface_to_usbdev(intf);
 	int devnum;
 	int retval;
 	pdabusb_t s;
@@ -725,14 +726,14 @@ static void *dabusb_probe (struct usb_device *usbdev, unsigned int ifnum,
 
 	/* We don't handle multiple configurations */
 	if (usbdev->descriptor.bNumConfigurations != 1)
-		return NULL;
+		return -ENODEV;
 
-	if (ifnum != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
-		return NULL;
+	if (intf->altsetting->bInterfaceNumber != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
+		return -ENODEV;
 
 	retval = usb_register_dev (&dabusb_fops, DABUSB_MINOR, 1, &devnum);
 	if (retval)
-		return NULL;
+		return -ENOMEM;
 
 	s = &dabusb[devnum];
 
@@ -760,28 +761,32 @@ static void *dabusb_probe (struct usb_device *usbdev, unsigned int ifnum,
 	dbg("bound to interface: %d", ifnum);
 	up (&s->mutex);
 	MOD_INC_USE_COUNT;
-	return s;
+	dev_set_drvdata (&intf->dev, s);
+	return 0;
 
       reject:
 	up (&s->mutex);
 	s->usbdev = NULL;
-	return NULL;
+	return -ENODEV;
 }
 
-static void dabusb_disconnect (struct usb_device *usbdev, void *ptr)
+static void dabusb_disconnect (struct usb_interface *intf)
 {
-	pdabusb_t s = (pdabusb_t) ptr;
+	pdabusb_t s = dev_get_drvdata (&intf->dev);
 
 	dbg("dabusb_disconnect");
 
-	usb_deregister_dev (1, s->devnum);
-	s->remove_pending = 1;
-	wake_up (&s->wait);
-	if (s->state == _started)
-		sleep_on (&s->remove_ok);
-	s->usbdev = NULL;
-	s->overruns = 0;
-	MOD_DEC_USE_COUNT;
+	dev_set_drvdata (&intf->dev, NULL);
+	if (s) {
+		usb_deregister_dev (1, s->devnum);
+		s->remove_pending = 1;
+		wake_up (&s->wait);
+		if (s->state == _started)
+			sleep_on (&s->remove_ok);
+		s->usbdev = NULL;
+		s->overruns = 0;
+		MOD_DEC_USE_COUNT;
+	}
 }
 
 static struct usb_device_id dabusb_ids [] = {

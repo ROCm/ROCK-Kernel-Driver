@@ -2740,9 +2740,9 @@ static /*const*/ struct file_operations usb_audio_fops = {
 
 /* --------------------------------------------------------------------- */
 
-static void * usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
-			      const struct usb_device_id *id);
-static void usb_audio_disconnect(struct usb_device *dev, void *ptr);
+static int usb_audio_probe(struct usb_interface *iface,
+			   const struct usb_device_id *id);
+static void usb_audio_disconnect(struct usb_interface *iface);
 
 static struct usb_device_id usb_audio_ids [] = {
     { .match_flags = (USB_DEVICE_ID_MATCH_INT_CLASS | USB_DEVICE_ID_MATCH_INT_SUBCLASS),
@@ -2756,7 +2756,6 @@ static struct usb_driver usb_audio_driver = {
 	.name =		"audio",
 	.probe =	usb_audio_probe,
 	.disconnect =	usb_audio_disconnect,
-	.driver_list =	LIST_HEAD_INIT(usb_audio_driver.driver_list), 
 	.id_table =	usb_audio_ids,
 };
 
@@ -3643,7 +3642,7 @@ static void usb_audio_constructmixer(struct usb_audio_state *s, unsigned char *b
 	list_add_tail(&ms->list, &s->mixerlist);
 }
 
-static void *usb_audio_parsecontrol(struct usb_device *dev, unsigned char *buffer, unsigned int buflen, unsigned int ctrlif)
+static struct usb_audio_state *usb_audio_parsecontrol(struct usb_device *dev, unsigned char *buffer, unsigned int buflen, unsigned int ctrlif)
 {
 	struct usb_audio_state *s;
 	struct usb_config_descriptor *config = dev->actconfig;
@@ -3766,10 +3765,12 @@ ret:
 
 /* we only care for the currently active configuration */
 
-static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
-			     const struct usb_device_id *id)
+static int usb_audio_probe(struct usb_interface *intf,
+			   const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev (intf);
 	struct usb_config_descriptor *config = dev->actconfig;	
+	struct usb_audio_state *s;
 	unsigned char *buffer;
 	unsigned char buf[8];
 	unsigned int i, buflen;
@@ -3789,38 +3790,46 @@ static void *usb_audio_probe(struct usb_device *dev, unsigned int ifnum,
 
 	if (usb_set_configuration(dev, config->bConfigurationValue) < 0) {
 		printk(KERN_ERR "usbaudio: set_configuration failed (ConfigValue 0x%x)\n", config->bConfigurationValue);
-		return NULL;
+		return -EIO;
 	}
 	ret = usb_get_descriptor(dev, USB_DT_CONFIG, i, buf, 8);
 	if (ret < 0) {
 		printk(KERN_ERR "usbaudio: cannot get first 8 bytes of config descriptor %d of device %d (error %d)\n", i, dev->devnum, ret);
-		return NULL;
+		return -EIO;
 	}
 	if (buf[1] != USB_DT_CONFIG || buf[0] < 9) {
 		printk(KERN_ERR "usbaudio: invalid config descriptor %d of device %d\n", i, dev->devnum);
-		return NULL;
+		return -EIO;
 	}
 	buflen = buf[2] | (buf[3] << 8);
 	if (!(buffer = kmalloc(buflen, GFP_KERNEL)))
-		return NULL;
+		return -ENOMEM;
 	ret = usb_get_descriptor(dev, USB_DT_CONFIG, i, buffer, buflen);
 	if (ret < 0) {
 		kfree(buffer);
 		printk(KERN_ERR "usbaudio: cannot get config descriptor %d of device %d (error %d)\n", i, dev->devnum, ret);
-		return NULL;
+		return -EIO;
 	}
-	return usb_audio_parsecontrol(dev, buffer, buflen, ifnum);
+	s = usb_audio_parsecontrol(dev, buffer, buflen, intf->altsetting->bInterfaceNumber);
+	if (s) {
+		dev_set_drvdata (&intf->dev, s);
+		return 0;
+	}
+	return -ENODEV;
 }
 
 
 /* a revoke facility would make things simpler */
 
-static void usb_audio_disconnect(struct usb_device *dev, void *ptr)
+static void usb_audio_disconnect(struct usb_interface *intf)
 {
-	struct usb_audio_state *s = (struct usb_audio_state *)ptr;
+	struct usb_audio_state *s = dev_get_drvdata (&intf->dev);
 	struct list_head *list;
 	struct usb_audiodev *as;
 	struct usb_mixerdev *ms;
+
+	if (!s)
+		return;
 
 	/* we get called with -1 for every audiostreaming interface registered */
 	if (s == (struct usb_audio_state *)-1) {
@@ -3835,6 +3844,8 @@ static void usb_audio_disconnect(struct usb_device *dev, void *ptr)
 	list_del(&s->audiodev);
 	INIT_LIST_HEAD(&s->audiodev);
 	s->usbdev = NULL;
+	dev_set_drvdata (&intf->dev, NULL);
+
 	/* deregister all audio and mixer devices, so no new processes can open this device */
 	for(list = s->audiolist.next; list != &s->audiolist; list = list->next) {
 		as = list_entry(list, struct usb_audiodev, list);

@@ -356,26 +356,28 @@ static void wacom_close(struct input_dev *dev)
 		usb_unlink_urb(wacom->irq);
 }
 
-static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id)
+static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev (intf);
 	struct usb_endpoint_descriptor *endpoint;
 	struct wacom *wacom;
 	char path[64];
 
-	if (!(wacom = kmalloc(sizeof(struct wacom), GFP_KERNEL))) return NULL;
+	if (!(wacom = kmalloc(sizeof(struct wacom), GFP_KERNEL)))
+		return -ENOMEM;
 	memset(wacom, 0, sizeof(struct wacom));
 
 	wacom->data = usb_buffer_alloc(dev, 10, SLAB_ATOMIC, &wacom->data_dma);
 	if (!wacom->data) {
 		kfree(wacom);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	wacom->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!wacom->irq) {
 		usb_buffer_free(dev, 10, wacom->data, wacom->data_dma);
 		kfree(wacom);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	wacom->features = wacom_features + id->driver_info;
@@ -419,7 +421,7 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 	wacom->dev.id.version = dev->descriptor.bcdDevice;
 	wacom->usbdev = dev;
 
-	endpoint = dev->config[0].interface[ifnum].altsetting[0].endpoint + 0;
+	endpoint = intf->altsetting[0].endpoint + 0;
 
 	if (wacom->features->pktlen > 10)
 		BUG();
@@ -435,17 +437,22 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 
 	printk(KERN_INFO "input: %s on %s\n", wacom->features->name, path);
 
-	return wacom;
+	dev_set_drvdata(&intf->dev, wacom);
+	return 0;
 }
 
-static void wacom_disconnect(struct usb_device *dev, void *ptr)
+static void wacom_disconnect(struct usb_interface *intf)
 {
-	struct wacom *wacom = ptr;
-	usb_unlink_urb(wacom->irq);
-	input_unregister_device(&wacom->dev);
-	usb_free_urb(wacom->irq);
-	usb_buffer_free(dev, 10, wacom->data, wacom->data_dma);
-	kfree(wacom);
+	struct wacom *wacom = dev_get_drvdata(&intf->dev);
+
+	dev_set_drvdata(&intf->dev, NULL);
+	if (wacom) {
+		usb_unlink_urb(wacom->irq);
+		input_unregister_device(&wacom->dev);
+		usb_free_urb(wacom->irq);
+		usb_buffer_free(interface_to_usbdev(intf), 10, wacom->data, wacom->data_dma);
+		kfree(wacom);
+	}
 }
 
 static struct usb_driver wacom_driver = {

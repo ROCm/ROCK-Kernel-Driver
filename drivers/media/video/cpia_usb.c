@@ -479,9 +479,10 @@ int cpia_usb_init(void)
 
 /* Probing and initializing */
 
-static void *cpia_probe(struct usb_device *udev, unsigned int ifnum,
-			const struct usb_device_id *id)
+static int cpia_probe(struct usb_interface *intf,
+		      const struct usb_device_id *id)
 {
+	struct usb_device *udev = interface_to_usbdev(intf);
 	struct usb_interface_descriptor *interface;
 	struct usb_cpia *ucpia;
 	struct cam_data *cam;
@@ -489,16 +490,16 @@ static void *cpia_probe(struct usb_device *udev, unsigned int ifnum,
   
 	/* A multi-config CPiA camera? */
 	if (udev->descriptor.bNumConfigurations != 1)
-		return NULL;
+		return -ENODEV;
 
-	interface = &udev->actconfig->interface[ifnum].altsetting[0];
+	interface = &intf->altsetting[0];
 
 	printk(KERN_INFO "USB CPiA camera found\n");
 
 	ucpia = kmalloc(sizeof(*ucpia), GFP_KERNEL);
 	if (!ucpia) {
 		printk(KERN_ERR "couldn't kmalloc cpia struct\n");
-		return NULL;
+		return -ENOMEM;
 	}
 
 	memset(ucpia, 0, sizeof(*ucpia));
@@ -548,7 +549,8 @@ static void *cpia_probe(struct usb_device *udev, unsigned int ifnum,
 	cpia_add_to_list(cam_list, cam);
 	spin_unlock( &cam_list_lock_usb );
 
-	return cam;
+	dev_set_drvdata(&intf->dev, cam);
+	return 0;
 
 fail_all:
 	vfree(ucpia->buffers[2]);
@@ -561,10 +563,10 @@ fail_alloc_1:
 	ucpia->buffers[0] = NULL;
 fail_alloc_0:
 
-	return NULL;
+	return -EIO;
 }
 
-static void cpia_disconnect(struct usb_device *dev, void *ptr);
+static void cpia_disconnect(struct usb_interface *intf);
 
 static struct usb_device_id cpia_id_table [] = {
 	{ USB_DEVICE(0x0553, 0x0002) },
@@ -586,11 +588,17 @@ static struct usb_driver cpia_driver = {
 /* don't use dev, it may be NULL! (see usb_cpia_cleanup) */
 /* _disconnect from usb_cpia_cleanup is not necessary since usb_deregister */
 /* will do it for us as well as passing a udev structure - jerdfelt */
-static void cpia_disconnect(struct usb_device *udev, void *ptr)
+static void cpia_disconnect(struct usb_interface *intf)
 {
-	struct cam_data *cam = (struct cam_data *) ptr;
-	struct usb_cpia *ucpia = (struct usb_cpia *) cam->lowlevel_data;
+	struct cam_data *cam = dev_get_drvdata(&intf->dev);
+	struct usb_cpia *ucpia;
+	struct usb_device *udev;
   
+	dev_set_drvdata(&intf->dev, NULL);
+	if (!cam)
+		return;
+
+	ucpia = (struct usb_cpia *) cam->lowlevel_data;
 	spin_lock( &cam_list_lock_usb );
 	cpia_remove_from_list(cam);
 	spin_unlock( &cam_list_lock_usb );
@@ -607,6 +615,7 @@ static void cpia_disconnect(struct usb_device *udev, void *ptr)
 	if (waitqueue_active(&ucpia->wq_stream))
 		wake_up_interruptible(&ucpia->wq_stream);
 
+	udev = interface_to_usbdev(intf);
 	usb_driver_release_interface(&cpia_driver,
 				     &udev->actconfig->interface[0]);
 

@@ -73,6 +73,13 @@ static struct usb_device_id id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
+static struct usb_driver cyberjack_driver = {
+	.name =		"cyberjack",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table,
+};
+
 static struct usb_serial_device_type cyberjack_device = {
 	.owner =		THIS_MODULE,
 	.name =			"Reiner SCT Cyberjack USB card reader",
@@ -461,6 +468,7 @@ static void cyberjack_write_bulk_callback (struct urb *urb)
 static int __init cyberjack_init (void)
 {
 	usb_serial_register (&cyberjack_device);
+	usb_register (&cyberjack_driver);
 
 	info(DRIVER_VERSION " " DRIVER_AUTHOR);
 	info(DRIVER_DESC);
@@ -470,6 +478,7 @@ static int __init cyberjack_init (void)
 
 static void __exit cyberjack_exit (void)
 {
+	usb_deregister (&cyberjack_driver);
 	usb_serial_deregister (&cyberjack_device);
 }
 

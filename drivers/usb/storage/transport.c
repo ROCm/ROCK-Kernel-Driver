@@ -349,8 +349,8 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 	 * all the complex logic above, let's find them and eliminate them.
 	 */
 	if (len != srb->request_bufflen) {
-		printk("USB len=%d, request_bufflen=%d\n", len, srb->request_bufflen);
-		show_trace(NULL);
+		printk(KERN_ERR "USB len=%d, request_bufflen=%d\n", len, srb->request_bufflen);
+		printk(KERN_ERR "Fix this -- future 2.5 kernels will not work if this is not fixed!\n");
 	}
 
 	return len;
@@ -370,16 +370,20 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
  * as those occurring during device-specific initialization, must be handled
  * by a separate code path.)
  *
- * The abort function first sets the machine state, then acquires the lock
- * on the current_urb before checking if it needs to be aborted.
+ * The abort function first sets the machine state, then atomically
+ * tests-and-clears the CAN_CANCEL bit in us->flags to see if the current_urb
+ * needs to be aborted.
  *
- * When a function submits the current_urb, it must first grab the
- * current_urb_sem to prevent the abort function from trying to cancel the
- * URB while the submit call is underway.  After a function submits the
- * current_urb, it -MUST- test the state to see if we got aborted just before
- * the submission.  If so, it's essential to abort the URB if it's still in
- * progress.  Either way, the function must then release the lock and wait
- * for the URB to finish.
+ * The submit function first verifies that the submission completed without
+ * errors, and only then sets the CAN_CANCEL bit.  This prevents the abort
+ * function from trying to cancel the URB while the submit call is underway.
+ * Next, the submit function must test the state to see if we got aborted
+ * before the submission or before setting the CAN_CANCEL bit.  If so, it's
+ * essential to abort the URB if it hasn't been cancelled already (i.e.,
+ * if the CAN_CANCEL bit is still set).  Either way, the function must then
+ * wait for the URB to finish.  Note that because the USB_ASYNC_UNLINK flag
+ * is set, the URB can still be in progress even after a call to
+ * usb_unlink_urb() returns.
  *
  * (It's also permissible, but not necessary, to test the state -before-
  * submitting the URB.  Doing so would prevent an unnecessary submission if
@@ -389,7 +393,7 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
  *
  * The idea is that (1) once the state is changed to ABORTING, either the
  * aborting function or the submitting function is guaranteed to call
- * usb_unlink_urb() for an active URB, and (2) current_urb_sem prevents
+ * usb_unlink_urb() for an active URB, and (2) test_and_clear_bit() prevents
  * usb_unlink_urb() from being called more than once or from being called
  * during usb_submit_urb().
  */
@@ -424,28 +428,30 @@ static int usb_stor_msg_common(struct us_data *us)
 	us->current_urb->error_count = 0;
 	us->current_urb->transfer_flags = USB_ASYNC_UNLINK;
 
-	/* lock and submit the URB */
-	down(&(us->current_urb_sem));
+	/* submit the URB */
 	status = usb_submit_urb(us->current_urb, GFP_NOIO);
 	if (status) {
 		/* something went wrong */
-		up(&(us->current_urb_sem));
 		return status;
 	}
+
+	/* since the URB has been submitted successfully, it's now okay
+	 * to cancel it */
+	set_bit(US_FLIDX_CAN_CANCEL, &us->flags);
 
 	/* has the current command been aborted? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 
 		/* cancel the URB, if it hasn't been cancelled already */
-		if (us->current_urb->status == -EINPROGRESS) {
+		if (test_and_clear_bit(US_FLIDX_CAN_CANCEL, &us->flags)) {
 			US_DEBUGP("-- cancelling URB\n");
 			usb_unlink_urb(us->current_urb);
 		}
 	}
-	up(&(us->current_urb_sem));
 
 	/* wait for the completion of the URB */
 	wait_for_completion(&urb_done);
+	clear_bit(US_FLIDX_CAN_CANCEL, &us->flags);
 
 	/* return the URB status */
 	return us->current_urb->status;
@@ -565,7 +571,8 @@ int usb_stor_transfer_partial(struct us_data *us, char *buf, int length)
 	/* if we stall, we need to clear it before we go on */
 	if (result == -EPIPE) {
 		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-		usb_stor_clear_halt(us, pipe);
+		if (usb_stor_clear_halt(us, pipe) < 0)
+			return US_BULK_TRANSFER_FAILED;
 	}
 
 	/* did we abort this command? */
@@ -635,11 +642,11 @@ void usb_stor_transfer(Scsi_Cmnd *srb, struct us_data* us)
 			if (transfer_amount - total_transferred >= 
 					sg[i].length) {
 				result = usb_stor_transfer_partial(us,
-						page_address(sg[i].page) + sg[i].offset, sg[i].length);
+						sg_address(sg[i]), sg[i].length);
 				total_transferred += sg[i].length;
 			} else
 				result = usb_stor_transfer_partial(us,
-						page_address(sg[i].page) + sg[i].offset,
+						sg_address(sg[i]),
 						transfer_amount - total_transferred);
 
 			/* if we get an error, end the loop here */
@@ -867,15 +874,13 @@ void usb_stor_abort_transport(struct us_data *us)
 	/* If the state machine is blocked waiting for an URB or an IRQ,
 	 * let's wake it up */
 
-	/* If we have an URB pending, cancel it.  Note that we guarantee with
-	 * the current_urb_sem that if a URB has just been submitted, it
+	/* If we have an URB pending, cancel it.  The test_and_clear_bit()
+	 * call guarantees that if a URB has just been submitted, it
 	 * won't be cancelled more than once. */
-	down(&(us->current_urb_sem));
-	if (us->current_urb->status == -EINPROGRESS) {
+	if (test_and_clear_bit(US_FLIDX_CAN_CANCEL, &us->flags)) {
 		US_DEBUGP("-- cancelling URB\n");
 		usb_unlink_urb(us->current_urb);
 	}
-	up(&(us->current_urb_sem));
 
 	/* If we are waiting for an IRQ, simulate it */
 	if (test_bit(US_FLIDX_IP_WANTED, &us->flags)) {
@@ -993,18 +998,9 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return US_BULK_TRANSFER_ABORTED;
 	}
 
-	/* STALL must be cleared when it is detected */
+	/* a stall indicates a protocol error */
 	if (result == -EPIPE) {
-		US_DEBUGP("-- Stall on control pipe. Clearing\n");
-		result = usb_stor_clear_halt(us,	
-			usb_sndctrlpipe(us->pusb_dev, 0));
-
-		/* did we abort this command? */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-			US_DEBUGP("usb_stor_control_msg(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
-		}
-
+		US_DEBUGP("-- Stall on control pipe\n");
 		return USB_STOR_TRANSPORT_FAILED;
 	}
 
@@ -1110,17 +1106,9 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 			return US_BULK_TRANSFER_ABORTED;
 		}
 
-		/* a stall is a fatal condition from the device */
+		/* a stall indicates a protocol error */
 		if (result == -EPIPE) {
-			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_stor_clear_halt(us,
-				usb_sndctrlpipe(us->pusb_dev, 0));
-
-			/* did we abort this command? */
-			if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-				US_DEBUGP("usb_stor_CB_transport(): transfer aborted\n");
-				return US_BULK_TRANSFER_ABORTED;
-			}
+			US_DEBUGP("-- Stall on control pipe\n");
 			return USB_STOR_TRANSPORT_FAILED;
 		}
 
@@ -1178,15 +1166,6 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	if (result == 1)
 		return data;
 
-	/* if we get a STALL, clear the stall */
-	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-
-		/* Use usb_clear_halt() because this is not a
-		 * scsi queued-command */
-		usb_clear_halt(us->pusb_dev, pipe);
-	}
-
 	/* return the default -- no LUNs */
 	return 0;
 }
@@ -1241,6 +1220,8 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
 			return US_BULK_TRANSFER_ABORTED;
 		}
+		if (result < 0)
+			return USB_STOR_TRANSPORT_ERROR;
 		result = -EPIPE;
 	} else if (result) {
 		/* unknown error -- we've got a problem */
@@ -1289,6 +1270,8 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
 			return US_BULK_TRANSFER_ABORTED;
 		}
+		if (result < 0)
+			return USB_STOR_TRANSPORT_ERROR;
 
 		/* get the status again */
 		US_DEBUGP("Attempting to get CSW (2nd try)...\n");

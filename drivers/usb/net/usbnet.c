@@ -1941,12 +1941,20 @@ static void usbnet_bh (unsigned long param)
  
 // precondition: never called in_interrupt
 
-static void usbnet_disconnect (struct usb_device *udev, void *ptr)
+static void usbnet_disconnect (struct usb_interface *intf)
 {
-	struct usbnet	*dev = (struct usbnet *) ptr;
+	struct usbnet		*dev;
+	struct usb_device	*xdev;
+
+	dev = dev_get_drvdata (&intf->dev);
+	dev_set_drvdata (&intf->dev, NULL);
+	if (!dev)
+		return;
+
+	xdev = interface_to_usbdev (intf);
 
 	devinfo (dev, "unregister usbnet usb-%s-%s, %s",
-		udev->bus->bus_name, udev->devpath,
+		xdev->bus->bus_name, xdev->devpath,
 		dev->driver_info->description);
 	
 	unregister_netdev (&dev->net);
@@ -1960,7 +1968,7 @@ static void usbnet_disconnect (struct usb_device *udev, void *ptr)
 	flush_scheduled_tasks ();
 
 	kfree (dev);
-	usb_put_dev (udev);
+	usb_put_dev (xdev);
 }
 
 
@@ -1968,46 +1976,38 @@ static void usbnet_disconnect (struct usb_device *udev, void *ptr)
 
 // precondition: never called in_interrupt
 
-static void *
-usbnet_probe (struct usb_device *udev, unsigned ifnum,
-			const struct usb_device_id *prod)
+int
+usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
 	struct usbnet			*dev;
 	struct net_device 		*net;
 	struct usb_interface_descriptor	*interface;
 	struct driver_info		*info;
-	int				altnum = 0;
+	struct usb_device		*xdev;
 
 	info = (struct driver_info *) prod->driver_info;
 
-	// sanity check; expect dedicated interface/devices for now.
-	interface = &udev->actconfig->interface [ifnum].altsetting [altnum];
-	if (udev->descriptor.bNumConfigurations != 1
-			|| udev->config[0].bNumInterfaces != 1
-//			|| interface->bInterfaceClass != USB_CLASS_VENDOR_SPEC
-			) {
-		dbg ("Bogus config info");
-		return 0;
-	}
+	xdev = interface_to_usbdev (udev);
+	interface = &udev->altsetting [udev->act_altsetting];
 
-	// more sanity (unless the device is broken)
 	if (!(info->flags & FLAG_NO_SETINT)) {
-		if (usb_set_interface (udev, ifnum, altnum) < 0) {
+		if (usb_set_interface (xdev, interface->bInterfaceNumber,
+				interface->bAlternateSetting) < 0) {
 			err ("set_interface failed");
-			return 0;
+			return -EIO;
 		}
 	}
 
 	// set up our own records
 	if (!(dev = kmalloc (sizeof *dev, GFP_KERNEL))) {
 		dbg ("can't kmalloc dev");
-		return 0;
+		return -ENOMEM;
 	}
 	memset (dev, 0, sizeof *dev);
 
 	init_MUTEX_LOCKED (&dev->mutex);
-	usb_get_dev (udev);
-	dev->udev = udev;
+	usb_get_dev (xdev);
+	dev->udev = xdev;
 	dev->driver_info = info;
 	dev->msg_level = msg_level;
 	INIT_LIST_HEAD (&dev->dev_list);
@@ -2040,10 +2040,11 @@ usbnet_probe (struct usb_device *udev, unsigned ifnum,
 
 	register_netdev (&dev->net);
 	devinfo (dev, "register usbnet usb-%s-%s, %s",
-		udev->bus->bus_name, udev->devpath,
+		xdev->bus->bus_name, xdev->devpath,
 		dev->driver_info->description);
 
 	// ok, it's ready to go.
+	dev_set_drvdata (&udev->dev, net);
 	mutex_lock (&usbnet_mutex);
 	list_add (&dev->dev_list, &usbnet_list);
 	mutex_unlock (&dev->mutex);
@@ -2052,7 +2053,7 @@ usbnet_probe (struct usb_device *udev, unsigned ifnum,
 	netif_device_attach (&dev->net);
 
 	mutex_unlock (&usbnet_mutex);
-	return dev;
+	return 0;
 }
 
 

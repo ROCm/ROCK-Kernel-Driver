@@ -204,7 +204,7 @@ int __init have_cpuid_p(void)
 
 void __init generic_identify(struct cpuinfo_x86 * c)
 {
-	u32 tfms;
+	u32 tfms, xlvl;
 	int junk;
 
 	if (have_cpuid_p()) {
@@ -229,6 +229,15 @@ void __init generic_identify(struct cpuinfo_x86 * c)
 		} else {
 			/* Have CPUID level 0 only - unheard of */
 			c->x86 = 4;
+		}
+
+		/* AMD-defined flags: level 0x80000001 */
+		xlvl = cpuid_eax(0x80000000);
+		if ( (xlvl & 0xffff0000) == 0x80000000 ) {
+			if ( xlvl >= 0x80000001 )
+				c->x86_capability[1] = cpuid_edx(0x80000001);
+			if ( xlvl >= 0x80000004 )
+				get_model_name(c); /* Default name */
 		}
 	}
 }

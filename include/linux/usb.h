@@ -227,7 +227,7 @@ struct usb_interface {
 	int act_altsetting;		/* active alternate setting */
 	int num_altsetting;		/* number of alternate settings */
 	int max_altsetting;		/* total memory allocated */
- 
+
 	struct usb_driver *driver;	/* driver */
 	struct device dev;		/* interface specific device info */
 	void *private_data;
@@ -398,9 +398,6 @@ extern struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bu
 extern struct usb_device *usb_get_dev(struct usb_device *dev);
 extern void usb_free_dev(struct usb_device *);
 #define usb_put_dev usb_free_dev
-
-/* for when layers above USB add new non-USB drivers */
-extern void usb_scan_devices(void);
 
 /* mostly for devices emulating SCSI over USB */
 extern int usb_reset_device(struct usb_device *dev);
@@ -623,10 +620,10 @@ struct usb_device_id {
  *	expose information to user space regardless of where they
  *	do (or don't) show up otherwise in the filesystem.
  * @id_table: USB drivers use ID table to support hotplugging.
- *	Export this with MODULE_DEVICE_TABLE(usb,...), or use NULL to
- *	say that probe() should be called for any unclaimed interfce.
+ *	Export this with MODULE_DEVICE_TABLE(usb,...).  This must be set
+ *	or your driver's probe function will never get called. 
  *
- * USB drivers should provide a name, probe() and disconnect() methods,
+ * USB drivers must provide a name, probe() and disconnect() methods,
  * and an id_table.  Other driver fields are optional.
  *
  * The id_table is used in hotplugging.  It holds a set of descriptors,
@@ -643,32 +640,23 @@ struct usb_device_id {
  */
 struct usb_driver {
 	struct module *owner;
+
 	const char *name;
 
-	void *(*probe)(
-	    struct usb_device *dev,		/* the device */
-	    unsigned intf,			/* what interface */
-	    const struct usb_device_id *id	/* from id_table */
-	    );
-	void (*disconnect)(
-	    struct usb_device *dev,		/* the device */
-	    void *handle			/* as returned by probe() */
-	    );
+	int (*probe) (struct usb_interface *intf,
+		      const struct usb_device_id *id);
 
-	struct list_head driver_list;
-	struct semaphore serialize;
+	void (*disconnect) (struct usb_interface *intf);
 
-	/* ioctl -- userspace apps can talk to drivers through usbfs */
-	int (*ioctl)(struct usb_device *dev, unsigned int code, void *buf);
+	int (*ioctl) (struct usb_device *dev, unsigned int code, void *buf);
 
-	/* support for "new-style" USB hotplugging */
 	const struct usb_device_id *id_table;
 
-	/* suspend before the bus suspends;
-	 * disconnect or resume when the bus resumes */
-	/* void (*suspend)(struct usb_device *dev); */
-	/* void (*resume)(struct usb_device *dev); */
+	struct device_driver driver;
+
+	struct semaphore serialize;
 };
+#define	to_usb_driver(d) container_of(d, struct usb_driver, driver)
 
 extern struct bus_type usb_bus_type;
 
@@ -681,6 +669,9 @@ extern void usb_deregister(struct usb_driver *);
 
 extern int usb_register_dev(struct file_operations *fops, int minor, int num_minors, int *start_minor);
 extern void usb_deregister_dev(int num_minors, int start_minor);
+
+extern int usb_device_probe(struct device *dev);
+extern int usb_device_remove(struct device *dev);
 
 /* -------------------------------------------------------------------------- */
 
