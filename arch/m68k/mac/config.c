@@ -90,7 +90,7 @@ static void mac_get_model(char *str);
 
 void mac_bang(int irq, void *vector, struct pt_regs *p)
 {
-	printk("Resetting ...\n");
+	printk(KERN_INFO "Resetting ...\n");
 	mac_reset();
 }
 
@@ -190,7 +190,7 @@ static void mac_cache_card_flush(int writeback)
 void __init config_mac(void)
 {
 	if (!MACH_IS_MAC) {
-	  printk("ERROR: no Mac, but config_mac() called!! \n");
+	  printk(KERN_ERR "ERROR: no Mac, but config_mac() called!! \n");
 	}
 
 	mach_sched_init      = mac_sched_init;
@@ -325,13 +325,14 @@ static struct mac_model mac_data_table[]=
 	 */	 
 	 
 	{	MAC_MODEL_Q605, "Quadra 605", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA,  MAC_IDE_NONE,   MAC_SCC_QUADRA,	MAC_ETHER_NONE,		MAC_NUBUS},
+	{	MAC_MODEL_Q605_ACC, "Quadra 605", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA,  MAC_IDE_NONE,   MAC_SCC_QUADRA,	MAC_ETHER_NONE,		MAC_NUBUS},
 	{	MAC_MODEL_Q610, "Quadra 610", MAC_ADB_II,   MAC_VIA_QUADRA, MAC_SCSI_QUADRA,  MAC_IDE_NONE,   MAC_SCC_QUADRA,	MAC_ETHER_SONIC,	MAC_NUBUS},
 	{	MAC_MODEL_Q630, "Quadra 630", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA,  MAC_IDE_QUADRA, MAC_SCC_QUADRA,	MAC_ETHER_SONIC,	MAC_NUBUS},
  	{	MAC_MODEL_Q650, "Quadra 650", MAC_ADB_II,   MAC_VIA_QUADRA, MAC_SCSI_QUADRA,  MAC_IDE_NONE,   MAC_SCC_QUADRA,	MAC_ETHER_SONIC,	MAC_NUBUS},
 	/*	The Q700 does have a NS Sonic */
-	{	MAC_MODEL_Q700, "Quadra 700", MAC_ADB_II,   MAC_VIA_QUADRA, MAC_SCSI_QUADRA2, MAC_IDE_NONE,   MAC_SCC_QUADRA2,	MAC_ETHER_SONIC,	MAC_NUBUS},
+	{	MAC_MODEL_Q700, "Quadra 700", MAC_ADB_II,   MAC_VIA_QUADRA, MAC_SCSI_QUADRA2, MAC_IDE_NONE,   MAC_SCC_QUADRA,	MAC_ETHER_SONIC,	MAC_NUBUS},
 	{	MAC_MODEL_Q800, "Quadra 800", MAC_ADB_II,   MAC_VIA_QUADRA, MAC_SCSI_QUADRA,  MAC_IDE_NONE,   MAC_SCC_QUADRA,	MAC_ETHER_SONIC,	MAC_NUBUS},
-	{	MAC_MODEL_Q840, "Quadra 840AV", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA3, MAC_IDE_NONE, MAC_SCC_II,	MAC_ETHER_MACE,		MAC_NUBUS},
+	{	MAC_MODEL_Q840, "Quadra 840AV", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA3, MAC_IDE_NONE, MAC_SCC_PSC,	MAC_ETHER_MACE,		MAC_NUBUS},
 	{	MAC_MODEL_Q900, "Quadra 900", MAC_ADB_IOP, MAC_VIA_QUADRA, MAC_SCSI_QUADRA2, MAC_IDE_NONE,   MAC_SCC_IOP,	MAC_ETHER_SONIC,	MAC_NUBUS},
 	{	MAC_MODEL_Q950, "Quadra 950", MAC_ADB_IOP, MAC_VIA_QUADRA, MAC_SCSI_QUADRA2, MAC_IDE_NONE,   MAC_SCC_IOP,	MAC_ETHER_SONIC,	MAC_NUBUS},
 
@@ -344,8 +345,8 @@ static struct mac_model mac_data_table[]=
 	{	MAC_MODEL_P475F, "Performa 475", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA, MAC_IDE_NONE,   MAC_SCC_II,	MAC_ETHER_NONE, MAC_NUBUS},
 	{	MAC_MODEL_P520,  "Performa 520", MAC_ADB_CUDA, MAC_VIA_IIci,   MAC_SCSI_OLD,    MAC_IDE_NONE,   MAC_SCC_II,	MAC_ETHER_NONE,	MAC_NUBUS},
 	{	MAC_MODEL_P550,  "Performa 550", MAC_ADB_CUDA, MAC_VIA_IIci,   MAC_SCSI_OLD,    MAC_IDE_NONE,   MAC_SCC_II,	MAC_ETHER_NONE,	MAC_NUBUS},
-	{	MAC_MODEL_P575,  "Performa 575", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA, MAC_IDE_NONE,   MAC_SCC_II,	MAC_ETHER_NONE, MAC_NUBUS},
 	/* These have the comm slot, and therefore the possibility of SONIC ethernet */
+	{	MAC_MODEL_P575,  "Performa 575", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA, MAC_IDE_NONE,   MAC_SCC_II,	MAC_ETHER_SONIC, MAC_NUBUS},
 	{	MAC_MODEL_P588,  "Performa 588", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA, MAC_IDE_QUADRA, MAC_SCC_II,	MAC_ETHER_SONIC, MAC_NUBUS},
 	{	MAC_MODEL_TV,    "TV",           MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_OLD,	MAC_IDE_NONE,   MAC_SCC_II,	MAC_ETHER_NONE,	MAC_NUBUS},
 	{	MAC_MODEL_P600,  "Performa 600", MAC_ADB_IISI, MAC_VIA_IIci,   MAC_SCSI_OLD,	MAC_IDE_NONE,   MAC_SCC_II,	MAC_ETHER_NONE,	MAC_NUBUS},
@@ -357,7 +358,7 @@ static struct mac_model mac_data_table[]=
 	/* The C610 may or may not have SONIC.  We probe to make sure */
 	{	MAC_MODEL_C610, "Centris 610",   MAC_ADB_II,   MAC_VIA_QUADRA, MAC_SCSI_QUADRA,  MAC_IDE_NONE, MAC_SCC_QUADRA,	MAC_ETHER_SONIC,	MAC_NUBUS},
 	{	MAC_MODEL_C650, "Centris 650",   MAC_ADB_II,   MAC_VIA_QUADRA, MAC_SCSI_QUADRA,  MAC_IDE_NONE, MAC_SCC_QUADRA,	MAC_ETHER_SONIC,	MAC_NUBUS},
-	{	MAC_MODEL_C660, "Centris 660AV", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA3, MAC_IDE_NONE, MAC_SCC_QUADRA,	MAC_ETHER_MACE,		MAC_NUBUS},
+	{	MAC_MODEL_C660, "Centris 660AV", MAC_ADB_CUDA, MAC_VIA_QUADRA, MAC_SCSI_QUADRA3, MAC_IDE_NONE, MAC_SCC_PSC,	MAC_ETHER_MACE,		MAC_NUBUS},
 
 	/*
 	 * The PowerBooks all the same "Combo" custom IC for SCSI and SCC
@@ -410,7 +411,7 @@ void mac_identify(void)
 		/* no bootinfo model id -> NetBSD booter was used! */
 		/* XXX FIXME: breaks for model > 31 */
 		model=(mac_bi_data.cpuid>>2)&63;
-		printk ("No bootinfo model ID, using cpuid instead (hey, use Penguin!)\n");
+		printk (KERN_WARNING "No bootinfo model ID, using cpuid instead (hey, use Penguin!)\n");
 	}
 
 	macintosh_config = mac_data_table; 
@@ -428,22 +429,22 @@ void mac_identify(void)
 	iop_preinit();
 	mac_debug_init();
 
-	printk ("Detected Macintosh model: %d \n", model);
+	printk (KERN_INFO "Detected Macintosh model: %d \n", model);
 
 	/*
 	 * Report booter data:
 	 */
-	printk (" Penguin bootinfo data:\n");
-	printk (" Video: addr 0x%lx row 0x%lx depth %lx dimensions %ld x %ld\n", 
+	printk (KERN_DEBUG " Penguin bootinfo data:\n");
+	printk (KERN_DEBUG " Video: addr 0x%lx row 0x%lx depth %lx dimensions %ld x %ld\n", 
 		mac_bi_data.videoaddr, mac_bi_data.videorow, 
 		mac_bi_data.videodepth, mac_bi_data.dimensions & 0xFFFF, 
 		mac_bi_data.dimensions >> 16); 
-	printk (" Videological 0x%lx phys. 0x%lx, SCC at 0x%lx \n",
+	printk (KERN_DEBUG " Videological 0x%lx phys. 0x%lx, SCC at 0x%lx \n",
 		mac_bi_data.videological, mac_orig_videoaddr, 
 		mac_bi_data.sccbase); 
-	printk (" Boottime: 0x%lx GMTBias: 0x%lx \n",
+	printk (KERN_DEBUG " Boottime: 0x%lx GMTBias: 0x%lx \n",
 		mac_bi_data.boottime, mac_bi_data.gmtbias); 
-	printk (" Machine ID: %ld CPUid: 0x%lx memory size: 0x%lx \n",
+	printk (KERN_DEBUG " Machine ID: %ld CPUid: 0x%lx memory size: 0x%lx \n",
 		mac_bi_data.id, mac_bi_data.cpuid, mac_bi_data.memsize); 
 #if 0
 	printk ("Ramdisk: addr 0x%lx size 0x%lx\n", 
@@ -466,7 +467,7 @@ void mac_identify(void)
 	    MACHW_SET(MAC_SCSI_96_2);
 	  break;
 	default:
-	  printk("config.c: wtf: unknown scsi, using 53c80\n");
+	  printk(KERN_WARNING "config.c: wtf: unknown scsi, using 53c80\n");
 	  MACHW_SET(MAC_SCSI_80);
 	  break;
 
@@ -480,7 +481,7 @@ void mac_identify(void)
 
 void mac_report_hardware(void)
 {
-	printk("Apple Macintosh %s\n", macintosh_config->name);
+	printk(KERN_INFO "Apple Macintosh %s\n", macintosh_config->name);
 }
 
 static void mac_get_model(char *str)
