@@ -30,6 +30,7 @@
 #include <linux/interrupt.h>
 #include <linux/sysctl.h>
 #include <linux/errno.h>
+#include <linux/device.h>
 #include <linux/cpufreq.h>
 
 #include <asm/hardware.h>

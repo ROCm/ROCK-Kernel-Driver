@@ -27,15 +27,11 @@ void sa1111_dma_sync_sg(struct pci_dev *, struct scatterlist *, int, int);
 #ifdef CONFIG_SA1111
 
 #define SA1111_FAKE_PCIDEV ((struct pci_dev *) 1111)
-
-static inline int dev_is_sa1111(const struct pci_dev *dev)
-{
-	return (dev == SA1111_FAKE_PCIDEV);
-}
+#define dev_is_sa1111(dev) (dev == SA1111_FAKE_PCIDEV)
 
 #else
 
-static inline int dev_is_sa1111(const struct pci_dev *dev) { return 0; }
+#define dev_is_sa1111(dev) (0)
 
 #endif
 

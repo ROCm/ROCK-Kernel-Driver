@@ -35,7 +35,7 @@
 #else
 /*
  * "code" is actually the FSR register.  Bit 11 set means the
- * isntruction was performing a write.
+ * instruction was performing a write.
  */
 #define DO_COW(code)		((code) & (1 << 11))
 #define READ_FAULT(code)	(!DO_COW(code))
@@ -54,7 +54,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 
 	printk(KERN_ALERT "pgd = %p\n", mm->pgd);
 	pgd = pgd_offset(mm, addr);
-	printk(KERN_ALERT "*pgd=%08lx", pgd_val(*pgd));
+	printk(KERN_ALERT "[%08lx] *pgd=%08lx", addr, pgd_val(*pgd));
 
 	do {
 		pmd_t *pmd;
