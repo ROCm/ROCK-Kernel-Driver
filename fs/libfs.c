@@ -27,14 +27,27 @@ int simple_statfs(struct super_block *sb, struct kstatfs *buf)
 }
 
 /*
- * Lookup the data. This is trivial - if the dentry didn't already
- * exist, we know it is negative.
+ * Retaining negative dentries for an in-memory filesystem just wastes
+ * memory and lookup time: arrange for them to be deleted immediately.
  */
+static int simple_delete_dentry(struct dentry *dentry)
+{
+	return 1;
+}
 
+/*
+ * Lookup the data. This is trivial - if the dentry didn't already
+ * exist, we know it is negative.  Set d_op to delete negative dentries.
+ */
 struct dentry *simple_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
+	static struct dentry_operations simple_dentry_operations = {
+		.d_delete = simple_delete_dentry,
+	};
+
 	if (dentry->d_name.len > NAME_MAX)
 		return ERR_PTR(-ENAMETOOLONG);
+	dentry->d_op = &simple_dentry_operations;
 	d_add(dentry, NULL);
 	return NULL;
 }
