@@ -188,8 +188,6 @@ extern struct net_device *atrtr_get_dev(struct atalk_addr *sa);
 extern int		 aarp_send_ddp(struct net_device *dev,
 				       struct sk_buff *skb,
 				       struct atalk_addr *sa, void *hwaddr);
-extern void		 aarp_send_probe(struct net_device *dev,
-					 struct atalk_addr *addr);
 extern void		 aarp_device_down(struct net_device *dev);
 extern void		 aarp_probe_network(struct atalk_iface *atif);
 extern int 		 aarp_proxy_probe_network(struct atalk_iface *atif,
