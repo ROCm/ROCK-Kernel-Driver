@@ -824,7 +824,7 @@ static int compat_fillonedir(void *__buf, const char *name, int namlen,
 		return -EINVAL;
 	buf->result++;
 	dirent = buf->dirent;
-	if (!access_ok(VERIFY_WRITE, (unsigned long)dirent,
+	if (!access_ok(VERIFY_WRITE, dirent,
 			(unsigned long)(dirent->d_name + namlen + 1) -
 				(unsigned long)dirent))
 		goto efault;
