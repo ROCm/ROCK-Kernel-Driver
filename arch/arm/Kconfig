@@ -1016,15 +1016,6 @@ config DEBUG_ERRORS
 	  you are concerned with the code size or don't want to see these
 	  messages.
 
-config DEBUG_INFO
-	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL
-	help
-          If you say Y here the resulting kernel image will include
-	  debugging info resulting in a larger kernel image.
-	  Say Y here only if you plan to use gdb to debug the kernel.
-	  If you don't debug the kernel, you can say N.
-
 # These options are only for real kernel hackers who want to get their hands dirty. 
 config DEBUG_LL
 	bool "Kernel low-level debugging functions"
