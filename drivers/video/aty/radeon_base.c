@@ -2551,7 +2551,7 @@ MODULE_AUTHOR("Ani Joshi");
 MODULE_DESCRIPTION("framebuffer driver for ATI Radeon chipset");
 MODULE_LICENSE("GPL");
 module_param(noaccel, bool, 0);
-module_param(default_dynclk, int, -2);
+module_param(default_dynclk, int, 0);
 MODULE_PARM_DESC(default_dynclk, "int: -2=enable on mobility only,-1=do not change,0=off,1=on");
 MODULE_PARM_DESC(noaccel, "bool: disable acceleration");
 module_param(nomodeset, bool, 0);

@@ -163,7 +163,7 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (rvalue || !mem_addr) {
 		printk(KERN_ERR "%s: PCI device memory region not configured; fix your BIOS or CardBus bridge/drivers\n",
 		       DRV_NAME);
-		goto do_pci_disable_device;
+		goto do_pci_release_regions;
 	}
 
 	/* enable PCI bus-mastering */

@@ -773,7 +773,7 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 	cladatum = kmalloc(sizeof(*cladatum), GFP_KERNEL);
 	if (!cladatum) {
 		rc = -ENOMEM;
-		goto bad;
+		goto out;
 	}
 	memset(cladatum, 0, sizeof(*cladatum));
 

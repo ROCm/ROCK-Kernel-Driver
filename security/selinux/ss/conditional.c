@@ -401,8 +401,10 @@ static int cond_read_node(struct policydb *p, struct cond_node *node, void *fp)
 		expr->expr_type = le32_to_cpu(buf[0]);
 		expr->bool = le32_to_cpu(buf[1]);
 
-		if (!expr_isvalid(p, expr))
+		if (!expr_isvalid(p, expr)) {
+			kfree(expr);
 			goto err;
+		}
 
 		if (i == 0) {
 			node->expr = expr;

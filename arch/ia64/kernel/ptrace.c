@@ -16,6 +16,7 @@
 #include <linux/smp_lock.h>
 #include <linux/user.h>
 #include <linux/security.h>
+#include <linux/audit.h>
 
 #include <asm/pgtable.h>
 #include <asm/processor.h>
