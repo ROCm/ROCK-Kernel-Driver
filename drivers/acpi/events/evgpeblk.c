@@ -634,13 +634,13 @@ acpi_ev_create_gpe_info_blocks (
 		 * by writing a '0'.
 		 */
 		status = acpi_hw_low_level_write (ACPI_GPE_REGISTER_WIDTH, 0x00,
-				 &this_register->enable_address, 0);
+				 &this_register->enable_address);
 		if (ACPI_FAILURE (status)) {
 			goto error_exit;
 		}
 
 		status = acpi_hw_low_level_write (ACPI_GPE_REGISTER_WIDTH, 0xFF,
-				 &this_register->status_address, 0);
+				 &this_register->status_address);
 		if (ACPI_FAILURE (status)) {
 			goto error_exit;
 		}
