@@ -408,6 +408,8 @@ struct reiserfs_sb_info
 #define REISERFS_HASHED_RELOCATION 13
 #define REISERFS_TEST4 14 
 
+#define REISERFS_ATTRS 15
+
 #define REISERFS_TEST1 11
 #define REISERFS_TEST2 12
 #define REISERFS_TEST3 13

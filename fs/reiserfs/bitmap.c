@@ -670,10 +670,7 @@ int reiserfs_new_unf_blocknrs2 (struct reiserfs_transaction_handle *th,
   return ret;
 }
 
-//
-// a portion of this function, was derived from minix or ext2's
-// analog. You should be able to tell which portion by looking at the
-// ext2 code and comparing. 
+
 static void __discard_prealloc (struct reiserfs_transaction_handle * th,
 				struct reiserfs_inode_info *ei)
 {

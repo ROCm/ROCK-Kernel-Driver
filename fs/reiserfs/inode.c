@@ -20,10 +20,7 @@
 
 static int reiserfs_get_block (struct inode * inode, sector_t block,
 			       struct buffer_head * bh_result, int create);
-//
-// initially this function was derived from minix or ext2's analog and
-// evolved as the prototype did
-//
+
 void reiserfs_delete_inode (struct inode * inode)
 {
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2; 
@@ -112,8 +109,7 @@ static void add_to_flushlist(struct inode *inode, struct buffer_head *bh) {
 }
 
 //
-// FIXME: we might cache recently accessed indirect item (or at least
-// first 15 pointers just like ext2 does
+// FIXME: we might cache recently accessed indirect item
 
 // Ugh.  Not too eager for that....
 //  I cut the code until such time as I see a convincing argument (benchmark).
@@ -521,12 +517,7 @@ static inline int _allocate_block(struct reiserfs_transaction_handle *th,
 #endif
     return reiserfs_new_unf_blocknrs (th, allocated_block_nr, tag);
 }
-//
-// initially this function was derived from ext2's analog and evolved
-// as the prototype did.  You'll need to look at the ext2 version to
-// determine which parts are derivative, if any, understanding that
-// there are only so many ways to code to a given interface.
-//
+
 int reiserfs_get_block (struct inode * inode, sector_t block,
 			struct buffer_head * bh_result, int create)
 {
@@ -1353,10 +1344,6 @@ int reiserfs_encode_fh(struct dentry *dentry, __u32 *data, int *lenp, int need_p
 }
 
 
-//
-// initially this function was derived from minix or ext2's analog and
-// evolved as the prototype did
-//
 /* looks for stat data, then copies fields to it, marks the buffer
    containing stat data as dirty */
 /* reiserfs inodes are never really dirty, since the dirty inode call
@@ -2034,18 +2021,13 @@ fail:
     return error ;
 }
 
-//
-// this is exactly what 2.3.99-pre9's ext2_readpage is
-//
+
 static int reiserfs_readpage (struct file *f, struct page * page)
 {
     return block_read_full_page (page, reiserfs_get_block);
 }
 
 
-//
-// modified from ext2_writepage is
-//
 static int reiserfs_writepage (struct page * page)
 {
     struct inode *inode = page->mapping->host ;
@@ -2054,9 +2036,6 @@ static int reiserfs_writepage (struct page * page)
 }
 
 
-//
-// from ext2_prepare_write, but modified
-//
 int reiserfs_prepare_write(struct file *f, struct page *page, 
 			   unsigned from, unsigned to) {
     struct inode *inode = page->mapping->host ;
@@ -2066,9 +2045,6 @@ int reiserfs_prepare_write(struct file *f, struct page *page,
 }
 
 
-//
-// this is exactly what 2.3.99-pre9's ext2_bmap is
-//
 static int reiserfs_aop_bmap(struct address_space *as, long block) {
   return generic_block_bmap(as, block, reiserfs_bmap) ;
 }

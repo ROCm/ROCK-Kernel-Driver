@@ -1062,9 +1062,7 @@ static inline int entry_length (const struct buffer_head * bh,
 #define B_I_E_NAME(bh,ih,entry_num) ((char *)(bh->b_data + ih_location(ih) + deh_location(B_I_DEH(bh,ih)+(entry_num))))
 
 // two entries per block (at least)
-//#define REISERFS_MAX_NAME_LEN(block_size) 
-//((block_size - BLKH_SIZE - IH_SIZE - DEH_SIZE * 2) / 2)
-#define REISERFS_MAX_NAME_LEN(block_size) 255
+#define REISERFS_MAX_NAME(block_size) 255
 
 
 /* this structure is used for operations on directory entries. It is

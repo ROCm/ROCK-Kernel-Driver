@@ -65,13 +65,6 @@ int is_reiserfs_super (struct super_block *s)
 static int reiserfs_remount (struct super_block * s, int * flags, char * data);
 static int reiserfs_statfs (struct super_block * s, struct statfs * buf);
 
-//
-// a portion of this function, particularly the VFS interface portion,
-// was derived from minix or ext2's analog and evolved as the
-// prototype did. You should be able to tell which portion by looking
-// at the ext2 code and comparing. It's subfunctions contain no code
-// used as a template unless they are so labeled.
-//
 static void reiserfs_write_super (struct super_block * s)
 {
 
@@ -84,13 +77,6 @@ static void reiserfs_write_super (struct super_block * s)
   unlock_kernel() ;
 }
 
-//
-// a portion of this function, particularly the VFS interface portion,
-// was derived from minix or ext2's analog and evolved as the
-// prototype did. You should be able to tell which portion by looking
-// at the ext2 code and comparing. It's subfunctions contain no code
-// used as a template unless they are so labeled.
-//
 static void reiserfs_write_super_lockfs (struct super_block * s)
 {
 
@@ -369,13 +355,6 @@ void remove_save_link (struct inode * inode, int truncate)
 }
 
 
-//
-// a portion of this function, particularly the VFS interface portion,
-// was derived from minix or ext2's analog and evolved as the
-// prototype did. You should be able to tell which portion by looking
-// at the ext2 code and comparing. It's subfunctions contain no code
-// used as a template unless they are so labeled.
-//
 static void reiserfs_put_super (struct super_block * s)
 {
   int i;
@@ -510,100 +489,190 @@ static struct export_operations reiserfs_export_ops = {
   get_dentry: reiserfs_get_dentry,
 } ;
 
-/* this was (ext2)parse_options */
-static int parse_options (char * options, unsigned long * mount_options, unsigned long * blocks, char **jdev_name)
-{
-    char * this_char;
+/* this struct is used in reiserfs_getopt () for containing the value for those
+   mount options that have values rather than being toggles. */
+typedef struct {
     char * value;
-  
-    *blocks = 0;
-    if (!options)
-	/* use default configuration: create tails, journaling on, no
-           conversion to newest format */
-	return 1;
-    while ((this_char = strsep (&options, ",")) != NULL) {
-	if (!*this_char)
-	    continue;
-	if ((value = strchr (this_char, '=')) != NULL)
-	    *value++ = 0;
-	if (!strcmp (this_char, "notail")) {
-	    set_bit (NOTAIL, mount_options);
-	} else if (!strcmp (this_char, "conv")) {
-	    // if this is set, we update super block such that
-	    // the partition will not be mounable by 3.5.x anymore
-	    set_bit (REISERFS_CONVERT, mount_options);
-	} else if (!strcmp (this_char, "noborder")) {
-				/* this is used for benchmarking
-                                   experimental variations, it is not
-                                   intended for users to use, only for
-                                   developers who want to casually
-                                   hack in something to test */
-	    set_bit (REISERFS_NO_BORDER, mount_options);
-	} else if (!strcmp (this_char, "no_unhashed_relocation")) {
-	    set_bit (REISERFS_NO_UNHASHED_RELOCATION, mount_options);
-	} else if (!strcmp (this_char, "hashed_relocation")) {
-	    set_bit (REISERFS_HASHED_RELOCATION, mount_options);
-	} else if (!strcmp (this_char, "test4")) {
-	    set_bit (REISERFS_TEST4, mount_options);
-	} else if (!strcmp (this_char, "nolog")) {
-	    reiserfs_warning("reiserfs: nolog mount option not supported yet\n");
-	} else if (!strcmp (this_char, "replayonly")) {
-	    set_bit (REPLAYONLY, mount_options);
-	} else if (!strcmp (this_char, "resize")) {
-	    if (value && *value){
-		*blocks = simple_strtoul (value, &value, 0);
-	    } else {
-	  	printk("reiserfs: resize option requires a value\n");
-		return 0;
-	    }
-	} else if (!strcmp (this_char, "hash")) {
-	    if (value && *value) {
-		/* if they specify any hash option, we force detection
-		** to make sure they aren't using the wrong hash
-		*/
-	        if (!strcmp(value, "rupasov")) {
-		    set_bit (FORCE_RUPASOV_HASH, mount_options);
-		    set_bit (FORCE_HASH_DETECT, mount_options);
-		} else if (!strcmp(value, "tea")) {
-		    set_bit (FORCE_TEA_HASH, mount_options);
-		    set_bit (FORCE_HASH_DETECT, mount_options);
-		} else if (!strcmp(value, "r5")) {
-		    set_bit (FORCE_R5_HASH, mount_options);
-		    set_bit (FORCE_HASH_DETECT, mount_options);
-		} else if (!strcmp(value, "detect")) {
-		    set_bit (FORCE_HASH_DETECT, mount_options);
-		} else {
-		    printk("reiserfs: invalid hash function specified\n") ;
-		    return 0 ;
-		}
-	    } else {
-	  	printk("reiserfs: hash option requires a value\n");
-		return 0 ;
-	    }
-	} else if (!strcmp (this_char, "jdev")) {
-	    if (value && *value && jdev_name) {
-		    *jdev_name = value;
-	    } else {
-		    printk("reiserfs: jdev option requires a value\n");
-		    return 0 ;
-	    }
-	} else {
-	    printk ("reiserfs: Unrecognized mount option %s\n", this_char);
-	    return 0;
+    int bitmask; /* bit which is to be set in mount_options bitmask when this
+                    value is found, 0 is no bits are to be set */
+} arg_desc_t;
+
+
+/* this struct is used in reiserfs_getopt() for describing the set of reiserfs
+   mount options */
+typedef struct {
+    char * option_name;
+    int arg_required; /* 0 if argument is not required, not 0 otherwise */
+    const arg_desc_t * values; /* list of values accepted by an option */
+    int bitmask;  /* bit which is to be set in mount_options bitmask when this
+		     option is selected, 0 is not bits are to be set */
+} opt_desc_t;
+
+/* possible values for "-o block-allocator=" and bits which are to be set in
+   s_mount_opt of reiserfs specific part of in-core super block */
+const arg_desc_t balloc[] = {
+    {"noborder", REISERFS_NO_BORDER},
+    {"no_unhashed_relocation", REISERFS_NO_UNHASHED_RELOCATION},
+    {"hashed_relocation", REISERFS_HASHED_RELOCATION},
+    {"test4", REISERFS_TEST4},
+    {NULL, -1}
+};
+
+
+/* proceed only one option from a list *cur - string containing of mount options
+   opts - array of options which are accepted
+   opt_arg - if option is found and requires an argument and if it is specifed
+   in the input - pointer to the argument is stored here
+   bit_flags - if option requires to set a certain bit - it is set here
+   return -1 if unknown option is found, opt->arg_required otherwise */
+static int reiserfs_getopt (char ** cur, opt_desc_t * opts, char ** opt_arg,
+			    unsigned long * bit_flags)
+{
+    char * p;
+    /* foo=bar, 
+       ^   ^  ^
+       |   |  +-- option_end
+       |   +-- arg_start
+       +-- option_start
+    */
+    const opt_desc_t * opt;
+    const arg_desc_t * arg;
+    
+    
+    p = *cur;
+    
+    /* assume argument cannot contain commas */
+    *cur = strchr (p, ',');
+    if (*cur) {
+	*(*cur) = '\0';
+	(*cur) ++;
+    }
+    
+    /* for every option in the list */
+    for (opt = opts; opt->option_name; opt ++) {
+	if (!strncmp (p, opt->option_name, strlen (opt->option_name))) {
+	    if (bit_flags && opt->bitmask != -1)
+		set_bit (opt->bitmask, bit_flags);
+	    break;
 	}
     }
-    return 1;
+    if (!opt->option_name) {
+	printk ("reiserfs_getopt: unknown option \"%s\"\n", p);
+	return -1;
+    }
+    
+    p += strlen (opt->option_name);
+    switch (*p) {
+    case '=':
+	if (!opt->arg_required) {
+	    printk ("reiserfs_getopt: the option \"%s\" does not require an argument\n",
+		    opt->option_name);
+	    return -1;
+	}
+	break;
+	
+    case 0:
+	if (opt->arg_required) {
+	    printk ("reiserfs_getopt: the option \"%s\" requires an argument\n", opt->option_name);
+	    return -1;
+	}
+	break;
+    default:
+	printk ("reiserfs_getopt: head of option \"%s\" is only correct\n", opt->option_name);
+	return -1;
+    }
+	
+    /* move to the argument, or to next option if argument is not required */
+    p ++;
+    
+    if ( opt->arg_required && !strlen (p) ) {
+	/* this catches "option=," */
+	printk ("reiserfs_getopt: empty argument for \"%s\"\n", opt->option_name);
+	return -1;
+    }
+    
+    if (!opt->values) {
+	/* *opt_arg contains pointer to argument */
+	*opt_arg = p;
+	return opt->arg_required;
+    }
+    
+    /* values possible for this option are listed in opt->values */
+    for (arg = opt->values; arg->value; arg ++) {
+	if (!strcmp (p, arg->value)) {
+	    if (bit_flags && arg->bitmask != -1 )
+		set_bit (arg->bitmask, bit_flags);
+	    return opt->arg_required;
+	}
+    }
+    
+    printk ("reiserfs_getopt: bad value \"%s\" for option \"%s\"\n", p, opt->option_name);
+    return -1;
 }
 
 
-//
-// a portion of this function, particularly the VFS interface portion,
-// was derived from minix or ext2's analog and evolved as the
-// prototype did. You should be able to tell which portion by looking
-// at the ext2 code and comparing. It's subfunctions contain no code
-// used as a template unless they are so labeled.
-//
-static int reiserfs_remount (struct super_block * s, int * flags, char * data)
+/* returns 0 if something is wrong in option string, 1 - otherwise */
+static int reiserfs_parse_options (char * options, /* string given via mount's -o */
+				   unsigned long * mount_options,
+				   /* after the parsing phase, contains the
+				      collection of bitflags defining what
+				      mount options were selected. */
+				   unsigned long * blocks, /* strtol-ed from NNN of resize=NNN */
+				   char ** jdev_name)
+{
+    int c;
+    char * arg = NULL;
+    char * pos;
+    opt_desc_t opts[] = {
+		{"notail", 0, 0, NOTAIL},
+		{"conv", 0, 0, REISERFS_CONVERT}, 
+		{"attrs", 0, 0, REISERFS_ATTRS}, 
+		{"nolog", 0, 0, -1},
+		{"replayonly", 0, 0, REPLAYONLY},
+		
+		{"block-allocator", 'a', balloc, -1}, 
+		
+		{"resize", 'r', 0, -1},
+		{"jdev", 'j', 0, -1},
+		{NULL, 0, 0, -1}
+    };
+	
+    *blocks = 0;
+    if (!options || !*options)
+	/* use default configuration: create tails, journaling on, no
+	   conversion to newest format */
+	return 1;
+    
+    for (pos = options; pos; ) {
+	c = reiserfs_getopt (&pos, opts, &arg, mount_options);
+	if (c == -1)
+	    /* wrong option is given */
+	    return 0;
+	
+	if (c == 'r') {
+	    char * p;
+	    
+	    p = 0;
+	    /* "resize=NNN" */
+	    *blocks = simple_strtoul (arg, &p, 0);
+	    if (*p != '\0') {
+		/* NNN does not look like a number */
+		printk ("reiserfs_parse_options: bad value %s\n", arg);
+		return 0;
+	    }
+	}
+
+	if (c == 'j') {
+	    if (arg && *arg && jdev_name) {
+		*jdev_name = arg;
+	    }
+	}
+    }
+    
+    return 1;
+}
+
+static int reiserfs_remount (struct super_block * s, int * mount_flags, char * arg)
 {
   struct reiserfs_super_block * rs;
   struct reiserfs_transaction_handle th ;
@@ -611,21 +680,21 @@ static int reiserfs_remount (struct super_block * s, int * flags, char * data)
   unsigned long mount_options;
 
   rs = SB_DISK_SUPER_BLOCK (s);
-  if (!parse_options(data, &mount_options, &blocks, NULL))
-  	return 0;
 
-  if(blocks) {
-      int rc = reiserfs_resize(s, blocks);
-      if (rc != 0)
-	  return rc;
-  }
-
-  if ((unsigned long)(*flags & MS_RDONLY) == (s->s_flags & MS_RDONLY)) {
-    /* there is nothing to do to remount read-only fs as read-only fs */
-    return 0;
-  }
+  if (!reiserfs_parse_options(arg, &mount_options, &blocks, NULL))
+    return -EINVAL;
   
-  if (*flags & MS_RDONLY) {
+  if(blocks) {
+    int rc = reiserfs_resize(s, blocks);
+    if (rc != 0)
+      return rc;
+  }
+
+  if (*mount_flags & MS_RDONLY) {
+    /* remount rean-only */
+    if (s->s_flags & MS_RDONLY)
+      /* it is read-only already */
+      return 0;
     /* try to remount file system with read-only permissions */
     if (sb_umount_state(rs) == REISERFS_VALID_FS || REISERFS_SB(s)->s_mount_state != REISERFS_VALID_FS) {
       return 0;
@@ -641,7 +710,7 @@ static int reiserfs_remount (struct super_block * s, int * flags, char * data)
     REISERFS_SB(s)->s_mount_state = sb_umount_state(rs) ;
     s->s_flags &= ~MS_RDONLY ; /* now it is safe to call journal_begin */
     journal_begin(&th, s, 10) ;
-
+    
     /* Mount a partition which is read-only, read-write */
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
     REISERFS_SB(s)->s_mount_state = sb_umount_state(rs);
@@ -656,7 +725,7 @@ static int reiserfs_remount (struct super_block * s, int * flags, char * data)
   SB_JOURNAL(s)->j_must_wait = 1 ;
   journal_end(&th, s, 10) ;
 
-  if (!( *flags & MS_RDONLY ) )
+  if (!( *mount_flags & MS_RDONLY ) )
     finish_unfinished( s );
 
   return 0;
@@ -997,13 +1066,6 @@ int function2code (hashf_t func)
     return 0;
 }
 
-//
-// a portion of this function, particularly the VFS interface portion,
-// was derived from minix or ext2's analog and evolved as the
-// prototype did. You should be able to tell which portion by looking
-// at the ext2 code and comparing. It's subfunctions contain no code
-// used as a template unless they are so labeled.
-//
 static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 {
     struct inode *root_inode;
@@ -1027,7 +1089,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     memset (sbi, 0, sizeof (struct reiserfs_sb_info));
 
     jdev_name = NULL;
-    if (parse_options ((char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name) == 0) {
+    if (reiserfs_parse_options ((char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name) == 0) {
 	goto error;
     }
 
@@ -1191,26 +1253,19 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 }
 
 
-//
-// a portion of this function, particularly the VFS interface portion,
-// was derived from minix or ext2's analog and evolved as the
-// prototype did. You should be able to tell which portion by looking
-// at the ext2 code and comparing. It's subfunctions contain no code
-// used as a template unless they are so labeled.
-//
 static int reiserfs_statfs (struct super_block * s, struct statfs * buf)
 {
   struct reiserfs_super_block * rs = SB_DISK_SUPER_BLOCK (s);
   
-				/* changed to accomodate gcc folks.*/
-  buf->f_type    =  REISERFS_SUPER_MAGIC;
-  buf->f_bsize   = s->s_blocksize;
-  buf->f_blocks  = sb_block_count(rs) - sb_bmap_nr(rs) - 1;
+  buf->f_namelen = (REISERFS_MAX_NAME (s->s_blocksize));
+  buf->f_ffree   = -1;
+  buf->f_files   = -1;
   buf->f_bfree   = sb_free_blocks(rs);
   buf->f_bavail  = buf->f_bfree;
-  buf->f_files   = -1;
-  buf->f_ffree   = -1;
-  buf->f_namelen = (REISERFS_MAX_NAME_LEN (s->s_blocksize));
+  buf->f_blocks  = sb_block_count(rs) - sb_bmap_nr(rs) - 1;
+  buf->f_bsize   = s->s_blocksize;
+  /* changed to accomodate gcc folks.*/
+  buf->f_type    =  REISERFS_SUPER_MAGIC;
   return 0;
 }
 
