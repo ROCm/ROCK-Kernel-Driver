@@ -1076,6 +1076,7 @@ struct smb_t2_rsp {
 #define SMB_QUERY_FILE_COMPRESSION_INFO 0x10B
 #define SMB_QUERY_FILE_UNIX_BASIC       0x200
 #define SMB_QUERY_FILE_UNIX_LINK        0x201
+#define SMB_QUERY_POSIX_ACL             0x204
 #define SMB_QUERY_FILE_INTERNAL_INFO    0x3ee
 #define SMB_QUERY_FILE_ACCESS_INFO      0x3f0
 #define SMB_QUERY_FILE_NAME_INFO2       0x3f1 /* 0x30 bytes */
@@ -1090,6 +1091,7 @@ struct smb_t2_rsp {
 #define SMB_SET_FILE_END_OF_FILE_INFO   0x104
 #define SMB_SET_FILE_UNIX_BASIC         0x200
 #define SMB_SET_FILE_UNIX_LINK          0x201
+#define SMB_SET_POSIX_ACL               0x204
 #define SMB_SET_FILE_UNIX_HLINK         0x203
 #define SMB_SET_FILE_BASIC_INFO2        0x3ec
 #define SMB_SET_FILE_RENAME_INFORMATION 0x3f2 /* BB check if qpathinfo level too */
@@ -1637,6 +1639,27 @@ struct file_compression_info {
 	__u8   cl_shift;
 	__u8   pad[3];
 };      /* level 0x10b */
+
+/* POSIX ACL set/query path info structures */
+#define CIFS_ACL_VERSION 1
+struct cifs_posix_acl {
+	/* BB fixme add here */
+};  /* level 0x204 */
+
+/* types of access control entries */
+#define CIFS_POSIX_ACL_USER_OBJ	 0x01
+#define CIFS_POSIX_ACL_USER	 0x02
+#define CIFS_POSIX_ACL_GROUP_OBJ 0x04
+#define CIFS_POSIX_ACL_GROUP	 0x08
+#define CIFS_POSIX_ACL_MASK	 0x10
+#define CIFS_POSIX_ACL_OTHER	 0x20
+
+/* types of perms */
+#define CIFS_POSIX_ACL_EXECUTE   0x01
+#define CIFS_POSIX_ACL_WRITE     0x02
+#define CIFS_POSIX_ACL_READ	 0x04
+
+/* end of POSIX ACL definitions */
 
 struct file_internal_info {
 	__u64  UniqueId; /* inode number */

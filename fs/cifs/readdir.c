@@ -75,7 +75,7 @@ static int initiate_cifs_search(const int xid, struct file * file, char * full_p
 }
 
 /* find the corresponding entry in the search */
-static int find_cifs_entry(const int xid, const struct cifsTconInfo * pTcon, 
+static int find_cifs_entry(const int xid, struct cifsTconInfo * pTcon, 
 		const loff_t index_to_find, struct cifsFileInfo * cifsFile /* BB add missing parm */) 
 {
 	int rc = 0;
