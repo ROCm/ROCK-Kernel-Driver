@@ -1715,7 +1715,7 @@ static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned
 	return written;
 }
 
-static ssize_t common_sendfile(int out_fd, int in_fd, loff_t *offset, size_t count)
+static ssize_t common_sendfile(int out_fd, int in_fd, loff_t *offset, size_t count, loff_t max)
 {
 	ssize_t retval;
 	struct file * in_file, * out_file;
@@ -1760,9 +1760,21 @@ static ssize_t common_sendfile(int out_fd, int in_fd, loff_t *offset, size_t cou
 	retval = 0;
 	if (count) {
 		read_descriptor_t desc;
+		loff_t pos;
 
 		if (!offset)
 			offset = &in_file->f_pos;
+
+		pos = *offset;
+		retval = -EINVAL;
+		if (unlikely(pos < 0))
+			goto fput_out;
+		if (unlikely(pos + count > max)) {
+			retval = -EOVERFLOW;
+			if (pos >= max)
+				goto fput_out;
+			count = max - pos;
+		}
 
 		desc.written = 0;
 		desc.count = count;
@@ -1773,6 +1785,9 @@ static ssize_t common_sendfile(int out_fd, int in_fd, loff_t *offset, size_t cou
 		retval = desc.written;
 		if (!retval)
 			retval = desc.error;
+		pos = *offset;
+		if (pos > max)
+			retval = -EOVERFLOW;
 	}
 
 fput_out:
@@ -1794,9 +1809,9 @@ asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t cou
 		pos = off;
 		ppos = &pos;
 	}
-	ret = common_sendfile(out_fd, in_fd, ppos, count);
-	if (offset)
-		put_user((off_t)pos, offset);
+	ret = common_sendfile(out_fd, in_fd, ppos, count, MAX_NON_LFS);
+	if (offset && put_user(pos, offset))
+		ret = -EFAULT;
 	return ret;
 }
 
@@ -1809,9 +1824,9 @@ asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, loff_t *offset, size_t 
 			return -EFAULT;
 		ppos = &pos;
 	}
-	ret = common_sendfile(out_fd, in_fd, ppos, count);
-	if (offset)
-		put_user(pos, offset);
+	ret = common_sendfile(out_fd, in_fd, ppos, count, MAX_LFS_FILESIZE);
+	if (offset && put_user(pos, offset))
+		ret = -EFAULT;
 	return ret;
 }
 
