@@ -86,6 +86,7 @@
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/compat.h>
 
 #include <linux/kdev_t.h>	/* needed for access to Scsi_Host struct */
 #include <linux/blkdev.h>
@@ -2727,7 +2728,7 @@ compat_mptfwxfer_ioctl(unsigned int fd, unsigned int cmd,
 
 	dctlprintk((KERN_INFO MYNAM "::compat_mptfwxfer_ioctl() called\n"));
 
-	if (copy_from_user(&kfw32, (char *)arg, sizeof(kfw32)))
+	if (copy_from_user(&kfw32, (char __user *)arg, sizeof(kfw32)))
 		return -EFAULT;
 
 	/* Verify intended MPT adapter */
@@ -2758,7 +2759,7 @@ compat_mpt_command(unsigned int fd, unsigned int cmd,
 			unsigned long arg, struct file *filp)
 {
 	struct mpt_ioctl_command32 karg32;
-	struct mpt_ioctl_command32 *uarg = (struct mpt_ioctl_command32 *) arg;
+	struct mpt_ioctl_command32 __user *uarg = (struct mpt_ioctl_command32 __user *) arg;
 	struct mpt_ioctl_command karg;
 	MPT_ADAPTER *iocp = NULL;
 	int iocnum, iocnumX;
@@ -2767,7 +2768,7 @@ compat_mpt_command(unsigned int fd, unsigned int cmd,
 
 	dctlprintk((KERN_INFO MYNAM "::compat_mpt_command() called\n"));
 
-	if (copy_from_user(&karg32, (char *)arg, sizeof(karg32)))
+	if (copy_from_user(&karg32, (char __user *)arg, sizeof(karg32)))
 		return -EFAULT;
 
 	/* Verify intended MPT adapter */
@@ -2793,10 +2794,10 @@ compat_mpt_command(unsigned int fd, unsigned int cmd,
 	karg.maxSenseBytes = karg32.maxSenseBytes;
 	karg.dataSgeOffset = karg32.dataSgeOffset;
 
-	karg.replyFrameBufPtr = (char *)(unsigned long)karg32.replyFrameBufPtr;
-	karg.dataInBufPtr = (char *)(unsigned long)karg32.dataInBufPtr;
-	karg.dataOutBufPtr = (char *)(unsigned long)karg32.dataOutBufPtr;
-	karg.senseDataPtr = (char *)(unsigned long)karg32.senseDataPtr;
+	karg.replyFrameBufPtr = (char __user *)(unsigned long)karg32.replyFrameBufPtr;
+	karg.dataInBufPtr = (char __user *)(unsigned long)karg32.dataInBufPtr;
+	karg.dataOutBufPtr = (char __user *)(unsigned long)karg32.dataOutBufPtr;
+	karg.senseDataPtr = (char __user *)(unsigned long)karg32.senseDataPtr;
 
 	/* Pass new structure to do_mpt_command
 	 */
