@@ -1148,6 +1148,7 @@ jffs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	int symname_len = strlen(symname);
 	int err;
 
+	lock_kernel();
 	D1({
 		int len = dentry->d_name.len; 
 		char *_name = (char *)kmalloc(len + 1, GFP_KERNEL);
@@ -1167,6 +1168,7 @@ jffs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	ASSERT(if (!dir_f) {
 		printk(KERN_ERR "jffs_symlink(): No reference to a "
 		       "jffs_file struct in inode.\n");
+		unlock_kernel();
 		return -EIO;
 	});
 
@@ -1175,6 +1177,7 @@ jffs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	/* Create a node and initialize it as much as needed.  */
 	if (!(node = jffs_alloc_node())) {
 		D(printk("jffs_symlink(): Allocation failed: node = NULL\n"));
+		unlock_kernel();
 		return -ENOMEM;
 	}
 	D3(printk (KERN_NOTICE "symlink(): down biglock\n"));
@@ -1229,6 +1232,7 @@ jffs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
  jffs_symlink_end:
 	D3(printk (KERN_NOTICE "symlink(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return err;
 } /* jffs_symlink()  */
 

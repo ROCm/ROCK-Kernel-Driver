@@ -3066,27 +3066,37 @@ static int devfs_symlink (struct inode *dir, struct dentry *dentry,
     struct inode *inode;
 
     /*  First try to get the devfs entry for this directory  */
+    lock_kernel();
     parent = get_devfs_entry_from_vfs_inode (dir);
-    if (parent == NULL) return -ENOENT;
+    if (parent == NULL) {
+	unlock_kernel();
+	return -ENOENT;
+    }
     err = devfs_do_symlink (parent, dentry->d_name.name, DEVFS_FL_NONE,
 			    symname, &de, NULL);
     DPRINTK (DEBUG_DISABLED, "(%s): errcode from <devfs_do_symlink>: %d\n",
 	     dentry->d_name.name, err);
-    if (err < 0) return err;
+    if (err < 0) {
+	unlock_kernel();
+	return err;
+    }
     de->vfs_deletable = TRUE;
     de->inode.uid = current->euid;
     de->inode.gid = current->egid;
     de->inode.atime = CURRENT_TIME;
     de->inode.mtime = CURRENT_TIME;
     de->inode.ctime = CURRENT_TIME;
-    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL )
+    if ( ( inode = _devfs_get_vfs_inode (dir->i_sb, de, dentry) ) == NULL ) {
+	unlock_kernel();
 	return -ENOMEM;
+    }
     DPRINTK (DEBUG_DISABLED, "(%s): new VFS inode(%u): %p  dentry: %p\n",
 	     dentry->d_name.name, de->inode.ino, inode, dentry);
     d_instantiate (dentry, inode);
     if ( !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_CREATE, inode->i_mode,
 			  inode->i_uid, inode->i_gid, fs_info, 0);
+    unlock_kernel();
     return 0;
 }   /*  End Function devfs_symlink  */
 

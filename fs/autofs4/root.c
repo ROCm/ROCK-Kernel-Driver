@@ -321,18 +321,24 @@ static int autofs4_dir_symlink(struct inode *dir,
 	DPRINTK(("autofs_dir_symlink: %s <- %.*s\n", symname, 
 		 dentry->d_name.len, dentry->d_name.name));
 
-	if (!autofs4_oz_mode(sbi))
+	lock_kernel();
+	if (!autofs4_oz_mode(sbi)) {
+		unlock_kernel();
 		return -EACCES;
+	}
 
 	ino = autofs4_init_ino(ino, sbi, S_IFLNK | 0555);
-	if (ino == NULL)
+	if (ino == NULL) {
+		unlock_kernel();
 		return -ENOSPC;
+	}
 
 	ino->size = strlen(symname);
 	ino->u.symlink = cp = kmalloc(ino->size + 1, GFP_KERNEL);
 
 	if (cp == NULL) {
 		kfree(ino);
+		unlock_kernel();
 		return -ENOSPC;
 	}
 
@@ -352,6 +358,7 @@ static int autofs4_dir_symlink(struct inode *dir,
 
 	dir->i_mtime = CURRENT_TIME;
 
+	unlock_kernel();
 	return 0;
 }
 

@@ -28,6 +28,7 @@
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/stat.h>
+#include <linux/smp_lock.h>
 #include "ncplib_kernel.h"
 
 
@@ -121,6 +122,7 @@ int ncp_symlink(struct inode *dir, struct dentry *dentry, const char *symname) {
 		return -ENOMEM;
 
 	err = -EIO;
+	lock_kernel();
 	if (ncp_create_new(dir,dentry,0,aSHARED|aHIDDEN))
 		goto failfree;
 
@@ -147,6 +149,7 @@ int ncp_symlink(struct inode *dir, struct dentry *dentry, const char *symname) {
 
 	ncp_inode_close(inode);
 	ncp_make_closed(inode);
+	unlock_kernel();
 	kfree(link);
 	return 0;
 
@@ -154,6 +157,7 @@ fail:
 	ncp_inode_close(inode);
 	ncp_make_closed(inode);
 failfree:
+	unlock_kernel();
 	kfree(link);
 	return err;	
 }

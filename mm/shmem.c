@@ -1109,22 +1109,22 @@ static int shmem_rename(struct inode * old_dir, struct dentry *old_dentry, struc
 
 static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char * symname)
 {
-	int error;
 	int len;
 	struct inode *inode;
 	struct page *page;
 	char *kaddr;
 	struct shmem_inode_info * info;
 
-	error = shmem_mknod(dir, dentry, S_IFLNK | S_IRWXUGO, 0);
-	if (error)
-		return error;
+	inode = shmem_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
+	if (!inode)
+		return -ENOSPC;
 
 	len = strlen(symname) + 1;
-	if (len > PAGE_CACHE_SIZE)
+	if (len > PAGE_CACHE_SIZE) {
+		iput(inode);
 		return -ENAMETOOLONG;
+	}
 		
-	inode = dentry->d_inode;
 	info = SHMEM_I(inode);
 	inode->i_size = len-1;
 	if (len <= sizeof(struct shmem_inode_info)) {
@@ -1139,6 +1139,7 @@ static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char *
 		page = shmem_getpage_locked(info, inode, 0);
 		if (IS_ERR(page)) {
 			up(&info->sem);
+			iput(inode);
 			return PTR_ERR(page);
 		}
 		kaddr = kmap(page);
@@ -1151,6 +1152,8 @@ static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char *
 		inode->i_op = &shmem_symlink_inode_operations;
 	}
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+	d_instantiate(dentry, inode);
+	dget(dentry);
 	return 0;
 }
 

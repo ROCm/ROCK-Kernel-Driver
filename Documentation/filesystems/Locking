@@ -57,6 +57,7 @@ lookup:		no	yes
 create:		no	yes
 link:		no	yes
 mknod:		no	yes
+symlink:	no	yes
 mkdir:		no	yes
 unlink:		no	yes (both)
 rmdir:		no	yes (both)	(see below)

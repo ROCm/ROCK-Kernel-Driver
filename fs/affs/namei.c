@@ -366,11 +366,14 @@ affs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	pr_debug("AFFS: symlink(%lu,\"%.*s\" -> \"%s\")\n",dir->i_ino,
 		 (int)dentry->d_name.len,dentry->d_name.name,symname);
 
+	lock_kernel();
 	maxlen = AFFS_SB->s_hashsize * sizeof(u32) - 1;
 	error = -ENOSPC;
 	inode  = affs_new_inode(dir);
-	if (!inode)
+	if (!inode) {
+		unlock_kernel();
 		return -ENOSPC;
+	}
 
 	inode->i_op = &affs_symlink_inode_operations;
 	inode->i_data.a_ops = &affs_symlink_aops;
@@ -416,6 +419,7 @@ affs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	error = affs_add_entry(dir, inode, dentry, ST_SOFTLINK);
 	if (error)
 		goto err;
+	unlock_kernel();
 
 	return 0;
 
@@ -423,6 +427,7 @@ err:
 	inode->i_nlink = 0;
 	mark_inode_dirty(inode);
 	iput(inode);
+	unlock_kernel();
 	return error;
 }
 

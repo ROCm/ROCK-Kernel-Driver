@@ -920,6 +920,7 @@ dentry->d_parent->d_name.name, dentry->d_name.name);
 	qsymname.name = symname;
 	qsymname.len  = strlen(symname);
 
+	lock_kernel();
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->symlink(dir, &dentry->d_name, &qsymname,
 					  &attr, &sym_fh, &sym_attr);
@@ -931,6 +932,7 @@ dentry->d_parent->d_name.name, dentry->d_name.name);
 			       dentry->d_parent->d_name.name, dentry->d_name.name);
 		d_drop(dentry);
 	}
+	unlock_kernel();
 
 out:
 	return error;

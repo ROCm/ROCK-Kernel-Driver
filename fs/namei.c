@@ -1549,9 +1549,7 @@ int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 		return -EPERM;
 
 	DQUOT_INIT(dir);
-	lock_kernel();
 	error = dir->i_op->symlink(dir, dentry, oldname);
-	unlock_kernel();
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;

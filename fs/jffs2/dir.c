@@ -534,6 +534,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	if (strlen(target) > 254)
 		return -EINVAL;
 
+	lock_kernel();
 	ri = jffs2_alloc_raw_inode();
 
 	if (!ri)
@@ -549,6 +550,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 
 	if (ret) {
 		jffs2_free_raw_inode(ri);
+		unlock_kernel();
 		return ret;
 	}
 
@@ -557,6 +559,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	if (IS_ERR(inode)) {
 		jffs2_free_raw_inode(ri);
 		jffs2_complete_reservation(c);
+		unlock_kernel();
 		return PTR_ERR(inode);
 	}
 
@@ -581,6 +584,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 		up(&f->sem);
 		jffs2_complete_reservation(c);
 		jffs2_clear_inode(inode);
+		unlock_kernel();
 		return PTR_ERR(fn);
 	}
 	/* No data here. Only a metadata node, which will be 
@@ -601,6 +605,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 		if (ret) {
 			/* Eep. */
 			jffs2_clear_inode(inode);
+			unlock_kernel();
 			return ret;
 		}
 	}
@@ -610,6 +615,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 		/* Argh. Now we treat it like a normal delete */
 		jffs2_complete_reservation(c);
 		jffs2_clear_inode(inode);
+		unlock_kernel();
 		return -ENOMEM;
 	}
 
@@ -640,6 +646,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 		   as if it were the final unlink() */
 		up(&dir_f->sem);
 		jffs2_clear_inode(inode);
+		unlock_kernel();
 		return PTR_ERR(fd);
 	}
 
@@ -649,6 +656,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	up(&dir_f->sem);
 
 	d_instantiate(dentry, inode);
+	unlock_kernel();
 	return 0;
 }
 

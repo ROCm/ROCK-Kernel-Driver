@@ -929,9 +929,12 @@ static int ext3_symlink (struct inode * dir,
 	if (l > dir->i_sb->s_blocksize)
 		return -ENAMETOOLONG;
 
+	lock_kernel();
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS + 5);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		unlock_kernel();
 		return PTR_ERR(handle);
+	}
 
 	if (IS_SYNC(dir))
 		handle->h_sync = 1;
@@ -962,6 +965,7 @@ static int ext3_symlink (struct inode * dir,
 	err = ext3_add_nondir(handle, dentry, inode);
 out_stop:
 	ext3_journal_stop(handle, dir);
+	unlock_kernel();
 	return err;
 
 out_no_entry:
@@ -1143,11 +1147,11 @@ end_rename:
 struct inode_operations ext3_dir_inode_operations = {
 	create:		ext3_create,
 	lookup:		ext3_lookup,
-	link:		ext3_link,		/* BKL held */
+	link:		ext3_link,
 	unlink:		ext3_unlink,
-	symlink:	ext3_symlink,		/* BKL held */
-	mkdir:		ext3_mkdir,		/* BKL held */
-	rmdir:		ext3_rmdir,		/* BKL held */
+	symlink:	ext3_symlink,
+	mkdir:		ext3_mkdir,
+	rmdir:		ext3_rmdir,
 	mknod:		ext3_mknod,
 	rename:		ext3_rename,		/* BKL held */
 };

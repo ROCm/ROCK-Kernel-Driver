@@ -265,15 +265,22 @@ static int autofs_root_symlink(struct inode *dir, struct dentry *dentry, const c
 	DPRINTK(("autofs_root_symlink: %s <- ", symname));
 	autofs_say(dentry->d_name.name,dentry->d_name.len);
 
-	if ( !autofs_oz_mode(sbi) )
+	lock_kernel();
+	if ( !autofs_oz_mode(sbi) ) {
+		unlock_kernel();
 		return -EACCES;
+	}
 
-	if ( autofs_hash_lookup(dh, &dentry->d_name) )
+	if ( autofs_hash_lookup(dh, &dentry->d_name) ) {
+		unlock_kernel();
 		return -EEXIST;
+	}
 
 	n = find_first_zero_bit(sbi->symlink_bitmap,AUTOFS_MAX_SYMLINKS);
-	if ( n >= AUTOFS_MAX_SYMLINKS )
+	if ( n >= AUTOFS_MAX_SYMLINKS ) {
+		unlock_kernel();
 		return -ENOSPC;
+	}
 
 	set_bit(n,sbi->symlink_bitmap);
 	sl = &sbi->symlink[n];
@@ -281,6 +288,7 @@ static int autofs_root_symlink(struct inode *dir, struct dentry *dentry, const c
 	sl->data = kmalloc(slsize = sl->len+1, GFP_KERNEL);
 	if ( !sl->data ) {
 		clear_bit(n,sbi->symlink_bitmap);
+		unlock_kernel();
 		return -ENOSPC;
 	}
 
@@ -288,6 +296,7 @@ static int autofs_root_symlink(struct inode *dir, struct dentry *dentry, const c
 	if ( !ent ) {
 		kfree(sl->data);
 		clear_bit(n,sbi->symlink_bitmap);
+		unlock_kernel();
 		return -ENOSPC;
 	}
 
@@ -296,6 +305,7 @@ static int autofs_root_symlink(struct inode *dir, struct dentry *dentry, const c
 		kfree(sl->data);
 		kfree(ent);
 		clear_bit(n,sbi->symlink_bitmap);
+		unlock_kernel();
 		return -ENOSPC;
 	}
 
@@ -309,7 +319,7 @@ static int autofs_root_symlink(struct inode *dir, struct dentry *dentry, const c
 
 	autofs_hash_insert(dh,ent);
 	d_instantiate(dentry, iget(dir->i_sb,ent->ino));
-
+	unlock_kernel();
 	return 0;
 }
 

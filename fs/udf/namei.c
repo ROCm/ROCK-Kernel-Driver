@@ -949,6 +949,7 @@ static int udf_symlink(struct inode * dir, struct dentry * dentry, const char * 
 	int err;
 	int block;
 
+	lock_kernel();
 	if (!(inode = udf_new_inode(dir, S_IFLNK, &err)))
 		goto out;
 
@@ -1092,6 +1093,7 @@ static int udf_symlink(struct inode * dir, struct dentry * dentry, const char * 
 	err = 0;
 
 out:
+	unlock_kernel();
 	return err;
 
 out_no_entry:

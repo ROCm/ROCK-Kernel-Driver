@@ -401,14 +401,19 @@ static int coda_symlink(struct inode *dir_inode, struct dentry *de,
 	int symlen;
         int error=0;
         
+	lock_kernel();
 	coda_vfs_stat.symlink++;
 
-	if (coda_isroot(dir_inode) && coda_iscontrol(name, len))
+	if (coda_isroot(dir_inode) && coda_iscontrol(name, len)) {
+		unlock_kernel();
 		return -EPERM;
+	}
 
 	symlen = strlen(symname);
-	if ( symlen > CODA_MAXPATHLEN )
-                return -ENAMETOOLONG;
+	if ( symlen > CODA_MAXPATHLEN ) {
+		unlock_kernel();
+		return -ENAMETOOLONG;
+	}
 
         CDEBUG(D_INODE, "symname: %s, length: %d\n", symname, symlen);
 
@@ -425,6 +430,7 @@ static int coda_symlink(struct inode *dir_inode, struct dentry *de,
 		coda_dir_changed(dir_inode, 0);
 
         CDEBUG(D_INODE, "in symlink result %d\n",error);
+	unlock_kernel();
         return error;
 }
 

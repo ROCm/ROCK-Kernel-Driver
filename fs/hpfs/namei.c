@@ -252,7 +252,11 @@ int hpfs_symlink(struct inode *dir, struct dentry *dentry, const char *symlink)
 	struct inode *result;
 	int err;
 	if ((err = hpfs_chk_name((char *)name, &len))) return err==-ENOENT ? -EINVAL : err;
-	if (dir->i_sb->s_hpfs_eas < 2) return -EPERM;
+	lock_kernel();
+	if (dir->i_sb->s_hpfs_eas < 2) {
+		unlock_kernel();
+		return -EPERM;
+	}
 	if (!(fnode = hpfs_alloc_fnode(dir->i_sb, hpfs_i(dir)->i_dno, &fno, &bh))) goto bail;
 	memset(&dee, 0, sizeof dee);
 	dee.archive = 1;
@@ -266,6 +270,7 @@ int hpfs_symlink(struct inode *dir, struct dentry *dentry, const char *symlink)
 		brelse(bh);
 		hpfs_free_sectors(dir->i_sb, fno, 1);
 		hpfs_unlock_inode(dir);
+		unlock_kernel();
 		return -EEXIST;
 	}
 	fnode->len = len;
@@ -297,12 +302,14 @@ int hpfs_symlink(struct inode *dir, struct dentry *dentry, const char *symlink)
 	}
 	hpfs_unlock_iget(dir->i_sb);
 	hpfs_unlock_inode(dir);
+	unlock_kernel();
 	return 0;
-	bail1:
+bail1:
 	brelse(bh);
 	hpfs_free_sectors(dir->i_sb, fno, 1);
 	hpfs_unlock_inode(dir);
-	bail:
+bail:
+	unlock_kernel();
 	return -ENOSPC;
 }
 

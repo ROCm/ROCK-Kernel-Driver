@@ -253,13 +253,18 @@ static int ramfs_rename(struct inode * old_dir, struct dentry *old_dentry, struc
 
 static int ramfs_symlink(struct inode * dir, struct dentry *dentry, const char * symname)
 {
-	int error;
+	struct inode *inode;
+	int error = -ENOSPC;
 
-	error = ramfs_mknod(dir, dentry, S_IFLNK | S_IRWXUGO, 0);
-	if (!error) {
+	inode = ramfs_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
+	if (inode) {
 		int l = strlen(symname)+1;
-		struct inode *inode = dentry->d_inode;
 		error = block_symlink(inode, symname, l);
+		if (!error) {
+			d_instantiate(dentry, inode);
+			dget(dentry);
+		} else
+			iput(inode);
 	}
 	return error;
 }
