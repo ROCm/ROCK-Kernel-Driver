@@ -33,7 +33,7 @@
 #if 0
 #define DEBUGP printk
 #else
-#define DEBUGP(fmt , ...)
+#define DEBUGP(fmt , a...)
 #endif
 
 extern const struct exception_table_entry __start___ex_table[];
@@ -285,7 +285,7 @@ static int stop_refcounts(void)
 	for (i = 0; i < NR_CPUS; i++) {
 		if (i == cpu || !cpu_online(i))
 			continue;
-		ret = kernel_thread(stopref, (void *)i, CLONE_KERNEL);
+		ret = kernel_thread(stopref, (void *)(long)i, CLONE_KERNEL);
 		if (ret < 0)
 			break;
 		stopref_num_threads++;
