@@ -4,6 +4,9 @@
  * Copyright (C) 1998 David S. Miller (davem@redhat.com)
  * Copyright 2001 Jeff Garzik <jgarzik@mandrakesoft.com>
  * Portions Copyright 2001 Sun Microsystems (thockin@sun.com)
+ * Portions Copyright 2002 Intel (eli.kupermann@intel.com,
+ *                                christopher.leech@intel.com,
+ *                                scott.feldman@intel.com)
  */
 
 #ifndef _LINUX_ETHTOOL_H
@@ -268,6 +271,7 @@ struct ethtool_test {
 					    * (ethtool_value), priv. */
 #define ETHTOOL_TEST		0x0000001a /* execute NIC self-test, priv. */
 #define ETHTOOL_GSTRINGS	0x0000001b /* get specified string set */
+#define ETHTOOL_PHYS_ID		0x0000001c /* identify the NIC */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
