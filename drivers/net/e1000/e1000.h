@@ -107,7 +107,6 @@
 #include <linux/udp.h>
 #include <net/pkt_sched.h>
 #include <linux/list.h>
-#include <asm/uaccess.h>
 #include <linux/ethtool.h>
 #ifdef NETIF_F_HW_VLAN_TX
 #include <linux/if_vlan.h>
@@ -204,6 +203,11 @@ struct e1000_adapter {
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
 
+#ifdef ETHTOOL_PHYS_ID
+	struct timer_list blink_timer;
+	unsigned long led_status;
+#endif
+
 	/* TX */
 	struct e1000_desc_ring tx_ring;
 	unsigned long trans_finish;
@@ -228,6 +232,7 @@ struct e1000_adapter {
 	struct e1000_hw_stats stats;
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;
-};
 
+
+};
 #endif /* _E1000_H_ */

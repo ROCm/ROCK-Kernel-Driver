@@ -76,7 +76,7 @@
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.2.8";
+char e1000_driver_version[] = "4.2.9-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -126,7 +126,7 @@ static char *e1000_strings[] = {
 	"IBM Mobile, Desktop & Server Adapters"
 };
 
-/* e1000_main.c Function Prototypes */
+/* Local Function Prototypes */
 
 int e1000_up(struct e1000_adapter *adapter);
 void e1000_down(struct e1000_adapter *adapter);
@@ -403,8 +403,10 @@ e1000_probe(struct pci_dev *pdev,
 
 	/* make sure the EEPROM is good */
 
-	if(e1000_validate_eeprom_checksum(&adapter->hw) < 0)
+	if(e1000_validate_eeprom_checksum(&adapter->hw) < 0) {
+		printk(KERN_ERR "The EEPROM Checksum Is Not Valid\n");
 		goto err_eeprom;
+	}
 
 	/* copy the MAC address out of the EEPROM */
 
@@ -437,7 +439,7 @@ e1000_probe(struct pci_dev *pdev,
 	register_netdev(netdev);
 
 	/* we're going to reset, so assume we have no link for now */
-	
+
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
 

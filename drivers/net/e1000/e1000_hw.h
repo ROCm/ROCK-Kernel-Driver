@@ -882,7 +882,9 @@ struct e1000_hw {
     uint32_t num_mc_addrs;
     uint32_t collision_delta;
     uint32_t tx_packet_delta;
-    uint32_t ledctl;
+    uint32_t ledctl_default;
+    uint32_t ledctl_mode1;
+    uint32_t ledctl_mode2;
     uint16_t autoneg_advertised;
     uint16_t pci_cmd_word;
     uint16_t fc_high_water;
@@ -1324,10 +1326,28 @@ struct e1000_hw {
 #define EEPROM_EWDS_OPCODE  0x10 /* EERPOM erast/write disable */
 
 /* EEPROM Word Offsets */
-#define EEPROM_INIT_CONTROL1_REG 0x000A
-#define EEPROM_INIT_CONTROL2_REG 0x000F
-#define EEPROM_FLASH_VERSION     0x0032
-#define EEPROM_CHECKSUM_REG      0x003F
+#define EEPROM_ID_LED_SETTINGS     0x0004
+#define EEPROM_INIT_CONTROL1_REG   0x000A
+#define EEPROM_INIT_CONTROL2_REG   0x000F
+#define EEPROM_FLASH_VERSION       0x0032
+#define EEPROM_CHECKSUM_REG        0x003F
+
+/* Word definitions for ID LED Settings */
+#define ID_LED_RESERVED_0000 0x0000
+#define ID_LED_RESERVED_FFFF 0xFFFF
+#define ID_LED_DEFAULT       ((ID_LED_OFF1_ON2 << 12) | \
+		              (ID_LED_OFF1_OFF2 << 8) | \
+		              (ID_LED_DEF1_DEF2 << 4) | \
+			      (ID_LED_DEF1_DEF2))
+#define ID_LED_DEF1_DEF2     0x1
+#define ID_LED_DEF1_ON2      0x2
+#define ID_LED_DEF1_OFF2     0x3
+#define ID_LED_ON1_DEF2      0x4
+#define ID_LED_ON1_ON2       0x5
+#define ID_LED_ON1_OFF2      0x6
+#define ID_LED_OFF1_DEF2     0x7
+#define ID_LED_OFF1_ON2      0x8
+#define ID_LED_OFF1_OFF2     0x9
 
 /* Mask bits for fields in Word 0x0a of the EEPROM */
 #define EEPROM_WORD0A_ILOS   0x0010

@@ -93,6 +93,7 @@ static void e1000_shift_out_ee_bits(struct e1000_hw *hw, uint16_t data, uint16_t
 static uint16_t e1000_shift_in_ee_bits(struct e1000_hw *hw);
 static void e1000_setup_eeprom(struct e1000_hw *hw);
 static void e1000_standby_eeprom(struct e1000_hw *hw);
+static int32_t e1000_id_led_init(struct e1000_hw * hw);
 
 /******************************************************************************
  * Reset the transmit and receive units; mask and clear all interrupts.
@@ -200,6 +201,13 @@ e1000_init_hw(struct e1000_hw *hw)
 
     DEBUGFUNC("e1000_init_hw");
 
+    /* Initialize Identification LED */
+    ret_val = e1000_id_led_init(hw);
+    if(ret_val < 0) {
+	DEBUGOUT("Error Initializing Identification LED\n");
+	return ret_val;
+    }
+    
     /* Set the Media Type and exit with error if it is not valid. */
     if(hw->mac_type != e1000_82543) {
         /* tbi_compatibility is only valid on 82543 */
@@ -541,6 +549,7 @@ e1000_setup_copper_link(struct e1000_hw *hw)
      */
     if(hw->mac_type > e1000_82543) {
         ctrl |= E1000_CTRL_SLU;
+        ctrl &= ~(E1000_CTRL_FRCSPD | E1000_CTRL_FRCDPX);
         E1000_WRITE_REG(hw, CTRL, ctrl);
     } else {
         ctrl |= (E1000_CTRL_FRCSPD | E1000_CTRL_FRCDPX | E1000_CTRL_SLU);
@@ -2087,9 +2096,9 @@ e1000_phy_reset_dsp(struct e1000_hw *hw)
     DEBUGFUNC("e1000_phy_reset_dsp");
     
     do {
-        if(e1000_write_phy_reg(hw, 29, 0x1d) < 0) break;
-        if(e1000_write_phy_reg(hw, 30, 0xc1) < 0) break;
-        if(e1000_write_phy_reg(hw, 30, 0x00) < 0) break;
+        if(e1000_write_phy_reg(hw, 29, 0x001d) < 0) break;
+        if(e1000_write_phy_reg(hw, 30, 0x00c1) < 0) break;
+        if(e1000_write_phy_reg(hw, 30, 0x0000) < 0) break;
         ret_val = 0;
     } while(0);
 
@@ -2150,8 +2159,8 @@ e1000_phy_get_info(struct e1000_hw *hw,
             M88E1000_PSSR_MDIX_SHIFT;
         if(phy_data & M88E1000_PSSR_1000MBS) {
             /* Cable Length Estimation and Local/Remote Receiver Informatoion
-	     * are only valid at 1000 Mbps
-	     */
+             * are only valid at 1000 Mbps
+             */
             phy_info->cable_length = ((phy_data & M88E1000_PSSR_CABLE_LENGTH) >>
                                       M88E1000_PSSR_CABLE_LENGTH_SHIFT);
             if(e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_data) < 0) 
@@ -2785,6 +2794,74 @@ e1000_clear_vfta(struct e1000_hw *hw)
         E1000_WRITE_REG_ARRAY(hw, VFTA, offset, 0);
 }
 
+static int32_t
+e1000_id_led_init(struct e1000_hw * hw)
+{
+    uint32_t ledctl;
+    const uint32_t ledctl_mask = 0x000000FF;
+    const uint32_t ledctl_on = E1000_LEDCTL_MODE_LED_ON;
+    const uint32_t ledctl_off = E1000_LEDCTL_MODE_LED_OFF;
+    uint16_t eeprom_data, i, temp;
+    const uint16_t led_mask = 0x0F;
+	
+    DEBUGFUNC("e1000_id_led_init");
+    
+    if(hw->mac_type < e1000_82540) {
+	/* Nothing to do */
+	return 0;
+    }
+    
+    ledctl = E1000_READ_REG(hw, LEDCTL);
+    hw->ledctl_default = ledctl;
+    hw->ledctl_mode1 = hw->ledctl_default;
+    hw->ledctl_mode2 = hw->ledctl_default;
+        
+    if(e1000_read_eeprom(hw, EEPROM_ID_LED_SETTINGS, &eeprom_data) < 0) {
+        DEBUGOUT("EEPROM Read Error\n");
+        return -E1000_ERR_EEPROM;
+    }
+    if((eeprom_data== ID_LED_RESERVED_0000) || 
+       (eeprom_data == ID_LED_RESERVED_FFFF)) eeprom_data = ID_LED_DEFAULT;
+    for(i = 0; i < 4; i++) {
+        temp = (eeprom_data >> (i << 2)) & led_mask;
+        switch(temp) {
+	case ID_LED_ON1_DEF2:
+	case ID_LED_ON1_ON2:
+	case ID_LED_ON1_OFF2:
+            hw->ledctl_mode1 &= ~(ledctl_mask << (i << 3));
+            hw->ledctl_mode1 |= ledctl_on << (i << 3);
+            break;
+	case ID_LED_OFF1_DEF2:
+	case ID_LED_OFF1_ON2:
+	case ID_LED_OFF1_OFF2:
+            hw->ledctl_mode1 &= ~(ledctl_mask << (i << 3));
+            hw->ledctl_mode1 |= ledctl_off << (i << 3);
+            break;
+	default:
+	    /* Do nothing */
+	    break;
+	}
+	switch(temp) {
+	case ID_LED_DEF1_ON2:
+	case ID_LED_ON1_ON2:
+	case ID_LED_OFF1_ON2:
+            hw->ledctl_mode2 &= ~(ledctl_mask << (i << 3));
+            hw->ledctl_mode2 |= ledctl_on << (i << 3);
+            break;
+	case ID_LED_DEF1_OFF2:
+	case ID_LED_ON1_OFF2:
+	case ID_LED_OFF1_OFF2:
+            hw->ledctl_mode2 &= ~(ledctl_mask << (i << 3));
+            hw->ledctl_mode2 |= ledctl_off << (i << 3);
+            break;
+	default:
+	    /* Do nothing */
+	    break;
+	}
+    }
+    return 0;
+}
+
 /******************************************************************************
  * Prepares SW controlable LED for use and saves the current state of the LED.
  *
@@ -2809,19 +2886,7 @@ e1000_setup_led(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
-        ledctl = E1000_READ_REG(hw, LEDCTL);
-        /* Save current LEDCTL settings */
-        hw->ledctl = ledctl;
-        /* Turn off LED2 and LED3 */
-        ledctl &= ~(E1000_LEDCTL_LED2_IVRT |
-                    E1000_LEDCTL_LED2_BLINK | 
-                    E1000_LEDCTL_LED2_MODE_MASK);
-        ledctl |= (E1000_LEDCTL_MODE_LED_OFF << E1000_LEDCTL_LED2_MODE_SHIFT);
-        ledctl &= ~(E1000_LEDCTL_LED3_IVRT |
-                    E1000_LEDCTL_LED3_BLINK | 
-                    E1000_LEDCTL_LED3_MODE_MASK);
-        ledctl |= (E1000_LEDCTL_MODE_LED_OFF << E1000_LEDCTL_LED3_MODE_SHIFT);
-        E1000_WRITE_REG(hw, LEDCTL, ledctl);
+        E1000_WRITE_REG(hw, LEDCTL, hw->ledctl_mode1);
         break;
     default:
         DEBUGOUT("Invalid device ID\n");
@@ -2853,7 +2918,7 @@ e1000_cleanup_led(struct e1000_hw *hw)
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
         /* Restore LEDCTL settings */
-        E1000_WRITE_REG(hw, LEDCTL, hw->ledctl);
+        E1000_WRITE_REG(hw, LEDCTL, hw->ledctl_default);
         break;
     default:
         DEBUGOUT("Invalid device ID\n");
@@ -2871,7 +2936,6 @@ int32_t
 e1000_led_on(struct e1000_hw *hw)
 {
     uint32_t ctrl;
-    uint32_t ledctl;
 
     DEBUGFUNC("e1000_led_on");
 
@@ -2897,11 +2961,7 @@ e1000_led_on(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
-        ledctl = E1000_READ_REG(hw, LEDCTL);
-        /* Set LED 3 mode to on */
-        ledctl &= ~E1000_LEDCTL_LED3_MODE_MASK;
-        ledctl |= (E1000_LEDCTL_MODE_LED_ON << E1000_LEDCTL_LED3_MODE_SHIFT);
-        E1000_WRITE_REG(hw, LEDCTL, ledctl);
+        E1000_WRITE_REG(hw, LEDCTL, hw->ledctl_mode2);
         break;
     default:
         DEBUGOUT("Invalid device ID\n");
@@ -2919,7 +2979,6 @@ int32_t
 e1000_led_off(struct e1000_hw *hw)
 {
     uint32_t ctrl;
-    uint32_t ledctl;
 
     DEBUGFUNC("e1000_led_off");
 
@@ -2945,11 +3004,7 @@ e1000_led_off(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
-        ledctl = E1000_READ_REG(hw, LEDCTL);
-        /* Set LED 3 mode to off */
-        ledctl &= ~E1000_LEDCTL_LED3_MODE_MASK;
-        ledctl |= (E1000_LEDCTL_MODE_LED_OFF << E1000_LEDCTL_LED3_MODE_SHIFT);
-        E1000_WRITE_REG(hw, LEDCTL, ledctl);
+        E1000_WRITE_REG(hw, LEDCTL, hw->ledctl_mode1);
         break;
     default:
         DEBUGOUT("Invalid device ID\n");
