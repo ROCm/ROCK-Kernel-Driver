@@ -224,7 +224,7 @@ static unsigned long amd_8151_mask_memory(unsigned long addr, int type)
 
 static struct gatt_mask amd_8151_masks[] =
 {
-	{0x00000001, 0}
+	{.mask = 0x00000001, .type = 0}
 };
 
 
