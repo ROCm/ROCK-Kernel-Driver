@@ -7,5 +7,5 @@
  *
  */
 
-void capifs_new_ncci(char type, unsigned int num, kdev_t device);
+void capifs_new_ncci(char type, unsigned int num, dev_t device);
 void capifs_free_ncci(char type, unsigned int num);

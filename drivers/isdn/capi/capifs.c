@@ -9,24 +9,12 @@
  *
  */
 
-#include <linux/version.h>
 #include <linux/fs.h>
-#include <linux/tty.h>
-#include <linux/types.h>
-#include <linux/errno.h>
-#include <linux/stat.h>
-#include <linux/param.h>
+#include <linux/mount.h>
+#include <linux/namei.h>
 #include <linux/module.h>
-#include <linux/string.h>
 #include <linux/init.h>
-#include <linux/kdev_t.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/slab.h>
 #include <linux/ctype.h>
-#include <linux/smp_lock.h>
-#include <asm/bitops.h>
-#include <asm/uaccess.h>
 
 MODULE_DESCRIPTION("CAPI4Linux: /dev/capi/ filesystem");
 MODULE_AUTHOR("Carsten Paeth");
@@ -34,209 +22,33 @@ MODULE_LICENSE("GPL");
 
 static char *revision = "$Revision: 1.14.6.8 $";
 
-struct capifs_ncci {
-	struct inode *inode;
-	char used;
-	char type;
-	unsigned int num;
-	kdev_t kdev;
-};
-
-struct capifs_sb_info {
-	u32 magic;
-	struct super_block *next;
-	struct super_block **back;
+struct options {
 	int setuid;
 	int setgid;
 	uid_t   uid;
 	gid_t   gid;
 	umode_t mode;
-
-	unsigned int max_ncci;
-	struct capifs_ncci *nccis;
 };
+static struct options options = {.mode = 0600};
 
 #define CAPIFS_SUPER_MAGIC (('C'<<8)|'N')
-#define CAPIFS_SBI_MAGIC   (('C'<<24)|('A'<<16)|('P'<<8)|'I')
-
-static inline struct capifs_sb_info *SBI(struct super_block *sb)
-{
-	return (struct capifs_sb_info *)(sb->s_fs_info);
-}
 
 /* ------------------------------------------------------------------ */
 
-static int capifs_root_readdir(struct file *,void *,filldir_t);
-static struct dentry *capifs_root_lookup(struct inode *,struct dentry *);
-static int capifs_revalidate(struct dentry *, int);
-static struct inode *capifs_new_inode(struct super_block *sb);
 
-static struct file_operations capifs_root_operations = {
-	.read		= generic_read_dir,
-	.readdir	= capifs_root_readdir,
-};
-
-struct inode_operations capifs_root_inode_operations = {
-	.lookup = capifs_root_lookup,
-};
-
-static struct dentry_operations capifs_dentry_operations = {
-	.d_revalidate = capifs_revalidate,
-};
-
-/*
- * /dev/capi/%d
- * /dev/capi/r%d
- */
-
-static int capifs_root_readdir(struct file *filp, void *dirent, filldir_t filldir)
-{
-	struct inode * inode = filp->f_dentry->d_inode;
-	struct capifs_sb_info * sbi = SBI(filp->f_dentry->d_inode->i_sb);
-	off_t nr;
-	char numbuf[32];
-
-	lock_kernel();
-
-	nr = filp->f_pos;
-
-	switch(nr)
-	{
-	case 0:
-		if (filldir(dirent, ".", 1, nr, inode->i_ino, DT_DIR) < 0)
-			goto out;
-		filp->f_pos = ++nr;
-		/* fall through */
-	case 1:
-		if (filldir(dirent, "..", 2, nr, inode->i_ino, DT_DIR) < 0)
-			goto out;
-		filp->f_pos = ++nr;
-		/* fall through */
-	default:
-		while (nr < sbi->max_ncci) {
-			int n = nr - 2;
-			struct capifs_ncci *np = &sbi->nccis[n];
-			if (np->inode && np->used) {
-				char *p = numbuf;
-				if (np->type) *p++ = np->type;
-				sprintf(p, "%u", np->num);
-				if ( filldir(dirent, numbuf, strlen(numbuf), nr, nr, DT_UNKNOWN) < 0 )
-					goto out;
-			}
-			filp->f_pos = ++nr;
-		}
-		break;
-	}
-
-out:
-	unlock_kernel();
-	return 0;
-}
-
-/*
- * Revalidate is called on every cache lookup.  We use it to check that
- * the ncci really does still exist.  Never revalidate negative dentries;
- * for simplicity (fix later?)
- */
-static int capifs_revalidate(struct dentry * dentry, int flags)
-{
-	struct capifs_sb_info *sbi;
-
-	if ( !dentry->d_inode )
-		return 0;
-
-	sbi = SBI(dentry->d_inode->i_sb);
-
-	return ( sbi->nccis[dentry->d_inode->i_ino - 2].inode == dentry->d_inode );
-}
-
-static struct dentry *capifs_root_lookup(struct inode * dir, struct dentry * dentry)
-{
-	struct capifs_sb_info *sbi = SBI(dir->i_sb);
-	struct capifs_ncci *np;
-	unsigned int i;
-	char numbuf[32];
-	char *p, *tmp;
-	unsigned int num;
-	char type = 0;
-
-	dentry->d_inode = NULL;	/* Assume failure */
-	dentry->d_op    = &capifs_dentry_operations;
-
-	if (dentry->d_name.len >= sizeof(numbuf) )
-		return NULL;
-	strncpy(numbuf, dentry->d_name.name, dentry->d_name.len);
-	numbuf[dentry->d_name.len] = 0;
-        p = numbuf;
-	if (!isdigit(*p)) type = *p++;
-	tmp = p;
-	num = (unsigned int)simple_strtoul(p, &tmp, 10);
-	if (tmp == p || *tmp)
-		return NULL;
-
-	lock_kernel();
-	for (i = 0, np = sbi->nccis ; i < sbi->max_ncci; i++, np++) {
-		if (np->used && np->num == num && np->type == type)
-			break;
-	}
-	unlock_kernel();
-
-	if ( i >= sbi->max_ncci )
-		return NULL;
-
-	dentry->d_inode = np->inode;
-	if ( dentry->d_inode )
-		atomic_inc(&dentry->d_inode->i_count);
-	
-	d_add(dentry, dentry->d_inode);
-
-	return NULL;
-}
-
-/* ------------------------------------------------------------------ */
-
-static struct super_block *mounts = NULL;
-
-static void capifs_put_super(struct super_block *sb)
-{
-	struct capifs_sb_info *sbi = SBI(sb);
-	struct inode *inode;
-	int i;
-
-	for ( i = 0 ; i < sbi->max_ncci ; i++ ) {
-		if ( (inode = sbi->nccis[i].inode) ) {
-			if (atomic_read(&inode->i_count) != 1 )
-				printk("capifs_put_super: badness: entry %d count %d\n",
-				       i, (unsigned)atomic_read(&inode->i_count));
-			inode->i_nlink--;
-			iput(inode);
-		}
-	}
-
-	*sbi->back = sbi->next;
-	if ( sbi->next )
-		SBI(sbi->next)->back = sbi->back;
-
-	kfree(sbi->nccis);
-	kfree(sbi);
-}
-
-static struct super_operations capifs_sops = {
-	.put_super	= capifs_put_super,
-	.statfs		= simple_statfs,
-};
-
-static int capifs_parse_options(char *options, struct capifs_sb_info *sbi)
+static int capifs_parse_options(char *s, struct options *p)
 {
 	int setuid = 0;
 	int setgid = 0;
 	uid_t uid = 0;
 	gid_t gid = 0;
 	umode_t mode = 0600;
-	unsigned int maxncci = 512;
 	char *this_char, *value;
 
-	while ((this_char = strsep(&options,",")) != NULL) {
+	if (!s)
+		return 0;
+
+	while ((this_char = strsep(&s, ",")) != NULL) {
 		if (!*this_char)
 			continue;
 		if ((value = strchr(this_char,'=')) != NULL)
@@ -264,110 +76,74 @@ static int capifs_parse_options(char *options, struct capifs_sb_info *sbi)
 			if (*value)
 				return 1;
 		}
-		else if (!strcmp(this_char,"maxncci")) {
-			if (!value || !*value)
-				return 1;
-			maxncci = simple_strtoul(value,&value,8);
-			if (*value)
-				return 1;
-		}
-		else
-			return 1;
 	}
-	sbi->setuid   = setuid;
-	sbi->setgid   = setgid;
-	sbi->uid      = uid;
-	sbi->gid      = gid;
-	sbi->mode     = mode & ~S_IFMT;
-	sbi->max_ncci = maxncci;
+	p->setuid   = setuid;
+	p->setgid   = setgid;
+	p->uid      = uid;
+	p->gid      = gid;
+	p->mode     = mode & ~S_IFMT;
 
 	return 0;
 }
 
+static int capifs_remount(struct super_block *s, int *flags, char *data)
+{
+	struct options new;
+	if (capifs_parse_options(data, &new)) {
+		printk("capifs: called with bogus options\n");
+		return -EINVAL;
+	}
+	options = new;
+	return 0;
+}
+
+
+static struct super_operations capifs_sops =
+{
+	.statfs		= simple_statfs,
+	.remount_fs	= capifs_remount,
+};
+
 static int capifs_fill_super(struct super_block *s, void *data, int silent)
 {
-	struct inode * root_inode;
-	struct dentry * root;
-	struct capifs_sb_info *sbi;
+	struct inode * inode;
 
-	sbi = (struct capifs_sb_info *) kmalloc(sizeof(struct capifs_sb_info), GFP_KERNEL);
-	if ( !sbi )
-		goto fail;
-
-	memset(sbi, 0, sizeof(struct capifs_sb_info));
-	sbi->magic  = CAPIFS_SBI_MAGIC;
-
-	if ( capifs_parse_options(data,sbi) ) {
-		kfree(sbi);
+	if (capifs_parse_options(data, &options)) {
 		printk("capifs: called with bogus options\n");
-		goto fail;
+		return -EINVAL;
 	}
 
-	sbi->nccis = kmalloc(sizeof(struct capifs_ncci) * sbi->max_ncci, GFP_KERNEL);
-	if ( !sbi->nccis ) {
-		kfree(sbi);
-		goto fail;
-	}
-	memset(sbi->nccis, 0, sizeof(struct capifs_ncci) * sbi->max_ncci);
-
-	s->s_fs_info = (void *) sbi;
 	s->s_blocksize = 1024;
 	s->s_blocksize_bits = 10;
 	s->s_magic = CAPIFS_SUPER_MAGIC;
 	s->s_op = &capifs_sops;
 
-	/*
-	 * Get the root inode and dentry, but defer checking for errors.
-	 */
-	root_inode = capifs_new_inode(s);
-	if (root_inode) {
-		root_inode->i_ino = 1;
-		root_inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO | S_IWUSR;
-		root_inode->i_op = &capifs_root_inode_operations;
-		root_inode->i_fop = &capifs_root_operations;
-		root_inode->i_nlink = 2;
-	} 
-	root = d_alloc_root(root_inode);
+	inode = new_inode(s);
+	if (!inode)
+		return -ENOMEM;
+	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_blocks = 0;
+	inode->i_blksize = 1024;
+	inode->i_uid = inode->i_gid = 0;
+	inode->i_ino = 1;
+	inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO | S_IWUSR;
+	inode->i_op = &simple_dir_inode_operations;
+	inode->i_fop = &simple_dir_operations;
+	inode->i_nlink = 2;
+	s->s_root = d_alloc_root(inode);
 
-	if (!root) {
+	if (!s->s_root) {
 		printk("capifs: get root dentry failed\n");
-		/*
-	 	* iput() can block, so we clear the super block first.
-	 	*/
-		iput(root_inode);
-		kfree(sbi->nccis);
-		kfree(sbi);
-		goto fail;
+		iput(inode);
+		return -ENOMEM;
 	}
-
-	s->s_root = root;
-
-	sbi->next = mounts;
-	if ( sbi->next )
-		SBI(sbi->next)->back = &(sbi->next);
-	sbi->back = &mounts;
-	mounts = s;
 	return 0;
-fail:
-	return -EINVAL;
-}
-
-static struct inode *capifs_new_inode(struct super_block *sb)
-{
-	struct inode *inode = new_inode(sb);
-	if (inode) {
-		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-		inode->i_blocks = 0;
-		inode->i_blksize = 1024;
-		inode->i_uid = inode->i_gid = 0;
-	}
-	return inode;
 }
 
 static struct super_block *capifs_get_sb(struct file_system_type *fs_type,
 	int flags, char *dev_name, void *data)
 {
-	return get_sb_nodev(fs_type, flags, data, capifs_fill_super);
+	return get_sb_single(fs_type, flags, data, capifs_fill_super);
 }
 
 static struct file_system_type capifs_fs_type = {
@@ -377,62 +153,99 @@ static struct file_system_type capifs_fs_type = {
 	.kill_sb	= kill_anon_super,
 };
 
-void capifs_new_ncci(char type, unsigned int num, kdev_t device)
+static spinlock_t entries_lock = SPIN_LOCK_UNLOCKED;
+static struct vfsmount *capifs_mnt;
+static int entry_count = 0;
+
+static struct vfsmount *grab_instance(void)
+{
+	struct vfsmount *mnt = NULL;
+	spin_lock(&entries_lock);
+	if (!capifs_mnt) {
+		spin_unlock(&entries_lock);
+		mnt = kern_mount(&capifs_fs_type);
+		if (IS_ERR(mnt))
+			return NULL;
+		spin_lock(&entries_lock);
+		if (!capifs_mnt)
+			capifs_mnt = mnt;
+	}
+	mntget(capifs_mnt);
+	entry_count++;
+	spin_unlock(&entries_lock);
+	mntput(mnt);
+	return capifs_mnt;
+}
+
+static void drop_instance(void)
+{
+	struct vfsmount *mnt;
+	spin_lock(&entries_lock);
+	mnt = capifs_mnt;
+	if (!--entry_count)
+		capifs_mnt = NULL;
+	spin_unlock(&entries_lock);
+	mntput(mnt);
+}
+
+static struct dentry *get_node(int type, int num)
+{
+	char s[10];
+	int len;
+	struct dentry *root = capifs_mnt->mnt_root;
+	if (type)
+		len = sprintf(s, "%d", num);
+	else
+		len = sprintf(s, "%c%d", type, num);
+	down(&root->d_inode->i_sem);
+	return lookup_one_len(s, root, len);
+}
+
+void capifs_new_ncci(char type, unsigned int num, dev_t device)
 {
 	struct super_block *sb;
-	struct capifs_sb_info *sbi;
-	struct capifs_ncci *np;
-	ino_t ino;
+	struct dentry *dentry;
+	struct inode *inode;
 
-	for ( sb = mounts ; sb ; sb = sbi->next ) {
-		sbi = SBI(sb);
-
-		for (ino = 0, np = sbi->nccis ; ino < sbi->max_ncci; ino++, np++) {
-			if (np->used == 0) {
-				np->used = 1;
-				np->type = type;
-				np->num = num;
-				np->kdev = device;
-				break;
-			}
-		}
-		if ( ino >= sbi->max_ncci )
-			continue;
-
-		if ((np->inode = capifs_new_inode(sb)) != NULL) {
-			struct inode *inode = np->inode;
-			inode->i_uid = sbi->setuid ? sbi->uid : current->fsuid;
-			inode->i_gid = sbi->setgid ? sbi->gid : current->fsgid;
-			inode->i_nlink = 1;
-			inode->i_ino = ino + 2;
-			init_special_inode(inode, sbi->mode|S_IFCHR, kdev_t_to_nr(np->kdev));
-		}
+	if (!grab_instance())
+		return;
+	sb = capifs_mnt->mnt_sb;
+	inode = new_inode(sb);
+	if (inode) {
+		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+		inode->i_blocks = 0;
+		inode->i_blksize = 1024;
+		inode->i_uid = options.setuid ? options.uid : current->fsuid;
+		inode->i_gid = options.setgid ? options.gid : current->fsgid;
+		inode->i_nlink = 1;
+		init_special_inode(inode, S_IFCHR | options.mode, device);
+		dentry = get_node(type, num);
+		if (!IS_ERR(dentry) && !dentry->d_inode) {
+			grab_instance();
+			d_instantiate(dentry, inode);
+		} else
+			iput(inode);
+		up(&sb->s_root->d_inode->i_sem);
 	}
+	drop_instance();
 }
 
 void capifs_free_ncci(char type, unsigned int num)
 {
-	struct super_block *sb;
-	struct capifs_sb_info *sbi;
-	struct inode *inode;
-	struct capifs_ncci *np;
-	ino_t ino;
-
-	for ( sb = mounts ; sb ; sb = sbi->next ) {
-		sbi = SBI(sb);
-
-		for (ino = 0, np = sbi->nccis ; ino < sbi->max_ncci; ino++, np++) {
-			if (!np->used || np->type != type || np->num != num)
-				continue;
-			if (np->inode) {
-				inode = np->inode;
-				np->inode = 0;
-				np->used = 0;
+	if (grab_instance()) {
+		struct dentry *dentry = get_node(type, num);
+		if (!IS_ERR(dentry)) {
+			struct inode *inode = dentry->d_inode;
+			if (inode) {
 				inode->i_nlink--;
-				iput(inode);
-				break;
+				d_delete(dentry);
+				dput(dentry);
+				drop_instance();
 			}
+			dput(dentry);
 		}
+		up(&capifs_mnt->mnt_root->d_inode->i_sem);
+		drop_instance();
 	}
 }
 
@@ -441,8 +254,6 @@ static int __init capifs_init(void)
 	char rev[32];
 	char *p;
 	int err;
-
-	MOD_INC_USE_COUNT;
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strncpy(rev, p + 2, sizeof(rev));
@@ -453,12 +264,8 @@ static int __init capifs_init(void)
 		strcpy(rev, "1.0");
 
 	err = register_filesystem(&capifs_fs_type);
-	if (err) {
-		MOD_DEC_USE_COUNT;
-		return err;
-	}
-        printk(KERN_NOTICE "capifs: Rev %s\n", rev);
-	MOD_DEC_USE_COUNT;
+	if (!err)
+		printk(KERN_NOTICE "capifs: Rev %s\n", rev);
 	return 0;
 }
 
