@@ -55,6 +55,7 @@ static isdn_divert_if *divert_if; /* = NULL */
 #define divert_if ((isdn_divert_if *) NULL)
 #endif
 
+spinlock_t stat_lock = SPIN_LOCK_UNLOCKED;
 
 static void set_global_features(void);
 static void isdn_register_devfs(int);
@@ -364,6 +365,10 @@ isdn_command(isdn_ctrl *cmd)
 	}
 #ifdef ISDN_DEBUG_COMMAND
 	switch (cmd->command) {
+	case ISDN_CMD_LOCK: 
+		printk(KERN_DEBUG "ISDN_CMD_LOCK %d\n", idx); break;
+	case ISDN_CMD_UNLOCK: 
+		printk(KERN_DEBUG "ISDN_CMD_UNLOCK %d\n", idx); break;
 	case ISDN_CMD_SETL2: 
 		printk(KERN_DEBUG "ISDN_CMD_SETL2 %d\n", idx); break;
 	case ISDN_CMD_SETL3: 
@@ -414,7 +419,7 @@ static int
 isdn_status_callback(isdn_ctrl * c)
 {
 	int di;
-	ulong flags;
+	unsigned long flags;
 	int i;
 	int r;
 	int retval = 0;
@@ -435,10 +440,9 @@ isdn_status_callback(isdn_ctrl * c)
 				return 0;
 			break;
 		case ISDN_STAT_STAVAIL:
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&stat_lock, flags);
 			dev->drv[di]->stavail += c->arg;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&stat_lock, flags);
 			wake_up_interruptible(&dev->drv[di]->st_waitq);
 			break;
 		case ISDN_STAT_RUN:
@@ -1036,79 +1040,100 @@ static struct file_operations isdn_status_fops =
 static int
 isdn_ctrl_open(struct inode *ino, struct file *filep)
 {
-	uint minor = minor(ino->i_rdev);
-	int drvidx;
+	unsigned int minor = minor(ino->i_rdev);
+	int drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
+	int retval = 0;
 
-	drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
-	if (drvidx < 0)
-		return -ENODEV;
-
+	if (drvidx < 0) {
+		retval = -ENODEV;
+		goto out;
+	}
 	isdn_lock_drivers();
-	return 0;
+
+ out:
+	return retval;
 }
 
 static int
 isdn_ctrl_release(struct inode *ino, struct file *filep)
 {
-	lock_kernel();
+	unsigned int minor = minor(ino->i_rdev);
+	int drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
 
+	if (drvidx < 0) {
+		isdn_BUG();
+		goto out;
+	}
 	if (dev->profd == current)
 		dev->profd = NULL;
 
 	isdn_unlock_drivers();
 
-	unlock_kernel();
+ out:
 	return 0;
 }
 
 static ssize_t
 isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 {
-	uint minor = minor(file->f_dentry->d_inode->i_rdev);
-	ulong flags;
+	DECLARE_WAITQUEUE(wait, current);
+	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
+	int drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
+	unsigned long flags;
 	int len = 0;
-	int drvidx;
-	int retval;
+
 
 	if (off != &file->f_pos)
 		return -ESPIPE;
 
-	lock_kernel();
-
-	drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
 	if (drvidx < 0) {
-		retval = -ENODEV;
-		goto out;
+		isdn_BUG();
+		return -ENODEV;
 	}
-	if (!dev->drv[drvidx]->stavail) {
-		if (file->f_flags & O_NONBLOCK) {
-			retval = -EAGAIN;
-			goto out;
+	if (!dev->drv[drvidx]->interface->readstat) {
+		isdn_BUG();
+		return 0;
+	}
+ 	add_wait_queue(&dev->drv[drvidx]->st_waitq, &wait);
+	for (;;) {
+		spin_lock_irqsave(&stat_lock, flags);
+		len = dev->drv[drvidx]->stavail;
+		spin_unlock_irqrestore(&stat_lock, flags);
+		if (len > 0)
+			break;
+		if (signal_pending(current)) {
+			len = -ERESTARTSYS;
+			break;
 		}
-		interruptible_sleep_on(&(dev->drv[drvidx]->st_waitq));
+		if (file->f_flags & O_NONBLOCK) {
+			len = -EAGAIN;
+			break;
+		}
+		schedule();
 	}
-	if (dev->drv[drvidx]->interface->readstat) {
-		if (count > dev->drv[drvidx]->stavail)
-			count = dev->drv[drvidx]->stavail;
-		len = dev->drv[drvidx]->interface->
-			readstat(buf, count, 1, drvidx,
-				 isdn_minor2chan(minor));
-	} else {
-		len = 0;
-	}
-	save_flags(flags);
-	cli();
-	if (len)
-		dev->drv[drvidx]->stavail -= len;
-	else
-		dev->drv[drvidx]->stavail = 0;
-	restore_flags(flags);
-	*off += len;
-	retval = len;
+	__set_current_state(TASK_RUNNING);
+	remove_wait_queue(&dev->drv[drvidx]->st_waitq, &wait);
 	
- out:
-	unlock_kernel();
-	return retval;
+	if (len < 0)
+		return len;
+	
+	if (count > len)
+		count = len;
+		
+	len = dev->drv[drvidx]->interface->readstat(buf, count, 1, drvidx,
+						    isdn_minor2chan(minor));
+
+	spin_lock_irqsave(&stat_lock, flags);
+	if (len) {
+		dev->drv[drvidx]->stavail -= len;
+	} else {
+		isdn_BUG();
+		dev->drv[drvidx]->stavail = 0;
+	}
+	spin_unlock_irqrestore(&stat_lock, flags);
+
+	*off += len;
+	return len;
 }
 
 static ssize_t
@@ -1120,8 +1145,6 @@ isdn_ctrl_write(struct file *file, const char *buf, size_t count, loff_t *off)
 
 	if (off != &file->f_pos)
 		return -ESPIPE;
-
-	lock_kernel();
 
 	drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
 	if (drvidx < 0) {
@@ -1136,7 +1159,6 @@ isdn_ctrl_write(struct file *file, const char *buf, size_t count, loff_t *off)
 		writecmd(buf, count, 1, drvidx, isdn_minor2chan(minor - ISDN_MINOR_CTRL));
 
  out:
-	unlock_kernel();
 	return retval;
 }
 
@@ -1152,14 +1174,11 @@ isdn_ctrl_poll(struct file *file, poll_table *wait)
 		/* driver deregistered while file open */
 		return POLLHUP;
 
-	lock_kernel();
-
 	poll_wait(file, &(dev->drv[drvidx]->st_waitq), wait);
 	mask = POLLOUT | POLLWRNORM;
 	if (dev->drv[drvidx]->stavail)
 		mask |= POLLIN | POLLRDNORM;
 
-	unlock_kernel();
 	return mask;
 }
 
