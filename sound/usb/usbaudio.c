@@ -1183,9 +1183,9 @@ static int init_usb_sample_rate(struct usb_device *dev, int iface,
 		if ((err = snd_usb_ctl_msg(dev, usb_rcvctrlpipe(dev, 0), GET_CUR,
 					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_IN,
 					   SAMPLING_FREQ_CONTROL << 8, ep, data, 3, HZ)) < 0) {
-			snd_printk(KERN_ERR "%d:%d:%d: cannot get freq at ep 0x%x\n",
+			snd_printk(KERN_WARNING "%d:%d:%d: cannot get freq at ep 0x%x\n",
 				   dev->devnum, iface, fmt->altsetting, ep);
-			return err;
+			return 0; /* some devices don't support reading */
 		}
 		crate = data[0] | (data[1] << 8) | (data[2] << 16);
 		if (crate != rate) {
