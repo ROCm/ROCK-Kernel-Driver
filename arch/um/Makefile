@@ -35,9 +35,8 @@ ARCH_SUBDIRS = $(ARCH_DIR)/drivers $(ARCH_DIR)/kernel \
 
 SUBDIRS += $(ARCH_SUBDIRS)
 
-LIBS += $(ARCH_DIR)/kernel/um.o \
-	$(ARCH_DIR)/drivers/drivers.o \
-	$(ARCH_DIR)/sys-$(SUBARCH)/sys.o $(ARCH_DIR)/os/os.o
+LIBS += $(ARCH_DIR)/kernel/um.o $(ARCH_DIR)/drivers/drivers.o \
+	$(ARCH_DIR)/sys-$(SUBARCH)/sys.o $(ARCH_DIR)/os/os.o -L/usr/lib -lutil
 
 ifeq ($(CONFIG_PT_PROXY), y)
 SUBDIRS += $(ARCH_DIR)/ptproxy
@@ -61,9 +60,15 @@ LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 
 SIZE = (($(CONFIG_NEST_LEVEL) + $(CONFIG_KERNEL_HALF_GIGS)) * 0x20000000)
 
-$(ARCH_DIR)/link.ld: $(ARCH_DIR)/link.ld.in
-	m4 -DSTART=$$(($(TOP_ADDR) - $(SIZE))) -DELF_ARCH=$(ELF_ARCH) \
-		-DELF_FORMAT=$(ELF_FORMAT) $< > $@
+AFLAGS_vmlinux.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
+	-DELF_ARCH=$(ELF_ARCH) -DELF_FORMAT=\"$(ELF_FORMAT)\"
+
+LD_vmlinux = $(CC) 
+LDFLAGS_vmlinux = $(LINK_PROFILE) $(LINK_WRAPS) -static $(ARCH_DIR)/main.o 
+
+cmd_link_vmlinux := $(CC) $(LINK_PROFILE) $(LINK_WRAPS) -static \
+	$(subst $(cmd_link_vmlinux),$(LD),) $(ARCH_DIR)/main.o vmlinux.o \
+	-L/usr/lib -lutil
 
 SYMLINK_HEADERS = include/asm-um/archparam.h include/asm-um/system.h \
 	include/asm-um/sigcontext.h include/asm-um/processor.h \
@@ -74,11 +79,9 @@ ARCH_SYMLINKS = include/asm-um/arch arch/um/include/sysdep arch/um/os \
 
 GEN_HEADERS = $(ARCH_DIR)/include/task.h
 
-linux: scripts $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS) $(ARCH_DIR)/main.o \
-	vmlinux $(ARCH_DIR)/link.ld
-	mv vmlinux vmlinux.o
-	$(CC) -Wl,-T,$(ARCH_DIR)/link.ld $(LINK_PROFILE) $(LINK_WRAPS) \
-		-o linux -static $(ARCH_DIR)/main.o vmlinux.o -L/usr/lib -lutil
+linux: $(ARCH_SYMLINKS) $(GEN_HEADERS) $(SYS_HEADERS) $(ARCH_DIR)/main.o \
+	vmlinux
+	mv vmlinux linux
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
@@ -129,7 +132,7 @@ arch/um/os:
 $(ARCH_DIR)/include/task.h : $(ARCH_DIR)/util/mk_task
 	$< > $@
 
-$(ARCH_DIR)/util/mk_task : $(ARCH_DIR)/util/mk_task_user.c \
+$(ARCH_DIR)/util/mk_task : $(SYS_HEADERS) $(ARCH_DIR)/util/mk_task_user.c \
 	$(ARCH_DIR)/util/mk_task_kern.c 
 	$(MAKE) $(MFLAGS) -C $(ARCH_DIR)/util all
 

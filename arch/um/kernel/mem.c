@@ -233,7 +233,7 @@ struct page *arch_validate(struct page *page, int mask, int order)
 		addr += PAGE_SIZE;
 	}
 	if(i == (1 << order)) return(page);
-	page = _alloc_pages(mask, order);
+	page = alloc_pages(mask, order);
 	goto again;
 }
 

@@ -1,11 +1,11 @@
-OUTPUT_FORMAT("ELF_FORMAT")
+OUTPUT_FORMAT(ELF_FORMAT)
 OUTPUT_ARCH(ELF_ARCH)
 ENTRY(_start)
 jiffies = jiffies_64;
 
 SECTIONS
 {
-  . = START() + SIZEOF_HEADERS;
+  . = START + SIZEOF_HEADERS;
 
   . = ALIGN(4096);
   __binary_start = .;
