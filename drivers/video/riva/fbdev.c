@@ -52,10 +52,12 @@
 #error This driver requires PCI support.
 #endif
 
+#ifdef CONFIG_PPC
 #include <linux/adb.h>
 #include <linux/pmu.h>
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
+#endif
 
 /* version number of this driver */
 #define RIVAFB_VERSION "0.9.5b"
