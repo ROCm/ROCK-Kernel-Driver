@@ -8,7 +8,10 @@
 #define _SPARC_PGTSRMMU_H
 
 #include <asm/page.h>
+
+#ifdef __ASSEMBLY__
 #include <asm/thread_info.h>	/* TI_UWINMASK for WINDOW_FLUSH */
+#endif
 
 /* PMD_SHIFT determines the size of the area a second-level page table entry can map */
 #define SRMMU_PMD_SHIFT         18

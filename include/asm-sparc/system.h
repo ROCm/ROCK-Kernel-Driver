@@ -7,9 +7,9 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/threads.h>	/* NR_CPUS */
+#include <linux/thread_info.h>
 
 #include <asm/segment.h>
-#include <asm/thread_info.h>
 #include <asm/page.h>
 #include <asm/openprom.h>	/* romvec. XXX will be dealt later. Promise. */
 #include <asm/psr.h>
