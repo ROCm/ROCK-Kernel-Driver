@@ -21,7 +21,7 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"",			0	}
 };
 
-static void __init reserve_ioport_range(char *pnpid, int start, int end)
+static void reserve_ioport_range(char *pnpid, int start, int end)
 {
 	struct resource *res;
 	char *regionid;
@@ -49,7 +49,7 @@ static void __init reserve_ioport_range(char *pnpid, int start, int end)
 	return;
 }
 
-static void __init reserve_resources_of_dev( struct pnp_dev *dev )
+static void reserve_resources_of_dev( struct pnp_dev *dev )
 {
 	int i;
 
