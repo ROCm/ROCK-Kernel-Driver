@@ -249,9 +249,9 @@ static void __init pagetable_init (void)
 {
 	unsigned long vaddr;
 	pgd_t *pgd_base = swapper_pg_dir;
-	int i;
 
 #if CONFIG_X86_PAE
+	int i;
 	/* Init entries of the first-level page table to the zero page */
 	for (i = 0; i < PTRS_PER_PGD; i++)
 		set_pgd(pgd_base + i, __pgd(__pa(empty_zero_page) | _PAGE_PRESENT));

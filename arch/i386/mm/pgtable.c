@@ -52,7 +52,7 @@ void show_mem(void)
  * Associate a virtual page frame with a given physical page frame 
  * and protection flags for that frame.
  */ 
-static void set_pte_phys (unsigned long vaddr, unsigned long phys, pgprot_t flags)
+static void set_pte_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
 {
 	pgd_t *pgd;
 	pmd_t *pmd;
@@ -69,8 +69,8 @@ static void set_pte_phys (unsigned long vaddr, unsigned long phys, pgprot_t flag
 		return;
 	}
 	pte = pte_offset_kernel(pmd, vaddr);
-	/* <phys,flags> stored as-is, to permit clearing entries */
-	set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+	/* <pfn,flags> stored as-is, to permit clearing entries */
+	set_pte(pte, pfn_pte(pfn, flags));
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -87,7 +87,7 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
 		BUG();
 		return;
 	}
-	set_pte_phys(address, phys, flags);
+	set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
 }
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
