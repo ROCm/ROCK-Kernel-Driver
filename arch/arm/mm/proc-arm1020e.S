@@ -30,6 +30,7 @@
 #include <asm/assembler.h>
 #include <asm/constants.h>
 #include <asm/pgtable.h>
+#include <asm/domain.h>
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
 #include <asm/hardware.h>
@@ -414,7 +415,11 @@ __arm1020e_setup:
 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer on v4
 	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs on v4
 	mcr	p15, 0, r4, c2, c0		@ load page table pointer
-	mov	r0, #0x1f			@ Domains 0, 1 = client
+	mov	r0, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
+
 	mcr	p15, 0, r0, c3, c0		@ load domain access register
 	mrc	p15, 0, r0, c1, c0		@ get control register v4
 /*
@@ -504,7 +509,10 @@ cpu_arm1020e_name:
 __arm1020e_proc_info:
 	.long	0x4105a200			@ ARM 1020TE (Architecture v5TE)
 	.long	0xff0ffff0
-	.long	0x00000c12			@ mmuflags
+	.long   PMD_TYPE_SECT | \
+		PMD_BIT4 | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__arm1020e_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name

@@ -19,6 +19,7 @@
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
 #include <asm/pgtable.h>
+#include <asm/domain.h>
 #include <asm/ptrace.h>
 
 /*
@@ -196,7 +197,10 @@ __sa110_setup:
 	mcr	p15, 0, r10, c7, c10, 4		@ drain write buffer on v4
 	mcr	p15, 0, r10, c8, c7		@ invalidate I,D TLBs on v4
 	mcr	p15, 0, r4, c2, c0		@ load page table pointer
-	mov	r10, #0x1f			@ Domains 0, 1 = client
+	mov	r10, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+		       domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+		       domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+		       domain_val(DOMAIN_IO, DOMAIN_CLIENT))
 	mcr	p15, 0, r10, c3, c0		@ load domain access register
 	mov	pc, lr
 	.size	__sa110_setup, . - __sa110_setup
@@ -245,7 +249,11 @@ cpu_sa110_name:
 __sa110_proc_info:
 	.long	0x4401a100
 	.long	0xfffffff0
-	.long	0x00000c0e
+	.long   PMD_TYPE_SECT | \
+		PMD_SECT_BUFFERABLE | \
+		PMD_SECT_CACHEABLE | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__sa110_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name

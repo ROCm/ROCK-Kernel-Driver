@@ -14,6 +14,7 @@
 #include <asm/constants.h>
 #include <asm/procinfo.h>
 #include <asm/pgtable.h>
+#include <asm/domain.h>
 
 #include "proc-macros.S"
 
@@ -198,7 +199,10 @@ __v6_setup:
 	mcr	p15, 0, r10, c2, c0, 2		@ TTB control register
 	mcr	p15, 0, r4, c2, c0, 0		@ load TTB0
 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
-	mov	r10, #0x1f			@ domains 0, 1 = manager
+	mov	r10, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+		       domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+		       domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+		       domain_val(DOMAIN_IO, DOMAIN_CLIENT))
 	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
 #ifdef CONFIG_VFP
@@ -257,7 +261,11 @@ cpu_elf_name:
 __v6_proc_info:
 	.long	0x0007b000
 	.long	0x0007f000
-	.long	0x00000c0e
+	.long   PMD_TYPE_SECT | \
+		PMD_SECT_BUFFERABLE | \
+		PMD_SECT_CACHEABLE | \
+		PMD_SECT_AP_WRITE | \
+		PMD_SECT_AP_READ
 	b	__v6_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
