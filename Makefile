@@ -673,14 +673,8 @@ defconfig:
 CLEAN_FILES += \
 	include/linux/compile.h \
 	vmlinux System.map \
-	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
-	drivers/char/conmakehash \
 	drivers/char/drm/*-mod.c \
-	drivers/char/defkeymap.c drivers/char/qtronixmap.c \
-	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
-	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
 	sound/oss/bin2hex sound/oss/hex2hex \
-	drivers/atm/fore200e_mkfirm drivers/atm/{pca,sba}*{.bin,.bin1,.bin2} \
 	net/802/cl2llc.c net/802/transit/pdutr.h net/802/transit/timertr.h \
 	net/802/pseudo/pseudocode.h \
 	net/khttpd/make_times_h net/khttpd/times.h \
@@ -698,7 +692,6 @@ MRPROPER_FILES += \
 	sound/oss/msndperm.c \
 	sound/oss/pndsperm.c \
 	sound/oss/pndspini.c \
-	drivers/atm/fore200e_*_fw.c drivers/atm/.fore200e_*.fw \
 	.version .config* config.in config.old \
 	scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp \
 	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
