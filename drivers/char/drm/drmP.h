@@ -735,12 +735,6 @@ extern int	     DRM(lock_transfer)(drm_device_t *dev,
 extern int	     DRM(lock_free)(drm_device_t *dev,
 				    __volatile__ unsigned int *lock,
 				    unsigned int context);
-extern int	     DRM(finish)(struct inode *inode, struct file *filp,
-				 unsigned int cmd, unsigned long arg);
-extern int	     DRM(flush_unblock)(drm_device_t *dev, int context,
-					drm_lock_flags_t flags);
-extern int	     DRM(flush_block_and_flush)(drm_device_t *dev, int context,
-						drm_lock_flags_t flags);
 extern int           DRM(notifier)(void *priv);
 
 				/* Buffer management support (drm_bufs.h) */
