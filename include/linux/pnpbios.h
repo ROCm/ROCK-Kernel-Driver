@@ -142,7 +142,7 @@ static __inline struct pnpbios_driver *pnpbios_dev_driver(const struct pci_dev *
 
 extern int  pnpbios_dont_use_current_config;
 extern void *pnpbios_kmalloc(size_t size, int f);
-extern void pnpbios_init (void);
+extern int pnpbios_init (void);
 extern void pnpbios_proc_init (void);
 
 extern int pnp_bios_dev_node_info (struct pnp_dev_node_info *data);

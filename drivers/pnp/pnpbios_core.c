@@ -1189,7 +1189,7 @@ __setup("pnpbios=", pnpbios_setup);
 
 subsys_initcall(pnpbios_init);
 
-void __init pnpbios_init(void)
+int __init pnpbios_init(void)
 {
 	union pnp_bios_expansion_header *check;
 	u8 sum;
@@ -1200,7 +1200,7 @@ void __init pnpbios_init(void)
 
 	if(pnpbios_disabled) {
 		printk(KERN_INFO "PnPBIOS: Disabled.\n");
-		return;
+		return 0;
 	}
 
 	if ( is_sony_vaio_laptop )
@@ -1253,6 +1253,7 @@ void __init pnpbios_init(void)
 	if(kernel_thread(pnp_dock_thread, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL)>0)
 		unloading = 0;
 #endif		
+	return 0;
 }
 
 #ifdef MODULE
