@@ -80,7 +80,21 @@ module_param_named(max_luns, max_scsi_luns, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(max_luns,
 		 "last scsi LUN (should be between 1 and 2^32-1)");
 
-#ifdef CONFIG_SCSI_REPORT_LUNS
+static int scsi_sparselun;
+module_param_named(scsi_sparselun, scsi_sparselun, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(scsi_sparselun,
+		 "Assume sparse LUNs for all SCSI devices");
+
+static int scsi_largelun;
+module_param_named(scsi_largelun, scsi_largelun, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(scsi_largelun,
+		 "Assume all SCSI-2 devs support more than 8 LUNs");
+
+static unsigned int max_scsi_sparseluns;
+module_param_named(max_scsi_sparseluns, max_scsi_sparseluns, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(max_scsi_sparseluns,
+		 "Limit LUNs for scanning sparse LUN devices");
+
 /*
  * max_scsi_report_luns: the maximum number of LUNS that will be
  * returned from the REPORT LUNS command. 8 times this value must
@@ -88,13 +102,95 @@ MODULE_PARM_DESC(max_luns,
  * in practice, the maximum number of LUNs suppored by any device
  * is about 16k.
  */
-static unsigned int max_scsi_report_luns = 128;
+static unsigned int max_scsi_report_luns = 511;
 
 module_param_named(max_report_luns, max_scsi_report_luns, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(max_report_luns,
 		 "REPORT LUNS maximum number of LUNS received (should be"
 		 " between 1 and 16384)");
+
+static int scsi_noreportlun;
+module_param_named(scsi_noreportlun, scsi_noreportlun, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(scsi_noreportlun,
+		 "Don't use REPORT_LUNs for scanning SCSI-3 devs");
+
+static int scsi_reportlun2;
+module_param_named(scsi_reportlun2, scsi_reportlun2, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(scsi_reportlun2,
+		 "Use REPORT_LUNs for scanning SCSI-2 devs as well");
+
+static unsigned int scsi_allow_ghost_devices;
+module_param_named(scsi_allow_ghost_devices ,scsi_allow_ghost_devices, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(scsi_allow_ghost_devices, 
+		 "allow devices marked as being offline to be accessed anyway "
+		 "(0 = off, else allow ghosts on lun 0 through allow_ghost_devices - 1");
+
+/* Some AChip ARC765 based DVD-ROM's take 15 or more seconds
+ * to reset.  A scan will fail if made right after a reset.
+ * It's completely broken device behaviour: SCSI specification
+ * says devices need to be able to respond to INQUIRY always
+ * (after a selection timeout ... of 250ms).
+ */
+#ifdef __powerpc64__
+static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ+25;
+#else
+static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ+3;
 #endif
+
+module_param_named(scsi_inq_timeout, scsi_inq_timeout, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(scsi_inq_timeout, 
+		 "Timeout (in seconds) waiting for devices to answer INQUIRY."
+		 " Default is 6. Some non-compliant devices need more.");
+
+#define MAX_LLUN_BLKLEN 8
+static int llun_blklst[3*MAX_LLUN_BLKLEN] = {
+	-1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1 };
+
+MODULE_PARM(llun_blklst, "3-24i");
+MODULE_PARM_DESC(llun_blklst, "SCSI-2 devs (C,B,T) that need LARGELUN|SPARSELUN support");
+
+static int __init llun_blklst_setup(char *str)
+{
+	unsigned int tmp;
+	int i = 0;
+	do {
+		int rc;
+		if (get_option(&str, &tmp) == 2)
+			llun_blklst[i++] = tmp;
+		else 
+			break;
+		if (get_option(&str, &tmp) == 2)
+			llun_blklst[i++] = tmp;
+		else 
+			break;
+		if ((rc = get_option(&str, &tmp)) >= 1)
+			llun_blklst[i++] = tmp;
+		if (rc != 2)
+			break;
+	} while (1);
+	return i;
+}
+__setup("llun_blklst=", llun_blklst_setup);
+
+static inline int is_on_llun_blklst (int hostno, int channel, int target)
+{
+	int i;
+	for (i = 0; i < MAX_LLUN_BLKLEN; ++i) {
+		if (llun_blklst[i*3] == -1)
+			break;
+		if (llun_blklst[i*3+0] == hostno  &&
+		    llun_blklst[i*3+1] == channel &&
+		    llun_blklst[i*3+2] == target) {
+			printk (KERN_DEBUG "Found c%ib%it%i on llun_blklst\n",
+				hostno, channel, target);
+			return 1;
+		}
+	}
+	return 0;
+}
 
 /**
  * scsi_unlock_floptical - unlock device via a special MODE SENSE command
@@ -346,7 +442,7 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 
 	memset(inq_result, 0, 36);
 	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) inq_result, 36,
-		      SCSI_TIMEOUT + 4 * HZ, 3);
+		      HZ/2 + HZ*scsi_inq_timeout, 3);
 
 	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: 1st INQUIRY %s with"
 			" code 0x%x\n", sreq->sr_result ?
@@ -395,7 +491,7 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 		memset(inq_result, 0, possible_inq_resp_len);
 		scsi_wait_req(sreq, (void *) scsi_cmd,
 			      (void *) inq_result,
-			      possible_inq_resp_len, SCSI_TIMEOUT + 4 * HZ, 3);
+			      possible_inq_resp_len, (1+scsi_inq_timeout)*(HZ/2), 3);
 		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: 2nd INQUIRY"
 				" %s with code 0x%x\n", sreq->sr_result ?
 				"failed" : "successful", sreq->sr_result));
@@ -549,7 +645,8 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	 * otherwise, offline devices still get an sd allocated, and they
 	 * use up an sd slot.
 	 */
-	if (((inq_result[0] >> 5) & 7) == 1) {
+	if (((inq_result[0] >> 5) & 7) == 1 &&
+	    (sdev->lun >= scsi_allow_ghost_devices)) {
 		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: peripheral"
 				" qualifier of 1, device offlined\n"));
 		sdev->online = FALSE;
@@ -800,8 +897,10 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
 	 * override the other settings, and scan all of them. Normally,
 	 * SCSI-3 devices should be scanned via the REPORT LUNS.
 	 */
-	if (bflags & BLIST_SPARSELUN) {
-		max_dev_lun = shost->max_lun;
+	if (bflags & BLIST_SPARSELUN || scsi_sparselun || 
+	    is_on_llun_blklst(shost->host_no, channel, id)) {
+		max_dev_lun = min(shost->max_lun, max_scsi_sparseluns? 
+				  max_scsi_sparseluns: max_scsi_luns);
 		sparse_lun = 1;
 	} else
 		sparse_lun = 0;
@@ -845,7 +944,8 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
 	 * Do not scan SCSI-2 or lower device past LUN 7, unless
 	 * BLIST_LARGELUN.
 	 */
-	if (scsi_level < SCSI_3 && !(bflags & BLIST_LARGELUN))
+	if (scsi_level < SCSI_3 && !(bflags & BLIST_LARGELUN) && !scsi_largelun &&
+	    !is_on_llun_blklst(shost->host_no, channel, id))
 		max_dev_lun = min(8U, max_dev_lun);
 
 	/*
@@ -860,7 +960,6 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
 			return;
 }
 
-#ifdef CONFIG_SCSI_REPORT_LUNS
 /**
  * scsilun_to_int: convert a scsi_lun to an int
  * @scsilun:	struct scsi_lun to be converted.
@@ -921,9 +1020,16 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 	u8 *data;
 
 	/*
-	 * Only support SCSI-3 and up devices.
+	 * Only support SCSI-3 devices unless scsi_noreportlun is set.
+	 * SCSI-2 is supported is scsi_reportlun2 is set and the host
+	 * adapter claims to support more than 8 LUNS (likely FC). 
 	 */
-	if (sdev->scsi_level < SCSI_3)
+	
+	if ( scsi_noreportlun ||
+	     sdev->host->no_reportlun ||
+	     sdev->scsi_level < SCSI_2 || 
+	    (sdev->scsi_level < SCSI_3 &&
+	     (!scsi_reportlun2 || sdev->host->max_lun <= 8)))
 		return 1;
 	if (bflags & BLIST_NOLUN)
 		return 0;
@@ -1087,9 +1193,6 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
 	return 0;
 }
-#else
-# define scsi_report_lun_scan(sdev, blags, rescan)	(1)
-#endif	/* CONFIG_SCSI_REPORT_LUNS */
 
 struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 				    uint channel, uint id, uint lun)
