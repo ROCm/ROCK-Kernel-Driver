@@ -19,7 +19,7 @@
 
 #define RTSIG_MAX	  32
 
-#ifdef __KERNEL__
+#if defined(__KERNEL__) && defined(CONFIG_SYSCTL)
 extern int ngroups_max;
 # define NGROUPS_MAX ngroups_max
 #else
