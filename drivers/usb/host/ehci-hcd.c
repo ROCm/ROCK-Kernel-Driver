@@ -290,16 +290,17 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 {
 	if (cap & (1 << 16)) {
 		int msec = 500;
+		struct pci_dev *pdev = to_pci_dev(ehci->hcd.self.controller);
 
 		/* request handoff to OS */
-		cap &= 1 << 24;
-		pci_write_config_dword (to_pci_dev(ehci->hcd.self.controller), where, cap);
+		cap |= 1 << 24;
+		pci_write_config_dword(pdev, where, cap);
 
 		/* and wait a while for it to happen */
 		do {
 			msleep(10);
 			msec -= 10;
-			pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller), where, &cap);
+			pci_read_config_dword(pdev, where, &cap);
 		} while ((cap & (1 << 16)) && msec);
 		if (cap & (1 << 16)) {
 			ehci_err (ehci, "BIOS handoff failed (%d, %04x)\n",
