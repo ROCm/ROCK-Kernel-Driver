@@ -344,8 +344,8 @@ endif
 include arch/$(ARCH)/Makefile
 
 # Let architecture Makefiles change CPPFLAGS if needed
-CFLAGS += $(CPPFLAGS) $(CFLAGS)
-AFLAGS += $(CPPFLAGS) $(AFLAGS)
+CFLAGS := $(CPPFLAGS) $(CFLAGS)
+AFLAGS := $(CPPFLAGS) $(AFLAGS)
 
 core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
 
