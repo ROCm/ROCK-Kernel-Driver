@@ -173,6 +173,9 @@ int sys_device_register(struct sys_device * sysdev)
 	/* Make sure the kset is set */
 	sysdev->kobj.kset = &cls->kset;
 
+	/* But make sure we point to the right type for sysfs translation */
+	sysdev->kobj.ktype = &ktype_sysdev;
+
 	/* set the kobject name */
 	snprintf(sysdev->kobj.name,KOBJ_NAME_LEN,"%s%d",
 		 cls->kset.kobj.name,sysdev->id);
