@@ -1013,6 +1013,7 @@ out:
 static struct net_proto_family llc_ui_family_ops = {
 	.family = PF_LLC,
 	.create = llc_ui_create,
+	.owner	= THIS_MODULE,
 };
 
 static struct proto_ops llc_ui_ops = {
