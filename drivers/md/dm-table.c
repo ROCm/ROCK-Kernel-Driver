@@ -900,6 +900,7 @@ void dm_table_unplug_all(struct dm_table *t)
 	}
 }
 
+EXPORT_SYMBOL(dm_table_unplug_all);
 EXPORT_SYMBOL(dm_vcalloc);
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
