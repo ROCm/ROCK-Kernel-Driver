@@ -1130,10 +1130,12 @@ int patch_alc650(ac97_t * ac97)
 		val &= ~0x03; /* disable */
 	snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK, val);
 
-	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
-	val &= ~0xc000; /* slot: 3,4,7,8,6,9 */
-	val &= ~(1 << 10); /* center-on-mic off */
-	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, val);
+	/* set default: slot 3,4,7,8,6,9
+	   spdif-in monitor off, analog-spdif off, spdif-in off
+	   center on mic off, surround on line-in off
+	   downmix off, duplicate front off
+	*/
+	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, 0);
 
 	/* set GPIO0 for mic bias */
 	/* GPIO0 pin output, no interrupt, high */
@@ -1262,10 +1264,12 @@ int patch_alc655(ac97_t * ac97)
 	val |= (1 << 1); /* spdif input pin */
 	val &= ~(1 << 12); /* vref enable */
 	snd_ac97_write_cache(ac97, 0x7a, val);
-	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
-	val |= (1 << 15); /* enable spdif in */
-	val &= ~(1 << 10); /* disable center on mic */
-	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, val);
+	/* set default: spdif-in enabled,
+	   spdif-in monitor off, spdif-in PCM off
+	   center on mic off, surround on line-in off
+	   duplicate front off
+	*/
+	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, 1<<15);
 
 	/* full DAC volume */
 	snd_ac97_write_cache(ac97, AC97_ALC650_SURR_DAC_VOL, 0x0808);
