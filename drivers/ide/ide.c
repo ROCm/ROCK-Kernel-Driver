@@ -151,6 +151,7 @@
 #include <linux/completion.h>
 #include <linux/reboot.h>
 #include <linux/cdrom.h>
+#include <linux/seq_file.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -196,7 +197,6 @@ int noautodma = 0;
 /*
  * ide_modules keeps track of the available IDE chipset/probe/driver modules.
  */
-ide_module_t *ide_modules;
 ide_module_t *ide_probe;
 
 /*
@@ -1900,6 +1900,41 @@ static int ide_release (struct inode * inode, struct file * file)
 static LIST_HEAD(ata_unused);
 static spinlock_t drives_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
+static LIST_HEAD(drivers);
+
+/* Iterator */
+static void *m_start(struct seq_file *m, loff_t *pos)
+{
+	struct list_head *p;
+	loff_t l = *pos;
+	spin_lock(&drivers_lock);
+	list_for_each(p, &drivers)
+		if (!l--)
+			return list_entry(p, ide_driver_t, drivers);
+	return NULL;
+}
+static void *m_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	struct list_head *p = ((ide_driver_t *)v)->drivers.next;
+	(*pos)++;
+	return p==&drivers ? NULL : list_entry(p, ide_driver_t, drivers);
+}
+static void m_stop(struct seq_file *m, void *v)
+{
+	spin_unlock(&drivers_lock);
+}
+static int show_driver(struct seq_file *m, void *v)
+{
+	ide_driver_t *driver = v;
+	seq_printf(m, "%s version %s\n", driver->name, driver->version);
+	return 0;
+}
+struct seq_operations ide_drivers_op = {
+	start:	m_start,
+	next:	m_next,
+	stop:	m_stop,
+	show:	show_driver
+};
 
 /*
  *	Locking is badly broken here - since way back.  That sucker is
@@ -2508,10 +2543,10 @@ int system_bus_clock (void)
 
 int ata_attach(ide_drive_t *drive)
 {
-	ide_module_t *module;
+	struct list_head *p;
 	spin_lock(&drivers_lock);
-	for (module = ide_modules; module; module = module->next) {
-		ide_driver_t *driver = module->info;
+	list_for_each(p, &drivers) {
+		ide_driver_t *driver = list_entry(p, ide_driver_t, drivers);
 		if (!try_inc_mod_count(driver->owner))
 			continue;
 		spin_unlock(&drivers_lock);
@@ -3523,20 +3558,12 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 	return 0;
 }
 
-int ide_register_module (ide_module_t *module)
+int ide_register_driver(ide_driver_t *driver)
 {
-	ide_module_t *p;
 	struct list_head list;
 
 	spin_lock(&drivers_lock);
-	for (p = ide_modules; p; p = p->next) {
-		if (p == module) {
-			spin_unlock(&drivers_lock);
-			return 1;
-		}
-	}
-	module->next = ide_modules;
-	ide_modules = module;
+	list_add(&driver->drivers, &drivers);
 	spin_unlock(&drivers_lock);
 
 	spin_lock(&drives_lock);
@@ -3553,16 +3580,12 @@ int ide_register_module (ide_module_t *module)
 	return 0;
 }
 
-void ide_unregister_module (ide_module_t *module)
+void ide_unregister_driver(ide_driver_t *driver)
 {
-	ide_driver_t *driver = module->info;
-	ide_module_t **p;
 	ide_drive_t *drive;
 
 	spin_lock(&drivers_lock);
-	for (p = &ide_modules; (*p) && (*p) != module; p = &((*p)->next));
-	if (*p)
-		*p = (*p)->next;
+	list_del(&driver->drivers);
 	spin_unlock(&drivers_lock);
 
 	while(!list_empty(&driver->drives)) {
@@ -3591,8 +3614,8 @@ struct block_device_operations ide_fops[] = {{
 }};
 
 EXPORT_SYMBOL(ide_hwifs);
-EXPORT_SYMBOL(ide_register_module);
-EXPORT_SYMBOL(ide_unregister_module);
+EXPORT_SYMBOL(ide_register_driver);
+EXPORT_SYMBOL(ide_unregister_driver);
 EXPORT_SYMBOL(ide_spin_wait_hwgroup);
 
 /*

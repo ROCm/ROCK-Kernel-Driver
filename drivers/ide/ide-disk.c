@@ -1673,10 +1673,6 @@ static ide_driver_t idedisk_driver = {
 	drives:			LIST_HEAD_INIT(idedisk_driver.drives),
 };
 
-static ide_module_t idedisk_module = {
-	info:	&idedisk_driver,
-};
-
 MODULE_DESCRIPTION("ATA DISK Driver");
 
 static int idedisk_reinit(ide_drive_t *drive)
@@ -1710,12 +1706,12 @@ failed:
 
 static void __exit idedisk_exit (void)
 {
-	ide_unregister_module(&idedisk_module);
+	ide_unregister_driver(&idedisk_driver);
 }
 
 static int idedisk_init (void)
 {
-	ide_register_module(&idedisk_module);
+	ide_register_driver(&idedisk_driver);
 	return 0;
 }
 

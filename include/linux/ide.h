@@ -919,6 +919,7 @@ typedef struct ide_driver_s {
 	void		(*ata_prebuilder)(ide_drive_t *);
 	void		(*atapi_prebuilder)(ide_drive_t *);
 	struct list_head drives;
+	struct list_head drivers;
 } ide_driver_t;
 
 #define DRIVER(drive)		((drive)->driver)
@@ -948,7 +949,6 @@ typedef struct ide_module_s {
  */
 #ifndef _IDE_C
 extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
-extern	ide_module_t	*ide_modules;
 extern	ide_module_t	*ide_probe;
 #endif
 extern int noautodma;
@@ -1219,8 +1219,8 @@ int ideprobe_init (void);
 #endif /* CONFIG_BLK_DEV_IDE */
 #endif /* _IDE_C */
 
-int ide_register_module (ide_module_t *module);
-void ide_unregister_module (ide_module_t *module);
+int ide_register_driver(ide_driver_t *driver);
+void ide_unregister_driver(ide_driver_t *driver);
 int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int version);
 int ide_unregister_subdriver (ide_drive_t *drive);
 int ide_replace_subdriver(ide_drive_t *drive, const char *driver);

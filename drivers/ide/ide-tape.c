@@ -6340,10 +6340,6 @@ static ide_driver_t idetape_driver = {
 	drives:			LIST_HEAD_INIT(idetape_driver.drives),
 };
 
-static ide_module_t idetape_module = {
-	info:	&idetape_driver,
-};
-
 /*
  *	Our character device supporting functions, passed to register_chrdev.
  */
@@ -6414,7 +6410,7 @@ MODULE_LICENSE("GPL");
 
 static void __exit idetape_exit (void)
 {
-	ide_unregister_module(&idetape_module);
+	ide_unregister_driver(&idetape_driver);
 	unregister_chrdev(IDETAPE_MAJOR, "ht");
 }
 
@@ -6427,7 +6423,7 @@ static int idetape_init (void)
 		printk(KERN_ERR "ide-tape: Failed to register character device interface\n");
 		return -EBUSY;
 	}
-	ide_register_module(&idetape_module);
+	ide_register_driver(&idetape_driver);
 	return 0;
 }
 

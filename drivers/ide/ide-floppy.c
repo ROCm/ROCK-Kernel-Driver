@@ -2184,10 +2184,6 @@ static ide_driver_t idefloppy_driver = {
 	drives:			LIST_HEAD_INIT(idefloppy_driver.drives),
 };
 
-static ide_module_t idefloppy_module = {
-	info: &idefloppy_driver,
-};
-
 static int idefloppy_reinit (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy;
@@ -2226,7 +2222,7 @@ MODULE_DESCRIPTION("ATAPI FLOPPY Driver");
 
 static void __exit idefloppy_exit (void)
 {
-	ide_unregister_module(&idefloppy_module);
+	ide_unregister_driver(&idefloppy_driver);
 }
 
 /*
@@ -2235,7 +2231,7 @@ static void __exit idefloppy_exit (void)
 static int idefloppy_init (void)
 {
 	printk("ide-floppy driver " IDEFLOPPY_VERSION "\n");
-	ide_register_module(&idefloppy_module);
+	ide_register_driver(&idefloppy_driver);
 	return 0;
 }
 

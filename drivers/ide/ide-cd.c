@@ -3085,10 +3085,6 @@ static ide_driver_t ide_cdrom_driver = {
 	drives:			LIST_HEAD_INIT(ide_cdrom_driver.drives),
 };
 
-static ide_module_t ide_cdrom_module = {
-	info:	&ide_cdrom_driver,
-};
-
 /* options */
 char *ignore = NULL;
 
@@ -3143,12 +3139,12 @@ failed:
 
 static void __exit ide_cdrom_exit(void)
 {
-	ide_unregister_module (&ide_cdrom_module);
+	ide_unregister_driver(&ide_cdrom_driver);
 }
  
 static int ide_cdrom_init(void)
 {
-	ide_register_module(&ide_cdrom_module);
+	ide_register_driver(&ide_cdrom_driver);
 	return 0;
 }
 

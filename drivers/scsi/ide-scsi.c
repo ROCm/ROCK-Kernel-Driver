@@ -569,10 +569,6 @@ static ide_driver_t idescsi_driver = {
 	drives:			LIST_HEAD_INIT(idescsi_driver.drives),
 };
 
-static ide_module_t idescsi_module = {
-	info:	&idescsi_driver,
-};
-
 static int idescsi_reinit(ide_drive_t *drive)
 {
 	idescsi_scsi_t *scsi;
@@ -847,7 +843,7 @@ static Scsi_Host_Template idescsi_template = {
 
 static int __init init_idescsi_module(void)
 {
-	ide_register_module(&idescsi_module);
+	ide_register_driver(&idescsi_driver);
 	scsi_register_host(&idescsi_template);
 	return 0;
 }
@@ -855,7 +851,7 @@ static int __init init_idescsi_module(void)
 static void __exit exit_idescsi_module(void)
 {
 	scsi_unregister_host(&idescsi_template);
-	ide_unregister_module(&idescsi_module);
+	ide_unregister_driver(&idescsi_driver);
 }
 
 module_init(init_idescsi_module);
