@@ -468,27 +468,18 @@ xfs_initialize_vnode(
 
 int
 xfs_blkdev_get(
+	xfs_mount_t		*mp,
 	const char		*name,
 	struct block_device	**bdevp)
 {
-	struct nameidata	nd;
-	int			error;
+	int			error = 0;
 
-	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
-	if (error) {
+	*bdevp = open_bdev_excl(name, 0, BDEV_FS, mp);
+	if (IS_ERR(*bdevp)) {
+		error = PTR_ERR(*bdevp);
 		printk("XFS: Invalid device [%s], error=%d\n", name, error);
-		return -error;
 	}
 
-	/* I think we actually want bd_acquire here..  --hch */
-	*bdevp = bdget(kdev_t_to_nr(nd.dentry->d_inode->i_rdev));
-	if (*bdevp) {
-		error = blkdev_get(*bdevp, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
-	} else {
-		error = -ENOMEM;
-	}
-
-	path_release(&nd);
 	return -error;
 }
 
@@ -497,7 +488,7 @@ xfs_blkdev_put(
 	struct block_device	*bdev)
 {
 	if (bdev)
-		blkdev_put(bdev, BDEV_FS);
+		close_bdev_excl(bdev, BDEV_FS);
 }
 
 void
@@ -762,17 +753,6 @@ linvfs_clear_inode(
 }
 
 STATIC void
-linvfs_put_inode(
-	struct inode		*ip)
-{
-	vnode_t			*vp = LINVFS_GET_VP(ip);
-	int			error;
-
-	if (vp && vp->v_fbhv && (atomic_read(&ip->i_count) == 1))
-		VOP_RELEASE(vp, error);
-}
-
-STATIC void
 linvfs_put_super(
 	struct super_block	*sb)
 {
@@ -989,7 +969,6 @@ STATIC struct super_operations linvfs_sops = {
 	.alloc_inode		= linvfs_alloc_inode,
 	.destroy_inode		= linvfs_destroy_inode,
 	.write_inode		= linvfs_write_inode,
-	.put_inode		= linvfs_put_inode,
 	.clear_inode		= linvfs_clear_inode,
 	.put_super		= linvfs_put_super,
 	.write_super		= linvfs_write_super,
