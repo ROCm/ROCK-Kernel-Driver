@@ -539,8 +539,8 @@ int datafab_transport(Scsi_Cmnd * srb, struct us_data *us)
 			  info->sectors, info->ssize);
 
 		// build the reply
-		//
-		((u32 *) ptr)[0] = cpu_to_be32(info->sectors);
+		// we need the last sector, not the number of sectors
+		((u32 *) ptr)[0] = cpu_to_be32(info->sectors - 1);
 		((u32 *) ptr)[1] = cpu_to_be32(info->ssize);
 		usb_stor_set_xfer_buf(ptr, 8, srb);
 

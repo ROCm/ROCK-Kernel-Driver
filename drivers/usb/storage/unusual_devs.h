@@ -720,6 +720,21 @@ UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
 		0 ),
 #endif
 
+#ifdef CONFIG_USB_STORAGE_DATAFAB
+UNUSUAL_DEV( 0x0c0b, 0xa109, 0x0000, 0xffff,
+	       "Acomdata",
+	       "CF",
+	       US_SC_SCSI, US_PR_DATAFAB, NULL,
+	       US_FL_SINGLE_LUN ),
+#endif
+#ifdef CONFIG_USB_STORAGE_SDDR55
+UNUSUAL_DEV( 0x0c0b, 0xa109, 0x0000, 0xffff,
+	       "Acomdata",
+	       "SM",
+	       US_SC_SCSI, US_PR_SDDR55, NULL,
+	       US_FL_SINGLE_LUN ),
+#endif
+
 /* Submitted by Joris Struyve <joris@struyve.be> */
 UNUSUAL_DEV( 0x0d96, 0x410a, 0x0001, 0xffff,
 		"Medion",
