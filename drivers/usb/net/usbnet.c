@@ -3152,10 +3152,7 @@ static int __init usbnet_init (void)
 	node_id [0] &= 0xfe;	// clear multicast bit
 	node_id [0] |= 0x02;    // set local assignment bit (IEEE802)
 
- 	if (usb_register (&usbnet_driver) < 0)
- 		return -1;
-
-	return 0;
+ 	return usb_register(&usbnet_driver);
 }
 module_init (usbnet_init);
 
