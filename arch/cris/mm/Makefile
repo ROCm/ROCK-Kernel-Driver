@@ -3,3 +3,4 @@
 #
 
 obj-y	 := init.o fault.o tlb.o extable.o ioremap.o
+

@@ -88,6 +88,30 @@ struct termios {
 #define   FF1	0100000
 
 /* c_cflag bit meaning */
+/*
+ *     3             2            1
+ *    10 987 654 321 098 765 432 109 876 543 210
+ *                             |           | ||| CBAUD
+ *                                         obaud    
+ *
+ *                                       ||CSIZE
+ *
+ *                                     |CSTOP
+ *                                    |CREAD
+ *                                   |CPARENB
+ *
+ *                                 |CPARODD 
+ *                                |HUPCL
+ *                               |CLOCAL
+ *                             |CBAUDEX
+ *    10 987 654 321 098 765 432 109 876 543 210
+ *        |           || ||   CIBAUD, IBSHIFT=16
+ *                    ibaud
+ *     |CMSPAR
+ *    | CRTSCTS
+ *       x x xxx xxx x     x xx Free bits
+ */
+
 #define CBAUD	0010017
 #define  B0	0000000		/* hang up */
 #define  B50	0000001
@@ -123,11 +147,18 @@ struct termios {
 #define  B115200 0010002
 #define  B230400 0010003
 #define  B460800 0010004
-/* etrax100 supports these additional three baud rates */
-#define  B921600 0010005
-#define  B1843200 0010006
-#define  B6250000 0010007
-#define CIBAUD	  002003600000	/* input baud rate (not used) */
+/* etrax supports these additional three baud rates */
+#define  B921600   0010005
+#define  B1843200  0010006
+#define  B6250000  0010007
+/* etrax 200 supports this as well */
+#define  B12500000 0010010
+#define CIBAUD	  002003600000	/* input baud rate */
+/* The values for CIBAUD bits are the same as the values for CBAUD and CBAUDEX
+ * shifted left IBSHIFT bits.
+ */
+#define IBSHIFT   16
+#define CMSPAR    010000000000 /* mark or space (stick) parity - PARODD=space*/
 #define CRTSCTS	  020000000000		/* flow control */
 
 /* c_lflag bits */

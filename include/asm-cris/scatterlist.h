@@ -11,6 +11,8 @@ struct scatterlist {
 
 };
 
+#define sg_dma_address(sg)	((sg)->address)
+#define sg_dma_len(sg)		((sg)->length)
 /* i386 junk */
 
 #define ISA_DMA_THRESHOLD (0x1fffffff)

@@ -27,115 +27,115 @@ typedef struct { int counter; } atomic_t;
 
 /* These should be written in asm but we do it in C for now. */
 
-static __inline__ void atomic_add(int i, volatile atomic_t *v)
+extern __inline__ void atomic_add(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	v->counter += i;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
-static __inline__ void atomic_sub(int i, volatile atomic_t *v)
+extern __inline__ void atomic_sub(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	v->counter -= i;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
-static __inline__ int atomic_add_return(int i, volatile atomic_t *v)
+extern __inline__ int atomic_add_return(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
 	int retval;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = (v->counter += i);
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
-static __inline__ int atomic_sub_return(int i, volatile atomic_t *v)
+extern __inline__ int atomic_sub_return(int i, volatile atomic_t *v)
 {
 	unsigned long flags;
 	int retval;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = (v->counter -= i);
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
-static __inline__ int atomic_sub_and_test(int i, volatile atomic_t *v)
+extern __inline__ int atomic_sub_and_test(int i, volatile atomic_t *v)
 {
 	int retval;
 	unsigned long flags;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = (v->counter -= i) == 0;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
-static __inline__ void atomic_inc(volatile atomic_t *v)
+extern __inline__ void atomic_inc(volatile atomic_t *v)
 {
 	unsigned long flags;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	(v->counter)++;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
-static __inline__ void atomic_dec(volatile atomic_t *v)
+extern __inline__ void atomic_dec(volatile atomic_t *v)
 {
 	unsigned long flags;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	(v->counter)--;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
-static __inline__ int atomic_inc_return(volatile atomic_t *v)
+extern __inline__ int atomic_inc_return(volatile atomic_t *v)
 {
 	unsigned long flags;
 	int retval;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = (v->counter)++;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
-static __inline__ int atomic_dec_return(volatile atomic_t *v)
+extern __inline__ int atomic_dec_return(volatile atomic_t *v)
 {
 	unsigned long flags;
 	int retval;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = (v->counter)--;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
-static __inline__ int atomic_dec_and_test(volatile atomic_t *v)
+extern __inline__ int atomic_dec_and_test(volatile atomic_t *v)
 {
 	int retval;
 	unsigned long flags;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = --(v->counter) == 0;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
-static __inline__ int atomic_inc_and_test(volatile atomic_t *v)
+extern __inline__ int atomic_inc_and_test(volatile atomic_t *v)
 {
 	int retval;
 	unsigned long flags;
-	save_flags(flags);
-	cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	retval = ++(v->counter) == 0;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
