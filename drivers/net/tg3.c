@@ -2865,10 +2865,10 @@ static void tg3_reset_task(void *_data)
 	tg3_halt(tp);
 	tg3_init_hw(tp);
 
+	tg3_netif_start(tp);
+
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
-
-	tg3_netif_start(tp);
 
 	if (restart_timer)
 		mod_timer(&tp->timer, jiffies + 1);
@@ -3229,9 +3229,10 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 
 	tg3_init_hw(tp);
 
+	tg3_netif_start(tp);
+
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
-	tg3_netif_start(tp);
 
 	return 0;
 }
@@ -6606,10 +6607,9 @@ static int tg3_set_ringparam(struct net_device *dev, struct ethtool_ringparam *e
 
 	tg3_halt(tp);
 	tg3_init_hw(tp);
-	netif_wake_queue(tp->dev);
+	tg3_netif_start(tp);
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
-	tg3_netif_start(tp);
   
 	return 0;
 }
@@ -6644,9 +6644,9 @@ static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam 
 		tp->tg3_flags &= ~TG3_FLAG_PAUSE_TX;
 	tg3_halt(tp);
 	tg3_init_hw(tp);
+	tg3_netif_start(tp);
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
-	tg3_netif_start(tp);
   
 	return 0;
 }
@@ -8499,11 +8499,11 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 		tp->timer.expires = jiffies + tp->timer_offset;
 		add_timer(&tp->timer);
 
-		spin_unlock(&tp->tx_lock);
-		spin_unlock_irq(&tp->lock);
-
 		netif_device_attach(dev);
 		tg3_netif_start(tp);
+
+		spin_unlock(&tp->tx_lock);
+		spin_unlock_irq(&tp->lock);
 	}
 
 	return err;
@@ -8536,10 +8536,10 @@ static int tg3_resume(struct pci_dev *pdev)
 
 	tg3_enable_ints(tp);
 
+	tg3_netif_start(tp);
+
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
-
-	tg3_netif_start(tp);
 
 	return 0;
 }
