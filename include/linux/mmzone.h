@@ -44,6 +44,7 @@ struct zone {
 	unsigned long		pages_min, pages_low, pages_high;
 	int			need_balance;
 
+	spinlock_t		lru_lock;	
 	struct list_head	active_list;
 	struct list_head	inactive_list;
 	atomic_t		refill_counter;

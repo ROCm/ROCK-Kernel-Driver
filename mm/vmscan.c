@@ -263,7 +263,7 @@ keep:
 }
 
 /*
- * pagemap_lru_lock is heavily contented.  We relieve it by quickly privatising
+ * zone->lru_lock is heavily contented.  We relieve it by quickly privatising
  * a batch of pages and working on them outside the lock.  Any pages which were
  * not freed will be added back to the LRU.
  *
@@ -291,7 +291,7 @@ shrink_cache(int nr_pages, struct zone *zone,
 	pagevec_init(&pvec);
 
 	lru_add_drain();
-	spin_lock_irq(&_pagemap_lru_lock);
+	spin_lock_irq(&zone->lru_lock);
 	while (max_scan > 0 && nr_pages > 0) {
 		struct page *page;
 		int n = 0;
@@ -317,7 +317,7 @@ shrink_cache(int nr_pages, struct zone *zone,
 			n++;
 		}
 		zone->nr_inactive -= n;
-		spin_unlock_irq(&_pagemap_lru_lock);
+		spin_unlock_irq(&zone->lru_lock);
 
 		if (list_empty(&page_list))
 			goto done;
@@ -330,7 +330,7 @@ shrink_cache(int nr_pages, struct zone *zone,
 		if (nr_pages <= 0 && list_empty(&page_list))
 			goto done;
 
-		spin_lock_irq(&_pagemap_lru_lock);
+		spin_lock_irq(&zone->lru_lock);
 		/*
 		 * Put back any unfreeable pages.
 		 */
@@ -344,13 +344,13 @@ shrink_cache(int nr_pages, struct zone *zone,
 			else
 				add_page_to_inactive_list(zone, page);
 			if (!pagevec_add(&pvec, page)) {
-				spin_unlock_irq(&_pagemap_lru_lock);
+				spin_unlock_irq(&zone->lru_lock);
 				__pagevec_release(&pvec);
-				spin_lock_irq(&_pagemap_lru_lock);
+				spin_lock_irq(&zone->lru_lock);
 			}
 		}
   	}
-	spin_unlock_irq(&_pagemap_lru_lock);
+	spin_unlock_irq(&zone->lru_lock);
 done:
 	pagevec_release(&pvec);
 	return nr_pages;	
@@ -363,9 +363,9 @@ done:
  * processes, from rmap.
  *
  * If the pages are mostly unmapped, the processing is fast and it is
- * appropriate to hold pagemap_lru_lock across the whole operation.  But if
+ * appropriate to hold zone->lru_lock across the whole operation.  But if
  * the pages are mapped, the processing is slow (page_referenced()) so we
- * should drop pagemap_lru_lock around each page.  It's impossible to balance
+ * should drop zone->lru_lock around each page.  It's impossible to balance
  * this, so instead we remove the pages from the LRU while processing them.
  * It is safe to rely on PG_active against the non-LRU pages in here because
  * nobody will play with that bit on a non-LRU page.
@@ -385,7 +385,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 	struct pagevec pvec;
 
 	lru_add_drain();
-	spin_lock_irq(&_pagemap_lru_lock);
+	spin_lock_irq(&zone->lru_lock);
 	while (nr_pages && !list_empty(&zone->active_list)) {
 		page = list_entry(zone->active_list.prev, struct page, lru);
 		prefetchw_prev_lru_page(page, &zone->active_list, flags);
@@ -402,7 +402,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 		list_add(&page->lru, &l_hold);
 		nr_pages--;
 	}
-	spin_unlock_irq(&_pagemap_lru_lock);
+	spin_unlock_irq(&zone->lru_lock);
 
 	while (!list_empty(&l_hold)) {
 		page = list_entry(l_hold.prev, struct page, lru);
@@ -421,7 +421,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 	}
 
 	pagevec_init(&pvec);
-	spin_lock_irq(&_pagemap_lru_lock);
+	spin_lock_irq(&zone->lru_lock);
 	while (!list_empty(&l_inactive)) {
 		page = list_entry(l_inactive.prev, struct page, lru);
 		prefetchw_prev_lru_page(page, &l_inactive, flags);
@@ -431,9 +431,9 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 			BUG();
 		list_move(&page->lru, &zone->inactive_list);
 		if (!pagevec_add(&pvec, page)) {
-			spin_unlock_irq(&_pagemap_lru_lock);
+			spin_unlock_irq(&zone->lru_lock);
 			__pagevec_release(&pvec);
-			spin_lock_irq(&_pagemap_lru_lock);
+			spin_lock_irq(&zone->lru_lock);
 		}
 	}
 	while (!list_empty(&l_active)) {
@@ -444,14 +444,14 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 		BUG_ON(!PageActive(page));
 		list_move(&page->lru, &zone->active_list);
 		if (!pagevec_add(&pvec, page)) {
-			spin_unlock_irq(&_pagemap_lru_lock);
+			spin_unlock_irq(&zone->lru_lock);
 			__pagevec_release(&pvec);
-			spin_lock_irq(&_pagemap_lru_lock);
+			spin_lock_irq(&zone->lru_lock);
 		}
 	}
 	zone->nr_active -= pgdeactivate;
 	zone->nr_inactive += pgdeactivate;
-	spin_unlock_irq(&_pagemap_lru_lock);
+	spin_unlock_irq(&zone->lru_lock);
 	pagevec_release(&pvec);
 
 	KERNEL_STAT_ADD(pgscan, nr_pages_in - nr_pages);

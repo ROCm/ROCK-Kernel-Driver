@@ -828,7 +828,8 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 		printk("zone(%lu): %lu pages.\n", j, size);
 		zone->size = size;
 		zone->name = zone_names[j];
-		zone->lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&zone->lock);
+		spin_lock_init(&zone->lru_lock);
 		zone->zone_pgdat = pgdat;
 		zone->free_pages = 0;
 		zone->need_balance = 0;

@@ -28,7 +28,7 @@
  *
  * Note that the referenced bit, the page->lru list_head and the active,
  * inactive_dirty and inactive_clean lists are protected by the
- * pagemap_lru_lock, and *NOT* by the usual PG_locked bit!
+ * zone->lru_lock, and *NOT* by the usual PG_locked bit!
  *
  * PG_error is set to indicate that an I/O error occurred on this page.
  *
