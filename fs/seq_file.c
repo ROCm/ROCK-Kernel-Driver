@@ -94,8 +94,10 @@ ssize_t seq_read(struct file *file, char *buf, size_t size, loff_t *ppos)
 		m->buf = kmalloc(m->size <<= 1, GFP_KERNEL);
 		if (!m->buf)
 			goto Enomem;
+		m->count = 0;
 	}
 	m->op->stop(m, p);
+	m->count = 0;
 	goto Done;
 Fill:
 	/* they want more? let's try to get some more */
