@@ -136,10 +136,6 @@ if ( vsyscall_ehdr ) {							      \
 #define R_386_GOTPC	10
 #define R_386_NUM	11
 
-/********* Bits for asm-um/delay.h **********/
-
-typedef unsigned long um_udelay_t;
-
 /********* Nothing for asm-um/hardirq.h **********/
 
 /********* Nothing for asm-um/hw_irq.h **********/

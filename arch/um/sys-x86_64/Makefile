@@ -4,7 +4,7 @@
 # Licensed under the GPL
 #
 
-lib-y = bitops.o bugs.o csum-partial.o fault.o mem.o memcpy.o \
+lib-y = bitops.o bugs.o csum-partial.o delay.o fault.o mem.o memcpy.o \
 	ptrace.o ptrace_user.o semaphore.o sigcontext.o signal.o \
 	syscalls.o sysrq.o thunk.o
 
