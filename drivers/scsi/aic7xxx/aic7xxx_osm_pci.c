@@ -166,7 +166,10 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		ahc->flags |= AHC_39BIT_ADDRESSING;
 		ahc->platform_data->hw_dma_mask = mask_39bit;
 	} else {
-		ahc_pci_set_dma_mask(pdev, 0xFFFFFFFF);
+		if (ahc_pci_set_dma_mask(pdev, 0xFFFFFFFF)) {
+			printk(KERN_WARNING "aic7xxx: No suitable DMA available.\n");
+                	return (-ENODEV);
+		}
 		ahc->platform_data->hw_dma_mask = 0xFFFFFFFF;
 	}
 #endif
