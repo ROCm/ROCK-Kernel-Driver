@@ -851,6 +851,10 @@ static void ip6ip6_tnl_link_config(struct ip6_tnl *t)
 	struct net_device *dev = t->dev;
 	struct ip6_tnl_parm *p = &t->parms;
 	struct flowi *fl;
+
+	memcpy(&dev->dev_addr, &p->laddr, sizeof(struct in6_addr));
+	memcpy(&dev->broadcast, &p->raddr, sizeof(struct in6_addr));
+
 	/* Set up flowi template */
 	fl = &t->fl;
 	ipv6_addr_copy(&fl->fl6_src, &p->laddr);
@@ -1093,10 +1097,7 @@ static void ip6ip6_tnl_dev_setup(struct net_device *dev)
 	dev->mtu = ETH_DATA_LEN - sizeof (struct ipv6hdr);
 	dev->flags |= IFF_NOARP;
 	dev->iflink = 0;
-	/* Hmm... MAX_ADDR_LEN is 8, so the ipv6 addresses can't be
-	   copied to dev->dev_addr and dev->broadcast, like the ipv4
-	   addresses were in ipip.c, ip_gre.c and sit.c. */
-	dev->addr_len = 0;
+	dev->addr_len = sizeof(struct in6_addr);
 }
 
 
