@@ -675,7 +675,7 @@ MRPROPER_FILES += \
 	.menuconfig.log \
 	include/asm \
 	.hdepend include/linux/modversions.h \
-	tags TAGS cscope kernel.spec \
+	tags TAGS cscope.out kernel.spec \
 	.tmp*
 
 # Directories removed with 'make mrproper'
