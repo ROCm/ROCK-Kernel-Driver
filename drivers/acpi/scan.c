@@ -706,11 +706,11 @@ acpi_bus_add (
 	switch (type) {
 	case ACPI_BUS_TYPE_DEVICE:
 		result = acpi_bus_get_status(device);
-		if (!result)
-			break;
-		if (!device->status.present) 
+		if (ACPI_FAILURE(result) || !device->status.present) {
 			result = -ENOENT;
-		goto end;
+			goto end;
+		}
+		break;
 	default:
 		STRUCT_TO_INT(device->status) = 0x0F;
 		break;
