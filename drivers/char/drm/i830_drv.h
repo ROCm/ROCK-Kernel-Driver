@@ -78,6 +78,19 @@ typedef struct drm_i830_private {
 	int back_pitch;
 	int depth_pitch;
 	unsigned int cpp;
+
+	int do_boxes;
+	int dma_used;
+
+	int current_page;
+	int page_flipping;
+
+	wait_queue_head_t irq_queue;
+   	atomic_t irq_received;
+   	atomic_t irq_emitted;
+
+	int use_mi_batchbuffer_start;
+
 } drm_i830_private_t;
 
 				/* i830_dma.c */
@@ -88,7 +101,7 @@ extern int  i830_dma_init(struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg);
 extern int  i830_flush_ioctl(struct inode *inode, struct file *filp,
 			     unsigned int cmd, unsigned long arg);
-extern void i830_reclaim_buffers(drm_device_t *dev, pid_t pid);
+extern void i830_reclaim_buffers(struct file *filp);
 extern int  i830_getage(struct inode *inode, struct file *filp, unsigned int cmd,
 			unsigned long arg);
 extern int i830_mmap_buffers(struct file *filp, struct vm_area_struct *vma);
@@ -108,6 +121,23 @@ extern int i830_swap_bufs(struct inode *inode, struct file *filp,
 extern int i830_clear_bufs(struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg);
 
+extern int i830_flip_bufs(struct inode *inode, struct file *filp,
+			 unsigned int cmd, unsigned long arg);
+
+extern int i830_getparam( struct inode *inode, struct file *filp,
+			  unsigned int cmd, unsigned long arg );
+
+extern int i830_setparam( struct inode *inode, struct file *filp,
+			  unsigned int cmd, unsigned long arg );
+
+/* i830_irq.c */
+extern int i830_irq_emit( struct inode *inode, struct file *filp, 
+			  unsigned int cmd, unsigned long arg );
+extern int i830_irq_wait( struct inode *inode, struct file *filp,
+			  unsigned int cmd, unsigned long arg );
+extern int i830_wait_irq(drm_device_t *dev, int irq_nr);
+extern int i830_emit_irq(drm_device_t *dev);
+
 
 #define I830_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)
@@ -119,11 +149,52 @@ extern int i830_clear_bufs(struct inode *inode, struct file *filp,
 #define I830_READ16(reg) 	I830_DEREF16(reg)
 #define I830_WRITE16(reg,val)	do { I830_DEREF16(reg) = val; } while (0)
 
+
+
+#define I830_VERBOSE 0
+
+#define RING_LOCALS	unsigned int outring, ringmask, outcount; \
+                        volatile char *virt;
+
+#define BEGIN_LP_RING(n) do {				\
+	if (I830_VERBOSE)				\
+		printk("BEGIN_LP_RING(%d) in %s\n",	\
+			  n, __FUNCTION__);		\
+	if (dev_priv->ring.space < n*4)			\
+		i830_wait_ring(dev, n*4, __FUNCTION__);		\
+	outcount = 0;					\
+	outring = dev_priv->ring.tail;			\
+	ringmask = dev_priv->ring.tail_mask;		\
+	virt = dev_priv->ring.virtual_start;		\
+} while (0)
+
+
+#define OUT_RING(n) do {					\
+	if (I830_VERBOSE) printk("   OUT_RING %x\n", (int)(n));	\
+	*(volatile unsigned int *)(virt + outring) = n;		\
+        outcount++;						\
+	outring += 4;						\
+	outring &= ringmask;					\
+} while (0)
+
+#define ADVANCE_LP_RING() do {						\
+	if (I830_VERBOSE) printk("ADVANCE_LP_RING %x\n", outring);	\
+	dev_priv->ring.tail = outring;					\
+	dev_priv->ring.space -= outcount * 4;				\
+	I830_WRITE(LP_RING + RING_TAIL, outring);			\
+} while(0)
+
+extern int i830_wait_ring(drm_device_t *dev, int n, const char *caller);
+
+
 #define GFX_OP_USER_INTERRUPT 		((0<<29)|(2<<23))
 #define GFX_OP_BREAKPOINT_INTERRUPT	((0<<29)|(1<<23))
 #define CMD_REPORT_HEAD			(7<<23)
 #define CMD_STORE_DWORD_IDX		((0x21<<23) | 0x1)
 #define CMD_OP_BATCH_BUFFER  ((0x0<<29)|(0x30<<23)|0x1)
+
+#define STATE3D_LOAD_STATE_IMMEDIATE_2      ((0x3<<29)|(0x1d<<24)|(0x03<<16))
+#define LOAD_TEXTURE_MAP0                   (1<<11)
 
 #define INST_PARSER_CLIENT   0x00000000
 #define INST_OP_FLUSH        0x02000000
@@ -139,6 +210,9 @@ extern int i830_clear_bufs(struct inode *inode, struct file *filp,
 #define I830REG_INT_IDENTITY_R	0x020a4
 #define I830REG_INT_MASK_R 	0x020a8
 #define I830REG_INT_ENABLE_R	0x020a0
+
+#define I830_IRQ_RESERVED ((1<<13)|(3<<2))
+
 
 #define LP_RING     		0x2030
 #define HP_RING     		0x2040
@@ -182,6 +256,9 @@ extern int i830_clear_bufs(struct inode *inode, struct file *filp,
 
 #define CMD_OP_DESTBUFFER_INFO	 ((0x3<<29)|(0x1d<<24)|(0x8e<<16)|1)
 
+#define CMD_OP_DISPLAYBUFFER_INFO ((0x0<<29)|(0x14<<23)|2)
+#define ASYNC_FLIP                (1<<22)
+
 #define CMD_3D                          (0x3<<29)
 #define STATE3D_CONST_BLEND_COLOR_CMD   (CMD_3D|(0x1d<<24)|(0x88<<16))
 #define STATE3D_MAP_COORD_SETBIND_CMD   (CMD_3D|(0x1d<<24)|(0x02<<16))
@@ -213,6 +290,11 @@ extern int i830_clear_bufs(struct inode *inode, struct file *filp,
 #define MI_BATCH_BUFFER_END 	(0xA<<23)
 #define MI_BATCH_NON_SECURE	(1)
 
+#define MI_WAIT_FOR_EVENT       ((0x3<<23))
+#define MI_WAIT_FOR_PLANE_A_FLIP      (1<<2) 
+#define MI_WAIT_FOR_PLANE_A_SCANLINES (1<<1) 
+
+#define MI_LOAD_SCAN_LINES_INCL  ((0x12<<23))
 
 #endif
 

@@ -42,16 +42,6 @@ typedef struct drm_gamma_private {
 	drm_map_t *mmio3;
 } drm_gamma_private_t;
 
-#define LOCK_TEST_WITH_RETURN( dev )					\
-do {									\
-	if ( !_DRM_LOCK_IS_HELD( dev->lock.hw_lock->lock ) ||		\
-	     dev->lock.pid != current->pid ) {				\
-		DRM_ERROR( "%s called without lock held\n",		\
-			   __FUNCTION__ );				\
-		return -EINVAL;						\
-	}								\
-} while (0)
-
 				/* gamma_dma.c */
 extern int gamma_dma_init( struct inode *inode, struct file *filp,
 			 unsigned int cmd, unsigned long arg );

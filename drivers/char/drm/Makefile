@@ -7,7 +7,7 @@ tdfx-objs   := tdfx_drv.o
 r128-objs   := r128_drv.o r128_cce.o r128_state.o r128_irq.o
 mga-objs    := mga_drv.o mga_dma.o mga_state.o mga_warp.o mga_irq.o
 i810-objs   := i810_drv.o i810_dma.o
-i830-objs   := i830_drv.o i830_dma.o
+i830-objs   := i830_drv.o i830_dma.o i830_irq.o
 radeon-objs := radeon_drv.o radeon_cp.o radeon_state.o radeon_mem.o radeon_irq.o
 ffb-objs    := ffb_drv.o ffb_context.o
 
