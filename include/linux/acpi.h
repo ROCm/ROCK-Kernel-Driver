@@ -419,6 +419,12 @@ int acpi_pci_irq_init (void);
 
 #endif /*CONFIG_ACPI_PCI*/
 
+#ifdef CONFIG_ACPI_EC
+
+int ec_read(u8 addr, u8 *val);
+int ec_write(u8 addr, u8 val);
+
+#endif /*CONFIG_ACPI_EC*/
 
 #ifdef CONFIG_ACPI
 
