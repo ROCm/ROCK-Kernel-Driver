@@ -183,9 +183,11 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 		}
 
 		uaddr = (unsigned long) hdr.dxferp;
-		if (writing && !access_ok(VERIFY_WRITE, uaddr, bytes))
+		/* writing to device -> reading from vm */
+		if (writing && !access_ok(VERIFY_READ, uaddr, bytes))
 			return -EFAULT;
-		else if (reading && !access_ok(VERIFY_READ, uaddr, bytes))
+		/* reading from device -> writing to vm */
+		else if (reading && !access_ok(VERIFY_WRITE, uaddr, bytes))
 			return -EFAULT;
 
 		/*
