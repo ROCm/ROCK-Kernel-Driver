@@ -120,7 +120,7 @@ xfs_max_file_offset(
 	 */
 
 #if BITS_PER_LONG == 32
-# if defined(HAVE_SECTOR_T)
+# if defined(CONFIG_LBD)
 	ASSERT(sizeof(sector_t) == 8);
 	pagefactor = PAGE_CACHE_SIZE;
 	bitshift = BITS_PER_LONG;
