@@ -29,10 +29,12 @@ obj-$(CONFIG_FRAMEBUFFER_CONSOLE) += fbcon.o font.o
 obj-$(CONFIG_FB_STI)              += sticore.o
 
 # Files generated that shall be removed upon make clean
-clean-files := promcon_tbl.c
+targets := promcon_tbl.c
 
-$(obj)/promcon_tbl.c: $(src)/prom.uni
-	$(objtree)/scripts/conmakehash $< | \
-	sed -e '/#include <[^>]*>/p' -e 's/types/init/' \
-	    -e 's/dfont\(_uni.*\]\)/promfont\1 __initdata/' > $@
+quiet_cmd_conmakehash = CNMKHSH $@
+      cmd_conmakehash = $(objtree)/scripts/conmakehash $< | \
+		sed -e '/\#include <[^>]*>/p' -e 's/types/init/' \
+		-e 's/dfont\(_uni.*\]\)/promfont\1 __initdata/' > $@
 
+$(obj)/promcon_tbl.c: $(src)/prom.uni FORCE
+	$(call if_changed,conmakehash)
