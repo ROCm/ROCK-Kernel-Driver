@@ -17,7 +17,7 @@ clean-files := ../include/linux/compile.h
 
 # dependencies on generated files need to be listed explicitly
 
-$(obj)/version.o: include/linux/compile.h
+$(obj)/version.o $(obj)/kerntypes.o: include/linux/compile.h
 
 # compile.h changes depending on hostname, generation number, etc,
 # so we regenerate it always.
