@@ -2175,6 +2175,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 		goto out;
 	}
 
+	locks_init_lock(&file_lock);
 	switch (lock->lk_type) {
 		case NFS4_READ_LT:
 		case NFS4_READW_LT:
@@ -2192,9 +2193,6 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 	file_lock.fl_pid = lockownerid_hashval(lock->lk_stateowner->so_id);
 	file_lock.fl_file = filp;
 	file_lock.fl_flags = FL_POSIX;
-	file_lock.fl_notify = NULL;
-	file_lock.fl_insert = NULL;
-	file_lock.fl_remove = NULL;
 
 	file_lock.fl_start = lock->lk_offset;
 	if ((lock->lk_length == ~(u64)0) || 
@@ -2210,6 +2208,8 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 	*/
 
 	status = posix_lock_file(filp, &file_lock);
+	if (file_lock.fl_ops && file_lock.fl_ops->fl_release_private)
+		file_lock.fl_ops->fl_release_private(&file_lock);
 	dprintk("NFSD: nfsd4_lock: posix_test_lock passed. posix_lock_file status %d\n",status);
 	switch (-status) {
 	case 0: /* success! */
@@ -2291,6 +2291,7 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	}
 
 	inode = current_fh->fh_dentry->d_inode;
+	locks_init_lock(&file_lock);
 	switch (lockt->lt_type) {
 		case NFS4_READ_LT:
 		case NFS4_READW_LT:
@@ -2376,14 +2377,12 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 
 	filp = stp->st_vfs_file;
 	BUG_ON(!filp);
+	locks_init_lock(&file_lock);
 	file_lock.fl_type = F_UNLCK;
 	file_lock.fl_owner = (fl_owner_t) locku->lu_stateowner;
 	file_lock.fl_pid = lockownerid_hashval(locku->lu_stateowner->so_id);
 	file_lock.fl_file = filp;
 	file_lock.fl_flags = FL_POSIX; 
-	file_lock.fl_notify = NULL;
-	file_lock.fl_insert = NULL;
-	file_lock.fl_remove = NULL;
 	file_lock.fl_start = locku->lu_offset;
 
 	if ((locku->lu_length == ~(u64)0) || LOFF_OVERFLOW(locku->lu_offset, locku->lu_length))
@@ -2396,6 +2395,8 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	*  Try to unlock the file in the VFS.
 	*/
 	status = posix_lock_file(filp, &file_lock); 
+	if (file_lock.fl_ops && file_lock.fl_ops->fl_release_private)
+		file_lock.fl_ops->fl_release_private(&file_lock);
 	if (status) {
 		printk("NFSD: nfs4_locku: posix_lock_file failed!\n");
 		goto out_nfserr;
