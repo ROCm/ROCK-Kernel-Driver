@@ -105,6 +105,10 @@ static int update_vbat;
 /* Reset the registers on init if true */
 static int reset;
 
+/* Chip Type */
+
+static u16 chip_type;
+
 /* Many IT87 constants specified below */
 
 /* Length of ISA address segment */
@@ -592,9 +596,9 @@ static int it87_find(int *address)
 	u16 val;
 
 	superio_enter();
-	val = (superio_inb(DEVID) << 8) |
+	chip_type = (superio_inb(DEVID) << 8) |
 	       superio_inb(DEVID + 1);
-	if (val != IT8712F_DEVID) {
+	if (chip_type != IT8712F_DEVID) {
 		superio_exit();
 		return -ENODEV;
 	}
@@ -691,11 +695,9 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	if (kind <= 0) {
 		i = it87_read_value(new_client, IT87_REG_CHIPID);
 		if (i == 0x90) {
-			u16 val;
 			kind = it87;
-			val = (superio_inb(DEVID) << 8) |
-			superio_inb(DEVID + 1);
-			if (val == IT8712F_DEVID) kind = it8712;
+			if ((is_isa) && (chip_type == IT8712F_DEVID))
+				kind = it8712;
 		}
 		else {
 			if (kind == 0)
