@@ -58,7 +58,7 @@ decode_time3(u32 *p, struct timespec *time)
 static inline u32 *
 decode_fh(u32 *p, struct svc_fh *fhp)
 {
-	int size;
+	unsigned int size;
 	fh_init(fhp, NFS3_FHSIZE);
 	size = ntohl(*p++);
 	if (size > NFS3_FHSIZE)
