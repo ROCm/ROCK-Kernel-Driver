@@ -16,6 +16,10 @@
 #define VERIFY_READ	0
 #define VERIFY_WRITE	1
 
+extern long not_a_user_address;
+#define check_user_ptr(x) \
+	(void) ({ void __user * __userptr = (__typeof__(*(x)) *)&not_a_user_address; __userptr; })
+
 /*
  * The fs value determines whether argument validity checking should be
  * performed or not.  If get_fs() == USER_DS, checking is performed, with
@@ -54,7 +58,7 @@
 	(((segment).seg & (addr | size )) == 0)
 
 #define access_ok(type,addr,size) \
-	__access_ok(((unsigned long)(addr)),(size),get_fs())
+	__access_ok(((__force unsigned long)(addr)),(size),get_fs())
 
 static inline int verify_area(int type, const void __user *addr, unsigned long size)
 {
@@ -116,6 +120,7 @@ extern long __put_user_bad(void);
 #define __put_user_nocheck(x,ptr,size)				\
 ({								\
 	long __pu_err;						\
+	check_user_ptr(ptr);					\
 	__put_user_size((x),(ptr),(size),__pu_err,-EFAULT);	\
 	__pu_err;						\
 })
@@ -123,7 +128,7 @@ extern long __put_user_bad(void);
 #define __put_user_check(x,ptr,size)					\
 ({									\
 	long __pu_err = -EFAULT;					\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
+	void __user *__pu_addr = (ptr);					\
 	if (access_ok(VERIFY_WRITE,__pu_addr,size))			\
 		__put_user_size((x),__pu_addr,(size),__pu_err,-EFAULT);	\
 	__pu_err;							\
@@ -187,6 +192,7 @@ extern long __get_user_bad(void);
 do {									\
 	might_sleep();							\
 	retval = 0;							\
+	check_user_ptr(ptr);						\
 	switch (size) {							\
 	  case 1: __get_user_asm(x,ptr,retval,"lbz",errret); break;	\
 	  case 2: __get_user_asm(x,ptr,retval,"lhz",errret); break;	\
