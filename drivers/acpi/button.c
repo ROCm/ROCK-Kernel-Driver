@@ -146,7 +146,7 @@ static int acpi_button_state_seq_show(struct seq_file *seq, void *offset)
 		seq_printf(seq, "state:      unsupported\n");
 	}
 	else{
-		seq_printf(seq, "state:      %lu\n", state); 
+		seq_printf(seq, "state:      %s\n", (state ? "open" : "closed")); 
 	}
 
 	return 0;
