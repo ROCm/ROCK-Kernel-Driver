@@ -351,7 +351,6 @@ err_out:
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
- *	FIXME: kmap inside spin_lock_irqsave ok?
  *
  *	RETURNS:
  *	Length of response buffer.
@@ -366,7 +365,7 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 		struct scatterlist *sg;
 
 		sg = (struct scatterlist *) cmd->request_buffer;
-		buf = kmap(sg->page) + sg->offset;
+		buf = kmap_atomic(sg->page, KM_USER0) + sg->offset;
 		buflen = sg->length;
 	} else {
 		buf = cmd->request_buffer;
@@ -394,7 +393,7 @@ static inline void ata_scsi_rbuf_put(struct scsi_cmnd *cmd)
 		struct scatterlist *sg;
 
 		sg = (struct scatterlist *) cmd->request_buffer;
-		kunmap(sg->page);
+		kunmap_atomic(sg->page, KM_USER0);
 	}
 }
 
