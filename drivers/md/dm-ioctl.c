@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2001, 2002 Sistina Software (UK) Limited.
+ * Copyright (C) 2004 Red Hat, Inc. All rights reserved.
  *
  * This file is released under the GPL.
  */
@@ -1097,6 +1098,67 @@ static int table_status(struct dm_ioctl *param, size_t param_size)
 	return r;
 }
 
+/*
+ * Pass a message to the target that's at the supplied device offset.
+ */
+static int target_message(struct dm_ioctl *param, size_t param_size)
+{
+	int r, argc;
+	char **argv;
+	struct mapped_device *md;
+	struct dm_table *table;
+	struct dm_target *ti;
+	struct dm_target_msg *tmsg = (void *) param + param->data_start;
+
+	md = find_device(param);
+	if (!md)
+		return -ENXIO;
+
+	r = __dev_status(md, param);
+	if (r)
+		goto out;
+
+	if (tmsg < (struct dm_target_msg *) (param + 1) ||
+	    invalid_str(tmsg->message, (void *) param + param_size)) {
+		DMWARN("Invalid target message parameters.");
+		r = -EINVAL;
+		goto out;
+	}
+
+	r = dm_split_args(&argc, &argv, tmsg->message);
+	if (r) {
+		DMWARN("Failed to split target message parameters");
+		goto out;
+	}
+
+	table = dm_get_table(md);
+	if (!table)
+		goto out_argv;
+
+	if (tmsg->sector >= dm_table_get_size(table)) {
+		DMWARN("Target message sector outside device.");
+		r = -EINVAL;
+		goto out_table;
+	}
+
+	ti = dm_table_find_target(table, tmsg->sector);
+	if (ti->type->message)
+		r = ti->type->message(ti, argc, argv);
+	else {
+		DMWARN("Target type does not support messages");
+		r = -EINVAL;
+	}
+
+ out_table:
+	dm_table_put(table);
+ out_argv:
+	kfree(argv);
+ out:
+	param->data_size = 0;
+	dm_put(md);
+	return r;
+}
+
 /*-----------------------------------------------------------------
  * Implementation of open/close/ioctl on the special char
  * device.
@@ -1123,7 +1185,9 @@ static ioctl_fn lookup_ioctl(unsigned int cmd)
 		{DM_TABLE_DEPS_CMD, table_deps},
 		{DM_TABLE_STATUS_CMD, table_status},
 
-		{DM_LIST_VERSIONS_CMD, list_versions}
+		{DM_LIST_VERSIONS_CMD, list_versions},
+
+		{DM_TARGET_MSG_CMD, target_message}
 	};
 
 	return (cmd >= ARRAY_SIZE(_ioctls)) ? NULL : _ioctls[cmd].fn;

@@ -2,6 +2,7 @@
  * Internal header file for device mapper
  *
  * Copyright (C) 2001, 2002 Sistina Software
+ * Copyright (C) 2004 Red Hat, Inc. All rights reserved.
  *
  * This file is released under the LGPL.
  */
@@ -164,6 +165,8 @@ static inline unsigned long to_bytes(sector_t n)
 {
 	return (n << 9);
 }
+
+int dm_split_args(int *argc, char ***argvp, char *input);
 
 /*
  * The device-mapper can be driven through one of two interfaces;
