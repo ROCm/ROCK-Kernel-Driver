@@ -77,7 +77,10 @@ extern int proc_unknown_nmi_panic(ctl_table *, int, struct file *,
 static int maxolduid = 65535;
 static int minolduid;
 
-static int ngroups_max = NGROUPS_MAX;
+int ngroups_max = __NGROUPS_MAX;
+EXPORT_SYMBOL(ngroups_max);
+static int min_ngroups = 16;
+static int max_ngroups = __NGROUPS_MAX;
 
 #ifdef CONFIG_KMOD
 extern char modprobe_path[];
@@ -609,9 +612,12 @@ static ctl_table kern_table[] = {
 		.ctl_name	= KERN_NGROUPS_MAX,
 		.procname	= "ngroups_max",
 		.data		= &ngroups_max,
-		.maxlen		= sizeof (int),
-		.mode		= 0444,
-		.proc_handler	= &proc_dointvec,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &min_ngroups,
+		.extra2		= &max_ngroups,
 	},
 #if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_X86)
 	{

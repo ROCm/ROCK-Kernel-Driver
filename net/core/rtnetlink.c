@@ -218,7 +218,9 @@ static int rtnetlink_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 		RTA_PUT(skb, IFLA_MASTER, sizeof(master), &master);
 	}
 
-	if (dev->get_stats) {
+	/* Don't call get_stats when the device is in low power state */
+	if (dev->get_stats &&
+	    (!dev->class_dev.dev || !dev->class_dev.dev->power_state)) { 
 		unsigned long *stats = (unsigned long*)dev->get_stats(dev);
 		if (stats) {
 			struct rtattr  *a;

@@ -15,7 +15,7 @@
  * be seen in entry 128, 0x8408. This corresponds to x^0 + x^5 + x^12.
  * Add the implicit x^16, and you have the standard CRC-CCITT.
  */
-u16 const crc_ccitt_table[256] = {
+__u16 const crc_ccitt_table[256] = {
 	0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
 	0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
 	0x1081, 0x0108, 0x3393, 0x221a, 0x56a5, 0x472c, 0x75b7, 0x643e,
@@ -57,7 +57,7 @@ EXPORT_SYMBOL(crc_ccitt_table);
  *	@buffer - data pointer
  *	@len - number of bytes in the buffer
  */
-u16 crc_ccitt(u16 crc, u8 const *buffer, size_t len)
+__u16 crc_ccitt(__u16 crc, __u8 const *buffer, size_t len)
 {
 	while (len--)
 		crc = crc_ccitt_byte(crc, *buffer++);
