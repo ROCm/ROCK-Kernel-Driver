@@ -174,7 +174,7 @@ xfs_revalidate_inode(
 		inode->i_rdev = 0;
 	} else {
 		xfs_dev_t dev = ip->i_df.if_u2.if_rdev;
-		inode->i_rdev = XFS_DEV_TO_DEVT(dev);
+		inode->i_rdev = MKDEV(sysv_major(dev) & 0x1ff, sysv_minor(dev));
 	}
 	inode->i_blksize = PAGE_CACHE_SIZE;
 	inode->i_generation = ip->i_d.di_gen;

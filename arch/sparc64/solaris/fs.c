@@ -28,21 +28,6 @@
 
 #include "conv.h"
 
-static inline u32 R4_DEV(dev_t DEV)
-{
-	return MINOR(DEV) | (MAJOR(DEV) << 18);
-}
-
-static inline unsigned R4_MAJOR(u32 DEV)
-{
-	return (DEV >> 18) & 0x3fff;
-}
-
-static inline unsigned R4_MINOR(u32 DEV)
-{
-	return DEV & 0x3ffff;
-}
-
 #define R3_VERSION	1
 #define R4_VERSION	2
 
@@ -96,15 +81,17 @@ struct sol_stat64 {
 
 static inline int putstat(struct sol_stat *ubuf, struct kstat *kbuf)
 {
-	if (kbuf->size > MAX_NON_LFS)
+	if (kbuf->size > MAX_NON_LFS ||
+	    !sysv_valid_dev(kbuf->dev) ||
+	    !sysv_valid_dev(kbuf->rdev))
 		return -EOVERFLOW;
-	if (put_user (R4_DEV(kbuf->dev), &ubuf->st_dev)	||
+	if (put_user (sysv_encode_dev(kbuf->dev), &ubuf->st_dev)	||
 	    __put_user (kbuf->ino, &ubuf->st_ino)		||
 	    __put_user (kbuf->mode, &ubuf->st_mode)		||
 	    __put_user (kbuf->nlink, &ubuf->st_nlink)	||
 	    __put_user (kbuf->uid, &ubuf->st_uid)		||
 	    __put_user (kbuf->gid, &ubuf->st_gid)		||
-	    __put_user (R4_DEV(kbuf->rdev), &ubuf->st_rdev)	||
+	    __put_user (sysv_encode_dev(kbuf->rdev), &ubuf->st_rdev)	||
 	    __put_user (kbuf->size, &ubuf->st_size)		||
 	    __put_user (kbuf->atime.tv_sec, &ubuf->st_atime.tv_sec)	||
 	    __put_user (kbuf->atime.tv_nsec, &ubuf->st_atime.tv_nsec)	||
@@ -121,13 +108,15 @@ static inline int putstat(struct sol_stat *ubuf, struct kstat *kbuf)
 
 static inline int putstat64(struct sol_stat64 *ubuf, struct kstat *kbuf)
 {
-	if (put_user (R4_DEV(kbuf->dev), &ubuf->st_dev)	||
+	if (!sysv_valid_dev(kbuf->dev) || !sysv_valid_dev(kbuf->rdev))
+		return -EOVERFLOW;
+	if (put_user (sysv_encode_dev(kbuf->dev), &ubuf->st_dev)	||
 	    __put_user (kbuf->ino, &ubuf->st_ino)		||
 	    __put_user (kbuf->mode, &ubuf->st_mode)		||
 	    __put_user (kbuf->nlink, &ubuf->st_nlink)	||
 	    __put_user (kbuf->uid, &ubuf->st_uid)		||
 	    __put_user (kbuf->gid, &ubuf->st_gid)		||
-	    __put_user (R4_DEV(kbuf->rdev), &ubuf->st_rdev)	||
+	    __put_user (sysv_encode_dev(kbuf->rdev), &ubuf->st_rdev)	||
 	    __put_user (kbuf->size, &ubuf->st_size)		||
 	    __put_user (kbuf->atime.tv_sec, &ubuf->st_atime.tv_sec)	||
 	    __put_user (kbuf->atime.tv_nsec, &ubuf->st_atime.tv_nsec)	||
@@ -261,8 +250,8 @@ asmlinkage int solaris_mknod(u32 path, u32 mode, s32 dev)
 		(int (*)(const char *,int,unsigned))SYS(mknod);
 	int major, minor;
 
-	if ((major = R4_MAJOR(dev)) > 255 || 
-	    (minor = R4_MINOR(dev)) > 255) return -EINVAL;
+	if ((major = sysv_major(dev)) > 255 || 
+	    (minor = sysv_minor(dev)) > 255) return -EINVAL;
 	return sys_mknod((const char *)A(path), mode, old_encode_dev(MKDEV(major,minor)));
 }
 
@@ -415,6 +404,8 @@ static int report_statvfs(struct vfsmount *mnt, struct inode *inode, u32 buf)
 		if (j > 15) j = 15;
 		if (IS_RDONLY(inode)) i = 1;
 		if (mnt->mnt_flags & MNT_NOSUID) i |= 2;
+		if (!sysv_valid_dev(inode->i_sb->s_dev))
+			return -EOVERFLOW;
 		if (put_user (s.f_bsize, &ss->f_bsize)		||
 		    __put_user (0, &ss->f_frsize)		||
 		    __put_user (s.f_blocks, &ss->f_blocks)	||
@@ -423,7 +414,7 @@ static int report_statvfs(struct vfsmount *mnt, struct inode *inode, u32 buf)
 		    __put_user (s.f_files, &ss->f_files)	||
 		    __put_user (s.f_ffree, &ss->f_ffree)	||
 		    __put_user (s.f_ffree, &ss->f_favail)	||
-		    __put_user (R4_DEV(inode->i_sb->s_dev), &ss->f_fsid) ||
+		    __put_user (sysv_encode_dev(inode->i_sb->s_dev), &ss->f_fsid) ||
 		    __copy_to_user (ss->f_basetype,p,j)		||
 		    __put_user (0, (char *)&ss->f_basetype[j])	||
 		    __put_user (s.f_namelen, &ss->f_namemax)	||
@@ -449,6 +440,8 @@ static int report_statvfs64(struct vfsmount *mnt, struct inode *inode, u32 buf)
 		if (j > 15) j = 15;
 		if (IS_RDONLY(inode)) i = 1;
 		if (mnt->mnt_flags & MNT_NOSUID) i |= 2;
+		if (!sysv_valid_dev(inode->i_sb->s_dev))
+			return -EOVERFLOW;
 		if (put_user (s.f_bsize, &ss->f_bsize)		||
 		    __put_user (0, &ss->f_frsize)		||
 		    __put_user (s.f_blocks, &ss->f_blocks)	||
@@ -457,7 +450,7 @@ static int report_statvfs64(struct vfsmount *mnt, struct inode *inode, u32 buf)
 		    __put_user (s.f_files, &ss->f_files)	||
 		    __put_user (s.f_ffree, &ss->f_ffree)	||
 		    __put_user (s.f_ffree, &ss->f_favail)	||
-		    __put_user (R4_DEV(inode->i_sb->s_dev), &ss->f_fsid) ||
+		    __put_user (sysv_encode_dev(inode->i_sb->s_dev), &ss->f_fsid) ||
 		    __copy_to_user (ss->f_basetype,p,j)		||
 		    __put_user (0, (char *)&ss->f_basetype[j])	||
 		    __put_user (s.f_namelen, &ss->f_namemax)	||
