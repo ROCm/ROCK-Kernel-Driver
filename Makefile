@@ -713,7 +713,6 @@ mrproper: clean archmrproper
 		-type f -print | xargs rm -f
 	$(call cmd,mrproper)
 	+@$(call descend,scripts,mrproper)
-	+@$(call descend,Documentation/DocBook,mrproper)
 
 # distclean - remove all temporaries left behind by patch, vi, emacs etc.
 #
