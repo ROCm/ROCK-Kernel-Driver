@@ -280,6 +280,9 @@ config COMPAT
 	depends on IA32_SUPPORT
 	default y
 
+config IA64_MCA_RECOVERY
+	tristate "MCA recovery from errors other than TLB."
+
 config PERFMON
 	bool "Performance monitor support"
 	help
